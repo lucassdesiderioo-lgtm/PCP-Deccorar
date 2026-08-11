@@ -1,0 +1,37 @@
+# Dependências
+node_modules/
+
+# Banco de dados de produção
+*.db
+*.db-wal
+*.db-shm
+
+# Segredos
+.env
+.env.*
+!.env.example
+.session_secret
+
+# Backups
+backups/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Arquivos temporários
+*.tmp
+*.temp
+
+# Backups manuais antigos
+*.bak
+*.bak-*
+
+# Sistema operacional / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# PDFs de entrada - dados operacionais temporarios
+lotes/

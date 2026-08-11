@@ -1,0 +1,177 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revisão — Operador</title>
+<style>
+  :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--red:#f85149;--blue:#4493f8}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
+  h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
+  .wrap{max-width:900px;margin:0 auto;padding:18px}
+  .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:26px;text-align:center;margin-bottom:16px}
+  .banner.rev{background:#0f2233;border-color:#1d4f78}.banner.ok{background:#10331c;border-color:#1f6f37}.banner.err{background:#3a1513;border-color:#7d2820}
+  .bt{font-size:26px;font-weight:750}.bs{font-size:15px;color:var(--muted);margin-top:6px}
+  .timer{font-size:52px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:8px;letter-spacing:2px}
+  #scan{display:block;width:100%;max-width:520px;margin:0 auto 14px;padding:14px;
+        font-size:17px;font-family:ui-monospace,monospace;text-align:center;letter-spacing:1px;
+        background:var(--panel);border:2px solid var(--line);border-radius:12px;color:var(--txt)}
+  #scan:focus{outline:none;border-color:var(--amber)}
+  .stats{font-size:13px;color:var(--muted);text-align:center;margin-bottom:14px}.stats b{color:var(--txt)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .tile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;text-align:left;cursor:pointer;color:var(--txt)}
+  .tile.active{border-color:var(--amber);background:#231d06}
+  .tc{font-family:ui-monospace,monospace;font-weight:700;font-size:15px;word-break:break-all}
+  .tcor{font-size:12px;color:var(--muted);margin:2px 0 8px}.tp{font-size:20px;font-weight:800;color:var(--blue)}
+  .muted{color:var(--muted);padding:20px}
+  .link{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
+  header{padding-right:200px}
+  .modoTag{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .modoNome{font-size:13px;font-weight:800;letter-spacing:.5px;padding:7px 13px;border-radius:999px}
+  .btModo{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer}
+  body.m-hoje .modoNome{background:#3a1513;color:#ff8b80;border:1px solid #7d2820}
+  body.m-hoje header{border-bottom:3px solid var(--red)}
+  body.m-est .modoNome{background:#0f2233;color:#7cc0ff;border:1px solid #1d4f78}
+  body.m-est header{border-bottom:3px solid var(--blue)}
+  .tf{font-size:12px;color:var(--muted);margin-top:4px}
+  .tile.falta{border-color:#7d2820}
+  #escolha{position:fixed;inset:0;background:#0e1217;z-index:9998;display:none;
+           flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:22px}
+  #escolha h2{margin:0 0 8px;font-size:22px}
+  .esc{width:100%;max-width:520px;padding:34px 26px;border-radius:20px;border:2px solid;
+       font-size:22px;font-weight:800;cursor:pointer;text-align:center;background:var(--panel);color:var(--txt)}
+  .esc small{display:block;font-size:14px;font-weight:500;color:var(--muted);margin-top:8px}
+  .esc.hoje{border-color:#7d2820;background:#2a1210}
+  .esc.est{border-color:#1d4f78;background:#0f2233}
+</style></head><body>
+<header><div class="mark">R</div><div><h1>Estação de Revisão</h1><div class="sub">Bipe ao começar · bipe ao terminar</div></div>
+<div class="modoTag"><span class="modoNome" id="modoNome">—</span>
+<button class="btModo" id="btModo">Trocar</button></div></header>
+<div id="escolha">
+  <h2>O que você vai revisar agora?</h2>
+  <button class="esc hoje" data-m="hoje">PEDIDOS DE HOJE<small>Peças com venda feita, entrega no mesmo dia</small></button>
+  <button class="esc est" data-m="estoque">PRODUÇÃO PRA ESTOQUE<small>Sem venda ainda — repondo o estoque</small></button>
+</div>
+<div class="wrap">
+  <div class="banner" id="banner"></div>
+  <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters"
+   spellcheck="false" inputmode="text" placeholder="bipe aqui">
+  <div class="stats" id="stats"></div>
+  <div class="grid" id="tiles"></div>
+</div>
+<script>
+let SKUS=[], PROD={}, emRev=null, tick=null;
+var MODO=null, DIA=[], METAS=[];
+const $=s=>document.querySelector(s);
+async function load(){
+  if(!MODO) return;
+  SKUS=await (await fetch('/api/skus')).json();
+  const prod=await (await fetch('/api/producao')).json();
+  PROD={}; for(const r of prod){ (PROD[r.codigo]=PROD[r.codigo]||{pedido:0,feito:0}); PROD[r.codigo].pedido+=r.qtd; PROD[r.codigo].feito+=r.produzido; }
+  if(MODO==='hoje') DIA=await (await fetch('/api/revisao/dia')).json();
+  else METAS=await (await fetch('/api/revisao/metas')).json();
+  renderTiles(); loadStats();
+}
+function skuInfo(c){ return SKUS.find(s=>s.codigo===c); }
+function renderTiles(){
+  var html='';
+  if(MODO==='hoje'){
+    html=DIA.map(function(d){ var act=emRev&&emRev.codigo===d.codigo;
+      return '<button class="tile '+(act?'active':'')+'" data-cod="'+d.codigo+'"><div class="tc">'+d.codigo+'</div><div class="tcor">'+(d.cor||'')+'</div><div class="tp">'+d.produzido+'/'+d.qtd+'</div><div class="tf">'+(d.falta>0?'faltam '+d.falta:'completo')+'</div></button>';
+    }).join('')||'<div class="muted">Nenhuma produção lançada para hoje. Lance no Admin.</div>';
+  } else {
+    html=METAS.map(function(m){ var act=emRev&&emRev.codigo===m.codigo;
+      return '<button class="tile '+(act?'active':'')+(m.falta>0?' falta':'')+'" data-cod="'+m.codigo+'"><div class="tc">'+m.codigo+'</div><div class="tcor">'+(m.cor||'')+'</div><div class="tp">'+m.estoque+'/'+m.alvo+'</div><div class="tf">'+(m.falta>0?'faltam '+m.falta:'meta atingida')+'</div></button>';
+    }).join('')||'<div class="muted">Nenhum SKU com meta. Defina o alvo no Admin.</div>';
+  }
+  $('#tiles').innerHTML=html;
+}
+function setModo(m){
+  MODO=m; try{ localStorage.setItem('rev_modo',m); }catch(e){}
+  document.body.classList.toggle('m-hoje',m==='hoje');
+  document.body.classList.toggle('m-est',m==='estoque');
+  $('#modoNome').textContent=(m==='hoje'?'PEDIDOS DE HOJE':'PRA ESTOQUE');
+  $('#escolha').style.display='none';
+  banner('','Pronto','Bipe o código pra iniciar a revisão');
+  load(); setTimeout(function(){ $('#scan').focus(); },100);
+}
+async function loadStats(){
+  const st=await (await fetch('/api/revisao/hoje')).json();
+  const tot=st.reduce((a,b)=>a+b.qtd,0);
+  $('#stats').innerHTML = 'Hoje: <b>'+tot+'</b> revisadas' + (st.length? (' · '+st.map(x=>x.codigo+': '+x.qtd+' (méd '+fmt(x.tmedio)+')').join(' · ')) : '');
+}
+function fmt(seg){ seg=+seg||0; const m=Math.floor(seg/60),s=seg%60; return (m?m+'m':'')+s+'s'; }
+function mmss(ms){ const t=Math.floor(ms/1000),m=Math.floor(t/60),s=t%60; return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'); }
+function banner(kind,title,sub,timer){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(timer?'<div class="timer" id="timer">00:00</div>':''); }
+function toggle(codigo){
+  codigo=(codigo||'').trim().toUpperCase(); if(!codigo) return;
+  if(!emRev){ const info=skuInfo(codigo);
+    if(!info){ banner('err','SKU não cadastrado',codigo+' — cadastre no Admin antes'); beep(false); return; }
+    var fora=(MODO==='hoje')&&!DIA.some(function(d){return d.codigo===codigo&&d.falta>0;});
+    emRev={codigo:codigo,cor:info.cor||'',inicio:Date.now(),fora:fora}; renderTiles();
+    banner('rev','Revisando '+codigo, fora?'⚠ NÃO está nos pedidos de hoje — vai contar como estoque':((info.cor||'')+' — bipe de novo ao terminar'), true);
+    clearInterval(tick); tick=setInterval(()=>{ const t=$('#timer'); if(emRev&&t) t.textContent=mmss(Date.now()-emRev.inicio); },250);
+    beep(true);
+  } else { finish(); }
+}
+async function finish(){
+  const cur=emRev; clearInterval(tick); tick=null; emRev=null; renderTiles();
+  const seg=Math.round((Date.now()-cur.inicio)/1000);
+  try{
+    const r=await (await fetch('/api/revisao',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({codigo:cur.codigo,segundos:seg,modo:(cur.fora?'estoque':MODO),inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})})).json();
+    if(r.erro){ banner('err','Erro',r.erro); beep(false); return; }
+    var det=(MODO==='hoje'&&!cur.fora)?(' · pedido do dia '+r.feito+'/'+r.pedido):' · foi pra estoque';
+    banner('ok','Revisada ✓ ('+fmt(seg)+')', cur.codigo+' · estoque agora '+r.estoque+det);
+    beep(true); load();
+  }catch(e){ banner('err','Falha de conexão',String(e)); beep(false); }
+}
+$('#tiles').addEventListener('click',e=>{ const b=e.target.closest('.tile'); if(b) toggle(b.dataset.cod); });
+const scan=$('#scan');
+const keep=()=>{ if(document.activeElement!==scan) scan.focus(); };
+scan.addEventListener('blur',()=>setTimeout(keep,50));
+document.addEventListener('click',e=>{ if(!e.target.closest('button,a')) keep(); });
+var tmr=null;
+function processa(){
+  var v=(scan.value||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+  scan.value='';
+  if(v.length>=8) toggle(v);
+}
+scan.addEventListener('keydown',function(e){
+  if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); clearTimeout(tmr); processa(); }
+});
+scan.addEventListener('input',function(){
+  clearTimeout(tmr);
+  tmr=setTimeout(processa,220);
+});
+var buf='', ult=0;
+document.addEventListener('keydown',function(e){
+  if(e.target===scan) return;
+  var ag=e.target;
+  if(ag&&(ag.tagName==='INPUT'||ag.tagName==='TEXTAREA')) return;
+  var t=Date.now();
+  if(t-ult>1200) buf='';
+  ult=t;
+  if(e.key==='Enter'||e.key==='Tab'){
+    var lim=buf.replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+    if(lim.length>=8){ e.preventDefault(); buf=''; toggle(lim); }
+    else buf='';
+    return;
+  }
+  if(e.key&&e.key.length===1) buf+=e.key;
+});
+scan.focus();
+function beep(ok){ try{const a=new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=ok?820:240;g.gain.value=.05;o.start();setTimeout(()=>{o.stop();a.close();},ok?100:220);}catch(e){} }
+document.getElementById('escolha').addEventListener('click',function(e){
+  var b=e.target.closest('.esc'); if(b) setModo(b.dataset.m);
+});
+document.getElementById('btModo').addEventListener('click',function(){
+  if(emRev){ alert('Termine a revisão em andamento antes de trocar de modo.'); return; }
+  document.getElementById('escolha').style.display='flex';
+});
+(function(){ var m=null; try{ m=localStorage.getItem('rev_modo'); }catch(e){}
+  if(m==='hoje'||m==='estoque') setModo(m);
+  else document.getElementById('escolha').style.display='flex';
+})();
+/* AUTO_REFRESH_OP */ setInterval(()=>{ if(!emRev&&MODO) load(); }, 3000);
+</script><script src="/nav.js"></script>
+</body></html>

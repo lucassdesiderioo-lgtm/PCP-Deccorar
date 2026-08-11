@@ -1,0 +1,80 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Embalagem — etiqueta de venda</title>
+<style>
+  :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--red:#f85149;--blue:#4493f8}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
+  h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
+  .link{margin-left:auto;font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
+  .wrap{max-width:820px;margin:0 auto;padding:18px}
+  .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:26px;margin-bottom:16px}
+  .banner.cfm{background:#0f2233;border-color:#1d4f78}.banner.ok{background:#10331c;border-color:#1f6f37}.banner.err{background:#3a1513;border-color:#7d2820}.banner.warn{background:#3a2e10;border-color:#7a6017}
+  .bt{font-size:26px;font-weight:750}.bs{font-size:15px;color:var(--muted);margin-top:6px;line-height:1.5}.bs b{color:var(--txt)}
+  .sku{font-family:ui-monospace,monospace;background:#0b0f14;border:1px solid var(--line);padding:2px 8px;border-radius:6px}
+  .acts{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+  button{cursor:pointer;border:0;border-radius:10px;font-weight:700;font-size:14px;padding:12px 18px}
+  .primary{background:var(--amber);color:#1a1300}.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  #scan{position:absolute;left:-9999px;opacity:0}
+  .stats{display:flex;gap:12px;margin-bottom:8px}
+  .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .stat .n{font-size:28px;font-weight:800}.stat .l{font-size:12px;color:var(--muted);text-transform:uppercase}
+  .stat.pend .n{color:var(--amber)}.stat.emb .n{color:var(--green)}
+  iframe{position:fixed;left:-9999px;width:0;height:0;border:0}
+</style></head><body>
+<header><div class="mark">B</div><div><h1>Embalagem — etiqueta de venda</h1><div class="sub">Bipe o SKU · confira · bipe de novo pra imprimir</div></div>
+<a class="link" href="/painel">Painel</a></header>
+<div class="wrap">
+  <div class="stats">
+    <div class="stat pend"><div class="n" id="nPend">0</div><div class="l">Pendentes</div></div>
+    <div class="stat emb"><div class="n" id="nEmb">0</div><div class="l">Embaladas hoje</div></div>
+  </div>
+  <div class="banner" id="banner"></div>
+  <input id="scan" autocomplete="off">
+</div>
+<iframe id="pr"></iframe>
+<script>
+const $=s=>document.querySelector(s);
+let confirmar=null, last={c:null,t:0};
+function banner(kind,title,sub,acts){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(acts?'<div class="acts">'+acts+'</div>':''); }
+function idle(){ confirmar=null; banner('','Pronto','Bipe o SKU da embalagem pra puxar a próxima venda.'); }
+async function stats(){
+  const d=await (await fetch('/api/lote')).json();
+  $('#nPend').textContent=d.filter(x=>x.estagio==='pendente').length;
+  $('#nEmb').textContent=d.filter(x=>x.estagio==='embalado').length;
+}
+async function scanSku(sku){
+  sku=(sku||'').trim().toUpperCase(); if(!sku) return;
+  const now=Date.now(); if(last.c===sku && now-last.t<700) return; last={c:sku,t:now};
+  // 2º bip do mesmo SKU = confirma
+  if(confirmar && confirmar.codigo && confirmar.codigo.toUpperCase()===sku){ imprimir(); return; }
+  const r=await (await fetch('/api/proximo/'+encodeURIComponent(sku))).json();
+  if(!r.cadastrado){ banner('err','SKU não cadastrado', '<span class="sku">'+sku+'</span> — cadastre no Admin.'); beep(false); confirmar=null; return; }
+  if(r.estoque!==null && r.estoque<=0){ banner('err','SEM ESTOQUE — bloqueado', '<span class="sku">'+sku+'</span> não passou pela produção. Não dá pra imprimir a venda.'); beep(false); confirmar=null; return; }
+  if(!r.pedido){ if(r.total>0){ banner('warn','Todas embaladas', 'Todas as vendas de <span class="sku">'+sku+'</span> já foram embaladas.'); } else { banner('err','SKU não está no lote', 'Nenhuma venda de <span class="sku">'+sku+'</span> hoje. Já subiu o PDF do Mercado Livre?'); } beep(false); confirmar=null; return; }
+  confirmar=r.pedido;
+  banner('cfm','Confira: '+r.pedido.buyer, 'NF <b>'+(r.pedido.nf||'—')+'</b> · '+(r.pedido.city||'')+' · <span class="sku">'+sku+'</span><br>Estoque: '+r.estoque+' · pendentes desse SKU: '+r.pendentes+'<br><b>Bipe de novo</b> ou clique pra imprimir a etiqueta de venda.',
+    '<button class="primary" onclick="imprimir()">Imprimir etiqueta de venda</button><button class="ghost" onclick="idle()">Cancelar</button>');
+  beep(true);
+}
+async function imprimir(){
+  const o=confirmar; if(!o) return; confirmar=null;
+  try{
+    const r=await (await fetch('/api/embalar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:o.id})})).json();
+    if(r.erro){ banner('err','Não deu pra embalar', r.erro); beep(false); stats(); return; }
+    const fr=$('#pr'); fr.onload=()=>{ try{fr.contentWindow.print();}catch(e){ window.open('/api/print/'+o.id,'_blank'); } }; fr.src='/api/print/'+o.id;
+    banner('ok','Impresso ✓ — '+o.buyer, 'NF <b>'+(o.nf||'—')+'</b> · <span class="sku">'+(o.codigo||'')+'</span> · estoque agora: '+r.estoque);
+    beep(true); stats();
+  }catch(e){ banner('err','Falha de conexão', String(e)); beep(false); }
+}
+const scan=$('#scan');
+const keep=()=>{ if(document.activeElement!==scan) scan.focus(); };
+scan.addEventListener('blur',()=>setTimeout(keep,50));
+document.addEventListener('click',e=>{ if(!e.target.closest('button,a')) keep(); });
+scan.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=scan.value.trim(); scan.value=''; if(!v && confirmar){ imprimir(); return; } scanSku(v); } });
+scan.focus();
+function beep(ok){ try{const a=new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=ok?820:240;g.gain.value=.05;o.start();setTimeout(()=>{o.stop();a.close();},ok?100:220);}catch(e){} }
+idle(); stats(); setInterval(stats,4000);
+</script><script src="/nav.js"></script>
+</body></html>

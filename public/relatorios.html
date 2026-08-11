@@ -1,0 +1,79 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relatórios de produtividade</title>
+<style>
+  :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--blue:#4493f8;--violet:#a371f7}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  header{padding:16px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
+  h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
+  .links{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  .link{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
+  .wrap{max-width:1000px;margin:0 auto;padding:20px}
+  .filtro{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:16px;display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+  .filtro label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+  .filtro input{padding:9px;border-radius:8px;border:1px solid var(--line);background:#0b0f14;color:var(--txt)}
+  .filtro button{background:var(--amber);color:#1a1300;border:0;border-radius:8px;font-weight:700;padding:10px 16px;cursor:pointer}
+  .filtro .qk{background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:500;padding:9px 12px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .kpi .n{font-size:26px;font-weight:800}.kpi .l{font-size:12px;color:var(--muted);text-transform:uppercase;margin-top:4px}
+  .kpi.rev .n{color:var(--blue)}.kpi.emb .n{color:var(--violet)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:18px}
+  .card h3{margin:0 0 12px;font-size:13px;color:var(--muted);text-transform:uppercase}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:right;padding:10px;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  th{font-size:11px;color:var(--muted);text-transform:uppercase}
+  td.code{font-family:ui-monospace,monospace;font-weight:600}
+  canvas{max-width:100%}
+</style></head><body>
+<header><div class="mark">R</div><div><h1>Relatórios de produtividade</h1><div class="sub">Tempos e volume de revisão e embalagem</div></div>
+<div class="links"><a class="link" href="/painel">Painel</a><a class="link" href="/">Admin</a></div></header>
+<div class="wrap">
+  <div class="filtro">
+    <div><label>De</label><input type="date" id="de"></div>
+    <div><label>Até</label><input type="date" id="ate"></div>
+    <button onclick="carregar()">Aplicar</button>
+    <button class="qk" onclick="atalho(0)">Hoje</button>
+    <button class="qk" onclick="atalho(6)">7 dias</button>
+    <button class="qk" onclick="atalho(29)">30 dias</button>
+  </div>
+  <div class="cards">
+    <div class="kpi rev"><div class="n" id="kRevQ">0</div><div class="l">Revisadas · méd <span id="kRevT">0s</span></div></div>
+    <div class="kpi emb"><div class="n" id="kEmbQ">0</div><div class="l">Embaladas · méd <span id="kEmbT">0s</span></div></div>
+  </div>
+  <div class="card"><h3>Evolução por dia</h3><canvas id="graf" height="90"></canvas></div>
+  <div class="card"><h3>Por SKU</h3>
+    <table><thead><tr><th>SKU</th><th>Revisadas</th><th>Tempo méd. revisão</th><th>Embaladas</th><th>Tempo méd. embalagem</th></tr></thead>
+    <tbody id="corpo"></tbody></table>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+function fmt(s){ s=+s||0; const m=Math.floor(s/60); return (m?m+'m':'')+(s%60)+'s'; }
+function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function atalho(dias){ const a=new Date(); const d=new Date(); d.setDate(d.getDate()-dias); $('#de').value=iso(d); $('#ate').value=iso(a); carregar(); }
+let chart=null;
+async function carregar(){
+  const de=$('#de').value, ate=$('#ate').value;
+  const qs='?de='+de+'&ate='+ate;
+  const resumo=await (await fetch('/api/rel/resumo'+qs)).json();
+  $('#kRevQ').textContent=resumo.rev_qtd; $('#kRevT').textContent=fmt(resumo.rev_tmedio);
+  $('#kEmbQ').textContent=resumo.emb_qtd; $('#kEmbT').textContent=fmt(resumo.emb_tmedio);
+  const sku=await (await fetch('/api/rel/sku'+qs)).json();
+  $('#corpo').innerHTML = sku.map(r=>'<tr><td class="code">'+r.codigo+'</td><td>'+r.rev_qtd+'</td><td>'+fmt(r.rev_tmedio)+'</td><td>'+r.emb_qtd+'</td><td>'+fmt(r.emb_tmedio)+'</td></tr>').join('')
+    || '<tr><td colspan="5" style="color:#8b97a5;padding:20px;text-align:center">Sem dados no período.</td></tr>';
+  const dia=await (await fetch('/api/rel/dia'+qs)).json();
+  const labels=dia.map(d=>{const p=d.data.split('-');return p[2]+'/'+p[1];});
+  const ctx=$('#graf');
+  if(chart) chart.destroy();
+  chart=new Chart(ctx,{type:'bar',data:{labels,datasets:[
+    {label:'Revisadas',data:dia.map(d=>d.rev),backgroundColor:'#4493f8'},
+    {label:'Embaladas',data:dia.map(d=>d.emb),backgroundColor:'#a371f7'}]},
+    options:{responsive:true,scales:{x:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'}},y:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'},beginAtZero:true}},plugins:{legend:{labels:{color:'#e6edf3'}}}}});
+}
+atalho(6);
+</script><script src="/nav.js"></script>
+</body></html>

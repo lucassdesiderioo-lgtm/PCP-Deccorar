@@ -1,0 +1,150 @@
+const crypto=require('crypto'), fs=require('fs'), path=require('path');
+
+const AREAS=[
+  {id:'admin',       nome:'Admin (controle geral)'},
+  {id:'painel',      nome:'Painel do dia'},
+  {id:'relatorios',  nome:'Relatorios'},
+  {id:'necessidade', nome:'Necessidade (ABC)'},
+  {id:'operador',    nome:'Revisao'},
+  {id:'montagem',    nome:'Montagem'},
+  {id:'embalagem',   nome:'Embalagem'},
+  {id:'expedicao',   nome:'Expedicao'},
+  {id:'carregamento',nome:'Carregamento'}
+];
+
+const TELAS={
+  '/':'admin','/admin':'admin','/index.html':'admin',
+  '/painel':'painel','/painel.html':'painel',
+  '/relatorios':'relatorios','/relatorios.html':'relatorios',
+  '/necessidade':'necessidade','/necessidade.html':'necessidade',
+  '/operador':'operador','/operador.html':'operador',
+  '/montagem':'montagem','/montagem.html':'montagem',
+  '/embalagem':'embalagem','/embalagem.html':'embalagem',
+  '/expedicao':'expedicao','/expedicao.html':'expedicao',
+  '/carregamento':'carregamento','/carregamento.html':'carregamento'
+};
+
+const API_ADMIN=['/api/teste','/api/usuarios','/api/estoque','/api/alvo','/api/backup'];
+const LIVRE=['/login','/login.html','/nav.js','/favicon.ico'];
+
+module.exports=function(app, db){
+  db.exec("CREATE TABLE IF NOT EXISTS usuarios(id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, salt TEXT NOT NULL, pin_hash TEXT NOT NULL, areas TEXT NOT NULL DEFAULT '', ativo INTEGER NOT NULL DEFAULT 1, criado_em TEXT DEFAULT (datetime('now','localtime')))");
+
+  const arqSeg=path.join(__dirname,'.session_secret');
+  let SEG;
+  try{ SEG=fs.readFileSync(arqSeg,'utf8').trim(); }
+  catch(e){ SEG=crypto.randomBytes(32).toString('hex'); fs.writeFileSync(arqSeg,SEG,{mode:0o600}); }
+
+  const hash=(pin,salt)=>crypto.scryptSync(String(pin),salt,32).toString('hex');
+  const assina=v=>crypto.createHmac('sha256',SEG).update(v).digest('hex').slice(0,32);
+
+  function criar(nome,pin,areas){
+    const salt=crypto.randomBytes(16).toString('hex');
+    return db.prepare('INSERT INTO usuarios(nome,salt,pin_hash,areas) VALUES(?,?,?,?)')
+      .run(nome,salt,hash(pin,salt),(areas||[]).join(','));
+  }
+
+  if(db.prepare('SELECT COUNT(*) c FROM usuarios').get().c===0){
+    criar('Administrador','1234',AREAS.map(a=>a.id));
+    console.log('[auth] usuario inicial: Administrador / PIN 1234 - TROQUE ASSIM QUE ENTRAR');
+  }
+
+  function lerSessao(req){
+    const raw=req.headers.cookie||'';
+    const par=raw.split(';').map(s=>s.trim()).find(s=>s.startsWith('sess='));
+    if(!par) return null;
+    const val=decodeURIComponent(par.slice(5));
+    const i=val.lastIndexOf('.');
+    if(i<0) return null;
+    const corpo=val.slice(0,i), sig=val.slice(i+1);
+    if(assina(corpo)!==sig) return null;
+    try{
+      const o=JSON.parse(Buffer.from(corpo,'base64').toString('utf8'));
+      const u=db.prepare('SELECT id,nome,areas,ativo FROM usuarios WHERE id=?').get(o.id);
+      if(!u||!u.ativo) return null;
+      return {id:u.id,nome:u.nome,areas:u.areas.split(',').filter(Boolean)};
+    }catch(e){ return null; }
+  }
+
+  const tem=(u,a)=>u&&(u.areas.includes('admin')||u.areas.includes(a));
+
+  const falhas={};
+  function bloqueado(id){
+    const f=falhas[id];
+    return f&&f.n>=5&&(Date.now()-f.t)<60000;
+  }
+
+  app.use(function(req,res,next){
+    const p=req.path;
+    if(LIVRE.includes(p)||p.startsWith('/api/auth/')) return next();
+    const u=lerSessao(req);
+    req.usuario=u;
+    const area=TELAS[p];
+    const api=p.startsWith('/api/');
+    if(!u){
+      if(api) return res.status(401).json({erro:'nao_logado'});
+      if(area) return res.redirect('/login?r='+encodeURIComponent(req.originalUrl));
+      return next();
+    }
+    if(area&&!tem(u,area)) return res.status(403).send('<body style="font-family:system-ui;padding:40px"><h2>Sem permissao</h2><p>Voce nao tem acesso a esta tela.</p><a href="/login">Entrar com outro usuario</a></body>');
+    if(api&&API_ADMIN.some(x=>p.startsWith(x))&&!tem(u,'admin')) return res.status(403).json({erro:'sem_permissao'});
+    next();
+  });
+
+  app.get('/login',(req,res)=>res.sendFile(path.join(__dirname,'public','login.html')));
+
+  app.get('/api/auth/pessoas',(req,res)=>
+    res.json(db.prepare('SELECT id,nome FROM usuarios WHERE ativo=1 ORDER BY nome').all()));
+
+  app.post('/api/auth/login',(req,res)=>{
+    const {id,pin}=req.body||{};
+    if(bloqueado(id)) return res.status(429).json({erro:'Muitas tentativas. Aguarde 1 minuto.'});
+    const u=db.prepare('SELECT * FROM usuarios WHERE id=? AND ativo=1').get(id);
+    if(!u||hash(pin,u.salt)!==u.pin_hash){
+      const f=falhas[id]||{n:0,t:0};
+      falhas[id]={n:(Date.now()-f.t<60000?f.n:0)+1,t:Date.now()};
+      return res.status(401).json({erro:'PIN incorreto'});
+    }
+    delete falhas[id];
+    const corpo=Buffer.from(JSON.stringify({id:u.id})).toString('base64');
+    res.setHeader('Set-Cookie','sess='+encodeURIComponent(corpo+'.'+assina(corpo))+'; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax');
+    res.json({ok:true,nome:u.nome,areas:u.areas.split(',').filter(Boolean)});
+  });
+
+  app.post('/api/auth/logout',(req,res)=>{
+    res.setHeader('Set-Cookie','sess=; Path=/; Max-Age=0');
+    res.json({ok:true});
+  });
+
+  app.get('/api/auth/eu',(req,res)=>{
+    const u=lerSessao(req);
+    res.json(u?{logado:true,...u}:{logado:false});
+  });
+
+  app.get('/api/auth/areas',(req,res)=>res.json(AREAS));
+
+  app.get('/api/usuarios',(req,res)=>
+    res.json(db.prepare('SELECT id,nome,areas,ativo FROM usuarios ORDER BY nome').all()));
+
+  app.post('/api/usuarios',(req,res)=>{
+    const {id,nome,pin,areas,ativo}=req.body||{};
+    if(!nome) return res.status(400).json({erro:'nome obrigatorio'});
+    const lista=(areas||[]).join(',');
+    if(id){
+      db.prepare('UPDATE usuarios SET nome=?,areas=?,ativo=? WHERE id=?').run(nome,lista,ativo?1:0,id);
+      if(pin&&String(pin).length>=4){
+        const salt=crypto.randomBytes(16).toString('hex');
+        db.prepare('UPDATE usuarios SET salt=?,pin_hash=? WHERE id=?').run(salt,hash(pin,salt),id);
+      }
+    } else {
+      if(!pin||String(pin).length<4) return res.status(400).json({erro:'PIN de 4 digitos obrigatorio'});
+      criar(nome,pin,areas);
+    }
+    res.json({ok:true});
+  });
+
+  app.delete('/api/usuarios/:id',(req,res)=>{
+    db.prepare('UPDATE usuarios SET ativo=0 WHERE id=?').run(req.params.id);
+    res.json({ok:true});
+  });
+};

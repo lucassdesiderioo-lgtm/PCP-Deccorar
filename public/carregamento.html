@@ -1,0 +1,74 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carregamento</title>
+<style>
+  :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--red:#f85149;--violet:#a371f7}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
+  h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
+  .link{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
+  .links{margin-left:auto;display:flex;gap:8px}
+  .wrap{max-width:820px;margin:0 auto;padding:18px}
+  .stats{display:flex;gap:12px;margin-bottom:14px}
+  .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
+  .stat .n{font-size:34px;font-weight:800}.stat .l{font-size:12px;color:var(--muted);text-transform:uppercase}
+  .stat.car .n{color:var(--green)}.stat.fal .n{color:var(--amber)}
+  .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:26px;text-align:center;margin-bottom:14px}
+  .banner.ok{background:#10331c;border-color:#1f6f37}.banner.err{background:#3a1513;border-color:#7d2820}.banner.warn{background:#3a2e10;border-color:#7a6017}
+  .bt{font-size:26px;font-weight:780}.bs{font-size:15px;color:var(--muted);margin-top:6px}.bs b{color:var(--txt)}
+  #scan{position:absolute;left:-9999px;opacity:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .card h3{margin:0;padding:12px 14px;font-size:13px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--line)}
+  .row{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:14px;align-items:center}
+  .row .c{font-family:ui-monospace,monospace;color:var(--muted);font-size:12px}
+  .row .who{flex:1}
+  .btn{border:0;border-radius:9px;font-weight:700;padding:11px 16px;cursor:pointer}
+  .conf{background:var(--amber);color:#1a1300;margin-top:12px}
+  .empty{padding:22px;text-align:center;color:var(--green)}
+</style></head><body>
+<header><div class="mark">C</div><div><h1>Carregamento</h1><div class="sub">Bipe a etiqueta de venda ao pôr no carro</div></div>
+<div class="links"><a class="link" href="/embalagem">Expedição</a><a class="link" href="/painel">Painel</a></div></header>
+<div class="wrap">
+  <div class="stats">
+    <div class="stat car"><div class="n" id="nCar">0</div><div class="l">Carregados</div></div>
+    <div class="stat fal"><div class="n" id="nFal">0</div><div class="l">Faltam carregar</div></div>
+  </div>
+  <div class="banner" id="banner"><div class="bt">Pronto</div><div class="bs">Bipe o QR ou código de barras da etiqueta de venda.</div></div>
+  <input id="scan" autocomplete="off">
+  <button class="btn conf" onclick="conferir()" style="width:100%">✓ Conferir carga</button>
+  <div class="card" style="margin-top:14px"><h3>Faltam carregar</h3><div id="lista"></div></div>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+let last={c:null,t:0};
+function banner(kind,title,sub){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'; }
+async function bip(code){
+  code=(code||'').trim(); if(!code) return;
+  const now=Date.now(); if(last.c===code && now-last.t<600) return; last={c:code,t:now};
+  const r=await (await fetch('/api/carregar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})})).json();
+  if(r.ok){ banner('ok','Carregado ✓ — '+r.pedido.buyer,'NF <b>'+(r.pedido.nf||'—')+'</b> · <span class="c">'+(r.pedido.codigo||'')+'</span> · Carregados <b>'+r.carregados+'</b> de '+r.total); beep(true); }
+  else if(r.motivo==='duplicado'){ banner('err','⚠ JÁ CARREGADO','Esse pacote ('+r.pedido.buyer+' · NF '+(r.pedido.nf||'—')+') já foi carregado. Cuidado com duplicidade.'); beep(false); }
+  else { banner('err','Etiqueta não reconhecida','Lido: '+code+'. Bipe a etiqueta de VENDA (não o SKU do produto).'); beep(false); }
+  carregar();
+}
+async function carregar(){
+  const d=await (await fetch('/api/carregamento')).json();
+  $('#nCar').textContent=d.carregados; $('#nFal').textContent=d.faltam.length;
+  $('#lista').innerHTML = d.faltam.length ? d.faltam.map(f=>'<div class="row"><span class="who">'+f.buyer+' <span class="c">NF '+(f.nf||'—')+' · '+(f.codigo||'')+'</span></span></div>').join('') : '<div class="empty">✅ Nada faltando — tudo carregado!</div>';
+}
+async function conferir(){
+  const d=await (await fetch('/api/carregamento')).json();
+  if(d.total===0){ banner('warn','Sem lote hoje','Nada foi embalado hoje ainda.'); return; }
+  if(d.faltam.length===0){ banner('ok','Carga completa ✓','Pode fechar o carro. '+d.carregados+' pacotes conferidos.'); beep(true); }
+  else{ banner('err','Faltam '+d.faltam.length+' no carro','NÃO feche ainda: '+d.faltam.slice(0,6).map(f=>f.buyer).join(', ')+(d.faltam.length>6?'…':'')); beep(false); }
+}
+const scan=$('#scan'); const keep=()=>{ if(document.activeElement!==scan) scan.focus(); };
+scan.addEventListener('blur',()=>setTimeout(keep,50));
+document.addEventListener('click',e=>{ if(!e.target.closest('button,a')) keep(); });
+scan.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=scan.value.trim(); scan.value=''; bip(v); } });
+scan.focus();
+function beep(ok){ try{const a=new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=ok?820:240;g.gain.value=.05;o.start();setTimeout(()=>{o.stop();a.close();},ok?100:220);}catch(e){} }
+carregar(); setInterval(carregar,4000);
+</script><script src="/nav.js"></script>
+</body></html>

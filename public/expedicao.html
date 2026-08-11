@@ -1,0 +1,61 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expedição — leitura de PDFs</title>
+<style>
+  body{margin:0;background:#0e1217;color:#e6edf3;font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  header{padding:16px 22px;border-bottom:1px solid #262d37;display:flex;gap:12px;align-items:center}
+  .mark{width:32px;height:32px;border-radius:8px;background:#ffb800;display:grid;place-items:center;color:#1a1300;font-weight:800}
+  .wrap{max-width:900px;margin:0 auto;padding:22px}
+  .drop{border:2px dashed #262d37;border-radius:14px;padding:34px;text-align:center;background:#161b22;cursor:pointer}
+  .drop:hover{border-color:#ffb800}
+  .res{margin:16px 0;font-size:14px;color:#8b97a5}
+  .res b{color:#e6edf3}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:10px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid #262d37}
+  th{font-size:11px;color:#8b97a5;text-transform:uppercase}
+  td.c{font-family:ui-monospace,monospace}
+  button{cursor:pointer;border:0;border-radius:8px;font-weight:600;padding:8px 14px}
+  .pr{background:#0b0f14;border:1px solid #262d37;color:#e6edf3;font-size:12px}
+  .link{margin-left:auto;font-size:13px;color:#8b97a5;text-decoration:none;border:1px solid #262d37;padding:8px 12px;border-radius:8px}
+  iframe{position:fixed;left:-9999px;width:0;height:0;border:0}
+</style></head><body>
+<header><div class="mark">X</div><div><b>Expedição — leitura de PDFs</b><div style="font-size:12px;color:#8b97a5">Suba um ou vários PDFs do Mercado Livre</div></div>
+<a class="link" href="/painel">Painel</a></header>
+<div class="wrap">
+  <div class="drop" id="drop">📄 Clique ou solte um ou mais PDFs do Mercado Livre aqui
+    <input type="file" id="file" accept="application/pdf" multiple style="display:none"></div>
+  <div class="res" id="res"></div>
+  <table id="tbl" style="display:none"><thead><tr><th>#</th><th>SKU</th><th>Comprador</th><th>NF</th><th>Estágio</th><th></th></tr></thead><tbody id="corpo"></tbody></table>
+</div>
+<iframe id="pr"></iframe>
+<script>
+const $=s=>document.querySelector(s);
+$('#drop').onclick=()=>$('#file').click();
+$('#file').onchange=e=>{ upMany(e.target.files); e.target.value=''; };
+['dragover','dragenter'].forEach(ev=>$('#drop').addEventListener(ev,e=>e.preventDefault()));
+$('#drop').addEventListener('drop',e=>{e.preventDefault(); upMany(e.dataTransfer.files);});
+function b64(f){ return new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f);}); }
+async function upMany(fileList){
+  const files=[...fileList].filter(f=>/pdf/i.test(f.type)||/\.pdf$/i.test(f.name));
+  if(!files.length) return;
+  let totNov=0,totRep=0,totSem=0,totPdf=0,ok=0;
+  for(let i=0;i<files.length;i++){
+    $('#res').innerHTML='Lendo '+(i+1)+' de '+files.length+': <b>'+files[i].name+'</b>…';
+    try{
+      const j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
+      if(j.erro){ console.error(files[i].name, j.erro); continue; }
+      totNov+=j.novos; totRep+=j.repetidas; totSem+=j.sem_sku; totPdf+=j.total; ok++;
+    }catch(e){ console.error(files[i].name,e); }
+  }
+  $('#res').innerHTML='<b>'+ok+' PDF(s) processado(s)</b> · '+totNov+' vendas adicionadas · '+totPdf+' no total · '+totRep+' repetidas ignoradas · '+totSem+' sem SKU';
+  lista();
+}
+async function lista(){
+  const d=await (await fetch('/api/lote')).json();
+  $('#tbl').style.display=d.length?'table':'none';
+  $('#corpo').innerHTML=d.map(r=>'<tr><td>'+r.id+'</td><td class="c">'+(r.codigo||'<span style=color:#f85149>sem SKU</span>')+'</td><td>'+r.buyer+'</td><td>'+(r.nf||'—')+'</td><td>'+r.estagio+'</td><td><button class="pr" onclick="imp('+r.id+')">imprimir</button></td></tr>').join('');
+}
+function imp(id){ const fr=$('#pr'); fr.onload=()=>{ try{fr.contentWindow.print();}catch(e){ window.open('/api/print/'+id,'_blank'); } }; fr.src='/api/print/'+id; }
+lista();
+</script><script src="/nav.js"></script>
+</body></html>
