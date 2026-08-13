@@ -1,37 +1,22 @@
-# Dependências
-node_modules/
-
-# Banco de dados de produção
-*.db
-*.db-wal
-*.db-shm
-
-# Segredos
-.env
-.env.*
-!.env.example
+# Segredos - NUNCA versionar
 .session_secret
+.env
 
-# Backups
+# Banco (PINs dos funcionarios, dados de clientes)
+dados.db
+dados.db-shm
+dados.db-wal
+dados.db.*
 backups/
 
-# Logs
-*.log
-npm-debug.log*
-
-# Arquivos temporários
-*.tmp
-*.temp
-
-# Backups manuais antigos
-*.bak
-*.bak-*
-
-# Sistema operacional / editor
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
-
-# PDFs de entrada - dados operacionais temporarios
+# PDFs do Mercado Livre (dados pessoais de compradores)
 lotes/
+
+node_modules/
+
+# Backups manuais
+*.bak-*
+*.bak
+
+*.log
+.DS_Store

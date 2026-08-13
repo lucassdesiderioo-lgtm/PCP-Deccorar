@@ -14,6 +14,7 @@ app.post('/api/skus', (req,res)=>{
   db.prepare(`INSERT INTO skus (codigo,descricao,cor,estoque,alvo) VALUES (?,?,?,?,?)
     ON CONFLICT(codigo) DO UPDATE SET descricao=excluded.descricao,cor=excluded.cor,estoque=excluded.estoque,alvo=excluded.alvo`)
     .run(codigo.trim().toUpperCase(),descricao,cor,+estoque||0,+alvo||0);
+  try{ db.prepare("UPDATE lote SET estagio='pendente' WHERE estagio='bloqueado' AND codigo=?").run(codigo.trim().toUpperCase()); }catch(e){}
   res.json({ok:true});
 });
 app.delete('/api/skus/:codigo',(req,res)=>{ db.prepare('DELETE FROM skus WHERE codigo=?').run(req.params.codigo); res.json({ok:true}); });
@@ -36,7 +37,7 @@ app.post('/api/producao',(req,res)=>{
 app.get('/api/producao',(req,res)=> res.json(db.prepare(`SELECT p.*, s.estoque, s.alvo, s.cor FROM producao p
   LEFT JOIN skus s ON s.codigo=p.codigo WHERE p.data=date('now','localtime') ORDER BY p.id DESC`).all()));
 
-// baixa da revisão: registra tempo + abate do pedido + soma no estoque
+// revisao: registra tempo e joga na fila de embalagem
 app.post('/api/revisao',(req,res)=>{
   const {codigo,segundos=0,inicio=null,fim=null}=req.body||{};
   if(!codigo) return res.status(400).json({erro:'codigo'});
@@ -44,15 +45,9 @@ app.post('/api/revisao',(req,res)=>{
   if(!db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(cod)) return res.status(404).json({erro:'SKU não cadastrado: '+cod});
   db.transaction(()=>{
     db.prepare('INSERT INTO revisao (codigo,inicio,fim,segundos) VALUES (?,?,?,?)').run(cod,inicio,fim,Math.round(+segundos||0));
-    db.prepare('UPDATE skus SET estoque=estoque+1 WHERE codigo=?').run(cod);
     const modo=(req.body&&req.body.modo)==='estoque'?'estoque':'hoje';
-    let abatido=false;
-    if(modo==='hoje'){
-      const row=db.prepare(`SELECT id FROM producao WHERE codigo=? AND data=date('now','localtime') AND produzido<qtd ORDER BY id LIMIT 1`).get(cod);
-      if(row){ db.prepare('UPDATE producao SET produzido=produzido+1 WHERE id=?').run(row.id); abatido=true; }
-    }
     db.prepare(`UPDATE revisao SET modo=? WHERE id=(SELECT MAX(id) FROM revisao)`).run(modo);
-    res.locals.abatido=abatido; res.locals.modo=modo;
+    db.prepare('INSERT INTO fila (codigo,modo) VALUES (?,?)').run(cod,modo);
   })();
   const est=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(cod);
   const prog=db.prepare(`SELECT COALESCE(SUM(qtd),0) pedido, COALESCE(SUM(produzido),0) feito FROM producao WHERE codigo=? AND data=date('now','localtime')`).get(cod);
@@ -81,4 +76,12 @@ app.get('/status',(req,res)=> res.json({ok:true,hora:new Date().toISOString()}))
 app.get('/admin',(req,res)=> res.sendFile(path.join(__dirname,'public','index.html')));
 require('./modo_route')(app, db);
 require('./teste_route')(app, db);
+require('./cruz_route')(app, db);
+require('./cont_route')(app, db);
+require('./etq_route')(app, db);
+require('./dev_route')(app, db);
+app.get('/devolucao',(req,res)=> res.sendFile(path.join(__dirname,'public','devolucao.html')));
+require('./cad_route')(app, db);
+require('./ger_route')(app, db);
+require('./st_route')(app, db);
 app.listen(PORT,()=> console.log('Servidor na porta '+PORT));

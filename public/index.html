@@ -50,11 +50,21 @@
   <div class="tab" data-t="nec">Necessidade (ABC)</div>
   <div class="tab" data-t="rel">Relatórios</div>
   <div class="tab" data-t="usr">Pessoas &amp; Acessos</div>
-  <div class="tab" data-t="tst">Modo teste</div>
+  <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="blq" id="tabBlq">Bloqueados</div><div class="tab" data-t="tst">Modo teste</div>
 </div>
 <div class="wrap">
   <!-- PRODUÇÃO -->
   <div id="v-prod">
+<div id="boxUp" style="display:none;margin-bottom:16px">
+  <div id="upTit" style="cursor:pointer;background:#161b22;border:1px solid #262d37;border-radius:12px;padding:12px 16px;font-weight:700;font-size:14px">Subir PDFs do Mercado Livre</div>
+  <div id="upCorpo" style="display:none;background:#161b22;border:1px solid #262d37;border-top:0;border-radius:0 0 12px 12px;padding:16px">
+    <div id="drop" style="border:2px dashed #3a4351;border-radius:12px;padding:26px;text-align:center;cursor:pointer;color:#8b97a5">Clique ou solte os PDFs aqui
+      <input type="file" id="file" accept="application/pdf" multiple style="display:none"></div>
+    <div id="res" style="margin-top:12px;font-size:14px"></div>
+    <div id="cruz" style="margin-top:12px"></div>
+  </div>
+</div>
+
     <div class="card"><div style="font-weight:700;margin-bottom:10px">Selecione os SKUs e as quantidades a produzir</div>
       <div id="sellist"></div>
       <div class="row-actions"><button class="primary" onclick="lancar()">Lançar para produção</button>
@@ -81,7 +91,22 @@
   <div id="v-nec" class="hide"><iframe id="ifNec" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
   <div id="v-rel" class="hide"><iframe id="ifRel" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
   <!-- CADASTRO -->
-  <div id="v-tst" class="hide">
+  <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide">
+  <div class="card">
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <input id="ctBipe" placeholder="bipe as pecas aqui" style="flex:1;min-width:260px;padding:14px;font-size:17px;font-family:ui-monospace,monospace;text-align:center">
+      <button class="ghost" onclick="ctNova()">Nova contagem</button>
+      <button class="primary" onclick="ctLancar()">Lancar no estoque (soma)</button><button class="ghost" onclick="ctAjustar()">Ajustar (substitui)</button>
+    </div>
+    <div id="ctUlt" style="margin-top:12px;font-size:15px"></div>
+  </div>
+  <div class="card">
+    <table><thead><tr><th>SKU</th><th>Sistema</th><th>Contado</th><th>Diferenca</th></tr></thead><tbody id="ctLista"></tbody></table>
+  </div>
+  <div class="card" id="ctAlertas"></div>
+</div>
+
+<div id="v-blq" class="hide"><div class="card"><div id="blqEstado"></div><table><thead><tr><th>SKU</th><th>Volumes</th><th></th></tr></thead><tbody id="blqLista"></tbody></table></div></div><div id="v-tst" class="hide">
   <div class="card">
     <div id="tstEstado" style="font-size:16px;margin-bottom:14px"></div>
     <div class="row-actions" id="tstBotoes"></div>
@@ -133,6 +158,16 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   var vu=$("#v-usr"); if(vu) vu.classList.toggle("hide",t.dataset.t!=="usr");
   var vt=$("#v-tst"); if(vt) vt.classList.toggle("hide",t.dataset.t!=="tst");
   if(t.dataset.t==="tst") carregarTeste();
+  var vb=$("#v-blq"); if(vb) vb.classList.toggle("hide",t.dataset.t!=="blq");
+  if(t.dataset.t==="blq") carregarBloq();
+  var vc=$("#v-ct"); if(vc) vc.classList.toggle("hide",t.dataset.t!=="ct");
+  var vp=$("#v-pb"); if(vp) vp.classList.toggle("hide",t.dataset.t!=="pb");
+  if(t.dataset.t==="pb") carregarProb();
+  var vd=$("#v-dv"); if(vd) vd.classList.toggle("hide",t.dataset.t!=="dv");
+  if(t.dataset.t==="dv") carregarDev();
+  var vcd=$("#v-cd"); if(vcd) vcd.classList.toggle("hide",t.dataset.t!=="cd");
+  if(t.dataset.t==="cd") carregarCad();
+  if(t.dataset.t==="ct"){ ctLista(); setTimeout(function(){var b=document.getElementById("ctBipe"); if(b) b.focus();},100); }
   if(t.dataset.t==="usr") carregarUsr();
   var ifn=$("#ifNec"), ifr=$("#ifRel");
   if(t.dataset.t==="nec" && ifn && !ifn.dataset.l){ ifn.src="/necessidade"; ifn.dataset.l=1; }
@@ -355,6 +390,316 @@ document.addEventListener("click",function(e){
   var b=e.target.closest("[data-etq]");
   if(b) etiqueta(b.dataset.etq);
 });
+
+async function carregarBloq(){
+var l=[]; try{ l=await (await fetch("/api/bloqueados")).json(); }catch(e){}
+var n=0; for(var i=0;i<l.length;i++) n+=l[i].qtd;
+var tb=document.getElementById("tabBlq");
+if(tb) tb.textContent = n ? ("Bloqueados ("+n+")") : "Bloqueados";
+var est=document.getElementById("blqEstado"), lis=document.getElementById("blqLista");
+if(!est||!lis) return;
+if(!l.length){ est.innerHTML="<b>Nenhum volume bloqueado.</b>"; lis.innerHTML=""; return; }
+est.innerHTML="<b>"+n+" volume(s) bloqueado(s)</b> - nao imprimem nem carregam.";
+var h="";
+for(var j=0;j<l.length;j++){
+var cod=String(l[j].codigo||"");
+h+="<tr><td><b>"+(cod||"(sem SKU)")+"</b></td><td>"+l[j].qtd+"</td><td>";
+h+= cod ? ("<button class=ghost data-cadbloq="+cod+">Cadastrar</button>") : "corrigir no ML";
+h+="</td></tr>";
+}
+lis.innerHTML=h;
+}
+document.addEventListener("click",function(e){
+var b=e.target.closest("[data-cadbloq]");
+if(!b) return;
+var ct=document.querySelector(".tab[data-t=cad]");
+if(ct) ct.click();
+var ci=document.getElementById("codigo");
+if(ci){ ci.value=b.getAttribute("data-cadbloq"); ci.focus(); }
+window.scrollTo(0,0);
+});
+setInterval(carregarBloq,30000);
+carregarBloq();
+
+fetch('/api/auth/eu').then(function(r){return r.json();}).then(function(u){
+  if(!u.logado) return;
+  var pode = u.areas.indexOf('expedicao')>=0 || u.areas.indexOf('admin')>=0;
+  if(pode) document.getElementById('boxUp').style.display='block';
+});
+document.getElementById('upTit').onclick=function(){
+  var c=document.getElementById('upCorpo');
+  c.style.display = c.style.display==='none' ? 'block' : 'none';
+};
+document.getElementById('drop').onclick=function(){ document.getElementById('file').click(); };
+document.getElementById('file').onchange=function(e){ upMany(e.target.files); e.target.value=''; };
+function b64(f){ return new Promise(function(r){ var fr=new FileReader(); fr.onload=function(){r(fr.result);}; fr.readAsDataURL(f); }); }
+async function upMany(fl){
+  var files=[].slice.call(fl).filter(function(f){ return /pdf/i.test(f.type)||/\.pdf$/i.test(f.name); });
+  if(!files.length) return;
+  var nov=0,rep=0,bloq=0,ok=0;
+  for(var i=0;i<files.length;i++){
+    document.getElementById('res').innerHTML='Lendo '+(i+1)+' de '+files.length+'...';
+    try{
+      var j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
+      if(j.erro) continue;
+      nov+=j.novos; rep+=j.repetidas; bloq+=(j.bloqueados||0); ok++;
+    }catch(e){}
+  }
+  var msg='<b>'+ok+' PDF(s)</b> - '+nov+' vendas novas, '+rep+' repetidas';
+  if(bloq>0) msg+=', <b style="color:#ff6b6b">'+bloq+' BLOQUEADAS</b> (SKU fora do cadastro)';
+  document.getElementById('res').innerHTML=msg;
+  verCruz();
+}
+async function verCruz(){
+  var l=[]; try{ l=await (await fetch('/api/cruzamento')).json(); }catch(e){}
+  if(!l.length){ document.getElementById('cruz').innerHTML=''; return; }
+  var u=0,r=0,h='<table style="width:100%;font-size:13px;margin-top:8px"><tr style="color:#8b97a5"><th align=left>SKU</th><th>Vendas</th><th>Estoque</th><th>Urgente</th><th>Repor</th></tr>';
+  for(var i=0;i<l.length;i++){
+    u+=l[i].urgente; r+=l[i].reposicao;
+    h+='<tr><td>'+l[i].codigo+'</td><td align=center>'+l[i].vendas+'</td><td align=center>'+l[i].estoque+'</td><td align=center style="color:#ff6b6b"><b>'+l[i].urgente+'</b></td><td align=center style="color:#4493f8">'+l[i].reposicao+'</td></tr>';
+  }
+  h+='</table><button id="btAplicar" style="margin-top:12px;background:#ffb800;border:0;border-radius:8px;padding:10px 18px;font-weight:700;cursor:pointer">Lancar '+u+' urgentes + '+r+' reposicao na producao</button>';
+  document.getElementById('cruz').innerHTML=h;
+  document.getElementById('btAplicar').onclick=async function(){
+    var j=await (await fetch('/api/cruzamento/aplicar',{method:'POST'})).json();
+    document.getElementById('cruz').innerHTML='<b style="color:#2ea043">Lancado: '+j.urgentes+' urgentes e '+j.reposicao+' de reposicao.</b>';
+  };
+}
+verCruz();
+
+var CTSES='';
+function ctSessao(){
+  if(!CTSES){ try{ CTSES=localStorage.getItem('ct_sessao')||''; }catch(e){} }
+  if(!CTSES){ CTSES='C'+Date.now(); try{ localStorage.setItem('ct_sessao',CTSES); }catch(e){} }
+  return CTSES;
+}
+function ctNova(){
+  if(!confirm('Comecar uma contagem nova? A atual sera descartada.')) return;
+  fetch('/api/contagem/'+ctSessao(),{method:'DELETE'}).then(function(){
+    CTSES=''; try{ localStorage.removeItem('ct_sessao'); }catch(e){}
+    ctSessao(); ctLista();
+    document.getElementById('ctUlt').innerHTML='';
+  });
+}
+async function ctBipar(cod){
+  if(!cod||cod.length<3) return;
+  var r=await (await fetch('/api/contagem/bipe',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({codigo:cod,sessao:ctSessao()})})).json();
+  var u=document.getElementById('ctUlt');
+  if(r.cadastrado) u.innerHTML='<b style="color:#2ea043">'+r.codigo+'</b> - contado '+r.contado+' (sistema: '+r.estoque+')';
+  else u.innerHTML='<b style="color:#ff6b6b">'+r.codigo+' NAO EXISTE NO CADASTRO</b> - etiqueta errada?';
+  ctLista();
+}
+async function ctLista(){
+  var d={linhas:[],desconhecidos:[],naoContados:[]};
+  try{ d=await (await fetch('/api/contagem/'+ctSessao())).json(); }catch(e){}
+  var h='';
+  for(var i=0;i<d.linhas.length;i++){
+    var l=d.linhas[i];
+    var cor = l.dif===0 ? '#8b97a5' : (l.dif>0?'#4493f8':'#ff6b6b');
+    var sinal = l.dif>0?'+':'';
+    h+='<tr><td><b>'+l.codigo+'</b></td><td align=center>'+l.sistema+'</td><td align=center><b>'+l.contado+'</b></td><td align=center style="color:'+cor+'"><b>'+sinal+l.dif+'</b></td></tr>';
+  }
+  document.getElementById('ctLista').innerHTML=h||'<tr><td colspan=4 style="color:#8b97a5;padding:16px">Nenhuma peca contada ainda.</td></tr>';
+  var a='';
+  if(d.desconhecidos.length){
+    a+='<div style="color:#ff6b6b;font-weight:700;margin-bottom:8px">Codigos que nao estao no cadastro:</div>';
+    for(var j=0;j<d.desconhecidos.length;j++) a+='<div>'+d.desconhecidos[j].codigo+' - '+d.desconhecidos[j].qtd+'x</div>';
+    a+='<div style="margin-top:10px;font-size:13px;color:#8b97a5">Verifique se a etiqueta foi impressa errada.</div>';
+  }
+  if(d.naoContados.length){
+    a+='<div style="margin-top:14px;color:#8b97a5;font-size:13px">Ainda nao contados (tem estoque no sistema): ';
+    var ns=[]; for(var k=0;k<d.naoContados.length;k++) ns.push(d.naoContados[k].codigo+' ('+d.naoContados[k].sistema+')');
+    a+=ns.join(', ')+'</div>';
+  }
+  document.getElementById('ctAlertas').innerHTML=a;
+  document.getElementById('ctAlertas').style.display=a?'block':'none';
+}
+async function ctAjustar(){
+  var d=await (await fetch('/api/contagem/'+ctSessao())).json();
+  var difs=d.linhas.filter(function(l){ return l.dif!==0; });
+  if(!difs.length){ alert('Nenhuma diferenca para ajustar.'); return; }
+  var txt=difs.map(function(l){ return l.codigo+': '+l.sistema+' -> '+l.contado; }).join('\n');
+  if(!confirm('Ajustar o estoque destes SKUs?\n\n'+txt)) return;
+  var r=await (await fetch('/api/contagem/ajustar',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sessao:ctSessao(),codigos:difs.map(function(l){return l.codigo;})})})).json();
+  alert('Ajustados: '+r.ajustados+' SKUs.');
+  ctLista(); carregar();
+}
+document.addEventListener('DOMContentLoaded',function(){
+  var b=document.getElementById('ctBipe');
+  if(!b) return;
+  b.addEventListener('keydown',function(e){
+    if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); var v=b.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase(); b.value=''; ctBipar(v); }
+  });
+});
+
+async function carregarProb(){
+  var d={porMotivo:[],porSku:[],lista:[],total:0};
+  var de=document.getElementById('pbDe'), ate=document.getElementById('pbAte');
+  var q=[];
+  if(de&&de.value) q.push('de='+de.value);
+  if(ate&&ate.value) q.push('ate='+ate.value);
+  try{ d=await (await fetch('/api/rejeicao/resumo'+(q.length?'?'+q.join('&'):''))).json(); }catch(e){}
+  var el=document.getElementById('pbResumo');
+  if(!el) return;
+  if(!d.total){ el.innerHTML='<b style="color:var(--green)">Nenhuma peca rejeitada no periodo.</b>'; document.getElementById('pbLista').innerHTML=''; return; }
+  var h='<div style="font-size:22px;font-weight:800;margin-bottom:14px">'+d.total+' pecas voltaram para a producao</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">';
+  h+='<div><div class="sub" style="margin-bottom:8px">POR MOTIVO</div>';
+  for(var i=0;i<d.porMotivo.length;i++){
+    var pc=Math.round(d.porMotivo[i].qtd*100/d.total);
+    h+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)"><span>'+d.porMotivo[i].motivo+'</span><b style="color:var(--amber)">'+d.porMotivo[i].qtd+' ('+pc+'%)</b></div>';
+  }
+  h+='</div><div><div class="sub" style="margin-bottom:8px">POR SKU</div>';
+  for(var j=0;j<d.porSku.length;j++){
+    h+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)"><span style="font-family:ui-monospace,monospace;font-size:13px">'+d.porSku[j].codigo+'</span><b>'+d.porSku[j].qtd+'</b></div>';
+  }
+  h+='</div></div>';
+  el.innerHTML=h;
+  var t='<table><thead><tr><th>Quando</th><th>SKU</th><th>Motivo</th><th>Quem</th><th>Obs</th></tr></thead><tbody>';
+  for(var k=0;k<d.lista.length;k++){
+    var r=d.lista[k];
+    t+='<tr><td style="font-size:13px;color:var(--muted)">'+(r.criado_em||'').slice(5,16)+'</td><td><b>'+r.codigo+'</b></td><td>'+r.motivo+'</td><td style="color:var(--muted)">'+(r.usuario||'-')+'</td><td style="color:var(--muted);font-size:13px">'+(r.obs||'')+'</td></tr>';
+  }
+  document.getElementById('pbLista').innerHTML=t+'</tbody></table>';
+}
+
+var DVMOTIVOS=[];
+async function carregarDev(){
+  if(!DVMOTIVOS.length){ try{ DVMOTIVOS=await (await fetch('/api/listas/motivo_devolucao')).json(); }catch(e){} }
+  var l=[]; try{ l=await (await fetch('/api/devolucao/pendentes')).json(); }catch(e){}
+  var el=document.getElementById('dvAdmLista');
+  if(!el) return;
+  if(!l.length){ el.innerHTML='<b style="color:var(--green)">Nenhuma devolucao aguardando baixa.</b>'; return; }
+  var h='';
+  for(var i=0;i<l.length;i++){
+    var d=l[i];
+    var div = (d.sku_venda && d.sku_fisico && d.sku_venda!==d.sku_fisico);
+    h+='<div style="border:1px solid '+(div?'#7d2820':'var(--line)')+';border-radius:12px;padding:16px;margin-bottom:14px">';
+    h+='<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px"><div><b style="font-size:17px;font-family:ui-monospace,monospace">'+d.sku_fisico+'</b>';
+    if(d.buyer) h+=' <span class="sub">- '+d.buyer+'</span>';
+    h+='</div><span class="sub">'+(d.recebido_em||'').slice(0,16)+'</span></div>';
+    if(div) h+='<div style="color:#ff6b6b;font-weight:700;margin-top:8px">DIVERGENCIA: enviado '+d.sku_venda+', voltou '+d.sku_fisico+'</div>';
+    else if(d.sku_venda) h+='<div class="sub" style="margin-top:6px">Confere com o enviado ('+d.sku_venda+')</div>';
+    else h+='<div class="sub" style="margin-top:6px">Sem registro da venda original</div>';
+    h+='<div class="sub" style="margin-top:10px;line-height:1.7">Embalagem: <b>'+(d.embalagem||'-')+'</b> &middot; Tecido: <b>'+(d.tecido||'-')+'</b> &middot; Tubo: <b>'+(d.tubo||'-')+'</b> &middot; Base: <b>'+(d.base||'-')+'</b> &middot; Comando: <b>'+(d.comando||'-')+'</b> &middot; Kit: <b>'+(d.kit||'-')+'</b><br>Destinacao: <b style="color:var(--amber)">'+(d.destinacao||'-')+'</b>';
+    if(d.obs) h+='<br>Obs: '+d.obs;
+    if(d.codigo_ml) h+='<br>Etiqueta ML: '+d.codigo_ml;
+    h+='</div>';
+    h+='<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">';
+    h+='<div class="sub" style="margin-bottom:6px">Afetou a reputacao?</div><div style="display:flex;gap:8px;margin-bottom:12px">';
+    h+='<button class="ghost dvRep" data-id="'+d.id+'" data-v="sim">Sim</button><button class="ghost dvRep" data-id="'+d.id+'" data-v="nao">Nao</button>';
+    h+='<span id="rep'+d.id+'" style="align-self:center;color:var(--amber);font-weight:700"></span></div>';
+    h+='<div class="sub" style="margin-bottom:6px">Motivo da devolucao</div><div style="display:flex;gap:8px;flex-wrap:wrap">';
+    for(var j=0;j<DVMOTIVOS.length;j++){
+      h+='<button class="ghost dvMot" data-id="'+d.id+'" data-v="'+DVMOTIVOS[j].valor+'">'+DVMOTIVOS[j].valor+'</button>';
+    }
+    h+='<span id="mot'+d.id+'" style="align-self:center;color:var(--amber);font-weight:700"></span></div>';
+    h+='<button class="primary dvBaixa" data-id="'+d.id+'" style="margin-top:14px">Dar baixa</button>';
+    h+='</div></div>';
+  }
+  el.innerHTML=h;
+}
+var DVESC={};
+document.addEventListener('click',function(e){
+  var r=e.target.closest('.dvRep');
+  if(r){ var id=r.getAttribute('data-id'); DVESC[id]=DVESC[id]||{}; DVESC[id].rep=r.getAttribute('data-v');
+    document.getElementById('rep'+id).textContent=r.getAttribute('data-v'); return; }
+  var m=e.target.closest('.dvMot');
+  if(m){ var id2=m.getAttribute('data-id'); DVESC[id2]=DVESC[id2]||{}; DVESC[id2].mot=m.getAttribute('data-v');
+    document.getElementById('mot'+id2).textContent=m.getAttribute('data-v'); return; }
+  var b=e.target.closest('.dvBaixa');
+  if(b){
+    var id3=b.getAttribute('data-id');
+    var v=DVESC[id3]||{};
+    if(!v.rep||!v.mot){ alert('Responda a reputacao e o motivo antes de dar baixa.'); return; }
+    fetch('/api/devolucao/baixa',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:id3,reputacao:v.rep,motivo:v.mot})}).then(function(){ carregarDev(); });
+  }
+});
+
+var CDTIPOS=[
+  {t:'rejeicao',n:'Motivos de peça com problema (revisão)'},
+  {t:'motivo_devolucao',n:'Motivos de devolução (admin)'}
+];
+async function carregarCad(){
+  var el=document.getElementById('cdBox');
+  if(!el) return;
+  var h='';
+  for(var i=0;i<CDTIPOS.length;i++){
+    var tp=CDTIPOS[i];
+    var l=[]; try{ l=await (await fetch('/api/listas/'+tp.t)).json(); }catch(e){}
+    h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:12px">'+tp.n+'</div>';
+    for(var j=0;j<l.length;j++){
+      h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span>'+l[j].valor+'</span><button class="ghost small cdDel" data-id="'+l[j].id+'">remover</button></div>';
+    }
+    h+='<div style="display:flex;gap:8px;margin-top:14px"><input id="cdIn_'+tp.t+'" placeholder="novo item" style="flex:1"><button class="primary cdAdd" data-t="'+tp.t+'">Adicionar</button></div>';
+    h+='</div>';
+  }
+  var kit=''; try{ kit=(await (await fetch('/api/config/kit')).json()).kit||''; }catch(e){}
+  h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:6px">Código do kit de instalação</div>';
+  h+='<div class="sub" style="margin-bottom:12px">O QR que o operador bipa na embalagem para confirmar que o kit foi incluído.</div>';
+  h+='<div style="display:flex;gap:8px"><input id="cdKit" placeholder="bipe ou cole o código do kit" value="'+String(kit).replace(/"/g,"&quot;")+'" style="flex:1"><button class="primary" id="cdKitBt">Salvar</button></div>';
+  h+='<div id="cdKitMsg" style="margin-top:10px;font-size:14px"></div></div>';
+  el.innerHTML=h;
+}
+document.addEventListener('click',async function(e){
+  var a=e.target.closest('.cdAdd');
+  if(a){
+    var tp=a.getAttribute('data-t');
+    var inp=document.getElementById('cdIn_'+tp);
+    var v=(inp.value||'').trim();
+    if(!v) return;
+    await fetch('/api/listas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo:tp,valor:v})});
+    carregarCad(); return;
+  }
+  var d=e.target.closest('.cdDel');
+  if(d){
+    if(!confirm('Remover este item? Registros antigos que já usaram ele continuam intactos.')) return;
+    await fetch('/api/listas/'+d.getAttribute('data-id'),{method:'DELETE'});
+    carregarCad(); return;
+  }
+  if(e.target.closest('#cdKitBt')){
+    var k=document.getElementById('cdKit').value.trim();
+    var msg=document.getElementById('cdKitMsg');
+    if(!k){ msg.innerHTML='<span style="color:#ff6b6b">Informe o código</span>'; return; }
+    var ehSku=false;
+    for(var i=0;i<SKUS.length;i++) if(SKUS[i].codigo===k.toUpperCase()){ ehSku=true; break; }
+    if(ehSku){ msg.innerHTML='<span style="color:#ff6b6b">Isso é um SKU de persiana, não o kit. Bipe o QR do kit.</span>'; return; }
+    await fetch('/api/config/kit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kit:k})});
+    msg.innerHTML='<span style="color:var(--green)">Salvo</span>';
+    setTimeout(function(){ msg.innerHTML=''; },3000);
+  }
+});
+
+
+async function ctLancar(){
+  var d=await (await fetch("/api/contagem/"+ctSessao())).json();
+  var itens=d.linhas.filter(function(l){ return l.contado>0; });
+  if(!itens.length){ alert("Nada bipado para lancar."); return; }
+  var txt=itens.map(function(l){ return l.codigo+": +"+l.contado+" (fica "+(l.sistema+l.contado)+")"; }).join(String.fromCharCode(10));
+  if(!confirm("ACRESCENTAR estas quantidades ao estoque?"+String.fromCharCode(10)+String.fromCharCode(10)+txt)) return;
+  var r=await (await fetch("/api/contagem/lancar",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({sessao:ctSessao(),codigos:itens.map(function(l){return l.codigo;})})})).json();
+  alert("Lancado em "+r.lancados+" SKUs. Pode bipar a proxima leva.");
+  ctLista(); carregar();
+  var b=document.getElementById("ctBipe"); if(b) b.focus();
+}
+
+
+async function ctLancar(){
+  var d=await (await fetch("/api/contagem/"+ctSessao())).json();
+  var itens=d.linhas.filter(function(l){ return l.contado>0; });
+  if(!itens.length){ alert("Nada bipado para lancar."); return; }
+  var txt=itens.map(function(l){ return l.codigo+": +"+l.contado+" (fica "+(l.sistema+l.contado)+")"; }).join(String.fromCharCode(10));
+  if(!confirm("ACRESCENTAR estas quantidades ao estoque?"+String.fromCharCode(10)+String.fromCharCode(10)+txt)) return;
+  var r=await (await fetch("/api/contagem/lancar",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({sessao:ctSessao(),codigos:itens.map(function(l){return l.codigo;})})})).json();
+  alert("Lancado em "+r.lancados+" SKUs. Pode bipar a proxima leva.");
+  ctLista(); carregar();
+  var b=document.getElementById("ctBipe"); if(b) b.focus();
+}
 
 /*AUTO_ADMIN*/ setInterval(function(){ var a=document.activeElement; if(a && a.tagName==='INPUT') return; carregar(); },4000);
 </script>

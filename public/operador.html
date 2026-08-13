@@ -42,6 +42,7 @@
   .esc small{display:block;font-size:14px;font-weight:500;color:var(--muted);margin-top:8px}
   .esc.hoje{border-color:#7d2820;background:#2a1210}
   .esc.est{border-color:#1d4f78;background:#0f2233}
+  .esc.dev{border-color:#7a6017;background:#231d06}
 </style></head><body>
 <header><div class="mark">R</div><div><h1>Estação de Revisão</h1><div class="sub">Bipe ao começar · bipe ao terminar</div></div>
 <div class="modoTag"><span class="modoNome" id="modoNome">—</span>
@@ -50,6 +51,7 @@
   <h2>O que você vai revisar agora?</h2>
   <button class="esc hoje" data-m="hoje">PEDIDOS DE HOJE<small>Peças com venda feita, entrega no mesmo dia</small></button>
   <button class="esc est" data-m="estoque">PRODUÇÃO PRA ESTOQUE<small>Sem venda ainda — repondo o estoque</small></button>
+  <button class="esc dev" onclick="location.href='/devolucao'">DEVOLUÇÕES<small>Peças que voltaram do Mercado Livre</small></button>
 </div>
 <div class="wrap">
   <div class="banner" id="banner"></div>
@@ -60,15 +62,17 @@
 </div>
 <script>
 let SKUS=[], PROD={}, emRev=null, tick=null;
-var MODO=null, DIA=[], METAS=[];
+var MODO=null, DIA=[], METAS=[], REVHOJE=[], ADIANTA=[];
 const $=s=>document.querySelector(s);
 async function load(){
   if(!MODO) return;
   SKUS=await (await fetch('/api/skus')).json();
   const prod=await (await fetch('/api/producao')).json();
   PROD={}; for(const r of prod){ (PROD[r.codigo]=PROD[r.codigo]||{pedido:0,feito:0}); PROD[r.codigo].pedido+=r.qtd; PROD[r.codigo].feito+=r.produzido; }
-  if(MODO==='hoje') DIA=await (await fetch('/api/revisao/dia')).json();
-  else METAS=await (await fetch('/api/revisao/metas')).json();
+  if(MODO==='hoje'){ DIA=await (await fetch('/api/revisao/dia')).json();
+    try{ REVHOJE=await (await fetch('/api/revisao/hoje')).json(); }catch(e){ REVHOJE=[]; } }
+  else { METAS=await (await fetch('/api/revisao/metas')).json();
+    try{ ADIANTA=await (await fetch('/api/revisao/adiantar')).json(); }catch(e){ ADIANTA=[]; } }
   renderTiles(); loadStats();
 }
 function skuInfo(c){ return SKUS.find(s=>s.codigo===c); }
@@ -76,12 +80,22 @@ function renderTiles(){
   var html='';
   if(MODO==='hoje'){
     html=DIA.map(function(d){ var act=emRev&&emRev.codigo===d.codigo;
-      return '<button class="tile '+(act?'active':'')+'" data-cod="'+d.codigo+'"><div class="tc">'+d.codigo+'</div><div class="tcor">'+(d.cor||'')+'</div><div class="tp">'+d.produzido+'/'+d.qtd+'</div><div class="tf">'+(d.falta>0?'faltam '+d.falta:'completo')+'</div></button>';
+      var rv=0; for(var i=0;i<REVHOJE.length;i++){ if(REVHOJE[i].codigo===d.codigo){ rv=REVHOJE[i].qtd; break; } }
+      var falta=Math.max(0,d.qtd-rv);
+      return '<button class="tile '+(act?'active':'')+(falta>0?' falta':'')+'" data-cod="'+d.codigo+'"><div class="tc">'+d.codigo+'</div><div class="tcor">'+(d.cor||'')+'</div><div class="tp">'+rv+'/'+d.qtd+'</div><div class="tf">'+(falta>0?'faltam '+falta+' pra revisar':'revisão completa')+'</div></button>';
     }).join('')||'<div class="muted">Nenhuma produção lançada para hoje. Lance no Admin.</div>';
   } else {
-    html=METAS.map(function(m){ var act=emRev&&emRev.codigo===m.codigo;
+    if(ADIANTA.length){
+      html+='<div style="grid-column:1/-1;background:#231d06;border:1px solid #7a6017;border-radius:12px;padding:14px;margin-bottom:6px"><b style="color:#ffb800">ADIANTAMENTO - pedidos de amanha</b><div style="font-size:13px;color:#8b97a5;margin-top:4px">Se sobrar tempo hoje, ja pode produzir estes.</div></div>';
+      for(var a=0;a<ADIANTA.length;a++){
+        var d2=ADIANTA[a];
+        html+='<button class="tile" data-cod="'+d2.codigo+'" style="border-color:#7a6017;background:#1a1508"><div class="tc">'+d2.codigo+'</div><div class="tcor">'+(d2.cor||'')+'</div><div class="tp" style="color:#ffb800">'+d2.falta+'</div><div class="tf">amanha</div></button>';
+      }
+    }
+    html+=METAS.map(function(m){ var act=emRev&&emRev.codigo===m.codigo;
       return '<button class="tile '+(act?'active':'')+(m.falta>0?' falta':'')+'" data-cod="'+m.codigo+'"><div class="tc">'+m.codigo+'</div><div class="tcor">'+(m.cor||'')+'</div><div class="tp">'+m.estoque+'/'+m.alvo+'</div><div class="tf">'+(m.falta>0?'faltam '+m.falta:'meta atingida')+'</div></button>';
-    }).join('')||'<div class="muted">Nenhum SKU com meta. Defina o alvo no Admin.</div>';
+    }).join('');
+    if(!html) html='<div class="muted">Nenhum SKU com meta. Defina o alvo no Admin.</div>';
   }
   $('#tiles').innerHTML=html;
 }
@@ -109,6 +123,7 @@ function toggle(codigo){
     var fora=(MODO==='hoje')&&!DIA.some(function(d){return d.codigo===codigo&&d.falta>0;});
     emRev={codigo:codigo,cor:info.cor||'',inicio:Date.now(),fora:fora}; renderTiles();
     banner('rev','Revisando '+codigo, fora?'⚠ NÃO está nos pedidos de hoje — vai contar como estoque':((info.cor||'')+' — bipe de novo ao terminar'), true);
+    setTimeout(function(){ var bn=document.getElementById("banner"); if(bn && !document.getElementById("rjBt")){ var b=document.createElement("button"); b.id="rjBt"; b.textContent="Peça com problema"; b.style.cssText="margin-top:14px;padding:11px 20px;border-radius:9px;border:1px solid #7d2820;background:transparent;color:#ff8b80;font-size:14px;cursor:pointer"; b.onclick=rjAbrir; bn.appendChild(b); } },50);
     clearInterval(tick); tick=setInterval(()=>{ const t=$('#timer'); if(emRev&&t) t.textContent=mmss(Date.now()-emRev.inicio); },250);
     beep(true);
   } else { finish(); }
@@ -120,8 +135,7 @@ async function finish(){
     const r=await (await fetch('/api/revisao',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({codigo:cur.codigo,segundos:seg,modo:(cur.fora?'estoque':MODO),inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})})).json();
     if(r.erro){ banner('err','Erro',r.erro); beep(false); return; }
-    var det=(MODO==='hoje'&&!cur.fora)?(' · pedido do dia '+r.feito+'/'+r.pedido):' · foi pra estoque';
-    banner('ok','Revisada ✓ ('+fmt(seg)+')', cur.codigo+' · estoque agora '+r.estoque+det);
+    banner('ok','Revisada ✓ ('+fmt(seg)+')', cur.codigo+' · liberada para a EMBALAGEM');
     beep(true); load();
   }catch(e){ banner('err','Falha de conexão',String(e)); beep(false); }
 }
@@ -173,5 +187,84 @@ document.getElementById('btModo').addEventListener('click',function(){
   else document.getElementById('escolha').style.display='flex';
 })();
 /* AUTO_REFRESH_OP */ setInterval(()=>{ if(!emRev&&MODO) load(); }, 3000);
+var RJMOT=[];
+async function rjCarregar(){
+  try{ RJMOT=await (await fetch('/api/listas/rejeicao')).json(); }catch(e){}
+}
+rjCarregar();
+function rjAbrir(){
+  if(!emRev) return;
+  var h='<div style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px" id="rjBox">';
+  h+='<div style="background:#161b22;border:1px solid #262d37;border-radius:16px;padding:24px;max-width:520px;width:100%">';
+  h+='<div style="font-size:19px;font-weight:800;margin-bottom:4px">Peça com problema</div>';
+  h+='<div style="font-size:14px;color:#8b97a5;margin-bottom:18px">'+emRev.codigo+' volta para a produção. Qual o motivo?</div>';
+  for(var i=0;i<RJMOT.length;i++){
+    h+='<button type="button" class="rjOp" data-m="'+RJMOT[i].valor+'" style="display:block;width:100%;text-align:left;margin-bottom:8px;padding:15px;border-radius:10px;border:1px solid #262d37;background:transparent;color:#e6edf3;font-size:16px;cursor:pointer">'+RJMOT[i].valor+'</button>';
+  }
+  h+='<input id="rjObs" placeholder="observação (opcional)" style="width:100%;margin-top:10px;padding:12px;background:#0e1217;border:1px solid #262d37;border-radius:9px;color:#e6edf3;font-size:15px">';
+  h+='<button type="button" id="rjCancel" style="width:100%;margin-top:14px;padding:13px;border-radius:9px;border:1px solid #262d37;background:transparent;color:#8b97a5;font-size:15px;cursor:pointer">Cancelar</button>';
+  h+='</div></div>';
+  var d=document.createElement('div'); d.innerHTML=h; document.body.appendChild(d.firstChild);
+}
+document.addEventListener('click',function(e){
+  if(e.target.closest('#rjCancel')){ var b=document.getElementById('rjBox'); if(b) b.remove(); return; }
+  var o=e.target.closest('.rjOp');
+  if(!o) return;
+  var motivo=o.getAttribute('data-m');
+  var obs=(document.getElementById('rjObs')||{}).value||'';
+  var cur=emRev;
+  if(!cur) return;
+  var seg=Math.round((Date.now()-cur.inicio)/1000);
+  clearInterval(tick); tick=null; emRev=null;
+  var bx=document.getElementById('rjBox'); if(bx) bx.remove();
+  fetch('/api/rejeicao',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({codigo:cur.codigo,motivo:motivo,obs:obs,segundos:seg,modo:MODO})})
+   .then(function(){
+     banner('err','Voltou para a produção', cur.codigo+' · '+motivo);
+     renderTiles(); load();
+   });
+});
+
+var AVANT=0;
+async function avisoStatus(){
+  var s=null;
+  try{ s=await (await fetch('/api/revisao/status')).json(); }catch(e){ return; }
+  var el=document.getElementById('avBox');
+  if(!el){
+    el=document.createElement('div');
+    el.id='avBox';
+    el.style.cssText='margin-bottom:14px;padding:15px 18px;border-radius:13px;font-size:15px;line-height:1.5';
+    var w=document.querySelector('.wrap');
+    if(w) w.insertBefore(el,w.firstChild);
+  }
+  var txt='', cor='#161b22', bd='#262d37';
+  if(!s.lancado){
+    txt='<b>Nenhuma venda lançada ainda hoje.</b><br><span style="color:#8b97a5">O corte de hoje é às '+s.corte+'. Assim que a lista sair, ela aparece aqui.</span>';
+  } else if(s.urgentes===0){
+    txt='<b style="color:#4493f8">Todas as vendas de hoje já estão em estoque.</b><br><span style="color:#8b97a5">'+
+        (s.passouCorte?('Lista fechada às '+s.corte+'. '):('Corte às '+s.corte+' — ainda pode entrar venda. '))+
+        'Trabalhe na reposição (tela azul): '+s.reposicao+' peças.</span>';
+  } else if(s.urgentesFalta>0){
+    txt='<b style="color:#ff6b6b">'+s.urgentesFalta+' peça(s) URGENTE(S) para hoje</b><br><span style="color:#8b97a5">Cliente esperando. Priorize a tela vermelha.</span>';
+    cor='#3a1513'; bd='#7d2820';
+  } else {
+    txt='<b style="color:#2ea043">Urgentes do dia concluídos.</b><br><span style="color:#8b97a5">Pode seguir na reposição (tela azul).</span>';
+    cor='#10331c'; bd='#1f6f37';
+  }
+  el.style.background=cor; el.style.border='1px solid '+bd;
+  el.innerHTML=txt;
+  if(s.urgentesFalta>AVANT && AVANT>=0 && MODO==='estoque' && s.urgentesFalta>0){
+    try{ beep(false); setTimeout(function(){beep(false);},300); }catch(e){}
+    var al=document.createElement('div');
+    al.style.cssText='position:fixed;top:0;left:0;right:0;z-index:10002;background:#cc3a21;color:#fff;padding:16px;text-align:center;font:800 17px system-ui;cursor:pointer';
+    al.innerHTML='CHEGOU PEDIDO URGENTE - '+s.urgentesFalta+' peça(s) para hoje (toque para fechar)';
+    al.onclick=function(){ al.remove(); };
+    document.body.appendChild(al);
+    setTimeout(function(){ if(al.parentNode) al.remove(); },20000);
+  }
+  AVANT=s.urgentesFalta;
+}
+setInterval(avisoStatus,20000);
+
 </script><script src="/nav.js"></script>
 </body></html>

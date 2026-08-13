@@ -1,6 +1,6 @@
 <!DOCTYPE html><html lang="pt-BR"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Embalagem — Montagem</title>
+<title>Embalagem</title>
 <style>
   :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--red:#f85149;--blue:#4493f8}
   *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
@@ -24,9 +24,15 @@
   .chip.done{background:#10331c;border-color:#1f6f37;color:#7ee2a0}
   #scan{position:absolute;left:-9999px;opacity:0}
   .stats{font-size:13px;color:var(--muted);text-align:center;margin-top:10px}.stats b{color:var(--txt)}
+  .fila{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:16px}
+  .ft{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+  .fi{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+  .fi:last-child{border-bottom:0}
+  .fc{font-family:ui-monospace,monospace;font-weight:700;font-size:15px}
+  .fq{font-size:19px;font-weight:800;color:var(--amber)}
 </style></head><body>
-<header><div class="mark">M</div><div><h1>Embalagem — Montagem</h1><div class="sub">Bipa SKU · prepara · bipa kit · bipa SKU pra finalizar</div></div>
-<div class="links"><a class="link" href="/embalagem">Expedição de venda</a><a class="link" href="/painel">Painel</a></div></header>
+<header><div class="mark">M</div><div><h1>Embalagem</h1><div class="sub">Bipa SKU · bipa kit · bipa SKU pra finalizar</div></div>
+<div class="links"><a class="link" href="/embalagem">Etiqueta de Venda</a><a class="link" href="/painel">Painel</a></div></header>
 <div class="wrap">
   <div class="cfg" id="cfg">
     <span class="lab">Código do kit:</span>
@@ -37,11 +43,22 @@
   <div class="banner" id="banner"></div>
   <input id="scan" autocomplete="off">
   <div class="stats" id="stats"></div>
+  <div class="fila"><div class="ft">Aguardando embalagem</div><div id="filaLista"></div></div>
 </div>
 <script>
 const $=s=>document.querySelector(s);
-let SKUS=[], KIT=null, emb=null, tick=null, last={c:null,t:0};
+let SKUS=[], KIT=null, emb=null, tick=null, last={c:null,t:0}, FILA=[];
+async function carregarFila(){
+  try{
+    FILA=await (await fetch('/api/fila')).json();
+    document.getElementById('filaLista').innerHTML = FILA.length
+      ? FILA.map(function(f){ return '<div class="fi"><div><div class="fc">'+f.codigo+'</div><div style="font-size:12px;color:var(--muted)">'+(f.cor||'')+'</div></div><div class="fq">'+f.qtd+'</div></div>'; }).join('')
+      : '<div style="color:var(--muted);font-size:14px">Nada aguardando. A revis&atilde;o ainda n&atilde;o liberou pe&ccedil;as.</div>';
+  }catch(e){}
+}
+setInterval(function(){ if(!emb) carregarFila(); },4000);
 async function load(){
+  carregarFila();
   SKUS=await (await fetch('/api/skus')).json();
   KIT=(await (await fetch('/api/config/kit')).json()).kit;
   $('#kitatual').textContent = KIT ? ('atual: '+KIT) : '';

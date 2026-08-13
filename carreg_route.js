@@ -15,6 +15,8 @@ module.exports=function(app,db){
       if(cs.some(c=> cands.includes(String(c)) )){ alvo=r; break; }
     }
     if(!alvo) return res.json({ok:false,motivo:'nao_encontrado',lido:code});
+    if(alvo.estagio==='bloqueado') return res.json({ok:false,motivo:'bloqueado',pedido:alvo,
+        aviso:'SKU "'+(alvo.codigo||'(vazio)')+'" nao esta no cadastro. Nao pode ser carregado.'});
     if(alvo.estagio==='carregado') return res.json({ok:false,motivo:'duplicado',pedido:alvo});
     db.prepare("UPDATE lote SET estagio='carregado', carregado_em=datetime('now','localtime') WHERE id=?").run(alvo.id);
     const tot=db.prepare("SELECT COUNT(*) n FROM lote WHERE data=date('now','localtime') AND estagio IN ('embalado','carregado')").get().n;

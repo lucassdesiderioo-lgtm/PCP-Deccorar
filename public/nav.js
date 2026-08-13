@@ -1,6 +1,6 @@
 (function(){
-  var MAP={ '1':'/painel','2':'/operador','3':'/montagem','4':'/embalagem','5':'/carregamento','6':'/','7':'/relatorios','8':'/necessidade' };
-  var NAMES={ '/painel':'Painel','/operador':'Revisão','/montagem':'Montagem','/embalagem':'Expedição','/carregamento':'Carregamento','/':'Admin','/relatorios':'Relatórios','/necessidade':'Necessidade' };
+  var MAP={ '1':'/painel','2':'/operador','3':'/montagem','4':'/expedicao','5':'/embalagem','6':'/carregamento','7':'/','8':'/relatorios','9':'/necessidade' };
+  var NAMES={ '/painel':'Painel','/operador':'Revisão','/montagem':'Embalagem','/embalagem':'Etiqueta Venda','/expedicao':'Subir PDFs','/carregamento':'Carregamento','/':'Admin','/relatorios':'Relatórios','/necessidade':'Necessidade' };
   var cur=location.pathname.replace(/\/$/,'')||'/';
   // barra de atalhos no rodapé
   var bar=document.createElement('div');
@@ -28,12 +28,12 @@
 
   var css=document.createElement('style');
   css.textContent=
-    '#sessBar{position:fixed;top:10px;right:12px;z-index:9999;display:flex;align-items:center;'+
-    'gap:10px;background:rgba(28,31,40,.94);border:1px solid #2a2f3a;border-radius:999px;'+
-    'padding:7px 8px 7px 15px;font:600 14px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#eef1f6}'+
+    '#sessBar{position:sticky;top:0;z-index:9999;display:flex;align-items:center;justify-content:flex-end;'+
+    'gap:10px;background:#0b0e13;border-bottom:1px solid #2a2f3a;'+
+    'padding:6px 14px;font:600 13px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#8b97a5}'+
     '#sessBar b{font-weight:700}'+
-    '#sessSair{background:#f0b429;color:#12141a;border:0;border-radius:999px;padding:9px 17px;'+
-    'font:700 14px system-ui;cursor:pointer;min-height:40px}'+
+    '#sessSair{background:transparent;color:#f0b429;border:1px solid #f0b429;border-radius:8px;'+
+    'padding:6px 14px;font:700 13px system-ui;cursor:pointer;min-height:34px}'+
     '#sessSair:active{opacity:.75}'+
     '@media print{#sessBar{display:none}}';
   document.head.appendChild(css);
@@ -47,8 +47,8 @@
     if(!u.logado) return;
     var d=document.createElement('div');
     d.id='sessBar';
-    d.innerHTML='<span><b>'+u.nome+'</b></span><button id="sessSair">Sair</button>';
-    document.body.appendChild(d);
+    d.innerHTML='<span><b style="color:#eef1f6">'+u.nome+'</b></span><button id="sessSair">Sair</button>';
+    document.body.insertBefore(d, document.body.firstChild);
     document.getElementById('sessSair').onclick=sair;
   });
 

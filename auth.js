@@ -6,9 +6,10 @@ const AREAS=[
   {id:'relatorios',  nome:'Relatorios'},
   {id:'necessidade', nome:'Necessidade (ABC)'},
   {id:'operador',    nome:'Revisao'},
+  {id:'devolucao',   nome:'Devolucoes'},
   {id:'montagem',    nome:'Montagem'},
-  {id:'embalagem',   nome:'Embalagem'},
-  {id:'expedicao',   nome:'Expedicao'},
+  {id:'embalagem',   nome:'Etiqueta de Venda'},
+  {id:'expedicao',   nome:'Subir PDFs (ML)'},
   {id:'carregamento',nome:'Carregamento'}
 ];
 
@@ -18,6 +19,7 @@ const TELAS={
   '/relatorios':'relatorios','/relatorios.html':'relatorios',
   '/necessidade':'necessidade','/necessidade.html':'necessidade',
   '/operador':'operador','/operador.html':'operador',
+  '/devolucao':'devolucao','/devolucao.html':'devolucao',
   '/montagem':'montagem','/montagem.html':'montagem',
   '/embalagem':'embalagem','/embalagem.html':'embalagem',
   '/expedicao':'expedicao','/expedicao.html':'expedicao',

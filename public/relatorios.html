@@ -44,6 +44,26 @@
     <div class="kpi emb"><div class="n" id="kEmbQ">0</div><div class="l">Embaladas · méd <span id="kEmbT">0s</span></div></div>
   </div>
   <div class="card"><h3>Evolução por dia</h3><canvas id="graf" height="90"></canvas></div>
+<div class="card" style="margin-top:26px">
+  <h3 style="margin:0 0 14px">Painel gerencial</h3>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap">
+    <span style="font-size:13px;color:#8b97a5">De</span><input type="date" id="gDe" onchange="carregarGer()">
+    <span style="font-size:13px;color:#8b97a5">ate</span><input type="date" id="gAte" onchange="carregarGer()">
+  </div>
+  <div id="gCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px"></div>
+  <div id="gInd" style="padding:16px;background:#0e1217;border-radius:12px"></div>
+</div>
+<div class="card"><h3>Evolucao: revisadas, embaladas e rejeitadas</h3><canvas id="gSerie" height="80"></canvas></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <div class="card"><h3>Por que voltam para a producao</h3><canvas id="gRejMot" height="150"></canvas></div>
+  <div class="card"><h3>SKUs que mais voltam</h3><canvas id="gRejSku" height="150"></canvas></div>
+  <div class="card"><h3>Motivos de devolucao</h3><canvas id="gDevMot" height="150"></canvas></div>
+  <div class="card"><h3>SKUs mais devolvidos</h3><canvas id="gDevSku" height="150"></canvas></div>
+  <div class="card"><h3>Tempo medio de revisao (seg)</h3><canvas id="gTempo" height="150"></canvas></div>
+  <div class="card"><h3>Estoque: quanto falta para o alvo</h3><canvas id="gEstoque" height="150"></canvas></div>
+</div>
+<div class="card"><h3>Reputacao</h3><div id="gRep" style="font-size:15px"></div></div>
+
   <div class="card"><h3>Por SKU</h3>
     <table><thead><tr><th>SKU</th><th>Revisadas</th><th>Tempo méd. revisão</th><th>Embaladas</th><th>Tempo méd. embalagem</th></tr></thead>
     <tbody id="corpo"></tbody></table>
@@ -75,5 +95,76 @@ async function carregar(){
     options:{responsive:true,scales:{x:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'}},y:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'},beginAtZero:true}},plugins:{legend:{labels:{color:'#e6edf3'}}}}});
 }
 atalho(6);
+
+var GCH={};
+function gcor(i){ var c=['#ffb800','#4493f8','#f85149','#2ea043','#a479e2','#e07798','#3dc789','#ffad47']; return c[i%c.length]; }
+function gfmt(s){ s=+s||0; var m=Math.floor(s/60); return (m?m+'m':'')+(s%60)+'s'; }
+function gGraf(id,tipo,labels,dados,cores){
+  var el=document.getElementById(id);
+  if(!el) return;
+  if(GCH[id]) GCH[id].destroy();
+  GCH[id]=new Chart(el.getContext('2d'),{
+    type:tipo,
+    data:{labels:labels,datasets:[{data:dados,backgroundColor:cores||labels.map(function(x,i){return gcor(i);}),borderWidth:0}]},
+    options:{responsive:true,plugins:{legend:{display:tipo==='doughnut',position:'right',labels:{color:'#8b97a5',font:{size:11}}}},
+      scales:tipo==='doughnut'?{}:{x:{ticks:{color:'#8b97a5',font:{size:10}},grid:{display:false}},y:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'},beginAtZero:true}}}
+  });
+}
+async function carregarGer(){
+  var de=document.getElementById('gDe'), ate=document.getElementById('gAte');
+  var q=[]; if(de&&de.value)q.push('de='+de.value); if(ate&&ate.value)q.push('ate='+ate.value);
+  var d=null;
+  try{ d=await (await fetch('/api/gerencial'+(q.length?'?'+q.join('&'):''))).json(); }catch(e){ return; }
+  var t=d.totais;
+  var cards=[
+    {n:t.revisadas,l:'revisadas',c:'#ffb800'},
+    {n:t.embaladas,l:'embaladas',c:'#2ea043'},
+    {n:t.filaAtual,l:'na fila agora',c:'#4493f8'},
+    {n:t.rejeitadas,l:'voltaram p/ producao',c:'#f85149'},
+    {n:t.devolucoes,l:'devolucoes',c:'#e07798'},
+    {n:t.vendas,l:'vendas',c:'#8b97a5'}
+  ];
+  var h='';
+  for(var i=0;i<cards.length;i++){
+    h+='<div style="background:#161b22;border:1px solid #262d37;border-radius:14px;padding:16px"><div style="font-size:30px;font-weight:800;color:'+cards[i].c+'">'+cards[i].n+'</div><div style="font-size:12px;color:#8b97a5;text-transform:uppercase;letter-spacing:.4px">'+cards[i].l+'</div></div>';
+  }
+  document.getElementById('gCards').innerHTML=h;
+  var taxaRej = t.revisadas+t.rejeitadas ? Math.round(t.rejeitadas*100/(t.revisadas+t.rejeitadas)) : 0;
+  var taxaDev = t.vendas ? (t.devolucoes*100/t.vendas).toFixed(1) : '0';
+  var ind='<div style="display:flex;gap:26px;flex-wrap:wrap;font-size:14px">';
+  ind+='<div>Taxa de retrabalho: <b style="color:'+(taxaRej>10?'#f85149':'#2ea043')+';font-size:19px">'+taxaRej+'%</b></div>';
+  ind+='<div>Taxa de devolucao: <b style="color:'+(taxaDev>5?'#f85149':'#2ea043')+';font-size:19px">'+taxaDev+'%</b></div>';
+  ind+='<div>Tempo medio revisao: <b style="font-size:19px">'+gfmt(t.tempoRev)+'</b></div>';
+  ind+='<div>Tempo medio embalagem: <b style="font-size:19px">'+gfmt(t.tempoEmb)+'</b></div>';
+  if(t.divergencias>0) ind+='<div style="color:#f85149">SKU divergente em <b style="font-size:19px">'+t.divergencias+'</b> devolucoes</div>';
+  document.getElementById('gInd').innerHTML=ind+'</div>';
+  var dias={};
+  ['producao','embalagem','rejeicao'].forEach(function(k){ d.serie[k].forEach(function(r){ dias[r.data]=1; }); });
+  var L=Object.keys(dias).sort();
+  var mapa=function(arr){ var m={}; arr.forEach(function(r){ m[r.data]=r.qtd; }); return L.map(function(x){ return m[x]||0; }); };
+  var el=document.getElementById('gSerie');
+  if(el){
+    if(GCH.gSerie) GCH.gSerie.destroy();
+    GCH.gSerie=new Chart(el.getContext('2d'),{type:'line',
+      data:{labels:L.map(function(x){return x.slice(5);}),datasets:[
+        {label:'Revisadas',data:mapa(d.serie.producao),borderColor:'#ffb800',backgroundColor:'transparent',tension:.3},
+        {label:'Embaladas',data:mapa(d.serie.embalagem),borderColor:'#2ea043',backgroundColor:'transparent',tension:.3},
+        {label:'Rejeitadas',data:mapa(d.serie.rejeicao),borderColor:'#f85149',backgroundColor:'transparent',tension:.3}]},
+      options:{responsive:true,plugins:{legend:{labels:{color:'#8b97a5'}}},
+        scales:{x:{ticks:{color:'#8b97a5'},grid:{display:false}},y:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'},beginAtZero:true}}}});
+  }
+  var L2=function(a){ return a.map(function(x){ return x.l; }); };
+  var Q=function(a){ return a.map(function(x){ return x.qtd; }); };
+  gGraf('gRejMot','doughnut',L2(d.qualidade.porMotivo),Q(d.qualidade.porMotivo));
+  gGraf('gRejSku','bar',L2(d.qualidade.porSku),Q(d.qualidade.porSku),'#f85149');
+  gGraf('gDevMot','doughnut',L2(d.devolucao.porMotivo),Q(d.devolucao.porMotivo));
+  gGraf('gDevSku','bar',L2(d.devolucao.porSku),Q(d.devolucao.porSku),'#e07798');
+  gGraf('gTempo','bar',L2(d.tempos.porSku),d.tempos.porSku.map(function(x){return x.media;}),'#4493f8');
+  gGraf('gEstoque','bar',L2(d.estoque),d.estoque.map(function(x){return x.falta;}),'#ffb800');
+  var r=d.devolucao.reputacao||{};
+  document.getElementById('gRep').innerHTML='Afetaram reputacao: <b style="color:#f85149;font-size:19px">'+(r.sim||0)+'</b> &nbsp; Nao afetaram: <b style="color:#2ea043;font-size:19px">'+(r.nao||0)+'</b> &nbsp; Sem baixa: <b style="color:#ffb800;font-size:19px">'+(r.pendente||0)+'</b>';
+}
+
+carregarGer();
 </script><script src="/nav.js"></script>
 </body></html>

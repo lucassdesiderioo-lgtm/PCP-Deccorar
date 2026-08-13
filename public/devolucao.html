@@ -1,0 +1,180 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Devolucoes</title>
+<style>
+  :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--red:#f85149}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
+  h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
+  .wrap{max-width:760px;margin:0 auto;padding:20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  .lb{font-size:13px;color:var(--muted);margin-bottom:6px}
+  input,select{width:100%;padding:13px;font-size:16px;background:#0e1217;border:2px solid var(--line);border-radius:10px;color:var(--txt)}
+  input:focus,select:focus{outline:none;border-color:var(--amber)}
+  #dvCod{font-family:ui-monospace,monospace;text-align:center;letter-spacing:1px}
+  .op{padding:10px 16px;border-radius:9px;font-size:14px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--txt)}
+  .op.on{background:var(--amber);color:#1a1300;border-color:var(--amber);font-weight:700}
+  .grp{margin-bottom:14px}
+  .ops{display:flex;gap:8px;flex-wrap:wrap}
+  .bt{background:var(--amber);border:0;border-radius:10px;padding:15px 26px;font-weight:700;font-size:16px;cursor:pointer}
+</style></head><body>
+<header><div class="mark">D</div><div><h1>Devolucoes</h1><div class="sub">Recebimento e triagem de peças devolvidas</div></div><button onclick="(function(){try{localStorage.removeItem('rev_modo');}catch(e){} location.href='/operador';})()" style="margin-left:auto;background:transparent;border:1px solid #262d37;color:#8b97a5;border-radius:9px;padding:11px 18px;font-size:14px;cursor:pointer">Trocar</button></header>
+<div class="wrap">
+  <div class="card">
+    <div class="lb">Codigo da etiqueta do Mercado Livre</div>
+    <input id="dvCod" placeholder="bipe aqui" autocomplete="off">
+    <div id="dvVenda" style="margin-top:10px;font-size:14px;color:var(--muted)"></div>
+  </div>
+  <div class="card">
+    <div class="lb">SKU que voce esta revisando</div>
+    <div id="dvSkuBox"></div>
+  </div>
+  <div class="card">
+    <div id="dvPerg"></div>
+    <div class="grp"><div class="lb">Observacao (opcional)</div><input id="dvObs" placeholder="algo que queira registrar"></div>
+    <div style="display:flex;gap:12px;align-items:center">
+      <button class="bt" id="dvSalvar">Salvar devolucao</button>
+      <span id="dvMsg" style="font-size:15px"></span>
+    </div>
+  </div>
+  <div class="card"><div class="lb">Recebidas hoje</div><div id="dvHoje" style="font-size:26px;font-weight:800">0</div></div>
+</div>
+<script>
+var SKUS=[];
+var DVPERG=[
+  {id:'embalagem',t:'Embalagem',o:['intacta','amassada','violada']},
+  {id:'tecido',t:'Tecido',o:['intacto','sujo','rasgado','amassado']},
+  {id:'tubo',t:'Tubo do rolo',o:['ok','amassado']},
+  {id:'base',t:'Base',o:['ok','amassada']},
+  {id:'comando',t:'Comando',o:['perfeito','quebrado','sem comando']},
+  {id:'kit',t:'Kit de instalacao',o:['com kit','sem kit']},
+  {id:'destinacao',t:'DESTINACAO',o:['reembalar','assistencia']}
+];
+var DVSEL={}, DVVENDA=null;
+function dvMontar(){
+  var h='';
+  for(var i=0;i<DVPERG.length;i++){
+    var p=DVPERG[i];
+    h+='<div style="margin-bottom:12px"><div style="font-size:13px;color:#8b97a5;margin-bottom:5px">'+p.t+'</div><div style="display:flex;gap:7px;flex-wrap:wrap">';
+    for(var j=0;j<p.o.length;j++){
+      var sel=DVSEL[p.id]===p.o[j];
+      h+='<button type="button" class="op dvOp" data-p="'+p.id+'" data-v="'+p.o[j]+'" style="padding:9px 15px;border-radius:8px;font-size:14px;cursor:pointer;border:1px solid '+(sel?'#ffb800':'#262d37')+';background:'+(sel?'#ffb800':'transparent')+';color:'+(sel?'#1a1300':'#e6edf3')+';font-weight:'+(sel?'700':'500')+'">'+p.o[j]+'</button>';
+    }
+    h+='</div></div>';
+  }
+  document.getElementById('dvPerg').innerHTML=h;
+}
+document.addEventListener('click',function(e){
+  var t=e.target.closest('#devTit');
+  if(t){ var f=document.getElementById('devForm'); f.style.display=f.style.display==='none'?'block':'none'; if(f.style.display==='block'){ dvSkus(); dvMontar(); } return; }
+  var b=e.target.closest('.dvOp');
+  if(b){ DVSEL[b.getAttribute('data-p')]=b.getAttribute('data-v'); dvMontar(); return; }
+  var s=e.target.closest('#dvSalvar');
+  if(s){ dvSalvar(); return; }
+});
+var DVCOR=null, DVMED=null;
+function dvOpcoes(){
+  var cores={}, medidas={};
+  for(var i=0;i<SKUS.length;i++){
+    var m=/^BK(\d{3})(\d{3})([A-Z]+)$/.exec(String(SKUS[i].codigo||'').toUpperCase());
+    if(!m) continue;
+    cores[m[3]]=1; medidas[m[1]+m[2]]=1;
+  }
+  return {cores:Object.keys(cores).sort(), medidas:Object.keys(medidas).sort()};
+}
+function dvSkus(){
+  var box=document.getElementById('dvSkuBox');
+  if(!box) return;
+  var op=dvOpcoes();
+  var h='<div class="lb">Cor</div><div class="ops" style="margin-bottom:16px">';
+  for(var i=0;i<op.cores.length;i++){
+    var on=DVCOR===op.cores[i];
+    h+='<button type="button" class="op'+(on?' on':'')+'" data-cor="'+op.cores[i]+'" style="font-size:16px;padding:14px 22px">'+op.cores[i]+'</button>';
+  }
+  h+='</div><div class="lb">Medida (largura x altura)</div><div class="ops">';
+  for(var j=0;j<op.medidas.length;j++){
+    var md=op.medidas[j];
+    var txt=(parseInt(md.slice(0,3),10)/100).toFixed(2)+' x '+(parseInt(md.slice(3),10)/100).toFixed(2);
+    var on2=DVMED===md;
+    h+='<button type="button" class="op'+(on2?' on':'')+'" data-med="'+md+'" style="font-size:16px;padding:14px 18px">'+txt+'</button>';
+  }
+  h+='</div><div id="dvResult" style="margin-top:16px;font-size:17px"></div>';
+  box.innerHTML=h;
+  dvResultado();
+}
+function dvSkuAtual(){
+  if(!DVCOR||!DVMED) return '';
+  return 'BK'+DVMED+DVCOR;
+}
+function dvResultado(){
+  var el=document.getElementById('dvResult');
+  if(!el) return;
+  var s=dvSkuAtual();
+  if(!s){ el.innerHTML='<span style="color:#8b97a5">Escolha a cor e a medida</span>'; return; }
+  var existe=false;
+  for(var i=0;i<SKUS.length;i++) if(SKUS[i].codigo===s){ existe=true; break; }
+  if(existe) el.innerHTML='SKU: <b style="color:#ffb800;font-family:ui-monospace,monospace;font-size:19px">'+s+'</b>';
+  else el.innerHTML='<b style="color:#f85149">'+s+' nao esta cadastrado</b>';
+}
+document.addEventListener('click',function(e){
+  var c=e.target.closest('[data-cor]');
+  if(c){ DVCOR=c.getAttribute('data-cor'); dvSkus(); return; }
+  var m=e.target.closest('[data-med]');
+  if(m){ DVMED=m.getAttribute('data-med'); dvSkus(); return; }
+});
+
+async function dvBuscar(cod){
+  var r={achou:false};
+  try{ r=await (await fetch('/api/devolucao/buscar/'+encodeURIComponent(cod))).json(); }catch(e){}
+  var el=document.getElementById('dvVenda');
+  if(r.achou){
+    DVVENDA=r.venda;
+    el.innerHTML='Venda encontrada: <b>'+(r.venda.buyer||'')+'</b> - enviado <b style="color:#ffb800">'+(r.venda.codigo||'?')+'</b> em '+(r.venda.data||'');
+    var sel=document.getElementById('dvSku');
+    if(sel) sel.value='';
+  } else {
+    DVVENDA=null;
+    el.innerHTML='<span style="color:#8b97a5">Sem registro dessa venda - tudo bem, siga normalmente.</span>';
+  }
+}
+async function dvSalvar(){
+  var sku=dvSkuAtual();
+  var msg=document.getElementById('dvMsg');
+  if(!sku){ msg.innerHTML='<span style="color:#ff6b6b">Escolha o SKU</span>'; return; }
+  if(!DVSEL.destinacao){ msg.innerHTML='<span style="color:#ff6b6b">Escolha a destinacao</span>'; return; }
+  var body={codigo_ml:document.getElementById('dvCod').value.trim(),sku_fisico:sku,
+    sku_venda:DVVENDA?DVVENDA.codigo:null, venda_id:DVVENDA?DVVENDA.id:null, buyer:DVVENDA?DVVENDA.buyer:null,
+    obs:document.getElementById('dvObs').value.trim()};
+  for(var k in DVSEL) body[k]=DVSEL[k];
+  var r=await (await fetch('/api/devolucao',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+  if(r.erro){ msg.innerHTML='<span style="color:#ff6b6b">'+r.erro+'</span>'; return; }
+  msg.innerHTML='<span style="color:#2ea043">Salvo'+(r.naFila?' - foi pra fila de embalagem':'')+'</span>';
+  DVSEL={}; DVVENDA=null;
+  document.getElementById('dvCod').value=''; document.getElementById('dvObs').value='';
+  DVCOR=null; DVMED=null; dvSkus(); document.getElementById('dvVenda').innerHTML='';
+  dvMontar();
+  setTimeout(function(){ msg.innerHTML=''; },4000);
+}
+document.addEventListener('DOMContentLoaded',function(){
+  var c=document.getElementById('dvCod');
+  if(!c) return;
+  var t=null;
+  c.addEventListener('input',function(){ clearTimeout(t); t=setTimeout(function(){ var v=c.value.trim(); if(v.length>=6) dvBuscar(v); },400); });
+});
+
+
+async function dvInit(){
+  try{ SKUS=await (await fetch('/api/skus')).json(); }catch(e){}
+  dvSkus(); dvMontar(); dvContar();
+  var c=document.getElementById('dvCod'); if(c) c.focus();
+}
+async function dvContar(){
+  try{ var r=await (await fetch('/api/devolucao/hoje')).json();
+    document.getElementById('dvHoje').textContent=r.qtd||0; }catch(e){}
+}
+dvInit();
+
+</script>
+<script src="/nav.js"></script>
+</body></html>
