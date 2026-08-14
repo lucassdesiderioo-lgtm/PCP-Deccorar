@@ -1,5 +1,6 @@
 module.exports=function(app,db){
-  db.exec("CREATE TABLE IF NOT EXISTS foto_estoque (data TEXT PRIMARY KEY, dados TEXT, criado_em TEXT DEFAULT (datetime('now','localtime')))");
+  // sem id: a PK e a data (uma foto por dia). O trigger de modo teste casa por data
+  db.exec("CREATE TABLE IF NOT EXISTS foto_estoque (data TEXT PRIMARY KEY, dados TEXT, criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0)");
 
   function foto(){
     const hoje=db.prepare("SELECT date('now','localtime') d").get().d;

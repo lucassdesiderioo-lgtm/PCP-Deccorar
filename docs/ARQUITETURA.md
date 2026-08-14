@@ -124,10 +124,15 @@ codigo     TEXT
 qtd        INTEGER
 produzido  INTEGER DEFAULT 0     -- incrementado pela EMBALAGEM, não pela revisão
 data       TEXT DEFAULT (date('now','localtime'))
+criado_em  TEXT DEFAULT (datetime('now','localtime'))
 origem     TEXT DEFAULT 'manual' -- 'manual' | 'ml'
 urgente    INTEGER DEFAULT 0     -- 1 = vermelho, 0 = azul
 teste      INTEGER DEFAULT 0
 ```
+> `origem` e `urgente` existiam só no banco de produção até 14/08/2026. Os
+> defaults são obrigatórios: o lançamento manual (`server.js`) grava apenas
+> `codigo` e `qtd`, e `/api/revisao/status` soma `urgente=1` e `urgente=0` em
+> colunas separadas — com `NULL` a linha não entraria em nenhuma das duas.
 
 #### `revisao` — cada peça revisada
 ```sql
@@ -136,11 +141,16 @@ codigo     TEXT
 inicio     TEXT      -- ISO
 fim        TEXT      -- ISO
 segundos   INTEGER
+data       TEXT DEFAULT (date('now','localtime'))
+criado_em  TEXT DEFAULT (datetime('now','localtime'))
 modo       TEXT DEFAULT 'hoje'   -- 'hoje' | 'estoque'
-data       TEXT
 teste      INTEGER DEFAULT 0
 ```
 > Não grava usuário — ver dívida técnica #9 no CLAUDE.md.
+>
+> `modo` existia só no banco de produção até 14/08/2026. O `INSERT` do
+> `/api/revisao` não preenche a coluna — um `UPDATE` logo em seguida grava
+> `'hoje'` ou `'estoque'` —, então o default cobre a janela entre os dois.
 
 #### `fila` — entre revisão e embalagem
 ```sql
@@ -153,9 +163,16 @@ embalado_em  TEXT
 data         TEXT
 teste        INTEGER DEFAULT 0
 ```
-> ⚠️ **Não existe `CREATE TABLE` de `fila` no código.** A tabela só existe no
-> banco de produção, criada à mão. Banco novo quebra na primeira revisão — e o
-> trigger de modo teste dela também é pulado. Dívida técnica #1b.
+> Criada em **`db.js`**, e não num módulo de rota, porque nenhum módulo é dono
+> dela: inserem `server.js` (revisão) e `dev_route.js` (devolução `reembalar`),
+> leem `mont_route.js` (embalagem) e `ger_route.js` (painel).
+>
+> ⚠️ Os defaults de `revisado_em` e `data` são **obrigatórios**: nenhum `INSERT`
+> preenche esses campos (ambos gravam só `codigo`+`modo`) e `/api/fila` ordena
+> por `MIN(revisado_em)`. Sem eles a fila perde a ordem de chegada.
+>
+> Até 14/08/2026 a tabela existia **apenas no banco de produção**, criada à mão.
+> `db.js` avisa no log se as colunas de lá divergirem do código.
 
 #### `montagem` — embalagem concluída
 ```sql
@@ -211,7 +228,8 @@ obs       TEXT
 segundos  INTEGER    -- tempo até a detecção
 modo      TEXT
 usuario   TEXT       -- única tabela que grava quem fez
-data      TEXT
+data      TEXT DEFAULT (date('now','localtime'))
+criado_em TEXT DEFAULT (datetime('now','localtime'))
 teste     INTEGER DEFAULT 0
 ```
 
@@ -465,8 +483,12 @@ e todas pausam enquanto há operação em andamento.
 
 Cada entrada declara a coluna de PK. Oito casam por `WHERE id=NEW.id`;
 **`foto_estoque` casa por `WHERE data=NEW.data`**, porque não tem `id` — sua PK é
-a data (uma foto por dia). O módulo também faz `ALTER TABLE ... ADD COLUMN teste`
-quando a coluna falta (era o caso de `foto_estoque`).
+a data (uma foto por dia).
+
+A coluna `teste` está declarada no `CREATE TABLE` das nove tabelas, então numa
+instalação limpa ela já nasce lá. O `ALTER TABLE ... ADD COLUMN teste` do
+`teste_route` continua como rede de segurança para bancos antigos onde a coluna
+ainda não existe — é idempotente (checa `PRAGMA table_info` antes).
 
 **Snapshot:** ao ligar, grava `config.teste_snapshot` com o estoque e o alvo de
 todos os SKUs.

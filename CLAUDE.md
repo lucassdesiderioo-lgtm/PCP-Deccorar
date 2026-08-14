@@ -355,7 +355,8 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | # | Dívida | Risco |
 |---|---|---|
 | 1 | ~~Modo teste não cobre `fila`, `devolucao`, `rejeicao`, `contagem`, `foto_estoque`~~ **RESOLVIDO em 14/08/2026** — ver §11 | — |
-| 1b | **`fila` não tem `CREATE TABLE` em lugar nenhum** — existe só no banco de produção | Alto — instalação nova quebra na 1ª revisão |
+| 1b | ~~`fila` não tem `CREATE TABLE` em lugar nenhum~~ **RESOLVIDO em 14/08/2026** — criada em `db.js` | — |
+| 1d | ~~`revisao.modo` e `producao.origem`/`urgente` sem migração~~ **RESOLVIDO em 14/08/2026** — auditoria completa, ver §17 | — |
 | 1c | **Embalagem em teste consome linha real da `fila`** — `mont_route.js:11` pega a mais antiga `aguardando` sem olhar `teste`; ao apagar os testes a linha real fica presa em `embalado` | Médio — peça real some da fila |
 | 2 | **Sem HTTPS.** PINs trafegam em texto aberto | Alto se exposto à internet |
 | 3 | **Revisão perdida em falha de conexão** — sem fila local de reenvio | Médio — buraco silencioso no relatório |
@@ -395,3 +396,42 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | **Reposição** | Produção para refazer o estoque consumido por uma venda |
 | **Urgente** | Venda sem estoque — cliente esperando, sai no mesmo dia |
 | **Adiantamento** | Ordem de amanhã produzida hoje, se sobrar tempo |
+
+---
+
+## 17. Schema: instalação limpa tem que bater com produção
+
+Não há migrations. Cada tabela nasce de um `CREATE TABLE IF NOT EXISTS` inline.
+O banco de produção foi ganhando colunas **à mão** ao longo do tempo, e esses
+`ALTER TABLE` nunca voltaram para o código — o resultado era um `CREATE` que não
+descrevia mais o banco real. Auditoria de 14/08/2026 fechou o buraco:
+
+| Tabela | Estava faltando no `CREATE` | Onde é usada |
+|---|---|---|
+| `fila` | a tabela **inteira** | `server.js`, `dev_route`, `mont_route`, `ger_route` |
+| `producao` | `origem`, `urgente`, `teste` | `cruz_route.js:35-36`, `st_route.js:14` |
+| `revisao` | `modo`, `teste` | `server.js:49`, `st_route.js:15`, `ger_route.js:37` |
+| `montagem` | `teste` | `teste_route` |
+| `lote` | `teste` | `teste_route` |
+| `foto_estoque` | `teste` | `teste_route` |
+
+**Regra daqui pra frente:** coluna nova entra no `CREATE TABLE` do módulo **no
+mesmo commit** em que o código passa a usá-la. Se precisar existir também no
+banco de produção, o `ALTER` correspondente vai junto, com a coluna acrescentada
+**no fim** — é onde o SQLite a coloca, e é o que mantém a ordem igual à de lá.
+
+> ⚠️ `ALTER TABLE ADD COLUMN` **não aceita default dinâmico** no SQLite
+> (`(datetime('now','localtime'))` é recusado). Colunas de data adicionadas por
+> `ALTER` ficam sem default e entram `NULL` — foi o risco que quase pegou
+> `fila.revisado_em`, que ordena a tela de embalagem.
+
+**Como conferir** que o código bate com o banco (roda no servidor):
+
+```bash
+cd /opt/expedicao
+for t in skus producao revisao fila montagem lote devolucao rejeicao contagem foto_estoque; do
+  printf "%-13s " "$t"; sqlite3 dados.db "SELECT GROUP_CONCAT(name,', ') FROM pragma_table_info('$t');"
+done
+```
+
+Compare com a §3 do `docs/ARQUITETURA.md`. Diferença ali é dívida nova.
