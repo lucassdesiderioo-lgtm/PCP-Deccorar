@@ -1,0 +1,151 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planejamento — comparação (Fase 1)</title>
+<style>
+  :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--red:#f85149;--blue:#4493f8}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  header{padding:16px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  .mark{width:34px;height:34px;border-radius:8px;background:var(--blue);display:grid;place-items:center;color:#04121f;font-weight:800}
+  h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
+  .links{margin-left:auto;display:flex;gap:8px}.link{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
+  .wrap{max-width:1180px;margin:0 auto;padding:20px}
+  .bar{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .bar input[type=number]{width:66px;padding:9px;border-radius:8px;border:1px solid var(--line);background:#0b0f14;color:var(--txt);text-align:center}
+  .bar button{border:0;border-radius:9px;font-weight:700;padding:11px 16px;cursor:pointer}
+  .prim{background:var(--blue);color:#04121f}.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  .file{color:var(--txt);font-size:13px}
+  .tot{margin-left:auto;font-size:14px;color:var(--muted)}.tot b{color:var(--blue);font-size:20px}
+  .msg{font-size:13px;color:var(--green)}
+  .meta{font-size:12px;color:var(--muted);margin:2px 0 14px}
+  .aviso{background:#2a2410;border:1px solid #6b5a12;color:#ffd85c;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:13px;display:none}
+  .aviso b{color:#ffe98a}
+  .tbwrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
+  table{width:100%;border-collapse:collapse;font-size:14px;background:var(--panel);min-width:920px}
+  th,td{text-align:right;padding:9px 11px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th.l,td.l{text-align:left}
+  thead .grp th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;background:#11161d;padding:8px 11px}
+  thead .grp .atual{color:var(--muted)}thead .grp .novo{color:var(--blue)}
+  thead .cols th{font-size:11px;color:var(--muted);text-transform:uppercase;background:#0f141b;font-weight:600}
+  .sep{border-left:2px solid #2f3a48}
+  td.code{font-family:ui-monospace,monospace;font-weight:600}
+  .abc{font-weight:800;padding:2px 9px;border-radius:20px;font-size:12px}
+  .abc.A{background:#10331c;color:#7ee2a0}.abc.B{background:#2a2410;color:#ffd85c}.abc.C{background:#20242b;color:#8b97a5}
+  .precisa{color:var(--blue);font-weight:800}.zero{color:var(--muted)}
+  .novoSku{font-size:11px;color:#ffb4ae}
+  .dim{color:var(--muted)}
+</style></head><body>
+<header><div class="mark">P</div>
+  <div><h1>Planejamento por estoque alvo — comparação</h1>
+  <div class="sub">Fase 1: cálculo novo <b>lado a lado</b> com o modelo atual (ABC). Nada do fluxo é alterado.</div></div>
+  <div class="links"><a class="link" href="/">Admin</a><a class="link" href="/necessidade">Necessidade (ABC)</a></div>
+</header>
+<div class="wrap">
+
+  <div class="bar">
+    <span class="sub">Planilha do ML</span>
+    <input type="file" id="arq" class="file" accept=".xlsx,.csv">
+    <button class="prim" onclick="importar()">Importar</button>
+    <span class="msg" id="msgImp"></span>
+  </div>
+  <div class="meta" id="meta">Nenhuma planilha importada ainda.</div>
+
+  <div class="aviso" id="aviso"></div>
+
+  <div class="bar">
+    <span class="sub">Dias de cobertura</span>
+    <input type="number" id="diasCob" min="1" value="10">
+    <span class="sub">· Janela da média</span>
+    <input type="number" id="janela" min="1" value="30">
+    <span class="sub">dias · Alvo mínimo</span>
+    <input type="number" id="alvoMin" min="0" value="2">
+    <button class="ghost" onclick="salvarConfig()">recalcular</button>
+    <span class="msg" id="msgCfg"></span>
+    <span class="tot">Precisa (total): <b id="totPrecisa">0</b> peças</span>
+  </div>
+
+  <div class="tbwrap"><table>
+    <thead>
+      <tr class="grp">
+        <th class="l" rowspan="2">SKU</th>
+        <th class="atual" colspan="4">Modelo atual (ABC)</th>
+        <th class="novo sep" colspan="5">Modelo novo (planejamento)</th>
+      </tr>
+      <tr class="cols">
+        <th>Venda 30d</th><th>Média/d</th><th>Classe</th><th>Alvo sug.</th>
+        <th class="sep">Vendas jan.</th><th>Média/d</th><th>Compromet.</th><th>Estoque</th><th>Precisa</th>
+      </tr>
+    </thead>
+    <tbody id="corpo"></tbody>
+  </table></div>
+
+  <div class="sub" style="margin-top:12px">
+    <b class="dim">Modelo atual:</b> alvo = média dos últimos 30d × dias de cobertura (curva ABC).
+    &nbsp;·&nbsp; <b style="color:var(--blue)">Modelo novo:</b>
+    precisa = comprometido (envios futuros da planilha) + alvo (média na janela × cobertura, piso = alvo mínimo) − estoque.
+  </div>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+function fmt(v){ return v==null?'—':v; }
+
+async function load(){
+  const d=await (await fetch('/api/planejamento')).json();
+  $('#diasCob').value=d.config.dias_cobertura;
+  $('#janela').value=d.config.janela_media;
+  $('#alvoMin').value=d.config.alvo_minimo;
+  $('#totPrecisa').textContent=d.total_precisa;
+
+  if(d.importado_em){
+    $('#meta').innerHTML='Última importação: <b style="color:#e6edf3">'+d.importado_em+'</b> · '
+      +d.total_linhas+' vendas na base · '+d.total_skus+' SKUs · comprometido total: '+d.total_comprometido+' peças';
+  } else {
+    $('#meta').textContent='Nenhuma planilha importada ainda. Os números novos só aparecem após a primeira importação.';
+  }
+
+  const av=$('#aviso');
+  if(d.desconhecidos && d.desconhecidos.length){
+    av.style.display='block';
+    av.innerHTML='<b>⚠ SKUs na planilha e fora do cadastro:</b> '
+      +d.desconhecidos.map(x=>x.codigo+' ('+x.qtd+')').join(' · ')
+      +' — cadastre no Admin para entrarem no cálculo de estoque.';
+  } else av.style.display='none';
+
+  $('#corpo').innerHTML=d.linhas.map(r=>`<tr>
+    <td class="l code">${r.codigo}${r.cadastrado?'':' <span class="novoSku">s/ cadastro</span>'}</td>
+    <td>${fmt(r.at_qtd30)}</td>
+    <td>${fmt(r.at_media)}</td>
+    <td>${r.at_classe?`<span class="abc ${r.at_classe}">${r.at_classe}</span>`:'<span class="dim">—</span>'}</td>
+    <td>${fmt(r.at_alvo)}</td>
+    <td class="sep">${r.vendas_janela}</td>
+    <td>${r.media_dia}</td>
+    <td>${r.comprometido}</td>
+    <td>${fmt(r.estoque)}</td>
+    <td class="${r.precisa>0?'precisa':'zero'}">${r.precisa>0?r.precisa:'—'}</td>
+  </tr>`).join('');
+}
+
+async function importar(){
+  const f=$('#arq').files[0];
+  if(!f){ alert('Escolha o arquivo da planilha (.xlsx ou .csv).'); return; }
+  $('#msgImp').textContent='importando…'; $('#msgImp').style.color='#8b97a5';
+  const b64=await new Promise((ok,err)=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.onerror=err; fr.readAsDataURL(f); });
+  try{
+    const r=await (await fetch('/api/planejamento/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({arquivo:b64,nome:f.name})})).json();
+    if(r.erro){ $('#msgImp').style.color='#f85149'; $('#msgImp').textContent='erro: '+r.erro; return; }
+    $('#msgImp').style.color='#2ea043';
+    $('#msgImp').textContent=`${r.novas} novas · ${r.atualizadas} atualizadas · ${r.removidas} removidas`
+      +(r.sem_sku?` · ${r.sem_sku} sem SKU`:'');
+    load();
+  }catch(e){ $('#msgImp').style.color='#f85149'; $('#msgImp').textContent='falha: '+e; }
+}
+
+async function salvarConfig(){
+  const body={dias_cobertura:+$('#diasCob').value||10, janela_media:+$('#janela').value||30, alvo_minimo:+$('#alvoMin').value||0};
+  await fetch('/api/planejamento/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  $('#msgCfg').textContent='recalculado'; setTimeout(()=>$('#msgCfg').textContent='',2000);
+  load();
+}
+load();
+</script>
+<script src="/nav.js"></script>
+</body></html>
