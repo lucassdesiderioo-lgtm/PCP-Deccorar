@@ -40,9 +40,34 @@
   .sumbox.low .n{color:var(--red)}.sumbox.rep .n{color:var(--amber)}
   .barmini{height:6px;background:#0b0f14;border-radius:4px;overflow:hidden;width:80px;display:inline-block;vertical-align:middle;margin-left:6px}
   .barmini>i{display:block;height:100%;background:var(--green)}
+  .mltask{display:flex;align-items:center;gap:12px;padding:11px 22px;font-size:14px;line-height:1.4;border-bottom:1px solid #262d37}
+  .mltask a{margin-left:auto;white-space:nowrap;text-decoration:none;padding:8px 14px;border-radius:8px;font-weight:700;font-size:13px}
+  .mltask.late{background:#3a1513;color:#ffb0a8}.mltask.late a{background:#f85149;color:#fff}
+  .mltask.warn{background:#2a2410;color:#ffd85c}.mltask.warn a{background:#ffb800;color:#1a1300}
+  .mltask.ok{background:#10241a;color:#8ce0ad}.mltask.ok a{background:transparent;color:#8ce0ad;border:1px solid #1f6f37}
 </style></head><body>
 <header><div class="mark">E</div><div><h1>Admin — Produção &amp; Estoque</h1><div class="sub">Lance o dia · controle estoque e necessidade · cadastre SKUs</div></div>
 <a class="link" href="/painel">Painel</a></header>
+<div id="mlTask" class="mltask" style="display:none"></div>
+<script>
+(function(){
+  fetch('/api/planejamento/status').then(function(r){return r.json();}).then(function(s){
+    var el=document.getElementById('mlTask'); if(!el) return;
+    var d=s.dias, per=s.periodo_dias||30, cls, txt;
+    if(d==null){ cls='late';
+      txt='📋 <b>Tarefa semanal do Mercado Livre:</b> nenhuma planilha importada ainda — exporte o relatório de vendas dos últimos '+per+' dias e suba em Planejamento.'; }
+    else if(d>=8){ cls='late';
+      txt='📋 <b>Tarefa semanal do Mercado Livre — atrasada ('+d+' dias):</b> exporte o relatório de vendas dos últimos '+per+' dias e atualize em Planejamento.'; }
+    else if(d>=6){ cls='warn';
+      txt='📋 <b>Tarefa semanal do Mercado Livre:</b> última planilha há '+d+' dias — já vale atualizar (relatório dos últimos '+per+' dias).'; }
+    else { cls='ok';
+      txt='✓ Planilha de vendas do ML em dia (há '+d+(d===1?' dia':' dias')+').'; }
+    el.className='mltask '+cls;
+    el.innerHTML=txt+' <a href="/planejamento">Abrir Planejamento</a>';
+    el.style.display='flex';
+  }).catch(function(){});
+})();
+</script>
 <div class="tabs">
   <div class="tab active" data-t="prod">Lançar produção</div>
   <div class="tab" data-t="est">Estoque &amp; Necessidade</div>
