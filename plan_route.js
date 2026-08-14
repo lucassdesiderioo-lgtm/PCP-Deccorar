@@ -21,8 +21,16 @@ module.exports = function(app, db){
     data_venda   TEXT,
     data_envio   TEXT,
     importado_em TEXT DEFAULT (datetime('now','localtime')),
-    teste        INTEGER DEFAULT 0
+    teste        INTEGER DEFAULT 0,
+    cancelada    INTEGER DEFAULT 0
   );`);
+  // 'cancelada' entrou depois de a tabela ja existir em producao. O ALTER
+  // acrescenta a coluna no fim (mesma ordem do CREATE) so quando falta, com
+  // default estatico 0 — ALTER nao aceita default dinamico no SQLite (secao 17).
+  try{
+    var vfCols = db.prepare("PRAGMA table_info(venda_futura)").all().map(function(c){return c.name;});
+    if(vfCols.indexOf('cancelada') < 0) db.exec("ALTER TABLE venda_futura ADD COLUMN cancelada INTEGER DEFAULT 0");
+  }catch(e){ console.log('[plan] nao consegui conferir venda_futura.cancelada: '+e.message); }
   // Fase 4: snapshot diario do fechamento, uma linha por dia (PK = data).
   // Guarda o numero do dia para permitir "era M ontem" e o historico.
   // So numeros derivados de dado real (a contagem ja exclui teste=1), por isso
@@ -62,16 +70,17 @@ module.exports = function(app, db){
       const buf = Buffer.from(b64, 'base64');
       const linhas = lerPlanilha(buf);
 
-      const up = db.prepare(`INSERT INTO venda_futura (venda_id,codigo,data_venda,data_envio)
-        VALUES (?,?,?,?)
+      const up = db.prepare(`INSERT INTO venda_futura (venda_id,codigo,data_venda,data_envio,cancelada)
+        VALUES (?,?,?,?,?)
         ON CONFLICT(venda_id) DO UPDATE SET
           codigo=excluded.codigo, data_venda=excluded.data_venda,
-          data_envio=excluded.data_envio, importado_em=datetime('now','localtime')`);
+          data_envio=excluded.data_envio, cancelada=excluded.cancelada,
+          importado_em=datetime('now','localtime')`);
       const existe   = db.prepare("SELECT 1 FROM venda_futura WHERE venda_id=?");
       const skuExiste= db.prepare("SELECT 1 FROM skus WHERE codigo=?");
       const del      = db.prepare("DELETE FROM venda_futura WHERE venda_id=? AND teste=0");
 
-      let novas=0, atualizadas=0, semSku=0, semData=0, removidas=0;
+      let novas=0, atualizadas=0, semSku=0, semData=0, removidas=0, canceladas=0;
       const vistos = new Set();
       const desconhecidos = {};
 
@@ -83,10 +92,14 @@ module.exports = function(app, db){
           const sku = String(l[ISKU] || '').replace(/\s+/g,'').toUpperCase();
           if(!sku){ semSku++; continue; }
           const dv = parseDataVenda(l[IDV]);
-          const de = parseDataEnvio(l[IE]);
+          const estado = String(l[IE] || '');
+          const de = parseDataEnvio(estado);
+          // venda cancelada/devolvida/reembolsada nao e demanda real -> fora da media
+          const cancelada = /cancel|devolu|reembols/i.test(estado) ? 1 : 0;
           if(!de) semData++;
+          if(cancelada) canceladas++;
           if(existe.get(vid)) atualizadas++; else novas++;
-          up.run(vid, sku, dv, de);
+          up.run(vid, sku, dv, de, cancelada);
           vistos.add(vid);
           if(!skuExiste.get(sku)) desconhecidos[sku] = (desconhecidos[sku]||0) + 1;
         }
@@ -97,7 +110,7 @@ module.exports = function(app, db){
       })();
 
       res.json({ ok:true, linhas_arquivo:linhas.length, novas, atualizadas,
-        removidas, sem_sku:semSku, sem_data_envio:semData,
+        removidas, sem_sku:semSku, sem_data_envio:semData, canceladas,
         desconhecidos: Object.keys(desconhecidos).map(k=>({sku:k, qtd:desconhecidos[k]})) });
     }catch(e){ console.error(e); res.status(500).json({ erro:String(e.message||e) }); }
   });
@@ -113,7 +126,8 @@ module.exports = function(app, db){
     // --- modelo NOVO: media pela janela e demanda comprometida ---
     const mediaMap = {}, compMap = {};
     db.prepare("SELECT UPPER(codigo) c, COUNT(*) n FROM venda_futura "+
-      "WHERE data_venda IS NOT NULL AND data_venda >= date('now','localtime','-'||?||' days') "+
+      "WHERE data_venda IS NOT NULL AND COALESCE(cancelada,0)=0 "+
+      "AND data_venda >= date('now','localtime','-'||?||' days') "+
       "GROUP BY UPPER(codigo)").all(janela).forEach(r=> mediaMap[r.c]=r.n);
     db.prepare("SELECT UPPER(codigo) c, COUNT(*) n FROM venda_futura "+
       "WHERE data_envio IS NOT NULL AND data_envio >= date('now','localtime') "+
@@ -221,7 +235,8 @@ module.exports = function(app, db){
     const estoqueTotal = db.prepare("SELECT COALESCE(SUM(estoque),0) t FROM skus").get().t;
     let vendJanela = 0;
     try{ vendJanela = db.prepare("SELECT COUNT(*) n FROM venda_futura "+
-      "WHERE data_venda IS NOT NULL AND data_venda >= date('now','localtime','-'||?||' days') "+
+      "WHERE data_venda IS NOT NULL AND COALESCE(cancelada,0)=0 "+
+      "AND data_venda >= date('now','localtime','-'||?||' days') "+
       "AND COALESCE(teste,0)=0").get(janela).n; }catch(e){}
     const mediaDiaTotal = janela>0 ? vendJanela/janela : 0;
     const cobertura = mediaDiaTotal>0 ? +(estoqueTotal/mediaDiaTotal).toFixed(1) : null;
