@@ -4,6 +4,9 @@
 > Ele contém regras de negócio que **parecem bugs mas são intencionais**.
 > Alterar código sem ler esta seção já causou perda de dados de estoque em produção.
 
+> 🗣️ **Idioma:** responda ao usuário **sempre em português** — todas as
+> mensagens de chat, resumos e explicações. Vale para todo o projeto.
+
 ---
 
 ## 1. O que é este sistema
