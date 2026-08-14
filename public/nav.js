@@ -9,6 +9,9 @@
   for(var k in MAP){ var p=MAP[k]; var on=(p===cur||(p==='/'&&cur==='/'));
     html+='<a href="'+p+'" style="text-decoration:none;font-size:12px;padding:6px 12px;border-radius:7px;color:'+(on?'#1a1300':'#8b97a5')+';background:'+(on?'#ffb800':'transparent')+';font-weight:'+(on?'700':'500')+'"><b>Alt+'+k+'</b> '+NAMES[p]+'</a>';
   }
+  // Planejamento (Fase 1/2/4) — sem atalho Alt porque 1..9 ja estao ocupados
+  var onPlan=(cur==='/planejamento');
+  html+='<a href="/planejamento" style="text-decoration:none;font-size:12px;padding:6px 12px;border-radius:7px;color:'+(onPlan?'#04121f':'#8b97a5')+';background:'+(onPlan?'#4493f8':'transparent')+';font-weight:'+(onPlan?'700':'500')+'">Planejamento</a>';
   bar.innerHTML=html;
   document.body.appendChild(bar);
   document.body.style.paddingBottom='52px';

@@ -2,8 +2,9 @@ module.exports=function(app, db){
   db.exec("CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT)");
 
   // Tabelas cobertas pelo modo teste.
-  // 'pk' existe porque foto_estoque NAO tem id: a chave primaria e a data
-  // (uma foto por dia). O trigger precisa casar pela coluna certa.
+  // 'pk' e a coluna de chave primaria (o trigger casa por ela); hoje todas usam
+  // 'id'. O campo ficou generico por causa da foto_estoque (PK='data'), que foi
+  // removida na Fase 3 — o PDF nao gera mais producao, entao a foto perdeu a razao.
   // 'rotulo' e o nome mostrado na tela do admin.
   var TABELAS=[
     {nome:'revisao',      pk:'id',   rotulo:'revisao'},
@@ -13,9 +14,12 @@ module.exports=function(app, db){
     {nome:'fila',         pk:'id',   rotulo:'fila'},
     {nome:'devolucao',    pk:'id',   rotulo:'devolucoes'},
     {nome:'rejeicao',     pk:'id',   rotulo:'problemas'},
-    {nome:'contagem',     pk:'id',   rotulo:'contagem'},
-    {nome:'foto_estoque', pk:'data', rotulo:'foto de estoque'}
+    {nome:'contagem',     pk:'id',   rotulo:'contagem'}
   ];
+
+  // Fase 3: foto_estoque saiu da cobertura; limpa o trigger antigo em bancos
+  // que ja o tinham (num banco novo o DROP IF EXISTS e no-op).
+  try{ db.exec('DROP TRIGGER IF EXISTS trg_teste_foto_estoque'); }catch(e){}
 
   // Quais tabelas realmente ficaram com trigger. Se alguma falhar (tabela
   // inexistente, coluna faltando), ela NAO e marcada nem limpa — e isso

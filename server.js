@@ -72,6 +72,8 @@ app.get('/relatorios',(req,res)=>res.sendFile(path.join(__dirname,'public','rela
 require('./alvo_route')(app, db);
 require('./nec_route')(app, db);
 app.get('/necessidade',(req,res)=>res.sendFile(path.join(__dirname,'public','necessidade.html')));
+require('./plan_route')(app, db);
+app.get('/planejamento',(req,res)=>res.sendFile(path.join(__dirname,'public','planejamento.html')));
 app.get('/status',(req,res)=> res.json({ok:true,hora:new Date().toISOString()}));
 app.get('/admin',(req,res)=> res.sendFile(path.join(__dirname,'public','index.html')));
 require('./modo_route')(app, db);

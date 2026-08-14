@@ -71,7 +71,7 @@ async function load(){
   PROD={}; for(const r of prod){ (PROD[r.codigo]=PROD[r.codigo]||{pedido:0,feito:0}); PROD[r.codigo].pedido+=r.qtd; PROD[r.codigo].feito+=r.produzido; }
   if(MODO==='hoje'){ DIA=await (await fetch('/api/revisao/dia')).json();
     try{ REVHOJE=await (await fetch('/api/revisao/hoje')).json(); }catch(e){ REVHOJE=[]; } }
-  else { METAS=await (await fetch('/api/revisao/metas')).json();
+  else { METAS=await (await fetch('/api/revisao/producao')).json();
     try{ ADIANTA=await (await fetch('/api/revisao/adiantar')).json(); }catch(e){ ADIANTA=[]; } }
   renderTiles(); loadStats();
 }
@@ -93,9 +93,9 @@ function renderTiles(){
       }
     }
     html+=METAS.map(function(m){ var act=emRev&&emRev.codigo===m.codigo;
-      return '<button class="tile '+(act?'active':'')+(m.falta>0?' falta':'')+'" data-cod="'+m.codigo+'"><div class="tc">'+m.codigo+'</div><div class="tcor">'+(m.cor||'')+'</div><div class="tp">'+m.estoque+'/'+m.alvo+'</div><div class="tf">'+(m.falta>0?'faltam '+m.falta:'meta atingida')+'</div></button>';
+      return '<button class="tile '+(act?'active':'')+(m.precisa>0?' falta':'')+'" data-cod="'+m.codigo+'"><div class="tc">'+m.codigo+'</div><div class="tcor">'+(m.cor||'')+'</div><div class="tp">'+m.precisa+'</div><div class="tf">comp '+m.comprometido+' · alvo '+m.alvo+' · est '+(m.estoque==null?'—':m.estoque)+'</div></button>';
     }).join('');
-    if(!html) html='<div class="muted">Nenhum SKU com meta. Defina o alvo no Admin.</div>';
+    if(!html) html='<div class="muted">Estoque coberto — nada a produzir agora. (Confira o Planejamento no Admin se acabou de importar a planilha.)</div>';
   }
   $('#tiles').innerHTML=html;
 }
@@ -243,7 +243,7 @@ async function avisoStatus(){
   } else if(s.urgentes===0){
     txt='<b style="color:#4493f8">Todas as vendas de hoje já estão em estoque.</b><br><span style="color:#8b97a5">'+
         (s.passouCorte?('Lista fechada às '+s.corte+'. '):('Corte às '+s.corte+' — ainda pode entrar venda. '))+
-        'Trabalhe na reposição (tela azul): '+s.reposicao+' peças.</span>';
+        'Trabalhe na reposição (tela azul).</span>';
   } else if(s.urgentesFalta>0){
     txt='<b style="color:#ff6b6b">'+s.urgentesFalta+' peça(s) URGENTE(S) para hoje</b><br><span style="color:#8b97a5">Cliente esperando. Priorize a tela vermelha.</span>';
     cor='#3a1513'; bd='#7d2820';

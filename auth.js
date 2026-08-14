@@ -18,6 +18,7 @@ const TELAS={
   '/painel':'painel','/painel.html':'painel',
   '/relatorios':'relatorios','/relatorios.html':'relatorios',
   '/necessidade':'necessidade','/necessidade.html':'necessidade',
+  '/planejamento':'necessidade','/planejamento.html':'necessidade',
   '/operador':'operador','/operador.html':'operador',
   '/devolucao':'devolucao','/devolucao.html':'devolucao',
   '/montagem':'montagem','/montagem.html':'montagem',
