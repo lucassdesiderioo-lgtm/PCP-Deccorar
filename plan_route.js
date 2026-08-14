@@ -257,6 +257,18 @@ module.exports = function(app, db){
       dias_cobertura_alvo: cfgNum('dias_cobertura',10) });
   });
 
+  // Tarja de lembrete no admin: ha quantos dias foi a ultima importacao da
+  // planilha. A tarja se auto-resolve — sobe a planilha, o contador zera.
+  app.get('/api/planejamento/status',(req,res)=>{
+    let imp=null;
+    try{ imp=db.prepare("SELECT MAX(importado_em) i FROM venda_futura WHERE teste=0").get().i; }catch(e){}
+    let dias=null;
+    if(imp){
+      try{ dias=db.prepare("SELECT CAST(julianday('now','localtime') - julianday(substr(?,1,10)) AS INTEGER) n").get(imp).n; }catch(e){}
+    }
+    res.json({ importado_em:imp, dias, periodo_dias: cfgNum('janela_media',30) });
+  });
+
   app.post('/api/planejamento/config',(req,res)=>{
     const b = req.body || {};
     const ins = db.prepare("INSERT INTO config (chave,valor) VALUES (?,?) "+
