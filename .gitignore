@@ -13,7 +13,10 @@ backups/
 lotes/
 
 # Planilhas de vendas do Mercado Livre (nome, CPF, endereco do comprador)
+# O painel do ML exporta em xlsx e em csv - os tres formatos ficam de fora
 *.xlsx
+*.xls
+*.csv
 
 node_modules/
 
