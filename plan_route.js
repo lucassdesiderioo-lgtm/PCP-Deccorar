@@ -89,7 +89,9 @@ module.exports = function(app, db){
     }catch(e){ console.error(e); res.status(500).json({ erro:String(e.message||e) }); }
   });
 
-  app.get('/api/planejamento',(req,res)=>{
+  // Calculo compartilhado entre a tela de comparacao (/api/planejamento) e a
+  // lista do modo azul do operador (/api/revisao/producao).
+  function calcular(){
     const diasCob     = cfgNum('dias_cobertura', 10);
     const janela      = cfgNum('janela_media', 30);
     const alvoMin     = cfgNum('alvo_minimo', 2);
@@ -105,7 +107,7 @@ module.exports = function(app, db){
       "GROUP BY UPPER(codigo)").all().forEach(r=> compMap[r.c]=r.n);
 
     const smap = {};
-    db.prepare("SELECT UPPER(codigo) c, estoque, alvo FROM skus").all().forEach(s=> smap[s.c]=s);
+    db.prepare("SELECT UPPER(codigo) c, descricao, cor, estoque, alvo FROM skus").all().forEach(s=> smap[s.c]=s);
 
     // --- modelo ATUAL: curva ABC da tabela `demanda` (igual a /api/necessidade) ---
     const demMap = {};
@@ -139,7 +141,9 @@ module.exports = function(app, db){
       const precisa = Math.max(0, comprometido + alvo - (estoque||0));
       const at = demMap[c] || null;
       linhas.push({
-        codigo:c, cadastrado:!!s, estoque,
+        codigo:c, cadastrado:!!s,
+        descricao: s?s.descricao:'', cor: s?s.cor:'',
+        estoque,
         // NOVO
         vendas_janela:nVendas, media_dia:+media.toFixed(2), alvo, comprometido, precisa,
         // ATUAL
@@ -151,6 +155,11 @@ module.exports = function(app, db){
       || (b.at_qtd30||0) - (a.at_qtd30||0)
       || a.codigo.localeCompare(b.codigo));
 
+    return { config:{ dias_cobertura:diasCob, janela_media:janela, alvo_minimo:alvoMin, dias_colchao:diasColchao }, linhas };
+  }
+
+  app.get('/api/planejamento',(req,res)=>{
+    const { config, linhas } = calcular();
     let meta = { imp:null, linhas:0, skus:0 };
     try{ meta = db.prepare("SELECT MAX(importado_em) imp, COUNT(*) linhas, "+
       "COUNT(DISTINCT UPPER(codigo)) skus FROM venda_futura WHERE teste=0").get(); }catch(e){}
@@ -158,14 +167,24 @@ module.exports = function(app, db){
       "SELECT UPPER(vf.codigo) codigo, COUNT(*) qtd FROM venda_futura vf "+
       "LEFT JOIN skus s ON s.codigo=UPPER(vf.codigo) "+
       "WHERE vf.teste=0 AND s.codigo IS NULL GROUP BY UPPER(vf.codigo) ORDER BY qtd DESC").all();
-
     res.json({
-      config:{ dias_cobertura:diasCob, janela_media:janela, alvo_minimo:alvoMin, dias_colchao:diasColchao },
+      config,
       importado_em: meta.imp, total_linhas: meta.linhas, total_skus: meta.skus,
       total_precisa: linhas.reduce((a,b)=>a+b.precisa,0),
       total_comprometido: linhas.reduce((a,b)=>a+b.comprometido,0),
       desconhecidos, linhas
     });
+  });
+
+  // Fase 2: a tela AZUL (PRODUCAO PRA ESTOQUE) passa a usar o calculo ao vivo,
+  // em vez de depender de lancamento. So SKUs cadastrados com necessidade > 0,
+  // ja ordenados pela maior necessidade. A tela vermelha (pedidos de hoje) nao muda.
+  app.get('/api/revisao/producao',(req,res)=>{
+    const { linhas } = calcular();
+    res.json(linhas.filter(l=> l.cadastrado && l.precisa>0).map(l=>({
+      codigo:l.codigo, descricao:l.descricao, cor:l.cor,
+      estoque:l.estoque, comprometido:l.comprometido, alvo:l.alvo, precisa:l.precisa
+    })));
   });
 
   app.post('/api/planejamento/config',(req,res)=>{

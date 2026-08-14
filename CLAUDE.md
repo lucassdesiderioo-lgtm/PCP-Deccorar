@@ -60,7 +60,7 @@ que impede o operador de revisar meia hora no modo errado.
 | Modo | Cor | O que é | Origem dos dados |
 |---|---|---|---|
 | **PEDIDOS DE HOJE** | 🔴 vermelho | Vendas sem estoque — cliente esperando | `GET /api/revisao/dia` |
-| **PRODUÇÃO PRA ESTOQUE** | 🔵 azul | Reposição + metas de alvo + adiantamento | `GET /api/revisao/metas` + `/api/revisao/adiantar` |
+| **PRODUÇÃO PRA ESTOQUE** | 🔵 azul | Necessidade calculada ao vivo (`comprometido + alvo − estoque`) — Fase 2 | `GET /api/revisao/producao` (+ `/api/revisao/adiantar`) |
 | **DEVOLUÇÕES** | 🟡 âmbar | Peças que voltaram do ML | navega para `/devolucao` |
 
 **Ground truth físico:** a produção separa os carrinhos fisicamente. Carrinho de
