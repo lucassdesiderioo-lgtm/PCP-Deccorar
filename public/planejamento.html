@@ -164,6 +164,7 @@ async function importar(){
     if(r.erro){ $('#msgImp').style.color='#f85149'; $('#msgImp').textContent='erro: '+r.erro; return; }
     $('#msgImp').style.color='#2ea043';
     $('#msgImp').textContent=`${r.novas} novas · ${r.atualizadas} atualizadas · ${r.removidas} removidas`
+      +(r.canceladas?` · ${r.canceladas} fora da média (cancel./devol.)`:'')
       +(r.sem_sku?` · ${r.sem_sku} sem SKU`:'');
     load(); fechamento();
   }catch(e){ $('#msgImp').style.color='#f85149'; $('#msgImp').textContent='falha: '+e; }
