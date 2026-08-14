@@ -17,6 +17,11 @@
   .tot{margin-left:auto;font-size:14px;color:var(--muted)}.tot b{color:var(--blue);font-size:20px}
   .msg{font-size:13px;color:var(--green)}
   .meta{font-size:12px;color:var(--muted);margin:2px 0 14px}
+  .fecho{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end}
+  .fecho h3{margin:0 0 6px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;width:100%}
+  .fecho .cell{display:flex;flex-direction:column;gap:2px}
+  .fecho .cn{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
+  .fecho .cl{font-size:12px;color:var(--muted)}
   .aviso{background:#2a2410;border:1px solid #6b5a12;color:#ffd85c;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:13px;display:none}
   .aviso b{color:#ffe98a}
   .tbwrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
@@ -40,6 +45,14 @@
   <div class="links"><a class="link" href="/">Admin</a><a class="link" href="/necessidade">Necessidade (ABC)</a></div>
 </header>
 <div class="wrap">
+
+  <div class="fecho" id="fecho">
+    <h3>Fechamento do dia — <span id="fData">—</span></h3>
+    <div class="cell"><div class="cn" id="fProd" style="color:var(--green)">–</div><div class="cl">Produzi (virou estoque)</div></div>
+    <div class="cell"><div class="cn" id="fVend" style="color:var(--red)">–</div><div class="cl">Vendi (etiquetas de venda)</div></div>
+    <div class="cell"><div class="cn" id="fVar">–</div><div class="cl">Estoque variou</div></div>
+    <div class="cell"><div class="cn" id="fCob" style="color:var(--blue)">–</div><div class="cl" id="fCobL">Cobertura média</div></div>
+  </div>
 
   <div class="bar">
     <span class="sub">Planilha do ML</span>
@@ -88,6 +101,23 @@
 const $=s=>document.querySelector(s);
 function fmt(v){ return v==null?'—':v; }
 
+async function fechamento(){
+  let f; try{ f=await (await fetch('/api/fechamento')).json(); }catch(e){ return; }
+  $('#fData').textContent=f.data||'—';
+  $('#fProd').textContent=f.produzido;
+  $('#fVend').textContent=f.vendido;
+  const v=f.variou; $('#fVar').textContent=(v>0?'+':'')+v;
+  $('#fVar').style.color = v>0?'var(--green)':(v<0?'var(--red)':'var(--muted)');
+  if(f.cobertura_dias==null){ $('#fCob').textContent='—'; $('#fCobL').textContent='Cobertura média (sem vendas na janela)'; }
+  else{
+    $('#fCob').textContent=f.cobertura_dias+'d';
+    var cmp='';
+    if(f.cobertura_ontem!=null){ var dd=+(f.cobertura_dias-f.cobertura_ontem).toFixed(1);
+      cmp=' · era '+f.cobertura_ontem+'d ontem'+(dd>0?' (↑'+dd+')':(dd<0?' (↓'+Math.abs(dd)+')':' (=)')); }
+    $('#fCobL').textContent='Cobertura média · alvo '+f.dias_cobertura_alvo+'d'+cmp;
+  }
+}
+
 async function load(){
   const d=await (await fetch('/api/planejamento')).json();
   $('#diasCob').value=d.config.dias_cobertura;
@@ -135,7 +165,7 @@ async function importar(){
     $('#msgImp').style.color='#2ea043';
     $('#msgImp').textContent=`${r.novas} novas · ${r.atualizadas} atualizadas · ${r.removidas} removidas`
       +(r.sem_sku?` · ${r.sem_sku} sem SKU`:'');
-    load();
+    load(); fechamento();
   }catch(e){ $('#msgImp').style.color='#f85149'; $('#msgImp').textContent='falha: '+e; }
 }
 
@@ -143,9 +173,9 @@ async function salvarConfig(){
   const body={dias_cobertura:+$('#diasCob').value||10, janela_media:+$('#janela').value||30, alvo_minimo:+$('#alvoMin').value||0};
   await fetch('/api/planejamento/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   $('#msgCfg').textContent='recalculado'; setTimeout(()=>$('#msgCfg').textContent='',2000);
-  load();
+  load(); fechamento();
 }
-load();
+load(); fechamento();
 </script>
 <script src="/nav.js"></script>
 </body></html>

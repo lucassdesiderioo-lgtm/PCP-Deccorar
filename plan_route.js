@@ -23,6 +23,19 @@ module.exports = function(app, db){
     importado_em TEXT DEFAULT (datetime('now','localtime')),
     teste        INTEGER DEFAULT 0
   );`);
+  // Fase 4: snapshot diario do fechamento, uma linha por dia (PK = data).
+  // Guarda o numero do dia para permitir "era M ontem" e o historico.
+  // So numeros derivados de dado real (a contagem ja exclui teste=1), por isso
+  // nao entra na cobertura do modo teste.
+  db.exec(`CREATE TABLE IF NOT EXISTS fechamento (
+    data         TEXT PRIMARY KEY,
+    produzido    INTEGER DEFAULT 0,
+    vendido      INTEGER DEFAULT 0,
+    variou       INTEGER DEFAULT 0,
+    estoque_fim  INTEGER DEFAULT 0,
+    cobertura    REAL,
+    atualizado_em TEXT
+  );`);
   db.exec("CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT);");
   // defaults (secao 6 do desenho); OR IGNORE preserva valor ja ajustado
   const seed = db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES (?,?)");
@@ -185,6 +198,48 @@ module.exports = function(app, db){
       codigo:l.codigo, descricao:l.descricao, cor:l.cor,
       estoque:l.estoque, comprometido:l.comprometido, alvo:l.alvo, precisa:l.precisa
     })));
+  });
+
+  // Fase 4: fechamento diario (secao 10 do desenho).
+  //   Produzi X   = pecas que viraram estoque hoje  (embalagem, tabela montagem)
+  //   Vendi  Y    = pecas que sairam hoje           (etiqueta de venda, lote.embalado_em)
+  //   Estoque variou Z = X - Y
+  //   Cobertura   = estoque total / media diaria total (dias que o estoque dura)
+  // Grava o snapshot do dia (idempotente) para comparar com ontem e formar historico.
+  app.get('/api/fechamento',(req,res)=>{
+    const janela = cfgNum('janela_media', 30);
+    const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
+
+    const produzido = db.prepare("SELECT COUNT(*) n FROM montagem "+
+      "WHERE data=date('now','localtime') AND COALESCE(teste,0)=0").get().n;
+    let vendido = 0;
+    try{ vendido = db.prepare("SELECT COUNT(*) n FROM lote "+
+      "WHERE embalado_em IS NOT NULL AND date(embalado_em)=date('now','localtime') "+
+      "AND COALESCE(teste,0)=0").get().n; }catch(e){}
+    const variou = produzido - vendido;
+
+    const estoqueTotal = db.prepare("SELECT COALESCE(SUM(estoque),0) t FROM skus").get().t;
+    let vendJanela = 0;
+    try{ vendJanela = db.prepare("SELECT COUNT(*) n FROM venda_futura "+
+      "WHERE data_venda IS NOT NULL AND data_venda >= date('now','localtime','-'||?||' days') "+
+      "AND COALESCE(teste,0)=0").get(janela).n; }catch(e){}
+    const mediaDiaTotal = janela>0 ? vendJanela/janela : 0;
+    const cobertura = mediaDiaTotal>0 ? +(estoqueTotal/mediaDiaTotal).toFixed(1) : null;
+
+    try{
+      db.prepare(`INSERT INTO fechamento (data,produzido,vendido,variou,estoque_fim,cobertura,atualizado_em)
+        VALUES (date('now','localtime'),?,?,?,?,?,datetime('now','localtime'))
+        ON CONFLICT(data) DO UPDATE SET produzido=excluded.produzido, vendido=excluded.vendido,
+          variou=excluded.variou, estoque_fim=excluded.estoque_fim, cobertura=excluded.cobertura,
+          atualizado_em=excluded.atualizado_em`).run(produzido,vendido,variou,estoqueTotal,cobertura);
+    }catch(e){}
+    let ontem = null;
+    try{ ontem = db.prepare("SELECT cobertura FROM fechamento WHERE data=date('now','localtime','-1 day')").get(); }catch(e){}
+
+    res.json({ data:hoje, produzido, vendido, variou,
+      estoque_total:estoqueTotal, media_dia_total:+mediaDiaTotal.toFixed(2),
+      cobertura_dias:cobertura, cobertura_ontem: ontem&&ontem.cobertura!=null ? ontem.cobertura : null,
+      dias_cobertura_alvo: cfgNum('dias_cobertura',10) });
   });
 
   app.post('/api/planejamento/config',(req,res)=>{
