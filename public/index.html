@@ -304,18 +304,33 @@ document.addEventListener("click",async function(e){
 
 
 /* ---- Modo teste ---- */
+/* Percorre o que o servidor mandou: as tabelas cobertas mudam com o tempo,
+   entao nada de lista fixa aqui — senao a tela esconde registros de teste. */
+function detalheTeste(itens,rotulos){
+  var p=[],n=0;
+  for(var k in (itens||{})){
+    var q=itens[k]||0; n+=q;
+    if(q>0) p.push(((rotulos&&rotulos[k])||k)+" "+q);
+  }
+  return {total:n, texto:p.length?p.join(", "):"nenhum registro"};
+}
 async function carregarTeste(){
   var t=await (await fetch("/api/teste")).json();
-  var n=(t.itens.revisao||0)+(t.itens.producao||0)+(t.itens.montagem||0)+(t.itens.lote||0);
+  var d=detalheTeste(t.itens,t.rotulos);
+  var alerta="";
+  if(t.naoCobertas&&t.naoCobertas.length){
+    alerta="<br><span class='sub' style='color:var(--amber)'>&#9888; Sem cobertura de teste: "+
+      t.naoCobertas.map(function(f){return f.tabela+" ("+f.motivo+")";}).join(", ")+
+      " &middot; o que for gravado nessas tabelas fica como dado real.</span>";
+  }
   if(t.ativo){
     $("#tstEstado").innerHTML="<b style='color:var(--amber)'>MODO TESTE LIGADO</b><br>"+
-      "<span class='sub'>Desde "+(t.desde||"")+" &middot; "+n+" registros de teste "+
-      "(revis&atilde;o "+(t.itens.revisao||0)+", produ&ccedil;&atilde;o "+(t.itens.producao||0)+
-      ", montagem "+(t.itens.montagem||0)+", expedi&ccedil;&atilde;o "+(t.itens.lote||0)+")</span>";
+      "<span class='sub'>Desde "+(t.desde||"")+" &middot; "+d.total+" registros de teste "+
+      "("+d.texto+")</span>"+alerta;
     $("#tstBotoes").innerHTML="<button class='primary' onclick='limparTeste()'>Encerrar e APAGAR os testes</button>"+
       " <button class='ghost' onclick='manterTeste()'>Encerrar e manter como real</button>";
   } else {
-    $("#tstEstado").innerHTML="<b>Modo teste desligado</b><br><span class='sub'>Tudo que for feito conta como produ&ccedil;&atilde;o real.</span>";
+    $("#tstEstado").innerHTML="<b>Modo teste desligado</b><br><span class='sub'>Tudo que for feito conta como produ&ccedil;&atilde;o real.</span>"+alerta;
     $("#tstBotoes").innerHTML="<button class='primary' onclick='ligarTeste()'>Ligar modo teste</button>";
   }
 }
@@ -326,8 +341,8 @@ async function ligarTeste(){
 async function limparTeste(){
   if(!confirm("Apagar TODOS os registros marcados como teste e restaurar o estoque? Dados reais nao sao tocados.")) return;
   var r=await (await fetch("/api/teste/limpar",{method:"POST"})).json();
-  alert("Apagados: revisao "+r.apagados.revisao+", producao "+r.apagados.producao+
-        ", montagem "+r.apagados.montagem+", expedicao "+r.apagados.lote+
+  var d=detalheTeste(r.apagados,r.rotulos);
+  alert("Apagados "+d.total+" registros: "+d.texto+
         ".\nEstoque restaurado em "+r.estoqueRestaurado+" SKUs.");
   carregarTeste(); carregar();
 }

@@ -153,6 +153,9 @@ embalado_em  TEXT
 data         TEXT
 teste        INTEGER DEFAULT 0
 ```
+> ⚠️ **Não existe `CREATE TABLE` de `fila` no código.** A tabela só existe no
+> banco de produção, criada à mão. Banco novo quebra na primeira revisão — e o
+> trigger de modo teste dela também é pulado. Dívida técnica #1b.
 
 #### `montagem` — embalagem concluída
 ```sql
@@ -255,10 +258,12 @@ criado_em  TEXT
 
 #### `foto_estoque` — base do cruzamento
 ```sql
-data       TEXT PRIMARY KEY   -- uma foto por dia
+data       TEXT PRIMARY KEY   -- uma foto por dia. NÃO tem id
 dados      TEXT               -- JSON {codigo: estoque}
 criado_em  TEXT
+teste      INTEGER DEFAULT 0  -- adicionada por teste_route.js no boot
 ```
+> Única tabela do modo teste sem `id`: o trigger casa por `data`, não por `id`.
 
 #### `demanda` — consumo para a curva ABC
 ```sql
@@ -453,17 +458,32 @@ e todas pausam enquanto há operação em andamento.
 
 ## 9. Modo teste — implementação
 
-**Triggers:** `AFTER INSERT` em `revisao`, `producao`, `montagem` e `lote`, que
-marcam `teste=1` quando `config.modo_teste = '1'`.
+**Triggers:** `AFTER INSERT` nas 9 tabelas da lista `TABELAS` (topo do
+`teste_route.js`), marcando `teste=1` quando `config.modo_teste = '1'`:
+`revisao`, `producao`, `montagem`, `lote`, `fila`, `devolucao`, `rejeicao`,
+`contagem` e `foto_estoque`.
+
+Cada entrada declara a coluna de PK. Oito casam por `WHERE id=NEW.id`;
+**`foto_estoque` casa por `WHERE data=NEW.data`**, porque não tem `id` — sua PK é
+a data (uma foto por dia). O módulo também faz `ALTER TABLE ... ADD COLUMN teste`
+quando a coluna falta (era o caso de `foto_estoque`).
 
 **Snapshot:** ao ligar, grava `config.teste_snapshot` com o estoque e o alvo de
 todos os SKUs.
 
-**Ao limpar:** apaga as linhas com `teste=1` das quatro tabelas e restaura o
-estoque pelo snapshot.
+**Ao limpar:** apaga as linhas com `teste=1` das 9 tabelas e restaura o estoque
+pelo snapshot. Apagar a foto de teste é intencional — o cruzamento seguinte
+refotografa o estoque já restaurado.
 
-> ⚠️ **Não cobre** `fila`, `devolucao`, `rejeicao`, `contagem` nem `foto_estoque`,
-> apesar de todas terem a coluna `teste`. Corrigir é a dívida técnica #1.
+**Ao manter:** zera `teste` nas 9 tabelas, promovendo tudo a produção real.
+
+> ⚠️ **Ordem de carga:** `require('./teste_route')` é o **último** do `server.js`.
+> Ele depende das tabelas criadas por `mont_route`, `cruz_route`, `cont_route`,
+> `dev_route` e `cad_route`. Antes delas, num banco novo os triggers seriam
+> pulados em silêncio.
+
+**Diagnóstico:** tabelas cujo trigger falhou saem em `naoCobertas` no
+`GET /api/teste`, e a aba Modo teste as exibe em âmbar.
 
 ---
 

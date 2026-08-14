@@ -75,7 +75,6 @@ app.get('/necessidade',(req,res)=>res.sendFile(path.join(__dirname,'public','nec
 app.get('/status',(req,res)=> res.json({ok:true,hora:new Date().toISOString()}));
 app.get('/admin',(req,res)=> res.sendFile(path.join(__dirname,'public','index.html')));
 require('./modo_route')(app, db);
-require('./teste_route')(app, db);
 require('./cruz_route')(app, db);
 require('./cont_route')(app, db);
 require('./etq_route')(app, db);
@@ -84,4 +83,9 @@ app.get('/devolucao',(req,res)=> res.sendFile(path.join(__dirname,'public','devo
 require('./cad_route')(app, db);
 require('./ger_route')(app, db);
 require('./st_route')(app, db);
+// teste_route por ULTIMO: ele cria os triggers de modo teste em cima das
+// tabelas dos outros modulos (fila, devolucao, rejeicao, contagem,
+// foto_estoque). Se subir antes, as tabelas ainda nao existem e os triggers
+// sao pulados em silencio — o teste passaria a sujar dados reais.
+require('./teste_route')(app, db);
 app.listen(PORT,()=> console.log('Servidor na porta '+PORT));

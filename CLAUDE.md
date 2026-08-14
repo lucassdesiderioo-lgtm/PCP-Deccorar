@@ -273,11 +273,22 @@ a produção real). Tarja amarela aparece em todas as telas via `nav.js`.
 > **Por que a foto do estoque:** estoque é número corrido, não lista de linhas.
 > Apagar as revisões de teste não desfaria o `+1` que cada uma somou.
 
-> ⚠️ **DÍVIDA TÉCNICA CONHECIDA:** os triggers em `teste_route.js` cobrem apenas
-> `revisao`, `producao`, `montagem` e `lote`. As tabelas criadas depois —
-> **`fila`, `devolucao`, `rejeicao`, `contagem`, `foto_estoque`** — não são
-> marcadas nem limpas pelo modo teste, mesmo tendo a coluna `teste`.
-> Corrigir isso é prioridade alta antes de usar o modo teste para valer.
+**Cobertura atual (9 tabelas):** `revisao`, `producao`, `montagem`, `lote`,
+`fila`, `devolucao`, `rejeicao`, `contagem` e `foto_estoque`.
+
+A lista fica em `TABELAS`, no topo do `teste_route.js`. Cada entrada traz a coluna
+de chave primária, porque **`foto_estoque` não tem `id`** — a PK é `data` (uma foto
+por dia) e o trigger casa por `WHERE data=NEW.data`. Ao acrescentar uma tabela,
+basta incluí-la nessa lista: trigger, contagem, limpeza e "manter" saem dali.
+
+> ⚠️ **`teste_route` tem que ser o ÚLTIMO `require` do `server.js`.** Ele cria
+> triggers em cima de tabelas de outros módulos (`fila`, `devolucao`, `rejeicao`,
+> `contagem`, `foto_estoque`). Subindo antes, num banco novo essas tabelas ainda
+> não existem, o `try/catch` engole o erro e o modo teste volta a sujar dado real
+> **sem avisar**.
+
+**Se um trigger falhar**, a tabela entra em `naoCobertas` no `GET /api/teste` e a
+aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não silenciosa.
 
 ---
 
@@ -343,7 +354,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 
 | # | Dívida | Risco |
 |---|---|---|
-| 1 | **Modo teste não cobre** `fila`, `devolucao`, `rejeicao`, `contagem`, `foto_estoque` | Alto — teste sujaria dados reais |
+| 1 | ~~Modo teste não cobre `fila`, `devolucao`, `rejeicao`, `contagem`, `foto_estoque`~~ **RESOLVIDO em 14/08/2026** — ver §11 | — |
+| 1b | **`fila` não tem `CREATE TABLE` em lugar nenhum** — existe só no banco de produção | Alto — instalação nova quebra na 1ª revisão |
+| 1c | **Embalagem em teste consome linha real da `fila`** — `mont_route.js:11` pega a mais antiga `aguardando` sem olhar `teste`; ao apagar os testes a linha real fica presa em `embalado` | Médio — peça real some da fila |
 | 2 | **Sem HTTPS.** PINs trafegam em texto aberto | Alto se exposto à internet |
 | 3 | **Revisão perdida em falha de conexão** — sem fila local de reenvio | Médio — buraco silencioso no relatório |
 | 4 | `POST /api/producao` (manual) não aceita `data`, `origem` nem `urgente` | Médio — impede lançar adiantado pela tela |

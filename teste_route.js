@@ -1,28 +1,62 @@
 module.exports=function(app, db){
   db.exec("CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT)");
-  ['revisao','producao','montagem','lote'].forEach(function(t){
+
+  // Tabelas cobertas pelo modo teste.
+  // 'pk' existe porque foto_estoque NAO tem id: a chave primaria e a data
+  // (uma foto por dia). O trigger precisa casar pela coluna certa.
+  // 'rotulo' e o nome mostrado na tela do admin.
+  var TABELAS=[
+    {nome:'revisao',      pk:'id',   rotulo:'revisao'},
+    {nome:'producao',     pk:'id',   rotulo:'producao'},
+    {nome:'montagem',     pk:'id',   rotulo:'embalagem'},
+    {nome:'lote',         pk:'id',   rotulo:'expedicao'},
+    {nome:'fila',         pk:'id',   rotulo:'fila'},
+    {nome:'devolucao',    pk:'id',   rotulo:'devolucoes'},
+    {nome:'rejeicao',     pk:'id',   rotulo:'problemas'},
+    {nome:'contagem',     pk:'id',   rotulo:'contagem'},
+    {nome:'foto_estoque', pk:'data', rotulo:'foto de estoque'}
+  ];
+
+  // Quais tabelas realmente ficaram com trigger. Se alguma falhar (tabela
+  // inexistente, coluna faltando), ela NAO e marcada nem limpa — e isso
+  // aparece em GET /api/teste em vez de sumir num console.log.
+  var COBERTAS=[], FALHOU=[];
+
+  TABELAS.forEach(function(t){
     try{
-      var cols=db.prepare('PRAGMA table_info('+t+')').all().map(function(c){return c.name;});
-      if(cols.indexOf('teste')<0) db.exec('ALTER TABLE '+t+' ADD COLUMN teste INTEGER DEFAULT 0');
-      db.exec('DROP TRIGGER IF EXISTS trg_teste_'+t);
-      db.exec("CREATE TRIGGER trg_teste_"+t+" AFTER INSERT ON "+t+
+      var cols=db.prepare('PRAGMA table_info('+t.nome+')').all().map(function(c){return c.name;});
+      if(!cols.length) throw new Error('tabela nao existe');
+      if(cols.indexOf(t.pk)<0) throw new Error('sem coluna '+t.pk);
+      if(cols.indexOf('teste')<0) db.exec('ALTER TABLE '+t.nome+' ADD COLUMN teste INTEGER DEFAULT 0');
+      db.exec('DROP TRIGGER IF EXISTS trg_teste_'+t.nome);
+      db.exec("CREATE TRIGGER trg_teste_"+t.nome+" AFTER INSERT ON "+t.nome+
               " WHEN (SELECT valor FROM config WHERE chave='modo_teste')='1'"+
-              " BEGIN UPDATE "+t+" SET teste=1 WHERE id=NEW.id; END");
-    }catch(e){ console.log('[teste] pulei '+t+': '+e.message); }
+              " BEGIN UPDATE "+t.nome+" SET teste=1 WHERE "+t.pk+"=NEW."+t.pk+"; END");
+      COBERTAS.push(t);
+    }catch(e){
+      FALHOU.push({tabela:t.nome,motivo:e.message});
+      console.log('[teste] pulei '+t.nome+': '+e.message);
+    }
   });
 
   var get=function(k){ var r=db.prepare('SELECT valor FROM config WHERE chave=?').get(k); return r?r.valor:null; };
   var set=function(k,v){ db.prepare('INSERT INTO config(chave,valor) VALUES(?,?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor').run(k,String(v)); };
   var conta=function(){
     var o={};
-    ['revisao','producao','montagem','lote'].forEach(function(t){
-      try{ o[t]=db.prepare('SELECT COUNT(*) c FROM '+t+' WHERE teste=1').get().c; }catch(e){ o[t]=0; }
+    COBERTAS.forEach(function(t){
+      try{ o[t.nome]=db.prepare('SELECT COUNT(*) c FROM '+t.nome+' WHERE teste=1').get().c; }catch(e){ o[t.nome]=0; }
     });
+    return o;
+  };
+  var rotulos=function(){
+    var o={};
+    COBERTAS.forEach(function(t){ o[t.nome]=t.rotulo; });
     return o;
   };
 
   app.get('/api/teste',function(req,res){
-    res.json({ativo:get('modo_teste')==='1', desde:get('teste_desde')||null, itens:conta()});
+    res.json({ativo:get('modo_teste')==='1', desde:get('teste_desde')||null,
+              itens:conta(), rotulos:rotulos(), naoCobertas:FALHOU});
   });
 
   app.post('/api/teste/ligar',function(req,res){
@@ -30,27 +64,27 @@ module.exports=function(app, db){
     set('teste_snapshot',JSON.stringify(db.prepare('SELECT codigo,estoque,alvo FROM skus').all()));
     set('teste_desde',new Date().toLocaleString('pt-BR'));
     set('modo_teste','1');
-    res.json({ok:true});
+    res.json({ok:true,naoCobertas:FALHOU});
   });
 
   app.post('/api/teste/limpar',function(req,res){
     var snap=[]; try{ snap=JSON.parse(get('teste_snapshot')||'[]'); }catch(e){}
     var apagados={};
     db.transaction(function(){
-      ['revisao','producao','montagem','lote'].forEach(function(t){
-        try{ apagados[t]=db.prepare('DELETE FROM '+t+' WHERE teste=1').run().changes; }catch(e){ apagados[t]=0; }
+      COBERTAS.forEach(function(t){
+        try{ apagados[t.nome]=db.prepare('DELETE FROM '+t.nome+' WHERE teste=1').run().changes; }catch(e){ apagados[t.nome]=0; }
       });
       var up=db.prepare('UPDATE skus SET estoque=?, alvo=? WHERE codigo=?');
       snap.forEach(function(s){ up.run(s.estoque,s.alvo,s.codigo); });
       set('modo_teste','0');
     })();
-    res.json({ok:true,apagados:apagados,estoqueRestaurado:snap.length});
+    res.json({ok:true,apagados:apagados,rotulos:rotulos(),estoqueRestaurado:snap.length});
   });
 
   app.post('/api/teste/manter',function(req,res){
     db.transaction(function(){
-      ['revisao','producao','montagem','lote'].forEach(function(t){
-        try{ db.prepare('UPDATE '+t+' SET teste=0 WHERE teste=1').run(); }catch(e){}
+      COBERTAS.forEach(function(t){
+        try{ db.prepare('UPDATE '+t.nome+' SET teste=0 WHERE teste=1').run(); }catch(e){}
       });
       set('modo_teste','0');
     })();
