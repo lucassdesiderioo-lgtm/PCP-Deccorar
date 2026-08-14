@@ -12,6 +12,9 @@ backups/
 # PDFs do Mercado Livre (dados pessoais de compradores)
 lotes/
 
+# Planilhas de vendas do Mercado Livre (nome, CPF, endereco do comprador)
+*.xlsx
+
 node_modules/
 
 # Backups manuais
