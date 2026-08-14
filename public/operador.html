@@ -243,7 +243,7 @@ async function avisoStatus(){
   } else if(s.urgentes===0){
     txt='<b style="color:#4493f8">Todas as vendas de hoje já estão em estoque.</b><br><span style="color:#8b97a5">'+
         (s.passouCorte?('Lista fechada às '+s.corte+'. '):('Corte às '+s.corte+' — ainda pode entrar venda. '))+
-        'Trabalhe na reposição (tela azul): '+s.reposicao+' peças.</span>';
+        'Trabalhe na reposição (tela azul).</span>';
   } else if(s.urgentesFalta>0){
     txt='<b style="color:#ff6b6b">'+s.urgentesFalta+' peça(s) URGENTE(S) para hoje</b><br><span style="color:#8b97a5">Cliente esperando. Priorize a tela vermelha.</span>';
     cor='#3a1513'; bd='#7d2820';

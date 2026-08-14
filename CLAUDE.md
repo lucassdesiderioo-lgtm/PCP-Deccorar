@@ -116,24 +116,28 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 
 1. `parse.js` extrai SKU, Pack ID, venda, comprador, NF e páginas de etiqueta/DANFE
 2. Cada volume vira uma linha em `lote`
-3. `cruz_route.js` compara vendas × estoque e divide em duas ordens:
+3. `cruz_route.js` compara os volumes **pendentes** × estoque e gera só urgência:
 
 | Situação | Vira | Cor na revisão |
 |---|---|---|
 | Vendido, **sem** estoque | Produção **urgente** (`urgente=1`) | 🔴 |
-| Vendido, **com** estoque | **Reposição** (`urgente=0`) | 🔵 |
+| Vendido, **com** estoque | Sai da etiqueta direto do estoque — **sem** ordem de produção | — |
 
-**Exemplo:** 5 vendas de um SKU com 2 em estoque → 3 urgentes + 2 de reposição.
-As 2 com estoque vão direto para a etiqueta de venda; a reposição refaz o buraco.
+> **Fase 3 (14/08/2026):** o PDF passa a gerar **só urgência**. A reposição
+> (produção para repor o estoque vendido) saiu do cruzamento e agora vem do
+> cálculo ao vivo da tela azul (`/api/revisao/producao`). O PDF fica só na expedição.
 
-### A foto do estoque (`foto_estoque`)
+**Exemplo:** 5 vendas de um SKU com 2 em estoque → 3 urgentes. As 2 com estoque
+vão direto para a etiqueta de venda; o buraco no estoque é refeito pelo
+planejamento (tela azul), não mais por uma ordem de reposição do PDF.
 
-No primeiro cruzamento do dia, o sistema fotografa o estoque de todos os SKUs e
-usa **essa foto** como base em todos os cruzamentos seguintes daquele dia.
+### ~~A foto do estoque (`foto_estoque`)~~ — removida na Fase 3
 
-> **Por quê:** durante o dia o estoque muda (embalagem soma, etiqueta subtrai).
-> Se o segundo upload recalculasse contra o estoque do momento, contaria peças
-> duas vezes ou apagaria urgentes já em produção.
+A foto era um remendo para o recálculo do PDF: congelava o estoque do dia para o
+segundo upload não recontar. Sem produção de reposição vinda do PDF, perdeu a
+razão. A urgência agora é **auto-corrigível**: conta os volumes ainda `pendente`
+contra o estoque atual, então reaplicar depois de produzir/expedir não infla o
+número — o volume processado sai de `pendente` e o estoque baixa junto.
 
 **Recálculo é idempotente:** `POST /api/cruzamento/aplicar` apaga as ordens de
 `origem='ml'` do dia e refaz. Subir o mesmo PDF duas vezes não duplica.
@@ -276,17 +280,17 @@ a produção real). Tarja amarela aparece em todas as telas via `nav.js`.
 > **Por que a foto do estoque:** estoque é número corrido, não lista de linhas.
 > Apagar as revisões de teste não desfaria o `+1` que cada uma somou.
 
-**Cobertura atual (9 tabelas):** `revisao`, `producao`, `montagem`, `lote`,
-`fila`, `devolucao`, `rejeicao`, `contagem` e `foto_estoque`.
+**Cobertura atual (8 tabelas):** `revisao`, `producao`, `montagem`, `lote`,
+`fila`, `devolucao`, `rejeicao` e `contagem`. (`foto_estoque` saiu na Fase 3.)
 
 A lista fica em `TABELAS`, no topo do `teste_route.js`. Cada entrada traz a coluna
-de chave primária, porque **`foto_estoque` não tem `id`** — a PK é `data` (uma foto
-por dia) e o trigger casa por `WHERE data=NEW.data`. Ao acrescentar uma tabela,
-basta incluí-la nessa lista: trigger, contagem, limpeza e "manter" saem dali.
+de chave primária — hoje todas usam `id`. O campo ficou genérico por causa da
+`foto_estoque` (PK = `data`), removida na Fase 3. Ao acrescentar uma tabela, basta
+incluí-la nessa lista: trigger, contagem, limpeza e "manter" saem dali.
 
 > ⚠️ **`teste_route` tem que ser o ÚLTIMO `require` do `server.js`.** Ele cria
-> triggers em cima de tabelas de outros módulos (`fila`, `devolucao`, `rejeicao`,
-> `contagem`, `foto_estoque`). Subindo antes, num banco novo essas tabelas ainda
+> triggers em cima de tabelas de outros módulos (`fila`, `devolucao`, `rejeicao`
+> e `contagem`). Subindo antes, num banco novo essas tabelas ainda
 > não existem, o `try/catch` engole o erro e o modo teste volta a sujar dado real
 > **sem avisar**.
 
