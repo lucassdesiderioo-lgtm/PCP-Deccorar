@@ -183,6 +183,9 @@ function parseDataVenda(cel){
   if(m) return iso(+m[1], +m[2], +m[3]);
   m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); // dd/mm/aaaa
   if(m) return iso(+m[3], +m[2], +m[1]);
+  // por extenso, como vem do ML: "14 de agosto de 2026 08:38 hs."
+  m = s.toLowerCase().match(/(\d{1,2})\s+de\s+([a-zç]+)\s+de\s+(\d{4})/);
+  if(m && MESES[m[2]]) return iso(+m[3], MESES[m[2]], +m[1]);
   const t = Date.parse(s);
   if(!isNaN(t)){ const dt = new Date(t); return iso(dt.getFullYear(), dt.getMonth()+1, dt.getDate()); }
   return null;
