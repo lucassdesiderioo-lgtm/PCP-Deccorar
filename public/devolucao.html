@@ -18,6 +18,26 @@
   .grp{margin-bottom:14px}
   .ops{display:flex;gap:8px;flex-wrap:wrap}
   .bt{background:var(--amber);border:0;border-radius:10px;padding:15px 26px;font-weight:700;font-size:16px;cursor:pointer}
+  /* triagem — botoes grandes p/ tablet 8" (DESIGN secao 5) */
+  .dvprog{display:flex;align-items:center;gap:12px;margin-bottom:18px;padding:12px 14px;
+    background:#0e1217;border:1px solid var(--line);border-radius:10px;font-size:15px;font-weight:700}
+  .dvprog .bar{flex:1;height:8px;background:#0b0f14;border-radius:5px;overflow:hidden}
+  .dvprog .bar>i{display:block;height:100%;background:var(--amber);transition:width .2s}
+  .dvprog.full{color:var(--green)}.dvprog.full .bar>i{background:var(--green)}
+  .dvgrp{margin-bottom:18px}
+  .dvgrp>.t{font-size:15px;font-weight:700;margin-bottom:8px}
+  .dvopts{display:grid;gap:10px}
+  .dvopts.duo{grid-template-columns:1fr 1fr}
+  .dvopts.stack{grid-template-columns:1fr}
+  .dvopt{display:flex;align-items:center;gap:10px;min-height:56px;padding:12px 18px;
+    border:2px solid var(--line);border-radius:12px;background:transparent;color:var(--txt);
+    font-size:17px;font-weight:600;cursor:pointer;line-height:1.2;-webkit-tap-highlight-color:transparent}
+  .dvopts.duo .dvopt{justify-content:center}
+  .dvopts.stack .dvopt{justify-content:flex-start}
+  .dvopt:active{transform:scale(.99)}
+  .dvopt.sel{background:var(--amber);color:#1a1300;border-color:#8a6300;border-width:3px;font-weight:800}
+  .dvopt .ck{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;
+    background:#1a1300;color:var(--amber);font-size:15px;font-weight:900;flex:0 0 auto}
 </style></head><body>
 <header><div class="mark">D</div><div><h1>Devolucoes</h1><div class="sub">Recebimento e triagem de peças devolvidas</div></div><button onclick="(function(){try{localStorage.removeItem('rev_modo');}catch(e){} location.href='/operador';})()" style="margin-left:auto;background:transparent;border:1px solid #262d37;color:#8b97a5;border-radius:9px;padding:11px 18px;font-size:14px;cursor:pointer">Trocar</button></header>
 <div class="wrap">
@@ -53,13 +73,22 @@ var DVPERG=[
 ];
 var DVSEL={}, DVVENDA=null;
 function dvMontar(){
-  var h='';
-  for(var i=0;i<DVPERG.length;i++){
+  var total=DVPERG.length, feitas=0;
+  for(var i=0;i<total;i++){ if(DVSEL[DVPERG[i].id]) feitas++; }
+  var pct=Math.round(feitas/total*100);
+  var h='<div class="dvprog'+(feitas===total?' full':'')+'">'
+      + '<span>'+feitas+' de '+total+' respondidas</span>'
+      + '<span class="bar"><i style="width:'+pct+'%"></i></span></div>';
+  for(var i=0;i<total;i++){
     var p=DVPERG[i];
-    h+='<div style="margin-bottom:12px"><div style="font-size:13px;color:#8b97a5;margin-bottom:5px">'+p.t+'</div><div style="display:flex;gap:7px;flex-wrap:wrap">';
+    var duo = p.o.length<=2;                 // 2 opcoes lado a lado; 3+ empilhado
+    h+='<div class="dvgrp"><div class="t">'+p.t+'</div>';
+    h+='<div class="dvopts '+(duo?'duo':'stack')+'">';
     for(var j=0;j<p.o.length;j++){
       var sel=DVSEL[p.id]===p.o[j];
-      h+='<button type="button" class="op dvOp" data-p="'+p.id+'" data-v="'+p.o[j]+'" style="padding:9px 15px;border-radius:8px;font-size:14px;cursor:pointer;border:1px solid '+(sel?'#ffb800':'#262d37')+';background:'+(sel?'#ffb800':'transparent')+';color:'+(sel?'#1a1300':'#e6edf3')+';font-weight:'+(sel?'700':'500')+'">'+p.o[j]+'</button>';
+      h+='<button type="button" class="dvopt dvOp'+(sel?' sel':'')+'" data-p="'+p.id+'" data-v="'+p.o[j]+'">'
+        +(sel?'<span class="ck">✓</span>':'')
+        +'<span>'+p.o[j]+'</span></button>';
     }
     h+='</div></div>';
   }
