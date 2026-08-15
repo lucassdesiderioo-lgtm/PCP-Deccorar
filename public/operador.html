@@ -17,11 +17,16 @@
         background:var(--panel);border:2px solid var(--line);border-radius:12px;color:var(--txt)}
   #scan:focus{outline:none;border-color:var(--amber)}
   .stats{font-size:13px;color:var(--muted);text-align:center;margin-bottom:14px}.stats b{color:var(--txt)}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  /* item 5: 2 colunas no tablet 8" (300px min -> ~2 col em 768; 1 col no celular) */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
   .tile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;text-align:left;cursor:pointer;color:var(--txt)}
   .tile.active{border-color:var(--amber);background:#fbf1db}
-  .tc{font-family:ui-monospace,monospace;font-weight:700;font-size:15px;word-break:break-all}
-  .tcor{font-size:12px;color:var(--muted);margin:2px 0 8px}.tp{font-size:20px;font-weight:800;color:var(--blue)}
+  /* item 4: medida como ancora visual — medida grande, SKU abaixo, progresso a direita */
+  .thead{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .tmed{font-size:23px;font-weight:800;line-height:1.05}
+  .tcor{font-size:13px;color:var(--muted);font-weight:600;margin-top:1px}
+  .tc{font-family:ui-monospace,monospace;font-weight:600;font-size:14px;color:var(--muted);margin-top:6px;word-break:break-all}
+  .tp{font-size:26px;font-weight:800;color:var(--blue);white-space:nowrap}
   .muted{color:var(--muted);padding:20px}
   .link{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
   header{padding-right:200px}
@@ -76,24 +81,40 @@ async function load(){
   renderTiles(); loadStats();
 }
 function skuInfo(c){ return SKUS.find(s=>s.codigo===c); }
+// item 4: medida como ancora visual — deriva medida+cor do SKU (regex ja usada no projeto)
+function medidaDe(cod){
+  var m=/^BK(\d{3})(\d{3})([A-Z]+)$/.exec(String(cod||'').toUpperCase());
+  if(!m) return null;
+  return { medida:(parseInt(m[1],10)/100).toFixed(2).replace('.',',')+' × '+(parseInt(m[2],10)/100).toFixed(2).replace('.',','), cor:m[3] };
+}
+function tileInner(cod, corFallback, num, numColor, detail){
+  var md=medidaDe(cod);
+  var cab = md ? '<div class="tmed">'+md.medida+'</div><div class="tcor">'+md.cor+'</div>'
+               : '<div class="tmed">'+cod+'</div>'+(corFallback?'<div class="tcor">'+corFallback+'</div>':'');
+  var sku = md ? '<div class="tc">'+cod+'</div>' : '';
+  return '<div class="thead"><div>'+cab+'</div><div class="tp"'+(numColor?' style="color:'+numColor+'"':'')+'>'+num+'</div></div>'+sku+'<div class="tf">'+detail+'</div>';
+}
 function renderTiles(){
   var html='';
   if(MODO==='hoje'){
     html=DIA.map(function(d){ var act=emRev&&emRev.codigo===d.codigo;
       var rv=0; for(var i=0;i<REVHOJE.length;i++){ if(REVHOJE[i].codigo===d.codigo){ rv=REVHOJE[i].qtd; break; } }
       var falta=Math.max(0,d.qtd-rv);
-      return '<button class="tile '+(act?'active':'')+(falta>0?' falta':'')+'" data-cod="'+d.codigo+'"><div class="tc">'+d.codigo+'</div><div class="tcor">'+(d.cor||'')+'</div><div class="tp">'+rv+'/'+d.qtd+'</div><div class="tf">'+(falta>0?'faltam '+falta+' pra revisar':'revisão completa')+'</div></button>';
+      return '<button class="tile '+(act?'active':'')+(falta>0?' falta':'')+'" data-cod="'+d.codigo+'">'
+        +tileInner(d.codigo, d.cor, rv+'/'+d.qtd, '', (falta>0?'faltam '+falta+' pra revisar':'revisão completa'))+'</button>';
     }).join('')||'<div class="muted">Nenhuma produção lançada para hoje. Lance no Admin.</div>';
   } else {
     if(ADIANTA.length){
       html+='<div style="grid-column:1/-1;background:#fbf1db;border:1px solid #e7cb8c;border-radius:12px;padding:14px;margin-bottom:6px"><b style="color:#b26a00">ADIANTAMENTO - pedidos de amanha</b><div style="font-size:13px;color:#5a6472;margin-top:4px">Se sobrar tempo hoje, ja pode produzir estes.</div></div>';
       for(var a=0;a<ADIANTA.length;a++){
         var d2=ADIANTA[a];
-        html+='<button class="tile" data-cod="'+d2.codigo+'" style="border-color:#e7cb8c;background:#fbf1db"><div class="tc">'+d2.codigo+'</div><div class="tcor">'+(d2.cor||'')+'</div><div class="tp" style="color:#b26a00">'+d2.falta+'</div><div class="tf">amanha</div></button>';
+        html+='<button class="tile" data-cod="'+d2.codigo+'" style="border-color:#e7cb8c;background:#fbf1db">'
+          +tileInner(d2.codigo, d2.cor, d2.falta, '#b26a00', 'amanha')+'</button>';
       }
     }
     html+=METAS.map(function(m){ var act=emRev&&emRev.codigo===m.codigo;
-      return '<button class="tile '+(act?'active':'')+(m.precisa>0?' falta':'')+'" data-cod="'+m.codigo+'"><div class="tc">'+m.codigo+'</div><div class="tcor">'+(m.cor||'')+'</div><div class="tp">'+m.precisa+'</div><div class="tf">comp '+m.comprometido+' · alvo '+m.alvo+' · est '+(m.estoque==null?'—':m.estoque)+'</div></button>';
+      return '<button class="tile '+(act?'active':'')+(m.precisa>0?' falta':'')+'" data-cod="'+m.codigo+'">'
+        +tileInner(m.codigo, m.cor, m.precisa, '', 'comp '+m.comprometido+' · alvo '+m.alvo+' · est '+(m.estoque==null?'—':m.estoque))+'</button>';
     }).join('');
     if(!html) html='<div class="muted">Estoque coberto — nada a produzir agora. (Confira o Planejamento no Admin se acabou de importar a planilha.)</div>';
   }
@@ -122,7 +143,8 @@ function toggle(codigo){
     if(!info){ banner('err','SKU não cadastrado',codigo+' — cadastre no Admin antes'); beep(false); return; }
     var fora=(MODO==='hoje')&&!DIA.some(function(d){return d.codigo===codigo&&d.falta>0;});
     emRev={codigo:codigo,cor:info.cor||'',inicio:Date.now(),fora:fora}; renderTiles();
-    banner('rev','Revisando '+codigo, fora?'⚠ NÃO está nos pedidos de hoje — vai contar como estoque':((info.cor||'')+' — bipe de novo ao terminar'), true);
+    var md=medidaDe(codigo);
+    banner('rev', md? md.medida+'  '+md.cor : codigo, fora?'⚠ NÃO está nos pedidos de hoje — vai contar como estoque':(codigo+' — bipe de novo ao terminar'), true);
     setTimeout(function(){ var bn=document.getElementById("banner"); if(bn && !document.getElementById("rjBt")){ var b=document.createElement("button"); b.id="rjBt"; b.textContent="Peça com problema"; b.style.cssText="margin-top:14px;padding:11px 20px;border-radius:9px;border:1px solid #efb1ad;background:transparent;color:#c62828;font-size:14px;cursor:pointer"; b.onclick=rjAbrir; bn.appendChild(b); } },50);
     clearInterval(tick); tick=setInterval(()=>{ const t=$('#timer'); if(emRev&&t) t.textContent=mmss(Date.now()-emRev.inicio); },250);
     beep(true);
