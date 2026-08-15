@@ -2,14 +2,14 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revisão — Operador</title>
 <style>
-  :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--red:#f85149;--blue:#4493f8}
+  :root{--bg:#ffffff;--panel:#f4f6f8;--line:#d8dee6;--txt:#1a1d23;--muted:#5a6472;--amber:#b26a00;--green:#2e7d32;--red:#c62828;--blue:#1565c0}
   *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
   header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
   .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
   h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
   .wrap{max-width:900px;margin:0 auto;padding:18px}
   .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:26px;text-align:center;margin-bottom:16px}
-  .banner.rev{background:#0f2233;border-color:#1d4f78}.banner.ok{background:#10331c;border-color:#1f6f37}.banner.err{background:#3a1513;border-color:#7d2820}
+  .banner.rev{background:#e8f0fb;border-color:#a9c9ee}.banner.ok{background:#e7f5eb;border-color:#a9d8b4}.banner.err{background:#fbe9e8;border-color:#efb1ad}
   .bt{font-size:26px;font-weight:750}.bs{font-size:15px;color:var(--muted);margin-top:6px}
   .timer{font-size:52px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:8px;letter-spacing:2px}
   #scan{display:block;width:100%;max-width:520px;margin:0 auto 14px;padding:14px;
@@ -19,7 +19,7 @@
   .stats{font-size:13px;color:var(--muted);text-align:center;margin-bottom:14px}.stats b{color:var(--txt)}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
   .tile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;text-align:left;cursor:pointer;color:var(--txt)}
-  .tile.active{border-color:var(--amber);background:#231d06}
+  .tile.active{border-color:var(--amber);background:#fbf1db}
   .tc{font-family:ui-monospace,monospace;font-weight:700;font-size:15px;word-break:break-all}
   .tcor{font-size:12px;color:var(--muted);margin:2px 0 8px}.tp{font-size:20px;font-weight:800;color:var(--blue)}
   .muted{color:var(--muted);padding:20px}
@@ -28,21 +28,21 @@
   .modoTag{margin-left:auto;display:flex;align-items:center;gap:10px}
   .modoNome{font-size:13px;font-weight:800;letter-spacing:.5px;padding:7px 13px;border-radius:999px}
   .btModo{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer}
-  body.m-hoje .modoNome{background:#3a1513;color:#ff8b80;border:1px solid #7d2820}
+  body.m-hoje .modoNome{background:#fbe9e8;color:#c62828;border:1px solid #efb1ad}
   body.m-hoje header{border-bottom:3px solid var(--red)}
-  body.m-est .modoNome{background:#0f2233;color:#7cc0ff;border:1px solid #1d4f78}
+  body.m-est .modoNome{background:#e8f0fb;color:#1565c0;border:1px solid #a9c9ee}
   body.m-est header{border-bottom:3px solid var(--blue)}
   .tf{font-size:12px;color:var(--muted);margin-top:4px}
-  .tile.falta{border-color:#7d2820}
-  #escolha{position:fixed;inset:0;background:#0e1217;z-index:9998;display:none;
+  .tile.falta{border-color:#efb1ad}
+  #escolha{position:fixed;inset:0;background:#ffffff;z-index:9998;display:none;
            flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:22px}
   #escolha h2{margin:0 0 8px;font-size:22px}
   .esc{width:100%;max-width:520px;padding:34px 26px;border-radius:20px;border:2px solid;
        font-size:22px;font-weight:800;cursor:pointer;text-align:center;background:var(--panel);color:var(--txt)}
   .esc small{display:block;font-size:14px;font-weight:500;color:var(--muted);margin-top:8px}
-  .esc.hoje{border-color:#7d2820;background:#2a1210}
-  .esc.est{border-color:#1d4f78;background:#0f2233}
-  .esc.dev{border-color:#7a6017;background:#231d06}
+  .esc.hoje{border-color:#efb1ad;background:#fbe9e8}
+  .esc.est{border-color:#a9c9ee;background:#e8f0fb}
+  .esc.dev{border-color:#e7cb8c;background:#fbf1db}
 </style></head><body>
 <header><div class="mark">R</div><div><h1>Estação de Revisão</h1><div class="sub">Bipe ao começar · bipe ao terminar</div></div>
 <div class="modoTag"><span class="modoNome" id="modoNome">—</span>
@@ -86,10 +86,10 @@ function renderTiles(){
     }).join('')||'<div class="muted">Nenhuma produção lançada para hoje. Lance no Admin.</div>';
   } else {
     if(ADIANTA.length){
-      html+='<div style="grid-column:1/-1;background:#231d06;border:1px solid #7a6017;border-radius:12px;padding:14px;margin-bottom:6px"><b style="color:#ffb800">ADIANTAMENTO - pedidos de amanha</b><div style="font-size:13px;color:#8b97a5;margin-top:4px">Se sobrar tempo hoje, ja pode produzir estes.</div></div>';
+      html+='<div style="grid-column:1/-1;background:#fbf1db;border:1px solid #e7cb8c;border-radius:12px;padding:14px;margin-bottom:6px"><b style="color:#b26a00">ADIANTAMENTO - pedidos de amanha</b><div style="font-size:13px;color:#5a6472;margin-top:4px">Se sobrar tempo hoje, ja pode produzir estes.</div></div>';
       for(var a=0;a<ADIANTA.length;a++){
         var d2=ADIANTA[a];
-        html+='<button class="tile" data-cod="'+d2.codigo+'" style="border-color:#7a6017;background:#1a1508"><div class="tc">'+d2.codigo+'</div><div class="tcor">'+(d2.cor||'')+'</div><div class="tp" style="color:#ffb800">'+d2.falta+'</div><div class="tf">amanha</div></button>';
+        html+='<button class="tile" data-cod="'+d2.codigo+'" style="border-color:#e7cb8c;background:#fbf1db"><div class="tc">'+d2.codigo+'</div><div class="tcor">'+(d2.cor||'')+'</div><div class="tp" style="color:#b26a00">'+d2.falta+'</div><div class="tf">amanha</div></button>';
       }
     }
     html+=METAS.map(function(m){ var act=emRev&&emRev.codigo===m.codigo;
@@ -123,7 +123,7 @@ function toggle(codigo){
     var fora=(MODO==='hoje')&&!DIA.some(function(d){return d.codigo===codigo&&d.falta>0;});
     emRev={codigo:codigo,cor:info.cor||'',inicio:Date.now(),fora:fora}; renderTiles();
     banner('rev','Revisando '+codigo, fora?'⚠ NÃO está nos pedidos de hoje — vai contar como estoque':((info.cor||'')+' — bipe de novo ao terminar'), true);
-    setTimeout(function(){ var bn=document.getElementById("banner"); if(bn && !document.getElementById("rjBt")){ var b=document.createElement("button"); b.id="rjBt"; b.textContent="Peça com problema"; b.style.cssText="margin-top:14px;padding:11px 20px;border-radius:9px;border:1px solid #7d2820;background:transparent;color:#ff8b80;font-size:14px;cursor:pointer"; b.onclick=rjAbrir; bn.appendChild(b); } },50);
+    setTimeout(function(){ var bn=document.getElementById("banner"); if(bn && !document.getElementById("rjBt")){ var b=document.createElement("button"); b.id="rjBt"; b.textContent="Peça com problema"; b.style.cssText="margin-top:14px;padding:11px 20px;border-radius:9px;border:1px solid #efb1ad;background:transparent;color:#c62828;font-size:14px;cursor:pointer"; b.onclick=rjAbrir; bn.appendChild(b); } },50);
     clearInterval(tick); tick=setInterval(()=>{ const t=$('#timer'); if(emRev&&t) t.textContent=mmss(Date.now()-emRev.inicio); },250);
     beep(true);
   } else { finish(); }
@@ -195,14 +195,14 @@ rjCarregar();
 function rjAbrir(){
   if(!emRev) return;
   var h='<div style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px" id="rjBox">';
-  h+='<div style="background:#161b22;border:1px solid #262d37;border-radius:16px;padding:24px;max-width:520px;width:100%">';
+  h+='<div style="background:#f4f6f8;border:1px solid #d8dee6;border-radius:16px;padding:24px;max-width:520px;width:100%">';
   h+='<div style="font-size:19px;font-weight:800;margin-bottom:4px">Peça com problema</div>';
-  h+='<div style="font-size:14px;color:#8b97a5;margin-bottom:18px">'+emRev.codigo+' volta para a produção. Qual o motivo?</div>';
+  h+='<div style="font-size:14px;color:#5a6472;margin-bottom:18px">'+emRev.codigo+' volta para a produção. Qual o motivo?</div>';
   for(var i=0;i<RJMOT.length;i++){
-    h+='<button type="button" class="rjOp" data-m="'+RJMOT[i].valor+'" style="display:block;width:100%;text-align:left;margin-bottom:8px;padding:15px;border-radius:10px;border:1px solid #262d37;background:transparent;color:#e6edf3;font-size:16px;cursor:pointer">'+RJMOT[i].valor+'</button>';
+    h+='<button type="button" class="rjOp" data-m="'+RJMOT[i].valor+'" style="display:block;width:100%;text-align:left;margin-bottom:8px;padding:15px;border-radius:10px;border:1px solid #d8dee6;background:transparent;color:#1a1d23;font-size:16px;cursor:pointer">'+RJMOT[i].valor+'</button>';
   }
-  h+='<input id="rjObs" placeholder="observação (opcional)" style="width:100%;margin-top:10px;padding:12px;background:#0e1217;border:1px solid #262d37;border-radius:9px;color:#e6edf3;font-size:15px">';
-  h+='<button type="button" id="rjCancel" style="width:100%;margin-top:14px;padding:13px;border-radius:9px;border:1px solid #262d37;background:transparent;color:#8b97a5;font-size:15px;cursor:pointer">Cancelar</button>';
+  h+='<input id="rjObs" placeholder="observação (opcional)" style="width:100%;margin-top:10px;padding:12px;background:#ffffff;border:1px solid #d8dee6;border-radius:9px;color:#1a1d23;font-size:15px">';
+  h+='<button type="button" id="rjCancel" style="width:100%;margin-top:14px;padding:13px;border-radius:9px;border:1px solid #d8dee6;background:transparent;color:#5a6472;font-size:15px;cursor:pointer">Cancelar</button>';
   h+='</div></div>';
   var d=document.createElement('div'); d.innerHTML=h; document.body.appendChild(d.firstChild);
 }
@@ -237,26 +237,26 @@ async function avisoStatus(){
     var w=document.querySelector('.wrap');
     if(w) w.insertBefore(el,w.firstChild);
   }
-  var txt='', cor='#161b22', bd='#262d37';
+  var txt='', cor='#f4f6f8', bd='#d8dee6';
   if(!s.lancado){
-    txt='<b>Nenhuma venda lançada ainda hoje.</b><br><span style="color:#8b97a5">O corte de hoje é às '+s.corte+'. Assim que a lista sair, ela aparece aqui.</span>';
+    txt='<b>Nenhuma venda lançada ainda hoje.</b><br><span style="color:#5a6472">O corte de hoje é às '+s.corte+'. Assim que a lista sair, ela aparece aqui.</span>';
   } else if(s.urgentes===0){
-    txt='<b style="color:#4493f8">Todas as vendas de hoje já estão em estoque.</b><br><span style="color:#8b97a5">'+
+    txt='<b style="color:#1565c0">Todas as vendas de hoje já estão em estoque.</b><br><span style="color:#5a6472">'+
         (s.passouCorte?('Lista fechada às '+s.corte+'. '):('Corte às '+s.corte+' — ainda pode entrar venda. '))+
         'Trabalhe na reposição (tela azul).</span>';
   } else if(s.urgentesFalta>0){
-    txt='<b style="color:#ff6b6b">'+s.urgentesFalta+' peça(s) URGENTE(S) para hoje</b><br><span style="color:#8b97a5">Cliente esperando. Priorize a tela vermelha.</span>';
-    cor='#3a1513'; bd='#7d2820';
+    txt='<b style="color:#c62828">'+s.urgentesFalta+' peça(s) URGENTE(S) para hoje</b><br><span style="color:#5a6472">Cliente esperando. Priorize a tela vermelha.</span>';
+    cor='#fbe9e8'; bd='#efb1ad';
   } else {
-    txt='<b style="color:#2ea043">Urgentes do dia concluídos.</b><br><span style="color:#8b97a5">Pode seguir na reposição (tela azul).</span>';
-    cor='#10331c'; bd='#1f6f37';
+    txt='<b style="color:#2e7d32">Urgentes do dia concluídos.</b><br><span style="color:#5a6472">Pode seguir na reposição (tela azul).</span>';
+    cor='#e7f5eb'; bd='#a9d8b4';
   }
   el.style.background=cor; el.style.border='1px solid '+bd;
   el.innerHTML=txt;
   if(s.urgentesFalta>AVANT && AVANT>=0 && MODO==='estoque' && s.urgentesFalta>0){
     try{ beep(false); setTimeout(function(){beep(false);},300); }catch(e){}
     var al=document.createElement('div');
-    al.style.cssText='position:fixed;top:0;left:0;right:0;z-index:10002;background:#cc3a21;color:#fff;padding:16px;text-align:center;font:800 17px system-ui;cursor:pointer';
+    al.style.cssText='position:fixed;top:0;left:0;right:0;z-index:10002;background:#c62828;color:#fff;padding:16px;text-align:center;font:800 17px system-ui;cursor:pointer';
     al.innerHTML='CHEGOU PEDIDO URGENTE - '+s.urgentesFalta+' peça(s) para hoje (toque para fechar)';
     al.onclick=function(){ al.remove(); };
     document.body.appendChild(al);
