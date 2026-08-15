@@ -9,12 +9,25 @@ var CH=(function(){
     if(m){ var lum=0.299*+m[1]+0.587*+m[2]+0.114*+m[3]; light=lum>140; }
   }catch(e){}
   return light
-    ? {barBg:'#f4f6f8',barLine:'#d8dee6',off:'#5a6472',actBg:'#b26a00',actTx:'#ffffff',
+    ? {light:true, barBg:'#f4f6f8',barLine:'#d8dee6',off:'#5a6472',actBg:'#b26a00',actTx:'#ffffff',
        planBg:'#1565c0',planTx:'#ffffff',
        sBg:'#f4f6f8',sLine:'#d8dee6',sTx:'#5a6472',sName:'#1a1d23',sBtn:'#b26a00'}
-    : {barBg:'#0b0f14',barLine:'#262d37',off:'#8b97a5',actBg:'#ffb800',actTx:'#1a1300',
+    : {light:false, barBg:'#0b0f14',barLine:'#262d37',off:'#8b97a5',actBg:'#ffb800',actTx:'#1a1300',
        planBg:'#4493f8',planTx:'#04121f',
        sBg:'#0b0e13',sLine:'#2a2f3a',sTx:'#8b97a5',sName:'#eef1f6',sBtn:'#f0b429'};
+})();
+
+/* Ajuste de fonte A+/A- por aparelho (DESIGN secao 3) — so na operacao (fundo
+   claro). 3 niveis: normal, +15%, +30%. Escala o layout inteiro via zoom no
+   <html> (as telas usam px; zoom reflui e funciona no Safari do iPad). A escolha
+   fica salva em localStorage, por aparelho. */
+var FONT=(function(){
+  var Z=[1, 1.15, 1.30], LB=['A', 'A+', 'A++'];
+  function get(){ var v; try{ v=parseInt(localStorage.getItem('op_font')||'0',10); }catch(e){ v=0; } return (v>=0&&v<=2)?v:0; }
+  function apply(){ if(CH.light){ try{ document.documentElement.style.zoom=Z[get()]; }catch(e){} } }
+  apply();
+  return { get:get, label:function(){ return LB[get()]; },
+    set:function(v){ v=Math.max(0,Math.min(2,v)); try{ localStorage.setItem('op_font',String(v)); }catch(e){} apply(); } };
 })();
 
 (function(){
@@ -57,6 +70,11 @@ var CH=(function(){
     '#sessSair{background:transparent;color:'+CH.sBtn+';border:1px solid '+CH.sBtn+';border-radius:8px;'+
     'padding:6px 14px;font:700 13px system-ui;cursor:pointer;min-height:34px}'+
     '#sessSair:active{opacity:.75}'+
+    '#fadj{margin-right:auto;display:flex;gap:8px;align-items:center}'+
+    '#fadj .fbtn{min-width:46px;min-height:34px;border:1px solid '+CH.sBtn+';color:'+CH.sBtn+';'+
+    'background:transparent;border-radius:8px;font:800 15px system-ui;cursor:pointer}'+
+    '#fadj .fbtn:active{opacity:.7}'+
+    '#flab{color:'+CH.sTx+';min-width:28px;text-align:center;font-weight:800}'+
     '@media print{#sessBar{display:none}}';
   document.head.appendChild(css);
 
@@ -69,9 +87,15 @@ var CH=(function(){
     if(!u.logado) return;
     var d=document.createElement('div');
     d.id='sessBar';
-    d.innerHTML='<span><b style="color:'+CH.sName+'">'+u.nome+'</b></span><button id="sessSair">Sair</button>';
+    var fadj = CH.light ? '<div id="fadj"><button class="fbtn" data-fd="-1" aria-label="Diminuir a fonte">A−</button>'+
+      '<b id="flab">'+FONT.label()+'</b><button class="fbtn" data-fd="1" aria-label="Aumentar a fonte">A+</button></div>' : '';
+    d.innerHTML=fadj+'<span><b style="color:'+CH.sName+'">'+u.nome+'</b></span><button id="sessSair">Sair</button>';
     document.body.insertBefore(d, document.body.firstChild);
     document.getElementById('sessSair').onclick=sair;
+    var fa=document.getElementById('fadj');
+    if(fa){ fa.addEventListener('click',function(e){ var btn=e.target.closest('[data-fd]'); if(!btn) return;
+      FONT.set(FONT.get()+ (+btn.getAttribute('data-fd')));
+      var l=document.getElementById('flab'); if(l) l.textContent=FONT.label(); }); }
   });
 
   document.addEventListener('keydown',function(e){
