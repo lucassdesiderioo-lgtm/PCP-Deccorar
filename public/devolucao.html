@@ -2,7 +2,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Devolucoes</title>
 <style>
-  :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--red:#f85149}
+  :root{--bg:#ffffff;--panel:#f4f6f8;--line:#d8dee6;--txt:#1a1d23;--muted:#5a6472;--amber:#b26a00;--green:#2e7d32;--red:#c62828}
   *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
   header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
   .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
@@ -10,7 +10,7 @@
   .wrap{max-width:760px;margin:0 auto;padding:20px}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
   .lb{font-size:13px;color:var(--muted);margin-bottom:6px}
-  input,select{width:100%;padding:13px;font-size:16px;background:#0e1217;border:2px solid var(--line);border-radius:10px;color:var(--txt)}
+  input,select{width:100%;padding:13px;font-size:16px;background:#ffffff;border:2px solid var(--line);border-radius:10px;color:var(--txt)}
   input:focus,select:focus{outline:none;border-color:var(--amber)}
   #dvCod{font-family:ui-monospace,monospace;text-align:center;letter-spacing:1px}
   .op{padding:10px 16px;border-radius:9px;font-size:14px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--txt)}
@@ -20,8 +20,8 @@
   .bt{background:var(--amber);border:0;border-radius:10px;padding:15px 26px;font-weight:700;font-size:16px;cursor:pointer}
   /* triagem — botoes grandes p/ tablet 8" (DESIGN secao 5) */
   .dvprog{display:flex;align-items:center;gap:12px;margin-bottom:18px;padding:12px 14px;
-    background:#0e1217;border:1px solid var(--line);border-radius:10px;font-size:15px;font-weight:700}
-  .dvprog .bar{flex:1;height:8px;background:#0b0f14;border-radius:5px;overflow:hidden}
+    background:#ffffff;border:1px solid var(--line);border-radius:10px;font-size:15px;font-weight:700}
+  .dvprog .bar{flex:1;height:8px;background:#edf0f4;border-radius:5px;overflow:hidden}
   .dvprog .bar>i{display:block;height:100%;background:var(--amber);transition:width .2s}
   .dvprog.full{color:var(--green)}.dvprog.full .bar>i{background:var(--green)}
   .dvgrp{margin-bottom:18px}
@@ -39,7 +39,7 @@
   .dvopt .ck{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;
     background:#1a1300;color:var(--amber);font-size:15px;font-weight:900;flex:0 0 auto}
 </style></head><body>
-<header><div class="mark">D</div><div><h1>Devolucoes</h1><div class="sub">Recebimento e triagem de peças devolvidas</div></div><button onclick="(function(){try{localStorage.removeItem('rev_modo');}catch(e){} location.href='/operador';})()" style="margin-left:auto;background:transparent;border:1px solid #262d37;color:#8b97a5;border-radius:9px;padding:11px 18px;font-size:14px;cursor:pointer">Trocar</button></header>
+<header><div class="mark">D</div><div><h1>Devolucoes</h1><div class="sub">Recebimento e triagem de peças devolvidas</div></div><button onclick="(function(){try{localStorage.removeItem('rev_modo');}catch(e){} location.href='/operador';})()" style="margin-left:auto;background:transparent;border:1px solid #d8dee6;color:#5a6472;border-radius:9px;padding:11px 18px;font-size:14px;cursor:pointer">Trocar</button></header>
 <div class="wrap">
   <div class="card">
     <div class="lb">Codigo da etiqueta do Mercado Livre</div>
@@ -140,11 +140,11 @@ function dvResultado(){
   var el=document.getElementById('dvResult');
   if(!el) return;
   var s=dvSkuAtual();
-  if(!s){ el.innerHTML='<span style="color:#8b97a5">Escolha a cor e a medida</span>'; return; }
+  if(!s){ el.innerHTML='<span style="color:#5a6472">Escolha a cor e a medida</span>'; return; }
   var existe=false;
   for(var i=0;i<SKUS.length;i++) if(SKUS[i].codigo===s){ existe=true; break; }
-  if(existe) el.innerHTML='SKU: <b style="color:#ffb800;font-family:ui-monospace,monospace;font-size:19px">'+s+'</b>';
-  else el.innerHTML='<b style="color:#f85149">'+s+' nao esta cadastrado</b>';
+  if(existe) el.innerHTML='SKU: <b style="color:#b26a00;font-family:ui-monospace,monospace;font-size:19px">'+s+'</b>';
+  else el.innerHTML='<b style="color:#c62828">'+s+' nao esta cadastrado</b>';
 }
 document.addEventListener('click',function(e){
   var c=e.target.closest('[data-cor]');
@@ -159,26 +159,26 @@ async function dvBuscar(cod){
   var el=document.getElementById('dvVenda');
   if(r.achou){
     DVVENDA=r.venda;
-    el.innerHTML='Venda encontrada: <b>'+(r.venda.buyer||'')+'</b> - enviado <b style="color:#ffb800">'+(r.venda.codigo||'?')+'</b> em '+(r.venda.data||'');
+    el.innerHTML='Venda encontrada: <b>'+(r.venda.buyer||'')+'</b> - enviado <b style="color:#b26a00">'+(r.venda.codigo||'?')+'</b> em '+(r.venda.data||'');
     var sel=document.getElementById('dvSku');
     if(sel) sel.value='';
   } else {
     DVVENDA=null;
-    el.innerHTML='<span style="color:#8b97a5">Sem registro dessa venda - tudo bem, siga normalmente.</span>';
+    el.innerHTML='<span style="color:#5a6472">Sem registro dessa venda - tudo bem, siga normalmente.</span>';
   }
 }
 async function dvSalvar(){
   var sku=dvSkuAtual();
   var msg=document.getElementById('dvMsg');
-  if(!sku){ msg.innerHTML='<span style="color:#ff6b6b">Escolha o SKU</span>'; return; }
-  if(!DVSEL.destinacao){ msg.innerHTML='<span style="color:#ff6b6b">Escolha a destinacao</span>'; return; }
+  if(!sku){ msg.innerHTML='<span style="color:#c62828">Escolha o SKU</span>'; return; }
+  if(!DVSEL.destinacao){ msg.innerHTML='<span style="color:#c62828">Escolha a destinacao</span>'; return; }
   var body={codigo_ml:document.getElementById('dvCod').value.trim(),sku_fisico:sku,
     sku_venda:DVVENDA?DVVENDA.codigo:null, venda_id:DVVENDA?DVVENDA.id:null, buyer:DVVENDA?DVVENDA.buyer:null,
     obs:document.getElementById('dvObs').value.trim()};
   for(var k in DVSEL) body[k]=DVSEL[k];
   var r=await (await fetch('/api/devolucao',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
-  if(r.erro){ msg.innerHTML='<span style="color:#ff6b6b">'+r.erro+'</span>'; return; }
-  msg.innerHTML='<span style="color:#2ea043">Salvo'+(r.naFila?' - foi pra fila de embalagem':'')+'</span>';
+  if(r.erro){ msg.innerHTML='<span style="color:#c62828">'+r.erro+'</span>'; return; }
+  msg.innerHTML='<span style="color:#2e7d32">Salvo'+(r.naFila?' - foi pra fila de embalagem':'')+'</span>';
   DVSEL={}; DVVENDA=null;
   document.getElementById('dvCod').value=''; document.getElementById('dvObs').value='';
   DVCOR=null; DVMED=null; dvSkus(); document.getElementById('dvVenda').innerHTML='';

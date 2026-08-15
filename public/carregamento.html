@@ -2,7 +2,8 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Carregamento</title>
 <style>
-  :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--red:#f85149;--violet:#a371f7}
+  /* Operacao: fundo CLARO (DESIGN secao 2) — tela usada sob luz de fabrica, escuro vira espelho */
+  :root{--bg:#ffffff;--panel:#f4f6f8;--line:#d8dee6;--txt:#1a1d23;--muted:#5a6472;--amber:#b26a00;--green:#2e7d32;--red:#c62828;--blue:#1565c0;--violet:#6f42c1}
   *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
   header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
   .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
@@ -15,7 +16,7 @@
   .stat .n{font-size:34px;font-weight:800}.stat .l{font-size:12px;color:var(--muted);text-transform:uppercase}
   .stat.car .n{color:var(--green)}.stat.fal .n{color:var(--amber)}
   .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:26px;text-align:center;margin-bottom:14px}
-  .banner.ok{background:#10331c;border-color:#1f6f37}.banner.err{background:#3a1513;border-color:#7d2820}.banner.warn{background:#3a2e10;border-color:#7a6017}
+  .banner.ok{background:#e7f5eb;border-color:#a9d8b4}.banner.err{background:#fbe9e8;border-color:#efb1ad}.banner.warn{background:#fbf1db;border-color:#e7cb8c}
   .bt{font-size:26px;font-weight:780}.bs{font-size:15px;color:var(--muted);margin-top:6px}.bs b{color:var(--txt)}
   #scan{position:absolute;left:-9999px;opacity:0}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}

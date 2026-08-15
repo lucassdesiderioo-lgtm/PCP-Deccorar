@@ -2,7 +2,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Etiqueta de Venda</title>
 <style>
-  :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--red:#f85149;--blue:#4493f8}
+  :root{--bg:#ffffff;--panel:#f4f6f8;--line:#d8dee6;--txt:#1a1d23;--muted:#5a6472;--amber:#b26a00;--green:#2e7d32;--red:#c62828;--blue:#1565c0}
   *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
   header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
   .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
@@ -10,13 +10,13 @@
   .link{margin-left:auto;font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
   .wrap{max-width:820px;margin:0 auto;padding:18px}
   .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:26px;margin-bottom:16px}
-  .banner.cfm{background:#0f2233;border-color:#1d4f78}.banner.ok{background:#10331c;border-color:#1f6f37}.banner.err{background:#3a1513;border-color:#7d2820}.banner.warn{background:#3a2e10;border-color:#7a6017}
+  .banner.cfm{background:#e8f0fb;border-color:#a9c9ee}.banner.ok{background:#e7f5eb;border-color:#a9d8b4}.banner.err{background:#fbe9e8;border-color:#efb1ad}.banner.warn{background:#fbf1db;border-color:#e7cb8c}
   .bt{font-size:26px;font-weight:750}.bs{font-size:15px;color:var(--muted);margin-top:6px;line-height:1.5}.bs b{color:var(--txt)}
-  .sku{font-family:ui-monospace,monospace;background:#0b0f14;border:1px solid var(--line);padding:2px 8px;border-radius:6px}
+  .sku{font-family:ui-monospace,monospace;background:#edf0f4;border:1px solid var(--line);padding:2px 8px;border-radius:6px}
   .acts{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
   button{cursor:pointer;border:0;border-radius:10px;font-weight:700;font-size:14px;padding:12px 18px}
   .primary{background:var(--amber);color:#1a1300}.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
-  #scan{display:block;width:100%;max-width:520px;margin:0 auto 14px;padding:14px;font-size:17px;font-family:ui-monospace,monospace;text-align:center;letter-spacing:1px;background:#161b22;border:2px solid #262d37;border-radius:12px;color:#e6edf3}#scan:focus{outline:none;border-color:#ffb800}
+  #scan{display:block;width:100%;max-width:520px;margin:0 auto 14px;padding:14px;font-size:17px;font-family:ui-monospace,monospace;text-align:center;letter-spacing:1px;background:#f4f6f8;border:2px solid #d8dee6;border-radius:12px;color:#1a1d23}#scan:focus{outline:none;border-color:#b26a00}
   .stats{display:flex;gap:12px;margin-bottom:8px}
   .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
   .stat .n{font-size:28px;font-weight:800}.stat .l{font-size:12px;color:var(--muted);text-transform:uppercase}
@@ -32,7 +32,7 @@
   </div>
   <div class="banner" id="banner"></div>
   <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="bipe aqui">
-<div class="card" style="margin-top:16px"><div style="font-size:12px;color:#8b97a5;text-transform:uppercase;margin-bottom:10px">Faltam imprimir</div><div id="pendLista"></div></div></div>
+<div class="card" style="margin-top:16px"><div style="font-size:12px;color:#5a6472;text-transform:uppercase;margin-bottom:10px">Faltam imprimir</div><div id="pendLista"></div></div></div>
 <iframe id="pr"></iframe>
 <script>
 const $=s=>document.querySelector(s);
@@ -91,10 +91,10 @@ async function listaPend(){
   var l=[]; try{ l=await (await fetch("/api/pendentes")).json(); }catch(e){}
   var el=document.getElementById("pendLista");
   if(!el) return;
-  if(!l.length){ el.innerHTML='<span style="color:#8b97a5;font-size:14px">Nada pendente.</span>'; return; }
+  if(!l.length){ el.innerHTML='<span style="color:#5a6472;font-size:14px">Nada pendente.</span>'; return; }
   var h='';
   for(var i=0;i<l.length;i++){
-    h+='<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #262d37"><b style="font-family:ui-monospace,monospace">'+l[i].codigo+'</b><b style="color:#ffb800;font-size:18px">'+l[i].qtd+'</b></div>';
+    h+='<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #d8dee6"><b style="font-family:ui-monospace,monospace">'+l[i].codigo+'</b><b style="color:#b26a00;font-size:18px">'+l[i].qtd+'</b></div>';
   }
   el.innerHTML=h;
 }
@@ -114,13 +114,13 @@ async function relogioDesp(){
   }
   var m=d.minutosRestantes, h=Math.floor(Math.abs(m)/60), mm=Math.abs(m)%60;
   var tempo=(h?h+"h":"")+mm+"min";
-  var cor="#161b22", bd="#262d37", txt="";
-  if(d.passou){ txt="DESPACHO ENCERRADO ("+d.despacho+") - passou "+tempo; cor="#3a1513"; bd="#7d2820"; }
+  var cor="#f4f6f8", bd="#d8dee6", txt="";
+  if(d.passou){ txt="DESPACHO ENCERRADO ("+d.despacho+") - passou "+tempo; cor="#fbe9e8"; bd="#efb1ad"; }
   else {
     txt="Despacho as "+d.despacho+" - faltam "+tempo;
     if(d.pendentes>0) txt+=" para imprimir "+d.pendentes;
-    if(m<60 && d.pendentes>0){ cor="#3a1513"; bd="#7d2820"; }
-    else if(m<120 && d.pendentes>0){ cor="#231d06"; bd="#7a6017"; }
+    if(m<60 && d.pendentes>0){ cor="#fbe9e8"; bd="#efb1ad"; }
+    else if(m<120 && d.pendentes>0){ cor="#fbf1db"; bd="#e7cb8c"; }
   }
   el.style.background=cor; el.style.border="1px solid "+bd;
   el.innerHTML=txt;
