@@ -230,10 +230,18 @@ module.exports = function(app, db){
     console.log('[acesso] comparacao paralela: '+d+' divergencia(s) hoje (modelo novo NAO decide nada ainda — Fase 3)');
   }catch(e){ console.log('[acesso] comparacao paralela falhou: '+e.message); }
 
-  // ── leitura (so Admin Geral do modelo ANTIGO, via area 'admin') ──
+  // ── porteiro das telas/rotas de administracao do proprio controle de acesso.
+  // Usa o modelo NOVO (Admin Geral OU permissao de nivel admin), com fallback
+  // para a area 'admin' do modelo antigo — assim ninguem fica sem acesso durante
+  // a transicao mesmo que os setores ainda nao tenham sido conferidos. O
+  // middleware ja gateia a permissao exata de cada rota (pessoas.gerenciar,
+  // setores.gerenciar, auditoria.ver); este e defesa em profundidade. ──
   function soAdmin(req, res){
     const u = req.usuario;
-    if(!u || !(u.areas||[]).includes('admin')){ res.status(403).json({erro:'sem_permissao'}); return false; }
+    let ok = false;
+    try{ ok = !!u && (ehAdminGeral(u.id) || temAdmin(permissoesDe(u.id))); }catch(e){}
+    if(!ok && u && (u.areas||[]).includes('admin')) ok = true;   // fallback do modelo antigo
+    if(!ok){ res.status(403).json({erro:'sem_permissao'}); return false; }
     return true;
   }
   app.get('/api/acesso/divergencias', (req, res) => {
@@ -416,7 +424,10 @@ module.exports = function(app, db){
     if(M !== 'GET' && eq('/api/skus')) return 'sku.cadastrar';
     if(M === 'DELETE' && pre('/api/skus')) return 'sku.excluir';
     if(M !== 'GET' && eq('/api/cruzamento/aplicar')) return 'producao.lancar';
-    if(M !== 'GET' && eq('/api/contagem/ajustar')) return 'contagem.ajustar';
+    // contagem em dois passos (secao 9): aprovar/rejeitar o pendente exige
+    // contagem.ajustar; contar e ENVIAR (que pode virar pendente) exige so
+    // contagem.contar — o handler decide aplicar direto ou enfileirar.
+    if(pre('/api/contagem/pendentes')) return 'contagem.ajustar';
     if(M !== 'GET' && pre('/api/contagem')) return 'contagem.contar';
     if(M !== 'GET' && eq('/api/config/horarios')) return 'horarios.editar';
     if(M !== 'GET' && eq('/api/config/kit')) return 'kit.editar';
@@ -435,6 +446,16 @@ module.exports = function(app, db){
     return db.prepare(`SELECT 1 FROM usuario_setor us JOIN setores s ON s.id=us.setor_id
       WHERE us.usuario_id=? AND s.ativo=1 AND s.nivel='admin_geral' LIMIT 1`).get(uid) ? true : false;
   }
+  // pergunta pontual (usada por outras rotas, ex.: contagem em dois passos):
+  // o usuario tem esta permissao? Admin Geral tem todas. Migra na primeira vez.
+  function podePermissao(u, chave){
+    if(!u) return false;
+    try{
+      if(!jaConferido.has(u.id)){ try{ migrarPendentes(); }catch(e){} jaConferido.add(u.id); }
+      if(ehAdminGeral(u.id)) return true;
+      return permissoesDe(u.id).has(chave);
+    }catch(e){ return (u.areas||[]).includes('admin'); }
+  }
   // decide o acesso pelo modelo NOVO. Retorna {ok, chave, motivo}.
   const jaConferido = new Set();
   function decidir(u, pathRaw, method){
@@ -452,10 +473,20 @@ module.exports = function(app, db){
     return { ok: perms.has(req), chave:req, motivo:'permissao' };
   }
 
+  // ── FASE 6: o modelo NOVO passa a ser o padrao permanente. Semeia 'novo' uma
+  // unica vez (INSERT OR IGNORE nao sobrescreve uma escolha ja feita). O modelo
+  // antigo do auth.js NAO e apagado: continua la como rede de seguranca — so
+  // entra em acao se o modelo novo lancar excecao (o try/catch do middleware),
+  // honrando "ninguem pode ficar sem acesso". O kill-switch (POST /api/acesso/
+  // modo -> 'antigo') segue disponivel para reverter em emergencia. ──
+  try{
+    db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('acesso_modo','novo')").run();
+  }catch(e){ console.log('[acesso] seed do modo de acesso falhou: '+e.message); }
+
   // config do modo de acesso: 'antigo' (auth.js decide) | 'novo' (modelo novo decide)
   function modoAcesso(){
-    try{ const c = db.prepare("SELECT valor FROM config WHERE chave='acesso_modo'").get(); return (c && c.valor) || 'antigo'; }
-    catch(e){ return 'antigo'; }
+    try{ const c = db.prepare("SELECT valor FROM config WHERE chave='acesso_modo'").get(); return (c && c.valor) || 'novo'; }
+    catch(e){ return 'novo'; }
   }
   app.post('/api/acesso/modo', (req, res) => {
     if(!soAdmin(req, res)) return;
@@ -476,6 +507,8 @@ module.exports = function(app, db){
     ['POST','/api/devolucao/baixa'],['POST','/api/estoque'],['POST','/api/alvo'],['POST','/api/necessidade/aplicar'],
     ['POST','/api/producao'],['POST','/api/planejamento/importar'],['POST','/api/skus'],['DELETE','/api/skus/:c'],
     ['POST','/api/cruzamento/aplicar'],['POST','/api/contagem/bipe'],['POST','/api/contagem/ajustar'],
+    ['POST','/api/contagem/lancar'],['GET','/api/contagem/pendentes'],['POST','/api/contagem/pendentes/aprovar'],
+    ['POST','/api/contagem/pendentes/rejeitar'],
     ['POST','/api/config/horarios'],['POST','/api/config/kit'],['POST','/api/listas'],['GET','/api/teste'],
     ['GET','/api/usuarios'],['GET','/api/acesso/setores'],['GET','/api/acesso/divergencias'],
     ['GET','/api/painel'],['GET','/api/rel/dia'],['GET','/api/necessidade'],['GET','/api/cruzamento'],
@@ -494,6 +527,16 @@ module.exports = function(app, db){
     res.json({ linhas });
   });
 
-  // exposto para o auth.js (Fase 3) e proximas fases
-  app.locals.acesso = { permissoesDe, compararDivergencias, AREA_CHAVE, decidir, modoAcesso, permDaRota, auditar };
+  // ── FASE 6 (secao 6.4): aviso no boot de rotas sem permissao declarada. ──
+  try{
+    const semDeclarar = TODAS_ROTAS
+      .map(([m,p]) => ({ m, p, req: permDaRota(p, m) }))
+      .filter(l => l.req === '@logado' && l.p.indexOf('/api/') !== 0);
+    console.log('[acesso] Fase 6: modo de acesso = '+modoAcesso()
+      + ' — '+(semDeclarar.length ? semDeclarar.length+' TELA(S) SEM PERMISSAO DECLARADA: '
+          + semDeclarar.map(l => l.p).join(', ') : 'cobertura de telas OK (0 sem declarar)'));
+  }catch(e){ console.log('[acesso] aviso de cobertura falhou: '+e.message); }
+
+  // exposto para o auth.js (Fase 3) e demais rotas (Fases 5/6)
+  app.locals.acesso = { permissoesDe, compararDivergencias, AREA_CHAVE, decidir, modoAcesso, permDaRota, auditar, podePermissao, ehAdminGeral };
 };
