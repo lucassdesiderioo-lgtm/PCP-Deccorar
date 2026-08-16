@@ -85,6 +85,9 @@ app.get('/devolucao',(req,res)=> res.sendFile(path.join(__dirname,'public','devo
 require('./cad_route')(app, db);
 require('./ger_route')(app, db);
 require('./st_route')(app, db);
+// Controle de Acesso — Fase 1 (roda em paralelo; NAO decide acesso ainda).
+// Depois do auth (precisa da tabela usuarios) e antes do teste_route.
+require('./acesso')(app, db);
 // teste_route por ULTIMO: ele cria os triggers de modo teste em cima das
 // tabelas dos outros modulos (fila, devolucao, rejeicao, contagem,
 // foto_estoque). Se subir antes, as tabelas ainda nao existem e os triggers
