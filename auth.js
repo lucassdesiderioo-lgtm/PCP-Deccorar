@@ -77,6 +77,8 @@ module.exports=function(app, db){
     return f&&f.n>=5&&(Date.now()-f.t)<60000;
   }
 
+  const negaTela=res=>res.status(403).send('<body style="font-family:system-ui;padding:40px"><h2>Sem permissao</h2><p>Voce nao tem acesso a esta tela.</p><a href="/login">Entrar com outro usuario</a></body>');
+
   app.use(function(req,res,next){
     const p=req.path;
     if(LIVRE.includes(p)||p.startsWith('/api/auth/')) return next();
@@ -89,7 +91,18 @@ module.exports=function(app, db){
       if(area) return res.redirect('/login?r='+encodeURIComponent(req.originalUrl));
       return next();
     }
-    if(area&&!tem(u,area)) return res.status(403).send('<body style="font-family:system-ui;padding:40px"><h2>Sem permissao</h2><p>Voce nao tem acesso a esta tela.</p><a href="/login">Entrar com outro usuario</a></body>');
+    // FASE 3 do controle de acesso: com o modo 'novo' ligado, o modelo de
+    // permissoes decide. Qualquer erro no modelo novo cai no antigo abaixo —
+    // um bug no controle novo nunca tranca ninguem.
+    const ac=app.locals.acesso;
+    if(ac&&ac.modoAcesso&&ac.modoAcesso()==='novo'){
+      try{
+        const d=ac.decidir(u,p,req.method);
+        if(!d.ok) return api?res.status(403).json({erro:'sem_permissao',chave:d.chave}):negaTela(res);
+        return next();
+      }catch(e){ /* fallback pro modelo antigo */ }
+    }
+    if(area&&!tem(u,area)) return negaTela(res);
     if(api&&API_ADMIN.some(x=>p.startsWith(x))&&!tem(u,'admin')) return res.status(403).json({erro:'sem_permissao'});
     next();
   });
