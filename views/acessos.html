@@ -1,0 +1,225 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pessoas & Acessos</title>
+<style>
+  :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--red:#f85149;--blue:#4493f8}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  .mark{width:32px;height:32px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
+  h1{font-size:16px;margin:0}.sub{font-size:12px;color:var(--muted)}
+  .link{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
+  .links{margin-left:auto;display:flex;gap:8px}
+  .tabs{display:flex;gap:4px;padding:10px 20px 0}
+  .tab{padding:9px 16px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;border:1px solid var(--line);border-bottom:0;border-radius:9px 9px 0 0}
+  .tab.on{color:var(--txt);background:var(--panel)}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 20px 60px}
+  .cols{display:grid;grid-template-columns:260px 1fr;gap:16px;margin-top:-1px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+  .plist{list-style:none;margin:0;padding:0}
+  .plist li{padding:11px 12px;border-radius:9px;cursor:pointer;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+  .plist li:hover{background:#1b222b}.plist li.on{background:#231d06;color:var(--amber)}
+  .plist .tag{font-size:11px;color:var(--muted);font-weight:500}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px}
+  .chk{display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--line)}
+  .chk:last-child{border-bottom:0}
+  .chk input{width:20px;height:20px;accent-color:var(--amber)}
+  .chk .lb{flex:1}.chk .lb small{display:block;color:var(--muted);font-size:11px;font-weight:400}
+  .orig{font-size:11px;padding:2px 8px;border-radius:20px;white-space:nowrap}
+  .orig.setor{background:#0f2233;color:#7cc0ff}.orig.exc{background:#231d06;color:var(--amber)}.orig.no{color:var(--muted)}
+  .sens{font-size:10px;font-weight:800;color:#ffb4ae;background:#3a1513;border-radius:5px;padding:1px 6px;margin-left:6px}
+  .intr{font-size:10px;font-weight:800;color:#8b97a5;border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin-left:6px}
+  .grp{font-size:13px;font-weight:800;color:var(--amber);margin:14px 0 4px;letter-spacing:.03em}
+  button{cursor:pointer;border:0;border-radius:9px;font-weight:700;font-size:14px;padding:10px 16px}
+  .primary{background:var(--amber);color:#1a1300}.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  .del{color:var(--red);background:transparent;border:1px solid var(--line);font-size:12px;padding:6px 11px}
+  input.tin,select.tin{background:#0b0f14;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px;font-size:14px}
+  .msg{font-size:13px;color:var(--green);margin-left:10px}
+  .warn{background:#2a2410;border:1px solid #6b5a12;color:#ffd85c;border-radius:9px;padding:10px 12px;font-size:13px;margin:8px 0}
+  .setor-row{display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--line)}
+  .setor-row .nm{flex:1;font-weight:700}.setor-row .nv{font-size:11px;color:var(--muted)}
+  .nivelpill{font-size:11px;padding:2px 8px;border-radius:20px;background:#11161d;color:var(--muted)}
+</style></head><body>
+<header><div class="mark">A</div><div><h1>Pessoas &amp; Acessos</h1><div class="sub">Setores, permissões e exceções — montado do registro (Fase 2)</div></div>
+<div class="links"><a class="link" href="/">Admin</a></div></header>
+<div class="tabs"><div class="tab on" data-t="pessoas">Pessoas</div><div class="tab" data-t="setores">Setores</div></div>
+<div class="wrap">
+
+  <div id="v-pessoas" class="cols">
+    <div class="card"><h2>Pessoas</h2><ul class="plist" id="pessoas"></ul></div>
+    <div class="card" id="detalhe"><div class="sub">Selecione uma pessoa.</div></div>
+  </div>
+
+  <div id="v-setores" style="display:none">
+    <div class="card">
+      <h2>Setores</h2>
+      <div id="setores"></div>
+    </div>
+    <div class="card">
+      <h2 id="setorTit">Novo setor</h2>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:10px">
+        <div><div class="sub">Nome</div><input class="tin" id="sNome" placeholder="ex: Operador / Corte"></div>
+        <div><div class="sub">Nível</div><select class="tin" id="sNivel">
+          <option value="operacao">Operação</option><option value="supervisor">Supervisor</option><option value="admin">Admin</option>
+        </select></div>
+        <button class="primary" onclick="salvarSetor()">Salvar setor</button>
+        <button class="ghost" onclick="novoSetor()">Limpar</button>
+        <span class="msg" id="setorMsg"></span>
+      </div>
+      <div class="sub" style="margin-bottom:6px">Permissões (só até o nível do setor):</div>
+      <div id="setorPerms"></div>
+    </div>
+  </div>
+
+</div>
+<script>
+var REG=null, SETORES=[], PESSOAS=[], SEL=null, EST=null, SETOR_EDIT=null;
+var NIVEIS={operacao:1,supervisor:2,admin:3,admin_geral:4};
+function $(s){return document.querySelector(s);}
+async function jget(u){ return (await fetch(u)).json(); }
+async function jpost(u,b){ return (await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})})).json(); }
+
+async function init(){
+  REG=await jget('/api/acesso/registro');
+  await carregarSetores();
+  PESSOAS=await jget('/api/usuarios');
+  $('#pessoas').innerHTML=PESSOAS.map(function(p){
+    return '<li data-id="'+p.id+'">'+p.nome+(p.ativo?'':' <span class="tag">inativo</span>')+'</li>';
+  }).join('');
+  renderSetorPerms();
+}
+async function carregarSetores(){ SETORES=await jget('/api/acesso/setores'); renderSetoresLista(); }
+
+/* ---------- PESSOAS ---------- */
+document.addEventListener('click',function(e){
+  var li=e.target.closest('#pessoas li'); if(li){ selPessoa(+li.dataset.id); return; }
+  var tb=e.target.closest('.tab'); if(tb){ troca(tb.dataset.t); return; }
+});
+function troca(t){
+  document.querySelectorAll('.tab').forEach(function(x){x.classList.toggle('on',x.dataset.t===t);});
+  $('#v-pessoas').style.display=(t==='pessoas')?'grid':'none';
+  $('#v-setores').style.display=(t==='setores')?'block':'none';
+}
+async function selPessoa(id){
+  SEL=id;
+  document.querySelectorAll('#pessoas li').forEach(function(x){x.classList.toggle('on',+x.dataset.id===id);});
+  EST=await jget('/api/acesso/usuario/'+id);   // {setores:[{nome,nivel}], permissoes:[...]}
+  renderDetalhe();
+}
+function meusSetorIds(){
+  // reconstroi os ids a partir dos nomes (EST.setores traz nome/nivel)
+  var nomes={}; EST.setores.forEach(function(s){nomes[s.nome]=1;});
+  return SETORES.filter(function(s){return nomes[s.nome];}).map(function(s){return s.id;});
+}
+function renderDetalhe(){
+  var p=PESSOAS.find(function(x){return x.id===SEL;});
+  var meus=meusSetorIds();
+  var perms=new Set(EST.permissoes);
+  // origem de cada permissao: setor (herdada) ou excecao
+  var viaSetor=new Set();
+  SETORES.forEach(function(s){ if(meus.indexOf(s.id)>=0) s.permissoes.forEach(function(c){viaSetor.add(c);}); });
+  var isAG=EST.setores.some(function(s){return s.nivel==='admin_geral';});
+  var h='<div style="display:flex;justify-content:space-between;align-items:center"><div><b style="font-size:18px">'+p.nome+'</b>'
+    +(isAG?' <span class="orig exc">Admin Geral · todas</span>':'')+'</div></div>';
+  // SETORES
+  h+='<h2 style="margin-top:16px">Setores</h2>';
+  h+=SETORES.filter(function(s){return s.ativo;}).map(function(s){
+    var on=meus.indexOf(s.id)>=0;
+    return '<label class="chk"><input type="checkbox" class="setchk" value="'+s.id+'"'+(on?' checked':'')+'>'
+      +'<span class="lb">'+s.nome+' <span class="nivelpill">'+s.nivel+'</span></span></label>';
+  }).join('');
+  h+='<div style="margin-top:10px"><button class="primary" onclick="salvarSetoresPessoa()">Salvar setores</button><span class="msg" id="msgSet"></span></div>';
+  // PERMISSOES
+  h+='<h2 style="margin-top:20px">Permissões '+(isAG?'(Admin Geral tem todas)':'')+'</h2>';
+  REG.grupos.forEach(function(g){
+    h+='<div class="grp">'+g.grupo+'</div>';
+    g.permissoes.forEach(function(pm){
+      var temSetor=viaSetor.has(pm.chave);
+      var tem=isAG||perms.has(pm.chave);
+      var origem = isAG?'<span class="orig exc">Admin Geral</span>'
+                 : (tem&&temSetor)?'<span class="orig setor">via setor</span>'
+                 : (tem&&!temSetor)?'<span class="orig exc">exceção</span>'
+                 : (!tem&&temSetor)?'<span class="orig exc">revogada</span>'
+                 : '<span class="orig no">—</span>';
+      h+='<label class="chk"><input type="checkbox" class="permchk" data-c="'+pm.chave+'" data-setor="'+(temSetor?1:0)+'"'
+        +(tem?' checked':'')+(isAG?' disabled':'')+'>'
+        +'<span class="lb">'+pm.rotulo+(pm.sensivel?' <span class="sens">SENSÍVEL</span>':'')+(pm.intransferivel?' <span class="intr">intransferível</span>':'')
+        +'<small>'+(pm.desc||'')+'</small></span>'+origem+'</label>';
+    });
+  });
+  $('#detalhe').innerHTML=h;
+}
+async function salvarSetoresPessoa(){
+  var ids=[].slice.call(document.querySelectorAll('.setchk:checked')).map(function(x){return +x.value;});
+  var r=await jpost('/api/acesso/usuario/'+SEL+'/setores',{setores:ids});
+  $('#msgSet').textContent='setores salvos'; setTimeout(function(){$('#msgSet').textContent='';},2000);
+  EST.permissoes=r.permissoes; await carregarSetores(); await selPessoa(SEL);
+}
+// toggle de permissao individual => cria exceção (concede/revoga) ou limpa
+document.addEventListener('change',async function(e){
+  var c=e.target.closest('.permchk'); if(!c||!SEL) return;
+  var chave=c.getAttribute('data-c'), temSetor=c.getAttribute('data-setor')==='1', marcado=c.checked;
+  var body;
+  if(marcado && temSetor) body={chave:chave,limpar:true};          // volta ao herdado
+  else if(marcado && !temSetor) body={chave:chave,concede:1};       // exceção concede
+  else if(!marcado && temSetor) body={chave:chave,concede:0};       // revoga o herdado
+  else body={chave:chave,limpar:true};                             // nada a fazer
+  var r=await jpost('/api/acesso/usuario/'+SEL+'/excecao',body);
+  EST.permissoes=r.permissoes; renderDetalhe();
+});
+
+/* ---------- SETORES ---------- */
+function renderSetoresLista(){
+  var el=$('#setores'); if(!el) return;
+  el.innerHTML=SETORES.map(function(s){
+    return '<div class="setor-row"><div class="nm">'+s.nome+(s.ativo?'':' <span class="nv">(inativo)</span>')+'</div>'
+      +'<span class="nivelpill">'+s.nivel+'</span>'
+      +'<span class="nv">'+s.usuarios+' pessoa(s) · '+s.permissoes.length+' perm.</span>'
+      +(s.nivel==='admin_geral'?'':'<button class="del" onclick="editarSetor('+s.id+')">editar</button>')
+      +((s.nativo||s.nivel==='admin_geral')?'':'<button class="del" onclick="excluirSetor('+s.id+',\''+s.nome.replace(/'/g,"")+'\')">excluir</button>')
+      +'</div>';
+  }).join('');
+}
+function novoSetor(){ SETOR_EDIT=null; $('#setorTit').textContent='Novo setor'; $('#sNome').value=''; $('#sNivel').value='operacao'; renderSetorPerms(); }
+function editarSetor(id){
+  var s=SETORES.find(function(x){return x.id===id;}); if(!s) return;
+  SETOR_EDIT=s; $('#setorTit').textContent='Editar: '+s.nome; $('#sNome').value=s.nome; $('#sNivel').value=s.nivel;
+  renderSetorPerms(); troca('setores');
+}
+function renderSetorPerms(){
+  if(!REG) return;
+  var nivel=$('#sNivel').value, marc=(SETOR_EDIT?SETOR_EDIT.permissoes:[]);
+  var h='';
+  REG.grupos.forEach(function(g){
+    h+='<div class="grp">'+g.grupo+'</div>';
+    g.permissoes.forEach(function(pm){
+      var permitido=NIVEIS[pm.nivel]<=NIVEIS[nivel];
+      var on=marc.indexOf(pm.chave)>=0 && permitido;
+      h+='<label class="chk" style="'+(permitido?'':'opacity:.4')+'"><input type="checkbox" class="spermchk" data-c="'+pm.chave+'"'
+        +(on?' checked':'')+(permitido?'':' disabled')+'>'
+        +'<span class="lb">'+pm.rotulo+(pm.sensivel?' <span class="sens">SENSÍVEL</span>':'')
+        +'<small>'+pm.nivel+(permitido?'':' — acima do nível do setor')+'</small></span></label>';
+    });
+  });
+  $('#setorPerms').innerHTML=h;
+}
+document.addEventListener('change',function(e){ if(e.target.id==='sNivel') renderSetorPerms(); });
+async function salvarSetor(){
+  var perms=[].slice.call(document.querySelectorAll('.spermchk:checked')).map(function(x){return x.getAttribute('data-c');});
+  var body={nome:$('#sNome').value.trim(),nivel:$('#sNivel').value,permissoes:perms};
+  if(SETOR_EDIT) body.id=SETOR_EDIT.id;
+  var r=await jpost('/api/acesso/setores',body);
+  if(r.erro){ $('#setorMsg').style.color='#f85149'; $('#setorMsg').textContent=r.erro; return; }
+  $('#setorMsg').style.color='#2ea043'; $('#setorMsg').textContent='salvo';
+  setTimeout(function(){$('#setorMsg').textContent='';},2000);
+  novoSetor(); await carregarSetores();
+}
+async function excluirSetor(id,nome){
+  if(!confirm('Excluir/desativar o setor "'+nome+'"?')) return;
+  var r=await (await fetch('/api/acesso/setores/'+id,{method:'DELETE'})).json();
+  if(r.erro){ alert(r.erro); return; }
+  await carregarSetores();
+}
+init();
+</script>
+<script src="/nav.js"></script>
+</body></html>
