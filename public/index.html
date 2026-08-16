@@ -75,7 +75,8 @@
   <div class="tab" data-t="cad">Cadastro de SKU</div>
   <div class="tab" data-t="nec">Necessidade (ABC)</div>
   <div class="tab" data-t="rel">Relatórios</div>
-  <div class="tab" data-t="usr">Pessoas &amp; Acessos</div>
+  <div class="tab" data-t="usr">Usuários &amp; PIN</div>
+  <div class="tab" data-t="acs">Acessos &amp; Permissões</div>
   <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="blq" id="tabBlq">Bloqueados</div><div class="tab" data-t="tst">Modo teste</div>
 </div>
 <div class="wrap">
@@ -116,6 +117,7 @@
 
   <div id="v-nec" class="hide"><iframe id="ifNec" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
   <div id="v-rel" class="hide"><iframe id="ifRel" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
+  <div id="v-acs" class="hide"><iframe id="ifAcs" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
   <!-- CADASTRO -->
   <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide">
   <div class="card">
@@ -179,9 +181,10 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   $("#v-prod").classList.toggle("hide",t.dataset.t!=="prod");
   $("#v-est").classList.toggle("hide",t.dataset.t!=="est");
   $("#v-cad").classList.toggle("hide",t.dataset.t!=="cad");
-  var vn=$("#v-nec"), vr=$("#v-rel");
+  var vn=$("#v-nec"), vr=$("#v-rel"), va=$("#v-acs");
   if(vn) vn.classList.toggle("hide",t.dataset.t!=="nec");
   if(vr) vr.classList.toggle("hide",t.dataset.t!=="rel");
+  if(va) va.classList.toggle("hide",t.dataset.t!=="acs");
   var vu=$("#v-usr"); if(vu) vu.classList.toggle("hide",t.dataset.t!=="usr");
   var vt=$("#v-tst"); if(vt) vt.classList.toggle("hide",t.dataset.t!=="tst");
   if(t.dataset.t==="tst") carregarTeste();
@@ -196,9 +199,10 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.t==="cd") carregarCad();
   if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); setTimeout(function(){var b=document.getElementById("ctBipe"); if(b) b.focus();},100); }
   if(t.dataset.t==="usr") carregarUsr();
-  var ifn=$("#ifNec"), ifr=$("#ifRel");
+  var ifn=$("#ifNec"), ifr=$("#ifRel"), ifa=$("#ifAcs");
   if(t.dataset.t==="nec" && ifn && !ifn.dataset.l){ ifn.src="/necessidade"; ifn.dataset.l=1; }
   if(t.dataset.t==="rel" && ifr && !ifr.dataset.l){ ifr.src="/relatorios"; ifr.dataset.l=1; }
+  if(t.dataset.t==="acs" && ifa && !ifa.dataset.l){ ifa.src="/acessos"; ifa.dataset.l=1; }
 });
 async function carregar(){
   SKUS=await (await fetch('/api/skus')).json();
