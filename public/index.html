@@ -130,6 +130,7 @@
     <table><thead><tr><th>SKU</th><th>Sistema</th><th>Contado</th><th>Diferenca</th></tr></thead><tbody id="ctLista"></tbody></table>
   </div>
   <div class="card" id="ctAlertas"></div>
+  <div class="card" id="ctPend" style="display:none"></div>
 </div>
 
 <div id="v-blq" class="hide"><div class="card"><div id="blqEstado"></div><table><thead><tr><th>SKU</th><th>Volumes</th><th></th></tr></thead><tbody id="blqLista"></tbody></table></div></div><div id="v-tst" class="hide">
@@ -193,7 +194,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.t==="dv") carregarDev();
   var vcd=$("#v-cd"); if(vcd) vcd.classList.toggle("hide",t.dataset.t!=="cd");
   if(t.dataset.t==="cd") carregarCad();
-  if(t.dataset.t==="ct"){ ctLista(); setTimeout(function(){var b=document.getElementById("ctBipe"); if(b) b.focus();},100); }
+  if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); setTimeout(function(){var b=document.getElementById("ctBipe"); if(b) b.focus();},100); }
   if(t.dataset.t==="usr") carregarUsr();
   var ifn=$("#ifNec"), ifr=$("#ifRel");
   if(t.dataset.t==="nec" && ifn && !ifn.dataset.l){ ifn.src="/necessidade"; ifn.dataset.l=1; }
@@ -565,8 +566,9 @@ async function ctAjustar(){
   if(!confirm('Ajustar o estoque destes SKUs?\n\n'+txt)) return;
   var r=await (await fetch('/api/contagem/ajustar',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({sessao:ctSessao(),codigos:difs.map(function(l){return l.codigo;})})})).json();
-  alert('Ajustados: '+r.ajustados+' SKUs.');
-  ctLista(); carregar();
+  if(r.pendente!==undefined) alert('Enviado para aprovacao: '+r.pendente+' SKU(s). O estoque so muda quando um responsavel aprovar.');
+  else alert('Ajustados: '+r.ajustados+' SKUs.');
+  ctLista(); ctPendentes(); carregar();
 }
 document.addEventListener('DOMContentLoaded',function(){
   var b=document.getElementById('ctBipe');
@@ -724,24 +726,46 @@ async function ctLancar(){
   if(!confirm("ACRESCENTAR estas quantidades ao estoque?"+String.fromCharCode(10)+String.fromCharCode(10)+txt)) return;
   var r=await (await fetch("/api/contagem/lancar",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({sessao:ctSessao(),codigos:itens.map(function(l){return l.codigo;})})})).json();
-  alert("Lancado em "+r.lancados+" SKUs. Pode bipar a proxima leva.");
-  ctLista(); carregar();
+  if(r.pendente!==undefined) alert("Enviado para aprovacao: "+r.pendente+" SKU(s). O estoque so muda quando um responsavel aprovar.");
+  else alert("Lancado em "+r.lancados+" SKUs. Pode bipar a proxima leva.");
+  ctLista(); ctPendentes(); carregar();
   var b=document.getElementById("ctBipe"); if(b) b.focus();
 }
 
-
-async function ctLancar(){
-  var d=await (await fetch("/api/contagem/"+ctSessao())).json();
-  var itens=d.linhas.filter(function(l){ return l.contado>0; });
-  if(!itens.length){ alert("Nada bipado para lancar."); return; }
-  var txt=itens.map(function(l){ return l.codigo+": +"+l.contado+" (fica "+(l.sistema+l.contado)+")"; }).join(String.fromCharCode(10));
-  if(!confirm("ACRESCENTAR estas quantidades ao estoque?"+String.fromCharCode(10)+String.fromCharCode(10)+txt)) return;
-  var r=await (await fetch("/api/contagem/lancar",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({sessao:ctSessao(),codigos:itens.map(function(l){return l.codigo;})})})).json();
-  alert("Lancado em "+r.lancados+" SKUs. Pode bipar a proxima leva.");
-  ctLista(); carregar();
-  var b=document.getElementById("ctBipe"); if(b) b.focus();
+// Contagem em dois passos: fila de aprovacao (so quem tem contagem.ajustar ve).
+async function ctPendentes(){
+  var box=document.getElementById("ctPend"); if(!box) return;
+  var d={linhas:[]};
+  try{ var resp=await fetch("/api/contagem/pendentes"); if(resp.status!==200){ box.style.display="none"; return; } d=await resp.json(); }
+  catch(e){ box.style.display="none"; return; }
+  if(!d.linhas.length){ box.style.display="none"; return; }
+  box.style.display="block";
+  var h='<div style="font-weight:700;margin-bottom:8px">Ajustes aguardando aprovacao ('+d.linhas.length+')</div>';
+  h+='<table><thead><tr><th>SKU</th><th>Operacao</th><th>Contado</th><th>Estoque atual</th><th>Quem contou</th><th>Quando</th><th></th></tr></thead><tbody>';
+  for(var i=0;i<d.linhas.length;i++){
+    var l=d.linhas[i];
+    var op=l.operacao==='lancar'?'somar':'substituir';
+    h+='<tr><td><b>'+l.codigo+'</b></td><td>'+op+'</td><td align=center><b>'+l.contado+'</b></td><td align=center>'+(l.estoque_atual==null?'-':l.estoque_atual)+'</td><td>'+(l.contado_por||'-')+'</td><td class="sub">'+(l.criado_em||'')+'</td>'
+      +'<td><button class="primary" style="padding:6px 10px" onclick="ctAprovar(['+l.id+'])">Aprovar</button> <button class="ghost" style="padding:6px 10px" onclick="ctRejeitar(['+l.id+'])">Rejeitar</button></td></tr>';
+  }
+  h+='</tbody></table>';
+  h+='<div style="margin-top:10px"><button class="primary" onclick="ctAprovarTodos()">Aprovar todos</button></div>';
+  box.innerHTML=h;
+  ctPendIds=d.linhas.map(function(l){return l.id;});
 }
+var ctPendIds=[];
+async function ctAprovar(ids){
+  var r=await (await fetch("/api/contagem/pendentes/aprovar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ids:ids})})).json();
+  if(r.erro){ alert(r.erro); return; }
+  ctPendentes(); carregar();
+}
+async function ctRejeitar(ids){
+  if(!confirm("Rejeitar este(s) ajuste(s)? O estoque nao muda.")) return;
+  var r=await (await fetch("/api/contagem/pendentes/rejeitar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ids:ids})})).json();
+  if(r.erro){ alert(r.erro); return; }
+  ctPendentes();
+}
+function ctAprovarTodos(){ if(ctPendIds.length && confirm("Aprovar TODOS os "+ctPendIds.length+" ajustes pendentes?")) ctAprovar(ctPendIds); }
 
 /*AUTO_ADMIN*/ setInterval(function(){ var a=document.activeElement; if(a && a.tagName==='INPUT') return; carregar(); },4000);
 </script>

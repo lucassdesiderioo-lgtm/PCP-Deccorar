@@ -41,7 +41,7 @@
 </style></head><body>
 <header><div class="mark">A</div><div><h1>Pessoas &amp; Acessos</h1><div class="sub">Setores, permissões e exceções — montado do registro (Fase 2)</div></div>
 <div class="links"><a class="link" href="/">Admin</a></div></header>
-<div class="tabs"><div class="tab on" data-t="pessoas">Pessoas</div><div class="tab" data-t="setores">Setores</div></div>
+<div class="tabs"><div class="tab on" data-t="pessoas">Pessoas</div><div class="tab" data-t="setores">Setores</div><div class="tab" data-t="auditoria">Auditoria &amp; cobertura</div></div>
 <div class="wrap">
 
   <div id="v-pessoas" class="cols">
@@ -67,6 +67,32 @@
       </div>
       <div class="sub" style="margin-bottom:6px">Permissões (só até o nível do setor):</div>
       <div id="setorPerms"></div>
+    </div>
+  </div>
+
+  <div id="v-auditoria" style="display:none">
+    <div class="card">
+      <h2>Modo de acesso</h2>
+      <div id="modoBox" class="sub">carregando…</div>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="primary" id="btModoNovo" onclick="setModo('novo')">Usar modelo novo</button>
+        <button class="ghost" id="btModoAntigo" onclick="setModo('antigo')">Reverter p/ modelo antigo</button>
+        <span class="msg" id="modoMsg"></span>
+      </div>
+      <div class="sub" style="margin-top:8px">O modelo antigo continua como rede de segurança: se o modelo novo falhar, o acesso não trava. O botão acima é o kill-switch de emergência.</div>
+    </div>
+    <div class="card">
+      <h2>Cobertura de rotas</h2>
+      <div id="cobResumo" class="sub">carregando…</div>
+      <div style="overflow:auto;max-height:280px;margin-top:8px"><table style="width:100%;border-collapse:collapse;font-size:12px" id="cobTab"></table></div>
+    </div>
+    <div class="card">
+      <h2>Divergências (modelo antigo × novo)</h2>
+      <div id="divBox" class="sub">carregando…</div>
+    </div>
+    <div class="card">
+      <h2>Auditoria — últimas ações</h2>
+      <div style="overflow:auto;max-height:420px"><table style="width:100%;border-collapse:collapse;font-size:12px" id="audTab"></table></div>
     </div>
   </div>
 
@@ -98,6 +124,39 @@ function troca(t){
   document.querySelectorAll('.tab').forEach(function(x){x.classList.toggle('on',x.dataset.t===t);});
   $('#v-pessoas').style.display=(t==='pessoas')?'grid':'none';
   $('#v-setores').style.display=(t==='setores')?'block':'none';
+  $('#v-auditoria').style.display=(t==='auditoria')?'block':'none';
+  if(t==='auditoria') carregarAuditoria();
+}
+
+/* ---------- AUDITORIA & COBERTURA (Fases 4/6) ---------- */
+function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+async function carregarAuditoria(){
+  var m=await jget('/api/acesso/modo');
+  $('#modoBox').innerHTML='Modo atual: <b style="color:'+(m.modo==='novo'?'#2ea043':'#ffb800')+'">'+m.modo.toUpperCase()+'</b>'
+    +(m.modo==='novo'?' — o modelo de permissões decide o acesso.':' — o modelo antigo (por área) decide o acesso.');
+  var cob=await jget('/api/acesso/cobertura');
+  $('#cobResumo').innerHTML=cob.total+' rotas mapeadas · '
+    +(cob.sem_declarar?'<b style="color:#f85149">'+cob.sem_declarar+' TELA(S) SEM PERMISSÃO DECLARADA</b>':'<b style="color:#2ea043">cobertura OK (0 telas sem declarar)</b>');
+  $('#cobTab').innerHTML='<tr style="color:#8b97a5;text-align:left"><th>Método</th><th>Rota</th><th>Permissão</th></tr>'
+    +cob.linhas.map(function(l){
+      var semDecl=(l.permissao==='@logado'&&l.rota.indexOf('/api/')!==0);
+      return '<tr style="border-top:1px solid #262d37'+(semDecl?';color:#f85149':'')+'"><td>'+l.metodo+'</td><td style="font-family:ui-monospace,monospace">'+esc(l.rota)+'</td><td>'+esc(l.permissao)+(semDecl?' ⚠':'')+'</td></tr>';
+    }).join('');
+  var dv=await jget('/api/acesso/divergencias');
+  $('#divBox').innerHTML=dv.total?('<b style="color:#f85149">'+dv.total+' divergência(s) hoje</b><div style="margin-top:6px">'
+      +dv.linhas.map(function(l){return esc(l.usuario_nome)+' · '+esc(l.area)+' → antigo '+l.antigo+' / novo '+l.novo;}).join('<br>')+'</div>')
+    :'<b style="color:#2ea043">Sem divergências hoje — os dois modelos concordam.</b>';
+  var au=await jget('/api/acesso/auditoria');
+  $('#audTab').innerHTML='<tr style="color:#8b97a5;text-align:left"><th>Quando</th><th>Quem</th><th>Categoria</th><th>Ação</th><th>Alvo</th><th>Detalhe</th><th>IP</th></tr>'
+    +(au.linhas.length?au.linhas.map(function(l){
+      return '<tr style="border-top:1px solid #262d37"><td style="white-space:nowrap">'+esc(l.criado_em)+'</td><td>'+esc(l.usuario_nome)+'</td><td>'+esc(l.categoria)+'</td><td>'+esc(l.acao)+'</td><td style="font-family:ui-monospace,monospace">'+esc(l.alvo)+'</td><td>'+esc(l.detalhe)+'</td><td class="sub">'+esc(l.ip)+'</td></tr>';
+    }).join(''):'<tr><td colspan=7 class="sub" style="padding:12px">Nenhuma ação registrada ainda.</td></tr>');
+}
+async function setModo(m){
+  if(m==='antigo' && !confirm('Reverter para o modelo ANTIGO de acesso?\n\nUse só em emergência — o modelo novo deixa de decidir.')) return;
+  var r=await jpost('/api/acesso/modo',{modo:m});
+  $('#modoMsg').textContent='modo: '+r.modo; setTimeout(function(){$('#modoMsg').textContent='';},2500);
+  carregarAuditoria();
 }
 async function selPessoa(id){
   SEL=id;

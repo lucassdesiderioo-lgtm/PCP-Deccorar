@@ -77,6 +77,13 @@ module.exports=function(app, db){
     return f&&f.n>=5&&(Date.now()-f.t)<60000;
   }
 
+  const negaTela=res=>res.status(403).send('<body style="font-family:system-ui;padding:40px"><h2>Sem permissao</h2><p>Voce nao tem acesso a esta tela.</p><a href="/login">Entrar com outro usuario</a></body>');
+
+  // auditoria (secao 7): o modulo de acesso expoe auditar() via app.locals apos
+  // subir. Aqui so registra; nunca deixa o log derrubar a acao.
+  const aud=(reqOrShim,cat,acao,alvo,det)=>{ const ac=app.locals.acesso;
+    try{ if(ac&&ac.auditar) ac.auditar(reqOrShim,cat,acao,alvo,det); }catch(e){} };
+
   app.use(function(req,res,next){
     const p=req.path;
     if(LIVRE.includes(p)||p.startsWith('/api/auth/')) return next();
@@ -89,7 +96,23 @@ module.exports=function(app, db){
       if(area) return res.redirect('/login?r='+encodeURIComponent(req.originalUrl));
       return next();
     }
-    if(area&&!tem(u,area)) return res.status(403).send('<body style="font-family:system-ui;padding:40px"><h2>Sem permissao</h2><p>Voce nao tem acesso a esta tela.</p><a href="/login">Entrar com outro usuario</a></body>');
+    // FASE 3 do controle de acesso: com o modo 'novo' ligado, o modelo de
+    // permissoes decide. Qualquer erro no modelo novo cai no antigo abaixo —
+    // um bug no controle novo nunca tranca ninguem.
+    const ac=app.locals.acesso;
+    if(ac&&ac.modoAcesso&&ac.modoAcesso()==='novo'){
+      try{
+        const d=ac.decidir(u,p,req.method);
+        if(!d.ok){
+          // registra a negativa (mutacoes e telas; leituras GET de API sao
+          // ignoradas para nao afogar a auditoria com polling)
+          if(req.method!=='GET' || !api) aud(req,'seguranca','acesso_negado',p,'chave='+(d.chave||''));
+          return api?res.status(403).json({erro:'sem_permissao',chave:d.chave}):negaTela(res);
+        }
+        return next();
+      }catch(e){ /* fallback pro modelo antigo */ }
+    }
+    if(area&&!tem(u,area)) return negaTela(res);
     if(api&&API_ADMIN.some(x=>p.startsWith(x))&&!tem(u,'admin')) return res.status(403).json({erro:'sem_permissao'});
     next();
   });
@@ -101,20 +124,25 @@ module.exports=function(app, db){
 
   app.post('/api/auth/login',(req,res)=>{
     const {id,pin}=req.body||{};
-    if(bloqueado(id)) return res.status(429).json({erro:'Muitas tentativas. Aguarde 1 minuto.'});
+    const shim=n=>({usuario:{id:id||null,nome:n||''},headers:req.headers,socket:req.socket});
+    if(bloqueado(id)){ aud(shim(),'acesso','bloqueio',String(id||''),'5 PINs errados'); return res.status(429).json({erro:'Muitas tentativas. Aguarde 1 minuto.'}); }
     const u=db.prepare('SELECT * FROM usuarios WHERE id=? AND ativo=1').get(id);
     if(!u||hash(pin,u.salt)!==u.pin_hash){
       const f=falhas[id]||{n:0,t:0};
       falhas[id]={n:(Date.now()-f.t<60000?f.n:0)+1,t:Date.now()};
+      aud(shim(u&&u.nome),'acesso','pin_errado',String(id||''),'');
       return res.status(401).json({erro:'PIN incorreto'});
     }
     delete falhas[id];
     const corpo=Buffer.from(JSON.stringify({id:u.id})).toString('base64');
     res.setHeader('Set-Cookie','sess='+encodeURIComponent(corpo+'.'+assina(corpo))+'; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax');
+    aud({usuario:{id:u.id,nome:u.nome},headers:req.headers,socket:req.socket},'acesso','login',u.nome,'');
     res.json({ok:true,nome:u.nome,areas:u.areas.split(',').filter(Boolean)});
   });
 
   app.post('/api/auth/logout',(req,res)=>{
+    const u=lerSessao(req);
+    if(u) aud({usuario:u,headers:req.headers,socket:req.socket},'acesso','logout',u.nome,'');
     res.setHeader('Set-Cookie','sess=; Path=/; Max-Age=0');
     res.json({ok:true});
   });
