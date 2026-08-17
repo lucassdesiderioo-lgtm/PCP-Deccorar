@@ -75,7 +75,6 @@
   <div class="tab" data-t="cad">Cadastro de SKU</div>
   <div class="tab" data-t="nec">Necessidade (ABC)</div>
   <div class="tab" data-t="rel">Relatórios</div>
-  <div class="tab" data-t="usr">Usuários &amp; PIN</div>
   <div class="tab" data-t="acs">Acessos &amp; Permissões</div>
   <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="blq" id="tabBlq">Bloqueados</div><div class="tab" data-t="tst">Modo teste</div>
 </div>
@@ -145,22 +144,6 @@
     </div>
   </div>
 </div>
-<div id="v-usr" class="hide">
-  <div class="card">
-    <div class="grid">
-      <div><label>Nome</label><input id="uNome" placeholder="Maria"></div>
-      <div><label>PIN (4 dígitos)</label><input id="uPin" maxlength="6" inputmode="numeric" placeholder="deixe vazio p/ manter"></div>
-    </div>
-    <div style="margin:14px 0 6px"><label>Pode acessar</label></div>
-    <div id="uAreas" style="display:flex;flex-wrap:wrap;gap:14px"></div>
-    <div class="row-actions" style="margin-top:14px">
-      <button class="primary" onclick="salvarUsr()">Salvar pessoa</button>
-      <button class="ghost" onclick="limparUsr()">Limpar</button>
-      <span class="msg" id="msgUsr"></span>
-    </div>
-  </div>
-  <div class="card"><table><thead><tr><th>Nome</th><th>Acessos</th><th>Situação</th><th></th></tr></thead><tbody id="uLista"></tbody></table></div>
-</div>
 <div id="v-cad" class="hide">
     <div class="card"><div style="font-weight:700;margin-bottom:10px">Cadastrar / editar produto</div>
       <div class="grid">
@@ -185,7 +168,6 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(vn) vn.classList.toggle("hide",t.dataset.t!=="nec");
   if(vr) vr.classList.toggle("hide",t.dataset.t!=="rel");
   if(va) va.classList.toggle("hide",t.dataset.t!=="acs");
-  var vu=$("#v-usr"); if(vu) vu.classList.toggle("hide",t.dataset.t!=="usr");
   var vt=$("#v-tst"); if(vt) vt.classList.toggle("hide",t.dataset.t!=="tst");
   if(t.dataset.t==="tst") carregarTeste();
   var vb=$("#v-blq"); if(vb) vb.classList.toggle("hide",t.dataset.t!=="blq");
@@ -198,7 +180,6 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   var vcd=$("#v-cd"); if(vcd) vcd.classList.toggle("hide",t.dataset.t!=="cd");
   if(t.dataset.t==="cd") carregarCad();
   if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); setTimeout(function(){var b=document.getElementById("ctBipe"); if(b) b.focus();},100); }
-  if(t.dataset.t==="usr") carregarUsr();
   var ifn=$("#ifNec"), ifr=$("#ifRel"), ifa=$("#ifAcs");
   if(t.dataset.t==="nec" && ifn && !ifn.dataset.l){ ifn.src="/necessidade"; ifn.dataset.l=1; }
   if(t.dataset.t==="rel" && ifr && !ifr.dataset.l){ ifr.src="/relatorios"; ifr.dataset.l=1; }
@@ -280,60 +261,6 @@ document.addEventListener("click",async e=>{
 carregar();
 
 /* ---- Pessoas & Acessos ---- */
-var AREAS=[], USRS=[], editId=null;
-async function carregarUsr(){
-  if(!AREAS.length) AREAS=await (await fetch("/api/auth/areas")).json();
-  $("#uAreas").innerHTML=AREAS.map(function(a){
-    return '<label style="display:flex;gap:6px;align-items:center;font-weight:500;color:var(--txt)">'+
-           '<input type="checkbox" class="chkA" value="'+a.id+'"> '+a.nome+'</label>';
-  }).join("");
-  USRS=await (await fetch("/api/usuarios")).json();
-  $("#uLista").innerHTML=USRS.map(function(u){
-    var nomes=u.areas.split(",").filter(Boolean).map(function(id){
-      var a=AREAS.find(function(x){return x.id===id;}); return a?a.nome:id;
-    }).join(", ")||"&mdash;";
-    return "<tr><td><b>"+u.nome+"</b></td><td style='color:var(--muted)'>"+nomes+"</td>"+
-      "<td>"+(u.ativo?"Ativo":"Inativo")+"</td>"+
-      "<td style='text-align:right'><button class='ghost' data-eu='"+u.id+"'>Editar</button> "+
-      "<button class='ghost' data-du='"+u.id+"'>Desativar</button></td></tr>";
-  }).join("");
-}
-function limparUsr(){
-  editId=null; $("#uNome").value=""; $("#uPin").value="";
-  document.querySelectorAll(".chkA").forEach(function(c){c.checked=false;});
-  $("#msgUsr").textContent="";
-}
-async function salvarUsr(){
-  var nome=$("#uNome").value.trim(), pin=$("#uPin").value.trim();
-  if(!nome){ $("#msgUsr").textContent="Informe o nome"; return; }
-  if(!editId && pin.length<4){ $("#msgUsr").textContent="PIN de 4 digitos obrigatorio"; return; }
-  var areas=[].slice.call(document.querySelectorAll(".chkA:checked")).map(function(c){return c.value;});
-  var r=await fetch("/api/usuarios",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({id:editId,nome:nome,pin:pin,areas:areas,ativo:1})});
-  var j=await r.json();
-  if(!r.ok){ $("#msgUsr").textContent=j.erro||"Erro"; return; }
-  $("#msgUsr").textContent="Salvo"; limparUsr(); carregarUsr();
-  setTimeout(function(){$("#msgUsr").textContent="";},2000);
-}
-document.addEventListener("click",async function(e){
-  var eu=e.target.closest("[data-eu]");
-  if(eu){
-    var u=USRS.find(function(x){return x.id==eu.dataset.eu;});
-    editId=u.id; $("#uNome").value=u.nome; $("#uPin").value="";
-    var lst=u.areas.split(",");
-    document.querySelectorAll(".chkA").forEach(function(c){c.checked=lst.indexOf(c.value)>=0;});
-    $("#msgUsr").textContent="Editando "+u.nome+" (PIN vazio = mantem o atual)";
-    window.scrollTo(0,0); return;
-  }
-  var du=e.target.closest("[data-du]");
-  if(du){
-    if(!confirm("Desativar esta pessoa? Ela perde o acesso.")) return;
-    await fetch("/api/usuarios/"+du.dataset.du,{method:"DELETE"});
-    carregarUsr(); return;
-  }
-});
-
-
 /* ---- Modo teste ---- */
 /* Percorre o que o servidor mandou: as tabelas cobertas mudam com o tempo,
    entao nada de lista fixa aqui — senao a tela esconde registros de teste. */

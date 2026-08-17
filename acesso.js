@@ -315,6 +315,10 @@ module.exports = function(app, db){
         const ins = db.prepare("INSERT OR IGNORE INTO setor_permissao (setor_id,chave) VALUES (?,?)");
         perms.forEach(c => ins.run(id, c));
       })();
+      // editar um setor muda as permissoes de quem pertence a ele -> ressincroniza
+      // as areas (sombra) desses membros (setor novo ainda nao tem ninguem)
+      if(b.id) db.prepare("SELECT usuario_id FROM usuario_setor WHERE setor_id=?").all(b.id)
+        .forEach(m => sincronizarAreas(m.usuario_id));
       auditar(req, 'sistema', b.id ? 'setor_editado' : 'setor_criado', nome, perms.join(','));
       res.json({ ok:true });
     }catch(e){ res.status(400).json({ erro:String(e.message||e) }); }
@@ -343,6 +347,7 @@ module.exports = function(app, db){
       const ins = db.prepare("INSERT OR IGNORE INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)");
       ids.forEach(sid => ins.run(uid, sid));
     })();
+    sincronizarAreas(uid);
     auditar(req, 'sistema', 'usuario_setores', String(uid), ids.join(','));
     res.json({ ok:true, permissoes:[...permissoesDe(uid)].sort() });
   });
@@ -362,6 +367,7 @@ module.exports = function(app, db){
         motivo=excluded.motivo, criado_por=excluded.criado_por`).run(uid, chave, concede,
         String(b.motivo||''), (req.usuario && req.usuario.nome) || '');
     }
+    sincronizarAreas(uid);
     auditar(req, 'sistema', 'usuario_excecao', String(uid), chave+(b.limpar?':limpa':(b.concede?':concede':':revoga')));
     res.json({ ok:true, permissoes:[...permissoesDe(uid)].sort() });
   });
@@ -446,6 +452,28 @@ module.exports = function(app, db){
     return db.prepare(`SELECT 1 FROM usuario_setor us JOIN setores s ON s.id=us.setor_id
       WHERE us.usuario_id=? AND s.ativo=1 AND s.nivel='admin_geral' LIMIT 1`).get(uid) ? true : false;
   }
+  // ── `areas` (modelo antigo) virou SOMBRA dos setores: nao e mais editada a
+  // mao. Mantida so para o que ainda depende dela — o redirecionamento pos-login
+  // (login.html), a caixa de subir PDF no admin e o fallback de emergencia.
+  // Recalcula a partir das permissoes efetivas sempre que os setores/excecoes
+  // de uma pessoa mudam. ──
+  const PERM_AREA = [
+    ['revisao.executar','operador'], ['embalagem.executar','montagem'],
+    ['etiqueta.emitir','embalagem'], ['carregamento.executar','carregamento'],
+    ['pdf.subir','expedicao'], ['devolucao.registrar','devolucao'],
+    ['painel.ver','painel'], ['relatorios.ver','relatorios'], ['necessidade.ver','necessidade']
+  ];
+  function sincronizarAreas(uid){
+    try{
+      const ag = ehAdminGeral(uid);
+      const perms = permissoesDe(uid);
+      const areas = [];
+      if(ag || temAdmin(perms)) areas.push('admin');   // landing /admin + fallback
+      PERM_AREA.forEach(([chave,area]) => { if(ag || perms.has(chave)) areas.push(area); });
+      db.prepare("UPDATE usuarios SET areas=? WHERE id=?").run(areas.join(','), uid);
+    }catch(e){}
+  }
+
   // pergunta pontual (usada por outras rotas, ex.: contagem em dois passos):
   // o usuario tem esta permissao? Admin Geral tem todas. Migra na primeira vez.
   function podePermissao(u, chave){
