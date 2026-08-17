@@ -149,10 +149,24 @@ async function salvarPessoa(){
 }
 async function toggleAtivo(){
   var p=PESSOAS.find(function(x){return x.id===SEL;}); if(!p) return;
-  if(p.ativo){ if(!confirm('Desativar '+p.nome+'? Ela perde o acesso ao sistema.')) return;
-    await fetch('/api/usuarios/'+SEL,{method:'DELETE'}); }
-  else { await jpost('/api/usuarios',{id:SEL,ativo:1}); }
+  if(p.ativo){
+    if(!confirm('Desativar '+p.nome+'? Ela perde o acesso na hora (o histórico é mantido).')) return;
+    var r=await (await fetch('/api/usuarios/'+SEL,{method:'DELETE'})).json();
+    if(r.erro){ alert(r.erro); return; }
+  } else {
+    var r2=await jpost('/api/usuarios',{id:SEL,ativo:1});
+    if(r2.erro){ alert(r2.erro); return; }
+  }
   await recarregarPessoas(); selPessoa(SEL);
+}
+async function excluirPessoa(){
+  var p=PESSOAS.find(function(x){return x.id===SEL;}); if(!p) return;
+  if(!confirm('EXCLUIR "'+p.nome+'" de vez?\n\nA pessoa some da lista e perde o acesso. O histórico de ações dela na auditoria é mantido.\n\nSe ela só saiu do time, o recomendado é Desativar.')) return;
+  var r=await (await fetch('/api/usuarios/'+SEL+'?hard=1',{method:'DELETE'})).json();
+  if(r.erro){ alert(r.erro); return; }
+  SEL=null;
+  await recarregarPessoas();
+  $('#detalhe').innerHTML='<div class="sub">Pessoa excluída. Selecione outra ou cadastre uma nova.</div>';
 }
 async function carregarSetores(){ SETORES=await jget('/api/acesso/setores'); renderSetoresLista(); }
 
@@ -223,7 +237,9 @@ function renderDetalhe(){
     +'<input class="tin" id="pPin" placeholder="novo PIN (vazio = mantém)" maxlength="6" inputmode="numeric" style="width:190px">'
     +'<button class="primary" onclick="salvarPessoa()">Salvar</button>'
     +'<button class="ghost" onclick="toggleAtivo()">'+(p.ativo?'Desativar':'Reativar')+'</button>'
+    +'<button class="del" onclick="excluirPessoa()">Excluir</button>'
     +'<span class="msg" id="pMsg"></span></div>'
+    +'<div class="sub" style="margin-bottom:8px">Saiu do time? <b>Desativar</b> bloqueia o login na hora e mantém o histórico (recomendado). <b>Excluir</b> remove a pessoa da lista de vez.</div>'
     +(p.ativo?'':'<div class="warn">Esta pessoa está <b>inativa</b> — não consegue entrar até ser reativada.</div>')
     +(isAG?'<div class="orig exc" style="display:inline-block;margin-bottom:4px">Admin Geral · todas as permissões</div>':'');
   // SETORES

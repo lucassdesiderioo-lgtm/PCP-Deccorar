@@ -163,6 +163,8 @@ module.exports=function(app, db){
     if(id){
       // areas e ativo so mudam se vierem no corpo — a tela de Acessos edita
       // nome/PIN sem tocar neles (areas passou a ser derivada dos setores).
+      if(ativo!==undefined && !ativo && ehUltimoAdminGeral(id))
+        return res.status(400).json({erro:'Esta é a única pessoa com acesso total (Admin Geral). Dê esse acesso a outra pessoa antes de bloquear esta.'});
       db.prepare('UPDATE usuarios SET nome=? WHERE id=?').run(nome,id);
       if(areas!==undefined) db.prepare('UPDATE usuarios SET areas=? WHERE id=?').run((areas||[]).join(','),id);
       if(ativo!==undefined) db.prepare('UPDATE usuarios SET ativo=? WHERE id=?').run(ativo?1:0,id);
@@ -178,8 +180,33 @@ module.exports=function(app, db){
     res.json({ok:true});
   });
 
+  // Trava de seguranca: nao deixa remover/bloquear o ULTIMO Admin Geral ativo —
+  // senao ninguem mais consegue administrar (regra "ninguem sem acesso").
+  function ehUltimoAdminGeral(id){
+    const ac=app.locals.acesso;
+    if(!ac||!ac.ehAdminGeral) return false;         // modelo novo indisponivel: nao trava
+    if(!ac.ehAdminGeral(+id)) return false;         // nem e Admin Geral
+    const outros=db.prepare('SELECT id FROM usuarios WHERE ativo=1 AND id!=?').all(id);
+    return !outros.some(u=>ac.ehAdminGeral(u.id));   // ninguem mais e AG ativo
+  }
+
   app.delete('/api/usuarios/:id',(req,res)=>{
-    db.prepare('UPDATE usuarios SET ativo=0 WHERE id=?').run(req.params.id);
+    const id=req.params.id;
+    const hard=req.query.hard==='1';
+    if(ehUltimoAdminGeral(id))
+      return res.status(400).json({erro:'Esta é a única pessoa com acesso total (Admin Geral). Dê o acesso de Admin Geral a outra pessoa antes de remover esta.'});
+    const alvo=db.prepare('SELECT nome FROM usuarios WHERE id=?').get(id);
+    if(hard){
+      db.transaction(()=>{
+        db.prepare('DELETE FROM usuarios WHERE id=?').run(id);
+        try{ db.prepare('DELETE FROM usuario_setor WHERE usuario_id=?').run(id); }catch(e){}
+        try{ db.prepare('DELETE FROM usuario_excecao WHERE usuario_id=?').run(id); }catch(e){}
+      })();
+      aud(req,'sistema','pessoa_excluida',alvo?alvo.nome:String(id),'exclusao definitiva');
+      return res.json({ok:true,excluido:true});
+    }
+    db.prepare('UPDATE usuarios SET ativo=0 WHERE id=?').run(id);
+    aud(req,'sistema','pessoa_desativada',alvo?alvo.nome:String(id),'acesso bloqueado');
     res.json({ok:true});
   });
 };
