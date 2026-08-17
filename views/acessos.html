@@ -45,8 +45,17 @@
 <div class="wrap">
 
   <div id="v-pessoas" class="cols">
-    <div class="card"><h2>Pessoas</h2><ul class="plist" id="pessoas"></ul></div>
-    <div class="card" id="detalhe"><div class="sub">Selecione uma pessoa.</div></div>
+    <div class="card">
+      <h2>Pessoas</h2>
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <input class="tin" id="npNome" placeholder="Nova pessoa" style="flex:1;min-width:0">
+        <input class="tin" id="npPin" placeholder="PIN" maxlength="6" inputmode="numeric" style="width:70px">
+        <button class="primary" style="padding:9px 12px" onclick="criarPessoa()">+</button>
+      </div>
+      <div class="msg" id="npMsg" style="margin:0 0 8px"></div>
+      <ul class="plist" id="pessoas"></ul>
+    </div>
+    <div class="card" id="detalhe"><div class="sub">Selecione uma pessoa ou cadastre uma nova.</div></div>
   </div>
 
   <div id="v-setores" style="display:none">
@@ -108,10 +117,42 @@ async function init(){
   REG=await jget('/api/acesso/registro');
   await carregarSetores();
   PESSOAS=await jget('/api/usuarios');
-  $('#pessoas').innerHTML=PESSOAS.map(function(p){
-    return '<li data-id="'+p.id+'">'+p.nome+(p.ativo?'':' <span class="tag">inativo</span>')+'</li>';
-  }).join('');
+  renderPessoas();
   renderSetorPerms();
+}
+function renderPessoas(){
+  $('#pessoas').innerHTML=PESSOAS.map(function(p){
+    return '<li data-id="'+p.id+'"'+(p.id===SEL?' class="on"':'')+'>'+p.nome+(p.ativo?'':' <span class="tag">inativo</span>')+'</li>';
+  }).join('');
+}
+async function recarregarPessoas(){ PESSOAS=await jget('/api/usuarios'); renderPessoas(); }
+async function criarPessoa(){
+  var nome=$('#npNome').value.trim(), pin=$('#npPin').value.trim();
+  $('#npMsg').style.color='#f85149';
+  if(!nome){ $('#npMsg').textContent='Informe o nome'; return; }
+  if(pin.length<4){ $('#npMsg').textContent='PIN de 4 dígitos'; return; }
+  var r=await jpost('/api/usuarios',{nome:nome,pin:pin});
+  if(r.erro){ $('#npMsg').textContent=r.erro; return; }
+  $('#npNome').value=''; $('#npPin').value=''; $('#npMsg').textContent='';
+  await recarregarPessoas();
+  if(r.id) selPessoa(r.id);
+}
+async function salvarPessoa(){
+  var nome=$('#pNome').value.trim(), pin=$('#pPin').value.trim();
+  if(!nome){ $('#pMsg').style.color='#f85149'; $('#pMsg').textContent='Informe o nome'; return; }
+  var body={id:SEL,nome:nome}; if(pin) body.pin=pin;
+  var r=await jpost('/api/usuarios',body);
+  if(r.erro){ $('#pMsg').style.color='#f85149'; $('#pMsg').textContent=r.erro; return; }
+  $('#pMsg').style.color='#2ea043'; $('#pMsg').textContent='salvo'; $('#pPin').value='';
+  setTimeout(function(){$('#pMsg').textContent='';},2000);
+  await recarregarPessoas();
+}
+async function toggleAtivo(){
+  var p=PESSOAS.find(function(x){return x.id===SEL;}); if(!p) return;
+  if(p.ativo){ if(!confirm('Desativar '+p.nome+'? Ela perde o acesso ao sistema.')) return;
+    await fetch('/api/usuarios/'+SEL,{method:'DELETE'}); }
+  else { await jpost('/api/usuarios',{id:SEL,ativo:1}); }
+  await recarregarPessoas(); selPessoa(SEL);
 }
 async function carregarSetores(){ SETORES=await jget('/api/acesso/setores'); renderSetoresLista(); }
 
@@ -177,8 +218,14 @@ function renderDetalhe(){
   var viaSetor=new Set();
   SETORES.forEach(function(s){ if(meus.indexOf(s.id)>=0) s.permissoes.forEach(function(c){viaSetor.add(c);}); });
   var isAG=EST.setores.some(function(s){return s.nivel==='admin_geral';});
-  var h='<div style="display:flex;justify-content:space-between;align-items:center"><div><b style="font-size:18px">'+p.nome+'</b>'
-    +(isAG?' <span class="orig exc">Admin Geral · todas</span>':'')+'</div></div>';
+  var h='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'
+    +'<input class="tin" id="pNome" value="'+String(p.nome).replace(/"/g,"&quot;")+'" style="flex:1;min-width:150px">'
+    +'<input class="tin" id="pPin" placeholder="novo PIN (vazio = mantém)" maxlength="6" inputmode="numeric" style="width:190px">'
+    +'<button class="primary" onclick="salvarPessoa()">Salvar</button>'
+    +'<button class="ghost" onclick="toggleAtivo()">'+(p.ativo?'Desativar':'Reativar')+'</button>'
+    +'<span class="msg" id="pMsg"></span></div>'
+    +(p.ativo?'':'<div class="warn">Esta pessoa está <b>inativa</b> — não consegue entrar até ser reativada.</div>')
+    +(isAG?'<div class="orig exc" style="display:inline-block;margin-bottom:4px">Admin Geral · todas as permissões</div>':'');
   // SETORES
   h+='<h2 style="margin-top:16px">Setores</h2>';
   h+=SETORES.filter(function(s){return s.ativo;}).map(function(s){

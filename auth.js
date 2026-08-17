@@ -160,16 +160,20 @@ module.exports=function(app, db){
   app.post('/api/usuarios',(req,res)=>{
     const {id,nome,pin,areas,ativo}=req.body||{};
     if(!nome) return res.status(400).json({erro:'nome obrigatorio'});
-    const lista=(areas||[]).join(',');
     if(id){
-      db.prepare('UPDATE usuarios SET nome=?,areas=?,ativo=? WHERE id=?').run(nome,lista,ativo?1:0,id);
+      // areas e ativo so mudam se vierem no corpo — a tela de Acessos edita
+      // nome/PIN sem tocar neles (areas passou a ser derivada dos setores).
+      db.prepare('UPDATE usuarios SET nome=? WHERE id=?').run(nome,id);
+      if(areas!==undefined) db.prepare('UPDATE usuarios SET areas=? WHERE id=?').run((areas||[]).join(','),id);
+      if(ativo!==undefined) db.prepare('UPDATE usuarios SET ativo=? WHERE id=?').run(ativo?1:0,id);
       if(pin&&String(pin).length>=4){
         const salt=crypto.randomBytes(16).toString('hex');
         db.prepare('UPDATE usuarios SET salt=?,pin_hash=? WHERE id=?').run(salt,hash(pin,salt),id);
       }
     } else {
       if(!pin||String(pin).length<4) return res.status(400).json({erro:'PIN de 4 digitos obrigatorio'});
-      criar(nome,pin,areas);
+      const r=criar(nome,pin,areas||[]);
+      return res.json({ok:true,id:r.lastInsertRowid});
     }
     res.json({ok:true});
   });
