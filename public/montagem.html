@@ -37,6 +37,17 @@
 <script>
 const $=s=>document.querySelector(s);
 function kitNorm(x){ return String(x||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase(); }
+// maior sequencia continua de letras/numeros — no link do Drive e o ID da
+// pasta, que e igual em qualquer forma do link (/folders/, /u/1/folders/, ?usp).
+function kitTok(x){ var m=String(x||'').toUpperCase().match(/[A-Z0-9]+/g)||[]; return m.reduce(function(a,b){return b.length>a.length?b:a;},''); }
+// Bate o kit ignorando simbolos: pelo miolo alfanumerico (um conter o outro)
+// OU pelo ID da pasta (maior token). Min 12 chars evita casar por acaso.
+function kitBate(lido, cad){
+  var a=kitNorm(lido), b=kitNorm(cad);
+  if(a.length>=12 && b.length>=12 && (a===b || a.indexOf(b)>=0 || b.indexOf(a)>=0)) return true;
+  var ta=kitTok(lido), tb=kitTok(cad);
+  return ta.length>=12 && ta===tb;
+}
 let SKUS=[], KIT=null, emb=null, tick=null, last={c:null,t:0}, FILA=[];
 async function carregarFila(){
   try{
@@ -71,7 +82,7 @@ function handle(code){
   // Kit: compara so letras/numeros. O leitor + teclado ABNT2 embaralha os
   // simbolos do link do Drive (: -> Ç, / -> ;), mas o miolo alfanumerico e o
   // mesmo. Assim bate tanto bipando o QR quanto digitando a URL limpa.
-  if(KIT && kitNorm(code)===kitNorm(KIT) && kitNorm(KIT).length>=8){
+  if(KIT && kitBate(code, KIT)){
     if(!emb){ banner('err','Bipe o SKU primeiro','O kit só entra depois de começar uma persiana.'); beep(false); return; }
     emb.kitOk=true; banner('kit','Kit confirmado ✓','Agora cole a etiqueta de SKU e <b>bipe o SKU de novo</b> pra finalizar.<div class="timer" id="tm">'+mmss(Date.now()-emb.inicio)+'</div>'+steps()); beep(true); return;
   }
@@ -85,7 +96,10 @@ function handle(code){
     }
     banner('err','Termine a persiana atual','Você está embalando '+emb.codigo+'. Bipe o kit e o SKU pra finalizar antes de começar outra.'); beep(false); return;
   }
-  banner('err','Código não reconhecido',code+' não é um SKU cadastrado nem o kit.'); beep(false);
+  var dg = KIT
+    ? '<div style="font-size:12px;color:#8b97a5;margin-top:10px">conferência do kit &middot; lido: …<b>'+(kitNorm(code).slice(-10)||'(vazio)')+'</b> &middot; cadastrado: …<b>'+(kitNorm(KIT).slice(-10)||'(vazio)')+'</b></div>'
+    : '<div style="font-size:12px;color:#8b97a5;margin-top:10px">Nenhum código de kit cadastrado — cadastre em <b>Admin → Cadastros</b>.</div>';
+  banner('err','Código não reconhecido',code+' não é um SKU cadastrado nem o kit.'+dg); beep(false);
 }
 async function finish(){
   const cur=emb; clearInterval(tick); tick=null; emb=null;
