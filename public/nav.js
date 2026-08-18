@@ -31,8 +31,10 @@ var FONT=(function(){
 })();
 
 (function(){
-  var MAP={ '1':'/painel','2':'/operador','3':'/montagem','4':'/expedicao','5':'/embalagem','6':'/carregamento','7':'/','8':'/relatorios','9':'/necessidade' };
-  var NAMES={ '/painel':'Painel','/operador':'Revisão','/montagem':'Embalagem','/embalagem':'Etiqueta Venda','/expedicao':'Subir PDFs','/carregamento':'Carregamento','/':'Admin','/relatorios':'Relatórios','/necessidade':'Necessidade' };
+  // '/expedicao' (Subir PDFs) saiu do menu: o upload agora fica na propria tela
+  // Etiqueta de Venda. A rota continua viva e acessivel por URL.
+  var MAP={ '1':'/painel','2':'/operador','3':'/montagem','5':'/embalagem','6':'/carregamento','7':'/','8':'/relatorios','9':'/necessidade' };
+  var NAMES={ '/painel':'Painel','/operador':'Revisão','/montagem':'Embalagem','/embalagem':'Etiqueta Venda','/carregamento':'Carregamento','/':'Admin','/relatorios':'Relatórios','/necessidade':'Necessidade' };
   var cur=location.pathname.replace(/\/$/,'')||'/';
   // barra de atalhos no rodapé
   var bar=document.createElement('div');
