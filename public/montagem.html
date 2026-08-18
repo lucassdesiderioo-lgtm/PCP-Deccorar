@@ -36,6 +36,7 @@
 </div>
 <script>
 const $=s=>document.querySelector(s);
+function kitNorm(x){ return String(x||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase(); }
 let SKUS=[], KIT=null, emb=null, tick=null, last={c:null,t:0}, FILA=[];
 async function carregarFila(){
   try{
@@ -67,7 +68,10 @@ function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const t=$('#t
 function handle(code){
   code=(code||'').trim().toUpperCase(); if(!code) return;
   const now=Date.now(); if(last.c===code && now-last.t<700) return; last={c:code,t:now};
-  if(KIT && code===KIT){
+  // Kit: compara so letras/numeros. O leitor + teclado ABNT2 embaralha os
+  // simbolos do link do Drive (: -> Ç, / -> ;), mas o miolo alfanumerico e o
+  // mesmo. Assim bate tanto bipando o QR quanto digitando a URL limpa.
+  if(KIT && kitNorm(code)===kitNorm(KIT) && kitNorm(KIT).length>=8){
     if(!emb){ banner('err','Bipe o SKU primeiro','O kit só entra depois de começar uma persiana.'); beep(false); return; }
     emb.kitOk=true; banner('kit','Kit confirmado ✓','Agora cole a etiqueta de SKU e <b>bipe o SKU de novo</b> pra finalizar.<div class="timer" id="tm">'+mmss(Date.now()-emb.inicio)+'</div>'+steps()); beep(true); return;
   }
