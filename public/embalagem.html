@@ -21,6 +21,12 @@
   .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
   .stat .n{font-size:28px;font-weight:800}.stat .l{font-size:12px;color:var(--muted);text-transform:uppercase}
   .stat.pend .n{color:var(--amber)}.stat.emb .n{color:var(--green)}
+  .up{border:1px solid var(--line);border-radius:12px;margin-bottom:14px;overflow:hidden}
+  .uphd{width:100%;text-align:left;background:var(--panel);color:var(--txt);border:0;padding:12px 16px;font-weight:700;font-size:14px;cursor:pointer}
+  .upbody{padding:14px 16px}
+  .drop{display:block;border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;background:#fff;cursor:pointer;color:var(--muted);font-size:14px}
+  .drop:hover{border-color:var(--amber)}
+  .upres{margin-top:10px;font-size:13px;color:var(--muted)}.upres b{color:var(--txt)}
   iframe{position:fixed;left:-9999px;width:0;height:0;border:0}
 </style></head><body>
 <header><div class="mark">B</div><div><h1>Etiqueta de Venda</h1><div class="sub">Bipe o SKU · confira · bipe de novo pra imprimir</div></div>
@@ -29,6 +35,13 @@
   <div class="stats">
     <div class="stat pend"><div class="n" id="nPend">0</div><div class="l">Pendentes</div></div>
     <div class="stat emb"><div class="n" id="nEmb">0</div><div class="l">Embaladas hoje</div></div>
+  </div>
+  <div class="up" id="upBox" style="display:none">
+    <button class="uphd" id="upTgl" type="button">📄 Subir PDF do Mercado Livre (vendas do dia) ▾</button>
+    <div class="upbody" id="upBody" style="display:none">
+      <label class="drop" for="file">Clique ou solte um ou mais PDFs do Mercado Livre aqui<input type="file" id="file" accept="application/pdf" multiple style="display:none"></label>
+      <div class="upres" id="upRes"></div>
+    </div>
   </div>
   <div class="banner" id="banner"></div>
   <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="bipe aqui">
@@ -127,6 +140,39 @@ async function relogioDesp(){
 }
 setInterval(relogioDesp,30000);
 relogioDesp();
+
+// Subir PDF do ML — mesma bancada da expedicao. Painel so aparece pra quem
+// pode subir (pdf.subir => area 'expedicao', ou admin). O upload alimenta a
+// mesma lista que esta tela imprime.
+function b64(f){ return new Promise(function(r){var fr=new FileReader();fr.onload=function(){r(fr.result);};fr.readAsDataURL(f);}); }
+async function upMany(fileList){
+  var files=[].slice.call(fileList).filter(function(f){ return /pdf/i.test(f.type)||/\.pdf$/i.test(f.name); });
+  if(!files.length) return;
+  var totNov=0,totRep=0,totSem=0,totPdf=0,ok=0;
+  for(var i=0;i<files.length;i++){
+    document.getElementById('upRes').innerHTML='Lendo '+(i+1)+' de '+files.length+': <b>'+files[i].name+'</b>…';
+    try{
+      var j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
+      if(j.erro){ continue; }
+      totNov+=j.novos||0; totRep+=j.repetidas||0; totSem+=j.sem_sku||0; totPdf+=j.total||0; ok++;
+    }catch(e){}
+  }
+  document.getElementById('upRes').innerHTML='<b>'+ok+' PDF(s)</b> · '+totNov+' vendas adicionadas · '+totPdf+' no total · '+totRep+' repetidas · '+totSem+' sem SKU';
+  stats(); listaPend();
+}
+(async function(){
+  try{
+    var u=await (await fetch('/api/auth/eu')).json();
+    var pode=u.logado && (u.areas||[]).some(function(a){ return a==='expedicao'||a==='admin'; });
+    if(!pode) return;
+    document.getElementById('upBox').style.display='block';
+    document.getElementById('upTgl').onclick=function(){ var b=document.getElementById('upBody'); b.style.display=(b.style.display==='none'?'block':'none'); };
+    document.getElementById('file').onchange=function(e){ upMany(e.target.files); e.target.value=''; };
+    var drop=document.querySelector('.drop');
+    ['dragover','dragenter'].forEach(function(ev){ drop.addEventListener(ev,function(e){ e.preventDefault(); }); });
+    drop.addEventListener('drop',function(e){ e.preventDefault(); upMany(e.dataTransfer.files); });
+  }catch(e){}
+})();
 
 </script><script src="/nav.js"></script>
 </body></html>
