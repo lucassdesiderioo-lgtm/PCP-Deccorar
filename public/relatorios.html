@@ -63,6 +63,11 @@
   <div class="card"><h3>Estoque: quanto falta para o alvo</h3><canvas id="gEstoque" height="150"></canvas></div>
 </div>
 <div class="card"><h3>Reputacao</h3><div id="gRep" style="font-size:15px"></div></div>
+<div class="card"><h3>Cobertura de estoque — produzi &times; vendi</h3>
+  <canvas id="gCob" height="80"></canvas>
+  <div style="overflow:auto;margin-top:12px"><table id="gCobTab"><thead><tr><th>Dia</th><th>Produzi</th><th>Vendi</th><th>Variação</th><th>Estoque fim</th><th>Cobertura (dias)</th></tr></thead><tbody id="gCobBody"></tbody></table></div>
+  <div id="gCobMsg" style="color:#8b97a5;font-size:13px;margin-top:8px">O fechamento do dia é gravado na tela Planejamento.</div>
+</div>
 
   <div class="card"><h3>Por SKU</h3>
     <table><thead><tr><th>SKU</th><th>Revisadas</th><th>Tempo méd. revisão</th><th>Embaladas</th><th>Tempo méd. embalagem</th></tr></thead>
@@ -119,6 +124,7 @@ async function carregarGer(){
   var cards=[
     {n:t.revisadas,l:'revisadas',c:'#ffb800'},
     {n:t.embaladas,l:'embaladas',c:'#2ea043'},
+    {n:t.carregadas,l:'carregadas',c:'#7ee2a0'},
     {n:t.filaAtual,l:'na fila agora',c:'#4493f8'},
     {n:t.rejeitadas,l:'voltaram p/ producao',c:'#f85149'},
     {n:t.devolucoes,l:'devolucoes',c:'#e07798'},
@@ -139,7 +145,7 @@ async function carregarGer(){
   if(t.divergencias>0) ind+='<div style="color:#f85149">SKU divergente em <b style="font-size:19px">'+t.divergencias+'</b> devolucoes</div>';
   document.getElementById('gInd').innerHTML=ind+'</div>';
   var dias={};
-  ['producao','embalagem','rejeicao'].forEach(function(k){ d.serie[k].forEach(function(r){ dias[r.data]=1; }); });
+  ['producao','embalagem','rejeicao','carregamento'].forEach(function(k){ (d.serie[k]||[]).forEach(function(r){ dias[r.data]=1; }); });
   var L=Object.keys(dias).sort();
   var mapa=function(arr){ var m={}; arr.forEach(function(r){ m[r.data]=r.qtd; }); return L.map(function(x){ return m[x]||0; }); };
   var el=document.getElementById('gSerie');
@@ -149,6 +155,7 @@ async function carregarGer(){
       data:{labels:L.map(function(x){return x.slice(5);}),datasets:[
         {label:'Revisadas',data:mapa(d.serie.producao),borderColor:'#ffb800',backgroundColor:'transparent',tension:.3},
         {label:'Embaladas',data:mapa(d.serie.embalagem),borderColor:'#2ea043',backgroundColor:'transparent',tension:.3},
+        {label:'Carregadas',data:mapa(d.serie.carregamento||[]),borderColor:'#7ee2a0',backgroundColor:'transparent',tension:.3},
         {label:'Rejeitadas',data:mapa(d.serie.rejeicao),borderColor:'#f85149',backgroundColor:'transparent',tension:.3}]},
       options:{responsive:true,plugins:{legend:{labels:{color:'#8b97a5'}}},
         scales:{x:{ticks:{color:'#8b97a5'},grid:{display:false}},y:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'},beginAtZero:true}}}});
@@ -163,6 +170,25 @@ async function carregarGer(){
   gGraf('gEstoque','bar',L2(d.estoque),d.estoque.map(function(x){return x.falta;}),'#ffb800');
   var r=d.devolucao.reputacao||{};
   document.getElementById('gRep').innerHTML='Afetaram reputacao: <b style="color:#f85149;font-size:19px">'+(r.sim||0)+'</b> &nbsp; Nao afetaram: <b style="color:#2ea043;font-size:19px">'+(r.nao||0)+'</b> &nbsp; Sem baixa: <b style="color:#ffb800;font-size:19px">'+(r.pendente||0)+'</b>';
+  // cobertura de estoque (produzi x vendi) — da tabela fechamento
+  var cob=d.cobertura||[];
+  var cbBody=document.getElementById('gCobBody');
+  if(cbBody){
+    cbBody.innerHTML = cob.length ? cob.map(function(x){
+      var v=x.variou||0, vc=v>0?'#2ea043':(v<0?'#f85149':'#8b97a5');
+      return '<tr><td class="code">'+String(x.data).slice(5)+'</td><td>'+(x.produzido||0)+'</td><td>'+(x.vendido||0)+'</td><td style="color:'+vc+'">'+(v>0?'+':'')+v+'</td><td>'+(x.estoque_fim||0)+'</td><td>'+(x.cobertura==null?'—':(+x.cobertura).toFixed(1))+'</td></tr>';
+    }).join('') : '<tr><td colspan="6" style="color:#8b97a5;padding:16px;text-align:center">Sem fechamento registrado no período.</td></tr>';
+  }
+  var cbEl=document.getElementById('gCob');
+  if(cbEl){
+    if(GCH.gCob) GCH.gCob.destroy();
+    GCH.gCob=new Chart(cbEl.getContext('2d'),{type:'bar',
+      data:{labels:cob.map(function(x){return String(x.data).slice(5);}),datasets:[
+        {label:'Produzi',data:cob.map(function(x){return x.produzido||0;}),backgroundColor:'#2ea043'},
+        {label:'Vendi',data:cob.map(function(x){return x.vendido||0;}),backgroundColor:'#4493f8'}]},
+      options:{responsive:true,plugins:{legend:{labels:{color:'#8b97a5'}}},
+        scales:{x:{ticks:{color:'#8b97a5'},grid:{display:false}},y:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'},beginAtZero:true}}}});
+  }
 }
 
 carregarGer();
