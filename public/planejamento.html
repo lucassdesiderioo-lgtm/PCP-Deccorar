@@ -38,11 +38,12 @@
   .precisa{color:var(--blue);font-weight:800}.zero{color:var(--muted)}
   .novoSku{font-size:11px;color:#ffb4ae}
   .dim{color:var(--muted)}
+  .apl{background:transparent;color:var(--blue);border:1px solid var(--line);border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}.apl:hover{border-color:var(--blue)}
 </style></head><body>
 <header><div class="mark">P</div>
   <div><h1>Planejamento por estoque alvo — comparação</h1>
   <div class="sub">Fase 1: cálculo novo <b>lado a lado</b> com o modelo atual (ABC). Nada do fluxo é alterado.</div></div>
-  <div class="links"><a class="link" href="/">Admin</a><a class="link" href="/necessidade">Necessidade (ABC)</a></div>
+  <div class="links"><a class="link" href="/">Admin</a></div>
 </header>
 <div class="wrap">
 
@@ -81,15 +82,17 @@
       <tr class="grp">
         <th class="l" rowspan="2">SKU</th>
         <th class="atual" colspan="4">Modelo atual (ABC)</th>
-        <th class="novo sep" colspan="5">Modelo novo (planejamento)</th>
+        <th class="novo sep" colspan="7">Modelo novo (planejamento)</th>
       </tr>
       <tr class="cols">
         <th>Venda 30d</th><th>Média/d</th><th>Classe</th><th>Alvo sug.</th>
-        <th class="sep">Vendas jan.</th><th>Média/d</th><th>Compromet.</th><th>Estoque</th><th>Precisa</th>
+        <th class="sep">Vendas jan.</th><th>Média/d</th><th>Compromet.</th><th>Estoque</th><th>Precisa</th><th>Alvo</th><th></th>
       </tr>
     </thead>
     <tbody id="corpo"></tbody>
   </table></div>
+  <div style="margin-top:12px"><button class="prim" onclick="aplicarTodos()">Aplicar alvo do modelo novo em todos (com venda)</button>
+    <span class="sub" style="margin-left:8px">grava o alvo sugerido nos SKUs que tiveram venda na janela</span></div>
 
   <div class="sub" style="margin-top:12px">
     <b class="dim">Modelo atual:</b> alvo = média dos últimos 30d × dias de cobertura (curva ABC).
@@ -151,8 +154,24 @@ async function load(){
     <td>${r.comprometido}</td>
     <td>${fmt(r.estoque)}</td>
     <td class="${r.precisa>0?'precisa':'zero'}">${r.precisa>0?r.precisa:'—'}</td>
+    <td><b>${fmt(r.alvo)}</b></td>
+    <td>${r.cadastrado?`<button class="apl" data-cod="${r.codigo}" data-alvo="${r.alvo}">aplicar</button>`:'<span class="dim">—</span>'}</td>
   </tr>`).join('');
 }
+// aplica o alvo do modelo novo em skus.alvo
+async function aplicarUm(cod){
+  const r=await (await fetch('/api/planejamento/aplicar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigo:cod})})).json();
+  if(r.erro){ alert(r.erro); return; }
+  carregar();
+}
+async function aplicarTodos(){
+  if(!confirm('Gravar o alvo do modelo novo em TODOS os SKUs com venda na janela?\n\n(SKUs sem venda na janela não são alterados.)')) return;
+  const r=await (await fetch('/api/planejamento/aplicar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})})).json();
+  if(r.erro){ alert(r.erro); return; }
+  alert('Alvo aplicado em '+r.aplicados+' SKU(s).');
+  carregar();
+}
+document.addEventListener('click',function(e){ var b=e.target.closest('.apl'); if(b) aplicarUm(b.getAttribute('data-cod')); });
 
 async function importar(){
   const f=$('#arq').files[0];

@@ -73,7 +73,7 @@
   <div class="tab active" data-t="prod">Lançar produção</div>
   <div class="tab" data-t="est">Estoque &amp; Necessidade</div>
   <div class="tab" data-t="cad">Cadastro de SKU</div>
-  <div class="tab" data-t="nec">Necessidade (ABC)</div>
+  <div class="tab" data-t="plan">Planejamento</div>
   <div class="tab" data-t="rel">Relatórios</div>
   <div class="tab" data-t="acs">Acessos &amp; Permissões</div>
   <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="blq" id="tabBlq">Bloqueados</div><div class="tab" data-t="tst">Modo teste</div>
@@ -114,7 +114,7 @@
     </div>
   </div>
 
-  <div id="v-nec" class="hide"><iframe id="ifNec" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
+  <div id="v-plan" class="hide"><iframe id="ifPlan" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
   <div id="v-rel" class="hide"><iframe id="ifRel" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
   <div id="v-acs" class="hide"><iframe id="ifAcs" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
   <!-- CADASTRO -->
@@ -164,8 +164,8 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   $("#v-prod").classList.toggle("hide",t.dataset.t!=="prod");
   $("#v-est").classList.toggle("hide",t.dataset.t!=="est");
   $("#v-cad").classList.toggle("hide",t.dataset.t!=="cad");
-  var vn=$("#v-nec"), vr=$("#v-rel"), va=$("#v-acs");
-  if(vn) vn.classList.toggle("hide",t.dataset.t!=="nec");
+  var vn=$("#v-plan"), vr=$("#v-rel"), va=$("#v-acs");
+  if(vn) vn.classList.toggle("hide",t.dataset.t!=="plan");
   if(vr) vr.classList.toggle("hide",t.dataset.t!=="rel");
   if(va) va.classList.toggle("hide",t.dataset.t!=="acs");
   var vt=$("#v-tst"); if(vt) vt.classList.toggle("hide",t.dataset.t!=="tst");
@@ -180,8 +180,8 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   var vcd=$("#v-cd"); if(vcd) vcd.classList.toggle("hide",t.dataset.t!=="cd");
   if(t.dataset.t==="cd") carregarCad();
   if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); setTimeout(function(){var b=document.getElementById("ctBipe"); if(b) b.focus();},100); }
-  var ifn=$("#ifNec"), ifr=$("#ifRel"), ifa=$("#ifAcs");
-  if(t.dataset.t==="nec" && ifn && !ifn.dataset.l){ ifn.src="/necessidade"; ifn.dataset.l=1; }
+  var ifn=$("#ifPlan"), ifr=$("#ifRel"), ifa=$("#ifAcs");
+  if(t.dataset.t==="plan" && ifn && !ifn.dataset.l){ ifn.src="/planejamento"; ifn.dataset.l=1; }
   if(t.dataset.t==="rel" && ifr && !ifr.dataset.l){ ifr.src="/relatorios"; ifr.dataset.l=1; }
   if(t.dataset.t==="acs" && ifa && !ifa.dataset.l){ ifa.src="/acessos"; ifa.dataset.l=1; }
 });

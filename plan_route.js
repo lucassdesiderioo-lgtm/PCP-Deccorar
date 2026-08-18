@@ -269,6 +269,28 @@ module.exports = function(app, db){
     res.json({ importado_em:imp, dias, periodo_dias: cfgNum('janela_media',30) });
   });
 
+  // Aplica o alvo do modelo NOVO em skus.alvo (absorve o "aplicar" da tela
+  // Necessidade). Um SKU (body.codigo) ou todos. "Todos" so mexe onde ha venda
+  // na janela — assim nao zera o alvo de SKU sem dado de venda.
+  app.post('/api/planejamento/aplicar',(req,res)=>{
+    const b = req.body || {};
+    const { linhas } = calcular();
+    const upd = db.prepare("UPDATE skus SET alvo=? WHERE UPPER(codigo)=?");
+    let n = 0;
+    db.transaction(()=>{
+      if(b.codigo){
+        const c = String(b.codigo).toUpperCase();
+        const l = linhas.find(x=>x.codigo===c);
+        if(l && l.cadastrado){ upd.run(l.alvo, c); n++; }
+      } else {
+        linhas.filter(l=> l.cadastrado && l.vendas_janela>0)
+          .forEach(l=>{ upd.run(l.alvo, l.codigo); n++; });
+      }
+    })();
+    const ac = app.locals.acesso; try{ if(ac&&ac.auditar) ac.auditar(req,'estoque','alvo_planejamento', b.codigo||'(todos)', 'aplicados '+n); }catch(e){}
+    res.json({ ok:true, aplicados:n });
+  });
+
   app.post('/api/planejamento/config',(req,res)=>{
     const b = req.body || {};
     const ins = db.prepare("INSERT INTO config (chave,valor) VALUES (?,?) "+
