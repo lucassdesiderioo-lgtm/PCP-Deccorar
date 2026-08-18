@@ -88,6 +88,10 @@ require('./st_route')(app, db);
 // Controle de Acesso — Fase 1 (roda em paralelo; NAO decide acesso ainda).
 // Depois do auth (precisa da tabela usuarios) e antes do teste_route.
 require('./acesso')(app, db);
+// zerar: reset da operacao (aba "Zerar" do admin). Depois do acesso — usa
+// app.locals.acesso para auditar — e antes do teste_route, que continua sendo o
+// ultimo.
+require('./zerar_route')(app, db);
 // teste_route por ULTIMO: ele cria os triggers de modo teste em cima das
 // tabelas dos outros modulos (fila, devolucao, rejeicao, contagem,
 // foto_estoque). Se subir antes, as tabelas ainda nao existem e os triggers

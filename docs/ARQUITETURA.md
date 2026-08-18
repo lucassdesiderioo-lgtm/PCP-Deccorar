@@ -15,6 +15,7 @@
 ├── auth.js                Login, sessão, permissões  ⚠️ CRÍTICO — ver ordem
 ├── parse.js               Extração dos PDFs do Mercado Livre (pdfjs-dist)
 ├── backup.js              Backup do banco via db.backup()
+├── zerar.js               Reset da operação (módulo + CLI `node zerar.js`)
 │
 ├── Rotas (cada uma exporta function(app, db))
 │   ├── painel_route.js    Painel do dia
@@ -33,10 +34,11 @@
 │   ├── nec_route.js       Necessidade / curva ABC
 │   ├── alvo_route.js      Definição de alvo por SKU
 │   ├── teste_route.js     Modo teste (triggers e snapshot)
+│   ├── zerar_route.js     Aba Zerar (prévia + execução, usa zerar.js)
 │   └── backup_route.js    Download do backup por token
 │
 ├── public/
-│   ├── index.html         Admin (12 abas)
+│   ├── index.html         Admin (13 abas)
 │   ├── operador.html      Revisão
 │   ├── devolucao.html     Recebimento de devoluções
 │   ├── montagem.html      Embalagem
@@ -396,13 +398,20 @@ atualizado  TEXT
 `GET /api/teste` · `POST /api/teste/ligar` · `POST /api/teste/limpar` ·
 `POST /api/teste/manter`
 
+### Zerar a operação — **admin geral** (`sistema.zerar`)
+| Método | Rota | Efeito |
+|---|---|---|
+| GET | `/api/zerar` | Prévia: quanto cada grupo tem hoje, quais vêm marcados, se o modo teste está ligado |
+| POST | `/api/zerar` | Faz o backup, apaga os grupos de `{grupos:[...], confirmar:'ZERAR'}` e audita |
+
 ### Relatórios
 `GET /api/rel/resumo` · `/api/rel/sku` · `/api/rel/dia` · `/api/painel` ·
 `/api/necessidade` · `POST /api/necessidade/aplicar` · `GET /api/gerencial`
 
 ### APIs restritas ao admin
 Definidas em `auth.js`:
-`/api/teste` · `/api/usuarios` · `/api/estoque` · `/api/alvo` · `/api/backup`
+`/api/teste` · `/api/usuarios` · `/api/estoque` · `/api/alvo` · `/api/backup` ·
+`/api/zerar`
 
 ---
 
@@ -506,6 +515,36 @@ refotografa o estoque já restaurado.
 
 **Diagnóstico:** tabelas cujo trigger falhou saem em `naoCobertas` no
 `GET /api/teste`, e a aba Modo teste as exibe em âmbar.
+
+---
+
+## 9B. Zerar a operação — implementação
+
+`zerar.js` é módulo **e** CLI: `zerar_route.js` (aba Zerar) e `node zerar.js` (no
+servidor) chamam as mesmas funções, então a regra do que cada grupo apaga existe
+num lugar só.
+
+```
+GRUPOS[]            id, rótulo, detalhe, padrão, contar(db), limpar(db)
+previa(db)          quanto cada grupo tem hoje  →  GET /api/zerar
+zerar(db, ids)      apaga tudo numa transação só + encerra o modo teste
+backupAntes(db)     db.backup() → backups/dados-antes-de-zerar-<data>.db
+```
+
+Grupos e o que cada um não toca: ver `CLAUDE.md` §11B.
+
+- **Uma transação só:** ou apaga todos os grupos escolhidos, ou nenhum — não
+  existe banco meio zerado.
+- **Tabela inexistente conta 0** e não derruba o resto (banco novo).
+- **`sqlite_sequence` não é resetado** de propósito: `devolucao.venda_id` aponta
+  para `lote.id`, e reiniciar os IDs faria uma devolução antiga apontar para uma
+  venda nova.
+- **Backup antes é obrigatório** na rota: se `db.backup()` falhar, responde 500 e
+  não apaga nada.
+- **Confirmação:** `confirmar:'ZERAR'` no corpo (a tela pede o texto digitado, não
+  só um `confirm()`).
+- **Ordem de carga:** depois de `acesso.js` (usa `app.locals.acesso.auditar`) e
+  antes de `teste_route`, que continua sendo o último.
 
 ---
 

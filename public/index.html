@@ -76,7 +76,7 @@
   <div class="tab" data-t="plan">Planejamento</div>
   <div class="tab" data-t="rel">Relatórios</div>
   <div class="tab" data-t="acs">Acessos &amp; Permissões</div>
-  <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="blq" id="tabBlq">Bloqueados</div><div class="tab" data-t="tst">Modo teste</div>
+  <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="blq" id="tabBlq">Bloqueados</div><div class="tab" data-t="tst">Modo teste</div><div class="tab" data-t="zr" id="tabZerar" style="display:none">Zerar</div>
 </div>
 <div class="wrap">
   <!-- PRODUÇÃO -->
@@ -144,6 +144,22 @@
     </div>
   </div>
 </div>
+<div id="v-zr" class="hide">
+  <div class="card">
+    <div style="font-weight:700;margin-bottom:4px">Zerar a opera&ccedil;&atilde;o (recome&ccedil;ar do zero)</div>
+    <div class="sub" style="margin-bottom:14px;line-height:1.6">
+      Apaga o que estiver marcado abaixo. O sistema faz um <b>backup do banco antes</b>
+      (<span class="code">backups/dados-antes-de-zerar-*.db</span>), mas pela tela <b>n&atilde;o tem como desfazer</b>.<br>
+      Cadastro de SKU, cor, alvo, pessoas, permiss&otilde;es, hor&aacute;rios e c&oacute;digo do kit <b>n&atilde;o</b> s&atilde;o tocados.
+    </div>
+    <div id="zrLista"></div>
+    <div class="row-actions" style="margin-top:16px;align-items:center">
+      <input id="zrConf" placeholder="digite ZERAR" autocomplete="off" style="width:160px;text-transform:uppercase">
+      <button class="primary" onclick="zerarAgora()">Zerar o que est&aacute; marcado</button>
+      <span class="msg" id="zrMsg"></span>
+    </div>
+  </div>
+</div>
 <div id="v-cad" class="hide">
     <div class="card"><div style="font-weight:700;margin-bottom:10px">Cadastrar / editar produto</div>
       <div class="grid">
@@ -170,6 +186,8 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(va) va.classList.toggle("hide",t.dataset.t!=="acs");
   var vt=$("#v-tst"); if(vt) vt.classList.toggle("hide",t.dataset.t!=="tst");
   if(t.dataset.t==="tst") carregarTeste();
+  var vz=$("#v-zr"); if(vz) vz.classList.toggle("hide",t.dataset.t!=="zr");
+  if(t.dataset.t==="zr") carregarZerar();
   var vb=$("#v-blq"); if(vb) vb.classList.toggle("hide",t.dataset.t!=="blq");
   if(t.dataset.t==="blq") carregarBloq();
   var vc=$("#v-ct"); if(vc) vc.classList.toggle("hide",t.dataset.t!=="ct");
@@ -308,6 +326,46 @@ async function manterTeste(){
   if(!confirm("Encerrar o teste MANTENDO tudo como producao real?")) return;
   await fetch("/api/teste/manter",{method:"POST"});
   carregarTeste(); carregar();
+}
+
+/* ---- Zerar a operacao ---- */
+/* A aba nasce escondida (style=display:none no HTML) e so aparece se a API
+   deixar: /api/zerar exige 'sistema.zerar' (Admin Geral). Assim ninguem clica
+   num botao que vai negar. */
+fetch("/api/zerar").then(function(r){
+  var b=document.getElementById("tabZerar");
+  if(b && r.ok) b.style.display="";
+}).catch(function(){});
+async function carregarZerar(){
+  var r=await fetch("/api/zerar");
+  if(!r.ok){ $("#zrLista").innerHTML="<div class='sub'>Voc&ecirc; n&atilde;o tem permiss&atilde;o para zerar a opera&ccedil;&atilde;o.</div>"; return; }
+  var z=await r.json();
+  var h="";
+  if(z.modoTeste) h+="<div class='sub' style='color:var(--amber);margin-bottom:12px'>&#9888; Modo teste ligado &middot; zerar encerra o modo teste e descarta a foto do estoque (sen&atilde;o ela devolveria o estoque antigo depois).</div>";
+  z.grupos.forEach(function(g){
+    // text-transform/letter-spacing/cor: o CSS global de <label> e um rotulo de
+    // formulario (12px, MAIUSCULO) — aqui e texto corrido, entao desfaz.
+    h+="<label style='display:flex;gap:10px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line);cursor:pointer;text-transform:none;letter-spacing:0;font-size:14px;color:var(--txt)'>"
+      +"<input type='checkbox' class='zrG' value='"+g.id+"'"+(g.padrao?" checked":"")+" style='margin-top:4px;width:18px;height:18px'>"
+      +"<span><b>"+g.rotulo+"</b> &middot; <b style='color:var(--amber)'>"+g.itens+"</b> "+g.unidade
+      +"<br><span class='sub'>"+g.detalhe+"</span></span></label>";
+  });
+  $("#zrLista").innerHTML=h;
+  $("#zrConf").value=""; $("#zrMsg").textContent="";
+}
+async function zerarAgora(){
+  var ids=[].slice.call(document.querySelectorAll(".zrG:checked")).map(function(c){ return c.value; });
+  if(!ids.length){ alert("Marque pelo menos um item para zerar."); return; }
+  if(($("#zrConf").value||"").trim().toUpperCase()!=="ZERAR"){ alert("Digite ZERAR no campo antes de confirmar."); $("#zrConf").focus(); return; }
+  if(!confirm("Apagar definitivamente os "+ids.length+" itens marcados?\nUm backup do banco e feito antes, mas a tela nao desfaz.")) return;
+  $("#zrMsg").style.color=""; $("#zrMsg").textContent="zerando...";
+  var r=await (await fetch("/api/zerar",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({grupos:ids,confirmar:"ZERAR"})})).json();
+  if(r.erro){ $("#zrMsg").style.color="#f85149"; $("#zrMsg").textContent=r.erro; return; }
+  var p=[]; for(var k in r.apagados) p.push((r.rotulos[k]||k)+": "+r.apagados[k]);
+  alert("Pronto.\n"+p.join("\n")+(r.modoTesteEncerrado?"\nModo teste encerrado.":"")+"\n\nBackup: "+r.backup);
+  $("#zrMsg").textContent="";
+  carregarZerar(); carregar();
 }
 
 

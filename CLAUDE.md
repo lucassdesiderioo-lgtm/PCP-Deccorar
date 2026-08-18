@@ -300,6 +300,62 @@ aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não sil
 
 ---
 
+## 11B. Zerar a operação — recomeço do zero
+
+Serve para a virada entre "brincando com o sistema" e "operando de verdade":
+apaga estoque, ordens, fila e histórico de uma vez, para a fábrica começar o dia
+com números que correspondem ao que existe fisicamente.
+
+**Não é o modo teste.** O modo teste só apaga o que foi marcado `teste=1` — o que
+foi lançado antes dele ou fora dele fica. O zerar apaga sem marcação e **não tem
+desfazer**; o que protege é o backup automático e a confirmação digitada.
+
+| Onde | Como |
+|---|---|
+| Tela | Admin → aba **Zerar** (só aparece para Admin Geral) |
+| Servidor | `cd /opt/expedicao && node zerar.js` |
+
+Os dois caminhos usam o mesmo `zerar.js` — a regra do que cada grupo apaga mora
+lá, e não em dois lugares.
+
+**Grupos** (os sete primeiros vêm marcados; os dois últimos, não):
+
+| Grupo | Apaga | Padrão |
+|---|---|---|
+| `estoque` | `skus.estoque = 0` | ✅ |
+| `producao` | tabela `producao` | ✅ |
+| `fila` | tabela `fila` | ✅ |
+| `revisao` | tabela `revisao` | ✅ |
+| `embalagem` | tabela `montagem` | ✅ |
+| `problemas` | tabela `rejeicao` | ✅ |
+| `contagem` | `contagem` + `contagem_pendente` | ✅ |
+| `expedicao` | tabela `lote` — **vendas reais do ML** | ❌ |
+| `devolucoes` | tabela `devolucao` | ❌ |
+
+**Nunca é tocado:** cadastro de SKU (código/descrição/cor), `alvo`, usuários,
+permissões, setores, auditoria, listas, horários e o código do kit. Zerar a
+operação não pode desconfigurar o sistema — no dia seguinte a fábrica abre a tela
+e trabalha.
+
+> ⚠️ **A fila entra junto por um motivo.** Peça revisada em `fila` com
+> `situacao='aguardando'` vira **+1 de estoque** quando for embalada. Zerar o
+> estoque e deixar a fila devolve o número apagado alguns bipes depois.
+
+> ⚠️ **Zerar encerra o modo teste** (e descarta `config.teste_snapshot`). Se não
+> encerrasse, o "encerrar e apagar" seguinte restauraria o estoque **antigo** pela
+> foto, desfazendo o zeramento.
+
+**Backup:** obrigatório e automático, via `db.backup()` (WAL — `cp` não serve),
+em `backups/dados-antes-de-zerar-AAAA-MM-DD-HHMMSS.db`. Se o backup falhar, **nada
+é apagado**. Para voltar atrás: parar o serviço, substituir `dados.db` por essa
+cópia (apagando `-wal` e `-shm`), subir de novo.
+
+**Permissão:** `sistema.zerar` — nível `admin_geral`, sensível e intransferível,
+como pessoas/setores/auditoria. A ação vai para a auditoria com os grupos, as
+quantidades apagadas e o caminho do backup.
+
+---
+
 ## 12. Armadilhas técnicas do ambiente
 
 | Armadilha | O que acontece | Como evitar |

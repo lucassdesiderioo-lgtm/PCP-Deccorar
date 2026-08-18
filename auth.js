@@ -27,7 +27,7 @@ const TELAS={
   '/carregamento':'carregamento','/carregamento.html':'carregamento'
 };
 
-const API_ADMIN=['/api/teste','/api/usuarios','/api/estoque','/api/alvo','/api/backup'];
+const API_ADMIN=['/api/teste','/api/usuarios','/api/estoque','/api/alvo','/api/backup','/api/zerar'];
 const LIVRE=['/login','/login.html','/nav.js','/favicon.ico'];
 
 module.exports=function(app, db){

@@ -76,15 +76,17 @@ passar adiante, quando sentir segurança na pessoa. Isso inclui coisas que parec
 sensíveis à primeira vista — horários de corte, modo teste, exclusão de SKU — e que
 podem ser delegadas com o aviso apropriado.
 
-**Apenas duas permissões são intransferíveis:**
+**As permissões intransferíveis** (`intransferivel: true` no registro):
 
 | Permissão | Por quê |
 |---|---|
 | `pessoas.gerenciar` | Quem pode dar permissão pode se dar **qualquer** permissão, inclusive as que você não delegou. Delegar isso torna todo o resto decorativo — a pessoa se marca Admin Geral e pronto. |
+| `setores.gerenciar` | Editar o setor é editar as permissões de todo mundo que está nele — é `pessoas.gerenciar` por outro caminho. |
 | `auditoria.ver` | Se quem é auditado controla a auditoria, ela deixa de servir. E como o log registra tentativas negadas, dar isso é dar visão de tudo que acontece no sistema. |
+| `sistema.zerar` | Apaga estoque, ordens e histórico de uma vez, sem desfazer pela tela. Não é uma tarefa de rotina — é a virada de uso do sistema, e quem decide isso é o dono da operação. |
 
-Não é questão de confiança na pessoa — é que essas duas **anulam o próprio modelo**
-se delegadas. Todas as demais são decisão sua.
+Não é questão de confiança na pessoa — é que essas **anulam o próprio modelo** se
+delegadas. Todas as demais são decisão sua.
 
 ### Permissões sensíveis
 
@@ -92,7 +94,7 @@ Marcadas com `sensivel: true` no registro. Continuam delegáveis, mas a tela de
 cadastro exibe aviso visual e a ação fica registrada na auditoria:
 
 `estoque.editar` · `contagem.ajustar` · `sku.excluir` · `teste.operar` ·
-`horarios.editar` · `produtividade.nominal` · `dados.apagar`
+`horarios.editar` · `produtividade.nominal` · `sistema.zerar` · `dados.apagar`
 
 ---
 
@@ -188,6 +190,9 @@ module.exports = [
     sensivel:true },
   { chave:'auditoria.ver',        grupo:'Sistema',    nivel:'admin_geral',
     rotulo:'Ver auditoria',       desc:'Histórico de ações e cobertura',
+    sensivel:true, intransferivel:true },
+  { chave:'sistema.zerar',        grupo:'Sistema',    nivel:'admin_geral',
+    rotulo:'Zerar a operação',    desc:'Apagar estoque, lançamentos e histórico para recomeçar',
     sensivel:true, intransferivel:true },
 ];
 ```
@@ -500,7 +505,7 @@ a Fase 3 troca a chave.
 1. **Admin Geral tem todas as permissões**, sempre, sem exceção editável
 2. **Fechado por padrão** — o que não é declarado é negado
 3. **Revogação vence concessão** em qualquer conflito
-4. **`pessoas.gerenciar` e `auditoria.ver` nunca são delegáveis** — as duas anulam o modelo se saírem do Admin Geral. Todas as demais são decisão do Admin Geral
+4. **As permissões `intransferivel` nunca são delegáveis** — `pessoas.gerenciar`, `setores.gerenciar`, `auditoria.ver` e `sistema.zerar` anulam o modelo (ou o dado) se saírem do Admin Geral. Todas as demais são decisão do Admin Geral
 5. **Toda permissão nova nasce no registro** — não há permissão escrita à mão numa tela
 6. **Produtividade nominal é sensível** e sua consulta fica registrada
 7. **Auditoria é somente leitura** — não existe rota que apague registro

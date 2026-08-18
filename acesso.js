@@ -414,6 +414,7 @@ module.exports = function(app, db){
     if(eq('/api/acesso/auditoria') || eq('/api/acesso/cobertura')) return 'auditoria.ver';
     if(pre('/api/acesso')) return 'pessoas.gerenciar';
     if(eq('/api/backup')) return '@ag';
+    if(pre('/api/zerar')) return 'sistema.zerar';
     if(M !== 'GET' && eq('/api/revisao')) return 'revisao.executar';
     if(M !== 'GET' && eq('/api/rejeicao')) return 'revisao.rejeitar';
     if(M !== 'GET' && eq('/api/montagem')) return 'embalagem.executar';

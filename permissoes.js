@@ -92,4 +92,9 @@ module.exports = [
   { chave:'auditoria.ver',        grupo:'Sistema',    nivel:'admin_geral',
     rotulo:'Ver auditoria',       desc:'Histórico de ações e cobertura',
     sensivel:true, intransferivel:true },
+  // apaga dado real em massa e nao tem volta (so o backup) — fica no nivel mais
+  // alto e fora de qualquer delegacao, como pessoas/setores/auditoria
+  { chave:'sistema.zerar',        grupo:'Sistema',    nivel:'admin_geral',
+    rotulo:'Zerar a operação',    desc:'Apagar estoque, lançamentos e histórico para recomeçar',
+    sensivel:true, intransferivel:true },
 ];
