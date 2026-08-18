@@ -11,17 +11,22 @@ module.exports=function(app,db){
     const totRej=g("SELECT COUNT(*) c FROM rejeicao WHERE "+W);
     const totDev=g("SELECT COUNT(*) c FROM devolucao WHERE "+W);
     const totVen=g("SELECT COUNT(*) c FROM lote WHERE "+W);
+    const totCar=g("SELECT COUNT(*) c FROM lote WHERE "+W+" AND estagio='carregado'");
     const div=g("SELECT COUNT(*) c FROM devolucao WHERE "+W+" AND sku_venda IS NOT NULL AND sku_venda<>sku_fisico");
     let fila={}; try{ fila=db.prepare("SELECT COUNT(*) c FROM fila WHERE situacao='aguardando'").get()||{}; }catch(e){}
     let est=[]; try{ est=db.prepare("SELECT codigo l, estoque, alvo, MAX(0,alvo-estoque) falta FROM skus WHERE alvo>0 ORDER BY (alvo-estoque) DESC LIMIT 12").all(); }catch(e){}
     res.json({
       totais:{revisadas:totRev.c||0,tempoRev:totRev.t||0,embaladas:totEmb.c||0,tempoEmb:totEmb.t||0,
-        rejeitadas:totRej.c||0,devolucoes:totDev.c||0,vendas:totVen.c||0,filaAtual:fila.c||0,divergencias:div.c||0},
+        rejeitadas:totRej.c||0,devolucoes:totDev.c||0,vendas:totVen.c||0,carregadas:totCar.c||0,filaAtual:fila.c||0,divergencias:div.c||0},
       serie:{
         producao:q("SELECT data, COUNT(*) qtd FROM revisao WHERE "+W+" GROUP BY data ORDER BY data"),
         embalagem:q("SELECT data, COUNT(*) qtd FROM montagem WHERE "+W+" GROUP BY data ORDER BY data"),
-        rejeicao:q("SELECT data, COUNT(*) qtd FROM rejeicao WHERE "+W+" GROUP BY data ORDER BY data")
+        rejeicao:q("SELECT data, COUNT(*) qtd FROM rejeicao WHERE "+W+" GROUP BY data ORDER BY data"),
+        carregamento:q("SELECT data, SUM(CASE WHEN estagio='carregado' THEN 1 ELSE 0 END) qtd FROM lote WHERE "+W+" GROUP BY data ORDER BY data")
       },
+      // cobertura de estoque (produzi x vendi) — snapshot diario da tabela
+      // fechamento, gravado pela tela Planejamento. Vazio se nunca fechou o dia.
+      cobertura:q("SELECT data, produzido, vendido, variou, estoque_fim, cobertura FROM fechamento WHERE "+W+" ORDER BY data"),
       qualidade:{
         porMotivo:q("SELECT motivo l, COUNT(*) qtd FROM rejeicao WHERE "+W+" GROUP BY motivo ORDER BY qtd DESC"),
         porSku:q("SELECT codigo l, COUNT(*) qtd FROM rejeicao WHERE "+W+" GROUP BY codigo ORDER BY qtd DESC LIMIT 10")
