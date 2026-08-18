@@ -614,7 +614,7 @@ async function carregarCad(){
   }
   var kit=''; try{ kit=(await (await fetch('/api/config/kit')).json()).kit||''; }catch(e){}
   h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:6px">Código do kit de instalação</div>';
-  h+='<div class="sub" style="margin-bottom:12px">O QR que o operador bipa na embalagem para confirmar que o kit foi incluído.</div>';
+  h+='<div class="sub" style="margin-bottom:12px">O QR que o operador bipa na embalagem para confirmar que o kit foi incluído. <b>Cadastre aqui</b> — é o único lugar; a tela da embalagem só confere, não altera. Dica: bipe o próprio QR no campo abaixo para gravar exatamente o que o leitor lê.</div>';
   h+='<div style="display:flex;gap:8px"><input id="cdKit" placeholder="bipe ou cole o código do kit" value="'+String(kit).replace(/"/g,"&quot;")+'" style="flex:1"><button class="primary" id="cdKitBt">Salvar</button></div>';
   h+='<div id="cdKitMsg" style="margin-top:10px;font-size:14px"></div></div>';
   el.innerHTML=h;
@@ -642,9 +642,9 @@ document.addEventListener('click',async function(e){
     var ehSku=false;
     for(var i=0;i<SKUS.length;i++) if(SKUS[i].codigo===k.toUpperCase()){ ehSku=true; break; }
     if(ehSku){ msg.innerHTML='<span style="color:#ff6b6b">Isso é um SKU de persiana, não o kit. Bipe o QR do kit.</span>'; return; }
-    await fetch('/api/config/kit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kit:k})});
-    msg.innerHTML='<span style="color:var(--green)">Salvo</span>';
-    setTimeout(function(){ msg.innerHTML=''; },3000);
+    var rk=await (await fetch('/api/config/kit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kit:k})})).json();
+    document.getElementById('cdKit').value=rk.kit||k.toUpperCase();
+    msg.innerHTML='<span style="color:var(--green)">Salvo: <b>'+(rk.kit||k.toUpperCase())+'</b> — é este código que a embalagem vai reconhecer.</span>';
   }
 });
 
