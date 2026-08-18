@@ -437,6 +437,7 @@ module.exports = function(app, db){
     if(M !== 'GET' && pre('/api/contagem')) return 'contagem.contar';
     if(M !== 'GET' && eq('/api/config/horarios')) return 'horarios.editar';
     if(M !== 'GET' && eq('/api/config/kit')) return 'kit.editar';
+    if(M !== 'GET' && pre('/api/kit')) return 'kit.editar';
     if(M !== 'GET' && pre('/api/listas')) return 'listas.editar';
     if(eq('/api/rejeicao/resumo')) return 'produtividade.nominal';
     // ── leituras de gestao ──

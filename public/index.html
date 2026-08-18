@@ -613,12 +613,24 @@ async function carregarCad(){
     h+='</div>';
   }
   var kit=''; try{ kit=(await (await fetch('/api/config/kit')).json()).kit||''; }catch(e){}
-  h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:6px">Código do kit de instalação</div>';
-  h+='<div class="sub" style="margin-bottom:12px">O QR que o operador bipa na embalagem para confirmar que o kit foi incluído. <b>Cadastre aqui</b> — é o único lugar; a tela da embalagem só confere, não altera. Dica: bipe o próprio QR no campo abaixo para gravar exatamente o que o leitor lê.</div>';
-  h+='<div style="display:flex;gap:8px"><input id="cdKit" placeholder="cole o link do manual (Drive)" value="'+String(kit).replace(/"/g,"&quot;")+'" style="flex:1"><button class="primary" id="cdKitBt">Salvar</button><button class="ghost" id="cdKitEtq">Imprimir QR do kit</button></div>';
-  h+='<div class="sub" style="margin-top:8px">Cole aqui o <b>link do manual</b> (Google Drive) e Salve. Depois clique em <b>Imprimir QR do kit</b>: sai uma etiqueta com o QR que <b>faz as duas coisas</b> — o cliente aponta o celular e vê o manual, e o operador bipa o mesmo QR na embalagem para confirmar o kit.</div>';
-  h+='<div id="cdKitMsg" style="margin-top:10px;font-size:14px"></div></div>';
+  h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:6px">Código do kit (o que o operador bipa)</div>';
+  h+='<div class="sub" style="margin-bottom:12px">É o código que o operador bipa na embalagem para confirmar o kit. Use um código <b>simples, só com letras/números</b> — ex.: <b>KITENVIO</b>. Imprima esse código de barras na etiqueta (abaixo). A tela da embalagem só confere, não altera.</div>';
+  h+='<div style="display:flex;gap:8px"><input id="cdKit" placeholder="ex.: KITENVIO" value="'+String(kit).replace(/"/g,"&quot;")+'" style="flex:1"><button class="primary" id="cdKitBt">Salvar</button></div>';
+  h+='<div id="cdKitMsg" style="margin-top:10px;font-size:14px"></div>';
+  // Etiqueta pronta (arquivo) — sobe a arte da etiqueta (QR + KITENVIO etc.) e
+  // imprime por aqui quando quiser.
+  h+='<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">';
+  h+='<div style="font-weight:700;margin-bottom:4px">Etiqueta do kit (arquivo pronto)</div>';
+  h+='<div class="sub" style="margin-bottom:10px">Tem a etiqueta pronta (com o QR + código)? Suba o arquivo aqui (PDF, PNG, JPG ou SVG) e imprima por aqui quando quiser. Substitui a anterior.</div>';
+  h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="file" id="cdKitFile" accept="application/pdf,image/png,image/jpeg,image/svg+xml"><button class="primary" id="cdKitUp">Enviar etiqueta</button><button class="ghost" id="cdKitPrint">Imprimir etiqueta</button><button class="del" id="cdKitDel">Remover</button></div>';
+  h+='<div id="cdKitLabelMsg" class="sub" style="margin-top:10px"></div>';
+  h+='</div></div>';
   el.innerHTML=h;
+  // mostra a etiqueta atual, se houver
+  try{ var lm=await (await fetch('/api/kit/label/meta')).json();
+    if(lm && lm.arquivo) document.getElementById('cdKitLabelMsg').innerHTML='Etiqueta atual: <b style="color:var(--txt)">'+(lm.nome||lm.arquivo)+'</b>'+(lm.em?' &middot; enviada '+lm.em:'');
+    else document.getElementById('cdKitLabelMsg').textContent='Nenhuma etiqueta enviada ainda.';
+  }catch(e){}
 }
 document.addEventListener('click',async function(e){
   var a=e.target.closest('.cdAdd');
@@ -645,39 +657,33 @@ document.addEventListener('click',async function(e){
     if(ehSku){ msg.innerHTML='<span style="color:#ff6b6b">Isso é um SKU de persiana, não o kit. Bipe o QR do kit.</span>'; return; }
     var rk=await (await fetch('/api/config/kit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kit:k})})).json();
     document.getElementById('cdKit').value=rk.kit||k.toUpperCase();
-    msg.innerHTML='<span style="color:var(--green)">Salvo: <b>'+(rk.kit||k.toUpperCase())+'</b> — é este código que a embalagem vai reconhecer.</span>';
+    msg.innerHTML='<span style="color:var(--green)">Salvo: <b>'+(rk.kit||k)+'</b> — é este código que a embalagem vai reconhecer.</span>';
   }
-  if(e.target.closest('#cdKitEtq')){
-    var kv=(document.getElementById('cdKit').value||'').trim();
-    if(!kv){ document.getElementById('cdKitMsg').innerHTML='<span style="color:#ff6b6b">Cole e salve o link do manual antes de imprimir.</span>'; return; }
-    etiquetaKit(kv);
+  if(e.target.closest('#cdKitUp')){
+    var lm=document.getElementById('cdKitLabelMsg');
+    var fi=document.getElementById('cdKitFile');
+    var f=fi&&fi.files&&fi.files[0];
+    if(!f){ lm.innerHTML='<span style="color:#ff6b6b">Escolha um arquivo (PDF, PNG, JPG ou SVG).</span>'; return; }
+    if(f.size>8*1024*1024){ lm.innerHTML='<span style="color:#ff6b6b">Arquivo muito grande (máx 8 MB).</span>'; return; }
+    lm.textContent='Enviando…';
+    var b64=await new Promise(function(r){ var fr=new FileReader(); fr.onload=function(){r(fr.result);}; fr.readAsDataURL(f); });
+    var rr=await (await fetch('/api/kit/label',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({arquivo:b64,nome:f.name})})).json();
+    if(rr.erro){ lm.innerHTML='<span style="color:#ff6b6b">'+rr.erro+'</span>'; return; }
+    lm.innerHTML='<span style="color:var(--green)">Etiqueta enviada: <b>'+(rr.nome||rr.arquivo)+'</b>.</span>';
+    fi.value='';
+  }
+  if(e.target.closest('#cdKitPrint')){
+    var lm2=document.getElementById('cdKitLabelMsg');
+    var meta=await (await fetch('/api/kit/label/meta')).json();
+    if(!meta || !meta.arquivo){ lm2.innerHTML='<span style="color:#ff6b6b">Nenhuma etiqueta enviada ainda.</span>'; return; }
+    window.open('/api/kit/label?t='+Date.now(),'_blank');
+  }
+  if(e.target.closest('#cdKitDel')){
+    if(!confirm('Remover a etiqueta do kit enviada?')) return;
+    await fetch('/api/kit/label',{method:'DELETE'});
+    carregarCad();
   }
 });
-// QR do kit: gera o QR code do link do manual. Serve para as DUAS funcoes —
-// o cliente aponta a camera (ve o manual) e o operador bipa (a embalagem
-// reconhece via kitBate). Uma etiqueta so.
-function etiquetaKit(link){
-  var w=window.open("","etqkit","width=460,height=560");
-  if(!w){ alert("O navegador bloqueou a janela. Libere o pop-up e tente de novo."); return; }
-  var lib="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js";
-  var css='@page{margin:8mm}html,body{margin:0;padding:0;background:#fff;font-family:Arial,Helvetica,sans-serif;color:#000}'+
-   '.card{width:72mm;margin:0 auto;text-align:center;padding:6mm 4mm;border:1.5px solid #000;border-radius:4mm}'+
-   '.tit{font-size:13pt;font-weight:800;letter-spacing:.3px;margin-bottom:3mm}'+
-   '#qr{display:flex;justify-content:center;margin:2mm 0}#qr img{width:46mm;height:46mm;image-rendering:pixelated}'+
-   '.sub{font-size:9pt;line-height:1.35;margin-top:3mm}.err{color:#c00;font-size:10pt;padding:8mm}';
-  var doc='<!doctype html><html><head><meta charset="utf-8"><title>QR do kit</title>'+
-   '<scr'+'ipt src="'+lib+'"></scr'+'ipt><style>'+css+'</style></head><body>'+
-   '<div class="card"><div class="tit">MANUAL DE INSTALA&Ccedil;&Atilde;O</div>'+
-   '<div id="qr"></div>'+
-   '<div class="sub">Aponte a c&acirc;mera do celular para o c&oacute;digo<br>e veja o passo a passo da instala&ccedil;&atilde;o.</div></div>'+
-   '<scr'+'ipt>window.onload=function(){'+
-   'try{ var qr=qrcode(0,"M"); qr.addData('+JSON.stringify(link)+'); qr.make();'+
-   'document.getElementById("qr").innerHTML=qr.createImgTag(6,0);'+
-   'setTimeout(function(){window.print();},400); }'+
-   'catch(e){ document.body.innerHTML=\'<div class="err">Nao foi possivel gerar o QR (sem internet para carregar a biblioteca?). Tente de novo online.</div>\'; }'+
-   '};</scr'+'ipt></body></html>';
-  w.document.write(doc); w.document.close();
-}
 
 
 async function ctLancar(){
