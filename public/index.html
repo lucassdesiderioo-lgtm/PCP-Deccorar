@@ -615,7 +615,8 @@ async function carregarCad(){
   var kit=''; try{ kit=(await (await fetch('/api/config/kit')).json()).kit||''; }catch(e){}
   h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:6px">Código do kit de instalação</div>';
   h+='<div class="sub" style="margin-bottom:12px">O QR que o operador bipa na embalagem para confirmar que o kit foi incluído. <b>Cadastre aqui</b> — é o único lugar; a tela da embalagem só confere, não altera. Dica: bipe o próprio QR no campo abaixo para gravar exatamente o que o leitor lê.</div>';
-  h+='<div style="display:flex;gap:8px"><input id="cdKit" placeholder="bipe ou cole o código do kit" value="'+String(kit).replace(/"/g,"&quot;")+'" style="flex:1"><button class="primary" id="cdKitBt">Salvar</button></div>';
+  h+='<div style="display:flex;gap:8px"><input id="cdKit" placeholder="bipe ou cole o código do kit" value="'+String(kit).replace(/"/g,"&quot;")+'" style="flex:1"><button class="primary" id="cdKitBt">Salvar</button><button class="ghost" id="cdKitEtq">Imprimir etiqueta do kit</button></div>';
+  h+='<div class="sub" style="margin-top:8px">Dica: em vez do QR do Drive (que o leitor embaralha), use um código simples só com letras/números — ex.: <b>KITDECCORAR</b>. Salve e imprima a etiqueta abaixo; cole na bancada/prateleira dos kits e bipe ela na embalagem.</div>';
   h+='<div id="cdKitMsg" style="margin-top:10px;font-size:14px"></div></div>';
   el.innerHTML=h;
 }
@@ -646,7 +647,34 @@ document.addEventListener('click',async function(e){
     document.getElementById('cdKit').value=rk.kit||k.toUpperCase();
     msg.innerHTML='<span style="color:var(--green)">Salvo: <b>'+(rk.kit||k.toUpperCase())+'</b> — é este código que a embalagem vai reconhecer.</span>';
   }
+  if(e.target.closest('#cdKitEtq')){
+    var kv=(document.getElementById('cdKit').value||'').trim();
+    if(!kv){ document.getElementById('cdKitMsg').innerHTML='<span style="color:#ff6b6b">Informe e salve o código do kit antes de imprimir.</span>'; return; }
+    etiquetaKit(kv);
+  }
 });
+// Etiqueta do kit: codigo de barras CODE128 (alfanumerico, sem simbolo -> o
+// leitor nao embaralha). Cole na bancada/prateleira e bipe na embalagem.
+function etiquetaKit(cod){
+  var w=window.open("","etqkit","width=520,height=280");
+  if(!w){ alert("O navegador bloqueou a janela. Libere o pop-up e tente de novo."); return; }
+  var css='@page{size:100mm 35mm;margin:0}html,body{margin:0;padding:0;background:#fff}'+
+   '.etq{width:100mm;height:35mm;box-sizing:border-box;padding:2mm;page-break-after:always;'+
+   'font-family:Arial,Helvetica,sans-serif;color:#000;display:flex;flex-direction:column;'+
+   'align-items:center;justify-content:center;gap:1mm;overflow:hidden}'+
+   '.tit{font-size:11pt;font-weight:800;letter-spacing:.5px}'+
+   '.bc{height:12mm;width:80mm}.cod{font-size:9pt;font-weight:700;letter-spacing:.5px}';
+  var lib="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js";
+  var body='<div class="etq"><div class="tit">KIT DE INSTALA&Ccedil;&Atilde;O</div>'+
+    '<svg class="bc" data-c="'+String(cod).replace(/"/g,'')+'"></svg>'+
+    '<div class="cod">'+String(cod).replace(/</g,'')+'</div></div>';
+  var doc='<!doctype html><html><head><meta charset="utf-8"><title>Kit</title>'+
+   '<scr'+'ipt src="'+lib+'"></scr'+'ipt><style>'+css+'</style></head><body>'+body+
+   '<scr'+'ipt>window.onload=function(){var el=document.querySelector(".bc");'+
+   'JsBarcode(el,el.getAttribute("data-c"),{format:"CODE128B",displayValue:false,margin:0,height:70,width:2});'+
+   'setTimeout(function(){window.print();},400);};</scr'+'ipt></body></html>';
+  w.document.write(doc); w.document.close();
+}
 
 
 async function ctLancar(){
