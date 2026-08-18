@@ -14,6 +14,11 @@ module.exports = function(app, db){
         embalado:emb[U]||0, carregado:car[U]||0,
         aProduzir: Math.max(0, p.pedido + (s.alvo||0) - (s.estoque||0)) };
     });
-    res.json(linhas);
+    // produtividade do dia: quantas peças revisadas/embaladas e o tempo médio
+    // (revisao/montagem trazem segundos e data). Calculado no servidor p/ usar
+    // a data local do banco e nao depender do relogio do navegador.
+    const rp = db.prepare("SELECT COUNT(*) q, ROUND(AVG(segundos)) t FROM revisao WHERE data=date('now','localtime')").get();
+    const ep = db.prepare("SELECT COUNT(*) q, ROUND(AVG(segundos)) t FROM montagem WHERE data=date('now','localtime')").get();
+    res.json({ linhas, prod:{ rev_qtd:rp.q||0, rev_tmedio:rp.t||0, emb_qtd:ep.q||0, emb_tmedio:ep.t||0 } });
   });
 };
