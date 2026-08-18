@@ -14,6 +14,7 @@
   .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
   .kpi .n{font-size:28px;font-weight:800}.kpi .l{font-size:11px;color:var(--muted);text-transform:uppercase;margin-top:4px}
   .kpi.dem .n{color:var(--blue)}.kpi.est .n{color:var(--green)}.kpi.prod .n{color:var(--amber)}.kpi.emb .n{color:var(--violet)}.kpi.car .n{color:#7ee2a0}
+  .kpi.rev .n{color:var(--blue)}.kpi.embp .n{color:var(--violet)}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:auto}
   table{width:100%;border-collapse:collapse;font-size:14px}
   th,td{text-align:right;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -34,6 +35,13 @@
     <div class="kpi emb"><div class="n" id="kEmb">0</div><div class="l">Embalado</div></div>
     <div class="kpi car"><div class="n" id="kCar">0</div><div class="l">Carregado</div></div>
   </div>
+  <div class="sub" style="margin:2px 0 8px;font-weight:700;color:var(--txt);font-size:13px">Produtividade do dia</div>
+  <div class="cards">
+    <div class="kpi rev"><div class="n" id="kRev">0</div><div class="l">Revisadas hoje</div></div>
+    <div class="kpi"><div class="n" id="kRevT">—</div><div class="l">Tempo médio revisão</div></div>
+    <div class="kpi embp"><div class="n" id="kEmbP">0</div><div class="l">Embaladas hoje</div></div>
+    <div class="kpi"><div class="n" id="kEmbT">—</div><div class="l">Tempo médio embalagem</div></div>
+  </div>
   <div class="card"><table><thead><tr>
     <th>SKU</th><th>Demanda</th><th>Estoque</th><th>Alvo</th><th>A produzir</th><th>Produzido</th><th>Embalado</th><th>Carregado</th>
   </tr></thead><tbody id="corpo"></tbody></table></div>
@@ -41,10 +49,12 @@
 </div>
 <script>
 const $=s=>document.querySelector(s);
+function fmtS(s){ s=+s||0; if(!s) return '—'; const m=Math.floor(s/60); return (m?m+'m':'')+(s%60)+'s'; }
 async function load(){
   let d; try{ d=await (await fetch('/api/painel')).json(); }catch(e){ return; }
+  const linhas=(d&&d.linhas)||[], p=(d&&d.prod)||{};
   let dem=0,est=0,prod=0,emb=0,car=0;
-  const rows=d.map(r=>{ dem+=r.demanda;est+=r.estoque;prod+=r.produzido;emb+=r.embalado;car+=r.carregado;
+  const rows=linhas.map(r=>{ dem+=r.demanda;est+=r.estoque;prod+=r.produzido;emb+=r.embalado;car+=r.carregado;
     const ec=r.estoque<r.alvo?'baixo':(r.estoque>0?'ok':'zero');
     return '<tr><td class="code">'+r.codigo+'<div class="cor">'+(r.cor||'')+'</div></td>'+
       '<td>'+r.demanda+'</td><td class="'+ec+'">'+r.estoque+'</td><td class="zero">'+r.alvo+'</td>'+
@@ -53,6 +63,8 @@ async function load(){
   }).join('');
   $('#corpo').innerHTML=rows||'<tr><td colspan="8" style="color:#8b97a5;padding:20px;text-align:center">Sem dados hoje.</td></tr>';
   $('#kDem').textContent=dem;$('#kEst').textContent=est;$('#kProd').textContent=prod;$('#kEmb').textContent=emb;$('#kCar').textContent=car;
+  $('#kRev').textContent=p.rev_qtd||0; $('#kRevT').textContent=fmtS(p.rev_tmedio);
+  $('#kEmbP').textContent=p.emb_qtd||0; $('#kEmbT').textContent=fmtS(p.emb_tmedio);
   $('#upd').textContent='Atualizado '+new Date().toLocaleTimeString('pt-BR');
 }
 load(); setInterval(load,3000);
