@@ -280,8 +280,9 @@ a produção real). Tarja amarela aparece em todas as telas via `nav.js`.
 > **Por que a foto do estoque:** estoque é número corrido, não lista de linhas.
 > Apagar as revisões de teste não desfaria o `+1` que cada uma somou.
 
-**Cobertura atual (8 tabelas):** `revisao`, `producao`, `montagem`, `lote`,
-`fila`, `devolucao`, `rejeicao` e `contagem`. (`foto_estoque` saiu na Fase 3.)
+**Cobertura atual (9 tabelas):** `revisao`, `producao`, `montagem`, `lote`,
+`fila`, `devolucao`, `rejeicao`, `contagem` e `contagem_pendente`.
+(`foto_estoque` saiu na Fase 3.)
 
 A lista fica em `TABELAS`, no topo do `teste_route.js`. Cada entrada traz a coluna
 de chave primária — hoje todas usam `id`. O campo ficou genérico por causa da

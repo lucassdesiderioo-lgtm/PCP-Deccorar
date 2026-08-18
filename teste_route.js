@@ -14,7 +14,8 @@ module.exports=function(app, db){
     {nome:'fila',         pk:'id',   rotulo:'fila'},
     {nome:'devolucao',    pk:'id',   rotulo:'devolucoes'},
     {nome:'rejeicao',     pk:'id',   rotulo:'problemas'},
-    {nome:'contagem',     pk:'id',   rotulo:'contagem'}
+    {nome:'contagem',          pk:'id', rotulo:'contagem'},
+    {nome:'contagem_pendente', pk:'id', rotulo:'contagem (aprovacao)'}
   ];
 
   // Fase 3: foto_estoque saiu da cobertura; limpa o trigger antigo em bancos
