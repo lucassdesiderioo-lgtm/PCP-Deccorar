@@ -44,12 +44,14 @@ function kitTok(x){ var m=String(x||'').toUpperCase().match(/[A-Z0-9]+/g)||[]; r
 // OU pelo ID da pasta (maior token). Min 12 chars evita casar por acaso.
 function kitBate(lido, cad){
   var a=kitNorm(lido), b=kitNorm(cad);
-  if(a.length>=12 && b.length>=12 && (a===b || a.indexOf(b)>=0 || b.indexOf(a)>=0)) return true;
+  if(a.length<3 || b.length<3) return false;
+  if(a===b) return true;   // exato: serve para codigo simples (KITENVIO) e link igual
+  // daqui pra baixo e a tolerancia do LINK do Drive (formas diferentes do
+  // mesmo link). So com pedacos longos, para nao casar codigo curto por acaso.
+  if(a.length>=12 && b.length>=12 && (a.indexOf(b)>=0 || b.indexOf(a)>=0)) return true;
   var ta=kitTok(lido), tb=kitTok(cad);
   if(ta.length>=12 && ta===tb) return true;
-  // o ID da pasta (maior token, >=15) de um aparece dentro do outro. Robusto a
-  // como o leitor trata _ e - no meio do ID (pode juntar/separar os tokens).
-  if(ta.length>=15 && b.indexOf(ta)>=0) return true;
+  if(ta.length>=15 && b.indexOf(ta)>=0) return true;   // ID da pasta como substring
   if(tb.length>=15 && a.indexOf(tb)>=0) return true;
   return false;
 }
