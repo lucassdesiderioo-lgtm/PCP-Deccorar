@@ -10,11 +10,6 @@
   .link{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
   .links{margin-left:auto;display:flex;gap:8px}
   .wrap{max-width:820px;margin:0 auto;padding:18px}
-  .cfg{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .cfg.warn{border-color:#e7cb8c;background:#fbf1db}
-  .cfg input{flex:1;min-width:160px;padding:9px;border-radius:8px;border:1px solid var(--line);background:#edf0f4;color:var(--txt)}
-  .cfg button{background:var(--amber);color:#1a1300;border:0;border-radius:8px;font-weight:700;padding:9px 14px;cursor:pointer}
-  .cfg .lab{font-size:12px;color:var(--muted)}
   .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:28px;text-align:center;margin-bottom:14px}
   .banner.go{background:#e8f0fb;border-color:#a9c9ee}.banner.kit{background:#fbf1db;border-color:#e7cb8c}.banner.ok{background:#e7f5eb;border-color:#a9d8b4}.banner.err{background:#fbe9e8;border-color:#efb1ad}
   .bt{font-size:28px;font-weight:780}.bs{font-size:16px;color:var(--muted);margin-top:8px;line-height:1.5}.bs b{color:var(--txt)}
@@ -34,12 +29,6 @@
 <header><div class="mark">M</div><div><h1>Embalagem</h1><div class="sub">Bipa SKU · bipa kit · bipa SKU pra finalizar</div></div>
 <div class="links"><a class="link" href="/embalagem">Etiqueta de Venda</a><a class="link" href="/painel">Painel</a></div></header>
 <div class="wrap">
-  <div class="cfg" id="cfg">
-    <span class="lab">Código do kit:</span>
-    <input id="kitin" placeholder="bipe ou digite o código do kit aqui e salve">
-    <button onclick="salvarKit()">Salvar</button>
-    <span class="lab" id="kitatual"></span>
-  </div>
   <div class="banner" id="banner"></div>
   <input id="scan" autocomplete="off">
   <div class="stats" id="stats"></div>
@@ -61,8 +50,6 @@ async function load(){
   carregarFila();
   SKUS=await (await fetch('/api/skus')).json();
   KIT=(await (await fetch('/api/config/kit')).json()).kit;
-  $('#kitatual').textContent = KIT ? ('atual: '+KIT) : '';
-  $('#cfg').className = 'cfg' + (KIT?'':' warn');
   stats();
   if(!emb) idle();
 }
@@ -75,7 +62,7 @@ function fmt(s){ s=+s||0; const m=Math.floor(s/60); return (m?m+'m':'')+(s%60)+'
 function mmss(ms){ const t=Math.floor(ms/1000),m=Math.floor(t/60); return String(m).padStart(2,'0')+':'+String(t%60).padStart(2,'0'); }
 function steps(){ return '<div class="steps"><span class="chip done">1 · SKU ✓</span><span class="chip '+(emb&&emb.kitOk?'done':'')+'">2 · Kit '+(emb&&emb.kitOk?'✓':'…')+'</span><span class="chip">3 · SKU final</span></div>'; }
 function banner(kind,title,sub,extra){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(extra||''); }
-function idle(){ emb=null; if(!KIT){ banner('err','Configure o código do kit','Bipe/aponte o código do kit no campo acima e clique em Salvar. Sem isso não dá pra conferir o kit.'); return; } banner('','Pronto','Bipe o <b>SKU</b> da persiana pra começar a embalagem.'); }
+function idle(){ emb=null; if(!KIT){ banner('err','Código do kit não cadastrado','Peça ao responsável para cadastrar o código do kit no <b>Admin → Cadastros</b>. Sem isso não dá pra conferir o kit na embalagem.'); return; } banner('','Pronto','Bipe o <b>SKU</b> da persiana pra começar a embalagem.'); }
 function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const t=$('#tm'); if(emb&&t) t.textContent=mmss(Date.now()-emb.inicio); },250); }
 function handle(code){
   code=(code||'').trim().toUpperCase(); if(!code) return;
@@ -104,9 +91,8 @@ async function finish(){
     banner('ok','Embalada ✓ ('+fmt(seg)+')', cur.codigo+' · kit conferido · foi pro estoque.'); beep(true); stats();
   }catch(e){ banner('err','Falha de conexão',String(e)); beep(false); }
 }
-async function salvarKit(){ const v=$('#kitin').value.trim(); if(!v) return; await fetch('/api/config/kit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kit:v})}); $('#kitin').value=''; await load(); }
 const scan=$('#scan');
-const keep=()=>{ if(document.activeElement!==scan && document.activeElement!==$('#kitin')) scan.focus(); };
+const keep=()=>{ if(document.activeElement!==scan) scan.focus(); };
 scan.addEventListener('blur',()=>setTimeout(keep,50));
 document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input')) keep(); });
 scan.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=scan.value.trim(); scan.value=''; handle(v); } });
