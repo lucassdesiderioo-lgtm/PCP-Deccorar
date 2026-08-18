@@ -46,7 +46,12 @@ function kitBate(lido, cad){
   var a=kitNorm(lido), b=kitNorm(cad);
   if(a.length>=12 && b.length>=12 && (a===b || a.indexOf(b)>=0 || b.indexOf(a)>=0)) return true;
   var ta=kitTok(lido), tb=kitTok(cad);
-  return ta.length>=12 && ta===tb;
+  if(ta.length>=12 && ta===tb) return true;
+  // o ID da pasta (maior token, >=15) de um aparece dentro do outro. Robusto a
+  // como o leitor trata _ e - no meio do ID (pode juntar/separar os tokens).
+  if(ta.length>=15 && b.indexOf(ta)>=0) return true;
+  if(tb.length>=15 && a.indexOf(tb)>=0) return true;
+  return false;
 }
 let SKUS=[], KIT=null, emb=null, tick=null, last={c:null,t:0}, FILA=[];
 async function carregarFila(){
