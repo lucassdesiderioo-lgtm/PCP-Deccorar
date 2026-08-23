@@ -472,6 +472,15 @@ module.exports = function(app, db){
     // Pedido: criar/enviar/cancelar e do Comprador; pagar e do Financeiro; ver
     // o que esta a caminho e de OPERACAO, porque quem recebe precisa saber o que
     // vem — e por isso a leitura NAO carrega preco (regra 14 do §13).
+    // Recebimento (§8): a tela e as rotas de conferencia sao de OPERACAO e nao
+    // carregam preco. Lancar o preco da nota e do Comprador.
+    if(eq('/recebimento')) return 'pedido.receber';
+    if(eq('/api/recebimento/aguardando')) return 'pedido.ver';
+    if(M !== 'GET' && /\/preco$/.test(p) && pre('/api/recebimento')) return 'preco.lancar';
+    if(M !== 'GET' && eq('/api/recebimento')) return 'pedido.receber';
+    if(eq('/api/recebimento/devolucoes')) return 'compras.ver';
+    if(M !== 'GET' && /\/fechar$/.test(p) && pre('/api/pedidos')) return 'pedido.criar';
+    if(eq('/api/pedidos/zumbis')) return 'compras.ver';
     if(M !== 'GET' && pre('/api/pedidos') && /\/pagar$/.test(p)) return 'pedido.pagar';
     if(M !== 'GET' && pre('/api/pedidos')) return 'pedido.criar';
     if(pre('/api/pedidos')) return 'pedido.ver';
@@ -509,7 +518,8 @@ module.exports = function(app, db){
     ['revisao.executar','operador'], ['embalagem.executar','montagem'],
     ['etiqueta.emitir','embalagem'], ['carregamento.executar','carregamento'],
     ['pdf.subir','expedicao'], ['devolucao.registrar','devolucao'],
-    ['painel.ver','painel'], ['relatorios.ver','relatorios'], ['necessidade.ver','necessidade']
+    ['painel.ver','painel'], ['relatorios.ver','relatorios'], ['necessidade.ver','necessidade'],
+    ['pedido.receber','recebimento']
   ];
   function sincronizarAreas(uid){
     try{
@@ -589,6 +599,9 @@ module.exports = function(app, db){
     ['GET','/api/componentes'],['POST','/api/componentes'],['DELETE','/api/componentes/:id'],
     ['GET','/api/ofertas'],['POST','/api/ofertas'],['DELETE','/api/ofertas/:id'],
     ['GET','/api/precos/historico'],['GET','/api/skus/custo'],['GET','/api/comparar'],['GET','/api/compras/lista'],
+    ['GET','/recebimento'],['GET','/api/recebimento/aguardando'],['POST','/api/recebimento'],
+    ['POST','/api/recebimento/:id/preco'],['GET','/api/recebimento/devolucoes'],
+    ['POST','/api/pedidos/:id/fechar'],['GET','/api/pedidos/zumbis'],
     ['GET','/api/pedidos'],['POST','/api/pedidos'],['GET','/api/pedidos/:id'],
     ['GET','/api/pedidos/:id/whatsapp'],['POST','/api/pedidos/:id/enviar'],
     ['POST','/api/pedidos/:id/cancelar'],['POST','/api/pedidos/:id/pagar'],

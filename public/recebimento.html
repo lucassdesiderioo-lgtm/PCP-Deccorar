@@ -1,0 +1,139 @@
+<!doctype html><html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recebimento — Deccorar</title>
+<style>
+/* Estacao de OPERACAO: fundo CLARO (DESIGN.md §1). A tela escura vira espelho
+   sob a luz natural forte do galpao, e quem confere entrega esta em pe, com a
+   caixa na mao. Alvo minimo 52px (§4), fonte minima 15px (§3). */
+:root{--bg:#fff;--pan:#F4F6F8;--line:#D8DEE6;--txt:#1A1D23;--sub:#5A6472;
+      --verm:#C62828;--azul:#1565C0;--ambar:#B26A00;--verde:#2E7D32}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif;font-size:16px}
+header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.mark{width:34px;height:34px;border-radius:9px;background:var(--ambar);color:#fff;display:flex;
+      align-items:center;justify-content:center;font-weight:800}
+h1{font-size:19px;margin:0}.sub{color:var(--sub);font-size:14px}
+.wrap{max-width:900px;margin:0 auto;padding:18px}
+.card{background:var(--pan);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+.ped{font-size:19px;font-weight:800;margin-bottom:2px}
+.item{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:14px}
+.nome{font-size:19px;font-weight:700}
+.ped-lin{color:var(--sub);font-size:15px;margin:4px 0 14px}
+.lb{font-size:14px;color:var(--sub);margin-bottom:6px}
+.step{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.stepb{width:56px;height:56px;border-radius:12px;border:1px solid var(--line);background:#fff;
+       font-size:26px;cursor:pointer;color:var(--txt)}
+.stepv{font-size:26px;font-weight:800;min-width:96px;text-align:center;border:1px solid var(--line);
+       border-radius:12px;padding:10px 8px;background:#fff}
+.un{color:var(--sub);font-size:15px}
+button{font-family:inherit}
+.b{min-height:56px;padding:0 22px;font-size:16px;font-weight:700;border-radius:12px;
+   border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--txt)}
+.b.pri{background:var(--ambar);border-color:var(--ambar);color:#fff}
+.b.on{border:2px solid var(--ambar);color:var(--ambar)}
+.avi{background:#FDF3E3;border:1px solid #E8C48A;color:#7A4A06;border-radius:10px;
+     padding:12px 14px;margin-top:12px;font-size:15px}
+.ok{background:#EAF3E7;border:1px solid #A9CEA2;color:#1F5E22}
+.err{background:#FBEBEB;border:1px solid #E4A9A9;color:#8A2020}
+.dev{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
+.ops{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+input[type=text]{font-family:inherit;font-size:16px;padding:14px;border:1px solid var(--line);
+                 border-radius:10px;width:100%;background:#fff;color:var(--txt)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.g2{grid-template-columns:1fr}}
+.rod{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+</style></head><body>
+<header><div class="mark">R</div><div><h1>Recebimento</h1>
+  <div class="sub">Confira o que chegou. Você não precisa saber de preço — isso é do comprador.</div></div></header>
+<div class="wrap"><div id="app">carregando…</div></div>
+<script src="/nav.js"></script>
+<script>
+var PED=[], SEL=null, EST={};
+var $=function(s){return document.querySelector(s);};
+function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+function n3(v){return (Math.round((+v||0)*1000)/1000).toString().replace('.',',');}
+
+async function carregar(){
+  try{ PED=await (await fetch('/api/recebimento/aguardando')).json(); }catch(e){ PED=[]; }
+  SEL=null; EST={}; render();
+}
+function render(){
+  var el=$('#app');
+  if(!PED.length){ el.innerHTML='<div class="card"><div class="ped">Nada a caminho</div>'
+    +'<div class="sub">Quando o comprador enviar um pedido, ele aparece aqui.</div></div>'; return; }
+  if(!SEL){
+    el.innerHTML='<div class="card"><div class="ped">O que está a caminho</div>'
+      +'<div class="sub">Toque no pedido que chegou.</div></div>'
+      +PED.map(function(p){ return '<div class="card"><div class="ped">'+esc(p.numero)+' · '+esc(p.fornecedor)+'</div>'
+        +'<div class="ped-lin">'+p.itens.length+' item(ns) aguardando'
+        +(p.status==='parcial'?' · <b>entrega parcial</b>':'')+'</div>'
+        +'<button class="b pri" data-abrir="'+p.id+'">Conferir esta entrega</button></div>'; }).join('');
+    return;
+  }
+  var p=PED.find(function(x){return x.id==SEL;});
+  var h='<div class="card"><div class="ped">'+esc(p.numero)+' · '+esc(p.fornecedor)+'</div>'
+    +'<div class="ped-lin">Informe quantas embalagens chegaram de cada item.</div>';
+  p.itens.forEach(function(i){
+    var e=EST[i.id]||(EST[i.id]={rec:Math.round((i.falta_embalagem||0)*1000)/1000,dev:0,motivo:null});
+    h+='<div class="item"><div class="nome">'+esc(i.item)+'</div>'
+      +'<div class="ped-lin">Pedido: '+n3(i.falta_embalagem)+' × '+esc(i.embalagem)
+      +' &nbsp;=&nbsp; '+n3(i.falta_consumo)+' '+esc(i.unidade||'')+'</div>'
+      +'<div class="lb">Chegou quantas?</div>'
+      +'<div class="step"><button class="stepb" data-mais="'+i.id+'" data-d="-1">−</button>'
+      +'<div class="stepv" id="v'+i.id+'">'+n3(e.rec)+'</div>'
+      +'<button class="stepb" data-mais="'+i.id+'" data-d="1">+</button>'
+      +'<span class="un">× '+esc(i.embalagem)+'</span></div>';
+    var falta=(i.falta_embalagem||0)-e.rec-e.dev;
+    if(Math.abs(falta)>0.0001)
+      h+='<div class="avi">⚠ '+(falta>0?n3(falta)+' a menos que o pedido':n3(-falta)+' a mais que o pedido')+'</div>';
+    h+='<div class="dev"><div class="lb">Veio algo com problema?</div>'
+      +'<div class="step"><button class="stepb" data-dev="'+i.id+'" data-d="-1">−</button>'
+      +'<div class="stepv" id="d'+i.id+'">'+n3(e.dev)+'</div>'
+      +'<button class="stepb" data-dev="'+i.id+'" data-d="1">+</button>'
+      +'<span class="un">devolvidas</span></div>';
+    if(e.dev>0){
+      h+='<div class="lb">Por quê?</div><div class="ops">'
+        +[['fora_medida','Fora da medida'],['defeito','Defeito'],
+          ['veio_errado','Veio errado'],['qtd_a_mais','Quantidade a mais']]
+          .map(function(m){ return '<button class="b'+(e.motivo===m[0]?' on':'')+'" data-mot="'+i.id+'" data-v="'+m[0]+'">'
+            +(e.motivo===m[0]?'✓ ':'')+m[1]+'</button>'; }).join('')+'</div>'
+        +'<div class="avi">O que volta <b>não entra no estoque</b> e continua contando como a caminho — o fornecedor ainda deve.</div>';
+    }
+    h+='</div></div>';
+  });
+  h+='<div class="dev"><div class="g2"><div><div class="lb">Número da nota</div>'
+    +'<input type="text" id="nf" inputmode="numeric" autocomplete="off"></div>'
+    +'<div><div class="lb">Data da nota</div><input type="text" id="nd" placeholder="dd/mm/aaaa" autocomplete="off"></div></div></div>'
+    +'<div class="rod"><button class="b" id="volta">Voltar</button>'
+    +'<button class="b pri" id="conf">Confirmar entrega</button></div>'
+    +'<div id="msg"></div></div>';
+  el.innerHTML=h;
+}
+document.addEventListener('click',async function(ev){
+  var t=ev.target, b;
+  if((b=t.closest('[data-abrir]'))){ SEL=+b.getAttribute('data-abrir'); render(); return; }
+  if(t.id==='volta'){ SEL=null; render(); return; }
+  if((b=t.closest('[data-mais]'))){
+    var id=b.getAttribute('data-mais'), e=EST[id];
+    e.rec=Math.max(0,Math.round((e.rec+ +b.getAttribute('data-d'))*1000)/1000); render(); return; }
+  if((b=t.closest('[data-dev]'))){
+    var id2=b.getAttribute('data-dev'), e2=EST[id2];
+    e2.dev=Math.max(0,Math.round((e2.dev+ +b.getAttribute('data-d'))*1000)/1000);
+    if(e2.dev===0) e2.motivo=null; render(); return; }
+  if((b=t.closest('[data-mot]'))){ EST[b.getAttribute('data-mot')].motivo=b.getAttribute('data-v'); render(); return; }
+  if(t.id==='conf'){
+    var p=PED.find(function(x){return x.id==SEL;});
+    var itens=p.itens.map(function(i){ var e=EST[i.id];
+      return {pedido_item_id:i.id, embalagens_recebidas:e.rec, embalagens_devolvidas:e.dev,
+              motivo_devolucao:e.motivo}; }).filter(function(x){ return x.embalagens_recebidas>0||x.embalagens_devolvidas>0; });
+    var r=await fetch('/api/recebimento',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pedido_id:SEL, nota_fiscal:$('#nf').value, nota_data:$('#nd').value, itens:itens})});
+    var j=await r.json();
+    if(!r.ok){ $('#msg').innerHTML='<div class="avi err">'+esc(j.erro||'não deu')+'</div>'; return; }
+    $('#msg').innerHTML='<div class="avi ok">✓ Entrada registrada.'
+      +(j.aviso?'<br>'+esc(j.aviso):'')+'</div>';
+    setTimeout(carregar,1800);
+  }
+});
+carregar();
+</script></body></html>

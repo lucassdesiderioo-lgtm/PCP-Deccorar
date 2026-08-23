@@ -197,6 +197,57 @@ function garantirSchemaCompras(db){
     );
     CREATE INDEX IF NOT EXISTS idx_pedido_item_aberto ON pedido_item(componente_id, status);
 
+    /* ── RECEBIMENTO (§8, §9) ─────────────────────────────────────────────────
+       Quem pede nao e quem confere. A nota fiscal fica em NUMERO e DATA,
+       digitados: e o que amarra o que chegou ao documento. Anexar PDF ou XML
+       puxaria espaco, backup e uma decisao de retencao — a nota continua vivendo
+       onde ja vive, e o sistema guarda o ponteiro. */
+    CREATE TABLE IF NOT EXISTS recebimento (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      pedido_id    INTEGER REFERENCES pedido_compra(id),
+      nota_fiscal  TEXT,
+      nota_data    TEXT,
+      recebido_por TEXT,
+      criado_em    TEXT DEFAULT (datetime('now','localtime')),
+      data         TEXT DEFAULT (date('now','localtime')),
+      teste        INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS recebimento_item (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      recebimento_id   INTEGER REFERENCES recebimento(id),
+      pedido_item_id   INTEGER REFERENCES pedido_item(id),
+      qtd_embalagem    REAL,
+      qtd_consumo      REAL,       -- entra no estoque
+      /* Regra 28: o devolvido NAO entra no estoque e continua contando como
+         "a caminho" — o fornecedor ainda deve. Dar entrada em material que foi
+         embora no mesmo caminhao e o erro que mais estraga estoque novo. */
+      qtd_devolvida    REAL DEFAULT 0,
+      motivo_devolucao TEXT,       -- fora_medida|defeito|veio_errado|qtd_a_mais
+      preco_pago       REAL,       -- lancado DEPOIS, pelo comprador
+      divergencia      TEXT        -- nenhuma|quantidade|preco|ambos
+    );
+    CREATE INDEX IF NOT EXISTS idx_receb_devol
+      ON recebimento_item(motivo_devolucao) WHERE qtd_devolvida > 0;
+
+    /* ── MOVIMENTO DE COMPONENTE (§9) ─────────────────────────────────────────
+       Mesma ideia do movimento_estoque: o numero atual e conveniencia, a
+       historia e a verdade. Dono unico: componente_dominio.js. */
+    CREATE TABLE IF NOT EXISTS movimento_componente (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      componente_id INTEGER REFERENCES componente(id),
+      delta         REAL,
+      saldo_apos    REAL,
+      motivo        TEXT,   -- recebimento|embalagem|perda|ajuste|contagem|devolucao
+      referencia    TEXT,
+      custo_unit    REAL,   -- so na entrada — alimenta o custo medio
+      usuario_id    INTEGER,
+      usuario_nome  TEXT,
+      criado_em     TEXT DEFAULT (datetime('now','localtime')),
+      data          TEXT DEFAULT (date('now','localtime')),
+      teste         INTEGER DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_mov_comp ON movimento_componente(componente_id, data);
+
     /* ── FICHA POR FORMULA (§3) ───────────────────────────────────────────────
        A decisao que reduz o projeto: a ficha nao e uma lista digitada por SKU, e
        uma FORMULA sobre a medida, lancada UMA VEZ no modelo. Com 200 SKUs e 3
@@ -245,6 +296,11 @@ function garantirSchemaCompras(db){
   };
   colunas('componente', COLUNAS_COMPONENTE);
   colunas('skus', COLUNAS_SKU);
+  /* §8: a contagem de componente usa O MESMO fluxo que ja existe — o operador
+     conta, o ajuste fica pendente, o admin aprova. Uma mecanica so no sistema
+     inteiro. E uma coluna, nao um modulo. */
+  if(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='contagem_pendente'").get())
+    colunas('contagem_pendente', [['tipo', "TEXT DEFAULT 'sku'"]]);   // sku|componente
 
   /* §3: o componente resolvido por familia + cor + largura de bobina precisa ser
      unico nessa combinacao, senao a resolucao da formula fica ambigua. */

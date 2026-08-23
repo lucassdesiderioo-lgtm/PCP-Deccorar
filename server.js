@@ -160,6 +160,8 @@ require('./sku_route')(app, db);
 require('./compras_route')(app, db);
 require('./ficha_route')(app, db);
 require('./pedido_route')(app, db);
+require('./receb_route')(app, db);
+app.get('/recebimento',(req,res)=>res.sendFile(path.join(__dirname,'public','recebimento.html')));
 require('./ger_route')(app, db);
 require('./st_route')(app, db);
 // Controle de Acesso — Fase 1 (roda em paralelo; NAO decide acesso ainda).
