@@ -2,8 +2,15 @@ const Database = require('better-sqlite3');
 const db = new Database('/opt/expedicao/dados.db');
 db.pragma('journal_mode = WAL');
 db.exec(`
+  /* modelo_id/largura_cm/altura_cm/cor_codigo sao a Fase 0 de Compras: medida e
+     cor param de ser interpretadas do codigo do SKU e passam a ser coluna.
+     Ficam NO FIM e NESTA ORDEM de proposito — e a ordem em que o ALTER do
+     sku_schema.js as acrescenta no banco de producao (§17). Campo sem dado fica
+     NULL: zero e um valor valido e mentiroso para medida. */
   CREATE TABLE IF NOT EXISTS skus (codigo TEXT PRIMARY KEY, descricao TEXT DEFAULT '', cor TEXT DEFAULT '',
-    estoque INTEGER DEFAULT 0, alvo INTEGER DEFAULT 0, criado_em TEXT DEFAULT (datetime('now','localtime')));
+    estoque INTEGER DEFAULT 0, alvo INTEGER DEFAULT 0, criado_em TEXT DEFAULT (datetime('now','localtime')),
+    modelo_id INTEGER REFERENCES modelo(id), largura_cm INTEGER, altura_cm INTEGER,
+    cor_codigo TEXT REFERENCES cor(codigo));
   /* origem/urgente eram colunas so de producao, adicionadas a mao. Os defaults
      importam: server.js insere producao manual so com (codigo,qtd), e o
      cruzamento apaga por origem='ml'. Sem DEFAULT 'manual' o lancamento manual
@@ -43,5 +50,10 @@ try{
   var faltando=esperadas.filter(function(c){ return tem.indexOf(c)<0; });
   if(faltando.length) console.log('[db] ATENCAO: fila sem as colunas: '+faltando.join(', '));
 }catch(e){ console.log('[db] nao consegui conferir a fila: '+e.message); }
+
+/* Compras Fase 0: cria `cor` e `modelo` e acrescenta as colunas novas de `skus`
+   no banco que ja existe. O CREATE acima cobre a instalacao limpa; este ALTER
+   cobre producao, que nasceu sem elas. Idempotente. */
+require('./sku_schema').garantirSchema(db);
 
 module.exports = db;
