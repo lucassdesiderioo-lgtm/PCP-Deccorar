@@ -8,7 +8,9 @@
   .mark{width:32px;height:32px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
   h1{font-size:16px;margin:0}.sub{font-size:12px;color:var(--muted)}
   .link{margin-left:auto;font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
-  .tabs{display:flex;padding:0 22px;border-bottom:1px solid var(--line)}
+  /* wrap: com a aba de pendencias a fila passa de 1440px (o MacBook Air que o
+     DESIGN.md §7 define como alvo) e a ultima aba sairia da tela. */
+  .tabs{display:flex;flex-wrap:wrap;padding:0 22px;border-bottom:1px solid var(--line)}
   .tab{padding:13px 18px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
   .tab.active{color:var(--txt);border-bottom-color:var(--amber)}
   .wrap{max-width:1200px;margin:0 auto;padding:22px}
@@ -80,6 +82,7 @@
   <div class="tab" data-t="plan">Planejamento</div>
   <div class="tab" data-t="rel">Relatórios</div>
   <div class="tab" data-t="acs">Acessos &amp; Permissões</div>
+  <div class="tab" data-t="pend" id="tabPend">Pendências de SKU</div>
   <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="blq" id="tabBlq">Bloqueados</div><div class="tab" data-t="tst">Modo teste</div>
 </div>
 <div class="wrap">
@@ -122,6 +125,11 @@
   <div id="v-rel" class="hide"><iframe id="ifRel" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
   <div id="v-acs" class="hide"><iframe id="ifAcs" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
   <!-- CADASTRO -->
+  <div id="v-pend" class="hide">
+    <div class="card"><div style="font-weight:700;margin-bottom:4px">SKUs incompletos</div>
+      <div class="sub">Enquanto houver medida pendente, a ficha técnica por fórmula não fecha — é este contador que diz quando a próxima fase pode começar. Um SKU aparece em mais de um grupo se faltar mais de uma coisa.</div>
+      <div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:16px" id="pendResumo"></div></div>
+    <div id="pendBox"></div></div>
   <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide">
   <div class="card">
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
@@ -197,6 +205,8 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.t==="dv") carregarDev();
   var vcd=$("#v-cd"); if(vcd) vcd.classList.toggle("hide",t.dataset.t!=="cd");
   if(t.dataset.t==="cd") carregarCad();
+  var vpd=$("#v-pend"); if(vpd) vpd.classList.toggle("hide",t.dataset.t!=="pend");
+  if(t.dataset.t==="pend") carregarPend();
   if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); setTimeout(function(){var b=document.getElementById("ctBipe"); if(b) b.focus();},100); }
   var ifn=$("#ifPlan"), ifr=$("#ifRel"), ifa=$("#ifAcs");
   if(t.dataset.t==="plan" && ifn && !ifn.dataset.l){ ifn.src="/planejamento"; ifn.dataset.l=1; }
@@ -207,6 +217,7 @@ async function carregar(){
   await carregarListas();   // antes do renderCad: a lista de SKU mostra o nome do modelo
   SKUS=await (await fetch('/api/skus')).json();
   renderCad(); renderSel(); renderEst(); carregarHoje();
+  carregarPend();   // o contador da aba aparece sem precisar abri-la
 }
 
 /* ---- Compras Fase 0: modelo, medida e cor ------------------------------
@@ -327,6 +338,51 @@ function renderMC(){
   h+='<div class="mcrow"><input id="mcCorCod" placeholder="código (ex.: BEGE)"><input id="mcCorNome" placeholder="nome">'
     +'<button class="primary small mcAdd" data-tipo="cor">Adicionar</button></div></div>';
   el.innerHTML=h;
+}
+
+/* ---- Pendências de SKU ------------------------------------------------
+   Tres perguntas independentes, nao um funil: o mesmo SKU aparece em mais de
+   um grupo se faltar mais de uma coisa. Cada linha leva ao cadastro daquele
+   SKU, reaproveitando o mesmo [data-edit] da lista de produtos. */
+async function carregarPend(){
+  const box=$('#pendBox'), res=$('#pendResumo');
+  if(!box) return;
+  let d;
+  try{ d=await (await fetch('/api/skus/pendencias')).json(); }
+  catch(e){ box.innerHTML='<div class="card">Não consegui carregar as pendências.</div>'; return; }
+
+  const cor=n=>n?'var(--amber)':'var(--green)';
+  res.innerHTML=
+     '<div class="sumbox"><div class="sub">MEDIDA PENDENTE</div><div style="font-size:26px;font-weight:700;color:'+cor(d.medida.length)+'">'+d.medida.length+'</div></div>'
+    +'<div class="sumbox"><div class="sub">MODELO PENDENTE</div><div style="font-size:26px;font-weight:700;color:'+cor(d.modelo.length)+'">'+d.modelo.length+'</div></div>'
+    +'<div class="sumbox"><div class="sub">COR PENDENTE</div><div style="font-size:26px;font-weight:700;color:'+cor(d.cor.length)+'">'+d.cor.length+'</div></div>';
+
+  const grupo=(titulo,motivo,lista)=>{
+    if(!lista.length) return '<div class="card"><div style="font-weight:700">'+titulo+'</div>'
+      +'<div class="sub" style="margin-top:6px">✓ Nenhum. Todos os SKUs têm este campo preenchido.</div></div>';
+    let h='<div class="card"><div style="font-weight:700;margin-bottom:4px">'+titulo+' — '+lista.length+'</div>'
+      +'<div class="sub" style="margin-bottom:12px">'+motivo+'</div>'
+      +'<table><thead><tr><th>Código</th><th>Descrição</th><th>O que está gravado</th><th></th></tr></thead><tbody>';
+    for(const s of lista){
+      const med=(s.largura_cm==null||s.altura_cm==null)
+        ? '<span style="color:var(--amber)">medida —</span>'
+        : s.largura_cm+' × '+s.altura_cm;
+      const mod=s.modelo_id==null?'<span style="color:var(--amber)">modelo —</span>':'modelo ok';
+      const cr =s.cor_codigo?esc(s.cor_codigo):'<span style="color:var(--amber)">cor —</span>';
+      h+='<tr><td class="code">'+esc(s.codigo)+'</td><td>'+esc(s.descricao)+'</td>'
+        +'<td class="sub">'+med+' · '+mod+' · '+cr+'</td>'
+        +'<td><button class="ghost small" data-edit="'+esc(s.codigo)+'">completar cadastro</button></td></tr>';
+    }
+    return h+'</tbody></table></div>';
+  };
+
+  box.innerHTML=
+     grupo('Medida pendente','Largura ou altura em branco. Sem as duas, a fórmula da ficha técnica não tem de onde partir.',d.medida)
+    +grupo('Modelo pendente','Sem linha de produto. É o modelo que vai carregar as fórmulas na próxima fase.',d.modelo)
+    +grupo('Cor pendente','Cor em branco, ou apontando para um código que não está na lista de cores.',d.cor);
+
+  const tab=$('#tabPend');
+  if(tab) tab.textContent='Pendências de SKU'+(d.total?' ('+d.total+')':'');
 }
 
 /* ---- Cadastro (só dados do produto) ---- */

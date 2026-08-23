@@ -103,7 +103,15 @@ skus ──┬── producao      (codigo)
 lote ───── devolucao     (venda_id → lote.id)
 ```
 
-Não há foreign keys declaradas. As ligações são por convenção de código.
+As ligações por `codigo` são por convenção de código, sem foreign key.
+
+> ⚠️ As **únicas** foreign keys do schema são `skus.modelo_id → modelo(id)` e
+> `skus.cor_codigo → cor(codigo)`, da Fase 0 de Compras. E elas **são
+> aplicadas**: o `better-sqlite3` liga `PRAGMA foreign_keys` por padrão, ao
+> contrário do `sqlite3` de linha de comando. Gravar um `modelo_id` ou
+> `cor_codigo` inexistente derruba o INSERT — por isso o `POST /api/skus`
+> valida os dois e transforma desconhecido em NULL, que cai em pendências.
+> Quem editar o banco pelo CLI não tem essa rede.
 
 ### Tabelas
 
@@ -111,11 +119,38 @@ Não há foreign keys declaradas. As ligações são por convenção de código.
 ```sql
 codigo     TEXT PRIMARY KEY
 descricao  TEXT DEFAULT ''
-cor        TEXT DEFAULT ''
+cor        TEXT DEFAULT ''     -- texto livre, legado (ver cor_codigo)
 estoque    INTEGER DEFAULT 0     -- peças prontas e embaladas
 alvo       INTEGER DEFAULT 0     -- meta de estoque
 criado_em  TEXT
+-- Compras Fase 0. Nulo = pendente; nunca zero. Ver GET /api/skus/pendencias.
+modelo_id  INTEGER REFERENCES modelo(id)
+largura_cm INTEGER               -- centímetros inteiros
+altura_cm  INTEGER               -- centímetros inteiros
+cor_codigo TEXT REFERENCES cor(codigo)
 ```
+
+> Medida e cor se leem **destas colunas**, não do código do SKU. `medidaDe()`
+> (`public/sku.js`) é conveniência de digitação no cadastro, não fonte da
+> verdade. As colunas nascem em `sku_schema.js`, que o `db.js` chama no boot e
+> o `migrar_sku.js` chama sozinho.
+
+#### `cor` — lista fechada de cores (Compras Fase 0)
+```sql
+codigo TEXT PRIMARY KEY   -- forma canônica, maiúscula: 'BEGE'
+nome   TEXT               -- rótulo de tela: 'Bege'
+ativa  INTEGER DEFAULT 1  -- desativa, não apaga: pode haver SKU apontando
+```
+
+#### `modelo` — linha de produto (Compras Fase 0)
+```sql
+id        INTEGER PK
+codigo    TEXT UNIQUE     -- o prefixo do SKU: 'BK'
+nome      TEXT            -- 'Persiana Rolô Blackout'
+ativo     INTEGER DEFAULT 1
+criado_em TEXT
+```
+Só cadastro nesta fase. As fórmulas da ficha técnica penduram aqui na Fase 2.
 
 #### `producao` — ordens de produção
 ```sql
@@ -301,7 +336,18 @@ atualizado  TEXT
 | GET | `/api/skus` | Lista todos |
 | POST | `/api/skus` | Cria/atualiza · **destrava volumes bloqueados** |
 | DELETE | `/api/skus/:codigo` | Remove o cadastro |
+| GET | `/api/skus/pendencias` | SKUs incompletos, em 3 grupos — `sku.cadastrar` |
 | POST | `/api/estoque` | Define (`estoque`) ou soma (`delta`) — **admin** |
+
+### Cor e modelo (`sku_route.js`) — Compras Fase 0
+| Método | Rota | Efeito |
+|---|---|---|
+| GET | `/api/cores` | Lista (inclui as inativas, com a flag) |
+| POST | `/api/cores` | Cria/renomeia pelo código — `sku.cadastrar` |
+| DELETE | `/api/cores/:codigo` | **Desativa**, não apaga — `sku.cadastrar` |
+| GET | `/api/modelos` | Lista (inclui os inativos, com a flag) |
+| POST | `/api/modelos` | Cria/renomeia pelo código — `modelo.cadastrar` |
+| DELETE | `/api/modelos/:id` | **Desativa**, não apaga — `modelo.cadastrar` |
 
 ### Produção
 | Método | Rota | Efeito |
