@@ -14,9 +14,13 @@
   .wrap{max-width:1200px;margin:0 auto;padding:22px}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:18px}
   label{display:block;font-size:12px;color:var(--muted);margin:0 0 4px;text-transform:uppercase;letter-spacing:.05em}
-  input{width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:#0b0f14;color:var(--txt);font-size:15px}
+  input,select{width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:#0b0f14;color:var(--txt);font-size:15px}
   .grid{display:grid;grid-template-columns:2fr 3fr 2fr;gap:10px;align-items:end}
-  @media(max-width:700px){.grid{grid-template-columns:1fr}}
+  /* Compras Fase 0: modelo, largura, altura e cor da lista */
+  .grid-med{display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:10px;align-items:end;margin-top:12px}
+  .mcrow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+  .mcrow .code{min-width:96px}
+  @media(max-width:700px){.grid,.grid-med{grid-template-columns:1fr}}
   button{cursor:pointer;border:0;border-radius:9px;font-weight:600;font-size:14px;padding:11px 16px}
   .primary{background:var(--amber);color:#1a1300}.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
   .small{font-size:12px;padding:7px 12px}
@@ -149,11 +153,24 @@
       <div class="grid">
         <div><label>Código (SKU)</label><input id="codigo" placeholder="BK-BRANCO"></div>
         <div><label>Descrição</label><input id="descricao" placeholder="Persiana Blackout Branco"></div>
-        <div><label>Cor</label><input id="cor" placeholder="Branco"></div>
+        <div><label>Cor (descrição livre)</label><input id="cor" placeholder="Branco"></div>
       </div>
+      <div class="grid-med">
+        <div><label>Modelo</label><select id="modeloId"></select></div>
+        <div><label>Largura (cm)</label><input id="larguraCm" type="number" min="1" step="1" placeholder="180"></div>
+        <div><label>Altura (cm)</label><input id="alturaCm" type="number" min="1" step="1" placeholder="150"></div>
+        <div><label>Cor (lista)</label><select id="corCodigo"></select></div>
+      </div>
+      <div class="sub" style="margin-top:10px">Ao digitar um código no padrão, estes quatro campos se preenchem sozinhos — e continuam editáveis. Vale o que está no campo, não o que o código diz. Código fora da nomenclatura salva normalmente, com as medidas digitadas à mão.</div>
+      <div id="cadDica" style="margin-top:8px;font-size:13px"></div>
       <div class="row-actions"><button class="primary" onclick="salvar()">Salvar produto</button>
         <span class="sub">O estoque e a necessidade se definem na aba "Estoque".</span><span class="msg" id="msg"></span></div></div>
-    <div class="card"><table><thead><tr><th>Código</th><th>Descrição</th><th>Cor</th><th></th></tr></thead><tbody id="lista"></tbody></table></div>
+
+    <div class="card"><div style="font-weight:700;margin-bottom:4px">Modelos e cores</div>
+      <div class="sub" style="margin-bottom:14px">Listas fechadas. A migração criou estas linhas a partir dos códigos que já existiam, com o nome em branco — preencha revisando as grafias: <b>BEGE</b>, <b>BEGECLARO</b> e <b>BEGE CLARO</b> podem ser a mesma cor escrita de três jeitos. Desativar não apaga: SKU que já aponta para a linha continua apontando.</div>
+      <div id="mcBox" style="display:grid;grid-template-columns:1fr 1fr;gap:22px"></div></div>
+
+    <div class="card"><table><thead><tr><th>Código</th><th>Descrição</th><th>Medida</th><th>Modelo</th><th>Cor</th><th></th></tr></thead><tbody id="lista"></tbody></table></div>
   </div>
 </div>
 <script src="/sku.js"></script>
@@ -187,23 +204,155 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.t==="acs" && ifa && !ifa.dataset.l){ ifa.src="/acessos"; ifa.dataset.l=1; }
 });
 async function carregar(){
+  await carregarListas();   // antes do renderCad: a lista de SKU mostra o nome do modelo
   SKUS=await (await fetch('/api/skus')).json();
   renderCad(); renderSel(); renderEst(); carregarHoje();
 }
+
+/* ---- Compras Fase 0: modelo, medida e cor ------------------------------
+   Depois desta fase, medida e cor se leem das COLUNAS de skus. medidaDe()
+   (de /sku.js) so preenche o formulario quando alguem digita o codigo — e
+   conveniencia de digitacao, nao fonte da verdade. O que salva e o campo. */
+let MODELOS=[], CORES=[];
+const esc=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+const rotuloLista=x=>x.nome?x.nome+' ('+x.codigo+')':x.codigo;
+
+async function carregarListas(){
+  try{ MODELOS=await (await fetch('/api/modelos')).json(); }catch(e){ MODELOS=[]; }
+  try{ CORES  =await (await fetch('/api/cores')).json();   }catch(e){ CORES=[]; }
+  encherSelects(); renderMC();
+}
+/* Guarda o valor escolhido ao repovoar, e garante a opcao de um modelo/cor
+   DESATIVADO que o SKU em edicao ainda aponta — senao o select silenciosamente
+   voltaria para vazio e o "Salvar" apagaria o vinculo. */
+function encherSelects(){
+  const m=$('#modeloId'), c=$('#corCodigo');
+  if(!m||!c) return;
+  const vm=m.value, vc=c.value;
+  m.innerHTML='<option value="">— sem modelo —</option>'+
+    MODELOS.filter(x=>x.ativo).map(x=>'<option value="'+x.id+'">'+esc(rotuloLista(x))+'</option>').join('');
+  c.innerHTML='<option value="">— sem cor —</option>'+
+    CORES.filter(x=>x.ativa).map(x=>'<option value="'+esc(x.codigo)+'">'+esc(rotuloLista(x))+'</option>').join('');
+  m.value=vm; c.value=vc;
+}
+function garantirOpcao(sel,valor,texto){
+  if(!sel||!valor) return;
+  sel.value=valor;
+  if(sel.value!==String(valor)){
+    const o=document.createElement('option');
+    o.value=valor; o.textContent=texto+' (inativo)';
+    sel.appendChild(o); sel.value=valor;
+  }
+}
+/* So dispara quando a PESSOA digita: o botao "editar" preenche o campo por
+   codigo, o que nao emite 'input', entao o valor guardado nao e sobrescrito
+   pelo que o codigo sugere. */
+function preencherDoCodigo(){
+  const p=(typeof medidaDe==='function')?medidaDe($('#codigo').value.trim()):null;
+  const el=$('#cadDica');
+  if(!p){ if(el) el.innerHTML=''; return; }   // fora do padrao: nao mexe no que foi digitado
+  $('#larguraCm').value=p.larg;
+  $('#alturaCm').value=p.alt;
+  const mo=MODELOS.find(x=>x.codigo===p.fam && x.ativo);
+  const co=CORES.find(x=>x.codigo===p.cor && x.ativa);
+  $('#modeloId').value=mo?mo.id:'';
+  $('#corCodigo').value=co?co.codigo:'';
+  if(!el) return;
+  const falta=[];
+  if(!mo) falta.push('<button class="ghost small" data-novo-modelo="'+esc(p.fam)+'">cadastrar modelo '+esc(p.fam)+'</button>');
+  if(!co) falta.push('<button class="ghost small" data-nova-cor="'+esc(p.cor)+'">cadastrar cor '+esc(p.cor)+'</button>');
+  el.innerHTML=falta.length?'<span style="color:var(--amber)">Ainda não está na lista: </span>'+falta.join(' '):'';
+}
+/* Preenchimento automatico ao digitar o codigo. */
+document.addEventListener('input',function(e){ if(e.target&&e.target.id==='codigo') preencherDoCodigo(); });
+
+/* Nome de modelo/cor: grava ao sair do campo. POST faz upsert pelo codigo. */
+document.addEventListener('change',async function(e){
+  const n=e.target.closest&&e.target.closest('.mcNome'); if(!n) return;
+  const rota=n.dataset.tipo==='cor'?'/api/cores':'/api/modelos';
+  await fetch(rota,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({codigo:n.dataset.cod,nome:n.value.trim()})});
+  carregarListas();
+});
+
+document.addEventListener('click',async function(e){
+  const add=e.target.closest&&e.target.closest('.mcAdd');
+  if(add){
+    const cor=add.dataset.tipo==='cor';
+    const cod=$(cor?'#mcCorCod':'#mcModCod'), nome=$(cor?'#mcCorNome':'#mcModNome');
+    if(!cod.value.trim()) return;
+    await fetch(cor?'/api/cores':'/api/modelos',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({codigo:cod.value.trim(),nome:nome.value.trim()})});
+    cod.value=nome.value=''; carregarListas(); return;
+  }
+  const off=e.target.closest&&e.target.closest('.mcOff');
+  if(off){
+    const cor=off.dataset.tipo==='cor';
+    if(!confirm('Desativar '+off.dataset.id+'? Quem já aponta para ela continua apontando.')) return;
+    await fetch((cor?'/api/cores/':'/api/modelos/')+encodeURIComponent(off.dataset.id),{method:'DELETE'});
+    carregarListas(); return;
+  }
+  /* Atalhos da dica: cadastra o que o codigo digitado sugeriu e ja seleciona. */
+  const nm=e.target.closest&&e.target.closest('[data-novo-modelo]');
+  if(nm){ await fetch('/api/modelos',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({codigo:nm.dataset.novoModelo})}); await carregarListas(); preencherDoCodigo(); return; }
+  const nc=e.target.closest&&e.target.closest('[data-nova-cor]');
+  if(nc){ await fetch('/api/cores',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({codigo:nc.dataset.novaCor})}); await carregarListas(); preencherDoCodigo(); return; }
+});
+
+function limparCad(){
+  $('#codigo').value=$('#descricao').value=$('#cor').value='';
+  $('#larguraCm').value=$('#alturaCm').value='';
+  $('#modeloId').value=''; $('#corCodigo').value='';
+  const el=$('#cadDica'); if(el) el.innerHTML='';
+}
+function renderMC(){
+  const el=$('#mcBox'); if(!el) return;
+  let h='<div><div class="sub" style="margin-bottom:8px">MODELOS</div>';
+  for(const m of MODELOS)
+    h+='<div class="mcrow"'+(m.ativo?'':' style="opacity:.45"')+'><span class="code">'+esc(m.codigo)+'</span>'
+      +'<input class="mcNome" data-tipo="modelo" data-cod="'+esc(m.codigo)+'" value="'+esc(m.nome)+'" placeholder="nome do modelo">'
+      +(m.ativo?'<button class="ghost small mcOff" data-tipo="modelo" data-id="'+m.id+'">desativar</button>'
+               :'<span class="sub">inativo</span>')+'</div>';
+  h+='<div class="mcrow"><input id="mcModCod" placeholder="código (ex.: BK)"><input id="mcModNome" placeholder="nome">'
+    +'<button class="primary small mcAdd" data-tipo="modelo">Adicionar</button></div></div>';
+
+  h+='<div><div class="sub" style="margin-bottom:8px">CORES</div>';
+  for(const c of CORES)
+    h+='<div class="mcrow"'+(c.ativa?'':' style="opacity:.45"')+'><span class="code">'+esc(c.codigo)+'</span>'
+      +'<input class="mcNome" data-tipo="cor" data-cod="'+esc(c.codigo)+'" value="'+esc(c.nome)+'" placeholder="nome da cor">'
+      +(c.ativa?'<button class="ghost small mcOff" data-tipo="cor" data-id="'+esc(c.codigo)+'">desativar</button>'
+               :'<span class="sub">inativa</span>')+'</div>';
+  h+='<div class="mcrow"><input id="mcCorCod" placeholder="código (ex.: BEGE)"><input id="mcCorNome" placeholder="nome">'
+    +'<button class="primary small mcAdd" data-tipo="cor">Adicionar</button></div></div>';
+  el.innerHTML=h;
+}
+
 /* ---- Cadastro (só dados do produto) ---- */
 function renderCad(){
-  $('#lista').innerHTML = SKUS.map(s=>`<tr><td class="code">${s.codigo}</td><td>${s.descricao||''}</td><td>${s.cor||''}</td>
-    <td><button class="ghost small" data-etq="${s.codigo}" style="margin-right:6px">etiqueta</button><button class="ghost small" data-edit="${s.codigo}" style="margin-right:6px">editar</button><button class="del" data-del="${s.codigo}">excluir</button></td></tr>`).join('')
-    || '<tr><td colspan="4" style="color:#8b97a5;padding:20px">Nenhum SKU. Cadastre aqui.</td></tr>';
+  const nomeModelo=id=>{ const m=MODELOS.find(x=>x.id===id); return m?esc(m.nome||m.codigo):'<span style="color:var(--amber)">—</span>'; };
+  const pend='<span style="color:var(--amber)">—</span>';
+  $('#lista').innerHTML = SKUS.map(s=>`<tr><td class="code">${esc(s.codigo)}</td><td>${esc(s.descricao)}</td>
+    <td>${(s.largura_cm&&s.altura_cm)?s.largura_cm+' × '+s.altura_cm:pend}</td>
+    <td>${nomeModelo(s.modelo_id)}</td><td>${s.cor_codigo?esc(s.cor_codigo):pend}</td>
+    <td><button class="ghost small" data-etq="${esc(s.codigo)}" style="margin-right:6px">etiqueta</button><button class="ghost small" data-edit="${esc(s.codigo)}" style="margin-right:6px">editar</button><button class="del" data-del="${esc(s.codigo)}">excluir</button></td></tr>`).join('')
+    || '<tr><td colspan="6" style="color:#8b97a5;padding:20px">Nenhum SKU. Cadastre aqui.</td></tr>';
 }
 async function salvar(){
   const codigo=$('#codigo').value.trim();
   if(!codigo){$('#msg').textContent='Informe o código';$('#msg').style.color='#f85149';return;}
   // preserva estoque/alvo se o SKU já existir
   const ex=SKUS.find(s=>s.codigo.toUpperCase()===codigo.toUpperCase())||{estoque:0,alvo:0};
-  await fetch('/api/skus',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigo,descricao:$('#descricao').value,cor:$('#cor').value,estoque:ex.estoque,alvo:ex.alvo})});
+  // Campo vazio vai como null, nunca 0: onde não há dado, o SKU tem que aparecer
+  // em pendências em vez de gravar uma medida que ninguém conferiu.
+  const vazio=v=>{ const t=String(v==null?'':v).trim(); return t===''?null:t; };
+  await fetch('/api/skus',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    codigo,descricao:$('#descricao').value,cor:$('#cor').value,estoque:ex.estoque,alvo:ex.alvo,
+    modelo_id:vazio($('#modeloId').value), largura_cm:vazio($('#larguraCm').value),
+    altura_cm:vazio($('#alturaCm').value), cor_codigo:vazio($('#corCodigo').value)})});
   $('#msg').style.color='#2ea043';$('#msg').textContent='Salvo!';setTimeout(()=>$('#msg').textContent='',1500);
-  $('#codigo').value=$('#descricao').value=$('#cor').value='';carregar();
+  limparCad();carregar();
 }
 /* ---- Estoque & Necessidade ---- */
 function renderEst(){
@@ -253,7 +402,15 @@ async function carregarHoje(){
 }
 /* ---- ações (delegação de clique) ---- */
 document.addEventListener("click",async e=>{
-  const ed=e.target.closest("[data-edit]"); if(ed){ const s=SKUS.find(x=>x.codigo===ed.dataset.edit)||{}; const cadTab=document.querySelector(".tab[data-t=\"cad\"]"); if(cadTab) cadTab.click(); $("#codigo").value=s.codigo||""; $("#descricao").value=s.descricao||""; $("#cor").value=s.cor||""; $("#codigo").focus(); window.scrollTo(0,0); return; }
+  const ed=e.target.closest("[data-edit]"); if(ed){ const s=SKUS.find(x=>x.codigo===ed.dataset.edit)||{}; const cadTab=document.querySelector(".tab[data-t=\"cad\"]"); if(cadTab) cadTab.click(); $("#codigo").value=s.codigo||""; $("#descricao").value=s.descricao||""; $("#cor").value=s.cor||"";
+    /* atribuir .value nao dispara 'input', entao o preenchimento automatico nao
+       roda aqui: o que foi corrigido a mao e o que aparece. */
+    $("#larguraCm").value=(s.largura_cm==null?"":s.largura_cm); $("#alturaCm").value=(s.altura_cm==null?"":s.altura_cm);
+    $("#modeloId").value=""; $("#corCodigo").value="";
+    if(s.modelo_id!=null){ const m=MODELOS.find(x=>x.id===s.modelo_id); garantirOpcao($("#modeloId"),s.modelo_id,m?(m.nome||m.codigo):("modelo "+s.modelo_id)); }
+    if(s.cor_codigo) garantirOpcao($("#corCodigo"),s.cor_codigo,s.cor_codigo);
+    const dc=$("#cadDica"); if(dc) dc.innerHTML="";
+    $("#codigo").focus(); window.scrollTo(0,0); return; }
   const del=e.target.closest("[data-del]"); if(del){ if(confirm("Excluir "+del.dataset.del+"?")){ await fetch("/api/skus/"+encodeURIComponent(del.dataset.del),{method:"DELETE"}); carregar(); } return; }
   const adj=e.target.closest("[data-adj]"); if(adj){ await fetch("/api/estoque",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({codigo:adj.dataset.adj,delta:+adj.dataset.d})}); carregar(); return; }
   const se=e.target.closest("[data-setestbtn]"); if(se){ const inp=document.querySelector("[data-setest=\""+se.dataset.setestbtn+"\"]"); await fetch("/api/estoque",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({codigo:se.dataset.setestbtn,estoque:+inp.value||0})}); carregar(); return; }

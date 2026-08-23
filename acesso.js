@@ -428,7 +428,16 @@ module.exports = function(app, db){
     if(M !== 'GET' && eq('/api/producao')) return 'producao.lancar';
     if(M !== 'GET' && pre('/api/planejamento')) return 'planilha.importar';
     if(M !== 'GET' && eq('/api/skus')) return 'sku.cadastrar';
+    // Antes do DELETE generico: /api/skus/pendencias e leitura da tela de
+    // cadastro, nao exclusao de SKU.
+    if(eq('/api/skus/pendencias')) return 'sku.cadastrar';
     if(M === 'DELETE' && pre('/api/skus')) return 'sku.excluir';
+    // Compras Fase 0. As duas leituras ficam '@logado' por DECISAO, nao por
+    // omissao: sao listas de apoio de tela, sem dado sensivel, como GET
+    // /api/skus e GET /api/listas/:tipo.
+    if(M !== 'GET' && pre('/api/cores')) return 'sku.cadastrar';
+    if(M !== 'GET' && pre('/api/modelos')) return 'modelo.cadastrar';
+    if(eq('/api/cores') || eq('/api/modelos')) return '@logado';
     if(M !== 'GET' && eq('/api/cruzamento/aplicar')) return 'producao.lancar';
     // contagem em dois passos (secao 9): aprovar/rejeitar o pendente exige
     // contagem.ajustar; contar e ENVIAR (que pode virar pendente) exige so
@@ -535,6 +544,8 @@ module.exports = function(app, db){
     ['POST','/api/carregar'],['POST','/api/lote/upload'],['GET','/api/print/:id'],['POST','/api/devolucao'],
     ['POST','/api/devolucao/baixa'],['POST','/api/estoque'],['POST','/api/alvo'],['POST','/api/necessidade/aplicar'],
     ['POST','/api/producao'],['POST','/api/planejamento/importar'],['POST','/api/skus'],['DELETE','/api/skus/:c'],
+    ['GET','/api/skus/pendencias'],['GET','/api/cores'],['POST','/api/cores'],['DELETE','/api/cores/:c'],
+    ['GET','/api/modelos'],['POST','/api/modelos'],['DELETE','/api/modelos/:id'],
     ['POST','/api/cruzamento/aplicar'],['POST','/api/contagem/bipe'],['POST','/api/contagem/ajustar'],
     ['POST','/api/contagem/lancar'],['GET','/api/contagem/pendentes'],['POST','/api/contagem/pendentes/aprovar'],
     ['POST','/api/contagem/pendentes/rejeitar'],

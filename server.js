@@ -8,13 +8,52 @@ require('./auth')(app, db);
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/skus', (req,res)=> res.json(db.prepare('SELECT * FROM skus ORDER BY codigo').all()));
+/* Compras Fase 0: o que a tela grava e o que esta NOS CAMPOS, nunca o que o
+   codigo do SKU diz. Quem cadastra corrige o preenchimento automatico, e um SKU
+   fora da nomenclatura salva normalmente com as medidas digitadas a mao.
+
+   Medida vazia vira NULL, nunca 0 — e por isso que <=0 tambem vira NULL: um
+   zero gravado passaria batido pela tela de pendencias e viraria uma mentira
+   silenciosa na formula da ficha tecnica. Melhor a linha aparecer como pendente.
+
+   Campo AUSENTE do corpo nao e o mesmo que campo VAZIO: ausente preserva o que
+   ja esta no banco. Sem isso, qualquer chamador antigo que so mande
+   codigo/descricao/cor apagaria a medida de um SKU ja migrado. */
+const cmDe = v => { const n = parseInt(v,10); return (Number.isFinite(n) && n>0) ? n : null; };
 app.post('/api/skus', (req,res)=>{
-  const {codigo,descricao='',cor='',estoque=0,alvo=0}=req.body||{};
+  const b=req.body||{};
+  const {codigo,descricao='',cor='',estoque=0,alvo=0}=b;
   if(!codigo||!codigo.trim()) return res.status(400).json({erro:'código obrigatório'});
-  db.prepare(`INSERT INTO skus (codigo,descricao,cor,estoque,alvo) VALUES (?,?,?,?,?)
-    ON CONFLICT(codigo) DO UPDATE SET descricao=excluded.descricao,cor=excluded.cor,estoque=excluded.estoque,alvo=excluded.alvo`)
-    .run(codigo.trim().toUpperCase(),descricao,cor,+estoque||0,+alvo||0);
-  try{ db.prepare("UPDATE lote SET estagio='pendente' WHERE estagio='bloqueado' AND codigo=?").run(codigo.trim().toUpperCase()); }catch(e){}
+  const cod=codigo.trim().toUpperCase();
+  const atual=db.prepare('SELECT modelo_id,largura_cm,altura_cm,cor_codigo FROM skus WHERE codigo=?').get(cod)||{};
+  const manda=(k,novo)=> (k in b) ? novo : (atual[k]===undefined?null:atual[k]);
+
+  let modeloId=null;
+  if('modelo_id' in b){
+    const id=parseInt(b.modelo_id,10);
+    // id que nao existe vira NULL: o SKU aparece em pendencias em vez de apontar
+    // para um modelo fantasma.
+    modeloId=Number.isFinite(id)&&db.prepare('SELECT 1 FROM modelo WHERE id=?').get(id) ? id : null;
+  } else modeloId=atual.modelo_id===undefined?null:atual.modelo_id;
+
+  let corCod=null;
+  if('cor_codigo' in b){
+    // Mesmo tratamento do modelo: cor que nao esta na lista vira NULL e o SKU
+    // aparece em pendencias. Nao e so higiene — as colunas novas sao as
+    // primeiras FKs do schema e o better-sqlite3 liga foreign_keys por padrao,
+    // entao um codigo desconhecido derrubaria o INSERT com 500. Cadastro nunca
+    // bloqueia (§3 do CLAUDE.md): registra o que da e sinaliza o que falta.
+    const c=String(b.cor_codigo||'').trim().toUpperCase();
+    corCod=(c&&db.prepare('SELECT 1 FROM cor WHERE codigo=?').get(c))?c:null;
+  } else corCod=atual.cor_codigo===undefined?null:atual.cor_codigo;
+
+  db.prepare(`INSERT INTO skus (codigo,descricao,cor,estoque,alvo,modelo_id,largura_cm,altura_cm,cor_codigo)
+    VALUES (?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(codigo) DO UPDATE SET descricao=excluded.descricao,cor=excluded.cor,estoque=excluded.estoque,alvo=excluded.alvo,
+      modelo_id=excluded.modelo_id,largura_cm=excluded.largura_cm,altura_cm=excluded.altura_cm,cor_codigo=excluded.cor_codigo`)
+    .run(cod,descricao,cor,+estoque||0,+alvo||0,
+      modeloId, manda('largura_cm',cmDe(b.largura_cm)), manda('altura_cm',cmDe(b.altura_cm)), corCod);
+  try{ db.prepare("UPDATE lote SET estagio='pendente' WHERE estagio='bloqueado' AND codigo=?").run(cod); }catch(e){}
   res.json({ok:true});
 });
 app.delete('/api/skus/:codigo',(req,res)=>{ db.prepare('DELETE FROM skus WHERE codigo=?').run(req.params.codigo); res.json({ok:true}); });
@@ -83,6 +122,9 @@ require('./etq_route')(app, db);
 require('./dev_route')(app, db);
 app.get('/devolucao',(req,res)=> res.sendFile(path.join(__dirname,'public','devolucao.html')));
 require('./cad_route')(app, db);
+// Antes do acesso.js: as rotas de cor/modelo/pendencias precisam existir quando
+// a cobertura de permissoes for montada.
+require('./sku_route')(app, db);
 require('./ger_route')(app, db);
 require('./st_route')(app, db);
 // Controle de Acesso — Fase 1 (roda em paralelo; NAO decide acesso ainda).

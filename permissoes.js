@@ -52,6 +52,11 @@ module.exports = [
   { chave:'sku.excluir',          grupo:'Planejamento', nivel:'admin',
     rotulo:'Excluir SKU',         desc:'Remover produto do cadastro',
     sensivel:true },
+  // O cadastro de COR fica sob sku.cadastrar — e a mesma tela e a mesma pessoa.
+  // Modelo e permissao propria: na Fase 2 e ele que carrega as formulas da
+  // ficha tecnica, e quem mexe numa formula mexe no consumo de material.
+  { chave:'modelo.cadastrar',     grupo:'Planejamento', nivel:'admin',
+    rotulo:'Cadastrar modelo de produto', desc:'Linhas de produto e suas fórmulas' },
   { chave:'bloqueio.liberar',     grupo:'Planejamento', nivel:'admin',
     rotulo:'Desbloquear volumes', desc:'Liberar volumes com SKU desconhecido' },
 
