@@ -37,28 +37,29 @@ const alvo   = args.filter(function(a){ return a.indexOf('--') !== 0; })[0]
              || '/opt/expedicao/dados.db';
 
 console.log('Banco : ' + path.resolve(alvo));
-console.log('Modo  : ' + (dry ? 'SIMULACAO (--dry) — nada sera gravado' : 'APLICAR'));
+console.log('Modo  : ' + (dry ? 'SIMULACAO (--dry) — nada sera gravado, nem as tabelas novas' : 'APLICAR'));
 console.log('');
 
 const db = new Database(alvo);
-garantirSchema(db);   // a migracao roda sozinha, sem depender do boot do servidor
 
-const skus = db.prepare('SELECT codigo, modelo_id, largura_cm, altura_cm, cor_codigo FROM skus ORDER BY codigo').all();
-
-/* ── 1. decompor ─────────────────────────────────────────────────────────── */
+let skus = [];
 const cores = new Set(), modelos = new Set(), foraDoPadrao = [];
 const lidos = [];
-for(const s of skus){
-  const p = medidaDe(s.codigo);
-  if(!p){ foraDoPadrao.push(s.codigo); continue; }
-  cores.add(p.cor); modelos.add(p.fam);
-  lidos.push({ sku:s, p:p });
+let novasCores = 0, novosModelos = 0, preenchidos = 0, jaTinham = 0;
+
+/* ── 1. decompor ─────────────────────────────────────────────────────────── */
+function decompor(){
+  skus = db.prepare('SELECT codigo, modelo_id, largura_cm, altura_cm, cor_codigo FROM skus ORDER BY codigo').all();
+  for(const s of skus){
+    const p = medidaDe(s.codigo);
+    if(!p){ foraDoPadrao.push(s.codigo); continue; }
+    cores.add(p.cor); modelos.add(p.fam);
+    lidos.push({ sku:s, p:p });
+  }
 }
 
 /* ── 2. gravar ───────────────────────────────────────────────────────────── */
-let novasCores = 0, novosModelos = 0, preenchidos = 0, jaTinham = 0;
-
-const aplicar = db.transaction(function(){
+const aplicar = function(){
   const insCor = db.prepare('INSERT OR IGNORE INTO cor (codigo, nome) VALUES (?, NULL)');
   const insMod = db.prepare('INSERT OR IGNORE INTO modelo (codigo, nome) VALUES (?, NULL)');
   /* `nome` fica em branco de proposito, nos dois casos: e o rotulo de tela, e
@@ -83,15 +84,21 @@ const aplicar = db.transaction(function(){
                         largura_cm:it.p.larg, altura_cm:it.p.alt, cor_codigo:it.p.cor });
     if(r.changes) preenchidos++; else jaTinham++;
   }
-});
+};
 
-if(dry){
-  /* Roda tudo e desfaz: o relatorio sai identico ao da execucao real, sem
-     deixar rastro. E o unico jeito honesto de simular. */
-  db.exec('BEGIN'); try{ aplicar(); } finally { db.exec('ROLLBACK'); }
-} else {
+/* Uma transacao so, do CREATE/ALTER ate o ultimo UPDATE. No SQLite o DDL e
+   transacional, entao o ROLLBACK do --dry desfaz TAMBEM as tabelas e as colunas
+   novas — sem isso, "simular" ainda deixaria o schema alterado no banco de
+   producao, que e o oposto do que a palavra promete. */
+let erro = null;
+db.exec('BEGIN');
+try{
+  garantirSchema(db);   // a migracao roda sozinha, sem depender do boot do servidor
+  decompor();
   aplicar();
-}
+}catch(e){ erro = e; }
+db.exec((dry || erro) ? 'ROLLBACK' : 'COMMIT');
+if(erro){ console.error('\nNada foi gravado — a transacao inteira foi desfeita.\n'); throw erro; }
 
 /* ── 3. relatorio ────────────────────────────────────────────────────────── */
 const um = function(sql){ return db.prepare(sql).get().c; };
