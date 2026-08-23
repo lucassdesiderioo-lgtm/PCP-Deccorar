@@ -151,6 +151,52 @@ function garantirSchemaCompras(db){
     );
     CREATE INDEX IF NOT EXISTS idx_custo_sku ON custo_sku_historico(sku, data);
 
+    /* ── PEDIDO DE COMPRA (§8, §9) ────────────────────────────────────────────
+       Um pedido por fornecedor: comprar 6 itens do mesmo fornecedor e UM pedido,
+       nao seis. Sem aprovacao por valor — decisao explicita do §8. */
+    CREATE TABLE IF NOT EXISTS pedido_compra (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      numero         TEXT UNIQUE,             -- PC-000142
+      fornecedor_id  INTEGER REFERENCES fornecedor(id),
+      status         TEXT DEFAULT 'rascunho', -- rascunho|enviado|parcial|recebido|cancelado
+      valor_previsto REAL,
+      valor_pago     REAL,
+      frete          REAL DEFAULT 0,
+      previsao       TEXT,
+      observacao     TEXT,
+      criado_por     TEXT,
+      criado_em      TEXT DEFAULT (datetime('now','localtime')),
+      enviado_em     TEXT,
+      enviado_por    TEXT,                    -- pdf | whatsapp | outro
+      fechado_em     TEXT,
+      motivo_fecho   TEXT,
+      pago_em        TEXT,                    -- §8: uma marca, nao contas a pagar
+      pago_por       TEXT,
+      data           TEXT DEFAULT (date('now','localtime')),
+      teste          INTEGER DEFAULT 0
+    );
+
+    /* Regra 9 do §13: o pedido CONGELA embalagem, fator e preco no momento em
+       que e criado — mesma logica da reserva congelar a ficha tecnica. Se o
+       preco do cadastro mudar amanha, o que foi pedido hoje nao muda junto. */
+    CREATE TABLE IF NOT EXISTS pedido_item (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      pedido_id      INTEGER REFERENCES pedido_compra(id),
+      oferta_id      INTEGER REFERENCES oferta(id),
+      componente_id  INTEGER REFERENCES componente(id),
+      sku            TEXT,
+      embalagem      TEXT,
+      fator          REAL,
+      preco_unit     REAL,
+      qtd_embalagem  REAL,
+      qtd_consumo    REAL,
+      qtd_recebida   REAL DEFAULT 0,
+      preco_pago     REAL,
+      motivo_escolha TEXT,   -- regra 11: escolher fora do melhor preco exige motivo
+      status         TEXT DEFAULT 'aberto'    -- aberto|parcial|recebido|cancelado
+    );
+    CREATE INDEX IF NOT EXISTS idx_pedido_item_aberto ON pedido_item(componente_id, status);
+
     /* ── FICHA POR FORMULA (§3) ───────────────────────────────────────────────
        A decisao que reduz o projeto: a ficha nao e uma lista digitada por SKU, e
        uma FORMULA sobre a medida, lancada UMA VEZ no modelo. Com 200 SKUs e 3

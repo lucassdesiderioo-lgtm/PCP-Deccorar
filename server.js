@@ -159,6 +159,7 @@ require('./cad_route')(app, db);
 require('./sku_route')(app, db);
 require('./compras_route')(app, db);
 require('./ficha_route')(app, db);
+require('./pedido_route')(app, db);
 require('./ger_route')(app, db);
 require('./st_route')(app, db);
 // Controle de Acesso — Fase 1 (roda em paralelo; NAO decide acesso ainda).

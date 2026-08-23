@@ -173,6 +173,12 @@
       <button class="ghost" id="lcVer">Atualizar</button></div>
       <div id="lcRes" style="margin-top:14px"></div></div>
 
+    <div class="card"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div><div style="font-weight:700">Pedidos</div>
+        <div class="sub">Enviado, o item passa a contar como <b>a caminho</b> e sai da lista de compras.</div></div>
+      <button class="ghost" id="pdVer">Atualizar</button></div>
+      <div id="pdRes" style="margin-top:14px"></div></div>
+
     <div class="card"><div style="font-weight:700;margin-bottom:4px">Ponto de pedido por componente</div>
       <div class="sub" style="margin-bottom:12px">Mínimo é quando disparar. Ideal é até onde encher.</div>
       <div id="lcMin"></div></div>
@@ -677,10 +683,12 @@ async function verLista(){
   let d; try{ d=await (await fetch('/api/compras/lista')).json(); }catch(e){ return; }
   if(!d.linhas.length){
     box.innerHTML='<div class="sub" style="color:var(--green)">✓ Nada abaixo do mínimo. Nenhuma compra necessária agora.</div>'; return; }
-  let h='<table><thead><tr><th>Componente</th><th>Disponível</th><th>Precisa</th><th>Melhor</th><th>Desembolso</th><th>Sobra</th></tr></thead><tbody>';
+  let h='<table><thead><tr><th style="width:26px"></th><th>Componente</th><th>Disponível</th><th>Precisa</th><th>Melhor</th><th>Desembolso</th><th>Sobra</th></tr></thead><tbody>';
   for(const l of d.linhas){
     const un=l.unidade||'';
-    h+='<tr><td>'+esc(l.nome)+'<div class="sub">mínimo '+qtd(l.minimo)+' · ideal '+qtd(l.ideal)
+    h+='<tr><td>'+(l.melhor?'<input type="checkbox" class="lcSel" style="width:auto" data-oferta="'+l.melhor.oferta_id
+        +'" data-precisa="'+l.precisa+'" checked>':'')+'</td>'
+      +'<td>'+esc(l.nome)+'<div class="sub">mínimo '+qtd(l.minimo)+' · ideal '+qtd(l.ideal)
       +(l.a_caminho>0?' · a caminho '+qtd(l.a_caminho):'')+'</div></td>'
       +'<td'+(l.disponivel<=l.minimo?' style="color:var(--amber)"':'')+'>'+qtd(l.disponivel)+' '+esc(un)+'</td>'
       +'<td><b>'+qtd(l.precisa)+' '+esc(un)+'</b></td>'
@@ -693,7 +701,10 @@ async function verLista(){
   h+='</tbody></table><div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap;gap:8px">'
     +'<span class="sub">'+d.itens+' item(ns) · por fornecedor: '
     +Object.keys(d.por_fornecedor).map(f=>esc(f)+' ('+d.por_fornecedor[f].itens+')').join(' · ')+'</span>'
-    +'<span style="font-size:17px"><span class="sub">previsto: </span><b style="color:var(--amber);font-size:21px">'+brl(d.total)+'</b></span></div>';
+    +'<span style="font-size:17px"><span class="sub">previsto: </span><b style="color:var(--amber);font-size:21px">'+brl(d.total)+'</b></span></div>'
+    +'<div class="row-actions"><button class="primary" id="lcGerar">Gerar pedidos por fornecedor</button>'
+    +'<span class="sub">Um pedido por fornecedor — 6 itens do mesmo fornecedor é um pedido, não seis.</span>'
+    +'<span class="msg" id="lcGerMsg"></span></div>';
   /* O documento é explícito em não deixar o sistema parecer completo enquanto
      não é: sem o gatilho de demanda, esta lista só enxerga o ponto de pedido. */
   if(d.sem_demanda) h+='<div class="sub" style="margin-top:10px">Só o ponto de pedido por enquanto. O gatilho por demanda — explodir a ficha contra o que está planejado produzir — ainda não existe, então venda futura não aparece aqui.</div>';
@@ -709,11 +720,107 @@ async function verMinimos(){
       +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="estoque_ideal" type="number" step="0.01" value="'+(c.estoque_ideal||0)+'" style="width:110px"></td></tr>').join('')
     +'</tbody></table><span class="msg" id="lcMsg"></span>';
 }
-async function carregarListaCompras(){ await verMinimos(); await verLista(); }
+/* Pedidos (§8). O status conta a história: rascunho → enviado → parcial →
+   recebido. Enviado, o item passa a contar como "a caminho" na lista. */
+const ST={rascunho:'var(--muted)',enviado:'var(--amber)',parcial:'var(--amber)',
+          recebido:'var(--green)',cancelado:'var(--red)'};
+async function verPedidos(){
+  const box=$('#pdRes'); if(!box) return;
+  let l=[]; try{ l=await (await fetch('/api/pedidos')).json(); }catch(e){}
+  if(!l.length){ box.innerHTML='<div class="sub">Nenhum pedido ainda.</div>'; return; }
+  box.innerHTML='<table><thead><tr><th>Nº</th><th>Fornecedor</th><th>Itens</th><th>Valor</th><th>Status</th><th>Quando</th><th></th></tr></thead><tbody>'
+    +l.map(p=>'<tr><td class="code">'+esc(p.numero)+'</td><td>'+esc(p.fornecedor_nome)+'</td>'
+      +'<td>'+p.itens+'</td><td>'+brl(p.valor_previsto)+'</td>'
+      +'<td><b style="color:'+(ST[p.status]||'var(--muted)')+'">'+esc(p.status)+'</b>'
+      +(p.pago_em?' <span class="sub">· pago</span>':'')+'</td>'
+      +'<td class="sub">'+esc(String(p.criado_em||'').slice(0,16))+'</td>'
+      +'<td><button class="ghost small pdWa" data-id="'+p.id+'">WhatsApp</button> '
+      +'<button class="ghost small pdImp" data-id="'+p.id+'">imprimir</button>'
+      +(p.status==='rascunho'?' <button class="primary small pdEnv" data-id="'+p.id+'">enviar</button>':'')
+      +(p.status!=='cancelado'&&p.status!=='recebido'?' <button class="del pdCanc" data-id="'+p.id+'">cancelar</button>':'')
+      +'</td></tr>').join('')+'</tbody></table>';
+}
+/* Impressao no navegador, como a etiqueta ja faz — sem biblioteca de PDF no
+   servidor. "Salvar como PDF" na caixa de impressao resolve o anexo. */
+async function imprimirPedido(id){
+  let p; try{ p=await (await fetch('/api/pedidos/'+id)).json(); }catch(e){ return; }
+  const linhas=p.itens.map(i=>'<tr><td>'+esc(i.item)+(i.codigo_fornec?'<br><small>ref. '+esc(i.codigo_fornec)+'</small>':'')
+    +'</td><td class="n">'+qtd(i.qtd_embalagem)+' × '+esc(i.embalagem)+'</td>'
+    +'<td class="n">'+qtd(i.qtd_consumo)+' '+esc(i.unidade||'')+'</td>'
+    +'<td class="n">'+brl(i.preco_unit)+'</td><td class="n">'+brl(i.desembolso)+'</td></tr>').join('');
+  const w=window.open('','ped','width=800,height=900');
+  if(!w){ alert('O navegador bloqueou a janela. Libere o pop-up e tente de novo.'); return; }
+  w.document.write('<html><head><meta charset="utf-8"><title>'+esc(p.numero)+'</title><style>'
+    +'body{font-family:system-ui,sans-serif;margin:28px;color:#111}'
+    +'h1{font-size:20px;margin:0 0 2px}.sub{color:#666;font-size:13px}'
+    +'table{width:100%;border-collapse:collapse;margin-top:18px;font-size:13px}'
+    +'th,td{text-align:left;padding:7px 8px;border-bottom:1px solid #ddd}'
+    +'th{background:#f4f4f4}.n{text-align:right}'
+    +'tfoot td{font-weight:700;border-top:2px solid #111;border-bottom:0}'
+    +'</style></head><body>'
+    +'<h1>Pedido de compra '+esc(p.numero)+'</h1>'
+    +'<div class="sub">Deccorar · '+esc(String(p.criado_em||'').slice(0,10))+'</div>'
+    +'<div style="margin-top:14px"><b>'+esc(p.fornecedor_nome)+'</b>'
+    +(p.contato?'<br>A/C '+esc(p.contato):'')+(p.telefone?'<br>'+esc(p.telefone):'')
+    +(p.pagamento?'<br>Pagamento: '+esc(p.pagamento):'')+'</div>'
+    +'<table><thead><tr><th>Item</th><th class="n">Embalagens</th><th class="n">Total</th>'
+    +'<th class="n">R$/emb.</th><th class="n">Valor</th></tr></thead><tbody>'+linhas+'</tbody>'
+    +(p.frete>0?'<tr><td colspan="4" class="n">Frete</td><td class="n">'+brl(p.frete)+'</td></tr>':'')
+    +'<tfoot><tr><td colspan="4" class="n">Total</td><td class="n">'+brl(p.valor_previsto)+'</td></tr></tfoot>'
+    +'</table>'+(p.observacao?'<p class="sub">'+esc(p.observacao)+'</p>':'')
+    +'</body></html>');
+  w.document.close(); setTimeout(()=>w.print(),300);
+}
+async function carregarListaCompras(){ await verMinimos(); await verLista(); await verPedidos(); }
 
-document.addEventListener('click',function(e){
-  if(e.target&&e.target.id==='cpVer') compararItem();
-  if(e.target&&e.target.id==='lcVer') carregarListaCompras();
+document.addEventListener('click',async function(e){
+  const t=e.target; if(!t) return;
+  if(t.id==='cpVer'){ compararItem(); return; }
+  if(t.id==='lcVer'||t.id==='pdVer'){ carregarListaCompras(); return; }
+  if(t.id==='lcGerar'){
+    const sel=[...document.querySelectorAll('.lcSel:checked')]
+      .map(c=>({oferta_id:+c.dataset.oferta, necessidade:+c.dataset.precisa}));
+    if(!sel.length){ aviso('#lcGerMsg','Marque ao menos um item','var(--red)'); return; }
+    if(!confirm('Gerar pedidos para '+sel.length+' item(ns)? Eles nascem em RASCUNHO — nada é enviado agora.')) return;
+    const r=await fetch('/api/pedidos',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({itens:sel})});
+    const j=await r.json();
+    if(!r.ok){ aviso('#lcGerMsg', j.erro||'não deu','var(--red)'); return; }
+    aviso('#lcGerMsg', j.pedidos.length+' pedido(s) criado(s) em rascunho','var(--green)');
+    carregarListaCompras(); return;
+  }
+  const wa=t.closest&&t.closest('.pdWa');
+  if(wa){
+    const d=await (await fetch('/api/pedidos/'+wa.dataset.id+'/whatsapp')).json();
+    /* Copiar para a área de transferência é o caminho real: o fornecedor
+       pequeno recebe pedido por WhatsApp, e o texto vai colado. */
+    try{ await navigator.clipboard.writeText(d.texto); }catch(err){}
+    const zap=d.whatsapp&&String(d.whatsapp).replace(/\D/g,'');
+    if(zap && confirm('Texto copiado.\n\n'+d.texto+'\n\nAbrir a conversa no WhatsApp?'))
+      window.open('https://wa.me/'+(zap.length<=11?'55'+zap:zap)+'?text='+encodeURIComponent(d.texto),'_blank');
+    else if(!zap) alert('Texto copiado — cole no WhatsApp.\n\n'+d.texto
+      +'\n\n(Este fornecedor não tem WhatsApp cadastrado.)');
+    return;
+  }
+  const imp=t.closest&&t.closest('.pdImp');
+  if(imp){ imprimirPedido(imp.dataset.id); return; }
+  const env=t.closest&&t.closest('.pdEnv');
+  if(env){
+    if(!confirm('Marcar como enviado? A partir daí estes itens contam como "a caminho" e saem da lista de compras.')) return;
+    const r=await fetch('/api/pedidos/'+env.dataset.id+'/enviar',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({via:'whatsapp'})});
+    if(!r.ok) alert((await r.json()).erro||'não deu');
+    carregarListaCompras(); return;
+  }
+  const canc=t.closest&&t.closest('.pdCanc');
+  if(canc){
+    const m=prompt('Por que está cancelando? Vai para a auditoria.');
+    if(m===null||!m.trim()) return;
+    const r=await fetch('/api/pedidos/'+canc.dataset.id+'/cancelar',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({motivo:m})});
+    if(!r.ok) alert((await r.json()).erro||'não deu');
+    carregarListaCompras(); return;
+  }
 });
 document.addEventListener('change',async function(e){
   const t=e.target; if(!t) return;

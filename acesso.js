@@ -469,6 +469,12 @@ module.exports = function(app, db){
     // recebe (nivel operacao) NAO VE PRECO em lugar nenhum — regra 14 do §13.
     if(eq('/api/ofertas') || eq('/api/precos/historico')) return 'compras.ver';
     if(eq('/api/comparar') || eq('/api/compras/lista')) return 'compras.ver';
+    // Pedido: criar/enviar/cancelar e do Comprador; pagar e do Financeiro; ver
+    // o que esta a caminho e de OPERACAO, porque quem recebe precisa saber o que
+    // vem — e por isso a leitura NAO carrega preco (regra 14 do §13).
+    if(M !== 'GET' && pre('/api/pedidos') && /\/pagar$/.test(p)) return 'pedido.pagar';
+    if(M !== 'GET' && pre('/api/pedidos')) return 'pedido.criar';
+    if(pre('/api/pedidos')) return 'pedido.ver';
     if(eq('/api/fornecedores') || eq('/api/componentes')) return 'compras.ver';
     if(M !== 'GET' && eq('/api/cruzamento/aplicar')) return 'producao.lancar';
     // contagem em dois passos (secao 9): aprovar/rejeitar o pendente exige
@@ -583,6 +589,9 @@ module.exports = function(app, db){
     ['GET','/api/componentes'],['POST','/api/componentes'],['DELETE','/api/componentes/:id'],
     ['GET','/api/ofertas'],['POST','/api/ofertas'],['DELETE','/api/ofertas/:id'],
     ['GET','/api/precos/historico'],['GET','/api/skus/custo'],['GET','/api/comparar'],['GET','/api/compras/lista'],
+    ['GET','/api/pedidos'],['POST','/api/pedidos'],['GET','/api/pedidos/:id'],
+    ['GET','/api/pedidos/:id/whatsapp'],['POST','/api/pedidos/:id/enviar'],
+    ['POST','/api/pedidos/:id/cancelar'],['POST','/api/pedidos/:id/pagar'],
     ['GET','/api/formulas'],['POST','/api/formulas'],['POST','/api/formulas/testar'],
     ['DELETE','/api/formulas/:id'],['GET','/api/ficha/:sku'],['POST','/api/ficha/:sku/materializar'],
     ['POST','/api/cruzamento/aplicar'],['POST','/api/contagem/bipe'],['POST','/api/contagem/ajustar'],

@@ -276,8 +276,9 @@ module.exports = function(app, db){
         /* Sem gatilho de demanda ainda, tudo que esta abaixo do minimo e ambar:
            falta material, mas nao ha venda no horizonte confirmando urgencia. */
         cor:'ambar',
-        melhor: v ? { fornecedor:v.fornecedor, embalagens:v.embalagens, embalagem:v.embalagem,
-                      desembolso:v.desembolso, sobra:v.sobra, prazo:v.prazo, motivo:v.motivo } : null,
+        melhor: v ? { oferta_id:v.oferta_id, fornecedor:v.fornecedor, embalagens:v.embalagens,
+                      embalagem:v.embalagem, desembolso:v.desembolso, sobra:v.sobra,
+                      prazo:v.prazo, motivo:v.motivo } : null,
         sem_fornecedor: !ofertas.length
       });
     }
