@@ -225,6 +225,82 @@ recusa.
 
 ---
 
+## 7-B. Compras — o módulo novo
+
+> Especificação completa: `COMPRAS.md` (fora do repositório — peça ao dono).
+> Fases 1 a 5 implementadas em 23/08/2026. Fases 6 e 7 pendentes.
+
+Responde três perguntas que o sistema não respondia: **o que comprar**,
+**de quem comprar** e **quanto o produto custa**.
+
+### A peça que quase todo sistema de compras erra
+
+```
+UNIDADE DE CONSUMO   como a ficha gasta        metro · unidade
+UNIDADE DE COMPRA    como o fornecedor vende   barra 6 m · caixa 500 un
+FATOR                quantas de consumo cabem numa de compra
+```
+
+**A embalagem mora na OFERTA, não no componente.** O mesmo tubo é barra de 6 m
+num fornecedor e de 3 m no outro — se morasse no item, os dois não caberiam no
+cadastro. E ninguém compra fração de embalagem: precisa de 7 m, leva 12.
+
+Por isso a comparação mostra **sempre três números** — preço por unidade,
+desembolso e sobra. Ordenar por um só, escondendo os outros, é como o comprador
+é enganado.
+
+### A ficha é fórmula, não lista
+
+Componentes se lançam **uma vez, no modelo** — nunca SKU a SKU. Com 200 SKUs e 3
+modelos são 18 linhas em vez de 1.200, e o SKU novo de amanhã custa zero.
+
+`formula.js` é a **única porta** por onde uma expressão do banco é executada, e
+**não usa `eval()`**. Uma string do banco rodando como JavaScript daria a quem
+edita fórmula acesso ao `.session_secret` e aos PINs. Fórmula não salva sem
+passar no teste de três medidas.
+
+> ⚠️ **Tecido resolve por família + cor + largura de bobina**, e a quantidade
+> pode depender da bobina (corte invertido). A escolha é por **custo total da
+> peça**, não por menor preço por metro linear — com corte invertido a bobina
+> mais cara por metro sai mais barata por peça.
+
+### Donos únicos — não replicar
+
+| O quê | Dono | Por quê |
+|---|---|---|
+| `componente.estoque` e `movimento_componente` | `componente_dominio.js` | `skus.estoque` tem nove donos e por isso não se reconstrói história |
+| Custo médio | `componente_dominio.js` | Só se move no recebimento |
+| Necessidade → desembolso | `compras_calc.js` | Custo nunca se calcula em dois lugares |
+| Avaliação de fórmula | `formula.js` | Segunda porta = buraco de segurança |
+
+### Regras que parecem bug e não são
+
+- **Custo indefinido nunca vira zero.** Falta preço numa linha → o total é
+  `null`, não a soma parcial. Zero é um custo válido e mentiroso.
+- **Quem recebe não vê preço.** A rota do Recebimento monta o JSON **sem** os
+  campos de preço — não adianta esconder na tela e mandar pelo fio.
+- **Recebimento parcial mantém o pedido aberto**, e o saldo continua contando
+  como *a caminho*. Só fecha com um dos dois motivos.
+- **Material devolvido não entra no estoque** e segue como *a caminho* — o
+  fornecedor ainda deve.
+- **O pedido congela embalagem, fator e preço.** Mudar o preço do cadastro não
+  mexe em pedido já feito.
+- **Escolher fora do melhor preço exige motivo**, e vai para a auditoria.
+- **A necessidade é o MAIOR dos dois gatilhos, nunca a soma**, e sempre desconta
+  o que está a caminho.
+- **Enquanto a mão de obra for zero, o número se chama "custo de material"** —
+  nunca "custo do produto".
+
+### Dívidas abertas nesta entrega
+
+| Dívida | Detalhe |
+|---|---|
+| `componente` é **provisória** | O dono é `PRODUCAO-MONTAGEM.md` §6, não implementado. O que faltar entra por `ALTER`, nunca recriando |
+| Não segue a forma do `ARQUITETURA-ALVO.md` | O `COMPRAS.md` §11 manda `dominio/ dados/ rotas/`. Foi construído no padrão atual do projeto — o documento não estava disponível |
+| Fórmula do tecido | As oito medidas da planilha fecham em 6 de 8; a regra de quando o corte é invertido ainda depende do comprador |
+
+---
+
 ## 8. Horário de corte e despacho
 
 Configuráveis **por dia da semana** (`config`, chaves `corte_seg`, `despacho_seg`, etc.),

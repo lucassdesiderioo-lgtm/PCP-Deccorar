@@ -65,6 +65,15 @@ const MATERIAIS = [
   ['Etiqueta adesiva bolinha colorida 10 mm',   10000,    80.00,  'ML',      'un']
 ];
 
+/* O tecido existe nas TRES cores que os SKUs usam, e a planilha so traz uma
+   linha por largura de bobina. O comprador confirmou que "todos os precos do BK
+   sao iguais" entre as cores, entao cada bobina vira tres componentes com o
+   mesmo preco — e a resolucao da formula (familia + cor + bobina) passa a achar
+   o item certo para uma persiana bege ou cinza.
+   Sao itens de estoque DIFERENTES de proposito: compras precisa saber que
+   faltou BEGE, nao "tecido". */
+const CORES_TECIDO = ['BRANCO','BEGE','CINZA'];
+
 /* O nome da embalagem e descritivo — e o que vai impresso no pedido ao
    fornecedor. "6 m" diz mais que "6" na hora de conferir a entrega. */
 const nomeEmbalagem = (fator, un) => fator + (un === 'm' ? ' m' : ' un');
@@ -106,29 +115,39 @@ try{
       (oferta_id,preco_antigo,preco_novo,variacao_pct,fonte,usuario_nome)
       VALUES (?,?,?,?,'cadastro','importação da planilha')`);
 
+  const upC = db.prepare('UPDATE componente SET cor=? WHERE id=?');
+
   for(const m of MATERIAIS){
     const [nome, fator, preco, forn, un, familia, bobina] = m;
     const fid = idF(forn);
 
-    let c = getC.get(nome);
-    if(!c){ const r = insC.run(nome, un, familia||null, bobina||null);
-            c = { id:r.lastInsertRowid }; novosC++; }
+    /* Tecido vira uma linha POR COR; o resto e uma linha so. */
+    const variantes = familia
+      ? CORES_TECIDO.map((cor,i) => ({ nome: i===0 ? nome : nome + ' ' + cor.toLowerCase(), cor }))
+      : [{ nome, cor:null }];
 
-    const emb = nomeEmbalagem(fator, un);
-    const o = getO.get(fid, c.id, emb);
-    if(!o){
-      const r = insO.run(fid, c.id, emb, fator, preco);
-      insH.run(r.lastInsertRowid, null, preco, null);
-      novasO++;
-      log.push('  novo   ' + nome.padEnd(42) + forn.padEnd(6) + emb.padEnd(10)
-               + 'R$ ' + preco.toFixed(2).padStart(8) + '  = R$ ' + (preco/fator).toFixed(3) + '/' + un);
-    } else if(o.preco !== preco){
-      updO.run(preco, fator, o.id);
-      insH.run(o.id, o.preco, preco, o.preco>0 ? (preco-o.preco)/o.preco*100 : null);
-      precoMudou++;
-      log.push('  PRECO  ' + nome.padEnd(42) + 'R$ ' + o.preco.toFixed(2) + ' -> R$ ' + preco.toFixed(2)
-               + '  (' + (o.preco>0 ? ((preco-o.preco)/o.preco*100).toFixed(1)+'%' : '—') + ')');
-    } else jaIguais++;
+    for(const v of variantes){
+      let c = getC.get(v.nome);
+      if(!c){ const r = insC.run(v.nome, un, familia||null, bobina||null);
+              c = { id:r.lastInsertRowid }; novosC++; }
+      if(v.cor) upC.run(v.cor, c.id);
+
+      const emb = nomeEmbalagem(fator, un);
+      const o = getO.get(fid, c.id, emb);
+      if(!o){
+        const r = insO.run(fid, c.id, emb, fator, preco);
+        insH.run(r.lastInsertRowid, null, preco, null);
+        novasO++;
+        log.push('  novo   ' + v.nome.padEnd(42) + forn.padEnd(6) + emb.padEnd(10)
+                 + 'R$ ' + preco.toFixed(2).padStart(8) + '  = R$ ' + (preco/fator).toFixed(3) + '/' + un);
+      } else if(o.preco !== preco){
+        updO.run(preco, fator, o.id);
+        insH.run(o.id, o.preco, preco, o.preco>0 ? (preco-o.preco)/o.preco*100 : null);
+        precoMudou++;
+        log.push('  PRECO  ' + v.nome.padEnd(42) + 'R$ ' + o.preco.toFixed(2) + ' -> R$ ' + preco.toFixed(2)
+                 + '  (' + (o.preco>0 ? ((preco-o.preco)/o.preco*100).toFixed(1)+'%' : '—') + ')');
+      } else jaIguais++;
+    }
   }
 }catch(e){ erro = e; }
 db.exec((dry || erro) ? 'ROLLBACK' : 'COMMIT');

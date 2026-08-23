@@ -47,6 +47,10 @@ var FONT=(function(){
   // Planejamento (Fase 1/2/4) — sem atalho Alt porque 1..9 ja estao ocupados
   var onPlan=(cur==='/planejamento');
   html+='<a href="/planejamento" style="text-decoration:none;font-size:12px;padding:6px 12px;border-radius:7px;color:'+(onPlan?CH.planTx:CH.off)+';background:'+(onPlan?CH.planBg:'transparent')+';font-weight:'+(onPlan?'700':'500')+'">Planejamento</a>';
+  // Recebimento (Compras fase 5) — idem, sem atalho Alt. Quem confere entrega
+  // precisa achar a tela sem decorar URL.
+  var onRec=(cur==='/recebimento');
+  html+='<a href="/recebimento" style="text-decoration:none;font-size:12px;padding:6px 12px;border-radius:7px;color:'+(onRec?CH.planTx:CH.off)+';background:'+(onRec?CH.planBg:'transparent')+';font-weight:'+(onRec?'700':'500')+'">Recebimento</a>';
   bar.innerHTML=html;
   document.body.appendChild(bar);
   document.body.style.paddingBottom='52px';
