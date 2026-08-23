@@ -83,6 +83,7 @@
   <div class="tab" data-t="rel">Relatórios</div>
   <div class="tab" data-t="acs">Acessos &amp; Permissões</div>
   <div class="tab" data-t="pend" id="tabPend">Pendências de SKU</div>
+  <div class="tab" data-t="ficha">Ficha técnica</div>
   <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="blq" id="tabBlq">Bloqueados</div><div class="tab" data-t="tst">Modo teste</div>
 </div>
 <div class="wrap">
@@ -130,6 +131,30 @@
       <div class="sub">Enquanto houver medida pendente, a ficha técnica por fórmula não fecha — é este contador que diz quando a próxima fase pode começar. Um SKU aparece em mais de um grupo se faltar mais de uma coisa.</div>
       <div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:16px" id="pendResumo"></div></div>
     <div id="pendBox"></div></div>
+
+  <div id="v-ficha" class="hide">
+    <div class="card"><div style="display:flex;align-items:end;gap:12px;flex-wrap:wrap">
+      <div style="min-width:280px"><label>Modelo</label><select id="fxModelo"></select></div>
+      <div class="sub" style="flex:1;min-width:280px">Você lança os componentes <b>uma vez, aqui no modelo</b>. Todo SKU deste modelo passa a ter ficha — inclusive os que ainda não existem. Variáveis: <code>largura</code> e <code>altura</code>, em centímetros. Funções: <code>teto</code>, <code>piso</code>, <code>max</code>, <code>min</code>.</div>
+    </div></div>
+    <div class="card"><div style="font-weight:700;margin-bottom:12px">Linhas da ficha</div>
+      <div id="fxLinhas"></div>
+      <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:16px">
+        <div style="font-weight:700;margin-bottom:10px">Acrescentar linha</div>
+        <div class="grid-med" style="grid-template-columns:2fr 2fr 2fr">
+          <div><label>Componente</label><select id="fxComp"></select></div>
+          <div><label>Fórmula</label><input id="fxExpr" placeholder="largura / 100"></div>
+          <div><label>Por quê (fica no cadastro)</label><input id="fxObs" placeholder="a folga de 20 cm é bainha + volta no tubo"></div>
+        </div>
+        <div id="fxTeste" style="margin-top:10px;font-size:13px"></div>
+        <div class="row-actions"><button class="primary" id="fxAdd">Acrescentar à ficha</button><span class="msg" id="fxMsg"></span></div>
+      </div></div>
+    <div class="card"><div style="display:flex;align-items:end;gap:12px;margin-bottom:12px">
+      <div style="min-width:280px"><label>Conferir a ficha de um SKU</label><select id="fxSku"></select></div>
+      <button class="ghost" id="fxMat">Gravar na ficha da montagem</button><span class="msg" id="fxMatMsg"></span></div>
+      <div id="fxFicha"></div></div>
+  </div>
+
   <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide">
   <div class="card">
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
@@ -211,6 +236,8 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.t==="cd") carregarCad();
   var vpd=$("#v-pend"); if(vpd) vpd.classList.toggle("hide",t.dataset.t!=="pend");
   if(t.dataset.t==="pend") carregarPend();
+  var vfx=$("#v-ficha"); if(vfx) vfx.classList.toggle("hide",t.dataset.t!=="ficha");
+  if(t.dataset.t==="ficha") carregarFicha();
   if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); setTimeout(function(){var b=document.getElementById("ctBipe"); if(b) b.focus();},100); }
   var ifn=$("#ifPlan"), ifr=$("#ifRel"), ifa=$("#ifAcs");
   if(t.dataset.t==="plan" && ifn && !ifn.dataset.l){ ifn.src="/planejamento"; ifn.dataset.l=1; }
@@ -415,6 +442,156 @@ async function carregarPend(){
   const tab=$('#tabPend');
   if(tab) tab.textContent='Pendências de SKU'+(d.total?' ('+d.total+')':'');
 }
+
+/* ---- Ficha técnica por fórmula (COMPRAS.md §3) -------------------------
+   Os componentes se lançam UMA VEZ, no modelo — nunca SKU a SKU. Com 200 SKUs
+   e 3 modelos são 18 linhas em vez de 1.200, e o SKU novo de amanhã custa zero.
+   A fórmula não salva sem passar no teste de três medidas: fórmula errada em
+   cadastro vira compra errada em produção. */
+let COMPS=[];
+/* Um timer por caixa de mensagem. Com setTimeout solto, o temporizador de uma
+   gravacao apagava a mensagem da gravacao SEGUINTE — e quem cadastra varias
+   linhas seguidas via "salvou" sumir e nao sabia se tinha salvado. */
+const TIMERS={};
+function aviso(sel,texto,cor){
+  const el=$(sel); if(!el) return;
+  el.style.color=cor; el.textContent=texto;
+  clearTimeout(TIMERS[sel]);
+  TIMERS[sel]=setTimeout(()=>{ el.textContent=''; },2500);
+}
+const brl=v=>v==null?'—':'R$ '+v.toFixed(2).replace('.',',');
+const qtd=v=>v==null?'—':(Math.round(v*1000)/1000).toString().replace('.',',');
+
+async function carregarFicha(){
+  try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){ COMPS=[]; }
+  const m=$('#fxModelo');
+  if(m && !m.dataset.pronto){
+    m.innerHTML=MODELOS.filter(x=>x.ativo).map(x=>'<option value="'+x.id+'">'+esc(rotuloLista(x))+'</option>').join('')
+      || '<option value="">— cadastre um modelo primeiro —</option>';
+    m.dataset.pronto=1;
+  }
+  $('#fxComp').innerHTML='<option value="">— escolha —</option>'
+    +COMPS.filter(c=>c.ativo).map(c=>'<option value="'+c.id+'">'+esc(c.nome)+(c.unidade?' ('+esc(c.unidade)+')':'')+'</option>').join('')
+    /* Tecido não aponta um componente: aponta a FAMÍLIA, e a cor do SKU mais a
+       largura da bobina decidem qual item de estoque sai. */
+    +[...new Set(COMPS.filter(c=>c.familia).map(c=>c.familia))]
+      .map(f=>'<option value="fam:'+esc(f)+'">tecido da família '+esc(f)+' (resolve pela cor do SKU)</option>').join('');
+  const s=$('#fxSku');
+  if(s) s.innerHTML=SKUS.filter(x=>x.tem_ficha!==0).map(x=>'<option>'+esc(x.codigo)+'</option>').join('');
+  renderLinhas(); verFicha();
+}
+
+async function renderLinhas(){
+  const box=$('#fxLinhas'), mid=$('#fxModelo').value;
+  if(!box) return;
+  if(!mid){ box.innerHTML='<div class="sub">Cadastre um modelo na aba "Cadastro de SKU" primeiro.</div>'; return; }
+  let l=[]; try{ l=await (await fetch('/api/formulas?modelo_id='+mid)).json(); }catch(e){}
+  if(!l.length){ box.innerHTML='<div class="sub">Nenhuma linha ainda. Use o formulário abaixo — comece pelo tubo.</div>'; return; }
+  let h='<table><thead><tr><th>Material</th><th>Fórmula</th><th>Por quê</th><th>1,80×1,50</th><th></th></tr></thead><tbody>';
+  for(const f of l){
+    const nome=f.familia?('tecido · família '+esc(f.familia)):esc(f.componente_nome);
+    h+='<tr><td>'+nome+'</td>'
+      +'<td><input class="fxEd" data-id="'+f.id+'" value="'+esc(f.expressao)+'" style="font-family:ui-monospace,monospace;font-size:12.5px"></td>'
+      +'<td><input class="fxEdObs" data-id="'+f.id+'" value="'+esc(f.observacao)+'" placeholder="—" style="font-size:12.5px"></td>'
+      +'<td class="fxPrev" data-id="'+f.id+'" style="color:var(--muted)">…</td>'
+      +'<td><button class="del fxDel" data-id="'+f.id+'">excluir</button></td></tr>';
+  }
+  box.innerHTML=h+'</tbody></table>';
+  for(const f of l) previewLinha(f.id, f.expressao, f.familia);
+}
+/* Mostra o resultado da linha na medida de referência, ao lado da fórmula. */
+async function previewLinha(id, expr, familia){
+  const td=document.querySelector('.fxPrev[data-id="'+id+'"]'); if(!td) return;
+  const bob=familia?Math.min.apply(null,COMPS.filter(c=>c.familia===familia&&c.largura_bobina_cm).map(c=>c.largura_bobina_cm)):null;
+  try{
+    const r=await (await fetch('/api/formulas/testar',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({expressao:expr,largura_bobina:bob})})).json();
+    const t=r.testes&&r.testes.find(x=>x.largura===180&&x.altura===150);
+    td.innerHTML=r.ok&&t?qtd(t.resultado):'<span style="color:var(--red)">'+esc((r.erro||'').slice(0,40))+'</span>';
+  }catch(e){ td.textContent='—'; }
+}
+
+/* Teste ao vivo enquanto se digita — as três medidas do §3. */
+async function testarExpr(){
+  const el=$('#fxTeste'); if(!el) return;
+  const expr=$('#fxExpr').value.trim();
+  if(!expr){ el.innerHTML=''; return; }
+  const v=$('#fxComp').value, fam=v.indexOf('fam:')===0?v.slice(4):null;
+  const bob=fam?Math.min.apply(null,COMPS.filter(c=>c.familia===fam&&c.largura_bobina_cm).map(c=>c.largura_bobina_cm)):null;
+  let r; try{ r=await (await fetch('/api/formulas/testar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({expressao:expr,largura_bobina:bob})})).json(); }catch(e){ return; }
+  if(!r.ok){ el.innerHTML='<span style="color:var(--red)">✗ '+esc(r.erro)+'</span>'; return; }
+  el.innerHTML='<span style="color:var(--green)">✓ </span>'
+    +r.testes.map(t=>'<span style="margin-right:18px">'+t.largura/100+' × '+t.altura/100
+      +' <b style="color:var(--amber)">'+qtd(t.resultado)+'</b></span>').join('')
+    +(bob?'<span class="sub">(bobina '+(bob/100).toFixed(2)+' m)</span>':'');
+}
+
+async function verFicha(){
+  const box=$('#fxFicha'), sku=$('#fxSku')&&$('#fxSku').value;
+  if(!box||!sku){ if(box) box.innerHTML=''; return; }
+  let f; try{ f=await (await fetch('/api/ficha/'+encodeURIComponent(sku))).json(); }catch(e){ return; }
+  if(f.pendencia||f.erro||f.aviso){
+    box.innerHTML='<div class="sub" style="color:var(--amber)">'+esc(f.pendencia||f.erro||f.aviso)+'</div>'; return; }
+  let h='<div class="sub" style="margin-bottom:10px">'+esc(f.sku)+' · '+esc(f.modelo)+' · '
+    +f.largura_cm/100+' × '+f.altura_cm/100+' · '+esc(f.cor)+'</div>'
+    +'<table><thead><tr><th>Material</th><th>Qtd</th><th>Un</th><th>R$/un</th><th>Custo</th><th>Escolha</th></tr></thead><tbody>';
+  for(const l of f.linhas){
+    if(l.erro){ h+='<tr><td colspan="6" style="color:var(--amber)">⚠ '+esc(l.erro)+'</td></tr>'; continue; }
+    h+='<tr><td>'+esc(l.componente_nome)+'</td><td>'+qtd(l.quantidade)+'</td><td class="sub">'+esc(l.unidade)+'</td>'
+      +'<td>'+(l.preco_unitario!=null?brl(l.preco_unitario):'—')+'</td><td>'+brl(l.custo)+'</td>'
+      +'<td class="sub">'+esc(l.motivo)+'</td></tr>';
+  }
+  h+='</tbody></table><div style="text-align:right;margin-top:12px;font-size:16px">'
+    +'<span class="sub">'+esc(f.rotulo)+': </span><b style="color:var(--amber);font-size:20px">'+brl(f.custo_material)+'</b>'
+    /* Regra 4: custo indefinido nunca vira zero, e a tela diz por quê. */
+    +(f.incompleto?'<div class="sub" style="color:var(--amber)">alguma linha está sem preço — o total não fecha, e por isso aparece como indefinido em vez de somar só uma parte</div>':'')+'</div>';
+  box.innerHTML=h;
+}
+
+document.addEventListener('input',function(e){ if(e.target&&e.target.id==='fxExpr') testarExpr(); });
+document.addEventListener('change',async function(e){
+  const t=e.target; if(!t) return;
+  if(t.id==='fxModelo'){ renderLinhas(); return; }
+  if(t.id==='fxComp'){ testarExpr(); return; }
+  if(t.id==='fxSku'){ verFicha(); return; }
+  const ed=t.closest&&(t.closest('.fxEd')||t.closest('.fxEdObs'));
+  if(ed){
+    const id=ed.dataset.id;
+    const expr=document.querySelector('.fxEd[data-id="'+id+'"]').value;
+    const obs=document.querySelector('.fxEdObs[data-id="'+id+'"]').value;
+    const l=(await (await fetch('/api/formulas?modelo_id='+$('#fxModelo').value)).json()).find(x=>x.id==id);
+    const r=await fetch('/api/formulas',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:+id,modelo_id:l.modelo_id,componente_id:l.componente_id,familia:l.familia,
+        expressao:expr,observacao:obs,ordem:l.ordem})});
+    if(!r.ok){ const j=await r.json(); alert('Não salvei: '+(j.erro||'')); }
+    renderLinhas(); verFicha();
+  }
+});
+document.addEventListener('click',async function(e){
+  const d=e.target.closest&&e.target.closest('.fxDel');
+  if(d){ if(!confirm('Excluir esta linha da ficha?')) return;
+    await fetch('/api/formulas/'+d.dataset.id,{method:'DELETE'}); renderLinhas(); verFicha(); return; }
+  if(e.target&&e.target.id==='fxAdd'){
+    const v=$('#fxComp').value;
+    if(!v){ aviso('#fxMsg','Escolha o material','var(--red)'); return; }
+    const corpo={ modelo_id:+$('#fxModelo').value, expressao:$('#fxExpr').value.trim(),
+      observacao:$('#fxObs').value.trim(), ordem:99 };
+    if(v.indexOf('fam:')===0) corpo.familia=v.slice(4); else corpo.componente_id=+v;
+    const r=await fetch('/api/formulas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)});
+    const j=await r.json();
+    if(!r.ok){ aviso('#fxMsg', j.erro||'não salvou', 'var(--red)'); return; }
+    aviso('#fxMsg','Acrescentada!','var(--green)');
+    $('#fxExpr').value=$('#fxObs').value=''; $('#fxTeste').innerHTML='';
+    renderLinhas(); verFicha(); return;
+  }
+  if(e.target&&e.target.id==='fxMat'){
+    const r=await fetch('/api/ficha/'+encodeURIComponent($('#fxSku').value)+'/materializar',{method:'POST'});
+    const j=await r.json();
+    aviso('#fxMatMsg', r.ok?(j.linhas+' linhas gravadas'):(j.pendencia||j.erro||'não deu'),
+          r.ok?'var(--green)':'var(--red)'); return;
+  }
+});
 
 /* ---- Cadastro (só dados do produto) ---- */
 function renderCad(){

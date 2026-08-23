@@ -191,11 +191,19 @@ module.exports = function(app, db){
   app.post('/api/ficha/:sku/materializar',(req,res)=>{
     const f=calcular(req.params.sku);
     if(f.erro||f.pendencia) return res.status(400).json(f);
+    /* SOMA por componente antes de gravar. A ficha pode ter mais de uma linha do
+       mesmo material de proposito — o parafuso que prende o suporte e o que
+       prende a base sao duas linhas com razoes diferentes na observacao, e as
+       duas quantidades se somam. Sem somar aqui, a segunda linha bateria na
+       chave primaria (sku, componente_id) e derrubaria a gravacao inteira. */
+    const somado={};
+    for(const l of f.linhas) if(l.componente_id && l.quantidade!=null)
+      somado[l.componente_id]=(somado[l.componente_id]||0)+l.quantidade;
     db.transaction(()=>{
       db.prepare('DELETE FROM ficha_tecnica WHERE sku=?').run(f.sku);
       const ins=db.prepare('INSERT INTO ficha_tecnica (sku,componente_id,quantidade) VALUES (?,?,?)');
-      for(const l of f.linhas) if(l.componente_id && l.quantidade!=null) ins.run(f.sku,l.componente_id,l.quantidade);
+      for(const id in somado) ins.run(f.sku,+id,somado[id]);
     })();
-    res.json({ok:true, linhas:f.linhas.filter(l=>l.componente_id).length});
+    res.json({ok:true, linhas:Object.keys(somado).length});
   });
 };
