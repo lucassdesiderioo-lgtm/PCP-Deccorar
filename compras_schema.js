@@ -150,6 +150,44 @@ function garantirSchemaCompras(db){
       data           TEXT DEFAULT (date('now','localtime'))
     );
     CREATE INDEX IF NOT EXISTS idx_custo_sku ON custo_sku_historico(sku, data);
+
+    /* ── FICHA POR FORMULA (§3) ───────────────────────────────────────────────
+       A decisao que reduz o projeto: a ficha nao e uma lista digitada por SKU, e
+       uma FORMULA sobre a medida, lancada UMA VEZ no modelo. Com 200 SKUs e 3
+       modelos sao 18 linhas em vez de 1.200 — e o SKU novo de amanha custa zero.
+
+       componente_id OU familia, nunca os dois:
+         componente_id  aponta direto (tubo, comando, parafuso)
+         familia        resolve pela COR do SKU e pela largura da bobina (tecido)
+
+       A observacao nao e enfeite: e onde fica escrito POR QUE a folga e 30 cm.
+       Quando alguem perguntar daqui a um ano, a resposta esta no cadastro e nao
+       na cabeca de quem cadastrou. */
+    CREATE TABLE IF NOT EXISTS ficha_formula (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      modelo_id     INTEGER NOT NULL REFERENCES modelo(id),
+      componente_id INTEGER REFERENCES componente(id),
+      familia       TEXT,
+      expressao     TEXT NOT NULL,
+      observacao    TEXT,
+      ordem         INTEGER DEFAULT 0,
+      ativo         INTEGER DEFAULT 1,
+      CHECK ( (componente_id IS NULL) <> (familia IS NULL) )
+    );
+    CREATE INDEX IF NOT EXISTS idx_formula_modelo ON ficha_formula(modelo_id, ordem);
+
+    /* ── FICHA MATERIALIZADA (§3) ─────────────────────────────────────────────
+       A formula do modelo + as medidas do SKU viram linhas nesta tabela. Recalculada
+       quando a formula, o modelo ou as medidas mudam. Quem le a ficha continua
+       lendo a ficha, sem saber que existe formula por tras — e a reserva da
+       montagem continua congelando a quantidade do momento, nao a formula. */
+    CREATE TABLE IF NOT EXISTS ficha_tecnica (
+      sku           TEXT NOT NULL,
+      componente_id INTEGER NOT NULL REFERENCES componente(id),
+      quantidade    REAL NOT NULL,
+      calculado_em  TEXT DEFAULT (datetime('now','localtime')),
+      PRIMARY KEY (sku, componente_id)
+    );
   `);
 
   const colunas = function(tabela, novas){

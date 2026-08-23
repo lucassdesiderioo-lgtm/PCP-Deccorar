@@ -457,6 +457,11 @@ module.exports = function(app, db){
     // custo.ver e sensivel: custo do produto e a informacao mais estrategica do
     // sistema. Quem opera nao enxerga, e todo acesso passa pela auditoria.
     if(eq('/api/skus/custo')) return 'custo.ver';
+    // A ficha mostra consumo E custo por componente — mesma sensibilidade.
+    if(pre('/api/ficha')) return 'custo.ver';
+    // Quem mexe numa formula mexe no consumo de material de toda a linha.
+    if(M !== 'GET' && pre('/api/formulas')) return 'modelo.cadastrar';
+    if(eq('/api/formulas')) return 'compras.ver';
     if(M !== 'GET' && pre('/api/fornecedores')) return 'fornecedor.cadastrar';
     if(M !== 'GET' && pre('/api/componentes')) return 'componente.cadastrar';
     if(M !== 'GET' && pre('/api/ofertas')) return 'preco.lancar';
@@ -577,6 +582,8 @@ module.exports = function(app, db){
     ['GET','/api/componentes'],['POST','/api/componentes'],['DELETE','/api/componentes/:id'],
     ['GET','/api/ofertas'],['POST','/api/ofertas'],['DELETE','/api/ofertas/:id'],
     ['GET','/api/precos/historico'],['GET','/api/skus/custo'],
+    ['GET','/api/formulas'],['POST','/api/formulas'],['POST','/api/formulas/testar'],
+    ['DELETE','/api/formulas/:id'],['GET','/api/ficha/:sku'],['POST','/api/ficha/:sku/materializar'],
     ['POST','/api/cruzamento/aplicar'],['POST','/api/contagem/bipe'],['POST','/api/contagem/ajustar'],
     ['POST','/api/contagem/lancar'],['GET','/api/contagem/pendentes'],['POST','/api/contagem/pendentes/aprovar'],
     ['POST','/api/contagem/pendentes/rejeitar'],
