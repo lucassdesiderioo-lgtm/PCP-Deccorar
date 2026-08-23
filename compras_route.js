@@ -215,6 +215,86 @@ module.exports = function(app, db){
     res.json(Object.assign({ item: c?c.nome:sku, unidade: c?c.unidade:'un' }, r));
   });
 
+  /* ── LISTA DE COMPRAS: o que comprar (§7) ──────────────────────────────────
+     Gatilho 1, ponto de pedido. Funciona sozinho e nao depende de nada estar em
+     dia — e o piso do modulo:
+
+         disponivel = estoque fisico − reservado
+         se disponivel <= estoque_minimo:
+             necessidade = estoque_ideal − disponivel
+
+     Gatilho 2 (demanda pela explosao da ficha contra o planejamento) e a fase 6.
+     Quando ele existir, a regra e MAIOR dos dois, NUNCA a soma — os dois
+     descrevem a mesma falta por caminhos diferentes, e somar compraria o dobro.
+
+     `a_caminho` desconta o que ja foi pedido e ainda nao chegou. Sem isso o
+     comprador compra duas vezes toda semana em que o fornecedor atrasa. As
+     tabelas de pedido sao da fase 4; ate la o desconto e zero, e a consulta ja
+     esta escrita para quando existirem. */
+  function existe(tabela){
+    return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(tabela);
+  }
+  function aCaminho(){
+    if(!existe('pedido_item') || !existe('pedido_compra')) return {};
+    const m={};
+    for(const r of db.prepare(`SELECT i.componente_id, SUM(i.qtd_consumo - i.qtd_recebida) q
+      FROM pedido_item i JOIN pedido_compra p ON p.id=i.pedido_id
+      WHERE p.status IN ('enviado','parcial') AND i.status IN ('aberto','parcial')
+        AND i.componente_id IS NOT NULL GROUP BY i.componente_id`).all()) m[r.componente_id]=r.q;
+    return m;
+  }
+  function reservado(){
+    if(!existe('componente_reserva')) return {};
+    const m={};
+    for(const r of db.prepare(`SELECT componente_id, SUM(quantidade) q FROM componente_reserva
+      WHERE status='reservado' GROUP BY componente_id`).all()) m[r.componente_id]=r.q;
+    return m;
+  }
+
+  app.get('/api/compras/lista',(req,res)=>{
+    const cam=aCaminho(), res_=reservado();
+    const linhas=[];
+    for(const c of db.prepare(`SELECT id,nome,unidade,estoque,estoque_minimo,estoque_ideal,
+        perda_pct,sobra_aproveitavel FROM componente WHERE ativo=1 ORDER BY nome`).all()){
+      const disp=(c.estoque||0)-(res_[c.id]||0);
+      const ponto=(disp<=(c.estoque_minimo||0)) ? Math.max(0,(c.estoque_ideal||0)-disp) : 0;
+      /* A perda de corte entra na NECESSIDADE, nunca no custo (regra 32): o custo
+         ja a contem pelo consumo real, e soma-la de novo contaria duas vezes.
+         Nasce em zero e so muda quando o comprador mandar. */
+      const comPerda=ponto*(1+(c.perda_pct||0));
+      const precisa=Math.max(0, comPerda-(cam[c.id]||0));
+      if(precisa<=0) continue;
+
+      const ofertas=ofertasDe(c.id,null);
+      const comp=ofertas.length ? CALC.comparar(ofertas, precisa, {
+        unidade: c.unidade==='m'?'metro':'unidade', sobra_aproveitavel: c.sobra_aproveitavel }) : null;
+      const v=comp&&comp.linhas[0];
+      linhas.push({
+        componente_id:c.id, nome:c.nome, unidade:c.unidade,
+        disponivel:disp, minimo:c.estoque_minimo, ideal:c.estoque_ideal,
+        a_caminho:cam[c.id]||0, perda_pct:c.perda_pct||0, precisa,
+        /* Sem gatilho de demanda ainda, tudo que esta abaixo do minimo e ambar:
+           falta material, mas nao ha venda no horizonte confirmando urgencia. */
+        cor:'ambar',
+        melhor: v ? { fornecedor:v.fornecedor, embalagens:v.embalagens, embalagem:v.embalagem,
+                      desembolso:v.desembolso, sobra:v.sobra, prazo:v.prazo, motivo:v.motivo } : null,
+        sem_fornecedor: !ofertas.length
+      });
+    }
+    /* Agrupado por fornecedor vencedor: comprar 6 itens do mesmo fornecedor e UM
+       pedido, nao seis. */
+    const porFornecedor={};
+    for(const l of linhas){ const f=l.melhor?l.melhor.fornecedor:'(sem fornecedor)';
+      (porFornecedor[f]=porFornecedor[f]||{itens:0,total:0}); porFornecedor[f].itens++;
+      porFornecedor[f].total+=l.melhor?l.melhor.desembolso:0; }
+    res.json({
+      linhas, itens:linhas.length,
+      total: linhas.reduce((s,l)=>s+(l.melhor?l.melhor.desembolso:0),0),
+      por_fornecedor: porFornecedor,
+      sem_demanda: true   // gatilho 2 (fase 6) ainda nao existe
+    });
+  });
+
   /* ── HISTORICO DE PRECO ──────────────────────────────────────────────────── */
   app.get('/api/precos/historico',(req,res)=>{
     const w=[], p=[];

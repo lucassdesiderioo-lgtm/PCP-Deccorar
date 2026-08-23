@@ -165,7 +165,18 @@
         <div><label>Tenho quantos dias</label><input id="cpDias" type="number" min="0" step="1" placeholder="—"></div>
       </div>
       <div class="row-actions"><button class="primary" id="cpVer">Comparar</button></div></div>
-    <div id="cpRes"></div></div>
+    <div id="cpRes"></div>
+
+    <div class="card"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div><div style="font-weight:700">O que comprar</div>
+        <div class="sub">Repõe quando o disponível cai até o mínimo, e enche até o ideal. Os números nasceram do consumo real de uma persiana 1,50 × 1,50 — <b>edite à vontade</b>, é salvo na hora.</div></div>
+      <button class="ghost" id="lcVer">Atualizar</button></div>
+      <div id="lcRes" style="margin-top:14px"></div></div>
+
+    <div class="card"><div style="font-weight:700;margin-bottom:4px">Ponto de pedido por componente</div>
+      <div class="sub" style="margin-bottom:12px">Mínimo é quando disparar. Ideal é até onde encher.</div>
+      <div id="lcMin"></div></div>
+  </div>
 
   <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide">
   <div class="card">
@@ -251,7 +262,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   var vfx=$("#v-ficha"); if(vfx) vfx.classList.toggle("hide",t.dataset.t!=="ficha");
   if(t.dataset.t==="ficha") carregarFicha();
   var vcp=$("#v-compras"); if(vcp) vcp.classList.toggle("hide",t.dataset.t!=="compras");
-  if(t.dataset.t==="compras") carregarCompras();
+  if(t.dataset.t==="compras"){ carregarCompras(); carregarListaCompras(); }
   if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); setTimeout(function(){var b=document.getElementById("ctBipe"); if(b) b.focus();},100); }
   var ifn=$("#ifPlan"), ifr=$("#ifRel"), ifa=$("#ifAcs");
   if(t.dataset.t==="plan" && ifn && !ifn.dataset.l){ ifn.src="/planejamento"; ifn.dataset.l=1; }
@@ -658,8 +669,67 @@ async function compararItem(){
     h+='<div style="margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;color:var(--amber);font-size:13px">⚠ '+esc(a)+'</div>';
   box.innerHTML=h+'</div>';
 }
-document.addEventListener('click',function(e){ if(e.target&&e.target.id==='cpVer') compararItem(); });
-document.addEventListener('change',function(e){ if(e.target&&(e.target.id==='cpItem')) compararItem(); });
+/* A lista de compras (§7). Cada linha mostra de ONDE veio o número — disponível,
+   mínimo, ideal e o que já está a caminho. Ver a conta aberta é o que faz o
+   comprador confiar nela. */
+async function verLista(){
+  const box=$('#lcRes'); if(!box) return;
+  let d; try{ d=await (await fetch('/api/compras/lista')).json(); }catch(e){ return; }
+  if(!d.linhas.length){
+    box.innerHTML='<div class="sub" style="color:var(--green)">✓ Nada abaixo do mínimo. Nenhuma compra necessária agora.</div>'; return; }
+  let h='<table><thead><tr><th>Componente</th><th>Disponível</th><th>Precisa</th><th>Melhor</th><th>Desembolso</th><th>Sobra</th></tr></thead><tbody>';
+  for(const l of d.linhas){
+    const un=l.unidade||'';
+    h+='<tr><td>'+esc(l.nome)+'<div class="sub">mínimo '+qtd(l.minimo)+' · ideal '+qtd(l.ideal)
+      +(l.a_caminho>0?' · a caminho '+qtd(l.a_caminho):'')+'</div></td>'
+      +'<td'+(l.disponivel<=l.minimo?' style="color:var(--amber)"':'')+'>'+qtd(l.disponivel)+' '+esc(un)+'</td>'
+      +'<td><b>'+qtd(l.precisa)+' '+esc(un)+'</b></td>'
+      +'<td>'+(l.melhor?esc(l.melhor.fornecedor)+'<div class="sub">'+l.melhor.embalagens+' × '+esc(l.melhor.embalagem)
+          +(l.melhor.prazo!=null?' · '+l.melhor.prazo+' d':'')+'</div>'
+        :'<span style="color:var(--amber)">sem fornecedor cadastrado</span>')+'</td>'
+      +'<td>'+(l.melhor?'<b>'+brl(l.melhor.desembolso)+'</b>':'—')+'</td>'
+      +'<td class="sub">'+(l.melhor?qtd(l.melhor.sobra)+' '+esc(un):'—')+'</td></tr>';
+  }
+  h+='</tbody></table><div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap;gap:8px">'
+    +'<span class="sub">'+d.itens+' item(ns) · por fornecedor: '
+    +Object.keys(d.por_fornecedor).map(f=>esc(f)+' ('+d.por_fornecedor[f].itens+')').join(' · ')+'</span>'
+    +'<span style="font-size:17px"><span class="sub">previsto: </span><b style="color:var(--amber);font-size:21px">'+brl(d.total)+'</b></span></div>';
+  /* O documento é explícito em não deixar o sistema parecer completo enquanto
+     não é: sem o gatilho de demanda, esta lista só enxerga o ponto de pedido. */
+  if(d.sem_demanda) h+='<div class="sub" style="margin-top:10px">Só o ponto de pedido por enquanto. O gatilho por demanda — explodir a ficha contra o que está planejado produzir — ainda não existe, então venda futura não aparece aqui.</div>';
+  box.innerHTML=h;
+}
+async function verMinimos(){
+  const box=$('#lcMin'); if(!box) return;
+  if(!COMPS.length){ try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){} }
+  box.innerHTML='<table><thead><tr><th>Componente</th><th>Un</th><th>Estoque</th><th>Mínimo</th><th>Ideal</th></tr></thead><tbody>'
+    +COMPS.filter(c=>c.ativo).map(c=>'<tr><td>'+esc(c.nome)+'</td><td class="sub">'+esc(c.unidade)+'</td>'
+      +'<td class="sub">'+qtd(c.estoque)+'</td>'
+      +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="estoque_minimo" type="number" step="0.01" value="'+(c.estoque_minimo||0)+'" style="width:110px"></td>'
+      +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="estoque_ideal" type="number" step="0.01" value="'+(c.estoque_ideal||0)+'" style="width:110px"></td></tr>').join('')
+    +'</tbody></table><span class="msg" id="lcMsg"></span>';
+}
+async function carregarListaCompras(){ await verMinimos(); await verLista(); }
+
+document.addEventListener('click',function(e){
+  if(e.target&&e.target.id==='cpVer') compararItem();
+  if(e.target&&e.target.id==='lcVer') carregarListaCompras();
+});
+document.addEventListener('change',async function(e){
+  const t=e.target; if(!t) return;
+  if(t.id==='cpItem'){ compararItem(); return; }
+  const campo=t.closest&&t.closest('.lcCampo');
+  if(campo){
+    const c=COMPS.find(x=>x.id==campo.dataset.id); if(!c) return;
+    c[campo.dataset.campo]=parseFloat(campo.value)||0;
+    const r=await fetch('/api/componentes',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:c.id,nome:c.nome,codigo:c.codigo,unidade:c.unidade,
+        sobra_aproveitavel:c.sobra_aproveitavel,estoque_minimo:c.estoque_minimo,estoque_ideal:c.estoque_ideal,
+        familia:c.familia,cor:c.cor,largura_bobina_cm:c.largura_bobina_cm})});
+    aviso('#lcMsg', r.ok?'salvo':'não salvou', r.ok?'var(--green)':'var(--red)');
+    if(r.ok) verLista();   // o número mudou, a lista muda junto
+  }
+});
 
 /* ---- Cadastro (só dados do produto) ---- */
 function renderCad(){
