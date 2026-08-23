@@ -57,6 +57,43 @@ module.exports = [
   // ficha tecnica, e quem mexe numa formula mexe no consumo de material.
   { chave:'modelo.cadastrar',     grupo:'Planejamento', nivel:'admin',
     rotulo:'Cadastrar modelo de produto', desc:'Linhas de produto e suas fórmulas' },
+
+  // ─── COMPRAS ────────────────────────────────────────────────
+  // COMPRAS.md §10. Os tres papeis — Comprador, Recebimento e Financeiro —
+  // nascem separados mesmo enquanto forem a mesma pessoa: o dia em que entrar
+  // alguem para receber e desmarcar uma caixa, nao redesenhar o modulo.
+  //
+  // compras.ver e supervisor e pedido.ver e operacao por causa da regra 1 do
+  // controle de acesso: setor de nivel operacao nao aceita permissao acima do
+  // seu nivel. Quem recebe precisa saber o que esta chegando; nao precisa da
+  // lista de compras nem dos precos comparados.
+  { chave:'compras.ver',          grupo:'Compras', nivel:'supervisor',
+    rotulo:'Ver lista de compras', desc:'O que precisa ser comprado' },
+  { chave:'fornecedor.cadastrar', grupo:'Compras', nivel:'admin',
+    rotulo:'Cadastrar fornecedor', desc:'Criar e editar fornecedores' },
+  { chave:'preco.lancar',         grupo:'Compras', nivel:'admin',
+    rotulo:'Lançar preço',        desc:'Cadastrar e atualizar preço de fornecedor' },
+  { chave:'pedido.criar',         grupo:'Compras', nivel:'admin',
+    rotulo:'Criar e enviar pedido', desc:'Gerar pedido de compra ao fornecedor',
+    sensivel:true },
+  { chave:'pedido.ver',           grupo:'Compras', nivel:'operacao',
+    rotulo:'Ver pedidos em aberto', desc:'O que está a caminho, sem preço' },
+  { chave:'pedido.receber',       grupo:'Compras', nivel:'operacao',
+    rotulo:'Registrar recebimento', desc:'Conferir a entrega e dar entrada no estoque' },
+  { chave:'pedido.devolver',      grupo:'Compras', nivel:'operacao',
+    rotulo:'Devolver ao fornecedor', desc:'Recusar item na conferência, com motivo' },
+  { chave:'pedido.pagar',         grupo:'Compras', nivel:'admin',
+    rotulo:'Marcar pedido como pago', desc:'Fecha o ciclo — não é contas a pagar',
+    sensivel:true },
+  // Custo do produto e a informacao mais estrategica do sistema — mais que
+  // produtividade nominal. Nao vaza por padrao e todo acesso vai para a auditoria.
+  { chave:'custo.ver',            grupo:'Compras', nivel:'admin',
+    rotulo:'Ver custo do produto', desc:'Custo por SKU e evolução',
+    sensivel:true },
+  { chave:'componente.cadastrar', grupo:'Compras', nivel:'admin',
+    rotulo:'Cadastrar componente', desc:'Insumos e matérias-primas' },
+  { chave:'minimo.definir',       grupo:'Estoque', nivel:'admin',
+    rotulo:'Definir estoque mínimo', desc:'Ponto de pedido e estoque ideal por componente' },
   { chave:'bloqueio.liberar',     grupo:'Planejamento', nivel:'admin',
     rotulo:'Desbloquear volumes', desc:'Liberar volumes com SKU desconhecido' },
 

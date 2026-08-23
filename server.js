@@ -25,7 +25,7 @@ app.post('/api/skus', (req,res)=>{
   const {codigo,descricao='',cor='',estoque=0,alvo=0}=b;
   if(!codigo||!codigo.trim()) return res.status(400).json({erro:'código obrigatório'});
   const cod=codigo.trim().toUpperCase();
-  const atual=db.prepare('SELECT modelo_id,largura_cm,altura_cm,cor_codigo,tecido_codigo FROM skus WHERE codigo=?').get(cod)||{};
+  const atual=db.prepare('SELECT modelo_id,largura_cm,altura_cm,cor_codigo,tecido_codigo,tem_ficha,custo_direto FROM skus WHERE codigo=?').get(cod)||{};
   const manda=(k,novo)=> (k in b) ? novo : (atual[k]===undefined?null:atual[k]);
 
   let modeloId=null;
@@ -53,13 +53,38 @@ app.post('/api/skus', (req,res)=>{
     tecCod=(t&&db.prepare('SELECT 1 FROM tecido WHERE codigo=?').get(t))?t:null;
   } else tecCod=atual.tecido_codigo===undefined?null:atual.tecido_codigo;
 
-  db.prepare(`INSERT INTO skus (codigo,descricao,cor,estoque,alvo,modelo_id,largura_cm,altura_cm,cor_codigo,tecido_codigo)
-    VALUES (?,?,?,?,?,?,?,?,?,?)
+  /* COMPRAS.md §2: o SKU tem ficha tecnica ou nao tem, e e o CADASTRO que
+     responde — nunca a ausencia de dados. Deduzir "sem ficha => e revenda"
+     silenciaria o erro mais comum: a persiana nova sem ficha lancada apareceria
+     como revenda com custo zero e ninguem notaria. */
+  const temFicha = ('tem_ficha' in b) ? (b.tem_ficha?1:0)
+                 : (atual.tem_ficha===undefined?1:atual.tem_ficha);
+  let custoDireto = ('custo_direto' in b) ? (function(){
+        const n=parseFloat(String(b.custo_direto==null?'':b.custo_direto).replace(',','.'));
+        return (Number.isFinite(n)&&n>=0)?n:null;   // vazio nunca vira zero
+      })() : (atual.custo_direto===undefined?null:atual.custo_direto);
+  /* §2, tabela de erros: "tem_ficha = 0 com modelo apontado" e bloqueado no
+     cadastro. Produto comprado pronto nao tem modelo de fabricacao.
+     Mas so e contradicao quando as DUAS coisas vem na mesma requisicao. Se o SKU
+     ja tinha modelo e agora esta virando revenda, o modelo simplesmente deixa de
+     fazer sentido — recusar ali seria um beco sem saida: nao haveria como fazer
+     a transicao sem editar duas vezes. */
+  if(!temFicha){
+    if(('modelo_id' in b) && modeloId!=null)
+      return res.status(400).json({erro:'SKU de revenda não pode ter modelo — ele não é fabricado aqui'});
+    modeloId=null;
+  }
+  if(temFicha) custoDireto=null;   // custo_direto so existe quando tem_ficha = 0
+
+  db.prepare(`INSERT INTO skus (codigo,descricao,cor,estoque,alvo,modelo_id,largura_cm,altura_cm,cor_codigo,tecido_codigo,tem_ficha,custo_direto)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(codigo) DO UPDATE SET descricao=excluded.descricao,cor=excluded.cor,estoque=excluded.estoque,alvo=excluded.alvo,
       modelo_id=excluded.modelo_id,largura_cm=excluded.largura_cm,altura_cm=excluded.altura_cm,
-      cor_codigo=excluded.cor_codigo,tecido_codigo=excluded.tecido_codigo`)
+      cor_codigo=excluded.cor_codigo,tecido_codigo=excluded.tecido_codigo,
+      tem_ficha=excluded.tem_ficha,custo_direto=excluded.custo_direto`)
     .run(cod,descricao,cor,+estoque||0,+alvo||0,
-      modeloId, manda('largura_cm',cmDe(b.largura_cm)), manda('altura_cm',cmDe(b.altura_cm)), corCod, tecCod);
+      modeloId, manda('largura_cm',cmDe(b.largura_cm)), manda('altura_cm',cmDe(b.altura_cm)), corCod, tecCod,
+      temFicha, custoDireto);
   try{ db.prepare("UPDATE lote SET estagio='pendente' WHERE estagio='bloqueado' AND codigo=?").run(cod); }catch(e){}
   res.json({ok:true});
 });
@@ -132,6 +157,7 @@ require('./cad_route')(app, db);
 // Antes do acesso.js: as rotas de cor/modelo/pendencias precisam existir quando
 // a cobertura de permissoes for montada.
 require('./sku_route')(app, db);
+require('./compras_route')(app, db);
 require('./ger_route')(app, db);
 require('./st_route')(app, db);
 // Controle de Acesso — Fase 1 (roda em paralelo; NAO decide acesso ainda).

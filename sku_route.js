@@ -107,16 +107,28 @@ module.exports = function(app, db){
     /* Acessorio nao tem medida e nunca vai ter — cobrar dele e ruido que ensina
        a equipe a ignorar o contador. Modelo ainda NULO conta como pendente de
        medida: sem saber o que a peca e, nao da para dizer que ela nao tem. */
+    /* COMPRAS.md §2: so cobra medida e modelo de quem TEM ficha tecnica. SKU de
+       revenda (tem_ficha=0) e comprado pronto — nao tem modelo de fabricacao nem
+       precisa de medida; o que falta nele e custo. */
+    const FABRICADO='COALESCE(s.tem_ficha,1)=1';
     const SEM_MEDIDA='(s.modelo_id IS NULL OR COALESCE(m.exige_medida,1)=1)';
-    const medida=q(SEM_MEDIDA+' AND (s.largura_cm IS NULL OR s.altura_cm IS NULL)');
-    const modelo=q('s.modelo_id IS NULL');
+    const medida=q(FABRICADO+' AND '+SEM_MEDIDA+' AND (s.largura_cm IS NULL OR s.altura_cm IS NULL)');
+    const modelo=q(FABRICADO+' AND s.modelo_id IS NULL');
     const cor   =q('s.cor_codigo IS NULL OR s.cor_codigo NOT IN (SELECT codigo FROM cor)');
-    const todas =q('('+SEM_MEDIDA+' AND (s.largura_cm IS NULL OR s.altura_cm IS NULL))'
-      +' OR s.modelo_id IS NULL'
-      +' OR s.cor_codigo IS NULL OR s.cor_codigo NOT IN (SELECT codigo FROM cor)');
+    /* §2: revenda sem preco nenhum — nem digitado, nem cotado — e "custo
+       pendente". Regra 4 do §13: custo indefinido nunca vira zero. */
+    const custo=q(`COALESCE(s.tem_ficha,1)=0 AND s.custo_direto IS NULL
+      AND NOT EXISTS (SELECT 1 FROM oferta o JOIN fornecedor f ON f.id=o.fornecedor_id
+                      WHERE o.sku=s.codigo AND o.ativo=1 AND f.ativo=1)`);
+    const todas =q('('+FABRICADO+' AND '+SEM_MEDIDA+' AND (s.largura_cm IS NULL OR s.altura_cm IS NULL))'
+      +' OR ('+FABRICADO+' AND s.modelo_id IS NULL)'
+      +' OR s.cor_codigo IS NULL OR s.cor_codigo NOT IN (SELECT codigo FROM cor)'
+      +` OR (COALESCE(s.tem_ficha,1)=0 AND s.custo_direto IS NULL
+             AND NOT EXISTS (SELECT 1 FROM oferta o JOIN fornecedor f ON f.id=o.fornecedor_id
+                             WHERE o.sku=s.codigo AND o.ativo=1 AND f.ativo=1))`);
     res.json({
       total: todas.length, skus: db.prepare('SELECT COUNT(*) c FROM skus').get().c,
-      medida, modelo, cor
+      medida, modelo, cor, custo
     });
   });
 };

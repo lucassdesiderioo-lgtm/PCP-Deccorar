@@ -56,4 +56,8 @@ try{
    cobre producao, que nasceu sem elas. Idempotente. */
 require('./sku_schema').garantirSchema(db);
 
+/* Compras Fase 1: fornecedor, oferta, historico de preco e as colunas de custo
+   do SKU. Depois do sku_schema porque `oferta.sku` referencia `skus`. */
+require('./compras_schema').garantirSchemaCompras(db);
+
 module.exports = db;

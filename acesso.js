@@ -47,6 +47,20 @@ function setoresNativos(){
       perms:['contagem.contar','painel.ver','produtividade.propria'] },
     { nome:'Supervisor',                     nivel:'supervisor',
       perms:['painel.ver','produtividade.propria','produtividade.equipe','relatorios.ver','necessidade.ver'] },
+    // COMPRAS.md §10 — os tres papeis nascem separados mesmo sendo uma pessoa
+    // so. Segregacao de funcoes: quem pede, quem confere e quem paga. Nao e
+    // sobre desconfiar de ninguem, e sobre o erro honesto nao passar batido.
+    // Nascem VAZIOS: ninguem e migrado (mesma regra do setor de montagem).
+    { nome:'Comprador',                      nivel:'admin',
+      perms:['compras.ver','fornecedor.cadastrar','preco.lancar','pedido.criar','pedido.ver',
+             'custo.ver','minimo.definir','componente.cadastrar','modelo.cadastrar'] },
+    // Recebimento NAO VE PRECO em lugar nenhum — nem na conferencia, nem no
+    // pedido, nem no PDF. Quem confere quantidade vendo valor tende a confirmar
+    // o que esta escrito, e a separacao perde o sentido.
+    { nome:'Recebimento',                    nivel:'operacao',
+      perms:['pedido.ver','pedido.receber','pedido.devolver'] },
+    { nome:'Financeiro',                     nivel:'admin',
+      perms:['pedido.ver','pedido.pagar'] },
     { nome:'Admin',                          nivel:'admin', perms: admin },
     { nome:'Admin Geral',                    nivel:'admin_geral', perms: PERMISSOES.map(p => p.chave) }
   ];
@@ -439,6 +453,17 @@ module.exports = function(app, db){
     if(M !== 'GET' && pre('/api/tecidos')) return 'sku.cadastrar';
     if(M !== 'GET' && pre('/api/modelos')) return 'modelo.cadastrar';
     if(eq('/api/cores') || eq('/api/modelos') || eq('/api/tecidos')) return '@logado';
+    // ── COMPRAS (COMPRAS.md §10) ──
+    // custo.ver e sensivel: custo do produto e a informacao mais estrategica do
+    // sistema. Quem opera nao enxerga, e todo acesso passa pela auditoria.
+    if(eq('/api/skus/custo')) return 'custo.ver';
+    if(M !== 'GET' && pre('/api/fornecedores')) return 'fornecedor.cadastrar';
+    if(M !== 'GET' && pre('/api/componentes')) return 'componente.cadastrar';
+    if(M !== 'GET' && pre('/api/ofertas')) return 'preco.lancar';
+    // Leituras de compras: preco de fornecedor nao e leitura de operacao. Quem
+    // recebe (nivel operacao) NAO VE PRECO em lugar nenhum — regra 14 do §13.
+    if(eq('/api/ofertas') || eq('/api/precos/historico')) return 'compras.ver';
+    if(eq('/api/fornecedores') || eq('/api/componentes')) return 'compras.ver';
     if(M !== 'GET' && eq('/api/cruzamento/aplicar')) return 'producao.lancar';
     // contagem em dois passos (secao 9): aprovar/rejeitar o pendente exige
     // contagem.ajustar; contar e ENVIAR (que pode virar pendente) exige so
@@ -548,6 +573,10 @@ module.exports = function(app, db){
     ['GET','/api/skus/pendencias'],['GET','/api/cores'],['POST','/api/cores'],['DELETE','/api/cores/:c'],
     ['GET','/api/modelos'],['POST','/api/modelos'],['DELETE','/api/modelos/:id'],
     ['GET','/api/tecidos'],['POST','/api/tecidos'],['DELETE','/api/tecidos/:c'],
+    ['GET','/api/fornecedores'],['POST','/api/fornecedores'],['DELETE','/api/fornecedores/:id'],
+    ['GET','/api/componentes'],['POST','/api/componentes'],['DELETE','/api/componentes/:id'],
+    ['GET','/api/ofertas'],['POST','/api/ofertas'],['DELETE','/api/ofertas/:id'],
+    ['GET','/api/precos/historico'],['GET','/api/skus/custo'],
     ['POST','/api/cruzamento/aplicar'],['POST','/api/contagem/bipe'],['POST','/api/contagem/ajustar'],
     ['POST','/api/contagem/lancar'],['GET','/api/contagem/pendentes'],['POST','/api/contagem/pendentes/aprovar'],
     ['POST','/api/contagem/pendentes/rejeitar'],
