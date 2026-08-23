@@ -156,6 +156,7 @@
     <div class="card"><table><thead><tr><th>Código</th><th>Descrição</th><th>Cor</th><th></th></tr></thead><tbody id="lista"></tbody></table></div>
   </div>
 </div>
+<script src="/sku.js"></script>
 <script>
 let SKUS=[];
 const $=s=>document.querySelector(s);
@@ -312,11 +313,10 @@ async function manterTeste(){
 
 
 /* ---- Etiqueta Zebra ZD220 (100x35mm / 203dpi) ---- */
-function medidaDe(cod){
-  var m=/^([A-Z]+?)(\d{3})(\d{3})([A-Z]+)$/.exec(String(cod||"").toUpperCase());
-  if(!m) return null;
-  return {fam:m[1],larg:+m[2],alt:+m[3],cor:m[4]};
-}
+/* medidaDe() saiu daqui para /sku.js (carregado logo acima), que passou a ser o
+   parser unico do projeto — a migracao da Fase 0 roda em Node e precisava da
+   mesma funcao. Mesmo nome, mesma assinatura, mesmo retorno: nenhuma chamada
+   deste arquivo mudou. */
 function etiqueta(cod){
   var s=SKUS.find(function(x){return x.codigo===cod;})||{};
   var p=medidaDe(cod);
