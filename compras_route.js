@@ -178,6 +178,43 @@ module.exports = function(app, db){
     res.json({ok:true});
   });
 
+  /* ── COMPARACAO: de quem comprar (§5) ─────────────────────────────────────
+     A conta mora em compras_calc.js, sem Express e sem SQL. Aqui so se busca as
+     ofertas e se devolve o resultado — a §9 e explicita em que essa logica nao
+     pode existir em dois lugares. */
+  const CALC = require('./compras_calc');
+
+  function ofertasDe(componente_id, sku){
+    return db.prepare(`SELECT o.*, f.nome fornecedor_nome, f.prazo_entrega prazo_fornecedor,
+        f.pagamento, f.regime, f.pedido_minimo
+      FROM oferta o JOIN fornecedor f ON f.id=o.fornecedor_id
+      WHERE o.ativo=1 AND f.ativo=1 AND `+(componente_id?'o.componente_id=?':'o.sku=?'))
+      .all(componente_id || sku);
+  }
+
+  app.get('/api/comparar',(req,res)=>{
+    const cid=req.query.componente_id?+req.query.componente_id:null;
+    const sku=req.query.sku||null;
+    if(!cid && !sku) return res.status(400).json({erro:'informe componente_id ou sku'});
+    const N=parseFloat(String(req.query.necessidade||'').replace(',','.'));
+    if(!Number.isFinite(N) || N<=0) return res.status(400).json({erro:'necessidade tem que ser maior que zero'});
+
+    const c = cid ? db.prepare('SELECT nome, unidade, sobra_aproveitavel FROM componente WHERE id=?').get(cid) : null;
+    const r = CALC.comparar(ofertasDe(cid,sku), N, {
+      unidade: c ? (c.unidade==='m'?'metro':'unidade') : 'unidade',
+      sobra_aproveitavel: c ? c.sobra_aproveitavel : 1,
+      dias_ate: req.query.dias_ate!=null && req.query.dias_ate!=='' ? +req.query.dias_ate : null
+    });
+    /* Pedido minimo do fornecedor aparece como aviso, com quanto falta (§5). */
+    for(const l of r.linhas){
+      const f=db.prepare('SELECT pedido_minimo FROM fornecedor WHERE id=?').get(l.fornecedor_id);
+      if(f && f.pedido_minimo>0 && l.desembolso < f.pedido_minimo)
+        l.aviso_minimo='faltam R$ '+(f.pedido_minimo-l.desembolso).toFixed(2)
+          +' para o pedido mínimo deste fornecedor';
+    }
+    res.json(Object.assign({ item: c?c.nome:sku, unidade: c?c.unidade:'un' }, r));
+  });
+
   /* ── HISTORICO DE PRECO ──────────────────────────────────────────────────── */
   app.get('/api/precos/historico',(req,res)=>{
     const w=[], p=[];

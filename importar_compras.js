@@ -45,7 +45,9 @@ const MATERIAIS = [
   ['Comando 32 mm',                               100,   960.00,  'JP',      'un'],
   ['Emenda branca',                               100,    28.60,  'JP',      'un'],
   ['Limitador branco',                            100,    23.03,  'JP',      'un'],
-  ['Base redonda branca',                           6,    60.41,  'JP',      'un'],
+  /* Consumida por METRO, nao por unidade: 1,8 para uma persiana de 1,80 (a
+     planilha cobra R$ 18,12 = 1,8 x R$ 10,068). Confirmado pelo comprador. */
+  ['Base redonda branca',                           6,    60.41,  'JP',      'm'],
   ['Fita plastica 1,5 cm',                        100,    89.00,  'AC',      'm'],
   ['Tampa base redonda branca',                   100,    56.85,  'JP',      'un'],
   ['Corrente bola 10 branca',                     250,   182.50,  'AC',      'm'],

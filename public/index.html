@@ -84,6 +84,7 @@
   <div class="tab" data-t="acs">Acessos &amp; Permissões</div>
   <div class="tab" data-t="pend" id="tabPend">Pendências de SKU</div>
   <div class="tab" data-t="ficha">Ficha técnica</div>
+  <div class="tab" data-t="compras">Compras</div>
   <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="blq" id="tabBlq">Bloqueados</div><div class="tab" data-t="tst">Modo teste</div>
 </div>
 <div class="wrap">
@@ -154,6 +155,17 @@
       <button class="ghost" id="fxMat">Gravar na ficha da montagem</button><span class="msg" id="fxMatMsg"></span></div>
       <div id="fxFicha"></div></div>
   </div>
+
+  <div id="v-compras" class="hide">
+    <div class="card"><div style="font-weight:700;margin-bottom:4px">De quem comprar</div>
+      <div class="sub" style="margin-bottom:14px">Ninguém compra fração de embalagem. Se você precisa de 7 m e o fornecedor vende barra de 6 m, você leva 12 m e paga por 12 — e quem ordena pelo preço de tabela escolhe errado nessa hora. Por isso os <b>três números aparecem sempre</b>: preço por unidade, desembolso do pedido e sobra que entra no estoque.</div>
+      <div class="grid-med" style="grid-template-columns:3fr 1fr 1fr">
+        <div><label>Item</label><select id="cpItem"></select></div>
+        <div><label>Preciso de</label><input id="cpQtd" type="number" min="0" step="0.01" placeholder="7"></div>
+        <div><label>Tenho quantos dias</label><input id="cpDias" type="number" min="0" step="1" placeholder="—"></div>
+      </div>
+      <div class="row-actions"><button class="primary" id="cpVer">Comparar</button></div></div>
+    <div id="cpRes"></div></div>
 
   <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide">
   <div class="card">
@@ -238,6 +250,8 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.t==="pend") carregarPend();
   var vfx=$("#v-ficha"); if(vfx) vfx.classList.toggle("hide",t.dataset.t!=="ficha");
   if(t.dataset.t==="ficha") carregarFicha();
+  var vcp=$("#v-compras"); if(vcp) vcp.classList.toggle("hide",t.dataset.t!=="compras");
+  if(t.dataset.t==="compras") carregarCompras();
   if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); setTimeout(function(){var b=document.getElementById("ctBipe"); if(b) b.focus();},100); }
   var ifn=$("#ifPlan"), ifr=$("#ifRel"), ifa=$("#ifAcs");
   if(t.dataset.t==="plan" && ifn && !ifn.dataset.l){ ifn.src="/planejamento"; ifn.dataset.l=1; }
@@ -592,6 +606,60 @@ document.addEventListener('click',async function(e){
           r.ok?'var(--green)':'var(--red)'); return;
   }
 });
+
+/* ---- Compras: de quem comprar (COMPRAS.md §5) --------------------------
+   A regra 3 do §13 manda mostrar os três números SEMPRE — preço por unidade,
+   desembolso e sobra. Ordenar por um só, escondendo os outros, é como o
+   comprador é enganado. O sistema ordena e escreve o motivo; quem decide é ele. */
+async function carregarCompras(){
+  if(!COMPS.length){ try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){} }
+  const el=$('#cpItem'); if(!el) return;
+  el.innerHTML=COMPS.filter(c=>c.ativo).map(c=>'<option value="c'+c.id+'">'+esc(c.nome)
+      +(c.unidade?' ('+esc(c.unidade)+')':'')+'</option>').join('')
+    +SKUS.filter(s=>s.tem_ficha===0).map(s=>'<option value="s'+esc(s.codigo)+'">SKU de revenda · '+esc(s.codigo)+'</option>').join('');
+}
+async function compararItem(){
+  const box=$('#cpRes'), v=$('#cpItem').value, q=$('#cpQtd').value;
+  if(!box||!v) return;
+  if(!q||+q<=0){ box.innerHTML='<div class="card sub">Informe quanto você precisa.</div>'; return; }
+  const p=(v[0]==='c'?'componente_id='+v.slice(1):'sku='+encodeURIComponent(v.slice(1)))
+    +'&necessidade='+encodeURIComponent(q)
+    +($('#cpDias').value?'&dias_ate='+$('#cpDias').value:'');
+  let d; try{ d=await (await fetch('/api/comparar?'+p)).json(); }catch(e){ return; }
+  if(d.erro||!d.linhas||!d.linhas.length){
+    box.innerHTML='<div class="card" style="color:var(--amber)">'+esc(d.erro||(d.avisos&&d.avisos[0])||'sem fornecedor cadastrado para este item')+'</div>';
+    return;
+  }
+  const un=d.unidade==='m'?'m':'un';
+  let h='<div class="card"><div style="font-weight:700;margin-bottom:4px">'+esc(d.item)
+    +' <span class="sub" style="font-weight:400">— necessidade '+qtd(d.necessidade)+' '+un+'</span></div>'
+    +'<div class="sub" style="margin-bottom:12px">Ordenado por <b>'
+    +(d.criterio==='preco_unitario'?'preço por '+un+'</b> — a sobra deste item vira estoque e serve na próxima peça'
+      :'custo efetivo</b> — a sobra deste item não se aproveita, então entra na conta')+'</div>'
+    +'<table><thead><tr><th></th><th>Fornecedor</th><th>Embalagem</th><th>R$/'+un+'</th><th>Compra</th>'
+    +'<th>Desembolso</th><th>Sobra</th><th>Efetivo</th><th>Prazo</th></tr></thead><tbody>';
+  for(const l of d.linhas){
+    h+='<tr'+(l.vencedor?' style="background:rgba(255,184,0,.07)"':'')+'>'
+      +'<td>'+(l.vencedor?'<b style="color:var(--amber)">✓</b>':'')+'</td>'
+      +'<td>'+esc(l.fornecedor)+'</td><td>'+esc(l.embalagem)+'</td>'
+      +'<td>'+l.preco_unitario.toFixed(3).replace('.',',')+'</td>'
+      +'<td class="sub">'+l.embalagens+' × '+esc(l.embalagem)+'</td>'
+      +'<td><b>'+brl(l.desembolso)+'</b></td>'
+      +'<td>'+qtd(l.sobra)+' '+un+'</td>'
+      +'<td>'+l.custo_efetivo.toFixed(3).replace('.',',')+'</td>'
+      +'<td class="sub">'+(l.prazo!=null?l.prazo+' d':'—')+(l.pagamento?' · '+esc(l.pagamento):'')+'</td></tr>';
+    if(l.vencedor&&l.motivo) h+='<tr><td></td><td colspan="8" class="sub" style="color:var(--amber);border-top:0">↳ '+esc(l.motivo)+'</td></tr>';
+    if(l.aviso_minimo) h+='<tr><td></td><td colspan="8" class="sub" style="border-top:0">↳ '+esc(l.aviso_minimo)+'</td></tr>';
+  }
+  h+='</tbody></table>';
+  /* Esconder que o frete ou o prazo inverte a ordem é como um número vira
+     decisão errada sem ninguém perceber (§5). */
+  for(const a of (d.avisos||[]))
+    h+='<div style="margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;color:var(--amber);font-size:13px">⚠ '+esc(a)+'</div>';
+  box.innerHTML=h+'</div>';
+}
+document.addEventListener('click',function(e){ if(e.target&&e.target.id==='cpVer') compararItem(); });
+document.addEventListener('change',function(e){ if(e.target&&(e.target.id==='cpItem')) compararItem(); });
 
 /* ---- Cadastro (só dados do produto) ---- */
 function renderCad(){
