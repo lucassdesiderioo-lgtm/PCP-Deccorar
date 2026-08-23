@@ -124,10 +124,11 @@ estoque    INTEGER DEFAULT 0     -- peças prontas e embaladas
 alvo       INTEGER DEFAULT 0     -- meta de estoque
 criado_em  TEXT
 -- Compras Fase 0. Nulo = pendente; nunca zero. Ver GET /api/skus/pendencias.
-modelo_id  INTEGER REFERENCES modelo(id)
+modelo_id  INTEGER REFERENCES modelo(id)     -- mecanismo: Rolô, Acessório
 largura_cm INTEGER               -- centímetros inteiros
 altura_cm  INTEGER               -- centímetros inteiros
 cor_codigo TEXT REFERENCES cor(codigo)
+tecido_codigo TEXT REFERENCES tecido(codigo) -- material: Blackout, Screen
 ```
 
 > Medida e cor se leem **destas colunas**, não do código do SKU. `medidaDe()`
@@ -142,15 +143,27 @@ nome   TEXT               -- rótulo de tela: 'Bege'
 ativa  INTEGER DEFAULT 1  -- desativa, não apaga: pode haver SKU apontando
 ```
 
-#### `modelo` — linha de produto (Compras Fase 0)
+#### `tecido` — material, lista fechada (Compras Fase 0)
 ```sql
-id        INTEGER PK
-codigo    TEXT UNIQUE     -- o prefixo do SKU: 'BK'
-nome      TEXT            -- 'Persiana Rolô Blackout'
-ativo     INTEGER DEFAULT 1
-criado_em TEXT
+codigo TEXT PRIMARY KEY   -- 'BLACKOUT', 'SCREEN3'
+nome   TEXT               -- 'Blackout', 'Screen 3%'
+ativo  INTEGER DEFAULT 1
 ```
-Só cadastro nesta fase. As fórmulas da ficha técnica penduram aqui na Fase 2.
+O `BK` dos códigos antigos era **isto** — não o modelo. É o principal material
+comprado e o que a ficha técnica consome por metro.
+
+#### `modelo` — mecanismo (Compras Fase 0)
+```sql
+id           INTEGER PK
+codigo       TEXT UNIQUE     -- 'ROLO', 'ACESSORIO'
+nome         TEXT            -- 'Rolô', 'Acessório'
+ativo        INTEGER DEFAULT 1
+criado_em    TEXT
+exige_medida INTEGER DEFAULT 1  -- 0 = produto sem largura/altura (acessório, kit)
+```
+Rolô, Romana — o mecanismo, não o tecido. `exige_medida = 0` tira o produto da
+cobrança de medida em `GET /api/skus/pendencias`. As fórmulas da ficha técnica
+penduram aqui na Fase 2.
 
 #### `producao` — ordens de produção
 ```sql
@@ -346,8 +359,11 @@ atualizado  TEXT
 | POST | `/api/cores` | Cria/renomeia pelo código — `sku.cadastrar` |
 | DELETE | `/api/cores/:codigo` | **Desativa**, não apaga — `sku.cadastrar` |
 | GET | `/api/modelos` | Lista (inclui os inativos, com a flag) |
-| POST | `/api/modelos` | Cria/renomeia pelo código — `modelo.cadastrar` |
+| POST | `/api/modelos` | Cria/renomeia · também grava `exige_medida` — `modelo.cadastrar` |
 | DELETE | `/api/modelos/:id` | **Desativa**, não apaga — `modelo.cadastrar` |
+| GET | `/api/tecidos` | Lista (inclui os inativos, com a flag) |
+| POST | `/api/tecidos` | Cria/renomeia pelo código — `sku.cadastrar` |
+| DELETE | `/api/tecidos/:codigo` | **Desativa**, não apaga — `sku.cadastrar` |
 
 ### Produção
 | Método | Rota | Efeito |

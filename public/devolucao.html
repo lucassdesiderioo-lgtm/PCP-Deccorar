@@ -102,16 +102,41 @@ document.addEventListener('click',function(e){
   var s=e.target.closest('#dvSalvar');
   if(s){ dvSalvar(); return; }
 });
-var DVCOR=null, DVMED=null;
+/* Cor e medida vem das COLUNAS do SKU, nao mais da regex ^BK(\d{3})(\d{3}).
+   Antes, SKU fora da nomenclatura simplesmente NAO APARECIA aqui — nao havia
+   como registrar a devolucao dele. Agora aparece qualquer SKU com medida e cor
+   cadastradas, seja qual for o codigo.
+
+   E o SKU deixa de ser MONTADO por concatenacao: passa a ser PROCURADO. Com o
+   tecido em coluna, cor + medida nao identificam mais uma peca sozinhas — um
+   rolo blackout e um rolo screen 1,60 x 1,40 bege dao o mesmo par. Quando mais
+   de um SKU casa, a tela pergunta qual; quando so um casa, nada muda para quem
+   usa. */
+var DVCOR=null, DVMED=null, DVSKU=null;
+function dvChaveMed(s){ return s.largura_cm+'x'+s.altura_cm; }
 function dvOpcoes(){
   var cores={}, medidas={};
   for(var i=0;i<SKUS.length;i++){
-    var m=/^BK(\d{3})(\d{3})([A-Z]+)$/.exec(String(SKUS[i].codigo||'').toUpperCase());
-    if(!m) continue;
-    cores[m[3]]=1; medidas[m[1]+m[2]]=1;
+    var s=SKUS[i];
+    if(s.largura_cm==null||s.altura_cm==null||!s.cor_codigo) continue;
+    cores[s.cor_codigo]=1; medidas[dvChaveMed(s)]=1;
   }
-  return {cores:Object.keys(cores).sort(), medidas:Object.keys(medidas).sort()};
+  return {cores:Object.keys(cores).sort(), medidas:Object.keys(medidas).sort(function(a,b){
+    var pa=a.split('x'), pb=b.split('x');
+    return (+pa[0]-+pb[0])||(+pa[1]-+pb[1]);
+  })};
 }
+function dvCandidatos(){
+  if(!DVCOR||!DVMED) return [];
+  var r=[];
+  for(var i=0;i<SKUS.length;i++){
+    var s=SKUS[i];
+    if(s.largura_cm==null||s.altura_cm==null) continue;
+    if(s.cor_codigo===DVCOR && dvChaveMed(s)===DVMED) r.push(s);
+  }
+  return r;
+}
+function dvMed2(md){ var p=md.split('x'); return (parseInt(p[0],10)/100).toFixed(2)+' x '+(parseInt(p[1],10)/100).toFixed(2); }
 function dvSkus(){
   var box=document.getElementById('dvSkuBox');
   if(!box) return;
@@ -124,33 +149,51 @@ function dvSkus(){
   h+='</div><div class="lb">Medida (largura x altura)</div><div class="ops">';
   for(var j=0;j<op.medidas.length;j++){
     var md=op.medidas[j];
-    var txt=(parseInt(md.slice(0,3),10)/100).toFixed(2)+' x '+(parseInt(md.slice(3),10)/100).toFixed(2);
     var on2=DVMED===md;
-    h+='<button type="button" class="op'+(on2?' on':'')+'" data-med="'+md+'" style="font-size:16px;padding:14px 18px">'+txt+'</button>';
+    h+='<button type="button" class="op'+(on2?' on':'')+'" data-med="'+md+'" style="font-size:16px;padding:14px 18px">'+dvMed2(md)+'</button>';
   }
-  h+='</div><div id="dvResult" style="margin-top:16px;font-size:17px"></div>';
+  h+='</div>';
+  /* Terceiro grupo SO quando ha ambiguidade — dois toques seguem sendo o
+     caminho normal (DESIGN.md §5). */
+  var cand=dvCandidatos();
+  if(cand.length>1){
+    h+='<div class="lb" style="margin-top:16px">Qual destes?</div><div class="ops">';
+    for(var k=0;k<cand.length;k++){
+      var c=cand[k];
+      var rot=(c.descricao||'').trim()||c.tecido_codigo||c.codigo;
+      h+='<button type="button" class="op'+(DVSKU===c.codigo?' on':'')+'" data-dvsku="'+c.codigo+'" style="font-size:16px;padding:14px 18px">'+rot+'</button>';
+    }
+    h+='</div>';
+  }
+  h+='<div id="dvResult" style="margin-top:16px;font-size:17px"></div>';
   box.innerHTML=h;
   dvResultado();
 }
 function dvSkuAtual(){
-  if(!DVCOR||!DVMED) return '';
-  return 'BK'+DVMED+DVCOR;
+  var cand=dvCandidatos();
+  if(!cand.length) return '';
+  if(DVSKU){ for(var i=0;i<cand.length;i++) if(cand[i].codigo===DVSKU) return DVSKU; }
+  return cand.length===1 ? cand[0].codigo : '';
 }
 function dvResultado(){
   var el=document.getElementById('dvResult');
   if(!el) return;
+  if(!DVCOR||!DVMED){ el.innerHTML='<span style="color:#5a6472">Escolha a cor e a medida</span>'; return; }
+  if(!dvCandidatos().length){
+    el.innerHTML='<b style="color:#c62828">Nao ha SKU cadastrado com '+DVCOR+' '+dvMed2(DVMED)+'</b>';
+    return;
+  }
   var s=dvSkuAtual();
-  if(!s){ el.innerHTML='<span style="color:#5a6472">Escolha a cor e a medida</span>'; return; }
-  var existe=false;
-  for(var i=0;i<SKUS.length;i++) if(SKUS[i].codigo===s){ existe=true; break; }
-  if(existe) el.innerHTML='SKU: <b style="color:#b26a00;font-family:ui-monospace,monospace;font-size:19px">'+s+'</b>';
-  else el.innerHTML='<b style="color:#c62828">'+s+' nao esta cadastrado</b>';
+  if(!s){ el.innerHTML='<b style="color:#b26a00">Mais de um SKU com essa cor e medida — escolha acima</b>'; return; }
+  el.innerHTML='SKU: <b style="color:#b26a00;font-family:ui-monospace,monospace;font-size:19px">'+s+'</b>';
 }
 document.addEventListener('click',function(e){
+  var k=e.target.closest('[data-dvsku]');
+  if(k){ DVSKU=k.getAttribute('data-dvsku'); dvSkus(); return; }
   var c=e.target.closest('[data-cor]');
-  if(c){ DVCOR=c.getAttribute('data-cor'); dvSkus(); return; }
+  if(c){ DVCOR=c.getAttribute('data-cor'); DVSKU=null; dvSkus(); return; }
   var m=e.target.closest('[data-med]');
-  if(m){ DVMED=m.getAttribute('data-med'); dvSkus(); return; }
+  if(m){ DVMED=m.getAttribute('data-med'); DVSKU=null; dvSkus(); return; }
 });
 
 async function dvBuscar(cod){

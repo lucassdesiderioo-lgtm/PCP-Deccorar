@@ -81,11 +81,16 @@ async function load(){
   renderTiles(); loadStats();
 }
 function skuInfo(c){ return SKUS.find(s=>s.codigo===c); }
-// item 4: medida como ancora visual — deriva medida+cor do SKU (regex ja usada no projeto)
+// item 4: medida como ancora visual (DESIGN.md §3).
+// Le das COLUNAS do SKU, nao mais da regex ^BK(\d{3})(\d{3}): o codigo virou
+// etiqueta livre e nao carrega mais significado. Um SKU sem medida cadastrada
+// cai no mesmo fallback de antes — mostra so o codigo — e aparece na aba
+// "Pendencias de SKU" do admin para alguem completar.
 function medidaDe(cod){
-  var m=/^BK(\d{3})(\d{3})([A-Z]+)$/.exec(String(cod||'').toUpperCase());
-  if(!m) return null;
-  return { medida:(parseInt(m[1],10)/100).toFixed(2).replace('.',',')+' × '+(parseInt(m[2],10)/100).toFixed(2).replace('.',','), cor:m[3] };
+  var s=skuInfo(cod);
+  if(!s||s.largura_cm==null||s.altura_cm==null) return null;
+  return { medida:(s.largura_cm/100).toFixed(2).replace('.',',')+' × '+(s.altura_cm/100).toFixed(2).replace('.',','),
+           cor:s.cor_codigo||'' };
 }
 function tileInner(cod, corFallback, num, numColor, detail){
   var md=medidaDe(cod);

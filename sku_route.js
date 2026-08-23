@@ -46,16 +46,41 @@ module.exports = function(app, db){
      So cadastro nesta fase — o prefixo do SKU ('BK') virando linha. As formulas
      da ficha tecnica (tubo = (largura + 2) / 100) penduram aqui na Fase 2. */
   app.get('/api/modelos', (req,res)=>
-    res.json(db.prepare('SELECT id, codigo, nome, ativo FROM modelo ORDER BY codigo').all()));
+    res.json(db.prepare('SELECT id, codigo, nome, ativo, exige_medida FROM modelo ORDER BY codigo').all()));
 
   app.post('/api/modelos',(req,res)=>{
     const b=req.body||{};
     const cod=String(b.codigo||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
     if(!cod) return res.status(400).json({erro:'código obrigatório'});
     const nome=(b.nome===undefined||String(b.nome).trim()==='')?null:String(b.nome).trim();
-    db.prepare(`INSERT INTO modelo (codigo,nome,ativo) VALUES (?,?,1)
-      ON CONFLICT(codigo) DO UPDATE SET nome=COALESCE(excluded.nome,modelo.nome), ativo=1`).run(cod,nome);
-    res.json(db.prepare('SELECT id, codigo, nome, ativo FROM modelo WHERE codigo=?').get(cod));
+    /* exige_medida ausente = mantem o que esta la (o COALESCE do excluded nao
+       serve: 0 e valor legitimo, nao "nao mandou"). */
+    const em=('exige_medida' in b) ? (b.exige_medida?1:0) : null;
+    db.prepare(`INSERT INTO modelo (codigo,nome,ativo,exige_medida) VALUES (?,?,1,COALESCE(?,1))
+      ON CONFLICT(codigo) DO UPDATE SET nome=COALESCE(excluded.nome,modelo.nome), ativo=1,
+        exige_medida=COALESCE(?,modelo.exige_medida)`).run(cod,nome,em,em);
+    res.json(db.prepare('SELECT id, codigo, nome, ativo, exige_medida FROM modelo WHERE codigo=?').get(cod));
+  });
+
+  /* ── TECIDOS ──────────────────────────────────────────────────────────────
+     Mesma forma das cores. Blackout, Screen 3%. O prefixo do SKU ('BK') era
+     isto o tempo todo — nao o modelo. */
+  app.get('/api/tecidos', (req,res)=>
+    res.json(db.prepare('SELECT codigo, nome, ativo FROM tecido ORDER BY codigo').all()));
+
+  app.post('/api/tecidos',(req,res)=>{
+    const b=req.body||{};
+    const cod=String(b.codigo||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if(!cod) return res.status(400).json({erro:'código obrigatório'});
+    const nome=(b.nome===undefined||String(b.nome).trim()==='')?null:String(b.nome).trim();
+    db.prepare(`INSERT INTO tecido (codigo,nome,ativo) VALUES (?,?,1)
+      ON CONFLICT(codigo) DO UPDATE SET nome=COALESCE(excluded.nome,tecido.nome), ativo=1`).run(cod,nome);
+    res.json({ok:true,codigo:cod});
+  });
+
+  app.delete('/api/tecidos/:codigo',(req,res)=>{
+    db.prepare('UPDATE tecido SET ativo=0 WHERE codigo=?').run(String(req.params.codigo||'').toUpperCase());
+    res.json({ok:true});
   });
 
   app.delete('/api/modelos/:id',(req,res)=>{
@@ -74,15 +99,23 @@ module.exports = function(app, db){
      na lista, so nao e mais oferecida para cadastro novo. Pendencia e cor nula
      ou que nao existe na tabela. */
   app.get('/api/skus/pendencias',(req,res)=>{
-    const cols='codigo, descricao, largura_cm, altura_cm, modelo_id, cor_codigo';
-    const q=(where)=>db.prepare('SELECT '+cols+' FROM skus WHERE '+where+' ORDER BY codigo').all();
-    const medida=q('largura_cm IS NULL OR altura_cm IS NULL');
-    const modelo=q('modelo_id IS NULL');
-    const cor   =q('cor_codigo IS NULL OR cor_codigo NOT IN (SELECT codigo FROM cor)');
-    const total =db.prepare(`SELECT COUNT(*) c FROM skus WHERE largura_cm IS NULL OR altura_cm IS NULL
-      OR modelo_id IS NULL OR cor_codigo IS NULL OR cor_codigo NOT IN (SELECT codigo FROM cor)`).get().c;
+    const cols=`s.codigo, s.descricao, s.largura_cm, s.altura_cm, s.modelo_id, s.cor_codigo,
+                s.tecido_codigo, m.codigo modelo_codigo, m.nome modelo_nome`;
+    const q=(where)=>db.prepare('SELECT '+cols+' FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id'
+      +' WHERE '+where+' ORDER BY s.codigo').all();
+
+    /* Acessorio nao tem medida e nunca vai ter — cobrar dele e ruido que ensina
+       a equipe a ignorar o contador. Modelo ainda NULO conta como pendente de
+       medida: sem saber o que a peca e, nao da para dizer que ela nao tem. */
+    const SEM_MEDIDA='(s.modelo_id IS NULL OR COALESCE(m.exige_medida,1)=1)';
+    const medida=q(SEM_MEDIDA+' AND (s.largura_cm IS NULL OR s.altura_cm IS NULL)');
+    const modelo=q('s.modelo_id IS NULL');
+    const cor   =q('s.cor_codigo IS NULL OR s.cor_codigo NOT IN (SELECT codigo FROM cor)');
+    const todas =q('('+SEM_MEDIDA+' AND (s.largura_cm IS NULL OR s.altura_cm IS NULL))'
+      +' OR s.modelo_id IS NULL'
+      +' OR s.cor_codigo IS NULL OR s.cor_codigo NOT IN (SELECT codigo FROM cor)');
     res.json({
-      total, skus: db.prepare('SELECT COUNT(*) c FROM skus').get().c,
+      total: todas.length, skus: db.prepare('SELECT COUNT(*) c FROM skus').get().c,
       medida, modelo, cor
     });
   });

@@ -10,7 +10,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS skus (codigo TEXT PRIMARY KEY, descricao TEXT DEFAULT '', cor TEXT DEFAULT '',
     estoque INTEGER DEFAULT 0, alvo INTEGER DEFAULT 0, criado_em TEXT DEFAULT (datetime('now','localtime')),
     modelo_id INTEGER REFERENCES modelo(id), largura_cm INTEGER, altura_cm INTEGER,
-    cor_codigo TEXT REFERENCES cor(codigo));
+    cor_codigo TEXT REFERENCES cor(codigo), tecido_codigo TEXT REFERENCES tecido(codigo));
   /* origem/urgente eram colunas so de producao, adicionadas a mao. Os defaults
      importam: server.js insere producao manual so com (codigo,qtd), e o
      cruzamento apaga por origem='ml'. Sem DEFAULT 'manual' o lancamento manual

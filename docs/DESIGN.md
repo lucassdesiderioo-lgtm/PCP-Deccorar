@@ -118,8 +118,11 @@ confusão. Mas ele ganha uma linha acima, maior e mais legível:
 BK160140CINZA                ← 15px, o código que eles conhecem
 ```
 
-Derivada do próprio SKU pela regex já existente. Para códigos fora do padrão
-(`SCREEN3-160140BEGE`), exibe só o código.
+Lida das colunas `largura_cm`, `altura_cm` e `cor_codigo` do SKU — **não** do
+texto do código (ver §7 do `CLAUDE.md`: não há mais formato obrigatório). Assim
+`SCREEN3-160140BEGE`, que antes aparecia só como código, ganha a mesma âncora
+visual que os demais. SKU **sem medida cadastrada** é que cai no fallback de
+exibir só o código, e aparece em Admin → Pendências de SKU.
 
 ---
 

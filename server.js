@@ -25,7 +25,7 @@ app.post('/api/skus', (req,res)=>{
   const {codigo,descricao='',cor='',estoque=0,alvo=0}=b;
   if(!codigo||!codigo.trim()) return res.status(400).json({erro:'código obrigatório'});
   const cod=codigo.trim().toUpperCase();
-  const atual=db.prepare('SELECT modelo_id,largura_cm,altura_cm,cor_codigo FROM skus WHERE codigo=?').get(cod)||{};
+  const atual=db.prepare('SELECT modelo_id,largura_cm,altura_cm,cor_codigo,tecido_codigo FROM skus WHERE codigo=?').get(cod)||{};
   const manda=(k,novo)=> (k in b) ? novo : (atual[k]===undefined?null:atual[k]);
 
   let modeloId=null;
@@ -47,12 +47,19 @@ app.post('/api/skus', (req,res)=>{
     corCod=(c&&db.prepare('SELECT 1 FROM cor WHERE codigo=?').get(c))?c:null;
   } else corCod=atual.cor_codigo===undefined?null:atual.cor_codigo;
 
-  db.prepare(`INSERT INTO skus (codigo,descricao,cor,estoque,alvo,modelo_id,largura_cm,altura_cm,cor_codigo)
-    VALUES (?,?,?,?,?,?,?,?,?)
+  let tecCod=null;
+  if('tecido_codigo' in b){
+    const t=String(b.tecido_codigo||'').trim().toUpperCase();
+    tecCod=(t&&db.prepare('SELECT 1 FROM tecido WHERE codigo=?').get(t))?t:null;
+  } else tecCod=atual.tecido_codigo===undefined?null:atual.tecido_codigo;
+
+  db.prepare(`INSERT INTO skus (codigo,descricao,cor,estoque,alvo,modelo_id,largura_cm,altura_cm,cor_codigo,tecido_codigo)
+    VALUES (?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(codigo) DO UPDATE SET descricao=excluded.descricao,cor=excluded.cor,estoque=excluded.estoque,alvo=excluded.alvo,
-      modelo_id=excluded.modelo_id,largura_cm=excluded.largura_cm,altura_cm=excluded.altura_cm,cor_codigo=excluded.cor_codigo`)
+      modelo_id=excluded.modelo_id,largura_cm=excluded.largura_cm,altura_cm=excluded.altura_cm,
+      cor_codigo=excluded.cor_codigo,tecido_codigo=excluded.tecido_codigo`)
     .run(cod,descricao,cor,+estoque||0,+alvo||0,
-      modeloId, manda('largura_cm',cmDe(b.largura_cm)), manda('altura_cm',cmDe(b.altura_cm)), corCod);
+      modeloId, manda('largura_cm',cmDe(b.largura_cm)), manda('altura_cm',cmDe(b.altura_cm)), corCod, tecCod);
   try{ db.prepare("UPDATE lote SET estagio='pendente' WHERE estagio='bloqueado' AND codigo=?").run(cod); }catch(e){}
   res.json({ok:true});
 });

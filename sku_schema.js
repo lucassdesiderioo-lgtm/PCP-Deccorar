@@ -28,7 +28,24 @@ const COLUNAS_SKU = [
      texto livre ('Branco', 'bege claro'). Reaproveita-la obrigaria a migracao a
      sobrescrever dado existente. Esta coluna e a cor da lista fechada; a antiga
      fica intocada e some numa fase futura, com teste. */
-  ['cor_codigo', 'TEXT REFERENCES cor(codigo)']
+  ['cor_codigo', 'TEXT REFERENCES cor(codigo)'],
+  /* Tecido e MODELO sao coisas diferentes, e a primeira migracao errou nisso:
+     usou o prefixo do codigo ('BK') como modelo. BK e blackout, o TECIDO. O
+     modelo e o mecanismo — Rolo, Romana. Deixar a string decidir o significado
+     e exatamente o vicio que esta fase existe para matar.
+     O tecido e o principal material comprado e o que a ficha tecnica consome
+     por metro, entao ele e coluna, nao texto na descricao. */
+  ['tecido_codigo', 'TEXT REFERENCES tecido(codigo)']
+];
+
+/* Colunas novas de `modelo`, pela mesma razao: a tabela ja existe em producao. */
+const COLUNAS_MODELO = [
+  /* Nem todo produto do cadastro e uma persiana. KIT32 e ACESSORIOSPERSIANAS
+     nao tem largura nem altura, e nunca vao ter. Sem esta flag eles ficariam em
+     "Medida pendente" para sempre — e um contador que nunca zera e um contador
+     que a equipe aprende a ignorar, justamente o que sinaliza quando a ficha
+     tecnica pode comecar. */
+  ['exige_medida', 'INTEGER DEFAULT 1']
 ];
 
 function garantirSchema(db){
@@ -48,15 +65,26 @@ function garantirSchema(db){
       codigo    TEXT UNIQUE,
       nome      TEXT,
       ativo     INTEGER DEFAULT 1,
-      criado_em TEXT DEFAULT (datetime('now','localtime'))
+      criado_em TEXT DEFAULT (datetime('now','localtime')),
+      exige_medida INTEGER DEFAULT 1
+    );
+    /* Mesma forma da tabela cor. Blackout, Screen 3%. */
+    CREATE TABLE IF NOT EXISTS tecido (
+      codigo TEXT PRIMARY KEY,
+      nome   TEXT,
+      ativo  INTEGER DEFAULT 1
     );
   `);
 
-  const tem = db.prepare('PRAGMA table_info(skus)').all().map(function(c){ return c.name; });
-  for(const par of COLUNAS_SKU){
-    if(tem.indexOf(par[0]) < 0)
-      db.exec('ALTER TABLE skus ADD COLUMN ' + par[0] + ' ' + par[1]);
-  }
+  const colunas = function(tabela, novas){
+    const tem = db.prepare('PRAGMA table_info(' + tabela + ')').all().map(function(c){ return c.name; });
+    for(const par of novas){
+      if(tem.indexOf(par[0]) < 0)
+        db.exec('ALTER TABLE ' + tabela + ' ADD COLUMN ' + par[0] + ' ' + par[1]);
+    }
+  };
+  colunas('skus', COLUNAS_SKU);
+  colunas('modelo', COLUNAS_MODELO);
 }
 
-module.exports = { garantirSchema, COLUNAS_SKU };
+module.exports = { garantirSchema, COLUNAS_SKU, COLUNAS_MODELO };

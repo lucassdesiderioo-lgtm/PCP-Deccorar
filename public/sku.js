@@ -9,17 +9,23 @@
  * Escrever um parser novo do lado do servidor daria uma quarta estrategia de
  * normalizacao num projeto que ja tem tres; o objetivo da fase e reduzir isso.
  *
- * ATENCAO ao que ela passou a ser: depois da Fase 0, medida e cor se leem das
- * COLUNAS de `skus`. Esta funcao e conveniencia de cadastro — preenche o
- * formulario quando alguem digita o codigo, e alimentou a migracao uma vez.
- * Nao e mais fonte da verdade. Nao a use para decidir nada em tempo de execucao.
+ * ATENCAO ao que ela passou a ser: NAO HA MAIS PADRAO DE SKU. O codigo e uma
+ * etiqueta livre — pode ser o que a operacao quiser. Medida, cor, modelo e
+ * tecido se leem das COLUNAS de `skus`, e so delas.
  *
- * As copias em public/operador.html e public/devolucao.html continuam de pe e
- * cravam o prefixo BK. Sao dividas conhecidas; a limpeza vem depois, com teste,
- * porque sao telas de operacao.
+ * Sobrou UM uso, e e conveniencia de digitacao: quando alguem cadastra um SKU
+ * cujo codigo por acaso segue o formato antigo, o formulario adianta largura,
+ * altura e cor. Os campos seguem editaveis e o que salva e o campo.
  *
- * Devolve null para codigo fora do padrao — inclusive o legado BK110X240BEGE
- * (§14, item 7). Fora do padrao NUNCA vira chute: quem chama trata o null.
+ * NUNCA deduza MODELO daqui. O prefixo 'BK' e o TECIDO (blackout); o modelo e o
+ * mecanismo (Rolo). A primeira migracao da Fase 0 confundiu os dois — foi
+ * exatamente o erro que estas colunas existem para impedir.
+ *
+ * As telas de operacao (operador.html, devolucao.html) e a etiqueta ja nao
+ * chamam esta funcao: leem as colunas.
+ *
+ * Devolve null para qualquer codigo que nao siga o formato antigo. Null NUNCA
+ * vira chute: quem chama simplesmente nao adianta nada.
  */
 (function(raiz){
   function medidaDe(cod){

@@ -436,8 +436,9 @@ module.exports = function(app, db){
     // omissao: sao listas de apoio de tela, sem dado sensivel, como GET
     // /api/skus e GET /api/listas/:tipo.
     if(M !== 'GET' && pre('/api/cores')) return 'sku.cadastrar';
+    if(M !== 'GET' && pre('/api/tecidos')) return 'sku.cadastrar';
     if(M !== 'GET' && pre('/api/modelos')) return 'modelo.cadastrar';
-    if(eq('/api/cores') || eq('/api/modelos')) return '@logado';
+    if(eq('/api/cores') || eq('/api/modelos') || eq('/api/tecidos')) return '@logado';
     if(M !== 'GET' && eq('/api/cruzamento/aplicar')) return 'producao.lancar';
     // contagem em dois passos (secao 9): aprovar/rejeitar o pendente exige
     // contagem.ajustar; contar e ENVIAR (que pode virar pendente) exige so
@@ -546,6 +547,7 @@ module.exports = function(app, db){
     ['POST','/api/producao'],['POST','/api/planejamento/importar'],['POST','/api/skus'],['DELETE','/api/skus/:c'],
     ['GET','/api/skus/pendencias'],['GET','/api/cores'],['POST','/api/cores'],['DELETE','/api/cores/:c'],
     ['GET','/api/modelos'],['POST','/api/modelos'],['DELETE','/api/modelos/:id'],
+    ['GET','/api/tecidos'],['POST','/api/tecidos'],['DELETE','/api/tecidos/:c'],
     ['POST','/api/cruzamento/aplicar'],['POST','/api/contagem/bipe'],['POST','/api/contagem/ajustar'],
     ['POST','/api/contagem/lancar'],['GET','/api/contagem/pendentes'],['POST','/api/contagem/pendentes/aprovar'],
     ['POST','/api/contagem/pendentes/rejeitar'],

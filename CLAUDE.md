@@ -172,21 +172,51 @@ anúncio ser corrigido na origem. Isso força a padronização em vez de mascar�
 
 ---
 
-## 7. Formato do SKU
+## 7. O SKU — **não há formato obrigatório**
 
-```
-BK + largura(3) + altura(3) + COR
-```
+> ⚠️ Isto mudou em 23/08/2026 (Compras, Fase 0). Se você lembra da regra
+> `BK + largura(3) + altura(3) + COR`, ela **não existe mais**.
 
-Exemplo: `BK160140BRANCO` = Blackout, 1,60 m de largura × 1,40 m de altura, branco.
+**O código do SKU é uma etiqueta livre.** Pode ter espaços, hífens, números no
+meio — `ROLO SOB MEDIDA 137x212` é um SKU válido. O sistema não interpreta o
+código para descobrir nada.
 
-- Sempre MAIÚSCULAS, sem espaços, sem separadores
-- Medidas em centímetros, 3 dígitos com zero à esquerda
-- A regex usada em várias telas: `/^BK(\d{3})(\d{3})([A-Z]+)$/`
+O que a peça É vive em **colunas** de `skus`:
 
-> ⚠️ Existe pelo menos um SKU legado fora do padrão (`BK110X240BEGE`, com "X").
-> Ele quebra a geração de etiqueta e a seleção por cor+medida. Renomear para
-> `BK110240BEGE` é dívida técnica pendente.
+| Coluna | O que é | Exemplo |
+|---|---|---|
+| `largura_cm`, `altura_cm` | Medida, centímetros inteiros | 160, 140 |
+| `cor_codigo` | Cor, da lista fechada `cor` | `BEGE` |
+| `tecido_codigo` | **Material**, da lista `tecido` | `BLACKOUT` |
+| `modelo_id` | **Mecanismo**, da tabela `modelo` | Rolô, Acessório |
+
+> ⚠️ **Tecido não é modelo.** O `BK` dos códigos antigos é *blackout* — o
+> tecido. O modelo é o mecanismo: Rolô, Romana. A primeira migração da Fase 0
+> confundiu os dois e gravou modelo `BK` em 24 SKUs; foi corrigido. Nunca deduza
+> modelo do prefixo do código.
+
+**Produto sem medida existe.** `KIT32` e `ACESSORIOSPERSIANAS` não são persianas.
+O modelo deles tem `exige_medida = 0`, e por isso não são cobrados por largura e
+altura na tela de pendências. Sem essa flag, o contador nunca zeraria — e um
+contador que nunca zera é um contador que a equipe aprende a ignorar.
+
+### Quem lê o quê
+
+- Etiqueta, revisão (`/operador`) e devolução leem **as colunas**. Um SKU sem
+  medida cadastrada não imprime etiqueta e aparece só pelo código na revisão.
+- `public/sku.js` (`medidaDe`) é o **único** lugar que ainda olha o texto do
+  código, e serve a **um** propósito: no cadastro, quando alguém digita um
+  código no formato antigo, adiantar largura, altura e cor. Os campos seguem
+  editáveis e vale o que está no campo. Ela **nunca** devolve modelo.
+- O que falta preencher aparece em **Admin → Pendências de SKU**.
+
+**A trava do §6 continua valendo.** "Sem formato" não é "sem cadastro": o SKU
+tem que existir em `skus`, senão o volume fica bloqueado. São coisas diferentes.
+
+**A etiqueta impressa (Zebra ZD220, 100×35 mm, 203 dpi)** é gerada no navegador
+com JsBarcode em CODE128B, a partir da aba Cadastro de SKU. Impressão exige
+margens "Nenhuma" e escala 100% — "Ajustar à página" deforma as barras e o leitor
+recusa.
 
 **A etiqueta impressa (Zebra ZD220, 100×35 mm, 203 dpi)** é gerada no navegador
 com JsBarcode em CODE128B, a partir da aba Cadastro de SKU. Impressão exige
@@ -371,7 +401,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 4 | `POST /api/producao` (manual) não aceita `data`, `origem` nem `urgente` | Médio — impede lançar adiantado pela tela |
 | 5 | Upload não permite escolher a data das vendas | Médio — vendas de amanhã entram como hoje |
 | 6 | `POST /api/revisao` retorna campos obsoletos (`estoque`, `pedido`, `feito`) | Baixo — confunde quem lê a API |
-| 7 | SKU `BK110X240BEGE` fora do padrão | Baixo — quebra etiqueta e seletor |
+| 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
 | 10 | Sem testes automatizados | Médio a longo prazo |
