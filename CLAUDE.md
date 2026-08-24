@@ -229,6 +229,11 @@ recusa.
 
 > Especificação completa: `COMPRAS.md` (fora do repositório — peça ao dono).
 > Fases 1 a 5 implementadas em 23/08/2026. Fases 6 e 7 pendentes.
+> Histórico de custo (`custo_dominio.js`) e contagem de material entraram
+> **antes** da Fase 6, e de propósito: os dois são relógios de história. Enquanto
+> não existem, o período não fica atrasado — fica perdido, porque história não se
+> reconstrói depois. A perda de corte só aparece comparando o que a ficha diz que
+> foi consumido com o que sobrou na prateleira, e isso precisa de meses.
 
 Responde três perguntas que o sistema não respondia: **o que comprar**,
 **de quem comprar** e **quanto o produto custa**.
@@ -283,6 +288,16 @@ passar no teste de três medidas.
   como *a caminho*. Só fecha com um dos dois motivos.
 - **Material devolvido não entra no estoque** e segue como *a caminho* — o
   fornecedor ainda deve.
+- **Bipar código de material não conta 1.** A unidade de consumo do tubo é o
+  metro; `+1` ali seria 1 metro, não 1 barra. A tela avisa e manda para o campo
+  de material, onde a quantidade é digitada.
+- **Zero é lançamento válido na contagem de material.** É a única forma de um
+  material que acabou entrar na contagem em vez de ficar de fora dela — e ficar
+  de fora é o que mantém o saldo errado no sistema.
+- **Saldo de material é arredondado em 3 casas** dentro do
+  `componente_dominio.js`. `3,5 + 0,2 = 3,7000000000000006` não é precisão, é
+  ruído, e ele compõe: cada contagem grava o lixo da anterior. Custo médio é
+  outra escala (R$ 0,0825 por parafuso é preço de verdade) e corta em 6 casas.
 - **O pedido congela embalagem, fator e preço.** Mudar o preço do cadastro não
   mexe em pedido já feito.
 - **Escolher fora do melhor preço exige motivo**, e vai para a auditoria.
@@ -386,9 +401,14 @@ a produção real). Tarja amarela aparece em todas as telas via `nav.js`.
 > **Por que a foto do estoque:** estoque é número corrido, não lista de linhas.
 > Apagar as revisões de teste não desfaria o `+1` que cada uma somou.
 
-**Cobertura atual (9 tabelas):** `revisao`, `producao`, `montagem`, `lote`,
-`fila`, `devolucao`, `rejeicao`, `contagem` e `contagem_pendente`.
-(`foto_estoque` saiu na Fase 3.)
+**São duas fotos, não uma.** `skus.estoque`/`alvo` e, desde a contagem de
+material, `componente.estoque`/`custo_medio`. Apagar as linhas de
+`movimento_componente` não desfaz o saldo pela mesma razão de sempre — quem
+guarda o saldo é a coluna, o movimento é só a história dela.
+
+**Cobertura atual (10 tabelas):** `revisao`, `producao`, `montagem`, `lote`,
+`fila`, `devolucao`, `rejeicao`, `contagem`, `contagem_pendente` e
+`movimento_componente`. (`foto_estoque` saiu na Fase 3.)
 
 A lista fica em `TABELAS`, no topo do `teste_route.js`. Cada entrada traz a coluna
 de chave primária — hoje todas usam `id`. O campo ficou genérico por causa da
@@ -533,6 +553,13 @@ descrevia mais o banco real. Auditoria de 14/08/2026 fechou o buraco:
 mesmo commit** em que o código passa a usá-la. Se precisar existir também no
 banco de produção, o `ALTER` correspondente vai junto, com a coluna acrescentada
 **no fim** — é onde o SQLite a coloca, e é o que mantém a ordem igual à de lá.
+
+> ⚠️ **O `ALTER` guardado mora no módulo dono da tabela.** Um `ALTER` de
+> `contagem_pendente` ficou no `compras_schema.js`, que roda no boot do `db.js`
+> — antes de `cont_route.js` criar a tabela. Num banco **novo** a guarda não
+> achava a tabela e pulava; a coluna só nascia no segundo boot. Em produção nada
+> aparecia, porque lá a tabela já existia. Instalação limpa é justamente o caso
+> que essa seção existe para proteger.
 
 > ⚠️ `ALTER TABLE ADD COLUMN` **não aceita default dinâmico** no SQLite
 > (`(datetime('now','localtime'))` é recusado). Colunas de data adicionadas por

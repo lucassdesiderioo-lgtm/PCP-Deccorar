@@ -15,6 +15,19 @@
  * juntas.
  */
 
+/* Material se mede em metro, unidade e quilo — nunca em decimo de milimetro. O
+ * que a soma de ponto flutuante produz (3,5 + 0,2 = 3,7000000000000006) nao e
+ * precisao, e ruido, e ele COMPOE: cada contagem grava o lixo da anterior e a
+ * tela acaba mostrando "3,699999999999999 m".
+ *
+ * Como esta funcao e o dono unico do saldo, o corte mora aqui — arredondar so na
+ * hora de exibir deixaria o numero sujo no banco e nas comparacoes.
+ *
+ * Custo medio e outra escala: R$ 0,0825 por parafuso e um preco de verdade.
+ * Seis casas matam o ruido sem tocar em centavo nenhum. */
+const q3 = n => Math.round((+n||0)*1000)/1000;
+const m6 = n => Math.round((+n||0)*1e6)/1e6;
+
 /* Saldo e custo medio atuais. */
 function saldo(db, componente_id){
   const c = db.prepare('SELECT estoque, custo_medio FROM componente WHERE id=?').get(componente_id);
@@ -24,13 +37,17 @@ function saldo(db, componente_id){
 /* Movimento generico. `custo_unit` so faz sentido na ENTRADA — e ele que
    alimenta o custo medio. */
 function movimentar(db, args){
-  const { componente_id, delta, motivo, referencia, custo_unit, usuario_id, usuario_nome, teste } = args;
+  const { componente_id, motivo, referencia, custo_unit, usuario_id, usuario_nome, teste } = args;
   if(!componente_id) throw new Error('movimento sem componente');
-  if(!Number.isFinite(delta) || delta === 0) throw new Error('movimento com delta inválido');
+  if(!Number.isFinite(args.delta)) throw new Error('movimento com delta inválido');
+  /* Arredonda ANTES de conferir o zero: 0,0004 m nao e movimento de material, e
+     resto de conta. Assim o extrato soma exatamente o saldo, sem sobra. */
+  const delta = q3(args.delta);
+  if(delta === 0) throw new Error('movimento com delta inválido');
 
   const atual = saldo(db, componente_id);
   const estoqueAntes = +atual.estoque || 0;
-  const novo = estoqueAntes + delta;
+  const novo = q3(estoqueAntes + delta);
 
   let custoMedio = +atual.custo_medio || 0;
   if(delta > 0 && custo_unit != null && Number.isFinite(custo_unit)){
@@ -38,9 +55,9 @@ function movimentar(db, args){
        estoque (§6). Se o saldo estava negativo ou zerado, a entrada define o
        custo — nao ha o que ponderar. */
     const base = Math.max(0, estoqueAntes);
-    custoMedio = (base + delta) > 0
+    custoMedio = m6((base + delta) > 0
       ? (base * custoMedio + delta * custo_unit) / (base + delta)
-      : custo_unit;
+      : custo_unit);
   }
 
   db.prepare('UPDATE componente SET estoque=?, custo_medio=? WHERE id=?')
@@ -76,7 +93,7 @@ function corrigirCustoPago(db, args){
   const est = +c.estoque || 0;
   if(est <= 0) return null;                    // nada em estoque para corrigir
   const afetada = Math.min(quantidade, est);   // parte que ainda esta la
-  const novo = (+c.custo_medio || 0) + (custo_novo - custo_antigo) * afetada / est;
+  const novo = m6((+c.custo_medio || 0) + (custo_novo - custo_antigo) * afetada / est);
   db.prepare('UPDATE componente SET custo_medio=? WHERE id=?').run(novo, componente_id);
   return { custo_medio:novo };
 }

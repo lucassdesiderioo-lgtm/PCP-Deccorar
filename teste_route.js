@@ -15,7 +15,11 @@ module.exports=function(app, db){
     {nome:'devolucao',    pk:'id',   rotulo:'devolucoes'},
     {nome:'rejeicao',     pk:'id',   rotulo:'problemas'},
     {nome:'contagem',          pk:'id', rotulo:'contagem'},
-    {nome:'contagem_pendente', pk:'id', rotulo:'contagem (aprovacao)'}
+    {nome:'contagem_pendente', pk:'id', rotulo:'contagem (aprovacao)'},
+    // A contagem de material mexe em componente.estoque, e todo movimento deixa
+    // linha aqui (regra 10). Sem esta cobertura, "apagar tudo" apagaria a
+    // contagem de teste e deixaria o estoque de materia prima mexido.
+    {nome:'movimento_componente', pk:'id', rotulo:'movimento de material'}
   ];
 
   // Fase 3: foto_estoque saiu da cobertura; limpa o trigger antigo em bancos
@@ -67,6 +71,11 @@ module.exports=function(app, db){
   app.post('/api/teste/ligar',function(req,res){
     if(get('modo_teste')==='1') return res.json({ok:true,ja:true});
     set('teste_snapshot',JSON.stringify(db.prepare('SELECT codigo,estoque,alvo FROM skus').all()));
+    // Foto do material tambem. Apagar as linhas de movimento nao desfaz o saldo
+    // — quem guarda o saldo e a coluna componente.estoque, e o custo medio anda
+    // junto com ela no recebimento.
+    try{ set('teste_snapshot_comp',JSON.stringify(db.prepare('SELECT id,estoque,custo_medio FROM componente').all())); }
+    catch(e){ set('teste_snapshot_comp','[]'); }
     set('teste_desde',new Date().toLocaleString('pt-BR'));
     set('modo_teste','1');
     res.json({ok:true,naoCobertas:FALHOU});
@@ -74,6 +83,7 @@ module.exports=function(app, db){
 
   app.post('/api/teste/limpar',function(req,res){
     var snap=[]; try{ snap=JSON.parse(get('teste_snapshot')||'[]'); }catch(e){}
+    var snapC=[]; try{ snapC=JSON.parse(get('teste_snapshot_comp')||'[]'); }catch(e){}
     var apagados={};
     db.transaction(function(){
       COBERTAS.forEach(function(t){
@@ -81,9 +91,14 @@ module.exports=function(app, db){
       });
       var up=db.prepare('UPDATE skus SET estoque=?, alvo=? WHERE codigo=?');
       snap.forEach(function(s){ up.run(s.estoque,s.alvo,s.codigo); });
+      try{
+        var upc=db.prepare('UPDATE componente SET estoque=?, custo_medio=? WHERE id=?');
+        snapC.forEach(function(c){ upc.run(c.estoque,c.custo_medio,c.id); });
+      }catch(e){}
       set('modo_teste','0');
     })();
-    res.json({ok:true,apagados:apagados,rotulos:rotulos(),estoqueRestaurado:snap.length});
+    res.json({ok:true,apagados:apagados,rotulos:rotulos(),
+              estoqueRestaurado:snap.length,materialRestaurado:snapC.length});
   });
 
   app.post('/api/teste/manter',function(req,res){

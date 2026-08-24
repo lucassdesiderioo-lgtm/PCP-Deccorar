@@ -192,9 +192,20 @@
       <button class="primary" onclick="ctLancar()">Lancar no estoque (soma)</button><button class="ghost" onclick="ctAjustar()">Ajustar (substitui)</button>
     </div>
     <div id="ctUlt" style="margin-top:12px;font-size:15px"></div>
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid #30363d">
+      <div style="font-weight:700;margin-bottom:4px">Material</div>
+      <div class="sub" style="margin-bottom:10px">Material n&atilde;o tem etiqueta: escolha na lista e digite quanto tem. Cada lan&ccedil;amento SOMA, igual ao bipe &mdash; contou duas prateleiras, lance duas vezes. <b>Zero vale</b>: &eacute; assim que um material que acabou entra na contagem.</div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <select id="ctComp" onchange="ctCompUnidade()" style="flex:1;min-width:260px;padding:12px;font-size:15px"></select>
+        <input id="ctCompQtd" type="number" min="0" step="0.001" placeholder="quanto tem" style="width:150px;padding:12px;font-size:15px;text-align:center">
+        <span class="sub" id="ctCompUn" style="min-width:64px"></span>
+        <button class="ghost" onclick="ctLancarComp()">Lan&ccedil;ar na contagem</button>
+      </div>
+      <div id="ctCompUlt" style="margin-top:10px;font-size:15px"></div>
+    </div>
   </div>
   <div class="card">
-    <table><thead><tr><th>SKU</th><th>Sistema</th><th>Contado</th><th>Diferenca</th></tr></thead><tbody id="ctLista"></tbody></table>
+    <table><thead><tr><th>Item</th><th>Sistema</th><th>Contado</th><th>Diferenca</th></tr></thead><tbody id="ctLista"></tbody></table>
   </div>
   <div class="card" id="ctAlertas"></div>
   <div class="card" id="ctPend" style="display:none"></div>
@@ -1138,8 +1149,57 @@ async function ctBipar(cod){
   var r=await (await fetch('/api/contagem/bipe',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({codigo:cod,sessao:ctSessao()})})).json();
   var u=document.getElementById('ctUlt');
+  // Codigo de material bipado: nao conta 1 unidade (a unidade do tubo e o
+  // metro). Manda a pessoa para o campo de material em vez de contar errado.
+  if(r.ehComponente){
+    u.innerHTML='<b style="color:#d29922">'+r.codigo+' e MATERIAL ('+r.nome+')</b> - use o campo Material aqui embaixo, com a quantidade em '+r.unidade+'.';
+    var s=document.getElementById('ctComp');
+    if(s){ s.value=String(r.componente_id); ctCompUnidade(); var q=document.getElementById('ctCompQtd'); if(q) q.focus(); }
+    return;
+  }
   if(r.cadastrado) u.innerHTML='<b style="color:#2ea043">'+r.codigo+'</b> - contado '+r.contado+' (sistema: '+r.estoque+')';
   else u.innerHTML='<b style="color:#ff6b6b">'+r.codigo+' NAO EXISTE NO CADASTRO</b> - etiqueta errada?';
+  ctLista();
+}
+
+// ── Material (COMPRAS.md §8) ────────────────────────────────────────────────
+// Mesma sessao, mesma tabela, mesma fila de aprovacao das pecas. A unica coisa
+// diferente e a forma de entrar: lista + quantidade, porque material nao tem
+// etiqueta e nem sempre e inteiro.
+var CTCOMPS=[];
+async function ctComponentes(){
+  var s=document.getElementById('ctComp'); if(!s) return;
+  try{ CTCOMPS=await (await fetch('/api/contagem/componentes')).json(); }catch(e){ CTCOMPS=[]; }
+  if(!CTCOMPS.length){ s.innerHTML='<option value="">nenhum material cadastrado</option>'; return; }
+  var h='<option value="">escolha o material</option>';
+  for(var i=0;i<CTCOMPS.length;i++){
+    var c=CTCOMPS[i];
+    h+='<option value="'+c.id+'">'+c.nome+' ('+c.unidade+')</option>';
+  }
+  s.innerHTML=h; ctCompUnidade();
+}
+function ctCompAtual(){
+  var s=document.getElementById('ctComp'); if(!s||!s.value) return null;
+  for(var i=0;i<CTCOMPS.length;i++) if(String(CTCOMPS[i].id)===String(s.value)) return CTCOMPS[i];
+  return null;
+}
+function ctCompUnidade(){
+  var c=ctCompAtual(), el=document.getElementById('ctCompUn');
+  if(el) el.textContent=c?c.unidade:'';
+}
+async function ctLancarComp(){
+  var c=ctCompAtual();
+  if(!c){ alert('Escolha o material.'); return; }
+  var q=document.getElementById('ctCompQtd');
+  if(!q||q.value===''){ alert('Digite quanto tem. Se acabou, digite 0.'); return; }
+  var n=Number(q.value);
+  if(!isFinite(n)||n<0){ alert('Quantidade invalida.'); return; }
+  var r=await (await fetch('/api/contagem/componente',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({componente_id:c.id,quantidade:n,sessao:ctSessao()})})).json();
+  var u=document.getElementById('ctCompUlt');
+  if(r.erro){ if(u) u.innerHTML='<b style="color:#ff6b6b">'+r.erro+'</b>'; return; }
+  if(u) u.innerHTML='<b style="color:#2ea043">'+r.nome+'</b> - contado '+r.contado+' '+r.unidade+' (sistema: '+r.estoque+' '+r.unidade+')';
+  q.value=''; q.focus();
   ctLista();
 }
 async function ctLista(){
@@ -1150,9 +1210,12 @@ async function ctLista(){
     var l=d.linhas[i];
     var cor = l.dif===0 ? '#8b97a5' : (l.dif>0?'#4493f8':'#ff6b6b');
     var sinal = l.dif>0?'+':'';
-    h+='<tr><td><b>'+l.codigo+'</b></td><td align=center>'+l.sistema+'</td><td align=center><b>'+l.contado+'</b></td><td align=center style="color:'+cor+'"><b>'+sinal+l.dif+'</b></td></tr>';
+    // Material aparece com a unidade ao lado: "3,5" sem o "m" nao quer dizer nada.
+    var un = l.unidade ? ' <span class="sub">'+l.unidade+'</span>' : '';
+    var tag = l.tipo==='componente' ? ' <span class="sub" style="font-size:12px">material</span>' : '';
+    h+='<tr><td><b>'+l.codigo+'</b>'+tag+'</td><td align=center>'+l.sistema+un+'</td><td align=center><b>'+l.contado+'</b>'+un+'</td><td align=center style="color:'+cor+'"><b>'+sinal+l.dif+'</b></td></tr>';
   }
-  document.getElementById('ctLista').innerHTML=h||'<tr><td colspan=4 style="color:#8b97a5;padding:16px">Nenhuma peca contada ainda.</td></tr>';
+  document.getElementById('ctLista').innerHTML=h||'<tr><td colspan=4 style="color:#8b97a5;padding:16px">Nada contado ainda.</td></tr>';
   var a='';
   if(d.desconhecidos.length){
     a+='<div style="color:#ff6b6b;font-weight:700;margin-bottom:8px">Codigos que nao estao no cadastro:</div>';
@@ -1161,7 +1224,10 @@ async function ctLista(){
   }
   if(d.naoContados.length){
     a+='<div style="margin-top:14px;color:#8b97a5;font-size:13px">Ainda nao contados (tem estoque no sistema): ';
-    var ns=[]; for(var k=0;k<d.naoContados.length;k++) ns.push(d.naoContados[k].codigo+' ('+d.naoContados[k].sistema+')');
+    var ns=[]; for(var k=0;k<d.naoContados.length;k++){
+      var nc=d.naoContados[k];
+      ns.push(nc.codigo+' ('+nc.sistema+(nc.unidade?' '+nc.unidade:'')+')');
+    }
     a+=ns.join(', ')+'</div>';
   }
   document.getElementById('ctAlertas').innerHTML=a;
@@ -1171,15 +1237,22 @@ async function ctAjustar(){
   var d=await (await fetch('/api/contagem/'+ctSessao())).json();
   var difs=d.linhas.filter(function(l){ return l.dif!==0; });
   if(!difs.length){ alert('Nenhuma diferenca para ajustar.'); return; }
-  var txt=difs.map(function(l){ return l.codigo+': '+l.sistema+' -> '+l.contado; }).join('\n');
-  if(!confirm('Ajustar o estoque destes SKUs?\n\n'+txt)) return;
+  var txt=difs.map(function(l){ return l.codigo+': '+l.sistema+' -> '+l.contado+(l.unidade?' '+l.unidade:''); }).join('\n');
+  if(!confirm('Ajustar o estoque destes itens?\n\n'+txt)) return;
   var r=await (await fetch('/api/contagem/ajustar',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({sessao:ctSessao(),codigos:difs.map(function(l){return l.codigo;})})})).json();
-  if(r.pendente!==undefined) alert('Enviado para aprovacao: '+r.pendente+' SKU(s). O estoque so muda quando um responsavel aprovar.');
-  else alert('Ajustados: '+r.ajustados+' SKUs.');
+      body:JSON.stringify({sessao:ctSessao(),itens:difs.map(ctItem)})})).json();
+  if(r.erro){ alert(r.erro); return; }
+  if(r.pendente!==undefined) alert('Enviado para aprovacao: '+r.pendente+' item(ns). O estoque so muda quando um responsavel aprovar.');
+  else alert('Ajustados: '+r.ajustados+' itens.');
   ctLista(); ctPendentes(); carregar();
 }
+// O servidor precisa saber SE a linha e peca ou material: o estoque de material
+// nunca muda por UPDATE, passa pelo dono unico (regra 10).
+function ctItem(l){ return {tipo:l.tipo||'sku', codigo:l.codigo, componente_id:l.componente_id||null}; }
 document.addEventListener('DOMContentLoaded',function(){
+  ctComponentes();
+  var q=document.getElementById('ctCompQtd');
+  if(q) q.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); ctLancarComp(); } });
   var b=document.getElementById('ctBipe');
   if(!b) return;
   b.addEventListener('keydown',function(e){
@@ -1367,13 +1440,17 @@ document.addEventListener('click',async function(e){
 async function ctLancar(){
   var d=await (await fetch("/api/contagem/"+ctSessao())).json();
   var itens=d.linhas.filter(function(l){ return l.contado>0; });
-  if(!itens.length){ alert("Nada bipado para lancar."); return; }
-  var txt=itens.map(function(l){ return l.codigo+": +"+l.contado+" (fica "+(l.sistema+l.contado)+")"; }).join(String.fromCharCode(10));
+  if(!itens.length){ alert("Nada contado para lancar."); return; }
+  var txt=itens.map(function(l){
+    var un=l.unidade?' '+l.unidade:'';
+    return l.codigo+": +"+l.contado+un+" (fica "+(Math.round((l.sistema+l.contado)*1000)/1000)+un+")";
+  }).join(String.fromCharCode(10));
   if(!confirm("ACRESCENTAR estas quantidades ao estoque?"+String.fromCharCode(10)+String.fromCharCode(10)+txt)) return;
   var r=await (await fetch("/api/contagem/lancar",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({sessao:ctSessao(),codigos:itens.map(function(l){return l.codigo;})})})).json();
-  if(r.pendente!==undefined) alert("Enviado para aprovacao: "+r.pendente+" SKU(s). O estoque so muda quando um responsavel aprovar.");
-  else alert("Lancado em "+r.lancados+" SKUs. Pode bipar a proxima leva.");
+      body:JSON.stringify({sessao:ctSessao(),itens:itens.map(ctItem)})})).json();
+  if(r.erro){ alert(r.erro); return; }
+  if(r.pendente!==undefined) alert("Enviado para aprovacao: "+r.pendente+" item(ns). O estoque so muda quando um responsavel aprovar.");
+  else alert("Lancado em "+r.lancados+" itens. Pode bipar a proxima leva.");
   ctLista(); ctPendentes(); carregar();
   var b=document.getElementById("ctBipe"); if(b) b.focus();
 }
@@ -1387,11 +1464,15 @@ async function ctPendentes(){
   if(!d.linhas.length){ box.style.display="none"; return; }
   box.style.display="block";
   var h='<div style="font-weight:700;margin-bottom:8px">Ajustes aguardando aprovacao ('+d.linhas.length+')</div>';
-  h+='<table><thead><tr><th>SKU</th><th>Operacao</th><th>Contado</th><th>Estoque atual</th><th>Quem contou</th><th>Quando</th><th></th></tr></thead><tbody>';
+  h+='<table><thead><tr><th>Item</th><th>Operacao</th><th>Contado</th><th>Estoque atual</th><th>Quem contou</th><th>Quando</th><th></th></tr></thead><tbody>';
   for(var i=0;i<d.linhas.length;i++){
     var l=d.linhas[i];
     var op=l.operacao==='lancar'?'somar':'substituir';
-    h+='<tr><td><b>'+l.codigo+'</b></td><td>'+op+'</td><td align=center><b>'+l.contado+'</b></td><td align=center>'+(l.estoque_atual==null?'-':l.estoque_atual)+'</td><td>'+(l.contado_por||'-')+'</td><td class="sub">'+(l.criado_em||'')+'</td>'
+    // Em linha de material, `cor` traz a unidade — quem aprova precisa saber se
+    // "3,5" e metro ou peca antes de mexer no estoque.
+    var tag=l.tipo==='componente' ? ' <span class="sub" style="font-size:12px">material</span>' : '';
+    var un=l.tipo==='componente' && l.cor ? ' <span class="sub">'+l.cor+'</span>' : '';
+    h+='<tr><td><b>'+l.codigo+'</b>'+tag+'</td><td>'+op+'</td><td align=center><b>'+l.contado+'</b>'+un+'</td><td align=center>'+(l.estoque_atual==null?'-':l.estoque_atual)+un+'</td><td>'+(l.contado_por||'-')+'</td><td class="sub">'+(l.criado_em||'')+'</td>'
       +'<td><button class="primary" style="padding:6px 10px" onclick="ctAprovar(['+l.id+'])">Aprovar</button> <button class="ghost" style="padding:6px 10px" onclick="ctRejeitar(['+l.id+'])">Rejeitar</button></td></tr>';
   }
   h+='</tbody></table>';

@@ -491,6 +491,11 @@ module.exports = function(app, db){
     // contagem.ajustar; contar e ENVIAR (que pode virar pendente) exige so
     // contagem.contar — o handler decide aplicar direto ou enfileirar.
     if(pre('/api/contagem/pendentes')) return 'contagem.ajustar';
+    // §8: a lista de materiais da tela de contagem fica em 'contagem.contar' por
+    // DECISAO, e nao em 'compras.ver': quem conta precisa escolher o que esta
+    // contando, e a rota devolve nome, unidade e saldo — nunca preco (regra 14
+    // do §13). Quem nao conta nao tem por que ver a lista.
+    if(eq('/api/contagem/componentes')) return 'contagem.contar';
     if(M !== 'GET' && pre('/api/contagem')) return 'contagem.contar';
     if(M !== 'GET' && eq('/api/config/horarios')) return 'horarios.editar';
     if(M !== 'GET' && eq('/api/config/kit')) return 'kit.editar';
@@ -611,6 +616,7 @@ module.exports = function(app, db){
     ['POST','/api/cruzamento/aplicar'],['POST','/api/contagem/bipe'],['POST','/api/contagem/ajustar'],
     ['POST','/api/contagem/lancar'],['GET','/api/contagem/pendentes'],['POST','/api/contagem/pendentes/aprovar'],
     ['POST','/api/contagem/pendentes/rejeitar'],
+    ['GET','/api/contagem/componentes'],['POST','/api/contagem/componente'],
     ['POST','/api/config/horarios'],['POST','/api/config/kit'],['POST','/api/listas'],['GET','/api/teste'],
     ['GET','/api/usuarios'],['GET','/api/acesso/setores'],['GET','/api/acesso/divergencias'],
     ['GET','/api/painel'],['GET','/api/rel/dia'],['GET','/api/necessidade'],['GET','/api/cruzamento'],

@@ -298,9 +298,11 @@ function garantirSchemaCompras(db){
   colunas('skus', COLUNAS_SKU);
   /* §8: a contagem de componente usa O MESMO fluxo que ja existe — o operador
      conta, o ajuste fica pendente, o admin aprova. Uma mecanica so no sistema
-     inteiro. E uma coluna, nao um modulo. */
-  if(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='contagem_pendente'").get())
-    colunas('contagem_pendente', [['tipo', "TEXT DEFAULT 'sku'"]]);   // sku|componente
+     inteiro. As colunas `tipo` e `componente_id` de contagem/contagem_pendente
+     moraram aqui por um tempo, e estava errado: este arquivo roda no boot do
+     db.js, ANTES de cont_route.js criar as tabelas, entao num banco novo a
+     guarda nao achava a tabela e as colunas so nasciam no segundo boot. Agora
+     ficam em cont_route.js, que e o dono das duas. */
 
   /* §3: o componente resolvido por familia + cor + largura de bobina precisa ser
      unico nessa combinacao, senao a resolucao da formula fica ambigua. */
