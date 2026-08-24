@@ -8,6 +8,8 @@
  * de compras (fase 3), pedido (fase 4) e recebimento (fase 5). Cada fase tem
  * valor sozinha — e isso que evita seis semanas sem nada funcionando.
  */
+const CUSTO = require('./custo_dominio');
+
 module.exports = function(app, db){
 
   const usuario = req => (req.usuario && req.usuario.nome) || null;
@@ -161,7 +163,17 @@ module.exports = function(app, db){
               txt(b.fonte)||'cadastro', usuario(req));
         return id;
       });
-      res.json({ok:true,id:gravar()});
+      const id=gravar();
+      /* §6: preco de componente mudou -> o custo de todo SKU que o consome
+         mudou junto, e isso vira linha de historico. Sem este gatilho a tabela
+         custo_sku_historico fica vazia para sempre e a pergunta "por que o custo
+         subiu?" nunca tem resposta. */
+      try{
+        const quem={usuario_nome:usuario(req)};
+        if(comp) CUSTO.porComponente(db, comp, null, quem);
+        else if(sku) CUSTO.porSku(db, sku, 'preço de fornecedor alterado', quem);
+      }catch(e){ /* historico nunca derruba a gravacao do preco */ }
+      res.json({ok:true,id});
     }catch(e){
       // O indice unico (fornecedor, item, embalagem) e a regra: uma linha por
       // forma de comprar. Mesma embalagem duas vezes e edicao, nao oferta nova.
@@ -308,6 +320,20 @@ module.exports = function(app, db){
       LEFT JOIN componente c ON c.id=o.componente_id
       ${w.length?'WHERE '+w.join(' AND '):''}
       ORDER BY h.id DESC LIMIT 200`).all(...p));
+  });
+
+  /* ── HISTORICO DE CUSTO DO SKU (§6) ───────────────────────────────────────
+     "A persiana 1,60x1,40 custava R$ 187,40 em maio e custa R$ 203,10 hoje:
+      +8,4%, e 6,1 pontos vieram do tubo." */
+  app.get('/api/custo/historico',(req,res)=>{
+    const w=[], p=[];
+    if(req.query.sku){ w.push('sku=?'); p.push(req.query.sku); }
+    if(req.query.de){ w.push('data>=?'); p.push(req.query.de); }
+    const linhas=db.prepare(`SELECT * FROM custo_sku_historico
+      ${w.length?'WHERE '+w.join(' AND '):''} ORDER BY id DESC LIMIT 500`).all(...p);
+    res.json({ linhas, total:linhas.length,
+      // Regra 17: enquanto a mao de obra for zero, o numero se chama assim.
+      rotulo:'custo de material' });
   });
 
   /* ── CUSTO DO SKU DE REVENDA ─────────────────────────────────────────────────

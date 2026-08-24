@@ -469,6 +469,7 @@ module.exports = function(app, db){
     // recebe (nivel operacao) NAO VE PRECO em lugar nenhum — regra 14 do §13.
     if(eq('/api/ofertas') || eq('/api/precos/historico')) return 'compras.ver';
     if(eq('/api/comparar') || eq('/api/compras/lista')) return 'compras.ver';
+    if(eq('/api/custo/historico')) return 'custo.ver';
     // Pedido: criar/enviar/cancelar e do Comprador; pagar e do Financeiro; ver
     // o que esta a caminho e de OPERACAO, porque quem recebe precisa saber o que
     // vem — e por isso a leitura NAO carrega preco (regra 14 do §13).
@@ -598,7 +599,7 @@ module.exports = function(app, db){
     ['GET','/api/fornecedores'],['POST','/api/fornecedores'],['DELETE','/api/fornecedores/:id'],
     ['GET','/api/componentes'],['POST','/api/componentes'],['DELETE','/api/componentes/:id'],
     ['GET','/api/ofertas'],['POST','/api/ofertas'],['DELETE','/api/ofertas/:id'],
-    ['GET','/api/precos/historico'],['GET','/api/skus/custo'],['GET','/api/comparar'],['GET','/api/compras/lista'],
+    ['GET','/api/precos/historico'],['GET','/api/skus/custo'],['GET','/api/comparar'],['GET','/api/compras/lista'],['GET','/api/custo/historico'],
     ['GET','/recebimento'],['GET','/api/recebimento/aguardando'],['POST','/api/recebimento'],
     ['POST','/api/recebimento/:id/preco'],['GET','/api/recebimento/devolucoes'],
     ['POST','/api/pedidos/:id/fechar'],['GET','/api/pedidos/zumbis'],

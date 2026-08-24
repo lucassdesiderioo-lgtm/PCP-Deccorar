@@ -15,6 +15,7 @@
  * O estoque so entra por componente_dominio.js (regra 10).
  */
 const DOM = require('./componente_dominio');
+const CUSTO = require('./custo_dominio');
 
 module.exports = function(app, db){
 
@@ -160,10 +161,15 @@ module.exports = function(app, db){
           DOM.corrigirCustoPago(db,{ componente_id:ri.componente_id, quantidade:ri.qtd_consumo,
             custo_antigo:antigo/(ri.fator||1), custo_novo:preco/(ri.fator||1) });
 
-        mudancas.push({ item:ri.item, de:antigo, para:preco,
+        mudancas.push({ item:ri.item, componente_id:ri.componente_id, de:antigo, para:preco,
           variacao_pct: antigo>0 ? (preco-antigo)/antigo*100 : null });
       }
     })();
+    /* O preco pago virou o preco vigente -> o custo dos SKUs que usam o item
+       mudou. Fora da transacao: historico nunca derruba o lancamento da nota. */
+    try{ for(const m of mudancas) if(m.componente_id)
+      CUSTO.porComponente(db, m.componente_id, 'preço pago na nota '+(rec.nota_fiscal||rec.numero),
+        {usuario_nome:usuario(req), referencia:rec.numero}); }catch(e){}
     for(const m of mudancas)
       auditar(req,'divergencia_de_preco',rec.numero,
         m.item+': R$ '+m.de.toFixed(2)+' -> R$ '+m.para.toFixed(2)
