@@ -169,7 +169,7 @@
 
     <div class="card"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div><div style="font-weight:700">O que comprar</div>
-        <div class="sub">Repõe quando o disponível cai até o mínimo, e enche até o ideal. Os números nasceram do consumo real de uma persiana 1,50 × 1,50 — <b>edite à vontade</b>, é salvo na hora.</div></div>
+        <div class="sub">Dois gatilhos. <b style="color:var(--amber)">Mínimo</b>: o disponível caiu até o mínimo, enche até o ideal. <b style="color:var(--red)">Demanda</b>: há venda no horizonte, e a ficha diz quanto material ela consome. Vale o <b>maior</b> dos dois, nunca a soma.</div></div>
       <button class="ghost" id="lcVer">Atualizar</button></div>
       <div id="lcRes" style="margin-top:14px"></div></div>
 
@@ -692,17 +692,36 @@ async function compararItem(){
 async function verLista(){
   const box=$('#lcRes'); if(!box) return;
   let d; try{ d=await (await fetch('/api/compras/lista')).json(); }catch(e){ return; }
+  const cab=(d.demanda&&d.demanda.pecas>0)
+    ? '<div class="sub" style="margin-bottom:12px">Demanda no horizonte: <b>'+d.demanda.pecas+'</b> peça(s) de <b>'+d.demanda.skus+'</b> SKU(s) para produzir.</div>'
+    : '';
   if(!d.linhas.length){
-    box.innerHTML='<div class="sub" style="color:var(--green)">✓ Nada abaixo do mínimo. Nenhuma compra necessária agora.</div>'; return; }
-  let h='<table><thead><tr><th style="width:26px"></th><th>Componente</th><th>Disponível</th><th>Precisa</th><th>Melhor</th><th>Desembolso</th><th>Sobra</th></tr></thead><tbody>';
+    box.innerHTML=cab+'<div class="sub" style="color:var(--green)">✓ Nada abaixo do mínimo e nada pedido pela demanda. Nenhuma compra necessária agora.</div>'
+      +pendenciasHTML(d.pendencias); return; }
+  let h=cab+'<table><thead><tr><th style="width:26px"></th><th>Componente</th><th>Disponível</th><th>Precisa</th><th>Melhor</th><th>Desembolso</th><th>Sobra</th></tr></thead><tbody>';
   for(const l of d.linhas){
     const un=l.unidade||'';
+    /* Qual gatilho mandou, em palavra e não só em cor: cerca de 8% dos homens
+       não distingue as duas, e a lista de compras é uma decisão de dinheiro
+       (DESIGN.md). A cor acompanha, não substitui. */
+    const manda = l.manda==='demanda'
+      ? '<span style="color:var(--red)">venda esperando</span> · consumo '+qtd(l.consumo_demanda)+' '+esc(un)
+      : '<span style="color:var(--amber)">abaixo do mínimo</span>';
     h+='<tr><td>'+(l.melhor?'<input type="checkbox" class="lcSel" style="width:auto" data-oferta="'+l.melhor.oferta_id
         +'" data-precisa="'+l.precisa+'" checked>':'')+'</td>'
-      +'<td>'+esc(l.nome)+'<div class="sub">mínimo '+qtd(l.minimo)+' · ideal '+qtd(l.ideal)
-      +(l.a_caminho>0?' · a caminho '+qtd(l.a_caminho):'')+'</div></td>'
+      +'<td>'+esc(l.nome)+(l.revenda?' <span class="sub">revenda</span>':'')
+      +'<div class="sub">'+manda+'</div>'
+      +'<div class="sub">mínimo '+qtd(l.minimo)+' · ideal '+qtd(l.ideal)
+      +(l.a_caminho>0?' · a caminho '+qtd(l.a_caminho):'')+'</div>'
+      +(l.origem&&l.origem.length
+         ? '<details><summary class="sub" style="cursor:pointer">de onde vem</summary><div class="sub" style="margin-top:4px">'
+           +l.origem.slice(0,6).map(o=>esc(o.sku)+': '+o.precisa+' peça(s) × '+qtd(o.por_peca)+' = '+qtd(o.subtotal)+' '+esc(un)).join('<br>')
+           +(l.origem.length>6?'<br>… e mais '+(l.origem.length-6):'')+'</div></details>'
+         : '')
+      +'</td>'
       +'<td'+(l.disponivel<=l.minimo?' style="color:var(--amber)"':'')+'>'+qtd(l.disponivel)+' '+esc(un)+'</td>'
-      +'<td><b>'+qtd(l.precisa)+' '+esc(un)+'</b></td>'
+      +'<td><b'+(l.cor==='vermelho'?' style="color:var(--red)"':'')+'>'+qtd(l.precisa)+' '+esc(un)+'</b>'
+      +'<div class="sub">mín '+qtd(l.gatilho_minimo)+' · dem '+qtd(l.gatilho_demanda)+'</div></td>'
       +'<td>'+(l.melhor?esc(l.melhor.fornecedor)+'<div class="sub">'+l.melhor.embalagens+' × '+esc(l.melhor.embalagem)
           +(l.melhor.prazo!=null?' · '+l.melhor.prazo+' d':'')+'</div>'
         :'<span style="color:var(--amber)">sem fornecedor cadastrado</span>')+'</td>'
@@ -716,10 +735,20 @@ async function verLista(){
     +'<div class="row-actions"><button class="primary" id="lcGerar">Gerar pedidos por fornecedor</button>'
     +'<span class="sub">Um pedido por fornecedor — 6 itens do mesmo fornecedor é um pedido, não seis.</span>'
     +'<span class="msg" id="lcGerMsg"></span></div>';
-  /* O documento é explícito em não deixar o sistema parecer completo enquanto
-     não é: sem o gatilho de demanda, esta lista só enxerga o ponto de pedido. */
-  if(d.sem_demanda) h+='<div class="sub" style="margin-top:10px">Só o ponto de pedido por enquanto. O gatilho por demanda — explodir a ficha contra o que está planejado produzir — ainda não existe, então venda futura não aparece aqui.</div>';
+  h+='<div class="sub" style="margin-top:10px">A necessidade é o <b>maior</b> dos dois gatilhos, nunca a soma. O mínimo existe para cobrir a venda que ainda não apareceu; quando ela aparece, substitui o mínimo em vez de somar a ele.</div>';
+  h+=pendenciasHTML(d.pendencias);
   box.innerHTML=h;
+}
+/* Venda sem ficha calculável é um BURACO nesta lista, não um zero: o material
+   daquela peça simplesmente não foi somado. Some da tela = o comprador confia
+   num total incompleto. */
+function pendenciasHTML(p){
+  if(!p||!p.length) return '';
+  return '<div style="margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:9px">'
+    +'<b style="color:var(--amber)">⚠ '+p.length+' SKU(s) com venda e sem ficha — o material deles NÃO está somado acima:</b>'
+    +'<div class="sub" style="margin-top:6px">'
+    +p.map(x=>esc(x.sku)+' ('+x.precisa+' peça(s)): '+esc(x.motivo)+(x.expressao?' — <code>'+esc(x.expressao)+'</code>':'')).join('<br>')
+    +'</div></div>';
 }
 async function verMinimos(){
   const box=$('#lcMin'); if(!box) return;

@@ -469,6 +469,10 @@ module.exports = function(app, db){
     // recebe (nivel operacao) NAO VE PRECO em lugar nenhum — regra 14 do §13.
     if(eq('/api/ofertas') || eq('/api/precos/historico')) return 'compras.ver';
     if(eq('/api/comparar') || eq('/api/compras/lista')) return 'compras.ver';
+    // Fase 6: a corrente venda -> peca -> material. Nao carrega preco, mas
+    // carrega a ficha (quanto cada peca consome), que e informacao estrategica
+    // como o custo. Fica com o resto de compras.
+    if(eq('/api/compras/necessidade')) return 'compras.ver';
     if(eq('/api/custo/historico')) return 'custo.ver';
     // Pedido: criar/enviar/cancelar e do Comprador; pagar e do Financeiro; ver
     // o que esta a caminho e de OPERACAO, porque quem recebe precisa saber o que
@@ -617,6 +621,7 @@ module.exports = function(app, db){
     ['POST','/api/contagem/lancar'],['GET','/api/contagem/pendentes'],['POST','/api/contagem/pendentes/aprovar'],
     ['POST','/api/contagem/pendentes/rejeitar'],
     ['GET','/api/contagem/componentes'],['POST','/api/contagem/componente'],
+    ['GET','/api/compras/necessidade'],
     ['POST','/api/config/horarios'],['POST','/api/config/kit'],['POST','/api/listas'],['GET','/api/teste'],
     ['GET','/api/usuarios'],['GET','/api/acesso/setores'],['GET','/api/acesso/divergencias'],
     ['GET','/api/painel'],['GET','/api/rel/dia'],['GET','/api/necessidade'],['GET','/api/cruzamento'],

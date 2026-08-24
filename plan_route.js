@@ -12,6 +12,7 @@
  */
 const express = require('express');
 const { lerPlanilha, parseDataVenda, parseDataEnvio } = require('./planilha');
+const DEMANDA = require('./demanda_dominio');
 
 module.exports = function(app, db){
   // Schema no mesmo commit em que o codigo passa a usar (CLAUDE.md secao 17).
@@ -51,12 +52,9 @@ module.exports = function(app, db){
   seed.run('janela_media','30');
   seed.run('alvo_minimo','2');
 
-  function cfgNum(chave, padrao){
-    try{ const c = db.prepare("SELECT valor FROM config WHERE chave=?").get(chave);
-      if(c && c.valor!=null && c.valor!=='' && !isNaN(+c.valor)) return +c.valor;
-    }catch(e){}
-    return padrao;
-  }
+  // Delega ao dominio: o padrao de cada parametro tem que ser o MESMO nos dois
+  // lados, senao a tela mostra uma janela e a compra usa outra.
+  const cfgNum = (chave, padrao) => DEMANDA.cfgNum(db, chave, padrao);
 
   // Colunas usadas na planilha (secao 2 do desenho, 1-based -> 0-based):
   //   1=N.o de venda(0)  2=Data da venda(1)  4=Estado(3)  23=SKU(22)
@@ -117,73 +115,10 @@ module.exports = function(app, db){
 
   // Calculo compartilhado entre a tela de comparacao (/api/planejamento) e a
   // lista do modo azul do operador (/api/revisao/producao).
-  function calcular(){
-    const diasCob     = cfgNum('dias_cobertura', 10);
-    const janela      = cfgNum('janela_media', 30);
-    const alvoMin     = cfgNum('alvo_minimo', 2);
-    const diasColchao = cfgNum('dias_colchao', 10); // parametro do modelo ATUAL
-
-    // --- modelo NOVO: media pela janela e demanda comprometida ---
-    const mediaMap = {}, compMap = {};
-    db.prepare("SELECT UPPER(codigo) c, COUNT(*) n FROM venda_futura "+
-      "WHERE data_venda IS NOT NULL AND COALESCE(cancelada,0)=0 "+
-      "AND data_venda >= date('now','localtime','-'||?||' days') "+
-      "GROUP BY UPPER(codigo)").all(janela).forEach(r=> mediaMap[r.c]=r.n);
-    db.prepare("SELECT UPPER(codigo) c, COUNT(*) n FROM venda_futura "+
-      "WHERE data_envio IS NOT NULL AND data_envio >= date('now','localtime') "+
-      "GROUP BY UPPER(codigo)").all().forEach(r=> compMap[r.c]=r.n);
-
-    const smap = {};
-    db.prepare("SELECT UPPER(codigo) c, descricao, cor, estoque, alvo FROM skus").all().forEach(s=> smap[s.c]=s);
-
-    // --- modelo ATUAL: curva ABC da tabela `demanda` (igual a /api/necessidade) ---
-    const demMap = {};
-    let dem = [];
-    try{ dem = db.prepare("SELECT UPPER(codigo) c, qtd30 FROM demanda ORDER BY qtd30 DESC").all(); }catch(e){}
-    const totalDem = dem.reduce((a,b)=>a+b.qtd30,0) || 1;
-    let cum = 0;
-    for(const r of dem){
-      cum += r.qtd30; const pct = cum/totalDem*100;
-      const classe = pct<=80 ? 'A' : (pct<=95 ? 'B' : 'C');
-      const media = r.qtd30/30;
-      demMap[r.c] = { qtd30:r.qtd30, media_dia:+media.toFixed(1), classe,
-        alvo_sugerido: Math.max(1, Math.ceil(media*diasColchao)) };
-    }
-
-    // --- uniao de todos os codigos vistos ---
-    const cods = new Set();
-    Object.keys(mediaMap).forEach(c=>cods.add(c));
-    Object.keys(compMap).forEach(c=>cods.add(c));
-    Object.keys(demMap).forEach(c=>cods.add(c));
-    Object.keys(smap).forEach(c=>cods.add(c));
-
-    const linhas = [];
-    for(const c of cods){
-      const s = smap[c];
-      const estoque = s ? s.estoque : null;
-      const nVendas = mediaMap[c] || 0;
-      const media = janela>0 ? nVendas/janela : 0;
-      const alvo = Math.max(alvoMin, Math.ceil(media*diasCob));
-      const comprometido = compMap[c] || 0;
-      const precisa = Math.max(0, comprometido + alvo - (estoque||0));
-      const at = demMap[c] || null;
-      linhas.push({
-        codigo:c, cadastrado:!!s,
-        descricao: s?s.descricao:'', cor: s?s.cor:'',
-        estoque,
-        // NOVO
-        vendas_janela:nVendas, media_dia:+media.toFixed(2), alvo, comprometido, precisa,
-        // ATUAL
-        at_qtd30: at?at.qtd30:null, at_media: at?at.media_dia:null,
-        at_classe: at?at.classe:null, at_alvo: at?at.alvo_sugerido:null
-      });
-    }
-    linhas.sort((a,b)=> b.precisa - a.precisa
-      || (b.at_qtd30||0) - (a.at_qtd30||0)
-      || a.codigo.localeCompare(b.codigo));
-
-    return { config:{ dias_cobertura:diasCob, janela_media:janela, alvo_minimo:alvoMin, dias_colchao:diasColchao }, linhas };
-  }
+  /* A conta mora em demanda_dominio.js desde a Fase 6 de Compras: o `precisa`
+     daqui e o mesmo numero que decide a compra de material, e duas copias
+     divergiriam no primeiro ajuste de parametro (§9). */
+  const calcular = () => DEMANDA.calcular(db);
 
   app.get('/api/planejamento',(req,res)=>{
     const { config, linhas } = calcular();

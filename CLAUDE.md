@@ -228,7 +228,8 @@ recusa.
 ## 7-B. Compras — o módulo novo
 
 > Especificação completa: `COMPRAS.md` (fora do repositório — peça ao dono).
-> Fases 1 a 5 implementadas em 23/08/2026. Fases 6 e 7 pendentes.
+> Fases 1 a 6 implementadas (1–5 em 23/08/2026, 6 em 24/08). Fase 7 (relatórios)
+> pendente — espera haver história para mostrar.
 > Histórico de custo (`custo_dominio.js`) e contagem de material entraram
 > **antes** da Fase 6, e de propósito: os dois são relógios de história. Enquanto
 > não existem, o período não fica atrasado — fica perdido, porque história não se
@@ -275,8 +276,16 @@ passar no teste de três medidas.
 |---|---|---|
 | `componente.estoque` e `movimento_componente` | `componente_dominio.js` | `skus.estoque` tem nove donos e por isso não se reconstrói história |
 | Custo médio | `componente_dominio.js` | Só se move no recebimento |
+| Ficha e custo de um SKU | `ficha_dominio.js` | O histórico de custo precisa da MESMA conta da tela |
+| Demanda por SKU (`precisa`) | `demanda_dominio.js` | O número que a fábrica produz é o que manda na compra |
+| Explosão da ficha → material | `necessidade_dominio.js` | Gatilho 2 da lista de compras |
 | Necessidade → desembolso | `compras_calc.js` | Custo nunca se calcula em dois lugares |
 | Avaliação de fórmula | `formula.js` | Segunda porta = buraco de segurança |
+
+> **Por que a demanda saiu do `plan_route.js`:** o `precisa` de cada SKU já
+> decidia o que a fábrica produz (tela AZUL do operador). Quando ele passou a
+> decidir também **o que comprar**, uma segunda cópia significaria comprar
+> material para uma fábrica diferente da que existe.
 
 ### Regras que parecem bug e não são
 
@@ -302,7 +311,19 @@ passar no teste de três medidas.
   mexe em pedido já feito.
 - **Escolher fora do melhor preço exige motivo**, e vai para a auditoria.
 - **A necessidade é o MAIOR dos dois gatilhos, nunca a soma**, e sempre desconta
-  o que está a caminho.
+  o que está a caminho. O mínimo existe para cobrir a venda que ainda não
+  apareceu; quando ela aparece, **substitui** o mínimo em vez de somar a ele.
+- **A perda de corte pertence ao gatilho 2, não ao 1.** Perda é fenômeno de
+  consumo. Aplicá-la ao ponto de pedido compra *acima* do ideal — contradiz o
+  nome do campo. (Estava errado até a fase 6; como `perda_pct` nasce zero em
+  todos, a correção não mudou nenhum número.)
+- **Venda sem ficha calculável é um buraco na lista de compras, não um zero.**
+  Ela sai em `pendencias`, com o motivo, porque o total sem ela está incompleto
+  e o comprador precisa saber disso. Mesma regra 4 do custo.
+- **Acessório não tem medida e isso não é pendência.** `modelo.exige_medida = 0`
+  dispensa largura/altura; a fórmula que precisar delas reclama sozinha, uma
+  linha por vez. Antes da fase 6 o bloqueio era do SKU inteiro, e por isso todo
+  acessório ficava sem ficha e sem custo para sempre.
 - **Enquanto a mão de obra for zero, o número se chama "custo de material"** —
   nunca "custo do produto".
 
@@ -313,6 +334,8 @@ passar no teste de três medidas.
 | `componente` é **provisória** | O dono é `PRODUCAO-MONTAGEM.md` §6, não implementado. O que faltar entra por `ALTER`, nunca recriando |
 | Não segue a forma do `ARQUITETURA-ALVO.md` | O `COMPRAS.md` §11 manda `dominio/ dados/ rotas/`. Foi construído no padrão atual do projeto — o documento não estava disponível |
 | Fórmula do tecido | As oito medidas da planilha fecham em 6 de 8; a regra de quando o corte é invertido ainda depende do comprador |
+| Mínimos são placeholder | Foram semeados com um valor padrão ("depois eu edito"). Enquanto forem, o gatilho 1 vence quase sempre e a demanda quase não aparece na lista — não é bug da fase 6, é dado a revisar |
+| Modelo ACESSORIO sem ficha | Os dois kits têm venda e nenhuma linha de ficha. Ou lançam ficha, ou viram `tem_ficha=0` (revenda) com custo direto |
 
 ---
 

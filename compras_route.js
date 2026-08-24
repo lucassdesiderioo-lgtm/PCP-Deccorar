@@ -9,6 +9,7 @@
  * valor sozinha — e isso que evita seis semanas sem nada funcionando.
  */
 const CUSTO = require('./custo_dominio');
+const NEC   = require('./necessidade_dominio');
 
 module.exports = function(app, db){
 
@@ -235,9 +236,22 @@ module.exports = function(app, db){
          se disponivel <= estoque_minimo:
              necessidade = estoque_ideal − disponivel
 
-     Gatilho 2 (demanda pela explosao da ficha contra o planejamento) e a fase 6.
-     Quando ele existir, a regra e MAIOR dos dois, NUNCA a soma — os dois
-     descrevem a mesma falta por caminhos diferentes, e somar compraria o dobro.
+     Gatilho 2, demanda (fase 6, em necessidade_dominio.js): explode a ficha
+     contra o que a fabrica precisa produzir.
+
+         consumo     = Σ (pecas a produzir do SKU × quantidade da ficha)
+         necessidade = consumo × (1 + perda) − disponivel
+
+     A regra e MAIOR dos dois, NUNCA a soma — os dois descrevem a mesma falta por
+     caminhos diferentes. O minimo existe justamente para cobrir a venda que
+     ainda nao apareceu; quando a venda aparece, ela nao se ACRESCENTA ao minimo,
+     ela o SUBSTITUI.
+
+     A PERDA DE CORTE mudou de lado nesta fase, e era bug: estava multiplicando o
+     gatilho 1, onde a conta e "encher a prateleira ate o ideal" — aplicar perda
+     ali compra ACIMA do ideal, contradizendo o proprio nome do campo. Perda e
+     fenomeno de CONSUMO: ela pertence ao gatilho 2. Hoje o efeito e nenhum
+     (perda_pct nasce zero em todos), e e por isso que da para corrigir agora.
 
      `a_caminho` desconta o que ja foi pedido e ainda nao chegou. Sem isso o
      comprador compra duas vezes toda semana em que o fornecedor atrasa. As
@@ -263,18 +277,26 @@ module.exports = function(app, db){
     return m;
   }
 
+  const q3 = n => Math.round((+n||0)*1000)/1000;
+
   app.get('/api/compras/lista',(req,res)=>{
     const cam=aCaminho(), res_=reservado();
+    const nec=NEC.porItem(db);
     const linhas=[];
     for(const c of db.prepare(`SELECT id,nome,unidade,estoque,estoque_minimo,estoque_ideal,
         perda_pct,sobra_aproveitavel FROM componente WHERE ativo=1 ORDER BY nome`).all()){
       const disp=(c.estoque||0)-(res_[c.id]||0);
-      const ponto=(disp<=(c.estoque_minimo||0)) ? Math.max(0,(c.estoque_ideal||0)-disp) : 0;
-      /* A perda de corte entra na NECESSIDADE, nunca no custo (regra 32): o custo
-         ja a contem pelo consumo real, e soma-la de novo contaria duas vezes.
-         Nasce em zero e so muda quando o comprador mandar. */
-      const comPerda=ponto*(1+(c.perda_pct||0));
-      const precisa=Math.max(0, comPerda-(cam[c.id]||0));
+
+      // Gatilho 1 — ponto de pedido. Enche ate o ideal, e ate o ideal apenas.
+      const g1=(disp<=(c.estoque_minimo||0)) ? Math.max(0,(c.estoque_ideal||0)-disp) : 0;
+
+      // Gatilho 2 — demanda. A perda de corte mora aqui: e consumo que se perde.
+      const d=nec.componentes[c.id];
+      const consumo=d ? d.consumo : 0;
+      const g2=Math.max(0, q3(consumo*(1+(c.perda_pct||0))) - disp);
+
+      const bruto=Math.max(g1,g2);
+      const precisa=q3(Math.max(0, bruto-(cam[c.id]||0)));
       if(precisa<=0) continue;
 
       const ofertas=ofertasDe(c.id,null);
@@ -283,17 +305,52 @@ module.exports = function(app, db){
       const v=comp&&comp.linhas[0];
       linhas.push({
         componente_id:c.id, nome:c.nome, unidade:c.unidade,
-        disponivel:disp, minimo:c.estoque_minimo, ideal:c.estoque_ideal,
+        disponivel:q3(disp), minimo:c.estoque_minimo, ideal:c.estoque_ideal,
         a_caminho:cam[c.id]||0, perda_pct:c.perda_pct||0, precisa,
-        /* Sem gatilho de demanda ainda, tudo que esta abaixo do minimo e ambar:
-           falta material, mas nao ha venda no horizonte confirmando urgencia. */
-        cor:'ambar',
+        /* Os dois gatilhos vao no JSON, nao so o vencedor: "compre 98,7 m" sem
+           dizer POR QUE e um numero que o comprador tem que aceitar no escuro. */
+        gatilho_minimo:q3(g1), gatilho_demanda:q3(g2),
+        consumo_demanda:q3(consumo),
+        /* Vermelho = ha venda no horizonte pedindo este material; ambar = so o
+           minimo, falta material mas nada confirma urgencia. A palavra vai junto
+           da cor na tela: cor sozinha nao informa quem nao distingue (DESIGN.md). */
+        cor: g2>g1 ? 'vermelho' : 'ambar',
+        manda: g2>g1 ? 'demanda' : 'minimo',
+        // Para quem quiser abrir: de quais SKUs veio este consumo.
+        origem: d ? d.origem.slice().sort((a,b)=>b.subtotal-a.subtotal) : [],
         melhor: v ? { oferta_id:v.oferta_id, fornecedor:v.fornecedor, embalagens:v.embalagens,
                       embalagem:v.embalagem, desembolso:v.desembolso, sobra:v.sobra,
                       prazo:v.prazo, motivo:v.motivo } : null,
         sem_fornecedor: !ofertas.length
       });
     }
+
+    /* SKU de revenda com venda no horizonte: a peca vendida E a peca comprada,
+       nao ha ficha para explodir. Entra na mesma lista, pela oferta que aponta
+       `oferta.sku`, senao o comprador nunca recebe sinal para repor o kit. */
+    for(const k in nec.revenda){
+      const r=nec.revenda[k];
+      const s=db.prepare('SELECT codigo,descricao,estoque FROM skus WHERE codigo=?').get(k);
+      const precisa=q3(Math.max(0, r.precisa));
+      if(precisa<=0) continue;
+      const ofertas=ofertasDe(null,k);
+      const comp=ofertas.length ? CALC.comparar(ofertas, precisa, {unidade:'unidade'}) : null;
+      const v=comp&&comp.linhas[0];
+      linhas.push({
+        componente_id:null, sku:k, nome:(s&&s.descricao)||k, unidade:'un', revenda:true,
+        disponivel:s?s.estoque:0, minimo:null, ideal:null, a_caminho:0, perda_pct:0,
+        precisa, gatilho_minimo:0, gatilho_demanda:precisa, consumo_demanda:precisa,
+        cor:'vermelho', manda:'demanda',
+        origem:[{sku:k, precisa:r.precisa, por_peca:1, subtotal:r.precisa}],
+        melhor: v ? { oferta_id:v.oferta_id, fornecedor:v.fornecedor, embalagens:v.embalagens,
+                      embalagem:v.embalagem, desembolso:v.desembolso, sobra:v.sobra,
+                      prazo:v.prazo, motivo:v.motivo } : null,
+        sem_fornecedor: !ofertas.length
+      });
+    }
+    /* Vermelho primeiro: quem tem venda esperando nao pode ficar embaixo de quem
+       so cruzou o minimo. */
+    linhas.sort((a,b)=> (a.cor===b.cor ? String(a.nome).localeCompare(String(b.nome)) : (a.cor==='vermelho'?-1:1)));
     /* Agrupado por fornecedor vencedor: comprar 6 itens do mesmo fornecedor e UM
        pedido, nao seis. */
     const porFornecedor={};
@@ -304,8 +361,36 @@ module.exports = function(app, db){
       linhas, itens:linhas.length,
       total: linhas.reduce((s,l)=>s+(l.melhor?l.melhor.desembolso:0),0),
       por_fornecedor: porFornecedor,
-      sem_demanda: true   // gatilho 2 (fase 6) ainda nao existe
+      sem_demanda: false,
+      demanda: { skus:nec.skus_a_produzir, pecas:nec.pecas_a_produzir },
+      /* Venda sem ficha calculavel NAO some: ela e um buraco nesta lista, e o
+         comprador precisa saber que o total esta incompleto. */
+      pendencias: nec.pendencias
     });
+  });
+
+  /* ── NECESSIDADE POR DEMANDA: a corrente inteira (fase 6) ──────────────────
+     "Compre 98,7 m de tubo" e uma ordem. Esta rota e a explicacao dela:
+     quais vendas, quais pecas, quanto cada peca leva. Sem isso o comprador
+     obedece no escuro — e quando o numero sair errado, ninguem sabe onde olhar. */
+  app.get('/api/compras/necessidade',(req,res)=>{
+    const nec=NEC.porItem(db);
+    const linhas=[];
+    for(const id in nec.componentes){
+      const c=db.prepare(`SELECT id,nome,unidade,estoque,estoque_minimo,perda_pct
+        FROM componente WHERE id=?`).get(id);
+      if(!c) continue;
+      const d=nec.componentes[id];
+      linhas.push({ componente_id:c.id, nome:c.nome, unidade:c.unidade,
+        estoque:q3(c.estoque||0), minimo:c.estoque_minimo, perda_pct:c.perda_pct||0,
+        consumo:d.consumo, com_perda:q3(d.consumo*(1+(c.perda_pct||0))),
+        falta:q3(Math.max(0, d.consumo*(1+(c.perda_pct||0)) - (c.estoque||0))),
+        origem:d.origem.slice().sort((a,b)=>b.subtotal-a.subtotal) });
+    }
+    linhas.sort((a,b)=> b.falta-a.falta || a.nome.localeCompare(b.nome));
+    res.json({ skus_a_produzir:nec.skus_a_produzir, pecas_a_produzir:nec.pecas_a_produzir,
+      linhas, revenda:Object.keys(nec.revenda).map(k=>nec.revenda[k]),
+      pendencias:nec.pendencias });
   });
 
   /* ── HISTORICO DE PRECO ──────────────────────────────────────────────────── */

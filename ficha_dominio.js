@@ -63,7 +63,16 @@ function calcularFicha(db, sku){
   }
 
   if(s.modelo_id == null)  return { sku, linhas:[], pendencia:'modelo pendente' };
-  if(s.largura_cm == null || s.altura_cm == null) return { sku, linhas:[], pendencia:'medida pendente' };
+
+  /* Modelo com exige_medida=0 (acessorio) nao tem largura nem altura, e nunca
+     vai ter: kit de 32 mm nao mede 1,80x1,50. Bloquear por medida aqui deixava
+     TODO acessorio sem ficha e sem custo para sempre — foi o que jogou os dois
+     kits para fora do marco zero do historico e para dentro das pendencias da
+     necessidade. A formula que precisar de largura continua reclamando, uma
+     linha de cada vez, com o motivo exato ("largura" não tem valor aqui).
+     `!== 0` e de proposito: sem modelo ou sem a coluna, o bloqueio continua. */
+  if(s.exige_medida !== 0 && (s.largura_cm == null || s.altura_cm == null))
+    return { sku, linhas:[], pendencia:'medida pendente' };
 
   const formulas = db.prepare(`SELECT f.*, c.nome componente_nome, c.unidade
     FROM ficha_formula f LEFT JOIN componente c ON c.id=f.componente_id
