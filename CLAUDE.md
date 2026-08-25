@@ -281,6 +281,13 @@ O modelo deles tem `exige_medida = 0`, e por isso não são cobrados por largura
 altura na tela de pendências. Sem essa flag, o contador nunca zeraria — e um
 contador que nunca zera é um contador que a equipe aprende a ignorar.
 
+> A **etiqueta impressa** segue a mesma flag. Ela cobrava medida de todo mundo, e
+> o acessório caía num beco sem saída: não havia o que preencher em Pendências de
+> SKU e a etiqueta nunca saía. Hoje, sem medida, o lugar de destaque vira a
+> **descrição** (`Kit 32 mm completo`) e o M² não é impresso — área de acessório
+> não existe, e `M² 0.00` seria um número falso colado no produto. Persiana sem
+> medida cadastrada continua recusada: ali a medida falta mesmo.
+
 ### Quem lê o quê
 
 - Etiqueta, revisão (`/operador`) e devolução leem **as colunas**. Um SKU sem

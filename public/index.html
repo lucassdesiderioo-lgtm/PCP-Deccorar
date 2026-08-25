@@ -1051,25 +1051,43 @@ async function manterTeste(){
    o que a etiqueta precisa e medida e cor cadastradas. */
 function etiqueta(cod){
   var s=SKUS.find(function(x){return x.codigo===cod;})||{};
-  if(s.largura_cm==null||s.altura_cm==null){
+  /* PRODUTO SEM MEDIDA EXISTE (§7): kit e acessorio nao sao persianas, o modelo
+     deles tem exige_medida = 0. Cobrar largura e altura deles era um beco sem
+     saida — nao ha o que preencher em "Pendencias de SKU", e a etiqueta nunca
+     saia. A medida so e obrigatoria pra quem o modelo diz que tem medida. */
+  var exigeMedida = (s.exige_medida===undefined||s.exige_medida===null) ? 1 : s.exige_medida;
+  var temMedida = (s.largura_cm!=null && s.altura_cm!=null);
+  if(exigeMedida && !temMedida){
     alert("Este SKU nao tem medida cadastrada.\n\nAbra a aba \"Pendencias de SKU\" ou edite o produto e\npreencha largura e altura antes de imprimir.");
     return;
   }
   var q=prompt("Quantas etiquetas de "+cod+"?","1");
   if(q===null) return;
   q=Math.max(1,Math.min(200,parseInt(q,10)||1));
-  var L=(s.largura_cm/100).toFixed(2), A=(s.altura_cm/100).toFixed(2);
-  var m2=((s.largura_cm/100)*(s.altura_cm/100)).toFixed(2);
   var corEtq=s.cor_codigo||"";
   var desc=(s.descricao||"").trim();
   /* Fallback do titulo: "BLACKOUT" era literal no codigo, o que imprimia
      BLACKOUT numa persiana de screen. Com o tecido em coluna, usa o tecido. */
   var tec=TECIDOS.find(function(x){return x.codigo===s.tecido_codigo;});
-  var titulo="ROLO SOBRE MEDIDA - "+(desc||(((tec&&(tec.nome||tec.codigo))||"BLACKOUT")+" ML "+corEtq));
+  var miolo, titulo;
+  if(temMedida){
+    var L=(s.largura_cm/100).toFixed(2), A=(s.altura_cm/100).toFixed(2);
+    var m2=((s.largura_cm/100)*(s.altura_cm/100)).toFixed(2);
+    titulo="ROLO SOBRE MEDIDA - "+(desc||(((tec&&(tec.nome||tec.codigo))||"BLACKOUT")+" ML "+corEtq));
+    miolo='<div class="med">'+L+' X '+A+'</div>'+
+          '<div class="inf">M&sup2; '+m2+' &nbsp;&middot;&nbsp; '+corEtq+'</div>';
+  } else {
+    /* Sem medida, o lugar de destaque e a descricao — e ela que diz o que a
+       pessoa tem na mao ("Kit 32 mm completo"). Sem M2: area de acessorio nao
+       existe, e imprimir "M² 0.00" seria um numero falso na etiqueta. */
+    var nomeModelo=(s.modelo_nome||"").trim();
+    titulo=nomeModelo||"ACESSORIO";
+    miolo='<div class="med sem">'+(desc||cod)+'</div>'+
+          (corEtq?'<div class="inf">'+corEtq+'</div>':'<div class="inf">&nbsp;</div>');
+  }
   var uma='<div class="etq">'+
       '<div class="tit">'+titulo+'</div>'+
-      '<div class="med">'+L+' X '+A+'</div>'+
-      '<div class="inf">M&sup2; '+m2+' &nbsp;&middot;&nbsp; '+corEtq+'</div>'+
+      miolo+
       '<svg class="bc" data-c="'+cod+'"></svg>'+
       '<div class="cod">'+cod+'</div>'+
     '</div>';
@@ -1083,6 +1101,9 @@ function etiqueta(cod){
    'display:flex;flex-direction:column;align-items:center;justify-content:space-between;overflow:hidden}'+
    '.tit{font-size:8pt;font-weight:700;text-align:center;line-height:1.1;white-space:nowrap}'+
    '.med{font-size:19pt;font-weight:800;line-height:1}'+
+   /* Sem medida, o destaque vira a descricao: texto e mais comprido que
+      "1.40 X 1.40", entao cabe menor e pode quebrar em duas linhas. */
+   '.med.sem{font-size:12pt;text-align:center;line-height:1.15;max-width:94mm}'+
    '.inf{font-size:7.5pt;font-weight:600}'+
    '.bc{height:9mm;width:74mm}'+
    '.cod{font-size:8pt;font-weight:700;letter-spacing:.4px;margin-top:-1mm}';
