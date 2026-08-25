@@ -7,7 +7,18 @@ app.use(express.json({limit:'25mb'}));
 require('./auth')(app, db);
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/api/skus', (req,res)=> res.json(db.prepare('SELECT * FROM skus ORDER BY codigo').all()));
+/* Vai junto o NOME de cor, tecido e modelo. As colunas de `skus` guardam o
+   codigo ('BEGE'), e quem confere a peca na bancada precisa ler a palavra. Sao
+   campos a MAIS: tudo que existia continua igual, e nenhuma tela que so lia
+   `codigo`/`estoque` muda de comportamento. */
+app.get('/api/skus', (req,res)=> res.json(db.prepare(`SELECT s.*,
+    c.nome cor_nome, t.nome tecido_nome, m.nome modelo_nome,
+    COALESCE(m.exige_medida,1) exige_medida
+  FROM skus s
+  LEFT JOIN cor c ON c.codigo=s.cor_codigo
+  LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
+  LEFT JOIN modelo m ON m.id=s.modelo_id
+  ORDER BY s.codigo`).all()));
 /* Compras Fase 0: o que a tela grava e o que esta NOS CAMPOS, nunca o que o
    codigo do SKU diz. Quem cadastra corrige o preenchimento automatico, e um SKU
    fora da nomenclatura salva normalmente com as medidas digitadas a mao.

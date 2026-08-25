@@ -75,6 +75,8 @@
     <div id="impLista"></div>
   </div></div>
 <iframe id="pr"></iframe>
+<!-- antes do bloco de baixo: e dele que vem pecaTexto -->
+<script src="/sku.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 let confirmar=null, last={c:null,t:0};
@@ -101,13 +103,10 @@ function idle(){
    ANTES do cliente, e nao rodape de detalhe. */
 function pecaHtml(p){
   if(!p) return '';
-  var partes=[];
-  if(p.medida) partes.push(p.medida+' cm');
-  if(p.cor) partes.push(p.cor);
-  if(p.tecido) partes.push(p.tecido);
-  if(p.modelo) partes.push(p.modelo);
-  if(!partes.length) return '<div class="peca falta">⚠ Sem medida e cor no cadastro — não dá pra conferir a peça</div>';
-  return '<div class="peca">'+esc(partes.join(' · '))+'</div>';
+  // pecaTexto vem do /sku.js — mesmo formatador da tela de Embalagem.
+  var t=(typeof pecaTexto==='function') ? pecaTexto(p) : '';
+  if(!t) return '<div class="peca falta">⚠ Sem medida e cor no cadastro — não dá pra conferir a peça</div>';
+  return '<div class="peca">'+esc(t)+'</div>';
 }
 async function stats(){
   const d=await (await fetch('/api/lote')).json();

@@ -103,6 +103,21 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > **Bloqueio do kit:** sem o bipe 2, o bipe 3 é recusado com "⚠ FALTOU O KIT".
 > Essa é a garantia contra esquecimento — motivo de devolução recorrente.
 
+> ⚠️ **A CONFERÊNCIA DA PEÇA ACONTECE AQUI, E SÓ AQUI.** No bipe 1 a tela mostra
+> em letra grande **o que a peça é** — `140 × 140 cm · Bege · Blackout · Rolô`,
+> lido das colunas de `skus` (§7). O operador compara com a persiana na bancada
+> antes de ensacar.
+>
+> Não dá pra mover essa conferência para depois: a embalagem é um **saco preto**,
+> e uma vez fechado o único jeito de saber o que tem dentro é a etiqueta de SKU
+> colada por fora. Da Etiqueta de Venda em diante ninguém mais vê a peça — lá o
+> bipe confere a etiqueta contra a etiqueta, nunca contra o produto.
+>
+> É também a única defesa contra a peça errada dentro da caixa certa: o leitor lê
+> a etiqueta, nunca a persiana. A frase sai do formatador único `pecaTexto` em
+> `public/sku.js`, usado pelas duas telas — duas telas escrevendo a medida cada
+> uma do seu jeito ensinariam a equipe a achar que são coisas diferentes.
+
 > **Alcance real do kit:** o QR é **fixo** (um link do Google Drive com o manual
 > de instalação, que o cliente escaneia em casa). O sistema garante que *alguém
 > bipou um kit*, não que *aquele kit específico* entrou naquela caixa. É proteção

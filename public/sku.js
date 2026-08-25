@@ -33,6 +33,37 @@
     if(!m) return null;
     return {fam:m[1],larg:+m[2],alt:+m[3],cor:m[4]};
   }
-  if(typeof module!=="undefined"&&module.exports) module.exports={medidaDe:medidaDe};
-  else raiz.medidaDe=medidaDe;
+
+  /* O QUE A PECA E, em uma linha, pra pessoa comparar com a peca na mao.
+   *
+   * Formatador unico: a embalagem e a etiqueta de venda mostram a MESMA frase.
+   * Duas telas escrevendo a medida cada uma do seu jeito ensinariam a equipe
+   * a achar que sao coisas diferentes.
+   *
+   * Le SO as colunas (§7) — nunca o texto do codigo. Medida so entra quando o
+   * modelo cobra medida: acessorio nao tem, e "null x null" na tela ensina o
+   * operador a ignorar a linha inteira.
+   */
+  function pecaDeSku(s){
+    s=s||{};
+    var exige = (s.exige_medida===undefined||s.exige_medida===null) ? 1 : s.exige_medida;
+    return {
+      medida: (exige && s.largura_cm && s.altura_cm) ? (s.largura_cm+" × "+s.altura_cm) : null,
+      cor:    s.cor_nome || s.cor_codigo || s.cor || null,
+      tecido: s.tecido_nome || s.tecido_codigo || null,
+      modelo: s.modelo_nome || null
+    };
+  }
+  function pecaTexto(p){
+    if(!p) return "";
+    var partes=[];
+    if(p.medida) partes.push(p.medida+" cm");
+    if(p.cor) partes.push(p.cor);
+    if(p.tecido) partes.push(p.tecido);
+    if(p.modelo) partes.push(p.modelo);
+    return partes.join(" · ");
+  }
+  var api={medidaDe:medidaDe,pecaDeSku:pecaDeSku,pecaTexto:pecaTexto};
+  if(typeof module!=="undefined"&&module.exports) module.exports=api;
+  else for(var k in api) raiz[k]=api[k];
 })(typeof self!=="undefined"?self:this);

@@ -14,6 +14,11 @@
   .banner.go{background:#e8f0fb;border-color:#a9c9ee}.banner.kit{background:#fbf1db;border-color:#e7cb8c}.banner.ok{background:#e7f5eb;border-color:#a9d8b4}.banner.err{background:#fbe9e8;border-color:#efb1ad}
   .bt{font-size:28px;font-weight:780}.bs{font-size:16px;color:var(--muted);margin-top:8px;line-height:1.5}.bs b{color:var(--txt)}
   .timer{font-size:56px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:10px;letter-spacing:2px}
+  /* A peca fica MAIOR que o codigo do SKU: e ela que se compara com o que esta
+     na bancada. O codigo o leitor ja conferiu sozinho; a persiana, nao. */
+  .peca{font-size:34px;font-weight:800;color:var(--txt);line-height:1.2;margin:10px 0 4px;letter-spacing:-.5px}
+  .peca.falta{font-size:18px;color:var(--red);font-weight:700}
+  .confira{font-size:14px;color:var(--muted);margin-top:2px}
   .steps{display:flex;justify-content:center;gap:10px;margin-top:14px}
   .chip{font-size:13px;padding:6px 12px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
   .chip.done{background:#e7f5eb;border-color:#a9d8b4;color:#2e7d32}
@@ -34,6 +39,8 @@
   <div class="stats" id="stats"></div>
   <div class="fila"><div class="ft">Aguardando embalagem</div><div id="filaLista"></div></div>
 </div>
+<!-- antes do bloco de baixo: e dele que vem pecaDeSku/pecaTexto -->
+<script src="/sku.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 function kitNorm(x){ return String(x||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase(); }
@@ -81,6 +88,15 @@ function fmt(s){ s=+s||0; const m=Math.floor(s/60); return (m?m+'m':'')+(s%60)+'
 function mmss(ms){ const t=Math.floor(ms/1000),m=Math.floor(t/60); return String(m).padStart(2,'0')+':'+String(t%60).padStart(2,'0'); }
 function steps(){ return '<div class="steps"><span class="chip done">1 · SKU ✓</span><span class="chip '+(emb&&emb.kitOk?'done':'')+'">2 · Kit '+(emb&&emb.kitOk?'✓':'…')+'</span><span class="chip">3 · SKU final</span></div>'; }
 function banner(kind,title,sub,extra){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(extra||''); }
+/* Descricao da peca em letra grande. Sai do formatador unico do /sku.js — a
+   mesma frase da tela de Etiqueta de Venda, pra ninguem achar que sao medidas
+   diferentes. SKU sem medida/cor no cadastro avisa em vermelho em vez de ficar
+   em branco: em branco parece que esta tudo certo. */
+function pecaHtml(info){
+  var t=(typeof pecaTexto==='function'&&typeof pecaDeSku==='function') ? pecaTexto(pecaDeSku(info)) : '';
+  if(!t) return '<div class="peca falta">⚠ Sem medida e cor no cadastro — não dá pra conferir a peça</div>';
+  return '<div class="peca">'+t+'</div>';
+}
 function idle(){ emb=null; if(!KIT){ banner('err','Código do kit não cadastrado','Peça ao responsável para cadastrar o código do kit no <b>Admin → Cadastros</b>. Sem isso não dá pra conferir o kit na embalagem.'); return; } banner('','Pronto','Bipe o <b>SKU</b> da persiana pra começar a embalagem.'); }
 function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const t=$('#tm'); if(emb&&t) t.textContent=mmss(Date.now()-emb.inicio); },250); }
 function handle(code){
@@ -91,12 +107,23 @@ function handle(code){
   // mesmo. Assim bate tanto bipando o QR quanto digitando a URL limpa.
   if(KIT && kitBate(code, KIT)){
     if(!emb){ banner('err','Bipe o SKU primeiro','O kit só entra depois de começar uma persiana.'); beep(false); return; }
-    emb.kitOk=true; banner('kit','Kit confirmado ✓','Agora cole a etiqueta de SKU e <b>bipe o SKU de novo</b> pra finalizar.<div class="timer" id="tm">'+mmss(Date.now()-emb.inicio)+'</div>'+steps()); beep(true); return;
+    /* A peca continua na tela no passo do kit: e nesse instante que ela entra no
+       saco e some de vista, e e a etiqueta que vai ser colada por fora. */
+    emb.kitOk=true; banner('kit','Kit confirmado ✓', (emb.peca||'')
+      +'Cole a etiqueta de <b>'+emb.codigo+'</b> por fora e <b>bipe o SKU de novo</b> pra finalizar.'
+      +'<div class="timer" id="tm">'+mmss(Date.now()-emb.inicio)+'</div>'+steps()); beep(true); return;
   }
   const info=SKUS.find(s=>s.codigo.toUpperCase()===code);
   if(info){
-    if(!emb){ emb={codigo:info.codigo,cor:info.cor||'',inicio:Date.now(),kitOk:false}; startTimer();
-      banner('go','Embalando '+info.codigo,(info.cor||'')+' — prepare e depois <b>bipe o KIT</b>.<div class="timer" id="tm">00:00</div>'+steps()); beep(true); return; }
+    if(!emb){ emb={codigo:info.codigo,cor:info.cor||'',peca:pecaHtml(info),inicio:Date.now(),kitOk:false}; startTimer();
+      /* A CONFERENCIA DA PECA ACONTECE AQUI, e so aqui.
+         Depois de ensacada a persiana some dentro do saco preto e o unico jeito
+         de saber o que tem dentro passa a ser a etiqueta colada por fora. Este
+         e o ultimo momento em que alguem VE a peca — se a conferencia nao for
+         neste bipe, nao ha outro. */
+      banner('go','Embalando '+info.codigo, emb.peca
+        +'<div class="confira">Confira com a peça na bancada. Não bateu, <b>não embale</b>.</div>'
+        +'Prepare e depois <b>bipe o KIT</b>.<div class="timer" id="tm">00:00</div>'+steps()); beep(true); return; }
     if(emb.codigo.toUpperCase()===code){
       if(!emb.kitOk){ banner('err','⚠ FALTOU O KIT','Bipe o <b>kit</b> antes de finalizar '+emb.codigo+'.<div class="timer" id="tm">'+mmss(Date.now()-emb.inicio)+'</div>'+steps()); beep(false); return; }
       finish(); return;
