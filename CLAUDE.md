@@ -354,6 +354,38 @@ contador que nunca zera é um contador que a equipe aprende a ignorar.
 > não existe, e `M² 0.00` seria um número falso colado no produto. Persiana sem
 > medida cadastrada continua recusada: ali a medida falta mesmo.
 
+**Produto sem estoque existe, e não é falta.** `modelo.sob_medida = 1` marca a
+peça feita contra o pedido do cliente: ela não existe antes da venda e não sobra
+depois, então o saldo dela é sempre zero. Esses SKUs não passam pela trava de
+estoque da Etiqueta de Venda **nem pela baixa** — sem `+1` na embalagem não pode
+haver `−1` na impressão, senão cada venda sob medida abriria um buraco de uma
+peça no SKU.
+
+> ⚠️ **ARMADILHA #6 — a trava que a operação contorna não protege, só cega.**
+> Até 25/08/2026 o `POST /api/embalar` recusava todo SKU com estoque zero. Como
+> sob medida **nunca** tem estoque, isso recusava 100% dessas vendas. O que
+> acontecia então não era a peça ficar retida: a bancada imprimia a etiqueta
+> direto do PDF do Mercado Livre e despachava por fora — sem registro, sem a
+> conferência do carregamento, e com o volume preso em `pendente` para sempre,
+> reimportado a cada PDF novo. Foi assim que 1 SCREEN3 e 2 SOBMEDIDA de 24/08
+> viraram fantasmas depois de terem sido entregues.
+>
+> Quando uma trava dispara todo dia no caso normal, ela para de ser proteção e
+> vira um desvio que a equipe aprende a fazer — e o desvio acontece fora da
+> vista do sistema, que é o pior lugar possível.
+
+> ⚠️ **`SOBMEDIDA` é um balde, e isso ainda é dívida aberta.** Um código só para
+> peças que são todas diferentes: a folha de controle traz apenas `SOBMEDIDA`,
+> enquanto na bancada as peças vêm etiquetadas por pedido (`1027/01`, `1027/02`)
+> e com **medidas quase sempre diferentes**. Nada liga o volume do ML à peça
+> física — a fila pega "a mais antiga de `SOBMEDIDA`", que não diz *qual peça*.
+> Hoje quem resolve é a memória de quem embala, e nenhuma das cinco conferências
+> do §5 pega uma troca, porque as duas peças têm o mesmo código. Falta o cadastro
+> do item sob medida (pedido, item, medida, cor, cliente) e o bipe que fecha esse
+> vínculo contra **o cliente** — que é onde o erro caro mora: item trocado dentro
+> do mesmo pedido chega no mesmo endereço; peça trocada entre clientes é
+> reclamação.
+
 ### Quem lê o quê
 
 - Etiqueta, revisão (`/operador`) e devolução leem **as colunas**. Um SKU sem

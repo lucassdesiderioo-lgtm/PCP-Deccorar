@@ -45,7 +45,18 @@ const COLUNAS_MODELO = [
      "Medida pendente" para sempre — e um contador que nunca zera e um contador
      que a equipe aprende a ignorar, justamente o que sinaliza quando a ficha
      tecnica pode comecar. */
-  ['exige_medida', 'INTEGER DEFAULT 1']
+  ['exige_medida', 'INTEGER DEFAULT 1'],
+  /* SOB MEDIDA NAO TEM ESTOQUE, E NUNCA VAI TER.
+     A peca e produzida contra o pedido do cliente: ela nao existe antes da
+     venda e nao sobra depois. Perguntar "quantas ha em estoque" nao tem
+     resposta — e a trava de estoque da impressao, que existe para nao vender
+     o que nao ha, respondia SEMPRE zero e recusava TODA venda sob medida.
+     O efeito pratico nao era a peca ficar retida: era a bancada imprimir a
+     etiqueta direto do PDF do Mercado Livre e despachar por fora, deixando o
+     volume `pendente` para sempre e engordando a fila a cada PDF novo. Uma
+     trava que a operacao aprende a contornar nao protege nada — so cega o
+     sistema. */
+  ['sob_medida', 'INTEGER DEFAULT 0']
 ];
 
 function garantirSchema(db){
@@ -66,7 +77,8 @@ function garantirSchema(db){
       nome      TEXT,
       ativo     INTEGER DEFAULT 1,
       criado_em TEXT DEFAULT (datetime('now','localtime')),
-      exige_medida INTEGER DEFAULT 1
+      exige_medida INTEGER DEFAULT 1,
+      sob_medida INTEGER DEFAULT 0
     );
     /* Mesma forma da tabela cor. Blackout, Screen 3%. */
     CREATE TABLE IF NOT EXISTS tecido (

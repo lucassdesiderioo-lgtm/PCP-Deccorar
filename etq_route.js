@@ -8,7 +8,8 @@ module.exports=function(app,db){
        a tela. Vem das colunas de `skus` (§7), nunca do texto do codigo. */
     const s=db.prepare(`SELECT s.codigo,s.estoque,s.largura_cm,s.altura_cm,
         COALESCE(c.nome,s.cor_codigo,s.cor) cor_nome, COALESCE(t.nome,s.tecido_codigo) tecido_nome,
-        m.nome modelo_nome, COALESCE(m.exige_medida,1) exige_medida
+        m.nome modelo_nome, COALESCE(m.exige_medida,1) exige_medida,
+        COALESCE(m.sob_medida,0) sob_medida
       FROM skus s
       LEFT JOIN cor c ON c.codigo=s.cor_codigo
       LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
@@ -24,7 +25,11 @@ module.exports=function(app,db){
       medida:(s.exige_medida && s.largura_cm && s.altura_cm)?(s.largura_cm+' × '+s.altura_cm):null,
       cor:s.cor_nome||null, tecido:s.tecido_nome||null, modelo:s.modelo_nome||null
     };
-    res.json({cadastrado:true,estoque:s.estoque,total,pendentes:pend,pedido:p||null,peca});
+    /* A tela precisa saber que e sob medida para nao anunciar "Estoque: 0"
+       como se fosse falta. Zero ali e o normal, nao um alarme — e um numero
+       que aparece como problema todo dia ensina a equipe a ignora-lo. */
+    res.json({cadastrado:true,estoque:s.estoque,total,pendentes:pend,pedido:p||null,peca,
+              sob_medida:!!s.sob_medida});
   });
 
   app.post('/api/embalar',(req,res)=>{
@@ -34,12 +39,22 @@ module.exports=function(app,db){
     if(!o) return res.status(404).json({erro:'venda nao encontrada'});
     if(o.estagio==='bloqueado') return res.json({erro:'Volume bloqueado: SKU fora do cadastro.'});
     if(o.estagio!=='pendente') return res.json({erro:'Esta venda ja foi processada ('+o.estagio+').'});
-    const s=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(o.codigo);
+    const s=db.prepare(`SELECT s.estoque, COALESCE(m.sob_medida,0) sob_medida
+      FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id WHERE s.codigo=?`).get(o.codigo);
     if(!s) return res.json({erro:'SKU nao cadastrado.'});
-    if(s.estoque<=0) return res.json({erro:'Sem estoque desse SKU.'});
+    /* SOB MEDIDA NAO PASSA PELA TRAVA DE ESTOQUE — nem pela baixa.
+       A peca e feita contra o pedido: nao existe antes da venda, nao sobra
+       depois, e por isso o saldo dela e sempre zero. Cobrar estoque aqui
+       recusava TODA venda sob medida, e o que a operacao fazia era imprimir
+       a etiqueta pelo PDF do ML e despachar por fora — sem registro, sem
+       conferencia no carregamento, e com o volume preso em `pendente` para
+       sempre. A trava so protegia no papel.
+       A baixa tambem sai: sem +1 na embalagem nao pode haver -1 aqui, senao
+       cada venda sob medida abriria um buraco de uma peca no SKU. */
+    if(!s.sob_medida && s.estoque<=0) return res.json({erro:'Sem estoque desse SKU.'});
     db.transaction(()=>{
       db.prepare("UPDATE lote SET estagio='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(id);
-      db.prepare('UPDATE skus SET estoque=MAX(0,estoque-1) WHERE codigo=?').run(o.codigo);
+      if(!s.sob_medida) db.prepare('UPDATE skus SET estoque=MAX(0,estoque-1) WHERE codigo=?').run(o.codigo);
     })();
     const e=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(o.codigo);
     res.json({ok:true,estoque:e?e.estoque:0});

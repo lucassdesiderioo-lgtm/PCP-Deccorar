@@ -394,6 +394,15 @@ document.addEventListener('change',async function(e){
       body:JSON.stringify({codigo:md.dataset.cod,exige_medida:md.checked?1:0})});
     await carregarListas(); carregarPend(); return;
   }
+  /* "sob medida": a peca e feita contra o pedido, entao nao tem saldo pra
+     consultar. Tira o SKU da trava de estoque da Etiqueta de Venda — que,
+     respondendo zero todo dia, so empurrava a bancada a despachar por fora. */
+  const sm=e.target.closest&&e.target.closest('.mcSob');
+  if(sm){
+    await fetch('/api/modelos',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({codigo:sm.dataset.cod,sob_medida:sm.checked?1:0})});
+    await carregarListas(); return;
+  }
 });
 
 document.addEventListener('click',async function(e){
@@ -434,6 +443,8 @@ function renderMC(){
       +'<input class="mcNome" data-tipo="modelo" data-cod="'+esc(m.codigo)+'" value="'+esc(m.nome)+'" placeholder="nome do modelo">'
       +'<label style="display:flex;align-items:center;gap:5px;text-transform:none;letter-spacing:0;white-space:nowrap;margin:0">'
       +'<input type="checkbox" class="mcMedida" data-cod="'+esc(m.codigo)+'" style="width:auto"'+(m.exige_medida?' checked':'')+'> tem medida</label>'
+      +'<label title="Peça feita contra o pedido: não tem estoque pra consultar" style="display:flex;align-items:center;gap:5px;text-transform:none;letter-spacing:0;white-space:nowrap;margin:0">'
+      +'<input type="checkbox" class="mcSob" data-cod="'+esc(m.codigo)+'" style="width:auto"'+(m.sob_medida?' checked':'')+'> sob medida</label>'
       +(m.ativo?'<button class="ghost small mcOff" data-tipo="modelo" data-id="'+m.id+'">desativar</button>'
                :'<span class="sub">inativo</span>')+'</div>';
   h+='<div class="mcrow"><input id="mcModCod" placeholder="código (ex.: ROLO)"><input id="mcModNome" placeholder="nome">'

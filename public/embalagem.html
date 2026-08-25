@@ -120,11 +120,17 @@ async function scanSku(sku){
   if(confirmar && confirmar.codigo && confirmar.codigo.toUpperCase()===sku){ imprimir(); return; }
   const r=await (await fetch('/api/proximo/'+encodeURIComponent(sku))).json();
   if(!r.cadastrado){ banner('err','SKU não cadastrado', '<span class="sku">'+sku+'</span> — cadastre no Admin.'); beep(false); confirmar=null; return; }
-  if(r.estoque!==null && r.estoque<=0){ banner('err','SEM ESTOQUE — bloqueado', '<span class="sku">'+sku+'</span> não passou pela produção. Não dá pra imprimir a venda.'); beep(false); confirmar=null; return; }
+  // Sob medida nao tem estoque por definicao: a peca e feita contra o pedido.
+  // Zero ali e o normal, e barrar aqui empurrava a bancada a imprimir a
+  // etiqueta pelo PDF do ML e despachar por fora do sistema.
+  if(!r.sob_medida && r.estoque!==null && r.estoque<=0){ banner('err','SEM ESTOQUE — bloqueado', '<span class="sku">'+sku+'</span> não passou pela produção. Não dá pra imprimir a venda.'); beep(false); confirmar=null; return; }
   if(!r.pedido){ if(r.total>0){ banner('warn','Todas embaladas', 'Todas as vendas de <span class="sku">'+sku+'</span> já foram embaladas.'); } else { banner('err','SKU não está no lote', 'Nenhuma venda de <span class="sku">'+sku+'</span> hoje. Já subiu o PDF do Mercado Livre?'); } beep(false); confirmar=null; return; }
   confirmar=r.pedido;
   banner('cfm','Confira: '+esc(r.pedido.buyer), pecaHtml(r.peca)
-    +'NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+' · <span class="sku">'+esc(sku)+'</span><br>Estoque: '+r.estoque+' · pendentes desse SKU: '+r.pendentes+'<br><b>Bipe de novo</b> ou clique pra imprimir a etiqueta de venda.',
+    +'NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+' · <span class="sku">'+esc(sku)+'</span><br>'
+    +(r.sob_medida ? 'SOB MEDIDA — sem estoque, peça feita pro pedido'
+                   : 'Estoque: '+r.estoque)
+    +' · pendentes desse SKU: '+r.pendentes+'<br><b>Bipe de novo</b> ou clique pra imprimir a etiqueta de venda.',
     '<button class="primary" onclick="imprimir()">Imprimir etiqueta de venda</button><button class="ghost" onclick="idle()">Cancelar</button>');
   beep(true);
 }
