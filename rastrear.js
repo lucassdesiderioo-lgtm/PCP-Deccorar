@@ -21,13 +21,19 @@ const MAX_PDF=25;   // quantos PDFs recentes varrer quando o volume nao esta no 
 const args=process.argv.slice(2);
 const MODO_AUDITAR=args[0]==='--auditar';
 const MODO_DANFE=args[0]==='--danfe';
-const DIAS=MODO_AUDITAR?(parseInt(args[1],10)||7):0;
+const MODO_FOLHA=args[0]==='--folha';
+const MODO_ML=args[0]==='--ml';
+const MODO=[MODO_AUDITAR,MODO_DANFE,MODO_FOLHA,MODO_ML].some(Boolean);
+const DIAS=MODO_AUDITAR?(parseInt(args[1],10)||7):(MODO_ML?(parseInt(args[1],10)||7):0);
 const NF_ALVO=MODO_DANFE?String(args[1]||'').replace(/\D/g,''):null;
-const alvos=(MODO_AUDITAR||MODO_DANFE)?[]:args.map(s=>String(s).replace(/\D/g,'')).filter(Boolean);
-if(!MODO_AUDITAR && !MODO_DANFE && !alvos.length){
+const ACHAR=MODO_FOLHA?String(args[1]||'').trim():null;
+const alvos=MODO?[]:args.map(s=>String(s).replace(/\D/g,'')).filter(Boolean);
+if(!MODO && !alvos.length){
   console.log('uso: node rastrear.js <numero da venda ou do pack> [mais numeros...]');
   console.log('     node rastrear.js --auditar [dias]   confere o SKU de TODOS os volumes');
   console.log('     node rastrear.js --danfe [NF]       mostra o texto da nota de um volume');
+  console.log('     node rastrear.js --folha [texto]    mostra a FOLHA DE CONTROLE crua');
+  console.log('     node rastrear.js --ml [dias]        confere o SKU contra a planilha do ML');
   process.exit(1);
 }
 
@@ -212,4 +218,115 @@ async function verDanfe(){
   T('');
 }
 
-(MODO_AUDITAR?auditar():(MODO_DANFE?verDanfe():rastrear())).catch(e=>{ console.error(e); process.exit(1); });
+/* ── MODO 4: a FOLHA DE CONTROLE crua ───────────────────────────────────────
+   O parse so extrai Pack ID, Venda, SKU e Cor dela. Se a folha trouxer tambem
+   o comprador ou a NF ao lado de cada item, existe uma ligacao etiqueta->item
+   que NAO passa pelo Pack ID — e o Pack ID e exatamente o que desalinha. Este
+   modo despeja o texto como ele e, pra decidir olhando. */
+async function verFolha(){
+  const arq=db.prepare(`SELECT srcfile FROM lote
+    WHERE srcfile IS NOT NULL AND data >= date('now','localtime','-7 day')
+    GROUP BY srcfile ORDER BY MAX(id) DESC LIMIT 1`).get();
+  if(!arq||!fs.existsSync(arq.srcfile)){ T('Nenhum PDF recente disponivel no servidor.'); return; }
+  const pdfjs=require('pdfjs-dist/legacy/build/pdf.js');
+  const {pageLines}=require('./folha');
+  const pdf=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(arq.srcfile))}).promise;
+
+  /* Guarda o texto de todas as paginas uma vez so: os tres blocos abaixo leem
+     o mesmo material por angulos diferentes. */
+  const pgs=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const linhas=pageLines(await (await pdf.getPage(p)).getTextContent());
+    const t=linhas.join('\n');
+    let tipo='outro';
+    if(/SKU:/.test(t)) tipo='FOLHA';
+    else if(/DANFE/.test(t)||/Chave de acesso/i.test(t)) tipo='danfe';
+    else if(/Pack ID:/.test(t)||/Venda:/.test(t)) tipo='etiqueta';
+    pgs.push({p,linhas,t,tipo});
+  }
+
+  /* 1. A ESTRUTURA. Se cada etiqueta tiver a folha do item logo em seguida, a
+     ligacao etiqueta->SKU e POSICIONAL — muito mais firme que casar por Pack
+     ID, que e justamente o que desalinha. O mapa responde isso de relance. */
+  tit('COMO O PDF E MONTADO — '+path.basename(arq.srcfile)+' ('+pdf.numPages+' paginas)');
+  T('');
+  T('  '+pgs.slice(0,16).map(x=>x.p+':'+x.tipo).join('   '));
+  if(pgs.length>16) T('  … (padrao das 16 primeiras paginas)');
+  const conta={};
+  pgs.forEach(x=>{ conta[x.tipo]=(conta[x.tipo]||0)+1; });
+  T('');
+  T('  total por tipo: '+Object.keys(conta).map(k=>k+'='+conta[k]).join('   '));
+
+  /* 2. A ETIQUETA inteira: e nela que a busca por "mais alguma coisa que ligue"
+     comeca — qualquer campo aqui que tambem apareca na folha serve de ponte. */
+  const etq=pgs.find(x=>x.tipo==='etiqueta');
+  if(etq){
+    tit('UMA ETIQUETA DE VENDA INTEIRA (pagina '+etq.p+')');
+    etq.linhas.forEach(l=>T('    '+l));
+  }
+
+  /* 3. A FOLHA. Com um termo, so a vizinhanca dele: e o que vem GRUDADO no item
+     que interessa, nao a folha inteira. */
+  const folhas=pgs.filter(x=>x.tipo==='FOLHA');
+  if(!folhas.length){ T(''); T('Nenhuma pagina de folha de controle nesse PDF.'); return; }
+  tit('A FOLHA DE CONTROLE (paginas '+folhas.map(f=>f.p).join(', ')+')');
+  const alvo=ACHAR?ACHAR.toLowerCase():null;
+  folhas.slice(0,2).forEach(f=>{
+    T(''); T('── pagina '+f.p+' ──');
+    if(alvo){
+      const hits=f.linhas.map((l,i)=>({l,i})).filter(o=>o.l.toLowerCase().indexOf(alvo)>=0);
+      if(!hits.length){ T('  (nao achei "'+ACHAR+'" nesta pagina)'); return; }
+      hits.slice(0,3).forEach(h=>{ T('');
+        f.linhas.slice(Math.max(0,h.i-12),h.i+13).forEach((l,k)=>
+          T((k+Math.max(0,h.i-12)===h.i?'  → ':'    ')+l)); });
+    } else {
+      f.linhas.slice(0,70).forEach(l=>T('    '+l));
+      if(f.linhas.length>70) T('    … (+'+(f.linhas.length-70)+' linhas — passe um nome ou NF pra ver so a vizinhanca)');
+    }
+  });
+  T('');
+  T('O que procurar: comprador, NF ou qualquer campo que apareca JUNTO do SKU e');
+  T('TAMBEM na etiqueta acima. Se houver, o volume pode ser casado com o item');
+  T('por ele — sem depender do Pack ID.');
+  T('');
+}
+
+/* ── MODO 5: conferir contra a planilha do Mercado Livre ────────────────────
+   A `venda_futura` guarda venda -> SKU vindo da planilha do ML, que nao passa
+   pelo PDF. Onde o volume tem numero de venda, da pra conferir uma fonte
+   contra a outra. (Ela e limpa quando a venda sai da planilha, entao so vale
+   pro que ainda nao foi despachado.) */
+function conferirML(){
+  tit('O SKU DO PDF x O SKU DA PLANILHA DO MERCADO LIVRE ('+DIAS+' dias)');
+  let temVF=true;
+  try{ db.prepare('SELECT 1 FROM venda_futura LIMIT 1').get(); }catch(e){ temVF=false; }
+  if(!temVF){ T('A tabela venda_futura nao existe — nenhuma planilha foi importada ainda.'); return; }
+  const r=db.prepare(`SELECT COUNT(*) total,
+      SUM(CASE WHEN venda IS NOT NULL AND venda<>'' THEN 1 ELSE 0 END) com_venda
+    FROM lote WHERE data >= date('now','localtime','-'||?||' day')`).get(DIAS);
+  const casam=db.prepare(`SELECT COUNT(*) n FROM lote l JOIN venda_futura v ON v.venda_id=l.venda
+    WHERE l.data >= date('now','localtime','-'||?||' day')`).get(DIAS).n;
+  T('');
+  T('Volumes no periodo        : '+r.total);
+  T('  com numero de venda     : '+r.com_venda+'   (sem numero nao da pra casar)');
+  T('  casando com a planilha  : '+casam);
+  const div=db.prepare(`SELECT l.id,l.buyer,l.nf,l.data,l.estagio,l.codigo pdf,v.codigo ml
+    FROM lote l JOIN venda_futura v ON v.venda_id=l.venda
+    WHERE l.codigo IS NOT NULL AND UPPER(l.codigo)<>UPPER(v.codigo)
+      AND l.data >= date('now','localtime','-'||?||' day') ORDER BY l.id DESC`).all(DIAS);
+  T('  DIVERGENCIAS            : '+div.length);
+  if(div.length){
+    T(''); linha(); T('O PDF E O MERCADO LIVRE DISCORDAM'); linha();
+    div.forEach(d=>{ T('');
+      T('#'+d.id+'  '+(d.buyer||'—')+'   NF '+(d.nf||'—')+'   '+d.data+'   ('+d.estagio+')');
+      T('   PDF diz : '+d.pdf);
+      T('   ML  diz : '+d.ml);
+    });
+  }
+  T('');
+  if(!casam) T('Nenhum volume casou. Ou os volumes nao trazem numero de venda, ou a\nplanilha importada nao cobre esse periodo.');
+  T('');
+}
+
+(MODO_AUDITAR?auditar():MODO_DANFE?verDanfe():MODO_FOLHA?verFolha():MODO_ML?Promise.resolve(conferirML()):rastrear())
+  .catch(e=>{ console.error(e); process.exit(1); });
