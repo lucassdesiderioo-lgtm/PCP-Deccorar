@@ -148,6 +148,40 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > Para conferir o que já está gravado: `node rastrear.js --auditar [dias]` relê a
 > folha de cada PDF e lista os volumes cujo SKU não bate. `node rastrear.js
 > <número>` segue uma venda específica.
+
+### As duas leituras conferem uma à outra
+
+Desde 25/08/2026 as duas leituras vivem em **mapas separados** (`leitura1` e
+`leitura2` no `parse.js`) e o volume só passa se **concordarem**. Discordaram, o
+`parse` devolve `conflito` e o upload grava o volume como `bloqueado` com
+`lote.bloqueio = 'divergencia: SKU_A / SKU_B'`.
+
+> A leitura por pedaços **continua opinando sobre pedaço grudado, inclusive
+> errado** — de propósito. É exatamente ali que ela discorda da leitura 1, e essa
+> discordância é o único alarme que existe. Calar a testemunha no lugar onde ela
+> erra seria apagar o sinal.
+
+O volume divergente:
+- não imprime etiqueta e não carrega (é `bloqueado`);
+- **não é solto pelo destravamento automático do §6** — cadastrar SKU não resolve
+  uma dúvida sobre *qual peça o cliente comprou* (guarda no `server.js`);
+- sai só por `POST /api/divergencias/resolver`, depois de alguém abrir o pedido no
+  Mercado Livre e escolher. Aparece na aba **Bloqueados** do admin, em vermelho.
+
+### A conferência dupla no carregamento
+
+`config.conf_carregamento = '1'` faz o carregamento pedir **dois bipes**: a
+etiqueta de venda e o código do SKU **na mesma caixa** (ele fica visível porque a
+etiqueta de venda é colada por baixo). Não bateu, não carrega, e a divergência vai
+para a auditoria.
+
+> **O segundo bipe é cego.** O sistema não mostra o SKU esperado antes — quem já
+> sabe a resposta bipa o que for para fechar a linha, e a conferência vira
+> confirmação. Os dois códigos só aparecem depois de divergirem, como alarme.
+
+Desligável (Admin → Cadastros) porque custa um bipe por volume, todo dia. Nasce
+**desligada**: ela cobre o erro de colagem, que ainda não tem evidência nos dados
+— o erro que já aconteceu foi o do parse, e esse não passa mais.
 3. `cruz_route.js` compara os volumes **pendentes** × estoque e gera só urgência:
 
 | Situação | Vira | Cor na revisão |

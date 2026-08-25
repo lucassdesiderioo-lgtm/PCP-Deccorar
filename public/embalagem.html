@@ -27,6 +27,8 @@
   .drop{display:block;border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;background:#fff;cursor:pointer;color:var(--muted);font-size:14px}
   .drop:hover{border-color:var(--amber)}
   .upres{margin-top:10px;font-size:13px;color:var(--muted)}.upres b{color:var(--txt)}
+  .peca{font-size:30px;font-weight:800;color:var(--txt);line-height:1.25;margin:2px 0 12px;letter-spacing:-.5px}
+  .peca.falta{font-size:17px;color:var(--red);font-weight:700}
   .card{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:#fff}
   .ttl{font-size:12px;color:var(--muted);text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .sel,.busca{font-size:14px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--txt)}
@@ -91,6 +93,22 @@ function idle(){
     '<button class="rebt forte" onclick="reimprimir('+u.id+',this)">🖨 Reimprimir a última</button>');
   emIdle=true;
 }
+/* O QUE A PECA E, em cima de tudo e em letra grande.
+   O leitor le a etiqueta, nunca a persiana. Se a peca dentro da caixa nao for o
+   que a etiqueta diz, nenhum bipe percebe — nem o do SKU, nem o do kit, nem o do
+   carregamento. Estes quatro campos sao a unica conferencia possivel contra
+   isso: o operador olha a peca aberta na bancada e olha a tela. Por isso vem
+   ANTES do cliente, e nao rodape de detalhe. */
+function pecaHtml(p){
+  if(!p) return '';
+  var partes=[];
+  if(p.medida) partes.push(p.medida+' cm');
+  if(p.cor) partes.push(p.cor);
+  if(p.tecido) partes.push(p.tecido);
+  if(p.modelo) partes.push(p.modelo);
+  if(!partes.length) return '<div class="peca falta">⚠ Sem medida e cor no cadastro — não dá pra conferir a peça</div>';
+  return '<div class="peca">'+esc(partes.join(' · '))+'</div>';
+}
 async function stats(){
   const d=await (await fetch('/api/lote')).json();
   $('#nPend').textContent=d.filter(x=>x.estagio==='pendente').length;
@@ -106,7 +124,8 @@ async function scanSku(sku){
   if(r.estoque!==null && r.estoque<=0){ banner('err','SEM ESTOQUE — bloqueado', '<span class="sku">'+sku+'</span> não passou pela produção. Não dá pra imprimir a venda.'); beep(false); confirmar=null; return; }
   if(!r.pedido){ if(r.total>0){ banner('warn','Todas embaladas', 'Todas as vendas de <span class="sku">'+sku+'</span> já foram embaladas.'); } else { banner('err','SKU não está no lote', 'Nenhuma venda de <span class="sku">'+sku+'</span> hoje. Já subiu o PDF do Mercado Livre?'); } beep(false); confirmar=null; return; }
   confirmar=r.pedido;
-  banner('cfm','Confira: '+r.pedido.buyer, 'NF <b>'+(r.pedido.nf||'—')+'</b> · '+(r.pedido.city||'')+' · <span class="sku">'+sku+'</span><br>Estoque: '+r.estoque+' · pendentes desse SKU: '+r.pendentes+'<br><b>Bipe de novo</b> ou clique pra imprimir a etiqueta de venda.',
+  banner('cfm','Confira: '+esc(r.pedido.buyer), pecaHtml(r.peca)
+    +'NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+' · <span class="sku">'+esc(sku)+'</span><br>Estoque: '+r.estoque+' · pendentes desse SKU: '+r.pendentes+'<br><b>Bipe de novo</b> ou clique pra imprimir a etiqueta de venda.',
     '<button class="primary" onclick="imprimir()">Imprimir etiqueta de venda</button><button class="ghost" onclick="idle()">Cancelar</button>');
   beep(true);
 }

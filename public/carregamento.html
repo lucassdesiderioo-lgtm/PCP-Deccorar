@@ -44,13 +44,43 @@
 const $=s=>document.querySelector(s);
 let last={c:null,t:0};
 function banner(kind,title,sub){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'; }
+/* Quando a conferencia dupla esta ligada, o bipe da etiqueta nao carrega
+   sozinho: o volume fica ESPERANDO o bipe do SKU da propria caixa. Guardamos
+   qual etiqueta esta pendurada pra casar o segundo bipe com ela. */
+let aguardando=null;   // {code, buyer, nf}
 async function bip(code){
   code=(code||'').trim(); if(!code) return;
   const now=Date.now(); if(last.c===code && now-last.t<600) return; last={c:code,t:now};
-  const r=await (await fetch('/api/carregar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})})).json();
-  if(r.ok){ banner('ok','Carregado ✓ — '+r.pedido.buyer,'NF <b>'+(r.pedido.nf||'—')+'</b> · <span class="c">'+(r.pedido.codigo||'')+'</span> · Carregados <b>'+r.carregados+'</b> de '+r.total); beep(true); }
-  else if(r.motivo==='duplicado'){ banner('err','⚠ JÁ CARREGADO','Esse pacote ('+r.pedido.buyer+' · NF '+(r.pedido.nf||'—')+') já foi carregado. Cuidado com duplicidade.'); beep(false); }
-  else { banner('err','Etiqueta não reconhecida','Lido: '+code+'. Bipe a etiqueta de VENDA (não o SKU do produto).'); beep(false); }
+  const corpo = aguardando ? {code:aguardando.code, sku:code} : {code:code};
+  const r=await (await fetch('/api/carregar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)})).json();
+  if(r.ok){
+    aguardando=null;
+    banner('ok','Carregado ✓ — '+r.pedido.buyer,'NF <b>'+(r.pedido.nf||'—')+'</b> · <span class="c">'+(r.pedido.codigo||'')+'</span> · Carregados <b>'+r.carregados+'</b> de '+r.total); beep(true);
+  }
+  else if(r.motivo==='falta_sku'){
+    // 1o bipe aceito. NAO mostramos qual SKU esperar — a conferencia e cega.
+    aguardando={code:code, buyer:r.pedido.buyer, nf:r.pedido.nf};
+    banner('warn','Agora bipe o SKU da caixa','<b>'+r.pedido.buyer+'</b> · NF <b>'+(r.pedido.nf||'—')+'</b><br>Bipe o código de barras do produto <b>nesta mesma caixa</b> para conferir.');
+    beep(true);
+  }
+  else if(r.motivo==='sku_divergente'){
+    aguardando=null;
+    banner('err','⛔ PARE — CAIXA ERRADA',
+      'A etiqueta de <b>'+r.pedido.buyer+'</b> (NF '+(r.pedido.nf||'—')+') é do produto <span class="c">'+r.esperado+'</span>,<br>'+
+      'mas a caixa que ela está colada é <span class="c">'+r.lido+'</span>.<br><b>Não carregue.</b> Separe e confira antes de despachar.');
+    beep(false);
+  }
+  else if(r.motivo==='volume_sem_sku'){ aguardando=null; banner('err','Volume sem SKU', r.aviso||''); beep(false); }
+  else if(r.motivo==='duplicado'){ aguardando=null; banner('err','⚠ JÁ CARREGADO','Esse pacote ('+r.pedido.buyer+' · NF '+(r.pedido.nf||'—')+') já foi carregado. Cuidado com duplicidade.'); beep(false); }
+  else {
+    // Enquanto espera o SKU, um codigo nao reconhecido pode ser outra etiqueta:
+    // solta a pendencia pra pessoa nao ficar presa num volume.
+    var era=aguardando; aguardando=null;
+    banner('err','Etiqueta não reconhecida', era
+      ? 'Lido: '+code+'. Esperava o SKU da caixa de '+era.buyer+'. Bipe a etiqueta de venda de novo pra recomeçar.'
+      : 'Lido: '+code+'. Bipe a etiqueta de VENDA (não o SKU do produto).');
+    beep(false);
+  }
   carregar();
 }
 async function carregar(){

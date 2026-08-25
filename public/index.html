@@ -211,7 +211,17 @@
   <div class="card" id="ctPend" style="display:none"></div>
 </div>
 
-<div id="v-blq" class="hide"><div class="card"><div id="blqEstado"></div><table><thead><tr><th>SKU</th><th>Volumes</th><th></th></tr></thead><tbody id="blqLista"></tbody></table></div></div><div id="v-tst" class="hide">
+<div id="v-blq" class="hide">
+<div class="card" id="divCard" style="display:none;border:2px solid #c62828">
+  <div style="font-weight:800;color:#c62828;font-size:16px;margin-bottom:6px">⚠ AS DUAS LEITURAS DA FOLHA DISCORDAM</div>
+  <div style="font-size:13px;color:#5a6472;margin-bottom:12px">
+    O PDF do Mercado Livre foi lido de duas formas e elas deram SKUs diferentes para o mesmo volume.
+    O sistema <b>não escolhe</b> — a peça fica retida até alguém abrir o pedido no Mercado Livre e dizer qual é.
+    Enquanto isso ela não imprime etiqueta e não carrega.
+  </div>
+  <div id="divLista"></div>
+</div>
+<div class="card"><div id="blqEstado"></div><table><thead><tr><th>SKU</th><th>Volumes</th><th></th></tr></thead><tbody id="blqLista"></tbody></table></div></div><div id="v-tst" class="hide">
   <div class="card">
     <div id="tstEstado" style="font-size:16px;margin-bottom:14px"></div>
     <div class="row-actions" id="tstBotoes"></div>
@@ -1082,11 +1092,53 @@ document.addEventListener("click",function(e){
   if(b) etiqueta(b.dataset.etq);
 });
 
+/* Divergencia de leitura da folha: o volume so sai daqui quando alguem disser
+   qual peca o cliente comprou. Fica ACIMA dos bloqueados por SKU sem cadastro e
+   com moldura vermelha de proposito — os dois retem volume, mas so este
+   significa que uma peca errada quase foi despachada. */
+async function carregarDiv(){
+  var l=[]; try{ l=await (await fetch("/api/divergencias")).json(); }catch(e){}
+  var card=document.getElementById("divCard"), lis=document.getElementById("divLista");
+  if(!card||!lis) return 0;
+  if(!Array.isArray(l)||!l.length){ card.style.display="none"; lis.innerHTML=""; return 0; }
+  card.style.display="";
+  var h="";
+  for(var i=0;i<l.length;i++){
+    var r=l[i];
+    var op=String(r.bloqueio||"").replace(/^divergencia:\s*/,"").split("/").map(function(s){return s.trim();}).filter(Boolean);
+    h+='<div style="border-top:1px solid #d8dee6;padding:12px 0">'
+      +'<div style="font-weight:700">'+(r.buyer||"—")+' · NF '+(r.nf||"—")+' · '+(r.data||"")+'</div>'
+      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 10px">pack '+(r.packId||"—")+' · venda '+(r.venda||"—")+'</div>'
+      +'<div style="font-size:13px;margin-bottom:8px">Qual peça o cliente comprou?</div>';
+    for(var k=0;k<op.length;k++)
+      h+='<button class="ghost" style="margin-right:8px;font-family:ui-monospace,monospace;font-weight:700" '
+        +'data-resolvediv="'+r.id+'" data-sku="'+op[k]+'">'+op[k]+'</button>';
+    h+='<span style="font-size:12px;color:#5a6472">confira no Mercado Livre antes de escolher</span></div>';
+  }
+  lis.innerHTML=h;
+  return l.length;
+}
+document.addEventListener("click",async function(e){
+  var b=e.target.closest("[data-resolvediv]");
+  if(!b) return;
+  var sku=b.getAttribute("data-sku");
+  if(!confirm("Confirmar que esse volume é "+sku+"?\n\nA etiqueta vai sair com esse SKU.")) return;
+  b.disabled=true;
+  try{
+    var r=await (await fetch("/api/divergencias/resolver",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({id:+b.getAttribute("data-resolvediv"),codigo:sku})})).json();
+    if(r.erro) alert(r.erro);
+  }catch(err){ alert(String(err)); }
+  b.disabled=false;
+  carregarBloq();
+});
+
 async function carregarBloq(){
 var l=[]; try{ l=await (await fetch("/api/bloqueados")).json(); }catch(e){}
 var n=0; for(var i=0;i<l.length;i++) n+=l[i].qtd;
+var nd=await carregarDiv();
 var tb=document.getElementById("tabBlq");
-if(tb) tb.textContent = n ? ("Bloqueados ("+n+")") : "Bloqueados";
+if(tb) tb.textContent = (n+nd) ? ("Bloqueados ("+(n+nd)+")") : "Bloqueados";
 var est=document.getElementById("blqEstado"), lis=document.getElementById("blqLista");
 if(!est||!lis) return;
 if(!l.length){ est.innerHTML="<b>Nenhum volume bloqueado.</b>"; lis.innerHTML=""; return; }
@@ -1392,6 +1444,11 @@ async function carregarCad(){
     h+='<div style="display:flex;gap:8px;margin-top:14px"><input id="cdIn_'+tp.t+'" placeholder="novo item" style="flex:1"><button class="primary cdAdd" data-t="'+tp.t+'">Adicionar</button></div>';
     h+='</div>';
   }
+  var cnf=false; try{ cnf=!!(await (await fetch('/api/config/conferencia')).json()).ligada; }catch(e){}
+  h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:6px">Conferência dupla no carregamento</div>';
+  h+='<div class="sub" style="margin-bottom:12px">Com isso ligado, o carregamento pede <b>dois bipes</b>: a etiqueta de venda e, em seguida, o código de barras do produto <b>na mesma caixa</b>. Se a etiqueta estiver colada na caixa errada, os dois não batem e o volume <b>não carrega</b>. O operador não vê qual SKU esperar — a conferência é cega, senão vira só confirmação. Custa um bipe a mais por volume.</div>';
+  h+='<label style="display:flex;align-items:center;gap:10px;font-size:15px;cursor:pointer"><input type="checkbox" id="cdConf" '+(cnf?'checked':'')+' style="width:20px;height:20px"> <span>Exigir o bipe do SKU no carregamento</span></label>';
+  h+='<div id="cdConfMsg" style="margin-top:10px;font-size:14px"></div></div>';
   var kit=''; try{ kit=(await (await fetch('/api/config/kit')).json()).kit||''; }catch(e){}
   h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:6px">Código do kit (o que o operador bipa)</div>';
   h+='<div class="sub" style="margin-bottom:12px">É o código que o operador bipa na embalagem para confirmar o kit. Use um código <b>simples, só com letras/números</b> — ex.: <b>KITENVIO</b>. Imprima esse código de barras na etiqueta (abaixo). A tela da embalagem só confere, não altera.</div>';
@@ -1412,6 +1469,19 @@ async function carregarCad(){
     else document.getElementById('cdKitLabelMsg').textContent='Nenhuma etiqueta enviada ainda.';
   }catch(e){}
 }
+document.addEventListener('change',async function(e){
+  var c=e.target.closest('#cdConf');
+  if(!c) return;
+  var msg=document.getElementById('cdConfMsg');
+  try{
+    var r=await (await fetch('/api/config/conferencia',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ligada:c.checked})})).json();
+    if(r.erro){ msg.innerHTML='<span style="color:#ff6b6b">'+r.erro+'</span>'; c.checked=!c.checked; return; }
+    msg.innerHTML = r.ligada
+      ? '<span style="color:var(--green)">Ligado — o carregamento passa a exigir os dois bipes.</span>'
+      : '<span style="color:var(--muted)">Desligado — o carregamento volta a pedir só a etiqueta de venda.</span>';
+  }catch(err){ msg.innerHTML='<span style="color:#ff6b6b">'+String(err)+'</span>'; c.checked=!c.checked; }
+});
 document.addEventListener('click',async function(e){
   var a=e.target.closest('.cdAdd');
   if(a){

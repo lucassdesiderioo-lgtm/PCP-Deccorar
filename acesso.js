@@ -439,6 +439,11 @@ module.exports = function(app, db){
     // e gateada — a lista de impressos carrega comprador, cidade e NF, que e
     // dado de cliente, nao numero de operacao.
     if(eq('/api/impressos') || eq('/api/reimprimir')) return 'etiqueta.emitir';
+    // Divergencia de leitura da folha: ver e do admin; RESOLVER exige a mesma
+    // permissao de quem hoje destrava bloqueado cadastrando SKU — e a mesma
+    // decisao, "qual peca e essa", tomada olhando o pedido no Mercado Livre.
+    if(M !== 'GET' && pre('/api/divergencias')) return 'sku.cadastrar';
+    if(eq('/api/divergencias')) return '@admin';
     if(M !== 'GET' && eq('/api/devolucao')) return 'devolucao.registrar';
     if(M !== 'GET' && eq('/api/devolucao/baixa')) return 'devolucao.baixar';
     if(M !== 'GET' && eq('/api/estoque')) return 'estoque.editar';
@@ -507,6 +512,9 @@ module.exports = function(app, db){
     if(M !== 'GET' && pre('/api/contagem')) return 'contagem.contar';
     if(M !== 'GET' && eq('/api/config/horarios')) return 'horarios.editar';
     if(M !== 'GET' && eq('/api/config/kit')) return 'kit.editar';
+    // Ligar/desligar a conferencia dupla muda o que a expedicao e obrigada a
+    // fazer — e decisao de quem responde pela operacao, nao de quem carrega.
+    if(M !== 'GET' && eq('/api/config/conferencia')) return '@admin';
     if(M !== 'GET' && pre('/api/kit')) return 'kit.editar';
     if(M !== 'GET' && pre('/api/listas')) return 'listas.editar';
     if(eq('/api/rejeicao/resumo')) return 'produtividade.nominal';
@@ -604,7 +612,8 @@ module.exports = function(app, db){
     ['GET','/planejamento'],['GET','/acessos'],['GET','/baixar-backup'],
     ['POST','/api/revisao'],['POST','/api/rejeicao'],['POST','/api/montagem'],['POST','/api/embalar'],
     ['POST','/api/carregar'],['POST','/api/lote/upload'],['GET','/api/print/:id'],
-    ['GET','/api/impressos'],['POST','/api/reimprimir'],['POST','/api/devolucao'],
+    ['GET','/api/impressos'],['POST','/api/reimprimir'],
+    ['GET','/api/divergencias'],['POST','/api/divergencias/resolver'],['POST','/api/devolucao'],
     ['POST','/api/devolucao/baixa'],['POST','/api/estoque'],['POST','/api/alvo'],['POST','/api/necessidade/aplicar'],
     ['POST','/api/producao'],['POST','/api/planejamento/importar'],['POST','/api/skus'],['DELETE','/api/skus/:c'],
     ['GET','/api/skus/pendencias'],['GET','/api/cores'],['POST','/api/cores'],['DELETE','/api/cores/:c'],
@@ -627,7 +636,8 @@ module.exports = function(app, db){
     ['POST','/api/contagem/pendentes/rejeitar'],
     ['GET','/api/contagem/componentes'],['POST','/api/contagem/componente'],
     ['GET','/api/compras/necessidade'],
-    ['POST','/api/config/horarios'],['POST','/api/config/kit'],['POST','/api/listas'],['GET','/api/teste'],
+    ['POST','/api/config/horarios'],['POST','/api/config/kit'],
+    ['GET','/api/config/conferencia'],['POST','/api/config/conferencia'],['POST','/api/listas'],['GET','/api/teste'],
     ['GET','/api/usuarios'],['GET','/api/acesso/setores'],['GET','/api/acesso/divergencias'],
     ['GET','/api/painel'],['GET','/api/rel/dia'],['GET','/api/necessidade'],['GET','/api/cruzamento'],
     ['GET','/api/rejeicao/resumo'],['GET','/api/skus'],['GET','/api/fila'],['GET','/api/carregamento']

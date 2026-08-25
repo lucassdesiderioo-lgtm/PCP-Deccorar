@@ -91,7 +91,33 @@ function conferir(nome, orders, esperado){
     ]),
     {'901':'BK160140BRANCO','222':'BK140140BEGE'});
 
-  // ── 5. a cor sobrevive (ela vem da folha, e a tela de carregamento usa) ────
+  /* ── 5. a TESTEMUNHA: quando as duas leituras discordam sobre o mesmo volume,
+        o parse marca `conflito` e o upload retem a peca em vez de escolher.
+        Este e o caso do Abraao visto pelo outro lado — la o teste cobra o SKU
+        certo, aqui cobra que a discordancia apareca. */
+  casos++;
+  {
+    const os_=await montar([
+      'Pack ID: 111', 'SKU: BK160160BRANCO', 'Cor: BRANCO', 'Desenho do tecido ---',
+      'Venda: 900', 'SKU: BK160140BEGE', 'Cor: BEGE',
+      'Pack ID: 777', 'SKU: BK140140BEGE', 'Cor: BEGE', 'Desenho do tecido ---',
+    ],[
+      ['Pack ID: 111','NF: 1','Cidade de destino : Curitiba','Joao','Endereço: Rua A'],
+      ['Pack ID: 777','NF: 2','Cidade de destino : Recife','Cliente Teste','Endereço: Rua B'],
+    ]);
+    const alvo=os_.find(o=>o.packId==='777')||{}, limpo=os_.find(o=>o.packId==='111')||{};
+    const erros=[];
+    if(!alvo.conflito) erros.push('o volume com leituras discordantes nao foi marcado');
+    else if(!/BK140140BEGE/.test(alvo.conflito)||!/BK160140BEGE/.test(alvo.conflito))
+      erros.push('o conflito nao nomeia as duas leituras: '+alvo.conflito);
+    if(alvo.sku!=='BK140140BEGE') erros.push('mesmo em conflito, o SKU exibido vem da leitura 1');
+    if(limpo.conflito) erros.push('volume sem discordancia foi marcado a toa');
+    if(erros.length){ falhas++; console.log('FALHOU  leituras discordantes viram conflito');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      leituras discordantes viram conflito (peca fica retida)');
+  }
+
+  // ── 6. a cor sobrevive (ela vem da folha, e a tela de carregamento usa) ────
   casos++;
   const cs=await montar(
     ['Pack ID: 111','Venda: 901','SKU: BK160160BRANCO','Cor: BRANCO','Desenho do tecido ---'],
