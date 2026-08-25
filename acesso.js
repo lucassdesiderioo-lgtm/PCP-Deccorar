@@ -435,6 +435,10 @@ module.exports = function(app, db){
     if(M !== 'GET' && eq('/api/carregar')) return 'carregamento.executar';
     if(M !== 'GET' && pre('/api/lote')) return 'pdf.subir';
     if(pre('/api/print')) return 'etiqueta.emitir';
+    // Reimpressao: mesma bancada, mesma permissao de imprimir. A LEITURA tambem
+    // e gateada — a lista de impressos carrega comprador, cidade e NF, que e
+    // dado de cliente, nao numero de operacao.
+    if(eq('/api/impressos') || eq('/api/reimprimir')) return 'etiqueta.emitir';
     if(M !== 'GET' && eq('/api/devolucao')) return 'devolucao.registrar';
     if(M !== 'GET' && eq('/api/devolucao/baixa')) return 'devolucao.baixar';
     if(M !== 'GET' && eq('/api/estoque')) return 'estoque.editar';
@@ -599,7 +603,8 @@ module.exports = function(app, db){
     ['GET','/expedicao'],['GET','/devolucao'],['GET','/painel'],['GET','/relatorios'],['GET','/necessidade'],
     ['GET','/planejamento'],['GET','/acessos'],['GET','/baixar-backup'],
     ['POST','/api/revisao'],['POST','/api/rejeicao'],['POST','/api/montagem'],['POST','/api/embalar'],
-    ['POST','/api/carregar'],['POST','/api/lote/upload'],['GET','/api/print/:id'],['POST','/api/devolucao'],
+    ['POST','/api/carregar'],['POST','/api/lote/upload'],['GET','/api/print/:id'],
+    ['GET','/api/impressos'],['POST','/api/reimprimir'],['POST','/api/devolucao'],
     ['POST','/api/devolucao/baixa'],['POST','/api/estoque'],['POST','/api/alvo'],['POST','/api/necessidade/aplicar'],
     ['POST','/api/producao'],['POST','/api/planejamento/importar'],['POST','/api/skus'],['DELETE','/api/skus/:c'],
     ['GET','/api/skus/pendencias'],['GET','/api/cores'],['POST','/api/cores'],['DELETE','/api/cores/:c'],

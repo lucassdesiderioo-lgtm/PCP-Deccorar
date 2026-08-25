@@ -249,6 +249,8 @@ estagio      TEXT DEFAULT 'pendente'
              -- 'pendente' | 'embalado' | 'carregado' | 'bloqueado'
 embalado_em, carregado_em, data, criado_em
 teste        INTEGER DEFAULT 0
+reimpressoes INTEGER DEFAULT 0   -- quantas vezes voltou pra impressora
+reimpresso_em TEXT               -- ultima reimpressao (sem default: ALTER nao aceita)
 ```
 
 #### `devolucao`
@@ -400,8 +402,17 @@ atualizado  TEXT
 | GET | `/api/bloqueados` | SKUs desconhecidos agrupados |
 | GET | `/api/proximo/:sku` | Próxima venda pendente do SKU |
 | POST | `/api/embalar` | Marca embalado · **−1 estoque** |
-| GET | `/api/print/:id` | PDF com etiqueta + DANFE · **recusa bloqueado** |
+| GET | `/api/print/:id` | PDF com etiqueta + DANFE · **recusa bloqueado** · 410 se o PDF de origem já saiu de `lotes/` |
+| GET | `/api/impressos` | Notas e clientes já impressos · `?dias=N` (1 a 30, padrão hoje) |
+| POST | `/api/reimprimir` | Registra a reimpressão · **NÃO mexe no estoque** |
 | GET | `/api/expedicao/status` | Relógio de despacho e pendências |
+
+> **Reimprimir não é imprimir de novo pro estoque.** A baixa (−1) acontece uma
+> única vez, no `POST /api/embalar`. Papel enroscado, etiqueta borrada ou folha
+> perdida geram a MESMA etiqueta, do MESMO volume, pro MESMO cliente — somar de
+> novo furaria o estoque a cada problema de impressora. `POST /api/reimprimir` só
+> conta a história (`lote.reimpressoes`, `lote.reimpresso_em`); quem manda o PDF
+> continua sendo o `GET /api/print/:id`.
 
 ### Carregamento
 | Método | Rota | Efeito |
