@@ -65,7 +65,7 @@
   <div class="banner" id="banner"></div>
   <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="bipe aqui">
 <div class="card" style="margin-top:16px"><div class="ttl">Faltam imprimir</div><div id="pendLista"></div></div>
-<div class="card" id="futBox" style="margin-top:16px;display:none;opacity:.85"></div>
+<div class="card" id="futBox" style="margin-top:16px;display:none;border-left:4px solid #7aa3d8"></div>
   <div class="card" style="margin-top:16px">
     <div class="ttl">
       <span>Já impressos — reimprimir</span>
@@ -125,13 +125,24 @@ async function scanSku(sku){
   // Zero ali e o normal, e barrar aqui empurrava a bancada a imprimir a
   // etiqueta pelo PDF do ML e despachar por fora do sistema.
   if(!r.sob_medida && r.estoque!==null && r.estoque<=0){ banner('err','SEM ESTOQUE — bloqueado', '<span class="sku">'+sku+'</span> não passou pela produção. Não dá pra imprimir a venda.'); beep(false); confirmar=null; return; }
-  if(!r.pedido){ if(r.total>0){ banner('warn','Todas embaladas', 'Todas as vendas de <span class="sku">'+sku+'</span> já foram embaladas.'); } else { banner('err','SKU não está no lote', 'Nenhuma venda de <span class="sku">'+sku+'</span> hoje. Já subiu o PDF do Mercado Livre?'); } beep(false); confirmar=null; return; }
+  // Sem pedido agora significa mesmo NENHUM: a busca já inclui as vendas futuras.
+  if(!r.pedido){ if(r.total>0){ banner('warn','Todas embaladas', 'Todas as vendas de <span class="sku">'+sku+'</span> já foram embaladas.'); } else { banner('err','SKU não está no lote', 'Nenhuma venda de <span class="sku">'+sku+'</span> — nem pra hoje, nem pra frente. Já subiu o PDF do Mercado Livre?'); } beep(false); confirmar=null; return; }
   confirmar=r.pedido;
-  banner('cfm','Confira: '+esc(r.pedido.buyer), pecaHtml(r.peca)
+  // ADIANTANDO: a venda existe e a peça está na prateleira, mas a entrega não é
+  // de hoje. Precisa ser inconfundível — se passar por urgente, o operador gasta
+  // peça que amanhã pode faltar pra quem tem prazo curto. Por isso o aviso vem
+  // ANTES de tudo, na cor do modo estoque, e diz a data por extenso.
+  var adiant = r.adiantado ? '<div style="background:#e8f0fb;border:2px solid #7aa3d8;border-radius:8px;'
+      +'padding:8px 10px;margin-bottom:8px;font-weight:700;color:#1f4b82">'
+      +'ADIANTANDO — só despacha em '+dataBR(r.pedido.despachar_em)
+      +'<div style="font-weight:400;font-size:13px;margin-top:2px">Não precisa sair hoje. '
+      +'Vale se tiver peça sobrando na prateleira.</div></div>' : '';
+  banner(r.adiantado?'warn':'cfm','Confira: '+esc(r.pedido.buyer), adiant+pecaHtml(r.peca)
     +'NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+' · <span class="sku">'+esc(sku)+'</span><br>'
     +(r.sob_medida ? 'SOB MEDIDA — sem estoque, peça feita pro pedido'
                    : 'Estoque: '+r.estoque)
-    +' · pendentes desse SKU: '+r.pendentes+'<br><b>Bipe de novo</b> ou clique pra imprimir a etiqueta de venda.',
+    +' · pra hoje: '+r.pendentes+(r.futuros?' · pra depois: '+r.futuros:'')
+    +'<br><b>Bipe de novo</b> ou clique pra imprimir a etiqueta de venda.',
     '<button class="primary" onclick="imprimir()">Imprimir etiqueta de venda</button><button class="ghost" onclick="idle()">Cancelar</button>');
   beep(true);
 }
@@ -218,9 +229,19 @@ listaPend();
 // ── O que vem pela frente ────────────────────────────────────────────────────
 // Venda já faturada com prazo de despacho futuro. Fica FORA da fila do dia de
 // propósito — cobrar hoje o que só vence em três semanas é o que ensina a
-// equipe a ignorar a fila inteira. Mas não pode sumir, senão ninguém planeja a
-// produção. Por isso: painel próprio, agrupado por data, discreto.
+// equipe a ignorar a fila inteira.
+//
+// Mas é trabalho adiantável, não arquivo morto: se a peça está na prateleira,
+// bipar o SKU já imprime a etiqueta e a caixa fica pronta. Por isso o painel
+// mostra as datas e diz isso em voz alta — quem só olhasse "Faltam imprimir"
+// não teria como saber que dá pra seguir.
 function dataBR(s){ var p=String(s||'').split('-'); return p.length===3? p[2]+'/'+p[1] : s; }
+// Quantos dias faltam, pra "14/09" virar uma noção de urgência e não só um número.
+function faltamDias(s){
+  var p=String(s||'').split('-'); if(p.length!==3) return null;
+  var d=new Date(+p[0],+p[1]-1,+p[2],12,0,0), h=new Date(); h.setHours(12,0,0,0);
+  return Math.round((d-h)/86400000);
+}
 async function listaFut(){
   var l=[]; try{ l=await (await fetch("/api/pendentes/futuros")).json(); }catch(e){}
   var el=document.getElementById("futBox"); if(!el) return;
@@ -229,13 +250,19 @@ async function listaFut(){
   var por={}, ordem=[];
   for(var i=0;i<l.length;i++){ var d=l[i].despachar_em;
     if(!por[d]){ por[d]=[]; ordem.push(d); } por[d].push(l[i]); }
-  var h='<div class="ttl">Pra despachar depois</div>';
+  var h='<div class="ttl">Pra despachar depois</div>'
+    +'<div style="color:#1f4b82;font-size:13px;margin:-4px 0 8px">'
+    +'Dá pra adiantar: bipe o SKU e a etiqueta sai, se tiver peça na prateleira. '
+    +'Não precisa entregar nessas datas.</div>';
   for(var k=0;k<ordem.length;k++){
     var d=ordem[k], itens=por[d], tot=0;
     for(var j=0;j<itens.length;j++) tot+=itens[j].qtd;
     var skus=[]; for(var j=0;j<itens.length;j++) skus.push(esc(itens[j].codigo)+' ×'+itens[j].qtd);
+    var dias=faltamDias(d);
     h+='<div style="padding:8px 0;border-bottom:1px solid #e6eaf0">'
-      +'<div style="display:flex;justify-content:space-between"><b>'+dataBR(d)+'</b>'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline">'
+      +'<b>'+dataBR(d)+(dias!=null?'<span style="font-weight:400;color:#5a6472;font-size:12px"> · em '
+          +(dias===1?'1 dia':dias+' dias')+'</span>':'')+'</b>'
       +'<b style="color:#5a6472">'+tot+'</b></div>'
       +'<div style="color:#5a6472;font-size:13px;font-family:ui-monospace,monospace">'+skus.join(' · ')+'</div></div>';
   }

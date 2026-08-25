@@ -556,6 +556,22 @@ ao meio-dia em vez de 10:30.
 > cedo demais). O que vence depois aparece no painel "Pra despachar depois", que
 > existe para o planejamento enxergar sem poluir o dia. O filtro por `data` (dia
 > da importação) saiu: volume que entrou ontem e vence hoje é trabalho de hoje.
+
+> **Venda futura é trabalho adiantável, não arquivo morto.** O bipe do SKU
+> (`/api/proximo/:sku`) **não** filtra por prazo — quem decide é a ordem
+> (`ORDEM_URGENCIA`): sem data e vencido primeiro, depois hoje, e só então o
+> futuro. Assim o operador nunca adianta uma venda de setembro enquanto existe
+> uma atrasada do mesmo SKU esperando, e, esgotadas as do dia, o bipe segue
+> trabalhando em vez de dizer que não há nada.
+>
+> O que impede adiantar o que não pode é a **trava de estoque que já existia**:
+> sem peça na prateleira, nada é impresso. É exatamente a regra do dono — *"só
+> se tiver estoque disponível"* — sem precisar de trava nova.
+>
+> Quando o volume escolhido é futuro, a resposta traz `adiantado:true` e a tela
+> abre um aviso azul com a data por extenso. Ele é obrigatório: uma venda de
+> setembro que passe por urgente faz o operador gastar peça que amanhã pode
+> faltar para quem tem prazo curto.
 >
 > **O ano não vem na linha** e é inferido dos dois lados da virada: `05/jan`
 > lido em dezembro é do ano seguinte, `20/dez` lido em janeiro é do ano anterior.

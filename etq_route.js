@@ -24,11 +24,29 @@ module.exports=function(app,db){
        a propria tela diz que existe. */
     const total=db.prepare(`SELECT COUNT(*) c FROM lote WHERE codigo=? AND `+VENCE_HOJE).get(sku).c;
     const pend=db.prepare(`SELECT COUNT(*) c FROM lote WHERE codigo=? AND estagio='pendente' AND `+VENCE_HOJE).get(sku).c;
-    /* O mais urgente primeiro, nao o de menor id: sem isso um volume atrasado
-       espera enquanto sai um de prazo folgado. */
+    /* Quantas vendas desse SKU ainda vao vencer. Elas nao entram no `pendentes`
+       (que e a cobranca do dia) mas precisam ser contadas, porque sao o trabalho
+       que da pra adiantar quando sobra peca na prateleira. */
+    const fut=db.prepare(`SELECT COUNT(*) c FROM lote
+      WHERE codigo=? AND estagio='pendente' AND despachar_em IS NOT NULL
+        AND despachar_em>date('now','localtime')`).get(sku).c;
+    /* O PROXIMO VOLUME E O MAIS URGENTE — E VENDA FUTURA TAMBEM E VOLUME.
+       A busca nao filtra por prazo: quem decide e a ordem. Sem data e vencido
+       vem primeiro, depois hoje, e so entao o futuro. Assim o operador nunca
+       adianta uma venda de setembro enquanto existe uma atrasada do mesmo SKU
+       esperando — e, esgotadas as do dia, o bipe segue trabalhando em vez de
+       dizer que nao ha nada.
+       O que impede adiantar o que nao pode e a trava de estoque, que ja existe
+       logo abaixo: sem peca na prateleira nada e impresso. E exatamente a regra
+       "so se tiver estoque disponivel". */
     const p=db.prepare(`SELECT id,codigo,cor,buyer,city,nf,packId,venda,despachar_em
-      FROM lote WHERE codigo=? AND estagio='pendente' AND `+VENCE_HOJE+
-      ` ORDER BY `+ORDEM_URGENCIA+` LIMIT 1`).get(sku);
+      FROM lote WHERE codigo=? AND estagio='pendente'
+      ORDER BY `+ORDEM_URGENCIA+` LIMIT 1`).get(sku);
+    const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
+    /* Adiantado = tem prazo, e o prazo e depois de hoje. A tela usa isto pra
+       avisar que a entrega nao e do dia — sem isso o operador nao teria como
+       distinguir, e uma venda de setembro pareceria urgente. */
+    const adiantado = !!(p && p.despachar_em && p.despachar_em>hoje);
     /* Medida so entra quando o modelo cobra medida — acessorio nao tem, e
        exibir "null x null" ensinaria o operador a ignorar a linha inteira. */
     const peca={
@@ -38,8 +56,8 @@ module.exports=function(app,db){
     /* A tela precisa saber que e sob medida para nao anunciar "Estoque: 0"
        como se fosse falta. Zero ali e o normal, nao um alarme — e um numero
        que aparece como problema todo dia ensina a equipe a ignora-lo. */
-    res.json({cadastrado:true,estoque:s.estoque,total,pendentes:pend,pedido:p||null,peca,
-              sob_medida:!!s.sob_medida});
+    res.json({cadastrado:true,estoque:s.estoque,total,pendentes:pend,futuros:fut,
+              pedido:p||null,peca,sob_medida:!!s.sob_medida,adiantado});
   });
 
   app.post('/api/embalar',(req,res)=>{
