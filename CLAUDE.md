@@ -140,41 +140,60 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 1. `parse.js` extrai SKU, Pack ID, venda, comprador, NF e páginas de etiqueta/DANFE
 2. Cada volume vira uma linha em `lote`
 
-> ⚠️ **ARMADILHA #4 — a ordem das duas leituras da folha de controle decide
-> qual peça o cliente recebe.** O `parse.js` lê a folha duas vezes: primeiro
-> **item a item** (o tokenizer, que fecha cada registro no `SKU:` com o `Pack ID:`
-> e a `Venda:` que vieram antes), depois **por pedaços** (`split` em
-> `Desenho do tecido`), e o `put` **nunca sobrescreve** o SKU de um registro já
-> gravado. Quem lê primeiro manda.
+> ⚠️ **ARMADILHA #4 — a folha de controle é lida POR BLOCO, e a janela do bloco
+> não pode olhar para trás atrás de pack/venda/comprador.** A folha monta cada
+> item em cinco linhas, em duas colunas:
 >
-> A leitura por pedaços é frágil e **não pode voltar a rodar primeiro**: nem todo
-> item tem "Desenho do tecido" (acessório não tem), então dois itens caem no mesmo
-> pedaço e o `match` casa o **primeiro `SKU:`** com o **primeiro `Pack ID:`** — que
-> são de itens diferentes quando o de cima não traz pack. Em 20/08/2026 foi assim
-> que Abraão Amorim, que comprou 3 × `BK140140BEGE`, recebeu uma `BK160140BEGE`:
-> o SKU do vizinho de cima colou no Pack ID dele. Auditoria da semana: 2 volumes
-> errados em 361 (0,6%) — e nenhum erro humano no meio, a bancada bipou o que o
-> sistema mandou.
+> ```
+> <identificação>            Persiana ... 1,60x1,40 Blecaute Cinza
+> Pack ID: 2000014610097547  SKU: BK160140CINZA
+> Venda: 2000018016683414    Quantidade: 1
+> Tiago Sanches              Cor: Cinza
+>                            Desenho do tecido: Blackout
+> ```
 >
-> Hoje ela roda depois e só aceita pedaço com **exatamente um** `SKU:`, servindo
-> de reforço e para completar a cor. **Rode `node teste_parse.js` após qualquer
-> mudança no `parse.js`** — o caso do Abraão está lá.
+> Pack, venda, comprador e cor vêm **na linha do `SKU:` ou abaixo**; só a
+> descrição fica acima. Item que não fecha com "Desenho do tecido" (acessório
+> não fecha, e nem todo item traz) faria a janela do item seguinte pegar os
+> campos dele — foi assim que a etiqueta da Silvia Carolina quase colou no item
+> do Evandro num teste com o PDF real.
 >
-> Para conferir o que já está gravado: `node rastrear.js --auditar [dias]` relê a
-> folha de cada PDF e lista os volumes cujo SKU não bate. `node rastrear.js
-> <número>` segue uma venda específica.
+> **O que havia antes:** a folha era fatiada por `split` em "Desenho do tecido",
+> e o `match` casava o **primeiro `SKU:`** do pedaço com o **primeiro `Pack ID:`**
+> — de itens diferentes quando o de cima não trazia pack. Em 20/08/2026 foi assim
+> que Abraão Amorim, que comprou 3 × `BK140140BEGE`, recebeu uma `BK160140BEGE`.
+> Auditoria da semana: 2 volumes errados em 361 (0,6%), sem erro humano no meio —
+> a bancada bipou o que o sistema mandou.
+>
+> `folha.js` → `itensDaFolha()` é o **dono único** dessa leitura: o `parse.js`
+> grava por ela e a auditoria relê por ela. Duas cópias significaria conferir com
+> uma régua diferente da que gravou.
+>
+> **Rode `node teste_parse.js` após qualquer mudança no `parse.js`** — os sete
+> casos montam a folha no formato REAL do ML, e o caso do Abraão está lá.
+>
+> Para conferir o que já está gravado: `node rastrear.js --auditar [dias]`.
+> `node rastrear.js --folha` mostra o PDF cru quando o layout mudar.
 
-### As duas leituras conferem uma à outra
+### Três conferências, e qualquer uma delas retém o volume
 
-Desde 25/08/2026 as duas leituras vivem em **mapas separados** (`leitura1` e
-`leitura2` no `parse.js`) e o volume só passa se **concordarem**. Discordaram, o
-`parse` devolve `conflito` e o upload grava o volume como `bloqueado` com
-`lote.bloqueio = 'divergencia: SKU_A / SKU_B'`.
+O `parse` devolve `conflito` e o upload grava o volume como `bloqueado` com
+`lote.bloqueio = 'divergencia: ...'` quando:
 
-> A leitura por pedaços **continua opinando sobre pedaço grudado, inclusive
-> errado** — de propósito. É exatamente ali que ela discorda da leitura 1, e essa
-> discordância é o único alarme que existe. Calar a testemunha no lugar onde ela
-> erra seria apagar o sinal.
+| # | Conferência | O que ela pega |
+|---|---|---|
+| 1 | **As duas leituras da folha** — o bloco (`leitura1`) × o tokenizer (`leitura2`), em mapas separados | O PDF lido de dois jeitos dando SKUs diferentes |
+| 2 | **O comprador** — o nome na etiqueta × o nome no bloco | O volume casado com o item de outra pessoa. É a única que **não depende do Pack ID**, que é justamente o número que desalinha |
+| 3 | **A descrição** — `1,60x1,40` escrito no anúncio × a medida dentro do código do SKU | O item corrompido, mesmo que as duas leituras concordem |
+
+> As conferências 2 e 3 só acusam quando **os dois lados existem**: nome que não
+> deu para ler, ou SKU sem medida no código (§7 — SKU é etiqueta livre), nunca
+> viram acusação. Silêncio por falta de dado não pode virar bloqueio, senão a
+> operação para por ruído e a equipe aprende a destravar sem olhar.
+
+Validado contra os PDFs reais de 24/08: **47 volumes, zero conflitos**, e todos
+os 46 do lote grande conferidos por um caminho independente (o nome do comprador)
+sem uma única divergência.
 
 O volume divergente:
 - não imprime etiqueta e não carrega (é `bloqueado`);

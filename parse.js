@@ -26,8 +26,8 @@ async function parsePdf(uint8){
      upload nao escolhe — bloqueia e manda alguem conferir (§6: melhor reter
      que adivinhar). O SKU de um registro nunca e sobrescrito; a cor pode ser
      completada, mas so quando o SKU e o mesmo. */
-  const leitura1={pack:{},venda:{}};   // item a item — a que manda
-  const leitura2={pack:{},venda:{}};   // por pedacos — a testemunha
+  const leitura1={pack:{},venda:{}};   // por BLOCO — a que manda
+  const leitura2={pack:{},venda:{}};   // item a item (tokenizer) — a testemunha
   const guardar=(onde,rec)=>{
     const grava=(mapa,chave)=>{
       if(!chave) return;
@@ -39,38 +39,42 @@ async function parsePdf(uint8){
   const put=rec=>guardar(leitura1,rec);
   const byPack=leitura1.pack, byVenda=leitura1.venda;
 
-  /* LEITURA 1 (a que manda): item a item, na ordem em que aparecem na folha.
-     Cada "SKU:" fecha o registro com o Pack ID e a Venda que vieram antes dele,
-     e depois zera os dois — item que nao traz Pack ID fica com pack nulo em vez
-     de herdar o do vizinho. */
+  /* LEITURA 1 (a que manda): UM BLOCO POR ITEM.
+     A folha do Mercado Livre monta cada item em cinco linhas fixas:
+
+        <identificacao>  Persiana ... 1,60x1,40 Blecaute Cinza
+        Pack ID: 2000014610097547   SKU: BK160140CINZA
+        Venda: 2000018016683414     Quantidade: 1
+        Tiago Sanches               Cor: Cinza
+                                    Desenho do tecido: Blackout
+
+     Entao o item nao precisa de separador nenhum: ele E a janela de linhas em
+     volta do seu proprio "SKU:". Tudo que sai dali — pack, venda, comprador,
+     cor, descricao — e do MESMO item, e nao ha como herdar campo do vizinho.
+     Era exatamente essa heranca que mandava a peca errada.
+
+     De quebra, o bloco traz duas coisas que nenhuma leitura anterior via: o
+     COMPRADOR (que tambem esta na etiqueta, e por isso liga uma na outra sem
+     depender do Pack ID) e a DESCRICAO com a medida escrita por extenso (que
+     confere o proprio SKU). Ambas viram conferencia la embaixo. */
+  /* A montagem do bloco mora no folha.js — o mesmo codigo que a auditoria usa
+     pra reler o PDF depois. Se fossem duas copias, a conferencia poderia
+     "confirmar" um volume com uma regua diferente da que o gravou. */
+  const itensFolha=require('./folha').itensDaFolha(controlLines);
+  itensFolha.forEach(put);
+
+  /* LEITURA 2 (a testemunha): o tokenizer, que percorre a folha inteira e fecha
+     cada "SKU:" com o Pack ID e a Venda que vieram antes dele. Ele NAO decide
+     nada — existe para discordar. Le por um caminho diferente do bloco, entao
+     quando os dois chegam ao mesmo SKU para o mesmo volume, a chance de ambos
+     errarem igual e pequena; quando discordam, o volume e retido. */
   { const tok=/(Pack ID:\s*([\d ]+))|(Venda:\s*([\d ]+))|(SKU:\s*(\S+))|(Cor:\s*([^\n]+))/g; let m,pk=null,vd=null,last=null;
     while((m=tok.exec(controlText))){
       if(m[2])pk=m[2].replace(/\s+/g,'');
       else if(m[4])vd=m[4].replace(/\s+/g,'');
-      else if(m[6]){ last={packId:pk,venda:vd,sku:m[6].trim(),cor:null}; put(last); pk=null;vd=null; }
+      else if(m[6]){ last={packId:pk,venda:vd,sku:m[6].trim(),cor:null}; guardar(leitura2,last); pk=null;vd=null; }
       else if(m[8]&&last&&!last.cor) last.cor=m[8].trim();
     } }
-
-  /* LEITURA 2 (so completa o que faltou): fatia a folha por "Desenho do tecido".
-     Ela RODAVA PRIMEIRO e mandava o SKU errado pro cliente. O pedaco so casa
-     item com item quando ha exatamente um de cada dentro dele — e nao ha:
-     acessorio nao tem desenho de tecido, entao dois itens caem no mesmo pedaco,
-     e ai o `match` pega o PRIMEIRO "SKU:" com o PRIMEIRO "Pack ID:", que sao de
-     itens diferentes quando o de cima nao traz pack. Foi assim que o Abraao
-     Amorim (3 x BK140140BEGE) recebeu uma BK160140BEGE: o SKU do vizinho de
-     cima colou no pack dele.
-     Fica no mapa separado e NAO decide nada — vira TESTEMUNHA. E de proposito
-     que ela continua opinando sobre pedaco grudado, inclusive errado: e
-     exatamente ali que ela discorda da leitura 1, e essa discordancia e o
-     alarme. Calar a testemunha no lugar onde ela erra seria calar o unico
-     sinal que existe de que o PDF foi lido de dois jeitos. */
-  for(const blk of controlText.split(/Desenho do tecido[^\n]*/)){
-    if(!/Pack ID:|Venda:/.test(blk)) continue;
-    const ms=blk.match(/SKU:\s*(\S+)/);
-    if(!ms) continue;
-    const mp=blk.match(/Pack ID:\s*([\d ]+)/),mv=blk.match(/Venda:\s*([\d ]+)/),mc=blk.match(/Cor:\s*([^\n]+)/);
-    guardar(leitura2,{packId:mp?mp[1].replace(/\s+/g,''):null,venda:mv?mv[1].replace(/\s+/g,''):null,sku:ms[1].trim(),cor:mc?mc[1].trim():null});
-  }
   const danfeByNf={};
   for(let p=1;p<=N;p++){ if(pages[p].type!=='danfe')continue; const mm=pages[p].text.match(/N[úu]mero\s*([\d.,]+)/i); if(mm) danfeByNf[mm[1].replace(/\D/g,'')]=p; }
   const orders=[], seen=new Set();
@@ -90,14 +94,42 @@ async function parsePdf(uint8){
     for(const ln of lines){ const c=ln.replace(/\s+/g,'');
       if(/^[0-9]{8,}$/.test(c)) codes.add(c);
       else if(/^[0-9]{8,}\$[0-9]+$/.test(c)) codes.add(c.replace(/\D/g,'')); }
-    /* O VOLUME SO PASSA SE AS DUAS LEITURAS CONCORDAREM.
-       A leitura 1 decide o SKU; a 2, quando tem opiniao sobre o mesmo volume,
-       serve de conferencia. Discordaram: `conflito` vai preenchido e o upload
-       segura o volume em vez de escolher — o preco de reter uma peca e uma
-       conversa; o de mandar a errada e a reputacao no Mercado Livre. */
+    /* O VOLUME SO PASSA SE TUDO CONCORDAR. Sao tres conferencias independentes,
+       e qualquer uma delas segura a peca — o preco de reter um volume e uma
+       conversa; o de mandar a peca errada e a reputacao no Mercado Livre. */
     const busca=(L)=>(venda&&L.venda[venda])||(packId&&L.pack[packId])||null;
     const r1=busca(leitura1), r2=busca(leitura2), rec=r1||r2;
-    const conflito=(r1&&r2&&r1.sku!==r2.sku)?(r1.sku+' / '+r2.sku):null;
+    const motivos=[];
+
+    // 1. as duas leituras da folha discordam sobre o SKU deste volume
+    if(r1&&r2&&r1.sku!==r2.sku) motivos.push('leituras divergem: '+r1.sku+' / '+r2.sku);
+
+    /* 2. O COMPRADOR DA ETIQUETA NAO E O DO ITEM.
+       A etiqueta traz o nome de quem comprou e o bloco da folha tambem. Se o
+       volume foi casado com o item errado, o Pack ID pode ate coincidir, mas o
+       NOME nao vai — e essa e a unica conferencia que nao depende do numero que
+       justamente desalinha. So acusa quando os dois nomes existem: nome que nao
+       deu pra ler nao vira acusacao. */
+    const nomeChave=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
+    if(rec && rec.comprador && buyer){
+      const a=nomeChave(buyer), b=nomeChave(rec.comprador);
+      if(a && b && a!==b && a.indexOf(b)<0 && b.indexOf(a)<0)
+        motivos.push('comprador nao bate: etiqueta "'+buyer+'" / folha "'+rec.comprador+'"');
+    }
+
+    /* 3. A DESCRICAO DO ANUNCIO NAO BATE COM O SKU.
+       A folha escreve a medida por extenso ("1,60x1,40") ao lado do SKU
+       (BK160140...). Sao a mesma informacao por dois caminhos: o codigo e o
+       texto do anuncio. Discordaram, alguma das duas esta trocada. Vale so
+       quando o codigo carrega medida no formato antigo — SKU e etiqueta livre
+       (§7), e ausencia de medida no codigo nunca vira acusacao. */
+    if(rec && rec.larg && rec.alt){
+      const m=String(rec.sku||'').match(/(\d{3})(\d{3})/);
+      if(m && (+m[1]!==rec.larg || +m[2]!==rec.alt))
+        motivos.push('descricao diz '+rec.larg+'x'+rec.alt+' e o SKU e '+rec.sku);
+    }
+    const conflito=motivos.length?motivos.join(' · '):null;
     let danfePage=null;
     if(nf&&danfeByNf[nf]) danfePage=danfeByNf[nf];
     else if(pages[p+1]&&pages[p+1].type==='danfe') danfePage=p+1;
