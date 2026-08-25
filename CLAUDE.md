@@ -186,6 +186,14 @@ O `parse` devolve `conflito` e o upload grava o volume como `bloqueado` com
 | 2 | **O comprador** — o nome na etiqueta × o nome no bloco | O volume casado com o item de outra pessoa. É a única que **não depende do Pack ID**, que é justamente o número que desalinha |
 | 3 | **A descrição** — `1,60x1,40` escrito no anúncio × a medida dentro do código do SKU | O item corrompido, mesmo que as duas leituras concordem |
 | 4 | **A cor** — a cor do anúncio × a cor dentro do código do SKU | O que a medida não separa: duas peças do mesmo cliente, mesma medida, cores diferentes. Ali o nome também não desempata |
+| 5 | **A linha do produto** — a família da descrição × o prefixo do SKU, contra o que o sistema já viu | O que nem medida nem cor separam: `BK160140BEGE` ("Cortina Rolo Blackout") e `SCREEN3-160140BEGE` ("Toucher Rolô Evolux") têm a MESMA medida e a MESMA cor |
+
+> **A conferência 5 aprende sozinha, e por isso demora a acusar.** O par
+> família → prefixo é acumulado na tabela `familia_sku` a cada upload, e só vira
+> regra depois de **5 ocorrências**. Produto novo no catálogo não pode parar a
+> expedição enquanto o sistema ainda não sabe nada sobre ele: no PDF de 24/08 o
+> `SCREEN3` apareceu **uma vez em 47 volumes** e passou limpo, como tem que ser.
+> Uma tabela escrita à mão envelheceria calada; esta se atualiza com o catálogo.
 
 > A lista de cores da conferência 4 sai dos próprios campos `Cor:` da folha,
 > nunca de uma lista fixa: cor nova do catálogo entra sozinha, sem ninguém

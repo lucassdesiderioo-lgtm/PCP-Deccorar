@@ -155,7 +155,12 @@ async function parsePdf(uint8){
     let danfePage=null;
     if(nf&&danfeByNf[nf]) danfePage=danfeByNf[nf];
     else if(pages[p+1]&&pages[p+1].type==='danfe') danfePage=p+1;
-    orders.push({sku:rec?rec.sku:null,cor:(rec&&rec.cor)||'',conflito,buyer:buyer||'(sem nome)',city,nf,packId,venda,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
+    orders.push({sku:rec?rec.sku:null,cor:(rec&&rec.cor)||'',conflito,
+      /* A descricao do anuncio vai junto: e ela que diz a LINHA do produto
+         ("Cortina Rolo Blackout" x "Toucher Rolo Evolux"), a unica dimensao que
+         medida e cor nao separam. O upload guarda e aprende com ela. */
+      descricao:(rec&&rec.desc)||null,
+      buyer:buyer||'(sem nome)',city,nf,packId,venda,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
   }
   return orders;
 }

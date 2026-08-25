@@ -1,7 +1,7 @@
 const express=require('express'); const fs=require('fs');
 const {parsePdf}=require('./parse'); const {PDFDocument}=require('pdf-lib');
 module.exports=function(app,db){
-  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT);");
+  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
   // sao so historia: quantas vezes o volume voltou pra impressora e quando foi a
   // ultima. O ALTER mora aqui, no dono da tabela (§17 do CLAUDE.md), com a
@@ -14,6 +14,36 @@ module.exports=function(app,db){
   // leitura da folha sao dois, e eles se resolvem de formas diferentes — um
   // cadastrando o SKU, o outro escolhendo qual leitura vale.
   try{ db.exec("ALTER TABLE lote ADD COLUMN bloqueio TEXT"); }catch(e){}
+  // A descricao do anuncio, como o ML escreveu. Guardada porque e dela que sai
+  // a familia do produto na conferencia 5, e porque ter o texto original ajuda
+  // a entender uma divergencia meses depois.
+  try{ db.exec("ALTER TABLE lote ADD COLUMN descricao TEXT"); }catch(e){}
+
+  /* ── O QUE O SISTEMA APRENDE SOBRE FAMILIA x PREFIXO DE SKU ────────────────
+     Medida e cor nao separam duas pecas que so diferem no TECIDO — e elas
+     existem no catalogo: BK160140BEGE ("Cortina Rolo Blackout") e
+     SCREEN3-160140BEGE ("Toucher Rolo Evolux") tem a mesma medida e a mesma cor.
+     Se um cliente comprar as duas e o vinculo falhar entre elas, nenhuma das
+     quatro conferencias acusa.
+
+     A ligacao existe no documento — a familia da descricao sempre anda com o
+     mesmo prefixo de SKU — mas uma folha sozinha nao prova nada: SCREEN3 apareceu
+     UMA vez em 47 volumes. Entao o sistema acumula o par entre uploads e passa a
+     acusar quando um par consolidado e contrariado. Aprende do proprio historico
+     em vez de uma tabela escrita a mao, que envelheceria calada. */
+  db.exec(`CREATE TABLE IF NOT EXISTS familia_sku (
+    familia TEXT, prefixo TEXT, vezes INTEGER DEFAULT 0,
+    visto_em TEXT DEFAULT (datetime('now','localtime')),
+    PRIMARY KEY (familia,prefixo));`);
+  const familiaDe=d=>String(d||'').replace(/\d[,.]\d{2}\s*[xX].*/,'')
+    .toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z ]/g,' ')
+    .replace(/\s+/g,' ').trim();
+  const prefixoDe=s=>{ const m=String(s||'').toUpperCase().match(/^([A-Z0-9-]*?)(?=\d{3})/);
+    return m?m[1].replace(/[-\s]+$/,''):''; };
+  /* Quantas vezes um par precisa ter sido visto pra virar regra. Abaixo disso o
+     sistema ainda esta aprendendo e nao acusa ninguem — produto novo entrando no
+     catalogo nao pode parar a expedicao. */
+  const APRENDIZADO=5;
   try{ fs.mkdirSync('/opt/expedicao/lotes',{recursive:true}); }catch(e){}
   const bigJson=express.json({limit:'25mb'});
   app.post('/api/lote/upload', bigJson, async (req,res)=>{
@@ -24,23 +54,42 @@ module.exports=function(app,db){
       const orders=await parsePdf(new Uint8Array(buf));
       const fname='/opt/expedicao/lotes/'+Date.now()+'.pdf'; fs.writeFileSync(fname,buf);
       const seen=new Set(); db.prepare("SELECT packId,venda FROM lote WHERE data=date('now','localtime')").all().forEach(r=>{ if(r.packId)seen.add('p:'+r.packId); if(r.venda)seen.add('v:'+r.venda); });
-      const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+      const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio,descricao) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
       const existe=db.prepare('SELECT 1 FROM skus WHERE codigo=?');
+      const famVista=db.prepare('SELECT prefixo,vezes FROM familia_sku WHERE familia=?');
+      const famGrava=db.prepare(`INSERT INTO familia_sku (familia,prefixo,vezes) VALUES (?,?,1)
+        ON CONFLICT(familia,prefixo) DO UPDATE SET vezes=vezes+1, visto_em=datetime('now','localtime')`);
       let novos=0,rep=0,semsku=0,bloq=0,divs=0; const desconhecidos={};
       db.transaction(()=>{ for(const o of orders){
         if((o.packId&&seen.has('p:'+o.packId))||(o.venda&&seen.has('v:'+o.venda))){ rep++; continue; }
         if(o.packId)seen.add('p:'+o.packId); if(o.venda)seen.add('v:'+o.venda);
         const sku=(o.sku||'').trim().toUpperCase();
         const ok = sku && existe.get(sku);
-        let est='pendente', motivo=null;
-        /* A divergencia vem PRIMEIRO: um volume em que as duas leituras da folha
+        let est='pendente', motivo=null, conflito=o.conflito;
+
+        /* CONFERENCIA 5 — a familia do anuncio contra o prefixo do SKU.
+           Acusa so quando ha regra consolidada: a familia ja foi vista >= 5
+           vezes com OUTRO prefixo e nunca com este. Familia nova, prefixo novo
+           ou pouca historia nao param ninguem — o sistema aprende primeiro. */
+        const fam=familiaDe(o.descricao), pre=prefixoDe(sku);
+        if(fam && pre){
+          const vistos=famVista.all(fam);
+          const desteAqui=vistos.find(v=>v.prefixo===pre);
+          const consolidado=vistos.find(v=>v.prefixo!==pre && v.vezes>=APRENDIZADO);
+          if(!desteAqui && consolidado)
+            conflito=(conflito?conflito+' · ':'')+
+              'o anuncio "'+String(o.descricao||'').slice(0,40)+'" sempre foi '+consolidado.prefixo+', e o SKU e '+sku;
+          else famGrava.run(fam,pre);
+        }
+
+        /* A divergencia vem PRIMEIRO: um volume em que as leituras da folha
            discordam nao pode ser liberado por cadastro de SKU, porque nao e o
            cadastro que esta em duvida — e qual peca o cliente comprou. */
-        if(o.conflito){ est='bloqueado'; bloq++; divs++; motivo='divergencia: '+o.conflito; }
+        if(conflito){ est='bloqueado'; bloq++; divs++; motivo='divergencia: '+conflito; }
         else if(!ok){ est='bloqueado'; bloq++; motivo='sku_nao_cadastrado';
           const k=sku||'(sem SKU na folha)'; desconhecidos[k]=(desconhecidos[k]||0)+1; }
         if(!o.sku) semsku++;
-        ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo); novos++;
+        ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null); novos++;
       }})();
       res.json({ok:true,total:orders.length,novos,repetidas:rep,sem_sku:semsku,bloqueados:bloq,divergencias:divs,
                 desconhecidos:Object.keys(desconhecidos).map(k=>({sku:k,qtd:desconhecidos[k]}))});
@@ -74,7 +123,8 @@ module.exports=function(app,db){
          de fato olhar. Uma trava que para de acusar porque o dado sumiu nao faz
          barulho nenhum — o silencio dela e igual ao silencio de "esta tudo
          certo". Este contador e o que separa os dois. */
-      const cobertura={medida:0,cor:0,comprador:0};
+      const cobertura={medida:0,cor:0,comprador:0,familia:0};
+      const famConsolidada=db.prepare('SELECT 1 FROM familia_sku WHERE familia=? AND vezes>=? LIMIT 1');
       for(const arq of arqs){
         let f; try{ f=await lerFolha(arq); }catch(e){ ilegiveis.push(arq); continue; }
         const mapas=mapasDaFolha(f.blocos);
@@ -86,6 +136,12 @@ module.exports=function(app,db){
           conferidos++;
           const t=travasAtivas(v, itemDaFolha(v,f.blocos), cores);
           if(t.medida)cobertura.medida++; if(t.cor)cobertura.cor++; if(t.comprador)cobertura.comprador++;
+          /* A conferencia 5 so age quando a familia daquele anuncio ja virou
+             regra. Enquanto for produto novo ela nao protege — e isso precisa
+             aparecer, senao um catalogo que muda de nomenclatura toda semana
+             ficaria eternamente sem essa trava, em silencio. */
+          const fam=familiaDe(v.descricao);
+          if(fam && famConsolidada.get(fam,APRENDIZADO)) cobertura.familia++;
           if(String(v.codigo||'').toUpperCase()!==String(esperado).toUpperCase())
             divergencias.push({id:v.id,buyer:v.buyer,nf:v.nf,data:v.data,estagio:v.estagio,
                                gravado:v.codigo,folha:esperado,packId:v.packId,venda:v.venda});
