@@ -124,6 +124,30 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 
 1. `parse.js` extrai SKU, Pack ID, venda, comprador, NF e páginas de etiqueta/DANFE
 2. Cada volume vira uma linha em `lote`
+
+> ⚠️ **ARMADILHA #4 — a ordem das duas leituras da folha de controle decide
+> qual peça o cliente recebe.** O `parse.js` lê a folha duas vezes: primeiro
+> **item a item** (o tokenizer, que fecha cada registro no `SKU:` com o `Pack ID:`
+> e a `Venda:` que vieram antes), depois **por pedaços** (`split` em
+> `Desenho do tecido`), e o `put` **nunca sobrescreve** o SKU de um registro já
+> gravado. Quem lê primeiro manda.
+>
+> A leitura por pedaços é frágil e **não pode voltar a rodar primeiro**: nem todo
+> item tem "Desenho do tecido" (acessório não tem), então dois itens caem no mesmo
+> pedaço e o `match` casa o **primeiro `SKU:`** com o **primeiro `Pack ID:`** — que
+> são de itens diferentes quando o de cima não traz pack. Em 20/08/2026 foi assim
+> que Abraão Amorim, que comprou 3 × `BK140140BEGE`, recebeu uma `BK160140BEGE`:
+> o SKU do vizinho de cima colou no Pack ID dele. Auditoria da semana: 2 volumes
+> errados em 361 (0,6%) — e nenhum erro humano no meio, a bancada bipou o que o
+> sistema mandou.
+>
+> Hoje ela roda depois e só aceita pedaço com **exatamente um** `SKU:`, servindo
+> de reforço e para completar a cor. **Rode `node teste_parse.js` após qualquer
+> mudança no `parse.js`** — o caso do Abraão está lá.
+>
+> Para conferir o que já está gravado: `node rastrear.js --auditar [dias]` relê a
+> folha de cada PDF e lista os volumes cujo SKU não bate. `node rastrear.js
+> <número>` segue uma venda específica.
 3. `cruz_route.js` compara os volumes **pendentes** × estoque e gera só urgência:
 
 | Situação | Vira | Cor na revisão |
@@ -539,6 +563,8 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 
 - ❌ Fazer a revisão somar estoque "porque parece que falta"
 - ❌ Fazer a reimpressão baixar estoque "porque imprimiu de novo"
+- ❌ Fazer a leitura por pedaços (`split` em `Desenho do tecido`) voltar a rodar
+  antes do tokenizer no `parse.js` — manda a peça errada pro cliente (§5)
 - ❌ Mover `express.static` para antes do `auth`
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor
