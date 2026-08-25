@@ -62,6 +62,11 @@ async function parsePdf(uint8){
      "confirmar" um volume com uma regua diferente da que o gravou. */
   const itensFolha=require('./folha').itensDaFolha(controlLines);
   itensFolha.forEach(put);
+  /* As cores que a propria folha usa, para a conferencia 4 la embaixo. Sai do
+     documento e nao de uma lista no codigo: cor nova do catalogo entra sozinha,
+     sem ninguem lembrar de vir aqui. */
+  const semAcento=s=>String(s||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9]/g,'');
+  const coresDaFolha=new Set(itensFolha.map(i=>semAcento(i.cor)).filter(c=>c && c.length>2));
 
   /* LEITURA 2 (a testemunha): o tokenizer, que percorre a folha inteira e fecha
      cada "SKU:" com o Pack ID e a Venda que vieram antes dele. Ele NAO decide
@@ -128,6 +133,23 @@ async function parsePdf(uint8){
       const m=String(rec.sku||'').match(/(\d{3})(\d{3})/);
       if(m && (+m[1]!==rec.larg || +m[2]!==rec.alt))
         motivos.push('descricao diz '+rec.larg+'x'+rec.alt+' e o SKU e '+rec.sku);
+    }
+
+    /* 4. A COR DO ANUNCIO NAO BATE COM A COR NO CODIGO.
+       Medida sozinha nao separa duas pecas do mesmo cliente que so diferem na
+       cor — e cliente com dois itens de SKUs diferentes existe (1 em 46 no PDF
+       de 24/08: BK160160CINZA e BK160160BEGE, mesma medida). Sem esta, um
+       vinculo trocado entre esses dois passaria por todas as outras.
+       A lista de cores sai da PROPRIA folha (os campos "Cor:"), nunca de uma
+       lista fixa no codigo: cor nova entra sozinha. So acusa quando da pra ler
+       cor nos DOIS lados — SKU e etiqueta livre (§7), e codigo sem cor nao e
+       acusacao. */
+    if(rec && rec.cor && coresDaFolha.size>1){
+      const cod=semAcento(rec.sku), corItem=semAcento(rec.cor);
+      if(corItem && !cod.includes(corItem)){
+        const outra=[...coresDaFolha].find(c=>c!==corItem && c.length>2 && cod.includes(c));
+        if(outra) motivos.push('anuncio diz cor '+rec.cor+' e o SKU e '+rec.sku);
+      }
     }
     const conflito=motivos.length?motivos.join(' · '):null;
     let danfePage=null;
