@@ -152,7 +152,33 @@ function conferir(nome, orders, esperado){
       console.log('        conflito veio: '+JSON.stringify(v.conflito)); }
   }
 
-  // ── 7. a cor sobrevive (a tela de carregamento usa) ───────────────────────
+  /* ── 7. A COR acusa quando a medida nao separa ─────────────────────────────
+        Dois itens do MESMO cliente, mesma medida, cores diferentes (o caso
+        Carlos Henrique no PDF de 24/08). Aqui o nome nao desempata e a medida
+        tambem nao — so a cor do anuncio contra a cor do codigo. */
+  casos++;
+  {
+    const os_=await montar([
+      {pack:'111',venda:'901',sku:'BK160160CINZA',medida:'1,60x1,60',cor:'Cinza',comprador:'Carlos Henrique'},
+      {pack:'222',venda:'902',sku:'BK160160BEGE', medida:'1,60x1,60',cor:'Bege', comprador:'Carlos Henrique'},
+      // o terceiro tem a cor do anuncio brigando com a cor do codigo
+      {pack:'333',venda:'903',sku:'BK160160BEGE', medida:'1,60x1,60',cor:'Cinza',comprador:'Outro Cliente'},
+    ],[
+      {pack:'111',nf:'1',comprador:'Carlos Henrique'},
+      {pack:'222',nf:'2',comprador:'Carlos Henrique'},
+      {pack:'333',nf:'3',comprador:'Outro Cliente'},
+    ]);
+    const bons=os_.filter(o=>['111','222'].includes(o.packId));
+    const ruim=os_.find(o=>o.packId==='333')||{};
+    const erros=[];
+    bons.forEach(o=>{ if(o.conflito) erros.push('acusou a toa em '+o.packId+': '+o.conflito); });
+    if(!ruim.conflito || !/cor/.test(ruim.conflito)) erros.push('nao acusou a cor trocada: '+JSON.stringify(ruim.conflito));
+    if(erros.length){ falhas++; console.log('FALHOU  a cor do anuncio acusa quando a medida nao separa');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      a cor do anuncio acusa quando a medida nao separa');
+  }
+
+  // ── 8. a cor sobrevive (a tela de carregamento usa) ───────────────────────
   casos++;
   {
     const cs=await montar([{pack:'111',venda:'901',sku:'BK160160BRANCO',medida:'1,60x1,60',cor:'Branco',comprador:'Joao Silva'}],

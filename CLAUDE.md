@@ -185,6 +185,11 @@ O `parse` devolve `conflito` e o upload grava o volume como `bloqueado` com
 | 1 | **As duas leituras da folha** — o bloco (`leitura1`) × o tokenizer (`leitura2`), em mapas separados | O PDF lido de dois jeitos dando SKUs diferentes |
 | 2 | **O comprador** — o nome na etiqueta × o nome no bloco | O volume casado com o item de outra pessoa. É a única que **não depende do Pack ID**, que é justamente o número que desalinha |
 | 3 | **A descrição** — `1,60x1,40` escrito no anúncio × a medida dentro do código do SKU | O item corrompido, mesmo que as duas leituras concordem |
+| 4 | **A cor** — a cor do anúncio × a cor dentro do código do SKU | O que a medida não separa: duas peças do mesmo cliente, mesma medida, cores diferentes. Ali o nome também não desempata |
+
+> A lista de cores da conferência 4 sai dos próprios campos `Cor:` da folha,
+> nunca de uma lista fixa: cor nova do catálogo entra sozinha, sem ninguém
+> lembrar de vir aqui.
 
 > As conferências 2 e 3 só acusam quando **os dois lados existem**: nome que não
 > deu para ler, ou SKU sem medida no código (§7 — SKU é etiqueta livre), nunca
