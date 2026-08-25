@@ -85,7 +85,14 @@ app.post('/api/skus', (req,res)=>{
     .run(cod,descricao,cor,+estoque||0,+alvo||0,
       modeloId, manda('largura_cm',cmDe(b.largura_cm)), manda('altura_cm',cmDe(b.altura_cm)), corCod, tecCod,
       temFicha, custoDireto);
-  try{ db.prepare("UPDATE lote SET estagio='pendente' WHERE estagio='bloqueado' AND codigo=?").run(cod); }catch(e){}
+  /* Cadastrar o SKU libera os volumes retidos por ele (§6) — mas NUNCA os
+     retidos por divergencia de leitura da folha. Ali a duvida nao e se o SKU
+     existe, e sim QUAL peca o cliente comprou: as duas leituras do PDF
+     discordaram. Sem esta guarda, cadastrar um SKU qualquer soltaria um volume
+     que ninguem conferiu. Esses saem so pelo POST /api/divergencias/resolver,
+     depois de alguem olhar o pedido no Mercado Livre. */
+  try{ db.prepare(`UPDATE lote SET estagio='pendente' WHERE estagio='bloqueado' AND codigo=?
+        AND COALESCE(bloqueio,'') NOT LIKE 'divergencia%'`).run(cod); }catch(e){}
   res.json({ok:true});
 });
 app.delete('/api/skus/:codigo',(req,res)=>{ db.prepare('DELETE FROM skus WHERE codigo=?').run(req.params.codigo); res.json({ok:true}); });

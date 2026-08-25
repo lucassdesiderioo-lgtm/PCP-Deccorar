@@ -18,19 +18,26 @@ async function parsePdf(uint8){
     pages[p]={type,lines,text};
     if(type==='control') controlLines.push.apply(controlLines,lines);
   }
-  const byPack={},byVenda={}, controlText=controlLines.join('\n');
-  /* O SKU de um registro NUNCA e sobrescrito: quem chega primeiro manda, e a
-     ordem das duas leituras abaixo e o que decide qual peca o cliente recebe.
-     A cor pode ser completada depois, mas so quando o SKU e o mesmo — nunca
-     puxando junto o SKU de outro item. */
-  const put=rec=>{
+  const controlText=controlLines.join('\n');
+  /* AS DUAS LEITURAS FICAM SEPARADAS, DE PROPOSITO.
+     Antes elas se misturavam num mapa so e a primeira a escrever mandava — foi
+     assim que o SKU errado chegou no cliente sem ninguem perceber. Separadas,
+     uma vira TESTEMUNHA da outra: quando discordam sobre o mesmo volume, o
+     upload nao escolhe — bloqueia e manda alguem conferir (§6: melhor reter
+     que adivinhar). O SKU de um registro nunca e sobrescrito; a cor pode ser
+     completada, mas so quando o SKU e o mesmo. */
+  const leitura1={pack:{},venda:{}};   // item a item — a que manda
+  const leitura2={pack:{},venda:{}};   // por pedacos — a testemunha
+  const guardar=(onde,rec)=>{
     const grava=(mapa,chave)=>{
       if(!chave) return;
       if(!mapa[chave]) mapa[chave]=rec;
       else if(!mapa[chave].cor && rec.cor && mapa[chave].sku===rec.sku) mapa[chave].cor=rec.cor;
     };
-    grava(byPack,rec.packId); grava(byVenda,rec.venda);
+    grava(onde.pack,rec.packId); grava(onde.venda,rec.venda);
   };
+  const put=rec=>guardar(leitura1,rec);
+  const byPack=leitura1.pack, byVenda=leitura1.venda;
 
   /* LEITURA 1 (a que manda): item a item, na ordem em que aparecem na folha.
      Cada "SKU:" fecha o registro com o Pack ID e a Venda que vieram antes dele,
@@ -52,15 +59,17 @@ async function parsePdf(uint8){
      itens diferentes quando o de cima nao traz pack. Foi assim que o Abraao
      Amorim (3 x BK140140BEGE) recebeu uma BK160140BEGE: o SKU do vizinho de
      cima colou no pack dele.
-     Fica como reforco — pedaco com mais de um SKU e recusado, e o `put` acima
-     ja impede qualquer troca de SKU. */
+     Fica no mapa separado e NAO decide nada — vira TESTEMUNHA. E de proposito
+     que ela continua opinando sobre pedaco grudado, inclusive errado: e
+     exatamente ali que ela discorda da leitura 1, e essa discordancia e o
+     alarme. Calar a testemunha no lugar onde ela erra seria calar o unico
+     sinal que existe de que o PDF foi lido de dois jeitos. */
   for(const blk of controlText.split(/Desenho do tecido[^\n]*/)){
     if(!/Pack ID:|Venda:/.test(blk)) continue;
-    const todos=blk.match(/SKU:\s*\S+/g);
-    if(!todos||todos.length!==1) continue;         // pedaco grudado: nao da pra confiar
     const ms=blk.match(/SKU:\s*(\S+)/);
+    if(!ms) continue;
     const mp=blk.match(/Pack ID:\s*([\d ]+)/),mv=blk.match(/Venda:\s*([\d ]+)/),mc=blk.match(/Cor:\s*([^\n]+)/);
-    put({packId:mp?mp[1].replace(/\s+/g,''):null,venda:mv?mv[1].replace(/\s+/g,''):null,sku:ms[1].trim(),cor:mc?mc[1].trim():null});
+    guardar(leitura2,{packId:mp?mp[1].replace(/\s+/g,''):null,venda:mv?mv[1].replace(/\s+/g,''):null,sku:ms[1].trim(),cor:mc?mc[1].trim():null});
   }
   const danfeByNf={};
   for(let p=1;p<=N;p++){ if(pages[p].type!=='danfe')continue; const mm=pages[p].text.match(/N[úu]mero\s*([\d.,]+)/i); if(mm) danfeByNf[mm[1].replace(/\D/g,'')]=p; }
@@ -81,11 +90,18 @@ async function parsePdf(uint8){
     for(const ln of lines){ const c=ln.replace(/\s+/g,'');
       if(/^[0-9]{8,}$/.test(c)) codes.add(c);
       else if(/^[0-9]{8,}\$[0-9]+$/.test(c)) codes.add(c.replace(/\D/g,'')); }
-    const rec=(packId&&byPack[packId])||(venda&&byVenda[venda])||null;
+    /* O VOLUME SO PASSA SE AS DUAS LEITURAS CONCORDAREM.
+       A leitura 1 decide o SKU; a 2, quando tem opiniao sobre o mesmo volume,
+       serve de conferencia. Discordaram: `conflito` vai preenchido e o upload
+       segura o volume em vez de escolher — o preco de reter uma peca e uma
+       conversa; o de mandar a errada e a reputacao no Mercado Livre. */
+    const busca=(L)=>(venda&&L.venda[venda])||(packId&&L.pack[packId])||null;
+    const r1=busca(leitura1), r2=busca(leitura2), rec=r1||r2;
+    const conflito=(r1&&r2&&r1.sku!==r2.sku)?(r1.sku+' / '+r2.sku):null;
     let danfePage=null;
     if(nf&&danfeByNf[nf]) danfePage=danfeByNf[nf];
     else if(pages[p+1]&&pages[p+1].type==='danfe') danfePage=p+1;
-    orders.push({sku:rec?rec.sku:null,cor:rec?rec.cor:'',buyer:buyer||'(sem nome)',city,nf,packId,venda,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
+    orders.push({sku:rec?rec.sku:null,cor:(rec&&rec.cor)||'',conflito,buyer:buyer||'(sem nome)',city,nf,packId,venda,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
   }
   return orders;
 }

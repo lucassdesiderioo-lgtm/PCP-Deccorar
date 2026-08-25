@@ -251,6 +251,8 @@ embalado_em, carregado_em, data, criado_em
 teste        INTEGER DEFAULT 0
 reimpressoes INTEGER DEFAULT 0   -- quantas vezes voltou pra impressora
 reimpresso_em TEXT               -- ultima reimpressao (sem default: ALTER nao aceita)
+bloqueio     TEXT                -- POR QUE foi bloqueado:
+             -- 'sku_nao_cadastrado' | 'divergencia: SKU_A / SKU_B'
 ```
 
 #### `devolucao`
@@ -404,6 +406,9 @@ atualizado  TEXT
 | POST | `/api/embalar` | Marca embalado · **−1 estoque** |
 | GET | `/api/print/:id` | PDF com etiqueta + DANFE · **recusa bloqueado** · 410 se o PDF de origem já saiu de `lotes/` |
 | GET | `/api/impressos` | Notas e clientes já impressos · `?dias=N` (1 a 30, padrão hoje) |
+| GET | `/api/divergencias` | Volumes retidos porque as duas leituras da folha discordam |
+| POST | `/api/divergencias/resolver` | Grava o SKU escolhido e libera o volume |
+| GET/POST | `/api/config/conferencia` | Liga/desliga a conferência dupla no carregamento |
 | POST | `/api/reimprimir` | Registra a reimpressão · **NÃO mexe no estoque** |
 | GET | `/api/expedicao/status` | Relógio de despacho e pendências |
 
