@@ -27,6 +27,20 @@
   .drop{display:block;border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;background:#fff;cursor:pointer;color:var(--muted);font-size:14px}
   .drop:hover{border-color:var(--amber)}
   .upres{margin-top:10px;font-size:13px;color:var(--muted)}.upres b{color:var(--txt)}
+  .card{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:#fff}
+  .ttl{font-size:12px;color:var(--muted);text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .sel,.busca{font-size:14px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--txt)}
+  .busca{width:100%;margin-bottom:6px}
+  .imp{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .imp:last-child{border-bottom:0}
+  .imp .who{flex:1;min-width:0}
+  .imp .nome{font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .imp .meta{font-size:12px;color:var(--muted);margin-top:3px}
+  .imp .meta b{color:var(--txt);font-family:ui-monospace,monospace}
+  .tag{display:inline-block;background:#fbf1db;border:1px solid #e7cb8c;color:#7a5200;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700;margin-left:6px}
+  .rebt{background:#edf0f4;color:var(--txt);border:1px solid var(--line);padding:10px 16px;font-size:14px;white-space:nowrap}
+  .rebt:disabled{opacity:.5;cursor:default}
+  .vazio{color:var(--muted);font-size:14px}
   iframe{position:fixed;left:-9999px;width:0;height:0;border:0}
 </style></head><body>
 <header><div class="mark">B</div><div><h1>Etiqueta de Venda</h1><div class="sub">Bipe o SKU · confira · bipe de novo pra imprimir</div></div>
@@ -45,7 +59,16 @@
   </div>
   <div class="banner" id="banner"></div>
   <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="bipe aqui">
-<div class="card" style="margin-top:16px"><div style="font-size:12px;color:#5a6472;text-transform:uppercase;margin-bottom:10px">Faltam imprimir</div><div id="pendLista"></div></div></div>
+<div class="card" style="margin-top:16px"><div class="ttl">Faltam imprimir</div><div id="pendLista"></div></div>
+  <div class="card" style="margin-top:16px">
+    <div class="ttl">
+      <span>Já impressos — reimprimir</span>
+      <select class="sel" id="impDias"><option value="1">hoje</option><option value="2">2 dias</option><option value="7">7 dias</option><option value="30">30 dias</option></select>
+      <span id="impQtd" style="margin-left:auto"></span>
+    </div>
+    <input class="busca" id="impBusca" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="buscar por cliente, NF ou SKU">
+    <div id="impLista"></div>
+  </div></div>
 <iframe id="pr"></iframe>
 <script>
 const $=s=>document.querySelector(s);
@@ -71,20 +94,52 @@ async function scanSku(sku){
     '<button class="primary" onclick="imprimir()">Imprimir etiqueta de venda</button><button class="ghost" onclick="idle()">Cancelar</button>');
   beep(true);
 }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+// Manda o PDF (etiqueta + DANFE) pra impressora. Mesma porta pra impressao e
+// reimpressao: quem decide se e a primeira vez ou nao e quem chama.
+function mandarPraImpressora(id){
+  const fr=$('#pr');
+  fr.onload=()=>{ try{fr.contentWindow.print();}catch(e){ window.open('/api/print/'+id,'_blank'); } };
+  fr.src='/api/print/'+id;
+}
 async function imprimir(){
   const o=confirmar; if(!o) return; confirmar=null;
   try{
     const r=await (await fetch('/api/embalar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:o.id})})).json();
     if(r.erro){ banner('err','Não deu pra embalar', r.erro); beep(false); stats(); return; }
-    const fr=$('#pr'); fr.onload=()=>{ try{fr.contentWindow.print();}catch(e){ window.open('/api/print/'+o.id,'_blank'); } }; fr.src='/api/print/'+o.id;
-    banner('ok','Impresso ✓ — '+o.buyer, 'NF <b>'+(o.nf||'—')+'</b> · <span class="sku">'+(o.codigo||'')+'</span> · estoque agora: '+r.estoque);
-    beep(true); stats();
+    mandarPraImpressora(o.id);
+    banner('ok','Impresso ✓ — '+esc(o.buyer), 'NF <b>'+esc(o.nf||'—')+'</b> · <span class="sku">'+esc(o.codigo||'')+'</span> · estoque agora: '+r.estoque+'<br>Saiu borrada ou o papel enroscou? Reimprima aqui — o estoque não muda.',
+      '<button class="rebt" onclick="reimprimir('+o.id+',this)">🖨 Reimprimir esta</button>');
+    beep(true); stats(); listaImp();
   }catch(e){ banner('err','Falha de conexão', String(e)); beep(false); }
 }
+// Reimpressao: papel enroscado, etiqueta borrada, folha perdida. NAO mexe no
+// estoque — a baixa ja aconteceu na primeira impressao, e o volume e o mesmo.
+async function reimprimir(id,btn){
+  const rotulo=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.textContent='imprimindo…'; }
+  try{
+    const r=await (await fetch('/api/reimprimir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})})).json();
+    if(r.erro){ banner('err','Não deu pra reimprimir', esc(r.erro)); beep(false); listaImp(); return; }
+    mandarPraImpressora(id);
+    banner('ok','Reimpresso ✓ — '+esc(r.buyer), 'NF <b>'+esc(r.nf||'—')+'</b> · <span class="sku">'+esc(r.codigo||'')+'</span> · '+r.vezes+'ª reimpressão · <b>o estoque não mudou</b>',
+      '<button class="rebt" onclick="reimprimir('+id+',this)">🖨 Reimprimir de novo</button>');
+    beep(true); listaImp();
+  }catch(e){ banner('err','Falha de conexão', String(e)); beep(false); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=rotulo||'Reimprimir'; } }
+}
 const scan=$('#scan');
-const keep=()=>{ if(document.activeElement!==scan) scan.focus(); };
+// O bipe volta pro campo sozinho — menos o caso em que o operador está
+// digitando em OUTRO campo (a busca dos impressos). Sem essa exceção o foco
+// pula de volta pro #scan a cada letra e a busca fica impossível de usar.
+const keep=()=>{
+  const a=document.activeElement;
+  if(a===scan) return;
+  if(a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return;
+  scan.focus();
+};
 scan.addEventListener('blur',()=>setTimeout(keep,50));
-document.addEventListener('click',e=>{ if(!e.target.closest('button,a')) keep(); });
+document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input,select,textarea,label')) keep(); });
 var tmr=null;
 function proc(){
   var v=(scan.value||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
@@ -113,6 +168,58 @@ async function listaPend(){
 }
 setInterval(listaPend,5000);
 listaPend();
+
+// ── Já impressos: as notas e clientes que a impressora já cuspiu hoje ────────
+// Existe pra UM momento: a impressora enroscou e ninguém lembra qual era a
+// venda. Por isso vem do mais recente pro mais antigo, e a busca aceita
+// cliente, NF ou SKU — que é o que o operador tem na mão nessa hora.
+var impCache=[];
+function horaDe(s){
+  if(!s) return '—';
+  var p=String(s).split(' '), hm=(p[1]||'').slice(0,5);
+  var hoje=new Date().toLocaleDateString('sv-SE');   // AAAA-MM-DD, igual ao banco
+  if(p[0]===hoje) return hm;
+  var d=(p[0]||'').split('-');
+  return (d[2]||'')+'/'+(d[1]||'')+' '+hm;
+}
+async function listaImp(){
+  var dias=(document.getElementById('impDias')||{}).value||'1';
+  try{ var l=await (await fetch('/api/impressos?dias='+dias)).json(); impCache=Array.isArray(l)?l:[]; }catch(e){ return; }
+  renderImp();
+}
+function renderImp(){
+  var el=document.getElementById('impLista'); if(!el) return;
+  var q=((document.getElementById('impBusca')||{}).value||'').trim().toLowerCase();
+  var qs=q.replace(/[^a-z0-9]/g,'');
+  var l=impCache.filter(function(r){
+    if(!q) return true;
+    var alvo=[r.buyer,r.nf,r.codigo,r.city,r.packId,r.venda].join(' ').toLowerCase();
+    if(alvo.indexOf(q)>=0) return true;
+    return !!qs && alvo.replace(/[^a-z0-9]/g,'').indexOf(qs)>=0;
+  });
+  var cnt=document.getElementById('impQtd');
+  if(cnt) cnt.textContent=l.length+(q?' de '+impCache.length:'')+' impressa'+(l.length===1?'':'s');
+  if(!l.length){ el.innerHTML='<span class="vazio">'+(impCache.length?'Nada com esse termo.':'Nenhuma etiqueta impressa no período.')+'</span>'; return; }
+  var mostra=l.slice(0,60), h='';
+  for(var i=0;i<mostra.length;i++){
+    var r=mostra[i];
+    h+='<div class="imp"><div class="who"><div class="nome">'+esc(r.buyer||'—')
+      +(r.reimpressoes>0?'<span class="tag">reimpressa '+r.reimpressoes+'x</span>':'')+'</div>'
+      +'<div class="meta">NF <b>'+esc(r.nf||'—')+'</b> · <b>'+esc(r.codigo||'—')+'</b> · '+horaDe(r.embalado_em)
+      +(r.city?' · '+esc(r.city):'')
+      +(r.estagio==='carregado'?' · <span style="color:#2e7d32">carregado</span>':'')+'</div></div>'
+      +'<button class="rebt" onclick="reimprimir('+r.id+',this)">🖨 Reimprimir</button></div>';
+  }
+  if(l.length>mostra.length) h+='<div class="vazio" style="padding-top:10px">Mostrando '+mostra.length+' de '+l.length+' — use a busca pra achar a venda.</div>';
+  el.innerHTML=h;
+}
+(function(){
+  var b=document.getElementById('impBusca'), d=document.getElementById('impDias');
+  if(b) b.addEventListener('input',renderImp);
+  if(d) d.addEventListener('change',listaImp);
+})();
+setInterval(listaImp,15000);
+listaImp();
 
 async function relogioDesp(){
   var d=null;

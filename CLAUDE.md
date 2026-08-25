@@ -38,11 +38,19 @@ Ordem de produção → REVISÃO → FILA → EMBALAGEM → ESTOQUE → ETIQUETA
 | Peça **revisada** | **NENHUM.** Entra na tabela `fila` com `situacao='aguardando'` |
 | Peça **embalada** (com kit conferido) | **+1** — é aqui que vira estoque |
 | **Etiqueta de venda** impressa | **−1** — é aqui que sai |
+| Etiqueta de venda **reimpressa** | **NENHUM** — mesmo volume, mesmo cliente |
 
 > ⚠️ **ARMADILHA #1:** Se você ver que `/api/revisao` não mexe no estoque, **está
 > correto**. Não "conserte". A peça revisada ainda não está pronta — falta embalar
 > e conferir o kit de instalação. Essa regra foi decidida pelo dono da operação:
 > *"ela só pode passar a ser estoque depois da montagem/embalagem"*.
+
+> ⚠️ **ARMADILHA #1-B:** a **reimpressão** (`POST /api/reimprimir`, na tela
+> Etiqueta de Venda) não baixa estoque, e isso **está correto**. Impressora
+> enroscada, etiqueta borrada e folha perdida geram a mesma etiqueta do mesmo
+> volume, pro mesmo cliente — a baixa já aconteceu na primeira impressão.
+> Se a reimpressão descontasse, cada papel preso furaria o estoque. Ela só grava
+> `lote.reimpressoes` e `lote.reimpresso_em`, que são história, não saldo.
 
 > ⚠️ **ARMADILHA #2:** `POST /api/revisao` ainda **retorna** os campos `estoque`,
 > `pedido` e `feito` no JSON. Isso é **resquício** da versão antiga (quando a
@@ -530,6 +538,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 ## 15. O que NÃO fazer
 
 - ❌ Fazer a revisão somar estoque "porque parece que falta"
+- ❌ Fazer a reimpressão baixar estoque "porque imprimiu de novo"
 - ❌ Mover `express.static` para antes do `auth`
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor
