@@ -33,41 +33,10 @@ const linha=()=>T('─'.repeat(72));
 const tit=s=>{ T(''); linha(); T(s); linha(); };
 const db=new Database(DB,{readonly:true});
 
-// ── leitura crua do PDF ─────────────────────────────────────────────────────
-function pageLines(tc){
-  const items=tc.items.filter(it=>it.str&&it.str.trim()!=='');
-  const rows={};
-  for(const it of items){ const yb=Math.round(it.transform[5]/3)*3; (rows[yb]=rows[yb]||[]).push({x:it.transform[4],s:it.str}); }
-  return Object.keys(rows).map(Number).sort((a,b)=>b-a)
-    .map(y=>rows[y].sort((a,b)=>a.x-b.x).map(o=>o.s).join(' ').replace(/\s+/g,' ').trim());
-}
-/* Lista TUDO que o PDF traz, sem a deduplicacao do parse.js — e essa diferenca,
-   bruto x o que o parse aceitou, que revela o problema. Os blocos da folha de
-   controle saem pelo mesmo tokenizer da 2a passada do parse (o que le Pack ID e
-   Venda antes do SKU), nunca pelo split de "Desenho do tecido". */
-async function inspecionar(arquivo){
-  const pdfjs=require('pdfjs-dist/legacy/build/pdf.js');
-  const pdf=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(arquivo))}).promise;
-  const etiquetas=[], ctrl=[];
-  for(let p=1;p<=pdf.numPages;p++){
-    const lines=pageLines(await (await pdf.getPage(p)).getTextContent());
-    const text=lines.join('\n');
-    if(/SKU:/.test(text)) ctrl.push(text);
-    else if(/Pack ID:/.test(text)||/Venda:/.test(text)){
-      const g=re=>{ const m=text.match(re); return m?m[1].replace(/\s+/g,''):null; };
-      etiquetas.push({pagina:p,packId:g(/Pack ID:\s*([\d ]+)/),venda:g(/Venda:\s*([\d ]+)/),
-                      nf:(text.match(/NF:\s*(\d+)/)||[])[1]||null});
-    }
-  }
-  const blocos=[], tok=/(Pack ID:\s*([\d ]+))|(Venda:\s*([\d ]+))|(SKU:\s*(\S+))/g;
-  const texto=ctrl.join('\n'); let m,pk=null,vd=null;
-  while((m=tok.exec(texto))){
-    if(m[2])pk=m[2].replace(/\s+/g,'');
-    else if(m[4])vd=m[4].replace(/\s+/g,'');
-    else if(m[6]){ blocos.push({packId:pk,venda:vd,sku:m[6].trim()}); pk=null; vd=null; }
-  }
-  return {etiquetas,blocos,paginas:pdf.numPages};
-}
+// ── leitura crua do PDF: mesmo modulo que a tela usa (folha.js) ─────────────
+// Auditar com uma regua diferente da que a tela usa daria dois numeros pra
+// mesma pergunta — e o errado seria sempre o que ninguem estivesse olhando.
+const {lerFolha:inspecionar,mapasDaFolha,skuDaFolha}=require('./folha');
 function pdfsRecentes(){
   try{
     return fs.readdirSync(LOTES).filter(f=>/\.pdf$/i.test(f))
@@ -152,11 +121,9 @@ async function rastrear(){
     T('');
     T('  CONFERENCIA — o SKU gravado x o que a folha de controle diz:');
     const vols=db.prepare('SELECT * FROM lote WHERE srcfile=? ORDER BY id').all(arq);
-    const porPack={},porVenda={};
-    insp.blocos.forEach(b=>{ if(b.packId&&!porPack[b.packId])porPack[b.packId]=b.sku;
-                             if(b.venda&&!porVenda[b.venda])porVenda[b.venda]=b.sku; });
+    const mapas=mapasDaFolha(insp.blocos);
     vols.filter(v=>alvos.includes(v.packId)||alvos.includes(v.venda)).forEach(v=>{
-      const esperado=(v.venda&&porVenda[v.venda])||(v.packId&&porPack[v.packId])||null;
+      const esperado=skuDaFolha(v,mapas);
       const ok=esperado&&String(v.codigo||'').toUpperCase()===String(esperado).toUpperCase();
       T('     #'+v.id+'  gravado '+(v.codigo||'—')+'   folha diz '+(esperado||'?')+
         (esperado?(ok?'   ok':'   ←←← DIVERGENCIA'):'   (nao achei na folha)'));
@@ -167,20 +134,18 @@ async function rastrear(){
 
 // ── MODO 2: auditar todos os volumes ────────────────────────────────────────
 async function auditar(){
-  tit('AUDITORIA — o SKU gravado bate com a folha de controle? ('+DIAS+' dias)');
+  tit('AUDITORIA — o SKU gravado bate com a folha de controle? '+(DIAS===1?'(hoje)':'('+DIAS+' dias)'));
   const arqs=db.prepare(`SELECT DISTINCT srcfile FROM lote
-    WHERE srcfile IS NOT NULL AND data >= date('now','localtime','-'||?||' day')`).all(DIAS)
+    WHERE srcfile IS NOT NULL AND data >= date('now','localtime','-'||?||' day')`).all(DIAS-1)
     .map(r=>r.srcfile).filter(a=>{ try{ return fs.existsSync(a); }catch(e){ return false; } });
   if(!arqs.length){ T('Nenhum PDF disponivel no periodo (os arquivos saem depois de 7 dias).'); return; }
 
   let conferidos=0, semFolha=0; const div=[];
   for(const arq of arqs){
     let insp; try{ insp=await inspecionar(arq); }catch(e){ T('  '+path.basename(arq)+': nao deu pra ler'); continue; }
-    const porPack={},porVenda={};
-    insp.blocos.forEach(b=>{ if(b.packId&&!porPack[b.packId])porPack[b.packId]=b.sku;
-                             if(b.venda&&!porVenda[b.venda])porVenda[b.venda]=b.sku; });
+    const mapas=mapasDaFolha(insp.blocos);
     for(const v of db.prepare('SELECT * FROM lote WHERE srcfile=? ORDER BY id').all(arq)){
-      const esperado=(v.venda&&porVenda[v.venda])||(v.packId&&porPack[v.packId])||null;
+      const esperado=skuDaFolha(v,mapas);
       if(!esperado){ semFolha++; continue; }
       conferidos++;
       if(String(v.codigo||'').toUpperCase()!==String(esperado).toUpperCase())

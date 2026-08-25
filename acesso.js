@@ -444,6 +444,7 @@ module.exports = function(app, db){
     // decisao, "qual peca e essa", tomada olhando o pedido no Mercado Livre.
     if(M !== 'GET' && pre('/api/divergencias')) return 'sku.cadastrar';
     if(eq('/api/divergencias')) return '@admin';
+    if(eq('/api/auditoria/skus')) return '@admin';
     if(M !== 'GET' && eq('/api/devolucao')) return 'devolucao.registrar';
     if(M !== 'GET' && eq('/api/devolucao/baixa')) return 'devolucao.baixar';
     if(M !== 'GET' && eq('/api/estoque')) return 'estoque.editar';
@@ -613,7 +614,8 @@ module.exports = function(app, db){
     ['POST','/api/revisao'],['POST','/api/rejeicao'],['POST','/api/montagem'],['POST','/api/embalar'],
     ['POST','/api/carregar'],['POST','/api/lote/upload'],['GET','/api/print/:id'],
     ['GET','/api/impressos'],['POST','/api/reimprimir'],
-    ['GET','/api/divergencias'],['POST','/api/divergencias/resolver'],['POST','/api/devolucao'],
+    ['GET','/api/divergencias'],['POST','/api/divergencias/resolver'],
+    ['GET','/api/auditoria/skus'],['POST','/api/devolucao'],
     ['POST','/api/devolucao/baixa'],['POST','/api/estoque'],['POST','/api/alvo'],['POST','/api/necessidade/aplicar'],
     ['POST','/api/producao'],['POST','/api/planejamento/importar'],['POST','/api/skus'],['DELETE','/api/skus/:c'],
     ['GET','/api/skus/pendencias'],['GET','/api/cores'],['POST','/api/cores'],['DELETE','/api/cores/:c'],

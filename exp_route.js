@@ -55,6 +55,38 @@ module.exports=function(app,db){
       FROM lote WHERE estagio='bloqueado' AND COALESCE(bloqueio,'') NOT LIKE 'divergencia%'
       GROUP BY codigo ORDER BY qtd DESC`).all());
   });
+  /* CONFERENCIA DO QUE JA FOI IMPRESSO.
+     A trava do upload so vale pro que entra dali pra frente. Esta rota olha pra
+     tras: rele a folha de cada PDF do periodo e compara com o SKU que ficou
+     gravado em cada volume. Serve pro dia em que o PDF subiu antes de uma
+     correcao, e pro erro que ainda ninguem imaginou — a folha e a unica fonte
+     independente que existe do que o cliente comprou.
+     E cara (abre e le PDFs), entao roda sob demanda, nunca em intervalo. */
+  app.get('/api/auditoria/skus', async (req,res)=>{
+    try{
+      let dias=parseInt(req.query.dias,10); if(!(dias>=1)) dias=1; if(dias>30) dias=30;
+      const {lerFolha,mapasDaFolha,skuDaFolha}=require('./folha');
+      const arqs=db.prepare(`SELECT DISTINCT srcfile FROM lote
+        WHERE srcfile IS NOT NULL AND data >= date('now','localtime','-'||?||' day')`).all(dias-1)
+        .map(r=>r.srcfile).filter(a=>{ try{ return fs.existsSync(a); }catch(e){ return false; } });
+      let conferidos=0, semFolha=0; const divergencias=[]; const ilegiveis=[];
+      for(const arq of arqs){
+        let f; try{ f=await lerFolha(arq); }catch(e){ ilegiveis.push(arq); continue; }
+        const mapas=mapasDaFolha(f.blocos);
+        for(const v of db.prepare('SELECT * FROM lote WHERE srcfile=? ORDER BY id').all(arq)){
+          const esperado=skuDaFolha(v,mapas);
+          if(!esperado){ semFolha++; continue; }
+          conferidos++;
+          if(String(v.codigo||'').toUpperCase()!==String(esperado).toUpperCase())
+            divergencias.push({id:v.id,buyer:v.buyer,nf:v.nf,data:v.data,estagio:v.estagio,
+                               gravado:v.codigo,folha:esperado,packId:v.packId,venda:v.venda});
+        }
+      }
+      res.json({dias,pdfs:arqs.length,conferidos,sem_folha:semFolha,
+                ilegiveis:ilegiveis.length,divergencias});
+    }catch(e){ console.error(e); res.status(500).json({erro:String(e.message||e)}); }
+  });
+
   app.get('/api/divergencias',(req,res)=>{
     res.json(db.prepare(`SELECT id,codigo,buyer,city,nf,packId,venda,data,bloqueio
       FROM lote WHERE estagio='bloqueado' AND bloqueio LIKE 'divergencia%'
