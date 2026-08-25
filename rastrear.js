@@ -20,11 +20,14 @@ const MAX_PDF=25;   // quantos PDFs recentes varrer quando o volume nao esta no 
 
 const args=process.argv.slice(2);
 const MODO_AUDITAR=args[0]==='--auditar';
+const MODO_DANFE=args[0]==='--danfe';
 const DIAS=MODO_AUDITAR?(parseInt(args[1],10)||7):0;
-const alvos=MODO_AUDITAR?[]:args.map(s=>String(s).replace(/\D/g,'')).filter(Boolean);
-if(!MODO_AUDITAR && !alvos.length){
+const NF_ALVO=MODO_DANFE?String(args[1]||'').replace(/\D/g,''):null;
+const alvos=(MODO_AUDITAR||MODO_DANFE)?[]:args.map(s=>String(s).replace(/\D/g,'')).filter(Boolean);
+if(!MODO_AUDITAR && !MODO_DANFE && !alvos.length){
   console.log('uso: node rastrear.js <numero da venda ou do pack> [mais numeros...]');
   console.log('     node rastrear.js --auditar [dias]   confere o SKU de TODOS os volumes');
+  console.log('     node rastrear.js --danfe [NF]       mostra o texto da nota de um volume');
   process.exit(1);
 }
 
@@ -175,4 +178,38 @@ async function auditar(){
   T('');
 }
 
-(MODO_AUDITAR?auditar():rastrear()).catch(e=>{ console.error(e); process.exit(1); });
+/* ── MODO 3: o que a NOTA FISCAL diz ────────────────────────────────────────
+   Investigacao pra uma pergunta so: a DANFE descreve a mercadoria de um jeito
+   que da pra conferir contra a folha de controle? Se descrever, o PDF passa a
+   ter DUAS fontes independentes sobre o que o cliente comprou — hoje tem uma
+   so, e as duas leituras do parse leem o MESMO papel.
+   Despeja o texto cru da pagina da nota daquele volume. So le. */
+async function verDanfe(){
+  const v = NF_ALVO
+    ? db.prepare(`SELECT * FROM lote WHERE nf=? AND srcfile IS NOT NULL AND danfePage IS NOT NULL
+                  ORDER BY id DESC LIMIT 1`).get(NF_ALVO)
+    : db.prepare(`SELECT * FROM lote WHERE srcfile IS NOT NULL AND danfePage IS NOT NULL
+                  AND codigo IS NOT NULL ORDER BY id DESC LIMIT 1`).get();
+  if(!v){ T(NF_ALVO?('Nenhum volume com a NF '+NF_ALVO+' e nota no PDF.'):'Nenhum volume com nota no PDF.'); return; }
+  tit('A NOTA FISCAL DO VOLUME #'+v.id);
+  T('cliente '+(v.buyer||'—')+'   NF '+(v.nf||'—')+'   data '+v.data);
+  T('SKU gravado pela folha de controle: '+(v.codigo||'—'));
+  T('');
+  if(!fs.existsSync(v.srcfile)){ T('O PDF ja saiu do servidor (limpeza de 7 dias).'); return; }
+  const pdfjs=require('pdfjs-dist/legacy/build/pdf.js');
+  const {pageLines}=require('./folha');
+  const pdf=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(v.srcfile))}).promise;
+  const pag=v.danfePage+1;                       // danfePage e 0-based
+  if(pag<1||pag>pdf.numPages){ T('Pagina da nota fora do PDF ('+pag+' de '+pdf.numPages+').'); return; }
+  const linhas=pageLines(await (await pdf.getPage(pag)).getTextContent());
+  linha();
+  T('TEXTO DA PAGINA '+pag+' (a nota):');
+  linha();
+  linhas.forEach(l=>T('  '+l));
+  T('');
+  T('Procure aqui a descricao do produto: se a nota disser o que e a peca, ela');
+  T('vira a segunda testemunha — independente da folha de controle.');
+  T('');
+}
+
+(MODO_AUDITAR?auditar():(MODO_DANFE?verDanfe():rastrear())).catch(e=>{ console.error(e); process.exit(1); });
