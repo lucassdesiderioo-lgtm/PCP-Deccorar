@@ -65,25 +65,34 @@ module.exports=function(app,db){
   app.get('/api/auditoria/skus', async (req,res)=>{
     try{
       let dias=parseInt(req.query.dias,10); if(!(dias>=1)) dias=1; if(dias>30) dias=30;
-      const {lerFolha,mapasDaFolha,skuDaFolha}=require('./folha');
+      const {lerFolha,mapasDaFolha,skuDaFolha,itemDaFolha,travasAtivas}=require('./folha');
       const arqs=db.prepare(`SELECT DISTINCT srcfile FROM lote
         WHERE srcfile IS NOT NULL AND data >= date('now','localtime','-'||?||' day')`).all(dias-1)
         .map(r=>r.srcfile).filter(a=>{ try{ return fs.existsSync(a); }catch(e){ return false; } });
       let conferidos=0, semFolha=0; const divergencias=[]; const ilegiveis=[];
+      /* Cobertura das travas: quantos volumes cada conferencia do §5 conseguiu
+         de fato olhar. Uma trava que para de acusar porque o dado sumiu nao faz
+         barulho nenhum — o silencio dela e igual ao silencio de "esta tudo
+         certo". Este contador e o que separa os dois. */
+      const cobertura={medida:0,cor:0,comprador:0};
       for(const arq of arqs){
         let f; try{ f=await lerFolha(arq); }catch(e){ ilegiveis.push(arq); continue; }
         const mapas=mapasDaFolha(f.blocos);
+        const cores=new Set(f.blocos.map(b=>String(b.cor||'').toUpperCase()
+          .normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9]/g,'')).filter(c=>c.length>2));
         for(const v of db.prepare('SELECT * FROM lote WHERE srcfile=? ORDER BY id').all(arq)){
           const esperado=skuDaFolha(v,mapas);
           if(!esperado){ semFolha++; continue; }
           conferidos++;
+          const t=travasAtivas(v, itemDaFolha(v,f.blocos), cores);
+          if(t.medida)cobertura.medida++; if(t.cor)cobertura.cor++; if(t.comprador)cobertura.comprador++;
           if(String(v.codigo||'').toUpperCase()!==String(esperado).toUpperCase())
             divergencias.push({id:v.id,buyer:v.buyer,nf:v.nf,data:v.data,estagio:v.estagio,
                                gravado:v.codigo,folha:esperado,packId:v.packId,venda:v.venda});
         }
       }
       res.json({dias,pdfs:arqs.length,conferidos,sem_folha:semFolha,
-                ilegiveis:ilegiveis.length,divergencias});
+                ilegiveis:ilegiveis.length,cobertura,divergencias});
     }catch(e){ console.error(e); res.status(500).json({erro:String(e.message||e)}); }
   });
 

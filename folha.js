@@ -105,4 +105,32 @@ function skuDaFolha(volume, mapas){
       || null;
 }
 
-module.exports={lerFolha,mapasDaFolha,skuDaFolha,itensDaFolha,pageLines};
+/* O item inteiro (nao so o SKU), pela mesma ordem de chaves do parse. */
+function itemDaFolha(volume, itens){
+  return (volume.venda && (itens||[]).find(i=>i.venda===volume.venda))
+      || (volume.packId && (itens||[]).find(i=>i.packId===volume.packId))
+      || null;
+}
+
+/* QUAIS TRAVAS ESTAO DE FATO ATIVAS NESTE VOLUME.
+ *
+ * Cada conferencia do §5 depende de um dado existir dos DOIS lados. Quando o
+ * dado some, a trava para de acusar em silencio — e silencio parece "tudo
+ * certo". Medir a cobertura e o que transforma esse silencio em numero: se um
+ * dia os codigos de SKU deixarem de carregar a cor, a linha da cor despenca na
+ * auditoria e alguem pergunta por que, em vez de descobrir pela reclamacao.
+ */
+function travasAtivas(volume, item, coresConhecidas){
+  const cod=String((volume&&volume.codigo)||'').toUpperCase().normalize('NFD')
+    .replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9]/g,'');
+  const corItem=String((item&&item.cor)||'').toUpperCase().normalize('NFD')
+    .replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9]/g,'');
+  return {
+    medida: !!(item && item.larg && item.alt && /(\d{3})(\d{3})/.test(cod)),
+    cor: !!(corItem && (cod.includes(corItem) ||
+            [...(coresConhecidas||[])].some(c=>c!==corItem && c.length>2 && cod.includes(c)))),
+    comprador: !!(item && item.comprador && volume && volume.buyer)
+  };
+}
+
+module.exports={lerFolha,mapasDaFolha,skuDaFolha,itemDaFolha,itensDaFolha,travasAtivas,pageLines};

@@ -230,6 +230,7 @@
     <button class="primary" id="audBt">Conferir</button>
     <span class="sub" id="audMsg"></span>
   </div>
+  <div id="audCob" class="sub" style="margin-top:10px;font-size:13px"></div>
   <div id="audRes" style="margin-top:12px"></div>
 </div></div><div id="v-tst" class="hide">
   <div class="card">
@@ -1514,6 +1515,22 @@ document.addEventListener('click',async function(e){
     msg.textContent=r.pdfs+' PDF(s) · '+r.conferidos+' volume(s) conferido(s)'
       +(r.sem_folha?' · '+r.sem_folha+' sem par na folha':'')
       +(r.ilegiveis?' · '+r.ilegiveis+' PDF(s) ilegível(is)':'');
+    /* Cobertura das travas. Uma conferência que deixa de acusar porque o dado
+       sumiu do documento faz o mesmo silêncio de "está tudo certo" — este
+       contador é o que separa os dois. Cai abaixo de 100%? algo mudou no
+       formato do SKU ou da folha, e a proteção encolheu sem avisar. */
+    var c=r.cobertura, tot=r.conferidos||0, cob=document.getElementById('audCob');
+    if(c && tot){
+      var pct=function(n){ return Math.round(100*n/tot); };
+      var frag=function(nome,n){
+        var p=pct(n), cor=(p>=100)?'var(--green)':(p>=80?'var(--amber)':'#c62828');
+        return '<b style="color:'+cor+'">'+nome+' '+n+'/'+tot+'</b>';
+      };
+      cob.innerHTML='travas que conseguiram conferir: '+frag('medida',c.medida)
+        +' · '+frag('cor',c.cor)+' · '+frag('comprador',c.comprador)
+        +'<div class="sub" style="margin-top:4px">Abaixo de 100% significa que a trava ficou cega em alguns volumes — '
+        +'o dado que ela compara não estava no documento ou no código do SKU.</div>';
+    } else if(cob) cob.innerHTML='';
     var d=r.divergencias||[];
     if(!d.length){
       res.innerHTML='<div style="border:1px solid #2e7d32;border-radius:10px;padding:14px;color:var(--green);font-weight:700">'
