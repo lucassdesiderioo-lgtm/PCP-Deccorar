@@ -38,7 +38,10 @@
   .imp .meta{font-size:12px;color:var(--muted);margin-top:3px}
   .imp .meta b{color:var(--txt);font-family:ui-monospace,monospace}
   .tag{display:inline-block;background:#fbf1db;border:1px solid #e7cb8c;color:#7a5200;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700;margin-left:6px}
+  .tagU{display:inline-block;background:var(--amber);color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:800;margin-left:6px;letter-spacing:.4px}
+  .imp.ultima{background:#fff8e6;border:1px solid #e7cb8c;border-radius:12px;padding:12px;margin-bottom:6px}
   .rebt{background:#edf0f4;color:var(--txt);border:1px solid var(--line);padding:10px 16px;font-size:14px;white-space:nowrap}
+  .rebt.forte{background:var(--amber);color:#fff;border-color:#8f5500;font-weight:800}
   .rebt:disabled{opacity:.5;cursor:default}
   .vazio{color:var(--muted);font-size:14px}
   iframe{position:fixed;left:-9999px;width:0;height:0;border:0}
@@ -73,8 +76,21 @@
 <script>
 const $=s=>document.querySelector(s);
 let confirmar=null, last={c:null,t:0};
-function banner(kind,title,sub,acts){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(acts?'<div class="acts">'+acts+'</div>':''); }
-function idle(){ confirmar=null; banner('','Pronto','Bipe o SKU da embalagem pra puxar a próxima venda.'); }
+var emIdle=false;
+function banner(kind,title,sub,acts){ emIdle=false; $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(acts?'<div class="acts">'+acts+'</div>':''); }
+// Parada da tela: além do "Pronto", mostra a ÚLTIMA impressão com o botão de
+// reimprimir do lado. É o atalho pro caso que motivou tudo isso — o papel
+// prendeu na etiqueta que acabou de sair e ninguém quer procurar na lista.
+function idle(){
+  confirmar=null;
+  var u=(impCache||[])[0];   // var hoisted: no primeiro idle() a lista ainda nem carregou
+  if(!u){ banner('','Pronto','Bipe o SKU da embalagem pra puxar a próxima venda.'); emIdle=true; return; }
+  banner('','Pronto','Bipe o SKU da embalagem pra puxar a próxima venda.'
+    +'<br><b>Última impressão:</b> '+esc(u.buyer||'—')+' · NF <b>'+esc(u.nf||'—')+'</b>'
+    +' · <span class="sku">'+esc(u.codigo||'')+'</span> · '+horaDe(u.embalado_em),
+    '<button class="rebt forte" onclick="reimprimir('+u.id+',this)">🖨 Reimprimir a última</button>');
+  emIdle=true;
+}
 async function stats(){
   const d=await (await fetch('/api/lote')).json();
   $('#nPend').textContent=d.filter(x=>x.estagio==='pendente').length;
@@ -186,6 +202,9 @@ async function listaImp(){
   var dias=(document.getElementById('impDias')||{}).value||'1';
   try{ var l=await (await fetch('/api/impressos?dias='+dias)).json(); impCache=Array.isArray(l)?l:[]; }catch(e){ return; }
   renderImp();
+  // A tela parada precisa aprender qual é a última: no primeiro idle() a lista
+  // ainda não tinha chegado, e depois de cada impressão a última muda.
+  if(emIdle) idle();
 }
 function renderImp(){
   var el=document.getElementById('impLista'); if(!el) return;
@@ -200,15 +219,20 @@ function renderImp(){
   var cnt=document.getElementById('impQtd');
   if(cnt) cnt.textContent=l.length+(q?' de '+impCache.length:'')+' impressa'+(l.length===1?'':'s');
   if(!l.length){ el.innerHTML='<span class="vazio">'+(impCache.length?'Nada com esse termo.':'Nenhuma etiqueta impressa no período.')+'</span>'; return; }
+  // A ÚLTIMA é sempre a mesma venda, esteja a lista filtrada ou não — por isso
+  // marcada por id, e não pela posição na tela. "Última" = última que saiu pela
+  // PRIMEIRA vez; reimprimir uma venda velha não a promove a última.
+  var ultimoId=(impCache[0]||{}).id;
   var mostra=l.slice(0,60), h='';
   for(var i=0;i<mostra.length;i++){
-    var r=mostra[i];
-    h+='<div class="imp"><div class="who"><div class="nome">'+esc(r.buyer||'—')
+    var r=mostra[i], eh=(r.id===ultimoId);
+    h+='<div class="imp'+(eh?' ultima':'')+'"><div class="who"><div class="nome">'+esc(r.buyer||'—')
+      +(eh?'<span class="tagU">ÚLTIMA IMPRESSÃO</span>':'')
       +(r.reimpressoes>0?'<span class="tag">reimpressa '+r.reimpressoes+'x</span>':'')+'</div>'
       +'<div class="meta">NF <b>'+esc(r.nf||'—')+'</b> · <b>'+esc(r.codigo||'—')+'</b> · '+horaDe(r.embalado_em)
       +(r.city?' · '+esc(r.city):'')
       +(r.estagio==='carregado'?' · <span style="color:#2e7d32">carregado</span>':'')+'</div></div>'
-      +'<button class="rebt" onclick="reimprimir('+r.id+',this)">🖨 Reimprimir</button></div>';
+      +'<button class="rebt'+(eh?' forte':'')+'" onclick="reimprimir('+r.id+',this)">🖨 Reimprimir'+(eh?' a última':'')+'</button></div>';
   }
   if(l.length>mostra.length) h+='<div class="vazio" style="padding-top:10px">Mostrando '+mostra.length+' de '+l.length+' — use a busca pra achar a venda.</div>';
   el.innerHTML=h;
