@@ -1528,6 +1528,7 @@ document.addEventListener('click',async function(e){
       };
       cob.innerHTML='travas que conseguiram conferir: '+frag('medida',c.medida)
         +' · '+frag('cor',c.cor)+' · '+frag('comprador',c.comprador)
+        +(c.familia!==undefined?' · '+frag('linha do produto',c.familia):'')
         +'<div class="sub" style="margin-top:4px">Abaixo de 100% significa que a trava ficou cega em alguns volumes — '
         +'o dado que ela compara não estava no documento ou no código do SKU.</div>';
     } else if(cob) cob.innerHTML='';
