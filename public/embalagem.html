@@ -65,6 +65,7 @@
   <div class="banner" id="banner"></div>
   <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="bipe aqui">
 <div class="card" style="margin-top:16px"><div class="ttl">Faltam imprimir</div><div id="pendLista"></div></div>
+<div class="card" id="futBox" style="margin-top:16px;display:none;opacity:.85"></div>
   <div class="card" style="margin-top:16px">
     <div class="ttl">
       <span>Já impressos — reimprimir</span>
@@ -202,12 +203,46 @@ async function listaPend(){
   if(!l.length){ el.innerHTML='<span style="color:#5a6472;font-size:14px">Nada pendente.</span>'; return; }
   var h='';
   for(var i=0;i<l.length;i++){
-    h+='<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #d8dee6"><b style="font-family:ui-monospace,monospace">'+l[i].codigo+'</b><b style="color:#b26a00;font-size:18px">'+l[i].qtd+'</b></div>';
+    // Atrasado em vermelho: o prazo do ML já passou e o volume continua aqui.
+    var atr=l[i].atrasados>0;
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #d8dee6">'
+      +'<b style="font-family:ui-monospace,monospace">'+esc(l[i].codigo)+'</b>'
+      +(atr?'<span style="color:#c0392b;font-size:12px;font-weight:700">⚠ '+l[i].atrasados+' fora do prazo</span>':'')
+      +'<b style="color:'+(atr?'#c0392b':'#b26a00')+';font-size:18px">'+l[i].qtd+'</b></div>';
   }
   el.innerHTML=h;
 }
 setInterval(listaPend,5000);
 listaPend();
+
+// ── O que vem pela frente ────────────────────────────────────────────────────
+// Venda já faturada com prazo de despacho futuro. Fica FORA da fila do dia de
+// propósito — cobrar hoje o que só vence em três semanas é o que ensina a
+// equipe a ignorar a fila inteira. Mas não pode sumir, senão ninguém planeja a
+// produção. Por isso: painel próprio, agrupado por data, discreto.
+function dataBR(s){ var p=String(s||'').split('-'); return p.length===3? p[2]+'/'+p[1] : s; }
+async function listaFut(){
+  var l=[]; try{ l=await (await fetch("/api/pendentes/futuros")).json(); }catch(e){}
+  var el=document.getElementById("futBox"); if(!el) return;
+  if(!l.length){ el.style.display='none'; return; }
+  el.style.display='';
+  var por={}, ordem=[];
+  for(var i=0;i<l.length;i++){ var d=l[i].despachar_em;
+    if(!por[d]){ por[d]=[]; ordem.push(d); } por[d].push(l[i]); }
+  var h='<div class="ttl">Pra despachar depois</div>';
+  for(var k=0;k<ordem.length;k++){
+    var d=ordem[k], itens=por[d], tot=0;
+    for(var j=0;j<itens.length;j++) tot+=itens[j].qtd;
+    var skus=[]; for(var j=0;j<itens.length;j++) skus.push(esc(itens[j].codigo)+' ×'+itens[j].qtd);
+    h+='<div style="padding:8px 0;border-bottom:1px solid #e6eaf0">'
+      +'<div style="display:flex;justify-content:space-between"><b>'+dataBR(d)+'</b>'
+      +'<b style="color:#5a6472">'+tot+'</b></div>'
+      +'<div style="color:#5a6472;font-size:13px;font-family:ui-monospace,monospace">'+skus.join(' · ')+'</div></div>';
+  }
+  el.innerHTML=h;
+}
+setInterval(listaFut,30000);
+listaFut();
 
 // ── Já impressos: as notas e clientes que a impressora já cuspiu hoje ────────
 // Existe pra UM momento: a impressora enroscou e ninguém lembra qual era a

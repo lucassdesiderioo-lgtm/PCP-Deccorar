@@ -1,7 +1,7 @@
 const express=require('express'); const fs=require('fs');
 const {parsePdf}=require('./parse'); const {PDFDocument}=require('pdf-lib');
 module.exports=function(app,db){
-  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT);");
+  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
   // sao so historia: quantas vezes o volume voltou pra impressora e quando foi a
   // ultima. O ALTER mora aqui, no dono da tabela (§17 do CLAUDE.md), com a
@@ -18,6 +18,13 @@ module.exports=function(app,db){
   // a familia do produto na conferencia 5, e porque ter o texto original ajuda
   // a entender uma divergencia meses depois.
   try{ db.exec("ALTER TABLE lote ADD COLUMN descricao TEXT"); }catch(e){}
+  /* A DATA LIMITE DE DESPACHO que a etiqueta traz ("Despachar: qua 26/ago").
+     Nem todo volume de um lote sai no mesmo dia — no PDF de 25/08 as 14
+     etiquetas tinham CINCO datas, so 6 para o dia seguinte. Sem esta coluna a
+     fila "Faltam imprimir" cobra hoje a etiqueta que so vence em tres semanas.
+     Fica NULL quando a linha nao deu pra ler: volume sem data conhecida conta
+     como de hoje, porque some da fila e pior que aparecer cedo demais. */
+  try{ db.exec("ALTER TABLE lote ADD COLUMN despachar_em TEXT"); }catch(e){}
 
   /* ── O QUE O SISTEMA APRENDE SOBRE FAMILIA x PREFIXO DE SKU ────────────────
      Medida e cor nao separam duas pecas que so diferem no TECIDO — e elas
@@ -66,7 +73,7 @@ module.exports=function(app,db){
          semanas. Uma fila que mostra o que nao existe e uma fila que a equipe
          aprende a ignorar — e ai o volume que falta de verdade some junto. */
       const seen=new Set(); db.prepare("SELECT packId,venda FROM lote").all().forEach(r=>{ if(r.packId)seen.add('p:'+r.packId); if(r.venda)seen.add('v:'+r.venda); });
-      const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio,descricao) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+      const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio,descricao,despachar_em) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
       const existe=db.prepare('SELECT 1 FROM skus WHERE codigo=?');
       const famVista=db.prepare('SELECT prefixo,vezes FROM familia_sku WHERE familia=?');
       const famGrava=db.prepare(`INSERT INTO familia_sku (familia,prefixo,vezes) VALUES (?,?,1)
@@ -101,7 +108,7 @@ module.exports=function(app,db){
         else if(!ok){ est='bloqueado'; bloq++; motivo='sku_nao_cadastrado';
           const k=sku||'(sem SKU na folha)'; desconhecidos[k]=(desconhecidos[k]||0)+1; }
         if(!o.sku) semsku++;
-        ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null); novos++;
+        ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null,o.despacharEm||null); novos++;
       }})();
       res.json({ok:true,total:orders.length,novos,repetidas:rep,sem_sku:semsku,bloqueados:bloq,divergencias:divs,
                 desconhecidos:Object.keys(desconhecidos).map(k=>({sku:k,qtd:desconhecidos[k]}))});
@@ -182,8 +189,32 @@ module.exports=function(app,db){
     db.prepare("UPDATE lote SET codigo=?, estagio='pendente', bloqueio=NULL WHERE id=?").run(sku,id);
     res.json({ok:true,id:id,codigo:sku});
   });
+  /* A FILA E POR DATA DE DESPACHO, NAO POR DATA DE ENTRADA.
+     O que decide se a etiqueta sai hoje e o prazo que o Mercado Livre carimbou
+     na etiqueta, nao o dia em que o PDF foi subido: um lote traz volumes de
+     varias datas ao mesmo tempo (no PDF de 25/08, cinco datas em 14 etiquetas).
+     Entra na fila o que vence hoje, o que ja venceu — atraso tem que gritar,
+     nao sumir — e o que nao tem data lida, porque volume invisivel e pior que
+     volume cedo demais.
+     O filtro por `data` sai: um volume de ontem que vence hoje e trabalho de
+     hoje, e era justamente ele que desaparecia. */
+  const FILA_HOJE=`estagio='pendente' AND codigo IS NOT NULL AND `+require('./fila_dia').VENCE_HOJE;
   app.get('/api/pendentes',(req,res)=>{
-    res.json(db.prepare("SELECT codigo, COUNT(*) qtd FROM lote WHERE data=date('now','localtime') AND estagio='pendente' AND codigo IS NOT NULL GROUP BY codigo ORDER BY qtd DESC").all());
+    res.json(db.prepare(`SELECT codigo, COUNT(*) qtd,
+        MIN(despachar_em) vence_em,
+        SUM(CASE WHEN despachar_em IS NOT NULL AND despachar_em<date('now','localtime') THEN 1 ELSE 0 END) atrasados
+      FROM lote WHERE ${FILA_HOJE} GROUP BY codigo ORDER BY atrasados DESC, qtd DESC`).all());
+  });
+  /* O QUE VEM PELA FRENTE — venda ja faturada com prazo de despacho futuro.
+     Fica fora da fila do dia de proposito: cobrar hoje o que so vence em tres
+     semanas e o que ensina a equipe a ignorar a fila inteira. Mas nao pode
+     sumir, senao ninguem planeja a producao — entao aparece em painel proprio,
+     agrupado por data. */
+  app.get('/api/pendentes/futuros',(req,res)=>{
+    res.json(db.prepare(`SELECT despachar_em, codigo, COUNT(*) qtd
+      FROM lote WHERE estagio='pendente' AND codigo IS NOT NULL
+        AND despachar_em IS NOT NULL AND despachar_em>date('now','localtime')
+      GROUP BY despachar_em, codigo ORDER BY despachar_em, codigo`).all());
   });
   app.get('/api/lote',(req,res)=> res.json(db.prepare("SELECT id,codigo,cor,buyer,city,nf,estagio FROM lote WHERE data=date('now','localtime') ORDER BY id").all()));
 

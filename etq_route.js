@@ -1,3 +1,4 @@
+const {VENCE_HOJE,ORDEM_URGENCIA}=require('./fila_dia');
 module.exports=function(app,db){
   app.get('/api/proximo/:sku',(req,res)=>{
     const sku=(req.params.sku||'').trim().toUpperCase();
@@ -16,9 +17,18 @@ module.exports=function(app,db){
       LEFT JOIN modelo m ON m.id=s.modelo_id
       WHERE s.codigo=?`).get(sku);
     if(!s) return res.json({cadastrado:false});
-    const total=db.prepare("SELECT COUNT(*) c FROM lote WHERE codigo=? AND data=date('now','localtime')").get(sku).c;
-    const pend=db.prepare("SELECT COUNT(*) c FROM lote WHERE codigo=? AND data=date('now','localtime') AND estagio='pendente'").get(sku).c;
-    const p=db.prepare("SELECT id,codigo,cor,buyer,city,nf,packId,venda FROM lote WHERE codigo=? AND data=date('now','localtime') AND estagio='pendente' ORDER BY id LIMIT 1").get(sku);
+    /* MESMA REGUA DA LISTA "Faltam imprimir" (fila_dia.js): o que manda e a
+       data de despacho da etiqueta, nao o dia em que o PDF entrou. Se estas
+       consultas filtrassem por `data` enquanto a lista filtra por prazo, a tela
+       cobraria um volume que o bipe nao acha — e o operador bipa um codigo que
+       a propria tela diz que existe. */
+    const total=db.prepare(`SELECT COUNT(*) c FROM lote WHERE codigo=? AND `+VENCE_HOJE).get(sku).c;
+    const pend=db.prepare(`SELECT COUNT(*) c FROM lote WHERE codigo=? AND estagio='pendente' AND `+VENCE_HOJE).get(sku).c;
+    /* O mais urgente primeiro, nao o de menor id: sem isso um volume atrasado
+       espera enquanto sai um de prazo folgado. */
+    const p=db.prepare(`SELECT id,codigo,cor,buyer,city,nf,packId,venda,despachar_em
+      FROM lote WHERE codigo=? AND estagio='pendente' AND `+VENCE_HOJE+
+      ` ORDER BY `+ORDEM_URGENCIA+` LIMIT 1`).get(sku);
     /* Medida so entra quando o modelo cobra medida — acessorio nao tem, e
        exibir "null x null" ensinaria o operador a ignorar a linha inteira. */
     const peca={

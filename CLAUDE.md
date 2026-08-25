@@ -536,6 +536,32 @@ ao meio-dia em vez de 10:30.
 | Corte 10:30 | Vendas até esse horário são entregues no mesmo dia |
 | Despacho 15:00 | Limite para levar os volumes à agência |
 
+> ⚠️ **ARMADILHA #7 — nem todo volume de um lote sai no mesmo dia, e a etiqueta
+> diz qual é qual.** Cada etiqueta traz `Despachar: qua 26/ago, antes das 15:00 h`.
+> No PDF de 25/08 as **14 etiquetas tinham cinco datas diferentes** — só 6 para
+> o dia seguinte, as outras 8 espalhadas por três semanas.
+>
+> Enquanto o `parse.js` ignorava essa linha, todo volume entrava como se fosse
+> de hoje e a fila "Faltam imprimir" cobrava etiqueta de venda que só vencia
+> semanas depois. Mesma doença dos volumes fantasmas por outra porta: fila que
+> mostra o que não é pra agora é fila que a equipe aprende a ignorar.
+>
+> `fila_dia.js` é o **dono único** da pergunta "isto é trabalho de hoje?", e por
+> um motivo prático: a tela faz essa pergunta duas vezes por caminhos
+> diferentes — a lista de pendentes e o bipe do SKU (`/api/proximo/:sku`). Com
+> réguas diferentes, a lista cobraria um volume que o leitor não acha.
+>
+> Entram na fila: o que vence hoje, **o que já venceu** (atraso tem que gritar,
+> não sumir) e **o que não tem data lida** (volume invisível é pior que volume
+> cedo demais). O que vence depois aparece no painel "Pra despachar depois", que
+> existe para o planejamento enxergar sem poluir o dia. O filtro por `data` (dia
+> da importação) saiu: volume que entrou ontem e vence hoje é trabalho de hoje.
+>
+> **O ano não vem na linha** e é inferido dos dois lados da virada: `05/jan`
+> lido em dezembro é do ano seguinte, `20/dez` lido em janeiro é do ano anterior.
+> A janela é assimétrica (−60 / +180 dias) porque atraso de despacho é curto e
+> envio programado legítimo chega a semanas.
+
 A tela de revisão mostra o corte no aviso de status. A tela de Etiqueta de Venda
 mostra contagem regressiva para o despacho, ficando **amarela** abaixo de 2 h e
 **vermelha** abaixo de 1 h quando ainda há volumes pendentes.

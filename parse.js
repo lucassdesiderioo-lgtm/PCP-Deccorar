@@ -1,5 +1,42 @@
 const pdfjs = require('pdfjs-dist/legacy/build/pdf.js');
 pdfjs.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.js';
+
+/* A DATA LIMITE DE DESPACHO, QUE A ETIQUETA SEMPRE TRAZ.
+ *
+ *     Despachar: qua 26/ago, antes das 15:00 h
+ *
+ * Nem todo volume de um lote sai no mesmo dia: no PDF de 25/08 as 14 etiquetas
+ * traziam CINCO datas diferentes — 6 para o dia seguinte e 8 espalhadas por
+ * duas semanas. Sem ler esta linha o sistema entra com todas como se fossem de
+ * hoje, e a fila "Faltam imprimir" cobra etiqueta de venda que so vence daqui a
+ * tres semanas. Fila que mostra o que nao e pra agora e fila que a equipe
+ * aprende a ignorar — a mesma doenca dos volumes fantasmas, por outra porta.
+ *
+ * O ANO NAO VEM NA LINHA, e por isso ele e inferido — dos DOIS lados da virada,
+ * que e onde isso erra:
+ *   28/dez lendo "05/jan"  -> ano seguinte (a data cairia 357 dias atras)
+ *   05/jan lendo "20/dez"  -> ano anterior (a data cairia 349 dias a frente)
+ * A janela vai de 60 dias no passado a 180 no futuro. Assimetrica de proposito:
+ * atraso de despacho e curto (dias), enquanto envio programado legitimo chega a
+ * semanas — entao o limite do futuro tem que ser folgado e o do passado, nao.
+ */
+const MESES={jan:1,fev:2,mar:3,abr:4,mai:5,jun:6,jul:7,ago:8,set:9,out:10,nov:11,dez:12};
+function dataDespacho(texto, hoje){
+  const m=String(texto||'').match(/Despachar:[^\n]*?(\d{1,2})\s*\/\s*([a-zç]{3,})/i);
+  if(!m) return null;
+  const dia=+m[1], mes=MESES[m[2].slice(0,3).toLowerCase()];
+  if(!mes||dia<1||dia>31) return null;
+  const ref=hoje||new Date();
+  const iso=a=>a+'-'+String(mes).padStart(2,'0')+'-'+String(dia).padStart(2,'0');
+  let ano=ref.getFullYear();
+  const hojeISO=ref.getFullYear()+'-'+String(ref.getMonth()+1).padStart(2,'0')+'-'+String(ref.getDate()).padStart(2,'0');
+  const dias=(new Date(iso(ano)+'T12:00:00') - new Date(hojeISO+'T12:00:00'))/86400000;
+  if(dias < -60) ano++;        // 28/dez lendo "05/jan"
+  else if(dias > 180) ano--;   // 05/jan lendo "20/dez", despacho atrasado
+  const d=new Date(iso(ano)+'T12:00:00');
+  if(isNaN(d.getTime()) || d.getUTCDate()!==dia) return null;   // 31/fev e afins
+  return iso(ano);
+}
 function pageLines(tc){
   const items=tc.items.filter(it=>it.str&&it.str.trim()!=='');
   const rows={};
@@ -89,6 +126,7 @@ async function parsePdf(uint8){
     const grab=re=>{ const mm=t.match(re); return mm?mm[1].replace(/\s+/g,''):null; };
     const packId=grab(/Pack ID:\s*([\d ]+)/), venda=grab(/Venda:\s*([\d ]+)/);
     const nf=(t.match(/NF:\s*(\d+)/)||[])[1]||null;
+    const despacharEm=dataDespacho(t);
     const city=((t.match(/Cidade de destino\s*:\s*(.+)/)||[])[1]||'').trim();
     let buyer=''; const ei=lines.findIndex(l=>/^Endereço:/.test(l));
     if(ei>0){ buyer=lines[ei-1]; if(ei>1&&/^\(/.test(buyer)) buyer=lines[ei-2]+' '+buyer; }
@@ -159,9 +197,9 @@ async function parsePdf(uint8){
       /* A descricao do anuncio vai junto: e ela que diz a LINHA do produto
          ("Cortina Rolo Blackout" x "Toucher Rolo Evolux"), a unica dimensao que
          medida e cor nao separam. O upload guarda e aprende com ela. */
-      descricao:(rec&&rec.desc)||null,
+      descricao:(rec&&rec.desc)||null, despacharEm,
       buyer:buyer||'(sem nome)',city,nf,packId,venda,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
   }
   return orders;
 }
-module.exports={parsePdf};
+module.exports={parsePdf,dataDespacho};
