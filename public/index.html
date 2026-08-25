@@ -221,7 +221,17 @@
   </div>
   <div id="divLista"></div>
 </div>
-<div class="card"><div id="blqEstado"></div><table><thead><tr><th>SKU</th><th>Volumes</th><th></th></tr></thead><tbody id="blqLista"></tbody></table></div></div><div id="v-tst" class="hide">
+<div class="card"><div id="blqEstado"></div><table><thead><tr><th>SKU</th><th>Volumes</th><th></th></tr></thead><tbody id="blqLista"></tbody></table></div>
+<div class="card" style="margin-top:14px">
+  <div style="font-weight:700;font-size:15px;margin-bottom:6px">Conferir o que já foi impresso</div>
+  <div class="sub" style="margin-bottom:12px">Relê a folha de controle de cada PDF do período e compara com o SKU que ficou gravado em cada volume. A trava do upload só vale para o que entra dali em diante — <b>isto olha para trás</b>, e é o que pega o volume que subiu antes de uma correção.</div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <select id="audDias"><option value="1">hoje</option><option value="2">2 dias</option><option value="7">7 dias</option><option value="30">30 dias</option></select>
+    <button class="primary" id="audBt">Conferir</button>
+    <span class="sub" id="audMsg"></span>
+  </div>
+  <div id="audRes" style="margin-top:12px"></div>
+</div></div><div id="v-tst" class="hide">
   <div class="card">
     <div id="tstEstado" style="font-size:16px;margin-bottom:14px"></div>
     <div class="row-actions" id="tstBotoes"></div>
@@ -1469,6 +1479,40 @@ async function carregarCad(){
     else document.getElementById('cdKitLabelMsg').textContent='Nenhuma etiqueta enviada ainda.';
   }catch(e){}
 }
+/* Conferencia do que ja foi impresso. Abre e le PDFs, entao roda so quando
+   alguem pede — nunca em intervalo. Zero divergencia e resultado, nao silencio:
+   quantos volumes foram conferidos aparece sempre. */
+document.addEventListener('click',async function(e){
+  if(!e.target.closest('#audBt')) return;
+  var bt=document.getElementById('audBt'), msg=document.getElementById('audMsg'), res=document.getElementById('audRes');
+  var dias=document.getElementById('audDias').value;
+  bt.disabled=true; msg.textContent='lendo os PDFs…'; res.innerHTML='';
+  try{
+    var r=await (await fetch('/api/auditoria/skus?dias='+dias)).json();
+    if(r.erro){ msg.innerHTML='<span style="color:#ff6b6b">'+r.erro+'</span>'; bt.disabled=false; return; }
+    msg.textContent=r.pdfs+' PDF(s) · '+r.conferidos+' volume(s) conferido(s)'
+      +(r.sem_folha?' · '+r.sem_folha+' sem par na folha':'')
+      +(r.ilegiveis?' · '+r.ilegiveis+' PDF(s) ilegível(is)':'');
+    var d=r.divergencias||[];
+    if(!d.length){
+      res.innerHTML='<div style="border:1px solid #2e7d32;border-radius:10px;padding:14px;color:var(--green);font-weight:700">'
+        +'✓ Nenhuma divergência — o SKU gravado bate com a folha em todos os '+r.conferidos+' volumes.</div>';
+    } else {
+      var h='<div style="border:2px solid #c62828;border-radius:10px;padding:14px">'
+        +'<div style="font-weight:800;color:#c62828;margin-bottom:4px">'+d.length+' volume(s) com SKU diferente do que o cliente comprou</div>'
+        +'<div class="sub" style="margin-bottom:10px">Confira a NF contra o pedido no Mercado Livre. Volume já carregado significa que saiu errado.</div>';
+      for(var i=0;i<d.length;i++){
+        var v=d[i];
+        h+='<div style="border-top:1px solid var(--line);padding:10px 0">'
+          +'<div style="font-weight:700">'+(v.buyer||'—')+' · NF '+(v.nf||'—')+' · '+(v.data||'')+' <span class="sub">('+v.estagio+')</span></div>'
+          +'<div style="font-size:13px;margin-top:4px">saiu como <b style="font-family:ui-monospace,monospace">'+(v.gravado||'—')+'</b>'
+          +' · a folha diz <b style="font-family:ui-monospace,monospace;color:#c62828">'+v.folha+'</b></div></div>';
+      }
+      res.innerHTML=h+'</div>';
+    }
+  }catch(err){ msg.innerHTML='<span style="color:#ff6b6b">'+String(err)+'</span>'; }
+  bt.disabled=false;
+});
 document.addEventListener('change',async function(e){
   var c=e.target.closest('#cdConf');
   if(!c) return;
