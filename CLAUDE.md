@@ -267,6 +267,28 @@ número — o volume processado sai de `pendente` e o estoque baixa junto.
 **Recálculo é idempotente:** `POST /api/cruzamento/aplicar` apaga as ordens de
 `origem='ml'` do dia e refaz. Subir o mesmo PDF duas vezes não duplica.
 
+> ⚠️ **ARMADILHA #5 — a deduplicação do upload olha o HISTÓRICO INTEIRO, não o
+> dia.** Pack ID e Venda são números do Mercado Livre: cada volume tem o seu, e
+> ele nunca reaparece em outra venda. Então "já existe" é resposta definitiva —
+> nunca "já existe hoje".
+>
+> Enquanto o `SELECT` da dedup em `exp_route.js` trazia
+> `WHERE data=date('now','localtime')`, resubir um PDF de ontem (ou subir um
+> lote reemitido, que repete vendas de dias anteriores) reinseria cada volume
+> como **`pendente` de hoje** — inclusive volumes já impressos e despachados. Em
+> 25/08/2026 foram **94 volumes fantasmas num dia só**, e os montes órfãos de 21,
+> 19 e 18/08 mostram que vinha acontecendo havia semanas.
+>
+> O estrago não é a linha a mais: é a fila "Faltam imprimir" cobrando etiqueta de
+> peça que está no caminhão. Fila que mostra o que não existe é fila que a equipe
+> aprende a ignorar — e aí o volume que falta de verdade some junto com o ruído.
+>
+> Passivo antigo se limpa com `node limpar_fantasmas.js` (simula) e
+> `--aplicar` (faz backup por `db.backup()` e apaga). Ele só remove o
+> **`pendente`** cujo irmão mais antigo já **andou** (`embalado`/`carregado`) —
+> duplicata com irmão `pendente` ou `bloqueado` sai numa lista à parte, para
+> alguém olhar. O que fica é sempre o mais antigo, que é quem carrega a história.
+
 > ⚠️ **Lançamento manual e PDF não se conversam.** O manual (`origem='manual'`)
 > não é apagado pelo recálculo. Usar os dois no mesmo SKU **duplica a ordem**.
 > Regra prática: PDF cobre as vendas, manual cobre produção sem venda.

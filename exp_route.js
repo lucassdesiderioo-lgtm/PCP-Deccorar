@@ -53,7 +53,19 @@ module.exports=function(app,db){
       const buf=Buffer.from(b64,'base64');
       const orders=await parsePdf(new Uint8Array(buf));
       const fname='/opt/expedicao/lotes/'+Date.now()+'.pdf'; fs.writeFileSync(fname,buf);
-      const seen=new Set(); db.prepare("SELECT packId,venda FROM lote WHERE data=date('now','localtime')").all().forEach(r=>{ if(r.packId)seen.add('p:'+r.packId); if(r.venda)seen.add('v:'+r.venda); });
+      /* A DEDUPLICACAO OLHA O HISTORICO INTEIRO, NAO SO O DIA.
+         Pack ID e Venda sao numeros do Mercado Livre: cada volume tem o seu, e
+         ele nunca se repete em outra venda. Entao "ja existe" e resposta
+         definitiva, nao "ja existe hoje".
+         Enquanto ela olhava so o dia, resubir um PDF de ontem — ou um PDF que
+         repete vendas de dias anteriores, que e o normal quando o lote e
+         reemitido — reinseria tudo como PENDENTE de hoje. O volume ja tinha
+         sido impresso e carregado; voltava para a fila "Faltam imprimir" como
+         se faltasse. Em 25/08 foram 94 volumes fantasmas num dia so, e os
+         montes orfaos de 21, 19 e 18/08 mostram que vinha acontecendo ha
+         semanas. Uma fila que mostra o que nao existe e uma fila que a equipe
+         aprende a ignorar — e ai o volume que falta de verdade some junto. */
+      const seen=new Set(); db.prepare("SELECT packId,venda FROM lote").all().forEach(r=>{ if(r.packId)seen.add('p:'+r.packId); if(r.venda)seen.add('v:'+r.venda); });
       const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio,descricao) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
       const existe=db.prepare('SELECT 1 FROM skus WHERE codigo=?');
       const famVista=db.prepare('SELECT prefixo,vezes FROM familia_sku WHERE familia=?');
