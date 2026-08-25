@@ -191,6 +191,18 @@ O `parse` devolve `conflito` e o upload grava o volume como `bloqueado` com
 > nunca de uma lista fixa: cor nova do catálogo entra sozinha, sem ninguém
 > lembrar de vir aqui.
 
+> ⚠️ **UMA TRAVA QUE PARA DE ACUSAR FAZ O MESMO SILÊNCIO DE "ESTÁ TUDO CERTO".**
+> As conferências 3 e 4 leem a medida e a cor **de dentro do código do SKU**
+> (`BK160160`**`CINZA`**). O dia em que os códigos deixarem de carregar esses
+> dados — e o §7 permite, SKU é etiqueta livre — as duas param de proteger sem
+> emitir um único aviso.
+>
+> Por isso a auditoria (`/api/auditoria/skus` e o botão em Admin → Bloqueados)
+> reporta a **cobertura**: quantos volumes cada trava conseguiu de fato conferir.
+> Abaixo de 100% ela aparece em âmbar. **Se esse número cair, a proteção
+> encolheu** — e aí ou o código do SKU volta a carregar o dado, ou a conferência
+> passa a ler das colunas de `skus` em vez do texto do código.
+
 > As conferências 2 e 3 só acusam quando **os dois lados existem**: nome que não
 > deu para ler, ou SKU sem medida no código (§7 — SKU é etiqueta livre), nunca
 > viram acusação. Silêncio por falta de dado não pode virar bloqueio, senão a
