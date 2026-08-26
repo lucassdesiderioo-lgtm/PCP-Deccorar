@@ -1,5 +1,6 @@
 const express=require('express'); const fs=require('fs');
 const {parsePdf}=require('./parse'); const {PDFDocument}=require('pdf-lib');
+const {futuro}=require('./carga');
 module.exports=function(app,db){
   db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
@@ -270,12 +271,19 @@ module.exports=function(app,db){
   // antigo, que e a ordem em que o operador procura.
   app.get('/api/impressos',(req,res)=>{
     let dias=parseInt(req.query.dias,10); if(!(dias>=1)) dias=1; if(dias>30) dias=30;
-    res.json(db.prepare(`SELECT id,codigo,cor,buyer,city,nf,packId,venda,estagio,data,
+    const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
+    /* `adiantada` = a etiqueta saiu antes do prazo de despacho dela. Vem
+       marcada daqui, pela MESMA funcao que a tela de carregamento usa
+       (carga.js): a lista de reimpressao e uma terceira tela perguntando "esta
+       venda e de hoje?", e a terceira regua seria a que discorda das outras
+       duas. */
+    res.json(db.prepare(`SELECT id,codigo,cor,buyer,city,nf,packId,venda,estagio,data,despachar_em,
         embalado_em,carregado_em,COALESCE(reimpressoes,0) reimpressoes,reimpresso_em
       FROM lote
       WHERE estagio IN ('embalado','carregado')
         AND data >= date('now','localtime','-'||?||' day')
-      ORDER BY COALESCE(embalado_em,criado_em) DESC, id DESC LIMIT 400`).all(dias-1));
+      ORDER BY COALESCE(embalado_em,criado_em) DESC, id DESC LIMIT 400`).all(dias-1)
+      .map(v=>Object.assign({},v,{adiantada: futuro(v,hoje)?1:0})));
   });
 
   // Reimprimir NAO mexe no estoque. A baixa (-1) acontece uma unica vez, no

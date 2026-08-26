@@ -61,6 +61,10 @@
   .imp .meta b{color:var(--txt);font-family:ui-monospace,monospace}
   .tag{display:inline-block;background:#fbf1db;border:1px solid #e7cb8c;color:#7a5200;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700;margin-left:6px}
   .tagU{display:inline-block;background:var(--amber);color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:800;margin-left:6px;letter-spacing:.4px}
+  /* ADIANTADA: mesma cor do aviso "ADIANTANDO" que aparece no bipe. As duas
+     telas falam da mesma coisa — venda entregue antes do prazo —, e cor
+     diferente pra mesma coisa ensina a equipe que sao coisas diferentes. */
+  .tagA{display:inline-block;background:#e8f0fb;border:1px solid #7aa3d8;color:#1f4b82;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:800;margin-left:6px}
   .imp.ultima{background:#fff8e6;border:1px solid #e7cb8c;border-radius:12px;padding:12px;margin-bottom:6px}
   .rebt{background:#edf0f4;color:var(--txt);border:1px solid var(--line);padding:10px 16px;font-size:14px;white-space:nowrap}
   .rebt.forte{background:var(--amber);color:#fff;border-color:#8f5500;font-weight:800}
@@ -405,6 +409,13 @@ function renderImp(){
     var r=mostra[i], eh=(r.id===ultimoId);
     h+='<div class="imp'+(eh?' ultima':'')+'"><div class="who"><div class="nome">'+esc(r.buyer||'—')
       +(eh?'<span class="tagU">ÚLTIMA IMPRESSÃO</span>':'')
+      /* A tarja diz QUANDO a caixa sai, não só que está adiantada: na hora de
+         reimprimir é isso que a pessoa precisa saber pra não mandar hoje. E diz
+         em dias ("amanhã"), que é como ela pensa — o caso comum é justamente a
+         venda de amanhã entregue antes do prazo; a data fica junto pro que
+         estiver longe. */
+      +(r.adiantada?'<span class="tagA">📅 despacha '+esc(faltamDias(r.despachar_em)||'')
+        +' · '+esc(dataBR(r.despachar_em))+'</span>':'')
       +(r.reimpressoes>0?'<span class="tag">reimpressa '+r.reimpressoes+'x</span>':'')+'</div>'
       +'<div class="meta">NF <b>'+esc(r.nf||'—')+'</b> · <b>'+esc(r.codigo||'—')+'</b> · '+horaDe(r.embalado_em)
       +(r.city?' · '+esc(r.city):'')
