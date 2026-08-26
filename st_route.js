@@ -20,7 +20,11 @@ module.exports=function(app,db){
   app.get('/api/expedicao/status',(req,res)=>{
     const h=hoje();
     const desp=cfg('despacho_'+h.d,'15:00');
-    const pend=db.prepare("SELECT COUNT(*) c FROM lote WHERE data=date('now','localtime') AND estagio='pendente'").get().c;
+    /* Mesma regua da fila (fila_dia.js). Contando por dia de importacao, o
+       relogio de despacho ficava vermelho por causa de venda que so vence em
+       setembro — pressa por trabalho que nao e do dia. */
+    const pend=db.prepare("SELECT COUNT(*) c FROM lote WHERE estagio='pendente' AND "
+      +require('./fila_dia').VENCE_HOJE).get().c;
     const emb=db.prepare("SELECT COUNT(*) c FROM lote WHERE data=date('now','localtime') AND estagio='embalado'").get().c;
     const car=db.prepare("SELECT COUNT(*) c FROM lote WHERE data=date('now','localtime') AND estagio='carregado'").get().c;
     let falta=0;

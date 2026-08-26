@@ -205,6 +205,27 @@ module.exports=function(app,db){
         SUM(CASE WHEN despachar_em IS NOT NULL AND despachar_em<date('now','localtime') THEN 1 ELSE 0 END) atrasados
       FROM lote WHERE ${FILA_HOJE} GROUP BY codigo ORDER BY atrasados DESC, qtd DESC`).all());
   });
+  /* OS NUMEROS DA TELA, NUM LUGAR SO.
+     A tela mostrava "15 PENDENTES" no topo e "Nada pendente" na lista logo
+     abaixo — duas respostas opostas para a mesma pergunta, na mesma tela. Nao
+     era divergencia de opiniao: eram tres consultas com reguas diferentes
+     (/api/lote contava tudo que ENTROU hoje, a lista filtrava por PRAZO, e o
+     relogio de despacho tinha uma terceira). Quando o operador ve dois numeros
+     que se contradizem, ele para de confiar em todos.
+     Daqui pra frente a tela pergunta uma vez so, e a regua e a do fila_dia. */
+  app.get('/api/fila/resumo',(req,res)=>{
+    const hoje=db.prepare(`SELECT COUNT(*) c FROM lote WHERE ${FILA_HOJE}`).get().c;
+    const atras=db.prepare(`SELECT COUNT(*) c FROM lote WHERE estagio='pendente'
+      AND despachar_em IS NOT NULL AND despachar_em<date('now','localtime')`).get().c;
+    const fut=db.prepare(`SELECT COUNT(*) c FROM lote WHERE estagio='pendente'
+      AND despachar_em IS NOT NULL AND despachar_em>date('now','localtime')`).get().c;
+    /* Impressas HOJE conta por embalado_em, nao por `data`: um volume que
+       entrou ontem e foi impresso hoje e trabalho de hoje. Pelo criterio antigo
+       ele nao aparecia, e o placar do dia saia menor do que o dia rendeu. */
+    const imp=db.prepare(`SELECT COUNT(*) c FROM lote
+      WHERE embalado_em IS NOT NULL AND date(embalado_em)=date('now','localtime')`).get().c;
+    res.json({hoje,atrasados:atras,futuros:fut,impressas_hoje:imp});
+  });
   /* O QUE VEM PELA FRENTE — venda ja faturada com prazo de despacho futuro.
      Fica fora da fila do dia de proposito: cobrar hoje o que so vence em tres
      semanas e o que ensina a equipe a ignorar a fila inteira. Mas nao pode
