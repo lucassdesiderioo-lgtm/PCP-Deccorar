@@ -291,6 +291,40 @@ para a auditoria.
 Desligável (Admin → Cadastros) porque custa um bipe por volume, todo dia. Nasce
 **desligada**: ela cobre o erro de colagem, que ainda não tem evidência nos dados
 — o erro que já aconteceu foi o do parse, e esse não passa mais.
+
+> ⚠️ **ARMADILHA #9 — o carregamento NÃO filtra por dia, e não pode voltar a
+> filtrar.** `carga.js` é o dono único de "isto está pra carregar?", e a resposta
+> é `estagio='embalado'`, sem olhar `data`. Volume com etiqueta impressa e não
+> carregado está **fisicamente na fábrica** até alguém pôr no carro; não existe
+> hora em que ele deixe de estar.
+>
+> As três consultas da tela — a lista, o contador e **o bipe** — filtravam por
+> `data=date('now','localtime')`, o dia da *importação*. O volume embalado ontem
+> e não carregado ontem sumia das três de uma vez, e não havia nenhuma outra tela
+> em que reaparecesse. Em 26/08/2026 eram os volumes **#643 a #648**, impressos
+> no dia anterior.
+>
+> O pior dos três é o bipe: ele respondia **`nao_encontrado`** com a caixa na
+> mão, na frente do carro. Ali ninguém tem como conferir nada — o que a equipe
+> aprende é que o sistema erra, e a próxima caixa sobe no carro sem bipe.
+>
+> Terceira porta da mesma doença dos fantasmas (#5) e da fila por prazo (#7).
+> As duas primeiras eram tela mostrando trabalho que **não existe**; esta era
+> tela escondendo trabalho que **existe** — e é pior, porque o ruído a equipe
+> aprende a ignorar, mas o volume escondido ninguém procura.
+>
+> **`carregados` conta por `carregado_em`**, nunca por `data`: senão o operador
+> bipa um atrasado, ele sai da lista e o contador não anda — a tela dizendo que
+> ele não fez nada. Mesma correção que o "impressas hoje" do `exp_route.js`.
+>
+> **O atrasado sai marcado e em cima**, nunca diluído no dia. Passivo antigo
+> misturado no trabalho de hoje vira uma lista que nunca zera, e lista que nunca
+> zera ninguém lê até o fim — que é o mesmo fim de esconder.
+>
+> **Rode `node teste_carga.js` após qualquer mudança no `carreg_route.js`** —
+> os 13 casos incluem o dos seis volumes de 26/08, e cobrem que a busca larga
+> não virou "acha qualquer coisa" (código inexistente ainda dá `nao_encontrado`)
+> e que `bloqueado` continua recusado.
 3. `cruz_route.js` compara os volumes **pendentes** × estoque e gera só urgência:
 
 | Situação | Vira | Cor na revisão |
@@ -801,7 +835,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados | Médio a longo prazo |
+| 10 | Sem testes automatizados — hoje há `teste_parse.js` (9 casos) e `teste_carga.js` (13); o resto não tem | Médio a longo prazo |
 | 11 | **`Quantidade` da folha não chega no cruzamento** — item de 3 peças gera 1 urgente, e a fábrica produz 1 onde o cliente comprou 3 (§5, armadilha #5). `folha.js` já lê o campo e o `rastrear.js --lote` já mostra os itens afetados; falta `cruz_route.js` contar peças em vez de volumes | **Alto** — o cliente espera 3 e sai 1 |
 
 ---
