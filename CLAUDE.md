@@ -373,6 +373,38 @@ número — o volume processado sai de `pendente` e o estoque baixa junto.
 > duplicata com irmão `pendente` ou `bloqueado` sai numa lista à parte, para
 > alguém olhar. O que fica é sempre o mais antigo, que é quem carrega a história.
 
+### Os três scripts que fecham passivo — e as duas regras que valem para todos
+
+| Script | Fecha | Critério |
+|---|---|---|
+| `limpar_fantasmas.js` | duplicata `pendente` | irmão mais antigo já andou |
+| `fechar_vencidos.js` | `pendente` vencido | em bloco, por período conferido |
+| `regularizar_saida.js` | qualquer não-carregado | por id, um a um, decisão humana |
+
+> ⚠️ **A saída é carimbada na data DO VOLUME** — `COALESCE(despachar_em, data)`
+> às 15:00 (§8) —, nunca em `datetime('now')`. Fechar um passivo antigo com a
+> data de hoje cria um pico falso de dezenas de carregamentos num dia em que
+> não saiu nada, e deixa vazios os dias em que as peças realmente saíram.
+> O `fechar_vencidos.js` já nascia certo; o `regularizar_saida.js` foi
+> corrigido em 26/08/2026, quando passou a ser usado com 27 ids de uma vez.
+
+> ⚠️ **VENDA FUTURA NÃO FOI DESPACHADA.** Volume com `despachar_em > hoje` não
+> se fecha, mesmo com a etiqueta já impressa: ela foi impressa adiantada e a
+> peça está na fábrica esperando o prazo. Fechar carimba uma saída que não
+> aconteceu, e — o dano real — o volume **não aparece na tela de carregamento
+> no dia em que tiver que sair de verdade**. A peça fica na prateleira e
+> ninguém é cobrado.
+>
+> A guarda existia só no `fechar_vencidos.js`. Ao copiar a fórmula da data para
+> o `regularizar_saida.js` ela ficou para trás, e em 26/08/2026 quatro volumes
+> foram fechados com data de setembro (o caso da Lucélia, que despacha 17/09).
+> Hoje os dois recusam, dizendo em qual data o volume despacha.
+>
+> Reparo de uma vez só: `node reabrir_futuros.js` (simula) e `--aplicar`. O
+> critério é estreito de propósito — só `carregado_em` **maior que hoje**, que
+> não tem interpretação alternativa: ninguém saiu amanhã. Se ele voltar a achar
+> linha algum dia, alguém furou a guarda.
+
 > ⚠️ **Lançamento manual e PDF não se conversam.** O manual (`origem='manual'`)
 > não é apagado pelo recálculo. Usar os dois no mesmo SKU **duplica a ordem**.
 > Regra prática: PDF cobre as vendas, manual cobre produção sem venda.

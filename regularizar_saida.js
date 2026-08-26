@@ -42,13 +42,23 @@ if(!ids.length){
 
 (async()=>{
 const db=new Database(DB);
-const achar=db.prepare('SELECT id,data,codigo,buyer,nf,packId,venda,estagio FROM lote WHERE id=?');
+const HOJE=db.prepare("SELECT date('now','localtime') d").get().d;
+const achar=db.prepare('SELECT id,data,codigo,buyer,nf,packId,venda,estagio,despachar_em FROM lote WHERE id=?');
 const plano=[], recusados=[];
 
 for(const id of ids){
   const v=achar.get(id);
   if(!v){ recusados.push({id,por:'nao existe'}); continue; }
   if(v.estagio==='carregado'){ recusados.push({id,por:'ja esta carregado'}); continue; }
+  /* VENDA FUTURA NAO FOI DESPACHADA — a mesma guarda do fechar_vencidos.js.
+     Volume com etiqueta ja impressa e despacho marcado pra frente esta na
+     fabrica esperando o prazo, nao saiu: ele so foi adiantado na impressao.
+     Fechar um desses carimba uma saida que ainda nao aconteceu — em 26/08/2026
+     quatro volumes foram fechados com data de setembro antes desta guarda
+     existir. E o volume some da tela de carregamento no dia em que ele
+     realmente tiver que sair, que e o dano de verdade. */
+  if(v.despachar_em && v.despachar_em>HOJE){
+    recusados.push({id,por:'so despacha em '+v.despachar_em+' — nao saiu ainda'}); continue; }
   /* Copias do mesmo volume que os PDFs seguintes criaram. So as `pendente`
      saem: uma copia que andou e historia de verdade, nao ruido. */
   const copias=db.prepare(`SELECT id,data,estagio FROM lote
