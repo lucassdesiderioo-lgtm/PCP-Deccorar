@@ -175,7 +175,7 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > Para conferir o que já está gravado: `node rastrear.js --auditar [dias]`.
 > `node rastrear.js --folha` mostra o PDF cru quando o layout mudar.
 
-### ⚠️ ARMADILHA #5 — **peça não é volume**, e é daí que sai "subi 41 e aparecem 35"
+### ⚠️ ARMADILHA #8 — **peça não é volume**, e é daí que sai "subi 41 e aparecem 35"
 
 O sistema grava **uma linha em `lote` por etiqueta**, nunca por peça. O item da
 folha que diz `Quantidade: 3` tem **uma** etiqueta do Mercado Livre, logo **um**
@@ -193,24 +193,37 @@ A produção, essa sim, precisa das três peças. Hoje o `Quantidade` **não** e
 no cruzamento — a urgência conta volumes pendentes, então um item de 3 gera
 1 urgente e não 3. **Dívida 11 do §14.**
 
-**Do PDF até o número da tela vermelha há cinco degraus**, e em quatro deles o
-volume sai da conta por regra:
+**Do PDF até o número que o operador vê há SETE degraus**, e em seis deles o
+volume sai da conta por regra. Nenhum é bug — mas nenhum é visível, e é por
+isso que a pergunta "cadê as 6" vira desconfiança do sistema:
 
-| Degrau | Some quem |
-|---|---|
-| peças → etiquetas | as peças extras dos itens com `Quantidade > 1` |
-| etiquetas → gravados | pack/venda que já estava no dia (upload conta em `repetidas`) |
-| gravados → pendentes | os `bloqueado` (SKU sem cadastro **ou** divergência) |
-| pendentes → urgentes | **quem já tem estoque** — sai direto pra Etiqueta de Venda, sem ordem |
-| urgentes → tela | falta clicar em **"Lançar urgentes na produção"** |
+| Degrau | Some quem | Regra |
+|---|---|---|
+| peças → etiquetas | as peças extras dos itens com `Quantidade > 1` | esta armadilha |
+| etiquetas → gravados | pack/venda **que já existe no histórico** | #5 |
+| gravados → pendentes | os `bloqueado` (SKU sem cadastro **ou** divergência) | §6 e §5 |
+| pendentes → fila de hoje | quem **só despacha depois** — vai pro painel "Pra despachar depois" | #7 |
+| fila de hoje → urgentes | **quem já tem estoque** — sai direto pra Etiqueta de Venda, sem ordem | §5 |
+| urgentes → tela vermelha | falta clicar em **"Lançar urgentes na produção"** | §5 |
+
+> **Os dois degraus do meio são os que mais comem volume, e os dois são recentes.**
+> A dedup passou a olhar o histórico inteiro (#5) e a fila passou a ser por prazo
+> de despacho (#7) — as duas em 25/08/2026, as duas corretas, as duas mudando o
+> número da tela sem mudar nada no PDF. Quem comparou a folha com a tela antes e
+> depois viu a conta "quebrar" de um dia pro outro.
 
 ```bash
 node rastrear.js --lote            # a escada inteira, do PDF de hoje até a tela
 node rastrear.js --lote 2026-08-26 # de outro dia
 ```
 
-Ele desce os cinco degraus em voz alta e mostra em qual deles a conta mudou,
-além de listar os itens com mais de uma peça. Só lê — pode rodar em produção.
+Ele desce os sete degraus em voz alta e mostra em qual deles a conta mudou,
+lista os itens com mais de uma peça e as etiquetas recusadas pela dedup com o
+volume que já existia. Só lê — pode rodar em produção.
+
+> ⚠️ Ele usa o `fila_dia.js` para contar a fila de hoje, e não uma cópia da
+> regra. Uma ferramenta de diagnóstico com régua própria é pior que nenhuma:
+> ela confirmaria com autoridade um número que a tela não usa.
 
 ### Três conferências, e qualquer uma delas retém o volume
 

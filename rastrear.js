@@ -373,11 +373,18 @@ async function verLote(){
     const p=insp.blocos.reduce((a,b)=>a+(b.qtd||1),0);
     pecas+=p; itens+=insp.blocos.length; etqs+=insp.etiquetas.length;
     insp.blocos.filter(b=>(b.qtd||1)>1).forEach(b=>multi.push(b));
-    /* Etiqueta do PDF que nao virou volume: o pack/venda ja estava no dia
-       (subiu duas vezes) — o upload conta como "repetida" e nao insere. */
+    /* Etiqueta do PDF que nao virou volume no dia. Desde a armadilha #5 a
+       dedup olha o HISTORICO INTEIRO, entao o motivo quase sempre e que o
+       volume ja existe de antes — e ai o que interessa nao e o numero, e QUAL
+       volume ja existia e o que aconteceu com ele. Sem isso o operador ve
+       "6 recusadas" e nao tem como saber se foi acerto ou perda. */
     insp.etiquetas.forEach(e=>{
       const tem=(e.packId&&chaves.has('p:'+e.packId))||(e.venda&&chaves.has('v:'+e.venda));
-      if(!tem) orfas.push({arq:path.basename(arq),pagina:e.pagina,packId:e.packId,venda:e.venda});
+      if(tem) return;
+      const antigo=db.prepare(`SELECT id,data,estagio,buyer,codigo FROM lote
+        WHERE (packId=? AND packId IS NOT NULL) OR (venda=? AND venda IS NOT NULL)
+        ORDER BY id LIMIT 1`).get(e.packId,e.venda);
+      orfas.push({arq:path.basename(arq),pagina:e.pagina,packId:e.packId,venda:e.venda,antigo});
     });
     T('');
     T('  '+path.basename(arq)+'   ('+insp.paginas+' paginas)');
@@ -402,17 +409,49 @@ async function verLote(){
 
   const bSku=vols.filter(v=>v.estagio==='bloqueado'&&!/^divergencia/.test(String(v.bloqueio||''))).length;
   const bDiv=vols.filter(v=>v.estagio==='bloqueado'&&/^divergencia/.test(String(v.bloqueio||''))).length;
-  const pend=vols.filter(v=>v.estagio==='pendente'&&v.codigo);
+  const todosPend=vols.filter(v=>v.estagio==='pendente'&&v.codigo);
   const andando=vols.filter(v=>v.estagio!=='pendente'&&v.estagio!=='bloqueado').length;
   T('  - retidos: SKU sem cadastro : '+bSku+(bSku?'   (Admin > Bloqueados)':''));
   T('  - retidos: divergencia      : '+bDiv+(bDiv?'   (Admin > Bloqueados, em vermelho)':''));
   if(andando) T('  - ja embalados/carregados   : '+andando);
-  T('  = PENDENTES (contam pro dia): '+pend.length);
+  T('  = PENDENTES                 : '+todosPend.length);
 
-  /* ── 2. O ULTIMO DEGRAU: quem ja tinha estoque nao vira ordem ────────────
-     Aqui a queda e a MAIOR das cinco e a mais legitima: venda com peca pronta
-     na prateleira sai direto pra etiqueta, sem passar pela producao. A tela
-     vermelha mostra o que falta PRODUZIR, nunca o que falta EXPEDIR. */
+  /* ── 2. O PRAZO DE DESPACHO (§8, armadilha #7) ───────────────────────────
+     Nem todo volume de um lote sai no mesmo dia: a etiqueta traz "Despachar:
+     qua 26/ago" e no PDF de 25/08 as 14 etiquetas tinham CINCO datas. O que
+     vence depois nao esta na fila de hoje — esta no painel "Pra despachar
+     depois", e e um dos degraus que mais come volume.
+
+     A regra vem do fila_dia.js, o dono unico. Uma ferramenta de diagnostico
+     com regua propria e pior que nenhuma: confirmaria com autoridade um
+     numero que a tela nao usa. */
+  /* O corte e sempre HOJE, mesmo analisando um dia passado: e assim que a tela
+     decide, e a pergunta aqui e sempre "por que a tela mostra este numero". */
+  const {VENCE_HOJE}=require('./fila_dia');
+  const venceDepois=todosPend.filter(v=>v.despachar_em && v.despachar_em>hoje);
+  const jaVenceu=todosPend.filter(v=>v.despachar_em && v.despachar_em<hoje);
+  const semData=todosPend.filter(v=>!v.despachar_em);
+  const pend=todosPend.filter(v=>!v.despachar_em || v.despachar_em<=hoje);
+  if(venceDepois.length||jaVenceu.length||semData.length!==todosPend.length){
+    T('  - so despacham depois de hoje: '+venceDepois.length+
+      (venceDepois.length?'   (painel "Pra despachar depois")':''));
+    T('  = FILA DE HOJE deste lote   : '+pend.length+
+      (jaVenceu.length?'   (dos quais '+jaVenceu.length+' ja venceram — saem em vermelho)':'')+
+      (semData.length?'   ('+semData.length+' sem data lida na etiqueta)':''));
+  }
+  /* A tela nao mostra so este lote: ela mostra TODO pendente que vence hoje,
+     inclusive o que entrou dias atras. Comparar o numero do PDF com o da tela
+     sem isso da diferenca nos dois sentidos. */
+  const filaTela=db.prepare('SELECT COUNT(*) c FROM lote WHERE '+VENCE_HOJE+" AND estagio='pendente' AND codigo IS NOT NULL").get().c;
+  T('');
+  T('"Faltam imprimir" na tela     : '+filaTela+
+    (filaTela!==pend.length?'   ← inclui pendente de outros dias que vence hoje':''));
+
+  /* ── 3. O ULTIMO DEGRAU: quem ja tinha estoque nao vira ordem ────────────
+     A queda mais legitima de todas: venda com peca pronta na prateleira sai
+     direto pra etiqueta, sem passar pela producao. A tela vermelha mostra o
+     que falta PRODUZIR, nunca o que falta EXPEDIR. */
+  T('');
   const emap={}; db.prepare('SELECT codigo,estoque FROM skus').all().forEach(s=>{ emap[s.codigo]=s.estoque; });
   const porSku={}; pend.forEach(v=>{ porSku[v.codigo]=(porSku[v.codigo]||0)+1; });
   let urg=0, cobertos=0; const linhas=[];
@@ -454,12 +493,19 @@ async function verLote(){
   if(orfas.length){
     T('');
     linha();
-    T('ETIQUETAS DO PDF QUE NAO VIRARAM VOLUME');
+    T('ETIQUETAS DO PDF QUE NAO VIRARAM VOLUME NESTE DIA');
     linha();
     T('');
-    T('O pack/venda ja estava no dia — o upload conta como "repetida" e nao');
-    T('insere de novo. Normal quando o mesmo PDF sobe duas vezes.');
-    orfas.slice(0,20).forEach(o=>T('  '+o.arq+' pag '+o.pagina+'   pack '+(o.packId||'—')+'   venda '+(o.venda||'—')));
+    T('A dedup olha o historico inteiro (armadilha #5): pack/venda que ja existe');
+    T('nao entra de novo. Com o volume antigo ao lado da pra ver se foi acerto');
+    T('(ja despachado) ou se ficou parado em algum lugar:');
+    orfas.slice(0,20).forEach(o=>{
+      T('  pag '+o.pagina+'   pack '+(o.packId||'—')+'   venda '+(o.venda||'—'));
+      T('     ja existia: '+(o.antigo
+        ? '#'+o.antigo.id+'  '+(o.antigo.codigo||'(sem SKU)')+'  '+(o.antigo.buyer||'—')+
+          '  '+o.antigo.data+'  ('+o.antigo.estagio+')'
+        : 'NAO ACHEI no banco — esta etiqueta nao entrou e nao existe. Investigue.'));
+    });
     if(orfas.length>20) T('  … e mais '+(orfas.length-20));
   }
   T('');
