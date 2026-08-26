@@ -1,4 +1,4 @@
-const {PRA_CARREGAR,ORDEM_CARGA,atrasado}=require('./carga');
+const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro}=require('./carga');
 module.exports=function(app,db){
   /* ── CONFERENCIA DUPLA (etiqueta de venda + SKU da caixa) ──────────────────
      A ultima rede antes do carro. Bipe 1 = a etiqueta de venda JA COLADA;
@@ -88,9 +88,15 @@ module.exports=function(app,db){
      atrasado. */
   function progresso(){
     const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
-    const faltam=db.prepare(`SELECT id,codigo,cor,buyer,nf,data,despachar_em FROM lote
+    const todos=db.prepare(`SELECT id,codigo,cor,buyer,nf,data,despachar_em FROM lote
       WHERE ${PRA_CARREGAR} ORDER BY ${ORDEM_CARGA}`).all()
       .map(v=>Object.assign({},v,{atrasado: atrasado(v,hoje)?1:0}));
+    /* A VENDA FUTURA SAI DA CARGA DE HOJE, mas nao volta a sumir (#9): vai
+       numa linha a parte. Cobra-la junto mandaria por no carro hoje um volume
+       que so despacha semanas depois — a etiqueta foi impressa adiantada, a
+       peca ainda nao e pra sair. */
+    const faltam=todos.filter(v=>!futuro(v,hoje));
+    const depois=todos.filter(v=>futuro(v,hoje));
     /* CARREGADOS HOJE conta por `carregado_em`, nao por `data` — mesma razao do
        "impressas hoje" no exp_route.js. Contando pelo dia de importacao, o
        operador bipava um volume atrasado, ele saia da lista e o contador NAO
@@ -98,7 +104,8 @@ module.exports=function(app,db){
     const car=db.prepare(`SELECT COUNT(*) n FROM lote WHERE carregado_em IS NOT NULL
       AND date(carregado_em)=date('now','localtime')`).get().n;
     return {total:car+faltam.length, carregados:car, faltam,
-            atrasados:faltam.filter(f=>f.atrasado).length};
+            atrasados:faltam.filter(f=>f.atrasado).length,
+            depois, adiantadas:depois.length};
   }
   // conferencia: o que falta carregar — todo `embalado`, com o atrasado marcado
   app.get('/api/carregamento',(req,res)=> res.json(progresso()));

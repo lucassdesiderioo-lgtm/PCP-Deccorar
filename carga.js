@@ -26,20 +26,42 @@
  * nunca zera, e lista que nunca zera e lista que ninguem le ate o fim.
  */
 
-/* Condicao SQL sobre a tabela `lote`. Sem parametros: nao depende de data
-   nenhuma, que e justamente o ponto. */
+/* Condicao SQL sobre a tabela `lote`. Sem parametros: o ESTAGIO nao depende de
+   data nenhuma, que e justamente o ponto. */
 const PRA_CARREGAR = "estagio='embalado'";
+
+/* QUEM DECIDE O PRAZO E O fila_dia.js, NAO ESTE ARQUIVO.
+   "Isto vence hoje?" ja tem dono (§8, armadilha #7) e a resposta tem que ser a
+   mesma na Etiqueta de Venda e aqui: se as duas telas discordassem sobre o que
+   e trabalho de hoje, o volume sairia de uma e entraria na outra no mesmo dia.
+   O que e desta casa e so o estagio. */
+const {VENCE_HOJE} = require('./fila_dia');
+const DO_DIA = PRA_CARREGAR + ' AND ' + VENCE_HOJE;
 
 /* O mais velho primeiro. O atraso vai na frente porque e ele que corre risco
    de perder o prazo — e porque um volume que ja dormiu embalado uma vez e o
    candidato a dormir de novo. */
-const ORDEM_CARGA = "data ASC, id ASC";
+const ORDEM_CARGA = "COALESCE(despachar_em,data) ASC, id ASC";
 
-/* Volume embalado num dia anterior ao de hoje. `hoje` entra como parametro em
-   vez de ser lido aqui para a rota resolver a data pelo SQLite, no fuso local,
-   sem depender do relogio do processo Node. */
+/* ATRASO SE MEDE PELO PRAZO, NAO PELA DATA DE ENTRADA.
+   Volume impresso ontem com despacho marcado pra semana que vem nao esta
+   atrasado: esta adiantado. Marca-lo de atrasado manda a equipe por no carro
+   hoje uma venda que so despacha depois — e ai a peca vai embora semanas antes
+   do combinado. Foi o que aconteceu com quatro volumes em 26/08/2026 (o da
+   Lucelia despacha 17/09).
+   Sem prazo lido na etiqueta, a data de entrada e a melhor aproximacao: volume
+   embalado num dia anterior e passivo ate prova em contrario. */
 function atrasado(volume, hoje){
-  return !!(volume && volume.data && hoje && volume.data < hoje);
+  if(!volume || !hoje) return false;
+  const prazo = volume.despachar_em || volume.data;
+  return !!(prazo && prazo < hoje);
 }
 
-module.exports = { PRA_CARREGAR, ORDEM_CARGA, atrasado };
+/* Venda futura: existe, esta na fabrica, mas nao e da carga de hoje. Sai numa
+   linha a parte na tela — nem escondida (que foi o buraco de #9) nem cobrada
+   junto com o dia. */
+function futuro(volume, hoje){
+  return !!(volume && hoje && volume.despachar_em && volume.despachar_em > hoje);
+}
+
+module.exports = { PRA_CARREGAR, DO_DIA, ORDEM_CARGA, atrasado, futuro };

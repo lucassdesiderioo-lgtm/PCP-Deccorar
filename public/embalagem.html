@@ -250,11 +250,17 @@ const scan=$('#scan');
 // O bipe volta pro campo sozinho — menos o caso em que o operador está
 // digitando em OUTRO campo (a busca dos impressos). Sem essa exceção o foco
 // pula de volta pro #scan a cada letra e a busca fica impossível de usar.
+/* preventScroll: DEVOLVER O FOCO NÃO PODE ARRASTAR A TELA.
+   O #scan mora no alto. Sem isto, focar de volta rolava a página até ele —
+   e quem tivesse descido para abrir o "Subir PDF" (que fica no fim) era jogado
+   pro topo 50 ms depois de clicar, sem conseguir chegar no campo. O objetivo do
+   keep é que o BIPE caia no lugar certo, nunca mexer no que a pessoa está
+   olhando. */
 const keep=()=>{
   const a=document.activeElement;
   if(a===scan) return;
   if(a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return;
-  scan.focus();
+  scan.focus({preventScroll:true});
 };
 scan.addEventListener('blur',()=>setTimeout(keep,50));
 document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input,select,textarea,label')) keep(); });

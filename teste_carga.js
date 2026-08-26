@@ -39,6 +39,15 @@ ins.run('BK160140BEGE', 'Ana Costa', '5601','333','903','["333","903"]','embalad
 ins.run('BK150150CINZA','Joao Silva','5602','444','904','["444","904"]','carregado',hoje);
 db.prepare("UPDATE lote SET carregado_em=datetime('now','localtime') WHERE buyer='Joao Silva'").run();
 ins.run('SEMCADASTRO',  'Pedro Lima','5603','555','905','["555","905"]','bloqueado',hoje);
+/* VENDA FUTURA: etiqueta impressa adiantada, despacho marcado pra frente.
+   Existe e esta na fabrica, mas nao e carga de hoje — e nao pode ser marcada
+   de atrasada so porque entrou num dia anterior (o caso da Lucelia, 26/08). */
+const setembro=db.prepare("SELECT date('now','localtime','+22 day') d").get().d;
+ins.run('BK150150BRANCO','Lucelia','5606','777','907','["777","907"]','embalado',ontem);
+db.prepare("UPDATE lote SET despachar_em=? WHERE buyer='Lucelia'").run(setembro);
+/* E um atrasado DE VERDADE: o prazo ja venceu. */
+ins.run('BK120120CINZA','Maria Rita','5604','888','908','["888","908"]','embalado',ontem);
+db.prepare("UPDATE lote SET despachar_em=date('now','localtime','-3 day') WHERE buyer='Maria Rita'").run();
 
 const rotas={};
 const app={ get:(p,h)=>{rotas['GET '+p]=h;}, post:(p,h)=>{rotas['POST '+p]=h;}, locals:{} };
@@ -55,11 +64,21 @@ const ok=(n,c,extra)=>{ casos++;
 
 (async()=>{
   let d=await chamar('GET /api/carregamento');
-  ok('a lista mostra o atrasado junto com o de hoje', d.faltam.length===4,
+  ok('a lista mostra o atrasado junto com o de hoje', d.faltam.length===5,
      'veio '+JSON.stringify(d.faltam.map(f=>f.buyer)));
-  ok('marca quantos sao de dias anteriores', d.atrasados===3, 'veio '+d.atrasados);
-  ok('o atrasado vem em cima', d.faltam[0].atrasado===1 && d.faltam[3].atrasado===0);
-  ok('total = o que falta + o que ja foi carregado hoje', d.total===5, 'veio '+d.total);
+  ok('marca quantos sao de dias anteriores', d.atrasados===4, 'veio '+d.atrasados);
+  ok('o atrasado vem em cima', d.faltam[0].atrasado===1 && d.faltam[4].atrasado===0);
+  ok('total = o que falta + o que ja foi carregado hoje', d.total===6, 'veio '+d.total);
+
+  /* A VENDA FUTURA: nem cobrada junto com o dia, nem escondida (#9). */
+  ok('venda futura sai da lista de hoje', !d.faltam.some(f=>f.buyer==='Lucelia'),
+     'veio '+JSON.stringify(d.faltam.map(f=>f.buyer)));
+  ok('mas aparece a parte, com a data', d.adiantadas===1 && d.depois[0].buyer==='Lucelia',
+     'veio '+JSON.stringify(d.depois));
+  ok('e NAO e chamada de atrasada', !(d.depois[0]||{}).atrasado, 'veio '+JSON.stringify(d.depois[0]));
+  /* Atraso se mede pelo prazo: este venceu ha tres dias. */
+  ok('o prazo vencido conta como atrasado', (d.faltam.find(f=>f.buyer==='Maria Rita')||{}).atrasado===1,
+     'veio '+JSON.stringify(d.faltam.find(f=>f.buyer==='Maria Rita')));
   ok('carregados conta por carregado_em, nao por dia de importacao', d.carregados===1, 'veio '+d.carregados);
 
   /* O CASO QUE ORIGINOU TUDO: antes disto a resposta era "nao_encontrado". */
@@ -85,9 +104,13 @@ const ok=(n,c,extra)=>{ casos++;
   r=await chamar('POST /api/carregar',{code:'333'});
   ok('o volume do proprio dia carrega como sempre', r.ok===true && r.pedido.buyer==='Ana Costa', 'veio '+JSON.stringify(r.motivo));
 
+  /* Sobram os dois que ninguem bipou — os dois atrasados de verdade — e a
+     venda futura continua onde estava: fora da cobranca, mas visivel. */
   d=await chamar('GET /api/carregamento');
-  ok('a lista esvazia conforme carrega', d.faltam.length===1 && d.atrasados===1,
+  ok('a lista esvazia conforme carrega', d.faltam.length===2 && d.atrasados===2,
      'veio '+JSON.stringify(d.faltam.map(f=>f.buyer)));
+  ok('a venda futura nao entra na lista nem some', d.adiantadas===1 && !d.faltam.some(f=>f.buyer==='Lucelia'),
+     'veio faltam='+JSON.stringify(d.faltam.map(f=>f.buyer))+' depois='+JSON.stringify(d.depois.map(f=>f.buyer)));
 
   db.close();
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
