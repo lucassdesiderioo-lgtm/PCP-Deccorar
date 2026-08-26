@@ -198,12 +198,31 @@ module.exports=function(app,db){
      volume cedo demais.
      O filtro por `data` sai: um volume de ontem que vence hoje e trabalho de
      hoje, e era justamente ele que desaparecia. */
-  const FILA_HOJE=`estagio='pendente' AND codigo IS NOT NULL AND `+require('./fila_dia').VENCE_HOJE;
+  const {filaDoDia}=require('./fila_dia');
+  const FILA_HOJE=filaDoDia();
+  /* A LISTA E O ROTEIRO DE BUSCA, NAO UM PLACAR.
+     Quem esta na expedicao le esta lista e vai PROCURAR as caixas no estoque.
+     So o codigo ("BK160140BEGE") serve para quem decorou o catalogo — e a tela
+     e usada por gente diferente a cada dia. Por isso vao junto as colunas de
+     `skus` (§7): medida, cor, tecido e modelo, que e o que se le na prateleira.
+     O JOIN e por UPPER(codigo) porque o lote guarda o codigo como veio da
+     folha; skus.codigo e a chave. */
   app.get('/api/pendentes',(req,res)=>{
-    res.json(db.prepare(`SELECT codigo, COUNT(*) qtd,
-        MIN(despachar_em) vence_em,
-        SUM(CASE WHEN despachar_em IS NOT NULL AND despachar_em<date('now','localtime') THEN 1 ELSE 0 END) atrasados
-      FROM lote WHERE ${FILA_HOJE} GROUP BY codigo ORDER BY atrasados DESC, qtd DESC`).all());
+    res.json(db.prepare(`SELECT l.codigo, COUNT(*) qtd,
+        MIN(l.despachar_em) vence_em,
+        SUM(CASE WHEN l.despachar_em IS NOT NULL AND l.despachar_em<date('now','localtime') THEN 1 ELSE 0 END) atrasados,
+        s.largura_cm, s.altura_cm,
+        COALESCE(c.nome,s.cor_codigo,s.cor) cor_nome,
+        COALESCE(t.nome,s.tecido_codigo) tecido_nome,
+        m.nome modelo_nome, COALESCE(m.exige_medida,1) exige_medida,
+        s.estoque
+      FROM lote l
+      LEFT JOIN skus s ON s.codigo=l.codigo
+      LEFT JOIN cor c ON c.codigo=s.cor_codigo
+      LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
+      LEFT JOIN modelo m ON m.id=s.modelo_id
+      WHERE ${filaDoDia('l')}
+      GROUP BY l.codigo ORDER BY atrasados DESC, qtd DESC`).all());
   });
   /* OS NUMEROS DA TELA, NUM LUGAR SO.
      A tela mostrava "15 PENDENTES" no topo e "Nada pendente" na lista logo

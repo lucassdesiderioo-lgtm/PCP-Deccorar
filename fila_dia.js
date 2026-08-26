@@ -25,6 +25,16 @@
    do processo Node. */
 const VENCE_HOJE = "(despachar_em IS NULL OR despachar_em<=date('now','localtime'))";
 
+/* A MESMA REGRA QUANDO A CONSULTA TEM JOIN e a coluna precisa de apelido.
+   Existe para ninguem ser tentado a reescrever a condicao a mao — ou pior, a
+   remendar a string com replace, que quebraria calado no dia em que a regra
+   mudasse. Chame filaDoDia('l') e recebe a clausula inteira ja qualificada. */
+function filaDoDia(alias){
+  const p = alias ? alias+'.' : '';
+  return `${p}estagio='pendente' AND ${p}codigo IS NOT NULL AND `
+       + `(${p}despachar_em IS NULL OR ${p}despachar_em<=date('now','localtime'))`;
+}
+
 /* O volume mais urgente primeiro: o que ja venceu na frente, depois por data,
    e o id so desempata. Sem isso o bipe pegaria "o de menor id", que pode ser um
    volume de prazo folgado enquanto um atrasado espera. NULLS first e o que o
@@ -32,4 +42,4 @@ const VENCE_HOJE = "(despachar_em IS NULL OR despachar_em<=date('now','localtime
    como urgente. */
 const ORDEM_URGENCIA = "despachar_em ASC, id ASC";
 
-module.exports = { VENCE_HOJE, ORDEM_URGENCIA };
+module.exports = { VENCE_HOJE, ORDEM_URGENCIA, filaDoDia };
