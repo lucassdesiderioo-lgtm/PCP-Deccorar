@@ -18,7 +18,7 @@
  * fechar essa sozinho apagaria da fila justamente a peca que falta.
  *
  * O QUE ELE FAZ
- *   1. marca o volume como `carregado`, com a data de hoje
+ *   1. marca o volume como `carregado`, na data de despacho DELE (nao hoje)
  *   2. apaga as duplicatas `pendente` do MESMO volume (mesmo packId ou venda),
  *      que sao as copias que os PDFs seguintes criaram
  *
@@ -82,7 +82,15 @@ const arq=path.join(dest,'antes-regularizar-'+new Date().toISOString().replace(/
 await db.backup(arq);
 console.log(''); console.log('backup ->',arq);
 
-const fechar=db.prepare("UPDATE lote SET estagio='carregado', carregado_em=datetime('now','localtime') WHERE id=?");
+/* A DATA DA SAIDA E A DO VOLUME, NAO HOJE — mesma regra do fechar_vencidos.js.
+   Enquanto era datetime('now'), fechar um passivo antigo carimbava tudo com a
+   data de hoje: um pico falso de dezenas de carregamentos num dia em que nao
+   saiu nada, e os dias em que as pecas realmente sairam continuavam vazios.
+   Passava despercebido enquanto o uso era de dois ou tres ids por vez, que foi
+   pra que ele nasceu; com 27 volumes de treze dias o relatorio vira ficcao.
+   A HORA (15:00) e o limite do despacho (§8) — convencao, nao medicao. */
+const fechar=db.prepare(`UPDATE lote SET estagio='carregado',
+  carregado_em=COALESCE(despachar_em,data)||' 15:00:00' WHERE id=?`);
 const del=db.prepare('DELETE FROM lote WHERE id=?');
 db.transaction(()=>{
   for(const {v,copias} of plano){ fechar.run(v.id); copias.forEach(c=>del.run(c.id)); }
