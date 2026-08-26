@@ -26,7 +26,7 @@ const {PDFDocument,StandardFonts}=require('pdf-lib');
 const fs=require('fs'), os=require('os'), path=require('path');
 const {parsePdf}=require('./parse');
 
-let falhas=0, casos=0;
+let falhas=0, casos=0, ULTIMO_PDF=null;
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'pcp-parse-'));
 
 /* Um item da folha, do jeito do ML. `pack` e `venda` sao opcionais: item sem
@@ -34,7 +34,8 @@ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'pcp-parse-'));
 function item(o){
   const l1=(o.id||'IDENT'+Math.abs(o.sku.length*7))+' Persiana Cortina Rolo Blackout '+o.medida+' Blecaute '+o.cor;
   const l2=(o.pack?('Pack ID: '+o.pack+' '):'')+(!o.pack&&o.venda?('Venda: '+o.venda+' '):'')+'SKU: '+o.sku;
-  const l3=(o.pack&&o.venda)?('Venda: '+o.venda+' Quantidade: 1'):(o.comprador+' Quantidade: 1');
+  const q=o.qtd||1;
+  const l3=(o.pack&&o.venda)?('Venda: '+o.venda+' Quantidade: '+q):(o.comprador+' Quantidade: '+q);
   const l4=(o.pack&&o.venda)?(o.comprador+' Cor: '+o.cor):('Cor: '+o.cor);
   return [l1,l2,l3,l4,'Desenho do tecido: '+(o.tecido||'Liso')];
 }
@@ -53,6 +54,7 @@ async function montar(itens, etiquetas){
       .concat(itens.map(item).reduce((a,b)=>a.concat(b),[])));
   const arq=path.join(tmp,'t'+casos+'.pdf');
   fs.writeFileSync(arq, await d.save());
+  ULTIMO_PDF=arq;                                    // pro caso 9, que rele a folha
   return parsePdf(new Uint8Array(fs.readFileSync(arq)));
 }
 function conferir(nome, orders, esperado){
@@ -185,6 +187,39 @@ function conferir(nome, orders, esperado){
       [{pack:'111',nf:'1',comprador:'Joao Silva'}]);
     if(/branco/i.test((cs[0]||{}).cor||'')) console.log('ok      a cor da folha continua chegando no volume');
     else { falhas++; console.log('FALHOU  a cor da folha continua chegando no volume — veio '+JSON.stringify((cs[0]||{}).cor)); }
+  }
+
+  /* ── 9. UM ITEM, TRES PECAS, UM VOLUME ────────────────────────────────────
+        O item que diz "Quantidade: 3" tem UMA etiqueta e por isso vira UM
+        volume — e quem contou as persianas na folha achou tres. Nao e erro de
+        leitura: e a diferenca entre contar peca e contar volume, e foi ela que
+        fez o PDF de 41 aparecer como 35 na tela.
+
+        O teste trava as duas metades: a folha tem que ENTREGAR o 3 (senao o
+        `--lote` nao consegue explicar a diferenca a ninguem) e o parse tem que
+        continuar gravando UM volume (senao nasceria uma etiqueta de venda que
+        o Mercado Livre nao emitiu). */
+  casos++;
+  {
+    const os_=await montar([
+      {pack:'111',venda:'901',sku:'BK140140BEGE',medida:'1,40x1,40',cor:'Bege',comprador:'Abraao Amorim',qtd:3},
+      {pack:'222',venda:'902',sku:'BK160160CINZA',medida:'1,60x1,60',cor:'Cinza',comprador:'Maria Souza'},
+    ],[
+      {pack:'111',nf:'1',comprador:'Abraao Amorim'},
+      {pack:'222',nf:'2',comprador:'Maria Souza'},
+    ]);
+    const {lerFolha}=require('./folha');
+    const insp=await lerFolha(ULTIMO_PDF);
+    const b=insp.blocos.find(x=>x.sku==='BK140140BEGE')||{};
+    const pecas=insp.blocos.reduce((a,x)=>a+(x.qtd||1),0);
+    const erros=[];
+    if(b.qtd!==3) erros.push('a folha nao entregou a Quantidade: veio '+JSON.stringify(b.qtd));
+    if(pecas!==4) erros.push('pecas da folha: esperava 4, veio '+pecas);
+    if(os_.length!==2) erros.push('volumes: esperava 2 (uma etiqueta por item), veio '+os_.length);
+    if(os_.some(o=>o.conflito)) erros.push('marcou conflito a toa: '+os_.map(o=>o.conflito).filter(Boolean).join(' / '));
+    if(erros.length){ falhas++; console.log('FALHOU  item com Quantidade 3 e 3 pecas em 1 volume');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      item com Quantidade 3 e 3 pecas em 1 volume');
   }
 
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}

@@ -169,11 +169,48 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > grava por ela e a auditoria relê por ela. Duas cópias significaria conferir com
 > uma régua diferente da que gravou.
 >
-> **Rode `node teste_parse.js` após qualquer mudança no `parse.js`** — os sete
+> **Rode `node teste_parse.js` após qualquer mudança no `parse.js`** — os nove
 > casos montam a folha no formato REAL do ML, e o caso do Abraão está lá.
 >
 > Para conferir o que já está gravado: `node rastrear.js --auditar [dias]`.
 > `node rastrear.js --folha` mostra o PDF cru quando o layout mudar.
+
+### ⚠️ ARMADILHA #5 — **peça não é volume**, e é daí que sai "subi 41 e aparecem 35"
+
+O sistema grava **uma linha em `lote` por etiqueta**, nunca por peça. O item da
+folha que diz `Quantidade: 3` tem **uma** etiqueta do Mercado Livre, logo **um**
+volume — e quem contou as persianas na folha achou três. Nada se perdeu: são
+duas unidades de medida diferentes para o mesmo papel.
+
+> Não "conserte" isso multiplicando o item pela quantidade no `parse.js`.
+> Cada linha de `lote` vira uma **etiqueta de venda impressa**; três linhas para
+> um envio que o ML despachou como um só criariam duas etiquetas que não existem,
+> e o volume nunca fecharia no carregamento. O caso está travado por teste
+> (caso 9 do `teste_parse.js`): a folha tem que **entregar** o 3, e o parse tem
+> que continuar gravando **1**.
+
+A produção, essa sim, precisa das três peças. Hoje o `Quantidade` **não** entra
+no cruzamento — a urgência conta volumes pendentes, então um item de 3 gera
+1 urgente e não 3. **Dívida 11 do §14.**
+
+**Do PDF até o número da tela vermelha há cinco degraus**, e em quatro deles o
+volume sai da conta por regra:
+
+| Degrau | Some quem |
+|---|---|
+| peças → etiquetas | as peças extras dos itens com `Quantidade > 1` |
+| etiquetas → gravados | pack/venda que já estava no dia (upload conta em `repetidas`) |
+| gravados → pendentes | os `bloqueado` (SKU sem cadastro **ou** divergência) |
+| pendentes → urgentes | **quem já tem estoque** — sai direto pra Etiqueta de Venda, sem ordem |
+| urgentes → tela | falta clicar em **"Lançar urgentes na produção"** |
+
+```bash
+node rastrear.js --lote            # a escada inteira, do PDF de hoje até a tela
+node rastrear.js --lote 2026-08-26 # de outro dia
+```
+
+Ele desce os cinco degraus em voz alta e mostra em qual deles a conta mudou,
+além de listar os itens com mais de uma peça. Só lê — pode rodar em produção.
 
 ### Três conferências, e qualquer uma delas retém o volume
 
@@ -752,6 +789,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
 | 10 | Sem testes automatizados | Médio a longo prazo |
+| 11 | **`Quantidade` da folha não chega no cruzamento** — item de 3 peças gera 1 urgente, e a fábrica produz 1 onde o cliente comprou 3 (§5, armadilha #5). `folha.js` já lê o campo e o `rastrear.js --lote` já mostra os itens afetados; falta `cruz_route.js` contar peças em vez de volumes | **Alto** — o cliente espera 3 e sai 1 |
 
 ---
 
