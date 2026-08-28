@@ -1,0 +1,90 @@
+// Declaracoes das rotas de cadastro. Sem SQL, sem 'if' de negocio: cada
+// manipulador so traduz o pedido HTTP numa chamada do dominio.
+const tecido=require('../dominio/tecido');
+const endereco=require('../dominio/endereco');
+const motivo=require('../dominio/motivo');
+
+// A camada de dados entra aqui SO para o atualizar generico (ordem, ativo,
+// renomear) — nao ha regra nenhuma nesses tres campos. Criar, esse sim, passa
+// sempre pelo dominio.
+const dLinha=require('../dados/linha');
+const dAbertura=require('../dados/abertura');
+const dCor=require('../dados/cor');
+const dHaste=require('../dados/haste');
+const dAndar=require('../dados/andar');
+const dNivel=require('../dados/nivel');
+
+const LER='cadastro.ler', EDITAR='cadastro.editar';
+
+module.exports={rotas:[
+
+  // ── Tecido ─────────────────────────────────────────────────────────────
+  {metodo:'GET', caminho:'/api/linhas', permissao:LER,
+   manipulador:()=>tecido.listarLinhas()},
+  {metodo:'POST', caminho:'/api/linhas', permissao:EDITAR,
+   manipulador:({corpo})=>tecido.criarLinha(corpo),
+   detalhe:(req)=>'linha '+req.body.nome},
+  {metodo:'PUT', caminho:'/api/linhas/:id', permissao:EDITAR,
+   manipulador:({params,corpo})=>dLinha.atualizar(params.id,corpo)},
+
+  {metodo:'GET', caminho:'/api/aberturas', permissao:LER,
+   manipulador:({query})=>tecido.listarAberturas(query.linha_id)},
+  {metodo:'POST', caminho:'/api/aberturas', permissao:EDITAR,
+   manipulador:({corpo})=>tecido.criarAbertura(corpo),
+   detalhe:(req)=>'abertura '+req.body.nome},
+  {metodo:'PUT', caminho:'/api/aberturas/:id', permissao:EDITAR,
+   manipulador:({params,corpo})=>dAbertura.atualizar(params.id,corpo)},
+
+  {metodo:'GET', caminho:'/api/cores', permissao:LER,
+   manipulador:()=>tecido.listarCores()},
+  {metodo:'POST', caminho:'/api/cores', permissao:EDITAR,
+   manipulador:({corpo})=>tecido.criarCor(corpo),
+   detalhe:(req)=>'cor '+req.body.nome},
+  {metodo:'PUT', caminho:'/api/cores/:id', permissao:EDITAR,
+   manipulador:({params,corpo})=>dCor.atualizar(params.id,corpo)},
+
+  {metodo:'GET', caminho:'/api/tecidos', permissao:LER,
+   manipulador:()=>tecido.listarTecidos()},
+  {metodo:'POST', caminho:'/api/tecidos', permissao:EDITAR,
+   manipulador:({corpo})=>tecido.criarTecido(corpo),
+   detalhe:(req,d)=>'tecido '+(d&&d.codigo)},
+  {metodo:'PUT', caminho:'/api/tecidos/:id', permissao:EDITAR,
+   manipulador:({params,corpo})=>tecido.atualizarTecido(params.id,corpo)},
+
+  // ── Endereco ───────────────────────────────────────────────────────────
+  {metodo:'GET', caminho:'/api/armazens', permissao:LER,
+   manipulador:()=>endereco.listarArmazens()},
+  {metodo:'GET', caminho:'/api/enderecos/:armazem', permissao:LER,
+   manipulador:({params})=>endereco.arvore(params.armazem)},
+
+  {metodo:'POST', caminho:'/api/hastes', permissao:EDITAR,
+   manipulador:({corpo})=>endereco.criarHaste(corpo),
+   detalhe:(req)=>req.body.armazem_chave+' haste '+req.body.nome},
+  {metodo:'PUT', caminho:'/api/hastes/:id', permissao:EDITAR,
+   manipulador:({params,corpo})=>dHaste.atualizar(params.id,corpo)},
+
+  {metodo:'POST', caminho:'/api/andares', permissao:EDITAR,
+   manipulador:({corpo})=>endereco.criarAndar(corpo)},
+  {metodo:'PUT', caminho:'/api/andares/:id', permissao:EDITAR,
+   manipulador:({params,corpo})=>dAndar.atualizar(params.id,corpo)},
+
+  {metodo:'POST', caminho:'/api/niveis', permissao:EDITAR,
+   manipulador:({corpo})=>endereco.criarNivel(corpo)},
+  {metodo:'PUT', caminho:'/api/niveis/:id', permissao:EDITAR,
+   manipulador:({params,corpo})=>dNivel.atualizar(params.id,corpo)},
+
+  // ── Motivos de recusa e condicoes da sobra ─────────────────────────────
+  {metodo:'GET', caminho:'/api/motivos', permissao:LER,
+   manipulador:()=>motivo.listarMotivos()},
+  {metodo:'POST', caminho:'/api/motivos', permissao:EDITAR,
+   manipulador:({corpo})=>motivo.criarMotivo(corpo),
+   detalhe:(req)=>'motivo '+req.body.nome},
+  {metodo:'PUT', caminho:'/api/motivos/:id', permissao:EDITAR,
+   manipulador:({params,corpo})=>motivo.atualizarMotivo(params.id,corpo)},
+
+  {metodo:'GET', caminho:'/api/condicoes', permissao:LER,
+   manipulador:()=>motivo.listarCondicoes()},
+  {metodo:'PUT', caminho:'/api/condicoes/:chave', permissao:EDITAR,
+   manipulador:({params,corpo})=>motivo.atualizarCondicao(params.chave,corpo),
+   detalhe:(req)=>'condicao '+req.params.chave}
+]};

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tecido · Inicio</title>
+<link rel="stylesheet" href="/base.css">
+</head>
+<body>
+<header class="topo">
+  <h1>Estoque de tecido e sobras</h1>
+  <span class="espaco"></span>
+  <span class="quem" id="quem"></span>
+  <button class="bt pequeno" id="sair">Sair</button>
+</header>
+
+<div class="corpo">
+  <div class="cartao">
+    <h2>Por onde comecar</h2>
+    <p class="nota">Fase 1 entregue: cadastros e parametros. As telas de sobra,
+      rolo e plano de corte entram nas fases seguintes.</p>
+    <div class="fileira">
+      <a class="op bt" href="/cadastros" style="text-decoration:none;display:inline-flex;align-items:center">Cadastros</a>
+    </div>
+  </div>
+
+  <div class="cartao">
+    <h2>O que este modulo responde</h2>
+    <table>
+      <tr><td>1</td><td>Quanto eu tenho do tecido X?</td><td class="tag off">fase 5</td></tr>
+      <tr><td>2</td><td>Que sobras eu tenho do tecido X?</td><td class="tag off">fase 2</td></tr>
+      <tr><td>3</td><td>Estas medidas que vou cortar — como cortar?</td><td class="tag off">fases 3, 4 e 6</td></tr>
+    </table>
+  </div>
+</div>
+
+<script src="/ui.js"></script>
+<script>
+const {api,$}=window.ui;
+api('/api/auth/eu').then(u=>{ $('#quem').textContent=u.logado?(u.nome+' · '+u.papel):''; });
+$('#sair').onclick=async()=>{ await api('/api/auth/logout',{metodo:'POST'}); location.href='/login'; };
+</script>
+</body>
+</html>

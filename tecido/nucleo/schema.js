@@ -1,0 +1,303 @@
+// TODO o DDL do modulo mora aqui, numerado, com tabela de migracoes.
+//
+// Por que numerado, e nao "CREATE TABLE IF NOT EXISTS" espalhado pelos modulos:
+// no PCP do Mercado Livre as colunas foram nascendo a mao no banco de producao
+// e os ALTER nunca voltaram para o codigo — o CREATE deixou de descrever o
+// banco real, e instalacao limpa parou de bater com producao. Aqui uma migracao
+// so roda uma vez, fica registrada, e o banco novo termina identico ao antigo.
+//
+// REGRA: migracao aplicada NUNCA se edita. Corrige-se com uma nova, no fim.
+const MIGRACOES=[
+
+{n:1, nome:'estrutura inicial', sql:`
+
+/* ─── ACESSO ───────────────────────────────────────────────────────────── */
+CREATE TABLE usuario (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  salt TEXT NOT NULL,
+  pin_hash TEXT NOT NULL,
+  papel TEXT NOT NULL DEFAULT 'cortador',   -- diretor | cortador
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+
+CREATE TABLE auditoria (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  usuario_nome TEXT,
+  permissao TEXT,
+  metodo TEXT, caminho TEXT,
+  detalhe TEXT,
+  ok INTEGER,
+  criado_em TEXT DEFAULT (datetime('now','localtime')),
+  data TEXT DEFAULT (date('now','localtime'))
+);
+CREATE INDEX idx_auditoria_data ON auditoria(data);
+
+/* ─── PARAMETROS — a secao 6.5, cadastraveis, nunca constantes no codigo ── */
+CREATE TABLE parametro (
+  chave TEXT PRIMARY KEY,
+  valor TEXT NOT NULL,
+  tipo TEXT NOT NULL DEFAULT 'numero',      -- numero | texto
+  rotulo TEXT NOT NULL,
+  ajuda TEXT,
+  unidade TEXT,
+  ordem INTEGER DEFAULT 0,
+  alterado_em TEXT, alterado_por TEXT
+);
+
+/* ─── CADASTRO DE TECIDO ───────────────────────────────────────────────── */
+CREATE TABLE linha (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL UNIQUE COLLATE NOCASE,      -- 'Rolo', 'Romana'
+  ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1
+);
+
+CREATE TABLE abertura (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  linha_id INTEGER NOT NULL REFERENCES linha(id),
+  nome TEXT NOT NULL,                            -- '1%', '3%', 'Blackout'
+  ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+  UNIQUE(linha_id, nome)
+);
+
+CREATE TABLE cor (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL UNIQUE COLLATE NOCASE,      -- 'Bege', 'Branco'
+  ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1
+);
+
+/* O item de estoque e a combinacao que EXISTE comercialmente.
+   ATENCAO: a largura da bobina NAO e do tecido — e do rolo. O mesmo
+   Rolo 3% Bege existe em 2,00, 2,50 e 3,00, e e essa diferenca que o
+   plano de corte explora. Aqui fica so uma sugestao para a entrada. */
+CREATE TABLE tecido (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  codigo TEXT UNIQUE COLLATE NOCASE,             -- gerado: 'ROLO-3-BEGE'
+  linha_id INTEGER NOT NULL REFERENCES linha(id),
+  abertura_id INTEGER NOT NULL REFERENCES abertura(id),
+  cor_id INTEGER NOT NULL REFERENCES cor(id),
+  largura_sugerida REAL,                         -- so pre-preenche a entrada de rolo
+  permite_girar INTEGER DEFAULT 0,               -- 0 = tecido tem sentido
+  ativo INTEGER DEFAULT 1,
+  UNIQUE(linha_id, abertura_id, cor_id)
+);
+
+/* ─── ENDERECAMENTO — DOIS ARMAZENS, TUDO CADASTRAVEL ──────────────────── */
+CREATE TABLE armazem (chave TEXT PRIMARY KEY, nome TEXT NOT NULL, ordem INTEGER DEFAULT 0);
+
+CREATE TABLE haste (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  armazem_chave TEXT NOT NULL REFERENCES armazem(chave),
+  nome TEXT NOT NULL, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+  UNIQUE(armazem_chave, nome)
+);
+CREATE TABLE andar (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  haste_id INTEGER NOT NULL REFERENCES haste(id),
+  nome TEXT NOT NULL, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+  UNIQUE(haste_id, nome)
+);
+CREATE TABLE nivel (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  andar_id INTEGER NOT NULL REFERENCES andar(id),
+  nome TEXT NOT NULL, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+  UNIQUE(andar_id, nome)
+);
+
+/* ─── ROLO ─────────────────────────────────────────────────────────────── */
+CREATE TABLE rolo (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  codigo TEXT UNIQUE COLLATE NOCASE,             -- 'R-000087', sequencial
+  tecido_id INTEGER NOT NULL REFERENCES tecido(id),
+  largura REAL NOT NULL,                         -- largura DESTA bobina
+  metragem_inicial REAL NOT NULL,                -- da NF; nao conferida hoje
+  saldo REAL NOT NULL,                           -- metro linear
+  nivel_id INTEGER REFERENCES nivel(id),         -- armazem ROLO
+  status TEXT DEFAULT 'fechado',                 -- fechado|aberto|encerrado
+  nf TEXT, fornecedor TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime')), criado_por TEXT
+);
+CREATE INDEX idx_rolo_busca ON rolo(tecido_id, status, largura, saldo);
+
+CREATE TABLE movimento_rolo (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rolo_id INTEGER NOT NULL REFERENCES rolo(id),
+  delta REAL NOT NULL,          -- + entrada, - consumo, +- ajuste
+  saldo_apos REAL NOT NULL,
+  motivo TEXT NOT NULL,         -- entrada|consumo|ajuste|encerramento
+  referencia TEXT,              -- id do plano que gerou o consumo
+  observacao TEXT, usuario_nome TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime')),
+  data TEXT DEFAULT (date('now','localtime'))
+);
+CREATE INDEX idx_movimento_rolo ON movimento_rolo(rolo_id);
+
+/* ─── ETIQUETA DE SOBRA ────────────────────────────────────────────────── */
+/* O sistema IMPRIME a etiqueta em lote sequencial; o cortador cola, bipa, e
+   so entao a sobra nasce. Por isso "etiqueta colada e nao cadastrada" nao e
+   um palpite sobre lacunas na sequencia: e a lista exata das etiquetas
+   impressas que ainda nao foram bipadas. */
+CREATE TABLE etiqueta_lote (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  quantidade INTEGER NOT NULL,
+  de_seq INTEGER NOT NULL, ate_seq INTEGER NOT NULL,
+  criado_em TEXT DEFAULT (datetime('now','localtime')), criado_por TEXT
+);
+CREATE TABLE etiqueta (
+  codigo TEXT PRIMARY KEY COLLATE NOCASE,        -- 'S-000142'
+  seq INTEGER NOT NULL UNIQUE,
+  lote_id INTEGER REFERENCES etiqueta_lote(id),
+  sobra_id INTEGER REFERENCES sobra(id),         -- preenchido quando e bipada
+  usada_em TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX idx_etiqueta_pendente ON etiqueta(sobra_id);
+
+/* ─── SOBRA ────────────────────────────────────────────────────────────── */
+CREATE TABLE sobra (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  codigo TEXT UNIQUE COLLATE NOCASE,             -- 'S-000142'
+  tecido_id INTEGER NOT NULL REFERENCES tecido(id),
+  largura REAL NOT NULL, altura REAL NOT NULL,
+  area REAL GENERATED ALWAYS AS (largura * altura) STORED,
+  condicao TEXT NOT NULL,       -- integra|mancha|furo|tom_fora|borda_desfiada
+  nivel_id INTEGER NOT NULL REFERENCES nivel(id),  -- armazem SOBRA
+  origem TEXT,                  -- 'rolo' | 'sobra' | 'inventario'
+  origem_rolo_id INTEGER REFERENCES rolo(id),
+  origem_sobra_id INTEGER REFERENCES sobra(id),
+  status TEXT DEFAULT 'disponivel',   -- disponivel|usada|descartada
+  criado_em TEXT DEFAULT (datetime('now','localtime')), criado_por TEXT,
+  baixado_em TEXT, baixado_por TEXT, baixa_motivo TEXT
+);
+CREATE INDEX idx_sobra_busca ON sobra(tecido_id, status, largura, altura);
+
+/* ─── CONDICAO DA SOBRA — cadastro, nao lista fixa ─────────────────────── */
+/* 'aproveitavel' e o campo que decide se a sobra entra no plano. Defeito
+   parcial entra, mas por ULTIMO: 'prioridade' ordena as candidatas. */
+CREATE TABLE condicao_sobra (
+  chave TEXT PRIMARY KEY,
+  nome TEXT NOT NULL,
+  aproveitavel INTEGER NOT NULL DEFAULT 1,
+  prioridade INTEGER NOT NULL DEFAULT 0,   -- menor = tentada primeiro
+  ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1
+);
+
+/* ─── REFUGO — a perda fica medida, nao some ───────────────────────────── */
+CREATE TABLE refugo (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tecido_id INTEGER REFERENCES tecido(id),
+  largura REAL, altura REAL, area REAL,
+  motivo TEXT,                  -- 'tira_estreita'|'resto_de_pe'|'descarte'
+  plano_id INTEGER, usuario_nome TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime')),
+  data TEXT DEFAULT (date('now','localtime'))
+);
+
+/* ─── MOTIVOS DE RECUSA — CADASTRO, NAO LISTA FIXA ─────────────────────── */
+CREATE TABLE motivo_recusa (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1
+);
+
+/* ─── PLANO DE CORTE — o historico e o diagnostico ─────────────────────── */
+CREATE TABLE plano (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tecido_id INTEGER REFERENCES tecido(id),
+  origem TEXT,                  -- 'digitado' | 'arquivo'
+  consumo_linear REAL, consumo_m2 REAL,
+  area_pecas REAL, area_sobra_gerada REAL, desperdicio REAL,
+  usuario_nome TEXT, confirmado INTEGER DEFAULT 0,
+  criado_em TEXT DEFAULT (datetime('now','localtime')),
+  data TEXT DEFAULT (date('now','localtime'))
+);
+CREATE TABLE plano_peca (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plano_id INTEGER NOT NULL REFERENCES plano(id),
+  ordem INTEGER,
+  tecido_id INTEGER REFERENCES tecido(id),   -- pode diferir do cabecalho
+  largura REAL NOT NULL, altura REAL NOT NULL,
+  faixa_id INTEGER,             -- em qual faixa esta peca ficou
+  pos_x REAL,                   -- posicao na largura da faixa, para desenhar
+  nao_alocada_motivo TEXT,      -- peca que nao coube: volta marcada, nunca some
+  recusa_motivo_id INTEGER REFERENCES motivo_recusa(id),
+  recusa_obs TEXT
+);
+CREATE TABLE plano_faixa (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plano_id INTEGER NOT NULL REFERENCES plano(id),
+  ordem INTEGER,
+  fonte TEXT,                   -- 'rolo' | 'sobra'
+  rolo_id INTEGER REFERENCES rolo(id),
+  sobra_id INTEGER REFERENCES sobra(id),
+  largura_disponivel REAL, altura REAL,
+  largura_usada REAL,
+  sobra_gerada_codigo TEXT      -- etiqueta que o operador colou ao confirmar
+);
+CREATE TABLE plano_recusa (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plano_id INTEGER REFERENCES plano(id),
+  sobra_id INTEGER REFERENCES sobra(id),
+  motivo_id INTEGER REFERENCES motivo_recusa(id),
+  observacao TEXT, usuario_nome TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime')),
+  data TEXT DEFAULT (date('now','localtime'))
+);
+`}
+
+];
+
+// ─────────────────────────────────────────────────────────────────────────
+// Semente: o minimo para o sistema abrir com sentido. Roda so uma vez, na
+// criacao da tabela — o que o diretor apagar depois fica apagado.
+const SEMENTE=[
+  {n:1, nome:'armazens, parametros, motivos e condicoes', executar(db){
+    const arm=db.prepare('INSERT INTO armazem(chave,nome,ordem) VALUES(?,?,?)');
+    arm.run('ROLO','Rolos',1);
+    arm.run('SOBRA','Sobras',2);
+
+    // Os tres parametros da secao 6.5. margem = 0 pela resposta do dono:
+    // as pecas encostam. Fica cadastravel porque a decisao pode mudar sem
+    // programador — e mudar margem muda TODO o encaixe.
+    const par=db.prepare('INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES(?,?,?,?,?,?,?)');
+    par.run('larguraMinimaSobra','0.80','numero','Largura minima da sobra',
+      'Resto com largura ABAIXO deste valor vira refugo em vez de sobra com etiqueta. Vale so para a largura — altura nao tem minimo.','m',1);
+    par.run('pesoSobra','0.50','numero','Peso da sobra gerada',
+      'Quanto da sobra que nasce do corte conta como material recuperado na conta do desperdicio. E a unica variavel de julgamento do modulo: responde se o retalho que vai pra prateleira volta a ser usado (1,00) ou encalha (0,00). Metade e o palpite honesto de quem ainda nao tem historico.','0 a 1',2);
+    par.run('margem','0.00','numero','Margem entre pecas',
+      'Folga entre uma peca e a seguinte, e nas bordas da bobina. Zero significa que as pecas encostam. Aumentar aqui muda todo o encaixe: com 2 cm, tres pecas de 0,90 deixam de caber numa bobina de 2,70.','m',3);
+
+    const mot=db.prepare('INSERT INTO motivo_recusa(nome,ordem) VALUES(?,?)');
+    ['Tonalidade diferente','Defeito nao cadastrado','Textura / brilho diferente',
+     'Peca do mesmo pedido — tom unico','Outro'].forEach((n,i)=>mot.run(n,i+1));
+
+    // Condicao da sobra. 'prioridade' faz o defeito parcial entrar no plano
+    // POR ULTIMO — resposta do dono a pergunta 4 da secao 11.
+    const con=db.prepare('INSERT INTO condicao_sobra(chave,nome,aproveitavel,prioridade,ordem) VALUES(?,?,?,?,?)');
+    con.run('integra','Integra',1,0,1);
+    con.run('mancha','Mancha',1,1,2);
+    con.run('furo','Furo',1,1,3);
+    con.run('tom_fora','Tom fora',1,1,4);
+    con.run('borda_desfiada','Borda desfiada',1,1,5);
+  }}
+];
+
+function aplicar(db){
+  db.exec("CREATE TABLE IF NOT EXISTS migracao(n INTEGER PRIMARY KEY, nome TEXT, aplicada_em TEXT DEFAULT (datetime('now','localtime')))");
+  const feitas=new Set(db.prepare('SELECT n FROM migracao').all().map(r=>r.n));
+  const registra=db.prepare('INSERT INTO migracao(n,nome) VALUES(?,?)');
+
+  for(const m of MIGRACOES){
+    if(feitas.has(m.n)) continue;
+    db.transaction(()=>{
+      db.exec(m.sql);
+      const s=SEMENTE.find(s=>s.n===m.n);
+      if(s) s.executar(db);
+      registra.run(m.n,m.nome);
+    })();
+    console.log('[schema] migracao '+m.n+' aplicada: '+m.nome);
+  }
+}
+
+module.exports={aplicar,MIGRACOES};

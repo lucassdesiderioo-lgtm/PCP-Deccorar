@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cadastros · Tecido</title>
+<link rel="stylesheet" href="/base.css">
+</head>
+<body>
+<header class="topo">
+  <h1>Cadastros</h1>
+  <span class="espaco"></span>
+  <span class="quem" id="quem"></span>
+  <a class="bt pequeno" href="/" style="text-decoration:none;display:inline-flex;align-items:center">Inicio</a>
+</header>
+
+<div class="corpo">
+  <div class="abas" id="abas"></div>
+  <div id="conteudo"></div>
+</div>
+
+<script src="/ui.js"></script>
+<script>
+const {api,banner,el,limpar,$,num,comoNumero}=window.ui;
+
+let eu={}, aba='tecido';
+const estado={linhas:[],aberturas:[],cores:[],tecidos:[],linhaSel:null,armazem:'ROLO',arvore:[]};
+const podeEditar=()=>eu.papel==='diretor';
+
+const ABAS=[
+  {id:'tecido',    nome:'Tecido'},
+  {id:'endereco',  nome:'Enderecos'},
+  {id:'motivo',    nome:'Motivos e condicoes'},
+  {id:'parametro', nome:'Parametros'},
+  {id:'pessoa',    nome:'Pessoas', soDiretor:true}
+];
+
+function montarAbas(){
+  const c=limpar($('#abas'));
+  ABAS.filter(a=>!a.soDiretor||podeEditar()).forEach(a=>c.appendChild(el('button',{
+    texto:a.nome,'aria-selected':String(a.id===aba),onclick:()=>{ aba=a.id; desenhar(); }})));
+}
+
+function desenhar(){
+  montarAbas();
+  const c=limpar($('#conteudo'));
+  if(aba==='tecido')    return telaTecido(c);
+  if(aba==='endereco')  return telaEndereco(c);
+  if(aba==='motivo')    return telaMotivo(c);
+  if(aba==='parametro') return telaParametro(c);
+  if(aba==='pessoa')    return telaPessoa(c);
+}
+
+// Um cartao com titulo, nota e conteudo — a moldura repetida das quatro abas.
+function cartao(pai,titulo,nota){
+  const c=el('div',{class:'cartao'});
+  c.appendChild(el('h2',{texto:titulo}));
+  if(nota) c.appendChild(el('p',{class:'nota',texto:nota}));
+  pai.appendChild(c);
+  return c;
+}
+
+// Linha de formulario: campos + botao. Some inteira para quem nao edita.
+function formulario(pai,campos,rotuloBotao,aoEnviar){
+  if(!podeEditar()) return null;
+  const f=el('div',{class:'campos'});
+  const refs={};
+  campos.forEach(cp=>{
+    const box=el('div',{class:'campo'+(cp.cresce?' cresce':'')});
+    box.appendChild(el('label',{texto:cp.rotulo}));
+    const input=cp.opcoes
+      ? el('select',{})
+      : el('input',{type:cp.tipo||'text',inputmode:cp.inputmode||null,placeholder:cp.dica||''});
+    if(cp.opcoes) cp.opcoes.forEach(o=>input.appendChild(el('option',{value:o.valor,texto:o.nome})));
+    if(cp.aoMudar) input.addEventListener('change',()=>cp.aoMudar(input.value));
+    box.appendChild(input);
+    refs[cp.id]=input;
+    f.appendChild(box);
+  });
+  const bt=el('button',{class:'bt primario',texto:rotuloBotao,onclick:async()=>{
+    const valores={};
+    for(const k in refs) valores[k]=refs[k].value;
+    bt.disabled=true;
+    try{ await aoEnviar(valores,refs); }catch(e){}
+    bt.disabled=false;
+  }});
+  f.appendChild(el('div',{class:'campo'},[bt]));
+  pai.appendChild(f);
+  return refs;
+}
+
+// Botao de ligar/desligar o cadastro. Cadastro nao se apaga — se desativa.
+function botaoAtivo(item,rota,recarregar){
+  if(!podeEditar()) return el('span',{class:'tag '+(item.ativo?'bom':'off'),texto:item.ativo?'ativo':'inativo'});
+  return el('button',{class:'bt pequeno',texto:item.ativo?'Desativar':'Reativar',onclick:async()=>{
+    await api(rota,{metodo:'PUT',corpo:{ativo:item.ativo?0:1}});
+    await recarregar();
+  }});
+}
+
+// ── ABA TECIDO ───────────────────────────────────────────────────────────
+async function carregarTecido(){
+  estado.linhas=await api('/api/linhas');
+  estado.cores=await api('/api/cores');
+  if(!estado.linhaSel&&estado.linhas.length) estado.linhaSel=estado.linhas[0].id;
+  estado.aberturas=estado.linhaSel?await api('/api/aberturas?linha_id='+estado.linhaSel):[];
+  estado.tecidos=await api('/api/tecidos');
+}
+
+async function telaTecido(pai){
+  await carregarTecido();
+  pai=limpar(pai);
+
+  // Linha
+  const cL=cartao(pai,'Linha','Rolo, Romana, Painel. O primeiro dos tres niveis do tecido.');
+  formulario(cL,[{id:'nome',rotulo:'Nome da linha',dica:'Rolo',cresce:true}],'Adicionar linha',
+    async(v,refs)=>{ if(!v.nome.trim()) return;
+      await api('/api/linhas',{metodo:'POST',corpo:{nome:v.nome}});
+      refs.nome.value=''; banner('Linha cadastrada.'); await telaTecido($('#conteudo')); });
+  const tL=el('table',{});
+  estado.linhas.forEach(l=>tL.appendChild(el('tr',{class:l.ativo?'':'inativo'},[
+    el('td',{texto:l.nome}),
+    el('td',{style:'text-align:right'},[botaoAtivo(l,'/api/linhas/'+l.id,()=>telaTecido($('#conteudo')))])
+  ])));
+  cL.appendChild(estado.linhas.length?tL:el('div',{class:'vazio',texto:'Nenhuma linha ainda.'}));
+
+  // Abertura (pendurada na linha escolhida)
+  const cA=cartao(pai,'Abertura','1%, 3%, 5%, Blackout. A abertura pertence a uma linha — a de uma nao e a da outra.');
+  const fil=el('div',{class:'fileira'});
+  fil.appendChild(el('span',{class:'rotulo',texto:'LINHA'}));
+  estado.linhas.forEach(l=>fil.appendChild(el('button',{class:'op',texto:l.nome,
+    'aria-pressed':String(l.id===estado.linhaSel),
+    onclick:async()=>{ estado.linhaSel=l.id; await telaTecido($('#conteudo')); }})));
+  cA.appendChild(fil);
+  if(estado.linhaSel){
+    formulario(cA,[{id:'nome',rotulo:'Nome da abertura',dica:'3%',cresce:true}],'Adicionar abertura',
+      async(v,refs)=>{ if(!v.nome.trim()) return;
+        await api('/api/aberturas',{metodo:'POST',corpo:{nome:v.nome,linha_id:estado.linhaSel}});
+        refs.nome.value=''; banner('Abertura cadastrada.'); await telaTecido($('#conteudo')); });
+    const tA=el('table',{});
+    estado.aberturas.forEach(a=>tA.appendChild(el('tr',{class:a.ativo?'':'inativo'},[
+      el('td',{texto:a.nome}),
+      el('td',{style:'text-align:right'},[botaoAtivo(a,'/api/aberturas/'+a.id,()=>telaTecido($('#conteudo')))])
+    ])));
+    cA.appendChild(estado.aberturas.length?tA:el('div',{class:'vazio',texto:'Esta linha ainda nao tem abertura.'}));
+  }
+
+  // Cor
+  const cC=cartao(pai,'Cor','A cor atravessa as linhas — cadastro solto.');
+  formulario(cC,[{id:'nome',rotulo:'Nome da cor',dica:'Bege',cresce:true}],'Adicionar cor',
+    async(v,refs)=>{ if(!v.nome.trim()) return;
+      await api('/api/cores',{metodo:'POST',corpo:{nome:v.nome}});
+      refs.nome.value=''; banner('Cor cadastrada.'); await telaTecido($('#conteudo')); });
+  const tC=el('table',{});
+  estado.cores.forEach(c=>tC.appendChild(el('tr',{class:c.ativo?'':'inativo'},[
+    el('td',{texto:c.nome}),
+    el('td',{style:'text-align:right'},[botaoAtivo(c,'/api/cores/'+c.id,()=>telaTecido($('#conteudo')))])
+  ])));
+  cC.appendChild(estado.cores.length?tC:el('div',{class:'vazio',texto:'Nenhuma cor ainda.'}));
+
+  // Item de tecido
+  const cT=cartao(pai,'Item de tecido','A combinacao que existe de verdade: linha + abertura + cor.');
+  cT.appendChild(el('p',{class:'ajuda',texto:
+    'A largura da bobina NAO fica aqui — ela e do rolo. O mesmo Rolo 3% Bege existe em 2,00, 2,50 e 3,00, e e essa diferenca que o plano de corte explora. A largura abaixo so pre-preenche a entrada de rolo.'}));
+  if(podeEditar()){
+    const aberturasDaLinha=estado.aberturas.filter(a=>a.ativo);
+    formulario(cT,[
+      {id:'linha_id',rotulo:'Linha',opcoes:estado.linhas.filter(l=>l.ativo).map(l=>({valor:l.id,nome:l.nome})),
+       aoMudar:async(v)=>{ estado.linhaSel=Number(v); await telaTecido($('#conteudo')); }},
+      {id:'abertura_id',rotulo:'Abertura',opcoes:aberturasDaLinha.map(a=>({valor:a.id,nome:a.nome}))},
+      {id:'cor_id',rotulo:'Cor',opcoes:estado.cores.filter(c=>c.ativo).map(c=>({valor:c.id,nome:c.nome}))},
+      {id:'largura_sugerida',rotulo:'Largura sugerida (m)',dica:'2,50',inputmode:'decimal'},
+      {id:'permite_girar',rotulo:'Pode girar a peca?',opcoes:[{valor:'0',nome:'Nao — o tecido tem sentido'},{valor:'1',nome:'Sim'}]}
+    ],'Cadastrar tecido',async(v)=>{
+      await api('/api/tecidos',{metodo:'POST',corpo:{
+        linha_id:Number(v.linha_id), abertura_id:Number(v.abertura_id), cor_id:Number(v.cor_id),
+        largura_sugerida:v.largura_sugerida, permite_girar:v.permite_girar==='1'}});
+      banner('Tecido cadastrado.'); await telaTecido($('#conteudo'));
+    });
+  }
+  const tT=el('table',{});
+  tT.appendChild(el('tr',{},[el('th',{texto:'Codigo'}),el('th',{texto:'Tecido'}),
+    el('th',{class:'num',texto:'Largura sugerida'}),el('th',{texto:'Girar'}),el('th',{texto:''})]));
+  estado.tecidos.forEach(t=>tT.appendChild(el('tr',{class:t.ativo?'':'inativo'},[
+    el('td',{texto:t.codigo}),
+    el('td',{texto:[t.linha_nome,t.abertura_nome,t.cor_nome].join(' · ')}),
+    el('td',{class:'num',texto:t.largura_sugerida?num(t.largura_sugerida)+' m':'—'}),
+    el('td',{texto:t.permite_girar?'sim':'nao'}),
+    el('td',{style:'text-align:right'},[botaoAtivo(t,'/api/tecidos/'+t.id,()=>telaTecido($('#conteudo')))])
+  ])));
+  cT.appendChild(estado.tecidos.length?tT:el('div',{class:'vazio',texto:'Nenhum tecido cadastrado ainda.'}));
+}
+
+// ── ABA ENDERECO ─────────────────────────────────────────────────────────
+async function telaEndereco(pai){
+  estado.arvore=await api('/api/enderecos/'+estado.armazem);
+  pai=limpar(pai);
+
+  const c=cartao(pai,'Enderecos','Dois armazens, areas fisicas diferentes do mesmo galpao. Haste, andar e nivel sao cadastro livre — nenhuma quantidade e decidida no sistema.');
+  c.appendChild(el('p',{class:'ajuda',texto:
+    'Rolo fechado e aberto ficam no MESMO armazem ROLO: muda o status, nao o lugar. Sobra so endereca em SOBRA — endereco trocado e sobra que ninguem acha.'}));
+
+  const fil=el('div',{class:'fileira'});
+  fil.appendChild(el('span',{class:'rotulo',texto:'ARMAZEM'}));
+  [['ROLO','Rolos'],['SOBRA','Sobras']].forEach(([chave,nome])=>
+    fil.appendChild(el('button',{class:'op',texto:nome,'aria-pressed':String(chave===estado.armazem),
+      onclick:async()=>{ estado.armazem=chave; await telaEndereco($('#conteudo')); }})));
+  c.appendChild(fil);
+
+  const recarregar=()=>telaEndereco($('#conteudo'));
+
+  formulario(c,[{id:'nome',rotulo:'Nova haste',dica:'A',cresce:true}],'Adicionar haste',
+    async(v,refs)=>{ if(!v.nome.trim()) return;
+      await api('/api/hastes',{metodo:'POST',corpo:{nome:v.nome,armazem_chave:estado.armazem}});
+      refs.nome.value=''; banner('Haste cadastrada.'); await recarregar(); });
+
+  if(!estado.arvore.length){
+    c.appendChild(el('div',{class:'vazio',texto:'Este armazem ainda nao tem haste.'}));
+    return;
+  }
+
+  estado.arvore.forEach(h=>{
+    const cH=el('div',{class:'cartao',style:'margin:14px 0 0'});
+    const cab=el('div',{class:'campos',style:'align-items:center'});
+    cab.appendChild(el('h2',{style:'margin:0;flex:1',texto:'Haste '+h.nome}));
+    cab.appendChild(el('span',{class:'tag '+(estado.armazem==='ROLO'?'rolo':'sobra'),texto:estado.armazem}));
+    cab.appendChild(botaoAtivo(h,'/api/hastes/'+h.id,recarregar));
+    cH.appendChild(cab);
+
+    formulario(cH,[{id:'nome',rotulo:'Novo andar nesta haste',dica:'02',cresce:true}],'Adicionar andar',
+      async(v,refs)=>{ if(!v.nome.trim()) return;
+        await api('/api/andares',{metodo:'POST',corpo:{nome:v.nome,haste_id:h.id}});
+        refs.nome.value=''; await recarregar(); });
+
+    h.andares.forEach(a=>{
+      const cA=el('div',{style:'border-top:1px solid var(--linha);padding-top:12px;margin-top:12px'});
+      const linhaA=el('div',{class:'campos',style:'align-items:center'});
+      linhaA.appendChild(el('strong',{style:'flex:1',texto:'Andar '+a.nome}));
+      linhaA.appendChild(botaoAtivo(a,'/api/andares/'+a.id,recarregar));
+      cA.appendChild(linhaA);
+
+      const niveis=el('div',{class:'fileira'});
+      niveis.appendChild(el('span',{class:'rotulo',texto:'NIVEIS'}));
+      a.niveis.forEach(n=>niveis.appendChild(el('span',{
+        class:'tag '+(n.ativo?'bom':'off'),
+        style:'align-self:center;margin-right:4px',
+        texto:estado.armazem+' · '+h.nome+'-'+a.nome+'-'+n.nome})));
+      if(!a.niveis.length) niveis.appendChild(el('span',{class:'quem',style:'align-self:center',texto:'sem nivel'}));
+      cA.appendChild(niveis);
+
+      formulario(cA,[{id:'nome',rotulo:'Novo nivel neste andar',dica:'03',cresce:true}],'Adicionar nivel',
+        async(v,refs)=>{ if(!v.nome.trim()) return;
+          await api('/api/niveis',{metodo:'POST',corpo:{nome:v.nome,andar_id:a.id}});
+          refs.nome.value=''; await recarregar(); });
+
+      cH.appendChild(cA);
+    });
+
+    pai.appendChild(cH);
+  });
+}
+
+// ── ABA MOTIVOS E CONDICOES ──────────────────────────────────────────────
+async function telaMotivo(pai){
+  const motivos=await api('/api/motivos');
+  const condicoes=await api('/api/condicoes');
+  pai=limpar(pai);
+  const recarregar=()=>telaMotivo($('#conteudo'));
+
+  const cM=cartao(pai,'Motivos de recusa','Por que o cortador nao usou a sobra que o sistema sugeriu.');
+  cM.appendChild(el('p',{class:'ajuda',texto:
+    'O motivo nao e burocracia — e o diagnostico. Em tres meses o relatorio diz onde o reaproveitamento trava: se "tonalidade" dominar, a resposta e registrar o tom no cadastro da sobra; se for "defeito nao cadastrado", o problema esta no lancamento na bancada.'}));
+  formulario(cM,[{id:'nome',rotulo:'Novo motivo',dica:'Tonalidade diferente',cresce:true}],'Adicionar motivo',
+    async(v,refs)=>{ if(!v.nome.trim()) return;
+      await api('/api/motivos',{metodo:'POST',corpo:{nome:v.nome}});
+      refs.nome.value=''; banner('Motivo cadastrado.'); await recarregar(); });
+  const tM=el('table',{});
+  motivos.forEach(m=>tM.appendChild(el('tr',{class:m.ativo?'':'inativo'},[
+    el('td',{texto:m.nome}),
+    el('td',{style:'text-align:right'},[botaoAtivo(m,'/api/motivos/'+m.id,recarregar)])
+  ])));
+  cM.appendChild(tM);
+
+  const cC=cartao(pai,'Condicao da sobra','Como a sobra chegou na prateleira — e o que isso faz no plano de corte.');
+  cC.appendChild(el('p',{class:'ajuda',texto:
+    'Estas duas colunas trabalham: "aproveitavel" tira a sobra das candidatas; "por ultimo" manda o defeito parcial ser tentado depois das integras. Mancha num canto de uma peca grande ainda serve para um corte menor.'}));
+  const tC=el('table',{});
+  tC.appendChild(el('tr',{},[el('th',{texto:'Condicao'}),el('th',{texto:'Entra no plano?'}),el('th',{texto:'Ordem de tentativa'})]));
+  condicoes.forEach(c=>{
+    const bt=(rotulo,corpo)=>el('button',{class:'bt pequeno',texto:rotulo,onclick:async()=>{
+      await api('/api/condicoes/'+c.chave,{metodo:'PUT',corpo}); await recarregar(); }});
+    tC.appendChild(el('tr',{class:c.ativo?'':'inativo'},[
+      el('td',{texto:c.nome}),
+      el('td',{},[ podeEditar()
+        ? bt(c.aproveitavel?'Sim — clique para tirar':'Nao — clique para incluir',{aproveitavel:c.aproveitavel?0:1})
+        : el('span',{class:'tag '+(c.aproveitavel?'bom':'off'),texto:c.aproveitavel?'sim':'nao'}) ]),
+      el('td',{},[ podeEditar()
+        ? bt(c.prioridade?'Por ultimo':'Primeiro',{prioridade:c.prioridade?0:1})
+        : el('span',{texto:c.prioridade?'por ultimo':'primeiro'}) ])
+    ]));
+  });
+  cC.appendChild(tC);
+}
+
+// ── ABA PARAMETROS ───────────────────────────────────────────────────────
+async function telaParametro(pai){
+  const params=await api('/api/parametros');
+  pai=limpar(pai);
+  const c=cartao(pai,'Parametros do plano de corte','Tres numeros governam o calculo. Ficam aqui, no banco, e nao no codigo — mudar e um campo, nao um deploy.');
+
+  params.forEach(p=>{
+    const bloco=el('div',{style:'border-top:1px solid var(--linha);padding:14px 0'});
+    bloco.appendChild(el('strong',{texto:p.rotulo+(p.unidade?' ('+p.unidade+')':'')}));
+    bloco.appendChild(el('p',{class:'ajuda',texto:p.ajuda||''}));
+    const linha=el('div',{class:'campos',style:'margin-top:8px'});
+    const campo=el('div',{class:'campo'});
+    const input=el('input',{type:'text',inputmode:'decimal',value:String(p.valor).replace('.',',')});
+    input.disabled=!podeEditar();
+    campo.appendChild(input);
+    linha.appendChild(campo);
+    if(podeEditar()) linha.appendChild(el('div',{class:'campo'},[
+      el('button',{class:'bt primario',texto:'Salvar',onclick:async()=>{
+        const n=comoNumero(input.value);
+        if(n===null) return banner('Digite um numero, com virgula ou ponto.','erro');
+        await api('/api/parametros/'+p.chave,{metodo:'PUT',corpo:{valor:n}});
+        banner(p.rotulo+' salvo.'); await telaParametro($('#conteudo'));
+      }})]));
+    if(p.alterado_em) linha.appendChild(el('div',{class:'campo'},[
+      el('span',{class:'quem',texto:'alterado em '+p.alterado_em+(p.alterado_por?' por '+p.alterado_por:'')})]));
+    bloco.appendChild(linha);
+    c.appendChild(bloco);
+  });
+}
+
+// ── ABA PESSOAS ──────────────────────────────────────────────────────────
+async function telaPessoa(pai){
+  if(!podeEditar()) return;
+  const pessoas=await api('/api/usuarios');
+  const papeis=await api('/api/papeis');
+  pai=limpar(pai);
+  const recarregar=()=>telaPessoa($('#conteudo'));
+
+  const c=cartao(pai,'Pessoas','Quem entra no sistema, com que PIN e com que papel.');
+  formulario(c,[
+    {id:'nome',rotulo:'Nome',dica:'Joao',cresce:true},
+    {id:'pin',rotulo:'PIN (4 digitos)',tipo:'password',inputmode:'numeric'},
+    {id:'papel',rotulo:'Papel',opcoes:papeis.map(p=>({valor:p.papel,nome:p.papel}))}
+  ],'Cadastrar pessoa',async(v,refs)=>{
+    await api('/api/usuarios',{metodo:'POST',corpo:v});
+    refs.nome.value=''; refs.pin.value='';
+    banner('Pessoa cadastrada.'); await recarregar();
+  });
+
+  const t=el('table',{});
+  t.appendChild(el('tr',{},[el('th',{texto:'Nome'}),el('th',{texto:'Papel'}),el('th',{texto:''}),el('th',{texto:''})]));
+  pessoas.forEach(p=>{
+    const trocar=el('button',{class:'bt pequeno',texto:'Trocar PIN',onclick:async()=>{
+      const pin=prompt('Novo PIN de '+p.nome+' (4 digitos):');
+      if(!pin) return;
+      await api('/api/usuarios/'+p.id,{metodo:'PUT',corpo:{pin}});
+      banner('PIN trocado.');
+    }});
+    const virar=el('button',{class:'bt pequeno',texto:p.ativo?'Bloquear':'Liberar',onclick:async()=>{
+      await api('/api/usuarios/'+p.id,{metodo:'PUT',corpo:{ativo:p.ativo?0:1}}); await recarregar(); }});
+    const papel=el('select',{});
+    papeis.forEach(x=>papel.appendChild(el('option',{value:x.papel,texto:x.papel,selected:x.papel===p.papel?'selected':null})));
+    papel.addEventListener('change',async()=>{
+      try{ await api('/api/usuarios/'+p.id,{metodo:'PUT',corpo:{papel:papel.value}}); banner('Papel alterado.'); }
+      finally{ await recarregar(); }
+    });
+    t.appendChild(el('tr',{class:p.ativo?'':'inativo'},[
+      el('td',{texto:p.nome}), el('td',{},[papel]),
+      el('td',{},[trocar]), el('td',{style:'text-align:right'},[virar])
+    ]));
+  });
+  c.appendChild(t);
+
+  const cP=cartao(pai,'O que cada papel pode','O papel e um atalho que agrupa permissoes — nao um cargo.');
+  papeis.forEach(p=>{
+    cP.appendChild(el('strong',{texto:p.papel}));
+    cP.appendChild(el('p',{class:'ajuda',texto:p.permissoes.join(' · ')}));
+  });
+  cP.appendChild(el('p',{class:'ajuda',texto:
+    'Repare que "Descartar sobra" nao esta no cortador: baixa de sobra sem trava e o furo classico de inventario.'}));
+}
+
+// ── inicio ───────────────────────────────────────────────────────────────
+(async function(){
+  eu=await api('/api/auth/eu');
+  $('#quem').textContent=eu.logado?(eu.nome+' · '+eu.papel):'';
+  desenhar();
+})();
+</script>
+</body>
+</html>

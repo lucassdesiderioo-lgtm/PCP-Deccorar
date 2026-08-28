@@ -1,0 +1,18 @@
+# Segredo da sessao - NUNCA versionar
+.session_secret
+
+# Banco (PINs das pessoas, todo o estoque). Os dados vivem no -wal: backup e
+# db.backup(), nunca "cp tecido.db".
+tecido.db
+tecido.db-shm
+tecido.db-wal
+tecido.db.*
+
+# Banco descartavel do runner de testes
+teste/.teste.db
+teste/.teste.db-shm
+teste/.teste.db-wal
+
+node_modules/
+*.bak-*
+*.log
