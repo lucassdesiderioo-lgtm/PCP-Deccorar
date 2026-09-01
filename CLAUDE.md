@@ -179,6 +179,34 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > passivo), faz backup e apaga **só** `situacao='aguardando'` — a linha
 > `embalado` é história de peça que virou estoque e nunca é tocada.
 
+> **O caminho de volta é o `repor_fila.js`.** Apagada a fila com peça real no
+> carrinho, o único jeito de trazê-la de volta pelo sistema seria revisar tudo
+> outra vez — 100 peças viram 200 bipes de trabalho já feito, e a bancada acaba
+> embalando sem a fila (a armadilha #6 de novo: o desvio que a equipe aprende a
+> fazer). Ele lê a lista como ela é escrita (`bk130130bege - 8`, a quantidade é
+> o número **no fim** da linha, porque SKU tem espaço desde o §7), soma o SKU
+> repetido em vez de deixar o último vencer, e grava com o código **do
+> cadastro** — o bipe da embalagem procura por igualdade, e uma linha com o case
+> errado apareceria na tela sem ser achada pelo leitor.
+>
+> Ele **não** mexe em estoque (a fila nunca somou `+1`) e **não** grava
+> `revisao`: a peça não está sendo revisada agora, e inventar a linha sujaria o
+> tempo médio com trabalho que não aconteceu. Recusa a lista inteira se um SKU
+> estiver fora do cadastro (§6 — em lista digitada à mão, código desconhecido é
+> quase sempre erro de digitação) e recusa com o **modo teste ligado**, senão o
+> trigger do §11 marcaria as linhas e "apagar" as levaria junto.
+>
+> ```bash
+> node repor_fila.js --itens "BK130130BEGE=10, BK160160CINZA=23"   # simula
+> node repor_fila.js --lista lista.txt --confirmar                 # backup + grava
+> node repor_fila.js --testar                                      # só o leitor da lista
+> ```
+>
+> O `--modo` nasce `estoque` de propósito: é o que o `mont_route` já assume
+> quando a linha da fila não existe, então repor nunca deixa a conta pior do que
+> não repor. `--modo hoje` só quando a peça é mesmo da ordem do dia — aí a
+> embalagem volta a abater `producao.produzido`.
+
 > **Bloqueio do kit:** sem o bipe 2, o bipe 3 é recusado com "⚠ FALTOU O KIT".
 > Essa é a garantia contra esquecimento — motivo de devolução recorrente.
 
