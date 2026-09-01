@@ -40,6 +40,9 @@ db.exec(`
     depois INTEGER, delta INTEGER, motivo TEXT, obs TEXT, usuario_id INTEGER, usuario_nome TEXT,
     criado_em TEXT DEFAULT (datetime('now','localtime')), data TEXT DEFAULT (date('now','localtime')),
     teste INTEGER DEFAULT 0);
+  CREATE TABLE contagem (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT,
+    contado_em TEXT DEFAULT (datetime('now','localtime')), sessao TEXT, teste INTEGER DEFAULT 0,
+    tipo TEXT DEFAULT 'sku', componente_id INTEGER, qtd REAL DEFAULT 1);
   CREATE TABLE auditoria (id INTEGER PRIMARY KEY AUTOINCREMENT, usuario_id INTEGER, usuario_nome TEXT,
     categoria TEXT, acao TEXT, alvo TEXT, detalhe TEXT, ip TEXT,
     criado_em TEXT DEFAULT (datetime('now','localtime')), data TEXT DEFAULT (date('now','localtime')));
@@ -120,6 +123,15 @@ aj.run('BK140140BEGE', 4, 2, -2, 'Peca quebrada',        'Ana',   hoje +' 08:30:
 
 db.prepare(`INSERT INTO auditoria (categoria,acao,alvo,detalhe,criado_em)
   VALUES ('estoque','alvo_planejamento','(todos)','aplicados 4',?)`).run(ontem+' 17:00:00');
+
+/* Inventario: um SKU contado ha 5 dias, um contado no MODO TESTE (nao vale como
+   conferencia de saldo real) e o resto nunca contado. */
+const cinco=db.prepare("SELECT datetime('now','localtime','-5 days') d").get().d;
+const cont=db.prepare("INSERT INTO contagem (codigo,contado_em,sessao,tipo,qtd,teste) VALUES (?,?,?,?,?,?)");
+cont.run('BK140140BEGE', db.prepare("SELECT datetime('now','localtime','-9 days') d").get().d,'s0','sku',1,0);
+cont.run('BK140140BEGE', cinco, 's1','sku',1,0);
+cont.run('BK160160CINZA', cinco, 's1','sku',1,1);          // teste: nao conta
+cont.run('TUBO 32MM',    cinco, 's1','componente',12.5,0); // material: outra unidade
 
 const chamar = (k, body) => new Promise(r => {
   const res = { json:o=>r(o), status(){ return this; }, send:o=>r(o) };
@@ -220,7 +232,26 @@ const ok = (n, c, extra) => { casos++;
   ok('quem nao tem peca e precisa produzir sai como zerado',
      por.SOBMEDIDA2.situacao === 'zerado' && por.BK140140BEGE.situacao === 'baixo');
 
-  // ── 10. O QUE A PECA E — os campos do pecaTexto vao na linha ─────────────
+  // ── 10. INVENTARIO: quando esse saldo foi conferido ──────────────────────
+  ok('traz a idade do último inventário do SKU (5 dias, o mais recente)',
+     por.BK140140BEGE.contado_ha === 5 && !!por.BK140140BEGE.contado_em,
+     'veio ' + por.BK140140BEGE.contado_ha);
+  ok('contagem em MODO TESTE não conta como conferência do saldo real',
+     por.BK160160CINZA.contado_em === null);
+  ok('contagem de MATERIAL não vira conferência de peça',
+     !Object.keys(por).some(c => c === 'TUBO 32MM'));
+  ok('o resumo conta quantos nunca passaram por contagem', p.resumo.nunca_contados === 4,
+     'veio ' + p.resumo.nunca_contados);
+
+  // ── 11. O QUE O BOTAO "APLICAR ALVO" RESOLVE, E O QUE NAO ────────────────
+  ok('defasado COM venda na janela é aplicável', por.BK140140BEGE.alvo_aplicavel === true);
+  ok('defasado SEM venda na janela não é: o Planejamento não sobrescreve às cegas',
+     por.SOBMEDIDA.alvo_defasado === true && por.SOBMEDIDA.alvo_aplicavel === false);
+  ok('e o resumo separa os dois números',
+     p.resumo.alvo_defasados === 2 && p.resumo.alvo_aplicaveis === 1,
+     'defasados=' + p.resumo.alvo_defasados + ' aplicaveis=' + p.resumo.alvo_aplicaveis);
+
+  // ── 12. O QUE A PECA E — os campos do pecaTexto vao na linha ─────────────
   ok('a linha carrega as colunas da peca, nao o texto do codigo',
      por.BK140140BEGE.largura_cm === 140 && por.BK140140BEGE.cor_nome === 'Bege' &&
      por.BK140140BEGE.tecido_nome === 'Blackout' && por.BK140140BEGE.modelo_nome === 'Rolô');

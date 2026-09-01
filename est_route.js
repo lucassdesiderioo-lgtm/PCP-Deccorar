@@ -73,8 +73,24 @@ module.exports = function(app, db){
         .forEach(r => ultimo[String(r.codigo).toUpperCase()] = r);
     }catch(e){}
 
+    /* QUANDO ESSE SALDO FOI CONFERIDO PELA ULTIMA VEZ. Saldo nunca contado e
+       saldo em que ninguem tem por que confiar: `skus.estoque` tem varios donos
+       e nao se reconstroi (§14), entao o inventario e o unico momento em que a
+       coluna volta a bater com a prateleira. O try/catch cobre banco antigo,
+       anterior a coluna `tipo` — sem ele a aba inteira cairia por causa de uma
+       informacao de apoio. */
+    const contagem = {};
+    try{
+      db.prepare(`SELECT UPPER(codigo) c, MAX(contado_em) em,
+          CAST(julianday('now','localtime') - julianday(MAX(contado_em)) AS INTEGER) dias
+        FROM contagem
+        WHERE COALESCE(tipo,'sku')='sku' AND COALESCE(teste,0)=0
+        GROUP BY UPPER(codigo)`).all()
+        .forEach(r => contagem[r.c] = r);
+    }catch(e){}
+
     let zerados=0, baixos=0, ok=0, excesso=0, parados=0, sobMedida=0, defasados=0;
-    let pecas=0, precisaTotal=0, skusFalta=0;
+    let pecas=0, precisaTotal=0, skusFalta=0, aplicaveis=0, nuncaContados=0;
 
     const lista = linhas.filter(l => l.cadastrado).map(l => {
       const e = extra[l.codigo] || {};
@@ -111,10 +127,22 @@ module.exports = function(app, db){
       const alvoSalvo = e.alvo_salvo == null ? null : +e.alvo_salvo;
       const defasado = alvoSalvo != null && alvoSalvo !== l.alvo;
       if(defasado) defasados++;
+      /* O "Aplicar todos" do Planejamento so grava em SKU COM VENDA NA JANELA —
+         e proposital: sem dado de venda ele zeraria o alvo de quem tem historia
+         e nao vendeu no periodo. Entao nem todo defasado se resolve pelo botao,
+         e a tela precisa dizer quantos, senao a pessoa clica e nao entende por
+         que o aviso continua ali. */
+      const aplicavel = defasado && l.vendas_janela > 0;
+      if(aplicavel) aplicaveis++;
+
+      const cont = contagem[l.codigo] || null;
+      if(!cont) nuncaContados++;
 
       return {
         codigo: l.codigo, descricao: l.descricao, cor: l.cor,
         estoque, alvo: l.alvo, alvo_salvo: alvoSalvo, alvo_defasado: defasado,
+        alvo_aplicavel: aplicavel,
+        contado_em: cont ? cont.em : null, contado_ha: cont ? cont.dias : null,
         comprometido: l.comprometido, precisa: l.precisa, sobra,
         media_dia: l.media_dia, vendas_janela: l.vendas_janela,
         cobertura_dias: cobertura, situacao, parado,
@@ -169,6 +197,8 @@ module.exports = function(app, db){
         zerados, baixos, ok, excesso, parados,
         sob_medida: sobMedida,
         alvo_defasados: defasados,
+        alvo_aplicaveis: aplicaveis,
+        nunca_contados: nuncaContados,
         alvo_aplicado_em: alvoAplicadoEm,
         cobertura_dias: cob.cobertura_dias,
         cobertura_ontem: coberturaOntem,

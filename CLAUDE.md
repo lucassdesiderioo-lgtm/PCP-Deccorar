@@ -1000,7 +1000,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) e `teste_estoque.js` (32); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) e `teste_estoque.js` (39); o resto não tem | Médio a longo prazo |
 | 11 | **`Quantidade` da folha não chega no cruzamento** — item de 3 peças gera 1 urgente, e a fábrica produz 1 onde o cliente comprou 3 (§5, armadilha #5). `folha.js` já lê o campo e o `rastrear.js --lote` já mostra os itens afetados; falta `cruz_route.js` contar peças em vez de volumes | **Alto** — o cliente espera 3 e sai 1 |
 
 ---
@@ -1122,9 +1122,29 @@ hoje é o que faz a conta "quebrar" sem ninguém notar.
 |---|---|
 | Faixa: em estoque · cobertura · SKUs em falta · peças a produzir · entrou/saiu hoje | `demanda_dominio` + `fluxo_estoque` |
 | Gráfico **entrou × saiu**, 30 dias, espelhado no eixo | `fluxo_estoque.serie()` |
-| Semáforo em chips (zerado · abaixo · ok · excesso · parados · sob medida · alvo velho) | filtra em memória, sem ida ao servidor |
-| Tabela com cobertura em dias por SKU e o último ajuste | idem |
+| Semáforo em chips (zerado · abaixo · ok · excesso · parados · sob medida · alvo velho · nunca conferido) | filtra em memória, sem ida ao servidor |
+| Tabela com cobertura em dias, último ajuste e idade do inventário por SKU | idem |
 | **Últimos ajustes manuais** | `ajuste_estoque` |
+| Exportar CSV (respeita o filtro) e **aplicar alvo** | navegador; `POST /api/planejamento/aplicar` |
+
+> **A idade do inventário fica colada no saldo** porque é sobre ele: `skus.estoque`
+> tem vários donos e não se reconstrói (§14), então a contagem é o único momento
+> em que a coluna volta a bater com a prateleira. Acima de 30 dias vira âmbar;
+> quem nunca foi contado tem chip próprio, que serve de lista de trabalho no dia
+> do inventário. Contagem de **material** e contagem em **modo teste** não contam
+> como conferência de peça.
+
+> ⚠️ **O botão "aplicar alvo" diz quantos ele NÃO resolve.** O "Aplicar todos" do
+> Planejamento só grava em SKU **com venda na janela** — proposital: sem dado de
+> venda ele zeraria o alvo de quem tem história e não vendeu no período. Então a
+> tela separa `alvo_defasados` de `alvo_aplicaveis` e escreve os dois no rodapé.
+> Prometer "aplicar todos" e deixar o aviso de pé depois do clique ensina a
+> equipe a desconfiar da tela — que é o mesmo fim da armadilha #10.
+>
+> O botão existe porque a tela passou a **acusar** o alvo velho: acusar sem
+> oferecer o reparo, mandando a pessoa para outra aba, é como uma trava que não
+> sabe liberar (§5). Ele chama a MESMA rota do Planejamento; não há segundo
+> caminho de escrita no alvo.
 
 > **`fluxo_estoque.js` é o dono único de ENTROU e SAIU** — `montagem` (o +1 da
 > embalagem) e `lote.embalado_em` (o −1 da etiqueta). O `/api/fechamento` do
@@ -1150,6 +1170,22 @@ hoje é o que faz a conta "quebrar" sem ninguém notar.
 > cima de um ajuste aberto — a linha sumiria da mão de quem está preenchendo.
 
 **Rode `node teste_estoque.js` após qualquer mudança no `est_route.js`, no
-`fluxo_estoque.js` ou no `demanda_dominio.js`** — os 32 casos travam a conta
-única, o sob medida, o parado, a série do gráfico e o acordo com o fechamento
-diário do Planejamento.
+`fluxo_estoque.js` ou no `demanda_dominio.js`** — os 39 casos travam a conta
+única, o sob medida, o parado, a série do gráfico, a idade do inventário e o
+acordo com o fechamento diário do Planejamento.
+
+### Dívida aberta: `skus.alvo` ainda decide em duas telas
+
+A aba Estoque saiu da foto, mas o alvo gravado continua sendo lido por:
+
+| Onde | O que faz com ele |
+|---|---|
+| `painel_route.js:15` (a TV do chão de fábrica) | `aProduzir = pedido + alvo − estoque`, com `pedido` = ordens lançadas hoje |
+| `ger_route.js:17` (gerencial) | lista `falta = alvo − estoque` dos SKUs com `alvo > 0` |
+
+São mais duas réguas para "quanto produzir", alimentadas por um número que só
+muda quando alguém clica "Aplicar". Enquanto estiverem assim, o painel e o
+gerencial podem mostrar falta diferente da que a tela azul e a aba Estoque
+mostram — e ninguém consegue ver de onde vem a diferença. Não foi mexido nesta
+entrega porque são telas de outro público; entra na fila junto com a decisão de
+mostrar (ou não) o valor em R$ do estoque, que hoje é gateado por `custo.ver`.

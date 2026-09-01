@@ -1064,14 +1064,65 @@ const ESTCHIPS=[
   {k:'excesso', r:'Excesso',    c:'#4493f8', n:r=>r.excesso},
   {k:'parado',  r:'Parados',    c:'#a371f7', n:r=>r.parados},
   {k:'sob',     r:'Sob medida', c:'#3d5a80', n:r=>r.sob_medida},
-  {k:'defas',   r:'Alvo velho', c:'#e0a458', n:r=>r.alvo_defasados}
+  {k:'defas',   r:'Alvo velho', c:'#e0a458', n:r=>r.alvo_defasados},
+  /* "Nunca conferido" fecha a pergunta que a coluna do saldo abre: posso
+     confiar nesse número? Serve de lista de trabalho no dia do inventário. */
+  {k:'semcont', r:'Nunca conferido', c:'#6e7681', n:r=>r.nunca_contados}
 ];
 function estPassa(l){
-  if(estFiltro==='parado') return !!l.parado;
-  if(estFiltro==='sob')    return l.sob_medida===1;
-  if(estFiltro==='defas')  return !!l.alvo_defasado;
-  if(estFiltro)            return l.situacao===estFiltro;
+  if(estFiltro==='parado')  return !!l.parado;
+  if(estFiltro==='sob')     return l.sob_medida===1;
+  if(estFiltro==='defas')   return !!l.alvo_defasado;
+  if(estFiltro==='semcont') return l.contado_em==null;
+  if(estFiltro)             return l.situacao===estFiltro;
   return true;
+}
+
+/* CSV do que esta na tela — o filtro vale. Quem exporta escolheu o recorte
+   clicando; exportar o catalogo inteiro ignoraria a escolha. Sai pelo navegador,
+   sem rota nova: os dados ja estao aqui. */
+function estCSV(){
+  if(!PAINEL) return;
+  const busca=estNorm(($('#estBusca')||{}).value);
+  const l=(PAINEL.linhas||[]).filter(x=> estPassa(x) &&
+    (!busca || estNorm(x.codigo).indexOf(busca)>=0 || estNorm(x.descricao).indexOf(busca)>=0));
+  const cab=['codigo','descricao','estoque','alvo','alvo_salvo','vendido_a_despachar','precisa',
+             'cobertura_dias','situacao','sob_medida','parado','vendas_janela','media_dia',
+             'conferido_em','conferido_ha_dias'];
+  /* Ponto e virgula e BOM: e assim que o Excel em portugues abre o arquivo com
+     as colunas separadas e os acentos certos, sem ninguem passar pelo
+     assistente de importacao. */
+  const cel=v=>{ const s=String(v==null?'':v); return /[";\n]/.test(s)?('"'+s.replace(/"/g,'""')+'"'):s; };
+  const linhas=l.map(x=>[x.codigo,x.descricao,x.estoque,x.alvo,x.alvo_salvo,x.comprometido,x.precisa,
+    x.cobertura_dias,x.situacao,x.sob_medida?'sim':'nao',x.parado?'sim':'nao',
+    x.vendas_janela,x.media_dia,x.contado_em,x.contado_ha].map(cel).join(';'));
+  const txt='﻿'+cab.join(';')+'\n'+linhas.join('\n');
+  const hoje=new Date(), p=n=>String(n).padStart(2,'0');
+  const nome='estoque-'+hoje.getFullYear()+p(hoje.getMonth()+1)+p(hoje.getDate())+'.csv';
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([txt],{type:'text/csv;charset=utf-8'}));
+  a.download=nome; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
+}
+
+/* APLICAR O ALVO daqui, sem trocar de aba. A tela passou a acusar o alvo velho;
+   acusar sem oferecer o reparo e a armadilha #10 de novo — quem nao consegue
+   resolver na tela aprende a ignorar o aviso. Chama a MESMA rota do
+   Planejamento (nao ha segundo caminho de escrita no alvo). */
+async function estAplicarAlvo(){
+  const r=(PAINEL&&PAINEL.resumo)||{};
+  if(!confirm('Gravar no cadastro o alvo calculado hoje?\n\n'
+    +'Isso atualiza '+(r.alvo_aplicaveis||0)+' SKU(s) com venda na janela. '
+    +'O Planejamento não sobrescreve o alvo de quem não vendeu no período.')) return;
+  const b=$('#estAplicar'); if(b){ b.disabled=true; b.textContent='aplicando…'; }
+  let res={};
+  try{ res=await (await fetch('/api/planejamento/aplicar',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({})})).json(); }
+  catch(e){ res={erro:'falhou'}; }
+  if(b){ b.disabled=false; b.textContent='aplicar alvo'; }
+  if(res.erro==='sem_permissao') alert('Você não tem permissão para aplicar o alvo (é do Planejamento).');
+  else if(res.erro) alert('Não consegui aplicar: '+res.erro);
+  await carregarEst();
 }
 
 function renderEst(){
@@ -1131,6 +1182,16 @@ function renderEst(){
     const ujTxt = uj ? ('<div class="estq" style="white-space:nowrap" title="último ajuste manual: '
       +esc(uj.motivo||'')+' — '+esc(uj.usuario_nome||'')+'">'
       +(uj.delta>0?'+':'−')+Math.abs(uj.delta)+' · '+estQuando((uj.criado_em||'').slice(0,10))+'</div>') : '';
+    /* QUANDO ESSE SALDO FOI CONFERIDO. Fica junto do número porque é sobre ele:
+       a coluna tem vários donos e só o inventário a devolve para a prateleira. */
+    /* Acima de 30 dias a conferência vira aviso: o saldo teve tempo de andar
+       por quatro caminhos diferentes desde a última vez que bateu com a
+       prateleira. Abaixo disso é informação, e fica discreta. */
+    const ct = l.contado_em
+      ? '<div class="estq" style="white-space:nowrap'+(l.contado_ha>30?';color:var(--amber)':'')
+        +'" title="último inventário: '+esc(l.contado_em)+'">'
+        +'conferido há '+l.contado_ha+' d</div>'
+      : '<div class="estq" style="white-space:nowrap;color:#6e7681" title="Este saldo nunca passou por uma contagem">nunca conferido</div>';
 
     const base=l.alvo+l.comprometido;
     const pct=base>0?Math.min(100,Math.round((l.estoque/base)*100)):null;
@@ -1139,7 +1200,7 @@ function renderEst(){
     return '<tr>'
       +'<td class="code">'+esc(l.codigo)+selos
         +(peca?'<div class="estq">'+esc(peca)+'</div>':'')+'</td>'
-      +'<td class="n"><b style="font-size:17px" class="'+(l.precisa>0?'baixo':'ok')+'">'+l.estoque+'</b>'+ujTxt+'</td>'
+      +'<td class="n"><b style="font-size:17px" class="'+(l.precisa>0?'baixo':'ok')+'">'+l.estoque+'</b>'+ujTxt+ct+'</td>'
       +'<td class="n">'+l.alvo+(l.alvo_defasado
         ?'<div class="estq" style="color:var(--amber)" title="O alvo salvo no cadastro é '+l.alvo_salvo
           +' e o cálculo de hoje dá '+l.alvo+'. A tela usa o cálculo; para gravar, use Aplicar no Planejamento.">salvo '+l.alvo_salvo+'</div>'
@@ -1157,8 +1218,24 @@ function renderEst(){
 
   const alvoEm = r.alvo_aplicado_em ? ('Alvo aplicado pela última vez em '+estQuando(r.alvo_aplicado_em)+'.')
     : 'O alvo nunca foi aplicado pelo Planejamento.';
-  $('#estRodape').innerHTML = 'Mostrando '+linhas.length+' de '+(PAINEL.linhas||[]).length+' SKUs. '
-    +esc(alvoEm)+(r.alvo_defasados?(' <b>'+r.alvo_defasados+'</b> SKU(s) com alvo salvo diferente do cálculo de hoje — a tela usa o cálculo.'):'');
+  let avisoAlvo='';
+  if(r.alvo_defasados){
+    /* Diz quantos o botao resolve E quantos ele nao resolve. Prometer "aplicar
+       todos" e deixar aviso de pe depois do clique ensina a desconfiar da tela. */
+    const fora=r.alvo_defasados-(r.alvo_aplicaveis||0);
+    avisoAlvo=' <b>'+r.alvo_defasados+'</b> SKU(s) com alvo salvo diferente do cálculo de hoje'
+      +' — a tela usa o cálculo.'
+      +(r.alvo_aplicaveis?(' O botão grava '+r.alvo_aplicaveis+' deles no cadastro.'):'')
+      +(fora>0?(' '+fora+' fica'+(fora>1?'m':'')+' de fora: sem venda na janela, o Planejamento não'
+        +' sobrescreve o alvo — seria zerar o alvo de quem tem história e não vendeu no período.'):'');
+  }
+  $('#estRodape').innerHTML=
+     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'
+    +'<button class="ghost small" onclick="estCSV()">exportar CSV</button>'
+    +(r.alvo_aplicaveis?'<button class="ghost small" id="estAplicar" onclick="estAplicarAlvo()">aplicar alvo</button>':'')
+    +(r.nunca_contados?('<span class="sub">'+r.nunca_contados+' SKU(s) nunca passaram por contagem.</span>'):'')
+    +'</div>'
+    +'Mostrando '+linhas.length+' de '+(PAINEL.linhas||[]).length+' SKUs. '+esc(alvoEm)+avisoAlvo;
 
   // ── ajustes recentes: o registro que existia e nenhuma tela lia ──
   const aj=PAINEL.ajustes||[];
