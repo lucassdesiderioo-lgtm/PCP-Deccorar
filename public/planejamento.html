@@ -60,9 +60,19 @@
     <input type="file" id="arq" class="file" accept=".xlsx,.csv">
     <button class="prim" onclick="importar()">Importar</button>
     <span class="msg" id="msgImp"></span>
+    <span class="sub" style="width:100%;margin-top:2px">
+      A planilha precisa vir <b style="color:#e6edf3">inteira</b>: a janela toda de vendas
+      <b style="color:#e6edf3">mais</b> as ainda não despachadas. A data da venda alimenta a média;
+      o campo <i>Estado</i> alimenta o comprometido. O import é espelho —
+      <b style="color:#ffd85c">o que não vier no arquivo é apagado</b>, então um recorte apaga o histórico.
+    </span>
   </div>
   <div class="meta" id="meta">Nenhuma planilha importada ainda.</div>
 
+  <!-- Duas tarjas ambar, e sao coisas diferentes: `recorte` acusa o import que
+       encolheu a base (some no proximo import bom); `aviso` lista SKU da
+       planilha fora do cadastro (some quando alguem cadastra). -->
+  <div class="aviso" id="recorte" style="border-color:#8a5a12;background:#2e2008"></div>
   <div class="aviso" id="aviso"></div>
 
   <div class="bar">
@@ -176,6 +186,31 @@ async function importar(){
     $('#msgImp').textContent=`${r.novas} novas · ${r.atualizadas} atualizadas · ${r.removidas} removidas`
       +(r.canceladas?` · ${r.canceladas} fora da média (cancel./devol.)`:'')
       +(r.sem_sku?` · ${r.sem_sku} sem SKU`:'');
+    /* RECORTE TEM ASSINATURA, E ELA E MEDIVEL.
+       O import e espelho: o que nao veio no arquivo e apagado. Planilha completa
+       remove pouco (venda cancelada, venda ja despachada). Planilha recortada
+       remove quase tudo — e o estrago (media zerada, alvo no minimo, tela azul
+       vazia) nao emite erro nenhum, so um numero menor que ninguem compara.
+       `atualizadas + removidas` e o tamanho da base ANTES deste import.
+
+       O QUE ACUSA E A BASE TER ENCOLHIDO, nao ter sido substituida. Trocar 65
+       vendas velhas por 96 novas remove 100% da base e esta CERTO — planilha
+       nova, periodo novo. Olhar so o quanto foi removido acusaria esse caso, e
+       trava que acusa o inocente e trava que se aprende a ignorar. O recorte
+       tem outra assinatura: a base fica MENOR do que era. */
+    const antes  = r.atualizadas + r.removidas;
+    const depois = r.novas + r.atualizadas;
+    const rec = $('#recorte');
+    if(antes > 20 && depois < antes/2){
+      /* Tarja PROPRIA, nao a do #aviso: aquela e recarregada pelo load() a cada
+         chamada e apagaria esta. E o load() tem que rodar mesmo assim — a
+         pessoa precisa ver a tabela no estado em que ficou. */
+      rec.style.display='block';
+      rec.innerHTML='<b>⚠ A base caiu de '+antes+' para '+depois+' vendas.</b>'
+        +' Isso tem cara de planilha recortada, e não de vendas que saíram: sem o histórico da janela'
+        +' a média cai a zero, o alvo desce para o mínimo e a tela azul do operador para de pedir produção.'
+        +'<br>Se foi recorte, <b>suba a planilha completa de novo</b> — o import é espelho e reconstrói sozinho.';
+    } else rec.style.display='none';
     load(); fechamento();
   }catch(e){ $('#msgImp').style.color='#f85149'; $('#msgImp').textContent='falha: '+e; }
 }

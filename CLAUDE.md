@@ -71,6 +71,44 @@ que impede o operador de revisar meia hora no modo errado.
 | **PRODUÇÃO PRA ESTOQUE** | 🔵 azul | Necessidade calculada ao vivo (`comprometido + alvo − estoque`) — Fase 2 | `GET /api/revisao/producao` (+ `/api/revisao/adiantar`) |
 | **DEVOLUÇÕES** | 🟡 âmbar | Peças que voltaram do ML | navega para `/devolucao` |
 
+### ⚠️ ARMADILHA #11 — a planilha do ML é ESPELHO, e um recorte apaga a média
+
+A tela azul não sai de lançamento nenhum: ela é calculada ao vivo a partir da
+planilha do Mercado Livre, importada em **Admin → Planejamento**. Dessa planilha
+saem **dois** números, de lugares diferentes:
+
+| Coluna | Alimenta | Olha para |
+|---|---|---|
+| **Data da venda** | a média diária | os últimos 30 dias (`janela_media`) |
+| **Estado** (`"Para enviar no dia 17 de agosto"`) | o comprometido | os envios futuros |
+
+```
+alvo    = max(alvo_minimo, média_na_janela × dias_cobertura)
+precisa = comprometido + alvo − estoque
+```
+
+> ⚠️ **O import APAGA o que não veio no arquivo** (`plan_route.js`, ao fim da
+> transação): venda cancelada some da planilha e tem que sumir da conta. A
+> consequência é que a planilha precisa vir **inteira, sempre** — cobrindo a
+> janela toda e incluindo as vendas ainda não despachadas.
+>
+> Subir um recorte só com os próximos dias **apaga os 30 dias de histórico**. A
+> média de todo SKU cai a zero, o alvo despenca para o `alvo_minimo`, e a tela
+> azul para de pedir produção. Não dá erro e não dá aviso — o número só encolhe.
+>
+> Por isso a tela acusa: quando um import remove mais da metade da base, ela
+> mostra tarja âmbar dizendo que aquilo tem cara de recorte. **Reparo: subir a
+> planilha completa de novo.** Como o import é espelho, ele reconstrói sozinho.
+
+A janela não é fixa em 30 dias — é o campo "Janela da média" na própria tela. Se
+ela virar 60, a planilha precisa cobrir 60.
+
+> **Peça sob medida não tem alvo, e isso é definição, não exceção.** Ela não
+> existe antes da venda e não sobra depois (§7): não soma `+1` na embalagem nem
+> baixa na etiqueta, então o estoque dela é sempre zero. Com alvo, o `precisa`
+> daria `alvo − 0` todo dia e o SKU ficaria eterno na tela azul pedindo peça que
+> ninguém encomendou. O que ela precisa é o **comprometido**, e só ele.
+
 **Ground truth físico:** a produção separa os carrinhos fisicamente. Carrinho de
 hoje → tela vermelha. Carrinho de estoque → tela azul. O software espelha a
 realidade física; não tenta adivinhá-la.
