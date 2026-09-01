@@ -38,6 +38,8 @@
   .precisa{color:var(--blue);font-weight:800}.zero{color:var(--muted)}
   .novoSku{font-size:11px;color:#ffb4ae}
   .dim{color:var(--muted)}
+  tr.deg td{background:#11161d;font-size:11px;text-transform:uppercase;letter-spacing:.5px;
+            font-weight:700;padding:7px 11px;text-align:left}
   .apl{background:transparent;color:var(--blue);border:1px solid var(--line);border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}.apl:hover{border-color:var(--blue)}
 </style></head><body>
 <header><div class="mark">P</div>
@@ -91,16 +93,20 @@
     <thead>
       <tr class="cols">
         <th class="l">SKU</th>
-        <th>Vendas jan.</th><th>Média/d</th><th>Compromet.</th><th>Estoque</th><th>Precisa</th><th>Alvo</th><th></th>
+        <th>Vendas na janela</th><th>Comprometido</th><th>Estoque</th><th>Cobertura</th><th>Precisa</th><th>Alvo</th><th></th>
       </tr>
     </thead>
     <tbody id="corpo"></tbody>
   </table></div>
+  <div style="margin-top:10px"><button class="ghost" id="verTodos" style="font-size:12px">ver todos os SKUs</button></div>
   <div style="margin-top:12px"><button class="prim" onclick="aplicarTodos()">Aplicar alvo em todos (com venda na janela)</button>
     <span class="sub" style="margin-left:8px">grava o alvo sugerido nos SKUs que tiveram venda na janela</span></div>
 
   <div class="sub" style="margin-top:12px">
-    <b style="color:var(--blue)">Como o número sai:</b>
+    <b style="color:var(--blue)">A ordem é de prioridade, não de quantidade:</b>
+    quem tem cliente com prazo curto vem primeiro, depois quem está sem estoque, depois quem cobre poucos dias.
+    <b>Cobertura</b> = quantos dias o estoque atual aguenta a venda desse SKU.
+    <br><b style="color:var(--blue)">Como o número sai:</b>
     alvo = média na janela × dias de cobertura, com piso no alvo mínimo.
     &nbsp;·&nbsp; precisa = comprometido (envios futuros da planilha) + alvo − estoque.
   </div>
@@ -148,17 +154,71 @@ async function load(){
       +' — cadastre no Admin para entrarem no cálculo de estoque.';
   } else av.style.display='none';
 
-  $('#corpo').innerHTML=d.linhas.map(r=>`<tr>
-    <td class="l code">${r.codigo}${r.cadastrado?'':' <span class="novoSku">s/ cadastro</span>'}</td>
-    <td>${r.vendas_janela}</td>
-    <td>${r.media_dia}</td>
-    <td>${r.comprometido}</td>
-    <td>${fmt(r.estoque)}</td>
-    <td class="${r.precisa>0?'precisa':'zero'}">${r.precisa>0?r.precisa:'—'}</td>
-    <td><b>${fmt(r.alvo)}</b></td>
-    <td>${r.cadastrado?`<button class="apl" data-cod="${r.codigo}" data-alvo="${r.alvo}">aplicar</button>`:'<span class="dim">—</span>'}</td>
-  </tr>`).join('');
+  LINHAS=d.linhas;
+  desenhar();
 }
+
+/* Os quatro degraus de prioridade. O rotulo e a cor moram aqui, num lugar so —
+   a ordem quem decide e o demanda_dominio, que e onde a regra vive. */
+const DEGRAUS={
+  1:{t:'Cliente com prazo — despacha até amanhã', c:'#f85149'},
+  2:{t:'Sem estoque — a próxima venda já vira urgência', c:'#ff8c42'},
+  3:{t:'Cobertura baixa — falta em poucos dias', c:'#ffb800'},
+  4:{t:'Abaixo do alvo', c:'#4493f8'}
+};
+let LINHAS=[], VERTODOS=false;
+
+function desenhar(){
+  /* LISTA DE TRABALHO MOSTRA TRABALHO. Com 27 SKUs a maioria fica com precisa 0,
+     e uma tela cheia de linhas "—" ensina a passar o olho por cima justamente
+     onde estao as que importam. O resto continua a um clique. */
+  const trab=LINHAS.filter(r=>r.prioridade>0);
+  const resto=LINHAS.filter(r=>r.prioridade===0);
+  const mostrar = VERTODOS ? trab.concat(resto) : trab;
+
+  if(!mostrar.length){
+    $('#corpo').innerHTML='<tr><td colspan="8" style="color:var(--muted);padding:22px;text-align:center">'
+      +(LINHAS.length?'Nada a produzir: todo SKU está no alvo.':'Sem dados — importe a planilha do ML.')+'</td></tr>';
+  } else {
+    let h='', degrauAtual=null;
+    for(const r of mostrar){
+      if(r.prioridade!==degrauAtual){
+        degrauAtual=r.prioridade;
+        const g=DEGRAUS[r.prioridade];
+        h+= g
+          ? `<tr class="deg"><td colspan="8" style="border-left:3px solid ${g.c};color:${g.c}">${g.t}</td></tr>`
+          : '<tr class="deg"><td colspan="8" style="border-left:3px solid #2f3a48;color:var(--muted)">No alvo — nada a produzir</td></tr>';
+      }
+      const cob = r.cobertura==null ? '<span class="dim">—</span>'
+        : `<b style="color:${r.cobertura<2?'#f85149':(r.cobertura<5?'#ffb800':'var(--txt)')}">${r.cobertura}</b> <span class="dim">d</span>`;
+      /* O comprometido mostra o PRAZO junto: "10" nao diz se empurra hoje ou
+         daqui a tres semanas, e era essa a informacao que faltava. */
+      const comp = r.comprometido
+        ? `${r.comprometido}` + (r.comp_ja?` <span style="color:#f85149;font-size:11px">${r.comp_ja} até amanhã</span>`:'')
+                              + (!r.comp_ja&&r.comp_semana?` <span class="dim" style="font-size:11px">${r.comp_semana} na semana</span>`:'')
+        : '<span class="dim">—</span>';
+      h+=`<tr>
+        <td class="l code">${r.codigo}${r.cadastrado?'':' <span class="novoSku">s/ cadastro</span>'}
+            ${r.motivo?`<div class="dim" style="font-size:11px;font-family:system-ui">${r.motivo}</div>`:''}</td>
+        <td>${r.vendas_janela}<div class="dim" style="font-size:11px">${r.media_dia}/d</div></td>
+        <td>${comp}</td>
+        <td>${fmt(r.estoque)}</td>
+        <td>${cob}</td>
+        <td class="${r.precisa>0?'precisa':'zero'}">${r.precisa>0?r.precisa:'—'}</td>
+        <td><b>${fmt(r.alvo)}</b></td>
+        <td>${r.cadastrado?`<button class="apl" data-cod="${r.codigo}" data-alvo="${r.alvo}">aplicar</button>`:'<span class="dim">—</span>'}</td>
+      </tr>`;
+    }
+    $('#corpo').innerHTML=h;
+  }
+  $('#verTodos').textContent = VERTODOS
+    ? 'ver só o que precisa produzir'
+    : 'ver todos os SKUs ('+resto.length+' no alvo)';
+  $('#verTodos').style.display = resto.length ? '' : 'none';
+}
+document.addEventListener('click',function(e){
+  if(e.target.id==='verTodos'){ VERTODOS=!VERTODOS; desenhar(); }
+});
 // aplica o alvo calculado em skus.alvo
 async function aplicarUm(cod){
   const r=await (await fetch('/api/planejamento/aplicar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigo:cod})})).json();
