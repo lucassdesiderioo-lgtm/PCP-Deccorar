@@ -337,17 +337,57 @@ if(!inserir && !apagar){
   db.close(); return;
 }
 
-/* APAGAR NAO E O MESMO QUE INSERIR, e a diferenca e fisica: a linha inserida a
-   mais aparece na tela e alguem vai procurar a peca; a linha apagada some, e
-   ninguem procura o que nao esta escrito em lugar nenhum. Por isso o que sai
-   vai para um CSV ao lado do backup, com id, codigo, modo e data. */
-if(apagar){
+/* A ORDEM DE QUEM SAI E DELIBERADA:
+     1. a linha de devolucao fica por ultimo — apagar aquela perde o vinculo
+        com a devolucao que mandou reembalar (§9);
+     2. depois, a que NAO bate com o codigo do cadastro no case — essa e a
+        linha quebrada, que aparece na tela e o bipe nao acha;
+     3. entre as que sobram, sai a mais NOVA: a mais antiga e a que carrega a
+        historia da peca, e e ela que a tela de Embalagem poe na frente. */
+const escolher = db.prepare(`SELECT id, codigo, modo, revisado_em, data FROM fila
+  WHERE situacao='aguardando' AND UPPER(codigo)=UPPER(?)
+  ORDER BY (modo='devolucao') ASC, (codigo=?) ASC, revisado_em DESC, id DESC
+  LIMIT ?`);
+
+/* AS LINHAS QUE SAEM SAO ESCOLHIDAS ANTES DE PERGUNTAR, e nao depois de
+   confirmar: quem decide precisa ver QUAIS sao, nao so quantas. Uma linha
+   revisada hoje quase sempre tem peca no carrinho; uma de dois meses atras
+   quase nunca tem — e essa diferenca nao cabe num numero. */
+const aSair = [];
+acoes.forEach(a => { if(a.delta < 0) escolher.all(a.codigo, a.codigo, -a.delta).forEach(l => aSair.push(l)); });
+
+if(aSair.length){
+  const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
+  const faixa = l => {
+    const d = String(l.revisado_em || l.data || '').slice(0,10);
+    if(!d) return '(sem data)';
+    if(d === hoje) return 'revisadas HOJE';
+    const dias = Math.round((new Date(hoje+'T12:00:00') - new Date(d+'T12:00:00')) / 86400000);
+    return dias <= 7 ? 'ultimos 7 dias' : dias <= 30 ? 'ate 30 dias' : 'mais de 30 dias';
+  };
+  const porFaixa = {};
+  aSair.forEach(l => { const f = faixa(l); porFaixa[f] = (porFaixa[f]||0) + 1; });
+
   console.log('');
-  console.log('  ⚠ ' + apagar + ' linha(s) VAO SER APAGADAS da fila.');
-  console.log('  Sai primeiro a mais NOVA de cada SKU: a mais antiga e a que carrega a');
-  console.log('  historia da peca, e a de devolucao fica por ultimo — apagar aquela perde');
-  console.log('  o vinculo com a devolucao que a mandou reembalar (§9).');
-  console.log('  Nenhuma linha ja `embalado` e tocada: aquilo e peca que virou estoque.');
+  console.log('  ⚠ ' + aSair.length + ' linha(s) VAO SER APAGADAS da fila. Por idade da revisao:');
+  ['revisadas HOJE','ultimos 7 dias','ate 30 dias','mais de 30 dias','(sem data)']
+    .filter(k => porFaixa[k]).forEach(k => console.log('    ' + k.padEnd(18) + porFaixa[k]));
+  if(porFaixa['revisadas HOJE'])
+    console.log('    ^ revisada hoje quase sempre tem peca no carrinho. Confira a bancada.');
+
+  const devol = aSair.filter(l => l.modo === 'devolucao');
+  if(devol.length){
+    console.log('');
+    console.log('  ⚠ ' + devol.length + ' delas vieram de DEVOLUCAO (peca que voltou do ML para');
+    console.log('  reembalar). Apagar perde o vinculo com a devolucao (§9); a peca fisica');
+    console.log('  continua na fabrica. Sao as ultimas da fila a serem escolhidas — se elas');
+    console.log('  estao aqui, e porque o alvo do SKU e menor que o resto.');
+    devol.slice(0,10).forEach(l => console.log('    #' + l.id + '  ' + String(l.codigo).padEnd(26) + l.revisado_em));
+  }
+  console.log('');
+  console.log('  Sai primeiro a mais NOVA de cada SKU (a antiga carrega a historia), a de');
+  console.log('  devolucao por ultimo. Nenhuma linha ja `embalado` e tocada: aquilo e peca');
+  console.log('  que virou estoque. O que sair vai para um CSV ao lado do backup.');
 }
 
 /* Reposicao anterior a vista: rodar duas vezes e o erro natural deste script,
@@ -395,18 +435,12 @@ const aud = (function(){
   }catch(e){ return null; }
 })();
 
-/* A ORDEM DE QUEM SAI E DELIBERADA:
-     1. a linha de devolucao fica por ultimo — apagar aquela perde o vinculo
-        com a devolucao que mandou reembalar (§9);
-     2. depois, a que NAO bate com o codigo do cadastro no case — essa e a
-        linha quebrada, que aparece na tela e o bipe nao acha;
-     3. entre as que sobram, sai a mais NOVA: a mais antiga e a que carrega a
-        historia da peca, e e ela que a tela de Embalagem poe na frente. */
-const paraApagar = db.prepare(`SELECT id, codigo, modo, revisado_em, data FROM fila
-  WHERE situacao='aguardando' AND UPPER(codigo)=UPPER(?)
-  ORDER BY (modo='devolucao') ASC, (codigo=?) ASC, revisado_em DESC, id DESC
-  LIMIT ?`);
-const del = db.prepare('DELETE FROM fila WHERE id=?');
+/* O DELETE repete a condicao `aguardando` de proposito. As linhas foram
+   escolhidas alguns segundos antes, para poderem ser mostradas; se nesse
+   intervalo a bancada bipou o terceiro bipe de uma delas, ela virou `embalado`
+   — e apagar por id apagaria a historia de uma peca que ja somou +1 no
+   estoque. Assim ela apenas nao sai, e a contagem final diz a verdade. */
+const del = db.prepare("DELETE FROM fila WHERE id=? AND situacao='aguardando'");
 
 const saiu = [];
 const feito = db.transaction(() => {
@@ -418,8 +452,6 @@ const feito = db.transaction(() => {
         else   ins.run(a.codigo, MODO);
         mais++;
       }
-    } else if(a.delta < 0){
-      paraApagar.all(a.codigo, a.codigo, -a.delta).forEach(l => { del.run(l.id); saiu.push(l); menos++; });
     }
     /* Uma linha de auditoria por SKU, nao por peca: o que se quer saber depois
        e "quem mexeu no que", nao ler 100 linhas iguais. O texto guarda de onde
@@ -429,8 +461,16 @@ const feito = db.transaction(() => {
         ') na fila' + (a.delta > 0 ? ' (modo ' + MODO + ')' : '') +
         (a.foraDaLista ? ' [fora da lista, --so-a-lista]' : '') + ' — ' + MOTIVO);
   });
+  aSair.forEach(l => { if(del.run(l.id).changes){ saiu.push(l); menos++; } });
   return {mais:mais, menos:menos};
 })();
+
+if(feito.menos !== aSair.length){
+  console.log('');
+  console.log('  [aviso] ' + (aSair.length - feito.menos) + ' linha(s) que iam sair foram embaladas');
+  console.log('          entre a escolha e a gravacao — ficaram como estao, e isso e o certo:');
+  console.log('          peca embalada ja somou +1 no estoque.');
+}
 
 /* A foto do que saiu, ao lado do backup: ler um .db exige ferramenta, e a
    pergunta que vem depois ("o que tinha nessa fila?") merece um arquivo que
