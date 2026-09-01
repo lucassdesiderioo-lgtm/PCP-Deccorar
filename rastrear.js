@@ -415,18 +415,6 @@ async function verLote(){
   T('  - retidos: divergencia      : '+bDiv+(bDiv?'   (Admin > Bloqueados, em vermelho)':''));
   if(andando) T('  - ja embalados/carregados   : '+andando);
   T('  = PENDENTES                 : '+todosPend.length);
-  /* ONDE A UNIDADE MUDA, E POR ISSO ELE E UM DEGRAU PROPRIO. Ate aqui a escada
-     conta VOLUMES (uma etiqueta cada); da producao em diante conta PECAS, porque
-     e peca que a bancada faz. Sem esta linha, "pendentes 4 - cobertos 3 =
-     urgentes 4" parece erro de conta, e quem esta conferindo perde a confianca
-     na ferramenta inteira. */
-  {
-    const pcs=db.prepare(`SELECT COALESCE(SUM(COALESCE(pecas,1)),0) n FROM lote
-      WHERE data=? AND estagio='pendente' AND codigo IS NOT NULL`).get(dia).n;
-    if(pcs!==todosPend.length)
-      T('  = em PECAS                  : '+pcs+'   ← daqui pra baixo a conta e em pecas ('
-        +(pcs-todosPend.length)+' viajam junto de outra)');
-  }
 
   /* ── 2. O PRAZO DE DESPACHO (§8, armadilha #7) ───────────────────────────
      Nem todo volume de um lote sai no mesmo dia: a etiqueta traz "Despachar:
@@ -464,12 +452,12 @@ async function verLote(){
      direto pra etiqueta, sem passar pela producao. A tela vermelha mostra o
      que falta PRODUZIR, nunca o que falta EXPEDIR. */
   T('');
-  /* A conta sai do `urgencia.js`, o dono unico — nunca de uma copia aqui.
-     Ate 01/09/2026 esta linha somava +1 por volume; quando o cruzamento passou
-     a contar PECAS (o item de "Quantidade: 3"), uma copia continuaria dizendo o
-     numero velho, e com a autoridade de quem foi chamado para explicar. */
+  /* A conta sai do `urgencia.js`, o dono unico — nunca de uma copia aqui. Uma
+     ferramenta de diagnostico com regua propria e pior que nenhuma: ela
+     confirma com autoridade um numero que a tela nao usa (mesmo motivo pelo
+     qual a fila de hoje vem do `fila_dia.js`). */
   const linhas=require('./urgencia').calcular(db, dia)
-    .map(l=>({c:l.codigo, q:l.pendentes, vol:l.volumes, est:l.estoque, u:l.urgente}));
+    .map(l=>({c:l.codigo, q:l.pendentes, est:l.estoque, u:l.urgente}));
   let urg=0, cobertos=0;
   linhas.forEach(l=>{ urg+=l.u; cobertos+=l.q-l.u; });
   T('  - cobertos por estoque      : '+cobertos+'   (saem direto pra Etiqueta de Venda)');
@@ -486,8 +474,7 @@ async function verLote(){
     linha();
     T('POR SKU — pendente, estoque, urgente');
     linha();
-    linhas.forEach(l=>T('  '+String(l.c).padEnd(24)+' pecas '+String(l.q).padStart(3)+
-      (l.vol!==l.q?' (em '+l.vol+' vol.)':'            ')+
+    linhas.forEach(l=>T('  '+String(l.c).padEnd(24)+' pendentes '+String(l.q).padStart(3)+
       '   estoque '+String(l.est).padStart(3)+'   urgente '+String(l.u).padStart(3)+
       (l.u<l.q?'   ← '+(l.q-l.u)+' ja tem pronta':'')));
   }
@@ -498,11 +485,9 @@ async function verLote(){
     T('ITENS COM MAIS DE UMA PECA — a diferenca que a contagem na mao acusa');
     linha();
     T('');
-    T('Sao '+multi.reduce((a,b)=>a+(b.qtd-1),0)+' peca(s) alem do numero de volumes. O sistema grava UM');
-    T('volume por etiqueta (uma linha em `lote`), e desde 01/09/2026 esse volume');
-    T('guarda quantas pecas leva: a ordem de producao sai pela quantidade cheia.');
-    T('A ETIQUETA DE VENDA continua baixando UMA peca por volume — confira estes');
-    T('no fechamento, e o saldo deles:');
+    T('Sao '+multi.reduce((a,b)=>a+(b.qtd-1),0)+' peca(s) alem do numero de volumes. O sistema grava UM volume');
+    T('por etiqueta, entao esses itens entram como 1 e a fabrica precisa produzir');
+    T('a quantidade cheia — confira estes na mao antes de fechar o dia:');
     multi.forEach(b=>T('  '+String(b.sku).padEnd(24)+' Quantidade '+b.qtd+'   '+(b.comprador||'—')+
       '   venda '+(b.venda||'—')));
   }

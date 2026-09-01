@@ -3,16 +3,17 @@
  *
  *   node teste_etiqueta.js
  *
- * O QUE ORIGINOU ESTES TESTES (01/09/2026): a baixa era fixa em UMA peça por
- * volume. Quando a produção passou a contar peças (dívida 11), o envio de
- * "Quantidade: 3" virou 3 ordens → 3 embalagens → +3 no estoque, e a impressão
- * baixava −1: sobravam 2 peças no saldo que fisicamente foram na caixa do
- * cliente. Furo silencioso, porque nada na tela dizia que o volume levava mais
- * de uma peça.
+ * ⚠️ A REGRA QUE ESTES TESTES PROTEGEM: **uma venda = uma etiqueta = uma
+ * persiana** (§2). Cada impressão baixa exatamente UMA peça, porque cada
+ * etiqueta é de uma peça. Não se junta etiqueta, pacote nem caixa.
  *
- * A embalagem é sempre separada — uma peça por saco, independente da quantidade
- * (regra do dono da operação). Logo: entra +1 por peça embalada, e sai o tanto
- * que o volume leva.
+ * Em 01/09/2026 a baixa foi alterada para descontar uma "quantidade" do volume,
+ * e a alteração foi revertida no mesmo dia por contrariar a regra da operação.
+ * O caso 1 aqui existe para que a tentativa quebre um teste antes de chegar ao
+ * saldo.
+ *
+ * A rota não tinha teste nenhum até aqui, e ela mexe em `skus.estoque` — que é
+ * a coluna que não se reconstrói (§14).
  *
  * Sobe um banco temporário e chama os handlers direto, com um `app` de mentira
  * que só guarda as rotas. Não abre porta, não toca no banco de produção.
@@ -32,25 +33,28 @@ db.exec(`
     largura_cm INTEGER, altura_cm INTEGER, cor_codigo TEXT, tecido_codigo TEXT);
   CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT, buyer TEXT,
     city TEXT, nf TEXT, packId TEXT, venda TEXT, estagio TEXT DEFAULT 'pendente',
-    embalado_em TEXT, data TEXT DEFAULT (date('now','localtime')), despachar_em TEXT,
-    pecas INTEGER DEFAULT 1);
+    embalado_em TEXT, data TEXT DEFAULT (date('now','localtime')), despachar_em TEXT);
 `);
 db.prepare("INSERT INTO modelo (id,codigo,nome,sob_medida) VALUES (1,'ROLO','Rolô',0)").run();
 db.prepare("INSERT INTO modelo (id,codigo,nome,sob_medida) VALUES (2,'SOBMED','Sob medida',1)").run();
-const sku = db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES (?,?,?)");
-sku.run('BK140140BEGE', 5, 1);
-sku.run('BK160160CINZA', 2, 1);
-sku.run('SOBMEDIDA', 0, 2);
+db.prepare("INSERT INTO cor (codigo,nome) VALUES ('BEGE','Bege')").run();
+const sku = db.prepare(`INSERT INTO skus (codigo,estoque,modelo_id,largura_cm,altura_cm,cor_codigo)
+  VALUES (?,?,?,?,?,?)`);
+sku.run('BK140140BEGE', 2, 1, 140, 140, 'BEGE');
+sku.run('BK160160CINZA', 0, 1, 160, 160, null);
+sku.run('SOBMEDIDA', 0, 2, null, null, null);
 
 const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
-const vol = db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data,pecas)
+const amanha = db.prepare("SELECT date('now','localtime','+9 day') d").get().d;
+const vol = db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data,despachar_em)
   VALUES (?,?,?,?,?,'pendente',?,?)`);
-vol.run('BK140140BEGE','Abraao Amorim','1','111','901',hoje,3);   // id 1 — o caso
-vol.run('BK140140BEGE','Maria Souza',  '2','112','902',hoje,1);   // id 2
-vol.run('BK160160CINZA','Joao Silva',  '3','113','903',hoje,3);   // id 3 — falta peça
-vol.run('SOBMEDIDA','Lucelia',         '4','114','904',hoje,2);   // id 4 — sob medida
-db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data,pecas)
-  VALUES ('BK140140BEGE','Antigo','5','115','905','pendente',?,NULL)`).run(hoje); // id 5
+vol.run('BK140140BEGE','Abraao Amorim','1','111','901',hoje,hoje);   // id 1
+vol.run('BK140140BEGE','Abraao Amorim','2','112','902',hoje,hoje);   // id 2 — mesma pessoa, outra venda
+vol.run('BK140140BEGE','Maria Souza',  '3','113','903',hoje,amanha); // id 3 — venda futura
+vol.run('BK160160CINZA','Joao Silva',  '4','114','904',hoje,hoje);   // id 4 — sem estoque
+vol.run('SOBMEDIDA','Lucelia',         '5','115','905',hoje,hoje);   // id 5 — sob medida
+db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data)
+  VALUES ('BK140140BEGE','Pedro','6','116','906','bloqueado',?)`).run(hoje);  // id 6
 
 const rotas = {};
 const app = { get:(p,...h)=>{ rotas['GET '+p]=h[h.length-1]; },
@@ -69,51 +73,55 @@ const ok = (n, c, extra) => { casos++;
   else { falhas++; console.log('FALHOU  ' + n + (extra ? '   ' + extra : '')); } };
 
 (async () => {
-  // ── O BIPE MOSTRA QUANTAS PECAS ──────────────────────────────────────────
-  const px = await chamar('GET /api/proximo/:sku', null, {sku:'BK140140BEGE'});
-  ok('o bipe do SKU diz quantas peças o volume leva',
-     px.pedido && px.pedido.pecas === 3, JSON.stringify(px.pedido));
-
-  // ── A BAIXA E DO TAMANHO DO VOLUME ───────────────────────────────────────
-  const antes = estoqueDe('BK140140BEGE');
+  // ── CADA ETIQUETA BAIXA UMA PECA ─────────────────────────────────────────
   const r1 = await chamar('POST /api/embalar', {id:1});
-  ok('volume de 3 peças baixa 3 do estoque (5 → 2)',
-     r1.ok && estoqueDe('BK140140BEGE') === antes-3,
-     'antes ' + antes + ' depois ' + estoqueDe('BK140140BEGE'));
-  ok('e a resposta diz quantas saíram', r1.pecas === 3, JSON.stringify(r1));
-  /* A conta velha baixava 1 e deixava 2 peças fantasmas no saldo — peças que
-     foram na caixa do cliente e continuavam contando como estoque. */
-  ok('a conta velha (baixar 1) deixaria 4 no saldo', estoqueDe('BK140140BEGE') !== 4);
-
+  ok('imprimir a etiqueta baixa UMA peça (2 → 1)',
+     r1.ok && estoqueDe('BK140140BEGE') === 1, 'veio ' + estoqueDe('BK140140BEGE'));
   const r2 = await chamar('POST /api/embalar', {id:2});
-  ok('volume de 1 peça continua baixando 1 (2 → 1)',
-     r2.ok && estoqueDe('BK140140BEGE') === 1, 'veio ' + estoqueDe('BK140140BEGE'));
+  ok('a segunda venda do mesmo cliente baixa outra (1 → 0)',
+     r2.ok && estoqueDe('BK140140BEGE') === 0, 'veio ' + estoqueDe('BK140140BEGE'));
+  ok('o volume andou para embalado, com carimbo de hora',
+     db.prepare("SELECT estagio,embalado_em FROM lote WHERE id=1").get().estagio === 'embalado' &&
+     !!db.prepare("SELECT embalado_em FROM lote WHERE id=1").get().embalado_em);
 
-  // ── PASSIVO ANTIGO: pecas NULL vale 1 ────────────────────────────────────
-  const r5 = await chamar('POST /api/embalar', {id:5});
-  ok('volume gravado antes da coluna existir baixa 1 (1 → 0)',
-     r5.ok && estoqueDe('BK140140BEGE') === 0, 'veio ' + estoqueDe('BK140140BEGE'));
-
-  // ── A TRAVA E PELO QUE O VOLUME LEVA, E DIZ O QUE FALTA ──────────────────
+  // ── A TRAVA DE ESTOQUE ───────────────────────────────────────────────────
   const r3 = await chamar('POST /api/embalar', {id:3});
-  ok('volume de 3 peças com 2 em estoque é recusado', !!r3.erro, JSON.stringify(r3));
-  ok('e a mensagem diz quantas faltam, não só "sem estoque"',
-     /3 peças/.test(r3.erro||'') && /Falta 1\./.test(r3.erro||''), r3.erro);
-  ok('recusado não mexe no estoque nem no volume',
-     estoqueDe('BK160160CINZA') === 2 &&
-     db.prepare('SELECT estagio FROM lote WHERE id=3').get().estagio === 'pendente');
-
-  // ── SOB MEDIDA: nem trava nem baixa, mesmo com 2 pecas ───────────────────
+  ok('sem peça na prateleira não imprime — nem a venda futura',
+     !!r3.erro && estoqueDe('BK140140BEGE') === 0, JSON.stringify(r3));
+  ok('e o volume recusado continua pendente',
+     db.prepare("SELECT estagio FROM lote WHERE id=3").get().estagio === 'pendente');
   const r4 = await chamar('POST /api/embalar', {id:4});
-  ok('sob medida imprime com estoque zero (a peça é feita pro pedido)', !!r4.ok,
-     JSON.stringify(r4));
+  ok('SKU com estoque zero também é recusado', !!r4.erro, JSON.stringify(r4));
+
+  // ── SOB MEDIDA: nem trava nem baixa (§7) ─────────────────────────────────
+  const r5 = await chamar('POST /api/embalar', {id:5});
+  ok('sob medida imprime com estoque zero — a peça é feita pro pedido', !!r5.ok,
+     JSON.stringify(r5));
   ok('e não abre buraco no saldo: continua zero', estoqueDe('SOBMEDIDA') === 0,
      'veio ' + estoqueDe('SOBMEDIDA'));
 
-  // ── O QUE JA ANDOU NAO ANDA DE NOVO ──────────────────────────────────────
+  // ── O QUE A TRAVA DO §6 SEGURA ───────────────────────────────────────────
+  const r6 = await chamar('POST /api/embalar', {id:6});
+  ok('volume bloqueado não imprime (SKU fora do cadastro)', !!r6.erro,
+     JSON.stringify(r6));
+
+  // ── NADA ANDA DUAS VEZES ─────────────────────────────────────────────────
+  db.prepare("UPDATE skus SET estoque=5 WHERE codigo='BK140140BEGE'").run();
   const rep = await chamar('POST /api/embalar', {id:1});
-  ok('o mesmo volume não baixa duas vezes', !!rep.erro && estoqueDe('BK140140BEGE') === 0,
-     JSON.stringify(rep));
+  ok('o mesmo volume não baixa duas vezes, nem com estoque sobrando',
+     !!rep.erro && estoqueDe('BK140140BEGE') === 5, JSON.stringify(rep));
+
+  // ── O BIPE DO SKU ────────────────────────────────────────────────────────
+  const px = await chamar('GET /api/proximo/:sku', null, {sku:'BK140140BEGE'});
+  ok('o bipe acha a próxima venda e diz o que a peça é',
+     px.cadastrado && px.pedido && px.peca && px.peca.medida === '140 × 140',
+     JSON.stringify(px.peca));
+  /* Venda futura entra na busca (o que decide é a ORDEM, §8): esgotadas as de
+     hoje, o bipe segue trabalhando em vez de dizer que não há nada. */
+  ok('e marca quando a venda escolhida é adiantada', px.adiantado === true,
+     JSON.stringify({adiantado:px.adiantado, prazo:px.pedido&&px.pedido.despachar_em}));
+  const nx = await chamar('GET /api/proximo/:sku', null, {sku:'NAOEXISTE'});
+  ok('SKU fora do cadastro responde que não é cadastrado', nx.cadastrado === false);
 
   console.log('');
   console.log(falhas ? ('FALHARAM ' + falhas + ' de ' + casos)

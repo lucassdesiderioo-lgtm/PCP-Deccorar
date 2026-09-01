@@ -6,16 +6,8 @@
  * nao como ele chegou ali. O que da pra reconstruir sao os dois movimentos que
  * respondem pela producao e pela venda:
  *
- *   ENTROU = pecas embaladas   (tabela `montagem`, o +1 do §4 — uma linha por
- *                               peca, porque a embalagem e sempre separada)
- *   SAIU   = pecas despachadas (`lote.embalado_em`, a baixa da etiqueta de
- *                               venda — SOMA `pecas`, nao conta etiquetas)
- *
- * ⚠️ OS DOIS LADOS CONTAM PECA, e e isso que faz o grafico fechar com o saldo.
- * A etiqueta de venda e UMA por volume, mas o volume de "Quantidade: 3" leva
- * tres persianas e baixa tres do estoque (§5, armadilha #8). Contar etiquetas
- * de um lado e pecas do outro faria o grafico mostrar uma fabrica que produz
- * mais do que vende todo dia, sem nada ter acontecido.
+ *   ENTROU = pecas embaladas               (tabela `montagem`, o +1 do §4)
+ *   SAIU   = etiquetas de venda impressas  (`lote.embalado_em`, o -1 do §2)
  *
  * A conta ja existia dentro do `/api/fechamento` (plan_route.js). Quando o
  * painel da aba Estoque passou a mostrar o MESMO movimento em serie de 30 dias,
@@ -38,7 +30,7 @@
    try/catch cobre banco antigo sem a coluna, do mesmo jeito que o fechamento. */
 function saidasDoDia(db){
   try{
-    return db.prepare("SELECT COALESCE(SUM(COALESCE(pecas,1)),0) n FROM lote "+
+    return db.prepare("SELECT COUNT(*) n FROM lote "+
       "WHERE embalado_em IS NOT NULL AND date(embalado_em)=date('now','localtime') "+
       "AND COALESCE(teste,0)=0").get().n;
   }catch(e){ return 0; }
@@ -64,7 +56,7 @@ function serie(db, dias){
     "WHERE data >= date('now','localtime','-'||?||' days') AND COALESCE(teste,0)=0 "+
     "GROUP BY data").all(n-1).forEach(r => ent[r.d] = r.q);
   try{
-    db.prepare("SELECT date(embalado_em) d, COALESCE(SUM(COALESCE(pecas,1)),0) q FROM lote "+
+    db.prepare("SELECT date(embalado_em) d, COUNT(*) q FROM lote "+
       "WHERE embalado_em IS NOT NULL "+
       "AND date(embalado_em) >= date('now','localtime','-'||?||' days') "+
       "AND COALESCE(teste,0)=0 GROUP BY date(embalado_em)").all(n-1)

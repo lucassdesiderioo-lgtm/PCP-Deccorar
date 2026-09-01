@@ -1,28 +1,26 @@
 /* O DONO ÚNICO de "quanto falta PRODUZIR do que o PDF trouxe hoje".
  *
- * A conta morava dentro do `cruz_route.js` e o `rastrear.js --lote` tinha uma
- * cópia dela — cópia que contava volumes com `+1` por linha. No dia em que o
- * cruzamento passou a contar PEÇAS (dívida 11 do §14), a ferramenta de
- * diagnóstico continuaria dizendo o número velho: e uma ferramenta de
- * diagnóstico com régua própria é pior que nenhuma, porque confirma com
- * autoridade um número que a tela não usa. Mesmo motivo do `fila_dia.js`.
+ * ⚠️ A CONTA É POR ETIQUETA, E ISSO É A REGRA DO NEGÓCIO, NÃO UM ATALHO:
+ * **uma venda = uma etiqueta = uma persiana** (§2). Não se junta etiqueta,
+ * pacote nem caixa. Cada peça vendida tem o seu volume, então contar linhas de
+ * `lote` É contar peças — não existe volume que leve duas.
  *
- * ⚠️ CONTA PEÇAS, NÃO VOLUMES. O item da folha que diz "Quantidade: 3" tem UMA
- * etiqueta e vira UM volume — o parse está certo em gravar uma linha só
- * (armadilha #8). Mas a fábrica precisa das TRÊS persianas. Contando volumes,
- * aquele envio virava 1 ordem urgente: a bancada produzia 1, o cliente tinha
- * comprado 3, e a conta fechava com ela mesma porque a tela também mostrava 1.
+ * Se um dia alguém for tentado a multiplicar isto por uma "quantidade", pare:
+ * essa tentativa já foi feita em 01/09/2026 e foi revertida no mesmo dia. O
+ * campo `Quantidade` da folha de controle não multiplica volume nenhum aqui.
  *
- * `COALESCE(pecas,1)`: volume gravado antes da coluna existir vale uma peça —
- * exatamente o que o sistema assumia até aqui. O passivo não muda de número.
+ * POR QUE É UM MÓDULO, e não uma função dentro do `cruz_route`: o
+ * `rastrear.js --lote` faz a MESMA pergunta para explicar a escada do PDF até a
+ * tela, e tinha uma cópia da conta. Ferramenta de diagnóstico com régua própria
+ * é pior que nenhuma — ela confirma com autoridade um número que a tela não
+ * usa. Mesmo motivo do `fila_dia.js` e do `carga.js`.
  *
  * O que NÃO entra: volume já embalado (não é mais trabalho de produção) e
- * volume `bloqueado` (ninguém sabe ainda qual peça é — §6 e §5).
+ * volume `bloqueado` (ninguém sabe ainda qual peça é — §5 e §6).
  */
 
 function calcular(db, data){
-  const pend = db.prepare(`SELECT codigo, COUNT(*) volumes,
-      SUM(COALESCE(pecas,1)) qtd FROM lote
+  const pend = db.prepare(`SELECT codigo, COUNT(*) qtd FROM lote
     WHERE data = COALESCE(?, date('now','localtime'))
       AND codigo IS NOT NULL AND estagio='pendente'
     GROUP BY codigo ORDER BY codigo`).all(data || null);
@@ -37,7 +35,7 @@ function calcular(db, data){
        produção: a tela vermelha mostra o que falta PRODUZIR, nunca o que falta
        EXPEDIR. */
     const urgente = Math.max(0, v.qtd - estoque);
-    return { codigo:v.codigo, pendentes:v.qtd, volumes:v.volumes, estoque, urgente,
+    return { codigo:v.codigo, pendentes:v.qtd, estoque, urgente,
              cobertos: v.qtd - urgente };
   });
 }

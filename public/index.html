@@ -1789,15 +1789,10 @@ async function verCruz(){
   var l=[]; try{ l=await (await fetch('/api/cruzamento')).json(); }catch(e){}
   if(!l.length){ document.getElementById('cruz').innerHTML=''; return; }
   var u=0,h='<div style="font-size:12px;color:#8b97a5;margin-top:6px">O PDF gera só <b style="color:#ff6b6b">urgência</b> (venda sem estoque). A reposição vem do Planejamento (tela azul).</div>'
-    +'<table style="width:100%;font-size:13px;margin-top:8px"><tr style="color:#8b97a5"><th align=left>SKU</th><th title="Peças a despachar. Um item de \'Quantidade: 3\' é 1 volume e 3 peças.">Peças pendentes</th><th>Estoque</th><th>Urgente</th></tr>';
+    +'<table style="width:100%;font-size:13px;margin-top:8px"><tr style="color:#8b97a5"><th align=left>SKU</th><th>Pendentes</th><th>Estoque</th><th>Urgente</th></tr>';
   for(var i=0;i<l.length;i++){
     u+=l[i].urgente;
-    /* PECAS, e o numero de VOLUMES ao lado quando os dois diferem. Quem confere
-       a folha conta etiquetas; quem produz conta persianas. Mostrar so um dos
-       dois faz a pessoa procurar um numero que nao existe no PDF. */
-    var vol=l[i].volumes, dif=(vol!=null && vol!==l[i].pendentes)
-      ? ' <span style="color:#8b97a5;font-size:11px">em '+vol+' vol.</span>' : '';
-    h+='<tr><td>'+l[i].codigo+'</td><td align=center>'+l[i].pendentes+dif+'</td><td align=center>'+l[i].estoque+'</td><td align=center style="color:#ff6b6b"><b>'+l[i].urgente+'</b></td></tr>';
+    h+='<tr><td>'+l[i].codigo+'</td><td align=center>'+l[i].pendentes+'</td><td align=center>'+l[i].estoque+'</td><td align=center style="color:#ff6b6b"><b>'+l[i].urgente+'</b></td></tr>';
   }
   h+='</table><button id="btAplicar" style="margin-top:12px;background:#ffb800;border:0;border-radius:8px;padding:10px 18px;font-weight:700;cursor:pointer">Lancar '+u+' urgentes na producao</button>';
   document.getElementById('cruz').innerHTML=h;

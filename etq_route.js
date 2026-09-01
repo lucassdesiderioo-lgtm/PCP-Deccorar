@@ -39,12 +39,7 @@ module.exports=function(app,db){
        O que impede adiantar o que nao pode e a trava de estoque, que ja existe
        logo abaixo: sem peca na prateleira nada e impresso. E exatamente a regra
        "so se tiver estoque disponivel". */
-    /* `pecas` vem junto porque a bancada PRECISA saber: a embalagem e separada,
-       uma peca por saco, mas a etiqueta de venda e uma so. Sem esse numero na
-       tela, o volume de tres persianas sai com uma — e o sistema nem perceberia,
-       porque do ponto de vista dele a etiqueta foi impressa e o volume andou. */
-    const p=db.prepare(`SELECT id,codigo,cor,buyer,city,nf,packId,venda,despachar_em,
-        COALESCE(pecas,1) pecas
+    const p=db.prepare(`SELECT id,codigo,cor,buyer,city,nf,packId,venda,despachar_em
       FROM lote WHERE codigo=? AND estagio='pendente'
       ORDER BY `+ORDEM_URGENCIA+` LIMIT 1`).get(sku);
     const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
@@ -75,14 +70,6 @@ module.exports=function(app,db){
     const s=db.prepare(`SELECT s.estoque, COALESCE(m.sob_medida,0) sob_medida
       FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id WHERE s.codigo=?`).get(o.codigo);
     if(!s) return res.json({erro:'SKU nao cadastrado.'});
-    /* QUANTAS PECAS ESTE VOLUME LEVA (§5, armadilha #8). A embalagem e sempre
-       separada, uma peca por vez: o envio de "Quantidade: 3" soma +3 no estoque
-       ao ser embalado, entao a saida dele tambem e de 3. Enquanto a baixa era
-       fixa em 1, sobravam 2 pecas no saldo que fisicamente foram na caixa do
-       cliente — um furo silencioso, porque nada na tela dizia que aquele volume
-       levava mais de uma.
-       `COALESCE(pecas,1)`: volume gravado antes da coluna existir vale 1. */
-    const pecas=Math.max(1, +o.pecas||1);
     /* SOB MEDIDA NAO PASSA PELA TRAVA DE ESTOQUE — nem pela baixa.
        A peca e feita contra o pedido: nao existe antes da venda, nao sobra
        depois, e por isso o saldo dela e sempre zero. Cobrar estoque aqui
@@ -92,22 +79,12 @@ module.exports=function(app,db){
        sempre. A trava so protegia no papel.
        A baixa tambem sai: sem +1 na embalagem nao pode haver -1 aqui, senao
        cada venda sob medida abriria um buraco de uma peca no SKU. */
-    /* A TRAVA E PELO QUE O VOLUME LEVA, e a mensagem diz o que falta.
-       "Sem estoque desse SKU" para um volume de 3 com 2 na prateleira nao
-       explica nada, e trava que nao se entende e trava que a equipe aprende a
-       contornar (armadilha #6) — sem registro nenhum, que e o pior lugar. */
-    if(!s.sob_medida && s.estoque < pecas){
-      const falta = pecas - s.estoque;
-      return res.json({erro: pecas>1
-        ? ('Este volume leva '+pecas+' peças e há '+s.estoque+' em estoque. '
-           +(falta===1 ? 'Falta 1.' : 'Faltam '+falta+'.'))
-        : 'Sem estoque desse SKU.'});
-    }
+    if(!s.sob_medida && s.estoque<=0) return res.json({erro:'Sem estoque desse SKU.'});
     db.transaction(()=>{
       db.prepare("UPDATE lote SET estagio='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(id);
-      if(!s.sob_medida) db.prepare('UPDATE skus SET estoque=MAX(0,estoque-?) WHERE codigo=?').run(pecas,o.codigo);
+      if(!s.sob_medida) db.prepare('UPDATE skus SET estoque=MAX(0,estoque-1) WHERE codigo=?').run(o.codigo);
     })();
     const e=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(o.codigo);
-    res.json({ok:true,estoque:e?e.estoque:0,pecas});
+    res.json({ok:true,estoque:e?e.estoque:0});
   });
 };
