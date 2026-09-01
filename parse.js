@@ -37,6 +37,62 @@ function dataDespacho(texto, hoje){
   if(isNaN(d.getTime()) || d.getUTCDate()!==dia) return null;   // 31/fev e afins
   return iso(ano);
 }
+/* O NOME DE QUEM COMPROU, LIDO DA ETIQUETA.
+ *
+ * E o dado mais importante da etiqueta: e o unico que liga o volume ao item da
+ * folha sem depender do Pack ID — justamente o numero que desalinha. Se ele vem
+ * errado, a conferencia 2 para de proteger E passa a acusar inocente, que sao
+ * os dois piores resultados ao mesmo tempo.
+ *
+ * O nome fica na linha ACIMA do "Endereço:", e vem seguido do papel do
+ * comprador entre parenteses ("Dona Lizete (CONTADOR)"). O pdf.js quebra essa
+ * linha em duas quando os pedacos caem em alturas diferentes, e ai o que sobra
+ * na linha de cima do endereco e so o rabo do parentetico.
+ *
+ * Havia so UMA forma de remontar: quando o pedaco comecava com "(". O pedaco
+ * que chega como "CONTADOR)" — sem o "(", que ficou na linha anterior — nao
+ * era remontado, e o comprador do volume virava a palavra "CONTADOR)". Em
+ * 31/08/2026 foram tres volumes da Dona Lizete: os tres acusados de "comprador
+ * nao bate", os tres corretos. Uma trava que acusa o inocente ensina a equipe a
+ * destravar sem olhar — e ai ela nao protege mais ninguem.
+ */
+function nomeDaEtiqueta(lines){
+  const ei=(lines||[]).findIndex(l=>/^Endere[çc]o:/.test(l));
+  if(ei<=0) return '';
+  let nome=lines[ei-1]||'';
+  const orfao=s=>s.indexOf(')')>=0 && s.indexOf('(')<0;   // rabo de parentetico
+  if(ei>1 && (/^\(/.test(nome) || orfao(nome))) nome=(lines[ei-2]||'')+' '+nome;
+  nome=nome.replace(/\s*\([^)]*\)?\s*$/,'').trim();       // "(LOJA)" e "(LOJA"
+  /* Sobrou ")" sem abertura: o parentetico veio partido de um jeito que o passo
+     acima nao alcanca. Corta do ")" para tras, junto com a palavra que o carrega. */
+  if(orfao(nome)) nome=nome.slice(0,nome.indexOf(')')).replace(/[\s(]+\S*$/,'').trim();
+  return nome;
+}
+
+/* O MESMO NOME COM LETRA REPETIDA A MAIS OU A MENOS.
+ *
+ * Existe para UM caso, e ele e estreito de proposito: "Ryta de Kassia Andrade
+ * Rufiino" na etiqueta e "...Rufino" na folha. E a mesma pessoa com a letra
+ * dobrada — digitacao do proprio Mercado Livre, nao troca de cliente.
+ *
+ * A tentacao aqui e usar distancia de edicao ("ate 2 letras de diferenca"), e
+ * ela ABRE UM BURACO exatamente onde nao pode: "Marcelo Sousa Silva" e "Marcela
+ * Sousa Silvo" tambem estao a duas letras, e sao duas pessoas. Um nome trocado
+ * por outro e o erro que esta conferencia existe para pegar — ela e a UNICA que
+ * nao depende do Pack ID, que e justamente o numero que desalinha.
+ *
+ * Entao a tolerancia nao mede distancia: ela colapsa letras repetidas dos dois
+ * lados e exige igualdade. "rufiino" e "rufino" viram o mesmo; "marcelo" e
+ * "marcela" continuam diferentes, porque ali a letra foi TROCADA, nao dobrada.
+ * So passa quem difere unicamente na repeticao — o que, num nome inteiro,
+ * significa a mesma pessoa escrita duas vezes.
+ */
+function mesmoNomeComRepeticao(a,b){
+  const colapsa=s=>String(s||'').replace(/(.)\1+/g,'$1');
+  const x=colapsa(a), y=colapsa(b);
+  return !!x && x===y;
+}
+
 function pageLines(tc){
   const items=tc.items.filter(it=>it.str&&it.str.trim()!=='');
   const rows={};
@@ -128,9 +184,7 @@ async function parsePdf(uint8){
     const nf=(t.match(/NF:\s*(\d+)/)||[])[1]||null;
     const despacharEm=dataDespacho(t);
     const city=((t.match(/Cidade de destino\s*:\s*(.+)/)||[])[1]||'').trim();
-    let buyer=''; const ei=lines.findIndex(l=>/^Endereço:/.test(l));
-    if(ei>0){ buyer=lines[ei-1]; if(ei>1&&/^\(/.test(buyer)) buyer=lines[ei-2]+' '+buyer; }
-    buyer=buyer.replace(/\s*\([^)]*\)\s*$/,'').trim();
+    const buyer=nomeDaEtiqueta(lines);
     if((packId&&seen.has('p:'+packId))||(venda&&seen.has('v:'+venda))) continue;
     if(packId)seen.add('p:'+packId); if(venda)seen.add('v:'+venda);
     const codes=new Set(); if(packId)codes.add(packId); if(venda)codes.add(venda);
@@ -157,7 +211,10 @@ async function parsePdf(uint8){
       .replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
     if(rec && rec.comprador && buyer){
       const a=nomeChave(buyer), b=nomeChave(rec.comprador);
-      if(a && b && a!==b && a.indexOf(b)<0 && b.indexOf(a)<0)
+      /* Letra dobrada e digitacao do ML, nao outro cliente (ver
+         mesmoNomeComRepeticao — e so repeticao, nunca letra trocada). */
+      const mesmaPessoa = mesmoNomeComRepeticao(a,b);
+      if(a && b && a!==b && a.indexOf(b)<0 && b.indexOf(a)<0 && !mesmaPessoa)
         motivos.push('comprador nao bate: etiqueta "'+buyer+'" / folha "'+rec.comprador+'"');
     }
 
@@ -186,7 +243,15 @@ async function parsePdf(uint8){
       const cod=semAcento(rec.sku), corItem=semAcento(rec.cor);
       if(corItem && !cod.includes(corItem)){
         const outra=[...coresDaFolha].find(c=>c!==corItem && c.length>2 && cod.includes(c));
-        if(outra) motivos.push('anuncio diz cor '+rec.cor+' e o SKU e '+rec.sku);
+        /* A COR DO ANUNCIO PODE SER UM NOME COMERCIAL QUE CARREGA A COR BASE
+           DENTRO: "Tóquio 004 - Cinza com acabamento branco" e um SKU CINZA
+           dizem a MESMA coisa — o codigo so nao contem a frase inteira. Sem
+           esta linha, todo produto de nome comercial era retido: em 31/08/2026
+           foram 5 volumes seguidos (Tóquio 004 e Tóquio 002), todos corretos.
+           Acusar so quando a cor do codigo NAO aparece no texto do anuncio
+           mantem o caso real — anuncio "Bege" contra SKU CINZA continua retido. */
+        if(outra && !corItem.includes(outra))
+          motivos.push('anuncio diz cor '+rec.cor+' e o SKU e '+rec.sku);
       }
     }
     const conflito=motivos.length?motivos.join(' · '):null;
@@ -202,4 +267,4 @@ async function parsePdf(uint8){
   }
   return orders;
 }
-module.exports={parsePdf,dataDespacho};
+module.exports={parsePdf,dataDespacho,nomeDaEtiqueta,mesmoNomeComRepeticao};

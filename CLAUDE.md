@@ -249,6 +249,46 @@ O `parse` devolve `conflito` e o upload grava o volume como `bloqueado` com
 > nunca de uma lista fixa: cor nova do catálogo entra sozinha, sem ninguém
 > lembrar de vir aqui.
 
+### ⚠️ ARMADILHA #10 — a trava que acusa o inocente para de proteger o culpado
+
+Em 31/08/2026 havia **10 volumes retidos, e os 10 estavam corretos.** Nenhuma
+peça errada, nenhum cliente trocado — três defeitos diferentes acusando gente
+certa. Uma trava com 100% de falso positivo não é uma trava rigorosa: é a
+armadilha #6 outra vez, o desvio que a equipe aprende a fazer. Quem destrava
+dez inocentes em sequência destrava o décimo primeiro sem olhar, e é esse que
+importa.
+
+| Defeito | Vítimas | O que era |
+|---|---|---|
+| **O nome partido pelo PDF** | 3 (Dona Lizete) | A etiqueta traz `Dona Lizete (CONTADOR)`; o pdf.js quebrou a linha e sobrou `CONTADOR)`. A remontagem só olhava fragmento **começando** com `(` — o que chega com o `)` órfão não era remontado, e a palavra `CONTADOR)` virava o comprador |
+| **Cor com nome comercial** | 5 (Tóquio 004 / 002) | `Tóquio 004 - Cinza com acabamento branco` e um SKU `CINZA` dizem a **mesma** coisa. O código não contém a frase inteira, então a conferência procurava outra cor e achava a própria |
+| **Letra dobrada no nome** | 1 (Ryta) | `Rufiino` na etiqueta × `Rufino` na folha — digitação do próprio ML, não troca de cliente |
+
+**O reparo de cada um é de precisão, não de afrouxamento** — os três casos reais
+continuam retidos, e há teste para isso (casos 12 a 14 do `teste_parse.js`):
+
+- `nomeDaEtiqueta()` vira o dono único da leitura do comprador e remonta o nome
+  também quando o fragmento traz `)` sem `(`.
+- A conferência 4 só acusa quando a cor do código **não aparece** no texto do
+  anúncio. Anúncio `Bege` contra SKU `CINZA` continua retido.
+- A conferência 2 tolera **letra repetida**, e só isso.
+
+> ⚠️ **A TOLERAÇÃO DO NOME NÃO PODE SER DISTÂNCIA DE EDIÇÃO.** "Até 2 letras de
+> diferença" resolveria o caso da Ryta e abriria um buraco no lugar exato onde
+> não pode: **`Marcelo Sousa Silva` e `Marcela Sousa Silvo` também estão a duas
+> letras, e são duas pessoas.** A conferência 2 é a única que não depende do
+> Pack ID — ela existe justamente para pegar o volume casado com outro
+> comprador. Por isso `mesmoNomeComRepeticao()` colapsa letras repetidas dos
+> dois lados e exige **igualdade**: passa quem difere só na repetição
+> (`rufiino`/`rufino`), nunca quem teve letra **trocada** (`marcelo`/`marcela`).
+
+> **Consertar o comprador aumenta a proteção, não diminui.** Enquanto o nome vinha
+> como `CONTADOR)`, aquele volume não estava sendo conferido — estava sendo
+> acusado por ruído. Nome ilegível não vira acusação (é a regra dos dois lados),
+> então cada nome que volta a ser lido é um volume que **passa a ter** a
+> conferência de identidade. Acompanhe `cobertura.comprador` na auditoria: ela
+> tem que **subir** depois deste reparo.
+
 > ⚠️ **UMA TRAVA QUE PARA DE ACUSAR FAZ O MESMO SILÊNCIO DE "ESTÁ TUDO CERTO".**
 > As conferências 3 e 4 leem a medida e a cor **de dentro do código do SKU**
 > (`BK160160`**`CINZA`**). O dia em que os códigos deixarem de carregar esses

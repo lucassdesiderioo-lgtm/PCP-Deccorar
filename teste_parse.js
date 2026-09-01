@@ -222,6 +222,88 @@ function conferir(nome, orders, esperado){
     else console.log('ok      item com Quantidade 3 e 3 pecas em 1 volume');
   }
 
+  /* ── 12. O NOME PARTIDO PELO PDF NAO VIRA O COMPRADOR ─────────────────────
+        "Dona Lizete (CONTADOR)" quebrado em duas linhas deixava "CONTADOR)" na
+        linha de cima do endereco, e era ISSO que virava o comprador do volume.
+        Em 31/08/2026 acusou os tres volumes da Dona Lizete, todos corretos. */
+  casos++;
+  {
+    const {nomeDaEtiqueta}=require('./parse');
+    const layouts=[
+      [['Dona Lizete (CONTADOR)','Endereço: Rua X'],'Dona Lizete','tudo numa linha'],
+      [['Dona Lizete','CONTADOR)','Endereço: Rua X'],'Dona Lizete','o ")" ficou orfao — o caso real'],
+      [['Dona Lizete (','CONTADOR)','Endereço: Rua X'],'Dona Lizete','quebrou no meio do parentese'],
+      [['Dona Lizete','(CONTADOR)','Endereço: Rua X'],'Dona Lizete','o parentetico inteiro embaixo'],
+      [['Tiago Sanches','Endereço: Rua X'],'Tiago Sanches','nome sem papel nenhum'],
+    ];
+    const erros=[];
+    layouts.forEach(([ls,esperado,quando])=>{
+      const veio=nomeDaEtiqueta(ls);
+      if(veio!==esperado) erros.push(quando+': esperava "'+esperado+'", veio "'+veio+'"');
+    });
+    if(erros.length){ falhas++; console.log('FALHOU  o nome partido pelo PDF e remontado');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      o nome partido pelo PDF e remontado');
+  }
+
+  /* ── 13. COR COM NOME COMERCIAL NAO E DIVERGENCIA ─────────────────────────
+        "Tóquio 004 - Cinza com acabamento branco" e um SKU CINZA dizem a mesma
+        coisa. Em 31/08/2026 cinco volumes seguidos foram retidos por isso.
+        O caso REAL (anuncio de uma cor, codigo de outra) tem que continuar
+        sendo acusado — e a segunda metade deste caso. */
+  casos++;
+  {
+    const os_=await montar([
+      {pack:'111',venda:'901',sku:'BK180150CINZA',medida:'1,80x1,50',cor:'Tóquio 004 - Cinza com acabamento branco',comprador:'Marcelo Sousa'},
+      {pack:'222',venda:'902',sku:'BK180150BEGE', medida:'1,80x1,50',cor:'Bege claro - Tóquio 002',comprador:'Monica Gusmao'},
+      {pack:'333',venda:'903',sku:'BK150150BEGE', medida:'1,50x1,50',cor:'Cinza',comprador:'Outro Cliente'},
+      // um item de cor simples, para "BEGE" existir entre as cores da folha
+      {pack:'444',venda:'904',sku:'BK150150BEGE', medida:'1,50x1,50',cor:'Bege',comprador:'Mais Um Cliente'},
+    ],[
+      {pack:'111',nf:'1',comprador:'Marcelo Sousa'},
+      {pack:'222',nf:'2',comprador:'Monica Gusmao'},
+      {pack:'333',nf:'3',comprador:'Outro Cliente'},
+      {pack:'444',nf:'4',comprador:'Mais Um Cliente'},
+    ]);
+    const erros=[];
+    ['111','222','444'].forEach(k=>{ const v=os_.find(o=>o.packId===k)||{};
+      if(v.conflito) erros.push('reteve a toa em '+k+': '+v.conflito); });
+    const real=os_.find(o=>o.packId==='333')||{};
+    if(!real.conflito || !/cor/.test(real.conflito))
+      erros.push('parou de acusar a cor trocada de verdade: '+JSON.stringify(real.conflito));
+    if(erros.length){ falhas++; console.log('FALHOU  cor com nome comercial passa, cor trocada continua retida');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      cor com nome comercial passa, cor trocada continua retida');
+  }
+
+  /* ── 14. DUAS LETRAS NO NOME NAO SAO OUTRO CLIENTE ────────────────────────
+        "Rufiino" x "Rufino" e digitacao do ML. Mas a tolerancia nao pode virar
+        porta: nomes de pessoas diferentes tem que continuar acusando, e e isso
+        que a segunda metade cobre — e a unica conferencia que nao depende do
+        Pack ID. */
+  casos++;
+  {
+    const {mesmoNomeComRepeticao}=require('./parse');
+    const chave=s=>String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
+    const mesma=(x,y)=>mesmoNomeComRepeticao(chave(x),chave(y));
+    const erros=[];
+    if(!mesma('Ryta de Kassia Andrade Rufiino','Ryta De Kassia Andrade Rufino'))
+      erros.push('nao reconheceu a mesma pessoa com a letra dobrada (caso Ryta)');
+    /* O que NAO pode passar: letra TROCADA e outra pessoa, por mais parecida
+       que seja. Marcelo/Marcela esta a duas letras e sao dois clientes. */
+    [['Silvia Carolina Souza','Evandro Pereira Lima'],
+     ['Ana Paula Ayres Serpa','Ana Paula Ayres Costa'],
+     ['Marcelo Sousa Silva','Marcela Sousa Silvo'],
+     ['Marcelo Sousa Silva','Marcela Sousa Silva'],
+     ['Joao Pedro Lima','Joana Pedro Lima']].forEach(([x,y])=>{
+      if(mesma(x,y)) erros.push('tratou como a mesma pessoa: "'+x+'" e "'+y+'"');
+    });
+    if(erros.length){ falhas++; console.log('FALHOU  erro de digitacao passa, cliente diferente nao');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      erro de digitacao passa, cliente diferente nao');
+  }
+
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));
