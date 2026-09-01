@@ -452,13 +452,14 @@ async function verLote(){
      direto pra etiqueta, sem passar pela producao. A tela vermelha mostra o
      que falta PRODUZIR, nunca o que falta EXPEDIR. */
   T('');
-  const emap={}; db.prepare('SELECT codigo,estoque FROM skus').all().forEach(s=>{ emap[s.codigo]=s.estoque; });
-  const porSku={}; pend.forEach(v=>{ porSku[v.codigo]=(porSku[v.codigo]||0)+1; });
-  let urg=0, cobertos=0; const linhas=[];
-  Object.keys(porSku).sort().forEach(c=>{
-    const est=emap[c]||0, q=porSku[c], u=Math.max(0,q-est);
-    urg+=u; cobertos+=q-u; linhas.push({c,q,est,u});
-  });
+  /* A conta sai do `urgencia.js`, o dono unico — nunca de uma copia aqui. Uma
+     ferramenta de diagnostico com regua propria e pior que nenhuma: ela
+     confirma com autoridade um numero que a tela nao usa (mesmo motivo pelo
+     qual a fila de hoje vem do `fila_dia.js`). */
+  const linhas=require('./urgencia').calcular(db, dia)
+    .map(l=>({c:l.codigo, q:l.pendentes, est:l.estoque, u:l.urgente}));
+  let urg=0, cobertos=0;
+  linhas.forEach(l=>{ urg+=l.u; cobertos+=l.q-l.u; });
   T('  - cobertos por estoque      : '+cobertos+'   (saem direto pra Etiqueta de Venda)');
   T('  = URGENTES (tela vermelha)  : '+urg);
   const lancados=db.prepare("SELECT COALESCE(SUM(qtd),0) n FROM producao WHERE data=? AND origem='ml'").get(dia).n;

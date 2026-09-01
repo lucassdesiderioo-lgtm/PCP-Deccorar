@@ -1,3 +1,5 @@
+const DEMANDA = require('./demanda_dominio');
+
 module.exports=function(app,db){
   app.get('/api/gerencial',(req,res)=>{
     const de=req.query.de||null, ate=req.query.ate||null;
@@ -14,7 +16,17 @@ module.exports=function(app,db){
     const totCar=g("SELECT COUNT(*) c FROM lote WHERE "+W+" AND estagio='carregado'");
     const div=g("SELECT COUNT(*) c FROM devolucao WHERE "+W+" AND sku_venda IS NOT NULL AND sku_venda<>sku_fisico");
     let fila={}; try{ fila=db.prepare("SELECT COUNT(*) c FROM fila WHERE situacao='aguardando'").get()||{}; }catch(e){}
-    let est=[]; try{ est=db.prepare("SELECT codigo l, estoque, alvo, MAX(0,alvo-estoque) falta FROM skus WHERE alvo>0 ORDER BY (alvo-estoque) DESC LIMIT 12").all(); }catch(e){}
+    /* "Quanto falta para o alvo" sai do demanda_dominio, e nao mais de
+       `MAX(0, alvo-estoque)` sobre o `skus.alvo` gravado. Eram duas coisas
+       erradas na mesma linha: o alvo era uma foto (so muda no "Aplicar" do
+       Planejamento) e a conta ignorava o comprometido — a venda ja feita com
+       envio marcado pra frente. O gerencial cobrava um numero e a fabrica
+       produzia outro, como a aba Estoque fazia ate 01/09/2026 (§18). */
+    let est=[];
+    try{
+      est=DEMANDA.aProduzir(db).slice(0,12).map(l=>({
+        l:l.codigo, estoque:l.estoque, alvo:l.alvo, falta:l.precisa }));
+    }catch(e){}
     res.json({
       totais:{revisadas:totRev.c||0,tempoRev:totRev.t||0,embaladas:totEmb.c||0,tempoEmb:totEmb.t||0,
         rejeitadas:totRej.c||0,devolucoes:totDev.c||0,vendas:totVen.c||0,carregadas:totCar.c||0,filaAtual:fila.c||0,divergencias:div.c||0},

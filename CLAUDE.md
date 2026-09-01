@@ -268,9 +268,35 @@ duas unidades de medida diferentes para o mesmo papel.
 > (caso 9 do `teste_parse.js`): a folha tem que **entregar** o 3, e o parse tem
 > que continuar gravando **1**.
 
-A produção, essa sim, precisa das três peças. Hoje o `Quantidade` **não** entra
-no cruzamento — a urgência conta volumes pendentes, então um item de 3 gera
-1 urgente e não 3. **Dívida 11 do §14.**
+### ⚠️ A REGRA DA OPERAÇÃO: **uma venda = uma etiqueta = uma persiana**
+
+Regra do dono, reafirmada em 01/09/2026:
+
+> *"Para cada venda é uma etiqueta. Não tem essa de juntar etiqueta, não tem
+> essa de juntar pacote, não tem essa de juntar caixa. Não existe isso. Cada
+> etiqueta de venda é para um SKU, cada etiqueta de venda é para uma persiana."*
+
+Consequência prática, e é ela que vale no código: **contar linhas de `lote` É
+contar peças.** O cliente que comprou três leva três vendas, três etiquetas,
+três volumes — cada um com o seu ciclo completo (revisão, embalagem, etiqueta,
+carregamento).
+
+> ⚠️ **NÃO MULTIPLIQUE O VOLUME POR NENHUMA "QUANTIDADE".** Isso foi tentado em
+> 01/09/2026: o cruzamento passou a somar `pecas` e a etiqueta de venda a baixar
+> `pecas` do estoque. Foi revertido no mesmo dia por contrariar a regra acima —
+> nenhuma linha disso sobreviveu. Hoje há teste travando os dois lados: caso 1
+> do `teste_cruzamento.js` e caso 1 do `teste_etiqueta.js`.
+>
+> O caminho é sempre o mesmo: **cada peça tem a sua etiqueta.** Se um dia
+> aparecer venda de 3 peças com uma etiqueta só, isso é assunto do PDF do
+> Mercado Livre — não se resolve multiplicando número dentro do sistema.
+
+**Pergunta em aberto (a investigar, sem código):** a folha de controle traz o
+campo `Quantidade`, e ele já apareceu maior que 1. Pela regra acima isso não
+deveria acontecer, então falta olhar um PDF real desses e entender o que aquele
+número significa. Enquanto não se sabe, **nada no sistema decide por ele** — o
+`folha.js` lê o campo e o `rastrear.js --lote` só o exibe, para o dia em que
+alguém for investigar.
 
 **Do PDF até o número que o operador vê há SETE degraus**, e em seis deles o
 volume sai da conta por regra. Nenhum é bug — mas nenhum é visível, e é por
@@ -1027,15 +1053,19 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados — hoje há `teste_parse.js` (9 casos) e `teste_carga.js` (13); o resto não tem | Médio a longo prazo |
-| 11 | **`Quantidade` da folha não chega no cruzamento** — item de 3 peças gera 1 urgente, e a fábrica produz 1 onde o cliente comprou 3 (§5, armadilha #5). `folha.js` já lê o campo e o `rastrear.js --lote` já mostra os itens afetados; falta `cruz_route.js` contar peças em vez de volumes | **Alto** — o cliente espera 3 e sai 1 |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) `teste_estoque.js` (53), `teste_cruzamento.js` (14) e `teste_etiqueta.js` (13); o resto não tem | Médio a longo prazo |
+| 11 | **A investigar: o que é o `Quantidade` da folha** — a regra é uma venda = uma etiqueta = uma persiana (§5), então esse campo não deveria vir maior que 1. Ninguém decide nada com ele hoje. Falta abrir um PDF real com `Quantidade > 1` e entender o que aquele número diz | Baixo enquanto nada o usar — mas é uma pergunta sem resposta sobre o documento de origem |
 
 ---
 
 ## 15. O que NÃO fazer
 
+- ❌ Calcular a falta de estoque fora do `demanda_dominio.js` — a aba Estoque e a
+  tela azul do operador têm que dizer o mesmo número (§18)
 - ❌ Fazer a revisão somar estoque "porque parece que falta"
 - ❌ Fazer a reimpressão baixar estoque "porque imprimiu de novo"
+- ❌ Multiplicar volume por "quantidade" em qualquer lugar — uma venda é uma
+  etiqueta é uma persiana (§5); já foi tentado e revertido, e há teste travando
 - ❌ Fazer a leitura por pedaços (`split` em `Desenho do tecido`) voltar a rodar
   antes do tokenizer no `parse.js` — manda a peça errada pro cliente (§5)
 - ❌ Mover `express.static` para antes do `auth`
@@ -1107,3 +1137,151 @@ done
 ```
 
 Compare com a §3 do `docs/ARQUITETURA.md`. Diferença ali é dívida nova.
+
+---
+
+## 18. A aba Estoque do admin
+
+Reformada em 01/09/2026. Antes dela a aba era três contadores e uma tabela; o
+que mudou não foi a aparência, foi **de onde sai o número**.
+
+### ⚠️ ARMADILHA #12 — duas telas diziam "a repor" e não era o mesmo número
+
+A aba calculava `alvo − estoque`, lendo o `skus.alvo` **gravado**. A tela AZUL do
+operador calcula `comprometido + alvo − estoque`, ao vivo, no `demanda_dominio`.
+
+Faltava na conta do admin justamente o **comprometido** — a venda já feita, com
+envio marcado pra frente. O admin cobrava um número e a fábrica produzia outro,
+e ninguém via a diferença: as duas telas estavam certas, cada uma na sua régua.
+É a mesma doença que aposentou a tela `/necessidade` no mesmo dia.
+
+Hoje `est_route.js` (`GET /api/estoque/painel`) é a porta única da aba, e ela lê
+o **mesmo** `demanda_dominio` da tela azul. O `teste_estoque.js` compara os dois
+SKU a SKU — escrever uma segunda conta na tela quebra o caso 1.
+
+**Dois defeitos vinham junto, e sumiram com a correção:**
+
+| O que era | Por que acontecia |
+|---|---|
+| Alvo velho cobrado como se fosse de hoje | `skus.alvo` só muda quando alguém clica "Aplicar" no Planejamento, e o "aplicar todos" **só mexe em SKU com venda na janela**. SKU que parou de vender guardava o alvo do mês passado para sempre |
+| **Sob medida em falta eterna** | A peça feita contra o pedido nunca tem estoque (§7). Com um alvo legado > 0 gravado, `alvo − estoque` dava falta todo dia. O alvo ao vivo de sob medida é **zero**, então a linha só pede produção quando há venda comprometida |
+
+O alvo salvo não sumiu: vai em `alvo_salvo`, e quando discorda do cálculo a
+célula mostra "salvo N" em âmbar, com o chip **Alvo velho** para filtrar e a
+data do último "Aplicar" no rodapé. Alvo defasado que se parece com alvo de
+hoje é o que faz a conta "quebrar" sem ninguém notar.
+
+### O painel
+
+| Bloco | De onde vem |
+|---|---|
+| Faixa: em estoque · cobertura · SKUs em falta · peças a produzir · entrou/saiu hoje | `demanda_dominio` + `fluxo_estoque` |
+| Gráfico **entrou × saiu**, 30 dias, espelhado no eixo | `fluxo_estoque.serie()` |
+| Semáforo em chips (zerado · abaixo · ok · excesso · parados · sob medida · alvo velho · nunca conferido) | filtra em memória, sem ida ao servidor |
+| Tabela com cobertura em dias, último ajuste e idade do inventário por SKU | idem |
+| **Últimos ajustes manuais** | `ajuste_estoque` |
+| Exportar CSV (respeita o filtro) e **aplicar alvo** | navegador; `POST /api/planejamento/aplicar` |
+
+> **A idade do inventário fica colada no saldo** porque é sobre ele: `skus.estoque`
+> tem vários donos e não se reconstrói (§14), então a contagem é o único momento
+> em que a coluna volta a bater com a prateleira. Acima de 30 dias vira âmbar;
+> quem nunca foi contado tem chip próprio, que serve de lista de trabalho no dia
+> do inventário. Contagem de **material** e contagem em **modo teste** não contam
+> como conferência de peça.
+
+> ⚠️ **O botão "aplicar alvo" diz quantos ele NÃO resolve.** O "Aplicar todos" do
+> Planejamento só grava em SKU **com venda na janela** — proposital: sem dado de
+> venda ele zeraria o alvo de quem tem história e não vendeu no período. Então a
+> tela separa `alvo_defasados` de `alvo_aplicaveis` e escreve os dois no rodapé.
+> Prometer "aplicar todos" e deixar o aviso de pé depois do clique ensina a
+> equipe a desconfiar da tela — que é o mesmo fim da armadilha #10.
+>
+> O botão existe porque a tela passou a **acusar** o alvo velho: acusar sem
+> oferecer o reparo, mandando a pessoa para outra aba, é como uma trava que não
+> sabe liberar (§5). Ele chama a MESMA rota do Planejamento; não há segundo
+> caminho de escrita no alvo.
+
+> **`fluxo_estoque.js` é o dono único de ENTROU e SAIU** — `montagem` (o +1 da
+> embalagem) e `lote.embalado_em` (o −1 da etiqueta). O `/api/fechamento` do
+> Planejamento passou a ler dele: o painel mostra o mesmo movimento em série de
+> 30 dias, e um gráfico com régua própria é pior que nenhum, porque confirma com
+> autoridade um número que a outra tela não usa.
+>
+> **Ajuste manual e contagem NÃO entram no gráfico**, de propósito: os dois
+> mexem no saldo e nenhum é produção nem venda. Somados às barras, o gráfico
+> deixaria de responder "quanto a fábrica fez e quanto saiu" e passaria a
+> responder "quanto a coluna variou", que ninguém perguntou. O ajuste tem número
+> próprio na faixa e card próprio embaixo.
+
+> **O histórico existia e nenhuma tela lia.** `GET /api/estoque/ajustes` está de
+> pé desde que o ajuste passou a exigir motivo — gravando quem, quando, de→para
+> e por quê — e até 01/09/2026 nada o chamava. Metade do valor do registro
+> estava desligada: o dado era gravado e ninguém conseguia ler. Hoje sai no card
+> "Últimos ajustes" e no botão **histórico** de cada linha.
+
+> **O painel NÃO entra na cadência de 4 s do admin.** O `AUTO_ADMIN` recarrega a
+> tela inteira de 4 em 4 segundos; este painel calcula a demanda do catálogo
+> todo. Ele só atualiza com a aba aberta, no máximo a cada 12 s, e nunca por
+> cima de um ajuste aberto — a linha sumiria da mão de quem está preenchendo.
+
+**Rode `node teste_estoque.js` após qualquer mudança no `est_route.js`, no
+`fluxo_estoque.js`, no `demanda_dominio.js`, no `painel_route.js` ou no
+`ger_route.js`** — os 53 casos travam a conta única nas quatro telas, o sob
+medida, o parado, a série do gráfico, a idade do inventário, o gate do custo e o
+acordo com o fechamento diário do Planejamento.
+
+### A TV e o gerencial entraram na mesma régua (01/09/2026)
+
+Depois da aba, sobravam **duas telas medindo falta contra o `skus.alvo` gravado**
+— quarta e quinta réguas da mesma pergunta:
+
+| Onde | O que era | O que é |
+|---|---|---|
+| `painel_route.js` (a TV do chão de fábrica) | `aProduzir = pedido + alvo − estoque`, misturando as ordens do dia com a reposição, medida contra a foto | **duas** colunas: `faltaHoje` = pedido − produzido, e `precisa` = `demanda_dominio` |
+| `ger_route.js` (gerencial) | `falta = alvo − estoque` dos SKUs com `alvo > 0`, sem o comprometido | `DEMANDA.aProduzir()`, os 12 maiores |
+
+> ⚠️ **`faltaHoje` e `precisa` NÃO SE SOMAM, e é por isso que têm nomes
+> próprios.** A primeira é o que sobrou das ordens lançadas hoje — o trabalho
+> que está na bancada agora. A segunda é o que o estoque pede, a mesma conta da
+> tela azul. Somar as duas seria inventar a sexta régua; a tela escreve isso
+> embaixo da tabela, porque quem lê uma TV de longe soma o que vê.
+
+> ⚠️ **O cache de 20 s do `painel_route` é obrigatório.** A TV recarrega de 3 em
+> 3 segundos e o `calcular` percorre a planilha de vendas e o catálogo inteiro —
+> sem cache, são 1.200 varreduras por hora com a TV ligada. Ele é **local da
+> rota**, e não dentro do `demanda_dominio`: quem grava alvo ou decide compra
+> precisa do número fresco, e um cache escondido no domínio entregaria dado
+> velho para eles sem avisar.
+
+O `aProduzir` continua na resposta como apelido de `faltaHoje`, para não quebrar
+consumidor antigo da rota. Não use em tela nova.
+
+### O dinheiro parado na prateleira (01/09/2026)
+
+A aba passou a mostrar **quanto vale o estoque** e, no mesmo card, **quanto
+disso está parado** — SKU com peça e nenhuma venda na janela. O custo por SKU
+sai do `ficha_dominio` (dono único, §7-B): uma segunda soma aqui divergiria da
+tela de custo no primeiro preço lançado.
+
+> ⚠️ **REGRA 4 OUTRA VEZ: CUSTO INDEFINIDO NUNCA VIRA ZERO.** SKU sem preço de
+> fornecedor não entra na soma como zero — ele é contado à parte (`sem_custo`) e
+> o total aparece como **piso**, com o `≥` na frente e o aviso em âmbar. Zero
+> faria o estoque parecer mais barato do que é, e ninguém saberia por quê. Na
+> tabela, esse SKU mostra traço, nunca `R$ 0,00`.
+>
+> SKU **sem peça** também mostra traço na coluna de valor: `R$ 0,00` se lê como
+> "não vale nada", que é outra afirmação. O custo por peça continua ali, porque
+> esse segue verdadeiro.
+
+> ⚠️ **QUEM NÃO TEM `custo.ver` NÃO RECEBE OS CAMPOS** — o JSON sai sem eles,
+> não é a tela que esconde (regra 14 do §13: não adianta esconder na tela e
+> mandar pelo fio). O CSV segue a mesma regra. O acesso vai para a auditoria,
+> mas **amortecido**: no máximo uma linha por pessoa a cada 30 minutos, porque a
+> aba se recarrega sozinha a cada 12 s e uma linha por refresh enterraria a
+> auditoria de verdade em ruído.
+
+> Cache de 60 s no custo, local da rota: custo só muda quando alguém lança
+> preço, recebe material ou mexe na ficha — não a cada refresh.
+
+Enquanto a mão de obra for zero, o número se chama **custo de material**
+(regra 17 do §7-B), e é isso que está escrito no card.
