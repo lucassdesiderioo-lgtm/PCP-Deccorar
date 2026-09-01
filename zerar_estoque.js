@@ -137,7 +137,12 @@ console.log('  Banco   : ' + CAMINHO);
 console.log('  Data    : ' + DATA + ' ' + p2(agora.getHours()) + ':' + p2(agora.getMinutes()));
 console.log('  Escopo  : ' + [FAZ_PECAS?'pecas':null, FAZ_MATERIAL?'material':null].filter(Boolean).join(' + '));
 console.log('');
+/* NULL nao e saldo, e ausencia de dado — mas ele TAMBEM e normalizado para 0,
+   entao entra na contagem do que sera tocado. Sem esta linha o cabecalho diria
+   "1 com saldo" e o rodape "2 zerados", e quem le fica sem saber qual e o certo. */
+const nulos = FAZ_PECAS ? pecas.filter(s => s.estoque === null).length : 0;
 if(FAZ_PECAS)    console.log('  Pecas   : ' + pecas.length + ' SKU(s), ' + comPecas + ' com saldo, ' + somaPecas + ' peca(s) no total');
+if(nulos)        console.log('            ' + nulos + ' com estoque NULL (sem dado) — tambem viram 0');
 if(FAZ_MATERIAL) console.log('  Material: ' + materiais.length + ' componente(s) ativo(s), ' + comMat + ' com saldo');
 console.log('');
 
@@ -179,8 +184,17 @@ db.transaction(()=>{
      skus.estoque nao tem dono unico — e a divida registrada no CLAUDE.md, e nao
      e este script que vai consertar isso. O CSV do "antes" e o que sobra de
      historia aqui, e por isso ele e gravado ANTES e nao e opcional. */
+  /* O `IS NULL` NAO E ZELO EXTRA — SEM ELE A LINHA ESCAPA.
+     Em SQL `NULL <> 0` nao e verdadeiro, e o WHERE anterior (`estoque<>0`)
+     deixava intacto todo SKU com estoque gravado como NULL. Ele continuava
+     aparecendo com saldo na tela depois de uma zeragem que disse ter terminado.
+
+     E o NULL nao e so um numero errado: e um buraco por onde o saldo para de
+     andar. `estoque=estoque+1` da embalagem vira NULL+1 = NULL, e
+     `MAX(0,estoque-1)` da etiqueta tambem — o SKU nunca sobe e nunca desce.
+     Zerar normaliza os dois casos de uma vez. */
   if(FAZ_PECAS)
-    zeradasPecas = db.prepare('UPDATE skus SET estoque=0 WHERE estoque<>0').run().changes;
+    zeradasPecas = db.prepare('UPDATE skus SET estoque=0 WHERE estoque IS NULL OR estoque<>0').run().changes;
 
   /* Material: NUNCA por UPDATE. movimentar() e o dono unico do saldo e deixa a
      linha em movimento_componente — com --forcar em modo teste o trigger marca
@@ -199,9 +213,29 @@ db.transaction(()=>{
   });
 })();
 
+/* CONFERE O PROPRIO TRABALHO ANTES DE DIZER QUE TERMINOU.
+   "ZERADO" sem conferencia e uma promessa: quem ve saldo na tela depois disso
+   nao tem como saber se o script falhou, se alguem embalou uma peca no meio, ou
+   se a tela esta em cache — e a primeira suspeita recai sempre sobre o script.
+   Uma linha que sobrou vale mais dita aqui do que descoberta amanha. */
+const sobrouPecas = FAZ_PECAS
+  ? db.prepare('SELECT codigo, estoque FROM skus WHERE estoque IS NULL OR estoque<>0 ORDER BY codigo').all() : [];
+const sobrouMat = (FAZ_MATERIAL && existeTabela('componente'))
+  ? db.prepare('SELECT nome, estoque FROM componente WHERE ativo=1 AND COALESCE(estoque,0)<>0 ORDER BY nome').all() : [];
+
 console.log('  ZERADO.');
 if(FAZ_PECAS)    console.log('  - ' + zeradasPecas + ' SKU(s) de peca zerado(s)');
 if(FAZ_MATERIAL) console.log('  - ' + zeradosMat + ' componente(s) zerado(s), com movimento registrado');
+if(sobrouPecas.length || sobrouMat.length){
+  console.log('');
+  console.log('  ⚠ AINDA HA SALDO DEPOIS DE ZERAR — alguma coisa escreveu durante ou depois:');
+  sobrouPecas.forEach(s => console.log('     peca     ' + String(s.codigo).padEnd(26) + s.estoque));
+  sobrouMat.forEach(c => console.log('     material ' + String(c.nome).slice(0,26).padEnd(26) + c.estoque));
+  console.log('     Quem soma peca: a EMBALAGEM (+1 por bipe), a CONTAGEM ao lancar,');
+  console.log('     o +/- da aba Estoque, e o "apagar" do modo teste (restaura a foto).');
+}else{
+  console.log('  - conferido: nenhum SKU com saldo restante.');
+}
 arquivos.forEach(f => console.log('  - foto do antes: ' + f));
 console.log('');
 console.log('  PROXIMO PASSO: Admin -> aba Contagem -> "Nova contagem" -> bipe tudo');
