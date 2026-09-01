@@ -148,7 +148,8 @@
       <div class="chips" id="estChips"></div>
       <input id="estBusca" class="estbusca" placeholder="bipe ou digite o código" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
       <table style="margin-top:12px"><thead><tr>
-        <th>SKU</th><th class="n">Estoque</th><th class="n">Alvo</th><th class="n">Vendido<br>a despachar</th>
+        <th>SKU</th><th class="n">Estoque</th><th class="n" id="thValor" hidden>Valor</th>
+        <th class="n">Alvo</th><th class="n">Vendido<br>a despachar</th>
         <th class="n">Precisa</th><th class="n">Cobertura</th><th>Nível</th><th></th>
       </tr></thead><tbody id="estlist"></tbody></table>
       <div class="sub" id="estRodape" style="margin-top:10px"></div>
@@ -998,6 +999,16 @@ let PAINEL=null, estFiltro='', estUltimo=0;
 
 const estNorm = v => String(v==null?'':v).toUpperCase().replace(/[^A-Z0-9]/g,'');
 const estQtd  = v => v==null ? '—' : v;
+/* R$ só aparece para quem tem `custo.ver`. O servidor nem manda os campos para
+   os demais, então a tela nunca precisa decidir se esconde: se não veio, não há. */
+const estVerCusto = () => !!(PAINEL && PAINEL.resumo && PAINEL.resumo.custo_visivel);
+const estColunas  = () => estVerCusto() ? 9 : 8;
+function estRS(v, casas){
+  if(v==null) return '—';
+  const c = casas==null ? 2 : casas;
+  return (+v).toLocaleString('pt-BR',{style:'currency',currency:'BRL',
+    minimumFractionDigits:c, maximumFractionDigits:c});
+}
 function estQuando(s){        // '2026-09-01 08:30:00' -> '01/09 08:30'
   if(!s) return '';
   const t=String(s);
@@ -1008,7 +1019,7 @@ async function carregarEst(){
   estUltimo=Date.now();
   try{ PAINEL=await (await fetch('/api/estoque/painel')).json(); }
   catch(e){
-    $('#estlist').innerHTML='<tr><td colspan="8" class="baixo" style="padding:20px">'
+    $('#estlist').innerHTML='<tr><td colspan="'+estColunas()+'" class="baixo" style="padding:20px">'
       +'Não consegui carregar o painel de estoque. Recarregue a página.</td></tr>';
     return;
   }
@@ -1086,16 +1097,22 @@ function estCSV(){
   const busca=estNorm(($('#estBusca')||{}).value);
   const l=(PAINEL.linhas||[]).filter(x=> estPassa(x) &&
     (!busca || estNorm(x.codigo).indexOf(busca)>=0 || estNorm(x.descricao).indexOf(busca)>=0));
+  const comCusto=estVerCusto();
   const cab=['codigo','descricao','estoque','alvo','alvo_salvo','vendido_a_despachar','precisa',
              'cobertura_dias','situacao','sob_medida','parado','vendas_janela','media_dia',
-             'conferido_em','conferido_ha_dias'];
+             'conferido_em','conferido_ha_dias']
+    .concat(comCusto?['custo_unitario','valor']:[]);
   /* Ponto e virgula e BOM: e assim que o Excel em portugues abre o arquivo com
      as colunas separadas e os acentos certos, sem ninguem passar pelo
      assistente de importacao. */
   const cel=v=>{ const s=String(v==null?'':v); return /[";\n]/.test(s)?('"'+s.replace(/"/g,'""')+'"'):s; };
+  /* Numero decimal sai com VIRGULA: e o separador que o Excel em portugues
+     entende. Com ponto, "87.50" vira texto e a coluna nao soma. */
+  const dec=v=> v==null?'':String(v).replace('.',',');
   const linhas=l.map(x=>[x.codigo,x.descricao,x.estoque,x.alvo,x.alvo_salvo,x.comprometido,x.precisa,
-    x.cobertura_dias,x.situacao,x.sob_medida?'sim':'nao',x.parado?'sim':'nao',
-    x.vendas_janela,x.media_dia,x.contado_em,x.contado_ha].map(cel).join(';'));
+    dec(x.cobertura_dias),x.situacao,x.sob_medida?'sim':'nao',x.parado?'sim':'nao',
+    x.vendas_janela,dec(x.media_dia),x.contado_em,x.contado_ha]
+    .concat(comCusto?[dec(x.custo_unitario),dec(x.valor)]:[]).map(cel).join(';'));
   const txt='﻿'+cab.join(';')+'\n'+linhas.join('\n');
   const hoje=new Date(), p=n=>String(n).padStart(2,'0');
   const nome='estoque-'+hoje.getFullYear()+p(hoje.getMonth()+1)+p(hoje.getDate())+'.csv';
@@ -1139,6 +1156,18 @@ function renderEst(){
   $('#estResumo').innerHTML=
      '<div class="sumbox big"><div class="n">'+r.pecas_estoque+'</div><div class="l">Peças em estoque</div>'
        +'<div class="d">'+r.skus+' SKUs cadastrados</div></div>'
+    /* O DINHEIRO. Com um SKU sem custo o total deixa de ser o valor do estoque
+       e passa a ser um PISO — daí o "≥" e o aviso em âmbar. Custo indefinido
+       nunca vira zero (regra 4 do §7-B): zero faria o estoque parecer mais
+       barato do que é, e ninguém saberia por quê. */
+    +(estVerCusto() ? ('<div class="sumbox big"><div class="n" style="font-size:21px">'
+       +(r.sem_custo?'<span title="O total é um piso: há SKU com peça e sem custo">≥ </span>':'')
+       +estRS(r.valor_estoque,0)+'</div>'
+       +'<div class="l">'+esc(r.custo_rotulo||'custo de material')+' em estoque</div>'
+       +'<div class="d">'+estRS(r.valor_parado,0)+' em SKU parado</div>'
+       +(r.sem_custo?('<div class="d" style="color:var(--amber)">'+r.sem_custo
+          +' SKU com peça e sem custo</div>'):'')
+       +'</div>') : '')
     +'<div class="sumbox big"><div class="n">'+cob+'</div><div class="l">Cobertura média</div>'
        +'<div class="d">'+cobSub+'</div></div>'
     +'<div class="sumbox big low"><div class="n">'+r.skus_falta+'</div><div class="l">SKUs em falta</div>'
@@ -1162,6 +1191,8 @@ function renderEst(){
   const busca=estNorm(($('#estBusca')||{}).value);
   const linhas=(PAINEL.linhas||[]).filter(l=> estPassa(l) &&
     (!busca || estNorm(l.codigo).indexOf(busca)>=0 || estNorm(l.descricao).indexOf(busca)>=0));
+  const verCusto=estVerCusto();
+  const th=$('#thValor'); if(th) th.hidden=!verCusto;
 
   $('#estlist').innerHTML = linhas.map(l=>{
     /* O QUE A PECA E sai do pecaTexto de /sku.js — o mesmo formatador da
@@ -1201,6 +1232,15 @@ function renderEst(){
       +'<td class="code">'+esc(l.codigo)+selos
         +(peca?'<div class="estq">'+esc(peca)+'</div>':'')+'</td>'
       +'<td class="n"><b style="font-size:17px" class="'+(l.precisa>0?'baixo':'ok')+'">'+l.estoque+'</b>'+ujTxt+ct+'</td>'
+      /* Sem peça na prateleira não há valor a mostrar: "R$ 0,00" se lê como
+         "não vale nada", que é outra afirmação. O custo unitário fica, porque
+         esse continua verdadeiro e é o que interessa quando a peça voltar. */
+      +(verCusto ? ('<td class="n">'+(l.valor==null
+          ? '<span class="zero" title="Sem custo cadastrado — este SKU não entra na soma">—</span>'
+          : (l.estoque>0 ? estRS(l.valor) : '<span class="zero">—</span>'))
+        +(l.custo_unitario!=null?('<div class="estq" style="white-space:nowrap">'
+          +estRS(l.custo_unitario)+' / peça</div>'):'')
+        +'</td>') : '')
       +'<td class="n">'+l.alvo+(l.alvo_defasado
         ?'<div class="estq" style="color:var(--amber)" title="O alvo salvo no cadastro é '+l.alvo_salvo
           +' e o cálculo de hoje dá '+l.alvo+'. A tela usa o cálculo; para gravar, use Aplicar no Planejamento.">salvo '+l.alvo_salvo+'</div>'
@@ -1213,7 +1253,7 @@ function renderEst(){
       +'<td style="white-space:nowrap"><button class="ghost small" data-ajustar="'+esc(l.codigo)+'">ajustar</button> '
       +'<button class="ghost small" data-hist="'+esc(l.codigo)+'">histórico</button></td>'
     +'</tr>';
-  }).join('') || '<tr><td colspan="8" style="color:#8b97a5;padding:20px">'
+  }).join('') || '<tr><td colspan="'+estColunas()+'" style="color:#8b97a5;padding:20px">'
       +(PAINEL.linhas&&PAINEL.linhas.length?'Nenhum SKU nesse filtro.':'Cadastre SKUs primeiro.')+'</td></tr>';
 
   const alvoEm = r.alvo_aplicado_em ? ('Alvo aplicado pela última vez em '+estQuando(r.alvo_aplicado_em)+'.')
@@ -1303,7 +1343,7 @@ document.addEventListener("click",async e=>{
     let l=[]; try{ l=await (await fetch("/api/estoque/ajustes?codigo="+encodeURIComponent(cod))).json(); }catch(err){}
     const linha=document.createElement("tr");
     linha.className="histlin";
-    linha.innerHTML='<td colspan="8">'
+    linha.innerHTML='<td colspan="'+estColunas()+'">'
       +'<b style="font-family:ui-monospace,monospace">'+esc(cod)+'</b> — ajustes manuais'
       +(l.length?('<table style="margin-top:8px"><tbody>'+l.map(a=>
           '<tr><td class="n" style="width:130px">'+a.antes+' → <b>'+a.depois+'</b> '
@@ -1337,7 +1377,7 @@ document.addEventListener("click",async e=>{
     const atual=doPainel?doPainel.estoque:((SKUS.find(x=>x.codigo===cod)||{}).estoque||0);
     const linha=document.createElement("tr");
     linha.className="ajlin";
-    linha.innerHTML='<td colspan="8" style="background:#0f141b">'
+    linha.innerHTML='<td colspan="'+estColunas()+'" style="background:#0f141b">'
       +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0">'
       +'<b style="font-family:ui-monospace,monospace">'+esc(cod)+'</b>'
       +'<span class="sub">de <b>'+atual+'</b> para</span>'

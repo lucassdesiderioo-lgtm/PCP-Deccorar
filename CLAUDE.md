@@ -1000,7 +1000,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) e `teste_estoque.js` (46); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) e `teste_estoque.js` (53); o resto não tem | Médio a longo prazo |
 | 11 | **`Quantidade` da folha não chega no cruzamento** — item de 3 peças gera 1 urgente, e a fábrica produz 1 onde o cliente comprou 3 (§5, armadilha #5). `folha.js` já lê o campo e o `rastrear.js --lote` já mostra os itens afetados; falta `cruz_route.js` contar peças em vez de volumes | **Alto** — o cliente espera 3 e sai 1 |
 
 ---
@@ -1171,9 +1171,9 @@ hoje é o que faz a conta "quebrar" sem ninguém notar.
 
 **Rode `node teste_estoque.js` após qualquer mudança no `est_route.js`, no
 `fluxo_estoque.js`, no `demanda_dominio.js`, no `painel_route.js` ou no
-`ger_route.js`** — os 46 casos travam a conta única nas quatro telas, o sob
-medida, o parado, a série do gráfico, a idade do inventário e o acordo com o
-fechamento diário do Planejamento.
+`ger_route.js`** — os 53 casos travam a conta única nas quatro telas, o sob
+medida, o parado, a série do gráfico, a idade do inventário, o gate do custo e o
+acordo com o fechamento diário do Planejamento.
 
 ### A TV e o gerencial entraram na mesma régua (01/09/2026)
 
@@ -1201,6 +1201,32 @@ Depois da aba, sobravam **duas telas medindo falta contra o `skus.alvo` gravado*
 O `aProduzir` continua na resposta como apelido de `faltaHoje`, para não quebrar
 consumidor antigo da rota. Não use em tela nova.
 
-Sobra uma decisão, não uma dívida: **mostrar (ou não) o valor em R$ do estoque**
-na aba. A ficha técnica já sabe o custo por SKU, mas ele é gateado por
-`custo.ver` — a informação mais estratégica do sistema.
+### O dinheiro parado na prateleira (01/09/2026)
+
+A aba passou a mostrar **quanto vale o estoque** e, no mesmo card, **quanto
+disso está parado** — SKU com peça e nenhuma venda na janela. O custo por SKU
+sai do `ficha_dominio` (dono único, §7-B): uma segunda soma aqui divergiria da
+tela de custo no primeiro preço lançado.
+
+> ⚠️ **REGRA 4 OUTRA VEZ: CUSTO INDEFINIDO NUNCA VIRA ZERO.** SKU sem preço de
+> fornecedor não entra na soma como zero — ele é contado à parte (`sem_custo`) e
+> o total aparece como **piso**, com o `≥` na frente e o aviso em âmbar. Zero
+> faria o estoque parecer mais barato do que é, e ninguém saberia por quê. Na
+> tabela, esse SKU mostra traço, nunca `R$ 0,00`.
+>
+> SKU **sem peça** também mostra traço na coluna de valor: `R$ 0,00` se lê como
+> "não vale nada", que é outra afirmação. O custo por peça continua ali, porque
+> esse segue verdadeiro.
+
+> ⚠️ **QUEM NÃO TEM `custo.ver` NÃO RECEBE OS CAMPOS** — o JSON sai sem eles,
+> não é a tela que esconde (regra 14 do §13: não adianta esconder na tela e
+> mandar pelo fio). O CSV segue a mesma regra. O acesso vai para a auditoria,
+> mas **amortecido**: no máximo uma linha por pessoa a cada 30 minutos, porque a
+> aba se recarrega sozinha a cada 12 s e uma linha por refresh enterraria a
+> auditoria de verdade em ruído.
+
+> Cache de 60 s no custo, local da rota: custo só muda quando alguém lança
+> preço, recebe material ou mexe na ficha — não a cada refresh.
+
+Enquanto a mão de obra for zero, o número se chama **custo de material**
+(regra 17 do §7-B), e é isso que está escrito no card.

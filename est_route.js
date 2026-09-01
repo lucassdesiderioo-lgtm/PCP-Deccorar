@@ -36,8 +36,60 @@
  */
 const DEMANDA = require('./demanda_dominio');
 const FLUXO   = require('./fluxo_estoque');
+const FICHA   = require('./ficha_dominio');
 
 module.exports = function(app, db){
+
+  /* ── O DINHEIRO PARADO NA PRATELEIRA ───────────────────────────────────────
+   *
+   * O custo por SKU sai do `ficha_dominio` — o dono unico (§7-B). Ele ja e a
+   * conta que a ficha tecnica mostra e que o historico de custo grava; uma
+   * segunda soma aqui divergiria da tela de custo no primeiro preco lancado.
+   *
+   * ⚠️ REGRA 4 DO §7-B: CUSTO INDEFINIDO NUNCA VIRA ZERO. SKU sem preco de
+   * fornecedor devolve `custo_material = null`, e null NAO entra na soma como
+   * zero — ele sai contado a parte (`sem_custo`), e a tela mostra o total como
+   * PISO ("≥ R$ ..."). Zero seria um custo valido e mentiroso: o estoque
+   * pareceria mais barato do que e, e ninguem saberia por que.
+   *
+   * Cache de 60 s: custo so muda quando alguem lanca preco, recebe material ou
+   * mexe na ficha — nao a cada refresh da aba. Local da rota, pelo mesmo motivo
+   * do painel_route: quem decide compra precisa do numero fresco. */
+  let custoCache = null, custoEm = 0;
+  function mapaCusto(){
+    const agora = Date.now();
+    if(custoCache && (agora - custoEm) < 60000) return custoCache;
+    const m = {};
+    for(const s of db.prepare('SELECT codigo FROM skus').all()){
+      let c = null;
+      try{
+        const f = FICHA.calcularFicha(db, s.codigo);
+        if(f && f.custo_material != null && isFinite(f.custo_material)) c = +f.custo_material;
+      }catch(e){}
+      m[String(s.codigo).toUpperCase()] = c;
+    }
+    custoCache = m; custoEm = agora;
+    return m;
+  }
+
+  /* Custo e a informacao mais estrategica do sistema (§18) e mora atras de
+     `custo.ver`. Quem nao tem a permissao nao recebe os campos — nao adianta
+     esconder na tela e mandar pelo fio (regra 14 do §13). */
+  function podeVerCusto(req){
+    try{ return !!app.locals.acesso.podePermissao(req.usuario, 'custo.ver'); }
+    catch(e){ return (((req.usuario||{}).areas)||[]).indexOf('admin') >= 0; }
+  }
+  /* A aba se recarrega sozinha a cada 12 s. Uma linha de auditoria por refresh
+     enterraria a auditoria de verdade em ruido, entao o registro e amortecido:
+     no maximo um por pessoa a cada 30 minutos. */
+  const vistoEm = new Map();
+  function auditarCusto(req){
+    const u = req.usuario || {}; const agora = Date.now();
+    if((agora - (vistoEm.get(u.id) || 0)) < 30*60*1000) return;
+    vistoEm.set(u.id, agora);
+    try{ app.locals.acesso.auditar(req,'estoque','valor_estoque','(painel)',
+      'viu o valor em R$ do estoque'); }catch(e){}
+  }
 
   app.get('/api/estoque/painel', (req,res)=>{
     const { config, linhas } = DEMANDA.calcular(db);
@@ -89,8 +141,13 @@ module.exports = function(app, db){
         .forEach(r => contagem[r.c] = r);
     }catch(e){}
 
+    const verCusto = podeVerCusto(req);
+    const custo = verCusto ? mapaCusto() : null;
+    if(verCusto) auditarCusto(req);
+
     let zerados=0, baixos=0, ok=0, excesso=0, parados=0, sobMedida=0, defasados=0;
     let pecas=0, precisaTotal=0, skusFalta=0, aplicaveis=0, nuncaContados=0;
+    let valorTotal=0, valorParado=0, semCusto=0;
 
     const lista = linhas.filter(l => l.cadastrado).map(l => {
       const e = extra[l.codigo] || {};
@@ -138,11 +195,26 @@ module.exports = function(app, db){
       const cont = contagem[l.codigo] || null;
       if(!cont) nuncaContados++;
 
+      /* Valor da linha. So conta quem TEM peca: SKU zerado sem custo nao e
+         buraco na conta — nao ha o que valorizar ali. */
+      let cu = null, valor = null;
+      if(verCusto){
+        cu = custo[l.codigo];
+        if(cu != null){
+          valor = +(cu * estoque).toFixed(2);
+          valorTotal += valor;
+          if(parado) valorParado += valor;
+        } else if(estoque > 0) semCusto++;
+      }
+
       return {
         codigo: l.codigo, descricao: l.descricao, cor: l.cor,
         estoque, alvo: l.alvo, alvo_salvo: alvoSalvo, alvo_defasado: defasado,
         alvo_aplicavel: aplicavel,
         contado_em: cont ? cont.em : null, contado_ha: cont ? cont.dias : null,
+        /* Campos de custo SO existem quando quem pergunta pode ver. Ausente e
+           diferente de null: null seria "não tem custo", e isso é outra coisa. */
+        ...(verCusto ? { custo_unitario: cu, valor } : {}),
         comprometido: l.comprometido, precisa: l.precisa, sobra,
         media_dia: l.media_dia, vendas_janela: l.vendas_janela,
         cobertura_dias: cobertura, situacao, parado,
@@ -205,7 +277,18 @@ module.exports = function(app, db){
         dias_cobertura_alvo: config.dias_cobertura,
         media_dia_total: cob.media_dia_total,
         entrou_hoje: hoje.entrou, saiu_hoje: hoje.saiu, variou_hoje: hoje.variou,
-        ajustes_30d: ajustes30, ajustes_delta_30d: ajustesDelta30
+        ajustes_30d: ajustes30, ajustes_delta_30d: ajustesDelta30,
+        custo_visivel: verCusto,
+        /* `sem_custo > 0` faz do total um PISO, e a tela escreve o "≥". A regra
+           4 vale para a soma inteira: o valor do estoque com uma linha sem
+           preço não é um número menor — é um número que ainda não fechou. */
+        ...(verCusto ? {
+          valor_estoque: +valorTotal.toFixed(2),
+          valor_parado:  +valorParado.toFixed(2),
+          sem_custo: semCusto,
+          // Regra 17 do §7-B: enquanto a mão de obra for zero, é isto que o número é.
+          custo_rotulo: 'custo de material'
+        } : {})
       },
       serie, ajustes: recentes, linhas: lista
     });

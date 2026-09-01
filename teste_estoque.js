@@ -55,7 +55,8 @@ db.exec(`
     categoria TEXT, acao TEXT, alvo TEXT, detalhe TEXT, ip TEXT,
     criado_em TEXT DEFAULT (datetime('now','localtime')), data TEXT DEFAULT (date('now','localtime')));
 `);
-require('./sku_schema').garantirSchema(db);   // cor, modelo, tecido
+require('./sku_schema').garantirSchema(db);              // cor, modelo, tecido
+require('./compras_schema').garantirSchemaCompras(db);   // oferta, ficha e as colunas de custo
 
 db.prepare("INSERT INTO modelo (id,codigo,nome,exige_medida,sob_medida) VALUES (?,?,?,?,?)")
   .run(1, 'ROLO', 'Rolô', 1, 0);
@@ -81,6 +82,14 @@ sku.run('SOBMEDIDA2', 'Rolô sob medida 2', '', 0, 0, 2, null, null, null, null)
 sku.run('BK160160CINZA', 'Cortina Rolo Blackout', 'Cinza', 7, 2, 1, 160, 160, null, null);
 /* Acessorio, sem medida (exige_medida = 0). */
 sku.run('KIT32', 'Kit 32 mm completo', '', 5, 2, 3, null, null, null, null);
+
+/* CUSTO: dois de revenda com custo direto digitado (o `ficha_dominio` devolve
+   esse valor) e o resto sem custo nenhum — que e o estado real de quem ainda
+   nao lancou ficha, e o caso que a regra 4 protege. */
+const rev=db.prepare("UPDATE skus SET tem_ficha=0, custo_direto=? WHERE codigo=?");
+rev.run(87.50,  'BK140140BEGE');    // estoque 2  -> R$ 175,00
+rev.run(120.00, 'BK160160CINZA');   // estoque 7, parado -> R$ 840,00
+rev.run(45.00,  'SOBMEDIDA');       // estoque 0  -> nao vale nada, e nao e buraco
 
 const hoje  = db.prepare("SELECT date('now','localtime') d").get().d;
 const ontem = db.prepare("SELECT date('now','localtime','-1 day') d").get().d;
@@ -143,10 +152,17 @@ cont.run('BK140140BEGE', cinco, 's1','sku',1,0);
 cont.run('BK160160CINZA', cinco, 's1','sku',1,1);          // teste: nao conta
 cont.run('TUBO 32MM',    cinco, 's1','componente',12.5,0); // material: outra unidade
 
-const chamar = (k, body) => new Promise(r => {
+const chamar = (k, body, usuario) => new Promise(r => {
   const res = { json:o=>r(o), status(){ return this; }, send:o=>r(o) };
-  rotas[k]({ body:body||{}, query:{}, headers:{} }, res);
+  rotas[k]({ body:body||{}, query:{}, headers:{}, usuario:usuario||undefined }, res);
 });
+/* Quem pode ver custo. O `est_route` pergunta ao acesso.js; aqui o acesso e de
+   mentira e responde pela permissao que o caso quer testar. */
+let PERMITE_CUSTO = false;
+app.locals.acesso = {
+  podePermissao: (u, chave) => chave==='custo.ver' ? (PERMITE_CUSTO && !!u) : !!u,
+  auditar: () => {}
+};
 
 let falhas = 0, casos = 0;
 const ok = (n, c, extra) => { casos++;
@@ -293,7 +309,37 @@ const ok = (n, c, extra) => { casos++;
   ok('e não lista quem não precisa de nada', !gPor.BK160160CINZA && !gPor.KIT32,
      JSON.stringify(Object.keys(gPor)));
 
-  // ── 13. O QUE A PECA E — os campos do pecaTexto vao na linha ─────────────
+  // ── 13. O DINHEIRO PARADO, E QUEM PODE VER ───────────────────────────────
+  /* Custo e gateado por `custo.ver`. Quem nao tem a permissao nao recebe os
+     campos — nao adianta esconder na tela e mandar pelo fio (regra 14 do §13). */
+  const semPerm = await chamar('GET /api/estoque/painel', null, {id:9, nome:'Operador'});
+  ok('sem custo.ver, o JSON não traz valor nenhum',
+     semPerm.resumo.custo_visivel === false &&
+     semPerm.resumo.valor_estoque === undefined &&
+     semPerm.linhas.every(l => l.custo_unitario === undefined && l.valor === undefined));
+
+  PERMITE_CUSTO = true;
+  const comP = await chamar('GET /api/estoque/painel', null, {id:1, nome:'Dono'});
+  const cPor = {}; comP.linhas.forEach(l => cPor[l.codigo] = l);
+  ok('com custo.ver, a linha traz custo unitário e valor (2 × 87,50 = 175,00)',
+     cPor.BK140140BEGE.custo_unitario === 87.5 && cPor.BK140140BEGE.valor === 175,
+     JSON.stringify({c:cPor.BK140140BEGE.custo_unitario, v:cPor.BK140140BEGE.valor}));
+  ok('o total soma só quem tem custo (175 + 840)', comP.resumo.valor_estoque === 1015,
+     'veio ' + comP.resumo.valor_estoque);
+  ok('o valor PARADO é só o do SKU parado (840)', comP.resumo.valor_parado === 840,
+     'veio ' + comP.resumo.valor_parado);
+  /* Regra 4 do §7-B: custo indefinido nunca vira zero. O KIT32 tem 5 peças e
+     nenhuma ficha; ele NÃO entra na soma como zero — sai contado à parte, e é
+     isso que faz do total um piso em vez de uma mentira barata. */
+  ok('SKU com peça e sem custo não vira zero: conta em sem_custo',
+     comP.resumo.sem_custo === 1 && cPor.KIT32.valor === null && cPor.KIT32.estoque === 5,
+     'sem_custo=' + comP.resumo.sem_custo + ' valor KIT32=' + cPor.KIT32.valor);
+  ok('SKU zerado sem custo não conta como buraco — não há o que valorizar',
+     cPor.SOBMEDIDA2.estoque === 0 && comP.resumo.sem_custo === 1);
+  ok('e o número se chama "custo de material" enquanto a mão de obra for zero',
+     comP.resumo.custo_rotulo === 'custo de material');
+
+  // ── 14. O QUE A PECA E — os campos do pecaTexto vao na linha ─────────────
   ok('a linha carrega as colunas da peca, nao o texto do codigo',
      por.BK140140BEGE.largura_cm === 140 && por.BK140140BEGE.cor_nome === 'Bege' &&
      por.BK140140BEGE.tecido_nome === 'Blackout' && por.BK140140BEGE.modelo_nome === 'Rolô');
