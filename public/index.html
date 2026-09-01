@@ -47,6 +47,20 @@
   .sumbox.low .n{color:var(--red)}.sumbox.rep .n{color:var(--amber)}
   .barmini{height:6px;background:#0b0f14;border-radius:4px;overflow:hidden;width:80px;display:inline-block;vertical-align:middle;margin-left:6px}
   .barmini>i{display:block;height:100%;background:var(--green)}
+  /* ── painel da aba Estoque ── */
+  .sumbox.big{min-width:150px}.sumbox .d{font-size:11px;color:var(--muted);margin-top:3px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+  .chip{border:1px solid var(--line);background:#0b0f14;color:var(--muted);border-radius:20px;
+        padding:6px 13px;font-size:12.5px;font-weight:600;cursor:pointer;display:flex;gap:7px;align-items:center}
+  .chip.on{border-color:var(--amber);color:var(--txt);background:#1a1608}
+  .chip .q{font-variant-numeric:tabular-nums;opacity:.8}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+  .selo{font-size:10.5px;padding:1px 7px;border-radius:20px;border:1px solid var(--line);
+        color:var(--muted);margin-left:6px;white-space:nowrap;font-weight:600}
+  .selo.sm{border-color:#3d5a80;color:#8ab4f8}.selo.pr{border-color:#5a4a12;color:var(--amber)}
+  tr.histlin td{background:#0f141b;padding:10px 14px}
+  .estbusca{max-width:280px}
+  .grafleg{display:flex;gap:16px;font-size:12px;color:var(--muted);align-items:center;flex-wrap:wrap}
   .mltask{display:flex;align-items:center;gap:12px;padding:11px 22px;font-size:14px;line-height:1.4;border-bottom:1px solid #262d37}
   .mltask a{margin-left:auto;white-space:nowrap;text-decoration:none;padding:8px 14px;border-radius:8px;font-weight:700;font-size:13px}
   .mltask.late{background:#3a1513;color:#ffb0a8}.mltask.late a{background:#f85149;color:#fff}
@@ -111,16 +125,36 @@
 
   <!-- ESTOQUE & NECESSIDADE -->
   <div id="v-est" class="hide">
-    <div class="sumbar">
-      <div class="sumbox low"><div class="n" id="sLow">0</div><div class="l">SKUs abaixo do necessário</div></div>
-      <div class="sumbox rep"><div class="n" id="sRep">0</div><div class="l">Peças a repor no total</div></div>
-      <div class="sumbox"><div class="n" id="sEst">0</div><div class="l">Peças em estoque</div></div>
+    <div class="sumbar" id="estResumo"></div>
+
+    <!-- ENTROU x SAIU: a unica tela onde a fabrica se ve produzindo e vendendo
+         no mesmo eixo. As barras vem do fluxo_estoque.js, a mesma regua do
+         fechamento diario do Planejamento. -->
+    <div class="card">
+      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:2px">
+        <div style="font-weight:700">Entrou &times; saiu — 30 dias</div>
+        <div class="grafleg">
+          <span><span class="dot" style="background:#2ea043"></span> entrou (embalagem)</span>
+          <span><span class="dot" style="background:#f85149"></span> saiu (etiqueta de venda)</span>
+        </div>
+      </div>
+      <div class="sub" style="margin-bottom:10px">Acima da linha o que a fábrica fez; abaixo, o que saiu pro cliente. Ajuste manual e contagem não entram aqui — eles mexem no saldo, mas não são produção nem venda.</div>
+      <div id="estGraf"></div>
     </div>
+
     <div class="card">
       <div style="font-weight:700;margin-bottom:4px">Estoque</div>
-      <div class="sub" style="margin-bottom:12px">Correção pontual do saldo — peça quebrada, perdida, encontrada. Todo ajuste pede motivo e fica registrado. O <b>alvo</b> não se edita aqui: ele vem do Planejamento. Em vermelho = precisa repor.</div>
-      <table><thead><tr><th>SKU</th><th>Estoque atual</th><th>Alvo</th><th>A repor</th><th>Nível</th></tr></thead><tbody id="estlist"></tbody></table>
+      <div class="sub">Correção pontual do saldo — peça quebrada, perdida, encontrada. Todo ajuste pede motivo e fica registrado. O <b>alvo</b> não se edita aqui: ele vem do Planejamento, e a falta é o <b>mesmo número que o operador vê na tela azul</b>.</div>
+      <div class="chips" id="estChips"></div>
+      <input id="estBusca" class="estbusca" placeholder="bipe ou digite o código" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <table style="margin-top:12px"><thead><tr>
+        <th>SKU</th><th class="n">Estoque</th><th class="n">Alvo</th><th class="n">Vendido<br>a despachar</th>
+        <th class="n">Precisa</th><th class="n">Cobertura</th><th>Nível</th><th></th>
+      </tr></thead><tbody id="estlist"></tbody></table>
+      <div class="sub" id="estRodape" style="margin-top:10px"></div>
     </div>
+
+    <div class="card" id="estAjustes"></div>
   </div>
 
   <div id="v-plan" class="hide"><iframe id="ifPlan" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
@@ -283,6 +317,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));t.classList.add("active");
   $("#v-prod").classList.toggle("hide",t.dataset.t!=="prod");
   $("#v-est").classList.toggle("hide",t.dataset.t!=="est");
+  if(t.dataset.t==="est") carregarEst();
   $("#v-cad").classList.toggle("hide",t.dataset.t!=="cad");
   var vn=$("#v-plan"), vr=$("#v-rel"), va=$("#v-acs");
   if(vn) vn.classList.toggle("hide",t.dataset.t!=="plan");
@@ -314,7 +349,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
 async function carregar(){
   await carregarListas();   // antes do renderCad: a lista de SKU mostra o nome do modelo
   SKUS=await (await fetch('/api/skus')).json();
-  renderCad(); renderSel(); renderEst(); carregarHoje();
+  renderCad(); renderSel(); estAuto(); carregarHoje();
   carregarPend();   // o contador da aba aparece sem precisar abri-la
 }
 
@@ -940,27 +975,202 @@ async function salvar(){
   $('#msg').style.color='#2ea043';$('#msg').textContent='Salvo!';setTimeout(()=>$('#msg').textContent='',1500);
   limparCad();carregar();
 }
-/* ---- Estoque & Necessidade ---- */
+/* ---- Estoque & Necessidade -------------------------------------------------
+ *
+ * ⚠️ A FALTA NAO SE CALCULA MAIS AQUI, e essa e a mudanca de 01/09/2026.
+ *
+ * A tela fazia `alvo - estoque` lendo o `skus.alvo` gravado. A tela AZUL do
+ * operador faz `comprometido + alvo - estoque` ao vivo. Os dois numeros se
+ * chamavam "a repor" e nao eram o mesmo: faltava aqui o COMPROMETIDO — a venda
+ * ja feita com envio marcado pra frente —, e o alvo lido era uma foto que so
+ * muda quando alguem clica "Aplicar" no Planejamento. O admin cobrava um numero
+ * e a fabrica produzia outro, cada tela certa na sua regua.
+ *
+ * Agora tudo vem pronto de GET /api/estoque/painel, que le o MESMO
+ * demanda_dominio da tela azul. Nao recalcule nada por aqui: uma terceira conta
+ * seria a doenca de volta, e desta vez dentro do dashboard.
+ *
+ * O ALVO continua sem se editar nesta tela. Ele vem do Planejamento, e um
+ * segundo campo escrevendo na mesma coluna era a doenca da /necessidade,
+ * aposentada em 01/09/2026: duas fontes, e a ultima a salvar ganha sem avisar.
+ */
+let PAINEL=null, estFiltro='', estUltimo=0;
+
+const estNorm = v => String(v==null?'':v).toUpperCase().replace(/[^A-Z0-9]/g,'');
+const estQtd  = v => v==null ? '—' : v;
+function estQuando(s){        // '2026-09-01 08:30:00' -> '01/09 08:30'
+  if(!s) return '';
+  const t=String(s);
+  return t.slice(8,10)+'/'+t.slice(5,7)+(t.length>10?(' '+t.slice(11,16)):'');
+}
+
+async function carregarEst(){
+  estUltimo=Date.now();
+  try{ PAINEL=await (await fetch('/api/estoque/painel')).json(); }
+  catch(e){
+    $('#estlist').innerHTML='<tr><td colspan="8" class="baixo" style="padding:20px">'
+      +'Não consegui carregar o painel de estoque. Recarregue a página.</td></tr>';
+    return;
+  }
+  renderEst();
+}
+/* O admin inteiro se recarrega de 4 em 4 segundos (AUTO_ADMIN la embaixo). Este
+   painel calcula a demanda do catalogo todo, entao ele NAO entra nessa cadencia:
+   so atualiza com a aba aberta, no maximo a cada 12 s, e nunca por cima de um
+   ajuste que alguem esta preenchendo — a linha aberta sumiria da mao da pessoa. */
+function estAuto(){
+  const v=$('#v-est'); if(!v || v.classList.contains('hide')) return;
+  if(Date.now()-estUltimo < 12000) return;
+  if(document.querySelector('#v-est tr.ajlin')) return;
+  carregarEst();
+}
+
+/* ENTROU x SAIU, espelhado no eixo: producao pra cima, venda pra baixo. E a
+   forma que responde de relance a pergunta que interessa — em que dia saiu mais
+   do que entrou. Dia sem movimento vem ZERO do servidor e desenha vazio: buraco
+   se leria como "nao sei", e a resposta e "nao houve". */
+function estGrafico(serie){
+  const W=760, H=150, meio=H/2, n=serie.length||1, passo=W/n;
+  const larg=Math.max(3, passo-6);
+  const max=Math.max(1, ...serie.map(d=>Math.max(d.entrou,d.saiu)));
+  const alt=v=> (v/max)*(meio-16);
+  let b='';
+  serie.forEach((d,i)=>{
+    const x=i*passo+(passo-larg)/2, he=alt(d.entrou), hs=alt(d.saiu);
+    const dia=d.data.slice(8,10)+'/'+d.data.slice(5,7);
+    b+='<g><title>'+dia+' — entrou '+d.entrou+', saiu '+d.saiu+'</title>'
+      +'<rect x="'+(i*passo)+'" y="0" width="'+passo+'" height="'+H+'" fill="transparent"></rect>'
+      +(d.entrou?'<rect x="'+x.toFixed(1)+'" y="'+(meio-he).toFixed(1)+'" width="'+larg.toFixed(1)+'" height="'+he.toFixed(1)+'" fill="#2ea043" rx="2"></rect>':'')
+      +(d.saiu  ?'<rect x="'+x.toFixed(1)+'" y="'+meio+'" width="'+larg.toFixed(1)+'" height="'+hs.toFixed(1)+'" fill="#f85149" rx="2"></rect>':'')
+      +'</g>';
+  });
+  let eixo='';
+  serie.forEach((d,i)=>{        // de 7 em 7 dias contando DE TRAS PRA FRENTE:
+    if((n-1-i)%7) return;       // assim hoje sempre entra e nada se sobrepoe
+    eixo+='<text x="'+(i*passo+passo/2).toFixed(1)+'" y="'+(H+15)+'" fill="#8b97a5" font-size="10" text-anchor="middle">'
+      +d.data.slice(8,10)+'/'+d.data.slice(5,7)+'</text>';
+  });
+  return '<svg viewBox="0 0 '+W+' '+(H+20)+'" style="width:100%;height:auto;display:block" role="img">'
+    +'<line x1="0" y1="'+meio+'" x2="'+W+'" y2="'+meio+'" stroke="#262d37" stroke-width="1"></line>'
+    +b+eixo
+    +'<text x="2" y="12" fill="#8b97a5" font-size="10">pico '+max+'/dia</text></svg>';
+}
+
+const ESTCHIPS=[
+  {k:'',        r:'Todos',      c:'#8b97a5', n:r=>r.skus},
+  {k:'zerado',  r:'Zerado',     c:'#f85149', n:r=>r.zerados},
+  {k:'baixo',   r:'Abaixo',     c:'#ffb800', n:r=>r.baixos},
+  {k:'ok',      r:'Ok',         c:'#2ea043', n:r=>r.ok},
+  {k:'excesso', r:'Excesso',    c:'#4493f8', n:r=>r.excesso},
+  {k:'parado',  r:'Parados',    c:'#a371f7', n:r=>r.parados},
+  {k:'sob',     r:'Sob medida', c:'#3d5a80', n:r=>r.sob_medida},
+  {k:'defas',   r:'Alvo velho', c:'#e0a458', n:r=>r.alvo_defasados}
+];
+function estPassa(l){
+  if(estFiltro==='parado') return !!l.parado;
+  if(estFiltro==='sob')    return l.sob_medida===1;
+  if(estFiltro==='defas')  return !!l.alvo_defasado;
+  if(estFiltro)            return l.situacao===estFiltro;
+  return true;
+}
+
 function renderEst(){
-  const ord=[...SKUS].sort((a,b)=>((b.alvo-b.estoque))-((a.alvo-a.estoque)));
-  let low=0,rep=0,est=0;
-  $('#estlist').innerHTML = ord.map(s=>{
-    const arepor=Math.max(0,(s.alvo||0)-(s.estoque||0)); if(arepor>0)low++; rep+=arepor; est+=s.estoque||0;
-    const pct=s.alvo>0?Math.min(100,Math.round((s.estoque/s.alvo)*100)):100;
-    /* O ALVO NAO SE EDITA MAIS AQUI. Ele vem do Planejamento (média na janela ×
-       dias de cobertura), e ter um segundo campo escrevendo na mesma coluna era
-       a mesma doença da tela /necessidade, aposentada em 01/09/2026: duas
-       fontes, e a última a salvar ganha sem avisar. */
-    return `<tr>
-      <td class="code">${s.codigo}<div class="estq">${s.cor||''}</div></td>
-      <td><b class="${s.estoque<s.alvo?'baixo':'ok'}" style="font-size:17px">${s.estoque}</b>
-          <button class="ghost small" data-ajustar="${esc(s.codigo)}" style="margin-left:10px">ajustar</button></td>
-      <td>${s.alvo||0}<div class="estq">do Planejamento</div></td>
-      <td class="${arepor>0?'baixo':'ok'}">${arepor>0?('repor '+arepor):'ok'}</td>
-      <td><span class="barmini"><i style="width:${pct}%;background:${s.estoque<s.alvo?'#f85149':'#2ea043'}"></i></span></td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="5" style="color:#8b97a5;padding:20px">Cadastre SKUs primeiro.</td></tr>';
-  $('#sLow').textContent=low; $('#sRep').textContent=rep; $('#sEst').textContent=est;
+  if(!PAINEL || !PAINEL.resumo) return;
+  const r=PAINEL.resumo;
+
+  // ── faixa de numeros ──
+  const cob = r.cobertura_dias==null ? '—' : (r.cobertura_dias+'d');
+  let cobSub = 'alvo '+r.dias_cobertura_alvo+'d';
+  if(r.cobertura_ontem!=null && r.cobertura_dias!=null){
+    const dd=+(r.cobertura_dias-r.cobertura_ontem).toFixed(1);
+    cobSub += ' · era '+r.cobertura_ontem+'d ontem'+(dd>0?' (↑'+dd+')':(dd<0?' (↓'+Math.abs(dd)+')':' (=)'));
+  }
+  $('#estResumo').innerHTML=
+     '<div class="sumbox big"><div class="n">'+r.pecas_estoque+'</div><div class="l">Peças em estoque</div>'
+       +'<div class="d">'+r.skus+' SKUs cadastrados</div></div>'
+    +'<div class="sumbox big"><div class="n">'+cob+'</div><div class="l">Cobertura média</div>'
+       +'<div class="d">'+cobSub+'</div></div>'
+    +'<div class="sumbox big low"><div class="n">'+r.skus_falta+'</div><div class="l">SKUs em falta</div>'
+       +'<div class="d">'+r.zerados+' sem nenhuma peça</div></div>'
+    +'<div class="sumbox big rep"><div class="n">'+r.pecas_precisa+'</div><div class="l">Peças a produzir</div>'
+       +'<div class="d">o mesmo número da tela azul</div></div>'
+    +'<div class="sumbox big"><div class="n" style="font-size:20px">'
+       +'<span class="ok">+'+r.entrou_hoje+'</span> / <span class="baixo">−'+r.saiu_hoje+'</span></div>'
+       +'<div class="l">Hoje: entrou / saiu</div>'
+       +'<div class="d">'+r.ajustes_30d+' ajuste(s) manual(is) em 30 dias</div></div>';
+
+  $('#estGraf').innerHTML = estGrafico(PAINEL.serie||[]);
+
+  // ── chips: some quem esta zerado, menos o "Todos" ──
+  $('#estChips').innerHTML = ESTCHIPS.filter(c=>c.k===''||c.n(r)>0).map(c=>
+    '<div class="chip'+(estFiltro===c.k?' on':'')+'" data-estf="'+c.k+'">'
+    +'<span class="dot" style="background:'+c.c+'"></span>'+c.r
+    +'<span class="q">'+c.n(r)+'</span></div>').join('');
+
+  // ── tabela ──
+  const busca=estNorm(($('#estBusca')||{}).value);
+  const linhas=(PAINEL.linhas||[]).filter(l=> estPassa(l) &&
+    (!busca || estNorm(l.codigo).indexOf(busca)>=0 || estNorm(l.descricao).indexOf(busca)>=0));
+
+  $('#estlist').innerHTML = linhas.map(l=>{
+    /* O QUE A PECA E sai do pecaTexto de /sku.js — o mesmo formatador da
+       embalagem e da tela Bloqueados. Uma terceira tela escrevendo a medida do
+       seu jeito ensinaria a equipe a achar que sao coisas diferentes. */
+    const peca=(typeof pecaTexto==='function') ? pecaTexto(pecaDeSku(l)) : '';
+    /* SO DOIS SELOS. O "alvo velho" saiu da linha de proposito: ele acertava 6
+       de 9 SKUs no primeiro teste, e selo que aparece em quase toda linha nao
+       marca nada — vira textura. Quem precisa da informacao tem o "salvo N"
+       embaixo do alvo, o chip que filtra e o aviso no rodape. */
+    let selos='';
+    if(l.sob_medida) selos+='<span class="selo sm" title="Peça feita contra o pedido: não tem estoque para repor">sob medida</span>';
+    if(l.parado)     selos+='<span class="selo pr" title="Tem peça na prateleira e nenhuma venda na janela">parado</span>';
+
+    /* O ultimo ajuste vai CURTO — quanto e quando. O motivo inteiro esticava a
+       coluna em tres linhas e empurrava a tabela; ele mora no "histórico". */
+    const uj=l.ultimo_ajuste;
+    const ujTxt = uj ? ('<div class="estq" style="white-space:nowrap" title="último ajuste manual: '
+      +esc(uj.motivo||'')+' — '+esc(uj.usuario_nome||'')+'">'
+      +(uj.delta>0?'+':'−')+Math.abs(uj.delta)+' · '+estQuando((uj.criado_em||'').slice(0,10))+'</div>') : '';
+
+    const base=l.alvo+l.comprometido;
+    const pct=base>0?Math.min(100,Math.round((l.estoque/base)*100)):null;
+    const corBarra = l.situacao==='zerado'?'#f85149' : l.situacao==='baixo'?'#ffb800'
+                   : l.situacao==='excesso'?'#4493f8':'#2ea043';
+    return '<tr>'
+      +'<td class="code">'+esc(l.codigo)+selos
+        +(peca?'<div class="estq">'+esc(peca)+'</div>':'')+'</td>'
+      +'<td class="n"><b style="font-size:17px" class="'+(l.precisa>0?'baixo':'ok')+'">'+l.estoque+'</b>'+ujTxt+'</td>'
+      +'<td class="n">'+l.alvo+(l.alvo_defasado
+        ?'<div class="estq" style="color:var(--amber)" title="O alvo salvo no cadastro é '+l.alvo_salvo
+          +' e o cálculo de hoje dá '+l.alvo+'. A tela usa o cálculo; para gravar, use Aplicar no Planejamento.">salvo '+l.alvo_salvo+'</div>'
+        :'<div class="estq">do Planejamento</div>')+'</td>'
+      +'<td class="n">'+(l.comprometido||'—')+'</td>'
+      +'<td class="n">'+(l.precisa>0?'<b class="baixo">'+l.precisa+'</b>':'<span class="ok">ok</span>')+'</td>'
+      +'<td class="n">'+(l.cobertura_dias==null?'<span class="zero">—</span>':(l.cobertura_dias+'d'))+'</td>'
+      +'<td>'+(pct==null?'<span class="zero">—</span>'
+        :'<span class="barmini"><i style="width:'+pct+'%;background:'+corBarra+'"></i></span>')+'</td>'
+      +'<td style="white-space:nowrap"><button class="ghost small" data-ajustar="'+esc(l.codigo)+'">ajustar</button> '
+      +'<button class="ghost small" data-hist="'+esc(l.codigo)+'">histórico</button></td>'
+    +'</tr>';
+  }).join('') || '<tr><td colspan="8" style="color:#8b97a5;padding:20px">'
+      +(PAINEL.linhas&&PAINEL.linhas.length?'Nenhum SKU nesse filtro.':'Cadastre SKUs primeiro.')+'</td></tr>';
+
+  const alvoEm = r.alvo_aplicado_em ? ('Alvo aplicado pela última vez em '+estQuando(r.alvo_aplicado_em)+'.')
+    : 'O alvo nunca foi aplicado pelo Planejamento.';
+  $('#estRodape').innerHTML = 'Mostrando '+linhas.length+' de '+(PAINEL.linhas||[]).length+' SKUs. '
+    +esc(alvoEm)+(r.alvo_defasados?(' <b>'+r.alvo_defasados+'</b> SKU(s) com alvo salvo diferente do cálculo de hoje — a tela usa o cálculo.'):'');
+
+  // ── ajustes recentes: o registro que existia e nenhuma tela lia ──
+  const aj=PAINEL.ajustes||[];
+  $('#estAjustes').innerHTML='<div style="font-weight:700;margin-bottom:4px">Últimos ajustes manuais</div>'
+    +'<div class="sub" style="margin-bottom:10px">Toda correção de saldo feita à mão, com quem fez e por quê. Embalagem, etiqueta de venda e contagem mexem no estoque por caminhos próprios e não aparecem aqui.</div>'
+    +(aj.length?('<table><thead><tr><th>SKU</th><th class="n">De → para</th><th>Motivo</th><th>Quem</th><th>Quando</th></tr></thead><tbody>'
+      +aj.map(a=>'<tr><td class="code">'+esc(a.codigo)+(a.teste?'<span class="selo">teste</span>':'')+'</td>'
+        +'<td class="n">'+a.antes+' → <b>'+a.depois+'</b> <span class="'+(a.delta<0?'baixo':'ok')+'">('+(a.delta>0?'+':'')+a.delta+')</span></td>'
+        +'<td>'+esc(a.motivo||'')+(a.obs?'<div class="estq">'+esc(a.obs)+'</div>':'')+'</td>'
+        +'<td>'+esc(a.usuario_nome||'—')+'</td><td class="sub">'+esc(a.criado_em||'')+'</td></tr>').join('')
+      +'</tbody></table>')
+     :'<div class="sub">Nenhum ajuste manual registrado ainda.</div>');
 }
 /* ---- Produção ---- */
 function renderSel(){
@@ -999,6 +1209,37 @@ document.addEventListener("click",async e=>{
     const dc=$("#cadDica"); if(dc) dc.innerHTML="";
     $("#codigo").focus(); window.scrollTo(0,0); return; }
   const del=e.target.closest("[data-del]"); if(del){ if(confirm("Excluir "+del.dataset.del+"?")){ await fetch("/api/skus/"+encodeURIComponent(del.dataset.del),{method:"DELETE"}); carregar(); } return; }
+  /* FILTRO do painel de estoque: o chip so muda o que a tela mostra — nao ha
+     ida ao servidor, entao clicar entre os grupos e instantaneo. Clicar no chip
+     ja ligado volta pra "Todos". */
+  const cf=e.target.closest("[data-estf]");
+  if(cf){ const k=cf.getAttribute("data-estf"); estFiltro=(estFiltro===k?'':k); renderEst(); return; }
+  /* HISTORICO de um SKU: a rota /api/estoque/ajustes existe desde que o ajuste
+     passou a exigir motivo e ate 01/09/2026 NENHUMA tela a chamava. */
+  const hs=e.target.closest("[data-hist]");
+  if(hs){
+    const cod=hs.getAttribute("data-hist"), tr=hs.closest("tr");
+    if(tr.nextElementSibling && tr.nextElementSibling.classList.contains("histlin")){
+      tr.nextElementSibling.remove(); return;          // clicou de novo: fecha
+    }
+    document.querySelectorAll("tr.histlin").forEach(x=>x.remove());
+    let l=[]; try{ l=await (await fetch("/api/estoque/ajustes?codigo="+encodeURIComponent(cod))).json(); }catch(err){}
+    const linha=document.createElement("tr");
+    linha.className="histlin";
+    linha.innerHTML='<td colspan="8">'
+      +'<b style="font-family:ui-monospace,monospace">'+esc(cod)+'</b> — ajustes manuais'
+      +(l.length?('<table style="margin-top:8px"><tbody>'+l.map(a=>
+          '<tr><td class="n" style="width:130px">'+a.antes+' → <b>'+a.depois+'</b> '
+          +'<span class="'+(a.delta<0?'baixo':'ok')+'">('+(a.delta>0?'+':'')+a.delta+')</span></td>'
+          +'<td>'+esc(a.motivo||'')+(a.obs?' <span class="estq">'+esc(a.obs)+'</span>':'')+'</td>'
+          +'<td>'+esc(a.usuario_nome||'—')+'</td>'
+          +'<td class="sub">'+esc(a.criado_em||'')+'</td></tr>').join('')+'</tbody></table>')
+        :'<div class="sub" style="margin-top:6px">Nenhum ajuste manual neste SKU. '
+         +'A embalagem (+1), a etiqueta de venda (−1) e a contagem mexem no saldo por caminhos próprios.</div>')
+      +'</td>';
+    tr.after(linha);
+    return;
+  }
   /* AJUSTE DE ESTOQUE — abre a linha embaixo, com motivo obrigatorio.
      O +/- de um clique saiu: ele mudava o saldo sem deixar rastro, e era o
      unico movimento de estoque do sistema assim. Um clique a mais e o preco de
@@ -1012,10 +1253,14 @@ document.addEventListener("click",async e=>{
     }
     document.querySelectorAll("tr.ajlin").forEach(x=>x.remove());
     let motivos=[]; try{ motivos=await (await fetch("/api/listas/ajuste_estoque")).json(); }catch(err){}
-    const atual=(SKUS.find(x=>x.codigo===cod)||{}).estoque||0;
+    /* O saldo vem do painel, que e o que a linha em cima esta mostrando. Ler de
+       SKUS (carregado por outra rota, noutro instante) podia abrir o campo com
+       um numero diferente do que a pessoa acabou de ver na tela. */
+    const doPainel=((PAINEL&&PAINEL.linhas)||[]).find(x=>x.codigo===String(cod).toUpperCase());
+    const atual=doPainel?doPainel.estoque:((SKUS.find(x=>x.codigo===cod)||{}).estoque||0);
     const linha=document.createElement("tr");
     linha.className="ajlin";
-    linha.innerHTML='<td colspan="5" style="background:#0f141b">'
+    linha.innerHTML='<td colspan="8" style="background:#0f141b">'
       +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0">'
       +'<b style="font-family:ui-monospace,monospace">'+esc(cod)+'</b>'
       +'<span class="sub">de <b>'+atual+'</b> para</span>'
@@ -1042,10 +1287,20 @@ document.addEventListener("click",async e=>{
                            motivo:motivo, obs:document.getElementById("ajObs").value})})).json();
     ajs.disabled=false;
     if(r.erro){ document.getElementById("ajMsg").textContent=r.erro; return; }
-    carregar();
+    /* Recarrega o painel NA HORA (o estAuto segura por 12 s, e aqui o saldo
+       acabou de mudar pela mao de quem esta olhando a tela). */
+    carregarEst(); carregar();
     return;
   }
 });
+/* Busca com BIPE: o leitor manda o codigo e um Enter, e alguns mandam Tab.
+   Filtra em memoria, sem ida ao servidor. A comparacao normaliza os dois lados
+   (§12: o codigo chega picado, com espaco ou simbolo no meio). */
+(function(){
+  const b=document.getElementById('estBusca'); if(!b) return;
+  b.addEventListener('input', renderEst);
+  b.addEventListener('keydown', ev=>{ if(ev.key==='Enter'||ev.key==='Tab'){ ev.preventDefault(); renderEst(); } });
+})();
 carregar();
 
 /* ---- Pessoas & Acessos ---- */

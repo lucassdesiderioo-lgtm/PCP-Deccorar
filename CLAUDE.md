@@ -1000,13 +1000,15 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados — hoje há `teste_parse.js` (9 casos) e `teste_carga.js` (13); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) e `teste_estoque.js` (32); o resto não tem | Médio a longo prazo |
 | 11 | **`Quantidade` da folha não chega no cruzamento** — item de 3 peças gera 1 urgente, e a fábrica produz 1 onde o cliente comprou 3 (§5, armadilha #5). `folha.js` já lê o campo e o `rastrear.js --lote` já mostra os itens afetados; falta `cruz_route.js` contar peças em vez de volumes | **Alto** — o cliente espera 3 e sai 1 |
 
 ---
 
 ## 15. O que NÃO fazer
 
+- ❌ Calcular a falta de estoque fora do `demanda_dominio.js` — a aba Estoque e a
+  tela azul do operador têm que dizer o mesmo número (§18)
 - ❌ Fazer a revisão somar estoque "porque parece que falta"
 - ❌ Fazer a reimpressão baixar estoque "porque imprimiu de novo"
 - ❌ Fazer a leitura por pedaços (`split` em `Desenho do tecido`) voltar a rodar
@@ -1080,3 +1082,74 @@ done
 ```
 
 Compare com a §3 do `docs/ARQUITETURA.md`. Diferença ali é dívida nova.
+
+---
+
+## 18. A aba Estoque do admin
+
+Reformada em 01/09/2026. Antes dela a aba era três contadores e uma tabela; o
+que mudou não foi a aparência, foi **de onde sai o número**.
+
+### ⚠️ ARMADILHA #12 — duas telas diziam "a repor" e não era o mesmo número
+
+A aba calculava `alvo − estoque`, lendo o `skus.alvo` **gravado**. A tela AZUL do
+operador calcula `comprometido + alvo − estoque`, ao vivo, no `demanda_dominio`.
+
+Faltava na conta do admin justamente o **comprometido** — a venda já feita, com
+envio marcado pra frente. O admin cobrava um número e a fábrica produzia outro,
+e ninguém via a diferença: as duas telas estavam certas, cada uma na sua régua.
+É a mesma doença que aposentou a tela `/necessidade` no mesmo dia.
+
+Hoje `est_route.js` (`GET /api/estoque/painel`) é a porta única da aba, e ela lê
+o **mesmo** `demanda_dominio` da tela azul. O `teste_estoque.js` compara os dois
+SKU a SKU — escrever uma segunda conta na tela quebra o caso 1.
+
+**Dois defeitos vinham junto, e sumiram com a correção:**
+
+| O que era | Por que acontecia |
+|---|---|
+| Alvo velho cobrado como se fosse de hoje | `skus.alvo` só muda quando alguém clica "Aplicar" no Planejamento, e o "aplicar todos" **só mexe em SKU com venda na janela**. SKU que parou de vender guardava o alvo do mês passado para sempre |
+| **Sob medida em falta eterna** | A peça feita contra o pedido nunca tem estoque (§7). Com um alvo legado > 0 gravado, `alvo − estoque` dava falta todo dia. O alvo ao vivo de sob medida é **zero**, então a linha só pede produção quando há venda comprometida |
+
+O alvo salvo não sumiu: vai em `alvo_salvo`, e quando discorda do cálculo a
+célula mostra "salvo N" em âmbar, com o chip **Alvo velho** para filtrar e a
+data do último "Aplicar" no rodapé. Alvo defasado que se parece com alvo de
+hoje é o que faz a conta "quebrar" sem ninguém notar.
+
+### O painel
+
+| Bloco | De onde vem |
+|---|---|
+| Faixa: em estoque · cobertura · SKUs em falta · peças a produzir · entrou/saiu hoje | `demanda_dominio` + `fluxo_estoque` |
+| Gráfico **entrou × saiu**, 30 dias, espelhado no eixo | `fluxo_estoque.serie()` |
+| Semáforo em chips (zerado · abaixo · ok · excesso · parados · sob medida · alvo velho) | filtra em memória, sem ida ao servidor |
+| Tabela com cobertura em dias por SKU e o último ajuste | idem |
+| **Últimos ajustes manuais** | `ajuste_estoque` |
+
+> **`fluxo_estoque.js` é o dono único de ENTROU e SAIU** — `montagem` (o +1 da
+> embalagem) e `lote.embalado_em` (o −1 da etiqueta). O `/api/fechamento` do
+> Planejamento passou a ler dele: o painel mostra o mesmo movimento em série de
+> 30 dias, e um gráfico com régua própria é pior que nenhum, porque confirma com
+> autoridade um número que a outra tela não usa.
+>
+> **Ajuste manual e contagem NÃO entram no gráfico**, de propósito: os dois
+> mexem no saldo e nenhum é produção nem venda. Somados às barras, o gráfico
+> deixaria de responder "quanto a fábrica fez e quanto saiu" e passaria a
+> responder "quanto a coluna variou", que ninguém perguntou. O ajuste tem número
+> próprio na faixa e card próprio embaixo.
+
+> **O histórico existia e nenhuma tela lia.** `GET /api/estoque/ajustes` está de
+> pé desde que o ajuste passou a exigir motivo — gravando quem, quando, de→para
+> e por quê — e até 01/09/2026 nada o chamava. Metade do valor do registro
+> estava desligada: o dado era gravado e ninguém conseguia ler. Hoje sai no card
+> "Últimos ajustes" e no botão **histórico** de cada linha.
+
+> **O painel NÃO entra na cadência de 4 s do admin.** O `AUTO_ADMIN` recarrega a
+> tela inteira de 4 em 4 segundos; este painel calcula a demanda do catálogo
+> todo. Ele só atualiza com a aba aberta, no máximo a cada 12 s, e nunca por
+> cima de um ajuste aberto — a linha sumiria da mão de quem está preenchendo.
+
+**Rode `node teste_estoque.js` após qualquer mudança no `est_route.js`, no
+`fluxo_estoque.js` ou no `demanda_dominio.js`** — os 32 casos travam a conta
+única, o sob medida, o parado, a série do gráfico e o acordo com o fechamento
+diário do Planejamento.

@@ -447,6 +447,12 @@ module.exports = function(app, db){
     if(M !== 'GET' && eq('/api/devolucao')) return 'devolucao.registrar';
     if(M !== 'GET' && eq('/api/devolucao/baixa')) return 'devolucao.baixar';
     if(M !== 'GET' && eq('/api/estoque')) return 'estoque.editar';
+    // A aba Estoque do admin: o painel e o historico de ajustes sao leitura de
+    // GESTAO, nao de operacao. O painel carrega alvo, cobertura e o que falta
+    // produzir do catalogo inteiro; o historico diz quem mexeu no saldo e por
+    // que. Ficam com a mesma chave da tela que os mostra ('/' e '@admin'), e
+    // nao caindo no '@logado' do fim por omissao.
+    if(eq('/api/estoque/painel') || eq('/api/estoque/ajustes')) return '@admin';
     if(M !== 'GET' && eq('/api/alvo')) return 'alvo.editar';
     if(M !== 'GET' && eq('/api/producao')) return 'producao.lancar';
     if(M !== 'GET' && pre('/api/planejamento')) return 'planilha.importar';

@@ -216,6 +216,9 @@ require('./backup_route')(app, db);
 require('./rel_route')(app, db);
 app.get('/relatorios',(req,res)=>res.sendFile(path.join(__dirname,'public','relatorios.html')));
 require('./alvo_route')(app, db);
+/* A aba Estoque do admin. Depois do CREATE de `ajuste_estoque` la em cima —
+   a rota le a tabela, e num banco novo ela precisa existir antes. */
+require('./est_route')(app, db);
 /* A tela /necessidade (curva ABC) saiu em 01/09/2026. Ela lia a tabela `demanda`,
    que era semeada UMA VEZ no codigo do nec_route e nunca mais atualizada — entao
    mostrava a demanda de um mes ja passado com cara de numero atual. Pior: o
