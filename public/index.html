@@ -213,10 +213,14 @@
 
 <div id="v-blq" class="hide">
 <div class="card" id="divCard" style="display:none;border:2px solid #c62828">
-  <div style="font-weight:800;color:#c62828;font-size:16px;margin-bottom:6px">⚠ AS DUAS LEITURAS DA FOLHA DISCORDAM</div>
+  <!-- O titulo falava so da conferencia 1 ("as duas leituras discordam"), mas o
+       card recebe as CINCO do §5 — comprador, medida, cor e familia tambem param
+       aqui. Titulo que descreve o motivo errado ensina a ler a tela por cima:
+       cada volume ja diz o seu motivo logo abaixo, e e la que a informacao mora. -->
+  <div style="font-weight:800;color:#c62828;font-size:16px;margin-bottom:6px">⚠ VOLUMES RETIDOS POR DÚVIDA NA LEITURA</div>
   <div style="font-size:13px;color:#5a6472;margin-bottom:12px">
-    O PDF do Mercado Livre foi lido de duas formas e elas deram SKUs diferentes para o mesmo volume.
-    O sistema <b>não escolhe</b> — a peça fica retida até alguém abrir o pedido no Mercado Livre e dizer qual é.
+    Alguma conferência do PDF não fechou, e por isso o sistema <b>não escolheu</b> sozinho:
+    a peça fica retida até alguém abrir o pedido no Mercado Livre e dizer qual é.
     Enquanto isso ela não imprime etiqueta e não carrega.
   </div>
   <div id="divLista"></div>
@@ -1139,11 +1143,28 @@ document.addEventListener("click",function(e){
    qual peca o cliente comprou. Fica ACIMA dos bloqueados por SKU sem cadastro e
    com moldura vermelha de proposito — os dois retem volume, mas so este
    significa que uma peca errada quase foi despachada. */
+/* O CATALOGO INTEIRO como <option>, com o que cada peca E ao lado do codigo.
+   Montado na hora a cada abertura, nunca guardado: quem acabou de cadastrar o
+   SKU que faltava precisa ve-lo na lista sem dar F5 — e uma lista em cache que
+   nao mostra o cadastro novo faz a pessoa concluir que o cadastro nao salvou. */
+function opcoesCatalogo(){
+  var l=(SKUS||[]).slice().sort(function(a,b){
+    return String(a.codigo||"").localeCompare(String(b.codigo||"")); });
+  var h="";
+  for(var i=0;i<l.length;i++){
+    var t=pecaTexto(pecaDeSku(l[i]));
+    h+='<option value="'+esc(l[i].codigo)+'">'+esc(l[i].codigo)+(t?(" — "+t):"")+'</option>';
+  }
+  return h;
+}
 async function carregarDiv(){
   var l=[]; try{ l=await (await fetch("/api/divergencias")).json(); }catch(e){}
   var card=document.getElementById("divCard"), lis=document.getElementById("divLista");
   if(!card||!lis) return 0;
   if(!Array.isArray(l)||!l.length){ card.style.display="none"; lis.innerHTML=""; return 0; }
+  /* A aba Bloqueados pode abrir antes do carregar() geral — sem isto o seletor
+     do catalogo viria vazio justamente na tela onde ele e a saida. */
+  if(!SKUS||!SKUS.length){ try{ SKUS=await (await fetch("/api/skus")).json(); }catch(e){} }
   card.style.display="";
   var h="";
   for(var i=0;i<l.length;i++){
@@ -1169,29 +1190,59 @@ async function carregarDiv(){
         +'anúncio: <i>'+esc(r.descricao)+'</i></div>';
 
     h+='<div style="font-size:13px;font-weight:700;margin-bottom:2px">Qual peça o cliente comprou?</div>'
-      +'<div style="font-size:12px;color:#5a6472;margin-bottom:8px">'
+      +'<div style="font-size:12px;color:#5a6472;margin-bottom:10px">'
       +'Abra a venda '+esc(r.venda||r.packId||"")+' no Mercado Livre e confira antes de escolher.</div>';
 
-    /* Cada opcao vem com O QUE A PECA E, das colunas de `skus` — o codigo
-       sozinho so serve pra quem decorou o catalogo, e a tela e usada por gente
-       diferente a cada dia. Mesma frase da embalagem e da etiqueta (pecaTexto). */
-    var op=r.opcoes||[];
+    /* SAO DUAS DECISOES DIFERENTES, E A TELA SEPARA AS DUAS.
+       "O sistema leu certo" e "o sistema leu errado, a peca e esta outra" nao
+       sao dois itens de uma mesma lista: a primeira e confirmacao, a segunda e
+       correcao. Misturadas em botoes iguais, a de cima ganha por estar em cima
+       — e ela e justamente a que dispensa procurar. */
+    var op=r.opcoes||[], gravado=String(r.gravado||"").toUpperCase();
+    var sug=null, outras=[];
     for(var k=0;k<op.length;k++){
-      var txt=pecaTexto(pecaDeSku(op[k]));
-      var atual=(r.gravado||"").toUpperCase()===String(op[k].codigo).toUpperCase();
-      h+='<button class="ghost" style="display:block;width:100%;text-align:left;margin-bottom:6px;padding:10px 12px" '
-        +'data-resolvediv="'+r.id+'" data-sku="'+esc(op[k].codigo)+'" data-peca="'+esc(txt)+'">'
-        +'<b style="font-family:ui-monospace,monospace">'+esc(op[k].codigo)+'</b>'
-        +(txt?('<span style="color:#5a6472"> — '+esc(txt)+'</span>'):'')
-        +(atual?'<span style="font-size:11px;color:#5a6472"> · é o que está gravado</span>':'')
+      if(String(op[k].codigo).toUpperCase()===gravado && !sug) sug=op[k];
+      else outras.push(op[k]);
+    }
+    /* 1. CONFIRMAR O QUE O SISTEMA SUGERE. Nas conferencias 3, 4 e 5 a duvida e
+          entre o codigo e o ANUNCIO — e o codigo pode muito bem estar certo. */
+    if(sug){
+      var txtS=pecaTexto(pecaDeSku(sug));
+      h+='<div style="font-size:12px;color:#5a6472;margin-bottom:4px">O sistema leu:</div>'
+        +'<button style="display:block;width:100%;text-align:left;padding:12px;margin-bottom:12px;'
+        +'border:2px solid #2ea043;border-radius:8px;background:#f2fbf4;cursor:pointer" '
+        +'data-resolvediv="'+r.id+'" data-sku="'+esc(sug.codigo)+'" data-peca="'+esc(txtS)+'">'
+        +'<div style="font-weight:700;color:#1a7f37">✓ Confirmar esta peça</div>'
+        +'<div style="font-family:ui-monospace,monospace;font-weight:700;margin-top:4px">'+esc(sug.codigo)+'</div>'
+        +(txtS?('<div style="color:#5a6472;font-size:13px">'+esc(txtS)+'</div>'):'')
         +'</button>';
     }
-    /* A SAIDA PARA QUANDO A RESPOSTA NAO E NENHUMA DAS DUAS. O motivo cita os
-       codigos que brigaram, e a peca certa pode nao ser nenhum deles — sem este
-       campo o volume ficaria preso justamente no caso em que o sistema errou
-       mais feio. Aceita bipe do leitor (Enter) alem do clique. */
-    h+='<div style="display:flex;gap:6px;margin-top:8px">'
-      +'<input id="divOutro'+r.id+'" placeholder="ou bipe/digite outro SKU" autocorrect="off" autocapitalize="characters" '
+    /* 2. ESCOLHER OUTRA. Primeiro as que o proprio motivo citou (um toque), e
+          embaixo o catalogo inteiro — porque a peca certa pode nao ser nenhuma
+          das citadas, e ai o volume ficaria preso justamente no caso em que o
+          sistema errou mais feio. */
+    h+='<div style="font-size:12px;color:#5a6472;margin-bottom:4px">'
+      +(sug?'Ou escolha a peça certa:':'Escolha a peça certa:')+'</div>';
+    for(var k2=0;k2<outras.length;k2++){
+      var txt=pecaTexto(pecaDeSku(outras[k2]));
+      h+='<button class="ghost" style="display:block;width:100%;text-align:left;margin-bottom:6px;padding:10px 12px" '
+        +'data-resolvediv="'+r.id+'" data-sku="'+esc(outras[k2].codigo)+'" data-peca="'+esc(txt)+'">'
+        +'<b style="font-family:ui-monospace,monospace">'+esc(outras[k2].codigo)+'</b>'
+        +(txt?('<span style="color:#5a6472"> — '+esc(txt)+'</span>'):'')
+        +'</button>';
+    }
+    /* O CATALOGO INTEIRO, num seletor nativo. Escolher na lista preenche o campo
+       de baixo em vez de resolver direto: assim existe UM lugar so onde a
+       escolha final aparece antes de confirmar, seja ela vinda da lista ou do
+       bipe do leitor. Duas portas que resolvem sozinhas dariam dois caminhos
+       para o mesmo clique irreversivel. */
+    h+='<select data-cat="'+r.id+'" style="width:100%;padding:10px;margin-top:6px;'
+      +'border:1px solid #d8dee6;border-radius:6px;background:transparent;color:inherit">'
+      +'<option value="">— escolher na lista de SKUs cadastrados —</option>'
+      +opcoesCatalogo()+'</select>';
+    /* O campo aceita bipe do leitor, que e como a bancada trabalha (§12). */
+    h+='<div style="display:flex;gap:6px;margin-top:6px">'
+      +'<input id="divOutro'+r.id+'" placeholder="ou bipe o SKU com o leitor" autocorrect="off" autocapitalize="characters" '
       +'style="flex:1;padding:9px;border:1px solid #d8dee6;border-radius:6px;font-family:ui-monospace,monospace">'
       +'<button class="ghost" data-resolveoutro="'+r.id+'">Confirmar</button></div>';
     if(r.gravado && !r.gravado_cadastrado)
@@ -1212,14 +1263,26 @@ document.addEventListener("keydown",function(e){
   var b=document.querySelector('[data-resolveoutro="'+t.id.replace("divOutro","")+'"]');
   if(b) b.click();
 });
+/* Escolher na lista PREENCHE o campo, nao resolve. A confirmacao fica num
+   lugar so — e ela e irreversivel do ponto de vista de quem opera: a etiqueta
+   sai com o SKU escolhido. */
+document.addEventListener("change",function(e){
+  var s=e.target.closest("[data-cat]");
+  if(!s) return;
+  var campo=document.getElementById("divOutro"+s.getAttribute("data-cat"));
+  if(campo && s.value){ campo.value=s.value; campo.focus(); }
+});
 document.addEventListener("click",async function(e){
   var b=e.target.closest("[data-resolveoutro]");
   if(!b) return;
   var id=b.getAttribute("data-resolveoutro");
   var campo=document.getElementById("divOutro"+id);
   var sku=((campo&&campo.value)||"").replace(/[^A-Za-z0-9 -]/g,"").trim().toUpperCase();
-  if(!sku){ alert("Bipe ou digite o SKU."); return; }
-  await resolverDiv(b,id,sku,"");
+  if(!sku){ alert("Escolha na lista ou bipe o SKU."); return; }
+  /* Se o codigo escolhido esta no cadastro, a confirmacao mostra O QUE A PECA E
+     — que e o que a pessoa acabou de ler na tela do Mercado Livre. */
+  var s=(SKUS||[]).find(function(x){ return String(x.codigo).toUpperCase()===sku; });
+  await resolverDiv(b,id,sku,s?pecaTexto(pecaDeSku(s)):"");
 });
 /* A CONFIRMACAO DIZ O QUE A PECA E, nao so o codigo.
    Quem esta destravando acabou de olhar o pedido no Mercado Livre, onde nao
