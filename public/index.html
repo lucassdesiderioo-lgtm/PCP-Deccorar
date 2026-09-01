@@ -1148,32 +1148,103 @@ async function carregarDiv(){
   var h="";
   for(var i=0;i<l.length;i++){
     var r=l[i];
-    var op=String(r.bloqueio||"").replace(/^divergencia:\s*/,"").split("/").map(function(s){return s.trim();}).filter(Boolean);
-    h+='<div style="border-top:1px solid #d8dee6;padding:12px 0">'
-      +'<div style="font-weight:700">'+(r.buyer||"—")+' · NF '+(r.nf||"—")+' · '+(r.data||"")+'</div>'
-      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 10px">pack '+(r.packId||"—")+' · venda '+(r.venda||"—")+'</div>'
-      +'<div style="font-size:13px;margin-bottom:8px">Qual peça o cliente comprou?</div>';
-    for(var k=0;k<op.length;k++)
-      h+='<button class="ghost" style="margin-right:8px;font-family:ui-monospace,monospace;font-weight:700" '
-        +'data-resolvediv="'+r.id+'" data-sku="'+op[k]+'">'+op[k]+'</button>';
-    h+='<span style="font-size:12px;color:#5a6472">confira no Mercado Livre antes de escolher</span></div>';
+    h+='<div style="border-top:1px solid #d8dee6;padding:14px 0">'
+      +'<div style="font-weight:700">'+esc(r.buyer||"—")+' · NF '+esc(r.nf||"—")+' · '+esc(r.data||"")+'</div>'
+      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">pack '+esc(r.packId||"—")+' · venda '+esc(r.venda||"—")+'</div>';
+
+    /* POR QUE ESTE VOLUME PAROU. Sem isso a pessoa escolhe no chute: as cinco
+       conferencias do §5 param o volume por motivos bem diferentes, e a que
+       parou muda o que se vai procurar no Mercado Livre. */
+    var mot=r.motivos||[];
+    if(mot.length){
+      h+='<div style="margin:10px 0;padding:8px 10px;border-radius:6px;background:#fff4f4;'
+        +'border:1px solid #f0b4b4;font-size:12px;color:#8a2020">';
+      for(var m=0;m<mot.length;m++) h+='<div>⚠ '+esc(mot[m])+'</div>';
+      h+='</div>';
+    }
+    /* O ANUNCIO COMO O ML ESCREVEU. E o texto que a pessoa vai reconhecer na
+       tela do Mercado Livre — o codigo do SKU nao aparece la. */
+    if(r.descricao)
+      h+='<div style="font-size:12px;color:#5a6472;margin-bottom:10px">'
+        +'anúncio: <i>'+esc(r.descricao)+'</i></div>';
+
+    h+='<div style="font-size:13px;font-weight:700;margin-bottom:2px">Qual peça o cliente comprou?</div>'
+      +'<div style="font-size:12px;color:#5a6472;margin-bottom:8px">'
+      +'Abra a venda '+esc(r.venda||r.packId||"")+' no Mercado Livre e confira antes de escolher.</div>';
+
+    /* Cada opcao vem com O QUE A PECA E, das colunas de `skus` — o codigo
+       sozinho so serve pra quem decorou o catalogo, e a tela e usada por gente
+       diferente a cada dia. Mesma frase da embalagem e da etiqueta (pecaTexto). */
+    var op=r.opcoes||[];
+    for(var k=0;k<op.length;k++){
+      var txt=pecaTexto(pecaDeSku(op[k]));
+      var atual=(r.gravado||"").toUpperCase()===String(op[k].codigo).toUpperCase();
+      h+='<button class="ghost" style="display:block;width:100%;text-align:left;margin-bottom:6px;padding:10px 12px" '
+        +'data-resolvediv="'+r.id+'" data-sku="'+esc(op[k].codigo)+'" data-peca="'+esc(txt)+'">'
+        +'<b style="font-family:ui-monospace,monospace">'+esc(op[k].codigo)+'</b>'
+        +(txt?('<span style="color:#5a6472"> — '+esc(txt)+'</span>'):'')
+        +(atual?'<span style="font-size:11px;color:#5a6472"> · é o que está gravado</span>':'')
+        +'</button>';
+    }
+    /* A SAIDA PARA QUANDO A RESPOSTA NAO E NENHUMA DAS DUAS. O motivo cita os
+       codigos que brigaram, e a peca certa pode nao ser nenhum deles — sem este
+       campo o volume ficaria preso justamente no caso em que o sistema errou
+       mais feio. Aceita bipe do leitor (Enter) alem do clique. */
+    h+='<div style="display:flex;gap:6px;margin-top:8px">'
+      +'<input id="divOutro'+r.id+'" placeholder="ou bipe/digite outro SKU" autocorrect="off" autocapitalize="characters" '
+      +'style="flex:1;padding:9px;border:1px solid #d8dee6;border-radius:6px;font-family:ui-monospace,monospace">'
+      +'<button class="ghost" data-resolveoutro="'+r.id+'">Confirmar</button></div>';
+    if(r.gravado && !r.gravado_cadastrado)
+      h+='<div style="font-size:12px;color:#8a2020;margin-top:6px">O código gravado ('
+        +esc(r.gravado)+') não está no cadastro de SKU — só sai daqui com um código cadastrado.</div>';
+    h+='</div>';
   }
   lis.innerHTML=h;
   return l.length;
 }
+/* O leitor de codigo de barras manda Enter no fim do bipe (§12). Sem isto o
+   operador bipa, nada acontece, e ele conclui que a tela nao funciona. */
+document.addEventListener("keydown",function(e){
+  if(e.key!=="Enter") return;
+  var t=e.target;
+  if(!t||!t.id||t.id.indexOf("divOutro")!==0) return;
+  e.preventDefault();
+  var b=document.querySelector('[data-resolveoutro="'+t.id.replace("divOutro","")+'"]');
+  if(b) b.click();
+});
 document.addEventListener("click",async function(e){
-  var b=e.target.closest("[data-resolvediv]");
+  var b=e.target.closest("[data-resolveoutro]");
   if(!b) return;
-  var sku=b.getAttribute("data-sku");
-  if(!confirm("Confirmar que esse volume é "+sku+"?\n\nA etiqueta vai sair com esse SKU.")) return;
+  var id=b.getAttribute("data-resolveoutro");
+  var campo=document.getElementById("divOutro"+id);
+  var sku=((campo&&campo.value)||"").replace(/[^A-Za-z0-9 -]/g,"").trim().toUpperCase();
+  if(!sku){ alert("Bipe ou digite o SKU."); return; }
+  await resolverDiv(b,id,sku,"");
+});
+/* A CONFIRMACAO DIZ O QUE A PECA E, nao so o codigo.
+   Quem esta destravando acabou de olhar o pedido no Mercado Livre, onde nao
+   aparece SKU nenhum — aparece "1,60x1,40 Blackout Bege". Confirmar um codigo
+   contra uma lembranca de outro formato e como nao confirmar nada. */
+async function resolverDiv(b,id,sku,peca){
+  if(!confirm("Confirmar que esse volume é\n\n  "+sku+(peca?("\n  "+peca):"")+
+              "\n\nA etiqueta de venda vai sair com esse SKU.")) return;
   b.disabled=true;
   try{
     var r=await (await fetch("/api/divergencias/resolver",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({id:+b.getAttribute("data-resolvediv"),codigo:sku})})).json();
+      body:JSON.stringify({id:+id,codigo:sku})})).json();
     if(r.erro) alert(r.erro);
   }catch(err){ alert(String(err)); }
   b.disabled=false;
   carregarBloq();
+  /* O volume acabou de virar `pendente`: ele entra na fila de etiquetas agora,
+     e a tela tem que mostrar isso sem um F5 — senao a pessoa destrava e fica
+     sem saber se funcionou. */
+  try{ if(typeof verCruz==="function") verCruz(); }catch(e){}
+}
+document.addEventListener("click",async function(e){
+  var b=e.target.closest("[data-resolvediv]");
+  if(!b) return;
+  await resolverDiv(b,b.getAttribute("data-resolvediv"),b.getAttribute("data-sku"),b.getAttribute("data-peca")||"");
 });
 
 async function carregarBloq(){

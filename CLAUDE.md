@@ -277,6 +277,47 @@ O volume divergente:
 - sai só por `POST /api/divergencias/resolver`, depois de alguém abrir o pedido no
   Mercado Livre e escolher. Aparece na aba **Bloqueados** do admin, em vermelho.
 
+### Como o volume retido volta a andar (Bloqueados → escolher)
+
+> ⚠️ **UMA TRAVA QUE NÃO SABE LIBERAR É UMA TRAVA QUE A EQUIPE APRENDE A
+> CONTORNAR.** Até 01/09/2026 a tela montava os botões de escolha dando
+> `split("/")` no texto do `bloqueio`. Isso só devolve SKU no motivo 1
+> (`leituras divergem: A / B`); nos outros quatro o botão saía com a frase
+> inteira dentro — `descricao diz 160x140 e o SKU e BK140140BEGE` — e o resolver
+> recusava, porque aquilo não é código nenhum. **Quatro dos cinco motivos
+> prendiam o volume para sempre.** O sistema sabia acusar e não sabia liberar.
+
+As opções agora saem do **cadastro de SKU**, não do texto do motivo: a rota varre
+`skus` e fica com os códigos que aparecem no bloqueio. Isso acha SKU com espaço
+(`ROLO SOB MEDIDA 137x212`, §7), que nenhuma quebra por token acharia, e nunca
+oferece um código que o §6 recusaria dois cliques depois.
+
+**O código já gravado é sempre a primeira opção.** Nas conferências 3, 4 e 5 a
+dúvida é entre o código e o *anúncio* — e quem abriu o pedido no ML pode muito
+bem concluir que o código estava certo e o anúncio é que estava torto.
+Concordar com o sistema era, justamente, a única resposta que a tela não aceitava.
+
+A tela mostra, para cada volume retido: **por que parou** (os motivos, um por
+linha), **o anúncio como o ML escreveu** — é esse texto que se reconhece na tela
+do Mercado Livre, onde SKU não aparece —, as opções com **o que a peça é**
+(`160 × 140 cm · Bege · Blackout · Rolô`, do mesmo `pecaTexto` da embalagem) e um
+campo livre que **aceita bipe** para o caso em que a peça certa não é nenhuma das
+citadas.
+
+**A dúvida vira história.** Resolver apaga o `bloqueio` (é ele que retém), mas
+grava `lote.bloqueio_resolvido`, `resolvido_por` e `resolvido_em`, e registra na
+auditoria. Sem isso o volume destravado fica idêntico ao que nunca teve problema,
+e a trava não deixa rastro de quantas vezes salvou — nem de quem a destravou com
+pressa.
+
+> A trava do §6 continua de pé aqui: SKU fora do cadastro **não** solta volume.
+> A mensagem manda cadastrar antes, em vez de recusar sem dizer o quê.
+
+**Teste obrigatório após mexer no destravamento ou nos textos de conflito do
+`parse.js`:** `node teste_divergencia.js` — os cinco motivos entram com o texto
+**exato** que o `parse.js` escreve. Mudou a frase lá, o caso quebra aqui, que é
+o ponto: a tela lê esses textos.
+
 ### A conferência dupla no carregamento
 
 `config.conf_carregamento = '1'` faz o carregamento pedir **dois bipes**: a

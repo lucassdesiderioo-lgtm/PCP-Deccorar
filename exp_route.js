@@ -2,7 +2,7 @@ const express=require('express'); const fs=require('fs');
 const {parsePdf}=require('./parse'); const {PDFDocument}=require('pdf-lib');
 const {futuro}=require('./carga');
 module.exports=function(app,db){
-  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT);");
+  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
   // sao so historia: quantas vezes o volume voltou pra impressora e quando foi a
   // ultima. O ALTER mora aqui, no dono da tabela (§17 do CLAUDE.md), com a
@@ -10,6 +10,14 @@ module.exports=function(app,db){
   // producao. Sem default dinamico em reimpresso_em: ALTER nao aceita.
   try{ db.exec("ALTER TABLE lote ADD COLUMN reimpressoes INTEGER DEFAULT 0"); }catch(e){}
   try{ db.exec("ALTER TABLE lote ADD COLUMN reimpresso_em TEXT"); }catch(e){}
+  /* QUEM DESEMPATOU, E QUAL ERA A DUVIDA. Resolver uma divergencia apaga o
+     `bloqueio`, e com ele o unico registro de que uma peca errada quase foi
+     despachada. Sem estas tres colunas o volume resolvido fica indistinguivel
+     do volume que nunca teve problema — e a trava passa a nao deixar rastro
+     nenhum de quantas vezes ela salvou (ou de quem a destravou com pressa). */
+  try{ db.exec("ALTER TABLE lote ADD COLUMN bloqueio_resolvido TEXT"); }catch(e){}
+  try{ db.exec("ALTER TABLE lote ADD COLUMN resolvido_por TEXT"); }catch(e){}
+  try{ db.exec("ALTER TABLE lote ADD COLUMN resolvido_em TEXT"); }catch(e){}
   // POR QUE o volume foi bloqueado. Ate aqui so havia um motivo possivel (SKU
   // fora do cadastro) e ele se lia do proprio codigo; com a divergencia de
   // leitura da folha sao dois, e eles se resolvem de formas diferentes — um
@@ -172,10 +180,55 @@ module.exports=function(app,db){
     }catch(e){ console.error(e); res.status(500).json({erro:String(e.message||e)}); }
   });
 
+  /* AS OPCOES SAEM DO CADASTRO, NAO DO TEXTO DO BLOQUEIO.
+     A tela montava os botoes dando split("/") no motivo, e isso so devolve SKU
+     quando o motivo e "leituras divergem: A / B". Nos outros quatro o botao
+     saia com a frase inteira dentro ("descricao diz 160x140 e o SKU e BK...") e
+     o resolver recusava, porque aquilo nao e codigo nenhum. Na pratica quatro
+     dos cinco motivos retinham o volume PARA SEMPRE — a trava sabia acusar e
+     nao sabia liberar, que e o jeito mais rapido de ensinar a equipe a
+     desconfiar dela.
+
+     Agora o candidato e conferido contra `skus`: varre o cadastro e fica com os
+     codigos que aparecem no texto do motivo. Acha SKU com espaco ("ROLO SOB
+     MEDIDA 137x212", §7), que nenhuma quebra por token acharia, e nunca oferece
+     um codigo que nao existe — o resolver ia recusar dois cliques depois. */
+  const skusParaEscolha=()=>db.prepare(`SELECT s.codigo, s.largura_cm, s.altura_cm,
+      COALESCE(c.nome,s.cor_codigo,s.cor) cor_nome,
+      COALESCE(t.nome,s.tecido_codigo) tecido_nome,
+      m.nome modelo_nome, COALESCE(m.exige_medida,1) exige_medida
+    FROM skus s
+    LEFT JOIN cor c ON c.codigo=s.cor_codigo
+    LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
+    LEFT JOIN modelo m ON m.id=s.modelo_id`).all();
+
   app.get('/api/divergencias',(req,res)=>{
-    res.json(db.prepare(`SELECT id,codigo,buyer,city,nf,packId,venda,data,bloqueio
+    const rows=db.prepare(`SELECT id,codigo,buyer,city,nf,packId,venda,data,bloqueio,descricao
       FROM lote WHERE estagio='bloqueado' AND bloqueio LIKE 'divergencia%'
-      ORDER BY data DESC, id DESC`).all());
+      ORDER BY data DESC, id DESC`).all();
+    if(!rows.length) return res.json([]);
+    const cad=skusParaEscolha();
+    res.json(rows.map(r=>{
+      const texto=String(r.bloqueio||'').toUpperCase();
+      let cand=cad.filter(s=>texto.includes(String(s.codigo).toUpperCase()));
+      /* O codigo mais longo manda: achar "KIT32" dentro de "KIT320" ofereceria
+         uma peca que o motivo nunca citou. */
+      cand=cand.filter(s=>!cand.some(o=>o!==s &&
+        String(o.codigo).toUpperCase().includes(String(s.codigo).toUpperCase())));
+      /* O QUE ESTA GRAVADO E SEMPRE UMA OPCAO, e vem primeiro. Nas conferencias
+         3, 4 e 5 a duvida e entre o codigo e o ANUNCIO — e quem abriu o pedido
+         no ML pode muito bem concluir que o codigo estava certo desde o inicio.
+         Sem esta opcao, concordar com o sistema era a unica resposta que a tela
+         nao aceitava. */
+      const atual=cad.find(s=>String(s.codigo).toUpperCase()===String(r.codigo||'').toUpperCase());
+      if(atual) cand=[atual].concat(cand.filter(s=>s!==atual));
+      return Object.assign({},r,{
+        motivos:String(r.bloqueio||'').replace(/^divergencia:\s*/,'').split(' · ').filter(Boolean),
+        gravado:r.codigo||null,
+        gravado_cadastrado: !!atual,
+        opcoes:cand
+      });
+    }));
   });
   /* Resolver = alguem OLHOU o pedido no Mercado Livre e disse qual e o SKU.
      Nao ha escolha automatica possivel aqui: se houvesse, nao teria bloqueado. */
@@ -186,9 +239,20 @@ module.exports=function(app,db){
     const o=db.prepare('SELECT * FROM lote WHERE id=?').get(id);
     if(!o) return res.status(404).json({erro:'volume nao encontrado'});
     if(!/^divergencia/.test(String(o.bloqueio||''))) return res.json({erro:'esse volume nao esta em divergencia'});
-    if(!db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(sku)) return res.json({erro:'SKU nao cadastrado: '+sku});
-    db.prepare("UPDATE lote SET codigo=?, estagio='pendente', bloqueio=NULL WHERE id=?").run(sku,id);
-    res.json({ok:true,id:id,codigo:sku});
+    if(!db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(sku))
+      return res.json({erro:'SKU nao cadastrado: '+sku+'. Cadastre em Cadastro de SKU e volte aqui — '+
+        'a trava do §6 recusaria a etiqueta de qualquer jeito.'});
+    /* A DUVIDA VIRA HISTORIA, NAO SOME. O `bloqueio` e apagado porque e ele que
+       retem o volume; o texto dele fica guardado ao lado de quem desempatou.
+       Volume resolvido as pressas e volume resolvido com o pedido aberto na
+       tela sao a mesma linha no banco se ninguem gravar a diferenca. */
+    const quem=(req.usuario&&req.usuario.nome)||'';
+    db.prepare(`UPDATE lote SET codigo=?, estagio='pendente', bloqueio=NULL,
+      bloqueio_resolvido=?, resolvido_por=?, resolvido_em=datetime('now','localtime')
+      WHERE id=?`).run(sku,o.bloqueio,quem,id);
+    try{ app.locals.acesso.auditar(req,'expedicao','resolver_divergencia',id,
+      String(o.bloqueio||'')+'  ->  '+sku+(String(o.codigo||'').toUpperCase()===sku?'  (confirmou o que estava gravado)':'')); }catch(e){}
+    res.json({ok:true,id:id,codigo:sku,manteve:String(o.codigo||'').toUpperCase()===sku});
   });
   /* A FILA E POR DATA DE DESPACHO, NAO POR DATA DE ENTRADA.
      O que decide se a etiqueta sai hoje e o prazo que o Mercado Livre carimbou
