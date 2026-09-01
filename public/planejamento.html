@@ -1,6 +1,6 @@
 <!DOCTYPE html><html lang="pt-BR"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Planejamento — comparação (Fase 1)</title>
+<title>Planejamento por estoque alvo</title>
 <style>
   :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--red:#f85149;--blue:#4493f8}
   *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
@@ -41,8 +41,8 @@
   .apl{background:transparent;color:var(--blue);border:1px solid var(--line);border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}.apl:hover{border-color:var(--blue)}
 </style></head><body>
 <header><div class="mark">P</div>
-  <div><h1>Planejamento por estoque alvo — comparação</h1>
-  <div class="sub">Fase 1: cálculo novo <b>lado a lado</b> com o modelo atual (ABC). Nada do fluxo é alterado.</div></div>
+  <div><h1>Planejamento por estoque alvo</h1>
+  <div class="sub">O que a fábrica precisa produzir, calculado da planilha do ML. É este número que a tela azul da revisão mostra e que a compra de material usa.</div></div>
   <div class="links"><a class="link" href="/">Admin</a></div>
 </header>
 <div class="wrap">
@@ -79,25 +79,20 @@
 
   <div class="tbwrap"><table>
     <thead>
-      <tr class="grp">
-        <th class="l" rowspan="2">SKU</th>
-        <th class="atual" colspan="4">Modelo atual (ABC)</th>
-        <th class="novo sep" colspan="7">Modelo novo (planejamento)</th>
-      </tr>
       <tr class="cols">
-        <th>Venda 30d</th><th>Média/d</th><th>Classe</th><th>Alvo sug.</th>
-        <th class="sep">Vendas jan.</th><th>Média/d</th><th>Compromet.</th><th>Estoque</th><th>Precisa</th><th>Alvo</th><th></th>
+        <th class="l">SKU</th>
+        <th>Vendas jan.</th><th>Média/d</th><th>Compromet.</th><th>Estoque</th><th>Precisa</th><th>Alvo</th><th></th>
       </tr>
     </thead>
     <tbody id="corpo"></tbody>
   </table></div>
-  <div style="margin-top:12px"><button class="prim" onclick="aplicarTodos()">Aplicar alvo do modelo novo em todos (com venda)</button>
+  <div style="margin-top:12px"><button class="prim" onclick="aplicarTodos()">Aplicar alvo em todos (com venda na janela)</button>
     <span class="sub" style="margin-left:8px">grava o alvo sugerido nos SKUs que tiveram venda na janela</span></div>
 
   <div class="sub" style="margin-top:12px">
-    <b class="dim">Modelo atual:</b> alvo = média dos últimos 30d × dias de cobertura (curva ABC).
-    &nbsp;·&nbsp; <b style="color:var(--blue)">Modelo novo:</b>
-    precisa = comprometido (envios futuros da planilha) + alvo (média na janela × cobertura, piso = alvo mínimo) − estoque.
+    <b style="color:var(--blue)">Como o número sai:</b>
+    alvo = média na janela × dias de cobertura, com piso no alvo mínimo.
+    &nbsp;·&nbsp; precisa = comprometido (envios futuros da planilha) + alvo − estoque.
   </div>
 </div>
 <script>
@@ -145,11 +140,7 @@ async function load(){
 
   $('#corpo').innerHTML=d.linhas.map(r=>`<tr>
     <td class="l code">${r.codigo}${r.cadastrado?'':' <span class="novoSku">s/ cadastro</span>'}</td>
-    <td>${fmt(r.at_qtd30)}</td>
-    <td>${fmt(r.at_media)}</td>
-    <td>${r.at_classe?`<span class="abc ${r.at_classe}">${r.at_classe}</span>`:'<span class="dim">—</span>'}</td>
-    <td>${fmt(r.at_alvo)}</td>
-    <td class="sep">${r.vendas_janela}</td>
+    <td>${r.vendas_janela}</td>
     <td>${r.media_dia}</td>
     <td>${r.comprometido}</td>
     <td>${fmt(r.estoque)}</td>
@@ -158,18 +149,18 @@ async function load(){
     <td>${r.cadastrado?`<button class="apl" data-cod="${r.codigo}" data-alvo="${r.alvo}">aplicar</button>`:'<span class="dim">—</span>'}</td>
   </tr>`).join('');
 }
-// aplica o alvo do modelo novo em skus.alvo
+// aplica o alvo calculado em skus.alvo
 async function aplicarUm(cod){
   const r=await (await fetch('/api/planejamento/aplicar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigo:cod})})).json();
   if(r.erro){ alert(r.erro); return; }
-  carregar();
+  load();
 }
 async function aplicarTodos(){
-  if(!confirm('Gravar o alvo do modelo novo em TODOS os SKUs com venda na janela?\n\n(SKUs sem venda na janela não são alterados.)')) return;
+  if(!confirm('Gravar o alvo calculado em TODOS os SKUs com venda na janela?\n\n(SKUs sem venda na janela não são alterados.)')) return;
   const r=await (await fetch('/api/planejamento/aplicar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})})).json();
   if(r.erro){ alert(r.erro); return; }
   alert('Alvo aplicado em '+r.aplicados+' SKU(s).');
-  carregar();
+  load();
 }
 document.addEventListener('click',function(e){ var b=e.target.closest('.apl'); if(b) aplicarUm(b.getAttribute('data-cod')); });
 

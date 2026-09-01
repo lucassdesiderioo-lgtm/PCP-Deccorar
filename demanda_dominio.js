@@ -31,12 +31,11 @@ function cfgNum(db, chave, padrao){
 }
 
 function calcular(db){
-  const diasCob     = cfgNum(db, 'dias_cobertura', 10);
-  const janela      = cfgNum(db, 'janela_media', 30);
-  const alvoMin     = cfgNum(db, 'alvo_minimo', 2);
-  const diasColchao = cfgNum(db, 'dias_colchao', 10); // parametro do modelo ATUAL
+  const diasCob = cfgNum(db, 'dias_cobertura', 10);
+  const janela  = cfgNum(db, 'janela_media', 30);
+  const alvoMin = cfgNum(db, 'alvo_minimo', 2);
 
-  // --- modelo NOVO: media pela janela e demanda comprometida ---
+  // --- media pela janela e demanda comprometida ---
   const mediaMap = {}, compMap = {};
   db.prepare("SELECT UPPER(codigo) c, COUNT(*) n FROM venda_futura "+
     "WHERE data_venda IS NOT NULL AND COALESCE(cancelada,0)=0 "+
@@ -46,28 +45,24 @@ function calcular(db){
     "WHERE data_envio IS NOT NULL AND data_envio >= date('now','localtime') "+
     "GROUP BY UPPER(codigo)").all().forEach(r=> compMap[r.c]=r.n);
 
+  /* `sob_medida` vem junto porque muda a conta la embaixo: peca feita contra o
+     pedido nao tem estoque para repor. Sem o JOIN ela cai no alvo minimo e pede
+     producao para sempre. */
   const smap = {};
-  db.prepare("SELECT UPPER(codigo) c, descricao, cor, estoque, alvo FROM skus").all().forEach(s=> smap[s.c]=s);
+  db.prepare(`SELECT UPPER(s.codigo) c, s.descricao, s.cor, s.estoque, s.alvo,
+      COALESCE(m.sob_medida,0) sob_medida
+    FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id`).all().forEach(s=> smap[s.c]=s);
 
-  // --- modelo ATUAL: curva ABC da tabela `demanda` (igual a /api/necessidade) ---
-  const demMap = {};
-  let dem = [];
-  try{ dem = db.prepare("SELECT UPPER(codigo) c, qtd30 FROM demanda ORDER BY qtd30 DESC").all(); }catch(e){}
-  const totalDem = dem.reduce((a,b)=>a+b.qtd30,0) || 1;
-  let cum = 0;
-  for(const r of dem){
-    cum += r.qtd30; const pct = cum/totalDem*100;
-    const classe = pct<=80 ? 'A' : (pct<=95 ? 'B' : 'C');
-    const media = r.qtd30/30;
-    demMap[r.c] = { qtd30:r.qtd30, media_dia:+media.toFixed(1), classe,
-      alvo_sugerido: Math.max(1, Math.ceil(media*diasColchao)) };
-  }
+  /* A curva ABC da tabela `demanda` saiu daqui em 01/09/2026, junto com a tela
+     /necessidade. Ela vinha lado a lado so para conferencia (Fase 1 do desenho),
+     e a tabela que a alimentava era semeada uma vez no codigo e nunca mais
+     atualizada — entao a comparacao passou a ser contra um numero congelado, o
+     que e pior que nao comparar: da a impressao de que ha uma segunda opiniao. */
 
   // --- uniao de todos os codigos vistos ---
   const cods = new Set();
   Object.keys(mediaMap).forEach(c=>cods.add(c));
   Object.keys(compMap).forEach(c=>cods.add(c));
-  Object.keys(demMap).forEach(c=>cods.add(c));
   Object.keys(smap).forEach(c=>cods.add(c));
 
   const linhas = [];
@@ -76,26 +71,32 @@ function calcular(db){
     const estoque = s ? s.estoque : null;
     const nVendas = mediaMap[c] || 0;
     const media = janela>0 ? nVendas/janela : 0;
-    const alvo = Math.max(alvoMin, Math.ceil(media*diasCob));
     const comprometido = compMap[c] || 0;
+    /* SOB MEDIDA NAO TEM ALVO, E ISSO NAO E EXCECAO — E A DEFINICAO.
+       A peca feita contra o pedido do cliente nao existe antes da venda e nao
+       sobra depois (§7): ela nao soma +1 na embalagem nem baixa na etiqueta, e
+       por isso o estoque dela e sempre zero. Com alvo, `precisa` daria
+       `alvo - 0` todo dia: o SKU ficava eternamente na tela azul pedindo
+       producao de peca que ninguem encomendou, e fila que nunca zera e fila que
+       a equipe aprende a ignorar.
+       O que ela precisa e o que foi VENDIDO — o comprometido, e so ele. */
+    const alvo = (s && s.sob_medida) ? 0 : Math.max(alvoMin, Math.ceil(media*diasCob));
     const precisa = Math.max(0, comprometido + alvo - (estoque||0));
-    const at = demMap[c] || null;
     linhas.push({
       codigo:c, cadastrado:!!s,
       descricao: s?s.descricao:'', cor: s?s.cor:'',
       estoque,
-      // NOVO
-      vendas_janela:nVendas, media_dia:+media.toFixed(2), alvo, comprometido, precisa,
-      // ATUAL
-      at_qtd30: at?at.qtd30:null, at_media: at?at.media_dia:null,
-      at_classe: at?at.classe:null, at_alvo: at?at.alvo_sugerido:null
+      vendas_janela:nVendas, media_dia:+media.toFixed(2), alvo, comprometido, precisa
     });
   }
+  /* Desempate por VENDAS NA JANELA — antes era o qtd30 da curva ABC, que sumiu
+     com ela. Os dois respondem a mesma pergunta ("qual SKU gira mais"), so que
+     este le venda de verdade em vez de uma foto antiga. */
   linhas.sort((a,b)=> b.precisa - a.precisa
-    || (b.at_qtd30||0) - (a.at_qtd30||0)
+    || b.vendas_janela - a.vendas_janela
     || a.codigo.localeCompare(b.codigo));
 
-  return { config:{ dias_cobertura:diasCob, janela_media:janela, alvo_minimo:alvoMin, dias_colchao:diasColchao }, linhas };
+  return { config:{ dias_cobertura:diasCob, janela_media:janela, alvo_minimo:alvoMin }, linhas };
 }
 
 /* So o que a fabrica precisa produzir, e so de SKU que existe no cadastro.
