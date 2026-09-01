@@ -20,6 +20,14 @@
  * e um PISO — o tempo real de reposicao e ele mais o que a fabrica leva antes.
  * Dizer o contrario faria o parametro parecer medido quando so metade dele foi.
  *
+ * A JANELA CORTA OS DOIS CARIMBOS, e nao so o da embalagem. Cortando so um, a
+ * peca revisada ha meses e embalada ontem entrava inteira e trazia consigo todo
+ * o tempo que passou PARADA NA FILA — que nao e tempo de trabalho. Na primeira
+ * medicao real (01/09/2026, 589 pecas) isso deu uma distribuicao com dois
+ * corcovas: um grupo saindo em menos de uma hora e outro em cinco a dez dias.
+ * Meia hora e dez dias nao sao o mesmo trabalho feito devagar — o segundo grupo
+ * era a fila acumulada no periodo de testes.
+ *
  * SO LE.
  */
 const fs = require('fs');
@@ -38,7 +46,8 @@ const linhas = db.prepare(`SELECT codigo,
   FROM fila
   WHERE situacao='embalado' AND embalado_em IS NOT NULL AND revisado_em IS NOT NULL
     AND date(embalado_em) >= date('now','localtime','-'||?||' day')
-    AND COALESCE(teste,0)=0`).all(DIAS)
+    AND date(revisado_em) >= date('now','localtime','-'||?||' day')
+    AND COALESCE(teste,0)=0`).all(DIAS, DIAS)
   .filter(r => r.horas != null && r.horas >= 0);
 
 const T = s => console.log(s);
@@ -91,6 +100,22 @@ T('  é este mais o da produção, que só quem está no chão sabe dizer.');
 T('');
 T('  Dias de cobertura = (este número) + (o que a produção leva antes) + folga.');
 T('  Só a parte medida já pede ' + sugerido + ' dia(s).');
+
+/* DUAS CORCOVAS NAO SAO UMA MEDIA. Quando o p90 e muitas vezes a mediana, nao ha
+   um processo com variacao: ha dois comportamentos diferentes misturados — o
+   trabalho que flui e a peca que ficou parada. Tirar um parametro da media dos
+   dois da um numero que nao descreve nenhum deles. Foi o que apareceu na
+   primeira medicao real: metade saindo em menos de uma hora, metade em dias. */
+if(mediana > 0 && p90 / mediana >= 5){
+  const rapidas = ord.filter(h => h <= mediana*2).length;
+  T('');
+  T('  ⚠ A DISTRIBUIÇÃO TEM DUAS CORCOVAS — não tire média disto.');
+  T('    ' + rapidas + ' peça(s) saem em até ' + fmt(mediana*2) + ';');
+  T('    as outras ' + (ord.length-rapidas) + ' levam até ' + fmt(ord[ord.length-1]) + '.');
+  T('    Isso não é o mesmo trabalho feito devagar: quase sempre é peça que ficou');
+  T('    PARADA NA FILA, e fila parada não é tempo de bancada. Meça de novo com');
+  T('    uma janela curta (node tempo_reposicao.js 14) para pegar só o fluxo atual.');
+}
 
 /* Por SKU so quando ha amostra que sustente: media de duas pecas nao e media. */
 const porSku = {};
