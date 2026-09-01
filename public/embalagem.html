@@ -203,7 +203,20 @@ async function scanSku(sku){
      O que não é derivado é a VENDA escolhida: cliente, NF, cidade. É essa
      etiqueta que vai ser colada na caixa que está na mão dela — então é ela que
      merece o tamanho. */
-  banner((r.adiantado?'warn':'cfm')+' rotulo','Confira esta venda', adiant
+  /* ⚠️ VENDA DE MAIS DE UMA PEÇA — o aviso mais caro desta tela.
+     A embalagem é sempre separada (uma peça por saco), mas a etiqueta de venda
+     é UMA só: o Mercado Livre despachou este envio como um volume. Sem este
+     aviso, quem imprime cola a etiqueta num saco e manda um — e o cliente que
+     comprou três recebe uma. O sistema não perceberia: do ponto de vista dele
+     a etiqueta foi impressa e o volume andou.
+     Vem ANTES do nome do cliente, na cor de alerta, porque é a única coisa
+     nesta tela que não se descobre olhando a caixa. */
+  var multi = (r.pedido.pecas>1) ? '<div style="background:#3a1513;border:2px solid #f85149;'
+      +'border-radius:8px;padding:10px 12px;margin-bottom:8px;color:#ffb4ae">'
+      +'<div style="font-size:22px;font-weight:800">SÃO '+r.pedido.pecas+' PEÇAS NESTA VENDA</div>'
+      +'<div style="font-size:14px;margin-top:2px">Uma etiqueta só, '+r.pedido.pecas
+      +' sacos. Junte as '+r.pedido.pecas+' antes de despachar.</div></div>' : '';
+  banner((r.adiantado?'warn':'cfm')+' rotulo','Confira esta venda', multi + adiant
     +'<div style="font-size:30px;font-weight:800;color:var(--txt);line-height:1.15;letter-spacing:-.5px;margin:2px 0 6px">'+esc(r.pedido.buyer)+'</div>'
     +'<div style="font-size:16px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+'</div>'
     +'<div style="border-top:1px solid var(--line);padding-top:10px">'

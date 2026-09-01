@@ -35,7 +35,7 @@ db.exec(`
     criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0);
   CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, estagio TEXT DEFAULT 'pendente',
     embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')),
-    teste INTEGER DEFAULT 0);
+    teste INTEGER DEFAULT 0, pecas INTEGER DEFAULT 1);
   CREATE TABLE ajuste_estoque (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, antes INTEGER,
     depois INTEGER, delta INTEGER, motivo TEXT, obs TEXT, usuario_id INTEGER, usuario_nome TEXT,
     criado_em TEXT DEFAULT (datetime('now','localtime')), data TEXT DEFAULT (date('now','localtime')),
@@ -133,6 +133,12 @@ lote.run('BK140140BEGE','embalado', hoje +' 09:10:00', hoje, 0);
 lote.run('BK140140BEGE','carregado',hoje +' 11:20:00', hoje, 0);
 lote.run('BK140140BEGE','embalado', hoje +' 12:00:00', hoje, 1);   // teste
 lote.run('BK160160CINZA','carregado',ontem+' 16:40:00', ontem, 0);
+/* UM VOLUME DE 3 PECAS despachado hoje. A etiqueta e uma so, mas saíram tres
+   persianas do estoque (§5, armadilha #8) — o grafico tem que contar tres,
+   senao ele mostra uma fabrica que produz mais do que vende sem nada ter
+   acontecido. */
+db.prepare("INSERT INTO lote (codigo,estagio,embalado_em,data,teste,pecas) VALUES (?,?,?,?,?,?)")
+  .run('BK140140BEGE','embalado', hoje+' 14:30:00', hoje, 0, 3);
 
 // --- dois ajustes manuais no mesmo SKU: vale o ultimo ---
 const aj = db.prepare(`INSERT INTO ajuste_estoque (codigo,antes,depois,delta,motivo,usuario_nome,criado_em)
@@ -229,9 +235,14 @@ const ok = (n, c, extra) => { casos++;
   // ── 7. A SERIE DO GRAFICO ────────────────────────────────────────────────
   ok('a serie tem 30 dias', p.serie.length === 30, 'veio ' + p.serie.length);
   ok('termina em hoje e comeca 29 dias atras', p.serie[29].data === hoje);
-  ok('hoje: entraram 2 (a de teste nao conta) e sairam 2',
-     p.serie[29].entrou === 2 && p.serie[29].saiu === 2,
+  ok('hoje: entraram 2 (a de teste nao conta) e sairam 5 (2 volumes de 1 + um de 3)',
+     p.serie[29].entrou === 2 && p.serie[29].saiu === 5,
      JSON.stringify(p.serie[29]));
+  /* A SAIDA CONTA PECAS, NAO ETIQUETAS. Sao 3 volumes despachados hoje; um
+     deles leva 3 persianas. Contar etiquetas daria 3 e o grafico nao fecharia
+     com o saldo, que baixou 5. */
+  ok('a saída soma peças: 3 volumes, 5 peças', p.serie[29].saiu === 5,
+     'veio ' + p.serie[29].saiu);
   ok('ontem: entraram 2 e saiu 1', p.serie[28].entrou === 2 && p.serie[28].saiu === 1,
      JSON.stringify(p.serie[28]));
   ok('dia sem movimento entra como ZERO, nao como buraco',

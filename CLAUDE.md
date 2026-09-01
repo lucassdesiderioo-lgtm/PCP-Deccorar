@@ -37,7 +37,7 @@ Ordem de produção → REVISÃO → FILA → EMBALAGEM → ESTOQUE → ETIQUETA
 |---|---|
 | Peça **revisada** | **NENHUM.** Entra na tabela `fila` com `situacao='aguardando'` |
 | Peça **embalada** (com kit conferido) | **+1** — é aqui que vira estoque |
-| **Etiqueta de venda** impressa | **−1** — é aqui que sai |
+| **Etiqueta de venda** impressa | **− as peças do volume** — é aqui que sai (quase sempre 1; o item de `Quantidade: 3` baixa 3) |
 | Etiqueta de venda **reimpressa** | **NENHUM** — mesmo volume, mesmo cliente |
 
 > ⚠️ **ARMADILHA #1:** Se você ver que `/api/revisao` não mexe no estoque, **está
@@ -258,18 +258,30 @@ lote.pecas → quantas PERSIANAS vão nela    (o que a fábrica faz)
 > `COALESCE(pecas,1)`: volume gravado antes da coluna existir vale uma peça —
 > exatamente o que o sistema assumia. O passivo não muda de número.
 
-> ⚠️ **A BAIXA CONTINUA SENDO DE UMA PEÇA POR VOLUME, e isso agora desencontra.**
-> A etiqueta de venda faz `estoque-1` por volume (`etq_route.js`). Com a produção
-> em peças, o envio de 3 vira 3 ordens → 3 embalagens → **+3** no estoque, e a
-> etiqueta baixa **−1**: sobram 2 peças no saldo que fisicamente foram na caixa
-> do cliente. Antes o furo era o oposto (produzia 1 onde o cliente comprou 3), e
-> a conta "fechava" porque os dois lados erravam junto.
+> ⚠️ **A BAIXA TAMBÉM É EM PEÇAS, e os dois lados têm que contar igual.**
+> **A embalagem é sempre separada — uma peça por saco, independente da
+> quantidade** (regra do dono da operação, 01/09/2026). Então o envio de 3 soma
+> **+3** no estoque, e a etiqueta de venda baixa **−3**. Enquanto a baixa era
+> fixa em 1, sobravam 2 peças no saldo que fisicamente foram na caixa do
+> cliente — e nada na tela dizia que aquele volume levava mais de uma.
 >
-> Fechar isso é a **dívida 12 do §14**, e ela depende de uma resposta que o
-> código não tem: a bancada embala um envio de 3 como **três** embalagens (3
-> bipes, +3) ou como **uma**? O software espelha a realidade física; não tenta
-> adivinhá-la (§3). Enquanto não se sabe, o `rastrear.js --lote` lista esses
-> itens no fechamento do dia.
+> Três coisas mudam junto, e nenhuma funciona sozinha:
+>
+> | Onde | O que faz |
+> |---|---|
+> | `etq_route.js` | baixa `pecas`, e a **trava** passa a ser `estoque < pecas` |
+> | a mensagem da trava | diz o que falta (*"leva 3 peças e há 2 em estoque. Falta 1."*) — trava que não se entende é trava que a equipe aprende a contornar (armadilha #6) |
+> | `embalagem.html` | avisa **antes do nome do cliente**: "SÃO 3 PEÇAS NESTA VENDA — uma etiqueta só, 3 sacos" |
+>
+> O aviso na tela é o mais importante dos três: é a única coisa ali que **não se
+> descobre olhando a caixa**. Sem ele, quem imprime cola a etiqueta num saco e
+> manda um — e o sistema não perceberia, porque do ponto de vista dele a
+> etiqueta foi impressa e o volume andou.
+>
+> `fluxo_estoque.js` acompanhou: a saída do gráfico soma `pecas` em vez de
+> contar etiquetas. Contar etiqueta de um lado e peça do outro faria o painel
+> mostrar uma fábrica que produz mais do que vende todo dia, sem nada ter
+> acontecido.
 
 **Do PDF até o número que o operador vê há SETE degraus**, e em seis deles o
 volume sai da conta por regra. Nenhum é bug — mas nenhum é visível, e é por
@@ -1026,9 +1038,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15), `teste_estoque.js` (53) e `teste_cruzamento.js` (14); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15), `teste_estoque.js` (54), `teste_cruzamento.js` (14) e `teste_etiqueta.js` (12); o resto não tem | Médio a longo prazo |
 | 11 | ~~`Quantidade` da folha não chega no cruzamento~~ **RESOLVIDO em 01/09/2026** — `lote.pecas` guarda a quantidade e o `urgencia.js` (dono único) conta peças; ver §5, armadilha #8 | — |
-| 12 | **A etiqueta de venda baixa 1 peça por volume** — com a produção em peças (dívida 11), o envio de `Quantidade: 3` soma +3 na embalagem e baixa −1 na etiqueta: sobram 2 no saldo. Depende de saber se a bancada embala esse envio como 3 embalagens ou 1 | **Alto** — furo silencioso no saldo dos SKUs com item multi-peça |
+| 12 | ~~A etiqueta de venda baixa 1 peça por volume~~ **RESOLVIDO em 01/09/2026** — a embalagem é sempre separada, então a baixa é em peças; ver §5, armadilha #8 | — |
 
 ---
 
@@ -1201,9 +1213,9 @@ hoje é o que faz a conta "quebrar" sem ninguém notar.
 
 **Rode `node teste_estoque.js` após qualquer mudança no `est_route.js`, no
 `fluxo_estoque.js`, no `demanda_dominio.js`, no `painel_route.js` ou no
-`ger_route.js`** — os 53 casos travam a conta única nas quatro telas, o sob
-medida, o parado, a série do gráfico, a idade do inventário, o gate do custo e o
-acordo com o fechamento diário do Planejamento.
+`ger_route.js`** — os 54 casos travam a conta única nas quatro telas, o sob
+medida, o parado, a série do gráfico (que soma peças na saída, §5), a idade do
+inventário, o gate do custo e o acordo com o fechamento diário do Planejamento.
 
 ### A TV e o gerencial entraram na mesma régua (01/09/2026)
 
