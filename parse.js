@@ -259,6 +259,17 @@ async function parsePdf(uint8){
     if(nf&&danfeByNf[nf]) danfePage=danfeByNf[nf];
     else if(pages[p+1]&&pages[p+1].type==='danfe') danfePage=p+1;
     orders.push({sku:rec?rec.sku:null,cor:(rec&&rec.cor)||'',conflito,
+      /* QUANTAS PECAS ESTE VOLUME LEVA. O volume continua sendo UM (uma
+         etiqueta, uma linha em `lote`) — mudar isso criaria etiqueta que o
+         Mercado Livre nao emitiu. O que este campo carrega e a outra metade da
+         verdade: quantas persianas a fabrica tem que fazer para fechar esse
+         envio. Sem ele, o item de 3 gerava 1 urgente e o cliente recebia 1.
+
+         Cai para 1 quando o volume so foi reconhecido pela LEITURA 2 (o
+         tokenizer nao le Quantidade). Subestimar e o erro seguro: produzir a
+         menos aparece na conferencia da bancada, produzir a mais some no
+         estoque sem ninguem notar. */
+      pecas: Math.max(1, (rec && +rec.qtd) || 1),
       /* A descricao do anuncio vai junto: e ela que diz a LINHA do produto
          ("Cortina Rolo Blackout" x "Toucher Rolo Evolux"), a unica dimensao que
          medida e cor nao separam. O upload guarda e aprende com ela. */

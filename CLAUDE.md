@@ -241,9 +241,35 @@ duas unidades de medida diferentes para o mesmo papel.
 > (caso 9 do `teste_parse.js`): a folha tem que **entregar** o 3, e o parse tem
 > que continuar gravando **1**.
 
-A produção, essa sim, precisa das três peças. Hoje o `Quantidade` **não** entra
-no cruzamento — a urgência conta volumes pendentes, então um item de 3 gera
-1 urgente e não 3. **Dívida 11 do §14.**
+A produção, essa sim, precisa das três peças — e desde **01/09/2026** ela as
+recebe. O volume guarda a quantidade em `lote.pecas` (gravada pelo `parse.js` a
+partir da folha), e a urgência conta **peças**, não volumes:
+
+```
+lote      →  uma linha por ETIQUETA        (o que o ML despacha)
+lote.pecas → quantas PERSIANAS vão nela    (o que a fábrica faz)
+```
+
+> `urgencia.js` é o **dono único** dessa conta. O `cruz_route.js` e o
+> `rastrear.js --lote` chamam ele; nenhum dos dois tem cópia. Uma cópia no
+> diagnóstico continuaria dizendo o número velho **com a autoridade de quem foi
+> chamado para explicar** — mesmo motivo do `fila_dia.js`.
+>
+> `COALESCE(pecas,1)`: volume gravado antes da coluna existir vale uma peça —
+> exatamente o que o sistema assumia. O passivo não muda de número.
+
+> ⚠️ **A BAIXA CONTINUA SENDO DE UMA PEÇA POR VOLUME, e isso agora desencontra.**
+> A etiqueta de venda faz `estoque-1` por volume (`etq_route.js`). Com a produção
+> em peças, o envio de 3 vira 3 ordens → 3 embalagens → **+3** no estoque, e a
+> etiqueta baixa **−1**: sobram 2 peças no saldo que fisicamente foram na caixa
+> do cliente. Antes o furo era o oposto (produzia 1 onde o cliente comprou 3), e
+> a conta "fechava" porque os dois lados erravam junto.
+>
+> Fechar isso é a **dívida 12 do §14**, e ela depende de uma resposta que o
+> código não tem: a bancada embala um envio de 3 como **três** embalagens (3
+> bipes, +3) ou como **uma**? O software espelha a realidade física; não tenta
+> adivinhá-la (§3). Enquanto não se sabe, o `rastrear.js --lote` lista esses
+> itens no fechamento do dia.
 
 **Do PDF até o número que o operador vê há SETE degraus**, e em seis deles o
 volume sai da conta por regra. Nenhum é bug — mas nenhum é visível, e é por
@@ -251,7 +277,7 @@ isso que a pergunta "cadê as 6" vira desconfiança do sistema:
 
 | Degrau | Some quem | Regra |
 |---|---|---|
-| peças → etiquetas | as peças extras dos itens com `Quantidade > 1` | esta armadilha |
+| peças → etiquetas | as peças extras dos itens com `Quantidade > 1` | esta armadilha — **só na contagem de volumes**: a produção voltou a contá-las |
 | etiquetas → gravados | pack/venda **que já existe no histórico** | #5 |
 | gravados → pendentes | os `bloqueado` (SKU sem cadastro **ou** divergência) | §6 e §5 |
 | pendentes → fila de hoje | quem **só despacha depois** — vai pro painel "Pra despachar depois" | #7 |
@@ -1000,8 +1026,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) e `teste_estoque.js` (53); o resto não tem | Médio a longo prazo |
-| 11 | **`Quantidade` da folha não chega no cruzamento** — item de 3 peças gera 1 urgente, e a fábrica produz 1 onde o cliente comprou 3 (§5, armadilha #5). `folha.js` já lê o campo e o `rastrear.js --lote` já mostra os itens afetados; falta `cruz_route.js` contar peças em vez de volumes | **Alto** — o cliente espera 3 e sai 1 |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15), `teste_estoque.js` (53) e `teste_cruzamento.js` (14); o resto não tem | Médio a longo prazo |
+| 11 | ~~`Quantidade` da folha não chega no cruzamento~~ **RESOLVIDO em 01/09/2026** — `lote.pecas` guarda a quantidade e o `urgencia.js` (dono único) conta peças; ver §5, armadilha #8 | — |
+| 12 | **A etiqueta de venda baixa 1 peça por volume** — com a produção em peças (dívida 11), o envio de `Quantidade: 3` soma +3 na embalagem e baixa −1 na etiqueta: sobram 2 no saldo. Depende de saber se a bancada embala esse envio como 3 embalagens ou 1 | **Alto** — furo silencioso no saldo dos SKUs com item multi-peça |
 
 ---
 
@@ -1011,6 +1038,8 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   tela azul do operador têm que dizer o mesmo número (§18)
 - ❌ Fazer a revisão somar estoque "porque parece que falta"
 - ❌ Fazer a reimpressão baixar estoque "porque imprimiu de novo"
+- ❌ Contar volumes onde a conta é de peças (ou o contrário): `urgencia.js` decide
+  o que a fábrica produz, `carga.js` e `fila_dia.js` decidem o que se despacha
 - ❌ Fazer a leitura por pedaços (`split` em `Desenho do tecido`) voltar a rodar
   antes do tokenizer no `parse.js` — manda a peça errada pro cliente (§5)
 - ❌ Mover `express.static` para antes do `auth`
@@ -1053,6 +1082,7 @@ descrevia mais o banco real. Auditoria de 14/08/2026 fechou o buraco:
 | `revisao` | `modo`, `teste` | `server.js:49`, `st_route.js:15`, `ger_route.js:37` |
 | `montagem` | `teste` | `teste_route` |
 | `lote` | `teste` | `teste_route` |
+| `lote` | `pecas` (01/09/2026) | `urgencia.js`, `cruz_route.js`, `rastrear.js` |
 | `foto_estoque` | `teste` | `teste_route` |
 
 **Regra daqui pra frente:** coluna nova entra no `CREATE TABLE` do módulo **no

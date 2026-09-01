@@ -2,7 +2,7 @@ const express=require('express'); const fs=require('fs');
 const {parsePdf}=require('./parse'); const {PDFDocument}=require('pdf-lib');
 const {futuro}=require('./carga');
 module.exports=function(app,db){
-  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT);");
+  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, pecas INTEGER DEFAULT 1);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
   // sao so historia: quantas vezes o volume voltou pra impressora e quando foi a
   // ultima. O ALTER mora aqui, no dono da tabela (§17 do CLAUDE.md), com a
@@ -18,6 +18,16 @@ module.exports=function(app,db){
   try{ db.exec("ALTER TABLE lote ADD COLUMN bloqueio_resolvido TEXT"); }catch(e){}
   try{ db.exec("ALTER TABLE lote ADD COLUMN resolvido_por TEXT"); }catch(e){}
   try{ db.exec("ALTER TABLE lote ADD COLUMN resolvido_em TEXT"); }catch(e){}
+  /* QUANTAS PECAS O VOLUME LEVA (a "Quantidade" da folha de controle).
+     O volume continua sendo um — uma etiqueta, uma linha aqui. Esta coluna
+     carrega a outra metade: quantas persianas a fabrica precisa fazer para
+     fechar o envio. Sem ela o item de "Quantidade: 3" virava 1 ordem urgente e
+     o cliente que comprou 3 recebia 1 (divida 11 do §14).
+     DEFAULT 1 e o que faz o banco de producao continuar certo: as linhas
+     antigas, gravadas antes desta coluna existir, valem uma peca — que e
+     exatamente o que o sistema assumia ate agora. O `COALESCE` do cruzamento
+     cobre o mesmo para quem entrou com NULL. */
+  try{ db.exec("ALTER TABLE lote ADD COLUMN pecas INTEGER DEFAULT 1"); }catch(e){}
   // POR QUE o volume foi bloqueado. Ate aqui so havia um motivo possivel (SKU
   // fora do cadastro) e ele se lia do proprio codigo; com a divergencia de
   // leitura da folha sao dois, e eles se resolvem de formas diferentes — um
@@ -82,7 +92,7 @@ module.exports=function(app,db){
          semanas. Uma fila que mostra o que nao existe e uma fila que a equipe
          aprende a ignorar — e ai o volume que falta de verdade some junto. */
       const seen=new Set(); db.prepare("SELECT packId,venda FROM lote").all().forEach(r=>{ if(r.packId)seen.add('p:'+r.packId); if(r.venda)seen.add('v:'+r.venda); });
-      const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio,descricao,despachar_em) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+      const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio,descricao,despachar_em,pecas) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
       const existe=db.prepare('SELECT 1 FROM skus WHERE codigo=?');
       const famVista=db.prepare('SELECT prefixo,vezes FROM familia_sku WHERE familia=?');
       const famGrava=db.prepare(`INSERT INTO familia_sku (familia,prefixo,vezes) VALUES (?,?,1)
@@ -117,7 +127,7 @@ module.exports=function(app,db){
         else if(!ok){ est='bloqueado'; bloq++; motivo='sku_nao_cadastrado';
           const k=sku||'(sem SKU na folha)'; desconhecidos[k]=(desconhecidos[k]||0)+1; }
         if(!o.sku) semsku++;
-        ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null,o.despacharEm||null); novos++;
+        ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null,o.despacharEm||null,Math.max(1,+o.pecas||1)); novos++;
       }})();
       res.json({ok:true,total:orders.length,novos,repetidas:rep,sem_sku:semsku,bloqueados:bloq,divergencias:divs,
                 desconhecidos:Object.keys(desconhecidos).map(k=>({sku:k,qtd:desconhecidos[k]}))});

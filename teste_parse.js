@@ -216,6 +216,13 @@ function conferir(nome, orders, esperado){
     if(b.qtd!==3) erros.push('a folha nao entregou a Quantidade: veio '+JSON.stringify(b.qtd));
     if(pecas!==4) erros.push('pecas da folha: esperava 4, veio '+pecas);
     if(os_.length!==2) erros.push('volumes: esperava 2 (uma etiqueta por item), veio '+os_.length);
+    /* E A TERCEIRA METADE, que faltava ate 01/09/2026: o volume tem que SABER
+       quantas pecas leva. Sem isto o cruzamento gerava 1 ordem urgente para um
+       envio de 3 persianas, e o cliente recebia 1 (divida 11 do §14). */
+    const o3=os_.find(o=>o.sku==='BK140140BEGE')||{};
+    const o1=os_.find(o=>o.sku==='BK160160CINZA')||{};
+    if(o3.pecas!==3) erros.push('o volume de 3 pecas nao carregou a quantidade: veio '+JSON.stringify(o3.pecas));
+    if(o1.pecas!==1) erros.push('o volume de 1 peca deveria trazer 1: veio '+JSON.stringify(o1.pecas));
     if(os_.some(o=>o.conflito)) erros.push('marcou conflito a toa: '+os_.map(o=>o.conflito).filter(Boolean).join(' / '));
     if(erros.length){ falhas++; console.log('FALHOU  item com Quantidade 3 e 3 pecas em 1 volume');
       erros.forEach(e=>console.log('        '+e)); }
