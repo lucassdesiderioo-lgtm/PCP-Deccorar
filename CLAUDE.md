@@ -1000,7 +1000,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) e `teste_estoque.js` (39); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) e `teste_estoque.js` (46); o resto não tem | Médio a longo prazo |
 | 11 | **`Quantidade` da folha não chega no cruzamento** — item de 3 peças gera 1 urgente, e a fábrica produz 1 onde o cliente comprou 3 (§5, armadilha #5). `folha.js` já lê o campo e o `rastrear.js --lote` já mostra os itens afetados; falta `cruz_route.js` contar peças em vez de volumes | **Alto** — o cliente espera 3 e sai 1 |
 
 ---
@@ -1170,22 +1170,37 @@ hoje é o que faz a conta "quebrar" sem ninguém notar.
 > cima de um ajuste aberto — a linha sumiria da mão de quem está preenchendo.
 
 **Rode `node teste_estoque.js` após qualquer mudança no `est_route.js`, no
-`fluxo_estoque.js` ou no `demanda_dominio.js`** — os 39 casos travam a conta
-única, o sob medida, o parado, a série do gráfico, a idade do inventário e o
-acordo com o fechamento diário do Planejamento.
+`fluxo_estoque.js`, no `demanda_dominio.js`, no `painel_route.js` ou no
+`ger_route.js`** — os 46 casos travam a conta única nas quatro telas, o sob
+medida, o parado, a série do gráfico, a idade do inventário e o acordo com o
+fechamento diário do Planejamento.
 
-### Dívida aberta: `skus.alvo` ainda decide em duas telas
+### A TV e o gerencial entraram na mesma régua (01/09/2026)
 
-A aba Estoque saiu da foto, mas o alvo gravado continua sendo lido por:
+Depois da aba, sobravam **duas telas medindo falta contra o `skus.alvo` gravado**
+— quarta e quinta réguas da mesma pergunta:
 
-| Onde | O que faz com ele |
-|---|---|
-| `painel_route.js:15` (a TV do chão de fábrica) | `aProduzir = pedido + alvo − estoque`, com `pedido` = ordens lançadas hoje |
-| `ger_route.js:17` (gerencial) | lista `falta = alvo − estoque` dos SKUs com `alvo > 0` |
+| Onde | O que era | O que é |
+|---|---|---|
+| `painel_route.js` (a TV do chão de fábrica) | `aProduzir = pedido + alvo − estoque`, misturando as ordens do dia com a reposição, medida contra a foto | **duas** colunas: `faltaHoje` = pedido − produzido, e `precisa` = `demanda_dominio` |
+| `ger_route.js` (gerencial) | `falta = alvo − estoque` dos SKUs com `alvo > 0`, sem o comprometido | `DEMANDA.aProduzir()`, os 12 maiores |
 
-São mais duas réguas para "quanto produzir", alimentadas por um número que só
-muda quando alguém clica "Aplicar". Enquanto estiverem assim, o painel e o
-gerencial podem mostrar falta diferente da que a tela azul e a aba Estoque
-mostram — e ninguém consegue ver de onde vem a diferença. Não foi mexido nesta
-entrega porque são telas de outro público; entra na fila junto com a decisão de
-mostrar (ou não) o valor em R$ do estoque, que hoje é gateado por `custo.ver`.
+> ⚠️ **`faltaHoje` e `precisa` NÃO SE SOMAM, e é por isso que têm nomes
+> próprios.** A primeira é o que sobrou das ordens lançadas hoje — o trabalho
+> que está na bancada agora. A segunda é o que o estoque pede, a mesma conta da
+> tela azul. Somar as duas seria inventar a sexta régua; a tela escreve isso
+> embaixo da tabela, porque quem lê uma TV de longe soma o que vê.
+
+> ⚠️ **O cache de 20 s do `painel_route` é obrigatório.** A TV recarrega de 3 em
+> 3 segundos e o `calcular` percorre a planilha de vendas e o catálogo inteiro —
+> sem cache, são 1.200 varreduras por hora com a TV ligada. Ele é **local da
+> rota**, e não dentro do `demanda_dominio`: quem grava alvo ou decide compra
+> precisa do número fresco, e um cache escondido no domínio entregaria dado
+> velho para eles sem avisar.
+
+O `aProduzir` continua na resposta como apelido de `faltaHoje`, para não quebrar
+consumidor antigo da rota. Não use em tela nova.
+
+Sobra uma decisão, não uma dívida: **mostrar (ou não) o valor em R$ do estoque**
+na aba. A ficha técnica já sabe o custo por SKU, mas ele é gateado por
+`custo.ver` — a informação mais estratégica do sistema.

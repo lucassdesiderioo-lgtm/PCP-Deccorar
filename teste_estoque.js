@@ -40,6 +40,14 @@ db.exec(`
     depois INTEGER, delta INTEGER, motivo TEXT, obs TEXT, usuario_id INTEGER, usuario_nome TEXT,
     criado_em TEXT DEFAULT (datetime('now','localtime')), data TEXT DEFAULT (date('now','localtime')),
     teste INTEGER DEFAULT 0);
+  CREATE TABLE producao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, qtd INTEGER,
+    produzido INTEGER DEFAULT 0, data TEXT DEFAULT (date('now','localtime')),
+    criado_em TEXT DEFAULT (datetime('now','localtime')), origem TEXT DEFAULT 'manual',
+    urgente INTEGER DEFAULT 0, teste INTEGER DEFAULT 0);
+  CREATE TABLE revisao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, inicio TEXT, fim TEXT,
+    segundos INTEGER, data TEXT DEFAULT (date('now','localtime')),
+    criado_em TEXT DEFAULT (datetime('now','localtime')), modo TEXT DEFAULT 'hoje',
+    teste INTEGER DEFAULT 0);
   CREATE TABLE contagem (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT,
     contado_em TEXT DEFAULT (datetime('now','localtime')), sessao TEXT, teste INTEGER DEFAULT 0,
     tipo TEXT DEFAULT 'sku', componente_id INTEGER, qtd REAL DEFAULT 1);
@@ -85,6 +93,8 @@ const app = {
 };
 require('./plan_route')(app, db);    // cria venda_futura, fechamento e config
 require('./est_route')(app, db);
+require('./painel_route')(app, db);  // a TV do chao de fabrica
+require('./ger_route')(app, db);     // o gerencial
 
 // --- vendas: a janela (media) e o comprometido (envio futuro) ---
 const vf = db.prepare("INSERT INTO venda_futura (venda_id,codigo,data_venda,data_envio) VALUES (?,?,?,?)");
@@ -251,7 +261,39 @@ const ok = (n, c, extra) => { casos++;
      p.resumo.alvo_defasados === 2 && p.resumo.alvo_aplicaveis === 1,
      'defasados=' + p.resumo.alvo_defasados + ' aplicaveis=' + p.resumo.alvo_aplicaveis);
 
-  // ── 12. O QUE A PECA E — os campos do pecaTexto vao na linha ─────────────
+  // ── 12. A MESMA REGUA NAS QUATRO TELAS ───────────────────────────────────
+  /* A TV do chao de fabrica e o gerencial liam o `skus.alvo` GRAVADO: a TV
+     somava `pedido + alvo - estoque` (quarta regua) e o gerencial listava
+     `alvo - estoque` sem o comprometido (quinta). Os dois agora leem o
+     demanda_dominio, e estes casos travam isso. */
+  const painel = await chamar('GET /api/painel');
+  const pPor = {}; painel.linhas.forEach(l => pPor[l.codigo.toUpperCase()] = l);
+  ok('a TV do chão de fábrica pede o MESMO precisa da aba e da tela azul',
+     Object.keys(azulPor).every(c => pPor[c] && pPor[c].precisa === azulPor[c]),
+     JSON.stringify(Object.keys(azulPor).map(c => c+' tv='+(pPor[c]||{}).precisa+' azul='+azulPor[c])));
+  ok('e mostra o alvo calculado, não o gravado (BK140140BEGE: 10, salvo 5)',
+     pPor.BK140140BEGE.alvo === 10, 'veio ' + pPor.BK140140BEGE.alvo);
+  ok('sob medida não pede reposição na TV, como na aba',
+     pPor.SOBMEDIDA.precisa === 0 && pPor.SOBMEDIDA.alvo === 0);
+  /* "Falta hoje" e outra pergunta: o que sobrou das ordens do dia. Nao se soma
+     com `precisa`, e por isso as duas colunas tem nomes proprios. */
+  db.prepare("INSERT INTO producao (codigo,qtd,produzido,data) VALUES ('BK140140BEGE',5,2,date('now','localtime'))").run();
+  const painel2 = await chamar('GET /api/painel');
+  const l2 = painel2.linhas.find(l => l.codigo === 'BK140140BEGE');
+  ok('"falta hoje" conta a ordem do dia que ainda não saiu (5 pedidas − 2 feitas)',
+     l2.faltaHoje === 3, 'veio ' + l2.faltaHoje);
+  ok('e não se mistura com o precisa, que segue o do estoque',
+     l2.precisa === 10, 'veio ' + l2.precisa);
+
+  const ger = await chamar('GET /api/gerencial');
+  const gPor = {}; (ger.estoque||[]).forEach(x => gPor[x.l] = x);
+  ok('o gerencial lista a falta pela mesma conta',
+     Object.keys(gPor).every(c => gPor[c].falta === (azulPor[c] || 0)),
+     JSON.stringify(ger.estoque));
+  ok('e não lista quem não precisa de nada', !gPor.BK160160CINZA && !gPor.KIT32,
+     JSON.stringify(Object.keys(gPor)));
+
+  // ── 13. O QUE A PECA E — os campos do pecaTexto vao na linha ─────────────
   ok('a linha carrega as colunas da peca, nao o texto do codigo',
      por.BK140140BEGE.largura_cm === 140 && por.BK140140BEGE.cor_nome === 'Bege' &&
      por.BK140140BEGE.tecido_nome === 'Blackout' && por.BK140140BEGE.modelo_nome === 'Rolô');
