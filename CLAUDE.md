@@ -100,6 +100,20 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 2. Bipe no **QR do kit de instalação** → confirma que o kit entrou na caixa
 3. Bipe no SKU → encerra, consome da `fila`, **+1 no estoque**, abate a ordem do dia
 
+> **A fila não é obrigatória para embalar.** `POST /api/montagem` consome a linha
+> da `fila` **quando ela existe** e funciona sem ela: grava a embalagem e soma
+> `+1` no estoque igual. O que muda é o `modo`, que vira `'estoque'` — e aí a
+> embalagem deixa de abater a ordem do dia. Isso é o que torna
+> `node limpar_fila.js` seguro: limpar a fila não trava a bancada.
+>
+> A fila acumula quando a revisão é lançada e a peça nunca é embalada — foi o que
+> aconteceu no período de testes, que deixou centenas de linhas sem peça física
+> atrás. O lugar de limpar é o **inventário**: zerado o estoque e contada a
+> prateleira, a fila velha não descreve mais nada. `limpar_fila.js` simula por
+> padrão, mostra a **idade** das linhas (fila de hoje é trabalho, fila de meses é
+> passivo), faz backup e apaga **só** `situacao='aguardando'` — a linha
+> `embalado` é história de peça que virou estoque e nunca é tocada.
+
 > **Bloqueio do kit:** sem o bipe 2, o bipe 3 é recusado com "⚠ FALTOU O KIT".
 > Essa é a garantia contra esquecimento — motivo de devolução recorrente.
 
