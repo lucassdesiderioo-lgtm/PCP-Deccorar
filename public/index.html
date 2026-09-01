@@ -53,7 +53,7 @@
   .mltask.warn{background:#2a2410;color:#ffd85c}.mltask.warn a{background:#ffb800;color:#1a1300}
   .mltask.ok{background:#10241a;color:#8ce0ad}.mltask.ok a{background:transparent;color:#8ce0ad;border:1px solid #1f6f37}
 </style></head><body>
-<header><div class="mark">E</div><div><h1>Admin — Produção &amp; Estoque</h1><div class="sub">Lance o dia · controle estoque e necessidade · cadastre SKUs</div></div>
+<header><div class="mark">E</div><div><h1>Admin — Produção &amp; Estoque</h1><div class="sub">Lance o dia · corrija o estoque · cadastre SKUs</div></div>
 <a class="link" href="/painel">Painel</a></header>
 <div id="mlTask" class="mltask" style="display:none"></div>
 <script>
@@ -77,7 +77,7 @@
 </script>
 <div class="tabs">
   <div class="tab active" data-t="prod">Lançar produção</div>
-  <div class="tab" data-t="est">Estoque &amp; Necessidade</div>
+  <div class="tab" data-t="est">Estoque</div>
   <div class="tab" data-t="cad">Cadastro de SKU</div>
   <div class="tab" data-t="plan">Planejamento</div>
   <div class="tab" data-t="rel">Relatórios</div>
@@ -117,9 +117,9 @@
       <div class="sumbox"><div class="n" id="sEst">0</div><div class="l">Peças em estoque</div></div>
     </div>
     <div class="card">
-      <div style="font-weight:700;margin-bottom:4px">Controle de estoque e necessidade</div>
-      <div class="sub" style="margin-bottom:12px">Ajuste o estoque com − / +, defina a necessidade (alvo) de cada SKU. Em vermelho = precisa repor.</div>
-      <table><thead><tr><th>SKU</th><th>Estoque atual</th><th>Necessidade (alvo)</th><th>A repor</th><th>Nível</th></tr></thead><tbody id="estlist"></tbody></table>
+      <div style="font-weight:700;margin-bottom:4px">Estoque</div>
+      <div class="sub" style="margin-bottom:12px">Correção pontual do saldo — peça quebrada, perdida, encontrada. Todo ajuste pede motivo e fica registrado. O <b>alvo</b> não se edita aqui: ele vem do Planejamento. Em vermelho = precisa repor.</div>
+      <table><thead><tr><th>SKU</th><th>Estoque atual</th><th>Alvo</th><th>A repor</th><th>Nível</th></tr></thead><tbody id="estlist"></tbody></table>
     </div>
   </div>
 
@@ -266,7 +266,7 @@
       <div class="sub" style="margin-top:10px"><b>O código do SKU não precisa seguir formato nenhum</b> — pode ser o que você quiser. O que vale é o que está nestes campos. Se o código por acaso for do tipo antigo (<code>BK180150BRANCO</code>), largura, altura e cor se preenchem sozinhos como atalho de digitação, e seguem editáveis. Modelo e tecido nunca são deduzidos do código: <code>BK</code> é o tecido blackout, não o modelo.</div>
       <div id="cadDica" style="margin-top:8px;font-size:13px"></div>
       <div class="row-actions"><button class="primary" onclick="salvar()">Salvar produto</button>
-        <span class="sub">O estoque e a necessidade se definem na aba "Estoque".</span><span class="msg" id="msg"></span></div></div>
+        <span class="sub">O saldo se corrige na aba "Estoque"; o alvo vem do Planejamento.</span><span class="msg" id="msg"></span></div></div>
 
     <div class="card"><div style="font-weight:700;margin-bottom:4px">Modelos, cores e tecidos</div>
       <div class="sub" style="margin-bottom:14px"><b>Modelo</b> é o mecanismo — Rolô, Romana, Acessório. <b>Tecido</b> é o material — Blackout, Screen. São coisas diferentes: um rolô de blackout e um rolô de screen têm o mesmo modelo e tecidos distintos. Desmarque <b>tem medida</b> num modelo como Acessório, e os produtos dele param de ser cobrados por largura e altura. Desativar não apaga: SKU que já aponta continua apontando.</div>
@@ -947,15 +947,15 @@ function renderEst(){
   $('#estlist').innerHTML = ord.map(s=>{
     const arepor=Math.max(0,(s.alvo||0)-(s.estoque||0)); if(arepor>0)low++; rep+=arepor; est+=s.estoque||0;
     const pct=s.alvo>0?Math.min(100,Math.round((s.estoque/s.alvo)*100)):100;
+    /* O ALVO NAO SE EDITA MAIS AQUI. Ele vem do Planejamento (média na janela ×
+       dias de cobertura), e ter um segundo campo escrevendo na mesma coluna era
+       a mesma doença da tela /necessidade, aposentada em 01/09/2026: duas
+       fontes, e a última a salvar ganha sem avisar. */
     return `<tr>
       <td class="code">${s.codigo}<div class="estq">${s.cor||''}</div></td>
-      <td><button class="step" data-adj="${s.codigo}" data-d="-1">−</button>
-          <b class="${s.estoque<s.alvo?'baixo':'ok'}" style="margin:0 8px">${s.estoque}</b>
-          <button class="step" data-adj="${s.codigo}" data-d="1">+</button>
-          <input class="setin" type="number" value="${s.estoque}" data-setest="${s.codigo}" title="definir estoque">
-          <button class="ghost small" data-setestbtn="${s.codigo}">ok</button></td>
-      <td><input class="setin" type="number" value="${s.alvo}" data-setalvo="${s.codigo}" title="necessidade/alvo">
-          <button class="ghost small" data-setalvobtn="${s.codigo}">salvar</button></td>
+      <td><b class="${s.estoque<s.alvo?'baixo':'ok'}" style="font-size:17px">${s.estoque}</b>
+          <button class="ghost small" data-ajustar="${esc(s.codigo)}" style="margin-left:10px">ajustar</button></td>
+      <td>${s.alvo||0}<div class="estq">do Planejamento</div></td>
       <td class="${arepor>0?'baixo':'ok'}">${arepor>0?('repor '+arepor):'ok'}</td>
       <td><span class="barmini"><i style="width:${pct}%;background:${s.estoque<s.alvo?'#f85149':'#2ea043'}"></i></span></td>
     </tr>`;
@@ -999,9 +999,52 @@ document.addEventListener("click",async e=>{
     const dc=$("#cadDica"); if(dc) dc.innerHTML="";
     $("#codigo").focus(); window.scrollTo(0,0); return; }
   const del=e.target.closest("[data-del]"); if(del){ if(confirm("Excluir "+del.dataset.del+"?")){ await fetch("/api/skus/"+encodeURIComponent(del.dataset.del),{method:"DELETE"}); carregar(); } return; }
-  const adj=e.target.closest("[data-adj]"); if(adj){ await fetch("/api/estoque",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({codigo:adj.dataset.adj,delta:+adj.dataset.d})}); carregar(); return; }
-  const se=e.target.closest("[data-setestbtn]"); if(se){ const inp=document.querySelector("[data-setest=\""+se.dataset.setestbtn+"\"]"); await fetch("/api/estoque",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({codigo:se.dataset.setestbtn,estoque:+inp.value||0})}); carregar(); return; }
-  const sa=e.target.closest("[data-setalvobtn]"); if(sa){ const inp=document.querySelector("[data-setalvo=\""+sa.dataset.setalvobtn+"\"]"); await fetch("/api/alvo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({codigo:sa.dataset.setalvobtn,alvo:+inp.value||0})}); carregar(); return; }
+  /* AJUSTE DE ESTOQUE — abre a linha embaixo, com motivo obrigatorio.
+     O +/- de um clique saiu: ele mudava o saldo sem deixar rastro, e era o
+     unico movimento de estoque do sistema assim. Um clique a mais e o preco de
+     saber, seis meses depois, por que o numero mudou. */
+  const aj=e.target.closest("[data-ajustar]");
+  if(aj){
+    const cod=aj.getAttribute("data-ajustar");
+    const tr=aj.closest("tr");
+    if(tr.nextElementSibling && tr.nextElementSibling.classList.contains("ajlin")){
+      tr.nextElementSibling.remove(); return;          // clicou de novo: fecha
+    }
+    document.querySelectorAll("tr.ajlin").forEach(x=>x.remove());
+    let motivos=[]; try{ motivos=await (await fetch("/api/listas/ajuste_estoque")).json(); }catch(err){}
+    const atual=(SKUS.find(x=>x.codigo===cod)||{}).estoque||0;
+    const linha=document.createElement("tr");
+    linha.className="ajlin";
+    linha.innerHTML='<td colspan="5" style="background:#0f141b">'
+      +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0">'
+      +'<b style="font-family:ui-monospace,monospace">'+esc(cod)+'</b>'
+      +'<span class="sub">de <b>'+atual+'</b> para</span>'
+      +'<input class="setin" type="number" id="ajQtd" value="'+atual+'" style="width:80px">'
+      +'<select id="ajMotivo" class="setin" style="width:auto;min-width:190px">'
+      +'<option value="">— motivo —</option>'
+      +motivos.map(m=>'<option>'+esc(m.valor||m)+'</option>').join('')
+      +'</select>'
+      +'<input class="setin" id="ajObs" placeholder="observação (opcional)" style="width:210px">'
+      +'<button class="ghost small" data-ajsalvar="'+esc(cod)+'">salvar</button>'
+      +'<span class="sub" id="ajMsg"></span></div>'
+      +'<div class="sub">O ajuste fica gravado com quem fez, quando, o valor anterior e o motivo.</div></td>';
+    tr.after(linha);
+    return;
+  }
+  const ajs=e.target.closest("[data-ajsalvar]");
+  if(ajs){
+    const cod=ajs.getAttribute("data-ajsalvar");
+    const motivo=document.getElementById("ajMotivo").value;
+    if(!motivo){ document.getElementById("ajMsg").textContent="escolha o motivo"; return; }
+    ajs.disabled=true;
+    const r=await (await fetch("/api/estoque",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({codigo:cod, estoque:+document.getElementById("ajQtd").value||0,
+                           motivo:motivo, obs:document.getElementById("ajObs").value})})).json();
+    ajs.disabled=false;
+    if(r.erro){ document.getElementById("ajMsg").textContent=r.erro; return; }
+    carregar();
+    return;
+  }
 });
 carregar();
 

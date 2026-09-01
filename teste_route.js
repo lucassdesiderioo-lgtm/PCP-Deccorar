@@ -16,6 +16,11 @@ module.exports=function(app, db){
     {nome:'rejeicao',     pk:'id',   rotulo:'problemas'},
     {nome:'contagem',          pk:'id', rotulo:'contagem'},
     {nome:'contagem_pendente', pk:'id', rotulo:'contagem (aprovacao)'},
+    // O ajuste manual mexe em skus.estoque, que a foto do modo teste ja
+    // restaura. A linha do ajuste e a historia dele: sem esta cobertura,
+    // "apagar tudo" devolveria o saldo e deixaria o registro do ajuste de pe,
+    // descrevendo uma mudanca que nao existe mais.
+    {nome:'ajuste_estoque',    pk:'id', rotulo:'ajustes de estoque'},
     // A contagem de material mexe em componente.estoque, e todo movimento deixa
     // linha aqui (regra 10). Sem esta cobertura, "apagar tudo" apagaria a
     // contagem de teste e deixaria o estoque de materia prima mexido.

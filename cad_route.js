@@ -10,6 +10,10 @@ module.exports=function(app,db){
   };
   seed('rejeicao',['Corte de tecido errado','Medida errada','Etiqueta errada','Defeito no tecido','Lado do comando trocado','Outro']);
   seed('motivo_devolucao',['Comprador se arrependeu','Enviado medida ou cor errada','Avaria no transporte','Defeito de fabricacao']);
+  /* Motivos do ajuste manual de estoque. Configuraveis como os outros: a lista
+     que nasce no codigo envelhece calada, e quando nao tem o motivo certo a
+     pessoa escolhe qualquer um — que e o mesmo que nao ter motivo. */
+  seed('ajuste_estoque',['Peca quebrada','Peca perdida','Peca encontrada','Correcao de contagem','Correcao de erro do sistema','Outro']);
 
   app.get('/api/listas/:tipo',(req,res)=>
     res.json(db.prepare('SELECT id,valor FROM listas WHERE tipo=? AND ativo=1 ORDER BY ordem,id').all(req.params.tipo)));
