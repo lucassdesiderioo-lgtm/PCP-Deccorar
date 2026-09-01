@@ -4,7 +4,18 @@
  *   node repor_fila.js --itens "BK130130BEGE=10, BK150150BRANCO=9"
  *   node repor_fila.js --lista lista.txt
  *   node repor_fila.js --lista lista.txt --confirmar
- *   node repor_fila.js --testar          so o leitor da lista, sem banco
+ *   node repor_fila.js --lista lista.txt --definir      o numero e o TOTAL final
+ *   node repor_fila.js --testar          so a leitura e a conta, sem banco
+ *
+ * DUAS PERGUNTAS DIFERENTES, E A LISTA NAO DIZ QUAL DELAS E
+ * "BK130130BEGE 10" tanto pode ser "acrescente 10" quanto "deixe 10 no total" —
+ * e com 2 ja na fila as duas dao numeros diferentes (12 e 10). Quem digita a
+ * lista sabe qual e; o script nao tem como adivinhar, entao ele nao adivinha:
+ *   sem flag   ACRESCENTA   soma ao que ja esta la (peca nova revisada)
+ *   --definir  DEFINE       o numero e o total final; a diferenca entra ou sai
+ * O --definir e o que serve para contar o carrinho: conta-se o que existe e
+ * escreve-se o que existe, sem ter que descobrir a diferenca de cabeca — e
+ * subtrair de cabeca e exatamente onde a contagem erra.
  *
  * POR QUE ISTO EXISTE
  * A `fila` guarda a peca REVISADA que ainda nao foi embalada. Quem a apaga
@@ -26,6 +37,11 @@
  *   - NAO cria SKU. Fora do cadastro, recusa a lista inteira (§6) — numa lista
  *     digitada a mao, SKU desconhecido e quase sempre erro de digitacao, e
  *     inserir "o resto" esconderia justamente a linha que precisa de olho.
+ *   - NAO encosta em quem ja foi embalado. So `situacao='aguardando'` entra na
+ *     conta e so ela e apagada: a linha `embalado` e historia de peca que virou
+ *     estoque, e apagar historia seria desfazer um +1 que aconteceu.
+ *   - NAO mexe, sem --so-a-lista, no SKU que nao esta na lista. Contar dez SKUs
+ *     nao e afirmar nada sobre o decimo primeiro.
  *
  * ⚠ CONFIRA O CARRINHO ANTES. Cada linha reposta e uma peca que a tela de
  * Embalagem vai cobrar. Linha sem peca fisica atras e o passivo que o
@@ -39,6 +55,8 @@ const temFlag = f => argv.indexOf(f) >= 0;
 const valorDe = (f, padrao) => { const i = argv.indexOf(f); return i >= 0 && argv[i+1] ? argv[i+1] : padrao; };
 
 const CONFIRMAR = temFlag('--confirmar');
+const DEFINIR   = temFlag('--definir');
+const SO_LISTA  = temFlag('--so-a-lista');
 const CAMINHO   = valorDe('--db', '/opt/expedicao/dados.db');
 const SAIDA     = valorDe('--saida', path.join(path.dirname(CAMINHO), 'backups'));
 const MODO      = valorDe('--modo', 'estoque');
@@ -53,7 +71,7 @@ const MOTIVO    = valorDe('--motivo', 'reposicao de linhas apagadas da fila');
    quebrar por token transformaria esse codigo em quatro pedacos.
    Por isso a regra e ao contrario: a QUANTIDADE e o numero no fim da linha, e
    o codigo e tudo que vem antes. O separador (- = :) e opcional. */
-function lerLista(texto){
+function lerLista(texto, definir){
   const itens = [], erros = [];
   String(texto||'').split(/[\n,;]+/).forEach(bruto => {
     const linha = String(bruto).replace(/[.,;\s]+$/,'').trim();
@@ -65,17 +83,53 @@ function lerLista(texto){
     const codigo = m[1].replace(/[\s-=:]+$/,'').trim();
     const qtd = parseInt(m[2],10);
     if(!codigo){ erros.push({linha:linha, erro:'sem codigo'}); return; }
-    if(!(qtd > 0)){ erros.push({linha:linha, erro:'quantidade tem que ser maior que zero'}); return; }
+    /* ZERO E LANCAMENTO VALIDO NO --definir, e so nele. Acrescentar zero nao
+       quer dizer nada; mas "contei o carrinho e nao tem nenhuma" e uma
+       informacao — e a unica forma de o SKU que acabou entrar na contagem em
+       vez de ficar de fora dela, que e o que mantem o numero errado de pe. */
+    if(qtd === 0 && !definir){ erros.push({linha:linha, erro:'zero so vale com --definir (o total final)'}); return; }
+    if(!(qtd >= 0)){ erros.push({linha:linha, erro:'quantidade invalida'}); return; }
     itens.push({codigo:codigo, qtd:qtd});
   });
-  /* O mesmo SKU citado duas vezes soma, nao vence o ultimo: "8" numa linha e
-     "+2" noutra e exatamente como a lista chega quando alguem se lembra depois. */
   const juntos = [];
   itens.forEach(it => {
     const ja = juntos.filter(j => j.codigo.toUpperCase() === it.codigo.toUpperCase())[0];
-    if(ja) ja.qtd += it.qtd; else juntos.push({codigo:it.codigo, qtd:it.qtd});
+    /* Somar o SKU repetido so faz sentido quando o numero e um ACRESCIMO: "8"
+       numa linha e "+2" noutra e como a lista chega quando alguem lembra de
+       mais duas depois. No --definir os dois numeros sao totais finais, e dois
+       totais para o mesmo SKU se contradizem — somar ali inventaria uma
+       terceira resposta que ninguem escreveu. */
+    if(ja && definir) erros.push({linha:it.codigo, erro:'citado duas vezes; no --definir cada numero e o total final, entao os dois se contradizem'});
+    else if(ja) ja.qtd += it.qtd;
+    else juntos.push({codigo:it.codigo, qtd:it.qtd});
   });
   return {itens:juntos, erros:erros};
+}
+
+/* ── A conta: do que a lista diz para o que vai mudar na fila ────────────────
+   Separada do banco de proposito — e ela que o --testar exercita. `atual` e o
+   que ha de `aguardando` hoje; `alvo` e onde a lista quer chegar. */
+function planear(itens, filaPorUpper, opts){
+  opts = opts || {};
+  const acoes = [], naLista = {};
+  itens.forEach(it => {
+    const chave = it.codigo.toUpperCase();
+    naLista[chave] = true;
+    const atual = filaPorUpper[chave] || 0;
+    const alvo = opts.definir ? it.qtd : atual + it.qtd;
+    acoes.push({codigo:it.codigo, atual:atual, alvo:alvo, delta:alvo - atual});
+  });
+  /* Sem --so-a-lista o SKU ausente fica como esta: contar dez SKUs nao afirma
+     nada sobre o decimo primeiro, e zerar por omissao apagaria a peca de um
+     carrinho que ninguem foi conferir. */
+  if(opts.definir && opts.soALista){
+    Object.keys(filaPorUpper).sort().forEach(chave => {
+      if(naLista[chave] || !filaPorUpper[chave]) return;
+      acoes.push({codigo:(opts.nomes && opts.nomes[chave]) || chave, atual:filaPorUpper[chave],
+                  alvo:0, delta:-filaPorUpper[chave], foraDaLista:true});
+    });
+  }
+  return acoes;
 }
 
 /* ── Autoteste do leitor ────────────────────────────────────────────────────
@@ -92,17 +146,57 @@ if(temFlag('--testar')){
     ['bk180150bege - 6, bk180150branco - 5',
        [{codigo:'bk180150bege', qtd:6},{codigo:'bk180150branco', qtd:5}]]
   ];
-  let falhou = 0;
-  casos.forEach((c,i) => {
-    const r = lerLista(c[0]).itens;
-    const ok = JSON.stringify(r) === JSON.stringify(c[1]);
-    if(!ok){ falhou++; console.log('  FALHOU caso '+(i+1)+': '+JSON.stringify(c[0])+
-      '\n    esperado ' + JSON.stringify(c[1]) + '\n    veio     ' + JSON.stringify(r)); }
-  });
+  let falhou = 0, feitos = 0;
+  const confere = (nome, veio, esperado) => {
+    feitos++;
+    if(JSON.stringify(veio) === JSON.stringify(esperado)) return;
+    falhou++;
+    console.log('  FALHOU ' + nome + '\n    esperado ' + JSON.stringify(esperado) +
+                '\n    veio     ' + JSON.stringify(veio));
+  };
+
+  casos.forEach((c,i) => confere('leitura ' + (i+1) + ': ' + JSON.stringify(c[0]), lerLista(c[0]).itens, c[1]));
+
   const recusa = lerLista('BK130130BEGE\nBK130130BEGE - 0');
-  if(recusa.itens.length || recusa.erros.length !== 2){ falhou++; console.log('  FALHOU: linha sem quantidade ou com zero tinha que virar erro'); }
+  confere('linha sem quantidade e zero sem --definir viram erro',
+    [recusa.itens.length, recusa.erros.length], [0, 2]);
+  confere('zero vale com --definir', lerLista('BK130130BEGE - 0', true).itens,
+    [{codigo:'BK130130BEGE', qtd:0}]);
+  confere('SKU repetido no --definir e contradicao, nao soma',
+    lerLista('bege - 8, bege - 2', true).erros.length, 1);
+
+  /* A conta. O caso que importa e o terceiro: a fila com MAIS do que a lista
+     pede tem que devolver delta negativo, senao "definir" viraria "nunca
+     diminui" e o numero da tela ficaria sempre acima do carrinho. */
+  const fila = {BK130130BEGE:2, BK160140CINZA:9, BK999OUTRO:4};
+  confere('acrescentar soma ao que ja existe',
+    planear([{codigo:'BK130130BEGE', qtd:10}], fila, {}),
+    [{codigo:'BK130130BEGE', atual:2, alvo:12, delta:10}]);
+  confere('definir com a fila abaixo do alvo insere a diferenca',
+    planear([{codigo:'BK130130BEGE', qtd:10}], fila, {definir:true}),
+    [{codigo:'BK130130BEGE', atual:2, alvo:10, delta:8}]);
+  confere('definir com a fila acima do alvo apaga o excedente',
+    planear([{codigo:'BK160140CINZA', qtd:5}], fila, {definir:true}),
+    [{codigo:'BK160140CINZA', atual:9, alvo:5, delta:-4}]);
+  confere('definir no numero que ja esta la nao mexe em nada',
+    planear([{codigo:'BK130130BEGE', qtd:2}], fila, {definir:true}),
+    [{codigo:'BK130130BEGE', atual:2, alvo:2, delta:0}]);
+  confere('definir zero esvazia o SKU',
+    planear([{codigo:'BK130130BEGE', qtd:0}], fila, {definir:true}),
+    [{codigo:'BK130130BEGE', atual:2, alvo:0, delta:-2}]);
+  confere('SKU fora da lista fica como esta',
+    planear([{codigo:'BK130130BEGE', qtd:2}], fila, {definir:true}).length, 1);
+  confere('--so-a-lista zera quem nao foi citado',
+    planear([{codigo:'BK130130BEGE', qtd:2}], fila, {definir:true, soALista:true}).filter(a => a.foraDaLista),
+    [{codigo:'BK160140CINZA', atual:9, alvo:0, delta:-9, foraDaLista:true},
+     {codigo:'BK999OUTRO',    atual:4, alvo:0, delta:-4, foraDaLista:true}]);
+  /* A lista chega minuscula e a fila esta em maiuscula: sem casar por UPPER, o
+     --definir veria zero na fila e inseriria tudo de novo, dobrando o carrinho. */
+  confere('a conta casa o codigo ignorando maiusculas',
+    planear([{codigo:'bk130130bege', qtd:10}], fila, {definir:true})[0].delta, 8);
+
   console.log('');
-  console.log(falhou ? '  '+falhou+' caso(s) falharam.' : '  '+(casos.length+1)+' casos OK.');
+  console.log(falhou ? '  '+falhou+' de '+feitos+' caso(s) falharam.' : '  '+feitos+' casos OK.');
   console.log('');
   process.exit(falhou ? 1 : 0);
 }
@@ -123,6 +217,10 @@ if(EM && !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(EM)){
   console.error('--em tem que ser "AAAA-MM-DD HH:MM" (veio: '+EM+')');
   process.exit(1);
 }
+if(SO_LISTA && !DEFINIR){
+  console.error('--so-a-lista so faz sentido com --definir: sem ele o numero e um acrescimo,\ne "acrescente nada" nao e motivo para esvaziar a fila dos outros SKUs.');
+  process.exit(1);
+}
 if(!fs.existsSync(CAMINHO)){
   console.error('Banco nao encontrado: ' + CAMINHO + '\nUse --db <caminho> se ele estiver em outro lugar.');
   process.exit(1);
@@ -136,10 +234,14 @@ const p2 = n => String(n).padStart(2,'0');
 const agora = new Date();
 const CARIMBO = agora.getFullYear()+'-'+p2(agora.getMonth()+1)+'-'+p2(agora.getDate())+'_'+p2(agora.getHours())+p2(agora.getMinutes());
 
-const lido = lerLista(TEXTO);
+const lido = lerLista(TEXTO, DEFINIR);
 
 console.log('');
 console.log('  Banco : ' + CAMINHO);
+console.log('  Conta : ' + (DEFINIR
+  ? 'DEFINIR   o numero da lista e o TOTAL final na fila'
+  : 'ACRESCENTAR   o numero da lista soma ao que ja esta na fila')
+  + (SO_LISTA ? '  (+ zera quem nao esta na lista)' : ''));
 console.log('  Modo  : ' + MODO + (MODO==='estoque'
   ? '   (a embalagem NAO abate a ordem do dia)'
   : MODO==='hoje' ? '   (a embalagem abate a ordem do dia)' : ''));
@@ -162,24 +264,25 @@ const cadastro = db.prepare('SELECT codigo FROM skus').all();
 const porUpper = {};
 cadastro.forEach(s => { porUpper[String(s.codigo).toUpperCase()] = s.codigo; });
 
+/* SOMA, nao atribui: o GROUP BY do SQLite e case-sensitive, entao a mesma peca
+   gravada como BK130130BEGE e bk130130bege volta em DUAS linhas. Atribuir faria
+   a segunda apagar a primeira, o --definir enxergaria menos fila do que existe
+   e inseriria a diferenca de novo — peca a mais na tela, sem peca no carrinho. */
 const naFila = db.prepare("SELECT codigo, COUNT(*) c FROM fila WHERE situacao='aguardando' GROUP BY codigo").all();
 const filaDe = {};
-naFila.forEach(f => { filaDe[String(f.codigo).toUpperCase()] = f.c; });
+naFila.forEach(f => { const k = String(f.codigo).toUpperCase(); filaDe[k] = (filaDe[k]||0) + f.c; });
+
+/* O nome como ele esta NA FILA, para a linha do --so-a-lista falar do codigo
+   que a pessoa vai procurar na tela, e nao de uma versao maiuscula dele. */
+const nomeNaFila = {};
+naFila.forEach(f => { nomeNaFila[String(f.codigo).toUpperCase()] = f.codigo; });
 
 const semCadastro = [];
-let total = 0;
-console.log('  A REPOR');
-console.log('    ' + 'CODIGO (como sera gravado)'.padEnd(30) + 'QTD'.padStart(4) + '   ja na fila');
 lido.itens.forEach(it => {
   const canon = porUpper[it.codigo.toUpperCase()];
   it.gravar = canon || null;
-  if(!canon){ semCadastro.push(it.codigo); return; }
-  total += it.qtd;
-  const ja = filaDe[it.codigo.toUpperCase()] || 0;
-  console.log('    ' + String(canon).padEnd(30) + String(it.qtd).padStart(4) + '   ' +
-    (ja ? ja + (ja >= it.qtd ? '  <- ja tem tanto quanto o pedido: repetiu?' : '') : '-'));
+  if(!canon) semCadastro.push(it.codigo);
 });
-console.log('    ' + ''.padEnd(30) + String(total).padStart(4) + '   linha(s) no total');
 
 if(semCadastro.length){
   console.log('');
@@ -208,6 +311,44 @@ try{
     db.close(); process.exit(1);
   }
 }catch(e){}
+
+const acoes = planear(lido.itens.map(it => ({codigo:it.gravar, qtd:it.qtd})), filaDe,
+  {definir:DEFINIR, soALista:SO_LISTA, nomes:nomeNaFila});
+
+let inserir = 0, apagar = 0;
+acoes.forEach(a => { if(a.delta > 0) inserir += a.delta; else apagar += -a.delta; });
+
+console.log('  O QUE VAI MUDAR');
+console.log('    ' + 'CODIGO'.padEnd(28) + 'na fila'.padStart(8) + 'alvo'.padStart(6) + '   acao');
+acoes.forEach(a => {
+  const acao = a.delta > 0 ? 'insere ' + a.delta
+             : a.delta < 0 ? 'APAGA ' + (-a.delta) + (a.foraDaLista ? '  <- nao esta na lista' : '')
+             : 'ja esta assim';
+  console.log('    ' + String(a.codigo).padEnd(28) + String(a.atual).padStart(8) +
+              String(a.alvo).padStart(6) + '   ' + acao);
+});
+console.log('    ' + ''.padEnd(28) + ''.padStart(8) + ''.padStart(6) + '   ' +
+  inserir + ' a inserir, ' + apagar + ' a apagar');
+
+if(!inserir && !apagar){
+  console.log('');
+  console.log('  A fila ja esta exatamente assim — nada a fazer.');
+  console.log('');
+  db.close(); return;
+}
+
+/* APAGAR NAO E O MESMO QUE INSERIR, e a diferenca e fisica: a linha inserida a
+   mais aparece na tela e alguem vai procurar a peca; a linha apagada some, e
+   ninguem procura o que nao esta escrito em lugar nenhum. Por isso o que sai
+   vai para um CSV ao lado do backup, com id, codigo, modo e data. */
+if(apagar){
+  console.log('');
+  console.log('  ⚠ ' + apagar + ' linha(s) VAO SER APAGADAS da fila.');
+  console.log('  Sai primeiro a mais NOVA de cada SKU: a mais antiga e a que carrega a');
+  console.log('  historia da peca, e a de devolucao fica por ultimo — apagar aquela perde');
+  console.log('  o vinculo com a devolucao que a mandou reembalar (§9).');
+  console.log('  Nenhuma linha ja `embalado` e tocada: aquilo e peca que virou estoque.');
+}
 
 /* Reposicao anterior a vista: rodar duas vezes e o erro natural deste script,
    e ele nao tem como saber sozinho se a peca ja voltou. */
@@ -254,30 +395,69 @@ const aud = (function(){
   }catch(e){ return null; }
 })();
 
-const n = db.transaction(() => {
-  let c = 0;
-  lido.itens.forEach(it => {
-    for(let i = 0; i < it.qtd; i++){
-      if(EM) ins.run(it.gravar, MODO, EM.length === 16 ? EM+':00' : EM, EM.slice(0,10));
-      else   ins.run(it.gravar, MODO);
-      c++;
+/* A ORDEM DE QUEM SAI E DELIBERADA:
+     1. a linha de devolucao fica por ultimo — apagar aquela perde o vinculo
+        com a devolucao que mandou reembalar (§9);
+     2. depois, a que NAO bate com o codigo do cadastro no case — essa e a
+        linha quebrada, que aparece na tela e o bipe nao acha;
+     3. entre as que sobram, sai a mais NOVA: a mais antiga e a que carrega a
+        historia da peca, e e ela que a tela de Embalagem poe na frente. */
+const paraApagar = db.prepare(`SELECT id, codigo, modo, revisado_em, data FROM fila
+  WHERE situacao='aguardando' AND UPPER(codigo)=UPPER(?)
+  ORDER BY (modo='devolucao') ASC, (codigo=?) ASC, revisado_em DESC, id DESC
+  LIMIT ?`);
+const del = db.prepare('DELETE FROM fila WHERE id=?');
+
+const saiu = [];
+const feito = db.transaction(() => {
+  let mais = 0, menos = 0;
+  acoes.forEach(a => {
+    if(a.delta > 0){
+      for(let i = 0; i < a.delta; i++){
+        if(EM) ins.run(a.codigo, MODO, EM.length === 16 ? EM+':00' : EM, EM.slice(0,10));
+        else   ins.run(a.codigo, MODO);
+        mais++;
+      }
+    } else if(a.delta < 0){
+      paraApagar.all(a.codigo, a.codigo, -a.delta).forEach(l => { del.run(l.id); saiu.push(l); menos++; });
     }
     /* Uma linha de auditoria por SKU, nao por peca: o que se quer saber depois
-       e "quem repos o que", nao ler 100 linhas iguais. */
-    if(aud) aud.run(POR, it.gravar, '+' + it.qtd + ' na fila (modo ' + MODO + ') — ' + MOTIVO);
+       e "quem mexeu no que", nao ler 100 linhas iguais. O texto guarda de onde
+       para onde — sem o "de", o numero sozinho nao deixa refazer a conta. */
+    if(aud && a.delta !== 0)
+      aud.run(POR, a.codigo, a.atual + ' -> ' + a.alvo + ' (' + (a.delta > 0 ? '+' : '') + a.delta +
+        ') na fila' + (a.delta > 0 ? ' (modo ' + MODO + ')' : '') +
+        (a.foraDaLista ? ' [fora da lista, --so-a-lista]' : '') + ' — ' + MOTIVO);
   });
-  return c;
+  return {mais:mais, menos:menos};
 })();
+
+/* A foto do que saiu, ao lado do backup: ler um .db exige ferramenta, e a
+   pergunta que vem depois ("o que tinha nessa fila?") merece um arquivo que
+   abre no Excel. */
+let arqCsv = null;
+if(saiu.length){
+  const csv = v => { const s = String(v==null ? '' : v); return /[",;\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  arqCsv = path.join(SAIDA, 'apagadas_fila_' + CARIMBO + '.csv');
+  fs.writeFileSync(arqCsv, ['id,codigo,modo,revisado_em,data']
+    .concat(saiu.map(l => [l.id,l.codigo,l.modo,l.revisado_em,l.data].map(csv).join(','))).join('\n') + '\n', 'utf8');
+}
+const devolApagadas = saiu.filter(l => l.modo === 'devolucao').length;
 
 const agoraFila = db.prepare("SELECT COUNT(*) c FROM fila WHERE situacao='aguardando'").get().c;
 console.log('');
-console.log('  REPOSTO.');
-console.log('  - ' + n + ' linha(s) inserida(s) na fila (modo ' + MODO + ')');
+console.log('  PRONTO.');
+if(feito.mais)  console.log('  - ' + feito.mais + ' linha(s) inserida(s) na fila (modo ' + MODO + ')');
+if(feito.menos) console.log('  - ' + feito.menos + ' linha(s) apagada(s) da fila');
 console.log('  - fila agora  : ' + agoraFila + ' peca(s) aguardando embalagem');
 console.log('  - backup      : ' + bkp);
-console.log('');
-console.log('  Elas ja aparecem na tela de Embalagem. Cada uma sai de la com os tres bipes');
-console.log('  de sempre (SKU, kit, SKU) — e e o terceiro que soma +1 no estoque.');
+if(arqCsv) console.log('  - o que saiu  : ' + arqCsv);
+if(devolApagadas) console.log('  - ⚠ ' + devolApagadas + ' delas vieram de DEVOLUCAO — o vinculo com a devolucao se perdeu.');
+if(feito.mais){
+  console.log('');
+  console.log('  As novas ja aparecem na tela de Embalagem. Cada uma sai de la com os tres');
+  console.log('  bipes de sempre (SKU, kit, SKU) — e e o terceiro que soma +1 no estoque.');
+}
 console.log('');
 db.close();
 })().catch(e => { console.error('erro:', e.message); process.exit(1); });
