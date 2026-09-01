@@ -103,6 +103,33 @@ precisa = comprometido + alvo − estoque
 A janela não é fixa em 30 dias — é o campo "Janela da média" na própria tela. Se
 ela virar 60, a planilha precisa cobrir 60.
 
+### A ordem é de prioridade, não de quantidade
+
+Ordenar por `precisa` põe em cima o SKU que gira mais — que quase nunca é o que
+vai faltar primeiro. A lista desce quatro degraus, e **cada linha diz qual a
+colocou ali** (`motivo`): pontuação composta ordena bem e não explica nada, e
+quem lê a lista sem entender a ordem volta a produzir pela intuição.
+
+| # | Degrau | Critério |
+|---|---|---|
+| 1 | Cliente com prazo | tem comprometido que despacha **até amanhã** |
+| 2 | Sem estoque | a próxima venda já vira urgência |
+| 3 | Cobertura baixa | `estoque ÷ média` abaixo de metade dos dias de cobertura |
+| 4 | Abaixo do alvo | o resto do que precisa produzir |
+
+**Cobertura = quantos dias o estoque atual aguenta.** É ela que mede risco: um
+SKU que vende 6/dia com 3 em estoque tem meio dia de folga; outro que vende
+0,2/dia com 4 em estoque tem 20 dias — e era o segundo que aparecia em cima,
+porque a quantidade que falta é maior. Sem venda na janela a cobertura é `null`
+("não dá pra dizer"), que não é zero.
+
+> O comprometido é **repartido por prazo** (`comp_ja`, `comp_semana`,
+> `comp_depois`), mas o **total não mudou** — o `WHERE` da consulta é o mesmo.
+> `precisa` e a compra de material continuam idênticos: o que entrou foi a
+> informação de *quando*, que faltava para saber o que empurra a produção hoje.
+
+A mesma ordem vale para a tela AZUL do operador: ela lê as mesmas `linhas`.
+
 > **Peça sob medida não tem alvo, e isso é definição, não exceção.** Ela não
 > existe antes da venda e não sobra depois (§7): não soma `+1` na embalagem nem
 > baixa na etiqueta, então o estoque dela é sempre zero. Com alvo, o `precisa`
