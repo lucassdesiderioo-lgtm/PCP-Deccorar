@@ -215,6 +215,17 @@ const ok = (n, c, extra) => { casos++;
      por.BK160160CINZA.cobertura_dias === null);
   ok('quem gira tem cobertura em dias', por.BK140140BEGE.cobertura_dias === 2,
      'veio ' + por.BK140140BEGE.cobertura_dias);
+  /* A COBERTURA DA ABA E A DO DOMINIO, SKU A SKU. A aba chegou a ter a sua
+     propria conta e ela divergia na primeira casa decimal, porque dividia pela
+     media ja arredondada. Uma segunda conta aqui quebra este caso. */
+  {
+    const dom = {};
+    require('./demanda_dominio').calcular(db).linhas
+      .forEach(l => { if(l.cadastrado) dom[l.codigo] = l.cobertura; });
+    const fora = Object.keys(dom).filter(c => por[c] && por[c].cobertura_dias !== dom[c]);
+    ok('a cobertura da aba é a mesma do demanda_dominio, SKU a SKU', fora.length === 0,
+       JSON.stringify(fora.map(c => c+' aba='+por[c].cobertura_dias+' dominio='+dom[c])));
+  }
   ok('sob medida nunca conta como parado', por.SOBMEDIDA.parado === false);
 
   // ── 6. O ULTIMO AJUSTE, QUE NENHUMA TELA LIA ─────────────────────────────

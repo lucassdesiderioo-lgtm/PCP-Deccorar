@@ -156,8 +156,16 @@ module.exports = function(app, db){
       /* Cobertura POR SKU: quantos dias essa peca aguenta no ritmo dela. E o
          numero que decide — 40 pecas de um SKU que vende 1 por semana e
          excesso; 40 de um que vende 10 por dia e falta. Sem venda na janela
-         fica NULL, nunca infinito: numero errado e pior que traco. */
-      const cobertura = l.media_dia > 0 ? +(estoque / l.media_dia).toFixed(1) : null;
+         fica NULL, nunca infinito: numero errado e pior que traco.
+         ⚠️ VEM DO DOMINIO, nao se recalcula aqui. Esta aba chegou a ter a sua
+         propria conta (`estoque / media_dia`), e ela divergia na terceira casa:
+         o dominio divide pela media cheia e o `media_dia` da linha ja vem
+         arredondado em 2 casas — 2 pecas de um SKU que vende 1 a cada 3 dias
+         davam 6,0 la e 6,1 aqui. Duas coberturas para o mesmo SKU e a mesma
+         doenca que este arquivo existe para curar, uma casa decimal mais
+         discreta. */
+      const cobertura = (l.cobertura !== undefined) ? l.cobertura
+        : (l.media_dia > 0 ? +(estoque / l.media_dia).toFixed(1) : null);
       /* PARADO: tem peca na prateleira e nao vendeu uma unica vez na janela.
          E o unico grupo que a tela antiga nao tinha como mostrar, e e onde o
          dinheiro dorme. Sob medida fica de fora: o estoque dela e sempre zero
