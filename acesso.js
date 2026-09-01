@@ -417,7 +417,6 @@ module.exports = function(app, db){
     if(eq('/devolucao')) return 'devolucao.registrar';
     if(eq('/painel')) return 'painel.ver';
     if(eq('/relatorios')) return 'relatorios.ver';
-    if(eq('/necessidade')) return 'necessidade.ver';
     if(eq('/planejamento')) return 'planilha.importar';
     if(eq('/baixar-backup')) return '@ag';
     // ── acoes/admin por API ──
@@ -448,7 +447,7 @@ module.exports = function(app, db){
     if(M !== 'GET' && eq('/api/devolucao')) return 'devolucao.registrar';
     if(M !== 'GET' && eq('/api/devolucao/baixa')) return 'devolucao.baixar';
     if(M !== 'GET' && eq('/api/estoque')) return 'estoque.editar';
-    if(M !== 'GET' && (eq('/api/alvo') || eq('/api/necessidade/aplicar'))) return 'alvo.editar';
+    if(M !== 'GET' && eq('/api/alvo')) return 'alvo.editar';
     if(M !== 'GET' && eq('/api/producao')) return 'producao.lancar';
     if(M !== 'GET' && pre('/api/planejamento')) return 'planilha.importar';
     if(M !== 'GET' && eq('/api/skus')) return 'sku.cadastrar';
@@ -522,7 +521,6 @@ module.exports = function(app, db){
     // ── leituras de gestao ──
     if(eq('/api/painel') || eq('/api/gerencial')) return 'painel.ver';
     if(pre('/api/rel')) return 'relatorios.ver';
-    if(eq('/api/necessidade')) return 'necessidade.ver';
     if(eq('/api/cruzamento') || pre('/api/planejamento') || eq('/api/fechamento')) return '@admin';
     // ── resto: qualquer logado (operacao le livremente, como hoje) ──
     return '@logado';
@@ -609,14 +607,14 @@ module.exports = function(app, db){
   // ── FASE 4: cobertura (todas as rotas x permissao declarada) e auditoria ──
   const TODAS_ROTAS = [
     ['GET','/'],['GET','/operador'],['GET','/montagem'],['GET','/embalagem'],['GET','/carregamento'],
-    ['GET','/expedicao'],['GET','/devolucao'],['GET','/painel'],['GET','/relatorios'],['GET','/necessidade'],
+    ['GET','/expedicao'],['GET','/devolucao'],['GET','/painel'],['GET','/relatorios'],
     ['GET','/planejamento'],['GET','/acessos'],['GET','/baixar-backup'],
     ['POST','/api/revisao'],['POST','/api/rejeicao'],['POST','/api/montagem'],['POST','/api/embalar'],
     ['POST','/api/carregar'],['POST','/api/lote/upload'],['GET','/api/print/:id'],
     ['GET','/api/impressos'],['POST','/api/reimprimir'],
     ['GET','/api/divergencias'],['POST','/api/divergencias/resolver'],
     ['GET','/api/auditoria/skus'],['POST','/api/devolucao'],
-    ['POST','/api/devolucao/baixa'],['POST','/api/estoque'],['POST','/api/alvo'],['POST','/api/necessidade/aplicar'],
+    ['POST','/api/devolucao/baixa'],['POST','/api/estoque'],['POST','/api/alvo'],
     ['POST','/api/producao'],['POST','/api/planejamento/importar'],['POST','/api/skus'],['DELETE','/api/skus/:c'],
     ['GET','/api/skus/pendencias'],['GET','/api/cores'],['POST','/api/cores'],['DELETE','/api/cores/:c'],
     ['GET','/api/modelos'],['POST','/api/modelos'],['DELETE','/api/modelos/:id'],
@@ -641,7 +639,7 @@ module.exports = function(app, db){
     ['POST','/api/config/horarios'],['POST','/api/config/kit'],
     ['GET','/api/config/conferencia'],['POST','/api/config/conferencia'],['POST','/api/listas'],['GET','/api/teste'],
     ['GET','/api/usuarios'],['GET','/api/acesso/setores'],['GET','/api/acesso/divergencias'],
-    ['GET','/api/painel'],['GET','/api/rel/dia'],['GET','/api/necessidade'],['GET','/api/cruzamento'],
+    ['GET','/api/painel'],['GET','/api/rel/dia'],['GET','/api/cruzamento'],
     ['GET','/api/rejeicao/resumo'],['GET','/api/skus'],['GET','/api/fila'],['GET','/api/carregamento']
   ];
   app.get('/api/acesso/cobertura', (req, res) => {

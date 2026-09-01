@@ -4,7 +4,11 @@ const AREAS=[
   {id:'admin',       nome:'Admin (controle geral)'},
   {id:'painel',      nome:'Painel do dia'},
   {id:'relatorios',  nome:'Relatorios'},
-  {id:'necessidade', nome:'Necessidade (ABC)'},
+  /* O id continua 'necessidade' de proposito: ele esta gravado em
+     usuarios.areas de quem ja tem acesso, e renomear o id tiraria a permissao
+     de todo mundo de uma vez. Mudou so o rotulo — a tela ABC saiu e quem esta
+     area libera hoje e o Planejamento. */
+  {id:'necessidade', nome:'Planejamento'},
   {id:'operador',    nome:'Revisao'},
   {id:'devolucao',   nome:'Devolucoes'},
   {id:'montagem',    nome:'Montagem'},
@@ -22,7 +26,6 @@ const TELAS={
   '/':'admin','/admin':'admin','/index.html':'admin',
   '/painel':'painel','/painel.html':'painel',
   '/relatorios':'relatorios','/relatorios.html':'relatorios',
-  '/necessidade':'necessidade','/necessidade.html':'necessidade',
   '/planejamento':'necessidade','/planejamento.html':'necessidade',
   '/operador':'operador','/operador.html':'operador',
   '/devolucao':'devolucao','/devolucao.html':'devolucao',

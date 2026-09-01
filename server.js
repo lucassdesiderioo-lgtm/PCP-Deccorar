@@ -159,8 +159,15 @@ require('./backup_route')(app, db);
 require('./rel_route')(app, db);
 app.get('/relatorios',(req,res)=>res.sendFile(path.join(__dirname,'public','relatorios.html')));
 require('./alvo_route')(app, db);
-require('./nec_route')(app, db);
-app.get('/necessidade',(req,res)=>res.sendFile(path.join(__dirname,'public','necessidade.html')));
+/* A tela /necessidade (curva ABC) saiu em 01/09/2026. Ela lia a tabela `demanda`,
+   que era semeada UMA VEZ no codigo do nec_route e nunca mais atualizada — entao
+   mostrava a demanda de um mes ja passado com cara de numero atual. Pior: o
+   botao dela sobrescrevia `skus.alvo` com esse numero congelado, brigando com o
+   Planejamento pela MESMA coluna, e criava SKU deduzindo a cor do texto do
+   codigo (o que o §7 aposentou quando medida e cor viraram coluna).
+   O Planejamento a absorveu: mesmo calculo, alimentado pela planilha do ML.
+   A tabela `demanda` fica no banco como historia; o demanda_dominio le dela
+   dentro de try/catch, entao instalacao limpa nao quebra sem ela. */
 require('./plan_route')(app, db);
 app.get('/planejamento',(req,res)=>res.sendFile(path.join(__dirname,'public','planejamento.html')));
 app.get('/status',(req,res)=> res.json({ok:true,hora:new Date().toISOString()}));

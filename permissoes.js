@@ -109,8 +109,10 @@ module.exports = [
     sensivel:true },
   { chave:'relatorios.ver',       grupo:'Visão',      nivel:'supervisor',
     rotulo:'Ver relatórios',      desc:'Relatórios e painel gerencial' },
+  /* A chave segue 'necessidade.ver' porque ja esta gravada nos perfis; o que
+     ela libera hoje e a tela de Planejamento (a ABC saiu em 01/09/2026). */
   { chave:'necessidade.ver',      grupo:'Visão',      nivel:'supervisor',
-    rotulo:'Ver necessidade (ABC)', desc:'Curva ABC e cobertura' },
+    rotulo:'Ver planejamento',    desc:'Estoque alvo, cobertura e necessidade de produção' },
 
   // ─── CONFIGURAÇÃO ───────────────────────────────────────────
   { chave:'listas.editar',        grupo:'Configuração', nivel:'admin',
