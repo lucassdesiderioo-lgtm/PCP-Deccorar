@@ -184,10 +184,31 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > outra vez — 100 peças viram 200 bipes de trabalho já feito, e a bancada acaba
 > embalando sem a fila (a armadilha #6 de novo: o desvio que a equipe aprende a
 > fazer). Ele lê a lista como ela é escrita (`bk130130bege - 8`, a quantidade é
-> o número **no fim** da linha, porque SKU tem espaço desde o §7), soma o SKU
-> repetido em vez de deixar o último vencer, e grava com o código **do
-> cadastro** — o bipe da embalagem procura por igualdade, e uma linha com o case
-> errado apareceria na tela sem ser achada pelo leitor.
+> o número **no fim** da linha, porque SKU tem espaço desde o §7) e grava com o
+> código **do cadastro** — o bipe da embalagem procura por igualdade, e uma
+> linha com o case errado apareceria na tela sem ser achada pelo leitor.
+>
+> **"10" não diz se é acrescentar ou deixar 10**, e com 2 já na fila as duas
+> respostas são diferentes. Quem escreve a lista sabe qual é; o script não
+> adivinha:
+>
+> | | O número é | SKU repetido | Zero |
+> |---|---|---|---|
+> | sem flag | **acréscimo** ao que já está lá | soma (a lista chega assim quando alguém lembra de mais duas depois) | recusado — não diz nada |
+> | `--definir` | o **total final**; a diferença entra ou sai | erro: dois totais para o mesmo código se contradizem | vale — é como o SKU que acabou entra na contagem em vez de ficar fora dela |
+>
+> `--definir` é o que serve para **contar o carrinho**: conta-se o que existe e
+> escreve-se o que existe, em vez de subtrair de cabeça — que é onde a contagem
+> erra. `--so-a-lista` zera também quem está na fila e não foi citado; fica
+> atrás de uma flag porque contar dez SKUs não afirma nada sobre o décimo
+> primeiro.
+>
+> **Apagar não é o espelho de inserir.** A linha a mais aparece na tela e alguém
+> vai procurar a peça; a linha apagada some, e ninguém procura o que não está
+> escrito. Por isso o que sai é escolhido: a de **devolução** por último (§9), a
+> de **case quebrado** primeiro, e entre as demais a mais **nova** — a antiga
+> carrega a história e é ela que a tela põe na frente. Linha `embalado` nunca é
+> tocada, e o que saiu vai para um CSV ao lado do backup.
 >
 > Ele **não** mexe em estoque (a fila nunca somou `+1`) e **não** grava
 > `revisao`: a peça não está sendo revisada agora, e inventar a linha sujaria o
@@ -197,9 +218,10 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > trigger do §11 marcaria as linhas e "apagar" as levaria junto.
 >
 > ```bash
-> node repor_fila.js --itens "BK130130BEGE=10, BK160160CINZA=23"   # simula
-> node repor_fila.js --lista lista.txt --confirmar                 # backup + grava
-> node repor_fila.js --testar                                      # só o leitor da lista
+> node repor_fila.js --itens "BK130130BEGE=10, BK160160CINZA=23"   # simula (acrescenta)
+> node repor_fila.js --lista lista.txt --definir                   # simula (total final)
+> node repor_fila.js --lista lista.txt --definir --confirmar       # backup + grava
+> node repor_fila.js --testar                                      # 18 casos, sem banco
 > ```
 >
 > O `--modo` nasce `estoque` de propósito: é o que o `mont_route` já assume
