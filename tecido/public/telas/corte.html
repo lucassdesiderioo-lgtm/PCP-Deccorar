@@ -117,7 +117,8 @@ async function telaEntrada(){
   const tab=el('table',{class:'grade'});
   tab.appendChild(el('tr',{},[el('th',{texto:'#'}),el('th',{texto:'Pedido'}),
     el('th',{texto:'Largura do corte (m)'}),
-    el('th',{texto:'Altura do corte (m)'}),el('th',{texto:'Cliente'}),el('th',{texto:''})]));
+    el('th',{texto:'Altura do corte (m)'}),el('th',{texto:'Item / etiqueta'}),
+    el('th',{texto:'Cliente'}),el('th',{texto:''})]));
   estado.linhas.forEach((lin,i)=>{
     const iP=el('input',{type:'text',value:lin.pedido||'',placeholder:'4292-1',
       style:'width:120px;font-size:16px'});
@@ -135,6 +136,7 @@ async function telaEntrada(){
     }});
     tab.appendChild(el('tr',{},[
       el('td',{texto:String(i+1)}), el('td',{},[iP]), el('td',{},[iL]), el('td',{},[iA]),
+      el('td',{class:'quem',texto:[lin.item?('item '+lin.item):'',lin.codigo||''].filter(Boolean).join(' · ')}),
       el('td',{class:'quem',texto:lin.cliente||''}),
       el('td',{},[el('button',{class:'bt pequeno',texto:'✕',onclick:()=>{
         estado.linhas.splice(i,1);
@@ -173,7 +175,7 @@ async function telaEntrada(){
   c.appendChild(el('p',{class:'ajuda',texto:
     'MEDIDA DO CORTE, não a da persiana acabada. No PDF de etiquetas é a que aparece entre parênteses na via COLEÇÃO: 2.417 M2 - (1.465x1.650).'}));
   c.appendChild(el('p',{class:'ajuda',texto:
-    'PEDIDO: peças com o mesmo número de pedido saem sempre da MESMA fonte — nunca uma na sobra e outra na bobina, porque o tom pode não bater e o cliente vê as duas na mesma parede. Peça sem pedido é livre.'}));
+    'PEDIDO: peças com o mesmo número de pedido saem sempre da MESMA fonte — nunca uma na sobra e outra na bobina, porque o tom pode não bater e o cliente vê as duas na mesma parede. O que agrupa é o PEDIDO (4272), não o item: as persianas do pedido inteiro são da mesma casa. Peça sem pedido é livre.'}));
   c.appendChild(el('p',{class:'ajuda',texto:
     'O arquivo pode ser o PDF de etiquetas de produção (o sistema lê a via COLEÇÃO de cada item) ou um CSV/texto com dois números por linha. Em qualquer caso as medidas caem nesta grade e podem ser corrigidas antes de calcular — digitar continua sempre disponível.'}));
 }
@@ -188,7 +190,7 @@ async function lerEtiquetas(f){
   });
   const pecas=await api('/api/planos/ler-arquivo',{metodo:'POST',corpo:{arquivo:base64}});
   estado.linhas=pecas.map(p=>({
-    pedido:p.pedido, cliente:p.cliente,
+    pedido:p.pedido, item:p.item, sequencia:p.sequencia, codigo:p.codigo, cliente:p.cliente,
     largura:String(p.largura).replace('.',','), altura:String(p.altura).replace('.',','),
     acabada:p.acabada
   }));
@@ -197,8 +199,9 @@ async function lerEtiquetas(f){
   const comTecido=pecas.find(p=>p.tecido_id);
   if(comTecido){ estado.tecido_id=comTecido.tecido_id; memoria.set('tecido',comTecido.tecido_id); }
   estado.proposta=null;
-  banner(pecas.length+' peça(s) lida(s) da etiqueta'+
-    (comTecido?' · tecido: '+comTecido.tecido_sugerido:'')+'. Confira antes de calcular.','bom',6);
+  const pedidos=[...new Set(pecas.map(p=>p.pedido))];
+  banner(pecas.length+' peça(s) lida(s) · pedido '+pedidos.join(', ')+
+    (comTecido?' · '+comTecido.tecido_sugerido:'')+'. Confira antes de calcular.','bom',6);
   telaEntrada(); limpar($('#saida'));
 }
 
@@ -262,41 +265,58 @@ function desenharPlano(){
     c.appendChild(av);
   }
 
-  // Cada fonte, com o encaixe desenhado
+  // As faixas AGRUPADAS POR FONTE. Um rolo que leva sete puxadas e um rolo
+  // so: repetir o cabecalho sete vezes faria o cortador procurar sete rolos
+  // na prateleira.
+  const porFonte=[];
   p.faixas.forEach(f=>{
-    const bloco=el('div',{class:'blocoFonte '+f.fonte});
+    const chave=f.fonte+':'+f.fonte_id;
+    let g=porFonte.find(x=>x.chave===chave);
+    if(!g){ g={chave, ref:f, faixas:[]}; porFonte.push(g); }
+    g.faixas.push(f);
+  });
+
+  porFonte.forEach(g=>{
+    const f0=g.ref;
+    const bloco=el('div',{class:'blocoFonte '+f0.fonte});
     const cb=el('div',{class:'cabFonte'});
-    cb.appendChild(el('span',{class:'tag '+(f.fonte==='rolo'?'rolo':'sobra'),texto:f.fonte.toUpperCase()}));
-    cb.appendChild(el('b',{texto:f.rotulo}));
-    if(f.endereco) cb.appendChild(el('span',{class:'quem',texto:f.endereco}));
-    if(f.puxar) cb.appendChild(el('span',{class:'tag bom',texto:'puxar '+formatarMetros(f.puxar)}));
+    cb.appendChild(el('span',{class:'tag '+(f0.fonte==='rolo'?'rolo':'sobra'),texto:f0.fonte.toUpperCase()}));
+    cb.appendChild(el('b',{texto:f0.rotulo}));
+    if(f0.endereco) cb.appendChild(el('span',{class:'quem',texto:f0.endereco}));
+    const puxarTotal=g.faixas.reduce((s,f)=>s+(f.puxar||0),0);
+    if(puxarTotal>0.001) cb.appendChild(el('span',{class:'tag bom',
+      texto:'puxar '+formatarMetros(puxarTotal)+(g.faixas.length>1?' em '+g.faixas.length+' puxadas':'')}));
 
     // A recusa (R16): so faz sentido em sobra, e so antes de confirmar.
-    if(f.fonte==='sobra'){
-      const s=p.sobras_sugeridas.find(x=>x.id===f.fonte_id);
+    if(f0.fonte==='sobra'){
+      const s=p.sobras_sugeridas.find(x=>x.id===f0.fonte_id);
       if(s) cb.appendChild(el('button',{class:'bt pequeno naoImprime',texto:'não usar',
         onclick:()=>recusarSobra(s)}));
     }
     bloco.appendChild(cb);
 
-    // O retangulo proporcional. Altura visual limitada para caber na tela.
-    const alturaPx=Math.max(60,Math.min(200,f.altura*70));
-    const cx=el('div',{class:'faixa',style:'height:'+alturaPx+'px'});
-    f.pecas.forEach(pc=>{
-      const d=el('div',{class:'peca',style:
-        'left:'+(pc.x/f.largura_disponivel*100)+'%;'+
-        'width:'+(pc.largura/f.largura_disponivel*100)+'%;'+
-        'height:'+(pc.altura/f.altura*100)+'%;'});
-      d.appendChild(el('span',{texto:num(pc.largura)}));
-      d.appendChild(el('small',{texto:num(pc.altura)}));
-      cx.appendChild(d);
+    g.faixas.forEach((f,n)=>{
+      if(g.faixas.length>1) bloco.appendChild(el('div',{class:'quem',
+        style:'margin-top:10px;font-weight:700',
+        texto:(n+1)+'ª puxada: '+formatarMetros(f.altura)}));
+      // O retangulo proporcional. Altura visual limitada para caber na tela.
+      const alturaPx=Math.max(60,Math.min(200,f.altura*70));
+      const cx=el('div',{class:'faixa',style:'height:'+alturaPx+'px'});
+      f.pecas.forEach(pc=>{
+        const d=el('div',{class:'peca',style:
+          'left:'+(pc.x/f.largura_disponivel*100)+'%;'+
+          'width:'+(pc.largura/f.largura_disponivel*100)+'%;'+
+          'height:'+(pc.altura/f.altura*100)+'%;'});
+        d.appendChild(el('span',{texto:num(pc.largura)}));
+        d.appendChild(el('small',{texto:num(pc.altura)}));
+        cx.appendChild(d);
+      });
+      bloco.appendChild(cx);
+      const sobrouLargura=f.largura_disponivel-f.largura_usada;
+      bloco.appendChild(el('div',{class:'quem',texto:
+        'bobina '+num(f.largura_disponivel)+' m · usado '+num(f.largura_usada)+' m'+
+        (sobrouLargura>0.001?' · tira lateral '+num(sobrouLargura)+' m':'')}));
     });
-    bloco.appendChild(cx);
-
-    const sobrouLargura=f.largura_disponivel-f.largura_usada;
-    bloco.appendChild(el('div',{class:'quem',texto:
-      'bobina '+num(f.largura_disponivel)+' m · usado '+num(f.largura_usada)+' m'+
-      (sobrouLargura>0.001?' · tira lateral '+num(sobrouLargura)+' m':'')}));
     c.appendChild(bloco);
   });
 

@@ -4,13 +4,22 @@
 // e as quatro repetem o cabecalho. So a via COLEÇÃO interessa aqui, porque so
 // ela traz a MEDIDA DO CORTE DO TECIDO:
 //
-//   4292-1                                   pedido - item
-//   SAULO PAULO DA                           cliente
+//   4272-9                                   pedido - item
+//   03/11                                    peca 3 das 11 do pedido
+//   ROGERIO GOMES                            cliente
 //   COLEÇÃO
 //   ROLO SOB MEDIDA - SCREEN 1% BRANCO 3.00M
 //   1.500  X  1.400                          a persiana ACABADA
 //   SCREEN 1% BRANCO 3.00M                   o tecido
 //   2.417 M2 - (1.465x1.650)                 <- O CORTE. E esta que o plano usa.
+//
+// UM ITEM PODE TER VARIAS PECAS. O pedido 4272 tem 11 persianas; o item -9
+// tem duas iguais (03/11 e 04/11) e o -14 tem tres. Cada peca imprime o seu
+// proprio jogo de vias, com codigo proprio no rodape. Por isso o leitor conta
+// UMA PECA POR VIA COLEÇÃO — nunca uma por item.
+//
+// E o que agrupa para o TOM UNICO e o PEDIDO (4272), nao o item: as onze
+// persianas sao da mesma casa e o cliente as ve lado a lado.
 //
 // A medida acabada NAO serve para cortar: a largura do tecido e menor que a
 // da persiana montada (ponteiras e tubo entram na conta) e a altura e maior
@@ -88,7 +97,8 @@ function decodificar(b){
 }
 
 // ── 2. as pecas ──────────────────────────────────────────────────────────
-const PEDIDO=/^\s*(\d{2,8})\s*-\s*(\d{1,3})\s*$/;      // 4292-1
+const PEDIDO=/^\s*(\d{2,8})\s*-\s*(\d{1,3})\s*$/;      // 4272-9
+const SEQUENCIA=/^\s*(\d{1,3})\s*\/\s*(\d{1,3})\s*$/;   // 03/11
 const CORTE=/\((\d+[.,]?\d*)\s*[xX]\s*(\d+[.,]?\d*)\)/; // (1.465x1.650)
 const ACABADA=/^\s*\d+[.,]\d+\s*$/;
 
@@ -124,9 +134,13 @@ function lerPecas(buffer){
     const largura=numero(m[1]), altura=numero(m[2]);
     if(!(largura>0&&altura>0)) continue;
 
-    // O cliente e a linha logo depois do pedido que nao e o item (01/01).
-    const cliente=b.linhas.find(l=>/[A-Za-zÀ-ÿ]/.test(l)&&!/^\d+\/\d+$/.test(l)&&
+    // O cliente e a primeira linha com letras que nao e a sequencia nem a via.
+    const cliente=b.linhas.find(l=>/[A-Za-zÀ-ÿ]/.test(l)&&!SEQUENCIA.test(l)&&
       !/COLE[CÇ]/i.test(l))||null;
+    const seq=b.linhas.find(l=>SEQUENCIA.test(l));
+    // O codigo proprio da peca, no rodape, antes do site.
+    const iSite=b.linhas.findIndex(l=>/DECCORAR/i.test(l));
+    const codigo=iSite>0?(b.linhas.slice(0,iSite).reverse().find(l=>/^\d{2,8}$/.test(l))||null):null;
     // O tecido: a linha do produto ou a que se repete logo antes da medida.
     const produto=b.linhas.find(l=>/SOB MEDIDA/i.test(l))||null;
     const idx=b.linhas.indexOf(linhaCorte);
@@ -137,7 +151,13 @@ function lerPecas(buffer){
     const acabada=medidas.length>=2?{largura:medidas[0],altura:medidas[1]}:null;
 
     pecas.push({
-      pedido:b.pedido+'-'+b.item,
+      // O PEDIDO e o que agrupa no tom unico. O item e a sequencia sao
+      // identificacao, para o operador achar a etiqueta na bancada.
+      pedido:b.pedido,
+      item:b.item,
+      pedido_item:b.pedido+'-'+b.item,
+      sequencia:seq?seq.replace(/\s+/g,''):null,
+      codigo,
       cliente, produto, tecido_texto:tecidoTexto,
       largura, altura, acabada,
       area:Math.round(largura*altura*1000)/1000

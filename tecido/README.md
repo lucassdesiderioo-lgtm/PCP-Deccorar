@@ -213,6 +213,10 @@ Na prática, um grupo que entraria pela metade numa fonte é desfeito e tentado
 na fonte seguinte. Se o pedido inteiro não couber em lugar nenhum, ele volta
 marcado com esse motivo — nunca dividido.
 
+**O que agrupa é o PEDIDO, não o item.** O pedido `4272` do arquivo real tem
+onze persianas em quatro itens — e são todas da mesma casa. O item `4272-14`
+sozinho tem três peças iguais, cada uma com a sua etiqueta.
+
 **Peça sem pedido informado é livre**, porque não há com quem ela precise
 combinar. O campo Pedido fica na grade, e o upload da etiqueta já o preenche.
 
@@ -233,7 +237,13 @@ entram na conta) e a altura é **maior** (sobra para enrolar no tubo e para a
 barra). Cortar pela medida acabada erraria as duas dimensões, e para lados
 diferentes.
 
-Vêm juntos o **pedido**, o **cliente** e o **tecido** — este último casado com
+**Uma peça por via COLEÇÃO, nunca uma por item.** Um item pode ter várias
+persianas iguais: cada uma imprime o seu jogo de vias, com código próprio no
+rodapé (`4547`, `4548`, `4549`). Contar por item cortaria uma só e faltariam
+duas na obra.
+
+Vêm juntos o **pedido**, o **item**, a **posição** (`09/11`), o **código da
+etiqueta**, o **cliente** e o **tecido** — este último casado com
 o cadastro quando dá (`SCREEN 1% BRANCO 3.00M` → `Rolô · Screen 1% · Branco`),
 como sugestão: quem confirma continua sendo o botão que o operador aperta.
 

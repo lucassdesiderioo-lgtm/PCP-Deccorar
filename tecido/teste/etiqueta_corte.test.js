@@ -26,16 +26,20 @@ function pdfDe(linhas){
   ]);
 }
 
-// Uma etiqueta completa: as quatro vias, como sai da impressora.
-const etiqueta=(pedido,item,cliente,tecido,acabLarg,acabAlt,corteLarg,corteAlt)=>{
-  const cab=[pedido+'-'+item,'01/01',cliente];
+// Uma PECA completa: as quatro vias, como saem da impressora. 'seq' e a
+// posicao da peca dentro do pedido (03/11) — um item pode ter varias.
+const etiqueta=(pedido,item,cliente,tecido,acabLarg,acabAlt,corteLarg,corteAlt,seq,codigo)=>{
+  const cab=[pedido+'-'+item,seq||'01/01',cliente];
   const meio=['ROLO SOB MEDIDA - '+tecido,acabLarg,'X',acabAlt,'TC:1.300','CM: Lado Direito'];
   const area=(Number(corteLarg)*Number(corteAlt)).toFixed(3);
+  // O rodape se repete em CADA via, como no arquivo real: e ali que fica o
+  // codigo proprio da peca.
+  const pe=[codigo||'4541','DECCORAR.COM','40.119.477/0001-05'];
   return [
-    ...cab,'BASE','1',...meio,'6344 - BASE CONICA BRANCO AC403 6M','1.470 ML  - RL: PADRÃO - SALA',
-    ...cab,'COLEÇÃO','2',...meio,tecido,area+' M2 - ('+corteLarg+'x'+corteAlt+') - RL: PADRÃO - SALA',
-    ...cab,'EMBALAGEM','3',...meio,'EMBALAGEM BOBINA PEQ.','1.800 ML ('+acabLarg+'x'+acabAlt+')',
-    ...cab,'PERFIL','4',...meio,'6338 - TUBO 32MM','1.470 ML (L=1.470)'
+    ...cab,'BASE','1',...meio,'6344 - BASE CONICA BRANCO AC403 6M','1.470 ML  - RL: PADRÃO - SALA',...pe,
+    ...cab,'COLEÇÃO','2',...meio,tecido,area+' M2 - ('+corteLarg+'x'+corteAlt+') - RL: PADRÃO - SALA',...pe,
+    ...cab,'EMBALAGEM','3',...meio,'EMBALAGEM BOBINA PEQ.','1.800 ML ('+acabLarg+'x'+acabAlt+')',...pe,
+    ...cab,'PERFIL','4',...meio,'6338 - TUBO 32MM','1.470 ML (L=1.470)',...pe
   ];
 };
 
@@ -54,26 +58,44 @@ module.exports=[
   perto(pecas[0].acabada.altura,1.400,'idem');
 }},
 
-{nome:'traz pedido, cliente e o texto do tecido', executar({igual}){
+{nome:'traz pedido, item, cliente e o texto do tecido', executar({igual}){
   const pdf=pdfDe(etiqueta('4292','1','FULANO DE TAL','SCREEN 1% BRANCO 3.00M',
     '1.500','1.400','1.465','1.650'));
   const p=lerPecas(pdf)[0];
-  igual(p.pedido,'4292-1','pedido com o item');
+  // O PEDIDO e o que agrupa no tom unico; o item so identifica.
+  igual(p.pedido,'4292','pedido');
+  igual(p.item,'1','item');
+  igual(p.pedido_item,'4292-1','os dois juntos, para a tela');
   igual(p.cliente,'FULANO DE TAL','cliente');
   igual(p.tecido_texto,'SCREEN 1% BRANCO 3.00M','tecido');
 }},
 
+{nome:'UM ITEM COM VARIAS PECAS vira varias pecas, nao uma', executar({igual}){
+  // O item 4272-14 do pedido real tem TRES persianas iguais: 09/11, 10/11 e
+  // 11/11, cada uma com o seu jogo de vias e o seu codigo. Contar por item
+  // cortaria uma so e faltariam duas na obra.
+  const pdf=pdfDe([].concat(
+    etiqueta('4272','14','ROGERIO','SCREEN 1% BRANCO 3.00M','1.530','2.480','1.495','2.730','09/11','4547'),
+    etiqueta('4272','14','ROGERIO','SCREEN 1% BRANCO 3.00M','1.530','2.480','1.495','2.730','10/11','4548'),
+    etiqueta('4272','14','ROGERIO','SCREEN 1% BRANCO 3.00M','1.530','2.480','1.495','2.730','11/11','4549')));
+  const pecas=lerPecas(pdf);
+  igual(pecas.length,3,'tres pecas do mesmo item');
+  igual(pecas.map(p=>p.sequencia).join(' '),'09/11 10/11 11/11','cada uma com a sua posicao');
+  igual(pecas.map(p=>p.codigo).join(' '),'4547 4548 4549','e o seu codigo de etiqueta');
+  igual(new Set(pecas.map(p=>p.pedido)).size,1,'e todas do MESMO pedido — saem juntas');
+}},
+
 {nome:'varios itens do mesmo pedido viram varias pecas', executar({igual}){
   const pdf=pdfDe([].concat(
-    etiqueta('4300','1','CLIENTE UM','SCREEN 1% BRANCO 3.00M','1.500','1.400','1.465','1.650'),
-    etiqueta('4300','2','CLIENTE UM','SCREEN 1% BRANCO 3.00M','2.000','1.800','1.965','2.050'),
-    etiqueta('4301','1','CLIENTE DOIS','SCREEN 3% BEGE 2.50M','1.200','1.100','1.165','1.350')));
+    etiqueta('4300','1','CLIENTE UM','SCREEN 1% BRANCO 3.00M','1.500','1.400','1.465','1.650','01/03','1'),
+    etiqueta('4300','2','CLIENTE UM','SCREEN 1% BRANCO 3.00M','2.000','1.800','1.965','2.050','02/03','2'),
+    etiqueta('4301','1','CLIENTE DOIS','SCREEN 3% BEGE 2.50M','1.200','1.100','1.165','1.350','01/01','3')));
   const pecas=lerPecas(pdf);
   igual(pecas.length,3,'tres pecas');
-  igual(pecas.map(p=>p.pedido).join(' '),'4300-1 4300-2 4301-1','os pedidos, na ordem');
-  // Os dois itens do 4300 sao do mesmo cliente e viram grupos DIFERENTES
-  // ('4300-1' e '4300-2'). Se o dono quiser que o pedido inteiro ande junto,
-  // basta apagar o sufixo do item na grade — a tela deixa editar.
+  igual(pecas.map(p=>p.pedido_item).join(' '),'4300-1 4300-2 4301-1','os itens, na ordem');
+  // Os dois itens do 4300 sao do mesmo pedido: MESMO GRUPO de tom, mesmo
+  // sendo janelas diferentes da casa. O 4301 e outro cliente, outro grupo.
+  igual(new Set(pecas.map(p=>p.pedido)).size,2,'dois pedidos, dois grupos de tom');
 }},
 
 {nome:'casa o tecido da etiqueta com o cadastro', executar({igual}){
