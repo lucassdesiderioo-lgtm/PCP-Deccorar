@@ -123,7 +123,7 @@ teste/                 rodar.js + *.test.js — banco temporario, do zero
 |---|---|---|
 | `larguraMinimaSobra` | 0,80 m | Resto com largura abaixo disso é refugo em vez de sobra. Vale **só para a largura** |
 | `pesoSobra` | 0,50 | Quanto da sobra gerada conta como material recuperado. **A única variável de julgamento do módulo** |
-| `margem` | 0,00 m | Folga entre peças (a fórmula do 6.2 aplica entre peças, não nas bordas) |
+| `margem` | 0,00 m | Folga entre peças (aplica entre peças, não nas bordas) — **conferido na bancada**, ver abaixo |
 | `alturaMinimaSobra` | **1,00 m** | Resto com altura abaixo disso é refugo mesmo com largura boa — persiana mais baixa que isso praticamente não sai da fábrica |
 
 `pesoSobra` responde a uma pergunta de fábrica: *o retalho que vai pra
@@ -254,3 +254,34 @@ sempre disponível**, que é o caminho principal, não o de exceção.
 > Sem biblioteca de PDF: os fluxos são Flate (zlib, que vem no Node) e o texto
 > é UTF-16BE. O teste monta um PDF no formato real, então nenhuma etiqueta com
 > nome de cliente precisa ficar versionada no repositório.
+
+---
+
+## A margem zero foi conferida na bancada
+
+Não é palpite nem valor provisório. No pedido 4272 duas peças de `1,495`
+saem lado a lado de uma bobina de 3,00 e **sobram 5 mm certinhos** — medido
+na bancada, com o tecido na mão.
+
+```
+1,495 + 1,495 = 2,990        bobina 3,000        sobra 0,010 (5 mm de cada lado)
+```
+
+Isso quer dizer que **as peças encostam mesmo** e que a borda da bobina é
+aproveitável até o fim. Enquanto for assim, `margem = 0` está correto e o
+plano promete o que o corte entrega.
+
+> ⚠️ **Se um dia parecer que "falta folga", não mexa no `encaixe.js`.** O
+> encaixe está certo; o que muda é o dado. Na ordem em que se deve procurar:
+>
+> | O que aconteceu | Onde se resolve |
+> |---|---|
+> | A bobina não tem 3,00 de verdade (vem 2,98) | **Largura do rolo**, na entrada. Cada rolo tem a sua |
+> | Precisa de folga entre uma peça e a outra | **Parâmetro `margem`** |
+> | A borda do tecido é imprestável (ourela) | Cadastrar o rolo pela **largura útil** — o parâmetro de margem desconta entre peças, não nas bordas |
+>
+> Só o terceiro caso pediria código, e mesmo ele tem saída pelo cadastro.
+
+Um número para dar a dimensão do que está em jogo: com 2 cm de folga, essas
+duas peças **deixam de caber** e a faixa passa de 2,73 m para 5,46 m de rolo.
+A margem não é um detalhe de acabamento — ela dobra o consumo.
