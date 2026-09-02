@@ -7,7 +7,11 @@
 const {ErroDeRegra}=require('./erros');
 const {pode}=require('./permissoes');
 
-function montar(app, db, modulos){
+// `prefixo` existe para o modulo viver DENTRO do PCP ('/sobmedida'). Ele nao e
+// cosmetico: sem ele, /api/usuarios daqui colidiria com /api/usuarios de la, e
+// a ultima rota registrada venceria — em silencio, e so em producao.
+function montar(app, db, modulos, prefixo){
+  const pre=prefixo||'';
   const gravaAud=db.prepare(
     'INSERT INTO auditoria(usuario_nome,permissao,metodo,caminho,detalhe,ok) VALUES(?,?,?,?,?,?)');
   const audita=(u,perm,metodo,caminho,detalhe,ok)=>{
@@ -20,16 +24,18 @@ function montar(app, db, modulos){
       const metodo=(r.metodo||'GET').toLowerCase();
       const leitura=metodo==='get';
 
+      const caminho=pre+r.caminho;
+
       if(!r.permissao){
         // Falha ALTA e visivel: a rota sobe, mas so sabe dizer nao.
-        console.error('[registro] NEGADA — rota sem permissao declarada: '+metodo.toUpperCase()+' '+r.caminho);
-        app[metodo](r.caminho,(req,res)=>res.status(403).json({
+        console.error('[registro] NEGADA — rota sem permissao declarada: '+metodo.toUpperCase()+' '+caminho);
+        app[metodo](caminho,(req,res)=>res.status(403).json({
           ok:false,motivo:'rota_sem_permissao',
           mensagem:'Esta rota subiu sem permissao declarada e por isso esta fechada.'}));
         continue;
       }
 
-      app[metodo](r.caminho,async (req,res)=>{
+      app[metodo](caminho,async (req,res)=>{
         const u=req.usuario;
         if(!pode(u,r.permissao)){
           audita(u,r.permissao,req.method,req.path,'negado',0);

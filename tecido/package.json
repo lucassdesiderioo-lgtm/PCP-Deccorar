@@ -1,10 +1,9 @@
 {
   "name": "pcp-tecido",
   "version": "0.1.0",
-  "description": "Estoque de tecido, sobras e plano de corte - operacao sob medida",
-  "main": "server.js",
+  "description": "Estoque de tecido, sobras e plano de corte - operacao sob medida (montado no PCP em /sobmedida)",
+  "main": "montar.js",
   "scripts": {
-    "start": "node server.js",
     "test": "node teste/rodar.js"
   },
   "license": "ISC",

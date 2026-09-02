@@ -4,12 +4,15 @@
 // A chave que interessa hoje: sobra.descartar NAO esta no cortador. Baixa de
 // sobra sem trava e o furo classico de inventario, e a decisao do dono foi
 // "so a chefia".
+//
+// NAO HA CHAVE DE "gerenciar pessoas" aqui, e e de proposito: quem entra e
+// decidido por area no PCP (Admin -> Acessos). Uma chave sem tela por tras
+// mente para quem le a lista de permissoes do papel.
 const CHAVES=[
   {chave:'cadastro.ler',      nome:'Ver cadastros'},
   {chave:'cadastro.editar',   nome:'Editar cadastros (tecido, enderecos, motivos)'},
   {chave:'parametro.ler',     nome:'Ver parametros'},
   {chave:'parametro.editar',  nome:'Editar parametros do calculo'},
-  {chave:'usuario.editar',    nome:'Gerenciar pessoas e PINs'},
   {chave:'sobra.ler',         nome:'Ver sobras'},
   {chave:'sobra.criar',       nome:'Cadastrar sobra (mutirao e corte)'},
   {chave:'sobra.descartar',   nome:'Descartar sobra'},

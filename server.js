@@ -230,6 +230,7 @@ require('./est_route')(app, db);
    dentro de try/catch, entao instalacao limpa nao quebra sem ela. */
 require('./plan_route')(app, db);
 app.get('/planejamento',(req,res)=>res.sendFile(path.join(__dirname,'public','planejamento.html')));
+app.get('/setor',(req,res)=> res.sendFile(path.join(__dirname,'public','setor.html')));
 app.get('/status',(req,res)=> res.json({ok:true,hora:new Date().toISOString()}));
 app.get('/admin',(req,res)=> res.sendFile(path.join(__dirname,'public','index.html')));
 require('./modo_route')(app, db);
@@ -257,4 +258,32 @@ require('./acesso')(app, db);
 // foto_estoque). Se subir antes, as tabelas ainda nao existem e os triggers
 // sao pulados em silencio — o teste passaria a sujar dados reais.
 require('./teste_route')(app, db);
+
+/* ── SOB MEDIDA ────────────────────────────────────────────────────────────
+ * A segunda operacao da fabrica (corte de tecido contra o pedido do cliente)
+ * mora em tecido/, com banco e dominio proprios, e se monta aqui em
+ * /sobmedida. Ate 02/09/2026 era um servidor separado na porta 3020 — o que
+ * significava dois PINs, dois cadastros de pessoas e dois lugares para
+ * lembrar de bloquear alguem.
+ *
+ * Depois do teste_route de proposito: aquele require tem que ser o ultimo a
+ * tocar o banco do PCP, e este nao toca nele — usa o tecido.db.
+ *
+ * O TRY/CATCH NAO E PREGUICA. Este modulo tem migracoes que rodam no boot; um
+ * banco de tecido corrompido ou um disco cheio derrubaria, sem ele, a
+ * expedicao inteira junto — e a expedicao e quem despacha o dia. O sob medida
+ * ficar fora do ar para tres pessoas e um problema; a expedicao ficar fora do
+ * ar para a fabrica toda e outro. O erro grita no log e /sobmedida responde
+ * 503 dizendo o que houve, em vez de 404 fingindo que a tela nao existe. */
+try{
+  require('./tecido/montar').montar(app);
+}catch(e){
+  console.error('[sobmedida] NAO SUBIU:',e);
+  app.use('/sobmedida',(req,res)=>res.status(503).send(
+    '<body style="font-family:system-ui;background:#0e1217;color:#eef1f6;padding:40px">'+
+    '<h2>Sob medida fora do ar</h2><p>O modulo nao subiu neste boot. '+
+    'O resto do PCP esta funcionando normalmente.</p>'+
+    '<p>Chame o suporte e diga: falha no boot do sob medida.</p></body>'));
+}
+
 app.listen(PORT,()=> console.log('Servidor na porta '+PORT));

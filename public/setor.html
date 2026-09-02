@@ -1,0 +1,66 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Escolher setor</title>
+<style>
+  /* A escolha entre as DUAS OPERACOES da fabrica.
+     Vem logo depois do PIN e herda o visual da tela de login de proposito:
+     e a continuacao do mesmo gesto, nao uma tela nova.
+
+     Ela so aparece para quem alcanca as duas. Quem tem uma so vai direto —
+     escolha de uma opcao so nao e escolha, e cobrar um toque por dia de quem
+     nao tem alternativa e o tipo de atrito que faz a equipe reclamar do
+     sistema inteiro. */
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+       background:#12141a;color:#eef1f6;min-height:100vh;display:flex;
+       align-items:center;justify-content:center;padding:20px}
+  .box{width:100%;max-width:560px}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:#8c94a6;font-size:15px;margin-bottom:24px}
+  .op{display:block;text-decoration:none;color:inherit;
+      background:#1c1f28;border:1px solid #2a2f3a;border-left:8px solid #2a2f3a;
+      border-radius:16px;padding:22px 24px;margin-bottom:14px;min-height:112px}
+  .op:active{background:#252a35}
+  .op .nome{font-size:26px;font-weight:800;line-height:1.1}
+  .op .oque{color:#8c94a6;font-size:15px;margin-top:8px}
+  /* Cada setor tem cor E texto E posicao — cor sozinha nunca decide nada
+     (docs/DESIGN.md secao 2: 8% dos homens tem alguma forma de daltonismo). */
+  .op.padrao{border-left-color:#4493f8}
+  .op.padrao .nome{color:#4493f8}
+  .op.medida{border-left-color:#f0b429}
+  .op.medida .nome{color:#f0b429}
+  .rodape{margin-top:22px;text-align:center;color:#8c94a6;font-size:14px}
+  .rodape a{color:#8c94a6}
+</style></head><body>
+<div class="box">
+  <h1 id="oi">Onde voce vai trabalhar?</h1>
+  <div class="sub">Toque no setor. Da para trocar depois, sem sair.</div>
+
+  <a class="op padrao" href="/" id="opPadrao">
+    <div class="nome">MEDIDA PADRAO</div>
+    <div class="oque">Persianas prontas, vendidas pelo Mercado Livre.
+      Revisao, embalagem, etiqueta de venda e carregamento.</div>
+  </a>
+
+  <a class="op medida" href="/sobmedida" id="opMedida">
+    <div class="nome">SOB MEDIDA</div>
+    <div class="oque">Corte de tecido contra o pedido do cliente.
+      Rolos, plano de corte, sobras e etiquetas de prateleira.</div>
+  </a>
+
+  <div class="rodape"><a href="/login">Nao sou eu &mdash; trocar de pessoa</a></div>
+</div>
+<script>
+// O destino do lado PADRAO e a primeira tela que a pessoa alcanca — o mesmo
+// calculo do login. Mandar todo mundo para /admin daria "sem permissao" na
+// cara de quem so revisa.
+var ORDEM={admin:'/admin',painel:'/painel',operador:'/operador',montagem:'/montagem',
+           embalagem:'/embalagem',carregamento:'/carregamento',expedicao:'/expedicao',
+           relatorios:'/relatorios',necessidade:'/planejamento',recebimento:'/recebimento'};
+fetch('/api/auth/eu',{credentials:'same-origin'}).then(function(r){return r.json();})
+ .then(function(u){
+   if(!u.logado){ location.href='/login'; return; }
+   document.getElementById('oi').textContent='Ola, '+u.nome+'. Onde voce vai trabalhar?';
+   for(var k in ORDEM) if(u.areas.indexOf(k)>=0){ document.getElementById('opPadrao').href=ORDEM[k]; break; }
+ });
+</script></body></html>

@@ -24,6 +24,17 @@ module.exports = [
   { chave:'carregamento.executar',grupo:'Expedição',  nivel:'operacao',
     rotulo:'Carregar veículo',    desc:'Conferir volumes por bipe' },
 
+  // ─── SOB MEDIDA ─────────────────────────────────────────────
+  // A segunda operacao da fabrica: corte de tecido contra o pedido do cliente
+  // (modulo montado em /sobmedida). Duas chaves, e a divisao entre elas e o
+  // que se pode ESTRAGAR — a bancada corta e cadastra sobra; a chefia mexe no
+  // cadastro de tecido e nos parametros do calculo, que mudam o encaixe de
+  // todo mundo.
+  { chave:'sobmedida.cortar',     grupo:'Sob medida', nivel:'operacao',
+    rotulo:'Cortar tecido',       desc:'Plano de corte, rolos, sobras e etiquetas de prateleira' },
+  { chave:'sobmedida.cadastrar',  grupo:'Sob medida', nivel:'admin',
+    rotulo:'Cadastrar sob medida',desc:'Tecidos, enderecos, motivos e os parametros do encaixe' },
+
   // ─── DEVOLUÇÕES ─────────────────────────────────────────────
   { chave:'devolucao.registrar',  grupo:'Devoluções', nivel:'operacao',
     rotulo:'Registrar devolução', desc:'Receber e fazer a triagem física' },

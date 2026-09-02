@@ -4,14 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cadastros · Tecido</title>
-<link rel="stylesheet" href="/base.css">
+<link rel="stylesheet" href="/sobmedida/base.css">
 </head>
 <body>
 <header class="topo">
   <h1>Cadastros</h1>
   <span class="espaco"></span>
-  <span class="quem" id="quem"></span>
-  <a class="bt pequeno" href="/" style="text-decoration:none;display:inline-flex;align-items:center">Inicio</a>
 </header>
 
 <div class="corpo">
@@ -19,7 +17,8 @@
   <div id="conteudo"></div>
 </div>
 
-<script src="/ui.js"></script>
+<script src="/sobmedida/ui.js"></script>
+<script src="/sobmedida/nav.js"></script>
 <script>
 const {api,banner,el,limpar,$,num,comoNumero}=window.ui;
 
@@ -32,7 +31,7 @@ const ABAS=[
   {id:'endereco',  nome:'Enderecos'},
   {id:'motivo',    nome:'Motivos e condicoes'},
   {id:'parametro', nome:'Parametros'},
-  {id:'pessoa',    nome:'Pessoas', soDiretor:true}
+  {id:'acesso',    nome:'Quem entra', soDiretor:true}
 ];
 
 function montarAbas(){
@@ -48,7 +47,7 @@ function desenhar(){
   if(aba==='endereco')  return telaEndereco(c);
   if(aba==='motivo')    return telaMotivo(c);
   if(aba==='parametro') return telaParametro(c);
-  if(aba==='pessoa')    return telaPessoa(c);
+  if(aba==='acesso')    return telaAcesso(c);
 }
 
 // Um cartao com titulo, nota e conteudo — a moldura repetida das quatro abas.
@@ -332,110 +331,54 @@ async function telaParametro(pai){
   });
 }
 
-// ── ABA PESSOAS ──────────────────────────────────────────────────────────
-async function telaPessoa(pai){
+// ── ABA QUEM ENTRA ───────────────────────────────────────────────────────
+// Esta aba NAO cadastra ninguem, e e esse o ponto.
+//
+// Ate 02/09/2026 ela tinha PIN proprio, lista de pessoas e um botao de
+// liberar — um segundo cadastro paralelo ao do PCP. O custo apareceu no
+// primeiro dia: para liberar alguem era preciso ja estar liberado, e a
+// unica conta que existia era a que veio no boot. Uma tranca sem chave.
+//
+// Hoje quem entra e decidido por AREA, na mesma tela em que se libera
+// revisao ou carregamento. O que sobra aqui e explicar o que cada area
+// alcanca — e apontar o caminho, para ninguem sair procurando.
+async function telaAcesso(pai){
   if(!podeEditar()) return;
-  const pessoas=await api('/api/usuarios');
-  const papeis=await api('/api/papeis');
-  const unico=await api('/api/usuarios/login-unico');
-  const doPcp=unico.ligado?await api('/api/usuarios/pcp'):[];
   pai=limpar(pai);
-  const recarregar=()=>telaPessoa($('#conteudo'));
+  const papeis=await api('/api/papeis');
 
-  // ── ACESSO PELO PCP ───────────────────────────────────────────────────
-  // Autenticacao la, autorizacao aqui: a pessoa entra com o PIN que ja tem,
-  // e esta lista diz quem pode usar o modulo e com que papel.
-  if(unico.ligado){
-    const cP=cartao(pai,'Acesso pelo PCP',
-      'A pessoa entra uma vez, no PCP, e atravessa para ca sem digitar PIN de novo. Aqui voce so libera quem pode usar o Plano de corte.');
-    cP.appendChild(el('p',{class:'ajuda',texto:
-      'Bloqueou no PCP, nao entra aqui — e por isso que o desligamento de alguem deixa de depender de lembrar de dois sistemas.'}));
-    if(!doPcp.length) cP.appendChild(el('div',{class:'vazio',
-      texto:'Nao consegui falar com o PCP agora. As pessoas com PIN proprio continuam entrando normalmente.'}));
-    else {
-      const t=el('table',{});
-      t.appendChild(el('tr',{},[el('th',{texto:'Pessoa (PCP)'}),el('th',{texto:'Acesso ao corte'}),el('th',{texto:''})]));
-      doPcp.forEach(p=>{
-        const sel=el('select',{});
-        papeis.forEach(x=>sel.appendChild(el('option',{value:x.papel,texto:x.papel,
-          selected:x.papel===p.papel?'selected':null})));
-        const bt=el('button',{class:'bt pequeno '+(p.liberado?'':'primario'),
-          texto:p.liberado?'Tirar acesso':'Liberar',onclick:async()=>{
-            if(p.liberado) await api('/api/usuarios/'+p.usuario_id,{metodo:'PUT',corpo:{ativo:0}});
-            else await api('/api/usuarios/pcp',{metodo:'POST',
-              corpo:{pcp_id:p.pcp_id,nome:p.nome,papel:sel.value}});
-            banner(p.liberado?'Acesso retirado.':'Acesso liberado para '+p.nome+'.');
-            await recarregar();
-          }});
-        if(p.liberado) sel.addEventListener('change',async()=>{
-          await api('/api/usuarios/pcp',{metodo:'POST',
-            corpo:{pcp_id:p.pcp_id,nome:p.nome,papel:sel.value}});
-          banner('Papel alterado.'); await recarregar();
-        });
-        t.appendChild(el('tr',{class:p.liberado?'':'inativo'},[
-          el('td',{texto:p.nome}),
-          el('td',{},[p.liberado?sel:el('span',{class:'tag off',texto:'sem acesso'})]),
-          el('td',{style:'text-align:right'},[bt])
-        ]));
-      });
-      cP.appendChild(t);
-    }
-  }
-
-  const c=cartao(pai,'PIN proprio deste modulo',
-    unico.ligado
-      ? 'Para o dia em que o PCP estiver fora do ar — sem isto, uma queda da expedicao pararia o corte junto. No dia a dia ninguem precisa destes PINs.'
-      : 'Quem entra no sistema, com que PIN e com que papel.');
-  formulario(c,[
-    {id:'nome',rotulo:'Nome',dica:'Joao',cresce:true},
-    {id:'pin',rotulo:'PIN (4 digitos)',tipo:'password',inputmode:'numeric'},
-    {id:'papel',rotulo:'Papel',opcoes:papeis.map(p=>({valor:p.papel,nome:p.papel}))}
-  ],'Cadastrar pessoa',async(v,refs)=>{
-    await api('/api/usuarios',{metodo:'POST',corpo:v});
-    refs.nome.value=''; refs.pin.value='';
-    banner('Pessoa cadastrada.'); await recarregar();
-  });
+  const c=cartao(pai,'A liberacao mora no admin do PCP',
+    'Nao ha cadastro de pessoas aqui. Quem entra no sob medida e quem tem a area marcada em Admin -> Acessos.');
+  const ir=el('a',{class:'bt primario',href:'/admin',target:'_top',
+    style:'text-decoration:none;display:inline-flex;align-items:center',
+    texto:'Abrir Admin -> Acessos'});
+  c.appendChild(ir);
+  c.appendChild(el('p',{class:'ajuda',texto:
+    'Duas areas, e a diferenca entre elas e o que se pode ESTRAGAR: a bancada corta e cadastra sobra; a chefia mexe em tecido, endereco e nos parametros do calculo.'}));
 
   const t=el('table',{});
-  t.appendChild(el('tr',{},[el('th',{texto:'Nome'}),el('th',{texto:'Papel'}),
-    el('th',{texto:'Entra por'}),el('th',{texto:''}),el('th',{texto:''})]));
-  pessoas.forEach(p=>{
-    const trocar=el('button',{class:'bt pequeno',texto:'Trocar PIN',onclick:async()=>{
-      const pin=prompt('Novo PIN de '+p.nome+' (4 digitos):');
-      if(!pin) return;
-      await api('/api/usuarios/'+p.id,{metodo:'PUT',corpo:{pin}});
-      banner('PIN trocado.');
-    }});
-    const virar=el('button',{class:'bt pequeno',texto:p.ativo?'Bloquear':'Liberar',onclick:async()=>{
-      await api('/api/usuarios/'+p.id,{metodo:'PUT',corpo:{ativo:p.ativo?0:1}}); await recarregar(); }});
-    const papel=el('select',{});
-    papeis.forEach(x=>papel.appendChild(el('option',{value:x.papel,texto:x.papel,selected:x.papel===p.papel?'selected':null})));
-    papel.addEventListener('change',async()=>{
-      try{ await api('/api/usuarios/'+p.id,{metodo:'PUT',corpo:{papel:papel.value}}); banner('Papel alterado.'); }
-      finally{ await recarregar(); }
-    });
-    t.appendChild(el('tr',{class:p.ativo?'':'inativo'},[
-      el('td',{texto:p.nome}), el('td',{},[papel]),
-      el('td',{},[el('span',{class:'tag '+(p.pcp_id?'bom':'off'),
-        texto:p.pcp_id?(p.tem_pin?'PCP + PIN':'PCP'):'PIN daqui'})]),
-      el('td',{},[trocar]), el('td',{style:'text-align:right'},[virar])
+  t.appendChild(el('tr',{},[el('th',{texto:'Area no PCP'}),el('th',{texto:'Vira'}),el('th',{texto:'Alcanca'})]));
+  [['Sob medida - bancada','cortador'],
+   ['Sob medida - cadastros','diretor'],
+   ['Admin (controle geral)','diretor']].forEach(([area,papel])=>{
+    const p=papeis.find(x=>x.papel===papel);
+    t.appendChild(el('tr',{},[
+      el('td',{texto:area}),
+      el('td',{},[el('span',{class:'tag '+(papel==='diretor'?'bom':'rolo'),texto:papel})]),
+      el('td',{texto:p?p.permissoes.join(' · '):''})
     ]));
   });
   c.appendChild(t);
-
-  const cP=cartao(pai,'O que cada papel pode','O papel e um atalho que agrupa permissoes — nao um cargo.');
-  papeis.forEach(p=>{
-    cP.appendChild(el('strong',{texto:p.papel}));
-    cP.appendChild(el('p',{class:'ajuda',texto:p.permissoes.join(' · ')}));
-  });
-  cP.appendChild(el('p',{class:'ajuda',texto:
+  c.appendChild(el('p',{class:'ajuda',texto:
     'Repare que "Descartar sobra" nao esta no cortador: baixa de sobra sem trava e o furo classico de inventario.'}));
+
+  c.appendChild(el('p',{class:'ajuda',texto:
+    'Tirar o acesso e desmarcar a area la — ou desligar a pessoa, o que fecha as duas operacoes de uma vez. Era isso que os dois cadastros separados nao davam.'}));
 }
 
 // ── inicio ───────────────────────────────────────────────────────────────
 (async function(){
-  eu=await api('/api/auth/eu');
-  $('#quem').textContent=eu.logado?(eu.nome+' · '+eu.papel):'';
+  eu=await api('/api/eu');
   desenhar();
 })();
 </script>

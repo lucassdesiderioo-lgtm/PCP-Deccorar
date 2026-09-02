@@ -1,6 +1,12 @@
 // As quatro funcoes que toda tela usa. Nada de framework, nada de build.
 (function(){
 
+// ── BASE — onde este modulo esta montado ─────────────────────────────────
+// O sob medida vive DENTRO do PCP, sob /sobmedida. As chamadas de API levam
+// esse prefixo por aqui, num lugar so: espalhar '/sobmedida/api/...' por sete
+// telas seria sete lugares para errar no dia em que o caminho mudar.
+const BASE='/sobmedida';
+
 // ── api() — o unico jeito de falar com o servidor ────────────────────────
 // O envelope {ok, dados} / {ok, motivo, mensagem} e desembrulhado aqui, uma
 // vez. Erro vira banner vermelho com a frase que o dominio escreveu, e a
@@ -10,8 +16,9 @@ async function api(caminho,opcoes){
   const conf={method:o.metodo||'GET',headers:{},credentials:'same-origin'};
   if(o.corpo!==undefined){ conf.headers['Content-Type']='application/json'; conf.body=JSON.stringify(o.corpo); }
   let r;
-  try{ r=await fetch(caminho,conf); }
+  try{ r=await fetch(BASE+caminho,conf); }
   catch(e){ banner('Sem conexao com o servidor.','erro'); throw e; }
+  // O login e o do PCP, na raiz — nao ha mais um segundo PIN aqui.
   if(r.status===401){ location.href='/login?r='+encodeURIComponent(location.pathname); throw new Error('nao_logado'); }
   let j=null;
   try{ j=await r.json(); }catch(e){}

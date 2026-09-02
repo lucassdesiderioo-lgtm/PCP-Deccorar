@@ -1074,7 +1074,13 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Criar tabela de equivalências de SKU (decisão explícita do dono)
 - ❌ Remover a trava de SKU não cadastrado
 - ❌ Usar `.rindex('</script>')` ao inserir JS em HTML
-- ❌ Commitar `.session_secret`, `dados.db`, `backups/` ou `lotes/`
+- ❌ Commitar `.session_secret`, `dados.db`, `tecido.db`, `backups/` ou `lotes/`
+- ❌ Separar o sob medida de novo em outro servidor/porta — já foi, durou um
+  dia, e o beco sem saída da liberação está descrito na §19
+- ❌ Acrescentar área de sob medida sem pôr a linha correspondente no
+  `PERM_AREA` do `acesso.js` — o acesso some sozinho, em silêncio (§19)
+- ❌ Escrever cor nova no `tecido/public/base.css` sem que ela exista nas telas
+  do PCP — paleta "quase igual" é o que faz parecer outro sistema (§19)
 
 ---
 
@@ -1285,3 +1291,110 @@ tela de custo no primeiro preço lançado.
 
 Enquanto a mão de obra for zero, o número se chama **custo de material**
 (regra 17 do §7-B), e é isso que está escrito no card.
+
+---
+
+## 19. A SEGUNDA OPERAÇÃO — sob medida (`/sobmedida`)
+
+A fábrica tem **duas operações**, e até 02/09/2026 o CLAUDE.md só descrevia uma.
+
+| | **Medida padrão** | **Sob medida** |
+|---|---|---|
+| O que é | Persianas prontas, vendidas pelo Mercado Livre | Corte de tecido contra o pedido do cliente |
+| Onde vive | tudo que este arquivo descreve até a §18 | `tecido/`, montado em `/sobmedida` |
+| Banco | `dados.db` | `tecido.db` |
+| Entra pelo | mesmo PIN | mesmo PIN |
+
+O módulo tem `README.md` próprio em `tecido/`. **Leia-o antes de mexer lá** —
+ele tem regras que parecem bug e não são, como este arquivo tem as dele.
+
+### É um módulo montado, não um segundo servidor
+
+```js
+// server.js, depois do teste_route
+try{ require('./tecido/montar').montar(app); }catch(e){ /* 503 só no /sobmedida */ }
+```
+
+> ⚠️ **O TRY/CATCH NÃO É PREGUIÇA.** O módulo roda migrações no boot. Um banco
+> de tecido corrompido ou um disco cheio derrubaria, sem ele, a **expedição
+> inteira** junto — e a expedição é quem despacha o dia. O sob medida fora do
+> ar para três pessoas é um problema; a expedição fora do ar para a fábrica
+> toda é outro.
+
+> ⚠️ **Não é preciso `npm install` dentro de `tecido/`.** As dependências
+> (`better-sqlite3`, `express`) são as mesmas versões da raiz, e o Node resolve
+> subindo. Uma segunda árvore de dependências é uma segunda coisa para
+> atualizar e esquecer.
+
+### ⚠️ ARMADILHA #13 — a área de acesso é SOMBRA, e sombra se apaga sozinha
+
+A liberação do sob medida é uma **área do PCP**, marcada em Admin → Acessos.
+O portão em `tecido/montar.js` lê `req.usuario.areas`.
+
+Só que, no modelo novo de acesso (`acesso.js`), **`usuarios.areas` não é mais
+editada à mão**: ela é recalculada a partir das permissões efetivas, pelo mapa
+`PERM_AREA`. Uma área que não está nesse mapa é apagada no primeiro
+salvamento de acesso de qualquer pessoa.
+
+```js
+// acesso.js — sem estas duas linhas, a integração falha EM SILÊNCIO
+['sobmedida.cortar','sobmedida'], ['sobmedida.cadastrar','sobmedida_adm']
+```
+
+O modo de falhar é o pior possível: o admin marca o acesso, a tela confirma, e
+o acesso some sozinho depois — sem erro, sem log, sem ninguém saber por quê.
+Há teste travando as duas pontas (`tecido/teste/acesso.test.js`).
+
+**As três coisas andam juntas.** Chave em `permissoes.js`, setor em
+`acesso.js` (`setoresNativos`), linha em `PERM_AREA`. Faltando qualquer uma,
+não há como liberar ninguém.
+
+### Por que a liberação não mora mais lá dentro
+
+Na primeira versão o módulo tinha cadastro de pessoas e PIN próprios. Custou,
+no primeiro dia de produção:
+
+| Defeito | O que era |
+|---|---|
+| Botão não fazia nada | O `/admin` monta as telas em iframe; o login do outro sistema abria dentro do quadro |
+| `ERR_CONNECTION_TIMED_OUT` | A porta 3020 não estava no `ufw` |
+| **Beco sem saída** | Liberar alguém exigia estar liberado. A única conta era a do boot |
+
+O terceiro é o que decidiu a arquitetura. **Uma tranca que não sabe liberar é
+uma tranca que a equipe aprende a contornar** — é a mesma lição da §5
+(Bloqueados → escolher) e da armadilha #6. E dois cadastros de gente são dois
+lugares para lembrar de bloquear alguém: desligar no PCP e esquecer do outro é
+o furo que nenhum log acusa.
+
+### Design: dois contextos, e a paleta é a MESMA
+
+O `docs/DESIGN.md` §1 manda operação em fundo **claro** e admin em **escuro**.
+No sob medida isso vale por tela, declarado em `tecido/nucleo/telas.js`, e
+carimbado pelo servidor num `data-contexto` no `<html>`.
+
+> ⚠️ **A primeira versão usou uma paleta *quase* igual** — `#12161c` no lugar
+> de `#1a1d23`, `#1f6feb` no lugar de `#1565c0`, e assim nas sete cores.
+> Nenhuma batia. Diferente o bastante para o olho perceber, perto o bastante
+> para não parecer proposital, e o efeito é a equipe sentir que entrou em
+> outro sistema. Hoje os hex são **copiados** de `public/operador.html` e
+> `public/index.html`. Cor nova lá só entra se entrar aqui também.
+
+### Teste obrigatório
+
+```bash
+cd tecido && npm test          # 87 casos
+```
+
+E o teste de segurança da §10, agora incluindo os caminhos novos:
+
+```bash
+for r in / /admin /operador /setor /sobmedida /sobmedida/corte \
+         /sobmedida/cadastros /sobmedida/telas/corte.html /api/skus /sobmedida/api/eu; do
+  printf "%-30s " "$r"; curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3010$r
+done
+```
+
+Telas `302`, API `401`, `/login` `200`. E `/sobmedida/telas/corte.html` tem que
+dar **403 mesmo para o diretor logado** — se der `200`, o `express.static` do
+módulo furou o portão, que é a armadilha #3 por outra porta.
+

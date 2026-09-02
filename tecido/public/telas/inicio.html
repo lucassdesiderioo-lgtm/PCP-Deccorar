@@ -3,47 +3,85 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tecido · Inicio</title>
-<link rel="stylesheet" href="/base.css">
+<title>Sob medida</title>
+<link rel="stylesheet" href="/sobmedida/base.css">
+<style>
+  /* A porta da bancada. Tres regras vindas do docs/DESIGN.md:
+     alvo grande (o operador esta em pe, com a peca na mao), uma coisa por
+     vez, e NUNCA cor sozinha — cada porta traz titulo, uma linha dizendo
+     para que serve e um numero de ordem. Quem chega no primeiro dia consegue
+     ler o fluxo da fabrica na propria tela inicial. */
+  .portas{display:grid; gap:14px; grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+  .porta{
+    display:block; text-decoration:none; color:inherit;
+    background:var(--cartao); border:1px solid var(--linha);
+    border-left:6px solid var(--acao);
+    border-radius:var(--raio-g); padding:18px 20px; min-height:104px;
+    box-shadow:var(--sombra);
+  }
+  .porta:active{transform:translateY(1px)}
+  .porta .passo{font-size:13px; font-weight:800; letter-spacing:.08em;
+    color:var(--tinta-fraca); text-transform:uppercase}
+  .porta h2{margin:2px 0 4px; font-size:24px; font-weight:700; line-height:1.15}
+  .porta p{margin:0; font-size:15px; color:var(--tinta-fraca)}
+  .porta.sobra{border-left-color:var(--sobra)}
+  .porta.painel,.porta.cadastros{border-left-color:var(--tinta-fraca)}
+</style>
 </head>
 <body>
 <header class="topo">
-  <h1>Estoque de tecido e sobras</h1>
-  <span class="espaco"></span>
-  <span class="quem" id="quem"></span>
-  <button class="bt pequeno" id="sair">Sair</button>
+  <h1>Sob medida &mdash; corte de tecido</h1>
 </header>
 
 <div class="corpo">
-  <div class="cartao">
-    <h2>Por onde comecar</h2>
-    <p class="nota">As oito fases entregues: cadastros, mutirao das sobras, o
-      algoritmo do encaixe, o plano de corte, o rolo, o painel e o upload.</p>
-    <div class="fileira">
-      <a class="op bt" href="/corte" style="text-decoration:none;display:inline-flex;align-items:center">Plano de corte</a>
-      <a class="op bt" href="/sobras" style="text-decoration:none;display:inline-flex;align-items:center">Sobras e mutirao</a>
-      <a class="op bt" href="/rolos" style="text-decoration:none;display:inline-flex;align-items:center">Rolos</a>
-      <a class="op bt" href="/painel" style="text-decoration:none;display:inline-flex;align-items:center">Painel</a>
-      <a class="op bt" href="/etiquetas" style="text-decoration:none;display:inline-flex;align-items:center">Etiquetas</a>
-      <a class="op bt" href="/cadastros" style="text-decoration:none;display:inline-flex;align-items:center">Cadastros</a>
-    </div>
-  </div>
+  <div class="portas" id="portas"></div>
 
-  <div class="cartao">
-    <h2>O que este modulo responde</h2>
-    <table>
-      <tr><td>1</td><td>Quanto eu tenho do tecido X?</td><td class="tag bom">pronto</td></tr>
-      <tr><td>2</td><td>Que sobras eu tenho do tecido X?</td><td class="tag bom">pronto</td></tr>
-      <tr><td>3</td><td>Estas medidas que vou cortar — como cortar?</td><td class="tag bom">pronto</td></tr>
-    </table>
+  <div class="cartao" id="ajuda">
+    <h2>O caminho de uma peca</h2>
+    <p class="nota">O rolo entra no estoque, o pedido vira plano de corte, o que
+      sobra do corte volta para a prateleira com etiqueta &mdash; e a proxima peca
+      que couber numa sobra sai dela, nao do rolo.</p>
   </div>
 </div>
 
-<script src="/ui.js"></script>
+<script src="/sobmedida/ui.js"></script>
+<script src="/sobmedida/nav.js"></script>
 <script>
-const {api,$}=window.ui;
-api('/api/auth/eu').then(u=>{ $('#quem').textContent=u.logado?(u.nome+' · '+u.papel):''; });
-$('#sair').onclick=async()=>{ await api('/api/auth/logout',{metodo:'POST'}); location.href='/login'; };
+const {api,el,limpar,$}=window.ui;
+
+// Cada porta diz PARA QUE SERVE, nao so o nome da tela. "Sobras" e um
+// substantivo; "o retalho que sobrou do corte, na prateleira" e uma
+// instrucao — e quem chega no primeiro dia le a segunda.
+const PORTAS=[
+  {caminho:'/corte',     passo:'1 · pedido',   nome:'Plano de corte',
+   texto:'Suba as etiquetas do pedido e veja de onde cortar cada peca.'},
+  {caminho:'/rolos',     passo:'2 · estoque',  nome:'Rolos',
+   texto:'Entrada de rolo, saldo em metros e acerto de fim de rolo.'},
+  {caminho:'/sobras',    passo:'3 · retalho',  nome:'Sobras', classe:'sobra',
+   texto:'O que sobrou do corte, com medida, endereco e condicao.'},
+  {caminho:'/etiquetas', passo:'4 · prateleira', nome:'Etiquetas', classe:'sobra',
+   texto:'Imprime o lote de etiquetas para colar nas sobras.'},
+  {caminho:'/painel',    passo:'escritorio',   nome:'Painel', classe:'painel',
+   texto:'Cortes do periodo, desperdicio, encalhe e recusas.'},
+  {caminho:'/cadastros', passo:'escritorio',   nome:'Cadastros', classe:'cadastros',
+   texto:'Tecidos, enderecos, motivos e os parametros do calculo.'}
+];
+
+api('/api/eu').then(eu=>{
+  const c=limpar($('#portas'));
+  const minhas=PORTAS.filter(p=>eu.telas.includes(p.caminho));
+  minhas.forEach(p=>{
+    const a=el('a',{class:'porta '+(p.classe||''),href:'/sobmedida'+p.caminho});
+    a.appendChild(el('div',{class:'passo',texto:p.passo}));
+    a.appendChild(el('h2',{texto:p.nome}));
+    a.appendChild(el('p',{texto:p.texto}));
+    c.appendChild(a);
+  });
+  // Sem porta nenhuma nao deveria acontecer — o portao ja barraria antes.
+  // Mas se acontecer, a tela diz o que fazer em vez de ficar vazia.
+  if(!minhas.length) c.appendChild(el('div',{class:'vazio',
+    texto:'Seu acesso ainda nao alcanca nenhuma tela do sob medida. Peca ao admin em Admin -> Acessos.'}));
+});
 </script>
 </body>
 </html>

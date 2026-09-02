@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sobras · Tecido</title>
-<link rel="stylesheet" href="/base.css">
+<link rel="stylesheet" href="/sobmedida/base.css">
 <style>
 /* O campo de bipe e o centro da tela: grande, visivel e sempre com o foco.
    Campo fora da tela e campo que o iPad tira o foco — o leitor bipa e nada
@@ -20,8 +20,6 @@
   <h1>Sobras</h1>
   <span class="espaco"></span>
   <span class="quem" id="resumoTecido"></span>
-  <a class="bt pequeno" href="/etiquetas" id="linkEtiquetas" style="text-decoration:none;display:inline-flex;align-items:center">Etiquetas</a>
-  <a class="bt pequeno" href="/" style="text-decoration:none;display:inline-flex;align-items:center">Inicio</a>
 </header>
 
 <div class="corpo">
@@ -29,7 +27,8 @@
   <div id="conteudo"></div>
 </div>
 
-<script src="/ui.js"></script>
+<script src="/sobmedida/ui.js"></script>
+<script src="/sobmedida/nav.js"></script>
 <script>
 const {api,banner,beep,el,limpar,$,num,comoNumero,formatarMedida,formatarArea}=window.ui;
 
@@ -294,7 +293,7 @@ async function telaLista(pai){
 }
 
 (async function(){
-  eu=await api('/api/auth/eu');
+  eu=await api('/api/eu');
   desenhar();
 })();
 </script>
