@@ -124,7 +124,7 @@ teste/                 rodar.js + *.test.js — banco temporario, do zero
 | `larguraMinimaSobra` | 0,80 m | Resto com largura abaixo disso é refugo em vez de sobra. Vale **só para a largura** |
 | `pesoSobra` | 0,50 | Quanto da sobra gerada conta como material recuperado. **A única variável de julgamento do módulo** |
 | `margem` | 0,00 m | Folga entre peças (a fórmula do 6.2 aplica entre peças, não nas bordas) |
-| `alturaMinimaSobra` | 0,00 m | Resto com altura abaixo disso é refugo mesmo com largura boa. Nasce zero — "altura não tem mínimo" |
+| `alturaMinimaSobra` | **1,00 m** | Resto com altura abaixo disso é refugo mesmo com largura boa — persiana mais baixa que isso praticamente não sai da fábrica |
 
 `pesoSobra` responde a uma pergunta de fábrica: *o retalho que vai pra
 prateleira volta a ser usado, ou encalha?* Metade é o palpite honesto de quem
@@ -200,21 +200,47 @@ depender de disciplina: não existe tela separada para alguém esquecer.
 **A recusa é gravada na hora**, mesmo que o corte não aconteça — ela é
 diagnóstico, não papelada do plano.
 
-### Um ponto para você decidir
+### TOM ÚNICO POR PEDIDO — a regra que mais pesa no plano
 
-Aplicar a regra dos 80 cm ao **pé de uma sobra** transforma uma tira de
-`1,90 × 0,10` em sobra com etiqueta: a largura passa folgado, e a regra diz
-que altura não tem mínimo. Está assim porque é o que a regra manda. Se a
-prateleira começar a encher de tirinha, suba `alturaMinimaSobra` em
-Cadastros → Parâmetros — sem mexer na regra da largura, que é outra decisão.
+**Peças com o mesmo número de pedido saem sempre da MESMA fonte.** Três peças
+juntas numa sobra: ótimo. Uma na sobra e duas na bobina: **nunca**.
+
+Não é otimização, é defeito de produto — o tom pode não bater entre uma fonte
+e outra, e o cliente vê as duas persianas lado a lado na mesma parede. A regra
+vale também entre **dois rolos**: rolos diferentes são lotes diferentes.
+
+Na prática, um grupo que entraria pela metade numa fonte é desfeito e tentado
+na fonte seguinte. Se o pedido inteiro não couber em lugar nenhum, ele volta
+marcado com esse motivo — nunca dividido.
+
+**Peça sem pedido informado é livre**, porque não há com quem ela precise
+combinar. O campo Pedido fica na grade, e o upload da etiqueta já o preenche.
 
 ## O upload (fase 8)
 
-O leitor pega **os dois primeiros números de cada linha** e ignora cabeçalho e
-colunas extras — funciona com `1,90 x 2,60`, `1,90;2,60` ou separado por Tab,
-em `.csv` ou `.txt`. Números grandes demais para metro são lidos como
-centímetros. As medidas entram na **mesma grade**, editáveis antes de calcular.
+**O PDF de etiquetas de produção** (Decorsoft) é lido direto: o sistema pega a
+via **COLEÇÃO** de cada item e dela tira **a medida do corte do tecido** —
+a que aparece entre parênteses:
 
-> Quando você mandar um exemplar do arquivo real da etiqueta de corte (a
-> pendência 2 da especificação), é só o leitor que muda — a grade e a tela
-> ficam como estão.
+```
+4292-1  ·  SAULO PAULO DA  ·  COLEÇÃO
+1.500 X 1.400              ← a persiana ACABADA (não serve para cortar)
+2.417 M2 - (1.465x1.650)   ← O CORTE. É esta que o plano usa.
+```
+
+A largura do tecido é **menor** que a da persiana montada (ponteiras e tubo
+entram na conta) e a altura é **maior** (sobra para enrolar no tubo e para a
+barra). Cortar pela medida acabada erraria as duas dimensões, e para lados
+diferentes.
+
+Vêm juntos o **pedido**, o **cliente** e o **tecido** — este último casado com
+o cadastro quando dá (`SCREEN 1% BRANCO 3.00M` → `Rolô · Screen 1% · Branco`),
+como sugestão: quem confirma continua sendo o botão que o operador aperta.
+
+Também lê CSV/texto com dois números por linha. Em qualquer caso as medidas
+caem na **mesma grade**, editáveis antes de calcular — **digitar continua
+sempre disponível**, que é o caminho principal, não o de exceção.
+
+> Sem biblioteca de PDF: os fluxos são Flate (zlib, que vem no Node) e o texto
+> é UTF-16BE. O teste monta um PDF no formato real, então nenhuma etiqueta com
+> nome de cliente precisa ficar versionada no repositório.

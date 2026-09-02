@@ -177,11 +177,15 @@ module.exports=[
 
 {nome:'confirmar SEM a etiqueta da sobra nova e recusado', executar({recusa}){
   const x=cena();
-  // Peca estreita numa bobina larga: sobra muita tira lateral.
+  // Peca estreita e ALTA numa bobina larga: a tira lateral tem largura e
+  // altura de sobra (a altura minima e 1,00 m), entao nasce uma sobra que
+  // pede etiqueta. As sobras da prateleira sao recusadas para o corte cair
+  // no rolo, onde a tira lateral e larga.
   const pecas=[{largura:'0,90',altura:'2,00'}];
-  const p=plano.calcular({tecido_id:x.t.id,pecas});
+  const recusadas=sobra.candidatas(x.t.id).map(s=>s.id);
+  const p=plano.calcular({tecido_id:x.t.id,pecas,recusadas});
   if(!p.sobras_geradas.length) throw new Error('o cenario deveria gerar sobra');
-  recusa(()=>plano.confirmar({tecido_id:x.t.id,pecas,assinatura:p.assinatura,etiquetas:{}},'Cortador'),
+  recusa(()=>plano.confirmar({tecido_id:x.t.id,pecas,recusadas,assinatura:p.assinatura,etiquetas:{}},'Cortador'),
     'etiqueta_faltando');
 }},
 

@@ -35,8 +35,52 @@ function lerPecas(lista){
       'A linha '+(i+1)+' esta sem medida valida.');
     exigir(largura<=10&&altura<=60,'medida_absurda',
       'A linha '+(i+1)+' tem medida fora do razoavel — o campo e em METROS.');
-    return {id:i+1, largura:arred(largura), altura:arred(altura)};
+    const pedido=String(p.pedido||'').trim();
+    return {id:i+1, largura:arred(largura), altura:arred(altura), pedido,
+      cliente:String(p.cliente||'').trim()||null};
   });
+}
+
+// ── TOM UNICO POR PEDIDO ─────────────────────────────────────────────────
+// As pecas do MESMO pedido tem que sair do MESMO lugar.
+//
+// Nao e otimizacao — e defeito de produto. Duas persianas da mesma casa
+// cortadas em fontes diferentes podem chegar com tonalidade diferente, e o
+// cliente ve as duas lado a lado na mesma parede. Tres pecas juntas numa
+// sobra: otimo. Uma na sobra e duas na bobina: devolucao.
+//
+// Peca SEM pedido informado e um grupo de uma peca so — livre, porque nao ha
+// com quem ela precise combinar.
+function agrupar(pecas){
+  const grupos=new Map();
+  pecas.forEach(p=>{
+    const chave=p.pedido?('pedido:'+p.pedido.toUpperCase()):('avulsa:'+p.id);
+    if(!grupos.has(chave)) grupos.set(chave,{chave, pedido:p.pedido||null, pecas:[]});
+    grupos.get(chave).pecas.push(p);
+  });
+  // Grupo maior primeiro: o dificil de acomodar tenta as sobras enquanto
+  // ainda ha sobra disponivel.
+  return [...grupos.values()].sort((a,b)=>
+    b.pecas.reduce((s,p)=>s+p.largura*p.altura,0)-a.pecas.reduce((s,p)=>s+p.largura*p.altura,0));
+}
+
+// Encaixa numa fonte aceitando SO grupos completos. Um grupo que entrou pela
+// metade e desfeito e tentado na fonte seguinte.
+function encaixarGruposCompletos(grupos,fonte,params){
+  let tentativa=grupos.slice();
+  while(tentativa.length){
+    const pecas=tentativa.flatMap(g=>g.pecas);
+    const r=encaixe.planejar(pecas,[fonte],params);
+    const alocadas=new Set();
+    r.faixas.forEach(f=>f.pecas.forEach(p=>alocadas.add(p.id)));
+    const completos=tentativa.filter(g=>g.pecas.every(p=>alocadas.has(p.id)));
+    const parciais=tentativa.filter(g=>g.pecas.some(p=>alocadas.has(p.id))&&
+      !g.pecas.every(p=>alocadas.has(p.id)));
+    if(!parciais.length) return completos.length?{resultado:r, grupos:completos}:null;
+    // Tira os grupos que ficariam divididos e tenta de novo sem eles.
+    tentativa=tentativa.filter(g=>!parciais.includes(g));
+  }
+  return null;
 }
 
 // Uma peca cabe numa fonte quando as DUAS dimensoes passam. Area nao decide
@@ -55,37 +99,36 @@ function calcular(pedido){
   const params=config.paramsDeCorte();
   const recusadas=new Set((pedido.recusadas||[]).map(Number));
 
-  // ── 1. SOBRAS PRIMEIRO ────────────────────────────────────────────────
+  // ── 1. SOBRAS PRIMEIRO, e por GRUPO INTEIRO ───────────────────────────
   const todasSobras=sobra.candidatas(tecido.id);
   const disponiveis=todasSobras.filter(s=>!recusadas.has(s.id));
 
-  let pendentes=pecas.slice();
+  let grupos=agrupar(pecas);
   const fontes=[];
   const usadas=[];
 
   for(const s of disponiveis){
-    if(!pendentes.length) break;
+    if(!grupos.length) break;
     const fonte={id:'sobra:'+s.id, fonte:'sobra', largura:s.largura, alturaMax:s.altura};
     // SEM ROTACAO quando o tecido tem sentido: uma sobra 0,70 x 3,00 nunca
     // serve para uma peca 3,00 x 0,70. Girar resolveria no papel; no tecido
     // muda o desenho, o brilho e o caimento.
-    if(!pendentes.some(p=>serve(p,fonte))) continue;
+    if(!grupos.some(g=>g.pecas.some(p=>serve(p,fonte)))) continue;
 
-    const r=encaixe.planejar(pendentes,[fonte],params);
-    if(!r.faixas.length) continue;
+    const tentativa=encaixarGruposCompletos(grupos,fonte,params);
+    if(!tentativa) continue;
 
-    const alocadas=new Set();
-    r.faixas.forEach(f=>f.pecas.forEach(p=>alocadas.add(p.id)));
-    pendentes=pendentes.filter(p=>!alocadas.has(p.id));
+    grupos=grupos.filter(g=>!tentativa.grupos.includes(g));
     fontes.push(fonte);
-    usadas.push({tipo:'sobra', ref:s, fonteId:fonte.id});
+    usadas.push({tipo:'sobra', ref:s, fonteId:fonte.id, fonte, grupos:tentativa.grupos});
   }
 
   // ── 2. O QUE SOBROU VAI PARA O ROLO ───────────────────────────────────
   const rolos=rolo.disponiveis(tecido.id);
   let simulacoes=[], bobina=null;
 
-  if(pendentes.length&&rolos.length){
+  if(grupos.length&&rolos.length){
+    const pendentes=grupos.flatMap(g=>g.pecas);
     // Uma simulacao por LARGURA distinta. Dentro de cada largura os rolos
     // entram na ordem da regra: aberto antes de fechado, e entre abertos o
     // de MENOR saldo — fecha o rolo velho antes de abrir outro.
@@ -96,12 +139,29 @@ function calcular(pedido){
     });
 
     simulacoes=[...porLargura.entries()].map(([largura,lista])=>{
-      const fontesRolo=lista.map(r=>({id:'rolo:'+r.id, fonte:'rolo', largura:r.largura, alturaMax:r.saldo}));
-      const r=encaixe.planejar(pendentes,fontesRolo,params);
-      return {largura, rolos:lista, fontesRolo,
-        desperdicio:r.desperdicio, consumoLinear:r.consumoLinear, consumoM2:r.consumoM2,
-        naoAlocadas:r.pecasNaoAlocadas.length, areaSobras:r.areaSobras};
-    });
+      // Um grupo tambem nao se divide entre DOIS ROLOS: rolos diferentes sao
+      // lotes diferentes, e lote diferente e tom diferente. Por isso cada
+      // rolo recebe so grupos completos.
+      let restam=grupos.slice();
+      const fontesRolo=[], usadosAqui=[], gruposPorFonte=[];
+      for(const r of lista){
+        if(!restam.length) break;
+        const f={id:'rolo:'+r.id, fonte:'rolo', largura:r.largura, alturaMax:r.saldo};
+        const t=encaixarGruposCompletos(restam,f,params);
+        if(!t) continue;
+        restam=restam.filter(g=>!t.grupos.includes(g));
+        fontesRolo.push(f); usadosAqui.push(r); gruposPorFonte.push(t.grupos);
+      }
+      // A conta da simulacao soma os pedacos, cada um calculado na SUA fonte
+      // e so com os grupos que couberam la. Calcular tudo junto de novo
+      // deixaria o encaixe livre para dividir um pedido entre dois rolos —
+      // exatamente o que a regra do tom unico existe para impedir.
+      const soma=combinar(fontesRolo.map((f,i)=>
+        encaixe.planejar(gruposPorFonte[i].flatMap(g=>g.pecas),[f],params)));
+      return {largura, rolos:usadosAqui, fontesRolo, gruposPorFonte,
+        desperdicio:soma.desperdicio, consumoLinear:soma.consumoLinear, consumoM2:soma.consumoM2,
+        naoAlocadas:restam.flatMap(g=>g.pecas).length, areaSobras:soma.areaSobras};
+    }).filter(s=>s.fontesRolo.length);
 
     // VENCE A MENOR DESPERDICIO. Empate: menor consumo linear. E nunca a mais
     // larga por padrao — a de 2,00 bate a de 2,50 no exemplo do 6.4.
@@ -110,16 +170,32 @@ function calcular(pedido){
       (a.consumoLinear-b.consumoLinear) || (a.largura-b.largura));
 
     bobina=simulacoes[0];
-    bobina.fontesRolo.forEach((f,i)=>{
+    if(bobina) bobina.fontesRolo.forEach((f,i)=>{
       fontes.push(f);
-      usadas.push({tipo:'rolo', ref:bobina.rolos[i], fonteId:f.id});
+      usadas.push({tipo:'rolo', ref:bobina.rolos[i], fonteId:f.id, fonte:f,
+        grupos:bobina.gruposPorFonte[i]});
+      grupos=grupos.filter(g=>!bobina.gruposPorFonte[i].includes(g));
     });
   }
 
-  // ── 3. O PLANO FINAL, calculado de uma vez com as fontes escolhidas ────
-  // Recalcular tudo junto (em vez de somar os pedacos) e o que garante que o
-  // desperdicio mostrado e o desperdicio do plano inteiro.
-  const r=encaixe.planejar(pecas,fontes,params);
+  // ── 3. O PLANO FINAL, fonte por fonte ─────────────────────────────────
+  // Cada fonte e calculada SO com os grupos que foram atribuidos a ela, e os
+  // pedacos sao somados. Nao da para recalcular tudo junto: o encaixe nao
+  // conhece pedido nenhum e dividiria um cliente entre duas fontes.
+  const r=combinar(usadas.map(u=>encaixe.planejar(u.grupos.flatMap(g=>g.pecas),[u.fonte],params)));
+  // O que sobrou sem fonte volta marcado, com o motivo.
+  const semLugar=grupos.flatMap(g=>g.pecas);
+  if(semLugar.length){
+    const larguraMaxima=[...disponiveis.map(s=>s.largura),...rolos.map(x=>x.largura)]
+      .reduce((m,v)=>Math.max(m,v),0);
+    semLugar.forEach(p=>r.pecasNaoAlocadas.push({id:p.id, largura:p.largura, altura:p.altura,
+      motivo: p.largura>larguraMaxima+TOL
+        ? (larguraMaxima?'nenhuma bobina em estoque tem largura ≥ '+fmt(p.largura)
+                        :'nao ha bobina nem sobra deste tecido em estoque')
+        : (p.pedido
+            ? 'o pedido '+p.pedido+' inteiro nao coube em nenhuma fonte, e pecas do mesmo pedido nao se separam'
+            : 'nao sobrou material para esta peca')}));
+  }
 
   // ── 4. VESTE O RESULTADO PARA A TELA ──────────────────────────────────
   const porFonte=new Map(usadas.map(u=>[u.fonteId,u]));
@@ -191,12 +267,41 @@ function calcular(pedido){
   return proposta;
 }
 
+// Soma os resultados de cada fonte num resultado so. O desperdicio e
+// aditivo: consumo, area de peca e area de sobra somam, e a formula do 6.4
+// aplicada a soma da o mesmo que a soma das formulas.
+function combinar(partes){
+  const r={faixas:[], pecasNaoAlocadas:[], sobrasGeradas:[], refugos:[],
+    consumoLinear:0, consumoM2:0, areaPecas:0, areaSobras:0, areaRefugo:0, desperdicio:0};
+  partes.forEach(p=>{
+    p.faixas.forEach(f=>r.faixas.push(f));
+    p.pecasNaoAlocadas.forEach(x=>r.pecasNaoAlocadas.push(x));
+    p.sobrasGeradas.forEach(x=>r.sobrasGeradas.push(x));
+    p.refugos.forEach(x=>r.refugos.push(x));
+    ['consumoLinear','consumoM2','areaPecas','areaSobras','areaRefugo','desperdicio']
+      .forEach(k=>{ r[k]=arred(r[k]+p[k]); });
+  });
+  // O indice da faixa muda ao juntar as partes; os restos apontam para ela.
+  let deslocamento=0;
+  partes.forEach(p=>{
+    p.sobrasGeradas.concat(p.refugos).forEach(x=>{
+      if(x.faixa!==undefined&&x.faixa!==null&&x._ajustado!==true){
+        x.faixa+=deslocamento; x._ajustado=true;
+      }
+    });
+    deslocamento+=p.faixas.length;
+  });
+  r.faixas.forEach((f,i)=>{ f.ordem=i; });
+  return r;
+}
+
 // A assinatura amarra a proposta ao estoque que ela viu. Entre calcular e
 // confirmar, outro cortador pode ter usado a mesma sobra — e confirmar as
 // cegas baixaria um plano que ja nao existe.
 function assinar(p){
   const alma=JSON.stringify({
     t:p.tecido.id,
+    g:p.pecas.map(x=>[x.id,x.pedido||'']),
     f:p.faixas.map(f=>[f.fonte,f.fonte_id,f.altura,f.largura_usada,f.pecas.map(x=>x.id)]),
     s:p.sobras_geradas.map(s=>[s.largura,s.altura]),
     c:p.consumo_linear
@@ -254,8 +359,9 @@ function confirmar(pedido,usuarioNome){
       (plano_id,ordem,fonte,rolo_id,sobra_id,largura_disponivel,altura,largura_usada,sobra_gerada_codigo)
       VALUES(?,?,?,?,?,?,?,?,?)`);
     const gravaPeca=db.prepare(`INSERT INTO plano_peca
-      (plano_id,ordem,tecido_id,largura,altura,faixa_id,pos_x,nao_alocada_motivo)
-      VALUES(?,?,?,?,?,?,?,?)`);
+      (plano_id,ordem,tecido_id,largura,altura,faixa_id,pos_x,nao_alocada_motivo,pedido)
+      VALUES(?,?,?,?,?,?,?,?,?)`);
+    const pedidoDe=id=>{ const x=p.pecas.find(y=>y.id===id); return x&&x.pedido?x.pedido:null; };
 
     const faixaIds=[];
     p.faixas.forEach(f=>{
@@ -264,12 +370,12 @@ function confirmar(pedido,usuarioNome){
         f.largura_disponivel,f.altura,f.largura_usada,null);
       faixaIds[f.ordem]=r.lastInsertRowid;
       f.pecas.forEach(pc=>gravaPeca.run(plano_id,pc.id,p.tecido.id,pc.largura,pc.altura,
-        r.lastInsertRowid,pc.x,null));
+        r.lastInsertRowid,pc.x,null,pedidoDe(pc.id)));
     });
     // A peca que nao coube fica gravada com o motivo — o plano guarda o que
     // NAO deu certo tambem, senao o historico so conta a metade boa.
     p.pecas_nao_alocadas.forEach(pc=>
-      gravaPeca.run(plano_id,pc.id,p.tecido.id,pc.largura,pc.altura,null,null,pc.motivo));
+      gravaPeca.run(plano_id,pc.id,p.tecido.id,pc.largura,pc.altura,null,null,pc.motivo,pedidoDe(pc.id)));
 
     // As sobras usadas saem INTEIRAS (R12), mesmo carregando varias pecas.
     p.sobras_sugeridas.forEach(s=>sobra.marcarUsada(s.id,plano_id,usuarioNome));

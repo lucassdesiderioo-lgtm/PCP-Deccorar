@@ -65,7 +65,7 @@ const memoria={
 const estado={
   tecidos:[], motivos:[], arvoreSobra:[],
   tecido_id:memoria.get('tecido'),
-  linhas:[{largura:'',altura:''},{largura:'',altura:''},{largura:'',altura:''}],
+  linhas:[{pedido:'',largura:'',altura:''},{pedido:'',largura:'',altura:''},{pedido:'',largura:'',altura:''}],
   recusadas:[], proposta:null,
   nivelSobra:memoria.get('nivelSobra')
 };
@@ -115,25 +115,30 @@ async function telaEntrada(){
 
   // A grade de medidas
   const tab=el('table',{class:'grade'});
-  tab.appendChild(el('tr',{},[el('th',{texto:'#'}),el('th',{texto:'Largura (m)'}),
-    el('th',{texto:'Altura (m)'}),el('th',{texto:''})]));
+  tab.appendChild(el('tr',{},[el('th',{texto:'#'}),el('th',{texto:'Pedido'}),
+    el('th',{texto:'Largura do corte (m)'}),
+    el('th',{texto:'Altura do corte (m)'}),el('th',{texto:'Cliente'}),el('th',{texto:''})]));
   estado.linhas.forEach((lin,i)=>{
-    const iL=el('input',{type:'text',inputmode:'decimal',value:lin.largura,placeholder:'0,90'});
-    const iA=el('input',{type:'text',inputmode:'decimal',value:lin.altura,placeholder:'2,50'});
+    const iP=el('input',{type:'text',value:lin.pedido||'',placeholder:'4292-1',
+      style:'width:120px;font-size:16px'});
+    const iL=el('input',{type:'text',inputmode:'decimal',value:lin.largura,placeholder:'1,465'});
+    const iA=el('input',{type:'text',inputmode:'decimal',value:lin.altura,placeholder:'1,650'});
+    iP.addEventListener('input',()=>{ lin.pedido=iP.value; });
     iL.addEventListener('input',()=>{ lin.largura=iL.value; });
     iA.addEventListener('input',()=>{ lin.altura=iA.value; });
     // Enter na altura abre a proxima linha: digitar sem tirar a mao do teclado.
     iA.addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ ev.preventDefault();
-      if(i===estado.linhas.length-1){ estado.linhas.push({largura:'',altura:''}); telaEntrada();
+      if(i===estado.linhas.length-1){ estado.linhas.push({pedido:'',largura:'',altura:''}); telaEntrada();
         setTimeout(()=>{ const ins=$('#entrada').querySelectorAll('.grade input');
-          if(ins[ins.length-2]) ins[ins.length-2].focus(); },0);
-      } else { const ins=$('#entrada').querySelectorAll('.grade input'); ins[(i+1)*2].focus(); }
+          if(ins[ins.length-2]) ins[ins.length-2].focus(); },0);   // largura da linha nova
+      } else { const ins=$('#entrada').querySelectorAll('.grade input'); ins[(i+1)*3].focus(); }
     }});
     tab.appendChild(el('tr',{},[
-      el('td',{texto:String(i+1)}), el('td',{},[iL]), el('td',{},[iA]),
+      el('td',{texto:String(i+1)}), el('td',{},[iP]), el('td',{},[iL]), el('td',{},[iA]),
+      el('td',{class:'quem',texto:lin.cliente||''}),
       el('td',{},[el('button',{class:'bt pequeno',texto:'✕',onclick:()=>{
         estado.linhas.splice(i,1);
-        if(!estado.linhas.length) estado.linhas.push({largura:'',altura:''});
+        if(!estado.linhas.length) estado.linhas.push({pedido:'',largura:'',altura:''});
         telaEntrada(); }})])
     ]));
   });
@@ -141,19 +146,22 @@ async function telaEntrada(){
 
   const acoes=el('div',{class:'campos',style:'margin-top:10px;align-items:center'});
   acoes.appendChild(el('button',{class:'bt',texto:'+ linha',onclick:()=>{
-    estado.linhas.push({largura:'',altura:''}); telaEntrada(); }}));
+    estado.linhas.push({pedido:'',largura:'',altura:''}); telaEntrada(); }}));
 
   // FASE 8: o upload preenche a MESMA grade, editavel antes de calcular.
-  const arq=el('input',{type:'file',accept:'.csv,.txt,.tsv',style:'display:none'});
+  const arq=el('input',{type:'file',accept:'.pdf,.csv,.txt,.tsv',style:'display:none'});
   arq.addEventListener('change',async()=>{
     const f=arq.files[0]; if(!f) return;
-    const texto=await f.text();
-    const lidas=lerArquivo(texto);
-    if(!lidas.length) return banner('Nao encontrei medidas neste arquivo.','erro');
-    estado.linhas=lidas; estado.proposta=null;
-    banner(lidas.length+' medida(s) carregada(s). Confira antes de calcular.');
-    telaEntrada(); limpar($('#saida'));
-    arq.value='';
+    try{
+      if(/\.pdf$/i.test(f.name)) await lerEtiquetas(f);
+      else {
+        const lidas=lerArquivo(await f.text());
+        if(!lidas.length) return banner('Nao encontrei medidas neste arquivo.','erro');
+        estado.linhas=lidas; estado.proposta=null;
+        banner(lidas.length+' medida(s) carregada(s). Confira antes de calcular.');
+        telaEntrada(); limpar($('#saida'));
+      }
+    } finally { arq.value=''; }
   });
   acoes.appendChild(arq);
   acoes.appendChild(el('button',{class:'bt',texto:'Subir arquivo',onclick:()=>arq.click()}));
@@ -163,7 +171,35 @@ async function telaEntrada(){
   acoes.appendChild(btCalc);
   c.appendChild(acoes);
   c.appendChild(el('p',{class:'ajuda',texto:
-    'O arquivo pode ser CSV ou texto: o sistema pega os dois primeiros numeros de cada linha (1,90 x 2,60 · 1,90;2,60 · 1,90<tab>2,60). As medidas entram na grade e podem ser corrigidas antes de calcular.'}));
+    'MEDIDA DO CORTE, não a da persiana acabada. No PDF de etiquetas é a que aparece entre parênteses na via COLEÇÃO: 2.417 M2 - (1.465x1.650).'}));
+  c.appendChild(el('p',{class:'ajuda',texto:
+    'PEDIDO: peças com o mesmo número de pedido saem sempre da MESMA fonte — nunca uma na sobra e outra na bobina, porque o tom pode não bater e o cliente vê as duas na mesma parede. Peça sem pedido é livre.'}));
+  c.appendChild(el('p',{class:'ajuda',texto:
+    'O arquivo pode ser o PDF de etiquetas de produção (o sistema lê a via COLEÇÃO de cada item) ou um CSV/texto com dois números por linha. Em qualquer caso as medidas caem nesta grade e podem ser corrigidas antes de calcular — digitar continua sempre disponível.'}));
+}
+
+// O PDF de etiquetas de producao. O servidor le a via COLEÇÃO de cada item e
+// devolve a MEDIDA DO CORTE — nunca a medida acabada, que e outra coisa.
+async function lerEtiquetas(f){
+  const base64=await new Promise((ok,erro)=>{
+    const r=new FileReader();
+    r.onload=()=>ok(String(r.result).split(',')[1]);
+    r.onerror=erro; r.readAsDataURL(f);
+  });
+  const pecas=await api('/api/planos/ler-arquivo',{metodo:'POST',corpo:{arquivo:base64}});
+  estado.linhas=pecas.map(p=>({
+    pedido:p.pedido, cliente:p.cliente,
+    largura:String(p.largura).replace('.',','), altura:String(p.altura).replace('.',','),
+    acabada:p.acabada
+  }));
+  // Se a etiqueta disser de que tecido e, ja deixa escolhido — sem tirar do
+  // operador o botao que confirma.
+  const comTecido=pecas.find(p=>p.tecido_id);
+  if(comTecido){ estado.tecido_id=comTecido.tecido_id; memoria.set('tecido',comTecido.tecido_id); }
+  estado.proposta=null;
+  banner(pecas.length+' peça(s) lida(s) da etiqueta'+
+    (comTecido?' · tecido: '+comTecido.tecido_sugerido:'')+'. Confira antes de calcular.','bom',6);
+  telaEntrada(); limpar($('#saida'));
 }
 
 // Leitor tolerante: pega os dois primeiros numeros de cada linha e ignora
@@ -186,7 +222,8 @@ function lerArquivo(texto){
 
 // ── O CALCULO ────────────────────────────────────────────────────────────
 async function calcular(){
-  const pecas=estado.linhas.filter(l=>comoNumero(l.largura)!==null&&comoNumero(l.altura)!==null);
+  const pecas=estado.linhas.filter(l=>comoNumero(l.largura)!==null&&comoNumero(l.altura)!==null)
+    .map(l=>({pedido:l.pedido||'', cliente:l.cliente||'', largura:l.largura, altura:l.altura}));
   if(!pecas.length) return banner('Digite pelo menos uma medida.','alerta');
   if(!estado.tecido_id) return banner('Escolha o tecido.','alerta');
   try{
@@ -380,13 +417,14 @@ async function confirmar(campos,bt){
   try{
     const r=await api('/api/planos/confirmar',{metodo:'POST',corpo:{
       tecido_id:estado.tecido_id,
-      pecas:estado.linhas.filter(l=>comoNumero(l.largura)!==null&&comoNumero(l.altura)!==null),
+      pecas:estado.linhas.filter(l=>comoNumero(l.largura)!==null&&comoNumero(l.altura)!==null)
+        .map(l=>({pedido:l.pedido||'', cliente:l.cliente||'', largura:l.largura, altura:l.altura})),
       recusadas:estado.recusadas, assinatura:p.assinatura, etiquetas, origem:'digitado'}});
     beep();
     banner('Plano '+r.plano_id+' confirmado: '+formatarMetros(r.consumo_linear)+
       ' do rolo e '+r.sobras_criadas+' sobra(s) nova(s) na prateleira.','bom',6);
     estado.proposta=null; estado.recusadas=[];
-    estado.linhas=[{largura:'',altura:''}];
+    estado.linhas=[{pedido:'',largura:'',altura:''}];
     limpar($('#saida')); telaEntrada();
   }catch(e){ beep('erro'); }
   bt.disabled=false;

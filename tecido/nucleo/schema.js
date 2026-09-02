@@ -254,9 +254,23 @@ CREATE TABLE plano_recusa (
    folgado. Se a prateleira encher de tirinha, o diretor sobe este numero sem
    programador — e sem mexer na regra da largura, que e outra decisao. */
 INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem)
-VALUES('alturaMinimaSobra','0.00','numero','Altura minima da sobra',
- 'Resto com altura ABAIXO deste valor vira refugo, mesmo que a largura passe. Nasce zero porque a regra da casa e clara: os 80 cm valem so para a largura. Suba este numero se a prateleira comecar a encher de tiras baixas — uma faixa de 1,90 x 0,10 tem largura de sobra e utilidade de refugo.',
+VALUES('alturaMinimaSobra','1.00','numero','Altura minima da sobra',
+ 'Resto com altura ABAIXO deste valor vira refugo, mesmo que a largura passe folgado. Vale 1,00 m porque persiana mais baixa que isso praticamente nao sai da fabrica: uma faixa de 1,90 x 0,10 tem largura de sobra e utilidade de lixo, e contada como sobra ela faria o desperdicio parecer menor do que e.',
  'm',4);
+`
+},
+
+{n:3, nome:'tom unico por pedido e altura minima de 1 m', sql:`
+/* O PEDIDO na peca do plano. Sem ele o sistema nao tem como saber quais
+   pecas sao do MESMO cliente — e e essa a informacao que impede a persiana
+   da sala sair de uma sobra e a do quarto sair da bobina, com tom diferente
+   entre elas. Uma peca sem pedido e um grupo de uma peca so: livre. */
+ALTER TABLE plano_peca ADD COLUMN pedido TEXT;
+
+/* Altura minima da sobra: 1,00 m, decidido pelo dono. Abaixo disso o resto
+   e refugo mesmo que a largura passe folgado — uma faixa de 1,90 x 0,10 tem
+   largura de sobra e utilidade de lixo. */
+UPDATE parametro SET valor='1.00' WHERE chave='alturaMinimaSobra' AND valor='0.00';
 `}
 
 ];
