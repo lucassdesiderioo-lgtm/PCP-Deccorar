@@ -23,7 +23,12 @@
   .hide{display:none}
   /* A porta para o modulo de tecido. Fica na tela de login porque e onde o
      tablet da bancada ja esta parado — e o cortador nao tem que decorar
-     endereco nenhum. E outro sistema, com PIN proprio, e a tela diz isso. */
+     endereco nenhum. E outro sistema, com PIN proprio, e a tela diz isso.
+
+     target="_top" NAO e detalhe: o /admin monta as telas em IFRAME, e a
+     sessao que expira dentro de um deles traz este login para dentro do
+     quadro. Sem o _top o clique navega so o iframe, e o operador ve o botao
+     "nao fazer nada". */
   .outro{margin-top:26px;padding-top:20px;border-top:1px solid #2a2f3a}
   .outro a{display:block;padding:18px 14px;background:#1c1f28;border:1px solid #f0b429;
      border-radius:14px;color:#f0b429;font-size:17px;font-weight:700;text-align:center;
@@ -37,7 +42,7 @@
     <div class="sub">Toque no seu nome</div>
     <div class="nomes" id="nomes"></div>
     <div class="outro">
-      <a id="tecido" href="#">Plano de corte &mdash; tecido sob medida</a>
+      <a id="tecido" href="#" target="_top">Plano de corte &mdash; tecido sob medida</a>
       <div class="obs">Outro sistema, com PIN proprio</div>
     </div>
   </div>
