@@ -8,10 +8,15 @@ tecido.db-shm
 tecido.db-wal
 tecido.db.*
 
-# Banco descartavel do runner de testes
-teste/.teste.db
-teste/.teste.db-shm
-teste/.teste.db-wal
+# Bancos descartaveis do runner de testes (um por arquivo de teste)
+teste/.teste*.db
+teste/.teste*.db-shm
+teste/.teste*.db-wal
+
+# Banco de demonstracao
+demo.db
+demo.db-shm
+demo.db-wal
 
 node_modules/
 *.bak-*

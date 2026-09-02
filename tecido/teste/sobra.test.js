@@ -32,6 +32,7 @@ module.exports=[
   const lote=etiqueta.imprimirLote(5,'Diretor');
   igual(lote.codigos[0],'S-000001','primeira etiqueta');
   igual(lote.codigos[4],'S-000005','ultima etiqueta');
+  igual(lote.codigos.length,5,'cinco codigos');
   igual(etiqueta.pendentes().length,5,'todas impressas estao pendentes');
   // O lote seguinte continua de onde o anterior parou.
   const dois=etiqueta.imprimirLote(3,'Diretor');

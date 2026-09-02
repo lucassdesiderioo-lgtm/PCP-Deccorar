@@ -18,9 +18,9 @@ npm test         # testes de domínio, sem servidor
 
 | # | Pergunta | Onde | Fase |
 |---|---|---|---|
-| 1 | Quanto eu tenho do tecido X? | saldo por rolo, com endereço | 5 |
+| 1 | Quanto eu tenho do tecido X? | saldo por rolo, com endereço | **pronta** |
 | 2 | Que sobras eu tenho do tecido X? | medida, condição, endereço | **pronta** |
-| 3 | Estas medidas — **como cortar?** | plano com o encaixe desenhado | 3, 4 e 6 |
+| 3 | Estas medidas — **como cortar?** | plano com o encaixe desenhado | **pronta** |
 
 ---
 
@@ -30,12 +30,12 @@ npm test         # testes de domínio, sem servidor
 |---|---|---|
 | 1 | Esqueleto (núcleo, registro, schema, `base.css`, `ui.js`) + Cadastros + Parâmetros | **pronta** |
 | 2 | Cadastro de sobra + mutirão + etiquetas | **pronta** |
-| 3 | `encaixe.js` + testes (a tabela do 6.4) | a fazer |
-| 4 | Plano de corte só nas sobras | a fazer |
-| 5 | Rolo: entrada, saldo, acerto no fim | a fazer |
-| 6 | Plano completo: bobinas + recusa + sobra gerada | a fazer |
-| 7 | Painel e relatórios | a fazer |
-| 8 | Upload do arquivo de medidas | a fazer |
+| 3 | `encaixe.js` + testes (a tabela do 6.4) | **pronta** |
+| 4 | Plano de corte só nas sobras | **pronta** |
+| 5 | Rolo: entrada, saldo, acerto no fim | **pronta** |
+| 6 | Plano completo: bobinas + recusa + sobra gerada | **pronta** |
+| 7 | Painel e relatórios | **pronta** |
+| 8 | Upload do arquivo de medidas | **pronta** (leitor genérico — ver abaixo) |
 
 ---
 
@@ -108,7 +108,7 @@ nucleo/                infraestrutura — nao sabe nada de tecido
   db · schema · erros · dia · registro · config · auth · permissoes
 dominio/               a regra — nao conhece Express, req nem res
   tecido · endereco · motivo · usuario · sobra · etiqueta
-  (a chegar: rolo · encaixe · plano)
+  rolo · encaixe (funcao pura) · plano · painel
 dados/                 o SQL. Uma tabela, um arquivo. Nao decide nada
 rotas/                 declaracoes. Sem SQL, sem `if` de negocio
 public/                base.css (tokens) · ui.js · barras.js · login · telas/
@@ -123,7 +123,8 @@ teste/                 rodar.js + *.test.js — banco temporario, do zero
 |---|---|---|
 | `larguraMinimaSobra` | 0,80 m | Resto com largura abaixo disso é refugo em vez de sobra. Vale **só para a largura** |
 | `pesoSobra` | 0,50 | Quanto da sobra gerada conta como material recuperado. **A única variável de julgamento do módulo** |
-| `margem` | 0,00 m | Folga entre peças e nas bordas |
+| `margem` | 0,00 m | Folga entre peças (a fórmula do 6.2 aplica entre peças, não nas bordas) |
+| `alturaMinimaSobra` | 0,00 m | Resto com altura abaixo disso é refugo mesmo com largura boa. Nasce zero — "altura não tem mínimo" |
 
 `pesoSobra` responde a uma pergunta de fábrica: *o retalho que vai pra
 prateleira volta a ser usado, ou encalha?* Metade é o palpite honesto de quem
@@ -169,3 +170,51 @@ para a largura, `Enter` na altura salva, e o foco volta sozinho para o código.
 Uma trava que parece exagero e não é: **largura de 190 é recusada**. O campo
 fala metros, e 190 no lugar de 1,90 entraria calado e viraria um retalho de
 190 metros na prateleira.
+
+---
+
+## O plano de corte
+
+```
+ENTRADA: tecido (3 toques) + medidas (grade ou arquivo)
+   ↓
+1. SOBRA PRIMEIRO, sempre — a política da casa
+2. o que sobrou vai para o rolo, simulando TODAS as larguras
+3. peça que não cabe volta MARCADA, com o motivo
+   ↓
+proposta desenhada  →  [não usar] recalcula  →  [Confirmar] baixa tudo
+```
+
+**Nada baixa antes do Confirmar**, e o Confirmar é uma transação só: sobra
+usada, rolo consumido, sobras novas cadastradas e refugo medido — ou nada.
+
+**A proposta é assinada.** Entre calcular e confirmar, outra pessoa pode ter
+usado a mesma sobra; o Confirmar recalcula, compara a assinatura, e recusa se
+o estoque mudou. O cliente manda o *pedido*, nunca o plano — ninguém confirma
+um plano fabricado.
+
+**A sobra que vai nascer é cadastrada dentro do Confirmar**, com a medida já
+calculada e a etiqueta que o operador colou. É isso que fecha o ciclo sem
+depender de disciplina: não existe tela separada para alguém esquecer.
+
+**A recusa é gravada na hora**, mesmo que o corte não aconteça — ela é
+diagnóstico, não papelada do plano.
+
+### Um ponto para você decidir
+
+Aplicar a regra dos 80 cm ao **pé de uma sobra** transforma uma tira de
+`1,90 × 0,10` em sobra com etiqueta: a largura passa folgado, e a regra diz
+que altura não tem mínimo. Está assim porque é o que a regra manda. Se a
+prateleira começar a encher de tirinha, suba `alturaMinimaSobra` em
+Cadastros → Parâmetros — sem mexer na regra da largura, que é outra decisão.
+
+## O upload (fase 8)
+
+O leitor pega **os dois primeiros números de cada linha** e ignora cabeçalho e
+colunas extras — funciona com `1,90 x 2,60`, `1,90;2,60` ou separado por Tab,
+em `.csv` ou `.txt`. Números grandes demais para metro são lidos como
+centímetros. As medidas entram na **mesma grade**, editáveis antes de calcular.
+
+> Quando você mandar um exemplar do arquivo real da etiqueta de corte (a
+> pendência 2 da especificação), é só o leitor que muda — a grade e a tela
+> ficam como estão.

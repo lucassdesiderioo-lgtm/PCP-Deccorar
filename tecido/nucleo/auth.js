@@ -10,7 +10,10 @@ const TELAS={
   '/inicio':    {arquivo:'telas/inicio.html',    permissao:'cadastro.ler'},
   '/cadastros': {arquivo:'telas/cadastros.html', permissao:'cadastro.ler'},
   '/sobras':    {arquivo:'telas/sobras.html',    permissao:'sobra.ler'},
-  '/etiquetas': {arquivo:'telas/etiquetas.html', permissao:'etiqueta.imprimir'}
+  '/etiquetas': {arquivo:'telas/etiquetas.html', permissao:'etiqueta.imprimir'},
+  '/rolos':     {arquivo:'telas/rolos.html',     permissao:'rolo.ler'},
+  '/corte':     {arquivo:'telas/corte.html',     permissao:'plano.calcular'},
+  '/painel':    {arquivo:'telas/painel.html',    permissao:'painel.ler'}
 };
 const LIVRE=['/login','/favicon.ico','/base.css','/ui.js','/barras.js'];
 

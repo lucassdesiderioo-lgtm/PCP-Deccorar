@@ -27,6 +27,7 @@ const ler=chave=>{
 const paramsDeCorte=()=>({
   margem:ler('margem'),
   larguraMinimaSobra:ler('larguraMinimaSobra'),
+  alturaMinimaSobra:ler('alturaMinimaSobra'),
   pesoSobra:ler('pesoSobra')
 });
 

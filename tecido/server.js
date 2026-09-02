@@ -24,10 +24,18 @@ registro.montar(app,db,[
   require('./rotas/cadastros'),
   require('./rotas/parametros'),
   require('./rotas/usuarios'),
-  require('./rotas/sobras')
+  require('./rotas/sobras'),
+  require('./rotas/rolos'),
+  require('./rotas/planos'),
+  require('./rotas/painel')
 ]);
 
 app.use(express.static(path.join(__dirname,'public')));
+
+// Criterio 13 da secao 10: a soma dos movimentos tem que dar o saldo de cada
+// rolo. Nao trava o boot — reclama alto no log. Saldo que nao bate com a
+// propria historia e o comeco de um inventario em que ninguem confia.
+require('./dominio/rolo').conferirSaldos();
 
 const PORTA=process.env.PORTA||3020;
 if(require.main===module) app.listen(PORTA,()=>console.log('[tecido] no ar na porta '+PORTA+' — banco '+db.arquivo));

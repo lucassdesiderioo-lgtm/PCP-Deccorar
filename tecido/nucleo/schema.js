@@ -244,6 +244,19 @@ CREATE TABLE plano_recusa (
   criado_em TEXT DEFAULT (datetime('now','localtime')),
   data TEXT DEFAULT (date('now','localtime'))
 );
+`
+},
+
+{n:2, nome:'altura minima da sobra', sql:`
+/* Nasce 0 — "altura nao tem minimo", exatamente como a regra dos 80 cm foi
+   decidida. O parametro existe porque a regra, aplicada ao pe de uma sobra,
+   transforma uma tira de 1,90 x 0,10 em sobra com etiqueta: a largura passa
+   folgado. Se a prateleira encher de tirinha, o diretor sobe este numero sem
+   programador — e sem mexer na regra da largura, que e outra decisao. */
+INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem)
+VALUES('alturaMinimaSobra','0.00','numero','Altura minima da sobra',
+ 'Resto com altura ABAIXO deste valor vira refugo, mesmo que a largura passe. Nasce zero porque a regra da casa e clara: os 80 cm valem so para a largura. Suba este numero se a prateleira comecar a encher de tiras baixas — uma faixa de 1,90 x 0,10 tem largura de sobra e utilidade de refugo.',
+ 'm',4);
 `}
 
 ];
