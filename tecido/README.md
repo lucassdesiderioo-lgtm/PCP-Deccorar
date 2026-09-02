@@ -19,7 +19,7 @@ npm test         # testes de domínio, sem servidor
 | # | Pergunta | Onde | Fase |
 |---|---|---|---|
 | 1 | Quanto eu tenho do tecido X? | saldo por rolo, com endereço | 5 |
-| 2 | Que sobras eu tenho do tecido X? | medida, condição, endereço | 2 |
+| 2 | Que sobras eu tenho do tecido X? | medida, condição, endereço | **pronta** |
 | 3 | Estas medidas — **como cortar?** | plano com o encaixe desenhado | 3, 4 e 6 |
 
 ---
@@ -29,7 +29,7 @@ npm test         # testes de domínio, sem servidor
 | Fase | O quê | Estado |
 |---|---|---|
 | 1 | Esqueleto (núcleo, registro, schema, `base.css`, `ui.js`) + Cadastros + Parâmetros | **pronta** |
-| 2 | Cadastro de sobra + mutirão do acervo | a fazer |
+| 2 | Cadastro de sobra + mutirão + etiquetas | **pronta** |
 | 3 | `encaixe.js` + testes (a tabela do 6.4) | a fazer |
 | 4 | Plano de corte só nas sobras | a fazer |
 | 5 | Rolo: entrada, saldo, acerto no fim | a fazer |
@@ -107,11 +107,11 @@ server.js              sobe o banco, monta o registro, escuta
 nucleo/                infraestrutura — nao sabe nada de tecido
   db · schema · erros · dia · registro · config · auth · permissoes
 dominio/               a regra — nao conhece Express, req nem res
-  tecido · endereco · motivo · usuario
-  (a chegar: rolo · sobra · encaixe · plano)
+  tecido · endereco · motivo · usuario · sobra · etiqueta
+  (a chegar: rolo · encaixe · plano)
 dados/                 o SQL. Uma tabela, um arquivo. Nao decide nada
 rotas/                 declaracoes. Sem SQL, sem `if` de negocio
-public/                base.css (tokens) · ui.js · login · telas/
+public/                base.css (tokens) · ui.js · barras.js · login · telas/
 teste/                 rodar.js + *.test.js — banco temporario, do zero
 ```
 
@@ -129,3 +129,43 @@ teste/                 rodar.js + *.test.js — banco temporario, do zero
 prateleira volta a ser usado, ou encalha?* Metade é o palpite honesto de quem
 ainda não tem histórico. Depois de alguns meses o relatório de encalhe responde
 melhor que qualquer chute — e mudar é um campo, não uma linha de código.
+
+---
+
+## A etiqueta da sobra
+
+O sistema **imprime** o lote (Etiquetas → quantidade → folha em A4 para
+recortar), guarda a sequência, e a sobra nasce quando o cortador **bipa** a
+etiqueta colada. Três consequências:
+
+- **"Colada e não cadastrada" é exata.** É o que foi impresso menos o que
+  voltou da bancada — não um palpite sobre lacunas na numeração.
+- **Etiqueta que o sistema não imprimiu é recusada**, com a frase que ensina o
+  caminho. Aceitar código desconhecido encheria o acervo de retalho que não
+  existe na prateleira.
+- **A mesma etiqueta não cola em duas sobras.** A conferência acontece *antes*
+  de qualquer gravação: se fosse depois, quem recusaria seria o `UNIQUE` do
+  SQLite, e a bancada leria "deu erro aqui dentro" em vez de "cole outra".
+
+O código de barras é **CODE128-B gerado aqui** (`public/barras.js`), sem
+biblioteca. A tabela de padrões foi conferida contra uma implementação de
+referência e o teste repete a conferência estrutural a cada rodada — 106
+padrões de 11 módulos, barras somando par, nenhum repetido. **Uma etiqueta que
+não bipa é uma etiqueta que não existe**, e o erro só apareceria na bancada,
+com a folha já impressa e colada.
+
+> Ao imprimir: margens **"Nenhuma"** e escala **100%**. "Ajustar à página"
+> deforma as barras e o leitor recusa — a mesma regra da etiqueta de SKU no PCP.
+
+## O mutirão
+
+A tela lembra **tecido, condição e endereço** entre um retalho e o seguinte
+(`localStorage`, por aparelho). Catalogando uma prateleira por vez, só mudam o
+código bipado e as duas medidas — é isso que faz o mutirão render. O bipe pula
+para a largura, `Enter` na altura salva, e o foco volta sozinho para o código.
+
+**Medido:** 30 sobras seguidas, 0 erros, ~33 ms por lançamento.
+
+Uma trava que parece exagero e não é: **largura de 190 é recusada**. O campo
+fala metros, e 190 no lugar de 1,90 entraria calado e viraria um retalho de
+190 metros na prateleira.

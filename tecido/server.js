@@ -23,7 +23,8 @@ require('./nucleo/auth')(app,db);
 registro.montar(app,db,[
   require('./rotas/cadastros'),
   require('./rotas/parametros'),
-  require('./rotas/usuarios')
+  require('./rotas/usuarios'),
+  require('./rotas/sobras')
 ]);
 
 app.use(express.static(path.join(__dirname,'public')));

@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sobras · Tecido</title>
+<link rel="stylesheet" href="/base.css">
+<style>
+/* O campo de bipe e o centro da tela: grande, visivel e sempre com o foco.
+   Campo fora da tela e campo que o iPad tira o foco — o leitor bipa e nada
+   acontece. */
+#codigo{font-size:30px; letter-spacing:.08em; text-align:center; min-height:68px}
+.medidas input{font-size:28px; text-align:center; min-height:68px}
+.contador{font-size:15px; color:var(--tinta-fraca)}
+.contador b{font-size:22px; color:var(--tinta)}
+</style>
+</head>
+<body>
+<header class="topo">
+  <h1>Sobras</h1>
+  <span class="espaco"></span>
+  <span class="quem" id="resumoTecido"></span>
+  <a class="bt pequeno" href="/etiquetas" id="linkEtiquetas" style="text-decoration:none;display:inline-flex;align-items:center">Etiquetas</a>
+  <a class="bt pequeno" href="/" style="text-decoration:none;display:inline-flex;align-items:center">Inicio</a>
+</header>
+
+<div class="corpo">
+  <div class="abas" id="abas"></div>
+  <div id="conteudo"></div>
+</div>
+
+<script src="/ui.js"></script>
+<script>
+const {api,banner,beep,el,limpar,$,num,comoNumero,formatarMedida,formatarArea}=window.ui;
+
+let eu={}, aba='lancar';
+const memoria={
+  // O que faz o mutirao render: catalogando uma prateleira por vez, o tecido
+  // e o endereco quase nao mudam entre um retalho e o seguinte.
+  get(chave){ try{ return JSON.parse(localStorage.getItem('sobra_'+chave)); }catch(e){ return null; } },
+  set(chave,v){ try{ localStorage.setItem('sobra_'+chave,JSON.stringify(v)); }catch(e){} }
+};
+
+const estado={
+  tecidos:[], condicoes:[], arvore:[], pendentes:[], ultimas:[],
+  tecido_id:memoria.get('tecido'), condicao:memoria.get('condicao'),
+  haste_id:memoria.get('haste'), andar_id:memoria.get('andar'), nivel_id:memoria.get('nivel'),
+  naSessao:0
+};
+
+const ABAS=[{id:'lancar',nome:'Lancar sobra'},{id:'lista',nome:'Catalogo'}];
+
+function montarAbas(){
+  const c=limpar($('#abas'));
+  ABAS.forEach(a=>c.appendChild(el('button',{texto:a.nome,'aria-selected':String(a.id===aba),
+    onclick:()=>{ aba=a.id; desenhar(); }})));
+}
+function desenhar(){
+  montarAbas();
+  const c=limpar($('#conteudo'));
+  return aba==='lancar'?telaLancar(c):telaLista(c);
+}
+
+function fileira(rotulo,itens,selecionado,aoEscolher){
+  const f=el('div',{class:'fileira'});
+  f.appendChild(el('span',{class:'rotulo',texto:rotulo}));
+  if(!itens.length) f.appendChild(el('span',{class:'quem',style:'align-self:center',texto:'nada cadastrado'}));
+  itens.forEach(i=>f.appendChild(el('button',{class:'op',texto:i.nome,
+    'aria-pressed':String(String(i.valor)===String(selecionado)),
+    onclick:()=>aoEscolher(i.valor)})));
+  return f;
+}
+
+// ── LANCAR ───────────────────────────────────────────────────────────────
+async function telaLancar(pai){
+  estado.tecidos=await api('/api/tecidos');
+  estado.condicoes=await api('/api/condicoes');
+  estado.arvore=await api('/api/enderecos/SOBRA');
+  estado.pendentes=await api('/api/etiquetas/pendentes');
+  pai=limpar(pai);
+
+  // Aviso de etiqueta: sem lote impresso, nao ha o que bipar.
+  if(!estado.pendentes.length){
+    const av=el('div',{class:'cartao'});
+    av.appendChild(el('h2',{texto:'Nenhuma etiqueta livre'}));
+    av.appendChild(el('p',{class:'nota',texto:
+      'A sobra nasce quando voce bipa uma etiqueta que o sistema imprimiu. Imprima um lote antes de comecar o mutirao.'}));
+    av.appendChild(el('a',{class:'bt primario',href:'/etiquetas',texto:'Imprimir etiquetas',
+      style:'text-decoration:none;display:inline-flex;align-items:center'}));
+    pai.appendChild(av);
+  }
+
+  const c=el('div',{class:'cartao'});
+  pai.appendChild(c);
+
+  // 1. o codigo — o campo que manda na tela
+  const cod=el('input',{id:'codigo',type:'text',autocomplete:'off',autocorrect:'off',
+    autocapitalize:'off',spellcheck:'false',placeholder:'bipe a etiqueta'});
+  const boxCod=el('div',{class:'campo cresce'});
+  boxCod.appendChild(el('label',{texto:'CODIGO DA ETIQUETA'}));
+  boxCod.appendChild(cod);
+  c.appendChild(el('div',{class:'campos'},[boxCod]));
+
+  const aviso=el('p',{class:'ajuda',texto:
+    estado.pendentes.length+' etiqueta(s) impressa(s) esperando ser bipada(s).'});
+  c.appendChild(aviso);
+
+  // 2. o tecido, em tres fileiras de botoes
+  const linhas=[], aberturas=[], cores=[];
+  estado.tecidos.filter(t=>t.ativo).forEach(t=>{
+    if(!linhas.some(x=>x.valor===t.linha_id)) linhas.push({valor:t.linha_id,nome:t.linha_nome});
+  });
+  const sel=estado.tecidos.find(t=>t.id===estado.tecido_id);
+  const linhaSel=sel?sel.linha_id:(linhas[0]&&linhas[0].valor);
+  estado.tecidos.filter(t=>t.ativo&&t.linha_id===linhaSel).forEach(t=>{
+    if(!aberturas.some(x=>x.valor===t.abertura_id)) aberturas.push({valor:t.abertura_id,nome:t.abertura_nome});
+  });
+  const aberturaSel=sel&&sel.linha_id===linhaSel?sel.abertura_id:(aberturas[0]&&aberturas[0].valor);
+  estado.tecidos.filter(t=>t.ativo&&t.linha_id===linhaSel&&t.abertura_id===aberturaSel)
+    .forEach(t=>cores.push({valor:t.cor_id,nome:t.cor_nome,tecido_id:t.id}));
+
+  const escolherTecido=(linha_id,abertura_id,cor_id)=>{
+    const t=estado.tecidos.find(x=>x.linha_id===linha_id&&x.abertura_id===abertura_id&&x.cor_id===cor_id)
+      ||estado.tecidos.find(x=>x.linha_id===linha_id&&x.abertura_id===abertura_id)
+      ||estado.tecidos.find(x=>x.linha_id===linha_id);
+    if(t){ estado.tecido_id=t.id; memoria.set('tecido',t.id); }
+    telaLancar($('#conteudo'));
+  };
+
+  c.appendChild(fileira('LINHA',linhas,linhaSel,v=>escolherTecido(v,null,null)));
+  c.appendChild(fileira('ABERTURA',aberturas,aberturaSel,v=>escolherTecido(linhaSel,v,null)));
+  c.appendChild(fileira('COR',cores,sel?sel.cor_id:null,v=>escolherTecido(linhaSel,aberturaSel,v)));
+
+  // 3. as medidas
+  const larg=el('input',{type:'text',inputmode:'decimal',placeholder:'1,90'});
+  const alt=el('input',{type:'text',inputmode:'decimal',placeholder:'2,60'});
+  const medidas=el('div',{class:'campos medidas'});
+  [['LARGURA (m)',larg],['ALTURA (m)',alt]].forEach(([r,input])=>{
+    const b=el('div',{class:'campo cresce'});
+    b.appendChild(el('label',{texto:r})); b.appendChild(input);
+    medidas.appendChild(b);
+  });
+  c.appendChild(medidas);
+
+  // 4. a condicao
+  c.appendChild(fileira('CONDICAO',estado.condicoes.filter(x=>x.ativo).map(x=>({valor:x.chave,nome:x.nome})),
+    estado.condicao,v=>{ estado.condicao=v; memoria.set('condicao',v); telaLancar($('#conteudo')); }));
+
+  // 5. o endereco, tres fileiras encadeadas
+  const hastes=estado.arvore.filter(h=>h.ativo).map(h=>({valor:h.id,nome:h.nome}));
+  const hasteAtual=estado.arvore.find(h=>h.id===estado.haste_id)||estado.arvore[0];
+  const andares=hasteAtual?hasteAtual.andares.filter(a=>a.ativo).map(a=>({valor:a.id,nome:a.nome})):[];
+  const andarAtual=hasteAtual&&(hasteAtual.andares.find(a=>a.id===estado.andar_id)||hasteAtual.andares[0]);
+  const niveis=andarAtual?andarAtual.niveis.filter(n=>n.ativo).map(n=>({valor:n.id,nome:n.nome})):[];
+
+  c.appendChild(fileira('HASTE',hastes,hasteAtual&&hasteAtual.id,v=>{
+    estado.haste_id=v; estado.andar_id=null; estado.nivel_id=null;
+    memoria.set('haste',v); telaLancar($('#conteudo'));
+  }));
+  c.appendChild(fileira('ANDAR',andares,andarAtual&&andarAtual.id,v=>{
+    estado.andar_id=v; estado.nivel_id=null; memoria.set('andar',v); telaLancar($('#conteudo'));
+  }));
+  c.appendChild(fileira('NIVEL',niveis,estado.nivel_id,v=>{
+    estado.nivel_id=v; memoria.set('nivel',v); telaLancar($('#conteudo'));
+  }));
+
+  // 6. salvar
+  const acao=el('div',{class:'campos',style:'margin-top:8px;align-items:center'});
+  const btSalvar=el('button',{class:'bt primario',style:'flex:1;min-height:64px;font-size:19px',
+    texto:'Salvar e proxima'});
+  acao.appendChild(btSalvar);
+  acao.appendChild(el('span',{class:'contador',html:'nesta sessao<br><b>'+estado.naSessao+'</b> sobras'}));
+  c.appendChild(acao);
+
+  async function salvar(){
+    const tecido=estado.tecidos.find(t=>t.id===estado.tecido_id);
+    if(!cod.value.trim()) return faltou('Bipe a etiqueta.',cod);
+    if(!tecido) return faltou('Escolha o tecido.',null);
+    if(comoNumero(larg.value)===null) return faltou('Digite a largura.',larg);
+    if(comoNumero(alt.value)===null) return faltou('Digite a altura.',alt);
+    if(!estado.condicao) return faltou('Escolha a condicao.',null);
+    if(!estado.nivel_id) return faltou('Escolha o endereco.',null);
+
+    btSalvar.disabled=true;
+    try{
+      const s=await api('/api/sobras',{metodo:'POST',corpo:{
+        codigo:cod.value, tecido_id:tecido.id,
+        largura:larg.value, altura:alt.value,
+        condicao:estado.condicao, nivel_id:estado.nivel_id, origem:'inventario'}});
+      estado.naSessao++;
+      estado.ultimas.unshift(s);
+      beep();
+      banner(s.codigo+' · '+formatarMedida(s.largura,s.altura)+' · '+formatarArea(s.area),'bom',3);
+      // So o que muda de um retalho para o outro e limpo. Tecido, condicao e
+      // endereco ficam — e por isso que da para catalogar uma prateleira
+      // inteira sem sair da tela.
+      cod.value=''; larg.value=''; alt.value='';
+      await telaLancar($('#conteudo'));
+    }catch(e){ beep('erro'); cod.select(); }
+    btSalvar.disabled=false;
+  }
+  function faltou(msg,campo){ banner(msg,'alerta',3); beep('erro'); if(campo) campo.focus(); }
+
+  btSalvar.onclick=salvar;
+
+  // O leitor manda Enter ou Tab e as vezes pica o codigo. Aceitamos os dois e
+  // pulamos para a largura; Enter na altura salva.
+  const pula=(de,para)=>de.addEventListener('keydown',ev=>{
+    if(ev.key==='Enter'||ev.key==='Tab'){ ev.preventDefault(); para.focus(); para.select&&para.select(); }
+  });
+  pula(cod,larg); pula(larg,alt);
+  alt.addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); salvar(); } });
+
+  // O foco volta sempre para o codigo — e onde o proximo retalho comeca.
+  if(!document.activeElement||document.activeElement===document.body) cod.focus();
+
+  // As ultimas lancadas, para conferir de relance sem trocar de aba.
+  if(estado.ultimas.length){
+    const cU=el('div',{class:'cartao'});
+    cU.appendChild(el('h2',{texto:'Ultimas nesta sessao'}));
+    const t=el('table',{});
+    estado.ultimas.slice(0,8).forEach(s=>t.appendChild(el('tr',{},[
+      el('td',{texto:s.codigo}),
+      el('td',{texto:[s.linha_nome,s.abertura_nome,s.cor_nome].join(' · ')}),
+      el('td',{class:'num',texto:formatarMedida(s.largura,s.altura)}),
+      el('td',{class:'num',texto:formatarArea(s.area)})
+    ])));
+    cU.appendChild(t);
+    pai.appendChild(cU);
+  }
+
+  // O resumo do tecido escolhido, no cabecalho.
+  const resumo=await api('/api/sobras/resumo');
+  const r=resumo.find(x=>x.tecido_id===estado.tecido_id);
+  $('#resumoTecido').textContent=r?(r.sobras+' sobras · '+formatarArea(r.area)):'';
+}
+
+// ── CATALOGO ─────────────────────────────────────────────────────────────
+async function telaLista(pai){
+  const sobras=await api('/api/sobras?status=disponivel');
+  const resumo=await api('/api/sobras/resumo');
+  const pendentes=await api('/api/etiquetas/pendentes');
+  pai=limpar(pai);
+
+  const cR=el('div',{class:'cartao'});
+  cR.appendChild(el('h2',{texto:'Sobras por tecido'}));
+  cR.appendChild(el('p',{class:'nota',texto:'Em m², por tipo e cor — o numero que evita comprar tecido que ja esta na prateleira.'}));
+  const tR=el('table',{});
+  tR.appendChild(el('tr',{},[el('th',{texto:'Tecido'}),el('th',{class:'num',texto:'Sobras'}),el('th',{class:'num',texto:'Area'})]));
+  resumo.filter(r=>r.sobras>0).forEach(r=>tR.appendChild(el('tr',{},[
+    el('td',{texto:[r.linha_nome,r.abertura_nome,r.cor_nome].join(' · ')}),
+    el('td',{class:'num',texto:String(r.sobras)}),
+    el('td',{class:'num',texto:formatarArea(r.area)})
+  ])));
+  cR.appendChild(resumo.some(r=>r.sobras>0)?tR:el('div',{class:'vazio',texto:'Nenhuma sobra catalogada ainda.'}));
+  pai.appendChild(cR);
+
+  const cP=el('div',{class:'cartao'});
+  cP.appendChild(el('h2',{texto:'Etiquetas impressas e ainda nao bipadas'}));
+  cP.appendChild(el('p',{class:'nota',texto:
+    'Nao e palpite sobre lacunas: e o que o sistema imprimiu menos o que voltou da bancada.'}));
+  cP.appendChild(pendentes.length
+    ? el('p',{texto:pendentes.length+' esperando — da '+pendentes[0].codigo+' em diante.'})
+    : el('div',{class:'vazio',texto:'Nenhuma etiqueta solta.'}));
+  pai.appendChild(cP);
+
+  const c=el('div',{class:'cartao'});
+  c.appendChild(el('h2',{texto:'Catalogo ('+sobras.length+' disponiveis)'}));
+  const t=el('table',{});
+  t.appendChild(el('tr',{},[el('th',{texto:'Etiqueta'}),el('th',{texto:'Tecido'}),
+    el('th',{class:'num',texto:'Medida'}),el('th',{class:'num',texto:'Area'}),
+    el('th',{texto:'Condicao'}),el('th',{class:'num',texto:'Parada'}),el('th',{texto:''})]));
+  sobras.forEach(s=>{
+    const acoes=[];
+    if(eu.papel==='diretor') acoes.push(el('button',{class:'bt pequeno perigo',texto:'Descartar',onclick:async()=>{
+      const motivo=prompt('Por que a sobra '+s.codigo+' esta sendo descartada?');
+      if(!motivo) return;
+      await api('/api/sobras/'+s.id+'/descartar',{metodo:'POST',corpo:{motivo}});
+      banner('Sobra descartada — a perda ficou medida no refugo.','alerta');
+      await telaLista($('#conteudo'));
+    }}));
+    t.appendChild(el('tr',{},[
+      el('td',{texto:s.codigo}),
+      el('td',{texto:[s.linha_nome,s.abertura_nome,s.cor_nome].join(' · ')}),
+      el('td',{class:'num',texto:formatarMedida(s.largura,s.altura)}),
+      el('td',{class:'num',texto:formatarArea(s.area)}),
+      el('td',{texto:s.condicao_nome||s.condicao}),
+      el('td',{class:'num',texto:s.dias_parada+' d'}),
+      el('td',{style:'text-align:right'},acoes)
+    ]));
+  });
+  c.appendChild(sobras.length?t:el('div',{class:'vazio',texto:'Nada catalogado ainda.'}));
+  pai.appendChild(c);
+}
+
+(async function(){
+  eu=await api('/api/auth/eu');
+  desenhar();
+})();
+</script>
+</body>
+</html>

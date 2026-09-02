@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Etiquetas · Tecido</title>
+<link rel="stylesheet" href="/base.css">
+<style>
+/* A folha: grade de etiquetas para recortar e colar. Em papel comum, em
+   qualquer impressora — a bancada nao tem impressora propria. */
+.folha{display:grid; grid-template-columns:repeat(3,1fr); gap:4mm; margin-top:14px}
+.etq{
+  border:1px dashed var(--linha-forte); border-radius:6px;
+  padding:6px; text-align:center; background:var(--cartao);
+  break-inside:avoid; page-break-inside:avoid;
+}
+.etq svg{display:block; margin:0 auto; max-width:100%}
+.etq .cod{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:15px;
+  font-weight:700; letter-spacing:.06em; margin-top:2px}
+.etq .marca{font-size:10px; color:var(--tinta-fraca); letter-spacing:.08em}
+
+@media print{
+  /* Impressao: margens "Nenhuma" e escala 100%. "Ajustar a pagina" deforma as
+     barras e o leitor recusa — a mesma regra da etiqueta de SKU no PCP. */
+  .topo,.abas,#painel,.naoImprime{display:none !important}
+  body{background:#fff}
+  .corpo{max-width:none;padding:0}
+  .folha{gap:3mm}
+  .etq{border:1px dashed #999}
+}
+</style>
+</head>
+<body>
+<header class="topo">
+  <h1>Etiquetas de sobra</h1>
+  <span class="espaco"></span>
+  <a class="bt pequeno" href="/sobras" style="text-decoration:none;display:inline-flex;align-items:center">Sobras</a>
+  <a class="bt pequeno" href="/" style="text-decoration:none;display:inline-flex;align-items:center">Inicio</a>
+</header>
+
+<div class="corpo">
+  <div id="painel"></div>
+  <div id="folha"></div>
+</div>
+
+<script src="/ui.js"></script>
+<script src="/barras.js"></script>
+<script>
+const {api,banner,el,limpar,$}=window.ui;
+
+async function desenhar(){
+  const lotes=await api('/api/etiquetas/lotes');
+  const pendentes=await api('/api/etiquetas/pendentes');
+  const p=limpar($('#painel'));
+
+  const c=el('div',{class:'cartao'});
+  c.appendChild(el('h2',{texto:'Imprimir um lote'}));
+  c.appendChild(el('p',{class:'nota',texto:
+    'O sistema gera a sequencia, guarda que foi impressa, e a sobra nasce quando o cortador bipa a etiqueta colada.'}));
+
+  const qtd=el('input',{type:'number',min:'1',max:'500',value:'30',inputmode:'numeric'});
+  const box=el('div',{class:'campo'});
+  box.appendChild(el('label',{texto:'Quantas etiquetas'}));
+  box.appendChild(qtd);
+  const bt=el('button',{class:'bt primario',texto:'Gerar e imprimir',onclick:async()=>{
+    bt.disabled=true;
+    try{
+      const lote=await api('/api/etiquetas/lotes',{metodo:'POST',corpo:{quantidade:Number(qtd.value)}});
+      banner('Lote '+lote.de_seq+' a '+lote.ate_seq+' gerado. Confira a folha e mande imprimir.');
+      montarFolha(lote.codigos,lote);
+      await desenhar();
+    }catch(e){}
+    bt.disabled=false;
+  }});
+  c.appendChild(el('div',{class:'campos'},[box,el('div',{class:'campo'},[bt])]));
+  c.appendChild(el('p',{class:'ajuda',texto:
+    'Na hora de imprimir: margens "Nenhuma" e escala 100%. "Ajustar a pagina" deforma as barras e o leitor recusa.'}));
+  p.appendChild(c);
+
+  const cP=el('div',{class:'cartao'});
+  cP.appendChild(el('h2',{texto:'Impressas e ainda nao bipadas ('+pendentes.length+')'}));
+  cP.appendChild(el('p',{class:'nota',texto:
+    'A lista e exata: o que foi impresso menos o que voltou da bancada. Etiqueta parada aqui ha muitos dias e etiqueta que se perdeu no chao.'}));
+  if(pendentes.length){
+    const t=el('table',{});
+    t.appendChild(el('tr',{},[el('th',{texto:'Codigo'}),el('th',{texto:'Impressa em'}),el('th',{class:'num',texto:'Dias'})]));
+    pendentes.slice(0,40).forEach(e=>t.appendChild(el('tr',{},[
+      el('td',{texto:e.codigo}), el('td',{texto:e.criado_em}), el('td',{class:'num',texto:String(e.dias)})])));
+    cP.appendChild(t);
+    if(pendentes.length>40) cP.appendChild(el('p',{class:'ajuda',texto:'…e mais '+(pendentes.length-40)+'.'}));
+  } else cP.appendChild(el('div',{class:'vazio',texto:'Nenhuma etiqueta solta.'}));
+  p.appendChild(cP);
+
+  const cL=el('div',{class:'cartao'});
+  cL.appendChild(el('h2',{texto:'Lotes ja impressos'}));
+  if(lotes.length){
+    const t=el('table',{});
+    t.appendChild(el('tr',{},[el('th',{texto:'Faixa'}),el('th',{class:'num',texto:'Qtd'}),
+      el('th',{class:'num',texto:'Ja usadas'}),el('th',{texto:'Quando'}),el('th',{texto:''})]));
+    lotes.forEach(l=>t.appendChild(el('tr',{},[
+      el('td',{texto:'S-'+String(l.de_seq).padStart(6,'0')+' a S-'+String(l.ate_seq).padStart(6,'0')}),
+      el('td',{class:'num',texto:String(l.quantidade)}),
+      el('td',{class:'num',texto:String(l.usadas)}),
+      el('td',{texto:l.criado_em}),
+      el('td',{style:'text-align:right'},[el('button',{class:'bt pequeno',texto:'Ver folha',onclick:async()=>{
+        const etqs=await api('/api/etiquetas/lotes/'+l.id);
+        montarFolha(etqs.map(e=>e.codigo),l);
+      }})])
+    ])));
+    cL.appendChild(t);
+  } else cL.appendChild(el('div',{class:'vazio',texto:'Nenhum lote impresso ainda.'}));
+  p.appendChild(cL);
+}
+
+// A folha propriamente dita. O codigo aparece escrito embaixo das barras: se
+// o leitor falhar, o cortador digita — nunca fica sem saida.
+function montarFolha(codigos,lote){
+  const alvo=limpar($('#folha'));
+  const cab=el('div',{class:'cartao naoImprime',style:'display:flex;align-items:center;gap:12px'});
+  cab.appendChild(el('strong',{style:'flex:1',texto:'Folha: '+codigos.length+' etiquetas'+
+    (lote?' (S-'+String(lote.de_seq).padStart(6,'0')+' a S-'+String(lote.ate_seq).padStart(6,'0')+')':'')}));
+  cab.appendChild(el('button',{class:'bt primario',texto:'Imprimir',onclick:()=>window.print()}));
+  alvo.appendChild(cab);
+
+  const grade=el('div',{class:'folha'});
+  codigos.forEach(codigo=>{
+    const e=el('div',{class:'etq'});
+    e.appendChild(window.barras.svg(codigo,{modulo:2,altura:44}));
+    e.appendChild(el('div',{class:'cod',texto:codigo}));
+    e.appendChild(el('div',{class:'marca',texto:'SOBRA'}));
+    grade.appendChild(e);
+  });
+  alvo.appendChild(grade);
+  alvo.scrollIntoView({behavior:'smooth'});
+}
+
+desenhar();
+</script>
+</body>
+</html>

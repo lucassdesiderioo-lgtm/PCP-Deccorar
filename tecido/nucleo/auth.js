@@ -8,9 +8,11 @@ const {pode}=require('./permissoes');
 const TELAS={
   '/':          {arquivo:'telas/inicio.html',    permissao:'cadastro.ler'},
   '/inicio':    {arquivo:'telas/inicio.html',    permissao:'cadastro.ler'},
-  '/cadastros': {arquivo:'telas/cadastros.html', permissao:'cadastro.ler'}
+  '/cadastros': {arquivo:'telas/cadastros.html', permissao:'cadastro.ler'},
+  '/sobras':    {arquivo:'telas/sobras.html',    permissao:'sobra.ler'},
+  '/etiquetas': {arquivo:'telas/etiquetas.html', permissao:'etiqueta.imprimir'}
 };
-const LIVRE=['/login','/favicon.ico','/base.css','/ui.js'];
+const LIVRE=['/login','/favicon.ico','/base.css','/ui.js','/barras.js'];
 
 module.exports=function(app, db){
   const arqSeg=path.join(__dirname,'..','.session_secret');
