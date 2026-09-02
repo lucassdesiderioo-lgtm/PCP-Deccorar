@@ -265,6 +265,13 @@ function desenharPlano(){
     c.appendChild(av);
   }
 
+  // Peca sem pedido: lembrete, nunca bloqueio. Amostra e reposicao avulsa
+  // sao casos legitimos — o que nao pode e o operador achar que preencher o
+  // pedido e opcional no corte de um cliente.
+  if(p.sem_pedido) c.appendChild(el('p',{class:'ajuda',
+    style:'color:var(--alerta);font-weight:600',
+    texto:'⚠ '+p.sem_pedido+' peça(s) sem número de pedido. Elas não se agrupam por tom, e se este pedido voltar a ser cortado noutro dia o sistema não vai reconhecer a continuação. Se forem de um cliente, preencha o pedido.'}));
+
   // Por que nenhuma sobra serviu. Sem esta frase o operador desconfia do "nao"
   // e vai conferir a prateleira na mao de qualquer jeito.
   if(p.sobre_sobras) c.appendChild(el('p',{class:'ajuda',texto:'Sobras: '+p.sobre_sobras}));

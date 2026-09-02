@@ -301,6 +301,11 @@ function calcular(pedido){
     consumo_linear:r.consumoLinear, consumo_m2:r.consumoM2,
     area_pecas:r.areaPecas, area_sobras:r.areaSobras, desperdicio:r.desperdicio,
     sobre_sobras:sobreSobras,
+    // Quantas pecas vieram SEM pedido. Nao trava — peca avulsa (amostra,
+    // reposicao) e caso legitimo. Mas peca sem pedido nao tem como ser
+    // reconhecida como continuacao no dia seguinte, e e melhor a tela dizer
+    // isso agora do que a casa descobrir na parede.
+    sem_pedido:pecas.filter(x=>!x.pedido).length,
     // O aviso do corte anterior. A tela mostra em destaque: e a diferenca
     // entre continuar o pedido e recomecar de outro tom.
     cortes_anteriores:anteriores.map(h=>({
