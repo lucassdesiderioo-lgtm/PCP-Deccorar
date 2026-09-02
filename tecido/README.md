@@ -220,6 +220,25 @@ sozinho tem três peças iguais, cada uma com a sua etiqueta.
 **Peça sem pedido informado é livre**, porque não há com quem ela precise
 combinar. O campo Pedido fica na grade, e o upload da etiqueta já o preenche.
 
+### E o pedido cortado em dias diferentes
+
+O tom único dentro de um plano não bastava. O pedido `4272` tem **onze**
+persianas e o arquivo do dia trouxe **nove** — nada obriga a fábrica a cortar
+tudo de uma vez. Duas peças na terça, nove na quinta: cada plano, sozinho,
+estava certo, e mesmo assim a casa receberia dois tons.
+
+Então o plano **olha para trás**. Antes de escolher a bobina, pergunta em que
+fonte esse pedido já foi cortado:
+
+- **O rolo ainda tem saldo** → continua nele, mesmo que outra bobina rendesse
+  mais. Deixou de ser escolha de aproveitamento e virou escolha de tom.
+- **A fonte não existe mais** (sobra consumida, rolo encerrado) → o plano sai
+  normalmente, com aviso em âmbar: *o tom destas peças pode não bater com o que
+  já foi cortado*.
+
+Em qualquer caso a tela mostra, antes do desenho, quantas peças daquele pedido
+já saíram, quando, e de onde.
+
 ## O upload (fase 8)
 
 **O PDF de etiquetas de produção** (Decorsoft) é lido direto: o sistema pega a

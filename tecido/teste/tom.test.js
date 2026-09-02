@@ -127,6 +127,47 @@ module.exports=[
     'com motivo legivel: '+p.pecas_nao_alocadas[0].motivo);
 }},
 
+{nome:'O PEDIDO CORTADO EM DOIS DIAS CONTINUA NO MESMO ROLO', executar({igual,perto}){
+  const x=cena();
+  // O caso real: o pedido 4272 tem 11 persianas e o arquivo do dia trouxe
+  // so 9. As outras duas foram cortadas antes. Cada plano, sozinho, estava
+  // certo — e mesmo assim a casa receberia dois tons.
+  const bom=rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.nivelRolo},'teste');
+  // Um rolo mais economico para estas medidas, que venceria a simulacao.
+  rolo.entrada({tecido_id:x.t.id,largura:'2,00',metragem:'50',nivel_id:x.nivelRolo},'teste');
+
+  // DIA 1: as duas primeiras pecas do pedido.
+  const dia1=[{pedido:'4272',largura:'1,495',altura:'2,730'},
+              {pedido:'4272',largura:'1,495',altura:'2,730'}];
+  const p1=plano.calcular({tecido_id:x.t.id,pecas:dia1});
+  igual(p1.faixas[0].codigo,bom.codigo,'o dia 1 escolheu a bobina de 3,00 (duas por faixa)');
+  const etiquetas={};
+  p1.sobras_geradas.forEach(sg=>{ etiquetas[sg.indice]={codigo:etiquetaLivre(),nivel_id:x.nivelSobra}; });
+  plano.confirmar({tecido_id:x.t.id,pecas:dia1,assinatura:p1.assinatura,etiquetas},'teste');
+
+  // DIA 2: o resto do pedido. Sem olhar para tras, o plano poderia mudar de
+  // rolo — e o cliente veria a diferenca na parede.
+  const p2=plano.calcular({tecido_id:x.t.id,pecas:[
+    {pedido:'4272',largura:'1,495',altura:'2,730'},
+    {pedido:'4272',largura:'1,615',altura:'2,540'}]});
+
+  igual(p2.continuando_em!==null,true,'o plano reconheceu o corte anterior');
+  igual(p2.continuando_em.codigo,bom.codigo,'e continua no MESMO rolo');
+  igual(new Set(p2.faixas.map(f=>f.codigo)).size,1,'uma fonte so');
+  igual(p2.faixas[0].codigo,bom.codigo,'o rolo do dia 1');
+  igual(p2.cortes_anteriores.length>0,true,'e avisa quantas pecas ja sairam: '+
+    p2.cortes_anteriores.map(h=>h.pecas+' em '+h.codigo).join(', '));
+}},
+
+{nome:'pedido novo nao herda rolo de outro pedido', executar({igual}){
+  const x=cena();
+  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.nivelRolo},'teste');
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[
+    {pedido:'9999',largura:'1,00',altura:'2,00'}]});
+  igual(p.continuando_em,null,'sem historico, escolhe livremente');
+  igual(p.cortes_anteriores.length,0,'e nao inventa aviso');
+}},
+
 {nome:'a altura minima de 1 m manda a tira baixa para o refugo', executar({igual,perto}){
   const x=cena();
   const config=require('../nucleo/config');

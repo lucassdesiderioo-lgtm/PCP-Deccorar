@@ -83,6 +83,32 @@ function encaixarGruposCompletos(grupos,fonte,params){
   return null;
 }
 
+// ── O PEDIDO QUE JA FOI CORTADO ANTES ────────────────────────────────────
+// O tom unico dentro de um plano nao basta: o pedido 4272 tem onze persianas
+// e nada obriga a fabrica a cortar as onze no mesmo dia. Se as duas primeiras
+// sairam do rolo R-000005 na terca e as outras nove sairem de outro rolo na
+// quinta, o cliente recebe a mesma casa em dois tons — e o sistema teria
+// ajudado a errar, porque cada plano, sozinho, estava certo.
+//
+// Por isso o plano olha para tras: pergunta em que fonte este pedido ja foi
+// cortado e, se aquele rolo ainda tem saldo, CONTINUA NELE.
+const pHistorico=db.prepare(`
+  SELECT pp.pedido, p.id AS plano_id, p.data,
+         pf.fonte, pf.rolo_id, pf.sobra_id,
+         COUNT(*) AS pecas
+    FROM plano_peca pp
+    JOIN plano p ON p.id=pp.plano_id
+    JOIN plano_faixa pf ON pf.id=pp.faixa_id
+   WHERE p.confirmado=1 AND pp.pedido IS NOT NULL AND pp.pedido<>''
+   GROUP BY pp.pedido, pf.fonte, pf.rolo_id, pf.sobra_id
+   ORDER BY p.id DESC`);
+
+function cortesAnteriores(pedidos){
+  if(!pedidos.length) return [];
+  const alvo=new Set(pedidos.map(x=>String(x).toUpperCase()));
+  return pHistorico.all().filter(h=>alvo.has(String(h.pedido).toUpperCase()));
+}
+
 // Uma peca cabe numa fonte quando as DUAS dimensoes passam. Area nao decide
 // nada aqui: uma sobra de 0,50 x 4,00 tem 2,00 m2 e nao serve para uma peca
 // de 0,90 x 2,00, que tem 1,80.
@@ -106,6 +132,17 @@ function calcular(pedido){
   let grupos=agrupar(pecas);
   const fontes=[];
   const usadas=[];
+
+  // O que ja foi cortado deste(s) pedido(s), em outro dia.
+  const anteriores=cortesAnteriores([...new Set(pecas.map(p=>p.pedido).filter(Boolean))]);
+  const roloAnterior=(()=>{
+    for(const h of anteriores){
+      if(h.fonte!=='rolo'||!h.rolo_id) continue;
+      const r=rolo.porId(h.rolo_id);
+      if(r&&r.status!=='encerrado'&&r.saldo>TOL) return {ref:r, historico:h};
+    }
+    return null;
+  })();
 
   for(const s of disponiveis){
     if(!grupos.length) break;
@@ -137,6 +174,17 @@ function calcular(pedido){
       if(!porLargura.has(r.largura)) porLargura.set(r.largura,[]);
       porLargura.get(r.largura).push(r);
     });
+
+    // CONTINUAR NO ROLO DO CORTE ANTERIOR. Deixa de ser uma escolha de
+    // aproveitamento e passa a ser de tom: a bobina mais economica nao serve
+    // se o resto da casa saiu de outra. Simula so a largura dele, com ele na
+    // frente.
+    if(roloAnterior){
+      const mesmaLargura=(porLargura.get(roloAnterior.ref.largura)||[])
+        .filter(r=>r.id!==roloAnterior.ref.id);
+      porLargura.clear();
+      porLargura.set(roloAnterior.ref.largura,[roloAnterior.ref,...mesmaLargura]);
+    }
 
     simulacoes=[...porLargura.entries()].map(([largura,lista])=>{
       // Um grupo tambem nao se divide entre DOIS ROLOS: rolos diferentes sao
@@ -253,6 +301,19 @@ function calcular(pedido){
     consumo_linear:r.consumoLinear, consumo_m2:r.consumoM2,
     area_pecas:r.areaPecas, area_sobras:r.areaSobras, desperdicio:r.desperdicio,
     sobre_sobras:sobreSobras,
+    // O aviso do corte anterior. A tela mostra em destaque: e a diferenca
+    // entre continuar o pedido e recomecar de outro tom.
+    cortes_anteriores:anteriores.map(h=>({
+      pedido:h.pedido, plano_id:h.plano_id, data:h.data, pecas:h.pecas,
+      fonte:h.fonte,
+      codigo:h.fonte==='rolo'
+        ?((rolo.porId(h.rolo_id)||{}).codigo||null)
+        :((sobra.porId(h.sobra_id)||{}).codigo||null)
+    })),
+    continuando_em:roloAnterior?{
+      codigo:roloAnterior.ref.codigo, saldo:roloAnterior.ref.saldo,
+      pedido:roloAnterior.historico.pedido
+    }:null,
     bobina:bobina?{largura:bobina.largura, desperdicio:bobina.desperdicio}:null,
     simulacoes:simulacoes.map(s=>({largura:s.largura, desperdicio:s.desperdicio,
       consumo_linear:s.consumoLinear, consumo_m2:s.consumoM2, nao_alocadas:s.naoAlocadas})),

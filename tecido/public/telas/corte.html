@@ -248,6 +248,23 @@ function desenharPlano(){
   cab.appendChild(el('span',{class:'quem',texto:p.pecas.length+' peças · '+formatarArea(p.area_pecas)}));
   c.appendChild(cab);
 
+  // O CORTE ANTERIOR DESTE PEDIDO. Vem antes de tudo: e a informacao que
+  // explica por que o plano escolheu aquele rolo e nao o mais economico.
+  if(p.cortes_anteriores&&p.cortes_anteriores.length){
+    const av=el('div',{style:'background:var(--alerta-fraca);border:1px solid var(--alerta);'+
+      'border-radius:var(--raio);padding:12px;margin:12px 0'});
+    av.appendChild(el('strong',{style:'color:var(--alerta)',texto:'Este pedido já foi cortado antes'}));
+    p.cortes_anteriores.forEach(h=>av.appendChild(el('div',{
+      texto:'• pedido '+h.pedido+': '+h.pecas+' peça(s) em '+h.data+
+        ', de '+(h.fonte==='rolo'?'ROLO ':'SOBRA ')+(h.codigo||'?')})));
+    if(p.continuando_em) av.appendChild(el('p',{class:'ajuda',style:'margin-bottom:0',
+      texto:'Continuando no rolo '+p.continuando_em.codigo+' ('+formatarMetros(p.continuando_em.saldo)+
+        ' de saldo). Mesmo rolo, mesmo tom — mesmo que outra bobina rendesse mais.'}));
+    else av.appendChild(el('p',{class:'ajuda',style:'margin-bottom:0',
+      texto:'⚠ A fonte usada antes não está mais disponível. O tom destas peças pode não bater com o que já foi cortado — confira o retalho antes de seguir.'}));
+    c.appendChild(av);
+  }
+
   // Por que nenhuma sobra serviu. Sem esta frase o operador desconfia do "nao"
   // e vai conferir a prateleira na mao de qualquer jeito.
   if(p.sobre_sobras) c.appendChild(el('p',{class:'ajuda',texto:'Sobras: '+p.sobre_sobras}));
