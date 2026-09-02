@@ -6,10 +6,12 @@ const crypto=require('crypto');
 const db=require('../nucleo/db');
 const {ErroDeRegra,exigir}=require('../nucleo/erros');
 const {PAPEIS}=require('../nucleo/permissoes');
+const pcp=require('../nucleo/pcp');
 
 const hash=(pin,salt)=>crypto.scryptSync(String(pin),salt,32).toString('hex');
 
-const listar=()=>db.prepare('SELECT id,nome,papel,ativo,criado_em FROM usuario ORDER BY nome').all();
+const listar=()=>db.prepare(
+  'SELECT id,nome,papel,ativo,pcp_id,criado_em,(pin_hash<>\'\') AS tem_pin FROM usuario ORDER BY nome').all();
 const porId=id=>db.prepare('SELECT id,nome,papel,ativo FROM usuario WHERE id=?').get(id);
 
 function validar(nome,pin,papel){
@@ -23,13 +25,53 @@ function criar(dados){
   const nome=String(dados.nome||'').trim();
   const papel=dados.papel||'cortador';
   validar(nome,dados.pin,papel);
-  exigir(dados.pin,'pin_obrigatorio','Defina um PIN de 4 digitos para a pessoa entrar.');
+  // PIN so e obrigatorio para quem NAO vem do PCP. Quem vem de la ja tem
+  // credencial; duplicar a senha seria duplicar o problema que o login unico
+  // veio resolver.
+  exigir(dados.pin||dados.pcp_id,'pin_obrigatorio',
+    'Defina um PIN de 4 digitos, ou libere a pessoa a partir do cadastro do PCP.');
   if(db.prepare('SELECT id FROM usuario WHERE nome=?').get(nome))
     throw new ErroDeRegra('nome_repetido','Ja existe alguem cadastrado como "'+nome+'".');
   const salt=crypto.randomBytes(16).toString('hex');
-  const r=db.prepare('INSERT INTO usuario(nome,salt,pin_hash,papel) VALUES(?,?,?,?)')
-    .run(nome,salt,hash(dados.pin,salt),papel);
+  const r=db.prepare('INSERT INTO usuario(nome,salt,pin_hash,papel,pcp_id) VALUES(?,?,?,?,?)')
+    .run(nome,salt,dados.pin?hash(dados.pin,salt):'',papel,dados.pcp_id||null);
   return porId(r.lastInsertRowid);
+}
+
+// ── LIBERAR UMA PESSOA DO PCP ────────────────────────────────────────────
+// Nao cria credencial nenhuma: so diz que aquela pessoa do PCP pode usar
+// este modulo, e com que papel.
+function liberarDoPcp(dados){
+  const pcp_id=Number(dados.pcp_id);
+  exigir(pcp_id>0,'pcp_id_invalido','Escolha a pessoa na lista do PCP.');
+  const papel=dados.papel||'cortador';
+  exigir(PAPEIS[papel],'papel_invalido','Papel invalido.');
+  const nome=String(dados.nome||'').trim();
+  exigir(nome,'nome_vazio','Nome da pessoa nao veio do PCP.');
+
+  const ja=db.prepare('SELECT id FROM usuario WHERE pcp_id=?').get(pcp_id);
+  if(ja) return atualizar(ja.id,{papel,ativo:1});
+
+  // Mesmo nome ja cadastrado com PIN proprio: vincula em vez de duplicar,
+  // senao a mesma pessoa apareceria duas vezes na lista de acessos.
+  const mesmoNome=db.prepare('SELECT id FROM usuario WHERE nome=? AND pcp_id IS NULL').get(nome);
+  if(mesmoNome){
+    db.prepare('UPDATE usuario SET pcp_id=?, papel=?, ativo=1 WHERE id=?').run(pcp_id,papel,mesmoNome.id);
+    return porId(mesmoNome.id);
+  }
+  return criar({nome,papel,pcp_id});
+}
+
+// A lista que a tela de acessos mostra: todo mundo do PCP, com a marca de
+// quem ja esta liberado aqui.
+async function doPcp(){
+  const gente=await pcp.pessoas();
+  const aqui=new Map(listar().filter(u=>u.pcp_id).map(u=>[u.pcp_id,u]));
+  return gente.map(p=>{
+    const u=aqui.get(p.id);
+    return {pcp_id:p.id, nome:p.nome,
+      liberado:!!u&&!!u.ativo, papel:u?u.papel:null, usuario_id:u?u.id:null};
+  });
 }
 
 // Trava: nunca deixar o sistema sem UM diretor ativo. Sem ela, um clique
@@ -59,4 +101,5 @@ function atualizar(id,dados){
   return porId(id);
 }
 
-module.exports={listar,porId,criar,atualizar};
+module.exports={listar,porId,criar,atualizar,liberarDoPcp,doPcp,
+  loginUnicoLigado:()=>pcp.ligado()};

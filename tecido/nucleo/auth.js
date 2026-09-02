@@ -3,6 +3,7 @@
 // da fabrica ja sabe entrar assim (grade de nomes -> teclado numerico).
 const crypto=require('crypto'), fs=require('fs'), path=require('path');
 const {pode}=require('./permissoes');
+const pcp=require('./pcp');
 
 // Tela -> arquivo + permissao. Uma tela fora desta lista nao existe.
 const TELAS={
@@ -62,12 +63,53 @@ module.exports=function(app, db){
     '<body style="font-family:system-ui;padding:40px"><h2>Sem permissao</h2>'+
     '<p>Voce nao tem acesso a esta tela.</p><a href="/login">Entrar com outro usuario</a></body>');
 
-  app.use(function(req,res,next){
+  // A pessoa esta logada no PCP mas ninguem liberou o acesso a este modulo.
+  // A mensagem diz o nome e o caminho — sem isso ela tentaria o PIN do PCP
+  // aqui, nao funcionaria, e abriria um chamado.
+  const semAcesso=(res,nome)=>res.status(403).send(
+    '<body style="font-family:system-ui;padding:40px;max-width:32em">'+
+    '<h2>Acesso ainda nao liberado</h2>'+
+    '<p><b>'+String(nome||'').replace(/[<>&]/g,'')+'</b> esta logado no PCP, mas ainda nao tem acesso ao Plano de corte.</p>'+
+    '<p>Peca ao diretor para liberar em <b>Cadastros &rarr; Pessoas</b>, aqui neste modulo.</p>'+
+    '<a href="/login">Entrar com um PIN daqui</a></body>');
+
+  // ── LOGIN UNICO ────────────────────────────────────────────────────────
+  // Autenticacao no PCP, autorizacao aqui: o PCP diz QUEM e a pessoa, e o
+  // cadastro deste modulo diz SE ela entra e com que papel. Bloqueou no PCP,
+  // nao entra aqui — que era o furo do cadastro duplicado.
+  const porPcp=db.prepare('SELECT id,nome,papel,ativo FROM usuario WHERE pcp_id=?');
+  async function sessaoDoPcp(req){
+    const quem=await pcp.quemEsta(req.headers.cookie||'');
+    if(!quem) return null;
+    const u=porPcp.get(quem.id);
+    if(!u) return {bloqueado:'nao_liberado', nome:quem.nome};
+    if(!u.ativo) return {bloqueado:'inativo', nome:u.nome};
+    return {id:u.id, nome:u.nome, papel:u.papel, via:'pcp'};
+  }
+
+  app.use(async function(req,res,next){
     const p=req.path;
     if(LIVRE.includes(p)||p.startsWith('/api/auth/')) return next();
 
-    const u=lerSessao(req);
+    // Primeiro a sessao PROPRIA (PIN daqui), depois a do PCP. Nesta ordem
+    // porque quem entrou com o PIN daqui fez isso de proposito — em geral
+    // porque o PCP estava fora do ar.
+    let u=lerSessao(req);
+    let recado=null;
+    if(!u){
+      const doPcp=await sessaoDoPcp(req);
+      if(doPcp&&doPcp.bloqueado) recado=doPcp;
+      else u=doPcp;
+    }
     req.usuario=u;
+
+    if(recado){
+      if(p.startsWith('/api/')) return res.status(403).json({ok:false,motivo:recado.bloqueado,
+        mensagem:recado.bloqueado==='inativo'
+          ?'Seu acesso ao Plano de corte esta bloqueado.'
+          :'Voce ainda nao tem acesso ao Plano de corte. Peca ao diretor para liberar.'});
+      return semAcesso(res,recado.nome);
+    }
 
     // Nenhum .html sai do disco por caminho direto. As telas so abrem pelo
     // caminho declarado em TELAS, e e la que a permissao e conferida — e a
@@ -112,8 +154,12 @@ module.exports=function(app, db){
     res.json({ok:true,dados:{}});
   });
 
-  app.get('/api/auth/eu',(req,res)=>{
-    const u=lerSessao(req);
+  app.get('/api/auth/eu',async (req,res)=>{
+    let u=lerSessao(req);
+    if(!u){
+      const doPcp=await sessaoDoPcp(req);
+      if(doPcp&&!doPcp.bloqueado) u=doPcp;
+    }
     res.json({ok:true,dados:u?{logado:true,...u}:{logado:false}});
   });
 

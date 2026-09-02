@@ -1,9 +1,8 @@
 # Tecido — estoque, sobras e plano de corte
 
 Operação **sob medida**. Aplicação **separada** do PCP do Mercado Livre: banco
-próprio (`tecido.db`), porta própria (3020), **nenhuma integração**. O que se
-mantém compatível é a *linguagem* — unidade, etiqueta, endereço, movimento —
-para uma junção futura.
+próprio (`tecido.db`), porta própria (3020). A única ponte é o **login único**
+(abaixo) — estoque, cadastros e regras continuam independentes.
 
 ```bash
 cd tecido
@@ -52,7 +51,7 @@ não só a tela.
 | 4 | Sobra com defeito parcial? | **Entra, mas por último** | `condicao_sobra.prioridade` e `.aproveitavel` |
 | 5 | Leitor na bancada? | **Sim.** Campo de bipe visível, aceita Enter e Tab, processa por timeout | telas das fases 2 e 4 |
 | 6 | Sequência das etiquetas? | **O sistema imprime.** Escolhe-se a quantidade, ele gera a sequência e registra o lote; a sobra nasce quando o operador bipa a etiqueta colada | tabelas `etiqueta` e `etiqueta_lote` |
-| 7 | Autenticação? | **PIN de 4 dígitos**, mesmo desenho do PCP | `nucleo/auth.js` |
+| 7 | Autenticação? | **Login único com o PCP** — a pessoa entra uma vez, com o PIN que já tem | `nucleo/pcp.js` + `nucleo/auth.js` |
 
 > **A resposta 6 revoga a R11 da especificação.** Lá a etiqueta era pré-impressa
 > e o código, digitado pelo operador; a lista de pendência seria um palpite
@@ -304,3 +303,60 @@ plano promete o que o corte entrega.
 Um número para dar a dimensão do que está em jogo: com 2 cm de folga, essas
 duas peças **deixam de caber** e a faixa passa de 2,73 m para 5,46 m de rolo.
 A margem não é um detalhe de acabamento — ela dobra o consumo.
+
+---
+
+## Login único com o PCP
+
+**Autenticação no PCP, autorização aqui.** A pessoa entra uma vez, com o PIN
+que já tem, clica em *Plano de corte* na tela de login do PCP e atravessa sem
+digitar nada de novo.
+
+```
+PCP (3010)                          Tecido (3020)
+  entra com o PIN  ──cookie──▶  "quem é o dono deste cookie?"
+                                        │
+                                        ▼
+                              cadastro interno decide:
+                              pode entrar? com que papel?
+```
+
+**Por que essa divisão.** O cadastro duplicado tinha um furo silencioso:
+alguém sair da empresa, ser bloqueado no PCP e continuar entrando no estoque
+de tecido porque ninguém lembrou do segundo sistema. Agora **bloqueou lá, não
+entra aqui** — e há teste provando exatamente isso.
+
+O caminho contrário também vale: tirar o acesso ao corte **não** mexe no PCP.
+São perguntas diferentes — *quem é você* e *o que você faz aqui*.
+
+### O que este módulo NÃO faz
+
+Não lê o banco do PCP, não lê o segredo do cookie dele, não conhece o schema
+de lá. Pergunta por HTTP (`GET /api/auth/eu`) e recebe id e nome — mais nada.
+Se o PCP mudar o jeito de assinar a sessão, aqui não quebra.
+
+### O PIN próprio continua existindo
+
+Não é sobra do desenho antigo: é a saída para o dia em que o PCP estiver fora
+do ar. **Sem ela, uma queda da expedição pararia o corte junto** — e as duas
+operações não têm nada a ver uma com a outra. No dia a dia ninguém usa esses
+PINs; eles ficam guardados para a emergência.
+
+Para desligar o login único e voltar todo mundo ao PIN daqui: apague o
+parâmetro **Endereço do PCP** em Cadastros → Parâmetros. Sem tocar em código.
+
+### Liberando alguém
+
+Cadastros → Pessoas → **Acesso pelo PCP**: a lista traz quem existe no PCP, e
+o diretor libera com um toque, escolhendo o papel. Não cria senha nenhuma — a
+credencial continua sendo a de lá.
+
+> Quem já tinha PIN próprio aqui é **vinculado**, não duplicado. Duas contas
+> para a mesma pessoa dariam a falsa sensação de ter bloqueado o acesso ao
+> desativar só uma delas.
+
+### Uma limitação conhecida
+
+Com o PCP fora do ar, a primeira tela de cada pessoa espera até 2 segundos
+antes de cair no login próprio (o tempo de desistir da pergunta). Depois disso
+a resposta fica em cache por 5 segundos e a navegação volta ao normal.

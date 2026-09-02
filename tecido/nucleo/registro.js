@@ -29,7 +29,7 @@ function montar(app, db, modulos){
         continue;
       }
 
-      app[metodo](r.caminho,(req,res)=>{
+      app[metodo](r.caminho,async (req,res)=>{
         const u=req.usuario;
         if(!pode(u,r.permissao)){
           audita(u,r.permissao,req.method,req.path,'negado',0);
@@ -37,7 +37,10 @@ function montar(app, db, modulos){
             mensagem:'Voce nao tem permissao para isto.'});
         }
         try{
-          const dados=r.manipulador({
+          // O await serve ao manipulador que fala com o mundo de fora (o PCP,
+          // no login unico). Sem ele a resposta sairia como objeto vazio, e o
+          // erro apareceria como tela em branco em vez de falha.
+          const dados=await r.manipulador({
             corpo:req.body||{}, params:req.params, query:req.query, usuario:u, db
           });
           if(!leitura) audita(u,r.permissao,req.method,req.path,r.detalhe?r.detalhe(req,dados):null,1);

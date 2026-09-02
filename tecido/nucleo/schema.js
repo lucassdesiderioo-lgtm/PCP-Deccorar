@@ -271,6 +271,29 @@ ALTER TABLE plano_peca ADD COLUMN pedido TEXT;
    e refugo mesmo que a largura passe folgado — uma faixa de 1,90 x 0,10 tem
    largura de sobra e utilidade de lixo. */
 UPDATE parametro SET valor='1.00' WHERE chave='alturaMinimaSobra' AND valor='0.00';
+`
+},
+
+{n:4, nome:'login unico com o PCP', sql:`
+/* LOGIN UNICO. A pessoa entra uma vez, no PCP, e atravessa para ca sem
+   digitar PIN de novo. A conta daqui deixa de guardar credencial e passa a
+   guardar so PERMISSAO: quem pode usar o modulo e com que papel.
+
+   AUTENTICACAO no PCP, AUTORIZACAO aqui. E a divisao que evita o pior
+   defeito do cadastro duplicado: alguem sair da empresa, ser bloqueado no
+   PCP e continuar entrando no estoque de tecido porque ninguem lembrou do
+   segundo sistema. Bloqueou la, nao entra aqui. */
+ALTER TABLE usuario ADD COLUMN pcp_id INTEGER;
+CREATE UNIQUE INDEX idx_usuario_pcp ON usuario(pcp_id) WHERE pcp_id IS NOT NULL;
+
+/* pin_hash vazio = pessoa que so entra pelo PCP. O PIN proprio continua
+   existindo para quem precisar entrar com o PCP fora do ar — o corte nao
+   pode parar porque a expedicao caiu. */
+
+INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem)
+VALUES('pcpUrl','http://localhost:3010','texto','Endereco do PCP',
+ 'De onde este modulo pergunta quem esta logado. Os dois sistemas rodam na mesma maquina, entao localhost e o normal. Apagar este valor desliga o login unico e todo mundo passa a entrar com o PIN proprio daqui.',
+ '',10);
 `}
 
 ];

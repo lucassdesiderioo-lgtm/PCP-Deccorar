@@ -337,10 +337,55 @@ async function telaPessoa(pai){
   if(!podeEditar()) return;
   const pessoas=await api('/api/usuarios');
   const papeis=await api('/api/papeis');
+  const unico=await api('/api/usuarios/login-unico');
+  const doPcp=unico.ligado?await api('/api/usuarios/pcp'):[];
   pai=limpar(pai);
   const recarregar=()=>telaPessoa($('#conteudo'));
 
-  const c=cartao(pai,'Pessoas','Quem entra no sistema, com que PIN e com que papel.');
+  // ── ACESSO PELO PCP ───────────────────────────────────────────────────
+  // Autenticacao la, autorizacao aqui: a pessoa entra com o PIN que ja tem,
+  // e esta lista diz quem pode usar o modulo e com que papel.
+  if(unico.ligado){
+    const cP=cartao(pai,'Acesso pelo PCP',
+      'A pessoa entra uma vez, no PCP, e atravessa para ca sem digitar PIN de novo. Aqui voce so libera quem pode usar o Plano de corte.');
+    cP.appendChild(el('p',{class:'ajuda',texto:
+      'Bloqueou no PCP, nao entra aqui — e por isso que o desligamento de alguem deixa de depender de lembrar de dois sistemas.'}));
+    if(!doPcp.length) cP.appendChild(el('div',{class:'vazio',
+      texto:'Nao consegui falar com o PCP agora. As pessoas com PIN proprio continuam entrando normalmente.'}));
+    else {
+      const t=el('table',{});
+      t.appendChild(el('tr',{},[el('th',{texto:'Pessoa (PCP)'}),el('th',{texto:'Acesso ao corte'}),el('th',{texto:''})]));
+      doPcp.forEach(p=>{
+        const sel=el('select',{});
+        papeis.forEach(x=>sel.appendChild(el('option',{value:x.papel,texto:x.papel,
+          selected:x.papel===p.papel?'selected':null})));
+        const bt=el('button',{class:'bt pequeno '+(p.liberado?'':'primario'),
+          texto:p.liberado?'Tirar acesso':'Liberar',onclick:async()=>{
+            if(p.liberado) await api('/api/usuarios/'+p.usuario_id,{metodo:'PUT',corpo:{ativo:0}});
+            else await api('/api/usuarios/pcp',{metodo:'POST',
+              corpo:{pcp_id:p.pcp_id,nome:p.nome,papel:sel.value}});
+            banner(p.liberado?'Acesso retirado.':'Acesso liberado para '+p.nome+'.');
+            await recarregar();
+          }});
+        if(p.liberado) sel.addEventListener('change',async()=>{
+          await api('/api/usuarios/pcp',{metodo:'POST',
+            corpo:{pcp_id:p.pcp_id,nome:p.nome,papel:sel.value}});
+          banner('Papel alterado.'); await recarregar();
+        });
+        t.appendChild(el('tr',{class:p.liberado?'':'inativo'},[
+          el('td',{texto:p.nome}),
+          el('td',{},[p.liberado?sel:el('span',{class:'tag off',texto:'sem acesso'})]),
+          el('td',{style:'text-align:right'},[bt])
+        ]));
+      });
+      cP.appendChild(t);
+    }
+  }
+
+  const c=cartao(pai,'PIN proprio deste modulo',
+    unico.ligado
+      ? 'Para o dia em que o PCP estiver fora do ar — sem isto, uma queda da expedicao pararia o corte junto. No dia a dia ninguem precisa destes PINs.'
+      : 'Quem entra no sistema, com que PIN e com que papel.');
   formulario(c,[
     {id:'nome',rotulo:'Nome',dica:'Joao',cresce:true},
     {id:'pin',rotulo:'PIN (4 digitos)',tipo:'password',inputmode:'numeric'},
@@ -352,7 +397,8 @@ async function telaPessoa(pai){
   });
 
   const t=el('table',{});
-  t.appendChild(el('tr',{},[el('th',{texto:'Nome'}),el('th',{texto:'Papel'}),el('th',{texto:''}),el('th',{texto:''})]));
+  t.appendChild(el('tr',{},[el('th',{texto:'Nome'}),el('th',{texto:'Papel'}),
+    el('th',{texto:'Entra por'}),el('th',{texto:''}),el('th',{texto:''})]));
   pessoas.forEach(p=>{
     const trocar=el('button',{class:'bt pequeno',texto:'Trocar PIN',onclick:async()=>{
       const pin=prompt('Novo PIN de '+p.nome+' (4 digitos):');
@@ -370,6 +416,8 @@ async function telaPessoa(pai){
     });
     t.appendChild(el('tr',{class:p.ativo?'':'inativo'},[
       el('td',{texto:p.nome}), el('td',{},[papel]),
+      el('td',{},[el('span',{class:'tag '+(p.pcp_id?'bom':'off'),
+        texto:p.pcp_id?(p.tem_pin?'PCP + PIN':'PCP'):'PIN daqui'})]),
       el('td',{},[trocar]), el('td',{style:'text-align:right'},[virar])
     ]));
   });
