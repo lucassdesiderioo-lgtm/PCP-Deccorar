@@ -46,7 +46,7 @@ module.exports = function(app, db){
      So cadastro nesta fase — o prefixo do SKU ('BK') virando linha. As formulas
      da ficha tecnica (tubo = (largura + 2) / 100) penduram aqui na Fase 2. */
   app.get('/api/modelos', (req,res)=>
-    res.json(db.prepare('SELECT id, codigo, nome, ativo, exige_medida FROM modelo ORDER BY codigo').all()));
+    res.json(db.prepare('SELECT id, codigo, nome, ativo, exige_medida, sob_medida FROM modelo ORDER BY codigo').all()));
 
   app.post('/api/modelos',(req,res)=>{
     const b=req.body||{};
@@ -54,12 +54,15 @@ module.exports = function(app, db){
     if(!cod) return res.status(400).json({erro:'código obrigatório'});
     const nome=(b.nome===undefined||String(b.nome).trim()==='')?null:String(b.nome).trim();
     /* exige_medida ausente = mantem o que esta la (o COALESCE do excluded nao
-       serve: 0 e valor legitimo, nao "nao mandou"). */
+       serve: 0 e valor legitimo, nao "nao mandou"). Mesma regra para
+       sob_medida: os dois sao flags onde 0 significa alguma coisa. */
     const em=('exige_medida' in b) ? (b.exige_medida?1:0) : null;
-    db.prepare(`INSERT INTO modelo (codigo,nome,ativo,exige_medida) VALUES (?,?,1,COALESCE(?,1))
+    const sm=('sob_medida' in b) ? (b.sob_medida?1:0) : null;
+    db.prepare(`INSERT INTO modelo (codigo,nome,ativo,exige_medida,sob_medida) VALUES (?,?,1,COALESCE(?,1),COALESCE(?,0))
       ON CONFLICT(codigo) DO UPDATE SET nome=COALESCE(excluded.nome,modelo.nome), ativo=1,
-        exige_medida=COALESCE(?,modelo.exige_medida)`).run(cod,nome,em,em);
-    res.json(db.prepare('SELECT id, codigo, nome, ativo, exige_medida FROM modelo WHERE codigo=?').get(cod));
+        exige_medida=COALESCE(?,modelo.exige_medida),
+        sob_medida=COALESCE(?,modelo.sob_medida)`).run(cod,nome,em,sm,em,sm);
+    res.json(db.prepare('SELECT id, codigo, nome, ativo, exige_medida, sob_medida FROM modelo WHERE codigo=?').get(cod));
   });
 
   /* ── TECIDOS ──────────────────────────────────────────────────────────────

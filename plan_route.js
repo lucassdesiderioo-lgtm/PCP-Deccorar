@@ -13,6 +13,7 @@
 const express = require('express');
 const { lerPlanilha, parseDataVenda, parseDataEnvio } = require('./planilha');
 const DEMANDA = require('./demanda_dominio');
+const FLUXO = require('./fluxo_estoque');
 
 module.exports = function(app, db){
   // Schema no mesmo commit em que o codigo passa a usar (CLAUDE.md secao 17).
@@ -159,22 +160,16 @@ module.exports = function(app, db){
     const janela = cfgNum('janela_media', 30);
     const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
 
-    const produzido = db.prepare("SELECT COUNT(*) n FROM montagem "+
-      "WHERE data=date('now','localtime') AND COALESCE(teste,0)=0").get().n;
-    let vendido = 0;
-    try{ vendido = db.prepare("SELECT COUNT(*) n FROM lote "+
-      "WHERE embalado_em IS NOT NULL AND date(embalado_em)=date('now','localtime') "+
-      "AND COALESCE(teste,0)=0").get().n; }catch(e){}
-    const variou = produzido - vendido;
+    /* As duas contas saem do fluxo_estoque, que passou a ser o dono unico dos
+       movimentos: o painel da aba Estoque mostra a MESMA coisa em serie de 30
+       dias, e duas copias divergiriam no primeiro filtro mudado de um lado so. */
+    const fx = FLUXO.doDia(db);
+    const produzido = fx.entrou, vendido = fx.saiu, variou = fx.variou;
 
-    const estoqueTotal = db.prepare("SELECT COALESCE(SUM(estoque),0) t FROM skus").get().t;
-    let vendJanela = 0;
-    try{ vendJanela = db.prepare("SELECT COUNT(*) n FROM venda_futura "+
-      "WHERE data_venda IS NOT NULL AND COALESCE(cancelada,0)=0 "+
-      "AND data_venda >= date('now','localtime','-'||?||' days') "+
-      "AND COALESCE(teste,0)=0").get(janela).n; }catch(e){}
-    const mediaDiaTotal = janela>0 ? vendJanela/janela : 0;
-    const cobertura = mediaDiaTotal>0 ? +(estoqueTotal/mediaDiaTotal).toFixed(1) : null;
+    const cob = FLUXO.cobertura(db, janela);
+    const estoqueTotal = cob.estoque_total;
+    const mediaDiaTotal = cob.media_dia_total;
+    const cobertura = cob.cobertura_dias;
 
     try{
       db.prepare(`INSERT INTO fechamento (data,produzido,vendido,variou,estoque_fim,cobertura,atualizado_em)

@@ -26,7 +26,7 @@ const {PDFDocument,StandardFonts}=require('pdf-lib');
 const fs=require('fs'), os=require('os'), path=require('path');
 const {parsePdf}=require('./parse');
 
-let falhas=0, casos=0;
+let falhas=0, casos=0, ULTIMO_PDF=null;
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'pcp-parse-'));
 
 /* Um item da folha, do jeito do ML. `pack` e `venda` sao opcionais: item sem
@@ -34,7 +34,8 @@ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'pcp-parse-'));
 function item(o){
   const l1=(o.id||'IDENT'+Math.abs(o.sku.length*7))+' Persiana Cortina Rolo Blackout '+o.medida+' Blecaute '+o.cor;
   const l2=(o.pack?('Pack ID: '+o.pack+' '):'')+(!o.pack&&o.venda?('Venda: '+o.venda+' '):'')+'SKU: '+o.sku;
-  const l3=(o.pack&&o.venda)?('Venda: '+o.venda+' Quantidade: 1'):(o.comprador+' Quantidade: 1');
+  const q=o.qtd||1;
+  const l3=(o.pack&&o.venda)?('Venda: '+o.venda+' Quantidade: '+q):(o.comprador+' Quantidade: '+q);
   const l4=(o.pack&&o.venda)?(o.comprador+' Cor: '+o.cor):('Cor: '+o.cor);
   return [l1,l2,l3,l4,'Desenho do tecido: '+(o.tecido||'Liso')];
 }
@@ -53,6 +54,7 @@ async function montar(itens, etiquetas){
       .concat(itens.map(item).reduce((a,b)=>a.concat(b),[])));
   const arq=path.join(tmp,'t'+casos+'.pdf');
   fs.writeFileSync(arq, await d.save());
+  ULTIMO_PDF=arq;                                    // pro caso 9, que rele a folha
   return parsePdf(new Uint8Array(fs.readFileSync(arq)));
 }
 function conferir(nome, orders, esperado){
@@ -185,6 +187,121 @@ function conferir(nome, orders, esperado){
       [{pack:'111',nf:'1',comprador:'Joao Silva'}]);
     if(/branco/i.test((cs[0]||{}).cor||'')) console.log('ok      a cor da folha continua chegando no volume');
     else { falhas++; console.log('FALHOU  a cor da folha continua chegando no volume — veio '+JSON.stringify((cs[0]||{}).cor)); }
+  }
+
+  /* ── 9. UM ITEM, TRES PECAS, UM VOLUME ────────────────────────────────────
+        O item que diz "Quantidade: 3" tem UMA etiqueta e por isso vira UM
+        volume — e quem contou as persianas na folha achou tres. Nao e erro de
+        leitura: e a diferenca entre contar peca e contar volume, e foi ela que
+        fez o PDF de 41 aparecer como 35 na tela.
+
+        O teste trava as duas metades: a folha tem que ENTREGAR o 3 (senao o
+        `--lote` nao consegue explicar a diferenca a ninguem) e o parse tem que
+        continuar gravando UM volume (senao nasceria uma etiqueta de venda que
+        o Mercado Livre nao emitiu). */
+  casos++;
+  {
+    const os_=await montar([
+      {pack:'111',venda:'901',sku:'BK140140BEGE',medida:'1,40x1,40',cor:'Bege',comprador:'Abraao Amorim',qtd:3},
+      {pack:'222',venda:'902',sku:'BK160160CINZA',medida:'1,60x1,60',cor:'Cinza',comprador:'Maria Souza'},
+    ],[
+      {pack:'111',nf:'1',comprador:'Abraao Amorim'},
+      {pack:'222',nf:'2',comprador:'Maria Souza'},
+    ]);
+    const {lerFolha}=require('./folha');
+    const insp=await lerFolha(ULTIMO_PDF);
+    const b=insp.blocos.find(x=>x.sku==='BK140140BEGE')||{};
+    const pecas=insp.blocos.reduce((a,x)=>a+(x.qtd||1),0);
+    const erros=[];
+    if(b.qtd!==3) erros.push('a folha nao entregou a Quantidade: veio '+JSON.stringify(b.qtd));
+    if(pecas!==4) erros.push('pecas da folha: esperava 4, veio '+pecas);
+    if(os_.length!==2) erros.push('volumes: esperava 2 (uma etiqueta por item), veio '+os_.length);
+    if(os_.some(o=>o.conflito)) erros.push('marcou conflito a toa: '+os_.map(o=>o.conflito).filter(Boolean).join(' / '));
+    if(erros.length){ falhas++; console.log('FALHOU  item com Quantidade 3 e 3 pecas em 1 volume');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      item com Quantidade 3 e 3 pecas em 1 volume');
+  }
+
+  /* ── 12. O NOME PARTIDO PELO PDF NAO VIRA O COMPRADOR ─────────────────────
+        "Dona Lizete (CONTADOR)" quebrado em duas linhas deixava "CONTADOR)" na
+        linha de cima do endereco, e era ISSO que virava o comprador do volume.
+        Em 31/08/2026 acusou os tres volumes da Dona Lizete, todos corretos. */
+  casos++;
+  {
+    const {nomeDaEtiqueta}=require('./parse');
+    const layouts=[
+      [['Dona Lizete (CONTADOR)','Endereço: Rua X'],'Dona Lizete','tudo numa linha'],
+      [['Dona Lizete','CONTADOR)','Endereço: Rua X'],'Dona Lizete','o ")" ficou orfao — o caso real'],
+      [['Dona Lizete (','CONTADOR)','Endereço: Rua X'],'Dona Lizete','quebrou no meio do parentese'],
+      [['Dona Lizete','(CONTADOR)','Endereço: Rua X'],'Dona Lizete','o parentetico inteiro embaixo'],
+      [['Tiago Sanches','Endereço: Rua X'],'Tiago Sanches','nome sem papel nenhum'],
+    ];
+    const erros=[];
+    layouts.forEach(([ls,esperado,quando])=>{
+      const veio=nomeDaEtiqueta(ls);
+      if(veio!==esperado) erros.push(quando+': esperava "'+esperado+'", veio "'+veio+'"');
+    });
+    if(erros.length){ falhas++; console.log('FALHOU  o nome partido pelo PDF e remontado');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      o nome partido pelo PDF e remontado');
+  }
+
+  /* ── 13. COR COM NOME COMERCIAL NAO E DIVERGENCIA ─────────────────────────
+        "Tóquio 004 - Cinza com acabamento branco" e um SKU CINZA dizem a mesma
+        coisa. Em 31/08/2026 cinco volumes seguidos foram retidos por isso.
+        O caso REAL (anuncio de uma cor, codigo de outra) tem que continuar
+        sendo acusado — e a segunda metade deste caso. */
+  casos++;
+  {
+    const os_=await montar([
+      {pack:'111',venda:'901',sku:'BK180150CINZA',medida:'1,80x1,50',cor:'Tóquio 004 - Cinza com acabamento branco',comprador:'Marcelo Sousa'},
+      {pack:'222',venda:'902',sku:'BK180150BEGE', medida:'1,80x1,50',cor:'Bege claro - Tóquio 002',comprador:'Monica Gusmao'},
+      {pack:'333',venda:'903',sku:'BK150150BEGE', medida:'1,50x1,50',cor:'Cinza',comprador:'Outro Cliente'},
+      // um item de cor simples, para "BEGE" existir entre as cores da folha
+      {pack:'444',venda:'904',sku:'BK150150BEGE', medida:'1,50x1,50',cor:'Bege',comprador:'Mais Um Cliente'},
+    ],[
+      {pack:'111',nf:'1',comprador:'Marcelo Sousa'},
+      {pack:'222',nf:'2',comprador:'Monica Gusmao'},
+      {pack:'333',nf:'3',comprador:'Outro Cliente'},
+      {pack:'444',nf:'4',comprador:'Mais Um Cliente'},
+    ]);
+    const erros=[];
+    ['111','222','444'].forEach(k=>{ const v=os_.find(o=>o.packId===k)||{};
+      if(v.conflito) erros.push('reteve a toa em '+k+': '+v.conflito); });
+    const real=os_.find(o=>o.packId==='333')||{};
+    if(!real.conflito || !/cor/.test(real.conflito))
+      erros.push('parou de acusar a cor trocada de verdade: '+JSON.stringify(real.conflito));
+    if(erros.length){ falhas++; console.log('FALHOU  cor com nome comercial passa, cor trocada continua retida');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      cor com nome comercial passa, cor trocada continua retida');
+  }
+
+  /* ── 14. DUAS LETRAS NO NOME NAO SAO OUTRO CLIENTE ────────────────────────
+        "Rufiino" x "Rufino" e digitacao do ML. Mas a tolerancia nao pode virar
+        porta: nomes de pessoas diferentes tem que continuar acusando, e e isso
+        que a segunda metade cobre — e a unica conferencia que nao depende do
+        Pack ID. */
+  casos++;
+  {
+    const {mesmoNomeComRepeticao}=require('./parse');
+    const chave=s=>String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
+    const mesma=(x,y)=>mesmoNomeComRepeticao(chave(x),chave(y));
+    const erros=[];
+    if(!mesma('Ryta de Kassia Andrade Rufiino','Ryta De Kassia Andrade Rufino'))
+      erros.push('nao reconheceu a mesma pessoa com a letra dobrada (caso Ryta)');
+    /* O que NAO pode passar: letra TROCADA e outra pessoa, por mais parecida
+       que seja. Marcelo/Marcela esta a duas letras e sao dois clientes. */
+    [['Silvia Carolina Souza','Evandro Pereira Lima'],
+     ['Ana Paula Ayres Serpa','Ana Paula Ayres Costa'],
+     ['Marcelo Sousa Silva','Marcela Sousa Silvo'],
+     ['Marcelo Sousa Silva','Marcela Sousa Silva'],
+     ['Joao Pedro Lima','Joana Pedro Lima']].forEach(([x,y])=>{
+      if(mesma(x,y)) erros.push('tratou como a mesma pessoa: "'+x+'" e "'+y+'"');
+    });
+    if(erros.length){ falhas++; console.log('FALHOU  erro de digitacao passa, cliente diferente nao');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      erro de digitacao passa, cliente diferente nao');
   }
 
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}

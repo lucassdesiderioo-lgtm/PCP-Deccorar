@@ -1,7 +1,8 @@
 const express=require('express'); const fs=require('fs');
 const {parsePdf}=require('./parse'); const {PDFDocument}=require('pdf-lib');
+const {futuro}=require('./carga');
 module.exports=function(app,db){
-  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT);");
+  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
   // sao so historia: quantas vezes o volume voltou pra impressora e quando foi a
   // ultima. O ALTER mora aqui, no dono da tabela (§17 do CLAUDE.md), com a
@@ -9,6 +10,14 @@ module.exports=function(app,db){
   // producao. Sem default dinamico em reimpresso_em: ALTER nao aceita.
   try{ db.exec("ALTER TABLE lote ADD COLUMN reimpressoes INTEGER DEFAULT 0"); }catch(e){}
   try{ db.exec("ALTER TABLE lote ADD COLUMN reimpresso_em TEXT"); }catch(e){}
+  /* QUEM DESEMPATOU, E QUAL ERA A DUVIDA. Resolver uma divergencia apaga o
+     `bloqueio`, e com ele o unico registro de que uma peca errada quase foi
+     despachada. Sem estas tres colunas o volume resolvido fica indistinguivel
+     do volume que nunca teve problema — e a trava passa a nao deixar rastro
+     nenhum de quantas vezes ela salvou (ou de quem a destravou com pressa). */
+  try{ db.exec("ALTER TABLE lote ADD COLUMN bloqueio_resolvido TEXT"); }catch(e){}
+  try{ db.exec("ALTER TABLE lote ADD COLUMN resolvido_por TEXT"); }catch(e){}
+  try{ db.exec("ALTER TABLE lote ADD COLUMN resolvido_em TEXT"); }catch(e){}
   // POR QUE o volume foi bloqueado. Ate aqui so havia um motivo possivel (SKU
   // fora do cadastro) e ele se lia do proprio codigo; com a divergencia de
   // leitura da folha sao dois, e eles se resolvem de formas diferentes — um
@@ -18,6 +27,13 @@ module.exports=function(app,db){
   // a familia do produto na conferencia 5, e porque ter o texto original ajuda
   // a entender uma divergencia meses depois.
   try{ db.exec("ALTER TABLE lote ADD COLUMN descricao TEXT"); }catch(e){}
+  /* A DATA LIMITE DE DESPACHO que a etiqueta traz ("Despachar: qua 26/ago").
+     Nem todo volume de um lote sai no mesmo dia — no PDF de 25/08 as 14
+     etiquetas tinham CINCO datas, so 6 para o dia seguinte. Sem esta coluna a
+     fila "Faltam imprimir" cobra hoje a etiqueta que so vence em tres semanas.
+     Fica NULL quando a linha nao deu pra ler: volume sem data conhecida conta
+     como de hoje, porque some da fila e pior que aparecer cedo demais. */
+  try{ db.exec("ALTER TABLE lote ADD COLUMN despachar_em TEXT"); }catch(e){}
 
   /* ── O QUE O SISTEMA APRENDE SOBRE FAMILIA x PREFIXO DE SKU ────────────────
      Medida e cor nao separam duas pecas que so diferem no TECIDO — e elas
@@ -53,8 +69,20 @@ module.exports=function(app,db){
       const buf=Buffer.from(b64,'base64');
       const orders=await parsePdf(new Uint8Array(buf));
       const fname='/opt/expedicao/lotes/'+Date.now()+'.pdf'; fs.writeFileSync(fname,buf);
-      const seen=new Set(); db.prepare("SELECT packId,venda FROM lote WHERE data=date('now','localtime')").all().forEach(r=>{ if(r.packId)seen.add('p:'+r.packId); if(r.venda)seen.add('v:'+r.venda); });
-      const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio,descricao) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+      /* A DEDUPLICACAO OLHA O HISTORICO INTEIRO, NAO SO O DIA.
+         Pack ID e Venda sao numeros do Mercado Livre: cada volume tem o seu, e
+         ele nunca se repete em outra venda. Entao "ja existe" e resposta
+         definitiva, nao "ja existe hoje".
+         Enquanto ela olhava so o dia, resubir um PDF de ontem — ou um PDF que
+         repete vendas de dias anteriores, que e o normal quando o lote e
+         reemitido — reinseria tudo como PENDENTE de hoje. O volume ja tinha
+         sido impresso e carregado; voltava para a fila "Faltam imprimir" como
+         se faltasse. Em 25/08 foram 94 volumes fantasmas num dia so, e os
+         montes orfaos de 21, 19 e 18/08 mostram que vinha acontecendo ha
+         semanas. Uma fila que mostra o que nao existe e uma fila que a equipe
+         aprende a ignorar — e ai o volume que falta de verdade some junto. */
+      const seen=new Set(); db.prepare("SELECT packId,venda FROM lote").all().forEach(r=>{ if(r.packId)seen.add('p:'+r.packId); if(r.venda)seen.add('v:'+r.venda); });
+      const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio,descricao,despachar_em) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
       const existe=db.prepare('SELECT 1 FROM skus WHERE codigo=?');
       const famVista=db.prepare('SELECT prefixo,vezes FROM familia_sku WHERE familia=?');
       const famGrava=db.prepare(`INSERT INTO familia_sku (familia,prefixo,vezes) VALUES (?,?,1)
@@ -89,7 +117,7 @@ module.exports=function(app,db){
         else if(!ok){ est='bloqueado'; bloq++; motivo='sku_nao_cadastrado';
           const k=sku||'(sem SKU na folha)'; desconhecidos[k]=(desconhecidos[k]||0)+1; }
         if(!o.sku) semsku++;
-        ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null); novos++;
+        ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null,o.despacharEm||null); novos++;
       }})();
       res.json({ok:true,total:orders.length,novos,repetidas:rep,sem_sku:semsku,bloqueados:bloq,divergencias:divs,
                 desconhecidos:Object.keys(desconhecidos).map(k=>({sku:k,qtd:desconhecidos[k]}))});
@@ -152,10 +180,55 @@ module.exports=function(app,db){
     }catch(e){ console.error(e); res.status(500).json({erro:String(e.message||e)}); }
   });
 
+  /* AS OPCOES SAEM DO CADASTRO, NAO DO TEXTO DO BLOQUEIO.
+     A tela montava os botoes dando split("/") no motivo, e isso so devolve SKU
+     quando o motivo e "leituras divergem: A / B". Nos outros quatro o botao
+     saia com a frase inteira dentro ("descricao diz 160x140 e o SKU e BK...") e
+     o resolver recusava, porque aquilo nao e codigo nenhum. Na pratica quatro
+     dos cinco motivos retinham o volume PARA SEMPRE — a trava sabia acusar e
+     nao sabia liberar, que e o jeito mais rapido de ensinar a equipe a
+     desconfiar dela.
+
+     Agora o candidato e conferido contra `skus`: varre o cadastro e fica com os
+     codigos que aparecem no texto do motivo. Acha SKU com espaco ("ROLO SOB
+     MEDIDA 137x212", §7), que nenhuma quebra por token acharia, e nunca oferece
+     um codigo que nao existe — o resolver ia recusar dois cliques depois. */
+  const skusParaEscolha=()=>db.prepare(`SELECT s.codigo, s.largura_cm, s.altura_cm,
+      COALESCE(c.nome,s.cor_codigo,s.cor) cor_nome,
+      COALESCE(t.nome,s.tecido_codigo) tecido_nome,
+      m.nome modelo_nome, COALESCE(m.exige_medida,1) exige_medida
+    FROM skus s
+    LEFT JOIN cor c ON c.codigo=s.cor_codigo
+    LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
+    LEFT JOIN modelo m ON m.id=s.modelo_id`).all();
+
   app.get('/api/divergencias',(req,res)=>{
-    res.json(db.prepare(`SELECT id,codigo,buyer,city,nf,packId,venda,data,bloqueio
+    const rows=db.prepare(`SELECT id,codigo,buyer,city,nf,packId,venda,data,bloqueio,descricao
       FROM lote WHERE estagio='bloqueado' AND bloqueio LIKE 'divergencia%'
-      ORDER BY data DESC, id DESC`).all());
+      ORDER BY data DESC, id DESC`).all();
+    if(!rows.length) return res.json([]);
+    const cad=skusParaEscolha();
+    res.json(rows.map(r=>{
+      const texto=String(r.bloqueio||'').toUpperCase();
+      let cand=cad.filter(s=>texto.includes(String(s.codigo).toUpperCase()));
+      /* O codigo mais longo manda: achar "KIT32" dentro de "KIT320" ofereceria
+         uma peca que o motivo nunca citou. */
+      cand=cand.filter(s=>!cand.some(o=>o!==s &&
+        String(o.codigo).toUpperCase().includes(String(s.codigo).toUpperCase())));
+      /* O QUE ESTA GRAVADO E SEMPRE UMA OPCAO, e vem primeiro. Nas conferencias
+         3, 4 e 5 a duvida e entre o codigo e o ANUNCIO — e quem abriu o pedido
+         no ML pode muito bem concluir que o codigo estava certo desde o inicio.
+         Sem esta opcao, concordar com o sistema era a unica resposta que a tela
+         nao aceitava. */
+      const atual=cad.find(s=>String(s.codigo).toUpperCase()===String(r.codigo||'').toUpperCase());
+      if(atual) cand=[atual].concat(cand.filter(s=>s!==atual));
+      return Object.assign({},r,{
+        motivos:String(r.bloqueio||'').replace(/^divergencia:\s*/,'').split(' · ').filter(Boolean),
+        gravado:r.codigo||null,
+        gravado_cadastrado: !!atual,
+        opcoes:cand
+      });
+    }));
   });
   /* Resolver = alguem OLHOU o pedido no Mercado Livre e disse qual e o SKU.
      Nao ha escolha automatica possivel aqui: se houvesse, nao teria bloqueado. */
@@ -166,12 +239,87 @@ module.exports=function(app,db){
     const o=db.prepare('SELECT * FROM lote WHERE id=?').get(id);
     if(!o) return res.status(404).json({erro:'volume nao encontrado'});
     if(!/^divergencia/.test(String(o.bloqueio||''))) return res.json({erro:'esse volume nao esta em divergencia'});
-    if(!db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(sku)) return res.json({erro:'SKU nao cadastrado: '+sku});
-    db.prepare("UPDATE lote SET codigo=?, estagio='pendente', bloqueio=NULL WHERE id=?").run(sku,id);
-    res.json({ok:true,id:id,codigo:sku});
+    if(!db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(sku))
+      return res.json({erro:'SKU nao cadastrado: '+sku+'. Cadastre em Cadastro de SKU e volte aqui — '+
+        'a trava do §6 recusaria a etiqueta de qualquer jeito.'});
+    /* A DUVIDA VIRA HISTORIA, NAO SOME. O `bloqueio` e apagado porque e ele que
+       retem o volume; o texto dele fica guardado ao lado de quem desempatou.
+       Volume resolvido as pressas e volume resolvido com o pedido aberto na
+       tela sao a mesma linha no banco se ninguem gravar a diferenca. */
+    const quem=(req.usuario&&req.usuario.nome)||'';
+    db.prepare(`UPDATE lote SET codigo=?, estagio='pendente', bloqueio=NULL,
+      bloqueio_resolvido=?, resolvido_por=?, resolvido_em=datetime('now','localtime')
+      WHERE id=?`).run(sku,o.bloqueio,quem,id);
+    try{ app.locals.acesso.auditar(req,'expedicao','resolver_divergencia',id,
+      String(o.bloqueio||'')+'  ->  '+sku+(String(o.codigo||'').toUpperCase()===sku?'  (confirmou o que estava gravado)':'')); }catch(e){}
+    res.json({ok:true,id:id,codigo:sku,manteve:String(o.codigo||'').toUpperCase()===sku});
   });
+  /* A FILA E POR DATA DE DESPACHO, NAO POR DATA DE ENTRADA.
+     O que decide se a etiqueta sai hoje e o prazo que o Mercado Livre carimbou
+     na etiqueta, nao o dia em que o PDF foi subido: um lote traz volumes de
+     varias datas ao mesmo tempo (no PDF de 25/08, cinco datas em 14 etiquetas).
+     Entra na fila o que vence hoje, o que ja venceu — atraso tem que gritar,
+     nao sumir — e o que nao tem data lida, porque volume invisivel e pior que
+     volume cedo demais.
+     O filtro por `data` sai: um volume de ontem que vence hoje e trabalho de
+     hoje, e era justamente ele que desaparecia. */
+  const {filaDoDia}=require('./fila_dia');
+  const FILA_HOJE=filaDoDia();
+  /* A LISTA E O ROTEIRO DE BUSCA, NAO UM PLACAR.
+     Quem esta na expedicao le esta lista e vai PROCURAR as caixas no estoque.
+     So o codigo ("BK160140BEGE") serve para quem decorou o catalogo — e a tela
+     e usada por gente diferente a cada dia. Por isso vao junto as colunas de
+     `skus` (§7): medida, cor, tecido e modelo, que e o que se le na prateleira.
+     O JOIN e por UPPER(codigo) porque o lote guarda o codigo como veio da
+     folha; skus.codigo e a chave. */
   app.get('/api/pendentes',(req,res)=>{
-    res.json(db.prepare("SELECT codigo, COUNT(*) qtd FROM lote WHERE data=date('now','localtime') AND estagio='pendente' AND codigo IS NOT NULL GROUP BY codigo ORDER BY qtd DESC").all());
+    res.json(db.prepare(`SELECT l.codigo, COUNT(*) qtd,
+        MIN(l.despachar_em) vence_em,
+        SUM(CASE WHEN l.despachar_em IS NOT NULL AND l.despachar_em<date('now','localtime') THEN 1 ELSE 0 END) atrasados,
+        s.largura_cm, s.altura_cm,
+        COALESCE(c.nome,s.cor_codigo,s.cor) cor_nome,
+        COALESCE(t.nome,s.tecido_codigo) tecido_nome,
+        m.nome modelo_nome, COALESCE(m.exige_medida,1) exige_medida,
+        s.estoque
+      FROM lote l
+      LEFT JOIN skus s ON s.codigo=l.codigo
+      LEFT JOIN cor c ON c.codigo=s.cor_codigo
+      LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
+      LEFT JOIN modelo m ON m.id=s.modelo_id
+      WHERE ${filaDoDia('l')}
+      GROUP BY l.codigo ORDER BY atrasados DESC, qtd DESC`).all());
+  });
+  /* OS NUMEROS DA TELA, NUM LUGAR SO.
+     A tela mostrava "15 PENDENTES" no topo e "Nada pendente" na lista logo
+     abaixo — duas respostas opostas para a mesma pergunta, na mesma tela. Nao
+     era divergencia de opiniao: eram tres consultas com reguas diferentes
+     (/api/lote contava tudo que ENTROU hoje, a lista filtrava por PRAZO, e o
+     relogio de despacho tinha uma terceira). Quando o operador ve dois numeros
+     que se contradizem, ele para de confiar em todos.
+     Daqui pra frente a tela pergunta uma vez so, e a regua e a do fila_dia. */
+  app.get('/api/fila/resumo',(req,res)=>{
+    const hoje=db.prepare(`SELECT COUNT(*) c FROM lote WHERE ${FILA_HOJE}`).get().c;
+    const atras=db.prepare(`SELECT COUNT(*) c FROM lote WHERE estagio='pendente'
+      AND despachar_em IS NOT NULL AND despachar_em<date('now','localtime')`).get().c;
+    const fut=db.prepare(`SELECT COUNT(*) c FROM lote WHERE estagio='pendente'
+      AND despachar_em IS NOT NULL AND despachar_em>date('now','localtime')`).get().c;
+    /* Impressas HOJE conta por embalado_em, nao por `data`: um volume que
+       entrou ontem e foi impresso hoje e trabalho de hoje. Pelo criterio antigo
+       ele nao aparecia, e o placar do dia saia menor do que o dia rendeu. */
+    const imp=db.prepare(`SELECT COUNT(*) c FROM lote
+      WHERE embalado_em IS NOT NULL AND date(embalado_em)=date('now','localtime')`).get().c;
+    res.json({hoje,atrasados:atras,futuros:fut,impressas_hoje:imp});
+  });
+  /* O QUE VEM PELA FRENTE — venda ja faturada com prazo de despacho futuro.
+     Fica fora da fila do dia de proposito: cobrar hoje o que so vence em tres
+     semanas e o que ensina a equipe a ignorar a fila inteira. Mas nao pode
+     sumir, senao ninguem planeja a producao — entao aparece em painel proprio,
+     agrupado por data. */
+  app.get('/api/pendentes/futuros',(req,res)=>{
+    res.json(db.prepare(`SELECT despachar_em, codigo, COUNT(*) qtd
+      FROM lote WHERE estagio='pendente' AND codigo IS NOT NULL
+        AND despachar_em IS NOT NULL AND despachar_em>date('now','localtime')
+      GROUP BY despachar_em, codigo ORDER BY despachar_em, codigo`).all());
   });
   app.get('/api/lote',(req,res)=> res.json(db.prepare("SELECT id,codigo,cor,buyer,city,nf,estagio FROM lote WHERE data=date('now','localtime') ORDER BY id").all()));
 
@@ -187,12 +335,19 @@ module.exports=function(app,db){
   // antigo, que e a ordem em que o operador procura.
   app.get('/api/impressos',(req,res)=>{
     let dias=parseInt(req.query.dias,10); if(!(dias>=1)) dias=1; if(dias>30) dias=30;
-    res.json(db.prepare(`SELECT id,codigo,cor,buyer,city,nf,packId,venda,estagio,data,
+    const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
+    /* `adiantada` = a etiqueta saiu antes do prazo de despacho dela. Vem
+       marcada daqui, pela MESMA funcao que a tela de carregamento usa
+       (carga.js): a lista de reimpressao e uma terceira tela perguntando "esta
+       venda e de hoje?", e a terceira regua seria a que discorda das outras
+       duas. */
+    res.json(db.prepare(`SELECT id,codigo,cor,buyer,city,nf,packId,venda,estagio,data,despachar_em,
         embalado_em,carregado_em,COALESCE(reimpressoes,0) reimpressoes,reimpresso_em
       FROM lote
       WHERE estagio IN ('embalado','carregado')
         AND data >= date('now','localtime','-'||?||' day')
-      ORDER BY COALESCE(embalado_em,criado_em) DESC, id DESC LIMIT 400`).all(dias-1));
+      ORDER BY COALESCE(embalado_em,criado_em) DESC, id DESC LIMIT 400`).all(dias-1)
+      .map(v=>Object.assign({},v,{adiantada: futuro(v,hoje)?1:0})));
   });
 
   // Reimprimir NAO mexe no estoque. A baixa (-1) acontece uma unica vez, no

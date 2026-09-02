@@ -38,7 +38,7 @@
   <div class="banner" id="banner"><div class="bt">Pronto</div><div class="bs">Bipe o QR ou código de barras da etiqueta de venda.</div></div>
   <input id="scan" autocomplete="off">
   <button class="btn conf" onclick="conferir()" style="width:100%">✓ Conferir carga</button>
-  <div class="card" style="margin-top:14px"><h3>Faltam carregar</h3><div id="lista"></div></div>
+  <div class="card" style="margin-top:14px"><h3>Faltam carregar</h3><div id="lista"></div><div id="depois"></div></div>
 </div>
 <script>
 const $=s=>document.querySelector(s);
@@ -83,18 +83,48 @@ async function bip(code){
   }
   carregar();
 }
+/* O ATRASADO SAI MARCADO E EM CIMA (carga.js).
+   Ele ja vem primeiro do servidor. Aqui so ganha a tarja: diluido no meio do
+   trabalho de hoje, sem nada que o distinga, ele viraria uma linha a mais numa
+   lista que nunca zera — e lista que nunca zera ninguem le ate o fim. */
+function dataBR(s){ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?(m[3]+'/'+m[2]):''; }
 async function carregar(){
   const d=await (await fetch('/api/carregamento')).json();
   $('#nCar').textContent=d.carregados; $('#nFal').textContent=d.faltam.length;
-  $('#lista').innerHTML = d.faltam.length ? d.faltam.map(f=>'<div class="row"><span class="who">'+f.buyer+' <span class="c">NF '+(f.nf||'—')+' · '+(f.codigo||'')+'</span></span></div>').join('') : '<div class="empty">✅ Nada faltando — tudo carregado!</div>';
+  $('#lista').innerHTML = d.faltam.length ? d.faltam.map(function(f){
+    return '<div class="row"><span class="who">'
+      +(f.atrasado?'<b style="color:var(--amber)">⏳ de '+dataBR(f.data)+'</b> · ':'')
+      +f.buyer+' <span class="c">NF '+(f.nf||'—')+' · '+(f.codigo||'')+'</span></span></div>';
+  }).join('') : '<div class="empty">✅ Nada faltando — tudo carregado!</div>';
+  /* A venda futura aparece, mas fora da cobranca: ela existe e esta na
+     fabrica (nao pode sumir, foi esse o buraco), so nao e carga de hoje. */
+  var dp=document.getElementById('depois');
+  if(dp) dp.innerHTML = d.adiantadas
+    ? '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#eef3fb;'
+      +'border:1px solid #c9d8ee;font-size:14px">📅 <b>'+d.adiantadas+'</b> com etiqueta impressa '
+      +'que <b>só despacham depois</b> — não vão no carro hoje: '
+      +d.depois.slice(0,6).map(function(f){ return esc0(f.buyer)+' ('+dataBR(f.despachar_em)+')'; }).join(', ')
+      +(d.depois.length>6?'…':'')+'</div>'
+    : '';
 }
+function esc0(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 async function conferir(){
   const d=await (await fetch('/api/carregamento')).json();
-  if(d.total===0){ banner('warn','Sem lote hoje','Nada foi embalado hoje ainda.'); return; }
+  /* "Sem lote" olha o que FALTA, nao o dia: com volume atrasado esperando, o
+     aviso de dia vazio mandaria fechar o carro por cima dele. */
+  if(d.total===0){ banner('warn','Nada pra carregar','Nenhum volume embalado esperando.'); return; }
   if(d.faltam.length===0){ banner('ok','Carga completa ✓','Pode fechar o carro. '+d.carregados+' pacotes conferidos.'); beep(true); }
-  else{ banner('err','Faltam '+d.faltam.length+' no carro','NÃO feche ainda: '+d.faltam.slice(0,6).map(f=>f.buyer).join(', ')+(d.faltam.length>6?'…':'')); beep(false); }
+  else{ banner('err','Faltam '+d.faltam.length+' no carro',
+    (d.atrasados?'<b>'+d.atrasados+' de dias anteriores.</b> ':'')
+    +'NÃO feche ainda: '+d.faltam.slice(0,6).map(f=>f.buyer).join(', ')+(d.faltam.length>6?'…':'')); beep(false); }
 }
-const scan=$('#scan'); const keep=()=>{ if(document.activeElement!==scan) scan.focus(); };
+const scan=$('#scan');
+/* preventScroll: devolver o foco nao pode arrastar a tela. O #scan mora no
+   alto; sem isto, focar de volta rolava a pagina ate ele e jogava pro topo
+   quem tivesse descido pra usar qualquer coisa no fim. O keep existe pro
+   BIPE cair no lugar certo, nao pra mexer no que a pessoa esta olhando. */
+const keep=()=>{ if(document.activeElement!==scan) scan.focus({preventScroll:true}); };
 scan.addEventListener('blur',()=>setTimeout(keep,50));
 document.addEventListener('click',e=>{ if(!e.target.closest('button,a')) keep(); });
 scan.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=scan.value.trim(); scan.value=''; bip(v); } });

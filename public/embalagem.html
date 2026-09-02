@@ -8,15 +8,35 @@
   .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
   h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
   .link{margin-left:auto;font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
-  .wrap{max-width:820px;margin:0 auto;padding:18px}
+  /* A barra de navegacao do nav.js e `position:fixed` no rodape e cobria o fim
+     da pagina — o painel "Pra despachar depois" ficava cortado por baixo dela.
+     Espaco reservado aqui; generoso porque a barra quebra em duas linhas em
+     tela estreita. */
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 18px 110px}
+  /* DUAS COLUNAS NUM MONITOR: à esquerda o que se FAZ (bipar e o resultado), à
+     direita o que se PROCURA (a lista das caixas que faltam). As duas coisas
+     acontecem juntas — a pessoa lê a lista, vai buscar a caixa, volta e bipa —
+     e ter que rolar a tela entre uma e outra é atrito a cada volume.
+     Abaixo de 900px empilha sozinho: a regra de ouro continua sendo o campo de
+     bipe em primeiro lugar. */
+  .colunas{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;align-items:start}
+  @media(max-width:900px){ .colunas{grid-template-columns:1fr} }
   .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:26px;margin-bottom:16px}
   .banner.cfm{background:#e8f0fb;border-color:#a9c9ee}.banner.ok{background:#e7f5eb;border-color:#a9d8b4}.banner.err{background:#fbe9e8;border-color:#efb1ad}.banner.warn{background:#fbf1db;border-color:#e7cb8c}
   .bt{font-size:26px;font-weight:750}.bs{font-size:15px;color:var(--muted);margin-top:6px;line-height:1.5}.bs b{color:var(--txt)}
+  /* Na confirmação o título é ROTULO, não manchete: quem tem que saltar aos
+     olhos é o nome do cliente logo abaixo. Com os dois no mesmo peso viravam
+     uma frase só, e a pessoa lia "Confira esta venda Mariana Buzetti". */
+  .banner.rotulo .bt{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
   .sku{font-family:ui-monospace,monospace;background:#edf0f4;border:1px solid var(--line);padding:2px 8px;border-radius:6px}
   .acts{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
   button{cursor:pointer;border:0;border-radius:10px;font-weight:700;font-size:14px;padding:12px 18px}
   .primary{background:var(--amber);color:#1a1300}.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
-  #scan{display:block;width:100%;max-width:520px;margin:0 auto 14px;padding:14px;font-size:17px;font-family:ui-monospace,monospace;text-align:center;letter-spacing:1px;background:#f4f6f8;border:2px solid #d8dee6;border-radius:12px;color:#1a1d23}#scan:focus{outline:none;border-color:#b26a00}
+  /* O campo e o protagonista da tela: maior, com a borda ambar sempre visivel,
+     pra quem chega saber onde bipar sem procurar. */
+  #scan{display:block;width:100%;max-width:560px;margin:0 auto 10px;padding:20px;font-size:22px;font-weight:700;font-family:ui-monospace,monospace;text-align:center;letter-spacing:1px;background:#fff;border:3px solid #b26a00;border-radius:14px;color:#1a1d23}
+  #scan::placeholder{color:#b0b8c2;font-weight:400;letter-spacing:2px}
+  #scan:focus{outline:none;box-shadow:0 0 0 4px rgba(178,106,0,.18)}
   .stats{display:flex;gap:12px;margin-bottom:8px}
   .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
   .stat .n{font-size:28px;font-weight:800}.stat .l{font-size:12px;color:var(--muted);text-transform:uppercase}
@@ -41,6 +61,10 @@
   .imp .meta b{color:var(--txt);font-family:ui-monospace,monospace}
   .tag{display:inline-block;background:#fbf1db;border:1px solid #e7cb8c;color:#7a5200;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700;margin-left:6px}
   .tagU{display:inline-block;background:var(--amber);color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:800;margin-left:6px;letter-spacing:.4px}
+  /* ADIANTADA: mesma cor do aviso "ADIANTANDO" que aparece no bipe. As duas
+     telas falam da mesma coisa — venda entregue antes do prazo —, e cor
+     diferente pra mesma coisa ensina a equipe que sao coisas diferentes. */
+  .tagA{display:inline-block;background:#e8f0fb;border:1px solid #7aa3d8;color:#1f4b82;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:800;margin-left:6px}
   .imp.ultima{background:#fff8e6;border:1px solid #e7cb8c;border-radius:12px;padding:12px;margin-bottom:6px}
   .rebt{background:#edf0f4;color:var(--txt);border:1px solid var(--line);padding:10px 16px;font-size:14px;white-space:nowrap}
   .rebt.forte{background:var(--amber);color:#fff;border-color:#8f5500;font-weight:800}
@@ -48,31 +72,49 @@
   .vazio{color:var(--muted);font-size:14px}
   iframe{position:fixed;left:-9999px;width:0;height:0;border:0}
 </style></head><body>
-<header><div class="mark">B</div><div><h1>Etiqueta de Venda</h1><div class="sub">Bipe o SKU · confira · bipe de novo pra imprimir</div></div>
-<a class="link" href="/painel">Painel</a></header>
+<!-- O link "Painel" saiu daqui: o rodape de navegacao ja tem "Alt+1 Painel", e
+     dois caminhos pro mesmo lugar na mesma tela e ruido. O subtitulo fica —
+     ele e a instrucao do fluxo pra quem so usa esta tela de vez em quando. -->
+<header><div class="mark">B</div><div><h1>Etiqueta de Venda</h1><div class="sub">Bipe o SKU · confira · bipe de novo pra imprimir</div></div></header>
 <div class="wrap">
-  <div class="stats">
-    <div class="stat pend"><div class="n" id="nPend">0</div><div class="l">Pendentes</div></div>
-    <div class="stat emb"><div class="n" id="nEmb">0</div><div class="l">Embaladas hoje</div></div>
+  <!-- O QUE SE FAZ AQUI VEM PRIMEIRO.
+       Esta e uma tela de bipar: o operador chega com a caixa na mao e uma coisa
+       pra fazer. Antes ele passava por um alarme vermelho, dois contadores e um
+       botao de upload ate chegar no campo. O que e 95% do uso estava em quarto
+       lugar. -->
+  <div class="colunas">
+    <div>
+      <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="bipe aqui">
+      <!-- Uma linha, tres numeros, nenhum concorrendo com o outro: o que falta
+           hoje manda, o resto e contexto. -->
+      <div id="resumo"></div>
+      <div class="banner" id="banner"></div>
+      <!-- Reimprimir mora do lado do bipe, e nao no fim da pagina: as duas
+           coisas sao a MESMA mao no mesmo momento — imprimiu, o papel enroscou,
+           reimprime. Descer pra buscar isso no rodape e atrito na pior hora. -->
+      <div class="card" style="margin-top:16px">
+        <div class="ttl">
+          <span>Já impressos — reimprimir</span>
+          <select class="sel" id="impDias"><option value="1">hoje</option><option value="2">2 dias</option><option value="7">7 dias</option><option value="30">30 dias</option></select>
+          <span id="impQtd" style="margin-left:auto"></span>
+        </div>
+        <input class="busca" id="impBusca" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="buscar por cliente, NF ou SKU">
+        <div id="impLista"></div>
+      </div>
+    </div>
+    <div>
+      <div class="card"><div class="ttl">Faltam imprimir</div><div id="pendLista"></div></div>
+      <div class="card" id="futBox" style="margin-top:16px;display:none;border-left:4px solid #7aa3d8"></div>
+    </div>
   </div>
-  <div class="up" id="upBox" style="display:none">
+  <!-- Subir PDF desceu pro fim: e tarefa de quem administra, uma vez por dia,
+       e ocupava espaco nobre na tela de quem bipa cem vezes. -->
+  <div class="up" id="upBox" style="display:none;margin-top:16px">
     <button class="uphd" id="upTgl" type="button">📄 Subir PDF do Mercado Livre (vendas do dia) ▾</button>
     <div class="upbody" id="upBody" style="display:none">
       <label class="drop" for="file">Clique ou solte um ou mais PDFs do Mercado Livre aqui<input type="file" id="file" accept="application/pdf" multiple style="display:none"></label>
       <div class="upres" id="upRes"></div>
     </div>
-  </div>
-  <div class="banner" id="banner"></div>
-  <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="bipe aqui">
-<div class="card" style="margin-top:16px"><div class="ttl">Faltam imprimir</div><div id="pendLista"></div></div>
-  <div class="card" style="margin-top:16px">
-    <div class="ttl">
-      <span>Já impressos — reimprimir</span>
-      <select class="sel" id="impDias"><option value="1">hoje</option><option value="2">2 dias</option><option value="7">7 dias</option><option value="30">30 dias</option></select>
-      <span id="impQtd" style="margin-left:auto"></span>
-    </div>
-    <input class="busca" id="impBusca" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="buscar por cliente, NF ou SKU">
-    <div id="impLista"></div>
   </div></div>
 <iframe id="pr"></iframe>
 <!-- antes do bloco de baixo: e dele que vem pecaTexto -->
@@ -88,8 +130,8 @@ function banner(kind,title,sub,acts){ emIdle=false; $('#banner').className='bann
 function idle(){
   confirmar=null;
   var u=(impCache||[])[0];   // var hoisted: no primeiro idle() a lista ainda nem carregou
-  if(!u){ banner('','Pronto','Bipe o SKU da embalagem pra puxar a próxima venda.'); emIdle=true; return; }
-  banner('','Pronto','Bipe o SKU da embalagem pra puxar a próxima venda.'
+  if(!u){ banner('','Bipe o SKU da caixa','A próxima venda desse SKU aparece aqui pra você conferir.'); emIdle=true; return; }
+  banner('','Bipe o SKU da caixa','A próxima venda desse SKU aparece aqui pra você conferir.'
     +'<br><b>Última impressão:</b> '+esc(u.buyer||'—')+' · NF <b>'+esc(u.nf||'—')+'</b>'
     +' · <span class="sku">'+esc(u.codigo||'')+'</span> · '+horaDe(u.embalado_em),
     '<button class="rebt forte" onclick="reimprimir('+u.id+',this)">🖨 Reimprimir a última</button>');
@@ -101,17 +143,34 @@ function idle(){
    carregamento. Estes quatro campos sao a unica conferencia possivel contra
    isso: o operador olha a peca aberta na bancada e olha a tela. Por isso vem
    ANTES do cliente, e nao rodape de detalhe. */
-function pecaHtml(p){
-  if(!p) return '';
-  // pecaTexto vem do /sku.js — mesmo formatador da tela de Embalagem.
-  var t=(typeof pecaTexto==='function') ? pecaTexto(p) : '';
-  if(!t) return '<div class="peca falta">⚠ Sem medida e cor no cadastro — não dá pra conferir a peça</div>';
-  return '<div class="peca">'+esc(t)+'</div>';
-}
+// pecaTexto vem do /sku.js — mesmo formatador da tela de Embalagem, pra que as
+// duas escrevam a medida do mesmo jeito (§4: duas telas escrevendo cada uma do
+// seu jeito ensinariam a equipe a achar que são coisas diferentes).
+function pecaTxt(p){ return (p && typeof pecaTexto==='function') ? (pecaTexto(p)||'') : ''; }
+/* A LINHA DE NUMEROS FALA, NAO SO CONTA.
+   "15 PENDENTES" nao dizia o que fazer, e ainda contradizia a lista logo
+   abaixo. Agora e uma frase: quanto falta hoje, quanto disso esta atrasado,
+   quanto da pra adiantar e quanto ja saiu. Um numero manda (o de hoje); o resto
+   e contexto, em cinza, sem competir. */
 async function stats(){
-  const d=await (await fetch('/api/lote')).json();
-  $('#nPend').textContent=d.filter(x=>x.estagio==='pendente').length;
-  $('#nEmb').textContent=d.filter(x=>x.estagio==='embalado').length;
+  var d=null;
+  try{ d=await (await fetch('/api/fila/resumo')).json(); }catch(e){ return; }
+  var el=$('#resumo'); if(!el) return;
+  var h='';
+  if(d.hoje>0){
+    h='<b style="font-size:26px;color:var(--amber)">'+d.hoje+'</b>'
+      +'<span style="font-size:16px;font-weight:700"> pra imprimir agora</span>';
+    if(d.atrasados>0) h+='<span style="color:var(--red);font-weight:700"> · '+d.atrasados+' fora do prazo</span>';
+  } else {
+    // "Acabou por hoje" é o que a pessoa precisa ouvir. "Nada pendente" faz ela
+    // procurar o que fazer; isto encerra a dúvida.
+    h='<b style="font-size:22px;color:var(--green)">✓ Acabou por hoje</b>';
+  }
+  var ctx=[];
+  if(d.futuros>0) ctx.push(d.futuros+' pra adiantar');
+  if(d.impressas_hoje>0) ctx.push(d.impressas_hoje+' já saíram hoje');
+  if(ctx.length) h+='<div style="color:var(--muted);font-size:14px;margin-top:4px">'+ctx.join(' · ')+'</div>';
+  el.innerHTML='<div style="text-align:center;margin:-6px 0 14px">'+h+'</div>';
 }
 async function scanSku(sku){
   sku=(sku||'').trim().toUpperCase(); if(!sku) return;
@@ -120,11 +179,40 @@ async function scanSku(sku){
   if(confirmar && confirmar.codigo && confirmar.codigo.toUpperCase()===sku){ imprimir(); return; }
   const r=await (await fetch('/api/proximo/'+encodeURIComponent(sku))).json();
   if(!r.cadastrado){ banner('err','SKU não cadastrado', '<span class="sku">'+sku+'</span> — cadastre no Admin.'); beep(false); confirmar=null; return; }
-  if(r.estoque!==null && r.estoque<=0){ banner('err','SEM ESTOQUE — bloqueado', '<span class="sku">'+sku+'</span> não passou pela produção. Não dá pra imprimir a venda.'); beep(false); confirmar=null; return; }
-  if(!r.pedido){ if(r.total>0){ banner('warn','Todas embaladas', 'Todas as vendas de <span class="sku">'+sku+'</span> já foram embaladas.'); } else { banner('err','SKU não está no lote', 'Nenhuma venda de <span class="sku">'+sku+'</span> hoje. Já subiu o PDF do Mercado Livre?'); } beep(false); confirmar=null; return; }
+  // Sob medida nao tem estoque por definicao: a peca e feita contra o pedido.
+  // Zero ali e o normal, e barrar aqui empurrava a bancada a imprimir a
+  // etiqueta pelo PDF do ML e despachar por fora do sistema.
+  if(!r.sob_medida && r.estoque!==null && r.estoque<=0){ banner('err','SEM ESTOQUE — bloqueado', '<span class="sku">'+sku+'</span> não passou pela produção. Não dá pra imprimir a venda.'); beep(false); confirmar=null; return; }
+  // Sem pedido agora significa mesmo NENHUM: a busca já inclui as vendas futuras.
+  if(!r.pedido){ if(r.total>0){ banner('warn','Todas embaladas', 'Todas as vendas de <span class="sku">'+sku+'</span> já foram embaladas.'); } else { banner('err','SKU não está no lote', 'Nenhuma venda de <span class="sku">'+sku+'</span> — nem pra hoje, nem pra frente. Já subiu o PDF do Mercado Livre?'); } beep(false); confirmar=null; return; }
   confirmar=r.pedido;
-  banner('cfm','Confira: '+esc(r.pedido.buyer), pecaHtml(r.peca)
-    +'NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+' · <span class="sku">'+esc(sku)+'</span><br>Estoque: '+r.estoque+' · pendentes desse SKU: '+r.pendentes+'<br><b>Bipe de novo</b> ou clique pra imprimir a etiqueta de venda.',
+  // ADIANTANDO: a venda existe e a peça está na prateleira, mas a entrega não é
+  // de hoje. Precisa ser inconfundível — se passar por urgente, o operador gasta
+  // peça que amanhã pode faltar pra quem tem prazo curto. Por isso o aviso vem
+  // ANTES de tudo, na cor do modo estoque, e diz a data por extenso.
+  var adiant = r.adiantado ? '<div style="background:#e8f0fb;border:2px solid #7aa3d8;border-radius:8px;'
+      +'padding:8px 10px;margin-bottom:8px;font-weight:700;color:#1f4b82">'
+      +'ADIANTANDO — só despacha em '+dataBR(r.pedido.despachar_em)
+      +'<div style="font-weight:400;font-size:13px;margin-top:2px">Não precisa sair hoje. '
+      +'Vale se tiver peça sobrando na prateleira.</div></div>' : '';
+  /* HIERARQUIA: O CLIENTE PRIMEIRO.
+     Aqui o bipe confere etiqueta contra etiqueta, nunca contra o produto (§4 do
+     CLAUDE.md) — a caixa já está fechada num saco preto. Medida e cor são
+     DERIVADAS do SKU que a pessoa acabou de bipar, então não conferem nada de
+     novo; ficam como apoio, e porque pegam um cadastro errado.
+     O que não é derivado é a VENDA escolhida: cliente, NF, cidade. É essa
+     etiqueta que vai ser colada na caixa que está na mão dela — então é ela que
+     merece o tamanho. */
+  banner((r.adiantado?'warn':'cfm')+' rotulo','Confira esta venda', adiant
+    +'<div style="font-size:30px;font-weight:800;color:var(--txt);line-height:1.15;letter-spacing:-.5px;margin:2px 0 6px">'+esc(r.pedido.buyer)+'</div>'
+    +'<div style="font-size:16px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+'</div>'
+    +'<div style="border-top:1px solid var(--line);padding-top:10px">'
+    +'<span class="sku" style="font-size:15px">'+esc(sku)+'</span>'
+    +(pecaTxt(r.peca)?'<span style="font-weight:700;margin-left:8px">'+esc(pecaTxt(r.peca))+'</span>':'')
+    +'<br>'+(r.sob_medida ? 'SOB MEDIDA — sem estoque, peça feita pro pedido'
+                          : 'Estoque: '+r.estoque)
+    +' · pra hoje: '+r.pendentes+(r.futuros?' · pra depois: '+r.futuros:'')+'</div>'
+    +'<div style="margin-top:8px"><b>Bipe de novo</b> ou clique pra imprimir a etiqueta de venda.</div>',
     '<button class="primary" onclick="imprimir()">Imprimir etiqueta de venda</button><button class="ghost" onclick="idle()">Cancelar</button>');
   beep(true);
 }
@@ -166,11 +254,17 @@ const scan=$('#scan');
 // O bipe volta pro campo sozinho — menos o caso em que o operador está
 // digitando em OUTRO campo (a busca dos impressos). Sem essa exceção o foco
 // pula de volta pro #scan a cada letra e a busca fica impossível de usar.
+/* preventScroll: DEVOLVER O FOCO NÃO PODE ARRASTAR A TELA.
+   O #scan mora no alto. Sem isto, focar de volta rolava a página até ele —
+   e quem tivesse descido para abrir o "Subir PDF" (que fica no fim) era jogado
+   pro topo 50 ms depois de clicar, sem conseguir chegar no campo. O objetivo do
+   keep é que o BIPE caia no lugar certo, nunca mexer no que a pessoa está
+   olhando. */
 const keep=()=>{
   const a=document.activeElement;
   if(a===scan) return;
   if(a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return;
-  scan.focus();
+  scan.focus({preventScroll:true});
 };
 scan.addEventListener('blur',()=>setTimeout(keep,50));
 document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input,select,textarea,label')) keep(); });
@@ -193,15 +287,84 @@ async function listaPend(){
   var l=[]; try{ l=await (await fetch("/api/pendentes")).json(); }catch(e){}
   var el=document.getElementById("pendLista");
   if(!el) return;
-  if(!l.length){ el.innerHTML='<span style="color:#5a6472;font-size:14px">Nada pendente.</span>'; return; }
+  // Card vazio some: a linha de cima já disse "Acabou por hoje", e um card
+  // repetindo isso é ruído entre o operador e o que ele precisa ver.
+  var card=el.closest?el.closest('.card'):null;
+  if(card) card.style.display = l.length? '' : 'none';
+  if(!l.length){ el.innerHTML=''; return; }
   var h='';
   for(var i=0;i<l.length;i++){
-    h+='<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #d8dee6"><b style="font-family:ui-monospace,monospace">'+l[i].codigo+'</b><b style="color:#b26a00;font-size:18px">'+l[i].qtd+'</b></div>';
+    var r=l[i];
+    // Atrasado em vermelho: o prazo do ML já passou e o volume continua aqui.
+    var atr=r.atrasados>0;
+    // O QUE PROCURAR NA PRATELEIRA, em português. Só o código serve pra quem
+    // decorou o catálogo, e essa tela é usada por gente diferente a cada dia.
+    var desc=(typeof pecaTexto==='function') ? pecaTexto({
+      medida:(r.exige_medida && r.largura_cm && r.altura_cm)?(r.largura_cm+' × '+r.altura_cm):null,
+      cor:r.cor_nome||null, tecido:r.tecido_nome||null, modelo:r.modelo_nome||null}) : '';
+    // Sem estoque a caixa não está lá — avisa antes da pessoa ir procurar.
+    var semEst=(r.estoque!=null && r.estoque<=0);
+    h+='<div style="padding:11px 0;border-bottom:1px solid #d8dee6">'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'
+      +'<b style="font-family:ui-monospace,monospace;font-size:15px">'+esc(r.codigo)+'</b>'
+      +'<b style="color:'+(atr?'#c0392b':'#b26a00')+';font-size:22px;line-height:1">'+r.qtd+'</b></div>'
+      +(desc?'<div style="font-size:15px;font-weight:600;margin-top:2px">'+esc(desc)+'</div>':'')
+      +(atr?'<div style="color:#c0392b;font-size:12px;font-weight:700;margin-top:3px">⚠ '+r.atrasados+' fora do prazo</div>':'')
+      +(semEst?'<div style="color:#c0392b;font-size:12px;font-weight:700;margin-top:3px">sem estoque — precisa produzir</div>':'')
+      +'</div>';
   }
   el.innerHTML=h;
 }
 setInterval(listaPend,5000);
 listaPend();
+
+// ── O que vem pela frente ────────────────────────────────────────────────────
+// Venda já faturada com prazo de despacho futuro. Fica FORA da fila do dia de
+// propósito — cobrar hoje o que só vence em três semanas é o que ensina a
+// equipe a ignorar a fila inteira.
+//
+// Mas é trabalho adiantável, não arquivo morto: se a peça está na prateleira,
+// bipar o SKU já imprime a etiqueta e a caixa fica pronta. Por isso o painel
+// mostra as datas e diz isso em voz alta — quem só olhasse "Faltam imprimir"
+// não teria como saber que dá pra seguir.
+function dataBR(s){ var p=String(s||'').split('-'); return p.length===3? p[2]+'/'+p[1] : s; }
+// Quantos dias faltam, pra "14/09" virar uma noção de urgência e não só um
+// número. Fala como gente: "hoje" e "amanhã" em vez de "em 0 dias".
+function faltamDias(s){
+  var p=String(s||'').split('-'); if(p.length!==3) return null;
+  var d=new Date(+p[0],+p[1]-1,+p[2],12,0,0), h=new Date(); h.setHours(12,0,0,0);
+  var n=Math.round((d-h)/86400000);
+  if(n<=0) return 'hoje';
+  if(n===1) return 'amanhã';
+  return 'em '+n+' dias';
+}
+async function listaFut(){
+  var l=[]; try{ l=await (await fetch("/api/pendentes/futuros")).json(); }catch(e){}
+  var el=document.getElementById("futBox"); if(!el) return;
+  if(!l.length){ el.style.display='none'; return; }
+  el.style.display='';
+  var por={}, ordem=[];
+  for(var i=0;i<l.length;i++){ var d=l[i].despachar_em;
+    if(!por[d]){ por[d]=[]; ordem.push(d); } por[d].push(l[i]); }
+  var h='<div class="ttl">Pra despachar depois</div>'
+    +'<div style="color:#1f4b82;font-size:13px;margin:-4px 0 8px">'
+    +'Dá pra adiantar: bipe o SKU e a etiqueta sai, se tiver peça na prateleira. '
+    +'Não precisa entregar nessas datas.</div>';
+  for(var k=0;k<ordem.length;k++){
+    var d=ordem[k], itens=por[d], tot=0;
+    for(var j=0;j<itens.length;j++) tot+=itens[j].qtd;
+    var skus=[]; for(var j=0;j<itens.length;j++) skus.push(esc(itens[j].codigo)+' ×'+itens[j].qtd);
+    var dias=faltamDias(d);
+    h+='<div style="padding:8px 0;border-bottom:1px solid #e6eaf0">'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline">'
+      +'<b>'+dataBR(d)+(dias?'<span style="font-weight:400;color:#5a6472;font-size:12px"> · '+dias+'</span>':'')+'</b>'
+      +'<b style="color:#5a6472">'+tot+'</b></div>'
+      +'<div style="color:#5a6472;font-size:13px;font-family:ui-monospace,monospace">'+skus.join(' · ')+'</div></div>';
+  }
+  el.innerHTML=h;
+}
+setInterval(listaFut,30000);
+listaFut();
 
 // ── Já impressos: as notas e clientes que a impressora já cuspiu hoje ────────
 // Existe pra UM momento: a impressora enroscou e ninguém lembra qual era a
@@ -246,6 +409,13 @@ function renderImp(){
     var r=mostra[i], eh=(r.id===ultimoId);
     h+='<div class="imp'+(eh?' ultima':'')+'"><div class="who"><div class="nome">'+esc(r.buyer||'—')
       +(eh?'<span class="tagU">ÚLTIMA IMPRESSÃO</span>':'')
+      /* A tarja diz QUANDO a caixa sai, não só que está adiantada: na hora de
+         reimprimir é isso que a pessoa precisa saber pra não mandar hoje. E diz
+         em dias ("amanhã"), que é como ela pensa — o caso comum é justamente a
+         venda de amanhã entregue antes do prazo; a data fica junto pro que
+         estiver longe. */
+      +(r.adiantada?'<span class="tagA">📅 despacha '+esc(faltamDias(r.despachar_em)||'')
+        +' · '+esc(dataBR(r.despachar_em))+'</span>':'')
       +(r.reimpressoes>0?'<span class="tag">reimpressa '+r.reimpressoes+'x</span>':'')+'</div>'
       +'<div class="meta">NF <b>'+esc(r.nf||'—')+'</b> · <b>'+esc(r.codigo||'—')+'</b> · '+horaDe(r.embalado_em)
       +(r.city?' · '+esc(r.city):'')
@@ -274,17 +444,34 @@ async function relogioDesp(){
     var w=document.querySelector(".wrap");
     if(w) w.insertBefore(el,w.firstChild);
   }
+  /* VERMELHO SO QUANDO HA O QUE FAZER.
+     Antes, "DESPACHO ENCERRADO — passou 3h9min" ocupava o topo em vermelho
+     todo santo dia depois das 15h, mesmo com a fila zerada e sem acao possivel.
+     Vermelho e o recurso mais caro da tela: gasto sem consequencia, todos os
+     dias, ele para de significar urgencia — e no dia em que houver mesmo uma
+     etiqueta atrasada, ninguem vai olhar.
+     Com nada pendente, a linha vira informacao discreta; sem prazo apertado,
+     nem aparece. */
   var m=d.minutosRestantes, h=Math.floor(Math.abs(m)/60), mm=Math.abs(m)%60;
   var tempo=(h?h+"h":"")+mm+"min";
-  var cor="#f4f6f8", bd="#d8dee6", txt="";
-  if(d.passou){ txt="DESPACHO ENCERRADO ("+d.despacho+") - passou "+tempo; cor="#fbe9e8"; bd="#efb1ad"; }
-  else {
-    txt="Despacho as "+d.despacho+" - faltam "+tempo;
-    if(d.pendentes>0) txt+=" para imprimir "+d.pendentes;
-    if(m<60 && d.pendentes>0){ cor="#fbe9e8"; bd="#efb1ad"; }
-    else if(m<120 && d.pendentes>0){ cor="#fbf1db"; bd="#e7cb8c"; }
+  var pend=d.pendentes>0;
+  var cor="", bd="", txt="", peso="400", tam="14px", cortxt="#5a6472";
+  if(d.passou){
+    if(pend){ txt="⚠ Despacho encerrou às "+d.despacho+" — ainda faltam "+d.pendentes+" etiqueta"+(d.pendentes>1?"s":"");
+              cor="#fbe9e8"; bd="#efb1ad"; peso="700"; tam="16px"; cortxt="#c62828"; }
+    else    { txt="Despacho de hoje encerrado ("+d.despacho+")"; }
+  } else if(pend){
+    txt="Despacho às "+d.despacho+" — faltam "+tempo+" para "+d.pendentes+" etiqueta"+(d.pendentes>1?"s":"");
+    if(m<60){ cor="#fbe9e8"; bd="#efb1ad"; peso="700"; tam="16px"; cortxt="#c62828"; }
+    else if(m<120){ cor="#fbf1db"; bd="#e7cb8c"; peso="700"; tam="16px"; cortxt="#7a5200"; }
+  } else {
+    txt="Despacho às "+d.despacho;   // sem fila: só a informação, sem alarme
   }
-  el.style.background=cor; el.style.border="1px solid "+bd;
+  el.style.background=cor||"transparent";
+  el.style.border=bd?("1px solid "+bd):"0";
+  el.style.padding=bd?"15px 18px":"0 0 10px";
+  el.style.fontWeight=peso; el.style.fontSize=tam; el.style.color=cortxt;
+  el.style.textAlign=bd?"left":"center";
   el.innerHTML=txt;
 }
 setInterval(relogioDesp,30000);

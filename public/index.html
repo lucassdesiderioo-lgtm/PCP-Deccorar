@@ -47,13 +47,27 @@
   .sumbox.low .n{color:var(--red)}.sumbox.rep .n{color:var(--amber)}
   .barmini{height:6px;background:#0b0f14;border-radius:4px;overflow:hidden;width:80px;display:inline-block;vertical-align:middle;margin-left:6px}
   .barmini>i{display:block;height:100%;background:var(--green)}
+  /* ── painel da aba Estoque ── */
+  .sumbox.big{min-width:150px}.sumbox .d{font-size:11px;color:var(--muted);margin-top:3px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+  .chip{border:1px solid var(--line);background:#0b0f14;color:var(--muted);border-radius:20px;
+        padding:6px 13px;font-size:12.5px;font-weight:600;cursor:pointer;display:flex;gap:7px;align-items:center}
+  .chip.on{border-color:var(--amber);color:var(--txt);background:#1a1608}
+  .chip .q{font-variant-numeric:tabular-nums;opacity:.8}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+  .selo{font-size:10.5px;padding:1px 7px;border-radius:20px;border:1px solid var(--line);
+        color:var(--muted);margin-left:6px;white-space:nowrap;font-weight:600}
+  .selo.sm{border-color:#3d5a80;color:#8ab4f8}.selo.pr{border-color:#5a4a12;color:var(--amber)}
+  tr.histlin td{background:#0f141b;padding:10px 14px}
+  .estbusca{max-width:280px}
+  .grafleg{display:flex;gap:16px;font-size:12px;color:var(--muted);align-items:center;flex-wrap:wrap}
   .mltask{display:flex;align-items:center;gap:12px;padding:11px 22px;font-size:14px;line-height:1.4;border-bottom:1px solid #262d37}
   .mltask a{margin-left:auto;white-space:nowrap;text-decoration:none;padding:8px 14px;border-radius:8px;font-weight:700;font-size:13px}
   .mltask.late{background:#3a1513;color:#ffb0a8}.mltask.late a{background:#f85149;color:#fff}
   .mltask.warn{background:#2a2410;color:#ffd85c}.mltask.warn a{background:#ffb800;color:#1a1300}
   .mltask.ok{background:#10241a;color:#8ce0ad}.mltask.ok a{background:transparent;color:#8ce0ad;border:1px solid #1f6f37}
 </style></head><body>
-<header><div class="mark">E</div><div><h1>Admin — Produção &amp; Estoque</h1><div class="sub">Lance o dia · controle estoque e necessidade · cadastre SKUs</div></div>
+<header><div class="mark">E</div><div><h1>Admin — Produção &amp; Estoque</h1><div class="sub">Lance o dia · corrija o estoque · cadastre SKUs</div></div>
 <a class="link" href="/painel">Painel</a></header>
 <div id="mlTask" class="mltask" style="display:none"></div>
 <script>
@@ -77,7 +91,7 @@
 </script>
 <div class="tabs">
   <div class="tab active" data-t="prod">Lançar produção</div>
-  <div class="tab" data-t="est">Estoque &amp; Necessidade</div>
+  <div class="tab" data-t="est">Estoque</div>
   <div class="tab" data-t="cad">Cadastro de SKU</div>
   <div class="tab" data-t="plan">Planejamento</div>
   <div class="tab" data-t="rel">Relatórios</div>
@@ -111,16 +125,37 @@
 
   <!-- ESTOQUE & NECESSIDADE -->
   <div id="v-est" class="hide">
-    <div class="sumbar">
-      <div class="sumbox low"><div class="n" id="sLow">0</div><div class="l">SKUs abaixo do necessário</div></div>
-      <div class="sumbox rep"><div class="n" id="sRep">0</div><div class="l">Peças a repor no total</div></div>
-      <div class="sumbox"><div class="n" id="sEst">0</div><div class="l">Peças em estoque</div></div>
-    </div>
+    <div class="sumbar" id="estResumo"></div>
+
+    <!-- ENTROU x SAIU: a unica tela onde a fabrica se ve produzindo e vendendo
+         no mesmo eixo. As barras vem do fluxo_estoque.js, a mesma regua do
+         fechamento diario do Planejamento. -->
     <div class="card">
-      <div style="font-weight:700;margin-bottom:4px">Controle de estoque e necessidade</div>
-      <div class="sub" style="margin-bottom:12px">Ajuste o estoque com − / +, defina a necessidade (alvo) de cada SKU. Em vermelho = precisa repor.</div>
-      <table><thead><tr><th>SKU</th><th>Estoque atual</th><th>Necessidade (alvo)</th><th>A repor</th><th>Nível</th></tr></thead><tbody id="estlist"></tbody></table>
+      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:2px">
+        <div style="font-weight:700">Entrou &times; saiu — 30 dias</div>
+        <div class="grafleg">
+          <span><span class="dot" style="background:#2ea043"></span> entrou (embalagem)</span>
+          <span><span class="dot" style="background:#f85149"></span> saiu (etiqueta de venda)</span>
+        </div>
+      </div>
+      <div class="sub" style="margin-bottom:10px">Acima da linha o que a fábrica fez; abaixo, o que saiu pro cliente. Ajuste manual e contagem não entram aqui — eles mexem no saldo, mas não são produção nem venda.</div>
+      <div id="estGraf"></div>
     </div>
+
+    <div class="card">
+      <div style="font-weight:700;margin-bottom:4px">Estoque</div>
+      <div class="sub">Correção pontual do saldo — peça quebrada, perdida, encontrada. Todo ajuste pede motivo e fica registrado. O <b>alvo</b> não se edita aqui: ele vem do Planejamento, e a falta é o <b>mesmo número que o operador vê na tela azul</b>.</div>
+      <div class="chips" id="estChips"></div>
+      <input id="estBusca" class="estbusca" placeholder="bipe ou digite o código" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <table style="margin-top:12px"><thead><tr>
+        <th>SKU</th><th class="n">Estoque</th><th class="n" id="thValor" hidden>Valor</th>
+        <th class="n">Alvo</th><th class="n">Vendido<br>a despachar</th>
+        <th class="n">Precisa</th><th class="n">Cobertura</th><th>Nível</th><th></th>
+      </tr></thead><tbody id="estlist"></tbody></table>
+      <div class="sub" id="estRodape" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card" id="estAjustes"></div>
   </div>
 
   <div id="v-plan" class="hide"><iframe id="ifPlan" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
@@ -213,10 +248,14 @@
 
 <div id="v-blq" class="hide">
 <div class="card" id="divCard" style="display:none;border:2px solid #c62828">
-  <div style="font-weight:800;color:#c62828;font-size:16px;margin-bottom:6px">⚠ AS DUAS LEITURAS DA FOLHA DISCORDAM</div>
+  <!-- O titulo falava so da conferencia 1 ("as duas leituras discordam"), mas o
+       card recebe as CINCO do §5 — comprador, medida, cor e familia tambem param
+       aqui. Titulo que descreve o motivo errado ensina a ler a tela por cima:
+       cada volume ja diz o seu motivo logo abaixo, e e la que a informacao mora. -->
+  <div style="font-weight:800;color:#c62828;font-size:16px;margin-bottom:6px">⚠ VOLUMES RETIDOS POR DÚVIDA NA LEITURA</div>
   <div style="font-size:13px;color:#5a6472;margin-bottom:12px">
-    O PDF do Mercado Livre foi lido de duas formas e elas deram SKUs diferentes para o mesmo volume.
-    O sistema <b>não escolhe</b> — a peça fica retida até alguém abrir o pedido no Mercado Livre e dizer qual é.
+    Alguma conferência do PDF não fechou, e por isso o sistema <b>não escolheu</b> sozinho:
+    a peça fica retida até alguém abrir o pedido no Mercado Livre e dizer qual é.
     Enquanto isso ela não imprime etiqueta e não carrega.
   </div>
   <div id="divLista"></div>
@@ -262,7 +301,7 @@
       <div class="sub" style="margin-top:10px"><b>O código do SKU não precisa seguir formato nenhum</b> — pode ser o que você quiser. O que vale é o que está nestes campos. Se o código por acaso for do tipo antigo (<code>BK180150BRANCO</code>), largura, altura e cor se preenchem sozinhos como atalho de digitação, e seguem editáveis. Modelo e tecido nunca são deduzidos do código: <code>BK</code> é o tecido blackout, não o modelo.</div>
       <div id="cadDica" style="margin-top:8px;font-size:13px"></div>
       <div class="row-actions"><button class="primary" onclick="salvar()">Salvar produto</button>
-        <span class="sub">O estoque e a necessidade se definem na aba "Estoque".</span><span class="msg" id="msg"></span></div></div>
+        <span class="sub">O saldo se corrige na aba "Estoque"; o alvo vem do Planejamento.</span><span class="msg" id="msg"></span></div></div>
 
     <div class="card"><div style="font-weight:700;margin-bottom:4px">Modelos, cores e tecidos</div>
       <div class="sub" style="margin-bottom:14px"><b>Modelo</b> é o mecanismo — Rolô, Romana, Acessório. <b>Tecido</b> é o material — Blackout, Screen. São coisas diferentes: um rolô de blackout e um rolô de screen têm o mesmo modelo e tecidos distintos. Desmarque <b>tem medida</b> num modelo como Acessório, e os produtos dele param de ser cobrados por largura e altura. Desativar não apaga: SKU que já aponta continua apontando.</div>
@@ -279,6 +318,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));t.classList.add("active");
   $("#v-prod").classList.toggle("hide",t.dataset.t!=="prod");
   $("#v-est").classList.toggle("hide",t.dataset.t!=="est");
+  if(t.dataset.t==="est") carregarEst();
   $("#v-cad").classList.toggle("hide",t.dataset.t!=="cad");
   var vn=$("#v-plan"), vr=$("#v-rel"), va=$("#v-acs");
   if(vn) vn.classList.toggle("hide",t.dataset.t!=="plan");
@@ -310,7 +350,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
 async function carregar(){
   await carregarListas();   // antes do renderCad: a lista de SKU mostra o nome do modelo
   SKUS=await (await fetch('/api/skus')).json();
-  renderCad(); renderSel(); renderEst(); carregarHoje();
+  renderCad(); renderSel(); estAuto(); carregarHoje();
   carregarPend();   // o contador da aba aparece sem precisar abri-la
 }
 
@@ -394,6 +434,15 @@ document.addEventListener('change',async function(e){
       body:JSON.stringify({codigo:md.dataset.cod,exige_medida:md.checked?1:0})});
     await carregarListas(); carregarPend(); return;
   }
+  /* "sob medida": a peca e feita contra o pedido, entao nao tem saldo pra
+     consultar. Tira o SKU da trava de estoque da Etiqueta de Venda — que,
+     respondendo zero todo dia, so empurrava a bancada a despachar por fora. */
+  const sm=e.target.closest&&e.target.closest('.mcSob');
+  if(sm){
+    await fetch('/api/modelos',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({codigo:sm.dataset.cod,sob_medida:sm.checked?1:0})});
+    await carregarListas(); return;
+  }
 });
 
 document.addEventListener('click',async function(e){
@@ -434,6 +483,8 @@ function renderMC(){
       +'<input class="mcNome" data-tipo="modelo" data-cod="'+esc(m.codigo)+'" value="'+esc(m.nome)+'" placeholder="nome do modelo">'
       +'<label style="display:flex;align-items:center;gap:5px;text-transform:none;letter-spacing:0;white-space:nowrap;margin:0">'
       +'<input type="checkbox" class="mcMedida" data-cod="'+esc(m.codigo)+'" style="width:auto"'+(m.exige_medida?' checked':'')+'> tem medida</label>'
+      +'<label title="Peça feita contra o pedido: não tem estoque pra consultar" style="display:flex;align-items:center;gap:5px;text-transform:none;letter-spacing:0;white-space:nowrap;margin:0">'
+      +'<input type="checkbox" class="mcSob" data-cod="'+esc(m.codigo)+'" style="width:auto"'+(m.sob_medida?' checked':'')+'> sob medida</label>'
       +(m.ativo?'<button class="ghost small mcOff" data-tipo="modelo" data-id="'+m.id+'">desativar</button>'
                :'<span class="sub">inativo</span>')+'</div>';
   h+='<div class="mcrow"><input id="mcModCod" placeholder="código (ex.: ROLO)"><input id="mcModNome" placeholder="nome">'
@@ -925,27 +976,318 @@ async function salvar(){
   $('#msg').style.color='#2ea043';$('#msg').textContent='Salvo!';setTimeout(()=>$('#msg').textContent='',1500);
   limparCad();carregar();
 }
-/* ---- Estoque & Necessidade ---- */
+/* ---- Estoque & Necessidade -------------------------------------------------
+ *
+ * ⚠️ A FALTA NAO SE CALCULA MAIS AQUI, e essa e a mudanca de 01/09/2026.
+ *
+ * A tela fazia `alvo - estoque` lendo o `skus.alvo` gravado. A tela AZUL do
+ * operador faz `comprometido + alvo - estoque` ao vivo. Os dois numeros se
+ * chamavam "a repor" e nao eram o mesmo: faltava aqui o COMPROMETIDO — a venda
+ * ja feita com envio marcado pra frente —, e o alvo lido era uma foto que so
+ * muda quando alguem clica "Aplicar" no Planejamento. O admin cobrava um numero
+ * e a fabrica produzia outro, cada tela certa na sua regua.
+ *
+ * Agora tudo vem pronto de GET /api/estoque/painel, que le o MESMO
+ * demanda_dominio da tela azul. Nao recalcule nada por aqui: uma terceira conta
+ * seria a doenca de volta, e desta vez dentro do dashboard.
+ *
+ * O ALVO continua sem se editar nesta tela. Ele vem do Planejamento, e um
+ * segundo campo escrevendo na mesma coluna era a doenca da /necessidade,
+ * aposentada em 01/09/2026: duas fontes, e a ultima a salvar ganha sem avisar.
+ */
+let PAINEL=null, estFiltro='', estUltimo=0;
+
+const estNorm = v => String(v==null?'':v).toUpperCase().replace(/[^A-Z0-9]/g,'');
+const estQtd  = v => v==null ? '—' : v;
+/* R$ só aparece para quem tem `custo.ver`. O servidor nem manda os campos para
+   os demais, então a tela nunca precisa decidir se esconde: se não veio, não há. */
+const estVerCusto = () => !!(PAINEL && PAINEL.resumo && PAINEL.resumo.custo_visivel);
+const estColunas  = () => estVerCusto() ? 9 : 8;
+function estRS(v, casas){
+  if(v==null) return '—';
+  const c = casas==null ? 2 : casas;
+  return (+v).toLocaleString('pt-BR',{style:'currency',currency:'BRL',
+    minimumFractionDigits:c, maximumFractionDigits:c});
+}
+function estQuando(s){        // '2026-09-01 08:30:00' -> '01/09 08:30'
+  if(!s) return '';
+  const t=String(s);
+  return t.slice(8,10)+'/'+t.slice(5,7)+(t.length>10?(' '+t.slice(11,16)):'');
+}
+
+async function carregarEst(){
+  estUltimo=Date.now();
+  try{ PAINEL=await (await fetch('/api/estoque/painel')).json(); }
+  catch(e){
+    $('#estlist').innerHTML='<tr><td colspan="'+estColunas()+'" class="baixo" style="padding:20px">'
+      +'Não consegui carregar o painel de estoque. Recarregue a página.</td></tr>';
+    return;
+  }
+  renderEst();
+}
+/* O admin inteiro se recarrega de 4 em 4 segundos (AUTO_ADMIN la embaixo). Este
+   painel calcula a demanda do catalogo todo, entao ele NAO entra nessa cadencia:
+   so atualiza com a aba aberta, no maximo a cada 12 s, e nunca por cima de um
+   ajuste que alguem esta preenchendo — a linha aberta sumiria da mao da pessoa. */
+function estAuto(){
+  const v=$('#v-est'); if(!v || v.classList.contains('hide')) return;
+  if(Date.now()-estUltimo < 12000) return;
+  if(document.querySelector('#v-est tr.ajlin')) return;
+  carregarEst();
+}
+
+/* ENTROU x SAIU, espelhado no eixo: producao pra cima, venda pra baixo. E a
+   forma que responde de relance a pergunta que interessa — em que dia saiu mais
+   do que entrou. Dia sem movimento vem ZERO do servidor e desenha vazio: buraco
+   se leria como "nao sei", e a resposta e "nao houve". */
+function estGrafico(serie){
+  const W=760, H=150, meio=H/2, n=serie.length||1, passo=W/n;
+  const larg=Math.max(3, passo-6);
+  const max=Math.max(1, ...serie.map(d=>Math.max(d.entrou,d.saiu)));
+  const alt=v=> (v/max)*(meio-16);
+  let b='';
+  serie.forEach((d,i)=>{
+    const x=i*passo+(passo-larg)/2, he=alt(d.entrou), hs=alt(d.saiu);
+    const dia=d.data.slice(8,10)+'/'+d.data.slice(5,7);
+    b+='<g><title>'+dia+' — entrou '+d.entrou+', saiu '+d.saiu+'</title>'
+      +'<rect x="'+(i*passo)+'" y="0" width="'+passo+'" height="'+H+'" fill="transparent"></rect>'
+      +(d.entrou?'<rect x="'+x.toFixed(1)+'" y="'+(meio-he).toFixed(1)+'" width="'+larg.toFixed(1)+'" height="'+he.toFixed(1)+'" fill="#2ea043" rx="2"></rect>':'')
+      +(d.saiu  ?'<rect x="'+x.toFixed(1)+'" y="'+meio+'" width="'+larg.toFixed(1)+'" height="'+hs.toFixed(1)+'" fill="#f85149" rx="2"></rect>':'')
+      +'</g>';
+  });
+  let eixo='';
+  serie.forEach((d,i)=>{        // de 7 em 7 dias contando DE TRAS PRA FRENTE:
+    if((n-1-i)%7) return;       // assim hoje sempre entra e nada se sobrepoe
+    eixo+='<text x="'+(i*passo+passo/2).toFixed(1)+'" y="'+(H+15)+'" fill="#8b97a5" font-size="10" text-anchor="middle">'
+      +d.data.slice(8,10)+'/'+d.data.slice(5,7)+'</text>';
+  });
+  return '<svg viewBox="0 0 '+W+' '+(H+20)+'" style="width:100%;height:auto;display:block" role="img">'
+    +'<line x1="0" y1="'+meio+'" x2="'+W+'" y2="'+meio+'" stroke="#262d37" stroke-width="1"></line>'
+    +b+eixo
+    +'<text x="2" y="12" fill="#8b97a5" font-size="10">pico '+max+'/dia</text></svg>';
+}
+
+const ESTCHIPS=[
+  {k:'',        r:'Todos',      c:'#8b97a5', n:r=>r.skus},
+  {k:'zerado',  r:'Zerado',     c:'#f85149', n:r=>r.zerados},
+  {k:'baixo',   r:'Abaixo',     c:'#ffb800', n:r=>r.baixos},
+  {k:'ok',      r:'Ok',         c:'#2ea043', n:r=>r.ok},
+  {k:'excesso', r:'Excesso',    c:'#4493f8', n:r=>r.excesso},
+  {k:'parado',  r:'Parados',    c:'#a371f7', n:r=>r.parados},
+  {k:'sob',     r:'Sob medida', c:'#3d5a80', n:r=>r.sob_medida},
+  {k:'defas',   r:'Alvo velho', c:'#e0a458', n:r=>r.alvo_defasados},
+  /* "Nunca conferido" fecha a pergunta que a coluna do saldo abre: posso
+     confiar nesse número? Serve de lista de trabalho no dia do inventário. */
+  {k:'semcont', r:'Nunca conferido', c:'#6e7681', n:r=>r.nunca_contados}
+];
+function estPassa(l){
+  if(estFiltro==='parado')  return !!l.parado;
+  if(estFiltro==='sob')     return l.sob_medida===1;
+  if(estFiltro==='defas')   return !!l.alvo_defasado;
+  if(estFiltro==='semcont') return l.contado_em==null;
+  if(estFiltro)             return l.situacao===estFiltro;
+  return true;
+}
+
+/* CSV do que esta na tela — o filtro vale. Quem exporta escolheu o recorte
+   clicando; exportar o catalogo inteiro ignoraria a escolha. Sai pelo navegador,
+   sem rota nova: os dados ja estao aqui. */
+function estCSV(){
+  if(!PAINEL) return;
+  const busca=estNorm(($('#estBusca')||{}).value);
+  const l=(PAINEL.linhas||[]).filter(x=> estPassa(x) &&
+    (!busca || estNorm(x.codigo).indexOf(busca)>=0 || estNorm(x.descricao).indexOf(busca)>=0));
+  const comCusto=estVerCusto();
+  const cab=['codigo','descricao','estoque','alvo','alvo_salvo','vendido_a_despachar','precisa',
+             'cobertura_dias','situacao','sob_medida','parado','vendas_janela','media_dia',
+             'conferido_em','conferido_ha_dias']
+    .concat(comCusto?['custo_unitario','valor']:[]);
+  /* Ponto e virgula e BOM: e assim que o Excel em portugues abre o arquivo com
+     as colunas separadas e os acentos certos, sem ninguem passar pelo
+     assistente de importacao. */
+  const cel=v=>{ const s=String(v==null?'':v); return /[";\n]/.test(s)?('"'+s.replace(/"/g,'""')+'"'):s; };
+  /* Numero decimal sai com VIRGULA: e o separador que o Excel em portugues
+     entende. Com ponto, "87.50" vira texto e a coluna nao soma. */
+  const dec=v=> v==null?'':String(v).replace('.',',');
+  const linhas=l.map(x=>[x.codigo,x.descricao,x.estoque,x.alvo,x.alvo_salvo,x.comprometido,x.precisa,
+    dec(x.cobertura_dias),x.situacao,x.sob_medida?'sim':'nao',x.parado?'sim':'nao',
+    x.vendas_janela,dec(x.media_dia),x.contado_em,x.contado_ha]
+    .concat(comCusto?[dec(x.custo_unitario),dec(x.valor)]:[]).map(cel).join(';'));
+  const txt='﻿'+cab.join(';')+'\n'+linhas.join('\n');
+  const hoje=new Date(), p=n=>String(n).padStart(2,'0');
+  const nome='estoque-'+hoje.getFullYear()+p(hoje.getMonth()+1)+p(hoje.getDate())+'.csv';
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([txt],{type:'text/csv;charset=utf-8'}));
+  a.download=nome; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
+}
+
+/* APLICAR O ALVO daqui, sem trocar de aba. A tela passou a acusar o alvo velho;
+   acusar sem oferecer o reparo e a armadilha #10 de novo — quem nao consegue
+   resolver na tela aprende a ignorar o aviso. Chama a MESMA rota do
+   Planejamento (nao ha segundo caminho de escrita no alvo). */
+async function estAplicarAlvo(){
+  const r=(PAINEL&&PAINEL.resumo)||{};
+  if(!confirm('Gravar no cadastro o alvo calculado hoje?\n\n'
+    +'Isso atualiza '+(r.alvo_aplicaveis||0)+' SKU(s) com venda na janela. '
+    +'O Planejamento não sobrescreve o alvo de quem não vendeu no período.')) return;
+  const b=$('#estAplicar'); if(b){ b.disabled=true; b.textContent='aplicando…'; }
+  let res={};
+  try{ res=await (await fetch('/api/planejamento/aplicar',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({})})).json(); }
+  catch(e){ res={erro:'falhou'}; }
+  if(b){ b.disabled=false; b.textContent='aplicar alvo'; }
+  if(res.erro==='sem_permissao') alert('Você não tem permissão para aplicar o alvo (é do Planejamento).');
+  else if(res.erro) alert('Não consegui aplicar: '+res.erro);
+  await carregarEst();
+}
+
 function renderEst(){
-  const ord=[...SKUS].sort((a,b)=>((b.alvo-b.estoque))-((a.alvo-a.estoque)));
-  let low=0,rep=0,est=0;
-  $('#estlist').innerHTML = ord.map(s=>{
-    const arepor=Math.max(0,(s.alvo||0)-(s.estoque||0)); if(arepor>0)low++; rep+=arepor; est+=s.estoque||0;
-    const pct=s.alvo>0?Math.min(100,Math.round((s.estoque/s.alvo)*100)):100;
-    return `<tr>
-      <td class="code">${s.codigo}<div class="estq">${s.cor||''}</div></td>
-      <td><button class="step" data-adj="${s.codigo}" data-d="-1">−</button>
-          <b class="${s.estoque<s.alvo?'baixo':'ok'}" style="margin:0 8px">${s.estoque}</b>
-          <button class="step" data-adj="${s.codigo}" data-d="1">+</button>
-          <input class="setin" type="number" value="${s.estoque}" data-setest="${s.codigo}" title="definir estoque">
-          <button class="ghost small" data-setestbtn="${s.codigo}">ok</button></td>
-      <td><input class="setin" type="number" value="${s.alvo}" data-setalvo="${s.codigo}" title="necessidade/alvo">
-          <button class="ghost small" data-setalvobtn="${s.codigo}">salvar</button></td>
-      <td class="${arepor>0?'baixo':'ok'}">${arepor>0?('repor '+arepor):'ok'}</td>
-      <td><span class="barmini"><i style="width:${pct}%;background:${s.estoque<s.alvo?'#f85149':'#2ea043'}"></i></span></td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="5" style="color:#8b97a5;padding:20px">Cadastre SKUs primeiro.</td></tr>';
-  $('#sLow').textContent=low; $('#sRep').textContent=rep; $('#sEst').textContent=est;
+  if(!PAINEL || !PAINEL.resumo) return;
+  const r=PAINEL.resumo;
+
+  // ── faixa de numeros ──
+  const cob = r.cobertura_dias==null ? '—' : (r.cobertura_dias+'d');
+  let cobSub = 'alvo '+r.dias_cobertura_alvo+'d';
+  if(r.cobertura_ontem!=null && r.cobertura_dias!=null){
+    const dd=+(r.cobertura_dias-r.cobertura_ontem).toFixed(1);
+    cobSub += ' · era '+r.cobertura_ontem+'d ontem'+(dd>0?' (↑'+dd+')':(dd<0?' (↓'+Math.abs(dd)+')':' (=)'));
+  }
+  $('#estResumo').innerHTML=
+     '<div class="sumbox big"><div class="n">'+r.pecas_estoque+'</div><div class="l">Peças em estoque</div>'
+       +'<div class="d">'+r.skus+' SKUs cadastrados</div></div>'
+    /* O DINHEIRO. Com um SKU sem custo o total deixa de ser o valor do estoque
+       e passa a ser um PISO — daí o "≥" e o aviso em âmbar. Custo indefinido
+       nunca vira zero (regra 4 do §7-B): zero faria o estoque parecer mais
+       barato do que é, e ninguém saberia por quê. */
+    +(estVerCusto() ? ('<div class="sumbox big"><div class="n" style="font-size:21px">'
+       +(r.sem_custo?'<span title="O total é um piso: há SKU com peça e sem custo">≥ </span>':'')
+       +estRS(r.valor_estoque,0)+'</div>'
+       +'<div class="l">'+esc(r.custo_rotulo||'custo de material')+' em estoque</div>'
+       +'<div class="d">'+estRS(r.valor_parado,0)+' em SKU parado</div>'
+       +(r.sem_custo?('<div class="d" style="color:var(--amber)">'+r.sem_custo
+          +' SKU com peça e sem custo</div>'):'')
+       +'</div>') : '')
+    +'<div class="sumbox big"><div class="n">'+cob+'</div><div class="l">Cobertura média</div>'
+       +'<div class="d">'+cobSub+'</div></div>'
+    +'<div class="sumbox big low"><div class="n">'+r.skus_falta+'</div><div class="l">SKUs em falta</div>'
+       +'<div class="d">'+r.zerados+' sem nenhuma peça</div></div>'
+    +'<div class="sumbox big rep"><div class="n">'+r.pecas_precisa+'</div><div class="l">Peças a produzir</div>'
+       +'<div class="d">o mesmo número da tela azul</div></div>'
+    +'<div class="sumbox big"><div class="n" style="font-size:20px">'
+       +'<span class="ok">+'+r.entrou_hoje+'</span> / <span class="baixo">−'+r.saiu_hoje+'</span></div>'
+       +'<div class="l">Hoje: entrou / saiu</div>'
+       +'<div class="d">'+r.ajustes_30d+' ajuste(s) manual(is) em 30 dias</div></div>';
+
+  $('#estGraf').innerHTML = estGrafico(PAINEL.serie||[]);
+
+  // ── chips: some quem esta zerado, menos o "Todos" ──
+  $('#estChips').innerHTML = ESTCHIPS.filter(c=>c.k===''||c.n(r)>0).map(c=>
+    '<div class="chip'+(estFiltro===c.k?' on':'')+'" data-estf="'+c.k+'">'
+    +'<span class="dot" style="background:'+c.c+'"></span>'+c.r
+    +'<span class="q">'+c.n(r)+'</span></div>').join('');
+
+  // ── tabela ──
+  const busca=estNorm(($('#estBusca')||{}).value);
+  const linhas=(PAINEL.linhas||[]).filter(l=> estPassa(l) &&
+    (!busca || estNorm(l.codigo).indexOf(busca)>=0 || estNorm(l.descricao).indexOf(busca)>=0));
+  const verCusto=estVerCusto();
+  const th=$('#thValor'); if(th) th.hidden=!verCusto;
+
+  $('#estlist').innerHTML = linhas.map(l=>{
+    /* O QUE A PECA E sai do pecaTexto de /sku.js — o mesmo formatador da
+       embalagem e da tela Bloqueados. Uma terceira tela escrevendo a medida do
+       seu jeito ensinaria a equipe a achar que sao coisas diferentes. */
+    const peca=(typeof pecaTexto==='function') ? pecaTexto(pecaDeSku(l)) : '';
+    /* SO DOIS SELOS. O "alvo velho" saiu da linha de proposito: ele acertava 6
+       de 9 SKUs no primeiro teste, e selo que aparece em quase toda linha nao
+       marca nada — vira textura. Quem precisa da informacao tem o "salvo N"
+       embaixo do alvo, o chip que filtra e o aviso no rodape. */
+    let selos='';
+    if(l.sob_medida) selos+='<span class="selo sm" title="Peça feita contra o pedido: não tem estoque para repor">sob medida</span>';
+    if(l.parado)     selos+='<span class="selo pr" title="Tem peça na prateleira e nenhuma venda na janela">parado</span>';
+
+    /* O ultimo ajuste vai CURTO — quanto e quando. O motivo inteiro esticava a
+       coluna em tres linhas e empurrava a tabela; ele mora no "histórico". */
+    const uj=l.ultimo_ajuste;
+    const ujTxt = uj ? ('<div class="estq" style="white-space:nowrap" title="último ajuste manual: '
+      +esc(uj.motivo||'')+' — '+esc(uj.usuario_nome||'')+'">'
+      +(uj.delta>0?'+':'−')+Math.abs(uj.delta)+' · '+estQuando((uj.criado_em||'').slice(0,10))+'</div>') : '';
+    /* QUANDO ESSE SALDO FOI CONFERIDO. Fica junto do número porque é sobre ele:
+       a coluna tem vários donos e só o inventário a devolve para a prateleira. */
+    /* Acima de 30 dias a conferência vira aviso: o saldo teve tempo de andar
+       por quatro caminhos diferentes desde a última vez que bateu com a
+       prateleira. Abaixo disso é informação, e fica discreta. */
+    const ct = l.contado_em
+      ? '<div class="estq" style="white-space:nowrap'+(l.contado_ha>30?';color:var(--amber)':'')
+        +'" title="último inventário: '+esc(l.contado_em)+'">'
+        +'conferido há '+l.contado_ha+' d</div>'
+      : '<div class="estq" style="white-space:nowrap;color:#6e7681" title="Este saldo nunca passou por uma contagem">nunca conferido</div>';
+
+    const base=l.alvo+l.comprometido;
+    const pct=base>0?Math.min(100,Math.round((l.estoque/base)*100)):null;
+    const corBarra = l.situacao==='zerado'?'#f85149' : l.situacao==='baixo'?'#ffb800'
+                   : l.situacao==='excesso'?'#4493f8':'#2ea043';
+    return '<tr>'
+      +'<td class="code">'+esc(l.codigo)+selos
+        +(peca?'<div class="estq">'+esc(peca)+'</div>':'')+'</td>'
+      +'<td class="n"><b style="font-size:17px" class="'+(l.precisa>0?'baixo':'ok')+'">'+l.estoque+'</b>'+ujTxt+ct+'</td>'
+      /* Sem peça na prateleira não há valor a mostrar: "R$ 0,00" se lê como
+         "não vale nada", que é outra afirmação. O custo unitário fica, porque
+         esse continua verdadeiro e é o que interessa quando a peça voltar. */
+      +(verCusto ? ('<td class="n">'+(l.valor==null
+          ? '<span class="zero" title="Sem custo cadastrado — este SKU não entra na soma">—</span>'
+          : (l.estoque>0 ? estRS(l.valor) : '<span class="zero">—</span>'))
+        +(l.custo_unitario!=null?('<div class="estq" style="white-space:nowrap">'
+          +estRS(l.custo_unitario)+' / peça</div>'):'')
+        +'</td>') : '')
+      +'<td class="n">'+l.alvo+(l.alvo_defasado
+        ?'<div class="estq" style="color:var(--amber)" title="O alvo salvo no cadastro é '+l.alvo_salvo
+          +' e o cálculo de hoje dá '+l.alvo+'. A tela usa o cálculo; para gravar, use Aplicar no Planejamento.">salvo '+l.alvo_salvo+'</div>'
+        :'<div class="estq">do Planejamento</div>')+'</td>'
+      +'<td class="n">'+(l.comprometido||'—')+'</td>'
+      +'<td class="n">'+(l.precisa>0?'<b class="baixo">'+l.precisa+'</b>':'<span class="ok">ok</span>')+'</td>'
+      +'<td class="n">'+(l.cobertura_dias==null?'<span class="zero">—</span>':(l.cobertura_dias+'d'))+'</td>'
+      +'<td>'+(pct==null?'<span class="zero">—</span>'
+        :'<span class="barmini"><i style="width:'+pct+'%;background:'+corBarra+'"></i></span>')+'</td>'
+      +'<td style="white-space:nowrap"><button class="ghost small" data-ajustar="'+esc(l.codigo)+'">ajustar</button> '
+      +'<button class="ghost small" data-hist="'+esc(l.codigo)+'">histórico</button></td>'
+    +'</tr>';
+  }).join('') || '<tr><td colspan="'+estColunas()+'" style="color:#8b97a5;padding:20px">'
+      +(PAINEL.linhas&&PAINEL.linhas.length?'Nenhum SKU nesse filtro.':'Cadastre SKUs primeiro.')+'</td></tr>';
+
+  const alvoEm = r.alvo_aplicado_em ? ('Alvo aplicado pela última vez em '+estQuando(r.alvo_aplicado_em)+'.')
+    : 'O alvo nunca foi aplicado pelo Planejamento.';
+  let avisoAlvo='';
+  if(r.alvo_defasados){
+    /* Diz quantos o botao resolve E quantos ele nao resolve. Prometer "aplicar
+       todos" e deixar aviso de pe depois do clique ensina a desconfiar da tela. */
+    const fora=r.alvo_defasados-(r.alvo_aplicaveis||0);
+    avisoAlvo=' <b>'+r.alvo_defasados+'</b> SKU(s) com alvo salvo diferente do cálculo de hoje'
+      +' — a tela usa o cálculo.'
+      +(r.alvo_aplicaveis?(' O botão grava '+r.alvo_aplicaveis+' deles no cadastro.'):'')
+      +(fora>0?(' '+fora+' fica'+(fora>1?'m':'')+' de fora: sem venda na janela, o Planejamento não'
+        +' sobrescreve o alvo — seria zerar o alvo de quem tem história e não vendeu no período.'):'');
+  }
+  $('#estRodape').innerHTML=
+     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'
+    +'<button class="ghost small" onclick="estCSV()">exportar CSV</button>'
+    +(r.alvo_aplicaveis?'<button class="ghost small" id="estAplicar" onclick="estAplicarAlvo()">aplicar alvo</button>':'')
+    +(r.nunca_contados?('<span class="sub">'+r.nunca_contados+' SKU(s) nunca passaram por contagem.</span>'):'')
+    +'</div>'
+    +'Mostrando '+linhas.length+' de '+(PAINEL.linhas||[]).length+' SKUs. '+esc(alvoEm)+avisoAlvo;
+
+  // ── ajustes recentes: o registro que existia e nenhuma tela lia ──
+  const aj=PAINEL.ajustes||[];
+  $('#estAjustes').innerHTML='<div style="font-weight:700;margin-bottom:4px">Últimos ajustes manuais</div>'
+    +'<div class="sub" style="margin-bottom:10px">Toda correção de saldo feita à mão, com quem fez e por quê. Embalagem, etiqueta de venda e contagem mexem no estoque por caminhos próprios e não aparecem aqui.</div>'
+    +(aj.length?('<table><thead><tr><th>SKU</th><th class="n">De → para</th><th>Motivo</th><th>Quem</th><th>Quando</th></tr></thead><tbody>'
+      +aj.map(a=>'<tr><td class="code">'+esc(a.codigo)+(a.teste?'<span class="selo">teste</span>':'')+'</td>'
+        +'<td class="n">'+a.antes+' → <b>'+a.depois+'</b> <span class="'+(a.delta<0?'baixo':'ok')+'">('+(a.delta>0?'+':'')+a.delta+')</span></td>'
+        +'<td>'+esc(a.motivo||'')+(a.obs?'<div class="estq">'+esc(a.obs)+'</div>':'')+'</td>'
+        +'<td>'+esc(a.usuario_nome||'—')+'</td><td class="sub">'+esc(a.criado_em||'')+'</td></tr>').join('')
+      +'</tbody></table>')
+     :'<div class="sub">Nenhum ajuste manual registrado ainda.</div>');
 }
 /* ---- Produção ---- */
 function renderSel(){
@@ -984,10 +1326,98 @@ document.addEventListener("click",async e=>{
     const dc=$("#cadDica"); if(dc) dc.innerHTML="";
     $("#codigo").focus(); window.scrollTo(0,0); return; }
   const del=e.target.closest("[data-del]"); if(del){ if(confirm("Excluir "+del.dataset.del+"?")){ await fetch("/api/skus/"+encodeURIComponent(del.dataset.del),{method:"DELETE"}); carregar(); } return; }
-  const adj=e.target.closest("[data-adj]"); if(adj){ await fetch("/api/estoque",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({codigo:adj.dataset.adj,delta:+adj.dataset.d})}); carregar(); return; }
-  const se=e.target.closest("[data-setestbtn]"); if(se){ const inp=document.querySelector("[data-setest=\""+se.dataset.setestbtn+"\"]"); await fetch("/api/estoque",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({codigo:se.dataset.setestbtn,estoque:+inp.value||0})}); carregar(); return; }
-  const sa=e.target.closest("[data-setalvobtn]"); if(sa){ const inp=document.querySelector("[data-setalvo=\""+sa.dataset.setalvobtn+"\"]"); await fetch("/api/alvo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({codigo:sa.dataset.setalvobtn,alvo:+inp.value||0})}); carregar(); return; }
+  /* FILTRO do painel de estoque: o chip so muda o que a tela mostra — nao ha
+     ida ao servidor, entao clicar entre os grupos e instantaneo. Clicar no chip
+     ja ligado volta pra "Todos". */
+  const cf=e.target.closest("[data-estf]");
+  if(cf){ const k=cf.getAttribute("data-estf"); estFiltro=(estFiltro===k?'':k); renderEst(); return; }
+  /* HISTORICO de um SKU: a rota /api/estoque/ajustes existe desde que o ajuste
+     passou a exigir motivo e ate 01/09/2026 NENHUMA tela a chamava. */
+  const hs=e.target.closest("[data-hist]");
+  if(hs){
+    const cod=hs.getAttribute("data-hist"), tr=hs.closest("tr");
+    if(tr.nextElementSibling && tr.nextElementSibling.classList.contains("histlin")){
+      tr.nextElementSibling.remove(); return;          // clicou de novo: fecha
+    }
+    document.querySelectorAll("tr.histlin").forEach(x=>x.remove());
+    let l=[]; try{ l=await (await fetch("/api/estoque/ajustes?codigo="+encodeURIComponent(cod))).json(); }catch(err){}
+    const linha=document.createElement("tr");
+    linha.className="histlin";
+    linha.innerHTML='<td colspan="'+estColunas()+'">'
+      +'<b style="font-family:ui-monospace,monospace">'+esc(cod)+'</b> — ajustes manuais'
+      +(l.length?('<table style="margin-top:8px"><tbody>'+l.map(a=>
+          '<tr><td class="n" style="width:130px">'+a.antes+' → <b>'+a.depois+'</b> '
+          +'<span class="'+(a.delta<0?'baixo':'ok')+'">('+(a.delta>0?'+':'')+a.delta+')</span></td>'
+          +'<td>'+esc(a.motivo||'')+(a.obs?' <span class="estq">'+esc(a.obs)+'</span>':'')+'</td>'
+          +'<td>'+esc(a.usuario_nome||'—')+'</td>'
+          +'<td class="sub">'+esc(a.criado_em||'')+'</td></tr>').join('')+'</tbody></table>')
+        :'<div class="sub" style="margin-top:6px">Nenhum ajuste manual neste SKU. '
+         +'A embalagem (+1), a etiqueta de venda (−1) e a contagem mexem no saldo por caminhos próprios.</div>')
+      +'</td>';
+    tr.after(linha);
+    return;
+  }
+  /* AJUSTE DE ESTOQUE — abre a linha embaixo, com motivo obrigatorio.
+     O +/- de um clique saiu: ele mudava o saldo sem deixar rastro, e era o
+     unico movimento de estoque do sistema assim. Um clique a mais e o preco de
+     saber, seis meses depois, por que o numero mudou. */
+  const aj=e.target.closest("[data-ajustar]");
+  if(aj){
+    const cod=aj.getAttribute("data-ajustar");
+    const tr=aj.closest("tr");
+    if(tr.nextElementSibling && tr.nextElementSibling.classList.contains("ajlin")){
+      tr.nextElementSibling.remove(); return;          // clicou de novo: fecha
+    }
+    document.querySelectorAll("tr.ajlin").forEach(x=>x.remove());
+    let motivos=[]; try{ motivos=await (await fetch("/api/listas/ajuste_estoque")).json(); }catch(err){}
+    /* O saldo vem do painel, que e o que a linha em cima esta mostrando. Ler de
+       SKUS (carregado por outra rota, noutro instante) podia abrir o campo com
+       um numero diferente do que a pessoa acabou de ver na tela. */
+    const doPainel=((PAINEL&&PAINEL.linhas)||[]).find(x=>x.codigo===String(cod).toUpperCase());
+    const atual=doPainel?doPainel.estoque:((SKUS.find(x=>x.codigo===cod)||{}).estoque||0);
+    const linha=document.createElement("tr");
+    linha.className="ajlin";
+    linha.innerHTML='<td colspan="'+estColunas()+'" style="background:#0f141b">'
+      +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0">'
+      +'<b style="font-family:ui-monospace,monospace">'+esc(cod)+'</b>'
+      +'<span class="sub">de <b>'+atual+'</b> para</span>'
+      +'<input class="setin" type="number" id="ajQtd" value="'+atual+'" style="width:80px">'
+      +'<select id="ajMotivo" class="setin" style="width:auto;min-width:190px">'
+      +'<option value="">— motivo —</option>'
+      +motivos.map(m=>'<option>'+esc(m.valor||m)+'</option>').join('')
+      +'</select>'
+      +'<input class="setin" id="ajObs" placeholder="observação (opcional)" style="width:210px">'
+      +'<button class="ghost small" data-ajsalvar="'+esc(cod)+'">salvar</button>'
+      +'<span class="sub" id="ajMsg"></span></div>'
+      +'<div class="sub">O ajuste fica gravado com quem fez, quando, o valor anterior e o motivo.</div></td>';
+    tr.after(linha);
+    return;
+  }
+  const ajs=e.target.closest("[data-ajsalvar]");
+  if(ajs){
+    const cod=ajs.getAttribute("data-ajsalvar");
+    const motivo=document.getElementById("ajMotivo").value;
+    if(!motivo){ document.getElementById("ajMsg").textContent="escolha o motivo"; return; }
+    ajs.disabled=true;
+    const r=await (await fetch("/api/estoque",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({codigo:cod, estoque:+document.getElementById("ajQtd").value||0,
+                           motivo:motivo, obs:document.getElementById("ajObs").value})})).json();
+    ajs.disabled=false;
+    if(r.erro){ document.getElementById("ajMsg").textContent=r.erro; return; }
+    /* Recarrega o painel NA HORA (o estAuto segura por 12 s, e aqui o saldo
+       acabou de mudar pela mao de quem esta olhando a tela). */
+    carregarEst(); carregar();
+    return;
+  }
 });
+/* Busca com BIPE: o leitor manda o codigo e um Enter, e alguns mandam Tab.
+   Filtra em memoria, sem ida ao servidor. A comparacao normaliza os dois lados
+   (§12: o codigo chega picado, com espaco ou simbolo no meio). */
+(function(){
+  const b=document.getElementById('estBusca'); if(!b) return;
+  b.addEventListener('input', renderEst);
+  b.addEventListener('keydown', ev=>{ if(ev.key==='Enter'||ev.key==='Tab'){ ev.preventDefault(); renderEst(); } });
+})();
 carregar();
 
 /* ---- Pessoas & Acessos ---- */
@@ -1128,41 +1558,171 @@ document.addEventListener("click",function(e){
    qual peca o cliente comprou. Fica ACIMA dos bloqueados por SKU sem cadastro e
    com moldura vermelha de proposito — os dois retem volume, mas so este
    significa que uma peca errada quase foi despachada. */
+/* O CATALOGO INTEIRO como <option>, com o que cada peca E ao lado do codigo.
+   Montado na hora a cada abertura, nunca guardado: quem acabou de cadastrar o
+   SKU que faltava precisa ve-lo na lista sem dar F5 — e uma lista em cache que
+   nao mostra o cadastro novo faz a pessoa concluir que o cadastro nao salvou. */
+function opcoesCatalogo(){
+  var l=(SKUS||[]).slice().sort(function(a,b){
+    return String(a.codigo||"").localeCompare(String(b.codigo||"")); });
+  var h="";
+  for(var i=0;i<l.length;i++){
+    var t=pecaTexto(pecaDeSku(l[i]));
+    h+='<option value="'+esc(l[i].codigo)+'">'+esc(l[i].codigo)+(t?(" — "+t):"")+'</option>';
+  }
+  return h;
+}
 async function carregarDiv(){
   var l=[]; try{ l=await (await fetch("/api/divergencias")).json(); }catch(e){}
   var card=document.getElementById("divCard"), lis=document.getElementById("divLista");
   if(!card||!lis) return 0;
   if(!Array.isArray(l)||!l.length){ card.style.display="none"; lis.innerHTML=""; return 0; }
+  /* A aba Bloqueados pode abrir antes do carregar() geral — sem isto o seletor
+     do catalogo viria vazio justamente na tela onde ele e a saida. */
+  if(!SKUS||!SKUS.length){ try{ SKUS=await (await fetch("/api/skus")).json(); }catch(e){} }
   card.style.display="";
   var h="";
   for(var i=0;i<l.length;i++){
     var r=l[i];
-    var op=String(r.bloqueio||"").replace(/^divergencia:\s*/,"").split("/").map(function(s){return s.trim();}).filter(Boolean);
-    h+='<div style="border-top:1px solid #d8dee6;padding:12px 0">'
-      +'<div style="font-weight:700">'+(r.buyer||"—")+' · NF '+(r.nf||"—")+' · '+(r.data||"")+'</div>'
-      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 10px">pack '+(r.packId||"—")+' · venda '+(r.venda||"—")+'</div>'
-      +'<div style="font-size:13px;margin-bottom:8px">Qual peça o cliente comprou?</div>';
-    for(var k=0;k<op.length;k++)
-      h+='<button class="ghost" style="margin-right:8px;font-family:ui-monospace,monospace;font-weight:700" '
-        +'data-resolvediv="'+r.id+'" data-sku="'+op[k]+'">'+op[k]+'</button>';
-    h+='<span style="font-size:12px;color:#5a6472">confira no Mercado Livre antes de escolher</span></div>';
+    h+='<div style="border-top:1px solid #d8dee6;padding:14px 0">'
+      +'<div style="font-weight:700">'+esc(r.buyer||"—")+' · NF '+esc(r.nf||"—")+' · '+esc(r.data||"")+'</div>'
+      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">pack '+esc(r.packId||"—")+' · venda '+esc(r.venda||"—")+'</div>';
+
+    /* POR QUE ESTE VOLUME PAROU. Sem isso a pessoa escolhe no chute: as cinco
+       conferencias do §5 param o volume por motivos bem diferentes, e a que
+       parou muda o que se vai procurar no Mercado Livre. */
+    var mot=r.motivos||[];
+    if(mot.length){
+      h+='<div style="margin:10px 0;padding:8px 10px;border-radius:6px;background:#fff4f4;'
+        +'border:1px solid #f0b4b4;font-size:12px;color:#8a2020">';
+      for(var m=0;m<mot.length;m++) h+='<div>⚠ '+esc(mot[m])+'</div>';
+      h+='</div>';
+    }
+    /* O ANUNCIO COMO O ML ESCREVEU. E o texto que a pessoa vai reconhecer na
+       tela do Mercado Livre — o codigo do SKU nao aparece la. */
+    if(r.descricao)
+      h+='<div style="font-size:12px;color:#5a6472;margin-bottom:10px">'
+        +'anúncio: <i>'+esc(r.descricao)+'</i></div>';
+
+    h+='<div style="font-size:13px;font-weight:700;margin-bottom:2px">Qual peça o cliente comprou?</div>'
+      +'<div style="font-size:12px;color:#5a6472;margin-bottom:10px">'
+      +'Abra a venda '+esc(r.venda||r.packId||"")+' no Mercado Livre e confira antes de escolher.</div>';
+
+    /* SAO DUAS DECISOES DIFERENTES, E A TELA SEPARA AS DUAS.
+       "O sistema leu certo" e "o sistema leu errado, a peca e esta outra" nao
+       sao dois itens de uma mesma lista: a primeira e confirmacao, a segunda e
+       correcao. Misturadas em botoes iguais, a de cima ganha por estar em cima
+       — e ela e justamente a que dispensa procurar. */
+    var op=r.opcoes||[], gravado=String(r.gravado||"").toUpperCase();
+    var sug=null, outras=[];
+    for(var k=0;k<op.length;k++){
+      if(String(op[k].codigo).toUpperCase()===gravado && !sug) sug=op[k];
+      else outras.push(op[k]);
+    }
+    /* 1. CONFIRMAR O QUE O SISTEMA SUGERE. Nas conferencias 3, 4 e 5 a duvida e
+          entre o codigo e o ANUNCIO — e o codigo pode muito bem estar certo. */
+    if(sug){
+      var txtS=pecaTexto(pecaDeSku(sug));
+      h+='<div style="font-size:12px;color:#5a6472;margin-bottom:4px">O sistema leu:</div>'
+        +'<button style="display:block;width:100%;text-align:left;padding:12px;margin-bottom:12px;'
+        +'border:2px solid #2ea043;border-radius:8px;background:#f2fbf4;cursor:pointer" '
+        +'data-resolvediv="'+r.id+'" data-sku="'+esc(sug.codigo)+'" data-peca="'+esc(txtS)+'">'
+        +'<div style="font-weight:700;color:#1a7f37">✓ Confirmar esta peça</div>'
+        +'<div style="font-family:ui-monospace,monospace;font-weight:700;margin-top:4px">'+esc(sug.codigo)+'</div>'
+        +(txtS?('<div style="color:#5a6472;font-size:13px">'+esc(txtS)+'</div>'):'')
+        +'</button>';
+    }
+    /* 2. ESCOLHER OUTRA. Primeiro as que o proprio motivo citou (um toque), e
+          embaixo o catalogo inteiro — porque a peca certa pode nao ser nenhuma
+          das citadas, e ai o volume ficaria preso justamente no caso em que o
+          sistema errou mais feio. */
+    h+='<div style="font-size:12px;color:#5a6472;margin-bottom:4px">'
+      +(sug?'Ou escolha a peça certa:':'Escolha a peça certa:')+'</div>';
+    for(var k2=0;k2<outras.length;k2++){
+      var txt=pecaTexto(pecaDeSku(outras[k2]));
+      h+='<button class="ghost" style="display:block;width:100%;text-align:left;margin-bottom:6px;padding:10px 12px" '
+        +'data-resolvediv="'+r.id+'" data-sku="'+esc(outras[k2].codigo)+'" data-peca="'+esc(txt)+'">'
+        +'<b style="font-family:ui-monospace,monospace">'+esc(outras[k2].codigo)+'</b>'
+        +(txt?('<span style="color:#5a6472"> — '+esc(txt)+'</span>'):'')
+        +'</button>';
+    }
+    /* O CATALOGO INTEIRO, num seletor nativo. Escolher na lista preenche o campo
+       de baixo em vez de resolver direto: assim existe UM lugar so onde a
+       escolha final aparece antes de confirmar, seja ela vinda da lista ou do
+       bipe do leitor. Duas portas que resolvem sozinhas dariam dois caminhos
+       para o mesmo clique irreversivel. */
+    h+='<select data-cat="'+r.id+'" style="width:100%;padding:10px;margin-top:6px;'
+      +'border:1px solid #d8dee6;border-radius:6px;background:transparent;color:inherit">'
+      +'<option value="">— escolher na lista de SKUs cadastrados —</option>'
+      +opcoesCatalogo()+'</select>';
+    /* O campo aceita bipe do leitor, que e como a bancada trabalha (§12). */
+    h+='<div style="display:flex;gap:6px;margin-top:6px">'
+      +'<input id="divOutro'+r.id+'" placeholder="ou bipe o SKU com o leitor" autocorrect="off" autocapitalize="characters" '
+      +'style="flex:1;padding:9px;border:1px solid #d8dee6;border-radius:6px;font-family:ui-monospace,monospace">'
+      +'<button class="ghost" data-resolveoutro="'+r.id+'">Confirmar</button></div>';
+    if(r.gravado && !r.gravado_cadastrado)
+      h+='<div style="font-size:12px;color:#8a2020;margin-top:6px">O código gravado ('
+        +esc(r.gravado)+') não está no cadastro de SKU — só sai daqui com um código cadastrado.</div>';
+    h+='</div>';
   }
   lis.innerHTML=h;
   return l.length;
 }
+/* O leitor de codigo de barras manda Enter no fim do bipe (§12). Sem isto o
+   operador bipa, nada acontece, e ele conclui que a tela nao funciona. */
+document.addEventListener("keydown",function(e){
+  if(e.key!=="Enter") return;
+  var t=e.target;
+  if(!t||!t.id||t.id.indexOf("divOutro")!==0) return;
+  e.preventDefault();
+  var b=document.querySelector('[data-resolveoutro="'+t.id.replace("divOutro","")+'"]');
+  if(b) b.click();
+});
+/* Escolher na lista PREENCHE o campo, nao resolve. A confirmacao fica num
+   lugar so — e ela e irreversivel do ponto de vista de quem opera: a etiqueta
+   sai com o SKU escolhido. */
+document.addEventListener("change",function(e){
+  var s=e.target.closest("[data-cat]");
+  if(!s) return;
+  var campo=document.getElementById("divOutro"+s.getAttribute("data-cat"));
+  if(campo && s.value){ campo.value=s.value; campo.focus(); }
+});
 document.addEventListener("click",async function(e){
-  var b=e.target.closest("[data-resolvediv]");
+  var b=e.target.closest("[data-resolveoutro]");
   if(!b) return;
-  var sku=b.getAttribute("data-sku");
-  if(!confirm("Confirmar que esse volume é "+sku+"?\n\nA etiqueta vai sair com esse SKU.")) return;
+  var id=b.getAttribute("data-resolveoutro");
+  var campo=document.getElementById("divOutro"+id);
+  var sku=((campo&&campo.value)||"").replace(/[^A-Za-z0-9 -]/g,"").trim().toUpperCase();
+  if(!sku){ alert("Escolha na lista ou bipe o SKU."); return; }
+  /* Se o codigo escolhido esta no cadastro, a confirmacao mostra O QUE A PECA E
+     — que e o que a pessoa acabou de ler na tela do Mercado Livre. */
+  var s=(SKUS||[]).find(function(x){ return String(x.codigo).toUpperCase()===sku; });
+  await resolverDiv(b,id,sku,s?pecaTexto(pecaDeSku(s)):"");
+});
+/* A CONFIRMACAO DIZ O QUE A PECA E, nao so o codigo.
+   Quem esta destravando acabou de olhar o pedido no Mercado Livre, onde nao
+   aparece SKU nenhum — aparece "1,60x1,40 Blackout Bege". Confirmar um codigo
+   contra uma lembranca de outro formato e como nao confirmar nada. */
+async function resolverDiv(b,id,sku,peca){
+  if(!confirm("Confirmar que esse volume é\n\n  "+sku+(peca?("\n  "+peca):"")+
+              "\n\nA etiqueta de venda vai sair com esse SKU.")) return;
   b.disabled=true;
   try{
     var r=await (await fetch("/api/divergencias/resolver",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({id:+b.getAttribute("data-resolvediv"),codigo:sku})})).json();
+      body:JSON.stringify({id:+id,codigo:sku})})).json();
     if(r.erro) alert(r.erro);
   }catch(err){ alert(String(err)); }
   b.disabled=false;
   carregarBloq();
+  /* O volume acabou de virar `pendente`: ele entra na fila de etiquetas agora,
+     e a tela tem que mostrar isso sem um F5 — senao a pessoa destrava e fica
+     sem saber se funcionou. */
+  try{ if(typeof verCruz==="function") verCruz(); }catch(e){}
+}
+document.addEventListener("click",async function(e){
+  var b=e.target.closest("[data-resolvediv]");
+  if(!b) return;
+  await resolverDiv(b,b.getAttribute("data-resolvediv"),b.getAttribute("data-sku"),b.getAttribute("data-peca")||"");
 });
 
 async function carregarBloq(){

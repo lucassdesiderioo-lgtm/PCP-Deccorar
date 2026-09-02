@@ -33,7 +33,10 @@ var FONT=(function(){
 (function(){
   // Saíram do menu (rotas seguem vivas por URL):
   //  '/expedicao' (Subir PDFs) -> upload agora fica na Etiqueta de Venda.
-  //  '/necessidade' (ABC) -> absorvida pelo Planejamento (mesmo cálculo + planilha).
+  //  '/necessidade' (ABC) -> REMOVIDA em 01/09/2026, não só do menu: a tabela
+  //  `demanda` que ela lia era semeada uma vez no código e nunca atualizada, e o
+  //  botão dela sobrescrevia skus.alvo com esse número congelado — brigando com
+  //  o Planejamento pela mesma coluna. Quem calcula alvo agora é um só.
   var MAP={ '1':'/painel','2':'/operador','3':'/montagem','5':'/embalagem','6':'/carregamento','7':'/','8':'/relatorios' };
   var NAMES={ '/painel':'Painel','/operador':'Revisão','/montagem':'Embalagem','/embalagem':'Etiqueta Venda','/carregamento':'Carregamento','/':'Admin','/relatorios':'Relatórios' };
   var cur=location.pathname.replace(/\/$/,'')||'/';

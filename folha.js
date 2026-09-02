@@ -81,6 +81,14 @@ function itensDaFolha(linhas){
       venda:(pega(/Venda:\s*([\d ]+)/)||'').replace(/\s+/g,'')||null,
       sku:ms[1].trim(), cor:(pega(/Cor:\s*([^\n|]+)/)||'').trim()||null,
       comprador:comprador||null, desc:desc||null,
+      /* QUANTIDADE — quantas PECAS aquele item tem.
+         Um volume nao e uma peca: o item que diz "Quantidade: 3" e uma
+         etiqueta so, e o sistema grava uma linha so em `lote`. Quem conta as
+         persianas do PDF na mao chega a um numero maior que o do sistema, e
+         ate aqui nao havia onde ver por que. Ninguem DECIDE nada com este
+         campo — ele existe pra `rastrear.js --lote` conseguir explicar a
+         diferenca em vez de deixar o operador achando que sumiu peca. */
+      qtd: Math.max(1, parseInt(pega(/Quantidade:\s*(\d+)/)||'1',10)||1),
       larg: med?+(med[1]+med[2]):null, alt: med?+(med[3]+med[4]):null
     });
   });

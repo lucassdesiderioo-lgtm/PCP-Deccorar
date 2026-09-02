@@ -168,7 +168,11 @@ async function finish(){
 }
 $('#tiles').addEventListener('click',e=>{ const b=e.target.closest('.tile'); if(b) toggle(b.dataset.cod); });
 const scan=$('#scan');
-const keep=()=>{ if(document.activeElement!==scan) scan.focus(); };
+/* preventScroll: devolver o foco nao pode arrastar a tela. O #scan mora no
+   alto; sem isto, focar de volta rolava a pagina ate ele e jogava pro topo
+   quem tivesse descido pra usar qualquer coisa no fim. O keep existe pro
+   BIPE cair no lugar certo, nao pra mexer no que a pessoa esta olhando. */
+const keep=()=>{ if(document.activeElement!==scan) scan.focus({preventScroll:true}); };
 scan.addEventListener('blur',()=>setTimeout(keep,50));
 document.addEventListener('click',e=>{ if(!e.target.closest('button,a')) keep(); });
 var tmr=null;

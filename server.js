@@ -108,13 +108,70 @@ app.post('/api/skus', (req,res)=>{
 });
 app.delete('/api/skus/:codigo',(req,res)=>{ db.prepare('DELETE FROM skus WHERE codigo=?').run(req.params.codigo); res.json({ok:true}); });
 
+/* ── AJUSTE MANUAL DE ESTOQUE ────────────────────────────────────────────────
+ * Era o unico movimento de estoque do sistema SEM registro: um UPDATE direto,
+ * sem quem, sem por que, sem o valor anterior. Todos os outros deixam rastro —
+ * a embalagem grava em `montagem`, a etiqueta grava `lote.embalado_em`, a
+ * contagem grava `contagem_pendente` com contado/sistema_era/contado_por, e o
+ * material passa pelo componente_dominio e deixa linha em movimento_componente.
+ * Numero que qualquer um muda e ninguem sabe quem mudou e numero em que a
+ * equipe para de confiar — e quando param de confiar, voltam pro caderno.
+ *
+ * O NOME E `ajuste_estoque`, NAO `movimento_estoque`, DE PROPOSITO. Ele guarda
+ * so o ajuste feito na mao por esta rota; a embalagem, a etiqueta e a contagem
+ * continuam mexendo em skus.estoque por fora (a divida dos nove donos, §14).
+ * Uma tabela chamada "movimento" prometeria a historia inteira da coluna e
+ * seria lida como tal — e ai o saldo nao fecharia com ela, em silencio. */
+db.exec(`CREATE TABLE IF NOT EXISTS ajuste_estoque (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  codigo       TEXT,
+  antes        INTEGER,
+  depois       INTEGER,
+  delta        INTEGER,
+  motivo       TEXT,
+  obs          TEXT,
+  usuario_id   INTEGER,
+  usuario_nome TEXT,
+  criado_em    TEXT DEFAULT (datetime('now','localtime')),
+  data         TEXT DEFAULT (date('now','localtime')),
+  teste        INTEGER DEFAULT 0
+);`);
+
 app.post('/api/estoque',(req,res)=>{
-  const {codigo,estoque,delta}=req.body||{};
+  const {codigo,estoque,delta,motivo,obs}=req.body||{};
   if(!codigo) return res.status(400).json({erro:'codigo'});
-  if(delta!==undefined) db.prepare('UPDATE skus SET estoque=MAX(0,estoque+?) WHERE codigo=?').run(Math.trunc(+delta||0),codigo);
-  else db.prepare('UPDATE skus SET estoque=? WHERE codigo=?').run(Math.max(0,Math.trunc(+estoque||0)),codigo);
-  const e=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(codigo);
-  res.json({ok:true,estoque:e?e.estoque:null});
+  /* O MOTIVO E OBRIGATORIO, e e o ponto todo desta rota. Ajuste sem motivo e
+     exatamente o que existia antes: um numero que mudou e ninguem sabe por que. */
+  const mot=String(motivo||'').trim();
+  if(!mot) return res.status(400).json({erro:'informe o motivo do ajuste'});
+
+  const linha=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(codigo);
+  if(!linha) return res.status(404).json({erro:'SKU nao cadastrado: '+codigo});
+  const antes=+linha.estoque||0;
+  const depois = (delta!==undefined)
+    ? Math.max(0, antes + Math.trunc(+delta||0))
+    : Math.max(0, Math.trunc(+estoque||0));
+  if(depois===antes) return res.json({ok:true,estoque:antes,sem_mudanca:true});
+
+  const u=req.usuario||{};
+  db.transaction(()=>{
+    db.prepare('UPDATE skus SET estoque=? WHERE codigo=?').run(depois,codigo);
+    db.prepare(`INSERT INTO ajuste_estoque (codigo,antes,depois,delta,motivo,obs,usuario_id,usuario_nome)
+      VALUES (?,?,?,?,?,?,?,?)`).run(codigo,antes,depois,depois-antes,mot,
+        String(obs||'').trim()||null,u.id||null,u.nome||'');
+  })();
+  try{ app.locals.acesso.auditar(req,'estoque','ajuste_manual',codigo,
+    antes+' -> '+depois+'  ('+mot+')'); }catch(e){}
+  res.json({ok:true,estoque:depois,antes:antes});
+});
+
+/* O historico de um SKU — e o que transforma o ajuste em algo conferivel. */
+app.get('/api/estoque/ajustes',(req,res)=>{
+  const cod=(req.query.codigo||'').trim();
+  const q=`SELECT id,codigo,antes,depois,delta,motivo,obs,usuario_nome,criado_em
+    FROM ajuste_estoque `+(cod?'WHERE UPPER(codigo)=UPPER(?) ':'')+
+    'ORDER BY id DESC LIMIT 100';
+  res.json(cod ? db.prepare(q).all(cod) : db.prepare(q).all());
 });
 
 app.post('/api/producao',(req,res)=>{
@@ -159,8 +216,18 @@ require('./backup_route')(app, db);
 require('./rel_route')(app, db);
 app.get('/relatorios',(req,res)=>res.sendFile(path.join(__dirname,'public','relatorios.html')));
 require('./alvo_route')(app, db);
-require('./nec_route')(app, db);
-app.get('/necessidade',(req,res)=>res.sendFile(path.join(__dirname,'public','necessidade.html')));
+/* A aba Estoque do admin. Depois do CREATE de `ajuste_estoque` la em cima —
+   a rota le a tabela, e num banco novo ela precisa existir antes. */
+require('./est_route')(app, db);
+/* A tela /necessidade (curva ABC) saiu em 01/09/2026. Ela lia a tabela `demanda`,
+   que era semeada UMA VEZ no codigo do nec_route e nunca mais atualizada — entao
+   mostrava a demanda de um mes ja passado com cara de numero atual. Pior: o
+   botao dela sobrescrevia `skus.alvo` com esse numero congelado, brigando com o
+   Planejamento pela MESMA coluna, e criava SKU deduzindo a cor do texto do
+   codigo (o que o §7 aposentou quando medida e cor viraram coluna).
+   O Planejamento a absorveu: mesmo calculo, alimentado pela planilha do ML.
+   A tabela `demanda` fica no banco como historia; o demanda_dominio le dela
+   dentro de try/catch, entao instalacao limpa nao quebra sem ela. */
 require('./plan_route')(app, db);
 app.get('/planejamento',(req,res)=>res.sendFile(path.join(__dirname,'public','planejamento.html')));
 app.get('/status',(req,res)=> res.json({ok:true,hora:new Date().toISOString()}));

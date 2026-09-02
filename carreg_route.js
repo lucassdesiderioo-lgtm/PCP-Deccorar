@@ -1,3 +1,4 @@
+const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro}=require('./carga');
 module.exports=function(app,db){
   /* ── CONFERENCIA DUPLA (etiqueta de venda + SKU da caixa) ──────────────────
      A ultima rede antes do carro. Bipe 1 = a etiqueta de venda JA COLADA;
@@ -32,14 +33,28 @@ module.exports=function(app,db){
     const digits=code.replace(/\D/g,'');
     const jid=(code.match(/"id"\s*:\s*"?(\d+)/)||[])[1]||null;
     const cands=[code, digits, jid].filter(Boolean);
-    // procura no lote de hoje um pedido cujos codigos batam
-    const rows=db.prepare("SELECT * FROM lote WHERE data=date('now','localtime')").all();
-    let alvo=null;
-    for(const r of rows){
+    /* PROCURA O VOLUME PELO CODIGO, NAO PELO DIA (carga.js).
+       Enquanto isto era `WHERE data=date('now','localtime')`, o volume
+       embalado ontem e nao carregado ontem respondia "nao encontrado" hoje —
+       com a caixa na mao, na frente do carro. A busca larga primeiro (a chave
+       e o codigo do ML, que e unico) e so depois confere o codigo exato, que
+       e a mesma comparacao de antes. */
+    const vistos=new Set(); const achados=[];
+    for(const c of cands){
+      for(const r of db.prepare('SELECT * FROM lote WHERE packId=? OR venda=? OR codes LIKE ?').all(c,c,'%'+c+'%')){
+        if(vistos.has(r.id)) continue;
+        vistos.add(r.id); achados.push(r);
+      }
+    }
+    const batem=achados.filter(r=>{
       let cs=[]; try{ cs=JSON.parse(r.codes||'[]'); }catch(e){}
       cs=cs.concat([r.packId,r.venda].filter(Boolean));
-      if(cs.some(c=> cands.includes(String(c)) )){ alvo=r; break; }
-    }
+      return cs.some(c=> cands.includes(String(c)) );
+    });
+    /* Duplicata do mesmo codigo existe (§5, os fantasmas). Entre irmaos, o que
+       esta pra carregar manda: bipar a caixa certa nao pode dar "ja carregado"
+       so porque um irmao fantasma andou antes. */
+    const alvo = batem.find(r=>r.estagio==='embalado') || batem[0] || null;
     if(!alvo) return res.json({ok:false,motivo:'nao_encontrado',lido:code});
     if(alvo.estagio==='bloqueado') return res.json({ok:false,motivo:'bloqueado',pedido:alvo,
         aviso:'SKU "'+(alvo.codigo||'(vazio)')+'" nao esta no cadastro. Nao pode ser carregado.'});
@@ -62,15 +77,36 @@ module.exports=function(app,db){
       }
     }
     db.prepare("UPDATE lote SET estagio='carregado', carregado_em=datetime('now','localtime') WHERE id=?").run(alvo.id);
-    const tot=db.prepare("SELECT COUNT(*) n FROM lote WHERE data=date('now','localtime') AND estagio IN ('embalado','carregado')").get().n;
-    const car=db.prepare("SELECT COUNT(*) n FROM lote WHERE data=date('now','localtime') AND estagio='carregado'").get().n;
-    res.json({ok:true,pedido:alvo,carregados:car,total:tot});
+    const p=progresso();
+    res.json({ok:true,pedido:alvo,carregados:p.carregados,total:p.total});
   });
-  // conferencia: o que falta carregar (do que foi embalado hoje)
-  app.get('/api/carregamento',(req,res)=>{
-    const total=db.prepare("SELECT COUNT(*) n FROM lote WHERE data=date('now','localtime') AND estagio IN ('embalado','carregado')").get().n;
-    const car=db.prepare("SELECT COUNT(*) n FROM lote WHERE data=date('now','localtime') AND estagio='carregado'").get().n;
-    const falta=db.prepare("SELECT id,codigo,cor,buyer,nf FROM lote WHERE data=date('now','localtime') AND estagio='embalado' ORDER BY id").all();
-    res.json({total,carregados:car,faltam:falta});
-  });
+  /* O PROGRESSO DA CARGA — o mesmo numero pras duas rotas.
+     "Carregados X de Y" e a lista tem que falar do mesmo universo, senao o
+     banner diz 12 de 12 com a lista mostrando 3 faltando. Y e o que ha pra
+     fazer agora (todo `embalado`, de qualquer dia) mais o que ja foi carregado
+     hoje — nao o total do dia de importacao, que era o que escondia o
+     atrasado. */
+  function progresso(){
+    const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
+    const todos=db.prepare(`SELECT id,codigo,cor,buyer,nf,data,despachar_em FROM lote
+      WHERE ${PRA_CARREGAR} ORDER BY ${ORDEM_CARGA}`).all()
+      .map(v=>Object.assign({},v,{atrasado: atrasado(v,hoje)?1:0}));
+    /* A VENDA FUTURA SAI DA CARGA DE HOJE, mas nao volta a sumir (#9): vai
+       numa linha a parte. Cobra-la junto mandaria por no carro hoje um volume
+       que so despacha semanas depois — a etiqueta foi impressa adiantada, a
+       peca ainda nao e pra sair. */
+    const faltam=todos.filter(v=>!futuro(v,hoje));
+    const depois=todos.filter(v=>futuro(v,hoje));
+    /* CARREGADOS HOJE conta por `carregado_em`, nao por `data` — mesma razao do
+       "impressas hoje" no exp_route.js. Contando pelo dia de importacao, o
+       operador bipava um volume atrasado, ele saia da lista e o contador NAO
+       andava: a tela ficava dizendo que ele nao tinha feito nada. */
+    const car=db.prepare(`SELECT COUNT(*) n FROM lote WHERE carregado_em IS NOT NULL
+      AND date(carregado_em)=date('now','localtime')`).get().n;
+    return {total:car+faltam.length, carregados:car, faltam,
+            atrasados:faltam.filter(f=>f.atrasado).length,
+            depois, adiantadas:depois.length};
+  }
+  // conferencia: o que falta carregar — todo `embalado`, com o atrasado marcado
+  app.get('/api/carregamento',(req,res)=> res.json(progresso()));
 };

@@ -3,6 +3,7 @@
  *
  *   node rastrear.js 2000014596231013 [outro numero...]
  *   node rastrear.js --auditar [dias]      confere o SKU de TODOS os volumes
+ *   node rastrear.js --lote [data]         "subi N e apareceram M" — onde foi o resto
  *
  * O primeiro modo serve a "o cliente reclamou — o que o sistema soube dessa
  * venda?". O segundo responde a pergunta que vem depois: "isso acontece em
@@ -23,10 +24,12 @@ const MODO_AUDITAR=args[0]==='--auditar';
 const MODO_DANFE=args[0]==='--danfe';
 const MODO_FOLHA=args[0]==='--folha';
 const MODO_ML=args[0]==='--ml';
-const MODO=[MODO_AUDITAR,MODO_DANFE,MODO_FOLHA,MODO_ML].some(Boolean);
+const MODO_LOTE=args[0]==='--lote';
+const MODO=[MODO_AUDITAR,MODO_DANFE,MODO_FOLHA,MODO_ML,MODO_LOTE].some(Boolean);
 const DIAS=MODO_AUDITAR?(parseInt(args[1],10)||7):(MODO_ML?(parseInt(args[1],10)||7):0);
 const NF_ALVO=MODO_DANFE?String(args[1]||'').replace(/\D/g,''):null;
 const ACHAR=MODO_FOLHA?String(args[1]||'').trim():null;
+const DATA_LOTE=MODO_LOTE?String(args[1]||'').trim():null;   // vazio = hoje
 const alvos=MODO?[]:args.map(s=>String(s).replace(/\D/g,'')).filter(Boolean);
 if(!MODO && !alvos.length){
   console.log('uso: node rastrear.js <numero da venda ou do pack> [mais numeros...]');
@@ -34,6 +37,7 @@ if(!MODO && !alvos.length){
   console.log('     node rastrear.js --danfe [NF]       mostra o texto da nota de um volume');
   console.log('     node rastrear.js --folha [texto]    mostra a FOLHA DE CONTROLE crua');
   console.log('     node rastrear.js --ml [dias]        confere o SKU contra a planilha do ML');
+  console.log('     node rastrear.js --lote [data]      "subi N pecas e apareceram M"');
   process.exit(1);
 }
 
@@ -328,5 +332,185 @@ function conferirML(){
   T('');
 }
 
-(MODO_AUDITAR?auditar():MODO_DANFE?verDanfe():MODO_FOLHA?verFolha():MODO_ML?Promise.resolve(conferirML()):rastrear())
+/* ── MODO 6: A ESCADA DO LOTE ───────────────────────────────────────────────
+   "Subi um PDF com 41 persianas e so aparecem 35."
+
+   O numero do PDF e o numero da tela contam coisas diferentes, e entre um e
+   outro existem CINCO degraus onde um volume sai da conta — todos por regra,
+   nenhum visivel. Ate aqui a unica saida era abrir o banco na mao e conferir
+   volume a volume, e por isso a pergunta virava desconfianca do sistema.
+
+   Este modo desce a escada inteira em voz alta: quantas PECAS a folha diz,
+   quantos VOLUMES viraram etiqueta, quantos foram gravados, quantos ficaram
+   retidos e quantos ja estavam cobertos por estoque. O degrau onde a conta
+   muda e a resposta.
+
+   SO LE. */
+async function verLote(){
+  const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
+  const dia=DATA_LOTE||hoje;
+  tit('DE ONDE VEM A DIFERENCA ENTRE O PDF E A TELA — '+dia+(dia===hoje?' (hoje)':''));
+
+  const vols=db.prepare('SELECT * FROM lote WHERE data=? ORDER BY id').all(dia);
+  if(!vols.length){ T(''); T('Nenhum volume gravado em '+dia+'.'); T(''); return; }
+  const arqs=[...new Set(vols.map(v=>v.srcfile).filter(Boolean))];
+
+  /* ── 1. O QUE CADA PDF TRAZ x O QUE ELE GRAVOU ───────────────────────────
+     A folha conta PECAS (o campo Quantidade), a etiqueta conta VOLUMES, e o
+     sistema grava um volume por etiqueta. Item com Quantidade 2 e uma peca a
+     mais na contagem da mao e nenhuma linha a mais no banco. */
+  let pecas=0, itens=0, etqs=0, gravados=0, semPdf=0;
+  const multi=[], orfas=[];
+  const chaves=new Set();
+  vols.forEach(v=>{ if(v.packId)chaves.add('p:'+v.packId); if(v.venda)chaves.add('v:'+v.venda); });
+
+  for(const arq of arqs){
+    const n=db.prepare('SELECT COUNT(*) n FROM lote WHERE data=? AND srcfile=?').get(dia,arq).n;
+    gravados+=n;
+    if(!fs.existsSync(arq)){ semPdf++; T(''); T('  '+path.basename(arq)+': o PDF ja saiu do servidor — '+n+' volume(s) sem conferir'); continue; }
+    let insp; try{ insp=await inspecionar(arq); }
+    catch(e){ semPdf++; T(''); T('  '+path.basename(arq)+': nao deu pra ler'); continue; }
+    const p=insp.blocos.reduce((a,b)=>a+(b.qtd||1),0);
+    pecas+=p; itens+=insp.blocos.length; etqs+=insp.etiquetas.length;
+    insp.blocos.filter(b=>(b.qtd||1)>1).forEach(b=>multi.push(b));
+    /* Etiqueta do PDF que nao virou volume no dia. Desde a armadilha #5 a
+       dedup olha o HISTORICO INTEIRO, entao o motivo quase sempre e que o
+       volume ja existe de antes — e ai o que interessa nao e o numero, e QUAL
+       volume ja existia e o que aconteceu com ele. Sem isso o operador ve
+       "6 recusadas" e nao tem como saber se foi acerto ou perda. */
+    insp.etiquetas.forEach(e=>{
+      const tem=(e.packId&&chaves.has('p:'+e.packId))||(e.venda&&chaves.has('v:'+e.venda));
+      if(tem) return;
+      const antigo=db.prepare(`SELECT id,data,estagio,buyer,codigo FROM lote
+        WHERE (packId=? AND packId IS NOT NULL) OR (venda=? AND venda IS NOT NULL)
+        ORDER BY id LIMIT 1`).get(e.packId,e.venda);
+      orfas.push({arq:path.basename(arq),pagina:e.pagina,packId:e.packId,venda:e.venda,antigo});
+    });
+    T('');
+    T('  '+path.basename(arq)+'   ('+insp.paginas+' paginas)');
+    T('     itens na folha    : '+insp.blocos.length);
+    T('     PECAS na folha    : '+p+'   (soma das Quantidades)');
+    T('     etiquetas no PDF  : '+insp.etiquetas.length);
+    T('     volumes gravados  : '+n);
+  }
+
+  T('');
+  linha();
+  T('A CONTA, DEGRAU POR DEGRAU');
+  linha();
+  if(semPdf<arqs.length){
+    T('');
+    T('PECAS que a folha declara     : '+pecas+'   ← e este o numero que se conta na mao');
+    if(pecas!==itens)
+      T('  em itens (etiquetas)        : '+itens+'   ← '+(pecas-itens)+' peca(s) viajam junto de outra');
+    T('etiquetas no(s) PDF(s)        : '+etqs);
+  }
+  T('volumes GRAVADOS no dia       : '+vols.length+'   ← uma linha por etiqueta, nunca por peca');
+
+  const bSku=vols.filter(v=>v.estagio==='bloqueado'&&!/^divergencia/.test(String(v.bloqueio||''))).length;
+  const bDiv=vols.filter(v=>v.estagio==='bloqueado'&&/^divergencia/.test(String(v.bloqueio||''))).length;
+  const todosPend=vols.filter(v=>v.estagio==='pendente'&&v.codigo);
+  const andando=vols.filter(v=>v.estagio!=='pendente'&&v.estagio!=='bloqueado').length;
+  T('  - retidos: SKU sem cadastro : '+bSku+(bSku?'   (Admin > Bloqueados)':''));
+  T('  - retidos: divergencia      : '+bDiv+(bDiv?'   (Admin > Bloqueados, em vermelho)':''));
+  if(andando) T('  - ja embalados/carregados   : '+andando);
+  T('  = PENDENTES                 : '+todosPend.length);
+
+  /* ── 2. O PRAZO DE DESPACHO (§8, armadilha #7) ───────────────────────────
+     Nem todo volume de um lote sai no mesmo dia: a etiqueta traz "Despachar:
+     qua 26/ago" e no PDF de 25/08 as 14 etiquetas tinham CINCO datas. O que
+     vence depois nao esta na fila de hoje — esta no painel "Pra despachar
+     depois", e e um dos degraus que mais come volume.
+
+     A regra vem do fila_dia.js, o dono unico. Uma ferramenta de diagnostico
+     com regua propria e pior que nenhuma: confirmaria com autoridade um
+     numero que a tela nao usa. */
+  /* O corte e sempre HOJE, mesmo analisando um dia passado: e assim que a tela
+     decide, e a pergunta aqui e sempre "por que a tela mostra este numero". */
+  const {VENCE_HOJE}=require('./fila_dia');
+  const venceDepois=todosPend.filter(v=>v.despachar_em && v.despachar_em>hoje);
+  const jaVenceu=todosPend.filter(v=>v.despachar_em && v.despachar_em<hoje);
+  const semData=todosPend.filter(v=>!v.despachar_em);
+  const pend=todosPend.filter(v=>!v.despachar_em || v.despachar_em<=hoje);
+  if(venceDepois.length||jaVenceu.length||semData.length!==todosPend.length){
+    T('  - so despacham depois de hoje: '+venceDepois.length+
+      (venceDepois.length?'   (painel "Pra despachar depois")':''));
+    T('  = FILA DE HOJE deste lote   : '+pend.length+
+      (jaVenceu.length?'   (dos quais '+jaVenceu.length+' ja venceram — saem em vermelho)':'')+
+      (semData.length?'   ('+semData.length+' sem data lida na etiqueta)':''));
+  }
+  /* A tela nao mostra so este lote: ela mostra TODO pendente que vence hoje,
+     inclusive o que entrou dias atras. Comparar o numero do PDF com o da tela
+     sem isso da diferenca nos dois sentidos. */
+  const filaTela=db.prepare('SELECT COUNT(*) c FROM lote WHERE '+VENCE_HOJE+" AND estagio='pendente' AND codigo IS NOT NULL").get().c;
+  T('');
+  T('"Faltam imprimir" na tela     : '+filaTela+
+    (filaTela!==pend.length?'   ← inclui pendente de outros dias que vence hoje':''));
+
+  /* ── 3. O ULTIMO DEGRAU: quem ja tinha estoque nao vira ordem ────────────
+     A queda mais legitima de todas: venda com peca pronta na prateleira sai
+     direto pra etiqueta, sem passar pela producao. A tela vermelha mostra o
+     que falta PRODUZIR, nunca o que falta EXPEDIR. */
+  T('');
+  /* A conta sai do `urgencia.js`, o dono unico — nunca de uma copia aqui. Uma
+     ferramenta de diagnostico com regua propria e pior que nenhuma: ela
+     confirma com autoridade um numero que a tela nao usa (mesmo motivo pelo
+     qual a fila de hoje vem do `fila_dia.js`). */
+  const linhas=require('./urgencia').calcular(db, dia)
+    .map(l=>({c:l.codigo, q:l.pendentes, est:l.estoque, u:l.urgente}));
+  let urg=0, cobertos=0;
+  linhas.forEach(l=>{ urg+=l.u; cobertos+=l.q-l.u; });
+  T('  - cobertos por estoque      : '+cobertos+'   (saem direto pra Etiqueta de Venda)');
+  T('  = URGENTES (tela vermelha)  : '+urg);
+  const lancados=db.prepare("SELECT COALESCE(SUM(qtd),0) n FROM producao WHERE data=? AND origem='ml'").get(dia).n;
+  const manual=db.prepare("SELECT COALESCE(SUM(qtd),0) n FROM producao WHERE data=? AND COALESCE(origem,'')<>'ml'").get(dia).n;
+  T('');
+  T('ordens do PDF ja lancadas     : '+lancados+(lancados!==urg?'   ← diferente do calculo acima: falta clicar em "Lancar urgentes"':''));
+  if(manual) T('ordens lancadas na mao        : '+manual+'   (nao vem do PDF; somam na tela)');
+  T('a tela vermelha soma          : '+(lancados+manual)+'   ← o numero que o operador ve');
+
+  if(linhas.length){
+    T('');
+    linha();
+    T('POR SKU — pendente, estoque, urgente');
+    linha();
+    linhas.forEach(l=>T('  '+String(l.c).padEnd(24)+' pendentes '+String(l.q).padStart(3)+
+      '   estoque '+String(l.est).padStart(3)+'   urgente '+String(l.u).padStart(3)+
+      (l.u<l.q?'   ← '+(l.q-l.u)+' ja tem pronta':'')));
+  }
+
+  if(multi.length){
+    T('');
+    linha();
+    T('ITENS COM MAIS DE UMA PECA — a diferenca que a contagem na mao acusa');
+    linha();
+    T('');
+    T('Sao '+multi.reduce((a,b)=>a+(b.qtd-1),0)+' peca(s) alem do numero de volumes. O sistema grava UM volume');
+    T('por etiqueta, entao esses itens entram como 1 e a fabrica precisa produzir');
+    T('a quantidade cheia — confira estes na mao antes de fechar o dia:');
+    multi.forEach(b=>T('  '+String(b.sku).padEnd(24)+' Quantidade '+b.qtd+'   '+(b.comprador||'—')+
+      '   venda '+(b.venda||'—')));
+  }
+  if(orfas.length){
+    T('');
+    linha();
+    T('ETIQUETAS DO PDF QUE NAO VIRARAM VOLUME NESTE DIA');
+    linha();
+    T('');
+    T('A dedup olha o historico inteiro (armadilha #5): pack/venda que ja existe');
+    T('nao entra de novo. Com o volume antigo ao lado da pra ver se foi acerto');
+    T('(ja despachado) ou se ficou parado em algum lugar:');
+    orfas.slice(0,20).forEach(o=>{
+      T('  pag '+o.pagina+'   pack '+(o.packId||'—')+'   venda '+(o.venda||'—'));
+      T('     ja existia: '+(o.antigo
+        ? '#'+o.antigo.id+'  '+(o.antigo.codigo||'(sem SKU)')+'  '+(o.antigo.buyer||'—')+
+          '  '+o.antigo.data+'  ('+o.antigo.estagio+')'
+        : 'NAO ACHEI no banco — esta etiqueta nao entrou e nao existe. Investigue.'));
+    });
+    if(orfas.length>20) T('  … e mais '+(orfas.length-20));
+  }
+  T('');
+}
+
+(MODO_AUDITAR?auditar():MODO_DANFE?verDanfe():MODO_FOLHA?verFolha():MODO_ML?Promise.resolve(conferirML()):MODO_LOTE?verLote():rastrear())
   .catch(e=>{ console.error(e); process.exit(1); });

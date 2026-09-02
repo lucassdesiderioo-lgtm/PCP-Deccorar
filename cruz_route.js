@@ -1,3 +1,5 @@
+const URGENCIA = require('./urgencia');
+
 module.exports=function(app,db){
   // Fase 3 (docs/DESENHO-PLANEJAMENTO.md, secoes 5 e 9): o PDF passa a gerar
   // SO urgencia. A reposicao saiu do cruzamento — agora vem do calculo ao vivo
@@ -9,20 +11,12 @@ module.exports=function(app,db){
   // numero se auto-corrige — reaplicar depois de produzir/expedir nao infla nada,
   // porque o volume ja processado sai de 'pendente' e o estoque ja baixou junto.
   // Era isso que a foto_estoque protegia; agora o proprio dado corrente resolve.
-  function calcular(){
-    const pend=db.prepare(`SELECT codigo, COUNT(*) qtd FROM lote
-      WHERE data=date('now','localtime') AND codigo IS NOT NULL AND estagio='pendente'
-      GROUP BY codigo`).all();
-    const emap={};
-    db.prepare('SELECT codigo,estoque FROM skus').all().forEach(s=>{ emap[s.codigo]=s.estoque; });
-    const r=[];
-    for(const v of pend){
-      const estoque=emap[v.codigo]||0;
-      const urgente=Math.max(0, v.qtd-estoque);
-      r.push({codigo:v.codigo, pendentes:v.qtd, estoque, urgente});
-    }
-    return r;
-  }
+  //
+  // A conta mora no `urgencia.js`, e nao aqui: o `rastrear.js --lote` faz a
+  // MESMA pergunta para explicar a escada do PDF ate a tela, e com duas copias a
+  // ferramenta de diagnostico confirmaria com autoridade um numero que a tela
+  // nao usa (mesmo motivo do `fila_dia.js`).
+  const calcular = () => URGENCIA.calcular(db);
 
   app.get('/api/cruzamento',(req,res)=> res.json(calcular()));
 

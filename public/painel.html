@@ -43,8 +43,15 @@
     <div class="kpi"><div class="n" id="kEmbT">—</div><div class="l">Tempo médio embalagem</div></div>
   </div>
   <div class="card"><table><thead><tr>
-    <th>SKU</th><th>Demanda</th><th>Estoque</th><th>Alvo</th><th>A produzir</th><th>Produzido</th><th>Embalado</th><th>Carregado</th>
+    <th>SKU</th><th>Demanda</th><th>Estoque</th><th>Alvo</th>
+    <th title="Ordens lançadas hoje que ainda não foram produzidas">Falta hoje</th>
+    <th title="O mesmo número da tela azul do operador: vendido a despachar + alvo − estoque">Precisa</th>
+    <th>Produzido</th><th>Embalado</th><th>Carregado</th>
   </tr></thead><tbody id="corpo"></tbody></table></div>
+  <div class="sub" style="margin-top:8px">
+    <b>Falta hoje</b> é o que sobrou das ordens do dia. <b>Precisa</b> é o que o estoque pede —
+    o mesmo número que o operador vê na tela azul. São perguntas diferentes: não se somam.
+  </div>
   <div class="upd" id="upd"></div>
 </div>
 <script>
@@ -58,10 +65,14 @@ async function load(){
     const ec=r.estoque<r.alvo?'baixo':(r.estoque>0?'ok':'zero');
     return '<tr><td class="code">'+r.codigo+'<div class="cor">'+(r.cor||'')+'</div></td>'+
       '<td>'+r.demanda+'</td><td class="'+ec+'">'+r.estoque+'</td><td class="zero">'+r.alvo+'</td>'+
-      '<td class="'+(r.aProduzir>0?'baixo':'ok')+'">'+(r.aProduzir||'—')+'</td>'+
+      /* Zero vira traco CINZA, nao verde: numa TV lida de longe, o que tem cor
+         e o que pede acao. Verde em cima de "nada a fazer" gasta a atencao que
+         o vermelho precisa ter. */
+      '<td class="'+(r.faltaHoje>0?'baixo':'zero')+'">'+(r.faltaHoje||'—')+'</td>'+
+      '<td class="'+(r.precisa>0?'baixo':'zero')+'">'+(r.precisa||'—')+'</td>'+
       '<td>'+r.produzido+'</td><td style="color:#a371f7">'+r.embalado+'</td><td style="color:#7ee2a0">'+r.carregado+'</td></tr>';
   }).join('');
-  $('#corpo').innerHTML=rows||'<tr><td colspan="8" style="color:#8b97a5;padding:20px;text-align:center">Sem dados hoje.</td></tr>';
+  $('#corpo').innerHTML=rows||'<tr><td colspan="9" style="color:#8b97a5;padding:20px;text-align:center">Sem dados hoje.</td></tr>';
   $('#kDem').textContent=dem;$('#kEst').textContent=est;$('#kProd').textContent=prod;$('#kEmb').textContent=emb;$('#kCar').textContent=car;
   $('#kRev').textContent=p.rev_qtd||0; $('#kRevT').textContent=fmtS(p.rev_tmedio);
   $('#kEmbP').textContent=p.emb_qtd||0; $('#kEmbT').textContent=fmtS(p.emb_tmedio);

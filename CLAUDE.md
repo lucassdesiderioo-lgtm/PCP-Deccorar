@@ -71,6 +71,71 @@ que impede o operador de revisar meia hora no modo errado.
 | **PRODUÇÃO PRA ESTOQUE** | 🔵 azul | Necessidade calculada ao vivo (`comprometido + alvo − estoque`) — Fase 2 | `GET /api/revisao/producao` (+ `/api/revisao/adiantar`) |
 | **DEVOLUÇÕES** | 🟡 âmbar | Peças que voltaram do ML | navega para `/devolucao` |
 
+### ⚠️ ARMADILHA #11 — a planilha do ML é ESPELHO, e um recorte apaga a média
+
+A tela azul não sai de lançamento nenhum: ela é calculada ao vivo a partir da
+planilha do Mercado Livre, importada em **Admin → Planejamento**. Dessa planilha
+saem **dois** números, de lugares diferentes:
+
+| Coluna | Alimenta | Olha para |
+|---|---|---|
+| **Data da venda** | a média diária | os últimos 30 dias (`janela_media`) |
+| **Estado** (`"Para enviar no dia 17 de agosto"`) | o comprometido | os envios futuros |
+
+```
+alvo    = max(alvo_minimo, média_na_janela × dias_cobertura)
+precisa = comprometido + alvo − estoque
+```
+
+> ⚠️ **O import APAGA o que não veio no arquivo** (`plan_route.js`, ao fim da
+> transação): venda cancelada some da planilha e tem que sumir da conta. A
+> consequência é que a planilha precisa vir **inteira, sempre** — cobrindo a
+> janela toda e incluindo as vendas ainda não despachadas.
+>
+> Subir um recorte só com os próximos dias **apaga os 30 dias de histórico**. A
+> média de todo SKU cai a zero, o alvo despenca para o `alvo_minimo`, e a tela
+> azul para de pedir produção. Não dá erro e não dá aviso — o número só encolhe.
+>
+> Por isso a tela acusa: quando um import remove mais da metade da base, ela
+> mostra tarja âmbar dizendo que aquilo tem cara de recorte. **Reparo: subir a
+> planilha completa de novo.** Como o import é espelho, ele reconstrói sozinho.
+
+A janela não é fixa em 30 dias — é o campo "Janela da média" na própria tela. Se
+ela virar 60, a planilha precisa cobrir 60.
+
+### A ordem é de prioridade, não de quantidade
+
+Ordenar por `precisa` põe em cima o SKU que gira mais — que quase nunca é o que
+vai faltar primeiro. A lista desce quatro degraus, e **cada linha diz qual a
+colocou ali** (`motivo`): pontuação composta ordena bem e não explica nada, e
+quem lê a lista sem entender a ordem volta a produzir pela intuição.
+
+| # | Degrau | Critério |
+|---|---|---|
+| 1 | Cliente com prazo | tem comprometido que despacha **até amanhã** |
+| 2 | Sem estoque | a próxima venda já vira urgência |
+| 3 | Cobertura baixa | `estoque ÷ média` abaixo de metade dos dias de cobertura |
+| 4 | Abaixo do alvo | o resto do que precisa produzir |
+
+**Cobertura = quantos dias o estoque atual aguenta.** É ela que mede risco: um
+SKU que vende 6/dia com 3 em estoque tem meio dia de folga; outro que vende
+0,2/dia com 4 em estoque tem 20 dias — e era o segundo que aparecia em cima,
+porque a quantidade que falta é maior. Sem venda na janela a cobertura é `null`
+("não dá pra dizer"), que não é zero.
+
+> O comprometido é **repartido por prazo** (`comp_ja`, `comp_semana`,
+> `comp_depois`), mas o **total não mudou** — o `WHERE` da consulta é o mesmo.
+> `precisa` e a compra de material continuam idênticos: o que entrou foi a
+> informação de *quando*, que faltava para saber o que empurra a produção hoje.
+
+A mesma ordem vale para a tela AZUL do operador: ela lê as mesmas `linhas`.
+
+> **Peça sob medida não tem alvo, e isso é definição, não exceção.** Ela não
+> existe antes da venda e não sobra depois (§7): não soma `+1` na embalagem nem
+> baixa na etiqueta, então o estoque dela é sempre zero. Com alvo, o `precisa`
+> daria `alvo − 0` todo dia e o SKU ficaria eterno na tela azul pedindo peça que
+> ninguém encomendou. O que ela precisa é o **comprometido**, e só ele.
+
 **Ground truth físico:** a produção separa os carrinhos fisicamente. Carrinho de
 hoje → tela vermelha. Carrinho de estoque → tela azul. O software espelha a
 realidade física; não tenta adivinhá-la.
@@ -99,6 +164,20 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 1. Bipe no SKU → inicia
 2. Bipe no **QR do kit de instalação** → confirma que o kit entrou na caixa
 3. Bipe no SKU → encerra, consome da `fila`, **+1 no estoque**, abate a ordem do dia
+
+> **A fila não é obrigatória para embalar.** `POST /api/montagem` consome a linha
+> da `fila` **quando ela existe** e funciona sem ela: grava a embalagem e soma
+> `+1` no estoque igual. O que muda é o `modo`, que vira `'estoque'` — e aí a
+> embalagem deixa de abater a ordem do dia. Isso é o que torna
+> `node limpar_fila.js` seguro: limpar a fila não trava a bancada.
+>
+> A fila acumula quando a revisão é lançada e a peça nunca é embalada — foi o que
+> aconteceu no período de testes, que deixou centenas de linhas sem peça física
+> atrás. O lugar de limpar é o **inventário**: zerado o estoque e contada a
+> prateleira, a fila velha não descreve mais nada. `limpar_fila.js` simula por
+> padrão, mostra a **idade** das linhas (fila de hoje é trabalho, fila de meses é
+> passivo), faz backup e apaga **só** `situacao='aguardando'` — a linha
+> `embalado` é história de peça que virou estoque e nunca é tocada.
 
 > **Bloqueio do kit:** sem o bipe 2, o bipe 3 é recusado com "⚠ FALTOU O KIT".
 > Essa é a garantia contra esquecimento — motivo de devolução recorrente.
@@ -169,11 +248,87 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > grava por ela e a auditoria relê por ela. Duas cópias significaria conferir com
 > uma régua diferente da que gravou.
 >
-> **Rode `node teste_parse.js` após qualquer mudança no `parse.js`** — os sete
+> **Rode `node teste_parse.js` após qualquer mudança no `parse.js`** — os nove
 > casos montam a folha no formato REAL do ML, e o caso do Abraão está lá.
 >
 > Para conferir o que já está gravado: `node rastrear.js --auditar [dias]`.
 > `node rastrear.js --folha` mostra o PDF cru quando o layout mudar.
+
+### ⚠️ ARMADILHA #8 — **peça não é volume**, e é daí que sai "subi 41 e aparecem 35"
+
+O sistema grava **uma linha em `lote` por etiqueta**, nunca por peça. O item da
+folha que diz `Quantidade: 3` tem **uma** etiqueta do Mercado Livre, logo **um**
+volume — e quem contou as persianas na folha achou três. Nada se perdeu: são
+duas unidades de medida diferentes para o mesmo papel.
+
+> Não "conserte" isso multiplicando o item pela quantidade no `parse.js`.
+> Cada linha de `lote` vira uma **etiqueta de venda impressa**; três linhas para
+> um envio que o ML despachou como um só criariam duas etiquetas que não existem,
+> e o volume nunca fecharia no carregamento. O caso está travado por teste
+> (caso 9 do `teste_parse.js`): a folha tem que **entregar** o 3, e o parse tem
+> que continuar gravando **1**.
+
+### ⚠️ A REGRA DA OPERAÇÃO: **uma venda = uma etiqueta = uma persiana**
+
+Regra do dono, reafirmada em 01/09/2026:
+
+> *"Para cada venda é uma etiqueta. Não tem essa de juntar etiqueta, não tem
+> essa de juntar pacote, não tem essa de juntar caixa. Não existe isso. Cada
+> etiqueta de venda é para um SKU, cada etiqueta de venda é para uma persiana."*
+
+Consequência prática, e é ela que vale no código: **contar linhas de `lote` É
+contar peças.** O cliente que comprou três leva três vendas, três etiquetas,
+três volumes — cada um com o seu ciclo completo (revisão, embalagem, etiqueta,
+carregamento).
+
+> ⚠️ **NÃO MULTIPLIQUE O VOLUME POR NENHUMA "QUANTIDADE".** Isso foi tentado em
+> 01/09/2026: o cruzamento passou a somar `pecas` e a etiqueta de venda a baixar
+> `pecas` do estoque. Foi revertido no mesmo dia por contrariar a regra acima —
+> nenhuma linha disso sobreviveu. Hoje há teste travando os dois lados: caso 1
+> do `teste_cruzamento.js` e caso 1 do `teste_etiqueta.js`.
+>
+> O caminho é sempre o mesmo: **cada peça tem a sua etiqueta.** Se um dia
+> aparecer venda de 3 peças com uma etiqueta só, isso é assunto do PDF do
+> Mercado Livre — não se resolve multiplicando número dentro do sistema.
+
+**Pergunta em aberto (a investigar, sem código):** a folha de controle traz o
+campo `Quantidade`, e ele já apareceu maior que 1. Pela regra acima isso não
+deveria acontecer, então falta olhar um PDF real desses e entender o que aquele
+número significa. Enquanto não se sabe, **nada no sistema decide por ele** — o
+`folha.js` lê o campo e o `rastrear.js --lote` só o exibe, para o dia em que
+alguém for investigar.
+
+**Do PDF até o número que o operador vê há SETE degraus**, e em seis deles o
+volume sai da conta por regra. Nenhum é bug — mas nenhum é visível, e é por
+isso que a pergunta "cadê as 6" vira desconfiança do sistema:
+
+| Degrau | Some quem | Regra |
+|---|---|---|
+| peças → etiquetas | as peças extras dos itens com `Quantidade > 1` | esta armadilha |
+| etiquetas → gravados | pack/venda **que já existe no histórico** | #5 |
+| gravados → pendentes | os `bloqueado` (SKU sem cadastro **ou** divergência) | §6 e §5 |
+| pendentes → fila de hoje | quem **só despacha depois** — vai pro painel "Pra despachar depois" | #7 |
+| fila de hoje → urgentes | **quem já tem estoque** — sai direto pra Etiqueta de Venda, sem ordem | §5 |
+| urgentes → tela vermelha | falta clicar em **"Lançar urgentes na produção"** | §5 |
+
+> **Os dois degraus do meio são os que mais comem volume, e os dois são recentes.**
+> A dedup passou a olhar o histórico inteiro (#5) e a fila passou a ser por prazo
+> de despacho (#7) — as duas em 25/08/2026, as duas corretas, as duas mudando o
+> número da tela sem mudar nada no PDF. Quem comparou a folha com a tela antes e
+> depois viu a conta "quebrar" de um dia pro outro.
+
+```bash
+node rastrear.js --lote            # a escada inteira, do PDF de hoje até a tela
+node rastrear.js --lote 2026-08-26 # de outro dia
+```
+
+Ele desce os sete degraus em voz alta e mostra em qual deles a conta mudou,
+lista os itens com mais de uma peça e as etiquetas recusadas pela dedup com o
+volume que já existia. Só lê — pode rodar em produção.
+
+> ⚠️ Ele usa o `fila_dia.js` para contar a fila de hoje, e não uma cópia da
+> regra. Uma ferramenta de diagnóstico com régua própria é pior que nenhuma:
+> ela confirmaria com autoridade um número que a tela não usa.
 
 ### Três conferências, e qualquer uma delas retém o volume
 
@@ -198,6 +353,46 @@ O `parse` devolve `conflito` e o upload grava o volume como `bloqueado` com
 > A lista de cores da conferência 4 sai dos próprios campos `Cor:` da folha,
 > nunca de uma lista fixa: cor nova do catálogo entra sozinha, sem ninguém
 > lembrar de vir aqui.
+
+### ⚠️ ARMADILHA #10 — a trava que acusa o inocente para de proteger o culpado
+
+Em 31/08/2026 havia **10 volumes retidos, e os 10 estavam corretos.** Nenhuma
+peça errada, nenhum cliente trocado — três defeitos diferentes acusando gente
+certa. Uma trava com 100% de falso positivo não é uma trava rigorosa: é a
+armadilha #6 outra vez, o desvio que a equipe aprende a fazer. Quem destrava
+dez inocentes em sequência destrava o décimo primeiro sem olhar, e é esse que
+importa.
+
+| Defeito | Vítimas | O que era |
+|---|---|---|
+| **O nome partido pelo PDF** | 3 (Dona Lizete) | A etiqueta traz `Dona Lizete (CONTADOR)`; o pdf.js quebrou a linha e sobrou `CONTADOR)`. A remontagem só olhava fragmento **começando** com `(` — o que chega com o `)` órfão não era remontado, e a palavra `CONTADOR)` virava o comprador |
+| **Cor com nome comercial** | 5 (Tóquio 004 / 002) | `Tóquio 004 - Cinza com acabamento branco` e um SKU `CINZA` dizem a **mesma** coisa. O código não contém a frase inteira, então a conferência procurava outra cor e achava a própria |
+| **Letra dobrada no nome** | 1 (Ryta) | `Rufiino` na etiqueta × `Rufino` na folha — digitação do próprio ML, não troca de cliente |
+
+**O reparo de cada um é de precisão, não de afrouxamento** — os três casos reais
+continuam retidos, e há teste para isso (casos 12 a 14 do `teste_parse.js`):
+
+- `nomeDaEtiqueta()` vira o dono único da leitura do comprador e remonta o nome
+  também quando o fragmento traz `)` sem `(`.
+- A conferência 4 só acusa quando a cor do código **não aparece** no texto do
+  anúncio. Anúncio `Bege` contra SKU `CINZA` continua retido.
+- A conferência 2 tolera **letra repetida**, e só isso.
+
+> ⚠️ **A TOLERAÇÃO DO NOME NÃO PODE SER DISTÂNCIA DE EDIÇÃO.** "Até 2 letras de
+> diferença" resolveria o caso da Ryta e abriria um buraco no lugar exato onde
+> não pode: **`Marcelo Sousa Silva` e `Marcela Sousa Silvo` também estão a duas
+> letras, e são duas pessoas.** A conferência 2 é a única que não depende do
+> Pack ID — ela existe justamente para pegar o volume casado com outro
+> comprador. Por isso `mesmoNomeComRepeticao()` colapsa letras repetidas dos
+> dois lados e exige **igualdade**: passa quem difere só na repetição
+> (`rufiino`/`rufino`), nunca quem teve letra **trocada** (`marcelo`/`marcela`).
+
+> **Consertar o comprador aumenta a proteção, não diminui.** Enquanto o nome vinha
+> como `CONTADOR)`, aquele volume não estava sendo conferido — estava sendo
+> acusado por ruído. Nome ilegível não vira acusação (é a regra dos dois lados),
+> então cada nome que volta a ser lido é um volume que **passa a ter** a
+> conferência de identidade. Acompanhe `cobertura.comprador` na auditoria: ela
+> tem que **subir** depois deste reparo.
 
 > ⚠️ **UMA TRAVA QUE PARA DE ACUSAR FAZ O MESMO SILÊNCIO DE "ESTÁ TUDO CERTO".**
 > As conferências 3 e 4 leem a medida e a cor **de dentro do código do SKU**
@@ -227,6 +422,47 @@ O volume divergente:
 - sai só por `POST /api/divergencias/resolver`, depois de alguém abrir o pedido no
   Mercado Livre e escolher. Aparece na aba **Bloqueados** do admin, em vermelho.
 
+### Como o volume retido volta a andar (Bloqueados → escolher)
+
+> ⚠️ **UMA TRAVA QUE NÃO SABE LIBERAR É UMA TRAVA QUE A EQUIPE APRENDE A
+> CONTORNAR.** Até 01/09/2026 a tela montava os botões de escolha dando
+> `split("/")` no texto do `bloqueio`. Isso só devolve SKU no motivo 1
+> (`leituras divergem: A / B`); nos outros quatro o botão saía com a frase
+> inteira dentro — `descricao diz 160x140 e o SKU e BK140140BEGE` — e o resolver
+> recusava, porque aquilo não é código nenhum. **Quatro dos cinco motivos
+> prendiam o volume para sempre.** O sistema sabia acusar e não sabia liberar.
+
+As opções agora saem do **cadastro de SKU**, não do texto do motivo: a rota varre
+`skus` e fica com os códigos que aparecem no bloqueio. Isso acha SKU com espaço
+(`ROLO SOB MEDIDA 137x212`, §7), que nenhuma quebra por token acharia, e nunca
+oferece um código que o §6 recusaria dois cliques depois.
+
+**O código já gravado é sempre a primeira opção.** Nas conferências 3, 4 e 5 a
+dúvida é entre o código e o *anúncio* — e quem abriu o pedido no ML pode muito
+bem concluir que o código estava certo e o anúncio é que estava torto.
+Concordar com o sistema era, justamente, a única resposta que a tela não aceitava.
+
+A tela mostra, para cada volume retido: **por que parou** (os motivos, um por
+linha), **o anúncio como o ML escreveu** — é esse texto que se reconhece na tela
+do Mercado Livre, onde SKU não aparece —, as opções com **o que a peça é**
+(`160 × 140 cm · Bege · Blackout · Rolô`, do mesmo `pecaTexto` da embalagem) e um
+campo livre que **aceita bipe** para o caso em que a peça certa não é nenhuma das
+citadas.
+
+**A dúvida vira história.** Resolver apaga o `bloqueio` (é ele que retém), mas
+grava `lote.bloqueio_resolvido`, `resolvido_por` e `resolvido_em`, e registra na
+auditoria. Sem isso o volume destravado fica idêntico ao que nunca teve problema,
+e a trava não deixa rastro de quantas vezes salvou — nem de quem a destravou com
+pressa.
+
+> A trava do §6 continua de pé aqui: SKU fora do cadastro **não** solta volume.
+> A mensagem manda cadastrar antes, em vez de recusar sem dizer o quê.
+
+**Teste obrigatório após mexer no destravamento ou nos textos de conflito do
+`parse.js`:** `node teste_divergencia.js` — os cinco motivos entram com o texto
+**exato** que o `parse.js` escreve. Mudou a frase lá, o caso quebra aqui, que é
+o ponto: a tela lê esses textos.
+
 ### A conferência dupla no carregamento
 
 `config.conf_carregamento = '1'` faz o carregamento pedir **dois bipes**: a
@@ -241,6 +477,40 @@ para a auditoria.
 Desligável (Admin → Cadastros) porque custa um bipe por volume, todo dia. Nasce
 **desligada**: ela cobre o erro de colagem, que ainda não tem evidência nos dados
 — o erro que já aconteceu foi o do parse, e esse não passa mais.
+
+> ⚠️ **ARMADILHA #9 — o carregamento NÃO filtra por dia, e não pode voltar a
+> filtrar.** `carga.js` é o dono único de "isto está pra carregar?", e a resposta
+> é `estagio='embalado'`, sem olhar `data`. Volume com etiqueta impressa e não
+> carregado está **fisicamente na fábrica** até alguém pôr no carro; não existe
+> hora em que ele deixe de estar.
+>
+> As três consultas da tela — a lista, o contador e **o bipe** — filtravam por
+> `data=date('now','localtime')`, o dia da *importação*. O volume embalado ontem
+> e não carregado ontem sumia das três de uma vez, e não havia nenhuma outra tela
+> em que reaparecesse. Em 26/08/2026 eram os volumes **#643 a #648**, impressos
+> no dia anterior.
+>
+> O pior dos três é o bipe: ele respondia **`nao_encontrado`** com a caixa na
+> mão, na frente do carro. Ali ninguém tem como conferir nada — o que a equipe
+> aprende é que o sistema erra, e a próxima caixa sobe no carro sem bipe.
+>
+> Terceira porta da mesma doença dos fantasmas (#5) e da fila por prazo (#7).
+> As duas primeiras eram tela mostrando trabalho que **não existe**; esta era
+> tela escondendo trabalho que **existe** — e é pior, porque o ruído a equipe
+> aprende a ignorar, mas o volume escondido ninguém procura.
+>
+> **`carregados` conta por `carregado_em`**, nunca por `data`: senão o operador
+> bipa um atrasado, ele sai da lista e o contador não anda — a tela dizendo que
+> ele não fez nada. Mesma correção que o "impressas hoje" do `exp_route.js`.
+>
+> **O atrasado sai marcado e em cima**, nunca diluído no dia. Passivo antigo
+> misturado no trabalho de hoje vira uma lista que nunca zera, e lista que nunca
+> zera ninguém lê até o fim — que é o mesmo fim de esconder.
+>
+> **Rode `node teste_carga.js` após qualquer mudança no `carreg_route.js`** —
+> os 13 casos incluem o dos seis volumes de 26/08, e cobrem que a busca larga
+> não virou "acha qualquer coisa" (código inexistente ainda dá `nao_encontrado`)
+> e que `bloqueado` continua recusado.
 3. `cruz_route.js` compara os volumes **pendentes** × estoque e gera só urgência:
 
 | Situação | Vira | Cor na revisão |
@@ -266,6 +536,60 @@ número — o volume processado sai de `pendente` e o estoque baixa junto.
 
 **Recálculo é idempotente:** `POST /api/cruzamento/aplicar` apaga as ordens de
 `origem='ml'` do dia e refaz. Subir o mesmo PDF duas vezes não duplica.
+
+> ⚠️ **ARMADILHA #5 — a deduplicação do upload olha o HISTÓRICO INTEIRO, não o
+> dia.** Pack ID e Venda são números do Mercado Livre: cada volume tem o seu, e
+> ele nunca reaparece em outra venda. Então "já existe" é resposta definitiva —
+> nunca "já existe hoje".
+>
+> Enquanto o `SELECT` da dedup em `exp_route.js` trazia
+> `WHERE data=date('now','localtime')`, resubir um PDF de ontem (ou subir um
+> lote reemitido, que repete vendas de dias anteriores) reinseria cada volume
+> como **`pendente` de hoje** — inclusive volumes já impressos e despachados. Em
+> 25/08/2026 foram **94 volumes fantasmas num dia só**, e os montes órfãos de 21,
+> 19 e 18/08 mostram que vinha acontecendo havia semanas.
+>
+> O estrago não é a linha a mais: é a fila "Faltam imprimir" cobrando etiqueta de
+> peça que está no caminhão. Fila que mostra o que não existe é fila que a equipe
+> aprende a ignorar — e aí o volume que falta de verdade some junto com o ruído.
+>
+> Passivo antigo se limpa com `node limpar_fantasmas.js` (simula) e
+> `--aplicar` (faz backup por `db.backup()` e apaga). Ele só remove o
+> **`pendente`** cujo irmão mais antigo já **andou** (`embalado`/`carregado`) —
+> duplicata com irmão `pendente` ou `bloqueado` sai numa lista à parte, para
+> alguém olhar. O que fica é sempre o mais antigo, que é quem carrega a história.
+
+### Os três scripts que fecham passivo — e as duas regras que valem para todos
+
+| Script | Fecha | Critério |
+|---|---|---|
+| `limpar_fantasmas.js` | duplicata `pendente` | irmão mais antigo já andou |
+| `fechar_vencidos.js` | `pendente` vencido | em bloco, por período conferido |
+| `regularizar_saida.js` | qualquer não-carregado | por id, um a um, decisão humana |
+
+> ⚠️ **A saída é carimbada na data DO VOLUME** — `COALESCE(despachar_em, data)`
+> às 15:00 (§8) —, nunca em `datetime('now')`. Fechar um passivo antigo com a
+> data de hoje cria um pico falso de dezenas de carregamentos num dia em que
+> não saiu nada, e deixa vazios os dias em que as peças realmente saíram.
+> O `fechar_vencidos.js` já nascia certo; o `regularizar_saida.js` foi
+> corrigido em 26/08/2026, quando passou a ser usado com 27 ids de uma vez.
+
+> ⚠️ **VENDA FUTURA NÃO FOI DESPACHADA.** Volume com `despachar_em > hoje` não
+> se fecha, mesmo com a etiqueta já impressa: ela foi impressa adiantada e a
+> peça está na fábrica esperando o prazo. Fechar carimba uma saída que não
+> aconteceu, e — o dano real — o volume **não aparece na tela de carregamento
+> no dia em que tiver que sair de verdade**. A peça fica na prateleira e
+> ninguém é cobrado.
+>
+> A guarda existia só no `fechar_vencidos.js`. Ao copiar a fórmula da data para
+> o `regularizar_saida.js` ela ficou para trás, e em 26/08/2026 quatro volumes
+> foram fechados com data de setembro (o caso da Lucélia, que despacha 17/09).
+> Hoje os dois recusam, dizendo em qual data o volume despacha.
+>
+> Reparo de uma vez só: `node reabrir_futuros.js` (simula) e `--aplicar`. O
+> critério é estreito de propósito — só `carregado_em` **maior que hoje**, que
+> não tem interpretação alternativa: ninguém saiu amanhã. Se ele voltar a achar
+> linha algum dia, alguém furou a guarda.
 
 > ⚠️ **Lançamento manual e PDF não se conversam.** O manual (`origem='manual'`)
 > não é apagado pelo recálculo. Usar os dois no mesmo SKU **duplica a ordem**.
@@ -331,6 +655,38 @@ contador que nunca zera é um contador que a equipe aprende a ignorar.
 > **descrição** (`Kit 32 mm completo`) e o M² não é impresso — área de acessório
 > não existe, e `M² 0.00` seria um número falso colado no produto. Persiana sem
 > medida cadastrada continua recusada: ali a medida falta mesmo.
+
+**Produto sem estoque existe, e não é falta.** `modelo.sob_medida = 1` marca a
+peça feita contra o pedido do cliente: ela não existe antes da venda e não sobra
+depois, então o saldo dela é sempre zero. Esses SKUs não passam pela trava de
+estoque da Etiqueta de Venda **nem pela baixa** — sem `+1` na embalagem não pode
+haver `−1` na impressão, senão cada venda sob medida abriria um buraco de uma
+peça no SKU.
+
+> ⚠️ **ARMADILHA #6 — a trava que a operação contorna não protege, só cega.**
+> Até 25/08/2026 o `POST /api/embalar` recusava todo SKU com estoque zero. Como
+> sob medida **nunca** tem estoque, isso recusava 100% dessas vendas. O que
+> acontecia então não era a peça ficar retida: a bancada imprimia a etiqueta
+> direto do PDF do Mercado Livre e despachava por fora — sem registro, sem a
+> conferência do carregamento, e com o volume preso em `pendente` para sempre,
+> reimportado a cada PDF novo. Foi assim que 1 SCREEN3 e 2 SOBMEDIDA de 24/08
+> viraram fantasmas depois de terem sido entregues.
+>
+> Quando uma trava dispara todo dia no caso normal, ela para de ser proteção e
+> vira um desvio que a equipe aprende a fazer — e o desvio acontece fora da
+> vista do sistema, que é o pior lugar possível.
+
+> ⚠️ **`SOBMEDIDA` é um balde, e isso ainda é dívida aberta.** Um código só para
+> peças que são todas diferentes: a folha de controle traz apenas `SOBMEDIDA`,
+> enquanto na bancada as peças vêm etiquetadas por pedido (`1027/01`, `1027/02`)
+> e com **medidas quase sempre diferentes**. Nada liga o volume do ML à peça
+> física — a fila pega "a mais antiga de `SOBMEDIDA`", que não diz *qual peça*.
+> Hoje quem resolve é a memória de quem embala, e nenhuma das cinco conferências
+> do §5 pega uma troca, porque as duas peças têm o mesmo código. Falta o cadastro
+> do item sob medida (pedido, item, medida, cor, cliente) e o bipe que fecha esse
+> vínculo contra **o cliente** — que é onde o erro caro mora: item trocado dentro
+> do mesmo pedido chega no mesmo endereço; peça trocada entre clientes é
+> reclamação.
 
 ### Quem lê o quê
 
@@ -481,6 +837,48 @@ ao meio-dia em vez de 10:30.
 |---|---|
 | Corte 10:30 | Vendas até esse horário são entregues no mesmo dia |
 | Despacho 15:00 | Limite para levar os volumes à agência |
+
+> ⚠️ **ARMADILHA #7 — nem todo volume de um lote sai no mesmo dia, e a etiqueta
+> diz qual é qual.** Cada etiqueta traz `Despachar: qua 26/ago, antes das 15:00 h`.
+> No PDF de 25/08 as **14 etiquetas tinham cinco datas diferentes** — só 6 para
+> o dia seguinte, as outras 8 espalhadas por três semanas.
+>
+> Enquanto o `parse.js` ignorava essa linha, todo volume entrava como se fosse
+> de hoje e a fila "Faltam imprimir" cobrava etiqueta de venda que só vencia
+> semanas depois. Mesma doença dos volumes fantasmas por outra porta: fila que
+> mostra o que não é pra agora é fila que a equipe aprende a ignorar.
+>
+> `fila_dia.js` é o **dono único** da pergunta "isto é trabalho de hoje?", e por
+> um motivo prático: a tela faz essa pergunta duas vezes por caminhos
+> diferentes — a lista de pendentes e o bipe do SKU (`/api/proximo/:sku`). Com
+> réguas diferentes, a lista cobraria um volume que o leitor não acha.
+>
+> Entram na fila: o que vence hoje, **o que já venceu** (atraso tem que gritar,
+> não sumir) e **o que não tem data lida** (volume invisível é pior que volume
+> cedo demais). O que vence depois aparece no painel "Pra despachar depois", que
+> existe para o planejamento enxergar sem poluir o dia. O filtro por `data` (dia
+> da importação) saiu: volume que entrou ontem e vence hoje é trabalho de hoje.
+
+> **Venda futura é trabalho adiantável, não arquivo morto.** O bipe do SKU
+> (`/api/proximo/:sku`) **não** filtra por prazo — quem decide é a ordem
+> (`ORDEM_URGENCIA`): sem data e vencido primeiro, depois hoje, e só então o
+> futuro. Assim o operador nunca adianta uma venda de setembro enquanto existe
+> uma atrasada do mesmo SKU esperando, e, esgotadas as do dia, o bipe segue
+> trabalhando em vez de dizer que não há nada.
+>
+> O que impede adiantar o que não pode é a **trava de estoque que já existia**:
+> sem peça na prateleira, nada é impresso. É exatamente a regra do dono — *"só
+> se tiver estoque disponível"* — sem precisar de trava nova.
+>
+> Quando o volume escolhido é futuro, a resposta traz `adiantado:true` e a tela
+> abre um aviso azul com a data por extenso. Ele é obrigatório: uma venda de
+> setembro que passe por urgente faz o operador gastar peça que amanhã pode
+> faltar para quem tem prazo curto.
+>
+> **O ano não vem na linha** e é inferido dos dois lados da virada: `05/jan`
+> lido em dezembro é do ano seguinte, `20/dez` lido em janeiro é do ano anterior.
+> A janela é assimétrica (−60 / +180 dias) porque atraso de despacho é curto e
+> envio programado legítimo chega a semanas.
 
 A tela de revisão mostra o corte no aviso de status. A tela de Etiqueta de Venda
 mostra contagem regressiva para o despacho, ficando **amarela** abaixo de 2 h e
@@ -655,14 +1053,19 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) `teste_estoque.js` (53), `teste_cruzamento.js` (14) e `teste_etiqueta.js` (13); o resto não tem | Médio a longo prazo |
+| 11 | **A investigar: o que é o `Quantidade` da folha** — a regra é uma venda = uma etiqueta = uma persiana (§5), então esse campo não deveria vir maior que 1. Ninguém decide nada com ele hoje. Falta abrir um PDF real com `Quantidade > 1` e entender o que aquele número diz | Baixo enquanto nada o usar — mas é uma pergunta sem resposta sobre o documento de origem |
 
 ---
 
 ## 15. O que NÃO fazer
 
+- ❌ Calcular a falta de estoque fora do `demanda_dominio.js` — a aba Estoque e a
+  tela azul do operador têm que dizer o mesmo número (§18)
 - ❌ Fazer a revisão somar estoque "porque parece que falta"
 - ❌ Fazer a reimpressão baixar estoque "porque imprimiu de novo"
+- ❌ Multiplicar volume por "quantidade" em qualquer lugar — uma venda é uma
+  etiqueta é uma persiana (§5); já foi tentado e revertido, e há teste travando
 - ❌ Fazer a leitura por pedaços (`split` em `Desenho do tecido`) voltar a rodar
   antes do tokenizer no `parse.js` — manda a peça errada pro cliente (§5)
 - ❌ Mover `express.static` para antes do `auth`
@@ -734,3 +1137,151 @@ done
 ```
 
 Compare com a §3 do `docs/ARQUITETURA.md`. Diferença ali é dívida nova.
+
+---
+
+## 18. A aba Estoque do admin
+
+Reformada em 01/09/2026. Antes dela a aba era três contadores e uma tabela; o
+que mudou não foi a aparência, foi **de onde sai o número**.
+
+### ⚠️ ARMADILHA #12 — duas telas diziam "a repor" e não era o mesmo número
+
+A aba calculava `alvo − estoque`, lendo o `skus.alvo` **gravado**. A tela AZUL do
+operador calcula `comprometido + alvo − estoque`, ao vivo, no `demanda_dominio`.
+
+Faltava na conta do admin justamente o **comprometido** — a venda já feita, com
+envio marcado pra frente. O admin cobrava um número e a fábrica produzia outro,
+e ninguém via a diferença: as duas telas estavam certas, cada uma na sua régua.
+É a mesma doença que aposentou a tela `/necessidade` no mesmo dia.
+
+Hoje `est_route.js` (`GET /api/estoque/painel`) é a porta única da aba, e ela lê
+o **mesmo** `demanda_dominio` da tela azul. O `teste_estoque.js` compara os dois
+SKU a SKU — escrever uma segunda conta na tela quebra o caso 1.
+
+**Dois defeitos vinham junto, e sumiram com a correção:**
+
+| O que era | Por que acontecia |
+|---|---|
+| Alvo velho cobrado como se fosse de hoje | `skus.alvo` só muda quando alguém clica "Aplicar" no Planejamento, e o "aplicar todos" **só mexe em SKU com venda na janela**. SKU que parou de vender guardava o alvo do mês passado para sempre |
+| **Sob medida em falta eterna** | A peça feita contra o pedido nunca tem estoque (§7). Com um alvo legado > 0 gravado, `alvo − estoque` dava falta todo dia. O alvo ao vivo de sob medida é **zero**, então a linha só pede produção quando há venda comprometida |
+
+O alvo salvo não sumiu: vai em `alvo_salvo`, e quando discorda do cálculo a
+célula mostra "salvo N" em âmbar, com o chip **Alvo velho** para filtrar e a
+data do último "Aplicar" no rodapé. Alvo defasado que se parece com alvo de
+hoje é o que faz a conta "quebrar" sem ninguém notar.
+
+### O painel
+
+| Bloco | De onde vem |
+|---|---|
+| Faixa: em estoque · cobertura · SKUs em falta · peças a produzir · entrou/saiu hoje | `demanda_dominio` + `fluxo_estoque` |
+| Gráfico **entrou × saiu**, 30 dias, espelhado no eixo | `fluxo_estoque.serie()` |
+| Semáforo em chips (zerado · abaixo · ok · excesso · parados · sob medida · alvo velho · nunca conferido) | filtra em memória, sem ida ao servidor |
+| Tabela com cobertura em dias, último ajuste e idade do inventário por SKU | idem |
+| **Últimos ajustes manuais** | `ajuste_estoque` |
+| Exportar CSV (respeita o filtro) e **aplicar alvo** | navegador; `POST /api/planejamento/aplicar` |
+
+> **A idade do inventário fica colada no saldo** porque é sobre ele: `skus.estoque`
+> tem vários donos e não se reconstrói (§14), então a contagem é o único momento
+> em que a coluna volta a bater com a prateleira. Acima de 30 dias vira âmbar;
+> quem nunca foi contado tem chip próprio, que serve de lista de trabalho no dia
+> do inventário. Contagem de **material** e contagem em **modo teste** não contam
+> como conferência de peça.
+
+> ⚠️ **O botão "aplicar alvo" diz quantos ele NÃO resolve.** O "Aplicar todos" do
+> Planejamento só grava em SKU **com venda na janela** — proposital: sem dado de
+> venda ele zeraria o alvo de quem tem história e não vendeu no período. Então a
+> tela separa `alvo_defasados` de `alvo_aplicaveis` e escreve os dois no rodapé.
+> Prometer "aplicar todos" e deixar o aviso de pé depois do clique ensina a
+> equipe a desconfiar da tela — que é o mesmo fim da armadilha #10.
+>
+> O botão existe porque a tela passou a **acusar** o alvo velho: acusar sem
+> oferecer o reparo, mandando a pessoa para outra aba, é como uma trava que não
+> sabe liberar (§5). Ele chama a MESMA rota do Planejamento; não há segundo
+> caminho de escrita no alvo.
+
+> **`fluxo_estoque.js` é o dono único de ENTROU e SAIU** — `montagem` (o +1 da
+> embalagem) e `lote.embalado_em` (o −1 da etiqueta). O `/api/fechamento` do
+> Planejamento passou a ler dele: o painel mostra o mesmo movimento em série de
+> 30 dias, e um gráfico com régua própria é pior que nenhum, porque confirma com
+> autoridade um número que a outra tela não usa.
+>
+> **Ajuste manual e contagem NÃO entram no gráfico**, de propósito: os dois
+> mexem no saldo e nenhum é produção nem venda. Somados às barras, o gráfico
+> deixaria de responder "quanto a fábrica fez e quanto saiu" e passaria a
+> responder "quanto a coluna variou", que ninguém perguntou. O ajuste tem número
+> próprio na faixa e card próprio embaixo.
+
+> **O histórico existia e nenhuma tela lia.** `GET /api/estoque/ajustes` está de
+> pé desde que o ajuste passou a exigir motivo — gravando quem, quando, de→para
+> e por quê — e até 01/09/2026 nada o chamava. Metade do valor do registro
+> estava desligada: o dado era gravado e ninguém conseguia ler. Hoje sai no card
+> "Últimos ajustes" e no botão **histórico** de cada linha.
+
+> **O painel NÃO entra na cadência de 4 s do admin.** O `AUTO_ADMIN` recarrega a
+> tela inteira de 4 em 4 segundos; este painel calcula a demanda do catálogo
+> todo. Ele só atualiza com a aba aberta, no máximo a cada 12 s, e nunca por
+> cima de um ajuste aberto — a linha sumiria da mão de quem está preenchendo.
+
+**Rode `node teste_estoque.js` após qualquer mudança no `est_route.js`, no
+`fluxo_estoque.js`, no `demanda_dominio.js`, no `painel_route.js` ou no
+`ger_route.js`** — os 53 casos travam a conta única nas quatro telas, o sob
+medida, o parado, a série do gráfico, a idade do inventário, o gate do custo e o
+acordo com o fechamento diário do Planejamento.
+
+### A TV e o gerencial entraram na mesma régua (01/09/2026)
+
+Depois da aba, sobravam **duas telas medindo falta contra o `skus.alvo` gravado**
+— quarta e quinta réguas da mesma pergunta:
+
+| Onde | O que era | O que é |
+|---|---|---|
+| `painel_route.js` (a TV do chão de fábrica) | `aProduzir = pedido + alvo − estoque`, misturando as ordens do dia com a reposição, medida contra a foto | **duas** colunas: `faltaHoje` = pedido − produzido, e `precisa` = `demanda_dominio` |
+| `ger_route.js` (gerencial) | `falta = alvo − estoque` dos SKUs com `alvo > 0`, sem o comprometido | `DEMANDA.aProduzir()`, os 12 maiores |
+
+> ⚠️ **`faltaHoje` e `precisa` NÃO SE SOMAM, e é por isso que têm nomes
+> próprios.** A primeira é o que sobrou das ordens lançadas hoje — o trabalho
+> que está na bancada agora. A segunda é o que o estoque pede, a mesma conta da
+> tela azul. Somar as duas seria inventar a sexta régua; a tela escreve isso
+> embaixo da tabela, porque quem lê uma TV de longe soma o que vê.
+
+> ⚠️ **O cache de 20 s do `painel_route` é obrigatório.** A TV recarrega de 3 em
+> 3 segundos e o `calcular` percorre a planilha de vendas e o catálogo inteiro —
+> sem cache, são 1.200 varreduras por hora com a TV ligada. Ele é **local da
+> rota**, e não dentro do `demanda_dominio`: quem grava alvo ou decide compra
+> precisa do número fresco, e um cache escondido no domínio entregaria dado
+> velho para eles sem avisar.
+
+O `aProduzir` continua na resposta como apelido de `faltaHoje`, para não quebrar
+consumidor antigo da rota. Não use em tela nova.
+
+### O dinheiro parado na prateleira (01/09/2026)
+
+A aba passou a mostrar **quanto vale o estoque** e, no mesmo card, **quanto
+disso está parado** — SKU com peça e nenhuma venda na janela. O custo por SKU
+sai do `ficha_dominio` (dono único, §7-B): uma segunda soma aqui divergiria da
+tela de custo no primeiro preço lançado.
+
+> ⚠️ **REGRA 4 OUTRA VEZ: CUSTO INDEFINIDO NUNCA VIRA ZERO.** SKU sem preço de
+> fornecedor não entra na soma como zero — ele é contado à parte (`sem_custo`) e
+> o total aparece como **piso**, com o `≥` na frente e o aviso em âmbar. Zero
+> faria o estoque parecer mais barato do que é, e ninguém saberia por quê. Na
+> tabela, esse SKU mostra traço, nunca `R$ 0,00`.
+>
+> SKU **sem peça** também mostra traço na coluna de valor: `R$ 0,00` se lê como
+> "não vale nada", que é outra afirmação. O custo por peça continua ali, porque
+> esse segue verdadeiro.
+
+> ⚠️ **QUEM NÃO TEM `custo.ver` NÃO RECEBE OS CAMPOS** — o JSON sai sem eles,
+> não é a tela que esconde (regra 14 do §13: não adianta esconder na tela e
+> mandar pelo fio). O CSV segue a mesma regra. O acesso vai para a auditoria,
+> mas **amortecido**: no máximo uma linha por pessoa a cada 30 minutos, porque a
+> aba se recarrega sozinha a cada 12 s e uma linha por refresh enterraria a
+> auditoria de verdade em ruído.
+
+> Cache de 60 s no custo, local da rota: custo só muda quando alguém lança
+> preço, recebe material ou mexe na ficha — não a cada refresh.
+
+Enquanto a mão de obra for zero, o número se chama **custo de material**
+(regra 17 do §7-B), e é isso que está escrito no card.
