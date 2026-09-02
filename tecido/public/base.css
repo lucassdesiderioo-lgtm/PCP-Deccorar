@@ -1,0 +1,148 @@
+/* Tokens. NENHUM hex mora dentro de uma tela — mudar a cara do modulo tem
+   que ser um arquivo, nao uma cacada por dez arquivos.
+   Alvo: tablet e desktop na fabrica. Dedo grosso, fonte grande, contraste
+   alto, e nada que exija mira fina. */
+:root{
+  --tinta:#12161c;
+  --tinta-fraca:#5b6673;
+  --papel:#f4f6f8;
+  --cartao:#ffffff;
+  --linha:#d7dde5;
+  --linha-forte:#b9c3ce;
+
+  --acao:#1f6feb;          /* azul de acao */
+  --acao-tinta:#ffffff;
+  --acao-fraca:#e8f0fe;
+
+  --bom:#1a7f45;
+  --bom-fraca:#e6f4ec;
+  --alerta:#a86800;
+  --alerta-fraca:#fdf3e0;
+  --erro:#b3261e;
+  --erro-fraca:#fdecea;
+
+  --rolo:#1f6feb;          /* armazem ROLO */
+  --sobra:#8a5a00;         /* armazem SOBRA */
+
+  --raio:10px;
+  --raio-g:14px;
+  --sombra:0 1px 2px rgba(18,22,28,.08), 0 4px 12px rgba(18,22,28,.06);
+  --toque:52px;            /* altura minima de qualquer alvo de toque */
+  --gap:12px;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  background:var(--papel); color:var(--tinta);
+  font-size:17px; line-height:1.45;
+  -webkit-text-size-adjust:100%;
+}
+
+/* ── Cabecalho ────────────────────────────────────────────────────────── */
+.topo{
+  display:flex; align-items:center; gap:var(--gap);
+  padding:14px 18px; background:var(--cartao);
+  border-bottom:1px solid var(--linha); position:sticky; top:0; z-index:20;
+}
+.topo h1{font-size:20px; margin:0; font-weight:650}
+.topo .espaco{flex:1}
+.topo .quem{color:var(--tinta-fraca); font-size:15px}
+
+.corpo{max-width:1100px; margin:0 auto; padding:18px}
+
+/* ── Abas ─────────────────────────────────────────────────────────────── */
+.abas{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px}
+.abas button{
+  min-height:var(--toque); padding:0 18px; font-size:16px; font-weight:600;
+  background:var(--cartao); color:var(--tinta-fraca);
+  border:1px solid var(--linha); border-radius:var(--raio); cursor:pointer;
+}
+.abas button[aria-selected="true"]{
+  background:var(--acao); color:var(--acao-tinta); border-color:var(--acao);
+}
+
+/* ── Cartao ───────────────────────────────────────────────────────────── */
+.cartao{
+  background:var(--cartao); border:1px solid var(--linha);
+  border-radius:var(--raio-g); box-shadow:var(--sombra);
+  padding:18px; margin-bottom:18px;
+}
+.cartao > h2{margin:0 0 4px; font-size:18px}
+.cartao > .nota{margin:0 0 16px; color:var(--tinta-fraca); font-size:15px}
+
+/* ── Formulario ───────────────────────────────────────────────────────── */
+.campos{display:flex; flex-wrap:wrap; gap:var(--gap); align-items:flex-end}
+.campo{display:flex; flex-direction:column; gap:5px; min-width:150px}
+.campo.cresce{flex:1}
+.campo label{font-size:14px; font-weight:600; color:var(--tinta-fraca)}
+input,select,textarea{
+  min-height:var(--toque); padding:10px 12px; font-size:17px;
+  border:1px solid var(--linha-forte); border-radius:var(--raio);
+  background:var(--cartao); color:var(--tinta); font-family:inherit;
+}
+input:focus,select:focus,textarea:focus{outline:3px solid var(--acao-fraca); border-color:var(--acao)}
+
+/* ── Botoes ───────────────────────────────────────────────────────────── */
+button{font-family:inherit}
+.bt{
+  min-height:var(--toque); padding:0 20px; font-size:16px; font-weight:650;
+  border-radius:var(--raio); border:1px solid var(--linha-forte);
+  background:var(--cartao); color:var(--tinta); cursor:pointer;
+}
+.bt:active{transform:translateY(1px)}
+.bt.primario{background:var(--acao); color:var(--acao-tinta); border-color:var(--acao)}
+.bt.perigo{background:var(--erro-fraca); color:var(--erro); border-color:var(--erro)}
+.bt.pequeno{min-height:38px; padding:0 12px; font-size:15px}
+.bt[disabled]{opacity:.5; cursor:not-allowed}
+
+/* Fileira de botoes de escolha — o padrao da tela de corte: tres toques e o
+   tecido esta escolhido. Nada de dropdown de texto na bancada. */
+.fileira{display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 14px}
+.fileira .op{
+  min-height:var(--toque); padding:0 18px; font-size:17px; font-weight:600;
+  border:2px solid var(--linha-forte); border-radius:var(--raio);
+  background:var(--cartao); color:var(--tinta); cursor:pointer;
+}
+.fileira .op[aria-pressed="true"]{
+  background:var(--acao); color:var(--acao-tinta); border-color:var(--acao);
+}
+.fileira .rotulo{align-self:center; font-size:14px; font-weight:700;
+  color:var(--tinta-fraca); width:96px; letter-spacing:.04em}
+
+/* ── Tabela ───────────────────────────────────────────────────────────── */
+table{width:100%; border-collapse:collapse; font-size:16px}
+th,td{padding:11px 10px; text-align:left; border-bottom:1px solid var(--linha)}
+th{font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--tinta-fraca)}
+tr.inativo td{opacity:.45}
+td.num,th.num{text-align:right; font-variant-numeric:tabular-nums}
+
+/* ── Etiquetas de estado ──────────────────────────────────────────────── */
+.tag{display:inline-block; padding:3px 10px; border-radius:999px;
+  font-size:13px; font-weight:700; letter-spacing:.02em}
+.tag.rolo{background:var(--acao-fraca); color:var(--rolo)}
+.tag.sobra{background:var(--alerta-fraca); color:var(--sobra)}
+.tag.bom{background:var(--bom-fraca); color:var(--bom)}
+.tag.off{background:var(--papel); color:var(--tinta-fraca)}
+
+/* ── Banner ───────────────────────────────────────────────────────────── */
+#banner{
+  position:fixed; left:50%; transform:translateX(-50%); top:14px; z-index:100;
+  max-width:min(680px,92vw); padding:14px 20px; border-radius:var(--raio-g);
+  font-size:17px; font-weight:600; box-shadow:var(--sombra); display:none;
+}
+#banner.bom{background:var(--bom-fraca); color:var(--bom); border:1px solid var(--bom)}
+#banner.erro{background:var(--erro-fraca); color:var(--erro); border:1px solid var(--erro)}
+#banner.alerta{background:var(--alerta-fraca); color:var(--alerta); border:1px solid var(--alerta)}
+
+.vazio{padding:26px; text-align:center; color:var(--tinta-fraca)}
+.ajuda{font-size:14px; color:var(--tinta-fraca); margin:6px 0 0; max-width:62ch}
+
+/* ── Login ────────────────────────────────────────────────────────────── */
+.login{max-width:460px; margin:8vh auto; padding:18px}
+.pessoas{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.pessoas .op{min-height:64px; font-size:19px}
+.teclado{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:14px}
+.teclado .bt{min-height:64px; font-size:24px}
+.pin{letter-spacing:.5em; font-size:32px; text-align:center; min-height:60px}

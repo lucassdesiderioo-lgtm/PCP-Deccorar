@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plano de corte · Tecido</title>
+<link rel="stylesheet" href="/base.css">
+<style>
+/* O DESENHO DAS FAIXAS — divs proporcionais, CSS puro. Sem canvas, sem
+   biblioteca: o operador precisa VER onde cada peca vai na bobina, nao ler
+   uma lista de onde tirar. */
+.faixa{
+  position:relative; border:2px solid var(--linha-forte); border-radius:6px;
+  background:repeating-linear-gradient(45deg,var(--papel),var(--papel) 6px,
+    var(--cartao) 6px,var(--cartao) 12px);   /* o hachurado e o que sobra */
+  margin:10px 0; overflow:hidden;
+}
+.peca{
+  position:absolute; top:0; background:var(--acao-fraca);
+  border:1px solid var(--acao); border-radius:3px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  font-size:13px; font-weight:700; color:var(--rolo); line-height:1.2; overflow:hidden;
+}
+.peca small{font-weight:500; font-size:11px; opacity:.8}
+.blocoFonte{border-left:5px solid var(--linha-forte); padding-left:14px; margin:18px 0}
+.blocoFonte.rolo{border-left-color:var(--rolo)}
+.blocoFonte.sobra{border-left-color:var(--sobra)}
+.cabFonte{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+.cabFonte b{font-size:17px}
+.grade td{padding:4px}
+.grade input{min-height:46px; font-size:18px; text-align:center; width:110px}
+.resumo{display:flex; gap:22px; flex-wrap:wrap; align-items:center;
+  border-top:1px solid var(--linha); padding-top:14px; margin-top:14px}
+.resumo .n{font-size:22px; font-weight:700}
+.resumo .r{font-size:13px; color:var(--tinta-fraca); text-transform:uppercase; letter-spacing:.05em}
+@media print{
+  .topo,.naoImprime{display:none !important}
+  body{background:#fff} .corpo{max-width:none;padding:0}
+  .cartao{box-shadow:none;border:1px solid #999;break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<header class="topo">
+  <h1>Plano de corte</h1>
+  <span class="espaco"></span>
+  <a class="bt pequeno" href="/rolos" style="text-decoration:none;display:inline-flex;align-items:center">Rolos</a>
+  <a class="bt pequeno" href="/sobras" style="text-decoration:none;display:inline-flex;align-items:center">Sobras</a>
+  <a class="bt pequeno" href="/" style="text-decoration:none;display:inline-flex;align-items:center">Inicio</a>
+</header>
+
+<div class="corpo">
+  <div id="entrada"></div>
+  <div id="saida"></div>
+</div>
+
+<script src="/ui.js"></script>
+<script>
+const {api,banner,beep,el,limpar,$,num,comoNumero,formatarMedida,formatarMetros,formatarArea}=window.ui;
+
+const memoria={
+  get(c){ try{ return JSON.parse(localStorage.getItem('corte_'+c)); }catch(e){ return null; } },
+  set(c,v){ try{ localStorage.setItem('corte_'+c,JSON.stringify(v)); }catch(e){} }
+};
+const estado={
+  tecidos:[], motivos:[], arvoreSobra:[],
+  tecido_id:memoria.get('tecido'),
+  linhas:[{pedido:'',largura:'',altura:''},{pedido:'',largura:'',altura:''},{pedido:'',largura:'',altura:''}],
+  recusadas:[], proposta:null,
+  nivelSobra:memoria.get('nivelSobra')
+};
+
+function fileira(rotulo,itens,sel,aoEscolher){
+  const f=el('div',{class:'fileira'});
+  f.appendChild(el('span',{class:'rotulo',texto:rotulo}));
+  if(!itens.length) f.appendChild(el('span',{class:'quem',style:'align-self:center',texto:'nada cadastrado'}));
+  itens.forEach(i=>f.appendChild(el('button',{class:'op',texto:i.nome,
+    'aria-pressed':String(String(i.valor)===String(sel)), onclick:()=>aoEscolher(i.valor)})));
+  return f;
+}
+
+// ── A ENTRADA: tecido por botao, medidas na grade ────────────────────────
+async function telaEntrada(){
+  if(!estado.tecidos.length){
+    estado.tecidos=await api('/api/tecidos');
+    estado.motivos=await api('/api/motivos');
+    estado.arvoreSobra=await api('/api/enderecos/SOBRA');
+  }
+  const pai=limpar($('#entrada'));
+  const c=el('div',{class:'cartao naoImprime'});
+  pai.appendChild(c);
+
+  const ativos=estado.tecidos.filter(t=>t.ativo);
+  const linhas=[], aberturas=[], cores=[];
+  ativos.forEach(t=>{ if(!linhas.some(x=>x.valor===t.linha_id)) linhas.push({valor:t.linha_id,nome:t.linha_nome}); });
+  const sel=ativos.find(t=>t.id===estado.tecido_id);
+  const linhaSel=sel?sel.linha_id:(linhas[0]&&linhas[0].valor);
+  ativos.filter(t=>t.linha_id===linhaSel).forEach(t=>{
+    if(!aberturas.some(x=>x.valor===t.abertura_id)) aberturas.push({valor:t.abertura_id,nome:t.abertura_nome}); });
+  const abSel=sel&&sel.linha_id===linhaSel?sel.abertura_id:(aberturas[0]&&aberturas[0].valor);
+  ativos.filter(t=>t.linha_id===linhaSel&&t.abertura_id===abSel).forEach(t=>cores.push({valor:t.cor_id,nome:t.cor_nome}));
+
+  const escolher=(l,a,co)=>{
+    const t=ativos.find(x=>x.linha_id===l&&x.abertura_id===a&&x.cor_id===co)
+      ||ativos.find(x=>x.linha_id===l&&x.abertura_id===a)||ativos.find(x=>x.linha_id===l);
+    if(t){ estado.tecido_id=t.id; memoria.set('tecido',t.id); }
+    estado.proposta=null; estado.recusadas=[];
+    telaEntrada(); limpar($('#saida'));
+  };
+  // Tres toques e o tecido esta escolhido. Nada de dropdown de texto na bancada.
+  c.appendChild(fileira('LINHA',linhas,linhaSel,v=>escolher(v,null,null)));
+  c.appendChild(fileira('ABERTURA',aberturas,abSel,v=>escolher(linhaSel,v,null)));
+  c.appendChild(fileira('COR',cores,sel?sel.cor_id:null,v=>escolher(linhaSel,abSel,v)));
+  c.appendChild(el('p',{class:'nota',texto:sel?('▸ '+[sel.linha_nome,sel.abertura_nome,sel.cor_nome].join(' · ')):'Escolha o tecido.'}));
+
+  // A grade de medidas
+  const tab=el('table',{class:'grade'});
+  tab.appendChild(el('tr',{},[el('th',{texto:'#'}),el('th',{texto:'Pedido'}),
+    el('th',{texto:'Largura do corte (m)'}),
+    el('th',{texto:'Altura do corte (m)'}),el('th',{texto:'Item / etiqueta'}),
+    el('th',{texto:'Cliente'}),el('th',{texto:''})]));
+  estado.linhas.forEach((lin,i)=>{
+    const iP=el('input',{type:'text',value:lin.pedido||'',placeholder:'4292-1',
+      style:'width:120px;font-size:16px'});
+    const iL=el('input',{type:'text',inputmode:'decimal',value:lin.largura,placeholder:'1,465'});
+    const iA=el('input',{type:'text',inputmode:'decimal',value:lin.altura,placeholder:'1,650'});
+    iP.addEventListener('input',()=>{ lin.pedido=iP.value; });
+    iL.addEventListener('input',()=>{ lin.largura=iL.value; });
+    iA.addEventListener('input',()=>{ lin.altura=iA.value; });
+    // Enter na altura abre a proxima linha: digitar sem tirar a mao do teclado.
+    iA.addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ ev.preventDefault();
+      if(i===estado.linhas.length-1){ estado.linhas.push({pedido:'',largura:'',altura:''}); telaEntrada();
+        setTimeout(()=>{ const ins=$('#entrada').querySelectorAll('.grade input');
+          if(ins[ins.length-2]) ins[ins.length-2].focus(); },0);   // largura da linha nova
+      } else { const ins=$('#entrada').querySelectorAll('.grade input'); ins[(i+1)*3].focus(); }
+    }});
+    tab.appendChild(el('tr',{},[
+      el('td',{texto:String(i+1)}), el('td',{},[iP]), el('td',{},[iL]), el('td',{},[iA]),
+      el('td',{class:'quem',texto:[lin.item?('item '+lin.item):'',lin.codigo||''].filter(Boolean).join(' · ')}),
+      el('td',{class:'quem',texto:lin.cliente||''}),
+      el('td',{},[el('button',{class:'bt pequeno',texto:'✕',onclick:()=>{
+        estado.linhas.splice(i,1);
+        if(!estado.linhas.length) estado.linhas.push({pedido:'',largura:'',altura:''});
+        telaEntrada(); }})])
+    ]));
+  });
+  c.appendChild(tab);
+
+  const acoes=el('div',{class:'campos',style:'margin-top:10px;align-items:center'});
+  acoes.appendChild(el('button',{class:'bt',texto:'+ linha',onclick:()=>{
+    estado.linhas.push({pedido:'',largura:'',altura:''}); telaEntrada(); }}));
+
+  // FASE 8: o upload preenche a MESMA grade, editavel antes de calcular.
+  const arq=el('input',{type:'file',accept:'.pdf,.csv,.txt,.tsv',style:'display:none'});
+  arq.addEventListener('change',async()=>{
+    const f=arq.files[0]; if(!f) return;
+    try{
+      if(/\.pdf$/i.test(f.name)) await lerEtiquetas(f);
+      else {
+        const lidas=lerArquivo(await f.text());
+        if(!lidas.length) return banner('Nao encontrei medidas neste arquivo.','erro');
+        estado.linhas=lidas; estado.proposta=null;
+        banner(lidas.length+' medida(s) carregada(s). Confira antes de calcular.');
+        telaEntrada(); limpar($('#saida'));
+      }
+    } finally { arq.value=''; }
+  });
+  acoes.appendChild(arq);
+  acoes.appendChild(el('button',{class:'bt',texto:'Subir arquivo',onclick:()=>arq.click()}));
+
+  const btCalc=el('button',{class:'bt primario',style:'flex:1;min-height:60px;font-size:19px',
+    texto:'Calcular o plano',onclick:calcular});
+  acoes.appendChild(btCalc);
+  c.appendChild(acoes);
+  c.appendChild(el('p',{class:'ajuda',texto:
+    'MEDIDA DO CORTE, não a da persiana acabada. No PDF de etiquetas é a que aparece entre parênteses na via COLEÇÃO: 2.417 M2 - (1.465x1.650).'}));
+  c.appendChild(el('p',{class:'ajuda',texto:
+    'PEDIDO: peças com o mesmo número de pedido saem sempre da MESMA fonte — nunca uma na sobra e outra na bobina, porque o tom pode não bater e o cliente vê as duas na mesma parede. O que agrupa é o PEDIDO (4272), não o item: as persianas do pedido inteiro são da mesma casa. Peça sem pedido é livre.'}));
+  c.appendChild(el('p',{class:'ajuda',texto:
+    'O arquivo pode ser o PDF de etiquetas de produção (o sistema lê a via COLEÇÃO de cada item) ou um CSV/texto com dois números por linha. Em qualquer caso as medidas caem nesta grade e podem ser corrigidas antes de calcular — digitar continua sempre disponível.'}));
+}
+
+// O PDF de etiquetas de producao. O servidor le a via COLEÇÃO de cada item e
+// devolve a MEDIDA DO CORTE — nunca a medida acabada, que e outra coisa.
+async function lerEtiquetas(f){
+  const base64=await new Promise((ok,erro)=>{
+    const r=new FileReader();
+    r.onload=()=>ok(String(r.result).split(',')[1]);
+    r.onerror=erro; r.readAsDataURL(f);
+  });
+  const pecas=await api('/api/planos/ler-arquivo',{metodo:'POST',corpo:{arquivo:base64}});
+  estado.linhas=pecas.map(p=>({
+    pedido:p.pedido, item:p.item, sequencia:p.sequencia, codigo:p.codigo, cliente:p.cliente,
+    largura:String(p.largura).replace('.',','), altura:String(p.altura).replace('.',','),
+    acabada:p.acabada
+  }));
+  // Se a etiqueta disser de que tecido e, ja deixa escolhido — sem tirar do
+  // operador o botao que confirma.
+  const comTecido=pecas.find(p=>p.tecido_id);
+  if(comTecido){ estado.tecido_id=comTecido.tecido_id; memoria.set('tecido',comTecido.tecido_id); }
+  estado.proposta=null;
+  const pedidos=[...new Set(pecas.map(p=>p.pedido))];
+  banner(pecas.length+' peça(s) lida(s) · pedido '+pedidos.join(', ')+
+    (comTecido?' · '+comTecido.tecido_sugerido:'')+'. Confira antes de calcular.','bom',6);
+  telaEntrada(); limpar($('#saida'));
+}
+
+// Leitor tolerante: pega os dois primeiros numeros de cada linha e ignora
+// cabecalho e colunas extras. Quando o arquivo real da etiqueta de corte
+// aparecer, e aqui que ele entra — a grade e a tela nao mudam.
+function lerArquivo(texto){
+  const linhas=[];
+  String(texto).split(/\r?\n/).forEach(l=>{
+    const nums=(l.match(/\d+(?:[.,]\d+)?/g)||[]).map(n=>Number(n.replace(',','.')));
+    const uteis=nums.filter(n=>n>0&&n<60);
+    if(uteis.length>=2){
+      let [a,b]=uteis;
+      // Numero grande demais para metro quase sempre e centimetro.
+      if(a>10&&b>10){ a=a/100; b=b/100; }
+      linhas.push({largura:String(a).replace('.',','),altura:String(b).replace('.',',')});
+    }
+  });
+  return linhas;
+}
+
+// ── O CALCULO ────────────────────────────────────────────────────────────
+async function calcular(){
+  const pecas=estado.linhas.filter(l=>comoNumero(l.largura)!==null&&comoNumero(l.altura)!==null)
+    .map(l=>({pedido:l.pedido||'', cliente:l.cliente||'', largura:l.largura, altura:l.altura}));
+  if(!pecas.length) return banner('Digite pelo menos uma medida.','alerta');
+  if(!estado.tecido_id) return banner('Escolha o tecido.','alerta');
+  try{
+    estado.proposta=await api('/api/planos/calcular',{metodo:'POST',corpo:{
+      tecido_id:estado.tecido_id, pecas, recusadas:estado.recusadas}});
+    desenharPlano();
+  }catch(e){ beep('erro'); }
+}
+
+// ── O DESENHO ────────────────────────────────────────────────────────────
+function desenharPlano(){
+  const p=estado.proposta;
+  const pai=limpar($('#saida'));
+  if(!p) return;
+
+  const c=el('div',{class:'cartao'});
+  const cab=el('div',{class:'campos',style:'align-items:baseline'});
+  cab.appendChild(el('h2',{style:'flex:1;margin:0',texto:'PLANO DE CORTE — '+p.tecido.nome}));
+  cab.appendChild(el('span',{class:'quem',texto:p.pecas.length+' peças · '+formatarArea(p.area_pecas)}));
+  c.appendChild(cab);
+
+  // O CORTE ANTERIOR DESTE PEDIDO. Vem antes de tudo: e a informacao que
+  // explica por que o plano escolheu aquele rolo e nao o mais economico.
+  if(p.cortes_anteriores&&p.cortes_anteriores.length){
+    const av=el('div',{style:'background:var(--alerta-fraca);border:1px solid var(--alerta);'+
+      'border-radius:var(--raio);padding:12px;margin:12px 0'});
+    av.appendChild(el('strong',{style:'color:var(--alerta)',texto:'Este pedido já foi cortado antes'}));
+    p.cortes_anteriores.forEach(h=>av.appendChild(el('div',{
+      texto:'• pedido '+h.pedido+': '+h.pecas+' peça(s) em '+h.data+
+        ', de '+(h.fonte==='rolo'?'ROLO ':'SOBRA ')+(h.codigo||'?')})));
+    if(p.continuando_em) av.appendChild(el('p',{class:'ajuda',style:'margin-bottom:0',
+      texto:'Continuando no rolo '+p.continuando_em.codigo+' ('+formatarMetros(p.continuando_em.saldo)+
+        ' de saldo). Mesmo rolo, mesmo tom — mesmo que outra bobina rendesse mais.'}));
+    else av.appendChild(el('p',{class:'ajuda',style:'margin-bottom:0',
+      texto:'⚠ A fonte usada antes não está mais disponível. O tom destas peças pode não bater com o que já foi cortado — confira o retalho antes de seguir.'}));
+    c.appendChild(av);
+  }
+
+  // Peca sem pedido: lembrete, nunca bloqueio. Amostra e reposicao avulsa
+  // sao casos legitimos — o que nao pode e o operador achar que preencher o
+  // pedido e opcional no corte de um cliente.
+  if(p.sem_pedido) c.appendChild(el('p',{class:'ajuda',
+    style:'color:var(--alerta);font-weight:600',
+    texto:'⚠ '+p.sem_pedido+' peça(s) sem número de pedido. Elas não se agrupam por tom, e se este pedido voltar a ser cortado noutro dia o sistema não vai reconhecer a continuação. Se forem de um cliente, preencha o pedido.'}));
+
+  // Por que nenhuma sobra serviu. Sem esta frase o operador desconfia do "nao"
+  // e vai conferir a prateleira na mao de qualquer jeito.
+  if(p.sobre_sobras) c.appendChild(el('p',{class:'ajuda',texto:'Sobras: '+p.sobre_sobras}));
+
+  // Peca que nao coube: aparece PRIMEIRO, em vermelho. Nunca some em silencio.
+  if(p.pecas_nao_alocadas.length){
+    const av=el('div',{style:'background:var(--erro-fraca);border:1px solid var(--erro);'+
+      'border-radius:var(--raio);padding:12px;margin:12px 0'});
+    av.appendChild(el('strong',{style:'color:var(--erro)',
+      texto:p.pecas_nao_alocadas.length+' peça(s) sem lugar neste estoque'}));
+    p.pecas_nao_alocadas.forEach(x=>av.appendChild(el('div',{
+      texto:'• '+formatarMedida(x.largura,x.altura)+' — '+x.motivo})));
+    av.appendChild(el('p',{class:'ajuda',style:'margin-bottom:0',
+      texto:'O resto do plano segue valendo: confirme o que da para cortar e resolva estas a parte.'}));
+    c.appendChild(av);
+  }
+
+  // As faixas AGRUPADAS POR FONTE. Um rolo que leva sete puxadas e um rolo
+  // so: repetir o cabecalho sete vezes faria o cortador procurar sete rolos
+  // na prateleira.
+  const porFonte=[];
+  p.faixas.forEach(f=>{
+    const chave=f.fonte+':'+f.fonte_id;
+    let g=porFonte.find(x=>x.chave===chave);
+    if(!g){ g={chave, ref:f, faixas:[]}; porFonte.push(g); }
+    g.faixas.push(f);
+  });
+
+  porFonte.forEach(g=>{
+    const f0=g.ref;
+    const bloco=el('div',{class:'blocoFonte '+f0.fonte});
+    const cb=el('div',{class:'cabFonte'});
+    cb.appendChild(el('span',{class:'tag '+(f0.fonte==='rolo'?'rolo':'sobra'),texto:f0.fonte.toUpperCase()}));
+    cb.appendChild(el('b',{texto:f0.rotulo}));
+    if(f0.endereco) cb.appendChild(el('span',{class:'quem',texto:f0.endereco}));
+    const puxarTotal=g.faixas.reduce((s,f)=>s+(f.puxar||0),0);
+    if(puxarTotal>0.001) cb.appendChild(el('span',{class:'tag bom',
+      texto:'puxar '+formatarMetros(puxarTotal)+(g.faixas.length>1?' em '+g.faixas.length+' puxadas':'')}));
+
+    // A recusa (R16): so faz sentido em sobra, e so antes de confirmar.
+    if(f0.fonte==='sobra'){
+      const s=p.sobras_sugeridas.find(x=>x.id===f0.fonte_id);
+      if(s) cb.appendChild(el('button',{class:'bt pequeno naoImprime',texto:'não usar',
+        onclick:()=>recusarSobra(s)}));
+    }
+    bloco.appendChild(cb);
+
+    g.faixas.forEach((f,n)=>{
+      if(g.faixas.length>1) bloco.appendChild(el('div',{class:'quem',
+        style:'margin-top:10px;font-weight:700',
+        texto:(n+1)+'ª puxada: '+formatarMetros(f.altura)}));
+      // O retangulo proporcional. Altura visual limitada para caber na tela.
+      const alturaPx=Math.max(60,Math.min(200,f.altura*70));
+      const cx=el('div',{class:'faixa',style:'height:'+alturaPx+'px'});
+      f.pecas.forEach(pc=>{
+        const d=el('div',{class:'peca',style:
+          'left:'+(pc.x/f.largura_disponivel*100)+'%;'+
+          'width:'+(pc.largura/f.largura_disponivel*100)+'%;'+
+          'height:'+(pc.altura/f.altura*100)+'%;'});
+        d.appendChild(el('span',{texto:num(pc.largura)}));
+        d.appendChild(el('small',{texto:num(pc.altura)}));
+        cx.appendChild(d);
+      });
+      bloco.appendChild(cx);
+      const sobrouLargura=f.largura_disponivel-f.largura_usada;
+      bloco.appendChild(el('div',{class:'quem',texto:
+        'bobina '+num(f.largura_disponivel)+' m · usado '+num(f.largura_usada)+' m'+
+        (sobrouLargura>0.001?' · tira lateral '+num(sobrouLargura)+' m':'')}));
+    });
+    c.appendChild(bloco);
+  });
+
+  // ── AS SOBRAS QUE VAO NASCER ──────────────────────────────────────────
+  // O cadastro acontece DENTRO do Confirmar, com a medida ja calculada. E
+  // isto que fecha o ciclo sozinho: nao ha tela separada para esquecer.
+  const campos={};
+  if(p.sobras_geradas.length){
+    const cs=el('div',{class:'cartao',style:'background:var(--alerta-fraca);border-color:var(--alerta)'});
+    cs.appendChild(el('h2',{texto:p.sobras_geradas.length+' sobra(s) vao nascer deste corte'}));
+    cs.appendChild(el('p',{class:'nota',texto:'Cole uma etiqueta em cada uma e bipe o codigo aqui. A medida o sistema ja sabe.'}));
+
+    const hastes=estado.arvoreSobra.filter(h=>h.ativo);
+    p.sobras_geradas.forEach(s=>{
+      const linha=el('div',{class:'campos',style:'align-items:flex-end;border-top:1px solid var(--linha);padding-top:10px'});
+      linha.appendChild(el('div',{class:'campo'},[
+        el('label',{texto:'RESTO'}),
+        el('div',{style:'font-size:19px;font-weight:700;padding:10px 0',
+          texto:formatarMedida(s.largura,s.altura)+'  ·  '+formatarArea(s.area)})]));
+      const iCod=el('input',{type:'text',placeholder:'bipe a etiqueta',autocomplete:'off',
+        autocorrect:'off',autocapitalize:'off',style:'font-size:20px;letter-spacing:.06em'});
+      linha.appendChild(el('div',{class:'campo cresce'},[el('label',{texto:'ETIQUETA'}),iCod]));
+
+      const sel=el('select',{});
+      hastes.forEach(h=>h.andares.forEach(a=>a.niveis.forEach(n=>
+        sel.appendChild(el('option',{value:n.id,
+          texto:'SOBRA · '+h.nome+'-'+a.nome+'-'+n.nome,
+          selected:String(n.id)===String(estado.nivelSobra)?'selected':null})))));
+      sel.addEventListener('change',()=>memoria.set('nivelSobra',sel.value));
+      linha.appendChild(el('div',{class:'campo'},[el('label',{texto:'ONDE GUARDAR'}),sel]));
+
+      campos[s.indice]={codigo:iCod,nivel:sel};
+      cs.appendChild(linha);
+    });
+    c.appendChild(cs);
+  }
+
+  if(p.refugos.length){
+    c.appendChild(el('p',{class:'ajuda',texto:'Refugo: '+p.refugos.map(r=>
+      formatarMedida(r.largura,r.altura)).join(' · ')+' — abaixo de '+
+      num(p.parametros.larguraMinimaSobra)+' m de largura nao vira sobra, mas fica medido.'}));
+  }
+
+  // ── O RESUMO E OS BOTOES ──────────────────────────────────────────────
+  const resumo=el('div',{class:'resumo'});
+  const dado=(rot,valor)=>{ const d=el('div',{});
+    d.appendChild(el('div',{class:'n',texto:valor}));
+    d.appendChild(el('div',{class:'r',texto:rot})); return d; };
+  resumo.appendChild(dado('consumo do rolo',formatarMetros(p.consumo_linear)));
+  resumo.appendChild(dado('desperdício',formatarArea(p.desperdicio)));
+  resumo.appendChild(dado('peças',formatarArea(p.area_pecas)));
+  if(p.area_sobras>0) resumo.appendChild(dado('vira sobra',formatarArea(p.area_sobras)));
+  resumo.appendChild(el('span',{class:'espaco',style:'flex:1'}));
+  resumo.appendChild(el('button',{class:'bt naoImprime',texto:'Imprimir',onclick:()=>window.print()}));
+  const btOk=el('button',{class:'bt primario naoImprime',style:'min-height:56px;font-size:18px',
+    texto:'Confirmar e baixar',onclick:()=>confirmar(campos,btOk)});
+  resumo.appendChild(btOk);
+  c.appendChild(resumo);
+
+  // As simulacoes: mostrar POR QUE esta bobina venceu.
+  if(p.simulacoes.length>1){
+    const cs=el('div',{class:'cartao'});
+    cs.appendChild(el('h2',{texto:'Por que esta bobina'}));
+    cs.appendChild(el('p',{class:'nota',texto:
+      'O sistema simula todas as larguras que existem em estoque. A mais larga nao vence por padrao — bobina estreita pode aproveitar melhor.'}));
+    const t=el('table',{});
+    t.appendChild(el('tr',{},[el('th',{texto:'Bobina'}),el('th',{class:'num',texto:'Consumo'}),
+      el('th',{class:'num',texto:'m² puxados'}),el('th',{class:'num',texto:'Desperdício'}),el('th',{texto:''})]));
+    p.simulacoes.forEach((s,i)=>t.appendChild(el('tr',{},[
+      el('td',{texto:num(s.largura)+' m'}),
+      el('td',{class:'num',texto:formatarMetros(s.consumo_linear)}),
+      el('td',{class:'num',texto:formatarArea(s.consumo_m2)}),
+      el('td',{class:'num',texto:formatarArea(s.desperdicio)}),
+      el('td',{},[i===0?el('span',{class:'tag bom',texto:'escolhida'}):el('span',{})])
+    ])));
+    cs.appendChild(t);
+    c.appendChild(cs);
+  }
+
+  pai.appendChild(c);
+  c.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ── A RECUSA ─────────────────────────────────────────────────────────────
+async function recusarSobra(s){
+  const nomes=estado.motivos.filter(m=>m.ativo);
+  const escolha=prompt('Por que a sobra '+s.codigo+' ('+formatarMedida(s.largura,s.altura)+
+    ') nao serve?\n\n'+nomes.map((m,i)=>(i+1)+') '+m.nome).join('\n')+
+    '\n\nDigite o numero:');
+  if(!escolha) return;
+  const m=nomes[Number(escolha)-1];
+  if(!m) return banner('Motivo nao reconhecido.','alerta');
+  const obs=prompt('Quer detalhar? (opcional)')||'';
+  await api('/api/planos/recusar',{metodo:'POST',corpo:{sobra_id:s.id,motivo_id:m.id,observacao:obs}});
+  // A sobra volta ao estoque SEM BAIXA, sai das candidatas, e o plano e
+  // recalculado sem ela.
+  estado.recusadas.push(s.id);
+  banner('Sobra '+s.codigo+' fora deste plano. Recalculando…','alerta');
+  await calcular();
+}
+
+// ── O CONFIRMAR ──────────────────────────────────────────────────────────
+async function confirmar(campos,bt){
+  const p=estado.proposta;
+  if(!p) return;
+  const etiquetas={};
+  for(const s of p.sobras_geradas){
+    const cp=campos[s.indice];
+    if(!cp||!cp.codigo.value.trim()){
+      beep('erro');
+      banner('Falta a etiqueta da sobra de '+formatarMedida(s.largura,s.altura)+'.','alerta');
+      if(cp) cp.codigo.focus();
+      return;
+    }
+    etiquetas[s.indice]={codigo:cp.codigo.value, nivel_id:Number(cp.nivel.value)};
+  }
+  bt.disabled=true;
+  try{
+    const r=await api('/api/planos/confirmar',{metodo:'POST',corpo:{
+      tecido_id:estado.tecido_id,
+      pecas:estado.linhas.filter(l=>comoNumero(l.largura)!==null&&comoNumero(l.altura)!==null)
+        .map(l=>({pedido:l.pedido||'', cliente:l.cliente||'', largura:l.largura, altura:l.altura})),
+      recusadas:estado.recusadas, assinatura:p.assinatura, etiquetas, origem:'digitado'}});
+    beep();
+    banner('Plano '+r.plano_id+' confirmado: '+formatarMetros(r.consumo_linear)+
+      ' do rolo e '+r.sobras_criadas+' sobra(s) nova(s) na prateleira.','bom',6);
+    estado.proposta=null; estado.recusadas=[];
+    estado.linhas=[{pedido:'',largura:'',altura:''}];
+    limpar($('#saida')); telaEntrada();
+  }catch(e){ beep('erro'); }
+  bt.disabled=false;
+}
+
+telaEntrada();
+</script>
+</body>
+</html>

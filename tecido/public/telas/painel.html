@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel · Tecido</title>
+<link rel="stylesheet" href="/base.css">
+<style>
+tr.soRetalho td{background:var(--alerta-fraca); font-weight:600}
+.seta{color:var(--alerta); font-weight:700}
+.barra{height:8px; background:var(--acao-fraca); border-radius:4px; min-width:2px}
+</style>
+</head>
+<body>
+<header class="topo">
+  <h1>Painel</h1>
+  <span class="espaco"></span>
+  <a class="bt pequeno" href="/corte" style="text-decoration:none;display:inline-flex;align-items:center">Plano de corte</a>
+  <a class="bt pequeno" href="/" style="text-decoration:none;display:inline-flex;align-items:center">Inicio</a>
+</header>
+
+<div class="corpo">
+  <div class="abas" id="abas"></div>
+  <div id="conteudo"></div>
+</div>
+
+<script src="/ui.js"></script>
+<script>
+const {api,el,limpar,$,num,formatarMedida,formatarMetros,formatarArea}=window.ui;
+
+let aba='estoque';
+const ABAS=[
+  {id:'estoque', nome:'Estoque'},
+  {id:'encalhe', nome:'Encalhe'},
+  {id:'refugo',  nome:'Refugo'},
+  {id:'recusas', nome:'Recusas'},
+  {id:'cortes',  nome:'Cortes'}
+];
+
+function montarAbas(){
+  const c=limpar($('#abas'));
+  ABAS.forEach(a=>c.appendChild(el('button',{texto:a.nome,'aria-selected':String(a.id===aba),
+    onclick:()=>{ aba=a.id; desenhar(); }})));
+}
+function cartao(pai,titulo,nota){
+  const c=el('div',{class:'cartao'});
+  c.appendChild(el('h2',{texto:titulo}));
+  if(nota) c.appendChild(el('p',{class:'nota',texto:nota}));
+  pai.appendChild(c); return c;
+}
+function tabela(cabecalho,linhas){
+  const t=el('table',{});
+  t.appendChild(el('tr',{},cabecalho.map(h=>el('th',{class:h.num?'num':'',texto:h.nome||h}))));
+  linhas.forEach(l=>t.appendChild(l));
+  return t;
+}
+
+function desenhar(){
+  montarAbas();
+  const c=limpar($('#conteudo'));
+  return ({estoque:telaEstoque,encalhe:telaEncalhe,refugo:telaRefugo,
+    recusas:telaRecusas,cortes:telaCortes})[aba](c);
+}
+
+// ── ESTOQUE — o cruzamento que da razao ao painel ────────────────────────
+async function telaEstoque(pai){
+  const linhas=await api('/api/painel/estoque');
+  pai=limpar(pai);
+  const c=cartao(pai,'Estoque por tecido',
+    'Rolo e retalho lado a lado. A linha em ambar e o cruzamento que evita comprar tecido que ja esta na prateleira.');
+
+  const t=tabela([{nome:'Tecido'},{nome:'Saldo',num:true},{nome:'Rolos'},
+    {nome:'Sobras',num:true},{nome:'m² de retalho',num:true},{nome:''}],
+    linhas.map(l=>el('tr',{class:l.so_retalho?'soRetalho':''},[
+      el('td',{texto:[l.linha_nome,l.abertura_nome,l.cor_nome].join(' · ')}),
+      el('td',{class:'num',texto:formatarMetros(l.saldo)}),
+      el('td',{texto:l.abertos?(l.abertos+' aberto'+(l.fechados?' + '+l.fechados+' fechado':'')):
+        (l.fechados?l.fechados+' fechado':'—')}),
+      el('td',{class:'num',texto:String(l.sobras)}),
+      el('td',{class:'num',texto:formatarArea(l.m2_sobra)}),
+      el('td',{},[l.so_retalho?el('span',{class:'seta',texto:'◀ sem rolo, com retalho'}):el('span',{})])
+    ])));
+  c.appendChild(linhas.length?t:el('div',{class:'vazio',texto:'Nada em estoque ainda.'}));
+
+  const destaque=linhas.filter(l=>l.so_retalho);
+  if(destaque.length) c.appendChild(el('p',{class:'ajuda',texto:
+    destaque.length+' tecido(s) sem rolo mas com retalho na prateleira: '+
+    destaque.map(l=>[l.linha_nome,l.abertura_nome,l.cor_nome].join(' ')+' ('+formatarArea(l.m2_sobra)+')').join(' · ')+
+    '. Antes de comprar, olhe aqui.'}));
+}
+
+// ── ENCALHE ──────────────────────────────────────────────────────────────
+async function telaEncalhe(pai){
+  const linhas=await api('/api/painel/encalhe');
+  pai=limpar(pai);
+  const c=cartao(pai,'Encalhe — a sobra mais parada primeiro',
+    'Retalho que nao sai ha meses e dinheiro dormindo. Em alguns meses este relatorio responde melhor que o palpite de 50% do peso da sobra.');
+  const t=tabela([{nome:'Etiqueta'},{nome:'Tecido'},{nome:'Medida',num:true},
+    {nome:'m²',num:true},{nome:'Condição'},{nome:'Parada há',num:true}],
+    linhas.map(s=>el('tr',{},[
+      el('td',{texto:s.codigo}),
+      el('td',{texto:[s.linha_nome,s.abertura_nome,s.cor_nome].join(' · ')}),
+      el('td',{class:'num',texto:formatarMedida(s.largura,s.altura)}),
+      el('td',{class:'num',texto:formatarArea(s.area)}),
+      el('td',{texto:s.condicao}),
+      el('td',{class:'num',texto:s.dias_parada+' dias'})
+    ])));
+  c.appendChild(linhas.length?t:el('div',{class:'vazio',texto:'Nenhuma sobra disponivel.'}));
+}
+
+// ── REFUGO ───────────────────────────────────────────────────────────────
+async function telaRefugo(pai){
+  const linhas=await api('/api/painel/refugo');
+  pai=limpar(pai);
+  const c=cartao(pai,'Refugo por mês e motivo',
+    'A perda fica medida, não some. Sem esta tabela o desperdício do mês é uma sensação.');
+  const t=tabela([{nome:'Mês'},{nome:'Motivo'},{nome:'Linhas',num:true},{nome:'m²',num:true}],
+    linhas.map(r=>el('tr',{},[
+      el('td',{texto:r.mes}), el('td',{texto:r.motivo||'—'}),
+      el('td',{class:'num',texto:String(r.linhas)}),
+      el('td',{class:'num',texto:formatarArea(r.area)})
+    ])));
+  c.appendChild(linhas.length?t:el('div',{class:'vazio',texto:'Nenhum refugo registrado.'}));
+}
+
+// ── RECUSAS ──────────────────────────────────────────────────────────────
+async function telaRecusas(pai){
+  const linhas=await api('/api/painel/recusas');
+  pai=limpar(pai);
+  const c=cartao(pai,'Recusas — onde o reaproveitamento trava',
+    'O motivo não é burocracia, é o diagnóstico. Se "tonalidade" dominar, a resposta é registrar o tom no cadastro da sobra; se for "defeito não cadastrado", o problema está no lançamento na bancada.');
+  const maior=linhas.reduce((m,r)=>Math.max(m,r.vezes),1);
+  const t=tabela([{nome:'Motivo'},{nome:'Vezes',num:true},{nome:''},{nome:'Última'}],
+    linhas.map(r=>el('tr',{},[
+      el('td',{texto:r.motivo||'—'}),
+      el('td',{class:'num',texto:String(r.vezes)}),
+      el('td',{},[el('div',{class:'barra',style:'width:'+(r.vezes/maior*100)+'%'})]),
+      el('td',{texto:r.ultima||''})
+    ])));
+  c.appendChild(linhas.length?t:el('div',{class:'vazio',
+    texto:'Nenhuma recusa ainda — e isso e uma boa noticia.'}));
+}
+
+// ── CORTES ───────────────────────────────────────────────────────────────
+async function telaCortes(pai){
+  const linhas=await api('/api/painel/cortes');
+  pai=limpar(pai);
+  const c=cartao(pai,'Cortes confirmados, por mês',
+    'Quanto de rolo saiu, quanto virou peça, quanto virou retalho e quanto se perdeu.');
+  const t=tabela([{nome:'Mês'},{nome:'Planos',num:true},{nome:'Rolo consumido',num:true},
+    {nome:'Peças',num:true},{nome:'Virou sobra',num:true},{nome:'Desperdício',num:true}],
+    linhas.map(r=>el('tr',{},[
+      el('td',{texto:r.mes}),
+      el('td',{class:'num',texto:String(r.planos)}),
+      el('td',{class:'num',texto:formatarMetros(r.consumo_linear)}),
+      el('td',{class:'num',texto:formatarArea(r.area_pecas)}),
+      el('td',{class:'num',texto:formatarArea(r.area_sobra)}),
+      el('td',{class:'num',texto:formatarArea(r.desperdicio)})
+    ])));
+  c.appendChild(linhas.length?t:el('div',{class:'vazio',texto:'Nenhum plano confirmado ainda.'}));
+}
+
+desenhar();
+</script>
+</body>
+</html>

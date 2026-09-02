@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Entrar · Tecido</title>
+<link rel="stylesheet" href="/base.css">
+</head>
+<body>
+<div class="login">
+  <div class="cartao">
+    <h2>Estoque de tecido</h2>
+    <p class="nota">Escolha seu nome e digite o PIN.</p>
+    <div id="passo1">
+      <div class="pessoas" id="pessoas"></div>
+    </div>
+    <div id="passo2" style="display:none">
+      <p class="nota" id="nomeEscolhido"></p>
+      <input class="pin" id="pin" type="password" inputmode="numeric" readonly>
+      <div class="teclado" id="teclado"></div>
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button class="bt" id="voltar">Voltar</button>
+        <button class="bt primario" id="entrar" style="flex:1">Entrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="/ui.js"></script>
+<script>
+const {api,banner,el,limpar,$}=window.ui;
+let escolhido=null, pin='';
+
+async function carregar(){
+  const pessoas=await api('/api/auth/pessoas');
+  const grade=limpar($('#pessoas'));
+  pessoas.forEach(p=>grade.appendChild(
+    el('button',{class:'op bt',texto:p.nome,onclick:()=>escolher(p)})));
+}
+
+function escolher(p){
+  escolhido=p; pin='';
+  $('#nomeEscolhido').textContent=p.nome;
+  $('#passo1').style.display='none';
+  $('#passo2').style.display='';
+  mostrar();
+}
+
+function mostrar(){ $('#pin').value='•'.repeat(pin.length); }
+
+function tecla(t){
+  if(t==='apagar') pin=pin.slice(0,-1);
+  else if(pin.length<8) pin+=t;
+  mostrar();
+  if(pin.length===4) entrar();
+}
+
+function montarTeclado(){
+  const t=limpar($('#teclado'));
+  ['1','2','3','4','5','6','7','8','9','apagar','0'].forEach(k=>
+    t.appendChild(el('button',{class:'bt',texto:k==='apagar'?'⌫':k,onclick:()=>tecla(k)})));
+}
+
+async function entrar(){
+  if(!escolhido||pin.length<4) return;
+  try{
+    await api('/api/auth/login',{metodo:'POST',corpo:{id:escolhido.id,pin}});
+    const r=new URLSearchParams(location.search).get('r');
+    location.href=r||'/';
+  }catch(e){ pin=''; mostrar(); }
+}
+
+$('#entrar').onclick=entrar;
+$('#voltar').onclick=()=>{ $('#passo2').style.display='none'; $('#passo1').style.display=''; pin=''; };
+montarTeclado();
+carregar();
+</script>
+</body>
+</html>

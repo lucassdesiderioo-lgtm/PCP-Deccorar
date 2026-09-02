@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rolos · Tecido</title>
+<link rel="stylesheet" href="/base.css">
+</head>
+<body>
+<header class="topo">
+  <h1>Rolos</h1>
+  <span class="espaco"></span>
+  <a class="bt pequeno" href="/corte" style="text-decoration:none;display:inline-flex;align-items:center">Plano de corte</a>
+  <a class="bt pequeno" href="/" style="text-decoration:none;display:inline-flex;align-items:center">Inicio</a>
+</header>
+
+<div class="corpo">
+  <div class="abas" id="abas"></div>
+  <div id="conteudo"></div>
+</div>
+
+<script src="/ui.js"></script>
+<script>
+const {api,banner,el,limpar,$,num,comoNumero,formatarMetros,formatarArea}=window.ui;
+
+let eu={}, aba='estoque';
+const estado={tecidos:[],arvore:[],tecido_id:null,nivel_id:null};
+const ABAS=[{id:'estoque',nome:'Em estoque'},{id:'entrada',nome:'Entrada de rolo'}];
+const podeEntrar=()=>['diretor','cortador'].includes(eu.papel);
+
+function montarAbas(){
+  const c=limpar($('#abas'));
+  ABAS.forEach(a=>c.appendChild(el('button',{texto:a.nome,'aria-selected':String(a.id===aba),
+    onclick:()=>{ aba=a.id; desenhar(); }})));
+}
+function desenhar(){
+  montarAbas();
+  const c=limpar($('#conteudo'));
+  return aba==='estoque'?telaEstoque(c):telaEntrada(c);
+}
+function fileira(rotulo,itens,sel,aoEscolher){
+  const f=el('div',{class:'fileira'});
+  f.appendChild(el('span',{class:'rotulo',texto:rotulo}));
+  if(!itens.length) f.appendChild(el('span',{class:'quem',style:'align-self:center',texto:'nada cadastrado'}));
+  itens.forEach(i=>f.appendChild(el('button',{class:'op',texto:i.nome,
+    'aria-pressed':String(String(i.valor)===String(sel)), onclick:()=>aoEscolher(i.valor)})));
+  return f;
+}
+
+// ── EM ESTOQUE ───────────────────────────────────────────────────────────
+async function telaEstoque(pai){
+  const rolos=await api('/api/rolos');
+  const saldo=await api('/api/rolos/saldo');
+  pai=limpar(pai);
+
+  const cS=el('div',{class:'cartao'});
+  cS.appendChild(el('h2',{texto:'Saldo por tecido'}));
+  cS.appendChild(el('p',{class:'nota',texto:
+    'Nao existe saldo guardado por tecido: e sempre a soma dos rolos. Um total numa coluna e um total que diverge sozinho.'}));
+  const tS=el('table',{});
+  tS.appendChild(el('tr',{},[el('th',{texto:'Tecido'}),el('th',{class:'num',texto:'Saldo'}),
+    el('th',{class:'num',texto:'m²'}),el('th',{texto:'Rolos'})]));
+  saldo.filter(s=>s.saldo>0||s.abertos||s.fechados).forEach(s=>tS.appendChild(el('tr',{},[
+    el('td',{texto:[s.linha_nome,s.abertura_nome,s.cor_nome].join(' · ')}),
+    el('td',{class:'num',texto:formatarMetros(s.saldo)}),
+    el('td',{class:'num',texto:formatarArea(s.m2)}),
+    el('td',{texto:(s.abertos||0)+' aberto(s) + '+(s.fechados||0)+' fechado(s)'})
+  ])));
+  cS.appendChild(saldo.some(s=>s.saldo>0)?tS:el('div',{class:'vazio',texto:'Nenhum rolo em estoque.'}));
+  pai.appendChild(cS);
+
+  const c=el('div',{class:'cartao'});
+  c.appendChild(el('h2',{texto:'Rolos'}));
+  const t=el('table',{});
+  t.appendChild(el('tr',{},[el('th',{texto:'Codigo'}),el('th',{texto:'Tecido'}),
+    el('th',{class:'num',texto:'Bobina'}),el('th',{class:'num',texto:'Saldo'}),
+    el('th',{class:'num',texto:'m²'}),el('th',{texto:'Estado'}),el('th',{texto:'Endereco'}),el('th',{texto:''})]));
+  rolos.forEach(r=>{
+    const acoes=[];
+    if(r.status!=='encerrado'&&podeEntrar()){
+      // R9: o acerto no fim. Sem ele o saldo infla mes a mes com metros que
+      // nunca existiram — a metragem vem da nota e nao e conferida na entrada.
+      acoes.push(el('button',{class:'bt pequeno',texto:'Rolo acabou',onclick:async()=>{
+        if(!confirm('Encerrar o rolo '+r.codigo+'? O sistema ainda marca '+formatarMetros(r.saldo)+
+          '. A diferenca fica gravada como acerto.')) return;
+        await api('/api/rolos/'+r.id+'/encerrar',{metodo:'POST'});
+        banner('Rolo '+r.codigo+' encerrado. A diferenca virou acerto.');
+        await telaEstoque($('#conteudo'));
+      }}));
+    }
+    if(r.status!=='encerrado'&&eu.papel==='diretor'){
+      acoes.push(el('button',{class:'bt pequeno',texto:'Ajustar',onclick:async()=>{
+        const s=prompt('Saldo real do rolo '+r.codigo+', em metros:',String(r.saldo).replace('.',','));
+        if(s===null) return;
+        const obs=prompt('Por que o saldo esta sendo corrigido?');
+        if(!obs) return;
+        await api('/api/rolos/'+r.id+'/ajustar',{metodo:'POST',corpo:{saldo:comoNumero(s),observacao:obs}});
+        banner('Saldo ajustado.'); await telaEstoque($('#conteudo'));
+      }}));
+    }
+    acoes.push(el('button',{class:'bt pequeno',texto:'Historico',onclick:async()=>{
+      const ms=await api('/api/rolos/'+r.id+'/movimentos');
+      alert(r.codigo+'\n\n'+ms.map(m=>
+        m.criado_em+'  '+(m.delta>0?'+':'')+num(m.delta)+' m  '+m.motivo+
+        (m.observacao?'  ('+m.observacao+')':'')).join('\n'));
+    }}));
+    t.appendChild(el('tr',{class:r.status==='encerrado'?'inativo':''},[
+      el('td',{texto:r.codigo}),
+      el('td',{texto:[r.linha_nome,r.abertura_nome,r.cor_nome].join(' · ')}),
+      el('td',{class:'num',texto:num(r.largura)+' m'}),
+      el('td',{class:'num',texto:formatarMetros(r.saldo)}),
+      el('td',{class:'num',texto:formatarArea(r.m2)}),
+      el('td',{},[el('span',{class:'tag '+(r.status==='aberto'?'bom':r.status==='fechado'?'rolo':'off'),texto:r.status})]),
+      el('td',{texto:r.endereco||''}),
+      el('td',{style:'text-align:right'},acoes)
+    ]));
+  });
+  c.appendChild(rolos.length?t:el('div',{class:'vazio',texto:'Nenhum rolo cadastrado.'}));
+  pai.appendChild(c);
+}
+
+// ── ENTRADA ──────────────────────────────────────────────────────────────
+async function telaEntrada(pai){
+  if(!podeEntrar()){ limpar(pai).appendChild(el('div',{class:'vazio',texto:'Sem permissao para dar entrada.'})); return; }
+  estado.tecidos=await api('/api/tecidos');
+  estado.arvore=await api('/api/enderecos/ROLO');
+  pai=limpar(pai);
+
+  const c=el('div',{class:'cartao'});
+  c.appendChild(el('h2',{texto:'Entrada de rolo'}));
+  c.appendChild(el('p',{class:'ajuda',texto:
+    'A largura da bobina e DESTE rolo, nao do tecido. O mesmo Rolo 3% Bege existe em 2,00, 2,50 e 3,00 — e e justamente essa diferenca que o plano de corte explora.'}));
+  pai.appendChild(c);
+
+  const ativos=estado.tecidos.filter(t=>t.ativo);
+  const linhas=[], aberturas=[], cores=[];
+  ativos.forEach(t=>{ if(!linhas.some(x=>x.valor===t.linha_id)) linhas.push({valor:t.linha_id,nome:t.linha_nome}); });
+  const sel=ativos.find(t=>t.id===estado.tecido_id);
+  const linhaSel=sel?sel.linha_id:(linhas[0]&&linhas[0].valor);
+  ativos.filter(t=>t.linha_id===linhaSel).forEach(t=>{
+    if(!aberturas.some(x=>x.valor===t.abertura_id)) aberturas.push({valor:t.abertura_id,nome:t.abertura_nome}); });
+  const abSel=sel&&sel.linha_id===linhaSel?sel.abertura_id:(aberturas[0]&&aberturas[0].valor);
+  ativos.filter(t=>t.linha_id===linhaSel&&t.abertura_id===abSel).forEach(t=>cores.push({valor:t.cor_id,nome:t.cor_nome}));
+
+  const escolher=(l,a,co)=>{
+    const t=ativos.find(x=>x.linha_id===l&&x.abertura_id===a&&x.cor_id===co)
+      ||ativos.find(x=>x.linha_id===l&&x.abertura_id===a)||ativos.find(x=>x.linha_id===l);
+    if(t) estado.tecido_id=t.id;
+    telaEntrada($('#conteudo'));
+  };
+  c.appendChild(fileira('LINHA',linhas,linhaSel,v=>escolher(v,null,null)));
+  c.appendChild(fileira('ABERTURA',aberturas,abSel,v=>escolher(linhaSel,v,null)));
+  c.appendChild(fileira('COR',cores,sel?sel.cor_id:null,v=>escolher(linhaSel,abSel,v)));
+
+  const campos={};
+  const linha=el('div',{class:'campos'});
+  [['largura','Largura da bobina (m)',sel&&sel.largura_sugerida?num(sel.largura_sugerida):''],
+   ['metragem','Metragem da nota (m)',''],
+   ['nf','NF',''],['fornecedor','Fornecedor','']].forEach(([id,rot,valor])=>{
+    const b=el('div',{class:'campo cresce'});
+    b.appendChild(el('label',{texto:rot}));
+    const i=el('input',{type:'text',value:valor,inputmode:id==='nf'?'text':'decimal'});
+    b.appendChild(i); campos[id]=i; linha.appendChild(b);
+  });
+  c.appendChild(linha);
+
+  // endereco na estante de ROLO
+  const hastes=estado.arvore.filter(h=>h.ativo).map(h=>({valor:h.id,nome:h.nome}));
+  const hAtual=estado.arvore.find(h=>h.id===estado.haste_id)||estado.arvore[0];
+  const andares=hAtual?hAtual.andares.map(a=>({valor:a.id,nome:a.nome})):[];
+  const aAtual=hAtual&&(hAtual.andares.find(a=>a.id===estado.andar_id)||hAtual.andares[0]);
+  const niveis=aAtual?aAtual.niveis.map(n=>({valor:n.id,nome:n.nome})):[];
+  c.appendChild(fileira('HASTE',hastes,hAtual&&hAtual.id,v=>{ estado.haste_id=v; estado.andar_id=null; estado.nivel_id=null; telaEntrada($('#conteudo')); }));
+  c.appendChild(fileira('ANDAR',andares,aAtual&&aAtual.id,v=>{ estado.andar_id=v; estado.nivel_id=null; telaEntrada($('#conteudo')); }));
+  c.appendChild(fileira('NIVEL',niveis,estado.nivel_id,v=>{ estado.nivel_id=v; telaEntrada($('#conteudo')); }));
+
+  const bt=el('button',{class:'bt primario',style:'min-height:60px;font-size:18px',texto:'Dar entrada',onclick:async()=>{
+    bt.disabled=true;
+    try{
+      const r=await api('/api/rolos',{metodo:'POST',corpo:{
+        tecido_id:estado.tecido_id, largura:campos.largura.value, metragem:campos.metragem.value,
+        nf:campos.nf.value, fornecedor:campos.fornecedor.value, nivel_id:estado.nivel_id}});
+      banner('Rolo '+r.codigo+' cadastrado com '+formatarMetros(r.saldo)+'.');
+      aba='estoque'; desenhar();
+    }catch(e){}
+    bt.disabled=false;
+  }});
+  c.appendChild(el('div',{class:'campos'},[bt]));
+}
+
+(async function(){ eu=await api('/api/auth/eu'); desenhar(); })();
+</script>
+</body>
+</html>
