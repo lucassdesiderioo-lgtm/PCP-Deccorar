@@ -21,12 +21,25 @@
   .err{color:#ff6b6b;text-align:center;height:20px;font-size:14px;margin-top:10px}
   .volta{margin-top:16px;text-align:center;color:#8c94a6;font-size:14px;cursor:pointer}
   .hide{display:none}
+  /* A porta para o modulo de tecido. Fica na tela de login porque e onde o
+     tablet da bancada ja esta parado — e o cortador nao tem que decorar
+     endereco nenhum. E outro sistema, com PIN proprio, e a tela diz isso. */
+  .outro{margin-top:26px;padding-top:20px;border-top:1px solid #2a2f3a}
+  .outro a{display:block;padding:18px 14px;background:#1c1f28;border:1px solid #f0b429;
+     border-radius:14px;color:#f0b429;font-size:17px;font-weight:700;text-align:center;
+     text-decoration:none}
+  .outro a:active{background:#252a35}
+  .outro .obs{color:#8c94a6;font-size:13px;text-align:center;margin-top:8px}
 </style></head><body>
 <div class="box">
   <div id="etapa1">
     <h1>Quem esta usando?</h1>
     <div class="sub">Toque no seu nome</div>
     <div class="nomes" id="nomes"></div>
+    <div class="outro">
+      <a id="tecido" href="#">Plano de corte &mdash; tecido sob medida</a>
+      <div class="obs">Outro sistema, com PIN proprio</div>
+    </div>
   </div>
   <div id="etapa2" class="hide">
     <h1 id="oi"></h1>
@@ -43,9 +56,14 @@
   </div>
 </div>
 <script>
+// O modulo de tecido roda na MESMA maquina, em outra porta. O endereco e
+// montado a partir de onde esta tela foi aberta: assim funciona pelo IP da
+// fabrica, pelo nome da maquina ou pelo localhost, sem ninguem editar nada.
+var PORTA_TECIDO=3020;
 var alvo=null, pin='';
 var destino=new URLSearchParams(location.search).get('r')||'';
 function $(s){return document.querySelector(s);}
+$('#tecido').href=location.protocol+'//'+location.hostname+':'+PORTA_TECIDO+'/';
 fetch('/api/auth/pessoas').then(r=>r.json()).then(function(l){
   $('#nomes').innerHTML=l.map(p=>'<div class="nome" data-id="'+p.id+'">'+p.nome+'</div>').join('');
 });
