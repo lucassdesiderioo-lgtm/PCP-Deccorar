@@ -6,8 +6,9 @@
 <title>Etiquetas · Tecido</title>
 <link rel="stylesheet" href="/sobmedida/base.css">
 <style>
-/* A folha: grade de etiquetas para recortar e colar. Em papel comum, em
-   qualquer impressora — a bancada nao tem impressora propria. */
+/* A grade na tela e CONFERENCIA, nao a folha que vai para a impressora.
+   Quem imprime e o PDF do servidor (100 x 35 mm por pagina). Aqui o operador
+   so olha se a sequencia bate antes de gastar rolo de etiqueta. */
 .folha{display:grid; grid-template-columns:repeat(3,1fr); gap:4mm; margin-top:14px}
 .etq{
   border:1px dashed var(--linha-forte); border-radius:6px;
@@ -20,13 +21,19 @@
 .etq .marca{font-size:10px; color:var(--tinta-fraca); letter-spacing:.08em}
 
 @media print{
-  /* Impressao: margens "Nenhuma" e escala 100%. "Ajustar a pagina" deforma as
-     barras e o leitor recusa — a mesma regra da etiqueta de SKU no PCP. */
+  /* Imprimir ESTA TELA nao produz etiqueta valida — a folha de verdade e o
+     PDF do servidor. Se alguem mandar imprimir a pagina por engano (Ctrl+P
+     na tela), o aviso sai junto em vez de sair uma folha de barras que a
+     bancada tentaria usar. */
   .topo,.abas,#painel,.naoImprime{display:none !important}
   body{background:#fff}
   .corpo{max-width:none;padding:0}
   .folha{gap:3mm}
   .etq{border:1px dashed #999}
+  .folha::before{
+    content:'CONFERENCIA — nao use esta folha. Imprima pelo botao "Imprimir (PDF 100 x 35 mm)".';
+    grid-column:1/-1; font-weight:700; font-size:12pt; margin-bottom:6mm;
+  }
 }
 </style>
 </head>
@@ -73,7 +80,7 @@ async function desenhar(){
   }});
   c.appendChild(el('div',{class:'campos'},[box,el('div',{class:'campo'},[bt])]));
   c.appendChild(el('p',{class:'ajuda',texto:
-    'Na hora de imprimir: margens "Nenhuma" e escala 100%. "Ajustar a pagina" deforma as barras e o leitor recusa.'}));
+    'O arquivo sai em PDF, uma etiqueta por pagina, ja no tamanho da bobina: 100 x 35 mm. Nao ha o que ajustar na tela de impressao — e por isso que ele e gerado assim.'}));
   p.appendChild(c);
 
   const cP=el('div',{class:'cartao'});
@@ -114,11 +121,22 @@ async function desenhar(){
 // A folha propriamente dita. O codigo aparece escrito embaixo das barras: se
 // o leitor falhar, o cortador digita — nunca fica sem saida.
 function montarFolha(codigos,lote){
+  // O lote chega de dois lugares com nomes diferentes: recem-criado o POST
+  // devolve `lote_id`; vindo da tabela de lotes a linha traz `id`. Normalizar
+  // aqui e o que impede o botao de imprimir nascer morto num dos caminhos.
+  const loteId=lote&&(lote.id!==undefined?lote.id:lote.lote_id);
   const alvo=limpar($('#folha'));
   const cab=el('div',{class:'cartao naoImprime',style:'display:flex;align-items:center;gap:12px'});
   cab.appendChild(el('strong',{style:'flex:1',texto:'Folha: '+codigos.length+' etiquetas'+
     (lote?' (S-'+String(lote.de_seq).padStart(6,'0')+' a S-'+String(lote.ate_seq).padStart(6,'0')+')':'')}));
-  cab.appendChild(el('button',{class:'bt primario',texto:'Imprimir',onclick:()=>window.print()}));
+  // Abre o PDF gerado pelo servidor, ja em 100 x 35 mm por pagina. O
+  // window.print() da folha saia certo so quando o operador acertava
+  // "margens: Nenhuma" e escala 100% — e ainda vinha com a URL e o numero da
+  // pagina carimbados em cima do codigo.
+  cab.appendChild(el('button',{class:'bt primario',
+    texto:'Imprimir (PDF 100 x 35 mm)',
+    disabled:loteId?null:'disabled',
+    onclick:()=>window.open('/sobmedida/api/etiquetas/lotes/'+loteId+'/pdf','_blank')}));
   alvo.appendChild(cab);
 
   const grade=el('div',{class:'folha'});

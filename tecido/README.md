@@ -160,6 +160,43 @@ melhor que qualquer chute — e mudar é um campo, não uma linha de código.
 
 ---
 
+## A etiqueta da sobra sai em PDF, 100 x 35 mm
+
+A folha que vai para a Zebra e gerada **no servidor**, uma etiqueta por pagina,
+no tamanho exato da bobina (`GET /api/etiquetas/lotes/:id/pdf`).
+
+> ⚠️ **Nao volte a imprimir pelo `window.print()`.** A folha do navegador so
+> saia certa quando quem imprime escolhia "margens: Nenhuma" e escala 100% —
+> **toda vez**. Errou uma, o Chrome ajusta a pagina, as barras esticam e o
+> leitor recusa. E ainda carimbava a URL e o "8/32" que, numa etiqueta de
+> 35 mm, caem em cima do codigo.
+>
+> E a mesma licao da armadilha #6 do CLAUDE.md: o que so funciona quando o
+> operador acerta a configuracao e o que vai falhar. A pagina agora ja nasce
+> 100 x 35 e nao ha o que ajustar.
+
+A grade que aparece na tela e **conferencia**, nao folha de impressao — e se
+alguem der Ctrl+P nela por engano, sai escrito isso na folha.
+
+`public/barras.js` serve as duas pontas: a tela desenha SVG, o servidor desenha
+as mesmas barras dentro do PDF. Duas tabelas CODE128 seriam duas etiquetas
+diferentes para o mesmo codigo, e a divergencia so apareceria na bancada.
+
+Medidas em `dominio/etiqueta_pdf.js`, travadas por `teste/etiqueta_pdf.test.js`:
+
+| | |
+|---|---|
+| Pagina | 100 x 35 mm, uma por etiqueta |
+| Margem | 4 mm (o silencio do CODE128 tem que caber DENTRO da area impressa) |
+| Barra | 16 mm de altura |
+| Modulo | 0,25 a 0,50 mm — a 203 dpi, abaixo de 0,25 mm sao 2 pontos e a leitura falha em etiqueta amassada |
+
+Codigo comprido demais para caber sai **marcado** na propria etiqueta, nunca
+impresso pequeno em silencio: o desfecho ruim nao e o erro, e a etiqueta sair
+bonita, colada na peca, e nao bipar.
+
+---
+
 ## A etiqueta da sobra
 
 O sistema **imprime** o lote (Etiquetas → quantidade → folha em A4 para
