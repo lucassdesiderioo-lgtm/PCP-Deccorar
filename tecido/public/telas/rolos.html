@@ -23,7 +23,13 @@
 const {api,banner,el,limpar,$,num,comoNumero,formatarMetros,formatarArea}=window.ui;
 
 let eu={}, aba='estoque';
-const estado={tecidos:[],arvore:[],tecido_id:null,nivel_id:null};
+const estado={tecidos:[],arvore:[],tecido_id:null,nivel_id:null,
+  larguras:null,largura:null,larguraOutra:''};
+
+// O MESMO arredondamento do servidor (dados/largura.js). Sem ele, o botao de
+// 2,50 nao casaria com o 2.5 que volta do banco e a tela nunca marcaria
+// nenhuma bobina como escolhida.
+const dLargura={arred:v=>Math.round(Number(String(v).replace(',','.'))*1000)/1000};
 const ABAS=[{id:'estoque',nome:'Em estoque'},{id:'entrada',nome:'Entrada de rolo'}];
 const podeEntrar=()=>['diretor','cortador'].includes(eu.papel);
 
@@ -123,6 +129,7 @@ async function telaEntrada(pai){
   if(!podeEntrar()){ limpar(pai).appendChild(el('div',{class:'vazio',texto:'Sem permissao para dar entrada.'})); return; }
   estado.tecidos=await api('/api/tecidos');
   estado.arvore=await api('/api/enderecos/ROLO');
+  if(!estado.larguras) estado.larguras=await api('/api/larguras');
   pai=limpar(pai);
 
   const c=el('div',{class:'cartao'});
@@ -151,17 +158,50 @@ async function telaEntrada(pai){
   c.appendChild(fileira('ABERTURA',aberturas,abSel,v=>escolher(linhaSel,v,null)));
   c.appendChild(fileira('COR',cores,sel?sel.cor_id:null,v=>escolher(linhaSel,abSel,v)));
 
+  /* A LARGURA VEM DA LISTA, e nao do teclado.
+     Digitar largura errava de dois jeitos que ninguem percebia: '2,5' e
+     '2,50' viravam bobinas diferentes na consulta do plano, e um '20,0' com
+     a virgula no lugar errado entrava como bobina de vinte metros — e o
+     encaixe passava a "achar" que cabia qualquer peca.
+
+     O campo livre continua embaixo, de proposito: rolo que chega fora do
+     padrao existe, e recusar a entrada dele seria a armadilha #6 — a trava
+     que a bancada aprende a contornar lancando a largura errada so para o
+     sistema aceitar. Ele avisa, nao bloqueia. */
+  const larguras=(estado.larguras||[]).filter(l=>l.ativo);
+  const sugerida=sel&&sel.largura_sugerida?dLargura.arred(sel.largura_sugerida):null;
+  if(estado.largura==null&&sugerida&&larguras.some(l=>l.valor===sugerida)) estado.largura=sugerida;
+
+  if(larguras.length){
+    c.appendChild(fileira('BOBINA',
+      larguras.map(l=>({valor:l.valor,nome:formatarMetros(l.valor)})),
+      estado.largura,
+      v=>{ estado.largura=v; estado.larguraOutra=''; telaEntrada($('#conteudo')); }));
+  } else {
+    c.appendChild(el('p',{class:'ajuda',style:'color:var(--alerta)',texto:
+      'Nenhuma largura de bobina cadastrada ainda. Digite abaixo e peca para cadastrar em Cadastros -> Tecido.'}));
+  }
+
   const campos={};
   const linha=el('div',{class:'campos'});
-  [['largura','Largura da bobina (m)',sel&&sel.largura_sugerida?num(sel.largura_sugerida):''],
+  [['largura','Outra largura (m) — so se nao estiver acima',''],
    ['metragem','Metragem da nota (m)',''],
    ['nf','NF',''],['fornecedor','Fornecedor','']].forEach(([id,rot,valor])=>{
     const b=el('div',{class:'campo cresce'});
     b.appendChild(el('label',{texto:rot}));
     const i=el('input',{type:'text',value:valor,inputmode:id==='nf'?'text':'decimal'});
+    if(id==='largura'){
+      i.value=estado.larguraOutra||'';
+      i.addEventListener('input',()=>{ estado.larguraOutra=i.value; estado.largura=null;
+        aviso.textContent=i.value.trim()&&!larguras.some(l=>l.valor===dLargura.arred(i.value))
+          ? '⚠ Esta largura nao esta na lista. O rolo entra assim mesmo — se a bobina veio para ficar, cadastre em Cadastros -> Tecido.'
+          : ''; });
+    }
     b.appendChild(i); campos[id]=i; linha.appendChild(b);
   });
   c.appendChild(linha);
+  const aviso=el('p',{class:'ajuda',style:'color:var(--alerta);min-height:1.2em'});
+  c.appendChild(aviso);
 
   // endereco na estante de ROLO
   const hastes=estado.arvore.filter(h=>h.ativo).map(h=>({valor:h.id,nome:h.nome}));
@@ -177,7 +217,11 @@ async function telaEntrada(pai){
     bt.disabled=true;
     try{
       const r=await api('/api/rolos',{metodo:'POST',corpo:{
-        tecido_id:estado.tecido_id, largura:campos.largura.value, metragem:campos.metragem.value,
+        // O botao escolhido ganha do campo livre — se a pessoa tocou num
+        // botao, foi essa a bobina que ela quis dizer.
+        tecido_id:estado.tecido_id,
+        largura:estado.largura!=null?estado.largura:campos.largura.value,
+        metragem:campos.metragem.value,
         nf:campos.nf.value, fornecedor:campos.fornecedor.value, nivel_id:estado.nivel_id}});
       banner('Rolo '+r.codigo+' cadastrado com '+formatarMetros(r.saldo)+'.');
       aba='estoque'; desenhar();

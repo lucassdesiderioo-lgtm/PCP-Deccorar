@@ -274,6 +274,39 @@ function desenharPlano(){
   // e vai conferir a prateleira na mao de qualquer jeito.
   if(p.sobre_sobras) c.appendChild(el('p',{class:'ajuda',texto:'Sobras: '+p.sobre_sobras}));
 
+  /* NAO TEM BOBINA PARA O CORTE.
+     Emenda nao existe nesta fabrica: peca mais larga que toda bobina do
+     estoque nao sai, ponto. Isso nao e um detalhe do plano — e uma venda
+     parada esperando material, e quem compra tecido precisa ver o numero.
+
+     Por isso vem ANTES de tudo, com a largura que falta em letra grande:
+     perder a peca por 8 cm de bobina e uma conversa; por 60 cm e outra. */
+  if(p.falta_bobina){
+    const f=p.falta_bobina;
+    const av=el('div',{style:'background:var(--erro-fraca);border:2px solid var(--erro);'+
+      'border-radius:var(--raio-g);padding:16px;margin:12px 0'});
+    av.appendChild(el('div',{style:'color:var(--erro);font-size:22px;font-weight:800',
+      texto:'NAO TEM BOBINA PARA ESTE CORTE'}));
+    av.appendChild(el('div',{style:'font-size:17px;margin-top:6px',
+      texto:f.pecas+' peça(s) precisam de bobina de '+formatarMetros(f.largura_necessaria)+
+            ' — a maior em estoque tem '+formatarMetros(f.largura_maxima_estoque)+
+            ' (faltam '+formatarMetros(f.faltam_m)+').'}));
+    if(f.larguras.length>1){
+      const t=el('table',{style:'margin-top:10px'});
+      t.appendChild(el('tr',{},[el('th',{texto:'Largura de bobina'}),
+        el('th',{class:'num',texto:'Peças'}),el('th',{class:'num',texto:'m²'})]));
+      f.larguras.forEach(g=>t.appendChild(el('tr',{},[
+        el('td',{texto:formatarMetros(g.largura)}),
+        el('td',{class:'num',texto:String(g.pecas)}),
+        el('td',{class:'num',texto:formatarArea(g.area_m2)})])));
+      av.appendChild(t);
+    }
+    av.appendChild(el('p',{class:'ajuda',style:'margin-bottom:0',
+      texto:'Não há emenda: ou existe bobina larga o bastante, ou a peça não sai. '+
+            'A bobina de '+formatarMetros(f.largura_necessaria)+' resolve todas as linhas acima.'}));
+    c.appendChild(av);
+  }
+
   // Peca que nao coube: aparece PRIMEIRO, em vermelho. Nunca some em silencio.
   if(p.pecas_nao_alocadas.length){
     const av=el('div',{style:'background:var(--erro-fraca);border:1px solid var(--erro);'+

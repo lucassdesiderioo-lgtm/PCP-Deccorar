@@ -185,5 +185,40 @@ module.exports=[
     'e NAO virou sobra com etiqueta');
   igual(p.refugos.some(s=>Math.abs(s.altura-0.10)<0.001),true,'foi para o refugo, medido');
 }}
+,
+
+// ── NAO HA EMENDA ────────────────────────────────────────────────────────
+
+{nome:'PECA MAIS LARGA QUE A BOBINA: o plano grita, e vira pedido de compra',
+ executar({igual,perto}){
+  const x=cena();
+  rolo.entrada({tecido_id:x.t.id,largura:'2,00',metragem:'50',nivel_id:x.nivelRolo},'teste');
+
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[
+    {largura:'1,20',altura:'2,00'},     // esta sai
+    {largura:'2,40',altura:'1,50'},     // esta nao tem bobina
+    {largura:'2,40',altura:'1,00'}]});  // nem esta
+
+  igual(p.faixas.length>0,true,'o resto do plano continua saindo');
+  igual(!!p.falta_bobina,true,'e a falta vem separada, nao so numa linha de texto');
+  igual(p.falta_bobina.pecas,2,'duas pecas sem bobina');
+  igual(p.falta_bobina.largura_necessaria,2.40,'precisa de bobina de 2,40');
+  igual(p.falta_bobina.largura_maxima_estoque,2.00,'a maior que existe tem 2,00');
+  perto(p.falta_bobina.faltam_m,0.40,'faltam 40 cm de largura');
+
+  /* Decisao do dono, 03/09/2026: EMENDA NAO EXISTE. Peca mais larga que toda
+     bobina do estoque simplesmente nao sai. Por isso a recusa nao pode morrer
+     numa linha de texto no meio da tela — ela e uma venda parada esperando
+     material, e o numero tem que chegar em quem compra tecido. */
+}},
+
+{nome:'com bobina larga o bastante, nao ha falta nenhuma', executar({igual}){
+  const x=cena();
+  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.nivelRolo},'teste');
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[{largura:'2,40',altura:'1,50'}]});
+  igual(p.falta_bobina,null,'null, e nao um objeto vazio');
+  // Tarja de alarme que aparece sem alarme e tarja que a equipe aprende a
+  // ignorar — e ai a de verdade passa batida.
+}}
 
 ];

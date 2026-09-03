@@ -3,6 +3,7 @@
 const tecido=require('../dominio/tecido');
 const endereco=require('../dominio/endereco');
 const motivo=require('../dominio/motivo');
+const largura=require('../dominio/largura');
 
 // A camada de dados entra aqui SO para o atualizar generico (ordem, ativo,
 // renomear) — nao ha regra nenhuma nesses tres campos. Criar, esse sim, passa
@@ -42,6 +43,19 @@ module.exports={rotas:[
    detalhe:(req)=>'cor '+req.body.nome},
   {metodo:'PUT', caminho:'/api/cores/:id', permissao:EDITAR,
    manipulador:({params,corpo})=>dCor.atualizar(params.id,corpo)},
+
+  /* AS LARGURAS DE BOBINA. Leitura com `cadastro.ler` porque a tela de
+     entrada de rolo — que e da bancada — precisa montar os botoes; escrita
+     com `cadastro.editar`, que e da chefia: largura errada na lista vira
+     largura errada em todo rolo lancado depois. */
+  {metodo:'GET', caminho:'/api/larguras', permissao:LER,
+   manipulador:()=>largura.listar()},
+  {metodo:'POST', caminho:'/api/larguras', permissao:EDITAR,
+   manipulador:({corpo})=>largura.criar(corpo.valor),
+   detalhe:(req)=>'largura de bobina '+req.body.valor+' m'},
+  {metodo:'PUT', caminho:'/api/larguras/:id', permissao:EDITAR,
+   manipulador:({params,corpo})=>corpo.ativo?largura.reativar(params.id):largura.desativar(params.id),
+   detalhe:(req)=>(req.body.ativo?'reativou':'tirou da lista')+' a largura '+req.params.id},
 
   {metodo:'GET', caminho:'/api/tecidos', permissao:LER,
    manipulador:()=>tecido.listarTecidos()},

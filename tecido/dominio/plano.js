@@ -114,6 +114,53 @@ function cortesAnteriores(pedidos){
 // de 0,90 x 2,00, que tem 1,80.
 const serve=(peca,fonte)=>peca.largura<=fonte.largura+TOL&&peca.altura<=fonte.alturaMax+TOL;
 
+/* A maior largura que existe HOJE no estoque deste tecido — bobina ou sobra.
+   E o numero contra o qual a peca e medida, e o que a tela mostra ao lado do
+   que falta: "precisa de 2,10 e a maior que temos e 2,00" diz na hora se o
+   problema e comprar bobina ou so achar a peca certa. */
+const larguraDoEstoque=(sobras,rolos)=>
+  [...(sobras||[]).map(s=>s.largura), ...(rolos||[]).map(r=>r.largura)]
+    .reduce((m,v)=>Math.max(m,v),0);
+
+/* AS PECAS QUE NAO TEM BOBINA, viradas em pedido de compra.
+
+   NAO HA EMENDA nesta fabrica (decisao do dono, 03/09/2026): peca mais larga
+   que toda bobina do estoque simplesmente NAO SAI. Isso muda o que a recusa
+   significa — nao e um contratempo do encaixe, e uma venda parada esperando
+   material. Se ela morre numa linha de texto na tela do corte, quem compra
+   tecido nunca fica sabendo que se perdeu a peca por 10 cm de bobina.
+
+   Agrupa por largura necessaria porque e assim que se compra: nao interessa
+   que sejam quatro pecas diferentes, interessa que quatro pecas precisam de
+   bobina de 2,10 m. Ordenado da maior para a menor — a bobina que resolve a
+   maior resolve todas as de baixo. */
+function faltaBobina(naoAlocadas, tecido, larguraMaxima){
+  const sem=(naoAlocadas||[]).filter(p=>p.largura_necessaria);
+  if(!sem.length) return null;
+
+  const porLargura=new Map();
+  for(const p of sem){
+    const k=Math.round(p.largura_necessaria*1000)/1000;
+    const g=porLargura.get(k)||{largura:k, pecas:0, area_m2:0};
+    g.pecas++; g.area_m2+=p.largura*p.altura;
+    porLargura.set(k,g);
+  }
+  const larguras=[...porLargura.values()]
+    .map(g=>({...g, area_m2:Math.round(g.area_m2*1000)/1000}))
+    .sort((a,b)=>b.largura-a.largura);
+
+  return {
+    tecido: tecido?(tecido.nome||tecido.codigo||null):null,
+    pecas: sem.length,
+    larguras,
+    largura_necessaria: larguras[0].largura,   // a bobina que resolve TUDO
+    largura_maxima_estoque: larguraMaxima||0,
+    // Quanto falta de largura. E este numero que doi: perder a venda por 8 cm
+    // de bobina e uma conversa; por 60 cm e outra.
+    faltam_m: Math.round((larguras[0].largura-(larguraMaxima||0))*1000)/1000
+  };
+}
+
 /**
  * Monta a proposta. NAO grava nada.
  * @param {{tecido_id, pecas:[{largura,altura}], recusadas:[sobra_id]}} pedido
@@ -236,13 +283,21 @@ function calcular(pedido){
   if(semLugar.length){
     const larguraMaxima=[...disponiveis.map(s=>s.largura),...rolos.map(x=>x.largura)]
       .reduce((m,v)=>Math.max(m,v),0);
-    semLugar.forEach(p=>r.pecasNaoAlocadas.push({id:p.id, largura:p.largura, altura:p.altura,
-      motivo: p.largura>larguraMaxima+TOL
-        ? (larguraMaxima?'nenhuma bobina em estoque tem largura ≥ '+fmt(p.largura)
-                        :'nao ha bobina nem sobra deste tecido em estoque')
-        : (p.pedido
-            ? 'o pedido '+p.pedido+' inteiro nao coube em nenhuma fonte, e pecas do mesmo pedido nao se separam'
-            : 'nao sobrou material para esta peca')}));
+    semLugar.forEach(p=>{
+      const semLargura=p.largura>larguraMaxima+TOL;
+      r.pecasNaoAlocadas.push({
+        id:p.id, largura:p.largura, altura:p.altura,
+        // O CODIGO e o que a compra soma; a frase e o que o operador le.
+        codigo: semLargura ? (larguraMaxima?'sem_largura':'sem_estoque')
+                           : (p.pedido?'tom_unico':'sem_material'),
+        largura_necessaria: semLargura ? p.largura : null,
+        motivo: semLargura
+          ? (larguraMaxima?'nenhuma bobina em estoque tem largura ≥ '+fmt(p.largura)
+                          :'nao ha bobina nem sobra deste tecido em estoque')
+          : (p.pedido
+              ? 'o pedido '+p.pedido+' inteiro nao coube em nenhuma fonte, e pecas do mesmo pedido nao se separam'
+              : 'nao sobrou material para esta peca')});
+    });
   }
 
   // ── 4. VESTE O RESULTADO PARA A TELA ──────────────────────────────────
@@ -296,6 +351,11 @@ function calcular(pedido){
       nome:[tecido.linha_nome,tecido.abertura_nome,tecido.cor_nome].join(' · ')},
     pecas, faixas,
     pecas_nao_alocadas:r.pecasNaoAlocadas,
+    /* O QUE FALTA COMPRAR. Sem emenda, peca larga demais nao tem conserto
+       dentro do plano: ou existe bobina que a comporte, ou a peca nao sai.
+       Por isso a recusa vira NUMERO — quantas pecas, de que largura, e qual
+       a maior que existe hoje. `null` quando nao falta bobina nenhuma. */
+    falta_bobina:faltaBobina(r.pecasNaoAlocadas, tecido, larguraDoEstoque(disponiveis,rolos)),
     sobras_geradas:sobrasGeradas,
     refugos:r.refugos,
     consumo_linear:r.consumoLinear, consumo_m2:r.consumoM2,
@@ -495,4 +555,8 @@ const historico=limite=>db.prepare(`
     LEFT JOIN cor c ON c.id=t.cor_id
    WHERE p.confirmado=1 ORDER BY p.id DESC LIMIT ?`).all(limite||30);
 
-module.exports={calcular, confirmar, recusar, historico};
+// faltaBobina sai exportada para o teste alcancar a REGRA DE AGRUPAMENTO sem
+// montar um pedido inteiro. Ela e o que vira decisao de compra, e a conta de
+// "quantas pecas por largura" e o tipo de coisa que se quebra numa refatoracao
+// sem ninguem notar — a tela continuaria mostrando um numero, so que errado.
+module.exports={calcular, confirmar, recusar, historico, faltaBobina};

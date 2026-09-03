@@ -144,6 +144,43 @@ teste/                 rodar.js + *.test.js — banco temporario, do zero
 
 ---
 
+## As larguras de bobina são cadastráveis (Cadastros → Tecido)
+
+A largura da bobina é **do rolo**, não do tecido — o mesmo Rolô 3% Bege existe
+em 2,00, 2,50 e 3,00, e é essa diferença que o plano de corte explora. O que
+mudou é que ela deixou de ser **digitada** e passou a ser **escolhida**.
+
+Na entrada de rolo as larguras cadastradas viram uma fileira de botões. Digitar
+errava de dois jeitos que ninguém percebia, e nenhum deles dava erro na tela:
+
+| O que se digita | O que acontece | Quando aparece |
+|---|---|---|
+| `2,5` e `2,50` | viram bobinas **diferentes** na consulta do plano | quando o plano não acha rolo que existe |
+| `20,0` | entra como bobina de **vinte metros** | quando o encaixe "acha" que cabe qualquer peça |
+
+> ⚠️ **O campo livre continua existindo, e isso é decisão.** Rolo que chega
+> fora do padrão existe, e recusar a entrada dele seria a armadilha #6 do
+> `CLAUDE.md`: a bancada lançaria a largura errada só para o sistema aceitar,
+> e o erro entraria no lugar onde ninguém procura. O campo **avisa** que a
+> largura não está na lista; nunca bloqueia.
+
+**Largura com rolo em uso não sai da lista.** A lista descreve a prateleira:
+tirá-la faria a próxima entrada daquela bobina cair no campo livre com aviso de
+"não cadastrada" — para uma bobina que a fábrica tem na mão. O aviso perderia o
+sentido na primeira vez, e depois disso ninguém mais o lê. A tela mostra
+quantos rolos cada largura tem, que é o número que separa *largura que a
+fábrica usa* de *largura que alguém cadastrou e nunca comprou*.
+
+**A lista nasce do que já existe.** A migração 6 semeia com as larguras dos
+rolos já cadastrados; num banco novo ela começa vazia — que é honesto: semear
+2,00/2,50/3,00 seria um chute sobre a fábrica, e a primeira entrada de rolo
+ensina qual cadastrar.
+
+`tecido.largura_sugerida` continua existindo, e agora tem função melhor: ela
+**pré-seleciona o botão** em vez de pré-preencher um campo de texto.
+
+---
+
 ## Os parâmetros do corte (Cadastros → Parâmetros)
 
 | Chave | Padrão | O que faz |
@@ -294,6 +331,55 @@ depender de disciplina: não existe tela separada para alguém esquecer.
 
 **A recusa é gravada na hora**, mesmo que o corte não aconteça — ela é
 diagnóstico, não papelada do plano.
+
+### NÃO HÁ EMENDA — e por isso a recusa vira pedido de compra
+
+Decisão do dono, 03/09/2026: **peça mais larga que toda bobina do estoque
+simplesmente não sai.** Não há emenda, não há meia solução.
+
+Isso muda o que a recusa significa. Ela deixa de ser um contratempo do encaixe
+e passa a ser uma **venda parada esperando material** — e se morre numa linha
+de texto no meio da tela do corte, quem compra tecido nunca fica sabendo que se
+perdeu a peça por 10 cm de bobina.
+
+Por isso o plano devolve `falta_bobina` separado das outras recusas:
+
+```
+NAO TEM BOBINA PARA ESTE CORTE
+2 peças precisam de bobina de 2,40 m — a maior em estoque tem 2,00 (faltam 0,40).
+
+  Largura de bobina   Peças   m²
+  2,40                    1   3,60
+  2,10                    2   6,30
+```
+
+Agrupado **por largura**, porque é assim que se compra: não interessa que sejam
+quatro peças diferentes, interessa que quatro precisam de bobina de 2,10 m. A
+maior primeiro — a bobina que resolve a maior resolve todas as de baixo.
+
+> ⚠️ **O motivo da recusa tem CÓDIGO, não só frase.** A frase é para o operador
+> ler; o código é o que a compra soma. Contar frase de texto funciona até o dia
+> em que alguém corrige uma vírgula.
+>
+> | Código | O que é | Vira compra? |
+> |---|---|---|
+> | `sem_largura` | nenhuma bobina do estoque comporta a peça | **sim** — bobina mais larga |
+> | `sem_estoque` | não há bobina nem sobra deste tecido | **sim** — o tecido |
+> | `sem_material` | a bobina serve, o metro acabou | não — é reposição |
+> | `tom_unico` | o pedido inteiro não coube numa fonte só | não — ver §tom único |
+
+**Faltar altura não é faltar bobina.** A bobina está certa; o que acabou foi o
+metro. Somar isso na conta de largura mandaria comprar a bobina errada.
+
+**Sem falta, `falta_bobina` é `null`** — nunca um objeto vazio. Tarja de alarme
+que aparece sem alarme é tarja que a equipe aprende a ignorar, e aí a de
+verdade passa batida.
+
+**Ourela:** não existe nesta operação (confirmado pelo dono, 03/09/2026). Se um
+dia existir, o caminho é cadastrar a largura **útil** do rolo — não há desconto
+automático a fazer.
+
+---
 
 ### TOM ÚNICO POR PEDIDO — a regra que mais pesa no plano
 
