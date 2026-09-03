@@ -16,6 +16,7 @@ const dRolo=require('../dados/rolo');
 const dTecido=require('../dados/tecido');
 const endereco=require('./endereco');
 const dLargura=require('./largura');
+const dFornecedor=require('../dados/fornecedor');
 
 const MAX_LARGURA=10, MAX_METRAGEM=2000;
 const arred=v=>Math.round(v*1000)/1000;    // milimetro; o resto e ruido
@@ -27,6 +28,29 @@ function medida(valor,rotulo,maximo){
   exigir(isFinite(n)&&n>0,'medida_invalida','Informe '+rotulo+'.');
   exigir(n<=maximo,'medida_absurda',rotulo+' de '+n+'? Confira o numero.');
   return arred(n);
+}
+
+/* ── DE QUEM VEIO, E QUANTO CUSTOU ────────────────────────────────────────
+   As duas conferencias que a entrada e a edicao compartilham. Ficam juntas
+   aqui porque um teto que vale so na entrada e um teto que nao vale: a
+   edicao posterior escreve na mesma coluna. */
+const MAX_PRECO=10000;   // R$/m2. Acima disso e virgula no lugar errado.
+
+function fornecedorDe(id){
+  if(id==null||id==='') return null;
+  const f=dFornecedor.porId(id);
+  exigir(f,'fornecedor_inexistente','Escolha um fornecedor da lista.');
+  exigir(f.ativo,'fornecedor_inativo','O fornecedor '+f.nome+' esta desativado.');
+  return f;
+}
+
+function precoDe(valor){
+  if(valor==null||String(valor).trim()==='') return null;   // nota ainda nao chegou
+  const n=Number(String(valor).replace(',','.').trim());
+  exigir(isFinite(n)&&n>0,'preco_invalido','O preco e em R$ por metro quadrado (ex.: 18,50).');
+  exigir(n<=MAX_PRECO,'preco_absurdo','R$ '+n+' por m²? Confira o numero.');
+  // Seis casas: R$ 0,0825 por m2 e preco de verdade, nao ruido.
+  return Math.round(n*1e6)/1e6;
 }
 
 // ── ENTRADA ──────────────────────────────────────────────────────────────
@@ -47,6 +71,14 @@ function entrada(dados,usuarioNome){
 
   if(dados.nivel_id) endereco.exigirArmazem(dados.nivel_id,'ROLO');
 
+  /* DE QUEM VEIO E QUANTO CUSTOU — os dois OPCIONAIS, e nao por preguica.
+     A nota fiscal chega dias DEPOIS do rolo: exigi-la na entrada faria o
+     operador inventar um numero ou deixar o rolo fora do sistema, que e a
+     armadilha #6 pela terceira porta. Rolo sem nota entra, e aparece na
+     lista "sem nota" ate alguem lancar (dominio/custo.js). */
+  const forn=fornecedorDe(dados.fornecedor_id);
+  const preco=precoDe(dados.preco_m2);
+
   return db.transaction(()=>{
     /* A LARGURA DESTA ENTRADA ENSINA A LISTA. Se o operador digitou uma
        bobina que nao esta cadastrada, ela entra aqui mesmo — marcada para a
@@ -60,13 +92,58 @@ function entrada(dados,usuarioNome){
 
     const codigo=formatar(dRolo.ultimoSeq()+1);
     const id=dRolo.criar({codigo,tecido_id:tecido.id,largura,metragem,
-      nivel_id:dados.nivel_id,nf:dados.nf,fornecedor:dados.fornecedor,criado_por:usuarioNome});
+      nivel_id:dados.nivel_id,nf:dados.nf,fornecedor:dados.fornecedor,
+      fornecedor_id:forn?forn.id:null, preco_m2:preco,
+      criado_por:usuarioNome});
     dRolo.movimentar({rolo_id:id,delta:metragem,saldo_apos:metragem,motivo:'entrada',
       observacao:dados.nf?('NF '+dados.nf):null,usuario_nome:usuarioNome});
     // `largura_cadastrada` sobe para a tela dizer o que ela fez. Cadastrar em
     // silencio faria a lista crescer sozinha, e lista que cresce sem ninguem
     // ver e a mesma coisa que lista que ninguem le.
     return {...dRolo.porId(id), largura_cadastrada:!!nova.criada};
+  })();
+}
+
+/* ── A NOTA CHEGA DEPOIS DO ROLO ──────────────────────────────────────────
+   E isso e o caso NORMAL, nao a excecao. O tubo desce do caminhao e vai para
+   a estante; a nota entra no financeiro dias depois, as vezes semanas. Um
+   sistema que so aceita a nota no momento da entrada obriga a uma de duas
+   coisas, e as duas sao piores: inventar um numero na hora, ou deixar o rolo
+   fora do sistema ate a nota chegar.
+
+   MUDAR O PRECO MUDA O VALOR DO ESTOQUE, entao nao passa calado: fica em
+   movimento_rolo com delta ZERO, dizendo de -> para e quem fez. Mesma tabela
+   da mudanca de endereco, pelo mesmo motivo — o historico do rolo e um so.
+
+   O QUE ESTA FUNCAO NAO TOCA: largura, metragem e saldo. Esses o plano de
+   corte usa para decidir de onde cortar, e cada um tem a sua porta com a sua
+   regra (ajustar, encerrar). Um `atualizar` generico aceitaria mexer neles
+   por engano vindo de um formulario de nota fiscal. */
+function editarDados(rolo_id,dados,usuarioNome){
+  const r=dRolo.porId(rolo_id);
+  exigir(r,'rolo_inexistente','Rolo nao encontrado.');
+
+  const forn=dados.fornecedor_id===undefined?{id:r.fornecedor_id,nome:r.fornecedor_nome}
+                                            :fornecedorDe(dados.fornecedor_id);
+  const preco=dados.preco_m2===undefined?r.preco_m2:precoDe(dados.preco_m2);
+  const nf=dados.nf===undefined?r.nf:(String(dados.nf||'').trim()||null);
+
+  const mudou=[];
+  const conta=(oque,de,para)=>{ if(String(de==null?'':de)!==String(para==null?'':para))
+    mudou.push(oque+': '+(de==null||de===''?'—':de)+' -> '+(para==null||para===''?'—':para)); };
+  conta('NF',r.nf,nf);
+  conta('fornecedor',r.fornecedor_nome,forn?forn.nome:null);
+  conta('preco/m²',r.preco_m2,preco);
+
+  // Salvar sem mudar nada nao vira linha de historico: historico que nao
+  // conta nada e historico que ninguem le.
+  if(!mudou.length) return dRolo.porId(rolo_id);
+
+  return db.transaction(()=>{
+    dRolo.atualizarDados(rolo_id,{nf,fornecedor_id:forn?forn.id:null,preco_m2:preco});
+    dRolo.movimentar({rolo_id,delta:0,saldo_apos:r.saldo,motivo:'nota',
+      observacao:mudou.join(' · '), usuario_nome:usuarioNome});
+    return dRolo.porId(rolo_id);
   })();
 }
 
@@ -181,7 +258,7 @@ function conferirSaldos(){
   return ruins;
 }
 
-module.exports={mover,
+module.exports={mover,editarDados,
   entrada, consumir, ajustar, encerrar, conferirSaldos, formatar,
   listar:f=>dRolo.listar(f),
   porId:id=>dRolo.porId(id),

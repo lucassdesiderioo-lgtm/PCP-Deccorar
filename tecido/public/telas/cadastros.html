@@ -297,6 +297,36 @@ async function telaTecido(pai){
   } else cLarg.appendChild(el('div',{class:'vazio',
     texto:'Nenhuma largura ainda. Sem elas, a entrada de rolo pede a largura digitada.'}));
 
+  /* FORNECEDORES. Era texto livre na entrada de rolo, e texto livre nao
+     compara: 'Ecotex', 'ecotex' e 'Ecotex Ltda' somam separado, e o defeito
+     so aparece meses depois, na hora de responder qual fornecedor esta mais
+     caro. A migracao 9 semeou esta lista com o que ja tinha sido digitado —
+     marcado para conferir, porque e AQUI que os duplicados aparecem. */
+  const cF=cartao(pai,'Fornecedores','De quem o rolo veio. O preco NAO mora aqui.');
+  cF.appendChild(el('p',{class:'ajuda',texto:
+    'Nao ha coluna de preco no fornecedor, e isso e decisao: o preco varia por tecido, e uma tabela mantida a mao envelhece calada — o numero fica parecendo atual e ninguem sabe de quando e. O preco mora no ROLO, congelado na compra, e o que pre-preenche a proxima entrada e o ULTIMO preco realmente pago.'}));
+  if(podeEditar()) formulario(cF,[{id:'nome',rotulo:'Nome do fornecedor',dica:'Ecotex',cresce:true}],
+    'Cadastrar fornecedor',async(v,refs)=>{
+      if(!v.nome.trim()) return;
+      await api('/api/fornecedores',{metodo:'POST',corpo:{nome:v.nome}});
+      refs.nome.value=''; banner('Fornecedor cadastrado.'); await telaTecido($('#conteudo'));
+    });
+  const forns=await api('/api/fornecedores');
+  if(forns.length){
+    const tF=el('table',{});
+    tF.appendChild(el('tr',{},[el('th',{texto:'Fornecedor'}),
+      el('th',{class:'num',texto:'Rolos'}),el('th',{class:'num',texto:'Em estoque'}),el('th',{texto:''})]));
+    forns.forEach(f=>tF.appendChild(el('tr',{class:f.ativo?'':'inativo'},[
+      el('td',{texto:f.nome}),
+      el('td',{class:'num',texto:String(f.rolos||0)}),
+      el('td',{class:'num',texto:String(f.em_estoque||0)}),
+      acoes(f,'/api/fornecedores/'+f.id,()=>telaTecido($('#conteudo')),'fornecedor')
+    ])));
+    cF.appendChild(tF);
+    cF.appendChild(el('p',{class:'ajuda',texto:
+      'A coluna Rolos e o que separa fornecedor de verdade de linha duplicada: "Ecotex" com 12 rolos e "ecotex" com 1 diz sozinho qual e qual. Para juntar os dois, renomeie o certo e apague o errado — o sistema recusa apagar quem tem rolo, dizendo quantos.'}));
+  } else cF.appendChild(el('div',{class:'vazio',texto:'Nenhum fornecedor ainda.'}));
+
   // Item de tecido
   const cT=cartao(pai,'Item de tecido','A combinacao que existe de verdade: linha + colecao + cor.');
   cT.appendChild(el('p',{class:'ajuda',texto:

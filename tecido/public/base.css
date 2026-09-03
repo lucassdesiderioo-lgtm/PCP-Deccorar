@@ -141,6 +141,12 @@ button{font-family:inherit}
 .bt:active{transform:translateY(1px)}
 .bt.primario{min-height:var(--toque-acao); background:var(--acao); color:var(--acao-tinta); border-color:var(--acao)}
 .bt.perigo{background:var(--erro-fraca); color:var(--erro); border-color:var(--erro)}
+/* AMBAR = "falta alguma coisa aqui", nunca "deu erro". O botao Nota de um
+   rolo sem preco e a coluna de dias parado usam os dois. Sao os MESMOS
+   tokens do banner de alerta — cor nova aqui e o que faz a equipe sentir
+   que entrou em outro sistema (CLAUDE.md §19). */
+.bt.alerta{background:var(--alerta-fraca); color:var(--alerta); border-color:var(--alerta)}
+td.aviso, .aviso{color:var(--alerta); font-weight:700}
 .bt.pequeno{min-height:38px; padding:0 12px; font-size:15px}
 .bt[disabled]{opacity:.5; cursor:not-allowed}
 

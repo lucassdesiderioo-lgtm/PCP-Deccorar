@@ -63,6 +63,13 @@ const MAPA={
       {sql:'SELECT COUNT(*) c FROM refugo WHERE tecido_id=?', frase:n=>n+' refugo(s) sao deste tecido'}
     ]
   },
+  fornecedor:{
+    tabela:'fornecedor', oque:'o fornecedor',
+    dependentes:[
+      {sql:'SELECT COUNT(*) c FROM rolo WHERE fornecedor_id=?',
+       frase:n=>n+' rolo(s) vieram deste fornecedor'}
+    ]
+  },
   nivel:{
     tabela:'nivel', oque:'o nivel',
     dependentes:[

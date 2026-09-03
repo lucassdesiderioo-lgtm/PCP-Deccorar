@@ -1,15 +1,33 @@
 // Tabelas 'rolo' e 'movimento_rolo'. Quem move o saldo e dominio/rolo.js.
 const db=require('../nucleo/db');
 
+/* ULTIMO CONSUMO, e nao a idade do rolo. Rolo que entrou ha oito meses e e
+   cortado toda semana NAO esta parado — a idade nao mede dinheiro dormindo,
+   mede so quando ele chegou. O que mede e ha quanto tempo nao sai nada dali;
+   quem nunca foi cortado conta desde a entrada, e a tela diz qual dos dois e
+   (`ultimo_consumo` vazio = nunca cortado). */
+const ULT_CONSUMO=`(SELECT MAX(m.criado_em) FROM movimento_rolo m
+                     WHERE m.rolo_id=r.id AND m.motivo='consumo')`;
+
 const CAMPOS=`r.id, r.codigo, r.tecido_id, r.largura, r.metragem_inicial, r.saldo,
-  r.nivel_id, r.status, r.nf, r.fornecedor, r.criado_em, r.criado_por,
+  r.nivel_id, r.status, r.nf, r.fornecedor, r.fornecedor_id, r.preco_m2,
+  r.criado_em, r.criado_por,
   r.saldo * r.largura AS m2,
+  /* VALOR PARADO NESTE ROLO. Sem preco o SQLite devolve NULL sozinho, e e
+     assim que tem que ser: rolo sem nota nao vale zero, vale "ainda nao se
+     sabe" — quem soma trata o NULL a parte (regra 4 do COMPRAS.md). */
+  r.saldo * r.largura * r.preco_m2 AS valor,
+  ${ULT_CONSUMO} AS ultimo_consumo,
+  CAST(julianday('now','localtime')
+       - julianday(COALESCE(${ULT_CONSUMO}, r.criado_em)) AS INTEGER) AS dias_parado,
+  f.nome AS fornecedor_nome,
   t.codigo AS tecido_codigo, l.nome AS linha_nome, a.nome AS abertura_nome, c.nome AS cor_nome`;
 const DE=`FROM rolo r
   JOIN tecido t ON t.id=r.tecido_id
   JOIN linha l ON l.id=t.linha_id
   JOIN abertura a ON a.id=t.abertura_id
-  JOIN cor c ON c.id=t.cor_id`;
+  JOIN cor c ON c.id=t.cor_id
+  LEFT JOIN fornecedor f ON f.id=r.fornecedor_id`;
 
 const ultimoSeq=()=>{
   const r=db.prepare("SELECT codigo FROM rolo WHERE codigo LIKE 'R-%' ORDER BY id DESC LIMIT 1").get();
@@ -37,12 +55,22 @@ const disponiveis=tecido_id=>db.prepare('SELECT '+CAMPOS+' '+DE+`
 
 function criar(d){
   const r=db.prepare(`INSERT INTO rolo
-    (codigo,tecido_id,largura,metragem_inicial,saldo,nivel_id,status,nf,fornecedor,criado_por)
-    VALUES(?,?,?,?,?,?,'fechado',?,?,?)`).run(
+    (codigo,tecido_id,largura,metragem_inicial,saldo,nivel_id,status,
+     nf,fornecedor,fornecedor_id,preco_m2,criado_por)
+    VALUES(?,?,?,?,?,?,'fechado',?,?,?,?,?)`).run(
       d.codigo,d.tecido_id,d.largura,d.metragem,d.metragem,d.nivel_id||null,
-      d.nf||null,d.fornecedor||null,d.criado_por||null);
+      d.nf||null,d.fornecedor||null,d.fornecedor_id||null,
+      d.preco_m2==null?null:d.preco_m2, d.criado_por||null);
   return r.lastInsertRowid;
 }
+
+/* A NOTA CHEGA DEPOIS DO ROLO, e isso e o caso normal — nao a excecao. Estes
+   tres campos sao os unicos que se editam sem o saldo mudar junto, e por isso
+   tem escrita propria: um `atualizar` generico aceitaria mexer em largura ou
+   metragem por engano, que sao numeros que o plano de corte usa. */
+const atualizarDados=(id,d)=>db.prepare(
+  'UPDATE rolo SET nf=?, fornecedor_id=?, preco_m2=? WHERE id=?')
+  .run(d.nf||null, d.fornecedor_id||null, d.preco_m2==null?null:d.preco_m2, id);
 
 const gravarSaldo=(id,saldo,status)=>
   db.prepare('UPDATE rolo SET saldo=?, status=? WHERE id=?').run(saldo,status,id);
@@ -86,4 +114,4 @@ const atualizarEndereco=(id,nivel_id)=>
   db.prepare('UPDATE rolo SET nivel_id=? WHERE id=?').run(nivel_id,id);
 
 module.exports={ultimoSeq,listar,porId,porCodigo,disponiveis,criar,gravarSaldo,
-  atualizarEndereco,movimentar,movimentos,saldoPorTecido,divergencias};
+  atualizarEndereco,atualizarDados,movimentar,movimentos,saldoPorTecido,divergencias};

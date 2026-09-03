@@ -25,6 +25,12 @@ const CHAVES=[
   {chave:'sobra.criar',       nome:'Cadastrar sobra (mutirao e corte)'},
   {chave:'sobra.descartar',   nome:'Descartar sobra'},
   {chave:'etiqueta.imprimir', nome:'Imprimir lote de etiquetas de sobra'},
+  /* VER PRECO E CHAVE SEPARADA, e quem nao tem NAO RECEBE OS CAMPOS — o JSON
+     sai sem eles. Nao adianta esconder na tela e mandar pelo fio (regra 14 do
+     CLAUDE.md §13). A bancada precisa saber onde o rolo esta e quanto ele
+     tem; quanto ele custou e outra conversa. */
+  {chave:'custo.ver',         nome:'Ver preco e valor do estoque'},
+  {chave:'rolo.nota',         nome:'Lancar NF, fornecedor e preco do rolo'},
   {chave:'rolo.ler',          nome:'Ver rolos'},
   {chave:'rolo.entrada',      nome:'Entrada de rolo'},
   {chave:'rolo.encerrar',     nome:'Encerrar rolo (acerto de fim)'},

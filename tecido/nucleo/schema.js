@@ -430,6 +430,54 @@ ALTER TABLE andar ADD COLUMN criado_em TEXT;
 ALTER TABLE nivel ADD COLUMN conferir INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE nivel ADD COLUMN criado_por TEXT;
 ALTER TABLE nivel ADD COLUMN criado_em TEXT;
+`},
+
+{n:9, nome:'de quem veio o rolo e quanto ele custou', sql:`
+/* O FORNECEDOR ERA TEXTO LIVRE, E ISSO JA ERA DIVIDA.
+   'Ecotex', 'ecotex' e 'Ecotex Ltda' sao tres fornecedores na hora de somar —
+   o mesmo defeito de '2,5' e '2,50' virarem duas bobinas. Comparacao entre
+   fornecedores nao existe enquanto o nome for digitado. */
+CREATE TABLE fornecedor (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  ordem INTEGER DEFAULT 0,
+  ativo INTEGER DEFAULT 1,
+  conferir INTEGER NOT NULL DEFAULT 0,
+  criado_por TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+
+/* A lista nasce do que ja foi digitado, marcada para a chefia conferir — e
+   ela vai achar os duplicados ali, que e o ponto. Uma lista semeada limpa
+   esconderia justamente a bagunca que motivou o cadastro. */
+INSERT OR IGNORE INTO fornecedor(nome,conferir)
+  SELECT DISTINCT TRIM(fornecedor), 1 FROM rolo WHERE TRIM(COALESCE(fornecedor,''))<>'';
+
+ALTER TABLE rolo ADD COLUMN fornecedor_id INTEGER REFERENCES fornecedor(id);
+
+/* ⚠️ O PRECO E DESTA COMPRA, E CONGELA AQUI.
+   A tentacao e guardar o preco no cadastro do fornecedor e multiplicar na
+   hora de mostrar. O dia em que ele reajustasse, TODO o estoque comprado
+   antes mudaria de valor retroativamente — o rolo pago a R$ 18 em marco
+   passaria a valer R$ 22 porque houve reajuste em setembro, e ninguem
+   perceberia: o numero so ficaria maior.
+
+   Mesma regra do COMPRAS.md: o pedido congela embalagem, fator e preco.
+   O R$ parado e a soma exata do que foi pago, rolo a rolo.
+
+   Nasce NULL, e NULL nao e zero: a nota chega dias depois do rolo. Rolo sem
+   preco e contado a parte e o total sai como PISO (>=), nunca somando zero —
+   zero e um custo valido e mentiroso (regra 4 do COMPRAS.md). */
+ALTER TABLE rolo ADD COLUMN preco_m2 REAL;
+
+/* A ligacao do texto velho com o cadastro novo. O que nao casar fica com
+   fornecedor_id NULL e o texto original preservado na coluna antiga — nunca
+   se apaga o que foi digitado para "arrumar" o dado. */
+UPDATE rolo SET fornecedor_id=(
+  SELECT f.id FROM fornecedor f WHERE f.nome=TRIM(rolo.fornecedor))
+ WHERE TRIM(COALESCE(fornecedor,''))<>'';
+
+CREATE INDEX idx_rolo_fornecedor ON rolo(fornecedor_id, tecido_id);
 `}
 
 ];

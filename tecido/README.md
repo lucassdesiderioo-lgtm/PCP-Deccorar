@@ -266,6 +266,118 @@ a divergência só apareceria no bipe.
 
 ---
 
+## De quem o rolo veio, quanto custou, e há quanto tempo está parado
+
+Três perguntas que o módulo não respondia: **quanto R$ está parado de cada
+tecido**, **quanto cada fornecedor cobra** e **há quanto tempo aquele material
+não sai**.
+
+### ⚠️ O PREÇO MORA NO ROLO, congelado na compra
+
+A forma óbvia — uma coluna `preco_m2` no cadastro do fornecedor, multiplicada
+na hora de mostrar — **quebra em silêncio**: no dia em que o fornecedor
+reajustar, **todo o estoque comprado antes muda de valor retroativamente.** O
+rolo pago a R$ 18 em março passa a valer R$ 22 porque houve reajuste em
+setembro, e ninguém percebe — o número só fica maior.
+
+É a regra do `COMPRAS.md`: *o pedido congela embalagem, fator e preço.*
+
+Então `rolo.preco_m2` guarda **o que foi pago naquela compra**, e o R$ parado é
+a soma exata rolo a rolo — nunca uma média aplicada por cima. Travado pelo caso
+*"REAJUSTE DO FORNECEDOR NAO MEXE NO QUE JA ESTA NA PRATELEIRA"*.
+
+### E por isso NÃO existe tabela de preço por fornecedor
+
+Duas razões, e as duas doem depois:
+
+1. o preço varia **por tecido** — o mesmo fornecedor não cobra igual por
+   blackout e por screen;
+2. uma tabela mantida à mão **envelhece calada**: o número fica lá parecendo
+   atual e ninguém sabe de quando é. É a dívida dos *"mínimos são placeholder"*
+   do `COMPRAS.md` e do **alvo velho** da §18 do `CLAUDE.md`.
+
+O que pré-preenche a próxima entrada é o **último preço realmente pago** daquele
+fornecedor naquele tecido, tirado das próprias entradas. Nunca fica velho,
+porque vem da compra de verdade. Sem histórico do par, cai para o último preço
+do tecido com qualquer fornecedor — e a tela **diz de quem era**, em vez de
+fingir que é o preço daquele.
+
+O mesmo dado responde *"quanto cada fornecedor cobrou"*: média **ponderada pelo
+m² comprado**, não pela quantidade de compras — uma ponta de 5 m e uma bobina
+de 200 m não pesam igual.
+
+### ⚠️ CUSTO INDEFINIDO NUNCA VIRA ZERO
+
+Rolo sem nota lançada **não entra na soma como zero**. Ele é contado à parte e
+o total sai como **piso**, com `≥` na frente e o número de rolos que faltam.
+
+Zero é um custo válido e mentiroso: faria o estoque parecer mais barato do que
+é, e o defeito é invisível — um total menor não tem cara de erro. Na tabela
+esse rolo mostra **traço**, nunca `R$ 0,00`, que se lê como "não vale nada".
+
+Regra 4 do `COMPRAS.md`, e a mesma da aba Estoque do PCP (§18).
+
+### ⚠️ QUEM NÃO TEM `custo.ver` NÃO RECEBE OS CAMPOS
+
+O JSON sai **sem** eles — a poda acontece na rota (`rotas/rolos.js`), não na
+tela. Esconder no navegador deixaria o número viajando pelo fio, ao alcance de
+quem abrisse a aba de rede. Regra 14 do `CLAUDE.md` §13, a mesma do Recebimento.
+
+### A nota chega DEPOIS do rolo — e isso é o caso normal
+
+O tubo desce do caminhão e vai para a estante; a nota entra no financeiro dias
+depois. Um sistema que só aceita a nota na entrada obriga a uma de duas coisas,
+e as duas são piores: **inventar um número** ou **deixar o rolo fora do
+sistema**.
+
+Por isso NF, fornecedor e preço são **opcionais na entrada**, e há o botão
+**Nota** em cada linha de rolo (permissão `rolo.nota`) — que abre um formulário,
+e não três `prompt` em fila: são campos que se leem juntos do mesmo papel.
+
+> **O total da compra sai calculado embaixo** (`m² comprado × R$/m²`). É ele que
+> se confere contra a nota na mão, e é o único jeito de pegar uma vírgula fora
+> de lugar **antes** de o número entrar no estoque.
+
+**Mexer no preço muda o valor do estoque, então não passa calado:** fica em
+`movimento_rolo` com `delta` zero, dizendo `de → para` e quem fez. Mesma tabela
+da mudança de endereço, pelo mesmo motivo — o histórico do rolo é um só. Salvar
+sem mudar nada **não** grava linha: histórico que não conta nada ninguém lê.
+
+> ⚠️ **E existe a lista "Sem nota".** Sem ela, *"a nota chega depois"* vira
+> *"a nota nunca chega"* — exatamente a armadilha #14: marcar sem listar não é
+> adiar a revisão, é cancelar a revisão.
+
+### ⚠️ PARADO É TEMPO SEM SAIR, não idade do rolo
+
+Rolo que entrou há oito meses e é cortado toda semana **não está parado**.
+A coluna conta desde o **último consumo**; quem nunca foi cortado conta desde a
+entrada, e a tela diz qual dos dois é.
+
+Medir por idade poria quem trabalha no topo da lista de encalhe — e lista que
+acusa inocente é lista que ninguém lê (armadilha #10 do `CLAUDE.md`).
+
+### O fornecedor era texto livre, e isso já era dívida
+
+`Ecotex`, `ecotex` e `Ecotex Ltda` somam separado — o mesmo defeito de `2,5` e
+`2,50` virarem duas bobinas, com o agravante de só aparecer meses depois, na
+hora de comparar fornecedor.
+
+A migração 9 **semeia a lista com o que já foi digitado, marcado para
+conferir** — é ali que a chefia acha os duplicados, que é o ponto. Uma lista
+semeada limpa esconderia justamente a bagunça que motivou o cadastro. A coluna
+**Rolos** diz qual é qual: *Ecotex* com 12 e *ecotex* com 1.
+
+**Criar fornecedor é da bancada** (`endereco.criar` — a mesma chave de "cadastro
+que nasce com a mercadoria na mão"): o rolo desce do caminhão de quem ninguém
+cadastrou, e a alternativa não é esperar, é o rolo entrar **sem fornecedor** —
+e esse dado não volta depois.
+
+**Teste obrigatório:** `node teste/rodar.js` — os 13 casos de
+`teste/custo.test.js` travam o preço congelado, o piso, a poda no fio, o rastro
+da edição e o "parado ≠ idade".
+
+---
+
 ## O inventário inicial: como lançar o que já está na prateleira
 
 A entrada de rolo (tela **Rolos**) é onde o estoque físico entra — inclusive as

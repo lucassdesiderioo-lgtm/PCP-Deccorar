@@ -1082,6 +1082,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   `PERM_AREA` do `acesso.js` — o acesso some sozinho, em silêncio (§19)
 - ❌ Escrever cor nova no `tecido/public/base.css` sem que ela exista nas telas
   do PCP — paleta "quase igual" é o que faz parecer outro sistema (§19)
+- ❌ Guardar preço no cadastro do fornecedor para multiplicar na hora de mostrar
+  — o estoque comprado antes muda de valor no dia do reajuste (§19, armadilha #15)
+- ❌ Somar zero pelo rolo sem nota lançada: o total é PISO, com o `≥` na frente
 - ❌ Deixar a bancada criar um cadastro **sem** marcá-lo para conferência, ou
   marcar **sem** ele aparecer na lista de Cadastros — meia decisão é pior que
   a trava que existia antes (§19, armadilha #14)
@@ -1411,6 +1414,32 @@ obrigatórias**:
 chefia (`cadastro.editar`). A assimetria é a regra — o buraco novo na
 prateleira aparece com o tubo já na mão; arrumar um nome torto espera.
 
+### ⚠️ ARMADILHA #15 — preço no cadastro do fornecedor anda para trás
+
+Desde 03/09/2026 o rolo sabe **de quem veio e quanto custou**. A forma óbvia
+seria uma coluna de preço no cadastro do fornecedor, multiplicada na hora de
+mostrar. Ela quebra em silêncio: no dia do reajuste, **todo o estoque comprado
+antes muda de valor retroativamente** — o rolo pago a R$ 18 em março passa a
+valer R$ 22 porque houve reajuste em setembro, e ninguém percebe, porque o
+número só fica maior.
+
+O preço mora em `rolo.preco_m2`, **congelado na compra** — a regra do
+`COMPRAS.md` (*o pedido congela embalagem, fator e preço*). E **não há tabela
+de preço**: o que pré-preenche a próxima entrada é o *último preço realmente
+pago*, tirado das próprias entradas. Tabela mantida à mão envelhece calada.
+
+As outras três regras vieram inteiras do PCP, e valem igual aqui:
+
+| Regra | Onde já doeu |
+|---|---|
+| Custo indefinido nunca vira zero — o total sai como **piso** (`≥`) | §18, regra 4 do §7-B |
+| Quem não tem `custo.ver` **não recebe os campos** no JSON | regra 14 do §13 |
+| **Parado é tempo sem sair**, não idade — e lista que acusa quem trabalha ninguém lê | armadilha #10 |
+
+`tecido/dominio/custo.js` é o **dono único de "quanto vale"**. Segunda soma em
+qualquer tela divergiria no primeiro preço lançado, e as duas estariam "certas"
+— cada uma na sua régua. É a armadilha #12 outra vez.
+
 ### Duas regras do sob medida que valem citar aqui
 
 **Não há emenda.** Peça mais larga que toda bobina do estoque não sai — e por
@@ -1424,7 +1453,7 @@ cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 147 casos
+cd tecido && npm test          # 160 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:

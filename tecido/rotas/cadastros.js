@@ -17,6 +17,7 @@ const dAndar=require('../dados/andar');
 const dNivel=require('../dados/nivel');
 
 const conferir=require('../dominio/conferir');
+const fornecedor=require('../dominio/fornecedor');
 
 const LER='cadastro.ler', EDITAR='cadastro.editar', CRIAR_END='endereco.criar';
 
@@ -84,6 +85,23 @@ module.exports={rotas:[
   {metodo:'POST', caminho:'/api/cadastro/conferir/:tipo/:id', permissao:EDITAR,
    manipulador:({params})=>conferir.marcar(params.tipo,params.id),
    detalhe:(req)=>'conferiu '+req.params.tipo+' '+req.params.id},
+
+  /* ── FORNECEDOR ─────────────────────────────────────────────────────────
+     Criar e da BANCADA (`endereco.criar` — a mesma chave de "cadastro que
+     nasce com a mercadoria na mao"): o rolo desce do caminhao de um
+     fornecedor que ninguem cadastrou, e a alternativa nao e esperar, e
+     lancar o rolo sem fornecedor. Renomear e da chefia, que e quem vai
+     juntar 'Ecotex' com 'ecotex' depois. */
+  {metodo:'GET', caminho:'/api/fornecedores', permissao:LER,
+   manipulador:()=>fornecedor.listar()},
+  {metodo:'POST', caminho:'/api/fornecedores', permissao:CRIAR_END,
+   manipulador:({corpo,usuario})=>fornecedor.criar(corpo,usuario),
+   detalhe:(req)=>'fornecedor '+req.body.nome},
+  {metodo:'PUT', caminho:'/api/fornecedores/:id', permissao:EDITAR,
+   manipulador:({params,corpo})=> corpo.nome!==undefined
+     ? fornecedor.renomear(params.id,corpo.nome)
+     : fornecedor.atualizar(params.id,corpo),
+   detalhe:(req)=>req.body.nome!==undefined?('renomeou para '+req.body.nome):null},
 
   {metodo:'GET', caminho:'/api/tecidos', permissao:LER,
    manipulador:()=>tecido.listarTecidos()},
