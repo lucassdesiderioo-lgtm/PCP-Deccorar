@@ -119,10 +119,37 @@ function botaoRenomear(item,rota,recarregar){
   }});
 }
 
-// A dupla que toda linha de cadastro carrega: renomear e ligar/desligar.
-const acoes=(item,rota,recarregar)=>
+/* APAGAR DE VERDADE. A regra da casa e "cadastro nao se apaga, desativa",
+   e ela existe porque linha de historico aponta para o cadastro — apagar a
+   cor faria o plano de tres meses atras deixar de saber o que foi cortado.
+
+   So que a regra sozinha produz o problema oposto: o cadastro digitado
+   errado no primeiro dia fica na lista para sempre, riscado, e a tela vira
+   deposito de coisa morta que ninguem le mais.
+
+   Quem decide e o servidor: se NINGUEM aponta, apaga; se alguem aponta,
+   recusa dizendo QUEM ("3 rolos usam este endereco"). O botao aparece
+   sempre — esconde-lo exigiria uma consulta por linha e, pior, deixaria a
+   pessoa sem saber POR QUE nao pode. */
+function botaoApagar(item,tipo,recarregar){
+  if(!podeEditar()) return el('span',{});
+  return el('button',{class:'bt pequeno perigo',texto:'Apagar',onclick:async()=>{
+    if(!confirm('Apagar "'+(item.nome||item.valor)+'" de vez?\n\n'+
+                'Se algo no historico usar este cadastro, o sistema recusa e diz o que e.')) return;
+    try{
+      await api('/api/cadastro/'+tipo+'/'+item.id,{metodo:'DELETE'});
+      banner('Apagado.');
+      await recarregar();
+    }catch(e){}
+  }});
+}
+
+// O trio que toda linha de cadastro carrega: renomear, apagar, ligar/desligar.
+const acoes=(item,rota,recarregar,tipo)=>
   el('td',{style:'text-align:right;white-space:nowrap'},
     [botaoRenomear(item,rota,recarregar),
+     el('span',{texto:' '}),
+     tipo?botaoApagar(item,tipo,recarregar):el('span',{}),
      el('span',{texto:' '}),
      botaoAtivo(item,rota,recarregar)]);
 
@@ -148,7 +175,7 @@ async function telaTecido(pai){
   const tL=el('table',{});
   estado.linhas.forEach(l=>tL.appendChild(el('tr',{class:l.ativo?'':'inativo'},[
     el('td',{texto:l.nome}),
-    acoes(l,'/api/linhas/'+l.id,()=>telaTecido($('#conteudo')))
+    acoes(l,'/api/linhas/'+l.id,()=>telaTecido($('#conteudo')),'linha')
   ])));
   cL.appendChild(estado.linhas.length?tL:el('div',{class:'vazio',texto:'Nenhuma linha ainda.'}));
 
@@ -168,7 +195,7 @@ async function telaTecido(pai){
     const tA=el('table',{});
     estado.aberturas.forEach(a=>tA.appendChild(el('tr',{class:a.ativo?'':'inativo'},[
       el('td',{texto:a.nome}),
-      acoes(a,'/api/aberturas/'+a.id,()=>telaTecido($('#conteudo')))
+      acoes(a,'/api/aberturas/'+a.id,()=>telaTecido($('#conteudo')),'abertura')
     ])));
     cA.appendChild(estado.aberturas.length?tA:el('div',{class:'vazio',texto:'Esta linha ainda nao tem colecao.'}));
   }
@@ -182,7 +209,7 @@ async function telaTecido(pai){
   const tC=el('table',{});
   estado.cores.forEach(c=>tC.appendChild(el('tr',{class:c.ativo?'':'inativo'},[
     el('td',{texto:c.nome}),
-    acoes(c,'/api/cores/'+c.id,()=>telaTecido($('#conteudo')))
+    acoes(c,'/api/cores/'+c.id,()=>telaTecido($('#conteudo')),'cor')
   ])));
   cC.appendChild(estado.cores.length?tC:el('div',{class:'vazio',texto:'Nenhuma cor ainda.'}));
 
@@ -262,7 +289,13 @@ async function telaTecido(pai){
     el('td',{texto:[t.linha_nome,t.abertura_nome,t.cor_nome].join(' · ')}),
     el('td',{class:'num',texto:t.largura_sugerida?num(t.largura_sugerida)+' m':'—'}),
     el('td',{texto:t.permite_girar?'sim':'nao'}),
-    el('td',{style:'text-align:right'},[botaoAtivo(t,'/api/tecidos/'+t.id,()=>telaTecido($('#conteudo')))])
+    /* O tecido nao tem renomear: o nome dele E a combinacao linha+colecao+cor,
+       e "renomear" ali seria trocar a combinacao — que e outro tecido. O que
+       cabe e apagar (quando nada usa) ou desativar. */
+    el('td',{style:'text-align:right;white-space:nowrap'},[
+      botaoApagar(t,'tecido',()=>telaTecido($('#conteudo'))),
+      el('span',{texto:' '}),
+      botaoAtivo(t,'/api/tecidos/'+t.id,()=>telaTecido($('#conteudo')))])
   ])));
   cT.appendChild(estado.tecidos.length?tT:el('div',{class:'vazio',texto:'Nenhum tecido cadastrado ainda.'}));
 }
@@ -300,6 +333,8 @@ async function telaEndereco(pai){
     const cab=el('div',{class:'campos',style:'align-items:center'});
     cab.appendChild(el('h2',{style:'margin:0;flex:1',texto:'Haste '+h.nome}));
     cab.appendChild(el('span',{class:'tag '+(estado.armazem==='ROLO'?'rolo':'sobra'),texto:estado.armazem}));
+    cab.appendChild(botaoRenomear(h,'/api/hastes/'+h.id,recarregar));
+    cab.appendChild(botaoApagar(h,'haste',recarregar));
     cab.appendChild(botaoAtivo(h,'/api/hastes/'+h.id,recarregar));
     cH.appendChild(cab);
 
@@ -312,15 +347,27 @@ async function telaEndereco(pai){
       const cA=el('div',{style:'border-top:1px solid var(--linha);padding-top:12px;margin-top:12px'});
       const linhaA=el('div',{class:'campos',style:'align-items:center'});
       linhaA.appendChild(el('strong',{style:'flex:1',texto:'Andar '+a.nome}));
+      linhaA.appendChild(botaoRenomear(a,'/api/andares/'+a.id,recarregar));
+      linhaA.appendChild(botaoApagar(a,'andar',recarregar));
       linhaA.appendChild(botaoAtivo(a,'/api/andares/'+a.id,recarregar));
       cA.appendChild(linhaA);
 
       const niveis=el('div',{class:'fileira'});
       niveis.appendChild(el('span',{class:'rotulo',texto:'NIVEIS'}));
-      a.niveis.forEach(n=>niveis.appendChild(el('span',{
-        class:'tag '+(n.ativo?'bom':'off'),
-        style:'align-self:center;margin-right:4px',
-        texto:estado.armazem+' · '+h.nome+'-'+a.nome+'-'+n.nome})));
+      /* O NIVEL ERA SO TEXTO: dava para criar e nunca mais tocar. Endereco
+         digitado errado ficava para sempre na estante do sistema, e o
+         operador procurava um buraco que nao existe. */
+      a.niveis.forEach(n=>{
+        const cx=el('span',{style:'display:inline-flex;align-items:center;gap:4px;margin:0 10px 6px 0'});
+        cx.appendChild(el('span',{class:'tag '+(n.ativo?'bom':'off'),
+          texto:estado.armazem+' · '+h.nome+'-'+a.nome+'-'+n.nome}));
+        if(podeEditar()){
+          cx.appendChild(botaoRenomear(n,'/api/niveis/'+n.id,recarregar));
+          cx.appendChild(botaoApagar(n,'nivel',recarregar));
+          cx.appendChild(botaoAtivo(n,'/api/niveis/'+n.id,recarregar));
+        }
+        niveis.appendChild(cx);
+      });
       if(!a.niveis.length) niveis.appendChild(el('span',{class:'quem',style:'align-self:center',texto:'sem nivel'}));
       cA.appendChild(niveis);
 
@@ -353,7 +400,7 @@ async function telaMotivo(pai){
   const tM=el('table',{});
   motivos.forEach(m=>tM.appendChild(el('tr',{class:m.ativo?'':'inativo'},[
     el('td',{texto:m.nome}),
-    acoes(m,'/api/motivos/'+m.id,recarregar)
+    acoes(m,'/api/motivos/'+m.id,recarregar,'motivo_recusa')
   ])));
   cM.appendChild(tM);
 
