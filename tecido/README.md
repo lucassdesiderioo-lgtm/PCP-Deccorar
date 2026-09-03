@@ -144,6 +144,27 @@ teste/                 rodar.js + *.test.js — banco temporario, do zero
 
 ---
 
+## Conferir o cadastro inteiro de uma vez
+
+```bash
+node tecido/ver_cadastro.js      # so le, pode rodar em producao
+```
+
+Mostra linhas, coleções, cores, larguras e itens de tecido numa tela só, e
+termina com **OLHAR COM ATENÇÃO** — três coisas que não aparecem clicando aba
+por aba:
+
+| Aviso | Por que importa |
+|---|---|
+| cor com nome de coleção dentro (`Nápoles Bege`) | o sistema deixa de saber que aquilo **é bege** |
+| linha sem coleção ativa | nenhum item de tecido pode nascer nela — ela some do seletor |
+| coleção sem nenhum item | ou é cadastro adiantado, ou alguém esqueceu de montar o item |
+
+Não são erros do sistema: são coisas que só quem conhece o catálogo sabe dizer
+se estão certas. **O script aponta e cala** — decidir é de quem cadastra.
+
+---
+
 ## O inventário inicial: como lançar o que já está na prateleira
 
 A entrada de rolo (tela **Rolos**) é onde o estoque físico entra — inclusive as
