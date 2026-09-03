@@ -1022,6 +1022,61 @@ com a folha já impressa e colada.
 > Ao imprimir: margens **"Nenhuma"** e escala **100%**. "Ajustar à página"
 > deforma as barras e o leitor recusa — a mesma regra da etiqueta de SKU no PCP.
 
+## ⚠️ A MEDIDA DA SOBRA É LISTA, e não campo digitado
+
+O campo aceitava `1,90`, `1.90` e `190` — e **só o terceiro é visivelmente
+errado**. Os dois primeiros entram calados como números *diferentes* conforme o
+teclado do tablet, e o defeito só aparece no plano de corte, com o tecido já na
+mesa: uma sobra cadastrada como 1,9 cm vira retalho que o encaixe nunca
+escolhe; ao contrário, vira faixa prometida que a peça não tem.
+
+A lista mata a classe inteira do problema: **não há o que digitar errado.**
+
+**De centímetro em centímetro** — é a menor unidade que a bancada mede.
+Milímetro em retalho de tecido é precisão que a fita não tem, e dobraria a
+lista sem dobrar a verdade.
+
+**Nada vem pré-selecionado.** Medida já marcada é medida que alguém salva sem
+olhar, e aí o erro volta pela porta que a lista veio fechar.
+
+O `value` vai com **ponto** (o que o servidor lê) e o rótulo com **vírgula** (o
+que o operador lê), no mesmo `<option>` — por isso não há conversão no meio do
+caminho para dar errado.
+
+### ⚠️ Os limites da lista NÃO são a regra do refugo
+
+Quatro parâmetros em **Cadastros → Parâmetros**: `sobraLarguraMin` (0,50),
+`sobraLarguraMax` (3,00), `sobraAlturaMin` (0,50), `sobraAlturaMax` (6,00).
+
+Começar a lista em `larguraMinimaSobra` (0,80) pareceria coerente e seria a
+**armadilha #6**: o `sobra.criar` **não exige** o mínimo — hoje uma sobra de
+0,60 entra normalmente. O operador com essa peça na mão, sem 0,60 na lista,
+escolheria 0,80 e **mentiria a medida**.
+
+> **A lista tem que alcançar o que existe na prateleira, não o que a regra
+> prefere.** Quem decide o que vira sobra e o que vira refugo continua sendo
+> `larguraMinimaSobra` / `alturaMinimaSobra`, no plano de corte, onde sempre
+> esteve.
+
+### O código e a medida sobrevivem ao redesenho
+
+Trocar a condição no meio do lançamento (o operador bipa, mede, e **só então**
+vê a mancha) recria o formulário inteiro. O código sumia calado.
+
+O pior não era perder o código: era a tela ficar com **a medida preenchida e o
+código vazio** — o operador apertava Salvar confiante e levava *"Bipe a
+etiqueta"* sem entender por quê.
+
+### E o endereço de SOBRA ganhou `+ novo`
+
+Mesma lição da tela de rolos (armadilha #14), aqui com um agravante: **endereço
+é obrigatório na sobra**. Sem poder criar, o operador do mutirão com o retalho
+na mão não consegue salvar — e a alternativa não é ele esperar a chefia, é
+empilhar o retalho num canto "para cadastrar depois". O que nasce ali entra
+marcado e cai na lista **Conferir**.
+
+---
+
 ## O mutirão
 
 A tela lembra **tecido, condição e endereço** entre um retalho e o seguinte

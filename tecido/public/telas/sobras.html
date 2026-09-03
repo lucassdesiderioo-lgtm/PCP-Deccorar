@@ -10,7 +10,11 @@
    Campo fora da tela e campo que o iPad tira o foco — o leitor bipa e nada
    acontece. */
 #codigo{font-size:30px; letter-spacing:.08em; text-align:center; min-height:68px}
-.medidas input{font-size:28px; text-align:center; min-height:68px}
+.medidas input, .medidas select{font-size:28px; text-align:center; min-height:68px}
+/* A lista aberta precisa caber MUITA linha na tela: sao ~250 larguras e ~550
+   alturas, de centimetro em centimetro. No iPad o select vira roda nativa e
+   isso nao importa; no desktop, importa. */
+.medidas select{background:var(--campo)}
 .contador{font-size:15px; color:var(--tinta-fraca)}
 .contador b{font-size:22px; color:var(--tinta)}
 </style>
@@ -44,6 +48,9 @@ const estado={
   tecidos:[], condicoes:[], arvore:[], pendentes:[], ultimas:[],
   tecido_id:memoria.get('tecido'), condicao:memoria.get('condicao'),
   haste_id:memoria.get('haste'), andar_id:memoria.get('andar'), nivel_id:memoria.get('nivel'),
+  // A medida escolhida sobrevive ao redesenho da tela (trocar condicao ou
+  // endereco recria os campos). Os limites da lista vem de `parametro`.
+  codigo:'', larg:'', alt:'', parametros:null,
   naSessao:0
 };
 
@@ -60,14 +67,59 @@ function desenhar(){
   return aba==='lancar'?telaLancar(c):telaLista(c);
 }
 
-function fileira(rotulo,itens,selecionado,aoEscolher){
+/* O "+ novo" NO FIM DA FILEIRA — o mesmo da tela de rolos, pelo mesmo motivo.
+   A prateleira de sobras ganha buraco novo no meio do mutirao, e sem isto o
+   operador com o retalho na mao nao consegue salvar: endereco e OBRIGATORIO
+   na sobra. A alternativa nao era ele esperar a chefia — era ele empilhar o
+   retalho num canto "para cadastrar depois", e o depois nao existe.
+   O que nasce aqui entra marcado e cai na lista "Conferir" do cadastro. */
+function fileira(rotulo,itens,selecionado,aoEscolher,novo){
   const f=el('div',{class:'fileira'});
   f.appendChild(el('span',{class:'rotulo',texto:rotulo}));
   if(!itens.length) f.appendChild(el('span',{class:'quem',style:'align-self:center',texto:'nada cadastrado'}));
   itens.forEach(i=>f.appendChild(el('button',{class:'op',texto:i.nome,
     'aria-pressed':String(String(i.valor)===String(selecionado)),
     onclick:()=>aoEscolher(i.valor)})));
+  if(novo) f.appendChild(el('button',{class:'op',style:'border-style:dashed',
+    texto:'+ '+novo.rotulo, onclick:async()=>{
+      const nome=prompt(novo.pergunta);
+      if(nome===null||!nome.trim()) return;
+      try{
+        const criado=await api(novo.rota,{metodo:'POST',corpo:{...novo.corpo,nome:nome.trim()}});
+        banner(novo.rotulo+' "'+criado.nome+'" criada. A chefia confere depois.','bom',3);
+        await novo.aoCriar(criado);
+      }catch(e){}
+    }}));
   return f;
+}
+
+/* ⚠️ A MEDIDA VIRA LISTA, E NAO CAMPO DIGITADO.
+   O campo aceitava "1,90", "1.90" e "190", e so o terceiro e visivelmente
+   errado. Os dois primeiros entram calados como numeros DIFERENTES conforme
+   o teclado do tablet, e o defeito so aparece no plano de corte, com o
+   tecido ja na mesa.
+
+   A lista mata a classe inteira do problema: nao ha o que digitar errado.
+
+   De centimetro em centimetro porque e a menor unidade que a bancada mede —
+   milimetro em retalho de tecido e precisao que a fita nao tem, e dobraria a
+   lista sem dobrar a verdade.
+
+   O VALOR vai com PONTO (o que o servidor le) e o ROTULO com virgula (o que
+   o operador le). Os dois no mesmo option, e por isso nao ha conversao no
+   meio do caminho para dar errado. */
+function listaMedida(min,max,valorAtual){
+  const sel=el('select',{});
+  sel.appendChild(el('option',{value:'',texto:'— escolha —'}));
+  const cmMin=Math.round(min*100), cmMax=Math.round(max*100);
+  for(let cm=cmMin; cm<=cmMax; cm++){
+    const m=(cm/100).toFixed(2);
+    sel.appendChild(el('option',{value:m, texto:m.replace('.',',')+' m'}));
+  }
+  // Nada vem pre-selecionado: medida ja marcada e medida que alguem salva sem
+  // olhar, e ai o erro volta pela porta que a lista veio fechar.
+  sel.value=valorAtual||'';
+  return sel;
 }
 
 // ── LANCAR ───────────────────────────────────────────────────────────────
@@ -75,6 +127,11 @@ async function telaLancar(pai){
   estado.tecidos=await api('/api/tecidos');
   estado.condicoes=await api('/api/condicoes');
   estado.arvore=await api('/api/enderecos/SOBRA');
+  // Uma vez por sessao: os limites nao mudam entre um retalho e o proximo.
+  if(!estado.parametros){
+    const ps=await api('/api/parametros');
+    estado.parametros={}; ps.forEach(x=>{ estado.parametros[x.chave]=x.valor; });
+  }
   estado.pendentes=await api('/api/etiquetas/pendentes');
   pai=limpar(pai);
 
@@ -92,9 +149,17 @@ async function telaLancar(pai){
   const c=el('div',{class:'cartao'});
   pai.appendChild(c);
 
-  // 1. o codigo — o campo que manda na tela
+  /* 1. o codigo — o campo que manda na tela.
+     ⚠️ ELE SOBREVIVE AO REDESENHO, como a medida. Trocar a condicao no meio
+     do lancamento (o operador bipa, mede, e SO ENTAO ve a mancha) recria o
+     formulario inteiro. Sem guardar, o codigo sumia calado — e o pior nao
+     era perder o codigo: era a tela ficar com a medida preenchida e o codigo
+     vazio, entao o operador apertava Salvar confiante e levava "Bipe a
+     etiqueta" sem entender o que tinha acontecido. */
   const cod=el('input',{id:'codigo',type:'text',autocomplete:'off',autocorrect:'off',
-    autocapitalize:'off',spellcheck:'false',placeholder:'bipe a etiqueta'});
+    autocapitalize:'off',spellcheck:'false',placeholder:'bipe a etiqueta',
+    value:estado.codigo||''});
+  cod.addEventListener('input',()=>{ estado.codigo=cod.value; });
   const boxCod=el('div',{class:'campo cresce'});
   boxCod.appendChild(el('label',{texto:'CODIGO DA ETIQUETA'}));
   boxCod.appendChild(cod);
@@ -130,9 +195,18 @@ async function telaLancar(pai){
   c.appendChild(fileira('COLECAO',aberturas,aberturaSel,v=>escolherTecido(linhaSel,v,null)));
   c.appendChild(fileira('COR',cores,sel?sel.cor_id:null,v=>escolherTecido(linhaSel,aberturaSel,v)));
 
-  // 3. as medidas
-  const larg=el('input',{type:'text',inputmode:'decimal',placeholder:'1,90'});
-  const alt=el('input',{type:'text',inputmode:'decimal',placeholder:'2,60'});
+  /* 3. as medidas — LISTA, nao campo digitado. Os limites saem de
+     `parametro` (Cadastros -> Parametros), e nao do codigo: a bancada acha
+     um retalho mais estreito que o minimo da lista e o operador escolhe o
+     valor errado de proposito para conseguir salvar. */
+  const P=estado.parametros||{};
+  const larg=listaMedida(Number(P.sobraLarguraMin||0.5),Number(P.sobraLarguraMax||3),estado.larg);
+  const alt =listaMedida(Number(P.sobraAlturaMin ||0.5),Number(P.sobraAlturaMax ||6),estado.alt);
+  // O redesenho da tela recria os campos; sem guardar a escolha, trocar a
+  // condicao ou o endereco apagaria a medida que o operador acabou de achar.
+  larg.addEventListener('change',()=>{ estado.larg=larg.value; });
+  alt .addEventListener('change',()=>{ estado.alt =alt.value;  });
+
   const medidas=el('div',{class:'campos medidas'});
   [['LARGURA (m)',larg],['ALTURA (m)',alt]].forEach(([r,input])=>{
     const b=el('div',{class:'campo cresce'});
@@ -152,16 +226,34 @@ async function telaLancar(pai){
   const andarAtual=hasteAtual&&(hasteAtual.andares.find(a=>a.id===estado.andar_id)||hasteAtual.andares[0]);
   const niveis=andarAtual?andarAtual.niveis.filter(n=>n.ativo).map(n=>({valor:n.id,nome:n.nome})):[];
 
+  // O que nasce aqui ja fica ESCOLHIDO: criar e ter de procurar o proprio
+  // botao na fileira e o passo a mais que faz a bancada parar de usar.
+  const novoEndereco=async(campo,criado)=>{
+    estado.arvore=await api('/api/enderecos/SOBRA');
+    if(campo==='haste'){ estado.haste_id=criado.id; estado.andar_id=null; estado.nivel_id=null; }
+    if(campo==='andar'){ estado.andar_id=criado.id; estado.nivel_id=null; }
+    if(campo==='nivel'){ estado.nivel_id=criado.id; memoria.set('nivel',criado.id); }
+    await telaLancar($('#conteudo'));
+  };
+
   c.appendChild(fileira('HASTE',hastes,hasteAtual&&hasteAtual.id,v=>{
     estado.haste_id=v; estado.andar_id=null; estado.nivel_id=null;
     memoria.set('haste',v); telaLancar($('#conteudo'));
-  }));
+  },{rotulo:'haste', pergunta:'Nome da haste nova de SOBRA (ex.: S4):',
+     rota:'/api/hastes', corpo:{armazem_chave:'SOBRA'},
+     aoCriar:x=>novoEndereco('haste',x)}));
+
   c.appendChild(fileira('ANDAR',andares,andarAtual&&andarAtual.id,v=>{
     estado.andar_id=v; estado.nivel_id=null; memoria.set('andar',v); telaLancar($('#conteudo'));
-  }));
+  },hasteAtual&&{rotulo:'andar', pergunta:'Nome do andar novo na haste '+hasteAtual.nome+' (ex.: 2):',
+     rota:'/api/andares', corpo:{haste_id:hasteAtual.id},
+     aoCriar:x=>novoEndereco('andar',x)}));
+
   c.appendChild(fileira('NIVEL',niveis,estado.nivel_id,v=>{
     estado.nivel_id=v; memoria.set('nivel',v); telaLancar($('#conteudo'));
-  }));
+  },andarAtual&&{rotulo:'nivel', pergunta:'Nome da posicao nova no andar '+andarAtual.nome+' (ex.: 3):',
+     rota:'/api/niveis', corpo:{andar_id:andarAtual.id},
+     aoCriar:x=>novoEndereco('nivel',x)}));
 
   // 6. salvar
   const acao=el('div',{class:'campos',style:'margin-top:8px;align-items:center'});
@@ -175,8 +267,8 @@ async function telaLancar(pai){
     const tecido=estado.tecidos.find(t=>t.id===estado.tecido_id);
     if(!cod.value.trim()) return faltou('Bipe a etiqueta.',cod);
     if(!tecido) return faltou('Escolha o tecido.',null);
-    if(comoNumero(larg.value)===null) return faltou('Digite a largura.',larg);
-    if(comoNumero(alt.value)===null) return faltou('Digite a altura.',alt);
+    if(comoNumero(larg.value)===null) return faltou('Escolha a largura.',larg);
+    if(comoNumero(alt.value)===null) return faltou('Escolha a altura.',alt);
     if(!estado.condicao) return faltou('Escolha a condicao.',null);
     if(!estado.nivel_id) return faltou('Escolha o endereco.',null);
 
@@ -194,6 +286,7 @@ async function telaLancar(pai){
       // endereco ficam — e por isso que da para catalogar uma prateleira
       // inteira sem sair da tela.
       cod.value=''; larg.value=''; alt.value='';
+      estado.codigo=''; estado.larg=''; estado.alt='';
       await telaLancar($('#conteudo'));
     }catch(e){ beep('erro'); cod.select(); }
     btSalvar.disabled=false;

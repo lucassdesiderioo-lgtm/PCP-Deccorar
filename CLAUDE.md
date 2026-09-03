@@ -1093,6 +1093,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   há emenda, são estoques diferentes (§19, armadilha #17)
 - ❌ Pôr o estoque parado no numerador da cobertura do conjunto: a folga dobra
   justamente porque há dinheiro dormindo (§19, armadilha #17)
+- ❌ Começar a lista de medida da sobra no mínimo do refugo — o `sobra.criar`
+  não exige esse mínimo, e o operador com a peça menor na mão escolheria o
+  valor errado de propósito (§19, a medida vira lista)
 - ❌ Deixar a bancada criar um cadastro **sem** marcá-lo para conferência, ou
   marcar **sem** ele aparecer na lista de Cadastros — meia decisão é pior que
   a trava que existia antes (§19, armadilha #14)
