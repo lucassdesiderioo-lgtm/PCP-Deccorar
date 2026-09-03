@@ -514,6 +514,43 @@ INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
    indice que existia e por rolo_id — otimo para o historico de UM rolo,
    inutil para "todo consumo dos ultimos 90 dias". */
 CREATE INDEX idx_movimento_periodo ON movimento_rolo(motivo, data);
+`},
+
+{n:11, nome:'a medida da sobra vira lista, e nao campo digitado', sql:`
+/* ⚠️ DIGITAR MEDIDA E O ERRO QUE NAO DA ERRO.
+   O campo aceitava "1,90", "1.90" e "190" — e so o terceiro e visivelmente
+   errado. Os dois primeiros entram calados como numeros DIFERENTES conforme
+   o navegador e o teclado do tablet, e o defeito so aparece no plano de
+   corte, com o tecido na mesa: uma sobra cadastrada como 1,9 cm em vez de
+   1,90 m vira retalho que o encaixe nunca escolhe, ou pior, uma faixa
+   prometida que a peca nao tem.
+
+   A lista mata a classe inteira do problema: nao ha o que digitar errado.
+
+   ⚠️ ESTES QUATRO NUMEROS SAO O ALCANCE DA LISTA, E NAO REGRA DE NEGOCIO.
+   Quem decide o que vira sobra e o que vira refugo continua sendo
+   larguraMinimaSobra / alturaMinimaSobra, no plano de corte, onde sempre
+   esteve. Comecar a lista naqueles valores pareceria coerente e seria a
+   armadilha #6: o sobra.criar NAO exige o minimo, entao hoje uma sobra de
+   0,60 entra normalmente — e o operador com essa peca na mao, sem 0,60 na
+   lista, escolheria 0,80 e MENTIRIA a medida. A lista tem que alcancar o
+   que existe na prateleira, nao o que a regra prefere. */
+INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
+('sobraLarguraMin','0.50','numero','Sobra: menor largura da lista',
+ 'O primeiro valor da lista de largura ao cadastrar sobra. E o ALCANCE da lista, nao a regra do que vira refugo — essa continua em "Largura minima da sobra". Desca este numero se a bancada tiver retalho mais estreito que isso: lista que nao alcanca a peca na mao faz o operador escolher o valor errado de proposito.',
+ 'm',50),
+
+('sobraLarguraMax','3.00','numero','Sobra: maior largura da lista',
+ 'O ultimo valor da lista de largura. Nenhuma sobra e mais larga que a maior bobina que a fabrica compra — hoje 3,00 m. Suba junto se entrar bobina maior.',
+ 'm',51),
+
+('sobraAlturaMin','0.50','numero','Sobra: menor altura da lista',
+ 'O primeiro valor da lista de altura. Mesma logica da largura: alcance, nao regra.',
+ 'm',52),
+
+('sobraAlturaMax','6.00','numero','Sobra: maior altura da lista',
+ 'O ultimo valor da lista de altura. Vai mais longe que a largura porque a altura corre no sentido do rolo, e um retalho comprido e comum.',
+ 'm',53);
 `}
 
 ];
