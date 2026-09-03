@@ -378,7 +378,169 @@ da edição e o "parado ≠ idade".
 
 ---
 
-## O que sai da prateleira (Painel → O que sai)
+## O PAINEL GERENCIAL (Painel → Gerencial)
+
+A visão de estoque de **bobina nova** para quem decide. Responde, em segundos:
+quanto temos, onde está, o que gira, o que está parado, quanto tempo dura, e
+quanto deveria ter.
+
+> ⚠️ **Esta aba SUBSTITUIU "O que sai", e não ficou ao lado dela.** Duas abas
+> respondendo *"quanto sai e quanto tenho"* com recortes diferentes seriam duas
+> réguas para a mesma pergunta — a armadilha #12 do `CLAUDE.md`, que já custou
+> a reforma inteira da aba Estoque do PCP. O conteúdo da antiga está todo aqui,
+> num grão mais fino.
+
+### ⚠️ O GRÃO É TECIDO × LARGURA DE BOBINA
+
+Somar as bobinas de um mesmo tecido responde bem *"o que mais sai"* e responde
+**errado a cobertura**. Aqui **não há emenda**: peça de 2,20 não sai de bobina
+2,00, e 2,00 não vira 3,00. São estoques diferentes — é por isso que a fábrica
+mantém as duas.
+
+O exemplo que trava isso em teste:
+
+```
+Rolo 1% Branco · bobina 2,00   →  20 m² parados,  ~4 dias de cobertura
+Rolo 1% Branco · bobina 3,00   → 270 m² parados, ~35 dias de cobertura
+
+somados:  290 m² sobre 13 m²/dia  →  22 dias  ← o gestor leria "tranquilo"
+```
+
+**Todo consolidado (coleção, cor, bobina) é SOMA desse grão**, nunca uma
+segunda consulta — duas consultas divergiriam no dia em que uma esquecesse de
+excluir o ajuste, e as duas pareceriam certas.
+
+### O que este painel olha, e o que ele ignora
+
+| | |
+|---|---|
+| **Olha** | bobina nova (`rolo`, status aberto/fechado) |
+| **Ignora** | sobra, retalho e refugo — outra prateleira, painel próprio (Encalhe) |
+
+> ⚠️ **E é por isso que a fonte de consumo é `movimento_rolo`, e NÃO
+> `plano.consumo_m2`.** O plano soma rolo **e** sobra na mesma coluna
+> (`encaixe.js:146`) — legítimo para medir desperdício do corte, e errado aqui:
+> contaria retalho como tecido novo. **Os dois números existem, os dois estão
+> certos, e eles não se reconciliam.** Quem tentar somar um no outro está
+> misturando duas perguntas.
+
+### As fórmulas, todas
+
+| Indicador | Conta |
+|---|---|
+| **Consumo** | `movimento_rolo` com `motivo='consumo'`, gravado só no plano **confirmado** |
+| **Média diária** | m² da janela ÷ **dias corridos** da janela |
+| **Média mensal** | média diária × 30 |
+| **Cobertura** | m² em estoque ÷ média diária — `null` sem consumo |
+| **Estoque mínimo** | média diária × `estMinDias` × (1 + `estMinSeguranca`/100) |
+| **Dias sem sair** | desde o último corte, **sem janela** |
+
+> ⚠️ **`ajuste` e `encerramento` não são consumo.** O ajuste é correção de
+> contagem; o encerramento é o acerto do que sobrou no tubo. Somados, o painel
+> deixaria de responder *"quanto a fábrica cortou"* e passaria a responder
+> *"quanto a coluna variou"*. Lição do `fluxo_estoque.js` do PCP (§18).
+
+### ⚠️ O estoque mínimo NÃO é um percentual chutado no código
+
+Sem prazo de fornecedor — que este módulo não tem, e não é escopo dele — **não
+existe ponto de pedido honesto**. O que existe é uma pergunta que o gestor
+responde: *"quantos dias de consumo eu quero ter na prateleira?"*
+
+Os dois números vivem em **Cadastros → Parâmetros**, com rótulo e ajuda ao
+lado. Um `× 1,3` escondido numa função seria um número que ninguém sabe de onde
+saiu e que ninguém muda sem deploy.
+
+> **`estMinSeguranca` nasce ZERO de propósito.** Um colchão inventado no
+> primeiro dia viraria fato: o mínimo sairia inflado e ninguém lembraria que os
+> 30% foram palpite meu, não decisão de ninguém.
+
+> **Sem consumo, o mínimo é `null` — não zero.** Zero diria *"não precisa
+> manter nada"*, que é uma afirmação que ninguém fez.
+
+### Os quatro status, e a ordem é a regra
+
+| Status | Critério |
+|---|---|
+| **SEM ESTOQUE** | saldo zerado — o único caso em que cobertura zero é verdade |
+| **CRÍTICO** | cobertura abaixo de **metade** de `estMinDias` |
+| **PARADO** | tem estoque e **nenhum** corte há `paradoDias`+ dias |
+| **ATENÇÃO** | cobertura abaixo do alvo, acima da metade |
+| **NORMAL** | o resto |
+
+A **precedência** importa: um material parado com cobertura infinita não é
+"normal", e um sem estoque nenhum não é "parado" — ele é a urgência. Uma lista
+sem ordem deixaria a linha cair no primeiro `if` que casasse.
+
+### ⚠️ A cobertura do conjunto só olha o que GIRA
+
+Duas armadilhas, e a segunda quase passou:
+
+1. **A média aritmética das coberturas** seria puxada por um material de giro
+   minúsculo com 900 dias de folga.
+2. **O conjunto inteiro tem o mesmo defeito por outra porta:** o material
+   parado põe metros no numerador e zero no denominador. Numa fábrica com
+   metade do estoque encalhado a cobertura **dobra** — e o número diz "folgado"
+   justamente *porque* há dinheiro dormindo.
+
+Na validação real isso deu **237 dias contra 138**. O parado tem card próprio,
+onde ele é problema em vez de virar conforto.
+
+### As faixas de parado
+
+30 / 60 / 90 / 180 / +180 dias, sempre as cinco, mesmo vazias.
+
+> **Material que NUNCA foi cortado cai na última faixa**, e não numa sexta
+> chamada "nunca" no fim da lista. Do ponto de vista do dinheiro parado ele é o
+> caso mais grave; separá-lo o tiraria de onde o olho procura. A coluna "último
+> corte" mostra `nunca`, que é onde a diferença aparece sem custar uma faixa.
+
+### ⚠️ Inconsistência não se corrige em silêncio
+
+O painel roda cinco checagens **read-only** e as mostra **antes dos gráficos** —
+se o dado está furado, ler o gráfico é pior que não ler nada, porque ele
+confirma com autoridade um número que não descreve a prateleira.
+
+- saldo negativo;
+- rolo sem largura de bobina;
+- saldo ≠ soma dos movimentos;
+- **plano confirmado que usou rolo e não gerou consumo** (o estoque não baixou);
+- largura em uso que sumiu do cadastro.
+
+Nenhuma delas escreve nada.
+
+### Gráficos sem biblioteca
+
+SVG inline. O projeto não tem build nem dependência de front; uma lib por CDN
+traria uma segunda coisa para atualizar e esquecer, e um estilo que não é o do
+sistema. Duas formas cobrem tudo: **barra horizontal** (rótulos são nomes, e em
+barra vertical eles saem deitados) e **linha**, sempre com **o eixo ancorado no
+zero** — começar no menor valor faz variação de 2% parecer despencar.
+
+**Estoque e consumo aparecem lado a lado no mesmo gráfico**, porque o que
+interessa é a proporção: coleção com muito estoque e pouco consumo é dinheiro
+dormindo; o contrário é risco de faltar.
+
+### Filtros e performance
+
+Coleção, cor, bobina e janela. **As opções saem do que existe de verdade** no
+estoque ou no consumo — cor cadastrada e nunca comprada num seletor faz a
+pessoa filtrar, receber tela vazia e concluir que o sistema perdeu dado.
+
+O filtro corta as linhas **e recalcula o topo**: cabeçalho no total com tabela
+filtrada faria a tela contar uma coisa em cima e outra embaixo.
+
+Cache de 15 s **local da rota** (mesma razão do `painel_route` do PCP, §18:
+cache escondido no domínio entregaria dado velho para quem decide compra). O
+índice `idx_movimento_periodo (motivo, data)` foi criado porque o que existia
+era por `rolo_id` — ótimo para o histórico de um rolo, inútil para "todo
+consumo dos últimos 90 dias".
+
+**Teste obrigatório:** `node teste/rodar.js` — os 14 casos de
+`teste/gerencial.test.js`.
+
+---
+
+## O que sai da prateleira (o antigo painel de giro)
 
 Responde **qual tecido tem mais saída**, **qual largura de bobina mais se usa**,
 **a média diária por bobina e por cor** e **quantos dias o estoque aguenta**.

@@ -478,6 +478,42 @@ UPDATE rolo SET fornecedor_id=(
  WHERE TRIM(COALESCE(fornecedor,''))<>'';
 
 CREATE INDEX idx_rolo_fornecedor ON rolo(fornecedor_id, tecido_id);
+`},
+
+{n:10, nome:'estoque minimo gerencial — os dois numeros que governam o status', sql:`
+/* ⚠️ O ESTOQUE MINIMO NAO E UM PERCENTUAL CHUTADO NO CODIGO.
+   Sem prazo de fornecedor (que este modulo NAO tem, e nao e escopo dele) nao
+   existe ponto de pedido honesto. O que existe e uma pergunta que o gestor
+   consegue responder: "quantos dias eu quero ter na prateleira?".
+
+   minimo = consumo medio diario x dias de cobertura x (1 + seguranca)
+
+   Os dois vivem na tabela parametro, e nao no codigo, por tres coisas: o gestor
+   muda sem deploy, a tela mostra o rotulo e a ajuda ao lado do numero, e a
+   conta fica auditavel — um "x 1,3" escondido numa funcao e um numero que
+   ninguem sabe de onde saiu.
+
+   A seguranca NASCE ZERO de proposito. Um colchao inventado no primeiro dia
+   viraria fato: o minimo sairia inflado e ninguem lembraria que 30% foi
+   palpite meu, nao decisao de ninguem. Zero e honesto e visivel — quando a
+   fabrica souber a variabilidade real, sobe o numero com razao. */
+INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
+('estMinDias','30','numero','Estoque minimo: dias de cobertura',
+ 'Quantos dias de consumo o estoque deve cobrir. E este numero que define o minimo de cada material: consumo medio diario x estes dias. Trinta dias e um mes de producao — suba se a reposicao demorar, desca se o giro for rapido e o dinheiro fizer falta.',
+ 'dias',40),
+
+('estMinSeguranca','0','numero','Estoque minimo: margem de seguranca',
+ 'Percentual somado ao minimo para absorver mes atipico. NASCE ZERO de proposito: um colchao inventado no primeiro dia viraria fato, e o minimo sairia inflado sem ninguem lembrar por que. Suba quando a fabrica souber a variabilidade real do consumo.',
+ '%',41),
+
+('paradoDias','90','numero','A partir de quantos dias o estoque e "parado"',
+ 'Material sem NENHUM consumo neste periodo entra como parado no painel gerencial. As faixas de 30/60/90/180 dias continuam aparecendo todas — este numero so define a partir de qual delas o status vira PARADO.',
+ 'dias',42);
+
+/* O painel varre movimento por data e motivo em toda abertura de tela. O
+   indice que existia e por rolo_id — otimo para o historico de UM rolo,
+   inutil para "todo consumo dos ultimos 90 dias". */
+CREATE INDEX idx_movimento_periodo ON movimento_rolo(motivo, data);
 `}
 
 ];

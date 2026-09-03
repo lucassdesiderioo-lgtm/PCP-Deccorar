@@ -64,6 +64,81 @@ const SOMAS=`
   COUNT(DISTINCT m.rolo_id) AS rolos,
   MAX(m.data) AS ultimo_corte`;
 
+/* ── ⚠️ A UNIDADE GERENCIAL DESTE MODULO E TECIDO × LARGURA ───────────────
+   E nao o tecido sozinho. Somar as bobinas de um mesmo tecido responde bem
+   "o que mais sai", e responde ERRADO a cobertura: 120 m² de bobina 2,00 nao
+   cobrem uma peca de 2,20. O gestor leria dez dias de folga onde ha zero.
+
+   Aqui nao ha emenda (README): peca mais larga que a bobina simplesmente nao
+   sai. Entao 2,00 e 2,50 sao estoques DIFERENTES, e e por isso que a fabrica
+   mantem as duas.
+
+   Este e o grao; todo consolidado (por colecao, por cor, por bobina) e SOMA
+   dele — nunca uma segunda consulta. Duas consultas paralelas divergiriam no
+   dia em que uma esquecesse de excluir o ajuste, e as duas pareceriam certas. */
+function porMaterial(dias){
+  const saiu=db.prepare(`
+    SELECT t.id AS tecido_id, r.largura AS largura, ${SOMAS}
+      ${DE}
+     WHERE ${SAIDA} AND m.data >= date('now','localtime','-'||?||' day')
+     GROUP BY t.id, r.largura`).all(dias-1);
+
+  /* O ESTOQUE VEM DE FORA DO CONSUMO, e por um motivo que so aparece no
+     primeiro mes: material que TEM estoque e nao teve consumo nenhum nao
+     existe na consulta acima — e e justamente ele que o gestor precisa ver. */
+  const parado=db.prepare(`
+    SELECT t.id AS tecido_id, r.largura AS largura,
+           l.nome AS linha_nome, a.nome AS abertura_nome, c.nome AS cor_nome,
+           COUNT(*) AS rolos,
+           ROUND(SUM(r.saldo),3) AS saldo,
+           ROUND(SUM(r.saldo*r.largura),3) AS m2_parado,
+           ROUND(SUM(CASE WHEN r.preco_m2 IS NOT NULL THEN r.saldo*r.largura*r.preco_m2 END),2) AS valor,
+           SUM(CASE WHEN r.preco_m2 IS NULL THEN 1 ELSE 0 END) AS rolos_sem_preco,
+           MAX((SELECT MAX(m.data) FROM movimento_rolo m
+                 WHERE m.rolo_id=r.id AND ${SAIDA})) AS ultimo_corte_rolo
+      FROM rolo r
+      JOIN tecido t ON t.id=r.tecido_id
+      JOIN linha l ON l.id=t.linha_id
+      JOIN abertura a ON a.id=t.abertura_id
+      JOIN cor c ON c.id=t.cor_id
+     WHERE r.status IN ('aberto','fechado') AND r.saldo > 0.001
+     GROUP BY t.id, r.largura`).all();
+
+  /* O ULTIMO CONSUMO DE VERDADE, sem janela. A janela mede a media; "ha
+     quantos dias nao sai nada" nao pode ser cortado por ela, senao todo
+     material parado ha mais tempo que a janela mostraria a mesma idade. */
+  const ultimo=db.prepare(`
+    SELECT r.tecido_id, r.largura, MAX(m.data) AS ultimo
+      FROM movimento_rolo m JOIN rolo r ON r.id=m.rolo_id
+     WHERE ${SAIDA} GROUP BY r.tecido_id, r.largura`).all();
+
+  const nomes=db.prepare(`
+    SELECT t.id AS tecido_id, l.nome AS linha_nome, a.nome AS abertura_nome, c.nome AS cor_nome
+      FROM tecido t JOIN linha l ON l.id=t.linha_id
+      JOIN abertura a ON a.id=t.abertura_id JOIN cor c ON c.id=t.cor_id`).all();
+  const nomeDe=new Map(nomes.map(n=>[n.tecido_id,n]));
+  const k=(t,l)=>t+'|'+arred(l);
+
+  const mapa=new Map();
+  const pega=(tecido_id,largura)=>{
+    const chave=k(tecido_id,largura);
+    if(!mapa.has(chave)) mapa.set(chave,{
+      chave, tecido_id, largura:arred(largura), ...(nomeDe.get(tecido_id)||{}),
+      metros:0, m2:0, dias_com_corte:0, rolos:0, saldo:0, m2_parado:0,
+      valor:null, rolos_sem_preco:0, ultimo_corte:null});
+    return mapa.get(chave);
+  };
+
+  saiu.forEach(s=>Object.assign(pega(s.tecido_id,s.largura),
+    {metros:s.metros, m2:s.m2, dias_com_corte:s.dias_com_corte}));
+  parado.forEach(p=>Object.assign(pega(p.tecido_id,p.largura),
+    {rolos:p.rolos, saldo:p.saldo, m2_parado:p.m2_parado,
+     valor:p.valor, rolos_sem_preco:p.rolos_sem_preco}));
+  ultimo.forEach(u=>{ pega(u.tecido_id,u.largura).ultimo_corte=u.ultimo; });
+
+  return [...mapa.values()];
+}
+
 /* O recorte generico. `chave` e a coluna que agrupa — tecido, largura ou cor.
    Um SQL so para os tres porque a CONTA e a mesma: tres copias envelheceriam
    separadas e, no dia em que uma esquecesse de excluir o ajuste, os totais
@@ -172,4 +247,4 @@ function painel(diasPedidos){
   };
 }
 
-module.exports={painel,janela,porMes,semSaida,primeiroConsumo};
+module.exports={painel,janela,porMes,semSaida,primeiroConsumo,porMaterial,SAIDA};
