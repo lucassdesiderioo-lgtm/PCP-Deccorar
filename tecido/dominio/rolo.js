@@ -37,7 +37,12 @@ function entrada(dados,usuarioNome){
   // R2: a largura e DESTE rolo. O mesmo Rolo 3% Bege existe em 2,00, 2,50 e
   // 3,00, e e justamente essa diferenca que o plano de corte explora.
   const largura=medida(dados.largura,'a largura da bobina em metros',MAX_LARGURA);
-  const metragem=medida(dados.metragem,'a metragem da nota em metros',MAX_METRAGEM);
+  /* METRAGEM E O QUE ESTA NO ROLO AGORA, e nao o que a nota dizia.
+     A diferenca so importa no inventario inicial — e la ela importa muito:
+     a fabrica tem bobinas ja abertas, e este numero vira o SALDO. Digitar os
+     50 m da nota num rolo com 18 m no tubo poe 32 metros inexistentes no
+     estoque, e o plano passa a prometer uma faixa que o rolo nao tem. */
+  const metragem=medida(dados.metragem,'quantos metros o rolo tem agora',MAX_METRAGEM);
 
   if(dados.nivel_id) endereco.exigirArmazem(dados.nivel_id,'ROLO');
 

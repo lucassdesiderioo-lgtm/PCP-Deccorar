@@ -144,6 +144,36 @@ teste/                 rodar.js + *.test.js — banco temporario, do zero
 
 ---
 
+## O inventário inicial: como lançar o que já está na prateleira
+
+A entrada de rolo (tela **Rolos**) é onde o estoque físico entra — inclusive as
+bobinas que já estão abertas e as que chegaram sem nota.
+
+| Situação | O que fazer |
+|---|---|
+| Rolo novo, fechado | metragem = o que diz a nota |
+| **Bobina já aberta** | metragem = **o que sobrou, medido** |
+| Sem NF, sem fornecedor | deixe em branco — os dois são opcionais |
+
+> ⚠️ **O CAMPO PERGUNTA O QUE ESTÁ NO ROLO AGORA, não o que a nota dizia.**
+> Ele se chamava "Metragem da nota", e para o inventário inicial isso era uma
+> armadilha: quem lê "da nota" digita os 50 m que a nota dizia num rolo que tem
+> 18 m no tubo.
+>
+> O número vira o **saldo**. Trinta e dois metros que não existem entrariam no
+> estoque, e o plano de corte prometeria uma faixa que o rolo não tem — o erro
+> apareceria com o tecido na mesa e a peça já começada.
+
+**Faltar nota não pode impedir a bobina de entrar no sistema.** No inventário
+inicial quase nunca existe nota; uma trava ali seria a armadilha #6 do
+`CLAUDE.md` — a bancada inventaria um número de NF só para o sistema aceitar.
+
+**Um rolo físico = uma entrada.** Duas bobinas do mesmo tecido e da mesma
+largura são dois rolos, com dois códigos e dois endereços: é assim que o
+cortador acha qual descer da estante.
+
+---
+
 ## O que é um "item de tecido"
 
 É **o que está enrolado no rolo**: a combinação `linha + abertura + cor`.
