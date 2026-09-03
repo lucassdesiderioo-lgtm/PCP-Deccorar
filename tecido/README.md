@@ -144,17 +144,68 @@ teste/                 rodar.js + *.test.js — banco temporario, do zero
 
 ---
 
+## O inventário inicial: como lançar o que já está na prateleira
+
+A entrada de rolo (tela **Rolos**) é onde o estoque físico entra — inclusive as
+bobinas que já estão abertas e as que chegaram sem nota.
+
+| Situação | O que fazer |
+|---|---|
+| Rolo novo, fechado | metragem = o que diz a nota |
+| **Bobina já aberta** | metragem = **o que sobrou, medido** |
+| Sem NF, sem fornecedor | deixe em branco — os dois são opcionais |
+
+> ⚠️ **O CAMPO PERGUNTA O QUE ESTÁ NO ROLO AGORA, não o que a nota dizia.**
+> Ele se chamava "Metragem da nota", e para o inventário inicial isso era uma
+> armadilha: quem lê "da nota" digita os 50 m que a nota dizia num rolo que tem
+> 18 m no tubo.
+>
+> O número vira o **saldo**. Trinta e dois metros que não existem entrariam no
+> estoque, e o plano de corte prometeria uma faixa que o rolo não tem — o erro
+> apareceria com o tecido na mesa e a peça já começada.
+
+**Faltar nota não pode impedir a bobina de entrar no sistema.** No inventário
+inicial quase nunca existe nota; uma trava ali seria a armadilha #6 do
+`CLAUDE.md` — a bancada inventaria um número de NF só para o sistema aceitar.
+
+**Um rolo físico = uma entrada.** Duas bobinas do mesmo tecido e da mesma
+largura são dois rolos, com dois códigos e dois endereços: é assim que o
+cortador acha qual descer da estante.
+
+---
+
 ## O que é um "item de tecido"
 
 É **o que está enrolado no rolo**: a combinação `linha + abertura + cor`.
 
 | Campo | O que é | Exemplo |
 |---|---|---|
-| **Linha** | a família do produto | Double Vision, Rolô |
-| **Abertura** | quanto de luz o tecido deixa passar | 1%, 3%, 5% |
-| **Cor** | a cor | Bege, Cinza |
+| **Linha** | o tipo de persiana | Rolô, Romana, Double Vision |
+| **Coleção** | qual tecido, dentro daquela linha | Nápoles, Pinpoint, 1%, 3%, Blackout |
+| **Cor** | **só** a cor | Bege, Cinza, Creme |
 
-`Double Vision · 1% · Bege` é **um** item.
+`Double Vision · Nápoles · Bege` é **um** item.
+
+> ⚠️ **O CAMPO SE CHAMA "COLEÇÃO" NA TELA E `abertura` NO BANCO.** Ele nasceu
+> como abertura (1%, 3%, 5% — quanto de luz passa) e a fábrica usa o mesmo
+> campo para coleções de nome próprio: Nápoles, Pinpoint. Um campo rotulado
+> "Abertura" com `Nápoles` dentro é o tipo de quase-mentira que faz a equipe
+> parar de confiar na tela, então o **rótulo** mudou em 03/09/2026.
+>
+> A tabela, a coluna, a rota e as variáveis continuam `abertura`: renomear
+> identificador não muda nada para quem usa e quebraria banco, rotas e
+> histórico de uma vez. É a mesma decisão que o PCP tomou com a área
+> `necessidade` (id preservado, rótulo trocado — ver `auth.js`).
+
+> ⚠️ **A COLEÇÃO NÃO PODE ENTRAR NO NOME DA COR.** `Nápoles Bege` cadastrado
+> como cor parece prático e cobra depois:
+>
+> - o sistema deixa de saber que aquilo **é bege** — `Nápoles Bege` e
+>   `Pinpoint Bege` viram cores sem relação nenhuma
+> - a lista de cores cresce **multiplicando**: coleção nova traz o mesmo
+>   punhado de cores de novo
+> - e o filtro por cor, que existe para achar a sobra na prateleira, para de
+>   agrupar o que a vista agrupa
 
 > ⚠️ **A LARGURA NÃO FAZ PARTE DO ITEM**, e essa é a decisão que mais confunde
 > quem chega. O mesmo `Double Vision 1% Bege` vem em bobina de 2,00, 2,50 e
@@ -176,6 +227,37 @@ que existe justamente para padronizar.
 **Pode girar a peça?** — este muda. Tecido com sentido (textura, listra, desenho
 que corre) não pode ser virado, então a largura da peça tem que sair no sentido
 da largura da bobina. `Não` é o padrão e vale para a maioria.
+
+---
+
+## Cadastro se RENOMEIA, além de desativar
+
+Linha, coleção, cor e motivo têm **Renomear** ao lado de Desativar.
+
+> ⚠️ **Até 03/09/2026 a tela só sabia desativar**, e o servidor sempre soube
+> renomear — faltava o botão. A única saída para um `Pinpoit` sem o segundo N
+> era **desativar e criar de novo**: duas linhas na lista, uma delas morta,
+> para corrigir uma letra. Cadastro que só sabe desativar obriga a errar duas
+> vezes para consertar uma.
+>
+> E nome de tecido muda de verdade: o fornecedor renomeia a coleção, a equipe
+> passa a chamar pelo nome novo, e a tela continua mostrando o velho.
+
+**O rename passa pelo domínio, não direto ao banco.** O nome é `UNIQUE`:
+renomear `Pinpoit Bege` para `Bege` com `Bege` já cadastrado estouraria a
+restrição do SQLite e o operador leria *"deu erro aqui dentro, chame o
+suporte"* — quando o que ele precisa ler é *"essa cor já existe"*. Mesma lição
+da etiqueta de sobra duplicada: conferir **antes** de escrever é o que separa
+uma recusa útil de um chamado.
+
+**Renomear para o mesmo nome não é erro** — senão clicar e confirmar sem mudar
+nada daria erro, e o operador concluiria que quebrou alguma coisa.
+
+> ⚠️ **O CÓDIGO DO TECIDO NÃO É REFEITO NO RENAME.**
+> `DOUBLEVISION-NAPOLES-BEGE` já pode estar escrito em plano confirmado e em
+> histórico de rolo; mudar o código apagaria o rastro. O código é etiqueta de
+> **leitura** — quem identifica o tecido de verdade é o trio de ids, e a tela
+> sempre mostra os nomes atuais.
 
 ---
 

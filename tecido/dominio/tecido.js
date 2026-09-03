@@ -58,6 +58,47 @@ function criarCor(dados){
   return dCor.criar({nome,ordem:dados.ordem});
 }
 
+/* ── RENOMEAR ─────────────────────────────────────────────────────────────
+   Passa pelo dominio, e nao direto ao banco, por causa de UMA coisa: o nome
+   e UNIQUE. Renomear "Pinpoit Bege" para "Bege" com "Bege" ja cadastrado
+   estouraria a restricao do SQLite e o operador leria "deu erro aqui dentro,
+   chame o suporte" — quando o que ele precisa ler e "essa cor ja existe".
+
+   A mesma licao da etiqueta de sobra duplicada: conferir ANTES de escrever
+   e o que separa uma recusa util de um chamado. */
+function renomearLinha(id,nome){
+  const n=nomeLimpo(nome,'a linha');
+  const atual=dLinha.porId(id);
+  exigir(atual,'linha_inexistente','Linha nao encontrada.');
+  if(dLinha.listar().some(l=>l.id!==atual.id&&l.nome.toLowerCase()===n.toLowerCase()))
+    throw new ErroDeRegra('linha_repetida','A linha "'+n+'" ja existe.');
+  return dLinha.atualizar(id,{nome:n});
+}
+
+function renomearAbertura(id,nome){
+  const n=nomeLimpo(nome,'a colecao');
+  const atual=dAbertura.porId(id);
+  exigir(atual,'abertura_inexistente','Colecao nao encontrada.');
+  if(dAbertura.listar(atual.linha_id).some(a=>a.id!==atual.id&&a.nome.toLowerCase()===n.toLowerCase()))
+    throw new ErroDeRegra('abertura_repetida','Esta linha ja tem a colecao "'+n+'".');
+  return dAbertura.atualizar(id,{nome:n});
+}
+
+function renomearCor(id,nome){
+  const n=nomeLimpo(nome,'a cor');
+  const atual=dCor.porId(id);
+  exigir(atual,'cor_inexistente','Cor nao encontrada.');
+  if(dCor.listar().some(c=>c.id!==atual.id&&c.nome.toLowerCase()===n.toLowerCase()))
+    throw new ErroDeRegra('cor_repetida','A cor "'+n+'" ja existe.');
+  return dCor.atualizar(id,{nome:n});
+}
+
+/* O codigo do tecido NAO e refeito no rename, e isso e decisao.
+   `DOUBLEVISION-NAPOLES-BEGE` ja pode estar escrito em plano confirmado e em
+   historico de rolo; mudar o codigo apagaria o rastro. O codigo e etiqueta de
+   leitura — quem identifica o tecido de verdade e o trio de ids, e a tela
+   sempre mostra os NOMES atuais. */
+
 // ── Item de tecido ───────────────────────────────────────────────────────
 function criarTecido(dados){
   const linha=dLinha.porId(dados.linha_id);
@@ -89,7 +130,7 @@ function criarTecido(dados){
 // Nome de tela do tecido, num lugar so: 'Rolo · 3% · Bege'.
 const descrever=t=>t?[t.linha_nome,t.abertura_nome,t.cor_nome].filter(Boolean).join(' · '):'';
 
-module.exports={
+module.exports={renomearLinha,renomearAbertura,renomearCor,
   criarLinha, criarAbertura, criarCor, criarTecido,
   chaveDe, descrever,
   listarLinhas:()=>dLinha.listar(),

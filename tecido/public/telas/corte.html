@@ -107,7 +107,7 @@ async function telaEntrada(){
   };
   // Tres toques e o tecido esta escolhido. Nada de dropdown de texto na bancada.
   c.appendChild(fileira('LINHA',linhas,linhaSel,v=>escolher(v,null,null)));
-  c.appendChild(fileira('ABERTURA',aberturas,abSel,v=>escolher(linhaSel,v,null)));
+  c.appendChild(fileira('COLECAO',aberturas,abSel,v=>escolher(linhaSel,v,null)));
   c.appendChild(fileira('COR',cores,sel?sel.cor_id:null,v=>escolher(linhaSel,abSel,v)));
   c.appendChild(el('p',{class:'nota',texto:sel?('▸ '+[sel.linha_nome,sel.abertura_nome,sel.cor_nome].join(' · ')):'Escolha o tecido.'}));
 

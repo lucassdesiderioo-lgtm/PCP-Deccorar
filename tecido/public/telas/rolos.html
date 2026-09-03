@@ -155,7 +155,7 @@ async function telaEntrada(pai){
     telaEntrada($('#conteudo'));
   };
   c.appendChild(fileira('LINHA',linhas,linhaSel,v=>escolher(v,null,null)));
-  c.appendChild(fileira('ABERTURA',aberturas,abSel,v=>escolher(linhaSel,v,null)));
+  c.appendChild(fileira('COLECAO',aberturas,abSel,v=>escolher(linhaSel,v,null)));
   c.appendChild(fileira('COR',cores,sel?sel.cor_id:null,v=>escolher(linhaSel,abSel,v)));
 
   /* A LARGURA VEM DA LISTA, e nao do teclado.
@@ -184,9 +184,18 @@ async function telaEntrada(pai){
 
   const campos={};
   const linha=el('div',{class:'campos'});
+  /* O ROTULO DA METRAGEM MUDOU, e nao e cosmetica.
+     Ele dizia "Metragem da nota", e para o INVENTARIO INICIAL isso e uma
+     armadilha: a fabrica tem bobinas ja abertas, e quem le "da nota" digita
+     os 50 m que a nota dizia quando o rolo tem 18 m no tubo.
+
+     O sistema grava esse numero como SALDO. Trinta e dois metros que nao
+     existem entrariam no estoque, e o plano de corte prometeria uma faixa
+     que o rolo nao tem — o erro apareceria com o tecido na mesa e a peca ja
+     comecada. Por isso o campo pergunta o que esta NO ROLO AGORA. */
   [['largura','Outra largura (m) — so se nao estiver acima',''],
-   ['metragem','Metragem da nota (m)',''],
-   ['nf','NF',''],['fornecedor','Fornecedor','']].forEach(([id,rot,valor])=>{
+   ['metragem','Metragem AGORA no rolo (m)',''],
+   ['nf','NF (opcional)',''],['fornecedor','Fornecedor (opcional)','']].forEach(([id,rot,valor])=>{
     const b=el('div',{class:'campo cresce'});
     b.appendChild(el('label',{texto:rot}));
     const i=el('input',{type:'text',value:valor,inputmode:id==='nf'?'text':'decimal'});
@@ -202,6 +211,10 @@ async function telaEntrada(pai){
   c.appendChild(linha);
   const aviso=el('p',{class:'ajuda',style:'color:var(--alerta);min-height:1.2em'});
   c.appendChild(aviso);
+  c.appendChild(el('p',{class:'ajuda',texto:
+    'Metragem: rolo novo e o que diz a nota; rolo JA ABERTO e o que sobrou, medido. E este numero que vira o saldo — se ele vier maior que o real, o plano de corte promete uma faixa que o rolo nao tem.'}));
+  c.appendChild(el('p',{class:'ajuda',texto:
+    'NF e fornecedor sao opcionais: no inventario inicial quase nunca existe nota, e faltar nota nao pode impedir a bobina de entrar no sistema.'}));
 
   // endereco na estante de ROLO
   const hastes=estado.arvore.filter(h=>h.ativo).map(h=>({valor:h.id,nome:h.nome}));
