@@ -4,6 +4,7 @@ const tecido=require('../dominio/tecido');
 const endereco=require('../dominio/endereco');
 const motivo=require('../dominio/motivo');
 const largura=require('../dominio/largura');
+const exclusao=require('../dominio/exclusao');
 
 // A camada de dados entra aqui SO para o atualizar generico (ordem, ativo,
 // renomear) — nao ha regra nenhuma nesses tres campos. Criar, esse sim, passa
@@ -66,6 +67,13 @@ module.exports={rotas:[
    manipulador:({params,corpo})=>corpo.ativo?largura.reativar(params.id):largura.desativar(params.id),
    detalhe:(req)=>(req.body.ativo?'reativou':'tirou da lista')+' a largura '+req.params.id},
 
+  /* APAGAR CADASTRO. Uma rota so para todos os tipos porque a conta de quem
+     aponta para quem tem dono unico (dominio/exclusao.js) — sete rotas
+     iguais seriam sete lugares para esquecer de conferir um dependente. */
+  {metodo:'DELETE', caminho:'/api/cadastro/:tipo/:id', permissao:EDITAR,
+   manipulador:({params})=>exclusao.excluir(params.tipo,params.id),
+   detalhe:(req)=>'apagou '+req.params.tipo+' '+req.params.id},
+
   {metodo:'GET', caminho:'/api/tecidos', permissao:LER,
    manipulador:()=>tecido.listarTecidos()},
   {metodo:'POST', caminho:'/api/tecidos', permissao:EDITAR,
@@ -84,17 +92,20 @@ module.exports={rotas:[
    manipulador:({corpo})=>endereco.criarHaste(corpo),
    detalhe:(req)=>req.body.armazem_chave+' haste '+req.body.nome},
   {metodo:'PUT', caminho:'/api/hastes/:id', permissao:EDITAR,
-   manipulador:({params,corpo})=>dHaste.atualizar(params.id,corpo)},
+   manipulador:({params,corpo})=>dHaste.atualizar(params.id,corpo),
+   detalhe:(req)=>req.body.nome!==undefined?('renomeou para '+req.body.nome):null},
 
   {metodo:'POST', caminho:'/api/andares', permissao:EDITAR,
    manipulador:({corpo})=>endereco.criarAndar(corpo)},
   {metodo:'PUT', caminho:'/api/andares/:id', permissao:EDITAR,
-   manipulador:({params,corpo})=>dAndar.atualizar(params.id,corpo)},
+   manipulador:({params,corpo})=>dAndar.atualizar(params.id,corpo),
+   detalhe:(req)=>req.body.nome!==undefined?('renomeou para '+req.body.nome):null},
 
   {metodo:'POST', caminho:'/api/niveis', permissao:EDITAR,
    manipulador:({corpo})=>endereco.criarNivel(corpo)},
   {metodo:'PUT', caminho:'/api/niveis/:id', permissao:EDITAR,
-   manipulador:({params,corpo})=>dNivel.atualizar(params.id,corpo)},
+   manipulador:({params,corpo})=>dNivel.atualizar(params.id,corpo),
+   detalhe:(req)=>req.body.nome!==undefined?('renomeou para '+req.body.nome):null},
 
   // ── Motivos de recusa e condicoes da sobra ─────────────────────────────
   {metodo:'GET', caminho:'/api/motivos', permissao:LER,

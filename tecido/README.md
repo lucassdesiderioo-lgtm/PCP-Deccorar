@@ -352,6 +352,54 @@ da largura da bobina. `Não` é o padrão e vale para a maioria.
 
 ---
 
+## Cadastro se RENOMEIA e se APAGA — com uma regra no meio
+
+Linha, coleção, cor, motivo, haste, andar e nível têm **Renomear**, **Apagar**
+e **Desativar**. O item de tecido tem Apagar e Desativar (não Renomear: o nome
+dele *é* a combinação linha+coleção+cor, e trocar a combinação é outro tecido).
+
+### Quando apagar apaga
+
+A regra da casa sempre foi *"cadastro não se apaga, desativa"*, e existe por um
+motivo real: linha de histórico aponta para o cadastro, e apagar a cor faria o
+plano de três meses atrás deixar de saber o que foi cortado.
+
+Só que a regra sozinha produz o problema oposto: o cadastro digitado errado no
+primeiro dia fica na lista **para sempre**, riscado, e a tela vira depósito de
+coisa morta que ninguém lê mais.
+
+| Situação | O que acontece |
+|---|---|
+| **ninguém aponta** | apaga de verdade — não há histórico a preservar, o que existe é erro de digitação |
+| **alguém aponta** | recusa **dizendo quem**: *"1 rolo está neste endereço"* |
+
+> ⚠️ *"Não dá para apagar"* sozinho vira chamado de suporte. *"1 item de tecido
+> usa esta cor"* vira decisão — a pessoa sabe o que desfazer primeiro.
+>
+> E **todos** os motivos aparecem de uma vez. Dizer só o primeiro faria a
+> pessoa resolver um, tentar de novo, bater no segundo, e concluir que o
+> sistema inventa impedimento novo a cada tentativa.
+
+**Não desativa como consolo.** Quem clicou pediu para apagar; *"apaguei mas na
+verdade só escondi"* é a resposta que faz a pessoa apagar de novo no mês
+seguinte procurando o que sumiu. Desativar é ação separada, com nome próprio.
+
+**A árvore do endereço se protege de cima para baixo**: haste com andar não sai,
+andar com nível não sai. Quem quer desmontar começa de baixo, e a cada passo o
+sistema diz o que ainda está pendurado ali. Apagar de cima arrastaria a árvore
+inteira em silêncio.
+
+> ⚠️ **`dominio/exclusao.js` é o DONO ÚNICO de quem aponta para quem.**
+> Espalhar a conta pelos domínios faria cada um conhecer meio mapa, e o dia em
+> que uma tabela nova apontasse para `cor` ninguém lembraria de atualizar as
+> duas pontas — a exclusão passaria a apagar o que tem histórico, em silêncio.
+>
+> A largura de bobina conta **por valor**, não por id: o rolo guarda o número,
+> não uma chave estrangeira. Contar por id daria zero e apagaria uma largura
+> com rolo usando ela.
+
+---
+
 ## Cadastro se RENOMEIA, além de desativar
 
 Linha, coleção, cor e motivo têm **Renomear** ao lado de Desativar.
