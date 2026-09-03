@@ -1089,6 +1089,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   número sai menor que a verdade, sem erro e sem aviso (§19, armadilha #16)
 - ❌ Contar `ajuste` ou `encerramento` como saída de tecido: nenhum dos dois é
   corte (§19, armadilha #16)
+- ❌ Somar as larguras de bobina do mesmo tecido numa conta de cobertura — não
+  há emenda, são estoques diferentes (§19, armadilha #17)
+- ❌ Pôr o estoque parado no numerador da cobertura do conjunto: a folga dobra
+  justamente porque há dinheiro dormindo (§19, armadilha #17)
 - ❌ Deixar a bancada criar um cadastro **sem** marcá-lo para conferência, ou
   marcar **sem** ele aparecer na lista de Cadastros — meia decisão é pior que
   a trava que existia antes (§19, armadilha #14)
@@ -1470,6 +1474,49 @@ As outras três regras já eram do PCP:
 
 `tecido/dominio/giro.js` é o **dono único de "quanto consumiu"**.
 
+### ⚠️ ARMADILHA #17 — somar as bobinas esconde justamente a que vai faltar
+
+O painel gerencial (Painel → Gerencial) responde quanto tem, o que gira, o que
+está parado e quanto deveria ter. O grão dele é **tecido × largura de bobina**,
+e não o tecido — porque aqui **não há emenda**:
+
+```
+Rolo 1% Branco · 2,00 m   →  20 m²,  ~4 dias de cobertura
+Rolo 1% Branco · 3,00 m   → 270 m², ~35 dias
+
+somados: 290 m² sobre 13 m²/dia = 22 dias  ← "tranquilo", e a de 2,00 acaba
+                                              depois de amanhã
+```
+
+Todo consolidado é **soma desse grão**, nunca uma segunda consulta.
+
+> ⚠️ **A fonte de consumo é `movimento_rolo`, e NÃO `plano.consumo_m2`.** O
+> plano soma rolo **e sobra** na mesma coluna — certo para medir desperdício
+> do corte, errado aqui: contaria retalho como tecido novo. Os dois números
+> existem, os dois estão certos, e **eles não se reconciliam.**
+
+Três regras vieram inteiras do PCP, e uma é nova:
+
+| Regra | Onde já doeu |
+|---|---|
+| `ajuste` e `encerramento` não são consumo | §18, armadilha #16 |
+| Sem consumo, cobertura e mínimo são `null` — nunca zero | §3 |
+| Quem não tem `custo.ver` não recebe os campos | regra 14 do §13 |
+| **A cobertura do conjunto só olha o que GIRA** | nova — ver abaixo |
+
+> ⚠️ **A COBERTURA DO CONJUNTO NÃO PODE INCLUIR O ESTOQUE PARADO.** Ele põe
+> metros no numerador e zero no denominador: numa fábrica com metade do
+> estoque encalhado a cobertura **dobra**, e o número diz "folgado" justamente
+> *porque* há dinheiro dormindo. Na validação real deu **237 dias contra 138**.
+
+**O estoque mínimo não é percentual chutado no código.** Sem prazo de
+fornecedor não existe ponto de pedido honesto; o que existe é *"quantos dias
+quero ter na prateleira"* — `estMinDias` e `estMinSeguranca`, em `parametro`,
+com a margem nascendo **zero** para não virar fato inventado.
+
+`tecido/dominio/gerencial.js` é o dono único de **mínimo, status e faixas**. Ele
+não calcula consumo nem valor: compõe o `giro.js` e o `custo.js`.
+
 ### Duas regras do sob medida que valem citar aqui
 
 **Não há emenda.** Peça mais larga que toda bobina do estoque não sai — e por
@@ -1483,7 +1530,7 @@ cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 172 casos
+cd tecido && npm test          # 186 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:

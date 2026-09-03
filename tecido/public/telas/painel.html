@@ -9,6 +9,13 @@
 tr.soRetalho td{background:var(--alerta-fraca); font-weight:600}
 .seta{color:var(--alerta); font-weight:700}
 .barra{height:8px; background:var(--acao-fraca); border-radius:4px; min-width:2px}
+/* SEIS CARDS EM 3 x 2, e nao auto-fit. Com auto-fit a ultima linha fica com
+   um card sozinho ocupando a largura toda, e o olho le aquilo como "este e o
+   mais importante" — que nao e verdade. Tres colunas fecham exato, e ainda
+   dao largura para "R$ 13.575,00" caber numa linha so. */
+.cards{display:grid; gap:12px; margin:14px 0; grid-template-columns:repeat(3,1fr)}
+@media (max-width:900px){ .cards{grid-template-columns:repeat(2,1fr)} }
+@media (max-width:560px){ .cards{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -27,10 +34,14 @@ tr.soRetalho td{background:var(--alerta-fraca); font-weight:600}
 <script>
 const {api,el,limpar,$,num,formatarMedida,formatarMetros,formatarArea}=window.ui;
 
-let aba='estoque', diasGiro=30;
+let aba='gerencial';
+/* A ABA GERENCIAL E A PRIMEIRA, e "O que sai" saiu — o conteudo dela esta
+   toda dentro da nova, num grao mais fino. Duas abas respondendo "quanto sai
+   e quanto tenho" com recortes diferentes seriam duas reguas para a mesma
+   pergunta (armadilha #12 do CLAUDE.md). */
 const ABAS=[
-  {id:'estoque', nome:'Estoque'},
-  {id:'giro',    nome:'O que sai'},
+  {id:'gerencial',nome:'Gerencial'},
+  {id:'estoque', nome:'Rolo × retalho'},
   {id:'encalhe', nome:'Encalhe'},
   {id:'refugo',  nome:'Refugo'},
   {id:'recusas', nome:'Recusas'},
@@ -60,8 +71,8 @@ function tabela(cabecalho,linhas){
 function desenhar(){
   montarAbas();
   const c=limpar($('#conteudo'));
-  return ({estoque:telaEstoque,giro:telaGiro,encalhe:telaEncalhe,refugo:telaRefugo,
-    recusas:telaRecusas,cortes:telaCortes})[aba](c);
+  return ({gerencial:telaGerencial,estoque:telaEstoque,encalhe:telaEncalhe,
+    refugo:telaRefugo,recusas:telaRecusas,cortes:telaCortes})[aba](c);
 }
 
 // ── ESTOQUE — o cruzamento que da razao ao painel ────────────────────────
@@ -91,105 +102,267 @@ async function telaEstoque(pai){
     '. Antes de comprar, olhe aqui.'}));
 }
 
-/* ── O QUE SAI ────────────────────────────────────────────────────────────
-   ⚠️ A JANELA VEM ESCRITA NO TOPO, SEMPRE. Media diaria sem dizer de quantos
-   dias e um numero que engana com cara de fato — e o erro nao aparece: uma
-   media de 12 dias apresentada como se fosse de 30 sai 2,5x menor e leva
-   alguem a comprar errado. Quando a historia e menor que a janela pedida, a
-   tarja ambar diz isso com todas as letras. */
-async function telaGiro(pai){
-  const g=await api('/api/painel/giro?dias='+diasGiro);
+/* ══ GRAFICOS — SVG puro, sem biblioteca ══════════════════════════════════
+   O projeto nao tem build nem dependencia de front (README). Puxar uma lib
+   de grafico por CDN traria uma segunda coisa para atualizar e esquecer, e
+   um estilo que nao e o do sistema. Duas formas cobrem tudo que este painel
+   precisa: barra horizontal e linha.
+
+   BARRA HORIZONTAL, e nao vertical: os rotulos aqui sao nomes ("Rolo · 3%",
+   "mais de 180 dias") e em barra vertical eles saem deitados ou cortados. */
+const SVG='http://www.w3.org/2000/svg';
+const svg=(tag,attrs,filhos)=>{
+  const e=document.createElementNS(SVG,tag);
+  for(const k in (attrs||{})) if(attrs[k]!=null) e.setAttribute(k,attrs[k]);
+  (filhos||[]).forEach(f=>e.appendChild(f));
+  return e;
+};
+const svgTexto=(x,y,txt,attrs)=>{
+  const t=svg('text',{x,y,'font-size':12,fill:'currentColor',...(attrs||{})});
+  t.textContent=txt; return t;
+};
+
+/* `series` = [{nome, cor}]; cada item traz um valor por serie.
+   Duas series lado a lado servem ao unico cruzamento que interessa aqui:
+   ESTOQUE contra CONSUMO. Separados em dois graficos, o olho teria que
+   guardar a altura de um para comparar com o outro. */
+function barras(itens,{series,rotulo,formatar,altura}){
+  if(!itens.length) return el('div',{class:'vazio',texto:'Sem dados.'});
+  const linhaAlt=series.length>1?34:26, pad=8, rotuloLarg=170, valorLarg=110;
+  const larg=760, h=itens.length*linhaAlt+pad*2;
+  const max=Math.max(...itens.map(i=>Math.max(...series.map(s=>s.valor(i)||0))),0.0001);
+  const util=larg-rotuloLarg-valorLarg;
+
+  const g=[];
+  itens.forEach((it,i)=>{
+    const y0=pad+i*linhaAlt;
+    g.push(svgTexto(0,y0+linhaAlt/2+4,rotulo(it),{fill:'var(--tinta)'}));
+    const altBarra=series.length>1?10:12;
+    series.forEach((s,k)=>{
+      const v=s.valor(it)||0;
+      const y=y0+(linhaAlt-series.length*(altBarra+2))/2+k*(altBarra+2);
+      g.push(svg('rect',{x:rotuloLarg,y,width:Math.max(1,util*(v/max)),height:altBarra,
+        rx:3,fill:s.cor}));
+    });
+    g.push(svgTexto(larg-4,y0+linhaAlt/2+4,
+      series.map(s=>formatar(s.valor(it)||0)).join('  ·  '),
+      {'text-anchor':'end',fill:'var(--tinta-fraca)'}));
+  });
+  const box=svg('svg',{viewBox:'0 0 '+larg+' '+(altura||h),width:'100%',
+    height:(altura||h),style:'max-width:100%;color:var(--tinta)'},g);
+  const leg=el('div',{class:'ajuda',style:'display:flex;gap:16px;flex-wrap:wrap'},
+    series.length>1?series.map(s=>el('span',{},[
+      el('span',{style:'display:inline-block;width:10px;height:10px;border-radius:2px;'+
+        'margin-right:6px;background:'+s.cor}),
+      el('span',{texto:s.nome})])):[]);
+  return el('div',{},[box,leg]);
+}
+
+/* A LINHA DO TEMPO. Sempre com o eixo ancorado no ZERO — comecar o eixo no
+   menor valor faz uma variacao de 2% parecer despencar, que e a forma mais
+   comum de um grafico honesto mentir. */
+function linhaTempo(pontos,{formatar}){
+  if(pontos.length<2) return el('div',{class:'vazio',
+    texto:'Um mes so ainda nao desenha tendencia. O grafico aparece a partir do segundo.'});
+  const larg=760, alt=200, m={e:70,d:12,c:16,b:28};
+  const max=Math.max(...pontos.map(p=>p.valor),0.0001);
+  const x=i=>m.e+(larg-m.e-m.d)*(pontos.length===1?0:i/(pontos.length-1));
+  const y=v=>m.c+(alt-m.c-m.b)*(1-v/max);
+  const g=[];
+  [0,0.5,1].forEach(f=>{
+    g.push(svg('line',{x1:m.e,x2:larg-m.d,y1:y(max*f),y2:y(max*f),
+      stroke:'var(--linha)','stroke-width':1}));
+    g.push(svgTexto(m.e-8,y(max*f)+4,formatar(max*f),{'text-anchor':'end',fill:'var(--tinta-fraca)'}));
+  });
+  g.push(svg('polyline',{fill:'none',stroke:'var(--acao)','stroke-width':2.5,
+    'stroke-linejoin':'round',points:pontos.map((p,i)=>x(i)+','+y(p.valor)).join(' ')}));
+  pontos.forEach((p,i)=>{
+    g.push(svg('circle',{cx:x(i),cy:y(p.valor),r:4,fill:'var(--acao)'}));
+    g.push(svgTexto(x(i),alt-8,p.rotulo,{'text-anchor':'middle',fill:'var(--tinta-fraca)','font-size':11}));
+  });
+  return svg('svg',{viewBox:'0 0 '+larg+' '+alt,width:'100%',height:alt,
+    style:'max-width:100%;color:var(--tinta)'},g);
+}
+
+/* ══ PAINEL GERENCIAL ═════════════════════════════════════════════════════
+   ⚠️ ESTA ABA SUBSTITUIU "O QUE SAI", e nao ficou ao lado dela. Duas abas
+   respondendo "quanto sai e quanto tenho" com recortes diferentes seriam
+   duas reguas para a mesma pergunta — a armadilha #12 do CLAUDE.md, que ja
+   custou a reforma inteira da aba Estoque do PCP. O conteudo daquela aba
+   esta todo aqui, num grao mais fino.
+
+   O GRAO E TECIDO × LARGURA DE BOBINA. Somar as bobinas de um mesmo tecido
+   responde bem "o que mais sai" e responde ERRADO a cobertura: 120 m² de
+   bobina 2,00 nao cobrem uma peca de 2,20, e aqui nao ha emenda. */
+const ESTADO_G={dias:90, linha:'', abertura:'', cor:'', largura:''};
+
+const STATUS={
+  sem_estoque:{nome:'SEM ESTOQUE', cor:'var(--erro)',    fundo:'var(--erro-fraca)'},
+  critico:    {nome:'CRITICO',     cor:'var(--erro)',    fundo:'var(--erro-fraca)'},
+  atencao:    {nome:'ATENCAO',     cor:'var(--alerta)',  fundo:'var(--alerta-fraca)'},
+  parado:     {nome:'PARADO',      cor:'var(--sobra)',   fundo:'var(--alerta-fraca)'},
+  normal:     {nome:'NORMAL',      cor:'var(--bom)',     fundo:'var(--bom-fraca)'}
+};
+
+const cartaoNum=(rotulo,valor,nota,cor)=>el('div',{class:'cartao',style:'margin:0'},[
+  el('p',{class:'ajuda',style:'margin:0 0 4px',texto:rotulo}),
+  el('p',{style:'font-size:26px;font-weight:700;margin:0'+(cor?';color:'+cor:''),texto:valor}),
+  nota?el('p',{class:'ajuda',style:'margin:4px 0 0',texto:nota}):el('span',{})
+]);
+
+async function telaGerencial(pai){
+  const q=new URLSearchParams({dias:ESTADO_G.dias});
+  ['linha','abertura','cor','largura'].forEach(k=>{ if(ESTADO_G[k]) q.set(k,ESTADO_G[k]); });
+  const g=await api('/api/painel/gerencial?'+q);
+  const temCusto=g.resumo.valor!==undefined;
   pai=limpar(pai);
 
-  const c=cartao(pai,'O que sai da prateleira',
-    'So o CONSUMO dos planos confirmados. Ajuste de contagem e acerto de fim de rolo tambem mexem no saldo e nenhum dos dois e corte — somados, o numero deixaria de responder "quanto a fabrica cortou" e passaria a responder "quanto a coluna variou".');
-
-  // A janela e um botao, nao um numero fixo: 7 dias responde "o que estamos
-  // gastando agora", 90 responde "o que essa fabrica gasta".
-  const fil=el('div',{class:'fileira'});
-  fil.appendChild(el('span',{class:'rotulo',texto:'JANELA'}));
-  [7,15,30,60,90].forEach(d=>fil.appendChild(el('button',{class:'op',texto:d+' dias',
-    'aria-pressed':String(d===diasGiro), onclick:()=>{ diasGiro=d; desenhar(); }})));
-  c.appendChild(fil);
-
-  if(g.janela.vazia){
-    c.appendChild(el('div',{class:'vazio',texto:
-      'Nenhum corte confirmado ainda. Este painel comeca a existir no primeiro plano confirmado — nao da para reconstruir o que passou antes de o modulo entrar.'}));
-    return;
-  }
-
-  if(!g.janela.completa) c.appendChild(el('p',{class:'ajuda',style:'color:var(--alerta)',texto:
-    '⚠ A media abaixo e de '+g.janela.dias+' dia(s), e nao de '+g.janela.pedidos+
-    ': o primeiro corte registrado foi em '+g.janela.desde+', e nao existe historico antes disso. '+
-    'Dividir por '+g.janela.pedidos+' devolveria um numero menor que a verdade, sem erro e sem aviso.'}));
-  else c.appendChild(el('p',{class:'ajuda',texto:
-    'Media dos ultimos '+g.janela.dias+' dias corridos — fins de semana incluidos, porque a pergunta e quanto essa fabrica gasta por dia.'}));
-
-  const linhas=(itens,nome)=>itens.map(l=>el('tr',{},[
-    el('td',{texto:nome(l)}),
-    el('td',{class:'num',texto:formatarArea(l.m2)}),
-    el('td',{class:'num',texto:formatarMetros(l.metros)}),
-    el('td',{class:'num',texto:formatarArea(l.media_dia)+'/dia'}),
-    el('td',{class:'num',texto:formatarArea(l.media_mes)}),
-    el('td',{class:'num',texto:formatarArea(l.m2_parado)}),
-    /* COBERTURA MEDE RISCO, e a quantidade nao. 200 m² de um tecido que gira
-       40/dia e menos folga que 50 m² de um que gira 1. Sem consumo a
-       cobertura e "nao da pra dizer" — nunca zero. */
-    el('td',{class:'num'+(l.cobertura!=null&&l.cobertura<7?' aviso':''),
-      texto:l.cobertura==null?'—':num(l.cobertura)+' d'}),
-    el('td',{class:'quem',texto:l.dias_com_corte+' dia(s) com corte'})
-  ]));
-  /* Nenhum cabecalho vazio: o `tabela()` faz `h.nome||h`, entao string vazia
-     cai no objeto e a coluna sai escrita "[object Object]". E "Dias com
-     corte" e informacao de verdade — e ele que diz de quantos dias uteis
-     aquela media saiu. */
-  const cab=[{nome:'—'},{nome:'Saiu (m²)',num:true},{nome:'Saiu (m)',num:true},
-    {nome:'Media',num:true},{nome:'Por mes',num:true},{nome:'Parado',num:true},
-    {nome:'Cobertura',num:true},{nome:'Dias com corte'}];
-
-  const bloco=(titulo,itens,nome,ajuda)=>{
-    if(!itens.length) return;
-    c.appendChild(el('h2',{style:'margin-top:22px;font-size:16px',texto:titulo}));
-    if(ajuda) c.appendChild(el('p',{class:'ajuda',texto:ajuda}));
-    c.appendChild(tabela(cab,linhas(itens,nome)));
+  // ── FILTROS ────────────────────────────────────────────────────────────
+  const cf=el('div',{class:'cartao'});
+  const filtro=(rotulo,chave,opcoes,formatar)=>{
+    const f=el('div',{class:'fileira'});
+    f.appendChild(el('span',{class:'rotulo',texto:rotulo}));
+    f.appendChild(el('button',{class:'op',texto:'Todos',
+      'aria-pressed':String(!ESTADO_G[chave]),
+      onclick:()=>{ ESTADO_G[chave]=''; desenhar(); }}));
+    opcoes.forEach(o=>f.appendChild(el('button',{class:'op',texto:(formatar||String)(o),
+      'aria-pressed':String(String(ESTADO_G[chave])===String(o)),
+      onclick:()=>{ ESTADO_G[chave]=String(o); desenhar(); }})));
+    cf.appendChild(f);
   };
-  bloco('Por tecido — o que mais sai',g.tecidos,
-    l=>[l.linha_nome,l.abertura_nome,l.cor_nome].join(' · '),
-    'Ordenado por m², e nao por metro linear: 10 m de bobina 3,00 e mais tecido que 10 m de 2,00, e comparar metro com metro entre bobinas diferentes esconde isso.');
-  bloco('Por largura de bobina — qual mais usa',g.larguras,l=>num(l.chave)+' m');
-  bloco('Por cor',g.cores,l=>l.chave);
+  filtro('JANELA','dias',[30,60,90,180,365],d=>d+' dias');
+  filtro('LINHA','linha',g.opcoes.linhas);
+  filtro('COLECAO','abertura',g.opcoes.aberturas);
+  filtro('COR','cor',g.opcoes.cores);
+  filtro('BOBINA','largura',g.opcoes.larguras,v=>num(v)+' m');
+  pai.appendChild(cf);
 
-  /* O QUE NAO SAIU NA JANELA NAO APARECE ACIMA — a lista de giro parte do
-     consumo. Sem esta lista o tecido parado SOME da tela, que e o pior lugar
-     onde um tecido parado pode estar. */
-  if(g.sem_saida.length){
-    const cs=el('div',{class:'cartao',style:'border-color:var(--alerta)'});
-    cs.appendChild(el('h2',{texto:'Nao saiu nada em '+g.janela.dias+' dia(s) — '+g.sem_saida.length+' tecido(s)'}));
-    cs.appendChild(el('p',{class:'nota',texto:
-      'Estes nao aparecem na lista de cima porque ela parte do consumo. Cobertura deles nao e zero: nao da pra dizer, que e outra coisa — e por isso eles precisam de lista propria.'}));
-    const temValor=g.sem_saida.some(l=>l.valor!==undefined);
-    cs.appendChild(tabela(
-      [{nome:'Tecido'},{nome:'Rolos',num:true},{nome:'Parado (m²)',num:true}]
-        .concat(temValor?[{nome:'Valor',num:true}]:[]),
-      g.sem_saida.map(l=>el('tr',{},[
-        el('td',{texto:[l.linha_nome,l.abertura_nome,l.cor_nome].join(' · ')}),
-        el('td',{class:'num',texto:String(l.rolos)}),
-        el('td',{class:'num',texto:formatarArea(l.m2_parado)})
-      ].concat(temValor?[el('td',{class:'num',
-        texto:(l.rolos_sem_preco?'≥ ':'')+dinheiro(l.valor)})]:[])))));
-    pai.appendChild(cs);
+  // ── CARDS ──────────────────────────────────────────────────────────────
+  const piso=g.resumo.piso?'≥ ':'';
+  const cards=el('div',{class:'cards'});
+  if(temCusto) cards.appendChild(cartaoNum('Valor do estoque',piso+dinheiro(g.resumo.valor),
+    g.resumo.piso?g.resumo.rolos_sem_preco+' rolo(s) sem nota — este e o minimo':
+                  'todos os rolos com preco lancado'));
+  cards.appendChild(cartaoNum('Em estoque',formatarArea(g.resumo.m2),
+    formatarMetros(g.resumo.metros)+' · '+g.resumo.rolos+' rolo(s) · '+g.resumo.materiais+' material(is)'));
+  cards.appendChild(cartaoNum('Consumo medio',formatarArea(g.resumo.media_mes)+'/mes',
+    formatarArea(g.resumo.media_dia)+'/dia · janela de '+g.dias+' dia(s)'));
+  cards.appendChild(cartaoNum('Cobertura',
+    g.resumo.cobertura==null?'—':num(g.resumo.cobertura)+' dias',
+    'so o que GIRA: estoque ÷ consumo. O parado tem card proprio — somado aqui, ele faria a folga parecer maior'));
+  cards.appendChild(cartaoNum('Precisam de atencao',String(g.resumo.criticos+g.resumo.atencao),
+    g.resumo.criticos+' critico(s) · '+g.resumo.atencao+' em atencao',
+    g.resumo.criticos?'var(--erro)':null));
+  cards.appendChild(cartaoNum('Parado',
+    temCusto?piso+dinheiro(g.resumo.valor_parado):formatarArea(g.resumo.m2_parado),
+    g.resumo.parados+' material(is) sem corte ha '+g.parametros.parado_dias+'+ dias',
+    g.resumo.parados?'var(--sobra)':null));
+  pai.appendChild(cards);
+
+  /* ── PROBLEMAS ─────────────────────────────────────────────────────────
+     Vem ANTES dos graficos, e nao no rodape: se o dado esta furado, ler o
+     grafico e pior que nao ler nada — ele confirma com autoridade um numero
+     que nao descreve a prateleira. */
+  if(g.problemas.length){
+    const cp=el('div',{class:'cartao',style:'border-color:var(--erro)'});
+    cp.appendChild(el('h2',{texto:'Conferir os dados — '+g.problemas.length+' problema(s)'}));
+    cp.appendChild(el('p',{class:'nota',texto:
+      'Nada foi corrigido automaticamente. Numero errado que a tela arruma sozinha e pior que numero errado visivel: some a chance de alguem descobrir a causa.'}));
+    g.problemas.forEach(p=>cp.appendChild(el('p',{style:'color:var(--erro)',texto:'• '+p})));
+    pai.appendChild(cp);
   }
 
-  if(g.meses.length>1){
-    const cm=cartao(pai,'Consumo mes a mes','A serie inteira, sem a janela: a janela e da media, a serie e a historia.');
-    cm.appendChild(tabela([{nome:'Mes'},{nome:'m²',num:true},{nome:'Metros',num:true},{nome:'Rolos',num:true}],
-      g.meses.map(m=>el('tr',{},[
-        el('td',{texto:m.mes}),
-        el('td',{class:'num',texto:formatarArea(m.m2)}),
-        el('td',{class:'num',texto:formatarMetros(m.metros)}),
-        el('td',{class:'num',texto:String(m.rolos)})
-      ]))));
-  }
+  // ── GRAFICOS ───────────────────────────────────────────────────────────
+  const cg=el('div',{class:'cartao'});
+  cg.appendChild(el('h2',{texto:'Consumo mes a mes'}));
+  cg.appendChild(el('p',{class:'nota',texto:
+    'A serie inteira, sem a janela: a janela e da media, a serie e a historia. O eixo comeca no zero — comecar no menor valor faz variacao de 2% parecer despencar.'}));
+  cg.appendChild(linhaTempo(g.meses.slice().reverse().map(m=>({rotulo:m.mes.slice(2),valor:m.m2})),
+    {formatar:v=>Math.round(v)+' m²'}));
+  pai.appendChild(cg);
+
+  const cc=el('div',{class:'cartao'});
+  cc.appendChild(el('h2',{texto:'Estoque × consumo, por colecao'}));
+  cc.appendChild(el('p',{class:'nota',texto:
+    'Os dois lado a lado porque o que interessa e a proporcao. Colecao com muito estoque e pouco consumo e dinheiro dormindo; o contrario e risco de faltar.'}));
+  cc.appendChild(barras(g.por_colecao.slice().sort((a,b)=>b.m2_parado-a.m2_parado),{
+    series:[{nome:'em estoque (m²)',cor:'var(--acao)',valor:i=>i.m2_parado},
+            {nome:'consumido na janela (m²)',cor:'var(--sobra)',valor:i=>i.m2}],
+    rotulo:i=>i.chave, formatar:v=>num(Math.round(v*10)/10)}));
+  pai.appendChild(cc);
+
+  const cb=el('div',{class:'cartao'});
+  cb.appendChild(el('h2',{texto:'Por largura de bobina'}));
+  cb.appendChild(el('p',{class:'nota',texto:
+    'Bobinas diferentes sao estoques diferentes: nao ha emenda, entao 2,00 nao cobre peca de 2,20. Por isso elas nunca se somam nas contas de cobertura.'}));
+  cb.appendChild(barras(g.por_largura.slice().sort((a,b)=>b.m2_parado-a.m2_parado),{
+    series:[{nome:'em estoque (m²)',cor:'var(--acao)',valor:i=>i.m2_parado},
+            {nome:'consumido (m²)',cor:'var(--sobra)',valor:i=>i.m2}],
+    rotulo:i=>num(i.chave)+' m', formatar:v=>num(Math.round(v*10)/10)}));
+  cb.appendChild(el('h2',{style:'margin-top:20px;font-size:16px',texto:'Por cor'}));
+  cb.appendChild(barras(g.por_cor.slice().sort((a,b)=>b.m2_parado-a.m2_parado),{
+    series:[{nome:'em estoque (m²)',cor:'var(--acao)',valor:i=>i.m2_parado},
+            {nome:'consumido (m²)',cor:'var(--sobra)',valor:i=>i.m2}],
+    rotulo:i=>i.chave, formatar:v=>num(Math.round(v*10)/10)}));
+  pai.appendChild(cb);
+
+  const cp2=el('div',{class:'cartao'});
+  cp2.appendChild(el('h2',{texto:'Ha quanto tempo sem sair'}));
+  cp2.appendChild(el('p',{class:'nota',texto:
+    'Onde o dinheiro esta dormindo. Material que NUNCA foi cortado cai na ultima faixa, e nao numa faixa propria no fim da lista — do ponto de vista do dinheiro parado ele e o caso mais grave, e separa-lo o tiraria de onde o olho procura.'}));
+  cp2.appendChild(barras(g.por_faixa,{
+    series:temCusto
+      ?[{nome:'valor parado',cor:'var(--sobra)',valor:i=>i.valor||0}]
+      :[{nome:'m² parados',cor:'var(--sobra)',valor:i=>i.m2||0}],
+    rotulo:i=>i.nome,
+    formatar:v=>temCusto?dinheiro(v):num(Math.round(v))+' m²'}));
+  pai.appendChild(cp2);
+
+  // ── TABELA ─────────────────────────────────────────────────────────────
+  const ct=el('div',{class:'cartao'});
+  ct.appendChild(el('h2',{texto:'Material a material'}));
+  ct.appendChild(el('p',{class:'nota',texto:
+    'O grao e TECIDO × LARGURA DE BOBINA. Estoque minimo = consumo medio diario × '+
+    g.parametros.dias_alvo+' dias'+(g.parametros.seguranca?' + '+g.parametros.seguranca+'% de seguranca':'')+
+    ' — os dois em Cadastros → Parametros. Sem consumo, minimo e cobertura sao "—": nao da pra dizer, que nao e zero.'}));
+
+  const ordem={sem_estoque:0,critico:1,parado:2,atencao:3,normal:4};
+  const cab=[{nome:'Colecao'},{nome:'Cor'},{nome:'Bobina',num:true},
+    {nome:'Em estoque',num:true},{nome:'Media/mes',num:true},{nome:'Media/dia',num:true},
+    {nome:'Cobertura',num:true},{nome:'Minimo',num:true},{nome:'Ultimo corte'},
+    {nome:'Sem sair',num:true}].concat(temCusto?[{nome:'Valor',num:true}]:[]).concat([{nome:'Status'}]);
+
+  ct.appendChild(tabela(cab, g.linhas.slice()
+    .sort((a,b)=>ordem[a.status]-ordem[b.status]||(b.m2||0)-(a.m2||0))
+    .map(l=>{
+      const s=STATUS[l.status];
+      return el('tr',{},[
+        el('td',{texto:l.linha_nome+' · '+l.abertura_nome}),
+        el('td',{texto:l.cor_nome}),
+        el('td',{class:'num',texto:num(l.largura)+' m'}),
+        el('td',{class:'num',texto:formatarArea(l.m2_parado)}),
+        el('td',{class:'num',texto:l.media_dia>0?formatarArea(l.media_mes):'—'}),
+        el('td',{class:'num',texto:l.media_dia>0?formatarArea(l.media_dia):'—'}),
+        el('td',{class:'num',texto:l.cobertura==null?'—':num(l.cobertura)+' d'}),
+        /* O MINIMO SO E COBRANCA QUANDO ESTA ABAIXO. Pintar de ambar todo
+           minimo faria a coluna inteira gritar, e coluna que grita sempre
+           ninguem le. */
+        el('td',{class:'num'+(l.abaixo_do_minimo>0?' aviso':''),
+          texto:l.minimo==null?'—':formatarArea(l.minimo),
+          title:l.abaixo_do_minimo>0?('faltam '+formatarArea(l.abaixo_do_minimo)):''}),
+        el('td',{texto:l.ultimo_corte||'nunca'}),
+        el('td',{class:'num',texto:l.dias_sem_consumo==null?'—':l.dias_sem_consumo+' d'})
+      ].concat(temCusto?[el('td',{class:'num',
+          texto:l.valor==null?'—':(l.rolos_sem_preco?'≥ ':'')+dinheiro(l.valor)})]:[])
+       .concat([el('td',{},[el('span',{class:'tag',
+          style:'background:'+s.fundo+';color:'+s.cor,texto:s.nome})])]));
+    })));
+
+  ct.appendChild(el('p',{class:'ajuda',texto:
+    'CRITICO: cobertura abaixo de metade dos '+g.parametros.dias_alvo+' dias-alvo, ou estoque zerado. '+
+    'PARADO: tem estoque e nenhum corte ha '+g.parametros.parado_dias+'+ dias. '+
+    'ATENCAO: cobertura abaixo do alvo. A ordem e de precedencia: sem estoque nao e "parado", e a urgencia.'}));
+  pai.appendChild(ct);
 }
 
 // ── ENCALHE ──────────────────────────────────────────────────────────────
