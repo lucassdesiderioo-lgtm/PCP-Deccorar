@@ -378,6 +378,84 @@ da edição e o "parado ≠ idade".
 
 ---
 
+## O que sai da prateleira (Painel → O que sai)
+
+Responde **qual tecido tem mais saída**, **qual largura de bobina mais se usa**,
+**a média diária por bobina e por cor** e **quantos dias o estoque aguenta**.
+
+### ⚠️ A JANELA NUNCA É MAIOR QUE A HISTÓRIA QUE EXISTE
+
+É o defeito que este painel poderia ter e que **não daria erro nenhum**:
+
+```
+média de 12 dias de história ÷ 30 dias de janela
+= um número 2,5× MENOR que a verdade, com cara de fato
+```
+
+Ninguém descobre olhando a tela. O comprador lê *"gastamos 4 m²/dia"*, compra
+para isso, e a fábrica gasta 10.
+
+Por isso `giro.janela()` corta a janela pedida no **primeiro consumo
+registrado**, devolve `{pedidos, dias, desde, completa}` e a tela **escreve em
+âmbar** quando os dois diferem. Média sem a janela ao lado é um número que
+engana.
+
+> **A média divide por dias CORRIDOS**, fim de semana incluído — a pergunta é
+> quanto essa fábrica gasta por dia. Dividir só pelos dias com corte responderia
+> *"quanto ela gasta num dia de corte"*, que é outro número e sempre maior. A
+> coluna **Dias com corte** diz de quantos dias úteis aquela média saiu.
+
+### ⚠️ SAÍDA É `motivo='consumo'`, E SÓ
+
+`ajuste` e `encerramento` também mexem no saldo, e **nenhum dos dois é corte**:
+o ajuste é correção de contagem, o encerramento é o acerto do que sobrou no
+tubo. Somados, o painel deixaria de responder *"quanto a fábrica cortou"* e
+passaria a responder *"quanto a coluna variou"*, que ninguém perguntou.
+
+É a lição do `fluxo_estoque.js` do PCP (§18), aqui de novo.
+
+### O m² manda, e não o metro linear
+
+10 m de bobina 3,00 é **mais tecido** que 10 m de 2,00. Ordenar por metro linear
+responderia errado a pergunta *"qual bobina mais uso"* — o que se compra é área.
+As duas colunas aparecem; a ordenação é por m².
+
+### Cobertura mede risco; a quantidade não
+
+**Quantos dias o que está na prateleira aguenta neste ritmo.** 200 m² de um
+tecido que gira 40/dia é menos folga que 50 m² de um que gira 1 — e era o
+segundo que apareceria em cima numa lista ordenada por quantidade.
+
+> **Sem consumo na janela a cobertura é `null`** — "não dá pra dizer", que não é
+> zero. Mesma regra da tela azul do operador (`CLAUDE.md` §3).
+
+### ⚠️ "Não saiu nada" é por TECIDO, senão o título mente
+
+A lista de giro parte do consumo, então o que não girou **some da tela** — o
+pior lugar onde um tecido parado pode estar. Daí a segunda lista.
+
+Ela conta **por tecido, não por rolo**: por rolo, um tecido com um tubo girando
+e outro esquecido apareceria nas **duas** listas, e o título *"não saiu nada"*
+estaria mentindo sobre ele. Rolo parado já tem resposta própria e melhor — a
+coluna **Parado** da tela de Rolos, que conta desde o último consumo daquele
+tubo. Duas telas respondendo a mesma pergunta com granularidades diferentes é o
+começo de duas réguas.
+
+### A série mês a mês NÃO é cortada pela janela
+
+A janela é da **média**; a série é a **história**. Cortar as duas pelo mesmo
+número tiraria justamente a tendência, que é o que a série existe para mostrar.
+
+> `dominio/giro.js` é o **dono único de "quanto consumiu"**. E a poda do preço
+> vale aqui também: a lista "não saiu" carrega o valor parado, e valor é preço —
+> quem não tem `custo.ver` recebe o JSON sem ele, podado **na rota**.
+
+**Teste obrigatório:** `node teste/rodar.js` — os 12 casos de
+`teste/giro.test.js` travam a janela efetiva, a exclusão do ajuste, o m² acima
+do metro linear, a cobertura `null` e o "não saiu nada" por tecido.
+
+---
+
 ## O inventário inicial: como lançar o que já está na prateleira
 
 A entrada de rolo (tela **Rolos**) é onde o estoque físico entra — inclusive as

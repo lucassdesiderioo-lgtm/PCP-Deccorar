@@ -1085,6 +1085,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Guardar preço no cadastro do fornecedor para multiplicar na hora de mostrar
   — o estoque comprado antes muda de valor no dia do reajuste (§19, armadilha #15)
 - ❌ Somar zero pelo rolo sem nota lançada: o total é PISO, com o `≥` na frente
+- ❌ Dividir a média diária por uma janela maior que a história registrada — o
+  número sai menor que a verdade, sem erro e sem aviso (§19, armadilha #16)
+- ❌ Contar `ajuste` ou `encerramento` como saída de tecido: nenhum dos dois é
+  corte (§19, armadilha #16)
 - ❌ Deixar a bancada criar um cadastro **sem** marcá-lo para conferência, ou
   marcar **sem** ele aparecer na lista de Cadastros — meia decisão é pior que
   a trava que existia antes (§19, armadilha #14)
@@ -1440,6 +1444,32 @@ As outras três regras vieram inteiras do PCP, e valem igual aqui:
 qualquer tela divergiria no primeiro preço lançado, e as duas estariam "certas"
 — cada uma na sua régua. É a armadilha #12 outra vez.
 
+### ⚠️ ARMADILHA #16 — média cuja janela é maior que a história
+
+O painel "O que sai" (Painel → O que sai) responde qual tecido gira mais, qual
+bobina se usa mais e a média diária por cor. O defeito que ele poderia ter não
+daria erro nenhum:
+
+```
+média de 12 dias de história ÷ 30 dias de janela
+= um número 2,5× MENOR que a verdade, com cara de fato
+```
+
+Ninguém descobre olhando: o comprador lê "gastamos 4 m²/dia", compra para isso,
+e a fábrica gasta 10. Por isso `giro.janela()` corta a janela pedida no
+**primeiro consumo registrado** e a tela **escreve em âmbar** quando os dois
+diferem. Média sem a janela ao lado é número que engana.
+
+As outras três regras já eram do PCP:
+
+| Regra | Onde já doeu |
+|---|---|
+| Saída é `motivo='consumo'` e só — ajuste e encerramento **não são corte** | `fluxo_estoque.js`, §18 |
+| Cobertura sem consumo é `null`, nunca zero | §3 |
+| A média divide por dias **corridos**, e a tela diz quantos tiveram corte | — |
+
+`tecido/dominio/giro.js` é o **dono único de "quanto consumiu"**.
+
 ### Duas regras do sob medida que valem citar aqui
 
 **Não há emenda.** Peça mais larga que toda bobina do estoque não sai — e por
@@ -1453,7 +1483,7 @@ cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 160 casos
+cd tecido && npm test          # 172 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
