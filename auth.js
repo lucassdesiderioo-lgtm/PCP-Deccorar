@@ -19,8 +19,23 @@ const AREAS=[
   // lista protegida abaixo — sem entrada em TELAS, um usuario deslogado cairia
   // no next() e a pagina seria servida do disco (armadilha #3 da secao 10 do
   // CLAUDE.md). Quem decide de verdade e a permissao pedido.receber.
-  {id:'recebimento', nome:'Recebimento de compras'}
+  {id:'recebimento', nome:'Recebimento de compras'},
+  /* SOB MEDIDA (02/09/2026). A fabrica tem duas operacoes: a de medida padrao,
+     que vende pelo Mercado Livre, e a sob medida, que corta tecido contra o
+     pedido do cliente. Ate aqui a segunda vivia num segundo servidor, com um
+     segundo cadastro de pessoas — e desligar alguem exigia lembrar dos dois.
+
+     Como areas do PCP, a liberacao passa a ser uma linha na MESMA tela em que
+     se libera revisao ou carregamento, e o desligamento vale para tudo de uma
+     vez. Quem traduz area em papel la dentro e `tecido/nucleo/acesso.js`. */
+  {id:'sobmedida',     nome:'Sob medida - bancada (corte, sobras, etiquetas)'},
+  {id:'sobmedida_adm', nome:'Sob medida - cadastros e parametros'}
 ];
+
+// O caminho onde o modulo sob medida esta montado. Constante porque o auth e o
+// server.js precisam concordar, e um deles concordando sozinho e uma tela
+// servida sem sessao (armadilha #3).
+const SOBMEDIDA='/sobmedida';
 
 const TELAS={
   '/':'admin','/admin':'admin','/index.html':'admin',
@@ -33,7 +48,12 @@ const TELAS={
   '/embalagem':'embalagem','/embalagem.html':'embalagem',
   '/expedicao':'expedicao','/expedicao.html':'expedicao',
   '/carregamento':'carregamento','/carregamento.html':'carregamento',
-  '/recebimento':'recebimento','/recebimento.html':'recebimento'
+  '/recebimento':'recebimento','/recebimento.html':'recebimento',
+  /* A escolha de setor. O '*' quer dizer QUALQUER SESSAO: nao ha area para
+     escolher onde trabalhar. Ela precisa estar nesta lista de todo jeito —
+     fora dela, o pedido cairia no next() e o express.static entregaria o
+     arquivo do disco sem sessao nenhuma (armadilha #3 da secao 10). */
+  '/setor':'*','/setor.html':'*'
 };
 
 const API_ADMIN=['/api/teste','/api/usuarios','/api/estoque','/api/alvo','/api/backup'];
@@ -78,7 +98,7 @@ module.exports=function(app, db){
     }catch(e){ return null; }
   }
 
-  const tem=(u,a)=>u&&(u.areas.includes('admin')||u.areas.includes(a));
+  const tem=(u,a)=>!!u&&(a==='*'||u.areas.includes('admin')||u.areas.includes(a));
 
   const falhas={};
   function bloqueado(id){
@@ -98,6 +118,15 @@ module.exports=function(app, db){
     if(LIVRE.includes(p)||p.startsWith('/api/auth/')) return next();
     const u=lerSessao(req);
     req.usuario=u;
+    /* SOB MEDIDA — o modulo montado em /sobmedida tem portao proprio
+       (tecido/montar.js): ele traduz area do PCP em papel e confere permissao
+       por chave, tela a tela. Aqui so se passa a sessao adiante.
+
+       Fica ANTES do modelo novo de acesso de proposito. O `decidir()` nao
+       conhece estes caminhos, e decidir por omissao seria arbitrario nos dois
+       sentidos: liberar tudo abriria o corte a quem nao tem area, negar tudo
+       trancaria quem tem. Um dono so por caminho. */
+    if(p===SOBMEDIDA||p.startsWith(SOBMEDIDA+'/')) return next();
     const area=TELAS[p];
     const api=p.startsWith('/api/');
     if(!u){

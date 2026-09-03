@@ -1,34 +1,81 @@
 /* Tokens. NENHUM hex mora dentro de uma tela — mudar a cara do modulo tem
    que ser um arquivo, nao uma cacada por dez arquivos.
-   Alvo: tablet e desktop na fabrica. Dedo grosso, fonte grande, contraste
-   alto, e nada que exija mira fina. */
+
+   ⚠️ OS HEX SAO OS DO PCP, COPIADOS DAS TELAS QUE JA RODAM — o claro de
+   `public/operador.html`, o escuro de `public/index.html`, ambos fixados na
+   secao 2 do docs/DESIGN.md. Isto nao e detalhe de gosto: a primeira versao
+   deste modulo usou uma paleta QUASE igual (#12161c no lugar de #1a1d23,
+   #1f6feb no lugar de #1565c0, e assim em todas as sete cores). Nenhuma
+   batia. Diferente o bastante para o olho perceber, perto o bastante para
+   nao parecer proposital — e o efeito e a equipe sentir que entrou em outro
+   sistema. Cor nova aqui so entra se entrar tambem la.
+
+   DOIS CONTEXTOS, DOIS TEMAS (docs/DESIGN.md secao 1). O padrao e a OPERACAO:
+   iPad no suporte, luz natural forte e uma lampada branca de inspecao ao
+   lado — tela escura ali vira espelho e o operador enxerga o proprio reflexo
+   em vez da medida da peca. O escuro fica para o escritorio, onde a luz e
+   controlada e a tela e de numeros. Quem carimba o `data-contexto` no <html>
+   e o servidor, a partir de `nucleo/telas.js`. */
 :root{
-  --tinta:#12161c;
-  --tinta-fraca:#5b6673;
-  --papel:#f4f6f8;
-  --cartao:#ffffff;
-  --linha:#d7dde5;
+  --papel:#ffffff;         /* fundo da pagina */
+  --cartao:#f4f6f8;        /* cartao, area de agrupamento */
+  --campo:#ffffff;         /* input e botao: precisa destacar SOBRE o cartao */
+  --tinta:#1a1d23;
+  --tinta-fraca:#5a6472;
+  --linha:#d8dee6;
   --linha-forte:#b9c3ce;
 
-  --acao:#1f6feb;          /* azul de acao */
+  --acao:#1565c0;          /* azul de acao */
   --acao-tinta:#ffffff;
-  --acao-fraca:#e8f0fe;
+  --acao-fraca:#e8f0fb;
 
-  --bom:#1a7f45;
-  --bom-fraca:#e6f4ec;
-  --alerta:#a86800;
-  --alerta-fraca:#fdf3e0;
-  --erro:#b3261e;
-  --erro-fraca:#fdecea;
+  --bom:#2e7d32;
+  --bom-fraca:#e7f5eb;
+  --alerta:#b26a00;        /* o ambar do tema escuro (#ffb800) da 1.8:1 sobre
+                              branco — ilegivel. Por isso a versao escurecida. */
+  --alerta-fraca:#fbf1db;
+  --erro:#c62828;
+  --erro-fraca:#fbe9e8;
 
-  --rolo:#1f6feb;          /* armazem ROLO */
-  --sobra:#8a5a00;         /* armazem SOBRA */
+  --rolo:#1565c0;          /* armazem ROLO */
+  --sobra:#b26a00;         /* armazem SOBRA */
 
   --raio:10px;
   --raio-g:14px;
   --sombra:0 1px 2px rgba(18,22,28,.08), 0 4px 12px rgba(18,22,28,.06);
-  --toque:52px;            /* altura minima de qualquer alvo de toque */
+  --toque:52px;            /* opcao de formulario (DESIGN.md secao 4) */
+  --toque-acao:56px;       /* botao de acao principal — em pe, peca na mao */
   --gap:12px;
+}
+
+/* ── ESCRITORIO ───────────────────────────────────────────────────────────
+   Cadastros e Painel. Mesmos hex do admin do PCP, para as duas abas abertas
+   lado a lado no mesmo desktop parecerem o mesmo produto. */
+html[data-contexto="admin"]{
+  --papel:#0e1217;
+  --cartao:#161b22;
+  --campo:#0b0f14;
+  --tinta:#e6edf3;
+  --tinta-fraca:#8b97a5;
+  --linha:#262d37;
+  --linha-forte:#39424f;
+
+  --acao:#4493f8;
+  --acao-tinta:#04121f;
+  --acao-fraca:#10243a;
+
+  --bom:#2ea043;
+  --bom-fraca:#0b2a17;
+  --alerta:#ffb800;
+  --alerta-fraca:#1a1608;
+  --erro:#f85149;
+  --erro-fraca:#3a1513;
+
+  --rolo:#4493f8;
+  --sobra:#ffb800;
+
+  /* Sombra nao existe no escuro — o que separa o cartao do fundo e a borda. */
+  --sombra:none;
 }
 
 *{box-sizing:border-box}
@@ -56,7 +103,7 @@ body{
 .abas{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px}
 .abas button{
   min-height:var(--toque); padding:0 18px; font-size:16px; font-weight:600;
-  background:var(--cartao); color:var(--tinta-fraca);
+  background:var(--campo); color:var(--tinta-fraca);
   border:1px solid var(--linha); border-radius:var(--raio); cursor:pointer;
 }
 .abas button[aria-selected="true"]{
@@ -80,7 +127,7 @@ body{
 input,select,textarea{
   min-height:var(--toque); padding:10px 12px; font-size:17px;
   border:1px solid var(--linha-forte); border-radius:var(--raio);
-  background:var(--cartao); color:var(--tinta); font-family:inherit;
+  background:var(--campo); color:var(--tinta); font-family:inherit;
 }
 input:focus,select:focus,textarea:focus{outline:3px solid var(--acao-fraca); border-color:var(--acao)}
 
@@ -89,10 +136,10 @@ button{font-family:inherit}
 .bt{
   min-height:var(--toque); padding:0 20px; font-size:16px; font-weight:650;
   border-radius:var(--raio); border:1px solid var(--linha-forte);
-  background:var(--cartao); color:var(--tinta); cursor:pointer;
+  background:var(--campo); color:var(--tinta); cursor:pointer;
 }
 .bt:active{transform:translateY(1px)}
-.bt.primario{background:var(--acao); color:var(--acao-tinta); border-color:var(--acao)}
+.bt.primario{min-height:var(--toque-acao); background:var(--acao); color:var(--acao-tinta); border-color:var(--acao)}
 .bt.perigo{background:var(--erro-fraca); color:var(--erro); border-color:var(--erro)}
 .bt.pequeno{min-height:38px; padding:0 12px; font-size:15px}
 .bt[disabled]{opacity:.5; cursor:not-allowed}
@@ -103,7 +150,7 @@ button{font-family:inherit}
 .fileira .op{
   min-height:var(--toque); padding:0 18px; font-size:17px; font-weight:600;
   border:2px solid var(--linha-forte); border-radius:var(--raio);
-  background:var(--cartao); color:var(--tinta); cursor:pointer;
+  background:var(--campo); color:var(--tinta); cursor:pointer;
 }
 .fileira .op[aria-pressed="true"]{
   background:var(--acao); color:var(--acao-tinta); border-color:var(--acao);
@@ -139,10 +186,44 @@ td.num,th.num{text-align:right; font-variant-numeric:tabular-nums}
 .vazio{padding:26px; text-align:center; color:var(--tinta-fraca)}
 .ajuda{font-size:14px; color:var(--tinta-fraca); margin:6px 0 0; max-width:62ch}
 
-/* ── Login ────────────────────────────────────────────────────────────── */
-.login{max-width:460px; margin:8vh auto; padding:18px}
-.pessoas{display:grid; grid-template-columns:1fr 1fr; gap:10px}
-.pessoas .op{min-height:64px; font-size:19px}
-.teclado{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:14px}
-.teclado .bt{min-height:64px; font-size:24px}
-.pin{letter-spacing:.5em; font-size:32px; text-align:center; min-height:60px}
+/* ── Barra de atalhos do rodape ───────────────────────────────────────────
+   O mesmo lugar e o mesmo gesto da barra do PCP (public/nav.js). Ela e a
+   razao pratica de o modulo PARECER o mesmo sistema: o operador que trabalha
+   nas duas operacoes no mesmo dia acha a navegacao onde ela sempre esteve.
+   Montada por nav.js — aqui so a aparencia. */
+.rodape{
+  position:fixed; left:0; right:0; bottom:0; z-index:90;
+  display:flex; gap:2px; justify-content:center; flex-wrap:wrap;
+  padding:6px; background:var(--cartao); border-top:1px solid var(--linha);
+}
+.rodape a{
+  text-decoration:none; font-size:13px; font-weight:600;
+  padding:9px 14px; border-radius:8px; color:var(--tinta-fraca);
+}
+.rodape a[aria-current="page"]{background:var(--alerta); color:var(--papel)}
+.rodape .volta{color:var(--acao)}
+/* O rodape e fixo: sem esta folga ele cobre a ultima linha da tabela, e a
+   linha coberta e justamente a que a pessoa rolou ate o fim para ler. */
+body{padding-bottom:64px}
+@media print{ .rodape,.sessao{display:none} body{padding-bottom:0} }
+
+/* ── Barra de sessao ──────────────────────────────────────────────────── */
+.sessao{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:8px 18px; background:var(--cartao);
+  border-bottom:1px solid var(--linha); font-size:14px; color:var(--tinta-fraca);
+}
+.sessao b{color:var(--tinta); font-weight:700}
+.sessao .espaco{flex:1}
+.sessao button{
+  min-height:36px; padding:0 12px; font-size:14px; font-weight:600;
+  border:1px solid var(--linha-forte); border-radius:8px;
+  background:var(--campo); color:var(--tinta); cursor:pointer;
+}
+/* A faixa que diz em que operacao a pessoa esta. Ela existe porque agora ha
+   duas, e entrar na errada so se descobre depois de lancar alguma coisa. */
+.sessao .setor{
+  padding:3px 12px; border-radius:999px; font-weight:800; letter-spacing:.04em;
+  font-size:13px; background:var(--alerta-fraca); color:var(--alerta);
+  border:1px solid var(--alerta);
+}

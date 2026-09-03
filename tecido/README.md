@@ -1,15 +1,29 @@
 # Tecido — estoque, sobras e plano de corte
 
-Operação **sob medida**. Aplicação **separada** do PCP do Mercado Livre: banco
-próprio (`tecido.db`), porta própria (3020). A única ponte é o **login único**
-(abaixo) — estoque, cadastros e regras continuam independentes.
+Operação **sob medida** — a fábrica corta tecido contra o pedido do cliente,
+enquanto o resto do PCP cuida da operação de **medida padrão**, vendida pelo
+Mercado Livre.
+
+Este módulo **não sobe sozinho**. Ele é montado dentro do PCP, em `/sobmedida`,
+pelo `server.js` da raiz. Uma porta, um processo, um PIN.
 
 ```bash
-cd tecido
-npm install
-npm start        # http://localhost:3020   (usuário inicial: Diretor / PIN 1234)
-npm test         # testes de domínio, sem servidor
+npm test          # daqui: 87 casos, banco temporário, sem servidor
+node server.js    # da RAIZ: sobe o PCP inteiro, com o sob medida junto
 ```
+
+O que continua separado é o **miolo**: banco próprio (`tecido.db`), domínio
+próprio, migrações numeradas, testes próprios. A junção é de porta, não de
+dados — misturar os dois esquemas trocaria um problema de acesso por um de
+dados, e este é o único schema do projeto que se reconstrói sozinho num banco
+novo.
+
+> ⚠️ **Ele já foi um segundo servidor, na porta 3020, com PIN próprio.** Durou
+> um dia em produção e custou três defeitos: o botão que não escapava do iframe
+> do admin, a porta fechada no firewall e — o pior — um beco sem saída, porque
+> liberar alguém exigia uma sessão que só existia depois de liberado. Uma
+> tranca sem chave. Se você está pensando em separar de novo, leia a seção
+> **Entrada única** antes.
 
 ---
 
@@ -51,7 +65,13 @@ não só a tela.
 | 4 | Sobra com defeito parcial? | **Entra, mas por último** | `condicao_sobra.prioridade` e `.aproveitavel` |
 | 5 | Leitor na bancada? | **Sim.** Campo de bipe visível, aceita Enter e Tab, processa por timeout | telas das fases 2 e 4 |
 | 6 | Sequência das etiquetas? | **O sistema imprime.** Escolhe-se a quantidade, ele gera a sequência e registra o lote; a sobra nasce quando o operador bipa a etiqueta colada | tabelas `etiqueta` e `etiqueta_lote` |
-| 7 | Autenticação? | **Login único com o PCP** — a pessoa entra uma vez, com o PIN que já tem | `nucleo/pcp.js` + `nucleo/auth.js` |
+| 7 | Autenticação? | **Entrada única.** Um PIN, na tela do PCP; depois se escolhe a operação. A liberação é uma área em Admin → Acessos | `nucleo/acesso.js` + `montar.js` |
+
+> **A resposta 7 mudou em 02/09/2026, depois de um dia em produção.** Ela era
+> "login único": dois servidores, dois cadastros de pessoas, e uma ponte HTTP
+> perguntando ao PCP quem era o dono do cookie. Funcionava — e mesmo assim
+> liberar a primeira pessoa era impossível, porque a tela de liberação exigia
+> estar liberado. Hoje não há segundo cadastro nem ponte: um processo só.
 
 > **A resposta 6 revoga a R11 da especificação.** Lá a etiqueta era pré-impressa
 > e o código, digitado pelo operador; a lista de pendência seria um palpite
@@ -81,36 +101,44 @@ não só a tela.
 10. **Medidas em metros, `REAL`.** Exibição por `ui.js`; toda comparação com
     tolerância de 1 mm.
 
-> **A ordem no `server.js` é arquitetura, não estilo.** `auth` antes de
+> **A ordem no `server.js` da raiz é arquitetura, não estilo.** `auth` antes de
 > `express.static`. Invertendo, o Express entrega os `.html` direto do disco e
-> qualquer pessoa abre a tela sem PIN.
+> qualquer pessoa abre a tela sem PIN. O portão deste módulo repete a mesma
+> guarda por dentro: **nenhum `.html` sai do disco por caminho direto** — as
+> telas só abrem pelos caminhos declarados em `nucleo/telas.js`, e é lá que a
+> permissão é conferida.
 
-### Teste de segurança obrigatório após mexer em `auth.js` ou `server.js`
+### Teste de segurança obrigatório após mexer em `auth.js`, `server.js` ou `montar.js`
 
 ```bash
-for r in / /inicio /cadastros /telas/cadastros.html /api/tecidos /api/parametros; do
-  printf "%-26s " "$r"; curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3020$r
+for r in / /admin /operador /setor /sobmedida /sobmedida/corte \
+         /sobmedida/cadastros /sobmedida/telas/corte.html \
+         /api/skus /sobmedida/api/eu; do
+  printf "%-30s " "$r"; curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3010$r
 done
-curl -s -o /dev/null -w "/login  %{http_code}\n" http://localhost:3020/login
+curl -s -o /dev/null -w "/login  %{http_code}\n" http://localhost:3010/login
 ```
 
 Esperado: telas `302`, API `401`, `/login` `200`. **Qualquer `200` numa tela é
-furo de segurança.**
+furo de segurança.** E `/sobmedida/telas/corte.html` tem que dar `403` mesmo
+para o diretor logado — se der `200`, o static furou o portão.
 
 ---
 
 ## Estrutura
 
 ```
-server.js              sobe o banco, monta o registro, escuta
+montar.js              o PORTAO: monta tudo no app do PCP, sob /sobmedida
 nucleo/                infraestrutura — nao sabe nada de tecido
-  db · schema · erros · dia · registro · config · auth · permissoes
+  db · schema · erros · dia · registro · config · permissoes
+  acesso    traduz AREA do PCP em PAPEL daqui
+  telas     que telas existem, que permissao pedem, e o TEMA de cada uma
 dominio/               a regra — nao conhece Express, req nem res
-  tecido · endereco · motivo · usuario · sobra · etiqueta
+  tecido · endereco · motivo · sobra · etiqueta
   rolo · encaixe (funcao pura) · plano · painel
 dados/                 o SQL. Uma tabela, um arquivo. Nao decide nada
 rotas/                 declaracoes. Sem SQL, sem `if` de negocio
-public/                base.css (tokens) · ui.js · barras.js · login · telas/
+public/                base.css (tokens) · ui.js · nav.js · barras.js · telas/
 teste/                 rodar.js + *.test.js — banco temporario, do zero
 ```
 
@@ -306,57 +334,88 @@ A margem não é um detalhe de acabamento — ela dobra o consumo.
 
 ---
 
-## Login único com o PCP
+## Entrada única
 
-**Autenticação no PCP, autorização aqui.** A pessoa entra uma vez, com o PIN
-que já tem, clica em *Plano de corte* na tela de login do PCP e atravessa sem
-digitar nada de novo.
+A fábrica tem **duas operações**, e agora um único jeito de entrar nas duas.
 
 ```
-PCP (3010)                          Tecido (3020)
-  entra com o PIN  ──cookie──▶  "quem é o dono deste cookie?"
-                                        │
-                                        ▼
-                              cadastro interno decide:
-                              pode entrar? com que papel?
+      tela de PIN do PCP  (uma só, a que a equipe já conhece)
+                    │
+                    ▼
+            /setor  ── aparece SÓ para quem alcança as duas
+             │                    │
+   MEDIDA PADRÃO            SOB MEDIDA
+   (Mercado Livre)          /sobmedida
 ```
 
-**Por que essa divisão.** O cadastro duplicado tinha um furo silencioso:
-alguém sair da empresa, ser bloqueado no PCP e continuar entrando no estoque
-de tecido porque ninguém lembrou do segundo sistema. Agora **bloqueou lá, não
-entra aqui** — e há teste provando exatamente isso.
+Quem alcança uma operação só **vai direto** para ela: escolha de uma opção só
+não é escolha, e cobrar um toque por dia de quem não tem alternativa é o tipo
+de atrito que faz a equipe reclamar do sistema inteiro.
 
-O caminho contrário também vale: tirar o acesso ao corte **não** mexe no PCP.
-São perguntas diferentes — *quem é você* e *o que você faz aqui*.
+### A liberação mora num lugar só: Admin → Acessos
+
+Não há cadastro de pessoas aqui dentro. Quem entra é decidido por **área do
+PCP**, na mesma tela em que se libera Revisão ou Carregamento:
+
+| Setor no PCP | Permissão | Vira, aqui | Alcança |
+|---|---|---|---|
+| **Sob medida / Bancada** | `sobmedida.cortar` | `cortador` | corte, rolos, sobras, etiquetas, painel |
+| **Sob medida / Cadastros** | `sobmedida.cadastrar` | `diretor` | tudo, mais cadastros e parâmetros |
+| Admin Geral | (todas) | `diretor` | tudo |
+
+Quem traduz é `nucleo/acesso.js`, e é o **único** lugar que sabe dessa
+correspondência. Trocar o modelo de acesso do PCP amanhã mexe nesse arquivo, e
+em nenhum outro.
+
+> ⚠️ **O CONTRATO COM O PCP É A COLUNA `usuarios.areas`, E ELA É SOMBRA.**
+> No modelo novo de acesso do PCP, `areas` não é mais editada à mão: ela é
+> **recalculada** a partir das permissões efetivas, pelo mapa `PERM_AREA` em
+> `acesso.js`. As duas linhas de sob medida **precisam** estar nesse mapa.
+>
+> Faltando, o modo de falhar é o pior possível: o admin marca o acesso, a tela
+> confirma, e a área é apagada no salvamento seguinte. O acesso sumiria
+> sozinho, sem erro, sem log. Foi o que quase aconteceu — hoje há teste
+> travando as duas pontas (`teste/acesso.test.js`, caso do contrato).
+
+### Bloquear é uma coisa só
+
+Desligar a pessoa no PCP fecha as duas operações no mesmo gesto — era
+exatamente isso que os dois cadastros separados não davam. Tirar só o setor de
+sob medida fecha o corte e mantém o resto.
 
 ### O que este módulo NÃO faz
 
-Não lê o banco do PCP, não lê o segredo do cookie dele, não conhece o schema
-de lá. Pergunta por HTTP (`GET /api/auth/eu`) e recebe id e nome — mais nada.
-Se o PCP mudar o jeito de assinar a sessão, aqui não quebra.
+Não lê o banco do PCP, não conhece o segredo do cookie dele, não guarda PIN.
+Ele recebe `req.usuario` já resolvido e traduz. A autenticação continua tendo
+um dono só.
 
-### O PIN próprio continua existindo
+---
 
-Não é sobra do desenho antigo: é a saída para o dia em que o PCP estiver fora
-do ar. **Sem ela, uma queda da expedição pararia o corte junto** — e as duas
-operações não têm nada a ver uma com a outra. No dia a dia ninguém usa esses
-PINs; eles ficam guardados para a emergência.
+## O design: dois contextos, dois temas
 
-Para desligar o login único e voltar todo mundo ao PIN daqui: apague o
-parâmetro **Endereço do PCP** em Cadastros → Parâmetros. Sem tocar em código.
+Segue o `docs/DESIGN.md` do PCP, e os hex são **copiados das telas que já
+rodam** — o claro de `public/operador.html`, o escuro de `public/index.html`.
 
-### Liberando alguém
+| Tela | Contexto | Fundo | Por quê |
+|---|---|---|---|
+| Início, Corte, Rolos, Sobras, Etiquetas | operação | **claro** | iPad no suporte, luz natural forte e lâmpada de inspeção ao lado — tela escura ali vira espelho |
+| Cadastros, Painel | admin | **escuro** | escritório, luz controlada, tela de números |
 
-Cadastros → Pessoas → **Acesso pelo PCP**: a lista traz quem existe no PCP, e
-o diretor libera com um toque, escolhendo o papel. Não cria senha nenhuma — a
-credencial continua sendo a de lá.
+Quem carimba o tema é o **servidor**, a partir de `nucleo/telas.js`, num
+atributo `data-contexto` no `<html>`. Deixar cada arquivo declarar o próprio
+tema garantiria que, mais cedo ou mais tarde, uma tela nova nascesse errada.
 
-> Quem já tinha PIN próprio aqui é **vinculado**, não duplicado. Duas contas
-> para a mesma pessoa dariam a falsa sensação de ter bloqueado o acesso ao
-> desativar só uma delas.
+> ⚠️ **A primeira versão usou uma paleta *quase* igual à do PCP** — `#12161c`
+> no lugar de `#1a1d23`, `#1f6feb` no lugar de `#1565c0`, e assim nas sete
+> cores. Nenhuma batia. Diferente o bastante para o olho perceber, perto o
+> bastante para não parecer proposital: o efeito é a equipe sentir que entrou
+> em outro sistema. **Cor nova aqui só entra se entrar também lá.**
 
-### Uma limitação conhecida
+A moldura (`public/nav.js`) repete o gesto do `nav.js` do PCP de propósito:
+barra de sessão em cima, barra de atalhos embaixo, ajuste A+/A− na operação.
+O menu se monta com o que a pessoa alcança — botão que leva a porta fechada
+ensina o operador a não tentar, e quem bate em "sem permissão" três vezes para
+de clicar na quarta, mesmo quando já podia.
 
-Com o PCP fora do ar, a primeira tela de cada pessoa espera até 2 segundos
-antes de cair no login próprio (o tempo de desistir da pergunta). Depois disso
-a resposta fica em cache por 5 segundos e a navegação volta ao normal.
+---
+

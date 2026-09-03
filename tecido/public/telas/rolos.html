@@ -4,14 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rolos · Tecido</title>
-<link rel="stylesheet" href="/base.css">
+<link rel="stylesheet" href="/sobmedida/base.css">
 </head>
 <body>
 <header class="topo">
   <h1>Rolos</h1>
   <span class="espaco"></span>
-  <a class="bt pequeno" href="/corte" style="text-decoration:none;display:inline-flex;align-items:center">Plano de corte</a>
-  <a class="bt pequeno" href="/" style="text-decoration:none;display:inline-flex;align-items:center">Inicio</a>
 </header>
 
 <div class="corpo">
@@ -19,7 +17,8 @@
   <div id="conteudo"></div>
 </div>
 
-<script src="/ui.js"></script>
+<script src="/sobmedida/ui.js"></script>
+<script src="/sobmedida/nav.js"></script>
 <script>
 const {api,banner,el,limpar,$,num,comoNumero,formatarMetros,formatarArea}=window.ui;
 
@@ -188,7 +187,7 @@ async function telaEntrada(pai){
   c.appendChild(el('div',{class:'campos'},[bt]));
 }
 
-(async function(){ eu=await api('/api/auth/eu'); desenhar(); })();
+(async function(){ eu=await api('/api/eu'); desenhar(); })();
 </script>
 </body>
 </html>

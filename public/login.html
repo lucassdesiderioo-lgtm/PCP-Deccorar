@@ -21,30 +21,12 @@
   .err{color:#ff6b6b;text-align:center;height:20px;font-size:14px;margin-top:10px}
   .volta{margin-top:16px;text-align:center;color:#8c94a6;font-size:14px;cursor:pointer}
   .hide{display:none}
-  /* A porta para o modulo de tecido. Fica na tela de login porque e onde o
-     tablet da bancada ja esta parado — e o cortador nao tem que decorar
-     endereco nenhum. E outro sistema, com PIN proprio, e a tela diz isso.
-
-     target="_top" NAO e detalhe: o /admin monta as telas em IFRAME, e a
-     sessao que expira dentro de um deles traz este login para dentro do
-     quadro. Sem o _top o clique navega so o iframe, e o operador ve o botao
-     "nao fazer nada". */
-  .outro{margin-top:26px;padding-top:20px;border-top:1px solid #2a2f3a}
-  .outro a{display:block;padding:18px 14px;background:#1c1f28;border:1px solid #f0b429;
-     border-radius:14px;color:#f0b429;font-size:17px;font-weight:700;text-align:center;
-     text-decoration:none}
-  .outro a:active{background:#252a35}
-  .outro .obs{color:#8c94a6;font-size:13px;text-align:center;margin-top:8px}
 </style></head><body>
 <div class="box">
   <div id="etapa1">
     <h1>Quem esta usando?</h1>
     <div class="sub">Toque no seu nome</div>
     <div class="nomes" id="nomes"></div>
-    <div class="outro">
-      <a id="tecido" href="#" target="_top">Plano de corte &mdash; tecido sob medida</a>
-      <div class="obs">Outro sistema, com PIN proprio</div>
-    </div>
   </div>
   <div id="etapa2" class="hide">
     <h1 id="oi"></h1>
@@ -61,14 +43,9 @@
   </div>
 </div>
 <script>
-// O modulo de tecido roda na MESMA maquina, em outra porta. O endereco e
-// montado a partir de onde esta tela foi aberta: assim funciona pelo IP da
-// fabrica, pelo nome da maquina ou pelo localhost, sem ninguem editar nada.
-var PORTA_TECIDO=3020;
 var alvo=null, pin='';
 var destino=new URLSearchParams(location.search).get('r')||'';
 function $(s){return document.querySelector(s);}
-$('#tecido').href=location.protocol+'//'+location.hostname+':'+PORTA_TECIDO+'/';
 fetch('/api/auth/pessoas').then(r=>r.json()).then(function(l){
   $('#nomes').innerHTML=l.map(p=>'<div class="nome" data-id="'+p.id+'">'+p.nome+'</div>').join('');
 });
@@ -102,11 +79,23 @@ function enviar(){
      location.href=destino||primeira(r.j.areas);
    });
 }
+// PARA ONDE A PESSOA VAI DEPOIS DO PIN.
+//
+// A fabrica tem duas operacoes. Quem alcanca as DUAS escolhe em /setor; quem
+// alcanca uma so vai direto para ela. Escolha de uma opcao so nao e escolha —
+// e um toque a mais, todo dia, para quem nao tem alternativa.
+var SOB_MEDIDA=['sobmedida','sobmedida_adm'];
+var PADRAO={admin:'/admin',painel:'/painel',operador:'/operador',montagem:'/montagem',
+            embalagem:'/embalagem',carregamento:'/carregamento',expedicao:'/expedicao',
+            relatorios:'/relatorios',necessidade:'/planejamento',recebimento:'/recebimento'};
 function primeira(a){
-  var m={admin:'/admin',painel:'/painel',operador:'/operador',montagem:'/montagem',
-         expedicao:'/expedicao',embalagem:'/embalagem',carregamento:'/carregamento',
-         relatorios:'/relatorios',necessidade:'/necessidade'};
-  for(var i=0;i<a.length;i++) if(m[a[i]]) return m[a[i]];
-  return '/login';
+  a=a||[];
+  // 'admin' alcanca tudo, inclusive o sob medida — entao ele SEMPRE escolhe.
+  var temSob = a.indexOf('admin')>=0 || SOB_MEDIDA.some(function(x){ return a.indexOf(x)>=0; });
+  var telaPadrao=null;
+  for(var k in PADRAO) if(a.indexOf(k)>=0){ telaPadrao=PADRAO[k]; break; }
+  if(temSob&&telaPadrao) return '/setor';
+  if(temSob) return '/sobmedida';
+  return telaPadrao||'/login';
 }
 </script></body></html>

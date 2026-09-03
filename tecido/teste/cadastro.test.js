@@ -1,7 +1,6 @@
 // Fase 1 — as regras dos cadastros e dos parametros.
 const tecido=require('../dominio/tecido');
 const endereco=require('../dominio/endereco');
-const usuario=require('../dominio/usuario');
 const config=require('../nucleo/config');
 
 module.exports=[
@@ -61,19 +60,9 @@ module.exports=[
   config.gravar('pesoSobra',0.5,'teste');
 }},
 
-{nome:'o sistema nunca fica sem um diretor ativo', executar({recusa,igual}){
-  const d=usuario.criar({nome:'Diretora',pin:'4321',papel:'diretor'});
-  const c=usuario.criar({nome:'Cortador',pin:'1111',papel:'cortador'});
-  igual(c.papel,'cortador','papel do cortador');
-  recusa(()=>usuario.atualizar(d.id,{ativo:0}),'ultimo_diretor');
-  // Com um segundo diretor no ar, a troca passa.
-  usuario.atualizar(c.id,{papel:'diretor'});
-  igual(usuario.atualizar(d.id,{ativo:0}).ativo,0,'diretor pode sair quando ha outro');
-}},
-
-{nome:'PIN de menos de 4 digitos nao entra', executar({recusa}){
-  recusa(()=>usuario.criar({nome:'Curto',pin:'12',papel:'cortador'}),'pin_invalido');
-  recusa(()=>usuario.criar({nome:'SemPin',papel:'cortador'}),'pin_obrigatorio');
-}}
+// Os dois casos que viviam aqui — "nunca ficar sem um diretor" e "PIN de
+// menos de 4 digitos" — sairam com o cadastro local de pessoas. Quem entra
+// passou a ser decidido por area no PCP; o que substitui os dois esta em
+// acesso.test.js, que prova a traducao de area em papel.
 
 ];

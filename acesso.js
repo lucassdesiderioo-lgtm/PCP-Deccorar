@@ -45,6 +45,13 @@ function setoresNativos(){
       perms:['pdf.subir','etiqueta.emitir','carregamento.executar','painel.ver','produtividade.propria'] },
     { nome:'Operador / Controle de Estoque', nivel:'operacao',
       perms:['contagem.contar','painel.ver','produtividade.propria'] },
+    // SOB MEDIDA — nascem VAZIOS, como o de montagem e os de compras:
+    // ninguem e migrado para ca. A operacao sob medida e outra equipe, e
+    // herdar gente por engano daria acesso de corte a quem so revisa.
+    { nome:'Sob medida / Bancada',           nivel:'operacao',
+      perms:['sobmedida.cortar','painel.ver','produtividade.propria'] },
+    { nome:'Sob medida / Cadastros',         nivel:'admin',
+      perms:['sobmedida.cortar','sobmedida.cadastrar'] },
     { nome:'Supervisor',                     nivel:'supervisor',
       perms:['painel.ver','produtividade.propria','produtividade.equipe','relatorios.ver','necessidade.ver'] },
     // COMPRAS.md §10 — os tres papeis nascem separados mesmo sendo uma pessoa
@@ -546,7 +553,13 @@ module.exports = function(app, db){
     ['etiqueta.emitir','embalagem'], ['carregamento.executar','carregamento'],
     ['pdf.subir','expedicao'], ['devolucao.registrar','devolucao'],
     ['painel.ver','painel'], ['relatorios.ver','relatorios'], ['necessidade.ver','necessidade'],
-    ['pedido.receber','recebimento']
+    ['pedido.receber','recebimento'],
+    /* SOB MEDIDA. Sem estas duas linhas a integracao NAO FUNCIONA, e falha em
+       silencio: o portao em tecido/montar.js le `usuarios.areas`, e no modo
+       novo esta coluna e recalculada aqui a cada mudanca de setor. Area que
+       nao esta neste mapa e apagada no primeiro salvamento — o acesso seria
+       concedido na tela e sumiria sozinho depois. */
+    ['sobmedida.cortar','sobmedida'], ['sobmedida.cadastrar','sobmedida_adm']
   ];
   function sincronizarAreas(uid){
     try{
