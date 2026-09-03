@@ -72,6 +72,47 @@ cols.filter(c=>c.ativo).forEach(c=>{
 
 bloco('OLHAR COM ATENCAO ('+avisos.length+')', avisos);
 
-const rolos=db.prepare('SELECT COUNT(*) c FROM rolo').get().c;
+/* ── FORNECEDOR, PRECO E O RELOGIO DO GIRO ────────────────────────────────
+   Estes tres nao sao cadastro, mas respondem a pergunta que se faz logo
+   depois de subir a migracao 9: o que ela achou no texto livre, quanto ainda
+   falta de nota, e desde quando existe historia de corte.
+
+   O ultimo importa mais do que parece: o painel "O que sai" nao consegue
+   inventar passado, e uma media de poucos dias apresentada como media do mes
+   e um numero que engana com cara de fato. Aqui da para ver de quantos dias
+   ele esta falando ANTES de alguem decidir compra por ele. */
+const forn=db.prepare(`SELECT f.nome, f.conferir,
+    (SELECT COUNT(*) FROM rolo r WHERE r.fornecedor_id=f.id) rolos
+  FROM fornecedor f ORDER BY rolos DESC, f.nome`).all();
+/* Texto livre que nao casou com nenhum cadastro. Nao e erro da migracao — e
+   nome escrito de um jeito que nao bate com nada, e por isso precisa de olho.
+   Sai AQUI dentro, e nao em `avisos`: aquele bloco ja foi impresso acima, e
+   um aviso empurrado para uma lista ja escrita nao aparece em lugar nenhum. */
+const orfaos=db.prepare(`SELECT DISTINCT fornecedor FROM rolo
+  WHERE TRIM(COALESCE(fornecedor,''))<>'' AND fornecedor_id IS NULL`).all();
+
+bloco('FORNECEDORES', forn.map(x=>
+  x.nome.padEnd(26)+String(x.rolos).padStart(3)+' rolo(s)'+(x.conferir?'   [conferir]':''))
+  .concat(orfaos.length
+    ? ['','⚠ texto que NAO virou cadastro: '+orfaos.map(o=>o.fornecedor).join(' | ')]
+    : []));
+
+const r=db.prepare(`SELECT COUNT(*) t,
+    SUM(CASE WHEN status<>'encerrado' THEN 1 ELSE 0 END) vivos,
+    SUM(CASE WHEN status<>'encerrado' AND preco_m2 IS NULL THEN 1 ELSE 0 END) semPreco
+  FROM rolo`).get();
+const cortes=db.prepare(`SELECT COUNT(*) n, MIN(data) de, MAX(data) ate
+  FROM movimento_rolo WHERE motivo='consumo'`).get();
+
+bloco('ROLO, NOTA E CORTE', [
+  r.t+' rolo(s), '+r.vivos+' nao encerrado(s)',
+  r.semPreco
+    ? r.semPreco+' sem preco lancado — o total do estoque sai como PISO (>=) ate isso zerar'
+    : 'todos com preco lancado — o total do estoque e exato',
+  cortes.n
+    ? cortes.n+' corte(s) confirmado(s), de '+cortes.de+' ate '+cortes.ate
+    : 'nenhum corte confirmado ainda — o painel "O que sai" abre vazio, e esta certo'
+]);
+
 const sobras=db.prepare('SELECT COUNT(*) c FROM sobra').get().c;
-console.log('\n   rolos: '+rolos+'   ·   sobras: '+sobras+'   ·   banco: '+db.arquivo+'\n');
+console.log('\n   rolos: '+r.t+'   ·   sobras: '+sobras+'   ·   banco: '+db.arquivo+'\n');
