@@ -1,5 +1,4 @@
-// A ETIQUETA DE SOBRA EM PDF, no tamanho da bobina: 100 x 35 mm, uma por
-// pagina.
+// A ETIQUETA DE SOBRA EM PDF, uma por pagina, no tamanho da bobina.
 //
 // Por que no servidor e nao pelo `window.print()` do navegador:
 //
@@ -9,49 +8,81 @@
 //   cabecalho e rodape (a URL e o "8/32") que, numa etiqueta de 35 mm, caem
 //   em cima do codigo.
 //
-//   E a mesma licao da etiqueta de SKU no §7 do CLAUDE.md, e a mesma licao da
-//   armadilha #6: uma coisa que so funciona quando o operador acerta a
-//   configuracao e uma coisa que vai falhar. Aqui a pagina JA nasce 100x35 e
-//   nao ha o que ajustar.
+//   E a mesma licao da armadilha #6 do CLAUDE.md: o que so funciona quando o
+//   operador acerta a configuracao e o que vai falhar. Aqui a pagina JA nasce
+//   no tamanho certo e nao ha o que ajustar.
 //
-// Uma etiqueta que nao bipa e uma etiqueta que nao existe, e o erro so
-// apareceria na bancada, com o rolo de etiqueta ja gasto.
+// NENHUMA MEDIDA MORA AQUI. Todas vem do cadastro (Cadastros -> Parametros),
+// porque a etiqueta e um objeto fisico que a equipe ajusta olhando o
+// resultado na bancada: "a letra ta pequena", "a barra some quando amassa".
+// Cada um desses ajustes era um deploy.
 const {PDFDocument, StandardFonts, rgb} = require('pdf-lib');
 const barras = require('../public/barras.js');
+const config = require('../nucleo/config');
+const {ErroDeRegra} = require('../nucleo/erros');
 
 // PDF mede em pontos (1 pt = 1/72 pol). A bobina e medida em milimetros.
 const MM = 72 / 25.4;
+const PT_MM = 25.4 / 72;
 
-const LARGURA_MM = 100;
-const ALTURA_MM  = 35;
+/* Modulo e a barra fina do codigo. A 203 dpi (a Zebra ZD220) 1 mm sao 8
+   pontos de impressao; abaixo de 0,25 mm o modulo vira 2 pontos e a leitura
+   passa a falhar em etiqueta amassada — que e o estado normal de uma etiqueta
+   que passou um mes na prateleira.
 
-// Margem fisica da etiqueta. A Zebra nao imprime coladinho na borda, e o
-// silencio do CODE128 (as 10 barras vazias de cada lado) tem que caber DENTRO
-// da area impressa — sem ele o leitor nao acha o comeco do codigo.
-const MARGEM_MM = 4;
-
-// Altura da barra. Regra pratica de leitura: barra curta demais obriga o
-// operador a mirar, e mirar na bancada e o que faz ele desistir do leitor e
-// digitar. Sobra espaco para o codigo escrito embaixo, que e a saida quando o
-// leitor falha.
-const BARRA_MM = 16;
-
-// Modulo (a barra fina) em milimetros. A 203 dpi, 1 mm = 8 pontos de
-// impressao; abaixo de ~0,25 mm o modulo vira 2 pontos e a leitura comeca a
-// falhar em etiqueta amassada. O teto existe para o codigo curto nao virar um
-// borrao gordo que estoura a largura.
+   Ele NAO e cadastravel de proposito: e calculado para o codigo caber na
+   largura util. Um campo aqui deixaria alguem gerar 300 etiquetas
+   tecnicamente ilegiveis sem nenhum aviso, e o erro so apareceria no bipe. */
 const MODULO_MIN_MM = 0.25;
 const MODULO_MAX_MM = 0.50;
 
-// Quanto o codigo ocupa, em modulos, ja com os silencios obrigatorios.
+// Quanto o codigo ocupa, em modulos, ja com os silencios obrigatorios dos
+// dois lados — sem eles o leitor nao acha onde o codigo comeca.
 const modulosDe = codigo => barras.modulos(codigo).length + 20;
 
+/* As medidas, lidas do cadastro. Uma funcao e nao uma constante: o diretor
+   muda o numero na tela e o PDF seguinte ja sai diferente, sem reiniciar. */
+function medidas(){
+  return {
+    largura: config.ler('etqLargura'),
+    altura:  config.ler('etqAltura'),
+    margem:  config.ler('etqMargem'),
+    barra:   config.ler('etqBarraAltura'),
+    fonte:   config.ler('etqFonteCodigo')
+  };
+}
+
+/* O VERTICAL TEM QUE FECHAR, e e aqui que se descobre.
+   margem + barra + respiro + letra + margem <= altura da etiqueta
+
+   Cadastravel quer dizer que alguem VAI digitar 40 mm de barra numa etiqueta
+   de 35. Recusar na tela custa um aviso; nao recusar custa o rolo inteiro
+   impresso com o codigo cortado — e o operador descobre na prateleira. */
+const RESPIRO_MM = 1;
+
+function conferir(m){
+  const letra = m.fonte * PT_MM;
+  const usado = m.margem + m.barra + RESPIRO_MM + letra + m.margem;
+  const sobra = m.altura - usado;
+  return {
+    letra, usado, sobra, cabe: sobra >= 0,
+    // A frase e para quem cadastrou, e diz o que fazer — nao o que houve.
+    recado: 'Nao cabe na etiqueta de '+num(m.altura)+' mm: as barras ('+num(m.barra)+
+      ' mm), o codigo escrito ('+num(letra)+' mm com fonte '+num(m.fonte)+
+      ' pt) e as duas margens de '+num(m.margem)+' mm somam '+num(usado)+
+      ' mm. Reduza a altura das barras ou a fonte do codigo, ou use uma bobina mais alta.'
+  };
+}
+
+const num = v => String(Math.round(v*100)/100).replace('.',',');
+
 /* Largura do modulo para o codigo caber na area util.
-   Devolve tambem se coube: codigo comprido demais para 100 mm nao pode sair
-   pequeno demais em silencio — ele sairia impresso e nao bipaia, que e o
-   pior desfecho possivel. */
-function moduloPara(codigo){
-  const util = LARGURA_MM - 2*MARGEM_MM;
+   `cabe:false` quer dizer que nem no modulo minimo o codigo entra na largura
+   — a etiqueta sai, mas MARCADA. O desfecho ruim aqui nao e o erro: e a
+   etiqueta sair bonita, colada na peca, e nao bipar. */
+function moduloPara(codigo, m){
+  m = m || medidas();
+  const util = m.largura - 2*m.margem;
   const ideal = util / modulosDe(codigo);
   const mm = Math.min(MODULO_MAX_MM, ideal);
   return {mm, cabe: mm >= MODULO_MIN_MM};
@@ -60,7 +91,12 @@ function moduloPara(codigo){
 /* Uma pagina por etiqueta. `codigos` e a lista do lote, na ordem impressa. */
 async function gerar(codigos){
   const lista = (codigos||[]).map(c => String(c||'').trim()).filter(Boolean);
-  if(!lista.length) throw new Error('nenhuma etiqueta para gerar');
+  if(!lista.length)
+    throw new ErroDeRegra('lote_vazio','Nao ha etiqueta nenhuma para gerar.');
+
+  const m = medidas();
+  const v = conferir(m);
+  if(!v.cabe) throw new ErroDeRegra('etiqueta_nao_cabe', v.recado);
 
   const doc = await PDFDocument.create();
   doc.setTitle('Etiquetas de sobra — tecido');
@@ -68,58 +104,87 @@ async function gerar(codigos){
   const sans = await doc.embedFont(StandardFonts.Helvetica);
 
   for(const codigo of lista){
-    const pagina = doc.addPage([LARGURA_MM*MM, ALTURA_MM*MM]);
-    desenhar(pagina, codigo, mono, sans);
+    const pagina = doc.addPage([m.largura*MM, m.altura*MM]);
+    desenhar(pagina, codigo, m, mono, sans);
   }
   return Buffer.from(await doc.save());
 }
 
-function desenhar(pagina, codigo, mono, sans){
-  const {mm, cabe} = moduloPara(codigo);
+function desenhar(pagina, codigo, m, mono, sans){
+  const {mm, cabe} = moduloPara(codigo, m);
   const bits = barras.modulos(codigo);
   const silencio = 10 * mm;
   const larguraCodigo = (bits.length * mm) + 2*silencio;
 
-  // Centralizado na etiqueta: a Zebra tem folga de alinhamento de bobina, e
-  // codigo colado numa borda e codigo que sai cortado quando a bobina anda.
-  const x0 = ((LARGURA_MM - larguraCodigo) / 2 + silencio) * MM;
-  const yBarra = (ALTURA_MM - MARGEM_MM - BARRA_MM) * MM;
+  // Centralizado: a Zebra tem folga de alinhamento de bobina, e codigo colado
+  // numa borda e codigo que sai cortado quando a bobina anda.
+  const x0 = ((m.largura - larguraCodigo) / 2 + silencio) * MM;
+  const yBarra = (m.altura - m.margem - m.barra) * MM;
 
   // Barras vizinhas viram um retangulo so — menos objetos no PDF e menos
-  // chance de o rasterizador da impressora abrir uma fresta entre elas.
+  // chance de o rasterizador abrir uma fresta entre elas.
   let i = 0;
   while(i < bits.length){
     if(bits[i] === '1'){
       let j = i; while(j < bits.length && bits[j] === '1') j++;
       pagina.drawRectangle({
         x: x0 + i*mm*MM, y: yBarra,
-        width: (j-i)*mm*MM, height: BARRA_MM*MM,
+        width: (j-i)*mm*MM, height: m.barra*MM,
         color: rgb(0,0,0)
       });
       i = j;
     } else i++;
   }
 
-  // O CODIGO ESCRITO EMBAIXO NAO E ENFEITE: quando o leitor falha — etiqueta
-  // amassada, poeira de tecido na lente — o cortador digita e continua
-  // trabalhando. Sem ele, leitor com problema para a bancada.
-  const tam = 11;
+  /* O CODIGO ESCRITO E O QUE O OPERADOR PROCURA. Ele passa o olho na estante
+     lendo numero, e usa o leitor so para confirmar. Tambem e a saida quando o
+     leitor falha — etiqueta amassada, poeira de tecido na lente: ele digita e
+     continua trabalhando, em vez de parar a bancada.
+
+     A fonte encolhe SO se o codigo nao couber na largura. Preferir imprimir
+     um pouco menor a nao imprimir: aqui o texto e para olho humano, e olho
+     humano le 18 pt quando esperava 22. O que nunca pode encolher calado e o
+     modulo da barra, e esse nao e cadastravel. */
+  const utilTexto = (m.largura - 2*m.margem) * MM;
+  let tam = m.fonte;
+  while(tam > 5 && mono.widthOfTextAtSize(codigo, tam) > utilTexto) tam -= 0.5;
   const largura = mono.widthOfTextAtSize(codigo, tam);
+
+  /* A FAIXA DO TEXTO e o que sobra entre a margem de baixo e a barra. As
+     posicoes sao calculadas dentro dela, e nao somando margens no olho:
+     com fonte grande, um chute de 1 mm faz o rabo do "S" invadir a marca, e
+     isso so apareceria na etiqueta impressa. */
+  const faixaBase = m.margem;                        // piso da faixa
+  const faixaTopo = m.altura - m.margem - m.barra - RESPIRO_MM;
+  const faixa = faixaTopo - faixaBase;
+  const letra = tam * PT_MM;
+
+  // A marca so entra se sobrar espaco DE VERDADE depois da letra. Ela e
+  // conforto; o codigo e o trabalho — quando disputam, o codigo ganha.
+  const marca = cabe ? 'SOBRA' : 'SOBRA · CONFERIR LEITURA';
+  const tamMarca = 6, alturaMarca = tamMarca * PT_MM;
+  const larguraMarca = sans.widthOfTextAtSize(marca, tamMarca);
+  const temMarca = (faixa - letra) >= (alturaMarca + 1) && larguraMarca <= utilTexto;
+
+  // Codigo centrado no que resta da faixa depois de reservar a marca.
+  const baseCodigo = temMarca
+    ? faixaBase + alturaMarca + 0.8 + Math.max(0,(faixa - letra - alturaMarca - 0.8))/2
+    : faixaBase + Math.max(0,(faixa - letra))/2;
+
   pagina.drawText(codigo, {
-    x: (LARGURA_MM*MM - largura) / 2,
-    y: (MARGEM_MM + 5.5) * MM,
+    x: (m.largura*MM - largura) / 2,
+    y: baseCodigo * MM,
     size: tam, font: mono, color: rgb(0,0,0)
   });
 
-  // A marca diz de que sistema a etiqueta e. Na prateleira ela convive com a
+  // A marca diz de que sistema a etiqueta e: na prateleira ela convive com a
   // etiqueta de SKU do Mercado Livre, e as duas tem codigo de barras.
-  const marca = cabe ? 'SOBRA' : 'SOBRA · CODIGO LONGO, CONFERIR LEITURA';
-  const tamMarca = 6;
-  pagina.drawText(marca, {
-    x: (LARGURA_MM*MM - sans.widthOfTextAtSize(marca, tamMarca)) / 2,
-    y: MARGEM_MM * MM * 0.6,
+  // Codigo que nao caiu na largura sai ACUSADO aqui.
+  if(temMarca) pagina.drawText(marca, {
+    x: (m.largura*MM - larguraMarca) / 2,
+    y: faixaBase * MM,
     size: tamMarca, font: sans, color: rgb(.35,.35,.35)
   });
 }
 
-module.exports = {gerar, moduloPara, LARGURA_MM, ALTURA_MM, MODULO_MIN_MM};
+module.exports = {gerar, moduloPara, medidas, conferir, MODULO_MIN_MM, MODULO_MAX_MM};

@@ -33,6 +33,19 @@ module.exports={rotas:[
   {metodo:'GET', caminho:'/api/etiquetas/lotes/:id', permissao:'etiqueta.imprimir',
    manipulador:({params})=>etiqueta.doLote(params.id)},
 
+  /* AS MEDIDAS DA ETIQUETA, como estao cadastradas agora.
+     A tela le isto para escrever ao lado do botao o que vai sair, e para
+     DESABILITAR o botao quando os numeros nao fecham. Sem isso, o operador
+     clicaria em imprimir e abriria uma aba com o JSON do erro na cara —
+     tecnicamente correto, e inutil para quem esta na bancada. */
+  {metodo:'GET', caminho:'/api/etiquetas/medidas', permissao:'etiqueta.imprimir',
+   manipulador:()=>{
+     const m=pdf.medidas();
+     const v=pdf.conferir(m);
+     return {...m, cabe:v.cabe, sobra_mm:Math.round(v.sobra*100)/100,
+             recado:v.cabe?null:v.recado};
+   }},
+
   /* A FOLHA PARA A IMPRESSORA: uma etiqueta por pagina, 100 x 35 mm.
      Separada do GET acima (que devolve a lista para a tela conferir) porque
      sao duas perguntas diferentes: "o que tem neste lote" e "me da o arquivo

@@ -79,8 +79,14 @@ async function desenhar(){
     bt.disabled=false;
   }});
   c.appendChild(el('div',{class:'campos'},[box,el('div',{class:'campo'},[bt])]));
-  c.appendChild(el('p',{class:'ajuda',texto:
-    'O arquivo sai em PDF, uma etiqueta por pagina, ja no tamanho da bobina: 100 x 35 mm. Nao ha o que ajustar na tela de impressao — e por isso que ele e gerado assim.'}));
+  // O que VAI SAIR, lido do cadastro. Escrito aqui porque as medidas agora
+  // sao editaveis: quem mudou a fonte ontem precisa ver o efeito antes de
+  // gastar rolo, e quem nao mudou nada precisa saber o que esta valendo.
+  const med=await api('/api/etiquetas/medidas',{silencioso:true}).catch(()=>null);
+  if(med) c.appendChild(el('p',{class:'ajuda',texto:
+    'Vai sair: '+med.largura+' x '+med.altura+' mm por pagina · barras de '+
+    med.barra+' mm · codigo escrito em '+med.fonte+' pt · margem de '+med.margem+' mm. '+
+    'Muda em Cadastros -> Parametros.'}));
   p.appendChild(c);
 
   const cP=el('div',{class:'cartao'});
@@ -133,10 +139,25 @@ function montarFolha(codigos,lote){
   // window.print() da folha saia certo so quando o operador acertava
   // "margens: Nenhuma" e escala 100% — e ainda vinha com a URL e o numero da
   // pagina carimbados em cima do codigo.
-  cab.appendChild(el('button',{class:'bt primario',
-    texto:'Imprimir (PDF 100 x 35 mm)',
+  const bt=el('button',{class:'bt primario',
+    texto:'Imprimir em PDF',
     disabled:loteId?null:'disabled',
-    onclick:()=>window.open('/sobmedida/api/etiquetas/lotes/'+loteId+'/pdf','_blank')}));
+    onclick:()=>window.open('/sobmedida/api/etiquetas/lotes/'+loteId+'/pdf','_blank')});
+  cab.appendChild(bt);
+
+  // As medidas cadastradas podem nao fechar na altura da bobina — alguem
+  // digitou 40 mm de barra numa etiqueta de 35. Melhor o botao morto com o
+  // motivo escrito do que 300 etiquetas com o codigo cortado.
+  api('/api/etiquetas/medidas',{silencioso:true}).then(med=>{
+    bt.textContent='Imprimir em PDF ('+med.largura+' x '+med.altura+' mm)';
+    if(!med.cabe){
+      bt.disabled=true;
+      alvo.insertBefore(el('div',{class:'cartao naoImprime',
+        style:'border-color:var(--erro);color:var(--erro)'},
+        [el('strong',{texto:'As medidas da etiqueta nao fecham'}),
+         el('p',{class:'ajuda',style:'color:inherit',texto:med.recado})]),cab.nextSibling);
+    }
+  }).catch(()=>{});
   alvo.appendChild(cab);
 
   const grade=el('div',{class:'folha'});

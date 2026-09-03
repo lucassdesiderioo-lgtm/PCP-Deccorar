@@ -182,18 +182,49 @@ alguem der Ctrl+P nela por engano, sai escrito isso na folha.
 as mesmas barras dentro do PDF. Duas tabelas CODE128 seriam duas etiquetas
 diferentes para o mesmo codigo, e a divergencia so apareceria na bancada.
 
-Medidas em `dominio/etiqueta_pdf.js`, travadas por `teste/etiqueta_pdf.test.js`:
+### As medidas sao CADASTRAVEIS (Cadastros -> Parametros)
 
-| | |
-|---|---|
-| Pagina | 100 x 35 mm, uma por etiqueta |
-| Margem | 4 mm (o silencio do CODE128 tem que caber DENTRO da area impressa) |
-| Barra | 16 mm de altura |
-| Modulo | 0,25 a 0,50 mm — a 203 dpi, abaixo de 0,25 mm sao 2 pontos e a leitura falha em etiqueta amassada |
+Nenhuma medida mora no codigo. A etiqueta e um objeto fisico que a equipe
+ajusta olhando o resultado na bancada — *"a letra ta pequena"*, *"a barra some
+quando a etiqueta amassa"* — e cada um desses ajustes era um deploy.
 
-Codigo comprido demais para caber sai **marcado** na propria etiqueta, nunca
-impresso pequeno em silencio: o desfecho ruim nao e o erro, e a etiqueta sair
-bonita, colada na peca, e nao bipar.
+| Parametro | Padrao | O que e |
+|---|---|---|
+| `etqFonteCodigo` | **22 pt** | o codigo escrito embaixo das barras |
+| `etqBarraAltura` | 14 mm | altura das barras |
+| `etqLargura` | 100 mm | largura da bobina |
+| `etqAltura` | 35 mm | altura da bobina |
+| `etqMargem` | 4 mm | folga em volta |
+
+> ⚠️ **O TEXTO EMBAIXO DA BARRA NAO E LEGENDA.** E onde o operador PROCURA a
+> sobra: ele passa o olho na estante lendo numero, e usa o leitor so para
+> confirmar. Por isso a fonte nasce em 22 pt — o dobro da primeira versao — e
+> por isso ela e o primeiro parametro da lista.
+
+**Altura e largura falham de jeitos diferentes, e nao e inconsistencia:**
+
+| Nao cabe na | O que acontece | Por que |
+|---|---|---|
+| **altura** | **recusa** gerar o PDF, com a frase dizendo o que reduzir | passar da altura corta o desenho: parte do codigo nao existe no papel |
+| **largura** | **encolhe** a letra o suficiente e imprime | e so tamanho de letra, e letra menor o operador ainda le. Recusar pararia a bancada por estetica |
+
+A tela mostra as medidas ao lado do botao e **desabilita** o botao quando os
+numeros nao fecham — senao o operador clicaria em imprimir e abriria uma aba
+com o JSON do erro na cara.
+
+> ⚠️ **O MODULO DA BARRA NAO E CADASTRAVEL, e isso e decisao.** Ele e
+> calculado para o codigo caber na largura, com piso de 0,25 mm: a 203 dpi
+> isso e 2 pontos de impressao, e abaixo disso a leitura falha em etiqueta
+> amassada — que e o estado normal de uma etiqueta que passou um mes na
+> prateleira. Um campo ali deixaria alguem gerar 300 etiquetas tecnicamente
+> ilegiveis sem nenhum aviso, e o erro so apareceria no bipe.
+>
+> A diferenca de tratamento e a regra: **texto pequeno o operador ainda le;
+> barra fina demais o leitor recusa, e ninguem descobre por que.**
+
+Codigo comprido demais para caber sai **marcado** na propria etiqueta
+(`SOBRA · CONFERIR LEITURA`), nunca impresso pequeno em silencio: o desfecho
+ruim nao e o erro, e a etiqueta sair bonita, colada na peca, e nao bipar.
 
 ---
 
