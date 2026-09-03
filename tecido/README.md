@@ -144,6 +144,43 @@ teste/                 rodar.js + *.test.js — banco temporario, do zero
 
 ---
 
+## As larguras de bobina são cadastráveis (Cadastros → Tecido)
+
+A largura da bobina é **do rolo**, não do tecido — o mesmo Rolô 3% Bege existe
+em 2,00, 2,50 e 3,00, e é essa diferença que o plano de corte explora. O que
+mudou é que ela deixou de ser **digitada** e passou a ser **escolhida**.
+
+Na entrada de rolo as larguras cadastradas viram uma fileira de botões. Digitar
+errava de dois jeitos que ninguém percebia, e nenhum deles dava erro na tela:
+
+| O que se digita | O que acontece | Quando aparece |
+|---|---|---|
+| `2,5` e `2,50` | viram bobinas **diferentes** na consulta do plano | quando o plano não acha rolo que existe |
+| `20,0` | entra como bobina de **vinte metros** | quando o encaixe "acha" que cabe qualquer peça |
+
+> ⚠️ **O campo livre continua existindo, e isso é decisão.** Rolo que chega
+> fora do padrão existe, e recusar a entrada dele seria a armadilha #6 do
+> `CLAUDE.md`: a bancada lançaria a largura errada só para o sistema aceitar,
+> e o erro entraria no lugar onde ninguém procura. O campo **avisa** que a
+> largura não está na lista; nunca bloqueia.
+
+**Largura com rolo em uso não sai da lista.** A lista descreve a prateleira:
+tirá-la faria a próxima entrada daquela bobina cair no campo livre com aviso de
+"não cadastrada" — para uma bobina que a fábrica tem na mão. O aviso perderia o
+sentido na primeira vez, e depois disso ninguém mais o lê. A tela mostra
+quantos rolos cada largura tem, que é o número que separa *largura que a
+fábrica usa* de *largura que alguém cadastrou e nunca comprou*.
+
+**A lista nasce do que já existe.** A migração 6 semeia com as larguras dos
+rolos já cadastrados; num banco novo ela começa vazia — que é honesto: semear
+2,00/2,50/3,00 seria um chute sobre a fábrica, e a primeira entrada de rolo
+ensina qual cadastrar.
+
+`tecido.largura_sugerida` continua existindo, e agora tem função melhor: ela
+**pré-seleciona o botão** em vez de pré-preencher um campo de texto.
+
+---
+
 ## Os parâmetros do corte (Cadastros → Parâmetros)
 
 | Chave | Padrão | O que faz |

@@ -338,6 +338,35 @@ INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
    Alguem editaria aquele endereco tentando resolver um problema de acesso,
    nada mudaria, e a conclusao seria "esse sistema nao obedece". */
 DELETE FROM parametro WHERE chave='pcpUrl';
+`},
+
+{n:6, nome:'as larguras de bobina viram cadastro', sql:`
+/* AS LARGURAS QUE A FABRICA COMPRA.
+
+   Ate aqui a largura era digitada livre em cada entrada de rolo. Funciona, e
+   erra de dois jeitos que ninguem percebe: '2,5' e '2,50' viram larguras
+   diferentes na consulta do plano, e um '20,0' com a virgula no lugar errado
+   entra como bobina de vinte metros — e o encaixe passa a "achar" que cabe
+   qualquer peca.
+
+   Com a lista, a entrada normal e um toque num botao. O campo livre continua
+   existindo (rolo que chega com largura fora do padrao existe, e recusar a
+   entrada dele seria a armadilha #6: a trava que a bancada aprende a
+   contornar), mas ele AVISA que aquela largura nao esta cadastrada. */
+CREATE TABLE largura_bobina (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  valor REAL NOT NULL UNIQUE,                    -- em metros: 2.00, 2.50, 3.00
+  ordem INTEGER DEFAULT 0,
+  ativo INTEGER DEFAULT 1,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+
+/* A LISTA NASCE DO QUE JA EXISTE NA PRATELEIRA, nao de um chute meu.
+   Num banco novo isso nao traz nada e a lista comeca vazia — que e honesto:
+   a primeira entrada de rolo ensina qual largura cadastrar. Em producao ela
+   herda exatamente as bobinas que a fabrica ja usa. */
+INSERT OR IGNORE INTO largura_bobina(valor)
+  SELECT DISTINCT ROUND(largura,3) FROM rolo WHERE largura>0;
 `}
 
 ];

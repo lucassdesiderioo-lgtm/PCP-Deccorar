@@ -20,7 +20,7 @@
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,banner,el,limpar,$,num,comoNumero}=window.ui;
+const {api,banner,el,limpar,$,num,comoNumero,formatarMetros}=window.ui;
 
 let eu={}, aba='tecido';
 const estado={linhas:[],aberturas:[],cores:[],tecidos:[],linhaSel:null,armazem:'ROLO',arvore:[]};
@@ -156,6 +156,43 @@ async function telaTecido(pai){
     el('td',{style:'text-align:right'},[botaoAtivo(c,'/api/cores/'+c.id,()=>telaTecido($('#conteudo')))])
   ])));
   cC.appendChild(estado.cores.length?tC:el('div',{class:'vazio',texto:'Nenhuma cor ainda.'}));
+
+  /* AS LARGURAS DE BOBINA.
+     Fica nesta aba, logo antes do item de tecido, porque e a resposta da
+     pergunta que a nota abaixo levanta: "a largura e do rolo, entao onde ela
+     mora?". Mora aqui — e e daqui que saem os botoes da entrada de rolo. */
+  const cLarg=cartao(pai,'Larguras de bobina',
+    'As larguras que a fabrica compra. Sao elas que viram BOTAO na entrada de rolo, no lugar de o operador digitar.');
+  cLarg.appendChild(el('p',{class:'ajuda',texto:
+    'Digitar largura erra de dois jeitos que ninguem percebe: "2,5" e "2,50" viram bobinas diferentes na consulta do plano, e um "20,0" com a virgula no lugar errado entra como bobina de vinte metros — e o encaixe passa a achar que cabe qualquer peca.'}));
+  if(podeEditar()) formulario(cLarg,[
+    {id:'valor',rotulo:'Largura (m)',dica:'2,50',inputmode:'decimal',cresce:true}
+  ],'Cadastrar largura',async(v,refs)=>{
+    await api('/api/larguras',{metodo:'POST',corpo:{valor:v.valor}});
+    refs.valor.value=''; banner('Largura cadastrada.'); await telaTecido($('#conteudo'));
+  });
+  const larguras=await api('/api/larguras');
+  if(larguras.length){
+    const tL=el('table',{});
+    tL.appendChild(el('tr',{},[el('th',{texto:'Largura'}),
+      el('th',{class:'num',texto:'Rolos em uso'}),el('th',{texto:''})]));
+    larguras.forEach(l=>{
+      const bt=el('button',{class:'bt pequeno',texto:l.ativo?'Tirar da lista':'Reativar',
+        onclick:async()=>{
+          try{ await api('/api/larguras/'+l.id,{metodo:'PUT',corpo:{ativo:l.ativo?0:1}});
+               await telaTecido($('#conteudo')); }catch(e){}
+        }});
+      tL.appendChild(el('tr',{class:l.ativo?'':'inativo'},[
+        el('td',{texto:formatarMetros(l.valor)}),
+        el('td',{class:'num',texto:String(l.rolos)}),
+        el('td',{style:'text-align:right'},[podeEditar()?bt:el('span',{})])
+      ]));
+    });
+    cLarg.appendChild(tL);
+    cLarg.appendChild(el('p',{class:'ajuda',texto:
+      'Largura com rolo em uso nao sai da lista: ela ainda descreve a prateleira, e tira-la faria a proxima entrada daquela bobina cair no campo livre com aviso de "nao cadastrada".'}));
+  } else cLarg.appendChild(el('div',{class:'vazio',
+    texto:'Nenhuma largura ainda. Sem elas, a entrada de rolo pede a largura digitada.'}));
 
   // Item de tecido
   const cT=cartao(pai,'Item de tecido','A combinacao que existe de verdade: linha + abertura + cor.');
