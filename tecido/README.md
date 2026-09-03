@@ -202,6 +202,70 @@ se estão certas. **O script aponta e cala** — decidir é de quem cadastra.
 
 ---
 
+## O rolo na estante: endereço, movimentação e a etiqueta do tubo
+
+### O endereço é um LUGAR, não um tubo
+
+`ROLO · A-1-2` é *aquele buraco na estante*. O tubo que estiver ali é o que o
+operador pega. Três níveis: haste → andar → posição dentro do andar.
+
+### O que vai escrito onde
+
+| Onde | O quê | Responde |
+|---|---|---|
+| na prateleira | `A-1-2` | **onde** ir |
+| no tubo (etiqueta) | `R-000012` | **qual rolo** é |
+
+> ⚠️ **O ENDEREÇO NÃO ENTRA NA ETIQUETA DO TUBO, e isso é decisão.**
+> O que vai colado é o que **não muda de lugar**: código, tecido, largura da
+> bobina. O endereço muda toda vez que o tubo volta em outro buraco — uma
+> etiqueta dizendo `A-1-1` passaria a mentir no primeiro dia, e o operador
+> confia no que está escrito no tubo **antes** de olhar a tela.
+>
+> Onde o rolo está é pergunta para o sistema, que sabe a resposta de agora.
+
+### Mudou de lugar → botão **Mover**, na lista de rolos
+
+O tubo sai da estante para cortar e volta — quase sempre no mesmo buraco, e aí
+não há nada a registrar. Quando volta em **outra** haste ou andar, o endereço
+do sistema passa a apontar para um lugar vazio, e o próximo que procurar aquele
+rolo não acha. Ele não conclui *"alguém moveu"*: conclui *"o sistema erra"*.
+
+- Fica em `movimento_rolo` com **delta zero**: o saldo não mudou, o lugar mudou
+- É a **mesma tabela** do consumo de propósito — o histórico do rolo é um só
+- **Quem moveu vem da sessão**, nunca de um campo digitado: campo de nome em
+  tela de fábrica é preenchido com o nome de quem está por perto
+- Mover para o mesmo lugar é recusado — histórico cheio de linha que não conta
+  nada é histórico que ninguém lê, e aí a linha que importa passa batida
+- Rolo **encerrado** não volta para a estante: tubo vazio endereçado faria a
+  estante do sistema ter um rolo que não existe mais
+
+### A etiqueta do tubo — 100 × 150 mm
+
+Botão **Etiqueta** na lista de rolos. Parâmetros próprios (`etqRolo*`), não os
+da sobra:
+
+| | sobra | rolo |
+|---|---|---|
+| Tamanho | 100 × 35 mm | **100 × 150 mm** |
+| Código | 22 pt | **54 pt** |
+| Barras | 14 mm | 22 mm |
+| Margem | 4 mm | 6 mm |
+| Lida | de perto, na mão | **de longe, na estante** |
+
+São usos diferentes, por isso parâmetros separados — um "reaproveita os da
+sobra" faria mexer numa estragar a outra. Chegar perto de cada tubo para ler o
+número é o que faz o operador desistir e *"pegar aquele que parece"*.
+
+A metragem impressa sai **com a data**: ela envelhece no primeiro corte, e
+número sem data é número que alguém vai usar achando que é de hoje.
+
+`desenharBarras` é o dono único do traço do código — as duas etiquetas
+desenham por ele. Duas cópias divergiriam no dia em que alguém ajustasse uma, e
+a divergência só apareceria no bipe.
+
+---
+
 ## O inventário inicial: como lançar o que já está na prateleira
 
 A entrada de rolo (tela **Rolos**) é onde o estoque físico entra — inclusive as

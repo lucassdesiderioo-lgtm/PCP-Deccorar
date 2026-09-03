@@ -367,6 +367,35 @@ CREATE TABLE largura_bobina (
    herda exatamente as bobinas que a fabrica ja usa. */
 INSERT OR IGNORE INTO largura_bobina(valor)
   SELECT DISTINCT ROUND(largura,3) FROM rolo WHERE largura>0;
+`},
+
+{n:7, nome:'etiqueta do rolo e mudanca de endereco', sql:`
+/* A ETIQUETA DO ROLO — outra bobina, outras medidas.
+   Ela e colada DENTRO do tubo de papelao e lida de longe, na estante, por
+   quem esta procurando o rolo. Nada a ver com a etiqueta de sobra, que e
+   colada na peca dobrada e lida de perto: por isso os parametros sao
+   proprios, e nao um "reaproveita os da sobra" que faria mexer numa
+   estragar a outra. */
+INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
+('etqRoloFonte','54','numero','Etiqueta do rolo: tamanho do codigo',
+ 'O R-000012 impresso grande. E o numero que o operador le da estante, sem chegar perto — por isso ele nasce em 54 pt, mais que o dobro da etiqueta de sobra. Se o codigo passar da largura, o sistema reduz o suficiente para caber.',
+ 'pt',30),
+
+('etqRoloLargura','100','numero','Etiqueta do rolo: largura da bobina',
+ 'A largura do rolo de etiqueta usado para os tubos. Cada pagina do PDF sai exatamente neste tamanho.',
+ 'mm',31),
+
+('etqRoloAltura','150','numero','Etiqueta do rolo: altura da bobina',
+ 'A altura de uma etiqueta. Maior que a da sobra porque ela carrega mais coisa: codigo, tecido, largura da bobina e endereco. O sistema recusa gerar se o conteudo nao couber.',
+ 'mm',32),
+
+('etqRoloBarra','22','numero','Etiqueta do rolo: altura das barras',
+ 'Barra mais alta que a da sobra: esta e bipada dentro do tubo, com menos luz e em angulo pior.',
+ 'mm',33),
+
+('etqRoloMargem','6','numero','Etiqueta do rolo: margem',
+ 'Folga em volta. Maior que a da sobra porque a etiqueta e colada em superficie curva, e a borda e onde ela descola primeiro.',
+ 'mm',34);
 `}
 
 ];
