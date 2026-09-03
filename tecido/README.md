@@ -144,6 +144,43 @@ teste/                 rodar.js + *.test.js — banco temporario, do zero
 
 ---
 
+## Carregar os itens de tecido de uma lista
+
+```bash
+node tecido/carga_itens.js lista.txt              # simula, nao grava nada
+node tecido/carga_itens.js lista.txt --aplicar    # grava
+```
+
+Uma coleção por linha, cores separadas por vírgula:
+
+```
+Rolo · 3%: Bege, Branco, Cinza, Preto
+Double Vision · Classic: Branco, Creme, Mescla
+```
+
+Casa ignorando acento, caixa e espaço duplo — `Rolô` e `Rolo` são a mesma
+linha para quem digitou, e recusar por acento seria recusar por motivo nenhum.
+
+**Simula por padrão**, como o `limpar_fila` e o `limpar_fantasmas`. Trinta
+itens entrando de uma vez são trinta chances de a lista estar errada, e
+desfazer cadastro depois de ter rolo apontando para ele é caro.
+
+**Rodar duas vezes não duplica**: o que já existe é contado à parte e não entra
+na conta do que vai cadastrar.
+
+> ⚠️ **ELE NÃO INVENTA CADASTRO.** Cor, linha ou coleção que não existe vira
+> **recusa com o nome escrito**, nunca um cadastro novo criado em silêncio —
+> e nada é gravado, nem as linhas que estavam certas.
+>
+> `Mescla` que falta pode ser cor nova de verdade, ou `Mesela` digitado
+> errado. O segundo caso só apareceria quando alguém procurasse a cor na tela
+> e não achasse, com os itens já criados apontando para ela.
+>
+> **Carga pela metade é pior que carga nenhuma**: sobra a dúvida de quais
+> linhas entraram.
+
+---
+
 ## Conferir o cadastro inteiro de uma vez
 
 ```bash
