@@ -155,7 +155,7 @@ async function telaEntrada(pai){
     telaEntrada($('#conteudo'));
   };
   c.appendChild(fileira('LINHA',linhas,linhaSel,v=>escolher(v,null,null)));
-  c.appendChild(fileira('ABERTURA',aberturas,abSel,v=>escolher(linhaSel,v,null)));
+  c.appendChild(fileira('COLECAO',aberturas,abSel,v=>escolher(linhaSel,v,null)));
   c.appendChild(fileira('COR',cores,sel?sel.cor_id:null,v=>escolher(linhaSel,abSel,v)));
 
   /* A LARGURA VEM DA LISTA, e nao do teclado.

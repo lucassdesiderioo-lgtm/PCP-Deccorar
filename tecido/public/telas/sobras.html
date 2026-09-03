@@ -127,7 +127,7 @@ async function telaLancar(pai){
   };
 
   c.appendChild(fileira('LINHA',linhas,linhaSel,v=>escolherTecido(v,null,null)));
-  c.appendChild(fileira('ABERTURA',aberturas,aberturaSel,v=>escolherTecido(linhaSel,v,null)));
+  c.appendChild(fileira('COLECAO',aberturas,aberturaSel,v=>escolherTecido(linhaSel,v,null)));
   c.appendChild(fileira('COR',cores,sel?sel.cor_id:null,v=>escolherTecido(linhaSel,aberturaSel,v)));
 
   // 3. as medidas

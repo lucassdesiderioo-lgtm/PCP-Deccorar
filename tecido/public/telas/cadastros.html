@@ -124,7 +124,7 @@ async function telaTecido(pai){
   cL.appendChild(estado.linhas.length?tL:el('div',{class:'vazio',texto:'Nenhuma linha ainda.'}));
 
   // Abertura (pendurada na linha escolhida)
-  const cA=cartao(pai,'Abertura','1%, 3%, 5%, Blackout. A abertura pertence a uma linha — a de uma nao e a da outra.');
+  const cA=cartao(pai,'Colecao','Napoles, Pinpoint, 1%, 3%, 5%, Blackout. A colecao pertence a uma LINHA — a de uma nao e a da outra.');
   const fil=el('div',{class:'fileira'});
   fil.appendChild(el('span',{class:'rotulo',texto:'LINHA'}));
   estado.linhas.forEach(l=>fil.appendChild(el('button',{class:'op',texto:l.nome,
@@ -132,7 +132,7 @@ async function telaTecido(pai){
     onclick:async()=>{ estado.linhaSel=l.id; await telaTecido($('#conteudo')); }})));
   cA.appendChild(fil);
   if(estado.linhaSel){
-    formulario(cA,[{id:'nome',rotulo:'Nome da abertura',dica:'3%',cresce:true}],'Adicionar abertura',
+    formulario(cA,[{id:'nome',rotulo:'Nome da colecao',dica:'Napoles',cresce:true}],'Adicionar colecao',
       async(v,refs)=>{ if(!v.nome.trim()) return;
         await api('/api/aberturas',{metodo:'POST',corpo:{nome:v.nome,linha_id:estado.linhaSel}});
         refs.nome.value=''; banner('Abertura cadastrada.'); await telaTecido($('#conteudo')); });
@@ -141,11 +141,11 @@ async function telaTecido(pai){
       el('td',{texto:a.nome}),
       el('td',{style:'text-align:right'},[botaoAtivo(a,'/api/aberturas/'+a.id,()=>telaTecido($('#conteudo')))])
     ])));
-    cA.appendChild(estado.aberturas.length?tA:el('div',{class:'vazio',texto:'Esta linha ainda nao tem abertura.'}));
+    cA.appendChild(estado.aberturas.length?tA:el('div',{class:'vazio',texto:'Esta linha ainda nao tem colecao.'}));
   }
 
   // Cor
-  const cC=cartao(pai,'Cor','A cor atravessa as linhas — cadastro solto.');
+  const cC=cartao(pai,'Cor','So a COR: Bege, Branco, Cinza. A colecao (Napoles, Pinpoint) fica no campo de cima — "Napoles Bege" aqui faria o sistema deixar de saber que aquilo e bege, e cada colecao nova traria o mesmo punhado de cores de novo.');
   formulario(cC,[{id:'nome',rotulo:'Nome da cor',dica:'Bege',cresce:true}],'Adicionar cor',
     async(v,refs)=>{ if(!v.nome.trim()) return;
       await api('/api/cores',{metodo:'POST',corpo:{nome:v.nome}});
@@ -195,9 +195,9 @@ async function telaTecido(pai){
     texto:'Nenhuma largura ainda. Sem elas, a entrada de rolo pede a largura digitada.'}));
 
   // Item de tecido
-  const cT=cartao(pai,'Item de tecido','A combinacao que existe de verdade: linha + abertura + cor.');
+  const cT=cartao(pai,'Item de tecido','A combinacao que existe de verdade: linha + colecao + cor.');
   cT.appendChild(el('p',{class:'ajuda',texto:
-    'O item e o que esta ENROLADO no rolo: Double Vision + 1% + Bege e um item. A LARGURA nao entra aqui porque ela e do rolo — o mesmo Double Vision 1% Bege chega em 2,00, 2,50 e 3,00.'}));
+    'O item e o que esta ENROLADO no rolo: Double Vision + Napoles + Bege e um item. A LARGURA nao entra aqui porque ela e do rolo — o mesmo Double Vision Napoles Bege chega em 2,00, 2,50 e 3,00.'}));
   cT.appendChild(el('p',{class:'ajuda',texto:
     'Se a largura fizesse parte do item, o mesmo tecido viraria tres itens diferentes — e o plano de corte perderia justamente o que ele faz de mais util: comparar. Uma peca de 1,45 desperdica 40 cm na bobina de 2,00, e duas delas cabem lado a lado na de 3,00.'}));
   cT.appendChild(el('p',{class:'ajuda',texto:
@@ -207,7 +207,7 @@ async function telaTecido(pai){
     formulario(cT,[
       {id:'linha_id',rotulo:'Linha',opcoes:estado.linhas.filter(l=>l.ativo).map(l=>({valor:l.id,nome:l.nome})),
        aoMudar:async(v)=>{ estado.linhaSel=Number(v); await telaTecido($('#conteudo')); }},
-      {id:'abertura_id',rotulo:'Abertura',opcoes:aberturasDaLinha.map(a=>({valor:a.id,nome:a.nome}))},
+      {id:'abertura_id',rotulo:'Colecao',opcoes:aberturasDaLinha.map(a=>({valor:a.id,nome:a.nome}))},
       {id:'cor_id',rotulo:'Cor',opcoes:estado.cores.filter(c=>c.ativo).map(c=>({valor:c.id,nome:c.nome}))},
       /* Escolha, nao digitacao — pelo mesmo motivo da entrada de rolo. Um
          campo de texto aqui deixaria entrar 2,5 e 2,50 como coisas

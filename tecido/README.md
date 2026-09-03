@@ -180,11 +180,32 @@ cortador acha qual descer da estante.
 
 | Campo | O que é | Exemplo |
 |---|---|---|
-| **Linha** | a família do produto | Double Vision, Rolô |
-| **Abertura** | quanto de luz o tecido deixa passar | 1%, 3%, 5% |
-| **Cor** | a cor | Bege, Cinza |
+| **Linha** | o tipo de persiana | Rolô, Romana, Double Vision |
+| **Coleção** | qual tecido, dentro daquela linha | Nápoles, Pinpoint, 1%, 3%, Blackout |
+| **Cor** | **só** a cor | Bege, Cinza, Creme |
 
-`Double Vision · 1% · Bege` é **um** item.
+`Double Vision · Nápoles · Bege` é **um** item.
+
+> ⚠️ **O CAMPO SE CHAMA "COLEÇÃO" NA TELA E `abertura` NO BANCO.** Ele nasceu
+> como abertura (1%, 3%, 5% — quanto de luz passa) e a fábrica usa o mesmo
+> campo para coleções de nome próprio: Nápoles, Pinpoint. Um campo rotulado
+> "Abertura" com `Nápoles` dentro é o tipo de quase-mentira que faz a equipe
+> parar de confiar na tela, então o **rótulo** mudou em 03/09/2026.
+>
+> A tabela, a coluna, a rota e as variáveis continuam `abertura`: renomear
+> identificador não muda nada para quem usa e quebraria banco, rotas e
+> histórico de uma vez. É a mesma decisão que o PCP tomou com a área
+> `necessidade` (id preservado, rótulo trocado — ver `auth.js`).
+
+> ⚠️ **A COLEÇÃO NÃO PODE ENTRAR NO NOME DA COR.** `Nápoles Bege` cadastrado
+> como cor parece prático e cobra depois:
+>
+> - o sistema deixa de saber que aquilo **é bege** — `Nápoles Bege` e
+>   `Pinpoint Bege` viram cores sem relação nenhuma
+> - a lista de cores cresce **multiplicando**: coleção nova traz o mesmo
+>   punhado de cores de novo
+> - e o filtro por cor, que existe para achar a sobra na prateleira, para de
+>   agrupar o que a vista agrupa
 
 > ⚠️ **A LARGURA NÃO FAZ PARTE DO ITEM**, e essa é a decisão que mais confunde
 > quem chega. O mesmo `Double Vision 1% Bege` vem em bobina de 2,00, 2,50 e
