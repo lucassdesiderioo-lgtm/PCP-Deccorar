@@ -31,6 +31,34 @@ function criar(valor){
   return dLargura.criar(v);
 }
 
+/* ── A LARGURA QUE A ENTRADA DE ROLO ENSINOU ──────────────────────────────
+   Chamada pelo `rolo.entrada` com a largura que o operador digitou no campo
+   livre. Se ela nao esta na lista, ENTRA — marcada para a chefia conferir.
+
+   Por que cadastrar em vez de so avisar: o campo livre sozinho era um beco.
+   A largura entrava no rolo e nao entrava na lista, entao o proximo tubo da
+   MESMA bobina caia no campo livre de novo, e um '20,0' digitado no lugar de
+   '2,00' ficava escondido dentro de um rolo — lugar onde ninguem procura. Na
+   lista ele aparece, com o nome de quem lancou, e da para apagar.
+
+   E por que nao recusar a entrada ate alguem cadastrar: seria a armadilha #6.
+   Com o rolo na mao e a chefia longe, a bancada nao espera — ela toca no botao
+   de 2,00 para o sistema aceitar, e o encaixe passa a cortar por uma largura
+   que aquele tubo nao tem.
+
+   NAO LANCA ERRO NUNCA: quem valida o numero e o `rolo.entrada`, antes, com o
+   mesmo teto. Um erro aqui derrubaria a entrada do rolo por causa do cadastro,
+   que e exatamente o que esta funcao existe para nao fazer. */
+function garantir(valor,usuarioNome){
+  const n=numero(valor);
+  if(!isFinite(n)||n<=0||n>MAX_M) return {largura:null,criada:false};
+
+  const v=dLargura.arred(n);
+  const ja=dLargura.porValor(v);
+  if(ja) return {largura:ja.ativo?ja:dLargura.ativar(ja.id,1), criada:false, religada:!ja.ativo};
+  return {largura:dLargura.criar(v,{criado_por:usuarioNome,conferir:1}), criada:true};
+}
+
 function desativar(id){
   const l=dLargura.porId(id);
   exigir(l,'largura_inexistente','Largura nao encontrada.');
@@ -66,4 +94,4 @@ const cadastrada=valor=>{
   return !!(l&&l.ativo);
 };
 
-module.exports={criar,desativar,reativar,listar,ativos,cadastrada};
+module.exports={criar,garantir,desativar,reativar,listar,ativos,cadastrada};

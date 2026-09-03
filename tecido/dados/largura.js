@@ -14,8 +14,13 @@ const ativos=()=>db.prepare('SELECT * FROM largura_bobina WHERE ativo=1 ORDER BY
 const porId=id=>db.prepare('SELECT * FROM largura_bobina WHERE id=?').get(id);
 const porValor=v=>db.prepare('SELECT * FROM largura_bobina WHERE ROUND(valor,3)=?').get(arred(v));
 
-function criar(valor){
-  const r=db.prepare('INSERT INTO largura_bobina(valor) VALUES(?)').run(arred(valor));
+// `quem` = {criado_por, conferir}. Vem preenchido quando a largura nasceu na
+// bancada, no meio de uma entrada de rolo, e por isso ainda falta a chefia
+// olhar. Vazio quando a propria chefia cadastrou pela tela.
+function criar(valor,quem){
+  const q=quem||{};
+  const r=db.prepare('INSERT INTO largura_bobina(valor,criado_por,conferir) VALUES(?,?,?)')
+    .run(arred(valor), q.criado_por||null, q.conferir?1:0);
   return porId(r.lastInsertRowid);
 }
 

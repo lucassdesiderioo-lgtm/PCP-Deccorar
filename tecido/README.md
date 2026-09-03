@@ -451,6 +451,99 @@ errava de dois jeitos que ninguém percebia, e nenhum deles dava erro na tela:
 > e o erro entraria no lugar onde ninguém procura. O campo **avisa** que a
 > largura não está na lista; nunca bloqueia.
 
+### ⚠️ E DESDE 03/09 ELE CADASTRA — o campo livre era um beco
+
+A pergunta que abriu isto foi *"por que tem esse campo se as larguras estão
+cadastradas acima?"*. A resposta era a de cima — e estava pela metade.
+
+A largura digitada entrava **no rolo** e **não entrava na lista**. Duas
+consequências, e as duas silenciosas:
+
+- o próximo tubo da **mesma** bobina caía no campo livre outra vez, para
+  sempre — o sistema nunca aprendia;
+- um `20,0` digitado no lugar de `2,00` ficava **escondido dentro de um
+  registro de rolo**, que é onde ninguém procura.
+
+Hoje `rolo.entrada` chama `largura.garantir()` **dentro da mesma transação**:
+bobina fora da lista entra junto com o rolo, marcada com quem lançou. Na
+próxima entrada ela já é botão, e o erro de digitação aparece numa lista —
+onde dá para apagar.
+
+> **Não lança erro nunca.** Quem valida o número é o `rolo.entrada`, antes,
+> com o mesmo teto de 10 m. Um erro no cadastro derrubando a entrada do rolo
+> seria exatamente o que essa mudança existe para não fazer.
+
+---
+
+## A BANCADA NÃO ESPERA A CHEFIA — ela cria, e a chefia confere depois
+
+A regra velha era "cadastro é da chefia". Ela não fazia a bancada esperar:
+fazia a bancada **mentir**.
+
+| Trava | O que a bancada fazia de verdade | Onde o erro ia parar |
+|---|---|---|
+| largura não cadastrada | tocava no botão de 2,00 para o sistema aceitar | o encaixe passa a cortar por uma largura que aquele tubo não tem |
+| endereço não cadastrado | deixava o rolo **sem endereço**, "para endereçar depois" | o tubo fica na estante sem ninguém saber onde |
+
+Nos dois casos o erro acontece **fora da vista do sistema** — armadilha #6 do
+`CLAUDE.md` na letra: a trava que dispara no caso normal vira desvio que a
+equipe aprende a fazer.
+
+**A troca é de ORDEM, não de rigor:**
+
+```
+ANTES   pedir  →  esperar a chefia  →  lançar
+AGORA   lançar →  marcar            →  a chefia confere quando puder
+```
+
+Nada deixou de ser revisado. O que a chefia perdeu foi **a vez**, não o
+controle: ela renomeia, apaga ou aprova depois — com o rolo já no lugar.
+
+### O que a bancada passou a poder
+
+| Ação | Quem | Chave |
+|---|---|---|
+| Cadastrar largura de bobina (pelo campo livre da entrada) | bancada e chefia | — (sai junto com o rolo) |
+| **Criar** haste, andar e nível | bancada e chefia | `endereco.criar` |
+| **Renomear** e **apagar** cadastro | só chefia | `cadastro.editar` |
+
+> ⚠️ **A ASSIMETRIA É A REGRA, e não indecisão.** O buraco novo na prateleira
+> aparece com o tubo já na mão: endereço que não dá para criar na hora vira
+> rolo sem endereço. Arrumar um nome torto, não — isso espera sem custo nenhum.
+
+Na tela de Rolos → Entrada, cada fileira de endereço ganhou um **`+ haste`**,
+**`+ andar`**, **`+ nível`** tracejado no fim. O que nasce ali **já fica
+escolhido** — criar e ter de procurar o próprio botão na fileira é o tipo de
+passo a mais que faz a bancada parar de usar.
+
+### A lista "Conferir" é a outra metade da decisão
+
+Sem ela o que mudou não seria "a chefia confere depois" e sim **"ninguém
+confere"** — e a marcação no banco viraria uma promessa que a tela não cumpre.
+
+`GET /api/cadastro/conferir` devolve tudo que está com `conferir=1`, mais
+antigo primeiro (é o que já está valendo há mais tempo, logo o que mais gente
+já leu errado na estante). O cartão abre no **topo de todas as abas** de
+Cadastros, com o quê, quem, quando e **onde arrumar** — lista que acusa sem
+dizer o caminho manda a pessoa procurar, e ela desiste.
+
+> **"Conferi" só tira da lista — não arruma nada.** Corrigir tem botão próprio
+> (Renomear, Apagar) na aba certa. Um conferir que também arrumasse esconderia
+> qual das duas coisas a pessoa fez.
+
+> O cartão **some inteiro quando está vazio**. Um cartão permanente escrito
+> "nada a conferir" é ruído que ensina o olho a pular exatamente a região onde
+> o aviso de verdade vai aparecer.
+
+**`dominio/conferir.js` é o dono único de "o que falta conferir".** Cada tela
+com a sua consulta significaria o dia em que uma tabela nova nascesse marcável
+e não aparecesse em lista nenhuma — e cadastro marcado que ninguém vê é pior
+que cadastro não marcado: ele promete uma revisão que não acontece.
+
+**Teste obrigatório depois de mexer nisto:** `node teste/rodar.js` — os 10
+casos de `teste/bancada.test.js` travam as duas pontas (a bancada cria e fica
+marcada; a chefia cria e nasce conferida) e a assimetria criar × arrumar.
+
 **Largura com rolo em uso não sai da lista.** A lista descreve a prateleira:
 tirá-la faria a próxima entrada daquela bobina cair no campo livre com aviso de
 "não cadastrada" — para uma bobina que a fábrica tem na mão. O aviso perderia o

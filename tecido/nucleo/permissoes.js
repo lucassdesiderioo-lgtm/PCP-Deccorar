@@ -11,6 +11,14 @@
 const CHAVES=[
   {chave:'cadastro.ler',      nome:'Ver cadastros'},
   {chave:'cadastro.editar',   nome:'Editar cadastros (tecido, enderecos, motivos)'},
+  /* CRIAR ENDERECO E DA BANCADA TAMBEM, e nao e afrouxamento do cadastro.
+     A prateleira ganha buraco novo no meio do dia, e quem esta com o tubo na
+     mao e o operador. Sem esta chave ele nao espera a chefia — ele deixa o
+     rolo sem endereco "para enderecar depois", e o depois nao existe: o tubo
+     fica na estante sem ninguem saber onde.
+     Renomear e apagar continuam com a chefia (cadastro.editar): criar e
+     necessidade fisica com pressa, arrumar nao e. */
+  {chave:'endereco.criar',    nome:'Criar haste, andar e nivel na estante'},
   {chave:'parametro.ler',     nome:'Ver parametros'},
   {chave:'parametro.editar',  nome:'Editar parametros do calculo'},
   {chave:'sobra.ler',         nome:'Ver sobras'},
@@ -29,7 +37,8 @@ const CHAVES=[
 const PAPEIS={
   diretor:['*'],
   cortador:[
-    'cadastro.ler','parametro.ler','sobra.ler','sobra.criar','etiqueta.imprimir',
+    'cadastro.ler','endereco.criar',
+    'parametro.ler','sobra.ler','sobra.criar','etiqueta.imprimir',
     'rolo.ler','rolo.entrada','rolo.encerrar',
     'plano.calcular','plano.confirmar','painel.ler'
   ]

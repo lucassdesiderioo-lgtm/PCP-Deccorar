@@ -14,6 +14,9 @@
 
 <div class="corpo">
   <div class="abas" id="abas"></div>
+  <!-- Container PROPRIO, fora do #conteudo: cada aba faz limpar(#conteudo) ao
+       desenhar, e a lista do que falta conferir nao pertence a aba nenhuma. -->
+  <div id="conferir"></div>
   <div id="conteudo"></div>
 </div>
 
@@ -40,9 +43,11 @@ function montarAbas(){
     texto:a.nome,'aria-selected':String(a.id===aba),onclick:()=>{ aba=a.id; desenhar(); }})));
 }
 
-function desenhar(){
+async function desenhar(){
   montarAbas();
   const c=limpar($('#conteudo'));
+  // Em todas as abas, no topo: o que espera conferencia nao e de uma aba so.
+  cartaoConferir();
   if(aba==='tecido')    return telaTecido(c);
   if(aba==='endereco')  return telaEndereco(c);
   if(aba==='motivo')    return telaMotivo(c);
@@ -152,6 +157,48 @@ const acoes=(item,rota,recarregar,tipo)=>
      tipo?botaoApagar(item,tipo,recarregar):el('span',{}),
      el('span',{texto:' '}),
      botaoAtivo(item,rota,recarregar)]);
+
+/* ── O QUE A BANCADA CRIOU E FALTA CONFERIR ───────────────────────────────
+   A outra metade de deixar a bancada cadastrar. Sem esta lista o que mudou
+   nao foi "a chefia confere depois" — foi "ninguem confere", e a marcacao no
+   banco viraria uma promessa que a tela nao cumpre.
+
+   Ela abre em TODAS as abas de cadastro, no topo, porque o que espera
+   conferencia pode ser de qualquer uma delas. Some inteira quando esta vazia:
+   um cartao permanente escrito "nada a conferir" e ruido que ensina o olho a
+   pular a regiao onde o aviso de verdade vai aparecer. */
+async function cartaoConferir(){
+  const pai=limpar($('#conferir'));
+  if(!podeEditar()) return;
+  const itens=await api('/api/cadastro/conferir');
+  if(!itens.length) return;
+
+  const c=el('div',{class:'cartao',style:'border-color:var(--alerta)'});
+  c.appendChild(el('h2',{texto:'Conferir — '+itens.length+' cadastro(s) criado(s) na bancada'}));
+  c.appendChild(el('p',{class:'nota',texto:
+    'A bancada cria largura de bobina e endereco sem esperar, porque a alternativa nao era esperar: era lancar errado (largura) ou nao enderecar (rolo perdido na estante). O que sai de la entra valendo e cai aqui para voce olhar com calma.'}));
+
+  const t=el('table',{});
+  t.appendChild(el('tr',{},[el('th',{texto:'O que'}),el('th',{texto:'Cadastro'}),
+    el('th',{texto:'Quem'}),el('th',{texto:'Quando'}),el('th',{texto:'Onde arrumar'}),el('th',{texto:''})]));
+  itens.forEach(i=>t.appendChild(el('tr',{},[
+    el('td',{texto:i.oque}),
+    el('td',{texto:i.rotulo}),
+    el('td',{texto:i.criado_por||'—'}),
+    el('td',{texto:(i.criado_em||'').slice(0,16)}),
+    el('td',{class:'quem',texto:i.onde}),
+    el('td',{style:'text-align:right'},[
+      /* "Conferi" so tira da lista — nao arruma nada. Corrigir tem botao
+         proprio (Renomear, Apagar) na aba certa; um conferir que tambem
+         arrumasse esconderia qual das duas coisas a pessoa fez. */
+      el('button',{class:'bt pequeno',texto:'Conferi',onclick:async()=>{
+        await api('/api/cadastro/conferir/'+i.tipo+'/'+i.id,{metodo:'POST'});
+        await cartaoConferir();
+      }})])
+  ])));
+  c.appendChild(t);
+  pai.appendChild(c);
+}
 
 // ── ABA TECIDO ───────────────────────────────────────────────────────────
 async function carregarTecido(){
