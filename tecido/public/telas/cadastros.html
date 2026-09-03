@@ -97,6 +97,35 @@ function botaoAtivo(item,rota,recarregar){
   }});
 }
 
+/* RENOMEAR. O servidor sempre aceitou (o PUT do cadastro leva `nome`), e a
+   tela nunca ofereceu o botao — entao a unica saida para um "Pinpoit" sem o
+   segundo N era desativar e criar de novo, deixando uma linha morta na lista
+   e perdendo o vinculo com quem ja apontava para ela.
+
+   Cadastro que so sabe DESATIVAR obriga a errar duas vezes para consertar
+   uma. E nome de tecido muda de verdade: fornecedor renomeia colecao, e a
+   equipe passa a chamar pelo nome novo enquanto a tela mostra o velho. */
+function botaoRenomear(item,rota,recarregar){
+  if(!podeEditar()) return el('span',{});
+  return el('button',{class:'bt pequeno',texto:'Renomear',onclick:async()=>{
+    const nome=prompt('Novo nome para "'+item.nome+'":',item.nome);
+    if(nome===null) return;                      // cancelou
+    if(!nome.trim()||nome.trim()===item.nome) return;
+    try{
+      await api(rota,{metodo:'PUT',corpo:{nome:nome.trim()}});
+      banner('Renomeado para "'+nome.trim()+'".');
+      await recarregar();
+    }catch(e){}
+  }});
+}
+
+// A dupla que toda linha de cadastro carrega: renomear e ligar/desligar.
+const acoes=(item,rota,recarregar)=>
+  el('td',{style:'text-align:right;white-space:nowrap'},
+    [botaoRenomear(item,rota,recarregar),
+     el('span',{texto:' '}),
+     botaoAtivo(item,rota,recarregar)]);
+
 // ── ABA TECIDO ───────────────────────────────────────────────────────────
 async function carregarTecido(){
   estado.linhas=await api('/api/linhas');
@@ -119,7 +148,7 @@ async function telaTecido(pai){
   const tL=el('table',{});
   estado.linhas.forEach(l=>tL.appendChild(el('tr',{class:l.ativo?'':'inativo'},[
     el('td',{texto:l.nome}),
-    el('td',{style:'text-align:right'},[botaoAtivo(l,'/api/linhas/'+l.id,()=>telaTecido($('#conteudo')))])
+    acoes(l,'/api/linhas/'+l.id,()=>telaTecido($('#conteudo')))
   ])));
   cL.appendChild(estado.linhas.length?tL:el('div',{class:'vazio',texto:'Nenhuma linha ainda.'}));
 
@@ -139,7 +168,7 @@ async function telaTecido(pai){
     const tA=el('table',{});
     estado.aberturas.forEach(a=>tA.appendChild(el('tr',{class:a.ativo?'':'inativo'},[
       el('td',{texto:a.nome}),
-      el('td',{style:'text-align:right'},[botaoAtivo(a,'/api/aberturas/'+a.id,()=>telaTecido($('#conteudo')))])
+      acoes(a,'/api/aberturas/'+a.id,()=>telaTecido($('#conteudo')))
     ])));
     cA.appendChild(estado.aberturas.length?tA:el('div',{class:'vazio',texto:'Esta linha ainda nao tem colecao.'}));
   }
@@ -153,7 +182,7 @@ async function telaTecido(pai){
   const tC=el('table',{});
   estado.cores.forEach(c=>tC.appendChild(el('tr',{class:c.ativo?'':'inativo'},[
     el('td',{texto:c.nome}),
-    el('td',{style:'text-align:right'},[botaoAtivo(c,'/api/cores/'+c.id,()=>telaTecido($('#conteudo')))])
+    acoes(c,'/api/cores/'+c.id,()=>telaTecido($('#conteudo')))
   ])));
   cC.appendChild(estado.cores.length?tC:el('div',{class:'vazio',texto:'Nenhuma cor ainda.'}));
 
@@ -324,7 +353,7 @@ async function telaMotivo(pai){
   const tM=el('table',{});
   motivos.forEach(m=>tM.appendChild(el('tr',{class:m.ativo?'':'inativo'},[
     el('td',{texto:m.nome}),
-    el('td',{style:'text-align:right'},[botaoAtivo(m,'/api/motivos/'+m.id,recarregar)])
+    acoes(m,'/api/motivos/'+m.id,recarregar)
   ])));
   cM.appendChild(tM);
 

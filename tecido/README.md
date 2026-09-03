@@ -230,6 +230,37 @@ da largura da bobina. `Não` é o padrão e vale para a maioria.
 
 ---
 
+## Cadastro se RENOMEIA, além de desativar
+
+Linha, coleção, cor e motivo têm **Renomear** ao lado de Desativar.
+
+> ⚠️ **Até 03/09/2026 a tela só sabia desativar**, e o servidor sempre soube
+> renomear — faltava o botão. A única saída para um `Pinpoit` sem o segundo N
+> era **desativar e criar de novo**: duas linhas na lista, uma delas morta,
+> para corrigir uma letra. Cadastro que só sabe desativar obriga a errar duas
+> vezes para consertar uma.
+>
+> E nome de tecido muda de verdade: o fornecedor renomeia a coleção, a equipe
+> passa a chamar pelo nome novo, e a tela continua mostrando o velho.
+
+**O rename passa pelo domínio, não direto ao banco.** O nome é `UNIQUE`:
+renomear `Pinpoit Bege` para `Bege` com `Bege` já cadastrado estouraria a
+restrição do SQLite e o operador leria *"deu erro aqui dentro, chame o
+suporte"* — quando o que ele precisa ler é *"essa cor já existe"*. Mesma lição
+da etiqueta de sobra duplicada: conferir **antes** de escrever é o que separa
+uma recusa útil de um chamado.
+
+**Renomear para o mesmo nome não é erro** — senão clicar e confirmar sem mudar
+nada daria erro, e o operador concluiria que quebrou alguma coisa.
+
+> ⚠️ **O CÓDIGO DO TECIDO NÃO É REFEITO NO RENAME.**
+> `DOUBLEVISION-NAPOLES-BEGE` já pode estar escrito em plano confirmado e em
+> histórico de rolo; mudar o código apagaria o rastro. O código é etiqueta de
+> **leitura** — quem identifica o tecido de verdade é o trio de ids, e a tela
+> sempre mostra os nomes atuais.
+
+---
+
 ## As larguras de bobina são cadastráveis (Cadastros → Tecido)
 
 A largura da bobina é **do rolo**, não do tecido — o mesmo Rolô 3% Bege existe

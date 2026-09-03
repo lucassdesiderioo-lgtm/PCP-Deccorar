@@ -26,7 +26,10 @@ module.exports={rotas:[
    manipulador:({corpo})=>tecido.criarLinha(corpo),
    detalhe:(req)=>'linha '+req.body.nome},
   {metodo:'PUT', caminho:'/api/linhas/:id', permissao:EDITAR,
-   manipulador:({params,corpo})=>dLinha.atualizar(params.id,corpo)},
+   manipulador:({params,corpo})=> corpo.nome!==undefined
+     ? tecido.renomearLinha(params.id,corpo.nome)
+     : dLinha.atualizar(params.id,corpo),
+   detalhe:(req)=>req.body.nome!==undefined?('renomeou para '+req.body.nome):null},
 
   {metodo:'GET', caminho:'/api/aberturas', permissao:LER,
    manipulador:({query})=>tecido.listarAberturas(query.linha_id)},
@@ -34,7 +37,10 @@ module.exports={rotas:[
    manipulador:({corpo})=>tecido.criarAbertura(corpo),
    detalhe:(req)=>'abertura '+req.body.nome},
   {metodo:'PUT', caminho:'/api/aberturas/:id', permissao:EDITAR,
-   manipulador:({params,corpo})=>dAbertura.atualizar(params.id,corpo)},
+   manipulador:({params,corpo})=> corpo.nome!==undefined
+     ? tecido.renomearAbertura(params.id,corpo.nome)
+     : dAbertura.atualizar(params.id,corpo),
+   detalhe:(req)=>req.body.nome!==undefined?('renomeou para '+req.body.nome):null},
 
   {metodo:'GET', caminho:'/api/cores', permissao:LER,
    manipulador:()=>tecido.listarCores()},
@@ -42,7 +48,10 @@ module.exports={rotas:[
    manipulador:({corpo})=>tecido.criarCor(corpo),
    detalhe:(req)=>'cor '+req.body.nome},
   {metodo:'PUT', caminho:'/api/cores/:id', permissao:EDITAR,
-   manipulador:({params,corpo})=>dCor.atualizar(params.id,corpo)},
+   manipulador:({params,corpo})=> corpo.nome!==undefined
+     ? tecido.renomearCor(params.id,corpo.nome)
+     : dCor.atualizar(params.id,corpo),
+   detalhe:(req)=>req.body.nome!==undefined?('renomeou para '+req.body.nome):null},
 
   /* AS LARGURAS DE BOBINA. Leitura com `cadastro.ler` porque a tela de
      entrada de rolo — que e da bancada — precisa montar os botoes; escrita

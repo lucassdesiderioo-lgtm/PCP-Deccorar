@@ -65,4 +65,70 @@ module.exports=[
 // passou a ser decidido por area no PCP; o que substitui os dois esta em
 // acesso.test.js, que prova a traducao de area em papel.
 
+// ── RENOMEAR ─────────────────────────────────────────────────────────────
+// A tela so sabia DESATIVAR. Consertar um "Pinpoit" sem o segundo N exigia
+// desativar e criar de novo — duas linhas na lista, uma delas morta, para
+// corrigir uma letra. E nome de tecido muda de verdade: fornecedor renomeia
+// colecao, e a equipe passa a chamar pelo nome novo enquanto a tela mostra o
+// velho.
+
+{nome:'renomear conserta a digitacao sem criar linha nova', executar({igual}){
+  const c=tecido.criarCor({nome:'Pinpoit Bege'});
+  const antes=tecido.listarCores().length;
+  const dep=tecido.renomearCor(c.id,'Pinpoint Bege');
+  igual(dep.id,c.id,'e a MESMA linha');
+  igual(dep.nome,'Pinpoint Bege','com o nome certo');
+  igual(tecido.listarCores().length,antes,'nenhuma linha morta sobrou');
+}},
+
+{nome:'renomear para um nome QUE JA EXISTE recusa com frase humana',
+ executar({recusa}){
+  tecido.criarCor({nome:'Verde musgo'});
+  const outra=tecido.criarCor({nome:'Verde limao'});
+  recusa(()=>tecido.renomearCor(outra.id,'Verde musgo'),'cor_repetida');
+  /* O nome e UNIQUE no banco. Sem esta conferencia ANTES da escrita, o
+     SQLite estouraria a restricao e o operador leria "deu erro aqui dentro,
+     chame o suporte" — quando o que ele precisa ler e "essa cor ja existe".
+     Mesma licao da etiqueta de sobra duplicada. */
+}},
+
+{nome:'renomear para o MESMO nome nao e erro', executar({igual}){
+  const c=tecido.criarCor({nome:'Ocre'});
+  igual(tecido.renomearCor(c.id,'Ocre').nome,'Ocre','passa direto');
+  // Senao, clicar em renomear e confirmar sem mudar nada daria erro — e o
+  // operador concluiria que quebrou alguma coisa.
+}},
+
+{nome:'a colecao repetida so vale DENTRO da mesma linha', executar({igual,recusa}){
+  // Nomes proprios deste caso: o arquivo inteiro divide o mesmo banco, e
+  // 'Romana' ja nasceu num caso acima.
+  const l1=tecido.criarLinha({nome:'Painel A'});
+  const l2=tecido.criarLinha({nome:'Painel B'});
+  tecido.criarAbertura({nome:'Napoles',linha_id:l1.id});
+  const a2=tecido.criarAbertura({nome:'Pinpoint',linha_id:l2.id});
+  igual(tecido.renomearAbertura(a2.id,'Napoles').nome,'Napoles',
+    'Napoles em OUTRA linha passa');
+  const a3=tecido.criarAbertura({nome:'Blackout',linha_id:l2.id});
+  recusa(()=>tecido.renomearAbertura(a3.id,'Napoles'),'abertura_repetida');
+  // A colecao pertence a uma linha: o Napoles de uma nao e o da outra.
+}},
+
+{nome:'O CODIGO DO TECIDO NAO MUDA no rename, e isso e decisao',
+ executar({igual}){
+  const l=tecido.criarLinha({nome:'Vertical'});
+  const a=tecido.criarAbertura({nome:'Screen',linha_id:l.id});
+  const c=tecido.criarCor({nome:'Areia'});
+  const t=tecido.criarTecido({linha_id:l.id,abertura_id:a.id,cor_id:c.id});
+  const codigo=t.codigo;
+
+  tecido.renomearCor(c.id,'Areia clara');
+  const depois=tecido.listarTecidos().find(x=>x.id===t.id);
+  igual(depois.codigo,codigo,'o codigo continua '+codigo);
+  igual(depois.cor_nome,'Areia clara','mas a tela mostra o nome novo');
+
+  /* O codigo ja pode estar escrito em plano confirmado e em historico de
+     rolo. Refaze-lo apagaria o rastro. Ele e etiqueta de LEITURA — quem
+     identifica o tecido de verdade e o trio de ids. */
+}}
+
 ];
