@@ -110,6 +110,31 @@ async function gerar(codigos){
   return Buffer.from(await doc.save());
 }
 
+/* O TRACO DAS BARRAS, num lugar so. A etiqueta de sobra e a de rolo tem
+   medidas diferentes e o MESMO desenho de codigo — duas copias divergiriam
+   no dia em que alguem ajustasse uma delas, e a divergencia so apareceria no
+   bipe de uma das duas.
+
+   Barras vizinhas viram um retangulo so: menos objetos no PDF e menos chance
+   de o rasterizador da impressora abrir uma fresta entre elas. */
+// x0 e y chegam em PONTOS (ja convertidos); altura e modulo em MILIMETROS.
+// A mistura e proposital: quem chama ja calculou a posicao no seu proprio
+// layout, e as medidas da barra vem do cadastro, que fala em mm.
+function desenharBarras(pagina, bits, {x0, y, altura, modulo}){
+  let i = 0;
+  while(i < bits.length){
+    if(bits[i] === '1'){
+      let j = i; while(j < bits.length && bits[j] === '1') j++;
+      pagina.drawRectangle({
+        x: x0 + i*modulo*MM, y,
+        width: (j-i)*modulo*MM, height: altura*MM,
+        color: rgb(0,0,0)
+      });
+      i = j;
+    } else i++;
+  }
+}
+
 function desenhar(pagina, codigo, m, mono, sans){
   const {mm, cabe} = moduloPara(codigo, m);
   const bits = barras.modulos(codigo);
@@ -121,20 +146,7 @@ function desenhar(pagina, codigo, m, mono, sans){
   const x0 = ((m.largura - larguraCodigo) / 2 + silencio) * MM;
   const yBarra = (m.altura - m.margem - m.barra) * MM;
 
-  // Barras vizinhas viram um retangulo so — menos objetos no PDF e menos
-  // chance de o rasterizador abrir uma fresta entre elas.
-  let i = 0;
-  while(i < bits.length){
-    if(bits[i] === '1'){
-      let j = i; while(j < bits.length && bits[j] === '1') j++;
-      pagina.drawRectangle({
-        x: x0 + i*mm*MM, y: yBarra,
-        width: (j-i)*mm*MM, height: m.barra*MM,
-        color: rgb(0,0,0)
-      });
-      i = j;
-    } else i++;
-  }
+  desenharBarras(pagina, bits, {x0, y:yBarra, altura:m.barra, modulo:mm});
 
   /* O CODIGO ESCRITO E O QUE O OPERADOR PROCURA. Ele passa o olho na estante
      lendo numero, e usa o leitor so para confirmar. Tambem e a saida quando o
@@ -187,4 +199,124 @@ function desenhar(pagina, codigo, m, mono, sans){
   });
 }
 
-module.exports = {gerar, moduloPara, medidas, conferir, MODULO_MIN_MM, MODULO_MAX_MM};
+/* ═══ A ETIQUETA DO ROLO ═══════════════════════════════════════════════════
+
+   Outro objeto, outro uso, outros parametros — e nao um "reaproveita os da
+   sobra", que faria mexer numa estragar a outra.
+
+     sobra   colada na peca dobrada, lida DE PERTO, na mao
+     rolo    colada DENTRO do tubo de papelao, lida DE LONGE, na estante
+
+   Por isso o codigo do rolo nasce em 54 pt (contra 22 da sobra): quem procura
+   o rolo esta a dois metros da prateleira, e chegar perto de cada tubo para
+   ler o numero e o que faz o operador desistir e "pegar aquele que parece".
+
+   ⚠️ O QUE VAI NA ETIQUETA E O QUE NAO MUDA DE LUGAR.
+   O codigo, o tecido e a largura da bobina sao do rolo e viajam com ele. O
+   ENDERECO nao entra: o tubo sai da estante e volta em outro buraco, e uma
+   etiqueta colada dizendo "A-1-1" passaria a mentir no primeiro dia. Onde o
+   rolo esta e pergunta para a tela, que sabe a resposta de agora. */
+function medidasRolo(){
+  return {
+    largura: config.ler('etqRoloLargura'),
+    altura:  config.ler('etqRoloAltura'),
+    margem:  config.ler('etqRoloMargem'),
+    barra:   config.ler('etqRoloBarra'),
+    fonte:   config.ler('etqRoloFonte')
+  };
+}
+
+// Quanto o miolo ocupa na vertical: barras, codigo grande e as tres linhas
+// de apoio (tecido, bobina, metragem).
+const APOIO_PT = 13;
+const LINHAS_APOIO = 3;
+
+function conferirRolo(m){
+  const letra = m.fonte * PT_MM;
+  const apoio = LINHAS_APOIO * (APOIO_PT * PT_MM + 1.5);
+  const usado = m.margem + m.barra + RESPIRO_MM + letra + 2 + apoio + m.margem;
+  const sobra = m.altura - usado;
+  return {
+    letra, apoio, usado, sobra, cabe: sobra >= 0,
+    recado: 'Nao cabe na etiqueta de rolo de '+num(m.altura)+' mm: as barras ('+
+      num(m.barra)+' mm), o codigo ('+num(letra)+' mm com fonte '+num(m.fonte)+
+      ' pt), as tres linhas de apoio e as margens de '+num(m.margem)+
+      ' mm somam '+num(usado)+' mm. Reduza a fonte do codigo ou use bobina mais alta.'
+  };
+}
+
+/* `rolos` sao objetos com codigo, tecido (texto), largura e saldo. Quem monta
+   esse texto e a rota — o dominio da etiqueta nao sabe juntar linha, colecao
+   e cor, e nem deve: isso ja tem dono em dominio/tecido.js (`descrever`). */
+async function gerarRolo(rolos){
+  const lista = (rolos||[]).filter(r => r && String(r.codigo||'').trim());
+  if(!lista.length)
+    throw new ErroDeRegra('lote_vazio','Nao ha rolo nenhum para etiquetar.');
+
+  const m = medidasRolo();
+  const v = conferirRolo(m);
+  if(!v.cabe) throw new ErroDeRegra('etiqueta_nao_cabe', v.recado);
+
+  const doc = await PDFDocument.create();
+  doc.setTitle('Etiquetas de rolo — tecido');
+  const mono = await doc.embedFont(StandardFonts.CourierBold);
+  const negrito = await doc.embedFont(StandardFonts.HelveticaBold);
+  const sans = await doc.embedFont(StandardFonts.Helvetica);
+
+  for(const r of lista){
+    const pagina = doc.addPage([m.largura*MM, m.altura*MM]);
+    desenharRolo(pagina, r, m, mono, negrito, sans);
+  }
+  return Buffer.from(await doc.save());
+}
+
+function desenharRolo(pagina, rolo, m, mono, negrito, sans){
+  const codigo = String(rolo.codigo).trim();
+  const {mm} = moduloPara(codigo, m);
+  const bits = barras.modulos(codigo);
+  const silencio = 10 * mm;
+  const larguraCodigo = (bits.length * mm) + 2*silencio;
+  const utilTexto = (m.largura - 2*m.margem) * MM;
+  const meio = m.largura*MM/2;
+
+  // De cima para baixo: barras, codigo grande, depois as linhas de apoio.
+  const yBarra = (m.altura - m.margem - m.barra) * MM;
+  desenharBarras(pagina, bits, {
+    x0: ((m.largura - larguraCodigo)/2 + silencio) * MM,
+    y: yBarra, altura: m.barra, modulo: mm});
+
+  // O CODIGO, do tamanho que der para ler da estante.
+  let tam = m.fonte;
+  while(tam > 8 && mono.widthOfTextAtSize(codigo, tam) > utilTexto) tam -= 1;
+  const yCodigo = yBarra - RESPIRO_MM*MM - tam;
+  pagina.drawText(codigo, {
+    x: meio - mono.widthOfTextAtSize(codigo, tam)/2,
+    y: yCodigo, size: tam, font: mono, color: rgb(0,0,0)
+  });
+
+  /* As linhas de apoio respondem "e este mesmo?" sem abrir a tela. Elas nao
+     substituem o sistema — a metragem impressa envelhece no primeiro corte —
+     e por isso a metragem sai marcada com a data de quando foi impressa.
+     Numero sem data e numero que alguem vai usar achando que e de hoje. */
+  const apoio = [
+    String(rolo.tecido||'').trim(),
+    'Bobina ' + num(rolo.largura) + ' m',
+    rolo.saldo!=null ? ('Tinha ' + num(rolo.saldo) + ' m em ' + (rolo.impresso_em||'')) : ''
+  ].filter(Boolean);
+
+  let y = yCodigo - 6*MM;
+  apoio.forEach((linha, i) => {
+    const fonte = i===0 ? negrito : sans;
+    let t = APOIO_PT;
+    while(t > 6 && fonte.widthOfTextAtSize(linha, t) > utilTexto) t -= 0.5;
+    pagina.drawText(linha, {
+      x: meio - fonte.widthOfTextAtSize(linha, t)/2,
+      y, size: t, font: fonte,
+      color: i===0 ? rgb(0,0,0) : rgb(.35,.35,.35)
+    });
+    y -= (t * PT_MM + 1.5) * MM;
+  });
+}
+
+module.exports = {gerar, gerarRolo, moduloPara, medidas, medidasRolo,
+  conferir, conferirRolo, MODULO_MIN_MM, MODULO_MAX_MM};

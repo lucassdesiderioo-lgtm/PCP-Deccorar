@@ -103,6 +103,36 @@ async function telaEstoque(pai){
         banner('Saldo ajustado.'); await telaEstoque($('#conteudo'));
       }}));
     }
+    /* MOVER DE LUGAR. O tubo volta da bancada em outro buraco, e sem isto o
+       endereco do sistema passa a apontar para um lugar vazio — o proximo
+       que procurar aquele rolo nao acha, e conclui que o sistema erra.
+
+       Quem moveu sai da SESSAO, nunca de um campo digitado: campo de nome em
+       tela de fabrica e preenchido com o nome de quem esta por perto. */
+    if(r.status!=='encerrado') acoes.push(el('button',{class:'bt pequeno',texto:'Mover',
+      onclick:async()=>{
+        const arvore=await api('/api/enderecos/ROLO');
+        const niveis=[];
+        arvore.filter(h=>h.ativo).forEach(h=>h.andares.forEach(a=>a.niveis.forEach(n=>
+          niveis.push({id:n.id,texto:h.nome+'-'+a.nome+'-'+n.nome}))));
+        if(!niveis.length) return banner('Nenhum endereco de ROLO cadastrado.','erro');
+        const escolha=prompt('Para onde foi o rolo '+r.codigo+'?\n\n'+
+          niveis.map((n,i)=>(i+1)+') '+n.texto).join('\n')+
+          '\n\nDigite o numero da opcao:');
+        if(!escolha) return;
+        const n=niveis[Number(escolha)-1];
+        if(!n) return banner('Opcao invalida.','erro');
+        try{
+          await api('/api/rolos/'+r.id+'/mover',{metodo:'POST',corpo:{nivel_id:n.id}});
+          banner(r.codigo+' agora esta em '+n.texto+'.');
+          await telaEstoque($('#conteudo'));
+        }catch(e){}
+      }}));
+
+    // A etiqueta do tubo. Abre o PDF de 100 x 150 mm, uma pagina.
+    acoes.push(el('button',{class:'bt pequeno',texto:'Etiqueta',
+      onclick:()=>window.open('/sobmedida/api/rolos/'+r.id+'/etiqueta','_blank')}));
+
     acoes.push(el('button',{class:'bt pequeno',texto:'Historico',onclick:async()=>{
       const ms=await api('/api/rolos/'+r.id+'/movimentos');
       alert(r.codigo+'\n\n'+ms.map(m=>

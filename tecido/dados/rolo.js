@@ -79,5 +79,11 @@ const divergencias=()=>db.prepare(`
     FROM rolo r
    WHERE ABS(r.saldo - COALESCE((SELECT SUM(delta) FROM movimento_rolo m WHERE m.rolo_id=r.id),0)) > 0.001`).all();
 
+// O endereco e a UNICA coluna do rolo que muda sem o saldo mudar junto. Por
+// isso ela tem escrita propria, em vez de entrar num `atualizar` generico que
+// aceitaria mexer em largura ou metragem por engano.
+const atualizarEndereco=(id,nivel_id)=>
+  db.prepare('UPDATE rolo SET nivel_id=? WHERE id=?').run(nivel_id,id);
+
 module.exports={ultimoSeq,listar,porId,porCodigo,disponiveis,criar,gravarSaldo,
-  movimentar,movimentos,saldoPorTecido,divergencias};
+  atualizarEndereco,movimentar,movimentos,saldoPorTecido,divergencias};

@@ -56,6 +56,42 @@ function entrada(dados,usuarioNome){
   })();
 }
 
+/* ── MUDAR O ROLO DE LUGAR ────────────────────────────────────────────────
+   O tubo sai da estante para cortar e volta — na maioria das vezes para o
+   mesmo buraco, e ai nao ha nada a registrar. Quando volta em OUTRA haste ou
+   andar, o endereco do sistema passa a apontar para um lugar vazio, e o
+   proximo que procurar aquele rolo nao vai achar.
+
+   Fica registrado em movimento_rolo com delta ZERO: o saldo nao mudou, o
+   lugar mudou. E a mesma tabela de proposito — o historico do rolo e um so,
+   e quem investiga "cade este rolo" le a mesma lista de quem investiga
+   "quanto foi consumido".
+
+   O NOME DE QUEM MOVEU VEM DA SESSAO, nunca de um campo digitado. Campo de
+   nome em tela de fabrica e preenchido com o nome de quem esta por perto. */
+function mover(rolo_id,nivel_id,usuarioNome){
+  const r=dRolo.porId(rolo_id);
+  exigir(r,'rolo_inexistente','Rolo nao encontrado.');
+  exigir(r.status!=='encerrado','rolo_encerrado',
+    'O rolo '+r.codigo+' esta encerrado — ele nao volta para a estante.');
+  exigir(nivel_id,'endereco_obrigatorio','Diga para qual endereco o rolo foi.');
+  endereco.exigirArmazem(nivel_id,'ROLO');
+
+  const de=r.nivel_id?endereco.descrever(r.nivel_id):'sem endereco';
+  const para=endereco.descrever(nivel_id);
+  // Mesmo lugar nao e movimento: registrar isso encheria o historico de
+  // linhas que nao contam nada, e historico que nao conta nada ninguem le.
+  if(Number(r.nivel_id)===Number(nivel_id))
+    throw new ErroDeRegra('mesmo_endereco','O rolo '+r.codigo+' ja esta em '+para+'.');
+
+  return db.transaction(()=>{
+    dRolo.atualizarEndereco(rolo_id,nivel_id);
+    dRolo.movimentar({rolo_id,delta:0,saldo_apos:r.saldo,motivo:'mudanca_endereco',
+      observacao:'de '+de+' para '+para, usuario_nome:usuarioNome});
+    return dRolo.porId(rolo_id);
+  })();
+}
+
 // ── CONSUMO ──────────────────────────────────────────────────────────────
 // Chamado pelo plano, dentro da transacao do Confirmar.
 function consumir(rolo_id,metros,referencia,usuarioNome){
@@ -131,7 +167,7 @@ function conferirSaldos(){
   return ruins;
 }
 
-module.exports={
+module.exports={mover,
   entrada, consumir, ajustar, encerrar, conferirSaldos, formatar,
   listar:f=>dRolo.listar(f),
   porId:id=>dRolo.porId(id),

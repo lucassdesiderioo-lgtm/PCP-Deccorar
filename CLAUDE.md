@@ -1393,7 +1393,7 @@ cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 114 casos
+cd tecido && npm test          # 128 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
