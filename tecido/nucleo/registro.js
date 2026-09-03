@@ -49,7 +49,23 @@ function montar(app, db, modulos, prefixo){
           const dados=await r.manipulador({
             corpo:req.body||{}, params:req.params, query:req.query, usuario:u, db
           });
-          if(!leitura) audita(u,r.permissao,req.method,req.path,r.detalhe?r.detalhe(req,dados):null,1);
+          if(!leitura||r.tipo) audita(u,r.permissao,req.method,req.path,r.detalhe?r.detalhe(req,dados):null,1);
+
+          /* ARQUIVO, nao envelope. A etiqueta vai para a impressora como PDF, e
+             PDF dentro de {ok,dados} teria que passar por base64 e ser
+             remontado na tela — mais codigo, e a URL deixaria de ser algo que
+             o operador consegue abrir, salvar e reimprimir amanha.
+
+             A porta continua sendo esta: permissao conferida, erro tratado e
+             AUDITADO — impressao de etiqueta e um GET, mas gasta rolo e cria
+             sequencia; e das poucas leituras que valem uma linha na auditoria. */
+          if(r.tipo==='pdf'){
+            res.setHeader('Content-Type','application/pdf');
+            res.setHeader('Content-Disposition',
+              'inline; filename="'+(dados.nome||'etiquetas.pdf')+'"');
+            return res.send(dados.arquivo);
+          }
+
           res.json({ok:true,dados:dados===undefined?{}:dados});
         }catch(e){
           if(e instanceof ErroDeRegra){

@@ -294,6 +294,50 @@ INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem)
 VALUES('pcpUrl','http://localhost:3010','texto','Endereco do PCP',
  'De onde este modulo pergunta quem esta logado. Os dois sistemas rodam na mesma maquina, entao localhost e o normal. Apagar este valor desliga o login unico e todo mundo passa a entrar com o PIN proprio daqui.',
  '',10);
+`},
+
+{n:5, nome:'a etiqueta em PDF e cadastravel', sql:`
+/* A ETIQUETA DEIXA DE SER CONSTANTE NO CODIGO.
+
+   Ela e um objeto fisico que a equipe vai ajustar olhando o resultado na
+   bancada — "a letra ta pequena", "a barra some quando a etiqueta amassa".
+   Cada um desses ajustes era um deploy. Agora e um campo na tela, e quem
+   decide e quem cola a etiqueta na peca.
+
+   ⚠️ O TEXTO EMBAIXO DA BARRA NAO E LEGENDA. E onde o operador PROCURA a
+   sobra na prateleira: ele passa o olho na estante lendo numero, e usa o
+   leitor so na hora de confirmar. Por isso a fonte nasce em 22 pt, o dobro
+   do que era — e por isso ela e o primeiro parametro da lista. */
+INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
+('etqFonteCodigo','22','numero','Etiqueta: tamanho do codigo escrito',
+ 'A altura da letra do codigo (S-000123) impresso embaixo das barras. E por este texto que o operador acha a sobra na prateleira — o leitor serve para confirmar, nao para procurar. Se a equipe reclamar que precisa chegar perto para ler, aumente aqui. Se o codigo passar da largura da etiqueta, o sistema reduz o suficiente para caber e avisa.',
+ 'pt',20),
+
+('etqBarraAltura','14','numero','Etiqueta: altura das barras',
+ 'Barra curta obriga o operador a mirar com o leitor, e mirar na bancada e o que faz ele desistir do leitor e digitar. Barra alta come o espaco do codigo escrito. 14 mm e o equilibrio que sobrou depois de reservar a letra grande.',
+ 'mm',21),
+
+('etqLargura','100','numero','Etiqueta: largura da bobina',
+ 'A largura do rolo de etiqueta que esta na Zebra. Cada pagina do PDF sai exatamente neste tamanho, entao nao existe "ajustar a pagina" para dar errado. Trocou de bobina, troca aqui.',
+ 'mm',22),
+
+('etqAltura','35','numero','Etiqueta: altura da bobina',
+ 'A altura de uma etiqueta da bobina. O sistema confere se a barra, o codigo e as margens caibam nesta altura, e RECUSA gerar o PDF se nao couberem — melhor recusar na tela do que imprimir 300 etiquetas cortadas.',
+ 'mm',23),
+
+('etqMargem','4','numero','Etiqueta: margem',
+ 'A folga em volta do desenho. Nao e estetica: o silencio do codigo de barras (as barras vazias de cada lado, sem as quais o leitor nao acha o comeco do codigo) tem que caber DENTRO da area impressa, e a Zebra tem folga de alinhamento da bobina.',
+ 'mm',24);
+
+/* pcpUrl SAI. Ele apontava para a ponte HTTP que perguntava ao PCP quem
+   estava logado — e essa ponte deixou de existir quando o modulo passou a
+   ser montado dentro do proprio PCP (nao ha mais o que perguntar, o usuario
+   chega resolvido).
+
+   Nao e faxina: parametro que nao faz nada e MENTIRA na tela de cadastro.
+   Alguem editaria aquele endereco tentando resolver um problema de acesso,
+   nada mudaria, e a conclusao seria "esse sistema nao obedece". */
+DELETE FROM parametro WHERE chave='pcpUrl';
 `}
 
 ];

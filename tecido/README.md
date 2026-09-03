@@ -160,6 +160,74 @@ melhor que qualquer chute — e mudar é um campo, não uma linha de código.
 
 ---
 
+## A etiqueta da sobra sai em PDF, 100 x 35 mm
+
+A folha que vai para a Zebra e gerada **no servidor**, uma etiqueta por pagina,
+no tamanho exato da bobina (`GET /api/etiquetas/lotes/:id/pdf`).
+
+> ⚠️ **Nao volte a imprimir pelo `window.print()`.** A folha do navegador so
+> saia certa quando quem imprime escolhia "margens: Nenhuma" e escala 100% —
+> **toda vez**. Errou uma, o Chrome ajusta a pagina, as barras esticam e o
+> leitor recusa. E ainda carimbava a URL e o "8/32" que, numa etiqueta de
+> 35 mm, caem em cima do codigo.
+>
+> E a mesma licao da armadilha #6 do CLAUDE.md: o que so funciona quando o
+> operador acerta a configuracao e o que vai falhar. A pagina agora ja nasce
+> 100 x 35 e nao ha o que ajustar.
+
+A grade que aparece na tela e **conferencia**, nao folha de impressao — e se
+alguem der Ctrl+P nela por engano, sai escrito isso na folha.
+
+`public/barras.js` serve as duas pontas: a tela desenha SVG, o servidor desenha
+as mesmas barras dentro do PDF. Duas tabelas CODE128 seriam duas etiquetas
+diferentes para o mesmo codigo, e a divergencia so apareceria na bancada.
+
+### As medidas sao CADASTRAVEIS (Cadastros -> Parametros)
+
+Nenhuma medida mora no codigo. A etiqueta e um objeto fisico que a equipe
+ajusta olhando o resultado na bancada — *"a letra ta pequena"*, *"a barra some
+quando a etiqueta amassa"* — e cada um desses ajustes era um deploy.
+
+| Parametro | Padrao | O que e |
+|---|---|---|
+| `etqFonteCodigo` | **22 pt** | o codigo escrito embaixo das barras |
+| `etqBarraAltura` | 14 mm | altura das barras |
+| `etqLargura` | 100 mm | largura da bobina |
+| `etqAltura` | 35 mm | altura da bobina |
+| `etqMargem` | 4 mm | folga em volta |
+
+> ⚠️ **O TEXTO EMBAIXO DA BARRA NAO E LEGENDA.** E onde o operador PROCURA a
+> sobra: ele passa o olho na estante lendo numero, e usa o leitor so para
+> confirmar. Por isso a fonte nasce em 22 pt — o dobro da primeira versao — e
+> por isso ela e o primeiro parametro da lista.
+
+**Altura e largura falham de jeitos diferentes, e nao e inconsistencia:**
+
+| Nao cabe na | O que acontece | Por que |
+|---|---|---|
+| **altura** | **recusa** gerar o PDF, com a frase dizendo o que reduzir | passar da altura corta o desenho: parte do codigo nao existe no papel |
+| **largura** | **encolhe** a letra o suficiente e imprime | e so tamanho de letra, e letra menor o operador ainda le. Recusar pararia a bancada por estetica |
+
+A tela mostra as medidas ao lado do botao e **desabilita** o botao quando os
+numeros nao fecham — senao o operador clicaria em imprimir e abriria uma aba
+com o JSON do erro na cara.
+
+> ⚠️ **O MODULO DA BARRA NAO E CADASTRAVEL, e isso e decisao.** Ele e
+> calculado para o codigo caber na largura, com piso de 0,25 mm: a 203 dpi
+> isso e 2 pontos de impressao, e abaixo disso a leitura falha em etiqueta
+> amassada — que e o estado normal de uma etiqueta que passou um mes na
+> prateleira. Um campo ali deixaria alguem gerar 300 etiquetas tecnicamente
+> ilegiveis sem nenhum aviso, e o erro so apareceria no bipe.
+>
+> A diferenca de tratamento e a regra: **texto pequeno o operador ainda le;
+> barra fina demais o leitor recusa, e ninguem descobre por que.**
+
+Codigo comprido demais para caber sai **marcado** na propria etiqueta
+(`SOBRA · CONFERIR LEITURA`), nunca impresso pequeno em silencio: o desfecho
+ruim nao e o erro, e a etiqueta sair bonita, colada na peca, e nao bipar.
+
+---
+
 ## A etiqueta da sobra
 
 O sistema **imprime** o lote (Etiquetas → quantidade → folha em A4 para

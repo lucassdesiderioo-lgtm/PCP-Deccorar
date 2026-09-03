@@ -85,5 +85,14 @@ function svg(texto,opcoes){
   return el;
 }
 
-window.barras={svg,modulos,indices,LARGURAS};
+// O MESMO ARQUIVO SERVE AS DUAS PONTAS, e isso e de proposito. A tela desenha
+// SVG na folha de conferencia; o servidor desenha as MESMAS barras dentro do
+// PDF que vai para a Zebra. Duas tabelas CODE128 seriam duas etiquetas
+// diferentes para o mesmo codigo — e a divergencia so apareceria na bancada,
+// com a folha ja impressa e colada.
+//
+// `svg()` usa `document` e so existe no navegador; `modulos()` e puro e e o
+// que o gerador de PDF consome.
+if(typeof window!=='undefined') window.barras={svg,modulos,indices,LARGURAS};
+if(typeof module!=='undefined'&&module.exports) module.exports={modulos,indices,LARGURAS};
 })();

@@ -3,6 +3,7 @@
 //   sobra.descartar  cortador NAO tem — baixa de sobra e da chefia
 const sobra=require('../dominio/sobra');
 const etiqueta=require('../dominio/etiqueta');
+const pdf=require('../dominio/etiqueta_pdf');
 
 module.exports={rotas:[
   {metodo:'GET', caminho:'/api/sobras', permissao:'sobra.ler',
@@ -31,6 +32,33 @@ module.exports={rotas:[
 
   {metodo:'GET', caminho:'/api/etiquetas/lotes/:id', permissao:'etiqueta.imprimir',
    manipulador:({params})=>etiqueta.doLote(params.id)},
+
+  /* AS MEDIDAS DA ETIQUETA, como estao cadastradas agora.
+     A tela le isto para escrever ao lado do botao o que vai sair, e para
+     DESABILITAR o botao quando os numeros nao fecham. Sem isso, o operador
+     clicaria em imprimir e abriria uma aba com o JSON do erro na cara —
+     tecnicamente correto, e inutil para quem esta na bancada. */
+  {metodo:'GET', caminho:'/api/etiquetas/medidas', permissao:'etiqueta.imprimir',
+   manipulador:()=>{
+     const m=pdf.medidas();
+     const v=pdf.conferir(m);
+     return {...m, cabe:v.cabe, sobra_mm:Math.round(v.sobra*100)/100,
+             recado:v.cabe?null:v.recado};
+   }},
+
+  /* A FOLHA PARA A IMPRESSORA: uma etiqueta por pagina, 100 x 35 mm.
+     Separada do GET acima (que devolve a lista para a tela conferir) porque
+     sao duas perguntas diferentes: "o que tem neste lote" e "me da o arquivo
+     pronto para a Zebra". */
+  {metodo:'GET', caminho:'/api/etiquetas/lotes/:id/pdf', permissao:'etiqueta.imprimir',
+   tipo:'pdf',
+   manipulador:async ({params})=>{
+     const etqs=etiqueta.doLote(params.id);
+     const arquivo=await pdf.gerar(etqs.map(e=>e.codigo));
+     const de=etqs[0]&&etqs[0].codigo, ate=etqs[etqs.length-1]&&etqs[etqs.length-1].codigo;
+     return {arquivo, nome:'etiquetas-'+de+'-'+ate+'.pdf'};
+   },
+   detalhe:(req)=>'PDF do lote '+req.params.id},
 
   {metodo:'POST', caminho:'/api/etiquetas/lotes', permissao:'etiqueta.imprimir',
    manipulador:({corpo,usuario})=>etiqueta.imprimirLote(corpo.quantidade,usuario.nome),
