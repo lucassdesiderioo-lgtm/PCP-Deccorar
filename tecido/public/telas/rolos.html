@@ -24,7 +24,8 @@ const {api,banner,el,limpar,$,num,comoNumero,formatarMetros,formatarArea}=window
 
 let eu={}, aba='estoque';
 const estado={tecidos:[],arvore:[],tecido_id:null,nivel_id:null,
-  larguras:null,largura:null,larguraOutra:''};
+  larguras:null,largura:null,larguraOutra:'',
+  fornecedores:null,fornecedor_id:null,nota:null};
 
 // O MESMO arredondamento do servidor (dados/largura.js). Sem ele, o botao de
 // 2,50 nao casaria com o 2.5 que volta do banco e a tela nunca marcaria
@@ -32,6 +33,14 @@ const estado={tecidos:[],arvore:[],tecido_id:null,nivel_id:null,
 const dLargura={arred:v=>Math.round(Number(String(v).replace(',','.'))*1000)/1000};
 const ABAS=[{id:'estoque',nome:'Em estoque'},{id:'entrada',nome:'Entrada de rolo'}];
 const podeEntrar=()=>['diretor','cortador'].includes(eu.papel);
+/* QUEM VE PRECO E QUEM LANCA NOTA. A tela só decide o que DESENHAR — o
+   servidor ja mandou o JSON sem os campos de preco para quem nao tem
+   custo.ver, entao esconder aqui e conforto, nunca a trava. */
+const podeCusto=()=>(eu.permissoes||[]).includes('custo.ver');
+const podeNota =()=>(eu.permissoes||[]).includes('rolo.nota');
+
+const dinheiro=v=>v==null?'—':'R$ '+Number(v).toLocaleString('pt-BR',
+  {minimumFractionDigits:2,maximumFractionDigits:2});
 
 function montarAbas(){
   const c=limpar($('#abas'));
@@ -69,11 +78,177 @@ function fileira(rotulo,itens,sel,aoEscolher,novo){
   return f;
 }
 
+/* ── LANCAR A NOTA DE UM ROLO ─────────────────────────────────────────────
+   Formulario, e nao tres `prompt` em fila: sao quatro campos que se leem
+   juntos da mesma nota fiscal, e prompt em sequencia obriga a decorar o que
+   ja foi digitado. O total sai calculado embaixo — e ele que a pessoa
+   confere contra o papel na mao, e o unico jeito de pegar uma virgula fora
+   de lugar antes de o numero entrar no estoque. */
+function abrirNota(r){ estado.nota=r; telaEstoque($('#conteudo')); }
+
+async function cartaoNota(pai,r){
+  const fornecedores=(await api('/api/fornecedores')).filter(f=>f.ativo);
+  const c=el('div',{class:'cartao',style:'border-color:var(--acao)'});
+  c.appendChild(el('h2',{texto:'Nota do rolo '+r.codigo}));
+  c.appendChild(el('p',{class:'nota',texto:
+    [r.linha_nome,r.abertura_nome,r.cor_nome].join(' · ')+
+    '  ·  bobina '+num(r.largura)+' m  ·  entrou com '+formatarMetros(r.metragem_inicial)}));
+
+  const sel=el('select',{});
+  sel.appendChild(el('option',{value:'',texto:'— sem fornecedor —'}));
+  fornecedores.forEach(f=>sel.appendChild(el('option',{value:String(f.id),texto:f.nome})));
+  sel.value=r.fornecedor_id?String(r.fornecedor_id):'';
+
+  const nf=el('input',{type:'text',value:r.nf||'',inputmode:'numeric'});
+  const preco=el('input',{type:'text',value:r.preco_m2==null?'':num(r.preco_m2),inputmode:'decimal'});
+  const total=el('p',{class:'ajuda'});
+
+  /* O TOTAL DA COMPRA, ao vivo. m² COMPRADO (metragem inicial), nao o saldo:
+     a nota cobra o rolo inteiro, e conferir contra o que sobrou nao fecharia
+     com o papel nunca. */
+  const m2Comprado=r.metragem_inicial*r.largura;
+  const recalcular=()=>{
+    const p=comoNumero(preco.value);
+    total.textContent=p>0
+      ? 'Confira contra a nota: '+formatarArea(m2Comprado)+' × '+dinheiro(p)+
+        '/m²  =  '+dinheiro(m2Comprado*p)+' o rolo inteiro.'
+      : 'Sem preco, este rolo fica fora da soma do estoque — e contado a parte, nunca como zero.';
+  };
+  preco.addEventListener('input',recalcular); recalcular();
+
+  /* O ULTIMO PRECO PAGO pre-preenche — e vem das COMPRAS, nao de uma tabela.
+     Tabela de preco por fornecedor envelhece calada: o numero fica la
+     parecendo atual e ninguem sabe de quando e. */
+  const dica=el('p',{class:'ajuda'});
+  async function sugerir(){
+    dica.textContent='';
+    if(!sel.value) return;
+    const u=await api('/api/rolos/ultimo-preco?tecido_id='+r.tecido_id+'&fornecedor_id='+sel.value);
+    if(u.preco==null){ dica.textContent='Primeira compra deste tecido com este fornecedor.'; return; }
+    dica.textContent='Ultimo pago: '+dinheiro(u.preco)+'/m² em '+String(u.quando).slice(0,10)+
+      (u.de_outro_fornecedor?' — mas foi de '+u.de_outro_fornecedor+', nao deste.':'');
+    if(!preco.value) preco.value=num(u.preco);
+    recalcular();
+  }
+  sel.addEventListener('change',sugerir); sugerir();
+
+  const campo=(rot,input)=>el('div',{class:'campo cresce'},[el('label',{texto:rot}),input]);
+  c.appendChild(el('div',{class:'campos'},[
+    campo('Fornecedor',sel), campo('NF',nf), campo('R$ por m²',preco)]));
+  c.appendChild(dica); c.appendChild(total);
+
+  const bt=el('button',{class:'bt primario',texto:'Salvar',onclick:async()=>{
+    bt.disabled=true;
+    try{
+      await api('/api/rolos/'+r.id+'/dados',{metodo:'PUT',corpo:{
+        nf:nf.value, fornecedor_id:sel.value||null, preco_m2:preco.value}});
+      banner('Nota do rolo '+r.codigo+' lancada.');
+      estado.nota=null; await telaEstoque($('#conteudo'));
+    }catch(e){ bt.disabled=false; }
+  }});
+  c.appendChild(el('div',{class:'campos'},[bt,
+    el('button',{class:'bt',texto:'Cancelar',
+      onclick:()=>{ estado.nota=null; telaEstoque($('#conteudo')); }})]));
+  pai.appendChild(c);
+}
+
+/* ── O DINHEIRO PARADO NA PRATELEIRA ──────────────────────────────────────
+   ⚠️ O TOTAL SAI COMO PISO (>=) ENQUANTO HOUVER ROLO SEM PRECO. Somar zero
+   pelos que faltam faria o estoque parecer mais barato do que e, e ninguem
+   saberia por que — regra 4 do COMPRAS.md, a mesma da aba Estoque do PCP. */
+async function cartaoValor(pai){
+  if(!podeCusto()) return;
+  const p=await api('/api/rolos/valor');
+  const c=el('div',{class:'cartao'});
+  c.appendChild(el('h2',{texto:'Dinheiro parado em rolo'}));
+
+  const piso=p.resumo.piso;
+  c.appendChild(el('p',{style:'font-size:30px;font-weight:700;margin:6px 0',
+    texto:(piso?'≥ ':'')+dinheiro(p.resumo.valor)}));
+  c.appendChild(el('p',{class:'ajuda'+(piso?'':''),
+    style:piso?'color:var(--alerta)':'',
+    texto:piso
+      ? p.resumo.rolos_sem_preco+' de '+p.resumo.rolos+' rolos ainda nao tem preco lancado, entao este e o MINIMO. '+
+        'Eles nao entram como zero: zero e um custo valido e mentiroso.'
+      : 'Os '+p.resumo.rolos+' rolos em estoque tem preco lancado — o total e exato.'}));
+  c.appendChild(el('p',{class:'ajuda',texto:
+    formatarArea(p.resumo.m2)+' de tecido na prateleira. O valor e a soma do que foi PAGO em cada rolo, '+
+    'congelado na compra — reajuste de fornecedor nao muda o que ja esta aqui.'}));
+
+  const tabela=(titulo,linhas,coluna)=>{
+    if(!linhas.length) return;
+    const t=el('table',{style:'margin-top:14px'});
+    t.appendChild(el('tr',{},[el('th',{texto:titulo}),el('th',{class:'num',texto:'Rolos'}),
+      el('th',{class:'num',texto:'m²'}),el('th',{class:'num',texto:'Valor'})]));
+    linhas.forEach(l=>t.appendChild(el('tr',{},[
+      el('td',{texto:coluna(l)}),
+      el('td',{class:'num',texto:String(l.rolos)}),
+      el('td',{class:'num',texto:formatarArea(l.m2)}),
+      el('td',{class:'num',texto:(l.rolos_sem_preco?'≥ ':'')+dinheiro(l.valor)})
+    ])));
+    c.appendChild(t);
+  };
+  tabela('Tecido',p.tecidos,l=>[l.linha_nome,l.abertura_nome,l.cor_nome].join(' · '));
+  tabela('Bobina',p.larguras,l=>num(l.chave)+' m');
+  tabela('Cor',p.cores,l=>l.chave);
+
+  /* QUANTO CADA FORNECEDOR COBROU — das COMPRAS, nao de uma tabela. E o que
+     foi pago de verdade, e por isso e o unico jeito honesto de comparar. */
+  if(p.fornecedores.length){
+    const t=el('table',{style:'margin-top:14px'});
+    t.appendChild(el('tr',{},[el('th',{texto:'Fornecedor'}),el('th',{texto:'Tecido'}),
+      el('th',{class:'num',texto:'Compras'}),el('th',{class:'num',texto:'m² comprado'}),
+      el('th',{class:'num',texto:'R$/m² medio'}),el('th',{texto:'Ultima'})]));
+    p.fornecedores.forEach(f=>t.appendChild(el('tr',{},[
+      el('td',{texto:f.fornecedor_nome}),
+      el('td',{texto:[f.linha_nome,f.abertura_nome,f.cor_nome].join(' · ')}),
+      el('td',{class:'num',texto:String(f.compras)}),
+      el('td',{class:'num',texto:formatarArea(f.m2_comprado)}),
+      el('td',{class:'num',texto:dinheiro(f.preco_medio),
+        title:f.menor===f.maior?'':'de '+dinheiro(f.menor)+' a '+dinheiro(f.maior)}),
+      el('td',{texto:String(f.ultima_compra||'').slice(0,10)})
+    ])));
+    c.appendChild(el('h2',{style:'margin-top:20px;font-size:16px',texto:'Quanto cada fornecedor cobrou'}));
+    c.appendChild(t);
+    c.appendChild(el('p',{class:'ajuda',texto:
+      'Media ponderada pelo m² comprado, e nao pela quantidade de compras — uma barra de 5 m e uma de 200 m nao pesam igual. Passe o mouse no preco para ver a faixa.'}));
+  }
+  pai.appendChild(c);
+
+  /* OS ROLOS SEM NOTA. Sem esta lista, "a nota chega depois" vira "a nota
+     nunca chega" — mesma licao da lista Conferir (armadilha #14). */
+  if(podeNota()&&p.sem_nota.length){
+    const cs=el('div',{class:'cartao',style:'border-color:var(--alerta)'});
+    cs.appendChild(el('h2',{texto:'Sem nota — '+p.sem_nota.length+' rolo(s)'}));
+    cs.appendChild(el('p',{class:'nota',texto:
+      'Cada um destes fica FORA da soma do dinheiro parado. Nao entram como zero: sao contados a parte, e por isso o total la em cima sai com ">=" na frente.'}));
+    const t=el('table',{});
+    t.appendChild(el('tr',{},[el('th',{texto:'Rolo'}),el('th',{texto:'Tecido'}),
+      el('th',{texto:'Falta'}),el('th',{class:'num',texto:'Ha'}),el('th',{texto:''})]));
+    p.sem_nota.forEach(r=>{
+      const falta=[!r.fornecedor_nome&&'fornecedor',!r.nf&&'NF',r.preco_m2==null&&'preco']
+        .filter(Boolean).join(', ');
+      t.appendChild(el('tr',{},[
+        el('td',{texto:r.codigo}),
+        el('td',{texto:[r.linha_nome,r.abertura_nome,r.cor_nome].join(' · ')}),
+        el('td',{texto:falta}),
+        el('td',{class:'num'+(r.dias>=30?' aviso':''),texto:r.dias+' d'}),
+        el('td',{style:'text-align:right'},[el('button',{class:'bt pequeno',texto:'Lancar',
+          onclick:()=>abrirNota(r)})])
+      ]));
+    });
+    cs.appendChild(t);
+    pai.appendChild(cs);
+  }
+}
+
 // ── EM ESTOQUE ───────────────────────────────────────────────────────────
 async function telaEstoque(pai){
   const rolos=await api('/api/rolos');
   const saldo=await api('/api/rolos/saldo');
   pai=limpar(pai);
+  if(estado.nota) await cartaoNota(pai,rolos.find(r=>r.id===estado.nota.id)||estado.nota);
+  await cartaoValor(pai);
 
   const cS=el('div',{class:'cartao'});
   cS.appendChild(el('h2',{texto:'Saldo por tecido'}));
@@ -96,7 +271,10 @@ async function telaEstoque(pai){
   const t=el('table',{});
   t.appendChild(el('tr',{},[el('th',{texto:'Codigo'}),el('th',{texto:'Tecido'}),
     el('th',{class:'num',texto:'Bobina'}),el('th',{class:'num',texto:'Saldo'}),
-    el('th',{class:'num',texto:'m²'}),el('th',{texto:'Estado'}),el('th',{texto:'Endereco'}),el('th',{texto:''})]));
+    el('th',{class:'num',texto:'m²'}),
+    ...(podeCusto()?[el('th',{class:'num',texto:'Valor'})]:[]),
+    el('th',{class:'num',texto:'Parado'}),
+    el('th',{texto:'Estado'}),el('th',{texto:'Endereco'}),el('th',{texto:''})]));
   rolos.forEach(r=>{
     const acoes=[];
     if(r.status!=='encerrado'&&podeEntrar()){
@@ -146,6 +324,16 @@ async function telaEstoque(pai){
         }catch(e){}
       }}));
 
+    /* LANCAR A NOTA DEPOIS. A nota chega dias depois do rolo — e o caso
+       normal, nao a excecao. O botao fica marcado em ambar enquanto falta
+       alguma coisa: nota que "vai ser lancada depois" sem nada acusando e
+       nota que nao e lancada. */
+    if(podeNota()&&r.status!=='encerrado'){
+      const falta=!r.nf||!r.fornecedor_nome||(podeCusto()&&r.preco_m2==null);
+      acoes.push(el('button',{class:'bt pequeno'+(falta?' alerta':''),
+        texto:falta?'Nota ⚠':'Nota', onclick:()=>abrirNota(r)}));
+    }
+
     // A etiqueta do tubo. Abre o PDF de 100 x 150 mm, uma pagina.
     acoes.push(el('button',{class:'bt pequeno',texto:'Etiqueta',
       onclick:()=>window.open('/sobmedida/api/rolos/'+r.id+'/etiqueta','_blank')}));
@@ -162,6 +350,18 @@ async function telaEstoque(pai){
       el('td',{class:'num',texto:num(r.largura)+' m'}),
       el('td',{class:'num',texto:formatarMetros(r.saldo)}),
       el('td',{class:'num',texto:formatarArea(r.m2)}),
+      /* ⚠️ SEM PRECO E TRACO, NUNCA R$ 0,00 — "zero" se le como "nao vale
+         nada", que e outra afirmacao. E rolo encerrado tambem: ali o valor
+         parado e zero de verdade, mas ele nao esta na prateleira. */
+      ...(podeCusto()?[el('td',{class:'num',
+        texto:r.valor==null?'—':dinheiro(r.valor),
+        title:r.preco_m2==null?'sem nota lancada':('R$ '+num(r.preco_m2)+'/m²')})]:[]),
+      /* PARADO NAO E IDADE. Rolo cortado toda semana nao esta parado, mesmo
+         tendo entrado ha oito meses. O que conta e o ultimo consumo. */
+      el('td',{class:'num'+(r.dias_parado>=60?' aviso':''),
+        texto:r.status==='encerrado'?'—':r.dias_parado+' d',
+        title:r.ultimo_consumo?('ultimo corte em '+r.ultimo_consumo.slice(0,10))
+                              :'nunca foi cortado — conta desde a entrada'}),
       el('td',{},[el('span',{class:'tag '+(r.status==='aberto'?'bom':r.status==='fechado'?'rolo':'off'),texto:r.status})]),
       el('td',{texto:r.endereco||''}),
       el('td',{style:'text-align:right'},acoes)
@@ -177,6 +377,7 @@ async function telaEntrada(pai){
   estado.tecidos=await api('/api/tecidos');
   estado.arvore=await api('/api/enderecos/ROLO');
   if(!estado.larguras) estado.larguras=await api('/api/larguras');
+  if(!estado.fornecedores) estado.fornecedores=await api('/api/fornecedores');
   pai=limpar(pai);
 
   const c=el('div',{class:'cartao'});
@@ -249,7 +450,11 @@ async function telaEntrada(pai){
      comecada. Por isso o campo pergunta o que esta NO ROLO AGORA. */
   [['largura','Bobina que nao esta nos botoes (m) — ela entra na lista',''],
    ['metragem','Metragem AGORA no rolo (m)',''],
-   ['nf','NF (opcional)',''],['fornecedor','Fornecedor (opcional)','']].forEach(([id,rot,valor])=>{
+   ['nf','NF (se ja veio)',''],
+   /* R$/m² SO PARA QUEM VE PRECO. Para os outros o campo nem existe — e o
+      rolo entra sem preco e cai na lista "sem nota", que e o certo. */
+   ...(podeCusto()?[['preco_m2','R$ por m² (se ja souber)','']]:[])
+  ].forEach(([id,rot,valor])=>{
     const b=el('div',{class:'campo cresce'});
     b.appendChild(el('label',{texto:rot}));
     const i=el('input',{type:'text',value:valor,inputmode:id==='nf'?'text':'decimal'});
@@ -268,7 +473,22 @@ async function telaEntrada(pai){
   c.appendChild(el('p',{class:'ajuda',texto:
     'Metragem: rolo novo e o que diz a nota; rolo JA ABERTO e o que sobrou, medido. E este numero que vira o saldo — se ele vier maior que o real, o plano de corte promete uma faixa que o rolo nao tem.'}));
   c.appendChild(el('p',{class:'ajuda',texto:
-    'NF e fornecedor sao opcionais: no inventario inicial quase nunca existe nota, e faltar nota nao pode impedir a bobina de entrar no sistema.'}));
+    'NF, fornecedor e preco sao opcionais: a nota chega dias depois do rolo, e no inventario inicial quase nunca existe nota. Faltar nota nao pode impedir a bobina de entrar no sistema — o rolo entra e fica na lista "sem nota" ate alguem lancar, no botao Nota da lista de rolos.'}));
+
+  /* DE QUEM VEIO. Fileira de botoes, como todo o resto da tela: texto livre
+     era o que fazia 'Ecotex', 'ecotex' e 'Ecotex Ltda' somarem separado, e o
+     defeito so aparecia meses depois, na hora de comparar fornecedor.
+     O "+ fornecedor" existe pelo mesmo motivo do "+ haste": o rolo desce do
+     caminhao de quem ninguem cadastrou, e a alternativa nao e esperar — e
+     lancar o rolo sem fornecedor, que e o dado que se perde para sempre. */
+  const forns=(estado.fornecedores||[]).filter(f=>f.ativo);
+  c.appendChild(fileira('FORNECEDOR',
+    forns.map(f=>({valor:f.id,nome:f.nome})), estado.fornecedor_id,
+    v=>{ estado.fornecedor_id=(String(estado.fornecedor_id)===String(v)?null:v); telaEntrada($('#conteudo')); },
+    {rotulo:'fornecedor', pergunta:'Nome do fornecedor novo:',
+     rota:'/api/fornecedores', corpo:{},
+     aoCriar:async f=>{ estado.fornecedores=await api('/api/fornecedores');
+                        estado.fornecedor_id=f.id; await telaEntrada($('#conteudo')); }}));
 
   // endereco na estante de ROLO
   const hastes=estado.arvore.filter(h=>h.ativo).map(h=>({valor:h.id,nome:h.nome}));
@@ -314,7 +534,9 @@ async function telaEntrada(pai){
         tecido_id:estado.tecido_id,
         largura:estado.largura!=null?estado.largura:campos.largura.value,
         metragem:campos.metragem.value,
-        nf:campos.nf.value, fornecedor:campos.fornecedor.value, nivel_id:estado.nivel_id}});
+        nf:campos.nf.value, nivel_id:estado.nivel_id,
+        fornecedor_id:estado.fornecedor_id,
+        preco_m2:campos.preco_m2?campos.preco_m2.value:null}});
       banner('Rolo '+r.codigo+' cadastrado com '+formatarMetros(r.saldo)+'.'+
         // Cadastrar em silencio faria a lista de bobinas crescer sozinha, e
         // lista que cresce sem ninguem ver e lista que ninguem le.

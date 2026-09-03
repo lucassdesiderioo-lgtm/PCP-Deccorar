@@ -1,12 +1,36 @@
 // Rolo: entrada, saldo, ajuste e o acerto no fim.
 const rolo=require('../dominio/rolo');
 const tecido=require('../dominio/tecido');
+const custo=require('../dominio/custo');
 const pdf=require('../dominio/etiqueta_pdf');
 const dia=require('../nucleo/dia');
+const {pode}=require('../nucleo/permissoes');
+
+/* A PODA DO PRECO ACONTECE NA ROTA, e nao na tela. Quem nao tem custo.ver
+   recebe o JSON SEM os campos de preco — esconder no navegador deixaria o
+   numero viajando pelo fio, ao alcance de qualquer um que abrisse a aba de
+   rede. Regra 14 do CLAUDE.md §13, e a mesma do Recebimento no PCP. */
+const podar=(usuario,dados)=>pode(usuario,'custo.ver')?dados:custo.semPreco(dados);
 
 module.exports={rotas:[
   {metodo:'GET', caminho:'/api/rolos', permissao:'rolo.ler',
-   manipulador:({query})=>rolo.listar(query)},
+   manipulador:({query,usuario})=>podar(usuario,rolo.listar(query))},
+
+  /* O PAINEL DO DINHEIRO PARADO. Permissao custo.ver na propria rota: aqui
+     nao ha o que podar, a rota INTEIRA e sobre preco. */
+  {metodo:'GET', caminho:'/api/rolos/valor', permissao:'custo.ver',
+   manipulador:()=>custo.painel()},
+
+  /* OS ROLOS SEM NOTA. Sem esta lista, "a nota chega depois" vira "a nota
+     nunca chega" — a mesma licao da lista Conferir (armadilha #14). */
+  {metodo:'GET', caminho:'/api/rolos/sem-nota', permissao:'rolo.nota',
+   manipulador:()=>custo.semNota()},
+
+  /* O PRECO QUE PRE-PREENCHE A ENTRADA: o ULTIMO REALMENTE PAGO daquele
+     fornecedor naquele tecido. Nao ha tabela de preco — ela envelheceria
+     calada, e o numero ficaria la parecendo atual. */
+  {metodo:'GET', caminho:'/api/rolos/ultimo-preco', permissao:'custo.ver',
+   manipulador:({query})=>custo.ultimoPreco(query.tecido_id,query.fornecedor_id)},
 
   {metodo:'GET', caminho:'/api/rolos/saldo', permissao:'rolo.ler',
    manipulador:()=>rolo.saldoPorTecido()},
@@ -42,6 +66,15 @@ module.exports={rotas:[
      return {arquivo, nome:'rolo-'+r.codigo+'.pdf'};
    },
    detalhe:(req)=>'etiqueta do rolo '+req.params.id},
+
+  /* LANCAR A NOTA DEPOIS — o caso normal. O rolo desce do caminhao e vai para
+     a estante; a nota entra dias depois. Permissao propria (`rolo.nota`)
+     porque mexer no preco muda o valor do estoque: e trabalho de quem fecha
+     compras, nao de quem poe o tubo na prateleira. */
+  {metodo:'PUT', caminho:'/api/rolos/:id/dados', permissao:'rolo.nota',
+   manipulador:({params,corpo,usuario})=>rolo.editarDados(params.id,corpo,usuario.nome),
+   detalhe:(req)=>'nota do rolo '+req.params.id+': NF '+(req.body.nf||'—')+
+     ' · R$/m² '+(req.body.preco_m2==null?'—':req.body.preco_m2)},
 
   {metodo:'POST', caminho:'/api/rolos/:id/encerrar', permissao:'rolo.encerrar',
    manipulador:({params,usuario})=>rolo.encerrar(params.id,usuario.nome),

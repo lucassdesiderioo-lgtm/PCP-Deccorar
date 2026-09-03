@@ -33,6 +33,15 @@ const TIPOS={
     sql:`SELECT id, criado_por, criado_em, valor FROM largura_bobina WHERE conferir=1`,
     rotulo:r=>fmtM(r.valor)
   },
+  /* O FORNECEDOR CAI AQUI POR DOIS CAMINHOS: criado pela bancada com o rolo
+     na mao, e — na migracao 9 — semeado do texto livre que ja existia. O
+     segundo e o mais importante: e nesta lista que a chefia vai achar
+     'Ecotex' e 'ecotex' lado a lado e juntar os dois. */
+  fornecedor:{
+    oque:'Fornecedor', onde:'Cadastros → Tecido → Fornecedores',
+    sql:`SELECT id, criado_por, criado_em, nome FROM fornecedor WHERE conferir=1`,
+    rotulo:r=>r.nome
+  },
   haste:{
     oque:'Haste', onde:'Cadastros → Enderecos',
     sql:`SELECT h.id, h.criado_por, h.criado_em, h.nome, h.armazem_chave
