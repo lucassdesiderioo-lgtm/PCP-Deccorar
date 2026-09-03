@@ -295,6 +295,55 @@ depender de disciplina: não existe tela separada para alguém esquecer.
 **A recusa é gravada na hora**, mesmo que o corte não aconteça — ela é
 diagnóstico, não papelada do plano.
 
+### NÃO HÁ EMENDA — e por isso a recusa vira pedido de compra
+
+Decisão do dono, 03/09/2026: **peça mais larga que toda bobina do estoque
+simplesmente não sai.** Não há emenda, não há meia solução.
+
+Isso muda o que a recusa significa. Ela deixa de ser um contratempo do encaixe
+e passa a ser uma **venda parada esperando material** — e se morre numa linha
+de texto no meio da tela do corte, quem compra tecido nunca fica sabendo que se
+perdeu a peça por 10 cm de bobina.
+
+Por isso o plano devolve `falta_bobina` separado das outras recusas:
+
+```
+NAO TEM BOBINA PARA ESTE CORTE
+2 peças precisam de bobina de 2,40 m — a maior em estoque tem 2,00 (faltam 0,40).
+
+  Largura de bobina   Peças   m²
+  2,40                    1   3,60
+  2,10                    2   6,30
+```
+
+Agrupado **por largura**, porque é assim que se compra: não interessa que sejam
+quatro peças diferentes, interessa que quatro precisam de bobina de 2,10 m. A
+maior primeiro — a bobina que resolve a maior resolve todas as de baixo.
+
+> ⚠️ **O motivo da recusa tem CÓDIGO, não só frase.** A frase é para o operador
+> ler; o código é o que a compra soma. Contar frase de texto funciona até o dia
+> em que alguém corrige uma vírgula.
+>
+> | Código | O que é | Vira compra? |
+> |---|---|---|
+> | `sem_largura` | nenhuma bobina do estoque comporta a peça | **sim** — bobina mais larga |
+> | `sem_estoque` | não há bobina nem sobra deste tecido | **sim** — o tecido |
+> | `sem_material` | a bobina serve, o metro acabou | não — é reposição |
+> | `tom_unico` | o pedido inteiro não coube numa fonte só | não — ver §tom único |
+
+**Faltar altura não é faltar bobina.** A bobina está certa; o que acabou foi o
+metro. Somar isso na conta de largura mandaria comprar a bobina errada.
+
+**Sem falta, `falta_bobina` é `null`** — nunca um objeto vazio. Tarja de alarme
+que aparece sem alarme é tarja que a equipe aprende a ignorar, e aí a de
+verdade passa batida.
+
+**Ourela:** não existe nesta operação (confirmado pelo dono, 03/09/2026). Se um
+dia existir, o caminho é cadastrar a largura **útil** do rolo — não há desconto
+automático a fazer.
+
+---
+
 ### TOM ÚNICO POR PEDIDO — a regra que mais pesa no plano
 
 **Peças com o mesmo número de pedido saem sempre da MESMA fonte.** Três peças

@@ -94,14 +94,28 @@ function planejar(pecas, fontes, params){
 
   // 4. O QUE NAO COUBE VOLTA MARCADO, COM O MOTIVO. Nunca some em silencio.
   const maiorLargura=(fontes||[]).reduce((m,f)=>Math.max(m,f.largura),0);
-  const naoAlocadas=fila.filter(x=>restantes.has(x.id)).map(x=>({
-    id:x.id, largura:x.largura, altura:x.altura,
-    motivo: !cabe(x.largura,maiorLargura)
-      ? (fontes&&fontes.length
-          ? 'nenhuma bobina em estoque tem largura ≥ '+fmt(x.largura)
-          : 'nao ha bobina nem sobra deste tecido em estoque')
-      : 'nao sobrou material: a altura disponivel nao cobre '+fmt(x.altura)+' m'
-  }));
+  /* O motivo vai em DUAS formas, e as duas sao necessarias.
+
+     A frase e para o operador ler. O CODIGO e para o sistema contar: nao ha
+     emenda nesta fabrica, entao peca mais larga que toda bobina do estoque
+     nao e um contratempo do plano — e uma COMPRA que falta fazer, e alguem
+     precisa somar quantas sao e de que largura. Contar frase de texto e o
+     tipo de coisa que funciona ate o dia em que alguem corrige uma virgula. */
+  const naoAlocadas=fila.filter(x=>restantes.has(x.id)).map(x=>{
+    const semLargura=!cabe(x.largura,maiorLargura);
+    const temFonte=!!(fontes&&fontes.length);
+    return {
+      id:x.id, largura:x.largura, altura:x.altura,
+      codigo: semLargura ? (temFonte?'sem_largura':'sem_estoque') : 'sem_material',
+      // A largura que PRECISARIA existir. E este numero que vira pedido de compra.
+      largura_necessaria: semLargura ? x.largura : null,
+      motivo: semLargura
+        ? (temFonte
+            ? 'nenhuma bobina em estoque tem largura ≥ '+fmt(x.largura)
+            : 'nao ha bobina nem sobra deste tecido em estoque')
+        : 'nao sobrou material: a altura disponivel nao cobre '+fmt(x.altura)+' m'
+    };
+  });
 
   // ── OS RESTOS DE CADA FAIXA ──────────────────────────────────────────
   //   tira lateral = (largura da faixa - largura usada) x altura da faixa

@@ -1055,6 +1055,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
 | 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) `teste_estoque.js` (53), `teste_cruzamento.js` (14) e `teste_etiqueta.js` (13); o resto não tem | Médio a longo prazo |
 | 11 | **A investigar: o que é o `Quantidade` da folha** — a regra é uma venda = uma etiqueta = uma persiana (§5), então esse campo não deveria vir maior que 1. Ninguém decide nada com ele hoje. Falta abrir um PDF real com `Quantidade > 1` e entender o que aquele número diz | Baixo enquanto nada o usar — mas é uma pergunta sem resposta sobre o documento de origem |
+| 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
 ---
 
@@ -1379,10 +1380,20 @@ carimbado pelo servidor num `data-contexto` no `<html>`.
 > outro sistema. Hoje os hex são **copiados** de `public/operador.html` e
 > `public/index.html`. Cor nova lá só entra se entrar aqui também.
 
+### Duas regras do sob medida que valem citar aqui
+
+**Não há emenda.** Peça mais larga que toda bobina do estoque não sai — e por
+isso a recusa vira número de compra, não recado: o plano devolve `falta_bobina`
+com quantas peças, de que largura, e qual a maior que existe hoje. Sem isso a
+venda parada morre numa linha de texto e quem compra tecido nunca fica sabendo.
+
+**Não há ourela.** Confirmado em 03/09/2026. Se um dia existir, o caminho é
+cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
+
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 87 casos
+cd tecido && npm test          # 107 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
