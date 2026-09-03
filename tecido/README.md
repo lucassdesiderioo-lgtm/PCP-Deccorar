@@ -144,6 +144,41 @@ teste/                 rodar.js + *.test.js — banco temporario, do zero
 
 ---
 
+## O que é um "item de tecido"
+
+É **o que está enrolado no rolo**: a combinação `linha + abertura + cor`.
+
+| Campo | O que é | Exemplo |
+|---|---|---|
+| **Linha** | a família do produto | Double Vision, Rolô |
+| **Abertura** | quanto de luz o tecido deixa passar | 1%, 3%, 5% |
+| **Cor** | a cor | Bege, Cinza |
+
+`Double Vision · 1% · Bege` é **um** item.
+
+> ⚠️ **A LARGURA NÃO FAZ PARTE DO ITEM**, e essa é a decisão que mais confunde
+> quem chega. O mesmo `Double Vision 1% Bege` vem em bobina de 2,00, 2,50 e
+> 3,00 — é o mesmo tecido, muda o rolo.
+>
+> Se a largura entrasse aqui, o mesmo tecido viraria **três itens diferentes** —
+> e o plano perderia justamente o que faz de mais útil: **comparar**. Uma peça
+> de 1,45 desperdiça 40 cm na bobina de 2,00, e duas delas cabem lado a lado na
+> de 3,00. Com três itens separados, essa conta não existe.
+
+Os dois campos que não são óbvios:
+
+**Bobina mais comum** — não muda cálculo nenhum. Só deixa o botão já marcado na
+entrada de rolo. Pode ficar em branco (vazio grava `null`, nunca zero). Desde o
+cadastro de larguras ela é uma **escolha da lista**, não um campo de texto:
+digitar aqui deixaria `2,5` e `2,50` entrarem como coisas diferentes, na tela
+que existe justamente para padronizar.
+
+**Pode girar a peça?** — este muda. Tecido com sentido (textura, listra, desenho
+que corre) não pode ser virado, então a largura da peça tem que sair no sentido
+da largura da bobina. `Não` é o padrão e vale para a maioria.
+
+---
+
 ## As larguras de bobina são cadastráveis (Cadastros → Tecido)
 
 A largura da bobina é **do rolo**, não do tecido — o mesmo Rolô 3% Bege existe

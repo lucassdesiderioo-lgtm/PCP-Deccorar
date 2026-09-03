@@ -197,7 +197,11 @@ async function telaTecido(pai){
   // Item de tecido
   const cT=cartao(pai,'Item de tecido','A combinacao que existe de verdade: linha + abertura + cor.');
   cT.appendChild(el('p',{class:'ajuda',texto:
-    'A largura da bobina NAO fica aqui — ela e do rolo. O mesmo Rolo 3% Bege existe em 2,00, 2,50 e 3,00, e e essa diferenca que o plano de corte explora. A largura abaixo so pre-preenche a entrada de rolo.'}));
+    'O item e o que esta ENROLADO no rolo: Double Vision + 1% + Bege e um item. A LARGURA nao entra aqui porque ela e do rolo — o mesmo Double Vision 1% Bege chega em 2,00, 2,50 e 3,00.'}));
+  cT.appendChild(el('p',{class:'ajuda',texto:
+    'Se a largura fizesse parte do item, o mesmo tecido viraria tres itens diferentes — e o plano de corte perderia justamente o que ele faz de mais util: comparar. Uma peca de 1,45 desperdica 40 cm na bobina de 2,00, e duas delas cabem lado a lado na de 3,00.'}));
+  cT.appendChild(el('p',{class:'ajuda',texto:
+    '"Bobina mais comum" nao muda calculo nenhum: ela so deixa o botao ja marcado na entrada de rolo. Pode ficar em branco. "Pode girar" muda: tecido com sentido (textura, listra, desenho que corre) nao pode ser virado, entao a largura da peca tem que sair no sentido da largura da bobina.'}));
   if(podeEditar()){
     const aberturasDaLinha=estado.aberturas.filter(a=>a.ativo);
     formulario(cT,[
@@ -205,8 +209,15 @@ async function telaTecido(pai){
        aoMudar:async(v)=>{ estado.linhaSel=Number(v); await telaTecido($('#conteudo')); }},
       {id:'abertura_id',rotulo:'Abertura',opcoes:aberturasDaLinha.map(a=>({valor:a.id,nome:a.nome}))},
       {id:'cor_id',rotulo:'Cor',opcoes:estado.cores.filter(c=>c.ativo).map(c=>({valor:c.id,nome:c.nome}))},
-      {id:'largura_sugerida',rotulo:'Largura sugerida (m)',dica:'2,50',inputmode:'decimal'},
-      {id:'permite_girar',rotulo:'Pode girar a peca?',opcoes:[{valor:'0',nome:'Nao — o tecido tem sentido'},{valor:'1',nome:'Sim'}]}
+      /* Escolha, nao digitacao — pelo mesmo motivo da entrada de rolo. Um
+         campo de texto aqui deixaria entrar 2,5 e 2,50 como coisas
+         diferentes, na tela que existe para padronizar o cadastro.
+         Vazio e resposta valida: e so pre-marcar o botao na entrada. */
+      {id:'largura_sugerida',rotulo:'Bobina mais comum (opcional)',
+       opcoes:[{valor:'',nome:'— nenhuma —'}].concat(
+         larguras.filter(l=>l.ativo).map(l=>({valor:String(l.valor),nome:formatarMetros(l.valor)})))},
+      {id:'permite_girar',rotulo:'Pode girar a peca?',
+       opcoes:[{valor:'0',nome:'Nao — o tecido tem sentido'},{valor:'1',nome:'Sim'}]}
     ],'Cadastrar tecido',async(v)=>{
       await api('/api/tecidos',{metodo:'POST',corpo:{
         linha_id:Number(v.linha_id), abertura_id:Number(v.abertura_id), cor_id:Number(v.cor_id),
