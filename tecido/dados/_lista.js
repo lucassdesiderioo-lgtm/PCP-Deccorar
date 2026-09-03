@@ -6,8 +6,13 @@
 // copias do mesmo SELECT nao ensinam nada a ninguem e envelhecem separadas.
 const db=require('../nucleo/db');
 
-module.exports=function lista({tabela, pai}){
+/* `extras` sao colunas que SO algumas destas tabelas tem (hoje: quem criou e
+   se falta conferir). Elas entram no INSERT apenas quando o chamador manda
+   valor — sem isso, um `criado_por` num INSERT de `cor`, que nao tem a coluna,
+   derrubaria o cadastro inteiro. */
+module.exports=function lista({tabela, pai, extras}){
   const colPai=pai||null;
+  const opcionais=extras||[];
 
   const sel = colPai
     ? db.prepare('SELECT * FROM '+tabela+' WHERE '+colPai+'=? ORDER BY ordem, nome')
@@ -23,8 +28,10 @@ module.exports=function lista({tabela, pai}){
     ativos:(paiId)=>colPai?selAtivos.all(paiId):selAtivos.all(),
     porId:id=>porId.get(id),
     criar(dados){
-      const cols=['nome','ordem','ativo'].concat(colPai?[colPai]:[]);
-      const vals=[dados.nome, dados.ordem||0, dados.ativo===0?0:1].concat(colPai?[dados[colPai]]:[]);
+      const usados=opcionais.filter(c=>dados[c]!==undefined);
+      const cols=['nome','ordem','ativo'].concat(colPai?[colPai]:[]).concat(usados);
+      const vals=[dados.nome, dados.ordem||0, dados.ativo===0?0:1]
+        .concat(colPai?[dados[colPai]]:[]).concat(usados.map(c=>dados[c]));
       const r=db.prepare('INSERT INTO '+tabela+'('+cols.join(',')+') VALUES('+cols.map(()=>'?').join(',')+')').run(...vals);
       return porId.get(r.lastInsertRowid);
     },

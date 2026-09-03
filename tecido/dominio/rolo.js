@@ -15,6 +15,7 @@ const {ErroDeRegra,exigir}=require('../nucleo/erros');
 const dRolo=require('../dados/rolo');
 const dTecido=require('../dados/tecido');
 const endereco=require('./endereco');
+const dLargura=require('./largura');
 
 const MAX_LARGURA=10, MAX_METRAGEM=2000;
 const arred=v=>Math.round(v*1000)/1000;    // milimetro; o resto e ruido
@@ -47,12 +48,25 @@ function entrada(dados,usuarioNome){
   if(dados.nivel_id) endereco.exigirArmazem(dados.nivel_id,'ROLO');
 
   return db.transaction(()=>{
+    /* A LARGURA DESTA ENTRADA ENSINA A LISTA. Se o operador digitou uma
+       bobina que nao esta cadastrada, ela entra aqui mesmo — marcada para a
+       chefia conferir — em vez de ficar so dentro deste rolo. O proximo tubo
+       da mesma bobina ja acha o botao pronto, e um numero digitado errado
+       aparece numa lista em vez de sumir dentro de um registro.
+
+       Dentro da transacao de proposito: cadastro de largura sem rolo, se a
+       entrada falhasse depois, seria lixo que ninguem sabe de onde veio. */
+    const nova=dLargura.garantir(largura,usuarioNome);
+
     const codigo=formatar(dRolo.ultimoSeq()+1);
     const id=dRolo.criar({codigo,tecido_id:tecido.id,largura,metragem,
       nivel_id:dados.nivel_id,nf:dados.nf,fornecedor:dados.fornecedor,criado_por:usuarioNome});
     dRolo.movimentar({rolo_id:id,delta:metragem,saldo_apos:metragem,motivo:'entrada',
       observacao:dados.nf?('NF '+dados.nf):null,usuario_nome:usuarioNome});
-    return dRolo.porId(id);
+    // `largura_cadastrada` sobe para a tela dizer o que ela fez. Cadastrar em
+    // silencio faria a lista crescer sozinha, e lista que cresce sem ninguem
+    // ver e a mesma coisa que lista que ninguem le.
+    return {...dRolo.porId(id), largura_cadastrada:!!nova.criada};
   })();
 }
 

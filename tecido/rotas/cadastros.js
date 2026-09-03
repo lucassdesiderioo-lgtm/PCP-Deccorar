@@ -16,7 +16,9 @@ const dHaste=require('../dados/haste');
 const dAndar=require('../dados/andar');
 const dNivel=require('../dados/nivel');
 
-const LER='cadastro.ler', EDITAR='cadastro.editar';
+const conferir=require('../dominio/conferir');
+
+const LER='cadastro.ler', EDITAR='cadastro.editar', CRIAR_END='endereco.criar';
 
 module.exports={rotas:[
 
@@ -74,6 +76,15 @@ module.exports={rotas:[
    manipulador:({params})=>exclusao.excluir(params.tipo,params.id),
    detalhe:(req)=>'apagou '+req.params.tipo+' '+req.params.id},
 
+  /* A LISTA DO QUE A BANCADA CRIOU E A CHEFIA AINDA NAO OLHOU.
+     Ela e a outra metade de deixar a bancada cadastrar: sem a lista, o que
+     mudou nao foi "a chefia confere depois" e sim "ninguem confere". */
+  {metodo:'GET', caminho:'/api/cadastro/conferir', permissao:EDITAR,
+   manipulador:()=>conferir.listar()},
+  {metodo:'POST', caminho:'/api/cadastro/conferir/:tipo/:id', permissao:EDITAR,
+   manipulador:({params})=>conferir.marcar(params.tipo,params.id),
+   detalhe:(req)=>'conferiu '+req.params.tipo+' '+req.params.id},
+
   {metodo:'GET', caminho:'/api/tecidos', permissao:LER,
    manipulador:()=>tecido.listarTecidos()},
   {metodo:'POST', caminho:'/api/tecidos', permissao:EDITAR,
@@ -88,21 +99,27 @@ module.exports={rotas:[
   {metodo:'GET', caminho:'/api/enderecos/:armazem', permissao:LER,
    manipulador:({params})=>endereco.arvore(params.armazem)},
 
-  {metodo:'POST', caminho:'/api/hastes', permissao:EDITAR,
-   manipulador:({corpo})=>endereco.criarHaste(corpo),
+  /* CRIAR e da bancada (endereco.criar); RENOMEAR e APAGAR continuam da
+     chefia. A assimetria e a regra: o buraco novo na prateleira aparece com o
+     tubo ja na mao, e endereco que nao da para criar na hora vira rolo sem
+     endereco. Arrumar um nome torto, nao — isso espera. */
+  {metodo:'POST', caminho:'/api/hastes', permissao:CRIAR_END,
+   manipulador:({corpo,usuario})=>endereco.criarHaste(corpo,usuario),
    detalhe:(req)=>req.body.armazem_chave+' haste '+req.body.nome},
   {metodo:'PUT', caminho:'/api/hastes/:id', permissao:EDITAR,
    manipulador:({params,corpo})=>dHaste.atualizar(params.id,corpo),
    detalhe:(req)=>req.body.nome!==undefined?('renomeou para '+req.body.nome):null},
 
-  {metodo:'POST', caminho:'/api/andares', permissao:EDITAR,
-   manipulador:({corpo})=>endereco.criarAndar(corpo)},
+  {metodo:'POST', caminho:'/api/andares', permissao:CRIAR_END,
+   manipulador:({corpo,usuario})=>endereco.criarAndar(corpo,usuario),
+   detalhe:(req)=>'andar '+req.body.nome},
   {metodo:'PUT', caminho:'/api/andares/:id', permissao:EDITAR,
    manipulador:({params,corpo})=>dAndar.atualizar(params.id,corpo),
    detalhe:(req)=>req.body.nome!==undefined?('renomeou para '+req.body.nome):null},
 
-  {metodo:'POST', caminho:'/api/niveis', permissao:EDITAR,
-   manipulador:({corpo})=>endereco.criarNivel(corpo)},
+  {metodo:'POST', caminho:'/api/niveis', permissao:CRIAR_END,
+   manipulador:({corpo,usuario})=>endereco.criarNivel(corpo,usuario),
+   detalhe:(req)=>'nivel '+req.body.nome},
   {metodo:'PUT', caminho:'/api/niveis/:id', permissao:EDITAR,
    manipulador:({params,corpo})=>dNivel.atualizar(params.id,corpo),
    detalhe:(req)=>req.body.nome!==undefined?('renomeou para '+req.body.nome):null},

@@ -43,12 +43,29 @@ function desenhar(){
   const c=limpar($('#conteudo'));
   return aba==='estoque'?telaEstoque(c):telaEntrada(c);
 }
-function fileira(rotulo,itens,sel,aoEscolher){
+/* O "+ novo" NO FIM DA FILEIRA — a bancada nao espera a chefia.
+   Ele so aparece onde faz sentido criar com a peca na mao (endereco). A
+   alternativa real nao era o operador esperar: era ele deixar o rolo sem
+   endereco "para enderecar depois", e o depois nao existe — o tubo fica na
+   estante sem ninguem saber onde, que e pior que um nome digitado torto.
+   O que a chefia perde e a vez, nao o controle: o que nasce aqui entra
+   marcado e aparece na lista "Conferir" do cadastro. */
+function fileira(rotulo,itens,sel,aoEscolher,novo){
   const f=el('div',{class:'fileira'});
   f.appendChild(el('span',{class:'rotulo',texto:rotulo}));
   if(!itens.length) f.appendChild(el('span',{class:'quem',style:'align-self:center',texto:'nada cadastrado'}));
   itens.forEach(i=>f.appendChild(el('button',{class:'op',texto:i.nome,
     'aria-pressed':String(String(i.valor)===String(sel)), onclick:()=>aoEscolher(i.valor)})));
+  if(novo) f.appendChild(el('button',{class:'op',style:'border-style:dashed',
+    texto:'+ '+novo.rotulo, onclick:async()=>{
+      const nome=prompt(novo.pergunta);
+      if(nome===null||!nome.trim()) return;
+      try{
+        const criado=await api(novo.rota,{metodo:'POST',corpo:{...novo.corpo,nome:nome.trim()}});
+        banner(novo.rotulo+' "'+criado.nome+'" criada. A chefia confere depois — o rolo nao espera.');
+        await novo.aoCriar(criado);
+      }catch(e){}
+    }}));
   return f;
 }
 
@@ -197,7 +214,14 @@ async function telaEntrada(pai){
      O campo livre continua embaixo, de proposito: rolo que chega fora do
      padrao existe, e recusar a entrada dele seria a armadilha #6 — a trava
      que a bancada aprende a contornar lancando a largura errada so para o
-     sistema aceitar. Ele avisa, nao bloqueia. */
+     sistema aceitar. Ele avisa, nao bloqueia.
+
+     E DESDE 03/09 ELE CADASTRA. Antes o campo era um beco: a largura entrava
+     no rolo e nao entrava na lista, entao o proximo tubo da MESMA bobina caia
+     nele de novo, e um '20,0' digitado no lugar de '2,00' ficava escondido
+     dentro de um registro — lugar onde ninguem procura. Agora ele vira botao
+     na proxima entrada, e o erro de digitacao aparece numa lista onde da para
+     apagar. */
   const larguras=(estado.larguras||[]).filter(l=>l.ativo);
   const sugerida=sel&&sel.largura_sugerida?dLargura.arred(sel.largura_sugerida):null;
   if(estado.largura==null&&sugerida&&larguras.some(l=>l.valor===sugerida)) estado.largura=sugerida;
@@ -223,7 +247,7 @@ async function telaEntrada(pai){
      existem entrariam no estoque, e o plano de corte prometeria uma faixa
      que o rolo nao tem — o erro apareceria com o tecido na mesa e a peca ja
      comecada. Por isso o campo pergunta o que esta NO ROLO AGORA. */
-  [['largura','Outra largura (m) — so se nao estiver acima',''],
+  [['largura','Bobina que nao esta nos botoes (m) — ela entra na lista',''],
    ['metragem','Metragem AGORA no rolo (m)',''],
    ['nf','NF (opcional)',''],['fornecedor','Fornecedor (opcional)','']].forEach(([id,rot,valor])=>{
     const b=el('div',{class:'campo cresce'});
@@ -233,7 +257,7 @@ async function telaEntrada(pai){
       i.value=estado.larguraOutra||'';
       i.addEventListener('input',()=>{ estado.larguraOutra=i.value; estado.largura=null;
         aviso.textContent=i.value.trim()&&!larguras.some(l=>l.valor===dLargura.arred(i.value))
-          ? '⚠ Esta largura nao esta na lista. O rolo entra assim mesmo — se a bobina veio para ficar, cadastre em Cadastros -> Tecido.'
+          ? 'Esta bobina ainda nao esta na lista. Ela entra junto com o rolo e vira botao na proxima entrada — a chefia confere depois. Confira a virgula: o campo e em METROS (2,50 e nao 250).'
           : ''; });
     }
     b.appendChild(i); campos[id]=i; linha.appendChild(b);
@@ -252,9 +276,34 @@ async function telaEntrada(pai){
   const andares=hAtual?hAtual.andares.map(a=>({valor:a.id,nome:a.nome})):[];
   const aAtual=hAtual&&(hAtual.andares.find(a=>a.id===estado.andar_id)||hAtual.andares[0]);
   const niveis=aAtual?aAtual.niveis.map(n=>({valor:n.id,nome:n.nome})):[];
-  c.appendChild(fileira('HASTE',hastes,hAtual&&hAtual.id,v=>{ estado.haste_id=v; estado.andar_id=null; estado.nivel_id=null; telaEntrada($('#conteudo')); }));
-  c.appendChild(fileira('ANDAR',andares,aAtual&&aAtual.id,v=>{ estado.andar_id=v; estado.nivel_id=null; telaEntrada($('#conteudo')); }));
-  c.appendChild(fileira('NIVEL',niveis,estado.nivel_id,v=>{ estado.nivel_id=v; telaEntrada($('#conteudo')); }));
+
+  // O que for criado aqui ja fica ESCOLHIDO. Criar e ter de procurar o proprio
+  // botao na fileira e o tipo de passo a mais que faz a bancada parar de usar.
+  const recarregar=async(campo,criado)=>{
+    estado.arvore=await api('/api/enderecos/ROLO');
+    if(campo==='haste'){ estado.haste_id=criado.id; estado.andar_id=null; estado.nivel_id=null; }
+    if(campo==='andar'){ estado.andar_id=criado.id; estado.nivel_id=null; }
+    if(campo==='nivel'){ estado.nivel_id=criado.id; }
+    await telaEntrada($('#conteudo'));
+  };
+
+  c.appendChild(fileira('HASTE',hastes,hAtual&&hAtual.id,
+    v=>{ estado.haste_id=v; estado.andar_id=null; estado.nivel_id=null; telaEntrada($('#conteudo')); },
+    {rotulo:'haste', pergunta:'Nome da haste nova (ex.: A):',
+     rota:'/api/hastes', corpo:{armazem_chave:'ROLO'},
+     aoCriar:c=>recarregar('haste',c)}));
+
+  c.appendChild(fileira('ANDAR',andares,aAtual&&aAtual.id,
+    v=>{ estado.andar_id=v; estado.nivel_id=null; telaEntrada($('#conteudo')); },
+    hAtual&&{rotulo:'andar', pergunta:'Nome do andar novo na haste '+hAtual.nome+' (ex.: 2):',
+     rota:'/api/andares', corpo:{haste_id:hAtual.id},
+     aoCriar:c=>recarregar('andar',c)}));
+
+  c.appendChild(fileira('NIVEL',niveis,estado.nivel_id,
+    v=>{ estado.nivel_id=v; telaEntrada($('#conteudo')); },
+    aAtual&&{rotulo:'nivel', pergunta:'Nome da posicao nova no andar '+aAtual.nome+' (ex.: 3):',
+     rota:'/api/niveis', corpo:{andar_id:aAtual.id},
+     aoCriar:c=>recarregar('nivel',c)}));
 
   const bt=el('button',{class:'bt primario',style:'min-height:60px;font-size:18px',texto:'Dar entrada',onclick:async()=>{
     bt.disabled=true;
@@ -266,7 +315,11 @@ async function telaEntrada(pai){
         largura:estado.largura!=null?estado.largura:campos.largura.value,
         metragem:campos.metragem.value,
         nf:campos.nf.value, fornecedor:campos.fornecedor.value, nivel_id:estado.nivel_id}});
-      banner('Rolo '+r.codigo+' cadastrado com '+formatarMetros(r.saldo)+'.');
+      banner('Rolo '+r.codigo+' cadastrado com '+formatarMetros(r.saldo)+'.'+
+        // Cadastrar em silencio faria a lista de bobinas crescer sozinha, e
+        // lista que cresce sem ninguem ver e lista que ninguem le.
+        (r.largura_cadastrada?' A bobina de '+formatarMetros(r.largura)+
+          ' entrou na lista — na proxima entrada ela ja e botao.':''));
       aba='estoque'; desenhar();
     }catch(e){}
     bt.disabled=false;

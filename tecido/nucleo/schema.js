@@ -396,6 +396,40 @@ INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
 ('etqRoloMargem','6','numero','Etiqueta do rolo: margem',
  'Folga em volta. Maior que a da sobra porque a etiqueta e colada em superficie curva, e a borda e onde ela descola primeiro.',
  'mm',34);
+`},
+
+{n:8, nome:'a bancada cadastra o que falta, e a chefia confere depois', sql:`
+/* A BANCADA NAO ESPERA A CHEFIA — ELA CRIA, E A CHEFIA CONFERE DEPOIS.
+
+   Ate aqui largura de bobina e endereco eram cadastro de chefia. O modo de
+   falhar disso nao e o operador esperar: e ele NAO esperar. Rolo na mao,
+   largura fora da lista e a chefia em reuniao, o que acontece na bancada e o
+   toque no botao de 2,00 — e a partir dali o encaixe decide de onde cortar
+   com uma largura que aquele tubo nao tem. Armadilha #6 do CLAUDE.md, na
+   letra: a trava que dispara no caso normal vira desvio que a equipe aprende
+   a fazer, e o desvio acontece fora da vista do sistema.
+
+   A troca e de ORDEM, nao de rigor. Antes: pedir -> esperar -> lancar. Agora:
+   lancar -> marcar -> conferir. Nada fica sem revisao; o que muda e que a
+   revisao deixa de ser porteiro e vira lista de trabalho da chefia.
+
+   A coluna conferir=1 e o marcador. Nasce 0 nas linhas que ja existem, e esta
+   certo:
+   elas foram cadastradas pela chefia, ja estao conferidas. */
+ALTER TABLE largura_bobina ADD COLUMN conferir INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE largura_bobina ADD COLUMN criado_por TEXT;
+
+ALTER TABLE haste ADD COLUMN conferir INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE haste ADD COLUMN criado_por TEXT;
+ALTER TABLE haste ADD COLUMN criado_em TEXT;
+
+ALTER TABLE andar ADD COLUMN conferir INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE andar ADD COLUMN criado_por TEXT;
+ALTER TABLE andar ADD COLUMN criado_em TEXT;
+
+ALTER TABLE nivel ADD COLUMN conferir INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE nivel ADD COLUMN criado_por TEXT;
+ALTER TABLE nivel ADD COLUMN criado_em TEXT;
 `}
 
 ];

@@ -94,9 +94,13 @@ module.exports=[
   recusa(()=>exclusao.excluir('tecido',x.t.id),'cadastro_em_uso');
 }},
 
-{nome:'LARGURA conta por VALOR, nao por id', executar({igual}){
+{nome:'LARGURA conta por VALOR, nao por id', executar({igual,recusa}){
   const largura=require('../dominio/largura');
-  const l=largura.criar('2,50');   // ja ha um rolo de 2,50 na cena
+  /* A entrada do rolo da cena JA cadastrou a bobina de 2,50 — desde 03/09 o
+     campo livre ensina a lista em vez de ser um beco. Por isso cadastrar de
+     novo e recusado: e o mesmo cadastro, nao um segundo. */
+  recusa(()=>largura.criar('2,50'),'largura_repetida');
+  const l=largura.listar().find(x=>x.valor===2.5);
   igual(exclusao.quemUsa('largura_bobina',l.id)[0],'1 rolo(s) tem bobina desta largura',
     'achou o rolo pela medida');
   /* O rolo guarda o NUMERO da largura, nao uma chave estrangeira. Contar por

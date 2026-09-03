@@ -1082,6 +1082,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   `PERM_AREA` do `acesso.js` — o acesso some sozinho, em silêncio (§19)
 - ❌ Escrever cor nova no `tecido/public/base.css` sem que ela exista nas telas
   do PCP — paleta "quase igual" é o que faz parecer outro sistema (§19)
+- ❌ Deixar a bancada criar um cadastro **sem** marcá-lo para conferência, ou
+  marcar **sem** ele aparecer na lista de Cadastros — meia decisão é pior que
+  a trava que existia antes (§19, armadilha #14)
 
 ---
 
@@ -1380,6 +1383,34 @@ carimbado pelo servidor num `data-contexto` no `<html>`.
 > outro sistema. Hoje os hex são **copiados** de `public/operador.html` e
 > `public/index.html`. Cor nova lá só entra se entrar aqui também.
 
+### ⚠️ ARMADILHA #14 — a bancada não espera a chefia, e a lista é obrigatória
+
+Até 03/09/2026 largura de bobina e endereço eram cadastro de chefia. Isso não
+fazia a bancada esperar: fazia a bancada **mentir**. Rolo na mão e largura fora
+da lista, o que saía era o toque no botão de 2,00 para o sistema aceitar — e a
+partir dali o encaixe corta por uma largura que aquele tubo não tem. Endereço
+não cadastrado dava o outro desvio: rolo lançado **sem endereço**, "para
+endereçar depois", e o depois não existe.
+
+É a armadilha #6 (§7) outra vez: trava que dispara no caso normal vira desvio
+que a equipe aprende a fazer, e o desvio acontece fora da vista do sistema.
+
+A troca foi de **ordem**, não de rigor — `lançar → marcar → a chefia confere`
+no lugar de `pedir → esperar → lançar`. Duas peças, e **as duas são
+obrigatórias**:
+
+| Peça | Onde | Sem ela |
+|---|---|---|
+| o cadastro nasce marcado (`conferir=1`, com quem criou) | `endereco.js`, `largura.js` | soltar vira soltar sem rastro |
+| a lista "Conferir" no topo de Cadastros | `dominio/conferir.js` | não é "a chefia confere depois", é **ninguém confere** |
+
+> ⚠️ **NUNCA SOLTE UM CADASTRO PARA A BANCADA SEM PÔR ELE NA LISTA.** Meia
+> decisão é pior que qualquer uma das duas inteiras: a trava ao menos avisava.
+
+**Criar** é da bancada (`endereco.criar`); **renomear e apagar** continuam da
+chefia (`cadastro.editar`). A assimetria é a regra — o buraco novo na
+prateleira aparece com o tubo já na mão; arrumar um nome torto espera.
+
 ### Duas regras do sob medida que valem citar aqui
 
 **Não há emenda.** Peça mais larga que toda bobina do estoque não sai — e por
@@ -1393,7 +1424,7 @@ cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 137 casos
+cd tecido && npm test          # 147 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
