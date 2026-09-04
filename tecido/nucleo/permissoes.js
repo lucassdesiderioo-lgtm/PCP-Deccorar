@@ -46,7 +46,23 @@ const PAPEIS={
     'cadastro.ler','endereco.criar',
     'parametro.ler','sobra.ler','sobra.criar','etiqueta.imprimir',
     'rolo.ler','rolo.entrada','rolo.encerrar',
-    'plano.calcular','plano.confirmar','painel.ler'
+    'plano.calcular','plano.confirmar'
+    /* ⚠️ `painel.ler` SAIU DO CORTADOR em 04/09/2026, por decisao do dono.
+       O painel e escritorio: tema escuro, muitos numeros juntos, e responde
+       o que a fabrica CONSOME, quanto tem parado e onde esta o dinheiro. Sem
+       os campos de preco ele continua sendo a leitura gerencial do estoque —
+       e nao e o que ajuda alguem em pe na bancada a cortar uma peca.
+
+       E o mesmo argumento que moveu /cadastros de `ler` para `editar`: uma
+       tela escura no tablet, sob a lampada de inspecao, cheia de coisa que o
+       operador nao pode usar.
+
+       O QUE ISSO CUSTA, e esta escrito para nao se descobrir por acidente: o
+       cortador deixa de ver Encalhe, Refugo, Recusas e Cortes. Nenhum deles
+       e necessario para cortar — o plano ja sugere o retalho sozinho, que e
+       justamente para o cortador nao precisar caçar sobra em lista. Se um
+       dia fizer falta, a volta e devolver 'painel.ler' a esta lista; o
+       dinheiro continua podado pelo custo.semPreco de qualquer jeito. */
   ]
 };
 

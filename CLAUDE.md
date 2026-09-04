@@ -1093,6 +1093,8 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   há emenda, são estoques diferentes (§19, armadilha #17)
 - ❌ Pôr o estoque parado no numerador da cobertura do conjunto: a folga dobra
   justamente porque há dinheiro dormindo (§19, armadilha #17)
+- ❌ Podar preço por LISTA de nomes: ela envelhece em uma semana e o campo novo
+  viaja pelo fio até a bancada (§19, quem vê o quê)
 - ❌ Começar a lista de medida da sobra no mínimo do refugo — o `sobra.criar`
   não exige esse mínimo, e o operador com a peça menor na mão escolheria o
   valor errado de propósito (§19, a medida vira lista)
@@ -1533,7 +1535,7 @@ cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 186 casos
+cd tecido && npm test          # 194 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:

@@ -19,7 +19,8 @@ const dNivel=require('../dados/nivel');
 const conferir=require('../dominio/conferir');
 const fornecedor=require('../dominio/fornecedor');
 
-const LER='cadastro.ler', EDITAR='cadastro.editar', CRIAR_END='endereco.criar';
+const LER='cadastro.ler', EDITAR='cadastro.editar', CRIAR_END='endereco.criar',
+      NOTA='rolo.nota';
 
 module.exports={rotas:[
 
@@ -86,15 +87,24 @@ module.exports={rotas:[
    manipulador:({params})=>conferir.marcar(params.tipo,params.id),
    detalhe:(req)=>'conferiu '+req.params.tipo+' '+req.params.id},
 
-  /* ── FORNECEDOR ─────────────────────────────────────────────────────────
-     Criar e da BANCADA (`endereco.criar` — a mesma chave de "cadastro que
-     nasce com a mercadoria na mao"): o rolo desce do caminhao de um
-     fornecedor que ninguem cadastrou, e a alternativa nao e esperar, e
-     lancar o rolo sem fornecedor. Renomear e da chefia, que e quem vai
-     juntar 'Ecotex' com 'ecotex' depois. */
-  {metodo:'GET', caminho:'/api/fornecedores', permissao:LER,
+  /* ── FORNECEDOR — DADO DE ESCRITORIO, e nao de bancada ──────────────────
+     ⚠️ A PERMISSAO MUDOU DE `cadastro.ler` PARA `rolo.nota` em 04/09/2026.
+     Com `cadastro.ler`, a LISTA INTEIRA de fornecedores chegava ao operador:
+     ele tinha a chave para a tela de corte listar tecido e cor, e a lista de
+     quem a fabrica compra vinha junto de carona.
+
+     De quem se compra nao e o que o operador precisa para pegar o rolo na
+     estante — e e exatamente o tipo de informacao que sai da fabrica junto
+     com quem sai. O mesmo vale para a NF e o preco, podados no JSON.
+
+     E o argumento que justificava a bancada criar fornecedor caiu junto: ele
+     era "o rolo desce do caminhao de quem ninguem cadastrou, e a alternativa
+     nao e esperar". Verdade — mas a alternativa CERTA nunca foi o operador
+     cadastrar: e o rolo entrar SEM fornecedor e cair na lista "Sem nota",
+     que ja existe e e trabalho de quem fecha compras. */
+  {metodo:'GET', caminho:'/api/fornecedores', permissao:NOTA,
    manipulador:()=>fornecedor.listar()},
-  {metodo:'POST', caminho:'/api/fornecedores', permissao:CRIAR_END,
+  {metodo:'POST', caminho:'/api/fornecedores', permissao:NOTA,
    manipulador:({corpo,usuario})=>fornecedor.criar(corpo,usuario),
    detalhe:(req)=>'fornecedor '+req.body.nome},
   {metodo:'PUT', caminho:'/api/fornecedores/:id', permissao:EDITAR,
