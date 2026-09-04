@@ -1077,6 +1077,80 @@ marcado e cai na lista **Conferir**.
 
 ---
 
+## QUEM VÊ O QUÊ — a divisão entre bancada e escritório
+
+Revisão de 04/09/2026, tela por tela e rota por rota.
+
+| Tela | Operador | Chefia | Tema |
+|---|:---:|:---:|---|
+| Início | ✅ | ✅ | claro |
+| Plano de corte | ✅ | ✅ | claro |
+| Sobras | ✅ | ✅ | claro |
+| Rolos | ✅ | ✅ | claro |
+| Etiquetas | ✅ | ✅ | claro |
+| **Painel** | ❌ | ✅ | escuro |
+| **Cadastros** | ❌ | ✅ | escuro |
+
+O operador tem exatamente as cinco telas **claras**, de bancada. As duas
+escuras são escritório — e o tema não é decoração: tela escura no tablet sob a
+lâmpada de inspeção vira espelho.
+
+### ⚠️ A poda por LISTA envelheceu em uma semana
+
+A defesa era `CAMPOS_PRECO`, uma lista literal de nomes. O painel gerencial
+nasceu depois com `resumo.valor_parado`, que não estava nela — e **o número
+passou a viajar pelo fio até a bancada**. A tela não mostrava (ela testa
+`resumo.valor`), então ninguém veria olhando: só abrindo a aba de rede.
+
+É a mesma doença da tabela de preço por fornecedor e dos mínimos placeholder:
+**lista mantida à mão não acompanha o código**, e o defeito é silencioso dos
+dois lados.
+
+Hoje a poda é **padrão de nome** (`custo.eDinheiro`), que pega o campo que
+ainda não existe. E o `teste/acesso_operador.test.js` **varre o JSON inteiro**
+em toda profundidade procurando dinheiro — porque padrão também falha, e a
+defesa de verdade é alguém conferindo o resultado, não a intenção.
+
+### O que é "dado comercial", e por que NF e fornecedor entram
+
+Preço, valor, **NF e fornecedor**. De quem a fábrica compra e com que nota não
+ajuda o operador a pegar o rolo na estante — e é exatamente o tipo de
+informação que sai da fábrica junto com quem sai.
+
+Três consequências na tela de entrada de rolo, para quem não tem `rolo.nota`:
+
+- a fileira **FORNECEDOR** não existe;
+- os campos **NF** e **R$/m²** não existem;
+- no lugar, uma linha dizendo que isso entra depois, no escritório.
+
+O rolo entra sem os três e cai na lista **"Sem nota"**, que já é o trabalho de
+quem fecha compras. **Um campo que o operador preenche e nunca mais vê de volta
+é pior que campo nenhum** — o JSON dele já voltava podado.
+
+> ⚠️ **A lista de fornecedores vinha DE CARONA com `cadastro.ler`** — a chave
+> que o cortador tem para a tela de corte listar tecido e cor. Uma chave larga
+> demais carrega o que ninguém pediu. `GET /api/fornecedores` passou para
+> `rolo.nota`.
+
+### As chaves que o operador não tem
+
+`custo.ver` · `rolo.nota` · `cadastro.editar` · `parametro.editar` ·
+`sobra.descartar` · `rolo.ajustar` · `painel.ler`
+
+> **O que tirar o `painel.ler` custa:** o cortador deixa de ver Encalhe,
+> Refugo, Recusas e Cortes. Nenhum é necessário para cortar — o plano já sugere
+> o retalho sozinho, que é justamente para o cortador não precisar caçar sobra
+> em lista. A volta é uma linha em `PAPEIS.cortador`.
+
+### Dois falso-positivos que a auditoria acusa e estão certos
+
+`largura_bobina.valor` (a largura em metros) e `parametro.valor` (o valor do
+parâmetro) casam com o padrão de nome mas **não são dinheiro** — e o operador
+precisa dos dois: um monta os botões de BOBINA, o outro os limites da lista de
+medida. Nenhuma das duas rotas passa pela poda, e é assim que tem que ser.
+
+---
+
 ## O mutirão
 
 A tela lembra **tecido, condição e endereço** entre um retalho e o seguinte

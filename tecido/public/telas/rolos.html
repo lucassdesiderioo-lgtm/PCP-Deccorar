@@ -377,7 +377,7 @@ async function telaEntrada(pai){
   estado.tecidos=await api('/api/tecidos');
   estado.arvore=await api('/api/enderecos/ROLO');
   if(!estado.larguras) estado.larguras=await api('/api/larguras');
-  if(!estado.fornecedores) estado.fornecedores=await api('/api/fornecedores');
+  if(podeNota()&&!estado.fornecedores) estado.fornecedores=await api('/api/fornecedores');
   pai=limpar(pai);
 
   const c=el('div',{class:'cartao'});
@@ -450,9 +450,11 @@ async function telaEntrada(pai){
      comecada. Por isso o campo pergunta o que esta NO ROLO AGORA. */
   [['largura','Bobina que nao esta nos botoes (m) — ela entra na lista',''],
    ['metragem','Metragem AGORA no rolo (m)',''],
-   ['nf','NF (se ja veio)',''],
-   /* R$/m² SO PARA QUEM VE PRECO. Para os outros o campo nem existe — e o
-      rolo entra sem preco e cai na lista "sem nota", que e o certo. */
+   /* NF E R$/m² SO PARA QUEM LANCA NOTA. Para o operador os dois campos nem
+      existem: NF e preco sao papel de escritorio, e o JSON dele ja volta sem
+      eles — um campo que ele preenche e nunca mais ve de volta e pior que
+      campo nenhum. O rolo entra sem os dois e cai na lista "Sem nota". */
+   ...(podeNota() ?[['nf','NF (se ja veio)','']]:[]),
    ...(podeCusto()?[['preco_m2','R$ por m² (se ja souber)','']]:[])
   ].forEach(([id,rot,valor])=>{
     const b=el('div',{class:'campo cresce'});
@@ -481,14 +483,20 @@ async function telaEntrada(pai){
      O "+ fornecedor" existe pelo mesmo motivo do "+ haste": o rolo desce do
      caminhao de quem ninguem cadastrou, e a alternativa nao e esperar — e
      lancar o rolo sem fornecedor, que e o dado que se perde para sempre. */
-  const forns=(estado.fornecedores||[]).filter(f=>f.ativo);
-  c.appendChild(fileira('FORNECEDOR',
+  /* ⚠️ A FILEIRA DE FORNECEDOR SO EXISTE PARA QUEM LANCA NOTA. De quem a
+     fabrica compra e dado de escritorio: nao ajuda o operador a por o tubo na
+     estante, e sai da fabrica junto com quem sai. O rolo entra sem fornecedor
+     e cai na lista "Sem nota", que ja e o trabalho de quem fecha compras. */
+  const forns=podeNota()?(estado.fornecedores||[]).filter(f=>f.ativo):[];
+  if(podeNota()) c.appendChild(fileira('FORNECEDOR',
     forns.map(f=>({valor:f.id,nome:f.nome})), estado.fornecedor_id,
     v=>{ estado.fornecedor_id=(String(estado.fornecedor_id)===String(v)?null:v); telaEntrada($('#conteudo')); },
     {rotulo:'fornecedor', pergunta:'Nome do fornecedor novo:',
      rota:'/api/fornecedores', corpo:{},
      aoCriar:async f=>{ estado.fornecedores=await api('/api/fornecedores');
                         estado.fornecedor_id=f.id; await telaEntrada($('#conteudo')); }}));
+  else c.appendChild(el('p',{class:'ajuda',texto:
+    'Fornecedor, NF e preco entram depois, no escritorio — o rolo fica na lista "Sem nota" ate la. Aqui basta o tecido, a bobina, a metragem e o endereco.'}));
 
   // endereco na estante de ROLO
   const hastes=estado.arvore.filter(h=>h.ativo).map(h=>({valor:h.id,nome:h.nome}));
@@ -534,7 +542,7 @@ async function telaEntrada(pai){
         tecido_id:estado.tecido_id,
         largura:estado.largura!=null?estado.largura:campos.largura.value,
         metragem:campos.metragem.value,
-        nf:campos.nf.value, nivel_id:estado.nivel_id,
+        nf:campos.nf?campos.nf.value:null, nivel_id:estado.nivel_id,
         fornecedor_id:estado.fornecedor_id,
         preco_m2:campos.preco_m2?campos.preco_m2.value:null}});
       banner('Rolo '+r.codigo+' cadastrado com '+formatarMetros(r.saldo)+'.'+

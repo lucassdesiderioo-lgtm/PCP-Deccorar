@@ -10,7 +10,12 @@ const {pode}=require('../nucleo/permissoes');
    recebe o JSON SEM os campos de preco — esconder no navegador deixaria o
    numero viajando pelo fio, ao alcance de qualquer um que abrisse a aba de
    rede. Regra 14 do CLAUDE.md §13, e a mesma do Recebimento no PCP. */
-const podar=(usuario,dados)=>pode(usuario,'custo.ver')?dados:custo.semPreco(dados);
+/* Ve dado comercial quem TEM CUSTO ou LANCA NOTA — os dois precisam, por
+   motivos diferentes: um decide compra, o outro digita o papel. Testar so
+   `custo.ver` deixaria quem lanca a nota sem enxergar a nota que acabou de
+   lancar. */
+const veComercial=u=>pode(u,'custo.ver')||pode(u,'rolo.nota');
+const podar=(usuario,dados)=>veComercial(usuario)?dados:custo.semPreco(dados);
 
 module.exports={rotas:[
   {metodo:'GET', caminho:'/api/rolos', permissao:'rolo.ler',

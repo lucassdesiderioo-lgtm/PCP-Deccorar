@@ -164,14 +164,35 @@ function painel(){
 /* A PODA DOS CAMPOS DE PRECO, num lugar so. Chamada pela rota quando quem
    pediu nao tem custo.ver: o JSON sai SEM os campos, e nao com eles zerados
    ou escondidos por CSS. */
-const CAMPOS_PRECO=['preco_m2','valor','valor_total','preco_medio','menor','maior'];
+/* ⚠️ PADRAO DE NOME, E NAO LISTA ESCRITA A MAO.
+   A lista literal que existia aqui — ['preco_m2','valor','valor_total',
+   'preco_medio','menor','maior'] — envelheceu calada em UMA SEMANA: o painel
+   gerencial nasceu com `resumo.valor_parado`, que nao estava nela, e o numero
+   passou a viajar pelo fio ate a bancada. A TELA nao mostrava (ela testa
+   `resumo.valor`), entao ninguem veria olhando — so abrindo a aba de rede.
+
+   E a mesma doenca da tabela de preco por fornecedor e dos minimos
+   placeholder: lista mantida a mao nao acompanha o codigo, e o defeito e
+   silencioso dos dois lados.
+
+   O padrao pega o campo que ainda nao existe. E o teste `acesso_operador`
+   varre o JSON INTEIRO procurando dinheiro — porque padrao tambem falha, e a
+   defesa de verdade e alguem conferindo o resultado, nao a intencao.
+
+   NF E FORNECEDOR ENTRAM AQUI, e nao so o preco. De quem a fabrica compra e
+   com que nota e informacao comercial: nao e o que o operador precisa para
+   pegar o rolo na estante, e e exatamente o tipo de dado que sai da fabrica
+   junto com quem sai. */
+const ECONOMICO=/(^|_)(preco|precos|valor|valores|custo|custos|nf|fornecedor|fornecedores)(_|$)/i;
+const eDinheiro=chave=>ECONOMICO.test(chave);
+
 function semPreco(dados){
   if(Array.isArray(dados)) return dados.map(semPreco);
   if(!dados||typeof dados!=='object') return dados;
   const fora={};
-  for(const k in dados) if(!CAMPOS_PRECO.includes(k)) fora[k]=semPreco(dados[k]);
+  for(const k in dados) if(!eDinheiro(k)) fora[k]=semPreco(dados[k]);
   return fora;
 }
 
 module.exports={ultimoPreco,porTecido,agrupado,porFornecedor,semNota,painel,
-                semPreco,CAMPOS_PRECO};
+                semPreco,eDinheiro,ECONOMICO};
