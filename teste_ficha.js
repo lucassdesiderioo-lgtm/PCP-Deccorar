@@ -134,10 +134,33 @@ const cabe = (largura, bobina) => Math.floor(bobina / largura);
 ok('o /200 dá o mesmo número nas duas bobinas — a assinatura de quem ignora a bobina',
    quanto(VELHA,180,280) === quanto(VELHA,180,320));
 
-ok('1,80 não cabe duas vezes em bobina nenhuma (nem 2,80, nem 3,20)',
+ok('1,80 DE PÉ não cabe duas vezes em bobina nenhuma (nem 2,80, nem 3,20)',
    cabe(180,280) === 1 && cabe(180,320) === 1);
-ok('e por isso o /200 cobra METADE do que a peça de 1,80 sozinha consome',
+ok('e por isso o /200 cobraria METADE se a peça de 1,80 fosse cortada de pé',
    perto(quanto(VELHA,180,320) * 2, quanto(SOZINHA,180,320)));
+
+/* ⚠️ MAS ELA NÃO É CORTADA DE PÉ, E ESSE FOI O MEU ERRO DE LEITURA.
+   O corte real da 1,80 × 1,50 e `1,77 x 1,60` — largura menos 3, altura mais
+   DEZ (nao vinte). Invertida, quem atravessa a bobina e a altura do corte:
+   1,60 + 1,60 = 3,20 EXATO, duas por faixa, zero sobra de largura. Cada peca
+   puxa 1,77 / 2 = 0,885 m.
+
+   Os 10 cm nao sao economia de tecido: sao o que faz o 1,60 + 1,60 fechar.
+   Com os 20 de sempre seriam 1,70 + 1,70 = 3,40, e nao caberia.
+
+   Ou seja: contra a pratica REAL da fabrica o /200 erra 4% para MENOS, e nao
+   50%. Uma conta feita sem a medida de corte e sem a orientacao inventa uma
+   fabrica que nao existe — e foi o que aconteceu na primeira versao desta
+   secao. E o mesmo motivo pelo qual as duas moram na ficha agora. */
+const CORTE_180 = { largura:180-3, altura:150+10 };
+ok('⚠️ o corte real da 1,80 é 1,77 × 1,60 e INVERTIDO cabem duas na bobina de 3,20',
+   cabe(CORTE_180.altura, 320) === 2 && CORTE_180.altura*2 === 320,
+   '1,60 x 2 = ' + (CORTE_180.altura*2));
+ok('   e aí ela consome 0,885 m, não os 1,70 da peça de pé',
+   perto(CORTE_180.largura/2/100, 0.885));
+ok('   então o /200 erra 4% para MENOS nela, e não 50%',
+   Math.abs(quanto(VELHA,180,320) / (CORTE_180.largura/2/100) - 1) < 0.05,
+   'razão ' + (quanto(VELHA,180,320) / (CORTE_180.largura/2/100)).toFixed(3));
 
 ok('1,00 cabe TRÊS vezes na bobina de 3,20 — o /200 cobra 50% a mais',
    cabe(100,320) === 3 && perto(quanto(ENCAIXE,100,320), 1.70/3.2),
@@ -146,6 +169,27 @@ ok('1,00 cabe TRÊS vezes na bobina de 3,20 — o /200 cobra 50% a mais',
 ok('e acerta por coincidência justamente onde cabem duas (1,40 e 1,60)',
    perto(quanto(VELHA,140,280), quanto(SOZINHA,140,280)) &&
    perto(quanto(VELHA,160,320), quanto(SOZINHA,160,320)));
+
+/* ⚠️ A FORMULA POR AREA ESCOLHE SEMPRE A MESMA BOBINA, PARA TODO SKU.
+   custo = (altura+20)/100 x largura x [ preco_linear / largura_bobina ]
+   O que varia entre as bobinas e so o ultimo colchete, que e o preco por m².
+   Entao a comparacao lado a lado vira enfeite: uma bobina ganha sempre. */
+const precoM2 = { 280:100/2.80, 320:112/3.20 };
+const vencedoraArea = Object.keys(precoM2).sort((a,b)=>precoM2[a]-precoM2[b])[0];
+ok('⚠️ a fórmula por área elege a mesma bobina em TODAS as larguras',
+   LARGURAS.every(l => {
+     const c280 = quanto(ENCAIXE,l,280) * 100, c320 = quanto(ENCAIXE,l,320) * 112;
+     return (c320 < c280 ? '320' : '280') === vencedoraArea;
+   }), 'vencedora por m²: ' + vencedoraArea);
+
+/* Enquanto a orientacao nao for um dado lancado, a formula que descreve as duas
+   subfatura o que a fabrica corta de pe. E por isso ela NAO esta no sistema. */
+const DUAS = 'min( (altura + 20) / piso(largura_bobina / (largura - 3)),' +
+             '     (largura - 3) / piso(largura_bobina / (altura + 10)) ) / 100';
+ok('⚠️ a fórmula das duas orientações subfatura a 1,20, que a fábrica corta de pé',
+   quanto(DUAS,120,320) < 0.85 * 0.75,
+   'ela diria ' + quanto(DUAS,120,320).toFixed(3) + ' m, e o corte de pé consome 0,850');
+ok('   mas acerta a 1,80, que é a única invertida', perto(quanto(DUAS,180,320), 0.885));
 
 /* ⚠️ O ESTRAGO ESTRUTURAL: com o `/200` a escolha de bobina do ficha_dominio
    deixa de ser por custo da peca e vira preco por metro linear. */

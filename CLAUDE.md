@@ -807,34 +807,68 @@ sem fornecedor cadastrado, e ficha que some manda cortar de memória.
 
 ### ⚠️ ARMADILHA #19 — o `/200` do tecido é um DOIS escrito dentro da fórmula
 
-A linha de tecido do modelo Rolô era `(altura + 20) / 200`. O `/200` afirma que
-cabem **duas peças por faixa** em qualquer bobina, de qualquer largura. Com as
-bobinas reais (2,80 e 3,20) isso é verdade na 1,40 e na 1,60 — e falso nas duas
-pontas: a de 1,00 cabe **três** na 3,20, e a de 1,80 cabe **uma só**.
+A linha de tecido do modelo Rolô é `(altura + 20) / 200`. O `/200` afirma que
+cabem **duas peças por faixa** em qualquer bobina, de qualquer largura.
 
-| Largura | SKUs | cabe na 2,80 | cabe na 3,20 | o `/200` cobrava |
-|---|---|---|---|---|
-| 1,00 | 3 | 2 | **3** | 2 → 50% a mais |
-| 1,20 a 1,60 | 16 | 2 (até 1,40) | 2 | 2 ✔ |
-| 1,80 | 3 | **1** | **1** | 2 → **metade** |
+> ⚠️ **A CONTA SÓ FECHA COM A MEDIDA DE CORTE E A ORIENTAÇÃO NA MÃO, e nenhuma
+> das duas estava no sistema.** A primeira versão desta seção acusou a peça de
+> 1,80 de custar **metade** do que a ficha dizia. Estava errado: aquela conta
+> supunha a peça **de pé**, e a fábrica corta essa — e só essa — **invertida**.
+> O corte real dela é `1,77 × 1,60` (largura − 3, altura + **10**), e invertida
+> cabem **duas por faixa** na bobina de 3,20, porque `1,60 + 1,60 = 3,20`
+> exato. O consumo verdadeiro é **0,885 m**, contra os 0,850 que o `/200` cobra
+> — 4% a menos, não metade.
+>
+> A lição não é sobre o número: é que **medida de corte e orientação são dados
+> de produção, e enquanto moram na cabeça de quem corta qualquer conta feita
+> por fora inventa uma fábrica que não existe** — inclusive a minha.
+
+O corte real é `largura − 3` de largura por `altura + folga` de altura, e a
+folga muda com a orientação: **+20 de pé, +10 invertida**. Os 10 cm não são
+economia de tecido — são o que faz `1,60 + 1,60` fechar em 3,20.
+
+Contra o corte de pé, que é o que a fábrica faz em seis das sete larguras:
+
+| Largura | SKUs | melhor de pé | o `/200` cobra |
+|---|---|---|---|
+| 1,00 | 3 | 3 por faixa na 3,20 → 0,567 m | 0,850 → **50% a mais** |
+| 1,20 a 1,60 | 16 | 2 por faixa → 0,850 m | 0,850 ✔ |
+| 1,80 | 3 | **invertida**, 2 por faixa na 3,20 → 0,885 m | 0,850 → 4% a menos |
 
 **Pior que o número: ele curto-circuita a máquina que já existe.** O
 `ficha_dominio.js` avalia a fórmula **uma vez por bobina candidata** e fica com
 a de menor custo por peça — desenhado exatamente para o corte invertido. Com um
 `2` fixo as duas bobinas dão o mesmo consumo, e a escolha desempata por **preço
-por metro linear**, que é o critério errado: na 1,60 a bobina de 3,20 é mais
-cara por metro e **mais barata por peça**.
+por metro linear**, que é o critério errado quando as bobinas têm larguras
+diferentes: o que se compra é m², e um metro de 3,20 traz 14% mais tecido que
+um metro de 2,80.
 
-As duas fórmulas honestas, e a distância entre elas é o valor do encaixe:
+> ⚠️ **E A FÓRMULA POR ÁREA NÃO É O CONSERTO.** `(altura+20) * largura /
+> largura_bobina / 100` parece honesta e reparte a faixa proporcionalmente, mas
+> abrindo a conta do custo o que sobra variando entre as bobinas é só o **preço
+> por m²** — então ela escolhe sempre a mesma bobina, para todo SKU, e a
+> comparação lado a lado vira enfeite. Pior: ela supõe que o resto da largura
+> **sempre** é aproveitado por alguém, o que só vale onde o par fecha exato.
+
+A fórmula que descreve as duas orientações, e deixa a bobina decidir de verdade:
 
 ```
-encaixando peças lado a lado:  (altura + 20) * largura / largura_bobina / 100
-uma peça por faixa (o teto):   (altura + 20) / 100 / piso(largura_bobina / largura)
+min( (altura + 20) / piso(largura_bobina / (largura - 3)),     ← de pé
+     (largura - 3) / piso(largura_bobina / (altura + 10)) )    ← invertida
+   / 100
 ```
 
-Na 1,80 com bobina 3,20: **0,956 m** encaixada contra **1,70 m** sozinha — 78%.
-Onde a peça divide a bobina exato (1,40 na 2,80, 1,60 na 3,20) as duas
-coincidem, porque não há sobra para repartir.
+> ⚠️ **Ela diz o que É POSSÍVEL, não o que a fábrica FAZ** — e por isso ainda
+> não está no sistema. Pelo `min`, a 1,20 sairia invertida a 0,585 m; a fábrica
+> corta de pé a 0,850. A ficha subfaturaria 31%. **Orientação é decisão de quem
+> produz, não resultado de fórmula**, e o mesmo vale para a folga. Enquanto a
+> decisão não for um dado lançado, a fórmula honesta é a de pé.
+
+**Pareamento: as sete larguras fecham exato na 2,80; na 3,20, cinco das sete.**
+`1,80+1,00`, `1,60+1,20`, `1,50+1,30` e `1,40+1,40` fecham na 2,80;
+`1,80+1,40`, `1,60+1,60` e `1,20+1,00+1,00` fecham na 3,20. A 1,30 e a 1,50
+**nunca** fecham na 3,20 — o lugar delas é a 2,80, uma com a outra. Por isso as
+duas bobinas são necessárias **pelo par, não pelo preço**.
 
 > **Sinal na tela:** linha de tecido cuja fórmula não menciona
 > `largura_bobina` aparece com tarja âmbar "não olha a bobina", e o teste ao
@@ -853,7 +887,7 @@ coincidem, porque não há sobra para repartir.
 > Ignorar todas não aprova: um ok sem evidência mente pior que a recusa.
 
 **Rode `node teste_ficha.js` após qualquer mudança no `formula.js`, no
-`ficha_dominio.js` ou no `ficha_route.js`** — os 34 casos travam a separação
+`ficha_dominio.js` ou no `ficha_route.js`** — os 40 casos travam a separação
 entre consumo e corte, a conta das duas bobinas SKU a SKU, as medidas de teste
 e a porta única do avaliador.
 
@@ -1146,7 +1180,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) `teste_estoque.js` (54), `teste_cruzamento.js` (14), `teste_etiqueta.js` (13) e `teste_ficha.js` (34); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) `teste_estoque.js` (54), `teste_cruzamento.js` (14), `teste_etiqueta.js` (13) e `teste_ficha.js` (40); o resto não tem | Médio a longo prazo |
 | 11 | **A investigar: o que é o `Quantidade` da folha** — a regra é uma venda = uma etiqueta = uma persiana (§5), então esse campo não deveria vir maior que 1. Ninguém decide nada com ele hoje. Falta abrir um PDF real com `Quantidade > 1` e entender o que aquele número diz | Baixo enquanto nada o usar — mas é uma pergunta sem resposta sobre o documento de origem |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
