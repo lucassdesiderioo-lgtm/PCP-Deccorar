@@ -63,21 +63,69 @@ if (minimos.length && minimos[0].n > 1 && (comp ? comp.c : 0) > 1)
 /* A ficha e formula, e mora no MODELO: componentes se lancam uma vez, nunca
    SKU a SKU. Modelo sem nenhuma linha e modelo que nao tem custo — e sem
    custo ele nao entra na conta do que comprar. */
+/* `precisam` conta so os SKUs que DEPENDEM da ficha — `tem_ficha = 0` e a
+   revenda, que responde o custo por outro caminho. Sem essa separacao o aviso
+   cobraria ficha de produto que a fabrica compra pronto, e um aviso que
+   cobra o que ja esta resolvido e um aviso que a equipe aprende a ignorar. */
 const porModelo = todos(`
   SELECT m.id, m.nome, m.exige_medida, m.sob_medida,
          (SELECT COUNT(*) FROM ficha_formula f WHERE f.modelo_id = m.id) linhas,
-         (SELECT COUNT(*) FROM skus s WHERE s.modelo_id = m.id) skus
+         (SELECT COUNT(*) FROM skus s WHERE s.modelo_id = m.id) skus,
+         (SELECT COUNT(*) FROM skus s WHERE s.modelo_id = m.id
+           AND COALESCE(s.tem_ficha,1) <> 0) precisam
     FROM modelo m ORDER BY m.nome`);
 bloco('FICHA POR MODELO', porModelo.map(m =>
   m.nome.padEnd(16) + String(m.linhas).padStart(3) + ' linha(s) de ficha   ' +
   String(m.skus).padStart(4) + ' SKU(s)' +
+  (m.skus !== m.precisam ? ' (' + (m.skus - m.precisam) + ' de revenda)' : '') +
   (m.sob_medida ? '   [sob medida]' : '') +
   (m.exige_medida ? '' : '   [sem medida]')));
 
-porModelo.filter(m => m.linhas === 0 && m.skus > 0).forEach(m =>
-  avisos.push('o modelo "' + m.nome + '" tem ' + m.skus + ' SKU(s) e NENHUMA linha de ficha — ' +
-    'esses SKUs nao tem custo e nao entram na necessidade de material. ' +
-    'Ou lancam ficha, ou viram revenda com custo direto.'));
+porModelo.filter(m => m.linhas === 0 && m.precisam > 0).forEach(m =>
+  avisos.push('o modelo "' + m.nome + '" tem ' + m.precisam + ' SKU(s) que DEPENDEM de ficha ' +
+    'e NENHUMA linha lancada — esses SKUs nao tem custo e nao entram na necessidade ' +
+    'de material. Ou lancam ficha, ou viram revenda com custo direto.'));
+
+/* ── ⚠️ O SKU SEM CUSTO, POR TODOS OS CAMINHOS ────────────────────────────
+   A secao acima agrupa por MODELO, e por isso ela nao enxerga o pior caso:
+   SKU sem modelo nenhum. Ele nao tem ficha, nao tem custo, nao entra na
+   necessidade de material — e nao aparece em lista nenhuma, que e o que o
+   torna pior que o acessorio conhecido.
+
+   E ha o caminho legitimo: `tem_ficha = 0` com `custo_direto` preenchido e a
+   REVENDA — produto que a fabrica compra pronto e nao monta. Esse nao e
+   buraco, e uma resposta. O buraco e quem esta marcado como revenda e nao
+   tem o custo lancado: ali alguem comecou a responder e parou no meio. */
+const total = um('SELECT COUNT(*) c FROM skus');
+const semCusto = todos(`
+  SELECT s.codigo, s.descricao, s.modelo_id, s.tem_ficha, s.custo_direto,
+         m.nome AS modelo_nome,
+         (SELECT COUNT(*) FROM ficha_formula f WHERE f.modelo_id = s.modelo_id) linhas
+    FROM skus s LEFT JOIN modelo m ON m.id = s.modelo_id`);
+
+const semModelo   = semCusto.filter(s => !s.modelo_id);
+const revendaOk   = semCusto.filter(s => s.tem_ficha === 0 && s.custo_direto != null);
+const revendaFuro = semCusto.filter(s => s.tem_ficha === 0 && s.custo_direto == null);
+const semFicha    = semCusto.filter(s => s.modelo_id && s.tem_ficha !== 0 && s.linhas === 0);
+
+bloco('SKU × CUSTO (o catalogo inteiro, ' + (total ? total.c : 0) + ' SKU)', [
+  String(semCusto.filter(s => s.modelo_id && s.linhas > 0).length).padStart(4) + '  com ficha pelo modelo',
+  String(revendaOk.length).padStart(4) + '  revenda com custo direto — resposta valida, nao buraco',
+  String(semFicha.length).padStart(4) + '  com modelo, mas o modelo nao tem ficha',
+  String(revendaFuro.length).padStart(4) + '  marcados como revenda e SEM custo direto',
+  String(semModelo.length).padStart(4) + '  SEM MODELO — invisiveis em qualquer relatorio por modelo'
+]);
+
+if (semModelo.length)
+  avisos.push(semModelo.length + ' SKU(s) SEM MODELO: ' +
+    semModelo.slice(0, 8).map(s => s.codigo).join(', ') + (semModelo.length > 8 ? ' …' : '') +
+    ' — sem modelo nao ha ficha, nao ha custo, e eles nao aparecem em nenhum ' +
+    'relatorio agrupado por modelo. E o buraco que nao se ve.');
+
+if (revendaFuro.length)
+  avisos.push(revendaFuro.length + ' SKU(s) marcados como revenda (tem_ficha=0) e SEM custo_direto: ' +
+    revendaFuro.slice(0, 8).map(s => s.codigo).join(', ') +
+    ' — alguem comecou a responder "este eu compro pronto" e parou antes do preco.');
 
 // ── PEDIDOS ───────────────────────────────────────────────────────────────
 const pedidos = todos(`
