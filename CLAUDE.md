@@ -905,6 +905,19 @@ e a porta única do avaliador.
   `alert(...)` seguido de redesenho: o texto digitado sumia e voltava a fórmula
   velha, e quem editava via a recusa e uma fórmula que não era a sua. Hoje o
   erro fica na própria linha, com o que foi digitado ainda no campo.
+- **A tabela da ficha é só leitura, e editar abre UM material de cada vez.**
+  A primeira versão punha dez campos em duas linhas de tabela por material:
+  dava para editar e não dava para ler — não se enxergava onde um material
+  acabava e o outro começava. Não é preferência estética: quem não consegue
+  ler a ficha não confere a ficha, e ficha que ninguém confere é a armadilha
+  #6 de novo, a régua que a equipe contorna. Cada coluna carrega só o que
+  explica ela — a bobina escolhida fica sob a **quantidade**, que é o que ela
+  explica, e não empilhada sob o nome do material.
+- **Componente de família não entra na lista de "acrescentar material".**
+  Apontar `Blackout bege 3,20` direto **congela a bobina na ficha**: o
+  `ficha_dominio` deixa de avaliar as candidatas e a escolha por menor custo
+  por peça — a máquina inteira do corte invertido — não roda. Tecido se aponta
+  pela **família**, sempre.
 - **Quem recebe não vê preço.** A rota do Recebimento monta o JSON **sem** os
   campos de preço — não adianta esconder na tela e mandar pelo fio.
 - **Recebimento parcial mantém o pedido aberto**, e o saldo continua contando
