@@ -138,34 +138,67 @@ function avaliar(expressao, vars){
 }
 
 /* ── validacao de cadastro (§3: a formula e testada antes de salvar) ────────── */
-/* As tres medidas do documento. A do meio e uma persiana real. */
+/* As tres medidas do documento, usadas quando o modelo ainda nao tem SKU com
+   medida cadastrada. A do meio e uma persiana real.
+
+   ⚠️ ELAS SAO O ULTIMO RECURSO, NAO O PADRAO — e a razao esta no 300 × 250.
+   Nenhuma bobina do catalogo corta 3,00 m, e no sob medida nao ha emenda. Uma
+   formula de tecido honesta, escrita com piso(largura_bobina / largura), da
+   DIVISAO POR ZERO nessa medida e era recusada na tela: a trava rejeitava a
+   formula certa por causa de uma peca que nao existe. E a armadilha #6 outra
+   vez — trava que dispara no caso normal vira desvio, e aqui o desvio era
+   escrever a formula errada (um `2` fixo) para conseguir salvar.
+
+   Quem chama passa `medidas` com as medidas REAIS daquele modelo. */
 const MEDIDAS_TESTE = [
   { largura:100, altura:100 },
   { largura:180, altura:150 },
   { largura:300, altura:250 }
 ];
 
-/* Testa a expressao nas tres medidas. Devolve {ok, testes, erro}.
+/* Testa a expressao em cada medida. Devolve {ok, testes, erro, ignoradas}.
    Resultado zero, negativo ou absurdo NAO passa — regra do §3. Formula errada em
-   cadastro vira compra errada em producao; melhor recusar na tela. */
+   cadastro vira compra errada em producao; melhor recusar na tela.
+
+   opcoes:
+     largura_bobina  a bobina candidata (so em linha de tecido)
+     medidas         [{largura,altura}] — as reais do modelo; cai no padrao sem
+     dica            o que sugerir quando o numero sai absurdo (a unidade muda a
+                     sugestao: consumo em metro pede /100, corte em cm nao) */
 function validar(expressao, opcoes){
   const o = opcoes || {};
-  const testes = [];
-  for(const m of MEDIDAS_TESTE){
+  const medidas = (o.medidas && o.medidas.length) ? o.medidas : MEDIDAS_TESTE;
+  const dica = o.dica || 'Confira se falta dividir por 100.';
+  const testes = [], ignoradas = [];
+  for(const m of medidas){
+    /* PECA MAIS LARGA QUE A BOBINA NAO EXISTE — nao ha emenda (CLAUDE.md §19).
+       Testar a formula contra ela e testar ficcao, e o resultado dessa ficcao
+       (divisao por zero, quantidade absurda) reprovaria a formula certa. */
+    if(o.largura_bobina != null && m.largura > o.largura_bobina){
+      ignoradas.push({ largura:m.largura, altura:m.altura,
+        motivo:'não cabe na bobina de ' + (o.largura_bobina/100).toFixed(2) + ' m' });
+      continue;
+    }
     const vars = { largura:m.largura, altura:m.altura };
     if(o.largura_bobina != null) vars.largura_bobina = o.largura_bobina;
     let v;
     try{ v = avaliar(expressao, vars); }
-    catch(e){ return { ok:false, erro:e.message, testes }; }
+    catch(e){ return { ok:false, erro:e.message, testes, ignoradas }; }
     if(v <= 0)
-      return { ok:false, testes, erro:'em ' + m.largura + ' × ' + m.altura + ' o resultado é '
+      return { ok:false, testes, ignoradas, erro:'em ' + m.largura + ' × ' + m.altura + ' o resultado é '
         + v + '. Quantidade tem que ser maior que zero — um consumo zero vira custo mentiroso.' };
     if(v > 100000)
-      return { ok:false, testes, erro:'em ' + m.largura + ' × ' + m.altura + ' o resultado é '
-        + v + ', o que não parece uma quantidade real. Confira se falta dividir por 100.' };
+      return { ok:false, testes, ignoradas, erro:'em ' + m.largura + ' × ' + m.altura + ' o resultado é '
+        + v + ', o que não parece uma quantidade real. ' + dica };
     testes.push({ largura:m.largura, altura:m.altura, resultado:v });
   }
-  return { ok:true, testes };
+  /* Ignorar TODAS seria aprovar sem ter testado nada — e um ok sem evidencia
+     mente pior que uma recusa. */
+  if(!testes.length)
+    return { ok:false, testes, ignoradas,
+      erro:'nenhuma medida deste modelo cabe na bobina de '
+        + (o.largura_bobina/100).toFixed(2) + ' m, então não há como testar a fórmula.' };
+  return { ok:true, testes, ignoradas };
 }
 
 module.exports = { avaliar, validar, ErroFormula, MEDIDAS_TESTE, VARIAVEIS, FUNCOES:Object.keys(FUNCOES) };

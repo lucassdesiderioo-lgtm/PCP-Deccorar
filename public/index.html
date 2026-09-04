@@ -169,26 +169,43 @@
     <div id="pendBox"></div></div>
 
   <div id="v-ficha" class="hide">
-    <div class="card"><div style="display:flex;align-items:end;gap:12px;flex-wrap:wrap">
-      <div style="min-width:280px"><label>Modelo</label><select id="fxModelo"></select></div>
-      <div class="sub" style="flex:1;min-width:280px">Você lança os componentes <b>uma vez, aqui no modelo</b>. Todo SKU deste modelo passa a ter ficha — inclusive os que ainda não existem. Variáveis: <code>largura</code> e <code>altura</code>, em centímetros. Funções: <code>teto</code>, <code>piso</code>, <code>max</code>, <code>min</code>.</div>
-    </div></div>
-    <div class="card"><div style="font-weight:700;margin-bottom:12px">Linhas da ficha</div>
+    <!-- A BARRA DE MEDIDA. A tela mostrava `1,80 × 1,50` fixo na coluna de
+         prévia: a persiana crítica é a 1,80 (única que não encaixa duas na
+         bobina) e a mais vendida é a 1,60 — mostrava uma e escondia a outra.
+         A medida escolhida aqui recalcula TODAS as linhas ao mesmo tempo. -->
+    <div class="card">
+      <div style="display:flex;align-items:end;gap:12px;flex-wrap:wrap">
+        <div style="min-width:240px"><label>Modelo</label><select id="fxModelo"></select></div>
+        <div style="min-width:280px"><label>Ver a ficha na medida</label><select id="fxSku"></select></div>
+        <div style="min-width:120px"><label>&nbsp;</label>
+          <button class="ghost" id="fxMat">Gravar na montagem</button></div>
+        <span class="msg" id="fxMatMsg"></span>
+      </div>
+      <div class="sub" style="margin-top:10px">Você lança os componentes <b>uma vez, aqui no modelo</b>. Todo SKU deste modelo passa a ter ficha — inclusive os que ainda não existem. Variáveis: <code>largura</code>, <code>altura</code> e <code>largura_bobina</code> (só no tecido), em <b>centímetros</b>. Funções: <code>teto</code>, <code>piso</code>, <code>max</code>, <code>min</code>.</div>
+      <div class="sub" id="fxTotal" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card"><div style="font-weight:700;margin-bottom:4px">Linhas da ficha</div>
+      <div class="sub" style="margin-bottom:12px"><b>Consome</b> é o que vira custo e compra. <b>Corta a</b> é o que a bancada mede na mesa — e os dois são números diferentes de propósito: o tubo de uma persiana de 1,60 consome 1,60 m da barra e é cortado a 1,57, porque o resto entra nas ponteiras.</div>
       <div id="fxLinhas"></div>
       <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:16px">
         <div style="font-weight:700;margin-bottom:10px">Acrescentar linha</div>
-        <div class="grid-med" style="grid-template-columns:2fr 2fr 2fr">
+        <div class="grid-med" style="grid-template-columns:2fr 2fr">
           <div><label>Componente</label><select id="fxComp"></select></div>
-          <div><label>Fórmula</label><input id="fxExpr" placeholder="largura / 100"></div>
+          <div><label>Como se calcula</label><select id="fxTipo"></select></div>
+        </div>
+        <div id="fxTipoCampos" style="margin-top:12px"></div>
+        <div class="grid-med" style="grid-template-columns:2fr 1fr 1fr;margin-top:12px">
+          <div><label>Fórmula do consumo</label><input id="fxExpr" placeholder="largura / 100"></div>
+          <div><label>Corta a — largura (cm)</label><input id="fxCorteL" placeholder="— sem corte —"></div>
+          <div><label>Corta a — altura (cm)</label><input id="fxCorteA" placeholder="— sem corte —"></div>
+        </div>
+        <div class="grid-med" style="grid-template-columns:1fr;margin-top:12px">
           <div><label>Por quê (fica no cadastro)</label><input id="fxObs" placeholder="a folga de 20 cm é bainha + volta no tubo"></div>
         </div>
         <div id="fxTeste" style="margin-top:10px;font-size:13px"></div>
         <div class="row-actions"><button class="primary" id="fxAdd">Acrescentar à ficha</button><span class="msg" id="fxMsg"></span></div>
       </div></div>
-    <div class="card"><div style="display:flex;align-items:end;gap:12px;margin-bottom:12px">
-      <div style="min-width:280px"><label>Conferir a ficha de um SKU</label><select id="fxSku"></select></div>
-      <button class="ghost" id="fxMat">Gravar na ficha da montagem</button><span class="msg" id="fxMatMsg"></span></div>
-      <div id="fxFicha"></div></div>
   </div>
 
   <div id="v-compras" class="hide">
@@ -560,8 +577,17 @@ async function carregarPend(){
 /* ---- Ficha técnica por fórmula (COMPRAS.md §3) -------------------------
    Os componentes se lançam UMA VEZ, no modelo — nunca SKU a SKU. Com 200 SKUs
    e 3 modelos são 18 linhas em vez de 1.200, e o SKU novo de amanhã custa zero.
-   A fórmula não salva sem passar no teste de três medidas: fórmula errada em
-   cadastro vira compra errada em produção. */
+   A fórmula não salva sem passar no teste das medidas reais do modelo: fórmula
+   errada em cadastro vira compra errada em produção.
+
+   ⚠️ OS NÚMEROS DESTA TELA NÃO SÃO CALCULADOS AQUI. Quantidade, R$, bobina
+   escolhida e medida de corte vêm todos de `/api/ficha/<sku>`, que é o
+   ficha_dominio.js — dono único (§7-B). Uma segunda conta no navegador
+   divergiria da tela de custo no primeiro preço lançado, e as duas estariam
+   "certas", cada uma na sua régua. É a armadilha #12.
+
+   Por isso a barra do topo escolhe um SKU REAL e não uma medida digitada: o
+   tecido resolve por família + COR, e cor inventada não existe. */
 let COMPS=[];
 /* Um timer por caixa de mensagem. Com setTimeout solto, o temporizador de uma
    gravacao apagava a mensagem da gravacao SEGUINTE — e quem cadastra varias
@@ -575,6 +601,67 @@ function aviso(sel,texto,cor){
 }
 const brl=v=>v==null?'—':'R$ '+v.toFixed(2).replace('.',',');
 const qtd=v=>v==null?'—':(Math.round(v*1000)/1000).toString().replace('.',',');
+const cm =v=>v==null?'—':(Math.round(v*10)/10).toString().replace('.',',');
+const med=(l,a)=>(l/100).toFixed(2).replace('.',',')+' × '+(a/100).toFixed(2).replace('.',',');
+
+let FXLINHAS=[];   // as fórmulas do modelo
+let FXFICHA=null;  // o resultado do dono único, na medida escolhida
+const FXDEB={};    // um debounce por linha
+
+/* ── OS TIPOS DE LINHA ────────────────────────────────────────────────────
+   13 das 21 linhas do modelo Rolô são um número puro, e mesmo assim exigiam
+   escrever fórmula. O tipo é só um GERADOR: o que se grava continua sendo a
+   expressão, e a tela reconhece a forma de volta lendo o texto.
+
+   ⚠️ DE PROPÓSITO NÃO HÁ COLUNA `tipo` NO BANCO. Ela seria uma segunda fonte
+   de verdade sobre a mesma linha, e as duas divergiriam no dia em que alguém
+   editasse a expressão à mão — que é justamente o que a tela permite fazer. */
+const TIPOS=[
+  {id:'livre', nome:'Fórmula livre (escrevo eu)', campos:[]},
+  {id:'fixa', nome:'Quantidade fixa — sempre a mesma',
+   campos:[{k:'n',rot:'Quantas',v:'1'}],
+   gerar:c=>String(c.n||'1')},
+  {id:'largura', nome:'Pela largura da peça',
+   campos:[{k:'m',rot:'Vezes',v:'1'},{k:'f',rot:'Folga (cm, pode ser negativa)',v:'0'}],
+   gerar:c=>porMedida(c.m,'largura',c.f)},
+  {id:'altura', nome:'Pela altura da peça',
+   campos:[{k:'m',rot:'Vezes',v:'1'},{k:'f',rot:'Folga (cm, pode ser negativa)',v:'0'}],
+   gerar:c=>porMedida(c.m,'altura',c.f)},
+  /* AS DUAS PONTAS DO TECIDO, e a diferença entre elas é o valor do encaixe.
+     Encaixando 1,80 + 1,40 numa bobina de 3,20 a peça de 1,80 paga 0,956 m;
+     cortada sozinha ela paga os 1,70 m inteiros da faixa. 78% de diferença. */
+  {id:'tec_encaixe', nome:'Tecido — encaixando peças lado a lado (o normal)',
+   campos:[{k:'f',rot:'Folga na altura (cm)',v:'20'}],
+   gerar:c=>'(altura + '+(+c.f||0)+') * largura / largura_bobina / 100'},
+  {id:'tec_sozinha', nome:'Tecido — uma peça por faixa (o teto)',
+   campos:[{k:'f',rot:'Folga na altura (cm)',v:'20'}],
+   gerar:c=>'(altura + '+(+c.f||0)+') / 100 / piso(largura_bobina / largura)'}
+];
+
+function porMedida(m,v,f){
+  m=Number(m||1); f=Number(f||0);
+  if(m===1 && !f) return v+' / 100';
+  let dentro=(m===1?v:m+' * '+v);
+  if(f) dentro+=(f>0?' + '+f:' - '+Math.abs(f));
+  return '('+dentro+') / 100';
+}
+
+/* Reconhece a FORMA de uma expressão já gravada, para escrever ao lado dela o
+   que ela faz. Sem isso a tabela é uma coluna de texto que só quem escreveu
+   entende — e quem escreveu esquece. */
+function formaDe(expr){
+  const e=String(expr||'').replace(/\s+/g,'');
+  if(!e) return '—';
+  if(/^[0-9.]+$/.test(e)) return 'quantidade fixa';
+  const temBob=e.indexOf('largura_bobina')>=0;
+  const semBob=e.replace(/largura_bobina/g,'');
+  const temL=/largura/.test(semBob), temA=/altura/.test(e);
+  if(temBob) return 'pelo tecido, com a bobina na conta';
+  if(temL&&temA) return 'pela largura e pela altura';
+  if(temL) return 'pela largura';
+  if(temA) return 'pela altura';
+  return 'livre';
+}
 
 async function carregarFicha(){
   try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){ COMPS=[]; }
@@ -590,114 +677,277 @@ async function carregarFicha(){
        largura da bobina decidem qual item de estoque sai. */
     +[...new Set(COMPS.filter(c=>c.familia).map(c=>c.familia))]
       .map(f=>'<option value="fam:'+esc(f)+'">tecido da família '+esc(f)+' (resolve pela cor do SKU)</option>').join('');
-  const s=$('#fxSku');
-  if(s) s.innerHTML=SKUS.filter(x=>x.tem_ficha!==0).map(x=>'<option>'+esc(x.codigo)+'</option>').join('');
-  renderLinhas(); verFicha();
+  const t=$('#fxTipo');
+  if(t && !t.dataset.pronto){
+    t.innerHTML=TIPOS.map(x=>'<option value="'+x.id+'">'+esc(x.nome)+'</option>').join('');
+    t.dataset.pronto=1; montarCampos();
+  }
+  await trocarModelo();
 }
 
-async function renderLinhas(){
-  const box=$('#fxLinhas'), mid=$('#fxModelo').value;
-  if(!box) return;
-  if(!mid){ box.innerHTML='<div class="sub">Cadastre um modelo na aba "Cadastro de SKU" primeiro.</div>'; return; }
-  let l=[]; try{ l=await (await fetch('/api/formulas?modelo_id='+mid)).json(); }catch(e){}
-  if(!l.length){ box.innerHTML='<div class="sub">Nenhuma linha ainda. Use o formulário abaixo — comece pelo tubo.</div>'; return; }
-  let h='<table><thead><tr><th>Material</th><th>Fórmula</th><th>Por quê</th><th>1,80×1,50</th><th></th></tr></thead><tbody>';
-  for(const f of l){
-    const nome=f.familia?('tecido · família '+esc(f.familia)):esc(f.componente_nome);
-    h+='<tr><td>'+nome+'</td>'
+/* A barra de medida: os SKUs REAIS do modelo, rotulados pela medida. */
+async function trocarModelo(){
+  const mid=+$('#fxModelo').value, s=$('#fxSku');
+  if(s){
+    const lista=SKUS.filter(x=>x.modelo_id===mid && x.tem_ficha!==0)
+      .sort((a,b)=>(a.largura_cm||0)-(b.largura_cm||0)||(a.altura_cm||0)-(b.altura_cm||0)
+                 ||String(a.codigo).localeCompare(String(b.codigo)));
+    s.innerHTML=lista.map(x=>'<option value="'+esc(x.codigo)+'">'
+      +(x.largura_cm&&x.altura_cm?med(x.largura_cm,x.altura_cm)+' · ':'')+esc(x.codigo)+'</option>').join('')
+      || '<option value="">— este modelo não tem SKU com ficha —</option>';
+  }
+  await recarregar();
+}
+
+async function recarregar(){
+  const mid=$('#fxModelo').value;
+  FXLINHAS=[]; FXFICHA=null;
+  if(mid){ try{ FXLINHAS=await (await fetch('/api/formulas?modelo_id='+mid)).json(); }catch(e){} }
+  const sku=$('#fxSku')&&$('#fxSku').value;
+  if(sku){ try{ FXFICHA=await (await fetch('/api/ficha/'+encodeURIComponent(sku))).json(); }catch(e){} }
+  renderLinhas(); renderTotal();
+}
+
+/* ⚠️ REDESENHAR NÃO PODE TIRAR O CAMPO DA MÃO DE QUEM ESTÁ DIGITANDO. Salvar
+   uma linha recarrega a ficha inteira (os números vêm do dono único, e o custo
+   de uma linha muda o total), e isso troca a tabela por outra. Quem sai da
+   fórmula com Tab já está no campo seguinte quando a gravação volta — e o campo
+   seguinte deixou de existir. O foco caía no corpo da página e a próxima tecla
+   ia para lugar nenhum. É a mesma regra do painel de Estoque (§18): a tela não
+   se recarrega por cima de um ajuste aberto. */
+function focoAtual(){
+  const a=document.activeElement;
+  if(!a||!a.dataset||!a.dataset.id||!a.className) return null;
+  const c=['fxEd','fxEdObs','fxCL','fxCA'].find(x=>a.classList.contains(x));
+  return c ? { c, id:a.dataset.id, pos:a.selectionStart } : null;
+}
+function devolverFoco(f){
+  if(!f) return;
+  const el=document.querySelector('.'+f.c+'[data-id="'+f.id+'"]');
+  if(!el) return;
+  el.focus();
+  try{ el.setSelectionRange(f.pos, f.pos); }catch(e){}
+}
+
+function renderLinhas(){
+  const box=$('#fxLinhas'); if(!box) return;
+  const foco=focoAtual();
+  if(!$('#fxModelo').value){ box.innerHTML='<div class="sub">Cadastre um modelo na aba "Cadastro de SKU" primeiro.</div>'; return; }
+  if(!FXLINHAS.length){ box.innerHTML='<div class="sub">Nenhuma linha ainda. Use o formulário abaixo — comece pelo tubo.</div>'; return; }
+
+  /* O resultado por linha vem do dono único, casado por `formula_id`. */
+  const porId={};
+  if(FXFICHA&&FXFICHA.linhas) FXFICHA.linhas.forEach(l=>{ porId[l.formula_id]=l; });
+
+  let h='<table><thead><tr><th>Material</th><th>Fórmula do consumo</th>'
+    +'<th class="n">Consome</th><th class="n">R$</th><th class="n">Corta a</th><th></th></tr></thead><tbody>';
+  for(const f of FXLINHAS){
+    const r=porId[f.id]||{};
+    const nome=f.familia?('tecido · família '+esc(f.familia)):esc(f.componente_nome||'—');
+    /* ⚠️ A ACUSAÇÃO QUE FALTAVA: linha de tecido cuja fórmula não menciona
+       `largura_bobina` cobra a MESMA quantidade em qualquer bobina. É o
+       `(altura+20)/200`, que fixa duas peças por faixa — certo na 1,40 e na
+       1,60, e metade do custo na 1,80. E curto-circuita a escolha de bobina do
+       ficha_dominio, que passa a decidir por preço por metro linear, que é o
+       critério errado no corte invertido (§7-B). */
+    const cego=!!f.familia && String(f.expressao||'').indexOf('largura_bobina')<0;
+    h+='<tr><td>'+nome+(cego?'<div class="sub" style="color:var(--amber)">⚠ não olha a bobina</div>':'')+'</td>'
       +'<td><input class="fxEd" data-id="'+f.id+'" value="'+esc(f.expressao)+'" style="font-family:ui-monospace,monospace;font-size:12.5px"></td>'
-      +'<td><input class="fxEdObs" data-id="'+f.id+'" value="'+esc(f.observacao)+'" placeholder="—" style="font-size:12.5px"></td>'
-      +'<td class="fxPrev" data-id="'+f.id+'" style="color:var(--muted)">…</td>'
+      +'<td class="n">'+(r.erro?'<span style="color:var(--amber)">⚠</span>':qtd(r.quantidade))
+        +(r.unidade?' <span class="sub">'+esc(r.unidade)+'</span>':'')+'</td>'
+      +'<td class="n">'+brl(r.custo)+'</td>'
+      +'<td class="n">'+(r.corte&&r.corte.texto?esc(r.corte.texto):'<span class="sub">—</span>')+'</td>'
       +'<td><button class="del fxDel" data-id="'+f.id+'">excluir</button></td></tr>';
+    h+='<tr class="fxSub"><td colspan="6" style="padding-top:0">'
+      +'<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12.5px">'
+      +'<span class="sub">'+esc(formaDe(f.expressao))+'</span>'
+      +'<span class="sub">corta a</span>'
+      +'<input class="fxCL" data-id="'+f.id+'" value="'+esc(f.corte_largura)+'" placeholder="largura, cm" style="width:150px;font-family:ui-monospace,monospace;font-size:12px">'
+      +'<span class="sub">×</span>'
+      +'<input class="fxCA" data-id="'+f.id+'" value="'+esc(f.corte_altura)+'" placeholder="altura, cm" style="width:150px;font-family:ui-monospace,monospace;font-size:12px">'
+      +'<input class="fxEdObs" data-id="'+f.id+'" value="'+esc(f.observacao)+'" placeholder="por quê — fica no cadastro" style="flex:1;min-width:200px;font-size:12.5px">'
+      +'</div>'
+      +'<div class="fxHelp" data-id="'+f.id+'" style="margin-top:6px;font-size:12.5px">'
+        +(r.erro?'<span style="color:var(--amber)">⚠ '+esc(r.erro)+'</span>':'')
+        +(r.motivo?'<span class="sub">'+esc(r.motivo)+'</span>':'')+'</div>'
+      +'</td></tr>';
   }
   box.innerHTML=h+'</tbody></table>';
-  for(const f of l) previewLinha(f.id, f.expressao, f.familia);
-}
-/* Mostra o resultado da linha na medida de referência, ao lado da fórmula. */
-async function previewLinha(id, expr, familia){
-  const td=document.querySelector('.fxPrev[data-id="'+id+'"]'); if(!td) return;
-  const bob=familia?Math.min.apply(null,COMPS.filter(c=>c.familia===familia&&c.largura_bobina_cm).map(c=>c.largura_bobina_cm)):null;
-  try{
-    const r=await (await fetch('/api/formulas/testar',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({expressao:expr,largura_bobina:bob})})).json();
-    const t=r.testes&&r.testes.find(x=>x.largura===180&&x.altura===150);
-    td.innerHTML=r.ok&&t?qtd(t.resultado):'<span style="color:var(--red)">'+esc((r.erro||'').slice(0,40))+'</span>';
-  }catch(e){ td.textContent='—'; }
+  devolverFoco(foco);
 }
 
-/* Teste ao vivo enquanto se digita — as três medidas do §3. */
-async function testarExpr(){
+function renderTotal(){
+  const el=$('#fxTotal'); if(!el) return;
+  const f=FXFICHA;
+  if(!f){ el.innerHTML=''; return; }
+  if(f.pendencia||f.erro||f.aviso){
+    el.innerHTML='<span style="color:var(--amber)">'+esc(f.pendencia||f.erro||f.aviso)+'</span>'; return; }
+  /* Acessório não tem medida e isso NÃO é pendência (§7): `exige_medida = 0`
+     dispensa largura e altura, e o lugar de destaque vira o código. */
+  const temMedida=f.largura_cm!=null&&f.altura_cm!=null;
+  el.innerHTML='<b>'+esc(f.sku)+'</b>'+(temMedida?' · '+med(f.largura_cm,f.altura_cm):'')
+    +(f.cor?' · '+esc(f.cor):'')
+    +' &nbsp;·&nbsp; '+esc(f.rotulo)+': <b style="color:var(--amber);font-size:16px">'+brl(f.custo_material)+'</b>'
+    /* Regra 4: custo indefinido nunca vira zero, e a tela diz por quê. */
+    +(f.incompleto?'<div style="color:var(--amber)">alguma linha está sem preço — o total não fecha, e por isso aparece como indefinido em vez de somar só uma parte</div>':'');
+}
+
+/* ── TESTE AO VIVO ────────────────────────────────────────────────────────
+   Na medida escolhida na barra, e em CADA bobina da família lado a lado. Duas
+   colunas com o mesmo número são a assinatura da fórmula que ignora a bobina. */
+async function testar(corpo){
+  corpo.modelo_id=+$('#fxModelo').value;
+  const sku=$('#fxSku')&&$('#fxSku').value;
+  const s=SKUS.find(x=>x.codigo===sku);
+  if(s&&s.largura_cm&&s.altura_cm) corpo.medidas=[{largura:s.largura_cm,altura:s.altura_cm}];
+  try{ return await (await fetch('/api/formulas/testar',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)})).json(); }
+  catch(e){ return null; }
+}
+
+function textoTeste(r){
+  if(!r) return '';
+  if(!r.ok) return '<span style="color:var(--red)">✗ '+esc(r.erro||'')+'</span>';
+  let h='<span style="color:var(--green)">✓ </span>'
+    +r.testes.map(t=>'<span style="margin-right:14px">'+med(t.largura,t.altura)
+      +' <b style="color:var(--amber)">'+qtd(t.resultado)+'</b></span>').join('');
+  if(r.bobinas&&r.bobinas.length){
+    h+='<div style="margin-top:4px">'+r.bobinas.map(b=>{
+      const t=b.ok&&b.testes&&b.testes[0];
+      return '<span style="margin-right:14px" class="sub">bobina '+(b.cm/100).toFixed(2).replace('.',',')+' m: <b>'
+        +(t?qtd(t.resultado):(b.ok?'—':'não cabe'))+'</b></span>';
+    }).join('')+'</div>';
+    const vistos=new Set(r.bobinas.filter(b=>b.ok&&b.testes&&b.testes[0])
+      .map(b=>Math.round(b.testes[0].resultado*1000)));
+    if(r.bobinas.length>1 && vistos.size===1)
+      h+='<div style="color:var(--amber)">⚠ o mesmo número em toda bobina — a fórmula não usa <code>largura_bobina</code>, '
+        +'então a escolha da bobina vira preço por metro linear, que é o critério errado no corte invertido.</div>';
+  }
+  if(r.ignoradas&&r.ignoradas.length)
+    h+='<div class="sub">não testadas: '+r.ignoradas.map(i=>med(i.largura,i.altura)+' ('+esc(i.motivo)+')').join(', ')+'</div>';
+  if(r.corte){
+    const p=[];
+    for(const k of ['largura','altura']){
+      const c=r.corte[k]; if(!c) continue;
+      p.push(c.ok?('corte '+k+' <b>'+cm(c.testes[0].resultado)+' cm</b>')
+                 :('<span style="color:var(--red)">corte '+k+': '+esc(c.erro||'')+'</span>'));
+    }
+    if(p.length) h+='<div class="sub" style="margin-top:4px">'+p.join(' &nbsp;·&nbsp; ')+'</div>';
+  }
+  return h;
+}
+
+/* ── O FORMULÁRIO DE ACRESCENTAR ──────────────────────────────────────── */
+function montarCampos(){
+  const t=TIPOS.find(x=>x.id===$('#fxTipo').value)||TIPOS[0];
+  const box=$('#fxTipoCampos'); if(!box) return;
+  if(!t.campos.length){ box.innerHTML=''; return; }
+  box.innerHTML='<div class="grid-med" style="grid-template-columns:repeat('+t.campos.length+',1fr)">'
+    +t.campos.map(c=>'<div><label>'+esc(c.rot)+'</label>'
+      +'<input class="fxGer" data-k="'+c.k+'" value="'+esc(c.v)+'"></div>').join('')+'</div>';
+  gerar();
+}
+function gerar(){
+  const t=TIPOS.find(x=>x.id===$('#fxTipo').value);
+  if(!t||!t.gerar) return;
+  const c={};
+  document.querySelectorAll('#fxTipoCampos .fxGer').forEach(i=>{ c[i.dataset.k]=i.value; });
+  $('#fxExpr').value=t.gerar(c);
+  testarNovo();
+}
+async function testarNovo(){
   const el=$('#fxTeste'); if(!el) return;
   const expr=$('#fxExpr').value.trim();
   if(!expr){ el.innerHTML=''; return; }
   const v=$('#fxComp').value, fam=v.indexOf('fam:')===0?v.slice(4):null;
-  const bob=fam?Math.min.apply(null,COMPS.filter(c=>c.familia===fam&&c.largura_bobina_cm).map(c=>c.largura_bobina_cm)):null;
-  let r; try{ r=await (await fetch('/api/formulas/testar',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({expressao:expr,largura_bobina:bob})})).json(); }catch(e){ return; }
-  if(!r.ok){ el.innerHTML='<span style="color:var(--red)">✗ '+esc(r.erro)+'</span>'; return; }
-  el.innerHTML='<span style="color:var(--green)">✓ </span>'
-    +r.testes.map(t=>'<span style="margin-right:18px">'+t.largura/100+' × '+t.altura/100
-      +' <b style="color:var(--amber)">'+qtd(t.resultado)+'</b></span>').join('')
-    +(bob?'<span class="sub">(bobina '+(bob/100).toFixed(2)+' m)</span>':'');
-}
-
-async function verFicha(){
-  const box=$('#fxFicha'), sku=$('#fxSku')&&$('#fxSku').value;
-  if(!box||!sku){ if(box) box.innerHTML=''; return; }
-  let f; try{ f=await (await fetch('/api/ficha/'+encodeURIComponent(sku))).json(); }catch(e){ return; }
-  if(f.pendencia||f.erro||f.aviso){
-    box.innerHTML='<div class="sub" style="color:var(--amber)">'+esc(f.pendencia||f.erro||f.aviso)+'</div>'; return; }
-  let h='<div class="sub" style="margin-bottom:10px">'+esc(f.sku)+' · '+esc(f.modelo)+' · '
-    +f.largura_cm/100+' × '+f.altura_cm/100+' · '+esc(f.cor)+'</div>'
-    +'<table><thead><tr><th>Material</th><th>Qtd</th><th>Un</th><th>R$/un</th><th>Custo</th><th>Escolha</th></tr></thead><tbody>';
-  for(const l of f.linhas){
-    if(l.erro){ h+='<tr><td colspan="6" style="color:var(--amber)">⚠ '+esc(l.erro)+'</td></tr>'; continue; }
-    h+='<tr><td>'+esc(l.componente_nome)+'</td><td>'+qtd(l.quantidade)+'</td><td class="sub">'+esc(l.unidade)+'</td>'
-      +'<td>'+(l.preco_unitario!=null?brl(l.preco_unitario):'—')+'</td><td>'+brl(l.custo)+'</td>'
-      +'<td class="sub">'+esc(l.motivo)+'</td></tr>';
+  /* `largura_bobina` só existe em linha de tecido, e sem família escolhida o
+     avaliador diz isso com as palavras dele — que estão certas e não ajudam
+     quem acabou de escolher "Tecido" no seletor de cima e ainda não escolheu o
+     material. A recusa tem que dizer O QUE FAZER, senão a pessoa conclui que a
+     fórmula é que está errada e vai reescrevê-la. */
+  if(!fam && expr.indexOf('largura_bobina')>=0){
+    el.innerHTML='<span style="color:var(--amber)">escolha primeiro o <b>tecido da família</b> ali em cima — '
+      +'<code>largura_bobina</code> só existe em linha de tecido</span>';
+    return;
   }
-  h+='</tbody></table><div style="text-align:right;margin-top:12px;font-size:16px">'
-    +'<span class="sub">'+esc(f.rotulo)+': </span><b style="color:var(--amber);font-size:20px">'+brl(f.custo_material)+'</b>'
-    /* Regra 4: custo indefinido nunca vira zero, e a tela diz por quê. */
-    +(f.incompleto?'<div class="sub" style="color:var(--amber)">alguma linha está sem preço — o total não fecha, e por isso aparece como indefinido em vez de somar só uma parte</div>':'')+'</div>';
-  box.innerHTML=h;
+  el.innerHTML=textoTeste(await testar({expressao:expr, familia:fam,
+    corte_largura:$('#fxCorteL').value.trim(), corte_altura:$('#fxCorteA').value.trim()}));
 }
 
-document.addEventListener('input',function(e){ if(e.target&&e.target.id==='fxExpr') testarExpr(); });
+/* ── EDIÇÃO INLINE ────────────────────────────────────────────────────────
+   ⚠️ FALHA DE GRAVAÇÃO NÃO REPINTA O VALOR ANTIGO. O que havia antes era
+   `alert(...)` seguido de `renderLinhas()`: o texto digitado sumia e a tela
+   voltava a mostrar a fórmula velha — quem estava editando via a recusa e uma
+   fórmula que não era a sua, e não tinha como saber qual das duas estava
+   gravada. Agora o erro fica na própria linha, em vermelho, com o que foi
+   digitado ainda no campo. */
+async function salvarLinha(id){
+  const eL=document.querySelector('.fxEd[data-id="'+id+'"]');
+  const help=document.querySelector('.fxHelp[data-id="'+id+'"]');
+  const l=FXLINHAS.find(x=>x.id==id); if(!l||!eL) return;
+  const corpo={ id:+id, modelo_id:l.modelo_id, componente_id:l.componente_id, familia:l.familia,
+    expressao:eL.value.trim(), ordem:l.ordem,
+    observacao:(document.querySelector('.fxEdObs[data-id="'+id+'"]')||{}).value,
+    corte_largura:(document.querySelector('.fxCL[data-id="'+id+'"]')||{}).value,
+    corte_altura:(document.querySelector('.fxCA[data-id="'+id+'"]')||{}).value };
+  const r=await fetch('/api/formulas',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok){
+    eL.style.borderColor='var(--red)';
+    if(help) help.innerHTML='<span style="color:var(--red)">✗ não salvei: '+esc(j.erro||'')+'</span>';
+    return;
+  }
+  eL.style.borderColor='';
+  await recarregar();
+}
+
+function aoDigitar(id){
+  clearTimeout(FXDEB[id]);
+  FXDEB[id]=setTimeout(async()=>{
+    const l=FXLINHAS.find(x=>x.id==id); if(!l) return;
+    const help=document.querySelector('.fxHelp[data-id="'+id+'"]'); if(!help) return;
+    const g=s=>(document.querySelector('.'+s+'[data-id="'+id+'"]')||{}).value||'';
+    help.innerHTML=textoTeste(await testar({expressao:g('fxEd'), familia:l.familia,
+      corte_largura:g('fxCL'), corte_altura:g('fxCA')}));
+  },350);
+}
+
+document.addEventListener('input',function(e){
+  const t=e.target; if(!t) return;
+  if(t.id==='fxExpr'||t.id==='fxCorteL'||t.id==='fxCorteA'){ testarNovo(); return; }
+  if(t.classList&&t.classList.contains('fxGer')){ gerar(); return; }
+  if(t.classList&&(t.classList.contains('fxEd')||t.classList.contains('fxCL')||t.classList.contains('fxCA')))
+    aoDigitar(t.dataset.id);
+});
 document.addEventListener('change',async function(e){
   const t=e.target; if(!t) return;
-  if(t.id==='fxModelo'){ renderLinhas(); return; }
-  if(t.id==='fxComp'){ testarExpr(); return; }
-  if(t.id==='fxSku'){ verFicha(); return; }
-  const ed=t.closest&&(t.closest('.fxEd')||t.closest('.fxEdObs'));
-  if(ed){
-    const id=ed.dataset.id;
-    const expr=document.querySelector('.fxEd[data-id="'+id+'"]').value;
-    const obs=document.querySelector('.fxEdObs[data-id="'+id+'"]').value;
-    const l=(await (await fetch('/api/formulas?modelo_id='+$('#fxModelo').value)).json()).find(x=>x.id==id);
-    const r=await fetch('/api/formulas',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:+id,modelo_id:l.modelo_id,componente_id:l.componente_id,familia:l.familia,
-        expressao:expr,observacao:obs,ordem:l.ordem})});
-    if(!r.ok){ const j=await r.json(); alert('Não salvei: '+(j.erro||'')); }
-    renderLinhas(); verFicha();
-  }
+  if(t.id==='fxModelo'){ trocarModelo(); return; }
+  if(t.id==='fxSku'){ recarregar(); return; }
+  if(t.id==='fxTipo'){ montarCampos(); return; }
+  if(t.id==='fxComp'){ testarNovo(); return; }
+  if(t.classList&&(t.classList.contains('fxEd')||t.classList.contains('fxEdObs')
+     ||t.classList.contains('fxCL')||t.classList.contains('fxCA')))
+    salvarLinha(t.dataset.id);
 });
 document.addEventListener('click',async function(e){
   const d=e.target.closest&&e.target.closest('.fxDel');
   if(d){ if(!confirm('Excluir esta linha da ficha?')) return;
-    await fetch('/api/formulas/'+d.dataset.id,{method:'DELETE'}); renderLinhas(); verFicha(); return; }
+    await fetch('/api/formulas/'+d.dataset.id,{method:'DELETE'}); recarregar(); return; }
   if(e.target&&e.target.id==='fxAdd'){
     const v=$('#fxComp').value;
     if(!v){ aviso('#fxMsg','Escolha o material','var(--red)'); return; }
     const corpo={ modelo_id:+$('#fxModelo').value, expressao:$('#fxExpr').value.trim(),
-      observacao:$('#fxObs').value.trim(), ordem:99 };
+      observacao:$('#fxObs').value.trim(), ordem:99,
+      corte_largura:$('#fxCorteL').value.trim(), corte_altura:$('#fxCorteA').value.trim() };
     if(v.indexOf('fam:')===0) corpo.familia=v.slice(4); else corpo.componente_id=+v;
     const r=await fetch('/api/formulas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)});
     const j=await r.json();
     if(!r.ok){ aviso('#fxMsg', j.erro||'não salvou', 'var(--red)'); return; }
     aviso('#fxMsg','Acrescentada!','var(--green)');
-    $('#fxExpr').value=$('#fxObs').value=''; $('#fxTeste').innerHTML='';
-    renderLinhas(); verFicha(); return;
+    $('#fxExpr').value=$('#fxObs').value=$('#fxCorteL').value=$('#fxCorteA').value='';
+    $('#fxTeste').innerHTML='';
+    recarregar(); return;
   }
   if(e.target&&e.target.id==='fxMat'){
     const r=await fetch('/api/ficha/'+encodeURIComponent($('#fxSku').value)+'/materializar',{method:'POST'});

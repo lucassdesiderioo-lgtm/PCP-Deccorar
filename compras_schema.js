@@ -259,7 +259,28 @@ function garantirSchemaCompras(db){
 
        A observacao nao e enfeite: e onde fica escrito POR QUE a folga e 30 cm.
        Quando alguem perguntar daqui a um ano, a resposta esta no cadastro e nao
-       na cabeca de quem cadastrou. */
+       na cabeca de quem cadastrou.
+
+       ⚠️ SAO DUAS MEDIDAS, E ELAS NUNCA SE RECONCILIAM (04/09/2026).
+       A coluna expressao responde QUANTO A PECA CONSOME — e o numero que vira
+       custo e compra. As colunas corte_largura e corte_altura respondem A QUANTO
+       A BANCADA CORTA, que e outro numero:
+
+         tubo de uma persiana de 1,60   consome 1,60 m da barra de 6 m
+                                        e a bancada corta a 1,57 (entra nas ponteiras)
+
+       Os 3 cm de diferenca vao pro lixo. Precificar pela medida de corte faria a
+       fabrica deixar de pagar por eles; cortar pela medida de precificacao faria
+       o tubo nao entrar. Sao duas verdades, e por isso sao duas colunas — quem
+       um dia quiser "unificar" esta cortando ou o custo ou a peca.
+
+       No tecido a medida de corte e um RETANGULO, nao um numero: largura da peca
+       por altura + folga. Por isso duas colunas e nao uma. Onde nao ha o que
+       cortar (parafuso, comando pronto) as duas ficam NULL, e isso e resposta,
+       nao pendencia.
+
+       O custo NUNCA le estas colunas — ficha_dominio.js soma so a expressao, e
+       ha caso travando isso no teste_ficha.js. */
     CREATE TABLE IF NOT EXISTS ficha_formula (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       modelo_id     INTEGER NOT NULL REFERENCES modelo(id),
@@ -269,6 +290,9 @@ function garantirSchemaCompras(db){
       observacao    TEXT,
       ordem         INTEGER DEFAULT 0,
       ativo         INTEGER DEFAULT 1,
+      corte_largura TEXT,
+      corte_altura  TEXT,
+      corte_unidade TEXT,
       CHECK ( (componente_id IS NULL) <> (familia IS NULL) )
     );
     CREATE INDEX IF NOT EXISTS idx_formula_modelo ON ficha_formula(modelo_id, ordem);
@@ -296,6 +320,15 @@ function garantirSchemaCompras(db){
   };
   colunas('componente', COLUNAS_COMPONENTE);
   colunas('skus', COLUNAS_SKU);
+  /* §17: coluna nova entra no CREATE do modulo dono E no ALTER, no mesmo commit,
+     acrescentada NO FIM — que e onde o SQLite a coloca, e e o que mantem a ordem
+     de uma instalacao limpa igual a de producao. `ficha_formula` e criada aqui
+     em cima, entao o ALTER dela mora aqui: um ALTER guardado fora do modulo dono
+     ja rodou antes da tabela existir uma vez (a nota do §17 sobre a
+     contagem_pendente), e a coluna so nasceu no segundo boot. */
+  colunas('ficha_formula', [
+    ['corte_largura','TEXT'], ['corte_altura','TEXT'], ['corte_unidade','TEXT']
+  ]);
   /* §8: a contagem de componente usa O MESMO fluxo que ja existe — o operador
      conta, o ajuste fica pendente, o admin aprova. Uma mecanica so no sistema
      inteiro. As colunas `tipo` e `componente_id` de contagem/contagem_pendente
