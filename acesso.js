@@ -483,7 +483,13 @@ module.exports = function(app, db){
     if(pre('/api/ficha')) return 'custo.ver';
     // Quem mexe numa formula mexe no consumo de material de toda a linha.
     if(M !== 'GET' && pre('/api/formulas')) return 'modelo.cadastrar';
-    if(eq('/api/formulas')) return 'compras.ver';
+    /* `pre` e nao `eq`: a leitura das MEDIDAS de um modelo
+       (/api/formulas/medidas/:id) entrou depois, e com `eq` ela nao casava
+       nenhuma regra e caia no fallback de rota nao declarada. Enquanto a divida
+       12(c) do §14 nao existir — registro em que rota sem permissao NASCE
+       negada — cada rota nova precisa vir com a sua linha aqui, e e por isso
+       que esta usa prefixo: a proxima leitura de formula ja nasce coberta. */
+    if(pre('/api/formulas')) return 'compras.ver';
     if(M !== 'GET' && pre('/api/fornecedores')) return 'fornecedor.cadastrar';
     if(M !== 'GET' && pre('/api/componentes')) return 'componente.cadastrar';
     if(M !== 'GET' && pre('/api/ofertas')) return 'preco.lancar';
@@ -649,6 +655,7 @@ module.exports = function(app, db){
     ['GET','/api/pedidos/:id/whatsapp'],['POST','/api/pedidos/:id/enviar'],
     ['POST','/api/pedidos/:id/cancelar'],['POST','/api/pedidos/:id/pagar'],
     ['GET','/api/formulas'],['POST','/api/formulas'],['POST','/api/formulas/testar'],
+    ['GET','/api/formulas/medidas/:modelo_id'],
     ['DELETE','/api/formulas/:id'],['GET','/api/ficha/:sku'],['POST','/api/ficha/:sku/materializar'],
     ['POST','/api/cruzamento/aplicar'],['POST','/api/contagem/bipe'],['POST','/api/contagem/ajustar'],
     ['POST','/api/contagem/lancar'],['GET','/api/contagem/pendentes'],['POST','/api/contagem/pendentes/aprovar'],

@@ -36,6 +36,35 @@ function resolverTecido(db, familia, corSku){
    a comparacao completa (multiplo, minimo, frete, sobra) e do compras_calc, e
    serve para decidir A COMPRA. Aqui a pergunta e outra — quanto vale a unidade
    que a ficha consome. */
+/* ⚠️ A MEDIDA DE CORTE, QUE NAO E A MEDIDA DE CONSUMO — e as duas nunca se
+   reconciliam. O tubo de uma persiana de 1,60 CONSOME 1,60 m da barra de 6 m e
+   e CORTADO a 1,57 (o resto entra nas ponteiras). Os 3 cm vao pro lixo: quem
+   precificar pela medida de corte para de pagar por eles, e quem cortar pela
+   medida de consumo faz a peca nao entrar.
+
+   Este valor NAO SOMA CUSTO em lugar nenhum. Ele sai na ficha para a bancada
+   saber a quanto cortar — hoje esse numero mora na cabeca de quem corta, que e
+   a mesma doenca do SOBMEDIDA (§7): o vinculo existe na memoria e nao no
+   sistema. Ha caso travando a separacao no teste_ficha.js.
+
+   No tecido a medida e um RETANGULO (largura da peca × altura + folga), no tubo
+   e um numero so. Onde nao ha o que cortar — parafuso, comando pronto — as duas
+   expressoes ficam vazias, e isso e resposta, nao pendencia. */
+function medidaDeCorte(f, vars){
+  if(!f.corte_largura && !f.corte_altura) return null;
+  const c = { unidade: f.corte_unidade || 'cm' };
+  for(const par of [['corte_largura','largura'],['corte_altura','altura']]){
+    if(!f[par[0]]) continue;
+    try{ c[par[1]] = F.avaliar(f[par[0]], vars); }
+    catch(e){ c.erro = e.message; }
+  }
+  const n = v => (Math.round(v*10)/10).toString().replace('.',',');
+  c.texto = c.erro ? null
+    : (c.largura!=null && c.altura!=null) ? n(c.largura)+' × '+n(c.altura)+' '+c.unidade
+    : n(c.largura!=null?c.largura:c.altura)+' '+c.unidade;
+  return c;
+}
+
 function precoUnitario(db, componente_id){
   const r = db.prepare(`SELECT MIN(o.preco / o.fator) p FROM oferta o
     JOIN fornecedor f ON f.id=o.fornecedor_id
@@ -104,7 +133,14 @@ function calcularFicha(db, sku){
       Object.assign(l, { componente_id:melhor.componente_id, componente_nome:melhor.nome,
         unidade:'m linear', quantidade:melhor.quantidade, preco_unitario:melhor.preco_linear,
         custo:melhor.custo,
-        motivo:'bobina '+(melhor.bobina_cm/100).toFixed(2)+' m — menor custo por peça' });
+        /* Vírgula, não ponto: `bobina 2.80 m` numa tela em que todo o resto
+           escreve 2,80 é a paleta "quase igual" do §19 por outra porta — perto
+           demais para parecer proposital, diferente o bastante para o olho ver. */
+        motivo:'bobina '+(melhor.bobina_cm/100).toFixed(2).replace('.',',')+' m — menor custo por peça' });
+      /* A medida de corte do tecido conhece a bobina ESCOLHIDA — e a que vai
+         estar na mesa. Corte calculado sobre outra bobina cortaria a peca certa
+         do rolo errado. */
+      l.corte = medidaDeCorte(f, Object.assign({ largura_bobina:melhor.bobina_cm }, base));
       custo += melhor.custo;
     } else {
       let q;
@@ -114,6 +150,10 @@ function calcularFicha(db, sku){
       Object.assign(l, { componente_id:f.componente_id, componente_nome:f.componente_nome,
         unidade:f.unidade, quantidade:q, preco_unitario:p,
         custo:(p != null) ? q * p : null });
+      /* Falta de PRECO nao pode apagar a medida de CORTE: a bancada corta o tubo
+         do mesmo jeito com ou sem o fornecedor cadastrado, e uma ficha que some
+         porque falta preco manda a bancada cortar de memoria. */
+      l.corte = medidaDeCorte(f, base);
       if(l.custo == null){ l.erro = 'sem preço de fornecedor cadastrado'; indefinido = true; }
       else custo += l.custo;
     }
