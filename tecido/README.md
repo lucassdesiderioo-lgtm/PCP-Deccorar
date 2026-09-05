@@ -1225,40 +1225,55 @@ duas coisas.
 
 ### Quanto vale a prateleira de sobras
 
-O rolo já sabia quanto custou (`rolo.preco_m2`, congelado na compra). A sobra
-não, e a pergunta *"quanto temos em reais de cada tecido em retalho"* não tinha
-resposta. Desde 05/09/2026 ela tem, pelas **mesmas quatro regras do
-`custo.js`**:
+A pergunta do dono é uma só: *"quanto temos em reais de sobra, de cada
+tecido"*. A resposta soma, sobra a sobra, **área × preço do m²**, e o preço vem
+de um de dois lugares:
 
-| Regra | Como fica na sobra |
-|---|---|
-| **O preço mora na peça, congelado** (`sobra.preco_m2`) | A sobra que nasce do corte **herda** o preço do rolo de onde saiu (e a que nasce de outra sobra, o dela): é o que se pagou por aquele tecido. A do mutirão nasce **sem preço** |
-| **Custo indefinido nunca vira zero** | Sobra sem preço fica fora da soma e é contada à parte. O total por tecido e o total do acervo saem como **piso** (`≥`) enquanto houver alguma, com o número de quantas faltam |
-| **Sem preço, traço** | Nunca `R$ 0,00` na linha |
-| **Quem não tem `custo.ver` não recebe os campos** | A poda é na rota (`rotas/sobras.js`), pela mesma `custo.podar` dos rolos. O histórico de correção esconde a linha de preço inteira |
+| De onde | Quando | Muda depois? |
+|---|---|---|
+| **Do rolo** (`sobra.preco_m2`, herdado) | A sobra nasceu do corte de um rolo **com nota**, ou de outra sobra que herdou. É o que se pagou por aquele tecido, e isso é melhor que estimativa | Não: pago é pago |
+| **Do tecido** (`tecido.preco_m2`) | Todas as outras: o mutirão do acervo antigo, o rolo ainda sem nota. É a estimativa da chefia, um número por item de tecido | Sim, e todas as sobras que valem por ele acompanham |
 
-**O preço se lança por tecido, numa vez só.** Botão **Preço** na tabela "Sobras
-por tecido" (chefia com `sobra.corrigir` e `custo.ver`): diz o R$/m² e ele entra
-em cada sobra disponível do tecido que **ainda não tem** preço. A que já tem
-fica como está, porque aquele foi o preço pago. *"Substituir"* passa por cima de
-todas, para o dia em que o preço lançado estava errado. O que pré-preenche é o
-**último preço pago por rolo desse tecido**, a mesma fonte da nota do rolo.
+> ⚠️ **A migração 14 pôs o preço só na sobra, congelado, e durou um dia.** O
+> estoque antigo, catalogado no mutirão sem nota nenhuma, nunca teria preço
+> pago por retalho, e a chefia teria que inventar "o que se pagou" por
+> centenas de peças. Por isso a migração 15 pôs o preço **no tecido**: uma
+> estimativa de acervo tem que ser um número por tecido, que se revisa. O que
+> ficou da 14 é a herança do rolo, que o dono confirmou: onde a nota existe,
+> vale o pago.
 
-> ⚠️ **NÃO É UMA TABELA DE PREÇO POR TECIDO.** O número é gravado sobra a
-> sobra, e cada uma ganha a sua linha de rastro (`sobra_correcao`, campo
-> `preco`). A próxima sobra do mesmo tecido nasce sem preço e espera a próxima
-> rodada. Uma coluna de preço no cadastro do tecido, multiplicada na hora de
-> mostrar, mudaria o valor do acervo inteiro no dia do reajuste, e ninguém
-> perceberia porque o número só cresce (armadilha #15 do `CLAUDE.md`).
+As quatro regras do `custo.js` continuam valendo:
 
-O preço também se corrige sobra a sobra, no cartão **Corrigir**, com o mesmo
-rastro. **Não se aponta**: a bancada não recebe preço no JSON, então não tem o
-que ver nem o que propor. O `dinheiro()` do `ui.js` é o formatador único: rolos
-e sobras escrevem R$ do mesmo jeito.
+- **Custo indefinido nunca vira zero.** Sobra sem preço de rolo nem de tecido
+  fica fora da soma e é contada em `sem_preco`. O total do tecido e o do acervo
+  saem como **piso** (`≥`) enquanto houver alguma.
+- **Sem preço, traço.** Nunca `R$ 0,00` na linha.
+- **Quem não tem `custo.ver` não recebe os campos.** A poda é na rota, pela
+  `custo.podar` (dono único, usada por rolos, sobras e **tecidos**: o preço do
+  m² viaja em `/api/tecidos`, a rota que a bancada usa para montar as fileiras
+  do lançamento).
+- **Mudança de preço deixa rastro.** O do tecido em `tecido_preco` (de → para,
+  quem, quando); o do rolo já ficava em `movimento_rolo`, e a linha da nota
+  passa a dizer quantas sobras herdaram.
 
-**Teste obrigatório:** `node teste/rodar.js` — os 4 casos de preço em
-`teste/sobra.test.js` (herança do rolo, piso, precificar por tecido com rastro,
-corrigir sem apontar) e o caso de poda em `teste/acesso_operador.test.js`.
+**Onde se lança:** Sobras → Catálogo, botão **Preço** de cada tecido (chefia
+com `sobra.corrigir` e `custo.ver`). Quando o tecido ainda não tem preço, o
+campo vem com o **último preço pago por rolo desse tecido** como sugestão. O
+cartão diz quantas sobras vão valer por ele e quantas continuam pelo preço do
+rolo. Cadastros → Tecido mostra a coluna `R$/m²` para quem vê custo.
+
+**A nota que chega depois do corte** (botão Nota, em Rolos) propaga o preço
+pago para as sobras daquele rolo que ainda valiam pela estimativa. Um preço
+pago não é substituído por outro: reajuste do rolo depois não reescreve o
+herdado.
+
+O preço **não se corrige nem se aponta na sobra**: ele não é dela. O
+`dinheiro()` do `ui.js` é o formatador único de R$.
+
+**Teste obrigatório:** `node teste/rodar.js` — os 6 casos de preço em
+`teste/sobra.test.js` (sem preço é NULL, preço do tecido com histórico, sobra
+nova vale pelo tecido, herança do rolo vence o tecido, nota que chega depois,
+piso) e o caso de poda em `teste/acesso_operador.test.js`.
 
 O campo **Procurar** no topo do Catálogo aceita o **bipe da etiqueta** e filtra
 a tabela sem redesenhar: com centenas de linhas, corrigir a `S-000142` é

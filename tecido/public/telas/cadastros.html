@@ -359,13 +359,20 @@ async function telaTecido(pai){
     });
   }
   const tT=el('table',{});
+  /* O PRECO DO M² e o que da valor as sobras (area x preco). Le-se aqui e
+     lanca-se em Sobras -> Catalogo, botao Preco de cada tecido — que e onde a
+     falta dele aparece. Quem nao ve custo nem recebe o campo. */
+  const veCusto=(eu.permissoes||[]).includes('custo.ver');
   tT.appendChild(el('tr',{},[el('th',{texto:'Codigo'}),el('th',{texto:'Tecido'}),
-    el('th',{class:'num',texto:'Largura sugerida'}),el('th',{texto:'Girar'}),el('th',{texto:''})]));
+    el('th',{class:'num',texto:'Largura sugerida'}),el('th',{texto:'Girar'}),
+    ...(veCusto?[el('th',{class:'num',texto:'R$/m²'})]:[]),el('th',{texto:''})]));
   estado.tecidos.forEach(t=>tT.appendChild(el('tr',{class:t.ativo?'':'inativo'},[
     el('td',{texto:t.codigo}),
     el('td',{texto:[t.linha_nome,t.abertura_nome,t.cor_nome].join(' · ')}),
     el('td',{class:'num',texto:t.largura_sugerida?num(t.largura_sugerida)+' m':'—'}),
     el('td',{texto:t.permite_girar?'sim':'nao'}),
+    ...(veCusto?[el('td',{class:'num',texto:t.preco_m2==null?'—':window.ui.dinheiro(t.preco_m2),
+      title:'o preco do m² que da valor as sobras deste tecido — lanca-se em Sobras → Catalogo'})]:[]),
     /* O tecido nao tem renomear: o nome dele E a combinacao linha+colecao+cor,
        e "renomear" ali seria trocar a combinacao — que e outro tecido. O que
        cabe e apagar (quando nada usa) ou desativar. */

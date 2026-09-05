@@ -296,77 +296,124 @@ module.exports=[
   recusa(()=>sobra.propor(s.id,{condicao:'furo'},'Ana'),'sobra_indisponivel');
 }},
 
-/* ── QUANTO VALE — o preco do m² da sobra ───────────────────────────────── */
+/* ── QUANTO VALE — o preco do m² e do TECIDO, e a sobra vale area x preco ── */
 
-{nome:'a sobra que nasce do rolo HERDA o preco pago; a do mutirao nasce sem preco', executar({igual,perto}){
+{nome:'sem preco no tecido, a sobra vale "nao se sabe" — nunca zero — e o tecido fica fora da soma', executar({igual}){
+  const c=montar();
+  const s=sobra.porCodigo('S-000001');
+  igual(s.preco_m2,null,'o tecido ainda nao tem preco');
+  igual(s.valor,null,'e o valor e NULL, nao R$ 0,00');
+  const r=sobra.resumo().find(x=>x.tecido_id===c.tecido.id);
+  igual(r.preco_m2,null,'no resumo tambem');
+  igual(r.valor,null,'valor do tecido: nao se sabe');
+}},
+
+{nome:'o preco do m² e do tecido: define uma vez e TODAS as sobras dele passam a valer', executar({igual,perto,recusa}){
+  const c=montar();
+  recusa(()=>tecido.definirPreco(c.tecido.id,'abc','Diretor'),'preco_invalido');
+  recusa(()=>tecido.definirPreco(c.tecido.id,'','Diretor'),'preco_invalido');
+  recusa(()=>tecido.definirPreco(c.tecido.id,'190000','Diretor'),'preco_absurdo');
+  recusa(()=>tecido.definirPreco(999999,'10','Diretor'),'tecido_inexistente');
+
+  const d=tecido.definirPreco(c.tecido.id,'18,50','Diretor');
+  igual(d.mudou,true,'mudou');
+  igual(d.preco_anterior,null,'nao tinha preco antes');
+  perto(d.preco_m2,18.5,'preco gravado no tecido');
+
+  // Disponiveis deste tecido: S-000001 (4,94 m²), S-000002 (0,96) —
+  // S-000006 mudou de tecido, S-000007 foi descartada.
+  perto(sobra.porCodigo('S-000001').valor,4.94*18.5,'a sobra vale area x preco do tecido',0.01);
+  perto(sobra.porCodigo('S-000002').valor,0.96*18.5,'todas as do tecido, de uma vez',0.01);
+  const r=sobra.resumo().find(x=>x.tecido_id===c.tecido.id);
+  perto(r.preco_m2,18.5,'o resumo traz o preco');
+  perto(r.valor,(4.94+0.96)*18.5,'e o valor do tecido em sobras',0.01);
+
+  // O historico: quem, quando, de -> para.
+  const h=tecido.historicoPreco(c.tecido.id);
+  igual(h.length,1,'uma linha');
+  igual(h[0].de,null,'de: sem preco');
+  perto(h[0].para,18.5,'para: 18,50');
+  igual(h[0].usuario_nome,'Diretor','quem');
+
+  // Mesmo preco de novo: nada muda, nada grava.
+  igual(tecido.definirPreco(c.tecido.id,'18,5','Diretor').mudou,false,'mesmo preco nao e mudanca');
+  igual(tecido.historicoPreco(c.tecido.id).length,1,'e nao virou linha');
+
+  // Mudou o preco: todas acompanham, e fica registrado de -> para.
+  tecido.definirPreco(c.tecido.id,'22','Diretor');
+  perto(sobra.porCodigo('S-000001').valor,4.94*22,'a sobra acompanha o preco novo',0.01);
+  perto(tecido.historicoPreco(c.tecido.id)[0].de,18.5,'de 18,50');
+  perto(tecido.historicoPreco(c.tecido.id)[0].para,22,'para 22');
+}},
+
+{nome:'a sobra nova do mesmo tecido ja nasce valendo pelo preco do tecido', executar({perto,igual}){
   const c=montar();
   etiqueta.imprimirLote(5,'Diretor');   // S-000009 a S-000013
-  const rolo=require('../dominio/rolo');
-  const r=rolo.entrada({tecido_id:c.tecido.id,largura:'2,00',metragem:'30',nivel_id:c.nivelRolo,preco_m2:'20,00'},'Diretor');
-  const doRolo=sobra.criar({codigo:'S-000008',tecido_id:c.tecido.id,largura:'1,00',altura:'1,50',
-    condicao:'integra',nivel_id:c.nivelSobra,origem:'rolo',origem_rolo_id:r.id},'Ana');
-  perto(doRolo.preco_m2,20,'herdou o preco do rolo');
-  perto(doRolo.valor,30,'1,5 m² × R$ 20 = R$ 30');
-
-  const filha=sobra.criar({codigo:'S-000009',tecido_id:c.tecido.id,largura:'0,50',altura:'1,00',
-    condicao:'integra',nivel_id:c.nivelSobra,origem:'sobra',origem_sobra_id:doRolo.id},'Ana');
-  perto(filha.preco_m2,20,'a sobra da sobra herda tambem');
-
-  const mutirao=sobra.criar({codigo:'S-000010',tecido_id:c.tecido.id,largura:'1,00',altura:'2,00',
+  const s=sobra.criar({codigo:'S-000009',tecido_id:c.tecido.id,largura:'1,00',altura:'2,00',
     condicao:'integra',nivel_id:c.nivelSobra},'Ana');
-  igual(mutirao.preco_m2,null,'sem origem, sem preco — nao zero');
-  igual(mutirao.valor,null,'e o valor e "nao se sabe", nao R$ 0,00');
+  igual(s.preco_rolo_m2,null,'do mutirao: nada herdado');
+  perto(s.preco_m2,22,'vale pelo tecido');
+  perto(s.valor,2*22,'2 m² x R$ 22');
+  // O preco NAO se corrige nem se aponta na sobra: ele nao e dela.
+  const r=sobra.corrigir(s.id,{preco_m2:'99',condicao:'mancha'},'Diretor');
+  igual(r.mudancas.length,1,'so a condicao mudou');
+  perto(r.valor,44,'o valor continua o do tecido');
 }},
 
-{nome:'o resumo por tecido soma so quem tem preco e diz quantas faltam (piso)', executar({igual,perto}){
+{nome:'a sobra que nasce de um rolo COM NOTA herda o preco pago — e ele vence o do tecido', executar({perto,igual}){
   const c=montar();
-  const r=sobra.resumo().find(x=>x.tecido_id===c.tecido.id);
-  // Disponiveis deste tecido agora: S-000001 (4,94 m², sem preco), S-000002
-  // (0,96, sem), S-000006 mudou de tecido, S-000007 descartada, S-000008
-  // (1,5, R$20), S-000009 (0,5, R$20), S-000010 (2,0, sem).
-  perto(r.valor,40,'so as duas com preco entram: (1,5+0,5) × 20');
-  igual(r.sobras_sem_preco,3,'tres sem preco — o total e PISO');
-  perto(r.area_sem_preco,4.94+0.96+2,'e a area que falta precificar');
+  const rolo=require('../dominio/rolo');
+  const r=rolo.entrada({tecido_id:c.tecido.id,largura:'2,00',metragem:'30',nivel_id:c.nivelRolo,preco_m2:'15'},'Diretor');
+  const s=sobra.criar({codigo:'S-000010',tecido_id:c.tecido.id,largura:'1,00',altura:'1,00',
+    condicao:'integra',nivel_id:c.nivelSobra,origem:'rolo',origem_rolo_id:r.id},'Ana');
+  perto(s.preco_rolo_m2,15,'herdou o pago');
+  perto(s.preco_m2,15,'e vale por ele, nao pelos R$ 22 do tecido');
+  perto(s.valor,15,'1 m² x R$ 15');
+  // A sobra da sobra herda o pago da mae.
+  const filha=sobra.criar({codigo:'S-000011',tecido_id:c.tecido.id,largura:'0,50',altura:'1,00',
+    condicao:'integra',nivel_id:c.nivelSobra,origem:'sobra',origem_sobra_id:s.id},'Ana');
+  perto(filha.preco_rolo_m2,15,'a filha tambem');
+  // Mudar o preco do tecido nao mexe nas herdadas.
+  tecido.definirPreco(c.tecido.id,'30','Diretor');
+  perto(sobra.porCodigo('S-000010').valor,15,'o pago fica');
+  perto(sobra.porCodigo('S-000009').valor,60,'a do mutirao acompanha o tecido');
+  const res=sobra.resumo().find(x=>x.tecido_id===c.tecido.id);
+  igual(res.com_preco_do_rolo,2,'o resumo sabe quantas valem pelo rolo');
+  igual(res.sem_preco,0,'e nenhuma sem preco');
 }},
 
-{nome:'precificar por tecido preenche so quem nao tem preco, com rastro por sobra', executar({igual,perto,recusa}){
+{nome:'a nota do rolo chegou DEPOIS do corte: as sobras dele passam a valer pelo pago', executar({perto,igual}){
   const c=montar();
-  recusa(()=>sobra.precificar(c.tecido.id,'abc',{},'Diretor'),'preco_invalido');
-  recusa(()=>sobra.precificar(c.tecido.id,'',{},'Diretor'),'preco_invalido');
+  const rolo=require('../dominio/rolo');
+  const r=rolo.entrada({tecido_id:c.tecido.id,largura:'2,00',metragem:'30',nivel_id:c.nivelRolo},'Ana');
+  const s=sobra.criar({codigo:'S-000012',tecido_id:c.tecido.id,largura:'1,00',altura:'1,00',
+    condicao:'integra',nivel_id:c.nivelSobra,origem:'rolo',origem_rolo_id:r.id},'Ana');
+  igual(s.preco_rolo_m2,null,'rolo sem nota: nada a herdar');
+  perto(s.valor,30,'vale pelo tecido enquanto isso');
 
-  const d=sobra.precificar(c.tecido.id,'18,50',{},'Diretor');
-  igual(d.sobras,3,'as tres sem preco receberam');
-  igual(d.codigos.includes('S-000008'),false,'a herdada do rolo NAO foi tocada');
-  perto(sobra.porCodigo('S-000010').preco_m2,18.5,'preco gravado na sobra');
-  perto(sobra.porCodigo('S-000008').preco_m2,20,'a do rolo continua R$ 20');
-
-  const h=sobra.correcoes(sobra.porCodigo('S-000010').id);
-  igual(h[0].campo,'preco','rastro por sobra');
-  igual(h[0].de,'sem preco','de: sem preco');
-  igual(h[0].usuario_nome,'Diretor','quem lancou');
-
-  const r=sobra.resumo().find(x=>x.tecido_id===c.tecido.id);
-  igual(r.sobras_sem_preco,0,'nada mais sem preco');
-  perto(r.valor,40+(4.94+0.96+2)*18.5,'o total agora e exato',0.01);
-
-  // Rodar de novo com o mesmo preco: nada a fazer.
-  igual(sobra.precificar(c.tecido.id,'18,50',{},'Diretor').sobras,0,'segunda rodada nao mexe em nada');
-  // Substituir passa por cima de todas — inclusive a do rolo.
-  const s=sobra.precificar(c.tecido.id,'22',{substituir:true},'Diretor');
-  igual(s.sobras,5,'as cinco disponiveis trocaram');
-  perto(sobra.porCodigo('S-000008').preco_m2,22,'a do rolo tambem, porque foi pedido');
+  const d=rolo.editarDados(r.id,{preco_m2:'12',nf:'777'},'Diretor');
+  igual(d.sobras_herdaram,1,'uma sobra passou a valer pelo pago');
+  perto(sobra.porCodigo('S-000012').preco_rolo_m2,12,'herdou');
+  perto(sobra.porCodigo('S-000012').valor,12,'e vale R$ 12');
+  // Reajustar o preco do rolo depois nao reescreve o herdado: pago e pago.
+  rolo.editarDados(r.id,{preco_m2:'13'},'Diretor');
+  perto(sobra.porCodigo('S-000012').preco_rolo_m2,12,'o primeiro preco pago fica');
 }},
 
-{nome:'o preco tambem se corrige na sobra, mas nao se aponta', executar({igual,perto}){
-  const s=sobra.porCodigo('S-000010');
-  const r=sobra.corrigir(s.id,{preco_m2:'25'},'Diretor');
-  perto(r.preco_m2,25,'preco corrigido');
-  igual(r.mudancas[0].campo,'preco','com mudanca de preco');
-  perto(r.valor,50,'valor refeito: 2 m² × 25');
-  // A bancada aponta tecido, medida, condicao, endereco — preco nao entra.
-  const p=sobra.propor(s.id,{preco_m2:'99',condicao:'mancha'},'Ana');
-  igual(p.itens.length,1,'so a condicao virou item');
-  igual(p.itens[0].campo,'condicao','preco foi ignorado');
+{nome:'tecido sem preco e sobra sem rolo: fica fora da soma, e o resumo diz quantas', executar({igual,perto}){
+  const c=montar();
+  const cor=tecido.criarCor({nome:'Preto Sem Preco'});
+  const t=tecido.criarTecido({linha_id:c.tecido.linha_id,abertura_id:c.tecido.abertura_id,cor_id:cor.id});
+  const rolo=require('../dominio/rolo');
+  const r=rolo.entrada({tecido_id:t.id,largura:'2,00',metragem:'10',nivel_id:c.nivelRolo,preco_m2:'10'},'Diretor');
+  sobra.criar({codigo:'S-000013',tecido_id:t.id,largura:'1,00',altura:'1,00',condicao:'integra',nivel_id:c.nivelSobra},'Ana');
+  etiqueta.imprimirLote(2,'Diretor');   // S-000014, S-000015
+  sobra.criar({codigo:'S-000014',tecido_id:t.id,largura:'1,00',altura:'2,00',condicao:'integra',nivel_id:c.nivelSobra,
+    origem:'rolo',origem_rolo_id:r.id},'Ana');
+  const res=sobra.resumo().find(x=>x.tecido_id===t.id);
+  igual(res.sobras,2,'duas sobras');
+  igual(res.sem_preco,1,'uma sem preco nenhum');
+  perto(res.valor,20,'so a herdada entra: 2 m² x R$ 10 — e o valor e PISO');
 }},
 
 {nome:'lote de etiquetas com quantidade invalida e recusado', executar({recusa}){

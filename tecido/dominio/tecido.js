@@ -130,8 +130,32 @@ function criarTecido(dados){
 // Nome de tela do tecido, num lugar so: 'Rolo · 3% · Bege'.
 const descrever=t=>t?[t.linha_nome,t.abertura_nome,t.cor_nome].filter(Boolean).join(' · '):'';
 
+/* ── O PRECO DO M² DO TECIDO ──────────────────────────────────────────────
+   E o numero que responde "quanto temos em reais de sobra": a sobra vale
+   area x este preco, e todas as sobras do tecido acompanham quando ele muda
+   — e isso que se quer de uma estimativa de acervo. Decisao do dono
+   (05/09/2026): a pergunta e uma so, e o estoque antigo nunca teria preco
+   pago por retalho.
+
+   Mudar o preco muda o valor do acervo inteiro daquele tecido, entao nao
+   passa calado: fica em tecido_preco, de -> para, com quem e quando. Salvar
+   o mesmo preco nao grava linha. A leitura do numero digitado e a mesma do
+   rolo (precoDe): virgula, teto, seis casas. */
+const {precoDe}=require('./rolo');
+function definirPreco(id,preco_m2,usuarioNome){
+  const t=dTecido.porId(id);
+  exigir(t,'tecido_inexistente','Tecido nao encontrado.');
+  const preco=precoDe(preco_m2);
+  exigir(preco!=null,'preco_invalido','Diga o preco do metro quadrado (ex.: 18,50).');
+  if(t.preco_m2!=null&&Math.abs(t.preco_m2-preco)<1e-6) return {...t, mudou:false};
+  dTecido.gravarPreco(id,preco);
+  dTecido.registrarPreco({tecido_id:id,de:t.preco_m2,para:preco,usuario_nome:usuarioNome});
+  return {...dTecido.porId(id), mudou:true, preco_anterior:t.preco_m2};
+}
+
 module.exports={renomearLinha,renomearAbertura,renomearCor,
-  criarLinha, criarAbertura, criarCor, criarTecido,
+  criarLinha, criarAbertura, criarCor, criarTecido, definirPreco,
+  historicoPreco:id=>dTecido.historicoPreco(id),
   chaveDe, descrever,
   listarLinhas:()=>dLinha.listar(),
   listarAberturas:linha_id=>dAbertura.listar(linha_id),

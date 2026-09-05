@@ -28,16 +28,6 @@ module.exports={rotas:[
    manipulador:({corpo,usuario})=>podar(usuario,sobra.criar(corpo,usuario.nome)),
    detalhe:(req,d)=>'sobra '+(d&&d.codigo)+' '+(d&&d.largura)+'x'+(d&&d.altura)},
 
-  /* O PRECO DO M² DE UM TECIDO, nas sobras que ainda nao tem. Chefia
-     (sobra.corrigir) — e a tela so mostra o botao a quem tambem ve custo. A
-     auditoria registra o preco e QUAIS sobras receberam: e valor de acervo
-     mudando de uma vez. */
-  {metodo:'POST', caminho:'/api/sobras/precificar', permissao:'sobra.corrigir',
-   manipulador:({corpo,usuario})=>sobra.precificar(corpo.tecido_id,corpo.preco_m2,
-     {substituir:!!corpo.substituir},usuario.nome),
-   detalhe:(req,d)=>d?'preco R$ '+d.preco_m2+'/m² em '+d.sobras+' sobra(s) de '+d.tecido+
-     (d.sobras?': '+d.codigos.join(', '):'')+(req.body.substituir?' (substituindo)':''):null},
-
   /* A CORRECAO. O detalhe da auditoria sai do que o dominio MUDOU, e nao do
      que veio no corpo: o corpo traz a tela inteira, a maioria igual ao que ja
      estava — o que interessa registrar e so a diferenca. */
@@ -48,14 +38,8 @@ module.exports={rotas:[
        ? ': '+d.mudancas.map(m=>m.campo+' '+m.de+' → '+m.para).join(' · ')
        : ' (nada mudou)')},
 
-  /* O historico carrega o preco em `de`/`para` — chaves que a poda por nome
-     nao pega. Para quem nao ve custo, a linha de preco sai INTEIRA: uma linha
-     "preco: — → —" diria que houve preco, e isso ja e informacao comercial. */
   {metodo:'GET', caminho:'/api/sobras/:id/correcoes', permissao:'sobra.ler',
-   manipulador:({params,usuario})=>{
-     const h=sobra.correcoes(params.id);
-     return custo.veComercial(usuario)?h:h.filter(c=>c.campo!=='preco');
-   }},
+   manipulador:({params})=>sobra.correcoes(params.id)},
 
   // ── A bancada aponta, a chefia decide ──────────────────────────────────
   /* A LISTA DO QUE ESPERA DECISAO e da chefia. Nao ha GET '/api/sobras/:id'

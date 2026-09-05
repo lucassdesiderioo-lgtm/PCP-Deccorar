@@ -97,19 +97,25 @@ module.exports=[
   const n=endereco.criarNivel({nome:'1',andar_id:a.id},DIRETOR);
   etiqueta.imprimirLote(2,DIRETOR.nome);
   sobra.criar({codigo:'S-000001',tecido_id:b.t.id,largura:'1,00',altura:'1,00',condicao:'integra',
-    nivel_id:n.id,origem:'rolo',origem_rolo_id:b.r.id},DIRETOR.nome);
+    nivel_id:n.id},DIRETOR.nome);
+  tecido.definirPreco(b.t.id,'20',DIRETOR.nome);
 
-  const lista=sobra.listar({}), resumo=sobra.resumo();
+  const lista=sobra.listar({}), resumo=sobra.resumo(), tecidos=tecido.listarTecidos();
   igual(dinheiroEm(lista,'sobras').length>0,true,'a chefia ve preco e valor da sobra');
   igual(dinheiroEm(resumo,'resumo').length>0,true,'e o valor por tecido');
+  igual(dinheiroEm(tecidos,'tecidos').length>0,true,'e o preco no cadastro do tecido');
   igual(dinheiroEm(custo.semPreco(lista),'sobras').length,0,'a bancada nao ve nenhum — vazou: '+dinheiroEm(custo.semPreco(lista),'sobras').join(', '));
   igual(dinheiroEm(custo.semPreco(resumo),'resumo').length,0,'nem no resumo');
+  /* /api/tecidos e a rota que a BANCADA usa para montar as fileiras de
+     linha, colecao e cor no lancamento — o preco do m² viaja nela. A poda na
+     rota e o que impede o numero de chegar ao tablet. */
+  igual(dinheiroEm(custo.semPreco(tecidos),'tecidos').length,0,'nem no cadastro de tecido');
   const um=custo.semPreco(lista)[0];
   ['codigo','largura','altura','area','condicao','endereco','linha_nome','cor_nome','dias_parada']
     .forEach(c=>igual(c in um,true,'a bancada continua vendo '+c));
-  // `sobras_sem_preco` e `area_sem_preco` sao dinheiro por nome — e e assim
-  // que tem que ser: quantas faltam precificar e assunto do escritorio.
-  igual(custo.eDinheiro('sobras_sem_preco'),true,'sobras_sem_preco e podado');
+  const t=custo.semPreco(tecidos)[0];
+  ['id','codigo','linha_id','abertura_id','cor_id','linha_nome','cor_nome','ativo']
+    .forEach(c=>igual(c in t,true,'e do tecido continua vendo '+c));
 }},
 
 {nome:'o painel de giro tambem passa limpo', executar({igual}){
