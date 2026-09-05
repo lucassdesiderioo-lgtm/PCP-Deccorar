@@ -38,6 +38,10 @@ module.exports=[
   rolo.mover(r.id,x.n2,'Zeca');
 
   igual(endereco.descrever(rolo.porId(r.id).nivel_id),'ROLO · A-1-2','mudou de lugar');
+  // A tela de rolos le `endereco` pronto — a coluna saia vazia enquanto o
+  // servidor nao mandava o campo.
+  igual(rolo.porId(r.id).endereco,'ROLO · A-1-2','endereco escrito na resposta');
+  igual(rolo.listar().find(x=>x.id===r.id).endereco,'ROLO · A-1-2','e na lista');
   const m=rolo.movimentos(r.id).find(m=>m.motivo==='mudanca_endereco');
   igual(!!m,true,'ficou no historico do rolo');
   igual(m.usuario_nome,'Zeca','com o nome de quem moveu');

@@ -80,7 +80,7 @@ function criar(dados,usuarioNome){
     });
     // Dentro da mesma transacao: se a reserva falhar, a sobra nao acontece.
     etiqueta.reservar(codigo,id);
-    return dSobra.porId(id);
+    return comEndereco(dSobra.porId(id));
   })();
 }
 
@@ -164,13 +164,13 @@ function corrigir(id,dados,usuarioNome,proposta_id){
 
   // A resposta leva o que mudou NESTA chamada: e isso que a auditoria da rota
   // e o aviso da tela precisam dizer, e nao o historico inteiro da sobra.
-  if(!mudancas.length) return {...s, mudancas:[]};
+  if(!mudancas.length) return {...comEndereco(s), mudancas:[]};
 
   return db.transaction(()=>{
     dSobra.atualizar(id,novo);
     for(const m of mudancas)
       dSobra.registrarCorrecao({sobra_id:id,...m,usuario_nome:usuarioNome,proposta_id:proposta_id||null});
-    return {...dSobra.porId(id), mudancas};
+    return {...comEndereco(dSobra.porId(id)), mudancas};
   })();
 }
 
@@ -235,7 +235,7 @@ function aceitar(id,usuarioNome){
     dProposta.decidir(id,'aceita',usuarioNome,dia.agora(),null);
     // A sobra e relida DEPOIS da decisao: e ela que traz `propostas_pendentes`,
     // e devolver a leitura de antes diria que ainda ha algo esperando.
-    return {proposta:dProposta.porId(id), sobra:{...dSobra.porId(p.sobra_id), mudancas:s.mudancas}, mudancas:s.mudancas};
+    return {proposta:dProposta.porId(id), sobra:{...comEndereco(dSobra.porId(p.sobra_id)), mudancas:s.mudancas}, mudancas:s.mudancas};
   })();
 }
 
@@ -279,14 +279,21 @@ function descartar(id,motivo,usuarioNome){
   })();
 }
 
+/* O ENDERECO VAI ESCRITO NA RESPOSTA. A sobra tem endereco obrigatorio
+   justamente para ser achada na prateleira — e a lista mostrava tudo menos
+   isso. `endereco.descrever` e o dono unico do formato ('SOBRA · S1-01-04');
+   escrever o mesmo texto em SQL aqui seria uma segunda regua, e as duas
+   divergiriam no dia em que alguem mudasse o separador. */
+const comEndereco=s=>s?{...s, endereco:s.nivel_id?endereco.descrever(s.nivel_id):''}:s;
+
 module.exports={
   criar, corrigir, propor, aceitar, recusar, marcarUsada, descartar,
-  listar:f=>dSobra.listar(f),
-  porId:id=>dSobra.porId(id),
+  listar:f=>dSobra.listar(f).map(comEndereco),
+  porId:id=>comEndereco(dSobra.porId(id)),
   correcoes:id=>dSobra.correcoes(id),
   propostas:f=>dProposta.listar(f).map(itensDaProposta),
   propostasPendentes:()=>dProposta.quantasPendentes(),
-  porCodigo:c=>dSobra.porCodigo(etiqueta.limpar(c)),
+  porCodigo:c=>comEndereco(dSobra.porCodigo(etiqueta.limpar(c))),
   candidatas:tecido_id=>dSobra.candidatas(tecido_id),
   resumo:()=>dSobra.resumoPorTecido()
 };

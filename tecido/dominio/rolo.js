@@ -258,10 +258,16 @@ function conferirSaldos(){
   return ruins;
 }
 
+/* O ENDERECO VAI ESCRITO NA RESPOSTA. A tela de rolos tinha a coluna
+   "Endereco" desde a fase 5 e o servidor nunca mandou o campo — a coluna
+   saia vazia, e ninguem reparou porque tela que mostra menos nao da erro.
+   `endereco.descrever` e o dono unico do formato ('ROLO · A-1-2'). */
+const comEndereco=r=>r?{...r, endereco:r.nivel_id?endereco.descrever(r.nivel_id):''}:r;
+
 module.exports={mover,editarDados,
   entrada, consumir, ajustar, encerrar, conferirSaldos, formatar,
-  listar:f=>dRolo.listar(f),
-  porId:id=>dRolo.porId(id),
+  listar:f=>dRolo.listar(f).map(comEndereco),
+  porId:id=>comEndereco(dRolo.porId(id)),
   porCodigo:c=>dRolo.porCodigo(c),
   disponiveis:tecido_id=>dRolo.disponiveis(tecido_id),
   movimentos:id=>dRolo.movimentos(id),
