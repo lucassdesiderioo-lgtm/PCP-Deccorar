@@ -1,6 +1,6 @@
 // Sobras e etiquetas. Repare em quem pede o que:
 //   sobra.criar      cortador tem  — e ele que cataloga a prateleira
-//   sobra.corrigir   cortador tem  — quem lancou errado conserta, com rastro
+//   sobra.corrigir   cortador NAO tem — a chefia aceita a correcao, com rastro
 //   sobra.descartar  cortador NAO tem — baixa de sobra e da chefia
 const sobra=require('../dominio/sobra');
 const etiqueta=require('../dominio/etiqueta');

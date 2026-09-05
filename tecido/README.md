@@ -61,7 +61,7 @@ não só a tela.
 |---|---|---|---|
 | 1 | Margem entre peças? | **Não — as peças encostam.** `margem = 0` | parâmetro cadastrável; muda todo o encaixe |
 | 2 | Peça mais larga que a bobina? | **Sempre entregar o plano de menor desperdício.** A peça que fisicamente não cabe volta *marcada com o motivo* e o resto é planejado — o plano nunca deixa de sair | `dominio/plano.js`, fase 4/6 |
-| 3 | Quem descarta sobra? | **Só a chefia.** `sobra.descartar` não está no papel `cortador` | `nucleo/permissoes.js` |
+| 3 | Quem descarta ou corrige sobra? | **Só a chefia.** `sobra.descartar` e `sobra.corrigir` não estão no papel `cortador` | `nucleo/permissoes.js` |
 | 4 | Sobra com defeito parcial? | **Entra, mas por último** | `condicao_sobra.prioridade` e `.aproveitavel` |
 | 5 | Leitor na bancada? | **Sim.** Campo de bipe visível, aceita Enter e Tab, processa por timeout | telas das fases 2 e 4 |
 | 6 | Sequência das etiquetas? | **O sistema imprime.** Escolhe-se a quantidade, ele gera a sequência e registra o lote; a sobra nasce quando o operador bipa a etiqueta colada | tabelas `etiqueta` e `etiqueta_lote` |
@@ -1135,7 +1135,7 @@ quem fecha compras. **Um campo que o operador preenche e nunca mais vê de volta
 ### As chaves que o operador não tem
 
 `custo.ver` · `rolo.nota` · `cadastro.editar` · `parametro.editar` ·
-`sobra.descartar` · `rolo.ajustar` · `painel.ler`
+`sobra.descartar` · `sobra.corrigir` · `rolo.ajustar` · `painel.ler`
 
 > **O que tirar o `painel.ler` custa:** o cortador deixa de ver Encalhe,
 > Refugo, Recusas e Cortes. Nenhum é necessário para cortar — o plano já sugere
@@ -1181,7 +1181,7 @@ cor, medida, condição, endereço — já marcados no valor atual.
 
 | Regra | Por quê |
 |---|---|
-| **Quem lança corrige** (`sobra.corrigir`, no cortador) | Quem percebe o erro está com o retalho na mão. Mesma porta do *mover rolo*. Descartar continua só da chefia: correção não é baixa, a peça segue na prateleira |
+| **Só a chefia corrige** (`sobra.corrigir`, fora do cortador) | Decisão do dono: *a chefia aceita a correção*. Trocar o tecido muda de prateleira no sistema — o plano passa a oferecer a sobra para outra cor — e é mexida que se quer com alguém olhando. A bancada vê a marca "corrigida" e o histórico, não o botão |
 | **Só a sobra `disponivel`** | A usada já entrou num plano confirmado com aquele tecido; a descartada já virou linha de refugo com aquela área. Mexer nelas reescreveria uma história contada em outra tabela |
 | **Cada campo corrigido é uma linha em `sobra_correcao`** | De → para, como se lê na tela (não o id), com quem e quando. É a memória do rolo (`movimento_rolo` com delta zero), para o que a sobra tem de editável |
 | **Salvar sem mudar nada não grava linha** | Histórico que não conta nada ninguém lê |

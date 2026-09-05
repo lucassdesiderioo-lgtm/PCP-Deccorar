@@ -207,11 +207,12 @@ module.exports=[
   recusa(()=>sobra.corrigir(s.id,{largura:'2,00'},'Cortador'),'sobra_indisponivel');
 }},
 
-{nome:'o cortador corrige, e so a chefia descarta', executar({igual}){
+{nome:'corrigir e descartar sao da chefia — o cortador so lanca', executar({igual}){
   const {pode}=require('../nucleo/permissoes');
-  igual(pode({papel:'cortador'},'sobra.corrigir'),true,'quem lancou conserta');
-  igual(pode({papel:'cortador'},'sobra.descartar'),false,'mas a baixa continua da chefia');
-  igual(pode({papel:'diretor'},'sobra.corrigir'),true,'a chefia tambem corrige');
+  igual(pode({papel:'cortador'},'sobra.criar'),true,'o cortador cataloga');
+  igual(pode({papel:'cortador'},'sobra.corrigir'),false,'mas nao corrige: a chefia aceita a correcao');
+  igual(pode({papel:'cortador'},'sobra.descartar'),false,'e nao descarta');
+  igual(pode({papel:'diretor'},'sobra.corrigir'),true,'a chefia corrige');
 }},
 
 {nome:'lote de etiquetas com quantidade invalida e recusado', executar({recusa}){

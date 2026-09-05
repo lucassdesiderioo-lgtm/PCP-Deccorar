@@ -23,12 +23,12 @@ const CHAVES=[
   {chave:'parametro.editar',  nome:'Editar parametros do calculo'},
   {chave:'sobra.ler',         nome:'Ver sobras'},
   {chave:'sobra.criar',       nome:'Cadastrar sobra (mutirao e corte)'},
-  /* CORRIGIR E DA BANCADA, como mover rolo: quem percebe que a sobra entrou
-     com o tecido errado e quem esta com o retalho na mao. Sem esta chave a
-     alternativa nao e esperar a chefia — e deixar errado, e o plano de corte
-     passa a oferecer um retalho bege para uma peca cinza. Nao e baixa (a
-     peca continua na prateleira), e cada campo corrigido deixa linha de
-     historico com quem e quando. Descartar continua so com a chefia. */
+  /* CORRIGIR E DA CHEFIA, por decisao do dono (05/09/2026): e ela que aceita
+     a correcao. A sobra lancada com o tecido errado muda de prateleira no
+     sistema — o plano de corte passa a oferece-la para OUTRA cor —, e isso e
+     o tipo de mexida que se quer com alguem olhando. Cada campo corrigido
+     deixa linha de historico com quem e quando. A bancada ve a sobra marcada
+     como "corrigida" e o historico, mas nao ve o botao. */
   {chave:'sobra.corrigir',    nome:'Corrigir sobra lancada errada (tecido, medida, condicao, endereco)'},
   {chave:'sobra.descartar',   nome:'Descartar sobra'},
   {chave:'etiqueta.imprimir', nome:'Imprimir lote de etiquetas de sobra'},
@@ -51,7 +51,7 @@ const PAPEIS={
   diretor:['*'],
   cortador:[
     'cadastro.ler','endereco.criar',
-    'parametro.ler','sobra.ler','sobra.criar','sobra.corrigir','etiqueta.imprimir',
+    'parametro.ler','sobra.ler','sobra.criar','etiqueta.imprimir',
     'rolo.ler','rolo.entrada','rolo.encerrar',
     'plano.calcular','plano.confirmar'
     /* ⚠️ `painel.ler` SAIU DO CORTADOR em 04/09/2026, por decisao do dono.
