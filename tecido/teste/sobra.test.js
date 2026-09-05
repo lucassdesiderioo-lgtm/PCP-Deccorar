@@ -47,6 +47,10 @@ module.exports=[
   igual(s.codigo,'S-000001','codigo gravado');
   perto(s.area,1.90*2.60,'area calculada pelo banco');
   igual(s.status,'disponivel','estado inicial');
+  // O endereco vai escrito: a sobra existe para ser achada, e a lista tem
+  // que dizer ONDE, no mesmo formato de todo o modulo.
+  igual(s.endereco,'SOBRA · S1-01-01','endereco descrito na resposta');
+  igual(sobra.listar({status:'disponivel'})[0].endereco,'SOBRA · S1-01-01','e na lista tambem');
   igual(etiqueta.pendentes().length,antes-1,'saiu da lista de pendencia');
 }},
 

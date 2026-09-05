@@ -331,7 +331,8 @@ async function telaLancar(pai){
       el('td',{texto:s.codigo}),
       el('td',{texto:[s.linha_nome,s.abertura_nome,s.cor_nome].join(' · ')}),
       el('td',{class:'num',texto:formatarMedida(s.largura,s.altura)}),
-      el('td',{class:'num',texto:formatarArea(s.area)})
+      el('td',{class:'num',texto:formatarArea(s.area)}),
+      el('td',{class:'quem',texto:s.endereco||''})
     ])));
     cU.appendChild(t);
     pai.appendChild(cU);
@@ -414,7 +415,7 @@ async function telaLista(pai){
   const t=el('table',{});
   t.appendChild(el('tr',{},[el('th',{texto:'Etiqueta'}),el('th',{texto:'Tecido'}),
     el('th',{class:'num',texto:'Medida'}),el('th',{class:'num',texto:'Area'}),
-    el('th',{texto:'Condicao'}),el('th',{class:'num',texto:'Parada'}),el('th',{texto:''})]));
+    el('th',{texto:'Condicao'}),el('th',{texto:'Endereco'}),el('th',{class:'num',texto:'Parada'}),el('th',{texto:''})]));
   const linhas=[];
   sobras.forEach(s=>{
     const acoes=[];
@@ -448,10 +449,14 @@ async function telaLista(pai){
       el('td',{class:'num',texto:formatarMedida(s.largura,s.altura)}),
       el('td',{class:'num',texto:formatarArea(s.area)}),
       el('td',{texto:s.condicao_nome||s.condicao}),
+      // O endereco e para que a sobra exista: sem ele a linha diz o que a
+      // peca e, e nao onde esta. Vem do servidor no formato unico.
+      el('td',{style:'white-space:nowrap',texto:s.endereco||''}),
       el('td',{class:'num',texto:s.dias_parada+' d'}),
       el('td',{style:'text-align:right;white-space:nowrap'},acoes)
     ]);
-    tr.dataset.busca=normalizar(s.codigo+' '+nomeTecido);
+    // A busca acha tambem pelo endereco: "S1 2" lista a prateleira inteira.
+    tr.dataset.busca=normalizar(s.codigo+' '+nomeTecido+' '+(s.endereco||''));
     linhas.push(tr); t.appendChild(tr);
   });
   const filtrar=()=>{
@@ -567,6 +572,7 @@ async function cartaoCorrigir(pai,s,modo){
       'Marque como a sobra deveria estar. Nada muda agora: a chefia recebe o apontamento, confere e aceita ou recusa — e a resposta aparece nesta sobra.'}));
     c.appendChild(el('p',{class:'nota',texto:'Hoje: '+[s.linha_nome,s.abertura_nome,s.cor_nome].join(' · ')+
       '  ·  '+formatarMedida(s.largura,s.altura)+'  ·  '+(s.condicao_nome||s.condicao)+
+      (s.endereco?'  ·  '+s.endereco:'')+
       '  ·  lancada por '+(s.criado_por||'?')+' em '+String(s.criado_em).slice(0,10)}));
 
     // 1. o tecido
