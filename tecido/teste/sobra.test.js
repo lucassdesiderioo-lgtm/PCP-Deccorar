@@ -207,12 +207,89 @@ module.exports=[
   recusa(()=>sobra.corrigir(s.id,{largura:'2,00'},'Cortador'),'sobra_indisponivel');
 }},
 
-{nome:'corrigir e descartar sao da chefia — o cortador so lanca', executar({igual}){
+{nome:'corrigir e descartar sao da chefia — o cortador lanca e APONTA', executar({igual}){
   const {pode}=require('../nucleo/permissoes');
   igual(pode({papel:'cortador'},'sobra.criar'),true,'o cortador cataloga');
+  igual(pode({papel:'cortador'},'sobra.propor'),true,'e aponta o erro');
   igual(pode({papel:'cortador'},'sobra.corrigir'),false,'mas nao corrige: a chefia aceita a correcao');
   igual(pode({papel:'cortador'},'sobra.descartar'),false,'e nao descarta');
   igual(pode({papel:'diretor'},'sobra.corrigir'),true,'a chefia corrige');
+}},
+
+/* ── O APONTAMENTO — a bancada aponta, a chefia aceita ou recusa ─────────── */
+
+{nome:'a bancada aponta o tecido errado: nada muda na sobra ate a chefia aceitar', executar({igual,perto}){
+  const c=montar();
+  const s=sobra.criar({codigo:'S-000006',tecido_id:c.tecido.id,largura:'1,00',altura:'2,00',
+    condicao:'integra',nivel_id:c.nivelSobra},'Ana');
+  const p=sobra.propor(s.id,{tecido_id:cena.tecidoCerto.id,largura:'1,00',condicao:'furo',motivo:'veio bege, e cinza'},'Ana');
+  igual(p.status,'pendente','espera a chefia');
+  igual(p.criado_por,'Ana','quem apontou');
+  igual(p.motivo,'veio bege, e cinza','o que ela viu');
+  igual(p.itens.length,2,'so o que muda vira item: tecido e condicao (a largura veio igual)');
+  igual(p.itens[0].campo,'tecido','tecido');
+  igual(p.itens[0].de.includes('Cinza')&&p.itens[0].para.includes('Bege Correcao'),true,'de -> para legivel');
+  igual(p.largura,null,'campo igual ao atual nao e guardado na proposta');
+
+  const agora=sobra.porId(s.id);
+  igual(agora.tecido_id,c.tecido.id,'a sobra NAO mudou');
+  igual(agora.propostas_pendentes,1,'mas a lista sabe que ha apontamento esperando');
+  igual(sobra.correcoes(s.id).length,0,'e nao ha correcao ainda');
+  igual(sobra.propostasPendentes(),1,'uma pendente no total');
+  cena.proposta=p;
+}},
+
+{nome:'apontar sem mudar nada e recusado, e a sobra so tem UM apontamento pendente', executar({recusa}){
+  const c=montar();
+  const s=sobra.porCodigo('S-000006');
+  recusa(()=>sobra.propor(s.id,{tecido_id:s.tecido_id,largura:'1,00'},'Ana'),'nada_mudou');
+  recusa(()=>sobra.propor(s.id,{altura:'3,00'},'Bia'),'proposta_pendente');
+  // As guardas do lancamento valem no apontamento tambem.
+  const s2=sobra.porCodigo('S-000004');
+  recusa(()=>sobra.propor(s2.id,{largura:190},'Ana'),'medida_absurda');
+  recusa(()=>sobra.propor(s2.id,{nivel_id:c.nivelRolo},'Ana'),'armazem_errado');
+}},
+
+{nome:'recusar exige motivo e deixa a sobra como estava', executar({recusa,igual}){
+  const s=sobra.porCodigo('S-000006');
+  const p2=sobra.propor(sobra.porCodigo('S-000004').id,{altura:'2,50'},'Ana');
+  recusa(()=>sobra.recusar(p2.id,'  ','Diretor'),'motivo_obrigatorio');
+  const r=sobra.recusar(p2.id,'Medi aqui: e 2,00 mesmo','Diretor');
+  igual(r.status,'recusada','recusada');
+  igual(r.decidido_por,'Diretor','por quem');
+  igual(r.decisao_motivo,'Medi aqui: e 2,00 mesmo','e a bancada le por que');
+  igual(sobra.porCodigo('S-000004').altura,2,'a sobra ficou como estava');
+  recusa(()=>sobra.aceitar(p2.id,'Diretor'),'proposta_decidida');
+  igual(sobra.porId(s.id).propostas_pendentes,1,'a da S-000006 continua pendente');
+}},
+
+{nome:'aceitar vira correcao pelo mesmo caminho, com o rastro apontando para quem apontou', executar({igual}){
+  const c=montar();
+  const r=sobra.aceitar(cena.proposta.id,'Diretor');
+  igual(r.proposta.status,'aceita','aceita');
+  igual(r.proposta.decidido_por,'Diretor','por quem');
+  igual(r.mudancas.length,2,'duas mudancas aplicadas');
+  igual(r.sobra.tecido_id,cena.tecidoCerto.id,'a sobra agora e do tecido certo');
+  igual(r.sobra.condicao,'furo','e com a condicao apontada');
+  igual(r.sobra.propostas_pendentes,0,'nada mais pendente nela');
+
+  const h=sobra.correcoes(r.sobra.id);
+  igual(h.length,2,'duas linhas de correcao');
+  igual(h[0].usuario_nome,'Diretor','quem aceitou');
+  igual(h[0].proposto_por,'Ana','quem apontou');
+  igual(h[0].proposta_id,cena.proposta.id,'ligada ao apontamento');
+  igual(sobra.propostas({sobra_id:r.sobra.id}).length,1,'o apontamento fica na historia da sobra');
+  igual(sobra.propostasPendentes(),0,'fila da chefia vazia');
+}},
+
+{nome:'apontamento de sobra que ja foi descartada nao se aceita', executar({recusa}){
+  const c=montar();
+  const s=sobra.criar({codigo:'S-000007',tecido_id:c.tecido.id,largura:'1,00',altura:'1,00',
+    condicao:'integra',nivel_id:c.nivelSobra},'Ana');
+  const p=sobra.propor(s.id,{condicao:'mancha'},'Ana');
+  sobra.descartar(s.id,'Rasgou','Diretor');
+  recusa(()=>sobra.aceitar(p.id,'Diretor'),'sobra_indisponivel');
+  recusa(()=>sobra.propor(s.id,{condicao:'furo'},'Ana'),'sobra_indisponivel');
 }},
 
 {nome:'lote de etiquetas com quantidade invalida e recusado', executar({recusa}){

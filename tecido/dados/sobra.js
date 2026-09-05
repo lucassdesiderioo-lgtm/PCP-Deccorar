@@ -8,7 +8,8 @@ const CAMPOS=`s.id, s.codigo, s.tecido_id, s.largura, s.altura, s.area, s.condic
   t.permite_girar,
   cs.nome AS condicao_nome, cs.aproveitavel, cs.prioridade,
   CAST(julianday('now','localtime')-julianday(s.criado_em) AS INTEGER) AS dias_parada,
-  (SELECT COUNT(*) FROM sobra_correcao sc WHERE sc.sobra_id=s.id) AS correcoes`;
+  (SELECT COUNT(*) FROM sobra_correcao sc WHERE sc.sobra_id=s.id) AS correcoes,
+  (SELECT COUNT(*) FROM sobra_proposta sp WHERE sp.sobra_id=s.id AND sp.status='pendente') AS propostas_pendentes`;
 
 const DE=`FROM sobra s
   JOIN tecido t ON t.id=s.tecido_id
@@ -61,12 +62,18 @@ function atualizar(id,d){
 }
 
 const registrarCorrecao=c=>db.prepare(
-  'INSERT INTO sobra_correcao(sobra_id,campo,de,para,usuario_nome) VALUES(?,?,?,?,?)')
-  .run(c.sobra_id,c.campo,c.de==null?null:String(c.de),c.para==null?null:String(c.para),c.usuario_nome||null);
+  'INSERT INTO sobra_correcao(sobra_id,campo,de,para,usuario_nome,proposta_id) VALUES(?,?,?,?,?,?)')
+  .run(c.sobra_id,c.campo,c.de==null?null:String(c.de),c.para==null?null:String(c.para),
+       c.usuario_nome||null,c.proposta_id||null);
 
-const correcoes=sobra_id=>db.prepare(
-  'SELECT id, campo, de, para, usuario_nome, criado_em FROM sobra_correcao WHERE sobra_id=? ORDER BY id DESC')
-  .all(sobra_id);
+// Com quem APONTOU, quando a correcao nasceu de um apontamento da bancada:
+// "proposto por Ana, aceito por Lucas" conta mais que so "Lucas".
+const correcoes=sobra_id=>db.prepare(`
+  SELECT sc.id, sc.campo, sc.de, sc.para, sc.usuario_nome, sc.criado_em,
+         sc.proposta_id, p.criado_por AS proposto_por
+    FROM sobra_correcao sc
+    LEFT JOIN sobra_proposta p ON p.id=sc.proposta_id
+   WHERE sc.sobra_id=? ORDER BY sc.id DESC`).all(sobra_id);
 
 // O numero do painel (fase 7) e do cruzamento "sem rolo, com retalho".
 const resumoPorTecido=()=>db.prepare(`

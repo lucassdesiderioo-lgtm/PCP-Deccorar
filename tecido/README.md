@@ -61,7 +61,7 @@ não só a tela.
 |---|---|---|---|
 | 1 | Margem entre peças? | **Não — as peças encostam.** `margem = 0` | parâmetro cadastrável; muda todo o encaixe |
 | 2 | Peça mais larga que a bobina? | **Sempre entregar o plano de menor desperdício.** A peça que fisicamente não cabe volta *marcada com o motivo* e o resto é planejado — o plano nunca deixa de sair | `dominio/plano.js`, fase 4/6 |
-| 3 | Quem descarta ou corrige sobra? | **Só a chefia.** `sobra.descartar` e `sobra.corrigir` não estão no papel `cortador` | `nucleo/permissoes.js` |
+| 3 | Quem descarta ou corrige sobra? | **Só a chefia.** `sobra.descartar` e `sobra.corrigir` não estão no papel `cortador`. A bancada **aponta** (`sobra.propor`) e a chefia aceita | `nucleo/permissoes.js` |
 | 4 | Sobra com defeito parcial? | **Entra, mas por último** | `condicao_sobra.prioridade` e `.aproveitavel` |
 | 5 | Leitor na bancada? | **Sim.** Campo de bipe visível, aceita Enter e Tab, processa por timeout | telas das fases 2 e 4 |
 | 6 | Sequência das etiquetas? | **O sistema imprime.** Escolhe-se a quantidade, ele gera a sequência e registra o lote; a sobra nasce quando o operador bipa a etiqueta colada | tabelas `etiqueta` e `etiqueta_lote` |
@@ -1192,13 +1192,45 @@ A sobra corrigida sai **marcada** na lista, e o cartão mostra as correções
 anteriores embaixo. A auditoria da rota registra só o que **mudou**, não o
 corpo inteiro — o corpo traz a tela toda, quase tudo igual ao que já estava.
 
+### A bancada APONTA, a chefia ACEITA
+
+Quem corrige é a chefia — mas quem **percebe** o erro é a bancada, com o
+retalho na mão. Se ela não tem onde registrar o que viu, o erro fica na cabeça
+dela até a chefia passar por ali: dado na memória em vez de no sistema, a
+doença de sempre.
+
+```
+BANCADA   Catálogo → Apontar erro → marca o certo + motivo → Enviar para a chefia
+CHEFIA    Início avisa "N sobra(s) apontada(s)" → Catálogo → Aceitar / Recusar
+```
+
+| Regra | Por quê |
+|---|---|
+| **O apontamento não muda a sobra** (`sobra_proposta`, `sobra.propor` no cortador) | Vira correção **só** quando a chefia aceita — e aceitar passa pelo mesmo `corrigir`: uma porta só para mudar a sobra, venha a mudança de quem vier |
+| **Guarda só o que a bancada quer mudar** | Os outros campos ficam `NULL`. O que a chefia lê é `de → para`, campo a campo, contra a sobra **como está agora** |
+| **Uma sobra, um apontamento pendente** | Dois apontamentos discordando sobre a mesma sobra não é informação, é ruído para quem decide. A segunda pessoa vê "aguardando chefia" e fala com a primeira |
+| **Apontar sem mudar nada é recusado** | Aceitar em silêncio mandaria a bancada embora achando que avisou |
+| **Recusar exige motivo** | Quem apontou lê a decisão na própria sobra, e um "não" sem explicação ensina a não apontar mais |
+| **O rastro diz quem apontou e quem aceitou** | `sobra_correcao.proposta_id` liga a correção ao apontamento: o histórico escreve *apontado por Ana, aceito por Lucas* |
+| **A mesma comparação nos dois lados** (`diferencas`) | A bancada não pode propor o que a chefia não poderia gravar, e a chefia não vê uma diferença diferente da que a bancada viu |
+
+A fila da chefia fica **no topo do Catálogo** e **na tela Início**, e some
+quando está vazia. A tela Início existe para isso: se a chefia só descobre o
+apontamento quando abre Sobras por outro motivo, *"a chefia decide depois"*
+vira *"ninguém decide"* — a meia-decisão da armadilha #14.
+
+O mesmo cartão serve à bancada (modo apontar, com o campo de motivo) e à chefia
+(modo corrigir). Dois cartões diferentes ensinariam a equipe a achar que são
+duas coisas.
+
 O campo **Procurar** no topo do Catálogo aceita o **bipe da etiqueta** e filtra
 a tabela sem redesenhar: com centenas de linhas, corrigir a `S-000142` é
 primeiro achar a `S-000142`, e o operador está com ela na mão.
 
-**Teste obrigatório:** `node teste/rodar.js` — os 6 casos de correção em
-`teste/sobra.test.js` travam o rastro, a área refeita, o "nada mudou", as
-guardas e o status.
+**Teste obrigatório:** `node teste/rodar.js` — os 11 casos de correção e
+apontamento em `teste/sobra.test.js` travam o rastro, a área refeita, o "nada
+mudou", as guardas, o status, o apontamento único, a recusa com motivo e a
+aceitação ligada a quem apontou.
 
 ---
 

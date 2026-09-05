@@ -29,7 +29,12 @@ const CHAVES=[
      o tipo de mexida que se quer com alguem olhando. Cada campo corrigido
      deixa linha de historico com quem e quando. A bancada ve a sobra marcada
      como "corrigida" e o historico, mas nao ve o botao. */
-  {chave:'sobra.corrigir',    nome:'Corrigir sobra lancada errada (tecido, medida, condicao, endereco)'},
+  {chave:'sobra.corrigir',    nome:'Corrigir sobra lancada errada, e aceitar ou recusar o que a bancada apontou'},
+  /* APONTAR E DA BANCADA. Quem percebe o erro esta com o retalho na mao; se
+     nao tem onde registrar, o erro fica na cabeca dela ate a chefia passar
+     por ali — dado na memoria em vez de no sistema, a doenca de sempre. O
+     apontamento nao muda a sobra: vira correcao so quando a chefia aceita. */
+  {chave:'sobra.propor',      nome:'Apontar erro numa sobra para a chefia corrigir'},
   {chave:'sobra.descartar',   nome:'Descartar sobra'},
   {chave:'etiqueta.imprimir', nome:'Imprimir lote de etiquetas de sobra'},
   /* VER PRECO E CHAVE SEPARADA, e quem nao tem NAO RECEBE OS CAMPOS — o JSON
@@ -51,7 +56,7 @@ const PAPEIS={
   diretor:['*'],
   cortador:[
     'cadastro.ler','endereco.criar',
-    'parametro.ler','sobra.ler','sobra.criar','etiqueta.imprimir',
+    'parametro.ler','sobra.ler','sobra.criar','sobra.propor','etiqueta.imprimir',
     'rolo.ler','rolo.entrada','rolo.encerrar',
     'plano.calcular','plano.confirmar'
     /* ⚠️ `painel.ler` SAIU DO CORTADOR em 04/09/2026, por decisao do dono.
