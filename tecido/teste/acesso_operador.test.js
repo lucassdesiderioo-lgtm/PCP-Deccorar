@@ -129,13 +129,13 @@ module.exports=[
 {nome:'AS CHAVES que o operador nao tem, e nao pode ganhar por engano',
  executar({igual}){
   ['custo.ver','rolo.nota','cadastro.editar','parametro.editar',
-   'sobra.descartar','rolo.ajustar']
+   'sobra.descartar','sobra.corrigir','rolo.ajustar']
     .forEach(k=>igual(pode(CORTADOR,k),false,'o cortador NAO tem '+k));
 
   // Toda chave existe de verdade — um `pode()` com nome errado devolve false
   // e pareceria uma trava funcionando.
   ['custo.ver','rolo.nota','cadastro.editar','parametro.editar',
-   'sobra.descartar','rolo.ajustar']
+   'sobra.descartar','sobra.corrigir','rolo.ajustar']
     .forEach(k=>igual(CHAVES.some(c=>c.chave===k),true,k+' esta declarada'));
 
   igual(PAPEIS.diretor.includes('*'),true,'e o diretor alcanca tudo');

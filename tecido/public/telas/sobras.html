@@ -51,7 +51,10 @@ const estado={
   // A medida escolhida sobrevive ao redesenho da tela (trocar condicao ou
   // endereco recria os campos). Os limites da lista vem de `parametro`.
   codigo:'', larg:'', alt:'', parametros:null,
-  naSessao:0
+  naSessao:0,
+  // Catalogo: qual sobra esta aberta ({id, modo:'corrigir'|'propor'}), e o
+  // filtro digitado.
+  corrigindo:null, filtro:''
 };
 
 const ABAS=[{id:'lancar',nome:'Lancar sobra'},{id:'lista',nome:'Catalogo'}];
@@ -122,6 +125,36 @@ function listaMedida(min,max,valorAtual){
   return sel;
 }
 
+/* O TECIDO EM TRES FILEIRAS — linha, colecao, cor — e a mesma escolha no
+   lancamento e na correcao. Uma derivacao so: duas copias divergiriam no dia
+   em que uma passasse a esconder tecido inativo e a outra nao. */
+function opcoesTecido(tecidos,tecidoId){
+  const linhas=[], aberturas=[], cores=[];
+  tecidos.filter(t=>t.ativo).forEach(t=>{
+    if(!linhas.some(x=>x.valor===t.linha_id)) linhas.push({valor:t.linha_id,nome:t.linha_nome});
+  });
+  const sel=tecidos.find(t=>t.id===tecidoId);
+  const linhaSel=sel?sel.linha_id:(linhas[0]&&linhas[0].valor);
+  tecidos.filter(t=>t.ativo&&t.linha_id===linhaSel).forEach(t=>{
+    if(!aberturas.some(x=>x.valor===t.abertura_id)) aberturas.push({valor:t.abertura_id,nome:t.abertura_nome});
+  });
+  const aberturaSel=sel&&sel.linha_id===linhaSel?sel.abertura_id:(aberturas[0]&&aberturas[0].valor);
+  tecidos.filter(t=>t.ativo&&t.linha_id===linhaSel&&t.abertura_id===aberturaSel)
+    .forEach(t=>cores.push({valor:t.cor_id,nome:t.cor_nome,tecido_id:t.id}));
+  return {linhas,aberturas,cores,sel,linhaSel,aberturaSel};
+}
+// O tecido mais proximo da escolha: trocar de linha cai na primeira colecao
+// e cor dela, trocar de colecao cai na primeira cor.
+const tecidoPor=(tecidos,linha_id,abertura_id,cor_id)=>
+  tecidos.find(x=>x.linha_id===linha_id&&x.abertura_id===abertura_id&&x.cor_id===cor_id)
+  ||tecidos.find(x=>x.linha_id===linha_id&&x.abertura_id===abertura_id)
+  ||tecidos.find(x=>x.linha_id===linha_id);
+function fileirasTecido(pai,op,escolher){
+  pai.appendChild(fileira('LINHA',op.linhas,op.linhaSel,v=>escolher(v,null,null)));
+  pai.appendChild(fileira('COLECAO',op.aberturas,op.aberturaSel,v=>escolher(op.linhaSel,v,null)));
+  pai.appendChild(fileira('COR',op.cores,op.sel?op.sel.cor_id:null,v=>escolher(op.linhaSel,op.aberturaSel,v)));
+}
+
 // ── LANCAR ───────────────────────────────────────────────────────────────
 async function telaLancar(pai){
   estado.tecidos=await api('/api/tecidos');
@@ -170,30 +203,13 @@ async function telaLancar(pai){
   c.appendChild(aviso);
 
   // 2. o tecido, em tres fileiras de botoes
-  const linhas=[], aberturas=[], cores=[];
-  estado.tecidos.filter(t=>t.ativo).forEach(t=>{
-    if(!linhas.some(x=>x.valor===t.linha_id)) linhas.push({valor:t.linha_id,nome:t.linha_nome});
-  });
-  const sel=estado.tecidos.find(t=>t.id===estado.tecido_id);
-  const linhaSel=sel?sel.linha_id:(linhas[0]&&linhas[0].valor);
-  estado.tecidos.filter(t=>t.ativo&&t.linha_id===linhaSel).forEach(t=>{
-    if(!aberturas.some(x=>x.valor===t.abertura_id)) aberturas.push({valor:t.abertura_id,nome:t.abertura_nome});
-  });
-  const aberturaSel=sel&&sel.linha_id===linhaSel?sel.abertura_id:(aberturas[0]&&aberturas[0].valor);
-  estado.tecidos.filter(t=>t.ativo&&t.linha_id===linhaSel&&t.abertura_id===aberturaSel)
-    .forEach(t=>cores.push({valor:t.cor_id,nome:t.cor_nome,tecido_id:t.id}));
-
+  const op=opcoesTecido(estado.tecidos,estado.tecido_id);
   const escolherTecido=(linha_id,abertura_id,cor_id)=>{
-    const t=estado.tecidos.find(x=>x.linha_id===linha_id&&x.abertura_id===abertura_id&&x.cor_id===cor_id)
-      ||estado.tecidos.find(x=>x.linha_id===linha_id&&x.abertura_id===abertura_id)
-      ||estado.tecidos.find(x=>x.linha_id===linha_id);
+    const t=tecidoPor(estado.tecidos,linha_id,abertura_id,cor_id);
     if(t){ estado.tecido_id=t.id; memoria.set('tecido',t.id); }
     telaLancar($('#conteudo'));
   };
-
-  c.appendChild(fileira('LINHA',linhas,linhaSel,v=>escolherTecido(v,null,null)));
-  c.appendChild(fileira('COLECAO',aberturas,aberturaSel,v=>escolherTecido(linhaSel,v,null)));
-  c.appendChild(fileira('COR',cores,sel?sel.cor_id:null,v=>escolherTecido(linhaSel,aberturaSel,v)));
+  fileirasTecido(c,op,escolherTecido);
 
   /* 3. as medidas — LISTA, nao campo digitado. Os limites saem de
      `parametro` (Cadastros -> Parametros), e nao do codigo: a bancada acha
@@ -356,14 +372,59 @@ async function telaLista(pai){
     : el('div',{class:'vazio',texto:'Nenhuma etiqueta solta.'}));
   pai.appendChild(cP);
 
+  const podeCorrigir=(eu.permissoes||[]).includes('sobra.corrigir');
+  const podePropor=(eu.permissoes||[]).includes('sobra.propor');
+
+  // O QUE A BANCADA APONTOU, para a chefia decidir — em cima de tudo, porque
+  // e trabalho esperando gente. Some inteiro quando nao ha nada: um cartao
+  // permanente escrito "nada apontado" ensina o olho a pular a regiao.
+  if(podeCorrigir){
+    const pend=await api('/api/sobras/propostas');
+    if(pend.length) cartaoApontamentos(pai,pend);
+  }
+
+  // O cartao de correcao abre ACIMA da tabela, como a nota do rolo: a linha
+  // continua visivel embaixo, e cancelar volta para onde a pessoa estava.
+  if(estado.corrigindo){
+    const s=sobras.find(x=>x.id===estado.corrigindo.id);
+    if(s) await cartaoCorrigir(pai,s,estado.corrigindo.modo);
+    else estado.corrigindo=null;
+  }
+
   const c=el('div',{class:'cartao'});
   c.appendChild(el('h2',{texto:'Catalogo ('+sobras.length+' disponiveis)'}));
+
+  /* ACHAR A SOBRA PELO BIPE. Com centenas de linhas, "corrigir a S-000142" e
+     primeiro achar a S-000142 — e o operador esta com a etiqueta na mao. O
+     campo filtra a tabela sem redesenhar nada, por codigo ou pelo nome do
+     tecido, e aceita o que o leitor mandar (Enter, Tab, espaco no meio). */
+  const busca=el('input',{type:'text',autocomplete:'off',autocorrect:'off',autocapitalize:'off',
+    spellcheck:'false',placeholder:'bipe a etiqueta ou digite o tecido para filtrar',
+    style:'font-size:20px;min-height:52px',value:estado.filtro||''});
+  const boxBusca=el('div',{class:'campo cresce'});
+  boxBusca.appendChild(el('label',{texto:'PROCURAR'}));
+  boxBusca.appendChild(busca);
+  c.appendChild(el('div',{class:'campos'},[boxBusca]));
+
+  // O leitor manda o codigo com Tab, espaco ou quebra no meio, e o hifen do
+  // S-000142 pode vir ou nao. A MESMA regua nos dois lados: so letra e
+  // numero contam, e tudo o mais vira espaco. Regua diferente para a linha e
+  // para o que foi digitado e o que faria a busca nao achar o que esta ali.
+  const normalizar=t=>String(t||'').toLowerCase().replace(/[^a-z0-9à-ÿ]+/g,' ').trim();
   const t=el('table',{});
   t.appendChild(el('tr',{},[el('th',{texto:'Etiqueta'}),el('th',{texto:'Tecido'}),
     el('th',{class:'num',texto:'Medida'}),el('th',{class:'num',texto:'Area'}),
     el('th',{texto:'Condicao'}),el('th',{class:'num',texto:'Parada'}),el('th',{texto:''})]));
+  const linhas=[];
   sobras.forEach(s=>{
     const acoes=[];
+    /* Quem corrige ve "Corrigir"; quem so aponta ve "Apontar erro" — e nao ve
+       nada enquanto ha um apontamento esperando: a segunda pessoa a achar a
+       mesma sobra errada fala com a primeira, em vez de abrir outro. */
+    if(podeCorrigir) acoes.push(el('button',{class:'bt pequeno',texto:'Corrigir',
+      onclick:()=>{ estado.corrigindo={id:s.id,modo:'corrigir'}; telaLista($('#conteudo')); }}));
+    else if(podePropor&&!s.propostas_pendentes) acoes.push(el('button',{class:'bt pequeno',texto:'Apontar erro',
+      onclick:()=>{ estado.corrigindo={id:s.id,modo:'propor'}; telaLista($('#conteudo')); }}));
     if(eu.papel==='diretor') acoes.push(el('button',{class:'bt pequeno perigo',texto:'Descartar',onclick:async()=>{
       const motivo=prompt('Por que a sobra '+s.codigo+' esta sendo descartada?');
       if(!motivo) return;
@@ -371,18 +432,266 @@ async function telaLista(pai){
       banner('Sobra descartada — a perda ficou medida no refugo.','alerta');
       await telaLista($('#conteudo'));
     }}));
-    t.appendChild(el('tr',{},[
-      el('td',{texto:s.codigo}),
-      el('td',{texto:[s.linha_nome,s.abertura_nome,s.cor_nome].join(' · ')}),
+    const nomeTecido=[s.linha_nome,s.abertura_nome,s.cor_nome].join(' · ');
+    // A sobra ja corrigida fica marcada: quem le a lista sabe que aquela
+    // linha ja foi outra coisa, e o historico esta a um toque no Corrigir.
+    const celCod=el('td',{},[s.codigo]);
+    if(s.propostas_pendentes) celCod.appendChild(el('span',{class:'tag rolo',style:'margin-left:8px',
+      title:'a bancada apontou um erro nesta sobra; a chefia ainda nao decidiu',
+      texto:'aguardando chefia'}));
+    if(s.correcoes) celCod.appendChild(el('span',{class:'tag sobra',style:'margin-left:8px',
+      title:s.correcoes+' correcao(oes) — abra a sobra para ver o historico',
+      texto:'corrigida'}));
+    const tr=el('tr',{},[
+      celCod,
+      el('td',{texto:nomeTecido}),
       el('td',{class:'num',texto:formatarMedida(s.largura,s.altura)}),
       el('td',{class:'num',texto:formatarArea(s.area)}),
       el('td',{texto:s.condicao_nome||s.condicao}),
       el('td',{class:'num',texto:s.dias_parada+' d'}),
-      el('td',{style:'text-align:right'},acoes)
-    ]));
+      el('td',{style:'text-align:right;white-space:nowrap'},acoes)
+    ]);
+    tr.dataset.busca=normalizar(s.codigo+' '+nomeTecido);
+    linhas.push(tr); t.appendChild(tr);
   });
+  const filtrar=()=>{
+    estado.filtro=busca.value;
+    const partes=normalizar(busca.value).split(' ').filter(Boolean);
+    linhas.forEach(tr=>{ tr.hidden=partes.some(p=>!tr.dataset.busca.includes(p)); });
+  };
+  busca.addEventListener('input',filtrar);
+  busca.addEventListener('keydown',ev=>{ if(ev.key==='Enter'||ev.key==='Tab'){ ev.preventDefault(); filtrar(); } });
+  filtrar();
   c.appendChild(sobras.length?t:el('div',{class:'vazio',texto:'Nada catalogado ainda.'}));
   pai.appendChild(c);
+}
+
+/* ── O QUE A BANCADA APONTOU — a fila de decisao da chefia ───────────────
+   Cada apontamento diz a sobra, como ela esta hoje, o que a bancada acha que
+   e (de -> para, por campo), o motivo e quem apontou. Aceitar vira correcao
+   pelo mesmo caminho do botao Corrigir; recusar pede motivo, porque quem
+   apontou vai ler a resposta na propria sobra. */
+function cartaoApontamentos(pai,pend){
+  const c=el('div',{class:'cartao',style:'border-color:var(--alerta)'});
+  c.appendChild(el('h2',{texto:'Apontado pela bancada — '+pend.length+' sobra(s) esperando decisao'}));
+  c.appendChild(el('p',{class:'nota',texto:
+    'A bancada nao corrige a sobra: ela aponta o que viu com o retalho na mao, e a correcao so acontece quando voce aceita. Recusar pede motivo — quem apontou le a resposta na sobra.'}));
+  pend.forEach(p=>{
+    const bloco=el('div',{style:'border-top:1px solid var(--linha);padding:12px 0'});
+    bloco.appendChild(el('p',{style:'margin:0 0 6px',html:
+      '<b>'+p.sobra_codigo+'</b> · hoje: '+p.sobra_tecido+' · '+formatarMedida(p.sobra_largura,p.sobra_altura)+
+      ' · '+p.sobra_condicao+' · '+p.sobra_endereco}));
+    const t=el('table',{});
+    p.itens.forEach(i=>t.appendChild(el('tr',{},[
+      el('td',{texto:i.campo}),
+      el('td',{texto:String(i.de)}),
+      el('td',{texto:'→'}),
+      el('td',{},[el('b',{texto:String(i.para)})])
+    ])));
+    bloco.appendChild(t);
+    bloco.appendChild(el('p',{class:'ajuda',texto:
+      (p.motivo?'"'+p.motivo+'" — ':'')+'apontado por '+(p.criado_por||'?')+' em '+String(p.criado_em).slice(0,16)}));
+    const btOk=el('button',{class:'bt primario pequeno',texto:'Aceitar',onclick:async()=>{
+      btOk.disabled=true;
+      try{
+        const r=await api('/api/sobras/propostas/'+p.id+'/aceitar',{metodo:'POST'});
+        beep();
+        banner(p.sobra_codigo+(r.mudancas.length
+          ? ' corrigida: '+r.mudancas.map(m=>m.campo+' '+m.de+' → '+m.para).join(' · ')
+          : ': aceito, mas a sobra ja estava assim'),'bom',6);
+        await telaLista($('#conteudo'));
+      }catch(e){ beep('erro'); btOk.disabled=false; }
+    }});
+    const btNao=el('button',{class:'bt pequeno perigo',texto:'Recusar',onclick:async()=>{
+      const motivo=prompt('Por que o apontamento da '+p.sobra_codigo+' esta sendo recusado? Quem apontou vai ler.');
+      if(!motivo||!motivo.trim()) return;
+      try{
+        await api('/api/sobras/propostas/'+p.id+'/recusar',{metodo:'POST',corpo:{motivo}});
+        banner('Apontamento da '+p.sobra_codigo+' recusado — a sobra ficou como estava.','alerta',4);
+        await telaLista($('#conteudo'));
+      }catch(e){ beep('erro'); }
+    }});
+    const btVer=el('button',{class:'bt pequeno',texto:'Abrir sobra',
+      onclick:()=>{ estado.corrigindo={id:p.sobra_id,modo:'corrigir'}; telaLista($('#conteudo')); }});
+    bloco.appendChild(el('div',{class:'campos',style:'margin-top:6px'},[btOk,btNao,btVer]));
+    c.appendChild(bloco);
+  });
+  pai.appendChild(c);
+}
+
+/* ── CORRIGIR (chefia) OU APONTAR (bancada) A SOBRA LANCADA ERRADA ────────
+   O caso que motivou: o mutirao lembra o tecido entre um retalho e o
+   seguinte, e o primeiro da prateleira nova entra com a cor do anterior. Ate
+   aqui a unica saida era o descarte — da chefia, e medindo como perda uma
+   peca que esta inteira na prateleira.
+
+   O MESMO cartao serve aos dois: mostra o que a sobra E hoje e abre os
+   seletores do lancamento, ja marcados com o valor atual. No modo 'corrigir'
+   salvar grava; no modo 'propor' salvar so APONTA — nada muda na sobra ate a
+   chefia aceitar, e a bancada diz o que viu num campo de motivo. Dois
+   cartoes diferentes ensinariam a equipe a achar que sao duas coisas.
+
+   O servidor grava (ou guarda) so o que mudou e responde dizendo o que foi —
+   e e isso que o aviso repete, para a pessoa conferir que consertou (ou
+   apontou) o que queria. O codigo (a etiqueta colada) nao se edita: ele e o
+   que liga o papel a linha, e trocar isso e outra sobra. */
+async function cartaoCorrigir(pai,s,modo){
+  const propondo=modo==='propor';
+  if(!estado.tecidos.length) estado.tecidos=await api('/api/tecidos');
+  if(!estado.condicoes.length) estado.condicoes=await api('/api/condicoes');
+  estado.arvore=await api('/api/enderecos/SOBRA');
+  if(!estado.parametros){
+    const ps=await api('/api/parametros');
+    estado.parametros={}; ps.forEach(x=>{ estado.parametros[x.chave]=x.valor; });
+  }
+  const historico=await api('/api/sobras/'+s.id+'/correcoes');
+  const apontamentos=await api('/api/sobras/'+s.id+'/propostas');
+
+  // O estado da edicao e LOCAL do cartao: mexer aqui nao pode trocar o tecido
+  // lembrado pelo mutirao na aba de lancar.
+  const nivelAtual=(function(){
+    for(const h of estado.arvore) for(const a of h.andares) for(const n of a.niveis)
+      if(n.id===s.nivel_id) return {haste_id:h.id,andar_id:a.id,nivel_id:n.id};
+    return {haste_id:null,andar_id:null,nivel_id:s.nivel_id};
+  })();
+  const ed={tecido_id:s.tecido_id, larg:Number(s.largura).toFixed(2), alt:Number(s.altura).toFixed(2),
+    condicao:s.condicao, ...nivelAtual};
+
+  const c=el('div',{class:'cartao',style:'border-color:var(--acao)'});
+  pai.appendChild(c);
+
+  function montar(){
+    limpar(c);
+    c.appendChild(el('h2',{texto:(propondo?'Apontar erro na sobra ':'Corrigir sobra ')+s.codigo}));
+    if(propondo) c.appendChild(el('p',{class:'nota',texto:
+      'Marque como a sobra deveria estar. Nada muda agora: a chefia recebe o apontamento, confere e aceita ou recusa — e a resposta aparece nesta sobra.'}));
+    c.appendChild(el('p',{class:'nota',texto:'Hoje: '+[s.linha_nome,s.abertura_nome,s.cor_nome].join(' · ')+
+      '  ·  '+formatarMedida(s.largura,s.altura)+'  ·  '+(s.condicao_nome||s.condicao)+
+      '  ·  lancada por '+(s.criado_por||'?')+' em '+String(s.criado_em).slice(0,10)}));
+
+    // 1. o tecido
+    const op=opcoesTecido(estado.tecidos,ed.tecido_id);
+    fileirasTecido(c,op,(linha_id,abertura_id,cor_id)=>{
+      const t=tecidoPor(estado.tecidos,linha_id,abertura_id,cor_id);
+      if(t) ed.tecido_id=t.id;
+      montar();
+    });
+
+    // 2. as medidas — a mesma lista do lancamento, ja no valor de hoje. Se a
+    // medida atual estiver fora do alcance da lista, ela entra como opcao
+    // extra: senao o cartao mostraria "— escolha —" para uma medida que
+    // existe, e salvar cobraria a medida que a pessoa nao veio mudar.
+    const P=estado.parametros||{};
+    const larg=listaMedida(Number(P.sobraLarguraMin||0.5),Number(P.sobraLarguraMax||3),ed.larg);
+    const alt =listaMedida(Number(P.sobraAlturaMin ||0.5),Number(P.sobraAlturaMax ||6),ed.alt);
+    [[larg,ed.larg],[alt,ed.alt]].forEach(([sel,v])=>{
+      if(sel.value!==v){ sel.appendChild(el('option',{value:v,texto:v.replace('.',',')+' m (atual)'})); sel.value=v; }
+    });
+    larg.addEventListener('change',()=>{ ed.larg=larg.value; });
+    alt .addEventListener('change',()=>{ ed.alt =alt.value;  });
+    const medidas=el('div',{class:'campos medidas'});
+    [['LARGURA (m)',larg],['ALTURA (m)',alt]].forEach(([r,input])=>{
+      const b=el('div',{class:'campo cresce'});
+      b.appendChild(el('label',{texto:r})); b.appendChild(input);
+      medidas.appendChild(b);
+    });
+    c.appendChild(medidas);
+
+    // 3. a condicao
+    c.appendChild(fileira('CONDICAO',estado.condicoes.filter(x=>x.ativo||x.chave===ed.condicao)
+      .map(x=>({valor:x.chave,nome:x.nome})),ed.condicao,v=>{ ed.condicao=v; montar(); }));
+
+    // 4. o endereco
+    const hastes=estado.arvore.filter(h=>h.ativo).map(h=>({valor:h.id,nome:h.nome}));
+    const hasteAtual=estado.arvore.find(h=>h.id===ed.haste_id);
+    const andares=hasteAtual?hasteAtual.andares.filter(a=>a.ativo).map(a=>({valor:a.id,nome:a.nome})):[];
+    const andarAtual=hasteAtual&&hasteAtual.andares.find(a=>a.id===ed.andar_id);
+    const niveis=andarAtual?andarAtual.niveis.filter(n=>n.ativo).map(n=>({valor:n.id,nome:n.nome})):[];
+    c.appendChild(fileira('HASTE',hastes,ed.haste_id,v=>{ ed.haste_id=v; ed.andar_id=null; ed.nivel_id=null; montar(); }));
+    c.appendChild(fileira('ANDAR',andares,ed.andar_id,v=>{ ed.andar_id=v; ed.nivel_id=null; montar(); }));
+    c.appendChild(fileira('NIVEL',niveis,ed.nivel_id,v=>{ ed.nivel_id=v; montar(); }));
+
+    // 5. o motivo (so ao apontar) e salvar / cancelar
+    let motivo=null;
+    if(propondo){
+      motivo=el('input',{type:'text',autocomplete:'off',placeholder:'o que voce viu (ex.: veio bege, e cinza)',
+        value:ed.motivo||'',style:'font-size:18px;min-height:52px'});
+      motivo.addEventListener('input',()=>{ ed.motivo=motivo.value; });
+      const b=el('div',{class:'campo cresce'});
+      b.appendChild(el('label',{texto:'MOTIVO (a chefia le isto)'})); b.appendChild(motivo);
+      c.appendChild(el('div',{class:'campos'},[b]));
+    }
+    const bt=el('button',{class:'bt primario',style:'min-height:56px',
+      texto:propondo?'Enviar para a chefia':'Salvar correcao'});
+    bt.onclick=async()=>{
+      if(!ed.tecido_id) return faltou('Escolha o tecido.');
+      if(comoNumero(larg.value)===null) return faltou('Escolha a largura.');
+      if(comoNumero(alt.value)===null) return faltou('Escolha a altura.');
+      if(!ed.condicao) return faltou('Escolha a condicao.');
+      if(!ed.nivel_id) return faltou('Escolha o endereco.');
+      bt.disabled=true;
+      const corpo={tecido_id:ed.tecido_id, largura:larg.value, altura:alt.value,
+        condicao:ed.condicao, nivel_id:ed.nivel_id};
+      try{
+        if(propondo){
+          const p=await api('/api/sobras/'+s.id+'/propostas',{metodo:'POST',corpo:{...corpo,motivo:motivo.value}});
+          beep();
+          banner(s.codigo+' apontada para a chefia: '+p.itens.map(m=>m.campo+' '+m.de+' → '+m.para).join(' · '),'bom',6);
+        }else{
+          const r=await api('/api/sobras/'+s.id,{metodo:'PUT',corpo});
+          if(!r.mudancas.length){ banner('Nada mudou na sobra '+s.codigo+'.','alerta',3); }
+          else{
+            beep();
+            banner(s.codigo+' corrigida: '+r.mudancas.map(m=>m.campo+' '+m.de+' → '+m.para).join(' · '),'bom',6);
+          }
+        }
+        estado.corrigindo=null;
+        await telaLista($('#conteudo'));
+      }catch(e){ beep('erro'); bt.disabled=false; }
+    };
+    const cancelar=el('button',{class:'bt',texto:'Cancelar',
+      onclick:()=>{ estado.corrigindo=null; telaLista($('#conteudo')); }});
+    c.appendChild(el('div',{class:'campos',style:'margin-top:8px'},[bt,cancelar]));
+
+    // 6. o que ja foi corrigido nesta sobra — a memoria da linha. Quando a
+    // correcao nasceu de um apontamento, diz quem apontou e quem aceitou.
+    if(historico.length){
+      c.appendChild(el('h2',{style:'margin-top:16px',texto:'Correcoes anteriores'}));
+      const t=el('table',{});
+      historico.forEach(h=>t.appendChild(el('tr',{},[
+        el('td',{texto:String(h.criado_em).slice(0,16)}),
+        el('td',{texto:h.campo}),
+        el('td',{texto:(h.de==null?'—':h.de)+' → '+(h.para==null?'—':h.para)}),
+        el('td',{class:'quem',texto:h.proposto_por
+          ? 'apontado por '+h.proposto_por+', aceito por '+(h.usuario_nome||'?')
+          : (h.usuario_nome||'')})
+      ])));
+      c.appendChild(t);
+    }
+
+    // 7. os apontamentos — pendentes, aceitos e recusados. E AQUI que a
+    // bancada le a decisao da chefia, e o motivo quando foi "nao".
+    if(apontamentos.length){
+      c.appendChild(el('h2',{style:'margin-top:16px',texto:'Apontamentos da bancada'}));
+      const t=el('table',{});
+      apontamentos.forEach(p=>{
+        const estadoTxt=p.status==='pendente'?'aguardando chefia'
+          :p.status==='aceita'?'aceito por '+(p.decidido_por||'?')+' em '+String(p.decidido_em||'').slice(0,16)
+          :'recusado por '+(p.decidido_por||'?')+(p.decisao_motivo?': "'+p.decisao_motivo+'"':'');
+        t.appendChild(el('tr',{},[
+          el('td',{texto:String(p.criado_em).slice(0,16)}),
+          el('td',{texto:p.itens.map(i=>i.campo+' → '+i.para).join(' · ')}),
+          el('td',{class:'quem',texto:(p.criado_por||'?')+(p.motivo?': "'+p.motivo+'"':'')}),
+          el('td',{},[el('span',{class:'tag '+(p.status==='pendente'?'rolo':p.status==='aceita'?'bom':'off'),
+            texto:estadoTxt})])
+        ]));
+      });
+      c.appendChild(t);
+    }
+  }
+  function faltou(msg){ banner(msg,'alerta',3); beep('erro'); }
+  montar();
+  c.scrollIntoView({block:'start',behavior:'smooth'});
 }
 
 (async function(){

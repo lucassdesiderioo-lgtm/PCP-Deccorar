@@ -551,6 +551,60 @@ INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
 ('sobraAlturaMax','6.00','numero','Sobra: maior altura da lista',
  'O ultimo valor da lista de altura. Vai mais longe que a largura porque a altura corre no sentido do rolo, e um retalho comprido e comum.',
  'm',53);
+`},
+
+{n:12, nome:'a sobra lancada errada se corrige, e a correcao deixa rastro', sql:`
+/* A SOBRA E CADASTRO FEITO NA BANCADA, e cadastro feito na bancada erra:
+   o mutirao lembra o tecido entre um retalho e o seguinte (e o que faz ele
+   render), e o primeiro retalho da prateleira nova entra com a cor do
+   anterior. Ate aqui a unica saida era o descarte — que e da chefia, e que
+   mede a peca como PERDA no refugo, para uma peca que esta inteira na
+   prateleira.
+
+   O que a sobra nao tinha era a memoria do rolo: la, mudar preco ou endereco
+   fica em movimento_rolo com delta zero, dizendo de -> para e quem fez. Esta
+   tabela e a mesma ideia, para o que a sobra tem de editavel. Uma linha por
+   campo corrigido, com o valor como se le na tela — o historico e para gente
+   ler, e quem le nao tem o id do tecido de tres meses atras na cabeca. */
+CREATE TABLE sobra_correcao (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sobra_id INTEGER NOT NULL REFERENCES sobra(id),
+  campo TEXT NOT NULL,          -- tecido | largura | altura | condicao | endereco
+  de TEXT, para TEXT,           -- como se le na tela, nao o id
+  usuario_nome TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX idx_sobra_correcao ON sobra_correcao(sobra_id);
+`},
+
+{n:13, nome:'a bancada aponta o erro da sobra, e a chefia aceita', sql:`
+/* CORRIGIR E DA CHEFIA (decisao do dono, 05/09/2026) — mas quem percebe o
+   erro e a bancada, com o retalho na mao. Se ela nao tem como registrar o
+   que viu, o erro fica na cabeca de quem viu ate a chefia passar por ali, e
+   isso e a mesma doenca de sempre: o dado mora na memoria e nao no sistema.
+
+   O apontamento e uma PROPOSTA: guarda so os campos que a bancada acha que
+   estao errados (os outros ficam NULL), o motivo, e espera. A chefia aceita
+   — e ai vira correcao, pelo mesmo corrigir de sempre, com o rastro
+   apontando para a proposta — ou recusa, dizendo por que. A bancada le a
+   decisao na propria sobra. */
+CREATE TABLE sobra_proposta (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sobra_id INTEGER NOT NULL REFERENCES sobra(id),
+  tecido_id INTEGER REFERENCES tecido(id),   -- so o que a bancada quer mudar
+  largura REAL, altura REAL,
+  condicao TEXT,
+  nivel_id INTEGER REFERENCES nivel(id),
+  motivo TEXT,                                -- o que ela viu ("veio bege, e cinza")
+  status TEXT NOT NULL DEFAULT 'pendente',   -- pendente | aceita | recusada
+  criado_por TEXT, criado_em TEXT DEFAULT (datetime('now','localtime')),
+  decidido_por TEXT, decidido_em TEXT, decisao_motivo TEXT
+);
+CREATE INDEX idx_sobra_proposta ON sobra_proposta(sobra_id, status);
+
+/* A correcao que nasceu de um apontamento sabe de qual. E o que deixa o
+   historico dizer "proposto por Ana, aceito por Lucas" em vez de so "Lucas". */
+ALTER TABLE sobra_correcao ADD COLUMN proposta_id INTEGER REFERENCES sobra_proposta(id);
 `}
 
 ];

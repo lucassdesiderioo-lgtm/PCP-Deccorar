@@ -1,5 +1,7 @@
 // Sobras e etiquetas. Repare em quem pede o que:
 //   sobra.criar      cortador tem  — e ele que cataloga a prateleira
+//   sobra.propor     cortador tem  — aponta o erro; nao muda nada sozinho
+//   sobra.corrigir   cortador NAO tem — a chefia corrige, e aceita ou recusa o apontado
 //   sobra.descartar  cortador NAO tem — baixa de sobra e da chefia
 const sobra=require('../dominio/sobra');
 const etiqueta=require('../dominio/etiqueta');
@@ -18,6 +20,49 @@ module.exports={rotas:[
   {metodo:'POST', caminho:'/api/sobras', permissao:'sobra.criar',
    manipulador:({corpo,usuario})=>sobra.criar(corpo,usuario.nome),
    detalhe:(req,d)=>'sobra '+(d&&d.codigo)+' '+(d&&d.largura)+'x'+(d&&d.altura)},
+
+  /* A CORRECAO. O detalhe da auditoria sai do que o dominio MUDOU, e nao do
+     que veio no corpo: o corpo traz a tela inteira, a maioria igual ao que ja
+     estava — o que interessa registrar e so a diferenca. */
+  {metodo:'PUT', caminho:'/api/sobras/:id', permissao:'sobra.corrigir',
+   manipulador:({params,corpo,usuario})=>sobra.corrigir(params.id,corpo,usuario.nome),
+   detalhe:(req,d)=>'correcao da sobra '+(d&&d.codigo)+
+     (d&&d.mudancas&&d.mudancas.length
+       ? ': '+d.mudancas.map(m=>m.campo+' '+m.de+' → '+m.para).join(' · ')
+       : ' (nada mudou)')},
+
+  {metodo:'GET', caminho:'/api/sobras/:id/correcoes', permissao:'sobra.ler',
+   manipulador:({params})=>sobra.correcoes(params.id)},
+
+  // ── A bancada aponta, a chefia decide ──────────────────────────────────
+  /* A LISTA DO QUE ESPERA DECISAO e da chefia. Nao ha GET '/api/sobras/:id'
+     neste arquivo, entao 'propostas' nao e engolido como id; se um dia
+     alguem criar esse GET, ele tem que entrar DEPOIS desta linha — o Express
+     casa por ordem. */
+  {metodo:'GET', caminho:'/api/sobras/propostas', permissao:'sobra.corrigir',
+   manipulador:({query})=>sobra.propostas({status:query.status||'pendente'})},
+
+  // Os apontamentos DE UMA sobra, em qualquer estado: e aqui que a bancada
+  // le se o que apontou foi aceito ou recusado, e por que.
+  {metodo:'GET', caminho:'/api/sobras/:id/propostas', permissao:'sobra.ler',
+   manipulador:({params})=>sobra.propostas({sobra_id:params.id})},
+
+  {metodo:'POST', caminho:'/api/sobras/:id/propostas', permissao:'sobra.propor',
+   manipulador:({params,corpo,usuario})=>sobra.propor(params.id,corpo,usuario.nome),
+   detalhe:(req,d)=>'apontamento na sobra '+(d&&d.sobra_codigo)+': '+
+     (d?d.itens.map(m=>m.campo+' '+m.de+' → '+m.para).join(' · '):'')+
+     (d&&d.motivo?' ("'+d.motivo+'")':'')},
+
+  {metodo:'POST', caminho:'/api/sobras/propostas/:id/aceitar', permissao:'sobra.corrigir',
+   manipulador:({params,usuario})=>sobra.aceitar(params.id,usuario.nome),
+   detalhe:(req,d)=>'aceitou apontamento '+req.params.id+' da sobra '+(d&&d.sobra&&d.sobra.codigo)+
+     (d&&d.mudancas&&d.mudancas.length
+       ? ': '+d.mudancas.map(m=>m.campo+' '+m.de+' → '+m.para).join(' · ')
+       : ' (a sobra ja estava assim)')},
+
+  {metodo:'POST', caminho:'/api/sobras/propostas/:id/recusar', permissao:'sobra.corrigir',
+   manipulador:({params,corpo,usuario})=>sobra.recusar(params.id,corpo.motivo,usuario.nome),
+   detalhe:(req,d)=>'recusou apontamento '+req.params.id+' da sobra '+(d&&d.sobra_codigo)+': '+(req.body.motivo||'')},
 
   {metodo:'POST', caminho:'/api/sobras/:id/descartar', permissao:'sobra.descartar',
    manipulador:({params,corpo,usuario})=>sobra.descartar(params.id,corpo.motivo,usuario.nome),

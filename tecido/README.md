@@ -61,7 +61,7 @@ não só a tela.
 |---|---|---|---|
 | 1 | Margem entre peças? | **Não — as peças encostam.** `margem = 0` | parâmetro cadastrável; muda todo o encaixe |
 | 2 | Peça mais larga que a bobina? | **Sempre entregar o plano de menor desperdício.** A peça que fisicamente não cabe volta *marcada com o motivo* e o resto é planejado — o plano nunca deixa de sair | `dominio/plano.js`, fase 4/6 |
-| 3 | Quem descarta sobra? | **Só a chefia.** `sobra.descartar` não está no papel `cortador` | `nucleo/permissoes.js` |
+| 3 | Quem descarta ou corrige sobra? | **Só a chefia.** `sobra.descartar` e `sobra.corrigir` não estão no papel `cortador`. A bancada **aponta** (`sobra.propor`) e a chefia aceita | `nucleo/permissoes.js` |
 | 4 | Sobra com defeito parcial? | **Entra, mas por último** | `condicao_sobra.prioridade` e `.aproveitavel` |
 | 5 | Leitor na bancada? | **Sim.** Campo de bipe visível, aceita Enter e Tab, processa por timeout | telas das fases 2 e 4 |
 | 6 | Sequência das etiquetas? | **O sistema imprime.** Escolhe-se a quantidade, ele gera a sequência e registra o lote; a sobra nasce quando o operador bipa a etiqueta colada | tabelas `etiqueta` e `etiqueta_lote` |
@@ -1135,7 +1135,7 @@ quem fecha compras. **Um campo que o operador preenche e nunca mais vê de volta
 ### As chaves que o operador não tem
 
 `custo.ver` · `rolo.nota` · `cadastro.editar` · `parametro.editar` ·
-`sobra.descartar` · `rolo.ajustar` · `painel.ler`
+`sobra.descartar` · `sobra.corrigir` · `rolo.ajustar` · `painel.ler`
 
 > **O que tirar o `painel.ler` custa:** o cortador deixa de ver Encalhe,
 > Refugo, Recusas e Cortes. Nenhum é necessário para cortar — o plano já sugere
@@ -1163,6 +1163,74 @@ para a largura, `Enter` na altura salva, e o foco volta sozinho para o código.
 Uma trava que parece exagero e não é: **largura de 190 é recusada**. O campo
 fala metros, e 190 no lugar de 1,90 entraria calado e viraria um retalho de
 190 metros na prateleira.
+
+---
+
+## A sobra lançada errada se CORRIGE — e a correção deixa rastro
+
+A memória do mutirão tem um efeito colateral previsível: o **primeiro retalho
+da prateleira nova entra com o tecido do anterior**. Até 05/09/2026 a única
+saída era o descarte — da chefia, e medindo como **perda no refugo** uma peça
+que está inteira na prateleira. O que a bancada fazia de verdade era deixar
+errado, e o plano de corte passava a oferecer um retalho bege para uma peça
+cinza.
+
+Hoje o **Catálogo** tem o botão **Corrigir** em cada linha. Ele abre um cartão
+com o que a sobra é hoje e os mesmos seletores do lançamento — linha, coleção,
+cor, medida, condição, endereço — já marcados no valor atual.
+
+| Regra | Por quê |
+|---|---|
+| **Só a chefia corrige** (`sobra.corrigir`, fora do cortador) | Decisão do dono: *a chefia aceita a correção*. Trocar o tecido muda de prateleira no sistema — o plano passa a oferecer a sobra para outra cor — e é mexida que se quer com alguém olhando. A bancada vê a marca "corrigida" e o histórico, não o botão |
+| **Só a sobra `disponivel`** | A usada já entrou num plano confirmado com aquele tecido; a descartada já virou linha de refugo com aquela área. Mexer nelas reescreveria uma história contada em outra tabela |
+| **Cada campo corrigido é uma linha em `sobra_correcao`** | De → para, como se lê na tela (não o id), com quem e quando. É a memória do rolo (`movimento_rolo` com delta zero), para o que a sobra tem de editável |
+| **Salvar sem mudar nada não grava linha** | Histórico que não conta nada ninguém lê |
+| **O código não se edita** | A etiqueta colada é o que liga o papel à linha. Trocar isso é outra sobra |
+| **As mesmas guardas do lançamento** | Tecido inativo, medida em centímetros, condição fora do cadastro e endereço da estante de ROLO são recusados na correção como no `criar` |
+
+A sobra corrigida sai **marcada** na lista, e o cartão mostra as correções
+anteriores embaixo. A auditoria da rota registra só o que **mudou**, não o
+corpo inteiro — o corpo traz a tela toda, quase tudo igual ao que já estava.
+
+### A bancada APONTA, a chefia ACEITA
+
+Quem corrige é a chefia — mas quem **percebe** o erro é a bancada, com o
+retalho na mão. Se ela não tem onde registrar o que viu, o erro fica na cabeça
+dela até a chefia passar por ali: dado na memória em vez de no sistema, a
+doença de sempre.
+
+```
+BANCADA   Catálogo → Apontar erro → marca o certo + motivo → Enviar para a chefia
+CHEFIA    Início avisa "N sobra(s) apontada(s)" → Catálogo → Aceitar / Recusar
+```
+
+| Regra | Por quê |
+|---|---|
+| **O apontamento não muda a sobra** (`sobra_proposta`, `sobra.propor` no cortador) | Vira correção **só** quando a chefia aceita — e aceitar passa pelo mesmo `corrigir`: uma porta só para mudar a sobra, venha a mudança de quem vier |
+| **Guarda só o que a bancada quer mudar** | Os outros campos ficam `NULL`. O que a chefia lê é `de → para`, campo a campo, contra a sobra **como está agora** |
+| **Uma sobra, um apontamento pendente** | Dois apontamentos discordando sobre a mesma sobra não é informação, é ruído para quem decide. A segunda pessoa vê "aguardando chefia" e fala com a primeira |
+| **Apontar sem mudar nada é recusado** | Aceitar em silêncio mandaria a bancada embora achando que avisou |
+| **Recusar exige motivo** | Quem apontou lê a decisão na própria sobra, e um "não" sem explicação ensina a não apontar mais |
+| **O rastro diz quem apontou e quem aceitou** | `sobra_correcao.proposta_id` liga a correção ao apontamento: o histórico escreve *apontado por Ana, aceito por Lucas* |
+| **A mesma comparação nos dois lados** (`diferencas`) | A bancada não pode propor o que a chefia não poderia gravar, e a chefia não vê uma diferença diferente da que a bancada viu |
+
+A fila da chefia fica **no topo do Catálogo** e **na tela Início**, e some
+quando está vazia. A tela Início existe para isso: se a chefia só descobre o
+apontamento quando abre Sobras por outro motivo, *"a chefia decide depois"*
+vira *"ninguém decide"* — a meia-decisão da armadilha #14.
+
+O mesmo cartão serve à bancada (modo apontar, com o campo de motivo) e à chefia
+(modo corrigir). Dois cartões diferentes ensinariam a equipe a achar que são
+duas coisas.
+
+O campo **Procurar** no topo do Catálogo aceita o **bipe da etiqueta** e filtra
+a tabela sem redesenhar: com centenas de linhas, corrigir a `S-000142` é
+primeiro achar a `S-000142`, e o operador está com ela na mão.
+
+**Teste obrigatório:** `node teste/rodar.js` — os 11 casos de correção e
+apontamento em `teste/sobra.test.js` travam o rastro, a área refeita, o "nada
+mudou", as guardas, o status, o apontamento único, a recusa com motivo e a
+aceitação ligada a quem apontou.
 
 ---
 

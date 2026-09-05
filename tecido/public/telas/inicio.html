@@ -81,6 +81,23 @@ api('/api/eu').then(eu=>{
   // Mas se acontecer, a tela diz o que fazer em vez de ficar vazia.
   if(!minhas.length) c.appendChild(el('div',{class:'vazio',
     texto:'Seu acesso ainda nao alcanca nenhuma tela do sob medida. Peca ao admin em Admin -> Acessos.'}));
+
+  /* O QUE A BANCADA APONTOU E ESPERA A CHEFIA. A bancada nao corrige sobra:
+     ela aponta, e a correcao so acontece quando alguem com `sobra.corrigir`
+     aceita. Se esse alguem so descobre o apontamento quando abre o Catalogo
+     de Sobras por outro motivo, "a chefia decide depois" vira "ninguem
+     decide" — a mesma meia-decisao da armadilha #14. O aviso so aparece
+     quando ha algo, e some quando nao ha. */
+  if((eu.permissoes||[]).includes('sobra.corrigir')){
+    api('/api/sobras/propostas').then(pend=>{
+      if(!pend.length) return;
+      const av=el('a',{class:'porta sobra',href:'/sobmedida/sobras',style:'grid-column:1/-1'});
+      av.appendChild(el('div',{class:'passo',texto:'esperando voce'}));
+      av.appendChild(el('h2',{texto:pend.length+' sobra(s) apontada(s) pela bancada'}));
+      av.appendChild(el('p',{texto:'A bancada achou erro no cadastro e apontou o certo. Abra o Catalogo de Sobras para aceitar ou recusar.'}));
+      c.insertBefore(av,c.firstChild);
+    }).catch(()=>{});
+  }
 });
 </script>
 </body>
