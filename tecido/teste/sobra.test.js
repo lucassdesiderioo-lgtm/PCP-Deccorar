@@ -131,6 +131,89 @@ module.exports=[
   igual(sobra.candidatas(c.tecido.id).some(s=>s.codigo==='S-000002'),true,'voltou');
 }},
 
+/* ── A CORRECAO — a sobra lancada errada se conserta, com rastro ────────── */
+
+{nome:'a sobra lancada com o tecido errado se corrige, e a correcao deixa rastro', executar({igual,perto}){
+  const c=montar();
+  // O caso real: o mutirao lembra o tecido do retalho anterior, e o primeiro
+  // da prateleira nova entra com a cor errada.
+  const outraCor=tecido.criarCor({nome:'Bege Correcao'});
+  const certo=tecido.criarTecido({linha_id:c.tecido.linha_id,abertura_id:c.tecido.abertura_id,cor_id:outraCor.id});
+  cena.tecidoCerto=certo;
+
+  const s=sobra.criar({codigo:'S-000004',tecido_id:c.tecido.id,largura:'1,20',altura:'2,00',
+    condicao:'integra',nivel_id:c.nivelSobra},'Cortador');
+  igual(s.correcoes,0,'nasce sem correcao');
+
+  const r=sobra.corrigir(s.id,{tecido_id:certo.id},'Cortador');
+  igual(r.tecido_id,certo.id,'o tecido mudou');
+  igual(r.cor_nome,'Bege Correcao','e a tela le o nome novo');
+  perto(r.area,2.4,'a medida e a area ficaram como estavam');
+  igual(r.mudancas.length,1,'a resposta diz o que mudou nesta chamada');
+  igual(r.mudancas[0].campo,'tecido','e foi o tecido');
+
+  const h=sobra.correcoes(s.id);
+  igual(h.length,1,'uma linha de historico');
+  igual(h[0].campo,'tecido','do tecido');
+  igual(h[0].de.includes('Cinza'),true,'de: como se le na tela, nao o id');
+  igual(h[0].para.includes('Bege Correcao'),true,'para: idem');
+  igual(h[0].usuario_nome,'Cortador','quem corrigiu');
+  igual(sobra.porId(s.id).correcoes,1,'e a lista sabe que ela foi corrigida');
+
+  // A sobra saiu das candidatas do tecido errado e entrou nas do certo.
+  igual(sobra.candidatas(c.tecido.id).some(x=>x.id===s.id),false,'nao e mais candidata do tecido errado');
+  igual(sobra.candidatas(certo.id).some(x=>x.id===s.id),true,'e candidata do tecido certo');
+}},
+
+{nome:'corrigir a medida refaz a area, e cada campo e uma linha do historico', executar({igual,perto}){
+  const s=sobra.porCodigo('S-000004');
+  const r=sobra.corrigir(s.id,{largura:'1,50',altura:'2,00',condicao:'mancha'},'Cortador');
+  perto(r.largura,1.5,'largura nova');
+  perto(r.altura,2.0,'altura igual, nao conta como mudanca');
+  perto(r.area,3.0,'area refeita pelo banco');
+  igual(r.condicao,'mancha','condicao nova');
+  igual(r.mudancas.length,2,'duas mudancas: largura e condicao — a altura veio igual');
+  igual(sobra.correcoes(s.id).length,3,'tres linhas no total: tecido, largura, condicao');
+}},
+
+{nome:'salvar sem mudar nada nao grava historico', executar({igual}){
+  const s=sobra.porCodigo('S-000004');
+  const antes=sobra.correcoes(s.id).length;
+  const r=sobra.corrigir(s.id,{tecido_id:s.tecido_id,largura:'1,50',altura:'2,00',condicao:'mancha',nivel_id:s.nivel_id},'Cortador');
+  igual(r.mudancas.length,0,'nada mudou');
+  igual(sobra.correcoes(s.id).length,antes,'e nao entrou linha nenhuma');
+}},
+
+{nome:'a correcao passa pelas mesmas guardas do lancamento', executar({recusa,igual}){
+  const c=montar();
+  const s=sobra.porCodigo('S-000004');
+  recusa(()=>sobra.corrigir(s.id,{largura:190},'Cortador'),'medida_absurda');
+  recusa(()=>sobra.corrigir(s.id,{largura:0},'Cortador'),'medida_invalida');
+  recusa(()=>sobra.corrigir(s.id,{tecido_id:999999},'Cortador'),'tecido_inexistente');
+  recusa(()=>sobra.corrigir(s.id,{condicao:'inventada'},'Cortador'),'condicao_invalida');
+  recusa(()=>sobra.corrigir(s.id,{nivel_id:c.nivelRolo},'Cortador'),'armazem_errado');
+  recusa(()=>sobra.corrigir(999999,{largura:1},'Cortador'),'sobra_inexistente');
+  // A recusa nao deixa meia correcao: a sobra continua como estava.
+  const depois=sobra.porId(s.id);
+  igual(depois.largura,1.5,'largura intacta');
+  igual(depois.tecido_id,s.tecido_id,'tecido intacto');
+}},
+
+{nome:'so a sobra disponivel se corrige — a descartada ja virou refugo', executar({recusa}){
+  const c=montar();
+  const s=sobra.criar({codigo:'S-000005',tecido_id:c.tecido.id,largura:'1,00',altura:'1,00',
+    condicao:'integra',nivel_id:c.nivelSobra},'Cortador');
+  sobra.descartar(s.id,'Rasgou','Diretor');
+  recusa(()=>sobra.corrigir(s.id,{largura:'2,00'},'Cortador'),'sobra_indisponivel');
+}},
+
+{nome:'o cortador corrige, e so a chefia descarta', executar({igual}){
+  const {pode}=require('../nucleo/permissoes');
+  igual(pode({papel:'cortador'},'sobra.corrigir'),true,'quem lancou conserta');
+  igual(pode({papel:'cortador'},'sobra.descartar'),false,'mas a baixa continua da chefia');
+  igual(pode({papel:'diretor'},'sobra.corrigir'),true,'a chefia tambem corrige');
+}},
+
 {nome:'lote de etiquetas com quantidade invalida e recusado', executar({recusa}){
   recusa(()=>etiqueta.imprimirLote(0,'Diretor'),'quantidade_invalida');
   recusa(()=>etiqueta.imprimirLote('muitas','Diretor'),'quantidade_invalida');

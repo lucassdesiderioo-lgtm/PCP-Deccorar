@@ -551,6 +551,30 @@ INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
 ('sobraAlturaMax','6.00','numero','Sobra: maior altura da lista',
  'O ultimo valor da lista de altura. Vai mais longe que a largura porque a altura corre no sentido do rolo, e um retalho comprido e comum.',
  'm',53);
+`},
+
+{n:12, nome:'a sobra lancada errada se corrige, e a correcao deixa rastro', sql:`
+/* A SOBRA E CADASTRO FEITO NA BANCADA, e cadastro feito na bancada erra:
+   o mutirao lembra o tecido entre um retalho e o seguinte (e o que faz ele
+   render), e o primeiro retalho da prateleira nova entra com a cor do
+   anterior. Ate aqui a unica saida era o descarte — que e da chefia, e que
+   mede a peca como PERDA no refugo, para uma peca que esta inteira na
+   prateleira.
+
+   O que a sobra nao tinha era a memoria do rolo: la, mudar preco ou endereco
+   fica em movimento_rolo com delta zero, dizendo de -> para e quem fez. Esta
+   tabela e a mesma ideia, para o que a sobra tem de editavel. Uma linha por
+   campo corrigido, com o valor como se le na tela — o historico e para gente
+   ler, e quem le nao tem o id do tecido de tres meses atras na cabeca. */
+CREATE TABLE sobra_correcao (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sobra_id INTEGER NOT NULL REFERENCES sobra(id),
+  campo TEXT NOT NULL,          -- tecido | largura | altura | condicao | endereco
+  de TEXT, para TEXT,           -- como se le na tela, nao o id
+  usuario_nome TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX idx_sobra_correcao ON sobra_correcao(sobra_id);
 `}
 
 ];

@@ -7,7 +7,8 @@ const CAMPOS=`s.id, s.codigo, s.tecido_id, s.largura, s.altura, s.area, s.condic
   t.codigo AS tecido_codigo, l.nome AS linha_nome, a.nome AS abertura_nome, c.nome AS cor_nome,
   t.permite_girar,
   cs.nome AS condicao_nome, cs.aproveitavel, cs.prioridade,
-  CAST(julianday('now','localtime')-julianday(s.criado_em) AS INTEGER) AS dias_parada`;
+  CAST(julianday('now','localtime')-julianday(s.criado_em) AS INTEGER) AS dias_parada,
+  (SELECT COUNT(*) FROM sobra_correcao sc WHERE sc.sobra_id=s.id) AS correcoes`;
 
 const DE=`FROM sobra s
   JOIN tecido t ON t.id=s.tecido_id
@@ -49,6 +50,24 @@ const baixar=(id,status,quando,quem,motivo)=>
   db.prepare('UPDATE sobra SET status=?, baixado_em=?, baixado_por=?, baixa_motivo=? WHERE id=?')
     .run(status,quando,quem||null,motivo||null,id);
 
+// A correcao do que foi lancado errado. So os campos que vierem; quem decide
+// o que pode mudar (e em que status) e dominio/sobra.js. 'area' e coluna
+// gerada — mudar largura ou altura a refaz sozinha.
+function atualizar(id,d){
+  const campos=[], vals=[];
+  for(const k of ['tecido_id','largura','altura','condicao','nivel_id'])
+    if(d[k]!==undefined){ campos.push(k+'=?'); vals.push(d[k]); }
+  if(campos.length) db.prepare('UPDATE sobra SET '+campos.join(', ')+' WHERE id=?').run(...vals,id);
+}
+
+const registrarCorrecao=c=>db.prepare(
+  'INSERT INTO sobra_correcao(sobra_id,campo,de,para,usuario_nome) VALUES(?,?,?,?,?)')
+  .run(c.sobra_id,c.campo,c.de==null?null:String(c.de),c.para==null?null:String(c.para),c.usuario_nome||null);
+
+const correcoes=sobra_id=>db.prepare(
+  'SELECT id, campo, de, para, usuario_nome, criado_em FROM sobra_correcao WHERE sobra_id=? ORDER BY id DESC')
+  .all(sobra_id);
+
 // O numero do painel (fase 7) e do cruzamento "sem rolo, com retalho".
 const resumoPorTecido=()=>db.prepare(`
   SELECT t.id AS tecido_id, t.codigo AS tecido_codigo,
@@ -61,4 +80,4 @@ const resumoPorTecido=()=>db.prepare(`
     LEFT JOIN sobra s ON s.tecido_id=t.id AND s.status='disponivel'
    GROUP BY t.id ORDER BY l.ordem, l.nome, a.ordem, a.nome, c.ordem, c.nome`).all();
 
-module.exports={listar,porId,porCodigo,candidatas,criar,baixar,resumoPorTecido};
+module.exports={listar,porId,porCodigo,candidatas,criar,baixar,atualizar,registrarCorrecao,correcoes,resumoPorTecido};

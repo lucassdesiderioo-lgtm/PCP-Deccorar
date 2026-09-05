@@ -1166,6 +1166,42 @@ fala metros, e 190 no lugar de 1,90 entraria calado e viraria um retalho de
 
 ---
 
+## A sobra lançada errada se CORRIGE — e a correção deixa rastro
+
+A memória do mutirão tem um efeito colateral previsível: o **primeiro retalho
+da prateleira nova entra com o tecido do anterior**. Até 05/09/2026 a única
+saída era o descarte — da chefia, e medindo como **perda no refugo** uma peça
+que está inteira na prateleira. O que a bancada fazia de verdade era deixar
+errado, e o plano de corte passava a oferecer um retalho bege para uma peça
+cinza.
+
+Hoje o **Catálogo** tem o botão **Corrigir** em cada linha. Ele abre um cartão
+com o que a sobra é hoje e os mesmos seletores do lançamento — linha, coleção,
+cor, medida, condição, endereço — já marcados no valor atual.
+
+| Regra | Por quê |
+|---|---|
+| **Quem lança corrige** (`sobra.corrigir`, no cortador) | Quem percebe o erro está com o retalho na mão. Mesma porta do *mover rolo*. Descartar continua só da chefia: correção não é baixa, a peça segue na prateleira |
+| **Só a sobra `disponivel`** | A usada já entrou num plano confirmado com aquele tecido; a descartada já virou linha de refugo com aquela área. Mexer nelas reescreveria uma história contada em outra tabela |
+| **Cada campo corrigido é uma linha em `sobra_correcao`** | De → para, como se lê na tela (não o id), com quem e quando. É a memória do rolo (`movimento_rolo` com delta zero), para o que a sobra tem de editável |
+| **Salvar sem mudar nada não grava linha** | Histórico que não conta nada ninguém lê |
+| **O código não se edita** | A etiqueta colada é o que liga o papel à linha. Trocar isso é outra sobra |
+| **As mesmas guardas do lançamento** | Tecido inativo, medida em centímetros, condição fora do cadastro e endereço da estante de ROLO são recusados na correção como no `criar` |
+
+A sobra corrigida sai **marcada** na lista, e o cartão mostra as correções
+anteriores embaixo. A auditoria da rota registra só o que **mudou**, não o
+corpo inteiro — o corpo traz a tela toda, quase tudo igual ao que já estava.
+
+O campo **Procurar** no topo do Catálogo aceita o **bipe da etiqueta** e filtra
+a tabela sem redesenhar: com centenas de linhas, corrigir a `S-000142` é
+primeiro achar a `S-000142`, e o operador está com ela na mão.
+
+**Teste obrigatório:** `node teste/rodar.js` — os 6 casos de correção em
+`teste/sobra.test.js` travam o rastro, a área refeita, o "nada mudou", as
+guardas e o status.
+
+---
+
 ## O plano de corte
 
 ```

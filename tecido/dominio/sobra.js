@@ -6,6 +6,9 @@
 //      Origem e opcional e nunca trava o lancamento: no mutirao do acervo
 //      ninguem sabe de que rolo o retalho saiu, e exigir isso pararia a
 //      catalogacao inteira por um dado que nao muda decisao nenhuma.
+// Correcao: o que foi lancado errado (tecido, medida, condicao, endereco) se
+//      corrige enquanto a sobra esta disponivel, e cada campo corrigido deixa
+//      linha em sobra_correcao. O codigo (a etiqueta colada) nao se edita.
 const db=require('../nucleo/db');
 const dia=require('../nucleo/dia');
 const {ErroDeRegra,exigir}=require('../nucleo/erros');
@@ -30,17 +33,30 @@ function medida(valor,rotulo,maximo){
   return Math.round(n*1000)/1000;
 }
 
-function criar(dados,usuarioNome){
-  const tecido=dTecido.porId(dados.tecido_id);
+// As mesmas guardas servem ao lancamento e a correcao: uma regua so para o
+// que entra e para o que e consertado, senao a correcao aceitaria o que o
+// lancamento recusa.
+function tecidoValido(tecido_id){
+  const tecido=dTecido.porId(tecido_id);
   exigir(tecido,'tecido_inexistente','Escolha o tecido.');
   exigir(tecido.ativo,'tecido_inativo','O tecido '+tecido.codigo+' esta desativado.');
+  return tecido;
+}
+function condicaoValida(chave){
+  const cond=dCondicao.porChave(chave);
+  exigir(cond,'condicao_invalida','Escolha a condicao do retalho.');
+  exigir(cond.ativo,'condicao_inativa','A condicao "'+cond.nome+'" saiu do cadastro.');
+  return cond;
+}
+const nomeTecido=t=>[t.linha_nome,t.abertura_nome,t.cor_nome].join(' · ');
+
+function criar(dados,usuarioNome){
+  const tecido=tecidoValido(dados.tecido_id);
 
   const largura=medida(dados.largura,'a largura',MAX_LARGURA);
   const altura=medida(dados.altura,'a altura',MAX_ALTURA);
 
-  const cond=dCondicao.porChave(dados.condicao);
-  exigir(cond,'condicao_invalida','Escolha a condicao do retalho.');
-  exigir(cond.ativo,'condicao_inativa','A condicao "'+cond.nome+'" saiu do cadastro.');
+  const cond=condicaoValida(dados.condicao);
 
   // Sobra so endereca no armazem SOBRA. Endereco trocado e sobra que ninguem
   // acha — e sobra que ninguem acha e o problema que o modulo veio resolver.
@@ -62,6 +78,73 @@ function criar(dados,usuarioNome){
     // Dentro da mesma transacao: se a reserva falhar, a sobra nao acontece.
     etiqueta.reservar(codigo,id);
     return dSobra.porId(id);
+  })();
+}
+
+/* ── CORRIGIR O QUE FOI LANCADO ERRADO ────────────────────────────────────
+   A sobra e cadastro feito na bancada, e cadastro feito na bancada erra de um
+   jeito previsivel: o mutirao LEMBRA o tecido entre um retalho e o seguinte —
+   e o que faz ele render — e o primeiro retalho da prateleira nova entra com
+   a cor do anterior. Ate aqui a unica saida era o descarte, que e da chefia
+   e mede a peca como PERDA no refugo — para uma peca que esta inteira na
+   prateleira. O que a bancada fazia de verdade era deixar errado, e o plano
+   de corte passava a oferecer um retalho bege para uma peca cinza.
+
+   Mesma porta do rolo (mover, nota): quem lanca corrige, e NADA muda sem
+   linha de historico — de -> para, por campo, com quem e quando. Salvar sem
+   mudar nada nao grava linha: historico que nao conta nada ninguem le.
+
+   SO A SOBRA DISPONIVEL SE CORRIGE. A usada ja entrou num plano confirmado
+   com aquele tecido e aquela medida; a descartada ja virou linha de refugo
+   com aquela area. Mexer nas duas reescreveria uma historia que ja foi
+   contada em outra tabela. */
+function corrigir(id,dados,usuarioNome){
+  const s=dSobra.porId(id);
+  exigir(s,'sobra_inexistente','Sobra nao encontrada.');
+  exigir(s.status==='disponivel','sobra_indisponivel',
+    'A sobra '+s.codigo+' esta como "'+s.status+'" e nao se corrige mais — o que ela era ja ficou registrado.');
+
+  const veio=k=>dados[k]!==undefined&&dados[k]!==null&&String(dados[k]).trim()!=='';
+  const novo={}, mudancas=[];
+
+  if(veio('tecido_id')){
+    const t=tecidoValido(dados.tecido_id);
+    if(t.id!==s.tecido_id){
+      novo.tecido_id=t.id;
+      mudancas.push({campo:'tecido',de:nomeTecido(s),para:nomeTecido(t)});
+    }
+  }
+  if(veio('largura')){
+    const l=medida(dados.largura,'a largura',MAX_LARGURA);
+    if(Math.abs(l-s.largura)>0.0005){ novo.largura=l; mudancas.push({campo:'largura',de:s.largura,para:l}); }
+  }
+  if(veio('altura')){
+    const a=medida(dados.altura,'a altura',MAX_ALTURA);
+    if(Math.abs(a-s.altura)>0.0005){ novo.altura=a; mudancas.push({campo:'altura',de:s.altura,para:a}); }
+  }
+  if(veio('condicao')){
+    const c=condicaoValida(dados.condicao);
+    if(c.chave!==s.condicao){
+      novo.condicao=c.chave;
+      mudancas.push({campo:'condicao',de:s.condicao_nome||s.condicao,para:c.nome});
+    }
+  }
+  if(veio('nivel_id')){
+    endereco.exigirArmazem(dados.nivel_id,'SOBRA');
+    if(Number(dados.nivel_id)!==Number(s.nivel_id)){
+      novo.nivel_id=Number(dados.nivel_id);
+      mudancas.push({campo:'endereco',de:endereco.descrever(s.nivel_id),para:endereco.descrever(dados.nivel_id)});
+    }
+  }
+
+  // A resposta leva o que mudou NESTA chamada: e isso que a auditoria da rota
+  // e o aviso da tela precisam dizer, e nao o historico inteiro da sobra.
+  if(!mudancas.length) return {...s, mudancas:[]};
+
+  return db.transaction(()=>{
+    dSobra.atualizar(id,novo);
+    for(const m of mudancas) dSobra.registrarCorrecao({sobra_id:id,...m,usuario_nome:usuarioNome});
+    return {...dSobra.porId(id), mudancas};
   })();
 }
 
@@ -96,9 +179,10 @@ function descartar(id,motivo,usuarioNome){
 }
 
 module.exports={
-  criar, marcarUsada, descartar,
+  criar, corrigir, marcarUsada, descartar,
   listar:f=>dSobra.listar(f),
   porId:id=>dSobra.porId(id),
+  correcoes:id=>dSobra.correcoes(id),
   porCodigo:c=>dSobra.porCodigo(etiqueta.limpar(c)),
   candidatas:tecido_id=>dSobra.candidatas(tecido_id),
   resumo:()=>dSobra.resumoPorTecido()

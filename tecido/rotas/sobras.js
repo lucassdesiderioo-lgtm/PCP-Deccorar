@@ -1,5 +1,6 @@
 // Sobras e etiquetas. Repare em quem pede o que:
 //   sobra.criar      cortador tem  — e ele que cataloga a prateleira
+//   sobra.corrigir   cortador tem  — quem lancou errado conserta, com rastro
 //   sobra.descartar  cortador NAO tem — baixa de sobra e da chefia
 const sobra=require('../dominio/sobra');
 const etiqueta=require('../dominio/etiqueta');
@@ -18,6 +19,19 @@ module.exports={rotas:[
   {metodo:'POST', caminho:'/api/sobras', permissao:'sobra.criar',
    manipulador:({corpo,usuario})=>sobra.criar(corpo,usuario.nome),
    detalhe:(req,d)=>'sobra '+(d&&d.codigo)+' '+(d&&d.largura)+'x'+(d&&d.altura)},
+
+  /* A CORRECAO. O detalhe da auditoria sai do que o dominio MUDOU, e nao do
+     que veio no corpo: o corpo traz a tela inteira, a maioria igual ao que ja
+     estava — o que interessa registrar e so a diferenca. */
+  {metodo:'PUT', caminho:'/api/sobras/:id', permissao:'sobra.corrigir',
+   manipulador:({params,corpo,usuario})=>sobra.corrigir(params.id,corpo,usuario.nome),
+   detalhe:(req,d)=>'correcao da sobra '+(d&&d.codigo)+
+     (d&&d.mudancas&&d.mudancas.length
+       ? ': '+d.mudancas.map(m=>m.campo+' '+m.de+' → '+m.para).join(' · ')
+       : ' (nada mudou)')},
+
+  {metodo:'GET', caminho:'/api/sobras/:id/correcoes', permissao:'sobra.ler',
+   manipulador:({params})=>sobra.correcoes(params.id)},
 
   {metodo:'POST', caminho:'/api/sobras/:id/descartar', permissao:'sobra.descartar',
    manipulador:({params,corpo,usuario})=>sobra.descartar(params.id,corpo.motivo,usuario.nome),

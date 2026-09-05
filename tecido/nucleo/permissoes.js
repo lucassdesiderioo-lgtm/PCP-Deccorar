@@ -23,6 +23,13 @@ const CHAVES=[
   {chave:'parametro.editar',  nome:'Editar parametros do calculo'},
   {chave:'sobra.ler',         nome:'Ver sobras'},
   {chave:'sobra.criar',       nome:'Cadastrar sobra (mutirao e corte)'},
+  /* CORRIGIR E DA BANCADA, como mover rolo: quem percebe que a sobra entrou
+     com o tecido errado e quem esta com o retalho na mao. Sem esta chave a
+     alternativa nao e esperar a chefia — e deixar errado, e o plano de corte
+     passa a oferecer um retalho bege para uma peca cinza. Nao e baixa (a
+     peca continua na prateleira), e cada campo corrigido deixa linha de
+     historico com quem e quando. Descartar continua so com a chefia. */
+  {chave:'sobra.corrigir',    nome:'Corrigir sobra lancada errada (tecido, medida, condicao, endereco)'},
   {chave:'sobra.descartar',   nome:'Descartar sobra'},
   {chave:'etiqueta.imprimir', nome:'Imprimir lote de etiquetas de sobra'},
   /* VER PRECO E CHAVE SEPARADA, e quem nao tem NAO RECEBE OS CAMPOS — o JSON
@@ -44,7 +51,7 @@ const PAPEIS={
   diretor:['*'],
   cortador:[
     'cadastro.ler','endereco.criar',
-    'parametro.ler','sobra.ler','sobra.criar','etiqueta.imprimir',
+    'parametro.ler','sobra.ler','sobra.criar','sobra.corrigir','etiqueta.imprimir',
     'rolo.ler','rolo.entrada','rolo.encerrar',
     'plano.calcular','plano.confirmar'
     /* ⚠️ `painel.ler` SAIU DO CORTADOR em 04/09/2026, por decisao do dono.
