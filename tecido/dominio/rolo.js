@@ -266,6 +266,8 @@ const comEndereco=r=>r?{...r, endereco:r.nivel_id?endereco.descrever(r.nivel_id)
 
 module.exports={mover,editarDados,
   entrada, consumir, ajustar, encerrar, conferirSaldos, formatar,
+  // A leitura do preco digitado e uma so: a sobra usa a mesma regua do rolo.
+  precoDe,
   listar:f=>dRolo.listar(f).map(comEndereco),
   porId:id=>comEndereco(dRolo.porId(id)),
   porCodigo:c=>dRolo.porCodigo(c),

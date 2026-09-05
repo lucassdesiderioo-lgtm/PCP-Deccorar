@@ -1223,6 +1223,43 @@ O mesmo cartão serve à bancada (modo apontar, com o campo de motivo) e à chef
 (modo corrigir). Dois cartões diferentes ensinariam a equipe a achar que são
 duas coisas.
 
+### Quanto vale a prateleira de sobras
+
+O rolo já sabia quanto custou (`rolo.preco_m2`, congelado na compra). A sobra
+não, e a pergunta *"quanto temos em reais de cada tecido em retalho"* não tinha
+resposta. Desde 05/09/2026 ela tem, pelas **mesmas quatro regras do
+`custo.js`**:
+
+| Regra | Como fica na sobra |
+|---|---|
+| **O preço mora na peça, congelado** (`sobra.preco_m2`) | A sobra que nasce do corte **herda** o preço do rolo de onde saiu (e a que nasce de outra sobra, o dela): é o que se pagou por aquele tecido. A do mutirão nasce **sem preço** |
+| **Custo indefinido nunca vira zero** | Sobra sem preço fica fora da soma e é contada à parte. O total por tecido e o total do acervo saem como **piso** (`≥`) enquanto houver alguma, com o número de quantas faltam |
+| **Sem preço, traço** | Nunca `R$ 0,00` na linha |
+| **Quem não tem `custo.ver` não recebe os campos** | A poda é na rota (`rotas/sobras.js`), pela mesma `custo.podar` dos rolos. O histórico de correção esconde a linha de preço inteira |
+
+**O preço se lança por tecido, numa vez só.** Botão **Preço** na tabela "Sobras
+por tecido" (chefia com `sobra.corrigir` e `custo.ver`): diz o R$/m² e ele entra
+em cada sobra disponível do tecido que **ainda não tem** preço. A que já tem
+fica como está, porque aquele foi o preço pago. *"Substituir"* passa por cima de
+todas, para o dia em que o preço lançado estava errado. O que pré-preenche é o
+**último preço pago por rolo desse tecido**, a mesma fonte da nota do rolo.
+
+> ⚠️ **NÃO É UMA TABELA DE PREÇO POR TECIDO.** O número é gravado sobra a
+> sobra, e cada uma ganha a sua linha de rastro (`sobra_correcao`, campo
+> `preco`). A próxima sobra do mesmo tecido nasce sem preço e espera a próxima
+> rodada. Uma coluna de preço no cadastro do tecido, multiplicada na hora de
+> mostrar, mudaria o valor do acervo inteiro no dia do reajuste, e ninguém
+> perceberia porque o número só cresce (armadilha #15 do `CLAUDE.md`).
+
+O preço também se corrige sobra a sobra, no cartão **Corrigir**, com o mesmo
+rastro. **Não se aponta**: a bancada não recebe preço no JSON, então não tem o
+que ver nem o que propor. O `dinheiro()` do `ui.js` é o formatador único: rolos
+e sobras escrevem R$ do mesmo jeito.
+
+**Teste obrigatório:** `node teste/rodar.js` — os 4 casos de preço em
+`teste/sobra.test.js` (herança do rolo, piso, precificar por tecido com rastro,
+corrigir sem apontar) e o caso de poda em `teste/acesso_operador.test.js`.
+
 O campo **Procurar** no topo do Catálogo aceita o **bipe da etiqueta** e filtra
 a tabela sem redesenhar: com centenas de linhas, corrigir a `S-000142` é
 primeiro achar a `S-000142`, e o operador está com ela na mão.

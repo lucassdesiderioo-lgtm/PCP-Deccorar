@@ -296,6 +296,79 @@ module.exports=[
   recusa(()=>sobra.propor(s.id,{condicao:'furo'},'Ana'),'sobra_indisponivel');
 }},
 
+/* ── QUANTO VALE — o preco do m² da sobra ───────────────────────────────── */
+
+{nome:'a sobra que nasce do rolo HERDA o preco pago; a do mutirao nasce sem preco', executar({igual,perto}){
+  const c=montar();
+  etiqueta.imprimirLote(5,'Diretor');   // S-000009 a S-000013
+  const rolo=require('../dominio/rolo');
+  const r=rolo.entrada({tecido_id:c.tecido.id,largura:'2,00',metragem:'30',nivel_id:c.nivelRolo,preco_m2:'20,00'},'Diretor');
+  const doRolo=sobra.criar({codigo:'S-000008',tecido_id:c.tecido.id,largura:'1,00',altura:'1,50',
+    condicao:'integra',nivel_id:c.nivelSobra,origem:'rolo',origem_rolo_id:r.id},'Ana');
+  perto(doRolo.preco_m2,20,'herdou o preco do rolo');
+  perto(doRolo.valor,30,'1,5 m² × R$ 20 = R$ 30');
+
+  const filha=sobra.criar({codigo:'S-000009',tecido_id:c.tecido.id,largura:'0,50',altura:'1,00',
+    condicao:'integra',nivel_id:c.nivelSobra,origem:'sobra',origem_sobra_id:doRolo.id},'Ana');
+  perto(filha.preco_m2,20,'a sobra da sobra herda tambem');
+
+  const mutirao=sobra.criar({codigo:'S-000010',tecido_id:c.tecido.id,largura:'1,00',altura:'2,00',
+    condicao:'integra',nivel_id:c.nivelSobra},'Ana');
+  igual(mutirao.preco_m2,null,'sem origem, sem preco — nao zero');
+  igual(mutirao.valor,null,'e o valor e "nao se sabe", nao R$ 0,00');
+}},
+
+{nome:'o resumo por tecido soma so quem tem preco e diz quantas faltam (piso)', executar({igual,perto}){
+  const c=montar();
+  const r=sobra.resumo().find(x=>x.tecido_id===c.tecido.id);
+  // Disponiveis deste tecido agora: S-000001 (4,94 m², sem preco), S-000002
+  // (0,96, sem), S-000006 mudou de tecido, S-000007 descartada, S-000008
+  // (1,5, R$20), S-000009 (0,5, R$20), S-000010 (2,0, sem).
+  perto(r.valor,40,'so as duas com preco entram: (1,5+0,5) × 20');
+  igual(r.sobras_sem_preco,3,'tres sem preco — o total e PISO');
+  perto(r.area_sem_preco,4.94+0.96+2,'e a area que falta precificar');
+}},
+
+{nome:'precificar por tecido preenche so quem nao tem preco, com rastro por sobra', executar({igual,perto,recusa}){
+  const c=montar();
+  recusa(()=>sobra.precificar(c.tecido.id,'abc',{},'Diretor'),'preco_invalido');
+  recusa(()=>sobra.precificar(c.tecido.id,'',{},'Diretor'),'preco_invalido');
+
+  const d=sobra.precificar(c.tecido.id,'18,50',{},'Diretor');
+  igual(d.sobras,3,'as tres sem preco receberam');
+  igual(d.codigos.includes('S-000008'),false,'a herdada do rolo NAO foi tocada');
+  perto(sobra.porCodigo('S-000010').preco_m2,18.5,'preco gravado na sobra');
+  perto(sobra.porCodigo('S-000008').preco_m2,20,'a do rolo continua R$ 20');
+
+  const h=sobra.correcoes(sobra.porCodigo('S-000010').id);
+  igual(h[0].campo,'preco','rastro por sobra');
+  igual(h[0].de,'sem preco','de: sem preco');
+  igual(h[0].usuario_nome,'Diretor','quem lancou');
+
+  const r=sobra.resumo().find(x=>x.tecido_id===c.tecido.id);
+  igual(r.sobras_sem_preco,0,'nada mais sem preco');
+  perto(r.valor,40+(4.94+0.96+2)*18.5,'o total agora e exato',0.01);
+
+  // Rodar de novo com o mesmo preco: nada a fazer.
+  igual(sobra.precificar(c.tecido.id,'18,50',{},'Diretor').sobras,0,'segunda rodada nao mexe em nada');
+  // Substituir passa por cima de todas — inclusive a do rolo.
+  const s=sobra.precificar(c.tecido.id,'22',{substituir:true},'Diretor');
+  igual(s.sobras,5,'as cinco disponiveis trocaram');
+  perto(sobra.porCodigo('S-000008').preco_m2,22,'a do rolo tambem, porque foi pedido');
+}},
+
+{nome:'o preco tambem se corrige na sobra, mas nao se aponta', executar({igual,perto}){
+  const s=sobra.porCodigo('S-000010');
+  const r=sobra.corrigir(s.id,{preco_m2:'25'},'Diretor');
+  perto(r.preco_m2,25,'preco corrigido');
+  igual(r.mudancas[0].campo,'preco','com mudanca de preco');
+  perto(r.valor,50,'valor refeito: 2 m² × 25');
+  // A bancada aponta tecido, medida, condicao, endereco — preco nao entra.
+  const p=sobra.propor(s.id,{preco_m2:'99',condicao:'mancha'},'Ana');
+  igual(p.itens.length,1,'so a condicao virou item');
+  igual(p.itens[0].campo,'condicao','preco foi ignorado');
+}},
+
 {nome:'lote de etiquetas com quantidade invalida e recusado', executar({recusa}){
   recusa(()=>etiqueta.imprimirLote(0,'Diretor'),'quantidade_invalida');
   recusa(()=>etiqueta.imprimirLote('muitas','Diretor'),'quantidade_invalida');

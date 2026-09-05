@@ -87,6 +87,31 @@ module.exports=[
      com quem sai. */
 }},
 
+{nome:'⚠️ A LISTA E O RESUMO DE SOBRAS TAMBEM NAO — preco e valor ficam no escritorio', executar({igual}){
+  const b=cena();
+  const sobra=require('../dominio/sobra');
+  const endereco=require('../dominio/endereco');
+  const etiqueta=require('../dominio/etiqueta');
+  const h=endereco.criarHaste({nome:'S1',armazem_chave:'SOBRA'},DIRETOR);
+  const a=endereco.criarAndar({nome:'1',haste_id:h.id},DIRETOR);
+  const n=endereco.criarNivel({nome:'1',andar_id:a.id},DIRETOR);
+  etiqueta.imprimirLote(2,DIRETOR.nome);
+  sobra.criar({codigo:'S-000001',tecido_id:b.t.id,largura:'1,00',altura:'1,00',condicao:'integra',
+    nivel_id:n.id,origem:'rolo',origem_rolo_id:b.r.id},DIRETOR.nome);
+
+  const lista=sobra.listar({}), resumo=sobra.resumo();
+  igual(dinheiroEm(lista,'sobras').length>0,true,'a chefia ve preco e valor da sobra');
+  igual(dinheiroEm(resumo,'resumo').length>0,true,'e o valor por tecido');
+  igual(dinheiroEm(custo.semPreco(lista),'sobras').length,0,'a bancada nao ve nenhum — vazou: '+dinheiroEm(custo.semPreco(lista),'sobras').join(', '));
+  igual(dinheiroEm(custo.semPreco(resumo),'resumo').length,0,'nem no resumo');
+  const um=custo.semPreco(lista)[0];
+  ['codigo','largura','altura','area','condicao','endereco','linha_nome','cor_nome','dias_parada']
+    .forEach(c=>igual(c in um,true,'a bancada continua vendo '+c));
+  // `sobras_sem_preco` e `area_sem_preco` sao dinheiro por nome — e e assim
+  // que tem que ser: quantas faltam precificar e assunto do escritorio.
+  igual(custo.eDinheiro('sobras_sem_preco'),true,'sobras_sem_preco e podado');
+}},
+
 {nome:'o painel de giro tambem passa limpo', executar({igual}){
   const g=giro.painel(90);
   igual(dinheiroEm(custo.semPreco(g),'giro').length,0,'zero campo de dinheiro');

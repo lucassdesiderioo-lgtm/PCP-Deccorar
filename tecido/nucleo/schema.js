@@ -605,6 +605,21 @@ CREATE INDEX idx_sobra_proposta ON sobra_proposta(sobra_id, status);
 /* A correcao que nasceu de um apontamento sabe de qual. E o que deixa o
    historico dizer "proposto por Ana, aceito por Lucas" em vez de so "Lucas". */
 ALTER TABLE sobra_correcao ADD COLUMN proposta_id INTEGER REFERENCES sobra_proposta(id);
+`},
+
+{n:14, nome:'a sobra sabe quanto vale o metro quadrado', sql:`
+/* QUANTO VALE O QUE ESTA NA PRATELEIRA DE SOBRAS. O rolo ja sabia
+   (rolo.preco_m2, congelado na compra); a sobra nao, e a pergunta "quanto
+   temos em reais de cada tecido em retalho" nao tinha resposta.
+
+   O PRECO MORA NA SOBRA, como mora no rolo — e pela mesma razao: preco no
+   cadastro do tecido, multiplicado na hora de mostrar, muda o valor de todo
+   o acervo no dia do reajuste, e ninguem percebe porque o numero so cresce.
+   A sobra que nasce do corte HERDA o preco do rolo de onde saiu (e a que
+   nasce de outra sobra, o dela); a do mutirao do acervo nasce sem preco, e a
+   chefia lanca por tecido, numa vez so. Sem preco nao e zero: e "ainda nao
+   se sabe", e o total sai como piso. */
+ALTER TABLE sobra ADD COLUMN preco_m2 REAL;
 `}
 
 ];

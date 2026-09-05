@@ -194,5 +194,14 @@ function semPreco(dados){
   return fora;
 }
 
+/* QUEM VE DADO COMERCIAL: quem tem custo OU quem lanca nota — os dois
+   precisam, por motivos diferentes: um decide compra, o outro digita o papel.
+   Testar so `custo.ver` deixaria quem lanca a nota sem enxergar a nota que
+   acabou de lancar. A regra mora AQUI e nao em cada arquivo de rotas: duas
+   copias divergiriam no dia em que uma ganhasse uma chave nova. */
+const {pode}=require('../nucleo/permissoes');
+const veComercial=u=>pode(u,'custo.ver')||pode(u,'rolo.nota');
+const podar=(usuario,dados)=>veComercial(usuario)?dados:semPreco(dados);
+
 module.exports={ultimoPreco,porTecido,agrupado,porFornecedor,semNota,painel,
-                semPreco,eDinheiro,ECONOMICO};
+                semPreco,eDinheiro,ECONOMICO,veComercial,podar};

@@ -14,8 +14,9 @@ const {pode}=require('../nucleo/permissoes');
    motivos diferentes: um decide compra, o outro digita o papel. Testar so
    `custo.ver` deixaria quem lanca a nota sem enxergar a nota que acabou de
    lancar. */
-const veComercial=u=>pode(u,'custo.ver')||pode(u,'rolo.nota');
-const podar=(usuario,dados)=>veComercial(usuario)?dados:custo.semPreco(dados);
+// A regra de quem ve mora no custo.js (dono unico): sobras usa a mesma.
+const veComercial=custo.veComercial;
+const podar=custo.podar;
 
 module.exports={rotas:[
   {metodo:'GET', caminho:'/api/rolos', permissao:'rolo.ler',

@@ -20,6 +20,8 @@ const dTecido=require('../dados/tecido');
 const dCondicao=require('../dados/condicao_sobra');
 const endereco=require('./endereco');
 const etiqueta=require('./etiqueta');
+const dRolo=require('../dados/rolo');
+const {precoDe}=require('./rolo');
 
 // Limites de sanidade. Nao sao regra de negocio — sao a defesa contra o
 // operador digitar centimetros num campo que fala metros. 190 no lugar de
@@ -69,6 +71,15 @@ function criar(dados,usuarioNome){
   // chega na bancada e a frase do dominio, e nao o UNIQUE do banco.
   const codigo=etiqueta.conferir(dados.codigo);
 
+  /* QUANTO VALE O M² DESTA SOBRA. A que nasce do corte HERDA o preco de
+     onde saiu — o rolo (congelado na compra) ou a sobra-mae —, porque e o
+     que se pagou por aquele tecido. A do mutirao do acervo nasce sem preco,
+     a menos que venha lancado: a chefia precifica por tecido depois. Sem
+     preco nao e zero: e "ainda nao se sabe" (regra 2 do custo.js). */
+  let preco=precoDe(dados.preco_m2);
+  if(preco==null&&dados.origem_rolo_id){ const r=dRolo.porId(dados.origem_rolo_id); preco=r&&r.preco_m2!=null?r.preco_m2:null; }
+  if(preco==null&&dados.origem_sobra_id){ const m=dSobra.porId(dados.origem_sobra_id); preco=m&&m.preco_m2!=null?m.preco_m2:null; }
+
   return db.transaction(()=>{
     const id=dSobra.criar({
       codigo,
@@ -76,7 +87,7 @@ function criar(dados,usuarioNome){
       nivel_id:dados.nivel_id,
       origem:dados.origem||'inventario',
       origem_rolo_id:dados.origem_rolo_id, origem_sobra_id:dados.origem_sobra_id,
-      criado_por:usuarioNome
+      criado_por:usuarioNome, preco_m2:preco
     });
     // Dentro da mesma transacao: se a reserva falhar, a sobra nao acontece.
     etiqueta.reservar(codigo,id);
@@ -145,6 +156,15 @@ function diferencas(s,dados){
       mudancas.push({campo:'endereco',de:endereco.descrever(s.nivel_id),para:endereco.descrever(dados.nivel_id)});
     }
   }
+  // O preco tambem se corrige, com a mesma regua do rolo (precoDe) e o mesmo
+  // rastro. Mudar preco muda o valor do acervo — nao passa calado.
+  if(veio('preco_m2')){
+    const p=precoDe(dados.preco_m2);
+    if(s.preco_m2==null||Math.abs(p-s.preco_m2)>1e-6){
+      novo.preco_m2=p;
+      mudancas.push({campo:'preco',de:s.preco_m2==null?'sem preco':s.preco_m2,para:p});
+    }
+  }
   return {novo,mudancas};
 }
 
@@ -201,7 +221,9 @@ function itensDaProposta(p){
 
 function propor(sobra_id,dados,usuarioNome){
   const s=sobraCorrigivel(sobra_id);
-  const {novo,mudancas}=diferencas(s,dados);
+  // Preco nao se aponta: e dado comercial, que a bancada nem recebe no JSON
+  // (regra 4 do custo.js). A proposta so carrega o que a bancada ve.
+  const {novo,mudancas}=diferencas(s,{...dados,preco_m2:undefined});
   exigir(mudancas.length,'nada_mudou',
     'Nada esta diferente do que ja esta gravado. Marque o que esta errado antes de enviar.');
   const pend=dProposta.pendenteDe(s.id);
@@ -236,6 +258,37 @@ function aceitar(id,usuarioNome){
     // A sobra e relida DEPOIS da decisao: e ela que traz `propostas_pendentes`,
     // e devolver a leitura de antes diria que ainda ha algo esperando.
     return {proposta:dProposta.porId(id), sobra:{...comEndereco(dSobra.porId(p.sobra_id)), mudancas:s.mudancas}, mudancas:s.mudancas};
+  })();
+}
+
+/* ── O PRECO DO M², POR TECIDO, NUMA VEZ SO ──────────────────────────────
+   O mutirao catalogou centenas de retalhos sem preco, e lancar um a um nao
+   acontece. A chefia diz "o m² deste tecido vale R$ X" e o valor entra em
+   cada sobra disponivel do tecido que AINDA NAO TEM preco — a que ja tem
+   (herdado do rolo, ou lancado antes) fica como esta, porque aquele e o que
+   se pagou de fato. `substituir` passa por cima de todas, para o dia em que
+   o preco lancado estava errado.
+
+   NAO E UMA TABELA DE PRECO POR TECIDO. O numero e gravado sobra a sobra,
+   congelado, como no rolo: a proxima sobra do mesmo tecido nasce sem preco e
+   espera a proxima rodada. E por isso que cada sobra ganha a sua linha de
+   rastro, e nao um registro "preco do tecido mudou". */
+function precificar(tecido_id,preco_m2,opcoes,usuarioNome){
+  const tecido=tecidoValido(tecido_id);
+  const preco=precoDe(preco_m2);
+  exigir(preco!=null,'preco_invalido','Diga o preco do metro quadrado (ex.: 18,50).');
+  const o=opcoes||{};
+  const alvo=dSobra.disponiveisDoTecido(tecido.id)
+    .filter(s=>o.substituir?(s.preco_m2==null||Math.abs(s.preco_m2-preco)>1e-6):s.preco_m2==null);
+
+  return db.transaction(()=>{
+    for(const s of alvo){
+      dSobra.atualizar(s.id,{preco_m2:preco});
+      dSobra.registrarCorrecao({sobra_id:s.id,campo:'preco',
+        de:s.preco_m2==null?'sem preco':s.preco_m2,para:preco,usuario_nome:usuarioNome});
+    }
+    return {tecido:nomeTecido(tecido), preco_m2:preco, sobras:alvo.length,
+            codigos:alvo.map(s=>s.codigo)};
   })();
 }
 
@@ -287,7 +340,7 @@ function descartar(id,motivo,usuarioNome){
 const comEndereco=s=>s?{...s, endereco:s.nivel_id?endereco.descrever(s.nivel_id):''}:s;
 
 module.exports={
-  criar, corrigir, propor, aceitar, recusar, marcarUsada, descartar,
+  criar, corrigir, propor, aceitar, recusar, precificar, marcarUsada, descartar,
   listar:f=>dSobra.listar(f).map(comEndereco),
   porId:id=>comEndereco(dSobra.porId(id)),
   correcoes:id=>dSobra.correcoes(id),

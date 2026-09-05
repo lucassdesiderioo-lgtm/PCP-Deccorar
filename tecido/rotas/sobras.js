@@ -6,33 +6,56 @@
 const sobra=require('../dominio/sobra');
 const etiqueta=require('../dominio/etiqueta');
 const pdf=require('../dominio/etiqueta_pdf');
+const custo=require('../dominio/custo');
+
+/* A PODA DO PRECO ACONTECE NA ROTA, e nao na tela — a mesma dos rolos, pela
+   mesma regra (custo.js, regra 4): quem nao tem custo.ver recebe o JSON SEM
+   preco_m2 e valor. A bancada precisa saber o que a sobra e e onde esta;
+   quanto ela vale e outra conversa. */
+const podar=custo.podar;
 
 module.exports={rotas:[
   {metodo:'GET', caminho:'/api/sobras', permissao:'sobra.ler',
-   manipulador:({query})=>sobra.listar(query)},
+   manipulador:({query,usuario})=>podar(usuario,sobra.listar(query))},
 
   {metodo:'GET', caminho:'/api/sobras/resumo', permissao:'sobra.ler',
-   manipulador:()=>sobra.resumo()},
+   manipulador:({usuario})=>podar(usuario,sobra.resumo())},
 
   {metodo:'GET', caminho:'/api/sobras/codigo/:codigo', permissao:'sobra.ler',
-   manipulador:({params})=>sobra.porCodigo(params.codigo)||null},
+   manipulador:({params,usuario})=>podar(usuario,sobra.porCodigo(params.codigo)||null)},
 
   {metodo:'POST', caminho:'/api/sobras', permissao:'sobra.criar',
-   manipulador:({corpo,usuario})=>sobra.criar(corpo,usuario.nome),
+   manipulador:({corpo,usuario})=>podar(usuario,sobra.criar(corpo,usuario.nome)),
    detalhe:(req,d)=>'sobra '+(d&&d.codigo)+' '+(d&&d.largura)+'x'+(d&&d.altura)},
+
+  /* O PRECO DO M² DE UM TECIDO, nas sobras que ainda nao tem. Chefia
+     (sobra.corrigir) — e a tela so mostra o botao a quem tambem ve custo. A
+     auditoria registra o preco e QUAIS sobras receberam: e valor de acervo
+     mudando de uma vez. */
+  {metodo:'POST', caminho:'/api/sobras/precificar', permissao:'sobra.corrigir',
+   manipulador:({corpo,usuario})=>sobra.precificar(corpo.tecido_id,corpo.preco_m2,
+     {substituir:!!corpo.substituir},usuario.nome),
+   detalhe:(req,d)=>d?'preco R$ '+d.preco_m2+'/m² em '+d.sobras+' sobra(s) de '+d.tecido+
+     (d.sobras?': '+d.codigos.join(', '):'')+(req.body.substituir?' (substituindo)':''):null},
 
   /* A CORRECAO. O detalhe da auditoria sai do que o dominio MUDOU, e nao do
      que veio no corpo: o corpo traz a tela inteira, a maioria igual ao que ja
      estava — o que interessa registrar e so a diferenca. */
   {metodo:'PUT', caminho:'/api/sobras/:id', permissao:'sobra.corrigir',
-   manipulador:({params,corpo,usuario})=>sobra.corrigir(params.id,corpo,usuario.nome),
+   manipulador:({params,corpo,usuario})=>podar(usuario,sobra.corrigir(params.id,corpo,usuario.nome)),
    detalhe:(req,d)=>'correcao da sobra '+(d&&d.codigo)+
      (d&&d.mudancas&&d.mudancas.length
        ? ': '+d.mudancas.map(m=>m.campo+' '+m.de+' → '+m.para).join(' · ')
        : ' (nada mudou)')},
 
+  /* O historico carrega o preco em `de`/`para` — chaves que a poda por nome
+     nao pega. Para quem nao ve custo, a linha de preco sai INTEIRA: uma linha
+     "preco: — → —" diria que houve preco, e isso ja e informacao comercial. */
   {metodo:'GET', caminho:'/api/sobras/:id/correcoes', permissao:'sobra.ler',
-   manipulador:({params})=>sobra.correcoes(params.id)},
+   manipulador:({params,usuario})=>{
+     const h=sobra.correcoes(params.id);
+     return custo.veComercial(usuario)?h:h.filter(c=>c.campo!=='preco');
+   }},
 
   // ── A bancada aponta, a chefia decide ──────────────────────────────────
   /* A LISTA DO QUE ESPERA DECISAO e da chefia. Nao ha GET '/api/sobras/:id'
@@ -54,7 +77,7 @@ module.exports={rotas:[
      (d&&d.motivo?' ("'+d.motivo+'")':'')},
 
   {metodo:'POST', caminho:'/api/sobras/propostas/:id/aceitar', permissao:'sobra.corrigir',
-   manipulador:({params,usuario})=>sobra.aceitar(params.id,usuario.nome),
+   manipulador:({params,usuario})=>podar(usuario,sobra.aceitar(params.id,usuario.nome)),
    detalhe:(req,d)=>'aceitou apontamento '+req.params.id+' da sobra '+(d&&d.sobra&&d.sobra.codigo)+
      (d&&d.mudancas&&d.mudancas.length
        ? ': '+d.mudancas.map(m=>m.campo+' '+m.de+' → '+m.para).join(' · ')

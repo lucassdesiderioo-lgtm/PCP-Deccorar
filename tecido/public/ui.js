@@ -64,6 +64,10 @@ const num=(v,casas)=>(Number(v)||0).toFixed(casas===undefined?2:casas).replace('
 const formatarMedida=(largura,altura)=>num(largura)+' × '+num(altura);
 const formatarMetros=v=>num(v)+' m';
 const formatarArea=v=>num(v)+' m²';
+// Dinheiro num lugar so, e NULO E TRACO — nunca "R$ 0,00", que se le como
+// "nao vale nada" (regra 3 do custo.js). Rolos e sobras escrevem por aqui.
+const dinheiro=v=>v==null?'—':'R$ '+Number(v).toLocaleString('pt-BR',
+  {minimumFractionDigits:2,maximumFractionDigits:2});
 
 // ── atalhos de DOM ───────────────────────────────────────────────────────
 const $=s=>document.querySelector(s);
@@ -87,5 +91,5 @@ function comoNumero(texto){
   return isFinite(n)?n:null;
 }
 
-window.ui={api,banner,beep,formatarMedida,formatarMetros,formatarArea,num,$,$$,el,limpar,comoNumero};
+window.ui={api,banner,beep,formatarMedida,formatarMetros,formatarArea,dinheiro,num,$,$$,el,limpar,comoNumero};
 })();
