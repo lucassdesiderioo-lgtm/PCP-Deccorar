@@ -45,7 +45,6 @@ const podeCusto=()=>(eu.permissoes||[]).includes('custo.ver');
    O servidor manda numero cru (1.5, 18.5); o operador le "1,50" e "R$ 18,50". */
 const fmtVal=(campo,v)=>{
   if(v==null) return '—';
-  if(campo==='preco') return isFinite(Number(v))?dinheiro(Number(v)):String(v);
   if(campo==='largura'||campo==='altura') return isFinite(Number(v))?num(v)+' m':String(v);
   return String(v);
 };
@@ -370,17 +369,18 @@ async function telaLista(pai){
   cR.appendChild(el('h2',{texto:'Sobras por tecido'}));
   cR.appendChild(el('p',{class:'nota',texto:'Em m², por tipo e cor — o numero que evita comprar tecido que ja esta na prateleira.'}));
 
-  /* QUANTO VALE O ACERVO. A soma e das MESMAS linhas da tabela, e a sobra
-     sem preco fica fora dela: o total sai como PISO (>=) enquanto houver
-     alguma, com o numero de quantas faltam. Zero aqui seria mentira com cara
-     de economia (regra 2 do custo.js). */
+  /* QUANTO VALE O ACERVO: a soma das MESMAS linhas da tabela, cada uma
+     area x preco do m² do tecido. Tecido sem preco fica fora da soma, e o
+     total sai como PISO (>=) enquanto houver algum, dizendo quantos faltam.
+     Zero aqui seria mentira com cara de economia (regra 2 do custo.js). */
   if(podeCusto()&&comSobra.length){
     const total=comSobra.reduce((s,r)=>s+(r.valor||0),0);
-    const semPreco=comSobra.reduce((s,r)=>s+(r.sobras_sem_preco||0),0);
+    const semPreco=comSobra.reduce((s,r)=>s+(r.sem_preco||0),0);
+    const tecidosSem=comSobra.filter(r=>r.sem_preco>0).length;
     const comPreco=comSobra.some(r=>r.valor!=null);
     cR.appendChild(el('p',{style:'font-size:22px;margin:4px 0 10px',html:
       (comPreco?'<b>'+(semPreco?'≥ ':'')+dinheiro(total)+'</b> em sobras':'<b>—</b> nenhuma sobra com preco ainda')+
-      (semPreco?' <span class="quem">· '+semPreco+' sobra(s) sem preco — o total e o MINIMO. Lance o preco por tecido no botao de cada linha.</span>':'')}));
+      (semPreco?' <span class="quem">· '+semPreco+' sobra(s) sem preco em '+tecidosSem+' tecido(s) — o total e o MINIMO. Lance o preco do m² no botao de cada linha.</span>':'')}));
   }
 
   const tR=el('table',{});
@@ -393,14 +393,15 @@ async function telaLista(pai){
       el('td',{class:'num',texto:formatarArea(r.area)})
     ];
     if(podeCusto()){
-      // Sem nenhuma sobra com preco: traco. Com algumas: piso, e o titulo diz
-      // quantas faltam. Todas com preco: o numero exato.
-      celulas.push(el('td',{class:'num'+(r.sobras_sem_preco?' aviso':''),
-        texto:r.valor==null?'—':(r.sobras_sem_preco?'≥ ':'')+dinheiro(r.valor),
-        title:r.sobras_sem_preco?r.sobras_sem_preco+' de '+r.sobras+' sobra(s) sem preco ('+formatarArea(r.area_sem_preco)+')':'todas com preco'}));
+      // Nenhuma sobra com preco: traco, nunca R$ 0,00. Algumas sem: piso.
+      celulas.push(el('td',{class:'num'+(r.sem_preco?' aviso':''),
+        texto:r.valor==null?'—':(r.sem_preco?'≥ ':'')+dinheiro(r.valor),
+        title:(r.sem_preco?r.sem_preco+' de '+r.sobras+' sobra(s) sem preco. ':'')+
+              (r.com_preco_do_rolo?r.com_preco_do_rolo+' valem pelo preco do rolo de onde sairam. ':'')+
+              (r.preco_m2==null?'Tecido sem preco do m².':'Tecido a R$ '+num(r.preco_m2)+'/m².')}));
       celulas.push(el('td',{style:'text-align:right;white-space:nowrap'},podeCorrigirAqui?[
-        el('button',{class:'bt pequeno',texto:r.sobras_sem_preco?'Preco ⚠':'Preco',
-          title:'lancar o preco do m² nas sobras deste tecido',
+        el('button',{class:'bt pequeno',texto:r.preco_m2==null?'Preco ⚠':'R$ '+num(r.preco_m2)+'/m²',
+          title:'o preco do m² deste tecido — vale para todas as sobras dele',
           onclick:()=>{ estado.precificando=r.tecido_id; telaLista($('#conteudo')); }})]:[]));
     }
     tR.appendChild(el('tr',{},celulas));
@@ -505,9 +506,11 @@ async function telaLista(pai){
       // O endereco e para que a sobra exista: sem ele a linha diz o que a
       // peca e, e nao onde esta. Vem do servidor no formato unico.
       el('td',{style:'white-space:nowrap',texto:s.endereco||''}),
-      // Sem preco, traco — nunca R$ 0,00. O preco do m² vai no titulo.
+      // Sem preco, traco — nunca R$ 0,00. O titulo diz de onde veio o preco:
+      // do rolo (herdado no corte, e o que se pagou) ou do tecido (estimativa).
       ...(podeCusto()?[el('td',{class:'num',texto:dinheiro(s.valor),
-        title:s.preco_m2==null?'sem preco lancado':('R$ '+num(s.preco_m2)+'/m²')})]:[]),
+        title:s.preco_m2==null?'sem preco: o tecido nao tem preco do m²'
+             :('R$ '+num(s.preco_m2)+'/m² '+(s.preco_rolo_m2!=null?'(pago, herdado do rolo)':'(do tecido)'))})]:[]),
       el('td',{class:'num',texto:s.dias_parada+' d'}),
       el('td',{style:'text-align:right;white-space:nowrap'},acoes)
     ]);
@@ -527,69 +530,77 @@ async function telaLista(pai){
   pai.appendChild(c);
 }
 
-/* ── O PRECO DO M² DE UM TECIDO, nas sobras dele ─────────────────────────
-   O mutirao catalogou centenas de retalhos sem preco; lancar um a um nao
-   acontece. Aqui a chefia diz quanto vale o m² do tecido e o numero entra em
-   cada sobra que AINDA NAO TEM preco — a que ja tem (herdada do rolo, ou
-   lancada antes) fica, porque aquele foi o que se pagou. "Substituir" passa
-   por cima de todas, para o dia em que o preco lancado estava errado.
+/* ── O PRECO DO M² DO TECIDO ──────────────────────────────────────────────
+   Um numero por tecido, e a sobra vale area x esse numero. Mudou o preco,
+   todas as sobras do tecido acompanham — e o que se quer de uma estimativa
+   de acervo, e a pergunta que o dono fez e uma so: quanto temos de sobra,
+   em reais. Cada mudanca fica no historico, com quem e quando.
 
-   O que pre-preenche e o ULTIMO PRECO PAGO por rolo desse tecido — a mesma
-   fonte da nota do rolo, e nao uma tabela: tabela envelhece calada. */
+   O que pre-preenche, quando o tecido ainda nao tem preco, e o ULTIMO PRECO
+   PAGO por rolo desse tecido — a mesma fonte da nota do rolo. */
 async function cartaoPreco(pai,r){
   const nome=[r.linha_nome,r.abertura_nome,r.cor_nome].join(' · ');
   const c=el('div',{class:'cartao',style:'border-color:var(--acao)'});
   c.appendChild(el('h2',{texto:'Preco do m² — '+nome}));
   c.appendChild(el('p',{class:'nota',texto:
     r.sobras+' sobra(s) disponivel(is), '+formatarArea(r.area)+' no total. '+
-    (r.sobras_sem_preco?r.sobras_sem_preco+' sem preco ('+formatarArea(r.area_sem_preco)+').':'Todas ja tem preco.')}));
+    (r.preco_m2==null?'Este tecido ainda nao tem preco do m².':'Hoje: '+dinheiro(r.preco_m2)+'/m², '+dinheiro(r.valor)+' em sobras.')+
+    (r.com_preco_do_rolo?' '+r.com_preco_do_rolo+' sobra(s) vieram de rolo com nota e valem pelo preco pago, nao por este.':'')}));
 
   const preco=el('input',{type:'text',inputmode:'decimal',autocomplete:'off',placeholder:'ex.: 18,50',
-    style:'font-size:22px;min-height:56px'});
+    value:r.preco_m2==null?'':num(r.preco_m2),style:'font-size:22px;min-height:56px'});
   const dica=el('p',{class:'ajuda'});
-  try{
-    const u=await api('/api/rolos/ultimo-preco?tecido_id='+r.tecido_id,{silencioso:true});
-    if(u&&u.preco!=null){
-      preco.value=num(u.preco);
-      dica.textContent='Ultimo pago por rolo deste tecido: '+dinheiro(u.preco)+'/m² em '+String(u.quando).slice(0,10)+
-        (u.de_outro_fornecedor?' ('+u.de_outro_fornecedor+')':'')+'. Mude se a sobra vale outra coisa.';
-    } else dica.textContent='Nenhum rolo deste tecido tem preco lancado — nao ha sugestao.';
-  }catch(e){ dica.textContent=''; }
+  if(r.preco_m2==null){
+    try{
+      const u=await api('/api/rolos/ultimo-preco?tecido_id='+r.tecido_id,{silencioso:true});
+      if(u&&u.preco!=null){
+        preco.value=num(u.preco);
+        dica.textContent='Sugestao: ultimo pago por rolo deste tecido, '+dinheiro(u.preco)+'/m² em '+String(u.quando).slice(0,10)+
+          (u.de_outro_fornecedor?' ('+u.de_outro_fornecedor+')':'')+'. Mude se a sobra vale outra coisa.';
+      } else dica.textContent='Nenhum rolo deste tecido tem preco lancado — nao ha sugestao.';
+    }catch(e){ dica.textContent=''; }
+  }
 
-  const subst=el('input',{type:'checkbox',id:'substPreco'});
   const previa=el('p',{class:'ajuda'});
   const recalcular=()=>{
     const p=comoNumero(preco.value);
-    const n=subst.checked?r.sobras:r.sobras_sem_preco;
-    const area=subst.checked?r.area:r.area_sem_preco;
-    previa.textContent=p>0&&n
-      ? 'Vai entrar em '+n+' sobra(s): '+formatarArea(area)+' × '+dinheiro(p)+'/m² = '+dinheiro(area*p)+'.'
-      : (n?'':'Nenhuma sobra sem preco — marque "substituir" para trocar o preco de todas.');
+    const n=r.sobras-(r.com_preco_do_rolo||0);
+    previa.textContent=p>0&&n>0?n+' sobra(s) passam a valer por este preco: '+dinheiro(p)+'/m².':'';
   };
-  preco.addEventListener('input',recalcular); subst.addEventListener('change',recalcular); recalcular();
+  preco.addEventListener('input',recalcular); recalcular();
 
   const campo=el('div',{class:'campo'}); campo.appendChild(el('label',{texto:'R$ POR M²'})); campo.appendChild(preco);
   c.appendChild(el('div',{class:'campos'},[campo]));
   c.appendChild(dica);
-  const rot=el('label',{style:'display:flex;gap:8px;align-items:center;font-size:15px;margin:6px 0'},[subst,
-    'substituir tambem o preco das sobras que ja tem (o herdado do rolo fica para tras)']);
-  c.appendChild(rot);
   c.appendChild(previa);
 
-  const bt=el('button',{class:'bt primario',style:'min-height:56px',texto:'Aplicar'});
+  const bt=el('button',{class:'bt primario',style:'min-height:56px',texto:'Salvar preco'});
   bt.onclick=async()=>{
     if(comoNumero(preco.value)===null) return banner('Diga o preco do metro quadrado.','alerta',3);
     bt.disabled=true;
     try{
-      const d=await api('/api/sobras/precificar',{metodo:'POST',corpo:{
-        tecido_id:r.tecido_id, preco_m2:preco.value, substituir:subst.checked}});
-      beep();
-      banner(d.sobras?dinheiro(d.preco_m2)+'/m² lancado em '+d.sobras+' sobra(s) de '+d.tecido+'.'
-                     :'Nenhuma sobra recebeu preco — todas ja tinham.', d.sobras?'bom':'alerta',5);
+      const d=await api('/api/tecidos/'+r.tecido_id+'/preco',{metodo:'PUT',corpo:{preco_m2:preco.value}});
+      if(d.mudou){ beep(); banner(nome+': '+dinheiro(d.preco_m2)+'/m² — as '+r.sobras+' sobra(s) ja valem por ele.','bom',5); }
+      else banner('O preco ja era esse.','alerta',3);
       estado.precificando=null;
       await telaLista($('#conteudo'));
     }catch(e){ beep('erro'); bt.disabled=false; }
   };
+
+  // O historico do preco: quem mudou, quando, de -> para.
+  try{
+    const h=await api('/api/tecidos/'+r.tecido_id+'/preco/historico',{silencioso:true});
+    if(h.length){
+      const t=el('table',{});
+      h.forEach(x=>t.appendChild(el('tr',{},[
+        el('td',{texto:String(x.criado_em).slice(0,16)}),
+        el('td',{texto:dinheiro(x.de)+' → '+dinheiro(x.para)}),
+        el('td',{class:'quem',texto:x.usuario_nome||''})
+      ])));
+      c.appendChild(el('h2',{style:'margin-top:14px;font-size:16px',texto:'Mudancas do preco'}));
+      c.appendChild(t);
+    }
+  }catch(e){}
   c.appendChild(el('div',{class:'campos'},[bt,
     el('button',{class:'bt',texto:'Cancelar',onclick:()=>{ estado.precificando=null; telaLista($('#conteudo')); }})]));
   pai.appendChild(c);
@@ -727,21 +738,6 @@ async function cartaoCorrigir(pai,s,modo){
     });
     c.appendChild(medidas);
 
-    // 2b. o preco do m² — so na correcao, e so para quem ve custo. A bancada
-    // nao recebe o campo no JSON, entao nao tem o que mostrar nem apontar.
-    let preco=null;
-    if(!propondo&&podeCusto()){
-      preco=el('input',{type:'text',inputmode:'decimal',autocomplete:'off',
-        value:s.preco_m2==null?'':num(s.preco_m2),placeholder:'sem preco',
-        style:'font-size:18px;min-height:52px'});
-      const b=el('div',{class:'campo'});
-      b.appendChild(el('label',{texto:'R$ POR M²'})); b.appendChild(preco);
-      c.appendChild(el('div',{class:'campos'},[b,
-        el('p',{class:'ajuda',style:'align-self:center',texto:
-          s.preco_m2==null?'Sem preco esta sobra fica fora da soma do acervo — contada a parte, nunca como zero.'
-                          :'Vale '+dinheiro(s.valor)+' hoje ('+formatarArea(s.area)+').'})]));
-    }
-
     // 3. a condicao
     c.appendChild(fileira('CONDICAO',estado.condicoes.filter(x=>x.ativo||x.chave===ed.condicao)
       .map(x=>({valor:x.chave,nome:x.nome})),ed.condicao,v=>{ ed.condicao=v; montar(); }));
@@ -777,7 +773,6 @@ async function cartaoCorrigir(pai,s,modo){
       bt.disabled=true;
       const corpo={tecido_id:ed.tecido_id, largura:larg.value, altura:alt.value,
         condicao:ed.condicao, nivel_id:ed.nivel_id};
-      if(preco&&preco.value.trim()) corpo.preco_m2=preco.value;
       try{
         if(propondo){
           const p=await api('/api/sobras/'+s.id+'/propostas',{metodo:'POST',corpo:{...corpo,motivo:motivo.value}});

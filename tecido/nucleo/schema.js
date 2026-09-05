@@ -620,6 +620,32 @@ ALTER TABLE sobra_correcao ADD COLUMN proposta_id INTEGER REFERENCES sobra_propo
    chefia lanca por tecido, numa vez so. Sem preco nao e zero: e "ainda nao
    se sabe", e o total sai como piso. */
 ALTER TABLE sobra ADD COLUMN preco_m2 REAL;
+`},
+
+{n:15, nome:'o preco do m² e do TECIDO — a pergunta e quanto temos de sobra, em reais', sql:`
+/* A migracao 14 pos o preco na sobra, congelado, como no rolo. Durou um dia:
+   o dono da operacao disse que a pergunta e uma so — "quanto temos em reais
+   de sobra" — e que o estoque antigo, sem nota, nunca teria preco pago. Um
+   preco por sobra obrigava a inventar o que se pagou por um retalho que
+   ninguem sabe de onde veio.
+
+   Entao o preco e do TECIDO: um numero por item (Rolo · 3% · Bege), e a
+   sobra vale area x esse preco. Atualizou o preco do tecido, todas as sobras
+   dele acompanham — e e isso que se quer de uma ESTIMATIVA de acervo, que e
+   o que esta conta e. O rolo continua com o preco pago, congelado, porque la
+   a pergunta e outra (quanto se pagou naquela compra).
+
+   sobra.preco_m2 fica na tabela, sem uso: migracao aplicada nao se edita.
+   Toda mudanca do preco do tecido deixa linha em tecido_preco. */
+ALTER TABLE tecido ADD COLUMN preco_m2 REAL;
+CREATE TABLE tecido_preco (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tecido_id INTEGER NOT NULL REFERENCES tecido(id),
+  de REAL, para REAL,
+  usuario_nome TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX idx_tecido_preco ON tecido_preco(tecido_id);
 `}
 
 ];

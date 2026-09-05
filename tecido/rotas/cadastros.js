@@ -18,6 +18,9 @@ const dNivel=require('../dados/nivel');
 
 const conferir=require('../dominio/conferir');
 const fornecedor=require('../dominio/fornecedor');
+// O tecido carrega o preco do m² (o que da valor as sobras). Dado comercial:
+// quem nao tem custo.ver recebe o JSON SEM ele — a poda e do custo.js.
+const custo=require('../dominio/custo');
 
 const LER='cadastro.ler', EDITAR='cadastro.editar', CRIAR_END='endereco.criar',
       NOTA='rolo.nota';
@@ -114,12 +117,23 @@ module.exports={rotas:[
    detalhe:(req)=>req.body.nome!==undefined?('renomeou para '+req.body.nome):null},
 
   {metodo:'GET', caminho:'/api/tecidos', permissao:LER,
-   manipulador:()=>tecido.listarTecidos()},
+   manipulador:({usuario})=>custo.podar(usuario,tecido.listarTecidos())},
   {metodo:'POST', caminho:'/api/tecidos', permissao:EDITAR,
-   manipulador:({corpo})=>tecido.criarTecido(corpo),
+   manipulador:({corpo,usuario})=>custo.podar(usuario,tecido.criarTecido(corpo)),
    detalhe:(req,d)=>'tecido '+(d&&d.codigo)},
   {metodo:'PUT', caminho:'/api/tecidos/:id', permissao:EDITAR,
-   manipulador:({params,corpo})=>tecido.atualizarTecido(params.id,corpo)},
+   manipulador:({params,corpo,usuario})=>custo.podar(usuario,tecido.atualizarTecido(params.id,corpo))},
+
+  /* O PRECO DO M² DO TECIDO — o numero que responde "quanto temos em reais de
+     sobra". Porta propria, com historico: mudar isto muda o valor de todas
+     as sobras do tecido de uma vez. A tela so mostra o botao a quem ve custo;
+     a chave e a de editar cadastro, porque e cadastro. */
+  {metodo:'PUT', caminho:'/api/tecidos/:id/preco', permissao:EDITAR,
+   manipulador:({params,corpo,usuario})=>custo.podar(usuario,tecido.definirPreco(params.id,corpo.preco_m2,usuario.nome)),
+   detalhe:(req,d)=>d?'preco do m² de '+d.codigo+': '+
+     (d.mudou?(d.preco_anterior==null?'sem preco':'R$ '+d.preco_anterior)+' → R$ '+d.preco_m2:'sem mudanca'):null},
+  {metodo:'GET', caminho:'/api/tecidos/:id/preco/historico', permissao:'custo.ver',
+   manipulador:({params})=>tecido.historicoPreco(params.id)},
 
   // ── Endereco ───────────────────────────────────────────────────────────
   {metodo:'GET', caminho:'/api/armazens', permissao:LER,

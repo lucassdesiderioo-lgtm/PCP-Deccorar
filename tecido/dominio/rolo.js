@@ -141,9 +141,17 @@ function editarDados(rolo_id,dados,usuarioNome){
 
   return db.transaction(()=>{
     dRolo.atualizarDados(rolo_id,{nf,fornecedor_id:forn?forn.id:null,preco_m2:preco});
+    /* A NOTA CHEGOU DEPOIS DO CORTE. As sobras que ja nasceram deste rolo
+       valiam pela estimativa do tecido; agora que se sabe o que foi pago,
+       passam a valer por ele. So as que ainda nao tinham preco herdado — um
+       preco pago nao e substituido por outro. A conta e do dominio da sobra
+       (sobra.preco_m2 tem um dono so); aqui so se avisa. */
+    let herdaram=0;
+    if(preco!=null&&r.preco_m2==null) herdaram=require('./sobra').herdarPrecoDoRolo(rolo_id,preco);
     dRolo.movimentar({rolo_id,delta:0,saldo_apos:r.saldo,motivo:'nota',
-      observacao:mudou.join(' · '), usuario_nome:usuarioNome});
-    return dRolo.porId(rolo_id);
+      observacao:mudou.join(' · ')+(herdaram?' · '+herdaram+' sobra(s) deste rolo passaram a valer por este preco':''),
+      usuario_nome:usuarioNome});
+    return {...dRolo.porId(rolo_id), sobras_herdaram:herdaram};
   })();
 }
 

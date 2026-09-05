@@ -5,6 +5,9 @@ const db=require('../nucleo/db');
 
 const CAMPOS=`t.id, t.codigo, t.linha_id, t.abertura_id, t.cor_id,
   t.largura_sugerida, t.permite_girar, t.ativo,
+  /* O preco do m² do tecido — e o que da valor as sobras (area x preco).
+     Dado comercial: a rota poda para quem nao tem custo.ver. */
+  t.preco_m2,
   l.nome AS linha_nome, a.nome AS abertura_nome, c.nome AS cor_nome`;
 
 const DE=`FROM tecido t
@@ -34,4 +37,12 @@ function atualizar(id,d){
   return porId(id);
 }
 
-module.exports={listar,ativos,porId,porCombinacao,porCodigo,criar,atualizar};
+// O preco tem porta propria: quem muda e dominio/tecido.js, com historico.
+const gravarPreco=(id,preco)=>db.prepare('UPDATE tecido SET preco_m2=? WHERE id=?').run(preco,id);
+const registrarPreco=p=>db.prepare(
+  'INSERT INTO tecido_preco(tecido_id,de,para,usuario_nome) VALUES(?,?,?,?)')
+  .run(p.tecido_id,p.de==null?null:p.de,p.para,p.usuario_nome||null);
+const historicoPreco=tecido_id=>db.prepare(
+  'SELECT id, de, para, usuario_nome, criado_em FROM tecido_preco WHERE tecido_id=? ORDER BY id DESC').all(tecido_id);
+
+module.exports={listar,ativos,porId,porCombinacao,porCodigo,criar,atualizar,gravarPreco,registrarPreco,historicoPreco};
