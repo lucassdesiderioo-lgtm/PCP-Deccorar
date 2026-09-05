@@ -4,6 +4,10 @@ const db=require('../nucleo/db');
 const CAMPOS=`s.id, s.codigo, s.tecido_id, s.largura, s.altura, s.area, s.condicao,
   s.nivel_id, s.origem, s.origem_rolo_id, s.origem_sobra_id, s.status,
   s.criado_em, s.criado_por, s.baixado_em, s.baixado_por, s.baixa_motivo,
+  /* QUANTO VALE ESTA SOBRA. Sem preco o SQLite devolve NULL sozinho, e e
+     assim que tem que ser: sobra sem preco nao vale zero, vale "ainda nao se
+     sabe" — quem soma trata o NULL a parte (regra 2 do custo.js). */
+  s.preco_m2, s.area * s.preco_m2 AS valor,
   t.codigo AS tecido_codigo, l.nome AS linha_nome, a.nome AS abertura_nome, c.nome AS cor_nome,
   t.permite_girar,
   cs.nome AS condicao_nome, cs.aproveitavel, cs.prioridade,
@@ -40,12 +44,17 @@ const candidatas=tecido_id=>db.prepare('SELECT '+CAMPOS+' '+DE+`
 
 function criar(d){
   const r=db.prepare(`INSERT INTO sobra
-    (codigo,tecido_id,largura,altura,condicao,nivel_id,origem,origem_rolo_id,origem_sobra_id,criado_por)
-    VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
+    (codigo,tecido_id,largura,altura,condicao,nivel_id,origem,origem_rolo_id,origem_sobra_id,criado_por,preco_m2)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(
       d.codigo,d.tecido_id,d.largura,d.altura,d.condicao,d.nivel_id,
-      d.origem||null,d.origem_rolo_id||null,d.origem_sobra_id||null,d.criado_por||null);
+      d.origem||null,d.origem_rolo_id||null,d.origem_sobra_id||null,d.criado_por||null,
+      d.preco_m2==null?null:d.preco_m2);
   return r.lastInsertRowid;
 }
+
+// As sobras disponiveis de um tecido, so o que a precificacao precisa saber.
+const disponiveisDoTecido=tecido_id=>db.prepare(
+  "SELECT id, codigo, preco_m2 FROM sobra WHERE tecido_id=? AND status='disponivel' ORDER BY id").all(tecido_id);
 
 const baixar=(id,status,quando,quem,motivo)=>
   db.prepare('UPDATE sobra SET status=?, baixado_em=?, baixado_por=?, baixa_motivo=? WHERE id=?')
@@ -56,7 +65,7 @@ const baixar=(id,status,quando,quem,motivo)=>
 // gerada — mudar largura ou altura a refaz sozinha.
 function atualizar(id,d){
   const campos=[], vals=[];
-  for(const k of ['tecido_id','largura','altura','condicao','nivel_id'])
+  for(const k of ['tecido_id','largura','altura','condicao','nivel_id','preco_m2'])
     if(d[k]!==undefined){ campos.push(k+'=?'); vals.push(d[k]); }
   if(campos.length) db.prepare('UPDATE sobra SET '+campos.join(', ')+' WHERE id=?').run(...vals,id);
 }
@@ -76,10 +85,15 @@ const correcoes=sobra_id=>db.prepare(`
    WHERE sc.sobra_id=? ORDER BY sc.id DESC`).all(sobra_id);
 
 // O numero do painel (fase 7) e do cruzamento "sem rolo, com retalho".
+// E QUANTO VALE, pela regra do custo.js: a sobra sem preco fica fora da soma
+// e e contada a parte — o valor e PISO enquanto `sobras_sem_preco` > 0.
 const resumoPorTecido=()=>db.prepare(`
   SELECT t.id AS tecido_id, t.codigo AS tecido_codigo,
          l.nome AS linha_nome, a.nome AS abertura_nome, c.nome AS cor_nome,
-         COUNT(s.id) AS sobras, COALESCE(SUM(s.area),0) AS area
+         COUNT(s.id) AS sobras, COALESCE(SUM(s.area),0) AS area,
+         ROUND(SUM(CASE WHEN s.preco_m2 IS NOT NULL THEN s.area*s.preco_m2 END),2) AS valor,
+         COALESCE(SUM(CASE WHEN s.id IS NOT NULL AND s.preco_m2 IS NULL THEN 1 ELSE 0 END),0) AS sobras_sem_preco,
+         ROUND(COALESCE(SUM(CASE WHEN s.preco_m2 IS NULL THEN s.area END),0),3) AS area_sem_preco
     FROM tecido t
     JOIN linha l ON l.id=t.linha_id
     JOIN abertura a ON a.id=t.abertura_id
@@ -87,4 +101,5 @@ const resumoPorTecido=()=>db.prepare(`
     LEFT JOIN sobra s ON s.tecido_id=t.id AND s.status='disponivel'
    GROUP BY t.id ORDER BY l.ordem, l.nome, a.ordem, a.nome, c.ordem, c.nome`).all();
 
-module.exports={listar,porId,porCodigo,candidatas,criar,baixar,atualizar,registrarCorrecao,correcoes,resumoPorTecido};
+module.exports={listar,porId,porCodigo,candidatas,criar,baixar,atualizar,registrarCorrecao,correcoes,
+  resumoPorTecido,disponiveisDoTecido};
