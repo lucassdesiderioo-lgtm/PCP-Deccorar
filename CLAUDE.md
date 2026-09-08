@@ -179,6 +179,34 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > passivo), faz backup e apaga **só** `situacao='aguardando'` — a linha
 > `embalado` é história de peça que virou estoque e nunca é tocada.
 
+> ⚠️ **ARMADILHA #20 — a ordem urgente fica ABERTA quando a venda sai do
+> estoque, e isso não é peça perdida.** Só a embalagem de fila `modo='hoje'`
+> abate a ordem (`mont_route.js`). Peça revisada na tela **azul** e embalada
+> como estoque atende a venda do mesmo jeito — a etiqueta sai da prateleira —
+> mas a ordem não anda. Em 08/09/2026 as 140 etiquetas do dia estavam
+> despachadas, zero volume pendente, e a tela vermelha dizia "4 peça(s)
+> URGENTE(S) para hoje": eram 4 ordens assim. O tile, por sua vez, dizia
+> "revisão completa", porque contava revisão de **qualquer** modo — duas réguas
+> na mesma tela, e o número foi lido como persiana faltando.
+>
+> `ordem_dia.js` é o **dono único** de "o que ainda falta das ordens de hoje";
+> `/api/revisao/dia` (tile) e `/api/revisao/status` (aviso) leem dele. A régua:
+> `falta` é por revisão modo `hoje`; a parte urgente da falta que a conta ao
+> vivo do `urgencia.js` — a mesma do botão "Lançar urgentes" — não pede mais é
+> `atendidas` (o volume já saiu, ou o estoque cobre), e a tela escreve
+> **"saiu do estoque — nada a produzir"** em âmbar, em vez de cobrar. O que
+> sobra é `a_produzir`, e é só ele que fica vermelho e dispara o alarme.
+>
+> **Não "conserte" mandando a embalagem azul abater a ordem**: a tela azul é
+> produção pra estoque por definição (§3), e abater ali faria o estoque parecer
+> reposto quando a peça foi pro cliente. `producao.produzido` segue como
+> história do que passou pela bancada vermelha; a tela deixou de usá-lo como
+> régua. Ordem **manual** não tem venda atrás e nunca é "atendida".
+>
+> **Rode `node teste_ordem_dia.js` após mexer em `ordem_dia.js`, `modo_route.js`
+> ou `st_route.js`** — o caso de 08/09 está lá, e o último caso trava que a
+> soma dos tiles é igual ao número do aviso.
+
 > **Bloqueio do kit:** sem o bipe 2, o bipe 3 é recusado com "⚠ FALTOU O KIT".
 > Essa é a garantia contra esquecimento — motivo de devolução recorrente.
 
@@ -1193,7 +1221,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) `teste_estoque.js` (54), `teste_cruzamento.js` (14), `teste_etiqueta.js` (13) e `teste_ficha.js` (40); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) `teste_estoque.js` (54), `teste_cruzamento.js` (14), `teste_etiqueta.js` (13), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
 | 11 | **A investigar: o que é o `Quantidade` da folha** — a regra é uma venda = uma etiqueta = uma persiana (§5), então esse campo não deveria vir maior que 1. Ninguém decide nada com ele hoje. Falta abrir um PDF real com `Quantidade > 1` e entender o que aquele número diz | Baixo enquanto nada o usar — mas é uma pergunta sem resposta sobre o documento de origem |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 

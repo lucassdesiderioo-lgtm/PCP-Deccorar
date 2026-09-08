@@ -374,7 +374,7 @@ atualizado  TEXT
 |---|---|---|
 | POST | `/api/producao` | Lançamento manual (array `itens`) |
 | GET | `/api/producao` | Ordens de hoje com estoque e alvo |
-| GET | `/api/revisao/dia` | Ordens de hoje agrupadas |
+| GET | `/api/revisao/dia` | Ordens de hoje agrupadas, com `revisadas` (modo `hoje`), `a_produzir` e `atendidas` — dono: `ordem_dia.js` |
 | GET | `/api/revisao/adiantar` | Ordens de **amanhã** ainda não cumpridas |
 | GET | `/api/revisao/metas` | SKUs com alvo, ordenados pelo mais furado |
 
@@ -383,7 +383,7 @@ atualizado  TEXT
 |---|---|---|
 | POST | `/api/revisao` | Grava tempo + **insere na fila**. Não mexe no estoque |
 | GET | `/api/revisao/hoje` | Contagem e tempo médio por SKU |
-| GET | `/api/revisao/status` | Corte, urgentes pendentes, se foi lançado |
+| GET | `/api/revisao/status` | Corte, `urgentesFalta` (a produzir) e `atendidas` (ordem aberta com a venda já fora), se foi lançado — mesma régua de `/api/revisao/dia` |
 | POST | `/api/rejeicao` | Peça devolvida à produção |
 | GET | `/api/rejeicao/resumo` | Agrupado por motivo e SKU |
 

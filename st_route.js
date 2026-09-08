@@ -11,11 +11,14 @@ module.exports=function(app,db){
   app.get('/api/revisao/status',(req,res)=>{
     const h=hoje();
     const corte=cfg('corte_'+h.d,'10:30');
-    const prod=db.prepare("SELECT COALESCE(SUM(qtd),0) total, COALESCE(SUM(CASE WHEN urgente=1 THEN qtd ELSE 0 END),0) urg, COALESCE(SUM(CASE WHEN urgente=0 THEN qtd ELSE 0 END),0) rep FROM producao WHERE data=date('now','localtime')").get();
-    const revUrg=db.prepare("SELECT COUNT(*) c FROM revisao WHERE data=date('now','localtime') AND modo='hoje'").get().c;
+    /* Mesma régua do tile da tela vermelha (ordem_dia.js). `urgentesFalta` é o
+       que a bancada ainda tem que PRODUZIR; `atendidas` é a ordem que ficou
+       aberta com a venda já fora do estoque — peça revisada na tela azul e
+       embalada como estoque não abate ordem (§4), mas atende o cliente igual. */
+    const r=require('./ordem_dia').resumo(db);
     res.json({corte, agora:h.hm, passouCorte:h.hm>=corte, dia:h.d,
-      lancado: prod.total>0, urgentes:prod.urg, reposicao:prod.rep,
-      urgentesFalta: Math.max(0, prod.urg-revUrg)});
+      lancado: (r.urgentes+r.reposicao)>0, urgentes:r.urgentes, reposicao:r.reposicao,
+      urgentesFalta: r.urgentesFalta, atendidas: r.atendidas});
   });
   app.get('/api/expedicao/status',(req,res)=>{
     const h=hoje();

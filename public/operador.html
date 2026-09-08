@@ -39,6 +39,10 @@
   body.m-est header{border-bottom:3px solid var(--blue)}
   .tf{font-size:12px;color:var(--muted);margin-top:4px}
   .tile.falta{border-color:#efb1ad}
+  /* Ordem aberta cuja venda já saiu do estoque: nada a produzir, e a tela diz
+     por quê em vez de cobrar. Âmbar, como todo aviso que não é erro. */
+  .tile.coberto{border-color:#e7cb8c;background:#fbf1db}
+  .tile .tf.amb{color:#b26a00}
   #escolha{position:fixed;inset:0;background:#ffffff;z-index:9998;display:none;
            flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:22px}
   #escolha h2{margin:0 0 8px;font-size:22px}
@@ -67,15 +71,14 @@
 </div>
 <script>
 let SKUS=[], PROD={}, emRev=null, tick=null;
-var MODO=null, DIA=[], METAS=[], REVHOJE=[], ADIANTA=[];
+var MODO=null, DIA=[], METAS=[], ADIANTA=[];
 const $=s=>document.querySelector(s);
 async function load(){
   if(!MODO) return;
   SKUS=await (await fetch('/api/skus')).json();
   const prod=await (await fetch('/api/producao')).json();
   PROD={}; for(const r of prod){ (PROD[r.codigo]=PROD[r.codigo]||{pedido:0,feito:0}); PROD[r.codigo].pedido+=r.qtd; PROD[r.codigo].feito+=r.produzido; }
-  if(MODO==='hoje'){ DIA=await (await fetch('/api/revisao/dia')).json();
-    try{ REVHOJE=await (await fetch('/api/revisao/hoje')).json(); }catch(e){ REVHOJE=[]; } }
+  if(MODO==='hoje'){ DIA=await (await fetch('/api/revisao/dia')).json(); }
   else { METAS=await (await fetch('/api/revisao/producao')).json();
     try{ ADIANTA=await (await fetch('/api/revisao/adiantar')).json(); }catch(e){ ADIANTA=[]; } }
   renderTiles(); loadStats();
@@ -102,11 +105,20 @@ function tileInner(cod, corFallback, num, numColor, detail){
 function renderTiles(){
   var html='';
   if(MODO==='hoje'){
+    /* Os numeros vem prontos do /api/revisao/dia (ordem_dia.js), a MESMA regua
+       do aviso de status. `atendidas` e a ordem que ficou aberta com a venda ja
+       fora do estoque — peca revisada na tela azul, ou que ja estava na
+       prateleira — e nao e trabalho: a tela diz isso em ambar em vez de cobrar
+       producao de um cliente que ja recebeu. */
     html=DIA.map(function(d){ var act=emRev&&emRev.codigo===d.codigo;
-      var rv=0; for(var i=0;i<REVHOJE.length;i++){ if(REVHOJE[i].codigo===d.codigo){ rv=REVHOJE[i].qtd; break; } }
-      var falta=Math.max(0,d.qtd-rv);
-      return '<button class="tile '+(act?'active':'')+(falta>0?' falta':'')+'" data-cod="'+d.codigo+'">'
-        +tileInner(d.codigo, d.cor, rv+'/'+d.qtd, '', (falta>0?'faltam '+falta+' pra revisar':'revisão completa'))+'</button>';
+      var at=d.atendidas||0, ap=d.a_produzir||0;
+      var saiu = at ? (at+(at>1?' saíram':' saiu')+' do estoque' + (d.pendentes>0?' (tem estoque)':' — venda já despachada')) : '';
+      var det, cls='', amb=false;
+      if(ap>0){ det='faltam '+ap+' pra revisar'+(at?' · '+saiu:''); cls=' falta'; }
+      else if(at>0){ det=saiu+' · nada a produzir'; cls=' coberto'; amb=true; }
+      else det='revisão completa';
+      return '<button class="tile '+(act?'active':'')+cls+'" data-cod="'+d.codigo+'">'
+        +tileInner(d.codigo, d.cor, d.revisadas+'/'+d.qtd, '', det).replace('<div class="tf">', amb?'<div class="tf amb">':'<div class="tf">')+'</button>';
     }).join('')||'<div class="muted">Nenhuma produção lançada para hoje. Lance no Admin.</div>';
   } else {
     if(ADIANTA.length){
@@ -146,7 +158,9 @@ function toggle(codigo){
   codigo=(codigo||'').trim().toUpperCase(); if(!codigo) return;
   if(!emRev){ const info=skuInfo(codigo);
     if(!info){ banner('err','SKU não cadastrado',codigo+' — cadastre no Admin antes'); beep(false); return; }
-    var fora=(MODO==='hoje')&&!DIA.some(function(d){return d.codigo===codigo&&d.falta>0;});
+    /* `a_produzir`, nao `falta`: ordem cuja venda ja saiu do estoque nao pede
+       peca — a proxima revisao desse SKU e estoque, e o aviso tem que dizer. */
+    var fora=(MODO==='hoje')&&!DIA.some(function(d){return d.codigo===codigo&&d.a_produzir>0;});
     emRev={codigo:codigo,cor:info.cor||'',inicio:Date.now(),fora:fora}; renderTiles();
     var md=medidaDe(codigo);
     banner('rev', md? md.medida+'  '+md.cor : codigo, fora?'⚠ NÃO está nos pedidos de hoje — vai contar como estoque':(codigo+' — bipe de novo ao terminar'), true);
@@ -276,8 +290,16 @@ async function avisoStatus(){
         (s.passouCorte?('Lista fechada às '+s.corte+'. '):('Corte às '+s.corte+' — ainda pode entrar venda. '))+
         'Trabalhe na reposição (tela azul).</span>';
   } else if(s.urgentesFalta>0){
-    txt='<b style="color:#c62828">'+s.urgentesFalta+' peça(s) URGENTE(S) para hoje</b><br><span style="color:#5a6472">Cliente esperando. Priorize a tela vermelha.</span>';
+    txt='<b style="color:#c62828">'+s.urgentesFalta+' peça(s) URGENTE(S) para hoje</b><br><span style="color:#5a6472">Cliente esperando. Priorize a tela vermelha.'
+       +(s.atendidas>0?' Outras '+s.atendidas+' ordem(ns) já saíram do estoque e não contam aqui.':'')+'</span>';
     cor='#fbe9e8'; bd='#efb1ad';
+  } else if(s.atendidas>0){
+    /* Ordem aberta, venda fora: nao e pendencia, e a tela tem que dizer isso —
+       "4 pendentes" com 140 etiquetas ja despachadas foi lido como peca perdida
+       em 08/09/2026. */
+    txt='<b style="color:#b26a00">Urgentes do dia concluídos — '+s.atendidas+' saíram do estoque.</b><br><span style="color:#5a6472">'
+       +'Peça(s) revisada(s) na tela azul ou que já estavam na prateleira atenderam a venda; a ordem ficou aberta, mas não há nada a produzir. Pode seguir na reposição.</span>';
+    cor='#fbf1db'; bd='#e7cb8c';
   } else {
     txt='<b style="color:#2e7d32">Urgentes do dia concluídos.</b><br><span style="color:#5a6472">Pode seguir na reposição (tela azul).</span>';
     cor='#e7f5eb'; bd='#a9d8b4';
