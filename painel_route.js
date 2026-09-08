@@ -12,15 +12,25 @@
  *
  * Agora sao DUAS colunas, com nomes que nao se confundem:
  *
- *   FALTA HOJE = pedido - produzido   → as ordens de hoje que ainda nao sairam
+ *   FALTA HOJE = ordem_dia.a_produzir → as ordens de hoje que ainda pedem peca
  *   PRECISA    = demanda_dominio      → a MESMA conta da tela azul e da aba
  *                                       Estoque (comprometido + alvo - estoque)
  *
  * Elas nao se somam, e e por isso que estao separadas: a primeira e o que a
  * bancada tem na mao agora, a segunda e o que o estoque pede. Uma soma seria a
  * quinta regua.
+ *
+ * ⚠️ FALTA HOJE ERA `pedido - produzido` ATE 08/09/2026, e isso era a terceira
+ * regua da MESMA pergunta que a tela vermelha faz (armadilha #20 do CLAUDE.md):
+ * o tile contava revisao de qualquer modo, o aviso contava revisao modo 'hoje',
+ * a TV contava embalagem de fila modo 'hoje'. No dia em que 4 pecas revisadas
+ * na tela azul atenderam a venda, a TV cobrava 1 de um SKU cujas 5 etiquetas ja
+ * tinham saido. Agora as tres leem o ordem_dia.js, e a TV ganha `atendidas` —
+ * a ordem que ficou aberta com a venda ja fora do estoque — para dizer POR QUE
+ * a falta e zero com o produzido abaixo do pedido.
  */
 const DEMANDA = require('./demanda_dominio');
+const ORDEM_DIA = require('./ordem_dia');
 
 module.exports = function(app, db){
 
@@ -47,11 +57,13 @@ module.exports = function(app, db){
     let emb={}, car={};
     try{ db.prepare("SELECT UPPER(codigo) c, SUM(CASE WHEN estagio IN ('embalado','carregado') THEN 1 ELSE 0 END) emb, SUM(CASE WHEN estagio='carregado' THEN 1 ELSE 0 END) car FROM lote WHERE data=date('now','localtime') GROUP BY UPPER(codigo)").all().forEach(r=>{ emb[r.c]=r.emb; car[r.c]=r.car; }); }catch(e){}
     const pMap={}, rMap={}; prod.forEach(p=>pMap[p.codigo]=p); rev.forEach(r=>rMap[r.codigo]=r.revisadas);
+    const oMap={}; ORDEM_DIA.linhas(db).forEach(o=> oMap[o.codigo]=o);
 
     const dMap={}; demanda().forEach(l=> dMap[l.codigo]=l);
 
     const linhas = skus.map(s=>{
       const p = pMap[s.codigo] || {pedido:0, produzido:0};
+      const o = oMap[s.codigo] || {a_produzir:0, atendidas:0, pendentes:0};
       const U=s.codigo.toUpperCase();
       const d = dMap[U] || {alvo:0, precisa:0, comprometido:0};
       return { codigo:s.codigo, cor:s.cor||'', estoque:s.estoque||0,
@@ -61,11 +73,15 @@ module.exports = function(app, db){
         alvo:d.alvo, comprometido:d.comprometido,
         demanda:p.pedido, produzido:p.produzido||0, revisadas:rMap[s.codigo]||0,
         embalado:emb[U]||0, carregado:car[U]||0,
-        faltaHoje: Math.max(0, p.pedido - (p.produzido||0)),
+        faltaHoje: o.a_produzir,
+        /* Ordem aberta cuja venda ja saiu do estoque (ou que o estoque cobre):
+           nao e trabalho, e a TV escreve isso em vez de deixar o "produzido"
+           abaixo do pedido sem explicacao. `pendentes` diz qual dos dois. */
+        atendidas: o.atendidas, pendentesHoje: o.pendentes,
         precisa: d.precisa,
         /* `aProduzir` fica como apelido de `faltaHoje` para nao quebrar nenhum
            consumidor antigo desta rota. Nao use em tela nova. */
-        aProduzir: Math.max(0, p.pedido - (p.produzido||0)) };
+        aProduzir: o.a_produzir };
     });
     // produtividade do dia: quantas peças revisadas/embaladas e o tempo médio
     // (revisao/montagem trazem segundos e data). Calculado no servidor p/ usar
