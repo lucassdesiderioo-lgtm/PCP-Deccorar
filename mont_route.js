@@ -74,5 +74,65 @@ module.exports=function(app,db){
       FROM fila f LEFT JOIN skus s ON s.codigo=f.codigo
       WHERE f.situacao='aguardando' GROUP BY f.codigo ORDER BY desde`).all());
   });
+
+  /* ── ZERAR A FILA DE EMBALAGEM (Admin → Contagem) ──────────────────────────
+     E o `limpar_fila.js` como botao, com as MESMAS regras dele:
+       - some so `situacao='aguardando'`. A linha `embalado` e historia de peca
+         que virou estoque e nao e tocada;
+       - o estoque nao muda. A fila nunca somou +1 (§2), entao apagar nao
+         desconta nada;
+       - a bancada nao trava: POST /api/montagem consome a fila QUANDO ela
+         existe e funciona sem ela — so o `modo` vira 'estoque'.
+     Antes de apagar faz backup por db.backup() (o WAL torna `cp` inutil, §12)
+     e grava um CSV do que tinha na fila, porque a pergunta "o que estava la
+     naquele dia?" aparece depois e merece um arquivo que abre no Excel.
+     A simulacao (GET) mostra a IDADE das linhas: fila de hoje quase sempre tem
+     peca fisica no carrinho, fila de meses quase nunca tem. Quem decide e quem
+     olha a bancada; aqui so se poe o numero na frente. */
+  const BKPDIR=()=> (app.locals&&app.locals.backupDir) || path.join(__dirname,'backups');
+  function resumoFila(){
+    const linhas=db.prepare(`SELECT id, codigo, modo, revisado_em, data FROM fila
+      WHERE situacao='aguardando' ORDER BY revisado_em, id`).all();
+    const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
+    const idade={hoje:0, semana:0, mes:0, antigas:0, sem_data:0};
+    linhas.forEach(l=>{
+      const d=String(l.revisado_em||l.data||'').slice(0,10);
+      if(!d){ idade.sem_data++; return; }
+      if(d===hoje){ idade.hoje++; return; }
+      const dias=Math.round((new Date(hoje+'T12:00:00')-new Date(d+'T12:00:00'))/86400000);
+      if(dias<=7) idade.semana++; else if(dias<=30) idade.mes++; else idade.antigas++;
+    });
+    const porSku={};
+    linhas.forEach(l=>{ porSku[l.codigo]=(porSku[l.codigo]||0)+1; });
+    const skus=Object.keys(porSku).map(c=>({codigo:c, qtd:porSku[c]})).sort((a,b)=>b.qtd-a.qtd);
+    const embaladas=db.prepare("SELECT COUNT(*) c FROM fila WHERE situacao<>'aguardando'").get().c;
+    return { total:linhas.length, idade, skus,
+      devolucao: linhas.filter(l=>l.modo==='devolucao').length,
+      embaladas_intactas: embaladas, linhas };
+  }
+  app.get('/api/fila/limpar',(req,res)=>{
+    const r=resumoFila(); delete r.linhas; res.json(r);
+  });
+  app.post('/api/fila/limpar',async (req,res)=>{
+    try{
+      const r=resumoFila();
+      if(!r.total) return res.json({ok:true, apagadas:0, backup:null, csv:null});
+      const dir=BKPDIR(); fs.mkdirSync(dir,{recursive:true});
+      const d=new Date(), p2=n=>String(n).padStart(2,'0');
+      const carimbo=d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())+'_'+p2(d.getHours())+p2(d.getMinutes())+p2(d.getSeconds());
+      const bkp=path.join(dir,'antes-limpar-fila-'+carimbo+'.db');
+      await db.backup(bkp);
+      const csv=v=>{ const s=String(v==null?'':v); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+      const arqCsv=path.join(dir,'antes_fila_'+carimbo+'.csv');
+      fs.writeFileSync(arqCsv, ['id,codigo,modo,revisado_em,data']
+        .concat(r.linhas.map(l=>[l.id,l.codigo,l.modo,l.revisado_em,l.data].map(csv).join(','))).join('\n')+'\n','utf8');
+      const n=db.prepare("DELETE FROM fila WHERE situacao='aguardando'").run().changes;
+      const ac=app.locals.acesso;
+      try{ if(ac&&ac.auditar) ac.auditar(req,'estoque','fila_zerada',String(n),
+        'hoje '+r.idade.hoje+' · 7d '+r.idade.semana+' · 30d '+r.idade.mes+' · antigas '+r.idade.antigas
+        +(r.devolucao?' · devolucao '+r.devolucao:'')+' · backup '+path.basename(bkp)); }catch(e){}
+      res.json({ok:true, apagadas:n, backup:path.basename(bkp), csv:path.basename(arqCsv), embaladas_intactas:r.embaladas_intactas});
+    }catch(e){ res.status(500).json({erro:'não consegui zerar a fila: '+e.message}); }
+  });
   app.get('/api/montagem/hoje',(req,res)=> res.json(db.prepare("SELECT codigo, COUNT(*) qtd, ROUND(AVG(segundos)) tmedio FROM montagem WHERE data=date('now','localtime') GROUP BY codigo ORDER BY qtd DESC").all()));
 };

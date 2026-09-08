@@ -250,6 +250,7 @@
   </div>
   <div class="card" id="ctAlertas"></div>
   <div class="card" id="ctPend" style="display:none"></div>
+  <div class="card" id="ctFila" style="display:none"></div>
 </div>
 
 <div id="v-blq" class="hide">
@@ -347,7 +348,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.t==="ficha") carregarFicha();
   var vcp=$("#v-compras"); if(vcp) vcp.classList.toggle("hide",t.dataset.t!=="compras");
   if(t.dataset.t==="compras"){ carregarCompras(); carregarListaCompras(); }
-  if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); setTimeout(function(){var b=document.getElementById("ctBipe"); if(b) b.focus();},100); }
+  if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); ctFila(); setTimeout(function(){var b=document.getElementById("ctBipe"); if(b) b.focus();},100); }
   var ifn=$("#ifPlan"), ifr=$("#ifRel"), ifa=$("#ifAcs");
   if(t.dataset.t==="plan" && ifn && !ifn.dataset.l){ ifn.src="/planejamento"; ifn.dataset.l=1; }
   if(t.dataset.t==="rel" && ifr && !ifr.dataset.l){ ifr.src="/relatorios"; ifr.dataset.l=1; }
@@ -2503,6 +2504,41 @@ async function ctRejeitar(ids){
   ctPendentes();
 }
 function ctAprovarTodos(){ if(ctPendIds.length && confirm("Aprovar TODOS os "+ctPendIds.length+" ajustes pendentes?")) ctAprovar(ctPendIds); }
+
+// Fila de embalagem: o "Aguardando embalagem" da tela /montagem. E o
+// limpar_fila.js como botao (so quem tem contagem.ajustar ve o card). A
+// idade e o que separa passivo de trabalho: fila de hoje quase sempre tem
+// peca fisica no carrinho; fila de meses quase nunca tem.
+async function ctFila(){
+  var box=document.getElementById("ctFila"); if(!box) return;
+  var d=null;
+  try{ var resp=await fetch("/api/fila/limpar"); if(resp.status!==200){ box.style.display="none"; return; } d=await resp.json(); }
+  catch(e){ box.style.display="none"; return; }
+  box.style.display="block";
+  var h='<div style="font-weight:700;margin-bottom:4px">Fila de embalagem ('+d.total+' aguardando)</div>';
+  h+='<div class="sub" style="margin-bottom:10px">O que a revis&atilde;o liberou e ainda n&atilde;o foi embalado &mdash; a lista &ldquo;Aguardando embalagem&rdquo; da tela de Embalagem. N&atilde;o &eacute; estoque: o +1 acontece na embalagem. Zerar <b>n&atilde;o mexe no estoque</b> e n&atilde;o trava a bancada; pe&ccedil;a revisada de verdade que sobrar no carrinho precisa passar pela revis&atilde;o de novo pra voltar a aparecer.</div>';
+  if(!d.total){ h+='<div class="sub">Fila vazia. Nada a zerar.</div><div id="ctFilaMsg" style="margin-top:10px;font-size:14px"></div>'; box.innerHTML=h; return; }
+  var ia=d.idade||{};
+  var fx=[['hoje',ia.hoje],['&uacute;ltimos 7 dias',ia.semana],['at&eacute; 30 dias',ia.mes],['mais de 30 dias',ia.antigas],['sem data',ia.sem_data]].filter(function(x){return x[1];});
+  h+='<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px">'+fx.map(function(x){ return '<span><b style="font-size:18px">'+x[1]+'</b> <span class="sub">'+x[0]+'</span></span>'; }).join('')+'</div>';
+  if(ia.hoje) h+='<div style="color:var(--amber);margin-bottom:8px">'+ia.hoje+' revisada(s) <b>hoje</b>: confira o carrinho da bancada antes de zerar.</div>';
+  if(d.devolucao) h+='<div class="sub" style="margin-bottom:8px">'+d.devolucao+' vieram de devolu&ccedil;&atilde;o (pe&ccedil;a que voltou do ML pra reembalar). Zerar perde esse v&iacute;nculo; a pe&ccedil;a f&iacute;sica continua na f&aacute;brica.</div>';
+  var top=(d.skus||[]).slice(0,10);
+  h+='<table><thead><tr><th>SKU</th><th>Aguardando</th></tr></thead><tbody>'+top.map(function(s){ return '<tr><td><b>'+s.codigo+'</b></td><td align=center>'+s.qtd+'</td></tr>'; }).join('')+'</tbody></table>';
+  if((d.skus||[]).length>10) h+='<div class="sub">... e mais '+(d.skus.length-10)+' SKU(s)</div>';
+  h+='<div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="del" style="padding:10px 14px;font-size:14px" onclick="ctZerarFila('+d.total+')">Zerar fila de embalagem</button><span class="sub">faz backup do banco e guarda um CSV do que tinha na fila antes de apagar</span></div>';
+  h+='<div id="ctFilaMsg" style="margin-top:10px;font-size:14px"></div>';
+  box.innerHTML=h;
+}
+async function ctZerarFila(n){
+  if(!confirm("Zerar a fila de embalagem? "+n+" linha(s) somem da tela de Embalagem.\n\nO estoque NAO muda. Antes de apagar o sistema faz backup do banco e guarda um CSV do que tinha na fila.")) return;
+  var msg=document.getElementById("ctFilaMsg"); if(msg) msg.textContent="Zerando…";
+  var r={}; try{ r=await (await fetch("/api/fila/limpar",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})).json(); }catch(e){ r={erro:String(e)}; }
+  if(r.erro){ if(msg) msg.innerHTML='<span style="color:#ff6b6b">'+r.erro+'</span>'; return; }
+  await ctFila();
+  msg=document.getElementById("ctFilaMsg");
+  if(msg) msg.innerHTML='<span style="color:var(--green)">Fila zerada: '+r.apagadas+' linha(s) apagada(s). Backup <b>'+(r.backup||'-')+'</b> e foto do antes <b>'+(r.csv||'-')+'</b> na pasta backups do servidor.</span>';
+}
 
 /*AUTO_ADMIN*/ setInterval(function(){ var a=document.activeElement; if(a && a.tagName==='INPUT') return; carregar(); },4000);
 </script>

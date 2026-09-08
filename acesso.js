@@ -437,6 +437,11 @@ module.exports = function(app, db){
     if(M !== 'GET' && eq('/api/revisao')) return 'revisao.executar';
     if(M !== 'GET' && eq('/api/rejeicao')) return 'revisao.rejeitar';
     if(M !== 'GET' && eq('/api/montagem')) return 'embalagem.executar';
+    // Zerar a fila de embalagem e operacao de INVENTARIO (§4): o lugar de
+    // limpar e quando a prateleira foi contada e a fila velha nao descreve
+    // mais nada. Fica com quem aprova contagem — a simulacao (GET) inclusive,
+    // porque ela existe so para decidir o POST.
+    if(eq('/api/fila/limpar')) return 'contagem.ajustar';
     if(M !== 'GET' && eq('/api/embalar')) return 'etiqueta.emitir';
     if(M !== 'GET' && eq('/api/carregar')) return 'carregamento.executar';
     if(M !== 'GET' && pre('/api/lote')) return 'pdf.subir';
@@ -666,7 +671,8 @@ module.exports = function(app, db){
     ['GET','/api/config/conferencia'],['POST','/api/config/conferencia'],['POST','/api/listas'],['GET','/api/teste'],
     ['GET','/api/usuarios'],['GET','/api/acesso/setores'],['GET','/api/acesso/divergencias'],
     ['GET','/api/painel'],['GET','/api/rel/dia'],['GET','/api/cruzamento'],
-    ['GET','/api/rejeicao/resumo'],['GET','/api/skus'],['GET','/api/fila'],['GET','/api/carregamento']
+    ['GET','/api/rejeicao/resumo'],['GET','/api/skus'],['GET','/api/fila'],['GET','/api/carregamento'],
+    ['GET','/api/fila/limpar'],['POST','/api/fila/limpar']
   ];
   app.get('/api/acesso/cobertura', (req, res) => {
     if(!soAdmin(req, res)) return;
