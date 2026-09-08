@@ -23,6 +23,9 @@
   td.code{font-family:ui-monospace,monospace;font-weight:600;text-align:left}
   .cor{font-size:11px;color:var(--muted)}
   .baixo{color:var(--red);font-weight:700}.ok{color:var(--green)}.zero{color:var(--muted)}
+  /* Ordem aberta cuja venda ja saiu do estoque: nao e falta, e a TV diz por que.
+     Ambar, como todo aviso que nao e erro. */
+  .saiu{display:block;font-size:11px;color:var(--amber);font-weight:600;white-space:nowrap}
   .upd{font-size:12px;color:var(--muted);text-align:right;margin-top:8px}
 </style></head><body>
 <header><div class="mark">P</div><div><h1>Painel do dia</h1><div class="sub">Produção → estoque → embalado → carregado</div></div>
@@ -44,12 +47,14 @@
   </div>
   <div class="card"><table><thead><tr>
     <th>SKU</th><th>Demanda</th><th>Estoque</th><th>Alvo</th>
-    <th title="Ordens lançadas hoje que ainda não foram produzidas">Falta hoje</th>
+    <th title="Ordens lançadas hoje que ainda pedem peça — a mesma conta da tela vermelha do operador">Falta hoje</th>
     <th title="O mesmo número da tela azul do operador: vendido a despachar + alvo − estoque">Precisa</th>
     <th>Produzido</th><th>Embalado</th><th>Carregado</th>
   </tr></thead><tbody id="corpo"></tbody></table></div>
   <div class="sub" style="margin-top:8px">
-    <b>Falta hoje</b> é o que sobrou das ordens do dia. <b>Precisa</b> é o que o estoque pede —
+    <b>Falta hoje</b> é o que sobrou das ordens do dia — a mesma conta da tela vermelha do operador.
+    Quando a venda saiu do estoque sem passar pela bancada vermelha, a ordem fica aberta mas não é falta:
+    a célula diz "saiu do estoque". <b>Precisa</b> é o que o estoque pede —
     o mesmo número que o operador vê na tela azul. São perguntas diferentes: não se somam.
   </div>
   <div class="upd" id="upd"></div>
@@ -68,7 +73,12 @@ async function load(){
       /* Zero vira traco CINZA, nao verde: numa TV lida de longe, o que tem cor
          e o que pede acao. Verde em cima de "nada a fazer" gasta a atencao que
          o vermelho precisa ter. */
-      '<td class="'+(r.faltaHoje>0?'baixo':'zero')+'">'+(r.faltaHoje||'—')+'</td>'+
+      /* `atendidas`: ordem que ficou aberta com a venda ja fora do estoque —
+         peca revisada na tela azul, ou que ja estava na prateleira. Sem esta
+         linha o "produzido" fica abaixo do pedido e a falta em traco, e quem le
+         de longe conclui que a TV errou. */
+      '<td class="'+(r.faltaHoje>0?'baixo':'zero')+'">'+(r.faltaHoje||'—')+
+        (r.atendidas>0?'<span class="saiu">'+r.atendidas+' saiu do estoque'+(r.pendentesHoje>0?'':' · despachada')+'</span>':'')+'</td>'+
       '<td class="'+(r.precisa>0?'baixo':'zero')+'">'+(r.precisa||'—')+'</td>'+
       '<td>'+r.produzido+'</td><td style="color:#a371f7">'+r.embalado+'</td><td style="color:#7ee2a0">'+r.carregado+'</td></tr>';
   }).join('');

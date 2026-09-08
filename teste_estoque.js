@@ -303,14 +303,33 @@ const ok = (n, c, extra) => { casos++;
   ok('sob medida não pede reposição na TV, como na aba',
      pPor.SOBMEDIDA.precisa === 0 && pPor.SOBMEDIDA.alvo === 0);
   /* "Falta hoje" e outra pergunta: o que sobrou das ordens do dia. Nao se soma
-     com `precisa`, e por isso as duas colunas tem nomes proprios. */
+     com `precisa`, e por isso as duas colunas tem nomes proprios.
+     Desde 08/09/2026 ela sai do ordem_dia.js — a MESMA regua da tela vermelha
+     (armadilha #20): revisao modo 'hoje' abate, revisao azul nao. */
   db.prepare("INSERT INTO producao (codigo,qtd,produzido,data) VALUES ('BK140140BEGE',5,2,date('now','localtime'))").run();
+  const revH = db.prepare("INSERT INTO revisao (codigo,segundos,modo) VALUES ('BK140140BEGE',10,?)");
+  revH.run('hoje'); revH.run('hoje'); revH.run('estoque');
   const painel2 = await chamar('GET /api/painel');
   const l2 = painel2.linhas.find(l => l.codigo === 'BK140140BEGE');
-  ok('"falta hoje" conta a ordem do dia que ainda não saiu (5 pedidas − 2 feitas)',
-     l2.faltaHoje === 3, 'veio ' + l2.faltaHoje);
+  ok('"falta hoje" conta a ordem do dia que ainda não saiu (5 pedidas − 2 revisadas no vermelho)',
+     l2.faltaHoje === 3 && l2.atendidas === 0, 'veio ' + l2.faltaHoje + '/' + l2.atendidas);
   ok('e não se mistura com o precisa, que segue o do estoque',
      l2.precisa === 10, 'veio ' + l2.precisa);
+  /* O caso de 08/09/2026 na TV: ordem URGENTE cuja venda ja saiu inteira. A
+     falta e zero, e a TV diz que foi porque saiu do estoque — nao deixa o
+     "produzido" abaixo do pedido sem explicacao. */
+  db.prepare("INSERT INTO producao (codigo,qtd,produzido,origem,urgente,data) VALUES ('BK160160CINZA',2,1,'ml',1,date('now','localtime'))").run();
+  db.prepare("INSERT INTO revisao (codigo,segundos,modo) VALUES ('BK160160CINZA',10,'hoje')").run();
+  lote.run('BK160160CINZA','embalado', hoje+' 14:00:00', hoje, 0);
+  lote.run('BK160160CINZA','carregado',hoje+' 15:00:00', hoje, 0);
+  const painel3 = await chamar('GET /api/painel');
+  const l3 = painel3.linhas.find(l => l.codigo === 'BK160160CINZA');
+  ok('ordem urgente com a venda já despachada: falta hoje 0 e 1 "saiu do estoque"',
+     l3.faltaHoje === 0 && l3.atendidas === 1 && l3.pendentesHoje === 0,
+     JSON.stringify({faltaHoje:l3.faltaHoje, atendidas:l3.atendidas, pendentesHoje:l3.pendentesHoje}));
+  const dia = require('./ordem_dia').linhas(db).find(x => x.codigo === 'BK160160CINZA');
+  ok('e é o MESMO número da tela vermelha (ordem_dia)',
+     dia.a_produzir === l3.faltaHoje && dia.atendidas === l3.atendidas);
 
   const ger = await chamar('GET /api/gerencial');
   const gPor = {}; (ger.estoque||[]).forEach(x => gPor[x.l] = x);
