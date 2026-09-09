@@ -1,8 +1,8 @@
 const express=require('express'); const fs=require('fs');
 const {parsePdf}=require('./parse'); const {PDFDocument}=require('pdf-lib');
-const {futuro}=require('./carga');
+const {futuro,COLETA}=require('./carga');
 module.exports=function(app,db){
-  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT);");
+  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
   // sao so historia: quantas vezes o volume voltou pra impressora e quando foi a
   // ultima. O ALTER mora aqui, no dono da tabela (§17 do CLAUDE.md), com a
@@ -34,6 +34,15 @@ module.exports=function(app,db){
      Fica NULL quando a linha nao deu pra ler: volume sem data conhecida conta
      como de hoje, porque some da fila e pior que aparecer cedo demais. */
   try{ db.exec("ALTER TABLE lote ADD COLUMN despachar_em TEXT"); }catch(e){}
+  /* COMO O VOLUME SAI DA FABRICA: 'agencia' (a gente leva) ou 'coleta' (o
+     caminhao do Mercado Livre vem buscar, desde 10/09/2026). Lido da etiqueta
+     pelo parse.js (modalidadeDespacho): a de coleta vem SEM hora na linha
+     "Despachar:". NULL e o que nao deu pra ler — e todo volume anterior a
+     coluna — e conta como agencia em todo lugar (carga.js), que e o que sempre
+     existiu. `retirado_em` e quando o caminhao levou: so a coleta preenche,
+     no fechamento da conferencia com o motorista (carreg_route.js). */
+  try{ db.exec("ALTER TABLE lote ADD COLUMN modalidade TEXT"); }catch(e){}
+  try{ db.exec("ALTER TABLE lote ADD COLUMN retirado_em TEXT"); }catch(e){}
 
   /* ── O QUE O SISTEMA APRENDE SOBRE FAMILIA x PREFIXO DE SKU ────────────────
      Medida e cor nao separam duas pecas que so diferem no TECIDO — e elas
@@ -82,12 +91,12 @@ module.exports=function(app,db){
          semanas. Uma fila que mostra o que nao existe e uma fila que a equipe
          aprende a ignorar — e ai o volume que falta de verdade some junto. */
       const seen=new Set(); db.prepare("SELECT packId,venda FROM lote").all().forEach(r=>{ if(r.packId)seen.add('p:'+r.packId); if(r.venda)seen.add('v:'+r.venda); });
-      const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio,descricao,despachar_em) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+      const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio,descricao,despachar_em,modalidade) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
       const existe=db.prepare('SELECT 1 FROM skus WHERE codigo=?');
       const famVista=db.prepare('SELECT prefixo,vezes FROM familia_sku WHERE familia=?');
       const famGrava=db.prepare(`INSERT INTO familia_sku (familia,prefixo,vezes) VALUES (?,?,1)
         ON CONFLICT(familia,prefixo) DO UPDATE SET vezes=vezes+1, visto_em=datetime('now','localtime')`);
-      let novos=0,rep=0,semsku=0,bloq=0,divs=0; const desconhecidos={};
+      let novos=0,rep=0,semsku=0,bloq=0,divs=0,coleta=0; const desconhecidos={};
       db.transaction(()=>{ for(const o of orders){
         if((o.packId&&seen.has('p:'+o.packId))||(o.venda&&seen.has('v:'+o.venda))){ rep++; continue; }
         if(o.packId)seen.add('p:'+o.packId); if(o.venda)seen.add('v:'+o.venda);
@@ -117,9 +126,13 @@ module.exports=function(app,db){
         else if(!ok){ est='bloqueado'; bloq++; motivo='sku_nao_cadastrado';
           const k=sku||'(sem SKU na folha)'; desconhecidos[k]=(desconhecidos[k]||0)+1; }
         if(!o.sku) semsku++;
-        ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null,o.despacharEm||null); novos++;
+        if(o.modalidade==='coleta') coleta++;
+        ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null,o.despacharEm||null,o.modalidade||null); novos++;
       }})();
-      res.json({ok:true,total:orders.length,novos,repetidas:rep,sem_sku:semsku,bloqueados:bloq,divergencias:divs,
+      /* `coleta` vai na resposta pra quem subiu o PDF ver na hora quantos
+         volumes o caminhao vai buscar — e estranhar se der zero num PDF de
+         coleta, ou o lote inteiro num PDF de agencia (a marca e fraca). */
+      res.json({ok:true,total:orders.length,novos,repetidas:rep,sem_sku:semsku,bloqueados:bloq,divergencias:divs,coleta,
                 desconhecidos:Object.keys(desconhecidos).map(k=>({sku:k,qtd:desconhecidos[k]}))});
     }catch(e){ console.error(e); res.status(500).json({erro:String(e.message||e)}); }
   });
@@ -276,6 +289,7 @@ module.exports=function(app,db){
     res.json(db.prepare(`SELECT l.codigo, COUNT(*) qtd,
         MIN(l.despachar_em) vence_em,
         SUM(CASE WHEN l.despachar_em IS NOT NULL AND l.despachar_em<date('now','localtime') THEN 1 ELSE 0 END) atrasados,
+        SUM(CASE WHEN ${COLETA('l')} THEN 1 ELSE 0 END) coletas,
         s.largura_cm, s.altura_cm,
         COALESCE(c.nome,s.cor_codigo,s.cor) cor_nome,
         COALESCE(t.nome,s.tecido_codigo) tecido_nome,
@@ -308,7 +322,10 @@ module.exports=function(app,db){
        ele nao aparecia, e o placar do dia saia menor do que o dia rendeu. */
     const imp=db.prepare(`SELECT COUNT(*) c FROM lote
       WHERE embalado_em IS NOT NULL AND date(embalado_em)=date('now','localtime')`).get().c;
-    res.json({hoje,atrasados:atras,futuros:fut,impressas_hoje:imp});
+    /* Quantas das de hoje o caminhao vem buscar. E parte do `hoje`, nao soma a
+       ele: a etiqueta sai igual, so a caixa vai pro canto da coleta. */
+    const col=db.prepare(`SELECT COUNT(*) c FROM lote WHERE ${FILA_HOJE} AND ${COLETA()}`).get().c;
+    res.json({hoje,atrasados:atras,futuros:fut,impressas_hoje:imp,coleta_hoje:col});
   });
   /* O QUE VEM PELA FRENTE — venda ja faturada com prazo de despacho futuro.
      Fica fora da fila do dia de proposito: cobrar hoje o que so vence em tres
@@ -342,7 +359,8 @@ module.exports=function(app,db){
        venda e de hoje?", e a terceira regua seria a que discorda das outras
        duas. */
     res.json(db.prepare(`SELECT id,codigo,cor,buyer,city,nf,packId,venda,estagio,data,despachar_em,
-        embalado_em,carregado_em,COALESCE(reimpressoes,0) reimpressoes,reimpresso_em
+        embalado_em,carregado_em,COALESCE(reimpressoes,0) reimpressoes,reimpresso_em,
+        CASE WHEN ${COLETA()} THEN 1 ELSE 0 END coleta
       FROM lote
       WHERE estagio IN ('embalado','carregado')
         AND data >= date('now','localtime','-'||?||' day')

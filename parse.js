@@ -37,6 +37,37 @@ function dataDespacho(texto, hoje){
   if(isNaN(d.getTime()) || d.getUTCDate()!==dia) return null;   // 31/fev e afins
   return iso(ano);
 }
+/* COLETA OU AGENCIA — a etiqueta diz, e diz por AUSENCIA.
+ *
+ * Desde 10/09/2026 o Mercado Livre tem duas formas de retirar o volume da
+ * fabrica, e as duas saem no mesmo PDF, com a mesma etiqueta, a mesma rota
+ * ("XSP1 > SMG6 > EGO18") e a mesma folha de controle. A UNICA diferenca esta
+ * na caixa "Despachar":
+ *
+ *     agencia   Despachar: qua 9/set, antes das 15:45 h     (a gente leva)
+ *     coleta    Despachar: quinta 10/set                     (o caminhao busca)
+ *
+ * Faz sentido: na agencia o limite e a hora de entregar la; na coleta quem
+ * manda no horario e o caminhao, entao a etiqueta traz so o dia. Foi conferido
+ * nos dois PDFs de 09/09/2026 — 47 etiquetas de agencia, todas com hora; 8 de
+ * coleta, nenhuma — e tambem na imagem renderizada: nao ha icone nem marca
+ * grafica de coleta, so essa linha.
+ *
+ * E uma marca FRACA — uma hora que falta — e por isso ela nao decide sozinha
+ * nada que cause dano: a coleta so muda ONDE o volume aparece (lista propria
+ * no carregamento, tarja na Etiqueta de Venda). Se o ML um dia tirar a hora de
+ * todo mundo, o sintoma e todo volume virar "coleta" de uma vez, e isso a tela
+ * do carregamento mostra no mesmo minuto.
+ *
+ * Sem a linha "Despachar:" a resposta e null (nao se sabe), e null e tratado
+ * como agencia em todo lugar — o que sempre existiu. A hora e procurada na
+ * pagina inteira da etiqueta, nao so na linha: se o pdf.js quebrar
+ * ", antes das 15:45 h" para a linha de baixo, a leitura continua certa. */
+function modalidadeDespacho(texto){
+  const t=String(texto||'');
+  if(!/Despachar:/i.test(t)) return null;
+  return /antes\s+das\s+\d{1,2}\s*[:h]\s*\d{2}/i.test(t) ? 'agencia' : 'coleta';
+}
 /* O NOME DE QUEM COMPROU, LIDO DA ETIQUETA.
  *
  * E o dado mais importante da etiqueta: e o unico que liga o volume ao item da
@@ -183,6 +214,7 @@ async function parsePdf(uint8){
     const packId=grab(/Pack ID:\s*([\d ]+)/), venda=grab(/Venda:\s*([\d ]+)/);
     const nf=(t.match(/NF:\s*(\d+)/)||[])[1]||null;
     const despacharEm=dataDespacho(t);
+    const modalidade=modalidadeDespacho(t);
     const city=((t.match(/Cidade de destino\s*:\s*(.+)/)||[])[1]||'').trim();
     const buyer=nomeDaEtiqueta(lines);
     if((packId&&seen.has('p:'+packId))||(venda&&seen.has('v:'+venda))) continue;
@@ -262,9 +294,9 @@ async function parsePdf(uint8){
       /* A descricao do anuncio vai junto: e ela que diz a LINHA do produto
          ("Cortina Rolo Blackout" x "Toucher Rolo Evolux"), a unica dimensao que
          medida e cor nao separam. O upload guarda e aprende com ela. */
-      descricao:(rec&&rec.desc)||null, despacharEm,
+      descricao:(rec&&rec.desc)||null, despacharEm, modalidade,
       buyer:buyer||'(sem nome)',city,nf,packId,venda,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
   }
   return orders;
 }
-module.exports={parsePdf,dataDespacho,nomeDaEtiqueta,mesmoNomeComRepeticao};
+module.exports={parsePdf,dataDespacho,modalidadeDespacho,nomeDaEtiqueta,mesmoNomeComRepeticao};

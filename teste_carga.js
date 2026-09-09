@@ -23,7 +23,7 @@ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'pcp-carga-'));
 const db=new Database(path.join(tmp,'t.db'));
 db.exec(`CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT, buyer TEXT,
   city TEXT, nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', estagio TEXT, data TEXT,
-  carregado_em TEXT, despachar_em TEXT);`);
+  carregado_em TEXT, despachar_em TEXT, modalidade TEXT, retirado_em TEXT);`);
 const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
 const ontem=db.prepare("SELECT date('now','localtime','-1 day') d").get().d;
 const ins=db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,codes,estagio,data)
@@ -48,6 +48,15 @@ db.prepare("UPDATE lote SET despachar_em=? WHERE buyer='Lucelia'").run(setembro)
 /* E um atrasado DE VERDADE: o prazo ja venceu. */
 ins.run('BK120120CINZA','Maria Rita','5604','888','908','["888","908"]','embalado',ontem);
 db.prepare("UPDATE lote SET despachar_em=date('now','localtime','-3 day') WHERE buyer='Maria Rita'").run();
+/* COLETA (10/09/2026): o caminhao do ML vem buscar. Tres caixas embaladas com
+   etiqueta de coleta — elas NAO vao no carro, vao pro canto reservado, e o
+   motorista tem que bipar as tres. Uma quarta e de coleta mas futura. */
+ins.run('BK150150BEGE','Julia Souza',  '6259','2000014948163325',null,'["2000014948163325"]','embalado',hoje);
+ins.run('BK150150BEGE','Julia Souza',  '6257','2000014948163323',null,'["2000014948163323"]','embalado',hoje);
+ins.run('BK180150CINZA','John Phillips','6262','2000014941393951',null,'["2000014941393951"]','embalado',hoje);
+ins.run('BK150150BRANCO','Priscila Loyola','6270','2000014948199999',null,'["2000014948199999"]','embalado',hoje);
+db.prepare("UPDATE lote SET modalidade='coleta', despachar_em=date('now','localtime') WHERE nf IN ('6259','6257','6262')").run();
+db.prepare("UPDATE lote SET modalidade='coleta', despachar_em=date('now','localtime','+5 day') WHERE nf='6270'").run();
 
 const rotas={};
 const app={ get:(p,h)=>{rotas['GET '+p]=h;}, post:(p,h)=>{rotas['POST '+p]=h;}, locals:{} };
@@ -73,9 +82,10 @@ const ok=(n,c,extra)=>{ casos++;
   /* A VENDA FUTURA: nem cobrada junto com o dia, nem escondida (#9). */
   ok('venda futura sai da lista de hoje', !d.faltam.some(f=>f.buyer==='Lucelia'),
      'veio '+JSON.stringify(d.faltam.map(f=>f.buyer)));
-  ok('mas aparece a parte, com a data', d.adiantadas===1 && d.depois[0].buyer==='Lucelia',
+  const luc=d.depois.find(f=>f.buyer==='Lucelia')||null;
+  ok('mas aparece a parte, com a data', d.adiantadas===2 && !!luc && luc.despachar_em===setembro,
      'veio '+JSON.stringify(d.depois));
-  ok('e NAO e chamada de atrasada', !(d.depois[0]||{}).atrasado, 'veio '+JSON.stringify(d.depois[0]));
+  ok('e NAO e chamada de atrasada', !!luc && !luc.atrasado, 'veio '+JSON.stringify(luc));
   /* Atraso se mede pelo prazo: este venceu ha tres dias. */
   ok('o prazo vencido conta como atrasado', (d.faltam.find(f=>f.buyer==='Maria Rita')||{}).atrasado===1,
      'veio '+JSON.stringify(d.faltam.find(f=>f.buyer==='Maria Rita')));
@@ -109,8 +119,69 @@ const ok=(n,c,extra)=>{ casos++;
   d=await chamar('GET /api/carregamento');
   ok('a lista esvazia conforme carrega', d.faltam.length===2 && d.atrasados===2,
      'veio '+JSON.stringify(d.faltam.map(f=>f.buyer)));
-  ok('a venda futura nao entra na lista nem some', d.adiantadas===1 && !d.faltam.some(f=>f.buyer==='Lucelia'),
+  ok('a venda futura nao entra na lista nem some', d.adiantadas===2 && !d.faltam.some(f=>f.buyer==='Lucelia'),
      'veio faltam='+JSON.stringify(d.faltam.map(f=>f.buyer))+' depois='+JSON.stringify(d.depois.map(f=>f.buyer)));
+
+  /* ── COLETA: A SEGUNDA PORTA DE SAIDA (10/09/2026) ─────────────────────────
+     A caixa de coleta nao vai no carro: nao pode aparecer em "faltam carregar"
+     nem contar no "carregados X de Y" do carro. Ela tem lista propria, e o
+     bipe dela responde quantas estao esperando o caminhao — o numero que o
+     motorista tem que bater. */
+  ok('a coleta NAO entra na lista do carro', !d.faltam.some(f=>f.nf==='6259'||f.nf==='6257'||f.nf==='6262'),
+     'veio '+JSON.stringify(d.faltam.map(f=>f.nf)));
+  ok('e tem lista propria, so com as do dia', d.coleta && d.coleta.faltam.length===3
+     && !d.coleta.faltam.some(f=>f.nf==='6270'), 'veio '+JSON.stringify((d.coleta||{}).faltam));
+  ok('a coleta futura vai pro "depois", como a do carro', d.depois.some(f=>f.nf==='6270'),
+     'veio '+JSON.stringify(d.depois.map(f=>f.nf)));
+  ok('nada esperando o caminhao antes de bipar', d.coleta.aguardando.length===0);
+
+  const carroAntes=d.carregados;
+  r=await chamar('POST /api/carregar',{code:'2000014948163325'});
+  ok('bipar a caixa de coleta responde que e coleta', r.ok===true && r.coleta===true, 'veio '+JSON.stringify(r));
+  ok('e diz quantas estao indo (1)', r.coleta_aguardando===1, 'veio '+r.coleta_aguardando);
+  ok('o contador do CARRO nao anda com caixa de coleta', r.carregados===carroAntes, 'veio '+r.carregados+' (era '+carroAntes+')');
+  r=await chamar('POST /api/carregar',{code:'2000014948163323'});
+  r=await chamar('POST /api/carregar',{code:'2000014941393951'});
+  ok('depois das tres, estao indo 3', r.coleta_aguardando===3, 'veio '+r.coleta_aguardando);
+  d=await chamar('GET /api/carregamento');
+  ok('a lista de coleta esvazia e o canto enche', d.coleta.faltam.length===0 && d.coleta.aguardando.length===3,
+     'veio faltam='+d.coleta.faltam.length+' aguardando='+d.coleta.aguardando.length);
+  r=await chamar('POST /api/carregar',{code:'2000014948163325'});
+  ok('bipar de novo acusa duplicado, e continua dizendo que e coleta', r.ok===false && r.motivo==='duplicado' && r.coleta===true,
+     'veio '+JSON.stringify(r.motivo));
+
+  /* O MOTORISTA BIPOU 49 DE 50. Nada anda: a resposta traz a lista pra
+     conferir caixa a caixa, e o canto continua com as tres. */
+  r=await chamar('POST /api/coleta/fechar',{motorista:2});
+  ok('motorista com numero diferente NAO fecha a coleta', r.ok===false && r.motivo==='divergente'
+     && r.sistema===3 && r.motorista===2, 'veio '+JSON.stringify(r));
+  ok('e devolve a lista pra conferir uma a uma', Array.isArray(r.lista) && r.lista.length===3, 'veio '+JSON.stringify(r.lista));
+  d=await chamar('GET /api/carregamento');
+  ok('as caixas continuam esperando o caminhao', d.coleta.aguardando.length===3 && d.coleta.fechamentos.length===0);
+  r=await chamar('POST /api/coleta/fechar',{motorista:'abc'});
+  ok('numero invalido e recusado', !!r.erro, 'veio '+JSON.stringify(r));
+
+  /* O numero bateu: as tres saem do canto, e o fechamento fica registrado. */
+  r=await chamar('POST /api/coleta/fechar',{motorista:3});
+  ok('numero igual fecha a coleta', r.ok===true && r.divergente===false && r.sistema===3, 'veio '+JSON.stringify(r));
+  d=await chamar('GET /api/carregamento');
+  ok('o canto esvazia e o dia registra 3 retiradas', d.coleta.aguardando.length===0 && d.coleta.retiradas_hoje===3,
+     'veio '+JSON.stringify(d.coleta));
+  ok('o fechamento fica na historia do dia', d.coleta.fechamentos.length===1 && d.coleta.fechamentos[0].divergente===0
+     && d.coleta.fechamentos[0].qtd_sistema===3, 'veio '+JSON.stringify(d.coleta.fechamentos));
+  r=await chamar('POST /api/coleta/fechar',{motorista:0});
+  ok('sem caixa no canto nao ha o que fechar', r.ok===false && r.motivo==='nada', 'veio '+JSON.stringify(r));
+
+  /* Fechar COM divergencia, confirmando: permitido (o caminhao nao pode ficar
+     preso), mas gravado como divergente. */
+  ins.run('BK150150BEGE','Dorli Beck','6261','2000014948163399',null,'["2000014948163399"]','embalado',hoje);
+  db.prepare("UPDATE lote SET modalidade='coleta' WHERE nf='6261'").run();
+  await chamar('POST /api/carregar',{code:'2000014948163399'});
+  r=await chamar('POST /api/coleta/fechar',{motorista:0,confirmar:true,obs:'motorista nao achou a caixa'});
+  ok('fechar confirmando a divergencia grava como divergente', r.ok===true && r.divergente===true, 'veio '+JSON.stringify(r));
+  d=await chamar('GET /api/carregamento');
+  ok('e o registro do dia mostra a divergencia', d.coleta.fechamentos.length===2 && d.coleta.fechamentos[0].divergente===1,
+     'veio '+JSON.stringify(d.coleta.fechamentos));
 
   db.close();
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}

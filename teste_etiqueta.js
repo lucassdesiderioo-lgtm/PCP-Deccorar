@@ -33,7 +33,7 @@ db.exec(`
     largura_cm INTEGER, altura_cm INTEGER, cor_codigo TEXT, tecido_codigo TEXT);
   CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT, buyer TEXT,
     city TEXT, nf TEXT, packId TEXT, venda TEXT, estagio TEXT DEFAULT 'pendente',
-    embalado_em TEXT, data TEXT DEFAULT (date('now','localtime')), despachar_em TEXT);
+    embalado_em TEXT, data TEXT DEFAULT (date('now','localtime')), despachar_em TEXT, modalidade TEXT);
 `);
 db.prepare("INSERT INTO modelo (id,codigo,nome,sob_medida) VALUES (1,'ROLO','Rolô',0)").run();
 db.prepare("INSERT INTO modelo (id,codigo,nome,sob_medida) VALUES (2,'SOBMED','Sob medida',1)").run();
@@ -55,6 +55,11 @@ vol.run('BK160160CINZA','Joao Silva',  '4','114','904',hoje,hoje);   // id 4 —
 vol.run('SOBMEDIDA','Lucelia',         '5','115','905',hoje,hoje);   // id 5 — sob medida
 db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data)
   VALUES ('BK140140BEGE','Pedro','6','116','906','bloqueado',?)`).run(hoje);  // id 6
+/* COLETA (10/09/2026): o caminhao do ML vem buscar. A etiqueta sai igual, mas
+   a caixa vai pro canto reservado, e a tela tem que dizer isso ANTES de
+   imprimir — e quem cola a etiqueta que decide onde a caixa para. */
+db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data,despachar_em,modalidade)
+  VALUES ('BK160160CINZA','Julia Souza','6259','2000014948163325',null,'pendente',?,?,'coleta')`).run(hoje,hoje);  // id 7
 
 const rotas = {};
 const app = { get:(p,...h)=>{ rotas['GET '+p]=h[h.length-1]; },
@@ -122,6 +127,17 @@ const ok = (n, c, extra) => { casos++;
      JSON.stringify({adiantado:px.adiantado, prazo:px.pedido&&px.pedido.despachar_em}));
   const nx = await chamar('GET /api/proximo/:sku', null, {sku:'NAOEXISTE'});
   ok('SKU fora do cadastro responde que não é cadastrado', nx.cadastrado === false);
+  ok('a venda de agência NÃO vem marcada como coleta', px.coleta === false, JSON.stringify(px.coleta));
+
+  // ── COLETA: a tela avisa antes de imprimir, e de novo depois ─────────────
+  db.prepare("UPDATE skus SET estoque=1 WHERE codigo='BK160160CINZA'").run();
+  db.prepare("UPDATE lote SET estagio='embalado' WHERE id=4").run();   // tira o de agência da frente
+  const pc = await chamar('GET /api/proximo/:sku', null, {sku:'BK160160CINZA'});
+  ok('o bipe avisa que a venda é COLETA (o caminhão vem buscar)',
+     pc.cadastrado && pc.pedido && pc.pedido.id === 7 && pc.coleta === true, JSON.stringify({coleta:pc.coleta, id:pc.pedido&&pc.pedido.id}));
+  const ec = await chamar('POST /api/embalar', {id:7});
+  ok('imprimir a etiqueta de coleta baixa a peça igual e diz que é coleta',
+     ec.ok && ec.coleta === true && estoqueDe('BK160160CINZA') === 0, JSON.stringify(ec));
 
   console.log('');
   console.log(falhas ? ('FALHARAM ' + falhas + ' de ' + casos)

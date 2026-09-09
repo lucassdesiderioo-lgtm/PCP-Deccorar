@@ -1060,6 +1060,91 @@ mostra contagem regressiva para o despacho, ficando **amarela** abaixo de 2 h e
 
 ---
 
+## 8-B. Coleta — o caminhão do Mercado Livre vem buscar (desde 10/09/2026)
+
+A fábrica passou a ter **duas portas de saída** para o volume do ML:
+
+| | **Agência** | **Coleta** |
+|---|---|---|
+| Quem leva | a gente, no carro, até a agência | o caminhão do ML, na fábrica |
+| Onde a caixa espera | no carro | no **lugar reservado** da coleta |
+| Prazo | hora de despacho do `config` | só o dia — o caminhão não tem hora |
+| `lote.modalidade` | `'agencia'` (ou `NULL`) | `'coleta'` |
+
+O lançamento **não mudou**: sobe-se o PDF igual, e o sistema descobre sozinho.
+
+### ⚠️ ARMADILHA #21 — a etiqueta diz que é coleta por AUSÊNCIA
+
+Os dois PDFs de 09/09/2026 (47 de agência, 8 de coleta) são idênticos em
+tudo: layout, rota (`XSP1 > SMG6 > EGO18`), letra do rodapé, folha de
+controle, DANFE. Não há ícone nem marca gráfica. A **única** diferença é a
+caixa "Despachar":
+
+```
+agência   Despachar: qua 9/set, antes das 15:45 h
+coleta    Despachar: quinta 10/set
+```
+
+`parse.js` → `modalidadeDespacho()` lê isso: com hora é agência, sem hora é
+coleta, sem a linha é `null`. **`NULL` conta como agência em todo lugar** —
+é o que sempre existiu, e não se manda uma caixa pro canto da coleta por
+falta de dado. A hora é procurada na página inteira da etiqueta, não só na
+linha, porque o pdf.js pode quebrar `, antes das 15:45 h` para baixo.
+
+> É uma marca **fraca** (uma hora que falta), e por isso ela não decide
+> nada que cause dano: a modalidade só muda **onde a caixa aparece**. O dia
+> em que o ML tirar a hora de todo mundo, o sintoma é o lote inteiro virar
+> coleta de uma vez — e o upload já responde `coleta: N`, a Etiqueta de Venda
+> escreve "N pra coleta" e o carregamento enche o card de coleta. Não é
+> silencioso. Se acontecer, o conserto é no `modalidadeDespacho()`, com o PDF
+> novo na mão, e o caso 15 do `teste_parse.js` tem que ser atualizado junto.
+
+**`carga.js` é o dono único de "isto é coleta?"** (`COLETA`, `AGENCIA`,
+`ehColeta`, `AGUARDA_CAMINHAO`). O upload, a lista "Faltam imprimir", o bipe
+do SKU, os impressos, o relógio de despacho e as duas listas do carregamento
+leem dali. Duas réguas mandariam a mesma caixa pro carro numa tela e pro
+canto na outra.
+
+### O fluxo da coleta
+
+1. **Etiqueta de Venda**: o bipe do SKU mostra a tarja violeta **"COLETA — o
+   caminhão do Mercado Livre vem buscar"** *antes* de imprimir, e repete no
+   "Impresso ✓". É quem cola a etiqueta que decide onde a caixa para. A
+   etiqueta sai igual e o estoque baixa igual (`−1`).
+2. **Carregamento**: a caixa de coleta **não aparece em "Faltam carregar no
+   carro"** e não conta no "No carro X de Y". Ela tem card próprio (violeta).
+   O operador bipa ao levar pro lugar reservado — o mesmo `POST /api/carregar`,
+   que marca `carregado` e responde `coleta:true` com **"Está indo N peças"**.
+3. **Fechar coleta com o motorista** (`POST /api/coleta/fechar`): o caminhão
+   do ML bipa cada caixa que leva. O operador pergunta ao motorista quantas
+   ele bipou e digita. **Bateu** → todas ganham `retirado_em` e saem do canto.
+   **Não bateu** → nada anda: a tela lista as caixas para conferir uma a uma,
+   com o motorista ali na frente. Liberar assim mesmo existe (o caminhão não
+   pode ficar preso), mas grava `divergente=1` em `coleta_fechamento`, com
+   quem fechou, e vai para a auditoria.
+
+> **Por que a conferência é um número, e não bipe a bipe:** 50 caixas
+> separadas e o motorista bipou 49 — a que faltou está no canto, no caminhão
+> sem bipe, ou em lugar nenhum. Depois que o caminhão sai, ela vira
+> reclamação do cliente semanas depois, sem ninguém saber por onde sumiu. O
+> número na frente do motorista é a única hora em que isso ainda se resolve.
+
+> **O relógio de despacho é da agência.** `/api/expedicao/status` conta em
+> `pendentes` só a agência e devolve a coleta em `pendentes_coleta`. Contar a
+> coleta no relógio deixaria a tela vermelha por caixa que não vai no carro.
+
+> **`carregado_em` na coleta é a hora em que a caixa foi pro canto**, não a
+> hora em que o caminhão levou — essa é `retirado_em`. Relatório que conta
+> saída por `carregado_em` continua certo (é o mesmo dia); quem precisar da
+> hora real da retirada lê `retirado_em`.
+
+**Rode `node teste_carga.js` (38 casos, os últimos 18 são de coleta),
+`node teste_parse.js` (caso 15) e `node teste_etiqueta.js` após mexer nisso.**
+Volumes anteriores à coluna: `node backfill_modalidade.js` (simula) e
+`--aplicar` — só mexe em quem está `NULL` e ainda na fábrica.
+
+---
+
 ## 9. Devoluções
 
 Fluxo em duas etapas, com responsabilidades separadas:
@@ -1227,7 +1312,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (13), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (13 casos), `teste_carga.js` (38), `teste_divergencia.js` (15) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (16), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
 | 11 | **A investigar: o que é o `Quantidade` da folha** — a regra é uma venda = uma etiqueta = uma persiana (§5), então esse campo não deveria vir maior que 1. Ninguém decide nada com ele hoje. Falta abrir um PDF real com `Quantidade > 1` e entender o que aquele número diz | Baixo enquanto nada o usar — mas é uma pergunta sem resposta sobre o documento de origem |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
@@ -1249,6 +1334,13 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   etiqueta é uma persiana (§5); já foi tentado e revertido, e há teste travando
 - ❌ Fazer a leitura por pedaços (`split` em `Desenho do tecido`) voltar a rodar
   antes do tokenizer no `parse.js` — manda a peça errada pro cliente (§5)
+- ❌ Pôr a caixa de coleta na lista ou no contador do carro, ou somar a coleta
+  no relógio de despacho — são duas portas de saída, e `carga.js` é o dono
+  único de "isto é coleta?" (§8-B, armadilha #21)
+- ❌ Tratar `modalidade=NULL` como coleta: sem dado é agência, que é o que
+  sempre existiu (§8-B)
+- ❌ Fechar a coleta com número diferente do motorista sem `confirmar` e sem
+  registro — a divergência é a única chance de achar a caixa (§8-B)
 - ❌ Mover `express.static` para antes do `auth`
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor

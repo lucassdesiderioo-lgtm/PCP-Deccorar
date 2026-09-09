@@ -64,4 +64,34 @@ function futuro(volume, hoje){
   return !!(volume && hoje && volume.despachar_em && volume.despachar_em > hoje);
 }
 
-module.exports = { PRA_CARREGAR, DO_DIA, ORDEM_CARGA, atrasado, futuro };
+/* COLETA: O CAMINHAO DO MERCADO LIVRE VEM BUSCAR (desde 10/09/2026).
+   E a segunda porta de saida da fabrica, e a caixa dela NAO VAI NO CARRO. A
+   modalidade e lida da etiqueta pelo parse.js (a de coleta vem sem hora na
+   linha "Despachar:") e gravada em `lote.modalidade`. NULL — todo volume
+   anterior a coluna, e o que nao deu pra ler — e agencia, que e o que sempre
+   existiu: nao se manda pro canto da coleta um volume por falta de dado.
+   Esta e a UNICA definicao de "isto e coleta?": a lista do carregamento, o
+   bipe, a tarja da Etiqueta de Venda e o relogio de despacho leem daqui. Duas
+   reguas mandariam a mesma caixa pro carro numa tela e pro canto na outra. */
+function COLETA(alias){
+  const p = alias ? alias+'.' : '';
+  return `COALESCE(${p}modalidade,'agencia')='coleta'`;
+}
+function AGENCIA(alias){
+  const p = alias ? alias+'.' : '';
+  return `COALESCE(${p}modalidade,'agencia')<>'coleta'`;
+}
+function ehColeta(volume){
+  return !!(volume && volume.modalidade === 'coleta');
+}
+
+/* ESPERANDO O CAMINHAO: bipada no carregamento (`carregado`, com a hora em
+   `carregado_em`) e ainda nao levada (`retirado_em` vazio). O bipe acontece
+   quando a caixa vai pro lugar reservado, nao quando o motorista chega — e e
+   este conjunto que a conferencia com o motorista fecha, TODO de uma vez.
+   Sem filtro por dia, pela mesma razao do PRA_CARREGAR: caixa separada ontem
+   e nao retirada esta fisicamente no canto da coleta ate alguem levar. */
+const AGUARDA_CAMINHAO = "estagio='carregado' AND " + COLETA() + " AND retirado_em IS NULL";
+
+module.exports = { PRA_CARREGAR, DO_DIA, ORDEM_CARGA, atrasado, futuro,
+                   COLETA, AGENCIA, ehColeta, AGUARDA_CAMINHAO };

@@ -439,6 +439,9 @@ module.exports = function(app, db){
     if(M !== 'GET' && eq('/api/montagem')) return 'embalagem.executar';
     if(M !== 'GET' && eq('/api/embalar')) return 'etiqueta.emitir';
     if(M !== 'GET' && eq('/api/carregar')) return 'carregamento.executar';
+    // Fechar a coleta com o motorista e ato da mesma bancada que bipa a caixa:
+    // quem carrega e quem confere o numero na frente do caminhao.
+    if(M !== 'GET' && pre('/api/coleta')) return 'carregamento.executar';
     if(M !== 'GET' && pre('/api/lote')) return 'pdf.subir';
     if(pre('/api/print')) return 'etiqueta.emitir';
     // Reimpressao: mesma bancada, mesma permissao de imprimir. A LEITURA tambem
@@ -635,7 +638,7 @@ module.exports = function(app, db){
     ['GET','/expedicao'],['GET','/devolucao'],['GET','/painel'],['GET','/relatorios'],
     ['GET','/planejamento'],['GET','/acessos'],['GET','/baixar-backup'],
     ['POST','/api/revisao'],['POST','/api/rejeicao'],['POST','/api/montagem'],['POST','/api/embalar'],
-    ['POST','/api/carregar'],['POST','/api/lote/upload'],['GET','/api/print/:id'],
+    ['POST','/api/carregar'],['POST','/api/coleta/fechar'],['POST','/api/lote/upload'],['GET','/api/print/:id'],
     ['GET','/api/impressos'],['POST','/api/reimprimir'],
     ['GET','/api/divergencias'],['POST','/api/divergencias/resolver'],
     ['GET','/api/auditoria/skus'],['POST','/api/devolucao'],

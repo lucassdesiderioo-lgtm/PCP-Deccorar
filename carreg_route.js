@@ -1,4 +1,4 @@
-const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro}=require('./carga');
+const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro,ehColeta,AGENCIA,AGUARDA_CAMINHAO}=require('./carga');
 module.exports=function(app,db){
   /* ── CONFERENCIA DUPLA (etiqueta de venda + SKU da caixa) ──────────────────
      A ultima rede antes do carro. Bipe 1 = a etiqueta de venda JA COLADA;
@@ -24,6 +24,28 @@ module.exports=function(app,db){
       ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor`).run(v);
     res.json({ok:true,ligada:v==='1'});
   });
+
+  /* ── A CONFERENCIA COM O MOTORISTA DA COLETA ──────────────────────────────
+     O caminhao do Mercado Livre bipa cada caixa que leva. Do nosso lado, cada
+     caixa foi bipada quando foi pro canto reservado. Na hora de o caminhao
+     sair, os dois numeros tem que bater: 50 separadas, 50 bipadas por ele. Se
+     ele bipou 49, uma caixa ficou pra tras — no canto, no carro dele sem bipe,
+     ou em lugar nenhum — e e AGORA, com o motorista na frente, que isso se
+     resolve. Depois que o caminhao sai, a caixa que faltou vira reclamacao
+     do cliente semanas depois, sem ninguem saber por onde ela sumiu.
+     Cada fechamento e uma linha aqui: quantas o sistema tinha, quantas o
+     motorista disse, se bateu, e quem fechou. A divergencia fica gravada
+     mesmo quando alguem decide liberar o caminhao assim mesmo — e vai pra
+     auditoria, porque e o tipo de decisao que precisa ter nome. */
+  db.exec(`CREATE TABLE IF NOT EXISTS coleta_fechamento (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fechado_em TEXT DEFAULT (datetime('now','localtime')),
+    fechado_por TEXT DEFAULT '',
+    qtd_sistema INTEGER NOT NULL,
+    qtd_motorista INTEGER NOT NULL,
+    divergente INTEGER DEFAULT 0,
+    obs TEXT DEFAULT '',
+    ids TEXT DEFAULT '[]');`);
 
   // bipe da etiqueta de venda -> acha o pacote pelos codigos e marca carregado
   app.post('/api/carregar',(req,res)=>{
@@ -58,7 +80,7 @@ module.exports=function(app,db){
     if(!alvo) return res.json({ok:false,motivo:'nao_encontrado',lido:code});
     if(alvo.estagio==='bloqueado') return res.json({ok:false,motivo:'bloqueado',pedido:alvo,
         aviso:'SKU "'+(alvo.codigo||'(vazio)')+'" nao esta no cadastro. Nao pode ser carregado.'});
-    if(alvo.estagio==='carregado') return res.json({ok:false,motivo:'duplicado',pedido:alvo});
+    if(alvo.estagio==='carregado') return res.json({ok:false,motivo:'duplicado',pedido:alvo,coleta:ehColeta(alvo)});
     if(conferenciaLigada()){
       const esperado=soCodigo(alvo.codigo);
       if(!esperado) return res.json({ok:false,motivo:'volume_sem_sku',
@@ -78,35 +100,97 @@ module.exports=function(app,db){
     }
     db.prepare("UPDATE lote SET estagio='carregado', carregado_em=datetime('now','localtime') WHERE id=?").run(alvo.id);
     const p=progresso();
-    res.json({ok:true,pedido:alvo,carregados:p.carregados,total:p.total});
+    /* A COLETA RESPONDE COM O NUMERO QUE O MOTORISTA VAI TER QUE BATER.
+       "Esta indo N" depois de cada bipe e o que faz a pessoa saber, na hora,
+       quantas caixas tem no canto — e pedir esse numero ao motorista antes de
+       o caminhao sair. `carregados`/`total` continuam sendo do CARRO: a caixa
+       de coleta nao entra nessa conta, senao o "12 de 12" fecharia o carro
+       com caixa da agencia ainda no chao. */
+    res.json({ok:true,pedido:alvo,carregados:p.carregados,total:p.total,
+              coleta:ehColeta(alvo), coleta_aguardando:p.coleta.aguardando.length});
   });
   /* O PROGRESSO DA CARGA — o mesmo numero pras duas rotas.
      "Carregados X de Y" e a lista tem que falar do mesmo universo, senao o
      banner diz 12 de 12 com a lista mostrando 3 faltando. Y e o que ha pra
      fazer agora (todo `embalado`, de qualquer dia) mais o que ja foi carregado
      hoje — nao o total do dia de importacao, que era o que escondia o
-     atrasado. */
+     atrasado.
+     DUAS PORTAS DE SAIDA, DUAS LISTAS. O carro (agencia) e o canto da coleta
+     sao lugares fisicos diferentes, e a caixa que vai num nao pode aparecer na
+     conta do outro: coleta no "faltam carregar" mandaria a caixa pro carro, e
+     agencia no "esta indo" inflaria o numero que o motorista tem que bater. */
   function progresso(){
     const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
-    const todos=db.prepare(`SELECT id,codigo,cor,buyer,nf,data,despachar_em FROM lote
+    const todos=db.prepare(`SELECT id,codigo,cor,buyer,nf,data,despachar_em,modalidade FROM lote
       WHERE ${PRA_CARREGAR} ORDER BY ${ORDEM_CARGA}`).all()
       .map(v=>Object.assign({},v,{atrasado: atrasado(v,hoje)?1:0}));
     /* A VENDA FUTURA SAI DA CARGA DE HOJE, mas nao volta a sumir (#9): vai
        numa linha a parte. Cobra-la junto mandaria por no carro hoje um volume
        que so despacha semanas depois — a etiqueta foi impressa adiantada, a
-       peca ainda nao e pra sair. */
-    const faltam=todos.filter(v=>!futuro(v,hoje));
+       peca ainda nao e pra sair. Vale pras duas portas. */
+    const doDia=todos.filter(v=>!futuro(v,hoje));
     const depois=todos.filter(v=>futuro(v,hoje));
+    const faltam=doDia.filter(v=>!ehColeta(v));
+    const coletaFaltam=doDia.filter(v=>ehColeta(v));
     /* CARREGADOS HOJE conta por `carregado_em`, nao por `data` — mesma razao do
        "impressas hoje" no exp_route.js. Contando pelo dia de importacao, o
        operador bipava um volume atrasado, ele saia da lista e o contador NAO
        andava: a tela ficava dizendo que ele nao tinha feito nada. */
     const car=db.prepare(`SELECT COUNT(*) n FROM lote WHERE carregado_em IS NOT NULL
-      AND date(carregado_em)=date('now','localtime')`).get().n;
+      AND date(carregado_em)=date('now','localtime') AND ${AGENCIA()}`).get().n;
+    /* O canto da coleta: o que esta la esperando o caminhao (carga.js), o que
+       o caminhao ja levou hoje e os fechamentos do dia, com o resultado. */
+    const aguardando=db.prepare(`SELECT id,codigo,buyer,nf,data,despachar_em,carregado_em FROM lote
+      WHERE ${AGUARDA_CAMINHAO} ORDER BY carregado_em ASC, id ASC`).all();
+    const retiradas=db.prepare(`SELECT COUNT(*) n FROM lote WHERE retirado_em IS NOT NULL
+      AND date(retirado_em)=date('now','localtime')`).get().n;
+    const fechamentos=db.prepare(`SELECT id,fechado_em,fechado_por,qtd_sistema,qtd_motorista,divergente,obs
+      FROM coleta_fechamento WHERE date(fechado_em)=date('now','localtime') ORDER BY id DESC`).all();
     return {total:car+faltam.length, carregados:car, faltam,
             atrasados:faltam.filter(f=>f.atrasado).length,
-            depois, adiantadas:depois.length};
+            depois, adiantadas:depois.length,
+            coleta:{faltam:coletaFaltam, aguardando, retiradas_hoje:retiradas, fechamentos}};
   }
   // conferencia: o que falta carregar — todo `embalado`, com o atrasado marcado
   app.get('/api/carregamento',(req,res)=> res.json(progresso()));
+
+  /* FECHAR A COLETA = o motorista disse quantas bipou, e a gente compara.
+     Fecha TUDO que esta esperando o caminhao de uma vez: a coleta e um
+     evento, nao caixa a caixa. Quando bate, as caixas ganham `retirado_em` e
+     saem do canto. Quando nao bate, NADA anda sem alguem confirmar — a
+     resposta volta com a lista das caixas pra conferir uma a uma com o
+     motorista ali. Confirmar com divergencia e permitido (o caminhao nao pode
+     ficar preso pra sempre), mas fica gravado com quem fechou e vai pra
+     auditoria: e a decisao que precisa ter nome. */
+  app.post('/api/coleta/fechar',(req,res)=>{
+    const b=req.body||{};
+    const mot=parseInt(b.motorista,10);
+    if(!(mot>=0)) return res.status(400).json({erro:'informe quantas caixas o motorista bipou'});
+    const lista=db.prepare(`SELECT id,codigo,buyer,nf,carregado_em FROM lote
+      WHERE ${AGUARDA_CAMINHAO} ORDER BY carregado_em ASC, id ASC`).all();
+    const n=lista.length;
+    if(!n) return res.json({ok:false,motivo:'nada',aviso:'Nenhuma caixa separada pra coleta. Bipe as caixas antes de fechar.'});
+    const divergente = mot!==n;
+    const quem=(req.usuario&&req.usuario.nome)||'';
+    if(divergente && !b.confirmar){
+      try{ const ac=app.locals.acesso; if(ac&&ac.auditar)
+        ac.auditar(req,'expedicao','coleta_divergente','coleta '+n+' x motorista '+mot,
+          'nao fechou — mandou conferir caixa a caixa'); }catch(e){}
+      return res.json({ok:false,motivo:'divergente',sistema:n,motorista:mot,lista});
+    }
+    const obs=String(b.obs||'').slice(0,300);
+    let fid=null;
+    db.transaction(()=>{
+      fid=db.prepare(`INSERT INTO coleta_fechamento (fechado_por,qtd_sistema,qtd_motorista,divergente,obs,ids)
+        VALUES (?,?,?,?,?,?)`).run(quem,n,mot,divergente?1:0,obs,JSON.stringify(lista.map(v=>v.id))).lastInsertRowid;
+      const up=db.prepare("UPDATE lote SET retirado_em=datetime('now','localtime') WHERE id=? AND retirado_em IS NULL");
+      lista.forEach(v=>up.run(v.id));
+    })();
+    if(divergente){
+      try{ const ac=app.locals.acesso; if(ac&&ac.auditar)
+        ac.auditar(req,'expedicao','coleta_fechada_divergente','fechamento '+fid,
+          'sistema '+n+' / motorista '+mot+(obs?' — '+obs:'')); }catch(e){}
+    }
+    res.json({ok:true,id:fid,sistema:n,motorista:mot,divergente});
+  });
 };

@@ -41,7 +41,7 @@ function item(o){
 }
 function etiqueta(o){
   return ['lucas desiderio lucas des #136721278','Rua Jussara 1250 Tamboré',
-    (o.pack?('Pack ID: '+o.pack):('Venda: '+o.venda)),'Despachar: seg 24/ago, antes das 15:00 h',
+    (o.pack?('Pack ID: '+o.pack):('Venda: '+o.venda)),(o.despachar||'Despachar: seg 24/ago, antes das 15:00 h'),
     'QUA 26/08/2026 NF: '+o.nf, o.comprador+' (LOJA)',
     'Endereço: Rua Manoel Carvalho 75','Cidade de destino : Campinas, São Paulo'];
 }
@@ -302,6 +302,41 @@ function conferir(nome, orders, esperado){
     if(erros.length){ falhas++; console.log('FALHOU  erro de digitacao passa, cliente diferente nao');
       erros.forEach(e=>console.log('        '+e)); }
     else console.log('ok      erro de digitacao passa, cliente diferente nao');
+  }
+
+  /* ── 15. COLETA x AGENCIA: a etiqueta diz por AUSENCIA DA HORA ─────────────
+        Desde 10/09/2026 o caminhao do ML busca parte das vendas na fabrica. A
+        unica diferenca na etiqueta e a caixa "Despachar": agencia traz
+        "qua 9/set, antes das 15:45 h"; coleta traz so "quinta 10/set". Os dois
+        formatos sao copiados dos PDFs reais de 09/09/2026. A data tem que
+        continuar sendo lida nos dois — e sem a linha, a resposta e null (nao se
+        sabe), que todo lugar trata como agencia. */
+  casos++;
+  {
+    const {modalidadeDespacho}=require('./parse');
+    const os_=await montar([
+      {pack:'111',venda:'901',sku:'BK150150BEGE',medida:'1,50x1,50',cor:'Bege',comprador:'Julia Souza'},
+      {pack:'222',venda:'902',sku:'BK140140BEGE',medida:'1,40x1,40',cor:'Bege',comprador:'Leandro Costa'},
+      {pack:'333',venda:'903',sku:'BK160160BEGE',medida:'1,60x1,60',cor:'Bege',comprador:'Sem Linha'},
+    ],[
+      {pack:'111',nf:'6259',comprador:'Julia Souza',  despachar:'Despachar: quinta 10/set'},
+      {pack:'222',nf:'6232',comprador:'Leandro Costa',despachar:'Despachar: qua 9/set, antes das 15:45 h'},
+      {pack:'333',nf:'6001',comprador:'Sem Linha',    despachar:'XSP1 > SSP30 >'},
+    ]);
+    const por={}; os_.forEach(o=>por[o.packId]=o);
+    const erros=[];
+    if((por['111']||{}).modalidade!=='coleta') erros.push('etiqueta sem hora nao virou coleta: '+JSON.stringify((por['111']||{}).modalidade));
+    if((por['222']||{}).modalidade!=='agencia') erros.push('etiqueta com hora nao virou agencia: '+JSON.stringify((por['222']||{}).modalidade));
+    if((por['333']||{}).modalidade!==null) erros.push('etiqueta sem a linha tinha que dar null: '+JSON.stringify((por['333']||{}).modalidade));
+    if(!/-09-10$/.test((por['111']||{}).despacharEm||'')) erros.push('a data da coleta nao foi lida: '+JSON.stringify((por['111']||{}).despacharEm));
+    if(!/-09-09$/.test((por['222']||{}).despacharEm||'')) erros.push('a data da agencia nao foi lida: '+JSON.stringify((por['222']||{}).despacharEm));
+    os_.forEach(o=>{ if(o.conflito) erros.push('reteve a toa '+o.packId+': '+o.conflito); });
+    /* A hora quebrada pelo pdf.js na linha de baixo continua sendo agencia. */
+    if(modalidadeDespacho('XSP1 Despachar: qua 9/set,\nantes das 15:45 h')!=='agencia') erros.push('hora na linha de baixo deixou de ser agencia');
+    if(modalidadeDespacho('Despachar: qua 9/set, antes das 15h45')!=='agencia') erros.push('"15h45" nao foi lido como hora');
+    if(erros.length){ falhas++; console.log('FALHOU  coleta e agencia se separam pela hora da linha Despachar');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      coleta e agencia se separam pela hora da linha Despachar');
   }
 
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}

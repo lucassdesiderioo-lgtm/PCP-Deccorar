@@ -1,4 +1,5 @@
 const {VENCE_HOJE,ORDEM_URGENCIA}=require('./fila_dia');
+const {ehColeta}=require('./carga');
 module.exports=function(app,db){
   app.get('/api/proximo/:sku',(req,res)=>{
     const sku=(req.params.sku||'').trim().toUpperCase();
@@ -39,7 +40,7 @@ module.exports=function(app,db){
        O que impede adiantar o que nao pode e a trava de estoque, que ja existe
        logo abaixo: sem peca na prateleira nada e impresso. E exatamente a regra
        "so se tiver estoque disponivel". */
-    const p=db.prepare(`SELECT id,codigo,cor,buyer,city,nf,packId,venda,despachar_em
+    const p=db.prepare(`SELECT id,codigo,cor,buyer,city,nf,packId,venda,despachar_em,modalidade
       FROM lote WHERE codigo=? AND estagio='pendente'
       ORDER BY `+ORDEM_URGENCIA+` LIMIT 1`).get(sku);
     const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
@@ -56,8 +57,13 @@ module.exports=function(app,db){
     /* A tela precisa saber que e sob medida para nao anunciar "Estoque: 0"
        como se fosse falta. Zero ali e o normal, nao um alarme — e um numero
        que aparece como problema todo dia ensina a equipe a ignora-lo. */
+    /* COLETA: a etiqueta sai igual, mas a caixa vai pro canto reservado e NAO
+       pro carro — o caminhao do Mercado Livre vem buscar. A tela precisa dizer
+       isso ANTES de imprimir, porque e quem cola a etiqueta que decide onde a
+       caixa vai parar. Regua unica em carga.js. */
+    const coleta = ehColeta(p);
     res.json({cadastrado:true,estoque:s.estoque,total,pendentes:pend,futuros:fut,
-              pedido:p||null,peca,sob_medida:!!s.sob_medida,adiantado});
+              pedido:p||null,peca,sob_medida:!!s.sob_medida,adiantado,coleta});
   });
 
   app.post('/api/embalar',(req,res)=>{
@@ -85,6 +91,8 @@ module.exports=function(app,db){
       if(!s.sob_medida) db.prepare('UPDATE skus SET estoque=MAX(0,estoque-1) WHERE codigo=?').run(o.codigo);
     })();
     const e=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(o.codigo);
-    res.json({ok:true,estoque:e?e.estoque:0});
+    /* Depois de imprimir, a tela diz pra onde a caixa vai. Sai daqui, e nao
+       do que a tela guardou do bipe: e o volume gravado que manda. */
+    res.json({ok:true,estoque:e?e.estoque:0,coleta:ehColeta(o)});
   });
 };
