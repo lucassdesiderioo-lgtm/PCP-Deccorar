@@ -270,6 +270,8 @@ qtd_motorista INTEGER    -- quantas o motorista disse que bipou
 divergente    INTEGER    -- 1 quando não bateu e alguém liberou mesmo assim
 obs           TEXT
 ids           TEXT       -- JSON com os lote.id fechados
+foto          TEXT       -- caminho da foto da tela do motorista (coletas/coleta-<id>.jpeg)
+                         -- OBRIGATÓRIA: sem ela a rota não fecha
 ```
 
 #### `devolucao`
@@ -441,7 +443,10 @@ atualizado  TEXT
 |---|---|---|
 | POST | `/api/carregar` | Confere por código · recusa duplicado e bloqueado · responde `coleta` e `coleta_aguardando` ("está indo N") |
 | GET | `/api/carregamento` | Carro: total, carregados, faltantes · `coleta`: faltam bipar, esperando o caminhão, retiradas hoje, fechamentos do dia |
-| POST | `/api/coleta/fechar` | `{motorista:N}` compara com as caixas esperando · bateu → `retirado_em` em todas · não bateu → `divergente` com a lista, nada anda até `confirmar:true` (auditado) |
+| POST | `/api/coleta/fechar` | `{motorista:N, foto:dataURL}` compara com as caixas esperando · **sem foto → `sem_foto`, nada anda** · bateu → `retirado_em` em todas · não bateu → `divergente` com a lista, nada anda até `confirmar:true` (auditado) |
+| GET | `/api/coleta/foto/:id` | A foto da tela do motorista daquele fechamento |
+| GET | `/api/modalidade/pendentes` | Volumes retidos porque a linha "Despachar:" veio num formato desconhecido (`bloqueio LIKE 'modalidade%'`) · admin |
+| POST | `/api/modalidade/resolver` | `{ids:[...], modalidade:'agencia'|'coleta'}` — a gestão decide por onde a caixa sai · grava rastro · **não passa por cima do §6** |
 
 > **Coleta (10/09/2026):** o caminhão do Mercado Livre busca parte das vendas
 > na fábrica. A etiqueta é igual à da agência, menos a linha "Despachar", que

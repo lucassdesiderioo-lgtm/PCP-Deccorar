@@ -101,9 +101,12 @@ app.post('/api/skus', (req,res)=>{
      existe, e sim QUAL peca o cliente comprou: as duas leituras do PDF
      discordaram. Sem esta guarda, cadastrar um SKU qualquer soltaria um volume
      que ninguem conferiu. Esses saem so pelo POST /api/divergencias/resolver,
-     depois de alguem olhar o pedido no Mercado Livre. */
+     depois de alguem olhar o pedido no Mercado Livre.
+     O mesmo vale pro volume retido por MODALIDADE (§8-B): a etiqueta veio num
+     formato que o sistema nao reconhece, e cadastrar SKU nao diz se a caixa vai
+     pro carro ou pro canto da coleta. Sai so pelo POST /api/modalidade/resolver. */
   try{ db.prepare(`UPDATE lote SET estagio='pendente' WHERE estagio='bloqueado' AND codigo=?
-        AND COALESCE(bloqueio,'') NOT LIKE 'divergencia%'`).run(cod); }catch(e){}
+        AND COALESCE(bloqueio,'') NOT LIKE 'divergencia%' AND COALESCE(bloqueio,'') NOT LIKE 'modalidade%'`).run(cod); }catch(e){}
   res.json({ok:true});
 });
 app.delete('/api/skus/:codigo',(req,res)=>{ db.prepare('DELETE FROM skus WHERE codigo=?').run(req.params.codigo); res.json({ok:true}); });

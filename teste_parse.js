@@ -334,6 +334,15 @@ function conferir(nome, orders, esperado){
     /* A hora quebrada pelo pdf.js na linha de baixo continua sendo agencia. */
     if(modalidadeDespacho('XSP1 Despachar: qua 9/set,\nantes das 15:45 h')!=='agencia') erros.push('hora na linha de baixo deixou de ser agencia');
     if(modalidadeDespacho('Despachar: qua 9/set, antes das 15h45')!=='agencia') erros.push('"15h45" nao foi lido como hora');
+    /* QUALQUER MODIFICACAO vai pra Bloqueados (regra do dono): so os dois
+       formatos exatos decidem. Linha parecida mas diferente e 'desconhecida'. */
+    [['Despachar: quinta 10/set — retirada no local','coleta com texto a mais'],
+     ['Despachar: 10/09/2026','data em outro formato'],
+     ['Despachar: quinta 10/set, ate as 15:45','"ate as" no lugar de "antes das"'],
+     ['Despachar: hoje','sem data']].forEach(([l,por])=>{
+      const m=modalidadeDespacho('XSP1 '+l);
+      if(m!=='desconhecida') erros.push('formato novo ('+por+') passou como '+m+': "'+l+'"');
+    });
     if(erros.length){ falhas++; console.log('FALHOU  coleta e agencia se separam pela hora da linha Despachar');
       erros.forEach(e=>console.log('        '+e)); }
     else console.log('ok      coleta e agencia se separam pela hora da linha Despachar');

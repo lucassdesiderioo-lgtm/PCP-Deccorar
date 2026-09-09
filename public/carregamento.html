@@ -38,7 +38,16 @@
   .empty{padding:22px;text-align:center;color:var(--green)}
   .sub2{padding:10px 14px;font-size:13px;color:#4b2a91;background:#f6f2fd;border-bottom:1px solid #e3d9f5}
   .fechbox{padding:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line)}
-  .fechbox input{font-size:24px;font-weight:800;width:110px;padding:10px;text-align:center;border:2px solid #b9a3e6;border-radius:10px}
+  .fechbox input[type=number]{font-size:24px;font-weight:800;width:110px;padding:10px;text-align:center;border:2px solid #b9a3e6;border-radius:10px}
+  /* A FOTO E OBRIGATORIA e por isso o botao dela e grande e vem ANTES do
+     "Fechar": a camera abre direto no tablet (capture=environment). O
+     <input type=file> fica dentro do <label>, visivel, porque o iOS ignora
+     campo escondido (§12). */
+  .fotobtn{display:inline-flex;align-items:center;gap:8px;background:#fff;border:2px dashed #6f42c1;color:#4b2a91;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer}
+  .fotobtn input{position:absolute;width:1px;height:1px;opacity:0.01}
+  .fotobtn.ok{border-style:solid;background:#efe9fb}
+  .fotoprev{height:64px;border-radius:8px;border:1px solid #b9a3e6;display:none}
+  .fotoprev.on{display:inline-block}
   .hist{padding:8px 14px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)}
   .hist b.ok{color:var(--green)}.hist b.div{color:var(--red)}
 </style></head><body>
@@ -60,10 +69,13 @@
        o bipe e o que poe a caixa na conta que o motorista tem que bater. -->
   <div class="card col" style="margin-top:14px" id="colCard">
     <h3>Coleta — o caminhão do Mercado Livre vem buscar</h3>
-    <div class="sub2">Essas caixas <b>não vão no carro</b>. Bipe cada uma ao levar pro lugar reservado. Quando o motorista chegar, peça a ele o número de caixas que bipou e feche a coleta aqui.</div>
+    <div class="sub2">Essas caixas <b>não vão no carro</b>. Bipe cada uma ao levar pro lugar reservado. Quando o motorista chegar, <b>tire a foto da tela do celular dele</b> mostrando quantas caixas ele bipou, digite o número e feche a coleta.</div>
     <div id="colFaltam"></div>
     <div id="colAguard"></div>
     <div class="fechbox" id="fechBox">
+      <label class="fotobtn" id="fotoBtn">📷 <span id="fotoTxt">Foto da tela do motorista</span>
+        <input type="file" id="fotoIn" accept="image/*" capture="environment"></label>
+      <img class="fotoprev" id="fotoPrev" alt="">
       <span style="font-weight:700">Motorista bipou</span>
       <input id="motQtd" type="number" min="0" inputmode="numeric" placeholder="0">
       <span style="font-weight:700">caixas</span>
@@ -177,7 +189,8 @@ async function carregar(){
     return '<div class="hist">'+horaDe(f.fechado_em)+' — '
       +(f.divergente ? '<b class="div">⛔ DIVERGENTE</b>: sistema '+f.qtd_sistema+', motorista '+f.qtd_motorista
                      : '<b class="ok">✓ bateu</b>: '+f.qtd_sistema+' caixas')
-      +(f.fechado_por?' · '+esc0(f.fechado_por):'')+(f.obs?' · '+esc0(f.obs):'')+'</div>';
+      +(f.fechado_por?' · '+esc0(f.fechado_por):'')+(f.obs?' · '+esc0(f.obs):'')
+      +(f.tem_foto?' · <a href="/api/coleta/foto/'+f.id+'" target="_blank" style="color:#4b2a91;font-weight:700">📷 ver a foto</a>':'')+'</div>';
   }).join('');
 }
 async function conferir(){
@@ -196,18 +209,53 @@ async function conferir(){
    motorista ali na frente — e o unico momento em que a caixa que sumiu ainda
    pode ser achada. Liberar assim mesmo existe (o caminhao nao pode ficar
    preso), mas fica gravado como divergente, com quem fechou. */
+/* A FOTO DA TELA DO MOTORISTA E A PROVA DO NUMERO. Regra do dono: "nao adianta
+   apenas o motorista falar a quantidade". O tablet fotografa o celular dele
+   com a contagem do sistema do ML, a foto e reduzida aqui (1600 px, JPEG) pra
+   nao pesar no fio, e vai junto do fechamento. Sem foto o servidor recusa. */
+let fotoDataUrl=null;
+function reduzirFoto(file){
+  return new Promise(function(res,rej){
+    var fr=new FileReader();
+    fr.onload=function(){
+      var img=new Image();
+      img.onload=function(){
+        var max=1600, w=img.width, h=img.height, k=Math.min(1, max/Math.max(w,h));
+        var c=document.createElement('canvas'); c.width=Math.round(w*k); c.height=Math.round(h*k);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        res(c.toDataURL('image/jpeg',0.85));
+      };
+      img.onerror=rej; img.src=fr.result;
+    };
+    fr.onerror=rej; fr.readAsDataURL(file);
+  });
+}
+$('#fotoIn').addEventListener('change',async function(){
+  var f=this.files&&this.files[0]; if(!f) return;
+  try{ fotoDataUrl=await reduzirFoto(f); }
+  catch(e){ fotoDataUrl=null; banner('err','Não deu pra ler a foto','Tente tirar de novo.'); return; }
+  $('#fotoPrev').src=fotoDataUrl; $('#fotoPrev').className='fotoprev on';
+  $('#fotoBtn').className='fotobtn ok'; $('#fotoTxt').textContent='Foto tirada ✓ — tirar outra';
+  $('#motQtd').focus();
+});
+function limparFoto(){
+  fotoDataUrl=null; $('#fotoIn').value=''; $('#fotoPrev').className='fotoprev'; $('#fotoPrev').src='';
+  $('#fotoBtn').className='fotobtn'; $('#fotoTxt').textContent='Foto da tela do motorista';
+}
 let divergPend=null;
 async function fecharColeta(confirmar){
+  if(!fotoDataUrl){ banner('warn','Falta a foto da tela do motorista','Toque em <b>📷 Foto da tela do motorista</b> e fotografe o celular dele mostrando quantas caixas ele bipou. Sem a foto a coleta não fecha.'); beep(false); return; }
   var q=$('#motQtd').value;
-  if(q==='' || !(parseInt(q,10)>=0)){ banner('warn','Quantas caixas o motorista bipou?','Pergunte a ele e digite o número antes de fechar.'); return; }
-  var corpo={motorista:parseInt(q,10)};
+  if(q==='' || !(parseInt(q,10)>=0)){ banner('warn','Quantas caixas o motorista bipou?','Digite o número que está na foto antes de fechar.'); return; }
+  var corpo={motorista:parseInt(q,10),foto:fotoDataUrl};
   if(confirmar){ corpo.confirmar=true; corpo.obs=String(prompt('Por que está liberando com número diferente? (fica registrado)')||'').slice(0,300); }
   const r=await (await fetch('/api/coleta/fechar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)})).json();
   if(r.ok){
-    divergPend=null; $('#motQtd').value='';
-    if(r.divergente){ banner('err','Coleta fechada COM DIVERGÊNCIA','Sistema <b>'+r.sistema+'</b> · motorista <b>'+r.motorista+'</b>. Ficou registrado com o seu nome.'); beep(false); }
-    else { banner('ok','Coleta conferida ✓ — '+r.sistema+' = '+r.motorista,'O número do motorista bateu. Pode liberar o caminhão.'); beep(true); }
+    divergPend=null; $('#motQtd').value=''; limparFoto();
+    if(r.divergente){ banner('err','Coleta fechada COM DIVERGÊNCIA','Sistema <b>'+r.sistema+'</b> · motorista <b>'+r.motorista+'</b>. Ficou registrado com o seu nome e com a foto.'); beep(false); }
+    else { banner('ok','Coleta conferida ✓ — '+r.sistema+' = '+r.motorista,'O número do motorista bateu e a foto ficou guardada. Pode liberar o caminhão.'); beep(true); }
   }
+  else if(r.motivo==='sem_foto'){ banner('warn','Falta a foto da tela do motorista', esc0(r.aviso||'')); beep(false); }
   else if(r.motivo==='divergente'){
     divergPend=r;
     banner('err','⛔ NÃO BATEU — sistema '+r.sistema+', motorista '+r.motorista,
@@ -228,9 +276,9 @@ const scan=$('#scan');
    BIPE cair no lugar certo, nao pra mexer no que a pessoa esta olhando.
    O campo do motorista e a excecao: enquanto a pessoa digita ali, o foco
    fica ali. */
-const keep=()=>{ const a=document.activeElement; if(a===scan) return; if(a && a.id==='motQtd') return; scan.focus({preventScroll:true}); };
+const keep=()=>{ const a=document.activeElement; if(a===scan) return; if(a && (a.id==='motQtd'||a.id==='fotoIn')) return; scan.focus({preventScroll:true}); };
 scan.addEventListener('blur',()=>setTimeout(keep,50));
-document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input')) keep(); });
+document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input,label')) keep(); });
 scan.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=scan.value.trim(); scan.value=''; bip(v); } });
 $('#motQtd').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); fecharColeta(false); } });
 scan.focus();

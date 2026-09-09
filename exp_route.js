@@ -96,7 +96,7 @@ module.exports=function(app,db){
       const famVista=db.prepare('SELECT prefixo,vezes FROM familia_sku WHERE familia=?');
       const famGrava=db.prepare(`INSERT INTO familia_sku (familia,prefixo,vezes) VALUES (?,?,1)
         ON CONFLICT(familia,prefixo) DO UPDATE SET vezes=vezes+1, visto_em=datetime('now','localtime')`);
-      let novos=0,rep=0,semsku=0,bloq=0,divs=0,coleta=0; const desconhecidos={};
+      let novos=0,rep=0,semsku=0,bloq=0,divs=0,coleta=0,modal=0; const desconhecidos={};
       db.transaction(()=>{ for(const o of orders){
         if((o.packId&&seen.has('p:'+o.packId))||(o.venda&&seen.has('v:'+o.venda))){ rep++; continue; }
         if(o.packId)seen.add('p:'+o.packId); if(o.venda)seen.add('v:'+o.venda);
@@ -123,16 +123,32 @@ module.exports=function(app,db){
            discordam nao pode ser liberado por cadastro de SKU, porque nao e o
            cadastro que esta em duvida — e qual peca o cliente comprou. */
         if(conflito){ est='bloqueado'; bloq++; divs++; motivo='divergencia: '+conflito; }
+        /* A ETIQUETA EM FORMATO QUE O SISTEMA NAO CONHECE (§8-B, armadilha #21).
+           A modalidade e lida da linha "Despachar:", e so os dois formatos
+           conhecidos decidem. Linha diferente, ou sem linha, e o Mercado Livre
+           mudando a etiqueta — e ai NINGUEM adivinha se a caixa vai pro carro
+           ou pro caminhao da coleta: regra do dono, vai pra Bloqueados e a
+           gestao decide (POST /api/modalidade/resolver). Fica com modalidade
+           NULL ate la; o texto cru vai no motivo, pra pessoa ver o que o ML
+           escreveu. Vem DEPOIS da divergencia (a peca errada e mais grave) e
+           ANTES do SKU (cadastrar SKU nao responde esta pergunta). */
+        else if(o.modalidade==null || o.modalidade==='desconhecida'){
+          est='bloqueado'; bloq++; modal++;
+          motivo='modalidade: '+(o.modalidade==null ? 'a etiqueta veio SEM a linha "Despachar:"'
+            : 'a linha "Despachar:" veio num formato novo — "'+String(o.despachoLinha||'').slice(0,80)+'"');
+        }
         else if(!ok){ est='bloqueado'; bloq++; motivo='sku_nao_cadastrado';
           const k=sku||'(sem SKU na folha)'; desconhecidos[k]=(desconhecidos[k]||0)+1; }
         if(!o.sku) semsku++;
         if(o.modalidade==='coleta') coleta++;
-        ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null,o.despacharEm||null,o.modalidade||null); novos++;
+        const modGravada=(o.modalidade==='agencia'||o.modalidade==='coleta')?o.modalidade:null;
+        ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null,o.despacharEm||null,modGravada); novos++;
       }})();
       /* `coleta` vai na resposta pra quem subiu o PDF ver na hora quantos
          volumes o caminhao vai buscar — e estranhar se der zero num PDF de
-         coleta, ou o lote inteiro num PDF de agencia (a marca e fraca). */
-      res.json({ok:true,total:orders.length,novos,repetidas:rep,sem_sku:semsku,bloqueados:bloq,divergencias:divs,coleta,
+         coleta, ou o lote inteiro num PDF de agencia (a marca e fraca).
+         `modalidade_duvida` e o que ficou retido por formato desconhecido. */
+      res.json({ok:true,total:orders.length,novos,repetidas:rep,sem_sku:semsku,bloqueados:bloq,divergencias:divs,coleta,modalidade_duvida:modal,
                 desconhecidos:Object.keys(desconhecidos).map(k=>({sku:k,qtd:desconhecidos[k]}))});
     }catch(e){ console.error(e); res.status(500).json({erro:String(e.message||e)}); }
   });
@@ -143,7 +159,45 @@ module.exports=function(app,db){
   app.get('/api/bloqueados',(req,res)=>{
     res.json(db.prepare(`SELECT codigo, COUNT(*) qtd, GROUP_CONCAT(DISTINCT buyer) compradores
       FROM lote WHERE estagio='bloqueado' AND COALESCE(bloqueio,'') NOT LIKE 'divergencia%'
+        AND COALESCE(bloqueio,'') NOT LIKE 'modalidade%'
       GROUP BY codigo ORDER BY qtd DESC`).all());
+  });
+
+  /* ── ETIQUETA EM FORMATO DESCONHECIDO: A GESTAO DECIDE (§8-B) ─────────────
+     O volume retido por `modalidade:` nao e duvida de peca nem de cadastro — e
+     o Mercado Livre tendo mudado a etiqueta. A pergunta e uma so: esta caixa
+     vai pro carro (agencia) ou pro caminhao (coleta)? Quem responde e a gestao,
+     olhando o pedido no ML. A decisao grava a modalidade E o rastro (o
+     bloqueio vira `bloqueio_resolvido`, com quem e quando), e o volume so vira
+     `pendente` se o SKU estiver cadastrado — senao continua bloqueado, agora
+     pelo §6, que e a proxima trava da fila. */
+  app.get('/api/modalidade/pendentes',(req,res)=>{
+    res.json(db.prepare(`SELECT id,codigo,buyer,city,nf,packId,venda,data,despachar_em,bloqueio,descricao
+      FROM lote WHERE estagio='bloqueado' AND bloqueio LIKE 'modalidade%'
+      ORDER BY data DESC, id DESC`).all()
+      .map(r=>Object.assign({},r,{motivo:String(r.bloqueio||'').replace(/^modalidade:\s*/,'')})));
+  });
+  app.post('/api/modalidade/resolver',(req,res)=>{
+    const b=req.body||{};
+    const mod=String(b.modalidade||'').toLowerCase();
+    if(mod!=='agencia' && mod!=='coleta') return res.status(400).json({erro:'modalidade tem que ser agencia ou coleta'});
+    const ids=(Array.isArray(b.ids)?b.ids:[b.id]).map(Number).filter(n=>n>0);
+    if(!ids.length) return res.status(400).json({erro:'informe o(s) volume(s)'});
+    const quem=(req.usuario&&req.usuario.nome)||'';
+    const existe=db.prepare('SELECT 1 FROM skus WHERE codigo=?');
+    let liberados=0, aindaSemSku=0, ignorados=0;
+    db.transaction(()=>{ for(const id of ids){
+      const o=db.prepare('SELECT id,codigo,bloqueio,estagio FROM lote WHERE id=?').get(id);
+      if(!o || o.estagio!=='bloqueado' || !/^modalidade/.test(String(o.bloqueio||''))){ ignorados++; continue; }
+      const cadastrado = o.codigo && existe.get(String(o.codigo).toUpperCase());
+      db.prepare(`UPDATE lote SET modalidade=?, estagio=?, bloqueio=?,
+          bloqueio_resolvido=?, resolvido_por=?, resolvido_em=datetime('now','localtime') WHERE id=?`)
+        .run(mod, cadastrado?'pendente':'bloqueado', cadastrado?null:'sku_nao_cadastrado', o.bloqueio, quem, id);
+      if(cadastrado) liberados++; else aindaSemSku++;
+      try{ app.locals.acesso.auditar(req,'expedicao','resolver_modalidade',id,
+        String(o.bloqueio||'')+'  ->  '+mod+(cadastrado?'':'  (segue bloqueado: SKU sem cadastro)')); }catch(e){}
+    }})();
+    res.json({ok:true,modalidade:mod,liberados,ainda_sem_sku:aindaSemSku,ignorados});
   });
   /* CONFERENCIA DO QUE JA FOI IMPRESSO.
      A trava do upload so vale pro que entra dali pra frente. Esta rota olha pra

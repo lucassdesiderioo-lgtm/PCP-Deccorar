@@ -59,14 +59,31 @@ function dataDespacho(texto, hoje){
  * todo mundo, o sintoma e todo volume virar "coleta" de uma vez, e isso a tela
  * do carregamento mostra no mesmo minuto.
  *
- * Sem a linha "Despachar:" a resposta e null (nao se sabe), e null e tratado
- * como agencia em todo lugar — o que sempre existiu. A hora e procurada na
- * pagina inteira da etiqueta, nao so na linha: se o pdf.js quebrar
- * ", antes das 15:45 h" para a linha de baixo, a leitura continua certa. */
+ * SO OS DOIS FORMATOS CONHECIDOS DECIDEM. Regra do dono (09/09/2026): qualquer
+ * modificacao na etiqueta vai para Bloqueados, e a gestao decide. Entao a
+ * linha e conferida contra os dois formatos EXATOS acima; o que nao casa com
+ * nenhum vira 'desconhecida', e a etiqueta sem a linha vira null — os dois
+ * retem o volume no upload (exp_route.js) ate alguem escolher agencia ou
+ * coleta em Admin -> Bloqueados. Um "quase igual" que passasse como coleta
+ * mandaria pro canto do caminhao uma caixa que era do carro, em silencio.
+ * A hora pode ter quebrado para a linha de baixo (pdf.js faz isso): a linha
+ * seguinte e emendada quando comeca com "antes das". */
+const RE_AGENCIA=/^[a-zçãáéíóú.-]+\s+\d{1,2}\/[a-zç]{3,}\s*,\s*antes\s+das\s+\d{1,2}\s*[:h]\s*\d{2}\s*h?\.?$/i;
+const RE_COLETA =/^[a-zçãáéíóú.-]+\s+\d{1,2}\/[a-zç]{3,}$/i;
+function linhaDespacho(texto){
+  const lines=String(texto||'').split('\n');
+  const i=lines.findIndex(l=>/Despachar:/i.test(l));
+  if(i<0) return null;
+  let s=lines[i].replace(/^.*?Despachar:\s*/i,'');
+  if(lines[i+1] && /^\s*antes\s+das/i.test(lines[i+1])) s+=' '+lines[i+1];
+  return s.replace(/\s+/g,' ').trim();
+}
 function modalidadeDespacho(texto){
-  const t=String(texto||'');
-  if(!/Despachar:/i.test(t)) return null;
-  return /antes\s+das\s+\d{1,2}\s*[:h]\s*\d{2}/i.test(t) ? 'agencia' : 'coleta';
+  const s=linhaDespacho(texto);
+  if(s===null) return null;
+  if(RE_AGENCIA.test(s)) return 'agencia';
+  if(RE_COLETA.test(s)) return 'coleta';
+  return 'desconhecida';
 }
 /* O NOME DE QUEM COMPROU, LIDO DA ETIQUETA.
  *
@@ -215,6 +232,7 @@ async function parsePdf(uint8){
     const nf=(t.match(/NF:\s*(\d+)/)||[])[1]||null;
     const despacharEm=dataDespacho(t);
     const modalidade=modalidadeDespacho(t);
+    const despachoLinha=linhaDespacho(t);   // o texto cru, pro bloqueio dizer o que o ML escreveu
     const city=((t.match(/Cidade de destino\s*:\s*(.+)/)||[])[1]||'').trim();
     const buyer=nomeDaEtiqueta(lines);
     if((packId&&seen.has('p:'+packId))||(venda&&seen.has('v:'+venda))) continue;
@@ -294,9 +312,9 @@ async function parsePdf(uint8){
       /* A descricao do anuncio vai junto: e ela que diz a LINHA do produto
          ("Cortina Rolo Blackout" x "Toucher Rolo Evolux"), a unica dimensao que
          medida e cor nao separam. O upload guarda e aprende com ela. */
-      descricao:(rec&&rec.desc)||null, despacharEm, modalidade,
+      descricao:(rec&&rec.desc)||null, despacharEm, modalidade, despachoLinha,
       buyer:buyer||'(sem nome)',city,nf,packId,venda,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
   }
   return orders;
 }
-module.exports={parsePdf,dataDespacho,modalidadeDespacho,nomeDaEtiqueta,mesmoNomeComRepeticao};
+module.exports={parsePdf,dataDespacho,modalidadeDespacho,linhaDespacho,nomeDaEtiqueta,mesmoNomeComRepeticao};

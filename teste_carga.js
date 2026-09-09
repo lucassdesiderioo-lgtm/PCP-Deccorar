@@ -20,6 +20,12 @@ const Database=require('better-sqlite3');
 const fs=require('fs'), os=require('os'), path=require('path');
 
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'pcp-carga-'));
+/* As fotos da coleta vao pra um diretorio de teste, nunca pro /opt. Tem que
+   ser definido ANTES do require do carreg_route. */
+process.env.PCP_COLETAS_DIR=path.join(tmp,'coletas');
+/* Uma "foto": JPEG falso com tamanho de foto. O servidor confere so que e
+   imagem em data URL e que tem conteudo — o que a camera do tablet manda. */
+const FOTO='data:image/jpeg;base64,'+Buffer.alloc(4000,7).toString('base64');
 const db=new Database(path.join(tmp,'t.db'));
 db.exec(`CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT, buyer TEXT,
   city TEXT, nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', estagio TEXT, data TEXT,
@@ -150,34 +156,56 @@ const ok=(n,c,extra)=>{ casos++;
   ok('bipar de novo acusa duplicado, e continua dizendo que e coleta', r.ok===false && r.motivo==='duplicado' && r.coleta===true,
      'veio '+JSON.stringify(r.motivo));
 
+  /* SEM A FOTO DA TELA DO MOTORISTA NAO FECHA — nem com o numero certo. O
+     numero falado nao e prova; a foto do sistema dele e. */
+  r=await chamar('POST /api/coleta/fechar',{motorista:3});
+  ok('sem foto nao fecha, mesmo com o numero batendo', r.ok===false && r.motivo==='sem_foto', 'veio '+JSON.stringify(r));
+  r=await chamar('POST /api/coleta/fechar',{motorista:3,foto:'data:image/jpeg;base64,AAAA'});
+  ok('foto vazia nao e prova', r.ok===false && r.motivo==='sem_foto', 'veio '+JSON.stringify(r));
+  r=await chamar('POST /api/coleta/fechar',{motorista:3,foto:'data:text/plain;base64,'+Buffer.alloc(4000,7).toString('base64')});
+  ok('arquivo que nao e imagem nao e prova', r.ok===false && r.motivo==='sem_foto', 'veio '+JSON.stringify(r));
+  d=await chamar('GET /api/carregamento');
+  ok('e nada andou sem a foto', d.coleta.aguardando.length===3 && d.coleta.fechamentos.length===0);
+
   /* O MOTORISTA BIPOU 49 DE 50. Nada anda: a resposta traz a lista pra
      conferir caixa a caixa, e o canto continua com as tres. */
-  r=await chamar('POST /api/coleta/fechar',{motorista:2});
+  r=await chamar('POST /api/coleta/fechar',{motorista:2,foto:FOTO});
   ok('motorista com numero diferente NAO fecha a coleta', r.ok===false && r.motivo==='divergente'
      && r.sistema===3 && r.motorista===2, 'veio '+JSON.stringify(r));
   ok('e devolve a lista pra conferir uma a uma', Array.isArray(r.lista) && r.lista.length===3, 'veio '+JSON.stringify(r.lista));
   d=await chamar('GET /api/carregamento');
   ok('as caixas continuam esperando o caminhao', d.coleta.aguardando.length===3 && d.coleta.fechamentos.length===0);
-  r=await chamar('POST /api/coleta/fechar',{motorista:'abc'});
+  r=await chamar('POST /api/coleta/fechar',{motorista:'abc',foto:FOTO});
   ok('numero invalido e recusado', !!r.erro, 'veio '+JSON.stringify(r));
 
-  /* O numero bateu: as tres saem do canto, e o fechamento fica registrado. */
-  r=await chamar('POST /api/coleta/fechar',{motorista:3});
+  /* O numero bateu: as tres saem do canto, e o fechamento fica registrado
+     COM a foto no disco. */
+  r=await chamar('POST /api/coleta/fechar',{motorista:3,foto:FOTO});
   ok('numero igual fecha a coleta', r.ok===true && r.divergente===false && r.sistema===3, 'veio '+JSON.stringify(r));
+  const fotoArq=db.prepare('SELECT foto FROM coleta_fechamento WHERE id=?').get(r.id).foto;
+  ok('a foto ficou gravada no disco, com o id do fechamento no nome',
+     !!fotoArq && fs.existsSync(fotoArq) && fs.statSync(fotoArq).size===4000 && /coleta-\d+\.jpeg$/.test(fotoArq), 'veio '+fotoArq);
   d=await chamar('GET /api/carregamento');
   ok('o canto esvazia e o dia registra 3 retiradas', d.coleta.aguardando.length===0 && d.coleta.retiradas_hoje===3,
      'veio '+JSON.stringify(d.coleta));
-  ok('o fechamento fica na historia do dia', d.coleta.fechamentos.length===1 && d.coleta.fechamentos[0].divergente===0
-     && d.coleta.fechamentos[0].qtd_sistema===3, 'veio '+JSON.stringify(d.coleta.fechamentos));
-  r=await chamar('POST /api/coleta/fechar',{motorista:0});
+  ok('o fechamento fica na historia do dia, com foto', d.coleta.fechamentos.length===1 && d.coleta.fechamentos[0].divergente===0
+     && d.coleta.fechamentos[0].qtd_sistema===3 && d.coleta.fechamentos[0].tem_foto===1, 'veio '+JSON.stringify(d.coleta.fechamentos));
+  /* A foto volta pela rota, como imagem. */
+  {
+    let ct=null, corpo=null;
+    await new Promise(rs=>{ rotas['GET /api/coleta/foto/:id']({params:{id:r.id},body:{},headers:{}},
+      {setHeader:(k,v)=>{ if(/content-type/i.test(k)) ct=v; }, send:b=>{ corpo=b; rs(); }, status(){ return this; }, json:o=>{ corpo=o; rs(); }}); });
+    ok('a foto e servida de volta como imagem', ct==='image/jpeg' && Buffer.isBuffer(corpo) && corpo.length===4000, 'veio '+ct+' '+(corpo&&corpo.length));
+  }
+  r=await chamar('POST /api/coleta/fechar',{motorista:0,foto:FOTO});
   ok('sem caixa no canto nao ha o que fechar', r.ok===false && r.motivo==='nada', 'veio '+JSON.stringify(r));
 
   /* Fechar COM divergencia, confirmando: permitido (o caminhao nao pode ficar
-     preso), mas gravado como divergente. */
+     preso), mas gravado como divergente — e com a foto, que ai e a prova. */
   ins.run('BK150150BEGE','Dorli Beck','6261','2000014948163399',null,'["2000014948163399"]','embalado',hoje);
   db.prepare("UPDATE lote SET modalidade='coleta' WHERE nf='6261'").run();
   await chamar('POST /api/carregar',{code:'2000014948163399'});
-  r=await chamar('POST /api/coleta/fechar',{motorista:0,confirmar:true,obs:'motorista nao achou a caixa'});
+  r=await chamar('POST /api/coleta/fechar',{motorista:0,confirmar:true,obs:'motorista nao achou a caixa',foto:FOTO});
   ok('fechar confirmando a divergencia grava como divergente', r.ok===true && r.divergente===true, 'veio '+JSON.stringify(r));
   d=await chamar('GET /api/carregamento');
   ok('e o registro do dia mostra a divergencia', d.coleta.fechamentos.length===2 && d.coleta.fechamentos[0].divergente===1,

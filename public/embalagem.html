@@ -511,19 +511,21 @@ function b64(f){ return new Promise(function(r){var fr=new FileReader();fr.onloa
 async function upMany(fileList){
   var files=[].slice.call(fileList).filter(function(f){ return /pdf/i.test(f.type)||/\.pdf$/i.test(f.name); });
   if(!files.length) return;
-  var totNov=0,totRep=0,totSem=0,totPdf=0,totCol=0,ok=0;
+  var totNov=0,totRep=0,totSem=0,totPdf=0,totCol=0,totMod=0,ok=0;
   for(var i=0;i<files.length;i++){
     document.getElementById('upRes').innerHTML='Lendo '+(i+1)+' de '+files.length+': <b>'+files[i].name+'</b>…';
     try{
       var j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
       if(j.erro){ continue; }
-      totNov+=j.novos||0; totRep+=j.repetidas||0; totSem+=j.sem_sku||0; totPdf+=j.total||0; totCol+=j.coleta||0; ok++;
+      totNov+=j.novos||0; totRep+=j.repetidas||0; totSem+=j.sem_sku||0; totPdf+=j.total||0; totCol+=j.coleta||0; totMod+=j.modalidade_duvida||0; ok++;
     }catch(e){}
   }
   // Quantas o caminhão vem buscar sai aqui, na hora: é o momento de estranhar
   // um PDF de coleta que deu zero, ou um de agência que virou coleta inteiro.
+  // E se a etiqueta mudou de formato, o aviso é aqui — a gestão decide em Bloqueados.
   document.getElementById('upRes').innerHTML='<b>'+ok+' PDF(s)</b> · '+totNov+' vendas adicionadas · '+totPdf+' no total · '+totRep+' repetidas · '+totSem+' sem SKU'
-    +(totCol?' · <span class="tagC" style="margin-left:0">🚚 '+totCol+' pra coleta</span>':'');
+    +(totCol?' · <span class="tagC" style="margin-left:0">🚚 '+totCol+' pra coleta</span>':'')
+    +(totMod?'<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#efe9fb;border:2px solid #6f42c1;color:#4b2a91;font-weight:700">⚠ '+totMod+' etiqueta(s) num formato que o sistema não conhece — retidas. A gestão decide se é agência ou coleta em Admin → Bloqueados.</div>':'');
   stats(); listaPend();
 }
 (async function(){

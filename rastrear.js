@@ -407,12 +407,14 @@ async function verLote(){
   }
   T('volumes GRAVADOS no dia       : '+vols.length+'   ← uma linha por etiqueta, nunca por peca');
 
-  const bSku=vols.filter(v=>v.estagio==='bloqueado'&&!/^divergencia/.test(String(v.bloqueio||''))).length;
+  const bSku=vols.filter(v=>v.estagio==='bloqueado'&&!/^(divergencia|modalidade)/.test(String(v.bloqueio||''))).length;
   const bDiv=vols.filter(v=>v.estagio==='bloqueado'&&/^divergencia/.test(String(v.bloqueio||''))).length;
+  const bMod=vols.filter(v=>v.estagio==='bloqueado'&&/^modalidade/.test(String(v.bloqueio||''))).length;
   const todosPend=vols.filter(v=>v.estagio==='pendente'&&v.codigo);
   const andando=vols.filter(v=>v.estagio!=='pendente'&&v.estagio!=='bloqueado').length;
   T('  - retidos: SKU sem cadastro : '+bSku+(bSku?'   (Admin > Bloqueados)':''));
   T('  - retidos: divergencia      : '+bDiv+(bDiv?'   (Admin > Bloqueados, em vermelho)':''));
+  if(bMod) T('  - retidos: etiqueta em formato desconhecido (agencia ou coleta?) : '+bMod+'   (Admin > Bloqueados, em violeta — a gestao decide)');
   if(andando) T('  - ja embalados/carregados   : '+andando);
   T('  = PENDENTES                 : '+todosPend.length);
 

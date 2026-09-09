@@ -1,4 +1,10 @@
 const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro,ehColeta,AGENCIA,AGUARDA_CAMINHAO}=require('./carga');
+const fs=require('fs'), path=require('path');
+/* Onde ficam as fotos da conferencia com o motorista. Fora do git e FORA de
+   lotes/ (que o cron apaga em 7 dias): a foto e prova, e prova nao expira
+   junto com o PDF. Configuravel por ambiente so pro teste nao escrever em
+   /opt. */
+const FOTOS_DIR=process.env.PCP_COLETAS_DIR||'/opt/expedicao/coletas';
 module.exports=function(app,db){
   /* ── CONFERENCIA DUPLA (etiqueta de venda + SKU da caixa) ──────────────────
      A ultima rede antes do carro. Bipe 1 = a etiqueta de venda JA COLADA;
@@ -36,7 +42,14 @@ module.exports=function(app,db){
      Cada fechamento e uma linha aqui: quantas o sistema tinha, quantas o
      motorista disse, se bateu, e quem fechou. A divergencia fica gravada
      mesmo quando alguem decide liberar o caminhao assim mesmo — e vai pra
-     auditoria, porque e o tipo de decisao que precisa ter nome. */
+     auditoria, porque e o tipo de decisao que precisa ter nome.
+
+     O NUMERO DO MOTORISTA NAO VALE FALADO: VALE FOTOGRAFADO. Regra do dono
+     (09/09/2026): "nao adianta apenas o motorista falar a quantidade — temos
+     que ter prova da quantidade que ele bipou no sistema dele". A tela do
+     celular dele, com o numero, e fotografada pelo tablet e gravada em
+     `foto` (arquivo em FOTOS_DIR). Sem foto a rota nao fecha, nem batendo:
+     o dia em que a caixa sumir, o que decide e a foto, nao a memoria. */
   db.exec(`CREATE TABLE IF NOT EXISTS coleta_fechamento (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     fechado_em TEXT DEFAULT (datetime('now','localtime')),
@@ -45,7 +58,19 @@ module.exports=function(app,db){
     qtd_motorista INTEGER NOT NULL,
     divergente INTEGER DEFAULT 0,
     obs TEXT DEFAULT '',
-    ids TEXT DEFAULT '[]');`);
+    ids TEXT DEFAULT '[]',
+    foto TEXT);`);
+  try{ db.exec("ALTER TABLE coleta_fechamento ADD COLUMN foto TEXT"); }catch(e){}
+  try{ fs.mkdirSync(FOTOS_DIR,{recursive:true}); }catch(e){}
+  /* A foto chega como data URL (a tela ja reduziu pra ~1600 px em JPEG). Aqui
+     so se confere que E imagem e que tem conteudo — foto vazia nao e prova. */
+  function decodificarFoto(s){
+    const m=String(s||'').match(/^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=\s]+)$/i);
+    if(!m) return null;
+    const buf=Buffer.from(m[2].replace(/\s+/g,''),'base64');
+    if(buf.length<2000) return null;
+    return {ext:(m[1].toLowerCase()==='jpg'?'jpeg':m[1].toLowerCase()),buf};
+  }
 
   // bipe da etiqueta de venda -> acha o pacote pelos codigos e marca carregado
   app.post('/api/carregar',(req,res)=>{
@@ -144,7 +169,8 @@ module.exports=function(app,db){
       WHERE ${AGUARDA_CAMINHAO} ORDER BY carregado_em ASC, id ASC`).all();
     const retiradas=db.prepare(`SELECT COUNT(*) n FROM lote WHERE retirado_em IS NOT NULL
       AND date(retirado_em)=date('now','localtime')`).get().n;
-    const fechamentos=db.prepare(`SELECT id,fechado_em,fechado_por,qtd_sistema,qtd_motorista,divergente,obs
+    const fechamentos=db.prepare(`SELECT id,fechado_em,fechado_por,qtd_sistema,qtd_motorista,divergente,obs,
+        CASE WHEN foto IS NOT NULL THEN 1 ELSE 0 END tem_foto
       FROM coleta_fechamento WHERE date(fechado_em)=date('now','localtime') ORDER BY id DESC`).all();
     return {total:car+faltam.length, carregados:car, faltam,
             atrasados:faltam.filter(f=>f.atrasado).length,
@@ -170,6 +196,14 @@ module.exports=function(app,db){
       WHERE ${AGUARDA_CAMINHAO} ORDER BY carregado_em ASC, id ASC`).all();
     const n=lista.length;
     if(!n) return res.json({ok:false,motivo:'nada',aviso:'Nenhuma caixa separada pra coleta. Bipe as caixas antes de fechar.'});
+    /* SEM FOTO NAO FECHA — antes mesmo de comparar. A foto e da tela do
+       celular do motorista com a quantidade que ELE bipou; e ela que prova o
+       numero, nao o que foi dito em voz alta. Conferida antes da divergencia
+       pra pessoa nao descobrir que faltou a foto so depois de conferir 50
+       caixas uma a uma. */
+    const foto=decodificarFoto(b.foto);
+    if(!foto) return res.json({ok:false,motivo:'sem_foto',sistema:n,motorista:mot,
+      aviso:'Tire a foto da tela do celular do motorista mostrando quantas caixas ele bipou. Sem a foto a coleta nao fecha.'});
     const divergente = mot!==n;
     const quem=(req.usuario&&req.usuario.nome)||'';
     if(divergente && !b.confirmar){
@@ -179,10 +213,16 @@ module.exports=function(app,db){
       return res.json({ok:false,motivo:'divergente',sistema:n,motorista:mot,lista});
     }
     const obs=String(b.obs||'').slice(0,300);
-    let fid=null;
+    let fid=null, arq=null;
     db.transaction(()=>{
       fid=db.prepare(`INSERT INTO coleta_fechamento (fechado_por,qtd_sistema,qtd_motorista,divergente,obs,ids)
         VALUES (?,?,?,?,?,?)`).run(quem,n,mot,divergente?1:0,obs,JSON.stringify(lista.map(v=>v.id))).lastInsertRowid;
+      /* O arquivo leva o id do fechamento no nome: acha-se a foto pela linha
+         e a linha pela foto. Gravado DENTRO da transacao — se o disco recusar,
+         o fechamento nao existe, e a caixa continua no canto. */
+      arq=path.join(FOTOS_DIR,'coleta-'+fid+'.'+foto.ext);
+      fs.writeFileSync(arq,foto.buf);
+      db.prepare('UPDATE coleta_fechamento SET foto=? WHERE id=?').run(arq,fid);
       const up=db.prepare("UPDATE lote SET retirado_em=datetime('now','localtime') WHERE id=? AND retirado_em IS NULL");
       lista.forEach(v=>up.run(v.id));
     })();
@@ -191,6 +231,16 @@ module.exports=function(app,db){
         ac.auditar(req,'expedicao','coleta_fechada_divergente','fechamento '+fid,
           'sistema '+n+' / motorista '+mot+(obs?' — '+obs:'')); }catch(e){}
     }
-    res.json({ok:true,id:fid,sistema:n,motorista:mot,divergente});
+    res.json({ok:true,id:fid,sistema:n,motorista:mot,divergente,foto:'/api/coleta/foto/'+fid});
+  });
+  /* A prova, de volta: a foto de um fechamento. So a leitura — ninguem edita
+     nem apaga foto por rota; se um dia precisar, e no disco, com nome. */
+  app.get('/api/coleta/foto/:id',(req,res)=>{
+    const r=db.prepare('SELECT foto FROM coleta_fechamento WHERE id=?').get(req.params.id);
+    if(!r||!r.foto) return res.status(404).send('sem foto');
+    let ok=false; try{ ok=fs.existsSync(r.foto); }catch(e){}
+    if(!ok) return res.status(410).send('a foto nao esta mais no disco');
+    res.setHeader('Content-Type', /\.png$/i.test(r.foto)?'image/png':(/\.webp$/i.test(r.foto)?'image/webp':'image/jpeg'));
+    res.send(fs.readFileSync(r.foto));
   });
 };
