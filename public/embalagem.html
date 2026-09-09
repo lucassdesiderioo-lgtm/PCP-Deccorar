@@ -103,6 +103,13 @@
       </div>
     </div>
     <div>
+      <!-- O QUE FICOU FORA DA FILA vem ANTES da fila. Em 09/09/2026 a fila
+           dizia 49 e o Mercado Livre 50: a unidade estava retida por
+           divergencia de leitura e so a aba Bloqueados do admin sabia. Quem
+           olha "Faltam imprimir" tem que ver, no mesmo lugar, o que NAO esta
+           ali — senao a lista parece o dia inteiro e a peca fica na
+           prateleira. Vermelho porque e caixa que nao sai; some quando zera. -->
+      <div class="card" id="blqBox" style="margin-bottom:16px;display:none;border:2px solid var(--red);background:#fbe9e8"></div>
       <div class="card"><div class="ttl">Faltam imprimir</div><div id="pendLista"></div></div>
       <div class="card" id="futBox" style="margin-top:16px;display:none;border-left:4px solid #7aa3d8"></div>
     </div>
@@ -166,12 +173,50 @@ async function stats(){
     // procurar o que fazer; isto encerra a dúvida.
     h='<b style="font-size:22px;color:var(--green)">✓ Acabou por hoje</b>';
   }
+  // O BLOQUEADO ENTRA NA MESMA LINHA DO NUMERO QUE MANDA, em vermelho: e o que
+  // falta pra fila fechar com o Mercado Livre. "49 pra imprimir · 1 bloqueado"
+  // e a conta inteira; "49 pra imprimir" sozinho e o que fez o gestor passar a
+  // manha procurando a 50ª venda (09/09/2026).
+  if(d.bloqueados>0) h+='<span style="color:var(--red);font-weight:700"> · '+d.bloqueados+' bloqueado'+(d.bloqueados>1?'s':'')+' fora da fila</span>';
   var ctx=[];
   if(d.futuros>0) ctx.push(d.futuros+' pra adiantar');
   if(d.impressas_hoje>0) ctx.push(d.impressas_hoje+' já saíram hoje');
   if(ctx.length) h+='<div style="color:var(--muted);font-size:14px;margin-top:4px">'+ctx.join(' · ')+'</div>';
   el.innerHTML='<div style="text-align:center;margin:-6px 0 14px">'+h+'</div>';
 }
+
+// ── Bloqueados: o que existe e NÃO está na fila ─────────────────────────────
+// Nome, NF, SKU, prazo e o motivo em uma linha, e para onde ir. A bancada não
+// resolve daqui (é preciso abrir o pedido no ML, ou cadastrar o SKU) — mas
+// precisa SABER que a venda existe, senão a fila vira o dia inteiro e o cliente
+// espera uma caixa que ninguém está procurando.
+async function listaBloq(){
+  var l=[]; try{ l=await (await fetch('/api/bloqueados/lista')).json(); }catch(e){ return; }
+  var el=document.getElementById('blqBox'); if(!el) return;
+  if(!Array.isArray(l)||!l.length){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='';
+  var hoje=l.filter(function(v){ return v.hoje; }).length;
+  var h='<div style="font-weight:800;color:var(--red);font-size:15px;text-transform:uppercase;letter-spacing:.4px">⛔ '+l.length+' bloqueado'+(l.length>1?'s':'')+' — não '+(l.length>1?'estão':'está')+' na fila</div>'
+    +'<div style="font-size:13px;color:#7a2020;margin:4px 0 8px">'
+    +(hoje?'<b>'+hoje+' com despacho pra hoje ou vencido.</b> ':'')
+    +'Não imprime e não carrega até alguém resolver em <b>Admin → Bloqueados</b>.</div>';
+  var mostra=l.slice(0,8);
+  for(var i=0;i<mostra.length;i++){
+    var v=mostra[i];
+    h+='<div style="padding:8px 0;border-top:1px solid #efb1ad">'
+      +'<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">'
+      +'<b style="font-size:15px">'+esc(v.buyer||'—')+'</b>'
+      +'<span style="font-size:12px;color:#7a2020;white-space:nowrap">'+(v.despachar_em?('despacha '+esc(dataBR(v.despachar_em))+(v.hoje?' · <b>HOJE</b>':'')):'sem prazo lido')+'</span></div>'
+      +'<div style="font-size:13px;margin-top:2px">NF <b>'+esc(v.nf||'—')+'</b> · <span class="sku">'+esc(v.codigo||'(sem SKU)')+'</span>'
+      +' · <span style="color:#7a2020">'+esc(v.motivo)+'</span></div>'
+      +'</div>';
+  }
+  if(l.length>mostra.length) h+='<div style="font-size:12px;color:#7a2020;padding-top:6px">e mais '+(l.length-mostra.length)+' — a lista completa está em Admin → Bloqueados.</div>';
+  h+='<div style="margin-top:8px"><a href="/#blq" class="link" style="margin:0;background:#fff;color:var(--red);border-color:#efb1ad;font-weight:700">Abrir Admin → Bloqueados</a></div>';
+  el.innerHTML=h;
+}
+setInterval(listaBloq,15000);
+listaBloq();
 async function scanSku(sku){
   sku=(sku||'').trim().toUpperCase(); if(!sku) return;
   const now=Date.now(); if(last.c===sku && now-last.t<700) return; last={c:sku,t:now};
@@ -484,17 +529,34 @@ function b64(f){ return new Promise(function(r){var fr=new FileReader();fr.onloa
 async function upMany(fileList){
   var files=[].slice.call(fileList).filter(function(f){ return /pdf/i.test(f.type)||/\.pdf$/i.test(f.name); });
   if(!files.length) return;
-  var totNov=0,totRep=0,totSem=0,totPdf=0,ok=0;
+  var totNov=0,totRep=0,totSem=0,totPdf=0,totBloq=0,totDiv=0,ok=0;
   for(var i=0;i<files.length;i++){
     document.getElementById('upRes').innerHTML='Lendo '+(i+1)+' de '+files.length+': <b>'+files[i].name+'</b>…';
     try{
       var j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
       if(j.erro){ continue; }
-      totNov+=j.novos||0; totRep+=j.repetidas||0; totSem+=j.sem_sku||0; totPdf+=j.total||0; ok++;
+      totNov+=j.novos||0; totRep+=j.repetidas||0; totSem+=j.sem_sku||0; totPdf+=j.total||0;
+      totBloq+=j.bloqueados||0; totDiv+=j.divergencias||0; ok++;
     }catch(e){}
   }
-  document.getElementById('upRes').innerHTML='<b>'+ok+' PDF(s)</b> · '+totNov+' vendas adicionadas · '+totPdf+' no total · '+totRep+' repetidas · '+totSem+' sem SKU';
-  stats(); listaPend();
+  /* A CONTA QUE FECHA COM O MERCADO LIVRE, escrita por extenso. "50 vendas
+     adicionadas" e o numero que se compara com o painel do ML; quantas
+     dessas entraram na fila e quantas ficaram RETIDAS vem logo ao lado, em
+     vermelho, porque e a parte que a fila nao mostra. Sem isso o gestor
+     compara 50 com 49 e sai cacando uma venda que nao esta perdida. */
+  var fila=totNov-totBloq;
+  var h='<b>'+ok+' PDF(s)</b> · <b>'+totNov+' venda'+(totNov===1?'':'s')+' adicionada'+(totNov===1?'':'s')+'</b>'
+    +' (confira com o Mercado Livre) · '+totRep+' repetida'+(totRep===1?'':'s')+' · '+totPdf+' etiquetas lidas';
+  if(totBloq>0){
+    h+='<div style="margin-top:6px;color:var(--red);font-weight:700">⛔ '+totBloq+' retida'+(totBloq>1?'s':'')+' — '+fila+' na fila'
+      +(totDiv>0?' · '+totDiv+' por dúvida na leitura (precisa abrir o pedido no ML)':'')
+      +(totBloq-totDiv>0?' · '+(totBloq-totDiv)+' por SKU sem cadastro':'')
+      +' · <a href="/#blq" style="color:var(--red)">Admin → Bloqueados</a></div>';
+  } else if(totSem>0){
+    h+=' · '+totSem+' sem SKU';
+  }
+  document.getElementById('upRes').innerHTML=h;
+  stats(); listaPend(); listaBloq();
 }
 (async function(){
   try{

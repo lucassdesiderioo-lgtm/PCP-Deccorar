@@ -23,7 +23,7 @@ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'pcp-carga-'));
 const db=new Database(path.join(tmp,'t.db'));
 db.exec(`CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT, buyer TEXT,
   city TEXT, nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', estagio TEXT, data TEXT,
-  carregado_em TEXT, despachar_em TEXT);`);
+  carregado_em TEXT, despachar_em TEXT, bloqueio TEXT);`);
 const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
 const ontem=db.prepare("SELECT date('now','localtime','-1 day') d").get().d;
 const ins=db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,codes,estagio,data)
@@ -111,6 +111,21 @@ const ok=(n,c,extra)=>{ casos++;
      'veio '+JSON.stringify(d.faltam.map(f=>f.buyer)));
   ok('a venda futura nao entra na lista nem some', d.adiantadas===1 && !d.faltam.some(f=>f.buyer==='Lucelia'),
      'veio faltam='+JSON.stringify(d.faltam.map(f=>f.buyer))+' depois='+JSON.stringify(d.depois.map(f=>f.buyer)));
+
+  /* O BLOQUEADO COM PRAZO PRA HOJE APARECE NA CARGA (09/09/2026: a fila dizia
+     49, o ML 50, e a 50ª estava retida sem nenhuma tela de operacao saber).
+     Pedro Lima esta bloqueado, sem data de despacho lida — que a fila trata
+     como "hoje". Ele nao esta em `faltam` (nunca foi impresso) e por isso tem
+     que vir numa lista propria, com o motivo; e um bloqueado de semana que vem
+     nao e assunto do carro. */
+  ok('o bloqueado de hoje vem na carga, fora de faltam, com motivo',
+     d.bloqueados_total===1 && d.bloqueados.length===1 && d.bloqueados[0].buyer==='Pedro Lima'
+       && d.bloqueados[0].motivo==='SKU sem cadastro' && !d.faltam.some(f=>f.buyer==='Pedro Lima'),
+     'veio '+JSON.stringify(d.bloqueados));
+  db.prepare("UPDATE lote SET despachar_em=date('now','localtime','+7 day') WHERE buyer='Pedro Lima'").run();
+  d=await chamar('GET /api/carregamento');
+  ok('bloqueado com prazo pra frente conta no total mas nao na carga de hoje',
+     d.bloqueados_total===1 && d.bloqueados.length===0, 'veio '+JSON.stringify(d.bloqueados));
 
   db.close();
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}

@@ -1,6 +1,7 @@
 const express=require('express'); const fs=require('fs');
 const {parsePdf}=require('./parse'); const {PDFDocument}=require('pdf-lib');
 const {futuro}=require('./carga');
+const BLOQ=require('./bloqueados');
 module.exports=function(app,db){
   db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
@@ -308,8 +309,22 @@ module.exports=function(app,db){
        ele nao aparecia, e o placar do dia saia menor do que o dia rendeu. */
     const imp=db.prepare(`SELECT COUNT(*) c FROM lote
       WHERE embalado_em IS NOT NULL AND date(embalado_em)=date('now','localtime')`).get().c;
-    res.json({hoje,atrasados:atras,futuros:fut,impressas_hoje:imp});
+    /* O BLOQUEADO VAI JUNTO COM A FILA, porque ele e o que a fila NAO mostra.
+       Em 09/09/2026 o ML dizia 50 e a tela 49: a unidade estava retida por
+       divergencia e so aparecia na aba Bloqueados do admin. Quem le "49 pra
+       imprimir" tem que ler, na mesma linha, "1 bloqueado" — senao 49 parece o
+       dia inteiro e a peca fica na prateleira. Conta no bloqueados.js, dono
+       unico, a mesma da TV e do carregamento. */
+    const bloq=BLOQ.resumo(db);
+    res.json({hoje,atrasados:atras,futuros:fut,impressas_hoje:imp,
+              bloqueados:bloq.total,bloqueados_hoje:bloq.hoje,
+              divergencias:bloq.divergencias,sem_cadastro:bloq.sem_cadastro});
   });
+  /* A LISTA DO QUE ESTA RETIDO, para a bancada da Etiqueta de Venda.
+     Nome, NF, SKU, prazo e o motivo em uma linha — o que a pessoa precisa para
+     saber que a venda existe, que nao esta na fila, e para onde ir resolver.
+     Mesma permissao da lista de impressos: carrega nome de cliente e NF. */
+  app.get('/api/bloqueados/lista',(req,res)=> res.json(BLOQ.lista(db)));
   /* O QUE VEM PELA FRENTE — venda ja faturada com prazo de despacho futuro.
      Fica fora da fila do dia de proposito: cobrar hoje o que so vence em tres
      semanas e o que ensina a equipe a ignorar a fila inteira. Mas nao pode

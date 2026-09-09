@@ -99,13 +99,27 @@ async function carregar(){
   /* A venda futura aparece, mas fora da cobranca: ela existe e esta na
      fabrica (nao pode sumir, foi esse o buraco), so nao e carga de hoje. */
   var dp=document.getElementById('depois');
-  if(dp) dp.innerHTML = d.adiantadas
+  if(dp) dp.innerHTML = (d.adiantadas
     ? '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#eef3fb;'
       +'border:1px solid #c9d8ee;font-size:14px">📅 <b>'+d.adiantadas+'</b> com etiqueta impressa '
       +'que <b>só despacham depois</b> — não vão no carro hoje: '
       +d.depois.slice(0,6).map(function(f){ return esc0(f.buyer)+' ('+dataBR(f.despachar_em)+')'; }).join(', ')
       +(d.depois.length>6?'…':'')+'</div>'
-    : '';
+    : '') + avisoBloq(d);
+}
+/* O BLOQUEADO COM PRAZO PRA HOJE NAO VAI NO CARRO, e quem fecha a carga tem
+   que ver isso na mesma tela. Ele nunca foi impresso, entao nao esta em
+   "Faltam carregar" — e em 09/09/2026 foi assim que a fila fechou em 49 com
+   o Mercado Livre dizendo 50. A lista so traz os de hoje (ou vencidos): o
+   bloqueado de semana que vem e assunto do admin, nao do carro. */
+function avisoBloq(d){
+  var l=(d&&d.bloqueados)||[];
+  if(!l.length) return '';
+  return '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#fbe9e8;'
+    +'border:2px solid var(--red);font-size:14px">⛔ <b>'+l.length+' bloqueado'+(l.length>1?'s':'')+' com despacho pra hoje</b> '
+    +'— sem etiqueta, <b>não '+(l.length>1?'vão':'vai')+' no carro</b>: '
+    +l.slice(0,6).map(function(f){ return esc0(f.buyer)+' (NF '+esc0(f.nf||'—')+' · '+esc0(f.motivo)+')'; }).join(', ')
+    +(l.length>6?'…':'')+'. Resolve em <b>Admin → Bloqueados</b>.</div>';
 }
 function esc0(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
@@ -113,11 +127,20 @@ async function conferir(){
   const d=await (await fetch('/api/carregamento')).json();
   /* "Sem lote" olha o que FALTA, nao o dia: com volume atrasado esperando, o
      aviso de dia vazio mandaria fechar o carro por cima dele. */
-  if(d.total===0){ banner('warn','Nada pra carregar','Nenhum volume embalado esperando.'); return; }
-  if(d.faltam.length===0){ banner('ok','Carga completa ✓','Pode fechar o carro. '+d.carregados+' pacotes conferidos.'); beep(true); }
+  /* Bloqueado de hoje NAO e "carga completa": a caixa nao existe ainda, mas a
+     venda existe e vence hoje. Fechar o carro sem dizer isso e o silencio que
+     parece "tudo certo" — o cliente e o ML avisam depois. */
+  var nb=((d.bloqueados)||[]).length;
+  if(d.total===0 && !nb){ banner('warn','Nada pra carregar','Nenhum volume embalado esperando.'); return; }
+  if(d.faltam.length===0 && nb){ banner('err','Carga do dia incompleta',
+    '<b>'+nb+' venda'+(nb>1?'s':'')+' de hoje '+(nb>1?'estão bloqueadas':'está bloqueada')+'</b> e sem etiqueta: '
+    +d.bloqueados.slice(0,6).map(function(f){ return esc0(f.buyer)+' (NF '+esc0(f.nf||'—')+')'; }).join(', ')
+    +'. Resolve em <b>Admin → Bloqueados</b> antes de fechar o carro.'); beep(false); }
+  else if(d.faltam.length===0){ banner('ok','Carga completa ✓','Pode fechar o carro. '+d.carregados+' pacotes conferidos.'); beep(true); }
   else{ banner('err','Faltam '+d.faltam.length+' no carro',
     (d.atrasados?'<b>'+d.atrasados+' de dias anteriores.</b> ':'')
-    +'NÃO feche ainda: '+d.faltam.slice(0,6).map(f=>f.buyer).join(', ')+(d.faltam.length>6?'…':'')); beep(false); }
+    +'NÃO feche ainda: '+d.faltam.slice(0,6).map(f=>f.buyer).join(', ')+(d.faltam.length>6?'…':'')
+    +(nb?'<br><b>E mais '+nb+' bloqueado'+(nb>1?'s':'')+' de hoje sem etiqueta</b> — Admin → Bloqueados.':'')); beep(false); }
 }
 const scan=$('#scan');
 /* preventScroll: devolver o foco nao pode arrastar a tela. O #scan mora no

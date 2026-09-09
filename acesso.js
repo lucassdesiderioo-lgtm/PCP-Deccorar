@@ -445,6 +445,9 @@ module.exports = function(app, db){
     // e gateada — a lista de impressos carrega comprador, cidade e NF, que e
     // dado de cliente, nao numero de operacao.
     if(eq('/api/impressos') || eq('/api/reimprimir')) return 'etiqueta.emitir';
+    // A lista de bloqueados da bancada: nome de cliente e NF, como a de
+    // impressos — mesma permissao. O admin ve o mesmo em /api/divergencias.
+    if(eq('/api/bloqueados/lista')) return 'etiqueta.emitir';
     // Divergencia de leitura da folha: ver e do admin; RESOLVER exige a mesma
     // permissao de quem hoje destrava bloqueado cadastrando SKU — e a mesma
     // decisao, "qual peca e essa", tomada olhando o pedido no Mercado Livre.
@@ -636,7 +639,7 @@ module.exports = function(app, db){
     ['GET','/planejamento'],['GET','/acessos'],['GET','/baixar-backup'],
     ['POST','/api/revisao'],['POST','/api/rejeicao'],['POST','/api/montagem'],['POST','/api/embalar'],
     ['POST','/api/carregar'],['POST','/api/lote/upload'],['GET','/api/print/:id'],
-    ['GET','/api/impressos'],['POST','/api/reimprimir'],
+    ['GET','/api/impressos'],['POST','/api/reimprimir'],['GET','/api/bloqueados/lista'],
     ['GET','/api/divergencias'],['POST','/api/divergencias/resolver'],
     ['GET','/api/auditoria/skus'],['POST','/api/devolucao'],
     ['POST','/api/devolucao/baixa'],['POST','/api/estoque'],['POST','/api/alvo'],

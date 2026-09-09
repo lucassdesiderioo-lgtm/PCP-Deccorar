@@ -35,7 +35,7 @@ db.exec(`
     criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0);
   CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, estagio TEXT DEFAULT 'pendente',
     embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')),
-    teste INTEGER DEFAULT 0);
+    teste INTEGER DEFAULT 0, bloqueio TEXT, despachar_em TEXT);
   CREATE TABLE ajuste_estoque (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, antes INTEGER,
     depois INTEGER, delta INTEGER, motivo TEXT, obs TEXT, usuario_id INTEGER, usuario_nome TEXT,
     criado_em TEXT DEFAULT (datetime('now','localtime')), data TEXT DEFAULT (date('now','localtime')),

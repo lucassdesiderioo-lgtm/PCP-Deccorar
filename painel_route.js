@@ -31,6 +31,7 @@
  */
 const DEMANDA = require('./demanda_dominio');
 const ORDEM_DIA = require('./ordem_dia');
+const BLOQ = require('./bloqueados');
 
 module.exports = function(app, db){
 
@@ -88,6 +89,13 @@ module.exports = function(app, db){
     // a data local do banco e nao depender do relogio do navegador.
     const rp = db.prepare("SELECT COUNT(*) q, ROUND(AVG(segundos)) t FROM revisao WHERE data=date('now','localtime')").get();
     const ep = db.prepare("SELECT COUNT(*) q, ROUND(AVG(segundos)) t FROM montagem WHERE data=date('now','localtime')").get();
-    res.json({ linhas, prod:{ rev_qtd:rp.q||0, rev_tmedio:rp.t||0, emb_qtd:ep.q||0, emb_tmedio:ep.t||0 } });
+    /* BLOQUEADOS na TV: e o numero que a fila nao mostra. Em 09/09/2026 a
+       fila dizia 49 e o ML 50; a unidade estava retida e so a aba Bloqueados
+       do admin sabia. A TV e lida de longe pelo gestor — se o numero e zero
+       vira traco cinza, se nao e, e vermelho e ele vai olhar. Conta do
+       bloqueados.js, dono unico, a mesma da Etiqueta de Venda. */
+    const bloq = BLOQ.resumo(db);
+    res.json({ linhas, prod:{ rev_qtd:rp.q||0, rev_tmedio:rp.t||0, emb_qtd:ep.q||0, emb_tmedio:ep.t||0 },
+               bloqueados: bloq.total, bloqueados_hoje: bloq.hoje });
   });
 };

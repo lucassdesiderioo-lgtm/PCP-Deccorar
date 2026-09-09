@@ -130,6 +130,30 @@ function conferir(nome,cond,detalhe){
       !!r.body.erro && v.estagio==='bloqueado', JSON.stringify(r.body));
     fechar(ctx);
   }
+  /* O RETIDO APARECE ONDE A FILA APARECE (armadilha #10, o caso da Rafaela):
+     a Etiqueta de Venda le /api/fila/resumo e /api/bloqueados/lista. O resumo
+     tem que contar o bloqueado separado da fila, e a lista tem que trazer o
+     motivo curto certo — "nome da etiqueta difere da folha" manda a pessoa
+     abrir o pedido no ML, nao cadastrar SKU. Resolvido, some dos dois. */
+  {
+    const ctx=await montar(); const db=ctx.db;
+    const id=bloquear(db,'comprador nao bate: etiqueta "Rafaela Silva de Santana" / folha "Rafiaela Silva De Santana"','BK160140BEGE');
+    db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio) VALUES ('BK140140BEGE','Na Fila','5002','1','2','pendente')`).run();
+    let r=await chamar(ctx,'GET','/api/fila/resumo');
+    conferir('o resumo da fila conta o bloqueado fora da fila',
+      r.body.hoje===1 && r.body.bloqueados===1 && r.body.divergencias===1 && r.body.sem_cadastro===0, JSON.stringify(r.body));
+    r=await chamar(ctx,'GET','/api/bloqueados/lista');
+    const v=(r.body||[])[0]||{};
+    conferir('a lista da bancada traz nome, NF e o motivo curto certo',
+      r.body.length===1 && v.buyer==='Cliente Teste' && v.nf==='5001' && v.tipo==='divergencia'
+        && v.motivo==='nome da etiqueta difere da folha' && v.hoje===1, JSON.stringify(r.body));
+    await chamar(ctx,'POST','/api/divergencias/resolver',{id,codigo:'BK160140BEGE'});
+    r=await chamar(ctx,'GET','/api/fila/resumo');
+    const l=await chamar(ctx,'GET','/api/bloqueados/lista');
+    conferir('resolvido, sai do resumo e da lista e entra na fila',
+      r.body.hoje===2 && r.body.bloqueados===0 && l.body.length===0, JSON.stringify(r.body)+' '+JSON.stringify(l.body));
+    fechar(ctx);
+  }
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));
   process.exit(falhas?1:0);

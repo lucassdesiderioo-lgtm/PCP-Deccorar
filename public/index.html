@@ -353,6 +353,15 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.t==="rel" && ifr && !ifr.dataset.l){ ifr.src="/relatorios"; ifr.dataset.l=1; }
   if(t.dataset.t==="acs" && ifa && !ifa.dataset.l){ ifa.src="/acessos"; ifa.dataset.l=1; }
 });
+/* ABRIR UMA ABA PELA URL ("/#blq"). O aviso de bloqueados na Etiqueta de Venda
+   e no Carregamento manda a pessoa para "Admin -> Bloqueados"; mandar so para
+   "/" e deixar ela procurar a aba entre quinze e o mesmo que nao mandar. */
+(function(){
+  var h=(location.hash||"").replace(/^#/,"");
+  if(!h) return;
+  var t=document.querySelector('.tab[data-t="'+h+'"]');
+  if(t) t.click();
+})();
 async function carregar(){
   await carregarListas();   // antes do renderCad: a lista de SKU mostra o nome do modelo
   SKUS=await (await fetch('/api/skus')).json();
@@ -2039,19 +2048,27 @@ function b64(f){ return new Promise(function(r){ var fr=new FileReader(); fr.onl
 async function upMany(fl){
   var files=[].slice.call(fl).filter(function(f){ return /pdf/i.test(f.type)||/\.pdf$/i.test(f.name); });
   if(!files.length) return;
-  var nov=0,rep=0,bloq=0,ok=0;
+  var nov=0,rep=0,bloq=0,divs=0,ok=0;
   for(var i=0;i<files.length;i++){
     document.getElementById('res').innerHTML='Lendo '+(i+1)+' de '+files.length+'...';
     try{
       var j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
       if(j.erro) continue;
-      nov+=j.novos; rep+=j.repetidas; bloq+=(j.bloqueados||0); ok++;
+      nov+=j.novos; rep+=j.repetidas; bloq+=(j.bloqueados||0); divs+=(j.divergencias||0); ok++;
     }catch(e){}
   }
-  var msg='<b>'+ok+' PDF(s)</b> - '+nov+' vendas novas, '+rep+' repetidas';
-  if(bloq>0) msg+=', <b style="color:#ff6b6b">'+bloq+' BLOQUEADAS</b> (SKU fora do cadastro)';
+  /* A CONTA QUE FECHA COM O MERCADO LIVRE: "vendas novas" e o numero que se
+     compara com o painel do ML; a parte RETIDA vem ao lado, em vermelho, com
+     o motivo certo — divergencia de leitura nao se resolve cadastrando SKU, e
+     o texto antigo ("SKU fora do cadastro") mandava a pessoa pro lugar errado. */
+  var msg='<b>'+ok+' PDF(s)</b> - '+nov+' vendas novas (confira com o Mercado Livre), '+rep+' repetidas';
+  if(bloq>0){
+    msg+=', <b style="color:#ff6b6b">'+bloq+' RETIDA'+(bloq>1?'S':'')+'</b> — '+(nov-bloq)+' na fila';
+    if(divs>0) msg+=' · '+divs+' por dúvida na leitura (abrir o pedido no ML e escolher, na aba Bloqueados)';
+    if(bloq-divs>0) msg+=' · '+(bloq-divs)+' por SKU sem cadastro';
+  }
   document.getElementById('res').innerHTML=msg;
-  verCruz();
+  verCruz(); carregarBloq();
 }
 async function verCruz(){
   var l=[]; try{ l=await (await fetch('/api/cruzamento')).json(); }catch(e){}

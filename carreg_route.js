@@ -1,4 +1,5 @@
 const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro}=require('./carga');
+const BLOQ=require('./bloqueados');
 module.exports=function(app,db){
   /* ── CONFERENCIA DUPLA (etiqueta de venda + SKU da caixa) ──────────────────
      A ultima rede antes do carro. Bipe 1 = a etiqueta de venda JA COLADA;
@@ -103,9 +104,18 @@ module.exports=function(app,db){
        andava: a tela ficava dizendo que ele nao tinha feito nada. */
     const car=db.prepare(`SELECT COUNT(*) n FROM lote WHERE carregado_em IS NOT NULL
       AND date(carregado_em)=date('now','localtime')`).get().n;
+    /* O BLOQUEADO COM PRAZO PRA HOJE NAO VAI NO CARRO, e a tela tem que dizer
+       isso ANTES de alguem fechar a carga. Ele nunca foi impresso, entao nao
+       esta em `faltam` — e sem esta linha "carga completa" seria mentira: o
+       carro fecha com uma venda do dia parada na prateleira, e o cliente e o
+       Mercado Livre e que avisam. Conta do bloqueados.js, a mesma da Etiqueta
+       de Venda; a lista vem so com os de hoje, que sao os que importam aqui. */
+    const bloq=BLOQ.resumo(db);
+    const bloqueados=BLOQ.lista(db).filter(v=>v.hoje);
     return {total:car+faltam.length, carregados:car, faltam,
             atrasados:faltam.filter(f=>f.atrasado).length,
-            depois, adiantadas:depois.length};
+            depois, adiantadas:depois.length,
+            bloqueados_total:bloq.total, bloqueados};
   }
   // conferencia: o que falta carregar — todo `embalado`, com o atrasado marcado
   app.get('/api/carregamento',(req,res)=> res.json(progresso()));

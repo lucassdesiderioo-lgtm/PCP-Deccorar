@@ -402,15 +402,34 @@ importa.
 | **O nome partido pelo PDF** | 3 (Dona Lizete) | A etiqueta traz `Dona Lizete (CONTADOR)`; o pdf.js quebrou a linha e sobrou `CONTADOR)`. A remontagem só olhava fragmento **começando** com `(` — o que chega com o `)` órfão não era remontado, e a palavra `CONTADOR)` virava o comprador |
 | **Cor com nome comercial** | 5 (Tóquio 004 / 002) | `Tóquio 004 - Cinza com acabamento branco` e um SKU `CINZA` dizem a **mesma** coisa. O código não contém a frase inteira, então a conferência procurava outra cor e achava a própria |
 | **Letra dobrada no nome** | 1 (Ryta) | `Rufiino` na etiqueta × `Rufino` na folha — digitação do próprio ML, não troca de cliente |
+| **O "i" depois do "f"** (09/09/2026) | 1 (Rafaela) | Etiqueta e DANFE `Rafaela Silva de Santana`, folha `Rafiaela Silva De Santana`. Não é digitação: a fonte da folha desenha o `f` minúsculo com ligadura e o pdf.js lê `fi` — no mesmo PDF o cabeçalho sai `Identifiicação` e uma etiqueta sai `Refierencia`. O caso da Ryta era este mesmo defeito, escondido pela letra repetida |
 
-**O reparo de cada um é de precisão, não de afrouxamento** — os três casos reais
-continuam retidos, e há teste para isso (casos 12 a 14 do `teste_parse.js`):
+**O reparo de cada um é de precisão, não de afrouxamento** — os casos reais
+continuam retidos, e há teste para isso (casos 12 a 15 do `teste_parse.js`):
 
 - `nomeDaEtiqueta()` vira o dono único da leitura do comprador e remonta o nome
   também quando o fragmento traz `)` sem `(`.
 - A conferência 4 só acusa quando a cor do código **não aparece** no texto do
   anúncio. Anúncio `Bege` contra SKU `CINZA` continua retido.
-- A conferência 2 tolera **letra repetida**, e só isso.
+- A conferência 2 tolera **letra repetida** e o **`i` colado depois de um `f`**
+  (`mesmoNomeComIDepoisDoF`), e só isso. Cada função desfaz **um** defeito
+  conhecido do documento e exige igualdade; `Sofia`/`Sonia` e
+  `Rafael`/`Rafaela` continuam sendo duas pessoas.
+
+> ⚠️ **O VOLUME RETIDO TEM QUE APARECER ONDE A FILA APARECE.** Em 09/09/2026 o
+> Mercado Livre dizia 50 vendas e a Etiqueta de Venda dizia 49. A 50ª estava no
+> sistema o tempo todo — a Rafaela, retida pela conferência 2 — mas só a aba
+> Bloqueados do admin sabia. O gestor passou a manhã comparando os PDFs com o
+> ML procurando uma venda que não estava perdida. Desde então `bloqueados.js` é
+> o **dono único** de "o que está retido", e o número sai em quatro lugares:
+> na linha de resumo da Etiqueta de Venda (`49 pra imprimir · 1 bloqueado fora
+> da fila`) com um card vermelho listando nome, NF, SKU, prazo e motivo; no
+> resultado do upload (`50 vendas adicionadas · 1 retida — 49 na fila`); no
+> Carregamento, onde bloqueado com despacho pra hoje impede o "carga completa";
+> e na TV (`painel_route.js`), como KPI vermelho. **Vermelho porque é caixa que
+> não sai, e some quando zera** — não é alarme diário. A operação não resolve
+> dali (é preciso abrir o pedido no ML ou cadastrar o SKU), mas precisa **saber
+> que a venda existe**, senão a fila parece o dia inteiro.
 
 > ⚠️ **A TOLERAÇÃO DO NOME NÃO PODE SER DISTÂNCIA DE EDIÇÃO.** "Até 2 letras de
 > diferença" resolveria o caso da Ryta e abriria um buraco no lugar exato onde
@@ -454,7 +473,10 @@ O volume divergente:
 - **não é solto pelo destravamento automático do §6** — cadastrar SKU não resolve
   uma dúvida sobre *qual peça o cliente comprou* (guarda no `server.js`);
 - sai só por `POST /api/divergencias/resolver`, depois de alguém abrir o pedido no
-  Mercado Livre e escolher. Aparece na aba **Bloqueados** do admin, em vermelho.
+  Mercado Livre e escolher. Aparece na aba **Bloqueados** do admin, em vermelho
+  (`/#blq` abre a aba direto — é o link que a Etiqueta de Venda e o
+  Carregamento mostram), e é **contado** na Etiqueta de Venda, no Carregamento e
+  na TV pelo `bloqueados.js` (armadilha #10, o caso da Rafaela).
 
 ### Como o volume retido volta a andar (Bloqueados → escolher)
 
@@ -1227,7 +1249,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (12 casos), `teste_carga.js` (18), `teste_divergencia.js` (15) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (13), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (13 casos), `teste_carga.js` (20), `teste_divergencia.js` (18) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (13), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
 | 11 | **A investigar: o que é o `Quantidade` da folha** — a regra é uma venda = uma etiqueta = uma persiana (§5), então esse campo não deveria vir maior que 1. Ninguém decide nada com ele hoje. Falta abrir um PDF real com `Quantidade > 1` e entender o que aquele número diz | Baixo enquanto nada o usar — mas é uma pergunta sem resposta sobre o documento de origem |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 

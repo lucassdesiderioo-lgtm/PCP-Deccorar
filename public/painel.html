@@ -37,6 +37,10 @@
     <div class="kpi prod"><div class="n" id="kProd">0</div><div class="l">Produzido</div></div>
     <div class="kpi emb"><div class="n" id="kEmb">0</div><div class="l">Embalado</div></div>
     <div class="kpi car"><div class="n" id="kCar">0</div><div class="l">Carregado</div></div>
+    <!-- O que a fila NAO mostra. Zero vira traco cinza (nada a fazer); acima
+         de zero e vermelho, porque e venda parada que so a aba Bloqueados do
+         admin via ate 09/09/2026 — o dia em que a fila disse 49 e o ML 50. -->
+    <div class="kpi" id="kBloqBox" title="Volumes retidos no upload (SKU sem cadastro ou dúvida na leitura da folha). Não imprimem nem carregam até alguém resolver em Admin → Bloqueados."><div class="n zero" id="kBloq">—</div><div class="l">Bloqueados</div></div>
   </div>
   <div class="sub" style="margin:2px 0 8px;font-weight:700;color:var(--txt);font-size:13px">Produtividade do dia</div>
   <div class="cards">
@@ -84,6 +88,9 @@ async function load(){
   }).join('');
   $('#corpo').innerHTML=rows||'<tr><td colspan="9" style="color:#8b97a5;padding:20px;text-align:center">Sem dados hoje.</td></tr>';
   $('#kDem').textContent=dem;$('#kEst').textContent=est;$('#kProd').textContent=prod;$('#kEmb').textContent=emb;$('#kCar').textContent=car;
+  var nb=+d.bloqueados||0, kb=$('#kBloq');
+  kb.innerHTML = nb ? (nb+(d.bloqueados_hoje?'<span style="font-size:13px;font-weight:600"> · '+d.bloqueados_hoje+' pra hoje</span>':'')) : '—';
+  kb.className = 'n '+(nb?'baixo':'zero');
   $('#kRev').textContent=p.rev_qtd||0; $('#kRevT').textContent=fmtS(p.rev_tmedio);
   $('#kEmbP').textContent=p.emb_qtd||0; $('#kEmbT').textContent=fmtS(p.emb_tmedio);
   $('#upd').textContent='Atualizado '+new Date().toLocaleTimeString('pt-BR');
