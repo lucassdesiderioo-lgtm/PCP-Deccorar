@@ -19,8 +19,35 @@
      e ter que rolar a tela entre uma e outra é atrito a cada volume.
      Abaixo de 900px empilha sozinho: a regra de ouro continua sendo o campo de
      bipe em primeiro lugar. */
-  .colunas{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;align-items:start}
-  @media(max-width:900px){ .colunas{grid-template-columns:1fr} }
+  /* TRES COLUNAS desde 10/09/2026: bipe | Agência | Coleta. As duas portas de
+     saída (§8-B) viraram duas listas lado a lado, porque o operador separa a
+     caixa fisicamente — carro ou canto do caminhão — e uma lista só, com a
+     conta da coleta escondida dentro de cada linha, obrigava a ler linha por
+     linha. Abaixo de 1000 px empilha: bipe primeiro, sempre. */
+  .colunas{display:grid;grid-template-columns:1.1fr 1.6fr;gap:18px;align-items:start}
+  /* O BLOCO DA DIREITA tem grade própria: as duas listas lado a lado e, logo
+     abaixo delas, "Pra despachar depois". Quando os três estavam na grade de
+     fora, a caixa do "depois" caía na segunda linha — e a primeira linha só
+     termina onde termina a coluna mais alta, que é a do bipe com os impressos.
+     Resultado: a caixa aparecia lá embaixo, sozinha, longe das listas. */
+  .direita{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+  .direita .span2{grid-column:1 / 3}
+  @media(max-width:1000px){ .colunas{grid-template-columns:1fr} .direita{grid-template-columns:1fr} .direita .span2{grid-column:auto} }
+  /* O FILTRO: Todas / Agência / Coleta. Diz em qual lista o bipe trabalha; a
+     lista escolhida ganha borda na sua cor e a outra esmaece. Fica salvo no
+     tablet (localStorage etq_modo), como o modo da Revisão. */
+  .modo{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;font-size:14px}
+  .modo .lbl{color:var(--muted);font-weight:700;margin-right:4px}
+  .modo button{background:#fff;border:2px solid var(--line);color:var(--muted);border-radius:20px;padding:8px 16px;font-size:14px}
+  .modo button.on{color:#fff;border-color:transparent}
+  .modo button.on[data-modo=todas]{background:#1a1d23}
+  .modo button.on[data-modo=agencia]{background:var(--amber)}
+  .modo button.on[data-modo=coleta]{background:#6f42c1}
+  .card.lista{transition:opacity .15s}
+  .card.lista.ag .ttl{color:#7a5200}.card.lista.col .ttl{color:#4b2a91}
+  .card.lista.col{border-color:#b9a3e6}
+  .card.lista.foco.ag{border:2px solid var(--amber)}.card.lista.foco.col{border:2px solid #6f42c1}
+  .card.lista.fora{opacity:.45}
   .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:26px;margin-bottom:16px}
   .banner.cfm{background:#e8f0fb;border-color:#a9c9ee}.banner.ok{background:#e7f5eb;border-color:#a9d8b4}.banner.err{background:#fbe9e8;border-color:#efb1ad}.banner.warn{background:#fbf1db;border-color:#e7cb8c}
   .bt{font-size:26px;font-weight:750}.bs{font-size:15px;color:var(--muted);margin-top:6px;line-height:1.5}.bs b{color:var(--txt)}
@@ -65,6 +92,11 @@
      telas falam da mesma coisa — venda entregue antes do prazo —, e cor
      diferente pra mesma coisa ensina a equipe que sao coisas diferentes. */
   .tagA{display:inline-block;background:#e8f0fb;border:1px solid #7aa3d8;color:#1f4b82;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:800;margin-left:6px}
+  /* COLETA: violeta, a mesma cor do Carregamento. E a segunda porta de saida
+     (o caminhao do ML vem buscar) e a caixa NAO vai no carro — cor que nao se
+     confunde com "adiantada" (azul) nem com "atrasada" (vermelho). */
+  .tagC{display:inline-block;background:#efe9fb;border:1px solid #b9a3e6;color:#4b2a91;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:800;margin-left:6px}
+  .banner.col{background:#efe9fb;border-color:#b9a3e6}
   .imp.ultima{background:#fff8e6;border:1px solid #e7cb8c;border-radius:12px;padding:12px;margin-bottom:6px}
   .rebt{background:#edf0f4;color:var(--txt);border:1px solid var(--line);padding:10px 16px;font-size:14px;white-space:nowrap}
   .rebt.forte{background:var(--amber);color:#fff;border-color:#8f5500;font-weight:800}
@@ -82,6 +114,13 @@
        pra fazer. Antes ele passava por um alarme vermelho, dois contadores e um
        botao de upload ate chegar no campo. O que e 95% do uso estava em quarto
        lugar. -->
+  <div class="modo" id="modoBar">
+    <span class="lbl">Trabalhando em:</span>
+    <button type="button" data-modo="todas">Todas</button>
+    <button type="button" data-modo="agencia">🚗 Agência — vai no carro</button>
+    <button type="button" data-modo="coleta">🚚 Coleta — o caminhão busca</button>
+    <span id="modoDica" style="color:var(--muted);font-size:13px"></span>
+  </div>
   <div class="colunas">
     <div>
       <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="bipe aqui">
@@ -102,16 +141,17 @@
         <div id="impLista"></div>
       </div>
     </div>
-    <div>
-      <!-- O QUE FICOU FORA DA FILA vem ANTES da fila. Em 09/09/2026 a fila
-           dizia 49 e o Mercado Livre 50: a unidade estava retida por
+    <div class="direita">
+      <!-- O QUE FICOU FORA DA FILA vem ANTES das duas filas. Em 09/09/2026 a
+           fila dizia 49 e o Mercado Livre 50: a unidade estava retida por
            divergencia de leitura e so a aba Bloqueados do admin sabia. Quem
            olha "Faltam imprimir" tem que ver, no mesmo lugar, o que NAO esta
            ali — senao a lista parece o dia inteiro e a peca fica na
            prateleira. Vermelho porque e caixa que nao sai; some quando zera. -->
-      <div class="card" id="blqBox" style="margin-bottom:16px;display:none;border:2px solid var(--red);background:#fbe9e8"></div>
-      <div class="card"><div class="ttl">Faltam imprimir</div><div id="pendLista"></div></div>
-      <div class="card" id="futBox" style="margin-top:16px;display:none;border-left:4px solid #7aa3d8"></div>
+      <div class="card span2" id="blqBox" style="display:none;border:2px solid var(--red);background:#fbe9e8"></div>
+      <div class="card lista ag" id="cardAg"><div class="ttl">🚗 Faltam imprimir — Agência <span style="font-weight:400;text-transform:none;letter-spacing:0">(vai no carro)</span><b id="totAg" style="margin-left:auto;font-size:18px"></b></div><div id="pendAg"></div></div>
+      <div class="card lista col" id="cardCol"><div class="ttl">🚚 Faltam imprimir — Coleta <span style="font-weight:400;text-transform:none;letter-spacing:0">(o caminhão busca)</span><b id="totCol" style="margin-left:auto;font-size:18px"></b></div><div id="pendCol"></div></div>
+      <div class="card span2" id="futBox" style="display:none;border-left:4px solid #7aa3d8"></div>
     </div>
   </div>
   <!-- Subir PDF desceu pro fim: e tarefa de quem administra, uma vez por dia,
@@ -179,6 +219,7 @@ async function stats(){
   // manha procurando a 50ª venda (09/09/2026).
   if(d.bloqueados>0) h+='<span style="color:var(--red);font-weight:700"> · '+d.bloqueados+' bloqueado'+(d.bloqueados>1?'s':'')+' fora da fila</span>';
   var ctx=[];
+  if(d.coleta_hoje>0) ctx.push('<span style="color:#4b2a91;font-weight:700">'+d.coleta_hoje+' pra coleta</span>');
   if(d.futuros>0) ctx.push(d.futuros+' pra adiantar');
   if(d.impressas_hoje>0) ctx.push(d.impressas_hoje+' já saíram hoje');
   if(ctx.length) h+='<div style="color:var(--muted);font-size:14px;margin-top:4px">'+ctx.join(' · ')+'</div>';
@@ -222,14 +263,27 @@ async function scanSku(sku){
   const now=Date.now(); if(last.c===sku && now-last.t<700) return; last={c:sku,t:now};
   // 2º bip do mesmo SKU = confirma
   if(confirmar && confirmar.codigo && confirmar.codigo.toUpperCase()===sku){ imprimir(); return; }
-  const r=await (await fetch('/api/proximo/'+encodeURIComponent(sku))).json();
+  // O filtro vai junto: em Agência ou Coleta o bipe só pega venda daquela lista.
+  const r=await (await fetch('/api/proximo/'+encodeURIComponent(sku)+(MODO!=='todas'?'?modo='+MODO:''))).json();
   if(!r.cadastrado){ banner('err','SKU não cadastrado', '<span class="sku">'+sku+'</span> — cadastre no Admin.'); beep(false); confirmar=null; return; }
   // Sob medida nao tem estoque por definicao: a peca e feita contra o pedido.
   // Zero ali e o normal, e barrar aqui empurrava a bancada a imprimir a
   // etiqueta pelo PDF do ML e despachar por fora do sistema.
   if(!r.sob_medida && r.estoque!==null && r.estoque<=0){ banner('err','SEM ESTOQUE — bloqueado', '<span class="sku">'+sku+'</span> não passou pela produção. Não dá pra imprimir a venda.'); beep(false); confirmar=null; return; }
   // Sem pedido agora significa mesmo NENHUM: a busca já inclui as vendas futuras.
-  if(!r.pedido){ if(r.total>0){ banner('warn','Todas embaladas', 'Todas as vendas de <span class="sku">'+sku+'</span> já foram embaladas.'); } else { banner('err','SKU não está no lote', 'Nenhuma venda de <span class="sku">'+sku+'</span> — nem pra hoje, nem pra frente. Já subiu o PDF do Mercado Livre?'); } beep(false); confirmar=null; return; }
+  // Com filtro, "nenhum" pode ser "nenhum NESTA lista, mas tem na outra" — e
+  // esse aviso tem que dizer isso, senão a pessoa conclui que o PDF não subiu.
+  if(!r.pedido){
+    if(r.na_outra_lista>0){
+      var outra=(MODO==='coleta'?'agência':'coleta');
+      banner('warn','Nenhuma de '+(MODO==='coleta'?'coleta':'agência')+' desse SKU',
+        '<span class="sku">'+sku+'</span> tem <b>'+r.na_outra_lista+'</b> venda(s) na lista de <b>'+outra+'</b>. '
+        +'Troque o filtro em cima ("Trabalhando em") ou bipe outra caixa.');
+    }
+    else if(r.total>0){ banner('warn','Todas embaladas', 'Todas as vendas de <span class="sku">'+sku+'</span> já foram embaladas.'); }
+    else { banner('err','SKU não está no lote', 'Nenhuma venda de <span class="sku">'+sku+'</span> — nem pra hoje, nem pra frente. Já subiu o PDF do Mercado Livre?'); }
+    beep(false); confirmar=null; return;
+  }
   confirmar=r.pedido;
   // ADIANTANDO: a venda existe e a peça está na prateleira, mas a entrega não é
   // de hoje. Precisa ser inconfundível — se passar por urgente, o operador gasta
@@ -240,6 +294,15 @@ async function scanSku(sku){
       +'ADIANTANDO — só despacha em '+dataBR(r.pedido.despachar_em)
       +'<div style="font-weight:400;font-size:13px;margin-top:2px">Não precisa sair hoje. '
       +'Vale se tiver peça sobrando na prateleira.</div></div>' : '';
+  /* COLETA: o caminhão do Mercado Livre vem buscar esta caixa. A etiqueta sai
+     igual; o que muda é PRA ONDE a caixa vai depois — o lugar reservado, nunca
+     o carro. Quem decide isso é quem cola a etiqueta, então o aviso vem antes
+     de imprimir, na cor da coleta, e repete na hora do "Impresso ✓". */
+  var col = r.coleta ? '<div style="background:#efe9fb;border:2px solid #b9a3e6;border-radius:8px;'
+      +'padding:8px 10px;margin-bottom:8px;font-weight:800;color:#4b2a91">'
+      +'🚚 COLETA — o caminhão do Mercado Livre vem buscar'
+      +'<div style="font-weight:400;font-size:13px;margin-top:2px">Depois de imprimir, leve pro <b>lugar reservado da coleta</b> '
+      +'e bipe no Carregamento. <b>Não vai no carro.</b></div></div>' : '';
   /* HIERARQUIA: O CLIENTE PRIMEIRO.
      Aqui o bipe confere etiqueta contra etiqueta, nunca contra o produto (§4 do
      CLAUDE.md) — a caixa já está fechada num saco preto. Medida e cor são
@@ -248,7 +311,7 @@ async function scanSku(sku){
      O que não é derivado é a VENDA escolhida: cliente, NF, cidade. É essa
      etiqueta que vai ser colada na caixa que está na mão dela — então é ela que
      merece o tamanho. */
-  banner((r.adiantado?'warn':'cfm')+' rotulo','Confira esta venda', adiant
+  banner((r.coleta?'col':(r.adiantado?'warn':'cfm'))+' rotulo','Confira esta venda', col+adiant
     +'<div style="font-size:30px;font-weight:800;color:var(--txt);line-height:1.15;letter-spacing:-.5px;margin:2px 0 6px">'+esc(r.pedido.buyer)+'</div>'
     +'<div style="font-size:16px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+'</div>'
     +'<div style="border-top:1px solid var(--line);padding-top:10px">'
@@ -275,7 +338,13 @@ async function imprimir(){
     const r=await (await fetch('/api/embalar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:o.id})})).json();
     if(r.erro){ banner('err','Não deu pra embalar', r.erro); beep(false); stats(); return; }
     mandarPraImpressora(o.id);
-    banner('ok','Impresso ✓ — '+esc(o.buyer), 'NF <b>'+esc(o.nf||'—')+'</b> · <span class="sku">'+esc(o.codigo||'')+'</span> · estoque agora: '+r.estoque+'<br>Saiu borrada ou o papel enroscou? Reimprima aqui — o estoque não muda.',
+    /* A coleta repete o aviso DEPOIS de imprimir, que e quando a caixa sai da
+       mao da pessoa: e aqui que ela decide se vai pro carro ou pro canto. */
+    var ondeVai = r.coleta
+      ? '<div style="margin:6px 0 8px;padding:8px 10px;border-radius:8px;background:#efe9fb;border:2px solid #b9a3e6;color:#4b2a91;font-weight:800">'
+        +'🚚 COLETA — leve pro lugar reservado e bipe no Carregamento. Não vai no carro.</div>'
+      : '';
+    banner(r.coleta?'col':'ok','Impresso ✓ — '+esc(o.buyer), ondeVai+'NF <b>'+esc(o.nf||'—')+'</b> · <span class="sku">'+esc(o.codigo||'')+'</span> · estoque agora: '+r.estoque+'<br>Saiu borrada ou o papel enroscou? Reimprima aqui — o estoque não muda.',
       '<button class="rebt" onclick="reimprimir('+o.id+',this)">🖨 Reimprimir esta</button>');
     beep(true); stats(); listaImp();
   }catch(e){ banner('err','Falha de conexão', String(e)); beep(false); }
@@ -328,15 +397,46 @@ scan.focus();
 function beep(ok){ try{const a=new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=ok?820:240;g.gain.value=.05;o.start();setTimeout(()=>{o.stop();a.close();},ok?100:220);}catch(e){} }
 idle(); stats(); setInterval(stats,4000);
 
+/* O FILTRO DA TELA: em qual lista o bipe trabalha. 'todas' é o comportamento
+   de sempre (a venda mais urgente do SKU, seja de que porta for). Salvo por
+   aparelho, como o modo da Revisão: o tablet da bancada reabre onde parou. */
+var MODO='todas';
+try{ var m0=localStorage.getItem('etq_modo'); if(m0==='agencia'||m0==='coleta') MODO=m0; }catch(e){}
+function setModo(m){
+  MODO=(m==='agencia'||m==='coleta')?m:'todas';
+  try{ localStorage.setItem('etq_modo',MODO); }catch(e){}
+  var bs=document.querySelectorAll('#modoBar button');
+  for(var i=0;i<bs.length;i++) bs[i].className=(bs[i].getAttribute('data-modo')===MODO?'on':'');
+  var ag=document.getElementById('cardAg'), co=document.getElementById('cardCol');
+  if(ag) ag.className='card lista ag'+(MODO==='agencia'?' foco':(MODO==='coleta'?' fora':''));
+  if(co) co.className='card lista col'+(MODO==='coleta'?' foco':(MODO==='agencia'?' fora':''));
+  var d=document.getElementById('modoDica');
+  if(d) d.textContent = MODO==='todas' ? 'o bipe pega a venda mais urgente do SKU, de qualquer lista'
+    : (MODO==='coleta' ? 'o bipe só pega vendas de coleta' : 'o bipe só pega vendas de agência');
+  confirmar=null; if(typeof idle==='function') idle();
+}
+document.addEventListener('click',function(e){
+  var b=e.target.closest('#modoBar button'); if(b) setModo(b.getAttribute('data-modo'));
+});
+setModo(MODO);
+
 async function listaPend(){
   var l=[]; try{ l=await (await fetch("/api/pendentes")).json(); }catch(e){}
-  var el=document.getElementById("pendLista");
-  if(!el) return;
-  // Card vazio some: a linha de cima já disse "Acabou por hoje", e um card
-  // repetindo isso é ruído entre o operador e o que ele precisa ver.
-  var card=el.closest?el.closest('.card'):null;
-  if(card) card.style.display = l.length? '' : 'none';
-  if(!l.length){ el.innerHTML=''; return; }
+  var elAg=document.getElementById("pendAg"), elCo=document.getElementById("pendCol");
+  if(!elAg||!elCo) return;
+  /* DUAS LISTAS, UMA POR PORTA DE SAÍDA. O mesmo SKU pode estar nas duas,
+     cada um com a sua conta — e é assim que a caixa sai da prateleira já
+     sabendo o destino. Lista vazia não some (as duas ficam lado a lado, e
+     sumir uma desloca a outra): escreve que não falta nada. */
+  var ag=l.filter(function(r){ return r.modalidade!=='coleta'; });
+  var co=l.filter(function(r){ return r.modalidade==='coleta'; });
+  var soma=function(a){ var t=0; for(var i=0;i<a.length;i++) t+=a[i].qtd; return t; };
+  var tAg=document.getElementById('totAg'), tCo=document.getElementById('totCol');
+  if(tAg) tAg.textContent=soma(ag)||''; if(tCo) tCo.textContent=soma(co)||'';
+  elAg.innerHTML=ag.length?linhasPend(ag):'<div class="vazio" style="color:var(--green)">✓ Nada faltando pra agência</div>';
+  elCo.innerHTML=co.length?linhasPend(co):'<div class="vazio" style="color:var(--green)">✓ Nada faltando pra coleta</div>';
+}
+function linhasPend(l){
   var h='';
   for(var i=0;i<l.length;i++){
     var r=l[i];
@@ -358,7 +458,7 @@ async function listaPend(){
       +(semEst?'<div style="color:#c0392b;font-size:12px;font-weight:700;margin-top:3px">sem estoque — precisa produzir</div>':'')
       +'</div>';
   }
-  el.innerHTML=h;
+  return h;
 }
 setInterval(listaPend,5000);
 listaPend();
@@ -461,6 +561,7 @@ function renderImp(){
          estiver longe. */
       +(r.adiantada?'<span class="tagA">📅 despacha '+esc(faltamDias(r.despachar_em)||'')
         +' · '+esc(dataBR(r.despachar_em))+'</span>':'')
+      +(r.coleta?'<span class="tagC">🚚 coleta</span>':'')
       +(r.reimpressoes>0?'<span class="tag">reimpressa '+r.reimpressoes+'x</span>':'')+'</div>'
       +'<div class="meta">NF <b>'+esc(r.nf||'—')+'</b> · <b>'+esc(r.codigo||'—')+'</b> · '+horaDe(r.embalado_em)
       +(r.city?' · '+esc(r.city):'')
@@ -512,6 +613,9 @@ async function relogioDesp(){
   } else {
     txt="Despacho às "+d.despacho;   // sem fila: só a informação, sem alarme
   }
+  /* A coleta nao entra no relogio (o caminhao nao tem hora), mas aparece ao
+     lado: sumir daqui faria parecer que nao ha o que imprimir. */
+  if(d.pendentes_coleta>0) txt+=' · <span style="color:#4b2a91">'+d.pendentes_coleta+' pra coleta (sem hora — o caminhão busca)</span>';
   el.style.background=cor||"transparent";
   el.style.border=bd?("1px solid "+bd):"0";
   el.style.padding=bd?"15px 18px":"0 0 10px";
@@ -529,32 +633,39 @@ function b64(f){ return new Promise(function(r){var fr=new FileReader();fr.onloa
 async function upMany(fileList){
   var files=[].slice.call(fileList).filter(function(f){ return /pdf/i.test(f.type)||/\.pdf$/i.test(f.name); });
   if(!files.length) return;
-  var totNov=0,totRep=0,totSem=0,totPdf=0,totBloq=0,totDiv=0,ok=0;
+  var totNov=0,totRep=0,totSem=0,totPdf=0,totCol=0,totMod=0,totBloq=0,totDiv=0,ok=0;
   for(var i=0;i<files.length;i++){
     document.getElementById('upRes').innerHTML='Lendo '+(i+1)+' de '+files.length+': <b>'+files[i].name+'</b>…';
     try{
       var j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
       if(j.erro){ continue; }
       totNov+=j.novos||0; totRep+=j.repetidas||0; totSem+=j.sem_sku||0; totPdf+=j.total||0;
-      totBloq+=j.bloqueados||0; totDiv+=j.divergencias||0; ok++;
+      totCol+=j.coleta||0; totMod+=j.modalidade_duvida||0; totBloq+=j.bloqueados||0; totDiv+=j.divergencias||0; ok++;
     }catch(e){}
   }
   /* A CONTA QUE FECHA COM O MERCADO LIVRE, escrita por extenso. "50 vendas
      adicionadas" e o numero que se compara com o painel do ML; quantas
      dessas entraram na fila e quantas ficaram RETIDAS vem logo ao lado, em
      vermelho, porque e a parte que a fila nao mostra. Sem isso o gestor
-     compara 50 com 49 e sai cacando uma venda que nao esta perdida. */
-  var fila=totNov-totBloq;
+     compara 50 com 49 e sai cacando uma venda que nao esta perdida.
+     Quantas o caminhao vem buscar sai aqui tambem, na hora: e o momento de
+     estranhar um PDF de coleta que deu zero, ou um de agencia que virou
+     coleta inteiro. Etiqueta em formato novo e retencao tambem — a gestao
+     decide agencia ou coleta em Bloqueados. */
+  var fila=totNov-totBloq, semCad=Math.max(0,totBloq-totDiv-totMod);
   var h='<b>'+ok+' PDF(s)</b> · <b>'+totNov+' venda'+(totNov===1?'':'s')+' adicionada'+(totNov===1?'':'s')+'</b>'
-    +' (confira com o Mercado Livre) · '+totRep+' repetida'+(totRep===1?'':'s')+' · '+totPdf+' etiquetas lidas';
+    +' (confira com o Mercado Livre) · '+totRep+' repetida'+(totRep===1?'':'s')+' · '+totPdf+' etiquetas lidas'
+    +(totCol?' · <span class="tagC" style="margin-left:0">🚚 '+totCol+' pra coleta</span>':'');
   if(totBloq>0){
     h+='<div style="margin-top:6px;color:var(--red);font-weight:700">⛔ '+totBloq+' retida'+(totBloq>1?'s':'')+' — '+fila+' na fila'
       +(totDiv>0?' · '+totDiv+' por dúvida na leitura (precisa abrir o pedido no ML)':'')
-      +(totBloq-totDiv>0?' · '+(totBloq-totDiv)+' por SKU sem cadastro':'')
+      +(totMod>0?' · '+totMod+' por etiqueta em formato novo (agência ou coleta?)':'')
+      +(semCad>0?' · '+semCad+' por SKU sem cadastro':'')
       +' · <a href="/#blq" style="color:var(--red)">Admin → Bloqueados</a></div>';
   } else if(totSem>0){
     h+=' · '+totSem+' sem SKU';
   }
+  if(totMod) h+='<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#efe9fb;border:2px solid #6f42c1;color:#4b2a91;font-weight:700">⚠ '+totMod+' etiqueta(s) num formato que o sistema não conhece — retidas. A gestão decide se é agência ou coleta em Admin → Bloqueados.</div>';
   document.getElementById('upRes').innerHTML=h;
   stats(); listaPend(); listaBloq();
 }

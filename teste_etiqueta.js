@@ -33,7 +33,7 @@ db.exec(`
     largura_cm INTEGER, altura_cm INTEGER, cor_codigo TEXT, tecido_codigo TEXT);
   CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT, buyer TEXT,
     city TEXT, nf TEXT, packId TEXT, venda TEXT, estagio TEXT DEFAULT 'pendente',
-    embalado_em TEXT, data TEXT DEFAULT (date('now','localtime')), despachar_em TEXT);
+    embalado_em TEXT, data TEXT DEFAULT (date('now','localtime')), despachar_em TEXT, modalidade TEXT);
 `);
 db.prepare("INSERT INTO modelo (id,codigo,nome,sob_medida) VALUES (1,'ROLO','Rolô',0)").run();
 db.prepare("INSERT INTO modelo (id,codigo,nome,sob_medida) VALUES (2,'SOBMED','Sob medida',1)").run();
@@ -55,6 +55,11 @@ vol.run('BK160160CINZA','Joao Silva',  '4','114','904',hoje,hoje);   // id 4 —
 vol.run('SOBMEDIDA','Lucelia',         '5','115','905',hoje,hoje);   // id 5 — sob medida
 db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data)
   VALUES ('BK140140BEGE','Pedro','6','116','906','bloqueado',?)`).run(hoje);  // id 6
+/* COLETA (10/09/2026): o caminhao do ML vem buscar. A etiqueta sai igual, mas
+   a caixa vai pro canto reservado, e a tela tem que dizer isso ANTES de
+   imprimir — e quem cola a etiqueta que decide onde a caixa para. */
+db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data,despachar_em,modalidade)
+  VALUES ('BK160160CINZA','Julia Souza','6259','2000014948163325',null,'pendente',?,?,'coleta')`).run(hoje,hoje);  // id 7
 
 const rotas = {};
 const app = { get:(p,...h)=>{ rotas['GET '+p]=h[h.length-1]; },
@@ -122,6 +127,34 @@ const ok = (n, c, extra) => { casos++;
      JSON.stringify({adiantado:px.adiantado, prazo:px.pedido&&px.pedido.despachar_em}));
   const nx = await chamar('GET /api/proximo/:sku', null, {sku:'NAOEXISTE'});
   ok('SKU fora do cadastro responde que não é cadastrado', nx.cadastrado === false);
+  ok('a venda de agência NÃO vem marcada como coleta', px.coleta === false, JSON.stringify(px.coleta));
+
+  // ── O FILTRO DA TELA: Todas / Agência / Coleta (§8-B) ────────────────────
+  // BK160160CINZA tem duas vendas pendentes de hoje: id 4 (agência) e id 7
+  // (coleta). Sem filtro, a mais urgente manda (empate de data → menor id).
+  db.prepare("UPDATE skus SET estoque=1 WHERE codigo='BK160160CINZA'").run();
+  const pt = await chamar('GET /api/proximo/:sku', {}, {sku:'BK160160CINZA'});
+  ok('sem filtro (Todas) o bipe pega a mais urgente, de qualquer lista', pt.pedido && pt.pedido.id === 4 && pt.modo === 'todas', JSON.stringify({id:pt.pedido&&pt.pedido.id, modo:pt.modo}));
+  const pcol = await new Promise(r => { const res = { json:o=>r(o), status(){ return this; }, send:o=>r(o) };
+    rotas['GET /api/proximo/:sku']({ body:{}, params:{sku:'BK160160CINZA'}, query:{modo:'coleta'}, headers:{} }, res); });
+  ok('com filtro Coleta o bipe pula a venda de agência e pega a de coleta', pcol.pedido && pcol.pedido.id === 7 && pcol.coleta === true && pcol.modo === 'coleta', JSON.stringify({id:pcol.pedido&&pcol.pedido.id}));
+  const pag = await new Promise(r => { const res = { json:o=>r(o), status(){ return this; }, send:o=>r(o) };
+    rotas['GET /api/proximo/:sku']({ body:{}, params:{sku:'BK160160CINZA'}, query:{modo:'agencia'}, headers:{} }, res); });
+  ok('com filtro Agência o bipe pega só a de agência', pag.pedido && pag.pedido.id === 4 && pag.coleta === false && pag.pendentes === 1, JSON.stringify({id:pag.pedido&&pag.pedido.id, pend:pag.pendentes}));
+  /* SKU que só tem venda na OUTRA lista: a resposta tem que dizer isso, senão
+     a tela diz "SKU não está no lote" e a pessoa acha que o PDF não subiu. */
+  const pso = await new Promise(r => { const res = { json:o=>r(o), status(){ return this; }, send:o=>r(o) };
+    rotas['GET /api/proximo/:sku']({ body:{}, params:{sku:'BK140140BEGE'}, query:{modo:'coleta'}, headers:{} }, res); });
+  ok('filtro sem venda nesta lista diz quantas há na outra', !pso.pedido && pso.na_outra_lista === 1, JSON.stringify({pedido:pso.pedido, outra:pso.na_outra_lista}));
+
+  // ── COLETA: a tela avisa antes de imprimir, e de novo depois ─────────────
+  db.prepare("UPDATE lote SET estagio='embalado' WHERE id=4").run();   // tira o de agência da frente
+  const pc = await chamar('GET /api/proximo/:sku', null, {sku:'BK160160CINZA'});
+  ok('o bipe avisa que a venda é COLETA (o caminhão vem buscar)',
+     pc.cadastrado && pc.pedido && pc.pedido.id === 7 && pc.coleta === true, JSON.stringify({coleta:pc.coleta, id:pc.pedido&&pc.pedido.id}));
+  const ec = await chamar('POST /api/embalar', {id:7});
+  ok('imprimir a etiqueta de coleta baixa a peça igual e diz que é coleta',
+     ec.ok && ec.coleta === true && estoqueDe('BK160160CINZA') === 0, JSON.stringify(ec));
 
   console.log('');
   console.log(falhas ? ('FALHARAM ' + falhas + ' de ' + casos)

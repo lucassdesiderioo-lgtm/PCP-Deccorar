@@ -37,6 +37,54 @@ function dataDespacho(texto, hoje){
   if(isNaN(d.getTime()) || d.getUTCDate()!==dia) return null;   // 31/fev e afins
   return iso(ano);
 }
+/* COLETA OU AGENCIA — a etiqueta diz, e diz por AUSENCIA.
+ *
+ * Desde 10/09/2026 o Mercado Livre tem duas formas de retirar o volume da
+ * fabrica, e as duas saem no mesmo PDF, com a mesma etiqueta, a mesma rota
+ * ("XSP1 > SMG6 > EGO18") e a mesma folha de controle. A UNICA diferenca esta
+ * na caixa "Despachar":
+ *
+ *     agencia   Despachar: qua 9/set, antes das 15:45 h     (a gente leva)
+ *     coleta    Despachar: quinta 10/set                     (o caminhao busca)
+ *
+ * Faz sentido: na agencia o limite e a hora de entregar la; na coleta quem
+ * manda no horario e o caminhao, entao a etiqueta traz so o dia. Foi conferido
+ * nos dois PDFs de 09/09/2026 — 47 etiquetas de agencia, todas com hora; 8 de
+ * coleta, nenhuma — e tambem na imagem renderizada: nao ha icone nem marca
+ * grafica de coleta, so essa linha.
+ *
+ * E uma marca FRACA — uma hora que falta — e por isso ela nao decide sozinha
+ * nada que cause dano: a coleta so muda ONDE o volume aparece (lista propria
+ * no carregamento, tarja na Etiqueta de Venda). Se o ML um dia tirar a hora de
+ * todo mundo, o sintoma e todo volume virar "coleta" de uma vez, e isso a tela
+ * do carregamento mostra no mesmo minuto.
+ *
+ * SO OS DOIS FORMATOS CONHECIDOS DECIDEM. Regra do dono (09/09/2026): qualquer
+ * modificacao na etiqueta vai para Bloqueados, e a gestao decide. Entao a
+ * linha e conferida contra os dois formatos EXATOS acima; o que nao casa com
+ * nenhum vira 'desconhecida', e a etiqueta sem a linha vira null — os dois
+ * retem o volume no upload (exp_route.js) ate alguem escolher agencia ou
+ * coleta em Admin -> Bloqueados. Um "quase igual" que passasse como coleta
+ * mandaria pro canto do caminhao uma caixa que era do carro, em silencio.
+ * A hora pode ter quebrado para a linha de baixo (pdf.js faz isso): a linha
+ * seguinte e emendada quando comeca com "antes das". */
+const RE_AGENCIA=/^[a-zçãáéíóú.-]+\s+\d{1,2}\/[a-zç]{3,}\s*,\s*antes\s+das\s+\d{1,2}\s*[:h]\s*\d{2}\s*h?\.?$/i;
+const RE_COLETA =/^[a-zçãáéíóú.-]+\s+\d{1,2}\/[a-zç]{3,}$/i;
+function linhaDespacho(texto){
+  const lines=String(texto||'').split('\n');
+  const i=lines.findIndex(l=>/Despachar:/i.test(l));
+  if(i<0) return null;
+  let s=lines[i].replace(/^.*?Despachar:\s*/i,'');
+  if(lines[i+1] && /^\s*antes\s+das/i.test(lines[i+1])) s+=' '+lines[i+1];
+  return s.replace(/\s+/g,' ').trim();
+}
+function modalidadeDespacho(texto){
+  const s=linhaDespacho(texto);
+  if(s===null) return null;
+  if(RE_AGENCIA.test(s)) return 'agencia';
+  if(RE_COLETA.test(s)) return 'coleta';
+  return 'desconhecida';
+}
 /* O NOME DE QUEM COMPROU, LIDO DA ETIQUETA.
  *
  * E o dado mais importante da etiqueta: e o unico que liga o volume ao item da
@@ -209,6 +257,8 @@ async function parsePdf(uint8){
     const packId=grab(/Pack ID:\s*([\d ]+)/), venda=grab(/Venda:\s*([\d ]+)/);
     const nf=(t.match(/NF:\s*(\d+)/)||[])[1]||null;
     const despacharEm=dataDespacho(t);
+    const modalidade=modalidadeDespacho(t);
+    const despachoLinha=linhaDespacho(t);   // o texto cru, pro bloqueio dizer o que o ML escreveu
     const city=((t.match(/Cidade de destino\s*:\s*(.+)/)||[])[1]||'').trim();
     const buyer=nomeDaEtiqueta(lines);
     if((packId&&seen.has('p:'+packId))||(venda&&seen.has('v:'+venda))) continue;
@@ -290,9 +340,9 @@ async function parsePdf(uint8){
       /* A descricao do anuncio vai junto: e ela que diz a LINHA do produto
          ("Cortina Rolo Blackout" x "Toucher Rolo Evolux"), a unica dimensao que
          medida e cor nao separam. O upload guarda e aprende com ela. */
-      descricao:(rec&&rec.desc)||null, despacharEm,
+      descricao:(rec&&rec.desc)||null, despacharEm, modalidade, despachoLinha,
       buyer:buyer||'(sem nome)',city,nf,packId,venda,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
   }
   return orders;
 }
-module.exports={parsePdf,dataDespacho,nomeDaEtiqueta,mesmoNomeComRepeticao,mesmoNomeComIDepoisDoF};
+module.exports={parsePdf,dataDespacho,modalidadeDespacho,linhaDespacho,nomeDaEtiqueta,mesmoNomeComRepeticao,mesmoNomeComIDepoisDoF};

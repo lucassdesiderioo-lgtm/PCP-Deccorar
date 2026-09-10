@@ -48,11 +48,11 @@ async function chamar(ctx,metodo,url,corpo){
   return {status:r.status, body:await r.json()};
 }
 function fechar(ctx){ try{ctx.server.close();}catch(e){} try{ctx.db.close();}catch(e){} }
-function bloquear(db,motivo,codigo){
+function bloquear(db,motivo,codigo,prefixo){
   return db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,bloqueio,descricao)
     VALUES (?,?,?,?,?,'bloqueado',?,?)`)
     .run(codigo,'Cliente Teste','5001','2000014610097547','2000018016683414',
-         'divergencia: '+motivo,'Persiana Cortina Rolo Blackout 1,60x1,40 Blecaute Bege').lastInsertRowid;
+         (prefixo||'divergencia: ')+motivo,'Persiana Cortina Rolo Blackout 1,60x1,40 Blecaute Bege').lastInsertRowid;
 }
 function conferir(nome,cond,detalhe){
   casos++;
@@ -152,6 +152,62 @@ function conferir(nome,cond,detalhe){
     const l=await chamar(ctx,'GET','/api/bloqueados/lista');
     conferir('resolvido, sai do resumo e da lista e entra na fila',
       r.body.hoje===2 && r.body.bloqueados===0 && l.body.length===0, JSON.stringify(r.body)+' '+JSON.stringify(l.body));
+    fechar(ctx);
+  }
+  /* ── ETIQUETA EM FORMATO NOVO: A GESTAO DECIDE (§8-B, armadilha #21) ──────
+     O volume retido por `modalidade:` nao aparece na lista de SKU sem cadastro
+     nem na de divergencia — tem lista propria — e sai so pela decisao
+     agencia/coleta, que grava a modalidade e o rastro. */
+  {
+    const ctx=await montar(); const db=ctx.db;
+    const id=bloquear(db,'a linha "Despachar:" veio num formato novo — "quinta 10/set — retirada"','BK140140BEGE','modalidade: ');
+    const p=await chamar(ctx,'GET','/api/modalidade/pendentes');
+    conferir('o volume em formato novo aparece na lista da gestao, com o motivo',
+      p.body.length===1 && p.body[0].id===id && /formato novo/.test(p.body[0].motivo), JSON.stringify(p.body));
+    const b=await chamar(ctx,'GET','/api/bloqueados');
+    const dv=await chamar(ctx,'GET','/api/divergencias');
+    conferir('e NAO aparece como SKU sem cadastro nem como divergencia',
+      b.body.length===0 && dv.body.length===0, JSON.stringify({bloq:b.body,div:dv.body}));
+    const r=await chamar(ctx,'POST','/api/modalidade/resolver',{ids:[id],modalidade:'coleta'});
+    const v=db.prepare('SELECT * FROM lote WHERE id=?').get(id);
+    conferir('decidir "coleta" grava a modalidade, solta o volume e deixa rastro',
+      r.body.ok && r.body.liberados===1 && v.estagio==='pendente' && v.modalidade==='coleta' && v.bloqueio===null
+      && /formato novo/.test(v.bloqueio_resolvido||'') && v.resolvido_por==='Conferente' && !!v.resolvido_em,
+      JSON.stringify({r:r.body,v}));
+    const r2=await chamar(ctx,'POST','/api/modalidade/resolver',{ids:[id],modalidade:'agencia'});
+    conferir('decidir de novo um volume ja solto nao mexe nele',
+      r2.body.ok && r2.body.ignorados===1 && db.prepare('SELECT modalidade FROM lote WHERE id=?').get(id).modalidade==='coleta',
+      JSON.stringify(r2.body));
+    const r3=await chamar(ctx,'POST','/api/modalidade/resolver',{ids:[id],modalidade:'caminhao'});
+    conferir('so agencia ou coleta sao respostas', r3.status===400, JSON.stringify(r3.body));
+    fechar(ctx);
+  }
+  /* DUAS LISTAS EM "FALTAM IMPRIMIR": o mesmo SKU sai numa linha por porta
+     de saida, cada uma com a sua conta. NULL e agencia. */
+  {
+    const ctx=await montar(); const db=ctx.db;
+    const ins=db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,estagio,modalidade) VALUES (?,?,?,?,'pendente',?)`);
+    ins.run('BK140140BEGE','A','1','p1','agencia'); ins.run('BK140140BEGE','B','2','p2',null);
+    ins.run('BK140140BEGE','C','3','p3','coleta'); ins.run('BK160140BEGE','D','4','p4','coleta');
+    const r=await chamar(ctx,'GET','/api/pendentes');
+    const linhas=r.body.map(x=>x.codigo+':'+x.modalidade+'='+x.qtd).sort();
+    conferir('pendentes vem por SKU e por modalidade, NULL contando como agencia',
+      JSON.stringify(linhas)===JSON.stringify(['BK140140BEGE:agencia=2','BK140140BEGE:coleta=1','BK160140BEGE:coleta=1']),
+      JSON.stringify(linhas));
+    fechar(ctx);
+  }
+  /* A decisao da modalidade nao passa por cima do §6: SKU fora do cadastro
+     continua retido, agora pelo motivo certo. */
+  {
+    const ctx=await montar(); const db=ctx.db;
+    const id=bloquear(db,'a etiqueta veio SEM a linha "Despachar:"','BK999999PRETO','modalidade: ');
+    const r=await chamar(ctx,'POST','/api/modalidade/resolver',{ids:[id],modalidade:'agencia'});
+    const v=db.prepare('SELECT * FROM lote WHERE id=?').get(id);
+    conferir('SKU fora do cadastro: a modalidade fica gravada mas o volume segue bloqueado pelo §6',
+      r.body.ok && r.body.ainda_sem_sku===1 && v.estagio==='bloqueado' && v.bloqueio==='sku_nao_cadastrado' && v.modalidade==='agencia',
+      JSON.stringify({r:r.body,v}));
+    const b=await chamar(ctx,'GET','/api/bloqueados');
+    conferir('e agora aparece na lista de SKU sem cadastro', b.body.length===1 && b.body[0].codigo==='BK999999PRETO', JSON.stringify(b.body));
     fechar(ctx);
   }
   console.log('');

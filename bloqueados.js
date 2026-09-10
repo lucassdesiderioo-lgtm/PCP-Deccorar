@@ -15,8 +15,10 @@
  * porque e isso que a pessoa precisa para resolver ou para saber que nao pode
  * resolver dali.
  *
- * Dois tipos, porque sao dois reparos diferentes (§5 e §6 do CLAUDE.md):
+ * Tres tipos, porque sao tres reparos diferentes (§5, §6 e §8-B do CLAUDE.md):
  *   - divergencia   alguem abre o pedido no ML e escolhe (Admin -> Bloqueados)
+ *   - modalidade    a etiqueta veio num formato novo; a gestao decide se e
+ *                   agencia ou coleta (Admin -> Bloqueados)
  *   - sku           cadastrar o SKU libera sozinho (Admin -> Cadastro de SKU)
  *
  * Le, nao decide: quem retem e o upload (exp_route.js), quem solta e o
@@ -26,12 +28,14 @@
 const {VENCE_HOJE}=require('./fila_dia');
 
 const DIV="COALESCE(bloqueio,'') LIKE 'divergencia%'";
+const MOD="COALESCE(bloqueio,'') LIKE 'modalidade%'";
 
 /* Motivo curto, do jeito que cabe numa linha da bancada. O texto inteiro segue
    na aba Bloqueados; aqui a pessoa precisa saber QUE TIPO de problema e, e para
    onde ir. */
 function motivoCurto(bloqueio){
   const b=String(bloqueio||'');
+  if(/^modalidade/.test(b)) return 'etiqueta em formato novo — agência ou coleta?';
   if(!/^divergencia/.test(b)) return 'SKU sem cadastro';
   if(/comprador nao bate/.test(b)) return 'nome da etiqueta difere da folha';
   if(/leituras divergem/.test(b)) return 'as duas leituras da folha discordam';
@@ -48,16 +52,18 @@ function motivoCurto(bloqueio){
 function resumo(db){
   const r=db.prepare(`SELECT COUNT(*) total,
       SUM(CASE WHEN ${DIV} THEN 1 ELSE 0 END) divergencias,
-      SUM(CASE WHEN ${DIV} THEN 0 ELSE 1 END) sem_cadastro,
+      SUM(CASE WHEN ${MOD} THEN 1 ELSE 0 END) modalidade,
+      SUM(CASE WHEN ${DIV} OR ${MOD} THEN 0 ELSE 1 END) sem_cadastro,
       SUM(CASE WHEN ${VENCE_HOJE} THEN 1 ELSE 0 END) hoje
     FROM lote WHERE estagio='bloqueado'`).get();
-  return {total:r.total||0, divergencias:r.divergencias||0, sem_cadastro:r.sem_cadastro||0, hoje:r.hoje||0};
+  return {total:r.total||0, divergencias:r.divergencias||0, modalidade:r.modalidade||0,
+          sem_cadastro:r.sem_cadastro||0, hoje:r.hoje||0};
 }
 
 /* A lista, o mais urgente primeiro: o que vence hoje ou ja venceu em cima. */
 function lista(db){
   return db.prepare(`SELECT id,codigo,buyer,nf,city,packId,venda,data,despachar_em,bloqueio,
-      CASE WHEN ${DIV} THEN 'divergencia' ELSE 'sku' END tipo,
+      CASE WHEN ${DIV} THEN 'divergencia' WHEN ${MOD} THEN 'modalidade' ELSE 'sku' END tipo,
       CASE WHEN ${VENCE_HOJE} THEN 1 ELSE 0 END hoje
     FROM lote WHERE estagio='bloqueado'
     ORDER BY hoje DESC, despachar_em ASC, id ASC`).all()

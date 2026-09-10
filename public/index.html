@@ -253,6 +253,22 @@
 </div>
 
 <div id="v-blq" class="hide">
+<!-- A ETIQUETA MUDOU DE FORMATO (§8-B, armadilha #21). O sistema le se a caixa
+     e do carro (agencia) ou do caminhao (coleta) pela linha "Despachar:" da
+     etiqueta, e so os dois formatos conhecidos decidem. Linha diferente e o
+     Mercado Livre mudando a etiqueta — e ai ninguem adivinha: regra do dono,
+     vai pra ca e a gestao escolhe, olhando o pedido no ML. -->
+<div class="card" id="modCard" style="display:none;border:2px solid #6f42c1">
+  <div style="font-weight:800;color:#6f42c1;font-size:16px;margin-bottom:6px">🚚 ETIQUETA EM FORMATO NOVO — agência ou coleta?</div>
+  <div style="font-size:13px;color:#5a6472;margin-bottom:12px">
+    A linha "Despachar:" dessas etiquetas não está em nenhum dos dois formatos que o sistema conhece
+    (<i>qua 9/set, antes das 15:45 h</i> = agência · <i>quinta 10/set</i> = coleta). O Mercado Livre pode ter
+    mudado a etiqueta. Abra o pedido no ML e diga <b>por onde a caixa sai</b>: no carro pra agência, ou o caminhão vem buscar.
+    Enquanto isso ela não imprime etiqueta e não carrega.
+  </div>
+  <div id="modTodos" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"></div>
+  <div id="modLista"></div>
+</div>
 <div class="card" id="divCard" style="display:none;border:2px solid #c62828">
   <!-- O titulo falava so da conferencia 1 ("as duas leituras discordam"), mas o
        card recebe as CINCO do §5 — comprador, medida, cor e familia tambem param
@@ -2002,12 +2018,63 @@ document.addEventListener("click",async function(e){
   await resolverDiv(b,b.getAttribute("data-resolvediv"),b.getAttribute("data-sku"),b.getAttribute("data-peca")||"");
 });
 
+/* ETIQUETA EM FORMATO NOVO: agencia ou coleta? A decisao e por volume, mas o
+   caso real e o lote inteiro de uma vez (o ML muda a etiqueta pra todo mundo),
+   entao ha o botao "todos" em cima — e a pergunta e uma so, com duas
+   respostas, nas cores que as telas de operacao usam pra cada uma. */
+async function carregarMod(){
+  var l=[]; try{ l=await (await fetch("/api/modalidade/pendentes")).json(); }catch(e){}
+  var card=document.getElementById("modCard"), lis=document.getElementById("modLista"), todos=document.getElementById("modTodos");
+  if(!card||!lis) return 0;
+  if(!Array.isArray(l)||!l.length){ card.style.display="none"; lis.innerHTML=""; if(todos) todos.innerHTML=""; return 0; }
+  card.style.display="";
+  var ids=l.map(function(r){ return r.id; }).join(",");
+  if(todos) todos.innerHTML=(l.length>1?
+      '<span style="font-size:13px;color:#5a6472;align-self:center">Os '+l.length+' volumes de uma vez:</span>'
+      +'<button class="ghost" data-resolvemod="'+ids+'" data-mod="agencia" style="border-color:#b26a00;color:#7a5200">🚗 Todos → AGÊNCIA (vão no carro)</button>'
+      +'<button class="ghost" data-resolvemod="'+ids+'" data-mod="coleta" style="border-color:#6f42c1;color:#4b2a91">🚚 Todos → COLETA (o caminhão busca)</button>' : '');
+  var h="";
+  for(var i=0;i<l.length;i++){
+    var r=l[i];
+    h+='<div style="border-top:1px solid #d8dee6;padding:12px 0">'
+      +'<div style="font-weight:700">'+esc(r.buyer||"—")+' · NF '+esc(r.nf||"—")+' · '+esc(r.data||"")
+      +(r.codigo?' · <span style="font-family:ui-monospace,monospace">'+esc(r.codigo)+'</span>':'')+'</div>'
+      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">pack '+esc(r.packId||"—")+' · venda '+esc(r.venda||"—")
+      +(r.despachar_em?' · despacha '+esc(r.despachar_em):'')+'</div>'
+      +'<div style="margin:8px 0;padding:8px 10px;border-radius:6px;background:#f6f2fd;border:1px solid #d3c5ef;font-size:12px;color:#4b2a91">⚠ '+esc(r.motivo||"")+'</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+      +'<button class="ghost" data-resolvemod="'+r.id+'" data-mod="agencia" style="border-color:#b26a00;color:#7a5200">🚗 Agência — vai no carro</button>'
+      +'<button class="ghost" data-resolvemod="'+r.id+'" data-mod="coleta" style="border-color:#6f42c1;color:#4b2a91">🚚 Coleta — o caminhão busca</button>'
+      +'</div></div>';
+  }
+  lis.innerHTML=h;
+  return l.length;
+}
+document.addEventListener("click",async function(e){
+  var b=e.target.closest("[data-resolvemod]");
+  if(!b) return;
+  var ids=b.getAttribute("data-resolvemod").split(",").map(Number), mod=b.getAttribute("data-mod");
+  var rot=(mod==="coleta")?"COLETA — o caminhão do Mercado Livre vem buscar, a caixa NÃO vai no carro":"AGÊNCIA — a caixa vai no carro";
+  if(!confirm((ids.length>1?ids.length+" volumes":"Este volume")+" sai por:\n\n  "+rot+"\n\nA decisão fica registrada com o seu nome.")) return;
+  b.disabled=true;
+  try{
+    var r=await (await fetch("/api/modalidade/resolver",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ids:ids,modalidade:mod})})).json();
+    if(r.erro) alert(r.erro);
+    else if(r.ainda_sem_sku) alert(r.ainda_sem_sku+" volume(s) continuam bloqueados: o SKU não está no cadastro. Cadastre pra liberar.");
+  }catch(err){ alert(String(err)); }
+  b.disabled=false;
+  carregarBloq();
+  try{ if(typeof verCruz==="function") verCruz(); }catch(e){}
+});
+
 async function carregarBloq(){
 var l=[]; try{ l=await (await fetch("/api/bloqueados")).json(); }catch(e){}
 var n=0; for(var i=0;i<l.length;i++) n+=l[i].qtd;
 var nd=await carregarDiv();
+var nm=await carregarMod();
 var tb=document.getElementById("tabBlq");
-if(tb) tb.textContent = (n+nd) ? ("Bloqueados ("+(n+nd)+")") : "Bloqueados";
+if(tb) tb.textContent = (n+nd+nm) ? ("Bloqueados ("+(n+nd+nm)+")") : "Bloqueados";
 var est=document.getElementById("blqEstado"), lis=document.getElementById("blqLista");
 if(!est||!lis) return;
 if(!l.length){ est.innerHTML="<b>Nenhum volume bloqueado.</b>"; lis.innerHTML=""; return; }
