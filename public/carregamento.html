@@ -10,40 +10,86 @@
   h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
   .link{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
   .links{margin-left:auto;display:flex;gap:8px}
-  .wrap{max-width:820px;margin:0 auto;padding:18px}
+  .wrap{max-width:820px;margin:0 auto;padding:18px 18px 110px}
   .stats{display:flex;gap:12px;margin-bottom:14px}
   .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
   .stat .n{font-size:34px;font-weight:800}.stat .l{font-size:12px;color:var(--muted);text-transform:uppercase}
   .stat.car .n{color:var(--green)}.stat.fal .n{color:var(--amber)}
+  /* COLETA tem cor propria (violeta) nas duas telas — Etiqueta de Venda e aqui.
+     E a segunda porta de saida da fabrica, e a caixa dela NAO vai no carro:
+     uma cor que nao se confunde com "carregado" (verde) nem "falta" (ambar). */
+  .stat.col{border-color:#b9a3e6;background:#f6f2fd}.stat.col .n{color:var(--violet)}
   .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:26px;text-align:center;margin-bottom:14px}
   .banner.ok{background:#e7f5eb;border-color:#a9d8b4}.banner.err{background:#fbe9e8;border-color:#efb1ad}.banner.warn{background:#fbf1db;border-color:#e7cb8c}
+  .banner.col{background:#efe9fb;border-color:#b9a3e6}
   .bt{font-size:26px;font-weight:780}.bs{font-size:15px;color:var(--muted);margin-top:6px}.bs b{color:var(--txt)}
+  .indo{font-size:44px;font-weight:900;color:var(--violet);line-height:1.1;margin:8px 0 2px}
   #scan{position:absolute;left:-9999px;opacity:0}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
   .card h3{margin:0;padding:12px 14px;font-size:13px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--line)}
+  .card.col{border-color:#b9a3e6}.card.col h3{background:#efe9fb;color:#4b2a91}
   .row{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:14px;align-items:center}
   .row .c{font-family:ui-monospace,monospace;color:var(--muted);font-size:12px}
   .row .who{flex:1}
   .btn{border:0;border-radius:9px;font-weight:700;padding:11px 16px;cursor:pointer}
   .conf{background:var(--amber);color:#1a1300;margin-top:12px}
+  .fech{background:var(--violet);color:#fff}
+  .ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
   .empty{padding:22px;text-align:center;color:var(--green)}
+  .sub2{padding:10px 14px;font-size:13px;color:#4b2a91;background:#f6f2fd;border-bottom:1px solid #e3d9f5}
+  .fechbox{padding:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line)}
+  .fechbox input[type=number]{font-size:24px;font-weight:800;width:110px;padding:10px;text-align:center;border:2px solid #b9a3e6;border-radius:10px}
+  /* A FOTO E OBRIGATORIA e por isso o botao dela e grande e vem ANTES do
+     "Fechar": a camera abre direto no tablet (capture=environment). O
+     <input type=file> fica dentro do <label>, visivel, porque o iOS ignora
+     campo escondido (§12). */
+  .fotobtn{display:inline-flex;align-items:center;gap:8px;background:#fff;border:2px dashed #6f42c1;color:#4b2a91;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer}
+  .fotobtn input{position:absolute;width:1px;height:1px;opacity:0.01}
+  .fotobtn.ok{border-style:solid;background:#efe9fb}
+  .fotoprev{height:64px;border-radius:8px;border:1px solid #b9a3e6;display:none}
+  .fotoprev.on{display:inline-block}
+  .hist{padding:8px 14px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)}
+  .hist b.ok{color:var(--green)}.hist b.div{color:var(--red)}
 </style></head><body>
-<header><div class="mark">C</div><div><h1>Carregamento</h1><div class="sub">Bipe a etiqueta de venda ao pôr no carro</div></div>
+<header><div class="mark">C</div><div><h1>Carregamento</h1><div class="sub">Bipe a etiqueta de venda ao pôr no carro — ou ao separar pra coleta</div></div>
 <div class="links"><a class="link" href="/embalagem">Expedição</a><a class="link" href="/painel">Painel</a></div></header>
 <div class="wrap">
   <div class="stats">
-    <div class="stat car"><div class="n" id="nCar">0</div><div class="l">Carregados</div></div>
-    <div class="stat fal"><div class="n" id="nFal">0</div><div class="l">Faltam carregar</div></div>
+    <div class="stat car"><div class="n" id="nCar">0</div><div class="l">No carro</div></div>
+    <div class="stat fal"><div class="n" id="nFal">0</div><div class="l">Faltam no carro</div></div>
+    <div class="stat col"><div class="n" id="nCol">0</div><div class="l">Coleta esperando</div></div>
   </div>
   <div class="banner" id="banner"><div class="bt">Pronto</div><div class="bs">Bipe o QR ou código de barras da etiqueta de venda.</div></div>
   <input id="scan" autocomplete="off">
-  <button class="btn conf" onclick="conferir()" style="width:100%">✓ Conferir carga</button>
-  <div class="card" style="margin-top:14px"><h3>Faltam carregar</h3><div id="lista"></div><div id="depois"></div></div>
+  <button class="btn conf" onclick="conferir()" style="width:100%">✓ Conferir carga do carro</button>
+  <div class="card" style="margin-top:14px"><h3>Faltam carregar no carro (agência)</h3><div id="lista"></div><div id="depois"></div></div>
+
+  <!-- A COLETA: a segunda porta de saida. O caminhao do Mercado Livre vem
+       buscar; a caixa vai pro lugar reservado, nunca pro carro. Bipa-se igual —
+       o bipe e o que poe a caixa na conta que o motorista tem que bater. -->
+  <div class="card col" style="margin-top:14px" id="colCard">
+    <h3>Coleta — o caminhão do Mercado Livre vem buscar</h3>
+    <div class="sub2">Essas caixas <b>não vão no carro</b>. Bipe cada uma ao levar pro lugar reservado. Quando o motorista chegar, <b>tire a foto da tela do celular dele</b> mostrando quantas caixas ele bipou, digite o número e feche a coleta.</div>
+    <div id="colFaltam"></div>
+    <div id="colAguard"></div>
+    <div class="fechbox" id="fechBox">
+      <label class="fotobtn" id="fotoBtn">📷 <span id="fotoTxt">Foto da tela do motorista</span>
+        <input type="file" id="fotoIn" accept="image/*" capture="environment"></label>
+      <img class="fotoprev" id="fotoPrev" alt="">
+      <span style="font-weight:700">Motorista bipou</span>
+      <input id="motQtd" type="number" min="0" inputmode="numeric" placeholder="0">
+      <span style="font-weight:700">caixas</span>
+      <button class="btn fech" onclick="fecharColeta(false)">Fechar coleta</button>
+    </div>
+    <div id="colHist"></div>
+  </div>
 </div>
 <script>
 const $=s=>document.querySelector(s);
 let last={c:null,t:0};
 function banner(kind,title,sub){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'; }
+function esc0(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 /* Quando a conferencia dupla esta ligada, o bipe da etiqueta nao carrega
    sozinho: o volume fica ESPERANDO o bipe do SKU da propria caixa. Guardamos
    qual etiqueta esta pendurada pra casar o segundo bipe com ela. */
@@ -53,32 +99,45 @@ async function bip(code){
   const now=Date.now(); if(last.c===code && now-last.t<600) return; last={c:code,t:now};
   const corpo = aguardando ? {code:aguardando.code, sku:code} : {code:code};
   const r=await (await fetch('/api/carregar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)})).json();
-  if(r.ok){
+  if(r.ok && r.coleta){
+    /* ESTA INDO N. Depois de cada bipe de coleta a tela diz quantas caixas
+       estao no canto — e o numero que o motorista tem que bater. Sai em letra
+       grande porque e o que a pessoa vai falar em voz alta pra ele. */
     aguardando=null;
-    banner('ok','Carregado ✓ — '+r.pedido.buyer,'NF <b>'+(r.pedido.nf||'—')+'</b> · <span class="c">'+(r.pedido.codigo||'')+'</span> · Carregados <b>'+r.carregados+'</b> de '+r.total); beep(true);
+    var n=r.coleta_aguardando||0;
+    banner('col','COLETA ✓ — '+esc0(r.pedido.buyer),
+      'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · <span class="c">'+esc0(r.pedido.codigo||'')+'</span> · <b>não vai no carro</b>: deixe no lugar reservado.'
+      +'<div class="indo">Está indo '+n+' peça'+(n===1?'':'s')+'</div>'
+      +'<div style="color:#4b2a91;font-weight:700">Peça ao motorista o número de caixas que ele bipou antes de sair.</div>');
+    beep(true);
+  }
+  else if(r.ok){
+    aguardando=null;
+    banner('ok','Carregado ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · <span class="c">'+esc0(r.pedido.codigo||'')+'</span> · No carro <b>'+r.carregados+'</b> de '+r.total); beep(true);
   }
   else if(r.motivo==='falta_sku'){
     // 1o bipe aceito. NAO mostramos qual SKU esperar — a conferencia e cega.
     aguardando={code:code, buyer:r.pedido.buyer, nf:r.pedido.nf};
-    banner('warn','Agora bipe o SKU da caixa','<b>'+r.pedido.buyer+'</b> · NF <b>'+(r.pedido.nf||'—')+'</b><br>Bipe o código de barras do produto <b>nesta mesma caixa</b> para conferir.');
+    banner('warn','Agora bipe o SKU da caixa','<b>'+esc0(r.pedido.buyer)+'</b> · NF <b>'+esc0(r.pedido.nf||'—')+'</b><br>Bipe o código de barras do produto <b>nesta mesma caixa</b> para conferir.');
     beep(true);
   }
   else if(r.motivo==='sku_divergente'){
     aguardando=null;
     banner('err','⛔ PARE — CAIXA ERRADA',
-      'A etiqueta de <b>'+r.pedido.buyer+'</b> (NF '+(r.pedido.nf||'—')+') é do produto <span class="c">'+r.esperado+'</span>,<br>'+
-      'mas a caixa que ela está colada é <span class="c">'+r.lido+'</span>.<br><b>Não carregue.</b> Separe e confira antes de despachar.');
+      'A etiqueta de <b>'+esc0(r.pedido.buyer)+'</b> (NF '+esc0(r.pedido.nf||'—')+') é do produto <span class="c">'+esc0(r.esperado)+'</span>,<br>'+
+      'mas a caixa que ela está colada é <span class="c">'+esc0(r.lido)+'</span>.<br><b>Não carregue.</b> Separe e confira antes de despachar.');
     beep(false);
   }
   else if(r.motivo==='volume_sem_sku'){ aguardando=null; banner('err','Volume sem SKU', r.aviso||''); beep(false); }
-  else if(r.motivo==='duplicado'){ aguardando=null; banner('err','⚠ JÁ CARREGADO','Esse pacote ('+r.pedido.buyer+' · NF '+(r.pedido.nf||'—')+') já foi carregado. Cuidado com duplicidade.'); beep(false); }
+  else if(r.motivo==='duplicado'){ aguardando=null;
+    banner('err','⚠ JÁ '+(r.coleta?'SEPARADO PRA COLETA':'CARREGADO'),'Esse pacote ('+esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+') já foi bipado'+(r.coleta?' pra coleta':'')+'. Cuidado com duplicidade.'); beep(false); }
   else {
     // Enquanto espera o SKU, um codigo nao reconhecido pode ser outra etiqueta:
     // solta a pendencia pra pessoa nao ficar presa num volume.
     var era=aguardando; aguardando=null;
     banner('err','Etiqueta não reconhecida', era
-      ? 'Lido: '+code+'. Esperava o SKU da caixa de '+era.buyer+'. Bipe a etiqueta de venda de novo pra recomeçar.'
-      : 'Lido: '+code+'. Bipe a etiqueta de VENDA (não o SKU do produto).');
+      ? 'Lido: '+esc0(code)+'. Esperava o SKU da caixa de '+esc0(era.buyer)+'. Bipe a etiqueta de venda de novo pra recomeçar.'
+      : 'Lido: '+esc0(code)+'. Bipe a etiqueta de VENDA (não o SKU do produto).');
     beep(false);
   }
   carregar();
@@ -88,46 +147,140 @@ async function bip(code){
    trabalho de hoje, sem nada que o distinga, ele viraria uma linha a mais numa
    lista que nunca zera — e lista que nunca zera ninguem le ate o fim. */
 function dataBR(s){ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?(m[3]+'/'+m[2]):''; }
+function horaDe(s){ var p=String(s||'').split(' '); return (p[1]||'').slice(0,5); }
+function linha(f){
+  return '<div class="row"><span class="who">'
+    +(f.atrasado?'<b style="color:var(--amber)">⏳ de '+dataBR(f.data)+'</b> · ':'')
+    +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+'</span></span></div>';
+}
 async function carregar(){
   const d=await (await fetch('/api/carregamento')).json();
+  const col=d.coleta||{faltam:[],aguardando:[],fechamentos:[],retiradas_hoje:0};
   $('#nCar').textContent=d.carregados; $('#nFal').textContent=d.faltam.length;
-  $('#lista').innerHTML = d.faltam.length ? d.faltam.map(function(f){
-    return '<div class="row"><span class="who">'
-      +(f.atrasado?'<b style="color:var(--amber)">⏳ de '+dataBR(f.data)+'</b> · ':'')
-      +f.buyer+' <span class="c">NF '+(f.nf||'—')+' · '+(f.codigo||'')+'</span></span></div>';
-  }).join('') : '<div class="empty">✅ Nada faltando — tudo carregado!</div>';
+  $('#nCol').textContent=col.aguardando.length;
+  $('#lista').innerHTML = d.faltam.length ? d.faltam.map(linha).join('') : '<div class="empty">✅ Nada faltando — carro completo!</div>';
   /* A venda futura aparece, mas fora da cobranca: ela existe e esta na
      fabrica (nao pode sumir, foi esse o buraco), so nao e carga de hoje. */
   var dp=document.getElementById('depois');
   if(dp) dp.innerHTML = d.adiantadas
     ? '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#eef3fb;'
       +'border:1px solid #c9d8ee;font-size:14px">📅 <b>'+d.adiantadas+'</b> com etiqueta impressa '
-      +'que <b>só despacham depois</b> — não vão no carro hoje: '
+      +'que <b>só despacham depois</b> — não vão hoje: '
       +d.depois.slice(0,6).map(function(f){ return esc0(f.buyer)+' ('+dataBR(f.despachar_em)+')'; }).join(', ')
       +(d.depois.length>6?'…':'')+'</div>'
     : '';
+  /* O CANTO DA COLETA, em duas partes: o que ainda falta bipar (etiqueta
+     impressa, caixa ainda na bancada) e o que ja esta la esperando o
+     caminhao. O card so some quando nao ha nada de coleta em lugar nenhum —
+     hoje e o primeiro dia dessa modalidade e a equipe precisa VER onde ela
+     mora na tela. */
+  var temColeta = col.faltam.length || col.aguardando.length || col.fechamentos.length || col.retiradas_hoje;
+  $('#colCard').style.display = temColeta ? '' : 'none';
+  $('#colFaltam').innerHTML = col.faltam.length
+    ? '<div class="hist" style="border-top:0"><b>Faltam bipar pra coleta: '+col.faltam.length+'</b></div>'+col.faltam.map(linha).join('')
+    : '';
+  $('#colAguard').innerHTML = col.aguardando.length
+    ? '<div class="hist"><b style="color:#4b2a91">No lugar reservado, esperando o caminhão: '+col.aguardando.length+'</b></div>'
+      +col.aguardando.map(function(f){ return '<div class="row"><span class="who">'+esc0(f.buyer)
+        +' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+' · '+horaDe(f.carregado_em)+'</span></span></div>'; }).join('')
+    : '<div class="empty" style="color:var(--muted)">Nenhuma caixa esperando o caminhão'+(col.retiradas_hoje?' — '+col.retiradas_hoje+' já retirada'+(col.retiradas_hoje===1?'':'s')+' hoje':'')+'.</div>';
+  $('#fechBox').style.display = col.aguardando.length ? '' : 'none';
+  $('#colHist').innerHTML = col.fechamentos.map(function(f){
+    return '<div class="hist">'+horaDe(f.fechado_em)+' — '
+      +(f.divergente ? '<b class="div">⛔ DIVERGENTE</b>: sistema '+f.qtd_sistema+', motorista '+f.qtd_motorista
+                     : '<b class="ok">✓ bateu</b>: '+f.qtd_sistema+' caixas')
+      +(f.fechado_por?' · '+esc0(f.fechado_por):'')+(f.obs?' · '+esc0(f.obs):'')
+      +(f.tem_foto?' · <a href="/api/coleta/foto/'+f.id+'" target="_blank" style="color:#4b2a91;font-weight:700">📷 ver a foto</a>':'')+'</div>';
+  }).join('');
 }
-function esc0(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
-  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 async function conferir(){
   const d=await (await fetch('/api/carregamento')).json();
   /* "Sem lote" olha o que FALTA, nao o dia: com volume atrasado esperando, o
      aviso de dia vazio mandaria fechar o carro por cima dele. */
-  if(d.total===0){ banner('warn','Nada pra carregar','Nenhum volume embalado esperando.'); return; }
-  if(d.faltam.length===0){ banner('ok','Carga completa ✓','Pode fechar o carro. '+d.carregados+' pacotes conferidos.'); beep(true); }
+  if(d.total===0){ banner('warn','Nada pra carregar no carro','Nenhum volume de agência embalado esperando.'); return; }
+  if(d.faltam.length===0){ banner('ok','Carga do carro completa ✓','Pode fechar o carro. '+d.carregados+' pacotes conferidos.'); beep(true); }
   else{ banner('err','Faltam '+d.faltam.length+' no carro',
     (d.atrasados?'<b>'+d.atrasados+' de dias anteriores.</b> ':'')
-    +'NÃO feche ainda: '+d.faltam.slice(0,6).map(f=>f.buyer).join(', ')+(d.faltam.length>6?'…':'')); beep(false); }
+    +'NÃO feche ainda: '+d.faltam.slice(0,6).map(f=>esc0(f.buyer)).join(', ')+(d.faltam.length>6?'…':'')); beep(false); }
+}
+/* FECHAR A COLETA: o motorista diz quantas bipou, o sistema compara com as
+   que estao no canto. Bateu, as caixas saem do canto e fica registrado. Nao
+   bateu, NADA anda: a tela lista as caixas pra conferir uma a uma com o
+   motorista ali na frente — e o unico momento em que a caixa que sumiu ainda
+   pode ser achada. Liberar assim mesmo existe (o caminhao nao pode ficar
+   preso), mas fica gravado como divergente, com quem fechou. */
+/* A FOTO DA TELA DO MOTORISTA E A PROVA DO NUMERO. Regra do dono: "nao adianta
+   apenas o motorista falar a quantidade". O tablet fotografa o celular dele
+   com a contagem do sistema do ML, a foto e reduzida aqui (1600 px, JPEG) pra
+   nao pesar no fio, e vai junto do fechamento. Sem foto o servidor recusa. */
+let fotoDataUrl=null;
+function reduzirFoto(file){
+  return new Promise(function(res,rej){
+    var fr=new FileReader();
+    fr.onload=function(){
+      var img=new Image();
+      img.onload=function(){
+        var max=1600, w=img.width, h=img.height, k=Math.min(1, max/Math.max(w,h));
+        var c=document.createElement('canvas'); c.width=Math.round(w*k); c.height=Math.round(h*k);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        res(c.toDataURL('image/jpeg',0.85));
+      };
+      img.onerror=rej; img.src=fr.result;
+    };
+    fr.onerror=rej; fr.readAsDataURL(file);
+  });
+}
+$('#fotoIn').addEventListener('change',async function(){
+  var f=this.files&&this.files[0]; if(!f) return;
+  try{ fotoDataUrl=await reduzirFoto(f); }
+  catch(e){ fotoDataUrl=null; banner('err','Não deu pra ler a foto','Tente tirar de novo.'); return; }
+  $('#fotoPrev').src=fotoDataUrl; $('#fotoPrev').className='fotoprev on';
+  $('#fotoBtn').className='fotobtn ok'; $('#fotoTxt').textContent='Foto tirada ✓ — tirar outra';
+  $('#motQtd').focus();
+});
+function limparFoto(){
+  fotoDataUrl=null; $('#fotoIn').value=''; $('#fotoPrev').className='fotoprev'; $('#fotoPrev').src='';
+  $('#fotoBtn').className='fotobtn'; $('#fotoTxt').textContent='Foto da tela do motorista';
+}
+let divergPend=null;
+async function fecharColeta(confirmar){
+  if(!fotoDataUrl){ banner('warn','Falta a foto da tela do motorista','Toque em <b>📷 Foto da tela do motorista</b> e fotografe o celular dele mostrando quantas caixas ele bipou. Sem a foto a coleta não fecha.'); beep(false); return; }
+  var q=$('#motQtd').value;
+  if(q==='' || !(parseInt(q,10)>=0)){ banner('warn','Quantas caixas o motorista bipou?','Digite o número que está na foto antes de fechar.'); return; }
+  var corpo={motorista:parseInt(q,10),foto:fotoDataUrl};
+  if(confirmar){ corpo.confirmar=true; corpo.obs=String(prompt('Por que está liberando com número diferente? (fica registrado)')||'').slice(0,300); }
+  const r=await (await fetch('/api/coleta/fechar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)})).json();
+  if(r.ok){
+    divergPend=null; $('#motQtd').value=''; limparFoto();
+    if(r.divergente){ banner('err','Coleta fechada COM DIVERGÊNCIA','Sistema <b>'+r.sistema+'</b> · motorista <b>'+r.motorista+'</b>. Ficou registrado com o seu nome e com a foto.'); beep(false); }
+    else { banner('ok','Coleta conferida ✓ — '+r.sistema+' = '+r.motorista,'O número do motorista bateu e a foto ficou guardada. Pode liberar o caminhão.'); beep(true); }
+  }
+  else if(r.motivo==='sem_foto'){ banner('warn','Falta a foto da tela do motorista', esc0(r.aviso||'')); beep(false); }
+  else if(r.motivo==='divergente'){
+    divergPend=r;
+    banner('err','⛔ NÃO BATEU — sistema '+r.sistema+', motorista '+r.motorista,
+      'Diferença de <b>'+Math.abs(r.sistema-r.motorista)+'</b>. <b>Não libere o caminhão.</b> Confira caixa por caixa com o motorista:<br>'
+      +'<div style="text-align:left;margin:8px auto 0;max-width:520px;font-size:13px">'
+      +r.lista.map(function(f){ return '☐ '+esc0(f.buyer)+' · NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||''); }).join('<br>')+'</div>'
+      +'<div style="margin-top:12px"><button class="btn ghost" onclick="fecharColeta(true)">Liberar mesmo assim (fica registrado)</button></div>');
+    beep(false);
+  }
+  else if(r.motivo==='nada'){ banner('warn','Nada pra fechar', r.aviso||''); }
+  else { banner('err','Não deu pra fechar', esc0(r.erro||JSON.stringify(r))); beep(false); }
+  carregar();
 }
 const scan=$('#scan');
 /* preventScroll: devolver o foco nao pode arrastar a tela. O #scan mora no
    alto; sem isto, focar de volta rolava a pagina ate ele e jogava pro topo
    quem tivesse descido pra usar qualquer coisa no fim. O keep existe pro
-   BIPE cair no lugar certo, nao pra mexer no que a pessoa esta olhando. */
-const keep=()=>{ if(document.activeElement!==scan) scan.focus({preventScroll:true}); };
+   BIPE cair no lugar certo, nao pra mexer no que a pessoa esta olhando.
+   O campo do motorista e a excecao: enquanto a pessoa digita ali, o foco
+   fica ali. */
+const keep=()=>{ const a=document.activeElement; if(a===scan) return; if(a && (a.id==='motQtd'||a.id==='fotoIn')) return; scan.focus({preventScroll:true}); };
 scan.addEventListener('blur',()=>setTimeout(keep,50));
-document.addEventListener('click',e=>{ if(!e.target.closest('button,a')) keep(); });
+document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input,label')) keep(); });
 scan.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=scan.value.trim(); scan.value=''; bip(v); } });
+$('#motQtd').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); fecharColeta(false); } });
 scan.focus();
 function beep(ok){ try{const a=new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=ok?820:240;g.gain.value=.05;o.start();setTimeout(()=>{o.stop();a.close();},ok?100:220);}catch(e){} }
 carregar(); setInterval(carregar,4000);

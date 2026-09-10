@@ -253,6 +253,25 @@ reimpressoes INTEGER DEFAULT 0   -- quantas vezes voltou pra impressora
 reimpresso_em TEXT               -- ultima reimpressao (sem default: ALTER nao aceita)
 bloqueio     TEXT                -- POR QUE foi bloqueado:
              -- 'sku_nao_cadastrado' | 'divergencia: SKU_A / SKU_B'
+descricao, despachar_em, bloqueio_resolvido, resolvido_por, resolvido_em
+modalidade   TEXT                -- 'agencia' | 'coleta' | NULL (= agencia)
+             -- lido da etiqueta: coleta vem SEM hora em "Despachar:"
+retirado_em  TEXT                -- coleta: quando o caminhão do ML levou
+             -- (preenchido no fechamento com o motorista)
+```
+
+#### `coleta_fechamento` — a conferência com o motorista da coleta
+```sql
+id            INTEGER PK
+fechado_em    TEXT DEFAULT datetime('now','localtime')
+fechado_por   TEXT
+qtd_sistema   INTEGER    -- caixas no lugar reservado (bipadas, não retiradas)
+qtd_motorista INTEGER    -- quantas o motorista disse que bipou
+divergente    INTEGER    -- 1 quando não bateu e alguém liberou mesmo assim
+obs           TEXT
+ids           TEXT       -- JSON com os lote.id fechados
+foto          TEXT       -- caminho da foto da tela do motorista (coletas/coleta-<id>.jpeg)
+                         -- OBRIGATÓRIA: sem ela a rota não fecha
 ```
 
 #### `devolucao`
@@ -422,8 +441,18 @@ atualizado  TEXT
 ### Carregamento
 | Método | Rota | Efeito |
 |---|---|---|
-| POST | `/api/carregar` | Confere por código · recusa duplicado e bloqueado |
-| GET | `/api/carregamento` | Total, carregados, faltantes |
+| POST | `/api/carregar` | Confere por código · recusa duplicado e bloqueado · responde `coleta` e `coleta_aguardando` ("está indo N") |
+| GET | `/api/carregamento` | Carro: total, carregados, faltantes · `coleta`: faltam bipar, esperando o caminhão, retiradas hoje, fechamentos do dia |
+| POST | `/api/coleta/fechar` | `{motorista:N, foto:dataURL}` compara com as caixas esperando · **sem foto → `sem_foto`, nada anda** · bateu → `retirado_em` em todas · não bateu → `divergente` com a lista, nada anda até `confirmar:true` (auditado) |
+| GET | `/api/coleta/foto/:id` | A foto da tela do motorista daquele fechamento |
+| GET | `/api/modalidade/pendentes` | Volumes retidos porque a linha "Despachar:" veio num formato desconhecido (`bloqueio LIKE 'modalidade%'`) · admin |
+| POST | `/api/modalidade/resolver` | `{ids:[...], modalidade:'agencia'|'coleta'}` — a gestão decide por onde a caixa sai · grava rastro · **não passa por cima do §6** |
+
+> **Coleta (10/09/2026):** o caminhão do Mercado Livre busca parte das vendas
+> na fábrica. A etiqueta é igual à da agência, menos a linha "Despachar", que
+> vem **sem hora**. `parse.js` → `modalidadeDespacho()` lê isso; `carga.js` é o
+> dono único de "isto é coleta?" (`COLETA`, `AGENCIA`, `ehColeta`,
+> `AGUARDA_CAMINHAO`). Volumes anteriores à coluna: `node backfill_modalidade.js`.
 
 ### Cruzamento
 | Método | Rota | Efeito |

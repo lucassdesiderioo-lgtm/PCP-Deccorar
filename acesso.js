@@ -439,6 +439,9 @@ module.exports = function(app, db){
     if(M !== 'GET' && eq('/api/montagem')) return 'embalagem.executar';
     if(M !== 'GET' && eq('/api/embalar')) return 'etiqueta.emitir';
     if(M !== 'GET' && eq('/api/carregar')) return 'carregamento.executar';
+    // Fechar a coleta com o motorista e ato da mesma bancada que bipa a caixa:
+    // quem carrega e quem confere o numero na frente do caminhao.
+    if(M !== 'GET' && pre('/api/coleta')) return 'carregamento.executar';
     if(M !== 'GET' && pre('/api/lote')) return 'pdf.subir';
     if(pre('/api/print')) return 'etiqueta.emitir';
     // Reimpressao: mesma bancada, mesma permissao de imprimir. A LEITURA tambem
@@ -450,6 +453,9 @@ module.exports = function(app, db){
     // decisao, "qual peca e essa", tomada olhando o pedido no Mercado Livre.
     if(M !== 'GET' && pre('/api/divergencias')) return 'sku.cadastrar';
     if(eq('/api/divergencias')) return '@admin';
+    // Etiqueta em formato desconhecido (§8-B): ver e decidir se a caixa vai
+    // pro carro ou pro caminhao da coleta e da GESTAO, por regra do dono.
+    if(pre('/api/modalidade')) return '@admin';
     if(eq('/api/auditoria/skus')) return '@admin';
     if(M !== 'GET' && eq('/api/devolucao')) return 'devolucao.registrar';
     if(M !== 'GET' && eq('/api/devolucao/baixa')) return 'devolucao.baixar';
@@ -635,9 +641,10 @@ module.exports = function(app, db){
     ['GET','/expedicao'],['GET','/devolucao'],['GET','/painel'],['GET','/relatorios'],
     ['GET','/planejamento'],['GET','/acessos'],['GET','/baixar-backup'],
     ['POST','/api/revisao'],['POST','/api/rejeicao'],['POST','/api/montagem'],['POST','/api/embalar'],
-    ['POST','/api/carregar'],['POST','/api/lote/upload'],['GET','/api/print/:id'],
+    ['POST','/api/carregar'],['POST','/api/coleta/fechar'],['POST','/api/lote/upload'],['GET','/api/print/:id'],
     ['GET','/api/impressos'],['POST','/api/reimprimir'],
     ['GET','/api/divergencias'],['POST','/api/divergencias/resolver'],
+    ['GET','/api/modalidade/pendentes'],['POST','/api/modalidade/resolver'],['GET','/api/coleta/foto/:id'],
     ['GET','/api/auditoria/skus'],['POST','/api/devolucao'],
     ['POST','/api/devolucao/baixa'],['POST','/api/estoque'],['POST','/api/alvo'],
     ['POST','/api/producao'],['POST','/api/planejamento/importar'],['POST','/api/skus'],['DELETE','/api/skus/:c'],

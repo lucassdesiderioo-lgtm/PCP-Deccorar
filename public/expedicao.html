@@ -38,16 +38,18 @@ function b64(f){ return new Promise(r=>{const fr=new FileReader();fr.onload=()=>
 async function upMany(fileList){
   const files=[...fileList].filter(f=>/pdf/i.test(f.type)||/\.pdf$/i.test(f.name));
   if(!files.length) return;
-  let totNov=0,totRep=0,totSem=0,totPdf=0,ok=0;
+  let totNov=0,totRep=0,totSem=0,totPdf=0,totCol=0,totMod=0,ok=0;
   for(let i=0;i<files.length;i++){
     $('#res').innerHTML='Lendo '+(i+1)+' de '+files.length+': <b>'+files[i].name+'</b>…';
     try{
       const j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
       if(j.erro){ console.error(files[i].name, j.erro); continue; }
-      totNov+=j.novos; totRep+=j.repetidas; totSem+=j.sem_sku; totPdf+=j.total; ok++;
+      totNov+=j.novos; totRep+=j.repetidas; totSem+=j.sem_sku; totPdf+=j.total; totCol+=j.coleta||0; totMod+=j.modalidade_duvida||0; ok++;
     }catch(e){ console.error(files[i].name,e); }
   }
-  $('#res').innerHTML='<b>'+ok+' PDF(s) processado(s)</b> · '+totNov+' vendas adicionadas · '+totPdf+' no total · '+totRep+' repetidas ignoradas · '+totSem+' sem SKU';
+  $('#res').innerHTML='<b>'+ok+' PDF(s) processado(s)</b> · '+totNov+' vendas adicionadas · '+totPdf+' no total · '+totRep+' repetidas ignoradas · '+totSem+' sem SKU'
+    +(totCol?' · <b style="color:#b9a3e6">🚚 '+totCol+' pra coleta (o caminhão do ML vem buscar)</b>':'')
+    +(totMod?'<div style="margin-top:8px;color:#d2b8ff;font-weight:700">⚠ '+totMod+' etiqueta(s) num formato desconhecido — retidas. A gestão decide agência ou coleta em Admin → Bloqueados.</div>':'');
   lista();
 }
 async function lista(){

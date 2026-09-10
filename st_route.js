@@ -26,15 +26,23 @@ module.exports=function(app,db){
     /* Mesma regua da fila (fila_dia.js). Contando por dia de importacao, o
        relogio de despacho ficava vermelho por causa de venda que so vence em
        setembro — pressa por trabalho que nao e do dia. */
-    const pend=db.prepare("SELECT COUNT(*) c FROM lote WHERE estagio='pendente' AND "
-      +require('./fila_dia').VENCE_HOJE).get().c;
+    /* O RELOGIO E DA AGENCIA. A hora de despacho configurada e o limite pra
+       levar o carro ate la; a coleta nao tem hora (a etiqueta dela vem sem, e
+       quem manda e o caminhao do ML). Contar a coleta em `pendentes` deixaria
+       o relogio vermelho por caixa que nao vai no carro — pressa por trabalho
+       que nao e desse prazo. Ela sai a parte, em `pendentes_coleta`, pra tela
+       dizer que existe sem alarmar. Regua unica em carga.js. */
+    const {COLETA,AGENCIA}=require('./carga');
+    const VH=require('./fila_dia').VENCE_HOJE;
+    const pend=db.prepare("SELECT COUNT(*) c FROM lote WHERE estagio='pendente' AND "+VH+" AND "+AGENCIA()).get().c;
+    const pendCol=db.prepare("SELECT COUNT(*) c FROM lote WHERE estagio='pendente' AND "+VH+" AND "+COLETA()).get().c;
     const emb=db.prepare("SELECT COUNT(*) c FROM lote WHERE data=date('now','localtime') AND estagio='embalado'").get().c;
     const car=db.prepare("SELECT COUNT(*) c FROM lote WHERE data=date('now','localtime') AND estagio='carregado'").get().c;
     let falta=0;
     const p1=desp.split(':'), p2=h.hm.split(':');
     falta=(+p1[0]*60+ +p1[1])-(+p2[0]*60+ +p2[1]);
     res.json({despacho:desp, agora:h.hm, minutosRestantes:falta, passou:falta<0,
-      pendentes:pend, embalados:emb, carregados:car});
+      pendentes:pend, pendentes_coleta:pendCol, embalados:emb, carregados:car});
   });
   app.get('/api/config/horarios',(req,res)=>{
     const r={};
