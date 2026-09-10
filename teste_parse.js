@@ -348,6 +348,43 @@ function conferir(nome, orders, esperado){
     else console.log('ok      coleta e agencia se separam pela hora da linha Despachar');
   }
 
+  /* ── 16. O "i" DEPOIS DO "f" E DEFEITO DO PDF, NAO OUTRO CLIENTE ──────────
+        09/09/2026: etiqueta e DANFE "Rafaela Silva de Santana", folha
+        "Rafiaela Silva De Santana". A fonte da folha desenha o "f" com
+        ligadura e o pdf.js le "fi". O volume ficou retido e a fila mostrou 49
+        onde o Mercado Livre dizia 50. A primeira metade e o caso real, montado
+        num PDF com o nome DIFERENTE na etiqueta e na folha; a segunda garante
+        que letra trocada continua sendo outra pessoa. */
+  casos++;
+  {
+    const os_=await montar([
+      {pack:'111',venda:'901',sku:'BK150150BEGE',medida:'1,50x1,50',cor:'Bege',comprador:'Rafiaela Silva De Santana'},
+      {pack:'222',venda:'902',sku:'BK160160CINZA',medida:'1,60x1,60',cor:'Cinza',comprador:'Outra Pessoa Completamente'},
+    ],[
+      {pack:'111',nf:'6236',comprador:'Rafaela Silva de Santana'},
+      {pack:'222',nf:'6237',comprador:'Rafael Silva de Santana'},   // NAO e a Rafaela: e outra pessoa
+    ]);
+    const {mesmoNomeComIDepoisDoF}=require('./parse');
+    const chave=s=>String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
+    const mesma=(x,y)=>mesmoNomeComIDepoisDoF(chave(x),chave(y));
+    const erros=[];
+    const raf=os_.find(o=>o.packId==='111')||{};
+    if(raf.conflito) erros.push('reteve a Rafaela a toa: '+raf.conflito);
+    const outro=os_.find(o=>o.packId==='222')||{};
+    if(!outro.conflito || !/comprador/.test(outro.conflito))
+      erros.push('parou de acusar o volume casado com outra pessoa: '+JSON.stringify(outro.conflito));
+    if(!mesma('Rafiaela Silva De Santana','Rafaela Silva de Santana')) erros.push('nao reconheceu Rafiaela/Rafaela');
+    if(!mesma('Ryta de Kassia Andrade Rufiino','Ryta De Kassia Andrade Rufino')) erros.push('nao reconheceu Rufiino/Rufino pelo mesmo defeito');
+    [['Sofia Lima','Sonia Lima'],['Rafael Silva de Santana','Rafaela Silva de Santana'],
+     ['Marcelo Sousa Silva','Marcela Sousa Silva'],['Silvia Carolina Souza','Evandro Pereira Lima']].forEach(([x,y])=>{
+      if(mesma(x,y)) erros.push('tratou como a mesma pessoa: "'+x+'" e "'+y+'"');
+    });
+    if(erros.length){ falhas++; console.log('FALHOU  o "i" depois do "f" passa, letra trocada nao (caso Rafaela)');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      o "i" depois do "f" passa, letra trocada nao (caso Rafaela)');
+  }
+
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));

@@ -5,6 +5,7 @@ const fs=require('fs'), path=require('path');
    junto com o PDF. Configuravel por ambiente so pro teste nao escrever em
    /opt. */
 const FOTOS_DIR=process.env.PCP_COLETAS_DIR||'/opt/expedicao/coletas';
+const BLOQ=require('./bloqueados');
 module.exports=function(app,db){
   /* ── CONFERENCIA DUPLA (etiqueta de venda + SKU da caixa) ──────────────────
      A ultima rede antes do carro. Bipe 1 = a etiqueta de venda JA COLADA;
@@ -172,9 +173,19 @@ module.exports=function(app,db){
     const fechamentos=db.prepare(`SELECT id,fechado_em,fechado_por,qtd_sistema,qtd_motorista,divergente,obs,
         CASE WHEN foto IS NOT NULL THEN 1 ELSE 0 END tem_foto
       FROM coleta_fechamento WHERE date(fechado_em)=date('now','localtime') ORDER BY id DESC`).all();
+    /* O BLOQUEADO COM PRAZO PRA HOJE NAO VAI NO CARRO NEM NO CAMINHAO, e a tela
+       tem que dizer isso ANTES de alguem fechar a carga. Ele nunca foi impresso,
+       entao nao esta em `faltam` nem na coleta — e sem esta linha "carga completa"
+       seria mentira: o carro fecha com uma venda do dia parada na prateleira, e
+       o cliente e o Mercado Livre e que avisam. Conta do bloqueados.js, a mesma
+       da Etiqueta de Venda; a lista vem so com os de hoje, que sao os que
+       importam aqui. */
+    const bloq=BLOQ.resumo(db);
+    const bloqueados=BLOQ.lista(db).filter(v=>v.hoje);
     return {total:car+faltam.length, carregados:car, faltam,
             atrasados:faltam.filter(f=>f.atrasado).length,
             depois, adiantadas:depois.length,
+            bloqueados_total:bloq.total, bloqueados,
             coleta:{faltam:coletaFaltam, aguardando, retiradas_hoje:retiradas, fechamentos}};
   }
   // conferencia: o que falta carregar — todo `embalado`, com o atrasado marcado

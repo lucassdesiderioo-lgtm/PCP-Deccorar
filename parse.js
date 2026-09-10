@@ -141,6 +141,32 @@ function mesmoNomeComRepeticao(a,b){
   return !!x && x===y;
 }
 
+/* O "i" QUE O PDF DO MERCADO LIVRE ENFIA DEPOIS DO "f".
+ *
+ * Em 09/09/2026 a etiqueta e a DANFE diziam "Rafaela Silva de Santana" e a
+ * folha de controle dizia "Rafiaela Silva De Santana". Nao e digitacao de
+ * ninguem: e a fonte da folha, que desenha o "f" minusculo com uma ligadura e
+ * o pdf.js le como "fi". No mesmo PDF o cabecalho da folha sai "Identifiicação"
+ * e uma etiqueta sai "Refierencia" — "f" minusculo antes de vogal ganha um "i".
+ * O caso da Ryta ("Rufiino") e o mesmo defeito; ali a letra repetida escondeu
+ * a origem.
+ *
+ * A trava acusou uma inocente, e o volume ficou retido em Bloqueados enquanto o
+ * gestor cacava "a unidade que faltava" comparando o Mercado Livre com a fila
+ * (50 la, 49 aqui). Uma trava com falso positivo e a armadilha #10 outra vez.
+ *
+ * A tolerancia e ESTREITA de proposito, como a da repeticao: apaga o(s) "i"
+ * colado(s) depois de um "f" — dos DOIS lados —, colapsa repeticao e exige
+ * igualdade. "rafiaela" e "rafaela" viram o mesmo; "rufiino" e "rufino" tambem.
+ * Nome com letra TROCADA continua diferente ("sofia"/"sonia", "rafael"/
+ * "rafaela"): nao e distancia de edicao, e um unico defeito conhecido do
+ * documento, desfeito e mais nada. */
+function mesmoNomeComIDepoisDoF(a,b){
+  const semI=s=>String(s||'').replace(/fi+/g,'f').replace(/(.)\1+/g,'$1');
+  const x=semI(a), y=semI(b);
+  return !!x && x===y;
+}
+
 function pageLines(tc){
   const items=tc.items.filter(it=>it.str&&it.str.trim()!=='');
   const rows={};
@@ -261,9 +287,11 @@ async function parsePdf(uint8){
       .replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
     if(rec && rec.comprador && buyer){
       const a=nomeChave(buyer), b=nomeChave(rec.comprador);
-      /* Letra dobrada e digitacao do ML, nao outro cliente (ver
-         mesmoNomeComRepeticao — e so repeticao, nunca letra trocada). */
-      const mesmaPessoa = mesmoNomeComRepeticao(a,b);
+      /* Letra dobrada e o "i" depois do "f" sao defeitos do PDF, nao outro
+         cliente (ver mesmoNomeComRepeticao e mesmoNomeComIDepoisDoF — cada
+         uma desfaz UM defeito conhecido e exige igualdade; nunca letra
+         trocada). */
+      const mesmaPessoa = mesmoNomeComRepeticao(a,b) || mesmoNomeComIDepoisDoF(a,b);
       if(a && b && a!==b && a.indexOf(b)<0 && b.indexOf(a)<0 && !mesmaPessoa)
         motivos.push('comprador nao bate: etiqueta "'+buyer+'" / folha "'+rec.comprador+'"');
     }
@@ -317,4 +345,4 @@ async function parsePdf(uint8){
   }
   return orders;
 }
-module.exports={parsePdf,dataDespacho,modalidadeDespacho,linhaDespacho,nomeDaEtiqueta,mesmoNomeComRepeticao};
+module.exports={parsePdf,dataDespacho,modalidadeDespacho,linhaDespacho,nomeDaEtiqueta,mesmoNomeComRepeticao,mesmoNomeComIDepoisDoF};
