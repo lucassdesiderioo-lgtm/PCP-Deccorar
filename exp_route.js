@@ -339,11 +339,16 @@ module.exports=function(app,db){
      `skus` (§7): medida, cor, tecido e modelo, que e o que se le na prateleira.
      O JOIN e por UPPER(codigo) porque o lote guarda o codigo como veio da
      folha; skus.codigo e a chave. */
+  /* UMA LINHA POR SKU E POR PORTA DE SAIDA (§8-B). A tela mostra duas listas
+     lado a lado — Agencia (vai no carro) e Coleta (o caminhao busca) — e o
+     mesmo SKU pode estar nas duas, cada um com a sua conta. `modalidade` vem
+     ja resolvida ('agencia' | 'coleta') pela regua do carga.js: NULL e
+     agencia, a tela nao precisa saber disso. */
   app.get('/api/pendentes',(req,res)=>{
     res.json(db.prepare(`SELECT l.codigo, COUNT(*) qtd,
+        CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END modalidade,
         MIN(l.despachar_em) vence_em,
         SUM(CASE WHEN l.despachar_em IS NOT NULL AND l.despachar_em<date('now','localtime') THEN 1 ELSE 0 END) atrasados,
-        SUM(CASE WHEN ${COLETA('l')} THEN 1 ELSE 0 END) coletas,
         s.largura_cm, s.altura_cm,
         COALESCE(c.nome,s.cor_codigo,s.cor) cor_nome,
         COALESCE(t.nome,s.tecido_codigo) tecido_nome,
@@ -355,8 +360,12 @@ module.exports=function(app,db){
       LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
       LEFT JOIN modelo m ON m.id=s.modelo_id
       WHERE ${filaDoDia('l')}
-      GROUP BY l.codigo ORDER BY atrasados DESC, qtd DESC`).all());
+      GROUP BY l.codigo, CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END
+      ORDER BY atrasados DESC, qtd DESC`).all());
   });
+  /* O GROUP BY repete a expressao em vez de usar o apelido `modalidade`: com o
+     apelido, o SQLite agrupava pela COLUNA l.modalidade e o NULL (= agencia)
+     saia numa linha separada da agencia. Ha caso travando (teste_divergencia). */
   /* OS NUMEROS DA TELA, NUM LUGAR SO.
      A tela mostrava "15 PENDENTES" no topo e "Nada pendente" na lista logo
      abaixo — duas respostas opostas para a mesma pergunta, na mesma tela. Nao

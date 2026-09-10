@@ -159,6 +159,20 @@ function conferir(nome,cond,detalhe){
     conferir('so agencia ou coleta sao respostas', r3.status===400, JSON.stringify(r3.body));
     fechar(ctx);
   }
+  /* DUAS LISTAS EM "FALTAM IMPRIMIR": o mesmo SKU sai numa linha por porta
+     de saida, cada uma com a sua conta. NULL e agencia. */
+  {
+    const ctx=await montar(); const db=ctx.db;
+    const ins=db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,estagio,modalidade) VALUES (?,?,?,?,'pendente',?)`);
+    ins.run('BK140140BEGE','A','1','p1','agencia'); ins.run('BK140140BEGE','B','2','p2',null);
+    ins.run('BK140140BEGE','C','3','p3','coleta'); ins.run('BK160140BEGE','D','4','p4','coleta');
+    const r=await chamar(ctx,'GET','/api/pendentes');
+    const linhas=r.body.map(x=>x.codigo+':'+x.modalidade+'='+x.qtd).sort();
+    conferir('pendentes vem por SKU e por modalidade, NULL contando como agencia',
+      JSON.stringify(linhas)===JSON.stringify(['BK140140BEGE:agencia=2','BK140140BEGE:coleta=1','BK160140BEGE:coleta=1']),
+      JSON.stringify(linhas));
+    fechar(ctx);
+  }
   /* A decisao da modalidade nao passa por cima do §6: SKU fora do cadastro
      continua retido, agora pelo motivo certo. */
   {

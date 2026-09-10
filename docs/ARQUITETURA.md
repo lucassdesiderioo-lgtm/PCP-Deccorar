@@ -419,9 +419,9 @@ atualizado  TEXT
 |---|---|---|
 | POST | `/api/lote/upload` | Lê o PDF, grava volumes, **bloqueia SKU desconhecido** |
 | GET | `/api/lote` | Volumes de hoje |
-| GET | `/api/pendentes` | Faltam imprimir, por SKU |
+| GET | `/api/pendentes` | Faltam imprimir, **uma linha por SKU e por modalidade** (`agencia`/`coleta`) |
 | GET | `/api/bloqueados` | SKUs desconhecidos agrupados |
-| GET | `/api/proximo/:sku` | Próxima venda pendente do SKU |
+| GET | `/api/proximo/:sku` | Próxima venda pendente do SKU · `?modo=agencia\|coleta` restringe à lista escolhida; `na_outra_lista` diz quantas há na outra |
 | POST | `/api/embalar` | Marca embalado · **−1 estoque** |
 | GET | `/api/print/:id` | PDF com etiqueta + DANFE · **recusa bloqueado** · 410 se o PDF de origem já saiu de `lotes/` |
 | GET | `/api/impressos` | Notas e clientes já impressos · `?dias=N` (1 a 30, padrão hoje) |

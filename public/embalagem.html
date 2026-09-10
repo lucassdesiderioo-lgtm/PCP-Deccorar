@@ -19,8 +19,29 @@
      e ter que rolar a tela entre uma e outra é atrito a cada volume.
      Abaixo de 900px empilha sozinho: a regra de ouro continua sendo o campo de
      bipe em primeiro lugar. */
-  .colunas{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;align-items:start}
-  @media(max-width:900px){ .colunas{grid-template-columns:1fr} }
+  /* TRES COLUNAS desde 10/09/2026: bipe | Agência | Coleta. As duas portas de
+     saída (§8-B) viraram duas listas lado a lado, porque o operador separa a
+     caixa fisicamente — carro ou canto do caminhão — e uma lista só, com a
+     conta da coleta escondida dentro de cada linha, obrigava a ler linha por
+     linha. Abaixo de 1000 px empilha: bipe primeiro, sempre. */
+  .colunas{display:grid;grid-template-columns:1.1fr .8fr .8fr;gap:18px;align-items:start}
+  .colunas .span2{grid-column:2 / 4}
+  @media(max-width:1000px){ .colunas{grid-template-columns:1fr} .colunas .span2{grid-column:auto} }
+  /* O FILTRO: Todas / Agência / Coleta. Diz em qual lista o bipe trabalha; a
+     lista escolhida ganha borda na sua cor e a outra esmaece. Fica salvo no
+     tablet (localStorage etq_modo), como o modo da Revisão. */
+  .modo{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;font-size:14px}
+  .modo .lbl{color:var(--muted);font-weight:700;margin-right:4px}
+  .modo button{background:#fff;border:2px solid var(--line);color:var(--muted);border-radius:20px;padding:8px 16px;font-size:14px}
+  .modo button.on{color:#fff;border-color:transparent}
+  .modo button.on[data-modo=todas]{background:#1a1d23}
+  .modo button.on[data-modo=agencia]{background:var(--amber)}
+  .modo button.on[data-modo=coleta]{background:#6f42c1}
+  .card.lista{transition:opacity .15s}
+  .card.lista.ag .ttl{color:#7a5200}.card.lista.col .ttl{color:#4b2a91}
+  .card.lista.col{border-color:#b9a3e6}
+  .card.lista.foco.ag{border:2px solid var(--amber)}.card.lista.foco.col{border:2px solid #6f42c1}
+  .card.lista.fora{opacity:.45}
   .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:26px;margin-bottom:16px}
   .banner.cfm{background:#e8f0fb;border-color:#a9c9ee}.banner.ok{background:#e7f5eb;border-color:#a9d8b4}.banner.err{background:#fbe9e8;border-color:#efb1ad}.banner.warn{background:#fbf1db;border-color:#e7cb8c}
   .bt{font-size:26px;font-weight:750}.bs{font-size:15px;color:var(--muted);margin-top:6px;line-height:1.5}.bs b{color:var(--txt)}
@@ -87,6 +108,13 @@
        pra fazer. Antes ele passava por um alarme vermelho, dois contadores e um
        botao de upload ate chegar no campo. O que e 95% do uso estava em quarto
        lugar. -->
+  <div class="modo" id="modoBar">
+    <span class="lbl">Trabalhando em:</span>
+    <button type="button" data-modo="todas">Todas</button>
+    <button type="button" data-modo="agencia">🚗 Agência — vai no carro</button>
+    <button type="button" data-modo="coleta">🚚 Coleta — o caminhão busca</button>
+    <span id="modoDica" style="color:var(--muted);font-size:13px"></span>
+  </div>
   <div class="colunas">
     <div>
       <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="bipe aqui">
@@ -107,10 +135,9 @@
         <div id="impLista"></div>
       </div>
     </div>
-    <div>
-      <div class="card"><div class="ttl">Faltam imprimir</div><div id="pendLista"></div></div>
-      <div class="card" id="futBox" style="margin-top:16px;display:none;border-left:4px solid #7aa3d8"></div>
-    </div>
+    <div class="card lista ag" id="cardAg"><div class="ttl">🚗 Faltam imprimir — Agência <span style="font-weight:400;text-transform:none;letter-spacing:0">(vai no carro)</span><b id="totAg" style="margin-left:auto;font-size:18px"></b></div><div id="pendAg"></div></div>
+    <div class="card lista col" id="cardCol"><div class="ttl">🚚 Faltam imprimir — Coleta <span style="font-weight:400;text-transform:none;letter-spacing:0">(o caminhão busca)</span><b id="totCol" style="margin-left:auto;font-size:18px"></b></div><div id="pendCol"></div></div>
+    <div class="card span2" id="futBox" style="display:none;border-left:4px solid #7aa3d8"></div>
   </div>
   <!-- Subir PDF desceu pro fim: e tarefa de quem administra, uma vez por dia,
        e ocupava espaco nobre na tela de quem bipa cem vezes. -->
@@ -183,14 +210,27 @@ async function scanSku(sku){
   const now=Date.now(); if(last.c===sku && now-last.t<700) return; last={c:sku,t:now};
   // 2º bip do mesmo SKU = confirma
   if(confirmar && confirmar.codigo && confirmar.codigo.toUpperCase()===sku){ imprimir(); return; }
-  const r=await (await fetch('/api/proximo/'+encodeURIComponent(sku))).json();
+  // O filtro vai junto: em Agência ou Coleta o bipe só pega venda daquela lista.
+  const r=await (await fetch('/api/proximo/'+encodeURIComponent(sku)+(MODO!=='todas'?'?modo='+MODO:''))).json();
   if(!r.cadastrado){ banner('err','SKU não cadastrado', '<span class="sku">'+sku+'</span> — cadastre no Admin.'); beep(false); confirmar=null; return; }
   // Sob medida nao tem estoque por definicao: a peca e feita contra o pedido.
   // Zero ali e o normal, e barrar aqui empurrava a bancada a imprimir a
   // etiqueta pelo PDF do ML e despachar por fora do sistema.
   if(!r.sob_medida && r.estoque!==null && r.estoque<=0){ banner('err','SEM ESTOQUE — bloqueado', '<span class="sku">'+sku+'</span> não passou pela produção. Não dá pra imprimir a venda.'); beep(false); confirmar=null; return; }
   // Sem pedido agora significa mesmo NENHUM: a busca já inclui as vendas futuras.
-  if(!r.pedido){ if(r.total>0){ banner('warn','Todas embaladas', 'Todas as vendas de <span class="sku">'+sku+'</span> já foram embaladas.'); } else { banner('err','SKU não está no lote', 'Nenhuma venda de <span class="sku">'+sku+'</span> — nem pra hoje, nem pra frente. Já subiu o PDF do Mercado Livre?'); } beep(false); confirmar=null; return; }
+  // Com filtro, "nenhum" pode ser "nenhum NESTA lista, mas tem na outra" — e
+  // esse aviso tem que dizer isso, senão a pessoa conclui que o PDF não subiu.
+  if(!r.pedido){
+    if(r.na_outra_lista>0){
+      var outra=(MODO==='coleta'?'agência':'coleta');
+      banner('warn','Nenhuma de '+(MODO==='coleta'?'coleta':'agência')+' desse SKU',
+        '<span class="sku">'+sku+'</span> tem <b>'+r.na_outra_lista+'</b> venda(s) na lista de <b>'+outra+'</b>. '
+        +'Troque o filtro em cima ("Trabalhando em") ou bipe outra caixa.');
+    }
+    else if(r.total>0){ banner('warn','Todas embaladas', 'Todas as vendas de <span class="sku">'+sku+'</span> já foram embaladas.'); }
+    else { banner('err','SKU não está no lote', 'Nenhuma venda de <span class="sku">'+sku+'</span> — nem pra hoje, nem pra frente. Já subiu o PDF do Mercado Livre?'); }
+    beep(false); confirmar=null; return;
+  }
   confirmar=r.pedido;
   // ADIANTANDO: a venda existe e a peça está na prateleira, mas a entrega não é
   // de hoje. Precisa ser inconfundível — se passar por urgente, o operador gasta
@@ -304,15 +344,46 @@ scan.focus();
 function beep(ok){ try{const a=new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=ok?820:240;g.gain.value=.05;o.start();setTimeout(()=>{o.stop();a.close();},ok?100:220);}catch(e){} }
 idle(); stats(); setInterval(stats,4000);
 
+/* O FILTRO DA TELA: em qual lista o bipe trabalha. 'todas' é o comportamento
+   de sempre (a venda mais urgente do SKU, seja de que porta for). Salvo por
+   aparelho, como o modo da Revisão: o tablet da bancada reabre onde parou. */
+var MODO='todas';
+try{ var m0=localStorage.getItem('etq_modo'); if(m0==='agencia'||m0==='coleta') MODO=m0; }catch(e){}
+function setModo(m){
+  MODO=(m==='agencia'||m==='coleta')?m:'todas';
+  try{ localStorage.setItem('etq_modo',MODO); }catch(e){}
+  var bs=document.querySelectorAll('#modoBar button');
+  for(var i=0;i<bs.length;i++) bs[i].className=(bs[i].getAttribute('data-modo')===MODO?'on':'');
+  var ag=document.getElementById('cardAg'), co=document.getElementById('cardCol');
+  if(ag) ag.className='card lista ag'+(MODO==='agencia'?' foco':(MODO==='coleta'?' fora':''));
+  if(co) co.className='card lista col'+(MODO==='coleta'?' foco':(MODO==='agencia'?' fora':''));
+  var d=document.getElementById('modoDica');
+  if(d) d.textContent = MODO==='todas' ? 'o bipe pega a venda mais urgente do SKU, de qualquer lista'
+    : (MODO==='coleta' ? 'o bipe só pega vendas de coleta' : 'o bipe só pega vendas de agência');
+  confirmar=null; if(typeof idle==='function') idle();
+}
+document.addEventListener('click',function(e){
+  var b=e.target.closest('#modoBar button'); if(b) setModo(b.getAttribute('data-modo'));
+});
+setModo(MODO);
+
 async function listaPend(){
   var l=[]; try{ l=await (await fetch("/api/pendentes")).json(); }catch(e){}
-  var el=document.getElementById("pendLista");
-  if(!el) return;
-  // Card vazio some: a linha de cima já disse "Acabou por hoje", e um card
-  // repetindo isso é ruído entre o operador e o que ele precisa ver.
-  var card=el.closest?el.closest('.card'):null;
-  if(card) card.style.display = l.length? '' : 'none';
-  if(!l.length){ el.innerHTML=''; return; }
+  var elAg=document.getElementById("pendAg"), elCo=document.getElementById("pendCol");
+  if(!elAg||!elCo) return;
+  /* DUAS LISTAS, UMA POR PORTA DE SAÍDA. O mesmo SKU pode estar nas duas,
+     cada um com a sua conta — e é assim que a caixa sai da prateleira já
+     sabendo o destino. Lista vazia não some (as duas ficam lado a lado, e
+     sumir uma desloca a outra): escreve que não falta nada. */
+  var ag=l.filter(function(r){ return r.modalidade!=='coleta'; });
+  var co=l.filter(function(r){ return r.modalidade==='coleta'; });
+  var soma=function(a){ var t=0; for(var i=0;i<a.length;i++) t+=a[i].qtd; return t; };
+  var tAg=document.getElementById('totAg'), tCo=document.getElementById('totCol');
+  if(tAg) tAg.textContent=soma(ag)||''; if(tCo) tCo.textContent=soma(co)||'';
+  elAg.innerHTML=ag.length?linhasPend(ag):'<div class="vazio" style="color:var(--green)">✓ Nada faltando pra agência</div>';
+  elCo.innerHTML=co.length?linhasPend(co):'<div class="vazio" style="color:var(--green)">✓ Nada faltando pra coleta</div>';
+}
+function linhasPend(l){
   var h='';
   for(var i=0;i<l.length;i++){
     var r=l[i];
@@ -331,12 +402,10 @@ async function listaPend(){
       +'<b style="color:'+(atr?'#c0392b':'#b26a00')+';font-size:22px;line-height:1">'+r.qtd+'</b></div>'
       +(desc?'<div style="font-size:15px;font-weight:600;margin-top:2px">'+esc(desc)+'</div>':'')
       +(atr?'<div style="color:#c0392b;font-size:12px;font-weight:700;margin-top:3px">⚠ '+r.atrasados+' fora do prazo</div>':'')
-      // Quantas dessas o caminhão vem buscar — pra caixa já sair da prateleira sabendo o destino.
-      +(r.coletas>0?'<div style="margin-top:3px"><span class="tagC" style="margin-left:0">🚚 '+r.coletas+' pra coleta</span></div>':'')
       +(semEst?'<div style="color:#c0392b;font-size:12px;font-weight:700;margin-top:3px">sem estoque — precisa produzir</div>':'')
       +'</div>';
   }
-  el.innerHTML=h;
+  return h;
 }
 setInterval(listaPend,5000);
 listaPend();
