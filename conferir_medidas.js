@@ -85,10 +85,15 @@ const vols=db.prepare(`SELECT l.id, l.codigo, l.descricao, l.buyer, l.nf, l.data
   ORDER BY l.id`).all();
 
 let comDescricao=0, comMedida=0, conferiveis=0;
-const divergentes=[], semMedidaNoAnuncio=[], semCadastro=[];
+const divergentes=[], semMedidaNoAnuncio=[], semCadastro=[], semDescricao=[];
 
 for(const v of vols){
-  if(!v.descricao) continue;
+  /* Volume sem descricao gravada nao e so "dado velho": a `descricao` nasce da
+     leitura do titulo no bloco da folha, e ela tem um limite proprio (pega a
+     linha que traz "Persiana"). Volume RECENTE sem descricao e outro buraco,
+     na leitura do titulo — e a data mais nova da lista e que diz qual dos dois
+     e. Por isso eles nao somem da conta: aparecem no fim do relatorio. */
+  if(!v.descricao){ semDescricao.push(v); continue; }
   comDescricao++;
   const anuncio=medidaDaDescricao(v.descricao);
   if(!anuncio){ semMedidaNoAnuncio.push(v); continue; }
@@ -136,12 +141,24 @@ if(divergentes.length){
 /* Os dois silencios: onde a trava nao tem como rodar. Nao sao erro — sao o
    tamanho do ponto cego, e e ele que precisa ser visivel (§5, cobertura). */
 if(semMedidaNoAnuncio.length){
-  const skus={}; semMedidaNoAnuncio.forEach(v=>{ const k=v.codigo||'(sem SKU)'; skus[k]=(skus[k]||0)+1; });
+  /* COM O TITULO DE CADA UM, e nao um exemplo so. Foi assim que apareceu o
+     formato "1,00 L X 1,00 A" em 14/09/2026: a contagem dizia 41 volumes e o
+     exemplo unico nao mostrava que eram formatos diferentes entre si. Um ponto
+     cego so vira conserto quando da pra ler o que ele esconde. */
+  const skus={}; semMedidaNoAnuncio.forEach(v=>{ const k=v.codigo||'(sem SKU)';
+    (skus[k]=skus[k]||{n:0,ex:v.descricao}).n++; });
   console.log('·  '+semMedidaNoAnuncio.length+' volume(s) sem medida legivel no titulo do anuncio — nao da pra conferir:');
-  Object.keys(skus).sort((a,b)=>skus[b]-skus[a]).slice(0,10)
-    .forEach(k=>console.log('     '+String(skus[k]).padStart(4)+' x  '+k));
-  const ex=semMedidaNoAnuncio[0];
-  console.log('     exemplo: "'+String(ex.descricao).slice(0,80)+'"');
+  Object.keys(skus).sort((a,b)=>skus[b].n-skus[a].n).slice(0,15).forEach(k=>{
+    console.log('     '+String(skus[k].n).padStart(4)+' x  '+k);
+    console.log('             "'+String(skus[k].ex).slice(0,90)+'"'); });
+  console.log('');
+}
+if(semDescricao.length){
+  const maisNova=semDescricao.map(v=>v.data).sort().pop();
+  console.log('·  '+semDescricao.length+' volume(s) sem descricao gravada — a mais nova e de '+maisNova+'.');
+  console.log('     A coluna `lote.descricao` e recente: volume anterior a ela nao tem o que conferir,');
+  console.log('     e isso e historico, nao buraco. Mas se essa data for de HOJE, o titulo deixou de');
+  console.log('     ser lido no upload — e ai as conferencias 3, 5 e 6 estao desligadas nesses volumes.');
   console.log('');
 }
 if(semCadastro.length){

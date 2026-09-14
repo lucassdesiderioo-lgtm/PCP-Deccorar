@@ -360,7 +360,11 @@ function conferir(nome, orders, esperado){
         que e a outra metade (armadilha #10: trava que acusa inocente para de
         proteger o culpado). */
   {
-    const FORMATOS=['1,70x1,70','170x170','1,70 x 1,70 m','170 x 170 cm','1.70x1.70','1,7x1,7'];
+    /* "1,70 L X 1,70 A" (L de largura, A de altura) saiu da auditoria de
+       14/09/2026 no banco de producao: 41 volumes em 753 escreviam assim, e
+       nenhum deles estava sendo conferido. */
+    const FORMATOS=['1,70x1,70','170x170','1,70 x 1,70 m','170 x 170 cm','1.70x1.70','1,7x1,7',
+                    '1,70 L X 1,70 A','170 L x 170 A'];
     for(const medida of FORMATOS){
       casos++;
       const erros=[];

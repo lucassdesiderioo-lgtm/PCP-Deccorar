@@ -29,12 +29,19 @@ const fs=require('fs');
  * Agora a mesma medida e lida escrita de qualquer jeito, e devolvida SEMPRE em
  * centimetros inteiros — que e a unidade das colunas de `skus` (§7).
  *
+ * ⚠️ E NAO HA "o formato": a auditoria de 14/09/2026 achou 41 volumes em 753
+ * cujo titulo escreve a medida ROTULADA — "1,00 L X 1,00 A" (L de largura, A de
+ * altura). Nenhum deles estava sendo conferido, e nada na tela dizia isso. Cada
+ * formato novo que o anuncio inventa e mais um pedaco do catalogo saindo da
+ * conferencia em silencio: quando mexer aqui, conferir o ponto cego com
+ * `node conferir_medidas.js`, que conta exatamente isso.
+ *
  * Duas guardas contra o oposto (acusar inocente, armadilha #10):
  *   - so vale medida PLAUSIVEL de persiana (30 a 400 cm). "Kit 3x2" nao e medida;
  *   - titulo que diz DUAS medidas diferentes devolve null. Nao e "bate" nem
  *     "nao bate": e "nao da pra dizer", e duvida nunca vira acusacao.
  */
-const MEDIDA=/(?<!\d)(\d{1,3})(?:[,.](\d{1,2}))?\s*(?:cm|m)?\s*[xX×]\s*(\d{1,3})(?:[,.](\d{1,2}))?(?!\d)/g;
+const MEDIDA=/(?<!\d)(\d{1,3})(?:[,.](\d{1,2}))?\s*(?:cm|mm|m)?\s*(?:[LAlaCcHh]\b)?\s*[xX×]\s*(\d{1,3})(?:[,.](\d{1,2}))?(?!\d)/g;
 const PLAUSIVEL=v=>v>=30&&v<=400;
 /* Sem parte decimal o numero ja E centimetro ("170"); com ela e metro e vira
    centimetro ("1,7" e "1,70" sao os mesmos 170 — o decimal completa a direita). */

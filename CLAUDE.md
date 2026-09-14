@@ -283,7 +283,7 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > uma régua diferente da que gravou.
 >
 > **Rode `node teste_parse.js` após qualquer mudança no `parse.js` ou no
-> `folha.js`** — os 20 casos montam a folha no formato REAL do ML; o caso do
+> `folha.js`** — os 22 casos montam a folha no formato REAL do ML; o caso do
 > Abraão está lá, e o do `170x170` (armadilha #22) também.
 >
 > Para conferir o que já está gravado: `node rastrear.js --auditar [dias]` e
@@ -412,7 +412,7 @@ Três reparos, e os três são de precisão, não de afrouxamento:
 
 | O que era | O que é |
 |---|---|
-| um formato só de medida no anúncio | `folha.js` → `medidaDaDescricao()` lê metro e centímetro (`1,60x1,40`, `160x140`, `1,7 x 1,7 m`, `160 x 140 cm`) e devolve **sempre em centímetros inteiros**, a unidade das colunas de `skus` |
+| um formato só de medida no anúncio | `folha.js` → `medidaDaDescricao()` lê metro e centímetro, com unidade e com rótulo (`1,60x1,40`, `160x140`, `1,7 x 1,7 m`, `160 x 140 cm`, `1,00 L X 1,00 A`) e devolve **sempre em centímetros inteiros**, a unidade das colunas de `skus` |
 | medida no código só colada (`BK160140`) | `medidaDoCodigo()` lê também `BK110X240BEGE` e `ROLO SOB MEDIDA 137x212` — o formato com `X` era invisível, e ali a 3 também saía de cena calada |
 | a 3 conferindo contra o **texto do código** | nasce a **conferência 6**: o anúncio contra as **colunas** de `skus`, no upload. É o reparo que o próprio §5 já apontava ("ou o código volta a carregar o dado, ou a conferência passa a ler das colunas") |
 
@@ -421,6 +421,15 @@ medida plausível de persiana (30 a 400 cm), então `Kit 3x2` não vira medida; 
 título que diz **duas** medidas diferentes devolve `null` — não é "bate" nem "não
 bate", é *não dá pra dizer*, e dúvida nunca vira acusação. A conferência 6
 também se cala em acessório (`exige_medida=0`) e em SKU sem medida cadastrada.
+
+> ⚠️ **NÃO EXISTE "o formato" — existe o que o anúncio escreveu.** A primeira
+> rodada em produção (14/09/2026, 1.296 volumes) leu 753 e deixou **41 de fora**:
+> o título deles escreve `1,00 L X 1,00 A`, com o L de largura e o A de altura.
+> Nenhum estava sendo conferido, e nada na tela dizia isso. Cada formato que o
+> anúncio inventa é mais um pedaço do catálogo saindo da conferência em silêncio
+> — por isso o relatório imprime **o título de cada SKU** que ficou de fora, e
+> não uma contagem: ponto cego só vira conserto quando dá pra ler o que ele
+> esconde.
 
 **Antes de ligar a 6 em produção, meça:** `node conferir_medidas.js [dias]` relê
 a `descricao` já gravada em `lote` e diz **o que a trava nova acusaria** — e, de
@@ -1417,7 +1426,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (20 casos), `teste_carga.js` (44), `teste_divergencia.js` (25) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (20), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (22 casos), `teste_carga.js` (44), `teste_divergencia.js` (25) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (20), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
 | 11 | **A investigar: o que é o `Quantidade` da folha** — a regra é uma venda = uma etiqueta = uma persiana (§5), então esse campo não deveria vir maior que 1. Ninguém decide nada com ele hoje. Falta abrir um PDF real com `Quantidade > 1` e entender o que aquele número diz | Baixo enquanto nada o usar — mas é uma pergunta sem resposta sobre o documento de origem |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
