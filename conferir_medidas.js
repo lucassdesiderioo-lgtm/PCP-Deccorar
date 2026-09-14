@@ -106,6 +106,17 @@ for(const v of vols){
   if(conf) divergentes.push({...v,anuncio,conf});
 }
 
+/* ⚠️ O RELATORIO CONFERE A SI MESMO — contando a MESMA coisa pelos dois
+   caminhos, o JS (que leu as linhas) e o SQL (que as tem no disco).
+   Em 14/09/2026 este relatorio disse "60 volumes sem descricao" e o banco,
+   perguntado direto, disse zero: as duas leituras do MESMO banco discordando.
+   Enquanto a causa disso nao for conhecida, o pior desfecho seria o relatorio
+   seguir afirmando um numero que ninguem consegue reproduzir — que e a
+   armadilha #12 dentro da ferramenta que existe para achar armadilha #12.
+   Divergiu, ele diz que divergiu, e ai o numero vira pergunta, nao fato. */
+const semDescSql=db.prepare(`SELECT COUNT(*) n FROM lote l
+  ${onde ? onde+" AND" : "WHERE"} COALESCE(l.descricao,'')=''`).get().n;
+
 const pct=(a,b)=>b?Math.round(a*100/b)+'%':'—';
 console.log('');
 console.log('CONFERENCIA DE MEDIDA — anuncio x cadastro de SKU');
@@ -115,6 +126,20 @@ console.log('  com descricao gravada ......... '+comDescricao+'  ('+pct(comDescr
 console.log('  com medida legivel no anuncio . '+comMedida+'  ('+pct(comMedida,comDescricao)+' dos que tem descricao)');
 console.log('  de fato conferiveis ........... '+conferiveis);
 console.log('');
+if(semDescSql!==semDescricao.length){
+  console.log('⚠⚠ AS DUAS LEITURAS DO MESMO BANCO NAO BATEM — nao confie nos numeros acima:');
+  console.log('     sem descricao, contando as linhas lidas aqui ....... '+semDescricao.length);
+  console.log('     sem descricao, perguntando ao banco (SQL) .......... '+semDescSql);
+  const amostra=semDescricao.slice(0,3).map(v=>v.id);
+  if(amostra.length){
+    console.log('     ids que este processo leu como sem descricao: '+amostra.join(', '));
+    amostra.forEach(id=>{
+      const r=db.prepare('SELECT typeof(descricao) t, length(descricao) n, substr(descricao,1,60) d FROM lote WHERE id=?').get(id);
+      console.log('       #'+id+'  typeof='+r.t+'  length='+r.n+'  '+JSON.stringify(r.d));
+    });
+  }
+  console.log('');
+}
 
 if(divergentes.length){
   console.log('⚠  '+divergentes.length+' VOLUME(S) EM QUE O ANUNCIO E O CADASTRO DISCORDAM');
