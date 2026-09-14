@@ -126,7 +126,12 @@ function pageLines(tc){
    manda. */
 async function lerFolha(arquivo){
   const pdfjs=require('pdfjs-dist/legacy/build/pdf.js');
-  const pdf=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(arquivo))}).promise;
+  /* verbosity 0 = so erros. Nao renderizamos imagem nenhuma aqui, so texto, e
+     os avisos do pdf.js (fonte padrao que ele nao achou, por exemplo) saem uma
+     vez por arquivo — numa auditoria de 30 PDFs viram 60 linhas de ruido em
+     volta da resposta. Os dois avisos de polyfill (`canvas` nao instalado) nao
+     passam por aqui: saem no require do modulo, antes desta chamada. */
+  const pdf=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(arquivo)),verbosity:0}).promise;
   const etiquetas=[], ctrlLinhas=[];
   for(let p=1;p<=pdf.numPages;p++){
     const lines=pageLines(await (await pdf.getPage(p)).getTextContent());
@@ -138,7 +143,10 @@ async function lerFolha(arquivo){
                       nf:(text.match(/NF:\s*(\d+)/)||[])[1]||null});
     }
   }
-  return {paginas:pdf.numPages, etiquetas, blocos:itensDaFolha(ctrlLinhas)};
+  /* `linhas` sai junto com os blocos: quando a leitura do bloco FALHA, a unica
+     evidencia util e o texto cru em volta do `SKU:` — e reabrir o PDF por fora
+     para ver isso seria ler com outra regua que a que falhou. */
+  return {paginas:pdf.numPages, etiquetas, linhas:ctrlLinhas, blocos:itensDaFolha(ctrlLinhas)};
 }
 
 /* UM BLOCO POR ITEM — o mesmo criterio que o parse.js usa para gravar.

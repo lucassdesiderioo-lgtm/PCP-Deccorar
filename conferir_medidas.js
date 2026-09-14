@@ -208,18 +208,35 @@ async function porque(){
     const vs=porArquivo[arq];
     let f; try{ f=await lerFolha(arq); }
     catch(e){ console.log('   '+path.basename(arq)+': nao deu pra ler ('+(e.message||e)+')'); continue; }
-    let semItem=0, semTitulo=0; const exemplos=[];
+    let semItem=0, semTitulo=0; const exemplos={semItem:null,semTitulo:null};
     for(const v of vs){
       const it=itemDaFolha(v,f.blocos);
-      if(!it){ semItem++; if(exemplos.length<3) exemplos.push({v,causa:'a etiqueta nao casou com item nenhum da folha'}); }
-      else if(!it.desc){ semTitulo++; if(exemplos.length<3) exemplos.push({v,causa:'o item existe na folha (SKU '+it.sku+'), mas o titulo nao foi lido no bloco'}); }
+      if(!it){ semItem++; if(!exemplos.semItem) exemplos.semItem={v,causa:'a etiqueta nao casou com item nenhum da folha'}; }
+      else if(!it.desc){ semTitulo++; if(!exemplos.semTitulo) exemplos.semTitulo={v,it,causa:'o item existe na folha (SKU '+it.sku+'), mas o titulo nao foi lido no bloco'}; }
     }
     const ok=vs.length-semItem-semTitulo;
     console.log('   '+path.basename(arq)+'  ('+vs.length+' volume(s) sem descricao)');
     console.log('       sem casar com item da folha : '+semItem);
     console.log('       item achado, titulo nao lido: '+semTitulo);
     if(ok>0) console.log('       a folha TEM o titulo agora : '+ok+'  (foram gravados por uma versao anterior do parse)');
-    exemplos.forEach(e=>console.log('       #'+e.v.id+' '+(e.v.codigo||'(sem SKU)')+' — '+e.causa));
+    /* UM EXEMPLO DE CADA CAUSA, COM AS LINHAS CRUAS. O diagnostico so serve se
+       levar ao conserto, e a leitura do bloco (§5, armadilha #4) e o codigo que
+       manda a peca certa pro cliente: ninguem mexe nela por deducao. O texto de
+       como o PDF saiu de verdade e a unica base honesta. */
+    for(const e of [exemplos.semItem,exemplos.semTitulo].filter(Boolean)){
+      console.log('       #'+e.v.id+' '+(e.v.codigo||'(sem SKU)')+' — '+e.causa);
+      const chaves=[e.v.venda,e.v.packId].filter(Boolean);
+      const sec=(f.linhas||[]).map(l=>String(l).replace(/\s+/g,''));
+      let i=sec.findIndex(l=>chaves.some(c=>l.includes(c)));
+      if(i<0 && e.it) i=(f.linhas||[]).findIndex(l=>new RegExp('SKU:\\s*'+e.it.sku.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).test(l));
+      if(i<0){ console.log('         (nao achei a linha desse volume na folha)'); continue; }
+      console.log('         ── como o PDF saiu, linhas '+(Math.max(0,i-3)+1)+' a '+Math.min(f.linhas.length,i+5)+':');
+      f.linhas.slice(Math.max(0,i-3),i+5).forEach((l,k)=>{
+        const n=Math.max(0,i-3)+k;
+        console.log('         '+(n===i?'>':' ')+String(n+1).padStart(5)+'  '+String(l).slice(0,110));
+      });
+      console.log('');
+    }
     console.log('');
   }
 }
