@@ -1,11 +1,24 @@
 #!/usr/bin/env node
 /* O ANUNCIO E O CADASTRO DIZEM A MESMA MEDIDA? — sobre o que JA ESTA GRAVADO.
  *
- *   node conferir_medidas.js            confere os volumes dos ultimos 30 dias
- *   node conferir_medidas.js 90         outra janela
- *   node conferir_medidas.js --tudo     o historico inteiro
+ *   node conferir_medidas.js              confere os volumes dos ultimos 30 dias
+ *   node conferir_medidas.js 90           outra janela
+ *   node conferir_medidas.js --tudo       o historico inteiro
+ *   node conferir_medidas.js --db <arq>   outro banco (ver abaixo)
  *
- * So LE. Pode rodar em producao a qualquer hora.
+ * So LE. Pode rodar em producao a qualquer hora, com o servico no ar.
+ *
+ * PARA RODAR ANTES DE SUBIR O CODIGO NOVO (que e o ponto dele), sem trocar o
+ * checkout que o pm2 esta servindo:
+ *
+ *   cd /opt/expedicao
+ *   git fetch origin <branch>
+ *   git worktree add .diag origin/<branch>
+ *   node .diag/conferir_medidas.js --db /opt/expedicao/dados.db 30
+ *   git worktree remove .diag
+ *
+ * O `node_modules` e resolvido subindo um nivel, entao o worktree nao precisa
+ * de `npm install`.
  *
  * Por que ele existe, em duas partes:
  *
@@ -28,14 +41,38 @@
  * Ele NAO usa regua propria: a leitura da medida e a comparacao saem do
  * folha.js, o mesmo dono que o upload usa para acusar.
  */
-const path=require('path');
+const fs=require('fs'), path=require('path');
 const Database=require('better-sqlite3');
 const {medidaDaDescricao,medidaDoCodigo,conflitoDeMedida}=require('./folha');
 
 const args=process.argv.slice(2);
 const TUDO=args.includes('--tudo');
 const DIAS=(()=>{ const n=args.find(a=>/^\d+$/.test(a)); return n?+n:30; })();
-const db=new Database(path.join(__dirname,'dados.db'),{readonly:true});
+
+/* O MESMO CAMINHO DO db.js, e um --db para quando o script nao roda de dentro
+   do checkout de producao. E o caso normal, nao a excecao: para MEDIR a
+   conferencia 6 antes de liga-la, o jeito de rodar o codigo novo sem trocar o
+   checkout que o pm2 esta servindo e um `git worktree` ao lado — e ali o
+   __dirname nao e o do banco. Sem isto, a unica forma de rodar o diagnostico
+   seria ja ter subido o que ele deveria conferir antes. */
+const iDb=args.indexOf('--db');
+const CAMINHO=(iDb>=0 && args[iDb+1]) ? args[iDb+1]
+  : (fs.existsSync('/opt/expedicao/dados.db') ? '/opt/expedicao/dados.db'
+                                              : path.join(__dirname,'dados.db'));
+if(!fs.existsSync(CAMINHO)){
+  console.error('nao achei o banco em '+CAMINHO+' — passe o caminho com --db <arquivo>');
+  process.exit(2);
+}
+/* Readonly primeiro: um diagnostico nao escreve. O banco esta em WAL (§12) e o
+   servico o mantem aberto; se o modo somente-leitura nao conseguir mapear o
+   -shm, cai para a abertura normal — este script so faz SELECT, e SQLite
+   aguenta varios leitores. */
+let db;
+try{ db=new Database(CAMINHO,{readonly:true,fileMustExist:true}); }
+catch(e){
+  console.error('(somente-leitura recusado: '+(e.message||e)+' — abrindo normal, o script so le)');
+  db=new Database(CAMINHO,{fileMustExist:true});
+}
 
 const onde=TUDO?'':"WHERE l.data >= date('now','localtime','-"+DIAS+" day')";
 const vols=db.prepare(`SELECT l.id, l.codigo, l.descricao, l.buyer, l.nf, l.data,

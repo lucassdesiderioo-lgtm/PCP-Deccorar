@@ -430,6 +430,21 @@ três achados são casos reais; dezenas são **cadastro** para arrumar primeiro,
 senão a trava nasce retendo gente certa. Ele não tem régua própria: lê pelo
 `folha.js`, o mesmo dono que o upload usa para acusar.
 
+> Para medir **antes** de o servidor passar a rodar o código novo — que é o
+> ponto —, sem trocar o checkout que o pm2 está servindo:
+>
+> ```bash
+> cd /opt/expedicao && git fetch origin <branch>
+> git worktree add .diag origin/<branch>
+> node .diag/conferir_medidas.js --db /opt/expedicao/dados.db 30
+> git worktree remove .diag
+> ```
+>
+> O `node_modules` é resolvido subindo um nível, então o worktree não precisa de
+> `npm install`. O `--db` existe por isso: dentro do worktree o `__dirname` não
+> é o do banco, e sem ele a única forma de rodar o diagnóstico seria já ter
+> subido o que ele deveria conferir antes.
+
 > A `familia_sku` da conferência 5 sofria do mesmo defeito por tabela: o corte da
 > família usava a mesma regex de um formato só, então no título em centímetros a
 > medida ficava **dentro** da família e cada medida virava uma família diferente
