@@ -315,6 +315,20 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > `12110502998294`). Palavra de catálogo dentro do parser envelhece calada, como
 > a lista de cores e a tabela de famílias envelheceriam (§5).
 >
+> A identificação também cai **sozinha na linha de baixo** do título, e isso
+> conta como início de bloco do mesmo jeito — era o último volume da semana que
+> ainda ficava sem descrição depois dos dois reparos acima.
+
+> **Depois de consertar a leitura, recupere o que já entrou:**
+> `node backfill_descricao.js` (simula) e `--aplicar`. Ele relê os PDFs de
+> `lotes/` e grava **só** onde `descricao` está NULL — nunca sobrescreve o que o
+> parse leu na hora, que é história de como o volume foi gravado. **Tem prazo:**
+> o cron apaga o PDF em **7 dias**, e depois disso a descrição daqueles volumes
+> não se reconstrói de lugar nenhum. Antes de gravar,
+> `node conferir_medidas.js --porque` já confere a medida neles a partir do PDF
+> relido — é assim que um `170x170` que nunca teve descrição gravada ainda
+> aparece.
+>
 > **Rode `node teste_parse.js` após qualquer mudança no `parse.js` ou no
 > `folha.js`** — os 24 casos montam a folha no formato REAL do ML; o caso do
 > Abraão está lá, e o do `170x170` (armadilha #22) também.

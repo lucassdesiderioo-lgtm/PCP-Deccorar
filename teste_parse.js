@@ -502,6 +502,26 @@ function conferir(nome, orders, esperado){
       /* "Com Acabamento Branco" e continuacao do TITULO, nunca um comprador. */
       if(/Acabamento/.test(String(it.comprador||''))) erros.push(e.sku+': pegou continuacao de titulo como comprador');
     });
+    /* A identificacao tambem cai SOZINHA na linha de baixo do titulo — foi o
+       ultimo volume da semana de 14/09 que ainda ficava sem descricao. As
+       linhas tambem sao do PDF real. */
+    const separada=itensDaFolha([
+      'Desenho do tecido: Liso',
+      'Cortina Rolô Blackout 1,60x1,60 Quarto Branco',
+      '12110502998332',
+      'Pack ID: 2000014976193351 SKU: BK160160BRANCO',
+      'Venda: 2000018400015476 Quantidade: 1',
+      'Fernanda Gonçalves Rodrigues Cor: Branco',
+      'Desenho do tecido: Liso',
+    ]);
+    const s0=separada[0]||{};
+    if(s0.desc!=='Cortina Rolô Blackout 1,60x1,60 Quarto Branco')
+      erros.push('identificacao em linha separada: titulo veio '+JSON.stringify(s0.desc));
+    if(s0.larg!==160||s0.alt!==160)
+      erros.push('identificacao em linha separada: medida veio '+s0.larg+'x'+s0.alt);
+    if(s0.comprador!=='Fernanda Gonçalves Rodrigues')
+      erros.push('identificacao em linha separada: comprador veio '+JSON.stringify(s0.comprador));
+
     /* ⚠️ O CONTRARIO DISSO E A ARMADILHA #4. A janela passou a olhar pra tras,
        entao aqui entra o caso que ela NAO pode resolver: o item de baixo sem
        titulo reconhecivel, com o corpo do de cima logo acima. Se ele herdar a

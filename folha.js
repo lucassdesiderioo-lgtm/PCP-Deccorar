@@ -198,6 +198,13 @@ async function lerFolha(arquivo){
  */
 const CAMPO=/(?:Pack ID|Venda|SKU|Quantidade|Cor|Desenho do tecido)\s*:/;
 const TITULO=/^([A-Z0-9]{8,})\s+(\S.*)$/;
+/* A identificacao tambem cai SOZINHA numa linha, com o titulo logo acima —
+   o pdf.js quebra as duas colunas assim de vez em quando:
+       Cortina Rolô Blackout 1,60x1,60 Quarto Branco
+       12110502998332
+       Pack ID: 2000014976193351 SKU: BK160160BRANCO
+   Era o ultimo volume da semana que ainda ficava sem titulo. */
+const IDENT_SO=/^[A-Z0-9]{8,}$/;
 function itensDaFolha(linhas){
   linhas=linhas||[];
   const idxSku=[]; linhas.forEach((l,k)=>{ if(/SKU:\s*\S/.test(l)) idxSku.push(k); });
@@ -210,6 +217,12 @@ function itensDaFolha(linhas){
     for(let t=i-1;t>=limite;t--){
       if(CAMPO.test(linhas[t])) continue;
       if(TITULO.test(linhas[t])) return t;
+      /* Identificacao sozinha: o titulo e a linha de cima, quando ela existe e
+         nao e do item anterior (campo) nem outra identificacao. */
+      if(IDENT_SO.test(String(linhas[t]||'').trim())){
+        const acima=String(linhas[t-1]||'').trim();
+        return (t-1>=limite && acima && !CAMPO.test(acima) && !IDENT_SO.test(acima)) ? t-1 : t;
+      }
     }
     return i;
   });
@@ -225,8 +238,14 @@ function itensDaFolha(linhas){
     const daqui=linhas.slice(ini[j], Math.min(proximo, i+6));
     const pega=re=>{ for(const x of daqui){ const mm=x.match(re); if(mm) return mm[1]; } return null; };
     let desc='';
-    const mt=String(linhas[ini[j]]||'').match(TITULO);
-    if(ini[j]<i && mt) desc=mt[2].trim();
+    const linhaIni=String(linhas[ini[j]]||'').trim();
+    const mt=linhaIni.match(TITULO);
+    if(ini[j]<i){
+      /* Com a identificacao na frente, o titulo e o que vem depois dela; quando
+         ela caiu na linha de baixo, a linha inteira ja e o titulo. */
+      if(mt) desc=mt[2].trim();
+      else if(linhaIni && !CAMPO.test(linhaIni) && !IDENT_SO.test(linhaIni)) desc=linhaIni;
+    }
     /* Fallback do formato antigo: sem linha de identificacao, procura o texto do
        produto logo acima, como antes. */
     if(!desc){ for(const x of linhas.slice(Math.max(antes, i-2), i+1)){
@@ -234,7 +253,10 @@ function itensDaFolha(linhas){
     /* Titulo que nao coube numa linha continua na de baixo ("... Cor Bege Claro
        -" / "Tóquio 002"). Para no primeiro campo: dali em diante e o item. */
     if(desc && ini[j]<i){ for(let t=ini[j]+1;t<i;t++){
-      if(CAMPO.test(linhas[t])) break; desc+=' '+String(linhas[t]).trim(); } }
+      const l2=String(linhas[t]||'').trim();
+      if(CAMPO.test(l2)) break;
+      if(IDENT_SO.test(l2)) continue;   // a identificacao nao e parte do titulo
+      desc+=' '+l2; } }
     let comprador=''; for(const x of daqui){
       /* `SKU:` tambem fecha o nome: "Ramon Scopel Luz SKU: BK180150CINZA" e uma
          linha inteira do PDF real. */

@@ -195,6 +195,15 @@ if(semCadastro.length){
  */
 async function porque(){
   const {lerFolha,itemDaFolha}=require('./folha');
+  /* Relendo o PDF, o titulo que faltava existe AGORA — então dá para conferir
+     a medida desses volumes mesmo sem ela estar gravada. É a única janela: o
+     cron apaga o PDF em 7 dias, e depois disso esses volumes ficam sem resposta
+     para sempre. Sai separado do resto porque é conferência de material que o
+     banco não tem. */
+  const cad=db.prepare(`SELECT s.largura_cm larg, s.altura_cm alt,
+    COALESCE(m.exige_medida,1) exige_medida
+    FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id WHERE s.codigo=?`);
+  const achadosNaRelida=[];
   const alvo=semDescricao.filter(v=>v.srcfile);
   if(!alvo.length){ console.log('·  --porque: nenhum volume sem descricao tem PDF de origem registrado.'); return; }
   const porArquivo={}; alvo.forEach(v=>{ (porArquivo[v.srcfile]=porArquivo[v.srcfile]||[]).push(v); });
@@ -213,6 +222,11 @@ async function porque(){
       const it=itemDaFolha(v,f.blocos);
       if(!it){ semItem++; if(!exemplos.semItem) exemplos.semItem={v,causa:'a etiqueta nao casou com item nenhum da folha'}; }
       else if(!it.desc){ semTitulo++; if(!exemplos.semTitulo) exemplos.semTitulo={v,it,causa:'o item existe na folha (SKU '+it.sku+'), mas o titulo nao foi lido no bloco'}; }
+      else {
+        const anuncio=medidaDaDescricao(it.desc);
+        const conf=anuncio?conflitoDeMedida(anuncio,cad.get(v.codigo),v.codigo):null;
+        if(conf) achadosNaRelida.push({v,it,conf});
+      }
     }
     const ok=vs.length-semItem-semTitulo;
     console.log('   '+path.basename(arq)+'  ('+vs.length+' volume(s) sem descricao)');
@@ -239,10 +253,28 @@ async function porque(){
     }
     console.log('');
   }
+  if(achadosNaRelida.length){
+    console.log('⚠  '+achadosNaRelida.length+' VOLUME(S) SEM DESCRICAO GRAVADA EM QUE O PDF RELIDO ACUSA DIVERGENCIA');
+    console.log('   (nao apareciam na conta de cima porque a descricao deles nunca foi gravada)');
+    console.log('');
+    for(const d of achadosNaRelida){
+      console.log('   #'+d.v.id+'  '+d.v.data+'  '+d.v.estagio);
+      console.log('       cliente : '+(d.v.buyer||'—')+'   NF '+(d.v.nf||'—')+
+                  '   venda '+(d.v.venda||d.v.packId||'—'));
+      console.log('       anuncio : '+String(d.it.desc).slice(0,100));
+      console.log('       conflito: '+d.conf);
+      console.log('');
+    }
+  } else {
+    console.log('✓  nos volumes sem descricao que deu pra reler, anuncio e cadastro batem.');
+    console.log('');
+  }
+  return achadosNaRelida.length;
 }
 
 (async()=>{
-  if(args.includes('--porque')) await porque();
+  let extras=0;
+  if(args.includes('--porque')) extras=await porque();
   db.close();
-  process.exit(divergentes.length?1:0);
+  process.exit((divergentes.length+extras)?1:0);
 })();
