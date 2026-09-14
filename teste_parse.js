@@ -32,7 +32,13 @@ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'pcp-parse-'));
 /* Um item da folha, do jeito do ML. `pack` e `venda` sao opcionais: item sem
    Pack ID existe e foi exatamente o que quebrou tudo. */
 function item(o){
-  const l1=(o.id||'IDENT'+Math.abs(o.sku.length*7))+' Persiana Cortina Rolo Blackout '+o.medida+' Blecaute '+o.cor;
+  /* A identificacao do anuncio tem o tamanho REAL (26 caracteres, como
+     `AFPLKBSAWFKHHLAH7CBU3W5ZYA`): e por ela que o `folha.js` reconhece onde o
+     bloco do item comeca. Com o `IDENT84` curto que estava aqui, os testes
+     passavam pelo caminho antigo (a palavra "Persiana") e nao exercitavam
+     nada do que o PDF de verdade faz. */
+  const l1=(o.id||('ID'+o.sku).toUpperCase().replace(/[^A-Z0-9]/g,'').padEnd(26,'X').slice(0,26))
+    +' Persiana Cortina Rolo Blackout '+o.medida+' Blecaute '+o.cor;
   const l2=(o.pack?('Pack ID: '+o.pack+' '):'')+(!o.pack&&o.venda?('Venda: '+o.venda+' '):'')+'SKU: '+o.sku;
   const q=o.qtd||1;
   const l3=(o.pack&&o.venda)?('Venda: '+o.venda+' Quantidade: '+q):(o.comprador+' Quantidade: '+q);
@@ -423,6 +429,101 @@ function conferir(nome, orders, esperado){
     if(erros.length){ falhas++; console.log('FALHOU  numero que nao e medida nao vira acusacao');
       erros.forEach(e=>console.log('        '+e)); }
     else console.log('ok      numero que nao e medida nao vira acusacao');
+  }
+
+  /* ── 18. O BLOCO COMECA NO TITULO — as linhas SAO as do PDF de 14/09/2026 ──
+        Copiadas da saida de `conferir_medidas.js --porque` no servidor. Duas
+        coisas quebravam aqui, e as duas em silencio:
+
+        a) o titulo longo desmonta as duas colunas e o `Venda:` cai ACIMA do
+           `SKU:`. A janela olhava do SKU pra baixo, o item entrava sem chave
+           nenhuma e a etiqueta nao casava com ele — o volume era gravado pelo
+           tokenizer, que nao tem comprador nem descricao. Conferencias 2, 3, 5
+           e 6 desligadas nesse volume;
+        b) a descricao era procurada pela palavra "Persiana", e o catalogo
+           anuncia "Cortina Rolô Blackout 1,60x1,60 Quarto Branco".
+
+        O que torna seguro olhar pra tras e o LIMITE: o bloco vai do titulo
+        deste item ao titulo do proximo — o corpo do item anterior fica sempre
+        antes do titulo deste. O caso 2 (Abraao) e quem trava isso. */
+  casos++;
+  {
+    const {itensDaFolha}=require('./folha');
+    const linhas=[
+      'Despachem as suas vendas o quanto antes. Não demore, o seu comprador está esperando.',
+      'Identifiicação Produtos',
+      'YSDYNYNLGBMRBGNF6Q3RC2LNDA Cortina Rolô Blackout 1,60x1,60 Quarto Branco',
+      'Pack ID: 2000014938774039 SKU: BK160160BRANCO',
+      'Venda: 2000018359944974 Quantidade: 1',
+      'Joao Luiz Costa Cor: Branco',
+      'Desenho do tecido: Liso',
+      'AFPLKBSAWFKHHLAH7CBU3W5ZYA Cortina Rolo Blackout Medida L 1,80 X A 1,50 Blecaute Roller Cor Bege Claro -',
+      'Tóquio 002',
+      'Venda: 2000018412210894',
+      'SKU: BK180150BEGE',
+      'Camila Helena Henrique Dos Santos Souza',
+      'Quantidade: 1',
+      'Cor: Bege claro - Tóquio 002',
+      'Desenho do tecido: Liso',
+      'TYGGSFMAYBL6PHF6DQFI5WCT5A Cortina Rolo Blackout Medida L 1,80 X A 1,50 Blecaute Roller Cor Tóquio 004 - Cinza',
+      'Com Acabamento Branco',
+      'Venda: 2000018374402854',
+      'Ramon Scopel Luz SKU: BK180150CINZA',
+      'Quantidade: 1',
+      'Cor: Tóquio 004 - Cinza com acabamento branco',
+      'Desenho do tecido: Liso',
+      '12110502998294 Cortina Rolô Blackout 1,60x1,60 Quarto Cinza',
+      'Pack ID: 2000015014478009 SKU: BK160160CINZA',
+      'Venda: 2000018440804556 Quantidade: 1',
+      'Giselle Vieitas Pedrosa Cor: Cinza',
+      'Desenho do tecido: Liso',
+    ];
+    const esperado=[
+      {sku:'BK160160BRANCO',venda:'2000018359944974',pack:'2000014938774039',
+       comprador:'Joao Luiz Costa',larg:160,alt:160},
+      {sku:'BK180150BEGE',  venda:'2000018412210894',pack:null,
+       comprador:'Camila Helena Henrique Dos Santos Souza',larg:180,alt:150},
+      {sku:'BK180150CINZA', venda:'2000018374402854',pack:null,
+       comprador:'Ramon Scopel Luz',larg:180,alt:150},
+      {sku:'BK160160CINZA', venda:'2000018440804556',pack:'2000015014478009',
+       comprador:'Giselle Vieitas Pedrosa',larg:160,alt:160},
+    ];
+    const itens=itensDaFolha(linhas), erros=[];
+    if(itens.length!==esperado.length) erros.push('itens: esperava '+esperado.length+', veio '+itens.length);
+    esperado.forEach((e,k)=>{
+      const it=itens[k]; if(!it) return;
+      if(it.sku!==e.sku) erros.push(k+': SKU '+it.sku+' (esperava '+e.sku+')');
+      /* SEM CHAVE O ITEM NAO E INDEXADO, e a etiqueta nao casa com ele. */
+      if(it.venda!==e.venda) erros.push(e.sku+': venda '+it.venda+' (esperava '+e.venda+')');
+      if((it.packId||null)!==e.pack) erros.push(e.sku+': pack '+it.packId+' (esperava '+e.pack+')');
+      if(it.comprador!==e.comprador) erros.push(e.sku+': comprador '+JSON.stringify(it.comprador)+' (esperava '+e.comprador+')');
+      if(!it.desc) erros.push(e.sku+': ficou sem titulo');
+      if(it.larg!==e.larg||it.alt!==e.alt) erros.push(e.sku+': medida '+it.larg+'x'+it.alt+' (esperava '+e.larg+'x'+e.alt+')');
+      /* "Com Acabamento Branco" e continuacao do TITULO, nunca um comprador. */
+      if(/Acabamento/.test(String(it.comprador||''))) erros.push(e.sku+': pegou continuacao de titulo como comprador');
+    });
+    /* ⚠️ O CONTRARIO DISSO E A ARMADILHA #4. A janela passou a olhar pra tras,
+       entao aqui entra o caso que ela NAO pode resolver: o item de baixo sem
+       titulo reconhecivel, com o corpo do de cima logo acima. Se ele herdar a
+       venda do vizinho, a peca do vizinho vai pro cliente — que foi o caso do
+       Abraao. Sem titulo, o bloco tem que voltar a comecar no proprio SKU. */
+    const vizinho=itensDaFolha([
+      'ZZQWERTYUIOPASDFGHJKLZXCVB Cortina Rolô Blackout 1,60x1,40 Quarto Bege',
+      'Pack ID: 111 SKU: BK160140BEGE',
+      'Venda: 901 Quantidade: 1',
+      'Vizinho De Cima Cor: Bege',
+      'SKU: BK140140BEGE',              // item sem titulo e sem chave propria
+      'Quantidade: 1',
+      'Cor: Bege',
+    ]);
+    const segundo=vizinho[1]||{};
+    if(segundo.packId||segundo.venda)
+      erros.push('item sem titulo herdou a chave do vizinho: pack '+segundo.packId+' venda '+segundo.venda);
+    if(/Vizinho/.test(String(segundo.comprador||'')))
+      erros.push('item sem titulo herdou o comprador do vizinho');
+    if(erros.length){ falhas++; console.log('FALHOU  folha real: titulo em 2 linhas, Venda acima do SKU, anuncio sem "Persiana"');
+      erros.forEach(x=>console.log('        '+x)); }
+    else console.log('ok      folha real: titulo em 2 linhas, Venda acima do SKU, anuncio sem "Persiana"');
   }
 
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}

@@ -282,8 +282,41 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > grava por ela e a auditoria relê por ela. Duas cópias significaria conferir com
 > uma régua diferente da que gravou.
 >
+> ⚠️ **O BLOCO COMEÇA NO TÍTULO, NÃO NO `SKU:` — e isso é correção de 14/09/2026.**
+> As cinco linhas acima só valem enquanto o título cabe em **uma**. Quando ele é
+> longo, o layout de duas colunas se desfaz e o PDF sai assim:
+>
+> ```
+> AFPLKBSAWFKHHLAH7CBU3W5ZYA Cortina Rolo Blackout Medida L 1,80 X A 1,50 ... -
+> Tóquio 002
+> Venda: 2000018412210894          ← ACIMA do SKU
+> SKU: BK180150BEGE
+> Camila Helena Henrique Dos Santos Souza
+> ```
+>
+> A janela olhava do `SKU:` para baixo, então a venda ficava de fora, **o item
+> entrava sem chave nenhuma e não era indexado**: a etiqueta não casava com ele e
+> o volume era gravado pelo tokenizer — que não tem comprador nem descrição.
+> Conferências 2, 3, 5 e 6 desligadas naquele volume, em silêncio. Eram 14 assim
+> nos 5 PDFs que ainda estavam no servidor.
+>
+> **Olhar para trás sem limite é a armadilha #4 de volta.** O que torna seguro é
+> o limite: o bloco vai do **título deste item ao título do próximo**, e o corpo
+> do item anterior fica sempre antes do título deste — não há como herdar campo
+> do vizinho. Sem título reconhecível o bloco volta a começar no próprio `SKU:`,
+> que é o comportamento antigo. Os dois casos estão travados por teste (o do
+> Abraão e o caso 18, com as linhas **copiadas do PDF real**).
+>
+> ⚠️ **E O TÍTULO NÃO SE RECONHECE PELA PALAVRA "Persiana".** Ela estava escrita
+> no código, e o catálogo anuncia `Cortina Rolô Blackout 1,60x1,60 Quarto Branco`
+> — 47 volumes da mesma semana ficaram sem descrição por causa dela. Hoje o
+> título é reconhecido pela **estrutura**: `<identificação do anúncio> <texto>`,
+> onde a identificação é o código do ML (`AFPLKBSAWFKHHLAH7CBU3W5ZYA`,
+> `12110502998294`). Palavra de catálogo dentro do parser envelhece calada, como
+> a lista de cores e a tabela de famílias envelheceriam (§5).
+>
 > **Rode `node teste_parse.js` após qualquer mudança no `parse.js` ou no
-> `folha.js`** — os 23 casos montam a folha no formato REAL do ML; o caso do
+> `folha.js`** — os 24 casos montam a folha no formato REAL do ML; o caso do
 > Abraão está lá, e o do `170x170` (armadilha #22) também.
 >
 > Para conferir o que já está gravado: `node rastrear.js --auditar [dias]` e
@@ -1447,7 +1480,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (23 casos), `teste_carga.js` (44), `teste_divergencia.js` (25) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (20), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (44), `teste_divergencia.js` (25) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (20), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
 | 11 | **A investigar: o que é o `Quantidade` da folha** — a regra é uma venda = uma etiqueta = uma persiana (§5), então esse campo não deveria vir maior que 1. Ninguém decide nada com ele hoje. Falta abrir um PDF real com `Quantidade > 1` e entender o que aquele número diz | Baixo enquanto nada o usar — mas é uma pergunta sem resposta sobre o documento de origem |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
