@@ -207,8 +207,13 @@ async function porque(){
   const alvo=semDescricao.filter(v=>v.srcfile);
   if(!alvo.length){ console.log('·  --porque: nenhum volume sem descricao tem PDF de origem registrado.'); return; }
   const porArquivo={}; alvo.forEach(v=>{ (porArquivo[v.srcfile]=porArquivo[v.srcfile]||[]).push(v); });
-  const arquivos=Object.keys(porArquivo).filter(a=>fs.existsSync(a)).sort().reverse().slice(0,5);
-  const sumidos=Object.keys(porArquivo).length-arquivos.length;
+  /* TODOS os PDFs que ainda existem, não os N mais recentes: um dia grande sai
+     em vários arquivos, e cortar a lista faria o relatório dizer "conferi" sobre
+     volumes que ele nem abriu — que é o silêncio que este script existe para
+     acabar. Ler um PDF é rápido; os que o cron apagou aparecem contados. */
+  const existentes=Object.keys(porArquivo).filter(a=>fs.existsSync(a)).sort().reverse();
+  const sumidos=Object.keys(porArquivo).length-existentes.length;
+  const arquivos=existentes;
   console.log('');
   console.log('POR QUE O TITULO NAO FOI GRAVADO — relendo os PDFs que ainda estao no servidor');
   if(sumidos>0) console.log('('+sumidos+' arquivo(s) ja foram apagados pelo cron dos 7 dias — esses nao da mais pra reler)');
@@ -229,6 +234,12 @@ async function porque(){
       }
     }
     const ok=vs.length-semItem-semTitulo;
+    if(!semItem && !semTitulo){
+      /* Arquivo inteiro recuperado nao precisa de quatro linhas: com o dia
+         grande saindo em varios PDFs, o que importa e o que ainda falha. */
+      console.log('   '+path.basename(arq)+': '+vs.length+' sem descricao, a folha TEM o titulo de todos agora');
+      continue;
+    }
     console.log('   '+path.basename(arq)+'  ('+vs.length+' volume(s) sem descricao)');
     console.log('       sem casar com item da folha : '+semItem);
     console.log('       item achado, titulo nao lido: '+semTitulo);
@@ -253,12 +264,24 @@ async function porque(){
     }
     console.log('');
   }
+  console.log('');
   if(achadosNaRelida.length){
     console.log('⚠  '+achadosNaRelida.length+' VOLUME(S) SEM DESCRICAO GRAVADA EM QUE O PDF RELIDO ACUSA DIVERGENCIA');
     console.log('   (nao apareciam na conta de cima porque a descricao deles nunca foi gravada)');
     console.log('');
+    /* O ESTAGIO E O QUE DECIDE O QUE DA PRA FAZER AGORA, e e a primeira coisa
+       que alguem pergunta ao ler a lista. Sem isso o relatorio manda conferir
+       peca que ja esta na casa do cliente com a mesma urgencia da que ainda
+       esta na prateleira. */
+    const acao={
+      pendente:'ainda NAO imprimiu etiqueta — da pra segurar',
+      bloqueado:'ja esta retido em Admin → Bloqueados',
+      embalado:'etiqueta impressa, ainda na fabrica — da pra tirar do carro',
+      carregado:'JA SAIU da fabrica — aqui so resta falar com o cliente',
+    };
     for(const d of achadosNaRelida){
-      console.log('   #'+d.v.id+'  '+d.v.data+'  '+d.v.estagio);
+      console.log('   #'+d.v.id+'  '+d.v.data+'  '+d.v.estagio+
+        (acao[d.v.estagio]?'  → '+acao[d.v.estagio]:''));
       console.log('       cliente : '+(d.v.buyer||'—')+'   NF '+(d.v.nf||'—')+
                   '   venda '+(d.v.venda||d.v.packId||'—'));
       console.log('       anuncio : '+String(d.it.desc).slice(0,100));
