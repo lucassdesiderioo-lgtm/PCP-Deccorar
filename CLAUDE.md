@@ -282,10 +282,12 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > grava por ela e a auditoria relê por ela. Duas cópias significaria conferir com
 > uma régua diferente da que gravou.
 >
-> **Rode `node teste_parse.js` após qualquer mudança no `parse.js`** — os nove
-> casos montam a folha no formato REAL do ML, e o caso do Abraão está lá.
+> **Rode `node teste_parse.js` após qualquer mudança no `parse.js` ou no
+> `folha.js`** — os 20 casos montam a folha no formato REAL do ML; o caso do
+> Abraão está lá, e o do `170x170` (armadilha #22) também.
 >
-> Para conferir o que já está gravado: `node rastrear.js --auditar [dias]`.
+> Para conferir o que já está gravado: `node rastrear.js --auditar [dias]` e
+> `node conferir_medidas.js [dias]` (medida do anúncio × cadastro).
 > `node rastrear.js --folha` mostra o PDF cru quando o layout mudar.
 
 ### ⚠️ ARMADILHA #8 — **peça não é volume**, e é daí que sai "subi 41 e aparecem 35"
@@ -364,7 +366,7 @@ volume que já existia. Só lê — pode rodar em produção.
 > regra. Uma ferramenta de diagnóstico com régua própria é pior que nenhuma:
 > ela confirmaria com autoridade um número que a tela não usa.
 
-### Três conferências, e qualquer uma delas retém o volume
+### Seis conferências, e qualquer uma delas retém o volume
 
 O `parse` devolve `conflito` e o upload grava o volume como `bloqueado` com
 `lote.bloqueio = 'divergencia: ...'` quando:
@@ -376,6 +378,7 @@ O `parse` devolve `conflito` e o upload grava o volume como `bloqueado` com
 | 3 | **A descrição** — `1,60x1,40` escrito no anúncio × a medida dentro do código do SKU | O item corrompido, mesmo que as duas leituras concordem |
 | 4 | **A cor** — a cor do anúncio × a cor dentro do código do SKU | O que a medida não separa: duas peças do mesmo cliente, mesma medida, cores diferentes. Ali o nome também não desempata |
 | 5 | **A linha do produto** — a família da descrição × o prefixo do SKU, contra o que o sistema já viu | O que nem medida nem cor separam: `BK160140BEGE` ("Cortina Rolo Blackout") e `SCREEN3-160140BEGE` ("Toucher Rolô Evolux") têm a MESMA medida e a MESMA cor |
+| 6 | **A medida × o CADASTRO** — `170x170` no anúncio × `largura_cm`/`altura_cm` de `skus` | O que a 3 não pega: SKU cujo **código não carrega medida** nunca passou pela 3, e ela nunca disse isso. Roda no upload (`exp_route.js`), que é quem enxerga o banco |
 
 > **A conferência 5 aprende sozinha, e por isso demora a acusar.** O par
 > família → prefixo é acumulado na tabela `familia_sku` a cada upload, e só vira
@@ -387,6 +390,51 @@ O `parse` devolve `conflito` e o upload grava o volume como `bloqueado` com
 > A lista de cores da conferência 4 sai dos próprios campos `Cor:` da folha,
 > nunca de uma lista fixa: cor nova do catálogo entra sozinha, sem ninguém
 > lembrar de vir aqui.
+
+### ⚠️ ARMADILHA #22 — a trava não foi contornada: ela nunca chegou a rodar
+
+Em 14/09/2026 um volume com anúncio **`170x170`** e SKU **`BK160160BEGE`** passou
+pela expedição sem um aviso. A conferência 3 existe exatamente para isso e não
+disse nada — e não porque errou a comparação: porque **não teve o que comparar**.
+
+A medida do anúncio era lida por `(\d)[,.](\d{2})x(\d)[,.](\d{2})` — *um* dígito,
+vírgula, *dois* dígitos. Isso lê `1,60x1,40` e **não lê `170x170`**, que é como
+boa parte dos anúncios escreve a mesma medida, em centímetros. Nesses títulos
+`larg`/`alt` voltavam `null`, e a conferência 3 só acusa **quando os dois lados
+existem** (§5) — regra certa, aplicada a um lado que a leitura tinha apagado.
+
+> **É a frase do próprio §5 acontecendo:** *"uma trava que para de acusar faz o
+> mesmo silêncio de 'está tudo certo'"*. Não há erro, não há bloqueio, e a tela
+> do volume não conferido é idêntica à do volume conferido. Só a **cobertura** da
+> auditoria sabia — e ela é um número que ninguém olha todo dia.
+
+Três reparos, e os três são de precisão, não de afrouxamento:
+
+| O que era | O que é |
+|---|---|
+| um formato só de medida no anúncio | `folha.js` → `medidaDaDescricao()` lê metro e centímetro (`1,60x1,40`, `160x140`, `1,7 x 1,7 m`, `160 x 140 cm`) e devolve **sempre em centímetros inteiros**, a unidade das colunas de `skus` |
+| medida no código só colada (`BK160140`) | `medidaDoCodigo()` lê também `BK110X240BEGE` e `ROLO SOB MEDIDA 137x212` — o formato com `X` era invisível, e ali a 3 também saía de cena calada |
+| a 3 conferindo contra o **texto do código** | nasce a **conferência 6**: o anúncio contra as **colunas** de `skus`, no upload. É o reparo que o próprio §5 já apontava ("ou o código volta a carregar o dado, ou a conferência passa a ler das colunas") |
+
+**As duas guardas contra o oposto** (armadilha #10 — acusar inocente): só vale
+medida plausível de persiana (30 a 400 cm), então `Kit 3x2` não vira medida; e
+título que diz **duas** medidas diferentes devolve `null` — não é "bate" nem "não
+bate", é *não dá pra dizer*, e dúvida nunca vira acusação. A conferência 6
+também se cala em acessório (`exige_medida=0`) e em SKU sem medida cadastrada.
+
+**Antes de ligar a 6 em produção, meça:** `node conferir_medidas.js [dias]` relê
+a `descricao` já gravada em `lote` e diz **o que a trava nova acusaria** — e, de
+quebra, quais volumes já despachados estão na situação do 170x170, que é o
+único lugar onde ainda dá pra ligar para o cliente antes da reclamação. Dois ou
+três achados são casos reais; dezenas são **cadastro** para arrumar primeiro,
+senão a trava nasce retendo gente certa. Ele não tem régua própria: lê pelo
+`folha.js`, o mesmo dono que o upload usa para acusar.
+
+> A `familia_sku` da conferência 5 sofria do mesmo defeito por tabela: o corte da
+> família usava a mesma regex de um formato só, então no título em centímetros a
+> medida ficava **dentro** da família e cada medida virava uma família diferente
+> — que nunca junta as 5 ocorrências de que a 5 precisa. Corrigido junto; as
+> chaves antigas em centímetros são reaprendidas sozinhas nos próximos uploads.
 
 ### ⚠️ ARMADILHA #10 — a trava que acusa o inocente para de proteger o culpado
 
@@ -1354,7 +1402,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (13 casos), `teste_carga.js` (44), `teste_divergencia.js` (23) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (20), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (20 casos), `teste_carga.js` (44), `teste_divergencia.js` (25) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (20), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
 | 11 | **A investigar: o que é o `Quantidade` da folha** — a regra é uma venda = uma etiqueta = uma persiana (§5), então esse campo não deveria vir maior que 1. Ninguém decide nada com ele hoje. Falta abrir um PDF real com `Quantidade > 1` e entender o que aquele número diz | Baixo enquanto nada o usar — mas é uma pergunta sem resposta sobre o documento de origem |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
@@ -1376,6 +1424,13 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   etiqueta é uma persiana (§5); já foi tentado e revertido, e há teste travando
 - ❌ Fazer a leitura por pedaços (`split` em `Desenho do tecido`) voltar a rodar
   antes do tokenizer no `parse.js` — manda a peça errada pro cliente (§5)
+- ❌ Escrever uma segunda leitura de medida (do anúncio ou do código do SKU)
+  fora do `folha.js` — e nunca uma que conheça um formato só: foi assim que a
+  conferência 3 parou de rodar em silêncio no título em centímetros (§5,
+  armadilha #22)
+- ❌ Deixar a conferência 6 acusar quando falta medida de um dos lados, ou em
+  acessório (`exige_medida=0`) — silêncio por falta de dado não vira bloqueio
+  (§5, armadilhas #10 e #22)
 - ❌ Pôr a caixa de coleta na lista ou no contador do carro, ou somar a coleta
   no relógio de despacho — são duas portas de saída, e `carga.js` é o dono
   único de "isto é coleta?" (§8-B, armadilha #21)

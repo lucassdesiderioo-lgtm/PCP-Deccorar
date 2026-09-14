@@ -348,6 +348,70 @@ function conferir(nome, orders, esperado){
     else console.log('ok      coleta e agencia se separam pela hora da linha Despachar');
   }
 
+  /* ── 16. A MEDIDA DO ANUNCIO ESCRITA DE QUALQUER JEITO ─────────────────────
+        O caso de 14/09/2026: anuncio "170x170", SKU BK160160BEGE, e o volume
+        passou limpo. Nao foi a trava que errou — ela nem chegou a rodar: a
+        leitura da medida exigia "1,70x1,70" e devolvia NULL para o titulo
+        escrito em centimetros, e a conferencia 3 so acusa quando os dois lados
+        existem. Silencio identico ao de um volume conferido.
+
+        Aqui a MESMA medida entra escrita nos formatos que o ML usa. Todos tem
+        que acusar contra o SKU trocado — e nenhum pode acusar contra o certo,
+        que e a outra metade (armadilha #10: trava que acusa inocente para de
+        proteger o culpado). */
+  {
+    const FORMATOS=['1,70x1,70','170x170','1,70 x 1,70 m','170 x 170 cm','1.70x1.70','1,7x1,7'];
+    for(const medida of FORMATOS){
+      casos++;
+      const erros=[];
+      const errado=await montar([
+        {pack:'111',venda:'901',sku:'BK160160BEGE',medida,cor:'Bege',comprador:'Joao Silva'},
+      ],[{pack:'111',nf:'1',comprador:'Joao Silva'}]);
+      const v=errado[0]||{};
+      if(!(v.conflito&&/170x170/.test(v.conflito)))
+        erros.push('nao acusou o SKU 160160: conflito veio '+JSON.stringify(v.conflito));
+      if(v.larg!==170||v.alt!==170)
+        erros.push('a medida nao chegou em centimetros: '+v.larg+'x'+v.alt);
+      const certo=await montar([
+        {pack:'111',venda:'901',sku:'BK170170BEGE',medida,cor:'Bege',comprador:'Joao Silva'},
+      ],[{pack:'111',nf:'1',comprador:'Joao Silva'}]);
+      if((certo[0]||{}).conflito)
+        erros.push('reteve o SKU certo a toa: '+certo[0].conflito);
+      if(erros.length){ falhas++; console.log('FALHOU  medida "'+medida+'" acusa o SKU trocado e poupa o certo');
+        erros.forEach(e=>console.log('        '+e)); }
+      else console.log('ok      medida "'+medida+'" acusa o SKU trocado e poupa o certo');
+    }
+  }
+
+  /* ── 17. O QUE NAO E MEDIDA NAO PODE VIRAR ACUSACAO ────────────────────────
+        A leitura larga demais e o outro jeito de errar: numero que nao e
+        medida vira uma medida inventada, e o volume certo fica retido. Duvida
+        (duas medidas no mesmo titulo) tambem nao acusa — e "nao da pra dizer". */
+  casos++;
+  {
+    const {medidaDaDescricao,medidaDoCodigo}=require('./folha');
+    const erros=[];
+    const nao=['Persiana Rolo Blackout Bege','Kit 3x2 buchas','Garantia 2 x 12 meses',
+               'Tela Solar 5% protecao'];
+    nao.forEach(d=>{ const m=medidaDaDescricao(d);
+      if(m) erros.push('inventou medida em "'+d+'": '+m.larg+'x'+m.alt); });
+    const dois=medidaDaDescricao('Persiana 1,60x1,40 — serve em vao de 1,70x1,50');
+    if(dois) erros.push('titulo com duas medidas tinha que dar null, veio '+dois.larg+'x'+dois.alt);
+    const iguais=medidaDaDescricao('Persiana Rolo 1,60x1,40 (160x140 cm)');
+    if(!iguais||iguais.larg!==160||iguais.alt!==140)
+      erros.push('a mesma medida escrita duas vezes tinha que passar: '+JSON.stringify(iguais));
+    /* O codigo tambem carrega medida em dois formatos, e o do X era invisivel. */
+    const cod={'BK160140CINZA':'160x140','BK110X240BEGE':'110x240',
+               'ROLO SOB MEDIDA 137x212':'137x212','SCREEN3-160140BEGE':'160x140',
+               'ACESSORIOSPERSIANAS':null,'KIT32':null};
+    Object.keys(cod).forEach(c=>{ const m=medidaDoCodigo(c);
+      const veio=m?(m.larg+'x'+m.alt):null;
+      if(veio!==cod[c]) erros.push('codigo '+c+': esperava '+cod[c]+', veio '+veio); });
+    if(erros.length){ falhas++; console.log('FALHOU  numero que nao e medida nao vira acusacao');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      numero que nao e medida nao vira acusacao');
+  }
+
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));

@@ -69,6 +69,12 @@ function conferir(nome,cond,detalhe){
     ['3 descricao x SKU',       'descricao diz 160x140 e o SKU e BK140140BEGE', 'BK140140BEGE', 1],
     ['4 cor do anuncio',        'anuncio diz cor Cinza e o SKU e BK160140BEGE', 'BK160140BEGE', 1],
     ['5 familia do anuncio',    'o anuncio "Toucher Rolo Evolux" sempre foi SCREEN3, e o SKU e BK160140BEGE', 'BK160140BEGE', 1],
+    /* 6 e a conferencia que le as COLUNAS de `skus` em vez do texto do codigo
+       (exp_route.js). Ela nasceu em 14/09/2026 junto com o conserto da leitura
+       da medida do anuncio — antes, titulo em centimetros ("170x170") nao era
+       lido e nem a conferencia 3 rodava. Entra aqui pelo mesmo motivo dos
+       outros cinco: o texto tem que devolver uma escolha valida na tela. */
+    ['6 medida x cadastro',     'o anuncio diz 170x170 e o cadastro de BK160160CINZA e 160x160', 'BK160160CINZA', 1],
   ];
   for(const [nome,motivo,gravado,minOpcoes] of MOTIVOS){
     const ctx=await montar(); const db=ctx.db;

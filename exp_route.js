@@ -1,6 +1,7 @@
 const express=require('express'); const fs=require('fs');
 const {parsePdf}=require('./parse'); const {PDFDocument}=require('pdf-lib');
 const {futuro,COLETA}=require('./carga');
+const FOLHA=require('./folha');
 module.exports=function(app,db){
   db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
@@ -60,9 +61,16 @@ module.exports=function(app,db){
     familia TEXT, prefixo TEXT, vezes INTEGER DEFAULT 0,
     visto_em TEXT DEFAULT (datetime('now','localtime')),
     PRIMARY KEY (familia,prefixo));`);
-  const familiaDe=d=>String(d||'').replace(/\d[,.]\d{2}\s*[xX].*/,'')
-    .toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z ]/g,' ')
-    .replace(/\s+/g,' ').trim();
+  /* A familia e o que vem ANTES da medida no titulo do anuncio. O corte usava
+     um formato so ("1,60x1,40") e nao cortava o titulo escrito em centimetros
+     ("160x140") — ali a medida ficava DENTRO da familia, e cada medida virava
+     uma familia diferente, que nunca junta as 5 ocorrencias de que a
+     conferencia 5 precisa. Quem acha a medida agora e o folha.js, o mesmo dono
+     que a le para conferir. */
+  const familiaDe=d=>{ const s=String(d||''); const m=FOLHA.medidaDaDescricao(s);
+    return (m?s.slice(0,m.inicio):s)
+      .toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z ]/g,' ')
+      .replace(/\s+/g,' ').trim(); };
   const prefixoDe=s=>{ const m=String(s||'').toUpperCase().match(/^([A-Z0-9-]*?)(?=\d{3})/);
     return m?m[1].replace(/[-\s]+$/,''):''; };
   /* Quantas vezes um par precisa ter sido visto pra virar regra. Abaixo disso o
@@ -94,6 +102,12 @@ module.exports=function(app,db){
       const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio,descricao,despachar_em,modalidade) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
       const existe=db.prepare('SELECT 1 FROM skus WHERE codigo=?');
       const famVista=db.prepare('SELECT prefixo,vezes FROM familia_sku WHERE familia=?');
+      /* A MEDIDA QUE O CADASTRO DIZ — conferencia 6, la embaixo. Le as COLUNAS
+         de `skus` (§7), que sao a fonte de verdade do que a peca e; o texto do
+         codigo e so um resquicio do formato antigo e pode nao dizer nada. */
+      const medidaCad=db.prepare(`SELECT s.largura_cm larg, s.altura_cm alt,
+        COALESCE(m.exige_medida,1) exige_medida
+        FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id WHERE s.codigo=?`);
       const famGrava=db.prepare(`INSERT INTO familia_sku (familia,prefixo,vezes) VALUES (?,?,1)
         ON CONFLICT(familia,prefixo) DO UPDATE SET vezes=vezes+1, visto_em=datetime('now','localtime')`);
       let novos=0,rep=0,semsku=0,bloq=0,divs=0,coleta=0,modal=0; const desconhecidos={};
@@ -117,6 +131,22 @@ module.exports=function(app,db){
             conflito=(conflito?conflito+' · ':'')+
               'o anuncio "'+String(o.descricao||'').slice(0,40)+'" sempre foi '+consolidado.prefixo+', e o SKU e '+sku;
           else famGrava.run(fam,pre);
+        }
+
+        /* CONFERENCIA 6 — a medida do anuncio contra o CADASTRO do SKU.
+           A conferencia 3 (parse.js) compara o anuncio com a medida escrita
+           dentro do CODIGO, e o codigo e etiqueta livre (§7): SKU que nao
+           carrega medida no texto nunca foi conferido por ela — e o §5 ja
+           avisava que o dia em que os codigos parassem de carregar o dado as
+           travas 3 e 4 "param de proteger sem emitir um unico aviso". O reparo
+           que ele mesmo aponta e este: ler das COLUNAS de `skus`.
+           Aqui da pra fazer isso porque o upload enxerga o banco, e o parse
+           nao. Vale so quando os dois lados existem — SKU sem medida cadastrada
+           e acessorio (exige_medida=0) nao viram acusacao, pela regra de sempre:
+           silencio por falta de dado nao pode virar bloqueio. */
+        if(o.larg && o.alt && ok){
+          const m=FOLHA.conflitoDeMedida(o, medidaCad.get(sku), sku);
+          if(m) conflito=(conflito?conflito+' · ':'')+m;
         }
 
         /* A divergencia vem PRIMEIRO: um volume em que as leituras da folha

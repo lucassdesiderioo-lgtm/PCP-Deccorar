@@ -1,4 +1,8 @@
 const pdfjs = require('pdfjs-dist/legacy/build/pdf.js');
+/* As duas leituras de medida — do anuncio e do codigo — moram no folha.js, que
+   e quem le a folha para GRAVAR e para AUDITAR. Uma copia aqui conferiria com
+   uma regua diferente da que a auditoria usa depois. */
+const {medidaDoCodigo} = require('./folha');
 pdfjs.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.js';
 
 /* A DATA LIMITE DE DESPACHO, QUE A ETIQUETA SEMPRE TRAZ.
@@ -241,7 +245,8 @@ async function parsePdf(uint8){
     for(const ln of lines){ const c=ln.replace(/\s+/g,'');
       if(/^[0-9]{8,}$/.test(c)) codes.add(c);
       else if(/^[0-9]{8,}\$[0-9]+$/.test(c)) codes.add(c.replace(/\D/g,'')); }
-    /* O VOLUME SO PASSA SE TUDO CONCORDAR. Sao tres conferencias independentes,
+    /* O VOLUME SO PASSA SE TUDO CONCORDAR. Sao quatro conferencias independentes
+       aqui (a 5 e a 6 rodam no upload, que enxerga o banco),
        e qualquer uma delas segura a peca — o preco de reter um volume e uma
        conversa; o de mandar a peca errada e a reputacao no Mercado Livre. */
     const busca=(L)=>(venda&&L.venda[venda])||(packId&&L.pack[packId])||null;
@@ -273,10 +278,16 @@ async function parsePdf(uint8){
        (BK160140...). Sao a mesma informacao por dois caminhos: o codigo e o
        texto do anuncio. Discordaram, alguma das duas esta trocada. Vale so
        quando o codigo carrega medida no formato antigo — SKU e etiqueta livre
-       (§7), e ausencia de medida no codigo nunca vira acusacao. */
+       (§7), e ausencia de medida no codigo nunca vira acusacao.
+
+       As DUAS leituras moram no folha.js (medidaDaDescricao / medidaDoCodigo),
+       e nenhuma das duas e mais aquela regex de um formato so: o anuncio que
+       escrevia "170x170" em vez de "1,70x1,70" desligava esta conferencia sem
+       dizer nada, e foi assim que um volume 170x170 com SKU BK160160BEGE
+       atravessou a expedicao inteira em 14/09/2026. */
     if(rec && rec.larg && rec.alt){
-      const m=String(rec.sku||'').match(/(\d{3})(\d{3})/);
-      if(m && (+m[1]!==rec.larg || +m[2]!==rec.alt))
+      const m=medidaDoCodigo(rec.sku);
+      if(m && (m.larg!==rec.larg || m.alt!==rec.alt))
         motivos.push('descricao diz '+rec.larg+'x'+rec.alt+' e o SKU e '+rec.sku);
     }
 
@@ -313,6 +324,12 @@ async function parsePdf(uint8){
          ("Cortina Rolo Blackout" x "Toucher Rolo Evolux"), a unica dimensao que
          medida e cor nao separam. O upload guarda e aprende com ela. */
       descricao:(rec&&rec.desc)||null, despacharEm, modalidade, despachoLinha,
+      /* A medida do anuncio, em centimetros, vai junto: aqui ela so pode ser
+         conferida contra o TEXTO do codigo, e o codigo pode nao carregar
+         medida. Quem tem a medida de verdade e o cadastro (colunas de `skus`,
+         §7), e quem enxerga o cadastro e o upload — e la que ela e conferida
+         de novo (conferencia 6, exp_route.js). */
+      larg:(rec&&rec.larg)||null, alt:(rec&&rec.alt)||null,
       buyer:buyer||'(sem nome)',city,nf,packId,venda,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
   }
   return orders;

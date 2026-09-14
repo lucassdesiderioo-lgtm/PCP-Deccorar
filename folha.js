@@ -10,6 +10,91 @@
  */
 const fs=require('fs');
 
+/* ── A MEDIDA ESCRITA NO ANUNCIO — dono unico ────────────────────────────────
+ *
+ * ⚠️ ELA DESLIGOU A CONFERENCIA 3 EM SILENCIO POR MESES.
+ *
+ * A leitura era `(\d)[,.](\d{2})x(\d)[,.](\d{2})` — um digito, virgula, dois
+ * digitos. Isso le "1,60x1,40" e NAO le "170x170", que e como boa parte dos
+ * anuncios escreve a mesma medida (em centimetros, sem virgula). Nesses, `larg`
+ * e `alt` voltavam NULL, e a conferencia 3 do parse.js so acusa "quando os dois
+ * lados existem": sem medida do anuncio, ela nao acusava nada.
+ *
+ * O modo de falhar e o pior que existe aqui: nao ha erro, nao ha bloqueio, e a
+ * tela fica igual a de um volume conferido. Em 14/09/2026 um volume com anuncio
+ * "170x170" e SKU BK160160BEGE passou limpo pela expedicao — a trava nao foi
+ * contornada, ela nunca chegou a rodar. E a mesma doenca do §5: "uma trava que
+ * para de acusar faz o mesmo silencio de 'esta tudo certo'".
+ *
+ * Agora a mesma medida e lida escrita de qualquer jeito, e devolvida SEMPRE em
+ * centimetros inteiros — que e a unidade das colunas de `skus` (§7).
+ *
+ * Duas guardas contra o oposto (acusar inocente, armadilha #10):
+ *   - so vale medida PLAUSIVEL de persiana (30 a 400 cm). "Kit 3x2" nao e medida;
+ *   - titulo que diz DUAS medidas diferentes devolve null. Nao e "bate" nem
+ *     "nao bate": e "nao da pra dizer", e duvida nunca vira acusacao.
+ */
+const MEDIDA=/(?<!\d)(\d{1,3})(?:[,.](\d{1,2}))?\s*(?:cm|m)?\s*[xX×]\s*(\d{1,3})(?:[,.](\d{1,2}))?(?!\d)/g;
+const PLAUSIVEL=v=>v>=30&&v<=400;
+/* Sem parte decimal o numero ja E centimetro ("170"); com ela e metro e vira
+   centimetro ("1,7" e "1,70" sao os mesmos 170 — o decimal completa a direita). */
+const emCm=(inteiro,dec)=>(dec==null||dec==='')?+inteiro
+  :Math.round(+inteiro*100+ +String(dec).padEnd(2,'0'));
+function medidaDaDescricao(desc){
+  const s=String(desc||''); const achadas=[]; let inicio=null,m;
+  MEDIDA.lastIndex=0;
+  while((m=MEDIDA.exec(s))){
+    const l=emCm(m[1],m[2]), a=emCm(m[3],m[4]);
+    if(!PLAUSIVEL(l)||!PLAUSIVEL(a)) continue;
+    if(inicio==null) inicio=m.index;
+    achadas.push(l+'x'+a);
+  }
+  if(!achadas.length) return null;
+  if(new Set(achadas).size>1) return null;   // o anuncio diz duas medidas: nao da pra dizer
+  const [l,a]=achadas[0].split('x');
+  return {larg:+l,alt:+a,inicio};
+}
+
+/* ── A MEDIDA ESCRITA DENTRO DO CODIGO DO SKU — dono unico ───────────────────
+ *
+ * O codigo e etiqueta livre (§7) e pode nao carregar medida nenhuma: null aqui
+ * e "nao da pra conferir", nunca "nao bate". O que ele carrega vem em dois
+ * formatos — `BK160140BEGE` e `BK110X240BEGE` (ou `ROLO SOB MEDIDA 137x212`) —
+ * e o segundo era invisivel para a leitura antiga, que exigia os seis digitos
+ * colados. Mais um lugar por onde a conferencia 3 saia de cena calada.
+ *
+ * As bordas (`(?<!\d)` / `(?!\d)`) existem para nao recortar tres digitos do
+ * meio de um numero maior e comparar contra uma medida que ninguem escreveu.
+ */
+const MEDIDA_COD=/(?<!\d)(\d{3})\s*[xX]?\s*(\d{3})(?!\d)/;
+function medidaDoCodigo(cod){
+  const m=String(cod||'').match(MEDIDA_COD);
+  return m?{larg:+m[1],alt:+m[2]}:null;
+}
+
+/* ── CONFERENCIA 6: o anuncio contra o CADASTRO (§5 do CLAUDE.md) ────────────
+ *
+ * A conferencia 3 compara o anuncio com a medida escrita dentro do CODIGO, e o
+ * codigo e etiqueta livre: SKU que nao carrega medida no texto nunca foi
+ * conferido por ela. Quem sabe mesmo o que a peca e sao as COLUNAS de `skus`.
+ *
+ * Mora aqui, e nao dentro do upload, porque a mesma pergunta e feita em dois
+ * lugares: o exp_route.js a faz no volume que ENTRA, e o conferir_medidas.js a
+ * faz no que JA ESTA GRAVADO. Duas copias dariam dois numeros para a mesma
+ * pergunta — e o errado seria sempre o que ninguem estivesse olhando.
+ *
+ * Devolve null quando nao da pra conferir (falta medida de um dos lados, ou o
+ * modelo nao cobra medida — acessorio nao tem largura e isso nao e pendencia,
+ * §7). Silencio por falta de dado nunca vira bloqueio.
+ */
+function conflitoDeMedida(anuncio, cadastro, sku){
+  const a=anuncio||{}, c=cadastro||{};
+  const exige=(c.exige_medida==null)?1:c.exige_medida;
+  if(!exige || !a.larg || !a.alt || !c.larg || !c.alt) return null;
+  if(+c.larg===+a.larg && +c.alt===+a.alt) return null;
+  return 'o anuncio diz '+a.larg+'x'+a.alt+' e o cadastro de '+sku+' e '+c.larg+'x'+c.alt;
+}
+
 function pageLines(tc){
   const items=tc.items.filter(it=>it.str&&it.str.trim()!=='');
   const rows={};
@@ -75,7 +160,7 @@ function itensDaFolha(linhas){
       const mm=x.match(/^(.+?)\s+(?:Cor:|Quantidade:)/);
       if(mm && !/^(Pack ID|Venda|SKU|Desenho)/.test(mm[1]) && !/Persiana/i.test(mm[1])){ comprador=mm[1].trim(); break; }
     }
-    const med=desc.match(/(\d)[,.](\d{2})\s*[xX]\s*(\d)[,.](\d{2})/);
+    const med=medidaDaDescricao(desc);
     itens.push({
       packId:(pega(/Pack ID:\s*([\d ]+)/)||'').replace(/\s+/g,'')||null,
       venda:(pega(/Venda:\s*([\d ]+)/)||'').replace(/\s+/g,'')||null,
@@ -89,7 +174,9 @@ function itensDaFolha(linhas){
          campo — ele existe pra `rastrear.js --lote` conseguir explicar a
          diferenca em vez de deixar o operador achando que sumiu peca. */
       qtd: Math.max(1, parseInt(pega(/Quantidade:\s*(\d+)/)||'1',10)||1),
-      larg: med?+(med[1]+med[2]):null, alt: med?+(med[3]+med[4]):null
+      /* Sempre em centimetros inteiros, a mesma unidade das colunas de `skus`
+         (§7) — o anuncio escrevendo "1,60x1,40" ou "160x140" da no mesmo. */
+      larg: med?med.larg:null, alt: med?med.alt:null
     });
   });
   return itens;
@@ -134,11 +221,14 @@ function travasAtivas(volume, item, coresConhecidas){
   const corItem=String((item&&item.cor)||'').toUpperCase().normalize('NFD')
     .replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9]/g,'');
   return {
-    medida: !!(item && item.larg && item.alt && /(\d{3})(\d{3})/.test(cod)),
+    /* A mesma leitura do parse (medidaDoCodigo) — cobertura medida com uma
+       regua diferente da que acusa contaria protecao que nao existe. */
+    medida: !!(item && item.larg && item.alt && medidaDoCodigo(cod)),
     cor: !!(corItem && (cod.includes(corItem) ||
             [...(coresConhecidas||[])].some(c=>c!==corItem && c.length>2 && cod.includes(c)))),
     comprador: !!(item && item.comprador && volume && volume.buyer)
   };
 }
 
-module.exports={lerFolha,mapasDaFolha,skuDaFolha,itemDaFolha,itensDaFolha,travasAtivas,pageLines};
+module.exports={lerFolha,mapasDaFolha,skuDaFolha,itemDaFolha,itensDaFolha,travasAtivas,pageLines,
+                medidaDaDescricao,medidaDoCodigo,conflitoDeMedida};
