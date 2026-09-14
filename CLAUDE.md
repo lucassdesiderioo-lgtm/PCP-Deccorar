@@ -319,6 +319,22 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > conta como início de bloco do mesmo jeito — era o último volume da semana que
 > ainda ficava sem descrição depois dos dois reparos acima.
 
+> **O caso que a 6 existe para pegar é o anúncio novo com o SKU errado.** Em
+> 14/09/2026 três vendas de `Cortina Rolô Blackout 1,70x1,70 Quarto 0% Luz Bege`
+> entraram com `BK160160BEGE`: cliente comprando 1,70 e peça de 1,60 saindo da
+> prateleira. Nenhuma das outras cinco conferências pega isso — as duas leituras
+> da folha concordam (o SKU **é** esse), o comprador bate, a cor bate, o código
+> concorda com o cadastro, e a família ainda não tem as 5 ocorrências. Só o
+> **anúncio contra o cadastro** desmente.
+>
+> Volume que entrou **antes** da 6 não passou por ela, e pode estar na fila de
+> impressão agora: `node reter_divergentes.js` (simula) e `--aplicar` relê os
+> PDFs de `lotes/` e retém o que ela teria retido. Ele **só mexe em `pendente`** —
+> `embalado` já teve etiqueta impressa e estoque baixado, `carregado` já saiu, e
+> marcar esses como retidos põe na tela de Bloqueados um volume que ninguém
+> pode mais segurar (armadilha #10). Eles saem listados à parte, para o contato
+> com o cliente, que é o que resta ali.
+
 > **Depois de consertar a leitura, recupere o que já entrou:**
 > `node backfill_descricao.js` (simula) e `--aplicar`. Ele relê os PDFs de
 > `lotes/` e grava **só** onde `descricao` está NULL — nunca sobrescreve o que o
