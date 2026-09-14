@@ -46,12 +46,15 @@ const db=new Database(CAMINHO);
 (async()=>{
   /* ⚠️ "SEM DESCRICAO" E `COALESCE(descricao,'')=''`, NUNCA `IS NULL`.
      O relatorio (`conferir_medidas.js`) conta em JS, com `!v.descricao`, que
-     pega NULL E string vazia. Enquanto aqui a pergunta era `IS NULL`, os dois
-     respondiam coisas diferentes sobre os MESMOS volumes: em 14/09/2026 o
-     relatorio achou 60 volumes do dia para recuperar e este script disse
-     "nada a fazer" — sem erro, sem aviso, e a janela de 7 dias correndo.
-     Duas reguas para a mesma pergunta e o defeito que este projeto persegue
-     desde a armadilha #12; aqui ele quase custou a descricao de um dia inteiro. */
+     pega NULL E string vazia. Perguntar `IS NULL` aqui deixaria os dois
+     respondendo coisas diferentes sobre os MESMOS volumes — duas reguas para a
+     mesma pergunta, que e o defeito da armadilha #12.
+
+     (Em 14/09/2026 este script disse "nada a fazer" enquanto o relatorio
+     apontava 60 volumes do dia. NAO era isto: o banco nao tinha nem NULL nem
+     vazio, e na execucao seguinte os dois numeros ja batiam. A causa daquela
+     divergencia ficou sem explicacao; o que sobrou de garantia e a conferencia
+     JS x SQL que o relatorio faz de si mesmo, e ela grita se voltar.) */
   const vols=db.prepare(`SELECT id,codigo,buyer,nf,packId,venda,data,srcfile
     FROM lote WHERE COALESCE(descricao,'')='' AND srcfile IS NOT NULL ORDER BY id`).all();
   /* Volume sem PDF de origem nao entra na conta acima, e e ele que explica a
