@@ -41,7 +41,12 @@ const fs=require('fs');
  *   - titulo que diz DUAS medidas diferentes devolve null. Nao e "bate" nem
  *     "nao bate": e "nao da pra dizer", e duvida nunca vira acusacao.
  */
-const MEDIDA=/(?<!\d)(\d{1,3})(?:[,.](\d{1,2}))?\s*(?:cm|mm|m)?\s*(?:[LAlaCcHh]\b)?\s*[xX×]\s*(\d{1,3})(?:[,.](\d{1,2}))?(?!\d)/g;
+/* O rotulo (L de largura, A de altura) vem colado no numero tanto quanto
+   separado dele — "1,00 L X 1,00 A" e "1,65lx0,75a" sao o mesmo anuncio escrito
+   por duas pessoas. Ele nao e enfeite: quando vem INVERTIDO e a unica coisa que
+   diz que o primeiro numero e a altura, e ler na ordem errada nao da erro —
+   acusa o volume certo, ou cala no errado. */
+const MEDIDA=/(?<!\d)(\d{1,3})(?:[,.](\d{1,2}))?\s*(?:cm|mm|m)?\s*([lahLAH])?\s*[xX×]\s*(\d{1,3})(?:[,.](\d{1,2}))?\s*(?:cm|mm|m)?\s*([lahLAH])?(?![A-Za-z0-9])/g;
 const PLAUSIVEL=v=>v>=30&&v<=400;
 /* Sem parte decimal o numero ja E centimetro ("170"); com ela e metro e vira
    centimetro ("1,7" e "1,70" sao os mesmos 170 — o decimal completa a direita). */
@@ -51,7 +56,11 @@ function medidaDaDescricao(desc){
   const s=String(desc||''); const achadas=[]; let inicio=null,m;
   MEDIDA.lastIndex=0;
   while((m=MEDIDA.exec(s))){
-    const l=emCm(m[1],m[2]), a=emCm(m[3],m[4]);
+    let l=emCm(m[1],m[2]), a=emCm(m[4],m[5]);
+    const r1=String(m[3]||'').toLowerCase(), r2=String(m[6]||'').toLowerCase();
+    /* "1,60 A x 1,40 L" e altura x largura. So inverte quando os DOIS rotulos
+       estao escritos e dizem isso — um rotulo sozinho nao decide nada. */
+    if((r1==='a'||r1==='h') && r2==='l'){ const t=l; l=a; a=t; }
     if(!PLAUSIVEL(l)||!PLAUSIVEL(a)) continue;
     if(inicio==null) inicio=m.index;
     achadas.push(l+'x'+a);

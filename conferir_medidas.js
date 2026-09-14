@@ -4,6 +4,7 @@
  *   node conferir_medidas.js              confere os volumes dos ultimos 30 dias
  *   node conferir_medidas.js 90           outra janela
  *   node conferir_medidas.js --tudo       o historico inteiro
+ *   node conferir_medidas.js --porque     rele os PDFs e diz por que faltou titulo
  *   node conferir_medidas.js --db <arq>   outro banco (ver abaixo)
  *
  * So LE. Pode rodar em producao a qualquer hora, com o servico no ar.
@@ -76,7 +77,7 @@ catch(e){
 
 const onde=TUDO?'':"WHERE l.data >= date('now','localtime','-"+DIAS+" day')";
 const vols=db.prepare(`SELECT l.id, l.codigo, l.descricao, l.buyer, l.nf, l.data,
-    l.estagio, l.packId, l.venda, l.bloqueio,
+    l.estagio, l.packId, l.venda, l.bloqueio, l.srcfile,
     s.largura_cm larg, s.altura_cm alt, COALESCE(m.exige_medida,1) exige_medida
   FROM lote l
   LEFT JOIN skus s ON s.codigo=l.codigo
@@ -154,11 +155,23 @@ if(semMedidaNoAnuncio.length){
   console.log('');
 }
 if(semDescricao.length){
-  const maisNova=semDescricao.map(v=>v.data).sort().pop();
-  console.log('·  '+semDescricao.length+' volume(s) sem descricao gravada — a mais nova e de '+maisNova+'.');
+  const porData={}; semDescricao.forEach(v=>{ porData[v.data]=(porData[v.data]||0)+1; });
+  const datas=Object.keys(porData).sort().reverse();
+  console.log('·  '+semDescricao.length+' volume(s) sem descricao gravada — a mais nova e de '+datas[0]+'.');
   console.log('     A coluna `lote.descricao` e recente: volume anterior a ela nao tem o que conferir,');
-  console.log('     e isso e historico, nao buraco. Mas se essa data for de HOJE, o titulo deixou de');
-  console.log('     ser lido no upload — e ai as conferencias 3, 5 e 6 estao desligadas nesses volumes.');
+  console.log('     e isso e historico. Mas volume de HOJE sem descricao e outra coisa — ali o titulo');
+  console.log('     nao foi lido no upload, e as conferencias 3, 5 e 6 estao desligadas nele.');
+  console.log('     Os dias mais recentes:');
+  /* A CURVA POR DATA E QUE SEPARA OS DOIS CASOS. "A mais nova e de hoje" pode
+     ser um volume ou trezentos, e a diferenca entre "sobrou um" e "parou de
+     ler" e justamente essa. Com o total do dia ao lado da falta, da pra ver de
+     relance se o dia inteiro entrou sem titulo. */
+  const totalDoDia={}; vols.forEach(v=>{ totalDoDia[v.data]=(totalDoDia[v.data]||0)+1; });
+  datas.slice(0,7).forEach(d=>console.log('     '+d+'   '+String(porData[d]).padStart(4)+
+    ' sem descricao de '+totalDoDia[d]+' volume(s) do dia'));
+  console.log('');
+  console.log('     Para saber POR QUE, com o PDF ainda no servidor (7 dias):');
+  console.log('       node conferir_medidas.js --porque');
   console.log('');
 }
 if(semCadastro.length){
@@ -168,5 +181,51 @@ if(semCadastro.length){
     .forEach(k=>console.log('     '+String(skus[k]).padStart(4)+' x  '+k));
   console.log('');
 }
-db.close();
-process.exit(divergentes.length?1:0);
+/* ── --porque: RELER O PDF DOS VOLUMES SEM TITULO ────────────────────────────
+ *
+ * "Sem descricao" tem duas causas muito diferentes, e o contador sozinho nao
+ * separa: ou a etiqueta nao casou com item nenhum da folha (e ai as
+ * conferencias 2 e 3 tambem estao desligadas nesse volume), ou o item foi
+ * encontrado e o TITULO e que nao foi lido dentro dele. O reparo de cada uma e
+ * em lugar diferente, entao chutar qual e as duas coisas: um dia de trabalho no
+ * lugar errado e a outra causa continuando de pe.
+ *
+ * Relê pelo `folha.js`, o mesmo dono que gravou. Só lê. Os PDFs ficam 7 dias em
+ * /opt/expedicao/lotes (o cron apaga), então isto só responde sobre a semana.
+ */
+async function porque(){
+  const {lerFolha,itemDaFolha}=require('./folha');
+  const alvo=semDescricao.filter(v=>v.srcfile);
+  if(!alvo.length){ console.log('·  --porque: nenhum volume sem descricao tem PDF de origem registrado.'); return; }
+  const porArquivo={}; alvo.forEach(v=>{ (porArquivo[v.srcfile]=porArquivo[v.srcfile]||[]).push(v); });
+  const arquivos=Object.keys(porArquivo).filter(a=>fs.existsSync(a)).sort().reverse().slice(0,5);
+  const sumidos=Object.keys(porArquivo).length-arquivos.length;
+  console.log('');
+  console.log('POR QUE O TITULO NAO FOI GRAVADO — relendo os PDFs que ainda estao no servidor');
+  if(sumidos>0) console.log('('+sumidos+' arquivo(s) ja foram apagados pelo cron dos 7 dias — esses nao da mais pra reler)');
+  console.log('');
+  for(const arq of arquivos){
+    const vs=porArquivo[arq];
+    let f; try{ f=await lerFolha(arq); }
+    catch(e){ console.log('   '+path.basename(arq)+': nao deu pra ler ('+(e.message||e)+')'); continue; }
+    let semItem=0, semTitulo=0; const exemplos=[];
+    for(const v of vs){
+      const it=itemDaFolha(v,f.blocos);
+      if(!it){ semItem++; if(exemplos.length<3) exemplos.push({v,causa:'a etiqueta nao casou com item nenhum da folha'}); }
+      else if(!it.desc){ semTitulo++; if(exemplos.length<3) exemplos.push({v,causa:'o item existe na folha (SKU '+it.sku+'), mas o titulo nao foi lido no bloco'}); }
+    }
+    const ok=vs.length-semItem-semTitulo;
+    console.log('   '+path.basename(arq)+'  ('+vs.length+' volume(s) sem descricao)');
+    console.log('       sem casar com item da folha : '+semItem);
+    console.log('       item achado, titulo nao lido: '+semTitulo);
+    if(ok>0) console.log('       a folha TEM o titulo agora : '+ok+'  (foram gravados por uma versao anterior do parse)');
+    exemplos.forEach(e=>console.log('       #'+e.v.id+' '+(e.v.codigo||'(sem SKU)')+' — '+e.causa));
+    console.log('');
+  }
+}
+
+(async()=>{
+  if(args.includes('--porque')) await porque();
+  db.close();
+  process.exit(divergentes.length?1:0);
+})();

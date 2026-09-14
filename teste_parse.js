@@ -364,7 +364,7 @@ function conferir(nome, orders, esperado){
        14/09/2026 no banco de producao: 41 volumes em 753 escreviam assim, e
        nenhum deles estava sendo conferido. */
     const FORMATOS=['1,70x1,70','170x170','1,70 x 1,70 m','170 x 170 cm','1.70x1.70','1,7x1,7',
-                    '1,70 L X 1,70 A','170 L x 170 A'];
+                    '1,70 L X 1,70 A','170 L x 170 A','1,70lx1,70a'];
     for(const medida of FORMATOS){
       casos++;
       const erros=[];
@@ -399,6 +399,15 @@ function conferir(nome, orders, esperado){
                'Tela Solar 5% protecao'];
     nao.forEach(d=>{ const m=medidaDaDescricao(d);
       if(m) erros.push('inventou medida em "'+d+'": '+m.larg+'x'+m.alt); });
+    /* Rotulo INVERTIDO: "1,60 A x 1,40 L" e altura x largura, e ler na ordem
+       escrita acusaria o volume certo. So inverte com os DOIS rotulos escritos;
+       um sozinho nao decide nada. */
+    const inv=medidaDaDescricao('Persiana Rolo 1,60 A x 1,40 L Bege');
+    if(!inv||inv.larg!==140||inv.alt!==160)
+      erros.push('rotulo invertido (A x L) nao foi respeitado: '+JSON.stringify(inv));
+    const soUm=medidaDaDescricao('Persiana Rolo 1,60 A x 1,40 Bege');
+    if(!soUm||soUm.larg!==160||soUm.alt!==140)
+      erros.push('um rotulo sozinho nao pode inverter: '+JSON.stringify(soUm));
     const dois=medidaDaDescricao('Persiana 1,60x1,40 — serve em vao de 1,70x1,50');
     if(dois) erros.push('titulo com duas medidas tinha que dar null, veio '+dois.larg+'x'+dois.alt);
     const iguais=medidaDaDescricao('Persiana Rolo 1,60x1,40 (160x140 cm)');

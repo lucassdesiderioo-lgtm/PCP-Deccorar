@@ -283,7 +283,7 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > uma régua diferente da que gravou.
 >
 > **Rode `node teste_parse.js` após qualquer mudança no `parse.js` ou no
-> `folha.js`** — os 22 casos montam a folha no formato REAL do ML; o caso do
+> `folha.js`** — os 23 casos montam a folha no formato REAL do ML; o caso do
 > Abraão está lá, e o do `170x170` (armadilha #22) também.
 >
 > Para conferir o que já está gravado: `node rastrear.js --auditar [dias]` e
@@ -425,11 +425,20 @@ também se cala em acessório (`exige_medida=0`) e em SKU sem medida cadastrada.
 > ⚠️ **NÃO EXISTE "o formato" — existe o que o anúncio escreveu.** A primeira
 > rodada em produção (14/09/2026, 1.296 volumes) leu 753 e deixou **41 de fora**:
 > o título deles escreve `1,00 L X 1,00 A`, com o L de largura e o A de altura.
-> Nenhum estava sendo conferido, e nada na tela dizia isso. Cada formato que o
-> anúncio inventa é mais um pedaço do catálogo saindo da conferência em silêncio
-> — por isso o relatório imprime **o título de cada SKU** que ficou de fora, e
-> não uma contagem: ponto cego só vira conserto quando dá pra ler o que ele
-> esconde.
+> Depois de lê-los, sobraram 34, e no meio ainda havia `1,65lx0,75a` — o mesmo
+> rótulo **colado** no número. Cada formato que o anúncio inventa é mais um
+> pedaço do catálogo saindo da conferência em silêncio — por isso o relatório
+> imprime **o título de cada SKU** que ficou de fora, e não uma contagem: ponto
+> cego só vira conserto quando dá pra ler o que ele esconde.
+>
+> **O rótulo não é enfeite: `1,60 A x 1,40 L` é altura × largura.** Ler na ordem
+> escrita inverteria a medida e acusaria o volume certo. Só inverte quando os
+> **dois** rótulos estão escritos e dizem isso; um sozinho não decide nada.
+>
+> O que sobra depois disso são títulos que realmente não têm medida — `Persiana
+> Bege`, `Persiana Home Office Branco`. Ali não há o que ler, e a conferência 6
+> (contra o cadastro) também não roda porque depende da mesma leitura. Esse
+> resto é limite do documento, não do código.
 
 **Antes de ligar a 6 em produção, meça:** `node conferir_medidas.js [dias]` relê
 a `descricao` já gravada em `lote` e diz **o que a trava nova acusaria** — e, de
@@ -453,6 +462,18 @@ senão a trava nasce retendo gente certa. Ele não tem régua própria: lê pelo
 > `npm install`. O `--db` existe por isso: dentro do worktree o `__dirname` não
 > é o do banco, e sem ele a única forma de rodar o diagnóstico seria já ter
 > subido o que ele deveria conferir antes.
+
+> ⚠️ **SEM `descricao` GRAVADA NÃO HÁ CONFERÊNCIA 3, 5 NEM 6** — e o contador
+> sozinho não diz se isso é história ou buraco. Na rodada de 14/09/2026 eram
+> **502 volumes em 1.296**, e o mais novo era **do próprio dia**: parte é
+> anterior à coluna (24/08), parte não. Por isso o relatório quebra o número
+> **por data, com o total do dia ao lado** — "sobrou um" e "o dia inteiro entrou
+> sem título" são problemas diferentes —, e `--porque` relê os PDFs que ainda
+> estão em `lotes/` (7 dias) para separar as duas causas: **a etiqueta não casou
+> com item nenhum** da folha (e aí as conferências 2 e 3 também estão desligadas
+> nesse volume) ou **o item foi achado e o título é que não foi lido** dentro
+> dele. O reparo de cada uma é em lugar diferente; chutar qual é gastar um dia
+> no lugar errado e deixar a outra de pé.
 
 > A `familia_sku` da conferência 5 sofria do mesmo defeito por tabela: o corte da
 > família usava a mesma regex de um formato só, então no título em centímetros a
@@ -1426,7 +1447,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (22 casos), `teste_carga.js` (44), `teste_divergencia.js` (25) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (20), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (23 casos), `teste_carga.js` (44), `teste_divergencia.js` (25) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (20), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
 | 11 | **A investigar: o que é o `Quantidade` da folha** — a regra é uma venda = uma etiqueta = uma persiana (§5), então esse campo não deveria vir maior que 1. Ninguém decide nada com ele hoje. Falta abrir um PDF real com `Quantidade > 1` e entender o que aquele número diz | Baixo enquanto nada o usar — mas é uma pergunta sem resposta sobre o documento de origem |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
