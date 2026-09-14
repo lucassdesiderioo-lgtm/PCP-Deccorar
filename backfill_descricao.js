@@ -7,8 +7,8 @@
  *
  * Por que existe, e por que tem pressa: ate 14/09/2026 a leitura do bloco perdia
  * o titulo de parte dos itens (§5, armadilha #4 — o bloco comeca no titulo, e o
- * titulo nao e a palavra "Persiana"). Esses volumes ficaram com
- * `lote.descricao` NULL, e sem ela nao ha conferencia 3, 5 nem 6 — nem hoje nem
+ * titulo nao e a palavra "Persiana"). Esses volumes ficaram sem
+ * `lote.descricao`, e sem ela nao ha conferencia 3, 5 nem 6 — nem hoje nem
  * numa auditoria futura.
  *
  * O conserto vale para os proximos uploads. Para os que ja entraram, a unica
@@ -16,9 +16,10 @@
  * descricao daqueles volumes nao se reconstroi de lugar nenhum.
  *
  * Regras, e as tres importam:
- *   · so preenche quem esta NULL. Nunca sobrescreve descricao ja gravada —
- *     o que esta la foi o que o parse leu na hora, e reescrever historia com
- *     uma leitura de hoje e o tipo de coisa que ninguem consegue auditar depois;
+ *   · so preenche quem esta VAZIO — `COALESCE(descricao,'')=''`, o mesmo
+ *     criterio que o relatorio usa (ver a nota no SELECT). Nunca sobrescreve
+ *     descricao ja gravada: o que esta la foi o que o parse leu na hora, e
+ *     reescrever historia com uma leitura de hoje ninguem audita depois;
  *   · le pelo `folha.js`, o mesmo dono que grava no upload. Regua propria aqui
  *     produziria uma descricao que nenhuma tela usa;
  *   · backup por `db.backup()` antes de gravar (§12 — `cp dados.db` sai vazio).
@@ -43,8 +44,21 @@ if(!fs.existsSync(CAMINHO)){
 const db=new Database(CAMINHO);
 
 (async()=>{
+  /* ⚠️ "SEM DESCRICAO" E `COALESCE(descricao,'')=''`, NUNCA `IS NULL`.
+     O relatorio (`conferir_medidas.js`) conta em JS, com `!v.descricao`, que
+     pega NULL E string vazia. Enquanto aqui a pergunta era `IS NULL`, os dois
+     respondiam coisas diferentes sobre os MESMOS volumes: em 14/09/2026 o
+     relatorio achou 60 volumes do dia para recuperar e este script disse
+     "nada a fazer" — sem erro, sem aviso, e a janela de 7 dias correndo.
+     Duas reguas para a mesma pergunta e o defeito que este projeto persegue
+     desde a armadilha #12; aqui ele quase custou a descricao de um dia inteiro. */
   const vols=db.prepare(`SELECT id,codigo,buyer,nf,packId,venda,data,srcfile
-    FROM lote WHERE descricao IS NULL AND srcfile IS NOT NULL ORDER BY id`).all();
+    FROM lote WHERE COALESCE(descricao,'')='' AND srcfile IS NOT NULL ORDER BY id`).all();
+  /* Volume sem PDF de origem nao entra na conta acima, e e ele que explica a
+     diferenca entre este numero e o do relatorio. Dizer isso e mais barato que
+     alguem comparar os dois e achar que um deles mente. */
+  const semArquivo=db.prepare(`SELECT COUNT(*) n FROM lote
+    WHERE COALESCE(descricao,'')='' AND srcfile IS NULL`).get().n;
   const porArquivo={}; vols.forEach(v=>{ (porArquivo[v.srcfile]=porArquivo[v.srcfile]||[]).push(v); });
   const arquivos=Object.keys(porArquivo).filter(a=>fs.existsSync(a)).sort();
   const sumidos=Object.keys(porArquivo).length-arquivos.length;
@@ -53,6 +67,7 @@ const db=new Database(CAMINHO);
   console.log('DESCRICAO QUE FALTOU — relendo os PDFs ainda no servidor');
   console.log(APLICAR?'MODO: APLICAR (vai gravar)':'MODO: SIMULACAO (nao grava nada)');
   console.log('volumes sem descricao com PDF de origem: '+vols.length);
+  if(semArquivo) console.log('(+ '+semArquivo+' sem descricao e sem PDF de origem — esses nunca terao como ser recuperados)');
   if(sumidos>0) console.log(sumidos+' arquivo(s) ja apagados pelo cron dos 7 dias — esses nao ha como recuperar');
   console.log('');
 
@@ -88,9 +103,9 @@ const db=new Database(CAMINHO);
   const arqBk=path.join(dest,'antes-backfill-descricao-'+Date.now()+'.db');
   await db.backup(arqBk);
   console.log('backup: '+arqBk);
-  /* `descricao IS NULL` de novo no UPDATE, e nao so no SELECT: entre a leitura e
-     a gravacao alguem pode ter subido um PDF que preencheu a linha. */
-  const up=db.prepare('UPDATE lote SET descricao=? WHERE id=? AND descricao IS NULL');
+  /* A guarda de novo no UPDATE, e com o MESMO criterio do SELECT: entre a
+     leitura e a gravacao alguem pode ter subido um PDF que preencheu a linha. */
+  const up=db.prepare("UPDATE lote SET descricao=? WHERE id=? AND COALESCE(descricao,'')=''");
   let n=0; db.transaction(()=>{ for(const a of achados) n+=up.run(a.desc,a.id).changes; })();
   console.log('gravados: '+n+' volume(s).');
   console.log('Confira com: node conferir_medidas.js --tudo');

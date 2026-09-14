@@ -116,8 +116,11 @@ const db=new Database(CAMINHO);
   console.log('backup: '+arqBk);
   /* `estagio='pendente'` de novo no UPDATE: entre a leitura e a gravacao alguem
      pode ter impresso a etiqueta, e ai o volume ja nao e mais retivel. */
+  /* `NULLIF(descricao,'')` e nao `COALESCE(descricao,?)`: descricao pode estar
+     como string VAZIA, e ali o COALESCE manteria o vazio — a tela mostraria o
+     volume retido sem o anuncio. Mesmo criterio do backfill e do relatorio. */
   const up=db.prepare(`UPDATE lote SET estagio='bloqueado', bloqueio=?,
-    descricao=COALESCE(descricao,?) WHERE id=? AND estagio='pendente'`);
+    descricao=COALESCE(NULLIF(descricao,''),?) WHERE id=? AND estagio='pendente'`);
   let n=0; db.transaction(()=>{ for(const r of reter) n+=up.run('divergencia: '+r.conf,r.desc,r.v.id).changes; })();
   console.log('retidos: '+n+' volume(s).');
   console.log('Eles estao em Admin → Bloqueados. Abra o pedido no Mercado Livre e escolha o SKU certo.');

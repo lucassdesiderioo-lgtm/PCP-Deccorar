@@ -1539,6 +1539,11 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Deixar a conferência 6 acusar quando falta medida de um dos lados, ou em
   acessório (`exige_medida=0`) — silêncio por falta de dado não vira bloqueio
   (§5, armadilhas #10 e #22)
+- ❌ Perguntar "está sem descrição?" com `descricao IS NULL`: o relatório conta
+  com `!v.descricao`, que pega **também a string vazia**. Enquanto as duas
+  réguas divergiram, o relatório achou 60 volumes para recuperar e o
+  `backfill_descricao.js` respondeu "nada a fazer" — sem erro, com a janela de
+  7 dias do PDF correndo. O critério é `COALESCE(descricao,'')=''` (§5)
 - ❌ Pôr a caixa de coleta na lista ou no contador do carro, ou somar a coleta
   no relógio de despacho — são duas portas de saída, e `carga.js` é o dono
   único de "isto é coleta?" (§8-B, armadilha #21)
