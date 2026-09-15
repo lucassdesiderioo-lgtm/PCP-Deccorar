@@ -1,7 +1,7 @@
-# Os testes das DUAS operacoes, a cada push e a cada pull request.
+# Os testes das duas operacoes E A TRANCA DA PORTA, a cada push e a cada PR.
 #
 # A fabrica tem duas operacoes (CLAUDE.md §19) e elas tem bancos, dominios e
-# runners proprios. Por isso sao dois JOBS e nao dois passos do mesmo: rodam em
+# runners proprios. Por isso sao JOBS separados e nao passos do mesmo: rodam em
 # paralelo, e um vermelho nao esconde o outro na lista de checks. Passo que
 # falha cedo deixa o resto sem rodar, e a pessoa conserta um por rodada.
 #
@@ -94,3 +94,100 @@ jobs:
             exit 1
           fi
           echo "todos os arquivos de teste do PCP passaram"
+
+  # ── A TRANCA DA PORTA (CLAUDE.md §10 e §19) ──────────────────────────────
+  #
+  # ⚠️ ESTE E O UNICO CHECK QUE SOBE O SERVIDOR. Os outros dois exercitam
+  # dominio; este pergunta ao Express o que ele entrega para quem NAO fez login.
+  # A armadilha #3 e uma linha trocada de lugar no `server.js` — `static` antes
+  # do `auth` — e ela nao quebra teste de dominio nenhum: o sistema continua
+  # funcionando, so que com as telas abertas para qualquer um. Defeito que nao
+  # quebra nada e defeito que so aparece quando alguem de fora acha a porta.
+  seguranca:
+    name: seguranca (§10)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Instalar as dependencias
+        run: npm ci
+
+      # ⚠️ O LOG DO SERVIDOR VAI PARA ARQUIVO, e nao e so arrumacao: processo em
+      # segundo plano que herda a saida do passo segura o passo aberto, e a
+      # rodada fica pendurada ate o timeout em vez de falhar.
+      #
+      # ⚠️ E NAO HA `sleep` CEGO esperando o boot. Dormir N segundos passa a
+      # depender da carga do runner: um dia falha sozinho e todo mundo aprende a
+      # mandar rodar de novo, que e a armadilha #6 dentro do CI. Aqui se
+      # PERGUNTA ao servidor ate ele responder — e se ele nao subir, o log
+      # inteiro sai na tela em vez de um erro de conexao sem causa.
+      - name: A tranca da porta
+        run: |
+          node server.js > servidor.log 2>&1 &
+          servidor=$!
+
+          pronto=""
+          for i in $(seq 1 60); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3010/login || true)" = "200" ]; then
+              pronto=1; break
+            fi
+            sleep 1
+          done
+          if [ -z "$pronto" ]; then
+            echo "O SERVIDOR NAO SUBIU em 60 s. Log:"
+            cat servidor.log
+            exit 1
+          fi
+          echo "servidor no ar em ${i}s"
+          echo "────────────────────────────────────────────────────────────"
+
+          # Como o job do PCP: confere TODAS as portas antes de falhar. Parar na
+          # primeira esconde as outras, e aqui cada uma e um buraco diferente.
+          falhas=""
+          confere(){
+            veio=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:3010$1" || true)
+            if [ "$veio" = "$2" ]; then
+              printf '  ok      %-32s %s\n' "$1" "$veio"
+            else
+              printf '  FURO    %-32s esperava %s, veio %s\n' "$1" "$2" "$veio"
+              falhas="$falhas $1"
+            fi
+          }
+
+          # TELA = 302 (manda para o login). Qualquer 200 aqui e furo: e o
+          # `express.static` entregando o arquivo do disco por cima do portao.
+          for tela in / /admin /index.html /painel /operador /setor \
+                      /sobmedida /sobmedida/corte /sobmedida/cadastros \
+                      /sobmedida/telas/corte.html; do
+            confere "$tela" 302
+          done
+
+          # API = 401. Ela nao redireciona: quem chama API espera resposta, e
+          # um 302 aqui faria o leitor da bancada receber HTML de login.
+          confere /api/skus 401
+          confere /sobmedida/api/eu 401
+
+          # E o login abre, senao ninguem entra.
+          confere /login 200
+
+          echo "────────────────────────────────────────────────────────────"
+          kill $servidor 2>/dev/null || true
+          if [ -n "$falhas" ]; then
+            echo "FURO DE SEGURANCA:$falhas"
+            echo "log do servidor:"; cat servidor.log
+            exit 1
+          fi
+          echo "a porta esta trancada: telas 302, API 401, /login 200"
+
+          # ⚠️ O QUE ESTE CHECK NAO PROVA, e esta escrito para ninguem achar que
+          # prova: ele so pergunta como VISITANTE. A §19 exige que
+          # `/sobmedida/telas/corte.html` de 403 ate para o DIRETOR logado — se
+          # der 200, o `express.static` do modulo furou o portao por dentro.
+          # Cobrir isso pede criar pessoa, PIN e sessao no runner, e ficou de
+          # fora por enquanto. Sem esta nota, o verde aqui seria lido como "o
+          # §19 inteiro esta coberto", que e o silencio que parece "tudo certo".
