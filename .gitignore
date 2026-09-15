@@ -18,6 +18,10 @@ lotes/
 *.xls
 *.csv
 
+# Dados de uma rodada de CI ou de um servidor local com PCP_DIR apontado para
+# ca (§13). Efemero no runner; aqui aparece so se alguem rodar o mesmo comando.
+.dados-ci/
+
 node_modules/
 
 # Backups manuais

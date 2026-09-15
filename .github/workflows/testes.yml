@@ -117,23 +117,6 @@ jobs:
       - name: Instalar as dependencias
         run: npm ci
 
-      # ⚠️ O SERVIDOR SO SOBE ONDE `/opt/expedicao` EXISTE. `db.js` abre
-      # `/opt/expedicao/dados.db` por caminho ABSOLUTO — nao ha variavel de
-      # ambiente ali (o `tecido/` tem `BANCO_TECIDO`; a raiz nao tem nada). Sem
-      # o diretorio, o better-sqlite3 morre no `require` com "Cannot open
-      # database because the directory does not exist", antes de qualquer rota
-      # existir. Foi assim que este check falhou na primeira rodada.
-      #
-      # O DIRETORIO VAZIO BASTA: o banco nasce no boot pelos CREATE TABLE IF NOT
-      # EXISTS, e `lotes/` o proprio `exp_route.js` cria com `mkdirSync` quando
-      # chega o primeiro PDF. Por isso aqui se cria so o que o boot precisa, e
-      # nao a arvore inteira "por via das duvidas" — diretorio criado a toa no
-      # CI e uma diferenca a mais entre o runner e o servidor de verdade.
-      - name: O lugar onde o servidor espera o banco
-        run: |
-          sudo mkdir -p /opt/expedicao
-          sudo chown "$USER" /opt/expedicao
-
       # ⚠️ O LOG DO SERVIDOR VAI PARA ARQUIVO, e nao e so arrumacao: processo em
       # segundo plano que herda a saida do passo segura o passo aberto, e a
       # rodada fica pendurada ate o timeout em vez de falhar.
@@ -143,8 +126,35 @@ jobs:
       # mandar rodar de novo, que e a armadilha #6 dentro do CI. Aqui se
       # PERGUNTA ao servidor ate ele responder — e se ele nao subir, o log
       # inteiro sai na tela em vez de um erro de conexao sem causa.
+      #
+      # ⚠️ O CI RODA FORA DE `/opt/expedicao`, E ISSO E O TESTE. Antes este
+      # passo fazia `sudo mkdir -p /opt/expedicao` — o runner fingindo ser o
+      # servidor de producao para o `db.js` conseguir abrir o banco. Com o
+      # `caminhos.js` (§13) nao ha o que fingir: `PCP_DIR` manda o banco, os
+      # PDFs, as fotos e os backups para a area de trabalho do runner, e a
+      # rodada passa a PROVAR toda vez que o sistema sobe em qualquer pasta.
+      # Era essa a razao de o caminho ter deixado de ser fixo.
+      #
+      # O `sudo` saiu junto, e isso e ganho: passo de CI que escreve em `/opt`
+      # e passo que pede permissao de root para conferir uma porta HTTP.
+      #
+      # O DIRETORIO VAZIO BASTA — o banco nasce no boot pelos CREATE TABLE IF
+      # NOT EXISTS, e `lotes/` o proprio `exp_route.js` cria com `mkdirSync`
+      # quando chega o primeiro PDF. Por isso so ele e criado, e nao a arvore
+      # inteira: pasta criada a toa no CI e uma diferenca a mais entre o runner
+      # e o servidor de verdade.
+      #
+      # ⚠️ E O PADRAO CONTINUA SENDO CONFERIDO — no `teste_caminhos.js`, cujo
+      # primeiro caso exige que SEM variavel nenhuma o caminho seja
+      # `/opt/expedicao`. Se o padrao mudasse, a producao apontaria para um
+      # banco vazio no proximo `git pull`; quem trava isso e aquele caso, nao
+      # este passo.
       - name: A tranca da porta
+        env:
+          PCP_DIR: ${{ github.workspace }}/.dados-ci
         run: |
+          mkdir -p "$PCP_DIR"
+          echo "os dados desta rodada ficam em $PCP_DIR"
           node server.js > servidor.log 2>&1 &
           servidor=$!
 

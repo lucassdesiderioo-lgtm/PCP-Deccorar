@@ -1680,6 +1680,14 @@ varre os `.js` do projeto e **recusa `/opt/expedicao` escrito em código** fora
 do `caminhos.js` e do próprio teste. Sem ele a arrumação dura até o próximo
 script, porque script novo se escreve copiando o de cima.
 
+> **O CI roda FORA de `/opt/expedicao`, e isso é a prova viva.** O job de
+> segurança do `.github/workflows/testes.yml` sobe o servidor com `PCP_DIR`
+> apontado para a área de trabalho do runner, então toda rodada confirma que o
+> sistema abre em qualquer pasta. Antes ele fazia `sudo mkdir -p
+> /opt/expedicao` — o runner fingindo ser o servidor de produção para o
+> `db.js` conseguir abrir o banco. Quem continua conferindo o **padrão** é o
+> primeiro caso do `teste_caminhos.js`, não o CI.
+
 ---
 
 ## 14. Dívidas técnicas conhecidas
