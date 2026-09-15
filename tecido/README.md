@@ -702,6 +702,45 @@ que existe justamente para padronizar.
 que corre) não pode ser virado, então a largura da peça tem que sair no sentido
 da largura da bobina. `Não` é o padrão e vale para a maioria.
 
+### ⚠️ CADASTRAR A COR NÃO BASTA — e a entrada de rolo agora diz isso
+
+As fileiras LINHA / COLEÇÃO / COR da **entrada de rolo** (e as do corte e das
+sobras) **não leem a tabela `cor`**: elas saem dos **itens de tecido ativos**,
+porque o que se escolhe ali é um item que existe, e não uma combinação nova.
+
+A consequência é que uma cor recém-cadastrada simplesmente **não aparece**. A
+fileira fica mais curta, e mais nada — sem erro, sem aviso, sem lugar nenhum
+onde a cor apareça esperando alguma coisa.
+
+Isso é um beco, e do tipo caro: quem está com o rolo na mão procura a cor, não
+acha, e não tem como saber que falta o item de tecido. A saída que sobra é
+**bipar a cor parecida só para o sistema aceitar** — e a partir dali é o
+estoque do tecido errado que anda. É a armadilha #6 do `CLAUDE.md` na letra:
+trava que dispara no caso normal vira desvio, e o desvio acontece fora da
+vista do sistema.
+
+Por isso a tela escreve, embaixo da fileira COR:
+
+> Procurando uma cor que não está nos botões? `Branco, Cinza` estão
+> cadastradas, mas não existem em `Rolô · 3%`. A cor só vira botão aqui depois
+> que existe o ITEM DE TECIDO (linha · coleção · cor) — cadastre em
+> Cadastros → Tecido → Item de tecido.
+
+Três decisões dentro dessa linha:
+
+- **Não é alarme.** Não é vermelho e não pede providência de quem está ali: a
+  pessoa que dá entrada no rolo pode nem ter `cadastro.editar`. A linha
+  responde a pergunta que ela acabou de fazer e diz em que tela se resolve.
+- **Ela nomeia as cores, e não corta a lista.** Truncar esconderia justamente
+  a cor que a pessoa procura, que é o único motivo de a linha existir.
+- **A lista de cores não é cacheada** como as larguras e os fornecedores. O
+  que o aviso manda fazer acontece em *outra* tela; quem sai daqui, cadastra o
+  item e volta tem que ver a cor no lugar. Com cache veria o mesmo aviso e
+  concluiria que o cadastro não pegou.
+
+Ela some sozinha quando toda cor ativa já tem item naquela coleção — contador
+que nunca zera é contador que a equipe aprende a pular.
+
 ---
 
 ## Cadastro se RENOMEIA e se APAGA — com uma regra no meio

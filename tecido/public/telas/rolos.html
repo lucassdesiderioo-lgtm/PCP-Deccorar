@@ -376,6 +376,12 @@ async function telaEntrada(pai){
   if(!podeEntrar()){ limpar(pai).appendChild(el('div',{class:'vazio',texto:'Sem permissao para dar entrada.'})); return; }
   estado.tecidos=await api('/api/tecidos');
   estado.arvore=await api('/api/enderecos/ROLO');
+  /* A LISTA DE CORES NAO E CACHEADA como as larguras e os fornecedores, e e
+     de proposito: ela so serve para o aviso logo abaixo da fileira COR, e o
+     que esse aviso manda fazer acontece em OUTRA tela. Quem sai daqui,
+     cadastra o item de tecido e volta tem que ver a cor no lugar — com
+     cache, veria o mesmo aviso e concluiria que o cadastro nao pegou. */
+  estado.cores=await api('/api/cores');
   if(!estado.larguras) estado.larguras=await api('/api/larguras');
   if(podeNota()&&!estado.fornecedores) estado.fornecedores=await api('/api/fornecedores');
   pai=limpar(pai);
@@ -405,6 +411,38 @@ async function telaEntrada(pai){
   c.appendChild(fileira('LINHA',linhas,linhaSel,v=>escolher(v,null,null)));
   c.appendChild(fileira('COLECAO',aberturas,abSel,v=>escolher(linhaSel,v,null)));
   c.appendChild(fileira('COR',cores,sel?sel.cor_id:null,v=>escolher(linhaSel,abSel,v)));
+
+  /* ── A COR CADASTRADA QUE NAO VIRA BOTAO ──────────────────────────────
+     Estas tres fileiras NAO leem a tabela de cores: elas saem dos ITENS DE
+     TECIDO ativos, porque o que se escolhe aqui e um item que existe, e nao
+     uma combinacao nova. A consequencia e que uma cor recem-cadastrada
+     simplesmente nao aparece — a fileira fica mais curta, e mais nada.
+
+     Isso e um beco: quem esta com o rolo na mao procura a cor, nao acha, e
+     nao tem como saber que falta o item de tecido. A saida que sobra e
+     bipar a cor parecida so para o sistema aceitar, e a partir dali o
+     estoque do tecido errado e que anda — a armadilha #6 do CLAUDE.md na
+     letra: trava que dispara no caso normal vira desvio fora da vista.
+
+     O aviso NAO e alarme (nao e vermelho) e nao pede providencia de quem
+     esta aqui: ele responde a pergunta que a pessoa acabou de fazer e diz
+     em que tela se resolve. E ele nomeia as cores que faltam, sem cortar a
+     lista — truncar esconderia justamente a cor que a pessoa procura, que e
+     o unico motivo de a linha existir. */
+  const faltando=(estado.cores||[]).filter(k=>k.ativo&&!cores.some(x=>x.valor===k.id));
+  if(faltando.length){
+    const nomeL=(linhas.find(x=>x.valor===linhaSel)||{}).nome;
+    const nomeA=(aberturas.find(x=>x.valor===abSel)||{}).nome;
+    const onde=(nomeL&&nomeA)?(' em '+nomeL+' · '+nomeA):'';
+    const nomes=faltando.map(k=>k.nome).join(', ');
+    c.appendChild(el('p',{class:'ajuda',texto:
+      'Procurando uma cor que nao esta nos botoes? '+
+      (faltando.length===1
+        ? nomes+' esta cadastrada, mas nao existe'+onde+'.'
+        : nomes+' estao cadastradas, mas nao existem'+onde+'.')+
+      ' A cor so vira botao aqui depois que existe o ITEM DE TECIDO '+
+      '(linha · colecao · cor) — cadastre em Cadastros → Tecido → Item de tecido.'}));
+  }
 
   /* A LARGURA VEM DA LISTA, e nao do teclado.
      Digitar largura errava de dois jeitos que ninguem percebia: '2,5' e
