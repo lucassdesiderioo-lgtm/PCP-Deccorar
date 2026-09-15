@@ -8,7 +8,7 @@ Este módulo **não sobe sozinho**. Ele é montado dentro do PCP, em `/sobmedida
 pelo `server.js` da raiz. Uma porta, um processo, um PIN.
 
 ```bash
-npm test          # daqui: 87 casos, banco temporário, sem servidor
+npm test          # daqui: 222 casos, banco temporário, sem servidor
 node server.js    # da RAIZ: sobe o PCP inteiro, com o sob medida junto
 ```
 
@@ -208,6 +208,58 @@ se estão certas. **O script aponta e cala** — decidir é de quem cadastra.
 
 `ROLO · A-1-2` é *aquele buraco na estante*. O tubo que estiver ali é o que o
 operador pega. Três níveis: haste → andar → posição dentro do andar.
+
+### ⚠️ CADA NIVEL GUARDA UM ROLO SÓ (regra do dono, 15/09/2026)
+
+`Haste A · Andar 1 · Nível 1` é um buraco, e no buraco cabe **um** tubo. O
+andar tem quantos níveis a prateleira física tiver — quem precisa guardar mais
+material **cria mais nível**, que é exatamente o que a estante de verdade faz.
+
+| Onde | O que acontece |
+|---|---|
+| **Entrada de rolo** | nível com tubo vem **travado** na fileira, com o código dele escrito no botão |
+| **Mover** | só os buracos vazios entram na lista; os cheios aparecem contados embaixo, com quem está neles |
+| **Sobra** | **sem** esta trava — várias cabem no mesmo lugar |
+
+> ⚠️ **O BURACO SE ESVAZIA SOZINHO, e não há botão para isso.** São dois
+> caminhos, e só esses dois: o tubo **mudou de lugar** (Mover) ou o material
+> **acabou** (Rolo acabou, que encerra). Rolo encerrado não ocupa — tubo vazio
+> não guarda lugar. Um terceiro caminho, manual, seria um jeito de o sistema
+> achar que o buraco está vazio com o tubo ainda lá dentro.
+
+> **Por que a trava é do rolo e não da sobra.** São duas prateleiras com dois
+> usos. O rolo é um tubo que o cortador desce inteiro da estante, e dois tubos
+> no mesmo buraco viram *"pegar aquele que parece"* — que é a mesma coisa que
+> a etiqueta de 54 pt existe para evitar. A sobra é retalho dobrado: várias
+> cabem no mesmo lugar, e quem acha a peça certa lá é a **etiqueta**, não o
+> endereço.
+
+> ⚠️ **A RECUSA DIZ QUEM ESTÁ LÁ, e as duas saídas.** *"Endereço ocupado"*
+> sozinho manda a bancada procurar — e com o tubo na mão ela não procura: ela
+> lança **sem endereço**, que é o dado que não volta depois (armadilha #6).
+> Por isso a frase traz o código do rolo, o tecido, o saldo, e as duas coisas
+> que resolvem: escolher outro nível (ou criar um) ou marcar "Rolo acabou".
+
+> **E a tela trava o botão ANTES do toque.** `GET /api/rolos/ocupacao` diz quem
+> está em cada buraco, e o nível cheio nasce desabilitado com o código do tubo
+> ao lado. Recusa que só aparece depois do toque ensina que o sistema erra — é
+> a mesma regra do botão de imprimir etiqueta, que nasce desabilitado quando as
+> medidas não fecham. O botão fica **visível e apagado**, nunca escondido:
+> buraco que some da fileira faz a bancada procurar um endereço que ela sabe
+> que existe.
+
+> ⚠️ **O QUE JÁ ESTAVA NA PRATELEIRA ANTES DA REGRA NÃO É RECUSADO.** Trava
+> nova não apaga passado, e recusar de uma vez tudo que existe pararia a
+> estante inteira por um estado que ninguém criou hoje. O endereço com dois
+> rolos vira a **sexta checagem** do painel gerencial (`gerencial.problemas`),
+> onde é trabalho de arrumar em vez de recusa na cara de quem tem o tubo na
+> mão. Não há índice `UNIQUE` no banco pelo mesmo motivo — e porque um
+> `SQLITE_CONSTRAINT` cru não diz **quem** está no buraco.
+
+**Teste obrigatório:** `node teste/rodar.js` — os 10 casos de
+`teste/endereco_unico.test.js` travam a entrada, o Mover, os dois jeitos de
+liberar o buraco, o limite por nível (e não por andar), o rolo sem endereço, a
+sobra de fora e o aviso do painel.
 
 ### O que vai escrito onde
 

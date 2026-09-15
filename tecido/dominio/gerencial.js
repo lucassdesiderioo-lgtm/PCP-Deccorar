@@ -24,6 +24,10 @@
 const db=require('../nucleo/db');
 const config=require('../nucleo/config');
 const giro=require('./giro');
+// `descrever` e o dono unico do formato do endereco ('ROLO · A-1-2'). Montar
+// 'haste-andar-nivel' aqui seria uma segunda escrita do mesmo endereco, e as
+// duas divergiriam no dia em que o formato mudasse num lugar so.
+const endereco=require('./endereco');
 
 const arred=(v,c)=>v==null?null:Math.round(v*Math.pow(10,c==null?3:c))/Math.pow(10,c==null?3:c);
 const num=v=>Number(config.ler(v));
@@ -247,7 +251,7 @@ function opcoes(){
 /* ── ⚠️ INCONSISTENCIA NAO SE CORRIGE EM SILENCIO ─────────────────────────
    Este e um sistema de estoque: um numero errado que a tela "arruma" sozinha
    e pior que um numero errado visivel, porque some a chance de alguem
-   descobrir a causa. Estas cinco checagens sao read-only e aparecem no
+   descobrir a causa. Estas seis checagens sao read-only e aparecem no
    proprio painel; nenhuma delas escreve nada. */
 function problemas(){
   const p=[];
@@ -283,6 +287,24 @@ function problemas(){
                          WHERE ROUND(lb.valor,3)=ROUND(r.largura,3))`,
     r=>r.length+' largura(s) em uso que sumiram do cadastro: '+
       r.map(x=>x.largura+' m').join(', ')+' — o filtro por bobina nao as oferece');
+
+  /* DOIS TUBOS NO MESMO BURACO. Cada nivel guarda um rolo so, e a entrada e o
+     Mover recusam desde entao — mas o que ja estava na prateleira antes da
+     regra continua la. Trava nova nao apaga passado, e a alternativa (recusar
+     de uma vez tudo que ja existe) pararia a estante inteira por um estado que
+     ninguem criou hoje.
+
+     Por isso ele aparece AQUI, onde e trabalho de arrumar em vez de recusa na
+     cara de quem tem o tubo na mao: mover um dos dois resolve, e ate la os
+     dois estao visiveis. */
+  q(`SELECT r.nivel_id,
+            GROUP_CONCAT(r.codigo,', ') codigos, COUNT(*) c
+       FROM rolo r
+      WHERE r.nivel_id IS NOT NULL AND r.status IN ('aberto','fechado')
+      GROUP BY r.nivel_id HAVING COUNT(*) > 1`,
+    r=>r.length+' endereco(s) com mais de um rolo: '+
+      r.map(x=>endereco.descrever(x.nivel_id)+' ('+x.codigos+')').join('; ')+
+      ' — cada nivel guarda um rolo so; mova um deles para outro buraco');
 
   return p;
 }
