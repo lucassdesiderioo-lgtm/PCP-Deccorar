@@ -114,7 +114,8 @@ module.exports=function(app,db){
      sistema ainda esta aprendendo e nao acusa ninguem — produto novo entrando no
      catalogo nao pode parar a expedicao. */
   const APRENDIZADO=5;
-  try{ fs.mkdirSync('/opt/expedicao/lotes',{recursive:true}); }catch(e){}
+  const LOTES=require('./caminhos').LOTES;
+  try{ fs.mkdirSync(LOTES,{recursive:true}); }catch(e){}
   const bigJson=express.json({limit:'25mb'});
   app.post('/api/lote/upload', bigJson, async (req,res)=>{
     try{
@@ -122,7 +123,7 @@ module.exports=function(app,db){
       if(!b64) return res.status(400).json({erro:'sem pdf'});
       const buf=Buffer.from(b64,'base64');
       const orders=await parsePdf(new Uint8Array(buf));
-      const fname='/opt/expedicao/lotes/'+Date.now()+'.pdf'; fs.writeFileSync(fname,buf);
+      const fname=require('path').join(LOTES,Date.now()+'.pdf'); fs.writeFileSync(fname,buf);
       /* A DEDUPLICACAO OLHA O HISTORICO INTEIRO, NAO SO O DIA.
          Pack ID e Venda sao numeros do Mercado Livre: cada volume tem o seu, e
          ele nunca se repete em outra venda. Entao "ja existe" e resposta

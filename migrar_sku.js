@@ -34,7 +34,7 @@ const { garantirSchema } = require('./sku_schema');
 const args   = process.argv.slice(2);
 const dry    = args.indexOf('--dry') >= 0;
 const alvo   = args.filter(function(a){ return a.indexOf('--') !== 0; })[0]
-             || '/opt/expedicao/dados.db';
+             || require('./caminhos').BANCO;
 
 console.log('Banco : ' + path.resolve(alvo));
 console.log('Modo  : ' + (dry ? 'SIMULACAO (--dry) — nada sera gravado, nem as tabelas novas' : 'APLICAR'));

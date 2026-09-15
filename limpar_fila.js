@@ -42,7 +42,7 @@ const temFlag = f => argv.indexOf(f) >= 0;
 const valorDe = (f, padrao) => { const i = argv.indexOf(f); return i >= 0 && argv[i+1] ? argv[i+1] : padrao; };
 
 const CONFIRMAR = temFlag('--confirmar');
-const CAMINHO   = valorDe('--db', '/opt/expedicao/dados.db');
+const CAMINHO   = valorDe('--db', require('./caminhos').BANCO);
 const SAIDA     = valorDe('--saida', path.join(path.dirname(CAMINHO), 'backups'));
 
 if(!fs.existsSync(CAMINHO)){

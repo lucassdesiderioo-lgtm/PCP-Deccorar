@@ -45,7 +45,7 @@ const AVULSOS = [
 
 const args = process.argv.slice(2);
 const dry  = args.indexOf('--dry') >= 0;
-const alvo = args.filter(a => a.indexOf('--') !== 0)[0] || '/opt/expedicao/dados.db';
+const alvo = args.filter(a => a.indexOf('--') !== 0)[0] || require('./caminhos').BANCO;
 
 console.log('Banco : ' + path.resolve(alvo));
 console.log('Modo  : ' + (dry ? 'SIMULACAO (--dry) — nada sera gravado' : 'APLICAR'));

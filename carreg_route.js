@@ -4,7 +4,7 @@ const fs=require('fs'), path=require('path');
    lotes/ (que o cron apaga em 7 dias): a foto e prova, e prova nao expira
    junto com o PDF. Configuravel por ambiente so pro teste nao escrever em
    /opt. */
-const FOTOS_DIR=process.env.PCP_COLETAS_DIR||'/opt/expedicao/coletas';
+const FOTOS_DIR=require('./caminhos').COLETAS;
 module.exports=function(app,db){
   /* ── CONFERENCIA DUPLA (etiqueta de venda + SKU da caixa) ──────────────────
      A ultima rede antes do carro. Bipe 1 = a etiqueta de venda JA COLADA;

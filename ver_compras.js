@@ -175,4 +175,7 @@ bloco('ROTAS SEM TELA (a Fase 7 que falta)', [
 ]);
 
 bloco('OLHAR COM ATENCAO (' + avisos.length + ')', avisos);
-console.log('\n   banco: /opt/expedicao/dados.db\n');
+// O caminho SAI DO caminhos.js, e nao escrito aqui: a linha existe para dizer
+// de qual banco o relatorio saiu, e um caminho fixo passaria a mentir no
+// primeiro lugar onde o banco nao esta em /opt/expedicao.
+console.log('\n   banco: ' + require('./caminhos').BANCO + '\n');

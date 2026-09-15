@@ -29,7 +29,7 @@ const fs=require('fs'); const path=require('path');
 const {dataDespacho}=require('./parse');
 const {pageLines}=require('./folha');
 
-const DB=process.env.PCP_DB||'/opt/expedicao/dados.db';
+const DB=require('./caminhos').BANCO;
 const APLICAR=process.argv.includes('--aplicar');
 
 /* A data e lida com o PDF na mao, hoje, mas a etiqueta fala de um prazo que era

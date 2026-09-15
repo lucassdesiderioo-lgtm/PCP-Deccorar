@@ -38,7 +38,7 @@ const Database=require('better-sqlite3');
 const fs=require('fs'); const path=require('path');
 const {lerFolha,irmaosDoPacote,itemDaFolha}=require('./folha');
 
-const DB=process.env.PCP_DB||'/opt/expedicao/dados.db';
+const DB=require('./caminhos').BANCO;
 const APLICAR=process.argv.includes('--aplicar');
 const BAIXAR=process.argv.includes('--baixar');
 const QUEM=process.env.PCP_QUEM||'backfill_pacote';
