@@ -139,19 +139,24 @@ function listaMedida(min,max,valorAtual){
 
 /* O TECIDO EM TRES FILEIRAS — linha, colecao, cor — e a mesma escolha no
    lancamento e na correcao. Uma derivacao so: duas copias divergiriam no dia
-   em que uma passasse a esconder tecido inativo e a outra nao. */
+   em que uma passasse a esconder tecido inativo e a outra nao.
+
+   Filtra por `disponivel`, e nao por `ativo`: desativar a LINHA, a COLECAO ou
+   a COR tambem tira o tecido daqui. Quem calcula isso e o servidor
+   (dados/tecido.js) — tres telas repetindo o `e && e && e` divergiriam na
+   primeira que esquecesse um dos tres. */
 function opcoesTecido(tecidos,tecidoId){
   const linhas=[], aberturas=[], cores=[];
-  tecidos.filter(t=>t.ativo).forEach(t=>{
+  tecidos.filter(t=>t.disponivel).forEach(t=>{
     if(!linhas.some(x=>x.valor===t.linha_id)) linhas.push({valor:t.linha_id,nome:t.linha_nome});
   });
   const sel=tecidos.find(t=>t.id===tecidoId);
   const linhaSel=sel?sel.linha_id:(linhas[0]&&linhas[0].valor);
-  tecidos.filter(t=>t.ativo&&t.linha_id===linhaSel).forEach(t=>{
+  tecidos.filter(t=>t.disponivel&&t.linha_id===linhaSel).forEach(t=>{
     if(!aberturas.some(x=>x.valor===t.abertura_id)) aberturas.push({valor:t.abertura_id,nome:t.abertura_nome});
   });
   const aberturaSel=sel&&sel.linha_id===linhaSel?sel.abertura_id:(aberturas[0]&&aberturas[0].valor);
-  tecidos.filter(t=>t.ativo&&t.linha_id===linhaSel&&t.abertura_id===aberturaSel)
+  tecidos.filter(t=>t.disponivel&&t.linha_id===linhaSel&&t.abertura_id===aberturaSel)
     .forEach(t=>cores.push({valor:t.cor_id,nome:t.cor_nome,tecido_id:t.id}));
   return {linhas,aberturas,cores,sel,linhaSel,aberturaSel};
 }

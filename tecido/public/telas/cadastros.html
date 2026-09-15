@@ -472,9 +472,29 @@ async function telaTecido(pai){
   tT.appendChild(el('tr',{},[el('th',{texto:'Codigo'}),el('th',{texto:'Tecido'}),
     el('th',{class:'num',texto:'Largura sugerida'}),el('th',{texto:'Girar'}),
     ...(veCusto?[el('th',{class:'num',texto:'R$/m²'})]:[]),el('th',{texto:''})]));
-  estado.tecidos.forEach(t=>tT.appendChild(el('tr',{class:t.ativo?'':'inativo'},[
+  estado.tecidos.forEach(t=>tT.appendChild(el('tr',{class:t.disponivel?'':'inativo'},[
     el('td',{texto:t.codigo}),
-    el('td',{texto:[t.linha_nome,t.abertura_nome,t.cor_nome].join(' · ')}),
+    /* ⚠️ POR QUE ESTE TECIDO NAO APARECE PARA A FABRICA.
+       O tecido sai das telas da bancada quando ELE esta desativado ou quando
+       a linha, a colecao ou a cor dele esta (ver `disponivel` em
+       dados/tecido.js). Sem esta frase, quem desativou uma cor semanas atras
+       abre esta tabela, ve o tecido com o botao escrito "Desativar" — ou
+       seja, ativo — e nao entende por que a bancada nao o encontra. O botao
+       fala do tecido; a fabrica olha a cadeia inteira. */
+    el('td',{},[
+      el('span',{texto:[t.linha_nome,t.abertura_nome,t.cor_nome].join(' · ')}),
+      ...(t.ativo&&!t.disponivel?[el('span',{class:'quem',
+        texto:'  · fora das telas da fabrica: '+
+          [!t.linha_ativa?'linha':null,!t.abertura_ativa?'colecao':null,!t.cor_ativa?'cor':null]
+            .filter(Boolean).join(' e ')+' inativa'+
+          ([t.linha_ativa,t.abertura_ativa,t.cor_ativa].filter(x=>!x).length>1?'s':'')})]:[]),
+      /* ⚠️ E AINDA TEM MATERIAL DELE NA FABRICA. Este e o caso que doi: o
+         rolo esta na estante, alguem precisa cortar, e a bancada nao acha o
+         tecido em tela nenhuma. Nao e trava — e o recado de que a decisao
+         tem custo, e de qual botao desfaz (Reativar, na lista de cima). */
+      ...(!t.disponivel&&t.na_fabrica?[el('span',{class:'aviso',
+        texto:'  · ainda ha rolo ou sobra deste tecido na fabrica — a bancada nao consegue cortar nem lancar sobra dele'})]:[])
+    ]),
     el('td',{class:'num',texto:t.largura_sugerida?num(t.largura_sugerida)+' m':'—'}),
     el('td',{texto:t.permite_girar?'sim':'nao'}),
     ...(veCusto?[el('td',{class:'num'+(t.preco_m2==null?' aviso':''),

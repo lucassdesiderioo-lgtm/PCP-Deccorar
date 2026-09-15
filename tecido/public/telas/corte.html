@@ -92,7 +92,11 @@ async function telaEntrada(){
   const c=el('div',{class:'cartao naoImprime'});
   pai.appendChild(c);
 
-  const ativos=estado.tecidos.filter(t=>t.ativo);
+  /* `disponivel`, e nao `ativo`: desativar a LINHA, a COLECAO ou a COR
+     tambem tira o tecido daqui. O calculo e do servidor (dados/tecido.js)
+     — tres telas repetindo o `e && e && e` divergiriam na primeira que
+     esquecesse um dos tres, e o cadastro desligado voltaria so nela. */
+  const ativos=estado.tecidos.filter(t=>t.disponivel);
   const linhas=[], aberturas=[], cores=[];
   ativos.forEach(t=>{ if(!linhas.some(x=>x.valor===t.linha_id)) linhas.push({valor:t.linha_id,nome:t.linha_nome}); });
   const sel=ativos.find(t=>t.id===estado.tecido_id);

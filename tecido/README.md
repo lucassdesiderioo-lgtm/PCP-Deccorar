@@ -792,11 +792,10 @@ linha, coleção e cor existam, e que a coleção seja da linha), então isto é
 tela alcançando o que o domínio já permitia.
 
 > ⚠️ **Elas vão no fim da lista e escritas `(inativa)`, e essa marca não é
-> enfeite.** As fileiras da entrada de rolo, do corte e das sobras olham o
-> `ativo` **do tecido**, nunca o da linha, o da coleção ou o da cor. Um tecido
-> novo numa combinação desativada aparece para a fábrica inteira no mesmo
-> instante — trazendo de volta um cadastro que alguém desligou de propósito.
-> Quem escolhe tem que ver que escolheu isso.
+> enfeite.** Cadastrar ali cria um tecido que **nasce fora das telas da
+> fábrica** (ver abaixo): ele não aparece na entrada de rolo, no corte nem nas
+> sobras até a linha, a coleção e a cor estarem ativas. Quem escolhe tem que
+> ver que escolheu isso.
 
 > **As três passam pela mesma função** (`comInativasNoFim`). Três cópias
 > divergiriam no dia em que uma delas mudasse a marca ou a ordem, e aí a mesma
@@ -834,6 +833,70 @@ histórico de quem mudou, quando, de → para.
 
 Embaixo da tabela, quantos tecidos ativos estão sem preço — é a conta que
 explica por que o valor do acervo sai como **piso** (`≥`).
+
+### ⚠️ DESATIVAR A LINHA, A COLEÇÃO OU A COR TIRA O TECIDO DA FÁBRICA
+
+Até 15/09/2026 não tirava, e esse era o defeito. As fileiras LINHA / COLEÇÃO /
+COR da entrada de rolo, do corte e das sobras olhavam só `tecido.ativo`: você
+desativava uma cor e ela **continuava na bancada** como se nada tivesse
+acontecido. Desativar um cadastro que não desativa nada é pior que não ter o
+botão — ele promete uma coisa e faz outra, em silêncio.
+
+Agora `GET /api/tecidos` devolve **`disponivel`**, e é por ele que as três
+telas filtram:
+
+```
+disponivel = tecido ativo E linha ativa E coleção ativa E cor ativa
+```
+
+> ⚠️ **É DERIVADO, NÃO GRAVADO, e essa é a decisão.** Propagar em cascata na
+> escrita — desativar a cor desativa os tecidos dela — perderia a informação
+> de quem já estava desativado **antes**, e reativar a cor não teria como
+> saber quais tecidos devolver. Derivando, **reativar desfaz exatamente o que
+> desativar fez**.
+
+> `CASE` em vez de `AND` puro: `AND` com NULL devolve NULL, e uma coluna
+> `ativo` nula deixaria o tecido num terceiro estado que nenhuma tela sabe ler.
+
+**O cálculo é do servidor** (`dados/tecido.js`), e não de cada tela. Três
+telas repetindo o `e && e && e` divergiriam na primeira que esquecesse um dos
+três, e o cadastro desligado voltaria só nela.
+
+**Nada some de onde é histórico.** O rolo do tecido escondido continua na
+lista "Em estoque", a sobra continua no catálogo, os painéis continuam
+contando. O que muda são os **seletores de escolha** — o que a bancada pode
+começar hoje.
+
+### A tela de cadastro diz POR QUE o tecido sumiu
+
+Sem isso a mudança seria invisível pelo lado errado: quem desativou uma cor
+semanas atrás abre a tabela de Item de tecido, vê o tecido com o botão escrito
+**Desativar** — ou seja, ativo — e não entende por que a bancada não o
+encontra. O botão fala do tecido; a fábrica olha a cadeia inteira.
+
+```
+ROLO-BLACKOUT-BEGE   Rolo · Blackout · Bege
+                     · fora das telas da fabrica: colecao e cor inativas
+                     · ainda ha rolo ou sobra deste tecido na fabrica —
+                       a bancada nao consegue cortar nem lancar sobra dele
+```
+
+> ⚠️ **A SEGUNDA LINHA É A QUE IMPORTA, e ela é o motivo de `na_fabrica`
+> existir.** Esconder um tecido que ainda tem rolo na estante ou sobra na
+> prateleira não para só de vender: para de **cortar o que já está comprado**,
+> e a sobra que sair desse corte não tem onde ser lançada. A bancada não
+> espera — ela lança no tecido parecido, e a partir dali é o estoque errado
+> que anda. É a armadilha #6 do `CLAUDE.md`, e ela nasceria calada.
+>
+> **Não é trava**: quem desativa continua desativando. É o aviso que faz a
+> tela dizer o que a decisão custa, como o `exclusao.js` diz *"3 rolos estão
+> nesta haste"* em vez de só recusar. O botão que desfaz é **Reativar**, na
+> lista de cima.
+
+> `EXISTS` e não `COUNT`: a pergunta é *"tem ou não tem"*, e o `COUNT`
+> varreria as linhas para devolver um número que ninguém lê. Conta rolo não
+> encerrado com saldo e sobra disponível — encerrado e usada não são material
+> na fábrica.
 
 ---
 
