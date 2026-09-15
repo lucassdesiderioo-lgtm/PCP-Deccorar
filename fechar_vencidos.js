@@ -36,7 +36,7 @@
 const Database=require('better-sqlite3');
 const path=require('path'); const fs=require('fs');
 
-const DB=process.env.PCP_DB||'/opt/expedicao/dados.db';
+const DB=require('./caminhos').BANCO;
 const args=process.argv.slice(2);
 const APLICAR=args.includes('--aplicar');
 const iAte=args.indexOf('--ate');

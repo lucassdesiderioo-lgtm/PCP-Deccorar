@@ -47,7 +47,7 @@ const opt  = (n,padrao) => { const i=args.indexOf('--'+n); return i>=0 ? +args[i
 const P_MIN   = opt('min', 50);     // repor quando o saldo cobrir menos de 50 persianas
 const P_IDEAL = opt('ideal', 150);  // encher ate cobrir 150
 const alvo = args.filter((a,i) => a.indexOf('--')!==0 && args[i-1]!=='--min' && args[i-1]!=='--ideal')[0]
-          || '/opt/expedicao/dados.db';
+          || require('./caminhos').BANCO;
 
 /* Arredonda para um numero que uma pessoa escreveria: 3 -> 3, 37 -> 40,
    412 -> 400. Ponto de pedido com tres casas decimais so atrapalha a leitura. */

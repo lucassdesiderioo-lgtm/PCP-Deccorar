@@ -1,5 +1,11 @@
 const Database = require('better-sqlite3');
-const db = new Database('/opt/expedicao/dados.db');
+/* ⚠️ O CAMINHO DO BANCO E DO `caminhos.js`, e esta linha e a razao de ele
+   existir. Enquanto o caminho vinha escrito aqui, o PCP so subia em
+   /opt/expedicao: em qualquer outro lugar o better-sqlite3 morria neste
+   `require` com "Cannot open database because the directory does not exist",
+   antes de existir rota. O padrao continua o mesmo, entao o servidor que ja
+   roda nao sente nada. */
+const db = new Database(require('./caminhos').BANCO);
 db.pragma('journal_mode = WAL');
 db.exec(`
   /* modelo_id/largura_cm/altura_cm/cor_codigo sao a Fase 0 de Compras: medida e
