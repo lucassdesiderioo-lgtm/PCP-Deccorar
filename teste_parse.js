@@ -537,6 +537,40 @@ function conferir(nome, orders, esperado){
     else console.log('ok      ausencia so vira pacote quando o PDF fecha');
   }
 
+  /* ── caso 20: a licenca do pacote tem DONO UNICO, e o backfill le por ele ──
+     O `pdfFecha` nasceu dentro do parse.js. O backfill_pacote.js chamava o
+     `irmaosDoPacote` direto, SEM a licenca — e gravava como peca a mais o
+     orfao que o upload teria retido. Ali o erro e mais caro que na tela: com
+     `--baixar` ele tira do estoque uma persiana que nunca saiu da prateleira.
+     Este caso trava as duas pontas: a conta em si, e que nao ha segunda copia. */
+  {
+    casos++;
+    const FOLHA=require('./folha');
+    const erros=[];
+    /* Uma etiqueta, dois itens, e o de baixo e orfao: o PDF FECHA. */
+    const fecha=[{packId:'111',venda:'222',sku:'A',comprador:'Fulano'},{sku:'B'}];
+    if(FOLHA.etiquetasSemItem([{packId:'111',venda:'222'}], fecha).length!==0)
+      erros.push('pacote de verdade foi acusado de nao fechar');
+    if(FOLHA.pdfFecha([{packId:'111',venda:'222'}], fecha)!==true)
+      erros.push('pdfFecha disse false num PDF que fecha');
+    /* Duas etiquetas, dois itens, e o de baixo perdeu os campos: NAO fecha —
+       a segunda etiqueta fica sem item, e o orfao e ela, nao peca a mais. */
+    const quebra=[{packId:'111',venda:'222',sku:'A',comprador:'Fulano'},{sku:'B'}];
+    const semItem=FOLHA.etiquetasSemItem(
+      [{packId:'111',venda:'222'},{packId:'333',venda:'444'}], quebra);
+    if(semItem.length!==1) erros.push('leitura quebrada passou como pacote: '+semItem.length+' orfa(s)');
+    if(FOLHA.pdfFecha([{packId:'111',venda:'222'},{packId:'333',venda:'444'}], quebra)!==false)
+      erros.push('pdfFecha disse true num PDF que nao fecha');
+    /* E ninguem pode ter a sua propria copia da conta. */
+    const src=f=>fs.readFileSync(path.join(__dirname,f),'utf8');
+    ['parse.js','backfill_pacote.js'].forEach(f=>{
+      if(!/etiquetasSemItem/.test(src(f))) erros.push(f+' nao usa a regua do folha.js');
+    });
+    if(erros.length){ falhas++; console.log('FALHOU  a licenca do pacote tem dono unico');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      a licenca do pacote tem dono unico');
+  }
+
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));

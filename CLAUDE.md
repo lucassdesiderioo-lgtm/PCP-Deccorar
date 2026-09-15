@@ -431,8 +431,20 @@ A evidência que separa os dois não está no item: está na **conta do document
 | **pacote de verdade** | 1 | 2 | nenhuma | o órfão é peça a mais |
 | **leitura quebrada** | 2 | 2 | **uma** | o órfão é item que perdeu os campos |
 
-Por isso `pdfFecha` (no `parse.js`) é a **licença** para ler ausência como
+Por isso `pdfFecha` (no `folha.js`) é a **licença** para ler ausência como
 pacote: o órfão só vira irmão quando **nenhuma etiqueta do PDF ficou sem item**.
+
+> ⚠️ **A LICENÇA É DO `folha.js`, E O BACKFILL LÊ POR ELA.** Ela nasceu dentro
+> do `parse.js`, e o `backfill_pacote.js` chamava o `irmaosDoPacote` **direto,
+> sem a licença** — gravava como peça a mais o órfão que o upload teria retido.
+> Ali o erro é mais caro que na tela: com `--baixar` ele tira do estoque uma
+> persiana que nunca saiu da prateleira. Foi achado em 15/09/2026, rodando o
+> backfill contra os PDFs reais, e o caso 20 do `teste_parse.js` trava as duas
+> pontas — a conta e a ausência de segunda cópia.
+>
+> O script **diz o que recusou**, num bloco próprio com a conta de cada PDF:
+> recusa calada faz o mesmo silêncio de "não achei nada", e o que ele recusa é
+> justamente o que mais parece pacote.
 Sobrou etiqueta órfã, o sistema **não inventa pacote** — retém dizendo a conta
 que não bateu (`2 etiqueta(s), 2 item(ns), e 1 etiqueta(s) sem item na folha`),
 e manda conferir o pedido no ML ou subir o PDF de novo.
@@ -1661,7 +1673,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (17 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16) e `teste_acesso.js` (27); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16) e `teste_acesso.js` (27); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
@@ -1695,6 +1707,8 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   o caso Abraão, e herdar ali manda a peça errada pro cliente (§5, #4 e #23)
 - ❌ Ler ausência como pacote quando o PDF **não fecha** (sobrou etiqueta sem
   item na folha): ali é leitura quebrada, não peça a mais (§5, armadilha #23)
+- ❌ Chamar `irmaosDoPacote` sem a licença do `pdfFecha` — foi assim que o
+  `backfill_pacote.js` nasceu, e lá o erro **baixa estoque** (§5, #23)
 - ❌ Deixar cadastro de SKU soltar volume retido por `pacote:` — cadastro não
   responde quantas persianas vão na caixa (§5, armadilha #23)
 - ❌ Declarar chave nova em `permissoes.js` sem a linha no `permDaRota()` **e**

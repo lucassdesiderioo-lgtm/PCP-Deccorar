@@ -2,7 +2,7 @@ const pdfjs = require('pdfjs-dist/legacy/build/pdf.js');
 pdfjs.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.js';
 /* A leitura crua do PDF mora toda no folha.js — inclusive "que pagina e esta" e
    "qual o numero desta nota". Aqui elas gravam; na auditoria elas conferem. */
-const {tipoDaPagina,nfDaNota,itensDaFolha,irmaosDe,irmaosDoPacote} = require('./folha');
+const {tipoDaPagina,nfDaNota,itensDaFolha,irmaosDe,irmaosDoPacote,etiquetasSemItem} = require('./folha');
 /* "Estes dois nomes sao a mesma pessoa?" e do nome.js, dono unico: a conferencia
    de NF faz a MESMA pergunta, e duas reguas discordariam sobre o mesmo cliente. */
 const {mesmoCliente} = require('./nome');
@@ -242,10 +242,9 @@ async function parsePdf(uint8){
     const g=re=>{ const mm=t.match(re); return mm?mm[1].replace(/\s+/g,''):null; };
     etiquetasDoPdf.push({packId:g(/Pack ID:\s*([\d ]+)/), venda:g(/Venda:\s*([\d ]+)/)});
   }
-  const semItem=etiquetasDoPdf.filter(e=>
-    !((e.venda&&leitura1.venda[e.venda])||(e.packId&&leitura1.pack[e.packId])));
-  /* `pdfFecha` e a licenca pra ler ausencia como pacote. Sem ela, ausencia
-     volta a significar so "nao deu pra ler", que e o que ela sempre foi. */
+  /* A conta sai do `folha.js` — a MESMA que o backfill_pacote.js usa. Duas
+     copias significaria o backfill gravar peca que o upload teria retido. */
+  const semItem = etiquetasSemItem(etiquetasDoPdf, itensFolha);
   const pdfFecha = semItem.length===0;
 
   const orders=[], seen=new Set();

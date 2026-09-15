@@ -36,7 +36,7 @@
  */
 const Database=require('better-sqlite3');
 const fs=require('fs'); const path=require('path');
-const {lerFolha,irmaosDoPacote,itemDaFolha}=require('./folha');
+const {lerFolha,irmaosDoPacote,itemDaFolha,etiquetasSemItem}=require('./folha');
 
 const DB=process.env.PCP_DB||'/opt/expedicao/dados.db';
 const APLICAR=process.argv.includes('--aplicar');
@@ -76,7 +76,7 @@ for(const v of alvo){
   (porArquivo[v.srcfile]=porArquivo[v.srcfile]||[]).push(v);
 }
 
-const pacotes=[]; const ilegiveis=[];
+const pacotes=[]; const ilegiveis=[]; const naoFecham=[];
 const arquivos=Object.keys(porArquivo);
 let n=0;
 for(const arq of arquivos){
@@ -84,6 +84,20 @@ for(const arq of arquivos){
   let f; try{ f=await lerFolha(arq); }
   catch(e){ ilegiveis.push(path.basename(arq)); continue; }
   const grupos=irmaosDoPacote(f.blocos);
+  /* A MESMA LICENCA DO UPLOAD (§5, #23): ausencia so vale como peca a mais
+     quando NENHUMA etiqueta do PDF ficou sem item na folha. Sobrou etiqueta
+     orfa, o pdf.js comeu campo — e o orfao e um item que perdeu os campos, nao
+     uma persiana a mais. Aqui a guarda importa MAIS que no upload: la o erro
+     retem um volume numa tela; aqui ele grava peca e, com `--baixar`, tira do
+     estoque uma persiana que nunca saiu da prateleira. */
+  const semItem=etiquetasSemItem(f.etiquetas,f.blocos);
+  if(grupos.length && semItem.length){
+    naoFecham.push({arq:path.basename(arq), etiquetas:f.etiquetas.length,
+      itens:f.blocos.length, orfas:semItem.length, grupos:grupos.length,
+      volumes:porArquivo[arq].length});
+    process.stdout.write('\r  lendo PDFs: '+n+'/'+arquivos.length+'   ');
+    continue;
+  }
   if(grupos.length) for(const v of porArquivo[arq]){
     /* O MESMO CRITERIO DE CASAMENTO DO PARSE: venda primeiro, pack depois. O
        `itemDaFolha` devolve o PROPRIO objeto do array, entao a identidade
@@ -101,6 +115,27 @@ console.log(''); console.log('');
 
 if(ilegiveis.length) console.log('PDFs que nao deram pra ler:',ilegiveis.join(', '));
 if(semArquivo) console.log('volumes cujo PDF ja saiu do disco (limpeza de 7 dias):',semArquivo);
+
+/* Recusa calada e o mesmo silencio de "nao achei nada" — e aqui o que foi
+   recusado e justamente o que mais parece pacote. Quem le precisa saber que
+   existe, para ir olhar o pedido no ML em vez de achar que esta tudo fechado. */
+if(naoFecham.length){
+  console.log('');
+  console.log('── PDFs RECUSADOS: tem item orfao, mas a conta NAO FECHA ──');
+  console.log('');
+  console.log('   Sobrou etiqueta sem item na folha. Ali o orfao e um item que');
+  console.log('   PERDEU os campos (o pdf.js come campo), nao uma persiana a mais —');
+  console.log('   e gravar peca por causa dele juntaria duas vendas separadas numa');
+  console.log('   caixa que nao existe. Nada foi lido destes arquivos.');
+  console.log('');
+  for(const x of naoFecham)
+    console.log('  '+x.arq+'  ·  '+x.etiquetas+' etiqueta(s), '+x.itens+' item(ns), '
+      +x.orfas+' etiqueta(s) SEM item  ·  '+x.grupos+' orfao(s) ignorado(s)'
+      +'  ·  '+x.volumes+' volume(s) deste PDF na fabrica');
+  console.log('');
+  console.log('   Reparo: abrir o pedido no Mercado Livre e conferir, ou subir o PDF');
+  console.log('   de novo — o upload novo retem sozinho o que nao fechar.');
+}
 
 if(!pacotes.length){
   console.log('');

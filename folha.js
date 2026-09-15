@@ -201,6 +201,32 @@ function itemDaFolha(volume, itens){
       || null;
 }
 
+/* A LICENCA PRA LER AUSENCIA COMO PACOTE (§5, armadilha #23).
+ *
+ * Um item sem Pack ID, sem Venda e sem comprador tem duas leituras possiveis,
+ * e elas sao OPOSTAS:
+ *
+ *   pacote de verdade   1 etiqueta, 2 itens — TODA etiqueta achou o seu item
+ *   leitura quebrada    2 etiquetas, 2 itens — uma etiqueta ficou SEM item
+ *
+ * A evidencia que separa as duas nao esta no item: esta na conta do documento.
+ * O orfao so vale como irmao quando NENHUMA etiqueta do PDF ficou sem item na
+ * folha. Sobrou etiqueta orfa, o pdf.js comeu campo, e tratar aquilo como peca
+ * a mais juntaria duas vendas separadas numa caixa que nao existe — o erro
+ * contrario ao que o pacote veio consertar.
+ *
+ * DONO UNICO, e aqui isso nao e estilo: o upload (parse.js) e o
+ * backfill_pacote.js tem que ler pela MESMA regua. Uma copia solta no backfill
+ * grava peca que o upload teria retido — e o backfill grava em cima de volume
+ * que JA ANDOU, onde o erro custa baixa de estoque, nao um card na tela.
+ */
+function etiquetasSemItem(etiquetas, blocos){
+  const m=mapasDaFolha(blocos);
+  return (etiquetas||[]).filter(e =>
+    !((e.venda&&m.porVenda[e.venda])||(e.packId&&m.porPack[e.packId])));
+}
+function pdfFecha(etiquetas, blocos){ return etiquetasSemItem(etiquetas,blocos).length===0; }
+
 /* QUAIS TRAVAS ESTAO DE FATO ATIVAS NESTE VOLUME.
  *
  * Cada conferencia do §5 depende de um dado existir dos DOIS lados. Quando o
@@ -223,4 +249,4 @@ function travasAtivas(volume, item, coresConhecidas){
 }
 
 module.exports={lerFolha,mapasDaFolha,skuDaFolha,itemDaFolha,itensDaFolha,travasAtivas,pageLines,
-                tipoDaPagina,nfDaNota,irmaosDoPacote,irmaosDe};
+                tipoDaPagina,nfDaNota,irmaosDoPacote,irmaosDe,etiquetasSemItem,pdfFecha};
