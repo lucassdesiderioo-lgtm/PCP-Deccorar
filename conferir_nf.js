@@ -234,7 +234,33 @@ if(pdfSumiu.length){
    folha, que e o que decide se a impressao esta saindo completa. */
 /* O que a folha achou, para o veredito no fim nao repetir a leitura nem contar
    por conta propria. `lido` distingue "li e nao achei nada" de "nao li". */
-const folha={lido:false, pdfs:0, vendaDupla:[], comQtd:[], notaGrossa:[]};
+const folha={lido:false, pdfs:0, vendaDupla:[], comQtd:[], notaGrossa:[], pacote:[]};
+
+/* ── O PACOTE DE VARIOS PRODUTOS (15/09/2026) ───────────────────────────────
+ * O item IRMAO: bloco com SKU e sem Pack ID, sem Venda e sem comprador. Ele
+ * nao tem identidade propria porque a identidade dele e a do item de cima —
+ * os dois viajam na MESMA etiqueta, na mesma caixa.
+ *
+ * NAO CONFUNDIR COM O CASO ABRAAO (#4). La o item tambem vinha sem Pack ID,
+ * mas trazia `Venda:` e o comprador: era um item inteiro cuja etiqueta veio
+ * pela venda em vez do pack. Herdar o pack do vizinho ali mandou a peca errada
+ * pro cliente. Aqui os TRES campos faltam de uma vez, e e por isso que os dois
+ * casos se separam sem adivinhacao: o item irmao e o unico que nao tem como
+ * ser identificado sozinho.
+ *
+ * Esta funcao so RELATA. Nada no sistema decide por ela — a decisao do que
+ * fazer com o pacote e do dono. */
+function irmaosDoPacote(blocos){
+  const grupos=[]; let atual=null;
+  (blocos||[]).forEach(b=>{
+    const orfao = !b.packId && !b.venda && !b.comprador;
+    if(!orfao){ atual={pai:b, irmaos:[]}; grupos.push(atual); return; }
+    /* Orfao antes de qualquer item identificado nao e irmao de ninguem: e
+       folha que comeca torta, e isso e outro problema. */
+    if(atual) atual.irmaos.push(b);
+  });
+  return grupos.filter(g=>g.irmaos.length);
+}
 
 async function verPdfs(){
   tit('4. O QUE A FOLHA DE CONTROLE DOS PDFs DIZ');
@@ -246,7 +272,7 @@ async function verPdfs(){
   T('  '+arqs.length+' PDF(s) ainda no servidor.');
   folha.lido=true; folha.pdfs=arqs.length;
 
-  const {comQtd,vendaDupla,notaGrossa}=folha;
+  const {comQtd,vendaDupla,notaGrossa,pacote}=folha;
   let itens=0;
   for(const a of arqs){
     let f; try{ f=await lerFolha(a.srcfile); }
@@ -269,6 +295,12 @@ async function verPdfs(){
        pergunta continuar viva com numero do lado. */
     f.blocos.filter(b=>b.qtd>1).forEach(b=>comQtd.push({arq:path.basename(a.srcfile),b}));
 
+    /* UMA ETIQUETA COM MAIS DE UM PRODUTO — o achado de 15/09/2026. O sistema
+       grava so o item de cima e os irmaos somem SEM AVISO: nao viram volume,
+       nao baixam estoque e nao aparecem em tela nenhuma. Em numero de pecas
+       esta e a linha mais cara deste relatorio. */
+    irmaosDoPacote(f.blocos).forEach(g=>pacote.push({arq:path.basename(a.srcfile),g}));
+
     /* Nota de mais de uma folha: a impressao leva SO a primeira pagina, entao
        aqui e onde se ve se ela esta saindo incompleta. */
     const pags={};
@@ -278,6 +310,23 @@ async function verPdfs(){
   }
 
   T('  '+itens+' item(ns) de folha lidos.');
+
+  T('');
+  T('  ── UMA ETIQUETA COM MAIS DE UM PRODUTO (pacote do ML) ──');
+  if(!pacote.length) T('    nenhuma: cada etiqueta da folha leva um produto so.');
+  else{
+    T('    ⚠ O sistema grava SO o item de cima. Os de baixo somem sem aviso —');
+    T('    nao viram volume, nao baixam estoque, nao aparecem em tela nenhuma.');
+    pacote.forEach(x=>{
+      const p=x.g.pai, todas=p.qtd+x.g.irmaos.reduce((s,i)=>s+i.qtd,0);
+      T('');
+      T('    pack '+(p.packId||'—')+'  venda '+(p.venda||'—')+'  ('+x.arq+')');
+      T('      cliente '+(p.comprador||'—')+'   '+todas+' peca(s) numa etiqueta so:');
+      T('        GRAVA   '+String(p.sku).padEnd(22)+p.qtd+' un');
+      x.g.irmaos.forEach(i=>T('        PERDE   '+String(i.sku).padEnd(22)+i.qtd+' un'));
+    });
+  }
+
   T('');
   T('  ── a mesma Venda com mais de um item na folha ──');
   if(!vendaDupla.length) T('    nenhuma: cada "Venda:" da folha aparece uma vez so, com um SKU so.');
@@ -313,12 +362,18 @@ async function verPdfs(){
 function veredito(){
   tit('RESPOSTA');
   T('');
-  T('  1. venda com mais de um SKU gravado ....... '
-    +(vendaMultiSku.length?('⚠ '+vendaMultiSku.length+' — olhar'):'nenhuma'));
   /* Tres respostas diferentes, e so uma delas e "esta tudo certo": li e nao
      achei, nao li, ou li e nao havia o que ler. Juntar as duas ultimas num
      "nenhuma" seria dar por conferido o que ninguem olhou. */
   const semFolha = COM_PDF ? 'nenhum PDF no servidor pra ler' : 'nao foi lida (--pdf)';
+  /* O pacote vem PRIMEIRO porque e o unico item deste relatorio que faz peca
+     sumir: as outras linhas sao volume mal classificado ou papel incompleto. */
+  T('  0. etiqueta com mais de um produto ........ '
+    +(folha.lido?(folha.pacote.length
+        ?('⚠ '+folha.pacote.length+' — '+folha.pacote.reduce((s,x)=>s+x.g.irmaos.reduce((t,i)=>t+i.qtd,0),0)+' peca(s) somem')
+        :'nenhuma'):semFolha));
+  T('  1. venda com mais de um SKU gravado ....... '
+    +(vendaMultiSku.length?('⚠ '+vendaMultiSku.length+' — olhar'):'nenhuma'));
   T('     a mesma venda com 2 itens NA FOLHA ..... '
     +(folha.lido?(folha.vendaDupla.length?('⚠ '+folha.vendaDupla.length+' — olhar'):'nenhuma'):semFolha));
   T('  2. cliente com mais de uma persiana na NF . '
