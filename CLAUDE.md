@@ -510,9 +510,26 @@ baixas. A trava de estoque também passou a ser por peça, e a recusa **nomeia o
 SKU que faltou** — numa caixa de três, "sem estoque" sem dizer de qual manda a
 bancada procurar no escuro.
 
-> **Um bipe por LINHA de item, não por unidade.** Duas persianas iguais têm a
-> mesma etiqueta de SKU, e bipar o mesmo código duas vezes não prova nada a
-> mais. A quantidade a tela mostra ao lado, para conferir na mão.
+> ⚠️ **UM BIPE POR PERSIANA, NÃO POR SKU.** Regra do dono (15/09/2026). A caixa
+> do Fabiano tem 3 persianas em 2 linhas, e são **três** bipes:
+> `BK120120BEGE` uma vez, `BK140140BEGE` duas. `lote_item.conferidos` é um
+> **contador**, não um sim/não, e a tela escreve "1 de 2".
+>
+> A primeira versão fechava a linha inteira no primeiro bipe, com o argumento de
+> que duas persianas iguais têm a mesma etiqueta de SKU e bipar duas vezes não
+> provaria nada. **Está errado, e o erro é o caro:** não é o código que se
+> confere, é a *peça na mão*. Um bipe por linha deixa a persiana irmã na
+> prateleira com a caixa marcada como conferida — exatamente o que a caixa de
+> várias peças traz de volta.
+>
+> ⚠️ **O GUARD DE 700 ms DA TELA FICOU MAIS IMPORTANTE, NÃO MENOS.** Ele existe
+> porque o leitor às vezes manda o mesmo código duas vezes numa leitura só
+> (§12). Antes isso era inofensivo — o servidor respondia "já conferido". Agora
+> uma repetição acidental **conta uma persiana a mais**, e a caixa sai com uma
+> peça faltando porque o operador acha que conferiu duas. Duas persianas de
+> verdade exigem largar uma e pegar a outra, o que nunca leva menos de 0,7 s.
+> Não afrouxe esse número para "facilitar" o bipe repetido: é justamente o que
+> ele protege.
 
 > **Cadastrar SKU não solta volume retido por `pacote:`** (guarda no
 > `server.js`, como a da divergência e a da modalidade): cadastro não responde
@@ -551,7 +568,7 @@ carimbaria uma saída que aconteceu noutro dia (a regra dos três scripts de
 passivo, §5).
 
 **Rode `node teste_parse.js` (casos 17, 18 e 19), `node teste_divergencia.js` (os
-últimos 10 casos são o pacote) e `node teste_etiqueta.js` (os últimos 12) após
+últimos 10 casos são o pacote) e `node teste_etiqueta.js` (os últimos 16) após
 mexer nisso.** Para achar os casos nos PDFs do servidor:
 `node conferir_nf.js --pdf` — a pergunta 0 do relatório é esta.
 
@@ -1610,7 +1627,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (17 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (32), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (17 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
@@ -1636,6 +1653,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   `lote` é a ETIQUETA, o de `lote_item` é a PEÇA (§5, armadilha #23)
 - ❌ Deixar a caixa de pacote imprimir sem o bipe de todas as peças, ou baixar
   só uma do estoque: saíram N da prateleira (§5, armadilha #23)
+- ❌ Fechar a linha do `lote_item` num bipe só quando ela tem 2 unidades — é um
+  bipe por PERSIANA, e a irmã fica na prateleira (§5, armadilha #23)
+- ❌ Afrouxar o guard de 700 ms do bipe na Etiqueta de Venda: com o bipe por
+  unidade, a repetição do leitor vira persiana a mais (§5, #23 e §12)
 - ❌ Tratar como irmão de pacote um item que traz `Venda:` ou comprador — esse é
   o caso Abraão, e herdar ali manda a peça errada pro cliente (§5, #4 e #23)
 - ❌ Ler ausência como pacote quando o PDF **não fecha** (sobrou etiqueta sem

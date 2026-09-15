@@ -61,8 +61,16 @@ module.exports=function(app,db){
      e o volume nunca fecharia no carregamento (§5, armadilha #8). O grao de
      `lote` e a ETIQUETA; o grao daqui e a PECA.
 
-     `conferido_em` e o bipe da bancada antes de imprimir: sem ele a peca a mais
-     depende de alguem lembrar, e lembrar nao e processo. */
+     O bipe da bancada antes de imprimir mora em `conferidos`: sem ele a peca a
+     mais depende de alguem lembrar, e lembrar nao e processo.
+
+     ⚠️ `conferidos` E UM CONTADOR, NAO UM SIM/NAO — regra do dono (15/09/2026):
+     **um bipe por PERSIANA**, nao por linha. A linha que diz `qtd=2` so fecha
+     com dois bipes, e a tela mostra "1 de 2". Uma peca conferida e a outra
+     esquecida na prateleira e exatamente o erro que a caixa de varias pecas
+     traz de novo — e um bipe so por SKU nao separa os dois casos.
+     `conferido_em`/`conferido_por` marcam quando a LINHA fechou (a ultima
+     unidade), que e o que interessa pra auditoria. */
   db.exec(`CREATE TABLE IF NOT EXISTS lote_item (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     lote_id INTEGER NOT NULL,
@@ -74,7 +82,11 @@ module.exports=function(app,db){
     conferido_em TEXT,
     conferido_por TEXT,
     criado_em TEXT DEFAULT (datetime('now','localtime')),
-    teste INTEGER DEFAULT 0);`);
+    teste INTEGER DEFAULT 0,
+    conferidos INTEGER DEFAULT 0);`);
+  /* No fim e por ALTER, como manda o §17: e onde o SQLite poe a coluna nova, e
+     e o que mantem a ordem igual a do banco de producao. */
+  try{ db.exec("ALTER TABLE lote_item ADD COLUMN conferidos INTEGER DEFAULT 0"); }catch(e){}
   try{ db.exec("CREATE INDEX IF NOT EXISTS ix_lote_item_lote ON lote_item(lote_id)"); }catch(e){}
 
   /* ── O QUE O SISTEMA APRENDE SOBRE FAMILIA x PREFIXO DE SKU ────────────────

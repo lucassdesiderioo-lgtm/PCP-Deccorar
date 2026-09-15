@@ -82,7 +82,7 @@ module.exports=function(app,db){
        e o lugar em que mandar a peca errada fica mais facil, nao mais dificil.
        A peca de cada item vem junto, das colunas de `skus`: e o que a bancada
        compara com o que tem na mao antes de bipar. */
-    const itens = p ? db.prepare(`SELECT i.id,i.codigo,i.qtd,i.conferido_em,
+    const itens = p ? db.prepare(`SELECT i.id,i.codigo,i.qtd,i.conferido_em,COALESCE(i.conferidos,0) conferidos,
         s.largura_cm,s.altura_cm, COALESCE(c.nome,s.cor_codigo,s.cor) cor_nome,
         COALESCE(t.nome,s.tecido_codigo) tecido_nome, m.nome modelo_nome,
         COALESCE(m.exige_medida,1) exige_medida
@@ -118,20 +118,35 @@ module.exports=function(app,db){
     const o=db.prepare('SELECT id,estagio FROM lote WHERE id=?').get(id);
     if(!o) return res.status(404).json({erro:'venda nao encontrada'});
     if(o.estagio!=='pendente') return res.json({erro:'Esta venda ja foi processada ('+o.estagio+').'});
-    const itens=db.prepare('SELECT id,codigo,qtd,conferido_em FROM lote_item WHERE lote_id=? ORDER BY id').all(id);
+    const itens=db.prepare(`SELECT id,codigo,qtd,COALESCE(conferidos,0) conferidos
+      FROM lote_item WHERE lote_id=? ORDER BY id`).all(id);
     if(itens.length<2) return res.json({erro:'Esta caixa leva uma peca so — nao ha o que conferir.'});
-    const alvo=itens.find(i=>String(i.codigo||'').toUpperCase()===sku && !i.conferido_em);
+    /* UM BIPE POR PERSIANA: o alvo e a primeira linha deste SKU que ainda tem
+       unidade faltando. Duas persianas iguais tem a mesma etiqueta de SKU, e e
+       por isso que a conta e de UNIDADE e nao de linha — conferir uma e deixar
+       a irma na prateleira e justamente o erro que a caixa de varias pecas
+       traz de volta. */
+    const falta=i=>Math.max(0,(i.qtd||1)-(i.conferidos||0));
+    const restantes=()=>itens.reduce((s,i)=>s+falta(i),0);
+    const alvo=itens.find(i=>String(i.codigo||'').toUpperCase()===sku && falta(i)>0);
     if(!alvo){
       const jaFoi=itens.some(i=>String(i.codigo||'').toUpperCase()===sku);
       return res.json({erro: jaFoi
-        ? 'Esse SKU já foi conferido nesta caixa.'
-        : 'Esse SKU não é desta caixa.', faltam:itens.filter(i=>!i.conferido_em).length});
+        ? 'Todas as peças desse SKU já foram conferidas nesta caixa.'
+        : 'Esse SKU não é desta caixa.', faltam:restantes()});
     }
     const quem=(req.usuario&&req.usuario.nome)||'';
-    db.prepare(`UPDATE lote_item SET conferido_em=datetime('now','localtime'), conferido_por=?
-      WHERE id=?`).run(quem,alvo.id);
-    const faltam=itens.filter(i=>!i.conferido_em && i.id!==alvo.id).length;
-    res.json({ok:true,codigo:alvo.codigo,qtd:alvo.qtd,faltam});
+    alvo.conferidos=(alvo.conferidos||0)+1;
+    const fechou = alvo.conferidos >= (alvo.qtd||1);
+    /* `conferido_em` marca quando a LINHA fechou — a ultima unidade. E o que a
+       auditoria quer saber: quando aquela peca parou de faltar. */
+    db.prepare(`UPDATE lote_item SET conferidos=?, conferido_por=?,
+        conferido_em=CASE WHEN ? THEN datetime('now','localtime') ELSE conferido_em END
+      WHERE id=?`).run(alvo.conferidos, quem, fechou?1:0, alvo.id);
+    res.json({ok:true, codigo:alvo.codigo, qtd:alvo.qtd,
+      /* `conferidos` e `qtd` juntos deixam a tela escrever "1 de 2" sem contar
+         por fora — e `faltam` e a conta da CAIXA, em persianas. */
+      conferidos:alvo.conferidos, faltam:restantes()});
   });
 
   app.post('/api/embalar',(req,res)=>{
@@ -147,17 +162,21 @@ module.exports=function(app,db){
        "quantas": a trava de estoque, a baixa e a conferencia por bipe.
        A lista sai do `lote_item`; vazia (ou com um item so) e o caso normal, e
        dali pra baixo nada muda em relacao ao que sempre existiu. */
-    const itens=db.prepare('SELECT id,codigo,qtd,conferido_em FROM lote_item WHERE lote_id=? ORDER BY id').all(id);
+    const itens=db.prepare(`SELECT id,codigo,qtd,COALESCE(conferidos,0) conferidos
+      FROM lote_item WHERE lote_id=? ORDER BY id`).all(id);
     const pacote = itens.length>1;
 
     /* SEM O BIPE DE TODAS AS PECAS, NAO IMPRIME. E o mesmo desenho do kit na
        embalagem (§4): o bipe que falta recusa o passo seguinte, em vez de
        avisar e deixar passar. Aviso numa caixa com tres persianas e aviso que
-       se aprende a fechar. */
+       se aprende a fechar.
+       A conta e em PERSIANAS, nao em linhas: a linha de `qtd=2` com um bipe so
+       ainda deve uma peca, e e essa que ficaria na prateleira. */
     if(pacote){
-      const faltam=itens.filter(i=>!i.conferido_em);
-      if(faltam.length) return res.json({erro:'⚠ FALTA CONFERIR '+faltam.length+' de '+itens.length+
-        ' peça(s) desta caixa. Bipe o SKU de cada persiana antes de imprimir.', faltam:faltam.length});
+      const total=itens.reduce((s,i)=>s+(i.qtd||1),0);
+      const faltam=itens.reduce((s,i)=>s+Math.max(0,(i.qtd||1)-(i.conferidos||0)),0);
+      if(faltam) return res.json({erro:'⚠ FALTA CONFERIR '+faltam+' de '+total+
+        ' persiana(s) desta caixa. Bipe o SKU de CADA uma antes de imprimir.', faltam});
     }
 
     /* A TRAVA DE ESTOQUE VALE PARA CADA PECA, E A BAIXA TAMBEM. Cobrar so o

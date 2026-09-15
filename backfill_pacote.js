@@ -53,7 +53,9 @@ db.exec(`CREATE TABLE IF NOT EXISTS lote_item (
   id INTEGER PRIMARY KEY AUTOINCREMENT, lote_id INTEGER NOT NULL, codigo TEXT,
   qtd INTEGER DEFAULT 1, cor TEXT, descricao TEXT, origem TEXT DEFAULT 'folha',
   conferido_em TEXT, conferido_por TEXT,
-  criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0);`);
+  criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0,
+  conferidos INTEGER DEFAULT 0);`);
+try{ db.exec("ALTER TABLE lote_item ADD COLUMN conferidos INTEGER DEFAULT 0"); }catch(e){}
 
 /* So quem ainda esta na fabrica, e so quem ainda nao tem pecas gravadas —
    rodar duas vezes nao duplica. */

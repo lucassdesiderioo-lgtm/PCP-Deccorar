@@ -38,7 +38,8 @@ db.exec(`
      de imprimir e o etq_route — entao ela precisa existir aqui. */
   CREATE TABLE lote_item (id INTEGER PRIMARY KEY AUTOINCREMENT, lote_id INTEGER NOT NULL,
     codigo TEXT, qtd INTEGER DEFAULT 1, cor TEXT, descricao TEXT,
-    origem TEXT DEFAULT 'folha', conferido_em TEXT, conferido_por TEXT, teste INTEGER DEFAULT 0);
+    origem TEXT DEFAULT 'folha', conferido_em TEXT, conferido_por TEXT, teste INTEGER DEFAULT 0,
+    conferidos INTEGER DEFAULT 0);
 `);
 db.prepare("INSERT INTO modelo (id,codigo,nome,sob_medida) VALUES (1,'ROLO','Rolô',0)").run();
 db.prepare("INSERT INTO modelo (id,codigo,nome,sob_medida) VALUES (2,'SOBMED','Sob medida',1)").run();
@@ -182,9 +183,14 @@ const ok = (n, c, extra) => { casos++;
   ok('o bipe entrega as peças da caixa quando ela leva mais de uma',
      pp.pedido && pp.pedido.id === PAC && (pp.itens||[]).length === 2, JSON.stringify({id:pp.pedido&&pp.pedido.id, itens:(pp.itens||[]).length}));
 
+  /* ⚠️ UM BIPE POR PERSIANA, não por SKU (regra do dono, 15/09/2026). A caixa
+     tem 3 persianas em 2 linhas, e são precisos TRÊS bipes: BK120120BEGE uma
+     vez, BK140140BEGE duas. Um bipe por linha deixaria a segunda BK140140BEGE
+     na prateleira com a caixa marcada como conferida — o erro que a caixa de
+     várias peças traz de volta. */
   const semBipe = await chamar('POST /api/embalar', {id:PAC});
-  ok('SEM o bipe de todas as peças, não imprime',
-     !!semBipe.erro && semBipe.faltam === 2, JSON.stringify(semBipe));
+  ok('SEM o bipe de todas as peças, não imprime — e a conta é em PERSIANAS (3)',
+     !!semBipe.erro && semBipe.faltam === 3, JSON.stringify(semBipe));
   ok('e nada saiu do estoque na recusa',
      estoqueDe('BK120120BEGE') === 5 && estoqueDe('BK140140BEGE') === 4,
      estoqueDe('BK120120BEGE')+'/'+estoqueDe('BK140140BEGE'));
@@ -193,16 +199,36 @@ const ok = (n, c, extra) => { casos++;
   ok('bipar um SKU que não é da caixa é recusado', !!errado.erro, JSON.stringify(errado));
 
   const c1 = await chamar('POST /api/lote/conferir', {id:PAC, codigo:'BK120120BEGE'});
-  ok('o bipe da primeira peça confere e diz quantas faltam', c1.ok && c1.faltam === 1, JSON.stringify(c1));
+  ok('o 1º bipe confere UMA persiana e diz quantas faltam (3 → 2)',
+     c1.ok && c1.faltam === 2 && c1.conferidos === 1, JSON.stringify(c1));
+  /* A linha de qtd 1 fecha no primeiro bipe; bipar de novo não pode roubar
+     unidade da outra linha nem contar peça que não existe. */
   const bisRep = await chamar('POST /api/lote/conferir', {id:PAC, codigo:'BK120120BEGE'});
-  ok('bipar duas vezes a mesma peça não fecha a conta sozinho', !!bisRep.erro, JSON.stringify(bisRep));
+  ok('a linha de 1 unidade não aceita um segundo bipe', !!bisRep.erro, JSON.stringify(bisRep));
 
   const meio = await chamar('POST /api/embalar', {id:PAC});
-  ok('com UMA peça conferida de duas, ainda não imprime',
-     !!meio.erro && meio.faltam === 1, JSON.stringify(meio));
+  ok('com 1 de 3 persianas conferidas, ainda não imprime',
+     !!meio.erro && meio.faltam === 2, JSON.stringify(meio));
+
+  /* AS DUAS UNIDADES DA MESMA LINHA, UMA POR UMA. É este par que o bipe por
+     SKU não separava: no primeiro bipe a linha inteira era dada por conferida
+     e a persiana irmã ficava para trás. */
+  const c2a = await chamar('POST /api/lote/conferir', {id:PAC, codigo:'BK140140BEGE'});
+  ok('o bipe da 1ª de duas iguais NÃO fecha a linha (diz "1 de 2")',
+     c2a.ok && c2a.conferidos === 1 && c2a.qtd === 2 && c2a.faltam === 1, JSON.stringify(c2a));
+
+  const quase = await chamar('POST /api/embalar', {id:PAC});
+  ok('e com a persiana irmã faltando, a etiqueta continua recusada',
+     !!quase.erro && quase.faltam === 1, JSON.stringify(quase));
+  ok('nem o estoque andou nessa recusa',
+     estoqueDe('BK120120BEGE') === 5 && estoqueDe('BK140140BEGE') === 4,
+     estoqueDe('BK120120BEGE')+'/'+estoqueDe('BK140140BEGE'));
 
   const c2 = await chamar('POST /api/lote/conferir', {id:PAC, codigo:'BK140140BEGE'});
-  ok('o bipe da segunda peça fecha a conferência', c2.ok && c2.faltam === 0, JSON.stringify(c2));
+  ok('o bipe da 2ª persiana igual fecha a conferência (0 faltando)',
+     c2.ok && c2.conferidos === 2 && c2.faltam === 0, JSON.stringify(c2));
+  const sobrando = await chamar('POST /api/lote/conferir', {id:PAC, codigo:'BK140140BEGE'});
+  ok('e um bipe a mais depois de fechada é recusado', !!sobrando.erro, JSON.stringify(sobrando));
 
   const imp = await chamar('POST /api/embalar', {id:PAC});
   ok('conferidas todas, a etiqueta sai — e é UMA etiqueta só', !!imp.ok, JSON.stringify(imp));

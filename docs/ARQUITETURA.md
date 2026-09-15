@@ -270,7 +270,9 @@ qtd           INTEGER DEFAULT 1  -- quantas unidades deste SKU vão na caixa
 cor           TEXT
 descricao     TEXT
 origem        TEXT DEFAULT 'folha'  -- 'folha' (o PDF disse) | 'gestao' (alguém assinou)
-conferido_em  TEXT               -- o bipe da bancada, antes de imprimir
+conferidos    INTEGER DEFAULT 0  -- quantas unidades JÁ foram bipadas (0..qtd)
+                                 -- um bipe por PERSIANA, não por linha
+conferido_em  TEXT               -- quando a LINHA fechou (a última unidade)
 conferido_por TEXT
 criado_em     TEXT DEFAULT datetime('now','localtime')
 teste         INTEGER DEFAULT 0

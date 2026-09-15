@@ -195,22 +195,31 @@ function pecaTxt(p){ return (p && typeof pecaTexto==='function') ? (pecaTexto(p)
    persianas é aviso que se aprende a fechar.
    A lista aparece porque aqui a caixa está sendo MONTADA: sem ela a bancada
    não sabe o que buscar na prateleira. */
+/* UM BIPE POR PERSIANA (regra do dono, 15/09/2026). A linha de 2 unidades só
+   fecha com dois bipes, e por isso ela mostra "1 de 2": marcar a linha inteira
+   no primeiro bipe deixaria a persiana irmã na prateleira, que é o erro que a
+   caixa de várias peças traz de volta. */
 function linhaItem(i){
-  var ok=!!i.conferido_em;
+  var qtd=i.qtd||1, feitos=i.conferidos||0, ok=feitos>=qtd;
   var peca=pecaTxt({medida:(i.exige_medida&&i.largura_cm&&i.altura_cm)?(i.largura_cm+' × '+i.altura_cm):null,
                     cor:i.cor_nome||null, tecido:i.tecido_nome||null, modelo:i.modelo_nome||null});
   return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;margin-bottom:6px;'
-    +'background:'+(ok?'#e9f6ec':'#fff')+';border:2px solid '+(ok?'#57a65f':'#d8dee6')+'">'
-    +'<div style="font-size:22px;width:26px;text-align:center">'+(ok?'✓':'○')+'</div>'
+    +'background:'+(ok?'#e9f6ec':(feitos?'#fffaf0':'#fff'))+';border:2px solid '+(ok?'#57a65f':(feitos?'#e0a63f':'#d8dee6'))+'">'
+    +'<div style="font-size:22px;width:26px;text-align:center">'+(ok?'✓':(feitos?'◐':'○'))+'</div>'
     +'<div style="flex:1;min-width:0">'
     +'<span class="sku" style="font-size:15px">'+esc(i.codigo||'')+'</span>'
-    +'<b style="margin-left:8px">'+(i.qtd>1?(i.qtd+' unidades'):'1 unidade')+'</b>'
+    +'<b style="margin-left:8px">'+(qtd>1
+        ? (feitos+' de '+qtd+' conferidas')
+        : (ok?'conferida':'1 persiana'))+'</b>'
     +(peca?'<div style="font-size:14px;color:var(--muted)">'+esc(peca)+'</div>':'')
     +'</div></div>';
 }
 function telaPacote(r,extras){
-  var itens=r.itens||[], faltam=itens.filter(function(i){ return !i.conferido_em; }).length;
+  /* As duas contas são em PERSIANA, não em linha: é persiana que fica na
+     prateleira quando alguém esquece. */
+  var itens=r.itens||[];
   var total=itens.reduce(function(s,i){ return s+(i.qtd||1); },0);
+  var faltam=itens.reduce(function(s,i){ return s+Math.max(0,(i.qtd||1)-(i.conferidos||0)); },0);
   var corpo=(extras||'')
     +'<div style="background:#fff4e5;border:2px solid #e0a63f;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-weight:800;color:#8a5a00">'
     +'📦 ESTA CAIXA LEVA '+total+' PERSIANAS — o Mercado Livre juntou numa etiqueta só'
@@ -220,7 +229,7 @@ function telaPacote(r,extras){
     +'<div style="font-size:15px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+'</div>'
     +itens.map(linhaItem).join('')
     +(faltam
-      ? '<div style="margin-top:8px;font-weight:700">Faltam <b>'+faltam+'</b> — bipe o SKU de cada persiana.</div>'
+      ? '<div style="margin-top:8px;font-weight:700">Faltam <b>'+faltam+'</b> persiana(s) — bipe o SKU de cada uma, <b>uma por uma</b>.</div>'
       : '<div style="margin-top:8px;font-weight:700;color:#2e7d32">Todas conferidas. Pode imprimir.</div>');
   banner((faltam?'warn':'cfm')+' rotulo', faltam?'Confira as peças da caixa':'Caixa conferida', corpo,
     faltam ? '<button class="ghost" onclick="idle()">Cancelar</button>'
@@ -255,6 +264,14 @@ async function stats(){
 }
 async function scanSku(sku){
   sku=(sku||'').trim().toUpperCase(); if(!sku) return;
+  /* ⚠️ O GUARD DE 700 ms FICOU MAIS IMPORTANTE, NÃO MENOS, com o bipe por
+     persiana. Ele existe porque o leitor às vezes manda o mesmo código duas
+     vezes numa leitura só. Antes isso era inofensivo — o servidor respondia
+     "já conferido". Agora uma repetição acidental CONTA UMA PERSIANA A MAIS, e
+     a caixa sairia com uma peça faltando, porque o operador acha que conferiu
+     duas. Duas persianas de verdade exigem largar uma e pegar a outra, o que
+     nunca acontece em menos de 0,7 s. Não afrouxe isto para "facilitar" o bipe
+     repetido: é justamente o que o número protege. */
   const now=Date.now(); if(last.c===sku && now-last.t<700) return; last={c:sku,t:now};
   /* CAIXA COM MAIS DE UMA PERSIANA: o bipe CONFERE uma peça, não imprime.
      Vem antes do "2º bipe = imprime" de propósito — numa caixa de três, bipar
@@ -262,16 +279,21 @@ async function scanSku(sku){
      pra impressora pularia as outras duas. Só quando não falta nenhuma o bipe
      volta a significar "imprime". */
   if(confirmar && confirmar._itens && confirmar._itens.length>1){
-    var faltamAntes=confirmar._itens.filter(function(i){ return !i.conferido_em; }).length;
+    var faltamAntes=confirmar._itens.reduce(function(s,i){ return s+Math.max(0,(i.qtd||1)-(i.conferidos||0)); },0);
     if(faltamAntes){
       var c=await (await fetch('/api/lote/conferir',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:confirmar.id,codigo:sku})})).json();
       if(c.erro){ banner('err','Não confere', c.erro
         +'<div style="font-size:14px;margin-top:6px">Bipe o SKU de uma das persianas desta caixa.</div>',
         '<button class="ghost" onclick="idle()">Cancelar</button>'); beep(false); return; }
-      confirmar._itens.forEach(function(i){
-        if(String(i.codigo||'').toUpperCase()===sku && !i.conferido_em){ i.conferido_em='agora'; }
-      });
+      /* O SERVIDOR é quem conta: a tela copia o `conferidos` que ele devolveu,
+         na MESMA linha que ele escolheu (a primeira deste SKU que ainda devia
+         peça). Incrementar por conta própria faria um bipe perdido no caminho
+         virar persiana dada como conferida na tela. */
+      var alvo=confirmar._itens.filter(function(i){
+        return String(i.codigo||'').toUpperCase()===String(c.codigo||'').toUpperCase()
+            && (i.conferidos||0)<(i.qtd||1); })[0];
+      if(alvo) alvo.conferidos=c.conferidos;
       telaPacote({pedido:confirmar,itens:confirmar._itens},'');
       return;
     }
