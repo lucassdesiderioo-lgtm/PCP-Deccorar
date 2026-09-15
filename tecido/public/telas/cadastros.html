@@ -242,7 +242,7 @@ async function carregarTecido(){
      linha vai o tecido novo". Nomes proprios porque sao perguntas diferentes.
 
      `linhaForm` pode apontar para linha INATIVA (o seletor oferece as duas,
-     ver `linhasDoFormulario`), mas NASCE na primeira ativa: o caso normal e
+     ver `comInativasNoFim`), mas NASCE na primeira ativa: o caso normal e
      cadastrar no que esta em uso, e abrir o formulario ja apontando para uma
      linha desativada seria oferecer o incomum por acidente. So precisa
      apontar para uma linha que EXISTE — apontar para id apagado deixaria o
@@ -256,27 +256,36 @@ async function carregarTecido(){
   estado.tecidos=await api('/api/tecidos');
 }
 
-/* ⚠️ O SELETOR DE LINHA DO FORMULARIO OFERECE AS INATIVAS TAMBEM.
-   Desativar uma linha e dizer "nao vendemos mais isto", nao "esta linha nao
-   existe": as colecoes dela continuam na tela, os rolos continuam na estante
-   e o historico continua apontando para ela. Sem as inativas no seletor,
-   cadastrar um item que faltou numa linha dessas exigia REATIVAR a linha,
-   cadastrar e desativar de novo — tres passos, e no meio deles a linha volta
-   a aparecer na entrada de rolo e no corte para a fabrica inteira.
+/* ⚠️ OS TRES SELETORES DO FORMULARIO OFERECEM AS INATIVAS TAMBEM — linha,
+   colecao e cor.
+
+   Desativar um cadastro e dizer "nao vendemos mais isto", nao "isto nao
+   existe": os rolos continuam na estante, as sobras continuam na prateleira e
+   o historico continua apontando para ele. Sem as inativas nos seletores,
+   cadastrar um item que faltou numa combinacao dessas exigia REATIVAR,
+   cadastrar e desativar de novo — tres passos, e no meio deles o cadastro
+   volta a aparecer na entrada de rolo e no corte para a fabrica inteira.
 
    Elas vao NO FIM e escritas "(inativa)", e essa marca nao e enfeite: as
    fileiras da entrada de rolo, do corte e das sobras olham o `ativo` DO
-   TECIDO, nunca o da linha (conferido em 15/09/2026). Entao um tecido novo
-   numa linha desativada aparece para a fabrica inteira no mesmo instante —
-   trazendo de volta uma linha que alguem desligou de proposito. Quem escolhe
-   tem que ver que escolheu isso; um nome igual ao das outras faria a pessoa
-   reabrir a linha sem perceber que reabriu.
+   TECIDO, nunca o da linha, o da colecao ou o da cor (conferido em
+   15/09/2026). Entao um tecido novo numa combinacao desativada aparece para a
+   fabrica inteira no mesmo instante — trazendo de volta um cadastro que
+   alguem desligou de proposito. Quem escolhe tem que ver que escolheu isso;
+   um nome igual ao das outras faria a pessoa reabrir sem perceber.
 
-   O servidor nunca exigiu linha ativa (`criarTecido` so exige que ela
-   exista), entao isto e a tela alcancando o que o dominio ja permitia. */
-const linhasDoFormulario=()=>
-  estado.linhas.filter(l=>l.ativo).concat(estado.linhas.filter(l=>!l.ativo))
-    .map(l=>({valor:l.id, nome:l.ativo?l.nome:l.nome+' (inativa)'}));
+   O servidor nunca exigiu cadastro ativo (`criarTecido` so exige que linha,
+   colecao e cor existam, e que a colecao seja da linha), entao isto e a tela
+   alcancando o que o dominio ja permitia.
+
+   As tres passam pela MESMA funcao porque a regra e a mesma: tres copias
+   divergiriam no dia em que uma delas mudasse a marca ou a ordem, e ai a
+   mesma tela diria que "(inativa)" quer dizer coisas diferentes em campos
+   vizinhos. (Linha, colecao e cor sao todas femininas — por isso uma marca
+   so serve para as tres.) */
+const comInativasNoFim=itens=>
+  itens.filter(i=>i.ativo).concat(itens.filter(i=>!i.ativo))
+    .map(i=>({valor:i.id, nome:i.ativo?i.nome:i.nome+' (inativa)'}));
 
 /* As colecoes do formulario trocam SEM redesenhar a tela: e so o seletor do
    lado que muda, e redesenhar tudo era justamente o que movia o formulario
@@ -285,10 +294,12 @@ async function colecoesDoFormulario(linha_id,refs){
   estado.linhaForm=Number(linha_id);
   estado.aberturasForm=linha_id?await api('/api/aberturas?linha_id='+linha_id):[];
   const s=limpar(refs.abertura_id);
-  const ativas=estado.aberturasForm.filter(a=>a.ativo);
-  if(ativas.length) ativas.forEach(a=>s.appendChild(el('option',{value:a.id,texto:a.nome})));
+  const opcoes=comInativasNoFim(estado.aberturasForm);
+  if(opcoes.length) opcoes.forEach(o=>s.appendChild(el('option',{value:o.valor,texto:o.nome})));
   // Select vazio nao diz nada e em alguns navegadores nem abre. A frase diz
-  // o que falta, no lugar onde a pessoa esta olhando.
+  // o que falta, no lugar onde a pessoa esta olhando. Ela so aparece quando
+  // nao ha colecao NENHUMA — nem inativa —, senao mandaria cadastrar o que
+  // ja existe e esta logo ali na lista.
   else s.appendChild(el('option',{value:'',texto:'— esta linha ainda nao tem colecao —'}));
 }
 
@@ -419,16 +430,16 @@ async function telaTecido(pai){
   cT.appendChild(el('p',{class:'ajuda',texto:
     '"Bobina mais comum" nao muda calculo nenhum: ela so deixa o botao ja marcado na entrada de rolo. Pode ficar em branco. "Pode girar" muda: tecido com sentido (textura, listra, desenho que corre) nao pode ser virado, entao a largura da peca tem que sair no sentido da largura da bobina.'}));
   if(podeEditar()){
-    const aberturasDaLinha=estado.aberturasForm.filter(a=>a.ativo);
+    // Os tres pela mesma regra: ativas primeiro, inativas no fim e marcadas.
+    const colecoes=comInativasNoFim(estado.aberturasForm);
     formulario(cT,[
       {id:'linha_id',rotulo:'Linha',valor:estado.linhaForm,
-       opcoes:linhasDoFormulario(),
+       opcoes:comInativasNoFim(estado.linhas),
        aoMudar:colecoesDoFormulario},
       {id:'abertura_id',rotulo:'Colecao',
-       opcoes:aberturasDaLinha.length
-         ? aberturasDaLinha.map(a=>({valor:a.id,nome:a.nome}))
+       opcoes:colecoes.length?colecoes
          : [{valor:'',nome:'— esta linha ainda nao tem colecao —'}]},
-      {id:'cor_id',rotulo:'Cor',opcoes:estado.cores.filter(c=>c.ativo).map(c=>({valor:c.id,nome:c.nome}))},
+      {id:'cor_id',rotulo:'Cor',opcoes:comInativasNoFim(estado.cores)},
       /* Escolha, nao digitacao — pelo mesmo motivo da entrada de rolo. Um
          campo de texto aqui deixaria entrar 2,5 e 2,50 como coisas
          diferentes, na tela que existe para padronizar o cadastro.
