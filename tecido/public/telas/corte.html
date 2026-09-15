@@ -61,7 +61,7 @@ const memoria={
   set(c,v){ try{ localStorage.setItem('corte_'+c,JSON.stringify(v)); }catch(e){} }
 };
 const estado={
-  tecidos:[], motivos:[], arvoreSobra:[],
+  tecidos:[], motivos:[], arvoreSobra:[], cores:[],
   tecido_id:memoria.get('tecido'),
   linhas:[{pedido:'',largura:'',altura:''},{pedido:'',largura:'',altura:''},{pedido:'',largura:'',altura:''}],
   recusadas:[], proposta:null,
@@ -83,6 +83,10 @@ async function telaEntrada(){
     estado.tecidos=await api('/api/tecidos');
     estado.motivos=await api('/api/motivos');
     estado.arvoreSobra=await api('/api/enderecos/SOBRA');
+    // Para o aviso da cor sem item de tecido. Vem junto dos tecidos e fica
+    // guardada como eles: as duas listas tem que envelhecer no mesmo passo,
+    // senao o aviso cobraria uma cor que a fileira ja mostra.
+    estado.cores=await api('/api/cores');
   }
   const pai=limpar($('#entrada'));
   const c=el('div',{class:'cartao naoImprime'});
@@ -110,6 +114,13 @@ async function telaEntrada(){
   c.appendChild(fileira('COLECAO',aberturas,abSel,v=>escolher(linhaSel,v,null)));
   c.appendChild(fileira('COR',cores,sel?sel.cor_id:null,v=>escolher(linhaSel,abSel,v)));
   c.appendChild(el('p',{class:'nota',texto:sel?('▸ '+[sel.linha_nome,sel.abertura_nome,sel.cor_nome].join(' · ')):'Escolha o tecido.'}));
+
+  // A cor cadastrada que ainda nao virou item de tecido — mesmo aviso da
+  // entrada de rolo e das sobras, escrito num lugar so (ui.js).
+  const avisoCor=window.ui.avisoCorSemItem(estado.cores, cores,
+    (linhas.find(x=>x.valor===linhaSel)||{}).nome,
+    (aberturas.find(x=>x.valor===abSel)||{}).nome);
+  if(avisoCor) c.appendChild(avisoCor);
 
   // A grade de medidas
   const tab=el('table',{class:'grade'});

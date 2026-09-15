@@ -702,11 +702,12 @@ que existe justamente para padronizar.
 que corre) não pode ser virado, então a largura da peça tem que sair no sentido
 da largura da bobina. `Não` é o padrão e vale para a maioria.
 
-### ⚠️ CADASTRAR A COR NÃO BASTA — e a entrada de rolo agora diz isso
+### ⚠️ CADASTRAR A COR NÃO BASTA — e as três telas agora dizem isso
 
-As fileiras LINHA / COLEÇÃO / COR da **entrada de rolo** (e as do corte e das
-sobras) **não leem a tabela `cor`**: elas saem dos **itens de tecido ativos**,
-porque o que se escolhe ali é um item que existe, e não uma combinação nova.
+As fileiras LINHA / COLEÇÃO / COR da **entrada de rolo**, do **corte** e das
+**sobras** (lançar e corrigir) **não leem a tabela `cor`**: elas saem dos
+**itens de tecido ativos**, porque o que se escolhe ali é um item que existe,
+e não uma combinação nova.
 
 A consequência é que uma cor recém-cadastrada simplesmente **não aparece**. A
 fileira fica mais curta, e mais nada — sem erro, sem aviso, sem lugar nenhum
@@ -733,13 +734,75 @@ Três decisões dentro dessa linha:
   responde a pergunta que ela acabou de fazer e diz em que tela se resolve.
 - **Ela nomeia as cores, e não corta a lista.** Truncar esconderia justamente
   a cor que a pessoa procura, que é o único motivo de a linha existir.
-- **A lista de cores não é cacheada** como as larguras e os fornecedores. O
-  que o aviso manda fazer acontece em *outra* tela; quem sai daqui, cadastra o
-  item e volta tem que ver a cor no lugar. Com cache veria o mesmo aviso e
-  concluiria que o cadastro não pegou.
+- **A lista de cores não é cacheada** na entrada de rolo, ao contrário das
+  larguras e dos fornecedores. O que o aviso manda fazer acontece em *outra*
+  tela; quem sai daqui, cadastra o item e volta tem que ver a cor no lugar.
+  Com cache veria o mesmo aviso e concluiria que o cadastro não pegou. (No
+  corte e nas sobras ela vem junto dos tecidos e envelhece com eles — as duas
+  listas têm que andar no mesmo passo, senão o aviso cobraria uma cor que a
+  fileira já mostra.)
 
 Ela some sozinha quando toda cor ativa já tem item naquela coleção — contador
 que nunca zera é contador que a equipe aprende a pular.
+
+> ⚠️ **`avisoCorSemItem`, no `public/ui.js`, é o DONO ÚNICO deste aviso.** Três
+> telas escrevendo a mesma frase cada uma do seu jeito ensinariam a equipe a
+> achar que são três situações diferentes — e a que esquecesse de citar a
+> coleção mandaria cadastrar o que já existe. Nas sobras ele mora dentro do
+> `fileirasTecido`, que já é o ponto comum do lançar e do corrigir.
+
+### ⚠️ O SELETOR DE LINHA DO FORMULÁRIO NÃO É O DO CARTÃO COLEÇÃO
+
+Até 15/09/2026 os dois eram a mesma variável (`estado.linhaSel`), e isso
+quebrava duas coisas de uma vez ao trocar a linha no formulário de item de
+tecido:
+
+| O que acontecia | Por quê |
+|---|---|
+| o formulário **saía do lugar** | o cartão Coleção, que fica **acima**, passava a listar as coleções da outra linha, mudava de altura e empurrava tudo embaixo dele — o campo seguinte saía de debaixo do dedo |
+| o select **voltava sozinho** para a primeira linha | a aba inteira era redesenhada e o select nascia sem valor, enquanto as coleções ao lado já eram as da linha escolhida |
+
+O segundo é o caro: o formulário passava a descrever `Double Vision` + uma
+coleção do `Rolô`, e salvar batia em `abertura_de_outra_linha` — uma recusa
+que não tinha como fazer sentido para quem leu a tela.
+
+São perguntas diferentes e agora são variáveis diferentes: `linhaSel` é *"de
+qual linha estou editando as coleções"*, `linhaForm` é *"em qual linha entra o
+tecido novo"*. Trocar a linha no formulário **não redesenha mais a tela** —
+repovoa só o seletor de Coleção ao lado, que é a única coisa que muda.
+
+> **`formulario()` passou a aceitar um valor inicial**, e é isso que mantém a
+> linha escolhida no campo. Sem ele o select nasce sempre no primeiro item,
+> mesmo quando a tela já sabe qual é a escolha — e o campo mostra uma coisa
+> enquanto o resto do formulário descreve outra.
+
+> **Linha sem coleção nenhuma escreve "— esta linha ainda não tem coleção —"**
+> no lugar de um select vazio, que não diz nada e em alguns navegadores nem
+> abre.
+
+### O preço do m² se lança no cadastro do tecido
+
+Até 15/09/2026 a única porta era **Sobras → Catálogo**, e ela lista só tecido
+que **já tem sobra** (`resumo.filter(r => r.sobras > 0)`). O tecido
+recém-cadastrado, que nunca produziu retalho, **não tinha onde receber preço
+nenhum** — e sem preço ele nunca entra na conta do acervo, nem no dia em que a
+primeira sobra aparecer. Mesmo beco da cor: a tela sabia mostrar o traço na
+coluna `R$/m²` e não sabia deixar ninguém preencher.
+
+Agora cada linha do Item de tecido tem botão **Preço** (`Preço ⚠` quando
+falta), com a mesma sugestão de *último preço pago por rolo* e o mesmo
+histórico de quem mudou, quando, de → para.
+
+> ⚠️ **As duas portas chamam a MESMA rota** (`PUT /api/tecidos/:id/preco`).
+> Não há segundo caminho de escrita no preço — seria a armadilha #12 outra vez,
+> duas telas certas cada uma na sua régua.
+
+> Quem não tem `custo.ver` não vê a coluna nem o botão, e **o JSON já vem sem o
+> campo** — a poda é do servidor (regra 14 do §13 do `CLAUDE.md`). O botão
+> também exige `cadastro.editar`: preço é cadastro.
+
+Embaixo da tabela, quantos tecidos ativos estão sem preço — é a conta que
+explica por que o valor do acervo sai como **piso** (`≥`).
 
 ---
 

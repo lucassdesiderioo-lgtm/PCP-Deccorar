@@ -91,5 +91,45 @@ function comoNumero(texto){
   return isFinite(n)?n:null;
 }
 
-window.ui={api,banner,beep,formatarMedida,formatarMetros,formatarArea,dinheiro,num,$,$$,el,limpar,comoNumero};
+/* ── A COR CADASTRADA QUE NAO VIRA BOTAO ──────────────────────────────────
+   As fileiras LINHA/COLECAO/COR da entrada de rolo, do corte e das sobras
+   NAO leem a tabela de cores: elas saem dos ITENS DE TECIDO ativos, porque
+   o que se escolhe ali e um item que existe, e nao uma combinacao nova. A
+   consequencia e que uma cor recem-cadastrada simplesmente nao aparece — a
+   fileira fica mais curta, e mais nada.
+
+   Isso e um beco: quem esta com o rolo (ou a peca) na mao procura a cor, nao
+   acha, e nao tem como saber que falta o item de tecido. A saida que sobra e
+   bipar a cor parecida so para o sistema aceitar, e a partir dali o estoque
+   do tecido errado e que anda — a armadilha #6 do CLAUDE.md na letra: trava
+   que dispara no caso normal vira desvio, fora da vista do sistema.
+
+   ⚠️ DONO UNICO DAS TRES TELAS. Tres telas escrevendo este aviso cada uma do
+   seu jeito ensinariam a equipe a achar que sao tres situacoes diferentes —
+   e a que esquecesse de contar a colecao no texto mandaria cadastrar o que
+   ja existe.
+
+   O aviso NAO e alarme (nao e vermelho) e nao pede providencia de quem esta
+   ali: quem da entrada no rolo ou corta pode nem ter `cadastro.editar`. Ele
+   responde a pergunta que a pessoa acabou de fazer e diz em que tela se
+   resolve. E nomeia as cores que faltam SEM cortar a lista — truncar
+   esconderia justamente a cor que a pessoa procura, que e o unico motivo de
+   a linha existir. Devolve `null` quando nao falta nenhuma: contador que
+   nunca zera e contador que a equipe aprende a pular. */
+function avisoCorSemItem(cadastradas, naFileira, nomeLinha, nomeColecao){
+  const faltando=(cadastradas||[]).filter(k=>k.ativo&&
+    !(naFileira||[]).some(x=>String(x.valor)===String(k.id)));
+  if(!faltando.length) return null;
+  const onde=(nomeLinha&&nomeColecao)?(' em '+nomeLinha+' · '+nomeColecao):'';
+  const nomes=faltando.map(k=>k.nome).join(', ');
+  return el('p',{class:'ajuda',texto:
+    'Procurando uma cor que nao esta nos botoes? '+
+    (faltando.length===1
+      ? nomes+' esta cadastrada, mas nao existe'+onde+'.'
+      : nomes+' estao cadastradas, mas nao existem'+onde+'.')+
+    ' A cor so vira botao aqui depois que existe o ITEM DE TECIDO '+
+    '(linha · colecao · cor) — cadastre em Cadastros → Tecido → Item de tecido.'});
+}
+
+window.ui={api,banner,beep,formatarMedida,formatarMetros,formatarArea,dinheiro,num,$,$$,el,limpar,comoNumero,avisoCorSemItem};
 })();
