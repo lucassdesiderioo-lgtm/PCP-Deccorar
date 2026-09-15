@@ -22,7 +22,11 @@ function montar(){
   const aR=endereco.criarAndar({nome:'01',haste_id:hR.id});
   const nR=endereco.criarNivel({nome:'01',andar_id:aR.id});
 
-  cena={tecido:t, nivelSobra:nS.id, nivelRolo:nR.id};
+  /* UM BURACO NOVO A CADA TUBO. Cada nivel guarda um rolo so — uma cena com
+     varios rolos precisa de varios niveis, como a prateleira de verdade. */
+  let seq=1;
+  cena={tecido:t, nivelSobra:nS.id, nivelRolo:nR.id,
+        buraco:()=>endereco.criarNivel({nome:String(++seq).padStart(2,'0'),andar_id:aR.id}).id};
   return cena;
 }
 
@@ -363,7 +367,7 @@ module.exports=[
 {nome:'a sobra que nasce de um rolo COM NOTA herda o preco pago — e ele vence o do tecido', executar({perto,igual}){
   const c=montar();
   const rolo=require('../dominio/rolo');
-  const r=rolo.entrada({tecido_id:c.tecido.id,largura:'2,00',metragem:'30',nivel_id:c.nivelRolo,preco_m2:'15'},'Diretor');
+  const r=rolo.entrada({tecido_id:c.tecido.id,largura:'2,00',metragem:'30',nivel_id:c.buraco(),preco_m2:'15'},'Diretor');
   const s=sobra.criar({codigo:'S-000010',tecido_id:c.tecido.id,largura:'1,00',altura:'1,00',
     condicao:'integra',nivel_id:c.nivelSobra,origem:'rolo',origem_rolo_id:r.id},'Ana');
   perto(s.preco_rolo_m2,15,'herdou o pago');
@@ -385,7 +389,7 @@ module.exports=[
 {nome:'a nota do rolo chegou DEPOIS do corte: as sobras dele passam a valer pelo pago', executar({perto,igual}){
   const c=montar();
   const rolo=require('../dominio/rolo');
-  const r=rolo.entrada({tecido_id:c.tecido.id,largura:'2,00',metragem:'30',nivel_id:c.nivelRolo},'Ana');
+  const r=rolo.entrada({tecido_id:c.tecido.id,largura:'2,00',metragem:'30',nivel_id:c.buraco()},'Ana');
   const s=sobra.criar({codigo:'S-000012',tecido_id:c.tecido.id,largura:'1,00',altura:'1,00',
     condicao:'integra',nivel_id:c.nivelSobra,origem:'rolo',origem_rolo_id:r.id},'Ana');
   igual(s.preco_rolo_m2,null,'rolo sem nota: nada a herdar');
@@ -405,7 +409,7 @@ module.exports=[
   const cor=tecido.criarCor({nome:'Preto Sem Preco'});
   const t=tecido.criarTecido({linha_id:c.tecido.linha_id,abertura_id:c.tecido.abertura_id,cor_id:cor.id});
   const rolo=require('../dominio/rolo');
-  const r=rolo.entrada({tecido_id:t.id,largura:'2,00',metragem:'10',nivel_id:c.nivelRolo,preco_m2:'10'},'Diretor');
+  const r=rolo.entrada({tecido_id:t.id,largura:'2,00',metragem:'10',nivel_id:c.buraco(),preco_m2:'10'},'Diretor');
   sobra.criar({codigo:'S-000013',tecido_id:t.id,largura:'1,00',altura:'1,00',condicao:'integra',nivel_id:c.nivelSobra},'Ana');
   etiqueta.imprimirLote(2,'Diretor');   // S-000014, S-000015
   sobra.criar({codigo:'S-000014',tecido_id:t.id,largura:'1,00',altura:'2,00',condicao:'integra',nivel_id:c.nivelSobra,

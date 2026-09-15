@@ -24,7 +24,13 @@ function montar(){
   const hS=endereco.criarHaste({nome:'C',armazem_chave:'SOBRA'});
   const anS=endereco.criarAndar({nome:'1',haste_id:hS.id});
   const nS=endereco.criarNivel({nome:'1',andar_id:anS.id});
-  cena={t,n1:n1.id,n2:n2.id,nSobra:nS.id};
+  /* UM BURACO NOVO A CADA TUBO. Cada nivel guarda um rolo so, e a cena e
+     compartilhada entre os casos — o tubo do caso anterior continua na
+     estante. `n1` e `n2` sao do primeiro caso, que confere o endereco escrito
+     por extenso; os outros pedem um buraco proprio. */
+  let seq=2;
+  cena={t,n1:n1.id,n2:n2.id,nSobra:nS.id,
+    buraco:()=>endereco.criarNivel({nome:String(++seq),andar_id:an.id}).id};
   return cena;
 }
 const novoRolo=(x,nivel)=>rolo.entrada(
@@ -54,15 +60,19 @@ module.exports=[
 
 {nome:'o saldo nao e tocado por uma mudanca de lugar', executar({perto}){
   const x=montar();
-  const r=novoRolo(x,x.n1);
-  rolo.mover(r.id,x.n2,'Zeca');
+  const r=novoRolo(x,x.buraco());
+  rolo.mover(r.id,x.buraco(),'Zeca');
   perto(rolo.porId(r.id).saldo,48.5,'saldo intacto');
 }},
 
 {nome:'mover para o MESMO lugar nao vira linha de historico', executar({recusa,igual}){
   const x=montar();
-  const r=novoRolo(x,x.n1);
-  recusa(()=>rolo.mover(r.id,x.n1,'Zeca'),'mesmo_endereco');
+  const n=x.buraco();
+  const r=novoRolo(x,n);
+  /* O proprio rolo nao "ocupa" o endereco contra ele mesmo: quem repete o
+     lugar onde ja esta le que o rolo ja esta la, e nao que o buraco esta
+     cheio — por ele. */
+  recusa(()=>rolo.mover(r.id,n,'Zeca'),'mesmo_endereco');
   igual(rolo.movimentos(r.id).filter(m=>m.motivo==='mudanca_endereco').length,0,
     'nenhuma linha gravada');
   // Historico cheio de linha que nao conta nada e historico que ninguem le —
@@ -71,7 +81,7 @@ module.exports=[
 
 {nome:'rolo NAO vai para a estante das sobras', executar({recusa}){
   const x=montar();
-  const r=novoRolo(x,x.n1);
+  const r=novoRolo(x,x.buraco());
   recusa(()=>rolo.mover(r.id,x.nSobra,'Zeca'),'armazem_errado');
   // A mesma trava da entrada. Sem ela o rolo sumiria da tela de rolos e
   // apareceria como endereco de sobra, que nenhuma tela sabe ler.
@@ -79,9 +89,9 @@ module.exports=[
 
 {nome:'rolo ENCERRADO nao volta para a estante', executar({recusa}){
   const x=montar();
-  const r=novoRolo(x,x.n1);
+  const r=novoRolo(x,x.buraco());
   rolo.encerrar(r.id,'Lucas');
-  recusa(()=>rolo.mover(r.id,x.n2,'Zeca'),'rolo_encerrado');
+  recusa(()=>rolo.mover(r.id,x.buraco(),'Zeca'),'rolo_encerrado');
   // Rolo encerrado e tubo vazio. Endereca-lo faria a estante do sistema ter
   // um rolo que fisicamente nao existe mais.
 }},

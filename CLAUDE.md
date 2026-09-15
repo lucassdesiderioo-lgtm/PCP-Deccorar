@@ -2219,7 +2219,18 @@ com a margem nascendo **zero** para não virar fato inventado.
 `tecido/dominio/gerencial.js` é o dono único de **mínimo, status e faixas**. Ele
 não calcula consumo nem valor: compõe o `giro.js` e o `custo.js`.
 
-### Duas regras do sob medida que valem citar aqui
+### Três regras do sob medida que valem citar aqui
+
+**Cada nível guarda um rolo só.** Regra do dono, 15/09/2026: `Haste A · Andar 1
+· Nível 1` é um buraco, e no buraco cabe **um** tubo de tecido novo. O andar
+tem quantos níveis a prateleira tiver — guardar mais material é criar mais
+nível. O buraco se esvazia **sozinho**, por dois caminhos e só esses dois: o
+tubo mudou de lugar (Mover) ou o material acabou (Rolo acabou, que encerra) —
+rolo encerrado não ocupa. **A sobra não tem essa trava**: retalho dobrado é
+achado pela etiqueta, não pelo endereço. O que já estava duplicado antes da
+regra não é recusado; vira checagem no painel gerencial, pelo mesmo motivo de
+sempre — trava que dispara no caso normal vira desvio (armadilha #6). Detalhe
+no `tecido/README.md`.
 
 **Não há emenda.** Peça mais larga que toda bobina do estoque não sai — e por
 isso a recusa vira número de compra, não recado: o plano devolve `falta_bobina`
@@ -2232,7 +2243,7 @@ cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 194 casos
+cd tecido && npm test          # 222 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:

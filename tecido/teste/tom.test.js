@@ -31,7 +31,11 @@ function montarBase(){
   const aS=endereco.criarAndar({nome:'01',haste_id:hS.id});
   const nS=endereco.criarNivel({nome:'01',andar_id:aS.id});
   etiqueta.imprimirLote(60,'teste');
-  base={linha, abertura, nivelRolo:nR.id, nivelSobra:nS.id};
+  /* UM BURACO NOVO A CADA TUBO. Cada nivel guarda um rolo so — uma cena com
+     varios rolos precisa de varios niveis, como a prateleira de verdade. */
+  let seq=1;
+  base={linha, abertura, nivelRolo:nR.id, nivelSobra:nS.id,
+        buraco:()=>endereco.criarNivel({nome:String(++seq).padStart(2,'0'),andar_id:aR.id}).id};
   return base;
 }
 function novaSobra(x,largura,altura){
@@ -45,7 +49,7 @@ module.exports=[
 
 {nome:'as tres pecas do pedido cabem na sobra: usa a sobra', executar({igual}){
   const x=cena();
-  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.nivelRolo},'teste');
+  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
   novaSobra(x,2.90,2.60);      // comporta as tres lado a lado
 
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
@@ -60,7 +64,7 @@ module.exports=[
 
 {nome:'A REGRA: uma na sobra e duas na bobina NAO acontece', executar({igual}){
   const x=cena();
-  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.nivelRolo},'teste');
+  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
   // Sobra que comporta UMA peca so. Sem a regra do tom, o plano poria uma
   // aqui e as outras duas no rolo — tres persianas da mesma casa, dois tons.
   novaSobra(x,1.00,2.60);
@@ -78,7 +82,7 @@ module.exports=[
 
 {nome:'pedidos diferentes podem usar fontes diferentes', executar({igual}){
   const x=cena();
-  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.nivelRolo},'teste');
+  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
   // A sobra de 1,00 x 2,60 serve para o pedido de UMA peca: ali nao ha com
   // quem combinar tom.
   novaSobra(x,1.00,2.60);
@@ -98,7 +102,7 @@ module.exports=[
 
 {nome:'peca SEM pedido e livre — nao precisa combinar com ninguem', executar({igual}){
   const x=cena();
-  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.nivelRolo},'teste');
+  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
   novaSobra(x,1.00,2.60);
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
     {largura:'0,90',altura:'2,50'},
@@ -115,7 +119,7 @@ module.exports=[
   // Rolo de 3,00 com saldo curto: 4 pecas de 2,40 de altura pediriam 9,60 m
   // e o saldo nao cobre. O pedido inteiro volta, e o motivo explica que
   // pecas do mesmo pedido nao se separam.
-  const r=rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'3',nivel_id:x.nivelRolo},'teste');
+  const r=rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'3',nivel_id:x.buraco()},'teste');
 
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
     {pedido:'7777',largura:'2,90',altura:'2,40'},
@@ -132,9 +136,9 @@ module.exports=[
   // O caso real: o pedido 4272 tem 11 persianas e o arquivo do dia trouxe
   // so 9. As outras duas foram cortadas antes. Cada plano, sozinho, estava
   // certo — e mesmo assim a casa receberia dois tons.
-  const bom=rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.nivelRolo},'teste');
+  const bom=rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
   // Um rolo mais economico para estas medidas, que venceria a simulacao.
-  rolo.entrada({tecido_id:x.t.id,largura:'2,00',metragem:'50',nivel_id:x.nivelRolo},'teste');
+  rolo.entrada({tecido_id:x.t.id,largura:'2,00',metragem:'50',nivel_id:x.buraco()},'teste');
 
   // DIA 1: as duas primeiras pecas do pedido.
   const dia1=[{pedido:'4272',largura:'1,495',altura:'2,730'},
@@ -161,7 +165,7 @@ module.exports=[
 
 {nome:'pedido novo nao herda rolo de outro pedido', executar({igual}){
   const x=cena();
-  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.nivelRolo},'teste');
+  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
     {pedido:'9999',largura:'1,00',altura:'2,00'}]});
   igual(p.continuando_em,null,'sem historico, escolhe livremente');
@@ -192,7 +196,7 @@ module.exports=[
 {nome:'PECA MAIS LARGA QUE A BOBINA: o plano grita, e vira pedido de compra',
  executar({igual,perto}){
   const x=cena();
-  rolo.entrada({tecido_id:x.t.id,largura:'2,00',metragem:'50',nivel_id:x.nivelRolo},'teste');
+  rolo.entrada({tecido_id:x.t.id,largura:'2,00',metragem:'50',nivel_id:x.buraco()},'teste');
 
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
     {largura:'1,20',altura:'2,00'},     // esta sai
@@ -214,7 +218,7 @@ module.exports=[
 
 {nome:'com bobina larga o bastante, nao ha falta nenhuma', executar({igual}){
   const x=cena();
-  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.nivelRolo},'teste');
+  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
   const p=plano.calcular({tecido_id:x.t.id,pecas:[{largura:'2,40',altura:'1,50'}]});
   igual(p.falta_bobina,null,'null, e nao um objeto vazio');
   // Tarja de alarme que aparece sem alarme e tarja que a equipe aprende a

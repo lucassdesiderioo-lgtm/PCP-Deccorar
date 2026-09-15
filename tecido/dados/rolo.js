@@ -113,5 +113,38 @@ const divergencias=()=>db.prepare(`
 const atualizarEndereco=(id,nivel_id)=>
   db.prepare('UPDATE rolo SET nivel_id=? WHERE id=?').run(nivel_id,id);
 
+/* ── QUEM ESTA NESTE BURACO ───────────────────────────────────────────────
+   Um nivel guarda UM rolo (regra do dono). Quem OCUPA e o rolo que esta na
+   estante — aberto ou fechado.
+
+   O ENCERRADO NAO OCUPA, e e essa linha que faz o endereco "ficar vazio
+   quando o material acaba": o tubo vazio nao guarda lugar. Contar o encerrado
+   aqui deixaria o buraco preso a um rolo que fisicamente nao existe mais, e a
+   bancada teria que pedir para alguem apagar alguma coisa antes de poder por
+   o proximo tubo — que e o desvio da armadilha #6 outra vez. */
+const NA_ESTANTE="r.status IN ('aberto','fechado')";
+
+/* Colunas magras DE PROPOSITO: nem `ocupante` nem `ocupacao` trazem preco.
+   Quem so precisa saber "este buraco esta cheio" nao precisa do valor do
+   estoque, e campo de preco que viaja pelo fio sem necessidade e o buraco que
+   a poda do custo.js existe para fechar (regra 14 do CLAUDE.md §13). */
+const OCUPACAO=`r.nivel_id, r.id AS rolo_id, r.codigo, r.largura, r.saldo, r.status,
+  l.nome AS linha_nome, a.nome AS abertura_nome, c.nome AS cor_nome`;
+const DE_OCUPACAO=`FROM rolo r
+  JOIN tecido t ON t.id=r.tecido_id
+  JOIN linha l ON l.id=t.linha_id
+  JOIN abertura a ON a.id=t.abertura_id
+  JOIN cor c ON c.id=t.cor_id`;
+
+const ocupante=(nivel_id,exceto_rolo_id)=>db.prepare('SELECT '+OCUPACAO+' '+DE_OCUPACAO+
+  ' WHERE r.nivel_id=? AND '+NA_ESTANTE+
+  (exceto_rolo_id?' AND r.id<>?':'')+' ORDER BY r.id LIMIT 1')
+  .get(...(exceto_rolo_id?[nivel_id,exceto_rolo_id]:[nivel_id]));
+
+// A estante inteira, para a tela saber qual botao esta livre ANTES do toque.
+const ocupacao=()=>db.prepare('SELECT '+OCUPACAO+' '+DE_OCUPACAO+
+  ' WHERE r.nivel_id IS NOT NULL AND '+NA_ESTANTE+' ORDER BY r.nivel_id, r.id').all();
+
 module.exports={ultimoSeq,listar,porId,porCodigo,disponiveis,criar,gravarSaldo,
-  atualizarEndereco,atualizarDados,movimentar,movimentos,saldoPorTecido,divergencias};
+  atualizarEndereco,atualizarDados,movimentar,movimentos,saldoPorTecido,divergencias,
+  ocupante,ocupacao};
