@@ -483,6 +483,37 @@ bancada procurar no escuro.
 > quantas persianas vão na caixa. Soltar ali mandaria a caixa embora com a peça
 > a mais não conferida — o buraco que a trava existe para fechar.
 
+### Os volumes que entraram ANTES disto: `backfill_pacote.js`
+
+Volume gravado até 15/09/2026 conhece só o item de cima — as peças do irmão não
+existem em lugar nenhum do sistema. `node backfill_pacote.js` relê os PDFs ainda
+no servidor pela mesma régua, e **separa os dois casos, que não são o mesmo**:
+
+| Estágio | O que o saldo diz | O que fazer |
+|---|---|---|
+| **pendente** | a etiqueta não saiu, **nada baixou** | só gravar as peças — o fluxo novo faz o resto |
+| **embalado** | a etiqueta saiu e baixou **uma** peça | falta baixar o resto, **se elas foram na caixa** |
+
+> ⚠️ **O AJUSTE DE SALDO FICA ATRÁS DE `--baixar`, E É DE PROPÓSITO.** No volume
+> já impresso o script não tem como saber se a peça a mais entrou na caixa ou
+> continua na prateleira — e os dois mundos pedem coisas opostas. Se ela nunca
+> saiu, **o saldo está certo** e baixar abre um buraco em vez de fechar. Confira
+> a caixa antes. O ajuste vai para `ajuste_estoque` com motivo, quem e quando,
+> como todo ajuste manual (§18), e a observação diz de qual volume e de qual
+> cliente — daqui a um mês ninguém lembra por que o saldo andou sem venda.
+
+```bash
+node backfill_pacote.js                     # só mostra
+node backfill_pacote.js --aplicar           # grava as peças
+node backfill_pacote.js --aplicar --baixar  # e acerta o saldo dos já impressos
+```
+
+Faz backup por `db.backup()` antes de gravar, e é idempotente: só olha volume
+que ainda está na fábrica e que **não tem** peças gravadas. Volume já carregado
+fica de fora — saiu por onde saiu, e mexer no saldo por causa dele hoje
+carimbaria uma saída que aconteceu noutro dia (a regra dos três scripts de
+passivo, §5).
+
 **Rode `node teste_parse.js` (casos 17 e 18), `node teste_divergencia.js` (os
 últimos 10 casos são o pacote) e `node teste_etiqueta.js` (os últimos 12) após
 mexer nisso.** Para achar os casos nos PDFs do servidor:
