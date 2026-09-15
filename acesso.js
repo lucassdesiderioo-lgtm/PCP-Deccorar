@@ -163,6 +163,32 @@ module.exports = function(app, db){
     })();
   }catch(e){ console.log('[acesso] seed de setores falhou: '+e.message); }
 
+  /* ── 3-B. chave NOVA em banco que JA EXISTE ──
+     O seed acima so grava as permissoes quando o setor NASCE (`changes > 0`).
+     Numa instalacao limpa o setor Admin ja nasce com 'pacote.assinar' (ele
+     entra por `nivel==='admin'`); em producao o setor existe ha meses, o seed
+     nao mexe nele, e a chave nova nunca chegaria a ninguem — o card apareceria
+     em Bloqueados e daria 403 para todo mundo, sem erro, sem log e sem
+     ninguem saber por que. E a armadilha #13 por outra porta: la o acesso
+     sumia sozinho, aqui ele nem chega a existir.
+
+     Quem recebe: os setores que JA resolvem divergencia na mesma aba
+     ('sku.cadastrar'). Ninguem ganha o que nao tinha — e a mesma gente, na
+     mesma tela, decidindo sobre o mesmo volume retido.
+
+     Roda UMA VEZ (marca em `config`): quem desmarcar a caixinha depois nao a
+     ve voltar no proximo boot, senao a decisao de quem gerencia acesso seria
+     desfeita a cada restart. */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='seed_pacote_assinar'").get()){
+      db.transaction(() => {
+        db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
+          SELECT setor_id,'pacote.assinar' FROM setor_permissao WHERE chave='sku.cadastrar'`).run();
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('seed_pacote_assinar','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[acesso] seed de pacote.assinar falhou: '+e.message); }
+
   // ── resolvedor do modelo NOVO: permissoes efetivas de um usuario (secao 2) ──
   function permissoesDe(uid){
     const setores = db.prepare(`SELECT s.nivel FROM usuario_setor us
@@ -442,6 +468,12 @@ module.exports = function(app, db){
     // Fechar a coleta com o motorista e ato da mesma bancada que bipa a caixa:
     // quem carrega e quem confere o numero na frente do caminhao.
     if(M !== 'GET' && pre('/api/coleta')) return 'carregamento.executar';
+    /* O bipe das pecas da caixa de pacote (§5, #23) acontece na BANCADA da
+       Etiqueta de Venda, nao no upload — e sem ele a impressao e recusada.
+       Cair no `pre('/api/lote')` abaixo o deixaria em 'pdf.subir', e quem tem
+       so 'etiqueta.emitir' nao conseguiria conferir NEM imprimir: a trava
+       trancaria a propria bancada que ela existe para proteger. */
+    if(M !== 'GET' && eq('/api/lote/conferir')) return 'etiqueta.emitir';
     if(M !== 'GET' && pre('/api/lote')) return 'pdf.subir';
     if(pre('/api/print')) return 'etiqueta.emitir';
     // Reimpressao: mesma bancada, mesma permissao de imprimir. A LEITURA tambem
@@ -456,6 +488,13 @@ module.exports = function(app, db){
     // Etiqueta em formato desconhecido (§8-B): ver e decidir se a caixa vai
     // pro carro ou pro caminhao da coleta e da GESTAO, por regra do dono.
     if(pre('/api/modalidade')) return '@admin';
+    /* Pacote (§5, armadilha #23): a terceira trava da aba Bloqueados, e a unica
+       das tres com chave PROPRIA. As outras duas decidem qual peca e essa
+       (sku.cadastrar) e por onde a caixa sai ('@admin'); esta decide QUANTAS
+       persianas vao dentro e, com isso, quantas baixam do estoque na impressao.
+       VER continua '@admin', como o resto da aba. */
+    if(M !== 'GET' && pre('/api/pacote')) return 'pacote.assinar';
+    if(pre('/api/pacote')) return '@admin';
     if(eq('/api/auditoria/skus')) return '@admin';
     if(M !== 'GET' && eq('/api/devolucao')) return 'devolucao.registrar';
     if(M !== 'GET' && eq('/api/devolucao/baixa')) return 'devolucao.baixar';
@@ -645,6 +684,7 @@ module.exports = function(app, db){
     ['GET','/api/impressos'],['POST','/api/reimprimir'],
     ['GET','/api/divergencias'],['POST','/api/divergencias/resolver'],
     ['GET','/api/modalidade/pendentes'],['POST','/api/modalidade/resolver'],['GET','/api/coleta/foto/:id'],
+    ['GET','/api/pacote/pendentes'],['POST','/api/pacote/resolver'],['POST','/api/lote/conferir'],
     ['GET','/api/auditoria/skus'],['POST','/api/devolucao'],
     ['POST','/api/devolucao/baixa'],['POST','/api/estoque'],['POST','/api/alvo'],
     ['POST','/api/producao'],['POST','/api/planejamento/importar'],['POST','/api/skus'],['DELETE','/api/skus/:c'],

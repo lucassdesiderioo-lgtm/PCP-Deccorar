@@ -490,6 +490,35 @@ liberar é trava que a equipe aprende a contornar. A trava do §6 vale **para ca
 peça**, não só para o `lote.codigo`. A decisão vira história
 (`bloqueio_resolvido`, `resolvido_por`, `resolvido_em`) e vai para a auditoria.
 
+> ⚠️ **ASSINAR TEM CHAVE PRÓPRIA (`pacote.assinar`), E É A ÚNICA DAS TRÊS
+> TRAVAS DA ABA QUE TEM.** As outras duas respondem perguntas menores:
+> divergência é *qual peça é essa* (`sku.cadastrar`) e modalidade é *por onde a
+> caixa sai* (`@admin`). Assinar responde **quantas persianas vão dentro** — e é
+> essa lista que a Etiqueta de Venda cobra no bipe e que baixa do estoque, peça
+> por peça. É `sensivel`, como `estoque.editar`, pelo mesmo motivo: mexe no
+> saldo sem venda na frente, e a assinatura é o único rastro de por quê.
+> **Ver** a caixa retida continua `@admin`, como o resto da aba: esconder a
+> lista de quem abre Bloqueados não protegeria nada e deixaria a caixa parada
+> sem ninguém saber que ela existe.
+>
+> **São três pontas, e a que some em silêncio é a terceira** (é a armadilha #13
+> do §19 por outra porta): a chave em `permissoes.js`, a rota em `permDaRota()`
+> do `acesso.js`, e **alguém que tenha a chave**. O seed de setores só grava
+> quando o setor **nasce** — num banco que já existe, chave nova não chega a
+> ninguém, e a tela dá 403 para todo mundo sem erro e sem log. Por isso há o
+> backfill de uma vez só (seção 3-B do `acesso.js`, marcado em
+> `config.seed_pacote_assinar`): quem já resolve divergência passa a assinar,
+> ninguém ganha o que não tinha, e quem desmarcar a caixinha depois não a vê
+> voltar no próximo boot.
+>
+> O bipe das peças (`POST /api/lote/conferir`) é da **bancada**, não do upload:
+> `etiqueta.emitir`. Deixá-lo cair no `pre('/api/lote')` → `pdf.subir` trancaria
+> a própria bancada que a trava existe para proteger — quem só tem
+> `etiqueta.emitir` não conferiria nem imprimiria.
+>
+> **Rode `node teste_acesso.js` ao mexer em `permissoes.js` ou no `permDaRota()`**
+> — os 27 casos travam as três pontas, o backfill e a lista de cobertura.
+
 **3. Etiqueta de Venda: sem o bipe de TODAS as peças, não imprime.** Tela âmbar
 própria (`📦 ESTA CAIXA LEVA 3 PERSIANAS`), uma linha por peça com o que ela é
 (`120 × 120 cm · Bege · Blackout · Rolô`, do mesmo `pecaTexto`), e o bipe marca
@@ -1632,7 +1661,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (17 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (17 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16) e `teste_acesso.js` (27); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
@@ -1668,6 +1697,11 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   item na folha): ali é leitura quebrada, não peça a mais (§5, armadilha #23)
 - ❌ Deixar cadastro de SKU soltar volume retido por `pacote:` — cadastro não
   responde quantas persianas vão na caixa (§5, armadilha #23)
+- ❌ Declarar chave nova em `permissoes.js` sem a linha no `permDaRota()` **e**
+  sem o backfill de quem já devia tê-la: a rota fica em `@logado` ou a tela dá
+  403 para todo mundo, nos dois casos sem erro e sem log (§5, armadilha #23)
+- ❌ Deixar `POST /api/lote/conferir` cair no `pre('/api/lote')` → `pdf.subir`:
+  o bipe das peças é da bancada da etiqueta, e sem ele ela não imprime (§5, #23)
 - ❌ Tratar NF repetida como duplicidade: a nota é do **pedido**, e o cliente com
   três persianas tem três vendas e uma nota só (§5, armadilha #22)
 - ❌ Deixar o mapa `danfeByNf` sem guarda: a última folha da nota vence e a

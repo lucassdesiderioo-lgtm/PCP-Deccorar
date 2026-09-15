@@ -2100,7 +2100,12 @@ document.addEventListener("click",async function(e){
   try{
     var r=await (await fetch("/api/pacote/resolver",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({id:vid,itens:itens})})).json();
-    if(r.erro) alert(r.erro);
+    /* Assinar tem permissao propria ('pacote.assinar'). Quem abre Bloqueados e
+       nao a tem ve o card e a caixa retida — ver e do admin —, mas nao assina.
+       "sem_permissao" cru mandaria a pessoa procurar defeito no sistema; a
+       frase diz o que falta e a quem pedir. */
+    if(r.erro==="sem_permissao") alert("Você não tem permissão para assinar as peças de uma caixa.\n\nPeça a quem gerencia acessos a permissão “Assinar peças de caixa com várias persianas”.");
+    else if(r.erro) alert(r.erro);
   }catch(err){ alert(String(err)); }
   ok.disabled=false;
   carregarBloq();

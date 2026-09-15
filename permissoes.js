@@ -23,6 +23,16 @@ module.exports = [
     rotulo:'Emitir NF de venda',  desc:'Imprimir etiqueta e dar baixa no estoque' },
   { chave:'carregamento.executar',grupo:'Expedição',  nivel:'operacao',
     rotulo:'Carregar veículo',    desc:'Conferir volumes por bipe' },
+  /* Pacote (§5, armadilha #23). Quem ASSINA nao esta destravando um volume: esta
+     dizendo QUANTAS persianas e QUAIS vao dentro da caixa — e e essa lista que
+     a Etiqueta de Venda cobra no bipe e que baixa do estoque, peca por peca.
+     Chave propria, nivel admin e `sensivel` pelo mesmo motivo de 'estoque.editar':
+     a assinatura mexe no saldo sem venda na frente, e o unico rastro do porque e
+     quem assinou. Ver a caixa retida continua sendo '@admin' (a aba Bloqueados). */
+  { chave:'pacote.assinar',       grupo:'Expedição',  nivel:'admin',
+    rotulo:'Assinar peças de caixa com várias persianas',
+    desc:'Confirmar quais SKUs vão dentro do volume retido por pacote',
+    sensivel:true },
 
   // ─── SOB MEDIDA ─────────────────────────────────────────────
   // A segunda operacao da fabrica: corte de tecido contra o pedido do cliente
