@@ -499,11 +499,16 @@ persianas é aviso que se aprende a fechar. Depois de imprimir, a tela repete:
 `FECHE A CAIXA COM 3 PERSIANAS`, que é a última vez que alguém olha antes do
 saco preto.
 
-> **Aqui a lista APARECE, e não contradiz a conferência cega do carregamento
-> (§5).** Lá a caixa já está fechada e o bipe confere o que entrou; aqui a caixa
-> está sendo **montada**, e sem a lista a bancada não sabe o que buscar na
-> prateleira. É roteiro de separação, como a "Faltam imprimir". O que o sistema
-> não faz é dar a peça por conferida sem o bipe.
+> **A LISTA APARECE — decidido pelo dono em 15/09/2026**, depois de posta em
+> dúvida justamente por contrariar a conferência cega do carregamento (§5).
+> Não contraria: **lá a caixa já está fechada** e o bipe confere o que entrou —
+> mostrar o SKU esperado faria a pessoa bipar o que fosse para fechar a linha.
+> **Aqui a caixa está sendo MONTADA**, e sem a lista a bancada não sabe o que
+> buscar na prateleira; esconder viraria adivinhação, não rigor. É roteiro de
+> separação, como a "Faltam imprimir".
+>
+> O que o sistema **não** faz, e é onde o rigor mora, é dar a peça por conferida
+> sem o bipe: a lista diz o que procurar, o bipe prova o que entrou.
 
 **4. O estoque baixa POR PEÇA.** `1 × BK120120BEGE + 2 × BK140140BEGE` = três
 baixas. A trava de estoque também passou a ser por peça, e a recusa **nomeia o
