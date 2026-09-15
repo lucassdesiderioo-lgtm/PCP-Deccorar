@@ -34,6 +34,11 @@ db.exec(`
   CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT, buyer TEXT,
     city TEXT, nf TEXT, packId TEXT, venda TEXT, estagio TEXT DEFAULT 'pendente',
     embalado_em TEXT, data TEXT DEFAULT (date('now','localtime')), despachar_em TEXT, modalidade TEXT);
+  /* As pecas dentro da caixa (§5-B). O exp_route e o dono, mas quem le na hora
+     de imprimir e o etq_route — entao ela precisa existir aqui. */
+  CREATE TABLE lote_item (id INTEGER PRIMARY KEY AUTOINCREMENT, lote_id INTEGER NOT NULL,
+    codigo TEXT, qtd INTEGER DEFAULT 1, cor TEXT, descricao TEXT,
+    origem TEXT DEFAULT 'folha', conferido_em TEXT, conferido_por TEXT, teste INTEGER DEFAULT 0);
 `);
 db.prepare("INSERT INTO modelo (id,codigo,nome,sob_medida) VALUES (1,'ROLO','Rolô',0)").run();
 db.prepare("INSERT INTO modelo (id,codigo,nome,sob_medida) VALUES (2,'SOBMED','Sob medida',1)").run();
@@ -155,6 +160,62 @@ const ok = (n, c, extra) => { casos++;
   const ec = await chamar('POST /api/embalar', {id:7});
   ok('imprimir a etiqueta de coleta baixa a peça igual e diz que é coleta',
      ec.ok && ec.coleta === true && estoqueDe('BK160160CINZA') === 0, JSON.stringify(ec));
+
+  /* ── A CAIXA COM MAIS DE UMA PERSIANA (§5-B, armadilha #23) ───────────────
+     O caso real de 15/09/2026: NF 6585, Fabiano Pereira, pack 2000015040457349
+     — UMA etiqueta com 1 x BK120120BEGE e 2 x BK140140BEGE, três persianas.
+     Antes disso o sistema gravava só o item de cima e as outras duas sumiam
+     sem aviso: não viravam volume, não baixavam estoque, não apareciam em tela
+     nenhuma.
+     ⚠️ A REGRA DO §2 CONTINUA INTEIRA: é UMA etiqueta, UM volume, UM
+     carregamento. O que passou a existir é o conteúdo da caixa — e é por peça
+     que o estoque baixa, porque é por peça que a prateleira esvazia. */
+  db.prepare("INSERT INTO skus (codigo,estoque,modelo_id,largura_cm,altura_cm,cor_codigo) VALUES ('BK120120BEGE',5,1,120,120,'BEGE')").run();
+  db.prepare("UPDATE skus SET estoque=4 WHERE codigo='BK140140BEGE'").run();
+  db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data,despachar_em,modalidade)
+    VALUES ('BK120120BEGE','Fabiano Pereira','6585','2000015040457349','2000018468081338','pendente',?,?,'coleta')`).run(hoje,hoje); // id 8
+  const PAC = db.prepare("SELECT id FROM lote WHERE nf='6585'").get().id;
+  db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK120120BEGE',1,'gestao')").run(PAC);
+  db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK140140BEGE',2,'gestao')").run(PAC);
+
+  const pp = await chamar('GET /api/proximo/:sku', null, {sku:'BK120120BEGE'});
+  ok('o bipe entrega as peças da caixa quando ela leva mais de uma',
+     pp.pedido && pp.pedido.id === PAC && (pp.itens||[]).length === 2, JSON.stringify({id:pp.pedido&&pp.pedido.id, itens:(pp.itens||[]).length}));
+
+  const semBipe = await chamar('POST /api/embalar', {id:PAC});
+  ok('SEM o bipe de todas as peças, não imprime',
+     !!semBipe.erro && semBipe.faltam === 2, JSON.stringify(semBipe));
+  ok('e nada saiu do estoque na recusa',
+     estoqueDe('BK120120BEGE') === 5 && estoqueDe('BK140140BEGE') === 4,
+     estoqueDe('BK120120BEGE')+'/'+estoqueDe('BK140140BEGE'));
+
+  const errado = await chamar('POST /api/lote/conferir', {id:PAC, codigo:'BK160160CINZA'});
+  ok('bipar um SKU que não é da caixa é recusado', !!errado.erro, JSON.stringify(errado));
+
+  const c1 = await chamar('POST /api/lote/conferir', {id:PAC, codigo:'BK120120BEGE'});
+  ok('o bipe da primeira peça confere e diz quantas faltam', c1.ok && c1.faltam === 1, JSON.stringify(c1));
+  const bisRep = await chamar('POST /api/lote/conferir', {id:PAC, codigo:'BK120120BEGE'});
+  ok('bipar duas vezes a mesma peça não fecha a conta sozinho', !!bisRep.erro, JSON.stringify(bisRep));
+
+  const meio = await chamar('POST /api/embalar', {id:PAC});
+  ok('com UMA peça conferida de duas, ainda não imprime',
+     !!meio.erro && meio.faltam === 1, JSON.stringify(meio));
+
+  const c2 = await chamar('POST /api/lote/conferir', {id:PAC, codigo:'BK140140BEGE'});
+  ok('o bipe da segunda peça fecha a conferência', c2.ok && c2.faltam === 0, JSON.stringify(c2));
+
+  const imp = await chamar('POST /api/embalar', {id:PAC});
+  ok('conferidas todas, a etiqueta sai — e é UMA etiqueta só', !!imp.ok, JSON.stringify(imp));
+  /* ESTA É A LINHA QUE IMPORTA: 3 persianas saíram da fábrica, 3 saíram do
+     saldo. Enquanto o sistema gravava só o item de cima, as 2 do irmão saíam
+     da prateleira e o estoque não baixava — furo silencioso. */
+  ok('o estoque baixa POR PEÇA: 1 de um SKU e 2 do outro',
+     estoqueDe('BK120120BEGE') === 4 && estoqueDe('BK140140BEGE') === 2,
+     estoqueDe('BK120120BEGE')+'/'+estoqueDe('BK140140BEGE'));
+  ok('a resposta diz quantas persianas fechar na caixa', imp.pecas === 3, JSON.stringify(imp.pecas));
+  ok('e o volume andou UMA vez: um volume, um carregamento',
+     db.prepare("SELECT estagio FROM lote WHERE id=?").get(PAC).estagio === 'embalado' &&
+     db.prepare("SELECT COUNT(*) c FROM lote WHERE packId='2000015040457349'").get().c === 1);
 
   console.log('');
   console.log(falhas ? ('FALHARAM ' + falhas + ' de ' + casos)

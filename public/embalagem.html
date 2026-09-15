@@ -187,6 +187,46 @@ function idle(){
 // duas escrevam a medida do mesmo jeito (§4: duas telas escrevendo cada uma do
 // seu jeito ensinariam a equipe a achar que são coisas diferentes).
 function pecaTxt(p){ return (p && typeof pecaTexto==='function') ? (pecaTexto(p)||'') : ''; }
+/* ── A CAIXA COM MAIS DE UMA PERSIANA (§5-B) ────────────────────────────────
+   O Mercado Livre passou a despachar varios produtos numa etiqueta so. Aqui
+   isso muda uma coisa e só uma: antes de imprimir, cada peça da caixa tem que
+   ser BIPADA. É o mesmo desenho do kit na Embalagem — o bipe que falta recusa
+   o passo seguinte, em vez de avisar e deixar passar. Aviso numa caixa de três
+   persianas é aviso que se aprende a fechar.
+   A lista aparece porque aqui a caixa está sendo MONTADA: sem ela a bancada
+   não sabe o que buscar na prateleira. */
+function linhaItem(i){
+  var ok=!!i.conferido_em;
+  var peca=pecaTxt({medida:(i.exige_medida&&i.largura_cm&&i.altura_cm)?(i.largura_cm+' × '+i.altura_cm):null,
+                    cor:i.cor_nome||null, tecido:i.tecido_nome||null, modelo:i.modelo_nome||null});
+  return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;margin-bottom:6px;'
+    +'background:'+(ok?'#e9f6ec':'#fff')+';border:2px solid '+(ok?'#57a65f':'#d8dee6')+'">'
+    +'<div style="font-size:22px;width:26px;text-align:center">'+(ok?'✓':'○')+'</div>'
+    +'<div style="flex:1;min-width:0">'
+    +'<span class="sku" style="font-size:15px">'+esc(i.codigo||'')+'</span>'
+    +'<b style="margin-left:8px">'+(i.qtd>1?(i.qtd+' unidades'):'1 unidade')+'</b>'
+    +(peca?'<div style="font-size:14px;color:var(--muted)">'+esc(peca)+'</div>':'')
+    +'</div></div>';
+}
+function telaPacote(r,extras){
+  var itens=r.itens||[], faltam=itens.filter(function(i){ return !i.conferido_em; }).length;
+  var total=itens.reduce(function(s,i){ return s+(i.qtd||1); },0);
+  var corpo=(extras||'')
+    +'<div style="background:#fff4e5;border:2px solid #e0a63f;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-weight:800;color:#8a5a00">'
+    +'📦 ESTA CAIXA LEVA '+total+' PERSIANAS — o Mercado Livre juntou numa etiqueta só'
+    +'<div style="font-weight:400;font-size:13px;margin-top:2px">Bipe o SKU de <b>cada uma</b> antes de imprimir. '
+    +'A etiqueta de venda é uma só, e vai na caixa inteira.</div></div>'
+    +'<div style="font-size:26px;font-weight:800;color:var(--txt);line-height:1.15;margin:2px 0 4px">'+esc(r.pedido.buyer)+'</div>'
+    +'<div style="font-size:15px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+'</div>'
+    +itens.map(linhaItem).join('')
+    +(faltam
+      ? '<div style="margin-top:8px;font-weight:700">Faltam <b>'+faltam+'</b> — bipe o SKU de cada persiana.</div>'
+      : '<div style="margin-top:8px;font-weight:700;color:#2e7d32">Todas conferidas. Pode imprimir.</div>');
+  banner((faltam?'warn':'cfm')+' rotulo', faltam?'Confira as peças da caixa':'Caixa conferida', corpo,
+    faltam ? '<button class="ghost" onclick="idle()">Cancelar</button>'
+           : '<button class="primary" onclick="imprimir()">Imprimir etiqueta de venda</button><button class="ghost" onclick="idle()">Cancelar</button>');
+  beep(!faltam);
+}
 /* A LINHA DE NUMEROS FALA, NAO SO CONTA.
    "15 PENDENTES" nao dizia o que fazer, e ainda contradizia a lista logo
    abaixo. Agora e uma frase: quanto falta hoje, quanto disso esta atrasado,
@@ -216,6 +256,28 @@ async function stats(){
 async function scanSku(sku){
   sku=(sku||'').trim().toUpperCase(); if(!sku) return;
   const now=Date.now(); if(last.c===sku && now-last.t<700) return; last={c:sku,t:now};
+  /* CAIXA COM MAIS DE UMA PERSIANA: o bipe CONFERE uma peça, não imprime.
+     Vem antes do "2º bipe = imprime" de propósito — numa caixa de três, bipar
+     o mesmo SKU de novo é a pessoa conferindo a segunda peça, e mandar isso
+     pra impressora pularia as outras duas. Só quando não falta nenhuma o bipe
+     volta a significar "imprime". */
+  if(confirmar && confirmar._itens && confirmar._itens.length>1){
+    var faltamAntes=confirmar._itens.filter(function(i){ return !i.conferido_em; }).length;
+    if(faltamAntes){
+      var c=await (await fetch('/api/lote/conferir',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:confirmar.id,codigo:sku})})).json();
+      if(c.erro){ banner('err','Não confere', c.erro
+        +'<div style="font-size:14px;margin-top:6px">Bipe o SKU de uma das persianas desta caixa.</div>',
+        '<button class="ghost" onclick="idle()">Cancelar</button>'); beep(false); return; }
+      confirmar._itens.forEach(function(i){
+        if(String(i.codigo||'').toUpperCase()===sku && !i.conferido_em){ i.conferido_em='agora'; }
+      });
+      telaPacote({pedido:confirmar,itens:confirmar._itens},'');
+      return;
+    }
+    /* Nada falta: o bipe volta a ser o confirma de sempre. */
+    if(confirmar._itens.some(function(i){ return String(i.codigo||'').toUpperCase()===sku; })){ imprimir(); return; }
+  }
   // 2º bip do mesmo SKU = confirma
   if(confirmar && confirmar.codigo && confirmar.codigo.toUpperCase()===sku){ imprimir(); return; }
   // O filtro vai junto: em Agência ou Coleta o bipe só pega venda daquela lista.
@@ -240,6 +302,7 @@ async function scanSku(sku){
     beep(false); confirmar=null; return;
   }
   confirmar=r.pedido;
+  confirmar._itens=r.itens||[];
   // ADIANTANDO: a venda existe e a peça está na prateleira, mas a entrega não é
   // de hoje. Precisa ser inconfundível — se passar por urgente, o operador gasta
   // peça que amanhã pode faltar pra quem tem prazo curto. Por isso o aviso vem
@@ -266,6 +329,10 @@ async function scanSku(sku){
      O que não é derivado é a VENDA escolhida: cliente, NF, cidade. É essa
      etiqueta que vai ser colada na caixa que está na mão dela — então é ela que
      merece o tamanho. */
+  /* A caixa com mais de uma persiana tem tela própria: ali o que decide não é
+     "confira esta venda", é "confira as PEÇAS". Os avisos de coleta e de
+     adiantamento vão junto, no topo — eles continuam valendo. */
+  if((r.itens||[]).length>1){ telaPacote(r, col+adiant); return; }
   banner((r.coleta?'col':(r.adiantado?'warn':'cfm'))+' rotulo','Confira esta venda', col+adiant
     +'<div style="font-size:30px;font-weight:800;color:var(--txt);line-height:1.15;letter-spacing:-.5px;margin:2px 0 6px">'+esc(r.pedido.buyer)+'</div>'
     +'<div style="font-size:16px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+'</div>'
@@ -299,7 +366,12 @@ async function imprimir(){
       ? '<div style="margin:6px 0 8px;padding:8px 10px;border-radius:8px;background:#efe9fb;border:2px solid #b9a3e6;color:#4b2a91;font-weight:800">'
         +'🚚 COLETA — leve pro lugar reservado e bipe no Carregamento. Não vai no carro.</div>'
       : '';
-    banner(r.coleta?'col':'ok','Impresso ✓ — '+esc(o.buyer), ondeVai+'NF <b>'+esc(o.nf||'—')+'</b> · <span class="sku">'+esc(o.codigo||'')+'</span> · estoque agora: '+r.estoque+'<br>Saiu borrada ou o papel enroscou? Reimprima aqui — o estoque não muda.',
+    /* A caixa com várias persianas repete a conta DEPOIS de imprimir: é a
+       última vez que alguém olha antes de fechar o saco preto, e a etiqueta
+       colada por fora não diz quantas peças tem dentro. */
+    var quantas = r.pecas ? '<div style="margin:6px 0 8px;padding:8px 10px;border-radius:8px;background:#fff4e5;border:2px solid #e0a63f;color:#8a5a00;font-weight:800">'
+        +'📦 FECHE A CAIXA COM '+r.pecas+' PERSIANAS — uma etiqueta, '+r.pecas+' peças.</div>' : '';
+    banner(r.coleta?'col':'ok','Impresso ✓ — '+esc(o.buyer), quantas+ondeVai+'NF <b>'+esc(o.nf||'—')+'</b> · <span class="sku">'+esc(o.codigo||'')+'</span> · estoque agora: '+r.estoque+'<br>Saiu borrada ou o papel enroscou? Reimprima aqui — o estoque não muda.',
       '<button class="rebt" onclick="reimprimir('+o.id+',this)">🖨 Reimprimir esta</button>');
     beep(true); stats(); listaImp();
   }catch(e){ banner('err','Falha de conexão', String(e)); beep(false); }

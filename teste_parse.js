@@ -406,6 +406,88 @@ function conferir(nome, orders, esperado){
     else console.log('ok      nota de duas folhas: imprime a primeira, e a NF repetida e a mesma nota');
   }
 
+  /* ── 17. O PACOTE: UMA ETIQUETA, MAIS DE UM PRODUTO (§5-B, #23) ───────────
+        PDF real de 15/09/2026 — NF 6585, Fabiano Pereira, pack
+        2000015040457349. O painel do ML chamou de "Pacote de 2 produtos ·
+        3 unidades"; a folha traz o item irmão SEM Pack ID, SEM Venda e SEM
+        comprador, logo abaixo do item completo:
+
+            Cortina Rolo Blackout 1,40x1,40 Persiana Blecaute Bege
+            SKU: BK140140BEGE
+            Quantidade: 2
+            Cor: Bege
+            Desenho do tecido: Liso
+
+        Até aqui o parse gravava só o item de cima, com conflito NULL, e as
+        duas persianas do irmão sumiam sem uma linha de aviso.
+
+        ⚠️ O CASO 2 (Abraão) É O CONTRÁRIO DISTO, e os dois têm que continuar
+        passando juntos: lá o item sem Pack ID trazia Venda e comprador, e
+        herdar o pack do vizinho mandou a peça errada pro cliente. Aqui os três
+        campos faltam de uma vez. É essa diferença que separa "item irmão" de
+        "item que o PDF desalinhou", e ela está no documento, não num palpite. */
+  casos++;
+  {
+    const d=await PDFDocument.create(), f=await d.embedFont(StandardFonts.Helvetica);
+    const pag=ls=>{ const p=d.addPage([595,842]); let y=800;
+      for(const l of ls){ p.drawText(l,{x:30,y,size:9,font:f}); y-=14; } };
+    pag(etiqueta({pack:'2000015040457349',nf:'6585',comprador:'Fabiano Pereira',
+                  despachar:'Despachar: terça 15/set'}));
+    /* A folha COMO ELA VEIO: o item completo e, logo abaixo, o irmão com
+       quatro linhas e nenhum identificador. */
+    pag(['Despachem as suas vendas o quanto antes.','Identifiicação Produtos',
+      'RZ3OQY65HJJ3DJLW6PE4Z2J3OQ Cortina Rolo Blackout 1,20x1,20 Blecaute Persiana Bege',
+      'Pack ID: 2000015040457349 SKU: BK120120BEGE',
+      'Venda: 2000018468081338 Quantidade: 1',
+      'Fabiano Pereira Cor: Bege',
+      'Desenho do tecido: Liso',
+      'Cortina Rolo Blackout 1,40x1,40 Persiana Blecaute Bege',
+      'SKU: BK140140BEGE',
+      'Quantidade: 2',
+      'Cor: Bege',
+      'Desenho do tecido: Liso']);
+    const arq=path.join(tmp,'t'+casos+'.pdf');
+    fs.writeFileSync(arq, await d.save());
+    const os_=await parsePdf(new Uint8Array(fs.readFileSync(arq)));
+    const erros=[];
+    if(os_.length!==1) erros.push('era pra ser UM volume (uma etiqueta), veio '+os_.length);
+    const v=os_[0]||{};
+    if(v.sku!=='BK120120BEGE') erros.push('o SKU do volume mudou: '+v.sku);
+    const it=v.itens||[];
+    if(it.length!==2) erros.push('esperava 2 itens na caixa, veio '+it.length+' — '+JSON.stringify(it));
+    else{
+      if(it[0].sku!=='BK120120BEGE'||it[0].qtd!==1) erros.push('item 1 errado: '+JSON.stringify(it[0]));
+      if(it[1].sku!=='BK140140BEGE'||it[1].qtd!==2) erros.push('item 2 errado: '+JSON.stringify(it[1]));
+      const pecas=it.reduce((s,i)=>s+i.qtd,0);
+      if(pecas!==3) erros.push('a caixa tem 3 persianas, a conta deu '+pecas);
+    }
+    /* O irmão não é divergência: não há dúvida sobre qual peça, há peça a mais.
+       Marcar como conflito mandaria o volume pro resolvedor errado. */
+    if(v.conflito) erros.push('marcou divergência num pacote: '+v.conflito);
+    if(erros.length){ falhas++; console.log('FALHOU  o pacote de 2 produtos: uma etiqueta, tres persianas');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      o pacote de 2 produtos: uma etiqueta, tres persianas');
+  }
+
+  /* ── 18. E A ETIQUETA NORMAL CONTINUA SEM ITENS ───────────────────────────
+        `itens` null é o caso de todo dia, e é ele que garante que nada mudou
+        para as centenas de vendas que não são pacote. */
+  casos++;
+  {
+    const os_=await montar([
+      {pack:'111',venda:'901',sku:'BK160160BEGE',medida:'1,60x1,60',cor:'Bege',comprador:'Joao Silva'},
+      {pack:'222',venda:'902',sku:'BK140140BEGE',medida:'1,40x1,40',cor:'Bege',comprador:'Maria Souza'},
+    ],[
+      {pack:'111',nf:'1',comprador:'Joao Silva'},
+      {pack:'222',nf:'2',comprador:'Maria Souza'},
+    ]);
+    const erros=[];
+    os_.forEach(o=>{ if(o.itens) erros.push(o.packId+' virou pacote sem ser: '+JSON.stringify(o.itens)); });
+    if(erros.length){ falhas++; console.log('FALHOU  venda normal nao vira pacote');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      venda normal nao vira pacote');
+  }
+
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));

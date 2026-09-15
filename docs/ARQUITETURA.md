@@ -101,6 +101,7 @@ skus ──┬── producao      (codigo)
        └── demanda       (codigo)
 
 lote ───── devolucao     (venda_id → lote.id)
+lote ───── lote_item     (lote_id → lote.id)   -- as peças dentro da caixa
 ```
 
 As ligações por `codigo` são por convenção de código, sem foreign key.
@@ -259,6 +260,28 @@ modalidade   TEXT                -- 'agencia' | 'coleta' | NULL (= agencia)
 retirado_em  TEXT                -- coleta: quando o caminhão do ML levou
              -- (preenchido no fechamento com o motorista)
 ```
+
+#### `lote_item` — as peças dentro de UMA caixa (§5-B, armadilha #23)
+```sql
+id            INTEGER PK
+lote_id       INTEGER NOT NULL   -- o volume (a etiqueta) a que esta peça pertence
+codigo        TEXT               -- o SKU da peça
+qtd           INTEGER DEFAULT 1  -- quantas unidades deste SKU vão na caixa
+cor           TEXT
+descricao     TEXT
+origem        TEXT DEFAULT 'folha'  -- 'folha' (o PDF disse) | 'gestao' (alguém assinou)
+conferido_em  TEXT               -- o bipe da bancada, antes de imprimir
+conferido_por TEXT
+criado_em     TEXT DEFAULT datetime('now','localtime')
+teste         INTEGER DEFAULT 0
+```
+
+> Só existe quando o Mercado Livre despacha **mais de um produto na mesma
+> etiqueta** ("Pacote de N produtos"). Uma etiqueta normal não tem linha aqui.
+>
+> ⚠️ O grão de `lote` é a **etiqueta**; o grão daqui é a **peça**. São coisas
+> diferentes e não se fundem: N linhas em `lote` criariam etiquetas de venda que
+> não existem e o volume nunca fecharia no carregamento (§5, #8).
 
 #### `coleta_fechamento` — a conferência com o motorista da coleta
 ```sql

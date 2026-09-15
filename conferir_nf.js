@@ -39,7 +39,7 @@ const {mesmoCliente}=require('./nome');
 /* "O que e esta pagina do PDF" e "qual o numero desta nota" saem do folha.js,
    que e por onde o parse.js gravou. Conferir a impressao com outra regua seria
    conferir olhando um papel diferente do que a impressao usa. */
-const {lerFolha,tipoDaPagina,nfDaNota}=require('./folha');
+const {lerFolha,irmaosDoPacote}=require('./folha');
 
 const T=s=>console.log(s);
 const linha=()=>T('─'.repeat(74));
@@ -236,31 +236,6 @@ if(pdfSumiu.length){
    por conta propria. `lido` distingue "li e nao achei nada" de "nao li". */
 const folha={lido:false, pdfs:0, vendaDupla:[], comQtd:[], notaGrossa:[], pacote:[]};
 
-/* ── O PACOTE DE VARIOS PRODUTOS (15/09/2026) ───────────────────────────────
- * O item IRMAO: bloco com SKU e sem Pack ID, sem Venda e sem comprador. Ele
- * nao tem identidade propria porque a identidade dele e a do item de cima —
- * os dois viajam na MESMA etiqueta, na mesma caixa.
- *
- * NAO CONFUNDIR COM O CASO ABRAAO (#4). La o item tambem vinha sem Pack ID,
- * mas trazia `Venda:` e o comprador: era um item inteiro cuja etiqueta veio
- * pela venda em vez do pack. Herdar o pack do vizinho ali mandou a peca errada
- * pro cliente. Aqui os TRES campos faltam de uma vez, e e por isso que os dois
- * casos se separam sem adivinhacao: o item irmao e o unico que nao tem como
- * ser identificado sozinho.
- *
- * Esta funcao so RELATA. Nada no sistema decide por ela — a decisao do que
- * fazer com o pacote e do dono. */
-function irmaosDoPacote(blocos){
-  const grupos=[]; let atual=null;
-  (blocos||[]).forEach(b=>{
-    const orfao = !b.packId && !b.venda && !b.comprador;
-    if(!orfao){ atual={pai:b, irmaos:[]}; grupos.push(atual); return; }
-    /* Orfao antes de qualquer item identificado nao e irmao de ninguem: e
-       folha que comeca torta, e isso e outro problema. */
-    if(atual) atual.irmaos.push(b);
-  });
-  return grupos.filter(g=>g.irmaos.length);
-}
 
 async function verPdfs(){
   tit('4. O QUE A FOLHA DE CONTROLE DOS PDFs DIZ');

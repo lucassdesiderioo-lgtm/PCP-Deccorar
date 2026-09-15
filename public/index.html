@@ -258,6 +258,19 @@
      etiqueta, e so os dois formatos conhecidos decidem. Linha diferente e o
      Mercado Livre mudando a etiqueta — e ai ninguem adivinha: regra do dono,
      vai pra ca e a gestao escolhe, olhando o pedido no ML. -->
+<!-- A ETIQUETA COM MAIS DE UM PRODUTO (§5-B). O ML passou a despachar varias
+     persianas numa etiqueta so. Fica ACIMA de tudo porque e a unica retencao em
+     que o problema e PECA FALTANDO: as outras sao volume mal classificado. -->
+<div class="card" id="pacCard" style="display:none;border:2px solid #e0a63f">
+  <div style="font-weight:800;color:#8a5a00;font-size:16px;margin-bottom:6px">📦 ETIQUETA COM MAIS DE UM PRODUTO — assine as peças</div>
+  <div style="font-size:13px;color:#5a6472;margin-bottom:12px">
+    O Mercado Livre juntou mais de uma persiana na <b>mesma etiqueta</b> ("Pacote de N produtos", no painel dele).
+    A etiqueta de venda continua sendo <b>uma só</b> — o que muda é o que vai <b>dentro da caixa</b>.
+    Abra o pedido no ML, confira peça por peça e <b>assine</b>: é essa lista que a bancada vai bipar
+    antes de imprimir, e é por ela que o estoque baixa. Enquanto isso o volume não imprime e não carrega.
+  </div>
+  <div id="pacLista"></div>
+</div>
 <div class="card" id="modCard" style="display:none;border:2px solid #6f42c1">
   <div style="font-weight:800;color:#6f42c1;font-size:16px;margin-bottom:6px">🚚 ETIQUETA EM FORMATO NOVO — agência ou coleta?</div>
   <div style="font-size:13px;color:#5a6472;margin-bottom:12px">
@@ -2009,6 +2022,91 @@ document.addEventListener("click",async function(e){
   await resolverDiv(b,b.getAttribute("data-resolvediv"),b.getAttribute("data-sku"),b.getAttribute("data-peca")||"");
 });
 
+/* ── ETIQUETA COM MAIS DE UM PRODUTO: a gestao assina as pecas (§5-B) ───────
+   A folha ja disse o que vem na caixa, e a lista nasce preenchida com isso —
+   concordar com o documento e um clique. O que a tela oferece e o CONSERTO:
+   trocar um SKU (o campo aceita bipe), mudar a quantidade, tirar uma linha ou
+   acrescentar uma que a folha nao trouxe. E a licao da §5: trava que sabe
+   acusar e nao sabe liberar e trava que a equipe aprende a contornar. */
+var pacDados={};
+function pacPeca(i){
+  var p={medida:(i.exige_medida&&i.largura_cm&&i.altura_cm)?(i.largura_cm+' × '+i.altura_cm):null,
+         cor:i.cor_nome||null, tecido:i.tecido_nome||null, modelo:i.modelo_nome||null};
+  return (typeof pecaTexto==='function') ? (pecaTexto(p)||'') : '';
+}
+function pacLinha(vid,i,k){
+  var txt=pacPeca(i);
+  return '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px" data-pacrow="'+vid+'">'
+    +'<input value="'+esc(i.codigo||'')+'" data-paccod="1" placeholder="bipe ou digite o SKU" '
+      +'autocapitalize="characters" autocorrect="off" spellcheck="false" '
+      +'style="flex:1;min-width:0;font-family:ui-monospace,monospace;text-transform:uppercase">'
+    +'<input value="'+(i.qtd||1)+'" data-pacqtd="1" type="number" min="1" style="width:78px" title="quantas peças deste SKU">'
+    +'<button class="ghost" data-pacdel="1" title="tirar esta peça" style="padding:6px 10px">✕</button>'
+    +'<div style="flex-basis:100%;font-size:12px;color:'+(i.cadastrado?'#5a6472':'#c62828')+'">'
+    +(i.cadastrado ? esc(txt||'—') : '⚠ SKU fora do cadastro — cadastre antes de assinar')+'</div>'
+    +'</div>';
+}
+async function carregarPac(){
+  var l=[]; try{ l=await (await fetch("/api/pacote/pendentes")).json(); }catch(e){}
+  var card=document.getElementById("pacCard"), lis=document.getElementById("pacLista");
+  if(!card||!lis) return 0;
+  if(!Array.isArray(l)||!l.length){ card.style.display="none"; lis.innerHTML=""; return 0; }
+  card.style.display="";
+  pacDados={};
+  var h="";
+  for(var i=0;i<l.length;i++){
+    var r=l[i]; pacDados[r.id]=r;
+    var pecas=(r.itens||[]).reduce(function(s,x){ return s+(x.qtd||1); },0);
+    h+='<div style="border-top:1px solid #d8dee6;padding:12px 0" data-pacvol="'+r.id+'">'
+      +'<div style="font-weight:700">'+esc(r.buyer||"—")+' · NF '+esc(r.nf||"—")+' · '+esc(r.data||"")+'</div>'
+      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">pack '+esc(r.packId||"—")+' · venda '+esc(r.venda||"—")
+      +(r.despachar_em?' · despacha '+esc(r.despachar_em):'')+'</div>'
+      +'<div style="margin:8px 0;padding:8px 10px;border-radius:6px;background:#fff4e5;border:1px solid #e0c08a;font-size:12px;color:#8a5a00">'
+      +'⚠ '+esc(r.motivo||"")+'</div>'
+      +'<div data-paclinhas="'+r.id+'">'+(r.itens||[]).map(function(x,k){ return pacLinha(r.id,x,k); }).join('')+'</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
+      +'<button class="ghost" data-pacadd="'+r.id+'">+ outra peça</button>'
+      +'<button class="primary" data-pacok="'+r.id+'">✓ Assinar — '+pecas+' peça(s) nesta caixa</button>'
+      +'</div></div>';
+  }
+  lis.innerHTML=h;
+  return l.length;
+}
+function pacLer(vid){
+  var box=document.querySelector('[data-paclinhas="'+vid+'"]'); if(!box) return [];
+  return [].slice.call(box.querySelectorAll('[data-pacrow]')).map(function(row){
+    return {codigo:(row.querySelector('[data-paccod]').value||'').trim().toUpperCase(),
+            qtd:parseInt(row.querySelector('[data-pacqtd]').value,10)||1};
+  }).filter(function(x){ return x.codigo; });
+}
+document.addEventListener("click",async function(e){
+  var add=e.target.closest("[data-pacadd]");
+  if(add){
+    var vid=add.getAttribute("data-pacadd");
+    var box=document.querySelector('[data-paclinhas="'+vid+'"]');
+    if(box) box.insertAdjacentHTML("beforeend", pacLinha(vid,{codigo:"",qtd:1,cadastrado:1},-1));
+    return;
+  }
+  var del=e.target.closest("[data-pacdel]");
+  if(del){ var row=del.closest("[data-pacrow]"); if(row) row.remove(); return; }
+  var ok=e.target.closest("[data-pacok]");
+  if(!ok) return;
+  var vid=Number(ok.getAttribute("data-pacok")), itens=pacLer(vid);
+  if(!itens.length){ alert("Informe pelo menos uma peça."); return; }
+  var total=itens.reduce(function(s,x){ return s+x.qtd; },0);
+  if(!confirm("Esta caixa leva:\n\n  "+itens.map(function(x){ return "  "+x.qtd+" x "+x.codigo; }).join("\n")
+    +"\n\nTotal: "+total+" persiana(s).\n\nA bancada vai bipar cada uma antes de imprimir, e o estoque baixa por peça.\nA decisão fica registrada com o seu nome.")) return;
+  ok.disabled=true;
+  try{
+    var r=await (await fetch("/api/pacote/resolver",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({id:vid,itens:itens})})).json();
+    if(r.erro) alert(r.erro);
+  }catch(err){ alert(String(err)); }
+  ok.disabled=false;
+  carregarBloq();
+  try{ if(typeof verCruz==="function") verCruz(); }catch(e){}
+});
+
 /* ETIQUETA EM FORMATO NOVO: agencia ou coleta? A decisao e por volume, mas o
    caso real e o lote inteiro de uma vez (o ML muda a etiqueta pra todo mundo),
    entao ha o botao "todos" em cima — e a pergunta e uma so, com duas
@@ -2064,8 +2162,9 @@ var l=[]; try{ l=await (await fetch("/api/bloqueados")).json(); }catch(e){}
 var n=0; for(var i=0;i<l.length;i++) n+=l[i].qtd;
 var nd=await carregarDiv();
 var nm=await carregarMod();
+var np=await carregarPac();
 var tb=document.getElementById("tabBlq");
-if(tb) tb.textContent = (n+nd+nm) ? ("Bloqueados ("+(n+nd+nm)+")") : "Bloqueados";
+if(tb) tb.textContent = (n+nd+nm+np) ? ("Bloqueados ("+(n+nd+nm+np)+")") : "Bloqueados";
 var est=document.getElementById("blqEstado"), lis=document.getElementById("blqLista");
 if(!est||!lis) return;
 if(!l.length){ est.innerHTML="<b>Nenhum volume bloqueado.</b>"; lis.innerHTML=""; return; }

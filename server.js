@@ -104,9 +104,15 @@ app.post('/api/skus', (req,res)=>{
      depois de alguem olhar o pedido no Mercado Livre.
      O mesmo vale pro volume retido por MODALIDADE (§8-B): a etiqueta veio num
      formato que o sistema nao reconhece, e cadastrar SKU nao diz se a caixa vai
-     pro carro ou pro canto da coleta. Sai so pelo POST /api/modalidade/resolver. */
+     pro carro ou pro canto da coleta. Sai so pelo POST /api/modalidade/resolver.
+     E pro retido por PACOTE (§5-B): a etiqueta leva mais de uma persiana, e
+     cadastrar um SKU nao responde QUANTAS vao na caixa nem quais. Soltar aqui
+     mandaria a caixa embora com a peca a mais nao conferida — que e exatamente
+     o buraco que a trava existe pra fechar. Sai so pelo
+     POST /api/pacote/resolver, com a gestao assinando peca por peca. */
   try{ db.prepare(`UPDATE lote SET estagio='pendente' WHERE estagio='bloqueado' AND codigo=?
-        AND COALESCE(bloqueio,'') NOT LIKE 'divergencia%' AND COALESCE(bloqueio,'') NOT LIKE 'modalidade%'`).run(cod); }catch(e){}
+        AND COALESCE(bloqueio,'') NOT LIKE 'divergencia%' AND COALESCE(bloqueio,'') NOT LIKE 'modalidade%'
+        AND COALESCE(bloqueio,'') NOT LIKE 'pacote%'`).run(cod); }catch(e){}
   res.json({ok:true});
 });
 app.delete('/api/skus/:codigo',(req,res)=>{ db.prepare('DELETE FROM skus WHERE codigo=?').run(req.params.codigo); res.json({ok:true}); });

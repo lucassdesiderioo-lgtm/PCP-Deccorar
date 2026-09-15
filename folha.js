@@ -127,6 +127,55 @@ function itensDaFolha(linhas){
   return itens;
 }
 
+/* ── O PACOTE DE VARIOS PRODUTOS (15/09/2026) ───────────────────────────────
+ *
+ * O Mercado Livre passou a despachar mais de um produto na MESMA etiqueta. O
+ * painel dele chama isso de "Pacote de 2 produtos · 3 unidades"; na folha de
+ * controle sai assim (PDF real, NF 6585, Fabiano Pereira):
+ *
+ *     RZ3OQY... Cortina Rolo Blackout 1,20x1,20 Blecaute Persiana Bege
+ *     Pack ID: 2000015040457349   SKU: BK120120BEGE
+ *     Venda: 2000018468081338     Quantidade: 1
+ *     Fabiano Pereira             Cor: Bege
+ *                                 Desenho do tecido: Liso
+ *     Cortina Rolo Blackout 1,40x1,40 Persiana Blecaute Bege     <- o IRMAO
+ *     SKU: BK140140BEGE
+ *     Quantidade: 2
+ *     Cor: Bege
+ *     Desenho do tecido: Liso
+ *
+ * O item IRMAO nao traz Pack ID, nem Venda, nem comprador — so descricao, SKU,
+ * quantidade, cor e tecido. Ele nao tem identidade propria porque a identidade
+ * dele E A DO ITEM DE CIMA: os dois viajam na mesma etiqueta, na mesma caixa.
+ *
+ * ⚠️ NAO CONFUNDIR COM O CASO ABRAAO (§5, armadilha #4). La o item tambem vinha
+ * sem Pack ID, mas trazia `Venda:` E o comprador: era um item inteiro cuja
+ * etiqueta veio pela venda em vez do pack. Herdar o pack do vizinho ali mandou
+ * a peca errada pro cliente, e e por isso que a janela do bloco nao olha pra
+ * tras. Aqui os TRES campos faltam DE UMA VEZ — e e isso que separa os dois
+ * casos sem adivinhacao: o irmao e o unico item que nao tem como ser
+ * identificado sozinho. Um item com venda ou comprador NUNCA e irmao.
+ *
+ * Devolve [{pai, irmaos:[...]}] so dos grupos que tem irmao. */
+function irmaosDoPacote(blocos){
+  const grupos=[]; let atual=null;
+  (blocos||[]).forEach(b=>{
+    const orfao = !b.packId && !b.venda && !b.comprador;
+    if(!orfao){ atual={pai:b, irmaos:[]}; grupos.push(atual); return; }
+    /* Orfao antes de qualquer item identificado nao e irmao de ninguem: e folha
+       que comeca torta, e isso e outro problema — nao se inventa um pai. */
+    if(atual) atual.irmaos.push(b);
+  });
+  return grupos.filter(g=>g.irmaos.length);
+}
+
+/* Os irmaos de UM item, pela mesma regua. Devolve [] quando o item viaja
+   sozinho, que e o caso normal. */
+function irmaosDe(blocos, pai){
+  const g=irmaosDoPacote(blocos).find(x=>x.pai===pai);
+  return g?g.irmaos:[];
+}
+
 /* Mapas pack->sku e venda->sku, primeira ocorrencia manda (igual ao parse). */
 function mapasDaFolha(blocos){
   const porPack={}, porVenda={};
@@ -174,4 +223,4 @@ function travasAtivas(volume, item, coresConhecidas){
 }
 
 module.exports={lerFolha,mapasDaFolha,skuDaFolha,itemDaFolha,itensDaFolha,travasAtivas,pageLines,
-                tipoDaPagina,nfDaNota};
+                tipoDaPagina,nfDaNota,irmaosDoPacote,irmaosDe};

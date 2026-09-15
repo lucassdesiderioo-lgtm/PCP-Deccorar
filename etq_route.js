@@ -75,9 +75,63 @@ module.exports=function(app,db){
        isso ANTES de imprimir, porque e quem cola a etiqueta que decide onde a
        caixa vai parar. Regua unica em carga.js. */
     const coleta = ehColeta(p);
+    /* ESTA CAIXA LEVA MAIS DE UMA PERSIANA? (§5-B)
+       Quando leva, a tela NAO pode imprimir direto: quem cola a etiqueta tem
+       que bipar cada SKU que entra na caixa. O leitor le a etiqueta, nunca a
+       persiana (§4) — e aqui sao varias persianas atras de uma etiqueta so, que
+       e o lugar em que mandar a peca errada fica mais facil, nao mais dificil.
+       A peca de cada item vem junto, das colunas de `skus`: e o que a bancada
+       compara com o que tem na mao antes de bipar. */
+    const itens = p ? db.prepare(`SELECT i.id,i.codigo,i.qtd,i.conferido_em,
+        s.largura_cm,s.altura_cm, COALESCE(c.nome,s.cor_codigo,s.cor) cor_nome,
+        COALESCE(t.nome,s.tecido_codigo) tecido_nome, m.nome modelo_nome,
+        COALESCE(m.exige_medida,1) exige_medida
+      FROM lote_item i
+      LEFT JOIN skus s ON s.codigo=UPPER(i.codigo)
+      LEFT JOIN cor c ON c.codigo=s.cor_codigo
+      LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
+      LEFT JOIN modelo m ON m.id=s.modelo_id
+      WHERE i.lote_id=? ORDER BY i.id`).all(p.id) : [];
     res.json({cadastrado:true,estoque:s.estoque,total,pendentes:pend,futuros:fut,
               pedido:p||null,peca,sob_medida:!!s.sob_medida,adiantado,coleta,
+              /* Lista vazia e o caso normal (uma etiqueta, uma persiana) e a
+                 tela nao muda em nada por causa dela. */
+              itens: itens.length>1?itens:[],
               modo:(modo==='coleta'||modo==='agencia')?modo:'todas', na_outra_lista:outra});
+  });
+
+  /* O BIPE DE CADA PECA DA CAIXA, ANTES DE IMPRIMIR (§5-B).
+     Um bipe por LINHA de item, nao por unidade: duas persianas iguais tem a
+     mesma etiqueta de SKU, e bipar o mesmo codigo duas vezes nao prova nada a
+     mais. A quantidade a tela mostra ao lado, pra conferir na mao.
+
+     ⚠️ AQUI A LISTA APARECE, e nao e contradicao com a conferencia cega do
+     carregamento (§5). La a caixa ja esta fechada e o bipe confere o que
+     entrou; aqui a caixa esta sendo MONTADA, e sem a lista a bancada nao sabe
+     o que buscar na prateleira. E roteiro de separacao, como a "Faltam
+     imprimir" — esconder viraria adivinhacao, nao rigor. O que o sistema nao
+     faz e dar a peca por conferida sem o bipe. */
+  app.post('/api/lote/conferir',(req,res)=>{
+    const b=req.body||{};
+    const id=Number(b.id), sku=String(b.codigo||'').trim().toUpperCase();
+    if(!id||!sku) return res.status(400).json({erro:'sem volume ou sem codigo'});
+    const o=db.prepare('SELECT id,estagio FROM lote WHERE id=?').get(id);
+    if(!o) return res.status(404).json({erro:'venda nao encontrada'});
+    if(o.estagio!=='pendente') return res.json({erro:'Esta venda ja foi processada ('+o.estagio+').'});
+    const itens=db.prepare('SELECT id,codigo,qtd,conferido_em FROM lote_item WHERE lote_id=? ORDER BY id').all(id);
+    if(itens.length<2) return res.json({erro:'Esta caixa leva uma peca so — nao ha o que conferir.'});
+    const alvo=itens.find(i=>String(i.codigo||'').toUpperCase()===sku && !i.conferido_em);
+    if(!alvo){
+      const jaFoi=itens.some(i=>String(i.codigo||'').toUpperCase()===sku);
+      return res.json({erro: jaFoi
+        ? 'Esse SKU já foi conferido nesta caixa.'
+        : 'Esse SKU não é desta caixa.', faltam:itens.filter(i=>!i.conferido_em).length});
+    }
+    const quem=(req.usuario&&req.usuario.nome)||'';
+    db.prepare(`UPDATE lote_item SET conferido_em=datetime('now','localtime'), conferido_por=?
+      WHERE id=?`).run(quem,alvo.id);
+    const faltam=itens.filter(i=>!i.conferido_em && i.id!==alvo.id).length;
+    res.json({ok:true,codigo:alvo.codigo,qtd:alvo.qtd,faltam});
   });
 
   app.post('/api/embalar',(req,res)=>{
@@ -87,9 +141,38 @@ module.exports=function(app,db){
     if(!o) return res.status(404).json({erro:'venda nao encontrada'});
     if(o.estagio==='bloqueado') return res.json({erro:'Volume bloqueado: SKU fora do cadastro.'});
     if(o.estagio!=='pendente') return res.json({erro:'Esta venda ja foi processada ('+o.estagio+').'});
-    const s=db.prepare(`SELECT s.estoque, COALESCE(m.sob_medida,0) sob_medida
-      FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id WHERE s.codigo=?`).get(o.codigo);
-    if(!s) return res.json({erro:'SKU nao cadastrado.'});
+
+    /* ── A CAIXA COM MAIS DE UMA PERSIANA (§5-B) ────────────────────────────
+       Uma etiqueta, varias pecas. O que muda aqui e tudo o que depende de
+       "quantas": a trava de estoque, a baixa e a conferencia por bipe.
+       A lista sai do `lote_item`; vazia (ou com um item so) e o caso normal, e
+       dali pra baixo nada muda em relacao ao que sempre existiu. */
+    const itens=db.prepare('SELECT id,codigo,qtd,conferido_em FROM lote_item WHERE lote_id=? ORDER BY id').all(id);
+    const pacote = itens.length>1;
+
+    /* SEM O BIPE DE TODAS AS PECAS, NAO IMPRIME. E o mesmo desenho do kit na
+       embalagem (§4): o bipe que falta recusa o passo seguinte, em vez de
+       avisar e deixar passar. Aviso numa caixa com tres persianas e aviso que
+       se aprende a fechar. */
+    if(pacote){
+      const faltam=itens.filter(i=>!i.conferido_em);
+      if(faltam.length) return res.json({erro:'⚠ FALTA CONFERIR '+faltam.length+' de '+itens.length+
+        ' peça(s) desta caixa. Bipe o SKU de cada persiana antes de imprimir.', faltam:faltam.length});
+    }
+
+    /* A TRAVA DE ESTOQUE VALE PARA CADA PECA, E A BAIXA TAMBEM. Cobrar so o
+       `lote.codigo` numa caixa de tres persianas deixaria duas saindo da
+       prateleira sem baixar — o furo silencioso que a armadilha #23 descreve. */
+    const linhas = pacote ? itens.map(i=>({codigo:String(i.codigo||'').toUpperCase(), qtd:Math.max(1,i.qtd||1)}))
+                          : [{codigo:o.codigo, qtd:1}];
+    const dados=db.prepare(`SELECT s.codigo, s.estoque, COALESCE(m.sob_medida,0) sob_medida
+      FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id WHERE s.codigo=?`);
+    for(const l of linhas){
+      const d=dados.get(l.codigo);
+      if(!d) return res.json({erro:'SKU nao cadastrado: '+l.codigo});
+      l.sob_medida=!!d.sob_medida; l.estoque=d.estoque;
+    }
+    const s=linhas.find(l=>l.codigo===o.codigo)||linhas[0];
     /* SOB MEDIDA NAO PASSA PELA TRAVA DE ESTOQUE — nem pela baixa.
        A peca e feita contra o pedido: nao existe antes da venda, nao sobra
        depois, e por isso o saldo dela e sempre zero. Cobrar estoque aqui
@@ -99,14 +182,24 @@ module.exports=function(app,db){
        sempre. A trava so protegia no papel.
        A baixa tambem sai: sem +1 na embalagem nao pode haver -1 aqui, senao
        cada venda sob medida abriria um buraco de uma peca no SKU. */
-    if(!s.sob_medida && s.estoque<=0) return res.json({erro:'Sem estoque desse SKU.'});
+    /* A recusa nomeia O SKU que faltou: numa caixa de tres, "sem estoque" sem
+       dizer de que peca manda a bancada procurar no escuro. */
+    for(const l of linhas)
+      if(!l.sob_medida && l.estoque < l.qtd)
+        return res.json({erro: linhas.length>1
+          ? ('Sem estoque de '+l.codigo+' (precisa de '+l.qtd+', tem '+l.estoque+').')
+          : 'Sem estoque desse SKU.'});
     db.transaction(()=>{
       db.prepare("UPDATE lote SET estagio='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(id);
-      if(!s.sob_medida) db.prepare('UPDATE skus SET estoque=MAX(0,estoque-1) WHERE codigo=?').run(o.codigo);
+      const baixa=db.prepare('UPDATE skus SET estoque=MAX(0,estoque-?) WHERE codigo=?');
+      for(const l of linhas) if(!l.sob_medida) baixa.run(l.qtd,l.codigo);
     })();
     const e=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(o.codigo);
     /* Depois de imprimir, a tela diz pra onde a caixa vai. Sai daqui, e nao
        do que a tela guardou do bipe: e o volume gravado que manda. */
-    res.json({ok:true,estoque:e?e.estoque:0,coleta:ehColeta(o)});
+    res.json({ok:true,estoque:e?e.estoque:0,coleta:ehColeta(o),
+      /* `pecas` so vem quando a caixa leva mais de uma: e o numero que a tela
+         escreve no "Impresso ✓", pra quem fecha a caixa conferir na mao. */
+      pecas: pacote ? linhas.reduce((t,l)=>t+l.qtd,0) : undefined});
   });
 };

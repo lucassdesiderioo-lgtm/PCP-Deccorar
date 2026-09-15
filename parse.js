@@ -2,7 +2,7 @@ const pdfjs = require('pdfjs-dist/legacy/build/pdf.js');
 pdfjs.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.js';
 /* A leitura crua do PDF mora toda no folha.js — inclusive "que pagina e esta" e
    "qual o numero desta nota". Aqui elas gravam; na auditoria elas conferem. */
-const {tipoDaPagina,nfDaNota,itensDaFolha} = require('./folha');
+const {tipoDaPagina,nfDaNota,itensDaFolha,irmaosDe} = require('./folha');
 /* "Estes dois nomes sao a mesma pessoa?" e do nome.js, dono unico: a conferencia
    de NF faz a MESMA pergunta, e duas reguas discordariam sobre o mesmo cliente. */
 const {mesmoCliente} = require('./nome');
@@ -243,6 +243,19 @@ async function parsePdf(uint8){
     const r1=busca(leitura1), r2=busca(leitura2), rec=r1||r2;
     const motivos=[];
 
+    /* ESTA ETIQUETA LEVA MAIS DE UM PRODUTO? (§5-B)
+       Os irmaos saem do `itensFolha` pela regua do folha.js, e o pai tem que
+       ser o `r1`: a leitura 1 guarda os PROPRIOS objetos do itensFolha, entao
+       e ela que sabe qual bloco e este volume. O tokenizer monta objetos novos
+       e nao serve de ancora aqui.
+       A LISTA COMECA PELO PAI porque ele tambem e peca da caixa: a conta de
+       "quantas persianas vao aqui" e a soma dos dois lados, e uma lista que
+       comecasse nos irmaos leria como "1 + 2" em vez de "3". */
+    const irmaos = r1 ? irmaosDe(itensFolha, r1) : [];
+    const itensDoVolume = irmaos.length
+      ? [r1].concat(irmaos).map(b=>({sku:b.sku, qtd:b.qtd, cor:b.cor||null, descricao:b.desc||null}))
+      : null;
+
     // 1. as duas leituras da folha discordam sobre o SKU deste volume
     if(r1&&r2&&r1.sku!==r2.sku) motivos.push('leituras divergem: '+r1.sku+' / '+r2.sku);
 
@@ -303,6 +316,12 @@ async function parsePdf(uint8){
          ("Cortina Rolo Blackout" x "Toucher Rolo Evolux"), a unica dimensao que
          medida e cor nao separam. O upload guarda e aprende com ela. */
       descricao:(rec&&rec.desc)||null, despacharEm, modalidade, despachoLinha,
+      /* `itens` so vem preenchido quando a etiqueta leva MAIS DE UM produto —
+         null e o caso normal, uma etiqueta uma persiana. Ele NAO entra no
+         `conflito`: a duvida ali e sobre QUAL peca o cliente comprou, e o
+         pacote nao tem duvida nenhuma, tem peca a mais. Sao dois motivos de
+         retencao diferentes, com telas e resolvedores diferentes. */
+      itens: itensDoVolume,
       buyer:buyer||'(sem nome)',city,nf,packId,venda,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
   }
   return orders;

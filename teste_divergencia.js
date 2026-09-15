@@ -187,6 +187,75 @@ function conferir(nome,cond,detalhe){
     conferir('e agora aparece na lista de SKU sem cadastro', b.body.length===1 && b.body[0].codigo==='BK999999PRETO', JSON.stringify(b.body));
     fechar(ctx);
   }
+  /* ── A ETIQUETA COM MAIS DE UM PRODUTO (§5-B, armadilha #23) ──────────────
+     Caso real de 15/09/2026: NF 6585, Fabiano Pereira — UMA etiqueta com três
+     persianas de dois SKUs. Antes disso o volume passava LIMPO (conflito null)
+     e as duas peças do irmão sumiam sem aviso.
+     A trava aqui não é sobre QUAL peça (isso é divergência) — é sobre QUANTAS,
+     e por isso tem motivo, tela e resolvedor próprios. */
+  {
+    const ctx=await montar(); const db=ctx.db;
+    const id=db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,bloqueio,modalidade)
+      VALUES ('BK120120BEGE','Fabiano Pereira','6585','2000015040457349','2000018468081338','bloqueado',?,'coleta')`)
+      .run('pacote: esta etiqueta leva 3 pecas de 2 SKUs — 1x BK120120BEGE + 2x BK140140BEGE').lastInsertRowid;
+    db.prepare("INSERT INTO skus (codigo,largura_cm,altura_cm,cor_codigo,tecido_codigo,modelo_id) VALUES ('BK120120BEGE',120,120,'BEGE','BLACKOUT',1)").run();
+    db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK120120BEGE',1,'folha')").run(id);
+    db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK140140BEGE',2,'folha')").run(id);
+
+    const p=await chamar(ctx,'GET','/api/pacote/pendentes');
+    const v0=p.body[0]||{};
+    conferir('o volume do pacote sai na tela com as peças que a folha leu',
+      p.body.length===1 && (v0.itens||[]).length===2 && v0.itens[0].codigo==='BK120120BEGE' && v0.itens[1].qtd===2,
+      JSON.stringify(p.body));
+    conferir('e cada peça vem com o que ela É, não só o código (§7)',
+      v0.itens[0].largura_cm===120 && v0.itens[0].cor_nome==='Bege' && v0.itens[0].cadastrado===1,
+      JSON.stringify(v0.itens[0]));
+
+    /* O volume do pacote NAO pode aparecer na lista generica de bloqueados:
+       ali a solucao e cadastrar SKU, e cadastrar SKU nao diz quantas persianas
+       vao na caixa. Misturar as duas esconde a que e grave. */
+    const b=await chamar(ctx,'GET','/api/bloqueados');
+    conferir('e não se mistura com os bloqueados por SKU sem cadastro', b.body.length===0, JSON.stringify(b.body));
+
+    /* A TRAVA DO §6 VALE PARA CADA PECA, e nao so pro `lote.codigo`. */
+    const ruim=await chamar(ctx,'POST','/api/pacote/resolver',{id,itens:[{codigo:'BK120120BEGE',qtd:1},{codigo:'BK999PRETO',qtd:1}]});
+    conferir('assinar com um SKU fora do cadastro é recusado, dizendo qual',
+      !!ruim.body.erro && /BK999PRETO/.test(ruim.body.erro), JSON.stringify(ruim.body));
+    conferir('e o volume continua retido depois da recusa',
+      db.prepare('SELECT estagio FROM lote WHERE id=?').get(id).estagio==='bloqueado');
+
+    /* CONCORDAR COM A FOLHA E UM CLIQUE — e a licao da §5: a tela que so aceita
+       discordar prende o volume para sempre. */
+    const r=await chamar(ctx,'POST','/api/pacote/resolver',
+      {id,itens:[{codigo:'BK120120BEGE',qtd:1},{codigo:'BK140140BEGE',qtd:2}]});
+    const v=db.prepare('SELECT * FROM lote WHERE id=?').get(id);
+    conferir('assinar solta o volume e conta as peças',
+      r.body.ok && r.body.pecas===3 && v.estagio==='pendente' && v.bloqueio===null, JSON.stringify({r:r.body,v}));
+    conferir('a dúvida vira história: quem assinou, quando, e qual era',
+      /^pacote:/.test(v.bloqueio_resolvido||'') && v.resolvido_por==='Conferente' && !!v.resolvido_em,
+      JSON.stringify({b:v.bloqueio_resolvido,q:v.resolvido_por}));
+    conferir('as peças passam a ser da GESTÃO, não da folha',
+      db.prepare("SELECT COUNT(*) c FROM lote_item WHERE lote_id=? AND origem='gestao'").get(id).c===2);
+    conferir('e continua sendo UM volume: nenhuma etiqueta foi inventada',
+      db.prepare("SELECT COUNT(*) c FROM lote WHERE packId='2000015040457349'").get().c===1);
+
+    /* O conserto existe: a folha pode ter lido errado, e quem abriu o pedido no
+       ML troca o SKU. Sem isso a tela so sabe concordar. */
+    const id2=db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,estagio,bloqueio)
+      VALUES ('BK140140BEGE','Outro','6586','p9','bloqueado','pacote: esta etiqueta leva 2 pecas de 2 SKUs')`).run().lastInsertRowid;
+    db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK140140BEGE',1,'folha')").run(id2);
+    db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK160160CINZA',1,'folha')").run(id2);
+    const troca=await chamar(ctx,'POST','/api/pacote/resolver',
+      {id:id2,itens:[{codigo:'BK140140BEGE',qtd:1},{codigo:'BK160140BEGE',qtd:3}]});
+    const itens2=db.prepare('SELECT codigo,qtd FROM lote_item WHERE lote_id=? ORDER BY id').all(id2);
+    conferir('a gestão pode TROCAR o SKU e a quantidade que a folha trouxe',
+      troca.body.ok && troca.body.pecas===4 && itens2.length===2 &&
+      itens2[1].codigo==='BK160140BEGE' && itens2[1].qtd===3, JSON.stringify({r:troca.body,itens:itens2}));
+    conferir('e o lote.codigo passa a ser o da primeira peça',
+      db.prepare('SELECT codigo FROM lote WHERE id=?').get(id2).codigo==='BK140140BEGE');
+    fechar(ctx);
+  }
+
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));
   process.exit(falhas?1:0);

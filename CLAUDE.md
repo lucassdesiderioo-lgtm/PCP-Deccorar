@@ -283,7 +283,7 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > uma régua diferente da que gravou.
 >
 > **Rode `node teste_parse.js` após qualquer mudança no `parse.js`, no `folha.js`
-> ou no `nome.js`** — os 14 casos montam a folha no formato REAL do ML, e o caso
+> ou no `nome.js`** — os 16 casos montam a folha no formato REAL do ML, e o caso
 > do Abraão está lá.
 >
 > Para conferir o que já está gravado: `node rastrear.js --auditar [dias]`.
@@ -327,12 +327,15 @@ carregamento).
 > aparecer venda de 3 peças com uma etiqueta só, isso é assunto do PDF do
 > Mercado Livre — não se resolve multiplicando número dentro do sistema.
 
-**Pergunta em aberto (a investigar, sem código):** a folha de controle traz o
-campo `Quantidade`, e ele já apareceu maior que 1. Pela regra acima isso não
-deveria acontecer, então falta olhar um PDF real desses e entender o que aquele
-número significa. Enquanto não se sabe, **nada no sistema decide por ele** — o
-`folha.js` lê o campo e o `rastrear.js --lote` só o exibe, para o dia em que
-alguém for investigar.
+**~~Pergunta em aberto~~ — RESPONDIDA em 15/09/2026, ver armadilha #23.** A folha
+traz o campo `Quantidade`, e ele aparecia maior que 1 sem ninguém saber o que
+significava. O PDF da NF 6585 mostrou: é o **pacote de vários produtos** do
+Mercado Livre — uma etiqueta com mais de uma persiana. Hoje o volume é retido e
+a gestão assina as peças; `lote_item` guarda o que vai dentro da caixa.
+
+> O campo `Quantidade` do item **principal** continua sem mandar em nada: o
+> volume é um só, e é o `lote_item` que conta as peças. O que mudou é que agora
+> existe onde contá-las.
 
 **Do PDF até o número que o operador vê há SETE degraus**, e em seis deles o
 volume sai da conta por regra. Nenhum é bug — mas nenhum é visível, e é por
@@ -365,6 +368,125 @@ volume que já existia. Só lê — pode rodar em produção.
 > ⚠️ Ele usa o `fila_dia.js` para contar a fila de hoje, e não uma cópia da
 > regra. Uma ferramenta de diagnóstico com régua própria é pior que nenhuma:
 > ela confirmaria com autoridade um número que a tela não usa.
+
+### ⚠️ ARMADILHA #23 — UMA ETIQUETA COM MAIS DE UM PRODUTO, e as peças a mais sumiam
+
+**15/09/2026, e é o dia em que a pergunta em aberto do §5 recebeu resposta.**
+Aquele parágrafo dizia: *"Se um dia aparecer venda de 3 peças com uma etiqueta
+só, isso é assunto do PDF do Mercado Livre."* Apareceu.
+
+O painel do ML mostrou **"Pacote de 2 produtos · 3 unidades"**. O PDF (NF 6585,
+Fabiano Pereira, pack `2000015040457349`) traz **uma** etiqueta, **uma** nota e,
+na folha de controle, **dois** itens:
+
+```
+RZ3OQY... Cortina Rolo Blackout 1,20x1,20 Blecaute Persiana Bege
+Pack ID: 2000015040457349   SKU: BK120120BEGE
+Venda: 2000018468081338     Quantidade: 1
+Fabiano Pereira             Cor: Bege
+                            Desenho do tecido: Liso
+Cortina Rolo Blackout 1,40x1,40 Persiana Blecaute Bege     ← o IRMÃO
+SKU: BK140140BEGE
+Quantidade: 2
+Cor: Bege
+Desenho do tecido: Liso
+```
+
+> **O que acontecia:** o parse casava a etiqueta com o item de cima, gravava
+> `BK120120BEGE` e devolvia `conflito: null`. **As duas persianas do irmão
+> sumiam por completo** — não viravam volume, não baixavam estoque, não
+> apareciam em tela nenhuma. A caixa levava 3 e o sistema conhecia 1. Na
+> bancada: bipa uma, imprime, baixa uma, e as outras duas dependem de alguém
+> lembrar de olhar o painel do ML. No estoque: duas peças saem da prateleira e
+> o saldo não anda. Nenhum aviso, em lugar nenhum.
+
+**O irmão se reconhece por AUSÊNCIA**, e é a mesma família de sinal fraco da
+#21: ele não traz `Pack ID:`, nem `Venda:`, nem comprador — só descrição, SKU,
+quantidade, cor e tecido.
+
+> ⚠️ **NÃO CONFUNDIR COM O CASO ABRAÃO (#4), QUE É O CONTRÁRIO DISTO.** Lá o
+> item também vinha sem Pack ID, mas trazia **`Venda:` e o comprador**: era um
+> item inteiro cuja etiqueta veio pela venda em vez do pack, e herdar o pack do
+> vizinho mandou a peça errada pro cliente. Aqui os **três** campos faltam de
+> uma vez. É só isso que separa "item irmão" de "item que o PDF desalinhou" — e
+> está no documento, não num palpite: **o irmão é o único item que não tem como
+> ser identificado sozinho.** Item com venda ou comprador NUNCA é irmão.
+>
+> `folha.js` → `irmaosDoPacote()` é o dono único dessa leitura. Os dois casos
+> têm teste lado a lado (casos 2 e 17 do `teste_parse.js`) e **têm que passar
+> juntos**: quem afrouxar um quebra o outro, que é exatamente o ponto.
+
+### A regra do dono continua inteira — o que faltava era o CONTEÚDO da caixa
+
+> *"Não tem essa de juntar etiqueta, não tem essa de juntar pacote, não tem essa
+> de juntar caixa."*
+
+Continua valendo, e o código a respeita: **um volume, uma linha em `lote`, uma
+etiqueta de venda, um bipe no carregamento.** O ML juntou as peças; o sistema
+não junta nada. O que passou a existir é a tabela **`lote_item`** — o que vai
+*dentro* daquela caixa.
+
+| | Grão | Tabela |
+|---|---|---|
+| a etiqueta / o volume | uma caixa, um ciclo | `lote` |
+| **a peça** | **uma persiana** | **`lote_item`** |
+
+> ⚠️ **NÃO "CONSERTE" ISSO CRIANDO N LINHAS EM `lote`.** Três linhas para um
+> envio que o ML despachou como um só criariam duas etiquetas de venda que não
+> existem, e o volume nunca fecharia no carregamento (#8). O grão de `lote` é a
+> **etiqueta**; o grão de `lote_item` é a **peça**. E a dedup (#5) recusaria o
+> segundo de qualquer jeito: o Pack ID é o mesmo.
+
+### O caminho do volume, decidido pelo dono em 15/09/2026
+
+**1. O upload RETÉM** (`bloqueio = 'pacote: esta etiqueta leva N pecas de M
+SKUs — ...'`), e grava os itens que a folha leu em `lote_item` com
+`origem='folha'`. Vem logo **depois da divergência** (peça errada é mais grave)
+e **antes de tudo o mais**: nenhuma trava seguinte responde por conteúdo de
+caixa — cadastrar SKU não diz quantas persianas vão dentro, e escolher agência
+ou coleta muito menos.
+
+**2. Admin → Bloqueados, card âmbar próprio: a gestão ASSINA as peças.** A lista
+nasce preenchida com o que a folha disse — **concordar é um clique** — e cada
+linha aceita **bipe**, troca de SKU, troca de quantidade, remoção e acréscimo.
+É a lição da §5 (Bloqueados → escolher): trava que sabe acusar e não sabe
+liberar é trava que a equipe aprende a contornar. A trava do §6 vale **para cada
+peça**, não só para o `lote.codigo`. A decisão vira história
+(`bloqueio_resolvido`, `resolvido_por`, `resolvido_em`) e vai para a auditoria.
+
+**3. Etiqueta de Venda: sem o bipe de TODAS as peças, não imprime.** Tela âmbar
+própria (`📦 ESTA CAIXA LEVA 3 PERSIANAS`), uma linha por peça com o que ela é
+(`120 × 120 cm · Bege · Blackout · Rolô`, do mesmo `pecaTexto`), e o bipe marca
+cada uma. É o mesmo desenho do kit na embalagem (§4): **o bipe que falta recusa
+o passo seguinte**, em vez de avisar e deixar passar — aviso numa caixa de três
+persianas é aviso que se aprende a fechar. Depois de imprimir, a tela repete:
+`FECHE A CAIXA COM 3 PERSIANAS`, que é a última vez que alguém olha antes do
+saco preto.
+
+> **Aqui a lista APARECE, e não contradiz a conferência cega do carregamento
+> (§5).** Lá a caixa já está fechada e o bipe confere o que entrou; aqui a caixa
+> está sendo **montada**, e sem a lista a bancada não sabe o que buscar na
+> prateleira. É roteiro de separação, como a "Faltam imprimir". O que o sistema
+> não faz é dar a peça por conferida sem o bipe.
+
+**4. O estoque baixa POR PEÇA.** `1 × BK120120BEGE + 2 × BK140140BEGE` = três
+baixas. A trava de estoque também passou a ser por peça, e a recusa **nomeia o
+SKU que faltou** — numa caixa de três, "sem estoque" sem dizer de qual manda a
+bancada procurar no escuro.
+
+> **Um bipe por LINHA de item, não por unidade.** Duas persianas iguais têm a
+> mesma etiqueta de SKU, e bipar o mesmo código duas vezes não prova nada a
+> mais. A quantidade a tela mostra ao lado, para conferir na mão.
+
+> **Cadastrar SKU não solta volume retido por `pacote:`** (guarda no
+> `server.js`, como a da divergência e a da modalidade): cadastro não responde
+> quantas persianas vão na caixa. Soltar ali mandaria a caixa embora com a peça
+> a mais não conferida — o buraco que a trava existe para fechar.
+
+**Rode `node teste_parse.js` (casos 17 e 18), `node teste_divergencia.js` (os
+últimos 10 casos são o pacote) e `node teste_etiqueta.js` (os últimos 12) após
+mexer nisso.** Para achar os casos nos PDFs do servidor:
+`node conferir_nf.js --pdf` — a pergunta 0 do relatório é esta.
 
 ### ⚠️ ARMADILHA #22 — a NF é do PEDIDO, e a impressão leva a PRIMEIRA folha dela
 
@@ -1327,8 +1449,8 @@ material, `componente.estoque`/`custo_medio`. Apagar as linhas de
 `movimento_componente` não desfaz o saldo pela mesma razão de sempre — quem
 guarda o saldo é a coluna, o movimento é só a história dela.
 
-**Cobertura atual (10 tabelas):** `revisao`, `producao`, `montagem`, `lote`,
-`fila`, `devolucao`, `rejeicao`, `contagem`, `contagem_pendente` e
+**Cobertura atual (11 tabelas):** `revisao`, `producao`, `montagem`, `lote`,
+`lote_item`, `fila`, `devolucao`, `rejeicao`, `contagem`, `contagem_pendente` e
 `movimento_componente`. (`foto_estoque` saiu na Fase 3.)
 
 A lista fica em `TABELAS`, no topo do `teste_route.js`. Cada entrada traz a coluna
@@ -1421,8 +1543,8 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (14 casos), `teste_carga.js` (44), `teste_divergencia.js` (23) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (20), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
-| 11 | **A investigar: o que é o `Quantidade` da folha** — a regra é uma venda = uma etiqueta = uma persiana (§5), então esse campo não deveria vir maior que 1. Ninguém decide nada com ele hoje. Falta abrir um PDF real com `Quantidade > 1` e entender o que aquele número diz | Baixo enquanto nada o usar — mas é uma pergunta sem resposta sobre o documento de origem |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (16 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (32), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
+| 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
 ---
@@ -1443,6 +1565,14 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   etiqueta é uma persiana (§5); já foi tentado e revertido, e há teste travando
 - ❌ Fazer a leitura por pedaços (`split` em `Desenho do tecido`) voltar a rodar
   antes do tokenizer no `parse.js` — manda a peça errada pro cliente (§5)
+- ❌ Criar N linhas em `lote` para uma etiqueta que leva N persianas — o grão de
+  `lote` é a ETIQUETA, o de `lote_item` é a PEÇA (§5, armadilha #23)
+- ❌ Deixar a caixa de pacote imprimir sem o bipe de todas as peças, ou baixar
+  só uma do estoque: saíram N da prateleira (§5, armadilha #23)
+- ❌ Tratar como irmão de pacote um item que traz `Venda:` ou comprador — esse é
+  o caso Abraão, e herdar ali manda a peça errada pro cliente (§5, #4 e #23)
+- ❌ Deixar cadastro de SKU soltar volume retido por `pacote:` — cadastro não
+  responde quantas persianas vão na caixa (§5, armadilha #23)
 - ❌ Tratar NF repetida como duplicidade: a nota é do **pedido**, e o cliente com
   três persianas tem três vendas e uma nota só (§5, armadilha #22)
 - ❌ Deixar o mapa `danfeByNf` sem guarda: a última folha da nota vence e a

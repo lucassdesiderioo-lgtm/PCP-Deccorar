@@ -11,6 +11,10 @@ module.exports=function(app, db){
     {nome:'producao',     pk:'id',   rotulo:'producao'},
     {nome:'montagem',     pk:'id',   rotulo:'embalagem'},
     {nome:'lote',         pk:'id',   rotulo:'expedicao'},
+    // As pecas dentro da caixa (§5-B). Andam junto com o `lote`: apagar o
+    // volume de teste e deixar os itens dele de pe criaria linha orfa, e o
+    // proximo volume com o mesmo id herdaria pecas que nunca foram dele.
+    {nome:'lote_item',    pk:'id',   rotulo:'pecas do volume'},
     {nome:'fila',         pk:'id',   rotulo:'fila'},
     {nome:'devolucao',    pk:'id',   rotulo:'devolucoes'},
     {nome:'rejeicao',     pk:'id',   rotulo:'problemas'},

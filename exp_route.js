@@ -44,6 +44,39 @@ module.exports=function(app,db){
   try{ db.exec("ALTER TABLE lote ADD COLUMN modalidade TEXT"); }catch(e){}
   try{ db.exec("ALTER TABLE lote ADD COLUMN retirado_em TEXT"); }catch(e){}
 
+  /* ── AS PECAS DENTRO DA CAIXA (§5-B, desde 15/09/2026) ─────────────────────
+     Ate aqui uma etiqueta era uma persiana, e por isso `lote.codigo` bastava.
+     Em 15/09/2026 o Mercado Livre despachou UMA etiqueta com TRES persianas de
+     DOIS SKUs (NF 6585, Fabiano Pereira) — o "Pacote de 2 produtos" do painel.
+
+     ⚠️ ISTO NAO E "JUNTAR ETIQUETA". A regra do dono continua inteira: cada
+     etiqueta de venda e UMA, e o volume segue sendo UMA linha em `lote`, um
+     carregamento, um bipe na porta do carro. O que faltava era o sistema saber
+     O QUE VAI DENTRO dessa caixa — e era isso que sumia em silencio: o parse
+     gravava so o item de cima, e as outras duas persianas nao viravam volume,
+     nao baixavam estoque e nao apareciam em tela nenhuma.
+
+     Por que uma TABELA e nao N linhas em `lote`: tres linhas para um envio que
+     o ML despachou como um so criariam duas etiquetas de venda que nao existem,
+     e o volume nunca fecharia no carregamento (§5, armadilha #8). O grao de
+     `lote` e a ETIQUETA; o grao daqui e a PECA.
+
+     `conferido_em` e o bipe da bancada antes de imprimir: sem ele a peca a mais
+     depende de alguem lembrar, e lembrar nao e processo. */
+  db.exec(`CREATE TABLE IF NOT EXISTS lote_item (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lote_id INTEGER NOT NULL,
+    codigo TEXT,
+    qtd INTEGER DEFAULT 1,
+    cor TEXT,
+    descricao TEXT,
+    origem TEXT DEFAULT 'folha',
+    conferido_em TEXT,
+    conferido_por TEXT,
+    criado_em TEXT DEFAULT (datetime('now','localtime')),
+    teste INTEGER DEFAULT 0);`);
+  try{ db.exec("CREATE INDEX IF NOT EXISTS ix_lote_item_lote ON lote_item(lote_id)"); }catch(e){}
+
   /* ── O QUE O SISTEMA APRENDE SOBRE FAMILIA x PREFIXO DE SKU ────────────────
      Medida e cor nao separam duas pecas que so diferem no TECIDO — e elas
      existem no catalogo: BK160140BEGE ("Cortina Rolo Blackout") e
@@ -96,7 +129,9 @@ module.exports=function(app,db){
       const famVista=db.prepare('SELECT prefixo,vezes FROM familia_sku WHERE familia=?');
       const famGrava=db.prepare(`INSERT INTO familia_sku (familia,prefixo,vezes) VALUES (?,?,1)
         ON CONFLICT(familia,prefixo) DO UPDATE SET vezes=vezes+1, visto_em=datetime('now','localtime')`);
-      let novos=0,rep=0,semsku=0,bloq=0,divs=0,coleta=0,modal=0; const desconhecidos={};
+      const insItem=db.prepare(`INSERT INTO lote_item (lote_id,codigo,qtd,cor,descricao,origem)
+        VALUES (?,?,?,?,?,'folha')`);
+      let novos=0,rep=0,semsku=0,bloq=0,divs=0,coleta=0,modal=0,pacotes=0; const desconhecidos={};
       db.transaction(()=>{ for(const o of orders){
         if((o.packId&&seen.has('p:'+o.packId))||(o.venda&&seen.has('v:'+o.venda))){ rep++; continue; }
         if(o.packId)seen.add('p:'+o.packId); if(o.venda)seen.add('v:'+o.venda);
@@ -123,6 +158,21 @@ module.exports=function(app,db){
            discordam nao pode ser liberado por cadastro de SKU, porque nao e o
            cadastro que esta em duvida — e qual peca o cliente comprou. */
         if(conflito){ est='bloqueado'; bloq++; divs++; motivo='divergencia: '+conflito; }
+        /* A ETIQUETA COM MAIS DE UM PRODUTO (§5-B, armadilha #23).
+           Vem logo DEPOIS da divergencia e ANTES de tudo o mais porque a
+           pergunta e sobre o CONTEUDO DA CAIXA, e nenhuma das travas seguintes
+           responde por ele: cadastrar SKU nao diz quantas persianas vao dentro,
+           e escolher agencia ou coleta muito menos.
+           Ate 15/09/2026 este volume passava com conflito NULL e as pecas dos
+           irmaos sumiam sem uma linha de aviso. Reter e o que a regra do dono
+           manda fazer com etiqueta que o sistema nao conhece (§8-B): a gestao
+           abre o pedido no ML, confere os SKUs e assina. */
+        else if(o.itens && o.itens.length>1){
+          est='bloqueado'; bloq++; pacotes++;
+          const pecas=o.itens.reduce((s,i)=>s+(i.qtd||1),0);
+          motivo='pacote: esta etiqueta leva '+pecas+' pecas de '+o.itens.length+' SKUs — '
+            +o.itens.map(i=>i.qtd+'x '+i.sku).join(' + ');
+        }
         /* A ETIQUETA EM FORMATO QUE O SISTEMA NAO CONHECE (§8-B, armadilha #21).
            A modalidade e lida da linha "Despachar:", e so os dois formatos
            conhecidos decidem. Linha diferente, ou sem linha, e o Mercado Livre
@@ -142,13 +192,22 @@ module.exports=function(app,db){
         if(!o.sku) semsku++;
         if(o.modalidade==='coleta') coleta++;
         const modGravada=(o.modalidade==='agencia'||o.modalidade==='coleta')?o.modalidade:null;
-        ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null,o.despacharEm||null,modGravada); novos++;
+        const r=ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null,o.despacharEm||null,modGravada); novos++;
+        /* AS PECAS DA CAIXA SAO GRAVADAS MESMO COM O VOLUME RETIDO — ou melhor,
+           JUSTAMENTE por ele estar retido: e esta lista que a gestao vai ler na
+           tela pra assinar os SKUs. `origem='folha'` marca que quem disse isso
+           foi o documento, e nao uma pessoa; a decisao da gestao reescreve com
+           `origem='gestao'`, e as duas se distinguem depois. */
+        if(o.itens && o.itens.length>1) for(const it of o.itens)
+          insItem.run(r.lastInsertRowid, String(it.sku||'').toUpperCase()||null,
+                      it.qtd||1, it.cor||null, it.descricao||null);
       }})();
       /* `coleta` vai na resposta pra quem subiu o PDF ver na hora quantos
          volumes o caminhao vai buscar — e estranhar se der zero num PDF de
          coleta, ou o lote inteiro num PDF de agencia (a marca e fraca).
          `modalidade_duvida` e o que ficou retido por formato desconhecido. */
       res.json({ok:true,total:orders.length,novos,repetidas:rep,sem_sku:semsku,bloqueados:bloq,divergencias:divs,coleta,modalidade_duvida:modal,
+                pacotes,
                 desconhecidos:Object.keys(desconhecidos).map(k=>({sku:k,qtd:desconhecidos[k]}))});
     }catch(e){ console.error(e); res.status(500).json({erro:String(e.message||e)}); }
   });
@@ -160,7 +219,83 @@ module.exports=function(app,db){
     res.json(db.prepare(`SELECT codigo, COUNT(*) qtd, GROUP_CONCAT(DISTINCT buyer) compradores
       FROM lote WHERE estagio='bloqueado' AND COALESCE(bloqueio,'') NOT LIKE 'divergencia%'
         AND COALESCE(bloqueio,'') NOT LIKE 'modalidade%'
+        AND COALESCE(bloqueio,'') NOT LIKE 'pacote%'
       GROUP BY codigo ORDER BY qtd DESC`).all());
+  });
+
+  /* ── A ETIQUETA COM MAIS DE UM PRODUTO: A GESTAO ASSINA OS SKUs (§5-B) ────
+     O volume retido por `pacote:` nao esta em duvida sobre QUAL peca — esta em
+     duvida sobre QUANTAS, e quais. O documento ja disse (os itens vem gravados
+     em `lote_item` com origem='folha'), mas a folha e justamente o papel que
+     acabou de mudar de formato: quem assina e a gestao, com o pedido aberto no
+     Mercado Livre.
+     A lista vai com o que a peca E (as colunas de `skus`, §7) e nao so o
+     codigo — e a mesma informacao que a bancada le pra conferir a persiana. */
+  app.get('/api/pacote/pendentes',(req,res)=>{
+    const vols=db.prepare(`SELECT id,codigo,buyer,city,nf,packId,venda,data,despachar_em,bloqueio,descricao,modalidade
+      FROM lote WHERE estagio='bloqueado' AND bloqueio LIKE 'pacote%'
+      ORDER BY data DESC, id DESC`).all();
+    const itens=db.prepare(`SELECT i.id,i.codigo,i.qtd,i.cor,i.descricao,i.origem,
+        s.largura_cm,s.altura_cm, COALESCE(c.nome,s.cor_codigo,s.cor) cor_nome,
+        COALESCE(t.nome,s.tecido_codigo) tecido_nome, m.nome modelo_nome,
+        COALESCE(m.exige_medida,1) exige_medida,
+        CASE WHEN s.codigo IS NULL THEN 0 ELSE 1 END cadastrado
+      FROM lote_item i
+      LEFT JOIN skus s ON s.codigo=UPPER(i.codigo)
+      LEFT JOIN cor c ON c.codigo=s.cor_codigo
+      LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
+      LEFT JOIN modelo m ON m.id=s.modelo_id
+      WHERE i.lote_id=? ORDER BY i.id`);
+    res.json(vols.map(v=>Object.assign({},v,{
+      motivo:String(v.bloqueio||'').replace(/^pacote:\s*/,''),
+      itens:itens.all(v.id)
+    })));
+  });
+
+  /* Resolver = alguem ABRIU O PEDIDO NO ML e disse o que vai na caixa.
+     A lista mandada SUBSTITUI a da folha: e por isso que o item errado da folha
+     tem conserto, e e por isso que a origem passa a ser 'gestao'. */
+  app.post('/api/pacote/resolver',(req,res)=>{
+    const b=req.body||{};
+    const id=Number(b.id);
+    const itens=Array.isArray(b.itens)?b.itens:[];
+    if(!id) return res.status(400).json({erro:'informe o volume'});
+    if(!itens.length) return res.status(400).json({erro:'informe as pecas que vao na caixa'});
+    const o=db.prepare('SELECT * FROM lote WHERE id=?').get(id);
+    if(!o) return res.status(404).json({erro:'volume nao encontrado'});
+    if(!/^pacote/.test(String(o.bloqueio||''))) return res.json({erro:'esse volume nao esta retido por pacote'});
+
+    /* A TRAVA DO §6 CONTINUA DE PE, E AGORA VALE PARA CADA PECA. Antes ela
+       olhava so o `lote.codigo`; uma caixa com tres persianas em que a segunda
+       nao esta no cadastro passaria com duas conferidas e uma cega. */
+    const existe=db.prepare('SELECT 1 FROM skus WHERE codigo=?');
+    const limpos=[];
+    for(const it of itens){
+      const sku=String(it.codigo||'').trim().toUpperCase();
+      const qtd=Math.max(1, parseInt(it.qtd,10)||1);
+      if(!sku) return res.json({erro:'uma das pecas veio sem SKU'});
+      if(!existe.get(sku)) return res.json({erro:'SKU nao cadastrado: '+sku+
+        '. Cadastre em Cadastro de SKU e volte aqui — a trava do §6 recusaria a etiqueta de qualquer jeito.'});
+      limpos.push({sku,qtd,cor:it.cor||null,descricao:it.descricao||null});
+    }
+    const quem=(req.usuario&&req.usuario.nome)||'';
+    /* O `lote.codigo` fica sendo o da PRIMEIRA peca. Ele nao descreve mais a
+       caixa inteira — quem descreve e o `lote_item` —, mas continua sendo por
+       onde o bipe do SKU acha esta venda na Etiqueta de Venda, e toda tela
+       antiga que le `codigo` segue funcionando. */
+    db.transaction(()=>{
+      db.prepare('DELETE FROM lote_item WHERE lote_id=?').run(id);
+      const ins=db.prepare(`INSERT INTO lote_item (lote_id,codigo,qtd,cor,descricao,origem)
+        VALUES (?,?,?,?,?,'gestao')`);
+      for(const it of limpos) ins.run(id,it.sku,it.qtd,it.cor,it.descricao);
+      db.prepare(`UPDATE lote SET codigo=?, estagio='pendente', bloqueio=NULL,
+        bloqueio_resolvido=?, resolvido_por=?, resolvido_em=datetime('now','localtime')
+        WHERE id=?`).run(limpos[0].sku, o.bloqueio, quem, id);
+    })();
+    const pecas=limpos.reduce((s,i)=>s+i.qtd,0);
+    try{ app.locals.acesso.auditar(req,'expedicao','resolver_pacote',id,
+      String(o.bloqueio||'')+'  ->  '+limpos.map(i=>i.qtd+'x '+i.sku).join(' + ')+'  ('+pecas+' pecas)'); }catch(e){}
+    res.json({ok:true,id,pecas,itens:limpos});
   });
 
   /* ── ETIQUETA EM FORMATO DESCONHECIDO: A GESTAO DECIDE (§8-B) ─────────────
