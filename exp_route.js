@@ -131,7 +131,7 @@ module.exports=function(app,db){
         ON CONFLICT(familia,prefixo) DO UPDATE SET vezes=vezes+1, visto_em=datetime('now','localtime')`);
       const insItem=db.prepare(`INSERT INTO lote_item (lote_id,codigo,qtd,cor,descricao,origem)
         VALUES (?,?,?,?,?,'folha')`);
-      let novos=0,rep=0,semsku=0,bloq=0,divs=0,coleta=0,modal=0,pacotes=0; const desconhecidos={};
+      let novos=0,rep=0,semsku=0,bloq=0,divs=0,coleta=0,modal=0,pacotes=0,naoFecha=0; const desconhecidos={};
       db.transaction(()=>{ for(const o of orders){
         if((o.packId&&seen.has('p:'+o.packId))||(o.venda&&seen.has('v:'+o.venda))){ rep++; continue; }
         if(o.packId)seen.add('p:'+o.packId); if(o.venda)seen.add('v:'+o.venda);
@@ -173,6 +173,24 @@ module.exports=function(app,db){
           motivo='pacote: esta etiqueta leva '+pecas+' pecas de '+o.itens.length+' SKUs — '
             +o.itens.map(i=>i.qtd+'x '+i.sku).join(' + ');
         }
+        /* A FOLHA TEM ITEM SEM DONO E O PDF NAO FECHA (§5-B).
+           Aqui o sistema NAO SABE se aquele item e peca a mais nesta caixa ou
+           item legitimo que perdeu pack, venda e comprador na leitura — as duas
+           tem a mesma cara, e levam a caixas diferentes. Inventar um pacote
+           juntaria duas vendas separadas; ignorar o item deixaria peca sumir de
+           novo. Entao retem e conta o que viu.
+
+           VAI COMO `divergencia:` DE PROPOSITO, e nao com prefixo proprio: e
+           literalmente uma duvida de LEITURA da folha — a mesma familia da
+           conferencia 1 —, e o card vermelho que ja existe sabe resolve-la
+           (escolher o SKU, com campo que aceita bipe). Prefixo novo custaria
+           mais uma tela, mais um resolvedor e mais uma guarda no server.js pra
+           responder a mesma pergunta que o de sempre. */
+        else if(o.folhaNaoFecha){
+          est='bloqueado'; bloq++; divs++; naoFecha++;
+          motivo='divergencia: '+o.folhaNaoFecha
+            +' — confira o pedido no Mercado Livre, ou suba o PDF de novo';
+        }
         /* A ETIQUETA EM FORMATO QUE O SISTEMA NAO CONHECE (§8-B, armadilha #21).
            A modalidade e lida da linha "Despachar:", e so os dois formatos
            conhecidos decidem. Linha diferente, ou sem linha, e o Mercado Livre
@@ -207,7 +225,7 @@ module.exports=function(app,db){
          coleta, ou o lote inteiro num PDF de agencia (a marca e fraca).
          `modalidade_duvida` e o que ficou retido por formato desconhecido. */
       res.json({ok:true,total:orders.length,novos,repetidas:rep,sem_sku:semsku,bloqueados:bloq,divergencias:divs,coleta,modalidade_duvida:modal,
-                pacotes,
+                pacotes, folha_nao_fecha:naoFecha,
                 desconhecidos:Object.keys(desconhecidos).map(k=>({sku:k,qtd:desconhecidos[k]}))});
     }catch(e){ console.error(e); res.status(500).json({erro:String(e.message||e)}); }
   });

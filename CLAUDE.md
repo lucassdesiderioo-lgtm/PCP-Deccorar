@@ -283,7 +283,7 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > uma régua diferente da que gravou.
 >
 > **Rode `node teste_parse.js` após qualquer mudança no `parse.js`, no `folha.js`
-> ou no `nome.js`** — os 16 casos montam a folha no formato REAL do ML, e o caso
+> ou no `nome.js`** — os 17 casos montam a folha no formato REAL do ML, e o caso
 > do Abraão está lá.
 >
 > Para conferir o que já está gravado: `node rastrear.js --auditar [dias]`.
@@ -416,6 +416,42 @@ quantidade, cor e tecido.
 > têm teste lado a lado (casos 2 e 17 do `teste_parse.js`) e **têm que passar
 > juntos**: quem afrouxar um quebra o outro, que é exatamente o ponto.
 
+### ⚠️ AUSÊNCIA SÓ VALE COMO PACOTE QUANDO O PDF FECHA
+
+Ler ausência como "peça a mais" tem um buraco, e ele é a armadilha #10 por
+outra porta: **o pdf.js come campo**. Um item legítimo cujos três
+identificadores ficaram ilegíveis tem *exatamente* a mesma cara do irmão — e
+tratá-lo como peça a mais juntaria duas vendas separadas numa caixa que não
+existe, que é o erro contrário ao que o pacote veio consertar.
+
+A evidência que separa os dois não está no item: está na **conta do documento**.
+
+| | etiquetas | itens | etiqueta sem item | leitura |
+|---|---|---|---|---|
+| **pacote de verdade** | 1 | 2 | nenhuma | o órfão é peça a mais |
+| **leitura quebrada** | 2 | 2 | **uma** | o órfão é item que perdeu os campos |
+
+Por isso `pdfFecha` (no `parse.js`) é a **licença** para ler ausência como
+pacote: o órfão só vira irmão quando **nenhuma etiqueta do PDF ficou sem item**.
+Sobrou etiqueta órfã, o sistema **não inventa pacote** — retém dizendo a conta
+que não bateu (`2 etiqueta(s), 2 item(ns), e 1 etiqueta(s) sem item na folha`),
+e manda conferir o pedido no ML ou subir o PDF de novo.
+
+> **Esse volume vai como `divergencia:`, não com prefixo próprio.** É
+> literalmente uma dúvida de **leitura** da folha — a mesma família da
+> conferência 1 —, e o card vermelho que já existe sabe resolvê-la. Prefixo novo
+> custaria mais uma tela, mais um resolvedor e mais uma guarda no `server.js`
+> para responder a pergunta que o de sempre já responde.
+
+> ⚠️ **A BASE DESTE PADRÃO É UM PDF.** O `irmaosDoPacote` nasceu de **um** caso
+> (NF 6585). Compare com a conferência 5, que só vira regra depois de **5**
+> ocorrências justamente porque *"uma folha sozinha não prova nada"*. Aqui o erro
+> é para o lado seguro — retém, nunca libera —, mas retenção falsa em série é a
+> armadilha #6: a equipe aprende a assinar sem olhar. **Acompanhe `pacotes` e
+> `folha_nao_fecha` na resposta do upload**: se os dois começarem a aparecer em
+> lote normal, o padrão está largo demais e o conserto é aqui, com o PDF na mão.
+> Caso 19 do `teste_parse.js` trava a guarda.
+
 ### A regra do dono continua inteira — o que faltava era o CONTEÚDO da caixa
 
 > *"Não tem essa de juntar etiqueta, não tem essa de juntar pacote, não tem essa
@@ -514,7 +550,7 @@ fica de fora — saiu por onde saiu, e mexer no saldo por causa dele hoje
 carimbaria uma saída que aconteceu noutro dia (a regra dos três scripts de
 passivo, §5).
 
-**Rode `node teste_parse.js` (casos 17 e 18), `node teste_divergencia.js` (os
+**Rode `node teste_parse.js` (casos 17, 18 e 19), `node teste_divergencia.js` (os
 últimos 10 casos são o pacote) e `node teste_etiqueta.js` (os últimos 12) após
 mexer nisso.** Para achar os casos nos PDFs do servidor:
 `node conferir_nf.js --pdf` — a pergunta 0 do relatório é esta.
@@ -1574,7 +1610,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (16 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (32), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (17 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (32), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
@@ -1602,6 +1638,8 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   só uma do estoque: saíram N da prateleira (§5, armadilha #23)
 - ❌ Tratar como irmão de pacote um item que traz `Venda:` ou comprador — esse é
   o caso Abraão, e herdar ali manda a peça errada pro cliente (§5, #4 e #23)
+- ❌ Ler ausência como pacote quando o PDF **não fecha** (sobrou etiqueta sem
+  item na folha): ali é leitura quebrada, não peça a mais (§5, armadilha #23)
 - ❌ Deixar cadastro de SKU soltar volume retido por `pacote:` — cadastro não
   responde quantas persianas vão na caixa (§5, armadilha #23)
 - ❌ Tratar NF repetida como duplicidade: a nota é do **pedido**, e o cliente com

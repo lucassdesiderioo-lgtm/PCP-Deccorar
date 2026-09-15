@@ -488,6 +488,55 @@ function conferir(nome, orders, esperado){
     else console.log('ok      venda normal nao vira pacote');
   }
 
+  /* ── 19. O PDF TEM QUE FECHAR PRA AUSENCIA VALER COMO PACOTE ─────────────
+        O caso 17 lê ausência (sem pack, sem venda, sem comprador) como "peça a
+        mais na mesma caixa". Só que o pdf.js COME CAMPO — a armadilha #10
+        inteira é sobre isso —, e um item LEGÍTIMO cujos três identificadores
+        ficaram ilegíveis tem exatamente a mesma cara do irmão.
+
+        A evidência que separa os dois está na conta do documento:
+
+          pacote     1 etiqueta, 2 itens — toda etiqueta achou o seu item
+          quebrado   2 etiquetas, 2 itens — uma etiqueta ficou SEM item
+
+        Sem esta guarda, duas vendas separadas viravam "um pacote de 2 peças" e
+        a gestão assinaria uma caixa que não existe — o erro contrário ao que o
+        pacote veio consertar. Com ela, o volume também para, mas dizendo a
+        verdade: a folha não casa com as etiquetas. */
+  casos++;
+  {
+    const d=await PDFDocument.create(), f=await d.embedFont(StandardFonts.Helvetica);
+    const pag=ls=>{ const p=d.addPage([595,842]); let y=800;
+      for(const l of ls){ p.drawText(l,{x:30,y,size:9,font:f}); y-=14; } };
+    pag(etiqueta({pack:'111',nf:'1',comprador:'Fabiano Pereira'}));
+    pag(etiqueta({pack:'222',nf:'2',comprador:'Maria Souza'}));
+    /* O segundo item perdeu Pack ID, Venda E comprador na leitura — mas a
+       etiqueta dele existe, e é isso que denuncia. */
+    pag(['Despachem as suas vendas o quanto antes.','Identifiicação Produtos',
+      'X Cortina Rolo Blackout 1,20x1,20 Blecaute Persiana Bege',
+      'Pack ID: 111 SKU: BK120120BEGE','Venda: 901 Quantidade: 1',
+      'Fabiano Pereira Cor: Bege','Desenho do tecido: Liso',
+      'Y Cortina Rolo Blackout 1,40x1,40 Persiana Blecaute Bege',
+      'SKU: BK140140BEGE','Quantidade: 1','Cor: Bege','Desenho do tecido: Liso']);
+    const arq=path.join(tmp,'t'+casos+'.pdf');
+    fs.writeFileSync(arq, await d.save());
+    const os_=await parsePdf(new Uint8Array(fs.readFileSync(arq)));
+    const erros=[];
+    if(os_.length!==2) erros.push('esperava 2 volumes (2 etiquetas), veio '+os_.length);
+    os_.forEach(v=>{
+      if(v.itens) erros.push(v.packId+' virou PACOTE sendo leitura quebrada: '+JSON.stringify(v.itens));
+      if(!v.folhaNaoFecha) erros.push(v.packId+' passou limpo — a folha não fechava e ninguém foi avisado');
+    });
+    /* A mensagem tem que carregar a CONTA, não só "deu ruim": é ela que a
+       gestão lê pra decidir se sobe o PDF de novo ou abre o pedido no ML. */
+    const m=(os_[0]||{}).folhaNaoFecha||'';
+    if(!/2 etiqueta/.test(m) || !/1 etiqueta\(s\) sem item/.test(m))
+      erros.push('a mensagem não diz a conta: '+JSON.stringify(m));
+    if(erros.length){ falhas++; console.log('FALHOU  ausencia so vira pacote quando o PDF fecha');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      ausencia so vira pacote quando o PDF fecha');
+  }
+
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));

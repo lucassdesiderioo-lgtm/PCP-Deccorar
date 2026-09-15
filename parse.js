@@ -2,7 +2,7 @@ const pdfjs = require('pdfjs-dist/legacy/build/pdf.js');
 pdfjs.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.js';
 /* A leitura crua do PDF mora toda no folha.js — inclusive "que pagina e esta" e
    "qual o numero desta nota". Aqui elas gravam; na auditoria elas conferem. */
-const {tipoDaPagina,nfDaNota,itensDaFolha,irmaosDe} = require('./folha');
+const {tipoDaPagina,nfDaNota,itensDaFolha,irmaosDe,irmaosDoPacote} = require('./folha');
 /* "Estes dois nomes sao a mesma pessoa?" e do nome.js, dono unico: a conferencia
    de NF faz a MESMA pergunta, e duas reguas discordariam sobre o mesmo cliente. */
 const {mesmoCliente} = require('./nome');
@@ -218,6 +218,36 @@ async function parsePdf(uint8){
     const nfPag=nfDaNota(pages[p].text);
     if(nfPag && danfeByNf[nfPag]==null) danfeByNf[nfPag]=p;
   }
+  /* ── O PDF FECHA? A CONTA DAS ETIQUETAS CONTRA OS ITENS (§5-B) ────────────
+     O item irmao do pacote se reconhece por AUSENCIA — sem pack, sem venda,
+     sem comprador (folha.js -> irmaosDoPacote). Só que o pdf.js come campo: a
+     armadilha #10 inteira e sobre isso, e um item LEGITIMO cujos tres
+     identificadores ficaram ilegiveis tem exatamente a mesma cara do irmao.
+     Tratar esse como peca a mais juntaria duas vendas separadas numa caixa
+     que nao existe — o erro contrario ao que o pacote veio consertar.
+
+     A evidencia POSITIVA que separa os dois esta na conta do documento:
+
+       pacote de verdade   1 etiqueta, 2 itens — TODA etiqueta achou o seu item
+       leitura quebrada    2 etiquetas, 2 itens — uma etiqueta ficou SEM item
+
+     Entao o orfao so vale como irmao quando nenhuma etiqueta ficou orfa. Se
+     sobrou etiqueta sem item, o PDF nao fecha, e o sistema NAO inventa um
+     pacote: retem dizendo o que viu, que e a regra do dono pra documento em
+     formato que ele nao conhece (§8-B, #21). */
+  const etiquetasDoPdf=[];
+  for(let p=1;p<=N;p++){
+    if(pages[p].type!=='label')continue;
+    const t=pages[p].text;
+    const g=re=>{ const mm=t.match(re); return mm?mm[1].replace(/\s+/g,''):null; };
+    etiquetasDoPdf.push({packId:g(/Pack ID:\s*([\d ]+)/), venda:g(/Venda:\s*([\d ]+)/)});
+  }
+  const semItem=etiquetasDoPdf.filter(e=>
+    !((e.venda&&leitura1.venda[e.venda])||(e.packId&&leitura1.pack[e.packId])));
+  /* `pdfFecha` e a licenca pra ler ausencia como pacote. Sem ela, ausencia
+     volta a significar so "nao deu pra ler", que e o que ela sempre foi. */
+  const pdfFecha = semItem.length===0;
+
   const orders=[], seen=new Set();
   for(let p=1;p<=N;p++){
     if(pages[p].type!=='label')continue;
@@ -251,9 +281,17 @@ async function parsePdf(uint8){
        A LISTA COMECA PELO PAI porque ele tambem e peca da caixa: a conta de
        "quantas persianas vao aqui" e a soma dos dois lados, e uma lista que
        comecasse nos irmaos leria como "1 + 2" em vez de "3". */
-    const irmaos = r1 ? irmaosDe(itensFolha, r1) : [];
+    const irmaos = (r1 && pdfFecha) ? irmaosDe(itensFolha, r1) : [];
     const itensDoVolume = irmaos.length
       ? [r1].concat(irmaos).map(b=>({sku:b.sku, qtd:b.qtd, cor:b.cor||null, descricao:b.desc||null}))
+      : null;
+    /* O PDF NAO FECHOU E AINDA HA ITEM SEM DONO: nao da pra dizer se e peca a
+       mais ou item que perdeu os identificadores na leitura. As duas respostas
+       levam a caixas diferentes, entao o sistema nao escolhe — retem e conta o
+       que viu. E a mesma regra da modalidade desconhecida (#21). */
+    const folhaNaoFecha = !pdfFecha && irmaosDoPacote(itensFolha).length
+      ? 'a folha nao casa com as etiquetas: '+etiquetasDoPdf.length+' etiqueta(s), '
+        +itensFolha.length+' item(ns), e '+semItem.length+' etiqueta(s) sem item na folha'
       : null;
 
     // 1. as duas leituras da folha discordam sobre o SKU deste volume
@@ -322,6 +360,9 @@ async function parsePdf(uint8){
          pacote nao tem duvida nenhuma, tem peca a mais. Sao dois motivos de
          retencao diferentes, com telas e resolvedores diferentes. */
       itens: itensDoVolume,
+      /* Preenchido só quando a folha traz item sem dono E o PDF não fecha — o
+         upload retém por ele, e a mensagem diz a conta que não bateu. */
+      folhaNaoFecha,
       buyer:buyer||'(sem nome)',city,nf,packId,venda,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
   }
   return orders;
