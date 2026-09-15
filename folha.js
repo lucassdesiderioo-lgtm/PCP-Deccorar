@@ -18,7 +18,37 @@ function pageLines(tc){
     .map(y=>rows[y].sort((a,b)=>a.x-b.x).map(o=>o.s).join(' ').replace(/\s+/g,' ').trim());
 }
 
-/* Devolve {paginas, etiquetas:[{pagina,packId,venda,nf}], blocos:[{packId,venda,sku}]}.
+/* O QUE E CADA PAGINA DO PDF — 'control' (folha), 'danfe' (nota), 'label'
+   (etiqueta) ou 'other'.
+ *
+ * A ORDEM DOS TESTES E A REGRA, nao estilo: a folha de controle ganha de tudo
+ * (e a unica que traz "SKU:"), a nota vem antes da etiqueta porque a DANFE
+ * tambem carrega numeros de venda no corpo, e "other" e o resto.
+ *
+ * Mora aqui pelo mesmo motivo do itensDaFolha: o parse.js classifica para
+ * GRAVAR o volume (e e daqui que sai a pagina da nota que vai ser impressa), o
+ * rastrear.js e o conferir_nf.js classificam para CONFERIR o que ficou gravado.
+ * Com duas copias, a conferencia chamaria de nota uma pagina que o parse nao
+ * chamou — e diria com autoridade que a impressao esta certa olhando outro
+ * papel. */
+function tipoDaPagina(texto){
+  const t=String(texto||'');
+  if(/SKU:/.test(t)) return 'control';
+  if(/DANFE/.test(t)||/Chave de acesso/i.test(t)) return 'danfe';
+  if(/Pack ID:/.test(t)||/Venda:/.test(t)) return 'label';
+  return 'other';
+}
+
+/* O NUMERO DA NOTA dentro de uma pagina de DANFE — a chave que liga a etiqueta
+   ("NF: 5416") a pagina que vai ser impressa junto com ela. Mesma regua nos
+   dois lados pelo motivo acima. Devolve so digitos, ou null. */
+function nfDaNota(texto){
+  const m=String(texto||'').match(/N[úu]mero\s*([\d.,]+)/i);
+  return m?m[1].replace(/\D/g,'')||null:null;
+}
+
+/* Devolve {paginas, etiquetas:[{pagina,packId,venda,nf}], notas:[{pagina,nf}],
+   blocos:[{packId,venda,sku}]}.
    Os blocos saem pelo tokenizer item a item — o mesmo criterio que o parse.js usa
    para decidir o SKU (leitura 1). E de proposito: a auditoria pergunta "o volume
    gravado bate com o que a folha diz", e a folha, aqui, fala pela leitura que
@@ -26,18 +56,20 @@ function pageLines(tc){
 async function lerFolha(arquivo){
   const pdfjs=require('pdfjs-dist/legacy/build/pdf.js');
   const pdf=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(arquivo))}).promise;
-  const etiquetas=[], ctrlLinhas=[];
+  const etiquetas=[], notas=[], ctrlLinhas=[];
   for(let p=1;p<=pdf.numPages;p++){
     const lines=pageLines(await (await pdf.getPage(p)).getTextContent());
     const text=lines.join('\n');
-    if(/SKU:/.test(text)){ lines.forEach(x=>ctrlLinhas.push(x)); }
-    else if(/Pack ID:/.test(text)||/Venda:/.test(text)){
+    const tipo=tipoDaPagina(text);
+    if(tipo==='control'){ lines.forEach(x=>ctrlLinhas.push(x)); }
+    else if(tipo==='danfe'){ notas.push({pagina:p,nf:nfDaNota(text)}); }
+    else if(tipo==='label'){
       const g=re=>{ const m=text.match(re); return m?m[1].replace(/\s+/g,''):null; };
       etiquetas.push({pagina:p,packId:g(/Pack ID:\s*([\d ]+)/),venda:g(/Venda:\s*([\d ]+)/),
                       nf:(text.match(/NF:\s*(\d+)/)||[])[1]||null});
     }
   }
-  return {paginas:pdf.numPages, etiquetas, blocos:itensDaFolha(ctrlLinhas)};
+  return {paginas:pdf.numPages, etiquetas, notas, blocos:itensDaFolha(ctrlLinhas)};
 }
 
 /* UM BLOCO POR ITEM — o mesmo criterio que o parse.js usa para gravar.
@@ -141,4 +173,5 @@ function travasAtivas(volume, item, coresConhecidas){
   };
 }
 
-module.exports={lerFolha,mapasDaFolha,skuDaFolha,itemDaFolha,itensDaFolha,travasAtivas,pageLines};
+module.exports={lerFolha,mapasDaFolha,skuDaFolha,itemDaFolha,itensDaFolha,travasAtivas,pageLines,
+                tipoDaPagina,nfDaNota};

@@ -282,11 +282,13 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > grava por ela e a auditoria relê por ela. Duas cópias significaria conferir com
 > uma régua diferente da que gravou.
 >
-> **Rode `node teste_parse.js` após qualquer mudança no `parse.js`** — os nove
-> casos montam a folha no formato REAL do ML, e o caso do Abraão está lá.
+> **Rode `node teste_parse.js` após qualquer mudança no `parse.js`, no `folha.js`
+> ou no `nome.js`** — os 14 casos montam a folha no formato REAL do ML, e o caso
+> do Abraão está lá.
 >
 > Para conferir o que já está gravado: `node rastrear.js --auditar [dias]`.
 > `node rastrear.js --folha` mostra o PDF cru quando o layout mudar.
+> `node conferir_nf.js --pdf` confere a nota fiscal de cada volume (#22).
 
 ### ⚠️ ARMADILHA #8 — **peça não é volume**, e é daí que sai "subi 41 e aparecem 35"
 
@@ -363,6 +365,71 @@ volume que já existia. Só lê — pode rodar em produção.
 > ⚠️ Ele usa o `fila_dia.js` para contar a fila de hoje, e não uma cópia da
 > regra. Uma ferramenta de diagnóstico com régua própria é pior que nenhuma:
 > ela confirmaria com autoridade um número que a tela não usa.
+
+### ⚠️ ARMADILHA #22 — a NF é do PEDIDO, e a impressão leva a PRIMEIRA folha dela
+
+Revisado em 15/09/2026. A escada da armadilha #8 tem um degrau irmão que ninguém
+tinha olhado: **peça não é volume, e volume não é nota.**
+
+| Unidade | Grão | Onde vive |
+|---|---|---|
+| peça | o que o cliente comprou | `Quantidade:` da folha (dívida #11) |
+| volume | uma etiqueta, uma caixa, um ciclo | uma linha em `lote` |
+| **nota** | **o pedido** | `lote.nf`, e ela **pode se repetir** |
+
+**Venda repetida seria contradição; NF repetida não é.** A regra do dono
+(*uma venda = uma etiqueta = uma persiana*) fala de venda, e a dedup do upload
+(#5) já recusa Pack ID ou Venda que exista no histórico — então venda com dois
+SKUs no banco é ou volume anterior a 25/08/2026 ou o ML repetindo um número que
+promete não repetir. **A NF é outra coisa:** o cliente que leva três persianas
+num pedido só tem três vendas, três etiquetas, três caixas — e **uma nota**,
+impressa três vezes, uma por caixa. Isso está certo e não é duplicidade.
+
+O `GET /api/print/:id` monta duas páginas: a etiqueta (`labelPage`) e a nota
+(`danfePage`). É aqui que a NF repetida encosta no código:
+
+> ⚠️ **A NOTA DE DUAS FOLHAS IMPRIMIA A FOLHA 2.** Nota com muitos itens estoura
+> para uma página de continuação, e as duas trazem o mesmo `Número`. O mapa
+> `danfeByNf` do `parse.js` era `[nf]=p` sem guarda, e a **última vencia**: o
+> volume apontava para a continuação, e saía da impressora a folha 2 — sem
+> cabeçalho, sem chave de acesso, sem canhoto. Quem cola a etiqueta não tem como
+> perceber, porque a nota certa nunca aparece do lado para comparar. Hoje a
+> primeira folha vence, e há caso travando (caso 16 do `teste_parse.js`).
+>
+> **O que ainda não está resolvido:** a impressão leva **uma** página. Se a nota
+> tiver duas folhas, a segunda continua ficando para trás — agora com a folha 1
+> saindo, que é o documento. O `conferir_nf.js` diz se isso existe nos PDFs do
+> servidor; enquanto não existir, `lote.danfePage` continua sendo uma coluna só.
+
+**A leitura crua do PDF tem dono único, e passou a ter de verdade.** `tipoDaPagina`
+("o que é esta página") e `nfDaNota` ("qual o número desta nota") moram no
+`folha.js`: o `parse.js` grava por elas, o `rastrear.js` e o `conferir_nf.js`
+conferem pelas mesmas. Antes cada um tinha a sua cópia — e conferir a impressão
+com outra régua é conferir olhando um papel diferente do que a impressão usa.
+
+**`nome.js` é o dono único de "estes dois nomes são a mesma pessoa?"** — a régua
+da conferência 2 (#10: repetição sim, letra trocada nunca, e falta de dado devolve
+`null`, nunca acusação). A conferência de NF faz a **mesma** pergunta sobre os
+volumes de uma nota; com duas réguas ela chamaria de gente diferente quem o upload
+já aceitou como a mesma pessoa, e a lista de alarme nasceria cheia de falso
+positivo — armadilha #10 de novo.
+
+```bash
+node conferir_nf.js              # todo o histórico
+node conferir_nf.js 30           # só os últimos 30 dias
+node conferir_nf.js --pdf [30]   # relê também a folha dos PDFs ainda no servidor
+```
+
+Ele responde quatro coisas e **só lê**: venda com mais de um SKU, cliente com mais
+de uma persiana na mesma NF, **NF com clientes diferentes** (esta é para olhar no
+dia — ou a nota de um está na caixa de outro, ou o `NF:` foi lido errado) e o que
+a impressão faz com cada caso.
+
+> **O `--pdf` não é luxo: sem ele a pergunta 1 não tem resposta.** O banco só
+> guarda o que passou pela dedup — se o PDF trouxesse a mesma venda com dois
+> SKUs, o segundo teria sido **recusado antes de virar linha**. Só relendo a
+> folha dá para perguntar ao documento em vez de perguntar ao que sobrou dele.
+> Os PDFs somem em 7 dias (cron), então essa janela é a que existe.
 
 ### Três conferências, e qualquer uma delas retém o volume
 
@@ -1354,7 +1421,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (13 casos), `teste_carga.js` (44), `teste_divergencia.js` (23) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (20), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (14 casos), `teste_carga.js` (44), `teste_divergencia.js` (23) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (20), `teste_ficha.js` (40) e `teste_ordem_dia.js` (16); o resto não tem | Médio a longo prazo |
 | 11 | **A investigar: o que é o `Quantidade` da folha** — a regra é uma venda = uma etiqueta = uma persiana (§5), então esse campo não deveria vir maior que 1. Ninguém decide nada com ele hoje. Falta abrir um PDF real com `Quantidade > 1` e entender o que aquele número diz | Baixo enquanto nada o usar — mas é uma pergunta sem resposta sobre o documento de origem |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
@@ -1376,6 +1443,14 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   etiqueta é uma persiana (§5); já foi tentado e revertido, e há teste travando
 - ❌ Fazer a leitura por pedaços (`split` em `Desenho do tecido`) voltar a rodar
   antes do tokenizer no `parse.js` — manda a peça errada pro cliente (§5)
+- ❌ Tratar NF repetida como duplicidade: a nota é do **pedido**, e o cliente com
+  três persianas tem três vendas e uma nota só (§5, armadilha #22)
+- ❌ Deixar o mapa `danfeByNf` sem guarda: a última folha da nota vence e a
+  impressão sai com a continuação no lugar do documento (§5, armadilha #22)
+- ❌ Escrever uma segunda régua de "que página é esta" / "qual o número desta
+  nota" — as duas são do `folha.js`, e é por elas que a impressão gravou (§5)
+- ❌ Comparar nome de cliente fora do `nome.js`, ou com distância de edição:
+  `Marcelo`/`Marcela` estão a duas letras e são duas pessoas (§5, #10 e #22)
 - ❌ Pôr a caixa de coleta na lista ou no contador do carro, ou somar a coleta
   no relógio de despacho — são duas portas de saída, e `carga.js` é o dono
   único de "isto é coleta?" (§8-B, armadilha #21)

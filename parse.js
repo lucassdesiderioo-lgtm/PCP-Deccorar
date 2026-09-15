@@ -1,5 +1,11 @@
 const pdfjs = require('pdfjs-dist/legacy/build/pdf.js');
 pdfjs.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.js';
+/* A leitura crua do PDF mora toda no folha.js — inclusive "que pagina e esta" e
+   "qual o numero desta nota". Aqui elas gravam; na auditoria elas conferem. */
+const {tipoDaPagina,nfDaNota,itensDaFolha} = require('./folha');
+/* "Estes dois nomes sao a mesma pessoa?" e do nome.js, dono unico: a conferencia
+   de NF faz a MESMA pergunta, e duas reguas discordariam sobre o mesmo cliente. */
+const {mesmoCliente} = require('./nome');
 
 /* A DATA LIMITE DE DESPACHO, QUE A ETIQUETA SEMPRE TRAZ.
  *
@@ -117,30 +123,6 @@ function nomeDaEtiqueta(lines){
   return nome;
 }
 
-/* O MESMO NOME COM LETRA REPETIDA A MAIS OU A MENOS.
- *
- * Existe para UM caso, e ele e estreito de proposito: "Ryta de Kassia Andrade
- * Rufiino" na etiqueta e "...Rufino" na folha. E a mesma pessoa com a letra
- * dobrada — digitacao do proprio Mercado Livre, nao troca de cliente.
- *
- * A tentacao aqui e usar distancia de edicao ("ate 2 letras de diferenca"), e
- * ela ABRE UM BURACO exatamente onde nao pode: "Marcelo Sousa Silva" e "Marcela
- * Sousa Silvo" tambem estao a duas letras, e sao duas pessoas. Um nome trocado
- * por outro e o erro que esta conferencia existe para pegar — ela e a UNICA que
- * nao depende do Pack ID, que e justamente o numero que desalinha.
- *
- * Entao a tolerancia nao mede distancia: ela colapsa letras repetidas dos dois
- * lados e exige igualdade. "rufiino" e "rufino" viram o mesmo; "marcelo" e
- * "marcela" continuam diferentes, porque ali a letra foi TROCADA, nao dobrada.
- * So passa quem difere unicamente na repeticao — o que, num nome inteiro,
- * significa a mesma pessoa escrita duas vezes.
- */
-function mesmoNomeComRepeticao(a,b){
-  const colapsa=s=>String(s||'').replace(/(.)\1+/g,'$1');
-  const x=colapsa(a), y=colapsa(b);
-  return !!x && x===y;
-}
-
 function pageLines(tc){
   const items=tc.items.filter(it=>it.str&&it.str.trim()!=='');
   const rows={};
@@ -152,10 +134,12 @@ async function parsePdf(uint8){
   const N=pdf.numPages, pages=[], controlLines=[];
   for(let p=1;p<=N;p++){
     const lines=pageLines(await (await pdf.getPage(p)).getTextContent());
-    const text=lines.join('\n'); let type='other';
-    if(/SKU:/.test(text)) type='control';
-    else if(/DANFE/.test(text)||/Chave de acesso/i.test(text)) type='danfe';
-    else if(/Pack ID:/.test(text)||/Venda:/.test(text)) type='label';
+    const text=lines.join('\n');
+    /* A regua de "o que e esta pagina" mora no folha.js, com a leitura crua do
+       PDF. Aqui ela GRAVA (e decide qual pagina de nota vai ser impressa); no
+       rastrear.js e no conferir_nf.js ela CONFERE. Duas copias conferiam a
+       impressao olhando um papel diferente do que a impressao usa. */
+    const type=tipoDaPagina(text);
     pages[p]={type,lines,text};
     if(type==='control') controlLines.push.apply(controlLines,lines);
   }
@@ -201,7 +185,7 @@ async function parsePdf(uint8){
   /* A montagem do bloco mora no folha.js — o mesmo codigo que a auditoria usa
      pra reler o PDF depois. Se fossem duas copias, a conferencia poderia
      "confirmar" um volume com uma regua diferente da que o gravou. */
-  const itensFolha=require('./folha').itensDaFolha(controlLines);
+  const itensFolha=itensDaFolha(controlLines);
   itensFolha.forEach(put);
   /* As cores que a propria folha usa, para a conferencia 4 la embaixo. Sai do
      documento e nao de uma lista no codigo: cor nova do catalogo entra sozinha,
@@ -221,8 +205,19 @@ async function parsePdf(uint8){
       else if(m[6]){ last={packId:pk,venda:vd,sku:m[6].trim(),cor:null}; guardar(leitura2,last); pk=null;vd=null; }
       else if(m[8]&&last&&!last.cor) last.cor=m[8].trim();
     } }
+  /* A NOTA DE CADA NF, E A PRIMEIRA PAGINA DELA.
+     Uma nota com muitos itens estoura para uma pagina de continuacao, e as duas
+     trazem o mesmo "Numero". Enquanto este mapa era `[nf]=p` sem guarda, a
+     ULTIMA vencia: o volume apontava para a continuacao, e a impressao saia com
+     a folha 2 da nota — sem cabecalho, sem chave de acesso, sem canhoto. Quem
+     cola a etiqueta nao tem como perceber, porque a nota certa nunca aparece
+     pra comparar. A primeira pagina e a nota; as demais sao continuacao dela. */
   const danfeByNf={};
-  for(let p=1;p<=N;p++){ if(pages[p].type!=='danfe')continue; const mm=pages[p].text.match(/N[úu]mero\s*([\d.,]+)/i); if(mm) danfeByNf[mm[1].replace(/\D/g,'')]=p; }
+  for(let p=1;p<=N;p++){
+    if(pages[p].type!=='danfe')continue;
+    const nfPag=nfDaNota(pages[p].text);
+    if(nfPag && danfeByNf[nfPag]==null) danfeByNf[nfPag]=p;
+  }
   const orders=[], seen=new Set();
   for(let p=1;p<=N;p++){
     if(pages[p].type!=='label')continue;
@@ -255,18 +250,13 @@ async function parsePdf(uint8){
        A etiqueta traz o nome de quem comprou e o bloco da folha tambem. Se o
        volume foi casado com o item errado, o Pack ID pode ate coincidir, mas o
        NOME nao vai — e essa e a unica conferencia que nao depende do numero que
-       justamente desalinha. So acusa quando os dois nomes existem: nome que nao
-       deu pra ler nao vira acusacao. */
-    const nomeChave=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
-      .replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
-    if(rec && rec.comprador && buyer){
-      const a=nomeChave(buyer), b=nomeChave(rec.comprador);
-      /* Letra dobrada e digitacao do ML, nao outro cliente (ver
-         mesmoNomeComRepeticao — e so repeticao, nunca letra trocada). */
-      const mesmaPessoa = mesmoNomeComRepeticao(a,b);
-      if(a && b && a!==b && a.indexOf(b)<0 && b.indexOf(a)<0 && !mesmaPessoa)
-        motivos.push('comprador nao bate: etiqueta "'+buyer+'" / folha "'+rec.comprador+'"');
-    }
+       justamente desalinha.
+       A regra de "sao a mesma pessoa?" e do nome.js: nome abreviado e letra
+       dobrada sao digitacao do proprio ML, letra TROCADA nunca. E `mesmoCliente`
+       devolve NULL quando falta um dos lados — por isso a comparacao e com
+       `===false`, e nao com `!`: nome que nao deu pra ler nao vira acusacao. */
+    if(rec && rec.comprador && buyer && mesmoCliente(buyer,rec.comprador)===false)
+      motivos.push('comprador nao bate: etiqueta "'+buyer+'" / folha "'+rec.comprador+'"');
 
     /* 3. A DESCRICAO DO ANUNCIO NAO BATE COM O SKU.
        A folha escreve a medida por extenso ("1,60x1,40") ao lado do SKU
@@ -317,4 +307,7 @@ async function parsePdf(uint8){
   }
   return orders;
 }
-module.exports={parsePdf,dataDespacho,modalidadeDespacho,linhaDespacho,nomeDaEtiqueta,mesmoNomeComRepeticao};
+/* A comparacao de nomes NAO sai por aqui: ela e do nome.js, e reexportar criaria
+   uma segunda porta pra mesma regua — quem importasse pelo parse carregaria o
+   pdf.js inteiro atras de uma comparacao de string. */
+module.exports={parsePdf,dataDespacho,modalidadeDespacho,linhaDespacho,nomeDaEtiqueta};

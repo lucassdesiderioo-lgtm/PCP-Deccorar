@@ -45,13 +45,23 @@ function etiqueta(o){
     'QUA 26/08/2026 NF: '+o.nf, o.comprador+' (LOJA)',
     'Endereço: Rua Manoel Carvalho 75','Cidade de destino : Campinas, São Paulo'];
 }
-async function montar(itens, etiquetas){
+/* Uma pagina de DANFE. `folha` existe porque nota com muitos itens estoura para
+   uma pagina de continuacao, e as duas trazem o MESMO "Numero" — e desse par que
+   sai a pagina que vai ser impressa junto com a etiqueta. */
+function nota(o){
+  return ['DANFE Documento Auxiliar da Nota Fiscal Eletrônica',
+    'Série 1 Número '+o.nf+' Folha '+(o.folha||1),
+    'Chave de acesso 3526 0812 3456 7890 0001 5500 1000 0'+o.nf+' 1234 5678',
+    'DESTINATÁRIO '+(o.comprador||'Cliente')];
+}
+async function montar(itens, etiquetas, notas){
   const d=await PDFDocument.create(), f=await d.embedFont(StandardFonts.Helvetica);
   const pag=ls=>{ const p=d.addPage([595,842]); let y=800;
     for(const l of ls){ p.drawText(l,{x:30,y,size:9,font:f}); y-=14; } };
   etiquetas.forEach(e=>pag(etiqueta(e)));            // etiquetas primeiro, como no PDF real
   pag(['Despachem as suas vendas o quanto antes.','Identifiicação Produtos']
       .concat(itens.map(item).reduce((a,b)=>a.concat(b),[])));
+  (notas||[]).forEach(n=>pag(nota(n)));
   const arq=path.join(tmp,'t'+casos+'.pdf');
   fs.writeFileSync(arq, await d.save());
   ULTIMO_PDF=arq;                                    // pro caso 9, que rele a folha
@@ -283,10 +293,11 @@ function conferir(nome, orders, esperado){
         Pack ID. */
   casos++;
   {
-    const {mesmoNomeComRepeticao}=require('./parse');
-    const chave=s=>String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-      .replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
-    const mesma=(x,y)=>mesmoNomeComRepeticao(chave(x),chave(y));
+    /* A regua vem do nome.js, dono unico \u2014 a mesma que o conferir_nf.js usa pra
+       decidir se os volumes de uma NF sao do mesmo cliente. Uma copia da
+       normalizacao aqui testaria uma regra que o sistema nao aplica. */
+    const {mesmoCliente}=require('./nome');
+    const mesma=(x,y)=>mesmoCliente(x,y)===true;
     const erros=[];
     if(!mesma('Ryta de Kassia Andrade Rufiino','Ryta De Kassia Andrade Rufino'))
       erros.push('nao reconheceu a mesma pessoa com a letra dobrada (caso Ryta)');
@@ -299,6 +310,14 @@ function conferir(nome, orders, esperado){
      ['Joao Pedro Lima','Joana Pedro Lima']].forEach(([x,y])=>{
       if(mesma(x,y)) erros.push('tratou como a mesma pessoa: "'+x+'" e "'+y+'"');
     });
+    /* Nome abreviado de um lado e a mesma pessoa: a etiqueta corta o nome que a
+       folha escreve inteiro, e reter por isso seria acusar quem esta certo. */
+    if(!mesma('Tiago Sanches','Tiago Sanches de Oliveira'))
+      erros.push('nao reconheceu o nome abreviado como a mesma pessoa');
+    /* SEM OS DOIS LADOS NAO DA PRA DIZER, e "nao da pra dizer" nunca e "outra
+       pessoa": quem chama compara com ===false, entao null tem que sair null. */
+    if(mesmoCliente('','Tiago Sanches')!==null || mesmoCliente('Tiago Sanches',null)!==null)
+      erros.push('nome que nao deu pra ler virou resposta em vez de null');
     if(erros.length){ falhas++; console.log('FALHOU  erro de digitacao passa, cliente diferente nao');
       erros.forEach(e=>console.log('        '+e)); }
     else console.log('ok      erro de digitacao passa, cliente diferente nao');
@@ -346,6 +365,45 @@ function conferir(nome, orders, esperado){
     if(erros.length){ falhas++; console.log('FALHOU  coleta e agencia se separam pela hora da linha Despachar');
       erros.forEach(e=>console.log('        '+e)); }
     else console.log('ok      coleta e agencia se separam pela hora da linha Despachar');
+  }
+
+  /* ── 16. A NOTA DE DUAS FOLHAS: imprime a PRIMEIRA, nunca a continuacao ────
+        Cliente que leva duas persianas na mesma NF tem uma nota so, e ela pode
+        estourar para uma pagina de continuacao — as duas com o mesmo "Numero".
+        Enquanto o mapa NF->pagina nao tinha guarda, a ultima vencia e a
+        impressao saia com a folha 2: sem cabecalho, sem chave de acesso, sem
+        canhoto. Quem cola a etiqueta nao tem como perceber, porque a nota certa
+        nunca aparece do lado pra comparar.
+        Os dois volumes da mesma NF apontam para a MESMA nota, e isso esta
+        certo: a nota e uma so — o que muda e a etiqueta colada em cada caixa. */
+  casos++;
+  {
+    const os_=await montar([
+      {pack:'111',venda:'901',sku:'BK160160BEGE',medida:'1,60x1,60',cor:'Bege',comprador:'Marta Ribeiro'},
+      {pack:'222',venda:'902',sku:'BK140140BEGE',medida:'1,40x1,40',cor:'Bege',comprador:'Marta Ribeiro'},
+      {pack:'333',venda:'903',sku:'BK150150BEGE',medida:'1,50x1,50',cor:'Bege',comprador:'Outro Cliente'},
+    ],[
+      {pack:'111',nf:'7001',comprador:'Marta Ribeiro'},
+      {pack:'222',nf:'7001',comprador:'Marta Ribeiro'},
+      {pack:'333',nf:'7002',comprador:'Outro Cliente'},
+    ],[
+      {nf:'7001',folha:1,comprador:'Marta Ribeiro'},
+      {nf:'7001',folha:2,comprador:'Marta Ribeiro'},   // a continuacao
+      {nf:'7002',folha:1,comprador:'Outro Cliente'},
+    ]);
+    const por={}; os_.forEach(o=>por[o.packId]=o);
+    const erros=[];
+    const p1=(por['111']||{}).danfePage, p2=(por['222']||{}).danfePage, p3=(por['333']||{}).danfePage;
+    if(p1==null||p2==null) erros.push('volume da NF 7001 ficou sem nota: '+JSON.stringify([p1,p2]));
+    if(p1!==p2) erros.push('os dois volumes da mesma NF apontam para notas diferentes: '+p1+' / '+p2);
+    /* danfePage e 0-based; a folha 1 da NF 7001 e a primeira pagina de nota do
+       PDF, logo a de indice menor entre as tres. */
+    if(p3!=null && p1!=null && !(p1<p3)) erros.push('a nota escolhida nao foi a primeira folha: '+p1+' (a outra NF esta em '+p3+')');
+    if(p3!=null && p1!=null && p3-p1!==2) erros.push('a continuacao entrou no lugar da folha 1: '+p1+' / '+p3);
+    os_.forEach(o=>{ if(o.conflito) erros.push('reteve a toa '+o.packId+': '+o.conflito); });
+    if(erros.length){ falhas++; console.log('FALHOU  nota de duas folhas: imprime a primeira, e a NF repetida e a mesma nota');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      nota de duas folhas: imprime a primeira, e a NF repetida e a mesma nota');
   }
 
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}

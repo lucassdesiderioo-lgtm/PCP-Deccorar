@@ -49,7 +49,7 @@ const db=new Database(DB,{readonly:true});
 // ── leitura crua do PDF: mesmo modulo que a tela usa (folha.js) ─────────────
 // Auditar com uma regua diferente da que a tela usa daria dois numeros pra
 // mesma pergunta — e o errado seria sempre o que ninguem estivesse olhando.
-const {lerFolha:inspecionar,mapasDaFolha,skuDaFolha}=require('./folha');
+const {lerFolha:inspecionar,mapasDaFolha,skuDaFolha,tipoDaPagina}=require('./folha');
 function pdfsRecentes(){
   try{
     return fs.readdirSync(LOTES).filter(f=>/\.pdf$/i.test(f))
@@ -242,10 +242,10 @@ async function verFolha(){
   for(let p=1;p<=pdf.numPages;p++){
     const linhas=pageLines(await (await pdf.getPage(p)).getTextContent());
     const t=linhas.join('\n');
-    let tipo='outro';
-    if(/SKU:/.test(t)) tipo='FOLHA';
-    else if(/DANFE/.test(t)||/Chave de acesso/i.test(t)) tipo='danfe';
-    else if(/Pack ID:/.test(t)||/Venda:/.test(t)) tipo='etiqueta';
+    /* A regua e a do folha.js, a mesma com que o parse.js gravou — aqui so os
+       rotulos mudam, pra tela. Uma ferramenta de diagnostico com regua propria
+       confirmaria com autoridade um mapa do PDF que o sistema nao usa. */
+    const tipo={control:'FOLHA',danfe:'danfe',label:'etiqueta',other:'outro'}[tipoDaPagina(t)];
     pgs.push({p,linhas,t,tipo});
   }
 
