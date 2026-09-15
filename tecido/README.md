@@ -780,6 +780,28 @@ repovoa só o seletor de Coleção ao lado, que é a única coisa que muda.
 > no lugar de um select vazio, que não diz nada e em alguns navegadores nem
 > abre.
 
+**O seletor oferece as linhas INATIVAS também** (15/09/2026). Desativar uma
+linha é dizer *"não vendemos mais isto"*, não *"esta linha não existe"*: as
+coleções dela continuam na tela, os rolos continuam na estante e o histórico
+continua apontando para ela. Sem as inativas no seletor, cadastrar um item que
+faltou numa linha dessas exigia **reativar, cadastrar e desativar de novo** —
+e no meio desses três passos a linha volta a aparecer na entrada de rolo e no
+corte para a fábrica inteira. O servidor nunca exigiu linha ativa
+(`criarTecido` só exige que ela exista), então isto é a tela alcançando o que
+o domínio já permitia.
+
+> ⚠️ **Elas vão no fim da lista e escritas `(inativa)`, e essa marca não é
+> enfeite.** As fileiras da entrada de rolo, do corte e das sobras olham o
+> `ativo` **do tecido**, nunca o da linha. Um tecido novo numa linha desativada
+> aparece para a fábrica inteira no mesmo instante — trazendo de volta uma
+> linha que alguém desligou de propósito. Quem escolhe tem que ver que
+> escolheu isso.
+
+> O formulário **nasce na primeira linha ativa**, não na primeira da lista: o
+> caso normal é cadastrar no que está em uso, e abrir já apontando para uma
+> linha desativada seria oferecer o incomum por acidente. Coleção e cor
+> continuam listando só as ativas.
+
 ### O preço do m² se lança no cadastro do tecido
 
 Até 15/09/2026 a única porta era **Sobras → Catálogo**, e ela lista só tecido

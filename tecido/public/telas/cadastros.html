@@ -241,15 +241,42 @@ async function carregarTecido(){
      O cartao de cima e "qual linha estou editando as colecoes"; este e "qual
      linha vai o tecido novo". Nomes proprios porque sao perguntas diferentes.
 
-     `linhaForm` so aponta para linha ATIVA — o seletor nao oferece as
-     inativas, e apontar para uma delas deixaria o campo sem nada escolhido. */
+     `linhaForm` pode apontar para linha INATIVA (o seletor oferece as duas,
+     ver `linhasDoFormulario`), mas NASCE na primeira ativa: o caso normal e
+     cadastrar no que esta em uso, e abrir o formulario ja apontando para uma
+     linha desativada seria oferecer o incomum por acidente. So precisa
+     apontar para uma linha que EXISTE — apontar para id apagado deixaria o
+     campo sem nada escolhido. */
   const ativas=estado.linhas.filter(l=>l.ativo);
-  if(!ativas.some(l=>l.id===estado.linhaForm)) estado.linhaForm=ativas.length?ativas[0].id:null;
+  if(!estado.linhas.some(l=>l.id===estado.linhaForm))
+    estado.linhaForm=(ativas[0]||estado.linhas[0]||{}).id||null;
   estado.aberturasForm = estado.linhaForm===estado.linhaSel ? estado.aberturas
     : (estado.linhaForm?await api('/api/aberturas?linha_id='+estado.linhaForm):[]);
 
   estado.tecidos=await api('/api/tecidos');
 }
+
+/* ⚠️ O SELETOR DE LINHA DO FORMULARIO OFERECE AS INATIVAS TAMBEM.
+   Desativar uma linha e dizer "nao vendemos mais isto", nao "esta linha nao
+   existe": as colecoes dela continuam na tela, os rolos continuam na estante
+   e o historico continua apontando para ela. Sem as inativas no seletor,
+   cadastrar um item que faltou numa linha dessas exigia REATIVAR a linha,
+   cadastrar e desativar de novo — tres passos, e no meio deles a linha volta
+   a aparecer na entrada de rolo e no corte para a fabrica inteira.
+
+   Elas vao NO FIM e escritas "(inativa)", e essa marca nao e enfeite: as
+   fileiras da entrada de rolo, do corte e das sobras olham o `ativo` DO
+   TECIDO, nunca o da linha (conferido em 15/09/2026). Entao um tecido novo
+   numa linha desativada aparece para a fabrica inteira no mesmo instante —
+   trazendo de volta uma linha que alguem desligou de proposito. Quem escolhe
+   tem que ver que escolheu isso; um nome igual ao das outras faria a pessoa
+   reabrir a linha sem perceber que reabriu.
+
+   O servidor nunca exigiu linha ativa (`criarTecido` so exige que ela
+   exista), entao isto e a tela alcancando o que o dominio ja permitia. */
+const linhasDoFormulario=()=>
+  estado.linhas.filter(l=>l.ativo).concat(estado.linhas.filter(l=>!l.ativo))
+    .map(l=>({valor:l.id, nome:l.ativo?l.nome:l.nome+' (inativa)'}));
 
 /* As colecoes do formulario trocam SEM redesenhar a tela: e so o seletor do
    lado que muda, e redesenhar tudo era justamente o que movia o formulario
@@ -395,7 +422,7 @@ async function telaTecido(pai){
     const aberturasDaLinha=estado.aberturasForm.filter(a=>a.ativo);
     formulario(cT,[
       {id:'linha_id',rotulo:'Linha',valor:estado.linhaForm,
-       opcoes:estado.linhas.filter(l=>l.ativo).map(l=>({valor:l.id,nome:l.nome})),
+       opcoes:linhasDoFormulario(),
        aoMudar:colecoesDoFormulario},
       {id:'abertura_id',rotulo:'Colecao',
        opcoes:aberturasDaLinha.length
