@@ -41,6 +41,13 @@ module.exports={rotas:[
   {metodo:'GET', caminho:'/api/rolos/saldo', permissao:'rolo.ler',
    manipulador:()=>rolo.saldoPorTecido()},
 
+  /* A ESTANTE OCUPADA. Cada nivel guarda um rolo so, e a tela precisa saber
+     disso ANTES do toque: botao que so recusa depois de tocado ensina a
+     bancada que o sistema erra. Nao ha o que podar — a consulta nao traz
+     preco nenhum (dados/rolo.js). */
+  {metodo:'GET', caminho:'/api/rolos/ocupacao', permissao:'rolo.ler',
+   manipulador:()=>rolo.ocupacao()},
+
   {metodo:'GET', caminho:'/api/rolos/:id/movimentos', permissao:'rolo.ler',
    manipulador:({params})=>rolo.movimentos(params.id)},
 

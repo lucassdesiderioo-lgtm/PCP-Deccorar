@@ -23,9 +23,19 @@
 const {api,banner,el,limpar,$,num,comoNumero,formatarMetros,formatarArea}=window.ui;
 
 let eu={}, aba='estoque';
-const estado={tecidos:[],arvore:[],tecido_id:null,nivel_id:null,
+const estado={tecidos:[],arvore:[],ocupacao:[],tecido_id:null,nivel_id:null,
   larguras:null,largura:null,larguraOutra:'',
   fornecedores:null,fornecedor_id:null,nota:null};
+
+/* ── CADA NIVEL GUARDA UM ROLO SO ─────────────────────────────────────────
+   Regra do dono: `A-1-1` e um buraco, e no buraco cabe um tubo. Quem ocupa e
+   o rolo que esta na estante (aberto ou fechado) — o ENCERRADO nao ocupa, e e
+   por isso que o endereco fica livre sozinho quando o material acaba.
+
+   Quem recusa e o servidor (dominio/rolo.js); a tela so evita o toque que ja
+   se sabe recusado. Duas leituras do mesmo estado, e a que manda e a de la. */
+const ocupanteDe=nivel_id=>(estado.ocupacao||[])
+  .find(o=>String(o.nivel_id)===String(nivel_id));
 
 // O MESMO arredondamento do servidor (dados/largura.js). Sem ele, o botao de
 // 2,50 nao casaria com o 2.5 que volta do banco e a tela nunca marcaria
@@ -63,8 +73,16 @@ function fileira(rotulo,itens,sel,aoEscolher,novo){
   const f=el('div',{class:'fileira'});
   f.appendChild(el('span',{class:'rotulo',texto:rotulo}));
   if(!itens.length) f.appendChild(el('span',{class:'quem',style:'align-self:center',texto:'nada cadastrado'}));
-  itens.forEach(i=>f.appendChild(el('button',{class:'op',texto:i.nome,
-    'aria-pressed':String(String(i.valor)===String(sel)), onclick:()=>aoEscolher(i.valor)})));
+  /* `travado` desenha o botao que nao da para escolher — hoje so o nivel que
+     ja tem rolo. Ele aparece COM O CODIGO DO TUBO em vez de sumir da fileira:
+     nivel escondido faz a bancada procurar um buraco que ela sabe que existe e
+     concluir que o sistema perdeu o cadastro. E desabilitado em vez de recusar
+     depois do toque, que e a mesma regra do botao de imprimir etiqueta. */
+  itens.forEach(i=>f.appendChild(el('button',{
+    class:'op', texto:i.nome+(i.nota?' · '+i.nota:''),
+    title:i.titulo||null, disabled:i.travado?'':null,
+    'aria-pressed':String(!i.travado&&String(i.valor)===String(sel)),
+    onclick:()=>{ if(!i.travado) aoEscolher(i.valor); }})));
   if(novo) f.appendChild(el('button',{class:'op',style:'border-style:dashed',
     texto:'+ '+novo.rotulo, onclick:async()=>{
       const nome=prompt(novo.pergunta);
@@ -307,12 +325,27 @@ async function telaEstoque(pai){
     if(r.status!=='encerrado') acoes.push(el('button',{class:'bt pequeno',texto:'Mover',
       onclick:async()=>{
         const arvore=await api('/api/enderecos/ROLO');
-        const niveis=[];
+        estado.ocupacao=await api('/api/rolos/ocupacao');
+        const todos=[];
         arvore.filter(h=>h.ativo).forEach(h=>h.andares.forEach(a=>a.niveis.forEach(n=>
-          niveis.push({id:n.id,texto:h.nome+'-'+a.nome+'-'+n.nome}))));
-        if(!niveis.length) return banner('Nenhum endereco de ROLO cadastrado.','erro');
+          todos.push({id:n.id,texto:h.nome+'-'+a.nome+'-'+n.nome,ocupante:ocupanteDe(n.id)}))));
+        if(!todos.length) return banner('Nenhum endereco de ROLO cadastrado.','erro');
+        /* SO OS BURACOS VAZIOS ENTRAM NA LISTA. Cada nivel guarda um rolo so,
+           e oferecer o que ja esta cheio seria oferecer uma recusa — pior aqui
+           que na entrada, porque a lista e numerada: o operador digitaria o
+           numero de um lugar que o sistema ja sabe que nao aceita. Os cheios
+           aparecem CONTADOS embaixo, com quem esta neles, para a escolha curta
+           nao parecer cadastro faltando. */
+        const niveis=todos.filter(n=>!n.ocupante||Number(n.ocupante.rolo_id)===Number(r.id));
+        const cheios=todos.filter(n=>n.ocupante&&Number(n.ocupante.rolo_id)!==Number(r.id));
+        if(!niveis.length) return banner(
+          'Todos os '+todos.length+' enderecos de ROLO estao ocupados. Crie um nivel novo na '+
+          'aba Entrada de rolo, ou encerre o rolo que acabou para liberar o buraco dele.','erro',8);
         const escolha=prompt('Para onde foi o rolo '+r.codigo+'?\n\n'+
-          niveis.map((n,i)=>(i+1)+') '+n.texto).join('\n')+
+          niveis.map((n,i)=>(i+1)+') '+n.texto+
+            (Number(r.nivel_id)===Number(n.id)?'  (onde ele esta)':'')).join('\n')+
+          (cheios.length?'\n\nOcupados, nao entram na lista:\n'+
+            cheios.map(n=>'   '+n.texto+' — '+n.ocupante.codigo).join('\n'):'')+
           '\n\nDigite o numero da opcao:');
         if(!escolha) return;
         const n=niveis[Number(escolha)-1];
@@ -376,6 +409,9 @@ async function telaEntrada(pai){
   if(!podeEntrar()){ limpar(pai).appendChild(el('div',{class:'vazio',texto:'Sem permissao para dar entrada.'})); return; }
   estado.tecidos=await api('/api/tecidos');
   estado.arvore=await api('/api/enderecos/ROLO');
+  // Quem esta em cada buraco AGORA. Sempre relido: um nivel que estava livre
+  // ha dois minutos pode ter recebido um tubo no outro tablet.
+  estado.ocupacao=await api('/api/rolos/ocupacao');
   if(!estado.larguras) estado.larguras=await api('/api/larguras');
   if(podeNota()&&!estado.fornecedores) estado.fornecedores=await api('/api/fornecedores');
   pai=limpar(pai);
@@ -503,12 +539,28 @@ async function telaEntrada(pai){
   const hAtual=estado.arvore.find(h=>h.id===estado.haste_id)||estado.arvore[0];
   const andares=hAtual?hAtual.andares.map(a=>({valor:a.id,nome:a.nome})):[];
   const aAtual=hAtual&&(hAtual.andares.find(a=>a.id===estado.andar_id)||hAtual.andares[0]);
-  const niveis=aAtual?aAtual.niveis.map(n=>({valor:n.id,nome:n.nome})):[];
+  /* CADA NIVEL GUARDA UM ROLO SO. O buraco que ja tem tubo vem travado, com o
+     codigo dele escrito no botao — e o mesmo motivo do botao de etiqueta que
+     nasce desabilitado: recusa que so aparece depois do toque, com o tubo na
+     mao, ensina que o sistema erra. O endereco se libera sozinho quando o
+     rolo sai dali (Mover) ou quando ele acaba (Rolo acabou). */
+  const niveis=aAtual?aAtual.niveis.map(n=>{
+    const o=ocupanteDe(n.id);
+    return o?{valor:n.id, nome:n.nome, nota:o.codigo, travado:true,
+              titulo:'Ocupado por '+o.codigo+' — '+
+                [o.linha_nome,o.abertura_nome,o.cor_nome].join(' · ')+
+                ', '+formatarMetros(o.saldo)+'. Cada nivel guarda um rolo so.'}
+            :{valor:n.id, nome:n.nome};
+  }):[];
+  // A escolha nao sobrevive a um buraco que encheu: outro tablet pode ter dado
+  // entrada no mesmo nivel enquanto esta tela estava aberta.
+  if(estado.nivel_id&&ocupanteDe(estado.nivel_id)) estado.nivel_id=null;
 
   // O que for criado aqui ja fica ESCOLHIDO. Criar e ter de procurar o proprio
   // botao na fileira e o tipo de passo a mais que faz a bancada parar de usar.
   const recarregar=async(campo,criado)=>{
     estado.arvore=await api('/api/enderecos/ROLO');
+    estado.ocupacao=await api('/api/rolos/ocupacao');
     if(campo==='haste'){ estado.haste_id=criado.id; estado.andar_id=null; estado.nivel_id=null; }
     if(campo==='andar'){ estado.andar_id=criado.id; estado.nivel_id=null; }
     if(campo==='nivel'){ estado.nivel_id=criado.id; }
