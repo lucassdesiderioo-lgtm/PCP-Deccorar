@@ -81,7 +81,12 @@ function formulario(pai,campos,rotuloBotao,aoEnviar){
     box.appendChild(el('label',{texto:cp.rotulo}));
     const input=cp.opcoes
       ? el('select',{})
-      : el('input',{type:cp.tipo||'text',inputmode:cp.inputmode||null,placeholder:cp.dica||''});
+      /* `cp.valor` E O VALOR INICIAL DO CAMPO, e vale para os dois tipos: no
+         input ele abre escrito (o proximo nivel da sequencia), no select ele
+         abre escolhido. Um nome so para a mesma ideia — dois (`valor` aqui,
+         `inicial` ali) fariam quem escreve a proxima tela adivinhar qual usar. */
+      : el('input',{type:cp.tipo||'text',inputmode:cp.inputmode||null,
+                    placeholder:cp.dica||'', value:cp.valor||''});
     if(cp.opcoes){
       cp.opcoes.forEach(o=>input.appendChild(el('option',{value:o.valor,texto:o.nome})));
       /* O VALOR INICIAL E DECLARADO, e nao "o primeiro da lista".
@@ -640,7 +645,12 @@ async function telaEndereco(pai){
     cab.appendChild(botaoAtivo(h,'/api/hastes/'+h.id,recarregar));
     cH.appendChild(cab);
 
-    formulario(cH,[{id:'nome',rotulo:'Novo andar nesta haste',dica:'02',cresce:true}],'Adicionar andar',
+    /* O CAMPO ABRE COM O PROXIMO NUMERO JA ESCRITO (dominio/endereco.js).
+       Aqui a chefia cadastra a estante inteira de uma vez, um andar atras do
+       outro — digitar a sequencia a mao e onde nasce o "12" com o 11
+       faltando. Continua sendo campo: apagar e escrever outro nome passa. */
+    formulario(cH,[{id:'nome',rotulo:'Novo andar nesta haste',dica:'02',
+                    valor:h.proximo_andar,cresce:true}],'Adicionar andar',
       async(v,refs)=>{ if(!v.nome.trim()) return;
         await api('/api/andares',{metodo:'POST',corpo:{nome:v.nome,haste_id:h.id}});
         refs.nome.value=''; await recarregar(); });
@@ -673,7 +683,8 @@ async function telaEndereco(pai){
       if(!a.niveis.length) niveis.appendChild(el('span',{class:'quem',style:'align-self:center',texto:'sem nivel'}));
       cA.appendChild(niveis);
 
-      formulario(cA,[{id:'nome',rotulo:'Novo nivel neste andar',dica:'03',cresce:true}],'Adicionar nivel',
+      formulario(cA,[{id:'nome',rotulo:'Novo nivel neste andar',dica:'03',
+                      valor:a.proximo_nivel,cresce:true}],'Adicionar nivel',
         async(v,refs)=>{ if(!v.nome.trim()) return;
           await api('/api/niveis',{metodo:'POST',corpo:{nome:v.nome,andar_id:a.id}});
           refs.nome.value=''; await recarregar(); });
