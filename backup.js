@@ -1,5 +1,6 @@
 const Database=require('better-sqlite3'); const fs=require('fs'); const path=require('path');
-const SRC='/opt/expedicao/dados.db', DIR='/opt/expedicao/backups';
+const CAMINHOS=require('./caminhos');
+const SRC=CAMINHOS.BANCO, DIR=CAMINHOS.BACKUPS;
 fs.mkdirSync(DIR,{recursive:true});
 const d=new Date(); const st=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const dest=path.join(DIR,'dados-'+st+'.db');

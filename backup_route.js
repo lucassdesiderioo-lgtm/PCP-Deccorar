@@ -1,7 +1,10 @@
 const fs=require('fs'),path=require('path'),crypto=require('crypto');
 module.exports=function(app,db){
   db.exec("CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT);");
-  const DIR='/opt/expedicao/backups';
+  // A MESMA pasta do `backup.js`, pelo mesmo `caminhos.js`: quem gera e quem
+  // baixa tem que olhar para o mesmo lugar, senao a tela diz "sem backup ainda"
+  // com trinta copias no disco.
+  const DIR=require('./caminhos').BACKUPS;
   let t=db.prepare("SELECT valor FROM config WHERE chave='backup_token'").get();
   if(!t){ const tok=crypto.randomBytes(12).toString('hex'); db.prepare("INSERT INTO config (chave,valor) VALUES ('backup_token',?)").run(tok); t={valor:tok}; }
   const TOKEN=t.valor;

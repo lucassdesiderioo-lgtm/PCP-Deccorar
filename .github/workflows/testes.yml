@@ -1,0 +1,224 @@
+# Os testes das duas operacoes E A TRANCA DA PORTA, a cada push e a cada PR.
+#
+# A fabrica tem duas operacoes (CLAUDE.md §19) e elas tem bancos, dominios e
+# runners proprios. Por isso sao JOBS separados e nao passos do mesmo: rodam em
+# paralelo, e um vermelho nao esconde o outro na lista de checks. Passo que
+# falha cedo deixa o resto sem rodar, e a pessoa conserta um por rodada.
+#
+# ⚠️ NAO HA FILTRO POR `paths`. Filtrar por `tecido/**` faria o check do sob
+# medida PASSAR POR NAO TER RODADO em todo PR que mexesse na raiz — e e a raiz
+# que monta o modulo (`server.js` -> `tecido/montar.js`). Check verde que nao
+# rodou e pior que check nenhum: ele afirma com autoridade uma coisa que
+# ninguem conferiu. As duas suites juntas levam segundos.
+name: Testes
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Push novo na mesma branch cancela a rodada anterior: o que interessa e o
+# estado do ultimo commit, e fila de rodadas velhas so atrasa a resposta.
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sobmedida:
+    name: sob medida (tecido/)
+    runs-on: ubuntu-latest
+    steps:
+      # ⚠️ AS ACOES SAO PRESAS NO MAJOR, e o major aqui e o RUNTIME DELAS, nao o
+      # do projeto. Na v4 as duas rodavam em Node 20, que o runner aposentou — o
+      # aviso de deprecacao saia em toda rodada e um dia viraria falha. Isso nao
+      # tem nada a ver com o `node-version` abaixo, que e o do nosso codigo.
+      - uses: actions/checkout@v7
+
+      # A mesma versao maior que o SERVIDOR roda. Node novo demais quebra o
+      # better-sqlite3 (modulo nativo), e a quebra aparece como "nao instalou",
+      # que nao se parece nada com a causa. Subir a acao NAO sobe este numero.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      # ⚠️ `npm ci` SO NA RAIZ, e isso e decisao do modulo. Nao ha
+      # `npm install` dentro de `tecido/`: as dependencias sao as mesmas
+      # versoes da raiz e o Node resolve subindo. Uma segunda arvore aqui seria
+      # uma segunda coisa para atualizar e esquecer — e o dia em que as duas
+      # divergissem, o CI estaria testando um modulo diferente do que sobe no
+      # servidor.
+      - name: Instalar as dependencias (raiz)
+        run: npm ci
+
+      # O runner cria um banco descartavel POR ARQUIVO de teste, do zero, pelo
+      # schema — entao a migracao e exercitada a cada rodada. Nenhum teste toca
+      # em banco de trabalho, e nao ha servico para subir.
+      - name: teste/rodar.js
+        run: npm test
+        working-directory: tecido
+
+  pcp:
+    name: PCP (raiz)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Instalar as dependencias
+        run: npm ci
+
+      # ⚠️ A LISTA SAI DO DISCO, NAO DAQUI. Escrever os nove nomes a mao faria
+      # o teste_novo.js de amanha nascer sem rodar, e nada avisaria: o check
+      # ficaria verde por nao ter olhado, que e o mesmo defeito do filtro por
+      # `paths`. Arquivo com nome de teste que NAO for teste quebra a rodada de
+      # forma barulhenta — e o lado certo para errar.
+      #
+      # ⚠️ E RODAM TODOS ANTES DE FALHAR. Parar no primeiro vermelho faz a
+      # pessoa consertar um, subir, bater no segundo e concluir que o sistema
+      # inventa impedimento novo a cada tentativa. Todos os motivos aparecem de
+      # uma vez, e o resumo no fim diz quais.
+      - name: Os testes do PCP
+        run: |
+          falhas=""
+          for t in teste_*.js; do
+            # `teste_route.js` nao e teste: e o modulo do MODO TESTE (§11),
+            # que so tem o nome parecido.
+            if [ "$t" = "teste_route.js" ]; then continue; fi
+            echo "── $t"
+            node "$t" || falhas="$falhas $t"
+          done
+          echo "────────────────────────────────────────────────────────────"
+          if [ -n "$falhas" ]; then
+            echo "FALHARAM:$falhas"
+            exit 1
+          fi
+          echo "todos os arquivos de teste do PCP passaram"
+
+  # ── A TRANCA DA PORTA (CLAUDE.md §10 e §19) ──────────────────────────────
+  #
+  # ⚠️ ESTE E O UNICO CHECK QUE SOBE O SERVIDOR. Os outros dois exercitam
+  # dominio; este pergunta ao Express o que ele entrega para quem NAO fez login.
+  # A armadilha #3 e uma linha trocada de lugar no `server.js` — `static` antes
+  # do `auth` — e ela nao quebra teste de dominio nenhum: o sistema continua
+  # funcionando, so que com as telas abertas para qualquer um. Defeito que nao
+  # quebra nada e defeito que so aparece quando alguem de fora acha a porta.
+  seguranca:
+    name: seguranca (§10)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Instalar as dependencias
+        run: npm ci
+
+      # ⚠️ O LOG DO SERVIDOR VAI PARA ARQUIVO, e nao e so arrumacao: processo em
+      # segundo plano que herda a saida do passo segura o passo aberto, e a
+      # rodada fica pendurada ate o timeout em vez de falhar.
+      #
+      # ⚠️ E NAO HA `sleep` CEGO esperando o boot. Dormir N segundos passa a
+      # depender da carga do runner: um dia falha sozinho e todo mundo aprende a
+      # mandar rodar de novo, que e a armadilha #6 dentro do CI. Aqui se
+      # PERGUNTA ao servidor ate ele responder — e se ele nao subir, o log
+      # inteiro sai na tela em vez de um erro de conexao sem causa.
+      #
+      # ⚠️ O CI RODA FORA DE `/opt/expedicao`, E ISSO E O TESTE. Antes este
+      # passo fazia `sudo mkdir -p /opt/expedicao` — o runner fingindo ser o
+      # servidor de producao para o `db.js` conseguir abrir o banco. Com o
+      # `caminhos.js` (§13) nao ha o que fingir: `PCP_DIR` manda o banco, os
+      # PDFs, as fotos e os backups para a area de trabalho do runner, e a
+      # rodada passa a PROVAR toda vez que o sistema sobe em qualquer pasta.
+      # Era essa a razao de o caminho ter deixado de ser fixo.
+      #
+      # O `sudo` saiu junto, e isso e ganho: passo de CI que escreve em `/opt`
+      # e passo que pede permissao de root para conferir uma porta HTTP.
+      #
+      # O DIRETORIO VAZIO BASTA — o banco nasce no boot pelos CREATE TABLE IF
+      # NOT EXISTS, e `lotes/` o proprio `exp_route.js` cria com `mkdirSync`
+      # quando chega o primeiro PDF. Por isso so ele e criado, e nao a arvore
+      # inteira: pasta criada a toa no CI e uma diferenca a mais entre o runner
+      # e o servidor de verdade.
+      #
+      # ⚠️ E O PADRAO CONTINUA SENDO CONFERIDO — no `teste_caminhos.js`, cujo
+      # primeiro caso exige que SEM variavel nenhuma o caminho seja
+      # `/opt/expedicao`. Se o padrao mudasse, a producao apontaria para um
+      # banco vazio no proximo `git pull`; quem trava isso e aquele caso, nao
+      # este passo.
+      - name: A tranca da porta
+        env:
+          PCP_DIR: ${{ github.workspace }}/.dados-ci
+        run: |
+          mkdir -p "$PCP_DIR"
+          echo "os dados desta rodada ficam em $PCP_DIR"
+          node server.js > servidor.log 2>&1 &
+          servidor=$!
+
+          pronto=""
+          for i in $(seq 1 60); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3010/login || true)" = "200" ]; then
+              pronto=1; break
+            fi
+            sleep 1
+          done
+          if [ -z "$pronto" ]; then
+            echo "O SERVIDOR NAO SUBIU em 60 s. Log:"
+            cat servidor.log
+            exit 1
+          fi
+          echo "servidor no ar em ${i}s"
+          echo "────────────────────────────────────────────────────────────"
+
+          # Como o job do PCP: confere TODAS as portas antes de falhar. Parar na
+          # primeira esconde as outras, e aqui cada uma e um buraco diferente.
+          falhas=""
+          confere(){
+            veio=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:3010$1" || true)
+            if [ "$veio" = "$2" ]; then
+              printf '  ok      %-32s %s\n' "$1" "$veio"
+            else
+              printf '  FURO    %-32s esperava %s, veio %s\n' "$1" "$2" "$veio"
+              falhas="$falhas $1"
+            fi
+          }
+
+          # TELA = 302 (manda para o login). Qualquer 200 aqui e furo: e o
+          # `express.static` entregando o arquivo do disco por cima do portao.
+          for tela in / /admin /index.html /painel /operador /setor \
+                      /sobmedida /sobmedida/corte /sobmedida/cadastros \
+                      /sobmedida/telas/corte.html; do
+            confere "$tela" 302
+          done
+
+          # API = 401. Ela nao redireciona: quem chama API espera resposta, e
+          # um 302 aqui faria o leitor da bancada receber HTML de login.
+          confere /api/skus 401
+          confere /sobmedida/api/eu 401
+
+          # E o login abre, senao ninguem entra.
+          confere /login 200
+
+          echo "────────────────────────────────────────────────────────────"
+          kill $servidor 2>/dev/null || true
+          if [ -n "$falhas" ]; then
+            echo "FURO DE SEGURANCA:$falhas"
+            echo "log do servidor:"; cat servidor.log
+            exit 1
+          fi
+          echo "a porta esta trancada: telas 302, API 401, /login 200"
+
+          # ⚠️ O QUE ESTE CHECK NAO PROVA, e esta escrito para ninguem achar que
+          # prova: ele so pergunta como VISITANTE. A §19 exige que
+          # `/sobmedida/telas/corte.html` de 403 ate para o DIRETOR logado — se
+          # der 200, o `express.static` do modulo furou o portao por dentro.
+          # Cobrir isso pede criar pessoa, PIN e sessao no runner, e ficou de
+          # fora por enquanto. Sem esta nota, o verde aqui seria lido como "o
+          # §19 inteiro esta coberto", que e o silencio que parece "tudo certo".

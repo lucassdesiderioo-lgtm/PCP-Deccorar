@@ -1641,6 +1641,53 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3010/login   # tem que
 
 **Regra de ouro:** o servidor **só recebe** (`git pull`). Nunca editar direto lá.
 
+### Onde os dados moram — `caminhos.js` é o dono único
+
+`caminhos.js` responde **onde ficam banco, PDFs, fotos e backups**. O padrão é
+`/opt/expedicao`, e **continua sendo** — o deploy acima é `git pull && pm2
+restart`, ninguém edita variável de ambiente no servidor.
+
+| Chave | O quê | Variável |
+|---|---|---|
+| `BANCO` | `dados.db` | `PCP_DB` |
+| `LOTES` | os PDFs do ML (o cron apaga em 7 dias) | `PCP_LOTES` |
+| `COLETAS` | as fotos da conferência com o motorista (§8-B) | `PCP_COLETAS_DIR` |
+| `BACKUPS` | as cópias do `backup.js` | `PCP_BACKUPS` |
+
+`PCP_DIR` move as quatro de uma vez; a variável específica ganha da geral.
+
+> ⚠️ **O CAMINHO ESTAVA COLADO EM 29 LUGARES, e o efeito não era feiura: o PCP
+> só subia naquela pasta.** `db.js` abria `/opt/expedicao/dados.db` sem escape,
+> então um clone limpo — máquina de quem desenvolve, runner de CI, segundo
+> servidor, backup restaurado noutro lugar — morria no `require` com
+> *"Cannot open database because the directory does not exist"*, antes de
+> existir rota. Em produção nunca aparecia, porque lá a pasta existe; quem
+> descobriu foi um runner de CI limpo, em 15/09/2026.
+
+> ⚠️ **MUDAR O PADRÃO SERIA O PIOR DEFEITO POSSÍVEL.** O próximo `git pull`
+> apontaria a produção para um banco **vazio**, e o sintoma não parece erro: o
+> sistema sobe, as telas abrem, e o estoque inteiro "sumiu". Por isso o primeiro
+> caso do `teste_caminhos.js` é justamente *"sem variável nenhuma, o caminho é o
+> de sempre"*.
+
+> **O nome das variáveis não é novo.** `PCP_DB`, `PCP_LOTES` e
+> `PCP_COLETAS_DIR` já eram lidos por treze scripts e pelo `carreg_route.js` —
+> o que faltava era um lugar que soubesse de todos. Inventar nome novo criaria
+> duas réguas para a mesma pergunta (armadilha #12).
+
+**Rode `node teste_caminhos.js` ao mexer no `caminhos.js`** — o último caso
+varre os `.js` do projeto e **recusa `/opt/expedicao` escrito em código** fora
+do `caminhos.js` e do próprio teste. Sem ele a arrumação dura até o próximo
+script, porque script novo se escreve copiando o de cima.
+
+> **O CI roda FORA de `/opt/expedicao`, e isso é a prova viva.** O job de
+> segurança do `.github/workflows/testes.yml` sobe o servidor com `PCP_DIR`
+> apontado para a área de trabalho do runner, então toda rodada confirma que o
+> sistema abre em qualquer pasta. Antes ele fazia `sudo mkdir -p
+> /opt/expedicao` — o runner fingindo ser o servidor de produção para o
+> `db.js` conseguir abrir o banco. Quem continua conferindo o **padrão** é o
+> primeiro caso do `teste_caminhos.js`, não o CI.
+
 ---
 
 ## 14. Dívidas técnicas conhecidas
@@ -1661,7 +1708,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (17 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16) e `teste_acesso.js` (27); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (17 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (27) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
@@ -1723,6 +1770,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Fechar a coleta sem a foto da tela do motorista, ou com número diferente
   sem `confirmar` e sem registro — a foto é a prova, e a divergência é a
   única chance de achar a caixa (§8-B)
+- ❌ Escrever `/opt/expedicao` em código fora do `caminhos.js` — o caminho
+  colado é o que fazia o PCP só subir naquela pasta, e há teste varrendo (§13)
+- ❌ Mudar o PADRÃO do `caminhos.js`: o próximo `git pull` apontaria a produção
+  para um banco vazio, e o sistema subiria com o estoque "sumido" (§13)
 - ❌ Mover `express.static` para antes do `auth`
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor
@@ -2176,7 +2227,18 @@ com a margem nascendo **zero** para não virar fato inventado.
 `tecido/dominio/gerencial.js` é o dono único de **mínimo, status e faixas**. Ele
 não calcula consumo nem valor: compõe o `giro.js` e o `custo.js`.
 
-### Duas regras do sob medida que valem citar aqui
+### Três regras do sob medida que valem citar aqui
+
+**Cada nível guarda um rolo só.** Regra do dono, 15/09/2026: `Haste A · Andar 1
+· Nível 1` é um buraco, e no buraco cabe **um** tubo de tecido novo. O andar
+tem quantos níveis a prateleira tiver — guardar mais material é criar mais
+nível. O buraco se esvazia **sozinho**, por dois caminhos e só esses dois: o
+tubo mudou de lugar (Mover) ou o material acabou (Rolo acabou, que encerra) —
+rolo encerrado não ocupa. **A sobra não tem essa trava**: retalho dobrado é
+achado pela etiqueta, não pelo endereço. O que já estava duplicado antes da
+regra não é recusado; vira checagem no painel gerencial, pelo mesmo motivo de
+sempre — trava que dispara no caso normal vira desvio (armadilha #6). Detalhe
+no `tecido/README.md`.
 
 **Não há emenda.** Peça mais larga que toda bobina do estoque não sai — e por
 isso a recusa vira número de compra, não recado: o plano devolve `falta_bobina`
@@ -2189,7 +2251,7 @@ cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 194 casos
+cd tecido && npm test          # 222 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:

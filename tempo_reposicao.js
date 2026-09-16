@@ -35,7 +35,7 @@ const Database = require('better-sqlite3');
 
 const argv = process.argv.slice(2);
 const valorDe = (f, padrao) => { const i = argv.indexOf(f); return i >= 0 && argv[i+1] ? argv[i+1] : padrao; };
-const CAMINHO = valorDe('--db', '/opt/expedicao/dados.db');
+const CAMINHO = valorDe('--db', require('./caminhos').BANCO);
 const DIAS = (() => { const n = argv.find(a => /^\d+$/.test(a)); return n ? +n : 90; })();
 
 if(!fs.existsSync(CAMINHO)){ console.error('Banco nao encontrado: ' + CAMINHO); process.exit(1); }

@@ -71,13 +71,15 @@ if (!APLICAR) {
 /* BACKUP ANTES, SEMPRE — e por db.backup(), nunca `cp dados.db`: os dados
    vivem no -wal e a copia crua sai vazia (CLAUDE.md §12). */
 const fs = require('fs');
-const dest = '/opt/expedicao/backups/dados-antes-limpar-modelos-' +
-  new Date().toISOString().slice(0, 19).replace(/[:T]/g, '') + '.db';
-fs.mkdirSync('/opt/expedicao/backups', { recursive: true });
+const path = require('path');
+const CAMINHOS = require('./caminhos');
+const dest = path.join(CAMINHOS.BACKUPS, 'dados-antes-limpar-modelos-' +
+  new Date().toISOString().slice(0, 19).replace(/[:T]/g, '') + '.db');
+fs.mkdirSync(CAMINHOS.BACKUPS, { recursive: true });
 
 (async () => {
   const Database = require('better-sqlite3');
-  const leitura = new Database('/opt/expedicao/dados.db', { readonly: true });
+  const leitura = new Database(CAMINHOS.BANCO, { readonly: true });
   await leitura.backup(dest);
   leitura.close();
   console.log('\n   backup -> ' + dest);

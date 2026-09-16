@@ -30,6 +30,39 @@ function medida(valor,rotulo,maximo){
   return arred(n);
 }
 
+/* ── UM ROLO POR NIVEL ────────────────────────────────────────────────────
+   Regra do dono: o nivel e o buraco, e o buraco guarda UM material. `A-1-1`
+   tem um tubo, nao dois. O andar pode ter quantos niveis a prateleira tiver —
+   quem quiser guardar mais material cria mais nivel, que e o que a estante
+   fisica faz.
+
+   POR QUE A REGRA E DO ROLO E NAO DA SOBRA: sao duas prateleiras com dois
+   usos. O rolo e um tubo que o cortador desce inteiro da estante — dois tubos
+   no mesmo buraco viram "pegar aquele que parece", que e exatamente o que a
+   etiqueta de 54 pt existe para evitar. A sobra e retalho dobrado: varias
+   cabem no mesmo lugar, e o que acha a peca certa la e a etiqueta, nao o
+   endereco. Por isso `sobra.criar` continua sem esta trava.
+
+   O ENDERECO SE LIBERA SOZINHO. Nao ha botao de "esvaziar": o buraco fica
+   livre quando o rolo sai dele, e ele sai de dois jeitos — mudou de lugar
+   (Mover) ou acabou (Rolo acabou, que encerra). Um terceiro caminho, manual,
+   seria um jeito de o sistema achar que o buraco esta vazio com o tubo ainda
+   la dentro.
+
+   A RECUSA DIZ QUEM ESTA LA, e as duas saidas. "Endereco ocupado" sozinho
+   manda a bancada procurar — e com o tubo na mao ela nao procura: ela lanca
+   sem endereco, que e o dado que nao volta depois. */
+function exigirNivelVago(nivel_id,exceto_rolo_id){
+  const o=dRolo.ocupante(nivel_id,exceto_rolo_id);
+  if(!o) return;
+  throw new ErroDeRegra('endereco_ocupado',
+    'O endereco '+endereco.descrever(nivel_id)+' ja tem o rolo '+o.codigo+' ('+
+    [o.linha_nome,o.abertura_nome,o.cor_nome].join(' · ')+', '+
+    o.saldo.toFixed(2).replace('.',',')+' m). Cada nivel guarda um rolo so: '+
+    'escolha outro nivel (ou crie um novo no andar). Se esse rolo acabou, '+
+    'marque "Rolo acabou" nele — o endereco fica livre na hora.');
+}
+
 /* ── DE QUEM VEIO, E QUANTO CUSTOU ────────────────────────────────────────
    As duas conferencias que a entrada e a edicao compartilham. Ficam juntas
    aqui porque um teto que vale so na entrada e um teto que nao vale: a
@@ -69,7 +102,10 @@ function entrada(dados,usuarioNome){
      estoque, e o plano passa a prometer uma faixa que o rolo nao tem. */
   const metragem=medida(dados.metragem,'quantos metros o rolo tem agora',MAX_METRAGEM);
 
-  if(dados.nivel_id) endereco.exigirArmazem(dados.nivel_id,'ROLO');
+  if(dados.nivel_id){
+    endereco.exigirArmazem(dados.nivel_id,'ROLO');
+    exigirNivelVago(dados.nivel_id);
+  }
 
   /* DE QUEM VEIO E QUANTO CUSTOU — os dois OPCIONAIS, e nao por preguica.
      A nota fiscal chega dias DEPOIS do rolo: exigi-la na entrada faria o
@@ -182,6 +218,10 @@ function mover(rolo_id,nivel_id,usuarioNome){
   // linhas que nao contam nada, e historico que nao conta nada ninguem le.
   if(Number(r.nivel_id)===Number(nivel_id))
     throw new ErroDeRegra('mesmo_endereco','O rolo '+r.codigo+' ja esta em '+para+'.');
+  /* O destino tem que estar VAZIO. Depois do `mesmo_endereco` de proposito:
+     quem repetiu o proprio endereco le que o rolo ja esta la, e nao que o
+     lugar esta ocupado — por ele mesmo. */
+  exigirNivelVago(nivel_id,r.id);
 
   return db.transaction(()=>{
     dRolo.atualizarEndereco(rolo_id,nivel_id);
@@ -276,6 +316,11 @@ module.exports={mover,editarDados,
   entrada, consumir, ajustar, encerrar, conferirSaldos, formatar,
   // A leitura do preco digitado e uma so: a sobra usa a mesma regua do rolo.
   precoDe,
+  // A estante do jeito que ela esta agora: nivel -> rolo que o ocupa. A tela
+  // desenha o botao ocupado com o codigo do tubo em vez de deixar a bancada
+  // tocar e levar recusa — a trava que so aparece depois do toque ensina que
+  // o sistema erra.
+  ocupacao:()=>dRolo.ocupacao(),
   listar:f=>dRolo.listar(f).map(comEndereco),
   porId:id=>comEndereco(dRolo.porId(id)),
   porCodigo:c=>dRolo.porCodigo(c),

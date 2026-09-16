@@ -15,8 +15,8 @@
 const fs=require('fs'), path=require('path');
 const Database=require('better-sqlite3');
 
-const DB=process.env.PCP_DB||'/opt/expedicao/dados.db';
-const LOTES=process.env.PCP_LOTES||'/opt/expedicao/lotes';
+const DB=require('./caminhos').BANCO;
+const LOTES=require('./caminhos').LOTES;
 const MAX_PDF=25;   // quantos PDFs recentes varrer quando o volume nao esta no banco
 
 const args=process.argv.slice(2);

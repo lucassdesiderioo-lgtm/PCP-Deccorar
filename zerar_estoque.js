@@ -50,7 +50,7 @@ const valorDe = (f, padrao) => { const i = argv.indexOf(f); return i >= 0 && arg
 const CONFIRMAR = temFlag('--confirmar');
 const FORCAR    = temFlag('--forcar');
 const SAIDA     = valorDe('--saida', path.join(__dirname, 'backups'));
-const CAMINHO   = valorDe('--db', '/opt/expedicao/dados.db');
+const CAMINHO   = valorDe('--db', require('./caminhos').BANCO);
 /* Sem --pecas nem --material, faz os dois. Pedir um deles restringe ao pedido:
    quem digitou "--pecas" quis dizer "so as pecas". */
 const soPecas   = temFlag('--pecas');

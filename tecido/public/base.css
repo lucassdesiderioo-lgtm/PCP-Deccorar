@@ -158,6 +158,10 @@ td.aviso, .aviso{color:var(--alerta); font-weight:700}
   border:2px solid var(--linha-forte); border-radius:var(--raio);
   background:var(--campo); color:var(--tinta); cursor:pointer;
 }
+/* O botao que nao da para escolher — hoje o nivel que ja tem rolo. Ele fica
+   VISIVEL e apagado, nunca escondido: buraco que some da fileira faz a bancada
+   procurar um endereco que ela sabe que existe. */
+.fileira .op[disabled]{opacity:.45; cursor:not-allowed}
 .fileira .op[aria-pressed="true"]{
   background:var(--acao); color:var(--acao-tinta); border-color:var(--acao);
 }

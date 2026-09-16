@@ -24,7 +24,7 @@ const Database = require('better-sqlite3');
 const argv = process.argv.slice(2);
 const valorDe = (f, padrao) => { const i = argv.indexOf(f); return i >= 0 && argv[i+1] ? argv[i+1] : padrao; };
 const CSV = argv.find(a => !a.startsWith('--') && a !== valorDe('--db', null));
-const CAMINHO = valorDe('--db', '/opt/expedicao/dados.db');
+const CAMINHO = valorDe('--db', require('./caminhos').BANCO);
 
 if(!CSV){
   console.log('uso: node comparar_inventario.js <arquivo antes_pecas_*.csv> [--db <caminho>]');

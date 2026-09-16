@@ -33,7 +33,7 @@
 const Database=require('better-sqlite3');
 const path=require('path');
 
-const DB=process.env.PCP_DB||'/opt/expedicao/dados.db';
+const DB=require('./caminhos').BANCO;
 const APLICAR=process.argv.includes('--aplicar');
 
 (async()=>{

@@ -25,7 +25,13 @@ function cena(){
   const aS=endereco.criarAndar({nome:'01',haste_id:hS.id});
   const nS=endereco.criarNivel({nome:'04',andar_id:aS.id});
 
-  c={t, nivelRolo:nR.id, nivelSobra:nS.id};
+  /* UM BURACO NOVO A CADA TUBO. Cada nivel guarda um rolo so, entao uma cena
+     com tres rolos precisa de tres niveis — como a prateleira de verdade. Era
+     o mesmo id repetido aqui, e uma estante que nao pode existir faria estes
+     testes provarem o plano de corte contra um estoque impossivel. */
+  let seq=4;
+  c={t, nivelRolo:nR.id, nivelSobra:nS.id,
+     buraco:()=>endereco.criarNivel({nome:String(++seq).padStart(2,'0'),andar_id:aR.id}).id};
   return c;
 }
 // Etiquetas livres sob demanda. O 'entregues' existe porque duas sobras
@@ -45,7 +51,7 @@ module.exports=[
 {nome:'entrada de rolo: nasce fechado, com movimento de entrada', executar({igual,perto}){
   const x=cena();
   const r=rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',
-    nivel_id:x.nivelRolo,nf:'123',fornecedor:'Tecelagem'},'Diretor');
+    nivel_id:x.buraco(),nf:'123',fornecedor:'Tecelagem'},'Diretor');
   igual(r.codigo,'R-000001','codigo sequencial');
   igual(r.status,'fechado','nasce fechado');
   perto(r.saldo,50,'saldo = metragem da nota');
@@ -109,9 +115,9 @@ module.exports=[
 // ── O PLANO ────────────────────────────────────────────────────────────
 {nome:'o plano simula todas as larguras e escolhe a de menor desperdicio', executar({igual,perto}){
   const x=cena();
-  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'40',nivel_id:x.nivelRolo},'Diretor');
-  rolo.entrada({tecido_id:x.t.id,largura:'2,50',metragem:'40',nivel_id:x.nivelRolo},'Diretor');
-  rolo.entrada({tecido_id:x.t.id,largura:'2,00',metragem:'40',nivel_id:x.nivelRolo},'Diretor');
+  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'40',nivel_id:x.buraco()},'Diretor');
+  rolo.entrada({tecido_id:x.t.id,largura:'2,50',metragem:'40',nivel_id:x.buraco()},'Diretor');
+  rolo.entrada({tecido_id:x.t.id,largura:'2,00',metragem:'40',nivel_id:x.buraco()},'Diretor');
 
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
     {largura:'0,90',altura:'2,50'},{largura:'0,90',altura:'2,50'},{largura:'0,90',altura:'2,50'}]});
