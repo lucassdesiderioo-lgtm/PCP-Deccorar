@@ -400,6 +400,105 @@ Desenho do tecido: Liso
 > lembrar de olhar o painel do ML. No estoque: duas peças saem da prateleira e
 > o saldo não anda. Nenhum aviso, em lugar nenhum.
 
+### ⚠️ A CAIXA DE VÁRIAS PERSIANAS TEM DUAS FORMAS, E A SEGUNDA É A COMUM
+
+**16/09/2026, NF 6490: o cliente comprou 2 e recebeu 1.** O conserto de 15/09
+cobria só metade do problema, porque nasceu de um caso só.
+
+| Forma | Como vem na folha | Etiquetas |
+|---|---|---|
+| **2 SKUs** | dois itens, o de baixo órfão (sem pack/venda/comprador) | 1 |
+| **1 SKU, N unidades** | **UM** item, com `Quantidade: 2` escrito nele | 1 |
+
+A segunda passava limpo. O dado sempre esteve lá — o `folha.js` lê `Quantidade:`
+e grava em `qtd` desde sempre —, mas **quatro portões decidiam "isto é caixa de
+várias?" contando LINHA em vez de PERSIANA**:
+
+| Onde | Era | O efeito |
+|---|---|---|
+| `parse.js` | a lista de peças só existia `if(irmaos.length)` | o item de 2 unidades não virava `lote_item` |
+| `etq_route.js` `/api/proximo` | `itens.length>1` | o bipe devolvia `[]` e a tela seguia normal |
+| `etq_route.js` `/api/lote/conferir` | `itens.length<2` recusa | não dava nem para conferir |
+| `etq_route.js` `/api/embalar` | `pacote = itens.length>1` | imprimia e baixava **uma** de duas |
+
+Uma linha com `qtd:2` é **uma linha e duas persianas**. Todo portão conta a
+soma das `qtd`, nunca `length` — é a mesma lição do bipe por unidade, uma
+camada abaixo.
+
+> ⚠️ **NÃO CONFUNDIR COM A ARMADILHA #8.** A quantidade **não** multiplica o
+> VOLUME: uma etiqueta continua sendo uma linha em `lote`. Ela conta a **PEÇA**,
+> que é o grão do `lote_item` — e essa separação é exatamente o que a tabela
+> existe para carregar. Caso 9 do `teste_parse.js` trava as duas metades juntas:
+> o volume continua **um**, e as três persianas têm que **chegar** em `itens`.
+
+> **O `pdfFecha` não entra no caso de 1 SKU, e é de propósito.** Ele é a licença
+> para ler **ausência** como peça a mais, e o irmão depende dele. A quantidade
+> do próprio item não é lida por ausência: está escrita, com todas as letras, no
+> bloco daquele item. Exigir o documento fechar para acreditar num número que o
+> documento afirma seria recusar a evidência mais forte que existe.
+
+### ⚠️ SÓ O PACOTE DE VÁRIOS SKUs RETÉM — a caixa de N unidades não
+
+As duas levam mais de uma persiana, mas a pergunta é outra:
+
+| | O que o sistema sabe | Decisão |
+|---|---|---|
+| 2 SKUs | leu a peça a mais por **ausência** — sinal fraco, pode estar errado | retém, a gestão assina |
+| 1 SKU | a folha **escreveu** `Quantidade: 2` | não retém |
+
+Reter o caso de 1 SKU seria parar a venda para alguém clicar "confirmo o que o
+documento já diz" — e venda de 2 unidades é rotina, não exceção. Trava que
+dispara no caso normal vira desvio que a equipe aprende a fazer (#6), e aí o
+pacote de verdade passa junto, no meio do que se destrava sem olhar.
+
+A proteção dele mora onde morde: as peças vão pro `lote_item`, a Etiqueta de
+Venda não imprime sem o bipe de **todas**, e o estoque baixa por peça.
+
+### ⚠️ A DESCOBERTA NÃO PODE SER NO BIPE — ali a caixa já está montada
+
+A lista "Faltam imprimir" conta **volume**. Uma caixa de três persianas aparecia
+como `1`, igual a qualquer venda: a pessoa ia à prateleira, trazia **uma**, e só
+no bipe a tela âmbar dizia que eram três. A trava segurava o erro — com o
+trabalho já feito. Retrabalho que se repete todo dia é como a equipe aprende a
+contornar a tela.
+
+A tela de quem imprime mostra isso em **três** momentos, do mais cedo ao mais
+tarde:
+
+| Onde | O quê |
+|---|---|
+| **Card próprio**, acima das duas listas (`GET /api/pendentes/varias`) | uma caixa por **cliente**, com as peças que vão dentro |
+| Linha da lista por SKU | `📦 4 persianas em 3 caixas — leve 4`, quando `pecas ≠ qtd` |
+| Bipe e pós-impressão | a tela âmbar que já existia |
+
+> **O card agrupa por VOLUME; a lista de baixo, por SKU.** São duas perguntas
+> diferentes — "o que vai junto nesta caixa" e "o que buscar na prateleira" — e
+> nenhum recorte serve para as duas. Agrupar o card por SKU desmontaria
+> justamente a informação que ele existe para dar.
+
+> **`qtd` é CAIXA, `pecas` é PERSIANA, e eles não se somam.** São iguais no dia
+> normal e divergem só aqui. O número grande da linha continua sendo caixa
+> (é o que ela fecha e o que zera a lista); a linha âmbar diz quantas peças
+> tirar da prateleira. Mesma regra do `faltaHoje` × `precisa` do §18.
+
+> ⚠️ **A INSTRUÇÃO DE EMBALAGEM É CONTEÚDO, NÃO ENFEITE.** Regra do dono
+> (16/09/2026): **saco maior, as peças juntas com fita** — não é o saco de uma
+> peça só. A cor diz "isto é diferente"; só a frase diz o que fazer, e é ela que
+> vale para quem nunca montou uma destas. Ela aparece **igual** nos três
+> lugares: escrevê-la diferente ensinaria a equipe a achar que são duas coisas.
+
+> **O card some quando não há nenhuma.** Card vazio todo dia vira paisagem, e aí
+> ninguém lê no dia em que ele aparece cheio. Ele é largo e fica em cima, então
+> surgir empurra as listas para baixo sem trocá-las de coluna — diferente da
+> coleta no carregamento (§8-B), que fica fixa justamente para a coluna do carro
+> não pular de lugar.
+
+**Rode `node teste_etiqueta.js` (os 12 últimos casos são a NF 6490),
+`node teste_divergencia.js` (os 6 últimos são as duas contas e o card) e
+`node teste_parse.js` (caso 9) após mexer nisso.**
+
+---
+
 **O irmão se reconhece por AUSÊNCIA**, e é a mesma família de sinal fraco da
 #21: ele não traz `Pack ID:`, nem `Venda:`, nem comprador — só descrição, SKU,
 quantidade, cor e tecido.
@@ -1673,7 +1772,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16) e `teste_acesso.js` (27); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (41) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (45), `teste_ficha.js` (40), `teste_ordem_dia.js` (16) e `teste_acesso.js` (28); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
@@ -1709,6 +1808,15 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   item na folha): ali é leitura quebrada, não peça a mais (§5, armadilha #23)
 - ❌ Chamar `irmaosDoPacote` sem a licença do `pdfFecha` — foi assim que o
   `backfill_pacote.js` nasceu, e lá o erro **baixa estoque** (§5, #23)
+- ❌ Decidir "isto é caixa de várias persianas?" contando `itens.length` — uma
+  linha com `qtd:2` é UMA linha e DUAS persianas, e foi assim que a NF 6490 saiu
+  com uma de duas. Todo portão conta a soma das `qtd` (§5, #23)
+- ❌ Reter em Bloqueados a venda de N unidades do MESMO SKU: a folha escreveu a
+  quantidade, não há o que assinar, e travar o caso normal é a #6 (§5, #23)
+- ❌ Deixar a pessoa descobrir no BIPE que a caixa leva três — ali ela já montou;
+  o card e a linha âmbar existem para ela saber antes da prateleira (§5, #23)
+- ❌ Escrever a instrução de embalagem diferente em cada tela: é uma frase só —
+  *saco maior, as peças juntas com fita* (§5, #23)
 - ❌ Deixar cadastro de SKU soltar volume retido por `pacote:` — cadastro não
   responde quantas persianas vão na caixa (§5, armadilha #23)
 - ❌ Declarar chave nova em `permissoes.js` sem a linha no `permDaRota()` **e**

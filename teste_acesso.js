@@ -63,6 +63,10 @@ eq('POST /api/lote/conferir e da bancada da etiqueta, nao do upload',
   AC.permDaRota('/api/lote/conferir', 'POST'), 'etiqueta.emitir');
 eq('POST /api/lote/upload continua sendo de quem sobe o PDF',
   AC.permDaRota('/api/lote/upload', 'POST'), 'pdf.subir');
+/* O card das caixas de varias persianas carrega comprador e NF — dado de
+   cliente, como os impressos. Nao pode cair no '@logado'. */
+eq('o card das caixas de varias persianas e da bancada da etiqueta',
+  AC.permDaRota('/api/pendentes/varias', 'GET'), 'etiqueta.emitir');
 /* As outras duas travas da mesma aba nao podem ter mudado de dono. */
 eq('divergencia continua em sku.cadastrar',
   AC.permDaRota('/api/divergencias/resolver', 'POST'), 'sku.cadastrar');

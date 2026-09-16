@@ -480,6 +480,12 @@ module.exports = function(app, db){
     // e gateada — a lista de impressos carrega comprador, cidade e NF, que e
     // dado de cliente, nao numero de operacao.
     if(eq('/api/impressos') || eq('/api/reimprimir')) return 'etiqueta.emitir';
+    /* As caixas de varias persianas (§5-B): mesma regra dos impressos, e pelo
+       mesmo motivo. A lista carrega COMPRADOR e NF — dado de cliente, nao numero
+       de operacao —, entao ela e da bancada que emite a etiqueta, nao de
+       qualquer pessoa logada. A lista por SKU (`/api/pendentes`) nao carrega
+       nome nenhum e segue como estava. */
+    if(eq('/api/pendentes/varias')) return 'etiqueta.emitir';
     // Divergencia de leitura da folha: ver e do admin; RESOLVER exige a mesma
     // permissao de quem hoje destrava bloqueado cadastrando SKU — e a mesma
     // decisao, "qual peca e essa", tomada olhando o pedido no Mercado Livre.
@@ -685,6 +691,7 @@ module.exports = function(app, db){
     ['GET','/api/divergencias'],['POST','/api/divergencias/resolver'],
     ['GET','/api/modalidade/pendentes'],['POST','/api/modalidade/resolver'],['GET','/api/coleta/foto/:id'],
     ['GET','/api/pacote/pendentes'],['POST','/api/pacote/resolver'],['POST','/api/lote/conferir'],
+    ['GET','/api/pendentes/varias'],
     ['GET','/api/auditoria/skus'],['POST','/api/devolucao'],
     ['POST','/api/devolucao/baixa'],['POST','/api/estoque'],['POST','/api/alvo'],
     ['POST','/api/producao'],['POST','/api/planejamento/importar'],['POST','/api/skus'],['DELETE','/api/skus/:c'],

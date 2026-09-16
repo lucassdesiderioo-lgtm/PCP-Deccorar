@@ -227,6 +227,19 @@ function conferir(nome, orders, esperado){
     if(pecas!==4) erros.push('pecas da folha: esperava 4, veio '+pecas);
     if(os_.length!==2) erros.push('volumes: esperava 2 (uma etiqueta por item), veio '+os_.length);
     if(os_.some(o=>o.conflito)) erros.push('marcou conflito a toa: '+os_.map(o=>o.conflito).filter(Boolean).join(' / '));
+    /* ⚠️ A OUTRA METADE, QUE FALTAVA ATE 16/09/2026. O volume continua UM — e
+       as tres persianas tem que CHEGAR nele, em `itens`. Ate aqui elas paravam
+       na folha: a lista so era montada quando havia irmao de outro SKU, e a
+       venda de N unidades do MESMO SKU passava limpa. Imprimia uma etiqueta,
+       baixava UMA persiana, e o cliente recebia uma de tres (NF 6490). */
+    const tres=os_.find(o=>o.packId==='111')||{};
+    const um  =os_.find(o=>o.packId==='222')||{};
+    const its=tres.itens||[];
+    if(its.length!==1) erros.push('o volume de 3 pecas devia trazer 1 item, veio '+its.length);
+    else if((its[0].qtd||1)!==3) erros.push('o item devia trazer qtd 3, veio '+its[0].qtd);
+    /* E o volume normal NAO pode ganhar lista de pecas: uma venda de 1 persiana
+       que virasse "pacote" cobraria bipe a mais e abriria card na tela toda vez. */
+    if(um.itens) erros.push('a venda de 1 peca virou pacote: '+JSON.stringify(um.itens));
     if(erros.length){ falhas++; console.log('FALHOU  item com Quantidade 3 e 3 pecas em 1 volume');
       erros.forEach(e=>console.log('        '+e)); }
     else console.log('ok      item com Quantidade 3 e 3 pecas em 1 volume');

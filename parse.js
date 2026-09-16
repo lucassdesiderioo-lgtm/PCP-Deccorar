@@ -281,8 +281,30 @@ async function parsePdf(uint8){
        "quantas persianas vao aqui" e a soma dos dois lados, e uma lista que
        comecasse nos irmaos leria como "1 + 2" em vez de "3". */
     const irmaos = (r1 && pdfFecha) ? irmaosDe(itensFolha, r1) : [];
-    const itensDoVolume = irmaos.length
-      ? [r1].concat(irmaos).map(b=>({sku:b.sku, qtd:b.qtd, cor:b.cor||null, descricao:b.desc||null}))
+    /* ⚠️ A CAIXA DE VARIAS PECAS TEM DUAS FORMAS, E A SEGUNDA E A MAIS COMUM.
+       Ate 15/09/2026 so a primeira era vista:
+
+         2 SKUs   dois itens na folha, o de baixo orfao      (caso Fabiano)
+         1 SKU    UM item, com `Quantidade: 2` escrito nele  (NF 6490)
+
+       A segunda passava limpo — imprimia uma etiqueta, baixava UMA persiana, e
+       o cliente recebia uma de duas. O dado sempre esteve aqui: o `folha.js` le
+       o `Quantidade:` e grava em `qtd`. O que faltava era ligar os dois.
+
+       Nao confundir com a armadilha #8: a quantidade NAO multiplica o VOLUME
+       (uma etiqueta continua sendo uma linha em `lote`, senao nascem etiquetas
+       que o ML nao despachou). Ela conta a PECA, que e o grao do `lote_item` —
+       e e essa separacao que esta tabela existe para carregar.
+
+       O `pdfFecha` nao entra aqui, e de proposito: ele e a licenca para ler
+       AUSENCIA como peca a mais (§5-B), e o irmao depende dele. A quantidade do
+       proprio item nao e lida por ausencia — esta escrita, com todas as letras,
+       no bloco daquele item. Exigir o documento fechar para acreditar num numero
+       que o documento afirma seria recusar a evidencia mais forte que existe. */
+    const pecasDoPai = r1 ? Math.max(1, r1.qtd||1) : 1;
+    const itensDoVolume = (r1 && (irmaos.length || pecasDoPai>1))
+      ? [r1].concat(irmaos).map(b=>({sku:b.sku, qtd:Math.max(1,b.qtd||1),
+                                     cor:b.cor||null, descricao:b.desc||null}))
       : null;
     /* O PDF NAO FECHOU E AINDA HA ITEM SEM DONO: nao da pra dizer se e peca a
        mais ou item que perdeu os identificadores na leitura. As duas respostas

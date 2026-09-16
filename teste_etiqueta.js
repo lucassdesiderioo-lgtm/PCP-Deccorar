@@ -243,6 +243,52 @@ const ok = (n, c, extra) => { casos++;
      db.prepare("SELECT estagio FROM lote WHERE id=?").get(PAC).estagio === 'embalado' &&
      db.prepare("SELECT COUNT(*) c FROM lote WHERE packId='2000015040457349'").get().c === 1);
 
+  /* ── A CAIXA DE N UNIDADES DO MESMO SKU (NF 6490, 16/09/2026) ─────────────
+     A outra forma da caixa de várias persianas, e a que passou batido: UMA
+     linha em `lote_item`, com `qtd` 2. Três portões decidiam "isto é pacote?"
+     contando LINHA (`itens.length>1`) em vez de PERSIANA, então esta caixa não
+     pedia bipe, não travava o estoque e baixava UMA peça de duas. O cliente
+     recebeu uma.
+
+     Os casos abaixo são o mesmo roteiro do pacote de 2 SKUs, com uma linha só —
+     é justamente a diferença que os portões não enxergavam. */
+  {
+    const DUP = db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data,modalidade)
+      VALUES ('BK140140BEGE','Cliente 6490','6490','pk6490','vd6490','pendente',date('now','localtime'),'agencia')`).run().lastInsertRowid;
+    db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK140140BEGE',2,'folha')").run(DUP);
+    const antes = estoqueDe('BK140140BEGE');
+
+    const pp2 = await chamar('GET /api/proximo/:sku', null, {sku:'BK140140BEGE'});
+    /* O bipe tem que ENTREGAR a lista mesmo com uma linha só — é ela que abre a
+       tela âmbar. Com o critério por linha vinha `[]` e a tela seguia normal. */
+    ok('o bipe entrega as peças de uma caixa com 2 unidades do MESMO SKU',
+       (pp2.itens||[]).length === 1 && pp2.itens[0].qtd === 2,
+       JSON.stringify({itens:(pp2.itens||[]).length, qtd:(pp2.itens||[])[0]&&pp2.itens[0].qtd}));
+
+    const sem2 = await chamar('POST /api/embalar', {id:DUP});
+    ok('sem bipar as duas, NÃO imprime — e cobra 2 persianas, não 1 linha',
+       !!sem2.erro && sem2.faltam === 2, JSON.stringify(sem2));
+    ok('e o estoque não andou na recusa', estoqueDe('BK140140BEGE') === antes);
+
+    const b1 = await chamar('POST /api/lote/conferir', {id:DUP, codigo:'BK140140BEGE'});
+    ok('o 1º bipe conta UMA persiana e ainda deve a irmã',
+       b1.ok && b1.conferidos === 1 && b1.faltam === 1, JSON.stringify(b1));
+    const meio2 = await chamar('POST /api/embalar', {id:DUP});
+    ok('com 1 de 2, a etiqueta continua recusada', !!meio2.erro && meio2.faltam === 1, JSON.stringify(meio2));
+
+    const b2 = await chamar('POST /api/lote/conferir', {id:DUP, codigo:'BK140140BEGE'});
+    ok('o 2º bipe fecha a caixa', b2.ok && b2.conferidos === 2 && b2.faltam === 0, JSON.stringify(b2));
+
+    const imp2 = await chamar('POST /api/embalar', {id:DUP});
+    /* A LINHA QUE IMPORTA: saíram DUAS da prateleira, o saldo baixou DUAS. */
+    ok('a etiqueta sai e o estoque baixa 2 — não 1',
+       !!imp2.ok && estoqueDe('BK140140BEGE') === antes - 2,
+       JSON.stringify({ok:imp2.ok, antes, agora:estoqueDe('BK140140BEGE')}));
+    ok('e a resposta manda fechar a caixa com 2 persianas', imp2.pecas === 2, JSON.stringify(imp2.pecas));
+    ok('continua sendo UM volume: nenhuma etiqueta foi inventada',
+       db.prepare("SELECT COUNT(*) c FROM lote WHERE packId='pk6490'").get().c === 1);
+  }
+
   console.log('');
   console.log(falhas ? ('FALHARAM ' + falhas + ' de ' + casos)
                      : ('todos os ' + casos + ' casos passaram'));
