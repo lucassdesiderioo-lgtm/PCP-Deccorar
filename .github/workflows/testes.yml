@@ -28,12 +28,16 @@ jobs:
     name: sob medida (tecido/)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # ⚠️ AS ACOES SAO PRESAS NO MAJOR, e o major aqui e o RUNTIME DELAS, nao o
+      # do projeto. Na v4 as duas rodavam em Node 20, que o runner aposentou — o
+      # aviso de deprecacao saia em toda rodada e um dia viraria falha. Isso nao
+      # tem nada a ver com o `node-version` abaixo, que e o do nosso codigo.
+      - uses: actions/checkout@v7
 
-      # A mesma versao maior que o servidor roda. Node novo demais quebra o
+      # A mesma versao maior que o SERVIDOR roda. Node novo demais quebra o
       # better-sqlite3 (modulo nativo), e a quebra aparece como "nao instalou",
-      # que nao se parece nada com a causa.
-      - uses: actions/setup-node@v4
+      # que nao se parece nada com a causa. Subir a acao NAO sobe este numero.
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -58,9 +62,9 @@ jobs:
     name: PCP (raiz)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -107,9 +111,9 @@ jobs:
     name: seguranca (§10)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
