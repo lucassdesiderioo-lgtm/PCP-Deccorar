@@ -67,6 +67,32 @@ function criarNivel(dados,usuario){
   return dNivel.criar({nome,andar_id:andar.id,ordem:dados.ordem,...marca(usuario)});
 }
 
+/* ── O PROXIMO NUMERO DA SEQUENCIA ────────────────────────────────────────
+   A prateleira cresce: cheios os dez niveis do andar, o buraco novo e o 11.
+   Digitar esse numero e trabalho que o sistema ja sabe fazer, e o erro de
+   digitacao aqui nao da erro nenhum — cria o "12" com o 11 faltando, e a
+   estante do sistema passa a ter um buraco que a fisica nao tem.
+
+   E SUGESTAO, NAO REGRA. O nome segue livre (R5: nenhuma quantidade de
+   haste, andar ou nivel e decidida no codigo), e por isso ela mora aqui e
+   NAO dentro do `criarNivel`: o dominio propoe, a tela mostra o numero antes
+   do toque, e quem grava continua sendo a pessoa. Nivel chamado "fundo"
+   entra igual.
+
+   ⚠️ NOME QUE NAO E NUMERO FICA DE FORA DA CONTA, e quando nenhum e, a
+   resposta e `null` — "nao da pra dizer", nunca 1. Num andar cujos niveis se
+   chamam "frente" e "fundo", sugerir "1" inventaria uma sequencia que nao
+   existe; e a mesma regra da cobertura sem venda (CLAUDE.md §3). */
+function proximoNome(nomes){
+  const numeros=(nomes||[]).map(n=>String(n==null?'':n).trim()).filter(n=>/^\d+$/.test(n));
+  if(!numeros.length) return null;
+  /* O ZERO A ESQUERDA E COPIADO de quem ja esta la. Num andar de "01" a
+     "09", o proximo tem que sair "10" e nao "10" ao lado de "9": largura
+     misturada faz a lista ordenar torto, e o olho procura duas vezes. */
+  const largura=Math.max(0,...numeros.filter(n=>/^0\d/.test(n)).map(n=>n.length));
+  return String(Math.max(...numeros.map(Number))+1).padStart(largura,'0');
+}
+
 // A consulta que responde "onde fica o nivel 37" — e de qual armazem ele e.
 const pCompleto=db.prepare(`
   SELECT n.id, n.nome AS nivel_nome, n.ativo,
@@ -99,17 +125,28 @@ function exigirArmazem(nivel_id,armazem_chave){
   return e;
 }
 
-// A arvore inteira de um armazem, para a tela montar os tres seletores.
+/* A arvore inteira de um armazem, para a tela montar os tres seletores.
+   Ela leva junto o PROXIMO NOME de cada sequencia: as duas telas que criam
+   endereco (a bancada, na fileira dos rolos, e a chefia, em Cadastros)
+   precisam da mesma sugestao, e uma conta em cada tela e a armadilha #12 —
+   duas reguas para a mesma pergunta, divergindo no primeiro andar de nome
+   torto. Vem no mesmo pacote porque a tela ja tem os nomes na mao: perguntar
+   de novo ao servidor seria uma ida a rede para contar o que ela acabou de
+   receber. */
 function arvore(armazem_chave){
-  const hastes=dHaste.listar(armazem_chave);
-  return hastes.map(h=>({
-    ...h,
-    andares:dAndar.listar(h.id).map(a=>({...a, niveis:dNivel.listar(a.id)}))
-  }));
+  return dHaste.listar(armazem_chave).map(h=>{
+    const andares=dAndar.listar(h.id);
+    return {...h,
+      proximo_andar:proximoNome(andares.map(a=>a.nome)),
+      andares:andares.map(a=>{
+        const niveis=dNivel.listar(a.id);
+        return {...a, proximo_nivel:proximoNome(niveis.map(n=>n.nome)), niveis};
+      })};
+  });
 }
 
 module.exports={
-  criarHaste, criarAndar, criarNivel,
+  criarHaste, criarAndar, criarNivel, proximoNome,
   completo, descrever, exigirArmazem, arvore,
   listarArmazens:()=>dArmazem.listar()
 };

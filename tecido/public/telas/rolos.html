@@ -83,9 +83,17 @@ function fileira(rotulo,itens,sel,aoEscolher,novo){
     title:i.titulo||null, disabled:i.travado?'':null,
     'aria-pressed':String(!i.travado&&String(i.valor)===String(sel)),
     onclick:()=>{ if(!i.travado) aoEscolher(i.valor); }})));
+  /* O BOTAO DIZ QUAL VAI CRIAR: "+ nivel 11", e nao "+ nivel". Cheios os dez
+     buracos do andar, o proximo e sempre o 11 — mostrar o numero antes do
+     toque poupa a digitacao e, mais que isso, deixa a pessoa ver que o
+     sistema entendeu onde ela esta. Quando nao ha sequencia numerica para
+     seguir (`proximoNome` devolve null), o botao volta a ser so "+ nivel" e
+     o campo abre vazio: sugerir "1" num andar de niveis chamados "frente" e
+     "fundo" inventaria uma ordem que ninguem usa.
+     A sugestao vem PREENCHIDA e nao gravada: e so apagar e escrever outro. */
   if(novo) f.appendChild(el('button',{class:'op',style:'border-style:dashed',
-    texto:'+ '+novo.rotulo, onclick:async()=>{
-      const nome=prompt(novo.pergunta);
+    texto:'+ '+novo.rotulo+(novo.sugestao?' '+novo.sugestao:''), onclick:async()=>{
+      const nome=prompt(novo.pergunta,novo.sugestao||'');
       if(nome===null||!nome.trim()) return;
       try{
         const criado=await api(novo.rota,{metodo:'POST',corpo:{...novo.corpo,nome:nome.trim()}});
@@ -575,13 +583,17 @@ async function telaEntrada(pai){
 
   c.appendChild(fileira('ANDAR',andares,aAtual&&aAtual.id,
     v=>{ estado.andar_id=v; estado.nivel_id=null; telaEntrada($('#conteudo')); },
-    hAtual&&{rotulo:'andar', pergunta:'Nome do andar novo na haste '+hAtual.nome+' (ex.: 2):',
+    hAtual&&{rotulo:'andar', sugestao:hAtual.proximo_andar,
+     pergunta:'Nome do andar novo na haste '+hAtual.nome+
+       (hAtual.proximo_andar?':':' (ex.: 2):'),
      rota:'/api/andares', corpo:{haste_id:hAtual.id},
      aoCriar:c=>recarregar('andar',c)}));
 
   c.appendChild(fileira('NIVEL',niveis,estado.nivel_id,
     v=>{ estado.nivel_id=v; telaEntrada($('#conteudo')); },
-    aAtual&&{rotulo:'nivel', pergunta:'Nome da posicao nova no andar '+aAtual.nome+' (ex.: 3):',
+    aAtual&&{rotulo:'nivel', sugestao:aAtual.proximo_nivel,
+     pergunta:'Nome da posicao nova no andar '+aAtual.nome+
+       (aAtual.proximo_nivel?':':' (ex.: 3):'),
      rota:'/api/niveis', corpo:{andar_id:aAtual.id},
      aoCriar:c=>recarregar('nivel',c)}));
 

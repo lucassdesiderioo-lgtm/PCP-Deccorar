@@ -8,7 +8,7 @@ Este módulo **não sobe sozinho**. Ele é montado dentro do PCP, em `/sobmedida
 pelo `server.js` da raiz. Uma porta, um processo, um PIN.
 
 ```bash
-npm test          # daqui: 222 casos, banco temporário, sem servidor
+npm test          # daqui: 233 casos, banco temporário, sem servidor
 node server.js    # da RAIZ: sobe o PCP inteiro, com o sob medida junto
 ```
 
@@ -256,10 +256,30 @@ material **cria mais nível**, que é exatamente o que a estante de verdade faz.
 > mão. Não há índice `UNIQUE` no banco pelo mesmo motivo — e porque um
 > `SQLITE_CONSTRAINT` cru não diz **quem** está no buraco.
 
+> **Cheios os dez, o botão já oferece o 11.** A trava empurra para o lado
+> certo — criar o buraco novo —, e esse lado tinha um `prompt` vazio no fim.
+> `endereco.proximoNome()` calcula o próximo da sequência e a `arvore()` leva
+> ele pronto (`proximo_nivel` no andar, `proximo_andar` na haste): o botão
+> passa a dizer **"+ nivel 11"** e o campo abre preenchido, nas duas telas que
+> criam endereço — a fileira dos rolos e Cadastros. Uma conta só para as duas,
+> que é a armadilha #12 em miniatura.
+>
+> ⚠️ **É SUGESTÃO, NÃO REGRA — R5 continua de pé.** O nome segue livre: apagar
+> e escrever "fundo" passa igual, e por isso a conta mora no domínio e **não**
+> dentro do `criarNivel`. Ela vai pelo **maior número**, nunca pela quantidade
+> (o nível apagado no meio deixaria a sugestão repetir um nome que já existe),
+> conta o **desativado** também (o `criarNivel` recusa repetido olhando os
+> dois — sugerir o que ele recusa é a tela mandando fazer o que o sistema não
+> aceita), copia o **zero à esquerda** de quem já está lá, e devolve `null`
+> quando não há sequência numérica para seguir. `null` é "não dá pra dizer",
+> nunca 1: num andar de níveis chamados "frente" e "fundo", sugerir 1
+> inventaria uma ordem que ninguém usa.
+
 **Teste obrigatório:** `node teste/rodar.js` — os 10 casos de
 `teste/endereco_unico.test.js` travam a entrada, o Mover, os dois jeitos de
 liberar o buraco, o limite por nível (e não por andar), o rolo sem endereço, a
-sobra de fora e o aviso do painel.
+sobra de fora e o aviso do painel. Os 11 de `teste/proximo_nivel.test.js`
+travam a sugestão do próximo número — inclusive que ela não vira regra.
 
 ### O que vai escrito onde
 
