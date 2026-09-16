@@ -26,7 +26,14 @@
 const {api,banner,el,limpar,$,num,comoNumero,formatarMetros}=window.ui;
 
 let eu={}, aba='tecido';
-const estado={linhas:[],aberturas:[],cores:[],tecidos:[],linhaSel:null,armazem:'ROLO',arvore:[]};
+const estado={linhas:[],aberturas:[],cores:[],tecidos:[],linhaSel:null,armazem:'ROLO',arvore:[],
+  /* `linhaSel`/`aberturas` sao do cartao COLECAO ("de qual linha estou
+     editando as colecoes"); `linhaForm`/`aberturasForm` sao do formulario de
+     ITEM DE TECIDO ("em qual linha entra o tecido novo"). Sao perguntas
+     diferentes e por isso variaveis diferentes — ver `carregarTecido`. */
+  linhaForm:null, aberturasForm:[],
+  // Qual tecido esta com o cartao de preco do m² aberto (um de cada vez).
+  precificando:null};
 const podeEditar=()=>eu.papel==='diretor';
 
 const ABAS=[
@@ -75,8 +82,17 @@ function formulario(pai,campos,rotuloBotao,aoEnviar){
     const input=cp.opcoes
       ? el('select',{})
       : el('input',{type:cp.tipo||'text',inputmode:cp.inputmode||null,placeholder:cp.dica||''});
-    if(cp.opcoes) cp.opcoes.forEach(o=>input.appendChild(el('option',{value:o.valor,texto:o.nome})));
-    if(cp.aoMudar) input.addEventListener('change',()=>cp.aoMudar(input.value));
+    if(cp.opcoes){
+      cp.opcoes.forEach(o=>input.appendChild(el('option',{value:o.valor,texto:o.nome})));
+      /* O VALOR INICIAL E DECLARADO, e nao "o primeiro da lista".
+         Sem isto o select nasce sempre no primeiro item, mesmo quando a tela
+         ja sabe qual e a escolha — e o campo passa a mostrar uma coisa
+         enquanto o resto do formulario descreve outra. */
+      if(cp.valor!==undefined&&cp.valor!==null) input.value=String(cp.valor);
+    }
+    // O `aoMudar` recebe os campos do proprio formulario: mudar um seletor
+    // quase sempre significa mexer no seletor do lado, e nao redesenhar tudo.
+    if(cp.aoMudar) input.addEventListener('change',()=>cp.aoMudar(input.value,refs));
     box.appendChild(input);
     refs[cp.id]=input;
     f.appendChild(box);
@@ -206,7 +222,85 @@ async function carregarTecido(){
   estado.cores=await api('/api/cores');
   if(!estado.linhaSel&&estado.linhas.length) estado.linhaSel=estado.linhas[0].id;
   estado.aberturas=estado.linhaSel?await api('/api/aberturas?linha_id='+estado.linhaSel):[];
+
+  /* ⚠️ A LINHA DO FORMULARIO DE ITEM DE TECIDO E OUTRA ESCOLHA, e ate
+     15/09/2026 as duas eram a mesma variavel (`estado.linhaSel`). Duas coisas
+     quebravam por causa disso:
+
+     1. Trocar a linha no formulario redesenhava a aba inteira, e o cartao
+        "Colecao" la em cima passava a listar as colecoes da outra linha.
+        Como esse cartao fica ACIMA, ele muda de altura e EMPURRA o
+        formulario — a pessoa escolhe a linha e o campo seguinte sai de
+        debaixo do dedo dela.
+     2. Pior: o select era recriado sem valor, entao voltava sozinho para a
+        PRIMEIRA linha ativa, enquanto as colecoes ao lado ja eram as da
+        linha escolhida. O formulario passava a descrever uma combinacao que
+        o servidor recusa (`abertura_de_outra_linha`), e a recusa nao tinha
+        como fazer sentido para quem leu a tela.
+
+     O cartao de cima e "qual linha estou editando as colecoes"; este e "qual
+     linha vai o tecido novo". Nomes proprios porque sao perguntas diferentes.
+
+     `linhaForm` pode apontar para linha INATIVA (o seletor oferece as duas,
+     ver `comInativasNoFim`), mas NASCE na primeira ativa: o caso normal e
+     cadastrar no que esta em uso, e abrir o formulario ja apontando para uma
+     linha desativada seria oferecer o incomum por acidente. So precisa
+     apontar para uma linha que EXISTE — apontar para id apagado deixaria o
+     campo sem nada escolhido. */
+  const ativas=estado.linhas.filter(l=>l.ativo);
+  if(!estado.linhas.some(l=>l.id===estado.linhaForm))
+    estado.linhaForm=(ativas[0]||estado.linhas[0]||{}).id||null;
+  estado.aberturasForm = estado.linhaForm===estado.linhaSel ? estado.aberturas
+    : (estado.linhaForm?await api('/api/aberturas?linha_id='+estado.linhaForm):[]);
+
   estado.tecidos=await api('/api/tecidos');
+}
+
+/* ⚠️ OS TRES SELETORES DO FORMULARIO OFERECEM AS INATIVAS TAMBEM — linha,
+   colecao e cor.
+
+   Desativar um cadastro e dizer "nao vendemos mais isto", nao "isto nao
+   existe": os rolos continuam na estante, as sobras continuam na prateleira e
+   o historico continua apontando para ele. Sem as inativas nos seletores,
+   cadastrar um item que faltou numa combinacao dessas exigia REATIVAR,
+   cadastrar e desativar de novo — tres passos, e no meio deles o cadastro
+   volta a aparecer na entrada de rolo e no corte para a fabrica inteira.
+
+   Elas vao NO FIM e escritas "(inativa)", e essa marca nao e enfeite: as
+   fileiras da entrada de rolo, do corte e das sobras olham o `ativo` DO
+   TECIDO, nunca o da linha, o da colecao ou o da cor (conferido em
+   15/09/2026). Entao um tecido novo numa combinacao desativada aparece para a
+   fabrica inteira no mesmo instante — trazendo de volta um cadastro que
+   alguem desligou de proposito. Quem escolhe tem que ver que escolheu isso;
+   um nome igual ao das outras faria a pessoa reabrir sem perceber.
+
+   O servidor nunca exigiu cadastro ativo (`criarTecido` so exige que linha,
+   colecao e cor existam, e que a colecao seja da linha), entao isto e a tela
+   alcancando o que o dominio ja permitia.
+
+   As tres passam pela MESMA funcao porque a regra e a mesma: tres copias
+   divergiriam no dia em que uma delas mudasse a marca ou a ordem, e ai a
+   mesma tela diria que "(inativa)" quer dizer coisas diferentes em campos
+   vizinhos. (Linha, colecao e cor sao todas femininas — por isso uma marca
+   so serve para as tres.) */
+const comInativasNoFim=itens=>
+  itens.filter(i=>i.ativo).concat(itens.filter(i=>!i.ativo))
+    .map(i=>({valor:i.id, nome:i.ativo?i.nome:i.nome+' (inativa)'}));
+
+/* As colecoes do formulario trocam SEM redesenhar a tela: e so o seletor do
+   lado que muda, e redesenhar tudo era justamente o que movia o formulario
+   de lugar e perdia a linha escolhida. */
+async function colecoesDoFormulario(linha_id,refs){
+  estado.linhaForm=Number(linha_id);
+  estado.aberturasForm=linha_id?await api('/api/aberturas?linha_id='+linha_id):[];
+  const s=limpar(refs.abertura_id);
+  const opcoes=comInativasNoFim(estado.aberturasForm);
+  if(opcoes.length) opcoes.forEach(o=>s.appendChild(el('option',{value:o.valor,texto:o.nome})));
+  // Select vazio nao diz nada e em alguns navegadores nem abre. A frase diz
+  // o que falta, no lugar onde a pessoa esta olhando. Ela so aparece quando
+  // nao ha colecao NENHUMA — nem inativa —, senao mandaria cadastrar o que
+  // ja existe e esta logo ali na lista.
+  else s.appendChild(el('option',{value:'',texto:'— esta linha ainda nao tem colecao —'}));
 }
 
 async function telaTecido(pai){
@@ -336,12 +430,16 @@ async function telaTecido(pai){
   cT.appendChild(el('p',{class:'ajuda',texto:
     '"Bobina mais comum" nao muda calculo nenhum: ela so deixa o botao ja marcado na entrada de rolo. Pode ficar em branco. "Pode girar" muda: tecido com sentido (textura, listra, desenho que corre) nao pode ser virado, entao a largura da peca tem que sair no sentido da largura da bobina.'}));
   if(podeEditar()){
-    const aberturasDaLinha=estado.aberturas.filter(a=>a.ativo);
+    // Os tres pela mesma regra: ativas primeiro, inativas no fim e marcadas.
+    const colecoes=comInativasNoFim(estado.aberturasForm);
     formulario(cT,[
-      {id:'linha_id',rotulo:'Linha',opcoes:estado.linhas.filter(l=>l.ativo).map(l=>({valor:l.id,nome:l.nome})),
-       aoMudar:async(v)=>{ estado.linhaSel=Number(v); await telaTecido($('#conteudo')); }},
-      {id:'abertura_id',rotulo:'Colecao',opcoes:aberturasDaLinha.map(a=>({valor:a.id,nome:a.nome}))},
-      {id:'cor_id',rotulo:'Cor',opcoes:estado.cores.filter(c=>c.ativo).map(c=>({valor:c.id,nome:c.nome}))},
+      {id:'linha_id',rotulo:'Linha',valor:estado.linhaForm,
+       opcoes:comInativasNoFim(estado.linhas),
+       aoMudar:colecoesDoFormulario},
+      {id:'abertura_id',rotulo:'Colecao',
+       opcoes:colecoes.length?colecoes
+         : [{valor:'',nome:'— esta linha ainda nao tem colecao —'}]},
+      {id:'cor_id',rotulo:'Cor',opcoes:comInativasNoFim(estado.cores)},
       /* Escolha, nao digitacao — pelo mesmo motivo da entrada de rolo. Um
          campo de texto aqui deixaria entrar 2,5 e 2,50 como coisas
          diferentes, na tela que existe para padronizar o cadastro.
@@ -359,29 +457,149 @@ async function telaTecido(pai){
     });
   }
   const tT=el('table',{});
-  /* O PRECO DO M² e o que da valor as sobras (area x preco). Le-se aqui e
-     lanca-se em Sobras -> Catalogo, botao Preco de cada tecido — que e onde a
-     falta dele aparece. Quem nao ve custo nem recebe o campo. */
+  /* O PRECO DO M² e o que da valor as sobras (area x preco), e LANCA-SE AQUI
+     desde 15/09/2026. Antes a unica porta era Sobras → Catalogo, e ela so
+     lista tecido que JA TEM SOBRA: o tecido recem-cadastrado, que nunca
+     produziu retalho, nao tinha onde receber preco nenhum — e sem preco ele
+     nunca entra na conta do acervo, nem quando a primeira sobra aparecer.
+     Um beco igual ao da cor sem item de tecido: a tela sabia mostrar o traco
+     na coluna e nao sabia deixar ninguem preencher.
+
+     As duas portas chamam a MESMA rota (`PUT /api/tecidos/:id/preco`), com o
+     mesmo historico — nao ha segundo caminho de escrita no preco.
+     Quem nao ve custo nem recebe o campo (a poda e do servidor). */
   const veCusto=(eu.permissoes||[]).includes('custo.ver');
   tT.appendChild(el('tr',{},[el('th',{texto:'Codigo'}),el('th',{texto:'Tecido'}),
     el('th',{class:'num',texto:'Largura sugerida'}),el('th',{texto:'Girar'}),
     ...(veCusto?[el('th',{class:'num',texto:'R$/m²'})]:[]),el('th',{texto:''})]));
-  estado.tecidos.forEach(t=>tT.appendChild(el('tr',{class:t.ativo?'':'inativo'},[
+  estado.tecidos.forEach(t=>tT.appendChild(el('tr',{class:t.disponivel?'':'inativo'},[
     el('td',{texto:t.codigo}),
-    el('td',{texto:[t.linha_nome,t.abertura_nome,t.cor_nome].join(' · ')}),
+    /* ⚠️ POR QUE ESTE TECIDO NAO APARECE PARA A FABRICA.
+       O tecido sai das telas da bancada quando ELE esta desativado ou quando
+       a linha, a colecao ou a cor dele esta (ver `disponivel` em
+       dados/tecido.js). Sem esta frase, quem desativou uma cor semanas atras
+       abre esta tabela, ve o tecido com o botao escrito "Desativar" — ou
+       seja, ativo — e nao entende por que a bancada nao o encontra. O botao
+       fala do tecido; a fabrica olha a cadeia inteira. */
+    el('td',{},[
+      el('span',{texto:[t.linha_nome,t.abertura_nome,t.cor_nome].join(' · ')}),
+      ...(t.ativo&&!t.disponivel?[el('span',{class:'quem',
+        texto:'  · fora das telas da fabrica: '+
+          [!t.linha_ativa?'linha':null,!t.abertura_ativa?'colecao':null,!t.cor_ativa?'cor':null]
+            .filter(Boolean).join(' e ')+' inativa'+
+          ([t.linha_ativa,t.abertura_ativa,t.cor_ativa].filter(x=>!x).length>1?'s':'')})]:[]),
+      /* ⚠️ E AINDA TEM MATERIAL DELE NA FABRICA. Este e o caso que doi: o
+         rolo esta na estante, alguem precisa cortar, e a bancada nao acha o
+         tecido em tela nenhuma. Nao e trava — e o recado de que a decisao
+         tem custo, e de qual botao desfaz (Reativar, na lista de cima). */
+      ...(!t.disponivel&&t.na_fabrica?[el('span',{class:'aviso',
+        texto:'  · ainda ha rolo ou sobra deste tecido na fabrica — a bancada nao consegue cortar nem lancar sobra dele'})]:[])
+    ]),
     el('td',{class:'num',texto:t.largura_sugerida?num(t.largura_sugerida)+' m':'—'}),
     el('td',{texto:t.permite_girar?'sim':'nao'}),
-    ...(veCusto?[el('td',{class:'num',texto:t.preco_m2==null?'—':window.ui.dinheiro(t.preco_m2),
-      title:'o preco do m² que da valor as sobras deste tecido — lanca-se em Sobras → Catalogo'})]:[]),
+    ...(veCusto?[el('td',{class:'num'+(t.preco_m2==null?' aviso':''),
+      texto:t.preco_m2==null?'—':window.ui.dinheiro(t.preco_m2),
+      title:t.preco_m2==null
+        ? 'sem preco: as sobras deste tecido ficam fora da conta do acervo. O botao Preco lanca.'
+        : 'o preco do m² que da valor as sobras deste tecido'})]:[]),
     /* O tecido nao tem renomear: o nome dele E a combinacao linha+colecao+cor,
        e "renomear" ali seria trocar a combinacao — que e outro tecido. O que
        cabe e apagar (quando nada usa) ou desativar. */
     el('td',{style:'text-align:right;white-space:nowrap'},[
+      ...(veCusto&&podeEditar()?[
+        el('button',{class:'bt pequeno',texto:t.preco_m2==null?'Preco ⚠':'Preco',
+          title:'o preco do m² deste tecido — vale para todas as sobras dele',
+          onclick:()=>{ estado.precificando=t.id; telaTecido($('#conteudo')); }}),
+        el('span',{texto:' '})]:[]),
       botaoApagar(t,'tecido',()=>telaTecido($('#conteudo'))),
       el('span',{texto:' '}),
       botaoAtivo(t,'/api/tecidos/'+t.id,()=>telaTecido($('#conteudo')))])
   ])));
   cT.appendChild(estado.tecidos.length?tT:el('div',{class:'vazio',texto:'Nenhum tecido cadastrado ainda.'}));
+
+  if(veCusto){
+    const semPreco=estado.tecidos.filter(t=>t.ativo&&t.preco_m2==null).length;
+    if(semPreco) cT.appendChild(el('p',{class:'ajuda',texto:
+      semPreco+' tecido(s) ativo(s) sem preco do m². As sobras deles ficam de fora '+
+      'da conta de quanto vale a prateleira — ela sai como PISO ate o ultimo ser lancado.'}));
+  }
+
+  // O cartao de preco abre abaixo da tabela, com a linha ainda a vista.
+  if(estado.precificando){
+    const t=estado.tecidos.find(x=>x.id===estado.precificando);
+    if(t&&veCusto&&podeEditar()) await cartaoPreco(cT,t);
+    else estado.precificando=null;
+  }
+}
+
+/* ── O PRECO DO M² DE UM TECIDO ───────────────────────────────────────────
+   Um tecido de cada vez, como o resto desta aba: dez campos de preco abertos
+   ao mesmo tempo dariam para editar e nao dariam para ler, e ficha que
+   ninguem consegue conferir e ficha que ninguem confere.
+
+   O que pre-preenche, quando o tecido ainda nao tem preco, e o ULTIMO PRECO
+   PAGO por rolo deste tecido — a mesma fonte da nota do rolo, e a mesma
+   sugestao do cartao de Sobras → Catalogo. Tabela de preco mantida a mao
+   envelhece calada (armadilha #15 do CLAUDE.md); o ultimo pago, nao. */
+async function cartaoPreco(pai,t){
+  const nome=[t.linha_nome,t.abertura_nome,t.cor_nome].join(' · ');
+  const c=el('div',{class:'cartao',style:'border-color:var(--acao);margin-top:14px'});
+  c.appendChild(el('h2',{texto:'Preco do m² — '+nome}));
+  c.appendChild(el('p',{class:'nota',texto:t.preco_m2==null
+    ? 'Este tecido ainda nao tem preco do m². E ele que da valor as sobras (area × preco).'
+    : 'Hoje: '+window.ui.dinheiro(t.preco_m2)+'/m². Mudar aqui muda o valor de TODAS as sobras deste tecido de uma vez.'}));
+
+  const preco=el('input',{type:'text',inputmode:'decimal',autocomplete:'off',placeholder:'ex.: 18,50',
+    value:t.preco_m2==null?'':num(t.preco_m2),style:'font-size:22px;min-height:56px'});
+  const dica=el('p',{class:'ajuda'});
+  if(t.preco_m2==null){
+    try{
+      const u=await api('/api/rolos/ultimo-preco?tecido_id='+t.id,{silencioso:true});
+      if(u&&u.preco!=null){
+        preco.value=num(u.preco);
+        dica.textContent='Sugestao: ultimo pago por rolo deste tecido, '+
+          window.ui.dinheiro(u.preco)+'/m² em '+String(u.quando).slice(0,10)+
+          (u.de_outro_fornecedor?' ('+u.de_outro_fornecedor+')':'')+'. Mude se a sobra vale outra coisa.';
+      } else dica.textContent='Nenhum rolo deste tecido tem preco lancado — nao ha sugestao.';
+    }catch(e){ dica.textContent=''; }
+  }
+
+  const campo=el('div',{class:'campo'});
+  campo.appendChild(el('label',{texto:'R$ POR M²'}));
+  campo.appendChild(preco);
+  const bt=el('button',{class:'bt primario',style:'min-height:56px',texto:'Salvar preco'});
+  bt.onclick=async()=>{
+    if(comoNumero(preco.value)===null) return banner('Diga o preco do metro quadrado.','erro');
+    bt.disabled=true;
+    try{
+      const d=await api('/api/tecidos/'+t.id+'/preco',{metodo:'PUT',corpo:{preco_m2:preco.value}});
+      banner(d.mudou?(nome+': '+window.ui.dinheiro(d.preco_m2)+'/m².'):'O preco ja era esse.');
+      estado.precificando=null;
+      await telaTecido($('#conteudo'));
+    }catch(e){ bt.disabled=false; }
+  };
+  c.appendChild(el('div',{class:'campos'},[campo,
+    el('div',{class:'campo'},[bt]),
+    el('div',{class:'campo'},[el('button',{class:'bt',style:'min-height:56px',texto:'Cancelar',
+      onclick:()=>{ estado.precificando=null; telaTecido($('#conteudo')); }})])]));
+  c.appendChild(dica);
+
+  // O historico: quem mudou, quando, de → para. Sem ele, o preco de hoje nao
+  // se explica — e preco que nao se explica ninguem corrige com confianca.
+  try{
+    const h=await api('/api/tecidos/'+t.id+'/preco/historico',{silencioso:true});
+    if(h.length){
+      const tb=el('table',{});
+      h.forEach(x=>tb.appendChild(el('tr',{},[
+        el('td',{texto:String(x.criado_em).slice(0,16)}),
+        el('td',{texto:window.ui.dinheiro(x.de)+' → '+window.ui.dinheiro(x.para)}),
+        el('td',{class:'quem',texto:x.usuario_nome||''})
+      ])));
+      c.appendChild(el('h2',{style:'margin-top:14px;font-size:16px',texto:'Mudancas do preco'}));
+      c.appendChild(tb);
+    }
+  }catch(e){}
+  pai.appendChild(c);
 }
 
 // ── ABA ENDERECO ─────────────────────────────────────────────────────────
@@ -540,16 +758,6 @@ async function telaParametro(pai){
 }
 
 // ── ABA QUEM ENTRA ───────────────────────────────────────────────────────
-// Esta aba NAO cadastra ninguem, e e esse o ponto.
-//
-// Ate 02/09/2026 ela tinha PIN proprio, lista de pessoas e um botao de
-// liberar — um segundo cadastro paralelo ao do PCP. O custo apareceu no
-// primeiro dia: para liberar alguem era preciso ja estar liberado, e a
-// unica conta que existia era a que veio no boot. Uma tranca sem chave.
-//
-// Hoje quem entra e decidido por AREA, na mesma tela em que se libera
-// revisao ou carregamento. O que sobra aqui e explicar o que cada area
-// alcanca — e apontar o caminho, para ninguem sair procurando.
 async function telaAcesso(pai){
   if(!podeEditar()) return;
   pai=limpar(pai);

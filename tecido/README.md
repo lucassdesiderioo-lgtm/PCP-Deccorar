@@ -754,6 +754,202 @@ que existe justamente para padronizar.
 que corre) não pode ser virado, então a largura da peça tem que sair no sentido
 da largura da bobina. `Não` é o padrão e vale para a maioria.
 
+### ⚠️ CADASTRAR A COR NÃO BASTA — e as três telas agora dizem isso
+
+As fileiras LINHA / COLEÇÃO / COR da **entrada de rolo**, do **corte** e das
+**sobras** (lançar e corrigir) **não leem a tabela `cor`**: elas saem dos
+**itens de tecido ativos**, porque o que se escolhe ali é um item que existe,
+e não uma combinação nova.
+
+A consequência é que uma cor recém-cadastrada simplesmente **não aparece**. A
+fileira fica mais curta, e mais nada — sem erro, sem aviso, sem lugar nenhum
+onde a cor apareça esperando alguma coisa.
+
+Isso é um beco, e do tipo caro: quem está com o rolo na mão procura a cor, não
+acha, e não tem como saber que falta o item de tecido. A saída que sobra é
+**bipar a cor parecida só para o sistema aceitar** — e a partir dali é o
+estoque do tecido errado que anda. É a armadilha #6 do `CLAUDE.md` na letra:
+trava que dispara no caso normal vira desvio, e o desvio acontece fora da
+vista do sistema.
+
+Por isso a tela escreve, embaixo da fileira COR:
+
+> Procurando uma cor que não está nos botões? `Branco, Cinza` estão
+> cadastradas, mas não existem em `Rolô · 3%`. A cor só vira botão aqui depois
+> que existe o ITEM DE TECIDO (linha · coleção · cor) — cadastre em
+> Cadastros → Tecido → Item de tecido.
+
+Três decisões dentro dessa linha:
+
+- **Não é alarme.** Não é vermelho e não pede providência de quem está ali: a
+  pessoa que dá entrada no rolo pode nem ter `cadastro.editar`. A linha
+  responde a pergunta que ela acabou de fazer e diz em que tela se resolve.
+- **Ela nomeia as cores, e não corta a lista.** Truncar esconderia justamente
+  a cor que a pessoa procura, que é o único motivo de a linha existir.
+- **A lista de cores não é cacheada** na entrada de rolo, ao contrário das
+  larguras e dos fornecedores. O que o aviso manda fazer acontece em *outra*
+  tela; quem sai daqui, cadastra o item e volta tem que ver a cor no lugar.
+  Com cache veria o mesmo aviso e concluiria que o cadastro não pegou. (No
+  corte e nas sobras ela vem junto dos tecidos e envelhece com eles — as duas
+  listas têm que andar no mesmo passo, senão o aviso cobraria uma cor que a
+  fileira já mostra.)
+
+Ela some sozinha quando toda cor ativa já tem item naquela coleção — contador
+que nunca zera é contador que a equipe aprende a pular.
+
+> ⚠️ **`avisoCorSemItem`, no `public/ui.js`, é o DONO ÚNICO deste aviso.** Três
+> telas escrevendo a mesma frase cada uma do seu jeito ensinariam a equipe a
+> achar que são três situações diferentes — e a que esquecesse de citar a
+> coleção mandaria cadastrar o que já existe. Nas sobras ele mora dentro do
+> `fileirasTecido`, que já é o ponto comum do lançar e do corrigir.
+
+### ⚠️ O SELETOR DE LINHA DO FORMULÁRIO NÃO É O DO CARTÃO COLEÇÃO
+
+Até 15/09/2026 os dois eram a mesma variável (`estado.linhaSel`), e isso
+quebrava duas coisas de uma vez ao trocar a linha no formulário de item de
+tecido:
+
+| O que acontecia | Por quê |
+|---|---|
+| o formulário **saía do lugar** | o cartão Coleção, que fica **acima**, passava a listar as coleções da outra linha, mudava de altura e empurrava tudo embaixo dele — o campo seguinte saía de debaixo do dedo |
+| o select **voltava sozinho** para a primeira linha | a aba inteira era redesenhada e o select nascia sem valor, enquanto as coleções ao lado já eram as da linha escolhida |
+
+O segundo é o caro: o formulário passava a descrever `Double Vision` + uma
+coleção do `Rolô`, e salvar batia em `abertura_de_outra_linha` — uma recusa
+que não tinha como fazer sentido para quem leu a tela.
+
+São perguntas diferentes e agora são variáveis diferentes: `linhaSel` é *"de
+qual linha estou editando as coleções"*, `linhaForm` é *"em qual linha entra o
+tecido novo"*. Trocar a linha no formulário **não redesenha mais a tela** —
+repovoa só o seletor de Coleção ao lado, que é a única coisa que muda.
+
+> **`formulario()` passou a aceitar um valor inicial**, e é isso que mantém a
+> linha escolhida no campo. Sem ele o select nasce sempre no primeiro item,
+> mesmo quando a tela já sabe qual é a escolha — e o campo mostra uma coisa
+> enquanto o resto do formulário descreve outra.
+
+> **Linha sem coleção nenhuma escreve "— esta linha ainda não tem coleção —"**
+> no lugar de um select vazio, que não diz nada e em alguns navegadores nem
+> abre.
+
+**Os três seletores oferecem as INATIVAS também** — linha, coleção e cor
+(15/09/2026). Desativar um cadastro é dizer *"não vendemos mais isto"*, não
+*"isto não existe"*: os rolos continuam na estante, as sobras continuam na
+prateleira e o histórico continua apontando para ele. Sem as inativas nos
+seletores, cadastrar um item que faltou numa combinação dessas exigia
+**reativar, cadastrar e desativar de novo** — e no meio desses três passos o
+cadastro volta a aparecer na entrada de rolo e no corte para a fábrica
+inteira. O servidor nunca exigiu cadastro ativo (`criarTecido` só exige que
+linha, coleção e cor existam, e que a coleção seja da linha), então isto é a
+tela alcançando o que o domínio já permitia.
+
+> ⚠️ **Elas vão no fim da lista e escritas `(inativa)`, e essa marca não é
+> enfeite.** Cadastrar ali cria um tecido que **nasce fora das telas da
+> fábrica** (ver abaixo): ele não aparece na entrada de rolo, no corte nem nas
+> sobras até a linha, a coleção e a cor estarem ativas. Quem escolhe tem que
+> ver que escolheu isso.
+
+> **As três passam pela mesma função** (`comInativasNoFim`). Três cópias
+> divergiriam no dia em que uma delas mudasse a marca ou a ordem, e aí a mesma
+> tela diria que `(inativa)` quer dizer coisas diferentes em campos vizinhos.
+
+> Cada campo **nasce na primeira opção ativa**, não na primeira da lista: o
+> caso normal é cadastrar no que está em uso, e abrir já apontando para um
+> cadastro desativado seria oferecer o incomum por acidente.
+
+> **"Esta linha ainda não tem coleção" só aparece quando não há coleção
+> nenhuma — nem inativa.** Linha cujas coleções foram todas desativadas lista
+> as inativas; a frase ali mandaria cadastrar o que já existe e está logo na
+> lista.
+
+### O preço do m² se lança no cadastro do tecido
+
+Até 15/09/2026 a única porta era **Sobras → Catálogo**, e ela lista só tecido
+que **já tem sobra** (`resumo.filter(r => r.sobras > 0)`). O tecido
+recém-cadastrado, que nunca produziu retalho, **não tinha onde receber preço
+nenhum** — e sem preço ele nunca entra na conta do acervo, nem no dia em que a
+primeira sobra aparecer. Mesmo beco da cor: a tela sabia mostrar o traço na
+coluna `R$/m²` e não sabia deixar ninguém preencher.
+
+Agora cada linha do Item de tecido tem botão **Preço** (`Preço ⚠` quando
+falta), com a mesma sugestão de *último preço pago por rolo* e o mesmo
+histórico de quem mudou, quando, de → para.
+
+> ⚠️ **As duas portas chamam a MESMA rota** (`PUT /api/tecidos/:id/preco`).
+> Não há segundo caminho de escrita no preço — seria a armadilha #12 outra vez,
+> duas telas certas cada uma na sua régua.
+
+> Quem não tem `custo.ver` não vê a coluna nem o botão, e **o JSON já vem sem o
+> campo** — a poda é do servidor (regra 14 do §13 do `CLAUDE.md`). O botão
+> também exige `cadastro.editar`: preço é cadastro.
+
+Embaixo da tabela, quantos tecidos ativos estão sem preço — é a conta que
+explica por que o valor do acervo sai como **piso** (`≥`).
+
+### ⚠️ DESATIVAR A LINHA, A COLEÇÃO OU A COR TIRA O TECIDO DA FÁBRICA
+
+Até 15/09/2026 não tirava, e esse era o defeito. As fileiras LINHA / COLEÇÃO /
+COR da entrada de rolo, do corte e das sobras olhavam só `tecido.ativo`: você
+desativava uma cor e ela **continuava na bancada** como se nada tivesse
+acontecido. Desativar um cadastro que não desativa nada é pior que não ter o
+botão — ele promete uma coisa e faz outra, em silêncio.
+
+Agora `GET /api/tecidos` devolve **`disponivel`**, e é por ele que as três
+telas filtram:
+
+```
+disponivel = tecido ativo E linha ativa E coleção ativa E cor ativa
+```
+
+> ⚠️ **É DERIVADO, NÃO GRAVADO, e essa é a decisão.** Propagar em cascata na
+> escrita — desativar a cor desativa os tecidos dela — perderia a informação
+> de quem já estava desativado **antes**, e reativar a cor não teria como
+> saber quais tecidos devolver. Derivando, **reativar desfaz exatamente o que
+> desativar fez**.
+
+> `CASE` em vez de `AND` puro: `AND` com NULL devolve NULL, e uma coluna
+> `ativo` nula deixaria o tecido num terceiro estado que nenhuma tela sabe ler.
+
+**O cálculo é do servidor** (`dados/tecido.js`), e não de cada tela. Três
+telas repetindo o `e && e && e` divergiriam na primeira que esquecesse um dos
+três, e o cadastro desligado voltaria só nela.
+
+**Nada some de onde é histórico.** O rolo do tecido escondido continua na
+lista "Em estoque", a sobra continua no catálogo, os painéis continuam
+contando. O que muda são os **seletores de escolha** — o que a bancada pode
+começar hoje.
+
+### A tela de cadastro diz POR QUE o tecido sumiu
+
+Sem isso a mudança seria invisível pelo lado errado: quem desativou uma cor
+semanas atrás abre a tabela de Item de tecido, vê o tecido com o botão escrito
+**Desativar** — ou seja, ativo — e não entende por que a bancada não o
+encontra. O botão fala do tecido; a fábrica olha a cadeia inteira.
+
+```
+ROLO-BLACKOUT-BEGE   Rolo · Blackout · Bege
+                     · fora das telas da fabrica: colecao e cor inativas
+                     · ainda ha rolo ou sobra deste tecido na fabrica —
+                       a bancada nao consegue cortar nem lancar sobra dele
+```
+
+> ⚠️ **A SEGUNDA LINHA É A QUE IMPORTA, e ela é o motivo de `na_fabrica`
+> existir.** Esconder um tecido que ainda tem rolo na estante ou sobra na
+> prateleira não para só de vender: para de **cortar o que já está comprado**,
+> e a sobra que sair desse corte não tem onde ser lançada. A bancada não
+> espera — ela lança no tecido parecido, e a partir dali é o estoque errado
+> que anda. É a armadilha #6 do `CLAUDE.md`, e ela nasceria calada.
+>
+> **Não é trava**: quem desativa continua desativando. É o aviso que faz a
+> tela dizer o que a decisão custa, como o `exclusao.js` diz *"3 rolos estão
+> nesta haste"* em vez de só recusar. O botão que desfaz é **Reativar**, na
+> lista de cima.
+
+> `EXISTS` e não `COUNT`: a pergunta é *"tem ou não tem"*, e o `COUNT`
+> varreria as linhas para devolver um número que ninguém lê. Conta rolo não
+> encerrado com saldo e sobra disponível — encerrado e usada não são material
+> na fábrica.
+
 ---
 
 ## Cadastro se RENOMEIA e se APAGA — com uma regra no meio

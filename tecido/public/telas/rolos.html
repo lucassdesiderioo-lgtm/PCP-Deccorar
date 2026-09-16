@@ -409,6 +409,12 @@ async function telaEntrada(pai){
   if(!podeEntrar()){ limpar(pai).appendChild(el('div',{class:'vazio',texto:'Sem permissao para dar entrada.'})); return; }
   estado.tecidos=await api('/api/tecidos');
   estado.arvore=await api('/api/enderecos/ROLO');
+  /* A LISTA DE CORES NAO E CACHEADA como as larguras e os fornecedores, e e
+     de proposito: ela so serve para o aviso logo abaixo da fileira COR, e o
+     que esse aviso manda fazer acontece em OUTRA tela. Quem sai daqui,
+     cadastra o item de tecido e volta tem que ver a cor no lugar — com
+     cache, veria o mesmo aviso e concluiria que o cadastro nao pegou. */
+  estado.cores=await api('/api/cores');
   // Quem esta em cada buraco AGORA. Sempre relido: um nivel que estava livre
   // ha dois minutos pode ter recebido um tubo no outro tablet.
   estado.ocupacao=await api('/api/rolos/ocupacao');
@@ -422,7 +428,11 @@ async function telaEntrada(pai){
     'A largura da bobina e DESTE rolo, nao do tecido. O mesmo Rolo 3% Bege existe em 2,00, 2,50 e 3,00 — e e justamente essa diferenca que o plano de corte explora.'}));
   pai.appendChild(c);
 
-  const ativos=estado.tecidos.filter(t=>t.ativo);
+  /* `disponivel`, e nao `ativo`: desativar a LINHA, a COLECAO ou a COR
+     tambem tira o tecido daqui. O calculo e do servidor (dados/tecido.js)
+     — tres telas repetindo o `e && e && e` divergiriam na primeira que
+     esquecesse um dos tres, e o cadastro desligado voltaria so nela. */
+  const ativos=estado.tecidos.filter(t=>t.disponivel);
   const linhas=[], aberturas=[], cores=[];
   ativos.forEach(t=>{ if(!linhas.some(x=>x.valor===t.linha_id)) linhas.push({valor:t.linha_id,nome:t.linha_nome}); });
   const sel=ativos.find(t=>t.id===estado.tecido_id);
@@ -441,6 +451,14 @@ async function telaEntrada(pai){
   c.appendChild(fileira('LINHA',linhas,linhaSel,v=>escolher(v,null,null)));
   c.appendChild(fileira('COLECAO',aberturas,abSel,v=>escolher(linhaSel,v,null)));
   c.appendChild(fileira('COR',cores,sel?sel.cor_id:null,v=>escolher(linhaSel,abSel,v)));
+
+  // A cor cadastrada que ainda nao virou item de tecido. O aviso e do ui.js —
+  // as tres telas que montam estas fileiras dizem a MESMA coisa, do mesmo
+  // jeito (ver o comentario de `avisoCorSemItem`).
+  const avisoCor=window.ui.avisoCorSemItem(estado.cores, cores,
+    (linhas.find(x=>x.valor===linhaSel)||{}).nome,
+    (aberturas.find(x=>x.valor===abSel)||{}).nome);
+  if(avisoCor) c.appendChild(avisoCor);
 
   /* A LARGURA VEM DA LISTA, e nao do teclado.
      Digitar largura errava de dois jeitos que ninguem percebia: '2,5' e
