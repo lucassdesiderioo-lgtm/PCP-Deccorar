@@ -108,6 +108,62 @@ eq('o volume velho sai da janela de 30 dias', r.semBaixa, 4);
 r = levantar(db, {});
 eq('e continua na conta de todo o histórico', r.semBaixa, 5);
 
+console.log('\n── 7. o carimbo em BLOCO de antes de 26/08 não é bipe ──');
+/* ⚠️ O FALSO POSITIVO DA MARCA, e ele apareceu com o script rodando em
+   produção (17/09/2026). A marca das 15:00 só existe desde 26/08/2026: até o
+   dia anterior o `regularizar_saida.js` carimbava `datetime('now')`, o relógio
+   de verdade (§5). Um fechamento à mão feito em 25/08 sai, então, com hora de
+   gente — e era acusado como furo da dívida 13.
+   O que denuncia o bloco é o SEGUNDO REPETIDO: um `UPDATE` em transação grava
+   o mesmo instante em todas as linhas, e ninguém bipa três caixas no mesmo
+   segundo. */
+const MESMO = '2026-08-25 15:38:14';
+ins.run('BK140140BEGE','Bloco Um',  '9101','2026-08-25', null, MESMO);
+ins.run('BK160160CINZA','Bloco Dois','9102','2026-08-25', null, MESMO);
+ins.run('BK140140BEGE','Bloco Tres','9103','2026-08-25', null, MESMO);
+r = levantar(db, {});
+eq('os três saem da conta da dívida 13', r.semBaixa, 5);
+eq('e vão para a lista de provável fechamento à mão', r.provavelScript, 3);
+eq('o saldo não se mexe por causa deles', r.pecasTotal, 5);
+ok('e eles são nomeados, não só contados',
+   (r.volumesProvavelScript || []).map(v => v.nf).sort().join(',') === '9101,9102,9103',
+   JSON.stringify((r.volumesProvavelScript || []).map(v => v.nf)));
+
+console.log('\n── 7-B. DOIS no mesmo segundo continuam sendo furo ──');
+/* O guard de 700 ms da tela (§12) garante que duas caixas de verdade não venham
+   coladas — mas `datetime('now')` corta no segundo, e um bipe em x,1 s e outro
+   em x,9 s caem na mesma string. Dois é ambíguo; três não é.
+   Na ambiguidade a resposta é ACUSAR: esconder um furo deixa o saldo alto para
+   sempre e ninguém procura; acusar um fechamento à mão custa uma conferência. */
+ins.run('BK140140BEGE','Par Um', '9104','2026-08-20', null, '2026-08-20 13:44:18');
+ins.run('BK140140BEGE','Par Dois','9105','2026-08-20', null, '2026-08-20 13:44:18');
+r = levantar(db, {});
+eq('os dois continuam acusados', r.semBaixa, 7);
+eq('e não entram na lista de fechamento', r.provavelScript, 3);
+
+console.log('\n── 7-C. depois de 26/08 o bloco não explica mais nada ──');
+/* A partir dessa data os DOIS scripts do §5 carimbam 15:00:00. Um agrupamento
+   em outra hora, depois dela, não tem script que o explique — e volta a ser
+   furo. Sem esse corte, o dia em que alguém rodar um `UPDATE` em bloco novo
+   passaria a apagar furos sozinho. */
+const DEPOIS = '2026-09-02 10:11:12';
+ins.run('BK140140BEGE','Depois Um',  '9106','2026-09-02', null, DEPOIS);
+ins.run('BK140140BEGE','Depois Dois','9107','2026-09-02', null, DEPOIS);
+ins.run('BK140140BEGE','Depois Tres','9108','2026-09-02', null, DEPOIS);
+r = levantar(db, {});
+eq('os três continuam acusados', r.semBaixa, 10);
+eq('a lista de fechamento não cresce', r.provavelScript, 3);
+
+console.log('\n── 7-D. a janela não pode PARTIR um bloco ──');
+/* Ser parte de um fechamento em bloco é fato do volume, não do recorte por onde
+   se olha. Se a contagem do bloco fosse feita dentro da janela, pedir 30 dias
+   deixaria 2 dos 3 à vista, o grupo cairia abaixo de três e os dois voltariam a
+   ser acusados — o número mudaria de significado conforme o argumento da linha
+   de comando, que é o defeito que este arquivo existe para não ter. */
+r = levantar(db, {dias:30});
+eq('nenhum volume do bloco de 25/08 volta a ser acusado pela janela curta',
+   r.volumes.filter(v => v.carregado_em === MESMO).length, 0);
+
 console.log('\n────────────────────────────────────────────');
 console.log(falhas ? '  ' + falhas + ' de ' + n + ' FALHARAM' : '  todos os ' + n + ' casos passaram');
 try{ db.close(); fs.rmSync(tmp, {recursive:true, force:true}); }catch(e){}
