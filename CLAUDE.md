@@ -405,6 +405,29 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > meio milímetro. Encostar a legenda faz o celular demorar ou desistir, e
 > ninguém associa isso à distância do texto.
 >
+> ⚠️ **O QR DA TELA CAI NA GRADE DE PIXELS — e foi isto que impediu o celular
+> de ler a primeira prévia (consertado em 17/09/2026).** O QR de 20 mm a
+> 4,6 px/mm pedia **2,49 px por módulo**. O navegador arredonda cada borda para
+> o pixel mais próximo, e a grade saía com módulos de **2 e de 3 px
+> alternando** — inclusive na **linha de timing**, que é justamente a régua que
+> o leitor usa para medir o módulo e montar a grade. Ele procura passo
+> constante e achava passo que respira. Nada na tela denunciava: o desenho
+> continuava com cara de QR, e a matriz estava certa (o mesmo QR grande lia).
+>
+> `gradeDoQr()` arredonda o módulo para o pixel cheio e reposiciona o QR em
+> pixel inteiro, **sempre para baixo**: arredondar para cima deixa o QR maior
+> que os 20 mm e come a folga do silêncio, trocando um problema de leitura por
+> outro. A prévia desenha a 8 px/mm, onde o módulo fecha em 4 px.
+>
+> ⚠️ **E O QR DE 20 mm NUMA TELA NÃO É PARA SER LIDO PELO CELULAR.** Por isso
+> existe, ao lado da prévia, o **QR de conferência** — o mesmo conteúdo com
+> módulo de 6 px, rotulado ("no papel ele sai com 20 mm"). A etiqueta mostra
+> como vai ficar; o QR grande é o que se aponta a câmera. Sem ele, a fase 2
+> pede uma conferência que a própria tela torna difícil.
+>
+> **Isto é defeito de TELA, e não encosta no papel:** na ZD220 o QR é desenhado
+> pela impressora, com módulo inteiro em pontos.
+>
 > ⚠️ **A SETA TEM HASTE.** A primeira versão era um triângulo dentro do
 > círculo — e aquilo não se lê como seta, se lê como **botão de play**. Numa
 > etiqueta que manda apontar a câmera para um QR, símbolo de vídeo é a pior
@@ -1950,7 +1973,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (30), `teste_kit.js` (53), `teste_qr.js` (31) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (30), `teste_kit.js` (67), `teste_qr.js` (31) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | **Carregamento aceita volume que não foi embalado** — `carreg_route.js` só recusa `bloqueado` e `carregado`; um volume `pendente` vai para `carregado` e a peça sai sem o −1 do estoque. Achado da auditoria de 17/08 (`docs/arquivo/REVISAO-COMPLETA.md` §2.1), **conferido aberto em 17/09/2026** | Alto — estoque fica acima do físico, sem sinal |
@@ -2037,6 +2060,12 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   `public/kit_etiqueta.js`, em milímetros, e a fase 3 sai de lá (§4)
 - ❌ Dizer que a prévia prova a etiqueta impressa: ela prova o CONTEÚDO e o
   LUGAR — quem desenha o QR e as barras no papel é a impressora (§4)
+- ❌ Desenhar o QR da tela com módulo em pixel quebrado: a grade sai com 2 e 3
+  px alternando e o celular não lê — e o desenho continua com cara de QR (§4)
+- ❌ Arredondar o módulo do QR para CIMA: ele passa dos 20 mm e come a folga do
+  silêncio, que é o que o leitor precisa para achar o código (§4)
+- ❌ Pedir para conferir o QR com o celular só no QR de 20 mm da prévia: nesse
+  tamanho a câmera não fecha a leitura — é para isso que existe o ampliado (§4)
 - ❌ Copiar a tabela CODE128 para um segundo arquivo: `public/barras.js` serve o
   sob medida e a etiqueta do kit, e duas tabelas são duas etiquetas (§4, §19)
 - ❌ Mover `express.static` para antes do `auth`

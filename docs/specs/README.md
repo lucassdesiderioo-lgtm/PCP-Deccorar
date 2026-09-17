@@ -29,7 +29,7 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 | `COMPRAS.md` | Implementado (fases 0–6) · fase 7 pendente · com mudanças na construção |
 | `ARQUITETURA-ALVO.md` | Parcial — só no módulo sob medida (`tecido/`) |
 | `PCP-CONTROLE-E-VISAO.md` | Parcial e divergente · decisão pendente |
-| `GERADOR-ETIQUETA-KIT.md` | Em construção · fases 1 e 2 entregues (conteúdo + prévia) · falta impressão (3) e tirar o upload (4) |
+| `GERADOR-ETIQUETA-KIT.md` | Em construção · fases 1 e 2 entregues (conteúdo + prévia, com conserto na leitura do QR) · falta impressão (3) e tirar o upload (4) |
 | `TABLETS-E-KIOSK.md` | Planejado · nada no código · camada 1 (iPad) pode ir já |
 | `PRODUCAO-MAPA-E-MOTOR.md` | Planejado · não iniciado · depois da fila de consertos |
 | `PRODUCAO-MONTAGEM.md` | Planejado · não iniciado · depois da fila de consertos |
