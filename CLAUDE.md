@@ -1274,8 +1274,30 @@ Desligável (Admin → Cadastros) porque custa um bipe por volume, todo dia. Nas
 > `carregado` continua igual (armadilha #1-B).
 >
 > **Os volumes que já saíram assim não são desfeitos por este conserto** — o
-> saldo deles continua alto. Isso é passivo, e passivo se fecha pelos scripts do
-> §5, com a data carimbada na data do volume, nunca em `datetime('now')`.
+> saldo deles continua alto, e `skus.estoque` não se reconstrói (§14).
+>
+> **Quem conta esse passivo é o `node conferir_carregados.js`** (só lê; aceita
+> `N` dias e `--scripts`). Ele separa duas coisas que o banco não separa: o
+> volume que **pulou a etiqueta** e o que foi **fechado à mão** pelos scripts do
+> §5 — os dois deixam `embalado_em` vazio, e a única marca entre eles é a hora
+> `15:00:00` que aqueles scripts carimbam por **convenção** (§8), não por
+> relógio. Um bipe feito exatamente às 15:00:00 seria lido como fechamento de
+> script: é o único falso negativo, e está escrito no cabeçalho do arquivo
+> porque número de diagnóstico sem a margem ao lado vira fato.
+>
+> A conta é **por peça** (a caixa de pacote devia ter baixado N, §5 #23) e
+> **sob medida fica de fora** — ela nunca somou `+1` (§7), então cobrar a baixa
+> dela abriria um buraco em vez de fechar. `teste_carregados.js` (19 casos)
+> trava as três regras.
+>
+> ⚠️ **NÃO HÁ `--aplicar`, E ISSO É A DECISÃO, NÃO UMA FALTA.** O script diz o
+> que o sistema tem **a mais**; ele não sabe o que aconteceu **depois** — pode
+> ter havido contagem, ajuste ou devolução no meio do caminho, e descontar por
+> cima disso erra duas vezes. O caminho é: conferir a prateleira, e só então
+> corrigir por **Admin → Estoque**, que exige motivo e grava em
+> `ajuste_estoque` com quem e por quê (§18). Os scripts do §5 **não** servem
+> aqui: eles carimbam saída, e a saída desses volumes já aconteceu — o que
+> falta é o saldo, não o estágio.
 3. `cruz_route.js` compara os volumes **pendentes** × estoque e gera só urgência:
 
 | Situação | Vira | Cor na revisão |
@@ -2293,10 +2315,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (104), `teste_cobertura.js` (10), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (104), `teste_cobertura.js` (10), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42), `teste_carregados.js` (19) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
-| 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto — é passivo, e se fecha pelos scripts do §5 | — |
+| 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
 | 14 | ~~**`POST /api/montagem` (a embalagem) sem proteção**~~ **RESOLVIDO em 17/09/2026** — transação nas quatro escritas, SKU conferido (404), kit conferido no servidor e recusa aparecendo na tela; `teste_montagem.js` (42 casos). Ver §4, armadilha #26. **Fica aberto**: o código do kit é conferido quando vem, não exigido — exigir espera o refresh nos tablets. "Embalar sem revisar gera estoque" **não** entrou: é regra do §4, não defeito | — |
 | 15 | ~~**`POST /api/skus` zera o estoque** quando o corpo não traz `estoque`~~ **RESOLVIDO em 17/09/2026** — campo ausente preserva os quatro campos soltos, número impossível é recusado (400) em vez de clampado, e as duas escritas viraram uma transação com o `catch` vazio fora. A rota saiu para `sku_cad_route.js` e tem `teste_skus.js` (60 casos) atrás — ver §6, armadilha #25. **Fica aberto**: a rota ainda muda saldo com `sku.cadastrar`, sem motivo e sem auditoria (fechar isso é `REGRA`) | — |
 | 16 | ~~**Acesso: default `@logado` e cobertura mantida à mão**~~ **RESOLVIDO em 17/09/2026** — o padrão passou a ser **negar**, a cobertura varre o Express (a lista `TODAS_ROTAS` saiu) e o boot grita o nome da rota não declarada; as 28 leituras sem dono foram declaradas e as telas `.html` gêmeas herdaram a permissão da tela. Ver §10, armadilha #29 · `teste_cobertura.js` | — |
