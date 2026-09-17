@@ -428,6 +428,33 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > **Isto é defeito de TELA, e não encosta no papel:** na ZD220 o QR é desenhado
 > pela impressora, com módulo inteiro em pontos.
 >
+> ⚠️ **O DEFEITO MAIS CARO DESTA SPEC, E ELE PASSOU POR TRÊS RODADAS DE TESTE
+> VERDE (17/09/2026).** Nenhum celular lia o QR da prévia — nem grande, nem
+> pequeno, nem com link curto. A causa: o `qr.js` gravava os **15 bits da área
+> de formato na ordem invertida**. Essa área diz ao leitor qual máscara foi
+> usada; ele acha o código (os cantos da câmera piscam), vem ler o formato, a
+> verificação BCH não fecha e ele **desiste em silêncio**. O conteúdo estava
+> certo o tempo todo — o que estava errado era o bilhete que explica como ler.
+>
+> **Por que os testes não pegaram, e esta é a lição que vale mais que o
+> conserto:** o teste relia o formato **com a mesma convenção com que o gerador
+> o escrevia**. Os dois erravam juntos e concordavam. Pior: quando um
+> decodificador "independente" foi escrito justamente para caçar esse tipo de
+> erro, ele reaproveitou a leitura torta sem querer — **o ponto cego sobreviveu
+> à ferramenta criada para achá-lo**. Um teste que reusa a convenção do código
+> que testa não testa nada: ele pergunta a si mesmo.
+>
+> Hoje o `teste_qr.js` lê o formato **pela regra do padrão** e compara com os
+> **oito valores publicados** do nível M (`0x5412`, `0x5125`, `0x5E7C`,
+> `0x5B4B`, `0x45F9`, `0x40CE`, `0x4F97`, `0x4AA0`) — números que não saem
+> deste projeto e não mudam quando o gerador muda de ideia. Reintroduzir o
+> defeito reprova 17 casos; foi conferido assim, e é o único jeito de saber que
+> um teste serve.
+>
+> **Quem descobriu foi o dono, com o celular na mão**, depois de três "está
+> consertado" meus. A régua final de QR é câmera de verdade lendo — o resto é
+> indício.
+>
 > ⚠️ **A SETA TEM HASTE.** A primeira versão era um triângulo dentro do
 > círculo — e aquilo não se lê como seta, se lê como **botão de play**. Numa
 > etiqueta que manda apontar a câmera para um QR, símbolo de vídeo é a pior
@@ -1973,7 +2000,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (30), `teste_kit.js` (67), `teste_qr.js` (31) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (30), `teste_kit.js` (67), `teste_qr.js` (45) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | **Carregamento aceita volume que não foi embalado** — `carreg_route.js` só recusa `bloqueado` e `carregado`; um volume `pendente` vai para `carregado` e a peça sai sem o −1 do estoque. Achado da auditoria de 17/08 (`docs/arquivo/REVISAO-COMPLETA.md` §2.1), **conferido aberto em 17/09/2026** | Alto — estoque fica acima do físico, sem sinal |
@@ -2066,6 +2093,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   silêncio, que é o que o leitor precisa para achar o código (§4)
 - ❌ Pedir para conferir o QR com o celular só no QR de 20 mm da prévia: nesse
   tamanho a câmera não fecha a leitura — é para isso que existe o ampliado (§4)
+- ❌ Conferir o QR relendo com a mesma convenção com que ele foi escrito: o
+  formato invertido passou por três rodadas verdes assim (§4)
+- ❌ Escrever a área de formato do QR fora da ordem do padrão — o leitor acha o
+  código, não fecha o BCH e desiste sem dizer nada (§4)
 - ❌ Copiar a tabela CODE128 para um segundo arquivo: `public/barras.js` serve o
   sob medida e a etiqueta do kit, e duas tabelas são duas etiquetas (§4, §19)
 - ❌ Mover `express.static` para antes do `auth`

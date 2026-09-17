@@ -31,21 +31,41 @@ function eq(desc, achado, esperado){
 }
 
 // ── O DECODIFICADOR, escrito aqui e so aqui ──────────────────────────────
-function lerFormato(m){
-  // A copia de cima-esquerda, na ordem em que o padrao a grava.
-  const bit = [];
-  for(let i=0;i<=5;i++) bit.push(m[8][i]);
-  bit.push(m[8][7], m[8][8], m[7][8]);
-  for(let i=9;i<=14;i++) bit.push(m[14-i][8]);
+/* ⚠️ ESTA LEITURA É ESCRITA PELA REGRA DO PADRÃO, DE PROPÓSITO — e é a lição
+   mais cara deste arquivo.
+   Até 17/09/2026 ela relia o formato do mesmo jeito que o `qr.js` o gravava. O
+   gerador escrevia os 15 bits na ordem invertida, o teste os lia invertidos
+   também, e os dois concordavam: 31 casos verdes e NENHUM celular lendo o QR.
+   Um teste que reusa a convenção do código que ele testa não testa nada — ele
+   pergunta a si mesmo.
+   As duas cópias, como o padrão manda (as posições NÃO são simétricas):
+     vertical (coluna 8):  bit 0..5 → linha i · 6,7 → linha i+1 · 8..14 → tam-15+i
+     horizontal (linha 8): bit 0..7 → coluna tam-1-i · 8 → coluna 7 · 9..14 → 14-i */
+function lerFormatoPadrao(m, horizontal){
+  const t = m.length;
   let f = 0;
-  bit.forEach((b,i) => { if(b) f |= (1<<i); });
+  for(let i=0;i<15;i++){
+    let b;
+    if(horizontal){
+      if(i < 8)        b = m[8][t-1-i];
+      else if(i === 8) b = m[8][7];
+      else             b = m[8][14-i];
+    } else {
+      if(i < 6)      b = m[i][8];
+      else if(i < 8) b = m[i+1][8];
+      else           b = m[t-15+i][8];
+    }
+    if(b) f |= (1<<i);
+  }
+  const cru = f;
   f ^= 0x5412;                       // desfaz o XOR do padrao
   const dado = f >> 10;
   // confere o BCH: o resto da divisao tem que ser o que esta gravado
   let resto = (dado << 10);
   for(let i=14;i>=10;i--) if((resto>>i)&1) resto ^= 0x537 << (i-10);
-  return { nivel: dado >> 3, mascara: dado & 0b111, bchOk: (f & 0x3FF) === resto };
+  return { cru, nivel: dado >> 3, mascara: dado & 0b111, bchOk: (f & 0x3FF) === resto };
 }
+function lerFormato(m){ return lerFormatoPadrao(m, false); }
 function mascarar(i,j,k){
   switch(k){
     case 0: return (i+j)%2===0;
@@ -126,21 +146,52 @@ console.log('\n── 1. o texto volta inteiro (o caminho do leitor) ──');
   eq('volta o mesmo texto — ' + desc, d.texto, texto);
 });
 
-console.log('\n── 2. o cabecalho e o formato ──');
+console.log('\n── 2. o FORMATO contra a tabela PUBLICADA do padrao ──');
+/* ⚠️ O CASO QUE FALTAVA, E QUE CUSTOU TRÊS RODADAS.
+   Os 15 bits do formato do nivel M sao valores FIXOS e publicados no padrao,
+   um por mascara. Eles nao dependem de nada deste projeto — e e exatamente por
+   isso que estao aqui: sao a unica coisa neste arquivo que o `qr.js` nao pode
+   influenciar. Se o gerador mudar de ideia sobre como monta o formato, estes
+   oito numeros nao mudam junto. */
+const FORMATO_M = [0x5412, 0x5125, 0x5E7C, 0x5B4B, 0x45F9, 0x40CE, 0x4F97, 0x4AA0];
+/* As oito de uma vez, sem depender de qual mascara o gerador escolheu: o valor
+   gravado na matriz tem que ser o da TABELA para a mascara que ele diz ter
+   usado — nas DUAS copias, que e o que um leitor com a etiqueta rasgada usa. */
+[['KITINSTALACAO',1], ['https://www.google.com',2], [LINK,5], ['x'.repeat(100),7]]
+  .forEach(([txt, versao]) => {
+    const m = QR.modulos(txt, { versao });
+    const vert = lerFormatoPadrao(m, false), horiz = lerFormatoPadrao(m, true);
+    ok('v'+versao+': o formato gravado e o valor PUBLICADO da mascara '+vert.mascara,
+      vert.cru === FORMATO_M[vert.mascara],
+      'gravado 0x' + vert.cru.toString(16) + ', tabela 0x' + (FORMATO_M[vert.mascara]||0).toString(16));
+    ok('v'+versao+': a segunda copia diz o MESMO (etiqueta rasgada le a outra)',
+      horiz.cru === vert.cru,
+      'vertical 0x'+vert.cru.toString(16)+' × horizontal 0x'+horiz.cru.toString(16));
+    ok('v'+versao+': nivel M (00) e BCH fechando nas duas copias',
+      vert.nivel === 0 && vert.bchOk && horiz.bchOk);
+  });
+/* E a afirmacao exata que estava errada, escrita como caso para nunca voltar:
+   o modulo (8,0) carrega o bit 14 do formato, nao o bit 0. */
+{
+  const m = QR.modulos('TESTE', { versao:1 });
+  const f = lerFormatoPadrao(m, false).cru;
+  eq('o modulo (8,0) carrega o bit 14 do formato — nao o bit 0',
+    m[8][0], (f >> 14) & 1);
+  eq('e o modulo sempre escuro (tam-8,8) NAO e area de formato', m[m.length-8][8], 1);
+}
+
+console.log('\n── 3. o cabecalho e o formato ──');
 let d = decodificar(QR.modulos(LINK));
 eq('modo byte (0100)', d.modo, 0b0100);
 eq('nivel de correcao M (00)', d.nivel, 0b00);
 ok('o BCH do formato fecha', d.bchOk);
 ok('a mascara gravada e uma das oito', d.mascara >= 0 && d.mascara <= 7);
 /* As duas copias do formato tem que dizer a MESMA coisa: leitor que so enxerga
-   um canto (etiqueta rasgada, dedo em cima) le a outra. */
-const m1 = QR.modulos(LINK), tam1 = m1.length;
-let copia2 = [];
-for(let i=0;i<=6;i++) copia2.push(m1[tam1-1-i][8]);
-for(let i=7;i<=14;i++) copia2.push(m1[8][tam1-15+i]);
-let f2 = 0; copia2.forEach((b,i)=>{ if(b) f2 |= (1<<i); });
-f2 ^= 0x5412;
-eq('as duas copias do formato concordam', f2 >> 10, (0b00<<3) | d.mascara);
+   um canto (etiqueta rasgada, dedo em cima) le a outra. As DUAS pela regra do
+   padrao — era aqui que a convencao torta passava despercebida. */
+const m1 = QR.modulos(LINK);
+eq('as duas copias do formato concordam',
+  lerFormatoPadrao(m1, true).cru, lerFormatoPadrao(m1, false).cru);
 
 console.log('\n── 3. a correcao de erro fecha sozinha ──');
 d = decodificar(QR.modulos(LINK));
