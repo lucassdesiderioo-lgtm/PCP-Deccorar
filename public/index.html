@@ -2485,6 +2485,31 @@ async function carregarCad(){
   h+='<div class="sub" style="margin-bottom:12px">É o código que o operador bipa na embalagem para confirmar o kit. Use um código <b>simples, só com letras/números</b> — ex.: <b>KITENVIO</b>. Imprima esse código de barras na etiqueta (abaixo). A tela da embalagem só confere, não altera.</div>';
   h+='<div style="display:flex;gap:8px"><input id="cdKit" placeholder="ex.: KITENVIO" value="'+String(kit).replace(/"/g,"&quot;")+'" style="flex:1"><button class="primary" id="cdKitBt">Salvar</button></div>';
   h+='<div id="cdKitMsg" style="margin-top:10px;font-size:14px"></div>';
+  /* O CONTEUDO da etiqueta (spec GERADOR-ETIQUETA-KIT, fase 1). O codigo de
+     barras nao tem campo aqui de proposito: ele e SEMPRE o Codigo do kit acima
+     (R2) — campo separado e o que deixa o impresso diferente do que a Embalagem
+     bipa, que e o problema que a spec veio resolver. */
+  var etq={}; try{ etq=await (await fetch('/api/config/kit/etiqueta')).json(); }catch(e){}
+  var lim=(etq.limites||{linha:20,legenda:10});
+  h+='<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">';
+  h+='<div style="font-weight:700;margin-bottom:4px">Etiqueta do kit — o que vai impresso</div>';
+  h+='<div class="sub" style="margin-bottom:12px">O texto grande e o QR do manual. O <b>código de barras é sempre o Código do kit</b> acima — não se digita em outro lugar. A prévia e a impressão entram nas próximas fases.</div>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">';
+  h+='<label style="flex:1;min-width:190px"><span class="sub">Linha 1</span><input id="cdEtqL1" maxlength="'+lim.linha+'" value="'+esc(etq.linha1||'')+'" style="width:100%"></label>';
+  h+='<label style="flex:1;min-width:190px"><span class="sub">Linha 2</span><input id="cdEtqL2" maxlength="'+lim.linha+'" value="'+esc(etq.linha2||'')+'" style="width:100%"></label>';
+  h+='<label style="width:150px"><span class="sub">Legenda do QR</span><input id="cdEtqLeg" maxlength="'+lim.legenda+'" value="'+esc(etq.qr_legenda||'')+'" style="width:100%"></label>';
+  h+='</div>';
+  h+='<label style="display:block"><span class="sub">Link do manual (vira o QR)</span><input id="cdEtqLink" placeholder="https://drive.google.com/drive/folders/…" value="'+esc(etq.link||'')+'" style="width:100%"></label>';
+  h+='<div class="sub" style="margin-top:6px">A pasta precisa estar compartilhada como <b>"qualquer pessoa com o link pode ver"</b>. Trocar o manual é trocar o arquivo dentro da pasta — o link não muda e não é preciso reimprimir.</div>';
+  h+='<div style="margin-top:10px"><button class="primary" id="cdEtqBt">Salvar etiqueta</button></div>';
+  /* O que ainda falta para a etiqueta poder ser impressa aparece ANTES de
+     alguem tentar imprimir (R7) — trava que so fala na hora do clique manda a
+     pessoa descobrir o problema com a impressora ligada. */
+  var etqAviso='';
+  if(etq.aviso) etqAviso+='<span style="color:var(--amber)">'+esc(etq.aviso)+'</span> ';
+  if(etq.falta&&etq.falta.length) etqAviso+='<span style="color:var(--amber)">Ainda não dá para imprimir: falta '+esc(etq.falta.join(' e '))+'.</span>';
+  h+='<div id="cdEtqMsg" style="margin-top:10px;font-size:14px">'+etqAviso+'</div>';
+  h+='</div>';
   // Etiqueta pronta (arquivo) — sobe a arte da etiqueta (QR + KITENVIO etc.) e
   // imprime por aqui quando quiser.
   h+='<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">';
@@ -2588,8 +2613,39 @@ document.addEventListener('click',async function(e){
     for(var i=0;i<SKUS.length;i++) if(SKUS[i].codigo===k.toUpperCase()){ ehSku=true; break; }
     if(ehSku){ msg.innerHTML='<span style="color:#ff6b6b">Isso é um SKU de persiana, não o kit. Bipe o QR do kit.</span>'; return; }
     var rk=await (await fetch('/api/config/kit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kit:k})})).json();
+    /* R8: trocar um codigo ja salvo quebra o rolo de etiquetas ja impresso. Quem
+       pergunta e o SERVIDOR — a tela so mostra a pergunta dele e devolve a
+       resposta. Recusar aqui sem o `confirmar` significa que nada foi gravado. */
+    if(rk.confirmar_troca){
+      if(!confirm(rk.erro)){
+        msg.innerHTML='<span style="color:var(--muted)">Troca cancelada — a embalagem continua reconhecendo <b>'+(rk.antigo||'—')+'</b>.</span>';
+        document.getElementById('cdKit').value=rk.antigo||'';
+        return;
+      }
+      rk=await (await fetch('/api/config/kit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kit:k,confirmar:true})})).json();
+    }
+    if(rk.erro){ msg.innerHTML='<span style="color:#ff6b6b">'+rk.erro+'</span>'; return; }
     document.getElementById('cdKit').value=rk.kit||k.toUpperCase();
     msg.innerHTML='<span style="color:var(--green)">Salvo: <b>'+(rk.kit||k)+'</b> — é este código que a embalagem vai reconhecer.</span>';
+  }
+  if(e.target.closest('#cdEtqBt')){
+    var em=document.getElementById('cdEtqMsg');
+    em.textContent='Salvando…';
+    var corpo={
+      linha1:document.getElementById('cdEtqL1').value,
+      linha2:document.getElementById('cdEtqL2').value,
+      qr_legenda:document.getElementById('cdEtqLeg').value,
+      link:document.getElementById('cdEtqLink').value
+    };
+    var re=await (await fetch('/api/config/kit/etiqueta',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)})).json();
+    /* Recusa NAO repinta os campos (§7-B): o texto digitado continua na tela,
+       com o erro do lado. Redesenhar aqui faria sumir o que a pessoa escreveu e
+       voltar o valor velho — ela ve a recusa e um texto que nao e o dela. */
+    if(re.erro){ em.innerHTML='<span style="color:#ff6b6b">'+re.erro+'</span>'; return; }
+    var t='<span style="color:var(--green)">Salvo.</span>';
+    if(re.aviso) t+=' <span style="color:var(--amber)">'+re.aviso+'</span>';
+    if(re.falta&&re.falta.length) t+=' <span style="color:var(--amber)">Ainda não dá para imprimir: falta '+re.falta.join(' e ')+'.</span>';
+    em.innerHTML=t;
   }
   if(e.target.closest('#cdKitUp')){
     var lm=document.getElementById('cdKitLabelMsg');

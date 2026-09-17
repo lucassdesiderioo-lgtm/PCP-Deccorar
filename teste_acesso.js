@@ -63,6 +63,15 @@ eq('POST /api/lote/conferir e da bancada da etiqueta, nao do upload',
   AC.permDaRota('/api/lote/conferir', 'POST'), 'etiqueta.emitir');
 eq('POST /api/lote/upload continua sendo de quem sobe o PDF',
   AC.permDaRota('/api/lote/upload', 'POST'), 'pdf.subir');
+/* O conteudo da etiqueta do kit (spec GERADOR-ETIQUETA-KIT, fase 1) e do mesmo
+   dono do Codigo do kit: e a mesma decisao, no mesmo card. Cair no '@logado'
+   deixaria qualquer pessoa logada trocar o QR do manual — sem erro e sem log. */
+eq('POST /api/config/kit/etiqueta exige kit.editar',
+  AC.permDaRota('/api/config/kit/etiqueta', 'POST'), 'kit.editar');
+eq('o Codigo do kit continua em kit.editar',
+  AC.permDaRota('/api/config/kit', 'POST'), 'kit.editar');
+eq('ler a etiqueta e leitura de tela (a Embalagem le o codigo no tablet)',
+  AC.permDaRota('/api/config/kit/etiqueta', 'GET'), '@logado');
 /* As outras duas travas da mesma aba nao podem ter mudado de dono. */
 eq('divergencia continua em sku.cadastrar',
   AC.permDaRota('/api/divergencias/resolver', 'POST'), 'sku.cadastrar');
