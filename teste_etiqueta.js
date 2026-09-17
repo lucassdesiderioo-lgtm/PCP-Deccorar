@@ -22,6 +22,9 @@ const Database = require('better-sqlite3');
 const fs = require('fs'), os = require('os'), path = require('path');
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pcp-etq-'));
+/* Antes de qualquer require nosso: o exp_route (que serve o GET /api/print/:id)
+   cria a pasta dos PDFs pelo caminhos.js, e ela nao pode ser a de producao. */
+process.env.PCP_DIR = tmp;
 const db = new Database(path.join(tmp, 't.db'));
 db.exec(`
   CREATE TABLE modelo (id INTEGER PRIMARY KEY, codigo TEXT, nome TEXT,
@@ -242,6 +245,43 @@ const ok = (n, c, extra) => { casos++;
   ok('e o volume andou UMA vez: um volume, um carregamento',
      db.prepare("SELECT estagio FROM lote WHERE id=?").get(PAC).estagio === 'embalado' &&
      db.prepare("SELECT COUNT(*) c FROM lote WHERE packId='2000015040457349'").get().c === 1);
+
+  /* ── A BOCA DO BURACO DA DÍVIDA 13 (17/09/2026) ──────────────────────────
+     `GET /api/print/:id` imprimia a etiqueta de qualquer volume, inclusive o
+     `pendente` — que é o que punha etiqueta na mão do operador sem que o
+     estoque tivesse baixado. A caixa ia pro carro, o bipe do carregamento
+     aceitava, e o saldo ficava alto para sempre. Fechar aqui deixa UMA porta
+     para a etiqueta de venda: a bancada, pelo bipe do SKU.
+
+     A guarda é conferida pelo CÓDIGO da recusa: sem PDF no disco, o volume que
+     PASSA da guarda chega no 410 ("o PDF sumiu"), e o que é barrado por ela
+     responde 409. Os dois números separam uma coisa da outra sem precisar de
+     um PDF de verdade no teste. */
+  const rotasExp = {};
+  const appExp = { get:(p,...h)=>{ rotasExp['GET '+p]=h[h.length-1]; },
+                   post:(p,...h)=>{ rotasExp['POST '+p]=h[h.length-1]; },
+                   use:()=>{}, locals:{} };
+  require('./exp_route')(appExp, db);
+  const imprimir = (id) => new Promise(r => {
+    let st = 200;
+    const res = { status(c){ st=c; return res; }, json:o=>r({status:st,body:o}),
+                  send:o=>r({status:st,body:o}), setHeader(){} };
+    rotasExp['GET /api/print/:id']({ params:{id:String(id)}, query:{}, body:{}, headers:{} }, res);
+  });
+  let p = await imprimir(3);   // id 3 segue pendente (venda futura, nao impressa)
+  ok('etiqueta de volume PENDENTE é recusada — era o caminho que criava o furo',
+     p.status === 409, 'veio ' + p.status + ' ' + JSON.stringify(p.body));
+  ok('e a recusa manda imprimir pela Etiqueta de Venda',
+     /etiqueta de venda/i.test(String(p.body||'')), 'veio ' + JSON.stringify(p.body));
+  p = await imprimir(6);
+  ok('bloqueado continua recusado (§6)', p.status === 409, 'veio ' + p.status);
+  p = await imprimir(1);       // id 1 foi embalado no caso 1
+  ok('volume EMBALADO passa da guarda (chega no PDF, que neste teste não existe)',
+     p.status === 410, 'veio ' + p.status + ' ' + JSON.stringify(p.body));
+  db.prepare("UPDATE lote SET estagio='carregado' WHERE id=2").run();
+  p = await imprimir(2);
+  ok('e o já CARREGADO também passa — reimpressão depois do carro existe (§1-B)',
+     p.status === 410, 'veio ' + p.status);
 
   console.log('');
   console.log(falhas ? ('FALHARAM ' + falhas + ' de ' + casos)

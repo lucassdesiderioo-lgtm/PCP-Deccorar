@@ -66,6 +66,10 @@ db.prepare("UPDATE lote SET modalidade='coleta', despachar_em=date('now','localt
 
 const rotas={};
 const app={ get:(p,h)=>{rotas['GET '+p]=h;}, post:(p,h)=>{rotas['POST '+p]=h;}, locals:{} };
+/* Auditoria de mentira: a recusa do volume nao embalado precisa deixar rastro,
+   senao ninguem descobre que a caixa chegou no carro sem passar pela etiqueta. */
+const auditoria=[];
+app.locals.acesso={ auditar(req,cat,acao,alvo,detalhe){ auditoria.push({cat,acao,alvo,detalhe}); } };
 require('./carreg_route')(app,db);
 const chamar=(k,body)=>new Promise(r=>{
   const res={ json:o=>r(o), status(){ return this; }, send:o=>r(o) };
@@ -210,6 +214,35 @@ const ok=(n,c,extra)=>{ casos++;
   d=await chamar('GET /api/carregamento');
   ok('e o registro do dia mostra a divergencia', d.coleta.fechamentos.length===2 && d.coleta.fechamentos[0].divergente===1,
      'veio '+JSON.stringify(d.coleta.fechamentos));
+
+  /* ── O VOLUME QUE NUNCA FOI EMBALADO (divida 13, 17/09/2026) ──────────────
+     O carregamento recusava so 'bloqueado' e 'carregado'. Volume 'pendente'
+     virava 'carregado' e a peca saia da fabrica sem o -1 da Etiqueta de Venda:
+     o estoque ficava permanentemente acima do fisico, e como o cruzamento so
+     conta 'pendente', o volume sumia tambem da conta de urgencia. Nada
+     registrava. O caminho que criava isso era imprimir a etiqueta pela lista do
+     admin, sem passar pela bancada.
+     `carga.js` sempre disse que estar pra carregar e `estagio='embalado'` — a
+     lista e o contador liam de la, e so o BIPE tinha regua propria. */
+  ins.run('BK140140BEGE','Nunca Embalado','7001','7771','9071','["7771","9071"]','pendente',hoje);
+  r=await chamar('POST /api/carregar',{code:'7771'});
+  ok('volume que nunca foi embalado NAO carrega', r.ok===false && r.motivo==='nao_embalado',
+     'veio '+JSON.stringify(r));
+  ok('e a recusa diz por onde a caixa tem que passar', /etiqueta de venda/i.test(r.aviso||''),
+     'veio '+JSON.stringify(r.aviso));
+  ok('o volume continua pendente (nao andou pela metade)',
+     db.prepare("SELECT estagio FROM lote WHERE nf='7001'").get().estagio==='pendente');
+  ok('e a recusa vai pra auditoria — antes nada registrava',
+     auditoria.some(a=>a.acao==='carregar_nao_embalado'), 'veio '+JSON.stringify(auditoria));
+
+  /* A regra do irmao continua valendo (§5, os fantasmas): entre duplicatas do
+     mesmo codigo, quem esta pra carregar manda. O pendente nao pode roubar o
+     bipe do embalado e virar "nao_embalado" com a caixa certa na mao. */
+  ins.run('BK140140BEGE','Irmao Fantasma','7002','7781','9081','["7781","9081"]','pendente',hoje);
+  ins.run('BK140140BEGE','Irmao Bom',     '7003','7781','9081','["7781","9081"]','embalado',hoje);
+  r=await chamar('POST /api/carregar',{code:'7781'});
+  ok('entre irmaos, o embalado ainda manda', r.ok===true && r.pedido.nf==='7003',
+     'veio '+JSON.stringify(r.pedido&&r.pedido.nf));
 
   db.close();
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}

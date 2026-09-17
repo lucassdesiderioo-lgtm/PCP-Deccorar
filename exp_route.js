@@ -618,6 +618,21 @@ module.exports=function(app,db){
       const o=db.prepare('SELECT * FROM lote WHERE id=?').get(req.params.id);
       if(!o) return res.status(404).send('nao encontrado');
       if(o.estagio==='bloqueado') return res.status(409).send('BLOQUEADO: o SKU "'+(o.codigo||'(vazio)')+'" nao esta no cadastro. Cadastre no Admin antes de imprimir.');
+      /* ⚠️ ETIQUETA DE VENDA SO DEPOIS DA BAIXA (divida 13, 17/09/2026).
+         Esta rota imprimia a etiqueta de QUALQUER volume, inclusive o
+         'pendente' — e era ela que punha etiqueta na mao do operador sem que o
+         estoque tivesse baixado. Dali a caixa ia pro carro, o bipe do
+         carregamento aceitava (ele so recusava 'bloqueado' e 'carregado') e o
+         saldo ficava alto pra sempre, sem sinal em lugar nenhum.
+         Quem baixa a peca e o POST /api/embalar, na bancada da Etiqueta de
+         Venda — e a tela chama esta rota logo DEPOIS dele, entao o fluxo
+         normal nao muda. O que sai e o segundo caminho: o botao "imprimir" da
+         lista de lote, que pulava a bancada. E a licao do upload da etiqueta
+         do kit (§4): dois caminhos para o mesmo papel e o que faz um deles
+         sair errado sem ninguem saber que ele existia. */
+      if(o.estagio==='pendente') return res.status(409).send(
+        'AINDA NAO EMBALADO: imprima esta etiqueta pela tela ETIQUETA DE VENDA, bipando o SKU. '+
+        'E la que a peca baixa do estoque — imprimindo por aqui a caixa sairia da fabrica sem baixa.');
       if(!temPdf(o)) return res.status(410).send(PDF_SUMIU);
       const src=await PDFDocument.load(fs.readFileSync(o.srcfile));
       const out=await PDFDocument.create();

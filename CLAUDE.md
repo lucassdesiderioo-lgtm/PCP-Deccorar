@@ -1237,9 +1237,42 @@ Desligável (Admin → Cadastros) porque custa um bipe por volume, todo dia. Nas
 > zera ninguém lê até o fim — que é o mesmo fim de esconder.
 >
 > **Rode `node teste_carga.js` após qualquer mudança no `carreg_route.js`** —
-> os 13 casos incluem o dos seis volumes de 26/08, e cobrem que a busca larga
+> os 49 casos incluem o dos seis volumes de 26/08, e cobrem que a busca larga
 > não virou "acha qualquer coisa" (código inexistente ainda dá `nao_encontrado`)
 > e que `bloqueado` continua recusado.
+
+> ⚠️ **ARMADILHA #27 — A CAIXA SUBIA NO CARRO SEM NUNCA TER PASSADO PELA
+> ETIQUETA DE VENDA.** Corrigido em 17/09/2026 (era a dívida 13 do §14). O bipe
+> do carregamento recusava só `bloqueado` e `carregado`: volume **`pendente`**
+> virava `carregado` e a peça saía da fábrica **sem o −1** que só a Etiqueta de
+> Venda dá. Três estragos de uma vez, e nenhum com sinal em tela nenhuma:
+>
+> 1. o estoque fica **permanentemente acima do físico** — a peça saiu e o saldo
+>    não andou, e `skus.estoque` não se reconstrói (§14);
+> 2. o volume some da conta de urgência, porque `cruz_route.js` só olha
+>    `pendente` — a venda nunca vira ordem;
+> 3. **nada registrava.** Não havia como saber, depois, que aquilo aconteceu.
+>
+> `carga.js` sempre respondeu `estagio='embalado'` para *"isto está pra
+> carregar?"* — a lista e o contador liam de lá, e **só o bipe tinha régua
+> própria**, que é exatamente o que aquele arquivo existe para impedir. Hoje o
+> bipe recusa com `nao_embalado`, **diz por onde imprimir** (a caixa está na mão
+> da pessoa, na frente do carro: recusa sem caminho é o que ensina a empurrar do
+> jeito que der) e a recusa vai para a **auditoria**.
+>
+> ⚠️ **E A BOCA DO BURACO ERA O `GET /api/print/:id`**, que imprimia a etiqueta
+> de qualquer volume — inclusive o `pendente`. Era ele que punha etiqueta na mão
+> do operador sem baixa. A tela da Etiqueta de Venda chama essa rota **depois**
+> do `POST /api/embalar`, então o fluxo da bancada não mudou; o que saiu foi o
+> **segundo caminho**: o botão "imprimir" da lista de lote, em
+> `expedicao.html`, que pulava a bancada. É a lição do upload da etiqueta do kit
+> (§4): dois caminhos para o mesmo papel é o que faz um deles sair errado sem
+> ninguém saber que ele existia. Reimpressão de volume já `embalado` ou
+> `carregado` continua igual (armadilha #1-B).
+>
+> **Os volumes que já saíram assim não são desfeitos por este conserto** — o
+> saldo deles continua alto. Isso é passivo, e passivo se fecha pelos scripts do
+> §5, com a data carimbada na data do volume, nunca em `datetime('now')`.
 3. `cruz_route.js` compara os volumes **pendentes** × estoque e gera só urgência:
 
 | Situação | Vira | Cor na revisão |
@@ -1915,7 +1948,8 @@ canto na outra.
 > saída por `carregado_em` continua certo (é o mesmo dia); quem precisar da
 > hora real da retirada lê `retirado_em`.
 
-**Rode `node teste_carga.js` (44 casos, os últimos 24 são de coleta),
+**Rode `node teste_carga.js` (49 casos; 24 são de coleta e os 5 últimos são a
+trava do volume não embalado, §5 #27),
 `node teste_parse.js` (caso 15), `node teste_divergencia.js` (os dois últimos
 casos são a decisão da gestão) e `node teste_etiqueta.js` após mexer nisso.**
 Volumes anteriores à coluna: `node backfill_modalidade.js` (simula) e
@@ -2151,10 +2185,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (38), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (38), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
-| 13 | **Carregamento aceita volume que não foi embalado** — `carreg_route.js` só recusa `bloqueado` e `carregado`; um volume `pendente` vai para `carregado` e a peça sai sem o −1 do estoque. Achado da auditoria de 17/08 (`docs/arquivo/REVISAO-COMPLETA.md` §2.1), **conferido aberto em 17/09/2026** | Alto — estoque fica acima do físico, sem sinal |
+| 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto — é passivo, e se fecha pelos scripts do §5 | — |
 | 14 | ~~**`POST /api/montagem` (a embalagem) sem proteção**~~ **RESOLVIDO em 17/09/2026** — transação nas quatro escritas, SKU conferido (404), kit conferido no servidor e recusa aparecendo na tela; `teste_montagem.js` (42 casos). Ver §4, armadilha #26. **Fica aberto**: o código do kit é conferido quando vem, não exigido — exigir espera o refresh nos tablets. "Embalar sem revisar gera estoque" **não** entrou: é regra do §4, não defeito | — |
 | 15 | ~~**`POST /api/skus` zera o estoque** quando o corpo não traz `estoque`~~ **RESOLVIDO em 17/09/2026** — campo ausente preserva os quatro campos soltos, número impossível é recusado (400) em vez de clampado, e as duas escritas viraram uma transação com o `catch` vazio fora. A rota saiu para `sku_cad_route.js` e tem `teste_skus.js` (60 casos) atrás — ver §6, armadilha #25. **Fica aberto**: a rota ainda muda saldo com `sku.cadastrar`, sem motivo e sem auditoria (fechar isso é `REGRA`) | — |
 | 16 | **Acesso: default `@logado` e cobertura mantida à mão** — `permDaRota` termina em `@logado`; a tela de cobertura lê a lista `TODAS_ROTAS` e ignora `/api/`. Fecha junto com a dívida 12(c) (auditoria §1.2–1.3). **Aberto em 17/09/2026** | Médio — rota nova nasce aberta sem aparecer em lugar nenhum |
@@ -2208,6 +2242,14 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   conferência 3 lê e a família que a 5 aprende (§5, armadilha #24)
 - ❌ Comparar nome de cliente fora do `nome.js`, ou com distância de edição:
   `Marcelo`/`Marcela` estão a duas letras e são duas pessoas (§5, #10 e #22)
+- ❌ Deixar o carregamento aceitar volume que não está `embalado`: a peça sai da
+  fábrica sem o −1, o saldo fica alto para sempre e a venda some da conta de
+  urgência — sem sinal em tela nenhuma (§5, armadilha #27)
+- ❌ Voltar a imprimir a etiqueta de venda de um volume `pendente` pelo
+  `GET /api/print/:id`: é o segundo caminho que punha etiqueta na mão sem baixa,
+  e quem baixa a peça é o `POST /api/embalar` da bancada (§5, armadilha #27)
+- ❌ Recusar uma caixa no carregamento sem dizer por onde ela tem que passar — a
+  pessoa está na frente do carro com a caixa na mão (§5, armadilha #27)
 - ❌ Pôr a caixa de coleta na lista ou no contador do carro, ou somar a coleta
   no relógio de despacho — são duas portas de saída, e `carga.js` é o dono
   único de "isto é coleta?" (§8-B, armadilha #21)
