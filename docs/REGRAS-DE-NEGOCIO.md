@@ -182,7 +182,9 @@ Ao concluir:
 
 ### Bloqueio do kit
 
-Sem o bipe 2, o bipe 3 é recusado com **"⚠ FALTOU O KIT"**.
+Sem o bipe 2, o bipe 3 é recusado com **"⚠ FALTOU O KIT"** — e desde 17/09/2026
+a recusa é do **servidor**, não só da tela (`POST /api/montagem`). Enquanto foi um
+`if` do navegador, quem chamasse a rota por fora embalava sem kit.
 
 **Alcance real:** o QR é fixo — um link do Google Drive com o manual de instalação,
 que o cliente escaneia em casa. O sistema garante que *alguém bipou um kit*, não que
@@ -190,7 +192,10 @@ que o cliente escaneia em casa. O sistema garante que *alguém bipou um kit*, n�
 contra fraude.
 
 O código é configurável na aba Cadastros. O campo **recusa** um SKU de persiana —
-proteção contra o engano de bipar a etiqueta da peça em vez do QR do kit.
+proteção contra o engano de bipar a etiqueta da peça em vez do QR do kit. Essa
+recusa também passou a ser do servidor em 17/09/2026: gravar um SKU ali deixava
+aquela persiana **inembalável para sempre**, porque o bipe dela passava a ser
+lido como o kit.
 
 ### Fila
 

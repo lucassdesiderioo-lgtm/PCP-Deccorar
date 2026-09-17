@@ -319,6 +319,50 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > **Bloqueio do kit:** sem o bipe 2, o bipe 3 é recusado com "⚠ FALTOU O KIT".
 > Essa é a garantia contra esquecimento — motivo de devolução recorrente.
 
+> ⚠️ **ARMADILHA #26 — A PORTA DE ENTRADA DO ESTOQUE ERA A MENOS PROTEGIDA DO
+> SISTEMA.** Corrigido em 17/09/2026 (era a dívida 14 do §14). `POST
+> /api/montagem` é onde a peça vira `+1`, e a operação usa essa rota dezenas de
+> vezes por dia. Quatro coisas, e **nenhuma regra nova** — as regras já estavam
+> escritas nesta seção; o que faltava era existirem fora do navegador:
+>
+> - **As quatro escritas viraram uma transação** (`montagem`, `fila`, `skus`,
+>   `producao`). Com `better-sqlite3` cada statement auto-commita sozinho, então
+>   falha no meio deixava estado impossível: peça fora da fila e fora do estoque
+>   — a persiana na prateleira e em lugar nenhum do sistema —, ou `+1` com a
+>   ordem do dia ainda pedindo a peça, e aí **o operador produz de novo**.
+>   Falha agora é 500 dizendo o quê, com nada gravado e a peça ainda na fila.
+> - **SKU não cadastrado é recusado (404).** Era a única rota do fluxo que
+>   gravava sem conferir o cadastro (`/api/revisao`, `/api/devolucao` e
+>   `/api/embalar` sempre conferiram): o `UPDATE` pegava 0 linhas em silêncio e
+>   a resposta era `{ok:true, estoque:0}`. A peça sumia.
+> - **O bloqueio do kit virou trava de servidor.** `kit_ok` vinha do corpo com
+>   default `1` e ninguém conferia — o "⚠ FALTOU O KIT" era um `if` do
+>   navegador. É a mesma lição do `confirmar` do `kit_codigo`: aviso que só
+>   existe na tela não protege quem chama a rota por fora.
+> - **A tela passou a mostrar a recusa.** Ela ignorava a resposta: um 404 de SKU
+>   saía como "Embalada ✓", e a peça ia pra caixa sem existir no sistema.
+>
+> ⚠️ **O CÓDIGO DO KIT É CONFERIDO QUANDO VEM, E NÃO EXIGIDO** — decisão do dono
+> em 17/09/2026. A tela manda o código que foi bipado e o servidor confere;
+> chamada sem o campo passa. Exigir travaria o tablet que estivesse com a página
+> em cache, e trava que dispara no caso normal vira desvio (armadilha #6).
+> **Exigir é o passo seguinte, e depende de um refresh forçado nos tablets.**
+>
+> ⚠️ **`public/kit_bipe.js` é o dono único de "isto é o kit?"** (`kitNorm`,
+> `kitTok`, `kitBate`). A régua saiu de dentro do `montagem.html` porque o
+> servidor passou a fazer a mesma pergunta: duas cópias seriam a tela aceitando
+> um bipe que o servidor recusa no dia em que uma das duas mudasse. Mesmo
+> arranjo do `public/barras.js` e do `public/kit_etiqueta.js`.
+>
+> ⚠️ **E O QUE NÃO MUDOU: embalar SEM a peça estar na fila continua somando
+> `+1`.** A fila não é obrigatória para embalar — é regra, está logo acima, e é
+> o que torna o `limpar_fila.js` seguro. A auditoria de 17/08 listava isso como
+> defeito porque é anterior a essa decisão. Há caso travando.
+>
+> **Rode `node teste_montagem.js` ao mexer no `mont_route.js` ou no
+> `montagem.html`** — os 42 casos travam a transação, o SKU, o kit, o modo teste
+> e a regra da fila que **não** é bug.
+
 > ⚠️ **A CONFERÊNCIA DA PEÇA ACONTECE AQUI, E SÓ AQUI.** No bipe 1 a tela mostra
 > em letra grande **o que a peça é** — `140 × 140 cm · Bege · Blackout · Rolô`,
 > lido das colunas de `skus` (§7). O operador compara com a persiana na bancada
@@ -2098,7 +2142,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 1 | ~~Modo teste não cobre `fila`, `devolucao`, `rejeicao`, `contagem`, `foto_estoque`~~ **RESOLVIDO em 14/08/2026** — ver §11 | — |
 | 1b | ~~`fila` não tem `CREATE TABLE` em lugar nenhum~~ **RESOLVIDO em 14/08/2026** — criada em `db.js` | — |
 | 1d | ~~`revisao.modo` e `producao.origem`/`urgente` sem migração~~ **RESOLVIDO em 14/08/2026** — auditoria completa, ver §17 | — |
-| 1c | **Embalagem em teste consome linha real da `fila`** — `mont_route.js:11` pega a mais antiga `aguardando` sem olhar `teste`; ao apagar os testes a linha real fica presa em `embalado` | Médio — peça real some da fila |
+| 1c | ~~**Embalagem em teste consome linha real da `fila`**~~ **RESOLVIDO em 17/09/2026** — a fila é filtrada pelo mesmo `teste` do momento: em modo teste consome linha de teste, fora dele consome linha real (§4, armadilha #26) | — |
 | 2 | **Sem HTTPS.** PINs trafegam em texto aberto | Alto se exposto à internet |
 | 3 | **Revisão perdida em falha de conexão** — sem fila local de reenvio | Médio — buraco silencioso no relatório |
 | 4 | `POST /api/producao` (manual) não aceita `data`, `origem` nem `urgente` | Médio — impede lançar adiantado pela tela |
@@ -2107,11 +2151,11 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (38), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (38), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | **Carregamento aceita volume que não foi embalado** — `carreg_route.js` só recusa `bloqueado` e `carregado`; um volume `pendente` vai para `carregado` e a peça sai sem o −1 do estoque. Achado da auditoria de 17/08 (`docs/arquivo/REVISAO-COMPLETA.md` §2.1), **conferido aberto em 17/09/2026** | Alto — estoque fica acima do físico, sem sinal |
-| 14 | **`POST /api/montagem` (a embalagem) sem proteção** — quatro escritas sem transação, não valida se o SKU existe, `kit_ok` vem da tela, e embalar sem revisar gera estoque (auditoria §2.3). **Aberto em 17/09/2026** | Alto — é a porta de entrada do estoque |
+| 14 | ~~**`POST /api/montagem` (a embalagem) sem proteção**~~ **RESOLVIDO em 17/09/2026** — transação nas quatro escritas, SKU conferido (404), kit conferido no servidor e recusa aparecendo na tela; `teste_montagem.js` (42 casos). Ver §4, armadilha #26. **Fica aberto**: o código do kit é conferido quando vem, não exigido — exigir espera o refresh nos tablets. "Embalar sem revisar gera estoque" **não** entrou: é regra do §4, não defeito | — |
 | 15 | ~~**`POST /api/skus` zera o estoque** quando o corpo não traz `estoque`~~ **RESOLVIDO em 17/09/2026** — campo ausente preserva os quatro campos soltos, número impossível é recusado (400) em vez de clampado, e as duas escritas viraram uma transação com o `catch` vazio fora. A rota saiu para `sku_cad_route.js` e tem `teste_skus.js` (60 casos) atrás — ver §6, armadilha #25. **Fica aberto**: a rota ainda muda saldo com `sku.cadastrar`, sem motivo e sem auditoria (fechar isso é `REGRA`) | — |
 | 16 | **Acesso: default `@logado` e cobertura mantida à mão** — `permDaRota` termina em `@logado`; a tela de cobertura lê a lista `TODAS_ROTAS` e ignora `/api/`. Fecha junto com a dívida 12(c) (auditoria §1.2–1.3). **Aberto em 17/09/2026** | Médio — rota nova nasce aberta sem aparecer em lugar nenhum |
 | 17 | **Acesso: duas travas faltando** — `POST /api/acesso/usuario/:id/excecao` não recusa permissão `intransferivel`; `POST /api/acesso/usuario/:id/setores` não tem a trava do último Admin Geral (a de `auth.js` só cobre bloquear/excluir) (auditoria §1.1). **Aberto em 17/09/2026** | Médio — escalonar ou se trancar fora pela tela oficial |
@@ -2184,6 +2228,20 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Deixar a troca do `kit_codigo` salvar sem `confirmar`, ou mover essa guarda
   para o `confirm()` da tela — o rolo já impresso para de bipar e ninguém sabe
   por quê (§4)
+- ❌ Aceitar um SKU de persiana como `kit_codigo`: a partir dali aquela persiana
+  fica **inembalável para sempre**, porque o bipe dela passa a ser lido como o
+  kit — e ninguém liga isso a uma edição feita no Admin (§4, armadilha #26)
+- ❌ Devolver as quatro escritas da embalagem para fora de uma transação, ou
+  voltar a aceitar SKU sem cadastro ali: é a porta de ENTRADA do estoque, e o
+  estado quebrado dela é peça na prateleira que não existe no sistema (§4, #26)
+- ❌ Confiar no `kit_ok` que a tela manda sem conferir nada — o "⚠ FALTOU O KIT"
+  precisa existir no servidor, senão é um `if` de navegador (§4, armadilha #26)
+- ❌ Escrever uma segunda cópia do `kitBate`/`kitNorm`: a tela e o servidor leem
+  o `public/kit_bipe.js`, e duas réguas divergem no dia da troca (§4, #26)
+- ❌ Fazer a embalagem em modo teste consumir a fila REAL — era a dívida 1c, e a
+  peça de verdade sumia quando os testes eram apagados (§4, armadilha #26)
+- ❌ "Consertar" a embalagem para exigir que a peça esteja na fila: a fila não é
+  obrigatória, é regra do §4, e é o que torna o `limpar_fila.js` seguro
 - ❌ Criar um campo separado para o código de barras da etiqueta do kit: ele é
   sempre o **Código do kit** salvo, senão o impresso e o bipe divergem (§4)
 - ❌ Fazer o `POST /api/config/kit/etiqueta` apagar campo que não veio no corpo
