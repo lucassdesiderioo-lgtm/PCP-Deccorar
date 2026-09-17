@@ -575,7 +575,12 @@ module.exports = function(app, db){
     if(eq('/api/contagem/componentes')) return 'contagem.contar';
     if(M !== 'GET' && pre('/api/contagem')) return 'contagem.contar';
     if(M !== 'GET' && eq('/api/config/horarios')) return 'horarios.editar';
-    if(M !== 'GET' && eq('/api/config/kit')) return 'kit.editar';
+    /* `pre` e nao `eq`: o conteudo da etiqueta (/api/config/kit/etiqueta, spec
+       GERADOR-ETIQUETA-KIT) e a mesma pergunta do mesmo card — o que a
+       Embalagem bipa e o que vai impresso nela. Com `eq` a rota nova cairia no
+       default '@logado' e qualquer pessoa logada mudaria o QR do manual, sem
+       erro e sem log (§5, armadilha #23: a ponta que some em silencio). */
+    if(M !== 'GET' && pre('/api/config/kit')) return 'kit.editar';
     // Ligar/desligar a conferencia dupla muda o que a expedicao e obrigada a
     // fazer — e decisao de quem responde pela operacao, nao de quem carrega.
     if(M !== 'GET' && eq('/api/config/conferencia')) return '@admin';
@@ -709,7 +714,7 @@ module.exports = function(app, db){
     ['POST','/api/contagem/pendentes/rejeitar'],
     ['GET','/api/contagem/componentes'],['POST','/api/contagem/componente'],
     ['GET','/api/compras/necessidade'],
-    ['POST','/api/config/horarios'],['POST','/api/config/kit'],
+    ['POST','/api/config/horarios'],['POST','/api/config/kit'],['POST','/api/config/kit/etiqueta'],
     ['GET','/api/config/conferencia'],['POST','/api/config/conferencia'],['POST','/api/listas'],['GET','/api/teste'],
     ['GET','/api/usuarios'],['GET','/api/acesso/setores'],['GET','/api/acesso/divergencias'],
     ['GET','/api/painel'],['GET','/api/rel/dia'],['GET','/api/cruzamento'],

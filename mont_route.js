@@ -7,6 +7,19 @@ module.exports=function(app,db){
   const KITDIR=path.join(__dirname,'kit');
   try{ fs.mkdirSync(KITDIR,{recursive:true}); }catch(e){}
 
+  // Le uma chave do `config`. null = a chave NAO EXISTE (diferente de gravada
+  // vazia, que e uma decisao de quem editou — ver etiquetaAtual()).
+  function cfg(chave){
+    const r=db.prepare('SELECT valor FROM config WHERE chave=?').get(chave);
+    return r?r.valor:null;
+  }
+  // Registro das acoes do kit (R9 da spec). Nunca lanca: log nao derruba acao.
+  // So o que ACONTECEU vira linha — recusa nao e acao, e auditoria cheia de
+  // tentativa recusada enterra a troca de verdade no ruido.
+  function auditar(req,acao,alvo,detalhe){
+    try{ const ac=app.locals.acesso; if(ac&&ac.auditar) ac.auditar(req,'sistema',acao,alvo,detalhe); }catch(e){}
+  }
+
   // Sobe a etiqueta do kit (imagem ou PDF). Guarda no disco e o metadado em
   // config('kit_label'). Substitui a anterior.
   app.post('/api/kit/label',(req,res)=>{
@@ -50,7 +63,103 @@ module.exports=function(app,db){
   // Guarda o valor COMO VEIO (so trim) — o link do Drive e case-sensitive e
   // vira QR pro cliente. A conferencia na embalagem (kitBate/kitNorm) compara
   // ignorando maiusculas/simbolos, entao o casamento nao depende do case.
-  app.post('/api/config/kit',(req,res)=>{ const v=((req.body&&req.body.kit)||'').trim(); db.prepare("INSERT INTO config (chave,valor) VALUES ('kit_codigo',?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor").run(v); res.json({ok:true,kit:v}); });
+  //
+  // TROCAR O CODIGO EXIGE `confirmar` (spec GERADOR-ETIQUETA-KIT, R8). O rolo de
+  // etiquetas ja impresso com o codigo antigo para de bater no bipe da
+  // Embalagem, e quem descobre isso e a bancada, com a peca na mao, sem saber
+  // que alguem trocou. A guarda e no SERVIDOR, nao no `confirm()` da tela: um
+  // aviso que so existe no navegador nao protege quem chama a rota por fora.
+  //
+  // A comparacao e do texto cru, nao normalizada: trocar KITENVIO por kitenvio
+  // nao quebraria o bipe (o kitBate ignora caixa), mas confirmar de graca custa
+  // um clique — e uma SEGUNDA regua de "e o mesmo codigo?" aqui divergiria da
+  // do montagem.html no dia em que uma das duas mudasse, e aí a confirmacao
+  // seria pulada justamente na troca que quebra.
+  app.post('/api/config/kit',(req,res)=>{
+    const v=((req.body&&req.body.kit)||'').trim();
+    const antigo=cfg('kit_codigo');
+    if(antigo!==null && antigo!==v && !(req.body&&req.body.confirmar)){
+      return res.status(409).json({
+        confirmar_troca:true, antigo:antigo, novo:v,
+        erro:'As etiquetas já impressas com o código '+(antigo||'(nenhum)')
+          +' vão parar de funcionar na Embalagem. Confirmar troca para '+(v||'(nenhum)')+'?'
+      });
+    }
+    db.prepare("INSERT INTO config (chave,valor) VALUES ('kit_codigo',?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor").run(v);
+    if(antigo!==v) auditar(req,'kit_codigo',v,'antes: '+(antigo===null?'(nao havia)':(antigo||'(vazio)')));
+    res.json({ok:true,kit:v});
+  });
+
+  /* ── O CONTEUDO DA ETIQUETA DO KIT (spec GERADOR-ETIQUETA-KIT, fase 1) ──
+     Quatro campos, quatro linhas em `config`, ao lado do kit_codigo. Um JSON
+     unico caberia numa chave so, mas campo dentro de JSON nao se acha com grep
+     e nao se le com sqlite3 — e a divida 12(a) do §14 ja aponta para o lado
+     contrario disso (tabela `parametro`, com rotulo e unidade). */
+  const ETQ_PADRAO = { linha1:'SEU MANUAL ESTÁ', linha2:'AQUI', qr_legenda:'MANUAL', link:'' };
+  const ETQ_CHAVE  = { linha1:'kit_etq_linha1', linha2:'kit_etq_linha2',
+                       qr_legenda:'kit_etq_qr_legenda', link:'kit_etq_link' };
+  /* O limite das linhas e PROVISORIO: a spec manda medir pela previa, na fase 2
+     ("valor exato definido na Fase 2 pela previa"). 20 e o que cabe com folga na
+     coluna esquerda de 100x35 mm — a previa vai dizer o numero de verdade. */
+  const LIMITE_LINHA = 20, LIMITE_LEGENDA = 10;
+
+  function etiquetaAtual(){
+    const o = {};
+    for(const k of Object.keys(ETQ_CHAVE)){
+      const v = cfg(ETQ_CHAVE[k]);
+      // chave AUSENTE recebe o padrao; chave GRAVADA VAZIA e uma decisao de quem
+      // editou (etiqueta de uma linha so) e fica como esta.
+      o[k] = (v===null) ? ETQ_PADRAO[k] : v;
+    }
+    return o;
+  }
+  /* Fora do drive.google.com AVISA e deixa salvar (R4). Recusar seria trava
+     disparando no caso legitimo — o manual pode estar noutro lugar, e quem
+     decide isso e quem cola o link (armadilha #6). */
+  function avisoDoLink(link){
+    if(!link) return null;
+    let host=''; try{ host=new URL(link).hostname.toLowerCase(); }catch(e){ return null; }
+    if(host==='drive.google.com'||host.endsWith('.drive.google.com')) return null;
+    return 'Esse link não é do Google Drive ('+host+'). Salvo assim mesmo — confira se ele abre a pasta do manual.';
+  }
+  function respostaEtiqueta(extra){
+    const e = etiquetaAtual();
+    // Pronta = da para imprimir na fase 3. Falta o codigo ou o link, a impressao
+    // fica bloqueada, e a tela precisa dizer POR QUE antes de chegar la (R7).
+    const falta = [];
+    if(!cfg('kit_codigo')) falta.push('o Código do kit');
+    if(!e.link) falta.push('o link do manual');
+    return Object.assign({}, e, {
+      aviso: avisoDoLink(e.link), pronta: falta.length===0, falta: falta,
+      limites:{ linha:LIMITE_LINHA, legenda:LIMITE_LEGENDA }
+    }, extra||{});
+  }
+  app.get('/api/config/kit/etiqueta',(req,res)=> res.json(respostaEtiqueta()));
+  app.post('/api/config/kit/etiqueta',(req,res)=>{
+    const b = req.body||{};
+    /* CAMPO AUSENTE NAO E CAMPO VAZIO. E a divida 15 do §14 (o POST /api/skus
+       que zera o estoque quando o corpo nao traz `estoque`): um POST so com o
+       link nao pode apagar o texto da etiqueta. So mexe no que veio. */
+    const vem = Object.keys(ETQ_CHAVE).filter(k => Object.prototype.hasOwnProperty.call(b,k));
+    if(!vem.length) return res.status(400).json({erro:'nada para salvar'});
+    const novo = {};
+    for(const k of vem) novo[k] = String(b[k]==null?'':b[k]).trim();
+    if(novo.linha1!==undefined && novo.linha1.length>LIMITE_LINHA)
+      return res.status(400).json({erro:'A linha 1 cabe em '+LIMITE_LINHA+' caracteres (veio '+novo.linha1.length+').'});
+    if(novo.linha2!==undefined && novo.linha2.length>LIMITE_LINHA)
+      return res.status(400).json({erro:'A linha 2 cabe em '+LIMITE_LINHA+' caracteres (veio '+novo.linha2.length+').'});
+    if(novo.qr_legenda!==undefined && novo.qr_legenda.length>LIMITE_LEGENDA)
+      return res.status(400).json({erro:'A legenda do QR cabe em '+LIMITE_LEGENDA+' caracteres (veio '+novo.qr_legenda.length+').'});
+    if(novo.link!==undefined && novo.link && !/^https:\/\//i.test(novo.link))
+      return res.status(400).json({erro:'O link precisa começar com https:// — é ele que vira o QR que o cliente escaneia.'});
+    const gravar = db.transaction(()=>{
+      const up = db.prepare("INSERT INTO config (chave,valor) VALUES (?,?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor");
+      for(const k of vem) up.run(ETQ_CHAVE[k], novo[k]);
+    });
+    gravar();
+    auditar(req,'kit_etiqueta_conteudo', vem.join(', '), vem.map(k=>k+'='+novo[k]).join(' · '));
+    res.json(respostaEtiqueta({ok:true}));
+  });
   app.post('/api/montagem',(req,res)=>{
     const {codigo,segundos=0,kit_ok=1,inicio=null,fim=null}=req.body||{};
     if(!codigo) return res.status(400).json({erro:'codigo'});

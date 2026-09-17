@@ -2,13 +2,34 @@
 
 ```
 STATUS
-Situação: planejado
+Situação: em construção
 Criada em: 17/09/2026
 Última atualização: 17/09/2026
-Fase atual: nenhuma (aguardando início)
-Fases: 1 ☐  2 ☐  3 ☐  4 ☐
+Fase atual: fase 1 entregue (conteúdo da etiqueta) — falta o deploy
+Fases: 1 ☑  2 ☐  3 ☐  4 ☐
 Risco: 🔴 (etiqueta)
-Mudanças no caminho: —
+Mudanças no caminho:
+- 17/09/2026 (fase 1) — os quatro campos moram em `config`
+  (`kit_etq_linha1`, `kit_etq_linha2`, `kit_etq_qr_legenda`, `kit_etq_link`),
+  quatro linhas ao lado do `kit_codigo`, em vez de um JSON só: campo dentro de
+  JSON não se acha com grep nem se lê com sqlite3.
+- 17/09/2026 (fase 1) — a permissão de EDITAR não é nova: `kit.editar`
+  (Configuração, nível admin) já existia e já cobria o Código do kit. A rota
+  nova entrou nela por `pre('/api/config/kit')`. A permissão de IMPRIMIR
+  (Supervisor ou acima) é da fase 3 e aí sim é chave nova — vai precisar das
+  três pontas do §19 (chave, `permDaRota`, backfill de quem já devia tê-la).
+- 17/09/2026 (fase 1) — o limite das linhas 1 e 2 entrou PROVISÓRIO em 20
+  caracteres, como a §7 manda medir pela prévia na fase 2. A legenda do QR é
+  10, que é valor da spec.
+- 17/09/2026 (fase 1) — R8 é guarda de SERVIDOR, não `confirm()` de tela: sem
+  `confirmar` a rota devolve 409 e **nada** é gravado. A tela só mostra a
+  pergunta que o servidor fez.
+- **A REVER na fase 3:** a §6 manda reaproveitar o caminho de impressão Zebra
+  que o sistema já usa. Ele **não existe**: a etiqueta de SKU é impressa pelo
+  navegador (`public/index.html`, janela nova com `@page 100mm 35mm` e
+  JsBarcode vindo de **CDN**), sem uma linha de ZPL. Na fase 3 "reaproveitar"
+  significa construir o envio ZPL do zero — e a biblioteca local da fase 2
+  contraria o que a etiqueta de SKU faz hoje.
 ```
 
 ---

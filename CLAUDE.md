@@ -339,6 +339,39 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > bipou um kit*, não que *aquele kit específico* entrou naquela caixa. É proteção
 > contra esquecimento, não contra fraude. Configurável em `config.kit_codigo`.
 
+> ⚠️ **TROCAR O `kit_codigo` EXIGE `confirmar`, E A GUARDA É DO SERVIDOR.**
+> Desde 17/09/2026 (spec `GERADOR-ETIQUETA-KIT`, fase 1) o `POST /api/config/kit`
+> recusa com **409** quando já existe um código diferente salvo e o corpo não
+> traz `confirmar:true` — e aí **nada** é gravado. Motivo: o rolo de etiquetas
+> já impresso com o código antigo para de bater no bipe da Embalagem, e quem
+> descobre isso é a bancada, com a peça na mão, sem ninguém saber que houve
+> troca. Um `confirm()` só na tela não protegeria quem chama a rota por fora.
+> A troca vai para a auditoria, com o código anterior no detalhe.
+>
+> **O que vai impresso na etiqueta mora ao lado**, quatro linhas em `config`:
+> `kit_etq_linha1`, `kit_etq_linha2`, `kit_etq_qr_legenda` e `kit_etq_link`
+> (o link do Drive que vira o QR). Editáveis em Admin → Cadastros, no mesmo
+> card, com `kit.editar`. Regras que parecem bug e não são:
+> - **Campo ausente não é campo vazio.** O `POST /api/config/kit/etiqueta` só
+>   mexe no que veio no corpo — é a dívida 15 do §14 (o `POST /api/skus` que
+>   zera o estoque quando o corpo não traz `estoque`) evitada de propósito.
+>   Gravar vazio continua possível, e é decisão de quem editou: etiqueta de uma
+>   linha só existe.
+> - **Link fora do `drive.google.com` avisa e deixa salvar.** Recusar seria
+>   trava disparando no caso legítimo (armadilha #6) — o manual pode estar
+>   noutro lugar. Sem `https://`, aí sim recusa: é o que vira QR pro cliente.
+> - **Não há campo para o código de barras.** Ele é sempre o `kit_codigo` —
+>   um segundo campo é exatamente o que faz o impresso sair diferente do que a
+>   Embalagem bipa.
+> - O limite de 20 caracteres das linhas 1 e 2 é **provisório**, até a prévia
+>   da fase 2 dizer o que cabe de verdade. A legenda do QR são 10, por regra.
+>
+> **A Embalagem não mudou:** ela continua lendo só `GET /api/config/kit` e
+> conferindo o bipe contra o `kit_codigo`.
+>
+> **Rode `node teste_kit.js` ao mexer no `mont_route.js` ou no card do kit** —
+> os 40 casos travam a confirmação da troca, o campo ausente e o link.
+
 ### Peça com problema (rejeição)
 
 Durante uma revisão em andamento, o botão "Peça com problema" permite devolver a
@@ -1868,7 +1901,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (27) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (30), `teste_kit.js` (40) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | **Carregamento aceita volume que não foi embalado** — `carreg_route.js` só recusa `bloqueado` e `carregado`; um volume `pendente` vai para `carregado` e a peça sai sem o −1 do estoque. Achado da auditoria de 17/08 (`docs/arquivo/REVISAO-COMPLETA.md` §2.1), **conferido aberto em 17/09/2026** | Alto — estoque fica acima do físico, sem sinal |
@@ -1942,6 +1975,13 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   colado é o que fazia o PCP só subir naquela pasta, e há teste varrendo (§13)
 - ❌ Mudar o PADRÃO do `caminhos.js`: o próximo `git pull` apontaria a produção
   para um banco vazio, e o sistema subiria com o estoque "sumido" (§13)
+- ❌ Deixar a troca do `kit_codigo` salvar sem `confirmar`, ou mover essa guarda
+  para o `confirm()` da tela — o rolo já impresso para de bipar e ninguém sabe
+  por quê (§4)
+- ❌ Criar um campo separado para o código de barras da etiqueta do kit: ele é
+  sempre o **Código do kit** salvo, senão o impresso e o bipe divergem (§4)
+- ❌ Fazer o `POST /api/config/kit/etiqueta` apagar campo que não veio no corpo
+  — é a dívida 15 do §14 repetida em outra rota (§4)
 - ❌ Mover `express.static` para antes do `auth`
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor
