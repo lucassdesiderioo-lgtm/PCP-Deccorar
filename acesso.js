@@ -74,6 +74,16 @@ function setoresNativos(){
 }
 
 module.exports = function(app, db){
+  /* ⚠️ O `config` E CRIADO AQUI TAMBEM, E ISSO NAO E REDUNDANCIA (17/09/2026).
+     Este arquivo GRAVA em `config` (o seed do pacote.assinar, o modo de acesso
+     e a marca da migracao de areas), mas quem cria a tabela e o `mont_route`,
+     que no `server.js` roda antes. Carregado sozinho — um script, um teste, uma
+     ordem de require diferente amanha —, o `CREATE` nao aconteceu e os
+     `try/catch` daqui engolem tudo em silencio: os seeds "rodam", nao gravam
+     nada, e ninguem fica sabendo. E a mesma familia do §17 (o ALTER que morava
+     no modulo errado e so pegava no segundo boot). `IF NOT EXISTS` e idempotente
+     e nao muda nada onde a tabela ja existe — que e a producao. */
+  db.exec("CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT);");
   // ── 1. TABELAS (secao 10 — as do modelo de permissao; auditoria e
   //    contagem_pendente ficam para as Fases 4 e 5). acesso_divergencia e o
   //    log da comparacao paralela desta fase. ──
@@ -222,7 +232,29 @@ module.exports = function(app, db){
   // Migra so quem ainda nao tem setor (idempotente): pega os usuarios atuais no
   // boot e tambem qualquer usuario criado depois (pela tela antiga), mantendo o
   // modelo novo em dia sem tocar em quem ja foi ajustado a mao (Fase 2+).
+  /* ⚠️ A MIGRACAO DE `areas` E DE UMA VEZ SO, E ISSO FECHA UMA ESCALADA
+     (divida 17, porta A, 17/09/2026).
+     `usuarios.areas` deixou de ser ENTRADA e virou SOMBRA: quem escreve nela e
+     o `sincronizarAreas`, a partir das permissoes efetivas (§19, armadilha
+     #13). Só que esta funcao continuava lendo `areas` como se fosse entrada —
+     e `areasParaSetores` traduz `'admin'` para o setor **ADMIN GERAL**.
+     A cadeia completa: um Admin concede a alguem SEM SETOR uma excecao
+     qualquer de nivel admin (ver custo, por exemplo) → `sincronizarAreas`
+     grava `areas='admin'` → na proxima leitura da tela esta funcao roda, ve a
+     sombra e poe a pessoa no Admin Geral. Ninguem pediu isso, ninguem ve
+     acontecer, e a auditoria registra so a excecao — que era pequena.
+     A migracao e um evento da Fase 1, nao uma rotina: depois que ela roda,
+     `areas` nao volta a ser fonte de verdade sobre setor nenhum. Marcada em
+     `config`, como o backfill do `pacote.assinar` logo acima.
+     Pessoa NOVA nao depende disto: a tela de Acessos cria com `{nome, pin}` e
+     sem `areas`, e quem da os setores e o Admin, na mao. */
+  const MIGRACAO_FEITA = 'migracao_areas_fase1';
+  function migracaoEncerrada(){
+    try{ return !!db.prepare("SELECT 1 FROM config WHERE chave=?").get(MIGRACAO_FEITA); }
+    catch(e){ return false; }
+  }
   function migrarPendentes(){
+    if(migracaoEncerrada()) return { migrados:0, semMapa:[], encerrada:true };
     const usuarios = db.prepare("SELECT id,nome,areas FROM usuarios").all();
     const getS   = db.prepare("SELECT id FROM setores WHERE nome=?");
     const jaTem  = db.prepare("SELECT 1 FROM usuario_setor WHERE usuario_id=? LIMIT 1");
@@ -241,6 +273,10 @@ module.exports = function(app, db){
   }
   try{
     const r = migrarPendentes();
+    /* Fecha a migracao DEPOIS de ela ter rodado uma vez neste banco: o primeiro
+       boot com este codigo ainda migra quem estava pendente, e do segundo em
+       diante `areas` para de decidir setor. */
+    try{ db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES (?,'1')").run(MIGRACAO_FEITA); }catch(e){}
     console.log('[acesso] Fase 1: '+PERMISSOES.length+' permissoes, '
       + db.prepare("SELECT COUNT(*) c FROM setores").get().c + ' setores, '
       + r.migrados + ' usuarios migrados'
@@ -352,6 +388,16 @@ module.exports = function(app, db){
         const existe = id ? db.prepare("SELECT nativo,nivel FROM setores WHERE id=?").get(id) : null;
         if(existe && existe.nivel === 'admin_geral')
           throw new Error('Admin Geral tem todas as permissões e não é editável');
+        /* ⚠️ E NAO SE CRIA UM SEGUNDO ADMIN GERAL PELA TELA (divida 17).
+           A guarda acima cobria so o setor que JA EXISTE — criar um setor NOVO
+           de nivel `admin_geral` passava direto, e nivel admin_geral significa
+           TODAS as permissoes (o resolvedor forca isso, `permissoesDe`). Um
+           Admin criava "Coordenacao", marcava o nivel mais alto, se punha
+           dentro e saia com acesso total. E a mesma escalada da excecao
+           intransferivel, por outra porta da mesma tela. */
+        if(!existe && nivel === 'admin_geral')
+          throw new Error('Não dá para criar um setor de nível Admin Geral: ele tem TODAS as permissões. '
+            + 'Para dar acesso total a alguém, ponha a pessoa no setor Admin Geral que já existe.');
         if(id){
           db.prepare("UPDATE setores SET nome=?, nivel=? WHERE id=?").run(nome, nivel, id);
         } else {
@@ -389,6 +435,19 @@ module.exports = function(app, db){
     if(!soAdmin(req, res)) return;
     const uid = +req.params.id;
     const ids = (Array.isArray(req.body && req.body.setores) ? req.body.setores : []).map(Number).filter(Boolean);
+    /* ⚠️ E AQUI O ULTIMO ADMIN GERAL NAO SE TRANCA DO LADO DE FORA.
+       A trava existia no `auth.js` (bloquear e excluir) e nao existia aqui —
+       mas tirar o setor Admin Geral da unica pessoa que o tem produz o MESMO
+       resultado: ninguem mais administra o sistema, e a recuperacao e SQL
+       direto no banco. Vale so quando a lista nova nao tem nenhum setor de
+       nivel admin_geral: trocar um setor por outro, mantendo o cracha, passa. */
+    if(ehUltimoAdminGeral(uid)){
+      const temAG = ids.length ? !!db.prepare(
+        `SELECT 1 FROM setores WHERE nivel='admin_geral' AND ativo=1 AND id IN (${ids.map(()=>'?').join(',')}) LIMIT 1`
+      ).get(...ids) : false;
+      if(!temAG) return res.status(400).json({ erro:'Esta é a única pessoa com acesso total (Admin Geral). '+
+        'Dê o setor Admin Geral a outra pessoa antes de tirar o dela — senão ninguém mais administra o sistema.' });
+    }
     db.transaction(() => {
       db.prepare("DELETE FROM usuario_setor WHERE usuario_id=?").run(uid);
       const ins = db.prepare("INSERT OR IGNORE INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)");
@@ -405,6 +464,22 @@ module.exports = function(app, db){
     const b = req.body || {};
     const chave = String(b.chave || '');
     if(!infoPerm[chave]) return res.status(400).json({ erro:'permissão desconhecida' });
+    /* ⚠️ O `intransferivel` DEIXOU DE SER SO UM ROTULO (divida 17, 17/09/2026).
+       As tres chaves marcadas assim em `permissoes.js` (pessoas.gerenciar,
+       setores.gerenciar, auditoria.ver) sao as que MANDAM NO PROPRIO ACESSO:
+       quem as tem escolhe quem tem o que, e por isso elas sao de Admin Geral e
+       nao se delegam. O rotulo existia desde o inicio, nao era gravado na
+       tabela nem consultado em NENHUM caminho de escrita, e a tela desenhava a
+       caixinha sem `disabled` — entao um Admin podia conceder a si mesmo (ou a
+       qualquer um) o poder de gerenciar acessos. A tela de Acessos virava o
+       caminho mais curto entre "sou admin" e "mando em tudo", e a auditoria
+       registrava uma acao legitima, porque ela ERA legitima.
+       REVOGAR continua livre: tirar nao escala ninguem, e recusar tambem a
+       revogacao seria trava disparando no caso seguro (armadilha #6). */
+    if(!b.limpar && b.concede && infoPerm[chave].intransferivel)
+      return res.status(400).json({ erro:'"'+infoPerm[chave].rotulo+'" é intransferível: '+
+        'ela decide quem tem acesso a quê, então só o Admin Geral a tem, por nível. '+
+        'Para dar esse poder a alguém, ponha a pessoa no setor Admin Geral.' });
     if(b.limpar){
       db.prepare("DELETE FROM usuario_excecao WHERE usuario_id=? AND chave=?").run(uid, chave);
     } else {
@@ -604,6 +679,19 @@ module.exports = function(app, db){
     return db.prepare(`SELECT 1 FROM usuario_setor us JOIN setores s ON s.id=us.setor_id
       WHERE us.usuario_id=? AND s.ativo=1 AND s.nivel='admin_geral' LIMIT 1`).get(uid) ? true : false;
   }
+  /* "ELE E O ULTIMO ADMIN GERAL?" — a pergunta mora AQUI, ao lado de quem
+     responde "ele e Admin Geral?". O `auth.js` ja fazia essa conta para nao
+     deixar bloquear nem excluir o ultimo (a regra "ninguem sem acesso"), e o
+     `acesso.js` nao fazia nenhuma — entao dava para se trancar do lado de fora
+     pela tela de Acessos, tirando de si mesmo o setor Admin Geral. A saida
+     dali e SQL direto no banco, que e o oposto do que a tela existe para ser.
+     Uma segunda copia da conta divergiria no dia em que "quem e Admin Geral"
+     mudasse; por isso o auth.js passou a chamar esta (17/09/2026). */
+  function ehUltimoAdminGeral(uid){
+    if(!ehAdminGeral(+uid)) return false;
+    const outros = db.prepare('SELECT id FROM usuarios WHERE ativo=1 AND id!=?').all(+uid);
+    return !outros.some(u => ehAdminGeral(u.id));
+  }
   // ── `areas` (modelo antigo) virou SOMBRA dos setores: nao e mais editada a
   // mao. Mantida so para o que ainda depende dela — o redirecionamento pos-login
   // (login.html), a caixa de subir PDF no admin e o fallback de emergencia.
@@ -750,5 +838,5 @@ module.exports = function(app, db){
   }catch(e){ console.log('[acesso] aviso de cobertura falhou: '+e.message); }
 
   // exposto para o auth.js (Fase 3) e demais rotas (Fases 5/6)
-  app.locals.acesso = { permissoesDe, compararDivergencias, AREA_CHAVE, decidir, modoAcesso, permDaRota, auditar, podePermissao, ehAdminGeral };
+  app.locals.acesso = { permissoesDe, compararDivergencias, AREA_CHAVE, decidir, modoAcesso, permDaRota, auditar, podePermissao, ehAdminGeral, ehUltimoAdminGeral };
 };

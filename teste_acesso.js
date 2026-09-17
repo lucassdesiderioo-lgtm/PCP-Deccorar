@@ -35,9 +35,24 @@ db.exec(`
     pin_hash TEXT, salt TEXT, areas TEXT, ativo INTEGER DEFAULT 1);
   CREATE TABLE config (chave TEXT PRIMARY KEY, valor TEXT);
 `);
-const app = { locals:{}, get(){}, post(){}, delete(){} };
+/* O app falso passou a GUARDAR os handlers (17/09/2026, divida 17): as travas
+   de escalonamento moram nas ROTAS, e ate aqui este arquivo so conseguia
+   perguntar ao permDaRota. Trava que ninguem chama e trava que ninguem testa. */
+const rotas = {};
+const app = { locals:{},
+  get(p,h){ rotas['GET '+p]=h; }, post(p,h){ rotas['POST '+p]=h; },
+  delete(p,h){ rotas['DELETE '+p]=h; } };
 require('./acesso')(app, db);
 const AC = app.locals.acesso;
+function chamar(metodo, rota, corpo, params, usuario){
+  const h = rotas[metodo+' '+rota];
+  if(!h) throw new Error('rota nao registrada: '+metodo+' '+rota);
+  const out = { status:200, body:null };
+  const res = { status(c){ out.status=c; return res; }, json(b){ out.body=b; return res; },
+                send(b){ out.body=b; return res; } };
+  h({ body:corpo||{}, params:params||{}, query:{}, headers:{}, usuario:usuario||null }, res);
+  return out;
+}
 
 console.log('\n── 1. a CHAVE existe no registro ──');
 const chave = PERMISSOES.find(p => p.chave === 'pacote.assinar');
@@ -181,6 +196,78 @@ ok('...mas o Admin Geral imprime desde o primeiro boot',
   AC.decidir(g2, '/api/kit/etiqueta/imprimir', 'POST').ok === true);
 ok('e quem so tem kit.editar NAO imprime',
   AC.decidir({ id:ua, nome:'Gestao' }, '/api/kit/etiqueta/imprimir', 'POST').ok === false);
+
+/* ═══════════ AS TRAVAS DE ESCALONAMENTO (divida 17, 17/09/2026) ═══════════
+   Tudo daqui pra baixo responde a mesma pergunta: DA PRA SUBIR DE NIVEL PELA
+   TELA OFICIAL? Enquanto desse, a tela de Acessos era o caminho mais curto
+   entre "tenho acesso de admin" e "tenho acesso a tudo" — e o rastro que ela
+   deixa (auditoria) mostra uma acao legitima, porque ela ERA legitima. */
+const AG = { id:ug, nome:'Geral' };   // o Admin Geral do bloco 3
+
+console.log('\n── 7. a excecao nao delega o INDELEGAVEL ──');
+const INTRANSF = ['pessoas.gerenciar','setores.gerenciar','auditoria.ver'];
+const uNovo = db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('Ze da Bancada','')").run().lastInsertRowid;
+let recusou = 0;
+for(const chave of INTRANSF){
+  const r = chamar('POST','/api/acesso/usuario/:id/excecao',{chave,concede:1,motivo:'teste'},{id:String(uNovo)},AG);
+  if(r.status === 400) recusou++;
+}
+eq('as tres chaves intransferiveis sao recusadas', recusou, 3);
+eq('e NENHUMA foi gravada', db.prepare("SELECT COUNT(*) c FROM usuario_excecao WHERE usuario_id=? AND concede=1").get(uNovo).c, 0);
+ok('quem recebeu a recusa nao ganhou a permissao', !AC.permissoesDe(uNovo).has('pessoas.gerenciar'));
+/* REVOGAR uma intransferivel continua valendo: ela nao escala ninguem, e
+   recusar tambem a revogacao seria trava disparando no caso seguro. */
+let r7 = chamar('POST','/api/acesso/usuario/:id/excecao',{chave:'pessoas.gerenciar',concede:0,motivo:'teste'},{id:String(uNovo)},AG);
+eq('mas REVOGAR uma intransferivel continua permitido', r7.status, 200);
+r7 = chamar('POST','/api/acesso/usuario/:id/excecao',{chave:'custo.ver',concede:1,motivo:'ve custo'},{id:String(uNovo)},AG);
+eq('e a excecao normal continua funcionando', r7.status, 200);
+ok('a pessoa ganhou a permissao concedida', AC.permissoesDe(uNovo).has('custo.ver'));
+
+console.log('\n── 8. o ultimo Admin Geral nao se tranca do lado de fora ──');
+const sgId = db.prepare("SELECT id FROM setores WHERE nome='Admin Geral'").get().id;
+const sOper = db.prepare("SELECT id FROM setores WHERE nome='Operador / Revisão'").get().id;
+let r8 = chamar('POST','/api/acesso/usuario/:id/setores',{setores:[sOper]},{id:String(ug)},AG);
+eq('tirar o Admin Geral do UNICO Admin Geral → 400', r8.status, 400);
+ok('e ele continua Admin Geral', AC.ehAdminGeral(ug), 'perdeu o acesso total');
+/* Com um segundo Admin Geral ativo, a troca passa: a trava e do ULTIMO. */
+const ug2 = db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('Segundo Geral','')").run().lastInsertRowid;
+db.prepare("INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)").run(ug2, sgId);
+r8 = chamar('POST','/api/acesso/usuario/:id/setores',{setores:[sOper]},{id:String(ug)},AG);
+eq('com outro Admin Geral ativo, a troca passa', r8.status, 200);
+ok('e agora ele nao e mais Admin Geral', !AC.ehAdminGeral(ug));
+ok('...mas a casa continua tendo um', AC.ehAdminGeral(ug2));
+/* Devolve o cracha do `ug` para o resto do arquivo: ele e quem chama as rotas
+   daqui pra baixo, e sem Admin Geral as chamadas viram 403 e os casos
+   seguintes passariam a testar o 403, nao a trava. */
+db.prepare("INSERT OR IGNORE INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)").run(ug, sgId);
+r8 = chamar('POST','/api/acesso/usuario/:id/setores',{setores:[]},{id:String(uNovo)},AG);
+eq('mexer nos setores de quem nao e Admin Geral continua livre', r8.status, 200);
+
+console.log('\n── 9. setor NOVO nao nasce Admin Geral ──');
+let r9 = chamar('POST','/api/acesso/setores',{nome:'Quase Geral',nivel:'admin_geral',permissoes:[]},{},AG);
+eq('criar setor de nivel admin_geral → 400', r9.status, 400);
+eq('e ele nao foi criado', db.prepare("SELECT COUNT(*) c FROM setores WHERE nome='Quase Geral'").get().c, 0);
+r9 = chamar('POST','/api/acesso/setores',{nome:'Conferencia',nivel:'admin',permissoes:['custo.ver']},{},AG);
+eq('setor de nivel admin continua sendo criado normalmente', r9.status, 200);
+r9 = chamar('POST','/api/acesso/setores',{id:sgId,nome:'Admin Geral',nivel:'admin_geral',permissoes:[]},{},AG);
+eq('editar o setor Admin Geral continua recusado', r9.status, 400);
+
+console.log('\n── 10. PORTA A: a excecao nao promove ninguem a Admin Geral ──');
+/* A cadeia era: excecao de nivel admin → sincronizarAreas grava areas='admin'
+   → migrarPendentes le `areas` (que virou SOMBRA, §19 armadilha #13) e traduz
+   'admin' para o setor ADMIN GERAL. Quem so devia ver custo saia com acesso
+   total, sem ninguem ter pedido isso — e a auditoria mostrando so a excecao. */
+const uPorta = db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('Alvo da Porta A','')").run().lastInsertRowid;
+chamar('POST','/api/acesso/usuario/:id/excecao',{chave:'custo.ver',concede:1,motivo:'ve custo'},{id:String(uPorta)},AG);
+ok('a sombra `areas` ganha admin (é como o modelo antigo enxerga a pessoa)',
+  (db.prepare("SELECT areas FROM usuarios WHERE id=?").get(uPorta).areas||'').indexOf('admin') >= 0);
+// esta rota chama migrarPendentes() — era aqui que a promocao acontecia
+chamar('GET','/api/acesso/usuario/:id',{},{id:String(uPorta)},AG);
+ok('NAO virou Admin Geral', !AC.ehAdminGeral(uPorta), 'a porta A ainda escala');
+eq('e nao ganhou setor nenhum por causa da sombra',
+  db.prepare("SELECT COUNT(*) c FROM usuario_setor WHERE usuario_id=?").get(uPorta).c, 0);
+ok('continua tendo so a permissao que lhe deram', AC.permissoesDe(uPorta).has('custo.ver'));
+ok('e nao pode gerenciar pessoas', !AC.permissoesDe(uPorta).has('pessoas.gerenciar'));
 
 db.close();
 try{ fs.rmSync(dir, { recursive:true, force:true }); }catch(e){}

@@ -1,8 +1,16 @@
 # Controle de Acesso — Especificação
 
-> **STATUS · 17/09/2026 — IMPLEMENTADO** (fases 1 a 6, 16–17/08/2026) · com furos abertos:
-> default `@logado`, cobertura mantida à mão, exceção sem trava de `intransferivel` e
-> setores sem trava do último Admin Geral — ver `CLAUDE.md` §14, dívidas 16 e 17.
+> **STATUS · 17/09/2026 — IMPLEMENTADO** (fases 1 a 6, 16–17/08/2026).
+> **A dívida 17 foi fechada em 17/09/2026:** a exceção recusa conceder chave
+> `intransferivel`, a troca de setores tem a trava do último Admin Geral (mesma
+> conta do `auth.js`), setor novo não nasce `admin_geral`, e a migração de
+> `usuarios.areas` virou evento de uma vez só — ela promovia a Admin Geral quem
+> recebesse uma exceção de nível admin. Está no `CLAUDE.md` §10, armadilha #28.
+> **Continua aberto** o default `@logado` com a cobertura mantida à mão (dívida
+> 16): o levantamento de 17/09/2026 achou **47 de 160** rotas/telas em
+> `@logado` — nenhuma escrita de API sem dono, mas 13 telas `.html` gêmeas e 32
+> leituras. O caminho é a dívida 12(c) (rota sem permissão nasce negada), não
+> emendar a lista `TODAS_ROTAS`.
 > O "Status" logo abaixo é o da escrita original.
 
 > Modelo de permissões do PCP Deccorar.
