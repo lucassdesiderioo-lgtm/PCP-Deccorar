@@ -1,3 +1,9 @@
+/* "O que foi bipado é o kit?" tem UMA régua, e ela mora no `public/kit_bipe.js`
+   desde 17/09/2026 — a tela e o servidor leem o mesmo arquivo. Duas cópias
+   seriam a tela aceitando um bipe que o servidor recusa (ou o contrário) no dia
+   em que uma das duas mudasse. Mesmo arranjo do `public/barras.js` e do
+   `public/kit_etiqueta.js`. */
+const KIT_BIPE = require('./public/kit_bipe.js');
 module.exports=function(app,db){
   db.exec("CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT);");
   // Le uma chave do `config`. null = a chave NAO EXISTE (diferente de gravada
@@ -49,8 +55,21 @@ module.exports=function(app,db){
   // um clique — e uma SEGUNDA regua de "e o mesmo codigo?" aqui divergiria da
   // do montagem.html no dia em que uma das duas mudasse, e aí a confirmacao
   // seria pulada justamente na troca que quebra.
+  //
+  // ⚠️ O CODIGO DO KIT NAO PODE SER UM SKU DE PERSIANA, E A GUARDA E DAQUI.
+  // O `REGRAS-DE-NEGOCIO.md` §4 sempre disse que o campo recusa um SKU — mas a
+  // recusa existia so em `index.html`. Apontar o leitor para a etiqueta de uma
+  // persiana e salvar fazia `kit_codigo` virar BK160160BEGE, e a partir dali
+  // aquele SKU ficava INEMBALAVEL PARA SEMPRE: o `if(KIT && kitBate(code,KIT))`
+  // da tela roda ANTES da busca de SKU, entao todo bipe dele passava a
+  // responder "Bipe o SKU primeiro". Ninguem associaria isso a uma edicao feita
+  // no Admin dias antes. (Auditoria §2.4, fechada em 17/09/2026.)
   app.post('/api/config/kit',(req,res)=>{
     const v=((req.body&&req.body.kit)||'').trim();
+    if(v && db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(v.toUpperCase()))
+      return res.status(400).json({erro:'"'+v+'" é um SKU de persiana cadastrado. '+
+        'Usar um SKU como código do kit deixa aquela persiana inembalável — na Embalagem, '+
+        'o bipe dela passaria a ser lido como o kit. Bipe o QR do kit de instalação.'});
     const antigo=cfg('kit_codigo');
     if(antigo!==null && antigo!==v && !(req.body&&req.body.confirmar)){
       return res.status(409).json({
@@ -186,19 +205,69 @@ module.exports=function(app,db){
       nome:'etiquetas-kit-'+quantidade+'.pdf',
       arquivo: pdf.toString('base64') });
   });
+  /* ── A EMBALAGEM: A PORTA DE ENTRADA DO ESTOQUE ──────────────────────────
+     É aqui que a peça vira `+1`, e até 17/09/2026 esta era a rota menos
+     protegida do sistema (dívida 14 do §14). Quatro coisas mudaram, e nenhuma
+     delas é regra nova — as regras já estavam escritas no §4; o que faltava era
+     elas existirem fora do navegador:
+
+     1. AS QUATRO ESCRITAS SÃO UMA TRANSAÇÃO (montagem, fila, skus, producao).
+        Com better-sqlite3 cada statement auto-commita sozinho, então falha no
+        meio deixava estado impossível: peça fora da fila e fora do estoque (a
+        persiana na prateleira e em lugar nenhum do sistema), ou `+1` com a
+        ordem do dia ainda pedindo a peça — e aí o operador produz de novo.
+     2. O SKU TEM QUE EXISTIR. Era a única rota do fluxo que gravava sem
+        conferir o cadastro: o `UPDATE` pegava 0 linhas em silêncio e a resposta
+        era `{ok:true, estoque:0}`. A peça sumia.
+     3. O BLOQUEIO DO KIT VIROU TRAVA DE SERVIDOR. `kit_ok` vinha do corpo com
+        default 1 e ninguém conferia: o "⚠ FALTOU O KIT" era um `if` do
+        navegador, e kit esquecido é motivo de devolução recorrente (§4).
+        ⚠️ O CÓDIGO DO KIT É CONFERIDO QUANDO VEM, E NÃO EXIGIDO — decisão do
+        dono em 17/09/2026. Exigir travaria o tablet que estivesse com a página
+        em cache, e trava que dispara no caso normal vira desvio (armadilha #6).
+        Exigir é o passo seguinte, depois do refresh nos tablets.
+     4. MODO TESTE NÃO COME A FILA REAL (dívida 1c). A fila é filtrada pelo
+        mesmo `teste` do momento: em teste consome linha de teste, fora dele
+        consome linha real. Antes, embalar em teste prendia a peça REAL em
+        'embalado', e ela sumia quando os testes fossem apagados.
+
+     ⚠️ O QUE **NÃO** MUDOU, E NÃO PODE MUDAR: embalar SEM a peça estar na fila
+     continua somando `+1`, com `modo='estoque'`. A fila não é obrigatória para
+     embalar (§4) — é isso que torna o `limpar_fila.js` seguro, e quem
+     "consertar" isso trava a bancada. Há caso travando. */
   app.post('/api/montagem',(req,res)=>{
     const {codigo,segundos=0,kit_ok=1,inicio=null,fim=null}=req.body||{};
     if(!codigo) return res.status(400).json({erro:'codigo'});
     const cod=codigo.trim().toUpperCase();
-    db.prepare("INSERT INTO montagem (codigo,inicio,fim,segundos,kit_ok) VALUES (?,?,?,?,?)").run(cod,inicio,fim,Math.round(+segundos||0),kit_ok?1:0);
-    const f=db.prepare("SELECT id,modo FROM fila WHERE codigo=? AND situacao='aguardando' ORDER BY id LIMIT 1").get(cod);
-    let naFila=false, modo='estoque';
-    if(f){ db.prepare("UPDATE fila SET situacao='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(f.id); naFila=true; modo=f.modo; }
-    db.prepare('UPDATE skus SET estoque=estoque+1 WHERE codigo=?').run(cod);
-    let abatido=false;
-    if(modo==='hoje'){
-      const r=db.prepare("SELECT id FROM producao WHERE codigo=? AND data=date('now','localtime') AND produzido<qtd ORDER BY id LIMIT 1").get(cod);
-      if(r){ db.prepare('UPDATE producao SET produzido=produzido+1 WHERE id=?').run(r.id); abatido=true; }
+    if(!db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(cod))
+      return res.status(404).json({erro:'SKU não cadastrado: '+cod+'. Cadastre no Admin antes de embalar.'});
+    /* A frase é a MESMA da bancada de propósito: quem chamar a rota por fora
+       recebe o que o operador leria na tela. */
+    if(!kit_ok) return res.status(400).json({erro:'⚠ FALTOU O KIT — bipe o kit antes de finalizar '+cod+'.'});
+    const kitCad=cfg('kit_codigo');
+    const kitLido=(req.body&&req.body.kit_codigo)||'';
+    if(kitLido && kitCad && !KIT_BIPE.kitBate(kitLido,kitCad))
+      return res.status(400).json({erro:'⚠ O código bipado não é o kit cadastrado. Confira o kit da caixa.'});
+
+    // Fila do MOMENTO: em modo teste só linha de teste, fora dele só linha real.
+    const emTeste = cfg('modo_teste')==='1' ? 1 : 0;
+    let naFila=false, modo='estoque', abatido=false;
+    try{
+      db.transaction(()=>{
+        db.prepare("INSERT INTO montagem (codigo,inicio,fim,segundos,kit_ok) VALUES (?,?,?,?,1)")
+          .run(cod,inicio,fim,Math.round(+segundos||0));
+        const f=db.prepare("SELECT id,modo FROM fila WHERE codigo=? AND situacao='aguardando' AND COALESCE(teste,0)=? ORDER BY id LIMIT 1").get(cod,emTeste);
+        if(f){ db.prepare("UPDATE fila SET situacao='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(f.id); naFila=true; modo=f.modo; }
+        db.prepare('UPDATE skus SET estoque=estoque+1 WHERE codigo=?').run(cod);
+        if(modo==='hoje'){
+          const r=db.prepare("SELECT id FROM producao WHERE codigo=? AND data=date('now','localtime') AND produzido<qtd ORDER BY id LIMIT 1").get(cod);
+          if(r){ db.prepare('UPDATE producao SET produzido=produzido+1 WHERE id=?').run(r.id); abatido=true; }
+        }
+      })();
+    }catch(e){
+      console.error('[montagem] POST /api/montagem falhou em '+cod+':', e);
+      return res.status(500).json({erro:'Não deu pra registrar a embalagem de '+cod+': '+e.message+
+        ' — NADA foi gravado e a peça continua na fila. Tente de novo; se repetir, chame o suporte.'});
     }
     const est=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(cod);
     const prog=db.prepare("SELECT COUNT(*) n FROM montagem WHERE data=date('now','localtime')").get();

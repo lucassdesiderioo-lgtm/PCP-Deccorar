@@ -41,27 +41,12 @@
 </div>
 <!-- antes do bloco de baixo: e dele que vem pecaDeSku/pecaTexto -->
 <script src="/sku.js"></script>
+<!-- kitNorm/kitTok/kitBate. O SERVIDOR le o MESMO arquivo (mont_route.js): a
+     pergunta "isto e o kit?" tem uma regua so, senao a tela aceitaria um bipe
+     que o servidor recusa no dia em que uma das duas mudasse. -->
+<script src="/kit_bipe.js"></script>
 <script>
 const $=s=>document.querySelector(s);
-function kitNorm(x){ return String(x||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase(); }
-// maior sequencia continua de letras/numeros — no link do Drive e o ID da
-// pasta, que e igual em qualquer forma do link (/folders/, /u/1/folders/, ?usp).
-function kitTok(x){ var m=String(x||'').toUpperCase().match(/[A-Z0-9]+/g)||[]; return m.reduce(function(a,b){return b.length>a.length?b:a;},''); }
-// Bate o kit ignorando simbolos: pelo miolo alfanumerico (um conter o outro)
-// OU pelo ID da pasta (maior token). Min 12 chars evita casar por acaso.
-function kitBate(lido, cad){
-  var a=kitNorm(lido), b=kitNorm(cad);
-  if(a.length<3 || b.length<3) return false;
-  if(a===b) return true;   // exato: serve para codigo simples (KITENVIO) e link igual
-  // daqui pra baixo e a tolerancia do LINK do Drive (formas diferentes do
-  // mesmo link). So com pedacos longos, para nao casar codigo curto por acaso.
-  if(a.length>=12 && b.length>=12 && (a.indexOf(b)>=0 || b.indexOf(a)>=0)) return true;
-  var ta=kitTok(lido), tb=kitTok(cad);
-  if(ta.length>=12 && ta===tb) return true;
-  if(ta.length>=15 && b.indexOf(ta)>=0) return true;   // ID da pasta como substring
-  if(tb.length>=15 && a.indexOf(tb)>=0) return true;
-  return false;
-}
 let SKUS=[], KIT=null, emb=null, tick=null, last={c:null,t:0}, FILA=[];
 async function carregarFila(){
   try{
@@ -109,7 +94,10 @@ function handle(code){
     if(!emb){ banner('err','Bipe o SKU primeiro','O kit só entra depois de começar uma persiana.'); beep(false); return; }
     /* A peca continua na tela no passo do kit: e nesse instante que ela entra no
        saco e some de vista, e e a etiqueta que vai ser colada por fora. */
-    emb.kitOk=true; banner('kit','Kit confirmado ✓', (emb.peca||'')
+    /* Guarda O QUE FOI BIPADO para mandar no POST: desde 17/09/2026 o servidor
+       confere o kit também (dívida 14). O "⚠ FALTOU O KIT" deixou de existir só
+       aqui — quem chama a rota por fora esbarra na mesma trava. */
+    emb.kitOk=true; emb.kitCod=code; banner('kit','Kit confirmado ✓', (emb.peca||'')
       +'Cole a etiqueta de <b>'+emb.codigo+'</b> por fora e <b>bipe o SKU de novo</b> pra finalizar.'
       +'<div class="timer" id="tm">'+mmss(Date.now()-emb.inicio)+'</div>'+steps()); beep(true); return;
   }
@@ -139,7 +127,11 @@ async function finish(){
   const cur=emb; clearInterval(tick); tick=null; emb=null;
   const seg=Math.round((Date.now()-cur.inicio)/1000);
   try{
-    await fetch('/api/montagem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigo:cur.codigo,segundos:seg,kit_ok:1,inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})});
+    const r=await (await fetch('/api/montagem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigo:cur.codigo,segundos:seg,kit_ok:cur.kitOk?1:0,kit_codigo:cur.kitCod||'',inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})})).json();
+    /* A RECUSA DO SERVIDOR APARECE NA BANCADA. Antes a resposta era ignorada:
+       um 404 de SKU ou uma falha de gravação saíam como "Embalada ✓", e a peça
+       ia pra caixa sem existir no sistema. */
+    if(r && r.erro){ banner('err','Não deu pra embalar', r.erro); beep(false); stats(); return; }
     banner('ok','Embalada ✓ ('+fmt(seg)+')', cur.codigo+' · kit conferido · foi pro estoque.'); beep(true); stats();
   }catch(e){ banner('err','Falha de conexão',String(e)); beep(false); }
 }
