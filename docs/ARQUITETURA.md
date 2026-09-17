@@ -17,6 +17,8 @@
 ├── backup.js              Backup do banco via db.backup()
 │
 ├── Rotas (cada uma exporta function(app, db))
+│   ├── sku_cad_route.js   Cadastro de SKU (GET/POST/DELETE /api/skus) — saiu do
+│   │                      server.js em 17/09/2026 para poder ser testado
 │   ├── painel_route.js    Painel do dia
 │   ├── exp_route.js       Upload de PDF, listagem de lote, impressão, bloqueados
 │   ├── etq_route.js       Etiqueta de venda: próxima venda por SKU, embalar

@@ -8,9 +8,10 @@
  *     troca exige `confirmar`, e SEM ele nada e gravado (nao basta avisar na
  *     tela: quem chama a rota por fora tambem tem que esbarrar).
  *
- *  2. O CAMPO QUE SOME. `POST /api/skus` zera o estoque quando o corpo nao traz
- *     `estoque` (divida 15 do §14) — a mesma forma de falhar cabe aqui: um POST
- *     sem `linha1` nao pode apagar a linha 1. Campo ausente NAO e campo vazio.
+ *  2. O CAMPO QUE SOME. O `POST /api/skus` zerava o estoque quando o corpo nao
+ *     trazia `estoque` (divida 15 do §14, corrigida em 17/09/2026 — ver o
+ *     teste_skus.js) — a mesma forma de falhar cabe aqui: um POST sem `linha1`
+ *     nao pode apagar a linha 1. Campo ausente NAO e campo vazio.
  *
  * Rode:  node teste_kit.js
  */

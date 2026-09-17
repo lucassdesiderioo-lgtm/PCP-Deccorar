@@ -118,9 +118,10 @@ module.exports=function(app,db){
   app.get('/api/config/kit/etiqueta',(req,res)=> res.json(respostaEtiqueta()));
   app.post('/api/config/kit/etiqueta',(req,res)=>{
     const b = req.body||{};
-    /* CAMPO AUSENTE NAO E CAMPO VAZIO. E a divida 15 do §14 (o POST /api/skus
-       que zera o estoque quando o corpo nao traz `estoque`): um POST so com o
-       link nao pode apagar o texto da etiqueta. So mexe no que veio. */
+    /* CAMPO AUSENTE NAO E CAMPO VAZIO. Era a divida 15 do §14 (o POST
+       /api/skus que zerava o estoque quando o corpo nao trazia `estoque`,
+       corrigido em 17/09/2026): um POST so com o link nao pode apagar o texto
+       da etiqueta. So mexe no que veio. */
     const vem = Object.keys(ETQ_CHAVE).filter(k => Object.prototype.hasOwnProperty.call(b,k));
     if(!vem.length) return res.status(400).json({erro:'nada para salvar'});
     const novo = {};

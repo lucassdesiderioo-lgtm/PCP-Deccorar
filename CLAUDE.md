@@ -354,7 +354,8 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > card, com `kit.editar`. Regras que parecem bug e não são:
 > - **Campo ausente não é campo vazio.** O `POST /api/config/kit/etiqueta` só
 >   mexe no que veio no corpo — é a dívida 15 do §14 (o `POST /api/skus` que
->   zera o estoque quando o corpo não traz `estoque`) evitada de propósito.
+>   zerava o estoque quando o corpo não trazia `estoque`, corrigido em
+>   17/09/2026 — §6, armadilha #25) evitada de propósito.
 >   Gravar vazio continua possível, e é decisão de quem editou: etiqueta de uma
 >   linha só existe.
 > - **Link fora do `drive.google.com` avisa e deixa salvar.** Recusar seria
@@ -1297,7 +1298,48 @@ Volume cujo SKU não existe em `skus` entra com `estagio='bloqueado'` e:
 seguem normalmente, 3 ficam retidas.
 
 **Destravamento:** cadastrar o SKU em `POST /api/skus` libera automaticamente
-todos os volumes bloqueados daquele código (linha no `server.js`).
+todos os volumes bloqueados daquele código (`sku_cad_route.js`), e a resposta
+diz **quantos** soltou (`destravados`).
+
+> ⚠️ **ARMADILHA #25 — O CADASTRO DE SKU APAGAVA O SALDO, E A TELA ESCONDIA
+> ISSO.** Corrigido em 17/09/2026 (era a dívida 15 do §14). O `POST /api/skus`
+> tinha `estoque=0` e `alvo=0` como **padrão do corpo**, e o upsert gravava
+> `excluded.estoque`: uma chamada só com código e descrição **zerava o estoque
+> do SKU**. Sem erro, sem log, sem motivo e sem linha em `ajuste_estoque` — que
+> é o único lugar onde saldo mexido à mão deixa rastro (§18). A tela do admin
+> reenvia os valores e por isso nunca caiu nisso; qualquer outro chamador caía.
+> São três regras, e cada uma fecha uma porta diferente:
+>
+> - **Campo ausente não é campo vazio**, e vale para os **quatro** campos soltos
+>   (`descricao`, `cor`, `estoque`, `alvo`) — a mesma regra que já valia para as
+>   medidas na mesma rota. Ausente preserva o que está gravado; SKU novo nasce
+>   com texto vazio e zero.
+> - **Número impossível é recusado, nunca clampado.** Negativo, fração, texto e
+>   campo vazio levam **400** com o nome do campo, e o saldo gravado não se
+>   mexe. Clampar em zero seria a primeira regra outra vez por outra porta: o
+>   saldo sumiria em silêncio, que é o defeito que se está consertando. Para
+>   **manter** o saldo, o jeito é não mandar o campo.
+> - **As duas escritas são uma transação só.** O destravamento ficava fora de
+>   transação e dentro de um `catch(e){}` **vazio**: falhou, a API respondia
+>   `{ok:true}` e os volumes seguiam bloqueados sem nenhum sinal — o volume some
+>   da lista de quem cadastrou e ninguém vai procurá-lo. Hoje falha é **500**
+>   com nada gravado, e o erro vai para o log.
+>
+> **A rota saiu do `server.js` para o `sku_cad_route.js` por isso**: o
+> `server.js` abre porta e banco real, e nenhum teste do projeto consegue
+> carregá-lo. Rota que mexe em estoque e não dá para testar é dívida que só
+> fecha no susto. O `require` ficou exatamente onde as rotas estavam — mudar o
+> lugar mudaria a ordem de registro no Express.
+>
+> **Rode `node teste_skus.js` ao mexer no `sku_cad_route.js`** — os 60 casos
+> travam os quatro campos, a recusa do número impossível, o rollback e as três
+> guardas do destravamento (divergência, modalidade e pacote continuam presas).
+> Mexeu na ordem do `server.js`? O teste de segurança da §10 também.
+>
+> **O que NÃO entrou, e continua aberto:** a rota muda saldo com
+> `sku.cadastrar`, sem motivo e sem auditoria, enquanto o `POST /api/estoque`
+> exige motivo, é `sensivel` e grava em `ajuste_estoque` (§18). Fechar essa
+> porta muda como a fábrica trabalha — é `REGRA`, não conserto.
 
 **Sem tabela de equivalências, por decisão explícita.** Se o anúncio do ML manda
 `BK140140BEGEML` e o cadastro tem `BK140140BEGE`, o volume fica bloqueado até o
@@ -2065,12 +2107,12 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (38), `teste_kit.js` (112), `teste_qr.js` (45) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (38), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | **Carregamento aceita volume que não foi embalado** — `carreg_route.js` só recusa `bloqueado` e `carregado`; um volume `pendente` vai para `carregado` e a peça sai sem o −1 do estoque. Achado da auditoria de 17/08 (`docs/arquivo/REVISAO-COMPLETA.md` §2.1), **conferido aberto em 17/09/2026** | Alto — estoque fica acima do físico, sem sinal |
 | 14 | **`POST /api/montagem` (a embalagem) sem proteção** — quatro escritas sem transação, não valida se o SKU existe, `kit_ok` vem da tela, e embalar sem revisar gera estoque (auditoria §2.3). **Aberto em 17/09/2026** | Alto — é a porta de entrada do estoque |
-| 15 | **`POST /api/skus` zera o estoque** quando o corpo não traz `estoque` (`estoque=0` de padrão + upsert `estoque=excluded.estoque`). A tela do admin reenvia o valor; a API aceita sem ele (auditoria §2.5). **Aberto em 17/09/2026** | Médio |
+| 15 | ~~**`POST /api/skus` zera o estoque** quando o corpo não traz `estoque`~~ **RESOLVIDO em 17/09/2026** — campo ausente preserva os quatro campos soltos, número impossível é recusado (400) em vez de clampado, e as duas escritas viraram uma transação com o `catch` vazio fora. A rota saiu para `sku_cad_route.js` e tem `teste_skus.js` (60 casos) atrás — ver §6, armadilha #25. **Fica aberto**: a rota ainda muda saldo com `sku.cadastrar`, sem motivo e sem auditoria (fechar isso é `REGRA`) | — |
 | 16 | **Acesso: default `@logado` e cobertura mantida à mão** — `permDaRota` termina em `@logado`; a tela de cobertura lê a lista `TODAS_ROTAS` e ignora `/api/`. Fecha junto com a dívida 12(c) (auditoria §1.2–1.3). **Aberto em 17/09/2026** | Médio — rota nova nasce aberta sem aparecer em lugar nenhum |
 | 17 | **Acesso: duas travas faltando** — `POST /api/acesso/usuario/:id/excecao` não recusa permissão `intransferivel`; `POST /api/acesso/usuario/:id/setores` não tem a trava do último Admin Geral (a de `auth.js` só cobre bloquear/excluir) (auditoria §1.1). **Aberto em 17/09/2026** | Médio — escalonar ou se trancar fora pela tela oficial |
 
@@ -2145,7 +2187,14 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Criar um campo separado para o código de barras da etiqueta do kit: ele é
   sempre o **Código do kit** salvo, senão o impresso e o bipe divergem (§4)
 - ❌ Fazer o `POST /api/config/kit/etiqueta` apagar campo que não veio no corpo
-  — é a dívida 15 do §14 repetida em outra rota (§4)
+  — era a dívida 15 do §14 repetida em outra rota (§4, §6 #25)
+- ❌ Deixar campo ausente valer como zero no `POST /api/skus`: um POST só com
+  código e descrição apagava o saldo, sem erro e sem rastro (§6, armadilha #25)
+- ❌ Clampar estoque ou alvo impossível em zero "para não recusar": clampar é
+  apagar saldo em silêncio, que é o mesmo defeito por outra porta (§6, #25)
+- ❌ Devolver a escrita do SKU e o destravamento dos volumes para fora de uma
+  transação, ou pôr o destravamento de volta num `catch` vazio — o `ok:true`
+  mentindo deixa o volume bloqueado e ninguém vai procurá-lo (§6, #25)
 - ❌ Decidir "cabe na etiqueta?" contando caracteres: 16 letras estreitas cabem
   e 16 `M` não — quem responde é a medida do `kit_etiqueta.js` (§4)
 - ❌ Escrever as medidas da etiqueta do kit na tela ou no ZPL: elas moram no
