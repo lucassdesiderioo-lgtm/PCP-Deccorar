@@ -1282,13 +1282,37 @@ Desligável (Admin → Cadastros) porque custa um bipe por volume, todo dia. Nas
 > §5 — os dois deixam `embalado_em` vazio, e a única marca entre eles é a hora
 > `15:00:00` que aqueles scripts carimbam por **convenção** (§8), não por
 > relógio. Um bipe feito exatamente às 15:00:00 seria lido como fechamento de
-> script: é o único falso negativo, e está escrito no cabeçalho do arquivo
-> porque número de diagnóstico sem a margem ao lado vira fato.
+> script: é o falso negativo, e está escrito no cabeçalho do arquivo porque
+> número de diagnóstico sem a margem ao lado vira fato.
+>
+> ⚠️ **E A MARCA TEM O FALSO POSITIVO SIMÉTRICO, QUE EU NÃO PREVI E A PRODUÇÃO
+> MOSTROU (17/09/2026).** As 15:00 só existem desde **26/08/2026** — até a
+> véspera o `regularizar_saida.js` carimbava `datetime('now')`, o relógio de
+> verdade (o `fechar_vencidos.js` já nascia certo). Fechamento à mão feito antes
+> disso sai com hora de gente, e a primeira versão do script o acusava como furo
+> da dívida 13. Na primeira rodada em produção foram **3 dos 11**.
+>
+> O que denuncia esses é o **segundo repetido**: um `UPDATE` em transação grava
+> o mesmo instante em todas as linhas de uma vez, e ninguém larga uma caixa,
+> pega outra e bipa **três** vezes dentro de um segundo. **Três, e não dois:**
+> `datetime('now')` corta no segundo, então um bipe em x,1 s e outro em x,9 s
+> caem na mesma string sem nada de errado ter acontecido. Dois é ambíguo; três
+> não é — e na ambiguidade a resposta é **acusar**, porque esconder um furo
+> deixa o saldo alto para sempre e ninguém vai procurá-lo, enquanto acusar um
+> fechamento à mão custa uma conferência.
+>
+> O corte por data é obrigatório nos dois sentidos: depois de 26/08 os dois
+> scripts carimbam 15:00, então agrupamento em outra hora não tem script que o
+> explique e **volta a ser furo** — sem isso, um `UPDATE` em bloco feito amanhã
+> apagaria furos sozinho. E a contagem do bloco olha **todo o histórico, nunca a
+> janela**: ser parte de um fechamento em bloco é fato do volume, não do recorte
+> por onde se olha, e contar dentro da janela faria o mesmo volume mudar de
+> classificação conforme o argumento da linha de comando.
 >
 > A conta é **por peça** (a caixa de pacote devia ter baixado N, §5 #23) e
 > **sob medida fica de fora** — ela nunca somou `+1` (§7), então cobrar a baixa
-> dela abriria um buraco em vez de fechar. `teste_carregados.js` (19 casos)
-> trava as três regras.
+> dela abriria um buraco em vez de fechar. `teste_carregados.js` (28 casos)
+> trava as três regras e as duas margens da marca.
 >
 > ⚠️ **NÃO HÁ `--aplicar`, E ISSO É A DECISÃO, NÃO UMA FALTA.** O script diz o
 > que o sistema tem **a mais**; ele não sabe o que aconteceu **depois** — pode
@@ -2315,7 +2339,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (104), `teste_cobertura.js` (10), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42), `teste_carregados.js` (19) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (104), `teste_cobertura.js` (10), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42), `teste_carregados.js` (28) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2380,6 +2404,13 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   e quem baixa a peça é o `POST /api/embalar` da bancada (§5, armadilha #27)
 - ❌ Recusar uma caixa no carregamento sem dizer por onde ela tem que passar — a
   pessoa está na frente do carro com a caixa na mão (§5, armadilha #27)
+- ❌ Ler a marca das 15:00 do `conferir_carregados.js` como se valesse desde
+  sempre: ela só existe a partir de 26/08/2026, e antes disso o fechamento à
+  mão sai com hora de gente (§5, armadilha #27)
+- ❌ Baixar para **dois** o mínimo do bloco no mesmo segundo, ou contá-lo dentro
+  da janela: o primeiro esconde furo que ninguém vai procurar, o segundo faz o
+  volume mudar de classificação conforme o argumento da linha de comando
+  (§5, armadilha #27)
 - ❌ Pôr a caixa de coleta na lista ou no contador do carro, ou somar a coleta
   no relógio de despacho — são duas portas de saída, e `carga.js` é o dono
   único de "isto é coleta?" (§8-B, armadilha #21)

@@ -42,6 +42,25 @@
    função com os quatro casos montados à mão. */
 const MARCA_SCRIPT = "carregado_em LIKE '% 15:00:00'";
 
+/* ⚠️ E O FALSO **POSITIVO** DA MARCA, que eu não previ e a produção mostrou
+   (17/09/2026): a marca das 15:00 só existe desde **26/08/2026**. Até a véspera
+   o `regularizar_saida.js` carimbava `datetime('now')` — o relógio de verdade
+   (§5; o `fechar_vencidos.js` já nascia certo). Fechamento à mão feito antes
+   disso sai com hora de gente e era acusado como furo da dívida 13.
+
+   O que denuncia esses é o SEGUNDO REPETIDO: um `UPDATE` dentro de uma
+   transação grava o mesmo instante em todas as linhas de uma vez. Três volumes
+   com o carimbo no mesmo segundo não são três bipes — ninguém larga uma caixa,
+   pega outra e bipa três vezes dentro de um segundo.
+
+   TRÊS, e não dois, e a diferença é deliberada. `datetime('now')` corta no
+   segundo: um bipe em x,1 s e outro em x,9 s caem na mesma string sem que nada
+   de errado tenha acontecido. Dois é ambíguo; três não é. E na ambiguidade a
+   resposta é ACUSAR — esconder um furo deixa o saldo alto para sempre e
+   ninguém vai procurá-lo; acusar um fechamento à mão custa uma conferência. */
+const CORRIGIDO_EM = '2026-08-26';   // dia em que o regularizar_saida.js passou a carimbar 15:00
+const BLOCO_MINIMO = 3;              // quantos no mesmo segundo já não podem ser gente
+
 function levantar(db, opcoes){
   const DIAS = (opcoes && opcoes.dias) || null;
   const janela = DIAS ? ` AND COALESCE(despachar_em,data) >= date('now','localtime','-${DIAS} day')` : '';
@@ -52,9 +71,32 @@ function levantar(db, opcoes){
     WHERE estagio='carregado' AND embalado_em IS NOT NULL${janela}`);
   const porScript = um(`SELECT COUNT(*) c FROM lote
     WHERE estagio='carregado' AND embalado_em IS NULL AND ${MARCA_SCRIPT}${janela}`);
-  const volumes = db.prepare(`SELECT id, codigo, buyer, nf, data, despachar_em, carregado_em, modalidade
+  const candidatos = db.prepare(`SELECT id, codigo, buyer, nf, data, despachar_em, carregado_em, modalidade
     FROM lote WHERE estagio='carregado' AND embalado_em IS NULL AND NOT ${MARCA_SCRIPT}${janela}
     ORDER BY carregado_em`).all();
+
+  /* ⚠️ A CONTAGEM DO BLOCO É SOBRE TODO O HISTÓRICO, NUNCA SOBRE A JANELA — e
+     repare que a consulta abaixo não leva o `${janela}`. Ser parte de um
+     fechamento em bloco é fato do volume, não do recorte por onde se olha. Se
+     a conta fosse feita dentro da janela, pedir 30 dias deixaria 2 dos 3 à
+     vista, o grupo cairia abaixo de `BLOCO_MINIMO` e os dois voltariam a ser
+     acusados: o mesmo volume mudaria de classificação conforme o argumento da
+     linha de comando. */
+  const blocos = new Map();
+  for(const l of db.prepare(`SELECT carregado_em k, COUNT(*) c FROM lote
+    WHERE estagio='carregado' AND embalado_em IS NULL AND NOT ${MARCA_SCRIPT}
+      AND carregado_em IS NOT NULL GROUP BY carregado_em`).all()) blocos.set(l.k, l.c);
+
+  const ehBloco = (v) => {
+    const k = String(v.carregado_em || '');
+    /* Depois de 26/08 os dois scripts do §5 carimbam 15:00 — um agrupamento em
+       outra hora não tem script que o explique, e volta a ser furo. Sem este
+       corte, um `UPDATE` em bloco feito amanhã apagaria furos sozinho. */
+    if(!k || k.slice(0,10) >= CORRIGIDO_EM) return false;
+    return (blocos.get(k) || 0) >= BLOCO_MINIMO;
+  };
+  const volumesProvavelScript = candidatos.filter(ehBloco);
+  const volumes = candidatos.filter(v => !ehBloco(v));
 
   /* ⚠️ A CONTA É POR PEÇA, NÃO POR VOLUME (§5, armadilha #23): a caixa de
      pacote leva N persianas e deveria ter baixado N. E SOB MEDIDA FICA DE FORA
@@ -84,6 +126,7 @@ function levantar(db, opcoes){
   const porSku = [...pecas.entries()].map(([codigo, a]) => Object.assign({codigo}, a))
     .sort((a,b) => b.qtd - a.qtd);
   return { total, comEtiqueta, porScript, semBaixa:volumes.length, volumes,
+           provavelScript:volumesProvavelScript.length, volumesProvavelScript,
            porSku, pecasTotal:porSku.reduce((s,l) => s + l.qtd, 0), semCadastro, sobMedida, dias:DIAS };
 }
 
@@ -114,8 +157,10 @@ T('── 1. O QUE O BANCO DIZ ────────────────�
 T(`  carregados no total ....................... ${n2(R.total)}`);
 T(`  com etiqueta de venda (baixaram) .......... ${n2(R.comEtiqueta)}   ← o normal`);
 T(`  fechados à mão pelos scripts do §5 ........ ${n2(R.porScript)}   ← decisão humana na época`);
+if(R.provavelScript)
+  T(`  provável fechamento à mão (antes de 26/08)  ${n2(R.provavelScript)}   ← ver a seção 2-B`);
 T(`  SEM baixa, bipados no carregamento ........ ${n2(R.semBaixa)}   ← a dívida 13`);
-if(R.total !== R.comEtiqueta + R.porScript + R.semBaixa)
+if(R.total !== R.comEtiqueta + R.porScript + R.provavelScript + R.semBaixa)
   T('  (a soma não fecha — olhe o banco, pode haver estágio fora do previsto)');
 
 if(R.volumes.length){
@@ -128,6 +173,23 @@ if(R.volumes.length){
       + ' │ ' + String(v.codigo || '(sem SKU)').slice(0,20).padEnd(20)
       + ' │ ' + String(v.buyer || '—').slice(0,20).padEnd(20)
       + ' │ ' + String(v.nf || '—'));
+}
+
+if(R.volumesProvavelScript.length){
+  T('');
+  T('── 2-B. PROVÁVEL FECHAMENTO À MÃO — NÃO entram na conta de saldo ────────');
+  T('  Carimbados no MESMO SEGUNDO, antes de 26/08/2026 — a data em que o');
+  T('  `regularizar_saida.js` passou a gravar 15:00 (§5). Até a véspera ele');
+  T('  usava o relógio, então fechamento à mão daquela época sai com hora de');
+  T('  gente. Ninguém bipa três caixas dentro de um segundo: isso é `UPDATE`.');
+  T('   id  │ carregado em        │ SKU                  │ cliente');
+  T('  ─────┼─────────────────────┼──────────────────────┼─────────────────────');
+  for(const v of R.volumesProvavelScript)
+    T('  ' + String(v.id).padStart(4) + ' │ ' + String(v.carregado_em || '—').padEnd(19)
+      + ' │ ' + String(v.codigo || '(sem SKU)').slice(0,20).padEnd(20)
+      + ' │ ' + String(v.buyer || '—').slice(0,20));
+  T('  Se algum deles NÃO foi fechado à mão, ele é furo e o saldo dele falta na');
+  T('  conta abaixo — confira na prateleira junto com os outros.');
 }
 
 if(R.porSku.length){
