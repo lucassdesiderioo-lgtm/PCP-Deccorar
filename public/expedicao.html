@@ -55,7 +55,16 @@ async function upMany(fileList){
 async function lista(){
   const d=await (await fetch('/api/lote')).json();
   $('#tbl').style.display=d.length?'table':'none';
-  $('#corpo').innerHTML=d.map(r=>'<tr><td>'+r.id+'</td><td class="c">'+(r.codigo||'<span style=color:#f85149>sem SKU</span>')+'</td><td>'+r.buyer+'</td><td>'+(r.nf||'—')+'</td><td>'+r.estagio+'</td><td><button class="pr" onclick="imp('+r.id+')">imprimir</button></td></tr>').join('');
+  /* O BOTÃO SÓ EXISTE PARA QUEM JÁ FOI EMBALADO (dívida 13, 17/09/2026).
+     Imprimir daqui um volume 'pendente' punha a etiqueta de venda na mão do
+     operador sem que o estoque tivesse baixado — a caixa ia pro carro e o saldo
+     ficava alto para sempre. O servidor recusa (409), e a lista diz por onde
+     imprimir em vez de oferecer um botão que não funciona mais. */
+  $('#corpo').innerHTML=d.map(r=>'<tr><td>'+r.id+'</td><td class="c">'+(r.codigo||'<span style=color:#f85149>sem SKU</span>')+'</td><td>'+r.buyer+'</td><td>'+(r.nf||'—')+'</td><td>'+r.estagio+'</td><td>'
+    +(r.estagio==='pendente'
+        ? '<span style="font-size:12px;color:#8b97a5">imprima pela <b>Etiqueta de Venda</b> (é lá que baixa a peça)</span>'
+        : '<button class="pr" onclick="imp('+r.id+')">imprimir</button>')
+    +'</td></tr>').join('');
 }
 function imp(id){ const fr=$('#pr'); fr.onload=()=>{ try{fr.contentWindow.print();}catch(e){ window.open('/api/print/'+id,'_blank'); } }; fr.src='/api/print/'+id; }
 lista();

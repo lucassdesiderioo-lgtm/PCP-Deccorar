@@ -106,6 +106,27 @@ module.exports=function(app,db){
     if(alvo.estagio==='bloqueado') return res.json({ok:false,motivo:'bloqueado',pedido:alvo,
         aviso:'SKU "'+(alvo.codigo||'(vazio)')+'" nao esta no cadastro. Nao pode ser carregado.'});
     if(alvo.estagio==='carregado') return res.json({ok:false,motivo:'duplicado',pedido:alvo,coleta:ehColeta(alvo)});
+    /* ⚠️ SO CARREGA O QUE FOI EMBALADO (divida 13, 17/09/2026).
+       Ate aqui a rota recusava so 'bloqueado' e 'carregado' — entao um volume
+       'pendente' virava 'carregado' e a peca saia da fabrica SEM o -1 da
+       Etiqueta de Venda. O estoque ficava permanentemente acima do fisico, e
+       como o cruzamento so conta 'pendente', o volume sumia tambem da conta de
+       urgencia: a venda nao virava ordem e a peca nao existia no saldo. Nada
+       registrava.
+       `carga.js` sempre respondeu `estagio='embalado'` para "isto esta pra
+       carregar?" — a lista e o contador liam de la, e so o BIPE tinha regua
+       propria. Esta linha e o bipe voltando pra mesma regua.
+       A RECUSA DIZ O QUE FAZER, e nao so que nao pode: a caixa esta na mao da
+       pessoa, na frente do carro, e "recusado" sem caminho e o que ensina a
+       equipe a empurrar do jeito que der. */
+    if(alvo.estagio!=='embalado'){
+      try{ const ac=app.locals.acesso;
+           if(ac&&ac.auditar) ac.auditar(req,'expedicao','carregar_nao_embalado',
+             'NF '+(alvo.nf||alvo.id), 'estagio '+alvo.estagio+' — bipado no carregamento'); }catch(e){}
+      return res.json({ok:false,motivo:'nao_embalado',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
+        aviso:'Esta caixa ainda nao passou pela ETIQUETA DE VENDA. Imprima a etiqueta por la '+
+              '(bipando o SKU) e depois carregue — e a impressao que baixa a peca do estoque.'});
+    }
     if(conferenciaLigada()){
       const esperado=soCodigo(alvo.codigo);
       if(!esperado) return res.json({ok:false,motivo:'volume_sem_sku',
