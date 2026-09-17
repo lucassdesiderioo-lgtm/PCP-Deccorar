@@ -584,6 +584,11 @@ module.exports = function(app, db){
     // Ligar/desligar a conferencia dupla muda o que a expedicao e obrigada a
     // fazer — e decisao de quem responde pela operacao, nao de quem carrega.
     if(M !== 'GET' && eq('/api/config/conferencia')) return '@admin';
+    /* ⚠️ ANTES do `pre('/api/kit')`, senao a impressao cai em `kit.editar` e a
+       chave nova nao manda em nada — a ponta que some em silencio (§5,
+       armadilha #23). Imprimir e tirar copia do que ja foi decidido; editar e
+       decidir o que a Embalagem passa a bipar. */
+    if(M !== 'GET' && eq('/api/kit/etiqueta/imprimir')) return 'kit.imprimir';
     if(M !== 'GET' && pre('/api/kit')) return 'kit.editar';
     if(M !== 'GET' && pre('/api/listas')) return 'listas.editar';
     if(eq('/api/rejeicao/resumo')) return 'produtividade.nominal';
@@ -715,6 +720,7 @@ module.exports = function(app, db){
     ['GET','/api/contagem/componentes'],['POST','/api/contagem/componente'],
     ['GET','/api/compras/necessidade'],
     ['POST','/api/config/horarios'],['POST','/api/config/kit'],['POST','/api/config/kit/etiqueta'],
+    ['POST','/api/kit/etiqueta/imprimir'],
     ['GET','/api/config/conferencia'],['POST','/api/config/conferencia'],['POST','/api/listas'],['GET','/api/teste'],
     ['GET','/api/usuarios'],['GET','/api/acesso/setores'],['GET','/api/acesso/divergencias'],
     ['GET','/api/painel'],['GET','/api/rel/dia'],['GET','/api/cruzamento'],

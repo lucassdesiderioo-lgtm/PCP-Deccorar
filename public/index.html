@@ -2499,7 +2499,7 @@ async function carregarCad(){
   var lim=(etq.limites||{linha:20,legenda:10});
   h+='<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">';
   h+='<div style="font-weight:700;margin-bottom:4px">Etiqueta do kit — o que vai impresso</div>';
-  h+='<div class="sub" style="margin-bottom:12px">O texto grande e o QR do manual. O <b>código de barras é sempre o Código do kit</b> acima — não se digita em outro lugar. A prévia e a impressão entram nas próximas fases.</div>';
+  h+='<div class="sub" style="margin-bottom:12px">O texto grande e o QR do manual. O <b>código de barras é sempre o Código do kit</b> acima — não se digita em outro lugar.</div>';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">';
   h+='<label style="flex:1;min-width:190px"><span class="sub">Linha 1</span><input id="cdEtqL1" maxlength="'+lim.linha+'" value="'+esc(etq.linha1||'')+'" style="width:100%"></label>';
   h+='<label style="flex:1;min-width:190px"><span class="sub">Linha 2</span><input id="cdEtqL2" maxlength="'+lim.linha+'" value="'+esc(etq.linha2||'')+'" style="width:100%"></label>';
@@ -2531,6 +2531,19 @@ async function carregarCad(){
   if(etq.aviso) etqAviso+='<span style="color:var(--amber)">'+esc(etq.aviso)+'</span> ';
   if(etq.falta&&etq.falta.length) etqAviso+='<span style="color:var(--amber)">Ainda não dá para imprimir: falta '+esc(etq.falta.join(' e '))+'.</span>';
   h+='<div id="cdEtqMsg" style="margin-top:10px;font-size:14px">'+etqAviso+'</div>';
+  /* A IMPRESSAO (fase 3). O PDF ja sai no tamanho da etiqueta — nao ha margem
+     nem escala para configurar, que e o que sempre deformou as barras. */
+  h+='<div style="border-top:1px dashed var(--line);margin-top:14px;padding-top:12px">';
+  h+='<div style="font-weight:700;margin-bottom:4px">Imprimir o rolo</div>';
+  h+='<div class="sub" style="margin-bottom:10px">Sai um PDF com uma página por etiqueta, <b>já no tamanho 100 × 35 mm</b>. '
+    +'Na janela de impressão: impressora <b>Zebra ZD220</b>, margens <b>Nenhuma</b>, escala <b>100%</b>. '
+    +'<b>Comece por uma de teste</b> — é com a etiqueta na mão que se vê se o QR abre e se o leitor bipa o código.</div>';
+  h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+  h+='<button class="ghost" id="cdEtqPr1">Imprimir 1 de teste</button>';
+  h+='<span class="sub">ou</span><input id="cdEtqQtd" type="number" min="1" max="500" value="50" style="width:90px">';
+  h+='<button class="primary" id="cdEtqPrN">Imprimir o lote</button></div>';
+  h+='<div id="cdEtqPrMsg" style="margin-top:10px;font-size:14px"></div>';
+  h+='</div>';
   h+='</div>';
   // Etiqueta pronta (arquivo) — sobe a arte da etiqueta (QR + KITENVIO etc.) e
   // imprime por aqui quando quiser.
@@ -2541,6 +2554,8 @@ async function carregarCad(){
   h+='<div id="cdKitLabelMsg" class="sub" style="margin-top:10px"></div>';
   h+='</div></div>';
   el.innerHTML=h;
+  KIT_SALVO={ linha1:etq.linha1||'', linha2:etq.linha2||'', qr_legenda:etq.qr_legenda||'',
+              link:etq.link||'', codigo:kit||'' };
   desenharPreviaKit();
   // mostra a etiqueta atual, se houver
   try{ var lm=await (await fetch('/api/kit/label/meta')).json();
@@ -2557,6 +2572,18 @@ function conteudoKitDaTela(){
   var v=function(id){ var e=document.getElementById(id); return e?e.value:''; };
   return { linha1:v('cdEtqL1'), linha2:v('cdEtqL2'), qr_legenda:v('cdEtqLeg'),
            link:v('cdEtqLink'), codigo:v('cdKit') };
+}
+/* ⚠️ O ROLO SAI COM O QUE ESTA SALVO, NAO COM O QUE ESTA NA TELA. O servidor
+   le o conteudo do banco de proposito (senao o impresso podia sair diferente
+   do que a Embalagem bipa). Entao a tela guarda o que carregou e compara: 200
+   etiquetas com o texto velho e erro que so aparece no papel, depois de o rolo
+   estar impresso. */
+var KIT_SALVO={};
+function kitMexido(){
+  var c=conteudoKitDaTela();
+  return ['linha1','linha2','qr_legenda','link','codigo'].some(function(k){
+    return String(c[k]||'').trim() !== String(KIT_SALVO[k]||'').trim();
+  });
 }
 function desenharPreviaKit(){
   var caixa=document.getElementById('cdEtqPrev'), info=document.getElementById('cdEtqInfo');
@@ -2698,6 +2725,7 @@ document.addEventListener('click',async function(e){
     }
     if(rk.erro){ msg.innerHTML='<span style="color:#ff6b6b">'+rk.erro+'</span>'; return; }
     document.getElementById('cdKit').value=rk.kit||k.toUpperCase();
+    KIT_SALVO.codigo=rk.kit||k.toUpperCase();
     msg.innerHTML='<span style="color:var(--green)">Salvo: <b>'+(rk.kit||k)+'</b> — é este código que a embalagem vai reconhecer.</span>';
   }
   if(e.target.closest('#cdEtqBt')){
@@ -2714,10 +2742,49 @@ document.addEventListener('click',async function(e){
        com o erro do lado. Redesenhar aqui faria sumir o que a pessoa escreveu e
        voltar o valor velho — ela ve a recusa e um texto que nao e o dela. */
     if(re.erro){ em.innerHTML='<span style="color:#ff6b6b">'+re.erro+'</span>'; return; }
+    ['linha1','linha2','qr_legenda','link'].forEach(function(k){ KIT_SALVO[k]=re[k]||''; });
     var t='<span style="color:var(--green)">Salvo.</span>'; desenharPreviaKit();
     if(re.aviso) t+=' <span style="color:var(--amber)">'+re.aviso+'</span>';
     if(re.falta&&re.falta.length) t+=' <span style="color:var(--amber)">Ainda não dá para imprimir: falta '+re.falta.join(' e ')+'.</span>';
     em.innerHTML=t;
+  }
+  /* IMPRIMIR (fase 3). O rolo sai com o que está SALVO, não com o que está na
+     tela — o servidor lê o conteúdo do banco de propósito (§4). Então, se
+     houver texto digitado e não salvo, a tela avisa ANTES: imprimir 200
+     etiquetas com o texto velho é o tipo de erro que só aparece no papel. */
+  if(e.target.closest('#cdEtqPr1,#cdEtqPrN')){
+    var pm=document.getElementById('cdEtqPrMsg');
+    var umaSo=!!e.target.closest('#cdEtqPr1');
+    var qtd=umaSo?1:Math.trunc(Number(document.getElementById('cdEtqQtd').value));
+    if(!umaSo){
+      if(!(qtd>=1&&qtd<=500)){ pm.innerHTML='<span style="color:#ff6b6b">Escolha de 1 a 500 etiquetas.</span>'; return; }
+      if(!confirm('Imprimir '+qtd+' etiquetas do kit?\n\nSaem com o que está SALVO no card. Já imprimiu uma de teste?')) return;
+    }
+    if(kitMexido()){
+      pm.innerHTML='<span style="color:var(--amber)">O texto na tela não é o que está salvo — e o rolo sai com o <b>salvo</b>.'
+        +' Clique em <b>Salvar etiqueta</b> (e em <b>Salvar</b>, no Código do kit) antes de imprimir.</span>';
+      return;
+    }
+    pm.textContent='Gerando o PDF…';
+    var rp;
+    try{ rp=await (await fetch('/api/kit/etiqueta/imprimir',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({quantidade:qtd})})).json(); }
+    catch(err){ pm.innerHTML='<span style="color:#ff6b6b">Não deu para falar com o servidor.</span>'; return; }
+    if(rp.erro){
+      var lista=(rp.problemas&&rp.problemas.length>1)?('<br>• '+rp.problemas.join('<br>• ')):'';
+      pm.innerHTML='<span style="color:#ff6b6b">Não imprimiu: '+esc(rp.erro)+'</span>'+lista;
+      return;
+    }
+    // Abre o PDF numa aba: a impressão é do navegador, com a Zebra no USB.
+    var bin=atob(rp.arquivo), u8=new Uint8Array(bin.length);
+    for(var bi=0;bi<bin.length;bi++) u8[bi]=bin.charCodeAt(bi);
+    var url=URL.createObjectURL(new Blob([u8],{type:'application/pdf'}));
+    window.open(url,'_blank');
+    pm.innerHTML='<span style="color:var(--green)">'+qtd+' etiqueta(s) no PDF.</span> '
+      +'Na janela de impressão: margens <b>Nenhuma</b> e escala <b>100%</b>. '
+      +(umaSo?'<b>Confira a de teste com o celular e com o leitor antes de imprimir o lote.</b>':'')
+      +' <a href="'+url+'" download="'+esc(rp.nome||'etiquetas-kit.pdf')+'" style="color:var(--blue)">baixar</a>';
+    return;
   }
   if(e.target.closest('#cdKitUp')){
     var lm=document.getElementById('cdKitLabelMsg');
