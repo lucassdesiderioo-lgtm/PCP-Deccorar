@@ -5,10 +5,45 @@ STATUS
 Situação: em construção
 Criada em: 17/09/2026
 Última atualização: 17/09/2026
-Fase atual: fases 1 e 2 entregues (conteúdo + prévia), com um conserto na 2
-Fases: 1 ☑  2 ☑  3 ☐  4 ☐
+Fase atual: fases 1, 2 e 3 entregues (conteúdo + prévia + impressão) — falta tirar o upload (4)
+Fases: 1 ☑  2 ☑  3 ☑  4 ☐
 Risco: 🔴 (etiqueta)
 Mudanças no caminho:
+- 17/09/2026 (fase 2, CONFERIDA EM PRODUÇÃO) — o dono subiu, apontou o celular
+  e **o QR abriu a pasta do manual**. A régua final de QR é câmera de verdade
+  lendo; o resto era indício.
+- 17/09/2026 (fase 3) — **DIVERGÊNCIA DA §6: não há envio de ZPL.** A Zebra
+  ZD220 está ligada por **USB no computador**, não na rede: o servidor não tem
+  como falar com ela, e a §6 supunha um caminho de impressão que não existe
+  (ver o "A REVER" abaixo, escrito na fase 1). O caminho é o do sob medida
+  (`tecido/dominio/etiqueta_pdf.js`): o servidor devolve um **PDF com a página
+  já no tamanho da etiqueta**, e quem imprime não tem o que configurar — que é
+  a mesma lição da armadilha #6 (o que só funciona quando o operador acerta a
+  configuração é o que vai falhar).
+- 17/09/2026 (fase 3) — `public/kit_etiqueta.js` ganhou **`elementos()`**: a
+  etiqueta como lista de retângulos e textos em milímetros. O `svg()` da prévia
+  e o `kit_pdf.js` **consomem a mesma lista** — um desenho, dois desenhistas.
+  Sem isso o PDF repetiria as posições, e a divergência entre tela e papel só
+  apareceria com o rolo impresso: exatamente o que esta spec veio consertar.
+- 17/09/2026 (fase 3) — **o QR do papel passou a ser desenhado por nós**, e não
+  mais pela impressora (`^BQ`). Então o defeito da grade que quebrou a fase 2
+  passou a ser possível no papel também: a `escala` do PDF é **8**, que são os
+  pontos por milímetro da ZD220 a 203 dpi, e o módulo fecha em ponto inteiro.
+  O `teste_kit.js` **abre o PDF gerado e remonta o QR módulo a módulo** — é o
+  que pega um QR espelhado, que continua com cara de QR e não lê em celular
+  nenhum.
+- 17/09/2026 (fase 3) — a permissão de imprimir é `kit.imprimir` (Configuração,
+  nível supervisor), separada de `kit.editar`: editar decide o que a Embalagem
+  passa a bipar, imprimir só tira cópia do que já foi decidido.
+  **Decisão do dono: não há backfill** — *"quando assinalar o nome da pessoa
+  ela passa a poder imprimir"*. É o contrário do caso `pacote.assinar`, onde a
+  chave nova tinha que alcançar sozinha quem já fazia aquilo; aqui ninguém
+  fazia, porque a impressão não existia. O Admin Geral imprime desde o primeiro
+  boot (passa em tudo por nível), então a terceira ponta do §19 não fica vazia.
+- 17/09/2026 (fase 3) — o rolo sai com o que está **salvo**, não com o que está
+  na tela: o servidor lê o conteúdo do banco. A tela compara e recusa imprimir
+  com texto não salvo — 200 etiquetas com o texto velho é erro que só aparece
+  no papel.
 - 17/09/2026 (fase 2) — o CODE128 **já existia no projeto**
   (`tecido/public/barras.js`, escrito à mão com teste próprio). Ele foi movido
   para `public/barras.js`, na raiz, e agora serve as duas operações. Copiar a

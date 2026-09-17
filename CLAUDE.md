@@ -376,18 +376,19 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 >
 > | Arquivo | Responde |
 > |---|---|
-> | `public/kit_etiqueta.js` | **onde cada coisa fica**, em milímetros — dono único do desenho |
+> | `public/kit_etiqueta.js` | **onde cada coisa fica**, em milímetros — dono único do desenho (`elementos()`) |
 > | `public/qr.js` | o QR (modo byte, correção M), escrito no projeto |
 > | `public/barras.js` | o CODE128-B — **veio do `tecido/`** e agora serve os dois |
+> | `kit_pdf.js` | o mesmo desenho no **papel** (fase 3) — nenhuma medida mora aqui |
 >
-> ⚠️ **QUEM DESENHA A PRÉVIA NÃO É QUEM DESENHA O PAPEL.** Na tela, o QR e as
-> barras saem do navegador; na ZD220 quem os desenha é a **própria impressora**
-> (`^BQ`, `^BC`), a partir do mesmo texto. Então a prévia prova o **conteúdo e o
-> lugar** — que o link salvo virou QR, que o Código do kit virou barras, que o
-> texto coube —, nunca o traço impresso. O que os dois têm de comum, e que é o
-> ponto do `kit_etiqueta.js` existir, são as **medidas**: a 203 dpi elas viram
-> pontos multiplicando por 8, e é daí que o ZPL da fase 3 tem que sair. Duas
-> réguas de posição seriam duas etiquetas diferentes.
+> ⚠️ **UM DESENHO, DOIS DESENHISTAS — e é `elementos()` que garante isso**
+> (fase 3, 17/09/2026). O `kit_etiqueta.js` devolve a etiqueta como **lista de
+> retângulos e textos em milímetros**, com a origem no canto superior esquerdo;
+> a prévia traduz essa lista para SVG e o `kit_pdf.js` traduz para PDF. Nenhum
+> dos dois tem medida própria. Antes da fase 3 o desenho morava dentro da
+> função que fazia SVG, e isso bastava porque só a tela desenhava — o PDF
+> repetindo as posições seria a segunda régua, e a divergência só apareceria
+> com o rolo impresso.
 >
 > ⚠️ **O TEXTO ENCOLHE, NUNCA VAZA.** A letra cai de 6 mm até 3,6 mm de altura
 > de maiúscula para caber; abaixo disso a resposta é "não cabe" e o servidor
@@ -425,8 +426,56 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > como vai ficar; o QR grande é o que se aponta a câmera. Sem ele, a fase 2
 > pede uma conferência que a própria tela torna difícil.
 >
-> **Isto é defeito de TELA, e não encosta no papel:** na ZD220 o QR é desenhado
-> pela impressora, com módulo inteiro em pontos.
+> **Isto era defeito de TELA — até a fase 3 encostar no papel.** Enquanto o
+> plano era ZPL, quem desenhava o QR na ZD220 era a impressora (`^BQ`), com
+> módulo inteiro em pontos. Com PDF **quem desenha somos nós**, e o mesmo
+> defeito passou a ser possível no rolo: a 203 dpi cada milímetro tem 8 pontos,
+> e módulo em ponto quebrado faz o rasterizador da Zebra alternar 4 e 5 pontos.
+> Por isso o `kit_pdf.js` chama a mesma `gradeDoQr` com **escala 8**. A prévia
+> continua a 8 px/mm — o mesmo número, por acaso, e por isso está escrito nos
+> dois lugares o que ele significa em cada um.
+
+### ⚠️ A IMPRESSÃO (fase 3, 17/09/2026) — **PDF, e não ZPL**
+
+A §6 da spec mandava enviar ZPL para a impressora. **Não dá**: a ZD220 está
+ligada por **USB no computador**, não na rede — o servidor não tem como falar
+com ela. O caminho é o mesmo do sob medida (`tecido/dominio/etiqueta_pdf.js`):
+`POST /api/kit/etiqueta/imprimir {quantidade}` devolve um PDF com **uma página
+por etiqueta, já com 100 × 35 mm**. Não há margem nem escala para o operador
+errar — é a armadilha #6 outra vez: o que só funciona quando alguém acerta a
+configuração é o que vai falhar.
+
+> **O conteúdo vem do BANCO, nunca do corpo do POST.** Aceitar o texto da tela
+> deixaria sair um rolo diferente do que o card mostra e do que a Embalagem
+> bipa. Como o servidor lê o salvo, a tela **recusa imprimir com texto não
+> salvo** e manda salvar antes: 200 etiquetas com o texto velho é erro que só
+> aparece no papel. O teto do lote é 500, e a tela oferece **"Imprimir 1 de
+> teste"** primeiro — é com a etiqueta na mão que se vê se o QR abre e se o
+> leitor bipa.
+
+> ⚠️ **`kit.imprimir` NÃO É `kit.editar`, E NASCE SEM DONO.** Editar decide o
+> que a Embalagem passa a bipar; imprimir só tira cópia do que já foi decidido,
+> e quem tira cópia é quem está com o rolo na impressora. A linha em
+> `permDaRota()` vem **antes** do `pre('/api/kit')` — atrás dele a chave nova
+> seria engolida e não mandaria em nada (§5, armadilha #23).
+>
+> **Não há backfill, por decisão do dono (17/09/2026):** *"quando assinalar o
+> nome da pessoa ela passa a poder imprimir"*. É o contrário do caso
+> `pacote.assinar`, onde a chave nova tinha que alcançar sozinha quem **já**
+> fazia aquilo — aqui ninguém fazia, porque a impressão não existia. A terceira
+> ponta não fica vazia mesmo assim: Admin Geral passa por nível, então o dono
+> imprime desde o primeiro boot.
+
+> ⚠️ **O TESTE ABRE O PDF E REMONTA O QR MÓDULO A MÓDULO.** É a lição da fase 2
+> aplicada ao papel: um QR **espelhado** continua com cara de QR e não lê em
+> celular nenhum, e a inversão de eixo (a lista mede de cima para baixo, o PDF
+> de baixo para cima) é erro de um caractere. O caso descomprime o fluxo do PDF
+> gerado, remonta a matriz pelos retângulos e compara com o que o `qr.js`
+> produziu — reintroduzir a inversão reprova o caso.
+
+> **O upload de arquivo pronto continua na tela**, e sai na fase 4. Enquanto os
+> dois existirem, há dois caminhos para a mesma etiqueta — que é exatamente o
+> que a spec veio fechar.
 >
 > ⚠️ **O DEFEITO MAIS CARO DESTA SPEC, E ELE PASSOU POR TRÊS RODADAS DE TESTE
 > VERDE (17/09/2026).** Nenhum celular lia o QR da prévia — nem grande, nem
@@ -465,11 +514,14 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > abrir, e tirá-lo baixa a versão (módulo maior, leitura mais fácil).
 >
 > **Rode `node teste_kit.js` e `node teste_qr.js` ao mexer no `mont_route.js`,
-> no card do kit ou nos três arquivos acima** — os 53 + 31 casos travam a
-> confirmação da troca, o campo ausente, o link, a medida do texto e o QR (que
-> o teste não "olha": ele decodifica de volta e confere a paridade
-> Reed-Solomon). Mexeu no `barras.js`? **`cd tecido && npm test` também** — a
-> etiqueta de prateleira do sob medida lê o mesmo arquivo.
+> no `kit_pdf.js`, no card do kit ou nos arquivos acima** — os 107 + 45 casos
+> travam a confirmação da troca, o campo ausente, o link, a medida do texto, a
+> lista única do desenho, o PDF (tamanho da página, lote, recusa e auditoria) e
+> o QR — que o teste não "olha": ele decodifica de volta, confere a paridade
+> Reed-Solomon e **remonta o QR a partir do PDF gerado**. Mexeu na permissão?
+> **`node teste_acesso.js`** (38 casos). Mexeu no `barras.js`?
+> **`cd tecido && npm test` também** — a etiqueta de prateleira do sob medida
+> lê o mesmo arquivo.
 
 ### Peça com problema (rejeição)
 
@@ -2000,7 +2052,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (30), `teste_kit.js` (67), `teste_qr.js` (45) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (38), `teste_kit.js` (107), `teste_qr.js` (45) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | **Carregamento aceita volume que não foi embalado** — `carreg_route.js` só recusa `bloqueado` e `carregado`; um volume `pendente` vai para `carregado` e a peça sai sem o −1 do estoque. Achado da auditoria de 17/08 (`docs/arquivo/REVISAO-COMPLETA.md` §2.1), **conferido aberto em 17/09/2026** | Alto — estoque fica acima do físico, sem sinal |
@@ -2099,6 +2151,18 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   código, não fecha o BCH e desiste sem dizer nada (§4)
 - ❌ Copiar a tabela CODE128 para um segundo arquivo: `public/barras.js` serve o
   sob medida e a etiqueta do kit, e duas tabelas são duas etiquetas (§4, §19)
+- ❌ Escrever medida dentro do `kit_pdf.js` ou do desenhista de SVG: os dois
+  consomem a lista do `elementos()`, e a segunda régua só aparece no rolo
+  impresso (§4)
+- ❌ Desenhar o QR do PDF fora da grade de 8 pontos/mm: agora quem desenha o QR
+  no papel somos nós, e módulo em ponto quebrado a Zebra rasteriza alternando
+  4 e 5 pontos — o defeito da fase 2, no rolo (§4)
+- ❌ Fazer a impressão do kit usar o texto que veio da tela em vez do salvo no
+  banco: o rolo sairia diferente do que a Embalagem bipa (§4)
+- ❌ Pôr `kit.imprimir` depois do `pre('/api/kit')` no `permDaRota()` — a chave
+  vira enfeite e a impressão volta a pedir `kit.editar` (§4, §5 #23)
+- ❌ Dar `kit.imprimir` a quem já tem `kit.editar` "para facilitar": o dono
+  assinala nome por nome, e isso foi decidido em 17/09/2026 (§4)
 - ❌ Mover `express.static` para antes do `auth`
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor

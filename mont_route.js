@@ -179,6 +179,38 @@ module.exports=function(app,db){
     auditar(req,'kit_etiqueta_conteudo', vem.join(', '), vem.map(k=>k+'='+novo[k]).join(' · '));
     res.json(respostaEtiqueta({ok:true}));
   });
+
+  /* ── A IMPRESSAO (fase 3) ───────────────────────────────────────────────
+     Devolve o PDF pronto, no tamanho da etiqueta. O conteudo NAO vem da tela:
+     e lido do banco aqui. Aceitar o texto do corpo deixaria sair um rolo
+     diferente do que o card mostra e do que a Embalagem bipa — e ninguem
+     compararia os dois, porque o papel some dentro da caixa.
+
+     ⚠️ O CODIGO DE BARRAS E SEMPRE O `kit_codigo` SALVO. Nao ha campo para
+     ele, de proposito: um segundo campo e exatamente o que faz o impresso sair
+     diferente do que a bancada bipa (§4). */
+  const KIT_PDF = require('./kit_pdf.js');
+  app.post('/api/kit/etiqueta/imprimir', async (req,res)=>{
+    const quantidade = Math.trunc(Number((req.body||{}).quantidade));
+    const conteudo = Object.assign({ codigo: cfg('kit_codigo') || '' }, etiquetaAtual());
+    const v = KIT_PDF.conferir(conteudo, quantidade);
+    // 409 e nao 400: o corpo esta bem formado, o que falta e o CADASTRO — e a
+    // tela precisa saber a diferenca para mandar preencher o card em vez de
+    // dizer que a quantidade esta errada.
+    if(!v.pronta) return res.status(409).json({ erro:v.problemas[0], problemas:v.problemas });
+    let pdf;
+    try{ pdf = await KIT_PDF.gerar(conteudo, quantidade); }
+    catch(e){ return res.status(500).json({ erro:'Não deu para gerar o PDF: '+e.message }); }
+    /* R9 — QUEM IMPRIMIU, QUANDO E QUANTAS. O rolo impresso e um objeto fisico
+       que circula pela fabrica por meses; sem registro, ninguem responde de
+       que dia e aquele rolo quando o codigo mudar. O codigo vai no detalhe
+       justamente para isso. */
+    auditar(req,'kit_etiqueta_impressa', String(quantidade)+' etiqueta(s)',
+      'código '+conteudo.codigo+' · link '+conteudo.link);
+    res.json({ tipo:'pdf', quantidade,
+      nome:'etiquetas-kit-'+quantidade+'.pdf',
+      arquivo: pdf.toString('base64') });
+  });
   app.post('/api/montagem',(req,res)=>{
     const {codigo,segundos=0,kit_ok=1,inicio=null,fim=null}=req.body||{};
     if(!codigo) return res.status(400).json({erro:'codigo'});

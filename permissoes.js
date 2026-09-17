@@ -140,6 +140,17 @@ module.exports = [
     rotulo:'Editar listas',       desc:'Motivos de rejeição e devolução' },
   { chave:'kit.editar',           grupo:'Configuração', nivel:'admin',
     rotulo:'Definir código do kit', desc:'QR conferido na embalagem' },
+  /* IMPRIMIR NAO E EDITAR, e por isso sao duas chaves. Editar decide o que a
+     etiqueta diz (e o que a Embalagem passa a bipar); imprimir so tira copia
+     do que ja foi decidido — e quem tira copia e quem esta na bancada com o
+     rolo na impressora, nao quem manda na configuracao.
+     ⚠️ ELA NASCE SEM DONO, POR DECISAO DO DONO (17/09/2026): nao ha backfill.
+     Admin Geral imprime porque passa em tudo; os outros so quando alguem
+     assinalar o nome na tela de Acessos. E o contrario do caso `pacote.assinar`
+     (§5, armadilha #23), onde a chave nova tinha que alcancar sozinha quem ja
+     fazia aquilo — aqui ninguem fazia, porque a impressao nao existia. */
+  { chave:'kit.imprimir',         grupo:'Configuração', nivel:'supervisor',
+    rotulo:'Imprimir etiqueta do kit', desc:'Gerar o PDF do rolo de etiquetas' },
   { chave:'horarios.editar',      grupo:'Configuração', nivel:'admin',
     rotulo:'Editar horários',     desc:'Corte e despacho por dia',
     sensivel:true },

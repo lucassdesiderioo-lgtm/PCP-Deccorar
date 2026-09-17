@@ -232,7 +232,173 @@ eq('a 8 px/mm o modulo fecha em 4 px cheios (era 2,49 e nao lia)',
 ok('o QR ajustado nunca fica MAIOR que o espaco reservado, em escala nenhuma',
   [3,4,4.6,5,6,7,8,9,10,12,16].every(e => DESENHO.gradeDoQr(e,37).lado <= QRD.lado + 1e-9));
 
-console.log('\n── 9. a Embalagem nao muda (R10) ──');
+console.log('\n── 9. UM DESENHO, DOIS DESENHISTAS (fase 3) ──');
+/* ⚠️ O CASO CENTRAL DA FASE 3. O PDF nao repete o desenho: ele le a MESMA
+   lista que a previa desenha. Se alguem escrever uma medida dentro do
+   `kit_pdf.js`, a etiqueta da tela e a do rolo passam a divergir — e a
+   divergencia so aparece com o rolo impresso, que e o que esta spec veio
+   consertar. */
+const itens = DESENHO.elementos(cheio, { escala:8 });
+ok('elementos() devolve a etiqueta como lista', Array.isArray(itens) && itens.length > 50);
+ok('tudo cai DENTRO da etiqueta de 100 x 35 mm', itens.every(it => {
+  if(it.tipo === 'ret') return it.x >= 0 && it.y >= 0 &&
+    it.x + it.largura <= DESENHO.ETIQUETA.largura + 1e-9 &&
+    it.y + it.altura <= DESENHO.ETIQUETA.altura + 1e-9;
+  if(it.tipo === 'circulo') return it.cx - it.raio >= 0 && it.cy + it.raio <= DESENHO.ETIQUETA.altura;
+  if(it.tipo === 'poligono') return it.pontos.every(p => p[0] >= 0 && p[1] >= 0 &&
+    p[0] <= DESENHO.ETIQUETA.largura && p[1] <= DESENHO.ETIQUETA.altura);
+  return it.x >= 0 && it.base <= DESENHO.ETIQUETA.altura;
+}));
+eq('so existem quatro tipos de item — quem desenha nao precisa saber mais',
+  [...new Set(itens.map(i => i.tipo))].sort().join(','), 'circulo,poligono,ret,texto');
+ok('a letra do texto e a MESMA que `medir` calculou (uma regua so)',
+  itens.filter(i => i.tipo==='texto' && i.texto===cheio.linha1)[0].cap === DESENHO.medir(cheio).cap);
+/* A SETA TEM HASTE. Um triangulo sozinho dentro do circulo nao se le como
+   seta, se le como BOTAO DE PLAY — numa etiqueta que manda apontar a camera
+   para um QR, simbolo de video e a pior confusao possivel. */
+const seta = itens.filter(i => i.tipo==='poligono')[0];
+eq('a seta e um poligono de 7 pontos (circulo + haste), nao um triangulo',
+  seta.pontos.length, 7);
+eq('e ela e BRANCA, por cima do circulo preto', seta.cor, 'branco');
+/* O QR do PAPEL cai na grade da IMPRESSORA. A 203 dpi um milimetro tem 8
+   pontos; modulo em ponto quebrado faz o rasterizador da Zebra alternar
+   modulos de 4 e 5 pontos — o mesmo defeito que quebrou a previa, agora no
+   papel, onde ele custa o rolo inteiro. */
+const passoQr = itens.filter(i => i.tipo==='ret' && i.altura < 1)[0].altura;
+ok('o modulo do QR fecha em ponto INTEIRO da impressora (8/mm a 203 dpi)',
+  Math.abs(passoQr*8 - Math.round(passoQr*8)) < 1e-9, 'deu ' + (passoQr*8) + ' pontos');
+// sem link nao ha QR; sem codigo nao ha barras — e nao um QR em branco
+ok('sem link, nenhum modulo de QR entra na lista',
+  DESENHO.elementos(Object.assign({}, cheio, {link:''})).filter(i=>i.tipo==='ret'&&i.altura<1).length === 0);
+ok('sem Código do kit, nenhuma barra entra na lista',
+  DESENHO.elementos(Object.assign({}, cheio, {codigo:''})).filter(i=>i.tipo==='ret'&&i.altura>5).length === 0);
+
+console.log('\n── 10. o PDF (R6 — a impressao) ──');
+const PDF = require('./kit_pdf.js');
+eq('a etiqueta pronta nao tem impedimento', PDF.conferir(cheio, 1).pronta, true);
+ok('sem link o PDF e recusado (R7)', PDF.conferir(Object.assign({},cheio,{link:''}),1).pronta === false);
+ok('sem Código do kit o PDF e recusado (R7)', PDF.conferir(Object.assign({},cheio,{codigo:''}),1).pronta === false);
+/* ⚠️ A LISTA DE PROBLEMAS VEM INTEIRA. Dizer um por vez faz a pessoa corrigir,
+   tentar, descobrir o seguinte e concluir que o sistema inventa impedimento
+   novo a cada clique — e ai ela para de ler o aviso (armadilha #6). */
+eq('faltando os dois, o aviso traz os DOIS',
+  PDF.conferir({}, 1).problemas.length >= 2, true);
+[0, -1, 501, 1.5, 'tres', null].forEach(q =>
+  ok('quantidade ' + JSON.stringify(q) + ' e recusada', PDF.conferir(cheio, q).pronta === false));
+[1, 2, 500].forEach(q =>
+  ok('quantidade ' + q + ' e aceita', PDF.conferir(cheio, q).pronta === true));
+eq('o teto do lote e 500', PDF.MAX, 500);
+eq('a grade do papel e a da ZD220: 8 pontos por milimetro', PDF.PONTOS_POR_MM, 8);
+
+console.log('\n── 11. a rota de impressao ──');
+// A rota e assincrona (o PDF demora): o harness espera a resposta.
+async function chamarAsync(metodo, rota, corpo, usuario){
+  const h = rotas[metodo + ' ' + rota];
+  if(!h) throw new Error('rota nao registrada: ' + metodo + ' ' + rota);
+  let out = { status:200, body:null };
+  const res = { status(c){ out.status = c; return res; },
+                json(b){ out.body = b; return res; }, send(b){ out.body = b; return res; } };
+  await h({ body: corpo||{}, headers:{}, usuario: usuario||{ id:1, nome:'Gestao' } }, res);
+  return out;
+}
+(async () => {
+  // o card ainda esta sem link neste ponto do teste? garante o estado cheio
+  chamar('POST', '/api/config/kit', { kit:'KITINSTALACAO', confirmar:true });
+  chamar('POST', '/api/config/kit/etiqueta', { link:cheio.link, linha1:cheio.linha1,
+    linha2:cheio.linha2, qr_legenda:cheio.qr_legenda });
+  const antes = auditoria.length;
+
+  let p = await chamarAsync('POST', '/api/kit/etiqueta/imprimir', { quantidade:2 });
+  eq('imprimir 2 responde 200', p.status, 200);
+  eq('...e devolve um PDF', p.body.tipo, 'pdf');
+  eq('...com a quantidade pedida', p.body.quantidade, 2);
+  ok('...num arquivo que comeca com %PDF',
+    Buffer.from(p.body.arquivo, 'base64').slice(0,4).toString() === '%PDF');
+  /* Uma PAGINA por etiqueta, todas iguais: o rolo da ZD220 e continuo, e uma
+     pagina do tamanho exato faz a impressora avancar exatamente uma. E a
+     pagina tem que sair no tamanho da ETIQUETA — "ajustar a pagina" foi o que
+     sempre deformou as barras (§7). */
+  const doc = await require('pdf-lib').PDFDocument.load(Buffer.from(p.body.arquivo,'base64'));
+  eq('...com uma pagina por etiqueta', doc.getPageCount(), 2);
+  const pag = doc.getPages()[0], MM = 72/25.4;
+  ok('...e a pagina JA nasce com 100 x 35 mm — nao ha o que configurar',
+    Math.abs(pag.getWidth() - 100*MM) < 0.01 && Math.abs(pag.getHeight() - 35*MM) < 0.01,
+    pag.getWidth().toFixed(2) + ' x ' + pag.getHeight().toFixed(2) + ' pt');
+  /* R9 — quem imprimiu, quando e quantas. O rolo circula pela fabrica por
+     meses; sem registro ninguem responde de que dia e aquele rolo quando o
+     codigo mudar. */
+  const reg = auditoria.slice(antes).filter(a => a.acao === 'kit_etiqueta_impressa');
+  eq('a impressao vai para a auditoria (R9)', reg.length, 1);
+  ok('...dizendo quantas', /2 etiqueta/.test(reg[0].alvo));
+  ok('...e com qual codigo o rolo saiu', /KITINSTALACAO/.test(reg[0].detalhe));
+
+  /* ⚠️ O QR LIDO DE VOLTA DO PDF, MODULO A MODULO.
+     A licao da fase 2: conferir o QR com a mesma convencao com que ele foi
+     escrito nao confere nada. Aqui o caminho e outro — o PDF e ABERTO e os
+     retangulos dele sao remontados em matriz, do jeito que um leitor faz.
+     E o que pega o defeito que nenhum olho pega: um QR ESPELHADO continua com
+     cara de QR na tela e nao le em celular nenhum. A conversao de eixo mora no
+     `kit_pdf.js` (a lista mede de cima para baixo, o PDF de baixo para cima),
+     e inverter o sinal la e um erro de um caractere. */
+  const zlib = require('zlib');
+  const bruto = Buffer.from(p.body.arquivo, 'base64');
+  let fluxo = '';
+  for(let i=0; (i = bruto.indexOf('stream', i)) >= 0; ){
+    let s = i+6; if(bruto[s]===13) s++; if(bruto[s]===10) s++;
+    const e = bruto.indexOf('endstream', s);
+    try{ const t = zlib.inflateSync(bruto.slice(s,e)).toString('latin1');
+      if(t.length > fluxo.length) fluxo = t; }catch(err){}
+    i = e > 0 ? e : bruto.length;
+  }
+  // cada retangulo do pdf-lib: "1 0 0 1 <x> <y> cm ... 0 0 m 0 <h> l <w> <h> l"
+  const RET = /1 0 0 1 (-?[\d.]+) (-?[\d.]+) cm\n1 0 0 1 0 0 cm\n1 0 0 1 0 0 cm\n0 0 m\n0 ([\d.]+) l\n([\d.]+) \3 l/g;
+  const MMpt = 72/25.4, retangulos = [];
+  for(let mt; (mt = RET.exec(fluxo)); )
+    retangulos.push({ x:+mt[1]/MMpt, y:+mt[2]/MMpt, h:+mt[3]/MMpt, w:+mt[4]/MMpt });
+  const QR = require('./public/qr.js');
+  const esperado = QR.modulos(cheio.link);
+  const g = DESENHO.gradeDoQr(8, esperado.length);
+  const escuro = (xm, ym) => retangulos.some(R =>
+    xm > R.x - 1e-6 && xm < R.x + R.w + 1e-6 &&
+    ym > (DESENHO.ETIQUETA.altura - R.y - R.h) - 1e-6 &&
+    ym < (DESENHO.ETIQUETA.altura - R.y) + 1e-6);
+  let diferentes = 0;
+  for(let i=0;i<esperado.length;i++) for(let j=0;j<esperado.length;j++){
+    const lido = escuro(g.x + (j+0.5)*g.passo, g.topo + (i+0.5)*g.passo);
+    if(lido !== !!esperado[i][j]) diferentes++;
+  }
+  /* O PDF tem que trazer UM retangulo para cada `ret` da lista: nenhum se
+     perdeu no caminho, e nenhum foi inventado aqui. */
+  eq('o PDF traz um retangulo para cada item da lista — nem a mais, nem a menos',
+    retangulos.length, DESENHO.elementos(cheio, { escala:8 }).filter(i => i.tipo === 'ret').length);
+  eq('o QR remontado do PDF bate MODULO A MODULO com o gerado (nao espelhou, nao deslocou)',
+    diferentes, 0);
+  /* E a folga do silencio segue de pe no papel: o padrao pede 4 modulos livres
+     em volta, e encostar a legenda faz o celular demorar ou desistir. */
+  ok('o QR do papel cabe nos 20 mm reservados, com a folga inteira',
+    g.x >= DESENHO.DESENHO.qr.x - 1e-9 &&
+    g.x + g.lado <= DESENHO.DESENHO.qr.x + DESENHO.DESENHO.qr.lado + 1e-9);
+
+  p = await chamarAsync('POST', '/api/kit/etiqueta/imprimir', { quantidade:9000 });
+  eq('lote acima do teto e recusado', p.status, 409);
+  /* 409 e nao 400: o corpo esta bem formado; o que falta e o CADASTRO. A tela
+     precisa saber a diferenca para mandar preencher o card em vez de dizer que
+     a quantidade esta errada. */
+  chamar('POST', '/api/config/kit/etiqueta', { link:'' });
+  p = await chamarAsync('POST', '/api/kit/etiqueta/imprimir', { quantidade:1 });
+  eq('sem o link do manual, nao imprime (R7)', p.status, 409);
+  ok('...e diz o que falta', /link/.test(p.body.erro));
+  eq('nada foi impresso nesse caso',
+    auditoria.filter(a => a.acao === 'kit_etiqueta_impressa').length, 1);
+  // devolve o estado que os casos seguintes esperam
+  chamar('POST', '/api/config/kit/etiqueta', { link:cheio.link });
+  chamar('POST', '/api/config/kit', { kit:'KITNOVO', confirmar:true });
+
+  fim();
+})();
+
+function fim(){
+console.log('\n── 12. a Embalagem nao muda (R10) ──');
 /* A tela da Embalagem le esta rota, e so ela. Se o GET mudar de formato, a
    bancada para de conferir o kit sem ninguem mexer no montagem.html. */
 r = chamar('GET', '/api/config/kit');
@@ -241,3 +407,4 @@ eq('GET /api/config/kit continua devolvendo {kit}', r.body.kit, 'KITNOVO');
 console.log('\n' + (falhas ? falhas + ' FALHA(S) em ' + n + ' casos' : 'todos os ' + n + ' casos passaram'));
 try{ db.close(); fs.rmSync(dir, { recursive:true, force:true }); }catch(e){}
 process.exit(falhas ? 1 : 0);
+}

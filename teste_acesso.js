@@ -146,8 +146,41 @@ const fonte = fs.readFileSync(path.join(__dirname, 'acesso.js'), 'utf8');
    aparecem antes, em permDaRota(), e um indexOf solto acharia aquelas. */
 const ini = fonte.indexOf('const TODAS_ROTAS');
 const lista = fonte.slice(ini, fonte.indexOf('];', ini));
-['/api/pacote/pendentes', '/api/pacote/resolver', '/api/lote/conferir'].forEach(r =>
+['/api/pacote/pendentes', '/api/pacote/resolver', '/api/lote/conferir',
+ '/api/kit/etiqueta/imprimir'].forEach(r =>
   ok('TODAS_ROTAS lista ' + r, ini >= 0 && lista.indexOf("'" + r + "'") >= 0));
+
+console.log('\n── 6. imprimir a etiqueta do kit NAO e editar o kit ──');
+/* ⚠️ A ORDEM DAS LINHAS EM permDaRota() E A REGRA. A rota da impressao comeca
+   com /api/kit, entao um `pre('/api/kit')` acima dela engoliria a chave nova e
+   ela nao mandaria em nada — declarada, listada, e sem efeito. E a ponta que
+   some em silencio (§5, armadilha #23) na sua terceira forma. */
+const P = require('./permissoes');
+ok('a chave kit.imprimir esta declarada em permissoes.js',
+  P.some(p => p.chave === 'kit.imprimir'));
+eq('POST /api/kit/etiqueta/imprimir pede kit.imprimir',
+  AC.permDaRota('/api/kit/etiqueta/imprimir', 'POST'), 'kit.imprimir');
+eq('...e o resto de /api/kit continua em kit.editar',
+  AC.permDaRota('/api/kit/qualquer/outra', 'POST'), 'kit.editar');
+eq('editar o conteudo da etiqueta continua sendo kit.editar',
+  AC.permDaRota('/api/config/kit/etiqueta', 'POST'), 'kit.editar');
+/* ⚠️ ELA NASCE SEM DONO, POR DECISAO DO DONO (17/09/2026): nao ha backfill.
+   Quem edita o kit NAO ganha a impressao de brinde — o dono assinala nome por
+   nome na tela de Acessos. E o contrario do caso `pacote.assinar`, onde a
+   chave tinha que alcancar sozinha quem JA fazia aquilo; aqui ninguem fazia,
+   porque a impressao nao existia. */
+const comImprimir = db.prepare(`SELECT s.nome FROM setores s
+  JOIN setor_permissao sp ON sp.setor_id=s.id WHERE sp.chave='kit.imprimir'`).all().map(r => r.nome);
+eq('nenhum setor de gestao nasce com a chave (sem backfill, por decisao do dono)',
+  comImprimir.filter(x => x !== 'Admin Geral').length, 0,
+  'setores com a chave: ' + (comImprimir.join(', ') || '(nenhum)'));
+/* Mas o dono NAO fica trancado do lado de fora: Admin Geral passa em tudo, por
+   nivel. Sem isso a fase 3 subiria com a tela dando 403 para todo mundo — o
+   defeito das tres pontas, onde a terceira e "alguem que tenha a chave". */
+ok('...mas o Admin Geral imprime desde o primeiro boot',
+  AC.decidir(g2, '/api/kit/etiqueta/imprimir', 'POST').ok === true);
+ok('e quem so tem kit.editar NAO imprime',
+  AC.decidir({ id:ua, nome:'Gestao' }, '/api/kit/etiqueta/imprimir', 'POST').ok === false);
 
 db.close();
 try{ fs.rmSync(dir, { recursive:true, force:true }); }catch(e){}

@@ -29,7 +29,7 @@ const DESENHO = {
   // isso que a frase diz ("seu manual esta AQUI").
   seta:   { cx:67.5, cy:11, raio:5 },
   // As barras, embaixo do texto, com o codigo escrito por extenso.
-  barras: { x:3, topo:20, largura:58, altura:8.5, cap:2.8, folga:1.2 },
+  barras: { x:3, topo:20, largura:58, altura:8.5, cap:2.8, folga:1.2, espaco:0.2 },
   /* O QR, a direita, com a legenda embaixo.
      ⚠️ A `folga` NAO E ESTETICA: e o silencio que o leitor precisa para achar
      o QR (o padrao pede 4 modulos livres em volta). Com o QR de 20 mm, cada
@@ -157,86 +157,79 @@ function medir(conteudo){
   return { cap, capLegenda:capLeg, cabe, versaoQr, problemas, limite:limiteDeCaracteres() };
 }
 
-// ── o desenho em SVG (so no navegador) ───────────────────────────────────
-const NS = 'http://www.w3.org/2000/svg';
-function no(tipo, atributos){
-  const el = document.createElementNS(NS, tipo);
-  Object.keys(atributos||{}).forEach(k => el.setAttribute(k, atributos[k]));
-  return el;
-}
-function texto(conteudo, x, y, cap, extra){
-  const el = no('text', Object.assign({
-    x, y, 'font-family':'Arial, Helvetica, sans-serif', 'font-weight':'700',
-    'font-size':(cap/0.716), fill:'#000'
-  }, extra||{}));
-  el.textContent = conteudo;
-  return el;
-}
-// Um retangulo por faixa escura — o mesmo desenho que a impressora faz com
-// barra cheia, e o minimo de nos para a tela redesenhar a cada tecla.
-function faixas(pai, bits, x, y, largura, altura){
-  const passo = largura / bits.length;
-  let i = 0;
-  while(i < bits.length){
-    if(bits[i] === '1'){
-      let j = i; while(j < bits.length && bits[j] === '1') j++;
-      pai.appendChild(no('rect', { x:x + i*passo, y, width:(j-i)*passo, height:altura, fill:'#000' }));
-      i = j;
-    } else i++;
-  }
-}
+/* ═══ A ETIQUETA COMO LISTA ════════════════════════════════════════════════
 
-/* A etiqueta inteira, em SVG, com o viewBox em MILIMETROS — o desenho e o
-   mesmo em qualquer tamanho de tela. Quem chama decide quantos pixels vale um
-   milimetro (a previa usa o tamanho proporcional; nao existe "tamanho real"
-   no navegador, que nao sabe o tamanho fisico do monitor). */
-function svg(conteudo, opcoes){
+   ⚠️ ESTA E A PECA QUE FAZ A PREVIA E O PAPEL SEREM A MESMA ETIQUETA.
+
+   Ate a fase 2 o desenho morava DENTRO da funcao que faz SVG, e isso bastava
+   porque so a tela desenhava. Na fase 3 o PDF passou a desenhar tambem — e se
+   ele repetisse as posicoes, a etiqueta da tela e a do rolo divergiriam no dia
+   em que alguem ajustasse uma das duas. A divergencia so apareceria com o rolo
+   impresso, que e exatamente o que esta spec veio consertar.
+
+   Entao ha UM desenho e DOIS desenhistas: `elementos()` diz o que existe e
+   onde, em milimetros, e cada lado sabe so como traçar retangulo, texto,
+   circulo e poligono.
+
+   As convencoes, que os dois lados obedecem:
+     · tudo em MILIMETROS, com a origem no canto SUPERIOR esquerdo
+     · `base` do texto e a LINHA DE BASE, medida de cima para baixo
+     · texto ja vem com o `x` do comeco — nao ha "centralizar", porque
+       centralizar de dois jeitos diferentes da dois lugares diferentes
+     · `cor` so existe em dois valores: 'preto' e 'branco' (a seta)
+
+   ⚠️ A `escala` NAO E COSMETICA, e vale para os dois. Ela e quantos pontos da
+   grade valem um milimetro: na tela sao pixels, no papel sao os 8 pontos por
+   milimetro da ZD220 a 203 dpi. E ela que faz o modulo do QR cair em ponto
+   inteiro dos dois lados — a grade que respira nao le no celular nem no
+   leitor (ver `gradeDoQr`). */
+function elementos(conteudo, opcoes){
   const o = opcoes || {}, c = conteudo || {};
-  const escala = o.escala || 4;                 // px por mm
+  const escala = o.escala || 8;
   const m = medir(c);
-  const el = no('svg', {
-    viewBox:'0 0 '+ETIQUETA.largura+' '+ETIQUETA.altura,
-    width: ETIQUETA.largura*escala, height: ETIQUETA.altura*escala,
-    'shape-rendering':'crispEdges'
-  });
-  el.appendChild(no('rect', { width:ETIQUETA.largura, height:ETIQUETA.altura, fill:'#fff' }));
+  const itens = [];
 
   // 1. o texto grande, duas linhas
   const t = DESENHO.texto;
   [c.linha1 || '', c.linha2 || ''].forEach((linha, i) => {
     if(!linha) return;
-    el.appendChild(texto(linha, t.x, t.topo + m.cap + i*t.entrelinha, m.cap,
-      { 'shape-rendering':'geometricPrecision' }));
+    itens.push({ tipo:'texto', texto:linha, x:t.x,
+      base: t.topo + m.cap + i*t.entrelinha, cap:m.cap, espaco:0, cor:'preto' });
   });
 
-  // 2. a seta em circulo, apontando para o QR
-  const s = DESENHO.seta;
-  el.appendChild(no('circle', { cx:s.cx, cy:s.cy, r:s.raio, fill:'#000' }));
-  /* ⚠️ SETA COM HASTE, NAO UM TRIANGULO SOZINHO. A primeira versao era um
-     triangulo cheio dentro do circulo — e isso nao se le como seta, se le como
+  /* 2. a seta em circulo, apontando para o QR — porque e isso que a frase diz.
+     ⚠️ SETA COM HASTE, NAO UM TRIANGULO SOZINHO. A primeira versao era um
+     triangulo cheio dentro do circulo, e isso nao se le como seta: se le como
      BOTAO DE PLAY. Numa etiqueta que manda apontar a camera para um QR, um
      simbolo de video e a pior confusao possivel. */
-  const r = s.raio;
+  const s = DESENHO.seta, r = s.raio;
+  itens.push({ tipo:'circulo', cx:s.cx, cy:s.cy, raio:r, cor:'preto' });
   const haste = r*0.56, meia = r*0.16, ponta = r*0.40, aba = r*0.50;
-  el.appendChild(no('path', {
-    d: 'M '+(s.cx-haste)+' '+(s.cy-meia)+
-       ' L '+(s.cx+ponta-aba*0.1)+' '+(s.cy-meia)+
-       ' L '+(s.cx+ponta-aba*0.1)+' '+(s.cy-aba)+
-       ' L '+(s.cx+haste)+' '+s.cy+
-       ' L '+(s.cx+ponta-aba*0.1)+' '+(s.cy+aba)+
-       ' L '+(s.cx+ponta-aba*0.1)+' '+(s.cy+meia)+
-       ' L '+(s.cx-haste)+' '+(s.cy+meia)+' Z',
-    fill:'#fff', 'shape-rendering':'geometricPrecision'
-  }));
+  const recuo = ponta - aba*0.1;
+  itens.push({ tipo:'poligono', cor:'branco', pontos:[
+    [s.cx-haste, s.cy-meia], [s.cx+recuo, s.cy-meia], [s.cx+recuo, s.cy-aba],
+    [s.cx+haste, s.cy],      [s.cx+recuo, s.cy+aba], [s.cx+recuo, s.cy+meia],
+    [s.cx-haste, s.cy+meia]
+  ]});
 
-  // 3. as barras e o codigo escrito
+  // 3. as barras e o codigo escrito por extenso
   const b = DESENHO.barras;
   if(c.codigo && B){
     const bits = B.modulos(c.codigo);
-    faixas(el, bits, b.x, b.topo, b.largura, b.altura);
-    el.appendChild(texto(c.codigo, b.x + b.largura/2, b.topo + b.altura + b.folga + b.cap,
-      b.cap, { 'text-anchor':'middle', 'letter-spacing':'0.2',
-               'shape-rendering':'geometricPrecision' }));
+    const passo = b.largura / bits.length;
+    let i = 0;
+    while(i < bits.length){
+      if(bits[i] === '1'){
+        let j = i; while(j < bits.length && bits[j] === '1') j++;
+        itens.push({ tipo:'ret', x:b.x + i*passo, y:b.topo,
+          largura:(j-i)*passo, altura:b.altura, cor:'preto' });
+        i = j;
+      } else i++;
+    }
+    const larg = larguraDoTexto(c.codigo, b.cap) +
+                 b.espaco * Math.max(0, String(c.codigo).length - 1);
+    itens.push({ tipo:'texto', texto:c.codigo, x:b.x + b.largura/2 - larg/2,
+      base: b.topo + b.altura + b.folga + b.cap, cap:b.cap, espaco:b.espaco, cor:'preto' });
   }
 
   // 4. o QR e a legenda
@@ -249,21 +242,74 @@ function svg(conteudo, opcoes){
       while(j < mods.length){
         if(mods[i][j]){
           let k = j; while(k < mods.length && mods[i][k]) k++;
-          el.appendChild(no('rect', { x:g.x + j*g.passo, y:g.topo + i*g.passo,
-            width:(k-j)*g.passo, height:g.passo, fill:'#000' }));
+          itens.push({ tipo:'ret', x:g.x + j*g.passo, y:g.topo + i*g.passo,
+            largura:(k-j)*g.passo, altura:g.passo, cor:'preto' });
           j = k;
         } else j++;
       }
     }
   }
   if(c.qr_legenda){
-    el.appendChild(texto(c.qr_legenda, q.x + q.lado/2, q.topo + q.lado + q.folga + m.capLegenda,
-      m.capLegenda, { 'text-anchor':'middle', 'shape-rendering':'geometricPrecision' }));
+    const larg = larguraDoTexto(c.qr_legenda, m.capLegenda);
+    itens.push({ tipo:'texto', texto:c.qr_legenda, x:q.x + q.lado/2 - larg/2,
+      base: q.topo + q.lado + q.folga + m.capLegenda, cap:m.capLegenda,
+      espaco:0, cor:'preto' });
   }
+  return itens;
+}
+
+// ── o desenho em SVG (so no navegador) ───────────────────────────────────
+const NS = 'http://www.w3.org/2000/svg';
+function no(tipo, atributos){
+  const el = document.createElementNS(NS, tipo);
+  Object.keys(atributos||{}).forEach(k => el.setAttribute(k, atributos[k]));
+  return el;
+}
+const TINTA = cor => cor === 'branco' ? '#fff' : '#000';
+
+/* A etiqueta inteira, em SVG, com o viewBox em MILIMETROS — o desenho e o
+   mesmo em qualquer tamanho de tela. Quem chama decide quantos pixels vale um
+   milimetro (a previa usa o tamanho proporcional; nao existe "tamanho real"
+   no navegador, que nao sabe o tamanho fisico do monitor).
+
+   Daqui para baixo NAO HA DESENHO NENHUM: so a traducao de cada item da lista
+   para o no de SVG equivalente. Medida escrita aqui seria a segunda regua. */
+function svg(conteudo, opcoes){
+  const o = opcoes || {};
+  const escala = o.escala || 4;                 // px por mm
+  const el = no('svg', {
+    viewBox:'0 0 '+ETIQUETA.largura+' '+ETIQUETA.altura,
+    width: ETIQUETA.largura*escala, height: ETIQUETA.altura*escala,
+    'shape-rendering':'crispEdges'
+  });
+  el.appendChild(no('rect', { width:ETIQUETA.largura, height:ETIQUETA.altura, fill:'#fff' }));
+
+  elementos(conteudo, { escala }).forEach(it => {
+    if(it.tipo === 'ret'){
+      // As barras e os modulos do QR: aqui o `crispEdges` do pai e o que faz
+      // cada faixa cair em pixel cheio, e e por isso que ele esta la.
+      el.appendChild(no('rect', { x:it.x, y:it.y, width:it.largura, height:it.altura,
+        fill:TINTA(it.cor) }));
+    } else if(it.tipo === 'circulo'){
+      el.appendChild(no('circle', { cx:it.cx, cy:it.cy, r:it.raio, fill:TINTA(it.cor),
+        'shape-rendering':'geometricPrecision' }));
+    } else if(it.tipo === 'poligono'){
+      el.appendChild(no('polygon', { points: it.pontos.map(p => p.join(',')).join(' '),
+        fill:TINTA(it.cor), 'shape-rendering':'geometricPrecision' }));
+    } else if(it.tipo === 'texto'){
+      const t = no('text', { x:it.x, y:it.base,
+        'font-family':'Arial, Helvetica, sans-serif', 'font-weight':'700',
+        'font-size':(it.cap/0.716), fill:TINTA(it.cor),
+        'shape-rendering':'geometricPrecision' });
+      if(it.espaco) t.setAttribute('letter-spacing', it.espaco);
+      t.textContent = it.texto;
+      el.appendChild(t);
+    }
+  });
   return el;
 }
 
-const api = { svg, medir, larguraDoTexto, capParaLinhas, capParaLegenda,
+const api = { svg, elementos, medir, larguraDoTexto, capParaLinhas, capParaLegenda,
               limiteDeCaracteres, gradeDoQr, ETIQUETA, DESENHO, LARGURA };
 if(typeof window !== 'undefined') window.kitEtiqueta = api;
 if(typeof module !== 'undefined' && module.exports) module.exports = api;
