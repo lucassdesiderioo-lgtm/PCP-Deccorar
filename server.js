@@ -7,115 +7,13 @@ app.use(express.json({limit:'25mb'}));
 require('./auth')(app, db);
 app.use(express.static(path.join(__dirname, 'public')));
 
-/* Vai junto o NOME de cor, tecido e modelo. As colunas de `skus` guardam o
-   codigo ('BEGE'), e quem confere a peca na bancada precisa ler a palavra. Sao
-   campos a MAIS: tudo que existia continua igual, e nenhuma tela que so lia
-   `codigo`/`estoque` muda de comportamento. */
-app.get('/api/skus', (req,res)=> res.json(db.prepare(`SELECT s.*,
-    c.nome cor_nome, t.nome tecido_nome, m.nome modelo_nome,
-    COALESCE(m.exige_medida,1) exige_medida
-  FROM skus s
-  LEFT JOIN cor c ON c.codigo=s.cor_codigo
-  LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
-  LEFT JOIN modelo m ON m.id=s.modelo_id
-  ORDER BY s.codigo`).all()));
-/* Compras Fase 0: o que a tela grava e o que esta NOS CAMPOS, nunca o que o
-   codigo do SKU diz. Quem cadastra corrige o preenchimento automatico, e um SKU
-   fora da nomenclatura salva normalmente com as medidas digitadas a mao.
-
-   Medida vazia vira NULL, nunca 0 — e por isso que <=0 tambem vira NULL: um
-   zero gravado passaria batido pela tela de pendencias e viraria uma mentira
-   silenciosa na formula da ficha tecnica. Melhor a linha aparecer como pendente.
-
-   Campo AUSENTE do corpo nao e o mesmo que campo VAZIO: ausente preserva o que
-   ja esta no banco. Sem isso, qualquer chamador antigo que so mande
-   codigo/descricao/cor apagaria a medida de um SKU ja migrado. */
-const cmDe = v => { const n = parseInt(v,10); return (Number.isFinite(n) && n>0) ? n : null; };
-app.post('/api/skus', (req,res)=>{
-  const b=req.body||{};
-  const {codigo,descricao='',cor='',estoque=0,alvo=0}=b;
-  if(!codigo||!codigo.trim()) return res.status(400).json({erro:'código obrigatório'});
-  const cod=codigo.trim().toUpperCase();
-  const atual=db.prepare('SELECT modelo_id,largura_cm,altura_cm,cor_codigo,tecido_codigo,tem_ficha,custo_direto FROM skus WHERE codigo=?').get(cod)||{};
-  const manda=(k,novo)=> (k in b) ? novo : (atual[k]===undefined?null:atual[k]);
-
-  let modeloId=null;
-  if('modelo_id' in b){
-    const id=parseInt(b.modelo_id,10);
-    // id que nao existe vira NULL: o SKU aparece em pendencias em vez de apontar
-    // para um modelo fantasma.
-    modeloId=Number.isFinite(id)&&db.prepare('SELECT 1 FROM modelo WHERE id=?').get(id) ? id : null;
-  } else modeloId=atual.modelo_id===undefined?null:atual.modelo_id;
-
-  let corCod=null;
-  if('cor_codigo' in b){
-    // Mesmo tratamento do modelo: cor que nao esta na lista vira NULL e o SKU
-    // aparece em pendencias. Nao e so higiene — as colunas novas sao as
-    // primeiras FKs do schema e o better-sqlite3 liga foreign_keys por padrao,
-    // entao um codigo desconhecido derrubaria o INSERT com 500. Cadastro nunca
-    // bloqueia (§3 do CLAUDE.md): registra o que da e sinaliza o que falta.
-    const c=String(b.cor_codigo||'').trim().toUpperCase();
-    corCod=(c&&db.prepare('SELECT 1 FROM cor WHERE codigo=?').get(c))?c:null;
-  } else corCod=atual.cor_codigo===undefined?null:atual.cor_codigo;
-
-  let tecCod=null;
-  if('tecido_codigo' in b){
-    const t=String(b.tecido_codigo||'').trim().toUpperCase();
-    tecCod=(t&&db.prepare('SELECT 1 FROM tecido WHERE codigo=?').get(t))?t:null;
-  } else tecCod=atual.tecido_codigo===undefined?null:atual.tecido_codigo;
-
-  /* COMPRAS.md §2: o SKU tem ficha tecnica ou nao tem, e e o CADASTRO que
-     responde — nunca a ausencia de dados. Deduzir "sem ficha => e revenda"
-     silenciaria o erro mais comum: a persiana nova sem ficha lancada apareceria
-     como revenda com custo zero e ninguem notaria. */
-  const temFicha = ('tem_ficha' in b) ? (b.tem_ficha?1:0)
-                 : (atual.tem_ficha===undefined?1:atual.tem_ficha);
-  let custoDireto = ('custo_direto' in b) ? (function(){
-        const n=parseFloat(String(b.custo_direto==null?'':b.custo_direto).replace(',','.'));
-        return (Number.isFinite(n)&&n>=0)?n:null;   // vazio nunca vira zero
-      })() : (atual.custo_direto===undefined?null:atual.custo_direto);
-  /* §2, tabela de erros: "tem_ficha = 0 com modelo apontado" e bloqueado no
-     cadastro. Produto comprado pronto nao tem modelo de fabricacao.
-     Mas so e contradicao quando as DUAS coisas vem na mesma requisicao. Se o SKU
-     ja tinha modelo e agora esta virando revenda, o modelo simplesmente deixa de
-     fazer sentido — recusar ali seria um beco sem saida: nao haveria como fazer
-     a transicao sem editar duas vezes. */
-  if(!temFicha){
-    if(('modelo_id' in b) && modeloId!=null)
-      return res.status(400).json({erro:'SKU de revenda não pode ter modelo — ele não é fabricado aqui'});
-    modeloId=null;
-  }
-  if(temFicha) custoDireto=null;   // custo_direto so existe quando tem_ficha = 0
-
-  db.prepare(`INSERT INTO skus (codigo,descricao,cor,estoque,alvo,modelo_id,largura_cm,altura_cm,cor_codigo,tecido_codigo,tem_ficha,custo_direto)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-    ON CONFLICT(codigo) DO UPDATE SET descricao=excluded.descricao,cor=excluded.cor,estoque=excluded.estoque,alvo=excluded.alvo,
-      modelo_id=excluded.modelo_id,largura_cm=excluded.largura_cm,altura_cm=excluded.altura_cm,
-      cor_codigo=excluded.cor_codigo,tecido_codigo=excluded.tecido_codigo,
-      tem_ficha=excluded.tem_ficha,custo_direto=excluded.custo_direto`)
-    .run(cod,descricao,cor,+estoque||0,+alvo||0,
-      modeloId, manda('largura_cm',cmDe(b.largura_cm)), manda('altura_cm',cmDe(b.altura_cm)), corCod, tecCod,
-      temFicha, custoDireto);
-  /* Cadastrar o SKU libera os volumes retidos por ele (§6) — mas NUNCA os
-     retidos por divergencia de leitura da folha. Ali a duvida nao e se o SKU
-     existe, e sim QUAL peca o cliente comprou: as duas leituras do PDF
-     discordaram. Sem esta guarda, cadastrar um SKU qualquer soltaria um volume
-     que ninguem conferiu. Esses saem so pelo POST /api/divergencias/resolver,
-     depois de alguem olhar o pedido no Mercado Livre.
-     O mesmo vale pro volume retido por MODALIDADE (§8-B): a etiqueta veio num
-     formato que o sistema nao reconhece, e cadastrar SKU nao diz se a caixa vai
-     pro carro ou pro canto da coleta. Sai so pelo POST /api/modalidade/resolver.
-     E pro retido por PACOTE (§5-B): a etiqueta leva mais de uma persiana, e
-     cadastrar um SKU nao responde QUANTAS vao na caixa nem quais. Soltar aqui
-     mandaria a caixa embora com a peca a mais nao conferida — que e exatamente
-     o buraco que a trava existe pra fechar. Sai so pelo
-     POST /api/pacote/resolver, com a gestao assinando peca por peca. */
-  try{ db.prepare(`UPDATE lote SET estagio='pendente' WHERE estagio='bloqueado' AND codigo=?
-        AND COALESCE(bloqueio,'') NOT LIKE 'divergencia%' AND COALESCE(bloqueio,'') NOT LIKE 'modalidade%'
-        AND COALESCE(bloqueio,'') NOT LIKE 'pacote%'`).run(cod); }catch(e){}
-  res.json({ok:true});
-});
-app.delete('/api/skus/:codigo',(req,res)=>{ db.prepare('DELETE FROM skus WHERE codigo=?').run(req.params.codigo); res.json({ok:true}); });
+/* O cadastro de SKU (GET, POST e DELETE /api/skus) mora no
+   sku_cad_route.js desde 17/09/2026, e o require fica EXATAMENTE onde as
+   rotas estavam: mudar o lugar mudaria a ordem de registro no Express.
+   Saiu daqui porque este arquivo abre porta e banco real e nenhum teste
+   consegue carrega-lo — e aquela e a rota que apagava saldo em silencio
+   (divida 15 do §14). Agora ela tem o teste_skus.js atras. */
+require('./sku_cad_route')(app, db);
 
 /* ── AJUSTE MANUAL DE ESTOQUE ────────────────────────────────────────────────
  * Era o unico movimento de estoque do sistema SEM registro: um UPDATE direto,
