@@ -292,6 +292,13 @@ async function parsePdf(uint8){
     const folhaNaoFecha = !pdfFecha && irmaosDoPacote(itensFolha).length
       ? 'a folha nao casa com as etiquetas: '+etiquetasDoPdf.length+' etiqueta(s), '
         +itensFolha.length+' item(ns), e '+semItem.length+' etiqueta(s) sem item na folha'
+        /* O QUE "SEM ITEM" QUER DIZER, escrito na propria mensagem. Sem esta
+           frase o numero se le como quantidade de pecas faltando — foi a
+           primeira pergunta de quem viu a tarja. Nao e peca: e etiqueta cujo
+           Pack ID / Venda nao aparece em item nenhum da folha, ou seja, o PDF
+           traz o papel do envio e nao traz a linha que diz que peca e aquela. */
+        +' (o Pack ID/Venda dessas etiquetas nao aparece em item nenhum da folha'
+        +' — nao e quantidade de pecas)'
       : null;
 
     // 1. as duas leituras da folha discordam sobre o SKU deste volume
