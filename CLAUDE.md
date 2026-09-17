@@ -1099,7 +1099,7 @@ recusa.
 
 ## 7-B. Compras — o módulo novo
 
-> Especificação completa: `COMPRAS.md` (fora do repositório — peça ao dono).
+> Especificação completa: `docs/specs/COMPRAS.md` — o topo dela lista o que mudou na construção.
 > Fases 1 a 6 implementadas (1–5 em 23/08/2026, 6 em 24/08). Fase 7 (relatórios)
 > pendente — espera haver história para mostrar.
 > Histórico de custo (`custo_dominio.js`) e contagem de material entraram
@@ -1343,7 +1343,7 @@ e a porta única do avaliador.
 | Dívida | Detalhe |
 |---|---|
 | `componente` é **provisória** | O dono é `PRODUCAO-MONTAGEM.md` §6, não implementado. O que faltar entra por `ALTER`, nunca recriando |
-| Não segue a forma do `ARQUITETURA-ALVO.md` | O `COMPRAS.md` §11 manda `dominio/ dados/ rotas/`. Foi construído no padrão atual do projeto — o documento não estava disponível |
+| Não segue a forma do `ARQUITETURA-ALVO.md` | O `COMPRAS.md` §11 manda `dominio/ dados/ rotas/`. Foi construído no padrão atual do projeto — o documento não estava no repositório (hoje está em `docs/specs/ARQUITETURA-ALVO.md`) |
 | Fórmula do tecido | ~~As oito medidas da planilha fecham em 6 de 8~~ — a fórmula passou a usar `largura_bobina` em 04/09/2026 (armadilha #19). O que sobra: **quando** o corte é encaixado e quando é sozinho ainda é decisão de quem produz, e a ficha guarda uma das duas |
 | Medida de corte sem valor lançado | A `ficha_formula` já tem `corte_largura`/`corte_altura` (armadilha #18), mas as folgas reais — tubo, base redonda, tecido — ainda não foram preenchidas. Enquanto forem vazias a coluna "corta a" mostra traço, que é resposta e não erro |
 | Mínimos são placeholder | Foram semeados com um valor padrão ("depois eu edito"). Enquanto forem, o gatilho 1 vence quase sempre e a demanda quase não aparece na lista — não é bug da fase 6, é dado a revisar |
@@ -1684,6 +1684,20 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3010/login   # tem que
 
 **Regra de ouro:** o servidor **só recebe** (`git pull`). Nunca editar direto lá.
 
+### Onde moram os planos — `docs/specs/`
+
+Desde 17/09/2026, **toda especificação aprovada mora em `docs/specs/`**, com um
+bloco de STATUS datado no topo. Antes disso elas ficavam num Projeto do Claude,
+fora do repositório — e por isso Compras foi construído sem a spec de arquitetura,
+e as specs ficaram um mês dizendo "nada implementado" sobre coisa em produção.
+
+1. **Antes de construir algo que tem spec, leia a spec** (`docs/specs/README.md` tem o índice).
+2. **No mesmo commit do código, atualize o STATUS da spec** — e o índice do README.
+   Decisão que mudou na construção vai escrita no STATUS.
+3. **Onde a spec e este arquivo divergirem, vale este arquivo.** Anote a divergência na spec.
+4. **Spec implementada:** as regras que parecem bug entram aqui; a spec vai para
+   `docs/arquivo/`. `docs/arquivo/` é histórico — **não use como fonte de regra**.
+
 ### Onde os dados moram — `caminhos.js` é o dono único
 
 `caminhos.js` responde **onde ficam banco, PDFs, fotos e backups**. O padrão é
@@ -1754,6 +1768,11 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (27) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
+| 13 | **Carregamento aceita volume que não foi embalado** — `carreg_route.js` só recusa `bloqueado` e `carregado`; um volume `pendente` vai para `carregado` e a peça sai sem o −1 do estoque. Achado da auditoria de 17/08 (`docs/arquivo/REVISAO-COMPLETA.md` §2.1), **conferido aberto em 17/09/2026** | Alto — estoque fica acima do físico, sem sinal |
+| 14 | **`POST /api/montagem` (a embalagem) sem proteção** — quatro escritas sem transação, não valida se o SKU existe, `kit_ok` vem da tela, e embalar sem revisar gera estoque (auditoria §2.3). **Aberto em 17/09/2026** | Alto — é a porta de entrada do estoque |
+| 15 | **`POST /api/skus` zera o estoque** quando o corpo não traz `estoque` (`estoque=0` de padrão + upsert `estoque=excluded.estoque`). A tela do admin reenvia o valor; a API aceita sem ele (auditoria §2.5). **Aberto em 17/09/2026** | Médio |
+| 16 | **Acesso: default `@logado` e cobertura mantida à mão** — `permDaRota` termina em `@logado`; a tela de cobertura lê a lista `TODAS_ROTAS` e ignora `/api/`. Fecha junto com a dívida 12(c) (auditoria §1.2–1.3). **Aberto em 17/09/2026** | Médio — rota nova nasce aberta sem aparecer em lugar nenhum |
+| 17 | **Acesso: duas travas faltando** — `POST /api/acesso/usuario/:id/excecao` não recusa permissão `intransferivel`; `POST /api/acesso/usuario/:id/setores` não tem a trava do último Admin Geral (a de `auth.js` só cobre bloquear/excluir) (auditoria §1.1). **Aberto em 17/09/2026** | Médio — escalonar ou se trancar fora pela tela oficial |
 
 ---
 

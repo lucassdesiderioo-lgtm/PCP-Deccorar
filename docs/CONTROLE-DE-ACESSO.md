@@ -1,5 +1,10 @@
 # Controle de Acesso — Especificação
 
+> **STATUS · 17/09/2026 — IMPLEMENTADO** (fases 1 a 6, 16–17/08/2026) · com furos abertos:
+> default `@logado`, cobertura mantida à mão, exceção sem trava de `intransferivel` e
+> setores sem trava do último Admin Geral — ver `CLAUDE.md` §14, dívidas 16 e 17.
+> O "Status" logo abaixo é o da escrita original.
+
 > Modelo de permissões do PCP Deccorar.
 > **Data:** 14/08/2026 · **Status:** desenho para revisão, nada implementado
 
