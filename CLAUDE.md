@@ -9,6 +9,109 @@
 
 ---
 
+## 0. PROTOCOLO — toda tarefa tem começo, meio e fim
+
+> Vale para **toda** sessão (Mac ou nuvem), de qualquer tamanho. O dono decide as
+> regras e acompanha pelo relatório — e se perde quando regra e código mudam sem
+> ele ver. **Este protocolo não é opcional, nem "só dessa vez".**
+
+### O dono fala em dois momentos, e só neles
+
+```
+  ① COMEÇO ─────────▶ ✋ "pode seguir" ─────────▶ ② MEIO ─────────▶ ③ FIM ─────────▶ ✋ "pode subir"
+  entender e planejar   (aprova o plano)          construir         deixar em ordem    (aprova merge/deploy)
+```
+
+Entre um ✋ e outro, trabalhe sozinho. **Fora deles, só interrompa por um motivo:
+apareceu uma regra de negócio que precisa mudar.**
+
+### Como o dono abre uma tarefa
+
+Ele pode começar a mensagem com uma palavra. Se não começar, **você classifica e diz qual é**.
+
+| Palavra | Significa | Precisa de spec? |
+|---|---|---|
+| `CONSERTO:` | o sistema deveria fazer e não faz | não |
+| `AJUSTE:` | mudar algo pequeno sem mudar regra | não |
+| `REGRA:` | mudar como a fábrica trabalha | **sim** |
+| `NOVIDADE:` | algo que não existe | **sim** |
+| `FASE:` | construir a próxima fase de uma spec de `docs/specs/` | já tem |
+
+**`REGRA` ou `NOVIDADE` sem spec aprovada: não construa.** Explique que precisa ser
+desenhado no Projeto do Claude primeiro e ofereça um rascunho de spec.
+
+**Um `CONSERTO` que exige mudar regra vira `REGRA`.** Pare e avise — é exatamente
+assim que a bagunça começa.
+
+### O semáforo de risco — define o cuidado
+
+| | Mexe em | Cuidado exigido |
+|---|---|---|
+| 🟢 | texto, cor, posição, tamanho, tela de escritório | plano curto (3 linhas) |
+| 🟡 | comportamento de tela, bipe, cálculo exibido, relatório | plano completo + teste |
+| 🔴 | **estoque, acesso/permissão, etiqueta/NF, dados de produção, schema** | plano completo + **teste escrito antes do conserto** + backup + deploy fora do horário de expedição |
+
+Na dúvida entre duas cores, use a mais alta.
+
+---
+
+### ① COMEÇO — entender antes de mexer
+
+1. Leia a seção deste arquivo sobre o assunto e, se houver, a spec em `docs/specs/`.
+2. Investigue no código real (nunca de memória).
+3. Apresente o **PLANO**, neste formato, em português de fábrica:
+
+```
+📋 PLANO
+Tipo: CONSERTO | AJUSTE | FASE N da spec X        Risco: 🟢 | 🟡 | 🔴
+O que está acontecendo: (a causa, ou o que vai ser feito)
+O que vou mudar: (arquivos, em 1 linha cada)
+Regra de negócio muda? NÃO  |  SIM → antes: … / depois: …
+Como vou testar: …
+Fica de fora: …
+```
+
+4. **✋ Espere o "pode seguir".**
+
+### ② MEIO — construir só o combinado
+
+5. Faça **só** o que está no plano. Siga a §13 (backup, `node --check`, teste de segurança).
+6. **Achou outro problema?** Anote para o relatório. Não conserte junto.
+7. **Precisa mudar uma regra que não estava no plano?** Pare e pergunte. Nunca decida sozinho,
+   mesmo que pareça bug óbvio — metade das regras deste arquivo *parecem* bug.
+
+### ③ FIM — só termina com tudo em ordem
+
+8. Testes rodando e passando.
+9. Papel em dia, **no mesmo commit do código**:
+
+| Se… | Então atualize |
+|---|---|
+| mudou regra | este `CLAUDE.md` **e** uma linha em `docs/DECISOES.md` |
+| descobriu armadilha | este `CLAUDE.md` |
+| resolveu dívida | risque na §14, com data |
+| trabalhou numa spec | STATUS da spec + índice em `docs/specs/README.md` |
+| terminou a spec inteira | spec vai para `docs/arquivo/` |
+
+10. Commit com mensagem clara. Em branch: **abra o PR**.
+11. Entregue o **FECHAMENTO** e **✋ espere o "pode subir"** antes de merge ou deploy:
+
+```
+✅ FECHAMENTO
+Tipo e risco: …
+O que mudou: (2-3 linhas, sem jargão)
+Regra de negócio mudou? NÃO  |  SIM → antes / depois (registrado em DECISOES.md)
+Testes: quais rodaram · resultado
+Papel em dia: CLAUDE.md §… · DECISOES.md · spec … · README das specs
+Commit/PR: …   Falta mesclar? …
+Deploy: não precisa  |  precisa → comandos · melhor horário
+Achei no caminho (não mexi): …
+```
+
+Item do FIM que não foi possível cumprir: **diga qual e por quê.** Nunca declare pronto com item faltando.
+
+---
+
 ## 1. O que é este sistema
 
 PCP (Planejamento e Controle da Produção) de uma fábrica de persianas que vende
