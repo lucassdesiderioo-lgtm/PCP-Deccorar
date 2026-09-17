@@ -671,8 +671,81 @@ module.exports = function(app, db){
     if(eq('/api/painel') || eq('/api/gerencial')) return 'painel.ver';
     if(pre('/api/rel')) return 'relatorios.ver';
     if(eq('/api/cruzamento') || pre('/api/planejamento') || eq('/api/fechamento')) return '@admin';
-    // ── resto: qualquer logado (operacao le livremente, como hoje) ──
-    return '@logado';
+
+    /* ═══ AS LEITURAS QUE NÃO TINHAM DONO (dívida 16, 17/09/2026) ═══════════
+       Tudo daqui pra baixo vinha caindo no antigo `return '@logado'`. Nada
+       ACIMA desta linha muda de dono: as regras novas só pegam o que já era
+       aberto a qualquer pessoa logada.
+
+       ⚠️ O DONO DE UMA LEITURA É UMA **LISTA**, e isso não é frouxidão. Uma
+       chave só não descreve quem lê: `/api/lote` é lido pela Etiqueta de
+       Venda, pela tela de Lançar produção E pelo admin. Pior: as chaves de
+       operação são de nível `operacao`, e o setor **Admin** só recebe as de
+       nível `admin` — declarar a leitura pela chave da tela tiraria do próprio
+       Admin a leitura da tela dele. Quem passa é quem tem QUALQUER UMA. */
+    if(eq('/api/bloqueados')) return '@admin';
+    // A bancada da Etiqueta de Venda: o que falta imprimir, o que vem depois,
+    // o relógio do despacho e o bipe do SKU.
+    if(eq('/api/pendentes') || eq('/api/pendentes/futuros') || eq('/api/fila/resumo')
+       || eq('/api/expedicao/status') || pre('/api/proximo')) return ['etiqueta.emitir','@admin'];
+    if(eq('/api/lote')) return ['pdf.subir','etiqueta.emitir','@admin'];
+    if(eq('/api/fila') || eq('/api/montagem/hoje')) return ['embalagem.executar','etiqueta.emitir','@admin'];
+    /* A FOTO DA COLETA É PROVA (§8-B), e estava legível por qualquer pessoa
+       logada: é a tela do celular do motorista, com a contagem dele. */
+    if(eq('/api/carregamento') || pre('/api/coleta')) return ['carregamento.executar','@admin'];
+    if(pre('/api/revisao')) return ['revisao.executar','@admin'];
+    /* A lista de ordens do dia: a tela vermelha do operador mostra o que foi
+       lançado, e o admin mostra a mesma coisa na aba de lançar. Lançar (POST)
+       continua em `producao.lancar`, declarado lá em cima. */
+    if(eq('/api/producao')) return ['revisao.executar','@admin'];
+    if(pre('/api/contagem')) return ['contagem.contar','@admin'];
+    if(eq('/api/devolucao/pendentes')) return ['devolucao.baixar','@admin'];
+    if(pre('/api/devolucao')) return ['devolucao.registrar','@admin'];
+
+    /* ═══ LISTAS DE APOIO DE TELA: continuam abertas a quem entrou ═════════
+       Cor, modelo, tecido, SKU, as listas configuráveis e o código do kit são
+       o que as telas usam para montar seletor e conferir bipe. Não carregam
+       preço, custo nem dado de cliente, e a Embalagem precisa do kit no
+       tablet. Ficam `@logado` — mas agora DECLARADAS, não por sobra. */
+    if(eq('/api/skus') || eq('/api/cores') || eq('/api/modelos') || eq('/api/tecidos')
+       || pre('/api/listas') || pre('/api/config/kit')
+       || eq('/api/config/horarios') || eq('/api/config/conferencia')) return '@logado';
+    /* O login acontece ANTES de existir sessão, e o `/status` é healthcheck: os
+       dois já passam pela lista LIVRE do auth.js sem chegar aqui. Ficam
+       declarados para a varredura não acusar o que não é problema. */
+    if(eq('/login') || eq('/status') || pre('/api/auth')) return '@logado';
+    /* A escolha de setor é de QUALQUER SESSÃO — é a tela onde a pessoa diz onde
+       vai trabalhar hoje, antes de ter qualquer coisa marcada. */
+    if(eq('/setor')) return '@logado';
+
+    /* ⚠️ O ARQUIVO DA TELA NÃO É A TELA — E FOI ISTO QUE QUASE DERRUBOU TUDO.
+       Com sessão aberta, `/sku.js`, `/base.css` e as imagens passam por aqui
+       como qualquer caminho: a lista LIVRE do `auth.js` tem só `/login`,
+       `/login.html`, `/nav.js` e `/favicon.ico`. Negar por padrão sem esta
+       linha tiraria o JavaScript de TODAS as telas — elas abririam em branco,
+       com 403 no console, para todo mundo menos o Admin Geral, e o sintoma não
+       se pareceria nem de longe com "mexeram na permissão".
+       `.html` NÃO entra aqui de propósito: ele é tela, e cai na regra abaixo. */
+    if(/\.(js|mjs|css|map|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot)$/i.test(p)) return '@logado';
+    /* A GÊMEA `.html` VALE O MESMO QUE A TELA. `/operador` exigia
+       `revisao.executar` e `/operador.html` — o mesmo arquivo, servido pelo
+       `express.static` — exigia só estar logado. Ninguém navega por ela (o
+       rodapé usa a rota sem extensão), então fechar não tira nada de ninguém.
+       Herdar em vez de listar as dez faz a tela nova de amanhã já nascer com a
+       gêmea coberta. */
+    if(/\.html$/.test(p)) return permDaRota(eq('/index.html') ? '/admin' : p.slice(0, -5), M);
+
+    /* ⚠️ E O PADRÃO PASSOU A SER **NEGAR** (dívida 16). Enquanto foi
+       `return '@logado'`, rota nova nascia aberta a qualquer pessoa logada sem
+       aparecer em lugar nenhum: nem erro, nem log, nem linha na cobertura — que
+       era uma lista escrita à mão e ainda descartava tudo que começa com
+       `/api/`, imprimindo "cobertura OK (0 sem declarar)" no boot. Um verde que
+       ninguém conferiu.
+       Quem esquecer de declarar descobre na hora: a rota responde 403 e o boot
+       grita o nome dela. O Admin Geral continua passando por NÍVEL, antes da
+       chave — uma declaração esquecida não pode trancar o dono fora do próprio
+       sistema, e é ele quem vai ler o aviso. */
+    return '@negado';
   }
   function temAdmin(perms){ for(const c of perms){ const i=infoPerm[c]; if(i && (i.nivel==='admin'||i.nivel==='admin_geral')) return true; } return false; }
   function ehAdminGeral(uid){
@@ -741,11 +814,29 @@ module.exports = function(app, db){
     const req = permDaRota(pathRaw, method);
     if(req === '@logado') return { ok:true, chave:null, motivo:'logado' };
     const ag = ehAdminGeral(u.id);
-    if(ag) return { ok:true, chave:req, motivo:'admin_geral' };   // Admin Geral passa sempre
+    /* Admin Geral passa sempre, e ANTES da chave: e o que garante que uma rota
+       que alguem esqueceu de declarar (hoje ela nasce '@negado') nao tranque o
+       dono fora do proprio sistema — ele e quem le o aviso do boot. */
+    if(ag) return { ok:true, chave:Array.isArray(req)?req[0]:req, motivo:'admin_geral' };
     const perms = permissoesDe(u.id);
-    if(req === '@admin') return { ok: temAdmin(perms), chave:'@admin', motivo:'admin' };
-    if(req === '@ag')   return { ok:false, chave:'@ag', motivo:'so_admin_geral' };
-    return { ok: perms.has(req), chave:req, motivo:'permissao' };
+    /* ROTA SEM DECLARACAO NASCE NEGADA (divida 16). O nome do motivo importa:
+       na auditoria, 'rota_nao_declarada' quer dizer "falta uma linha no
+       permDaRota", e nao "esta pessoa nao devia estar ali". */
+    if(req === '@negado') return { ok:false, chave:'@negado', motivo:'rota_nao_declarada' };
+    /* A DECLARACAO PODE SER UMA LISTA: passa quem tem QUALQUER UMA das chaves.
+       E o caso das leituras com mais de um publico legitimo — a mesma tabela
+       que a Etiqueta de Venda le e a que o admin le (ver o bloco das leituras
+       no permDaRota). */
+    const exigidas = Array.isArray(req) ? req : [req];
+    const passa = (c) => c === '@logado' ? true
+                       : c === '@admin'  ? temAdmin(perms)
+                       : c === '@ag'     ? false
+                       : perms.has(c);
+    const atendida = exigidas.find(passa);
+    return { ok: !!atendida, chave: atendida || exigidas[0],
+             motivo: exigidas.length > 1 ? 'permissao_lista'
+                   : exigidas[0] === '@admin' ? 'admin'
+                   : exigidas[0] === '@ag' ? 'so_admin_geral' : 'permissao' };
   }
 
   // ── FASE 6: o modelo NOVO passa a ser o padrao permanente. Semeia 'novo' uma
@@ -773,52 +864,53 @@ module.exports = function(app, db){
   app.get('/api/acesso/modo', (req, res) => { if(!soAdmin(req, res)) return; res.json({ modo:modoAcesso() }); });
 
   // ── FASE 4: cobertura (todas as rotas x permissao declarada) e auditoria ──
-  const TODAS_ROTAS = [
-    ['GET','/'],['GET','/operador'],['GET','/montagem'],['GET','/embalagem'],['GET','/carregamento'],
-    ['GET','/expedicao'],['GET','/devolucao'],['GET','/painel'],['GET','/relatorios'],
-    ['GET','/planejamento'],['GET','/acessos'],['GET','/baixar-backup'],
-    ['POST','/api/revisao'],['POST','/api/rejeicao'],['POST','/api/montagem'],['POST','/api/embalar'],
-    ['POST','/api/carregar'],['POST','/api/coleta/fechar'],['POST','/api/lote/upload'],['GET','/api/print/:id'],
-    ['GET','/api/impressos'],['POST','/api/reimprimir'],
-    ['GET','/api/divergencias'],['POST','/api/divergencias/resolver'],
-    ['GET','/api/modalidade/pendentes'],['POST','/api/modalidade/resolver'],['GET','/api/coleta/foto/:id'],
-    ['GET','/api/pacote/pendentes'],['POST','/api/pacote/resolver'],['POST','/api/lote/conferir'],
-    ['GET','/api/auditoria/skus'],['POST','/api/devolucao'],
-    ['POST','/api/devolucao/baixa'],['POST','/api/estoque'],['POST','/api/alvo'],
-    ['POST','/api/producao'],['POST','/api/planejamento/importar'],['POST','/api/skus'],['DELETE','/api/skus/:c'],
-    ['GET','/api/skus/pendencias'],['GET','/api/cores'],['POST','/api/cores'],['DELETE','/api/cores/:c'],
-    ['GET','/api/modelos'],['POST','/api/modelos'],['DELETE','/api/modelos/:id'],
-    ['GET','/api/tecidos'],['POST','/api/tecidos'],['DELETE','/api/tecidos/:c'],
-    ['GET','/api/fornecedores'],['POST','/api/fornecedores'],['DELETE','/api/fornecedores/:id'],
-    ['GET','/api/componentes'],['POST','/api/componentes'],['DELETE','/api/componentes/:id'],
-    ['GET','/api/ofertas'],['POST','/api/ofertas'],['DELETE','/api/ofertas/:id'],
-    ['GET','/api/precos/historico'],['GET','/api/skus/custo'],['GET','/api/comparar'],['GET','/api/compras/lista'],['GET','/api/custo/historico'],
-    ['GET','/recebimento'],['GET','/api/recebimento/aguardando'],['POST','/api/recebimento'],
-    ['POST','/api/recebimento/:id/preco'],['GET','/api/recebimento/devolucoes'],
-    ['POST','/api/pedidos/:id/fechar'],['GET','/api/pedidos/zumbis'],
-    ['GET','/api/pedidos'],['POST','/api/pedidos'],['GET','/api/pedidos/:id'],
-    ['GET','/api/pedidos/:id/whatsapp'],['POST','/api/pedidos/:id/enviar'],
-    ['POST','/api/pedidos/:id/cancelar'],['POST','/api/pedidos/:id/pagar'],
-    ['GET','/api/formulas'],['POST','/api/formulas'],['POST','/api/formulas/testar'],
-    ['GET','/api/formulas/medidas/:modelo_id'],
-    ['DELETE','/api/formulas/:id'],['GET','/api/ficha/:sku'],['POST','/api/ficha/:sku/materializar'],
-    ['POST','/api/cruzamento/aplicar'],['POST','/api/contagem/bipe'],['POST','/api/contagem/ajustar'],
-    ['POST','/api/contagem/lancar'],['GET','/api/contagem/pendentes'],['POST','/api/contagem/pendentes/aprovar'],
-    ['POST','/api/contagem/pendentes/rejeitar'],
-    ['GET','/api/contagem/componentes'],['POST','/api/contagem/componente'],
-    ['GET','/api/compras/necessidade'],
-    ['POST','/api/config/horarios'],['POST','/api/config/kit'],['POST','/api/config/kit/etiqueta'],
-    ['POST','/api/kit/etiqueta/imprimir'],
-    ['GET','/api/config/conferencia'],['POST','/api/config/conferencia'],['POST','/api/listas'],['GET','/api/teste'],
-    ['GET','/api/usuarios'],['GET','/api/acesso/setores'],['GET','/api/acesso/divergencias'],
-    ['GET','/api/painel'],['GET','/api/rel/dia'],['GET','/api/cruzamento'],
-    ['GET','/api/rejeicao/resumo'],['GET','/api/skus'],['GET','/api/fila'],['GET','/api/carregamento']
-  ];
+  /* ═══ A COBERTURA VARRE O APP, E NAO UMA LISTA ESCRITA A MAO ═══════════
+     Aqui morava `TODAS_ROTAS`: 49 linhas digitadas para 151 rotas reais, e o
+     contador ainda descartava tudo que comecasse com `/api/` — por construcao
+     nenhuma API sem dono aparecia, e o boot imprimia "cobertura OK (0 sem
+     declarar)". Verde que ninguem conferiu e pior que vermelho: ele afirma com
+     autoridade uma coisa que nao foi olhada.
+     Hoje a lista sai do proprio Express, entao rota nova entra na conta no
+     mesmo minuto em que e escrita. E o que a divida 12(c) do §14 pede.
+
+     ⚠️ `/sobmedida` FICA DE FORA, e nao por esquecimento: aquele modulo tem
+     portao proprio (`tecido/montar.js`) e o `auth.js` passa por ele ANTES do
+     `decidir` — um dono so por caminho (§19). Acusar as rotas dele aqui seria
+     ruido permanente na lista, e ruido permanente e o que faz a lista deixar
+     de ser lida. */
+  function rotasRegistradas(){
+    const pilha = (app._router && app._router.stack) || (app.router && app.router.stack) || [];
+    const fora = [];
+    for(const camada of pilha){
+      if(!camada.route || !camada.route.path) continue;
+      const rota = String(camada.route.path);
+      if(rota === '/sobmedida' || rota.indexOf('/sobmedida/') === 0) continue;
+      for(const metodo of Object.keys(camada.route.methods || {}))
+        fora.push({ metodo:metodo.toUpperCase(), rota });
+    }
+    return fora;
+  }
+  /* O `:param` vira valor de mentira porque e assim que o caminho chega em
+     producao: o `permDaRota` julga `/api/coleta/foto/123`, nunca
+     `/api/coleta/foto/:id`. Perguntar com o padrao responderia por uma rota
+     que nao existe. */
+  const comoChega = (rota) => rota.replace(/:([A-Za-z_0-9]+)\??/g, '1');
+  function coberturaDeRotas(){
+    const linhas = rotasRegistradas().map(r => ({
+      metodo:r.metodo, rota:r.rota,
+      permissao: permDaRota(comoChega(r.rota), r.metodo)
+    }));
+    const naoDeclaradas = linhas.filter(l => l.permissao === '@negado');
+    return { total:linhas.length, nao_declaradas:naoDeclaradas.length,
+             lista_nao_declaradas:naoDeclaradas.map(l => l.metodo+' '+l.rota), linhas };
+  }
+
   app.get('/api/acesso/cobertura', (req, res) => {
     if(!soAdmin(req, res)) return;
-    const linhas = TODAS_ROTAS.map(([m,p]) => ({ metodo:m, rota:p, permissao:permDaRota(p, m) }));
-    const semDeclarar = linhas.filter(l => l.permissao === '@logado' && l.rota.indexOf('/api/') !== 0);
-    res.json({ total:linhas.length, sem_declarar:semDeclarar.length, linhas });
+    const c = coberturaDeRotas();
+    // `sem_declarar` continua no JSON com o nome antigo: a tela de Acessos le
+    // esse campo, e trocar o nome aqui apagaria o numero dela sem aviso.
+    res.json(Object.assign({ sem_declarar:c.nao_declaradas }, c));
   });
   app.get('/api/acesso/auditoria', (req, res) => {
     if(!soAdmin(req, res)) return;
@@ -827,16 +919,27 @@ module.exports = function(app, db){
     res.json({ linhas });
   });
 
-  // ── FASE 6 (secao 6.4): aviso no boot de rotas sem permissao declarada. ──
-  try{
-    const semDeclarar = TODAS_ROTAS
-      .map(([m,p]) => ({ m, p, req: permDaRota(p, m) }))
-      .filter(l => l.req === '@logado' && l.p.indexOf('/api/') !== 0);
-    console.log('[acesso] Fase 6: modo de acesso = '+modoAcesso()
-      + ' — '+(semDeclarar.length ? semDeclarar.length+' TELA(S) SEM PERMISSAO DECLARADA: '
-          + semDeclarar.map(l => l.p).join(', ') : 'cobertura de telas OK (0 sem declarar)'));
-  }catch(e){ console.log('[acesso] aviso de cobertura falhou: '+e.message); }
+  /* ── O AVISO DO BOOT, AGORA SOBRE O APP INTEIRO ──────────────────────────
+     ⚠️ `setImmediate` E OBRIGATORIO. Este arquivo e carregado no meio do
+     `server.js`: na hora em que ele roda, o `teste_route` e o `/sobmedida`
+     ainda nao registraram nada. Varrer agora contaria meio sistema e diria
+     "cobertura OK" sobre o que ainda nao existe — o mesmo verde sem conferencia
+     que a lista manual dava. Uma volta no laco de eventos depois, o
+     `server.js` terminou de montar tudo.
+     O aviso e RUIDOSO de proposito: rota nova nasce negada, e quem escreveu
+     precisa ver o nome dela no log da primeira vez que subir — nao no 403 da
+     bancada, tres dias depois. */
+  setImmediate(() => {
+    try{
+      const c = coberturaDeRotas();
+      console.log('[acesso] Fase 6: modo de acesso = '+modoAcesso()
+        + ' — '+c.total+' rotas registradas, '
+        + (c.nao_declaradas
+            ? c.nao_declaradas+' SEM PERMISSAO DECLARADA (nascem NEGADAS): '+c.lista_nao_declaradas.join(', ')
+            : 'todas com permissao declarada'));
+    }catch(e){ console.log('[acesso] aviso de cobertura falhou: '+e.message); }
+  });
 
   // exposto para o auth.js (Fase 3) e demais rotas (Fases 5/6)
-  app.locals.acesso = { permissoesDe, compararDivergencias, AREA_CHAVE, decidir, modoAcesso, permDaRota, auditar, podePermissao, ehAdminGeral, ehUltimoAdminGeral };
+  app.locals.acesso = { permissoesDe, compararDivergencias, AREA_CHAVE, decidir, modoAcesso, permDaRota, auditar, podePermissao, ehAdminGeral, ehUltimoAdminGeral, coberturaDeRotas };
 };

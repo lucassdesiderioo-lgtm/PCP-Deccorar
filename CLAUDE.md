@@ -577,7 +577,7 @@ configuração é o que vai falhar.
 > lista única do desenho, o PDF (tamanho da página, lote, recusa e auditoria) e
 > o QR — que o teste não "olha": ele decodifica de volta, confere a paridade
 > Reed-Solomon e **remonta o QR a partir do PDF gerado**. Mexeu na permissão?
-> **`node teste_acesso.js`** (59 casos). Mexeu no `barras.js`?
+> **`node teste_acesso.js`** (104 casos). Mexeu no `barras.js`?
 > **`cd tecido && npm test` também** — a etiqueta de prateleira do sob medida
 > lê o mesmo arquivo.
 
@@ -862,8 +862,10 @@ peça**, não só para o `lote.codigo`. A decisão vira história
 > `etiqueta.emitir` não conferiria nem imprimiria.
 >
 > **Rode `node teste_acesso.js` ao mexer em `permissoes.js` ou no `permDaRota()`**
-> — os 59 casos travam as três pontas, o backfill, a lista de cobertura e as
-> quatro portas de escalonamento da §10 (armadilha #28).
+> — os 104 casos travam as três pontas, o backfill, a cobertura e as quatro
+> portas de escalonamento da §10 (#28). **Rota nova pede uma linha no
+> `permDaRota()`**: sem ela a rota nasce NEGADA e o `teste_cobertura.js`
+> reprova (§10, armadilha #29).
 
 **3. Etiqueta de Venda: sem o bipe de TODAS as peças, não imprime.** Tela âmbar
 própria (`📦 ESTA CAIXA LEVA 3 PERSIANAS`), uma linha por peça com o que ela é
@@ -2028,10 +2030,71 @@ oficial, todas deixando **rastro de ação legítima** na auditoria — porque e
 > `CREATE` não aconteceu e os `try/catch` engolem tudo em silêncio: o seed
 > "roda", não grava nada, e ninguém fica sabendo. É a mesma família do §17.
 
-**Rode `node teste_acesso.js` ao mexer em `acesso.js`, `permissoes.js` ou
-`auth.js`** — os 59 casos cobrem as três pontas de uma permissão nova (§19,
-armadilha #13) e as quatro portas acima. As travas moram nas **rotas**, então o
-teste chama as rotas: trava que ninguém chama é trava que ninguém testa.
+### ⚠️ ARMADILHA #29 — ROTA SEM PERMISSÃO NASCE NEGADA (e o que quase veio junto)
+
+Fechado em 17/09/2026 (era a dívida 16, e fecha a **12(c)** do §14 junto). O
+`permDaRota()` terminava em `return '@logado'`: **rota nova nascia aberta** a
+qualquer pessoa logada, sem erro, sem log e sem aparecer em lugar nenhum.
+
+E a cobertura não acusava, porque era uma **lista escrita à mão**
+(`TODAS_ROTAS`) com 49 linhas para **151 rotas reais** — e o contador ainda
+descartava tudo que começasse com `/api/`. O boot imprimia *"cobertura de telas
+OK (0 sem declarar)"*. **Verde que ninguém conferiu é pior que vermelho:** ele
+afirma com autoridade uma coisa que não foi olhada. Hoje a varredura sai do
+próprio Express (`coberturaDeRotas()`), então rota nova entra na conta no mesmo
+minuto em que é escrita, e o boot **grita o nome dela**.
+
+> ⚠️ **O QUE QUASE DERRUBOU A FÁBRICA INTEIRA: o arquivo da tela também passa
+> pelo `decidir`.** Com sessão aberta, `/sku.js`, `/base.css` e as imagens são
+> julgados como qualquer caminho — a lista `LIVRE` do `auth.js` tem só
+> `/login`, `/login.html`, `/nav.js` e `/favicon.ico`. Negar por padrão sem uma
+> regra para eles tiraria o **JavaScript de todas as telas**: elas abririam em
+> branco, com 403 no console, para todo mundo menos o Admin Geral — e "tela em
+> branco" não se parece nem de longe com "mexeram na permissão". Por isso
+> existe a linha das extensões (`.js`, `.css`, imagens, fontes → `@logado`), e
+> por isso **`.html` fica de fora dela**: `.html` é tela.
+
+> ⚠️ **O DONO DE UMA LEITURA É UMA LISTA, e isso não é frouxidão.** Uma chave só
+> não descreve quem lê: `/api/lote` é lido pela Etiqueta de Venda, pela tela de
+> Lançar produção **e** pelo admin. Pior: as chaves de operação são de nível
+> `operacao` e o setor **Admin** só recebe as de nível `admin` — declarar a
+> leitura pela chave da tela **tiraria do próprio Admin** a leitura da tela
+> dele. Passa quem tem **qualquer uma** das chaves da lista.
+
+> ⚠️ **A GÊMEA `.html` HERDA A TELA, em vez de ser listada.** `/operador` exigia
+> `revisao.executar` e `/operador.html` — o mesmo arquivo, servido pelo
+> `express.static` — exigia só estar logado. Ninguém navega por ela (o rodapé
+> usa a rota sem extensão), então fechar não tira nada de ninguém; e herdar faz
+> a tela nova de amanhã já nascer com a gêmea coberta.
+
+> ⚠️ **O ADMIN GERAL PASSA ANTES DA CHAVE, e isso ficou mais importante.** Uma
+> declaração esquecida agora **nega**; se ela negasse o dono também, uma linha
+> faltando trancaria quem tem que consertar. Ele passa por nível e é quem lê o
+> aviso do boot.
+
+> ⚠️ **`/sobmedida` FICA FORA DA VARREDURA, por desenho.** Aquele módulo tem
+> portão próprio (`tecido/montar.js`) e o `auth.js` passa por ele **antes** do
+> `decidir` — um dono só por caminho (§19). Acusá-lo aqui seria ruído
+> permanente, e ruído permanente é o que faz a lista deixar de ser lida.
+
+> ⚠️ **O `setImmediate` DO AVISO NÃO É ENFEITE.** O `acesso.js` é carregado no
+> meio do `server.js`: na hora em que ele roda, o `teste_route` e o
+> `/sobmedida` ainda não registraram nada. Varrer ali contaria meio sistema e
+> diria "tudo declarado" sobre o que ainda não existe — o mesmo verde sem
+> conferência da lista manual.
+
+**O que mudou para quem usa:** nada para quem já tinha a permissão da tela. As
+28 leituras que eram abertas a qualquer pessoa logada ganharam dono — quem
+opera a tela **ou** o admin. A mais sensível delas era a **foto da coleta**
+(§8-B), que é prova e estava legível por qualquer sessão.
+
+**Rode `node teste_acesso.js` e `node teste_cobertura.js` ao mexer em
+`acesso.js`, `permissoes.js`, `auth.js` ou ao criar QUALQUER rota nova** — os
+104 + 10 casos cobrem as três pontas de uma permissão nova (§19, armadilha
+#13), as quatro portas da #28, e travam que **nenhuma das 170 rotas registradas
+hoje nasce negada**. O `teste_cobertura.js` sobe os módulos de verdade e varre
+o `server.js` por texto, porque as rotas dele não são carregáveis — foi assim
+que `GET /api/producao` apareceu, no boot, depois de o outro teste dizer zero.
 
 ### ⚠️ ARMADILHA #3 — a ordem no `server.js` é arquitetura, não estilo
 
@@ -2230,13 +2293,13 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (59), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (104), `teste_cobertura.js` (10), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
-| 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
+| 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto — é passivo, e se fecha pelos scripts do §5 | — |
 | 14 | ~~**`POST /api/montagem` (a embalagem) sem proteção**~~ **RESOLVIDO em 17/09/2026** — transação nas quatro escritas, SKU conferido (404), kit conferido no servidor e recusa aparecendo na tela; `teste_montagem.js` (42 casos). Ver §4, armadilha #26. **Fica aberto**: o código do kit é conferido quando vem, não exigido — exigir espera o refresh nos tablets. "Embalar sem revisar gera estoque" **não** entrou: é regra do §4, não defeito | — |
 | 15 | ~~**`POST /api/skus` zera o estoque** quando o corpo não traz `estoque`~~ **RESOLVIDO em 17/09/2026** — campo ausente preserva os quatro campos soltos, número impossível é recusado (400) em vez de clampado, e as duas escritas viraram uma transação com o `catch` vazio fora. A rota saiu para `sku_cad_route.js` e tem `teste_skus.js` (60 casos) atrás — ver §6, armadilha #25. **Fica aberto**: a rota ainda muda saldo com `sku.cadastrar`, sem motivo e sem auditoria (fechar isso é `REGRA`) | — |
-| 16 | **Acesso: default `@logado` e cobertura mantida à mão** — `permDaRota` termina em `@logado`; a tela de cobertura lê a lista `TODAS_ROTAS` e ignora `/api/`. Fecha junto com a dívida 12(c) (auditoria §1.2–1.3). **Aberto em 17/09/2026** | Médio — rota nova nasce aberta sem aparecer em lugar nenhum |
+| 16 | ~~**Acesso: default `@logado` e cobertura mantida à mão**~~ **RESOLVIDO em 17/09/2026** — o padrão passou a ser **negar**, a cobertura varre o Express (a lista `TODAS_ROTAS` saiu) e o boot grita o nome da rota não declarada; as 28 leituras sem dono foram declaradas e as telas `.html` gêmeas herdaram a permissão da tela. Ver §10, armadilha #29 · `teste_cobertura.js` | — |
 | 17 | ~~**Acesso: duas travas faltando**~~ **RESOLVIDO em 17/09/2026** — a exceção recusa conceder chave `intransferivel`, a troca de setores tem a trava do último Admin Geral (mesma conta do `auth.js`, agora no `acesso.js`), setor novo não nasce `admin_geral` e a migração de `areas` virou evento de uma vez só (a porta A, que promovia a Admin Geral em silêncio). Ver §10, armadilha #28 | — |
 
 ---
@@ -2386,6 +2449,23 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   qualquer de nível admin — sem ninguém pedir (§10, armadilha #28, porta A)
 - ❌ Gravar em `config` a partir de um módulo sem garantir que a tabela existe: o
   `try/catch` engole, o seed "roda" e não grava nada (§10, §17)
+- ❌ Fazer o `permDaRota()` voltar a terminar em `@logado`: rota nova nasceria
+  aberta a qualquer pessoa logada, sem erro e sem log (§10, armadilha #29)
+- ❌ Criar rota sem a linha no `permDaRota()` — ela **nasce negada**, e o
+  `teste_cobertura.js` reprova. Isso é o aviso funcionando, não um estorvo (§10)
+- ❌ Pôr `.html` na regra de extensões dos arquivos de apoio: `.html` é TELA, e
+  a gêmea tem que herdar a permissão da rota sem extensão (§10, #29)
+- ❌ Tirar a regra das extensões (`.js`, `.css`, imagens): com sessão aberta o
+  arquivo da tela passa pelo `decidir`, e sem ela toda tela abre em branco com
+  403 no console (§10, armadilha #29)
+- ❌ Voltar a medir cobertura por lista escrita à mão, ou descartar `/api/` do
+  contador — era isso que imprimia "cobertura OK" sobre 151 rotas olhando 49
+  (§10, armadilha #29)
+- ❌ Varrer as rotas sem `setImmediate` no boot: o `teste_route` e o
+  `/sobmedida` ainda não subiram, e a conta sairia sobre meio sistema (§10)
+- ❌ Declarar leitura de tela por uma chave só quando ela tem mais de um público:
+  o setor Admin não tem chave de operação, e a leitura da própria tela dele
+  sumiria — a declaração aceita uma LISTA (§10, armadilha #29)
 - ❌ Mover `express.static` para antes do `auth`
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor
