@@ -2545,23 +2545,15 @@ async function carregarCad(){
   h+='<div id="cdEtqPrMsg" style="margin-top:10px;font-size:14px"></div>';
   h+='</div>';
   h+='</div>';
-  // Etiqueta pronta (arquivo) — sobe a arte da etiqueta (QR + KITENVIO etc.) e
-  // imprime por aqui quando quiser.
-  h+='<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">';
-  h+='<div style="font-weight:700;margin-bottom:4px">Etiqueta do kit (arquivo pronto)</div>';
-  h+='<div class="sub" style="margin-bottom:10px">Tem a etiqueta pronta (com o QR + código)? Suba o arquivo aqui (PDF, PNG, JPG ou SVG) e imprima por aqui quando quiser. Substitui a anterior.</div>';
-  h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="file" id="cdKitFile" accept="application/pdf,image/png,image/jpeg,image/svg+xml"><button class="primary" id="cdKitUp">Enviar etiqueta</button><button class="ghost" id="cdKitPrint">Imprimir etiqueta</button><button class="del" id="cdKitDel">Remover</button></div>';
-  h+='<div id="cdKitLabelMsg" class="sub" style="margin-top:10px"></div>';
-  h+='</div></div>';
+  /* Aqui ficava "Etiqueta do kit (arquivo pronto)" — subir uma arte e imprimir
+     por ela. Saiu em 17/09/2026 (fase 4): o arquivo enviado não acompanha o
+     Código do kit, então trocar o código deixava o rolo impresso por ele sem
+     bipar na Embalagem. Uma etiqueta, um caminho. */
+  h+='</div>';
   el.innerHTML=h;
   KIT_SALVO={ linha1:etq.linha1||'', linha2:etq.linha2||'', qr_legenda:etq.qr_legenda||'',
               link:etq.link||'', codigo:kit||'' };
   desenharPreviaKit();
-  // mostra a etiqueta atual, se houver
-  try{ var lm=await (await fetch('/api/kit/label/meta')).json();
-    if(lm && lm.arquivo) document.getElementById('cdKitLabelMsg').innerHTML='Etiqueta atual: <b style="color:var(--txt)">'+(lm.nome||lm.arquivo)+'</b>'+(lm.em?' &middot; enviada '+lm.em:'');
-    else document.getElementById('cdKitLabelMsg').textContent='Nenhuma etiqueta enviada ainda.';
-  }catch(e){}
 }
 /* A PREVIA DA ETIQUETA DO KIT (spec GERADOR-ETIQUETA-KIT, fase 2).
    Le os CAMPOS da tela, nao o banco: a previa tem que mostrar o que a pessoa
@@ -2785,30 +2777,6 @@ document.addEventListener('click',async function(e){
       +(umaSo?'<b>Confira a de teste com o celular e com o leitor antes de imprimir o lote.</b>':'')
       +' <a href="'+url+'" download="'+esc(rp.nome||'etiquetas-kit.pdf')+'" style="color:var(--blue)">baixar</a>';
     return;
-  }
-  if(e.target.closest('#cdKitUp')){
-    var lm=document.getElementById('cdKitLabelMsg');
-    var fi=document.getElementById('cdKitFile');
-    var f=fi&&fi.files&&fi.files[0];
-    if(!f){ lm.innerHTML='<span style="color:#ff6b6b">Escolha um arquivo (PDF, PNG, JPG ou SVG).</span>'; return; }
-    if(f.size>8*1024*1024){ lm.innerHTML='<span style="color:#ff6b6b">Arquivo muito grande (máx 8 MB).</span>'; return; }
-    lm.textContent='Enviando…';
-    var b64=await new Promise(function(r){ var fr=new FileReader(); fr.onload=function(){r(fr.result);}; fr.readAsDataURL(f); });
-    var rr=await (await fetch('/api/kit/label',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({arquivo:b64,nome:f.name})})).json();
-    if(rr.erro){ lm.innerHTML='<span style="color:#ff6b6b">'+rr.erro+'</span>'; return; }
-    lm.innerHTML='<span style="color:var(--green)">Etiqueta enviada: <b>'+(rr.nome||rr.arquivo)+'</b>.</span>';
-    fi.value='';
-  }
-  if(e.target.closest('#cdKitPrint')){
-    var lm2=document.getElementById('cdKitLabelMsg');
-    var meta=await (await fetch('/api/kit/label/meta')).json();
-    if(!meta || !meta.arquivo){ lm2.innerHTML='<span style="color:#ff6b6b">Nenhuma etiqueta enviada ainda.</span>'; return; }
-    window.open('/api/kit/label?t='+Date.now(),'_blank');
-  }
-  if(e.target.closest('#cdKitDel')){
-    if(!confirm('Remover a etiqueta do kit enviada?')) return;
-    await fetch('/api/kit/label',{method:'DELETE'});
-    carregarCad();
   }
 });
 

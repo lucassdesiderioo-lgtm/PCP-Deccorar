@@ -473,9 +473,22 @@ configuração é o que vai falhar.
 > gerado, remonta a matriz pelos retângulos e compara com o que o `qr.js`
 > produziu — reintroduzir a inversão reprova o caso.
 
-> **O upload de arquivo pronto continua na tela**, e sai na fase 4. Enquanto os
-> dois existirem, há dois caminhos para a mesma etiqueta — que é exatamente o
-> que a spec veio fechar.
+> ⚠️ **O UPLOAD DE ARQUIVO PRONTO SAIU (fase 4, 17/09/2026), E NÃO PODE
+> VOLTAR.** Até aqui dava para subir a arte da etiqueta (PDF, PNG, JPG ou SVG)
+> em `/api/kit/label` e imprimir por ela. O problema nunca foi o upload: era
+> serem **dois**. O arquivo enviado é uma **imagem morta** — o gerador
+> acompanha o `kit_codigo`, o arquivo não. No dia de uma troca de código, quem
+> imprimisse pelo upload tirava um rolo que **não bipa na Embalagem**, e
+> descobria com a peça na mão, sem ninguém saber que havia um segundo caminho.
+>
+> Hoje a impressão da etiqueta do kit tem **uma porta**:
+> `POST /api/kit/etiqueta/imprimir`. A seção 12 do `teste_kit.js` trava que as
+> quatro rotas do upload não existem — é o que impede alguém recriar o segundo
+> caminho sem perceber.
+>
+> **Nada foi apagado no deploy:** o último arquivo enviado continua em
+> `kit/label.<ext>` e a linha `config.kit_label` continua no banco. O código
+> parou de lê-los. Limpar é um `rm` na pasta, quando quiser.
 >
 > ⚠️ **O DEFEITO MAIS CARO DESTA SPEC, E ELE PASSOU POR TRÊS RODADAS DE TESTE
 > VERDE (17/09/2026).** Nenhum celular lia o QR da prévia — nem grande, nem
@@ -514,7 +527,7 @@ configuração é o que vai falhar.
 > abrir, e tirá-lo baixa a versão (módulo maior, leitura mais fácil).
 >
 > **Rode `node teste_kit.js` e `node teste_qr.js` ao mexer no `mont_route.js`,
-> no `kit_pdf.js`, no card do kit ou nos arquivos acima** — os 107 + 45 casos
+> no `kit_pdf.js`, no card do kit ou nos arquivos acima** — os 112 + 45 casos
 > travam a confirmação da troca, o campo ausente, o link, a medida do texto, a
 > lista única do desenho, o PDF (tamanho da página, lote, recusa e auditoria) e
 > o QR — que o teste não "olha": ele decodifica de volta, confere a paridade
@@ -2052,7 +2065,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (38), `teste_kit.js` (107), `teste_qr.js` (45) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (38), `teste_kit.js` (112), `teste_qr.js` (45) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | **Carregamento aceita volume que não foi embalado** — `carreg_route.js` só recusa `bloqueado` e `carregado`; um volume `pendente` vai para `carregado` e a peça sai sem o −1 do estoque. Achado da auditoria de 17/08 (`docs/arquivo/REVISAO-COMPLETA.md` §2.1), **conferido aberto em 17/09/2026** | Alto — estoque fica acima do físico, sem sinal |
@@ -2163,6 +2176,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   vira enfeite e a impressão volta a pedir `kit.editar` (§4, §5 #23)
 - ❌ Dar `kit.imprimir` a quem já tem `kit.editar` "para facilitar": o dono
   assinala nome por nome, e isso foi decidido em 17/09/2026 (§4)
+- ❌ Recriar o upload de etiqueta do kit (`/api/kit/label`) ou qualquer segundo
+  caminho de impressão: o arquivo enviado não acompanha o Código do kit, e o
+  rolo impresso por ele para de bipar sem ninguém saber por quê (§4)
 - ❌ Mover `express.static` para antes do `auth`
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor

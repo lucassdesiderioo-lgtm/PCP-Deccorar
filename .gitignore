@@ -31,7 +31,10 @@ node_modules/
 *.log
 .DS_Store
 
-# Etiqueta do kit enviada pelo admin (arquivo local do servidor)
+# A etiqueta do kit enviada pelo admin saiu em 17/09/2026 (fase 4 da spec
+# GERADOR-ETIQUETA-KIT): ela era o segundo caminho da mesma etiqueta. A linha
+# fica aqui porque a pasta ainda existe no servidor, com o ultimo arquivo
+# enviado — o codigo parou de le-la, e nada foi apagado no deploy.
 kit/
 
 # fotos da conferencia da coleta (prova do numero do motorista) - FORA DO GIT
