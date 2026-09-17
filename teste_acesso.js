@@ -39,9 +39,18 @@ db.exec(`
    de escalonamento moram nas ROTAS, e ate aqui este arquivo so conseguia
    perguntar ao permDaRota. Trava que ninguem chama e trava que ninguem testa. */
 const rotas = {};
-const app = { locals:{},
-  get(p,h){ rotas['GET '+p]=h; }, post(p,h){ rotas['POST '+p]=h; },
-  delete(p,h){ rotas['DELETE '+p]=h; } };
+/* O app de mentira tem PILHA DE ROTAS como a do Express (17/09/2026, dívida
+   16): a cobertura deixou de ler uma lista escrita à mão e passou a varrer o
+   que o app registrou. Sem a pilha aqui, o teste não alcançaria a varredura —
+   que é justamente a peça nova. */
+const pilha = [];
+const registra = (metodo,p,h) => {
+  rotas[metodo+' '+p] = h;
+  pilha.push({ route:{ path:p, methods:{ [metodo.toLowerCase()]:true } } });
+};
+const app = { locals:{}, router:{ stack:pilha },
+  get(p,h){ registra('GET',p,h); }, post(p,h){ registra('POST',p,h); },
+  delete(p,h){ registra('DELETE',p,h); } };
 require('./acesso')(app, db);
 const AC = app.locals.acesso;
 function chamar(metodo, rota, corpo, params, usuario){
@@ -154,16 +163,33 @@ eq('o backfill NAO volta no boot seguinte (decisao de acesso e respeitada)',
   db.prepare("SELECT COUNT(*) c FROM setor_permissao WHERE chave='pacote.assinar'").get().c, 0);
 
 console.log('\n── 5. a cobertura enxerga as rotas novas ──');
-/* Rota que nao esta em TODAS_ROTAS nao aparece no relatorio de cobertura nem no
-   aviso do boot — fica invisivel justamente para quem confere se sobrou buraco. */
-const fonte = fs.readFileSync(path.join(__dirname, 'acesso.js'), 'utf8');
-/* Recorta a LISTA em vez de procurar no arquivo inteiro: as mesmas rotas
-   aparecem antes, em permDaRota(), e um indexOf solto acharia aquelas. */
-const ini = fonte.indexOf('const TODAS_ROTAS');
-const lista = fonte.slice(ini, fonte.indexOf('];', ini));
-['/api/pacote/pendentes', '/api/pacote/resolver', '/api/lote/conferir',
- '/api/kit/etiqueta/imprimir'].forEach(r =>
-  ok('TODAS_ROTAS lista ' + r, ini >= 0 && lista.indexOf("'" + r + "'") >= 0));
+/* ⚠️ ISTO AQUI CONFERIA UMA LISTA ESCRITA A MAO (`TODAS_ROTAS`), e ela saiu em
+   17/09/2026 (divida 16): eram 49 linhas digitadas para 151 rotas reais, e o
+   contador ainda descartava tudo que comecasse com `/api/`. Rota que nao
+   estivesse na lista ficava invisivel justamente para quem confere se sobrou
+   buraco — e ninguem lembra de editar uma lista ao criar uma rota.
+   Hoje a cobertura VARRE o app, entao o teste registra rotas no app de mentira
+   e cobra que a varredura as enxergue. */
+app.post('/api/pacote/resolver', () => {});
+app.post('/api/lote/conferir', () => {});
+app.post('/api/kit/etiqueta/imprimir', () => {});
+app.post('/api/rota/que/ninguem/declarou', () => {});
+const varredura = AC.coberturaDeRotas();
+const achou = (m,r) => varredura.linhas.some(l => l.metodo === m && l.rota === r);
+['/api/pacote/resolver','/api/lote/conferir','/api/kit/etiqueta/imprimir']
+  .forEach(r => ok('a varredura enxerga ' + r, achou('POST', r)));
+const declarada = (r) => (varredura.linhas.find(l => l.rota === r) || {}).permissao;
+eq('e com a permissao certa (o bipe das pecas e da bancada)',
+  declarada('/api/lote/conferir'), 'etiqueta.emitir');
+eq('imprimir a etiqueta do kit tem chave propria',
+  declarada('/api/kit/etiqueta/imprimir'), 'kit.imprimir');
+/* E a rota inventada aparece na conta das NAO DECLARADAS — que e o aviso que
+   o boot grita. A lista antiga nao tinha como acusar isso: o que nao estava
+   nela simplesmente nao existia para o relatorio. */
+ok('a rota sem declaracao entra na conta', varredura.nao_declaradas >= 1);
+ok('e ela e nomeada, para alguem poder declarar',
+  varredura.lista_nao_declaradas.some(x => x.indexOf('/api/rota/que/ninguem/declarou') >= 0),
+  JSON.stringify(varredura.lista_nao_declaradas));
 
 console.log('\n── 6. imprimir a etiqueta do kit NAO e editar o kit ──');
 /* ⚠️ A ORDEM DAS LINHAS EM permDaRota() E A REGRA. A rota da impressao comeca
@@ -269,8 +295,108 @@ eq('e nao ganhou setor nenhum por causa da sombra',
 ok('continua tendo so a permissao que lhe deram', AC.permissoesDe(uPorta).has('custo.ver'));
 ok('e nao pode gerenciar pessoas', !AC.permissoesDe(uPorta).has('pessoas.gerenciar'));
 
+/* ═══════════ ROTA SEM PERMISSÃO NASCE NEGADA (dívida 16) ═══════════════════
+   O `permDaRota` terminava em `return '@logado'`: rota nova nascia aberta para
+   qualquer pessoa logada, sem aparecer em lugar nenhum. A cobertura não
+   acusava porque era uma lista escrita à mão que ainda descartava tudo que
+   começa com `/api/` — o boot imprimia "cobertura OK (0 sem declarar)", que é
+   um verde que ninguém conferiu. */
+console.log('\n── 11. o padrao passou a ser NEGAR ──');
+eq('rota que ninguem declarou → @negado', AC.permDaRota('/api/inventada/ontem','GET'), '@negado');
+eq('e no POST tambem', AC.permDaRota('/api/inventada','POST'), '@negado');
+const adminComum = db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('Admin Comum','')").run().lastInsertRowid;
+db.prepare("INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,(SELECT id FROM setores WHERE nome='Admin'))").run(adminComum);
+const AD = { id:adminComum, nome:'Admin Comum' };
+ok('nem um Admin passa numa rota nao declarada', AC.decidir(AD,'/api/inventada','GET').ok === false);
+eq('e o motivo diz o que houve', AC.decidir(AD,'/api/inventada','GET').motivo, 'rota_nao_declarada');
+/* O Admin Geral passa por NÍVEL, antes da chave — e isso é proposital: uma
+   rota que alguém esqueceu de declarar não pode trancar o dono fora do próprio
+   sistema. Ele é quem vai ver o aviso no boot e mandar declarar. */
+ok('mas o Admin Geral continua passando (ninguem se tranca fora)',
+  AC.decidir(AG,'/api/inventada','GET').ok === true);
+
+console.log('\n── 12. o ARQUIVO da tela nao e a tela ──');
+/* ⚠️ O QUE QUASE DERRUBOU TUDO: com sessão aberta, `/sku.js`, `/base.css` e as
+   imagens passam pelo `decidir` como qualquer caminho — só `/nav.js`,
+   `/favicon.ico`, `/login` e `/login.html` estão na lista LIVRE do auth.js.
+   Negar por padrão sem esta regra tiraria o JavaScript de TODAS as telas: elas
+   abririam em branco, com 403 no console, para todo mundo menos o Admin Geral. */
+for(const a of ['/sku.js','/barras.js','/kit_bipe.js','/qr.js','/base.css','/favicon.png','/img/logo.svg'])
+  eq('arquivo de apoio continua @logado: '+a, AC.permDaRota(a,'GET'), '@logado');
+eq('mas .html NAO e arquivo de apoio — herda a tela', AC.permDaRota('/operador.html','GET'), 'revisao.executar');
+
+console.log('\n── 13. a gemea .html vale o mesmo que a tela ──');
+const GEMEAS = [['/operador','revisao.executar'],['/montagem','embalagem.executar'],
+  ['/embalagem','etiqueta.emitir'],['/carregamento','carregamento.executar'],
+  ['/expedicao','pdf.subir'],['/devolucao','devolucao.registrar'],
+  ['/painel','painel.ver'],['/relatorios','relatorios.ver'],
+  ['/planejamento','planilha.importar'],['/recebimento','pedido.receber']];
+let gemeasOk = 0;
+for(const [rota,chave] of GEMEAS){
+  if(AC.permDaRota(rota,'GET') === chave && AC.permDaRota(rota+'.html','GET') === chave) gemeasOk++;
+  else console.log('       ' + rota + ': rota=' + AC.permDaRota(rota,'GET') + ' gemea=' + AC.permDaRota(rota+'.html','GET'));
+}
+eq('as 10 telas e as 10 gemeas pedem a MESMA chave', gemeasOk, GEMEAS.length);
+eq('/index.html continua sendo o admin', AC.permDaRota('/index.html','GET'), '@admin');
+eq('a escolha de setor e de qualquer sessao', AC.permDaRota('/setor','GET'), '@logado');
+eq('e a gemea dela tambem', AC.permDaRota('/setor.html','GET'), '@logado');
+
+console.log('\n── 14. as leituras ganharam dono, e o dono e uma LISTA ──');
+/* Uma chave só não descreve quem lê: `/api/lote` é lido pela Etiqueta de Venda,
+   pela tela de Lançar produção E pelo admin. Declarar uma delas trancaria as
+   outras duas — e como as chaves de operação são de nível `operacao`, o setor
+   Admin NÃO as tem: declarar por chave de tela tiraria a leitura do próprio
+   Admin. Por isso a declaração aceita QUALQUER UMA das chaves da lista. */
+const naLista = (r,m) => { const x = AC.permDaRota(r,m||'GET'); return Array.isArray(x) ? x : [x]; };
+ok('/api/lote aceita quem sobe PDF, quem imprime e o admin',
+  ['pdf.subir','etiqueta.emitir','@admin'].every(c => naLista('/api/lote').indexOf(c) >= 0),
+  JSON.stringify(naLista('/api/lote')));
+ok('o operador de expedicao le /api/lote', AC.decidir(u2,'/api/lote','GET').ok === true);
+ok('o Admin tambem le /api/lote', AC.decidir(AD,'/api/lote','GET').ok === true);
+ok('a bancada da embalagem le a fila', AC.decidir(
+  { id:db.prepare("SELECT id FROM usuarios WHERE nome='Bancada'").get().id }, '/api/lote','GET').ok === true);
+/* E quem nao tem nenhuma das chaves continua de fora — senao a lista vira
+   @logado com mais passos. */
+const soRevisao = db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('So Revisao','')").run().lastInsertRowid;
+db.prepare("INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,(SELECT id FROM setores WHERE nome='Operador / Revisão'))").run(soRevisao);
+const REV = { id:soRevisao, nome:'So Revisao' };
+ok('quem so revisa NAO le a lista de lote', AC.decidir(REV,'/api/lote','GET').ok === false);
+ok('...mas le a propria tela vermelha', AC.decidir(REV,'/api/revisao/dia','GET').ok === true);
+ok('e nao abre o carregamento', AC.decidir(REV,'/api/carregamento','GET').ok === false);
+ok('o carregamento e de quem carrega', AC.decidir(u2,'/api/carregamento','GET').ok === true);
+/* A FOTO DA COLETA e prova (§8-B) e estava legivel por qualquer pessoa logada. */
+ok('a foto da coleta virou de quem carrega', AC.decidir(u2,'/api/coleta/foto/12','GET').ok === true);
+ok('e nao de qualquer pessoa logada', AC.decidir(REV,'/api/coleta/foto/12','GET').ok === false);
+
+console.log('\n── 15. as listas de apoio de tela continuam abertas a quem entrou ──');
+for(const r of ['/api/skus','/api/cores','/api/modelos','/api/tecidos','/api/listas/rejeicao',
+                '/api/config/kit','/api/config/kit/etiqueta','/api/config/horarios','/api/config/conferencia'])
+  eq('apoio de tela: '+r, AC.permDaRota(r,'GET'), '@logado');
+/* O login nao pode depender do modelo de acesso: ele acontece ANTES de existir
+   sessao. O auth.js ja o trata na lista LIVRE, e aqui ele fica declarado para
+   a varredura nao acusar o que nao e problema. */
+eq('/login continua aberto', AC.permDaRota('/login','GET'), '@logado');
+eq('o healthcheck tambem', AC.permDaRota('/status','GET'), '@logado');
+
+console.log('\n── 16. a cobertura passou a VARRER o app ──');
+const cob = AC.coberturaDeRotas ? AC.coberturaDeRotas() : null;
+ok('existe a varredura das rotas registradas', !!cob, 'coberturaDeRotas() nao existe');
+if(cob){
+  ok('ela devolve linhas com metodo, rota e permissao',
+    Array.isArray(cob.linhas) && cob.linhas.length > 0 && 'permissao' in cob.linhas[0]);
+  ok('e conta as NEGADAS, que sao as nao declaradas', typeof cob.nao_declaradas === 'number');
+  /* A lista manual TODAS_ROTAS saiu: ela tinha 49 linhas para 151 rotas reais,
+     e o contador ignorava tudo que comecasse com /api/ — por construcao nenhuma
+     API sem dono aparecia. */
+  ok('a varredura nao ignora /api/',
+    cob.linhas.some(l => l.rota.indexOf('/api/') === 0), 'nenhuma rota /api/ na varredura');
+}
+
 db.close();
 try{ fs.rmSync(dir, { recursive:true, force:true }); }catch(e){}
 console.log('');
 if(falhas){ console.log(falhas + ' de ' + n + ' casos FALHARAM'); process.exit(1); }
 console.log('todos os ' + n + ' casos passaram');
+/* Sai agora: o aviso de cobertura do boot roda num setImmediate, e sem isto ele
+   imprimiria DEPOIS do resultado — o CI mostra a ultima linha. */
+process.exit(0);
