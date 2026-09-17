@@ -98,10 +98,17 @@ module.exports=function(app,db){
   const ETQ_PADRAO = { linha1:'SEU MANUAL ESTÁ', linha2:'AQUI', qr_legenda:'MANUAL', link:'' };
   const ETQ_CHAVE  = { linha1:'kit_etq_linha1', linha2:'kit_etq_linha2',
                        qr_legenda:'kit_etq_qr_legenda', link:'kit_etq_link' };
-  /* O limite das linhas e PROVISORIO: a spec manda medir pela previa, na fase 2
-     ("valor exato definido na Fase 2 pela previa"). 20 e o que cabe com folga na
-     coluna esquerda de 100x35 mm — a previa vai dizer o numero de verdade. */
-  const LIMITE_LINHA = 20, LIMITE_LEGENDA = 10;
+  /* ⚠️ O LIMITE DAS LINHAS SAI DO DESENHO, NAO DAQUI. Ele era 20 por chute na
+     fase 1; na fase 2 passou a ser MEDIDO em `public/kit_etiqueta.js`, com a
+     largura real das letras na menor altura legivel — deu 16. Escrever o numero
+     aqui tambem criaria duas reguas para "cabe na etiqueta?", e a do servidor
+     envelheceria calada no dia em que o desenho mudasse de tamanho.
+     (E o mesmo arranjo que o `tecido/dominio/etiqueta_pdf.js` ja faz com o
+     `public/barras.js`: o back le o arquivo do desenho.)
+     A legenda do QR continua em 10, que e numero da spec, nao da medida. */
+  const DESENHO_ETQ = require('./public/kit_etiqueta.js');
+  const LIMITE_LINHA = DESENHO_ETQ.limiteDeCaracteres();
+  const LIMITE_LEGENDA = 10;
 
   function etiquetaAtual(){
     const o = {};
@@ -144,10 +151,22 @@ module.exports=function(app,db){
     if(!vem.length) return res.status(400).json({erro:'nada para salvar'});
     const novo = {};
     for(const k of vem) novo[k] = String(b[k]==null?'':b[k]).trim();
-    if(novo.linha1!==undefined && novo.linha1.length>LIMITE_LINHA)
-      return res.status(400).json({erro:'A linha 1 cabe em '+LIMITE_LINHA+' caracteres (veio '+novo.linha1.length+').'});
-    if(novo.linha2!==undefined && novo.linha2.length>LIMITE_LINHA)
-      return res.status(400).json({erro:'A linha 2 cabe em '+LIMITE_LINHA+' caracteres (veio '+novo.linha2.length+').'});
+    /* Duas cercas, e elas respondem coisas diferentes:
+       1. a contagem de caracteres impede o absurdo (paragrafo colado no campo);
+       2. a MEDIDA decide se cabe na etiqueta — 16 letras estreitas cabem com
+          folga e 16 'M' nao cabem, entao contar caractere nunca responderia.
+       A medida olha o RESULTADO (o que ja estava gravado mais o que veio), e
+       nao so o campo enviado: as duas linhas dividem o mesmo tamanho de letra,
+       entao a linha 1 pode deixar de caber por causa de uma linha 2 que este
+       POST nem tocou. */
+    for(const k of ['linha1','linha2']){
+      if(novo[k]!==undefined && novo[k].length>LIMITE_LINHA)
+        return res.status(400).json({erro:'A '+(k==='linha1'?'linha 1':'linha 2')+' cabe em '
+          +LIMITE_LINHA+' caracteres (veio '+novo[k].length+').'});
+    }
+    const resultado = Object.assign({}, etiquetaAtual(), novo);
+    if(!DESENHO_ETQ.capParaLinhas([resultado.linha1||'', resultado.linha2||'']).cabe)
+      return res.status(400).json({erro:'Esse texto não cabe na etiqueta nem na letra menor — encurte a linha 1 ou a linha 2.'});
     if(novo.qr_legenda!==undefined && novo.qr_legenda.length>LIMITE_LEGENDA)
       return res.status(400).json({erro:'A legenda do QR cabe em '+LIMITE_LEGENDA+' caracteres (veio '+novo.qr_legenda.length+').'});
     if(novo.link!==undefined && novo.link && !/^https:\/\//i.test(novo.link))

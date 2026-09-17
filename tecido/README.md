@@ -138,7 +138,7 @@ dominio/               a regra — nao conhece Express, req nem res
   rolo · encaixe (funcao pura) · plano · painel
 dados/                 o SQL. Uma tabela, um arquivo. Nao decide nada
 rotas/                 declaracoes. Sem SQL, sem `if` de negocio
-public/                base.css (tokens) · ui.js · nav.js · barras.js · telas/
+public/                base.css (tokens) · ui.js · nav.js · telas/
 teste/                 rodar.js + *.test.js — banco temporario, do zero
 ```
 
@@ -1215,7 +1215,10 @@ no tamanho exato da bobina (`GET /api/etiquetas/lotes/:id/pdf`).
 A grade que aparece na tela e **conferencia**, nao folha de impressao — e se
 alguem der Ctrl+P nela por engano, sai escrito isso na folha.
 
-`public/barras.js` serve as duas pontas: a tela desenha SVG, o servidor desenha
+`../public/barras.js` (na RAIZ do PCP desde 17/09/2026 — o gerador da
+etiqueta do kit passou a usar o mesmo, e duas tabelas CODE128 seriam duas
+etiquetas diferentes para o mesmo código) serve as duas pontas: a tela desenha
+SVG (por `/barras.js`), o servidor desenha
 as mesmas barras dentro do PDF. Duas tabelas CODE128 seriam duas etiquetas
 diferentes para o mesmo codigo, e a divergencia so apareceria na bancada.
 
@@ -1280,7 +1283,7 @@ etiqueta colada. Três consequências:
   de qualquer gravação: se fosse depois, quem recusaria seria o `UNIQUE` do
   SQLite, e a bancada leria "deu erro aqui dentro" em vez de "cole outra".
 
-O código de barras é **CODE128-B gerado aqui** (`public/barras.js`), sem
+O código de barras é **CODE128-B gerado no projeto** (`../public/barras.js`), sem
 biblioteca. A tabela de padrões foi conferida contra uma implementação de
 referência e o teste repete a conferência estrutural a cada rodada — 106
 padrões de 11 módulos, barras somando par, nenhum repetido. **Uma etiqueta que

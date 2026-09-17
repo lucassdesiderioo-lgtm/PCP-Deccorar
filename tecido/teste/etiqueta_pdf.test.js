@@ -103,7 +103,7 @@ module.exports=[
 }},
 
 {nome:'as barras do PDF sao as MESMAS da tela', executar({igual}){
-  const barras=require('../public/barras.js');
+  const barras=require('../../public/barras.js');
   igual(typeof barras.modulos,'function','o servidor alcanca o gerador da tela');
   igual(barras.modulos('S-000007').length,123,'o desenho do codigo e o conhecido');
   // Duas tabelas CODE128 seriam duas etiquetas diferentes para o mesmo

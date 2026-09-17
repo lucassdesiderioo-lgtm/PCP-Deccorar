@@ -346,6 +346,12 @@
   </div>
 </div>
 <script src="/sku.js"></script>
+<!-- A previa da etiqueta do kit (spec GERADOR-ETIQUETA-KIT, fase 2). Os tres
+     sao LOCAIS, sem CDN: barras.js e qr.js desenham, kit_etiqueta.js diz onde
+     cada coisa fica — e e dele que o ZPL da fase 3 vai sair. -->
+<script src="/barras.js"></script>
+<script src="/qr.js"></script>
+<script src="/kit_etiqueta.js"></script>
 <script>
 let SKUS=[];
 const $=s=>document.querySelector(s);
@@ -2501,6 +2507,14 @@ async function carregarCad(){
   h+='</div>';
   h+='<label style="display:block"><span class="sub">Link do manual (vira o QR)</span><input id="cdEtqLink" placeholder="https://drive.google.com/drive/folders/…" value="'+esc(etq.link||'')+'" style="width:100%"></label>';
   h+='<div class="sub" style="margin-top:6px">A pasta precisa estar compartilhada como <b>"qualquer pessoa com o link pode ver"</b>. Trocar o manual é trocar o arquivo dentro da pasta — o link não muda e não é preciso reimprimir.</div>';
+  /* A PREVIA. Ela existe para o Admin apontar o celular para o QR e conferir
+     que abre a pasta ANTES de sair rolo impresso — e para ver o texto caber.
+     Fundo branco sempre, mesmo no admin escuro: etiqueta e papel branco, e
+     previa em cima do tema escuro mentiria sobre o contraste do que imprime. */
+  h+='<div style="margin-top:14px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">';
+  h+='<div style="background:#fff;padding:8px;border-radius:8px;border:1px solid var(--line)"><div id="cdEtqPrev"></div></div>';
+  h+='<div class="sub" id="cdEtqInfo" style="flex:1;min-width:200px"></div>';
+  h+='</div>';
   h+='<div style="margin-top:10px"><button class="primary" id="cdEtqBt">Salvar etiqueta</button></div>';
   /* O que ainda falta para a etiqueta poder ser impressa aparece ANTES de
      alguem tentar imprimir (R7) — trava que so fala na hora do clique manda a
@@ -2519,12 +2533,49 @@ async function carregarCad(){
   h+='<div id="cdKitLabelMsg" class="sub" style="margin-top:10px"></div>';
   h+='</div></div>';
   el.innerHTML=h;
+  desenharPreviaKit();
   // mostra a etiqueta atual, se houver
   try{ var lm=await (await fetch('/api/kit/label/meta')).json();
     if(lm && lm.arquivo) document.getElementById('cdKitLabelMsg').innerHTML='Etiqueta atual: <b style="color:var(--txt)">'+(lm.nome||lm.arquivo)+'</b>'+(lm.em?' &middot; enviada '+lm.em:'');
     else document.getElementById('cdKitLabelMsg').textContent='Nenhuma etiqueta enviada ainda.';
   }catch(e){}
 }
+/* A PREVIA DA ETIQUETA DO KIT (spec GERADOR-ETIQUETA-KIT, fase 2).
+   Le os CAMPOS da tela, nao o banco: a previa tem que mostrar o que a pessoa
+   acabou de digitar, senao ela confere o texto velho e salva o novo sem nunca
+   ter olhado. O codigo de barras vem do campo do Codigo do kit pelo mesmo
+   motivo — e ele que vai impresso (R2). */
+function conteudoKitDaTela(){
+  var v=function(id){ var e=document.getElementById(id); return e?e.value:''; };
+  return { linha1:v('cdEtqL1'), linha2:v('cdEtqL2'), qr_legenda:v('cdEtqLeg'),
+           link:v('cdEtqLink'), codigo:v('cdKit') };
+}
+function desenharPreviaKit(){
+  var caixa=document.getElementById('cdEtqPrev'), info=document.getElementById('cdEtqInfo');
+  if(!caixa||!window.kitEtiqueta) return;
+  var c=conteudoKitDaTela(), m=window.kitEtiqueta.medir(c);
+  caixa.innerHTML='';
+  try{ caixa.appendChild(window.kitEtiqueta.svg(c,{escala:4.6})); }
+  catch(e){ caixa.innerHTML='<div class="sub" style="color:#c62828;padding:20px">'+String(e.message||e)+'</div>'; }
+  /* O que a previa NAO prova fica escrito do lado. Quem desenha o QR e as
+     barras no papel e a impressora (fase 3): a previa responde pelo CONTEUDO
+     — o link certo, o codigo certo, o texto cabendo —, nunca pelo traco. */
+  var t='<b style="color:var(--txt)">Confira agora, com o celular:</b> aponte a câmera para o QR da prévia. '
+       +'Tem que abrir a pasta do manual.';
+  if(m.versaoQr) t+='<div style="margin-top:8px">QR versão '+m.versaoQr+' · letra de '+m.cap.toFixed(1)+' mm</div>';
+  if(m.versaoQr>=6) t+='<div style="margin-top:6px;color:var(--amber)">O link é comprido, então o QR ficou mais denso. '
+       +'Se ele terminar em <b>?usp=drive_link</b>, dá para tirar esse pedaço: a pasta abre igual e o QR fica mais fácil de ler.</div>';
+  if(m.problemas.length) t+='<div style="margin-top:8px;color:var(--amber)">'+m.problemas.map(esc).join('<br>')+'</div>';
+  t+='<div style="margin-top:8px">A prévia mostra o <b>conteúdo e o lugar</b> de cada coisa. '
+     +'No papel, quem desenha o QR e as barras é a própria impressora.</div>';
+  if(info) info.innerHTML=t;
+}
+/* Redesenha a cada tecla — inclusive no campo do Codigo do kit, que muda as
+   barras. Nao espera o "Salvar": a previa e para decidir ANTES de salvar. */
+document.addEventListener('input',function(e){
+  if(e.target.closest('#cdEtqL1,#cdEtqL2,#cdEtqLeg,#cdEtqLink,#cdKit')) desenharPreviaKit();
+});
+
 /* Conferencia do que ja foi impresso. Abre e le PDFs, entao roda so quando
    alguem pede — nunca em intervalo. Zero divergencia e resultado, nao silencio:
    quantos volumes foram conferidos aparece sempre. */
@@ -2642,7 +2693,7 @@ document.addEventListener('click',async function(e){
        com o erro do lado. Redesenhar aqui faria sumir o que a pessoa escreveu e
        voltar o valor velho — ela ve a recusa e um texto que nao e o dela. */
     if(re.erro){ em.innerHTML='<span style="color:#ff6b6b">'+re.erro+'</span>'; return; }
-    var t='<span style="color:var(--green)">Salvo.</span>';
+    var t='<span style="color:var(--green)">Salvo.</span>'; desenharPreviaKit();
     if(re.aviso) t+=' <span style="color:var(--amber)">'+re.aviso+'</span>';
     if(re.falta&&re.falta.length) t+=' <span style="color:var(--amber)">Ainda não dá para imprimir: falta '+re.falta.join(' e ')+'.</span>';
     em.innerHTML=t;

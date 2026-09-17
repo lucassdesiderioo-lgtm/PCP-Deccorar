@@ -5,10 +5,26 @@ STATUS
 Situação: em construção
 Criada em: 17/09/2026
 Última atualização: 17/09/2026
-Fase atual: fase 1 entregue (conteúdo da etiqueta) — falta o deploy
-Fases: 1 ☑  2 ☐  3 ☐  4 ☐
+Fase atual: fases 1 e 2 entregues (conteúdo + prévia) — falta o deploy da 2
+Fases: 1 ☑  2 ☑  3 ☐  4 ☐
 Risco: 🔴 (etiqueta)
 Mudanças no caminho:
+- 17/09/2026 (fase 2) — o CODE128 **já existia no projeto**
+  (`tecido/public/barras.js`, escrito à mão com teste próprio). Ele foi movido
+  para `public/barras.js`, na raiz, e agora serve as duas operações. Copiar a
+  tabela seria duas etiquetas diferentes para o mesmo código.
+- 17/09/2026 (fase 2) — não havia gerador de QR e não há CDN: `public/qr.js`
+  foi escrito no projeto (modo byte, correção M, versões 1–10), no mesmo molde
+  do `barras.js`. O `teste_qr.js` não olha o desenho: ele **decodifica de
+  volta** e confere a paridade Reed-Solomon pela propriedade matemática dela.
+- 17/09/2026 (fase 2) — `public/kit_etiqueta.js` é o **dono único do desenho**,
+  em milímetros. A prévia lê dele e o ZPL da fase 3 sai dele. O que NÃO é
+  compartilhado: quem desenha o QR e as barras (navegador na prévia,
+  impressora no papel) — a prévia prova o conteúdo e o lugar, não o traço.
+- 17/09/2026 (fase 2) — **o limite de caracteres deixou de ser a regra.** Ele
+  é 16 (medido), como cerca grossa do campo; quem decide se cabe é a medida da
+  largura real das letras, e ela olha as duas linhas juntas. O texto encolhe
+  até 3,6 mm de altura de maiúscula e, abaixo disso, é recusado.
 - 17/09/2026 (fase 1) — os quatro campos moram em `config`
   (`kit_etq_linha1`, `kit_etq_linha2`, `kit_etq_qr_legenda`, `kit_etq_link`),
   quatro linhas ao lado do `kit_codigo`, em vez de um JSON só: campo dentro de
