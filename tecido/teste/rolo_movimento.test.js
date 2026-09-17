@@ -127,7 +127,7 @@ module.exports=[
 }},
 
 {nome:'as barras das duas etiquetas saem do MESMO desenho', executar({igual}){
-  const barras=require('../public/barras.js');
+  const barras=require('../../public/barras.js');
   igual(barras.modulos('R-000012').length,123,'o codigo do rolo tem o desenho conhecido');
   // Sobra e rolo desenham pelo mesmo desenharBarras. Duas copias divergiriam
   // no dia em que alguem ajustasse uma, e a divergencia so apareceria no bipe.

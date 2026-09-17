@@ -155,7 +155,51 @@ const antesRecusa = auditoria.length;
 chamar('POST', '/api/config/kit', { kit:'OUTRO' });
 eq('a RECUSA nao vira linha de auditoria', auditoria.length, antesRecusa);
 
-console.log('\n── 6. a Embalagem nao muda (R10) ──');
+console.log('\n── 6. o limite das linhas sai do DESENHO (fase 2) ──');
+/* O numero era 20 por chute. Agora e medido em public/kit_etiqueta.js, com a
+   largura real das letras na menor altura legivel. Se alguem reescrever o
+   numero aqui no servidor, as duas reguas divergem no dia em que o desenho
+   mudar de tamanho — e o texto passa a sair pela borda da etiqueta. */
+const DESENHO = require('./public/kit_etiqueta.js');
+const LIM = DESENHO.limiteDeCaracteres();
+eq('o GET publica o limite que o desenho mediu',
+  chamar('GET','/api/config/kit/etiqueta').body.limites.linha, LIM);
+r = chamar('POST', '/api/config/kit/etiqueta', { linha1:'I'.repeat(LIM) });
+eq('16 letras estreitas passam', r.status, 200);
+r = chamar('POST', '/api/config/kit/etiqueta', { linha1:'I'.repeat(LIM+1) });
+eq('um caractere acima da cerca e recusado', r.status, 400);
+ok('...dizendo o limite', String(r.body.erro).indexOf(String(LIM)) >= 0, JSON.stringify(r.body.erro));
+/* ⚠️ O CASO QUE PROVA QUE QUEM MANDA E A MEDIDA. 16 'M' tem o mesmo TAMANHO
+   que 16 'I' e ocupa quase o triplo da largura. Se a regra fosse contar
+   caractere, este texto passaria e sairia cortado no papel — e ninguem na
+   fabrica veria isso acontecer, porque a etiqueta ja sai errada da impressora. */
+r = chamar('POST', '/api/config/kit/etiqueta', { linha1:'M'.repeat(LIM) });
+eq('16 letras LARGAS passam na cerca e sao recusadas pela medida', r.status, 400);
+ok('...com a recusa falando de caber, nao de contar',
+  /não cabe/.test(String(r.body.erro)), JSON.stringify(r.body.erro));
+eq('...e nada foi gravado', valorDe('kit_etq_linha1'), 'I'.repeat(LIM));
+/* As duas linhas dividem o mesmo tamanho de letra: uma linha 2 comprida pode
+   fazer a linha 1 (que este POST nem tocou) deixar de caber. Por isso a medida
+   olha o RESULTADO, e nao so o campo enviado. */
+chamar('POST', '/api/config/kit/etiqueta', { linha1:'SEU MANUAL ESTÁ' });
+r = chamar('POST', '/api/config/kit/etiqueta', { linha2:'M'.repeat(LIM) });
+eq('a medida olha as DUAS linhas, nao so a que veio', r.status, 400);
+chamar('POST', '/api/config/kit/etiqueta', { linha1:'SEU MANUAL ESTÁ' });
+
+console.log('\n── 7. o desenho sabe o que falta ANTES de imprimir (R7) ──');
+const cheio = { linha1:'SEU MANUAL ESTÁ', linha2:'AQUI', qr_legenda:'MANUAL',
+  codigo:'KITINSTALACAO', link:'https://drive.google.com/drive/folders/1H8Pe8XngnQChRFoJ1MBl7Ni4hi3HGHqb' };
+eq('com tudo preenchido, nenhum problema', DESENHO.medir(cheio).problemas.length, 0);
+ok('sem link, o desenho acusa',
+  DESENHO.medir(Object.assign({}, cheio, {link:''})).problemas.some(p => /link/.test(p)));
+ok('sem Código do kit, o desenho acusa',
+  DESENHO.medir(Object.assign({}, cheio, {codigo:''})).problemas.some(p => /Código do kit/.test(p)));
+ok('a letra ENCOLHE para caber, em vez de vazar pela borda',
+  DESENHO.medir(cheio).cap < DESENHO.DESENHO.texto.capAlvo);
+ok('...mas nunca abaixo do minimo legivel',
+  DESENHO.medir(cheio).cap >= DESENHO.DESENHO.texto.capMin);
+
+console.log('\n── 8. a Embalagem nao muda (R10) ──');
 /* A tela da Embalagem le esta rota, e so ela. Se o GET mudar de formato, a
    bancada para de conferir o kit sem ninguem mexer no montagem.html. */
 r = chamar('GET', '/api/config/kit');

@@ -17,7 +17,7 @@
 // resultado na bancada: "a letra ta pequena", "a barra some quando amassa".
 // Cada um desses ajustes era um deploy.
 const {PDFDocument, StandardFonts, rgb} = require('pdf-lib');
-const barras = require('../public/barras.js');
+const barras = require('../../public/barras.js');
 const config = require('../nucleo/config');
 const {ErroDeRegra} = require('../nucleo/erros');
 

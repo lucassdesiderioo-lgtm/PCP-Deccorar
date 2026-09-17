@@ -8,7 +8,7 @@
 const fs=require('fs'), path=require('path'), vm=require('vm');
 
 function carregar(){
-  const codigo=fs.readFileSync(path.join(__dirname,'..','public','barras.js'),'utf8');
+  const codigo=fs.readFileSync(path.join(__dirname,'..','..','public','barras.js'),'utf8');
   const janela={};
   vm.createContext({window:janela, document:{createElementNS:()=>({setAttribute(){},appendChild(){}})}});
   vm.runInContext(codigo,vm.createContext({window:janela,

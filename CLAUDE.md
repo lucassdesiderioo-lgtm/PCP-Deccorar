@@ -369,8 +369,57 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > **A Embalagem não mudou:** ela continua lendo só `GET /api/config/kit` e
 > conferindo o bipe contra o `kit_codigo`.
 >
-> **Rode `node teste_kit.js` ao mexer no `mont_route.js` ou no card do kit** —
-> os 40 casos travam a confirmação da troca, o campo ausente e o link.
+> **A PRÉVIA (fase 2, 17/09/2026) e os DOIS DESENHISTAS.** O card mostra a
+> etiqueta desenhada, atualizando a cada tecla, e é nela que o Admin aponta o
+> celular para conferir o QR **antes** de sair rolo impresso. Três arquivos,
+> todos locais (sem CDN):
+>
+> | Arquivo | Responde |
+> |---|---|
+> | `public/kit_etiqueta.js` | **onde cada coisa fica**, em milímetros — dono único do desenho |
+> | `public/qr.js` | o QR (modo byte, correção M), escrito no projeto |
+> | `public/barras.js` | o CODE128-B — **veio do `tecido/`** e agora serve os dois |
+>
+> ⚠️ **QUEM DESENHA A PRÉVIA NÃO É QUEM DESENHA O PAPEL.** Na tela, o QR e as
+> barras saem do navegador; na ZD220 quem os desenha é a **própria impressora**
+> (`^BQ`, `^BC`), a partir do mesmo texto. Então a prévia prova o **conteúdo e o
+> lugar** — que o link salvo virou QR, que o Código do kit virou barras, que o
+> texto coube —, nunca o traço impresso. O que os dois têm de comum, e que é o
+> ponto do `kit_etiqueta.js` existir, são as **medidas**: a 203 dpi elas viram
+> pontos multiplicando por 8, e é daí que o ZPL da fase 3 tem que sair. Duas
+> réguas de posição seriam duas etiquetas diferentes.
+>
+> ⚠️ **O TEXTO ENCOLHE, NUNCA VAZA.** A letra cai de 6 mm até 3,6 mm de altura
+> de maiúscula para caber; abaixo disso a resposta é "não cabe" e o servidor
+> **recusa**. Texto cortado no papel é etiqueta que o cliente lê pela metade, e
+> ninguém na fábrica vê acontecer — a etiqueta já sai errada da impressora.
+>
+> ⚠️ **O LIMITE DE CARACTERES NÃO É A REGRA DE "CABE".** São 16 (medidos, não
+> chutados), e servem de cerca grossa no campo. Quem decide é a **medida**:
+> 16 letras estreitas cabem com folga e 16 `M` não cabem. E a medida olha as
+> **duas linhas juntas**, porque elas dividem o mesmo tamanho de letra — a
+> linha 1 pode deixar de caber por causa de uma linha 2 que o POST nem tocou.
+>
+> ⚠️ **A FOLGA EM VOLTA DO QR É FUNCIONAL.** São 2,4 mm de silêncio antes da
+> legenda: o padrão pede 4 módulos livres, e num QR de 20 mm cada módulo tem
+> meio milímetro. Encostar a legenda faz o celular demorar ou desistir, e
+> ninguém associa isso à distância do texto.
+>
+> ⚠️ **A SETA TEM HASTE.** A primeira versão era um triângulo dentro do
+> círculo — e aquilo não se lê como seta, se lê como **botão de play**. Numa
+> etiqueta que manda apontar a câmera para um QR, símbolo de vídeo é a pior
+> confusão possível.
+>
+> **Link comprido engrossa o QR:** a tela mostra a versão do QR e avisa quando
+> o link tem `?usp=drive_link` — esse pedaço não é necessário para a pasta
+> abrir, e tirá-lo baixa a versão (módulo maior, leitura mais fácil).
+>
+> **Rode `node teste_kit.js` e `node teste_qr.js` ao mexer no `mont_route.js`,
+> no card do kit ou nos três arquivos acima** — os 53 + 31 casos travam a
+> confirmação da troca, o campo ausente, o link, a medida do texto e o QR (que
+> o teste não "olha": ele decodifica de volta e confere a paridade
+> Reed-Solomon). Mexeu no `barras.js`? **`cd tecido && npm test` também** — a
+> etiqueta de prateleira do sob medida lê o mesmo arquivo.
 
 ### Peça com problema (rejeição)
 
@@ -1901,7 +1950,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (30), `teste_kit.js` (40) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (30), `teste_kit.js` (53), `teste_qr.js` (31) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | **Carregamento aceita volume que não foi embalado** — `carreg_route.js` só recusa `bloqueado` e `carregado`; um volume `pendente` vai para `carregado` e a peça sai sem o −1 do estoque. Achado da auditoria de 17/08 (`docs/arquivo/REVISAO-COMPLETA.md` §2.1), **conferido aberto em 17/09/2026** | Alto — estoque fica acima do físico, sem sinal |
@@ -1982,6 +2031,14 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   sempre o **Código do kit** salvo, senão o impresso e o bipe divergem (§4)
 - ❌ Fazer o `POST /api/config/kit/etiqueta` apagar campo que não veio no corpo
   — é a dívida 15 do §14 repetida em outra rota (§4)
+- ❌ Decidir "cabe na etiqueta?" contando caracteres: 16 letras estreitas cabem
+  e 16 `M` não — quem responde é a medida do `kit_etiqueta.js` (§4)
+- ❌ Escrever as medidas da etiqueta do kit na tela ou no ZPL: elas moram no
+  `public/kit_etiqueta.js`, em milímetros, e a fase 3 sai de lá (§4)
+- ❌ Dizer que a prévia prova a etiqueta impressa: ela prova o CONTEÚDO e o
+  LUGAR — quem desenha o QR e as barras no papel é a impressora (§4)
+- ❌ Copiar a tabela CODE128 para um segundo arquivo: `public/barras.js` serve o
+  sob medida e a etiqueta do kit, e duas tabelas são duas etiquetas (§4, §19)
 - ❌ Mover `express.static` para antes do `auth`
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor
