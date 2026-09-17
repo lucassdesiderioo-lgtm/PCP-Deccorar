@@ -231,17 +231,42 @@ function bitsDaVersao(v){
   for(let i=17;i>=12;i--) if((resto >> i) & 1) resto ^= 0x1F25 << (i-12);
   return (v << 12) | resto;
 }
+/* ⚠️ A ORDEM DOS 15 BITS DO FORMATO — foi ISTO que fez o celular não ler nada,
+   e é o defeito mais caro deste arquivo (17/09/2026).
+   Esta área diz ao leitor qual máscara foi usada. Ele acha o QR (os cantos do
+   celular piscam), vem ler aqui, o BCH não fecha e ele **desiste em silêncio**.
+   Nada no desenho denuncia: continua com cara de QR, e o conteúdo está certo.
+
+   O que estava errado: os bits entravam na ordem INVERTIDA — onde o padrão põe
+   o bit 14, este código punha o bit 0. A ordem correta, e ela não é simétrica:
+
+     cópia vertical (coluna 8):  bit 0..5 → linha i · 6 e 7 → linha i+1
+                                 8..14 → linha tam-15+i
+     cópia horizontal (linha 8): bit 0..7 → coluna tam-1-i · 8 → coluna 7
+                                 9..14 → coluna 14-i
+
+   O módulo sempre escuro (tam-8, 8) fica FORA das duas: a vertical de baixo
+   começa em tam-7. Escrever um a mais ali o apaga, e o leitor que o procura
+   também desiste.
+
+   **NUNCA confira isto relendo pela mesma convenção com que escreveu.** Foi
+   assim que o defeito passou por três rodadas de teste: o decodificador do
+   `teste_qr.js` — inclusive o que nasceu "independente" para caçar exatamente
+   este tipo de erro — lia o formato do mesmo jeito torto, e concordava consigo
+   mesmo. Hoje o teste lê pela regra do padrão e confere contra os oito valores
+   PUBLICADOS do nível M. */
 function porFormato(m, mascara, v){
   const tam = m.length, f = bitsDoFormato(mascara);
   const bit = i => (f >> i) & 1;
-  for(let i=0;i<=5;i++)  m[8][i] = bit(i);
-  m[8][7] = bit(6); m[8][8] = bit(7); m[7][8] = bit(8);
-  for(let i=9;i<=14;i++) m[14-i][8] = bit(i);
-  // A segunda copia: SETE modulos na coluna de baixo e OITO na linha da
-  // direita. Um a mais na vertical passa por cima do modulo sempre escuro
-  // (m[tam-8][8]) — e um leitor que procura esse modulo desiste do QR.
-  for(let i=0;i<=6;i++)  m[tam-1-i][8] = bit(i);
-  for(let i=7;i<=14;i++) m[8][tam-15+i] = bit(i);
+  for(let i=0;i<15;i++){
+    const b = bit(i);
+    if(i < 6)        m[i][8] = b;
+    else if(i < 8)   m[i+1][8] = b;
+    else             m[tam-15+i][8] = b;
+    if(i < 8)        m[8][tam-1-i] = b;
+    else if(i === 8) m[8][7] = b;
+    else             m[8][14-i] = b;
+  }
   if(v >= 7){
     const b = bitsDaVersao(v);
     for(let i=0;i<18;i++){

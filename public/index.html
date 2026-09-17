@@ -2513,6 +2513,14 @@ async function carregarCad(){
      previa em cima do tema escuro mentiria sobre o contraste do que imprime. */
   h+='<div style="margin-top:14px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">';
   h+='<div style="background:#fff;padding:8px;border-radius:8px;border:1px solid var(--line)"><div id="cdEtqPrev"></div></div>';
+  /* O QR DE CONFERÊNCIA, ao lado e GRANDE. A etiqueta acima mostra como ela
+     vai ficar; este aqui existe para uma coisa só: o celular ler. O QR de
+     20 mm dentro da prévia tem módulo de 2 a 4 pixels na tela — tamanho em que
+     a câmera não fecha a leitura, que foi o que aconteceu na primeira versão. */
+  h+='<div style="background:#fff;padding:10px;border-radius:8px;border:1px solid var(--line);text-align:center">';
+  h+='<div id="cdEtqQr"></div>';
+  h+='<div style="font-size:11px;color:#444;margin-top:6px;max-width:260px">📷 aponte o celular <b>aqui</b><br>é o mesmo QR da etiqueta, ampliado<br>(no papel ele sai com 20 mm)</div>';
+  h+='</div>';
   h+='<div class="sub" id="cdEtqInfo" style="flex:1;min-width:200px"></div>';
   h+='</div>';
   h+='<div style="margin-top:10px"><button class="primary" id="cdEtqBt">Salvar etiqueta</button></div>';
@@ -2555,8 +2563,21 @@ function desenharPreviaKit(){
   if(!caixa||!window.kitEtiqueta) return;
   var c=conteudoKitDaTela(), m=window.kitEtiqueta.medir(c);
   caixa.innerHTML='';
-  try{ caixa.appendChild(window.kitEtiqueta.svg(c,{escala:4.6})); }
+  /* 8 px por mm, e não 4,6: nesse tamanho o módulo do QR fecha em 4 pixels
+     cheios. Abaixo disso ele cai em pixel quebrado e a grade sai irregular. */
+  try{ caixa.appendChild(window.kitEtiqueta.svg(c,{escala:8})); }
   catch(e){ caixa.innerHTML='<div class="sub" style="color:#c62828;padding:20px">'+String(e.message||e)+'</div>'; }
+  // o QR grande, o que o celular lê: módulo de 6 px por construção
+  var cq=document.getElementById('cdEtqQr');
+  if(cq){
+    cq.innerHTML='';
+    if(c.link && m.versaoQr){
+      try{ cq.appendChild(window.qr.svg(c.link,{modulo:6})); }
+      catch(e){ cq.innerHTML='<div style="color:#c62828;font-size:12px;width:240px">'+String(e.message||e)+'</div>'; }
+    } else {
+      cq.innerHTML='<div style="color:#8b7500;font-size:12px;width:240px;padding:40px 0">cole o link do manual acima<br>para o QR aparecer</div>';
+    }
+  }
   /* O que a previa NAO prova fica escrito do lado. Quem desenha o QR e as
      barras no papel e a impressora (fase 3): a previa responde pelo CONTEUDO
      — o link certo, o codigo certo, o texto cabendo —, nunca pelo traco. */

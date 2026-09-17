@@ -199,7 +199,40 @@ ok('a letra ENCOLHE para caber, em vez de vazar pela borda',
 ok('...mas nunca abaixo do minimo legivel',
   DESENHO.medir(cheio).cap >= DESENHO.DESENHO.texto.capMin);
 
-console.log('\n── 8. a Embalagem nao muda (R10) ──');
+console.log('\n── 8. o QR da previa cai na grade de PIXELS ──');
+/* ⚠️ O CASO QUE NASCEU DO CELULAR NAO LENDO. Na fase 2 a previa desenhava o QR
+   de 20 mm a 4,6 px/mm: 2,49 px por modulo. O navegador arredonda cada borda
+   para o pixel mais proximo e a grade sai com modulos de 2 e de 3 px
+   alternando — inclusive na LINHA DE TIMING, que e a regua que o leitor usa
+   para medir o modulo. Grade que respira e QR que nao le, e nada na tela
+   denuncia isso: o desenho continua com cara de QR. */
+[[4.6,37],[7,37],[8,45],[5,29],[12,37]].forEach(([escala,mods]) => {
+  const g = DESENHO.gradeDoQr(escala, mods);
+  ok('escala '+escala+' com '+mods+' modulos: o modulo tem pixel INTEIRO',
+    Math.abs(g.passo*escala - Math.round(g.passo*escala)) < 1e-9,
+    'deu ' + (g.passo*escala) + ' px');
+  ok('...e a origem do QR tambem cai em pixel inteiro',
+    Math.abs(g.x*escala - Math.round(g.x*escala)) < 1e-9 &&
+    Math.abs(g.topo*escala - Math.round(g.topo*escala)) < 1e-9,
+    'x=' + (g.x*escala) + ' topo=' + (g.topo*escala));
+});
+/* O ajuste nao pode "consertar" o QR empurrando ele para fora do lugar: ele
+   continua dentro do espaco reservado, e a folga do silencio segue de pe. */
+const g8 = DESENHO.gradeDoQr(8, 37), QRD = DESENHO.DESENHO.qr;
+ok('o QR ajustado continua dentro do espaco reservado',
+  g8.lado <= QRD.lado + 1e-9 && g8.x >= QRD.x - 1e-9 &&
+  g8.x + g8.lado <= QRD.x + QRD.lado + 1e-9,
+  'lado ' + g8.lado.toFixed(2) + ' mm, x ' + g8.x.toFixed(2));
+ok('e o desenho do PAPEL nao mudou: o QR nominal segue 20 mm',
+  QRD.lado === 20);
+eq('a 8 px/mm o modulo fecha em 4 px cheios (era 2,49 e nao lia)',
+  DESENHO.gradeDoQr(8, 37).passoPx, 4);
+/* E o arredondamento e sempre PARA BAIXO: para cima o QR passaria dos 20 mm e
+   comeria a folga do silencio, trocando um problema de leitura por outro. */
+ok('o QR ajustado nunca fica MAIOR que o espaco reservado, em escala nenhuma',
+  [3,4,4.6,5,6,7,8,9,10,12,16].every(e => DESENHO.gradeDoQr(e,37).lado <= QRD.lado + 1e-9));
+
+console.log('\n── 9. a Embalagem nao muda (R10) ──');
 /* A tela da Embalagem le esta rota, e so ela. Se o GET mudar de formato, a
    bancada para de conferir o kit sem ninguem mexer no montagem.html. */
 r = chamar('GET', '/api/config/kit');

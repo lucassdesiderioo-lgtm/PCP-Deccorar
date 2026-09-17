@@ -5,7 +5,7 @@ STATUS
 Situação: em construção
 Criada em: 17/09/2026
 Última atualização: 17/09/2026
-Fase atual: fases 1 e 2 entregues (conteúdo + prévia) — falta o deploy da 2
+Fase atual: fases 1 e 2 entregues (conteúdo + prévia), com um conserto na 2
 Fases: 1 ☑  2 ☑  3 ☐  4 ☐
 Risco: 🔴 (etiqueta)
 Mudanças no caminho:
@@ -21,6 +21,23 @@ Mudanças no caminho:
   em milímetros. A prévia lê dele e o ZPL da fase 3 sai dele. O que NÃO é
   compartilhado: quem desenha o QR e as barras (navegador na prévia,
   impressora no papel) — a prévia prova o conteúdo e o lugar, não o traço.
+- 17/09/2026 (CONSERTO 2 da fase 2) — **a causa real de o celular não ler: os
+  15 bits da área de formato do QR estavam na ordem INVERTIDA.** O leitor acha
+  o código, vai ler qual máscara foi usada, o BCH não fecha e ele desiste em
+  silêncio. Passou por três rodadas de teste verde porque o teste relia o
+  formato com a mesma convenção torta do gerador — inclusive o decodificador
+  escrito para ser "independente". Hoje o teste lê pela regra do padrão e
+  compara com os oito valores publicados do nível M; reintroduzir o defeito
+  reprova 17 casos. Quem descobriu foi o dono, com o celular.
+- 17/09/2026 (CONSERTO 1 da fase 2) — o QR também estava pequeno demais e com
+  a grade em pixel quebrado. Não
+  era o conteúdo: o QR de 20 mm a 4,6 px/mm pedia 2,49 px por módulo, o
+  navegador arredondava cada borda e a grade saía com módulos de 2 e 3 px
+  alternando, inclusive na linha de timing (a régua do leitor). Agora o módulo
+  cai em pixel cheio (arredondado para baixo, para não comer o silêncio), a
+  prévia desenha a 8 px/mm, e **ao lado dela há um QR de conferência ampliado**
+  — porque um QR de 20 mm numa tela não é para ser lido por câmera. Defeito de
+  tela: no papel quem desenha é a impressora.
 - 17/09/2026 (fase 2) — **o limite de caracteres deixou de ser a regra.** Ele
   é 16 (medido), como cerca grossa do campo; quem decide se cabe é a medida da
   largura real das letras, e ela olha as duas linhas juntas. O texto encolhe

@@ -107,6 +107,31 @@ function capParaLegenda(legenda){
   return 1.6;
 }
 
+/* ⚠️ O QR DA TELA TEM QUE CAIR NA GRADE DE PIXELS, e isto nao e capricho: foi
+   o que impediu o celular de ler a previa da fase 2.
+   Com o QR de 20 mm e 37 modulos numa tela de 4,6 px/mm, cada modulo pedia
+   2,49 px. O navegador arredonda cada borda para o pixel mais proximo, e a
+   grade sai com modulos de 2 e de 3 px ALTERNANDO — inclusive na linha de
+   timing, que e justamente a regua que o leitor usa para medir o modulo e
+   montar a grade. Ele procura passo constante e acha passo que respira.
+   Por isso a previa arredonda o modulo para o pixel cheio e reposiciona o QR
+   em pixel inteiro. O deslocamento e menor que meio milimetro e NAO vai para o
+   papel: la quem desenha o QR e a impressora, com modulo inteiro em pontos. */
+function gradeDoQr(escala, mods){
+  const q = DESENHO.qr;
+  /* Arredonda para BAIXO, nunca para cima: arredondando para cima o QR fica
+     MAIOR que os 20 mm reservados e come a folga do silencio — que e o que faz
+     o leitor achar o codigo. Um QR ligeiramente menor e fiel; um QR que invade
+     a legenda troca um problema de leitura por outro. */
+  const passoPx = Math.max(1, Math.floor((q.lado * escala) / mods));
+  const lado = (passoPx * mods) / escala;
+  // a origem tambem tem que cair em pixel cheio, senao a primeira coluna de
+  // modulos nasce meio pixel deslocada e o arredondamento volta
+  const x = Math.round((q.x + (q.lado - lado) / 2) * escala) / escala;
+  const topo = Math.round((q.topo + (q.lado - lado) / 2) * escala) / escala;
+  return { x, topo, lado, passo: passoPx / escala, passoPx };
+}
+
 /* O que esta certo e o que nao esta, ANTES de imprimir (R7). Devolve sempre a
    lista inteira de problemas: dizer um por vez faz a pessoa corrigir, salvar,
    descobrir o seguinte e concluir que o sistema inventa impedimento novo a
@@ -218,14 +243,14 @@ function svg(conteudo, opcoes){
   const q = DESENHO.qr;
   if(c.link && m.versaoQr && Q){
     const mods = Q.modulos(c.link);
-    const passo = q.lado / mods.length;
+    const g = gradeDoQr(escala, mods.length);
     for(let i=0;i<mods.length;i++){
       let j = 0;
       while(j < mods.length){
         if(mods[i][j]){
           let k = j; while(k < mods.length && mods[i][k]) k++;
-          el.appendChild(no('rect', { x:q.x + j*passo, y:q.topo + i*passo,
-            width:(k-j)*passo, height:passo, fill:'#000' }));
+          el.appendChild(no('rect', { x:g.x + j*g.passo, y:g.topo + i*g.passo,
+            width:(k-j)*g.passo, height:g.passo, fill:'#000' }));
           j = k;
         } else j++;
       }
@@ -239,7 +264,7 @@ function svg(conteudo, opcoes){
 }
 
 const api = { svg, medir, larguraDoTexto, capParaLinhas, capParaLegenda,
-              limiteDeCaracteres, ETIQUETA, DESENHO, LARGURA };
+              limiteDeCaracteres, gradeDoQr, ETIQUETA, DESENHO, LARGURA };
 if(typeof window !== 'undefined') window.kitEtiqueta = api;
 if(typeof module !== 'undefined' && module.exports) module.exports = api;
 })();
