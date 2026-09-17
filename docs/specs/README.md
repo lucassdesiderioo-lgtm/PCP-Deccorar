@@ -29,11 +29,10 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 | `COMPRAS.md` | Implementado (fases 0–6) · fase 7 pendente · com mudanças na construção |
 | `ARQUITETURA-ALVO.md` | Parcial — só no módulo sob medida (`tecido/`) |
 | `PCP-CONTROLE-E-VISAO.md` | Parcial e divergente · decisão pendente |
-| `TABLETS-E-KIOSK.md` | Planejado · nada no código |
-| `PRODUCAO-MAPA-E-MOTOR.md` | Planejado · não iniciado · aguardando decisão do dono |
-| `PRODUCAO-MONTAGEM.md` | Planejado · não iniciado · aguardando decisão do dono |
-| `GESTAO-DE-TAREFAS.md` | Planejado · não iniciado · aguardando decisão do dono |
-| `MELHORIAS.md` | Não instalado · aguardando decisão do dono |
+| `TABLETS-E-KIOSK.md` | Planejado · nada no código · camada 1 (iPad) pode ir já |
+| `PRODUCAO-MAPA-E-MOTOR.md` | Planejado · não iniciado · depois da fila de consertos |
+| `PRODUCAO-MONTAGEM.md` | Planejado · não iniciado · depois da fila de consertos |
 
 Em `docs/arquivo/`: `REVISAO-COMPLETA.md`, `ESTOQUE-TECIDO-E-SOBRAS.md`,
-`PROMPT-ESTOQUE-TECIDO-E-SOBRAS.md`, `PROMPT-FASE-0.md`, `PERGUNTAS-COMPRAS.md`.
+`PROMPT-ESTOQUE-TECIDO-E-SOBRAS.md`, `PROMPT-FASE-0.md`, `PERGUNTAS-COMPRAS.md`,
+`GESTAO-DE-TAREFAS.md` e `MELHORIAS.md` (arquivados por decisão do dono em 17/09/2026).

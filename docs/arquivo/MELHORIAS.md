@@ -1,4 +1,7 @@
-> **STATUS · 17/09/2026 — NÃO INSTALADO · aguardando decisão do dono**
+> **ARQUIVADO · 17/09/2026 — decisão do dono: a fila de prioridade do Projeto, o `CLAUDE.md` §14
+> e o `docs/DECISOES.md` já cumprem o papel deste quadro.**
+>
+> Situação na data do arquivamento:
 > O texto abaixo diz "implementado e testado, aguardando instalação" (03/09/2026).
 > **O pacote nunca entrou no repositório:** não existe `nucleo/registro.js`,
 > `dados/melhoria.js`, `dominio/melhorias.js`, `rotas/melhorias.js` nem

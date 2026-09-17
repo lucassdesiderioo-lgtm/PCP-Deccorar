@@ -1,4 +1,7 @@
-> **STATUS · 17/09/2026 — PLANEJADO · não iniciado · aguardando decisão do dono**
+> **ARQUIVADO · 17/09/2026 — decisão do dono: sai do foco do PCP por enquanto.**
+> Nunca foi iniciado. Para retomar, volta para `docs/specs/` e passa pela conversa de REGRA/NOVIDADE.
+>
+> Situação na data do arquivamento:
 > Nenhuma tabela deste desenho existe (`tarefa`, `tarefa_evento`, `tarefa_modelo`).
 > Os setores de fora da produção (Compras, Financeiro, Manutenção…) também não foram
 > criados. O Compras criou setores próprios de Comprador/Recebimento/Financeiro — conferir

@@ -1,4 +1,4 @@
-> **STATUS · 17/09/2026 — PLANEJADO · não iniciado · aguardando decisão do dono**
+> **STATUS · 17/09/2026 — PLANEJADO · não iniciado** · mantido pelo dono em 17/09/2026, começa depois da fila de consertos
 > Nenhuma tabela deste desenho existe (`montagem_sessao`, `peca`, `componente_reserva`).
 > A tabela `componente` e a `ficha_tecnica` **existem**, criadas pelo módulo de Compras
 > de forma provisória — o que faltar entra por `ALTER`, nunca recriando

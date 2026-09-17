@@ -1,4 +1,4 @@
-> **STATUS · 17/09/2026 — PLANEJADO**
+> **STATUS · 17/09/2026 — PLANEJADO** · mantido pelo dono; a camada 1 (ajustes do iPad, sem código) pode ser feita já
 > Nada das camadas 2 e 3 está no código: sem `app.webmanifest`, sem meta tags de app,
 > sem `bipe.js` único, sem fila offline (`evento_recebido`), sem service worker.
 > A camada 1 (ajustes do iPad) não aparece no código — conferir nos tablets.

@@ -1,4 +1,4 @@
-> **STATUS · 17/09/2026 — PLANEJADO · não iniciado · aguardando decisão do dono**
+> **STATUS · 17/09/2026 — PLANEJADO · não iniciado** · mantido pelo dono em 17/09/2026, começa depois da fila de consertos
 > Nenhuma tabela deste desenho existe (`etapa`, `sessao_producao`, `unidade`,
 > `unidade_consumo`). Atenção a dois pontos que mudaram desde a escrita:
 > a rota `/montagem` hoje serve a tela de **Embalagem**; e o **SKU não tem mais formato**
