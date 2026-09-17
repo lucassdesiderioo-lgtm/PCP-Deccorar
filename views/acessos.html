@@ -22,6 +22,10 @@
   h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px}
   .chk{display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--line)}
   .chk:last-child{border-bottom:0}
+  /* Intransferível que a pessoa não tem: a linha continua legível (ela explica
+     o que é a permissão), mas a caixinha não convida ao clique. */
+  .chk.trancada{opacity:.55}
+  .chk.trancada input{cursor:not-allowed}
   .chk input{width:20px;height:20px;accent-color:var(--amber)}
   .chk .lb{flex:1}.chk .lb small{display:block;color:var(--muted);font-size:11px;font-weight:400}
   .orig{font-size:11px;padding:2px 8px;border-radius:20px;white-space:nowrap}
@@ -262,8 +266,18 @@ function renderDetalhe(){
                  : (tem&&!temSetor)?'<span class="orig exc">exceção</span>'
                  : (!tem&&temSetor)?'<span class="orig exc">revogada</span>'
                  : '<span class="orig no">—</span>';
-      h+='<label class="chk"><input type="checkbox" class="permchk" data-c="'+pm.chave+'" data-setor="'+(temSetor?1:0)+'"'
-        +(tem?' checked':'')+(isAG?' disabled':'')+'>'
+      /* A CAIXINHA DA INTRANSFERÍVEL NÃO SE MARCA (dívida 17, 17/09/2026).
+         Ela decide quem tem acesso a quê, e por isso só vem por nível, no setor
+         Admin Geral. O rótulo já aparecia aqui; a caixinha, não. Quem
+         desmarcava numa pessoa que a tinha continua podendo — quem NÃO a tem
+         não pode ganhá-la por exceção. A guarda que vale é a do servidor (a
+         tela sozinha não protege quem chama a rota por fora); esta linha existe
+         para a recusa não chegar como surpresa depois do clique. */
+      var trancada = pm.intransferivel && !tem;
+      h+='<label class="chk'+(trancada?' trancada':'')+'"'
+        +(trancada?' title="Intransferível: só o Admin Geral tem, por nível"':'')
+        +'><input type="checkbox" class="permchk" data-c="'+pm.chave+'" data-setor="'+(temSetor?1:0)+'"'
+        +(tem?' checked':'')+((isAG||trancada)?' disabled':'')+'>'
         +'<span class="lb">'+pm.rotulo+(pm.sensivel?' <span class="sens">SENSÍVEL</span>':'')+(pm.intransferivel?' <span class="intr">intransferível</span>':'')
         +'<small>'+(pm.desc||'')+'</small></span>'+origem+'</label>';
     });

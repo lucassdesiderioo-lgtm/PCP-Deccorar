@@ -220,12 +220,16 @@ module.exports=function(app, db){
 
   // Trava de seguranca: nao deixa remover/bloquear o ULTIMO Admin Geral ativo —
   // senao ninguem mais consegue administrar (regra "ninguem sem acesso").
+  //
+  // A CONTA MORA NO acesso.js, ao lado de "quem e Admin Geral" (17/09/2026).
+  // Ela passou a ser feita em dois lugares — aqui e na tela de Acessos, que
+  // tambem pode tirar o cracha do ultimo AG (divida 17) — e duas copias
+  // divergiriam no dia em que "quem e Admin Geral" mudasse de definicao.
+  // Modelo novo indisponivel: NAO trava, que e como sempre foi.
   function ehUltimoAdminGeral(id){
     const ac=app.locals.acesso;
-    if(!ac||!ac.ehAdminGeral) return false;         // modelo novo indisponivel: nao trava
-    if(!ac.ehAdminGeral(+id)) return false;         // nem e Admin Geral
-    const outros=db.prepare('SELECT id FROM usuarios WHERE ativo=1 AND id!=?').all(id);
-    return !outros.some(u=>ac.ehAdminGeral(u.id));   // ninguem mais e AG ativo
+    if(!ac||!ac.ehUltimoAdminGeral) return false;
+    try{ return ac.ehUltimoAdminGeral(+id); }catch(e){ return false; }
   }
 
   app.delete('/api/usuarios/:id',(req,res)=>{

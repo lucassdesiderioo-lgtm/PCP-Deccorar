@@ -577,7 +577,7 @@ configuração é o que vai falhar.
 > lista única do desenho, o PDF (tamanho da página, lote, recusa e auditoria) e
 > o QR — que o teste não "olha": ele decodifica de volta, confere a paridade
 > Reed-Solomon e **remonta o QR a partir do PDF gerado**. Mexeu na permissão?
-> **`node teste_acesso.js`** (38 casos). Mexeu no `barras.js`?
+> **`node teste_acesso.js`** (59 casos). Mexeu no `barras.js`?
 > **`cd tecido && npm test` também** — a etiqueta de prateleira do sob medida
 > lê o mesmo arquivo.
 
@@ -862,7 +862,8 @@ peça**, não só para o `lote.codigo`. A decisão vira história
 > `etiqueta.emitir` não conferiria nem imprimiria.
 >
 > **Rode `node teste_acesso.js` ao mexer em `permissoes.js` ou no `permDaRota()`**
-> — os 27 casos travam as três pontas, o backfill e a lista de cobertura.
+> — os 59 casos travam as três pontas, o backfill, a lista de cobertura e as
+> quatro portas de escalonamento da §10 (armadilha #28).
 
 **3. Etiqueta de Venda: sem o bipe de TODAS as peças, não imprime.** Tela âmbar
 própria (`📦 ESTA CAIXA LEVA 3 PERSIANAS`), uma linha por peça com o que ela é
@@ -1988,6 +1989,50 @@ de sessão assinado com HMAC-SHA256, permissões por **área** (não por cargo f
 
 Fluxo de login desenhado para tablet: grade de nomes → teclado numérico → entra.
 
+### ⚠️ ARMADILHA #28 — a tela de Acessos era o caminho mais curto para o acesso total
+
+Fechado em 17/09/2026 (era a dívida 17 do §14). Quatro portas, todas na tela
+oficial, todas deixando **rastro de ação legítima** na auditoria — porque elas
+*eram* legítimas. Quem auditasse depois veria um Admin fazendo o trabalho dele.
+
+| Porta | O que era | O que é |
+|---|---|---|
+| **A exceção do indelegável** | `permissoes.js` marca três chaves como `intransferivel` — `pessoas.gerenciar`, `setores.gerenciar`, `auditoria.ver`. O rótulo **nunca foi consultado em nenhum caminho de escrita**, e a tela desenhava a caixinha sem `disabled`: um Admin concedia a si mesmo o poder de mandar nos acessos | `POST .../excecao` recusa **conceder** uma intransferível. **Revogar continua livre** — tirar não escala ninguém, e recusar o caso seguro é a armadilha #6 |
+| **O setor novo de nível máximo** | A guarda do `acesso.js` cobria só o setor que **já existe**. Criar um setor **novo** com nível `admin_geral` passava — e esse nível significa TODAS as permissões. Criava "Coordenação", punha-se dentro, saía com tudo | Criar setor de nível `admin_geral` é recusado; para dar acesso total, põe-se a pessoa no setor Admin Geral que já existe |
+| **Trancar-se do lado de fora** | O `auth.js` não deixa bloquear nem excluir o último Admin Geral, mas a tela de Acessos tirava dele o **setor** — mesmo resultado, e a recuperação é SQL direto no banco | A trava passou a valer nos dois lugares, e a conta **é a mesma**: `ehUltimoAdminGeral` mora no `acesso.js`, ao lado de "quem é Admin Geral", e o `auth.js` chama ela |
+| **A porta A: a sombra promovendo** | Ver abaixo — é a mais difícil de enxergar das quatro | A migração de `areas` virou evento de uma vez só |
+
+> ⚠️ **A PORTA A É A ARMADILHA #13 (§19) COBRANDO O JURO.** `usuarios.areas`
+> deixou de ser **entrada** e virou **sombra**: quem escreve nela é o
+> `sincronizarAreas`, a partir das permissões efetivas. Só que o
+> `migrarPendentes` continuou lendo `areas` como se fosse entrada — e o
+> `areasParaSetores` traduz `'admin'` para o setor **Admin Geral**.
+>
+> A cadeia inteira, sem ninguém pedir nada: um Admin concede a alguém **sem
+> setor** uma exceção qualquer de nível admin (*ver custo*, por exemplo) → o
+> `sincronizarAreas` grava `areas='admin'` → na próxima vez que a ficha da
+> pessoa é aberta, o `migrarPendentes` roda, vê a sombra e a põe no **Admin
+> Geral**. Quem só devia ver custo sai podendo gerenciar acessos. Foi conferido
+> desligando a guarda: a pessoa termina com `pessoas.gerenciar`.
+>
+> **A migração é um evento da Fase 1, não uma rotina.** Ela agora roda enquanto
+> `config.migracao_areas_fase1` não existe e se marca depois — o primeiro boot
+> com este código ainda migra quem estava pendente, e do segundo em diante
+> `areas` não decide setor nenhum. Pessoa nova não depende disso: a tela de
+> Acessos cria com `{nome, pin}`, sem `areas`, e quem dá os setores é o Admin.
+>
+> **O `acesso.js` passou a criar o `config` também**, e não é redundância: ele
+> *grava* ali (o seed do `pacote.assinar`, o modo de acesso e essa marca), mas
+> quem cria a tabela é o `mont_route`, que no `server.js` roda antes. Carregado
+> sozinho — um script, um teste, uma ordem de `require` diferente amanhã — o
+> `CREATE` não aconteceu e os `try/catch` engolem tudo em silêncio: o seed
+> "roda", não grava nada, e ninguém fica sabendo. É a mesma família do §17.
+
+**Rode `node teste_acesso.js` ao mexer em `acesso.js`, `permissoes.js` ou
+`auth.js`** — os 59 casos cobrem as três pontas de uma permissão nova (§19,
+armadilha #13) e as quatro portas acima. As travas moram nas **rotas**, então o
+teste chama as rotas: trava que ninguém chama é trava que ninguém testa.
+
 ### ⚠️ ARMADILHA #3 — a ordem no `server.js` é arquitetura, não estilo
 
 ```js
@@ -2185,14 +2230,14 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (38), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (59), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto — é passivo, e se fecha pelos scripts do §5 | — |
 | 14 | ~~**`POST /api/montagem` (a embalagem) sem proteção**~~ **RESOLVIDO em 17/09/2026** — transação nas quatro escritas, SKU conferido (404), kit conferido no servidor e recusa aparecendo na tela; `teste_montagem.js` (42 casos). Ver §4, armadilha #26. **Fica aberto**: o código do kit é conferido quando vem, não exigido — exigir espera o refresh nos tablets. "Embalar sem revisar gera estoque" **não** entrou: é regra do §4, não defeito | — |
 | 15 | ~~**`POST /api/skus` zera o estoque** quando o corpo não traz `estoque`~~ **RESOLVIDO em 17/09/2026** — campo ausente preserva os quatro campos soltos, número impossível é recusado (400) em vez de clampado, e as duas escritas viraram uma transação com o `catch` vazio fora. A rota saiu para `sku_cad_route.js` e tem `teste_skus.js` (60 casos) atrás — ver §6, armadilha #25. **Fica aberto**: a rota ainda muda saldo com `sku.cadastrar`, sem motivo e sem auditoria (fechar isso é `REGRA`) | — |
 | 16 | **Acesso: default `@logado` e cobertura mantida à mão** — `permDaRota` termina em `@logado`; a tela de cobertura lê a lista `TODAS_ROTAS` e ignora `/api/`. Fecha junto com a dívida 12(c) (auditoria §1.2–1.3). **Aberto em 17/09/2026** | Médio — rota nova nasce aberta sem aparecer em lugar nenhum |
-| 17 | **Acesso: duas travas faltando** — `POST /api/acesso/usuario/:id/excecao` não recusa permissão `intransferivel`; `POST /api/acesso/usuario/:id/setores` não tem a trava do último Admin Geral (a de `auth.js` só cobre bloquear/excluir) (auditoria §1.1). **Aberto em 17/09/2026** | Médio — escalonar ou se trancar fora pela tela oficial |
+| 17 | ~~**Acesso: duas travas faltando**~~ **RESOLVIDO em 17/09/2026** — a exceção recusa conceder chave `intransferivel`, a troca de setores tem a trava do último Admin Geral (mesma conta do `auth.js`, agora no `acesso.js`), setor novo não nasce `admin_geral` e a migração de `areas` virou evento de uma vez só (a porta A, que promovia a Admin Geral em silêncio). Ver §10, armadilha #28 | — |
 
 ---
 
@@ -2328,6 +2373,19 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Recriar o upload de etiqueta do kit (`/api/kit/label`) ou qualquer segundo
   caminho de impressão: o arquivo enviado não acompanha o Código do kit, e o
   rolo impresso por ele para de bipar sem ninguém saber por quê (§4)
+- ❌ Deixar conceder por exceção uma permissão marcada `intransferivel`: as três
+  decidem quem tem acesso a quê, e delegar uma delas é dar o sistema inteiro
+  (§10, armadilha #28). Revogar continua livre
+- ❌ Permitir criar setor NOVO de nível `admin_geral` — esse nível é "todas as
+  permissões", e a guarda antiga só cobria o setor que já existia (§10, #28)
+- ❌ Deixar a tela de Acessos tirar o setor Admin Geral do último Admin Geral, ou
+  escrever uma segunda conta de "ele é o último?" — ela mora no `acesso.js` e o
+  `auth.js` chama ela (§10, armadilha #28)
+- ❌ Fazer o `migrarPendentes` voltar a ler `usuarios.areas` como entrada: ela é
+  SOMBRA (§19, #13), e lê-la promove a Admin Geral quem recebeu uma exceção
+  qualquer de nível admin — sem ninguém pedir (§10, armadilha #28, porta A)
+- ❌ Gravar em `config` a partir de um módulo sem garantir que a tabela existe: o
+  `try/catch` engole, o seed "roda" e não grava nada (§10, §17)
 - ❌ Mover `express.static` para antes do `auth`
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor
@@ -2623,6 +2681,14 @@ salvamento de acesso de qualquer pessoa.
 O modo de falhar é o pior possível: o admin marca o acesso, a tela confirma, e
 o acesso some sozinho depois — sem erro, sem log, sem ninguém saber por quê.
 Há teste travando as duas pontas (`tecido/teste/acesso.test.js`).
+
+> ⚠️ **E A SOMBRA TEM O DEFEITO SIMÉTRICO, que custou uma escalada de acesso:
+> além de sumir sozinha, ela também PROMOVIA sozinha.** O `migrarPendentes`
+> continuava lendo `usuarios.areas` como se fosse entrada, e `'admin'` ali vira
+> o setor **Admin Geral** — então uma exceção pequena de nível admin acabava
+> dando o sistema inteiro para a pessoa. Fechado em 17/09/2026; a história está
+> na §10, armadilha #28. **A regra que fica: `areas` é saída. Quem a lê para
+> decidir alguma coisa está lendo o eco da própria decisão.**
 
 **As três coisas andam juntas.** Chave em `permissoes.js`, setor em
 `acesso.js` (`setoresNativos`), linha em `PERM_AREA`. Faltando qualquer uma,
