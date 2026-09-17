@@ -72,6 +72,24 @@ async function lerFolha(arquivo){
   return {paginas:pdf.numPages, etiquetas, notas, blocos:itensDaFolha(ctrlLinhas)};
 }
 
+/* O TITULO DO ANUNCIO, SEM O CODIGO DA COLUNA DA ESQUERDA.
+ *
+ * A linha de cima do bloco traz duas colunas: a identificacao do envio
+ * (`RZ3OQY65HJJ3DJLW6PE4Z2J3OQ`) e o titulo do anuncio, como o ML escreveu.
+ * O codigo nao e o anuncio — ninguem o reconhece na tela do Mercado Livre —,
+ * entao ele sai e o resto da linha fica INTEIRO.
+ *
+ * So sai o que e claramente codigo: um bloco colado de maiusculas COM digito.
+ * Palavra de titulo em caixa alta ("BLACKOUT") nao tem digito e fica onde
+ * esta — podar por tamanho comeria a primeira palavra de um titulo gritado.
+ */
+function tituloDoAnuncio(linha){
+  const s=String(linha||'').trim();
+  const m=s.match(/^([A-Z0-9]{6,})\s+(?=\S)/);
+  if(m && /[0-9]/.test(m[1]) && /[A-Z]/.test(m[1])) return s.slice(m[0].length).trim();
+  return s;
+}
+
 /* UM BLOCO POR ITEM — o mesmo criterio que o parse.js usa para gravar.
  *
  * A folha do ML monta cada item em cinco linhas, em duas colunas:
@@ -102,7 +120,32 @@ function itensDaFolha(linhas){
     const daqui=linhas.slice(i, Math.min(depois, i+4));
     const acima=linhas.slice(Math.max(antes, i-2), i+1);
     const pega=re=>{ for(const x of daqui){ const mm=x.match(re); if(mm) return mm[1]; } return null; };
-    let desc=''; for(const x of acima){ const mm=x.match(/(Persiana[^|]*)$/); if(mm){ desc=mm[1].trim(); break; } }
+    /* A DESCRICAO E A LINHA INTEIRA DO ANUNCIO, NAO O PEDACO A PARTIR DE
+       "Persiana".
+       Ate 17/09/2026 o recorte era `/(Persiana[^|]*)$/`: pegava do "Persiana"
+       ate o fim da linha. Nos titulos em que a palavra vem NO COMECO
+       ("Persiana Cortina Rolo Blackout 1,60x1,40 ...") isso devolvia a linha
+       toda por acaso; nos em que ela vem NO FIM — que e como o ML escreve hoje
+       ("Cortina Rolo Blackout 1,50x1,50 Blecaute Persiana Cinza") — sobrava
+       "Persiana Cinza", e com ela iam embora a LINHA do produto e a MEDIDA.
+       O estrago era em tres lugares de uma vez: a tela de Bloqueados mostrava
+       "anuncio: Persiana Cinza", que nao identifica venda nenhuma no ML e
+       obrigava a abrir o pedido la pra saber de que anuncio se tratava; a
+       conferencia 3 (§5) ficava sem medida para conferir e parava de acusar em
+       silencio; e a conferencia 5 aprendia "PERSIANA CINZA" como familia — que
+       muda com a COR, quando a familia e justamente a linha do produto.
+
+       Quem manda agora e a estrutura da folha, nao a palavra: a candidata e a
+       linha acima do "SKU:" que NAO e linha de campo. A ancora continua de pe
+       so como guarda contra o cabecalho da pagina ("Identifiicação Produtos",
+       "Despachem as suas vendas o quanto antes."), que aparece acima do
+       primeiro item — e ela aceita tambem a MEDIDA escrita por extenso, que e
+       o mesmo dado que a conferencia 3 ja le e nao envelhece como lista de
+       palavras: titulo de persiana traz um ou o outro, cabecalho nao traz
+       nenhum. */
+    const ehCampo=x=>/(?:Pack ID|Venda|SKU|Quantidade|Cor|Desenho do tecido)\s*:/.test(x);
+    const ehAnuncio=x=>/Persiana/i.test(x)||/(\d)[,.](\d{2})\s*[xX]\s*(\d)[,.](\d{2})/.test(x);
+    let desc=''; for(const x of acima){ if(!ehCampo(x)&&ehAnuncio(x)){ desc=tituloDoAnuncio(x); break; } }
     let comprador=''; for(const x of daqui){
       const mm=x.match(/^(.+?)\s+(?:Cor:|Quantidade:)/);
       if(mm && !/^(Pack ID|Venda|SKU|Desenho)/.test(mm[1]) && !/Persiana/i.test(mm[1])){ comprador=mm[1].trim(); break; }
@@ -223,4 +266,4 @@ function travasAtivas(volume, item, coresConhecidas){
 }
 
 module.exports={lerFolha,mapasDaFolha,skuDaFolha,itemDaFolha,itensDaFolha,travasAtivas,pageLines,
-                tipoDaPagina,nfDaNota,irmaosDoPacote,irmaosDe};
+                tipoDaPagina,nfDaNota,irmaosDoPacote,irmaosDe,tituloDoAnuncio};

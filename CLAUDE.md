@@ -283,7 +283,7 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > uma régua diferente da que gravou.
 >
 > **Rode `node teste_parse.js` após qualquer mudança no `parse.js`, no `folha.js`
-> ou no `nome.js`** — os 17 casos montam a folha no formato REAL do ML, e o caso
+> ou no `nome.js`** — os 18 casos montam a folha no formato REAL do ML, e o caso
 > do Abraão está lá.
 >
 > Para conferir o que já está gravado: `node rastrear.js --auditar [dias]`.
@@ -762,6 +762,49 @@ O volume divergente:
   uma dúvida sobre *qual peça o cliente comprou* (guarda no `server.js`);
 - sai só por `POST /api/divergencias/resolver`, depois de alguém abrir o pedido no
   Mercado Livre e escolher. Aparece na aba **Bloqueados** do admin, em vermelho.
+
+### ⚠️ ARMADILHA #24 — o anúncio chegava DECAPITADO, e com ele iam três coisas
+
+Corrigido em 17/09/2026. A descrição do anúncio saía de um recorte a partir da
+palavra "Persiana" (`folha.js`, `/(Persiana[^|]*)$/`). O ML escreve a palavra
+**no fim** do título:
+
+```
+RZ3OQY...  Cortina Rolo Blackout 1,50x1,50 Blecaute Persiana Cinza
+o que era gravado:                                  Persiana Cinza
+```
+
+Nos testes isso nunca apareceu porque o helper do `teste_parse.js` montava
+"Persiana" logo depois do identificador — e aí o recorte pegava a linha toda
+**por acaso**. No PDF real, sobrava o rabo do título.
+
+**O estrago era em três lugares de uma vez, e só o primeiro era visível:**
+
+| Onde | O que acontecia |
+|---|---|
+| **Admin → Bloqueados** | `anúncio: Persiana Cinza` não identifica anúncio nenhum. Quem ia resolver o volume tinha que abrir a venda no ML só para descobrir de que anúncio se tratava — exatamente o trabalho que o campo existe para poupar |
+| **Conferência 3** (medida) | ela lê `1,50x1,50` do **texto do anúncio**; sem a medida, parava de acusar em silêncio, que é a armadilha #10 inteira |
+| **Conferência 5** (família) | aprendia `PERSIANA CINZA` como família — e família que **muda com a cor** não é a linha do produto. A `familia_sku` vinha acumulando isso |
+
+**Quem manda agora é a estrutura da folha, não a palavra:** a descrição é a
+linha acima do `SKU:` que não é linha de campo (`Pack ID:`, `Venda:`, `SKU:`,
+`Quantidade:`, `Cor:`, `Desenho do tecido:`). A âncora continua de pé só como
+guarda contra o **cabeçalho da página** ("Identifiicação Produtos"), e aceita
+também a **medida por extenso** — o mesmo dado que a conferência 3 já lê, e que
+não envelhece como lista de palavras. O identificador da coluna da esquerda sai
+(`tituloDoAnuncio`): ele não é o anúncio.
+
+> **A trava passa a acusar mais, e isso é o ponto.** Nos títulos com "Persiana"
+> no fim a conferência 3 estava desligada sem ninguém saber. Acompanhe
+> `cobertura.medida` na auditoria: ela tem que **subir**. A `familia_sku` velha
+> não é reescrita — é história do que o sistema viu, e o aprendizado recomeça
+> sozinho (≥5 ocorrências), então nada passa a acusar de repente.
+
+> **Os volumes já gravados:** `node backfill_descricao.js` (simula) e
+> `--aplicar`. Ele relê os PDFs ainda no disco pela mesma régua e regrava só
+> `lote.descricao` e `lote_item.descricao` — não toca em saldo, estágio nem
+> bloqueio. **Alcança só os últimos 7 dias**, que é o que o cron deixa: título
+> não se inventa de memória. Caso 20 do `teste_parse.js` trava o formato real.
 
 ### Como o volume retido volta a andar (Bloqueados → escolher)
 
@@ -1708,7 +1751,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (17 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (27) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (36), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (27) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
@@ -1755,6 +1798,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   impressão sai com a continuação no lugar do documento (§5, armadilha #22)
 - ❌ Escrever uma segunda régua de "que página é esta" / "qual o número desta
   nota" — as duas são do `folha.js`, e é por elas que a impressão gravou (§5)
+- ❌ Recortar a descrição do anúncio a partir de uma palavra ("Persiana"): o ML
+  escreve o título com ela no fim, e o recorte leva junto a medida que a
+  conferência 3 lê e a família que a 5 aprende (§5, armadilha #24)
 - ❌ Comparar nome de cliente fora do `nome.js`, ou com distância de edição:
   `Marcelo`/`Marcela` estão a duas letras e são duas pessoas (§5, #10 e #22)
 - ❌ Pôr a caixa de coleta na lista ou no contador do carro, ou somar a coleta

@@ -537,6 +537,59 @@ function conferir(nome, orders, esperado){
     else console.log('ok      ausencia so vira pacote quando o PDF fecha');
   }
 
+  /* ── 20. O TITULO DO ANUNCIO SAI INTEIRO, E A MEDIDA VOLTA A CONFERIR ─────
+        O ML escreve o titulo com "Persiana" NO FIM:
+
+            RZ3OQY... Cortina Rolo Blackout 1,50x1,50 Blecaute Persiana Cinza
+
+        O recorte antigo (`/(Persiana[^|]*)$/`) devolvia "Persiana Cinza" — o
+        titulo decapitado. Nos testes daqui isso nunca apareceu porque o helper
+        `item()` monta "Persiana" logo depois do identificador, e ai o recorte
+        pegava a linha toda por acaso. Este caso monta a folha como o PDF real.
+
+        Sao TRES coisas na mesma linha, e as tres se perdiam juntas:
+          - a tela de Bloqueados mostra o anuncio pra pessoa reconhecer a venda
+            no Mercado Livre — "Persiana Cinza" nao identifica anuncio nenhum;
+          - a conferencia 3 le a MEDIDA do texto do anuncio, e sem ela parava
+            de acusar em silencio (§5, armadilha #10);
+          - a conferencia 5 aprende a FAMILIA dessa linha, e "PERSIANA CINZA"
+            muda com a cor.
+        O identificador da coluna da esquerda nao entra: ele nao e o anuncio. */
+  casos++;
+  {
+    const folha=(ident,titulo,pack,venda,sku,cor,comprador)=>[
+      ident+' '+titulo,
+      'Pack ID: '+pack+' SKU: '+sku,
+      'Venda: '+venda+' Quantidade: 1',
+      comprador+' Cor: '+cor,
+      'Desenho do tecido: Blackout'];
+    const monta=async (sku)=>{
+      const d=await PDFDocument.create(), f=await d.embedFont(StandardFonts.Helvetica);
+      const pag=ls=>{ const p=d.addPage([595,842]); let y=800;
+        for(const l of ls){ p.drawText(l,{x:30,y,size:9,font:f}); y-=14; } };
+      pag(etiqueta({pack:'2000015068684269',nf:'6659',comprador:'Georgia Tavares Ignacio'}));
+      pag(['Despachem as suas vendas o quanto antes.','Identifiicação Produtos'].concat(
+        folha('RZ3OQY65HJJ3DJLW6PE4Z2J3OQ','Cortina Rolo Blackout 1,50x1,50 Blecaute Persiana Cinza',
+              '2000015068684269','2000018468081999',sku,'Cinza','Georgia Tavares Ignacio')));
+      const arq=path.join(tmp,'t'+casos+'-'+sku+'.pdf');
+      fs.writeFileSync(arq, await d.save());
+      return (await parsePdf(new Uint8Array(fs.readFileSync(arq))))[0]||{};
+    };
+    const erros=[];
+    const v=await monta('BK150150CINZA');
+    if(v.descricao!=='Cortina Rolo Blackout 1,50x1,50 Blecaute Persiana Cinza')
+      erros.push('o anuncio veio decapitado: '+JSON.stringify(v.descricao));
+    if(v.conflito) erros.push('reteve a toa: '+v.conflito);
+    /* A prova de que a medida voltou a ser lida: com o SKU trocado, a
+       conferencia 3 tem que acusar neste mesmo formato de titulo. */
+    const w=await monta('BK160140CINZA');
+    if(!(w.conflito && /150x150/.test(w.conflito)))
+      erros.push('a medida do anuncio nao acusou o SKU trocado: '+JSON.stringify(w.conflito));
+    if(erros.length){ falhas++; console.log('FALHOU  o anuncio sai inteiro quando "Persiana" vem no fim do titulo');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      o anuncio sai inteiro quando "Persiana" vem no fim do titulo');
+  }
+
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));
