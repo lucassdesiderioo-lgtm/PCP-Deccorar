@@ -398,7 +398,22 @@ async function chamarAsync(metodo, rota, corpo, usuario){
 })();
 
 function fim(){
-console.log('\n── 12. a Embalagem nao muda (R10) ──');
+console.log('\n── 12. o SEGUNDO CAMINHO nao existe mais (R11, fase 4) ──');
+/* ⚠️ O ARQUIVO PRONTO ERA UMA IMAGEM MORTA, e e por isso que ele saiu.
+   Ate 17/09/2026 dava para subir a arte da etiqueta (PDF/PNG/JPG/SVG) e
+   imprimir por ela. O gerador acompanha o Codigo do kit; o arquivo enviado
+   nao. Trocado o codigo, quem imprimisse pelo upload tirava um rolo que nao
+   bipa na Embalagem — e descobria com a peca na mao, sem ninguem saber que
+   havia dois caminhos.
+   Este caso existe para uma coisa so: impedir que o segundo caminho volte
+   sem ninguem perceber. Rota de impressao de etiqueta do kit ha UMA. */
+['POST /api/kit/label', 'GET /api/kit/label', 'GET /api/kit/label/meta',
+ 'DELETE /api/kit/label'].forEach(r =>
+  ok('a rota ' + r + ' nao existe mais', rotas[r] === undefined));
+ok('e a unica porta de impressao e a do gerador',
+  typeof rotas['POST /api/kit/etiqueta/imprimir'] === 'function');
+
+console.log('\n── 13. a Embalagem nao muda (R10) ──');
 /* A tela da Embalagem le esta rota, e so ela. Se o GET mudar de formato, a
    bancada para de conferir o kit sem ninguem mexer no montagem.html. */
 r = chamar('GET', '/api/config/kit');

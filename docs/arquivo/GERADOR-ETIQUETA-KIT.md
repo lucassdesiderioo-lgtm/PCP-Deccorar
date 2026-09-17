@@ -2,13 +2,29 @@
 
 ```
 STATUS
-Situação: em construção
+Situação: ARQUIVADA — implementada por inteiro em 17/09/2026
 Criada em: 17/09/2026
 Última atualização: 17/09/2026
-Fase atual: fases 1, 2 e 3 entregues (conteúdo + prévia + impressão) — falta tirar o upload (4)
-Fases: 1 ☑  2 ☑  3 ☑  4 ☐
+Fase atual: as quatro fases entregues e conferidas em produção
+Fases: 1 ☑  2 ☑  3 ☑  4 ☑
 Risco: 🔴 (etiqueta)
+
+⚠️ ESTE DOCUMENTO É HISTÓRICO. As regras que valem estão no CLAUDE.md §4 —
+   não use daqui como fonte de regra (CLAUDE.md §13, regra 4).
+
 Mudanças no caminho:
+- 17/09/2026 (fase 3, CONFERIDA EM PRODUÇÃO) — o dono imprimiu pela primeira
+  vez e fez as duas provas que só o papel dá: **o QR abriu e o leitor bipou**.
+- 17/09/2026 (fase 4) — o upload de arquivo pronto (`/api/kit/label`, quatro
+  rotas) foi removido, com o card da tela e o `.gitignore`. É a R11 cumprida.
+  O que fecha a spec não é o gerador existir: é o **segundo caminho deixar de
+  existir**. Enquanto os dois conviviam, o arquivo enviado seguia sendo imagem
+  morta que não acompanha o `kit_codigo`.
+  **Nada foi apagado no deploy** — o último arquivo enviado continua em
+  `kit/label.<ext>` e a linha `config.kit_label` continua no banco; o código
+  só parou de lê-los. Apagar no mesmo minuto em que o caminho novo vira o
+  único seria decisão irreversível cedo demais.
+  A seção 12 do `teste_kit.js` trava que as quatro rotas não voltam.
 - 17/09/2026 (fase 2, CONFERIDA EM PRODUÇÃO) — o dono subiu, apontou o celular
   e **o QR abriu a pasta do manual**. A régua final de QR é câmera de verdade
   lendo; o resto era indício.

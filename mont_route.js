@@ -1,12 +1,5 @@
-const fs=require('fs'), path=require('path');
 module.exports=function(app,db){
   db.exec("CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT);");
-  // pasta dos arquivos do kit (etiqueta enviada pelo admin). __dirname resolve
-  // tanto no servidor (/opt/expedicao) quanto no ambiente de teste. Fica fora
-  // do git (ver .gitignore).
-  const KITDIR=path.join(__dirname,'kit');
-  try{ fs.mkdirSync(KITDIR,{recursive:true}); }catch(e){}
-
   // Le uma chave do `config`. null = a chave NAO EXISTE (diferente de gravada
   // vazia, que e uma decisao de quem editou — ver etiquetaAtual()).
   function cfg(chave){
@@ -20,43 +13,24 @@ module.exports=function(app,db){
     try{ const ac=app.locals.acesso; if(ac&&ac.auditar) ac.auditar(req,'sistema',acao,alvo,detalhe); }catch(e){}
   }
 
-  // Sobe a etiqueta do kit (imagem ou PDF). Guarda no disco e o metadado em
-  // config('kit_label'). Substitui a anterior.
-  app.post('/api/kit/label',(req,res)=>{
-    const dataURL=(req.body&&req.body.arquivo)||'';
-    const mime=(dataURL.match(/^data:([^;,]+)/)||[])[1]||'application/octet-stream';
-    const b64=dataURL.replace(/^data:[^,]*,/,'');
-    if(!b64) return res.status(400).json({erro:'sem arquivo'});
-    const ext = /pdf/i.test(mime)?'pdf' : /png/i.test(mime)?'png' : /jpe?g/i.test(mime)?'jpg' : /svg/i.test(mime)?'svg' : null;
-    if(!ext) return res.status(400).json({erro:'formato não suportado — use PDF, PNG, JPG ou SVG'});
-    let buf; try{ buf=Buffer.from(b64,'base64'); }catch(e){ return res.status(400).json({erro:'arquivo inválido'}); }
-    if(buf.length>8*1024*1024) return res.status(400).json({erro:'arquivo muito grande (máx 8 MB)'});
-    ['pdf','png','jpg','svg'].forEach(e=>{ try{ fs.unlinkSync(path.join(KITDIR,'label.'+e)); }catch(_){} });
-    fs.writeFileSync(path.join(KITDIR,'label.'+ext), buf);
-    const meta={arquivo:'label.'+ext, tipo:mime, nome:String((req.body&&req.body.nome)||('etiqueta.'+ext)).slice(0,120), em:new Date().toLocaleString('pt-BR')};
-    db.prepare("INSERT INTO config (chave,valor) VALUES ('kit_label',?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor").run(JSON.stringify(meta));
-    const ac=app.locals.acesso; try{ if(ac&&ac.auditar) ac.auditar(req,'sistema','kit_etiqueta',meta.nome,''); }catch(e){}
-    res.json({ok:true, arquivo:meta.arquivo, nome:meta.nome, em:meta.em});
-  });
-  app.get('/api/kit/label/meta',(req,res)=>{
-    const r=db.prepare("SELECT valor FROM config WHERE chave='kit_label'").get();
-    let meta={arquivo:null}; try{ if(r) meta=JSON.parse(r.valor); }catch(e){}
-    res.json({arquivo:meta.arquivo||null, nome:meta.nome||null, em:meta.em||null});
-  });
-  app.get('/api/kit/label',(req,res)=>{
-    const r=db.prepare("SELECT valor FROM config WHERE chave='kit_label'").get();
-    let meta; try{ meta=r?JSON.parse(r.valor):null; }catch(e){ meta=null; }
-    if(!meta||!meta.arquivo) return res.status(404).send('nenhuma etiqueta enviada');
-    const f=path.join(KITDIR, path.basename(meta.arquivo));
-    if(!fs.existsSync(f)) return res.status(404).send('arquivo não encontrado');
-    res.setHeader('Content-Type', meta.tipo||'application/octet-stream');
-    res.send(fs.readFileSync(f));
-  });
-  app.delete('/api/kit/label',(req,res)=>{
-    ['pdf','png','jpg','svg'].forEach(e=>{ try{ fs.unlinkSync(path.join(KITDIR,'label.'+e)); }catch(_){} });
-    try{ db.prepare("DELETE FROM config WHERE chave='kit_label'").run(); }catch(e){}
-    res.json({ok:true});
-  });
+  /* ⚠️ AQUI MORAVA O SEGUNDO CAMINHO DA ETIQUETA DO KIT, e ele saiu em
+     17/09/2026 (spec GERADOR-ETIQUETA-KIT, R11, fase 4).
+     Eram quatro rotas em `/api/kit/label`: subir uma arte pronta (PDF, PNG,
+     JPG ou SVG), guardar no disco e imprimir por ela.
+
+     O problema não era o upload: era serem DOIS. O arquivo enviado é uma
+     imagem morta — o gerador acompanha o `kit_codigo`, o arquivo não. No dia
+     em que alguém trocasse o código, quem imprimisse pelo upload tiraria um
+     rolo que não bipa na Embalagem, e descobriria com a peça na mão, sem
+     ninguém saber que havia um segundo caminho.
+
+     NÃO RECRIE ISTO. A impressão da etiqueta do kit tem uma porta só:
+     `POST /api/kit/etiqueta/imprimir`, que desenha a partir do que está
+     salvo. Há caso travando (seção 12 do `teste_kit.js`).
+
+     O arquivo já enviado e a linha `config.kit_label` NÃO foram apagados no
+     deploy: o código parou de lê-los, e nada foi destruído. Limpar é `rm` na
+     pasta `kit/`, com o gerador já rodando. */
   // teste vem por ultimo: e a coluna que o teste_route adicionava por ALTER
   db.exec("CREATE TABLE IF NOT EXISTS montagem (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, inicio TEXT, fim TEXT, segundos INTEGER, kit_ok INTEGER DEFAULT 1, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0);");
   app.get('/api/config/kit',(req,res)=>{ const r=db.prepare("SELECT valor FROM config WHERE chave='kit_codigo'").get(); res.json({kit:r?r.valor:null}); });

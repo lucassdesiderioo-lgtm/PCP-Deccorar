@@ -29,11 +29,15 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 | `COMPRAS.md` | Implementado (fases 0–6) · fase 7 pendente · com mudanças na construção |
 | `ARQUITETURA-ALVO.md` | Parcial — só no módulo sob medida (`tecido/`) |
 | `PCP-CONTROLE-E-VISAO.md` | Parcial e divergente · decisão pendente |
-| `GERADOR-ETIQUETA-KIT.md` | Em construção · fases 1, 2 e 3 entregues (conteúdo + prévia + impressão em PDF, não ZPL) · falta tirar o upload (4) |
 | `TABLETS-E-KIOSK.md` | Planejado · nada no código · camada 1 (iPad) pode ir já |
 | `PRODUCAO-MAPA-E-MOTOR.md` | Planejado · não iniciado · depois da fila de consertos |
 | `PRODUCAO-MONTAGEM.md` | Planejado · não iniciado · depois da fila de consertos |
 
-Em `docs/arquivo/`: `REVISAO-COMPLETA.md`, `ESTOQUE-TECIDO-E-SOBRAS.md`,
-`PROMPT-ESTOQUE-TECIDO-E-SOBRAS.md`, `PROMPT-FASE-0.md`, `PERGUNTAS-COMPRAS.md`,
-`GESTAO-DE-TAREFAS.md` e `MELHORIAS.md` (arquivados por decisão do dono em 17/09/2026).
+**Implementada e arquivada em 17/09/2026:** `GERADOR-ETIQUETA-KIT.md` — as
+quatro fases (conteúdo, prévia, impressão em PDF e a remoção do upload),
+conferidas em produção. As regras estão no `CLAUDE.md` §4.
+
+Em `docs/arquivo/`: `GERADOR-ETIQUETA-KIT.md`, `REVISAO-COMPLETA.md`,
+`ESTOQUE-TECIDO-E-SOBRAS.md`, `PROMPT-ESTOQUE-TECIDO-E-SOBRAS.md`,
+`PROMPT-FASE-0.md`, `PERGUNTAS-COMPRAS.md`, `GESTAO-DE-TAREFAS.md` e
+`MELHORIAS.md` (os sete últimos arquivados por decisão do dono em 17/09/2026).
