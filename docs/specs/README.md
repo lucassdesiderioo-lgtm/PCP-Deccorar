@@ -22,10 +22,11 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 3. **Onde a spec e o `CLAUDE.md` divergirem, vale o `CLAUDE.md`** — ele descreve o
    que está em produção. A divergência é anotada no status da spec.
 
-## Índice — situação em 17/09/2026
+## Índice — situação em 18/09/2026
 
 | Spec | Status |
 |---|---|
+| `SOBRAS-TOM-E-DESPERDICIO.md` | Planejado (4 fases) · **Fase 1 urgente** — o recadastro das sobras começa 19/09/2026 |
 | `COMPRAS.md` | Implementado (fases 0–6) · fase 7 pendente · com mudanças na construção |
 | `ARQUITETURA-ALVO.md` | Parcial — só no módulo sob medida (`tecido/`) |
 | `PCP-CONTROLE-E-VISAO.md` | Parcial e divergente · decisão pendente |
