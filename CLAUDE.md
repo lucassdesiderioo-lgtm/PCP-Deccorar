@@ -1540,6 +1540,49 @@ peça no SKU.
 > vira um desvio que a equipe aprende a fazer — e o desvio acontece fora da
 > vista do sistema, que é o pior lugar possível.
 
+> ⚠️ **ARMADILHA #30 — E ESSE CONSERTO FICOU TRÊS SEMANAS SEM FUNCIONAR, PORQUE
+> NINGUÉM MARCOU A CAIXINHA.** Descoberto em 17/09/2026, por acaso, enquanto se
+> levantava outro passivo. O conserto da #6 lê `modelo.sob_medida`. Em produção
+> **nenhum modelo tinha a flag**: havia dois, `ROLO` e `ACESSORIO`, os dois com
+> `sob_medida = 0` — e o SKU `SOBMEDIDA` estava cadastrado como **Rolô**. A
+> regra estava escrita aqui, codificada em quatro arquivos, e **inerte**.
+>
+> **É a armadilha #13 (§19) pela terceira ponta.** Lá são chave, rota e alguém
+> que a tenha; aqui são a coluna, o código que a lê e **o dado preenchido**. A
+> que some em silêncio é sempre a última: nada no boot, no log ou em tela
+> nenhuma diz *"esta regra não está pegando em ninguém"*.
+>
+> E o modo de falhar é o da própria #6, o que torna a coisa circular: com a flag
+> em zero a trava de estoque voltava a disparar em **100%** das vendas sob
+> medida, a bancada despachava por fora, e o sistema não registrava nada. Os
+> volumes 484 e 485 (Geison Sobrinho, 25/08) saíram assim — foram lidos como
+> passivo da dívida 13 e eram, na verdade, o sintoma desta.
+>
+> **Os dois sinais que denunciaram, e servem para a próxima vez:**
+> - `SOBMEDIDA` aparecendo na conta de saldo do `conferir_carregados.js`. Aquele
+>   script só põe na tabela quem tem a flag **falsa** — foi ele que gritou, sem
+>   ter sido escrito para isso.
+> - `14 × 4 cm` no cadastro. O bipe 1 da embalagem mostra a medida em letra
+>   grande para o operador comparar com a peça na bancada (§4); número absurdo
+>   ali é conferência que ensina a equipe a ignorar a linha.
+>
+> **O reparo foi cadastro, não código** (17/09/2026): modelo `SOBMEDIDA` / *Sob
+> medida* com `sob_medida = 1` e `exige_medida = 0`, e o SKU apontado para ele,
+> com largura e altura **vazias** — vazio ali é resposta, não pendência. Custo
+> do `SOBMEDIDA` passou a sair como **pendência** na lista de compras, e isso
+> está certo: antes era um número tirado da ficha do Rolô aplicada a `14 × 4`
+> (§7-B, regra 4 — custo indefinido nunca vira zero).
+>
+> ⚠️ **NÃO MARQUE `sob_medida` NO MODELO `ROLO` "para resolver".** São 29 dos 30
+> SKUs: a fábrica inteira sairia da trava de estoque e da baixa de uma vez, e o
+> saldo pararia de andar sem um único aviso.
+>
+> **Regra que fica:** regra nova que dependa de flag de cadastro não está pronta
+> quando o código a lê — está pronta quando **existe linha marcada no banco**.
+> Enquanto não houver, ela é texto. Ainda **não há nada que acuse isso sozinho**
+> (a cobertura do §18 faz exatamente esse trabalho para as conferências do
+> parse; aqui não existe equivalente) — é dívida aberta.
+
 > ⚠️ **`SOBMEDIDA` é um balde, e isso ainda é dívida aberta.** Um código só para
 > peças que são todas diferentes: a folha de controle traz apenas `SOBMEDIDA`,
 > enquanto na bancada as peças vêm etiquetadas por pedido (`1027/01`, `1027/02`)
@@ -2359,6 +2402,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 15 | ~~**`POST /api/skus` zera o estoque** quando o corpo não traz `estoque`~~ **RESOLVIDO em 17/09/2026** — campo ausente preserva os quatro campos soltos, número impossível é recusado (400) em vez de clampado, e as duas escritas viraram uma transação com o `catch` vazio fora. A rota saiu para `sku_cad_route.js` e tem `teste_skus.js` (60 casos) atrás — ver §6, armadilha #25. **Fica aberto**: a rota ainda muda saldo com `sku.cadastrar`, sem motivo e sem auditoria (fechar isso é `REGRA`) | — |
 | 16 | ~~**Acesso: default `@logado` e cobertura mantida à mão**~~ **RESOLVIDO em 17/09/2026** — o padrão passou a ser **negar**, a cobertura varre o Express (a lista `TODAS_ROTAS` saiu) e o boot grita o nome da rota não declarada; as 28 leituras sem dono foram declaradas e as telas `.html` gêmeas herdaram a permissão da tela. Ver §10, armadilha #29 · `teste_cobertura.js` | — |
 | 17 | ~~**Acesso: duas travas faltando**~~ **RESOLVIDO em 17/09/2026** — a exceção recusa conceder chave `intransferivel`, a troca de setores tem a trava do último Admin Geral (mesma conta do `auth.js`, agora no `acesso.js`), setor novo não nasce `admin_geral` e a migração de `areas` virou evento de uma vez só (a porta A, que promovia a Admin Geral em silêncio). Ver §10, armadilha #28 | — |
+| 18 | **Nada acusa uma regra INERTE.** `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
 
 ---
 
@@ -2416,6 +2460,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   e quem baixa a peça é o `POST /api/embalar` da bancada (§5, armadilha #27)
 - ❌ Recusar uma caixa no carregamento sem dizer por onde ela tem que passar — a
   pessoa está na frente do carro com a caixa na mão (§5, armadilha #27)
+- ❌ Dar por pronta uma regra que depende de flag de cadastro só porque o código
+  a lê: sem linha marcada no banco ela é texto, e nada acusa isso (§7, #30)
+- ❌ Marcar `sob_medida` no modelo `ROLO` para "resolver o sob medida" — são 29
+  dos 30 SKUs, e a fábrica inteira sai da trava e da baixa (§7, armadilha #30)
 - ❌ Ler a marca das 15:00 do `conferir_carregados.js` como se valesse desde
   sempre: ela só existe a partir de 26/08/2026, e antes disso o fechamento à
   mão sai com hora de gente (§5, armadilha #27)
