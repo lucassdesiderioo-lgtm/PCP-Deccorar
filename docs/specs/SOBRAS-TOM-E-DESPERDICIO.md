@@ -2,14 +2,21 @@
 
 ```
 STATUS
-Situação: planejado
+Situação: em construção
 Criada em: 18/09/2026
 Última atualização: 18/09/2026
-Fase atual: nenhuma (aguardando início)
-Fases: 1 ☐  2 ☐  3 ☐  4 ☐
+Fase atual: 1 (limpeza) — implementada e testada; falta rodar no servidor
+Fases: 1 ☑  2 ☐  3 ☐  4 ☐
 Risco: 🔴 (dados de sobra e baixa no Confirmar do plano)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
-Mudanças no caminho: —
+Mudanças no caminho:
+  · Fase 1 — o corte por data virou a QUARTA GUARDA, e não um filtro. Achando
+    sobra cadastrada depois de 18/09/2026, o script PARA em vez de apagar só
+    as antigas: sem apagar `etiqueta` a numeração não voltaria ao S-000001, e
+    a limpeza teria feito metade do serviço sem dizer qual metade. O efeito
+    pretendido é o mesmo — rodado depois de hoje, ele não toca no cadastro
+    novo. Decidido pelo dono ao aprovar o plano ("pode seguir, com o corte
+    por data"); a forma de guarda saiu da construção.
 ```
 
 ---
@@ -170,7 +177,18 @@ depois, com esse número (ver §5).
 
 Cada fase é entregue e testada sozinha.
 
-### Fase 1: limpeza das sobras 🔴 — URGENTE (recadastro começa 19/09/2026)
+### Fase 1: limpeza das sobras 🔴 — FEITA em 18/09/2026 (falta rodar no servidor)
+
+> **Como ficou:** `tecido/limpar_sobras.js` + `tecido/teste/limpar_sobras.test.js`
+> (11 casos). As regras que parecem bug e não são foram para o
+> `tecido/README.md`, seção "A LIMPEZA DE 18/09/2026". Duas coisas que a spec
+> não previa e a construção achou:
+> - **o corte por data é guarda, não filtro** (ver STATUS);
+> - **`DELETE` em tabela com auto-referência**: com `foreign_keys = ON`, apagar
+>   *todas* as sobras passa (o FK é conferido no fim da instrução) e apagar
+>   *algumas* é recusado. O script solta o `origem_sobra_id` antes, e só o que
+>   aponta para sobra que vai sair — limpar a cadeia de uma sobra que fica
+>   apagaria a origem de tom que a Fase 3 (R5) vai ler.
 - Script `tecido/limpar_sobras.js`: **simula por padrão**, `--aplicar` grava.
 - Mostra quantas linhas sai de cada tabela (R1) e qual será a próxima etiqueta.
 - Para e lista se achar sobra em corte confirmado (R3).

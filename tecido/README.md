@@ -1557,6 +1557,76 @@ aceitação ligada a quem apontou.
 
 ---
 
+## A LIMPEZA DE 18/09/2026 — e por que ela não gerou refugo
+
+`node tecido/limpar_sobras.js` (simula) e `--aplicar`. Fase 1 da spec
+`docs/specs/SOBRAS-TOM-E-DESPERDICIO.md`; as decisões estão em
+`docs/DECISOES.md`.
+
+Na primeira semana de uso, as sobras foram **retiradas dos endereços para
+serem medidas** antes do cadastro com etiqueta. As medidas gravadas ficaram
+duvidosas e nenhuma sobra tinha etiqueta colada: o cadastro parou de descrever
+a prateleira. A equipe recomeçou do `S-000001` em 19/09.
+
+> ⚠️ **ISSO NÃO É PERDA DE TECIDO, e por isso a limpeza não escreve uma linha
+> de refugo.** Refugo mede o que o corte desperdiça. Aqui o tecido está inteiro
+> na prateleira — o que não valia nada era o cadastro. Contar como refugo faria
+> o relatório do mês acusar uma perda que nunca aconteceu, e ela ficaria lá
+> para sempre.
+
+**Apaga sete tabelas:** `sobra`, `etiqueta`, `etiqueta_lote`, `sobra_correcao`,
+`sobra_proposta`, `plano_recusa` (só as linhas que citam sobra) e `refugo`
+**só** com `motivo='descarte'` — que é escrito unicamente pelo
+`sobra.descartar`. O refugo **de corte** (`tira_estreita`, `resto_de_pe`, que
+vem com `plano_id`) é história de corte que aconteceu e fica.
+
+> ⚠️ **`etiqueta` E `etiqueta_lote` SAEM PORQUE A NUMERAÇÃO É O OBJETIVO.** Quem
+> decide o número seguinte é `ultimoSeq()` = `MAX(seq) FROM etiqueta`. Enquanto
+> houver uma linha de etiqueta, a próxima impressão **não** volta ao
+> `S-000001`. E é por isso que **as etiquetas antigas em papel têm que estar
+> recolhidas antes** (R2): com a numeração recomeçando, uma etiqueta velha na
+> bancada tem o número de uma nova, e o código é o único fio entre o papel e a
+> linha do banco.
+
+**As quatro guardas — ele para e não grava nada:**
+
+| Guarda | O que ela pega |
+|---|---|
+| sobra `usada` | peça que já saiu num corte |
+| `plano_faixa.sobra_id` | sobra **consumida** por corte confirmado |
+| `plano_faixa.sobra_gerada_codigo` | sobra que **nasceu** de corte confirmado |
+| `criado_em` > 18/09/2026 | o recadastro já começou |
+
+> As três primeiras são a mesma pergunta por três portas, e olhar só a primeira
+> deixaria passar **a sobra recém-nascida do corte de ontem** — justamente a que
+> tem história atrás. `plano_faixa` só recebe linha dentro do `confirmar()`; o
+> `calcular()` não persiste nada, e por isso plano calculado e não confirmado
+> (como o teste das 11 sobras que abriu a spec) não prende ninguém aqui.
+
+> ⚠️ **A QUARTA GUARDA É O QUE FAZ O SCRIPT SER INOFENSIVO DEPOIS DE HOJE.**
+> Rodado em outubro, ele acha o cadastro novo e **recusa**, em vez de apagar o
+> trabalho da equipe. E ele **para** em vez de limpar só os antigos: faltando
+> apagar `etiqueta`, a numeração não voltaria ao `S-000001` e a limpeza teria
+> feito metade do serviço sem dizer qual metade.
+
+> ⚠️ **ARMADILHA DO SQLITE: `DELETE` em tabela com auto-referência.** A sobra
+> que nasceu de outra aponta para a mãe (`origem_sobra_id`). Com
+> `foreign_keys = ON`, `DELETE FROM sobra` (todas) **passa** — o FK imediato é
+> conferido no **fim da instrução**, e ali não sobrou ninguém apontando —,
+> enquanto `DELETE ... WHERE id=1` com a filha de pé é **recusado**. O script
+> solta o ponteiro antes, e o `WHERE` dele é estreito: solta só o que aponta
+> para sobra **que vai sair**. Limpar a cadeia de uma sobra que fica apagaria a
+> **origem de tom** (R5) — o dado que a Fase 3 vai ler — sem nenhum aviso.
+
+**Teste obrigatório:** `node teste/rodar.js` — os 11 casos de
+`teste/limpar_sobras.test.js` travam as sete tabelas, as quatro guardas (e que
+nas quatro **nada** é gravado), o `S-000001` de volta, o backup por
+`db.backup()` com os dados dentro, o que **não** é da sobra ficando de pé, e a
+segunda rodada como no-op. O corte de produção tem caso próprio, para ninguém
+"atualizar" a data sem ver que isso reabre o script.
+
+---
+
 ## O plano de corte
 
 ```
