@@ -646,9 +646,31 @@ configuração é o que vai falhar.
 > etiqueta que manda apontar a câmera para um QR, símbolo de vídeo é a pior
 > confusão possível.
 >
-> **Link comprido engrossa o QR:** a tela mostra a versão do QR e avisa quando
-> o link tem `?usp=drive_link` — esse pedaço não é necessário para a pasta
-> abrir, e tirá-lo baixa a versão (módulo maior, leitura mais fácil).
+> ⚠️ **ENCURTAR O LINK SÓ AJUDA QUANDO AUMENTA O MÓDULO — e com a caixa de
+> 26 mm quase nunca aumenta.** Esta linha dizia, até 18/09/2026, que tirar o
+> `?usp=drive_link` "baixa a versão (módulo maior, leitura mais fácil)". Era
+> verdade com a caixa de 20 mm: ali o link de produção caía em **3 pontos** de
+> módulo e o curto fechava em 4, então tirar salvava a leitura. Depois da #31 os
+> dois fecham em **5 pontos**, e tirar só reduz a contagem de módulos — o QR
+> impresso sai **menor** (23,1 em vez de 25,6 mm) sem ganhar nada.
+>
+> **Conselho que sobrevive à trava que o justificava vira conselho errado**, e
+> este ficou um dia inteiro mandando encolher o QR que o conserto acabara de
+> aumentar. Quem pediu para tirar o parâmetro foi o dono, seguindo o que eu
+> mesmo tinha escrito aqui.
+>
+> Hoje a tela **mede** em vez de supor pela versão: ela chama o `medir` com o
+> link sem o sufixo e compara. São **três** desfechos, e cada um tem a sua
+> frase — tirar sobe o módulo (âmbar, "vale tirar"), tirar não muda nada
+> (etiqueta idêntica), ou tirar só encolhe (com os dois números lado a lado e
+> "deixe como está"). O aviso de **módulo abaixo de 4 pontos** continua de pé e
+> é independente: ele fala do que a ZD220 resolve, não do link.
+>
+> ⚠️ **E O TERCEIRO DESFECHO SÓ APARECEU QUANDO A NOTA FOI DESENHADA.** Com o
+> módulo igual **e** a mesma versão, a frase de "sai menor" imprimia *"23,1 mm
+> em vez de 23,1 mm"*. Absurdo numa frase é o que faz a equipe parar de ler a
+> linha inteira — e nenhum teste de unidade pegaria, porque o texto estava
+> sintaticamente perfeito. Renderizar os casos é o que pegou.
 >
 > **Rode `node teste_kit.js` e `node teste_qr.js` ao mexer no `mont_route.js`,
 > no `kit_pdf.js`, no card do kit ou nos arquivos acima** — os 133 + 45 casos
@@ -2677,6 +2699,13 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Montar a zona de silêncio de um caso de teste com um número de módulos
   escrito ao lado em vez do link do próprio caso — régua própria acusa o
   inocente hoje e deixa passar o culpado amanhã (§4, armadilha #31)
+- ❌ Mandar tirar o `?usp=drive_link` do link "para o QR ficar melhor": com a
+  caixa de 26 mm o módulo é o mesmo e o QR sai 2,5 mm MENOR. Quem responde é a
+  medida, não a versão — e conselho que sobrevive à trava que o justificava
+  vira conselho errado (§4)
+- ❌ Aprovar texto de tela sem renderizar os casos: a frase que dizia "sai
+  menor — 23,1 mm em vez de 23,1 mm" está sintaticamente perfeita, e nenhum
+  teste de unidade a pega (§4)
 - ❌ Conferir o QR relendo com a mesma convenção com que ele foi escrito: o
   formato invertido passou por três rodadas verdes assim (§4)
 - ❌ Escrever a área de formato do QR fora da ordem do padrão — o leitor acha o
