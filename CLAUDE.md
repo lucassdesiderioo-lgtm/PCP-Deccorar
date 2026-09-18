@@ -1587,11 +1587,33 @@ peça no SKU.
 >
 > `node arrumar_sobmedida.js` (simula) e `--aplicar` fazem as cinco coisas numa
 > transação, com backup por `db.backup()` antes. `teste_arrumar_sobmedida.js`
-> (48 casos) trava as duas guardas que importam: **o ROLO nunca recebe a flag**
+> (63 casos) trava as duas guardas que importam: **o ROLO nunca recebe a flag**
 > (são 29 dos 30 SKUs — a fábrica inteira sairia da trava de uma vez) e o SKU
 > vazio **só é apagado** se não houver saldo nem referência em nenhuma das dez
 > tabelas que citam um código. Apagar cadastro com volume atrás devolve o volume
 > para `bloqueado` (§6): SKU a mais é ruído, SKU a menos é caixa parada.
+>
+> ⚠️ **E HÁ MAIS DE UM SKU SOB MEDIDA — `--sku CODIGO` aponta os outros**
+> (18/09/2026). O `BKSOBMEDIDA` **não** nasceu de deslize: é um SKU real da
+> folha do ML, cadastrado em 16/09 para destravar a venda do Anderson (volume
+> 1628). Sem modelo, a Etiqueta de Venda lia `sob_medida = 0`, via saldo zero e
+> recusava — a #30 com um cliente esperando. Ele mexe **só no modelo**: cor,
+> medida e saldo ficam como estão, porque limpar campo de um SKU qualquer seria
+> o script inventando estrago onde não há.
+>
+> ⚠️ **SKU COM SALDO É RECUSADO, e essa é a #30 ao contrário.** Sob medida não
+> baixa estoque (§7): apontar para lá um SKU que tem peça na prateleira
+> **congela aquele saldo para sempre** — ele nunca mais desce e nada avisa. O
+> script recusa dizendo o número, e manda zerar por Admin → Estoque (com
+> motivo) antes. E **nomear um SKU no `--sku` é dizer que ele é legítimo**:
+> ele nunca é apagado na mesma rodada, senão o script o apontaria para o modelo
+> e o apagaria na mesma transação.
+>
+> ⚠️ **AVISO NÃO É AÇÃO.** O "NÃO apaguei o BKSOBMEDIDA" descreve o que o
+> script **deixou** de fazer, e entrava na lista de ações: toda rodada
+> anunciava "O QUE VOU FAZER" com uma linha que não faz nada. Lista que repete
+> o mesmo texto toda vez ensina a ignorá-la, e aí a rodada com algo de verdade
+> passa batida. Hoje os avisos saem num bloco **ATENÇÃO** próprio, antes.
 >
 > ⚠️ **DUAS ARMADILHAS DE TELA APARECERAM AÍ, e as duas continuam de pé:**
 > - **O campo do código no Cadastro de SKU é chave de upsert.** Editá-lo **cria
@@ -2420,7 +2442,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (104), `teste_cobertura.js` (10), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (48) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (104), `teste_cobertura.js` (10), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
