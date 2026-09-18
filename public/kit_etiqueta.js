@@ -23,19 +23,37 @@ const Q = (typeof window !== 'undefined' && window.qr) ? window.qr
 // ── as medidas, em milimetros ────────────────────────────────────────────
 const ETIQUETA = { largura:100, altura:35 };
 const DESENHO = {
-  // O texto grande: duas linhas, a esquerda.
-  texto:  { x:3, topo:4, largura:58, entrelinha:8.4, capAlvo:6.0, capMin:3.6 },
+  /* O texto grande: duas linhas, a esquerda.
+     ⚠️ A `largura` CAIU DE 58 PARA 53 EM 18/09/2026, e nao foi estetica: foram
+     os 5 mm que o QR precisava para sair de 15,4 mm (modulo de 3 pontos, no
+     limite do que a ZD220 imprime) para 25,6 mm. O custo esta escrito e e
+     real: a letra das duas linhas caiu de 4,3 para 3,9 mm e o
+     `limiteDeCaracteres()` de 16 para 15. */
+  texto:  { x:3, topo:4, largura:53, entrelinha:8.4, capAlvo:6.0, capMin:3.6 },
   // A seta em circulo, entre o texto e o QR: ela APONTA PARA O QR, porque e
-  // isso que a frase diz ("seu manual esta AQUI").
-  seta:   { cx:67.5, cy:11, raio:5 },
-  // As barras, embaixo do texto, com o codigo escrito por extenso.
+  // isso que a frase diz ("seu manual esta AQUI"). Andou 5,5 mm para a
+  // esquerda junto com o bloco de texto; o desenho e o raio nao mudaram.
+  seta:   { cx:62, cy:11, raio:5 },
+  /* As barras, embaixo do texto, com o codigo escrito por extenso.
+     ⚠️ NADA AQUI MUDOU, de proposito. Elas estao em y 20..28,5 e o QR comeca
+     em x 70,5 — nao se encostam, entao o QR podia crescer sem que a largura
+     das barras encolhesse. Estreitar este bloco afinaria a barra, e a
+     Embalagem bipa este codigo dezenas de vezes por dia. */
   barras: { x:3, topo:20, largura:58, altura:8.5, cap:2.8, folga:1.2, espaco:0.2 },
   /* O QR, a direita, com a legenda embaixo.
      ⚠️ A `folga` NAO E ESTETICA: e o silencio que o leitor precisa para achar
-     o QR (o padrao pede 4 modulos livres em volta). Com o QR de 20 mm, cada
-     modulo tem meio milimetro — encostar a legenda faz o celular demorar ou
-     desistir, e ninguem associa isso a distancia do texto. */
-  qr:     { x:76, topo:3, lado:20, cap:2.6, folga:2.4 }
+     o QR (o padrao pede 4 modulos livres em volta) — e por isso ela e um
+     MINIMO, nao o valor final: quem manda e `4 x o modulo`, que cresce quando
+     o link encurta. Encostar a legenda faz o celular demorar ou desistir, e
+     ninguem associa isso a distancia do texto.
+
+     ⚠️ O `envelope` E O QR MAIS OS DOIS SILENCIOS, de ponta a ponta: sao
+     (modulos + 8) modulos. E ele, nao a `lado`, que limita o tamanho do
+     modulo — porque a folga FAZ PARTE do espaco, e um QR que cresce comendo
+     o proprio silencio le PIOR, nao melhor. Os 31 mm sao o menor dos dois
+     espacos que sobram: na horizontal, da borda da seta (67) ate a borda da
+     etiqueta; na vertical, do topo ate a linha de base da legenda. */
+  qr:     { x:70.5, topo:2.5, lado:26, cap:2.6, folga:2.4, envelope:31 }
 };
 
 /* Larguras das letras, em milesimos do tamanho da fonte (Helvetica Bold).
@@ -120,10 +138,21 @@ function capParaLegenda(legenda){
 function gradeDoQr(escala, mods){
   const q = DESENHO.qr;
   /* Arredonda para BAIXO, nunca para cima: arredondando para cima o QR fica
-     MAIOR que os 20 mm reservados e come a folga do silencio — que e o que faz
+     MAIOR que o espaco reservado e come a folga do silencio — que e o que faz
      o leitor achar o codigo. Um QR ligeiramente menor e fiel; um QR que invade
-     a legenda troca um problema de leitura por outro. */
-  const passoPx = Math.max(1, Math.floor((q.lado * escala) / mods));
+     a legenda troca um problema de leitura por outro.
+
+     ⚠️ E SAO DOIS TETOS, NAO UM. O primeiro e a caixa (`lado`). O segundo e o
+     ENVELOPE: o QR mais os 4 modulos de silencio de cada lado, que na conta
+     sao (mods + 8) modulos. Sem o segundo, um link curto — poucos modulos,
+     modulo grande — faria o silencio crescer para fora da etiqueta, e o QR
+     sairia grande e ilegivel, com a legenda encostada e a borda cortada. O
+     leitor nao acha codigo sem silencio, e o defeito tem a cara do de sempre:
+     o desenho continua com cara de QR. */
+  const passoPx = Math.max(1, Math.min(
+    Math.floor((q.lado * escala) / mods),
+    Math.floor((q.envelope * escala) / (mods + 8))
+  ));
   const lado = (passoPx * mods) / escala;
   // a origem tambem tem que cair em pixel cheio, senao a primeira coluna de
   // modulos nasce meio pixel deslocada e o arredondamento volta
@@ -154,7 +183,19 @@ function medir(conteudo){
   if(!c.codigo) problemas.push('falta o Código do kit');
   else if(larguraDoTexto(c.codigo, DESENHO.barras.cap) > DESENHO.barras.largura)
     problemas.push('o Código do kit é comprido demais para caber embaixo das barras');
-  return { cap, capLegenda:capLeg, cabe, versaoQr, problemas, limite:limiteDeCaracteres() };
+  /* O TAMANHO QUE O QR VAI TER NO PAPEL, e nao o da caixa reservada. Eram
+     coisas diferentes e ninguem via: a caixa dizia 20 mm e a ZD220 imprimia
+     15,4, porque o modulo arredonda para ponto cheio. O numero que interessa a
+     quem confere a etiqueta e este, entao ele sai daqui para a tela. A grade
+     e a de 8 pontos por milimetro da impressora — na tela o QR tem o tamanho
+     que o monitor der. */
+  let qrPapel = null;
+  if(versaoQr){
+    const g = gradeDoQr(8, 17 + 4*versaoQr);
+    qrPapel = { lado:g.lado, modulo:g.passo, pontos:g.passoPx };
+  }
+  return { cap, capLegenda:capLeg, cabe, versaoQr, qrPapel, problemas,
+           limite:limiteDeCaracteres() };
 }
 
 /* ═══ A ETIQUETA COMO LISTA ════════════════════════════════════════════════
@@ -234,9 +275,10 @@ function elementos(conteudo, opcoes){
 
   // 4. o QR e a legenda
   const q = DESENHO.qr;
+  let g = null;
   if(c.link && m.versaoQr && Q){
     const mods = Q.modulos(c.link);
-    const g = gradeDoQr(escala, mods.length);
+    g = gradeDoQr(escala, mods.length);
     for(let i=0;i<mods.length;i++){
       let j = 0;
       while(j < mods.length){
@@ -249,10 +291,19 @@ function elementos(conteudo, opcoes){
       }
     }
   }
+  /* A legenda desce do QR DESENHADO, nao da caixa reservada — e o silencio
+     dela e `4 x o modulo`, com a `folga` de MINIMO.
+     ⚠️ MEDIR DA CAIXA ERA CERTO ENQUANTO O MODULO TINHA MEIO MILIMETRO E A
+     FOLGA FIXA DAVA OS 4 MODULOS POR ACASO. Com o QR grande o modulo passou a
+     variar de 0,375 a 1 mm conforme o tamanho do link, e uma folga fixa de
+     2,4 mm e silencio de sobra num caso e silencio de MENOS no outro — sem
+     mudar nada na tela, porque a legenda continua no mesmo lugar de sempre. */
   if(c.qr_legenda){
     const larg = larguraDoTexto(c.qr_legenda, m.capLegenda);
+    const baixo = g ? (g.topo + g.lado) : (q.topo + q.lado);
+    const silencio = g ? Math.max(q.folga, 4 * g.passo) : q.folga;
     itens.push({ tipo:'texto', texto:c.qr_legenda, x:q.x + q.lado/2 - larg/2,
-      base: q.topo + q.lado + q.folga + m.capLegenda, cap:m.capLegenda,
+      base: baixo + silencio + m.capLegenda, cap:m.capLegenda,
       espaco:0, cor:'preto' });
   }
   return itens;
