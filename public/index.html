@@ -2602,8 +2602,26 @@ function desenharPreviaKit(){
      — o link certo, o codigo certo, o texto cabendo —, nunca pelo traco. */
   var t='<b style="color:var(--txt)">Confira agora, com o celular:</b> aponte a câmera para o QR da prévia. '
        +'Tem que abrir a pasta do manual.';
-  if(m.versaoQr) t+='<div style="margin-top:8px">QR versão '+m.versaoQr+' · letra de '+m.cap.toFixed(1)+' mm</div>';
-  if(m.versaoQr>=6) t+='<div style="margin-top:6px;color:var(--amber)">O link é comprido, então o QR ficou mais denso. '
+  /* ⚠️ O NÚMERO QUE INTERESSA É O DO PAPEL, NÃO O DA CAIXA RESERVADA. Eram
+     coisas diferentes e nada em tela dizia isso: a caixa media 20 mm e a ZD220
+     imprimia 15,4, porque o módulo arredonda para ponto cheio da impressora.
+     Quem olhava a prévia não tinha como saber. Ele sai do `medir`, que é o dono
+     da conta — a tela não recalcula nada. */
+  if(m.versaoQr){
+    t+='<div style="margin-top:8px">QR versão '+m.versaoQr+' · letra de '+m.cap.toFixed(1)+' mm';
+    if(m.qrPapel) t+=' · <b style="color:var(--txt)">no papel o QR sai com '
+      +m.qrPapel.lado.toFixed(1).replace('.',',')+' mm</b> (módulo de '
+      +m.qrPapel.pontos+' ponto'+(m.qrPapel.pontos===1?'':'s')+' da ZD220)';
+    t+='</div>';
+  }
+  /* Módulo abaixo de 4 pontos é o limite do que a ZD220 resolve — foi com 3
+     que o celular parou de ler a etiqueta colada no kit. Aqui o aviso é sobre
+     o MÓDULO, não sobre a versão: é ele que a impressora tem que traçar. */
+  if(m.qrPapel && m.qrPapel.pontos < 4) t+='<div style="margin-top:6px;color:var(--amber)">'
+       +'O link é comprido, então o módulo do QR ficou em '+m.qrPapel.pontos+' pontos — '
+       +'no limite do que a ZD220 imprime. Se o link terminar em <b>?usp=drive_link</b>, '
+       +'tire esse pedaço: a pasta abre igual e o QR fica bem mais fácil de ler.</div>';
+  else if(m.versaoQr>=6) t+='<div style="margin-top:6px;color:var(--muted)">O link é comprido, então o QR ficou mais denso. '
        +'Se ele terminar em <b>?usp=drive_link</b>, dá para tirar esse pedaço: a pasta abre igual e o QR fica mais fácil de ler.</div>';
   if(m.problemas.length) t+='<div style="margin-top:8px;color:var(--amber)">'+m.problemas.map(esc).join('<br>')+'</div>';
   t+='<div style="margin-top:8px">A prévia mostra o <b>conteúdo e o lugar</b> de cada coisa. '
