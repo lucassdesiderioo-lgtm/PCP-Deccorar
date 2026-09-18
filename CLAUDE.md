@@ -408,8 +408,9 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > - **Não há campo para o código de barras.** Ele é sempre o `kit_codigo` —
 >   um segundo campo é exatamente o que faz o impresso sair diferente do que a
 >   Embalagem bipa.
-> - O limite de 20 caracteres das linhas 1 e 2 é **provisório**, até a prévia
->   da fase 2 dizer o que cabe de verdade. A legenda do QR são 10, por regra.
+> - O limite das linhas 1 e 2 era 20 por chute na fase 1; hoje é **medido** pelo
+>   desenho e vale **15** (era 16 até o bloco de texto estreitar em 18/09/2026 —
+>   armadilha #31). A legenda do QR são 10, por regra.
 >
 > **A Embalagem não mudou:** ela continua lendo só `GET /api/config/kit` e
 > conferindo o bipe contra o `kit_codigo`.
@@ -440,16 +441,23 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > **recusa**. Texto cortado no papel é etiqueta que o cliente lê pela metade, e
 > ninguém na fábrica vê acontecer — a etiqueta já sai errada da impressora.
 >
-> ⚠️ **O LIMITE DE CARACTERES NÃO É A REGRA DE "CABE".** São 16 (medidos, não
-> chutados), e servem de cerca grossa no campo. Quem decide é a **medida**:
-> 16 letras estreitas cabem com folga e 16 `M` não cabem. E a medida olha as
-> **duas linhas juntas**, porque elas dividem o mesmo tamanho de letra — a
-> linha 1 pode deixar de caber por causa de uma linha 2 que o POST nem tocou.
+> ⚠️ **O LIMITE DE CARACTERES NÃO É A REGRA DE "CABE".** São **15** (medidos,
+> não chutados — eram 16 até o bloco de texto estreitar para 53 mm em
+> 18/09/2026, ver #31), e servem de cerca grossa no campo. Quem decide é a
+> **medida**: 15 letras estreitas cabem com folga e 15 `M` não cabem. E a
+> medida olha as **duas linhas juntas**, porque elas dividem o mesmo tamanho de
+> letra — a linha 1 pode deixar de caber por causa de uma linha 2 que o POST
+> nem tocou.
 >
-> ⚠️ **A FOLGA EM VOLTA DO QR É FUNCIONAL.** São 2,4 mm de silêncio antes da
-> legenda: o padrão pede 4 módulos livres, e num QR de 20 mm cada módulo tem
-> meio milímetro. Encostar a legenda faz o celular demorar ou desistir, e
-> ninguém associa isso à distância do texto.
+> ⚠️ **A FOLGA EM VOLTA DO QR É FUNCIONAL, E É UM MÍNIMO — NÃO O VALOR.** O
+> padrão pede 4 módulos livres, então o silêncio é **4 × o módulo**, e o
+> módulo muda com o comprimento do link (de 0,375 a 1 mm). Os 2,4 mm do
+> `DESENHO.qr.folga` são só o piso. Até 18/09/2026 o número fixo dava os 4
+> módulos **por acaso**, porque o módulo tinha meio milímetro; com o QR grande
+> (#31) ele passou a ser silêncio de sobra num link e silêncio de **menos** no
+> outro — sem mudar nada em tela, porque a legenda fica no mesmo lugar de
+> sempre. Encostar a legenda faz o celular demorar ou desistir, e ninguém
+> associa isso à distância do texto.
 >
 > ⚠️ **O QR DA TELA CAI NA GRADE DE PIXELS — e foi isto que impediu o celular
 > de ler a primeira prévia (consertado em 17/09/2026).** O QR de 20 mm a
@@ -462,14 +470,14 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 >
 > `gradeDoQr()` arredonda o módulo para o pixel cheio e reposiciona o QR em
 > pixel inteiro, **sempre para baixo**: arredondar para cima deixa o QR maior
-> que os 20 mm e come a folga do silêncio, trocando um problema de leitura por
-> outro. A prévia desenha a 8 px/mm, onde o módulo fecha em 4 px.
+> que o espaço reservado e come a folga do silêncio, trocando um problema de
+> leitura por outro.
 >
-> ⚠️ **E O QR DE 20 mm NUMA TELA NÃO É PARA SER LIDO PELO CELULAR.** Por isso
+> ⚠️ **E O QR PEQUENO NUMA TELA NÃO É PARA SER LIDO PELO CELULAR.** Por isso
 > existe, ao lado da prévia, o **QR de conferência** — o mesmo conteúdo com
-> módulo de 6 px, rotulado ("no papel ele sai com 20 mm"). A etiqueta mostra
-> como vai ficar; o QR grande é o que se aponta a câmera. Sem ele, a fase 2
-> pede uma conferência que a própria tela torna difícil.
+> módulo de 6 px, rotulado. A etiqueta mostra como vai ficar; o QR grande é o
+> que se aponta a câmera. Sem ele, a fase 2 pede uma conferência que a própria
+> tela torna difícil.
 >
 > **Isto era defeito de TELA — até a fase 3 encostar no papel.** Enquanto o
 > plano era ZPL, quem desenhava o QR na ZD220 era a impressora (`^BQ`), com
@@ -479,6 +487,77 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > Por isso o `kit_pdf.js` chama a mesma `gradeDoQr` com **escala 8**. A prévia
 > continua a 8 px/mm — o mesmo número, por acaso, e por isso está escrito nos
 > dois lugares o que ele significa em cada um.
+
+### ⚠️ ARMADILHA #31 — o QR IMPRESSO não é o tamanho da caixa, e a diferença era de 23%
+
+**18/09/2026.** O dono comparou com a etiqueta antiga (feita no Chrome) e disse
+que o QR tinha ficado com cerca de metade do tamanho. Estava certo, e a causa
+não era a caixa reservada: era o **arredondamento**.
+
+```
+caixa reservada          20 mm          ← o que o DESENHO dizia
+link do Drive            41 módulos (v6)
+20 mm × 8 pontos ÷ 41  = 4,88 pontos   → arredonda para 3 (sempre para baixo)
+QR que saía da ZD220     41 × 3 ÷ 8   = 15,375 mm   ← 23% jogados fora
+módulo                   0,375 mm      ← o limite do que a ZD220 resolve
+```
+
+> ⚠️ **A CAIXA E O IMPRESSO ERAM DOIS NÚMEROS, E SÓ UM APARECIA.** A prévia
+> mostrava "QR versão 6 · letra de 4,3 mm" e nada dizia que o QR do papel tinha
+> 15,4 e não 20. O arredondamento para baixo está **certo** (módulo em ponto
+> quebrado é a armadilha da fase 2), mas quem escolheu os 20 mm não estava
+> escolhendo 20 mm — estava escolhendo um teto do qual a impressora usaria o
+> que sobrasse. Hoje o `medir()` devolve `qrPapel` e a tela escreve **"no papel
+> o QR sai com 25,6 mm (módulo de 5 pontos da ZD220)"**. O número que interessa
+> a quem confere a etiqueta é o do papel.
+
+**O conserto foi dar espaço, e ele custou duas medidas** — decisão do dono em
+18/09/2026, com as duas alternativas na mesa:
+
+| | antes | depois |
+|---|---|---|
+| caixa do QR | 20 mm | **26 mm** (`x` 76 → 70,5) |
+| **QR impresso** (link de hoje) | **15,4 mm** | **25,6 mm** — +67% linear, +178% de área |
+| módulo na ZD220 | 3 pontos | **5 pontos** |
+| bloco de texto | 58 mm | 53 mm |
+| letra das linhas 1 e 2 | 4,3 mm | 3,9 mm |
+| limite de caracteres | 16 | **15** |
+| seta | `cx` 67,5 | `cx` 62 (andou 5,5 mm; desenho e raio iguais) |
+| **código de barras** | 58 mm | **58 mm — intocado** |
+
+> ⚠️ **AS BARRAS NÃO ENCOLHERAM, E NÃO PODEM.** Elas ficam em `y` 20..28,5 e o
+> QR começa em `x` 70,5 — não se encostam, então o QR cresceu **por cima**, onde
+> não havia barra nenhuma. Estreitar aquele bloco afinaria a barra, e é esse
+> código que a Embalagem bipa dezenas de vezes por dia. Caso travando.
+
+> ⚠️ **O TETO DO MÓDULO NÃO É A CAIXA: É O ENVELOPE.** O QR mais os 4 módulos
+> de silêncio de cada lado são **(módulos + 8) módulos** de ponta a ponta, e é
+> esse total que tem que caber — `DESENHO.qr.envelope`, 31 mm, o menor dos dois
+> espaços livres (na horizontal, da borda da seta à borda da etiqueta; na
+> vertical, do topo à linha de base da legenda).
+>
+> Sem esse segundo teto o defeito é **invertido e pior**: link **curto** tem
+> menos módulos, logo módulo maior, logo silêncio maior em milímetros — o QR
+> cresceria empurrando o próprio silêncio para fora da etiqueta. E um QR sem
+> silêncio não é lido, com a cara de sempre: o desenho continua com cara de QR.
+> Um link do Drive é v5–v7, mas nada impede alguém colar um encurtador.
+>
+> **Conferido nas dez versões, não só na de hoje:** `teste_kit.js` §8-B varre
+> v1 a v10 e exige os 4 módulos livres nos quatro lados. E o caso que vale mais
+> que todos eles **não presume qual elemento está perto**: varre a etiqueta
+> inteira e exige que nenhuma tinta preta caia na zona de silêncio. Conferir só
+> a seta continuaria verde no dia em que alguém acrescentasse algo à direita.
+
+> ⚠️ **E A PRIMEIRA VERSÃO DESSE CASO TINHA RÉGUA PRÓPRIA.** Montei a zona de
+> silêncio com os 41 módulos do exemplo escrito acima, enquanto a etiqueta do
+> caso usa um link de 37 — comparou o desenho com o silêncio de **outro link** e
+> acusou a legenda de invasora sem nada estar errado. É a lição do QR da fase 2
+> por outra porta: a grade sai do próprio conteúdo do caso, nunca de um número
+> repetido ao lado. Régua própria mente nos dois sentidos — ali acusou o
+> inocente, e amanhã deixaria passar o culpado.
+
+**O tamanho é fixo e não tem campo na tela**, por decisão do dono. Ele sai do
+`DESENHO`, como todas as outras medidas.
 
 ### ⚠️ A IMPRESSÃO (fase 3, 17/09/2026) — **PDF, e não ZPL**
 
@@ -572,11 +651,13 @@ configuração é o que vai falhar.
 > abrir, e tirá-lo baixa a versão (módulo maior, leitura mais fácil).
 >
 > **Rode `node teste_kit.js` e `node teste_qr.js` ao mexer no `mont_route.js`,
-> no `kit_pdf.js`, no card do kit ou nos arquivos acima** — os 112 + 45 casos
+> no `kit_pdf.js`, no card do kit ou nos arquivos acima** — os 133 + 45 casos
 > travam a confirmação da troca, o campo ausente, o link, a medida do texto, a
-> lista única do desenho, o PDF (tamanho da página, lote, recusa e auditoria) e
-> o QR — que o teste não "olha": ele decodifica de volta, confere a paridade
-> Reed-Solomon e **remonta o QR a partir do PDF gerado**. Mexeu na permissão?
+> lista única do desenho, o PDF (tamanho da página, lote, recusa e auditoria),
+> **o tamanho impresso do QR e o silêncio em volta dele nas dez versões**
+> (§8-B, armadilha #31) e o QR em si — que o teste não "olha": ele decodifica
+> de volta, confere a paridade Reed-Solomon e **remonta o QR a partir do PDF
+> gerado**. Mexeu na permissão?
 > **`node teste_acesso.js`** (104 casos). Mexeu no `barras.js`?
 > **`cd tecido && npm test` também** — a etiqueta de prateleira do sob medida
 > lê o mesmo arquivo.
@@ -2443,7 +2524,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (104), `teste_cobertura.js` (10), `teste_kit.js` (112), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (104), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2579,10 +2660,23 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   LUGAR — quem desenha o QR e as barras no papel é a impressora (§4)
 - ❌ Desenhar o QR da tela com módulo em pixel quebrado: a grade sai com 2 e 3
   px alternando e o celular não lê — e o desenho continua com cara de QR (§4)
-- ❌ Arredondar o módulo do QR para CIMA: ele passa dos 20 mm e come a folga do
-  silêncio, que é o que o leitor precisa para achar o código (§4)
-- ❌ Pedir para conferir o QR com o celular só no QR de 20 mm da prévia: nesse
+- ❌ Arredondar o módulo do QR para CIMA: ele passa do espaço reservado e come a
+  folga do silêncio, que é o que o leitor precisa para achar o código (§4)
+- ❌ Pedir para conferir o QR com o celular só no QR pequeno da prévia: nesse
   tamanho a câmera não fecha a leitura — é para isso que existe o ampliado (§4)
+- ❌ Ler o tamanho da CAIXA do QR como o tamanho que sai da impressora: o módulo
+  arredonda para ponto cheio e o resto é jogado fora — a caixa dizia 20 mm e a
+  ZD220 imprimia 15,4 (§4, armadilha #31)
+- ❌ Limitar o módulo do QR só pela caixa, sem o `envelope`: link curto tem
+  módulo maior, e o QR cresceria empurrando o próprio silêncio para fora da
+  etiqueta — QR sem silêncio não é lido (§4, armadilha #31)
+- ❌ Fazer a folga da legenda voltar a ser um número fixo: ela é **4 × o
+  módulo**, e o módulo muda com o comprimento do link (§4, armadilha #31)
+- ❌ Estreitar o bloco das barras para dar espaço ao QR: o QR cresce por cima,
+  onde não há barra — afinar a barra é mexer no que a Embalagem bipa (§4, #31)
+- ❌ Montar a zona de silêncio de um caso de teste com um número de módulos
+  escrito ao lado em vez do link do próprio caso — régua própria acusa o
+  inocente hoje e deixa passar o culpado amanhã (§4, armadilha #31)
 - ❌ Conferir o QR relendo com a mesma convenção com que ele foi escrito: o
   formato invertido passou por três rodadas verdes assim (§4)
 - ❌ Escrever a área de formato do QR fora da ordem do padrão — o leitor acha o

@@ -12,6 +12,15 @@ Risco: 🔴 (etiqueta)
 ⚠️ ESTE DOCUMENTO É HISTÓRICO. As regras que valem estão no CLAUDE.md §4 —
    não use daqui como fonte de regra (CLAUDE.md §13, regra 4).
 
+Divergência depois do arquivamento (vale o CLAUDE.md, §13 regra 3):
+- 18/09/2026 — **o QR não tem mais 20 mm: a caixa é 26 mm e o impresso sai com
+  25,6 mm.** Onde este documento fala de "QR de 20 mm", leia 26. O motivo está
+  no CLAUDE.md §4, armadilha #31: os 20 mm eram a caixa, e a ZD220 imprimia
+  15,4 — o módulo arredonda para ponto cheio e o resto era jogado fora, com o
+  módulo em 0,375 mm, no limite do que a impressora resolve. O espaço saiu do
+  bloco de texto (58 → 53 mm, e o limite das linhas de 16 → 15 caracteres) e de
+  5,5 mm de deslocamento da seta. As barras não mudaram.
+
 Mudanças no caminho:
 - 17/09/2026 (fase 3, CONFERIDA EM PRODUÇÃO) — o dono imprimiu pela primeira
   vez e fez as duas provas que só o papel dá: **o QR abriu e o leitor bipou**.

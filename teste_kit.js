@@ -224,14 +224,126 @@ ok('o QR ajustado continua dentro do espaco reservado',
   g8.lado <= QRD.lado + 1e-9 && g8.x >= QRD.x - 1e-9 &&
   g8.x + g8.lado <= QRD.x + QRD.lado + 1e-9,
   'lado ' + g8.lado.toFixed(2) + ' mm, x ' + g8.x.toFixed(2));
-ok('e o desenho do PAPEL nao mudou: o QR nominal segue 20 mm',
-  QRD.lado === 20);
-eq('a 8 px/mm o modulo fecha em 4 px cheios (era 2,49 e nao lia)',
-  DESENHO.gradeDoQr(8, 37).passoPx, 4);
-/* E o arredondamento e sempre PARA BAIXO: para cima o QR passaria dos 20 mm e
-   comeria a folga do silencio, trocando um problema de leitura por outro. */
+eq('a 8 px/mm o modulo fecha em pixel cheio (era 2,49 e nao lia)',
+  DESENHO.gradeDoQr(8, 37).passo * 8, DESENHO.gradeDoQr(8, 37).passoPx);
+/* E o arredondamento e sempre PARA BAIXO: para cima o QR passaria do espaco
+   reservado e comeria a folga do silencio, trocando um problema de leitura por
+   outro. */
 ok('o QR ajustado nunca fica MAIOR que o espaco reservado, em escala nenhuma',
   [3,4,4.6,5,6,7,8,9,10,12,16].every(e => DESENHO.gradeDoQr(e,37).lado <= QRD.lado + 1e-9));
+
+console.log('\n── 8-B. O QR GRANDE, E O SILENCIO QUE VEM COM ELE (18/09/2026) ──');
+/* ⚠️ O QR IMPRESSO NAO E O TAMANHO DA CAIXA, e era isso que ninguem via: a
+   caixa dizia 20 mm e a ZD220 imprimia 15,4, porque o modulo arredonda para
+   ponto cheio da impressora e o resto e jogado fora. Com 41 modulos,
+   20 x 8 / 41 = 4,88 -> 3 pontos -> 15,375 mm. Tres pontos (0,375 mm) e o
+   limite do que a ZD220 resolve, e o celular nao lia a etiqueta colada.
+   O conserto foi dar espaco: a caixa passou a 26 mm e o link de hoje imprime
+   25,6 mm com modulo de 5 pontos. */
+const V6 = 17 + 4*6;                       // 41 modulos — o link do Drive de hoje
+const g6 = DESENHO.gradeDoQr(8, V6);
+ok('o link de hoje (v6) imprime um QR de mais de 25 mm, nao de 15',
+  g6.lado > 25, g6.lado.toFixed(3) + ' mm');
+ok('...com modulo de 5 pontos da ZD220, nao de 3',
+  g6.passoPx === 5, g6.passoPx + ' pontos');
+ok('o QR ocupa mais de 70% da altura da etiqueta',
+  g6.lado / DESENHO.ETIQUETA.altura > 0.70,
+  Math.round(100*g6.lado/DESENHO.ETIQUETA.altura) + '%');
+/* ⚠️ E O CASO QUE IMPORTA MAIS QUE O TAMANHO: o silencio de 4 modulos tem que
+   caber nos QUATRO lados, em TODA versao — nao so na de hoje. Um link curto
+   tem menos modulos, logo modulo MAIOR, logo silencio maior em milimetros: sem
+   o teto do envelope o QR cresceria empurrando o proprio silencio para fora da
+   etiqueta, e o leitor nao acha codigo sem silencio. O defeito teria a cara de
+   sempre — o desenho continua com cara de QR. */
+const SETA_DIR = DESENHO.DESENHO.seta.cx + DESENHO.DESENHO.seta.raio;
+for(let v=1; v<=10; v++){
+  const N = 17 + 4*v, g = DESENHO.gradeDoQr(8, N), silencio = 4 * g.passo;
+  const esq = g.x - SETA_DIR, dir = DESENHO.ETIQUETA.largura - (g.x + g.lado);
+  const abaixo = Math.max(QRD.folga, silencio);
+  const rodape = DESENHO.ETIQUETA.altura -
+    (g.topo + g.lado + abaixo + DESENHO.medir({qr_legenda:'MANUAL'}).capLegenda);
+  ok('v'+v+' ('+N+' modulos): os 4 modulos de silencio cabem nos quatro lados',
+    esq >= silencio - 1e-9 && dir >= silencio - 1e-9 && g.topo >= silencio - 1e-9 &&
+    rodape >= 1.2,
+    'precisa '+silencio.toFixed(2)+' · esq '+esq.toFixed(2)+' dir '+dir.toFixed(2)+
+    ' topo '+g.topo.toFixed(2)+' · sobra abaixo da legenda '+rodape.toFixed(2));
+}
+/* O QR nunca encosta na seta: ela e o elemento imediatamente a esquerda dele, e
+   foi o que andou 5,5 mm para o QR caber. */
+ok('o QR nunca invade a seta, em versao nenhuma',
+  [1,2,3,4,5,6,7,8,9,10].every(v => DESENHO.gradeDoQr(8, 17+4*v).x > SETA_DIR));
+/* ⚠️ E ESTE E O CASO QUE NAO PRESUME NADA: em vez de conferir o vizinho que eu
+   ACHO que esta perto, ele varre a etiqueta inteira e exige que NENHUMA tinta
+   preta caia na zona de silencio do QR. Conferir so a seta e a borda funciona
+   enquanto o desenho for este; no dia em que alguem acrescentar um elemento a
+   direita, o caso do vizinho continuaria verde. Foi assim que o formato do QR
+   passou por tres rodadas verdes na fase 2 — teste que so pergunta o que o
+   autor lembrou de perguntar. */
+(function silencioLimpo(){
+  /* ⚠️ A GRADE SAI DO PROPRIO `cheio`, nunca de um numero de modulos escrito
+     aqui. A primeira versao deste caso montou a zona com os 41 modulos do
+     exemplo de cima enquanto o `cheio` tem 37 — comparou a etiqueta desenhada
+     com o silencio de OUTRO link, e acusou a legenda de invasora sem que nada
+     estivesse errado. Caso com regua propria e caso que mente nos dois
+     sentidos: aqui acusou o inocente, e no dia seguinte deixaria passar o
+     culpado. */
+  const QR = require('./public/qr.js');
+  const g = DESENHO.gradeDoQr(8, QR.modulos(cheio.link).length), sil = 4 * g.passo;
+  const Z = { x0:g.x-sil, y0:g.topo-sil, x1:g.x+g.lado+sil, y1:g.topo+g.lado+sil };
+  const noQr = it => it.tipo === 'ret' && it.x >= g.x-1e-9 && it.y >= g.topo-1e-9 &&
+    it.x+it.largura <= g.x+g.lado+1e-9 && it.y+it.altura <= g.topo+g.lado+1e-9;
+  const caixa = it => {
+    if(it.tipo === 'ret')      return [it.x, it.y, it.x+it.largura, it.y+it.altura];
+    if(it.tipo === 'circulo')  return [it.cx-it.raio, it.cy-it.raio, it.cx+it.raio, it.cy+it.raio];
+    if(it.tipo === 'texto')    return [it.x, it.base-it.cap,
+      it.x + DESENHO.larguraDoTexto(it.texto, it.cap) +
+        (it.espaco||0)*Math.max(0, String(it.texto).length-1), it.base];
+    return null;
+  };
+  const invasores = DESENHO.elementos(cheio, { escala:8 }).filter(it => {
+    if(it.cor === 'branco' || noQr(it)) return false;
+    const b = caixa(it);
+    return b && b[0] < Z.x1-1e-9 && b[2] > Z.x0+1e-9 && b[1] < Z.y1-1e-9 && b[3] > Z.y0+1e-9;
+  });
+  ok('NADA preto cai na zona de silencio do QR — varrendo a etiqueta inteira',
+    invasores.length === 0,
+    invasores.map(i => i.tipo + (i.texto ? ' "'+i.texto+'"' : '')).join(', '));
+  ok('...e a zona de silencio inteira cabe dentro da etiqueta',
+    Z.x0 >= 0 && Z.y0 >= 0 && Z.x1 <= DESENHO.ETIQUETA.largura && Z.y1 <= DESENHO.ETIQUETA.altura,
+    Z.x0.toFixed(2)+','+Z.y0.toFixed(2)+'..'+Z.x1.toFixed(2)+','+Z.y1.toFixed(2));
+})();
+/* ⚠️ AS BARRAS NAO ENCOLHERAM, e isso e regra: a Embalagem bipa esse codigo
+   dezenas de vezes por dia e estreitar o bloco afinaria a barra. O QR cresceu
+   pelo lado de cima, onde nao havia barra nenhuma. */
+eq('as barras continuam com os 58 mm de largura', DESENHO.DESENHO.barras.largura, 58);
+/* E o tamanho impresso sai na resposta do `medir`, para a tela poder dizer o
+   numero que interessa — o do papel, nao o da caixa. */
+const mPapel = DESENHO.medir(cheio);
+ok('medir() informa o tamanho que o QR vai ter NO PAPEL',
+  mPapel.qrPapel && mPapel.qrPapel.lado > 0 && mPapel.qrPapel.pontos >= 1,
+  JSON.stringify(mPapel.qrPapel));
+ok('...e nao informa tamanho quando nao ha link para virar QR',
+  DESENHO.medir({ linha1:'A', codigo:'K' }).qrPapel === null);
+/* ⚠️ O `medir` conta os modulos pela FORMULA do padrao (17 + 4 x versao) para
+   nao montar a matriz inteira; o `elementos` conta pela matriz que o `qr.js`
+   gerou. Sao dois caminhos para o mesmo numero, e o dia em que discordarem a
+   tela vai anunciar um tamanho e a impressora vai imprimir outro — em silencio,
+   porque os dois numeros parecem certos. Este caso amarra os dois. */
+(function papelBateComODesenho(){
+  const QR = require('./public/qr.js');
+  let piores = [];
+  for(const link of [cheio.link, 'https://drive.google.com/x',
+      'https://drive.google.com/drive/folders/'+'A'.repeat(60),
+      'https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOpQrStUvWxYz012345?usp=drive_link']){
+    const v = QR.versaoPara(link);
+    if(!v) continue;
+    const porFormula = DESENHO.medir({ link:link }).qrPapel.lado;
+    const porMatriz  = DESENHO.gradeDoQr(8, QR.modulos(link).length).lado;
+    if(Math.abs(porFormula - porMatriz) > 1e-9) piores.push('v'+v+': '+porFormula+' vs '+porMatriz);
+  }
+  ok('o tamanho que a TELA anuncia e o mesmo que o PAPEL desenha',
+    piores.length === 0, piores.join(' · '));
+})();
 
 console.log('\n── 9. UM DESENHO, DOIS DESENHISTAS (fase 3) ──');
 /* ⚠️ O CASO CENTRAL DA FASE 3. O PDF nao repete o desenho: ele le a MESMA
@@ -376,9 +488,22 @@ async function chamarAsync(metodo, rota, corpo, usuario){
     diferentes, 0);
   /* E a folga do silencio segue de pe no papel: o padrao pede 4 modulos livres
      em volta, e encostar a legenda faz o celular demorar ou desistir. */
-  ok('o QR do papel cabe nos 20 mm reservados, com a folga inteira',
+  ok('o QR do papel cabe no espaco reservado, com a folga inteira',
     g.x >= DESENHO.DESENHO.qr.x - 1e-9 &&
     g.x + g.lado <= DESENHO.DESENHO.qr.x + DESENHO.DESENHO.qr.lado + 1e-9);
+  /* ⚠️ E A LEGENDA DESCE DO QR DESENHADO, nao da caixa: com o QR grande o
+     modulo varia de 0,375 a 1 mm conforme o link, e uma folga fixa seria
+     silencio de sobra num caso e silencio de MENOS no outro — sem nada mudar
+     na tela, porque a legenda fica no mesmo lugar de sempre. */
+  const legenda = DESENHO.elementos(cheio, { escala:8 })
+    .find(i => i.tipo === 'texto' && i.texto === cheio.qr_legenda);
+  ok('a legenda fica a 4 modulos do QR IMPRESSO, nunca encostada',
+    legenda && (legenda.base - legenda.cap) - (g.topo + g.lado) >= 4*g.passo - 1e-9,
+    legenda ? ((legenda.base - legenda.cap) - (g.topo + g.lado)).toFixed(2) +
+      ' mm de silencio, precisa ' + (4*g.passo).toFixed(2) : 'legenda nao saiu na lista');
+  ok('...e ela nao cai fora da etiqueta',
+    legenda && legenda.base <= DESENHO.ETIQUETA.altura,
+    legenda ? 'base ' + legenda.base.toFixed(2) + ' mm' : '');
 
   p = await chamarAsync('POST', '/api/kit/etiqueta/imprimir', { quantidade:9000 });
   eq('lote acima do teto e recusado', p.status, 409);
