@@ -1292,6 +1292,18 @@ Desligável (Admin → Cadastros) porque custa um bipe por volume, todo dia. Nas
 > disso sai com hora de gente, e a primeira versão do script o acusava como furo
 > da dívida 13. Na primeira rodada em produção foram **3 dos 11**.
 >
+> ⚠️ **E A RÉGUA FOI CONFERIDA CONTRA UMA FONTE QUE NÃO VEIO DO MESMO
+> RACIOCÍNIO** — é a lição do QR (§4) aplicada aqui: um teste que relê pela
+> convenção com que escreveu não testa nada, ele pergunta a si mesmo. O
+> agrupamento apontou os volumes **440, 484 e 485**; o histórico do shell do
+> servidor trazia, de 25/08, exatamente `node regularizar_saida.js 440 484 485
+> --aplicar`. Os três ids, na mesma ordem. Deixou de ser inferência.
+>
+> **Quando a dúvida voltar, o caminho é esse, e é barato:**
+> `grep -n "regularizar_saida\|fechar_vencidos" ~/.bash_history` no servidor. Os
+> scripts do §5 não gravam em auditoria — o histórico do shell é o único lugar
+> onde essa decisão humana deixou rastro, e ele não é eterno.
+>
 > O que denuncia esses é o **segundo repetido**: um `UPDATE` em transação grava
 > o mesmo instante em todas as linhas de uma vez, e ninguém larga uma caixa,
 > pega outra e bipa **três** vezes dentro de um segundo. **Três, e não dois:**
