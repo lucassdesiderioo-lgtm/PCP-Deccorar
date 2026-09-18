@@ -3,6 +3,7 @@
  *
  *   node arrumar_sobmedida.js              # só mostra o que faria
  *   node arrumar_sobmedida.js --aplicar    # grava, com backup antes
+ *   node arrumar_sobmedida.js --sku BKSOBMEDIDA [--aplicar]   # aponta TAMBEM esse SKU
  *
  * ── POR QUE ESTE ARQUIVO EXISTE ─────────────────────────────────────────────
  * A §7 descreve a regra do sob medida desde 25/08/2026, e o código a lê em
@@ -87,6 +88,36 @@ function arrumar(db, opcoes){
   if(precisaApontar) acoes.push('apontar o SKU ' + SKU_ALVO + ' para o modelo ' + MODELO);
   if(corSuja) acoes.push('limpar o campo cor do ' + SKU_ALVO + ' (está "' + sAtual.cor + '")');
 
+  /* ── 2-B. O `--sku`: OUTRO SKU QUE TAMBÉM É SOB MEDIDA ───────────────────
+     Apareceu em 18/09/2026 com o `BKSOBMEDIDA`, que é um SKU REAL da folha do
+     ML — cadastrado no dia 16 para destravar a venda do Anderson (volume 1628).
+     Sem modelo, a Etiqueta de Venda lê `sob_medida = 0`, vê saldo zero e
+     recusa: é a armadilha #30 com um cliente esperando.
+
+     ⚠️ ELE MEXE SÓ NO MODELO. Cor, medida e saldo ficam como estão — limpar
+     campo de um SKU qualquer seria o script inventando estrago onde não há. O
+     reparo dos campos sujos é do `SKU_ALVO`, onde o deslize é conhecido. */
+  const skuExtra = opcoes && opcoes.sku ? String(opcoes.sku).trim().toUpperCase() : null;
+  let skuRecusado = null, extraApontar = false;
+  if(skuExtra && skuExtra !== SKU_ALVO){
+    const e = db.prepare('SELECT * FROM skus WHERE codigo=?').get(skuExtra);
+    if(!e){
+      skuRecusado = 'o SKU ' + skuExtra + ' não está cadastrado — nada a apontar.';
+    } else if((+e.estoque || 0) > 0){
+      /* ⚠️ SALDO É A GUARDA QUE IMPORTA AQUI, e ela é a armadilha #30 ao
+         contrário: a regra pegando em quem ela não devia pegar. Sob medida não
+         baixa estoque (§7), então apontar para lá um SKU com peça na prateleira
+         CONGELA aquele saldo para sempre — ele nunca mais desce, e nada avisa. */
+      skuRecusado = 'NÃO apontei o ' + skuExtra + ': ele tem ' + e.estoque
+        + ' peça(s) em estoque. Sob medida não baixa saldo (§7), então esse número '
+        + 'ficaria congelado para sempre. Se ele é sob medida mesmo, zere o saldo '
+        + 'por Admin → Estoque (com motivo) e rode de novo.';
+    } else if(!mAtual || e.modelo_id !== mAtual.id){
+      extraApontar = true;
+      acoes.push('apontar o SKU ' + skuExtra + ' para o modelo ' + MODELO);
+    }
+  }
+
   /* ── 4. OS DESATIVADOS POR ENGANO ────────────────────────────────────── */
   const reativar = [];
   for(const cod of REATIVAR_TECIDO){
@@ -102,7 +133,12 @@ function arrumar(db, opcoes){
   /* ── 5. O SKU VAZIO ──────────────────────────────────────────────────────
      Ele nasceu de uma edição no CAMPO DO CÓDIGO do Cadastro de SKU, que é chave
      de upsert: código diferente cria linha nova, não renomeia. */
-  const lixo = db.prepare('SELECT * FROM skus WHERE codigo=?').get(SKU_LIXO);
+  /* ⚠️ NOMEAR UM SKU NO `--sku` É DIZER QUE ELE É LEGÍTIMO, e por isso ele
+     nunca é apagado na mesma rodada. Sem esta linha o script apontava o
+     `BKSOBMEDIDA` para o modelo e o apagava em seguida, na mesma transação — o
+     teste pegou a contradição antes de ela chegar em produção. */
+  const lixo = (skuExtra === SKU_LIXO) ? null
+    : db.prepare('SELECT * FROM skus WHERE codigo=?').get(SKU_LIXO);
   let apagarLixo = false;
   if(lixo){
     const presos = [];
@@ -115,16 +151,19 @@ function arrumar(db, opcoes){
        linha em `ajuste_estoque` — a porta que a armadilha #25 (§6) fechou. */
     if((+lixo.estoque || 0) !== 0) presos.push('saldo ' + lixo.estoque);
     if(presos.length){
+      /* ⚠️ ISTO É AVISO, NÃO AÇÃO — e a diferença apareceu rodando em produção
+         (18/09/2026). Ele descreve o que o script DEIXOU de fazer. Entrando na
+         lista de ações, toda rodada anunciava "O QUE VOU FAZER" com uma linha
+         que não faz nada, e a rodada com algo de verdade passaria batida. */
       bkRetido = 'NÃO apaguei o ' + SKU_LIXO + ': tem ' + presos.join(', ')
         + '. Apagar o cadastro devolveria esse volume para bloqueado (§6).';
-      acoes.push(bkRetido);
     } else {
       apagarLixo = true;
       acoes.push('apagar o SKU ' + SKU_LIXO + ' (vazio, sem saldo e sem nada atrás)');
     }
   }
 
-  if(!aplicar) return { acoes, bkRetido, aplicado:false };
+  if(!aplicar) return { acoes, bkRetido, skuRecusado, aplicado:false };
 
   /* ⚠️ AS CINCO ESCRITAS SÃO UMA TRANSAÇÃO SÓ. Com `better-sqlite3` cada
      statement auto-commita sozinho: falha no meio deixaria o modelo criado e o
@@ -139,20 +178,27 @@ function arrumar(db, opcoes){
     if(precisaApontar || corSuja)
       db.prepare('UPDATE skus SET modelo_id=?, cor=? WHERE codigo=?').run(id, '', SKU_ALVO);
 
+    /* Só o modelo — ver o comentário da seção 2-B. */
+    if(extraApontar) db.prepare('UPDATE skus SET modelo_id=? WHERE codigo=?').run(id, skuExtra);
+
     for(const [t,col,cod] of reativar)
       db.prepare('UPDATE ' + t + ' SET ' + col + '=1 WHERE codigo=?').run(cod);
 
     if(apagarLixo) db.prepare('DELETE FROM skus WHERE codigo=?').run(SKU_LIXO);
   })();
 
-  return { acoes, bkRetido, aplicado:true };
+  return { acoes, bkRetido, skuRecusado, aplicado:true };
 }
 
 module.exports = { arrumar, MODELO, SKU_ALVO, SKU_LIXO };
 if(require.main !== module) return;
 
 /* ── A LINHA DE COMANDO ──────────────────────────────────────────────────── */
-const APLICAR = process.argv.slice(2).includes('--aplicar');
+const ARGS = process.argv.slice(2);
+const APLICAR = ARGS.includes('--aplicar');
+/* `--sku CODIGO`: aponta TAMBÉM esse SKU para o modelo Sob medida (seção 2-B). */
+const iSku = ARGS.indexOf('--sku');
+const SKU_EXTRA = (iSku >= 0 && ARGS[iSku+1] && ARGS[iSku+1].slice(0,2) !== '--') ? ARGS[iSku+1] : null;
 const db = require('./db');
 const T = s => console.log(s);
 
@@ -168,7 +214,17 @@ T('╔════════════════════════�
 T('║  ARRUMAR SOB MEDIDA — põe a regra do §7 de pé no cadastro              ║');
 T('╚════════════════════════════════════════════════════════════════════════╝');
 
-const R0 = arrumar(db, { aplicar:false });
+const R0 = arrumar(db, { aplicar:false, sku:SKU_EXTRA });
+
+/* Os AVISOS saem antes e em separado: eles dizem o que o script NÃO vai fazer,
+   e misturá-los com as ações faz toda rodada parecer que tem trabalho. */
+const avisos = [R0.bkRetido, R0.skuRecusado].filter(Boolean);
+if(avisos.length){
+  T('');
+  T('── ATENÇÃO ──────────────────────────────────────────────────────────');
+  for(const a of avisos) T('  ⚠ ' + a);
+}
+
 T('');
 if(!R0.acoes.length){
   T('  Nada a fazer — o cadastro já está como a §7 manda.');
@@ -182,7 +238,8 @@ for(const a of R0.acoes) T('  · ' + a);
 
 if(!APLICAR){
   T('');
-  T('  Nada foi gravado. Para valer: node arrumar_sobmedida.js --aplicar');
+  T('  Nada foi gravado. Para valer: node arrumar_sobmedida.js '
+    + (SKU_EXTRA ? '--sku ' + SKU_EXTRA + ' ' : '') + '--aplicar');
   T('');
   db.close();
   return;
@@ -198,7 +255,7 @@ await db.backup(destino);
 T('');
 T('  backup -> ' + destino);
 
-arrumar(db, { aplicar:true });
+arrumar(db, { aplicar:true, sku:SKU_EXTRA });
 
 const m = db.prepare('SELECT * FROM modelo WHERE codigo=?').get(MODELO);
 const s = db.prepare('SELECT modelo_id, cor, estoque FROM skus WHERE codigo=?').get(SKU_ALVO);
@@ -209,6 +266,16 @@ T('  modelo ' + MODELO + ': sob medida=' + (m ? m.sob_medida : '?')
 T(s ? ('  SKU ' + SKU_ALVO + ': modelo_id=' + s.modelo_id + ' · cor="' + (s.cor||'')
        + '" · saldo=' + s.estoque)
     : ('  (não há SKU ' + SKU_ALVO + ' neste banco — só o modelo foi criado)'));
+/* O SKU do `--sku` sai aqui também: ele costuma ser o motivo da rodada — foi
+   uma venda parada que trouxe o comando —, e um relatório que não confirma o
+   que se veio fazer manda conferir noutro lugar. */
+if(SKU_EXTRA){
+  const x = db.prepare('SELECT modelo_id, estoque FROM skus WHERE codigo=?')
+    .get(String(SKU_EXTRA).trim().toUpperCase());
+  T(x ? ('  SKU ' + String(SKU_EXTRA).toUpperCase() + ': modelo_id=' + x.modelo_id
+         + ' · saldo=' + x.estoque)
+      : ('  SKU ' + String(SKU_EXTRA).toUpperCase() + ': não está cadastrado'));
+}
 T('');
 T('  CONFIRA NA ABA ESTOQUE (Admin → Estoque, busque por SO):');
 T('   · o ' + SKU_ALVO + ' tem que mostrar o chip "sob medida"');

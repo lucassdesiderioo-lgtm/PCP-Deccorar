@@ -205,6 +205,78 @@ eq('ACESSORIO também não é tocado', mod(db,'ACESSORIO').sob_medida, 0);
 eq('e o SKU comum continua no Rolô', sku(db,'BK140140BEGE').modelo_id, 2);
 db.close();
 
+console.log('\n── 11. o aviso do BKSOBMEDIDA não é uma AÇÃO ──');
+/* ⚠️ APARECEU RODANDO EM PRODUÇÃO (18/09/2026). O "NÃO apaguei o BKSOBMEDIDA"
+   é um aviso — ele descreve o que o script DEIXOU de fazer. Estava entrando na
+   lista de ações, e por isso a segunda rodada anunciava "O QUE VOU FAZER" com
+   uma linha que não faz nada. Lista que repete o mesmo texto toda vez ensina a
+   ignorá-la, e aí a rodada com algo de verdade passa batida. */
+db = bancoDeHoje();
+db.prepare("INSERT INTO lote (codigo,estagio) VALUES ('BKSOBMEDIDA','pendente')").run();
+arrumar(db, { aplicar:true });
+r = arrumar(db, { aplicar:false });
+eq('a segunda rodada não tem NENHUMA ação', r.acoes.length, 0);
+ok('mas o aviso continua sendo devolvido', /BKSOBMEDIDA/.test(String(r.bkRetido||'')),
+   JSON.stringify(r.bkRetido));
+db.close();
+
+console.log('\n── 12. --sku aponta OUTRO SKU para o modelo Sob medida ──');
+/* O BKSOBMEDIDA é um SKU real, que veio da folha do ML e foi cadastrado para
+   destravar uma venda. Sem modelo, a Etiqueta de Venda lê sob_medida=0, vê
+   saldo zero e recusa — é a armadilha #30 com um cliente esperando. */
+db = bancoDeHoje();
+r = arrumar(db, { aplicar:true, sku:'BKSOBMEDIDA' });
+const mSM = mod(db,'SOBMEDIDA');
+eq('o SKU passou a apontar para o Sob medida', sku(db,'BKSOBMEDIDA').modelo_id, mSM.id);
+eq('e o reparo normal aconteceu junto', sku(db,'SOBMEDIDA').modelo_id, mSM.id);
+eq('a segunda rodada não tem nada a fazer', arrumar(db,{sku:'BKSOBMEDIDA'}).acoes.length, 0);
+db.close();
+
+console.log('\n── 12-B. o --sku NÃO mexe em cor, medida nem saldo ──');
+/* O reparo dos campos sujos era específico do SOBMEDIDA, onde o texto tinha ido
+   parar na cor por um deslize conhecido. Num SKU qualquer, apagar cor e medida
+   seria o script inventando estrago onde não há. */
+db = bancoDeHoje();
+db.prepare("UPDATE skus SET cor='Bege', largura_cm=120, altura_cm=120 WHERE codigo='BKSOBMEDIDA'").run();
+arrumar(db, { aplicar:true, sku:'BKSOBMEDIDA' });
+const sBK = sku(db,'BKSOBMEDIDA');
+eq('a cor continua', sBK.cor, 'Bege');
+eq('a largura continua', sBK.largura_cm, 120);
+eq('a altura continua', sBK.altura_cm, 120);
+eq('e o saldo continua', sBK.estoque, 0);
+db.close();
+
+console.log('\n── 12-C. ⚠️ SKU COM SALDO É RECUSADO ──');
+/* Sob medida não baixa estoque (§7). Apontar para lá um SKU que tem peça na
+   prateleira CONGELA aquele saldo para sempre: ele nunca mais desce, e nada
+   avisa. É a armadilha #30 ao contrário — a regra pegando em quem ela não devia
+   pegar. Na dúvida o script recusa e diz o número. */
+db = bancoDeHoje();
+db.prepare("UPDATE skus SET estoque=7 WHERE codigo='BKSOBMEDIDA'").run();
+r = arrumar(db, { aplicar:true, sku:'BKSOBMEDIDA' });
+eq('ele NÃO foi apontado', sku(db,'BKSOBMEDIDA').modelo_id, null);
+ok('e o script diz o saldo que impediu', /7/.test(String(r.skuRecusado||'')),
+   JSON.stringify(r.skuRecusado));
+eq('mas o reparo do SOBMEDIDA aconteceu do mesmo jeito',
+   sku(db,'SOBMEDIDA').modelo_id, mod(db,'SOBMEDIDA').id);
+db.close();
+
+console.log('\n── 12-D. --sku de código que não existe ──');
+db = bancoDeHoje();
+r = arrumar(db, { aplicar:true, sku:'NAOEXISTE' });
+ok('recusa dizendo que não está cadastrado', /NAOEXISTE/.test(String(r.skuRecusado||'')),
+   JSON.stringify(r.skuRecusado));
+eq('e não cria SKU nenhum', sku(db,'NAOEXISTE'), undefined);
+db.close();
+
+console.log('\n── 12-E. o ROLO continua fora, mesmo passando pelo --sku ──');
+/* A guarda da seção 10 vale aqui também: o --sku aponta UM SKU para o modelo
+   Sob medida; ele nunca marca a flag num modelo que já existe. */
+db = bancoDeHoje();
+arrumar(db, { aplicar:true, sku:'BK140140BEGE' });
+eq('ROLO continua com sob_medida = 0', mod(db,'ROLO').sob_medida, 0);
+db.close();
+
 console.log('\n────────────────────────────────────────────');
 console.log(falhas ? '  ' + falhas + ' de ' + n + ' FALHARAM' : '  todos os ' + n + ' casos passaram');
 try{ fs.rmSync(tmp, {recursive:true, force:true}); }catch(e){}
