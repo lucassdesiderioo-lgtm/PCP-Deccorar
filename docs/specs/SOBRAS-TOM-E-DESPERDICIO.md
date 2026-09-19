@@ -4,8 +4,8 @@
 STATUS
 Situação: em construção
 Criada em: 18/09/2026
-Última atualização: 18/09/2026
-Fase atual: 1 (limpeza) — implementada e testada; falta rodar no servidor
+Última atualização: 19/09/2026
+Fase atual: 1 (limpeza) — RODADA EM PRODUÇÃO em 19/09/2026, 10:21
 Fases: 1 ☑  2 ☐  3 ☐  4 ☐
 Risco: 🔴 (dados de sobra e baixa no Confirmar do plano)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
@@ -18,6 +18,31 @@ Mudanças no caminho:
     novo. Decidido pelo dono ao aprovar o plano ("pode seguir, com o corte
     por data"); a forma de guarda saiu da construção.
 ```
+
+> **A rodada de produção, 19/09/2026 10:21** (backup em
+> `tecido/backups/antes-limpeza-sobras-2026-09-19T10-21-36-192Z.db`):
+>
+> | Tabela | Linhas |
+> |---|---|
+> | `sobra` | **96** |
+> | `etiqueta` | **150** |
+> | `etiqueta_lote` | 5 |
+> | `sobra_correcao` | 1 |
+> | `sobra_proposta` · `plano_recusa` · `refugo` (descarte) | 0 |
+>
+> Nenhuma das quatro guardas disparou: **nenhuma sobra tinha corte confirmado
+> atrás** — o que o dono já havia declarado e o script conferiu — e nenhum
+> cadastro havia sido feito depois do corte. Todo o acervo era de **um mutirão
+> só**, de `2026-09-05`, entre 08:25 e 11:48.
+>
+> ⚠️ **150 etiquetas para 96 sobras: 54 foram impressas e nunca bipadas.** O
+> papel delas existe, com números que a impressão vai reemitir — é o R2 em
+> volume maior do que o esperado (cinco lotes), e o único item da fase que
+> depende de gente, não de código.
+>
+> **O corte por data provou-se na própria rodada:** ela aconteceu já em 19/09,
+> depois do corte, e passou porque a equipe ainda não havia cadastrado nada. Se
+> tivesse, o script teria recusado em vez de apagar o trabalho novo.
 
 ---
 
@@ -177,7 +202,7 @@ depois, com esse número (ver §5).
 
 Cada fase é entregue e testada sozinha.
 
-### Fase 1: limpeza das sobras 🔴 — FEITA em 18/09/2026 (falta rodar no servidor)
+### Fase 1: limpeza das sobras 🔴 — FEITA em 18/09, RODADA em 19/09/2026
 
 > **Como ficou:** `tecido/limpar_sobras.js` + `tecido/teste/limpar_sobras.test.js`
 > (11 casos). As regras que parecem bug e não são foram para o

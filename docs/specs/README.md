@@ -26,7 +26,7 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 
 | Spec | Status |
 |---|---|
-| `SOBRAS-TOM-E-DESPERDICIO.md` | Em construção · **Fase 1 feita** (limpeza), falta rodar no servidor · fases 2–4 planejadas |
+| `SOBRAS-TOM-E-DESPERDICIO.md` | Em construção · **Fase 1 rodada em produção** em 19/09/2026 (96 sobras, 150 etiquetas) · fases 2–4 planejadas |
 | `COMPRAS.md` | Implementado (fases 0–6) · fase 7 pendente · com mudanças na construção |
 | `ARQUITETURA-ALVO.md` | Parcial — só no módulo sob medida (`tecido/`) |
 | `PCP-CONTROLE-E-VISAO.md` | Parcial e divergente · decisão pendente |
