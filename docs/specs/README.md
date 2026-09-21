@@ -26,7 +26,7 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 
 | Spec | Status |
 |---|---|
-| `ESTOQUE-LIVRO-E-CONFERENCIA.md` | Planejado · nada no código · **base do pacote de 21/09** · uma decisão em aberto (§6.4) |
+| `ESTOQUE-LIVRO-E-CONFERENCIA.md` | **Em construção** · fase 0 e fase 1 em código (21/09) · fases 2–4 planejadas · uma decisão em aberto (§6.4) |
 | `VENDAS-E-MEDIA.md` | Planejado · nada no código · a troca da fonte da média (fase 3) espera o ok do dono |
 | `MESA-DE-CORRECOES.md` | Planejado · nada no código · depende do livro (Estoque F1) e das canceladas (Vendas F2) |
 | `SOBRAS-TOM-E-DESPERDICIO.md` | Em construção · Fase 1 em produção (19/09) · **Fase 2 feita** (21/09, a mensagem do plano) · fases 3–4 planejadas |

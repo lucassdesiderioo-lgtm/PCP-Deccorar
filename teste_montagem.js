@@ -74,6 +74,10 @@ const app = { locals:{}, get(p,h){ rotas['GET '+p]=h; }, post(p,h){ rotas['POST 
               delete(p,h){ rotas['DELETE '+p]=h; } };
 const auditoria = [];
 app.locals.acesso = { auditar(req,cat,acao,alvo,detalhe){ auditoria.push({cat,acao,alvo,detalhe}); } };
+/* O livro de movimentos de pe (fase 1, 21/09/2026). Em producao quem chama
+   isto e o `db.js`; aqui, que sobe sem ele, o teste chama — e a abertura
+   carimba o saldo semeado como linha inicial, igual ao deploy. */
+require('./estoque_dominio').garantirSchema(db);
 require('./mont_route')(app, db);
 
 function chamar(metodo, rota, corpo){

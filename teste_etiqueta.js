@@ -73,6 +73,10 @@ db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data,despacha
 const rotas = {};
 const app = { get:(p,...h)=>{ rotas['GET '+p]=h[h.length-1]; },
               post:(p,...h)=>{ rotas['POST '+p]=h[h.length-1]; }, locals:{} };
+/* O livro de movimentos de pe (fase 1, 21/09/2026). Em producao quem chama
+   isto e o `db.js`; aqui, que sobe sem ele, o teste chama — e a abertura
+   carimba o saldo semeado como linha inicial, igual ao deploy. */
+require('./estoque_dominio').garantirSchema(db);
 require('./etq_route')(app, db);
 
 const chamar = (k, body, params) => new Promise(r => {

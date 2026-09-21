@@ -82,6 +82,10 @@ const app = {
   }},
   get(p,h){ rotas['GET '+p]=h; }, post(p,h){ rotas['POST '+p]=h; }, delete(p,h){ rotas['DELETE '+p]=h; }
 };
+/* O livro de movimentos de pe (fase 1, 21/09/2026). Em producao quem chama
+   isto e o `db.js`; aqui, que sobe sem ele, o teste chama — e a abertura
+   carimba o saldo semeado como linha inicial, igual ao deploy. */
+require('./estoque_dominio').garantirSchema(db);
 require('./cont_route')(app, db);
 // A coluna que o teste_route acrescenta no boot (§11: contagem_pendente e uma
 // das 11 tabelas cobertas). Sem ela, contagem em modo teste sujaria a idade.

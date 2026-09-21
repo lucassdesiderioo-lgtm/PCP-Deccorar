@@ -1,9 +1,38 @@
-> **STATUS · 21/09/2026 — PLANEJADO** · nada no código
-> Fase 1 (livro de movimentos) é a base das outras duas specs deste pacote
-> (`VENDAS-E-MEDIA.md` e `MESA-DE-CORRECOES.md`).
-> **Uma decisão em aberto:** o que fazer quando só há uma pessoa com
-> `contagem.aprovar` no dia (§6.4). Padrão proposto até o dono decidir: **espera**.
-> Pré-requisito: os consertos da "fase 0" (§9), que vão como CONSERTO, sem spec.
+> **STATUS · 21/09/2026 — EM CONSTRUÇÃO** · fase 0 e **fase 1 feitas**; fases 2 a 4 planejadas
+> **Fase 0 (consertos)** entrou em 21/09/2026: a aprovação da contagem passou a
+> aplicar a diferença contra o `sistema_era` em vez do número contado, a contagem
+> de peça passou a gravar em `ajuste_estoque`, e a idade da conferência deixou de
+> ler a tabela `contagem`, que é apagada (`CLAUDE.md` §18, armadilha #32 ·
+> `teste_contagem.js`). **Não entrou** o item (d): as dívidas #13, #14 e #15 já
+> estavam marcadas RESOLVIDO no §14 e o que sobrava de cada uma não era conserto —
+> a #15 era `REGRA` e fechou aqui, na fase 1.
+>
+> **Fase 1 (o livro)** entrou em 21/09/2026: `movimento_estoque`,
+> `estoque_dominio.js` como dono único, a virada de abertura, o fim do
+> `MAX(0, …)` nos sete escritores, o alerta de saldo negativo, o extrato
+> (`GET /api/estoque/extrato/:codigo`) e a varredura que recusa
+> `UPDATE skus SET estoque` fora do domínio (`teste_livro.js`, 60 casos).
+>
+> **O que mudou na construção, e vale mais que a spec:**
+> - a tabela do §1 estava velha em dois pontos (ver a nota de divergência abaixo);
+> - a §3.3.2 dizia só *"`POST /api/skus` deixa de gravar `estoque`"*. Na
+>   construção ficou claro que **o SKU novo também tem que nascer com zero**:
+>   nascer com 5 e livro vazio quebraria `SUM(delta) = skus.estoque` na primeira
+>   linha — que é justamente a regra 8 da própria spec. E a rota passou a
+>   **dizer** que ignorou o campo (`estoque_ignorado`), porque ignorar em
+>   silêncio é a armadilha #25 por outra porta;
+> - a **restauração da foto do modo teste** mudou de casa: ela escreve na coluna
+>   sem ser movimento, então mora dentro do domínio (`restaurarFoto`). Deixá-la
+>   no `teste_route.js` obrigaria a varredura a abrir uma exceção, e exceção numa
+>   regra de dono único é o começo do terceiro dono;
+> - eram **oito** escritores, não sete: a varredura achou o `teste_route.js`, que
+>   a primeira versão dela isentava por causa do prefixo `teste_`.
+>
+> Fase 1 é a base das outras duas specs deste pacote
+> (`VENDAS-E-MEDIA.md` e `MESA-DE-CORRECOES.md`), e as duas estão liberadas.
+> **Uma decisão em aberto, agora da fase 2:** o que fazer quando só há uma pessoa
+> com `contagem.aprovar` no dia (§6.4). Padrão proposto até o dono decidir:
+> **espera**.
 >
 > ⚠️ **Divergência com o código, anotada em 21/09/2026** (regra 3 da §13 do
 > `CLAUDE.md`: onde a spec e ele divergirem, vale ele). A linha *"cadastro de SKU
@@ -13,9 +42,12 @@
 > impossível é recusado em vez de clampado (`CLAUDE.md` §6, armadilha #25). O que
 > continua verdadeiro, e é o que a fase 1 fecha, é que **o upsert ainda grava
 > `estoque`** (`sku_cad_route.js:146`), com `sku.cadastrar`, sem motivo e sem linha
-> em `ajuste_estoque`. Pelo mesmo motivo, o item (d) do §9 ("dívidas #13, #14 e
-> #15") se refere à parte **"Fica aberto"** de cada uma delas no §14 — as três
-> estão marcadas RESOLVIDO desde 17/09/2026.
+> em `ajuste_estoque` — **e foi isso que a fase 1 fechou em 21/09/2026**, junto
+> com o SKU novo, que passou a nascer sempre com zero. Pelo mesmo motivo, o item
+> (d) do §9 ("dívidas #13, #14 e #15") se referia à parte **"Fica aberto"** de
+> cada uma delas no §14; as três já estavam marcadas RESOLVIDO desde 17/09/2026,
+> e o que sobrava das outras duas não é conserto (a #13 é contagem de
+> prateleira, a #14 espera o refresh nos tablets).
 
 ---
 

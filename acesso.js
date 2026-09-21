@@ -579,7 +579,11 @@ module.exports = function(app, db){
     // produzir do catalogo inteiro; o historico diz quem mexeu no saldo e por
     // que. Ficam com a mesma chave da tela que os mostra ('/' e '@admin'), e
     // nao caindo no '@logado' do fim por omissao.
-    if(eq('/api/estoque/painel') || eq('/api/estoque/ajustes')) return '@admin';
+    /* O extrato vem ANTES da linha de escrita de `/api/estoque` la em cima? Nao
+       precisa: aquela so pega `M !== 'GET'`. Aqui e leitura, e e `@admin` como
+       o resto da aba — quem abre Estoque ve o livro do SKU que esta olhando. */
+    if(eq('/api/estoque/painel') || eq('/api/estoque/ajustes') ||
+       pre('/api/estoque/extrato')) return '@admin';
     if(M !== 'GET' && eq('/api/alvo')) return 'alvo.editar';
     if(M !== 'GET' && eq('/api/producao')) return 'producao.lancar';
     if(M !== 'GET' && pre('/api/planejamento')) return 'planilha.importar';

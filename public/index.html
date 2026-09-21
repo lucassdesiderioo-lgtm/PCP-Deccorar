@@ -1266,13 +1266,16 @@ function renderCad(){
 async function salvar(){
   const codigo=$('#codigo').value.trim();
   if(!codigo){$('#msg').textContent='Informe o código';$('#msg').style.color='#f85149';return;}
-  // preserva estoque/alvo se o SKU já existir
-  const ex=SKUS.find(s=>s.codigo.toUpperCase()===codigo.toUpperCase())||{estoque:0,alvo:0};
+  /* preserva o ALVO se o SKU já existir. O ESTOQUE não vai mais no corpo: desde
+     a fase 1 do livro (21/09/2026) o cadastro não mexe em saldo, e mandar um
+     campo que a rota ignora é o que faz alguém acreditar que ele funciona.
+     Saldo se corrige em Admin → Estoque, com motivo. */
+  const ex=SKUS.find(s=>s.codigo.toUpperCase()===codigo.toUpperCase())||{alvo:0};
   // Campo vazio vai como null, nunca 0: onde não há dado, o SKU tem que aparecer
   // em pendências em vez de gravar uma medida que ninguém conferiu.
   const vazio=v=>{ const t=String(v==null?'':v).trim(); return t===''?null:t; };
   await fetch('/api/skus',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-    codigo,descricao:$('#descricao').value,cor:$('#cor').value,estoque:ex.estoque,alvo:ex.alvo,
+    codigo,descricao:$('#descricao').value,cor:$('#cor').value,alvo:ex.alvo,
     modelo_id:vazio($('#modeloId').value), largura_cm:vazio($('#larguraCm').value),
     altura_cm:vazio($('#alturaCm').value), cor_codigo:vazio($('#corCodigo').value),
     tecido_codigo:vazio($('#tecidoCodigo').value)})});

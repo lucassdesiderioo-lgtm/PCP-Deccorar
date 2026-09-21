@@ -41,6 +41,7 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 const COMPONENTE = require('./componente_dominio');
+const ESTOQUE    = require('./estoque_dominio');
 
 // ── argumentos ──────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
@@ -64,6 +65,7 @@ if(!fs.existsSync(CAMINHO)){
 }
 
 const db = new Database(CAMINHO);
+ESTOQUE.garantirSchema(db);   // o livro de pe antes de mover peca nenhuma
 db.pragma('journal_mode = WAL');
 
 const agora = new Date();
@@ -193,8 +195,20 @@ db.transaction(()=>{
      andar. `estoque=estoque+1` da embalagem vira NULL+1 = NULL, e
      `MAX(0,estoque-1)` da etiqueta tambem — o SKU nunca sobe e nunca desce.
      Zerar normaliza os dois casos de uma vez. */
-  if(FAZ_PECAS)
-    zeradasPecas = db.prepare('UPDATE skus SET estoque=0 WHERE estoque IS NULL OR estoque<>0').run().changes;
+  /* ⚠️ PECA: NUNCA MAIS POR UPDATE — fase 1 do livro (21/09/2026). Era o
+     ultimo `UPDATE skus SET estoque` de script que sobrava, e zerar por fora do
+     dono deixava o livro dizendo um saldo que a coluna ja nao tinha. Cada SKU
+     vira UM movimento de `ajuste` com o delta que zera, e o extrato passa a
+     mostrar a zeragem do inventario como o evento que ela e.
+     O `NULL` nao entra na conta porque a abertura do livro ja o normalizou para
+     zero — e zerar o que ja nao andava nao e movimento de peca nenhuma. */
+  if(FAZ_PECAS) db.prepare('SELECT codigo, estoque FROM skus WHERE COALESCE(estoque,0)<>0').all()
+    .forEach(s=>{
+      ESTOQUE.movimentar(db, {codigo:s.codigo, delta:-(+s.estoque||0), tipo:'ajuste',
+        motivo:'zeragem de inventario', referencia:'zerar_estoque.js ' + DATA,
+        usuario_nome:'zerar_estoque.js'});
+      zeradasPecas++;
+    });
 
   /* Material: NUNCA por UPDATE. movimentar() e o dono unico do saldo e deixa a
      linha em movimento_componente — com --forcar em modo teste o trigger marca

@@ -24,6 +24,7 @@
  * a de peca (ainda) nao.
  */
 const COMPONENTE = require('./componente_dominio');
+const ESTOQUE    = require('./estoque_dominio');
 
 module.exports=function(app,db){
   db.exec("CREATE TABLE IF NOT EXISTS contagem (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, contado_em TEXT DEFAULT (datetime('now','localtime')), sessao TEXT, teste INTEGER DEFAULT 0)");
@@ -139,9 +140,16 @@ module.exports=function(app,db){
     const antes = +linha.estoque || 0;
     const base  = era === null ? antes : era;
     const delta = operacao==='lancar' ? q : r3(q - base);
-    const depois = Math.max(0, antes + delta);
-    if(depois === antes) return 0;
-    db.prepare('UPDATE skus SET estoque=? WHERE codigo=?').run(depois, it.codigo);
+    if(delta === 0) return 0;
+    /* O SALDO PASSA PELO DONO UNICO (fase 1 do livro, 21/09/2026), e o
+       `MAX(0, ...)` saiu junto: contagem que acha menos do que o sistema diz
+       pode, sim, levar o saldo a negativo — e ai o numero esta dizendo a
+       verdade, que e o ponto do livro. */
+    const depois = ESTOQUE.movimentar(db, {codigo:it.codigo, delta, tipo:'inventario',
+      referencia: ctx.sessao ? ('contagem:' + ctx.sessao) : 'contagem',
+      motivo:'Correcao de contagem',
+      usuario_id: ctx.usuario_id || null, usuario_nome: ctx.quem || null,
+      aprovado_por: ctx.contou && ctx.contou !== ctx.quem ? ctx.quem : null}).depois;
     /* ⚠️ E DEIXA RASTRO. `ajuste_estoque` e o unico lugar onde saldo mexido fora
        da operacao deixa marca (§18), e o caminho da PECA nao gravava nada: o de
        material sempre gravou, porque passa pelo componente_dominio (regra 10 do

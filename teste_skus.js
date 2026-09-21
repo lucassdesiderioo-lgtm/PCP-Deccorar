@@ -106,27 +106,38 @@ eq('salvar so a descricao nao apaga o ALVO', sku('BK140140BEGE').alvo, 4);
 eq('a descricao enviada e gravada', sku('BK140140BEGE').descricao, 'Rolô Blackout 1,40 m');
 eq('e a chamada continua respondendo ok', r.body && r.body.ok, true);
 
+/* ⚠️ A PARTIR DAQUI A REGRA MUDOU (fase 1 do livro, 21/09/2026): O CADASTRO
+   NAO MEXE EM SALDO, NEM QUANDO O CAMPO VEM. A #25 fechou a porta do campo
+   AUSENTE apagar o saldo; esta fecha a do campo PRESENTE mexer nele sem motivo
+   e sem auditoria, que era o que ficava aberto na divida 15.
+   Estes casos eram o contrario ate ontem — e e por isso que eles estao aqui
+   com o texto trocado em vez de apagados: o dia em que alguem devolver o
+   `estoque=excluded.estoque` ao upsert, eles reprovam. */
 r = chamar('POST','/api/skus',{codigo:'BK140140BEGE', estoque:9});
 eq('salvar so o estoque nao apaga a DESCRICAO', sku('BK140140BEGE').descricao, 'Rolô Blackout 1,40 m');
 eq('salvar so o estoque nao apaga a COR', sku('BK140140BEGE').cor, 'Bege');
-eq('o estoque enviado e gravado', sku('BK140140BEGE').estoque, 9);
+eq('o estoque enviado NAO e gravado — saldo se move pelo livro', sku('BK140140BEGE').estoque, 7);
+eq('e a rota DIZ que ignorou, em vez de calar', r.body && r.body.estoque_ignorado, true);
+ok('   e o aviso manda pro lugar certo', /Admin → Estoque/.test((r.body&&r.body.aviso)||''),
+   JSON.stringify(r.body));
 eq('e a medida ja migrada continua de pe (o manda() de antes)', sku('BK140140BEGE').largura_cm, 140);
 
-chamar('POST','/api/skus',{codigo:'BK140140BEGE', alvo:12});
-eq('o alvo enviado e gravado', sku('BK140140BEGE').alvo, 12);
-eq('e o estoque nao andou junto', sku('BK140140BEGE').estoque, 9);
+r = chamar('POST','/api/skus',{codigo:'BK140140BEGE', alvo:12});
+eq('o alvo enviado e gravado — alvo nao e saldo', sku('BK140140BEGE').alvo, 12);
+eq('e o estoque nao andou junto', sku('BK140140BEGE').estoque, 7);
+eq('sem o campo, a resposta nao traz aviso nenhum', r.body && r.body.estoque_ignorado, undefined);
 
 chamar('POST','/api/skus',{codigo:'BK140140BEGE', estoque:0});
-eq('ZERO EXPLICITO e decisao, nao ausencia: grava 0', sku('BK140140BEGE').estoque, 0);
-chamar('POST','/api/skus',{codigo:'BK140140BEGE', estoque:6});
+eq('ZERO EXPLICITO tambem nao zera: era a porta mais perigosa das duas',
+   sku('BK140140BEGE').estoque, 7);
 chamar('POST','/api/skus',{codigo:'BK140140BEGE', cor:''});
 eq('cor vazia de proposito apaga a cor (texto, nao saldo)', sku('BK140140BEGE').cor, '');
-eq('e o saldo nao foi junto', sku('BK140140BEGE').estoque, 6);
+eq('e o saldo nao foi junto', sku('BK140140BEGE').estoque, 7);
 
 console.log('\n── 2. numero impossivel e RECUSADO, nunca clampado ──');
 r = chamar('POST','/api/skus',{codigo:'BK140140BEGE', estoque:-1});
 eq('estoque negativo → 400', r.status, 400);
-eq('e o saldo gravado NAO se mexeu', sku('BK140140BEGE').estoque, 6);
+eq('e o saldo gravado NAO se mexeu', sku('BK140140BEGE').estoque, 7);
 ok('o erro diz qual campo', /estoque/.test((r.body&&r.body.erro)||''), JSON.stringify(r.body));
 
 r = chamar('POST','/api/skus',{codigo:'BK140140BEGE', alvo:-2});
@@ -135,22 +146,22 @@ eq('e o alvo gravado NAO se mexeu', sku('BK140140BEGE').alvo, 12);
 
 r = chamar('POST','/api/skus',{codigo:'BK140140BEGE', estoque:'2,5'});
 eq('fracao → 400 (meia persiana nao existe)', r.status, 400);
-eq('o saldo continua o mesmo', sku('BK140140BEGE').estoque, 6);
+eq('o saldo continua o mesmo', sku('BK140140BEGE').estoque, 7);
 
 r = chamar('POST','/api/skus',{codigo:'BK140140BEGE', estoque:'abc'});
 eq('texto que nao e numero → 400', r.status, 400);
 
 r = chamar('POST','/api/skus',{codigo:'BK140140BEGE', estoque:''});
 eq('estoque VAZIO → 400 (vazio nao e zero; para manter, nao mande o campo)', r.status, 400);
-eq('e o saldo continua', sku('BK140140BEGE').estoque, 6);
+eq('e o saldo continua', sku('BK140140BEGE').estoque, 7);
 
 r = chamar('POST','/api/skus',{codigo:'BK140140BEGE', estoque:null});
 eq('estoque null → 400', r.status, 400);
-eq('e o saldo continua', sku('BK140140BEGE').estoque, 6);
+eq('e o saldo continua', sku('BK140140BEGE').estoque, 7);
 
 r = chamar('POST','/api/skus',{codigo:'BK140140BEGE', estoque:'8'});
-eq('numero em texto ("8", como vem de um <input>) → grava 8', sku('BK140140BEGE').estoque, 8);
-eq('e responde ok', r.status, 200);
+eq('numero em texto ("8", como vem de um <input>) passa na validacao', r.status, 200);
+eq('   mas o saldo segue sendo do livro', sku('BK140140BEGE').estoque, 7);
 
 console.log('\n── 3. o SKU novo ──');
 r = chamar('POST','/api/skus',{codigo:'novo1', descricao:'Peça nova'});
@@ -159,7 +170,11 @@ eq('SKU novo sem alvo nasce com 0', sku('NOVO1').alvo, 0);
 eq('codigo normalizado para maiusculas', sku('NOVO1').codigo, 'NOVO1');
 eq('SKU novo sem cor nasce com texto vazio, nunca null', sku('NOVO1').cor, '');
 chamar('POST','/api/skus',{codigo:'NOVO2', estoque:5, alvo:3});
-eq('SKU novo com estoque grava o estoque', sku('NOVO2').estoque, 5);
+/* ⚠️ NEM O SKU NOVO. Nascer com 5 e livro vazio quebraria
+   `SUM(delta) = skus.estoque` na primeira linha — e essa soma e a guarda
+   contra a volta dos sete donos. Peca em prateleira entra pela embalagem ou
+   por um ajuste com motivo, nunca por um campo de cadastro. */
+eq('SKU novo com estoque no corpo NASCE COM ZERO', sku('NOVO2').estoque, 0);
 eq('SKU novo com alvo grava o alvo', sku('NOVO2').alvo, 3);
 
 console.log('\n── 4. o destravamento dos volumes (§6) ──');

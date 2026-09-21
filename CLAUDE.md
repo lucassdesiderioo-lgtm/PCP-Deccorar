@@ -136,12 +136,13 @@ Ordem de produção → REVISÃO → FILA → EMBALAGEM → ESTOQUE → ETIQUETA
 
 ### Onde o estoque entra e sai (LEIA COM ATENÇÃO)
 
-| Evento | Efeito no estoque |
-|---|---|
-| Peça **revisada** | **NENHUM.** Entra na tabela `fila` com `situacao='aguardando'` |
-| Peça **embalada** (com kit conferido) | **+1** — é aqui que vira estoque |
-| **Etiqueta de venda** impressa | **−1** — é aqui que sai |
-| Etiqueta de venda **reimpressa** | **NENHUM** — mesmo volume, mesmo cliente |
+| Evento | Efeito no estoque | Linha no livro (desde 21/09/2026) |
+|---|---|---|
+| Peça **revisada** | **NENHUM.** Entra na tabela `fila` com `situacao='aguardando'` | nenhuma |
+| Peça **embalada** (com kit conferido) | **+1** — é aqui que vira estoque | `embalagem` · `montagem:<id>` |
+| **Etiqueta de venda** impressa | **−1** — é aqui que sai | `etiqueta` · `lote:<id>`, **uma por SKU** da caixa |
+| Etiqueta de venda **reimpressa** | **NENHUM** — mesmo volume, mesmo cliente | nenhuma |
+| Peça **sob medida** | **NENHUM** nos dois lados (§7) | nenhuma |
 
 > ⚠️ **ARMADILHA #1:** Se você ver que `/api/revisao` não mexe no estoque, **está
 > correto**. Não "conserte". A peça revisada ainda não está pronta — falta embalar
@@ -154,6 +155,90 @@ Ordem de produção → REVISÃO → FILA → EMBALAGEM → ESTOQUE → ETIQUETA
 > volume, pro mesmo cliente — a baixa já aconteceu na primeira impressão.
 > Se a reimpressão descontasse, cada papel preso furaria o estoque. Ela só grava
 > `lote.reimpressoes` e `lote.reimpresso_em`, que são história, não saldo.
+
+### O LIVRO DE MOVIMENTOS — `estoque_dominio.js` é o dono único do saldo
+
+**21/09/2026, fase 1 da spec `ESTOQUE-LIVRO-E-CONFERENCIA.md`.** Até aqui o saldo
+da persiana era **um número que sete lugares sobrescreviam**: a embalagem, a
+etiqueta, o ajuste manual, a contagem, o cadastro de SKU, dois scripts e o modo
+teste. Quando ele errava não sobrava rastro de quem mexeu, quando, nem por quê.
+
+```
+movimentar(db, {codigo, delta, tipo, referencia, motivo, usuario, aprovado_por})
+   INSERT em movimento_estoque   +   UPDATE em skus.estoque      ← na MESMA transação
+```
+
+| | |
+|---|---|
+| `delta` | **+1, −1, −2… nunca o saldo.** O saldo é consequência |
+| `tipo` | lista fechada: `abertura` · `embalagem` · `etiqueta` · `inventario` · `ajuste` · `correcao` · `cancelamento` |
+| `referencia` | o que causou: `montagem:12`, `lote:451`, `ajuste manual` |
+| `saldo_depois` | para ler o extrato sem somar tudo |
+
+> **`skus.estoque` continua existindo, como CACHE.** As telas e as contas
+> continuam lendo dele — são dezenas de consultas que somam, filtram e ordenam
+> por saldo. Quem **manda** é o livro, e a régua é `SUM(delta) = skus.estoque`
+> para todo SKU.
+
+> ⚠️ **NENHUMA FUNÇÃO DO DOMÍNIO ABRE TRANSAÇÃO**, e isso é desenho: a embalagem
+> são quatro escritas que entram ou não entram juntas (§4, #26) e a etiqueta de
+> uma caixa de pacote são N baixas que valem como uma (§5, #23). Domínio que
+> abrisse a própria transação tiraria de quem chama a chance de desfazer.
+
+> ⚠️ **O `MAX(0, …)` SAIU DE TODOS OS SETE, E É A MUDANÇA DE REGRA DESTA FASE.**
+> Os sete cortavam o saldo em zero, e com isso apagavam justamente o **sinal** de
+> que alguma peça saiu sem registro — é o passivo da dívida 13 (§5, #27) que
+> ficou invisível por semanas. Hoje o saldo negativo **fica** negativo e vira
+> chip vermelho próprio na aba Estoque, separado do "zerado": misturados, o
+> negativo seria lido como SKU que acabou, que é situação normal e ninguém
+> investiga. Quem impede o negativo na operação normal é a trava da Etiqueta de
+> Venda, que não imprime sem estoque — então negativo que aparecer é verdadeiro.
+
+> ⚠️ **O CADASTRO DE SKU NÃO MEXE MAIS EM SALDO, nem quando o campo vem.** A
+> armadilha #25 fechou a porta do campo **ausente** apagar o saldo; esta fecha a
+> do campo **presente** mexer nele sem motivo e sem auditoria — era o que ficava
+> aberto na dívida 15, e era `REGRA`, não conserto. **Nem o SKU novo**: nascer
+> com 5 e livro vazio quebraria a soma na primeira linha. A rota **diz** que
+> ignorou (`estoque_ignorado`) em vez de calar, e a tela do admin parou de mandar
+> o campo — mandar um campo que a rota ignora é o que faz alguém acreditar que
+> ele funciona.
+
+> ⚠️ **A VIRADA É EVENTO, NÃO ROTINA.** No deploy, cada SKU com saldo diferente
+> de zero ganha **uma** linha `abertura`, marcada em `config.livro_abertura`. Sem
+> a marca ela rodaria a cada boot e o livro passaria a dizer o dobro, o triplo, o
+> quádruplo do saldo — e a soma nunca mais bateria. É a lição da migração de
+> `areas` (§10, #28) por outra porta. `skus.estoque` **NULL** é normalizado para
+> zero na mesma passagem: NULL não é saldo, é o buraco por onde a coluna parava
+> de andar (`estoque+1` vira NULL, e o SKU nunca sobe nem desce).
+
+> ⚠️ **A RESTAURAÇÃO DA FOTO DO MODO TESTE MORA DENTRO DO DOMÍNIO**
+> (`restaurarFoto`), e não no `teste_route.js`. Ela escreve na coluna sem ser um
+> movimento — é o contrário: desfaz movimentos que acabaram de ser apagados. Se
+> ficasse lá fora, o `teste_route` seria o segundo dono, e a varredura precisaria
+> de uma exceção. **Exceção numa regra de dono único é o começo do terceiro
+> dono.** `movimento_estoque` entrou em `TABELAS` (§11) pelo mesmo motivo do
+> `movimento_componente`: sem cobertura, "apagar tudo" devolveria o saldo pela
+> foto e deixaria as linhas de teste de pé descrevendo o que já não existe.
+
+> **O extrato:** `GET /api/estoque/extrato/:codigo` (`@admin`), e o botão na
+> linha da aba Estoque. Ele devolve `soma_livro` e `bate` ao lado do saldo — a
+> mesma conferência que o teste faz, feita na tela com o dado real. Se um dia os
+> dois divergirem, alguém voltou a escrever na coluna por fora, e é aqui que isso
+> aparece primeiro, sem ninguém procurar.
+
+> **Rode `node teste_livro.js` ao mexer no `estoque_dominio.js` ou em qualquer
+> coisa que mova saldo** — os 60 casos vão do domínio isolado até o **fluxo
+> real** (embalar, imprimir, caixa de pacote, segunda impressão, sob medida,
+> modo teste apagar e manter), exigindo `SUM(delta) = skus.estoque` depois de
+> cada passo. E a **varredura** recusa `UPDATE skus SET estoque` — e o upsert
+> `estoque=excluded.estoque` — fora do `estoque_dominio.js`. Sem ela a arrumação
+> dura até o próximo módulo, porque módulo novo se escreve copiando o de cima.
+>
+> ⚠️ Ela **isenta os `teste_*.js`** (ali o `UPDATE` é montagem de cenário, não
+> escrita de produção) — **menos o `teste_route.js`, que não é teste**: é o
+> módulo do modo teste, que só tem o nome parecido, e é um dono de verdade da
+> coluna. Foi a própria varredura que achou essa isenção errada no dia em que
+> foi escrita.
 
 > ⚠️ **ARMADILHA #2:** `POST /api/revisao` ainda **retorna** os campos `estoque`,
 > `pedido` e `feito` no JSON. Isso é **resquício** da versão antiga (quando a
@@ -2546,12 +2631,12 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (62), `teste_contagem.js` (32), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (104), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (60), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (62), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (104), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
 | 14 | ~~**`POST /api/montagem` (a embalagem) sem proteção**~~ **RESOLVIDO em 17/09/2026** — transação nas quatro escritas, SKU conferido (404), kit conferido no servidor e recusa aparecendo na tela; `teste_montagem.js` (42 casos). Ver §4, armadilha #26. **Fica aberto**: o código do kit é conferido quando vem, não exigido — exigir espera o refresh nos tablets. "Embalar sem revisar gera estoque" **não** entrou: é regra do §4, não defeito | — |
-| 15 | ~~**`POST /api/skus` zera o estoque** quando o corpo não traz `estoque`~~ **RESOLVIDO em 17/09/2026** — campo ausente preserva os quatro campos soltos, número impossível é recusado (400) em vez de clampado, e as duas escritas viraram uma transação com o `catch` vazio fora. A rota saiu para `sku_cad_route.js` e tem `teste_skus.js` (60 casos) atrás — ver §6, armadilha #25. **Fica aberto**: a rota ainda muda saldo com `sku.cadastrar`, sem motivo e sem auditoria (fechar isso é `REGRA`) | — |
+| 15 | ~~**`POST /api/skus` zera o estoque** quando o corpo não traz `estoque`~~ **RESOLVIDO em 17/09/2026** — campo ausente preserva os quatro campos soltos, número impossível é recusado (400) em vez de clampado, e as duas escritas viraram uma transação com o `catch` vazio fora. A rota saiu para `sku_cad_route.js` e tem `teste_skus.js` (60 casos) atrás — ver §6, armadilha #25. ~~**Fica aberto**: a rota ainda muda saldo com `sku.cadastrar`~~ **FECHADO em 21/09/2026** na fase 1 do livro: o cadastro não mexe em saldo, nem com o campo presente, nem no SKU novo — e a rota diz que ignorou (§2, o livro) | — |
 | 16 | ~~**Acesso: default `@logado` e cobertura mantida à mão**~~ **RESOLVIDO em 17/09/2026** — o padrão passou a ser **negar**, a cobertura varre o Express (a lista `TODAS_ROTAS` saiu) e o boot grita o nome da rota não declarada; as 28 leituras sem dono foram declaradas e as telas `.html` gêmeas herdaram a permissão da tela. Ver §10, armadilha #29 · `teste_cobertura.js` | — |
 | 17 | ~~**Acesso: duas travas faltando**~~ **RESOLVIDO em 17/09/2026** — a exceção recusa conceder chave `intransferivel`, a troca de setores tem a trava do último Admin Geral (mesma conta do `auth.js`, agora no `acesso.js`), setor novo não nasce `admin_geral` e a migração de `areas` virou evento de uma vez só (a porta A, que promovia a Admin Geral em silêncio). Ver §10, armadilha #28 | — |
 | 18 | **Nada acusa uma regra INERTE.** `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
@@ -2582,6 +2667,26 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Amarrar a conferência ao rastro do ajuste: a contagem que **bateu** não gera
   linha nenhuma, e é justamente o SKU cujo saldo estava certo que apareceria
   como nunca conferido (§18, armadilha #32)
+- ❌ Escrever em `skus.estoque` fora do `estoque_dominio.js` — o saldo tinha
+  SETE donos e por isso não se reconstruía; há varredura recusando (§2, o livro)
+- ❌ Devolver o `MAX(0, …)` a qualquer escrita de saldo: ele apaga justamente o
+  sinal de peça que saiu sem registro, que é o passivo da dívida 13 (§2)
+- ❌ Misturar saldo negativo com "zerado" na aba Estoque: zerado é SKU que
+  acabou, e ninguém investiga o normal (§2, o livro)
+- ❌ Abrir transação dentro do `estoque_dominio`: a embalagem são quatro
+  escritas e a caixa de pacote são N baixas que valem como uma (§2)
+- ❌ Fazer o cadastro de SKU gravar saldo de novo — nem com o campo presente,
+  nem no SKU novo: livro vazio com coluna em 5 quebra a soma na 1ª linha (§2)
+- ❌ Ignorar em silêncio um campo que o chamador mandou: a rota DIZ que ignorou
+  o `estoque`, senão ele acredita que gravou e descobre no inventário (§2, §6)
+- ❌ Deixar a abertura do livro virar rotina: sem a marca em `config` ela roda a
+  cada boot e o livro passa a dizer o dobro do saldo (§2)
+- ❌ Mover a restauração da foto do modo teste para fora do domínio — exceção
+  numa regra de dono único é o começo do terceiro dono (§2, §11)
+- ❌ Tirar `movimento_estoque` de `TABELAS`: "apagar tudo" devolveria o saldo
+  pela foto e deixaria as linhas de teste descrevendo o que não existe (§11)
+- ❌ Isentar o `teste_route.js` de uma varredura por causa do prefixo: ele NÃO é
+  teste, é o módulo do modo teste, e é dono de verdade da coluna (§2)
 - ❌ Fazer a revisão somar estoque "porque parece que falta"
 - ❌ Fazer a reimpressão baixar estoque "porque imprimiu de novo"
 - ❌ Multiplicar volume por "quantidade" em qualquer lugar — uma venda é uma
