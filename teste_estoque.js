@@ -98,12 +98,20 @@ const rotas = {};
 const app = {
   get:(p, ...h)=>{ rotas['GET '+p]  = h[h.length-1]; },
   post:(p, ...h)=>{ rotas['POST '+p] = h[h.length-1]; },
+  delete:(p, ...h)=>{ rotas['DELETE '+p] = h[h.length-1]; },
   use:()=>{}, locals:{}
 };
 require('./plan_route')(app, db);    // cria venda_futura, fechamento e config
 require('./est_route')(app, db);
 require('./painel_route')(app, db);  // a TV do chao de fabrica
 require('./ger_route')(app, db);     // o gerencial
+/* A CONTAGEM ENTRA AQUI, e nao num teste so dela: a idade da conferencia e uma
+   pergunta que atravessa os dois modulos — quem conta e o `cont_route`, quem
+   mostra e o `est_route`. Testar cada um com a sua regua e o que deixou o
+   defeito de pe: o teste semeava `contagem` na mao e nunca passava pelo fluxo
+   que apaga essa tabela. */
+require('./cont_route')(app, db);
+try{ db.exec('ALTER TABLE contagem_pendente ADD COLUMN teste INTEGER DEFAULT 0'); }catch(e){}
 
 // --- vendas: a janela (media) e o comprometido (envio futuro) ---
 const vf = db.prepare("INSERT INTO venda_futura (venda_id,codigo,data_venda,data_envio) VALUES (?,?,?,?)");
@@ -160,7 +168,9 @@ const chamar = (k, body, usuario) => new Promise(r => {
    mentira e responde pela permissao que o caso quer testar. */
 let PERMITE_CUSTO = false;
 app.locals.acesso = {
-  podePermissao: (u, chave) => chave==='custo.ver' ? (PERMITE_CUSTO && !!u) : !!u,
+  podePermissao: (u, chave) => chave==='custo.ver' ? (PERMITE_CUSTO && !!u)
+                             : chave==='contagem.ajustar' ? false   // conta, mas nao aprova
+                             : !!u,
   auditar: () => {}
 };
 
@@ -279,6 +289,42 @@ const ok = (n, c, extra) => { casos++;
      !Object.keys(por).some(c => c === 'TUBO 32MM'));
   ok('o resumo conta quantos nunca passaram por contagem', p.resumo.nunca_contados === 4,
      'veio ' + p.resumo.nunca_contados);
+
+  // ── 10-B. A IDADE TEM QUE SOBREVIVER AO FLUXO REAL (fase 0, 21/09/2026) ───
+  /* O defeito: a idade lia a tabela `contagem`, que e RASCUNHO — o `enfileirar`
+     apaga a sessao assim que a contagem fecha e o dado passa a viver em
+     `contagem_pendente`. Contou, mandou pra aprovacao, e o SKU voltava a
+     aparecer como "nunca conferido". Os casos de cima nao pegavam isso porque
+     semeavam `contagem` na mao e nunca fechavam a contagem.
+
+     Contamos 7 com 7 no sistema: BATEU. E e de proposito — a contagem que bate
+     e a que mais some, porque nao mexe no saldo e nao deixa linha em
+     `ajuste_estoque`. Ainda assim alguem olhou a prateleira, e a data e a
+     unica coisa que prova isso. */
+  const usuario = {id:9, nome:'Joao'};
+  for(let i=0;i<7;i++) await chamar('POST /api/contagem/bipe', {codigo:'BK160160CINZA', sessao:'inv1'}, usuario);
+  await chamar('POST /api/contagem/ajustar', {sessao:'inv1', codigos:['BK160160CINZA']}, usuario);
+  ok('o fluxo real apagou a tabela de rascunho',
+     db.prepare("SELECT COUNT(*) n FROM contagem WHERE sessao='inv1'").get().n === 0);
+  const pend = db.prepare("SELECT id FROM contagem_pendente WHERE codigo='BK160160CINZA' AND aprovado=0").all();
+  ok('e deixou a contagem esperando aprovacao', pend.length === 1);
+
+  const meio = await chamar('GET /api/estoque/painel');
+  const meioPor = {}; meio.linhas.forEach(l => meioPor[l.codigo] = l);
+  ok('enquanto ninguém aprovou, o saldo ainda não foi conferido',
+     meioPor.BK160160CINZA.contado_em === null, 'veio ' + meioPor.BK160160CINZA.contado_em);
+
+  await chamar('POST /api/contagem/pendentes/aprovar', {ids:[pend[0].id]}, {id:1, nome:'Ana'});
+  const depois = await chamar('GET /api/estoque/painel');
+  const depPor = {}; depois.linhas.forEach(l => depPor[l.codigo] = l);
+  ok('depois de aprovada, a idade da conferência EXISTE — era aqui que ela mentia',
+     depPor.BK160160CINZA.contado_em !== null && depPor.BK160160CINZA.contado_ha === 0,
+     'contado_em=' + depPor.BK160160CINZA.contado_em + ' ha=' + depPor.BK160160CINZA.contado_ha);
+  ok('contagem que BATEU não mexe no saldo e mesmo assim conta como conferência',
+     db.prepare("SELECT estoque FROM skus WHERE codigo='BK160160CINZA'").get().estoque === 7 &&
+     db.prepare("SELECT COUNT(*) n FROM ajuste_estoque WHERE codigo='BK160160CINZA'").get().n === 0);
+  ok('e o resumo passa a contar um "nunca conferido" a menos',
+     depois.resumo.nunca_contados === 3, 'veio ' + depois.resumo.nunca_contados);
 
   // ── 11. O QUE O BOTAO "APLICAR ALVO" RESOLVE, E O QUE NAO ────────────────
   ok('defasado COM venda na janela é aplicável', por.BK140140BEGE.alvo_aplicavel === true);

@@ -130,13 +130,39 @@ module.exports = function(app, db){
        e nao se reconstroi (§14), entao o inventario e o unico momento em que a
        coluna volta a bater com a prateleira. O try/catch cobre banco antigo,
        anterior a coluna `tipo` — sem ele a aba inteira cairia por causa de uma
-       informacao de apoio. */
+       informacao de apoio.
+
+       ⚠️ ISTO LIA SO A `contagem`, QUE E RASCUNHO (fase 0 da spec
+       ESTOQUE-LIVRO-E-CONFERENCIA, 21/09/2026). O `enfileirar` do cont_route
+       apaga a sessao assim que a contagem fecha — o dado passa a viver em
+       `contagem_pendente`. Resultado: contou, mandou pra aprovacao, e o SKU
+       voltava a aparecer aqui como "nunca conferido". A idade e exatamente o
+       numero que diz se dá para confiar no saldo; ela mentia para baixo, que e
+       o lado seguro de cobrar conferencia a mais — mas tambem o lado que faz a
+       equipe parar de ler a coluna.
+
+       SAO DUAS FONTES, E NAO UMA TROCA, de proposito: `contagem_pendente` so
+       existe desde que a aprovacao em duas pessoas entrou, e o caminho direto
+       so passou a gravar la hoje. Trocar apagaria a historia de quem foi
+       contado antes disso — a idade so pode ficar mais completa, nunca menos.
+
+       `aprovado=1` e a regra: contagem esperando aprovacao ainda NAO acertou o
+       saldo, entao ela nao conferiu nada. E a data e a de quando se CONTOU
+       (`criado_em`), nunca a da aprovacao: quem olhou a prateleira olhou
+       naquele dia, e uma aprovacao que demora duas semanas nao rejuvenesce a
+       conferencia. */
     const contagem = {};
     try{
-      db.prepare(`SELECT UPPER(codigo) c, MAX(contado_em) em,
-          CAST(julianday('now','localtime') - julianday(MAX(contado_em)) AS INTEGER) dias
-        FROM contagem
-        WHERE COALESCE(tipo,'sku')='sku' AND COALESCE(teste,0)=0
+      db.prepare(`SELECT UPPER(codigo) c, MAX(em) em,
+          CAST(julianday('now','localtime') - julianday(MAX(em)) AS INTEGER) dias
+        FROM (
+          SELECT codigo, contado_em em FROM contagem
+           WHERE COALESCE(tipo,'sku')='sku' AND COALESCE(teste,0)=0
+          UNION ALL
+          SELECT codigo, criado_em em FROM contagem_pendente
+           WHERE COALESCE(tipo,'sku')='sku' AND COALESCE(teste,0)=0 AND aprovado=1
+        )
+        WHERE em IS NOT NULL
         GROUP BY UPPER(codigo)`).all()
         .forEach(r => contagem[r.c] = r);
     }catch(e){}

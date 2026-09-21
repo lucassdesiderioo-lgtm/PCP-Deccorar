@@ -103,22 +103,76 @@ module.exports=function(app,db){
 
   /* Aplica o resultado de uma contagem ao estoque. UNICO lugar do modulo que
      escreve estoque — tanto o caminho direto quanto a aprovacao do pendente
-     passam por aqui, senao as duas regras divergiriam no primeiro ajuste. */
+     passam por aqui, senao as duas regras divergiriam no primeiro ajuste.
+
+     ⚠️ A CONTA E A DIFERENCA, NUNCA O NUMERO CONTADO (fase 0 da spec
+     ESTOQUE-LIVRO-E-CONFERENCIA, 21/09/2026). Contar e aprovar sao dois
+     momentos, e entre eles a fabrica NAO para: embala e imprime etiqueta. A
+     aprovacao fazia `estoque := contado` e apagava tudo que andou no meio —
+     contou 8 com 10 no sistema, embalou 2 esperando o admin, e a aprovacao
+     gravava 8. As duas peças embaladas sumiam do saldo, sem erro e sem aviso.
+
+     `contexto.sistemaEra` e o SALDO GUARDADO: o que o sistema dizia na hora em
+     que a pessoa terminou de contar. A diferenca que a contagem achou e
+     `contado - sistemaEra`, e ela se aplica sobre o saldo de AGORA.
+
+     Sem `sistemaEra` (caminho direto, em que contar e aplicar sao o mesmo
+     instante) a base e o saldo de agora — e ai o resultado E o numero contado,
+     como sempre foi. Por isso isto e conserto, e nao conta nova. */
   function aplicar(it, operacao, quantidade, contexto){
     const q = r3(quantidade);
+    const ctx = contexto || {};
+    const era = (ctx.sistemaEra === undefined || ctx.sistemaEra === null) ? null : r3(ctx.sistemaEra);
     if(it.tipo==='componente'){
       const atual = r3(COMPONENTE.saldo(db, it.componente_id).estoque);
-      const delta = operacao==='lancar' ? q : r3(q - atual);
+      const base  = era === null ? atual : era;
+      const delta = operacao==='lancar' ? q : r3(q - base);
       // Substituir por um numero igual ao que ja esta la nao e movimento nenhum;
       // gravar linha de delta zero so sujaria o extrato do material.
       if(delta === 0) return 0;
       COMPONENTE.movimentar(db, {componente_id:it.componente_id, delta, motivo:'contagem',
-        referencia:(contexto&&contexto.sessao)||null, usuario_nome:(contexto&&contexto.quem)||null});
+        referencia:ctx.sessao||null, usuario_nome:ctx.quem||null});
       return delta;
     }
-    if(operacao==='lancar') db.prepare('UPDATE skus SET estoque=MAX(0,estoque+?) WHERE codigo=?').run(q, it.codigo);
-    else                    db.prepare('UPDATE skus SET estoque=? WHERE codigo=?').run(Math.max(0,q), it.codigo);
-    return q;
+    const linha = db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(it.codigo);
+    if(!linha) return 0;                       // SKU sumiu no meio da contagem
+    const antes = +linha.estoque || 0;
+    const base  = era === null ? antes : era;
+    const delta = operacao==='lancar' ? q : r3(q - base);
+    const depois = Math.max(0, antes + delta);
+    if(depois === antes) return 0;
+    db.prepare('UPDATE skus SET estoque=? WHERE codigo=?').run(depois, it.codigo);
+    /* ⚠️ E DEIXA RASTRO. `ajuste_estoque` e o unico lugar onde saldo mexido fora
+       da operacao deixa marca (§18), e o caminho da PECA nao gravava nada: o de
+       material sempre gravou, porque passa pelo componente_dominio (regra 10 do
+       §13). A contagem era a metade sem auditoria — e e justamente ela que
+       existe para consertar o numero. */
+    db.prepare(`INSERT INTO ajuste_estoque (codigo,antes,depois,delta,motivo,obs,usuario_id,usuario_nome)
+      VALUES (?,?,?,?,?,?,?,?)`).run(it.codigo, antes, depois, depois-antes,
+        'Correcao de contagem',
+        (operacao==='lancar' ? 'lancamento' : 'contagem') +
+          (ctx.sessao ? ' ' + ctx.sessao : '') + ' · contado ' + q +
+          (era === null ? '' : ' · sistema dizia ' + era) +
+          (ctx.contou ? ' · contou: ' + ctx.contou : ''),
+        ctx.usuario_id || null, ctx.quem || '');
+    return depois - antes;
+  }
+
+  /* O REGISTRO DE QUE ESTE SKU FOI CONFERIDO — e de quando.
+     `contagem` e rascunho: o `enfileirar` e o `lancar` apagam a sessao assim que
+     a contagem fecha. Quem sobrevive e `contagem_pendente`. So que ate aqui o
+     caminho DIRETO (quem tem contagem.ajustar) nao passava por la, entao metade
+     das contagens nao deixava data nenhuma — e a aba Estoque, que lia a idade da
+     conferencia de `contagem`, mostrava um numero que ja tinha sido apagado.
+     Aqui a linha nasce ja aprovada: nao ha segunda pessoa a esperar. */
+  function registrarDireto(req, sessao, it, operacao, contado, sistemaEra){
+    const quem = (req.usuario && req.usuario.nome) || '';
+    db.prepare(`INSERT INTO contagem_pendente
+        (sessao,codigo,contado,sistema_era,operacao,contado_por,tipo,componente_id,
+         aprovado,aprovado_por,aprovado_em)
+      VALUES (?,?,?,?,?,?,?,?,1,?,datetime('now','localtime'))`)
+      .run(sessao, rotulo(it), contado, sistemaEra, operacao, quem,
+           it.tipo, it.componente_id||null, quem);
   }
 
   // enfileira o ajuste para aprovacao posterior; captura a contagem e o estoque
@@ -204,7 +258,11 @@ module.exports=function(app,db){
       ids.forEach(id=>{
         const p=get.get(id); if(!p) return;
         const it={tipo:p.tipo, codigo:p.codigo, componente_id:p.componente_id};
-        aplicar(it, p.operacao, p.contado, {sessao:p.sessao, quem});
+        /* `sistemaEra` e o saldo de quando a pessoa terminou de contar. Sem ele
+           a aprovacao apagaria o que a fabrica fez enquanto esperava. */
+        aplicar(it, p.operacao, p.contado, {sessao:p.sessao, quem,
+          usuario_id:(req.usuario&&req.usuario.id)||null,
+          sistemaEra:p.sistema_era, contou:p.contado_por});
         mark.run(quem,id); n++;
         auditar(req,'contagem_aprovada',rotulo(it),p.operacao+' contado='+p.contado+' (contou: '+p.contado_por+')');
       });
@@ -281,7 +339,12 @@ module.exports=function(app,db){
     db.transaction(()=>{
       itens.forEach(it=>{
         const q=contadoNaSessao(ses,it);
-        aplicar(it,'ajustar',q,{sessao:ses,quem}); n++;
+        /* Contar e aplicar sao o mesmo instante aqui: o saldo guardado E o de
+           agora, e por isso ele nao e passado. O registro guarda esse numero
+           para a idade da conferencia e para o extrato. */
+        const era=sistemaAgora(it);
+        aplicar(it,'ajustar',q,{sessao:ses,quem,usuario_id:(req.usuario&&req.usuario.id)||null,contou:quem}); n++;
+        registrarDireto(req,ses,it,'ajustar',q,era);
         auditar(req,'contagem_ajuste',rotulo(it),'substitui -> '+q);
       });
     })();
@@ -303,7 +366,9 @@ module.exports=function(app,db){
     db.transaction(()=>{
       itens.forEach(it=>{
         const q=contadoNaSessao(ses,it);
-        aplicar(it,'lancar',q,{sessao:ses,quem}); n++;
+        const era=sistemaAgora(it);
+        aplicar(it,'lancar',q,{sessao:ses,quem,usuario_id:(req.usuario&&req.usuario.id)||null,contou:quem}); n++;
+        registrarDireto(req,ses,it,'lancar',q,era);
         auditar(req,'contagem_lancamento',rotulo(it),'soma +'+q);
       });
       db.prepare('DELETE FROM contagem WHERE sessao=?').run(ses);
