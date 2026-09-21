@@ -1,3 +1,4 @@
+const ESTOQUE=require('./estoque_dominio');
 module.exports=function(app, db){
   db.exec("CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT)");
 
@@ -28,7 +29,13 @@ module.exports=function(app, db){
     // A contagem de material mexe em componente.estoque, e todo movimento deixa
     // linha aqui (regra 10). Sem esta cobertura, "apagar tudo" apagaria a
     // contagem de teste e deixaria o estoque de materia prima mexido.
-    {nome:'movimento_componente', pk:'id', rotulo:'movimento de material'}
+    {nome:'movimento_componente', pk:'id', rotulo:'movimento de material'},
+    /* O LIVRO DA PERSIANA (fase 1, 21/09/2026). Mesma razao do
+       movimento_componente logo acima: "apagar tudo" restaura o saldo pela
+       foto, e sem esta cobertura as linhas de teste ficariam de pe descrevendo
+       movimentos que o saldo ja nao tem — e a soma do livro, que e a guarda
+       contra a volta dos sete donos, pararia de bater no dia seguinte. */
+    {nome:'movimento_estoque',    pk:'id', rotulo:'livro do estoque'}
   ];
 
   // Fase 3: foto_estoque saiu da cobertura; limpa o trigger antigo em bancos
@@ -98,8 +105,11 @@ module.exports=function(app, db){
       COBERTAS.forEach(function(t){
         try{ apagados[t.nome]=db.prepare('DELETE FROM '+t.nome+' WHERE teste=1').run().changes; }catch(e){ apagados[t.nome]=0; }
       });
-      var up=db.prepare('UPDATE skus SET estoque=?, alvo=? WHERE codigo=?');
-      snap.forEach(function(s){ up.run(s.estoque,s.alvo,s.codigo); });
+      /* A foto volta pelo DONO UNICO da coluna (fase 1 do livro). Ela nao gera
+         movimento: as linhas de teste acabaram de ser apagadas ali em cima, e
+         gravar um movimento de "volta" faria o livro contar uma historia que
+         nao aconteceu. */
+      ESTOQUE.restaurarFoto(db, snap);
       try{
         var upc=db.prepare('UPDATE componente SET estoque=?, custo_medio=? WHERE id=?');
         snapC.forEach(function(c){ upc.run(c.estoque,c.custo_medio,c.id); });

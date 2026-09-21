@@ -1,5 +1,6 @@
 const {VENCE_HOJE,ORDEM_URGENCIA}=require('./fila_dia');
 const {ehColeta,COLETA,AGENCIA}=require('./carga');
+const ESTOQUE=require('./estoque_dominio');
 module.exports=function(app,db){
   app.get('/api/proximo/:sku',(req,res)=>{
     const sku=(req.params.sku||'').trim().toUpperCase();
@@ -210,8 +211,15 @@ module.exports=function(app,db){
           : 'Sem estoque desse SKU.'});
     db.transaction(()=>{
       db.prepare("UPDATE lote SET estagio='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(id);
-      const baixa=db.prepare('UPDATE skus SET estoque=MAX(0,estoque-?) WHERE codigo=?');
-      for(const l of linhas) if(!l.sob_medida) baixa.run(l.qtd,l.codigo);
+      /* UMA LINHA DE LIVRO POR SKU DA CAIXA, com a mesma referencia do volume
+         (spec §3.3.4). Numa caixa de pacote sao N baixas que valem como uma: a
+         transacao e de quem chama, e o `estoque_dominio` nao abre a dele.
+         O `MAX(0, ...)` SAIU (§3.3.1): o corte apagava o sinal de peca que saiu
+         sem registro. Quem impede o negativo aqui e a trava de estoque logo
+         acima, que ja recusou o que nao tem na prateleira. */
+      for(const l of linhas) if(!l.sob_medida)
+        ESTOQUE.movimentar(db,{codigo:l.codigo, delta:-l.qtd, tipo:'etiqueta',
+          referencia:'lote:'+id, usuario:req.usuario});
     })();
     const e=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(o.codigo);
     /* Depois de imprimir, a tela diz pra onde a caixa vai. Sai daqui, e nao

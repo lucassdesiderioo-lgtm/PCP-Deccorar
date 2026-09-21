@@ -4,6 +4,7 @@
    em que uma das duas mudasse. Mesmo arranjo do `public/barras.js` e do
    `public/kit_etiqueta.js`. */
 const KIT_BIPE = require('./public/kit_bipe.js');
+const ESTOQUE  = require('./estoque_dominio');
 module.exports=function(app,db){
   db.exec("CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT);");
   // Le uma chave do `config`. null = a chave NAO EXISTE (diferente de gravada
@@ -254,11 +255,16 @@ module.exports=function(app,db){
     let naFila=false, modo='estoque', abatido=false;
     try{
       db.transaction(()=>{
-        db.prepare("INSERT INTO montagem (codigo,inicio,fim,segundos,kit_ok) VALUES (?,?,?,?,1)")
-          .run(cod,inicio,fim,Math.round(+segundos||0));
+        const mid=db.prepare("INSERT INTO montagem (codigo,inicio,fim,segundos,kit_ok) VALUES (?,?,?,?,1)")
+          .run(cod,inicio,fim,Math.round(+segundos||0)).lastInsertRowid;
         const f=db.prepare("SELECT id,modo FROM fila WHERE codigo=? AND situacao='aguardando' AND COALESCE(teste,0)=? ORDER BY id LIMIT 1").get(cod,emTeste);
         if(f){ db.prepare("UPDATE fila SET situacao='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(f.id); naFila=true; modo=f.modo; }
-        db.prepare('UPDATE skus SET estoque=estoque+1 WHERE codigo=?').run(cod);
+        /* A PORTA DE ENTRADA DO ESTOQUE, e ela passa pelo dono unico desde a
+           fase 1 do livro (21/09/2026). A referencia e a linha de `montagem`:
+           daqui a um mes, o extrato do SKU responde QUAL embalagem somou esta
+           peca, com a hora e o tempo de bancada ao lado. */
+        ESTOQUE.movimentar(db,{codigo:cod, delta:+1, tipo:'embalagem',
+          referencia:'montagem:'+mid, usuario:req.usuario});
         if(modo==='hoje'){
           const r=db.prepare("SELECT id FROM producao WHERE codigo=? AND data=date('now','localtime') AND produzido<qtd ORDER BY id LIMIT 1").get(cod);
           if(r){ db.prepare('UPDATE producao SET produzido=produzido+1 WHERE id=?').run(r.id); abatido=true; }

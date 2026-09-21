@@ -45,6 +45,8 @@ const QUEM=process.env.PCP_QUEM||'backfill_pacote';
 
 (async()=>{
 const db=new Database(DB);
+const ESTOQUE=require('./estoque_dominio');
+ESTOQUE.garantirSchema(db);
 
 /* A tabela nasce no exp_route, que nao roda aqui. Num servidor que ja subiu o
    deploy ela existe; este CREATE e para o caso de alguem rodar o script antes
@@ -197,7 +199,6 @@ const insItem=db.prepare(`INSERT INTO lote_item (lote_id,codigo,qtd,cor,descrica
   VALUES (?,?,?,?,?,'folha')`);
 const insAj=db.prepare(`INSERT INTO ajuste_estoque (codigo,antes,depois,delta,motivo,obs,usuario_nome)
   VALUES (?,?,?,?,?,?,?)`);
-const upEst=db.prepare('UPDATE skus SET estoque=MAX(0,estoque-?) WHERE codigo=?');
 
 let itens=0, ajustes=0;
 db.transaction(()=>{
@@ -207,7 +208,7 @@ db.transaction(()=>{
   }
   if(BAIXAR) for(const x of baixaveis){
     const e=estoqueDe.get(x.sku); if(!e) continue;
-    const antes=+e.estoque||0, depois=Math.max(0,antes-x.qtd);
+    const antes=+e.estoque||0, depois=antes-x.qtd;
     /* O MOTIVO CONTA A HISTORIA INTEIRA, porque daqui a um mes ninguem lembra:
        de qual volume, de qual cliente, e por que o saldo andou sem venda. */
     insAj.run(x.sku, antes, depois, depois-antes,
@@ -215,7 +216,10 @@ db.transaction(()=>{
       'volume #'+x.p.v.id+' · NF '+(x.p.v.nf||'—')+' · '+(x.p.v.buyer||'')
         +' · a etiqueta ja tinha saido baixando so '+(x.p.v.codigo||'')+', e esta peca foi junto na caixa',
       QUEM);
-    upEst.run(x.qtd,x.sku);
+    ESTOQUE.movimentar(db,{codigo:x.sku, delta:-x.qtd, tipo:'ajuste',
+      referencia:'lote:'+x.p.v.id,
+      motivo:'pacote do ML — peca a mais na mesma etiqueta (§5, #23)',
+      usuario_nome:QUEM});
     ajustes++;
   }
 })();

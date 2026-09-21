@@ -66,4 +66,11 @@ require('./sku_schema').garantirSchema(db);
    do SKU. Depois do sku_schema porque `oferta.sku` referencia `skus`. */
 require('./compras_schema').garantirSchemaCompras(db);
 
+/* O LIVRO DE MOVIMENTOS DA PERSIANA (fase 1 da spec ESTOQUE-LIVRO-E-CONFERENCIA,
+   21/09/2026). Fica AQUI, e depois do `skus`, por dois motivos: a abertura le a
+   coluna `estoque`, e todo script que faz `require('./db')` precisa do livro de
+   pe antes de mover uma peca. A abertura e evento de uma vez so, marcada em
+   `config.livro_abertura`. */
+require('./estoque_dominio').garantirSchema(db);
+
 module.exports = db;

@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const db = require('./db');
+const ESTOQUE = require('./estoque_dominio');
 const app = express();
 const PORT = 3010;
 app.use(express.json({limit:'25mb'}));
@@ -55,14 +56,22 @@ app.post('/api/estoque',(req,res)=>{
   const linha=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(codigo);
   if(!linha) return res.status(404).json({erro:'SKU nao cadastrado: '+codigo});
   const antes=+linha.estoque||0;
+  /* O `MAX(0, ...)` SAIU na fase 1 do livro (21/09/2026). Ele fazia o ajuste
+     mentir em silencio: pedir -5 num saldo de 3 gravava 0 e a linha de
+     auditoria dizia "-3", entao nem o rastro contava o que foi pedido. Hoje o
+     numero pedido e o numero aplicado, e saldo negativo acende alerta em vez
+     de sumir. */
   const depois = (delta!==undefined)
-    ? Math.max(0, antes + Math.trunc(+delta||0))
-    : Math.max(0, Math.trunc(+estoque||0));
+    ? antes + Math.trunc(+delta||0)
+    : Math.trunc(+estoque||0);
   if(depois===antes) return res.json({ok:true,estoque:antes,sem_mudanca:true});
 
   const u=req.usuario||{};
   db.transaction(()=>{
-    db.prepare('UPDATE skus SET estoque=? WHERE codigo=?').run(depois,codigo);
+    /* O saldo passa pelo dono unico; `ajuste_estoque` continua guardando o
+       MOTIVO, que e o que o livro nao pergunta. */
+    ESTOQUE.movimentar(db,{codigo, delta:depois-antes, tipo:'ajuste',
+      referencia:'ajuste manual', motivo:mot, usuario:u});
     db.prepare(`INSERT INTO ajuste_estoque (codigo,antes,depois,delta,motivo,obs,usuario_id,usuario_nome)
       VALUES (?,?,?,?,?,?,?,?)`).run(codigo,antes,depois,depois-antes,mot,
         String(obs||'').trim()||null,u.id||null,u.nome||'');

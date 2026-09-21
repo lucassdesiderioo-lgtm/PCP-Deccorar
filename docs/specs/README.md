@@ -22,10 +22,13 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 3. **Onde a spec e o `CLAUDE.md` divergirem, vale o `CLAUDE.md`** — ele descreve o
    que está em produção. A divergência é anotada no status da spec.
 
-## Índice — situação em 18/09/2026
+## Índice — situação em 21/09/2026
 
 | Spec | Status |
 |---|---|
+| `ESTOQUE-LIVRO-E-CONFERENCIA.md` | **Em construção** · fase 0 e fase 1 em código (21/09) · fases 2–4 planejadas · uma decisão em aberto (§6.4) |
+| `VENDAS-E-MEDIA.md` | Planejado · nada no código · a troca da fonte da média (fase 3) espera o ok do dono |
+| `MESA-DE-CORRECOES.md` | Planejado · nada no código · depende do livro (Estoque F1) e das canceladas (Vendas F2) |
 | `SOBRAS-TOM-E-DESPERDICIO.md` | Em construção · Fase 1 em produção (19/09) · **Fase 2 feita** (21/09, a mensagem do plano) · fases 3–4 planejadas |
 | `COMPRAS.md` | Implementado (fases 0–6) · fase 7 pendente · com mudanças na construção |
 | `ARQUITETURA-ALVO.md` | Parcial — só no módulo sob medida (`tecido/`) |
@@ -33,6 +36,27 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 | `TABLETS-E-KIOSK.md` | Planejado · nada no código · camada 1 (iPad) pode ir já |
 | `PRODUCAO-MAPA-E-MOTOR.md` | Planejado · não iniciado · depois da fila de consertos |
 | `PRODUCAO-MONTAGEM.md` | Planejado · não iniciado · depois da fila de consertos |
+
+## O pacote de 21/09/2026 — a ordem é do dono, e está aqui porque ordem combinada em conversa é a primeira coisa que se perde
+
+As três specs novas são **um pacote só**, e uma depende da outra. A ordem de
+construção, decidida pelo dono em 21/09/2026:
+
+```
+fase 0 (consertos, sem spec)
+   └─▶ ESTOQUE F1   o livro de movimentos      ← base de tudo
+          └─▶ VENDAS F1   a média do sistema, lado a lado
+                 └─▶ VENDAS F2   planilha só de futuras + canceladas
+                        └─▶ ESTOQUE F2 e F3   conferência e ajuste em duas pessoas
+                               └─▶ MESA F1 a F3   a mesa de correções e os scripts
+                                      └─▶ ESTOQUE F4 e VENDAS F3   acuracidade e a troca da média
+```
+
+> ⚠️ **A fase 1 do livro não começa antes dos consertos da fase 0.** Um deles é
+> justamente a aprovação de contagem que grava o número contado como saldo e apaga
+> o que andou entre contar e aprovar — é o defeito que o `saldo_na_contagem` da
+> `ESTOQUE-LIVRO-E-CONFERENCIA.md` §5.4 resolve de vez. Consertar depois do livro
+> seria consertar duas vezes.
 
 **Implementada e arquivada em 17/09/2026:** `GERADOR-ETIQUETA-KIT.md` — as
 quatro fases (conteúdo, prévia, impressão em PDF e a remoção do upload),

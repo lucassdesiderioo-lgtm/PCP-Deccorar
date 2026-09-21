@@ -88,7 +88,13 @@ app.post('/api/skus', (req,res)=>{
     if(q===null){ recusados.push(k); return 0; }
     return q;
   };
+  /* `estoqueFim` continua sendo CALCULADO e validado, e nunca mais gravado.
+     Validar o que se ignora parece estranho e nao e: um corpo com
+     `estoque:'abc'` e um chamador com defeito, e responder 200 a ele e a mesma
+     familia de silencio que a armadilha #25 fechou. O que a rota faz com o
+     valor valido, ela DIZ na resposta (`estoque_ignorado`). */
   const estoqueFim=qtdDe('estoque'), alvoFim=qtdDe('alvo');
+  const mandouEstoque = ('estoque' in b);
   if(recusados.length)
     return res.status(400).json({erro:recusados.join(' e ')+
       ': informe um número inteiro de peças, de 0 pra cima. Para manter o que está gravado, não mande o campo.'});
@@ -141,9 +147,16 @@ app.post('/api/skus', (req,res)=>{
   }
   if(temFicha) custoDireto=null;   // custo_direto so existe quando tem_ficha = 0
 
+  /* ⚠️ `estoque` NAO ESTA NO `DO UPDATE`, e isso e a fase 1 do livro
+     (21/09/2026, spec §3.3.2): CADASTRO NAO MEXE EM SALDO. Ele entra no INSERT
+     so para o SKU NOVO, que nasce com zero — dai em diante quem move a coluna e
+     o `estoque_dominio`, sempre com tipo, referencia e quem fez.
+     A armadilha #25 fechou a porta do campo AUSENTE apagar o saldo; esta fecha
+     a do campo PRESENTE mexer nele sem motivo e sem auditoria, que era o que
+     ficava aberto na divida 15. */
   const gravar=db.prepare(`INSERT INTO skus (codigo,descricao,cor,estoque,alvo,modelo_id,largura_cm,altura_cm,cor_codigo,tecido_codigo,tem_ficha,custo_direto)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-    ON CONFLICT(codigo) DO UPDATE SET descricao=excluded.descricao,cor=excluded.cor,estoque=excluded.estoque,alvo=excluded.alvo,
+    ON CONFLICT(codigo) DO UPDATE SET descricao=excluded.descricao,cor=excluded.cor,alvo=excluded.alvo,
       modelo_id=excluded.modelo_id,largura_cm=excluded.largura_cm,altura_cm=excluded.altura_cm,
       cor_codigo=excluded.cor_codigo,tecido_codigo=excluded.tecido_codigo,
       tem_ficha=excluded.tem_ficha,custo_direto=excluded.custo_direto`);
@@ -170,7 +183,13 @@ app.post('/api/skus', (req,res)=>{
   let destravados=0;
   try{
     db.transaction(()=>{
-      gravar.run(cod,desc,corTxt,estoqueFim,alvoFim,
+      /* ⚠️ SEMPRE ZERO, INCLUSIVE NO SKU NOVO — e o zero e obrigatorio, nao
+         uma escolha conservadora. SKU que nascesse com 5 teria saldo 5 e livro
+         vazio: `SUM(delta) = skus.estoque` quebraria na primeira linha, e essa
+         soma e justamente a guarda contra a volta dos sete donos (§3.3.8 da
+         spec). Peca em prateleira entra pela embalagem ou por um ajuste com
+         motivo — nunca por um campo de cadastro. */
+      gravar.run(cod,desc,corTxt,0,alvoFim,
         modeloId, manda('largura_cm',cmDe(b.largura_cm)), manda('altura_cm',cmDe(b.altura_cm)), corCod, tecCod,
         temFicha, custoDireto);
       destravados=db.prepare(`UPDATE lote SET estagio='pendente' WHERE estagio='bloqueado' AND codigo=?
@@ -182,7 +201,15 @@ app.post('/api/skus', (req,res)=>{
     return res.status(500).json({erro:'não consegui gravar o SKU '+cod+': '+e.message+
       ' — nada foi gravado. Tente de novo; se repetir, chame o suporte.'});
   }
-  res.json({ok:true,destravados});
+  /* ⚠️ A ROTA DIZ O QUE FEZ COM O CAMPO. Ignorar em silencio um valor que o
+     chamador mandou e o defeito da #25 por outra porta: ele acredita que
+     gravou, e so descobre no dia do inventario. A tela do admin parou de mandar
+     o campo por causa desta linha. */
+  res.json(mandouEstoque
+    ? {ok:true, destravados, estoque_ignorado:true,
+       aviso:'O cadastro não mexe mais em saldo. Para corrigir o estoque de '+cod+
+             ', use Admin → Estoque, que exige motivo e deixa rastro.'}
+    : {ok:true, destravados});
 });
 app.delete('/api/skus/:codigo',(req,res)=>{ db.prepare('DELETE FROM skus WHERE codigo=?').run(req.params.codigo); res.json({ok:true}); });
 

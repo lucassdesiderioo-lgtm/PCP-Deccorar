@@ -37,6 +37,7 @@
 const DEMANDA = require('./demanda_dominio');
 const FLUXO   = require('./fluxo_estoque');
 const FICHA   = require('./ficha_dominio');
+const ESTOQUE = require('./estoque_dominio');
 
 module.exports = function(app, db){
 
@@ -91,6 +92,26 @@ module.exports = function(app, db){
       'viu o valor em R$ do estoque'); }catch(e){}
   }
 
+  /* O EXTRATO DE UM SKU — o livro dele, do mais novo para o mais velho.
+     Fase 1 da spec ESTOQUE-LIVRO-E-CONFERENCIA. Até aqui, quando o saldo
+     errava, não havia o que abrir: `skus.estoque` é um número corrido e o
+     `ajuste_estoque` só conhece o que foi mexido à mão. Agora a embalagem, a
+     etiqueta, o inventário e o ajuste estão na mesma lista, com quem fez e o
+     que causou. */
+  app.get('/api/estoque/extrato/:codigo', (req,res)=>{
+    const cod = String(req.params.codigo||'').trim().toUpperCase();
+    const s = db.prepare('SELECT codigo, descricao, estoque FROM skus WHERE codigo=?').get(cod);
+    if(!s) return res.status(404).json({erro:'SKU não cadastrado: '+cod});
+    const linhas = ESTOQUE.extrato(db, cod, {limite:+req.query.limite || 100});
+    /* A SOMA DO LIVRO VAI AO LADO DO SALDO, e não é enfeite: é a conferência
+       que o `teste_livro.js` faz em teste, feita na tela com o dado real. Se um
+       dia os dois divergirem, alguém voltou a escrever na coluna por fora — e é
+       aqui que isso aparece primeiro, sem ninguém procurar. */
+    const soma = db.prepare('SELECT COALESCE(SUM(delta),0) s FROM movimento_estoque WHERE codigo=?').get(cod).s;
+    res.json({codigo:s.codigo, descricao:s.descricao, estoque:+s.estoque||0,
+      soma_livro:soma, bate:(+s.estoque||0) === soma, linhas});
+  });
+
   app.get('/api/estoque/painel', (req,res)=>{
     const { config, linhas } = DEMANDA.calcular(db);
 
@@ -130,13 +151,39 @@ module.exports = function(app, db){
        e nao se reconstroi (§14), entao o inventario e o unico momento em que a
        coluna volta a bater com a prateleira. O try/catch cobre banco antigo,
        anterior a coluna `tipo` — sem ele a aba inteira cairia por causa de uma
-       informacao de apoio. */
+       informacao de apoio.
+
+       ⚠️ ISTO LIA SO A `contagem`, QUE E RASCUNHO (fase 0 da spec
+       ESTOQUE-LIVRO-E-CONFERENCIA, 21/09/2026). O `enfileirar` do cont_route
+       apaga a sessao assim que a contagem fecha — o dado passa a viver em
+       `contagem_pendente`. Resultado: contou, mandou pra aprovacao, e o SKU
+       voltava a aparecer aqui como "nunca conferido". A idade e exatamente o
+       numero que diz se dá para confiar no saldo; ela mentia para baixo, que e
+       o lado seguro de cobrar conferencia a mais — mas tambem o lado que faz a
+       equipe parar de ler a coluna.
+
+       SAO DUAS FONTES, E NAO UMA TROCA, de proposito: `contagem_pendente` so
+       existe desde que a aprovacao em duas pessoas entrou, e o caminho direto
+       so passou a gravar la hoje. Trocar apagaria a historia de quem foi
+       contado antes disso — a idade so pode ficar mais completa, nunca menos.
+
+       `aprovado=1` e a regra: contagem esperando aprovacao ainda NAO acertou o
+       saldo, entao ela nao conferiu nada. E a data e a de quando se CONTOU
+       (`criado_em`), nunca a da aprovacao: quem olhou a prateleira olhou
+       naquele dia, e uma aprovacao que demora duas semanas nao rejuvenesce a
+       conferencia. */
     const contagem = {};
     try{
-      db.prepare(`SELECT UPPER(codigo) c, MAX(contado_em) em,
-          CAST(julianday('now','localtime') - julianday(MAX(contado_em)) AS INTEGER) dias
-        FROM contagem
-        WHERE COALESCE(tipo,'sku')='sku' AND COALESCE(teste,0)=0
+      db.prepare(`SELECT UPPER(codigo) c, MAX(em) em,
+          CAST(julianday('now','localtime') - julianday(MAX(em)) AS INTEGER) dias
+        FROM (
+          SELECT codigo, contado_em em FROM contagem
+           WHERE COALESCE(tipo,'sku')='sku' AND COALESCE(teste,0)=0
+          UNION ALL
+          SELECT codigo, criado_em em FROM contagem_pendente
+           WHERE COALESCE(tipo,'sku')='sku' AND COALESCE(teste,0)=0 AND aprovado=1
+        )
+        WHERE em IS NOT NULL
         GROUP BY UPPER(codigo)`).all()
         .forEach(r => contagem[r.c] = r);
     }catch(e){}
@@ -145,7 +192,7 @@ module.exports = function(app, db){
     const custo = verCusto ? mapaCusto() : null;
     if(verCusto) auditarCusto(req);
 
-    let zerados=0, baixos=0, ok=0, excesso=0, parados=0, sobMedida=0, defasados=0;
+    let zerados=0, baixos=0, ok=0, excesso=0, parados=0, sobMedida=0, defasados=0, negativos=0;
     let pecas=0, precisaTotal=0, skusFalta=0, aplicaveis=0, nuncaContados=0;
     let valorTotal=0, valorParado=0, semCusto=0;
 
@@ -172,12 +219,20 @@ module.exports = function(app, db){
          por definicao, entao ela nunca esta parada. */
       const parado = estoque > 0 && l.vendas_janela === 0 && !e.sob_medida;
 
+      /* ⚠️ SALDO NEGATIVO É CATEGORIA PRÓPRIA, e não "zerado com folga"
+         (fase 1 do livro, 21/09/2026). Até aqui ele não existia: os sete donos
+         da coluna cortavam em `MAX(0, …)` e o negativo sumia no caminho — com
+         ele, o SINAL de que alguma peça saiu sem registro. Agora ele fica, e
+         precisa GRITAR: misturado em "zerado" seria lido como SKU que acabou,
+         que é situação normal e ninguém investiga. */
       let situacao;
-      if(l.precisa > 0)   situacao = estoque <= 0 ? 'zerado' : 'baixo';
+      if(estoque < 0)     situacao = 'negativo';
+      else if(l.precisa > 0)   situacao = estoque === 0 ? 'zerado' : 'baixo';
       else if(sobra > 0)  situacao = 'excesso';
       else                situacao = 'ok';
 
-      if(situacao === 'zerado') zerados++;
+      if(situacao === 'negativo') negativos++;
+      else if(situacao === 'zerado') zerados++;
       else if(situacao === 'baixo') baixos++;
       else if(situacao === 'excesso') excesso++;
       else ok++;
@@ -274,7 +329,7 @@ module.exports = function(app, db){
         pecas_estoque: pecas,
         skus_falta: skusFalta,
         pecas_precisa: precisaTotal,
-        zerados, baixos, ok, excesso, parados,
+        zerados, baixos, ok, excesso, parados, negativos,
         sob_medida: sobMedida,
         alvo_defasados: defasados,
         alvo_aplicaveis: aplicaveis,
