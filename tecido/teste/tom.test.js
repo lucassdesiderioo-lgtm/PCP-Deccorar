@@ -223,6 +223,140 @@ module.exports=[
   igual(p.falta_bobina,null,'null, e nao um objeto vazio');
   // Tarja de alarme que aparece sem alarme e tarja que a equipe aprende a
   // ignorar — e ai a de verdade passa batida.
+}},
+
+/* ── R4: A MENSAGEM DIZ QUAL SOBRA SERVE, E POR QUE NAO ENTROU ────────────
+   Fase 2 da spec SOBRAS-TOM-E-DESPERDICIO. Estes casos moram AQUI, ao lado
+   dos do tom unico, porque sao a mesma regra vista pelo outro lado: o tom
+   unico e o que recusa a sobra, e a explicacao e o que a tela devia dizer.
+   Separar os dois arquivos deixaria alguem afrouxar um sem ler o outro. */
+
+{nome:'R4 — O CASO DO §1: a tela diz que a sobra serve, e por que nao entrou',
+ executar({igual,perto}){
+  const x=cena();
+  /* A MEDIDA E ESCOLHIDA PARA COMPORTAR SO UMA DAS DUAS PECAS, que e o caso
+     do §1: 0,95 × 1,55 aceita a de 0,92 × 1,50 e recusa a de 0,90 × 1,60
+     (altura). Uma sobra que comportasse as duas citaria a maior e o caso
+     deixaria de reproduzir o "pronto quando" da spec. */
+  const s=novaSobra(x,'0,95','1,55');
+  // Duas que nao servem para nada: a lista nao pode cita-las.
+  novaSobra(x,'0,40','0,40'); novaSobra(x,'0,50','0,60');
+
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[
+    {largura:'0,90',altura:'1,60',pedido:'1'},
+    {largura:'0,92',altura:'1,50',pedido:'1'}]});
+
+  igual(p.faixas.length,0,'nada foi cortado — o pedido nao cabe inteiro');
+  // ISTO E O DEFEITO QUE A FASE 2 CONSERTA: a frase negava e nomeava a
+  // propria sobra que servia.
+  igual(p.sobre_sobras,null,'a negativa categorica saiu');
+
+  igual(p.sobras_que_servem.length,1,'so a que serve entra na lista');
+  const e=p.sobras_que_servem[0];
+  igual(e.codigo,s.codigo,'a sobra certa');
+  perto(e.peca.largura,0.92,'a peca que ela comporta');
+  perto(e.peca.altura,1.50,'a peca que ela comporta');
+  igual(e.outras_pecas,0,'ela comporta so essa');
+  igual(e.motivo_codigo,'pedido_nao_separa','o motivo tecnico');
+  igual(/pedido 1/.test(e.motivo),true,'a frase nomeia o pedido: '+e.motivo);
+  igual(/nao se separam/.test(e.motivo),true,'e diz a regra: '+e.motivo);
+  igual(e.endereco.length>0,true,'com o endereco, para achar na prateleira');
+
+  // O card vermelho continua igual: a Fase 2 nao mexeu nele.
+  igual(p.pecas_nao_alocadas.length,2,'as duas pecas seguem marcadas');
+  igual(p.pecas_nao_alocadas[0].codigo,'tom_unico','com o codigo de sempre');
+}},
+
+{nome:'R4 — a sobra que comporta VARIAS cita a maior, e conta as outras',
+ executar({igual,perto}){
+  const x=cena();
+  novaSobra(x,'1,00','1,60');   // comporta as duas
+  /* A MENOR VEM PRIMEIRO, DE PROPOSITO. Com a maior na frente, "pegar a
+     primeira" acertaria por acaso e o caso ficaria cego — foi o que a
+     conferencia por mutacao mostrou: trocar a regra por `lista[0]` passava
+     com 17 verdes. A ordem da cena e o que da sentido a asserção. */
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[
+    {largura:'0,92',altura:'1,50',pedido:'7'},
+    {largura:'0,90',altura:'1,60',pedido:'7'}]});
+  igual(p.sobras_que_servem.length,1,'uma linha');
+  const e=p.sobras_que_servem[0];
+  // A MAIOR EM AREA: 0,90 × 1,60 = 1,44 m² contra 1,38 m². E ela que responde
+  // "ate onde essa sobra da".
+  perto(e.peca.largura,0.90,'citou a maior em area');
+  perto(e.peca.altura,1.60,'citou a maior em area');
+  igual(e.outras_pecas,1,'e disse que ha outra que tambem cabe');
+}},
+
+{nome:'R4 — quando nenhuma comporta DE VERDADE, a frase antiga continua',
+ executar({igual}){
+  const x=cena();
+  novaSobra(x,'0,40','0,40');
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[{largura:'1,00',altura:'2,00',pedido:'9'}]});
+  igual(p.sobras_que_servem.length,0,'nenhuma serve, nada a listar');
+  igual(/Nenhuma das 1 sobras/.test(p.sobre_sobras),true,'a negativa volta: '+p.sobre_sobras);
+  igual(/comporta/.test(p.sobre_sobras),true,'com a palavra de sempre');
+}},
+
+{nome:'R4 — a sobra RECUSADA no plano aparece como recusada, nao como "nao comporta"',
+ executar({igual}){
+  const x=cena();
+  const s=novaSobra(x,'1,20','2,20');           // comporta a peca com folga
+  const p=plano.calcular({tecido_id:x.t.id,
+    pecas:[{largura:'1,00',altura:'2,00',pedido:'11'}], recusadas:[s.id]});
+  igual(p.faixas.length,0,'sem fonte, porque a unica foi recusada');
+  igual(p.sobras_que_servem.length,1,'ela aparece');
+  igual(p.sobras_que_servem[0].motivo_codigo,'recusada','com o motivo certo');
+  igual(/recusada neste plano/.test(p.sobras_que_servem[0].motivo),true,
+    'e a frase diz isso: '+p.sobras_que_servem[0].motivo);
+  igual(p.sobre_sobras,null,'sem negativa por cima');
+}},
+
+{nome:'R4 — a sobra de condicao NAO APROVEITAVEL deixa de ser invisivel',
+ executar({igual,db}){
+  const x=cena();
+  /* O `candidatas()` filtra `aproveitavel=1` no SQL, entao esta sobra nunca
+     chegava a tela: retalho do tamanho certo, na prateleira, que o plano nao
+     oferece e nao explica. */
+  db.prepare(`INSERT OR IGNORE INTO condicao_sobra(chave,nome,aproveitavel,prioridade,ordem)
+    VALUES('inservivel','Inservivel',0,9,9)`).run();
+  const cod=etiqueta.pendentes()[0].codigo;
+  sobra.criar({codigo:cod,tecido_id:x.t.id,largura:'1,20',altura:'2,20',
+    condicao:'inservivel',nivel_id:x.nivelSobra},'teste');
+
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[{largura:'1,00',altura:'2,00',pedido:'13'}]});
+  igual(p.sobras_que_servem.length,1,'ela aparece na explicacao');
+  igual(p.sobras_que_servem[0].motivo_codigo,'nao_aproveitavel','com o motivo certo');
+  igual(/nao aproveitavel/.test(p.sobras_que_servem[0].motivo),true,
+    'e a frase manda para o cadastro: '+p.sobras_que_servem[0].motivo);
+  // E ela NAO voltou a ser candidata: explicar nao e liberar.
+  igual(p.faixas.length,0,'o plano continua sem cortar nela');
+}},
+
+{nome:'R4 — a "maior" da frase nunca e uma sobra RECUSADA', executar({igual}){
+  const x=cena();
+  // A recusada e a MAIOR em area (2,50 m²) e nao serve a peca: altura de 1,00
+  // contra 2,00. A antiga tirava a "maior" de todas as sobras e apresentava
+  // justamente esta — a que o operador acabara de recusar.
+  const grande=novaSobra(x,'2,50','1,00');
+  const pequena=novaSobra(x,'0,50','2,00');     // tambem nao serve (largura)
+  const p=plano.calcular({tecido_id:x.t.id,
+    pecas:[{largura:'0,90',altura:'2,00',pedido:'15'}], recusadas:[grande.id]});
+  igual(p.sobras_que_servem.length,0,'nenhuma serve esta peca');
+  igual(p.sobre_sobras.includes(pequena.codigo),true,
+    'a maior citada e a disponivel: '+p.sobre_sobras);
+  igual(p.sobre_sobras.includes(grande.codigo),false,
+    'e nunca a recusada: '+p.sobre_sobras);
+}},
+
+{nome:'R4 — plano que USOU sobra nao ganha lista nem frase', executar({igual}){
+  const x=cena();
+  novaSobra(x,'1,20','2,20');
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[{largura:'1,00',altura:'2,00',pedido:'17'}]});
+  igual(p.faixas.length,1,'cortou na sobra');
+  igual(p.sobras_que_servem.length,0,'nada a explicar');
+  igual(p.sobre_sobras,null,'e nenhuma frase');
+  // Aviso que aparece no caso normal e aviso que a equipe aprende a fechar
+  // (armadilha #6) — e ai o da lista de verdade passa batido.
 }}
 
 ];

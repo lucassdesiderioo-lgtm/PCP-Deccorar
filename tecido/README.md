@@ -8,7 +8,7 @@ Este módulo **não sobe sozinho**. Ele é montado dentro do PCP, em `/sobmedida
 pelo `server.js` da raiz. Uma porta, um processo, um PIN.
 
 ```bash
-npm test          # daqui: 233 casos, banco temporário, sem servidor
+npm test          # daqui: 251 casos, banco temporário, sem servidor
 node server.js    # da RAIZ: sobe o PCP inteiro, com o sob medida junto
 ```
 
@@ -1741,6 +1741,75 @@ fonte esse pedido já foi cortado:
 
 Em qualquer caso a tela mostra, antes do desenho, quantas peças daquele pedido
 já saíram, quando, e de onde.
+
+### ⚠️ A NEGATIVA QUE NOMEAVA A PRÓPRIA SOBRA QUE SERVIA
+
+**19/09/2026, Fase 2 da spec `SOBRAS-TOM-E-DESPERDICIO` (R4).** Num corte de
+duas peças do mesmo pedido, com uma sobra que comportava **uma** delas, a tela
+dizia:
+
+```
+Nenhuma das 11 sobras deste tecido comporta estas pecas — a maior e 1,00 × 1,60 (S-000091).
+```
+
+E a `S-000091` comportava a peça de 0,92 × 1,50. **A frase negava e nomeava, na
+mesma linha, a sobra que servia** — quem leu concluiu que o sistema só aceita
+medida exata, e foi isso que abriu a spec.
+
+> ⚠️ **O MOTIVO EXISTIA E ERA JOGADO FORA.** O laço das sobras sabia a
+> diferença entre *"não serve"* (o `serve()` recusa) e *"serve, mas o pedido
+> inteiro não cabe"* (o `encaixarGruposCompletos` devolve `null`) — e guardava
+> só o resultado. O que sobrava para a tela era uma contagem, e contagem não
+> tem como explicar nada. Hoje o laço **guarda o porquê**, e a explicação sai
+> da mesma régua que decidiu: reconstruí-la depois seria a segunda conta, e as
+> duas divergiriam no primeiro ajuste do encaixe.
+
+**Três motivos, e cada um responde uma pergunta diferente da bancada:**
+
+| `motivo_codigo` | O que aconteceu |
+|---|---|
+| `pedido_nao_separa` | serve a peça, mas o pedido inteiro não cabe — é o tom único (§ acima) |
+| `recusada` | o operador recusou esta sobra neste plano |
+| `nao_aproveitavel` | a condição está marcada como inaproveitável no cadastro |
+
+> ⚠️ **A INAPROVEITÁVEL ERA INVISÍVEL, e não por descuido:** o `candidatas()`
+> filtra `aproveitavel=1` **no SQL**, então ela nunca chegava à tela — retalho
+> do tamanho certo, na prateleira, que o plano não oferece e não explica. Agora
+> há uma consulta só para a explicação (`naoAproveitaveis`), e ela **não** a
+> devolve para o corte: explicar não é liberar.
+
+> ⚠️ **A LISTA SÓ APARECE QUANDO NENHUMA SOBRA FOI USADA, e o teto é cinco.**
+> Plano que cortou na sobra não ganha lista nem frase — aviso que aparece no
+> caso normal é aviso que a equipe aprende a fechar (armadilha #6), e aí o de
+> verdade passa batido. Com a prateleira cheia, "toda sobra que serve" viraria
+> parede de texto, que é a armadilha #10: deixa de proteger sem parar de
+> existir. As cinco primeiras são as que comportam a **maior** peça, porque é
+> isso que responde "até onde essa sobra dá".
+
+> ⚠️ **A "MAIOR" DA FRASE SAI DAS DISPONÍVEIS, nunca de todas.** A antiga
+> contava `disponiveis` e media `todasSobras`: apresentava como "a maior"
+> justamente a sobra que o operador acabara de recusar.
+
+> **A frase inteira é do domínio, inclusive o "e mais N peças".** A tela
+> montava esse rabo e o resultado era uma linha com meia acentuação — o motivo
+> vem do domínio, que escreve sem acento como todos os outros, e o pedaço vinha
+> da tela, que escreve com. Uma pergunta, um dono.
+
+> **Nada disto entra na `assinar()`.** É explicação, não plano: mudar o texto
+> nunca invalida um plano que a tela está mostrando, e o `Confirmar` não sente.
+
+**Teste obrigatório:** `node teste/rodar.js` — os 7 casos de R4 em
+`teste/tom.test.js`, ao lado dos do tom único de propósito: são a mesma regra
+vista pelo outro lado, e separá-las deixaria alguém afrouxar uma sem ler a
+outra. Eles travam o caso do §1, os três motivos, o teto, a "maior" e o
+silêncio no caso normal.
+
+> ⚠️ **UM DELES NASCEU CEGO, e foi a conferência por mutação que mostrou.** O
+> caso de "cita a maior peça" passava com a regra trocada por *"pega a
+> primeira"* — porque na cena a maior **era** a primeira, e o teste acertava
+> por acaso. A cena hoje põe a menor na frente. É a lição do QR do PCP (§4 do
+> `CLAUDE.md`) por outra porta: **teste verde só vale depois de você ver ele
+> ficar vermelho.**
 
 ## O upload (fase 8)
 

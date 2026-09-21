@@ -4,9 +4,9 @@
 STATUS
 Situação: em construção
 Criada em: 18/09/2026
-Última atualização: 19/09/2026
-Fase atual: 1 (limpeza) — RODADA EM PRODUÇÃO em 19/09/2026, 10:21
-Fases: 1 ☑  2 ☐  3 ☐  4 ☐
+Última atualização: 21/09/2026
+Fase atual: 2 (mensagem do plano) — feita e testada; falta subir
+Fases: 1 ☑  2 ☑  3 ☐  4 ☐
 Risco: 🔴 (dados de sobra e baixa no Confirmar do plano)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
 Mudanças no caminho:
@@ -226,10 +226,31 @@ Cada fase é entregue e testada sozinha.
 - **Pronto quando:** Sobras vazia, Etiquetas imprime S-000001, refugo sem linha
   de descarte de sobra, rolos intactos.
 
-### Fase 2: mensagem certa no plano 🟡
+### Fase 2: mensagem certa no plano 🟡 — FEITA em 21/09/2026
 - R4: lista de sobras que comportam alguma peça e o motivo de não terem entrado.
 - **Pronto quando:** o caso do §1 (duas peças do pedido 1, sobra S-000091) diz
   que a S-000091 serve para a peça 0,92 × 1,50 e por que não foi usada.
+
+> **Como ficou:** `proposta.sobras_que_servem` (dono: `dominio/plano.js`), com
+> três motivos — `pedido_nao_separa`, `recusada` e `nao_aproveitavel` —, e o
+> `sobre_sobras` só nega quando é verdade. A tela mostra cinco e resume o
+> resto. As regras que parecem bug estão no `tecido/README.md`, seção "A
+> negativa que nomeava a própria sobra que servia".
+>
+> **A frase era pior do que o relato:** ela negava **e nomeava** a S-000091 na
+> mesma linha (`— a maior e 1,00 × 1,60 (S-000091)`), porque a contagem saía
+> das disponíveis e a "maior" de todas. Reproduzido antes de mexer.
+>
+> Três coisas que a construção achou, e nenhuma muda regra:
+> - a sobra de **condição inaproveitável** era invisível para a tela (o
+>   `candidatas()` a filtra no SQL) — ganhou consulta própria, que não a
+>   devolve para o corte;
+> - a "maior" da frase podia ser uma sobra **recusada**;
+> - o `sobras_que_servem` **não** entra na `assinar()`: explicação não é plano.
+>
+> **Decisões de forma, aprovadas no plano:** a lista cita a **maior peça** que
+> a sobra comporta (é o que responde "até onde ela dá") e mostra **cinco**,
+> com o resto resumido.
 
 ### Fase 3: tom pela origem + conferência 🔴
 - R5: função única "origem de tom" de uma fonte (sobe a cadeia de sobras).
