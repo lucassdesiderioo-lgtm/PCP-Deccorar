@@ -191,16 +191,27 @@ function calcular(pedido){
     return null;
   })();
 
+  /* AS QUE SERVIRAM UMA PECA E NAO ENTRARAM (R4). O laco abaixo sabe o motivo
+     e antes o jogava fora: sobrava para a tela uma negativa categorica sobre
+     sobras que, na prateleira, servem. Guardar aqui e a unica forma de a
+     explicacao sair da MESMA regua que decidiu — reconstruir o "por que" depois
+     seria uma segunda conta, e as duas divergiriam no primeiro ajuste. */
+  const naoEntraram=[];
+
   for(const s of disponiveis){
     if(!grupos.length) break;
     const fonte={id:'sobra:'+s.id, fonte:'sobra', largura:s.largura, alturaMax:s.altura};
     // SEM ROTACAO quando o tecido tem sentido: uma sobra 0,70 x 3,00 nunca
     // serve para uma peca 3,00 x 0,70. Girar resolveria no papel; no tecido
     // muda o desenho, o brilho e o caimento.
-    if(!grupos.some(g=>g.pecas.some(p=>serve(p,fonte)))) continue;
+    const cabem=grupos.flatMap(g=>g.pecas).filter(p=>serve(p,fonte));
+    if(!cabem.length) continue;
 
     const tentativa=encaixarGruposCompletos(grupos,fonte,params);
-    if(!tentativa) continue;
+    // Nao entrou, mas serve alguma peca: o `null` aqui quer dizer que todo
+    // grupo ou nao cabe, ou ficaria DIVIDIDO — e dividir pedido e o que o tom
+    // unico proibe. E isso que a tela passa a dizer.
+    if(!tentativa){ naoEntraram.push({sobra:s, pecas:cabem}); continue; }
 
     grupos=grupos.filter(g=>!tentativa.grupos.includes(g));
     fontes.push(fonte);
@@ -332,19 +343,87 @@ function calcular(pedido){
     texto:'resto '+medida(s.largura,s.altura)+' → NOVA SOBRA'
   }));
 
+  /* ── POR QUE A SOBRA QUE SERVE NAO ENTROU (R4) ───────────────────────────
+     A frase daqui dizia "nenhuma das 11 sobras deste tecido comporta estas
+     pecas — a maior e 1,00 × 1,60 (S-000091)", e a S-000091 comportava a peca
+     de 0,92 × 1,50. A tela negava e NOMEAVA a sobra que servia, na mesma
+     linha: quem leu concluiu que o sistema so aceita medida exata.
+
+     O motivo real existia duas linhas acima e era descartado. Agora a tela
+     recebe a sobra, A PECA que ela comporta e o porque — e a negativa
+     categorica so sai quando e verdade. */
+  const usouSobra=usadas.some(u=>u.tipo==='sobra');
+  // Usou sobra? Nao ha o que explicar, e nao se gasta consulta para isso.
+  const naoAprov=usouSobra?[]:sobra.naoAproveitaveis(tecido.id);
+
+  // A MAIOR peca que a sobra comporta: e ela que responde "ate onde essa
+  // sobra da". Citar a primeira responderia outra pergunta, menor.
+  const pecaMaior=lista=>lista.reduce((m,p)=>(p.largura*p.altura>m.largura*m.altura?p:m),lista[0]);
+  // A mesma regua do laco (`serve`), nunca uma segunda: a recusada e a
+  // inaproveitavel nunca passaram por ele, e precisam ser medidas igual.
+  const pecasQueCabem=s=>pecas.filter(p=>serve(p,{largura:s.largura, alturaMax:s.altura}));
+
+  /* A FRASE INTEIRA SAI DAQUI, inclusive o "e mais N". A tela montava esse
+     pedaco e o resultado era uma linha com meia acentuacao — o motivo vem do
+     dominio, que escreve sem acento como todos os outros, e o rabo vinha da
+     tela, que escreve com. Frase de uma pergunta, um dono. */
+  const explicar=(s,quais,codigo,frase)=>{
+    const maior=pecaMaior(quais);
+    const outras=quais.length-1;
+    return {
+      id:s.id, codigo:s.codigo, largura:s.largura, altura:s.altura, area:s.area,
+      condicao:s.condicao_nome||s.condicao,
+      endereco:s.nivel_id?endereco.descrever(s.nivel_id):'',
+      peca:{id:maior.id, largura:maior.largura, altura:maior.altura, pedido:maior.pedido||null},
+      outras_pecas:outras,
+      motivo_codigo:codigo,
+      motivo:frase(maior)+(outras
+        ? (outras===1 ? ' (e mais 1 peca desta lista tambem cabe nela)'
+                      : ' (e mais '+outras+' pecas desta lista tambem cabem nela)')
+        : '')
+    };
+  };
+
+  const sobrasQueServem=usouSobra?[]:[
+    ...naoEntraram.map(x=>explicar(x.sobra,x.pecas,'pedido_nao_separa',m=>
+      m.pedido
+        ? 'serve a peca '+medida(m.largura,m.altura)+', mas o pedido '+m.pedido+
+          ' inteiro nao cabe nela — pecas do mesmo pedido nao se separam'
+        // Peca avulsa que serve entra sozinha, entao este caso quase nao
+        // existe. "Quase" e onde mora defeito: a frase nao inventa pedido.
+        : 'serve a peca '+medida(m.largura,m.altura)+', mas o encaixe nao fechou nesta sobra')),
+
+    ...todasSobras.filter(s=>recusadas.has(s.id)).map(s=>[s,pecasQueCabem(s)])
+      .filter(([,quais])=>quais.length)
+      .map(([s,quais])=>explicar(s,quais,'recusada',m=>
+        'serve a peca '+medida(m.largura,m.altura)+' — recusada neste plano')),
+
+    ...naoAprov.map(s=>[s,pecasQueCabem(s)]).filter(([,quais])=>quais.length)
+      .map(([s,quais])=>explicar(s,quais,'nao_aproveitavel',m=>
+        'serve a peca '+medida(m.largura,m.altura)+', mas a condicao "'+
+        (s.condicao_nome||s.condicao)+'" esta marcada como nao aproveitavel no cadastro'))
+  ].sort((a,b)=>(b.peca.largura*b.peca.altura)-(a.peca.largura*a.peca.altura)
+                || a.codigo.localeCompare(b.codigo));
+
   // Por que nenhuma sobra serviu. Sem esta frase o operador desconfia do
   // "nao" e vai conferir a prateleira na mao de qualquer jeito.
   let sobreSobras;
-  if(usadas.some(u=>u.tipo==='sobra')) sobreSobras=null;
-  else if(!todasSobras.length) sobreSobras='Nao ha nenhuma sobra deste tecido catalogada.';
-  else {
-    const maior=todasSobras.reduce((m,s)=>(s.largura*s.altura>m.largura*m.altura?s:m),todasSobras[0]);
-    const quantas=disponiveis.length;
-    sobreSobras=quantas
-      ? 'Nenhuma das '+quantas+' sobras deste tecido comporta estas pecas — a maior e '+
-        medida(maior.largura,maior.altura)+' ('+maior.codigo+').'
-      : 'Todas as sobras deste tecido foram recusadas neste plano.';
+  if(usouSobra) sobreSobras=null;
+  // A LISTA explica melhor, e com nome e medida. Frase ao lado dela seria a
+  // segunda regua da mesma pergunta, dizendo menos.
+  else if(sobrasQueServem.length) sobreSobras=null;
+  else if(!todasSobras.length&&!naoAprov.length)
+    sobreSobras='Nao ha nenhuma sobra deste tecido catalogada.';
+  else if(disponiveis.length){
+    // A MAIOR sai das DISPONIVEIS, nunca de `todasSobras`: com a antiga, a
+    // frase apresentava como "a maior" justamente a sobra que o operador
+    // acabara de recusar.
+    const maior=disponiveis.reduce((m,s)=>(s.largura*s.altura>m.largura*m.altura?s:m),disponiveis[0]);
+    sobreSobras='Nenhuma das '+disponiveis.length+' sobras deste tecido comporta estas pecas — a maior e '+
+      medida(maior.largura,maior.altura)+' ('+maior.codigo+').';
   }
+  else if(recusadas.size) sobreSobras='Todas as sobras deste tecido foram recusadas neste plano.';
+  else sobreSobras='As sobras deste tecido estao com a condicao marcada como nao aproveitavel.';
 
   const proposta={
     tecido:{id:tecido.id, codigo:tecido.codigo,
@@ -361,6 +440,12 @@ function calcular(pedido){
     consumo_linear:r.consumoLinear, consumo_m2:r.consumoM2,
     area_pecas:r.areaPecas, area_sobras:r.areaSobras, desperdicio:r.desperdicio,
     sobre_sobras:sobreSobras,
+    /* A sobra que SERVE uma peca e nao entrou, com o porque (R4). Vazia no
+       caso normal — plano que usou sobra nao ganha lista nenhuma, porque
+       aviso que aparece sempre e aviso que se aprende a fechar.
+       Ela NAO entra na `assinar()`: e explicacao, nao plano. Mudar o texto
+       nunca invalida um plano que a tela esta mostrando. */
+    sobras_que_servem:sobrasQueServem,
     // Quantas pecas vieram SEM pedido. Nao trava — peca avulsa (amostra,
     // reposicao) e caso legitimo. Mas peca sem pedido nao tem como ser
     // reconhecida como continuacao no dia seguinte, e e melhor a tela dizer

@@ -335,6 +335,47 @@ function desenharPlano(){
     c.appendChild(av);
   }
 
+  /* A SOBRA QUE SERVE E NAO ENTROU (R4, fase 2 da spec).
+     Vem DEPOIS do card vermelho: primeiro o que nao sai, depois por que a
+     sobra da prateleira nao resolveu. Antes, no lugar disto, havia uma linha
+     dizendo "nenhuma das 11 sobras comporta estas pecas — a maior e 1,00 ×
+     1,60 (S-000091)" enquanto a S-000091 comportava uma delas: a tela negava
+     e nomeava a sobra que servia.
+     NAO e vermelho: nao ha nada errado aqui. E a cor do armazem SOBRA, que e
+     do que a lista fala. */
+  if(p.sobras_que_servem&&p.sobras_que_servem.length){
+    const lista=p.sobras_que_servem, MOSTRA=5;
+    const bx=el('div',{style:'background:var(--cartao);border-left:4px solid var(--sobra);'+
+      'border-radius:var(--raio);padding:12px;margin:12px 0'});
+    /* O CABECALHO NAO CONTA PECAS, so sobras. "1 sobra serve uma destas
+       pecas" fica torto num plano de uma peca so, e quem le uma frase torta
+       para de ler a linha inteira — qual peca cada sobra comporta esta na
+       linha dela, que e onde a informacao serve. */
+    bx.appendChild(el('strong',{style:'color:var(--sobra)',
+      texto:lista.length===1
+        ? '1 sobra da prateleira serve, e não entrou no plano'
+        : lista.length+' sobras da prateleira servem, e não entraram no plano'}));
+    lista.slice(0,MOSTRA).forEach(s=>{
+      const li=el('div',{style:'margin-top:8px'});
+      li.appendChild(el('div',{style:'font-weight:600',
+        texto:s.codigo+'   '+formatarMedida(s.largura,s.altura)+
+              (s.endereco?'   ·   '+s.endereco:'')}));
+      // A frase vem inteira do dominio (o "e mais N" inclusive): montar
+       // pedaco dela aqui deixava a linha com meia acentuacao.
+      li.appendChild(el('div',{class:'ajuda',style:'margin:2px 0 0',texto:s.motivo}));
+      bx.appendChild(li);
+    });
+    /* TETO DE CINCO. Com a prateleira cheia, "toda sobra que serve" viraria
+       parede de texto — e lista que ninguem le ate o fim e a armadilha #10:
+       deixa de proteger sem parar de existir. As cinco primeiras sao as que
+       comportam a MAIOR peca, que e o que responde "ate onde da". */
+    if(lista.length>MOSTRA) bx.appendChild(el('p',{class:'ajuda',style:'margin-bottom:0',
+      texto:lista.length-MOSTRA===1
+        ? '… e mais 1 sobra na mesma situação.'
+        : '… e mais '+(lista.length-MOSTRA)+' sobras na mesma situação.'}));
+    c.appendChild(bx);
+  }
+
   // As faixas AGRUPADAS POR FONTE. Um rolo que leva sete puxadas e um rolo
   // so: repetir o cabecalho sete vezes faria o cortador procurar sete rolos
   // na prateleira.

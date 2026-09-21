@@ -46,6 +46,17 @@ const candidatas=tecido_id=>db.prepare('SELECT '+CAMPOS+' '+DE+`
    WHERE s.tecido_id=? AND s.status='disponivel' AND COALESCE(cs.aproveitavel,1)=1
    ORDER BY COALESCE(cs.prioridade,0), s.area`).all(tecido_id);
 
+/* AS QUE O `candidatas` NAO DEVOLVE, e por que a tela precisa delas.
+   A condicao marcada como inaproveitavel tira a sobra do plano ali em cima, no
+   SQL — e por isso ela nao existia para quem le a tela: sobra na prateleira,
+   do tamanho certo, que o plano nunca oferece e nao diz por que. Quem esta com
+   o retalho na mao conclui que o sistema errou.
+   Elas NUNCA voltam a ser candidatas por aqui: isto so alimenta a explicacao
+   (R4 da spec SOBRAS-TOM-E-DESPERDICIO). */
+const naoAproveitaveis=tecido_id=>db.prepare('SELECT '+CAMPOS+' '+DE+`
+   WHERE s.tecido_id=? AND s.status='disponivel' AND COALESCE(cs.aproveitavel,1)=0
+   ORDER BY COALESCE(cs.prioridade,0), s.area`).all(tecido_id);
+
 function criar(d){
   const r=db.prepare(`INSERT INTO sobra
     (codigo,tecido_id,largura,altura,condicao,nivel_id,origem,origem_rolo_id,origem_sobra_id,criado_por,preco_m2)
@@ -108,5 +119,5 @@ const resumoPorTecido=()=>db.prepare(`
     LEFT JOIN sobra s ON s.tecido_id=t.id AND s.status='disponivel'
    GROUP BY t.id ORDER BY l.ordem, l.nome, a.ordem, a.nome, c.ordem, c.nome`).all();
 
-module.exports={listar,porId,porCodigo,candidatas,criar,baixar,atualizar,registrarCorrecao,correcoes,
-  resumoPorTecido,herdarPrecoDoRolo};
+module.exports={listar,porId,porCodigo,candidatas,naoAproveitaveis,criar,baixar,atualizar,
+  registrarCorrecao,correcoes,resumoPorTecido,herdarPrecoDoRolo};

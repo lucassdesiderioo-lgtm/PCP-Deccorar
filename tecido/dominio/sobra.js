@@ -310,5 +310,8 @@ module.exports={
   propostasPendentes:()=>dProposta.quantasPendentes(),
   porCodigo:c=>comEndereco(dSobra.porCodigo(etiqueta.limpar(c))),
   candidatas:tecido_id=>dSobra.candidatas(tecido_id),
+  // As que a condicao tira do plano. Servem SO para o plano explicar a
+  // ausencia delas na tela (R4) — nunca para entrar no corte.
+  naoAproveitaveis:tecido_id=>dSobra.naoAproveitaveis(tecido_id).map(comEndereco),
   resumo:()=>dSobra.resumoPorTecido()
 };
