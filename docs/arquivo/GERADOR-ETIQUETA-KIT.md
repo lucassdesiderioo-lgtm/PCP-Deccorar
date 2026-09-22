@@ -4,7 +4,7 @@
 STATUS
 Situação: ARQUIVADA — implementada por inteiro em 17/09/2026
 Criada em: 17/09/2026
-Última atualização: 17/09/2026
+Última atualização: 22/09/2026
 Fase atual: as quatro fases entregues e conferidas em produção
 Fases: 1 ☑  2 ☑  3 ☑  4 ☑
 Risco: 🔴 (etiqueta)
@@ -20,6 +20,13 @@ Divergência depois do arquivamento (vale o CLAUDE.md, §13 regra 3):
   módulo em 0,375 mm, no limite do que a impressora resolve. O espaço saiu do
   bloco de texto (58 → 53 mm, e o limite das linhas de 16 → 15 caracteres) e de
   5,5 mm de deslocamento da seta. As barras não mudaram.
+  **CONFERIDA NO PAPEL em 22/09/2026, com as DUAS provas** que a fase 3 exigiu:
+  o dono imprimiu 1 de teste e, na etiqueta colada no kit, o celular leu o QR
+  **e** o leitor bipou o código de barras.
+- 18/09/2026 — a nota do card sobre o `?usp=drive_link` **não manda mais
+  encurtar o link**: com a caixa de 26 mm o módulo é o mesmo e tirar o sufixo
+  só deixa o QR 2,5 mm menor. A tela mede em vez de supor pela versão.
+  Ver CLAUDE.md §4.
 
 Mudanças no caminho:
 - 17/09/2026 (fase 3, CONFERIDA EM PRODUÇÃO) — o dono imprimiu pela primeira

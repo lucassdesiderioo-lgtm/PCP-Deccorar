@@ -644,6 +644,23 @@ módulo                   0,375 mm      ← o limite do que a ZD220 resolve
 **O tamanho é fixo e não tem campo na tela**, por decisão do dono. Ele sai do
 `DESENHO`, como todas as outras medidas.
 
+> ✅ **CONFERIDA NO PAPEL EM 22/09/2026, COM AS DUAS PROVAS.** O dono fez o
+> deploy, imprimiu 1 de teste e, na etiqueta colada no kit: **o celular leu o
+> QR e o leitor bipou** ("leu os dois"). É a régua final de QR — antes disso os
+> 133 + 45 casos verdes eram indício, e está escrito assim nesta seção de
+> propósito: o defeito da fase 2 passou por três rodadas verdes.
+>
+> ⚠️ **SÃO DUAS PROVAS DE PAPEL, E A SEGUNDA QUASE FICOU DE FORA.** A fase 3 foi
+> registrada com as duas ("o QR abriu **e** o leitor bipou"), e aqui a primeira
+> versão deste bloco saiu com o bipe **pendente**: o dono confirmou o celular e
+> não falou do leitor. O bloco das barras não tinha sido tocado — mesmos 58 mm,
+> mesma posição, mesma altura, e há caso travando —, então não havia motivo
+> esperado para falhar. **Mesmo assim ficou escrito como pendente**, porque
+> "não tenho motivo para esperar falha" não é a mesma coisa que "bipou", e um
+> `CLAUDE.md` que diz *conferido* fecha a pergunta para sempre. Custou um bipe
+> e uma pergunta. **Prova que não foi feita se escreve como não feita** — é o
+> verde sem conferência que o §10 chama de pior que vermelho.
+
 ### ⚠️ A IMPRESSÃO (fase 3, 17/09/2026) — **PDF, e não ZPL**
 
 A §6 da spec mandava enviar ZPL para a impressora. **Não dá**: a ZD220 está
