@@ -22,10 +22,11 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 3. **Onde a spec e o `CLAUDE.md` divergirem, vale o `CLAUDE.md`** — ele descreve o
    que está em produção. A divergência é anotada no status da spec.
 
-## Índice — situação em 21/09/2026
+## Índice — situação em 22/09/2026
 
 | Spec | Status |
 |---|---|
+| `SOBMEDIDA-PEDIDO-REVENDA.md` | Planejado · nada no código · módulo sob medida (`tecido/`) · fases 1 a 8 · duas decisões em aberto antes da fase 1 (§8) |
 | `ESTOQUE-LIVRO-E-CONFERENCIA.md` | **Em construção** · fase 0 e fase 1 em código (21/09) · fases 2–4 planejadas · uma decisão em aberto (§6.4) |
 | `VENDAS-E-MEDIA.md` | Planejado · nada no código · a troca da fonte da média (fase 3) espera o ok do dono |
 | `MESA-DE-CORRECOES.md` | Planejado · nada no código · depende do livro (Estoque F1) e das canceladas (Vendas F2) |
