@@ -172,6 +172,40 @@ module.exports=[
   igual(PAPEIS.diretor.includes('*'),true,'e o diretor alcanca tudo');
 }},
 
+{nome:'⚠️ O SIMULADOR DO SOB MEDIDA NAO LEVA UM CENTAVO A QUEM NAO VE CUSTO',
+ executar({igual}){
+  /* A fase 1 so alcanca a chefia, entao hoje esta poda e um no-op. Ela esta
+     aqui porque a fase 7 poe a REVENDA na mesma porta, e ai o preco Deccorar
+     nao pode viajar pelo fio (secao 4.12 da spec). Defesa que se escreve
+     depois que o usuario existe e defesa que se escreve tarde. */
+  const tecido=require('../dominio/tecido');
+  const catalogo=require('../dominio/catalogo_sm');
+  const persiana=require('../dominio/persiana');
+  const l=tecido.criarLinha({nome:'Rolo sob medida'});
+  const a=tecido.criarAbertura({nome:'Screen 1%',linha_id:l.id});
+  const cor=tecido.criarCor({nome:'Areia'});
+  const m=catalogo.modeloPorNome('Rolô');
+  catalogo.ligarColecao({modelo_id:m.id,abertura_id:a.id,preco_m2_centavos:11000});
+  catalogo.ligarCorAcessorio({modelo_id:m.id,cor_id:cor.id});
+  const r=persiana.calcular({modelo_id:m.id,abertura_id:a.id,cor_acessorio_id:cor.id,
+    largura_mm:1000,altura_mm:1000,comando:'direito',rolamento:'frente',
+    adicional:'bando',reducao:'nao'});
+
+  const antes=dinheiroEm(r,'simular');
+  igual(antes.length>0,true,'o calculo TEM dinheiro dentro: '+antes.join(', '));
+  igual(dinheiroEm(custo.podar(CORTADOR,r),'simular').join(', '),'',
+    'e nada disso sobra depois da poda');
+  igual(dinheiroEm(custo.podar(DIRETOR,r),'simular').length,antes.length,
+    'enquanto a chefia recebe tudo');
+
+  /* ⚠️ E O NOME DO CAMPO E O QUE FAZ A PODA FUNCIONAR. Um `total_centavos`
+     nao casa com o padrao `preco|valor|custo|nf|fornecedor` e vazaria em
+     silencio — por isso o subtotal se chama valor_subtotal_centavos. */
+  igual(custo.eDinheiro('valor_subtotal_centavos'),true,'valor_subtotal_centavos e podado');
+  igual(custo.eDinheiro('total_centavos'),false,
+    'e "total_centavos" NAO seria — o nome do campo e parte da defesa');
+}},
+
 {nome:'⚠️ O FORNECEDOR SAIU DO ALCANCE DA BANCADA', executar({igual}){
   const rotas=require('../rotas/cadastros').rotas
     .filter(r=>r.caminho==='/api/fornecedores');
@@ -186,9 +220,15 @@ module.exports=[
 }},
 
 {nome:'toda rota declara permissao — nenhuma nasce aberta', executar({igual}){
-  const mods=['cadastros','rolos','sobras','parametros','painel','eu'];
+  /* ⚠️ A LISTA SAI DO `montar.js`, e nao de uma copia escrita aqui.
+     Ela ERA uma copia — e ja tinha envelhecido: './rotas/planos' nao estava
+     nela, entao as rotas do plano de corte nao eram conferidas por ninguem.
+     E a mesma doenca da poda por lista literal, 20 linhas acima neste mesmo
+     arquivo, e da TODAS_ROTAS do PCP (CLAUDE.md secao 10, armadilha #29).
+     Um modulo novo entra na conta no minuto em que e montado. */
+  const mods=require('../montar').MODULOS;
   let n=0, semChave=[];
-  mods.forEach(m=>require('../rotas/'+m).rotas.forEach(r=>{
+  mods.forEach(m=>require(m.replace('./rotas/','../rotas/')).rotas.forEach(r=>{
     n++;
     if(!r.permissao) semChave.push((r.metodo||'GET')+' '+r.caminho);
     else if(!CHAVES.some(c=>c.chave===r.permissao))

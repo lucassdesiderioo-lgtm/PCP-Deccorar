@@ -2,15 +2,96 @@
 
 ```
 STATUS
-Situação: planejado
+Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 22/09/2026
-Fase atual: nenhuma (aguardando início)
-Fases: 1 ☐  2 ☐  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐
+Fase atual: 1 IMPLEMENTADA (22/09/2026) — falta a conferência do dono
+Fases: 1 ☑  2 ☐  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
-Mudanças no caminho: —
+Mudanças no caminho: 5 (fase 1) — ver abaixo
 ```
+
+## STATUS DA FASE 1 — implementada em 22/09/2026
+
+**Entregue:** migração 16 do `tecido/nucleo/schema.js` (oito tabelas `sm_*` e o
+cadastro inicial do Rolô), `tecido/dominio/persiana.js` (o dono único),
+`tecido/dominio/catalogo_sm.js`, `tecido/nucleo/unidade.js`, as rotas, as telas
+`/sobmedida/catalogo` e `/sobmedida/simulador`, e 52 casos de teste novos
+(`npm test` do módulo: **304 casos**).
+
+**Pronto quando** (seção 7): *o dono simula dez persianas reais do WhatsApp e o
+simulador bate com o que a fábrica cortaria.* — **ainda não feito.** Os três
+exemplos da §4.5, o kit da §4.7 e o preço da §4.8 estão travados por teste, e o
+R$ 209,00 foi conferido pelo fio, mas isso é indício: a régua é o dono com dez
+pedidos reais na mão.
+
+### As duas decisões que a seção 8 marcava "antes da fase 1" — respondidas
+
+**1. A tabela A/B/C é um PERCENTUAL por tabela**, guardado em inteiro, mais o
+desconto da revenda — e não um preço por coleção em cada tabela.
+
+O preço do m² já tem dono único por item no módulo (`tecido.preco_m2`, com
+histórico, e as duas telas que o editam chamam a mesma rota). Uma matriz
+3 × N coleções faria cada coleção nova **nascer sem preço em duas das três
+tabelas, em silêncio** — a doença dos "mínimos são placeholder" e do alvo velho
+do `CLAUDE.md` §18 —, e faria a fórmula da §4.8 ter três respostas para a mesma
+pergunta. O risco que a matriz pareceria resolver (preço andando para trás,
+armadilha #15) **já está resolvido pelo congelamento no envio**.
+
+> O cadastro da tabela é da **fase 2**. A fase 1 entrega o **subtotal
+> Deccorar**, que é exatamente o que o exemplo da §4.8 chama de "tabela sem
+> desconto". Se um dia uma coleção precisar de preço próprio numa tabela, isso
+> entra como **linha de exceção** — visível, uma —, nunca como matriz inteira.
+
+**2. O modelo NÃO aponta para uma linha: ele aponta para uma LISTA de
+coleções**, e cada coleção já carrega a linha dela.
+
+Sai do schema, não de palpite: `abertura` pendura em `linha` com
+`UNIQUE(linha_id,nome)` e o `criarTecido` recusa `abertura_de_outra_linha` — a
+linha **já está dentro** da coleção. Guardá-la também no modelo seria uma
+segunda afirmação sobre o mesmo fato, e é o defeito do `linhaSel`/`linhaForm`
+de 15/09/2026 (o formulário descrevia `Double Vision` com uma coleção do
+`Rolô`). Além disso não são a mesma coisa: `linha` é a família do **tecido**
+(Rolô, Romana, Double Vision), o modelo é o **mecanismo** (Rolô, Duplex,
+Motorizada) — Rolô e Motorizada partilham o tecido.
+
+> ⚠️ **Confirmar no cadastro real.** O `tecido.db` não está no repositório, e a
+> resposta acima é estrutural — vale de qualquer jeito. O que depende do dado é
+> **quais** coleções ligar a cada modelo: `node tecido/ver_cadastro.js` no
+> servidor responde em um comando, e só lê.
+
+### Mudanças no caminho (fase 1)
+
+1. **As tabelas levam prefixo `sm_`.** O esboço da §6 propunha `modelo`,
+   `componente_sm`, `ficha_linha`. O módulo já tinha 27 tabelas sobre estoque
+   de tecido: `modelo` e `componente` sozinhos obrigariam quem lê a adivinhar
+   de qual dos dois assuntos são — e as duas palavras já querem dizer outra
+   coisa no PCP.
+2. **O dono único chama-se `persiana.js`, não `ficha_sm.js`.** Ele não devolve
+   uma ficha: devolve degrau, cortes, consumo, kit, preço, avisos e recusas —
+   "o que esta persiana é", que é o nome da pergunta.
+3. **`sm_degrau_tubo` nasce SEM `componente_id`.** Ligar o degrau ao tubo
+   comprado é pergunta de Compras (fase 4), e coluna que não faz nada é mentira
+   na tela de cadastro. Ela entra por `ALTER` quando houver o que ligar.
+4. **Área em mm² inteiro** (1 m² = 1.000.000), e não `REAL`. É o que faz a
+   divisa "3,0 m² fica no degrau de baixo" existir de verdade, sem depender de
+   tolerância de ponto flutuante.
+5. **O resultado traz um bloco `opcoes`**, calculado sempre. A §4.6 manda a
+   opção de bandô sumir da tela *na hora, com a frase* — e uma tela só faz isso
+   se souber antes de tentar. Descobrir pela recusa daria a frase certa e
+   nenhuma persiana calculada junto.
+
+### O que a fase 1 deixou explicitamente aberto
+
+- **O vendedor entra por uma área larga demais.** Não foi criada área nova no
+  PCP: até a fase 2, quem usa o catálogo e o simulador precisa de "Sob medida —
+  cadastros", que também dá cadastro de tecido, parâmetros e descarte de sobra.
+- **As coleções de venda não são semeadas** — elas apontam para linhas de
+  `abertura` que só existem no cadastro real. Ligar cada uma e lançar o preço
+  do m² é o primeiro trabalho na tela de Catálogo.
+- **O consumo nasce igual ao corte.** A coluna existe desde o primeiro dia
+  (armadilha #18); as folgas reais ainda não foram medidas.
 
 > **Onde mora:** tudo dentro do `/sobmedida`, no banco `tecido.db`, com as
 > migrações numeradas de `tecido/nucleo/schema.js`. Nada nasce fora do PCP:
@@ -702,8 +783,8 @@ as revendas recebem acesso.
 
 | Antes da fase | Pergunta | Proposta desta spec |
 |---|---|---|
-| 1 | Tabela A/B/C é um **percentual** sobre o preço da coleção, ou um **preço por coleção** em cada tabela? | Percentual por tabela, mais o desconto da revenda |
-| 1 | O modelo aponta para a `linha` do tecido, ou aceita coleções de mais de uma linha? | Investigar no cadastro real; a Motorizada provavelmente usa tecidos do Rolô |
+| ~~1~~ | ~~Tabela A/B/C é um **percentual** sobre o preço da coleção, ou um **preço por coleção** em cada tabela?~~ | **RESPONDIDA em 22/09/2026: percentual por tabela**, em inteiro, mais o desconto da revenda. Ver o STATUS da fase 1 |
+| ~~1~~ | ~~O modelo aponta para a `linha` do tecido, ou aceita coleções de mais de uma linha?~~ | **RESPONDIDA em 22/09/2026: o modelo NÃO guarda linha** — aponta para uma lista de coleções, e cada uma já carrega a sua. Ver o STATUS da fase 1 |
 | 3 | A revenda pode editar ou cancelar um pedido **enviado e ainda não aprovado**? Editar recalcula o prazo? | Pode; editar devolve para rascunho e o reenvio recalcula prazo e preço |
 | 3 | O admin altera um pedido aprovado até quando? | Até a primeira etiqueta impressa; depois, só cancelando o item com registro e lançando outro |
 | 3 | Feriado **no meio** da semana de produção também empurra o prazo, ou só o feriado no dia da entrega? | Só o dia da entrega (foi o exemplo do dono) |

@@ -49,7 +49,21 @@ const CHAVES=[
   {chave:'rolo.ajustar',      nome:'Ajustar saldo de rolo'},
   {chave:'plano.calcular',    nome:'Calcular plano de corte'},
   {chave:'plano.confirmar',   nome:'Confirmar plano (baixa o estoque)'},
-  {chave:'painel.ler',        nome:'Painel e relatorios'}
+  {chave:'painel.ler',        nome:'Painel e relatorios'},
+
+  /* ── O CATALOGO DO SOB MEDIDA (spec SOBMEDIDA-PEDIDO-REVENDA, fase 1) ────
+     Duas chaves, e a divisao e a mesma de sempre: ver o catalogo e o que o
+     simulador precisa; mexer nele muda o que a fabrica corta e o que o
+     cliente paga.
+
+     ⚠️ NENHUMA DAS DUAS ESTA NO CORTADOR, e isso e decisao da fase 1: o
+     catalogo e o simulador sao escritorio (tela escura, muitos numeros), e
+     na fase 1 quem usa e a equipe interna lancando os pedidos do WhatsApp.
+     O papel proprio do VENDEDOR e da fase 2 — ate la ele entra pela area
+     "Sob medida - cadastros" do PCP, que e mais larga do que precisa. Isso
+     esta escrito aqui para nao se descobrir por acidente. */
+  {chave:'catalogo.ler',      nome:'Ver o catalogo de venda e usar o simulador'},
+  {chave:'catalogo.editar',   nome:'Editar modelo, colecoes de venda, escada de tubos, ficha e precos'}
 ];
 
 const PAPEIS={

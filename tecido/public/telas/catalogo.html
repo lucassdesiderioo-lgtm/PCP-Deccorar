@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catálogo · Sob medida</title>
+<link rel="stylesheet" href="/sobmedida/base.css">
+<style>
+table.lista{width:100%; border-collapse:collapse; margin-top:10px; font-size:15px}
+table.lista th,table.lista td{padding:8px; border-bottom:1px solid var(--linha); text-align:left; vertical-align:top}
+table.lista th{font-size:13px; color:var(--tinta-fraca); font-weight:600; text-transform:uppercase; letter-spacing:.04em}
+table.lista td.n{text-align:right; font-variant-numeric:tabular-nums}
+table.lista tr.inativa td{opacity:.55}
+.medida{font-family:ui-monospace,Menlo,Consolas,monospace}
+.falta{color:var(--alerta); font-weight:600}
+.editor{background:var(--cartao); border:1px solid var(--linha-forte);
+  border-radius:var(--raio); padding:12px; margin-top:10px}
+.editor .campos{align-items:flex-end}
+.editor .campo{min-width:130px}
+.editor input{width:100%}
+.erro-linha{color:var(--erro); font-size:14px; font-weight:600; margin:8px 0 0}
+.setor{font-size:12px; color:var(--tinta-fraca); text-transform:uppercase; letter-spacing:.05em}
+.hist{font-size:14px; color:var(--tinta-fraca); margin-top:8px}
+.hist div{padding:3px 0; border-bottom:1px solid var(--linha)}
+</style>
+</head>
+<body>
+<header class="topo">
+  <h1>Catálogo de venda</h1>
+  <span class="espaco"></span>
+  <span class="quem" id="quem"></span>
+</header>
+
+<div class="corpo">
+  <div class="cartao">
+    <div class="campos">
+      <div class="campo cresce">
+        <label for="modelo">Modelo</label>
+        <select id="modelo"></select>
+      </div>
+      <a class="bt" href="/sobmedida/simulador">Abrir o simulador →</a>
+    </div>
+    <p class="nota" id="sobreModelo"></p>
+  </div>
+  <div id="abas"></div>
+</div>
+
+<script src="/sobmedida/ui.js"></script>
+<script src="/sobmedida/nav.js"></script>
+<script>
+const {api,banner,el,limpar,$}=window.ui;
+
+/* As mesmas conversoes exatas do simulador: metro e reais entram como TEXTO e
+   viram inteiro por soma, nunca por `Number(x)*1000`. `1.007*1000` da
+   1007.0000000000001, e o servidor recusa milimetro quebrado — com razao. */
+function paraInteiro(texto,casas){
+  const t=String(texto==null?'':texto).trim().replace('.',',');
+  if(!t) return null;
+  const m=new RegExp('^(\\d+)(?:,(\\d{0,'+casas+'}))?$').exec(t);
+  if(!m) return NaN;
+  return Number(m[1])*Math.pow(10,casas)+Number((m[2]||'').padEnd(casas,'0'));
+}
+const paraMm=t=>paraInteiro(t,3);
+const paraCentavos=t=>paraInteiro(t,2);
+const emMetros=v=>v==null?'':(v/1000).toFixed(3).replace('.',',');
+const emM2=v=>v==null?'':(v/1000000).toFixed(3).replace('.',',');
+const emReais=v=>v==null?'':(v/100).toFixed(2).replace('.',',');
+
+let modelo=null, aba='colecoes', editando=null, erro=null;
+
+const ABAS=[['colecoes','Coleções de venda'],['escada','Escada de tubos'],
+            ['ficha','Ficha técnica'],['kit','Kit e suportes'],
+            ['componentes','Componentes e preços']];
+
+/* ⚠️ EDITAR ABRE UMA LINHA DE CADA VEZ, e a tabela continua so de leitura.
+   E a licao da ficha de Compras (CLAUDE.md secao 7-B): dez campos em duas
+   linhas de tabela por material davam para editar e nao davam para LER — e
+   ficha que ninguem consegue ler e ficha que ninguem confere. */
+function editor(campos, aoSalvar, aoCancelar){
+  const box=el('div',{class:'editor'});
+  const linha=el('div',{class:'campos'});
+  const entradas={};
+  campos.forEach(c=>{
+    const b=el('div',{class:'campo'},[el('label',{},[c.rotulo])]);
+    const i=el('input',{type:'text', value:c.valor==null?'':String(c.valor),
+      placeholder:c.dica||'', 'aria-label':c.rotulo});
+    entradas[c.chave]=i; b.appendChild(i); linha.appendChild(b);
+  });
+  const salvar=el('button',{class:'bt primario',type:'button'},['Salvar']);
+  const cancelar=el('button',{class:'bt',type:'button'},['Cancelar']);
+  salvar.addEventListener('click',()=>{
+    const valores={};
+    campos.forEach(c=>{ valores[c.chave]=entradas[c.chave].value; });
+    aoSalvar(valores);
+  });
+  cancelar.addEventListener('click',aoCancelar);
+  linha.appendChild(el('div',{class:'campo'},[salvar]));
+  linha.appendChild(el('div',{class:'campo'},[cancelar]));
+  box.appendChild(linha);
+  /* ⚠️ A RECUSA FICA NA PROPRIA LINHA, com o que foi digitado ainda no campo.
+     `alert()` seguido de redesenho apagava o texto e devolvia o valor velho —
+     quem editava via a recusa e um numero que nao era o seu (secao 7-B). */
+  if(erro) box.appendChild(el('p',{class:'erro-linha'},[erro]));
+  return box;
+}
+
+const botao=(texto,clique,classe)=>{
+  const b=el('button',{class:'bt pequeno'+(classe?' '+classe:''),type:'button'},[texto]);
+  b.addEventListener('click',clique); return b;
+};
+
+async function tentar(fn){
+  try{ erro=null; await fn(); editando=null; await recarregar(); }
+  catch(e){ erro=e.mensagem||'Não deu para salvar.'; desenhar(); }
+}
+
+// ── Coleções de venda ──────────────────────────────────────────────────────
+function abaColecoes(){
+  const c=el('div',{class:'cartao'},[
+    el('h2',{},['Coleções de venda']),
+    el('p',{class:'nota'},['Elas APONTAM para o cadastro de tecido — a coleção e a '+
+      'linha vêm de lá, e a venda só acrescenta preço e limites. Coleção nova se '+
+      'cadastra em Cadastros → Tecido.'])
+  ]);
+  const t=el('table',{class:'lista'});
+  t.appendChild(el('thead',{},[el('tr',{},[
+    el('th',{},['Coleção']),el('th',{},['Linha']),el('th',{class:'n'},['R$/m²']),
+    el('th',{class:'n'},['Largura máx']),el('th',{class:'n'},['m² máx']),
+    el('th',{class:'n'},['Mín. faturado']),el('th',{},[''])])]));
+  const tb=el('tbody');
+  modelo.colecoes.forEach(col=>{
+    const tr=el('tr',{class:col.disponivel?'':'inativa'});
+    tr.appendChild(el('td',{},[col.colecao_nome]));
+    tr.appendChild(el('td',{class:'setor'},[col.linha_nome]));
+    // O preco so chega a quem tem custo.ver — o JSON vem sem o campo.
+    const temPreco='preco_m2_centavos' in col;
+    tr.appendChild(el('td',{class:'n'},[ temPreco
+      ? (col.preco_m2_centavos==null?el('span',{class:'falta'},['sem preço'])
+                                    :emReais(col.preco_m2_centavos)) : '·' ]));
+    tr.appendChild(el('td',{class:'n medida'},[col.largura_max_mm==null?'—':emMetros(col.largura_max_mm)]));
+    tr.appendChild(el('td',{class:'n medida'},[col.m2_max_mm2==null?'—':emM2(col.m2_max_mm2)]));
+    tr.appendChild(el('td',{class:'n medida'},[col.m2_min_faturado_mm2==null
+      ? ('('+emM2(modelo.m2_min_faturado_mm2)+')') : emM2(col.m2_min_faturado_mm2)]));
+    const acoes=el('td');
+    acoes.appendChild(botao('Limites',()=>{ editando='col-'+col.id; erro=null; desenhar(); }));
+    if(temPreco) acoes.appendChild(botao('Preço',()=>{ editando='preco-'+col.id; erro=null; desenhar(); }));
+    acoes.appendChild(botao(col.ativo?'Desativar':'Reativar',
+      ()=>tentar(()=>api('/api/sm/colecoes/'+col.id,{metodo:'PUT',corpo:{ativo:col.ativo?0:1}}))));
+    tr.appendChild(acoes);
+    tb.appendChild(tr);
+
+    if(editando==='col-'+col.id){
+      const box=el('tr',{},[el('td',{colspan:'7'},[editor([
+        {chave:'largura_max_mm',rotulo:'Largura máx (m)',valor:emMetros(col.largura_max_mm),dica:'2,800'},
+        {chave:'altura_max_mm', rotulo:'Altura máx (m)', valor:emMetros(col.altura_max_mm)},
+        {chave:'m2_max_mm2',    rotulo:'m² máx',         valor:emM2(col.m2_max_mm2)},
+        {chave:'m2_min_faturado_mm2',rotulo:'Mín. faturado (m²)',valor:emM2(col.m2_min_faturado_mm2),
+         dica:emM2(modelo.m2_min_faturado_mm2)}
+      ],v=>{
+        /* ⚠️ CAMPO VAZIO AQUI QUER DIZER "SEM LIMITE PROPRIO" (null), e nao
+           zero — por isso ele e mandado explicitamente. O que NAO e mandado e
+           o preco: ele tem porta propria, com historico. */
+        const corpo={
+          largura_max_mm: v.largura_max_mm.trim()?paraMm(v.largura_max_mm):null,
+          altura_max_mm:  v.altura_max_mm.trim()?paraMm(v.altura_max_mm):null,
+          m2_max_mm2:     v.m2_max_mm2.trim()?paraInteiro(v.m2_max_mm2,6):null,
+          m2_min_faturado_mm2: v.m2_min_faturado_mm2.trim()?paraInteiro(v.m2_min_faturado_mm2,6):null
+        };
+        return tentar(()=>api('/api/sm/colecoes/'+col.id,{metodo:'PUT',corpo,silencioso:true}));
+      },()=>{ editando=null; erro=null; desenhar(); })])]);
+      tb.appendChild(box);
+    }
+    if(editando==='preco-'+col.id){
+      const box=el('tr',{},[el('td',{colspan:'7'},[
+        editor([{chave:'preco',rotulo:'R$ por m²',valor:emReais(col.preco_m2_centavos),dica:'110,00'}],
+          v=>tentar(()=>api('/api/sm/colecoes/'+col.id+'/preco',
+            {metodo:'PUT',corpo:{preco_m2_centavos:paraCentavos(v.preco)},silencioso:true})),
+          ()=>{ editando=null; erro=null; desenhar(); }),
+        historico('colecao',col.id)
+      ])]);
+      tb.appendChild(box);
+    }
+  });
+  t.appendChild(tb);
+  c.appendChild(t);
+  c.appendChild(ligarColecao());
+  c.appendChild(cores());
+  return c;
+}
+
+function historico(alvo,id){
+  const box=el('div',{class:'hist'},['carregando o histórico…']);
+  api('/api/sm/'+(alvo==='colecao'?'colecoes':'componentes')+'/'+id+'/preco/historico',{silencioso:true})
+    .then(linhas=>{
+      limpar(box);
+      if(!linhas.length) return box.appendChild(el('div',{},['Sem mudança de preço registrada.']));
+      linhas.forEach(l=>box.appendChild(el('div',{},[
+        l.criado_em+' · '+(l.de==null?'sem preço':'R$ '+emReais(l.de))+' → R$ '+emReais(l.para)+
+        ' · '+(l.usuario_nome||'—')])));
+    })
+    .catch(()=>{ limpar(box); });   // quem nao ve custo simplesmente nao ve isto
+  return box;
+}
+
+function ligarColecao(){
+  const box=el('div',{class:'editor'});
+  const sel=el('select',{id:'novaColecao'});
+  const campo=el('div',{class:'campo cresce'},[el('label',{},['Ligar uma coleção do cadastro de tecido']),sel]);
+  const preco=el('input',{type:'text',placeholder:'110,00','aria-label':'R$ por m²'});
+  const linha=el('div',{class:'campos'},[campo,
+    el('div',{class:'campo'},[el('label',{},['R$ por m² (pode ficar vazio)']),preco])]);
+  const bt=el('button',{class:'bt primario',type:'button'},['Ligar']);
+  bt.addEventListener('click',()=>{
+    if(!sel.value) return banner('Escolha a coleção.','alerta');
+    const corpo={abertura_id:Number(sel.value)};
+    if(preco.value.trim()) corpo.preco_m2_centavos=paraCentavos(preco.value);
+    tentar(()=>api('/api/sm/modelos/'+modelo.id+'/colecoes',{metodo:'POST',corpo,silencioso:true}));
+  });
+  linha.appendChild(el('div',{class:'campo'},[bt]));
+  box.appendChild(linha);
+  if(erro&&!editando) box.appendChild(el('p',{class:'erro-linha'},[erro]));
+
+  api('/api/linhas').then(async linhas=>{
+    const ligadas=modelo.colecoes.map(c=>c.abertura_id);
+    for(const l of linhas){
+      const abs=await api('/api/aberturas?linha_id='+l.id);
+      abs.filter(a=>ligadas.indexOf(a.id)<0).forEach(a=>{
+        const o=el('option',{value:String(a.id)},[l.nome+' · '+a.nome+(a.ativo?'':' (inativa)')]);
+        sel.appendChild(o);
+      });
+    }
+    if(!sel.options.length) sel.appendChild(el('option',{value:''},['— todas as coleções já estão ligadas —']));
+  });
+  return box;
+}
+
+function cores(){
+  const box=el('div',{class:'editor'});
+  const f=el('div',{class:'fileira'});
+  modelo.cores_acessorio.forEach(c=>f.appendChild(
+    el('span',{class:'op','aria-pressed':'true'},[c.cor_nome])));
+  if(!modelo.cores_acessorio.length) f.appendChild(el('span',{class:'falta'},
+    ['Nenhuma cor de acessório — o simulador recusa toda persiana até ter uma.']));
+  const sel=el('select');
+  const bt=el('button',{class:'bt',type:'button'},['Adicionar cor']);
+  bt.addEventListener('click',()=>{ if(sel.value)
+    tentar(()=>api('/api/sm/modelos/'+modelo.id+'/cores',
+      {metodo:'POST',corpo:{cor_id:Number(sel.value)},silencioso:true})); });
+  api('/api/cores').then(cores=>{
+    const ja=modelo.cores_acessorio.map(c=>c.cor_id);
+    cores.filter(c=>ja.indexOf(c.id)<0).forEach(c=>
+      sel.appendChild(el('option',{value:String(c.id)},[c.nome+(c.ativo?'':' (inativa)')])));
+  });
+  box.appendChild(el('h2',{},['Cores de acessório']));
+  box.appendChild(f);
+  box.appendChild(el('div',{class:'campos'},[el('div',{class:'campo cresce'},[sel]),
+    el('div',{class:'campo'},[bt])]));
+  return box;
+}
+
+// ── Escada de tubos ────────────────────────────────────────────────────────
+function abaEscada(){
+  const c=el('div',{class:'cartao'},[
+    el('h2',{},['Escada de tubos']),
+    el('p',{class:'nota'},['Sobe até o primeiro degrau onde a persiana cabe nos DOIS '+
+      'limites. A medida exata fica no degrau de baixo: 1,700 ainda é Tubo 32. '+
+      'A escada tem que subir nos dois — degrau que aceita menos que o de baixo é recusado.'])
+  ]);
+  const t=el('table',{class:'lista'});
+  t.appendChild(el('thead',{},[el('tr',{},[
+    el('th',{},['Degrau']),el('th',{class:'n'},['Largura até']),el('th',{class:'n'},['m² até']),
+    el('th',{class:'n'},['Desconto do tubo']),el('th',{class:'n'},['Altura do tecido']),
+    el('th',{},['Bandô']),el('th',{},['Redução']),el('th',{},[''])])]));
+  const tb=el('tbody');
+  modelo.degraus.forEach(d=>{
+    tb.appendChild(el('tr',{class:d.ativo?'':'inativa'},[
+      el('td',{},[d.nome]),
+      el('td',{class:'n medida'},[emMetros(d.largura_max_mm)]),
+      el('td',{class:'n medida'},[emM2(d.m2_max_mm2)]),
+      el('td',{class:'n medida'},['− '+d.desconto_mm+' mm']),
+      el('td',{class:'n medida'},['final + '+d.acrescimo_altura_tecido_mm+' mm']),
+      el('td',{},[d.aceita_bando?'sim':'não']),
+      el('td',{},[d.aceita_reducao?'pode pedir':'não tem']),
+      el('td',{},[botao('Editar',()=>{ editando='deg-'+d.id; erro=null; desenhar(); })])
+    ]));
+    if(editando==='deg-'+d.id) tb.appendChild(el('tr',{},[el('td',{colspan:'8'},[editor([
+      {chave:'nome',rotulo:'Nome',valor:d.nome},
+      {chave:'largura_max_mm',rotulo:'Largura até (m)',valor:emMetros(d.largura_max_mm)},
+      {chave:'m2_max_mm2',rotulo:'m² até',valor:emM2(d.m2_max_mm2)},
+      {chave:'desconto_mm',rotulo:'Desconto (mm)',valor:d.desconto_mm},
+      {chave:'acrescimo_altura_tecido_mm',rotulo:'Altura tecido (mm)',valor:d.acrescimo_altura_tecido_mm},
+      {chave:'aceita_bando',rotulo:'Aceita bandô (s/n)',valor:d.aceita_bando?'s':'n'},
+      {chave:'aceita_reducao',rotulo:'Redução pedida (s/n)',valor:d.aceita_reducao?'s':'n'}
+    ],v=>tentar(()=>api('/api/sm/degraus/'+d.id,{metodo:'PUT',silencioso:true,corpo:{
+      nome:v.nome, largura_max_mm:paraMm(v.largura_max_mm), m2_max_mm2:paraInteiro(v.m2_max_mm2,6),
+      desconto_mm:Number(v.desconto_mm), acrescimo_altura_tecido_mm:Number(v.acrescimo_altura_tecido_mm),
+      aceita_bando:/^s/i.test(v.aceita_bando), aceita_reducao:/^s/i.test(v.aceita_reducao)
+    }})),()=>{ editando=null; erro=null; desenhar(); })])]));
+  });
+  t.appendChild(tb);
+  c.appendChild(t);
+  return c;
+}
+
+// ── Ficha técnica ──────────────────────────────────────────────────────────
+function abaFicha(){
+  const c=el('div',{class:'cartao'},[
+    el('h2',{},['Ficha técnica']),
+    el('p',{class:'nota'},['Cada linha é REFERÊNCIA + AJUSTE. As referências são '+
+      '"final" (a medida acabada), "degrau" (o desconto ou o acréscimo do tubo) ou a '+
+      'chave de um componente calculado ANTES desta linha.']),
+    el('p',{class:'nota'},['⚠️ Corte e consumo são DOIS números e nunca fecham. O de '+
+      'corte vai para a etiqueta; o de consumo, para Compras e para o custo. Quem '+
+      'unificar está cortando ou a peça ou o custo.'])
+  ]);
+  const t=el('table',{class:'lista'});
+  t.appendChild(el('thead',{},[el('tr',{},[
+    el('th',{},['#']),el('th',{},['Componente']),el('th',{},['Quando']),
+    el('th',{},['Corta a']),el('th',{},['Consome']),el('th',{},[''])])]));
+  const tb=el('tbody');
+  const refTexto=(r,a)=>!r?'—':(r+(a?(a>0?' + '+a:' − '+Math.abs(a)):'')+' mm');
+  modelo.ficha.slice().sort((x,y)=>x.ordem-y.ordem).forEach(f=>{
+    tb.appendChild(el('tr',{class:f.ativo?'':'inativa'},[
+      el('td',{class:'n'},[String(f.ordem)]),
+      el('td',{},[f.componente_nome, el('div',{class:'setor'},[f.setor+' · '+f.chave])]),
+      el('td',{},[f.quando]),
+      el('td',{class:'medida'},[refTexto(f.ref_largura,f.ajuste_largura_mm)+
+        (f.ref_altura?(' × '+refTexto(f.ref_altura,f.ajuste_altura_mm)):'')]),
+      el('td',{class:'medida'},[refTexto(f.consumo_ref_largura,f.consumo_ajuste_largura_mm)+
+        (f.consumo_ref_altura?(' × '+refTexto(f.consumo_ref_altura,f.consumo_ajuste_altura_mm)):'')]),
+      el('td',{},[botao('Editar',()=>{ editando='fic-'+f.id; erro=null; desenhar(); })])
+    ]));
+    if(editando==='fic-'+f.id) tb.appendChild(el('tr',{},[el('td',{colspan:'6'},[editor([
+      {chave:'ref_largura',rotulo:'Corte: ref largura',valor:f.ref_largura,dica:'final | degrau | tubo'},
+      {chave:'ajuste_largura_mm',rotulo:'Corte: ajuste (mm)',valor:f.ajuste_largura_mm,dica:'-5'},
+      {chave:'ref_altura',rotulo:'Corte: ref altura',valor:f.ref_altura},
+      {chave:'ajuste_altura_mm',rotulo:'Corte: ajuste (mm)',valor:f.ajuste_altura_mm},
+      {chave:'consumo_ref_largura',rotulo:'Consumo: ref largura',valor:f.consumo_ref_largura},
+      {chave:'consumo_ajuste_largura_mm',rotulo:'Consumo: ajuste (mm)',valor:f.consumo_ajuste_largura_mm},
+      {chave:'consumo_ref_altura',rotulo:'Consumo: ref altura',valor:f.consumo_ref_altura},
+      {chave:'consumo_ajuste_altura_mm',rotulo:'Consumo: ajuste (mm)',valor:f.consumo_ajuste_altura_mm}
+    ],v=>{
+      const corpo={};
+      Object.keys(v).forEach(k=>{
+        const t=v[k].trim();
+        corpo[k]=/ajuste/.test(k) ? (t===''?null:Number(t.replace(',','.'))) : (t===''?null:t);
+      });
+      return tentar(()=>api('/api/sm/ficha/'+f.id,{metodo:'PUT',corpo,silencioso:true}));
+    },()=>{ editando=null; erro=null; desenhar(); })])]));
+  });
+  t.appendChild(tb);
+  c.appendChild(t);
+  return c;
+}
+
+// ── Kit e suportes ─────────────────────────────────────────────────────────
+function abaKit(){
+  const c=el('div',{class:'cartao'},[
+    el('h2',{},['Faixas de suporte']),
+    el('p',{class:'nota'},['Quantos suportes o kit leva, pela largura. A medida exata '+
+      'fica no degrau de baixo: 1,000 → 2 suportes, 1,001 → 3. O kit tradicional usa '+
+      'os suportes padrão dele e não passa por aqui.'])
+  ]);
+  const t=el('table',{class:'lista'});
+  t.appendChild(el('thead',{},[el('tr',{},[
+    el('th',{class:'n'},['Largura até']),el('th',{class:'n'},['Suportes']),el('th',{},[''])])]));
+  const tb=el('tbody');
+  modelo.faixas_suporte.forEach(f=>tb.appendChild(el('tr',{},[
+    el('td',{class:'n medida'},[emMetros(f.largura_max_mm)]),
+    el('td',{class:'n'},[String(f.quantidade)]),
+    el('td',{},[botao('Apagar',()=>tentar(()=>api('/api/sm/faixas/'+f.id,{metodo:'DELETE',silencioso:true})),'perigo')])
+  ])));
+  t.appendChild(tb);
+  c.appendChild(t);
+
+  const nova=el('div',{class:'editor'});
+  const l=el('input',{type:'text',placeholder:'3,000','aria-label':'Largura até'});
+  const q=el('input',{type:'text',placeholder:'5','aria-label':'Suportes'});
+  const bt=el('button',{class:'bt primario',type:'button'},['Acrescentar faixa']);
+  bt.addEventListener('click',()=>tentar(()=>api('/api/sm/modelos/'+modelo.id+'/faixas',
+    {metodo:'POST',silencioso:true,corpo:{largura_max_mm:paraMm(l.value),quantidade:Number(q.value)}})));
+  nova.appendChild(el('div',{class:'campos'},[
+    el('div',{class:'campo'},[el('label',{},['Largura até (m)']),l]),
+    el('div',{class:'campo'},[el('label',{},['Suportes']),q]),
+    el('div',{class:'campo'},[bt])]));
+  if(erro) nova.appendChild(el('p',{class:'erro-linha'},[erro]));
+  c.appendChild(nova);
+
+  const r=modelo.reducao||{};
+  const red=el('div',{class:'editor'},[
+    el('h2',{},['Redução de peso — a regra de garantia']),
+    el('p',{class:'nota'},['Acima de qualquer um dos dois a redução entra sozinha, e é '+
+      'cobrada do mesmo jeito. A tela do simulador diz "incluída pela regra de garantia".'])
+  ]);
+  const rm=el('input',{type:'text',value:emM2(r.m2_acima_mm2),placeholder:'4,500','aria-label':'m² acima de'});
+  const rl=el('input',{type:'text',value:emMetros(r.largura_acima_mm),placeholder:'2,200','aria-label':'largura acima de'});
+  const rb=el('button',{class:'bt primario',type:'button'},['Salvar a regra']);
+  rb.addEventListener('click',()=>tentar(()=>api('/api/sm/modelos/'+modelo.id+'/reducao',
+    {metodo:'PUT',silencioso:true,corpo:{
+      m2_acima_mm2: rm.value.trim()?paraInteiro(rm.value,6):null,
+      largura_acima_mm: rl.value.trim()?paraMm(rl.value):null}})));
+  red.appendChild(el('div',{class:'campos'},[
+    el('div',{class:'campo'},[el('label',{},['Acima de (m²)']),rm]),
+    el('div',{class:'campo'},[el('label',{},['ou acima da largura (m)']),rl]),
+    el('div',{class:'campo'},[rb])]));
+  c.appendChild(red);
+  return c;
+}
+
+// ── Componentes ────────────────────────────────────────────────────────────
+function abaComponentes(){
+  const c=el('div',{class:'cartao'},[
+    el('h2',{},['Componentes e preços']),
+    el('p',{class:'nota'},['O preço do tecido é o da COLEÇÃO (aba Coleções de venda). '+
+      'Aqui ficam os que têm preço próprio: bandô e barra por metro linear da largura '+
+      'real, redução de peso por peça.'])
+  ]);
+  const t=el('table',{class:'lista'});
+  t.appendChild(el('thead',{},[el('tr',{},[
+    el('th',{},['Componente']),el('th',{},['Setor']),el('th',{},['Cobrança']),
+    el('th',{class:'n'},['Preço']),el('th',{},['Código de barras']),el('th',{},[''])])]));
+  const tb=el('tbody');
+  (window.__componentes||[]).forEach(comp=>{
+    const temPreco='preco_centavos' in comp;
+    tb.appendChild(el('tr',{class:comp.ativo?'':'inativa'},[
+      el('td',{},[comp.nome, el('div',{class:'setor'},[comp.chave])]),
+      el('td',{class:'setor'},[comp.setor]),
+      el('td',{},[comp.unidade_cobranca||'não cobra']),
+      el('td',{class:'n'},[ temPreco
+        ? (comp.preco_centavos==null?'—':'R$ '+emReais(comp.preco_centavos)) : '·' ]),
+      el('td',{class:'medida'},[comp.codigo_barras||'—']),
+      el('td',{},[ temPreco&&comp.unidade_cobranca&&comp.unidade_cobranca!=='m2_colecao'
+        ? botao('Preço',()=>{ editando='comp-'+comp.id; erro=null; desenhar(); }) : '' ])
+    ]));
+    if(editando==='comp-'+comp.id) tb.appendChild(el('tr',{},[el('td',{colspan:'6'},[
+      editor([{chave:'preco',rotulo:'R$ por '+comp.unidade_cobranca,
+        valor:emReais(comp.preco_centavos),dica:'55,00'}],
+        v=>tentar(()=>api('/api/sm/componentes/'+comp.id+'/preco',
+          {metodo:'PUT',corpo:{preco_centavos:paraCentavos(v.preco)},silencioso:true})),
+        ()=>{ editando=null; erro=null; desenhar(); }),
+      historico('componente',comp.id)
+    ])]));
+  });
+  t.appendChild(tb);
+  c.appendChild(t);
+  return c;
+}
+
+// ── Moldura ────────────────────────────────────────────────────────────────
+function desenhar(){
+  const raiz=limpar($('#abas'));
+  const barra=el('div',{class:'abas'});
+  ABAS.forEach(([chave,nome])=>{
+    const b=el('button',{type:'button','aria-selected':String(aba===chave)},[nome]);
+    b.addEventListener('click',()=>{ aba=chave; editando=null; erro=null; desenhar(); });
+    barra.appendChild(b);
+  });
+  raiz.appendChild(barra);
+  raiz.appendChild({colecoes:abaColecoes, escada:abaEscada, ficha:abaFicha,
+                    kit:abaKit, componentes:abaComponentes}[aba]());
+
+  $('#sobreModelo').textContent='Mínimo faturado de '+emM2(modelo.m2_min_faturado_mm2)+
+    ' m² · '+modelo.degraus.length+' degraus · '+modelo.colecoes.length+' coleções ligadas · '+
+    modelo.ficha.length+' linhas de ficha.';
+}
+
+async function recarregar(){
+  modelo=await api('/api/sm/modelos/'+modelo.id);
+  window.__componentes=await api('/api/sm/componentes');
+  desenhar();
+}
+
+(async function(){
+  const eu=await api('/api/eu');
+  $('#quem').textContent=eu.nome;
+  const modelos=await api('/api/sm/modelos');
+  const sel=$('#modelo');
+  modelos.forEach(m=>sel.appendChild(el('option',{value:String(m.id)},[m.nome])));
+  if(!modelos.length) return banner('Nenhum modelo cadastrado.','alerta');
+  modelo={id:modelos[0].id};
+  sel.addEventListener('change',()=>{ modelo={id:Number(sel.value)}; editando=null; recarregar(); });
+  await recarregar();
+})();
+</script>
+</body>
+</html>

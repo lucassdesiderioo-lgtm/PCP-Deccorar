@@ -27,9 +27,17 @@ const acesso=require('./nucleo/acesso');
 const {TELAS}=require('./nucleo/telas');
 const {pode}=require('./nucleo/permissoes');
 
+/* A LISTA DE MODULOS DE ROTA, e ela e EXPORTADA de proposito.
+   O `teste/acesso_operador.js` conferia "toda rota declara permissao" por uma
+   copia escrita a mao desta lista — e a copia ja tinha envelhecido: './rotas/
+   planos' nao estava nela, entao as rotas do plano de corte nao eram
+   conferidas por ninguem. E a mesma doenca da poda por lista literal e da
+   TODAS_ROTAS do PCP (CLAUDE.md secao 10, armadilha #29): lista mantida a mao
+   nao acompanha o codigo, e o furo e silencioso dos dois lados.
+   Agora ha uma lista so, e ela e esta. */
 const MODULOS=[
   './rotas/eu','./rotas/cadastros','./rotas/parametros','./rotas/sobras',
-  './rotas/rolos','./rotas/planos','./rotas/painel'
+  './rotas/rolos','./rotas/planos','./rotas/painel','./rotas/catalogo_sm'
 ];
 
 // A pessoa esta logada no PCP mas ninguem marcou a area dela. A mensagem diz
@@ -123,4 +131,4 @@ function montar(app, prefixo){
   console.log('[sobmedida] montado em '+pre+' — banco '+db.arquivo);
 }
 
-module.exports={montar, AREAS_PCP:acesso.AREAS_PCP, PREFIXO:'/sobmedida'};
+module.exports={montar, MODULOS, AREAS_PCP:acesso.AREAS_PCP, PREFIXO:'/sobmedida'};

@@ -646,6 +646,262 @@ CREATE TABLE tecido_preco (
   criado_em TEXT DEFAULT (datetime('now','localtime'))
 );
 CREATE INDEX idx_tecido_preco ON tecido_preco(tecido_id);
+`},
+
+{n:16, nome:'o catalogo do sob medida — modelo, escada de tubos e ficha tecnica', sql:`
+/* ═══ O PEDIDO SOB MEDIDA ENTRA NO SISTEMA ════════════════════════════════
+   Fase 1 da spec SOBMEDIDA-PEDIDO-REVENDA: o catalogo e a ficha tecnica.
+   Nenhum pedido, nenhuma revenda, nenhuma etiqueta — isso e da 3 em diante.
+
+   ⚠️ PREFIXO sm_ PORQUE O MODULO PASSOU A TER DOIS ASSUNTOS. Ate aqui todas
+   as tabelas daqui falavam de ESTOQUE DE TECIDO; estas falam de VENDA. Uma
+   tabela chamada so modelo obrigaria quem le a adivinhar de qual dos dois
+   ela e — e modelo e componente ja querem dizer outra coisa no PCP.
+
+   ⚠️ MILIMETRO INTEIRO E CENTAVO INTEIRO, em toda coluna. A conta da ficha
+   EMPILHA (o tubo tira do final, o tecido tira do tubo, a base soma no
+   tecido) e ruido de ponto flutuante compoe a cada degrau. Area em mm²
+   inteiro pelo mesmo motivo: 1 m² = 1.000.000, e a divisa "3,0 m² fica no
+   degrau de baixo" passa a existir de verdade, sem depender de tolerancia.
+   Quem entra e sai dessas unidades e o nucleo/unidade.js, porta unica. */
+
+CREATE TABLE sm_modelo (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL UNIQUE COLLATE NOCASE,      -- 'Rolo', 'Rolo Duplex'
+  /* Tetos do MODELO. NULL = sem teto proprio, e quem limita e a escada ou a
+     colecao. Vale sempre o mais restritivo dos tres (secao 4.4). */
+  largura_max_mm INTEGER, altura_max_mm INTEGER, m2_max_mm2 INTEGER,
+  m2_min_faturado_mm2 INTEGER NOT NULL DEFAULT 1500000,   -- 1,5 m²
+  ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+  criado_em TEXT DEFAULT (datetime('now','localtime')), criado_por TEXT
+);
+
+/* ⚠️ A COLECAO DE VENDA APONTA PARA O CADASTRO DE TECIDO. NUNCA O DUPLICA.
+   Duas listas de colecoes — uma de venda, outra de estoque — divergiriam no
+   primeiro tecido novo, e o pedido chegaria ao plano de corte pedindo um
+   tecido que o estoque nao reconhece (secao 4.3 da spec).
+
+   ⚠️ E O MODELO NAO GUARDA LINHA — decisao da secao 8, respondida em
+   22/09/2026. A abertura ja pendura em linha com UNIQUE(linha_id,nome), e
+   o criarTecido recusa abertura_de_outra_linha: a linha JA ESTA DENTRO da
+   colecao. Guardar tambem no modelo seria uma segunda afirmacao sobre o mesmo
+   fato, e as duas divergiriam — e exatamente o defeito do linhaSel/linhaForm
+   de 15/09/2026, em que o formulario descrevia Double Vision com uma colecao
+   do Rolo. Alem disso os dois nao sao a mesma coisa: linha e a familia do
+   TECIDO (Rolo, Romana, Double Vision) e o modelo e o MECANISMO (Rolo, Rolo
+   Duplex, Rolo Motorizada) — Rolo e Motorizada partilham o mesmo tecido.
+
+   O que a venda acrescenta e o que o estoque nao tem: preco por m², largura
+   maxima, m² maximo e minimo faturado. */
+CREATE TABLE sm_modelo_colecao (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  modelo_id INTEGER NOT NULL REFERENCES sm_modelo(id),
+  abertura_id INTEGER NOT NULL REFERENCES abertura(id),
+  /* NULL nao e zero: e "ainda nao se sabe". Custo indefinido nunca vira zero
+     (regra 4 do COMPRAS.md) — o total sai como PISO e a linha e nomeada. */
+  preco_m2_centavos INTEGER,
+  largura_max_mm INTEGER, altura_max_mm INTEGER, m2_max_mm2 INTEGER,
+  m2_min_faturado_mm2 INTEGER,                   -- NULL = usa o do modelo
+  ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+  UNIQUE(modelo_id, abertura_id)
+);
+
+/* A cor dos acessorios (base, ponteiras) sai da MESMA tabela cor do
+   cadastro de tecido. Uma segunda lista de cores multiplicaria o mesmo
+   punhado de nomes, que e a armadilha da "Napoles Bege" do README. */
+CREATE TABLE sm_modelo_cor_acessorio (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  modelo_id INTEGER NOT NULL REFERENCES sm_modelo(id),
+  cor_id INTEGER NOT NULL REFERENCES cor(id),
+  ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+  UNIQUE(modelo_id, cor_id)
+);
+
+/* O QUE A PERSIANA LEVA DENTRO. Nao e o material de compra (isso e do
+   COMPRAS.md, e chega na fase 4): e a peca que vira etiqueta, que tem setor,
+   e que as vezes tem preco proprio.
+
+   unidade_cobranca diz DE ONDE sai o preco daquela linha:
+     m2_colecao   o preco do m² da colecao escolhida (o tecido)
+     metro        preco por metro linear da largura REAL (bando, barra)
+     peca         preco fixo por peca (reducao de peso)
+     NULL         nao cobra — e a maioria */
+CREATE TABLE sm_componente (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chave TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  nome TEXT NOT NULL,
+  setor TEXT NOT NULL,            -- serralheria|colecao|montagem|revisao|embalagem
+  gera_etiqueta INTEGER NOT NULL DEFAULT 1,
+  eh_kit INTEGER NOT NULL DEFAULT 0,
+  /* O kit tradicional leva os suportes PADRAO dele; os de bando e de barra
+     contam pela largura (secao 4.7). A diferenca e cadastro, nao if. */
+  usa_faixa_suporte INTEGER NOT NULL DEFAULT 0,
+  codigo_barras TEXT UNIQUE COLLATE NOCASE,
+  preco_centavos INTEGER,
+  unidade_cobranca TEXT,
+  largura_max_mm INTEGER, altura_max_mm INTEGER,   -- limite DESTE componente
+  ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1
+);
+
+/* A ESCADA DE TUBOS. Sobe ate o primeiro degrau onde a persiana cabe nos
+   DOIS limites: largura e m². Passou de qualquer um dos dois, sobe.
+   A medida exata fica no degrau de baixo.
+
+   Nao ha coluna de material aqui na fase 1, e e de proposito: ligar o degrau
+   ao tubo comprado e pergunta de Compras (fase 4), e coluna que nao faz nada
+   e mentira na tela de cadastro. Ela entra por ALTER quando houver o que
+   ligar — nunca recriando a tabela. */
+CREATE TABLE sm_degrau_tubo (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  modelo_id INTEGER NOT NULL REFERENCES sm_modelo(id),
+  ordem INTEGER NOT NULL,
+  nome TEXT NOT NULL,                             -- 'Tubo 32'
+  largura_max_mm INTEGER NOT NULL,
+  m2_max_mm2 INTEGER NOT NULL,
+  desconto_mm INTEGER NOT NULL,                   -- o tubo = final - isto
+  acrescimo_altura_tecido_mm INTEGER NOT NULL,    -- o tecido = final + isto
+  aceita_bando INTEGER NOT NULL DEFAULT 0,
+  aceita_reducao INTEGER NOT NULL DEFAULT 0,      -- reducao PEDIDA (secao 4.6)
+  ativo INTEGER DEFAULT 1,
+  UNIQUE(modelo_id, ordem)
+);
+
+/* ⚠️ A FICHA TEM OS DOIS NUMEROS POR LINHA — armadilha #18 do CLAUDE.md, e a
+   coluna existe desde o primeiro dia mesmo nascendo igual.
+
+     corte     vai para a ETIQUETA. E a quanto a bancada corta.
+     consumo   vai para COMPRAS e para o CUSTO. E quanto a peca gasta.
+
+   No PCP os dois nunca fecham: o tubo de uma persiana de 1,60 CONSOME 1,60 m
+   da barra e e CORTADO a 1,57 — os 3 cm vao pro lixo, e precificar pela
+   medida de corte faz a fabrica parar de pagar por eles. Quem um dia
+   "unificar" esta cortando ou a peca ou o custo.
+
+   Cada linha e "referencia + ajuste" (secao 4.5), e nao linguagem de formula:
+     ref_largura   final | degrau (final - desconto) | <chave de componente>
+     ref_altura    final | degrau (final + acrescimo)
+   Se um modelo futuro precisar de expressao, ela passa pelo avaliador seguro
+   do PCP (formula.js, sem eval) — nunca por uma segunda porta.
+
+   quando diz se a linha entra: sempre | bando | barra | sem_adicional |
+   reducao. */
+CREATE TABLE sm_ficha_linha (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  modelo_id INTEGER NOT NULL REFERENCES sm_modelo(id),
+  componente_id INTEGER NOT NULL REFERENCES sm_componente(id),
+  ordem INTEGER NOT NULL,
+  quando TEXT NOT NULL DEFAULT 'sempre',
+  quantidade INTEGER NOT NULL DEFAULT 1,
+  ref_largura TEXT, ajuste_largura_mm INTEGER,
+  ref_altura  TEXT, ajuste_altura_mm  INTEGER,
+  consumo_ref_largura TEXT, consumo_ajuste_largura_mm INTEGER,
+  consumo_ref_altura  TEXT, consumo_ajuste_altura_mm  INTEGER,
+  ativo INTEGER DEFAULT 1,
+  UNIQUE(modelo_id, componente_id, quando)
+);
+
+/* Quantos suportes o kit leva, pela largura. A medida exata fica no degrau de
+   baixo: 1,000 -> 2 e 1,001 -> 3. */
+CREATE TABLE sm_faixa_suporte (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  modelo_id INTEGER NOT NULL REFERENCES sm_modelo(id),
+  largura_max_mm INTEGER NOT NULL,
+  quantidade INTEGER NOT NULL,
+  UNIQUE(modelo_id, largura_max_mm)
+);
+
+/* A reducao de peso que entra sozinha, pela regra de garantia. Ela e COBRADA
+   do mesmo jeito (secao 4.8) — e a tela diz "incluida pela regra de
+   garantia", porque acessorio cobrado sem explicacao vira ligacao da revenda
+   para o vendedor. */
+CREATE TABLE sm_reducao_regra (
+  modelo_id INTEGER PRIMARY KEY REFERENCES sm_modelo(id),
+  m2_acima_mm2 INTEGER, largura_acima_mm INTEGER
+);
+
+/* Toda mudanca de preco deixa linha, como o tecido_preco da migracao 15 e o
+   movimento_rolo. Preco que muda sem rastro e a metade do registro que nao
+   existe quando alguem pergunta "desde quando custa isto?". */
+CREATE TABLE sm_preco_historico (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  alvo TEXT NOT NULL,                             -- colecao | componente
+  alvo_id INTEGER NOT NULL,
+  de INTEGER, para INTEGER,
+  usuario_nome TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX idx_sm_preco_historico ON sm_preco_historico(alvo, alvo_id);
+
+/* ═══ O CADASTRO INICIAL DO ROLO — os numeros das secoes 4.4 a 4.8 ════════
+   ⚠️ AS COLECOES DE VENDA NAO ENTRAM AQUI, e isso nao e esquecimento: elas
+   apontam para linhas de abertura que so existem no cadastro real da
+   fabrica. Inventa-las criaria colecao duplicada, que e o primeiro ❌ da
+   secao 9 da spec. Elas se ligam na tela de Catalogo, uma vez, com o
+   catalogo na frente. */
+INSERT INTO sm_modelo(nome,m2_min_faturado_mm2,ordem) VALUES('Rolô',1500000,1);
+
+INSERT INTO sm_componente(chave,nome,setor,gera_etiqueta,eh_kit,usa_faixa_suporte,
+  codigo_barras,preco_centavos,unidade_cobranca,altura_max_mm,ordem) VALUES
+ ('tubo','Tubo','serralheria',1,0,0,NULL,NULL,NULL,NULL,1),
+ ('tecido','Tecido','colecao',1,0,0,NULL,NULL,'m2_colecao',NULL,2),
+ ('base','Base inferior','serralheria',1,0,0,NULL,NULL,NULL,NULL,3),
+ /* O bando cabe ate 3,000 de altura: acima disso o tubo enrolado nao cabe
+    dentro dele. O limite e do COMPONENTE, e nao do modelo, porque e uma
+    propriedade fisica da peca. */
+ ('bando','Bandô','serralheria',1,0,0,NULL,5500,'metro',3000,4),
+ ('barra','Barra niveladora','serralheria',1,0,0,NULL,1700,'metro',NULL,5),
+ ('reducao','Redução de peso','montagem',0,0,0,NULL,5000,'peca',NULL,6),
+ ('montagem','Montagem','montagem',1,0,0,NULL,NULL,NULL,NULL,7),
+ ('revisao','Revisão','revisao',1,0,0,NULL,NULL,NULL,NULL,8),
+ ('embalagem','Embalagem','embalagem',1,0,0,NULL,NULL,NULL,NULL,9),
+ /* CADA KIT TEM CODIGO PROPRIO. Na medida padrao o QR do kit e fixo e prova
+    so que ALGUM kit entrou (CLAUDE.md secao 4); aqui prova que entrou o
+    CERTO, e e por isso que sao tres codigos e nao um. */
+ ('kit_tradicional','Kit tradicional','embalagem',0,1,0,'KIT-TRADICIONAL',NULL,NULL,NULL,10),
+ ('kit_bando','Kit bandô','embalagem',0,1,1,'KIT-BANDO',NULL,NULL,NULL,11),
+ ('kit_barra','Kit barra','embalagem',0,1,1,'KIT-BARRA',NULL,NULL,NULL,12);
+
+INSERT INTO sm_degrau_tubo(modelo_id,ordem,nome,largura_max_mm,m2_max_mm2,
+  desconto_mm,acrescimo_altura_tecido_mm,aceita_bando,aceita_reducao)
+SELECT m.id,v.ordem,v.nome,v.lmax,v.amax,v.desc,v.acr,v.bando,v.red
+  FROM sm_modelo m, (
+    SELECT 1 ordem,'Tubo 32' nome,1700 lmax,3000000 amax,30 desc,200 acr,1 bando,0 red
+    UNION ALL SELECT 2,'Tubo 38',2200,3500000,30,200,1,1
+    UNION ALL SELECT 3,'Tubo 41',2700,5000000,40,250,0,1
+    UNION ALL SELECT 4,'Tubo 56',3000,7000000,45,250,0,1
+  ) v
+ WHERE m.nome='Rolô';
+
+/* O consumo NASCE IGUAL ao corte (v.rl/v.al aparecem duas vezes), e a coluna
+   existe desde o primeiro dia. Quando a fabrica medir a perda de verdade, o
+   consumo anda sozinho e o corte fica onde esta. */
+INSERT INTO sm_ficha_linha(modelo_id,componente_id,ordem,quando,quantidade,
+  ref_largura,ajuste_largura_mm,ref_altura,ajuste_altura_mm,
+  consumo_ref_largura,consumo_ajuste_largura_mm,consumo_ref_altura,consumo_ajuste_altura_mm)
+SELECT m.id,c.id,v.ordem,v.quando,1,v.rl,v.al,v.ra,v.aa,v.rl,v.al,v.ra,v.aa
+  FROM sm_modelo m, sm_componente c, (
+    SELECT 'tubo' chave,1 ordem,'sempre' quando,'degrau' rl,0 al,NULL ra,NULL aa
+    UNION ALL SELECT 'tecido',2,'sempre','tubo',-5,'degrau',0
+    UNION ALL SELECT 'base',3,'sempre','tecido',5,NULL,NULL
+    UNION ALL SELECT 'bando',4,'bando','final',-5,NULL,NULL
+    UNION ALL SELECT 'barra',5,'barra','final',-9,NULL,NULL
+    UNION ALL SELECT 'reducao',6,'reducao',NULL,NULL,NULL,NULL
+    UNION ALL SELECT 'montagem',7,'sempre',NULL,NULL,NULL,NULL
+    UNION ALL SELECT 'revisao',8,'sempre',NULL,NULL,NULL,NULL
+    UNION ALL SELECT 'embalagem',9,'sempre',NULL,NULL,NULL,NULL
+    UNION ALL SELECT 'kit_tradicional',10,'sem_adicional',NULL,NULL,NULL,NULL
+    UNION ALL SELECT 'kit_bando',11,'bando',NULL,NULL,NULL,NULL
+    UNION ALL SELECT 'kit_barra',12,'barra',NULL,NULL,NULL,NULL
+  ) v
+ WHERE m.nome='Rolô' AND c.chave=v.chave;
+
+INSERT INTO sm_faixa_suporte(modelo_id,largura_max_mm,quantidade)
+SELECT m.id,v.l,v.q FROM sm_modelo m, (
+  SELECT 1000 l,2 q UNION ALL SELECT 1900,3 UNION ALL SELECT 2600,4 UNION ALL SELECT 3000,5
+) v WHERE m.nome='Rolô';
+
+INSERT INTO sm_reducao_regra(modelo_id,m2_acima_mm2,largura_acima_mm)
+SELECT id,4500000,2200 FROM sm_modelo WHERE nome='Rolô';
 `}
 
 ];
