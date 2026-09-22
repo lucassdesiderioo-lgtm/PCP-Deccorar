@@ -314,21 +314,41 @@ tubo, as medidas de corte e o kit bateram com o que a fábrica cortaria.
 |---|---|
 | Coleções ligadas ao Rolô | **oito** — `1%` · `1% FB` · `3%` · `5%` · `Blackout` · `Napoles BK` · `Pinpoint BK` · `Translucido` |
 | Cores de acessório | **quatro** — Branco · Bege · Cinza · Preto |
-| R$/m² por coleção | **em branco**, o dono lança depois |
+| R$/m² por coleção | **lançado em 22/09/2026**, e conferido nas dez |
 | Largura máxima por coleção | **em branco** — quem limita é a escada |
 
 > **`Double Vision · Classic` não foi ligada**, e não é esquecimento: ela é do
 > modelo Duplex, que ainda não existe como modelo de venda. Ligá-la ao Rolô
 > faria o simulador oferecer tecido de Duplex numa persiana Rolô.
 
-> ⚠️ **ENQUANTO NÃO HOUVER PREÇO, O SIMULADOR MOSTRA `≥` — e isso é a regra
-> funcionando.** O subtotal sai nulo, o que se sabe sai como **piso** e a linha
-> do tecido é **nomeada** como sem preço. Quem ler o âmbar como tela quebrada
-> vai "consertar" somando zero, que é o custo válido e mentiroso da regra 4.
+> ⚠️ **SEM PREÇO, O SIMULADOR MOSTRA `≥` — e isso é a regra funcionando.** Os
+> preços de hoje estão lançados, mas a regra continua de pé para a coleção nova
+> de amanhã: o subtotal sai nulo, o que se sabe sai como **piso** e a linha do
+> tecido é **nomeada** como sem preço. Quem ler o âmbar como tela quebrada vai
+> "consertar" somando zero, que é o custo válido e mentiroso da regra 4.
 
-> **A conferência do PREÇO ainda não aconteceu**, e não podia: ela depende do
-> R$/m² de cada coleção, que é cadastro do dono. Quando entrar, a conferência é
-> a mesma — dez pedidos reais, comparando o total com o que foi cobrado.
+### ✅ E O PREÇO FOI CONFERIDO NA MESMA TARDE — segunda rodada de dez
+
+O R$/m² das coleções foi lançado e as **dez foram refeitas comparando o TOTAL**
+com o que foi cobrado de verdade. As dez bateram.
+
+Antes delas, duas contas escolhidas para **não depender de qual preço foi
+lançado** — e as duas bateram:
+
+| Medida | m² real | O total tinha que ser | O que prova |
+|---|---|---|---|
+| `1,000 × 1,000` | 1,000 m² | **1,5 × o preço** | o mínimo faturado está pegando |
+| `2,000 × 1,000` | 2,000 m² | **2 × o preço** | acima do mínimo quem manda é o m² real |
+
+> **São DUAS rodadas de dez, e não uma.** O corte foi conferido antes de o preço
+> existir; o preço, depois que ele foi lançado. A fase 1 tem duas metades — o
+> que a fábrica corta e o que o cliente paga — e cada uma foi conferida com a
+> outra já de pé.
+
+> ⚠️ **O TOTAL É O PREÇO DECCORAR, não o que a revenda paga.** A tabela A/B/C e
+> o desconto dela são da **fase 2**, e o card escreve isso embaixo de propósito:
+> mandar esse número para a revenda como se fosse o dela é o erro que a frase
+> existe para impedir.
 
 ---
 

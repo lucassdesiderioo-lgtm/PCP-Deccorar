@@ -5,7 +5,7 @@ STATUS
 Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 22/09/2026
-Fase atual: 1 PRONTA e CONFERIDA em produção (22/09/2026)
+Fase atual: 1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
 Fases: 1 ☑  2 ☐  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
@@ -33,8 +33,24 @@ cadastro inicial do Rolô), `tecido/dominio/persiana.js` (o dono único),
 
 **Pronto quando** (seção 7): *o dono simula dez persianas reais do WhatsApp e o
 simulador bate com o que a fábrica cortaria.* — **cumprido em 22/09/2026, dez
-de dez.** O preço ficou de fora da conferência de propósito: o R$/m² das
-coleções ainda não foi lançado, então o total sai como piso (`≥`).
+de dez**, na primeira rodada (tubo, cortes e kit).
+
+### ✅ E O PREÇO FOI CONFERIDO NA MESMA TARDE, numa segunda rodada
+
+O R$/m² das coleções foi lançado e as **dez foram refeitas comparando o
+TOTAL** com o que foi cobrado de verdade. As dez bateram.
+
+Antes delas, duas contas de aritmética, escolhidas para não depender de qual
+preço foi lançado — e as duas bateram:
+
+| Medida | m² real | O total tinha que ser | O que prova |
+|---|---|---|---|
+| `1,000 × 1,000` | 1,000 m² | **1,5 × o preço** | o mínimo faturado está pegando |
+| `2,000 × 1,000` | 2,000 m² | **2 × o preço** | acima do mínimo quem manda é o m² real |
+
+> **A fase 1 fechou nas duas metades**: o que a fábrica corta e o que o cliente
+> paga. O corte foi conferido antes do preço existir; o preço, depois — e é por
+> isso que são duas rodadas de dez, e não uma.
 
 ### O que foi cadastrado no deploy de 22/09/2026
 
@@ -42,18 +58,23 @@ coleções ainda não foi lançado, então o total sai como piso (`≥`).
 |---|---|
 | Coleções de venda ligadas ao Rolô | **oito**, todas as do `Rolo`: `1%` · `1% FB` · `3%` · `5%` · `Blackout` · `Napoles BK` · `Pinpoint BK` · `Translucido` |
 | Cores de acessório | **quatro**: Branco · Bege · Cinza · Preto |
-| Preço do m² por coleção | **em branco** — o dono lança depois |
+| Preço do m² por coleção | **lançado em 22/09/2026**, e conferido nas dez |
 | Largura máxima por coleção | **em branco** — quem limita é a escada de tubos |
 
 > **`Double Vision · Classic` ficou de fora, e não é esquecimento:** ela é do
 > modelo Duplex, que ainda não existe como modelo de venda. Ligá-la ao Rolô
 > faria o simulador oferecer tecido de Duplex numa persiana Rolô.
 
-> ⚠️ **COLEÇÃO SEM PREÇO MOSTRA `≥` E ISSO NÃO É DEFEITO.** Enquanto o R$/m²
-> não for lançado, o simulador devolve `valor_subtotal` nulo, soma o que sabe
-> como **piso** e **nomeia** a linha que falta. É a regra 4 do custo — zero é um
+> ⚠️ **COLEÇÃO SEM PREÇO MOSTRA `≥`, E ISSO NÃO É DEFEITO.** Os preços de hoje
+> estão lançados, mas a regra continua de pé para a coleção nova de amanhã: sem
+> R$/m², o simulador devolve `valor_subtotal` nulo, soma o que sabe como
+> **piso** e **nomeia** a linha que falta. É a regra 4 do custo — zero é um
 > custo válido e mentiroso. Quem vir o `≥` em âmbar está vendo a regra
 > funcionando, não a tela quebrada.
+
+> ⚠️ **O TOTAL DO SIMULADOR É O PREÇO DECCORAR, e não o que a revenda paga.** A
+> tabela A/B/C e o desconto dela entram na **fase 2** — e o card escreve isso
+> embaixo, para ninguém mandar esse número para a revenda achando que é o dela.
 
 ### As duas decisões que a seção 8 marcava "antes da fase 1" — respondidas
 
