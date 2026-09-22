@@ -131,4 +131,27 @@ function apagarFeriado(data){
   return {apagado:true,data};
 }
 
-module.exports={calcular,listarFeriados,criarFeriado,apagarFeriado,dataValida,porExtenso};
+/* ── DIAS DE FABRICA ATE UMA DATA ─────────────────────────────────────────
+   A fila do vendedor (fase 3) mostra quantos dias de trabalho sobram ate o
+   prazo, e nao quantos dias de calendario: tres dias no papel com um feriado
+   e um fim de semana no meio sao ZERO dias de fabrica, e e essa a diferenca
+   entre cobrar a producao hoje ou na semana que vem.
+
+   ⚠️ NEGATIVO FICA NEGATIVO, e nao e cortado em zero. Prazo vencido e
+   justamente o que a fila existe para mostrar; zerar apagaria o sinal e
+   deixaria o atrasado com a mesma cara de quem vence hoje — e o MAX(0,…) do
+   saldo de estoque do PCP (CLAUDE.md §2) pela porta do prazo. */
+function diasUteis(de,ate){
+  const a=dataValida(String(de||'').slice(0,10)), b=dataValida(String(ate||'').slice(0,10));
+  if(!a||!b) return null;
+  const inverso=b<a;
+  let ini=inverso?b:a, fim=inverso?a:b, n=0;
+  for(let i=0;i<400&&ini<fim;i++){
+    ini=maisDias(ini,1);
+    const d=dow(ini);
+    if(d!==0&&d!==6&&!ehFeriado.get(ini)) n++;
+  }
+  return inverso?-n:n;
+}
+
+module.exports={calcular,listarFeriados,criarFeriado,apagarFeriado,dataValida,porExtenso,diasUteis};

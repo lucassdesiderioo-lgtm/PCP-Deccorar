@@ -322,6 +322,64 @@ module.exports=[
   igual(custo.eDinheiro('valor_limite_credito_centavos'),true,'o limite e podado');
   igual(custo.eDinheiro('limite_credito_centavos'),false,
     'e assim NAO seria — foi por isso que o campo nasceu com "valor_" na frente');
+}},
+
+/* ═══ O PEDIDO (fase 3) ════════════════════════════════════════════════════
+   A fase 3 acrescentou seis chaves de uma vez, e chave nova e exatamente
+   onde um papel ganha o que ninguem quis dar. */
+
+{nome:'O PEDIDO E DO ESCRITORIO: nenhuma rota dele chega a bancada',
+ executar({igual}){
+  const rotas=require('../rotas/pedido').rotas;
+  igual(rotas.length>0,true,'as rotas existem');
+  rotas.forEach(r=>igual(pode(CORTADOR,r.permissao),false,
+    r.metodo+' '+r.caminho+' fechado para o cortador'));
+  igual(pode(CORTADOR,TELAS['/pedidos'].permissao),false,'e a tela tambem');
+  igual(TELAS['/pedidos'].contexto,'admin','ela e de escritorio, nao de bancada');
+}},
+
+{nome:'⚠️ O VENDEDOR LANCA E APROVA A CARTEIRA DELE — mas nao a do colega, e nao cancela',
+ executar({igual}){
+  igual(pode(VENDEDOR,TELAS['/pedidos'].permissao),true,'a tela e a lista de trabalho dele');
+  [['pedido.ler','ver a fila'],['pedido.lancar','lancar e enviar'],
+   ['pedido.aprovar','aprovar a propria carteira'],['pedido.prazo','negociar prazo']]
+    .forEach(([k,oque])=>{
+      igual(CHAVES.some(c=>c.chave===k),true,k+' esta declarada de verdade');
+      igual(pode(VENDEDOR,k),true,'o vendedor tem '+k+' — '+oque);
+    });
+
+  /* As duas que ele NAO tem, e cada uma custa alguma coisa. A primeira e a
+     regra da carteira da secao 4.12: com ela, qualquer vendedor aprovaria a
+     revenda do colega. A segunda desfaz o que a fabrica ja viu. */
+  [['pedido.aprovar_qualquer','a carteira tem dono (secao 4.12)'],
+   ['pedido.cancelar','cancelar desfaz o que a fabrica ja viu']]
+    .forEach(([k,porque])=>{
+      igual(CHAVES.some(c=>c.chave===k),true,k+' esta declarada de verdade');
+      igual(pode(VENDEDOR,k),false,'o vendedor NAO tem '+k+' — '+porque);
+    });
+
+  /* ⚠️ E A ROTA DE APROVAR NAO PODE PEDIR A CHAVE LARGA. Declarar
+     `pedido.aprovar_qualquer` nela tiraria do vendedor exatamente a fila que
+     ele existe para trabalhar — e o efeito seria 403 numa tela que abre, que
+     nao se parece com "mexeram na permissao". */
+  const aprovar=require('../rotas/pedido').rotas
+    .find(r=>r.caminho==='/api/pedidos/:id/aprovar');
+  igual(aprovar.permissao,'pedido.aprovar','a rota pede a chave estreita');
+  igual(pode(VENDEDOR,aprovar.permissao),true,'e por isso o vendedor a alcanca');
+}},
+
+{nome:'⚠️ O PEDIDO E DINHEIRO DA PRIMEIRA A ULTIMA LINHA — e a poda alcanca tudo',
+ executar({igual}){
+  /* O varredor larga de novo: um campo novo no pedido que ninguem lembrou de
+     nomear com `valor_`/`preco_` quebra este caso no commit em que nasce. */
+  const amostra={valor_total_centavos:20900, valor_revenda_centavos:17870,
+    itens:[{valor_subtotal_centavos:20900, valor_final_centavos:17870,
+            linhas:[{preco_unitario_centavos:11000, valor_centavos:16500}]}]};
+  igual(dinheiroEm(amostra,'pedido').length,6,'a amostra tem seis campos de dinheiro');
+  igual(dinheiroEm(custo.podar(CORTADOR,amostra),'pedido').join(', '),'',
+    'e nada disso sobra do lado da bancada');
+  igual(dinheiroEm(custo.podar(VENDEDOR,amostra),'pedido').length,6,
+    'enquanto quem vende recebe tudo');
 }}
 
 ];

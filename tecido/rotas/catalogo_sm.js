@@ -96,5 +96,20 @@ module.exports={rotas:[
      o mesmo caminho que a fase 3 vai usar para montar o item do pedido.
      Ele NAO grava nada: simular e perguntar. */
   {metodo:'POST', caminho:'/api/sm/simular', permissao:LER,
-   manipulador:({corpo,usuario})=>custo.podar(usuario,persiana.calcular(corpo))}
+   manipulador:({corpo,usuario})=>custo.podar(usuario,persiana.calcular(corpo))},
+
+  /* ⚠️ AS CORES DE UMA COLECAO TEM PORTA PROPRIA, e nao e duplicacao do
+     cadastro de tecido. O pedido (fase 3) EXIGE a cor do tecido — e ela que
+     diz qual rolo sai da prateleira —, e quem lanca pedido e o vendedor, que
+     nao tem `cadastro.ler`. Mandar ele buscar em /api/cadastros daria a ele
+     a lista inteira de tecido, endereco e motivo de sobra para responder uma
+     pergunta de tres palavras; sem porta nenhuma, a tela abriria o seletor
+     vazio com 403 no console, que nao se parece com "falta permissao".
+
+     ⚠️ E SO SAI COR QUE TEM ITEM DE TECIDO CADASTRADO. Cor sem item nao
+     aparece em tela nenhuma do modulo e o corte nao a encontra — oferecê-la
+     aqui poria no pedido uma escolha que a bancada nao consegue cumprir, e a
+     descoberta seria na hora de cortar. */
+  {metodo:'GET', caminho:'/api/sm/colecoes/:id/cores', permissao:LER,
+   manipulador:({params,usuario})=>custo.podar(usuario,catalogo.coresDaColecao(params.id))}
 ]};

@@ -2974,6 +2974,36 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   `limite_credito_centavos` viaja pelo fio em silêncio (§19, e §15 acima)
 - ❌ Contar o prazo pela APROVAÇÃO em vez do envio, ou recalcular um prazo já
   congelado com o relógio de hoje (§19)
+- ❌ Fazer o pedido ENVIADO reler o catálogo ou o cadastro da revenda: o
+  reajuste de terça mudaria o que foi vendido na segunda (§19, fase 3)
+- ❌ Reler a ficha de um pedido APROVADO: a persiana é cortada como a etiqueta
+  dela já diz, e na bancada vence a etiqueta (§19, e a §4.11 da spec)
+- ❌ Deixar o tubo mudar entre o envio e a aprovação sem gravar linha: a fábrica
+  corta um tubo diferente do que foi vendido, e ninguém procura depois (§19)
+- ❌ Gravar preço no rascunho do orçamento: ele envelhece calado, e quem abrir
+  amanhã lê o número de ontem com cara de atual (§19, fase 3)
+- ❌ Numerar o rascunho, ou deixar o envio passar com `pedidoNumeroInicial` em
+  branco — o plano de corte herdaria o tom de um pedido do Decorsoft (§19)
+- ❌ Fazer a numeração do pedido descer quando alguém baixar o parâmetro: quem
+  manda é o MAIOR entre ele e o que já foi usado (§19, e a §4.18 da spec)
+- ❌ Devolver o número ao bolo quando o pedido volta a rascunho, ou apagar peça
+  de pedido que já teve número — ela sai CANCELADA, com motivo (§19)
+- ❌ Alterar pedido aprovado, nem pelo admin: corrige-se cancelando a peça com
+  motivo e lançando outra (§19, decisão de 22/09/2026)
+- ❌ Aceitar item de pedido sem a cor do tecido, ou reencontrar o `tecido_id`
+  pelo nome da cor depois — a segunda régua é a que manda o rolo errado (§19)
+- ❌ Travar o pedido de tecido que não está na estante: ele entra MARCADO, e o
+  vendedor negocia prazo — travar é a armadilha #6 (§19, e a §4.10 da spec)
+- ❌ Somar as peças de um pedido sem arredondar na peça, ou guardar um total só:
+  a folha impressa deixaria de fechar com as parcelas dela (§19)
+- ❌ Declarar `pedido.aprovar_qualquer` na rota de aprovar: o vendedor perderia
+  a própria fila, com 403 numa tela que abre (§19, fase 3)
+- ❌ Medir a fila do vendedor em dias de calendário, ou cortar o vencido em
+  zero: prazo vencido é o que a lista existe para mostrar (§19)
+- ❌ Imprimir a folha de um pedido em rascunho, ou tirar o higienizador de texto
+  do PDF — Helvetica é WinAnsi, e o emoji derruba a geração no meio (§19)
+- ❌ Mostrar `R$ 0,00` num pedido sem peça: ele não vale nada AINDA, que é outra
+  afirmação — e só a tela renderizada pega isso (§19)
 - ❌ Aceitar parâmetro de prazo fora da faixa (`prazoCorteHora` por extenso, dia
   da semana 7): aceito, ele muda a conta em silêncio (§19)
 
@@ -3711,10 +3741,160 @@ engano. Há caso travando.
 > silêncio — foi assim que o `resumo.valor_parado` do painel gerencial chegou à
 > bancada (§15). Há caso travando os dois nomes, o certo e o errado.
 
-**Rode `cd tecido && npm test` (355 casos) e `node teste_acesso.js` (113) ao
+**Rode `cd tecido && npm test` (387 casos) e `node teste_acesso.js` (113) ao
 mexer em revenda, prazo, preço, permissão ou no `server.js`.** Os casos do
 prazo saem das datas escritas na §4.9 da spec, e não da resposta que a função
 deu.
+
+### ⚠️ A FASE 3 (22/09/2026) — O PEDIDO, E A FRASE QUE GOVERNA TUDO: **CONGELADO É CONGELADO**
+
+A fase 1 respondeu o que a persiana **é**; a 2, **quem compra**. A 3 é o que
+liga os dois: o pedido. Migração 18 (sete tabelas `sm_pedido*` e o parâmetro
+`pedidoNumeroInicial`), `dominio/pedido.js` (dono único do ciclo),
+`dominio/pedido_pdf.js` e a tela `/sobmedida/pedidos`.
+
+```
+rascunho   se edita à vontade, e o preço lido é o de HOJE
+enviado    número, preço, tabela e prazo ficam GRAVADOS
+aprovado   a ficha é explodida e gravada — e nada mais muda
+```
+
+> ⚠️ **DEPOIS DO ENVIO NENHUMA LEITURA VOLTA AO CATÁLOGO**, nem ao cadastro da
+> revenda. Um reajuste de terça não pode mexer no que foi vendido na segunda —
+> é a armadilha #15 (preço no cadastro anda para trás) pela porta da venda. E
+> depois da aprovação nem a **ficha** se relê: a persiana é cortada como a
+> etiqueta dela já diz, e **na bancada vence a etiqueta**. As duas datas são
+> diferentes de propósito, e estão na spec: preço congela no **envio** (§4.8),
+> ficha congela na **aprovação** (§4.11).
+>
+> O caso que trava isso é o segundo do `pedido.test.js`: ele reajusta a coleção
+> **depois** do envio e exige que o pedido continue em R$ 209,00. Fazer a
+> leitura voltar a calcular ao vivo reprova três casos — foi conferido assim.
+
+> ⚠️ **E O TUBO QUE MUDA ENTRE O ENVIO E A APROVAÇÃO DEIXA LINHA, em vez de
+> silêncio.** São duas datas, então há uma janela: alguém mexe na escada com o
+> pedido na fila, e a fábrica corta um tubo diferente do que foi vendido. É
+> evento raro e caro — o tipo de coisa que ninguém procura depois se não
+> estiver escrito. A aprovação grava em `sm_pedido_alteracao` (`degrau`, antes
+> e depois), e a tela mostra no histórico.
+
+> ⚠️ **APROVADO NÃO SE ALTERA, NEM PELO ADMIN** — decisão minha, 22/09/2026,
+> registrada em `DECISOES.md`. A spec propunha *"até a primeira etiqueta
+> impressa"*, e essa marca só existe na fase 4: implementá-la agora criaria uma
+> regra escrita, codificada e que **não pega em ninguém** — é a dívida 18 (§14),
+> a que deixou `modelo.sob_medida` três semanas inerte. O caminho é **cancelar
+> a peça com motivo e lançar outra**: a peça cancelada **fica na lista**, sai da
+> conta e guarda quem cancelou e por quê. Sumir em silêncio de uma lista que
+> alguém imprimiu é o que faz a conferência virar discussão.
+
+> ⚠️ **O ENVIADO VOLTA A RASCUNHO, E O NÚMERO FICA.** Reabrir apaga o bloco
+> congelado (preço, tabela, prazo) e devolve o pedido à edição — mas não o
+> número, que já foi dito à revenda por escrito. **Número que volta para o bolo
+> é número que um dia sai duas vezes.** Pela mesma razão, `removerItem` só
+> existe no rascunho que **nunca** foi enviado: depois do primeiro número, a
+> peça sai cancelada, nunca apagada.
+
+> ⚠️ **ORÇAMENTO NÃO QUEIMA NÚMERO, e "virar pedido" é um ato próprio.**
+> Orçamento só simula (§4.10) — o preço dele é o de hoje, lido ao vivo a cada
+> leitura. Gravar um preço no rascunho faria o orçamento **envelhecer calado**:
+> a pessoa abriria amanhã e leria o número de ontem com cara de atual. O número
+> nasce no envio, e o envio **recusa** quem ainda é orçamento.
+
+> ⚠️ **SEM `pedidoNumeroInicial` LANÇADO, O ENVIO É RECUSADO — e isso é a
+> decisão, não uma falta.** O parâmetro nasce **em branco** (tipo texto: `''` é
+> "ainda não se sabe", e zero seria um número válido e mentiroso). O plano de
+> corte agrupa o **tom único** pelo TEXTO do pedido e olha para trás
+> (`cortesAnteriores`, em `plano.js`): um 4272 novo colado num 4272 antigo do
+> Decorsoft herdaria o histórico de tom de outra casa, e a persiana sairia de um
+> rolo escolhido para outro cliente (§4.18). A recusa **diz onde se lança**.
+>
+> E a numeração **nunca desce**: quem manda é o maior entre o parâmetro e o que
+> já foi usado. Baixar o parâmetro por engano não pode fazer o número voltar por
+> cima de pedido que existe. Há caso travando.
+
+> ⚠️ **A COR DO TECIDO É OBRIGATÓRIA NO PEDIDO, e opcional no simulador.** Lá
+> ela só escreve o nome na frase; aqui ela decide **qual rolo sai da
+> prateleira**, e não se corta sem saber a cor. O `tecido_id` é resolvido pelo
+> `persiana.js` — que passou a devolvê-lo — e **gravado no lançamento**:
+> reencontrá-lo depois pelo nome da cor seria a segunda régua da armadilha #12,
+> e a que erra é a que manda o rolo errado.
+>
+> A lista de cores tem porta própria (`GET /api/sm/colecoes/:id/cores`,
+> `catalogo.ler`), e só sai cor que **tem item de tecido cadastrado**. Mandar o
+> vendedor a `/api/cadastros` daria a ele a lista inteira de tecido, endereço e
+> motivo para responder uma pergunta de três palavras — ele não tem
+> `cadastro.ler`, e a tela abriria o seletor vazio com 403 no console, que não
+> se parece com "falta permissão" (§10, armadilha #29).
+
+> ⚠️ **"SEM TECIDO" É SINAL, NUNCA TRAVA** (§4.10). O pedido de um tecido que
+> não está na estante entra normalmente, marcado, e o vendedor negocia prazo
+> maior. Travar aqui seria a armadilha #6: a venda existe, e quem é recusado
+> vende por fora. E o sinal **não é a resposta do plano de corte** — a pergunta
+> aqui é grossa ("há bobina deste tecido, larga o bastante?"); quem decide entre
+> rolo e sobra é o plano.
+
+> ⚠️ **O TOTAL É A SOMA DAS PEÇAS QUE CONTINUAM DE PÉ; a coluna guarda o que o
+> ENVIO prometeu.** Os dois aparecem lado a lado quando divergem — a mesma forma
+> do prazo prometido × atual. Um número só faria a peça cancelada sumir da lista
+> e continuar no total, ou o contrário: o total baixar sem nada dizer que a
+> revenda recebeu outro por escrito.
+>
+> E o arredondamento mora na **peça**: cada persiana já sai arredondada uma vez
+> (§4.1), e é o valor dela que a revenda vê linha a linha no PDF. Somar os
+> arredondados é o único jeito de o total da folha fechar com as parcelas
+> impressas nela.
+
+> ⚠️ **O SUBTOTAL DECCORAR CONTINUA INTOCADO**, no pedido como no simulador: o
+> de cima vai para faturamento, Compras, crédito e relatório; o de baixo é o que
+> a revenda paga. Os dois juntos, nunca um no lugar do outro.
+
+> ⚠️ **AS LINHAS DE PREÇO TÊM TABELA PRÓPRIA (`sm_pedido_item_preco`), e essa
+> foi a mudança no caminho.** O plano dizia seis tabelas; são sete. Guardar só o
+> total faria a conferência da revenda virar *"confie no número"* — e é
+> justamente essa conferência que acha o erro de digitação da medida **antes**
+> de a peça ser cortada.
+
+> ⚠️ **RASCUNHO NÃO VIRA PAPEL.** `GET /api/pedidos/:id/pdf` recusa o que não
+> foi enviado: no rascunho o preço ainda é o de hoje, e impresso ele vira um
+> compromisso que o sistema não assumiu. E o texto do PDF passa por um
+> higienizador: Helvetica escreve em **WinAnsi**, e a seta ou o emoji que alguém
+> colou do WhatsApp na observação fazem o `pdf-lib` estourar **no meio da
+> geração**, com a folha pela metade e sem dizer por quê. Vira `?`, e a folha
+> sai. Há caso travando — tirar o higienizador reprova.
+
+> ⚠️ **`pedido.aprovar` E `pedido.aprovar_qualquer` SÃO DUAS CHAVES.** A
+> primeira é *"aprovo o que é da minha carteira"* (§4.12); a segunda é *"aprovo
+> a de qualquer um"*, e existe para a fila não parar numa semana de férias. Uma
+> chave só significaria escolher entre travar a fábrica e deixar qualquer
+> vendedor aprovar a revenda do colega. **A rota de aprovar pede a chave
+> estreita** — declarar a larga nela tiraria do vendedor exatamente a fila que
+> ele existe para trabalhar, e o efeito seria 403 numa tela que abre.
+>
+> `pedido.cancelar` **não está no vendedor**: cancelar desfaz o que a fábrica já
+> viu. Ele lança, envia, aprova a carteira dele e negocia prazo.
+
+> **A fila mostra DIAS DE FÁBRICA, não dias de calendário.** Três dias no papel
+> com um feriado e um fim de semana no meio são **zero** dias de trabalho, e é
+> essa a diferença entre cobrar a produção hoje ou na semana que vem. Quem conta
+> é o `prazo.diasUteis` — e **negativo fica negativo**: prazo vencido é
+> justamente o que a lista existe para mostrar, e zerar seria o `MAX(0, …)` do
+> saldo (§2) pela porta do prazo.
+
+> ⚠️ **PEDIDO SEM PEÇA NÃO VALE R$ 0,00 — ele não vale NADA AINDA.** Zero se lê
+> como "de graça". É a regra 4 na tela, e só apareceu **renderizando a tela**:
+> nenhum teste de unidade pega um total que está sintaticamente perfeito.
+
+> ⚠️ **A ORDEM DOS `DELETE` DO PEDIDO É A DOS PONTEIROS**, e `sm_pedido_alteracao`
+> aponta para o **item** (a troca de degrau e a peça cancelada guardam qual peça
+> era). Ele sai antes dele, e não junto dos outros registros, que só apontam para
+> o pedido. Com `foreign_keys = ON` o `DELETE` sem filtro só passa quando ninguém
+> mais aponta (§12) — foi assim que a limpeza do teste reprovou na primeira
+> rodada.
+
+**Rode `cd tecido && npm test` (387 casos) ao mexer em pedido, preço, prazo ou
+no catálogo** — 29 casos são do pedido e saem das seções 4.8 a 4.18 da spec, e
+3 do acesso (`acesso_operador.test.js`). Mexeu em permissão? **`node
+teste_acesso.js` (113) e `node teste_cobertura.js` (10) também.**
 
 ### Três regras do sob medida que valem citar aqui
 
@@ -3740,7 +3920,7 @@ cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 355 casos
+cd tecido && npm test          # 387 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:

@@ -5,13 +5,87 @@ STATUS
 Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 22/09/2026
-Fase atual: 2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
+Fase atual: 3 EM CÓDIGO (22/09/2026) — falta a semana em paralelo ao Decorsoft
+            2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
             1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
-Fases: 1 ☑  2 ☑(código)  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐
+Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
-Mudanças no caminho: 5 (fase 1) + 4 (fase 2) — ver abaixo
+Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) — ver abaixo
 ```
+
+## STATUS DA FASE 3 — em código em 22/09/2026
+
+**Entregue:** migração 18 do `tecido/nucleo/schema.js` (sete tabelas —
+`sm_pedido`, `sm_pedido_item`, `sm_pedido_item_preco`, `sm_pedido_componente`,
+`sm_pedido_marco`, `sm_pedido_prazo`, `sm_pedido_alteracao` — mais o parâmetro
+`pedidoNumeroInicial`), `tecido/dominio/pedido.js` (dono único do ciclo),
+`tecido/dominio/pedido_pdf.js`, `tecido/dados/pedido.js`, `tecido/rotas/pedido.js`,
+a tela `/sobmedida/pedidos`, seis chaves de permissão novas e
+`GET /api/sm/colecoes/:id/cores`. O `persiana.js` passou a devolver o
+`tecido_id` que já resolvia, e o `prazo.js` ganhou `diasUteis`. 32 casos de
+teste novos: `npm test` do módulo vai a **387**.
+
+> ⚠️ **AINDA NÃO ESTÁ PRONTA.** O "pronto quando" da seção 7 é *uma semana de
+> pedidos do WhatsApp lançada aqui, em paralelo ao Decorsoft, sem diferença de
+> preço nem de corte* — e isso é trabalho de tela, com os pedidos na frente.
+> Enquanto não estiver feito, a fase é **código entregue**.
+
+**Conferido pelo fio, na tela de verdade** (navegador dirigido contra o
+servidor local, do orçamento até a aprovação):
+
+| | |
+|---|---|
+| orçamento com a persiana da §4.8 | **R$ 209,00** Deccorar · **R$ 178,70** revenda |
+| envio | número **4273** (o seguinte ao 4272 do Decorsoft), preço e prazo gravados |
+| prazo, enviado numa terça | *"Pronto em quinta 01/10 · 7 dias de fábrica"* |
+| aprovação | a ficha explodiu: tubo 0,770 · tecido 0,765 × 1,400 · base 0,770 · bandô 0,795 |
+| a folha em PDF | sai com as linhas de preço uma a uma e o **TOTAL A PAGAR** |
+
+### As três decisões da fase 3
+
+**1. Pedido APROVADO não se altera, nem pelo admin.** A §4.10 dizia *"depois de
+aprovado, só o admin mexe"*, e a fase 4 traria *"até a primeira etiqueta
+impressa"*. Essa marca **não existe ainda** — implementá-la agora criaria uma
+regra escrita, codificada e que não pega em ninguém, que é a dívida 18 do
+`CLAUDE.md` (a flag `sob_medida` ficou três semanas inerte). O caminho é
+**cancelar a peça com motivo e lançar outra**: funciona hoje, não perde história
+nenhuma, e é a regra mais fácil de afrouxar depois.
+
+**2. O pedido ENVIADO volta a rascunho, e o reenvio recalcula.** A porta fecha
+na aprovação do vendedor, não no envio. O **número fica** — ele já foi dito à
+revenda por escrito, e número que volta para o bolo é número que um dia sai
+duas vezes.
+
+**3. Orçamento não queima número, e virar pedido é um ato próprio.** O número
+nasce no envio, e o envio recusa quem ainda é orçamento. Sem `pedidoNumeroInicial`
+lançado, o envio é **recusado** dizendo onde se lança: numerar por cima do
+Decorsoft faria o plano de corte herdar o tom de outra casa (§4.18).
+
+### Mudanças no caminho (fase 3)
+
+1. **Sete tabelas, e não seis.** As linhas de preço congeladas ganharam tabela
+   própria (`sm_pedido_item_preco`) em vez de caberem dentro do item: o PDF e o
+   faturamento leem linha a linha, e só o total faria a conferência da revenda
+   virar *"confie no número"*.
+2. **`GET /api/sm/colecoes/:id/cores` nasceu junto.** O pedido exige a cor do
+   tecido e quem lança é o vendedor, que **não tem `cadastro.ler`** — mandá-lo
+   a `/api/cadastros` daria a ele a lista inteira de tecido, endereço e motivo
+   para responder uma pergunta de três palavras.
+3. **`pedido.aprovar` e `pedido.aprovar_qualquer` são duas chaves.** Uma só
+   significaria escolher entre travar a fila numa semana de férias e deixar
+   qualquer vendedor aprovar a revenda do colega.
+
+### O que esta fase deixou explicitamente aberto
+
+| Fica de fora | Por quê |
+|---|---|
+| **Alteração de pedido aprovado** | decisão 1 acima — espera a marca da primeira etiqueta (fase 4) |
+| **O pedido ir para a fábrica** | fase 4: etiquetas, código sequencial por setor, plano de corte |
+| **Crédito descontando o pedido** | boleto é fase 6; hoje o limite é só cadastro |
+| **Portal da revenda** | fase 7 — e ali o preço Deccorar **não pode** viajar pelo fio |
+
+---
 
 ## STATUS DA FASE 2 — em código em 22/09/2026
 

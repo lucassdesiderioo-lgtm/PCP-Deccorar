@@ -1039,6 +1039,189 @@ INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
    esta nota fica porque o comentario da migracao 16 lista os alvos de entao
    e um dia alguem vai compara-los com o codigo. */
 `},
+
+{n:18, nome:'o pedido sob medida — orcamento, envio que congela, aprovacao que explode a ficha', sql:`
+/* ═══ O PEDIDO ════════════════════════════════════════════════════════════
+   Fase 3 da spec SOBMEDIDA-PEDIDO-REVENDA. A fase 1 respondeu o que a
+   persiana E, a 2 quem compra; aqui entra o que liga os dois.
+
+   O CICLO CABE NUMA FRASE, e as tres tabelas de registro existem para ele:
+
+     rascunho   se edita a vontade
+     enviado    volta a rascunho (e o reenvio recalcula), ou e aprovado
+     aprovado   e IMUTAVEL — corrige-se cancelando o item e lancando outro
+
+   ⚠️ APROVADO NAO SE ALTERA, NEM PELO ADMIN — decisao de 22/09/2026. A spec
+   propunha "ate a primeira etiqueta impressa", e essa marca so existe na
+   fase 4: implementa-la agora criaria uma regra escrita, codificada e que
+   nao pega em ninguem, que e a divida 18 do CLAUDE.md (o sob_medida ficou
+   tres semanas inerte). Cancelar-e-relancar funciona hoje, nao perde
+   historia nenhuma, e e a regra mais facil de afrouxar depois. */
+
+CREATE TABLE sm_pedido (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  /* ⚠️ O NUMERO SO NASCE NO ENVIO, e orcamento nao tem. Numerar o rascunho
+     queimaria numero em coisa que nunca virou pedido, e a numeracao desta
+     casa nao pode ter buraco: ela e comparada com a do Decorsoft. */
+  numero INTEGER UNIQUE,
+  revenda_id INTEGER NOT NULL REFERENCES sm_revenda(id),
+  tipo TEXT NOT NULL DEFAULT 'orcamento',    -- orcamento | pedido
+  marco TEXT NOT NULL DEFAULT 'rascunho',    -- rascunho | enviado | aprovado | cancelado
+
+  /* ── CONGELADOS NO ENVIO ────────────────────────────────────────────────
+     A tabela e o desconto ficam gravados AQUI, e nao lidos da revenda na
+     hora de mostrar: reajuste de tabela na quinta nao mexe no pedido
+     enviado na quarta. E a armadilha #15 (preco que anda para tras) pela
+     porta da venda, e a secao 4.8 da spec manda assim. */
+  enviado_em TEXT, enviado_por TEXT,
+  tabela_id INTEGER REFERENCES sm_tabela_preco(id),
+  tabela_nome TEXT,
+  tabela_desconto_centesimos INTEGER,
+  desconto_centesimos INTEGER,
+  valor_total_centavos INTEGER,
+  prazo_prometido TEXT,                      -- o que o envio prometeu
+  prazo_atual TEXT,                          -- o de hoje, se foi negociado
+
+  aprovado_em TEXT, aprovado_por TEXT,
+
+  endereco_entrega_id INTEGER REFERENCES sm_revenda_endereco(id),
+  entrega TEXT,                              -- entrega | retira
+  observacao TEXT,
+  /* Sinal, nunca trava: pedido de tecido que nao esta na fabrica entra
+     normalmente (secao 4.10) e o vendedor negocia prazo maior. */
+  sem_tecido INTEGER NOT NULL DEFAULT 0,
+
+  cancelado_em TEXT, cancelado_por TEXT, cancelado_motivo TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime')), criado_por TEXT
+);
+CREATE INDEX idx_sm_pedido_revenda ON sm_pedido(revenda_id);
+CREATE INDEX idx_sm_pedido_por_marco ON sm_pedido(marco);
+
+/* UMA PERSIANA. Guarda as ESCOLHAS (o que a pessoa pediu) e, depois do
+   envio, o que o calculo disse.
+
+   ⚠️ ENQUANTO E ORCAMENTO O PRECO NAO MORA AQUI: ele e calculado ao vivo a
+   cada leitura, porque orcamento e "preco de hoje, sem congelar" (secao
+   4.10). Gravar um preco no rascunho faria o orcamento envelhecer calado —
+   a pessoa abriria amanha e leria o numero de ontem com cara de atual. */
+CREATE TABLE sm_pedido_item (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pedido_id INTEGER NOT NULL REFERENCES sm_pedido(id),
+  n INTEGER NOT NULL,                        -- 1, 2, 3... dentro do pedido
+  modelo_id INTEGER NOT NULL REFERENCES sm_modelo(id),
+  abertura_id INTEGER NOT NULL REFERENCES abertura(id),
+  /* ⚠️ A COR DO TECIDO E OBRIGATORIA NO PEDIDO, e opcional no simulador.
+     Ali ela so escreve o nome; aqui ela decide QUAL item de tecido sai da
+     prateleira — nao se corta sem saber a cor. O tecido_id e resolvido no
+     lancamento e gravado: e por ele que a fase 4 manda a peca ao plano. */
+  cor_tecido_id INTEGER NOT NULL REFERENCES cor(id),
+  tecido_id INTEGER REFERENCES tecido(id),
+  cor_acessorio_id INTEGER NOT NULL REFERENCES cor(id),
+  largura_mm INTEGER NOT NULL, altura_mm INTEGER NOT NULL,
+  comando TEXT NOT NULL, rolamento TEXT NOT NULL,
+  adicional TEXT NOT NULL DEFAULT 'nenhum',
+  reducao TEXT NOT NULL DEFAULT 'nao',
+
+  -- o que o calculo disse, congelado no envio
+  degrau_nome TEXT,
+  m2_real_mm2 INTEGER, m2_cobrado_mm2 INTEGER,
+  valor_subtotal_centavos INTEGER,           -- o preco DECCORAR
+  valor_final_centavos INTEGER,              -- o que a revenda paga
+  resumo TEXT,                               -- a frase de conferencia
+
+  sem_tecido INTEGER NOT NULL DEFAULT 0, sem_tecido_motivo TEXT,
+  cancelado_em TEXT, cancelado_por TEXT, cancelado_motivo TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime')),
+  UNIQUE(pedido_id, n)
+);
+
+/* AS LINHAS DE PRECO, congeladas no envio — tecido, bando, barra, reducao.
+   Elas sao o que o PDF mostra e o que o faturamento vai ler; guardar so o
+   total faria a conferencia da revenda virar "confie no numero". */
+CREATE TABLE sm_pedido_item_preco (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL REFERENCES sm_pedido_item(id),
+  ordem INTEGER,
+  chave TEXT, nome TEXT, unidade TEXT,
+  preco_unitario_centavos INTEGER,
+  base TEXT,                                 -- '1,500 m² × R$ 110,00/m²'
+  valor_centavos INTEGER
+);
+CREATE INDEX idx_sm_pedido_item_preco ON sm_pedido_item_preco(item_id);
+
+/* ⚠️ A FICHA EXPLODIDA, E ELA SO NASCE NA APROVACAO (secao 4.11). Daqui em
+   diante o pedido NAO RELE O CATALOGO: mudar o desconto do tubo 41 amanha
+   nao mexe na persiana aprovada hoje, que e o que a etiqueta dela ja diz.
+   Ficha relida ao vivo faria a etiqueta impressa e a tela discordarem, e na
+   bancada vence a etiqueta.
+
+   O codigo_barras aqui e o do COMPONENTE (o kit), copiado do catalogo. O
+   codigo sequencial por setor (SER-000001) e da fase 4 — por isso nao ha
+   UNIQUE nesta coluna. */
+CREATE TABLE sm_pedido_componente (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL REFERENCES sm_pedido_item(id),
+  ordem INTEGER,
+  chave TEXT NOT NULL, nome TEXT, setor TEXT,
+  quantidade INTEGER NOT NULL DEFAULT 1,
+  gera_etiqueta INTEGER NOT NULL DEFAULT 1,
+  eh_kit INTEGER NOT NULL DEFAULT 0,
+  codigo_barras TEXT,
+  suportes INTEGER,
+  -- ⚠️ CORTE e CONSUMO lado a lado, e nunca somados (armadilha #18)
+  largura_corte_mm INTEGER, altura_corte_mm INTEGER,
+  consumo_largura_mm INTEGER, consumo_altura_mm INTEGER
+);
+CREATE INDEX idx_sm_pedido_componente ON sm_pedido_componente(item_id);
+
+/* ── OS TRES REGISTROS ──────────────────────────────────────────────────
+   Marco, prazo e alteracao. Sem eles um pedido corrigido fica identico ao
+   que nunca teve problema — e a mesma razao do bloqueio_resolvido do PCP
+   (secao 5): a trava nao deixa rastro de quantas vezes salvou. */
+CREATE TABLE sm_pedido_marco (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pedido_id INTEGER NOT NULL REFERENCES sm_pedido(id),
+  marco TEXT NOT NULL, detalhe TEXT,
+  usuario_nome TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX idx_sm_pedido_marco_pedido ON sm_pedido_marco(pedido_id);
+
+/* ⚠️ O PRAZO NEGOCIADO NAO APAGA O PROMETIDO (secao 4.9). O gerencial mostra
+   os dois separados: somados, o pedido empurrado pareceria entregue em dia. */
+CREATE TABLE sm_pedido_prazo (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pedido_id INTEGER NOT NULL REFERENCES sm_pedido(id),
+  de TEXT, para TEXT, motivo TEXT,
+  usuario_nome TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX idx_sm_pedido_prazo ON sm_pedido_prazo(pedido_id);
+
+CREATE TABLE sm_pedido_alteracao (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pedido_id INTEGER NOT NULL REFERENCES sm_pedido(id),
+  item_id INTEGER REFERENCES sm_pedido_item(id),
+  o_que TEXT NOT NULL, antes TEXT, depois TEXT, motivo TEXT,
+  usuario_nome TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX idx_sm_pedido_alteracao ON sm_pedido_alteracao(pedido_id);
+
+/* ⚠️ O NUMERO INICIAL NASCE EM BRANCO, E O ENVIO RECUSA ATE ALGUEM LANCAR.
+   Nao ha default, e isso e a decisao: o plano de corte agrupa o tom unico
+   pelo TEXTO do pedido e olha para tras (cortesAnteriores, em plano.js). Um
+   pedido novo 4272 colado num 4272 antigo do Decorsoft herdaria o historico
+   de tom de outra casa — a persiana sairia de um rolo escolhido para outro
+   cliente. Chutar um default aqui faria o numero parecer decidido, que e a
+   doenca dos "minimos sao placeholder" do COMPRAS.md.
+
+   Tipo TEXTO de proposito: '' e "ainda nao se sabe", e zero nao serviria —
+   zero e um numero valido e mentiroso, como o custo zero da regra 4. */
+INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
+ ('pedidoNumeroInicial','','texto','Ultimo numero de pedido do Decorsoft',
+  'O primeiro pedido lancado aqui sai com o numero seguinte a este, e a numeracao nunca reinicia. Enquanto estiver em branco o envio e RECUSADO: numero repetido faz o plano de corte herdar o tom de um pedido de outra casa.','numero',20);
+`},
 ];
 
 // ─────────────────────────────────────────────────────────────────────────

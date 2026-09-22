@@ -39,7 +39,7 @@ const pessoas=require('./nucleo/pessoas');
 const MODULOS=[
   './rotas/eu','./rotas/cadastros','./rotas/parametros','./rotas/sobras',
   './rotas/rolos','./rotas/planos','./rotas/painel','./rotas/catalogo_sm',
-  './rotas/revenda'
+  './rotas/revenda','./rotas/pedido'
 ];
 
 // A pessoa esta logada no PCP mas ninguem marcou a area dela. A mensagem diz

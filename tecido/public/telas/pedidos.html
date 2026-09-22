@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pedidos · Sob medida</title>
+<link rel="stylesheet" href="/sobmedida/base.css">
+<style>
+table.lista{width:100%; border-collapse:collapse; margin-top:10px; font-size:15px}
+table.lista th,table.lista td{padding:8px; border-bottom:1px solid var(--linha); text-align:left; vertical-align:top}
+table.lista th{font-size:13px; color:var(--tinta-fraca); font-weight:600; text-transform:uppercase; letter-spacing:.04em}
+table.lista td.n{text-align:right; font-variant-numeric:tabular-nums}
+table.lista tr.clicavel{cursor:pointer}
+table.lista tr.cancelado td{opacity:.55; text-decoration:line-through}
+.marco{border-radius:99px; padding:2px 10px; font-size:13px; font-weight:600;
+  background:var(--linha); display:inline-block}
+.marco.enviado{background:#1565c0; color:#fff}
+.marco.aprovado{background:#2e7d32; color:#fff}
+.marco.cancelado{background:var(--erro); color:#fff}
+.atrasado{color:var(--erro); font-weight:700}
+.aperta{color:var(--alerta); font-weight:600}
+.peca{border:1px solid var(--linha); border-radius:var(--raio); padding:10px 12px; margin-top:8px}
+.peca.cancelada{opacity:.6}
+.peca h3{margin:0 0 2px; font-size:15px}
+.peca .frase{color:var(--tinta-fraca); font-size:14px}
+.linhas{margin-top:6px; font-size:14px; color:var(--tinta-fraca)}
+.linhas div{display:flex; justify-content:space-between; gap:12px; padding:2px 0}
+.totais{margin-top:10px; border-top:1px solid var(--linha-forte); padding-top:8px}
+.totais div{display:flex; justify-content:space-between; gap:12px; padding:3px 0}
+.totais .grande{font-size:20px; font-weight:700}
+.editor{background:var(--cartao); border:1px solid var(--linha-forte);
+  border-radius:var(--raio); padding:12px; margin-top:10px}
+.editor .campo{min-width:140px}
+.editor input,.editor select{width:100%}
+.erro-linha{color:var(--erro); font-size:14px; font-weight:600; margin:8px 0 0}
+.aviso{background:var(--linha); border-left:4px solid var(--alerta);
+  border-radius:var(--raio); padding:8px 10px; margin-top:8px; font-size:14px}
+.acoes{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px}
+.subtitulo{margin:14px 0 0; font-size:14px; color:var(--tinta-fraca);
+  text-transform:uppercase; letter-spacing:.05em}
+.hist{font-size:14px; color:var(--tinta-fraca); margin-top:8px}
+.hist div{padding:3px 0; border-bottom:1px solid var(--linha)}
+</style>
+</head>
+<body>
+<header class="topo">
+  <h1>Pedidos</h1>
+  <span class="espaco"></span>
+  <span class="quem" id="quem"></span>
+</header>
+
+<div class="corpo">
+  <div class="cartao" id="cFila"><h2>Esperando a sua aprovação</h2><div id="fila"></div></div>
+  <div class="cartao" id="cLista"><h2>Pedidos e orçamentos</h2><div id="lista"></div></div>
+  <div class="cartao" id="cAberto" style="display:none"><h2 id="tituloAberto"></h2><div id="aberto"></div></div>
+</div>
+
+<script src="/sobmedida/ui.js"></script>
+<script src="/sobmedida/nav.js"></script>
+<script>
+const {api,banner,el,limpar,$}=window.ui;
+
+/* A mesma conversao exata do simulador e do catalogo: metro entra como TEXTO
+   e vira milimetro inteiro por soma, nunca por `Number(x)*1000`.
+   `1,007 * 1000` da 1007.0000000000001, e o servidor — que exige milimetro
+   inteiro — recusaria a medida que a pessoa digitou certo. */
+function paraMm(texto){
+  const t=String(texto||'').trim().replace('.',',');
+  if(!t) return null;
+  const m=/^(\d+)(?:,(\d{0,3}))?$/.exec(t);
+  if(!m) return NaN;
+  return Number(m[1])*1000+Number((m[2]||'').padEnd(3,'0'));
+}
+const emMetros=mm=>mm==null?'':(mm/1000).toFixed(3).replace('.',',');
+const reais=t=>t==null?'—':'R$ '+t;
+
+let eu={permissoes:[]}, fila=[], lista=[], revendas=[], modelo=null, cores=[];
+let aberto=null, erro=null, novaPeca=null;
+const posso=k=>(eu.permissoes||[]).indexOf(k)>=0;
+
+/* ⚠️ "DIAS DE FABRICA" NAO E "DIAS NO CALENDARIO", e a fila mostra o
+   primeiro. Tres dias no papel com um feriado e um fim de semana no meio sao
+   ZERO dias de trabalho — e e essa a diferenca entre cobrar a producao hoje
+   ou na semana que vem. Negativo fica negativo: prazo vencido e justamente o
+   que esta lista existe para mostrar. */
+function diasTexto(n){
+  if(n==null) return '';
+  if(n<0) return el('span',{class:'atrasado'},[Math.abs(n)+' dia(s) VENCIDO']);
+  if(n===0) return el('span',{class:'atrasado'},['vence hoje']);
+  if(n<=2) return el('span',{class:'aperta'},[n+' dia(s) de fábrica']);
+  return el('span',{},[n+' dias de fábrica']);
+}
+
+function tabela(linhas, aoClicar){
+  const t=el('table',{class:'lista'});
+  t.appendChild(el('thead',{},[el('tr',{},
+    ['Nº','Revenda','Estado','Prazo','Total'].map(h=>el('th',{},[h])))]));
+  const corpo=el('tbody');
+  linhas.forEach(p=>{
+    const tr=el('tr',{class:(aoClicar?'clicavel ':'')+(p.marco==='cancelado'?'cancelado':'')});
+    tr.appendChild(el('td',{},[String(p.numero||('rascunho #'+p.id))]));
+    tr.appendChild(el('td',{},[p.revenda_nome+(p.vendedor_nome?' · '+p.vendedor_nome:'')]));
+    tr.appendChild(el('td',{},[el('span',{class:'marco '+p.marco},[
+      p.marco==='rascunho'&&p.tipo==='orcamento'?'orçamento':p.marco])]));
+    const prazo=el('td');
+    if(p.prazo_extenso){
+      prazo.appendChild(el('div',{},[p.prazo_extenso]));
+      const d=diasTexto(p.dias_uteis_restantes);
+      if(d) prazo.appendChild(el('div',{},[d]));
+    }else prazo.appendChild(el('span',{},['—']));
+    tr.appendChild(prazo);
+    tr.appendChild(el('td',{class:'n'},[reais(p.valor_total)]));
+    if(p.sem_tecido) tr.appendChild(el('td',{},['sem tecido']));
+    if(aoClicar) tr.onclick=()=>aoClicar(p.id);
+    corpo.appendChild(tr);
+  });
+  t.appendChild(corpo);
+  return t;
+}
+
+// ── A fila e a lista ──────────────────────────────────────────────────────
+function desenharListas(){
+  const f=limpar($('#fila'));
+  if(!fila.length) f.appendChild(el('p',{class:'vazio'},['Nada esperando aprovação agora.']));
+  else f.appendChild(tabela(fila,abrir));
+
+  const l=limpar($('#lista'));
+  if(posso('pedido.lancar')&&revendas.length){
+    const b=el('button',{class:'bt primario',type:'button'},['Novo orçamento']);
+    b.onclick=novoPedido;
+    l.appendChild(b);
+  }
+  if(!lista.length) l.appendChild(el('p',{class:'vazio'},['Nenhum pedido lançado ainda.']));
+  else l.appendChild(tabela(lista,abrir));
+}
+
+async function novoPedido(){
+  const escolha=el('div',{class:'editor'});
+  const campos=el('div',{class:'campos'});
+  const sel=el('select',{'aria-label':'Revenda'});
+  revendas.forEach(r=>sel.appendChild(el('option',{value:String(r.id)},[r.nome_fantasia])));
+  campos.appendChild(el('div',{class:'campo cresce'},[el('label',{},['Revenda']),sel]));
+  const ok=el('button',{class:'bt primario',type:'button'},['Criar']);
+  ok.onclick=async()=>{
+    const p=await api('/api/pedidos',{metodo:'POST',corpo:{revenda_id:Number(sel.value)}});
+    await carregar(); abrir(p.id);
+  };
+  campos.appendChild(el('div',{class:'campo'},[ok]));
+  escolha.appendChild(campos);
+  limpar($('#lista')).appendChild(escolha);
+}
+
+// ── Um pedido aberto ──────────────────────────────────────────────────────
+async function abrir(id){
+  aberto=await api('/api/pedidos/'+id);
+  erro=null; novaPeca=null;
+  if(aberto.itens.length===0&&!modelo) await carregarCatalogo();
+  desenharAberto();
+  $('#cAberto').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+async function carregarCatalogo(){
+  const modelos=await api('/api/sm/modelos');
+  if(!modelos.length) return;
+  modelo=await api('/api/sm/modelos/'+modelos[0].id);
+}
+
+async function carregarCores(abertura_id){
+  const c=(modelo.colecoes||[]).find(x=>x.abertura_id===Number(abertura_id));
+  cores=c?await api('/api/sm/colecoes/'+c.id+'/cores').catch(()=>[]):[];
+}
+
+function desenharAberto(){
+  const p=aberto;
+  $('#cAberto').style.display='';
+  $('#tituloAberto').textContent=
+    (p.tipo==='pedido'?'Pedido ':'Orçamento ')+(p.numero||('#'+p.id))+' · '+p.revenda.nome_fantasia;
+  const c=limpar($('#aberto'));
+
+  c.appendChild(el('p',{},[
+    el('span',{class:'marco '+p.marco},[p.marco]),
+    ' · vendedor '+(p.revenda.vendedor_nome||'— nenhum —')+
+    (p.enviado_em?' · enviado em '+p.enviado_em:'')+
+    (p.aprovado_em?' · aprovado por '+p.aprovado_por:'')]));
+
+  if(p.marco==='cancelado')
+    c.appendChild(el('div',{class:'aviso'},['Cancelado por '+p.cancelado_por+': '+p.cancelado_motivo]));
+
+  if(p.prazo){
+    const t=['Pronto em '+p.prazo.atual_extenso];
+    if(p.prazo.negociado) t.push(' (prometido no envio: '+p.prazo.prometido_extenso+')');
+    const box=el('p',{},t);
+    const d=diasTexto(p.prazo.dias_uteis_restantes);
+    if(d){ box.appendChild(el('span',{},[' · '])); box.appendChild(d); }
+    c.appendChild(box);
+  }
+  if(p.sem_tecido)
+    c.appendChild(el('div',{class:'aviso'},[
+      'Alguma peça é de tecido que não está na estante. O pedido entra assim mesmo — '+
+      'negocie o prazo com a revenda.']));
+
+  // ── As peças ──
+  c.appendChild(el('p',{class:'subtitulo'},['Persianas']));
+  if(!p.itens.length) c.appendChild(el('p',{class:'vazio'},['Nenhuma peça ainda.']));
+  p.itens.forEach(item=>c.appendChild(desenharPeca(p,item)));
+
+  if(!p.congelado&&posso('pedido.lancar')&&modelo){
+    const b=el('button',{class:'bt',type:'button'},['Acrescentar persiana']);
+    b.onclick=()=>{ abrirNovaPeca(); };
+    c.appendChild(el('div',{class:'acoes'},[b]));
+    if(novaPeca) c.appendChild(novaPeca);
+  }
+
+  // ── Os totais ──
+  const pr=p.preco, tot=el('div',{class:'totais'});
+  const linhaTot=(rotulo,valor,classe)=>tot.appendChild(
+    el('div',{class:classe||''},[el('span',{},[rotulo]),el('span',{},[valor])]));
+  /* ⚠️ OS DOIS NUMEROS APARECEM JUNTOS, e nunca um no lugar do outro. O de
+     cima e o preco DECCORAR — e o que vai para faturamento, Compras, credito
+     e relatorio. O de baixo e o que a revenda paga. */
+  /* ⚠️ PEDIDO SEM PECA NAO VALE R$ 0,00 — ele nao vale NADA AINDA, que e
+     outra afirmacao. Zero se le como "de graca", e e a regra 4 do COMPRAS.md
+     ("zero e um custo valido e mentiroso") na tela: enquanto nao ha peca, o
+     lugar do numero fica com um traco. */
+  const vivas=p.itens.filter(i=>!i.cancelado_em).length;
+  linhaTot('Total Deccorar', !vivas?'—':
+    (pr.valor_total==null?('≥ '+reais(pr.valor_piso)):reais(pr.valor_total)));
+  if(pr.tabela&&pr.tabela.desconto!=null)
+    linhaTot('Tabela '+pr.tabela.nome+' (−'+pr.tabela.desconto+'%) e desconto de '+
+             pr.desconto+'%, em cascata','');
+  if(pr.valor_revenda!=null) linhaTot('A revenda paga',reais(pr.valor_revenda),'grande');
+  else if(pr.sem_preco.length)
+    tot.appendChild(el('div',{class:'aviso'},[
+      'Ainda não dá para dizer o que esta revenda paga — falta lançar: '+pr.sem_preco.join(', ')+'.']));
+  if(pr.mudou_depois_do_envio)
+    tot.appendChild(el('div',{class:'aviso'},[
+      'O envio prometia '+reais(pr.valor_enviado)+' — peça(s) cancelada(s) depois disso.']));
+  c.appendChild(tot);
+
+  c.appendChild(acoes(p));
+  if(erro) c.appendChild(el('p',{class:'erro-linha'},[erro]));
+
+  if(p.marcos&&p.marcos.length){
+    c.appendChild(el('p',{class:'subtitulo'},['Histórico']));
+    const h=el('div',{class:'hist'});
+    p.marcos.forEach(m=>h.appendChild(el('div',{},[
+      m.criado_em+' · '+m.marco+(m.usuario_nome?' · '+m.usuario_nome:'')+
+      (m.detalhe?' · '+m.detalhe:'')])));
+    (p.alteracoes||[]).forEach(a=>h.appendChild(el('div',{},[
+      a.criado_em+' · '+a.o_que+': '+(a.antes||'—')+' → '+(a.depois||'—')+
+      (a.motivo?' · '+a.motivo:'')+(a.usuario_nome?' · '+a.usuario_nome:'')])));
+    c.appendChild(h);
+  }
+}
+
+function desenharPeca(p,item){
+  const box=el('div',{class:'peca'+(item.cancelado_em?' cancelada':'')});
+  box.appendChild(el('h3',{},['Peça '+item.n+(item.degrau_nome?' · '+item.degrau_nome:'')]));
+  box.appendChild(el('div',{class:'frase'},[item.resumo||
+    (emMetros(item.largura_mm)+' × '+emMetros(item.altura_mm))]));
+  if(item.erro) box.appendChild(el('div',{class:'aviso'},[item.erro]));
+  if(item.cancelado_em)
+    box.appendChild(el('div',{class:'frase'},[
+      'Cancelada por '+item.cancelado_por+': '+item.cancelado_motivo]));
+  if(item.sem_tecido&&item.sem_tecido_motivo)
+    box.appendChild(el('div',{class:'aviso'},[item.sem_tecido_motivo]));
+
+  if(item.linhas&&item.linhas.length){
+    const l=el('div',{class:'linhas'});
+    item.linhas.forEach(x=>l.appendChild(el('div',{},[
+      el('span',{},[x.nome+(x.base?' · '+x.base:'')]),
+      el('span',{},[x.valor_centavos==null?'—':('R$ '+(x.valor_centavos/100).toFixed(2).replace('.',','))])])));
+    box.appendChild(l);
+  }
+  if(!item.cancelado_em){
+    const t=el('div',{class:'linhas'});
+    t.appendChild(el('div',{},[el('span',{},['Subtotal Deccorar']),
+      el('span',{},[reais(item.valor_subtotal)])]));
+    if(item.valor_final!=null)
+      t.appendChild(el('div',{},[el('span',{},['A revenda paga']),
+        el('span',{},[reais(item.valor_final)])]));
+    box.appendChild(t);
+
+    if(posso('pedido.cancelar')&&!p.cancelado_em){
+      const b=el('button',{class:'bt',type:'button'},['Cancelar esta peça']);
+      b.onclick=()=>comMotivo('Por que esta peça saiu?',async motivo=>{
+        await api('/api/pedidos/'+p.id+'/itens/'+item.id+'/cancelar',
+          {metodo:'POST',corpo:{motivo}});
+        await carregar(); abrir(p.id);
+      });
+      box.appendChild(el('div',{class:'acoes'},[b]));
+    }
+  }
+  if(item.componentes&&item.componentes.length){
+    const f=el('div',{class:'linhas'});
+    f.appendChild(el('div',{},[el('span',{},['Ficha congelada na aprovação']),el('span',{},[''])]));
+    item.componentes.forEach(x=>f.appendChild(el('div',{},[
+      el('span',{},[x.nome+(x.setor?' · '+x.setor:'')]),
+      el('span',{},[x.largura_corte_mm==null?'—':
+        (emMetros(x.largura_corte_mm)+(x.altura_corte_mm!=null?' × '+emMetros(x.altura_corte_mm):''))])])));
+    box.appendChild(f);
+  }
+  return box;
+}
+
+/* Acrescentar persiana: os mesmos campos do simulador, e o resultado vem da
+   MESMA rota de calculo. Uma segunda conta aqui seria a bancada cortando por
+   uma regua e a revenda cobrada pela outra. */
+function abrirNovaPeca(){
+  const e={abertura_id:null, cor_tecido_id:null, cor_acessorio_id:null,
+    largura:'1,000', altura:'1,000', comando:'direito', rolamento:'frente',
+    adicional:'nenhum', reducao:'nao'};
+  const box=el('div',{class:'editor'});
+
+  const redesenhar=async()=>{
+    limpar(box);
+    const l1=el('div',{class:'campos'});
+    const selCol=el('select',{'aria-label':'Coleção'});
+    (modelo.colecoes||[]).filter(x=>x.disponivel).forEach(x=>{
+      const o=el('option',{value:String(x.abertura_id)},[x.colecao_nome+' · '+x.linha_nome]);
+      if(String(x.abertura_id)===String(e.abertura_id)) o.selected=true;
+      selCol.appendChild(o);
+    });
+    if(e.abertura_id==null&&selCol.options.length){
+      e.abertura_id=Number(selCol.options[0].value);
+      await carregarCores(e.abertura_id);
+    }
+    selCol.onchange=async()=>{ e.abertura_id=Number(selCol.value); e.cor_tecido_id=null;
+      await carregarCores(e.abertura_id); redesenhar(); };
+    l1.appendChild(el('div',{class:'campo cresce'},[el('label',{},['Coleção']),selCol]));
+
+    /* ⚠️ A COR DO TECIDO NAO TEM PADRAO ESCONDIDO. No simulador ela e
+       opcional; aqui ela decide QUAL rolo sai da prateleira, e o servidor
+       recusa sem ela. Um primeiro item pre-selecionado faria a peca sair com
+       a cor que estava por acaso no topo da lista. */
+    const selCor=el('select',{'aria-label':'Cor do tecido'});
+    selCor.appendChild(el('option',{value:''},['— escolha a cor —']));
+    cores.forEach(x=>{
+      const o=el('option',{value:String(x.cor_id)},[x.cor_nome]);
+      if(String(x.cor_id)===String(e.cor_tecido_id)) o.selected=true;
+      selCor.appendChild(o);
+    });
+    selCor.onchange=()=>{ e.cor_tecido_id=selCor.value||null; };
+    l1.appendChild(el('div',{class:'campo cresce'},[el('label',{},['Cor do tecido']),selCor]));
+
+    const selAces=el('select',{'aria-label':'Cor dos acessórios'});
+    (modelo.cores_acessorio||[]).filter(x=>x.ativo&&x.cor_ativa).forEach(x=>{
+      const o=el('option',{value:String(x.cor_id)},[x.cor_nome]);
+      if(String(x.cor_id)===String(e.cor_acessorio_id)) o.selected=true;
+      selAces.appendChild(o);
+    });
+    if(e.cor_acessorio_id==null&&selAces.options.length) e.cor_acessorio_id=Number(selAces.options[0].value);
+    selAces.onchange=()=>{ e.cor_acessorio_id=Number(selAces.value); };
+    l1.appendChild(el('div',{class:'campo cresce'},[el('label',{},['Cor dos acessórios']),selAces]));
+    box.appendChild(l1);
+
+    const l2=el('div',{class:'campos'});
+    [['largura','Largura acabada (m)'],['altura','Altura acabada (m)']].forEach(([k,rot])=>{
+      const i=el('input',{type:'text',inputmode:'decimal',value:e[k],'aria-label':rot});
+      i.oninput=()=>{ e[k]=i.value; };
+      l2.appendChild(el('div',{class:'campo'},[el('label',{},[rot]),i]));
+    });
+    const selCmd=el('select',{'aria-label':'Comando'});
+    [['direito','Direito'],['esquerdo','Esquerdo']].forEach(([v,t])=>{
+      const o=el('option',{value:v},[t]); if(v===e.comando) o.selected=true; selCmd.appendChild(o); });
+    selCmd.onchange=()=>{ e.comando=selCmd.value; };
+    l2.appendChild(el('div',{class:'campo'},[el('label',{},['Comando']),selCmd]));
+    const selRol=el('select',{'aria-label':'Rolamento'});
+    [['frente','Desce pela frente'],['tras','Desce por trás']].forEach(([v,t])=>{
+      const o=el('option',{value:v},[t]); if(v===e.rolamento) o.selected=true; selRol.appendChild(o); });
+    selRol.onchange=()=>{ e.rolamento=selRol.value; };
+    l2.appendChild(el('div',{class:'campo'},[el('label',{},['Rolamento']),selRol]));
+    /* ⚠️ O `aria-label` E O TEXTO DO `<label>` DIZEM A MESMA COISA. Eram
+       "Bandô ou barra" e "Bandô / barra": quem enxerga le um nome e quem usa
+       leitor de tela ouve outro, e os dois conferem o mesmo campo. */
+    const selAd=el('select',{'aria-label':'Bandô / barra'});
+    [['nenhum','Sem bandô nem barra'],['bando','Bandô'],['barra','Barra niveladora']]
+      .forEach(([v,t])=>{ const o=el('option',{value:v},[t]); if(v===e.adicional) o.selected=true; selAd.appendChild(o); });
+    selAd.onchange=()=>{ e.adicional=selAd.value; };
+    l2.appendChild(el('div',{class:'campo'},[el('label',{},['Bandô / barra']),selAd]));
+    box.appendChild(l2);
+
+    const salvar=el('button',{class:'bt primario',type:'button'},['Acrescentar']);
+    salvar.onclick=async()=>{
+      const largura=paraMm(e.largura), altura=paraMm(e.altura);
+      if(!largura||!altura||isNaN(largura)||isNaN(altura)){
+        erro='Medida em metros, com até três casas: 1,450.'; desenharAberto(); return;
+      }
+      try{
+        await api('/api/pedidos/'+aberto.id+'/itens',{metodo:'POST',silencioso:true,corpo:{
+          modelo_id:modelo.id, abertura_id:e.abertura_id,
+          cor_tecido_id:e.cor_tecido_id, cor_acessorio_id:e.cor_acessorio_id,
+          largura_mm:largura, altura_mm:altura,
+          comando:e.comando, rolamento:e.rolamento,
+          adicional:e.adicional, reducao:e.reducao}});
+        erro=null; novaPeca=null;
+        await abrir(aberto.id);
+      }catch(x){ erro=x.message; desenharAberto(); }
+    };
+    const cancelar=el('button',{class:'bt',type:'button'},['Cancelar']);
+    cancelar.onclick=()=>{ novaPeca=null; desenharAberto(); };
+    box.appendChild(el('div',{class:'acoes'},[salvar,cancelar]));
+  };
+
+  novaPeca=box;
+  redesenhar().then(desenharAberto);
+}
+
+/* ⚠️ MOTIVO E CAMPO, NAO `prompt()` OPCIONAL. Cancelar, reabrir e mudar
+   prazo sao os tres lugares onde o "por que" e a informacao — sem ele, o
+   pedido corrigido fica identico ao que nunca teve problema. */
+function comMotivo(pergunta,aoConfirmar,extra){
+  const box=el('div',{class:'editor'});
+  const campos=el('div',{class:'campos'});
+  let dataInput=null;
+  if(extra==='data'){
+    dataInput=el('input',{type:'date','aria-label':'Nova data'});
+    campos.appendChild(el('div',{class:'campo'},[el('label',{},['Nova data']),dataInput]));
+  }
+  const i=el('input',{type:'text','aria-label':pergunta,placeholder:pergunta});
+  campos.appendChild(el('div',{class:'campo cresce'},[el('label',{},[pergunta]),i]));
+  const ok=el('button',{class:'bt primario',type:'button'},['Confirmar']);
+  ok.onclick=async()=>{
+    try{ await aoConfirmar(i.value.trim(), dataInput&&dataInput.value); }
+    catch(x){ erro=x.message; desenharAberto(); }
+  };
+  const nao=el('button',{class:'bt',type:'button'},['Voltar']);
+  nao.onclick=()=>desenharAberto();
+  campos.appendChild(el('div',{class:'campo'},[ok]));
+  campos.appendChild(el('div',{class:'campo'},[nao]));
+  box.appendChild(campos);
+  limpar($('#aberto')).appendChild(box);
+}
+
+function acoes(p){
+  const box=el('div',{class:'acoes'});
+  const bt=(texto,classe,fn)=>{ const b=el('button',{class:'bt '+(classe||''),type:'button'},[texto]);
+    b.onclick=fn; box.appendChild(b); return b; };
+
+  if(p.marco==='rascunho'&&posso('pedido.lancar')){
+    if(p.tipo==='orcamento')
+      bt('Transformar em pedido','primario',async()=>{
+        await api('/api/pedidos/'+p.id+'/virar-pedido',{metodo:'POST'});
+        await carregar(); abrir(p.id);
+      });
+    else
+      bt('Enviar (congela preço e prazo)','primario',async()=>{
+        try{
+          await api('/api/pedidos/'+p.id+'/enviar',{metodo:'POST',silencioso:true});
+          erro=null; await carregar(); abrir(p.id);
+        }catch(x){ erro=x.message; desenharAberto(); }
+      });
+  }
+  if(p.marco==='enviado'){
+    if(posso('pedido.aprovar'))
+      bt('Aprovar','primario',async()=>{
+        try{
+          await api('/api/pedidos/'+p.id+'/aprovar',{metodo:'POST',silencioso:true});
+          erro=null; await carregar(); abrir(p.id);
+        }catch(x){ erro=x.message; desenharAberto(); }
+      });
+    if(posso('pedido.lancar'))
+      bt('Reabrir para editar',null,()=>comMotivo('Por que o pedido voltou?',async motivo=>{
+        await api('/api/pedidos/'+p.id+'/reabrir',{metodo:'POST',corpo:{motivo}});
+        await carregar(); abrir(p.id);
+      }));
+  }
+  if(p.prazo&&posso('pedido.prazo')&&p.marco!=='cancelado')
+    bt('Negociar prazo',null,()=>comMotivo('Por que a data mudou?',async(motivo,para)=>{
+      await api('/api/pedidos/'+p.id+'/prazo',{metodo:'POST',corpo:{para,motivo}});
+      await carregar(); abrir(p.id);
+    },'data'));
+  if(p.congelado)
+    bt('Abrir a folha (PDF)',null,()=>window.open(NAV_BASE+'/api/pedidos/'+p.id+'/pdf','_blank'));
+  if(p.marco!=='cancelado'&&posso('pedido.cancelar'))
+    bt('Cancelar o pedido',null,()=>comMotivo('Por que o pedido foi cancelado?',async motivo=>{
+      await api('/api/pedidos/'+p.id+'/cancelar',{metodo:'POST',corpo:{motivo}});
+      await carregar(); abrir(p.id);
+    }));
+  return box;
+}
+
+const NAV_BASE='/sobmedida';
+
+async function carregar(){
+  eu=await api('/api/eu');
+  $('#quem').textContent=eu.nome+' · '+eu.papel;
+  [fila,lista]=await Promise.all([
+    api('/api/pedidos/fila').catch(()=>[]),
+    api('/api/pedidos')
+  ]);
+  if(posso('pedido.lancar')){
+    revendas=await api('/api/revendas?ativo=1',{silencioso:true}).catch(()=>[]);
+    if(!modelo) await carregarCatalogo().catch(()=>{});
+  }
+  desenharListas();
+}
+
+carregar();
+</script>
+</body>
+</html>
