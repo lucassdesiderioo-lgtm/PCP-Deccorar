@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador · Sob medida</title>
+<link rel="stylesheet" href="/sobmedida/base.css">
+<style>
+/* O DEGRAU E O MAIOR NUMERO DA TELA, e nao o preco. Quem simula esta ao
+   telefone com a revenda respondendo "qual tubo vai" — e e esse numero que
+   decide todo o resto da ficha. */
+.degrau{font-size:34px; font-weight:700; line-height:1.1}
+.degrau small{display:block; font-size:14px; font-weight:400; color:var(--tinta-fraca); margin-top:4px}
+.resumo{font-size:17px; font-weight:600; margin:10px 0 0}
+.grade{display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); align-items:start}
+@media (max-width:900px){ .grade{grid-template-columns:1fr} }
+table.lista{width:100%; border-collapse:collapse; margin-top:10px; font-size:15px}
+table.lista th,table.lista td{padding:7px 8px; border-bottom:1px solid var(--linha); text-align:left}
+table.lista th{font-size:13px; color:var(--tinta-fraca); font-weight:600; text-transform:uppercase; letter-spacing:.04em}
+table.lista td.n{text-align:right; font-variant-numeric:tabular-nums}
+.medida{font-family:ui-monospace,Menlo,Consolas,monospace; font-weight:600}
+.setor{font-size:12px; color:var(--tinta-fraca); text-transform:uppercase; letter-spacing:.05em}
+.total{display:flex; justify-content:space-between; align-items:baseline;
+  border-top:2px solid var(--linha-forte); margin-top:8px; padding-top:10px;
+  font-size:20px; font-weight:700}
+.recusa{background:var(--erro-fraca); color:var(--erro); border:1px solid var(--erro);
+  border-radius:var(--raio); padding:14px 16px; font-size:16px; font-weight:600}
+.aviso{background:var(--alerta-fraca); color:var(--alerta); border:1px solid var(--alerta);
+  border-radius:var(--raio); padding:10px 12px; font-size:15px; margin-top:8px}
+.piso{color:var(--alerta)}
+.motivo{font-size:13px; color:var(--tinta-fraca); margin:4px 0 0}
+</style>
+</head>
+<body>
+<header class="topo">
+  <h1>Simulador</h1>
+  <span class="espaco"></span>
+  <span class="quem" id="quem"></span>
+</header>
+
+<div class="corpo">
+  <div class="cartao">
+    <h2>A persiana</h2>
+    <p class="nota">Medida <b>acabada</b>, em metros com tres casas — a mesma que a
+       revenda manda. O sistema aplica a escada de tubos e a ficha do modelo.</p>
+    <div id="escolhas"></div>
+  </div>
+  <div id="saida"></div>
+</div>
+
+<script src="/sobmedida/ui.js"></script>
+<script src="/sobmedida/nav.js"></script>
+<script>
+const {api,banner,el,limpar,$}=window.ui;
+
+/* ⚠️ A CONVERSAO METRO → MILIMETRO E EXATA, e nao `Number(x)*1000`.
+   `1.007 * 1000` da 1007.0000000000001 em ponto flutuante, e o servidor — que
+   exige milimetro INTEIRO — recusaria uma medida que a pessoa digitou certo.
+   Aqui os dois lados do numero sao lidos como texto e somados como inteiros.
+   Mais de tres casas e recusado na hora: abaixo do milimetro nao ha corte. */
+function paraMm(texto){
+  const t=String(texto||'').trim().replace('.',',');
+  if(!t) return null;
+  const m=/^(\d+)(?:,(\d{0,3}))?$/.exec(t);
+  if(!m) return NaN;
+  return Number(m[1])*1000+Number((m[2]||'').padEnd(3,'0'));
+}
+const emMetros=mm=>mm==null?'':(mm/1000).toFixed(3).replace('.',',');
+const reais=c=>c==null?'—':'R$ '+(c/100).toFixed(2).replace('.',',');
+
+const estado={modelo:null, abertura_id:null, cor_acessorio_id:null,
+  largura:'1,000', altura:'1,000', comando:'direito', rolamento:'frente',
+  adicional:'nenhum', reducao:'nao', opcoes:null, recado:null};
+
+function fileira(rotulo, itens, valorAtual, aoEscolher, desabilitados){
+  const campo=el('div',{class:'campo cresce'},[el('label',{},[rotulo])]);
+  const f=el('div',{class:'fileira'});
+  itens.forEach(it=>{
+    const bloqueio=(desabilitados||{})[it.valor];
+    const b=el('button',{class:'op',type:'button','aria-pressed':String(it.valor===valorAtual)},[it.nome]);
+    if(bloqueio) b.setAttribute('disabled','');
+    b.addEventListener('click',()=>aoEscolher(it.valor));
+    f.appendChild(b);
+  });
+  campo.appendChild(f);
+  return campo;
+}
+
+function desenharEscolhas(){
+  const c=limpar($('#escolhas'));
+  const m=estado.modelo;
+  if(!m) return;
+
+  const linha1=el('div',{class:'campos'});
+  linha1.appendChild(fileira('Coleção',
+    m.colecoes.filter(x=>x.disponivel).map(x=>({valor:x.abertura_id,nome:x.colecao_nome+' · '+x.linha_nome})),
+    estado.abertura_id, v=>{ estado.abertura_id=v; simular(); }));
+  c.appendChild(linha1);
+
+  const linha2=el('div',{class:'campos'});
+  linha2.appendChild(fileira('Cor dos acessórios',
+    m.cores_acessorio.filter(x=>x.ativo&&x.cor_ativa).map(x=>({valor:x.cor_id,nome:x.cor_nome})),
+    estado.cor_acessorio_id, v=>{ estado.cor_acessorio_id=v; simular(); }));
+  c.appendChild(linha2);
+
+  const medidas=el('div',{class:'campos'});
+  [['largura','Largura acabada (m)'],['altura','Altura acabada (m)']].forEach(([campo,rotulo])=>{
+    const box=el('div',{class:'campo'},[el('label',{},[rotulo])]);
+    const i=el('input',{type:'text', inputmode:'decimal', value:estado[campo],
+      placeholder:'1,000', 'aria-label':rotulo});
+    i.addEventListener('input',()=>{ estado[campo]=i.value; simular(); });
+    box.appendChild(i);
+    medidas.appendChild(box);
+  });
+  c.appendChild(medidas);
+
+  const op=estado.opcoes||{};
+  const linha3=el('div',{class:'campos'});
+  linha3.appendChild(fileira('Comando',
+    [{valor:'direito',nome:'Direito'},{valor:'esquerdo',nome:'Esquerdo'}],
+    estado.comando, v=>{ estado.comando=v; simular(); }));
+  linha3.appendChild(fileira('Rolamento',
+    [{valor:'frente',nome:'Desce pela frente'},{valor:'tras',nome:'Desce por trás'}],
+    estado.rolamento, v=>{ estado.rolamento=v; simular(); }));
+  c.appendChild(linha3);
+
+  /* ⚠️ BANDO E BARRA NA MESMA FILEIRA, e nao duas caixinhas. Elas nunca
+     convivem (secao 4.6): escolher um desmarca o outro por construcao, e o
+     "desmarcar em silencio" deixa de existir porque nunca houve dois
+     marcados. A opcao indisponivel fica DESABILITADA com o motivo escrito
+     embaixo — sumir calado vira desconfianca da tela. */
+  const linha4=el('div',{class:'campos'});
+  const bloq={};
+  if(op.bando&&!op.bando.disponivel) bloq.bando=op.bando.motivo;
+  if(op.barra&&!op.barra.disponivel) bloq.barra=op.barra.motivo;
+  linha4.appendChild(fileira('Bandô ou barra',
+    [{valor:'nenhum',nome:'Nenhum'},{valor:'bando',nome:'Bandô'},{valor:'barra',nome:'Barra niveladora'}],
+    estado.adicional, v=>{ estado.adicional=v; simular(); }, bloq));
+
+  const podePedir=op.reducao&&op.reducao.pode_pedir;
+  const auto=op.reducao&&op.reducao.automatica;
+  linha4.appendChild(fileira('Redução de peso',
+    [{valor:'nao',nome:auto?'Incluída pela regra':'Não'},{valor:'pedida',nome:'Pedida'}],
+    auto?'nao':estado.reducao, v=>{ estado.reducao=v; simular(); },
+    (podePedir&&!auto)?{}:{pedida:true}));
+  c.appendChild(linha4);
+
+  Object.keys(bloq).forEach(k=>c.appendChild(el('p',{class:'motivo'},[bloq[k]])));
+  if(auto) c.appendChild(el('p',{class:'motivo'},
+    ['A redução entra sozinha nesta medida e é cobrada do mesmo jeito.']));
+  else if(!podePedir) c.appendChild(el('p',{class:'motivo'},
+    ['A redução de peso existe a partir do Tubo 38.']));
+}
+
+function desenhar(r){
+  const s=limpar($('#saida'));
+  const grade=el('div',{class:'grade'});
+
+  // ── O que a peca e ───────────────────────────────────────────────────────
+  const esq=el('div',{class:'cartao'},[
+    el('div',{class:'degrau'},[r.degrau.nome,
+      el('small',{},['desconto de '+r.degrau.desconto_mm+' mm no tubo · tecido + '+
+        r.degrau.acrescimo_altura_tecido_mm+' mm de altura'])]),
+    el('p',{class:'resumo'},[r.resumo])
+  ]);
+  const t=el('table',{class:'lista'});
+  t.appendChild(el('thead',{},[el('tr',{},[
+    el('th',{},['Componente']),el('th',{},['Corta a']),el('th',{},['Consome'])])]));
+  const tb=el('tbody');
+  r.componentes.forEach(c=>{
+    const corte=c.largura_corte_mm==null?'—'
+      :(c.altura_corte_mm==null?c.largura_corte:c.largura_corte+' × '+c.altura_corte);
+    const consumo=c.consumo_largura_mm==null?'—'
+      :(c.consumo_altura_mm==null?emMetros(c.consumo_largura_mm)
+        :emMetros(c.consumo_largura_mm)+' × '+emMetros(c.consumo_altura_mm));
+    tb.appendChild(el('tr',{},[
+      el('td',{},[c.nome, el('div',{class:'setor'},[c.setor])]),
+      el('td',{class:'medida'},[corte]),
+      el('td',{class:'medida'},[consumo])
+    ]));
+  });
+  t.appendChild(tb);
+  esq.appendChild(t);
+  if(r.kit) esq.appendChild(el('p',{class:'nota'},
+    [r.kit.nome+(r.kit.suportes?(' · '+r.kit.suportes+' suportes'):'')+' · código '+r.kit.codigo_barras]));
+  grade.appendChild(esq);
+
+  // ── Quanto custa ─────────────────────────────────────────────────────────
+  /* O preco so existe para quem tem `custo.ver`: o servidor PODA o JSON, e a
+     tela nao tem o que esconder porque o campo nao chegou. */
+  if(r.preco){
+    const dir=el('div',{class:'cartao'},[el('h2',{},['Preço Deccorar'])]);
+    const tp=el('table',{class:'lista'});
+    tp.appendChild(el('thead',{},[el('tr',{},[
+      el('th',{},['Linha']),el('th',{},['Conta']),el('th',{class:'n'},['Valor'])])]));
+    const tpb=el('tbody');
+    r.preco.linhas.forEach(l=>tpb.appendChild(el('tr',{},[
+      el('td',{},[l.nome]),
+      el('td',{class:'nota'},[l.base||'sem preço lançado']),
+      el('td',{class:'n'+(l.valor_centavos==null?' piso':'')},[reais(l.valor_centavos)])
+    ])));
+    tp.appendChild(tpb);
+    dir.appendChild(tp);
+    dir.appendChild(el('div',{class:'total'+(r.preco.sem_preco.length?' piso':'')},[
+      el('span',{},[r.preco.sem_preco.length?'No mínimo':'Subtotal']),
+      el('span',{},[(r.preco.sem_preco.length?'≥ ':'')+
+        reais(r.preco.valor_subtotal_centavos!=null?r.preco.valor_subtotal_centavos
+                                                  :r.preco.valor_piso_centavos)])
+    ]));
+    dir.appendChild(el('p',{class:'nota'},[
+      'Cobrado por '+r.preco.m2_cobrado+' m²'+
+      (r.preco.aplicou_minimo?(' (mínimo faturado; a peça tem '+r.preco.m2_real+' m²)')
+                             :(' — a peça tem '+r.preco.m2_real+' m²'))]));
+    dir.appendChild(el('p',{class:'nota'},
+      ['A tabela da revenda e o desconto dela entram na fase 2. Este é o preço Deccorar.']));
+    grade.appendChild(dir);
+  }
+
+  s.appendChild(grade);
+  (r.avisos||[]).forEach(a=>s.appendChild(el('div',{class:'aviso'},[a])));
+}
+
+let pendente=null;
+function simular(){
+  desenharEscolhas();
+  clearTimeout(pendente);
+  pendente=setTimeout(rodar,180);
+}
+
+async function rodar(){
+  const largura_mm=paraMm(estado.largura), altura_mm=paraMm(estado.altura);
+  const s=limpar($('#saida'));
+  if(largura_mm===null||altura_mm===null) return;
+  if(isNaN(largura_mm)||isNaN(altura_mm))
+    return s.appendChild(el('div',{class:'recusa'},
+      ['Medida em metros, com até três casas: 1,000 · 0,800 · 2,450.']));
+  if(!estado.abertura_id||!estado.cor_acessorio_id)
+    return s.appendChild(el('div',{class:'aviso'},
+      ['Escolha a coleção e a cor dos acessórios.']));
+
+  const corpo={modelo_id:estado.modelo.id, abertura_id:estado.abertura_id,
+    cor_acessorio_id:estado.cor_acessorio_id, largura_mm, altura_mm,
+    comando:estado.comando, rolamento:estado.rolamento,
+    adicional:estado.adicional, reducao:estado.reducao};
+  try{
+    const r=await api('/api/sm/simular',{metodo:'POST',corpo,silencioso:true});
+    estado.opcoes=r.opcoes;
+    if(r.reducao.automatica) estado.reducao='nao';
+    desenharEscolhas();
+    desenhar(r);
+    if(estado.recado){
+      $('#saida').insertBefore(el('div',{class:'aviso'},[estado.recado]),$('#saida').firstChild);
+      estado.recado=null;
+    }
+  }catch(e){
+    /* ⚠️ O ADICIONAL QUE DEIXOU DE CABER NAO SAI EM SILENCIO (secao 4.6):
+       a tela avisa, volta para "Nenhum" e pede para escolher de novo. Tirar
+       calado faria o orcamento mudar de preco sem ninguem entender por que. */
+    const voltou=(e.motivo==='bando_indisponivel'||e.motivo==='barra_indisponivel')
+      &&estado.adicional!=='nenhum';
+    limpar($('#saida')).appendChild(el('div',{class:'recusa'},[e.mensagem||'Não foi possível calcular.']));
+    if(voltou){
+      estado.adicional='nenhum';
+      /* O recado sobrevive ao proximo desenho DE PROPOSITO: a re-simulacao
+         limpa a saida, e um aviso que pisca por 50 ms e um aviso que ninguem
+         leu — que e o mesmo que tirar a opcao em silencio. */
+      estado.recado='A medida mudou e essa opção não cabe mais nela. Voltei para "Nenhum" — escolha de novo.';
+      desenharEscolhas();
+      setTimeout(rodar,0);
+    }
+  }
+}
+
+(async function(){
+  const eu=await api('/api/eu');
+  $('#quem').textContent=eu.nome;
+  const modelos=await api('/api/sm/modelos');
+  if(!modelos.length) return banner('Nenhum modelo cadastrado ainda.','alerta');
+  estado.modelo=await api('/api/sm/modelos/'+modelos[0].id);
+  const c=estado.modelo.colecoes.filter(x=>x.disponivel)[0];
+  const cor=estado.modelo.cores_acessorio.filter(x=>x.ativo&&x.cor_ativa)[0];
+  estado.abertura_id=c?c.abertura_id:null;
+  estado.cor_acessorio_id=cor?cor.cor_id:null;
+  simular();
+  if(!c) banner('O modelo '+estado.modelo.nome+' ainda não tem coleção de venda ligada. '+
+    'Ligue em Catálogo.','alerta',8);
+})();
+</script>
+</body>
+</html>

@@ -2925,6 +2925,26 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Deixar a bancada criar um cadastro **sem** marcá-lo para conferência, ou
   marcar **sem** ele aparecer na lista de Cadastros — meia decisão é pior que
   a trava que existia antes (§19, armadilha #14)
+- ❌ Calcular "o que esta persiana é" fora do `tecido/dominio/persiana.js` — o
+  simulador, o pedido, a ficha congelada e a etiqueta leem a MESMA conta (§19)
+- ❌ Guardar medida do sob medida em metro `REAL` ou dinheiro em reais: é
+  milímetro e centavo inteiros, e a conta da ficha EMPILHA (§19)
+- ❌ Converter metro em milímetro por `Number(x)*1000` na tela: `1,007` vira
+  1006,9999… e o servidor recusa, com razão, a medida que a pessoa acertou (§19)
+- ❌ Somar consumo com corte no sob medida, ou usar um no lugar do outro — são
+  os dois números da linha, e nunca fecham (§19, e a armadilha #18)
+- ❌ Guardar `linha` no modelo de venda: ela já está dentro da coleção, e a
+  segunda afirmação sobre o mesmo fato diverge (§19)
+- ❌ Duplicar o cadastro de coleção, cor ou tecido para a venda — a coleção de
+  venda APONTA para o cadastro de tecido (§19)
+- ❌ Escolher o tubo por outro caminho que não a escada, ou cadastrar degrau que
+  não sobe nos dois limites: a persiana pula o tubo em silêncio (§19)
+- ❌ Tirar o bandô, pôr a redução de peso ou recusar a medida **sem dizer por
+  quê** — a frase é parte da regra, não texto de erro (§19)
+- ❌ Nomear campo de dinheiro fora do padrão `preco_*`/`valor_*` no sob medida:
+  a poda corta por NOME, e um `total_centavos` vaza em silêncio (§19)
+- ❌ Declarar tela em `tecido/nucleo/telas.js` sem a linha no `public/nav.js` —
+  ela nasce sem botão, sem erro e sem log (§19)
 
 ---
 
@@ -3447,6 +3467,52 @@ com a margem nascendo **zero** para não virar fato inventado.
 `tecido/dominio/gerencial.js` é o dono único de **mínimo, status e faixas**. Ele
 não calcula consumo nem valor: compõe o `giro.js` e o `custo.js`.
 
+### ⚠️ O MÓDULO PASSOU A TER DOIS ASSUNTOS (22/09/2026)
+
+Até 21/09 o `tecido/` respondia só sobre **estoque de tecido**: quanto tem,
+que sobras existem, como cortar. A fase 1 da spec `SOBMEDIDA-PEDIDO-REVENDA`
+acrescentou o segundo: **a venda sob medida** — o que a fábrica vende, com que
+regra técnica e por quanto.
+
+| Assunto | Tabelas | Dono único |
+|---|---|---|
+| estoque de tecido | `rolo`, `sobra`, `plano`, `tecido`… | `dominio/rolo.js`, `dominio/plano.js`… |
+| **venda sob medida** | as `sm_*` (migração 16) | **`dominio/persiana.js`** |
+
+`persiana.js` responde *"dada esta persiana, o que ela é"*: o degrau da escada
+de tubos, os componentes com medida de corte **e** de consumo, o kit, o preço,
+os avisos e as recusas. O simulador de hoje, o pedido da fase 3, a explosão da
+ficha na aprovação e a etiqueta da fase 4 chamam **essa** função — uma segunda
+conta em qualquer uma seria a armadilha #12 com a bancada cortando por uma
+régua e o cliente cobrado pela outra.
+
+> ⚠️ **Milímetro inteiro e centavo inteiro por dentro**, metro com três casas e
+> reais por fora, e `tecido/nucleo/unidade.js` é a porta única. O resto do
+> módulo trabalha em metros `REAL` e ali está certo — a bobina é medida assim.
+> Aqui a conta **empilha** (o tubo tira do final, o tecido tira do tubo, a base
+> soma no tecido) e o ruído de ponto flutuante compõe a cada degrau. É o
+> `3,5 + 0,2 = 3,7000000000000006` do §7-B, numa escala em que ele decide corte.
+
+> ⚠️ **A ficha tem os DOIS números por linha desde o primeiro dia** (armadilha
+> #18): corte vai para a etiqueta, consumo vai para Compras e para o custo. Na
+> fase 1 o consumo nasce igual ao corte e a coluna já existe — há caso travando
+> que dobrar a medida de corte não muda um centavo.
+
+> ⚠️ **A coleção de venda APONTA para o cadastro de tecido, e o modelo NÃO
+> guarda linha.** A `abertura` já pendura em `linha`, então a linha já está
+> dentro da coleção; guardá-la também no modelo seria a segunda afirmação sobre
+> o mesmo fato, que é o defeito do `linhaSel`/`linhaForm` de 15/09/2026.
+
+> ⚠️ **Tela nova pede a linha em `nucleo/telas.js` E em `public/nav.js`.** O
+> rodapé monta `ORDEM.filter(...)`: tela declarada e liberada mas fora daquele
+> mapa **não tem botão**, sem erro e sem log. É a armadilha #13 por mais uma
+> porta, e a ponta que some em silêncio é sempre a última.
+
+**Detalhe inteiro no `tecido/README.md`**, seção "O catálogo de venda e o
+simulador". As permissões novas (`catalogo.ler`, `catalogo.editar`) são do
+módulo, não do PCP: nenhuma área nova foi criada — até a fase 2 o vendedor
+entra pela área "Sob medida — cadastros", **que é mais larga do que precisa**.
+
 ### Três regras do sob medida que valem citar aqui
 
 **Cada nível guarda um rolo só.** Regra do dono, 15/09/2026: `Haste A · Andar 1
@@ -3471,7 +3537,7 @@ cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 251 casos
+cd tecido && npm test          # 304 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:

@@ -8,7 +8,7 @@ Este módulo **não sobe sozinho**. Ele é montado dentro do PCP, em `/sobmedida
 pelo `server.js` da raiz. Uma porta, um processo, um PIN.
 
 ```bash
-npm test          # daqui: 251 casos, banco temporário, sem servidor
+npm test          # daqui: 304 casos, banco temporário, sem servidor
 node server.js    # da RAIZ: sobe o PCP inteiro, com o sob medida junto
 ```
 
@@ -49,6 +49,253 @@ novo.
 | 6 | Plano completo: bobinas + recusa + sobra gerada | **pronta** |
 | 7 | Painel e relatórios | **pronta** |
 | 8 | Upload do arquivo de medidas | **pronta** (leitor genérico — ver abaixo) |
+
+---
+
+## O CATÁLOGO DE VENDA E O SIMULADOR (fase 1 da spec `SOBMEDIDA-PEDIDO-REVENDA`)
+
+> **22/09/2026.** A partir daqui o módulo tem **dois assuntos**. Até ontem ele
+> respondia só sobre *estoque de tecido*; agora responde também sobre *venda
+> sob medida* — o que a fábrica vende, com que regra técnica e por quanto.
+> As tabelas novas levam prefixo `sm_` por isso: `modelo` e `componente`
+> sozinhos obrigariam quem lê a adivinhar de qual dos dois assuntos são.
+
+O pedido sob medida chega por WhatsApp, é digitado no Decorsoft e a regra
+técnica — qual tubo vai, se o bandô cabe, a quanto cortar o tecido — mora na
+cabeça de quem digita. A fase 1 tira essa regra da cabeça e põe em cadastro.
+
+### ⚠️ `dominio/persiana.js` é o DONO ÚNICO de "o que esta persiana é"
+
+Entra modelo, coleção, cor, medida **acabada** e as escolhas; sai o degrau, os
+componentes com medida de corte e de consumo, o kit, o preço, os avisos e as
+recusas. Quem faz essa pergunta chama **esta** função: o simulador de hoje, o
+pedido da fase 3, a explosão da ficha na aprovação e a etiqueta da fase 4.
+
+Uma segunda conta em qualquer uma delas seria a armadilha #12 do `CLAUDE.md` —
+duas telas certas, cada uma na sua régua, e a bancada cortando por uma
+enquanto o cliente foi cobrado pela outra.
+
+> **Ele não grava nada.** Na aprovação (fase 3) o pedido **congela** o
+> resultado: a persiana aprovada hoje continua sendo cortada com o desconto de
+> hoje, mesmo que alguém mude o cadastro amanhã. Ficha relida ao vivo faria a
+> etiqueta impressa e a tela discordarem, e na bancada vence a etiqueta.
+
+### ⚠️ MILÍMETRO INTEIRO E CENTAVO INTEIRO, e `nucleo/unidade.js` é a porta
+
+| | Por dentro | Por fora |
+|---|---|---|
+| Medida | milímetro inteiro (`970`) | metro com **três** casas (`0,970`) |
+| Área | mm² inteiro (1 m² = 1.000.000) | m² com três casas |
+| Dinheiro | centavo inteiro (`16500`) | `165,00` |
+
+O resto do módulo trabalha em metros `REAL`, e ali está certo: a bobina é
+medida assim, e a tolerância de 1 mm do `erros.js` resolve. Aqui a conta
+**empilha** — o tubo tira do final, o tecido tira do tubo, a base soma no
+tecido — e ruído de ponto flutuante compõe a cada degrau.
+
+> ⚠️ **AS TRÊS CASAS SÃO REGRA, INCLUSIVE O ZERO FINAL.** `0,97` na etiqueta
+> faz a serralheria parar para pensar se o número está completo; `0,970` não.
+
+> ⚠️ **E A CONVERSÃO DA TELA NÃO É `Number(x) * 1000`.** `1,007` digitado vira
+> `1006.9999999999999`, e o servidor — que exige milímetro inteiro, com razão —
+> recusaria uma medida que a pessoa digitou certa. As duas telas leem os dois
+> lados do número como **texto** e somam inteiros. Mais de três casas é
+> recusado na hora: abaixo do milímetro não há corte.
+
+### A escada de tubos, e por que ela tem que subir
+
+Sobe até o **primeiro degrau onde a persiana cabe nos dois limites**: largura
+**e** m². Passou de qualquer um dos dois, sobe. A medida exata fica no degrau
+de baixo — 1,700 ainda é Tubo 32.
+
+| Tubo | Largura até | m² até | Desconto | Altura do tecido | Bandô | Redução pedida |
+|---|---|---|---|---|---|---|
+| 32 | 1,700 | 3,0 | −30 mm | final + 200 | ✅ | ❌ |
+| 38 | 2,200 | 3,5 | −30 mm | final + 200 | ✅ | ✅ |
+| 41 | 2,700 | 5,0 | −40 mm | final + 250 | ❌ | ✅ |
+| 56 | 3,000 | 7,0 | −45 mm | final + 250 | ❌ | ✅ |
+
+> ⚠️ **A ESCADA TEM QUE SUBIR NOS DOIS LIMITES, e o cadastro recusa quem não
+> sobe.** Um degrau que aceita menos largura que o de baixo quebra a promessa
+> em silêncio: a persiana **pula** aquele tubo e vai para o seguinte, e o único
+> jeito de descobrir é comparando a etiqueta com o que a serralheria esperava.
+
+**Vale sempre o mais restritivo entre coleção, modelo e degrau**, e a recusa
+**nomeia quem recusou** — `A largura de 2,900 passa dos 2,800 que a coleção
+Screen 1% aceita`. "Acima do limite" sem dono não diz onde mexer.
+
+### ⚠️ A COLEÇÃO DE VENDA APONTA PARA O CADASTRO DE TECIDO. NUNCA O DUPLICA
+
+`sm_modelo_colecao` guarda `abertura_id` — a mesma linha que a entrada de rolo,
+o corte e as sobras usam. O que a venda acrescenta é o que o estoque não tem:
+preço por m², largura máxima, m² máximo e mínimo faturado.
+
+Duas listas de coleções divergiriam no primeiro tecido novo, e o pedido
+chegaria ao plano de corte pedindo um tecido que o estoque não reconhece.
+
+> ⚠️ **E O MODELO NÃO GUARDA LINHA** — decisão de 22/09/2026, e ela sai do
+> próprio schema: `abertura` já pendura em `linha` com `UNIQUE(linha_id,nome)`,
+> e o `criarTecido` recusa `abertura_de_outra_linha`. **A linha já está dentro
+> da coleção.** Guardá-la também no modelo seria uma segunda afirmação sobre o
+> mesmo fato — é o defeito do `linhaSel`/`linhaForm` de 15/09/2026, em que o
+> formulário descrevia `Double Vision` com uma coleção do `Rolô`.
+>
+> Além disso os dois não são a mesma coisa: `linha` é a família do **tecido**
+> (Rolô, Romana, Double Vision) e o modelo é o **mecanismo** (Rolô, Rolô
+> Duplex, Rolô Motorizada). Rolô e Motorizada partilham o mesmo tecido.
+
+### ⚠️ A FICHA TEM OS DOIS NÚMEROS POR LINHA — armadilha #18 do `CLAUDE.md`
+
+| Coluna | Responde | Quem lê |
+|---|---|---|
+| `ref_*` / `ajuste_*` | a quanto a bancada **corta** | a etiqueta de produção |
+| `consumo_ref_*` / `consumo_ajuste_*` | quanto a peça **consome** | Compras e o custo |
+
+Os dois nunca fecham, e quem um dia "unificar" está cortando ou a peça ou o
+custo. **Na fase 1 o consumo nasce igual ao corte, e a coluna existe desde o
+primeiro dia** — quando a fábrica medir a perda de verdade, o consumo anda
+sozinho e o corte fica onde está. Há caso travando: dobrar a medida de corte
+não pode mexer em um centavo.
+
+Cada linha é **referência + ajuste**, e não linguagem de fórmula:
+
+```
+ref_largura   final | degrau (final − desconto) | <chave de um componente>
+ref_altura    final | degrau (final + acréscimo)
+```
+
+A ficha do Rolô, inteira:
+
+```
+tubo     degrau  + 0      → 1,000 vira 0,970
+tecido   tubo    − 5      × degrau + 0   → 0,965 × 1,200
+base     tecido  + 5      → 0,970 (fica igual ao tubo)
+bandô    final   − 5      → 0,995      (só quando há bandô)
+barra    final   − 9      → 0,991      (só quando há barra)
+```
+
+> ⚠️ **A REFERÊNCIA NÃO PODE OLHAR PARA A FRENTE.** A ficha é calculada em
+> ordem; uma linha que se mede por um componente ainda não calculado não tem
+> resposta — e **sem a guarda ela não daria erro nenhum**: a medida sairia
+> vazia e a etiqueta iria para a bancada assim. O cadastro recusa, e o cálculo
+> confere de novo, porque ficha antiga no banco nunca passou por aquela guarda.
+
+### O kit, e por que são três códigos de barras
+
+| Persiana | Kit | Suportes |
+|---|---|---|
+| Sem bandô e sem barra | Kit tradicional | os padrão do kit |
+| Com bandô | Kit bandô | pela largura |
+| Com barra | Kit barra | pela largura |
+
+```
+até 1,000 → 2 · até 1,900 → 3 · até 2,600 → 4 · até 3,000 → 5
+```
+
+Na medida padrão o QR do kit é **fixo** e prova só que *algum* kit entrou
+(`CLAUDE.md` §4). Aqui prova que entrou **o certo** — e é por isso que são três
+códigos e não um. O bipe que confere isso é da fase 5.
+
+### Preço — e as duas regras que vieram inteiras do PCP
+
+```
+m² cobrado  = maior entre o m² real e o mínimo faturado (1,5 m²)
+tecido      = m² cobrado × preço do m² da COLEÇÃO
+bandô/barra = largura REAL × R$/m linear
+redução     = R$ por peça, cobrada inclusive quando entra automática
+```
+
+> ⚠️ **O BANDÔ E A BARRA COBRAM PELA LARGURA REAL, NUNCA PELA DE CORTE.** A
+> barra é cortada a 1,991 e o cliente compra 2,000 m de barra — cobrar pelo
+> corte faria a fábrica deixar de pagar o que ela corta fora.
+
+> ⚠️ **CUSTO INDEFINIDO NUNCA VIRA ZERO** (regra 4 do `COMPRAS.md`, e o
+> `custo.js` daqui). Coleção sem preço: o subtotal é `null` — não a soma
+> parcial —, o que se sabe sai como **piso** (`≥`) e a linha que falta é
+> **nomeada**. Zero é um custo válido e mentiroso.
+
+> ⚠️ **QUEM NÃO TEM `custo.ver` NÃO RECEBE OS CAMPOS.** A poda é a mesma do
+> resto do módulo (`custo.podar`), que corta **por padrão de nome**. Por isso
+> todo campo de dinheiro daqui se chama `preco_*` ou `valor_*`: um
+> `total_centavos` **não casaria** com o padrão e vazaria em silêncio. Há caso
+> travando os dois lados.
+>
+> Hoje isso é um no-op — só a chefia alcança o simulador. Ele está aqui porque
+> a **fase 7** põe a revenda na mesma porta, e defesa que se escreve depois que
+> o usuário existe é defesa que se escreve tarde.
+
+### ⚠️ A OPÇÃO QUE SOME DA TELA DIZ POR QUE SUMIU
+
+O resultado traz um bloco `opcoes` com o que **aquela medida** aceita, e o
+motivo quando não aceita. Ele é calculado sempre, e não só quando alguém pede:
+descobrir pela recusa daria a frase certa e **nenhuma persiana calculada
+junto**, e a revenda leria "deu erro" em vez de "nesta medida não tem bandô".
+
+> A frase é **parte da regra**: *"O bandô não é possível nesta medida: o tubo
+> enrolado não cabe dentro do bandô."* Acessório que some sem explicação vira
+> ligação da revenda para o vendedor.
+
+E quem escolhe o indisponível continua sendo **recusado pelo servidor** — a
+tela esconder o botão não é a regra; a regra é a que existe fora do navegador
+(armadilha #26 do `CLAUDE.md`). Quando a medida muda e o adicional deixa de
+caber, a tela **avisa e pede para escolher de novo**, nunca tira em silêncio —
+e o recado sobrevive ao redesenho seguinte, porque aviso que pisca por 50 ms é
+aviso que ninguém leu.
+
+### Quem vê o quê
+
+| Chave | O quê | Cortador | Chefia |
+|---|---|:---:|:---:|
+| `catalogo.ler` | ver o catálogo e usar o simulador | ❌ | ✅ |
+| `catalogo.editar` | modelo, coleções, escada, ficha, preços | ❌ | ✅ |
+
+As duas telas são **escritório** (tema escuro): `/sobmedida/catalogo` e
+`/sobmedida/simulador`.
+
+> ⚠️ **NENHUMA DAS DUAS ESTÁ NO CORTADOR, e isso é decisão da fase 1.** Quem
+> usa é a equipe interna lançando os pedidos que hoje chegam por WhatsApp. O
+> papel próprio do **vendedor** é da fase 2 — até lá ele entra pela área "Sob
+> medida — cadastros" do PCP, **que é mais larga do que precisa** (ela também
+> dá cadastro de tecido, parâmetros e descarte de sobra). Está escrito aqui
+> para não se descobrir por acidente.
+
+> ⚠️ **TELA QUE NÃO ESTÁ NO `public/nav.js` NASCE INVISÍVEL.** O rodapé monta
+> `ORDEM.filter(...)`: uma tela declarada em `nucleo/telas.js` e liberada pela
+> permissão, mas esquecida lá, simplesmente **não tem botão** — sem erro, sem
+> log, e só quem souber o endereço de cor chega nela. É a armadilha #13 do
+> `CLAUDE.md` por mais uma porta, e a ponta que some em silêncio é sempre a
+> última. **Tela nova pede a linha em `telas.js` E em `nav.js`**, no mesmo
+> commit.
+
+### O que a semente traz, e o que ela NÃO traz
+
+A migração 16 cria o modelo **Rolô** inteiro: os quatro degraus, os doze
+componentes, as doze linhas de ficha, as quatro faixas de suporte e a regra da
+redução — os números das seções 4.4 a 4.8 da spec.
+
+> ⚠️ **AS COLEÇÕES DE VENDA NÃO ENTRAM NA SEMENTE, e isso não é esquecimento.**
+> Elas apontam para linhas de `abertura` que só existem no cadastro real da
+> fábrica; inventá-las criaria coleção duplicada, que é o primeiro ❌ da seção 9
+> da spec. Elas se ligam na tela de Catálogo, uma vez, com o catálogo na
+> frente — e é lá que o preço do m² de cada uma é lançado.
+
+### Teste obrigatório
+
+```bash
+cd tecido && npm test          # 304 casos
+```
+
+**Rode ao mexer em `dominio/persiana.js`, `dominio/catalogo_sm.js`,
+`nucleo/unidade.js` ou na migração 16** — os 32 casos de `persiana.test.js`
+são os três exemplos do §4.5, o kit do §4.7 e o preço do §4.8 **escritos à
+mão, não calculados pelo código**, mais cada divisa com o par que fica e o que
+sobe: 1,700 · 3,0 m² · 2,200 · 3,5 m² · 3,000 · 7,0 m² · 1,000/1,001 suportes ·
+4,5 m² · 2,200 da redução · 3,000 de altura do bandô · 2,800 do Screen 1%.
+
+> ⚠️ **Os números dos casos vieram da spec, não do código.** Um teste que
+> refaz a conta com a mesma convenção do código que testa não testa nada: ele
+> pergunta a si mesmo. Foi assim que o QR da etiqueta do kit passou por três
+> rodadas verdes (`CLAUDE.md` §4).
 
 ---
 

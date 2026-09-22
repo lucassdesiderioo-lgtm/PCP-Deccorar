@@ -31,7 +31,15 @@ const TELAS={
      inteira em modo leitura: uma tela escura no tablet sob a lampada de
      inspecao, cheia de coisa que ele nao pode mexer. */
   '/cadastros': {arquivo:'telas/cadastros.html', permissao:'cadastro.editar',   contexto:'admin'},
-  '/painel':    {arquivo:'telas/painel.html',    permissao:'painel.ler',        contexto:'admin'}
+  '/painel':    {arquivo:'telas/painel.html',    permissao:'painel.ler',        contexto:'admin'},
+
+  /* ── O SOB MEDIDA DE VENDA (spec SOBMEDIDA-PEDIDO-REVENDA, fase 1) ──────
+     As duas nascem em contexto ADMIN, e nao por serem novas: sao escritorio.
+     O catalogo e cadastro (a mesma razao que moveu /cadastros de `ler` para
+     `editar`), e o simulador e desktop — quem simula esta ao telefone com a
+     revenda, nao em pe na bancada sob a lampada de inspecao. */
+  '/catalogo':  {arquivo:'telas/catalogo.html',  permissao:'catalogo.editar',   contexto:'admin'},
+  '/simulador': {arquivo:'telas/simulador.html', permissao:'catalogo.ler',      contexto:'admin'}
 };
 
 module.exports={TELAS};

@@ -14,12 +14,18 @@
 'use strict';
 
 var BASE='/sobmedida';
+// ⚠️ TELA QUE NAO ESTA NESTES DOIS MAPAS NASCE INVISIVEL. O rodape monta
+// `ORDEM.filter(...)`, entao uma tela declarada em nucleo/telas.js e liberada
+// pela permissao, mas esquecida aqui, simplesmente nao tem botao — sem erro,
+// sem log, e so quem souber o endereco de cor chega nela. E a armadilha #13
+// do CLAUDE.md por mais uma porta: a ponta que some em silencio e sempre a
+// ultima. Tela nova pede a linha aqui, no mesmo commit.
 var NOMES={'/':'Inicio','/corte':'Plano de corte','/sobras':'Sobras',
            '/rolos':'Rolos','/etiquetas':'Etiquetas','/cadastros':'Cadastros',
-           '/painel':'Painel'};
+           '/painel':'Painel','/simulador':'Simulador','/catalogo':'Catalogo'};
 // A ordem do rodape segue o FLUXO da bancada, nao o alfabeto: o rolo entra,
 // vira plano de corte, sobra o retalho, a sobra ganha etiqueta.
-var ORDEM=['/','/corte','/rolos','/sobras','/etiquetas','/painel','/cadastros'];
+var ORDEM=['/','/corte','/rolos','/sobras','/etiquetas','/simulador','/painel','/cadastros','/catalogo'];
 
 var aqui=location.pathname.replace(/\/$/,'')||BASE;
 var rel=aqui.indexOf(BASE)===0 ? (aqui.slice(BASE.length)||'/') : '/';
