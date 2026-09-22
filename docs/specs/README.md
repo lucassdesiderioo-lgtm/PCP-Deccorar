@@ -26,7 +26,7 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 
 | Spec | Status |
 |---|---|
-| `SOBMEDIDA-PEDIDO-REVENDA.md` | **Em construção** · módulo sob medida (`tecido/`) · **fase 1 em código (22/09)** · fases 2–8 planejadas · as duas decisões da §8 anteriores à fase 1 estão respondidas; falta o dono simular dez persianas reais |
+| `SOBMEDIDA-PEDIDO-REVENDA.md` | **Em construção** · módulo sob medida (`tecido/`) · **fase 1 em produção e conferida (22/09 — dez persianas reais, dez bateram)** · fases 2–8 planejadas · as duas decisões da §8 anteriores à fase 1 estão respondidas |
 | `ESTOQUE-LIVRO-E-CONFERENCIA.md` | **Em construção** · fase 0 e fase 1 em código (21/09) · fases 2–4 planejadas · uma decisão em aberto (§6.4) |
 | `VENDAS-E-MEDIA.md` | Planejado · nada no código · a troca da fonte da média (fase 3) espera o ok do dono |
 | `MESA-DE-CORRECOES.md` | Planejado · nada no código · depende do livro (Estoque F1) e das canceladas (Vendas F2) |

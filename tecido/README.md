@@ -297,6 +297,39 @@ sobe: 1,700 · 3,0 m² · 2,200 · 3,5 m² · 3,000 · 7,0 m² · 1,000/1,001 su
 > pergunta a si mesmo. Foi assim que o QR da etiqueta do kit passou por três
 > rodadas verdes (`CLAUDE.md` §4).
 
+### ✅ CONFERIDO NA FÁBRICA EM 22/09/2026 — dez persianas reais, dez bateram
+
+O dono fez o deploy e simulou **dez pedidos reais do WhatsApp**. Nas dez, o
+tubo, as medidas de corte e o kit bateram com o que a fábrica cortaria.
+
+> ⚠️ **ISTO VALE MAIS QUE OS 304 CASOS VERDES, e está escrito aqui por isso.**
+> Teste diz que o código faz o que eu escrevi; só a fábrica diz que o que eu
+> escrevi é o que ela corta. O defeito do QR da etiqueta do kit passou por
+> **três rodadas verdes** antes de o dono descobrir com o celular na mão
+> (`CLAUDE.md` §4) — a régua final nunca é o teste.
+
+**O que foi cadastrado no deploy**, e é o estado de hoje:
+
+| | |
+|---|---|
+| Coleções ligadas ao Rolô | **oito** — `1%` · `1% FB` · `3%` · `5%` · `Blackout` · `Napoles BK` · `Pinpoint BK` · `Translucido` |
+| Cores de acessório | **quatro** — Branco · Bege · Cinza · Preto |
+| R$/m² por coleção | **em branco**, o dono lança depois |
+| Largura máxima por coleção | **em branco** — quem limita é a escada |
+
+> **`Double Vision · Classic` não foi ligada**, e não é esquecimento: ela é do
+> modelo Duplex, que ainda não existe como modelo de venda. Ligá-la ao Rolô
+> faria o simulador oferecer tecido de Duplex numa persiana Rolô.
+
+> ⚠️ **ENQUANTO NÃO HOUVER PREÇO, O SIMULADOR MOSTRA `≥` — e isso é a regra
+> funcionando.** O subtotal sai nulo, o que se sabe sai como **piso** e a linha
+> do tecido é **nomeada** como sem preço. Quem ler o âmbar como tela quebrada
+> vai "consertar" somando zero, que é o custo válido e mentiroso da regra 4.
+
+> **A conferência do PREÇO ainda não aconteceu**, e não podia: ela depende do
+> R$/m² de cada coleção, que é cadastro do dono. Quando entrar, a conferência é
+> a mesma — dez pedidos reais, comparando o total com o que foi cobrado.
+
 ---
 
 ## As respostas que viraram regra (seção 11 da especificação)

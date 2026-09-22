@@ -3508,6 +3508,14 @@ régua e o cliente cobrado pela outra.
 > mapa **não tem botão**, sem erro e sem log. É a armadilha #13 por mais uma
 > porta, e a ponta que some em silêncio é sempre a última.
 
+> ✅ **EM PRODUÇÃO E CONFERIDA NA FÁBRICA EM 22/09/2026.** O dono fez o deploy e
+> simulou **dez persianas reais do WhatsApp: as dez bateram** (tubo, cortes e
+> kit). É o "pronto quando" da fase 1, e vale mais que os 304 casos verdes —
+> teste diz que o código faz o que eu escrevi; só a fábrica diz que o que eu
+> escrevi é o que ela corta. O **preço** ficou de fora: o R$/m² das coleções
+> ainda não foi lançado, e até lá o simulador mostra o total como piso (`≥`),
+> que é a regra 4 funcionando, não tela quebrada.
+
 **Detalhe inteiro no `tecido/README.md`**, seção "O catálogo de venda e o
 simulador". As permissões novas (`catalogo.ler`, `catalogo.editar`) são do
 módulo, não do PCP: nenhuma área nova foi criada — até a fase 2 o vendedor

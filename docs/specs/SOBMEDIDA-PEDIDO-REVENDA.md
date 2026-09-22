@@ -5,7 +5,7 @@ STATUS
 Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 22/09/2026
-Fase atual: 1 IMPLEMENTADA (22/09/2026) — falta a conferência do dono
+Fase atual: 1 PRONTA e CONFERIDA em produção (22/09/2026)
 Fases: 1 ☑  2 ☐  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
@@ -20,11 +20,40 @@ cadastro inicial do Rolô), `tecido/dominio/persiana.js` (o dono único),
 `/sobmedida/catalogo` e `/sobmedida/simulador`, e 52 casos de teste novos
 (`npm test` do módulo: **304 casos**).
 
+> ✅ **CONFERIDA EM PRODUÇÃO EM 22/09/2026.** O dono fez o deploy e simulou
+> **dez persianas reais do WhatsApp: as dez bateram** — tubo, medidas de corte e
+> kit, contra o que a fábrica cortaria. É o "pronto quando" da seção 7, e é a
+> régua que vale.
+>
+> ⚠️ **E ESTÁ ESCRITO ASSIM DE PROPÓSITO.** Os 304 casos verdes, os 133+45 do
+> kit e o R$ 209,00 conferido pelo fio eram **indício**, não prova: o defeito do
+> QR da etiqueta do kit passou por três rodadas verdes antes de o dono descobrir
+> com o celular na mão (`CLAUDE.md` §4). Teste diz que o código faz o que eu
+> escrevi; só a fábrica diz que o que eu escrevi é o que ela corta.
+
 **Pronto quando** (seção 7): *o dono simula dez persianas reais do WhatsApp e o
-simulador bate com o que a fábrica cortaria.* — **ainda não feito.** Os três
-exemplos da §4.5, o kit da §4.7 e o preço da §4.8 estão travados por teste, e o
-R$ 209,00 foi conferido pelo fio, mas isso é indício: a régua é o dono com dez
-pedidos reais na mão.
+simulador bate com o que a fábrica cortaria.* — **cumprido em 22/09/2026, dez
+de dez.** O preço ficou de fora da conferência de propósito: o R$/m² das
+coleções ainda não foi lançado, então o total sai como piso (`≥`).
+
+### O que foi cadastrado no deploy de 22/09/2026
+
+| | |
+|---|---|
+| Coleções de venda ligadas ao Rolô | **oito**, todas as do `Rolo`: `1%` · `1% FB` · `3%` · `5%` · `Blackout` · `Napoles BK` · `Pinpoint BK` · `Translucido` |
+| Cores de acessório | **quatro**: Branco · Bege · Cinza · Preto |
+| Preço do m² por coleção | **em branco** — o dono lança depois |
+| Largura máxima por coleção | **em branco** — quem limita é a escada de tubos |
+
+> **`Double Vision · Classic` ficou de fora, e não é esquecimento:** ela é do
+> modelo Duplex, que ainda não existe como modelo de venda. Ligá-la ao Rolô
+> faria o simulador oferecer tecido de Duplex numa persiana Rolô.
+
+> ⚠️ **COLEÇÃO SEM PREÇO MOSTRA `≥` E ISSO NÃO É DEFEITO.** Enquanto o R$/m²
+> não for lançado, o simulador devolve `valor_subtotal` nulo, soma o que sabe
+> como **piso** e **nomeia** a linha que falta. É a regra 4 do custo — zero é um
+> custo válido e mentiroso. Quem vir o `≥` em âmbar está vendo a regra
+> funcionando, não a tela quebrada.
 
 ### As duas decisões que a seção 8 marcava "antes da fase 1" — respondidas
 
