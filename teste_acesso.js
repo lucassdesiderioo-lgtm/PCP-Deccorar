@@ -223,6 +223,55 @@ ok('...mas o Admin Geral imprime desde o primeiro boot',
 ok('e quem so tem kit.editar NAO imprime',
   AC.decidir({ id:ua, nome:'Gestao' }, '/api/kit/etiqueta/imprimir', 'POST').ok === false);
 
+console.log('\n── 6-B. vender sob medida e uma area PROPRIA, e ela nao pode ser admin ──');
+/* Fase 2 da SOBMEDIDA-PEDIDO-REVENDA. Ate aqui o vendedor entrava pela area
+   "Sob medida / Cadastros" — a da CHEFIA, que abre cadastro de tecido,
+   parametros do encaixe e descarte de sobra. A area nova existe para ele
+   parar de precisar daquela.
+
+   ⚠️ E O NIVEL DELA E `operacao`, NAO `admin`, e isso nao e classificacao —
+   e trava. `sincronizarAreas` poe a area 'admin' em quem tem QUALQUER chave
+   de nivel admin, e o portao do sob medida (tecido/nucleo/acesso.js) le
+   'admin' como DIRETOR. Declarada como admin, esta chave devolveria ao
+   vendedor exatamente o modulo inteiro que ela veio tirar dele — sem
+   ninguem pedir, e sem erro em tela nenhuma. */
+const chaveVender = P.find(p => p.chave === 'sobmedida.vender');
+ok('a chave sobmedida.vender esta declarada em permissoes.js', !!chaveVender);
+if(chaveVender)
+  eq('e o nivel dela e operacao — admin faria o vendedor virar diretor no sob medida',
+    chaveVender.nivel, 'operacao');
+ok('o setor "Sob medida / Venda" foi semeado',
+  !!db.prepare("SELECT 1 FROM setores WHERE nome='Sob medida / Venda'").get());
+const permsVenda = db.prepare(`SELECT sp.chave FROM setores s
+  JOIN setor_permissao sp ON sp.setor_id=s.id WHERE s.nome='Sob medida / Venda'`)
+  .all().map(r => r.chave);
+eq('e ele nasce SO com a chave de vender — o vendedor nao corta',
+  permsVenda.sort().join(','), 'sobmedida.vender');
+/* A terceira ponta: a area tem que voltar para `usuarios.areas`, que e o que
+   o portao do modulo le. A linha do PERM_AREA e conferida por texto no teste
+   do proprio modulo (tecido/teste/acesso.test.js); aqui se confere o que
+   decide se a area 'admin' vem junto — que e o que faria o vendedor entrar
+   como DIRETOR. */
+const uVend = db.prepare("INSERT INTO usuarios (nome,pin_hash,salt,areas,ativo) VALUES ('Vendedor teste','x','y','',1)")
+  .run().lastInsertRowid;
+const sVenda = db.prepare("SELECT id FROM setores WHERE nome='Sob medida / Venda'").get().id;
+db.prepare('INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)').run(uVend, sVenda);
+const permsVend = AC.permissoesDe(uVend);
+ok('quem esta no setor de venda ganha sobmedida.vender', permsVend.has('sobmedida.vender'));
+const infoDe = c => P.find(x => x.chave === c);
+const admDoVendedor = [...permsVend].filter(c => { const i = infoDe(c); return i && (i.nivel === 'admin' || i.nivel === 'admin_geral'); });
+eq('e NENHUMA das permissoes dele e de nivel admin — e isso que mantem a area "admin" fora',
+  admDoVendedor.join(', '), '', 'admin-level: ' + (admDoVendedor.join(', ') || '(nenhuma)'));
+ok('ele nao corta nem cadastra tecido',
+  !permsVend.has('sobmedida.cortar') && !permsVend.has('sobmedida.cadastrar'));
+/* E o papel que sai disso, pelo tradutor do proprio modulo — a conta que o
+   portao faz de verdade, e nao uma releitura dela aqui. */
+const acessoSM = require('./tecido/nucleo/acesso');
+eq('o modulo traduz essa area em "vendedor"',
+  acessoSM.papelDe({ areas: ['sobmedida_venda'] }), 'vendedor');
+eq('...e "admin" continuaria valendo diretor, que e o motivo da trava acima',
+  acessoSM.papelDe({ areas: ['admin'] }), 'diretor');
+
 /* ═══════════ AS TRAVAS DE ESCALONAMENTO (divida 17, 17/09/2026) ═══════════
    Tudo daqui pra baixo responde a mesma pergunta: DA PRA SUBIR DE NIVEL PELA
    TELA OFICIAL? Enquanto desse, a tela de Acessos era o caminho mais curto

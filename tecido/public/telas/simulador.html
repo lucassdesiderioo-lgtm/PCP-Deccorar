@@ -70,7 +70,8 @@ const reais=c=>c==null?'—':'R$ '+(c/100).toFixed(2).replace('.',',');
 
 const estado={modelo:null, abertura_id:null, cor_acessorio_id:null,
   largura:'1,000', altura:'1,000', comando:'direito', rolamento:'frente',
-  adicional:'nenhum', reducao:'nao', opcoes:null, recado:null};
+  adicional:'nenhum', reducao:'nao', opcoes:null, recado:null,
+  revendas:[], revenda_id:null};
 
 function fileira(rotulo, itens, valorAtual, aoEscolher, desabilitados){
   const campo=el('div',{class:'campo cresce'},[el('label',{},[rotulo])]);
@@ -95,6 +96,17 @@ function desenharEscolhas(){
   linha1.appendChild(fileira('Coleção',
     m.colecoes.filter(x=>x.disponivel).map(x=>({valor:x.abertura_id,nome:x.colecao_nome+' · '+x.linha_nome})),
     estado.abertura_id, v=>{ estado.abertura_id=v; simular(); }));
+  /* A REVENDA E OPCIONAL, e o primeiro botao e "nenhuma". Simular sem revenda
+     responde o preco DECCORAR, que e o que se usa para conferir a tabela e
+     para o custo; escolher uma responde o que AQUELA revenda paga. Obrigar a
+     escolher faria quem so quer conferir o preco de lista ter que fingir ser
+     alguem. */
+  if(estado.revendas.length)
+    linha1.appendChild(fileira('Revenda',
+      [{valor:'',nome:'— só o preço Deccorar —'}].concat(
+        estado.revendas.map(r=>({valor:String(r.id),nome:r.nome_fantasia}))),
+      estado.revenda_id==null?'':String(estado.revenda_id),
+      v=>{ estado.revenda_id=v||null; simular(); }));
   c.appendChild(linha1);
 
   const linha2=el('div',{class:'campos'});
@@ -211,8 +223,36 @@ function desenhar(r){
       'Cobrado por '+r.preco.m2_cobrado+' m²'+
       (r.preco.aplicou_minimo?(' (mínimo faturado; a peça tem '+r.preco.m2_real+' m²)')
                              :(' — a peça tem '+r.preco.m2_real+' m²'))]));
-    dir.appendChild(el('p',{class:'nota'},
-      ['A tabela da revenda e o desconto dela entram na fase 2. Este é o preço Deccorar.']));
+    /* ⚠️ O PRECO DA REVENDA FICA EMBAIXO DO DECCORAR, e nao no lugar dele.
+       Os dois sao verdadeiros e respondem perguntas diferentes: o de cima vai
+       para faturamento, Compras, credito e relatorio; o de baixo e o que a
+       revenda paga. Trocar um pelo outro na tela e o primeiro passo para
+       trocar um pelo outro na conta (secao 9 da spec). */
+    const rv=r.preco.revenda;
+    if(!rv){
+      dir.appendChild(el('p',{class:'nota'},
+        ['Este é o preço Deccorar. Escolha uma revenda acima para ver o que ela paga.']));
+    }else{
+      const linhas=[];
+      if(rv.tabela&&rv.tabela.desconto_centesimos!=null)
+        linhas.push('Tabela '+rv.tabela.nome+' −'+rv.tabela.desconto+'%');
+      if(rv.desconto_centesimos) linhas.push('Desconto da revenda −'+rv.desconto+'%');
+      dir.appendChild(el('p',{class:'nota'},
+        [rv.nome_fantasia+(linhas.length?' · '+linhas.join(' · '):'')]));
+      if(rv.valor_final_centavos!=null){
+        dir.appendChild(el('div',{class:'total'},[
+          el('span',{},['A revenda paga']),
+          el('span',{},[reais(rv.valor_final_centavos)])]));
+      }else{
+        /* Nao ha piso aqui, e a frase diz o que falta em vez de mostrar um
+           numero: desconto so faz o preco DESCER, entao o subtotal Deccorar
+           seria um teto — escrever "≥ R$ 209,00" diria a coisa errada com a
+           palavra certa. */
+        dir.appendChild(el('p',{class:'recusa'},
+          ['Ainda não dá para dizer o que esta revenda paga — falta lançar: '+
+           rv.sem_preco.join(', ')+'.']));
+      }
+    }
     grade.appendChild(dir);
   }
 
@@ -242,6 +282,7 @@ async function rodar(){
     cor_acessorio_id:estado.cor_acessorio_id, largura_mm, altura_mm,
     comando:estado.comando, rolamento:estado.rolamento,
     adicional:estado.adicional, reducao:estado.reducao};
+  if(estado.revenda_id) corpo.revenda_id=estado.revenda_id;
   try{
     const r=await api('/api/sm/simular',{metodo:'POST',corpo,silencioso:true});
     estado.opcoes=r.opcoes;
@@ -274,6 +315,10 @@ async function rodar(){
 (async function(){
   const eu=await api('/api/eu');
   $('#quem').textContent=eu.nome;
+  /* A lista de revendas pede `revenda.ler`. Quem nao tiver a chave continua
+     simulando — so nao ve o seletor; por isso o catch devolve lista vazia em
+     vez de derrubar a tela. */
+  estado.revendas=await api('/api/revendas?ativo=1',{silencioso:true}).catch(()=>[]);
   const modelos=await api('/api/sm/modelos');
   if(!modelos.length) return banner('Nenhum modelo cadastrado ainda.','alerta');
   estado.modelo=await api('/api/sm/modelos/'+modelos[0].id);

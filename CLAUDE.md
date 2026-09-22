@@ -782,7 +782,7 @@ configuração é o que vai falhar.
 > (§8-B, armadilha #31) e o QR em si — que o teste não "olha": ele decodifica
 > de volta, confere a paridade Reed-Solomon e **remonta o QR a partir do PDF
 > gerado**. Mexeu na permissão?
-> **`node teste_acesso.js`** (104 casos). Mexeu no `barras.js`?
+> **`node teste_acesso.js`** (113 casos). Mexeu no `barras.js`?
 > **`cd tecido && npm test` também** — a etiqueta de prateleira do sob medida
 > lê o mesmo arquivo.
 
@@ -1067,7 +1067,7 @@ peça**, não só para o `lote.codigo`. A decisão vira história
 > `etiqueta.emitir` não conferiria nem imprimiria.
 >
 > **Rode `node teste_acesso.js` ao mexer em `permissoes.js` ou no `permDaRota()`**
-> — os 104 casos travam as três pontas, o backfill, a cobertura e as quatro
+> — os 113 casos travam as três pontas, o backfill, a cobertura e as quatro
 > portas de escalonamento da §10 (#28). **Rota nova pede uma linha no
 > `permDaRota()`**: sem ela a rota nasce NEGADA e o `teste_cobertura.js`
 > reprova (§10, armadilha #29).
@@ -2648,7 +2648,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (62), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (104), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (62), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (113), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2945,6 +2945,37 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   a poda corta por NOME, e um `total_centavos` vaza em silêncio (§19)
 - ❌ Declarar tela em `tecido/nucleo/telas.js` sem a linha no `public/nav.js` —
   ela nasce sem botão, sem erro e sem log (§19)
+- ❌ Somar a tabela A/B/C com o desconto da revenda em vez de aplicar em
+  cascata: 10% + 5% não é 15%, e somados dois percentuais grandes zeram a
+  venda sem ninguém notar (§19)
+- ❌ Arredondar o preço da revenda em cada degrau: dois arredondamentos em
+  cadeia erram um centavo sem regra, e é o centavo que a revenda confere (§19)
+- ❌ Deixar a tabela ou o desconto da revenda encostarem no **subtotal
+  Deccorar** — ele vai para faturamento, Compras, crédito e relatório (§19)
+- ❌ Mostrar o subtotal Deccorar como **piso** quando falta o percentual da
+  tabela: desconto só faz o número descer, então ali ele é um TETO (§19)
+- ❌ Semear as tabelas A/B/C com zero por cento: zero é "sem desconto", que é
+  decisão; em branco é "ainda não se sabe", e só ele cala a tela (§19)
+- ❌ Declarar `sobmedida.vender` (ou qualquer chave de venda) como `nivel:
+  'admin'` no PCP — a área `'admin'` é lida como **diretor** pelo portão do
+  sob medida, e o vendedor sairia com o módulo inteiro (§19)
+- ❌ Dar `revenda.editar` ou `credito.editar` ao vendedor "para facilitar": a
+  tabela, o desconto e o limite são decisão de quem responde pelo dinheiro (§19)
+- ❌ Tirar `custo.ver` do papel do vendedor — o simulador chegaria nele sem o
+  preço, que é justamente o número que ele foi buscar (§19)
+- ❌ Voltar a pedir `cadastro.ler` na tela inicial ou no `/api/eu` do sob
+  medida: com três papéis ela deixou de ser a chave que todos têm, e o efeito
+  é tela em branco com 403 no console (§19)
+- ❌ Criar um cadastro de vendedor dentro do sob medida — são dois lugares para
+  lembrar de desligar alguém, e foi por isso que o módulo perdeu o dele (§19)
+- ❌ Fazer a porta de pessoas devolver lista vazia quando não estiver ligada, ou
+  deixar passar mais que `id` e `nome` (§19)
+- ❌ Nomear o limite de crédito sem o prefixo do padrão de poda: um
+  `limite_credito_centavos` viaja pelo fio em silêncio (§19, e §15 acima)
+- ❌ Contar o prazo pela APROVAÇÃO em vez do envio, ou recalcular um prazo já
+  congelado com o relógio de hoje (§19)
+- ❌ Aceitar parâmetro de prazo fora da faixa (`prazoCorteHora` por extenso, dia
+  da semana 7): aceito, ele muda a conta em silêncio (§19)
 
 ---
 
@@ -3516,20 +3547,174 @@ régua e o cliente cobrado pela outra.
 > `2,000 × 1,000` cobra 2 ×).
 >
 > São **duas rodadas de dez, e não uma**: o corte foi conferido antes de o preço
-> existir. E vale mais que os 304 casos verdes — teste diz que o código faz o
+> existir. E vale mais que os 304 casos verdes de então — teste diz que o código faz o
 > que eu escrevi; só a fábrica diz que o que eu escrevi é o que ela corta e o
 > que ela cobra.
 >
-> ⚠️ **O total do simulador é o preço DECCORAR.** A tabela A/B/C e o desconto da
-> revenda são da fase 2, e o card diz isso embaixo — mandar esse número para a
-> revenda como se fosse o dela é o erro que a frase existe para impedir. E
-> coleção **sem** preço continua saindo como piso (`≥`), que é a regra 4
-> funcionando, não tela quebrada.
+> ⚠️ **O total do simulador continua sendo o preço DECCORAR** — e agora há um
+> segundo número embaixo dele, o que a revenda paga (fase 2, abaixo). Os dois
+> aparecem juntos e nunca um no lugar do outro: o de cima vai para
+> faturamento, Compras, crédito e relatório; o de baixo é da revenda. Coleção
+> **sem** preço continua saindo como piso (`≥`), que é a regra 4 funcionando,
+> não tela quebrada.
 
 **Detalhe inteiro no `tecido/README.md`**, seção "O catálogo de venda e o
-simulador". As permissões novas (`catalogo.ler`, `catalogo.editar`) são do
-módulo, não do PCP: nenhuma área nova foi criada — até a fase 2 o vendedor
-entra pela área "Sob medida — cadastros", **que é mais larga do que precisa**.
+simulador".
+
+### ⚠️ A FASE 2 (22/09/2026) — QUEM COMPRA, E A ÁREA QUE ELE USA
+
+A fase 1 respondeu o que a persiana **é** e quanto ela custa **na Deccorar**. A
+fase 2 traz quem compra: a **revenda**, o **vendedor** que cuida dela, a
+**tabela** que decide o preço dela e o **prazo**. Migração 17, mais
+`dominio/revenda.js`, `dominio/prazo.js`, `nucleo/pessoas.js` e a tela
+`/sobmedida/revendas`.
+
+#### O preço da revenda sai do Deccorar em CASCATA, e nunca por cima dele
+
+```
+subtotal Deccorar          R$ 209,00       ← não se mexe
+  × tabela B (−10,00%)
+  × desconto da revenda (−5,00%)
+a revenda paga             R$ 178,70
+```
+
+> ⚠️ **CASCATA, E NÃO SOMA** — decisão do dono em 22/09/2026. Somados, 10% + 5%
+> dariam 15%; em cascata dão 14,5%, e num pedido de mil reais a diferença é de
+> cinco. A soma tem um defeito pior: dois percentuais grandes zerariam a venda
+> sem ninguém notar, porque a tela continuaria mostrando dinheiro.
+
+> ⚠️ **ARREDONDA UMA VEZ, NO FIM.** Dois arredondamentos em cadeia erram um
+> centavo para cima ou para baixo sem regra nenhuma — e é o tipo de centavo que
+> aparece na conferência da revenda e não tem como ser explicado. A conta é
+> feita em inteiro (`subtotal × centésimos × centésimos`) e só divide no fim.
+> Há caso travando: reintroduzir o arredondamento por degrau reprova o
+> `persiana.test.js`, e foi conferido assim.
+
+> ⚠️ **O SUBTOTAL DECCORAR NÃO SE MEXE, e é esse o caso de teste que importa
+> mais.** "Misturar o preço com markup em qualquer número da Deccorar" é o
+> décimo item da §9 da spec, e a forma de isso acontecer nunca é alguém
+> decidir: é o desconto entrar no subtotal por descuido e ninguém notar,
+> porque o total continua parecendo dinheiro.
+
+> ⚠️ **TABELA SEM PERCENTUAL NÃO TEM PISO — tem recusa com o nome do que
+> falta.** Piso quer dizer "no mínimo isto", e desconto só faz o número
+> **descer**: o subtotal Deccorar seria um **teto**. Escrever `≥ R$ 209,00` ali
+> diria a coisa errada com a palavra certa, e ainda gastaria o sinal que a
+> equipe aprendeu a ler como "falta preço em alguma linha". A tela escreve
+> *"ainda não dá para dizer o que esta revenda paga — falta lançar: tabela B"*.
+
+> ⚠️ **AS TRÊS TABELAS NASCEM SEM PERCENTUAL, E NÃO COM ZERO.** `NULL` é "ainda
+> não se sabe"; zero é "sem desconto", que é decisão. Semeadas com zero, o
+> sistema cobraria o preço cheio de todo mundo com cara de regra aplicada — e
+> ninguém descobriria, porque o número só ficaria maior.
+
+#### O prazo é conta, não promessa de memória — `dominio/prazo.js` é o dono único
+
+```
+enviado até quarta 18:00  →  pronto na quinta da SEMANA SEGUINTE
+um minuto depois          →  a quinta da outra semana
+entrega em dia não útil   →  empurra, e DIZ qual feriado empurrou
+```
+
+Os quatro números (dia e hora do corte, dia da entrega, semanas) são
+**parâmetros**, e os feriados são **cadastro** — o corte do Mercado Livre já
+mudou sem aviso no PCP (§8), e não há razão para o da revenda ser diferente.
+Parâmetro fora da faixa é **recusado** (`prazoCorteHora` por extenso,
+`prazoCorteDiaSemana = 7`): aceito, ele mudaria a conta em silêncio.
+
+> ⚠️ **CONTA A HORA DO ENVIO, NUNCA A DA APROVAÇÃO.** Aprovar é tarefa da
+> Deccorar, e a demora dela não pode passar para a revenda. Por isso `calcular`
+> **recebe** o momento do envio em vez de olhar o relógio sozinho: na fase 3 o
+> pedido guarda o prazo congelado, e recalculá-lo depois com o relógio de hoje
+> daria outra data para o mesmo pedido.
+
+> **A prévia na tela é o que torna o cadastro conferível.** Quatro parâmetros e
+> uma lista de feriados não dizem nada sozinhos; a pergunta que se faz é *"um
+> pedido enviado agora fica pronto quando?"*. Sem a resposta escrita ali, o
+> cadastro só seria conferido pelo primeiro cliente que reclamasse.
+
+#### O vendedor ganhou área própria, e isso fecha a dívida da fase 1
+
+| | até a fase 1 | agora |
+|---|---|---|
+| área do PCP | **Sob medida — cadastros** (a da chefia) | **Sob medida — venda** |
+| papel no módulo | `diretor` | `vendedor` |
+| alcança | tudo: tecido, parâmetros do encaixe, descarte de sobra | simulador, catálogo de leitura, a carteira dele |
+| **não** alcança | — | cadastro de tecido, parâmetros, descarte, plano, painel, editar catálogo |
+
+> ⚠️ **A CHAVE `sobmedida.vender` É `nivel:'operacao'` NO PCP, E ISSO É TRAVA,
+> NÃO CLASSIFICAÇÃO.** `sincronizarAreas` põe a área `'admin'` em quem tem
+> **qualquer** chave de nível admin, e o portão do sob medida
+> (`tecido/nucleo/acesso.js`) lê `'admin'` como **diretor**. Declarada como
+> admin, a chave devolveria ao vendedor exatamente o módulo inteiro que ela
+> veio tirar dele — sem ninguém pedir, e sem erro em tela nenhuma. É a porta A
+> da armadilha #28 (§10) por uma porta nova. Caso travando no `teste_acesso.js`
+> (seção 6-B), e ele confere o **nível declarado**, não só a existência da chave.
+>
+> ⚠️ **E A MESMA LEITURA DE `'admin'` CONTINUA VALENDO PARA AS OUTRAS 23
+> CHAVES DE NÍVEL ADMIN DO PCP** — `sku.cadastrar`, `custo.ver`,
+> `devolucao.baixar` e as demais. Quem tem qualquer uma delas entra no sob
+> medida como **diretor**. Isso é anterior a esta fase e **não foi mexido
+> aqui**: estreitar aquela leitura muda quem pode o quê e é `REGRA`, não
+> conserto. Está escrito para não se descobrir por acidente.
+
+> ⚠️ **`revenda.editar` E `credito.editar` NÃO SÃO DO VENDEDOR**, e isso é
+> decisão, não esquecimento. A spec diz que a tabela é decidida pela Deccorar
+> (§4.12) e que o limite é revisto de dois em dois meses (§4.13) — as duas são
+> decisão de quem responde pelo dinheiro, não de quem vende. Custa isto:
+> revenda nova, troca de tabela, endereço de entrega novo e limite passam pela
+> chefia. **Alargar é uma linha; o contrário, não.**
+
+> ⚠️ **`custo.ver` ESTÁ NO PAPEL DO VENDEDOR, E TEM QUE ESTAR.** A poda do
+> `custo.js` corta todo campo de dinheiro de quem não a tem — e o vendedor sem
+> ela abriria o simulador e veria a persiana inteira **sem o preço**, que é
+> justamente o número que ele foi buscar.
+
+> ⚠️ **NASCEU A CHAVE `modulo.entrar`, e ela é conserto de um defeito
+> evitado.** A tela inicial e o `/api/eu` pediam `cadastro.ler`, *"a chave mais
+> baixa que todo mundo que entra tem"*. Com o terceiro papel isso virou
+> mentira: ou o vendedor abriria o módulo em branco com 403 no console, ou
+> ganharia `cadastro.ler` de carona — e com ela a lista inteira de tecido,
+> endereço e motivo. Tela em branco não se parece nem de longe com "mexeram na
+> permissão" (§10, armadilha #29).
+
+#### O vendedor é gente do PCP — `nucleo/pessoas.js` é a porta única
+
+O sob medida **continua sem cadastro de gente próprio**. A revenda guarda o
+`vendedor_usuario_id` do PCP e o `vendedor_nome` como **retrato** (a carteira
+precisa continuar legível daqui a um ano, mesmo que a pessoa saia). A lista de
+nomes chega por uma porta ligada no `server.js`, e ela **remapeia**: o que
+atravessa é `id` e `nome`, e mais nada — PIN, salt e áreas não passam nem por
+engano. Há caso travando.
+
+> ⚠️ **SEM A PORTA LIGADA, RECUSA — NUNCA LISTA VAZIA.** Lista vazia em
+> silêncio faria a tela afirmar que a fábrica não tem ninguém, e alguém
+> passaria a tarde procurando no lugar errado. A recusa **diz onde se liga**
+> (`server.js`, na chamada de `montar()`).
+
+> ⚠️ **DOIS CADASTROS DE GENTE SÃO DOIS LUGARES PARA LEMBRAR DE DESLIGAR
+> ALGUÉM.** Foi por isso que este módulo deixou de ter o dele em 02/09/2026, e
+> é por isso que a fase 2 não criou um de vendedores.
+
+#### O que a fase 2 deixou explicitamente de fora, e por quê
+
+| Fica de fora | Por quê |
+|---|---|
+| **Logo da revenda** | só é usado no orçamento ao cliente final (fase 7), e guardar arquivo é outro assunto: onde mora, backup, o cron que limpa |
+| **Markup** | é da revenda, para o cliente dela — fase 7, e nunca entra em número da Deccorar |
+| **Crédito disponível** | `limite − boletos em aberto`, e boleto é fase 6. Mostrar "disponível = limite" seria número mentindo |
+| **Pedido, aprovação, prazo negociado** | fase 3 |
+
+> **`valor_limite_credito_centavos` começa com `valor_` de propósito.** A poda
+> do `custo.js` corta por **padrão de nome**: `limite_credito_centavos` não
+> casaria com `preco|valor|custo|nf|fornecedor` e viajaria pelo fio em
+> silêncio — foi assim que o `resumo.valor_parado` do painel gerencial chegou à
+> bancada (§15). Há caso travando os dois nomes, o certo e o errado.
+
+**Rode `cd tecido && npm test` (354 casos) e `node teste_acesso.js` (113) ao
+mexer em revenda, prazo, preço, permissão ou no `server.js`.** Os casos do
+prazo saem das datas escritas na §4.9 da spec, e não da resposta que a função
+deu.
 
 ### Três regras do sob medida que valem citar aqui
 
@@ -3555,7 +3740,7 @@ cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 304 casos
+cd tecido && npm test          # 354 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:

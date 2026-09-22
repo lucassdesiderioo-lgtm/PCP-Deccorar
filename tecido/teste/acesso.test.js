@@ -55,6 +55,30 @@ module.exports=[
   igual(acesso.papelDe({areas:['sobmedida','sobmedida_adm']}),'diretor','as duas juntas');
 }},
 
+{nome:'a area de VENDA vira vendedor, e ela nao carrega a bancada junto (fase 2)',
+ executar({igual}){
+  const {pode}=require('../nucleo/permissoes');
+  igual(acesso.papelDe({areas:['sobmedida_venda']}),'vendedor','so a venda');
+  const v=acesso.daSessaoDoPcp({id:5,nome:'Renato',areas:['sobmedida_venda']});
+  igual(v.papel,'vendedor','a sessao traduz');
+  igual(pode(v,'catalogo.ler'),true,'ele simula');
+  igual(pode(v,'revenda.ler'),true,'e ve a carteira');
+  igual(pode(v,'cadastro.editar'),false,'mas nao abre o cadastro de tecido');
+  igual(pode(v,'sobra.descartar'),false,'nem descarta sobra');
+  igual(pode(v,'credito.editar'),false,'nem mexe no limite de credito');
+
+  /* ⚠️ E A AREA DE VENDA NAO PODE VIRAR 'admin' NO PCP. `sincronizarAreas`
+     poe a area 'admin' em quem tem QUALQUER chave de nivel admin, e a linha
+     acima mostra que 'admin' aqui e lido como DIRETOR. Se `sobmedida.vender`
+     fosse declarada como admin no PCP, o vendedor entraria com o modulo
+     inteiro na mao — sem ninguem pedir, e sem erro em tela nenhuma. */
+  const fs=require('fs'), path=require('path');
+  const perms=fs.readFileSync(path.join(__dirname,'..','..','permissoes.js'),'utf8');
+  const linha=perms.split('\n').filter(l=>l.indexOf("chave:'sobmedida.vender'")>=0).join('');
+  igual(linha.indexOf("nivel:'operacao'")>=0,true,
+    'sobmedida.vender e declarada como operacao no PCP, e nao como admin: '+linha.trim());
+}},
+
 {nome:'o cortador nao descarta sobra, e e por isso que o papel existe', executar({igual}){
   const {pode}=require('../nucleo/permissoes');
   const bancada=acesso.daSessaoDoPcp({id:7,nome:'Ze',areas:['sobmedida']});
@@ -110,6 +134,16 @@ module.exports=[
   igual((await pedir(porta,'/sobmedida/cadastros')).status,403,'mas nao cadastra');
   quem={id:1,nome:'Lucas',areas:['sobmedida_adm']};
   igual((await pedir(porta,'/sobmedida/cadastros')).status,200,'a chefia cadastra');
+
+  /* O VENDEDOR, pelo fio. O caso acima prova a conta; este prova a PORTA —
+     que e onde o acesso realmente acontece. */
+  quem={id:5,nome:'Renato',areas:['sobmedida_venda']};
+  igual((await pedir(porta,'/sobmedida')).status,200,'ele entra');
+  igual((await pedir(porta,'/sobmedida/simulador')).status,200,'e simula');
+  igual((await pedir(porta,'/sobmedida/revendas')).status,200,'e abre a carteira');
+  igual((await pedir(porta,'/sobmedida/corte')).status,403,'mas nao corta');
+  igual((await pedir(porta,'/sobmedida/cadastros')).status,403,'nem cadastra tecido');
+  igual((await pedir(porta,'/sobmedida/catalogo')).status,403,'nem edita o catalogo');
 }},
 
 {nome:'NENHUM .html sai do disco por caminho direto', async executar({igual}){
@@ -143,6 +177,7 @@ module.exports=[
   //    admin marcar, e a liberacao nao tem por onde ser feita.
   igual(perms.includes("chave:'sobmedida.cortar'"),true,'a chave da bancada esta declarada');
   igual(perms.includes("chave:'sobmedida.cadastrar'"),true,'a da chefia tambem');
+  igual(perms.includes("chave:'sobmedida.vender'"),true,'e a da venda (fase 2)');
 
   // 2. E o PERM_AREA as devolve para `usuarios.areas`. ESTA E A LINHA QUE
   //    QUASE FICOU DE FORA, e o modo de falhar dela e o pior possivel: no
@@ -154,11 +189,14 @@ module.exports=[
     'sobmedida.cortar -> '+acesso.AREA_BANCADA);
   igual(acessoPcp.includes("['sobmedida.cadastrar','"+acesso.AREA_CHEFIA+"']"),true,
     'sobmedida.cadastrar -> '+acesso.AREA_CHEFIA);
+  igual(acessoPcp.includes("['sobmedida.vender','"+acesso.AREA_VENDA+"']"),true,
+    'sobmedida.vender -> '+acesso.AREA_VENDA);
 
   // 3. E ha um setor pronto, para o admin liberar em um clique em vez de
   //    caçar duas caixinhas numa lista de 44.
   igual(acessoPcp.includes("Sob medida / Bancada"),true,'setor da bancada semeado');
   igual(acessoPcp.includes("Sob medida / Cadastros"),true,'setor da chefia semeado');
+  igual(acessoPcp.includes("Sob medida / Venda"),true,'e o da venda tambem (fase 2)');
 }},
 
 {nome:'o menu so oferece o que a pessoa alcanca', async executar({igual}){
@@ -168,6 +206,15 @@ module.exports=[
   igual(d.papel,'cortador','papel');
   igual(d.telas.includes('/corte'),true,'ve o corte');
   igual(d.telas.includes('/cadastros'),false,'NAO ve cadastros');
+
+  quem={id:5,nome:'Renato',areas:['sobmedida_venda']};
+  const v=JSON.parse((await pedir(porta,'/sobmedida/api/eu')).corpo).dados;
+  igual(v.papel,'vendedor','o vendedor tambem se enxerga');
+  igual(v.telas.includes('/simulador')&&v.telas.includes('/revendas'),true,'ve as duas dele');
+  igual(v.telas.includes('/corte'),false,'e nao ve a bancada');
+  /* ⚠️ O /api/eu DELE SO RESPONDE PORQUE A CHAVE DE ENTRAR EXISTE. Ate a
+     fase 2 esta rota pedia `cadastro.ler` — que o vendedor nao tem —, e o
+     menu dele viria vazio com 403 no console. */
   // Botao que leva a porta fechada ensina o operador a nao tentar: quem bate
   // em "sem permissao" tres vezes para de clicar na quarta, mesmo quando ja
   // podia. Por isso o menu se monta com a MESMA conta do portao.

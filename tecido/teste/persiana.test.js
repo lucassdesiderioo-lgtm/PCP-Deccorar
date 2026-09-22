@@ -12,6 +12,7 @@
 const tecido=require('../dominio/tecido');
 const catalogo=require('../dominio/catalogo_sm');
 const persiana=require('../dominio/persiana');
+const revendas=require('../dominio/revenda');
 
 /* A CENA: o catalogo de tecido (linha, colecao, cor) que ja existe no modulo,
    mais o vinculo de venda. O modelo Rolo, os degraus e a ficha vem da SEMENTE
@@ -51,6 +52,19 @@ function sim(extra){
 }
 const peca=(r,chave)=>r.componentes.find(c=>c.chave===chave)||{};
 const tubo=r=>r.degrau.nome;
+
+/* Uma revenda com tabela e desconto, para os casos do preco da fase 2.
+   Os percentuais entram em CENTESIMOS de por cento: 1000 = 10,00%. */
+let nRev=0;
+function revendaCom(tabelaCent,descontoCent,extra){
+  const t=revendas.tabelas()[0];
+  revendas.definirDescontoTabela(t.id,tabelaCent,{nome:'teste'});
+  const r=revendas.criar(Object.assign({
+    razao_social:'Revenda de teste '+(++nRev)+' LTDA',
+    nome_fantasia:'Revenda '+nRev,
+    tabela_id:t.id, desconto_centesimos:descontoCent},extra||{}),{nome:'teste'});
+  return r;
+}
 
 module.exports=[
 
@@ -381,6 +395,127 @@ module.exports=[
   igual(nao.degrau.nome,'Tubo 41','e a persiana foi calculada do mesmo jeito');
   igual(nao.opcoes.reducao.pode_pedir,true,'e a reducao pode ser pedida neste tubo');
   igual(sim().opcoes.reducao.pode_pedir,false,'mas nao no tubo 32');
+}},
+
+/* ═══ SECAO 4.8 — O PRECO DA REVENDA (fase 2) ══════════════════════════════
+   O subtotal acima e o preco DECCORAR. O que a revenda paga sai dele com a
+   tabela A/B/C e o desconto dela — EM CASCATA, decisao do dono em 22/09/2026.
+
+   ⚠️ O caso que importa mais aqui nao e o que confere o numero novo: e o que
+   confere que o numero VELHO nao se mexeu. "Misturar o preco com markup em
+   qualquer numero da Deccorar" e o decimo item da secao 9 da spec, e o jeito
+   de isso acontecer nao e alguem decidir — e o desconto entrar no subtotal
+   por descuido e ninguem notar, porque o total continua parecendo dinheiro. */
+
+{nome:'4.8 — sem revenda, nao ha preco de revenda nenhum no resultado',
+ executar({igual}){
+  const b=cena();
+  const r=sim({abertura_id:b.screen1.id,largura_mm:800,altura_mm:1200,adicional:'bando'});
+  igual(r.preco.revenda,null,'nulo, e nao um objeto com o subtotal repetido dentro');
+  igual(r.preco.valor_subtotal_centavos,20900,'e o preco Deccorar e o de sempre');
+}},
+
+{nome:'4.8 — A TABELA E O DESCONTO ENTRAM EM CASCATA, nesta ordem',
+ executar({igual}){
+  const b=cena();
+  const rev=revendaCom(1000,500);                       // tabela 10% + desconto 5%
+  const r=sim({abertura_id:b.screen1.id,largura_mm:800,altura_mm:1200,
+               adicional:'bando',revenda_id:rev.id});
+  // 20900 x 0,90 x 0,95 = 17869,5 -> 17870. Somados dariam 20900 x 0,85 = 17765.
+  igual(r.preco.revenda.valor_final_centavos,17870,'R$ 178,70 — cascata');
+  igual(r.preco.revenda.valor_final_centavos!==17765,true,
+    'e nao R$ 177,65, que e o que a soma dos dois percentuais daria');
+  igual(r.preco.revenda.tabela.nome,'A','a tabela vai nomeada');
+  igual(r.preco.revenda.desconto,'5,00','e o desconto por extenso, para a tela nao ter que dividir');
+}},
+
+{nome:'4.8 — O SUBTOTAL DECCORAR NAO SE MEXE com a revenda na frente',
+ executar({igual}){
+  const b=cena();
+  const rev=revendaCom(2500,1000);
+  const semRev=sim({abertura_id:b.screen1.id,largura_mm:800,altura_mm:1200,adicional:'bando'});
+  const comRev=sim({abertura_id:b.screen1.id,largura_mm:800,altura_mm:1200,
+                    adicional:'bando',revenda_id:rev.id});
+  igual(comRev.preco.valor_subtotal_centavos,semRev.preco.valor_subtotal_centavos,
+    'o preco da Deccorar e o mesmo com e sem revenda');
+  igual(comRev.preco.valor_subtotal_centavos,20900,'e continua sendo R$ 209,00');
+  igual(JSON.stringify(comRev.preco.linhas),JSON.stringify(semRev.preco.linhas),
+    'linha por linha, nada do desconto vazou para dentro do preco Deccorar');
+}},
+
+{nome:'4.8 — ARREDONDA UMA VEZ, no fim, e nao a cada degrau',
+ executar({igual}){
+  const b=cena();
+  const rev=revendaCom(1000,1000);
+  // 0,835 x 1,200 em Screen 1%: 1,002 m² cai no minimo (1,5 x 11000 = 16500)
+  // e o bando cobra 835 x 55,00/m = 4592,5 -> 4593. Subtotal 21093.
+  const r=sim({abertura_id:b.screen1.id,largura_mm:835,altura_mm:1200,
+               adicional:'bando',revenda_id:rev.id});
+  igual(r.preco.valor_subtotal_centavos,21093,'subtotal R$ 210,93');
+  // 21093 x 0,90 x 0,90 = 17085,33 -> 17085.
+  // Arredondando em cada degrau: round(18983,7)=18984; 18984 x 0,9 = 17085,6 -> 17086.
+  igual(r.preco.revenda.valor_final_centavos,17085,'R$ 170,85, e nao R$ 170,86');
+}},
+
+{nome:'4.8 — TABELA SEM PERCENTUAL: o preco da revenda nao existe, e ela e NOMEADA',
+ executar({igual}){
+  const b=cena();
+  const rev=revendaCom(null,0);
+  const r=sim({abertura_id:b.screen1.id,largura_mm:800,altura_mm:1200,
+               adicional:'bando',revenda_id:rev.id});
+  igual(r.preco.revenda.valor_final_centavos,null,
+    'custo indefinido nunca vira zero — e percentual em branco e indefinido');
+  /* ⚠️ E NAO HA PISO AQUI, de proposito. Piso e "no minimo isto"; desconto so
+     DESCE o numero, entao o subtotal Deccorar seria um TETO, nunca um piso.
+     Escrever 209,00 com um >= na frente diria a coisa errada com a palavra
+     certa — e o >= e justamente o sinal que a equipe aprendeu a ler como
+     "falta preco em alguma linha". */
+  igual(r.preco.revenda.valor_piso_centavos,null,'sem o percentual nao ha piso nenhum');
+  igual(r.preco.valor_subtotal_centavos,20900,'o que continua na tela e o preco DECCORAR');
+  igual(r.preco.revenda.sem_preco.join(' '),'tabela A',
+    'e a tela sabe dizer o que falta lancar, em vez de mostrar um >= sem explicacao');
+}},
+
+{nome:'4.8 — REVENDA SEM TABELA tambem nao tem preco, e diz isso',
+ executar({igual}){
+  const b=cena();
+  const rev=revendaCom(1000,0,{tabela_id:null});
+  const r=sim({abertura_id:b.screen1.id,largura_mm:800,altura_mm:1200,
+               adicional:'bando',revenda_id:rev.id});
+  igual(r.preco.revenda.valor_final_centavos,null,'sem tabela nao ha preco de revenda');
+  igual(/tabela/.test(r.preco.revenda.sem_preco.join(' ')),true,
+    'e o que falta e dito: '+r.preco.revenda.sem_preco.join(', '));
+}},
+
+{nome:'4.8 — colecao SEM PRECO com revenda: os dois pisos, e nenhum numero inventado',
+ executar({igual}){
+  const b=cena();
+  const rev=revendaCom(1000,0);
+  const r=sim({abertura_id:b.semPreco.id,revenda_id:rev.id});
+  igual(r.preco.valor_subtotal_centavos,null,'o subtotal Deccorar ja era nulo');
+  igual(r.preco.revenda.valor_final_centavos,null,'e o da revenda tambem');
+  igual(r.preco.revenda.sem_preco.indexOf('tecido')>=0,true,
+    'e a linha que falta continua sendo nomeada pelo nome dela: '+r.preco.revenda.sem_preco.join(', '));
+}},
+
+{nome:'4.8 — 100% de desconto da ZERO, e zero aqui e resposta, nao falta de preco',
+ executar({igual}){
+  const b=cena();
+  const rev=revendaCom(10000,0);
+  const r=sim({abertura_id:b.screen1.id,largura_mm:800,altura_mm:1200,
+               adicional:'bando',revenda_id:rev.id});
+  igual(r.preco.revenda.valor_final_centavos,0,'zero de verdade');
+  igual(r.preco.revenda.sem_preco.length,0,'e nao um piso com linha faltando');
+}},
+
+{nome:'4.8 — revenda que nao existe, ou desativada, e RECUSADA',
+ executar({igual,recusa}){
+  const b=cena();
+  recusa(()=>sim({revenda_id:99999}),'revenda_inexistente','id inventado');
+  const rev=revendaCom(1000,0);
+  revendas.editar(rev.id,{ativo:0});
+  const e=recusa(()=>sim({revenda_id:rev.id}),'revenda_inativa','revenda desligada');
+  igual(/desativada|inativa/i.test(e.mensagem),true,'e a frase diz por que: '+e.mensagem);
 }},
 
 {nome:'a resposta diz o que a peca E, em uma frase, para a conferencia da bancada',

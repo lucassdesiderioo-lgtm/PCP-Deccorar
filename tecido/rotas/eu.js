@@ -4,13 +4,15 @@
 // o resultado de traduzir as areas em bancada ou chefia. A barra de sessao e
 // o menu leem daqui para nao oferecer botao que a pessoa nao pode apertar.
 //
-// Permissao 'cadastro.ler' porque e a chave mais baixa que todo mundo que
-// entra tem: quem chegou ate aqui ja passou pelo portao.
+// Permissao 'modulo.entrar' — a chave que todo papel tem, e que existe
+// justamente para esta pergunta. Ate a fase 2 aqui dizia 'cadastro.ler',
+// "a chave mais baixa que todo mundo que entra tem"; com o papel VENDEDOR
+// isso deixou de ser verdade, e o menu dele viria vazio com 403 no console.
 const {CHAVES,PAPEIS,pode}=require('../nucleo/permissoes');
 const {TELAS}=require('../nucleo/telas');
 
 module.exports={rotas:[
-  {metodo:'GET', caminho:'/api/eu', permissao:'cadastro.ler',
+  {metodo:'GET', caminho:'/api/eu', permissao:'modulo.entrar',
    manipulador:({usuario})=>({
      nome:usuario.nome, papel:usuario.papel,
      // As telas que ESTA pessoa alcanca. O menu se monta com isto, entao um

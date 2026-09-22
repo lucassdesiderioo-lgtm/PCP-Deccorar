@@ -52,6 +52,12 @@ function setoresNativos(){
       perms:['sobmedida.cortar','painel.ver','produtividade.propria'] },
     { nome:'Sob medida / Cadastros',         nivel:'admin',
       perms:['sobmedida.cortar','sobmedida.cadastrar'] },
+    /* VENDA (fase 2 da SOBMEDIDA-PEDIDO-REVENDA). Nasce vazio como os dois
+       de cima, e SO com a chave de vender: o vendedor nao corta. Ate esta
+       fase ele entrava por 'Sob medida / Cadastros', que e da chefia — o
+       setor existe justamente para ele parar de precisar daquela. */
+    { nome:'Sob medida / Venda',             nivel:'operacao',
+      perms:['sobmedida.vender'] },
     { nome:'Supervisor',                     nivel:'supervisor',
       perms:['painel.ver','produtividade.propria','produtividade.equipe','relatorios.ver','necessidade.ver'] },
     // COMPRAS.md §10 — os tres papeis nascem separados mesmo sendo uma pessoa
@@ -785,7 +791,8 @@ module.exports = function(app, db){
        novo esta coluna e recalculada aqui a cada mudanca de setor. Area que
        nao esta neste mapa e apagada no primeiro salvamento — o acesso seria
        concedido na tela e sumiria sozinho depois. */
-    ['sobmedida.cortar','sobmedida'], ['sobmedida.cadastrar','sobmedida_adm']
+    ['sobmedida.cortar','sobmedida'], ['sobmedida.cadastrar','sobmedida_adm'],
+    ['sobmedida.vender','sobmedida_venda']
   ];
   function sincronizarAreas(uid){
     try{

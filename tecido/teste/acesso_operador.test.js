@@ -22,6 +22,7 @@ const tecido=require('../dominio/tecido');
 
 const CORTADOR={nome:'Ana da bancada',papel:'cortador'};
 const DIRETOR ={nome:'Lucas',papel:'diretor'};
+const VENDEDOR={nome:'Renato',papel:'vendedor'};
 
 /* O varredor. Larga de proposito: uma auditoria que so procura o que ja
    conhece nao acha o campo de amanha. Devolve o CAMINHO ate cada achado,
@@ -174,8 +175,10 @@ module.exports=[
 
 {nome:'⚠️ O SIMULADOR DO SOB MEDIDA NAO LEVA UM CENTAVO A QUEM NAO VE CUSTO',
  executar({igual}){
-  /* A fase 1 so alcanca a chefia, entao hoje esta poda e um no-op. Ela esta
-     aqui porque a fase 7 poe a REVENDA na mesma porta, e ai o preco Deccorar
+  /* Ate a fase 2 esta poda era um no-op: so a chefia alcancava o simulador.
+     Deixou de ser — o VENDEDOR entrou, e com ele `custo.ver` (sem preco o
+     simulador nao serviria para nada). Quem continua do lado de fora e a
+     bancada, e na fase 7 sera a REVENDA na mesma porta: ali o preco Deccorar
      nao pode viajar pelo fio (secao 4.12 da spec). Defesa que se escreve
      depois que o usuario existe e defesa que se escreve tarde. */
   const tecido=require('../dominio/tecido');
@@ -240,6 +243,85 @@ module.exports=[
      porta em vez de abrir. Mas uma chave com nome ERRADO passa pelo registro
      e e negada para todo mundo em silencio — inclusive para o diretor. Este
      caso pega isso. */
+}},
+
+/* ═══ O VENDEDOR (fase 2) ══════════════════════════════════════════════════
+   Ate aqui ele entrava pela area "Sob medida - cadastros" — a da CHEFIA —,
+   porque nao havia outra. Estes casos existem para que o estreitamento nao
+   se desfaca sozinho no dia em que alguem acrescentar uma chave ao papel
+   "so para facilitar". */
+
+{nome:'AS TELAS DO VENDEDOR: simulador, catalogo de leitura e revendas — nada da bancada',
+ executar({igual}){
+  const alcanca=t=>pode(VENDEDOR,TELAS[t].permissao);
+  igual(alcanca('/'),true,'inicio — e e por isso que existe a chave modulo.entrar');
+  igual(alcanca('/simulador'),true,'o simulador');
+  igual(alcanca('/revendas'),true,'a carteira dele');
+  igual(alcanca('/corte'),false,'ele nao corta');
+  igual(alcanca('/rolos'),false,'nem mexe em rolo');
+  igual(alcanca('/sobras'),false,'nem lanca sobra');
+  igual(alcanca('/etiquetas'),false,'nem imprime etiqueta de prateleira');
+  igual(alcanca('/cadastros'),false,'CADASTROS continua da chefia');
+  igual(alcanca('/painel'),false,'e o painel gerencial tambem');
+  igual(alcanca('/catalogo'),false,'EDITAR o catalogo decide o que a fabrica corta — nao e dele');
+  igual(TELAS['/revendas'].contexto,'admin','e a tela dele e de escritorio, nao de bancada');
+}},
+
+{nome:'AS CHAVES QUE O VENDEDOR NAO TEM, e cada uma custa alguma coisa',
+ executar({igual}){
+  [['cadastro.ler','a lista de tecido, endereco e motivo vinha de carona'],
+   ['cadastro.editar','mexer no cadastro de tecido muda o que a fabrica corta'],
+   ['parametro.editar','o parametro do encaixe vale para a fabrica inteira'],
+   ['sobra.descartar','baixa de sobra sem trava e o furo classico de inventario'],
+   ['plano.confirmar','confirmar plano baixa estoque'],
+   ['revenda.editar','a tabela e o desconto sao decisao da Deccorar (secao 4.12)'],
+   ['credito.editar','o limite decide quanto a revenda pode dever (secao 4.13)'],
+   ['catalogo.editar','o preco do m² e da chefia']]
+    .forEach(([k,porque])=>{
+      igual(CHAVES.some(c=>c.chave===k),true,k+' esta declarada de verdade');
+      igual(pode(VENDEDOR,k),false,'o vendedor NAO tem '+k+' — '+porque);
+    });
+  igual(PAPEIS.vendedor.includes('*'),false,'e o papel novo nao herda o coringa do diretor');
+}},
+
+{nome:'⚠️ O VENDEDOR VE O PRECO — sem isso o simulador nao serviria pra nada',
+ executar({igual}){
+  igual(pode(VENDEDOR,'custo.ver'),true,'ele tem custo.ver');
+  igual(custo.veComercial(VENDEDOR),true,'e por isso recebe os campos de dinheiro');
+  igual(custo.veComercial(CORTADOR),false,'enquanto a bancada continua sem');
+  const amostra={valor_subtotal_centavos:20900, revenda:{valor_final_centavos:17870}};
+  igual(JSON.stringify(custo.podar(VENDEDOR,amostra)),JSON.stringify(amostra),
+    'o preco da revenda chega inteiro a quem vende');
+  igual(JSON.stringify(custo.podar(CORTADOR,amostra)),'{"revenda":{}}',
+    'e nao sobra um centavo do lado da bancada');
+}},
+
+{nome:'⚠️ A CARTEIRA NAO CHEGA A BANCADA, e o limite de credito muito menos',
+ executar({igual}){
+  const rotas=require('../rotas/revenda').rotas;
+  igual(rotas.length>0,true,'as rotas existem');
+  rotas.forEach(r=>igual(pode(CORTADOR,r.permissao),false,
+    r.metodo+' '+r.caminho+' fechado para o cortador'));
+  /* As tres que MEXEM no limite. A barra no fim do padrao importa:
+     `/limites-vencidos` tambem contem "/limite", e ela e outra coisa — a
+     lista de quem esta com a revisao atrasada, que e justamente a tarefa
+     semanal do vendedor (secao 4.13). Fecha-la para ele seria dar a tarefa e
+     esconder a lista. */
+  const limite=rotas.filter(r=>/\/limite(\/|$)/.test(r.caminho));
+  igual(limite.map(r=>r.metodo).sort().join(','),'GET,POST,PUT','as tres que mexem no limite');
+  limite.forEach(r=>igual(pode(VENDEDOR,r.permissao),false,
+    r.metodo+' '+r.caminho+' fechado para o vendedor — quem define limite e a chefia'));
+  const vencidos=rotas.find(r=>r.caminho.indexOf('limites-vencidos')>0);
+  igual(pode(VENDEDOR,vencidos.permissao),true,
+    'mas a LISTA de revisao vencida ele ve: e a tarefa semanal dele');
+
+  /* ⚠️ E O NOME DO CAMPO DO LIMITE E PARTE DA DEFESA, como o do subtotal.
+     "limite_credito_centavos" nao casaria com o padrao `preco|valor|custo|
+     nf|fornecedor` e viajaria pelo fio em silencio — por isso ele se chama
+     valor_limite_credito_centavos. */
+  igual(custo.eDinheiro('valor_limite_credito_centavos'),true,'o limite e podado');
+  igual(custo.eDinheiro('limite_credito_centavos'),false,
+    'e assim NAO seria — foi por isso que o campo nasceu com "valor_" na frente');
 }}
 
 ];

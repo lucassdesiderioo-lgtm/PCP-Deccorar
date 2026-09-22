@@ -9,6 +9,16 @@
 // decidido por area no PCP (Admin -> Acessos). Uma chave sem tela por tras
 // mente para quem le a lista de permissoes do papel.
 const CHAVES=[
+  /* ⚠️ A CHAVE DE ENTRAR, e ela nasceu de um defeito evitado na fase 2.
+     A tela inicial e o /api/eu pediam `cadastro.ler` "porque e a chave mais
+     baixa que todo mundo que entra tem". Isso era verdade enquanto havia dois
+     papeis; com o VENDEDOR passou a ser mentira, e o efeito seria o pior
+     possivel: ou ele abriria o modulo em branco, com 403 no console, ou
+     ganharia `cadastro.ler` de carona — e com ela a lista inteira de tecido,
+     endereco e motivo, que nao e o que ele precisa para simular uma persiana.
+     E a armadilha #29 do CLAUDE.md pela porta de dentro: tela em branco nao
+     se parece nem de longe com "mexeram na permissao". */
+  {chave:'modulo.entrar',     nome:'Entrar no sob medida (tela inicial e menu)'},
   {chave:'cadastro.ler',      nome:'Ver cadastros'},
   {chave:'cadastro.editar',   nome:'Editar cadastros (tecido, enderecos, motivos)'},
   /* CRIAR ENDERECO E DA BANCADA TAMBEM, e nao e afrouxamento do cadastro.
@@ -63,12 +73,32 @@ const CHAVES=[
      "Sob medida - cadastros" do PCP, que e mais larga do que precisa. Isso
      esta escrito aqui para nao se descobrir por acidente. */
   {chave:'catalogo.ler',      nome:'Ver o catalogo de venda e usar o simulador'},
-  {chave:'catalogo.editar',   nome:'Editar modelo, colecoes de venda, escada de tubos, ficha e precos'}
+  {chave:'catalogo.editar',   nome:'Editar modelo, colecoes de venda, escada de tubos, ficha e precos'},
+
+  /* ── QUEM COMPRA (spec SOBMEDIDA-PEDIDO-REVENDA, fase 2) ────────────────
+     Tres chaves, e a divisao e por quanto custa errar.
+
+     Ler a carteira e o que o vendedor faz o dia inteiro. Editar o cadastro
+     decide a TABELA e o DESCONTO — ou seja, quanto aquela revenda paga em
+     todo pedido daqui para a frente. E o limite de credito decide quanto ela
+     pode dever.
+
+     ⚠️ O VENDEDOR NAO RECEBE `revenda.editar` NEM `credito.editar`, e isso e
+     decisao da fase 2, nao esquecimento. A spec diz que "a tabela e decidida
+     pela Deccorar" (secao 4.12) e que o limite e revisto de dois em dois
+     meses (4.13) — as duas sao decisao de quem responde pelo dinheiro, nao
+     de quem vende. Custa isto, e esta escrito para nao se descobrir por
+     acidente: revenda nova, troca de tabela, endereco de entrega novo e
+     limite passam pela chefia. Alargar e uma linha aqui; o contrario, nao. */
+  {chave:'revenda.ler',       nome:'Ver as revendas e a carteira'},
+  {chave:'revenda.editar',    nome:'Cadastrar revenda, enderecos, contatos, tabela e desconto'},
+  {chave:'credito.editar',    nome:'Definir e revisar o limite de credito da revenda'}
 ];
 
 const PAPEIS={
   diretor:['*'],
   cortador:[
+    'modulo.entrar',
     'cadastro.ler','endereco.criar',
     'parametro.ler','sobra.ler','sobra.criar','sobra.propor','etiqueta.imprimir',
     'rolo.ler','rolo.entrada','rolo.encerrar',
@@ -89,6 +119,27 @@ const PAPEIS={
        justamente para o cortador nao precisar caçar sobra em lista. Se um
        dia fizer falta, a volta e devolver 'painel.ler' a esta lista; o
        dinheiro continua podado pelo custo.semPreco de qualquer jeito. */
+  ],
+
+  /* ── O VENDEDOR (fase 2) ────────────────────────────────────────────────
+     Ele simula persiana, le o catalogo e cuida da carteira dele. Nao corta,
+     nao mexe em rolo, nao descarta sobra, nao abre o cadastro de tecido e
+     nao mexe nos parametros do encaixe.
+
+     Ate a fase 2 ele entrava pela area "Sob medida - cadastros", que e a da
+     CHEFIA: catalogo, tecido, parametros e descarte de sobra, tudo junto.
+     Estava escrito como divida aberta no STATUS da fase 1, e fecha aqui.
+
+     ⚠️ `custo.ver` ESTA NA LISTA, e tem que estar. A poda do custo.js corta
+     todo campo de dinheiro de quem nao a tem — e o vendedor sem ela abriria
+     o simulador e veria a persiana inteira SEM o preco, que e justamente o
+     numero que ele foi buscar. O que ela abre alem disso (o painel, o valor
+     do estoque) continua fechado por outra chave: `painel.ler` e
+     `cadastro.ler` nao estao aqui. */
+  vendedor:[
+    'modulo.entrar',
+    'catalogo.ler','custo.ver',
+    'revenda.ler'
   ]
 };
 
