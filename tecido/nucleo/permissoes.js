@@ -92,7 +92,29 @@ const CHAVES=[
      limite passam pela chefia. Alargar e uma linha aqui; o contrario, nao. */
   {chave:'revenda.ler',       nome:'Ver as revendas e a carteira'},
   {chave:'revenda.editar',    nome:'Cadastrar revenda, enderecos, contatos, tabela e desconto'},
-  {chave:'credito.editar',    nome:'Definir e revisar o limite de credito da revenda'}
+  {chave:'credito.editar',    nome:'Definir e revisar o limite de credito da revenda'},
+
+  /* ── O PEDIDO (fase 3) ──────────────────────────────────────────────────
+     Seis chaves, e a divisao e a de sempre: quanto custa errar.
+
+     ⚠️ `pedido.aprovar` E `pedido.aprovar_qualquer` SAO DUAS COISAS, e essa e
+     a linha que importa aqui. A primeira e "aprovo o que e da minha
+     carteira"; a segunda e "aprovo a de qualquer um", e existe para a fila
+     nao parar quando o vendedor esta de ferias. Uma chave so significaria
+     escolher entre travar a fabrica numa semana de folga e deixar qualquer
+     vendedor aprovar a revenda do colega — e a regra da secao 4.12 e que a
+     carteira tem dono.
+
+     ⚠️ `pedido.cancelar` NAO ESTA NO VENDEDOR, e nao e esquecimento. Cancelar
+     um pedido aprovado e desfazer o que a fabrica ja viu; o vendedor negocia
+     prazo (`pedido.prazo`) e lanca, mas desfazer e de quem responde pela
+     casa. Alargar e uma linha aqui; o contrario, nao. */
+  {chave:'pedido.ler',            nome:'Ver pedidos e orcamentos'},
+  {chave:'pedido.lancar',         nome:'Lancar orcamento e pedido, editar e enviar'},
+  {chave:'pedido.aprovar',        nome:'Aprovar pedido da propria carteira'},
+  {chave:'pedido.aprovar_qualquer', nome:'Aprovar pedido de qualquer carteira'},
+  {chave:'pedido.prazo',          nome:'Negociar o prazo de um pedido (com motivo)'},
+  {chave:'pedido.cancelar',       nome:'Cancelar pedido ou peca de pedido'}
 ];
 
 const PAPEIS={
@@ -139,7 +161,10 @@ const PAPEIS={
   vendedor:[
     'modulo.entrar',
     'catalogo.ler','custo.ver',
-    'revenda.ler'
+    'revenda.ler',
+    /* O pedido e o trabalho dele: lanca, envia, aprova a propria carteira e
+       negocia prazo. Nao aprova a carteira do colega e nao cancela. */
+    'pedido.ler','pedido.lancar','pedido.aprovar','pedido.prazo'
   ]
 };
 

@@ -48,7 +48,13 @@ const TELAS={
   /* QUEM COMPRA (fase 2). Escritorio, como as duas de cima. Pede `ler`, e
      nao `editar`, porque o vendedor vive nela — a carteira dele e a lista de
      trabalho. Os botoes de mexer aparecem por permissao, dentro. */
-  '/revendas':  {arquivo:'telas/revendas.html',  permissao:'revenda.ler',       contexto:'admin'}
+  '/revendas':  {arquivo:'telas/revendas.html',  permissao:'revenda.ler',       contexto:'admin'},
+
+  /* O PEDIDO (fase 3). Pede `pedido.ler` e nao `pedido.lancar`: a fila de
+     aprovacao e a lista de trabalho do vendedor, e quem so aprova tem que
+     conseguir abrir a tela. Os botoes de lancar, enviar e cancelar aparecem
+     por permissao, dentro dela. */
+  '/pedidos':   {arquivo:'telas/pedidos.html',   permissao:'pedido.ler',        contexto:'admin'}
 };
 
 module.exports={TELAS};

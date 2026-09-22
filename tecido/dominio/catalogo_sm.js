@@ -18,6 +18,7 @@ const u=require('../nucleo/unidade');
 const dCat=require('../dados/catalogo_sm');
 const dAbertura=require('../dados/abertura');
 const dCor=require('../dados/cor');
+const dTecido=require('../dados/tecido');
 
 /* As duas palavras que uma referencia de ficha pode ter alem de uma chave de
    componente. Elas sao reservadas: um componente chamado 'final' faria a
@@ -310,9 +311,28 @@ function definirReducaoRegra(d){
   });
 }
 
+/* ── AS CORES QUE ESTA COLECAO TEM DE VERDADE ─────────────────────────────
+   O pedido exige a cor do tecido, e "tem de verdade" quer dizer: existe ITEM
+   DE TECIDO cadastrado para a linha e a colecao desta colecao de venda. Cor
+   cadastrada sem item nao aparece em tela nenhuma do modulo e o corte nao a
+   encontra — e o beco descrito no README: a bancada acaba bipando "a cor
+   parecida". Oferecer aqui uma cor assim poria no pedido uma escolha que a
+   fabrica nao consegue cumprir. */
+function coresDaColecao(id){
+  const c=dCat.colecao(id);
+  exigir(c,'colecao_inexistente','Colecao de venda nao encontrada.');
+  // A ordem vem do `listar`, que ja ordena pelo cadastro (linha, colecao,
+  // cor). Reordenar aqui por nome faria a lista sair diferente da de
+  // Cadastros, e quem confere as duas acharia que sao coisas diferentes.
+  return dTecido.listar()
+    .filter(t=>t.linha_id===c.linha_id&&t.abertura_id===c.abertura_id&&t.disponivel===1)
+    .map(t=>({cor_id:t.cor_id, cor_nome:t.cor_nome, tecido_id:t.id, codigo:t.codigo}));
+}
+
 const historicoPreco=(alvo,alvo_id)=>dCat.historicoPreco(alvo,alvo_id);
 
 module.exports={
+  coresDaColecao,
   listarModelos, modelo, modeloPorNome, criarModelo,
   colecoesDe, colecaoDe, ligarColecao, editarColecao, definirPrecoColecao,
   ligarCorAcessorio,

@@ -111,12 +111,18 @@ function calcular(escolha){
      cortar), mas quando vem tem que existir como ITEM DE TECIDO — e o elo da
      secao 4.3, e o beco que o README descreve: cor cadastrada sem item nao
      aparece em tela nenhuma, e a bancada "bipa a cor parecida". */
-  let corTecido=null;
+  let corTecido=null, tecido_id=null;
   if(e.cor_tecido_id){
     const item=dTecido.porCombinacao(colecao.linha_id,colecao.abertura_id,Number(e.cor_tecido_id));
     exigir(item,'tecido_inexistente','Não existe o item de tecido '+colecao.linha_nome+' · '+
       colecao.colecao_nome+' nessa cor. Cadastre em Cadastros → Tecido → Item de tecido.');
     corTecido=dTecido.porId(item.id).cor_nome;
+    /* ⚠️ O `tecido_id` SAI DAQUI, e nao e reencontrado depois pelo nome da
+       cor. Quem resolve a combinacao linha+colecao+cor e esta funcao; o
+       pedido (fase 3) GRAVA o id resolvido no lancamento, e e por ele que a
+       peca vai ao plano de corte. Procurar de novo la fora seria a segunda
+       regua da armadilha #12 — e a que erra e a que manda o rolo errado. */
+    tecido_id=item.id;
   }
 
   // ── 2. As escolhas obrigatorias ─────────────────────────────────────────
@@ -419,7 +425,7 @@ function calcular(escolha){
     colecao:{id:colecao.id, abertura_id:colecao.abertura_id, nome:colecao.colecao_nome,
              linha_nome:colecao.linha_nome},
     cor_acessorio:{id:cor.cor_id, nome:cor.cor_nome},
-    cor_tecido:corTecido,
+    cor_tecido:corTecido, tecido_id,
     medida:{largura_mm, altura_mm, area_mm2,
             largura:u.emMetros(largura_mm), altura:u.emMetros(altura_mm), area:u.emM2(area_mm2)},
     comando:e.comando, rolamento:e.rolamento, adicional,
