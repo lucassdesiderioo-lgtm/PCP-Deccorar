@@ -28,6 +28,15 @@
 > - eram **oito** escritores, não sete: a varredura achou o `teste_route.js`, que
 >   a primeira versão dela isentava por causa do prefixo `teste_`.
 >
+> ⚠️ **A FASE 1 FOI ENTREGUE PELA METADE EM 21/09, e o fechamento disse que
+> estava inteira.** O extrato e o saldo negativo subiram só no servidor: não
+> havia botão de extrato nem chip "Negativo" na aba Estoque, e o dono foi abrir
+> e não achou. **Fechado em 22/09/2026**, com o chip, o botão, o painel do
+> extrato (com o `bate` escrito na tela) e 10 casos novos no `teste_estoque.js`
+> — a rota tinha subido **sem teste nenhum**, e agora a tela depende do formato
+> dela. A lição está no `CLAUDE.md` §2: regra que depende de tela não está
+> pronta quando a rota existe e o teste passa, e sim quando alguém clica e vê.
+>
 > Fase 1 é a base das outras duas specs deste pacote
 > (`VENDAS-E-MEDIA.md` e `MESA-DE-CORRECOES.md`), e as duas estão liberadas.
 > **Uma decisão em aberto, agora da fase 2:** o que fazer quando só há uma pessoa

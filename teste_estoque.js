@@ -110,6 +110,8 @@ require('./ger_route')(app, db);     // o gerencial
    mostra e o `est_route`. Testar cada um com a sua regua e o que deixou o
    defeito de pe: o teste semeava `contagem` na mao e nunca passava pelo fluxo
    que apaga essa tabela. */
+const ESTOQUE = require('./estoque_dominio');
+ESTOQUE.garantirSchema(db);
 require('./cont_route')(app, db);
 try{ db.exec('ALTER TABLE contagem_pendente ADD COLUMN teste INTEGER DEFAULT 0'); }catch(e){}
 
@@ -421,6 +423,69 @@ const ok = (n, c, extra) => { casos++;
      por.BK140140BEGE.tecido_nome === 'Blackout' && por.BK140140BEGE.modelo_nome === 'Rolô');
   ok('acessorio vai marcado como sem medida (exige_medida 0)',
      por.KIT32.exige_medida === 0);
+
+  // ── 15. O EXTRATO — o livro de um SKU, e a conferencia na tela ───────────
+  /* ⚠️ ESTA ROTA SUBIU SEM TESTE na fase 1 (21/09/2026), e a tela que a
+     consome so foi escrita em 22/09. Quem depende do FORMATO de uma resposta
+     tem que travar o formato: mudar um nome de campo aqui apaga a coluna na
+     aba Estoque sem erro nenhum no console — a linha simplesmente sai vazia. */
+  const extrato = cod => new Promise(r => {
+    const res = { json:o=>r(o), status(){ return this; }, send:o=>r(o) };
+    rotas['GET /api/estoque/extrato/:codigo'](
+      { body:{}, params:{codigo:cod}, query:{}, headers:{}, usuario:{id:1,nome:'Ana'} }, res);
+  });
+
+  ESTOQUE.movimentar(db, {codigo:'BK140140BEGE', delta:+3, tipo:'embalagem',
+    referencia:'montagem:1', usuario:{id:1,nome:'Ana'}});
+  ESTOQUE.movimentar(db, {codigo:'BK140140BEGE', delta:-1, tipo:'etiqueta', referencia:'lote:9'});
+
+  const ex = await extrato('BK140140BEGE');
+  ok('o extrato traz o livro do SKU', Array.isArray(ex.linhas) && ex.linhas.length === 3,
+     'veio ' + JSON.stringify(ex.linhas && ex.linhas.length));
+  ok('do mais novo para o mais velho, terminando na abertura',
+     ex.linhas[0].tipo === 'etiqueta' && ex.linhas[2].tipo === 'abertura',
+     ex.linhas.map(l=>l.tipo).join(' · '));
+  ok('cada linha carrega o que a tela escreve',
+     ex.linhas[0].delta === -1 && ex.linhas[0].saldo_depois != null &&
+     ex.linhas[0].referencia === 'lote:9' && 'usuario_nome' in ex.linhas[0] &&
+     'criado_em' in ex.linhas[0] && 'teste' in ex.linhas[0],
+     JSON.stringify(ex.linhas[0]));
+  ok('e o topo traz o saldo, a soma do livro e o veredito',
+     ex.estoque === 4 && ex.soma_livro === 4 && ex.bate === true,
+     'estoque=' + ex.estoque + ' soma=' + ex.soma_livro + ' bate=' + ex.bate);
+
+  /* ⚠️ O `bate` E A CONFERENCIA VIVA. Ele repete na tela, com o dado real, o
+     que o `teste_livro.js` faz em banco de teste: `SUM(delta) = skus.estoque`.
+     Alguem escrevendo na coluna por fora aparece AQUI primeiro, sem ninguem ir
+     procurar — por isso o caso simula exatamente isso. */
+  db.prepare("UPDATE skus SET estoque=99 WHERE codigo='BK140140BEGE'").run();
+  const furado = await extrato('BK140140BEGE');
+  ok('escrita por fora do domínio faz o extrato acusar',
+     furado.bate === false && furado.estoque === 99 && furado.soma_livro === 4,
+     JSON.stringify({bate:furado.bate, estoque:furado.estoque, soma:furado.soma_livro}));
+  db.prepare("UPDATE skus SET estoque=4 WHERE codigo='BK140140BEGE'").run();
+
+  const semMov = await extrato('SOBMEDIDA');
+  ok('SKU sem movimento devolve lista vazia, não erro',
+     Array.isArray(semMov.linhas) && semMov.linhas.length === 0 && semMov.bate === true);
+
+  const naoExiste = await extrato('NAOEXISTE');
+  ok('SKU fora do cadastro é recusado com motivo', !!naoExiste.erro, JSON.stringify(naoExiste));
+
+  // ── 16. O CHIP DE NEGATIVO — a categoria que o MAX(0,…) escondia ─────────
+  const saldoCinza = db.prepare("SELECT estoque FROM skus WHERE codigo='BK160160CINZA'").get().estoque;
+  ESTOQUE.movimentar(db, {codigo:'BK160160CINZA', delta:-(saldoCinza+2),
+    tipo:'ajuste', motivo:'teste', referencia:'caso 16'});
+  const comNeg = await chamar('GET /api/estoque/painel');
+  const negPor = {}; comNeg.linhas.forEach(l => negPor[l.codigo] = l);
+  ok('saldo negativo vira situação PRÓPRIA, e não "zerado"',
+     negPor.BK160160CINZA.situacao === 'negativo', 'veio ' + negPor.BK160160CINZA.situacao);
+  ok('e o resumo conta os negativos à parte', comNeg.resumo.negativos === 1,
+     'veio ' + comNeg.resumo.negativos);
+  ok('o semáforo continua cobrindo todos os SKUs',
+     comNeg.resumo.negativos + comNeg.resumo.zerados + comNeg.resumo.baixos +
+     comNeg.resumo.ok + comNeg.resumo.excesso === comNeg.resumo.skus,
+     JSON.stringify(comNeg.resumo));
 
   console.log('');
   console.log(falhas ? ('FALHARAM ' + falhas + ' de ' + casos)
