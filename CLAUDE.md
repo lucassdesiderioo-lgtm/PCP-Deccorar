@@ -644,6 +644,19 @@ módulo                   0,375 mm      ← o limite do que a ZD220 resolve
 **O tamanho é fixo e não tem campo na tela**, por decisão do dono. Ele sai do
 `DESENHO`, como todas as outras medidas.
 
+> ✅ **CONFERIDA NO PAPEL EM 22/09/2026.** O dono fez o deploy, imprimiu 1 de
+> teste e **o celular leu o QR na etiqueta colada no kit**. É a régua final de
+> QR — antes disso os 133 + 45 casos verdes eram indício, e está escrito assim
+> nesta seção de propósito: o defeito da fase 2 passou por três rodadas verdes.
+>
+> ⚠️ **O BIPE DO CÓDIGO DE BARRAS NA EMBALAGEM AINDA NÃO FOI CONFERIDO** no
+> rolo novo. São **duas** provas de papel, e a fase 3 foi registrada com as
+> duas ("o QR abriu **e** o leitor bipou"). O bloco das barras não foi tocado
+> por este conserto — mesmos 58 mm, mesma posição, mesma altura, e há caso
+> travando —, então não há motivo esperado para falhar. **Mas não foi bipado**,
+> e escrever aqui que foi seria o verde sem conferência que o §10 chama de pior
+> que vermelho. Custa um bipe: vale fazer antes de soltar o rolo grande.
+
 ### ⚠️ A IMPRESSÃO (fase 3, 17/09/2026) — **PDF, e não ZPL**
 
 A §6 da spec mandava enviar ZPL para a impressora. **Não dá**: a ZD220 está
