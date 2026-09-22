@@ -21,7 +21,7 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) — ver abaixo
 `tecido/dominio/revenda.js`, `tecido/dominio/prazo.js`,
 `tecido/nucleo/pessoas.js`, as rotas, a tela `/sobmedida/revendas`, o preço da
 revenda dentro do `persiana.js` e a área **Sob medida — venda** no PCP.
-50 casos de teste novos: `npm test` do módulo vai a **354**, `teste_acesso.js`
+51 casos de teste novos: `npm test` do módulo vai a **355**, `teste_acesso.js`
 a **113**.
 
 > ⚠️ **AINDA NÃO ESTÁ PRONTA.** O "pronto quando" da seção 7 é *as revendas

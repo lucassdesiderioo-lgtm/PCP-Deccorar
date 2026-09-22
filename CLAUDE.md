@@ -3711,7 +3711,7 @@ engano. Há caso travando.
 > silêncio — foi assim que o `resumo.valor_parado` do painel gerencial chegou à
 > bancada (§15). Há caso travando os dois nomes, o certo e o errado.
 
-**Rode `cd tecido && npm test` (354 casos) e `node teste_acesso.js` (113) ao
+**Rode `cd tecido && npm test` (355 casos) e `node teste_acesso.js` (113) ao
 mexer em revenda, prazo, preço, permissão ou no `server.js`.** Os casos do
 prazo saem das datas escritas na §4.9 da spec, e não da resposta que a função
 deu.
@@ -3740,7 +3740,7 @@ cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 354 casos
+cd tecido && npm test          # 355 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
