@@ -1375,6 +1375,14 @@ function estGrafico(serie){
 
 const ESTCHIPS=[
   {k:'',        r:'Todos',      c:'#8b97a5', n:r=>r.skus},
+  /* ⚠️ NEGATIVO VEM ANTES DE TUDO, E É CATEGORIA PRÓPRIA (fase 1 do livro).
+     Até 21/09/2026 ele não existia: os sete donos da coluna cortavam em
+     `MAX(0, …)` e o negativo sumia no caminho — com ele, o SINAL de que alguma
+     peça saiu sem registro. Misturado em "Zerado" seria lido como SKU que
+     acabou, que é situação normal e ninguém investiga. O chip só aparece
+     quando há algum (o filtro do ESTCHIPS esconde os de contagem zero), então
+     ele nunca é ruído: se está na tela, é para olhar. */
+  {k:'negativo',r:'Negativo',   c:'#da3633', n:r=>r.negativos},
   {k:'zerado',  r:'Zerado',     c:'#f85149', n:r=>r.zerados},
   {k:'baixo',   r:'Abaixo',     c:'#ffb800', n:r=>r.baixos},
   {k:'ok',      r:'Ok',         c:'#2ea043', n:r=>r.ok},
@@ -1532,12 +1540,18 @@ function renderEst(){
 
     const base=l.alvo+l.comprometido;
     const pct=base>0?Math.min(100,Math.round((l.estoque/base)*100)):null;
-    const corBarra = l.situacao==='zerado'?'#f85149' : l.situacao==='baixo'?'#ffb800'
+    const corBarra = l.situacao==='negativo'?'#da3633' : l.situacao==='zerado'?'#f85149'
+                   : l.situacao==='baixo'?'#ffb800'
                    : l.situacao==='excesso'?'#4493f8':'#2ea043';
     return '<tr>'
       +'<td class="code">'+esc(l.codigo)+selos
         +(peca?'<div class="estq">'+esc(peca)+'</div>':'')+'</td>'
-      +'<td class="n"><b style="font-size:17px" class="'+(l.precisa>0?'baixo':'ok')+'">'+l.estoque+'</b>'+ujTxt+ct+'</td>'
+      +'<td class="n">'+(l.estoque<0
+        /* Saiu mais do que entrou. Não é "pouco estoque": é conta que não
+           fecha, e a cor tem que ser outra — o âmbar de "abaixo do alvo" se lê
+           como rotina. */
+        ? '<b style="font-size:17px;color:#da3633" title="Saiu mais do que entrou. Confira a prateleira e veja o extrato — o saldo negativo é sinal de peça que saiu sem registro.">'+l.estoque+'</b>'
+        : '<b style="font-size:17px" class="'+(l.precisa>0?'baixo':'ok')+'">'+l.estoque+'</b>')+ujTxt+ct+'</td>'
       /* Sem peça na prateleira não há valor a mostrar: "R$ 0,00" se lê como
          "não vale nada", que é outra afirmação. O custo unitário fica, porque
          esse continua verdadeiro e é o que interessa quando a peça voltar. */
@@ -1557,7 +1571,8 @@ function renderEst(){
       +'<td>'+(pct==null?'<span class="zero">—</span>'
         :'<span class="barmini"><i style="width:'+pct+'%;background:'+corBarra+'"></i></span>')+'</td>'
       +'<td style="white-space:nowrap"><button class="ghost small" data-ajustar="'+esc(l.codigo)+'">ajustar</button> '
-      +'<button class="ghost small" data-hist="'+esc(l.codigo)+'">histórico</button></td>'
+      +'<button class="ghost small" data-hist="'+esc(l.codigo)+'">histórico</button> '
+      +'<button class="ghost small" data-extrato="'+esc(l.codigo)+'">extrato</button></td>'
     +'</tr>';
   }).join('') || '<tr><td colspan="'+estColunas()+'" style="color:#8b97a5;padding:20px">'
       +(PAINEL.linhas&&PAINEL.linhas.length?'Nenhum SKU nesse filtro.':'Cadastre SKUs primeiro.')+'</td></tr>';
@@ -1663,6 +1678,61 @@ document.addEventListener("click",async e=>{
     tr.after(linha);
     return;
   }
+  /* EXTRATO — o LIVRO daquele SKU (fase 1 da spec ESTOQUE-LIVRO-E-CONFERENCIA).
+     Nao confundir com o "historico" logo acima: aquele mostra so o ajuste feito
+     a mao (`ajuste_estoque`), e este mostra TUDO que moveu o saldo — a
+     embalagem, a etiqueta, o inventario, o ajuste e a abertura. Ate 21/09/2026
+     nao havia o que abrir: `skus.estoque` era um numero corrido, e quando ele
+     errava nao sobrava rastro de quem mexeu. */
+  const ex=e.target.closest("[data-extrato]");
+  if(ex){
+    const cod=ex.getAttribute("data-extrato"), tr=ex.closest("tr");
+    if(tr.nextElementSibling && tr.nextElementSibling.classList.contains("extlin")){
+      tr.nextElementSibling.remove(); return;          // clicou de novo: fecha
+    }
+    document.querySelectorAll("tr.extlin").forEach(x=>x.remove());
+    let d=null; try{ d=await (await fetch("/api/estoque/extrato/"+encodeURIComponent(cod))).json(); }catch(err){}
+    const linha=document.createElement("tr");
+    linha.className="extlin";
+    if(!d || d.erro){
+      linha.innerHTML='<td colspan="'+estColunas()+'"><span class="baixo">'
+        +esc((d&&d.erro)||'Não consegui ler o extrato deste SKU.')+'</span></td>';
+      tr.after(linha); return;
+    }
+    const ROTULO={abertura:'abertura do livro', embalagem:'embalagem', etiqueta:'etiqueta de venda',
+                  inventario:'contagem', ajuste:'ajuste manual', correcao:'correção',
+                  cancelamento:'cancelamento'};
+    /* ⚠️ A SOMA DO LIVRO VAI AO LADO DO SALDO, e nao e enfeite: e a mesma
+       conferencia que o `teste_livro.js` faz, feita aqui com o dado real. Se um
+       dia os dois divergirem, alguem voltou a escrever na coluna por fora — e e
+       nesta linha que isso aparece primeiro, sem ninguem ir procurar. */
+    const cab = d.bate
+      ? '<span class="ok">o livro fecha com o saldo ('+d.soma_livro+')</span>'
+      : '<b class="baixo" title="A coluna e o livro discordam. Alguém escreveu no saldo por fora do estoque_dominio.js.">'
+        +'⚠ a coluna diz '+d.estoque+' e o livro diz '+d.soma_livro+' — conferir</b>';
+    linha.innerHTML='<td colspan="'+estColunas()+'">'
+      +'<b style="font-family:ui-monospace,monospace">'+esc(cod)+'</b> — extrato · '+cab
+      +(d.linhas&&d.linhas.length?('<table style="margin-top:8px"><tbody>'+d.linhas.map(m=>
+          '<tr><td class="n" style="width:70px"><b class="'+(m.delta<0?'baixo':'ok')+'">'
+          +(m.delta>0?'+':'')+m.delta+'</b></td>'
+          +'<td class="n" style="width:70px">'+m.saldo_depois+'</td>'
+          +'<td style="width:150px">'+esc(ROTULO[m.tipo]||m.tipo)
+          +(m.teste?' <span class="selo">teste</span>':'')+'</td>'
+          /* O travessão só existe quando há os DOIS lados. Movimento de
+             contagem não tem referência, e "— Correcao de contagem" com o
+             traço pendurado no vazio é o tipo de coisa que nenhum teste de
+             unidade pega e que só aparece renderizando (§4). */
+          +'<td class="sub">'+[esc(m.referencia||''), esc(m.motivo||'')]
+            .filter(Boolean).join(' — ')+'</td>'
+          +'<td>'+esc(m.usuario_nome||'—')+'</td>'
+          +'<td class="sub">'+esc(m.criado_em||'')+'</td></tr>').join('')+'</tbody></table>')
+        :'<div class="sub" style="margin-top:6px">Este SKU não tem movimento no livro. '
+         +'Ou ele nunca teve saldo, ou é sob medida — que não soma na embalagem nem baixa na etiqueta.</div>')
+      +'</td>';
+    tr.after(linha);
+    return;
+  }
+
   /* AJUSTE DE ESTOQUE — abre a linha embaixo, com motivo obrigatorio.
      O +/- de um clique saiu: ele mudava o saldo sem deixar rastro, e era o
      unico movimento de estoque do sistema assim. Um clique a mais e o preco de

@@ -220,11 +220,39 @@ movimentar(db, {codigo, delta, tipo, referencia, motivo, usuario, aprovado_por})
 > `movimento_componente`: sem cobertura, "apagar tudo" devolveria o saldo pela
 > foto e deixaria as linhas de teste de pé descrevendo o que já não existe.
 
-> **O extrato:** `GET /api/estoque/extrato/:codigo` (`@admin`), e o botão na
-> linha da aba Estoque. Ele devolve `soma_livro` e `bate` ao lado do saldo — a
-> mesma conferência que o teste faz, feita na tela com o dado real. Se um dia os
-> dois divergirem, alguém voltou a escrever na coluna por fora, e é aqui que isso
-> aparece primeiro, sem ninguém procurar.
+> **O extrato:** `GET /api/estoque/extrato/:codigo` (`@admin`), e o botão
+> **extrato** na linha da aba Estoque, ao lado do "histórico". Os dois não são a
+> mesma coisa: o *histórico* mostra só o ajuste feito à mão (`ajuste_estoque`),
+> e o *extrato* mostra **tudo que moveu o saldo** — embalagem, etiqueta,
+> inventário, ajuste e a abertura.
+>
+> Ele devolve `soma_livro` e `bate` ao lado do saldo, e a tela escreve os dois:
+> *"o livro fecha com o saldo (5)"* em verde, ou **"⚠ a coluna diz 42 e o livro
+> diz 5 — conferir"** em vermelho. É a mesma conferência que o `teste_livro.js`
+> faz em banco de teste, feita aqui com o dado real — se um dia alguém voltar a
+> escrever na coluna por fora, é nesta linha que aparece primeiro, sem ninguém
+> ir procurar.
+
+> ⚠️ **A FASE 1 SUBIU SÓ COM A METADE DE SERVIDOR, E A DOCUMENTAÇÃO DISSE QUE
+> ESTAVA PRONTA (21→22/09/2026).** A rota do extrato e a classificação de saldo
+> negativo entraram, passaram nos testes e foram para produção; **nenhuma das
+> duas tinha tela**. O chip "Negativo" não existia no `ESTCHIPS` e não havia
+> botão nenhum que chamasse o extrato — a rota ficou um dia inteiro no ar,
+> declarada pronta, **sem nenhum caminho até ela**. Quem foi abrir não achou.
+>
+> **É a armadilha #30 (§7) por uma quarta ponta, e a dívida 18 do §14 de novo.**
+> Lá são a coluna, o código que a lê e o dado preenchido; aqui são a rota, o
+> teste que a cobre e **alguém que consiga chegar nela**. A que some em silêncio
+> é sempre a última: a rota responde 200 no `curl`, o teste fica verde, o boot
+> não reclama, e nada em lugar nenhum diz *"isto não tem porta"*.
+>
+> **Regra que fica:** regra nova que depende de tela não está pronta quando a
+> rota existe e o teste passa — está pronta quando **alguém clica e vê**. E a
+> conferência disso não é ler o próprio diff: é abrir a tela. Foi assim que
+> apareceu, no primeiro render, o *"— Correcao de contagem"* com o travessão
+> pendurado no vazio (movimento de contagem não tem referência) — o mesmo tipo
+> de coisa que a nota do link do QR ensinou em 18/09 (§4), e que nenhum teste de
+> unidade pega porque o texto está sintaticamente perfeito.
 
 > **Rode `node teste_livro.js` ao mexer no `estoque_dominio.js` ou em qualquer
 > coisa que mova saldo** — os 60 casos vão do domínio isolado até o **fluxo
@@ -2648,7 +2676,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (62), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (113), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (113), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2656,7 +2684,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 15 | ~~**`POST /api/skus` zera o estoque** quando o corpo não traz `estoque`~~ **RESOLVIDO em 17/09/2026** — campo ausente preserva os quatro campos soltos, número impossível é recusado (400) em vez de clampado, e as duas escritas viraram uma transação com o `catch` vazio fora. A rota saiu para `sku_cad_route.js` e tem `teste_skus.js` (60 casos) atrás — ver §6, armadilha #25. ~~**Fica aberto**: a rota ainda muda saldo com `sku.cadastrar`~~ **FECHADO em 21/09/2026** na fase 1 do livro: o cadastro não mexe em saldo, nem com o campo presente, nem no SKU novo — e a rota diz que ignorou (§2, o livro) | — |
 | 16 | ~~**Acesso: default `@logado` e cobertura mantida à mão**~~ **RESOLVIDO em 17/09/2026** — o padrão passou a ser **negar**, a cobertura varre o Express (a lista `TODAS_ROTAS` saiu) e o boot grita o nome da rota não declarada; as 28 leituras sem dono foram declaradas e as telas `.html` gêmeas herdaram a permissão da tela. Ver §10, armadilha #29 · `teste_cobertura.js` | — |
 | 17 | ~~**Acesso: duas travas faltando**~~ **RESOLVIDO em 17/09/2026** — a exceção recusa conceder chave `intransferivel`, a troca de setores tem a trava do último Admin Geral (mesma conta do `auth.js`, agora no `acesso.js`), setor novo não nasce `admin_geral` e a migração de `areas` virou evento de uma vez só (a porta A, que promovia a Admin Geral em silêncio). Ver §10, armadilha #28 | — |
-| 18 | **Nada acusa uma regra INERTE.** `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
+| 18 | **Nada acusa uma regra INERTE** — e ela tem pelo menos **duas formas**: dado que ninguém preencheu, e **rota que nenhuma tela chama** (o extrato do livro ficou um dia no ar sem botão, §2). `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
 
 ---
 
@@ -2684,6 +2712,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Amarrar a conferência ao rastro do ajuste: a contagem que **bateu** não gera
   linha nenhuma, e é justamente o SKU cujo saldo estava certo que apareceria
   como nunca conferido (§18, armadilha #32)
+- ❌ Dar por pronta uma fase que tem tela sem ABRIR a tela: a rota do extrato
+  ficou um dia no ar, testada e documentada como pronta, sem botão nenhum que
+  chegasse nela (§2, e é a #30 por outra ponta)
 - ❌ Escrever em `skus.estoque` fora do `estoque_dominio.js` — o saldo tinha
   SETE donos e por isso não se reconstruía; há varredura recusando (§2, o livro)
 - ❌ Devolver o `MAX(0, …)` a qualquer escrita de saldo: ele apaga justamente o
@@ -3218,7 +3249,7 @@ também o lado que faz a equipe parar de ler a coluna.
 
 **Rode `node teste_estoque.js` após qualquer mudança no `est_route.js`, no
 `fluxo_estoque.js`, no `demanda_dominio.js`, no `painel_route.js`, no
-`ger_route.js` ou no `cont_route.js`** — os 62 casos travam a conta única nas
+`ger_route.js` ou no `cont_route.js`** — os 72 casos travam a conta única nas
 quatro telas, o sob medida, o parado, a série do gráfico, a idade do inventário
 (de ponta a ponta, pelo fluxo real — armadilha #32), o gate do custo e o acordo
 com o fechamento diário do Planejamento. Mexeu na contagem?
