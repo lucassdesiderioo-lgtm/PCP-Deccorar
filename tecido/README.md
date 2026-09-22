@@ -50,6 +50,13 @@ novo.
 | 7 | Painel e relatórios | **pronta** |
 | 8 | Upload do arquivo de medidas | **pronta** (leitor genérico — ver abaixo) |
 
+E, da spec `SOBMEDIDA-PEDIDO-REVENDA` (o segundo assunto do módulo — a venda):
+
+| Fase | O quê | Estado |
+|---|---|---|
+| 1 | Catálogo de venda, ficha técnica e simulador | **pronta e conferida na fábrica** (22/09/2026) |
+| 2 | Revendas, carteiras, tabelas A/B/C, feriados e prazo | **em código** (22/09/2026) — falta cadastrar as revendas de hoje |
+
 ---
 
 ## O CATÁLOGO DE VENDA E O SIMULADOR (fase 1 da spec `SOBMEDIDA-PEDIDO-REVENDA`)
@@ -244,20 +251,52 @@ aviso que ninguém leu.
 
 ### Quem vê o quê
 
-| Chave | O quê | Cortador | Chefia |
-|---|---|:---:|:---:|
-| `catalogo.ler` | ver o catálogo e usar o simulador | ❌ | ✅ |
-| `catalogo.editar` | modelo, coleções, escada, ficha, preços | ❌ | ✅ |
+| Chave | O quê | Cortador | Vendedor | Chefia |
+|---|---|:---:|:---:|:---:|
+| `modulo.entrar` | abrir o módulo (tela inicial e menu) | ✅ | ✅ | ✅ |
+| `catalogo.ler` | ver o catálogo e usar o simulador | ❌ | ✅ | ✅ |
+| `catalogo.editar` | modelo, coleções, escada, ficha, preços | ❌ | ❌ | ✅ |
+| `custo.ver` | os campos de dinheiro no JSON | ❌ | ✅ | ✅ |
+| `revenda.ler` | as revendas e a carteira | ❌ | ✅ | ✅ |
+| `revenda.editar` | cadastro, endereços, contatos, tabela, desconto | ❌ | ❌ | ✅ |
+| `credito.editar` | o limite de crédito e a revisão dele | ❌ | ❌ | ✅ |
 
-As duas telas são **escritório** (tema escuro): `/sobmedida/catalogo` e
-`/sobmedida/simulador`.
+As três telas de venda são **escritório** (tema escuro):
+`/sobmedida/catalogo`, `/sobmedida/simulador` e `/sobmedida/revendas`.
 
-> ⚠️ **NENHUMA DAS DUAS ESTÁ NO CORTADOR, e isso é decisão da fase 1.** Quem
-> usa é a equipe interna lançando os pedidos que hoje chegam por WhatsApp. O
-> papel próprio do **vendedor** é da fase 2 — até lá ele entra pela área "Sob
-> medida — cadastros" do PCP, **que é mais larga do que precisa** (ela também
-> dá cadastro de tecido, parâmetros e descarte de sobra). Está escrito aqui
-> para não se descobrir por acidente.
+> ⚠️ **NENHUMA DELAS ESTÁ NO CORTADOR**, e isso é decisão da fase 1: quem usa é
+> a equipe de escritório, não quem está em pé na bancada.
+
+> ⚠️ **O VENDEDOR GANHOU ÁREA PRÓPRIA NA FASE 2** — *Sob medida — venda*, no
+> PCP —, e com ela o papel `vendedor`. Até a fase 1 ele entrava pela área "Sob
+> medida — cadastros", que é a da **chefia**: precisava de cadastro de tecido,
+> parâmetros do encaixe e descarte de sobra para simular uma persiana. A
+> dívida estava escrita e fechou aqui.
+>
+> ⚠️ **A CHAVE DELE É `nivel:'operacao'` NO PCP, E ISSO É TRAVA.**
+> `sincronizarAreas` põe a área `'admin'` em quem tem **qualquer** chave de
+> nível admin, e o portão em `nucleo/acesso.js` lê `'admin'` como **diretor**.
+> Declarada como admin, `sobmedida.vender` devolveria ao vendedor exatamente o
+> módulo inteiro que ela veio tirar dele — sem ninguém pedir, e sem erro em
+> tela nenhuma.
+>
+> ⚠️ **`custo.ver` ESTÁ NO PAPEL DELE, E TEM QUE ESTAR.** A poda do `custo.js`
+> corta todo campo de dinheiro de quem não a tem — sem ela o vendedor abriria
+> o simulador e veria a persiana inteira **sem o preço**, que é justamente o
+> número que ele foi buscar.
+>
+> ⚠️ **E `revenda.editar`/`credito.editar` NÃO SÃO DELE**, por decisão da fase
+> 2: a tabela, o desconto e o limite são decisão de quem responde pelo
+> dinheiro (§4.12 e §4.13 da spec). Revenda nova, troca de tabela, endereço de
+> entrega novo e limite passam pela chefia. **Alargar é uma linha; o
+> contrário, não.**
+
+> ⚠️ **NASCEU `modulo.entrar`, e ela é conserto de um defeito evitado.** A tela
+> inicial e o `/api/eu` pediam `cadastro.ler`, *"a chave mais baixa que todo
+> mundo que entra tem"* — com o terceiro papel isso virou mentira. Ou o
+> vendedor abriria o módulo em branco com 403 no console, ou ganharia
+> `cadastro.ler` de carona, e com ela a lista inteira de tecido, endereço e
+> motivo.
 
 > ⚠️ **TELA QUE NÃO ESTÁ NO `public/nav.js` NASCE INVISÍVEL.** O rodapé monta
 > `ORDEM.filter(...)`: uma tela declarada em `nucleo/telas.js` e liberada pela
@@ -345,10 +384,147 @@ lançado** — e as duas bateram:
 > que a fábrica corta e o que o cliente paga — e cada uma foi conferida com a
 > outra já de pé.
 
-> ⚠️ **O TOTAL É O PREÇO DECCORAR, não o que a revenda paga.** A tabela A/B/C e
-> o desconto dela são da **fase 2**, e o card escreve isso embaixo de propósito:
-> mandar esse número para a revenda como se fosse o dela é o erro que a frase
-> existe para impedir.
+> ⚠️ **O TOTAL DE CIMA É O PREÇO DECCORAR, e o da revenda vem EMBAIXO dele**
+> (fase 2, abaixo). Os dois aparecem juntos e nunca um no lugar do outro: o de
+> cima vai para faturamento, Compras, crédito e relatório; o de baixo é o que
+> aquela revenda paga. Trocar um pelo outro na tela é o primeiro passo para
+> trocar um pelo outro na conta.
+
+---
+
+## QUEM COMPRA: REVENDA, CARTEIRA, TABELA E PRAZO (fase 2)
+
+A tela é **`/sobmedida/revendas`** (escritório, tema escuro), e ela responde
+quatro coisas: quem são as revendas, quem cuida de cada uma, quanto cada uma
+paga, e quando o pedido fica pronto.
+
+### O preço da revenda sai do Deccorar em CASCATA
+
+```
+subtotal Deccorar          R$ 209,00      ← não se mexe
+  × tabela B (−10,00%)
+  × desconto da revenda (−5,00%)
+a revenda paga             R$ 178,70
+```
+
+> ⚠️ **CASCATA, E NÃO SOMA** — decisão do dono em 22/09/2026. Somados, 10% + 5%
+> dariam 15%; em cascata dão 14,5%, e num pedido de mil reais a diferença é de
+> cinco. Pior: a soma deixaria dois percentuais grandes **zerarem a venda** sem
+> ninguém notar, porque a tela continuaria mostrando dinheiro.
+
+> ⚠️ **ARREDONDA UMA VEZ, NO FIM.** A conta é feita em inteiro
+> (`subtotal × centésimos × centésimos`) e só divide no fim. Dois
+> arredondamentos em cadeia erram um centavo para cima ou para baixo sem regra
+> nenhuma — e é o centavo que aparece na conferência da revenda e não tem como
+> ser explicado. Há caso travando: reintroduzir o defeito reprova o teste.
+
+> ⚠️ **TABELA SEM PERCENTUAL NÃO TEM PISO.** Piso quer dizer "no mínimo isto",
+> e desconto só faz o número **descer** — ali o subtotal Deccorar seria um
+> **teto**. A tela escreve *"ainda não dá para dizer o que esta revenda paga —
+> falta lançar: tabela B"*, e não um `≥` que diria a coisa errada com a palavra
+> certa (e gastaria o sinal que a equipe aprendeu a ler como "falta preço em
+> alguma linha").
+
+> ⚠️ **AS TRÊS TABELAS NASCEM SEM PERCENTUAL, E NÃO COM ZERO.** `NULL` é "ainda
+> não se sabe"; zero é "sem desconto", que é decisão. Semeadas com zero, o
+> sistema cobraria o preço cheio de todo mundo com cara de regra aplicada — e
+> ninguém descobriria, porque o número só ficaria maior.
+
+> O desconto **da revenda**, esse sim, nasce **zero**: não ter desconto extra é
+> o caso normal de quase todo mundo. `NULL` ali faria o preço de toda revenda
+> sair como piso até alguém digitar zero, e aviso que aparece no caso normal é
+> aviso que a equipe aprende a ignorar (armadilha #6 do `CLAUDE.md`).
+
+### O prazo — `dominio/prazo.js` é o dono único
+
+```
+enviado até quarta 18:00  →  pronto na quinta da SEMANA SEGUINTE
+um minuto depois          →  a quinta da outra semana
+entrega em dia não útil   →  empurra, e DIZ qual feriado empurrou
+```
+
+Os quatro números (dia e hora do corte, dia da entrega, semanas) são
+**parâmetros**; os feriados são **cadastro**, com data e nome. Parâmetro fora
+da faixa é **recusado** — `prazoCorteHora` por extenso ou dia da semana 7,
+aceitos, mudariam a conta em silêncio.
+
+> ⚠️ **CONTA A HORA DO ENVIO, NUNCA A DA APROVAÇÃO.** Aprovar é tarefa da
+> Deccorar, e a demora dela não passa para a revenda. Por isso `calcular`
+> **recebe** o momento do envio em vez de olhar o relógio: na fase 3 o pedido
+> guarda o prazo congelado, e recalculá-lo com o relógio de hoje daria outra
+> data para o mesmo pedido.
+
+> ⚠️ **NENHUM `new Date()`.** A data sai do SQLite, como manda o `nucleo/dia.js`
+> — e aqui isso importa mais que no resto do módulo, porque um dia de
+> diferença muda a semana inteira.
+
+> **A prévia é o que torna o cadastro conferível.** Quatro parâmetros e uma
+> lista de feriados não dizem nada sozinhos; a pergunta é *"um pedido enviado
+> agora fica pronto quando?"*, e a tela responde por extenso. Sem isso o
+> cadastro só seria conferido pelo primeiro cliente que reclamasse.
+
+### O vendedor é gente do PCP — `nucleo/pessoas.js` é a porta única
+
+A revenda guarda o `vendedor_usuario_id` do PCP e o `vendedor_nome` como
+**retrato**: a carteira precisa continuar legível daqui a um ano, mesmo que a
+pessoa saia. A lista de nomes chega por uma porta ligada no `server.js`.
+
+> ⚠️ **A PORTA ENTREGA `id` E `nome`, E MAIS NADA.** O mapeamento é explícito:
+> mesmo que o PCP passe a linha inteira de `usuarios`, PIN, salt e áreas não
+> atravessam. O que não atravessa não vaza.
+
+> ⚠️ **SEM A PORTA LIGADA, RECUSA — NUNCA LISTA VAZIA.** Lista vazia em
+> silêncio faria a tela afirmar que a fábrica não tem ninguém, e alguém
+> passaria a tarde procurando no lugar errado. A recusa **diz onde se liga**.
+
+> ⚠️ **NÃO HÁ CADASTRO DE VENDEDOR AQUI DENTRO.** Dois cadastros de gente são
+> dois lugares para lembrar de desligar alguém — foi por isso que este módulo
+> deixou de ter o dele em 02/09/2026.
+
+### A carteira é DERIVADA, e quem está sem vendedor aparece
+
+A carteira é "o conjunto de revendas que este vendedor atende" — uma consulta,
+não uma tabela. Uma segunda tabela dizendo a mesma coisa divergiria no primeiro
+vendedor trocado, e as duas estariam certas, cada uma na sua régua.
+
+> ⚠️ **QUEM ESTÁ SEM VENDEDOR APARECE**, com o nome escrito por extenso
+> (*— sem vendedor —*) e em âmbar. Esconder faria a tela dizer que o trabalho
+> acabou, e o "pronto quando" desta fase é justamente cada revenda com um
+> vendedor.
+
+### O limite de crédito: mostra, não trava
+
+O limite tem **porta própria** (`credito.editar`), grava histórico e carimba a
+data da revisão. Quem está com a revisão vencida (o prazo é o parâmetro
+`creditoRevisaoMeses`, hoje 2) aparece marcado.
+
+> ⚠️ **O "DISPONÍVEL" NÃO EXISTE AINDA, e está escrito na tela.**
+> `disponível = limite − boletos em aberto`, e boleto é a fase 6. Mostrar o
+> limite cheio como disponível seria número mentindo.
+
+> ⚠️ **O CAMPO SE CHAMA `valor_limite_credito_centavos` DE PROPÓSITO.** A poda
+> do `custo.js` corta por **padrão de nome**: `limite_credito_centavos` não
+> casaria com `preco|valor|custo|nf|fornecedor` e viajaria pelo fio em
+> silêncio. Há caso travando os dois nomes, o certo e o errado.
+
+> **Revisar sem mudar o número também é revisão** — e é o caso mais comum: o
+> vendedor olha, conclui que está bom e carimba. Sem esse botão, a única forma
+> de sair da lista de vencidos seria mudar o limite, e aí a equipe mudaria o
+> número só para a tela parar de cobrar.
+
+### Regras do cadastro que parecem chatice e não são
+
+- **CNPJ torto é recusado; CNPJ vazio passa.** Revenda sem CNPJ existe — a que
+  ainda não mandou o cartão. Travar por isso faria o cadastro esperar papel, e
+  a equipe lançaria um número qualquer para a tela aceitar. O dígito
+  verificador, por outro lado, **nunca dispara no caso normal**: ele só pega
+  dedo trocado, que é o erro que vira nota recusada semanas depois.
+- **Campo ausente não é campo vazio.** Editar só mexe no que veio no corpo.
+  Vazio **explícito** apaga, e isso é decisão de quem editou.
+- **Um endereço padrão só.** Dois marcados fariam a tela do pedido escolher o
+  primeiro que a consulta devolvesse — por sorte, e a caixa iria para a loja
+  errada sem ninguém ter escolhido nada.
+- **Desativar não apaga.** Revenda apagada levaria o pedido dela junto.
 
 ---
 

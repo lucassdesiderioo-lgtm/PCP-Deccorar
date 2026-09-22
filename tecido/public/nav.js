@@ -22,10 +22,11 @@ var BASE='/sobmedida';
 // ultima. Tela nova pede a linha aqui, no mesmo commit.
 var NOMES={'/':'Inicio','/corte':'Plano de corte','/sobras':'Sobras',
            '/rolos':'Rolos','/etiquetas':'Etiquetas','/cadastros':'Cadastros',
-           '/painel':'Painel','/simulador':'Simulador','/catalogo':'Catalogo'};
+           '/painel':'Painel','/simulador':'Simulador','/catalogo':'Catalogo',
+           '/revendas':'Revendas'};
 // A ordem do rodape segue o FLUXO da bancada, nao o alfabeto: o rolo entra,
 // vira plano de corte, sobra o retalho, a sobra ganha etiqueta.
-var ORDEM=['/','/corte','/rolos','/sobras','/etiquetas','/simulador','/painel','/cadastros','/catalogo'];
+var ORDEM=['/','/corte','/rolos','/sobras','/etiquetas','/simulador','/revendas','/painel','/cadastros','/catalogo'];
 
 var aqui=location.pathname.replace(/\/$/,'')||BASE;
 var rel=aqui.indexOf(BASE)===0 ? (aqui.slice(BASE.length)||'/') : '/';

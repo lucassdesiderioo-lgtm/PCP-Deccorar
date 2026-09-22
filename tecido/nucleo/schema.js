@@ -903,7 +903,142 @@ SELECT m.id,v.l,v.q FROM sm_modelo m, (
 INSERT INTO sm_reducao_regra(modelo_id,m2_acima_mm2,largura_acima_mm)
 SELECT id,4500000,2200 FROM sm_modelo WHERE nome='Rolô';
 `}
+,
+{n:17, nome:'a revenda, a carteira do vendedor, as tabelas A/B/C e o calendario de prazo', sql:`
+/* ═══ QUEM COMPRA ═════════════════════════════════════════════════════════
+   Fase 2 da spec SOBMEDIDA-PEDIDO-REVENDA. A fase 1 respondeu o que a
+   persiana E e quanto ela custa NA DECCORAR; aqui entra a revenda, o
+   vendedor que cuida dela, a tabela que decide o preco dela e o prazo.
 
+   Nenhum pedido ainda — isso e a fase 3. O que estas tabelas guardam e o
+   cadastro que o pedido vai ler e CONGELAR no envio. */
+
+/* ── A TABELA A/B/C ───────────────────────────────────────────────────────
+   Um PERCENTUAL de desconto sobre o subtotal Deccorar, e nao um preco por
+   colecao em cada tabela — decisao de 22/09/2026, registrada no STATUS da
+   fase 1. Uma matriz 3 x N colecoes faria cada colecao nova nascer sem preco
+   em duas das tres, em silencio.
+
+   ⚠️ NASCE SEM PERCENTUAL, E NAO COM ZERO. NULL aqui e "ainda nao se sabe";
+   zero e "sem desconto", que e uma decisao. Semear as tres com zero faria o
+   sistema cobrar o preco cheio de todo mundo com cara de regra aplicada — e
+   ninguem descobriria, porque o numero so ficaria maior. Sem percentual, o
+   preco da revenda sai como PISO e a tabela e NOMEADA (regra 4 do custo).
+
+   centesimos de por cento: 500 = 5,00%. Inteiro, como toda unidade daqui. */
+CREATE TABLE sm_tabela_preco (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  desconto_centesimos INTEGER,
+  ordem INTEGER DEFAULT 0, ativo INTEGER NOT NULL DEFAULT 1
+);
+INSERT INTO sm_tabela_preco(nome,ordem) VALUES ('A',1),('B',2),('C',3);
+
+/* Como a revenda paga. Lista pequena e cadastravel, como os motivos de
+   recusa: escrever as formas no codigo faria a quarta forma virar deploy. */
+CREATE TABLE sm_forma_pagamento (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  ordem INTEGER DEFAULT 0, ativo INTEGER NOT NULL DEFAULT 1
+);
+INSERT INTO sm_forma_pagamento(nome,ordem) VALUES
+  ('Boleto',1),('Cartao',2),('PIX',3),('Dinheiro',4);
+
+/* ── A REVENDA ────────────────────────────────────────────────────────────
+   ⚠️ O VENDEDOR E GENTE DO PCP, E NAO UM CADASTRO DAQUI. Guarda-se o id da
+   pessoa no PCP e o nome como RETRATO. Um segundo cadastro de gente seriam
+   dois lugares para lembrar de desligar alguem — e foi exatamente isso que
+   tirou o cadastro de pessoas deste modulo em 02/09/2026 (CLAUDE.md §19).
+   O nome fica gravado porque ele e historia: daqui a um ano a carteira tem
+   que continuar dizendo quem cuidava da revenda, mesmo que a pessoa saia.
+
+   ⚠️ valor_limite_credito_centavos COMECA COM "valor_" DE PROPOSITO. A poda
+   do custo.js corta por PADRAO DE NOME, e um campo de dinheiro fora do
+   padrao viaja pelo fio em silencio — foi assim que o resumo.valor_parado do
+   painel gerencial chegou a bancada (CLAUDE.md §15). "limite_credito" sozinho
+   nao casaria com o padrao.
+
+   ⚠️ E O desconto DA REVENDA NASCE ZERO, ao contrario do da tabela. Aqui
+   zero e a realidade comercial de quase todo mundo — nao ter desconto extra
+   e o caso normal. NULL faria o preco de toda revenda sair como piso ate
+   alguem digitar zero, e piso que aparece no caso normal e aviso que a
+   equipe aprende a ignorar (armadilha #6). */
+CREATE TABLE sm_revenda (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  razao_social TEXT NOT NULL,
+  nome_fantasia TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  cnpj TEXT,                                   -- so digitos; vazio e permitido
+  fiscal_cep TEXT, fiscal_logradouro TEXT, fiscal_numero TEXT,
+  fiscal_complemento TEXT, fiscal_bairro TEXT, fiscal_cidade TEXT, fiscal_uf TEXT,
+  vendedor_usuario_id INTEGER,
+  vendedor_nome TEXT,
+  tabela_id INTEGER REFERENCES sm_tabela_preco(id),
+  desconto_centesimos INTEGER NOT NULL DEFAULT 0,
+  forma_pagamento_id INTEGER REFERENCES sm_forma_pagamento(id),
+  entrega TEXT NOT NULL DEFAULT 'entrega',     -- entrega | retira
+  valor_limite_credito_centavos INTEGER,
+  limite_revisado_em TEXT,
+  observacao TEXT,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT DEFAULT (datetime('now','localtime')), criado_por TEXT
+);
+CREATE INDEX idx_sm_revenda_vendedor ON sm_revenda(vendedor_usuario_id);
+
+/* VARIOS enderecos de entrega (secao 4.12) — a revenda com duas lojas manda
+   para a que estiver com o instalador naquela semana. O padrao e so o que
+   vem pre-escolhido no pedido; quem decide e quem lanca. */
+CREATE TABLE sm_revenda_endereco (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  revenda_id INTEGER NOT NULL REFERENCES sm_revenda(id),
+  apelido TEXT NOT NULL,
+  cep TEXT, logradouro TEXT, numero TEXT, complemento TEXT,
+  bairro TEXT, cidade TEXT, uf TEXT,
+  padrao INTEGER NOT NULL DEFAULT 0,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  UNIQUE(revenda_id, apelido)
+);
+
+CREATE TABLE sm_revenda_contato (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  revenda_id INTEGER NOT NULL REFERENCES sm_revenda(id),
+  nome TEXT NOT NULL,
+  papel TEXT, telefone TEXT, email TEXT,
+  principal INTEGER NOT NULL DEFAULT 0,
+  ativo INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX idx_sm_revenda_contato ON sm_revenda_contato(revenda_id);
+
+/* ── O CALENDARIO ─────────────────────────────────────────────────────────
+   Feriado e CADASTRO, com data e nome (secao 4.9). A data e a chave: o mesmo
+   dia nao e feriado duas vezes, e um cadastro repetido faria a lista de
+   "empurrado por" citar o mesmo nome duas vezes na mesma linha. */
+CREATE TABLE sm_feriado (
+  data TEXT PRIMARY KEY,                       -- 'AAAA-MM-DD'
+  nome TEXT NOT NULL,
+  criado_em TEXT DEFAULT (datetime('now','localtime')), criado_por TEXT
+);
+
+/* Os quatro numeros do prazo, na tabela de parametros que ja existe — nunca
+   constantes no codigo. O corte do Mercado Livre ja mudou sem aviso no PCP
+   (CLAUDE.md §8); nao ha razao para o corte da revenda ser diferente.
+   Dia da semana no padrao do SQLite: 0 = domingo. */
+INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
+ ('prazoCorteDiaSemana','3','numero','Dia do corte do pedido',
+  'Dia da semana em que fecha a producao da semana. 0 = domingo, 3 = quarta. Pedido ENVIADO ate este dia, no horario abaixo, fica pronto na entrega da semana seguinte.','0 a 6',10),
+ ('prazoCorteHora','18:00','texto','Hora do corte',
+  'Hora limite do dia do corte. Um minuto depois, o pedido cai para a semana seguinte. Conta a hora do ENVIO pela revenda, nunca a da aprovacao: aprovar e tarefa da Deccorar, e a demora dela nao passa para a revenda.','hh:mm',11),
+ ('prazoEntregaDiaSemana','4','numero','Dia da entrega',
+  'Dia da semana em que os pedidos daquele corte ficam prontos. 4 = quinta.','0 a 6',12),
+ ('prazoSemanas','1','numero','Semanas ate a entrega',
+  'Quantas semanas depois do corte. 1 quer dizer a entrega da semana seguinte ao corte.','semanas',13),
+ ('creditoRevisaoMeses','2','numero','Revisao do limite de credito',
+  'De quantos em quantos meses o limite de cada revenda tem que ser revisto. A tela lista quem esta vencido — limite que ninguem revisa envelhece calado, e o numero fica parecendo atual.','meses',14);
+
+/* O historico de preco ganha dois alvos novos (tabela e revenda). A coluna
+   alvo ja e texto livre e o indice ja existe — nao ha DDL a fazer aqui, e
+   esta nota fica porque o comentario da migracao 16 lista os alvos de entao
+   e um dia alguem vai compara-los com o codigo. */
+`},
 ];
 
 // ─────────────────────────────────────────────────────────────────────────

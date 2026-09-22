@@ -44,6 +44,18 @@ module.exports = [
     rotulo:'Cortar tecido',       desc:'Plano de corte, rolos, sobras e etiquetas de prateleira' },
   { chave:'sobmedida.cadastrar',  grupo:'Sob medida', nivel:'admin',
     rotulo:'Cadastrar sob medida',desc:'Tecidos, enderecos, motivos e os parametros do encaixe' },
+  /* ⚠️ VENDER E `operacao`, E NAO `admin` — e isto nao e classificacao, e
+     trava. `sincronizarAreas` poe a area 'admin' em quem tem QUALQUER chave
+     de nivel admin, e o portao do sob medida (tecido/nucleo/acesso.js) le
+     'admin' como DIRETOR. Declarada como admin, esta chave entregaria ao
+     vendedor o modulo inteiro — cadastro de tecido, parametros do encaixe e
+     descarte de sobra — sem ninguem ter pedido isso, e sem erro nenhum em
+     tela. E a porta A da armadilha #28 por uma porta nova.
+
+     Vender tambem nao e administrar o sistema: e o trabalho da pessoa, como
+     cortar e revisar. O nivel diz isso, e a trava vem de graca junto. */
+  { chave:'sobmedida.vender',     grupo:'Sob medida', nivel:'operacao',
+    rotulo:'Vender sob medida',   desc:'Simulador, catalogo de venda e a carteira de revendas' },
 
   // ─── DEVOLUÇÕES ─────────────────────────────────────────────
   { chave:'devolucao.registrar',  grupo:'Devoluções', nivel:'operacao',

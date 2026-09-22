@@ -69,5 +69,9 @@ const M2=1000000;
 const emMetros=v=>v==null?null:(v/1000).toFixed(3).replace('.',',');
 const emM2=v=>v==null?null:(v/M2).toFixed(3).replace('.',',');
 const emReais=v=>v==null?null:(v/100).toFixed(2).replace('.',',');
+/* Percentual guardado em CENTESIMOS de por cento: 500 vira '5,00'. Duas
+   casas sempre, pelo mesmo motivo das tres da medida — '5,0' faz quem le
+   parar para pensar se o numero esta completo. */
+const emPercentual=v=>v==null?null:(v/100).toFixed(2).replace('.',',');
 
-module.exports={mm,ajuste,centavos,areaMm2,M2,emMetros,emM2,emReais};
+module.exports={mm,ajuste,centavos,areaMm2,M2,emMetros,emM2,emReais,emPercentual};

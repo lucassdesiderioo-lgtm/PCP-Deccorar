@@ -18,6 +18,7 @@
 const {ErroDeRegra,exigir}=require('../nucleo/erros');
 const u=require('../nucleo/unidade');
 const catalogo=require('./catalogo_sm');
+const dRevenda=require('../dados/revenda');
 const dTecido=require('../dados/tecido');
 
 const COMANDOS={direito:'direito', esquerdo:'esquerdo'};
@@ -325,6 +326,73 @@ function calcular(escolha){
     valor_subtotal: semPreco.length?null:u.emReais(piso),
     valor_piso_centavos:piso, valor_piso:u.emReais(piso)
   };
+
+  /* ── 9-B. O PRECO DA REVENDA ────────────────────────────────────────────
+     O bloco acima e o preco DECCORAR, e ele nao se mexe daqui para baixo. O
+     que a revenda paga sai dele com a tabela A/B/C e o desconto dela.
+
+     ⚠️ EM CASCATA, NESTA ORDEM — decisao do dono em 22/09/2026. A tabela
+     primeiro, o desconto comercial depois, cada um sobre o resultado do
+     anterior. Somados, 10% + 5% dariam 15%; em cascata dao 14,5%, e num
+     pedido de mil reais a diferenca e de cinco. Somar tambem deixaria dois
+     percentuais grandes zerarem a venda sem ninguem notar — 60 + 50 nao e
+     desconto, e a tela continuaria mostrando dinheiro.
+
+     ⚠️ ARREDONDA UMA VEZ, no fim (secao 4.1), e nao a cada degrau: dois
+     arredondamentos em cadeia erram um centavo para cima ou para baixo sem
+     regra nenhuma, e e o tipo de centavo que aparece na conferencia da
+     revenda e nao tem como ser explicado. A conta e feita em inteiro
+     (subtotal x centesimos x centesimos) e so divide no fim — com preco de
+     ate R$ 100 mil o produto cabe folgado no inteiro exato do JavaScript.
+
+     ⚠️ E O SUBTOTAL DECCORAR CONTINUA INTEIRO. "Misturar o preco com markup
+     em qualquer numero da Deccorar" e o decimo item da secao 9 da spec, e a
+     forma de isso acontecer nunca e alguem decidir: e o desconto entrar no
+     subtotal por descuido, e ninguem notar, porque o total continua
+     parecendo dinheiro. Faturamento, Compras, credito e relatorio leem o
+     subtotal; so a revenda le o final. */
+  let precoRevenda=null;
+  if(e.revenda_id!==undefined&&e.revenda_id!==null&&e.revenda_id!==''){
+    const rev=dRevenda.porId(e.revenda_id);
+    exigir(rev,'revenda_inexistente','Esta revenda nao existe no cadastro.');
+    exigir(rev.ativo===1,'revenda_inativa',
+      'A revenda "'+rev.nome_fantasia+'" esta desativada. Reative em Revendas antes de simular '+
+      'para ela — preco de quem nao compra mais e numero que vai parar num orcamento.');
+
+    /* O que impede o numero, tudo numa lista so: as linhas sem preco do lado
+       Deccorar e o percentual que falta do lado da revenda. Uma lista
+       separada por motivo faria a tela ter que juntar as duas para dizer a
+       mesma frase. */
+    const falta=semPreco.slice();
+    const tabela=rev.tabela_id==null?null:
+      {id:rev.tabela_id, nome:rev.tabela_nome,
+       desconto_centesimos:rev.tabela_desconto_centesimos,
+       desconto:u.emPercentual(rev.tabela_desconto_centesimos)};
+    if(!tabela) falta.push('a tabela da revenda (nenhuma apontada no cadastro)');
+    else if(tabela.desconto_centesimos==null) falta.push('tabela '+tabela.nome);
+
+    const dRev=rev.desconto_centesimos||0;
+    /* ⚠️ SEM O PERCENTUAL NAO HA PISO, e isso nao e um descuido. Piso quer
+       dizer "no minimo isto", e desconto so faz o numero DESCER — o subtotal
+       Deccorar seria um TETO. Escrever "≥ R$ 209,00" ali diria a coisa
+       errada com a palavra certa, e ainda gastaria o sinal que a equipe
+       aprendeu a ler como "falta preco em alguma linha". */
+    const temPercentual=!!tabela&&tabela.desconto_centesimos!=null;
+    const aplicar=v=>v==null?null:
+      Math.round(v*(10000-tabela.desconto_centesimos)*(10000-dRev)/100000000);
+    const pisoRev=temPercentual?aplicar(piso):null;
+    const finalRev=(temPercentual&&!semPreco.length)?pisoRev:null;
+
+    precoRevenda={
+      revenda_id:rev.id, nome_fantasia:rev.nome_fantasia,
+      tabela,
+      desconto_centesimos:dRev, desconto:u.emPercentual(dRev),
+      valor_final_centavos:finalRev, valor_final:u.emReais(finalRev),
+      valor_piso_centavos:pisoRev, valor_piso:u.emReais(pisoRev),
+      sem_preco:falta
+    };
+  }
+  preco.revenda=precoRevenda;
 
   // ── 10. O que a tela e a bancada leem ───────────────────────────────────
   if(reducao.automatica)

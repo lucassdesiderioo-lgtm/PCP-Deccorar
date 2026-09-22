@@ -17,8 +17,12 @@
 // Escrever isso aqui, e nao no <body> de cada arquivo, e o que impede a
 // proxima tela de nascer com o tema errado por esquecimento.
 const TELAS={
-  '/':          {arquivo:'telas/inicio.html',    permissao:'cadastro.ler',      contexto:'operacao'},
-  '/inicio':    {arquivo:'telas/inicio.html',    permissao:'cadastro.ler',      contexto:'operacao'},
+  /* A tela inicial pede `modulo.entrar`, e nao `cadastro.ler`: com o papel
+     VENDEDOR da fase 2 a segunda deixou de ser "a chave que todo mundo que
+     entra tem". Ele abriria o modulo em branco, com 403 no console — e tela
+     em branco nao se parece nem de longe com "mexeram na permissao". */
+  '/':          {arquivo:'telas/inicio.html',    permissao:'modulo.entrar',     contexto:'operacao'},
+  '/inicio':    {arquivo:'telas/inicio.html',    permissao:'modulo.entrar',     contexto:'operacao'},
   '/corte':     {arquivo:'telas/corte.html',     permissao:'plano.calcular',    contexto:'operacao'},
   '/sobras':    {arquivo:'telas/sobras.html',    permissao:'sobra.ler',         contexto:'operacao'},
   '/rolos':     {arquivo:'telas/rolos.html',     permissao:'rolo.ler',          contexto:'operacao'},
@@ -39,7 +43,12 @@ const TELAS={
      `editar`), e o simulador e desktop — quem simula esta ao telefone com a
      revenda, nao em pe na bancada sob a lampada de inspecao. */
   '/catalogo':  {arquivo:'telas/catalogo.html',  permissao:'catalogo.editar',   contexto:'admin'},
-  '/simulador': {arquivo:'telas/simulador.html', permissao:'catalogo.ler',      contexto:'admin'}
+  '/simulador': {arquivo:'telas/simulador.html', permissao:'catalogo.ler',      contexto:'admin'},
+
+  /* QUEM COMPRA (fase 2). Escritorio, como as duas de cima. Pede `ler`, e
+     nao `editar`, porque o vendedor vive nela — a carteira dele e a lista de
+     trabalho. Os botoes de mexer aparecem por permissao, dentro. */
+  '/revendas':  {arquivo:'telas/revendas.html',  permissao:'revenda.ler',       contexto:'admin'}
 };
 
 module.exports={TELAS};

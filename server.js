@@ -192,7 +192,18 @@ require('./teste_route')(app, db);
  * ar para a fabrica toda e outro. O erro grita no log e /sobmedida responde
  * 503 dizendo o que houve, em vez de 404 fingindo que a tela nao existe. */
 try{
-  require('./tecido/montar').montar(app);
+  /* A PORTA DE PESSOAS (fase 2 da SOBMEDIDA-PEDIDO-REVENDA). O sob medida
+     precisa saber quem sao as pessoas do PCP para a revenda apontar o
+     vendedor da carteira — e nao guarda cadastro de gente proprio, que seria
+     um segundo lugar para lembrar de desligar alguem (CLAUDE.md §19).
+
+     Sai daqui, e nao de uma consulta la dentro, porque o banco e outro: o
+     modulo abre o tecido.db e nunca o dados.db. Uma porta so, com id e nome
+     — o `nucleo/pessoas.js` remapeia o que recebe, entao PIN, salt e areas
+     nao atravessam nem por engano. */
+  require('./tecido/montar').montar(app, null, {
+    pessoas: () => db.prepare('SELECT id,nome FROM usuarios WHERE ativo=1 ORDER BY nome').all()
+  });
 }catch(e){
   console.error('[sobmedida] NAO SUBIU:',e);
   app.use('/sobmedida',(req,res)=>res.status(503).send(

@@ -5,12 +5,103 @@ STATUS
 Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 22/09/2026
-Fase atual: 1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
-Fases: 1 ☑  2 ☐  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐
+Fase atual: 2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
+            1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
+Fases: 1 ☑  2 ☑(código)  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
-Mudanças no caminho: 5 (fase 1) — ver abaixo
+Mudanças no caminho: 5 (fase 1) + 4 (fase 2) — ver abaixo
 ```
+
+## STATUS DA FASE 2 — em código em 22/09/2026
+
+**Entregue:** migração 17 do `tecido/nucleo/schema.js` (`sm_revenda`,
+`sm_revenda_endereco`, `sm_revenda_contato`, `sm_tabela_preco`,
+`sm_forma_pagamento`, `sm_feriado` e os cinco parâmetros novos),
+`tecido/dominio/revenda.js`, `tecido/dominio/prazo.js`,
+`tecido/nucleo/pessoas.js`, as rotas, a tela `/sobmedida/revendas`, o preço da
+revenda dentro do `persiana.js` e a área **Sob medida — venda** no PCP.
+51 casos de teste novos: `npm test` do módulo vai a **355**, `teste_acesso.js`
+a **113**.
+
+> ⚠️ **AINDA NÃO ESTÁ PRONTA.** O "pronto quando" da seção 7 é *as revendas
+> ativas de hoje estão cadastradas, cada uma com vendedor* — e isso é trabalho
+> de tela, com a lista de clientes na frente. Enquanto não estiver feito, a
+> fase é **código entregue**, não fase concluída. Escrever "pronta" aqui
+> fecharia a pergunta para sempre, e é o mesmo verde sem conferência que o §10
+> do `CLAUDE.md` chama de pior que vermelho.
+
+**Conferido pelo fio, no servidor local**, com o exemplo da §4.8 e a cascata da
+decisão abaixo:
+
+| | |
+|---|---|
+| preço Deccorar, sem revenda | **R$ 209,00** — o mesmo da fase 1, intocado |
+| com tabela B (−10,00%) e desconto de 5,00% | **R$ 178,70** (cascata; somados dariam 177,65) |
+| prazo, enviado numa terça | *"corte quarta 23/09 às 18:00 · pronto quinta 01/10"* — o exemplo da §4.9 |
+
+### As quatro decisões da fase 2
+
+**1. A tabela e o desconto entram EM CASCATA**, nessa ordem, com **um único
+arredondamento no fim**. Somados, 10% + 5% dariam 15% e em cascata dão 14,5%;
+num pedido de mil reais são cinco reais. E a soma deixaria dois percentuais
+grandes zerarem a venda sem ninguém notar. Há caso travando o arredondamento:
+reintroduzir o defeito reprova o `persiana.test.js`, e foi conferido assim.
+
+**2. As três tabelas nascem SEM percentual**, e não com zero. `NULL` é "ainda
+não se sabe"; zero é "sem desconto", que é decisão. Sem percentual o simulador
+**não mostra** o preço daquela revenda e **nomeia** a tabela que falta — e não
+mostra piso, porque desconto só faz o número descer: ali o subtotal Deccorar
+seria um teto, e `≥` diria a coisa errada com a palavra certa.
+
+**3. O vendedor ganhou área própria no PCP** — *Sob medida — venda* —, e com
+ela o papel `vendedor` no módulo: simulador, catálogo de leitura e a carteira
+dele. Fecha a dívida que a fase 1 deixou escrita ("o vendedor entra por uma
+área larga demais"). `revenda.editar` e `credito.editar` **não** são dele: a
+tabela, o desconto e o limite são decisão de quem responde pelo dinheiro
+(§4.12 e §4.13). Alargar depois é uma linha; o contrário, não.
+
+**4. O vendedor é gente do PCP, por uma porta única.** Nenhum cadastro de
+pessoas nasceu aqui — a lista chega pelo `nucleo/pessoas.js`, ligado no
+`server.js`, e o que atravessa é `id` e `nome`, e mais nada. Sem a porta
+ligada, a escolha do vendedor **recusa dizendo onde se liga**; lista vazia em
+silêncio faria a tela afirmar que a fábrica não tem ninguém.
+
+### Mudanças no caminho (fase 2)
+
+1. **Nasceu a chave `modulo.entrar`.** A tela inicial e o `/api/eu` pediam
+   `cadastro.ler`, *"a chave mais baixa que todo mundo que entra tem"* — com o
+   terceiro papel isso virou mentira. Sem ela, ou o vendedor abriria o módulo
+   em branco com 403 no console, ou ganharia `cadastro.ler` de carona (e com
+   ela a lista de tecido, endereço e motivo).
+2. **`sobmedida.vender` é `nivel:'operacao'` no PCP, e isso é trava.**
+   `sincronizarAreas` põe a área `'admin'` em quem tem qualquer chave de nível
+   admin, e o portão do sob medida lê `'admin'` como **diretor** — declarada
+   como admin, a chave devolveria ao vendedor o módulo inteiro que ela veio
+   tirar dele. O `teste_acesso.js` confere o **nível declarado**.
+3. **O calendário e o prazo ficaram na tela de Revendas**, e não numa tela
+   própria: são quatro parâmetros e uma lista de feriados, e o que torna o
+   cadastro conferível é a prévia — *"enviando agora, fica pronto em ..."*.
+4. **O limite de crédito se chama `valor_limite_credito_centavos`.** A poda do
+   `custo.js` corta por padrão de nome; `limite_credito_centavos` não casaria
+   e viajaria pelo fio em silêncio.
+
+### O que esta fase deixou explicitamente aberto
+
+- **Logo da revenda** — só é usado no orçamento ao cliente final (fase 7), e
+  guardar arquivo é outro assunto (onde mora, backup, o cron que limpa).
+- **Markup** — é da revenda, fase 7.
+- **Crédito disponível** — `limite − boletos em aberto`, e boleto é fase 6.
+  A tela mostra o limite e quem está com a revisão vencida; mostrar
+  "disponível = limite" seria número mentindo, e está escrito na tela.
+- **Achado no caminho, e NÃO mexido:** as outras 23 chaves de nível `admin` do
+  PCP (`sku.cadastrar`, `custo.ver`, `devolucao.baixar`…) também põem a área
+  `'admin'` em quem as tem — e o portão do sob medida lê `'admin'` como
+  **diretor**. Ou seja: quem tem qualquer uma delas entra no sob medida com
+  tudo. É anterior a esta fase, estreitar muda quem pode o quê (é `REGRA`, não
+  conserto) e está registrado no `CLAUDE.md` §19.
+
+---
 
 ## STATUS DA FASE 1 — implementada em 22/09/2026
 

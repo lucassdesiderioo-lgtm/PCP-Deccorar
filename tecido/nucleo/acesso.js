@@ -14,22 +14,35 @@
 // so 'sobmedida' e bancada. Nenhuma area = NAO ENTRA — fechado por padrao,
 // que e a regra 4 do docs/CONTROLE-DE-ACESSO.md.
 
-const AREA_BANCADA = 'sobmedida';      // corta, bipa sobra, imprime etiqueta
-const AREA_CHEFIA  = 'sobmedida_adm';  // + cadastros, parametros, descarte
+const AREA_BANCADA = 'sobmedida';        // corta, bipa sobra, imprime etiqueta
+const AREA_CHEFIA  = 'sobmedida_adm';    // + cadastros, parametros, descarte
+const AREA_VENDA   = 'sobmedida_venda';  // simulador, catalogo e a carteira de revendas
 
 // As duas linhas que entram na lista de areas do PCP. O texto e o que o
 // diretor le na tela de acessos — por isso diz o que a pessoa passa a poder,
 // nao o nome tecnico da area.
 const AREAS_PCP = [
   {id:AREA_BANCADA, nome:'Sob medida — bancada (corte, sobras, etiquetas)'},
-  {id:AREA_CHEFIA,  nome:'Sob medida — cadastros e parametros'}
+  {id:AREA_CHEFIA,  nome:'Sob medida — cadastros e parametros'},
+  {id:AREA_VENDA,   nome:'Sob medida — venda (simulador, catalogo e revendas)'}
 ];
 
+/* ⚠️ A ORDEM E DO MAIS LARGO PARA O MAIS ESTREITO, e quem tem duas areas
+   fica com a maior. Nao ha soma de papeis: papel e agrupador de chaves, e
+   somar dois viraria um terceiro que ninguem declarou — e que nenhuma tela
+   saberia nomear.
+
+   ⚠️ E O VENDEDOR VEM DEPOIS DA BANCADA de proposito. Nao e ranking de
+   importancia: e que quem tem as duas areas corta, e quem corta precisa da
+   tela de corte. O vendedor com area de bancada e caso que nao existe hoje;
+   no dia em que existir, sera uma pessoa que corta E vende, e aí o papel
+   dela vai ter que ser desenhado — nao adivinhado aqui. */
 function papelDe(usuario){
   if(!usuario) return null;
   const areas=usuario.areas||[];
   if(areas.includes('admin')||areas.includes(AREA_CHEFIA)) return 'diretor';
   if(areas.includes(AREA_BANCADA)) return 'cortador';
+  if(areas.includes(AREA_VENDA)) return 'vendedor';
   return null;
 }
 
@@ -44,4 +57,4 @@ function daSessaoDoPcp(usuario){
 
 const temAcesso = usuario => !!papelDe(usuario);
 
-module.exports={AREA_BANCADA, AREA_CHEFIA, AREAS_PCP, papelDe, daSessaoDoPcp, temAcesso};
+module.exports={AREA_BANCADA, AREA_CHEFIA, AREA_VENDA, AREAS_PCP, papelDe, daSessaoDoPcp, temAcesso};

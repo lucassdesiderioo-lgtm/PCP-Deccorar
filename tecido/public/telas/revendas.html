@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revendas · Sob medida</title>
+<link rel="stylesheet" href="/sobmedida/base.css">
+<style>
+table.lista{width:100%; border-collapse:collapse; margin-top:10px; font-size:15px}
+table.lista th,table.lista td{padding:8px; border-bottom:1px solid var(--linha); text-align:left; vertical-align:top}
+table.lista th{font-size:13px; color:var(--tinta-fraca); font-weight:600; text-transform:uppercase; letter-spacing:.04em}
+table.lista td.n{text-align:right; font-variant-numeric:tabular-nums}
+table.lista tr.inativa td{opacity:.55}
+.falta{color:var(--alerta); font-weight:600}
+.editor{background:var(--cartao); border:1px solid var(--linha-forte);
+  border-radius:var(--raio); padding:12px; margin-top:10px}
+.editor .campos{align-items:flex-end}
+.editor .campo{min-width:150px}
+.editor input,.editor select{width:100%}
+.erro-linha{color:var(--erro); font-size:14px; font-weight:600; margin:8px 0 0}
+.carteira{border:1px solid var(--linha); border-radius:var(--raio); padding:10px 12px; margin-top:8px}
+.carteira h3{margin:0 0 4px; font-size:16px}
+.carteira.orfa{border-color:var(--alerta)}
+.chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px}
+.chip{background:var(--linha); border-radius:99px; padding:3px 10px; font-size:14px}
+.hist{font-size:14px; color:var(--tinta-fraca); margin-top:8px}
+.hist div{padding:3px 0; border-bottom:1px solid var(--linha)}
+.subtitulo{margin:14px 0 0; font-size:14px; color:var(--tinta-fraca);
+  text-transform:uppercase; letter-spacing:.05em}
+</style>
+</head>
+<body>
+<header class="topo">
+  <h1>Revendas e carteiras</h1>
+  <span class="espaco"></span>
+  <span class="quem" id="quem"></span>
+</header>
+
+<div class="corpo">
+  <div class="cartao" id="cCarteiras"><h2>Carteiras</h2><div id="carteiras"></div></div>
+  <div class="cartao" id="cRevendas"><h2>Revendas</h2><div id="revendas"></div></div>
+  <div class="cartao" id="cTabelas"><h2>Tabelas A / B / C</h2><div id="tabelas"></div></div>
+  <div class="cartao" id="cPrazo"><h2>Calendário e prazo</h2><div id="prazo"></div></div>
+</div>
+
+<script src="/sobmedida/ui.js"></script>
+<script src="/sobmedida/nav.js"></script>
+<script>
+const {api,banner,el,limpar,$}=window.ui;
+
+/* As mesmas conversoes exatas do catalogo e do simulador: dinheiro e
+   percentual entram como TEXTO e viram inteiro por soma, nunca por
+   `Number(x)*100`. `1,07*100` da 107.00000000000001, e o servidor recusa —
+   com razao — o que nao e inteiro. */
+function paraInteiro(texto,casas){
+  const t=String(texto==null?'':texto).trim().replace('.',',');
+  if(!t) return null;
+  const m=new RegExp('^(\\d+)(?:,(\\d{0,'+casas+'}))?$').exec(t);
+  if(!m) return NaN;
+  return Number(m[1])*Math.pow(10,casas)+Number((m[2]||'').padEnd(casas,'0'));
+}
+const paraCentavos=t=>paraInteiro(t,2);
+const emReais=v=>v==null?'':(v/100).toFixed(2).replace('.',',');
+const emPct=v=>v==null?'':(v/100).toFixed(2).replace('.',',');
+
+let eu={permissoes:[]}, dados={}, abertaId=null, aberta=null, erro=null;
+const posso=k=>(eu.permissoes||[]).indexOf(k)>=0;
+
+/* ⚠️ EDITAR ABRE UMA REVENDA DE CADA VEZ, e a tabela continua so de leitura.
+   E a licao da ficha de Compras (CLAUDE.md §7-B): campos demais dentro da
+   tabela davam para editar e nao davam para LER — e cadastro que ninguem
+   consegue ler e cadastro que ninguem confere. */
+function editor(campos, aoSalvar, aoCancelar){
+  const box=el('div',{class:'editor'});
+  const linha=el('div',{class:'campos'});
+  const entradas={};
+  campos.forEach(c=>{
+    const b=el('div',{class:'campo'},[el('label',{},[c.rotulo])]);
+    let i;
+    if(c.opcoes){
+      i=el('select',{'aria-label':c.rotulo});
+      c.opcoes.forEach(o=>{
+        const op=el('option',{value:String(o.valor)},[o.texto]);
+        if(String(o.valor)===String(c.valor==null?'':c.valor)) op.selected=true;
+        i.appendChild(op);
+      });
+    }else{
+      i=el('input',{type:'text', value:c.valor==null?'':String(c.valor),
+        placeholder:c.dica||'', 'aria-label':c.rotulo});
+    }
+    entradas[c.chave]=i; b.appendChild(i); linha.appendChild(b);
+  });
+  const salvar=el('button',{class:'bt primario',type:'button'},['Salvar']);
+  const cancelar=el('button',{class:'bt',type:'button'},['Cancelar']);
+  salvar.onclick=()=>{
+    const v={}; for(const k in entradas) v[k]=entradas[k].value.trim();
+    aoSalvar(v);
+  };
+  cancelar.onclick=aoCancelar;
+  linha.appendChild(el('div',{class:'campo'},[salvar]));
+  linha.appendChild(el('div',{class:'campo'},[cancelar]));
+  box.appendChild(linha);
+  /* ⚠️ A RECUSA FICA NA PROPRIA LINHA, e o que foi digitado continua no
+     campo. `alert()` seguido de redesenho apagava o texto e devolvia o valor
+     velho: quem editava via a recusa E uma fatia que nao era a sua
+     (CLAUDE.md §7-B). */
+  if(erro) box.appendChild(el('p',{class:'erro-linha'},[erro]));
+  return box;
+}
+
+async function carregar(){
+  eu=await api('/api/eu');
+  $('#quem').textContent=eu.nome+' · '+eu.papel;
+  const [revendas,carteiras,tabelas,formas,prazo,feriados]=await Promise.all([
+    api('/api/revendas'), api('/api/revendas/carteiras'), api('/api/tabelas'),
+    api('/api/formas-pagamento'), api('/api/prazo'), api('/api/feriados')
+  ]);
+  let pessoas=[];
+  if(posso('revenda.editar')) pessoas=await api('/api/pessoas').catch(()=>null)||[];
+  dados={revendas,carteiras,tabelas,formas,prazo,feriados,pessoas};
+  /* ⚠️ A LISTA NAO TRAZ ENDERECO NEM CONTATO — quem os traz e o
+     GET /api/revendas/:id. A ficha aberta e recarregada inteira aqui, e nao
+     lida da lista: lendo da lista, os dois cards apareceriam SEMPRE vazios,
+     e a tela diria "nenhum endereco cadastrado" sobre uma revenda que tem
+     tres. Nao daria erro nenhum — so mentiria. */
+  aberta=(typeof abertaId==='number')
+    ? await api('/api/revendas/'+abertaId,{silencioso:true}).catch(()=>null)
+    : null;
+  desenhar();
+}
+
+function desenhar(){ desCarteiras(); desRevendas(); desTabelas(); desPrazo(); }
+
+// ── Carteiras ─────────────────────────────────────────────────────────────
+function desCarteiras(){
+  const c=limpar($('#carteiras'));
+  if(!dados.carteiras.length){ c.appendChild(el('p',{class:'nota'},['Nenhuma revenda cadastrada ainda.'])); return; }
+  dados.carteiras.forEach(g=>{
+    const orfa=g.vendedor_usuario_id===null;
+    const box=el('div',{class:'carteira'+(orfa?' orfa':'')});
+    box.appendChild(el('h3',{},[g.vendedor_nome+' · '+g.revendas.length+
+      (g.revendas.length===1?' revenda':' revendas')]));
+    if(orfa) box.appendChild(el('p',{class:'nota falta'},[
+      'Estas ainda não têm vendedor. Cada revenda precisa de um: é por ele que o pedido vai para a fila de aprovação.']));
+    const chips=el('div',{class:'chips'});
+    g.revendas.forEach(r=>chips.appendChild(el('span',{class:'chip'},[
+      r.nome_fantasia+(r.ativo?'':' (inativa)')])));
+    box.appendChild(chips);
+    c.appendChild(box);
+  });
+}
+
+// ── Revendas ──────────────────────────────────────────────────────────────
+function desRevendas(){
+  const c=limpar($('#revendas'));
+  if(posso('revenda.editar')){
+    const bt=el('button',{class:'bt primario',type:'button'},['+ Nova revenda']);
+    bt.onclick=()=>{ abertaId='nova'; aberta=null; erro=null; desenhar(); };
+    c.appendChild(bt);
+  }
+  if(abertaId==='nova') c.appendChild(formularioNova());
+
+  const t=el('table',{class:'lista'});
+  t.appendChild(el('tr',{},['Revenda','Vendedor','Tabela','Desconto','Limite','Revisão',''].map(
+    h=>el('th',{},[h]))));
+  dados.revendas.forEach(r=>{
+    const tr=el('tr',{class:r.ativo?'':'inativa'});
+    tr.appendChild(el('td',{},[el('b',{},[r.nome_fantasia]),el('br'),
+      el('span',{class:'nota'},[r.razao_social+(r.cnpj?' · '+r.cnpj:'')])]));
+    tr.appendChild(el('td',{},[r.vendedor_nome||el('span',{class:'falta'},['— sem vendedor —'])]));
+    tr.appendChild(el('td',{},[r.tabela_nome||el('span',{class:'falta'},['—'])]));
+    tr.appendChild(el('td',{class:'n'},[emPct(r.desconto_centesimos)+'%']));
+    /* O limite pode nem chegar no JSON: quem nao ve custo nao recebe o campo
+       (a poda do custo.js). Por isso o teste e por `in`, e nao por valor. */
+    tr.appendChild(el('td',{class:'n'},[
+      ('valor_limite_credito_centavos' in r)
+        ? (r.valor_limite_credito_centavos==null?'—':'R$ '+emReais(r.valor_limite_credito_centavos))
+        : '·']));
+    tr.appendChild(el('td',{},[r.limite_revisado_em
+      ? el('span',{class:r.limite_vencido?'falta':''},[r.limite_revisado_em+(r.limite_vencido?' (vencida)':'')])
+      : '—']));
+    const bt=el('button',{class:'bt',type:'button'},[abertaId===r.id?'Fechar':'Abrir']);
+    bt.onclick=async()=>{
+      if(abertaId===r.id){ abertaId=null; aberta=null; erro=null; return desenhar(); }
+      abertaId=r.id; erro=null;
+      aberta=await api('/api/revendas/'+r.id,{silencioso:true}).catch(()=>null);
+      desenhar();
+    };
+    tr.appendChild(el('td',{},[bt]));
+    t.appendChild(tr);
+    if(abertaId===r.id&&aberta){
+      const td=el('td',{colspan:'7'});
+      td.appendChild(ficha(aberta));
+      t.appendChild(el('tr',{},[td]));
+    }
+  });
+  c.appendChild(t);
+}
+
+const opcoesTabela=()=>[{valor:'',texto:'— sem tabela —'}].concat(
+  dados.tabelas.map(t=>({valor:t.id,texto:'Tabela '+t.nome+
+    (t.desconto_centesimos==null?' (sem percentual)':' · '+emPct(t.desconto_centesimos)+'%')})));
+const opcoesForma=()=>[{valor:'',texto:'— não definida —'}].concat(
+  dados.formas.map(f=>({valor:f.id,texto:f.nome})));
+const opcoesPessoa=()=>[{valor:'',texto:'— sem vendedor —'}].concat(
+  dados.pessoas.map(p=>({valor:p.id,texto:p.nome})));
+
+function formularioNova(){
+  return editor([
+    {chave:'razao_social',rotulo:'Razão social',dica:'como vai na nota'},
+    {chave:'nome_fantasia',rotulo:'Nome fantasia',dica:'como a equipe chama'},
+    {chave:'cnpj',rotulo:'CNPJ',dica:'pode ficar em branco'}
+  ], async v=>{
+    erro=null;
+    try{ await api('/api/revendas',{metodo:'POST',corpo:v,silencioso:true});
+         abertaId=null; banner('Revenda cadastrada.'); await carregar(); }
+    catch(e){ erro=e.message; desenhar(); }
+  }, ()=>{ abertaId=null; aberta=null; erro=null; desenhar(); });
+}
+
+function ficha(r){
+  const box=el('div');
+  const pode=posso('revenda.editar');
+
+  if(pode){
+    box.appendChild(el('p',{class:'subtitulo'},['Cadastro']));
+    box.appendChild(editor([
+      {chave:'razao_social',rotulo:'Razão social',valor:r.razao_social},
+      {chave:'nome_fantasia',rotulo:'Nome fantasia',valor:r.nome_fantasia},
+      {chave:'cnpj',rotulo:'CNPJ',valor:r.cnpj},
+      {chave:'fiscal_cidade',rotulo:'Cidade',valor:r.fiscal_cidade},
+      {chave:'fiscal_uf',rotulo:'UF',valor:r.fiscal_uf},
+      {chave:'tabela_id',rotulo:'Tabela',valor:r.tabela_id,opcoes:opcoesTabela()},
+      {chave:'desconto_centesimos',rotulo:'Desconto (%)',
+       valor:emPct(r.desconto_centesimos),dica:'5,00'},
+      {chave:'forma_pagamento_id',rotulo:'Pagamento',valor:r.forma_pagamento_id,opcoes:opcoesForma()},
+      {chave:'entrega',rotulo:'Entrega',valor:r.entrega,
+       opcoes:[{valor:'entrega',texto:'Entregamos'},{valor:'retira',texto:'Ela retira'}]},
+      {chave:'ativo',rotulo:'Situação',valor:String(r.ativo),
+       opcoes:[{valor:'1',texto:'Ativa'},{valor:'0',texto:'Inativa'}]}
+    ], async v=>{
+      erro=null;
+      const pct=paraCentavos(v.desconto_centesimos);
+      if(pct===null||isNaN(pct)){ erro='O desconto se escreve como 5,00 — duas casas, sem o sinal de %.'; return desenhar(); }
+      const corpo=Object.assign({},v,{desconto_centesimos:pct,
+        tabela_id:v.tabela_id||null, forma_pagamento_id:v.forma_pagamento_id||null,
+        ativo:v.ativo==='1'?1:0});
+      try{ await api('/api/revendas/'+r.id,{metodo:'PUT',corpo,silencioso:true});
+           banner('Salvo.'); await carregar(); }
+      catch(e){ erro=e.message; desenhar(); }
+    }, ()=>{ abertaId=null; aberta=null; erro=null; desenhar(); }));
+
+    box.appendChild(el('p',{class:'subtitulo'},['Vendedor da carteira']));
+    box.appendChild(editor([
+      {chave:'vendedor_usuario_id',rotulo:'Quem cuida',valor:r.vendedor_usuario_id,
+       opcoes:opcoesPessoa()}
+    ], async v=>{
+      erro=null;
+      try{ await api('/api/revendas/'+r.id+'/vendedor',
+             {metodo:'PUT',corpo:{vendedor_usuario_id:v.vendedor_usuario_id||null},silencioso:true});
+           banner('Vendedor definido.'); await carregar(); }
+      catch(e){ erro=e.message; desenhar(); }
+    }, ()=>{ abertaId=null; aberta=null; erro=null; desenhar(); }));
+  }
+
+  if(posso('credito.editar')){
+    box.appendChild(el('p',{class:'subtitulo'},['Limite de crédito']));
+    box.appendChild(el('p',{class:'nota'},[
+      'O limite é mostrado, não trava pedido. O disponível (limite − boletos em aberto) '+
+      'chega quando a baixa de boleto existir — até lá, mostrar o limite cheio como '+
+      '"disponível" seria número mentindo.']));
+    box.appendChild(editor([
+      {chave:'valor_limite_credito_centavos',rotulo:'Limite (R$)',
+       valor:emReais(r.valor_limite_credito_centavos),dica:'5000,00'}
+    ], async v=>{
+      erro=null;
+      const c=paraCentavos(v.valor_limite_credito_centavos);
+      if(c!==null&&isNaN(c)){ erro='O limite se escreve como 5000,00.'; return desenhar(); }
+      try{ await api('/api/revendas/'+r.id+'/limite',
+             {metodo:'PUT',corpo:{valor_limite_credito_centavos:c},silencioso:true});
+           banner('Limite gravado.'); await carregar(); }
+      catch(e){ erro=e.message; desenhar(); }
+    }, ()=>{ abertaId=null; aberta=null; erro=null; desenhar(); }));
+
+    if(r.valor_limite_credito_centavos!=null){
+      const rev=el('button',{class:'bt',type:'button'},['Revisei — está bom assim']);
+      rev.onclick=async()=>{
+        await api('/api/revendas/'+r.id+'/limite/revisar',{metodo:'POST'});
+        banner('Revisão carimbada.'); await carregar();
+      };
+      box.appendChild(rev);
+    }
+  }
+
+  box.appendChild(el('p',{class:'subtitulo'},['Endereços de entrega']));
+  box.appendChild(listaFilha(r,'enderecos','apelido',
+    e=>[e.apelido,[e.logradouro,e.numero,e.bairro,e.cidade,e.uf].filter(Boolean).join(', ')]
+        .filter(Boolean).join(' — ')+(e.padrao?' · padrão':''),
+    [{chave:'apelido',rotulo:'Apelido',dica:'Loja centro'},
+     {chave:'logradouro',rotulo:'Rua'},{chave:'numero',rotulo:'Nº'},
+     {chave:'bairro',rotulo:'Bairro'},{chave:'cidade',rotulo:'Cidade'},
+     {chave:'uf',rotulo:'UF'},{chave:'cep',rotulo:'CEP'},
+     {chave:'padrao',rotulo:'Padrão',valor:'0',opcoes:[{valor:'0',texto:'Não'},{valor:'1',texto:'Sim'}]}]));
+
+  box.appendChild(el('p',{class:'subtitulo'},['Contatos']));
+  box.appendChild(listaFilha(r,'contatos','nome',
+    c=>[c.nome,c.papel,c.telefone,c.email].filter(Boolean).join(' · '),
+    [{chave:'nome',rotulo:'Nome'},{chave:'papel',rotulo:'Papel',dica:'Compras'},
+     {chave:'telefone',rotulo:'Telefone'},{chave:'email',rotulo:'E-mail'}]));
+
+  return box;
+}
+
+/* Endereco e contato sao a mesma tela por dentro: lista + um formulario de
+   acrescentar. Duas copias divergiriam na primeira mudanca, e a diferenca
+   entre elas nao teria motivo nenhum. */
+function listaFilha(r,qual,chaveNome,texto,campos){
+  const box=el('div');
+  const itens=r[qual]||[];
+  if(!itens.length) box.appendChild(el('p',{class:'nota'},['Nenhum cadastrado.']));
+  itens.forEach(i=>{
+    const linha=el('div',{class:'chips'});
+    linha.appendChild(el('span',{class:'chip'},[texto(i)]));
+    if(posso('revenda.editar')){
+      const x=el('button',{class:'bt',type:'button'},['apagar']);
+      x.onclick=async()=>{
+        await api('/api/revendas/'+r.id+'/'+qual+'/'+i.id,{metodo:'DELETE'});
+        banner('Apagado.'); await carregar();
+      };
+      linha.appendChild(x);
+    }
+    box.appendChild(linha);
+  });
+  if(posso('revenda.editar'))
+    box.appendChild(editor(campos, async v=>{
+      erro=null;
+      const corpo=Object.assign({},v);
+      if('padrao' in corpo) corpo.padrao=corpo.padrao==='1'?1:0;
+      try{ await api('/api/revendas/'+r.id+'/'+qual,{metodo:'POST',corpo,silencioso:true});
+           banner('Acrescentado.'); await carregar(); }
+      catch(e){ erro=e.message; desenhar(); }
+    }, ()=>{ erro=null; desenhar(); }));
+  return box;
+}
+
+// ── Tabelas A/B/C ─────────────────────────────────────────────────────────
+function desTabelas(){
+  const c=limpar($('#tabelas'));
+  c.appendChild(el('p',{class:'nota'},[
+    'O percentual da tabela desconta o preço Deccorar, e o desconto da revenda desconta '+
+    'em cima do que sobrou — nessa ordem. Tabela sem percentual não é "sem desconto": '+
+    'enquanto estiver em branco, o simulador não mostra o preço daquela revenda, e diz por quê.']));
+  const t=el('table',{class:'lista'});
+  t.appendChild(el('tr',{},['Tabela','Desconto',''].map(h=>el('th',{},[h]))));
+  dados.tabelas.forEach(tb=>{
+    const tr=el('tr');
+    tr.appendChild(el('td',{},[el('b',{},['Tabela '+tb.nome])]));
+    tr.appendChild(el('td',{class:'n'},[tb.desconto_centesimos==null
+      ? el('span',{class:'falta'},['em branco'])
+      : emPct(tb.desconto_centesimos)+'%']));
+    if(posso('catalogo.editar')){
+      const bt=el('button',{class:'bt',type:'button'},['Definir']);
+      bt.onclick=()=>{ abertaId='tabela'+tb.id; erro=null; desenhar(); };
+      tr.appendChild(el('td',{},[bt]));
+    }else tr.appendChild(el('td'));
+    t.appendChild(tr);
+    if(abertaId==='tabela'+tb.id){
+      const td=el('td',{colspan:'3'});
+      td.appendChild(editor([{chave:'desconto_centesimos',rotulo:'Desconto (%)',
+        valor:emPct(tb.desconto_centesimos),dica:'10,00'}], async v=>{
+        erro=null;
+        const pct=paraCentavos(v.desconto_centesimos);
+        if(pct===null||isNaN(pct)){ erro='O percentual se escreve como 10,00.'; return desenhar(); }
+        try{ await api('/api/tabelas/'+tb.id+'/desconto',
+               {metodo:'PUT',corpo:{desconto_centesimos:pct},silencioso:true});
+             abertaId=null; banner('Tabela '+tb.nome+' atualizada.'); await carregar(); }
+        catch(e){ erro=e.message; desenhar(); }
+      }, ()=>{ abertaId=null; aberta=null; erro=null; desenhar(); }));
+      t.appendChild(el('tr',{},[td]));
+    }
+  });
+  c.appendChild(t);
+}
+
+// ── Calendário e prazo ────────────────────────────────────────────────────
+function desPrazo(){
+  const c=limpar($('#prazo'));
+  const p=dados.prazo.prazo;
+  /* ⚠️ A PREVIA E O QUE FAZ O CADASTRO SER CONFERIVEL. Quatro parametros e
+     uma lista de feriados nao dizem nada sozinhos: a pergunta que se faz e
+     "um pedido enviado agora fica pronto quando?". Sem a resposta na tela, o
+     cadastro so seria conferido pelo primeiro cliente que reclamasse. */
+  c.appendChild(el('p',{},[el('b',{},['Enviando agora: pronto na '+p.entrega_extenso])]));
+  c.appendChild(el('p',{class:'nota'},[p.explicacao]));
+  if(p.empurrado_por.length) c.appendChild(el('p',{class:'nota falta'},[
+    'Empurrado por: '+p.empurrado_por.map(f=>f.nome+' ('+f.data+')').join(', ')]));
+
+  c.appendChild(el('p',{class:'subtitulo'},['Os quatro números do prazo']));
+  const t=el('table',{class:'lista'});
+  dados.prazo.parametros.forEach(par=>{
+    const tr=el('tr');
+    tr.appendChild(el('td',{},[el('b',{},[par.rotulo]),el('br'),
+      el('span',{class:'nota'},[par.ajuda||''])]));
+    tr.appendChild(el('td',{class:'n'},[par.valor_extenso||par.valor,
+      par.unidade?el('span',{class:'nota'},[' ('+par.unidade+')']):'']));
+    tr.appendChild(el('td',{},[posso('parametro.editar')
+      ? (()=>{ const b=el('button',{class:'bt',type:'button'},['Mudar']);
+               b.onclick=()=>{ abertaId='par'+par.chave; erro=null; desenhar(); }; return b; })()
+      : '']));
+    t.appendChild(tr);
+    if(abertaId==='par'+par.chave){
+      const td=el('td',{colspan:'3'});
+      td.appendChild(editor([{chave:'valor',rotulo:par.rotulo,valor:par.valor}], async v=>{
+        erro=null;
+        try{ await api('/api/parametros/'+par.chave,{metodo:'PUT',corpo:{valor:v.valor},silencioso:true});
+             abertaId=null; banner('Parâmetro salvo.'); await carregar(); }
+        catch(e){ erro=e.message; desenhar(); }
+      }, ()=>{ abertaId=null; aberta=null; erro=null; desenhar(); }));
+      t.appendChild(el('tr',{},[td]));
+    }
+  });
+  c.appendChild(t);
+
+  c.appendChild(el('p',{class:'subtitulo'},['Feriados']));
+  if(!dados.feriados.length) c.appendChild(el('p',{class:'nota'},['Nenhum cadastrado.']));
+  const chips=el('div',{class:'chips'});
+  dados.feriados.forEach(f=>{
+    chips.appendChild(el('span',{class:'chip'},[f.data+' · '+f.nome]));
+    if(posso('parametro.editar')){
+      const x=el('button',{class:'bt',type:'button'},['apagar']);
+      x.onclick=async()=>{ await api('/api/feriados/'+f.data,{metodo:'DELETE'});
+                           banner('Feriado apagado.'); await carregar(); };
+      chips.appendChild(x);
+    }
+  });
+  c.appendChild(chips);
+  if(posso('parametro.editar'))
+    c.appendChild(editor([{chave:'data',rotulo:'Data',dica:'2026-12-25'},
+                          {chave:'nome',rotulo:'Feriado',dica:'Natal'}], async v=>{
+      erro=null;
+      try{ await api('/api/feriados',{metodo:'POST',corpo:v,silencioso:true});
+           banner('Feriado cadastrado.'); await carregar(); }
+      catch(e){ erro=e.message; desenhar(); }
+    }, ()=>{ erro=null; desenhar(); }));
+}
+
+carregar().catch(()=>{});
+</script>
+</body>
+</html>

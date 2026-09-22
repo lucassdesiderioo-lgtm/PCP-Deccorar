@@ -26,6 +26,7 @@ const registro=require('./nucleo/registro');
 const acesso=require('./nucleo/acesso');
 const {TELAS}=require('./nucleo/telas');
 const {pode}=require('./nucleo/permissoes');
+const pessoas=require('./nucleo/pessoas');
 
 /* A LISTA DE MODULOS DE ROTA, e ela e EXPORTADA de proposito.
    O `teste/acesso_operador.js` conferia "toda rota declara permissao" por uma
@@ -37,7 +38,8 @@ const {pode}=require('./nucleo/permissoes');
    Agora ha uma lista so, e ela e esta. */
 const MODULOS=[
   './rotas/eu','./rotas/cadastros','./rotas/parametros','./rotas/sobras',
-  './rotas/rolos','./rotas/planos','./rotas/painel','./rotas/catalogo_sm'
+  './rotas/rolos','./rotas/planos','./rotas/painel','./rotas/catalogo_sm',
+  './rotas/revenda'
 ];
 
 // A pessoa esta logada no PCP mas ninguem marcou a area dela. A mensagem diz
@@ -48,7 +50,8 @@ const semAcesso=(res,nome)=>res.status(403).send(
   '<h2 style="color:#ffb800">Sob medida — acesso nao liberado</h2>'+
   '<p><b>'+String(nome||'').replace(/[<>&]/g,'')+'</b> esta logado, mas nao tem area de sob medida.</p>'+
   '<p>Quem libera e o admin, em <b>Admin &rarr; Acessos</b>, marcando<br>'+
-  '<b>Sob medida — bancada</b> (corte e sobras) ou <b>Sob medida — cadastros</b>.</p>'+
+  '<b>Sob medida — bancada</b> (corte e sobras), <b>Sob medida — cadastros</b><br>'+
+  'ou <b>Sob medida — venda</b> (simulador, catalogo e revendas).</p>'+
   '<p><a href="/" style="color:#ffb800">Voltar</a></p></body>');
 
 const negaTela=res=>res.status(403).send(
@@ -79,8 +82,18 @@ function servir(tela){
 
 // `prefixo` e parametro e nao constante porque os testes montam o modulo num
 // app de mentira para provar a traducao de area sem subir o PCP inteiro.
-function montar(app, prefixo){
+/* `opcoes.pessoas` e A PORTA por onde a lista de gente do PCP entra neste
+   modulo — ela alimenta a escolha do vendedor da carteira (fase 2). Quem a
+   liga e o server.js, e o modulo nao guarda cadastro de pessoas proprio: dois
+   cadastros de gente sao dois lugares para lembrar de desligar alguem, e foi
+   por isso que este modulo deixou de ter o dele em 02/09/2026.
+
+   Sem a porta o modulo sobe igual — so a escolha do vendedor e que RECUSA,
+   dizendo onde se liga. Lista vazia em silencio faria a tela afirmar que a
+   fabrica nao tem ninguem. */
+function montar(app, prefixo, opcoes){
   const pre=prefixo||'/sobmedida';
+  pessoas.ligar(opcoes&&opcoes.pessoas);
   schema.aplicar(db);
 
   // ── O PORTAO ──────────────────────────────────────────────────────────
