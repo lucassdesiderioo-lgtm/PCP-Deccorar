@@ -235,9 +235,9 @@ function telaPacote(r,extras){
     /* A EMBALAGEM É OUTRA, e isso não é detalhe: quem monta pelo automático
        pega o saco de uma peça só. A frase repete a do card da lista — é a mesma
        instrução, e escrevê-la diferente nos dois lugares ensinaria a equipe a
-       achar que são duas coisas. */
+       achar que são duas coisas. Por isso sai do `FITA`, e não de uma cópia. */
     +'<div style="font-weight:700;font-size:13px;margin-top:6px;border-top:1px solid #e0a63f;padding-top:6px">'
-    +'Saco maior, as peças juntas com fita.</div></div>'
+    +FITA+'</div></div>'
     +'<div style="font-size:26px;font-weight:800;color:var(--txt);line-height:1.15;margin:2px 0 4px">'+esc(r.pedido.buyer)+'</div>'
     +'<div style="font-size:15px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+'</div>'
     +itens.map(linhaItem).join('')
@@ -406,7 +406,7 @@ async function imprimir(){
        colada por fora não diz quantas peças tem dentro. */
     var quantas = r.pecas ? '<div style="margin:6px 0 8px;padding:8px 10px;border-radius:8px;background:#fff4e5;border:2px solid #e0a63f;color:#8a5a00;font-weight:800">'
         +'📦 FECHE A CAIXA COM '+r.pecas+' PERSIANAS — uma etiqueta, '+r.pecas+' peças.'
-        +'<div style="font-weight:400;font-size:13px;margin-top:2px">Saco maior, as peças juntas com fita.</div></div>' : '';
+        +'<div style="font-weight:400;font-size:13px;margin-top:2px">'+FITA+'</div></div>' : '';
     banner(r.coleta?'col':'ok','Impresso ✓ — '+esc(o.buyer), quantas+ondeVai+'NF <b>'+esc(o.nf||'—')+'</b> · <span class="sku">'+esc(o.codigo||'')+'</span> · estoque agora: '+r.estoque+'<br>Saiu borrada ou o papel enroscou? Reimprima aqui — o estoque não muda.',
       '<button class="rebt" onclick="reimprimir('+o.id+',this)">🖨 Reimprimir esta</button>');
     beep(true); stats(); listaImp();
@@ -489,6 +489,42 @@ setModo(MODO);
    segurava o erro, mas com a caixa já montada — e retrabalho que se repete todo
    dia é como a equipe aprende a contornar a tela (armadilha #6).
    Aqui ela lê antes, por cliente, com a instrução de embalagem junto. */
+/* A INSTRUÇÃO DE EMBALAGEM É O CONTEÚDO, NÃO O ENFEITE. A cor diz "isto é
+   diferente"; só a frase diz o que fazer, e é ela que vale para quem nunca
+   montou uma destas. Ela aparece em QUATRO lugares desta tela — o card de hoje,
+   o painel do "depois", a tela do bipe e o "Impresso ✓" — e sai de uma
+   constante só: escrevê-la diferente ensinaria a equipe a achar que são duas
+   coisas (§5, armadilha #23). */
+var FITA='Saco maior, as peças juntas com fita — não é o saco de uma peça só.';
+
+/* O BLOCO DE UMA CAIXA, NUM LUGAR SÓ. O card de hoje e o painel do "depois"
+   escrevem a MESMA caixa; duas cópias divergiriam no dia em que uma delas
+   ganhasse uma linha, e a que fica para trás é sempre a do "depois" — ninguém
+   a olha todo dia. */
+function blocoCaixa(v, sep){
+  var its=v.itens||[];
+  var h='<div style="padding:10px 0'+(sep?';border-top:1px solid #e6dcc8':'')+'">'
+    +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'
+    +'<b style="font-size:15px">'+esc(v.buyer||'(sem comprador)')+'</b>'
+    +'<span style="font-size:12px;color:#6b7280">'+(v.nf?'NF '+esc(v.nf)+' · ':'')
+    +(v.modalidade==='coleta'?'<b style="color:#4b2a91">coleta</b>':'agência')+'</span></div>';
+  for(var k=0;k<its.length;k++){
+    var it=its[k];
+    var d=(typeof pecaTexto==='function') ? pecaTexto({
+      medida:(it.exige_medida && it.largura_cm && it.altura_cm)?(it.largura_cm+' × '+it.altura_cm):null,
+      cor:it.cor_nome||null, tecido:it.tecido_nome||null, modelo:it.modelo_nome||null}) : '';
+    h+='<div style="display:flex;gap:8px;align-items:baseline;margin-top:4px">'
+      +'<b style="font-size:17px;min-width:26px;color:#8a5a00">'+(it.qtd||1)+'×</b>'
+      +'<span><b style="font-family:ui-monospace,monospace;font-size:14px">'+esc(it.codigo||'')+'</b>'
+      +(d?'<div style="font-size:14px;font-weight:600">'+esc(d)+'</div>':'')+'</span></div>';
+  }
+  return h+'<div style="text-align:right;font-size:13px;font-weight:700;color:#8a5a00;margin-top:4px">'
+    +'→ '+v.pecas+' persianas numa caixa</div></div>';
+}
+function avisoFita(){
+  return '<div style="background:#fff6e5;border-radius:6px;padding:8px 10px;margin-bottom:10px;'
+    +'font-size:14px;font-weight:600;color:#8a5a00">'+FITA+'</div>';
+}
 async function listaVarias(){
   var box=document.getElementById("variasBox"); if(!box) return;
   var l=[]; try{ l=await (await fetch("/api/pendentes/varias")).json(); }catch(e){}
@@ -497,32 +533,8 @@ async function listaVarias(){
   for(var i=0;i<l.length;i++) pecas+=(l[i].pecas||0);
   var h='<div class="ttl" style="color:#8a5a00">📦 Caixas com mais de uma persiana'
     +'<b style="margin-left:auto;font-size:18px">'+caixas+' caixa'+(caixas>1?'s':'')+' · '+pecas+' peças</b></div>'
-    /* A INSTRUÇÃO DE EMBALAGEM É O CONTEÚDO, NÃO O ENFEITE. A cor diz "isto é
-       diferente"; só a frase diz o que fazer, e é ela que vale para quem nunca
-       montou uma destas. */
-    +'<div style="background:#fff6e5;border-radius:6px;padding:8px 10px;margin-bottom:10px;'
-    +'font-size:14px;font-weight:600;color:#8a5a00">'
-    +'Saco maior, as peças juntas com fita — não é o saco de uma peça só.</div>';
-  for(var j=0;j<l.length;j++){
-    var v=l[j], its=v.itens||[];
-    h+='<div style="padding:10px 0'+(j?';border-top:1px solid #e6dcc8':'')+'">'
-      +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'
-      +'<b style="font-size:15px">'+esc(v.buyer||'(sem comprador)')+'</b>'
-      +'<span style="font-size:12px;color:#6b7280">'+(v.nf?'NF '+esc(v.nf)+' · ':'')
-      +(v.modalidade==='coleta'?'<b style="color:#4b2a91">coleta</b>':'agência')+'</span></div>';
-    for(var k=0;k<its.length;k++){
-      var it=its[k];
-      var d=(typeof pecaTexto==='function') ? pecaTexto({
-        medida:(it.exige_medida && it.largura_cm && it.altura_cm)?(it.largura_cm+' × '+it.altura_cm):null,
-        cor:it.cor_nome||null, tecido:it.tecido_nome||null, modelo:it.modelo_nome||null}) : '';
-      h+='<div style="display:flex;gap:8px;align-items:baseline;margin-top:4px">'
-        +'<b style="font-size:17px;min-width:26px;color:#8a5a00">'+(it.qtd||1)+'×</b>'
-        +'<span><b style="font-family:ui-monospace,monospace;font-size:14px">'+esc(it.codigo||'')+'</b>'
-        +(d?'<div style="font-size:14px;font-weight:600">'+esc(d)+'</div>':'')+'</span></div>';
-    }
-    h+='<div style="text-align:right;font-size:13px;font-weight:700;color:#8a5a00;margin-top:4px">'
-      +'→ '+v.pecas+' persianas numa caixa</div></div>';
-  }
+    +avisoFita();
+  for(var j=0;j<l.length;j++) h+=blocoCaixa(l[j], j>0);
   box.innerHTML=h; box.style.display="";
 }
 
@@ -600,28 +612,71 @@ function faltamDias(s){
   if(n===1) return 'amanhã';
   return 'em '+n+' dias';
 }
+/* ⚠️ ESTE PAINEL CONVIDA A ADIANTAR, E POR ISSO ELE TAMBÉM PRECISA AVISAR DA
+   CAIXA DE VÁRIAS PERSIANAS. A linha logo abaixo do título diz "bipe o SKU e a
+   etiqueta sai" — e o `/api/proximo/:sku` não filtra por prazo (§8), então o
+   convite é real. Sem a caixa marcada aqui, a pessoa bipava, ia buscar UMA peça
+   na prateleira e só na volta a tela âmbar dizia que eram duas: é a descoberta
+   no bipe que o card de hoje existe para impedir (§5, #23), acontecendo pela
+   porta do "depois".
+   `qtd` é CAIXA e `pecas` é PERSIANA — os dois números aparecem, e nunca um
+   somado ao outro (mesma regra do `faltaHoje` × `precisa`, §18). */
 async function listaFut(){
-  var l=[]; try{ l=await (await fetch("/api/pendentes/futuros")).json(); }catch(e){}
+  var l=[], cx=[];
+  try{
+    var rs=await Promise.all([fetch("/api/pendentes/futuros"),
+                              fetch("/api/pendentes/varias?quando=depois")]);
+    l=await rs[0].json(); cx=await rs[1].json();
+  }catch(e){}
+  if(!Array.isArray(l)) l=[];
+  if(!Array.isArray(cx)) cx=[];
   var el=document.getElementById("futBox"); if(!el) return;
   if(!l.length){ el.style.display='none'; return; }
   el.style.display='';
   var por={}, ordem=[];
   for(var i=0;i<l.length;i++){ var d=l[i].despachar_em;
     if(!por[d]){ por[d]=[]; ordem.push(d); } por[d].push(l[i]); }
+  var caixasPor={};
+  for(var i=0;i<cx.length;i++){ var dd=cx[i].despachar_em;
+    (caixasPor[dd]=caixasPor[dd]||[]).push(cx[i]); }
   var h='<div class="ttl">Pra despachar depois</div>'
     +'<div style="color:#1f4b82;font-size:13px;margin:-4px 0 8px">'
     +'Dá pra adiantar: bipe o SKU e a etiqueta sai, se tiver peça na prateleira. '
     +'Não precisa entregar nessas datas.</div>';
   for(var k=0;k<ordem.length;k++){
-    var d=ordem[k], itens=por[d], tot=0;
-    for(var j=0;j<itens.length;j++) tot+=itens[j].qtd;
-    var skus=[]; for(var j=0;j<itens.length;j++) skus.push(esc(itens[j].codigo)+' ×'+itens[j].qtd);
+    var d=ordem[k], itens=por[d], tot=0, totPecas=0;
+    for(var j=0;j<itens.length;j++){
+      tot+=itens[j].qtd;
+      totPecas+=(itens[j].pecas!=null?itens[j].pecas:itens[j].qtd);
+    }
+    var skus=[];
+    for(var j=0;j<itens.length;j++){
+      var it=itens[j], p=(it.pecas!=null?it.pecas:it.qtd);
+      /* O SKU cuja caixa leva peça a mais sai marcado JÁ NA LINHA: quem lê de
+         relance conta caixa, e é esse relance que manda buscar uma peça só. */
+      skus.push(esc(it.codigo)+' ×'+it.qtd
+        +(p>it.qtd?'<b style="color:#8a5a00"> 📦 '+p+' peças</b>':''));
+    }
     var dias=faltamDias(d);
     h+='<div style="padding:8px 0;border-bottom:1px solid #e6eaf0">'
       +'<div style="display:flex;justify-content:space-between;align-items:baseline">'
       +'<b>'+dataBR(d)+(dias?'<span style="font-weight:400;color:#5a6472;font-size:12px"> · '+dias+'</span>':'')+'</b>'
-      +'<b style="color:#5a6472">'+tot+'</b></div>'
-      +'<div style="color:#5a6472;font-size:13px;font-family:ui-monospace,monospace">'+skus.join(' · ')+'</div></div>';
+      /* Quando os dois números divergem o total ganha a palavra "caixas": um
+         "2 · 3 peças" pelado se lê como "2 peças e 3 peças". Iguais, fica só o
+         número — é o dia normal, e não há o que distinguir. */
+      +'<b style="color:#5a6472">'+tot+(totPecas>tot
+        ? ' caixas<span style="color:#8a5a00"> · '+totPecas+' peças</span>' : '')+'</b></div>'
+      +'<div style="color:#5a6472;font-size:13px;font-family:ui-monospace,monospace">'+skus.join(' · ')+'</div>';
+    var cs=caixasPor[d]||[];
+    if(cs.length){
+      h+='<div style="margin-top:8px;border:2px solid #e0a63f;border-radius:8px;padding:8px 10px;background:#fffdf7">'
+        +'<div style="font-weight:800;color:#8a5a00;font-size:14px;margin-bottom:6px">'
+        +'📦 '+cs.length+' caixa'+(cs.length>1?'s':'')+' com mais de uma persiana nesta data</div>'
+        +avisoFita();
+      for(var c=0;c<cs.length;c++) h+=blocoCaixa(cs[c], c>0);
+      h+='</div>';
+    }
+    h+='</div>';
   }
   el.innerHTML=h;
 }

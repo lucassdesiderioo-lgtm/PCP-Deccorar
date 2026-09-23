@@ -566,15 +566,35 @@ module.exports=function(app,db){
      a informacao que ela precisa — quais pecas vao juntas. E o contrario da
      lista de baixo, que agrupa por SKU porque ali a pergunta e o que buscar na
      prateleira. Duas perguntas, dois recortes, e nenhum serve para as duas. */
-  app.get('/api/pendentes/varias',(req,res)=>{
+  /* "ISTO VENCE DEPOIS DE HOJE?" — o avesso do `filaDoDia`, e escrito uma vez
+     so pelo mesmo motivo que ele: as duas consultas do painel "Pra despachar
+     depois" (a lista por SKU e as caixas de varias persianas) fazem a mesma
+     pergunta, e regua divergente aqui e volume que aparece numa e some na
+     outra.
+     ⚠️ O contador `futuros` do `/api/fila/resumo` NAO passa por aqui, e a
+     diferenca e real: ele nao exige `codigo IS NOT NULL`, entao conta tambem o
+     volume sem SKU lido — que nenhuma das duas listas mostra. Alinhar muda um
+     numero em tela e fica para uma tarefa propria. */
+  const DEPOIS=alias=>{ const p=alias?alias+'.':'';
+    return `${p}estagio='pendente' AND ${p}codigo IS NOT NULL `
+         + `AND ${p}despachar_em IS NOT NULL AND ${p}despachar_em>date('now','localtime')`; };
+  /* ⚠️ DOIS PAINEIS FAZEM ESTA PERGUNTA, E POR ISSO ELA TEM UM LUGAR SO.
+     O card de hoje pergunta "quais caixas de varias persianas vencem hoje?"; o
+     painel do "depois" pergunta a mesma coisa sobre as que ainda vao vencer. O
+     que muda entre os dois e UMA clausula. Escrita duas vezes, a copia que some
+     e sempre a do "depois" — ninguem a olha todo dia, e o defeito dorme ali.
+     `SUM(i.qtd)` e nao `COUNT(*)`: uma linha com `qtd:2` e UMA linha e DUAS
+     persianas (§5, armadilha #23), e contar linha foi exatamente o que deixou a
+     NF 6490 sair com uma de duas. */
+  const caixasDeVarias=(filtro)=>{
     const vols=db.prepare(`SELECT l.id, l.codigo, l.buyer, l.nf, l.despachar_em,
         CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END modalidade,
         (SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id) pecas
       FROM lote l
-      WHERE ${filaDoDia('l')}
+      WHERE ${filtro}
         AND (SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id) > 1
       ORDER BY l.despachar_em IS NULL DESC, l.despachar_em, l.id`).all();
-    if(!vols.length) return res.json([]);
+    if(!vols.length) return [];
     /* A peca vem com o que ela E (`pecaTexto`, o mesmo formatador da embalagem e
        da revisao): so o codigo serve a quem decorou o catalogo, e esta tela e
        usada por gente diferente a cada dia. */
@@ -588,7 +608,17 @@ module.exports=function(app,db){
       LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
       LEFT JOIN modelo m ON m.id=s.modelo_id
       WHERE i.lote_id=? ORDER BY i.id`);
-    res.json(vols.map(v=>Object.assign({},v,{itens:itens.all(v.id)})));
+    return vols.map(v=>Object.assign({},v,{itens:itens.all(v.id)}));
+  };
+  /* ⚠️ `?quando=depois` EM VEZ DE UMA ROTA NOVA, e nao e economia de linha.
+     A pergunta e a mesma ("quais caixas levam mais de uma persiana?"); o que
+     muda e a janela. Rota nova pediria mais uma linha no `permDaRota()` (§10) e
+     seria mais um lugar para a regra do `SUM(qtd)` ficar para tras. E o
+     parametro AUSENTE devolve o de hoje, igual a sempre: tablet com a pagina em
+     cache continua chamando sem ele e recebe exatamente o que recebia. */
+  app.get('/api/pendentes/varias',(req,res)=>{
+    const depois=String((req.query&&req.query.quando)||'').toLowerCase()==='depois';
+    res.json(caixasDeVarias(depois ? DEPOIS('l') : filaDoDia('l')));
   });
   /* O GROUP BY repete a expressao em vez de usar o apelido `modalidade`: com o
      apelido, o SQLite agrupava pela COLUNA l.modalidade e o NULL (= agencia)
@@ -622,11 +652,23 @@ module.exports=function(app,db){
      semanas e o que ensina a equipe a ignorar a fila inteira. Mas nao pode
      sumir, senao ninguem planeja a producao — entao aparece em painel proprio,
      agrupado por data. */
+  /* ⚠️ E ELE CONTAVA VOLUME ONDE HA PERSIANA — a armadilha #23 pela quarta
+     porta. Uma caixa com 2 persianas de 2 SKUs saia aqui como `BK130130BEGE
+     ×1`: o numero mentia e o segundo SKU nao aparecia em lugar nenhum, porque
+     ele mora no `lote_item` e esta consulta nunca olhou pra la.
+     E isto nao e painel de leitura passiva: o proprio painel convida a
+     adiantar ("bipe o SKU e a etiqueta sai"), e o `/api/proximo/:sku` NAO
+     filtra por prazo (§8) — entao a pessoa bipava, ia buscar UMA peca na
+     prateleira e so na volta a tela ambar dizia que eram duas. E exatamente a
+     descoberta-no-bipe que o card de hoje existe para impedir (§5, #23): "ali a
+     caixa ja esta montada".
+     `qtd` continua sendo CAIXA e `pecas` e PERSIANA — os dois nomes, nunca um
+     so, e eles nao se somam (mesma regra do `faltaHoje` x `precisa`, §18). */
   app.get('/api/pendentes/futuros',(req,res)=>{
-    res.json(db.prepare(`SELECT despachar_em, codigo, COUNT(*) qtd
-      FROM lote WHERE estagio='pendente' AND codigo IS NOT NULL
-        AND despachar_em IS NOT NULL AND despachar_em>date('now','localtime')
-      GROUP BY despachar_em, codigo ORDER BY despachar_em, codigo`).all());
+    res.json(db.prepare(`SELECT l.despachar_em, l.codigo, COUNT(*) qtd,
+        SUM(COALESCE((SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id),1)) pecas
+      FROM lote l WHERE ${DEPOIS('l')}
+      GROUP BY l.despachar_em, l.codigo ORDER BY l.despachar_em, l.codigo`).all());
   });
   app.get('/api/lote',(req,res)=> res.json(db.prepare("SELECT id,codigo,cor,buyer,city,nf,estagio FROM lote WHERE data=date('now','localtime') ORDER BY id").all()));
 

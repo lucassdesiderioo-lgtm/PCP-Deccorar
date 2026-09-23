@@ -320,6 +320,63 @@ function conferir(nome,cond,detalhe){
     fechar(ctx);
   }
 
+  /* ── A CAIXA DE VARIAS PERSIANAS NO PAINEL "PRA DESPACHAR DEPOIS" (23/09) ──
+     O caso real: NF 6959, Silmara, 2 persianas de 2 SKUs, despacho em 01/10. O
+     volume estava certo no banco (retido, assinado, solto) e MENTIA na tela: o
+     painel do "depois" contava volume com COUNT(*) e so olhava `lote.codigo`,
+     entao saia "BK130130BEGE ×1" — o numero errado E o segundo SKU invisivel.
+     E o painel convida a adiantar ("bipe o SKU e a etiqueta sai"), enquanto o
+     /api/proximo NAO filtra por prazo (§8): a pessoa ia buscar UMA peca e so
+     descobria na volta. E a armadilha #23 pela quarta porta. */
+  {
+    const ctx=await montar(); const db=ctx.db;
+    db.prepare("INSERT INTO cor VALUES ('BRANCO','Branco')").run();
+    db.prepare(`INSERT INTO skus (codigo,largura_cm,altura_cm,cor_codigo,tecido_codigo,modelo_id)
+      VALUES ('BK130130BEGE',130,130,'BEGE','BLACKOUT',1),('BK130130BRANCO',130,130,'BRANCO','BLACKOUT',1)`).run();
+    const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
+    const dep =db.prepare("SELECT date('now','localtime','+8 days') d").get().d;
+    const ins=db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,estagio,modalidade,despachar_em)
+      VALUES (?,?,?,?,'pendente',?,?)`);
+    const silmara=ins.run('BK130130BEGE','Silmara','6959','p9','agencia',dep).lastInsertRowid;
+    const futNormal=ins.run('BK140140BEGE','Ana','7000','p10','agencia',dep).lastInsertRowid;
+    const hojeDupla=ins.run('BK160160CINZA','Carla','7001','p11','agencia',hoje).lastInsertRowid;
+    db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK130130BEGE',1,'folha')").run(silmara);
+    db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK130130BRANCO',1,'folha')").run(silmara);
+    db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK160160CINZA',2,'folha')").run(hojeDupla);
+
+    const f=await chamar(ctx,'GET','/api/pendentes/futuros');
+    const lin=(f.body||[]).find(x=>x.codigo==='BK130130BEGE')||{};
+    /* UMA caixa, DUAS persianas. Os dois numeros, nunca um so — e `pecas` e o
+       que diz quantas peças tirar da prateleira. */
+    conferir('o painel do depois conta CAIXA e PERSIANA (NF 6959)',
+      lin.qtd===1 && lin.pecas===2, JSON.stringify(lin));
+    const linN=(f.body||[]).find(x=>x.codigo==='BK140140BEGE')||{};
+    conferir('venda futura normal continua valendo 1 peca',
+      linN.qtd===1 && linN.pecas===1, JSON.stringify(linN));
+
+    const d=await chamar(ctx,'GET','/api/pendentes/varias?quando=depois');
+    const ids=(d.body||[]).map(x=>x.id);
+    /* A caixa de HOJE nao pode vazar pro painel do depois: fila que mostra o
+       que nao e pra agora e fila que a equipe aprende a ignorar (§8, #7). */
+    conferir('o depois traz so a caixa futura, nunca a de hoje',
+      JSON.stringify(ids)===JSON.stringify([silmara]), JSON.stringify(ids));
+    const cx=(d.body||[])[0]||{};
+    /* O SEGUNDO SKU, que e o que a consulta antiga nao tinha como mostrar: ele
+       mora no lote_item, e sem ele a pessoa busca uma peca bege e fecha a caixa
+       sem a branca. */
+    conferir('a caixa futura vem com o cliente, a data e as DUAS pecas',
+      cx.buyer==='Silmara' && cx.pecas===2 && cx.despachar_em===dep
+      && (cx.itens||[]).length===2 && cx.itens[1].codigo==='BK130130BRANCO'
+      && cx.itens[1].cor_nome==='Branco', JSON.stringify(cx));
+
+    /* SEM o parametro a rota responde o de HOJE, exatamente como respondia —
+       e um tablet com a pagina em cache continua chamando assim. */
+    const hj=await chamar(ctx,'GET','/api/pendentes/varias');
+    conferir('sem `quando` a rota devolve o de hoje, como o tablet em cache espera',
+      (hj.body||[]).length===1 && hj.body[0].id===hojeDupla, JSON.stringify((hj.body||[]).map(x=>x.id)));
+    fechar(ctx);
+  }
+
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));
   process.exit(falhas?1:0);

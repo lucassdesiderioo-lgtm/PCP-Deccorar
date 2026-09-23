@@ -1107,14 +1107,42 @@ no bipe a tela âmbar dizia que eram três. A trava segurava o erro — com o
 trabalho já feito. Retrabalho que se repete todo dia é como a equipe aprende a
 contornar a tela.
 
-A tela de quem imprime mostra isso em **três** momentos, do mais cedo ao mais
+A tela de quem imprime mostra isso em **quatro** momentos, do mais cedo ao mais
 tarde:
 
 | Onde | O quê |
 |---|---|
 | **Card próprio**, acima das duas listas (`GET /api/pendentes/varias`) | uma caixa por **cliente**, com as peças que vão dentro |
+| **Painel "Pra despachar depois"** (`?quando=depois`) | a mesma caixa, dentro da data em que ela vence |
 | Linha da lista por SKU | `📦 4 persianas em 3 caixas — leve 4`, quando `pecas ≠ qtd` |
 | Bipe e pós-impressão | a tela âmbar que já existia |
+
+> ⚠️ **O PAINEL DO "DEPOIS" REABRIA O BURACO INTEIRO, e ficou uma semana assim
+> (23/09/2026).** O card cobre a fila de **hoje**; o `GET
+> /api/pendentes/futuros` contava `COUNT(*)` e só olhava `lote.codigo`. A NF
+> 6959 (Silmara, 2 persianas de 2 SKUs, despacho 01/10) saía ali como
+> `BK130130BEGE ×1`: o número mentia **e o segundo SKU não existia em tela
+> nenhuma** — ele mora em `lote_item`, e aquela consulta nunca olhou para lá.
+>
+> E não é painel de leitura passiva: ele diz, com todas as letras, *"dá pra
+> adiantar: bipe o SKU e a etiqueta sai"* — e o `/api/proximo/:sku` **não filtra
+> por prazo** (§8), então o convite é real. A pessoa bipava, ia buscar **uma**
+> peça na prateleira e só na volta a tela âmbar dizia que eram duas. É
+> literalmente a descoberta-no-bipe que este bloco existe para impedir,
+> acontecendo pela porta do "depois".
+>
+> **A pergunta ficou num lugar só:** `caixasDeVarias(filtro)` no
+> `exp_route.js`, e `/api/pendentes/varias` aceita `?quando=depois` em vez de
+> ganhar rota nova. Parâmetro **ausente** devolve o de hoje, igual a sempre —
+> tablet com a página em cache continua chamando sem ele e recebe o que recebia.
+> Caso travando no `teste_divergencia.js` (os 5 últimos), conferido
+> reintroduzindo o `COUNT(*)`: reprova.
+>
+> ⚠️ **E FOI RENDERIZANDO QUE APARECERAM AS DUAS ÚLTIMAS COISAS** — `📦2 peças`
+> grudado e um `2 · 3 peças` que se lê como *"2 peças e 3 peças"*. As duas
+> estavam sintaticamente perfeitas e nenhum teste de unidade as pegaria; é a
+> mesma lição do *"23,1 mm em vez de 23,1 mm"* do §4. Hoje sai `2 caixas · 3
+> peças`, e só quando os dois números divergem.
 
 > **O card agrupa por VOLUME; a lista de baixo, por SKU.** São duas perguntas
 > diferentes — "o que vai junto nesta caixa" e "o que buscar na prateleira" — e
@@ -1129,7 +1157,9 @@ tarde:
 > ⚠️ **A INSTRUÇÃO DE EMBALAGEM É CONTEÚDO, NÃO ENFEITE.** Regra do dono
 > (16/09/2026): **saco maior, as peças juntas com fita** — não é o saco de uma
 > peça só. A cor diz "isto é diferente"; só a frase diz o que fazer, e é ela que
-> vale para quem nunca montou uma destas. Ela aparece **igual** nos três
+> vale para quem nunca montou uma destas. Desde 23/09/2026 ela sai da constante
+> `FITA` do `embalagem.html` — quatro cópias literais são quatro coisas para
+> divergir. Ela aparece **igual** nos quatro
 > lugares: escrevê-la diferente ensinaria a equipe a achar que são duas coisas.
 
 > **O card some quando não há nenhuma.** Card vazio todo dia vira paisagem, e aí
@@ -1139,8 +1169,10 @@ tarde:
 > não pular de lugar.
 
 **Rode `node teste_etiqueta.js` (os 12 últimos casos são a NF 6490),
-`node teste_divergencia.js` (os 6 últimos são as duas contas e o card) e
-`node teste_parse.js` (caso 9) após mexer nisso.**
+`node teste_divergencia.js` (11 últimos: as duas contas, o card e o painel do
+"depois") e `node teste_parse.js` (caso 9) após mexer nisso.** E **abra a
+tela**: o card, o painel e a linha por SKU são texto montado, e a §2 já ensinou
+que rota verde sem tela aberta não é regra pronta.
 
 ---
 
@@ -2878,7 +2910,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (23 casos), `teste_carga.js` (49), `teste_divergencia.js` (41) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (50), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (23 casos), `teste_carga.js` (49), `teste_divergencia.js` (46) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (50), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2971,6 +3003,15 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   quantidade, não há o que assinar, e travar o caso normal é a #6 (§5, #23)
 - ❌ Deixar a pessoa descobrir no BIPE que a caixa leva três — ali ela já montou;
   o card e a linha âmbar existem para ela saber antes da prateleira (§5, #23)
+- ❌ Deixar o painel "Pra despachar depois" contar `COUNT(*)` e ler só o
+  `lote.codigo`: o número mente e o segundo SKU não aparece em tela nenhuma —
+  e aquele painel CONVIDA a adiantar, com o bipe que não filtra por prazo
+  (§5, #23)
+- ❌ Escrever uma segunda consulta de "quais caixas levam mais de uma persiana":
+  ela é do `caixasDeVarias`, e a cópia que fica para trás é sempre a do
+  "depois", que ninguém olha todo dia (§5, #23)
+- ❌ Trocar o `?quando=` por uma rota nova, ou fazer o parâmetro ausente
+  significar outra coisa: o tablet com a página em cache chama sem ele (§5, #23)
 - ❌ Escrever a instrução de embalagem diferente em cada tela: é uma frase só —
   *saco maior, as peças juntas com fita* (§5, #23)
 - ❌ Deixar cadastro de SKU soltar volume retido por `pacote:` — cadastro não
