@@ -83,6 +83,30 @@ async function lerFolha(arquivo){
  * Palavra de titulo em caixa alta ("BLACKOUT") nao tem digito e fica onde
  * esta — podar por tamanho comeria a primeira palavra de um titulo gritado.
  */
+/* A MEDIDA DENTRO DO TITULO DO ANUNCIO — dono unico (23/09/2026).
+ *
+ * O Mercado Livre escreve a mesma medida de tres jeitos, e o terceiro e o que
+ * derrubava a conferencia 3 em silencio:
+ *
+ *     1,60x1,40                    a maioria
+ *     1,80 X 1,50                  com espaco
+ *     Medida L 1,80 X A 1,50       anuncio de CATALOGO, com "L" e "A" no meio
+ *
+ * O `L` e o `A` sao rotulo de largura e altura — o mesmo dado, escrito por
+ * extenso. O regex antigo parava no espaco antes do `A` e nao casava nada, e ai
+ * `ehAnuncio` dizia que aquela linha nem era titulo: o anuncio saia vazio, a
+ * conferencia 3 ficava sem um dos lados e parava de acusar SEM AVISAR — que e
+ * o silencio da armadilha #10.
+ *
+ * Eram os cinco produtos "Tóquio" do PDF de 23/09, 5 em 28. Ter a conta num
+ * lugar so e o que impede a proxima variacao de formato ser consertada em um
+ * dos dois lugares e esquecida no outro. */
+const MEDIDA_TITULO=/(\d)[,.](\d{2})\s*(?:[xX]|\s[xX]\s)\s*(?:A\s*)?(\d)[,.](\d{2})/;
+function medidaDoTitulo(texto){
+  const m=String(texto||'').match(MEDIDA_TITULO);
+  return m ? { larg:+(m[1]+m[2]), alt:+(m[3]+m[4]) } : null;
+}
+
 function tituloDoAnuncio(linha){
   const s=String(linha||'').trim();
   const m=s.match(/^([A-Z0-9]{6,})\s+(?=\S)/);
@@ -195,8 +219,52 @@ function itensDaFolha(linhas){
        palavras: titulo de persiana traz um ou o outro, cabecalho nao traz
        nenhum. */
     const ehCampo=x=>/(?:Pack ID|Venda|SKU|Quantidade|Cor|Desenho do tecido)\s*:/.test(x);
-    const ehAnuncio=x=>/Persiana/i.test(x)||/(\d)[,.](\d{2})\s*[xX]\s*(\d)[,.](\d{2})/.test(x);
-    let desc=''; for(const x of acima){ if(!ehCampo(x)&&ehAnuncio(x)){ desc=tituloDoAnuncio(x); break; } }
+    const ehAnuncio=x=>/Persiana/i.test(x)||MEDIDA_TITULO.test(x);
+    /* ⚠️ O TITULO QUE QUEBRA EM DUAS LINHAS (23/09/2026). O anuncio de catalogo
+       e longo e o PDF o parte no meio:
+
+           ...Blecaute Roller Cor Bege Claro -
+           Tóquio 002
+
+       Pegar so a primeira metade deixa o anuncio truncado na tela de Bloqueados
+       (onde alguem precisa RECONHECER a venda no Mercado Livre) e, quando a
+       medida cai na segunda linha, tira um dos lados da conferencia 3.
+       A emenda so acontece quando a linha seguinte NAO e campo e NAO e outro
+       anuncio — o mesmo cuidado que o `modalidadeDespacho` ja toma com a linha
+       "Despachar:" partida (§8-B). Linha de campo nunca vira parte do titulo. */
+    /* A JANELA VAI ATE O SKU ANTERIOR, E A BUSCA E DE BAIXO PRA CIMA.
+       `acima` olhava 2 linhas para tras, e isso bastava no layout normal. No
+       anuncio de catalogo nao: o identificador vem em linha PROPRIA e empurra o
+       titulo para tres linhas acima —
+
+           Cortina Rolo Blackout Medida L 1,80 X A 1,50 ... Cor Bege Claro -
+           E4M2YZZCLZMRDKXC6QUEAE7FSI
+           Tóquio 002
+           Venda: 2000018578029006
+           SKU: BK180150BEGE
+
+       `antes` (a linha logo depois do SKU anterior) ja e a guarda que impede
+       pegar o titulo do vizinho, entao a janela pode ir ate la. E a varredura e
+       DE BAIXO PRA CIMA porque o titulo de um item e o mais PROXIMO dele: com a
+       janela larga, procurar de cima acharia primeiro o que estiver mais longe. */
+    const largo=linhas.slice(antes, i);
+    const soCodigo=x=>/^[A-Z0-9]{6,}$/.test(String(x||'').trim()) && /[0-9]/.test(x);
+    let desc='';
+    for(let k=largo.length-1;k>=0;k--){
+      const x=largo[k];
+      if(ehCampo(x)||!ehAnuncio(x)) continue;
+      /* A CONTINUACAO DO TITULO PARTIDO. Junta o que vem depois dele ate a
+         primeira linha de campo, pulando o identificador do envio — ele nao e
+         anuncio e ninguem o reconhece na tela do ML. */
+      const partes=[tituloDoAnuncio(x)];
+      for(let m=k+1;m<largo.length;m++){
+        const y=String(largo[m]||'').trim();
+        if(ehCampo(y)) break;
+        if(!y || soCodigo(y)) continue;
+        partes.push(y);
+      }
+      desc=partes.join(' ').trim(); break;
+    }
     let comprador=''; for(const x of daqui){
       const mm=x.match(/^(.+?)\s+(?:Cor:|Quantidade:)/);
       if(mm && !/^(Pack ID|Venda|SKU|Desenho)/.test(mm[1]) && !/Persiana/i.test(mm[1])){ comprador=mm[1].trim(); break; }
@@ -227,7 +295,7 @@ function itensDaFolha(linhas){
       if(t.split(/\s+/).length<2) continue;
       comprador=t; break;
     }
-    const med=desc.match(/(\d)[,.](\d{2})\s*[xX]\s*(\d)[,.](\d{2})/);
+    const med=medidaDoTitulo(desc);   // regua unica: ver MEDIDA_TITULO
     itens.push({
       packId:(pega(/Pack ID:\s*([\d ]+)/)||'').replace(/\s+/g,'')||null,
       venda:(pega(/Venda:\s*([\d ]+)/)||'').replace(/\s+/g,'')||null,
@@ -241,7 +309,7 @@ function itensDaFolha(linhas){
          campo — ele existe pra `rastrear.js --lote` conseguir explicar a
          diferenca em vez de deixar o operador achando que sumiu peca. */
       qtd: Math.max(1, parseInt(pega(/Quantidade:\s*(\d+)/)||'1',10)||1),
-      larg: med?+(med[1]+med[2]):null, alt: med?+(med[3]+med[4]):null
+      larg: med?med.larg:null, alt: med?med.alt:null
     });
     janelas.push({de:antes, ate:i});
   });
@@ -371,5 +439,5 @@ function travasAtivas(volume, item, coresConhecidas){
 }
 
 module.exports={lerFolha,mapasDaFolha,skuDaFolha,itemDaFolha,itensDaFolha,travasAtivas,pageLines,
-                tipoDaPagina,nfDaNota,irmaosDoPacote,irmaosDe,tituloDoAnuncio,
+                tipoDaPagina,nfDaNota,irmaosDoPacote,irmaosDe,tituloDoAnuncio,medidaDoTitulo,
                 etiquetasSemItem,pdfFecha};

@@ -793,6 +793,70 @@ function conferir(nome, orders, esperado){
     else console.log('ok      a licenca do pacote tem dono unico');
   }
 
+  /* ── caso 24: O ANUNCIO DE CATALOGO — "Medida L 1,80 X A 1,50" ────────────
+        Copiado linha a linha do PDF de 23/09/2026. O titulo de catalogo do ML
+        tem duas coisas que o layout normal nao tem, e cada uma derrubava a
+        leitura por um caminho:
+
+          a) a medida vem com ROTULO no meio — `L 1,80 X A 1,50` —, e o regex
+             antigo parava no espaco antes do `A`. Sem medida e sem a palavra
+             "Persiana", a linha nem era reconhecida como titulo;
+          b) o identificador do envio vem em LINHA PROPRIA, o que empurra o
+             titulo para tres linhas acima do `SKU:` — fora da janela de duas.
+
+        As duas juntas deixavam o anuncio vazio nesses volumes, e a conferencia
+        3 (a que compara a medida do titulo com a do SKU) parava de acusar SEM
+        AVISAR — o silencio da armadilha #10. Eram 5 em 28. */
+  casos++;
+  {
+    const {itensDaFolha,medidaDoTitulo}=require('./folha');
+    const erros=[];
+    /* Os tres formatos que o ML usa para a MESMA medida. */
+    [['1,80x1,50',180,150],['1,80 X 1,50',180,150],
+     ['Medida L 1,80 X A 1,50',180,150],['1,00x1,00',100,100]].forEach(([txt,l,a])=>{
+      const m=medidaDoTitulo(txt);
+      if(!m || m.larg!==l || m.alt!==a)
+        erros.push('nao leu a medida de '+JSON.stringify(txt)+': '+JSON.stringify(m));
+    });
+    /* E o bloco inteiro, como o PDF real o entrega. */
+    const its=itensDaFolha([
+      'Despachem as suas vendas o quanto antes.','Identifiicação Produtos',
+      'JTI4BDYZH5M4XMTGQRGEZUKA34 Cortina Rolo Blackout 1,60x1,40 Persiana Bege',
+      'Venda: 2000018594751248 SKU: BK160140BEGE',
+      'Biel Monteiro Quantidade: 1','Cor: Bege','Desenho do tecido: Liso',
+      /* o catalogo: titulo com rotulo, identificador em linha propria, e a
+         continuacao do titulo numa terceira linha */
+      'Cortina Rolo Blackout Medida L 1,80 X A 1,50 Blecaute Roller Cor Bege Claro -',
+      'E4M2YZZCLZMRDKXC6QUEAE7FSI',
+      'Tóquio 002',
+      'Venda: 2000018578029006',
+      'SKU: BK180150BEGE',
+      'Marcelo Da Silva Gomes',
+      'Quantidade: 1','Cor: Bege claro - Tóquio 002','Desenho do tecido: Liso']);
+    const t=its.find(x=>x.sku==='BK180150BEGE')||{};
+    const n=its.find(x=>x.sku==='BK160140BEGE')||{};
+    if(its.length!==2) erros.push('esperava 2 itens, veio '+its.length);
+    if(t.larg!==180 || t.alt!==150)
+      erros.push('a medida do anuncio de catalogo nao foi lida: '+t.larg+'x'+t.alt);
+    /* O titulo sai INTEIRO, com a continuacao — e a tela de Bloqueados que o
+       usa para a pessoa reconhecer a venda no Mercado Livre. */
+    if(!/Medida L 1,80 X A 1,50/.test(t.desc||''))
+      erros.push('o titulo veio truncado: '+JSON.stringify(t.desc));
+    if(!/Tóquio 002/.test(t.desc||''))
+      erros.push('a continuacao do titulo nao foi emendada: '+JSON.stringify(t.desc));
+    /* O identificador do envio NAO e anuncio: ninguem o reconhece na tela do ML. */
+    if(/E4M2YZZ/.test(t.desc||''))
+      erros.push('o identificador do envio entrou no titulo: '+JSON.stringify(t.desc));
+    /* E a janela larga nao pode ter roubado o titulo do vizinho de cima. */
+    if(!/1,60x1,40/.test(n.desc||'') || n.larg!==160 || n.alt!==140)
+      erros.push('o item normal perdeu o titulo dele: '+JSON.stringify(n.desc));
+    if(/Tóquio|Roller/.test(n.desc||''))
+      erros.push('o item normal herdou o titulo do vizinho: '+JSON.stringify(n.desc));
+    if(erros.length){ falhas++; console.log('FALHOU  o anuncio de catalogo entrega medida e titulo inteiros');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      o anuncio de catalogo entrega medida e titulo inteiros');
+  }
+
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));

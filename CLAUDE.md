@@ -860,6 +860,38 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > grava por ela e a auditoria relê por ela. Duas cópias significaria conferir com
 > uma régua diferente da que gravou.
 
+> ⚠️ **O ANÚNCIO DE CATÁLOGO ESCREVE A MEDIDA COM RÓTULO, E O TÍTULO EM TRÊS
+> LINHAS (23/09/2026).** O ML tem um layout que o normal não tem:
+>
+> ```
+> Cortina Rolo Blackout Medida L 1,80 X A 1,50 ... Cor Bege Claro -
+> E4M2YZZCLZMRDKXC6QUEAE7FSI          ← identificador em linha própria
+> Tóquio 002                          ← a continuação do título
+> Venda: 2000018578029006
+> SKU: BK180150BEGE
+> ```
+>
+> Duas coisas quebravam juntas: a medida vem como `L 1,80 X A 1,50` (o regex
+> parava no espaço antes do `A`), e o título fica **três** linhas acima do
+> `SKU:`, fora da janela de duas. Sem medida e sem a palavra "Persiana", a linha
+> nem era reconhecida como título — o anúncio saía vazio e a **conferência 3
+> parava de acusar sem avisar**, que é o silêncio da armadilha #10. Eram 5 em 28.
+>
+> **`MEDIDA_TITULO` / `medidaDoTitulo()` são o dono único da medida do anúncio**
+> — ela era o mesmo regex escrito em dois lugares, e a próxima variação de
+> formato seria consertada num e esquecida no outro.
+>
+> A janela foi até `antes` (a linha logo depois do `SKU:` anterior), que já era
+> a guarda contra pegar o título do vizinho, e a varredura passou a ser **de
+> baixo para cima**: o título de um item é o mais **próximo** dele, e com janela
+> larga procurar de cima acharia primeiro o que está mais longe. A continuação
+> é emendada até a primeira linha de campo, pulando o identificador do envio —
+> ele não é anúncio e ninguém o reconhece na tela do ML.
+>
+> Resultado no PDF real: título lido e conferência 3 ativa em **28/28**, contra
+> 2/28 antes de tudo isso. Caso 24 do `teste_parse.js`, e o **caso 2 (Abraão)
+> passa junto** — a janela larga não pode roubar o título do vizinho.
+
 > ⚠️ **A ÚNICA EXCEÇÃO AO "NÃO OLHAR PARA TRÁS", E O QUE A TORNA SEGURA
 > (23/09/2026).** Quando a descrição do anúncio é longa, ela quebra em duas
 > linhas e **desfaz o pareamento das colunas** — a venda sobe para a linha
@@ -2846,7 +2878,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (22 casos), `teste_carga.js` (49), `teste_divergencia.js` (41) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (50), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (23 casos), `teste_carga.js` (49), `teste_divergencia.js` (41) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (50), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
