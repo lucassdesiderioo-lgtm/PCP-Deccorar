@@ -2,7 +2,8 @@ const pdfjs = require('pdfjs-dist/legacy/build/pdf.js');
 pdfjs.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.js';
 /* A leitura crua do PDF mora toda no folha.js — inclusive "que pagina e esta" e
    "qual o numero desta nota". Aqui elas gravam; na auditoria elas conferem. */
-const {tipoDaPagina,nfDaNota,itensDaFolha,irmaosDe,irmaosDoPacote,etiquetasSemItem} = require('./folha');
+const {tipoDaPagina,nfDaNota,itensDaFolha,irmaosDe,irmaosDoPacote,etiquetasSemItem,
+       pecasDaCaixa} = require('./folha');
 /* "Estes dois nomes sao a mesma pessoa?" e do nome.js, dono unico: a conferencia
    de NF faz a MESMA pergunta, e duas reguas discordariam sobre o mesmo cliente. */
 const {mesmoCliente} = require('./nome');
@@ -302,10 +303,7 @@ async function parsePdf(uint8){
        no bloco daquele item. Exigir o documento fechar para acreditar num numero
        que o documento afirma seria recusar a evidencia mais forte que existe. */
     const pecasDoPai = r1 ? Math.max(1, r1.qtd||1) : 1;
-    const itensDoVolume = (r1 && (irmaos.length || pecasDoPai>1))
-      ? [r1].concat(irmaos).map(b=>({sku:b.sku, qtd:Math.max(1,b.qtd||1),
-                                     cor:b.cor||null, descricao:b.desc||null}))
-      : null;
+    const itensDoVolume = pecasDaCaixa(r1, irmaos);
     /* O PDF NAO FECHOU E AINDA HA ITEM SEM DONO: nao da pra dizer se e peca a
        mais ou item que perdeu os identificadores na leitura. As duas respostas
        levam a caixas diferentes, entao o sistema nao escolhe — retem e conta o

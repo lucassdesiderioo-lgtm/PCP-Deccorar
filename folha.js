@@ -417,6 +417,43 @@ function etiquetasSemItem(etiquetas, blocos){
 }
 function pdfFecha(etiquetas, blocos){ return etiquetasSemItem(etiquetas,blocos).length===0; }
 
+/* QUAIS PERSIANAS VAO DENTRO DESTA CAIXA — e a resposta tem DUAS formas (§5).
+ *
+ *   2 SKUs      dois itens na folha, o de baixo orfao (sem pack, sem venda e
+ *               sem comprador). A peca a mais e lida por AUSENCIA — sinal
+ *               fraco, e por isso o upload retem e a gestao assina.
+ *   1 SKU, N    UM item, com `Quantidade: N` escrito nele. Nao ha ausencia
+ *               nenhuma: o documento AFIRMA o numero. Nao retem.
+ *
+ * `null` e o caso normal — uma etiqueta, uma persiana — e e ele que mantem a
+ * tela igual no dia comum: card, tarja e bipe por peca so existem acima de 1.
+ *
+ * ⚠️ DONO UNICO, e esta e a segunda vez que a licao cobra. O `pdfFecha` (logo
+ * acima) virou dono unico em 15/09/2026 porque o backfill tinha a propria
+ * copia; esta funcao vira dono unico em 23/09/2026 pelo mesmo motivo, uma
+ * camada adiante: o conserto de 16/09 ensinou os quatro portoes do fluxo ao
+ * vivo a contarem PERSIANA em vez de LINHA, e o `backfill_pacote.js` ficou
+ * varrendo so `irmaosDoPacote`. A forma de 1 SKU passava batida — e o unico
+ * script que existe para consertar o passivo nao enxergava metade dele.
+ * Custou a NF 6986 (Silvio, `Quantidade: 2`): entrou as 06:40, o deploy foi as
+ * 08:32, ficou com zero peca gravada e invisivel para o reparo.
+ *
+ * ⚠️ A LICENCA DO `pdfFecha` NAO ENTRA AQUI, e isso e de proposito. Ela e a
+ * licenca para ler AUSENCIA, entao vale para os irmaos e quem chama decide se
+ * os passa. A quantidade do proprio item esta escrita, com todas as letras, no
+ * bloco daquele item: exigir o documento fechar para acreditar num numero que
+ * o documento afirma seria recusar a evidencia mais forte que existe.
+ */
+function pecasDaCaixa(pai, irmaos){
+  if(!pai) return null;                       // sem item casado nao se inventa peca
+  const outros=irmaos||[];
+  const qtdPai=Math.max(1, pai.qtd||1);
+  if(!outros.length && qtdPai<=1) return null;   // a venda comum, que e a maioria
+  return [pai].concat(outros).map(b=>({
+    sku:b.sku, qtd:Math.max(1,b.qtd||1),
+    cor:b.cor||null, descricao:b.desc||null}));
+}
+
 /* QUAIS TRAVAS ESTAO DE FATO ATIVAS NESTE VOLUME.
  *
  * Cada conferencia do §5 depende de um dado existir dos DOIS lados. Quando o
@@ -440,4 +477,4 @@ function travasAtivas(volume, item, coresConhecidas){
 
 module.exports={lerFolha,mapasDaFolha,skuDaFolha,itemDaFolha,itensDaFolha,travasAtivas,pageLines,
                 tipoDaPagina,nfDaNota,irmaosDoPacote,irmaosDe,tituloDoAnuncio,medidaDoTitulo,
-                etiquetasSemItem,pdfFecha};
+                etiquetasSemItem,pdfFecha,pecasDaCaixa};

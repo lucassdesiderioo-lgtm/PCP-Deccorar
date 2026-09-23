@@ -774,6 +774,11 @@ function renderImp(){
       +(r.adiantada?'<span class="tagA">📅 despacha '+esc(faltamDias(r.despachar_em)||'')
         +' · '+esc(dataBR(r.despachar_em))+'</span>':'')
       +(r.coleta?'<span class="tagC">🚚 coleta</span>':'')
+      /* A CAIXA DE VÁRIAS, no último lugar em que ela ainda aparece. Depois de
+         impressa ela sai do card e da lista por SKU — as duas mostram o que
+         FALTA —, e o banner do "FECHE A CAIXA COM N" some no bipe seguinte.
+         Aqui é onde alguém volta pra conferir, e é daqui que se reimprime. */
+      +(r.pecas>1?'<span class="tag" style="background:#fff4e5;border-color:#e0a63f;color:#8a5a00;font-weight:800">📦 '+r.pecas+' persianas</span>':'')
       +(r.reimpressoes>0?'<span class="tag">reimpressa '+r.reimpressoes+'x</span>':'')+'</div>'
       +'<div class="meta">NF <b>'+esc(r.nf||'—')+'</b> · <b>'+esc(r.codigo||'—')+'</b> · '+horaDe(r.embalado_em)
       +(r.city?' · '+esc(r.city):'')

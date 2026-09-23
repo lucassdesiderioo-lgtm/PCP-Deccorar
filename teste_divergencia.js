@@ -412,6 +412,23 @@ function conferir(nome,cond,detalhe){
     const hj=await chamar(ctx,'GET','/api/pendentes/varias');
     conferir('sem `quando` a rota devolve o de hoje, como o tablet em cache espera',
       (hj.body||[]).length===1 && hj.body[0].id===hojeDupla, JSON.stringify((hj.body||[]).map(x=>x.id)));
+
+    /* ── O ULTIMO LUGAR EM QUE A CAIXA APARECE: os JA IMPRESSOS (23/09/2026) ──
+       Depois de impressa, a caixa sai do card e da lista por SKU — as duas
+       mostram o que FALTA — e o banner "FECHE A CAIXA COM N PERSIANAS" some no
+       bipe seguinte. Dali em diante o volume ficava igual a qualquer venda, e
+       e desta lista que se REIMPRIME. O caso real: NF 6986, Silvio. */
+    db.prepare("UPDATE lote SET estagio='embalado', embalado_em=datetime('now','localtime') WHERE id IN (?,?)")
+      .run(hojeDupla, futNormal);
+    const imp=await chamar(ctx,'GET','/api/impressos?dias=2');
+    const cxImp=(imp.body||[]).find(x=>x.id===hojeDupla)||{};
+    const soloImp=(imp.body||[]).find(x=>x.id===futNormal)||{};
+    conferir('o ja impresso diz quantas persianas a caixa levou',
+      cxImp.pecas===2, JSON.stringify({id:cxImp.id,pecas:cxImp.pecas}));
+    /* E a venda comum continua valendo 1 — sem isso a tarja apareceria em toda
+       linha e viraria paisagem. */
+    conferir('a venda comum ja impressa continua valendo 1 peca',
+      soloImp.pecas===1, JSON.stringify({id:soloImp.id,pecas:soloImp.pecas}));
     fechar(ctx);
   }
 

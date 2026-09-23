@@ -36,7 +36,7 @@
  */
 const Database=require('better-sqlite3');
 const fs=require('fs'); const path=require('path');
-const {lerFolha,irmaosDoPacote,itemDaFolha,etiquetasSemItem}=require('./folha');
+const {lerFolha,irmaosDoPacote,itemDaFolha,etiquetasSemItem,pecasDaCaixa}=require('./folha');
 
 const DB=require('./caminhos').BANCO;
 const APLICAR=process.argv.includes('--aplicar');
@@ -93,23 +93,32 @@ for(const arq of arquivos){
      retem um volume numa tela; aqui ele grava peca e, com `--baixar`, tira do
      estoque uma persiana que nunca saiu da prateleira. */
   const semItem=etiquetasSemItem(f.etiquetas,f.blocos);
-  if(grupos.length && semItem.length){
+  /* ⚠️ A LICENCA VALE PARA A AUSENCIA, NAO PARA O NUMERO ESCRITO (23/09/2026).
+     Sem ela os IRMAOS nao sao lidos — e so eles. A `Quantidade: N` do proprio
+     item continua valendo: ela nao depende de ausencia nenhuma, esta escrita no
+     bloco daquele item, e recusa-la seria descartar o PDF inteiro por uma
+     duvida que e de OUTRO volume. E a mesma licao da retencao em massa do §5
+     ("a retencao e do volume com duvida, nunca do PDF inteiro"). */
+  const semLicenca = grupos.length && semItem.length;
+  if(semLicenca)
     naoFecham.push({arq:path.basename(arq), etiquetas:f.etiquetas.length,
       itens:f.blocos.length, orfas:semItem.length, grupos:grupos.length,
       volumes:porArquivo[arq].length});
-    process.stdout.write('\r  lendo PDFs: '+n+'/'+arquivos.length+'   ');
-    continue;
-  }
-  if(grupos.length) for(const v of porArquivo[arq]){
+  for(const v of porArquivo[arq]){
     /* O MESMO CRITERIO DE CASAMENTO DO PARSE: venda primeiro, pack depois. O
        `itemDaFolha` devolve o PROPRIO objeto do array, entao a identidade
        serve de ancora pro grupo. */
     const pai=itemDaFolha(v,f.blocos);
-    const g=pai && grupos.find(x=>x.pai===pai);
-    if(!g) continue;
-    pacotes.push({v, arq:path.basename(arq),
-      itens:[g.pai].concat(g.irmaos).map(b=>({sku:String(b.sku||'').toUpperCase(),
-        qtd:Math.max(1,b.qtd||1), cor:b.cor||null, descricao:b.desc||null}))});
+    if(!pai) continue;
+    const g=(!semLicenca) && grupos.find(x=>x.pai===pai);
+    /* A MESMA REGUA DO UPLOAD, nas DUAS formas: 2 SKUs com o de baixo orfao, e
+       1 SKU com `Quantidade: N` escrito nele. Era esta segunda que o script nao
+       enxergava — e e a comum (§5). `null` e a venda de sempre. */
+    const itens=pecasDaCaixa(pai, g?g.irmaos:[]);
+    if(!itens) continue;
+    pacotes.push({v, arq:path.basename(arq), forma:(g?'2 SKUs':'1 SKU'),
+      itens:itens.map(i=>({sku:String(i.sku||'').toUpperCase(),
+        qtd:i.qtd, cor:i.cor, descricao:i.descricao}))});
   }
   process.stdout.write('\r  lendo PDFs: '+n+'/'+arquivos.length+'   ');
 }
@@ -128,7 +137,9 @@ if(naoFecham.length){
   console.log('   Sobrou etiqueta sem item na folha. Ali o orfao e um item que');
   console.log('   PERDEU os campos (o pdf.js come campo), nao uma persiana a mais —');
   console.log('   e gravar peca por causa dele juntaria duas vendas separadas numa');
-  console.log('   caixa que nao existe. Nada foi lido destes arquivos.');
+  console.log('   caixa que nao existe. Os ORFAOS destes arquivos foram ignorados.');
+  console.log('   O que a folha ESCREVE (`Quantidade: N` no proprio item) continua');
+  console.log('   valendo: aquele numero nao e lido por ausencia.');
   console.log('');
   for(const x of naoFecham)
     console.log('  '+x.arq+'  ·  '+x.etiquetas+' etiqueta(s), '+x.itens+' item(ns), '
@@ -155,10 +166,16 @@ function mostrar(p,extra){
   const total=p.itens.reduce((s,i)=>s+i.qtd,0);
   console.log('  #'+p.v.id+'  '+(p.v.buyer||'—')+'  ·  NF '+(p.v.nf||'—')+'  ·  '+p.v.data
     +'  ·  '+(p.v.estagio||'')+(p.v.modalidade?(' · '+p.v.modalidade):''));
-  console.log('        pack '+(p.v.packId||'—')+'   '+total+' persiana(s) nesta caixa:');
+  console.log('        pack '+(p.v.packId||'—')+'   '+total+' persiana(s) nesta caixa'
+    +(p.forma?'  ('+p.forma+')':'')+':');
   p.itens.forEach((i,k)=>{
     const sem = cadastrado(i.sku) ? '' : '   ⚠ SKU FORA DO CADASTRO';
-    console.log('          '+(k===0?'gravado ':'A MAIS  ')+String(i.sku).padEnd(22)+i.qtd+' un'+sem);
+    /* O item de cima e o unico que o sistema ja conhece — e ele conhece UMA
+       unidade dele, nunca a quantidade cheia. Escrever so "gravado" numa linha
+       que diz "2 un" faria parecer que as duas ja estao no sistema, que e o
+       contrario do motivo de este script existir. */
+    const marca = k===0 ? (i.qtd>1 ? 'gravado 1 de '+i.qtd+'  ' : 'gravado ') : 'A MAIS  ';
+    console.log('          '+marca+String(i.sku).padEnd(22)+i.qtd+' un'+sem);
   });
   if(extra) console.log('        '+extra);
 }

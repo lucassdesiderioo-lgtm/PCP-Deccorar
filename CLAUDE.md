@@ -1107,7 +1107,7 @@ no bipe a tela âmbar dizia que eram três. A trava segurava o erro — com o
 trabalho já feito. Retrabalho que se repete todo dia é como a equipe aprende a
 contornar a tela.
 
-A tela de quem imprime mostra isso em **quatro** momentos, do mais cedo ao mais
+A tela de quem imprime mostra isso em **cinco** momentos, do mais cedo ao mais
 tarde:
 
 | Onde | O quê |
@@ -1116,6 +1116,15 @@ tarde:
 | **Painel "Pra despachar depois"** (`?quando=depois`) | a mesma caixa, dentro da data em que ela vence |
 | Linha da lista por SKU | `📦 4 persianas em 3 caixas — leve 4`, quando `pecas ≠ qtd` |
 | Bipe e pós-impressão | a tela âmbar que já existia |
+| **"Já impressos"** (`GET /api/impressos`) | tarja `📦 N persianas` na linha — o **último** lugar |
+
+> ⚠️ **O "JÁ IMPRESSOS" É O ÚLTIMO LUGAR, E ERA O ÚNICO SEM NADA (23/09/2026).**
+> Depois de impressa, a caixa sai do card e da lista por SKU — as duas mostram o
+> que **falta** — e o banner *"FECHE A CAIXA COM N PERSIANAS"* some no bipe
+> seguinte. Dali em diante o volume ficava idêntico a qualquer venda. E esta
+> lista tem dois usos em que isso pesa: é onde alguém **volta para conferir**, e
+> é de onde se **reimprime** — tirar de novo a etiqueta de uma caixa de duas sem
+> saber que são duas é a descoberta tardia um passo adiante.
 
 > ⚠️ **O PAINEL DO "DEPOIS" REABRIA O BURACO INTEIRO, e ficou uma semana assim
 > (23/09/2026).** O card cobre a fila de **hoje**; o `GET
@@ -1435,6 +1444,29 @@ no servidor pela mesma régua, e **separa os dois casos, que não são o mesmo**
 | **pendente** | a etiqueta não saiu, **nada baixou** | só gravar as peças — o fluxo novo faz o resto |
 | **embalado** | a etiqueta saiu e baixou **uma** peça | falta baixar o resto, **se elas foram na caixa** |
 
+> ⚠️ **ELE SÓ ENXERGAVA METADE DO PASSIVO, E ISSO CUSTOU A NF 6986
+> (23/09/2026).** O script varria só `irmaosDoPacote` — a forma de **2 SKUs**.
+> A forma de **1 SKU com `Quantidade: N`**, que a §5 chama de "a segunda, e é a
+> comum", passava batida. O conserto de 16/09 ensinou os **quatro portões do
+> fluxo ao vivo** a contarem persiana em vez de linha, e o backfill ficou para
+> trás: o único script que existe para consertar o passivo não via metade dele.
+>
+> O caso real: o volume do Silvio entrou às **06:40**, o deploy foi às
+> **08:32**, e ele ficou com zero peça gravada — a etiqueta cobrou uma, o
+> estoque baixou uma, e o script não o achava.
+>
+> **A pergunta ganhou dono único:** `folha.js → pecasDaCaixa(pai, irmaos)`, e o
+> `parse.js` e o backfill leem por ela. Duas cópias divergem no dia em que uma
+> das formas mudar, e a que fica para trás é sempre a do script — que ninguém
+> roda todo dia.
+>
+> ⚠️ **A LICENÇA DO `pdfFecha` GATEIA OS IRMÃOS, NÃO A QUANTIDADE ESCRITA.**
+> Sobrou etiqueta sem item, os **órfãos** daquele PDF não são lidos — e só
+> eles. A `Quantidade: N` do próprio item continua valendo: ela não depende de
+> ausência nenhuma. Antes o script descartava o **arquivo inteiro**, o que é a
+> retenção em massa do §5 por outra porta — uma dúvida que é de *outro* volume
+> apagando o que está escrito neste. O relatório diz as duas coisas.
+
 > ⚠️ **O AJUSTE DE SALDO FICA ATRÁS DE `--baixar`, E É DE PROPÓSITO.** No volume
 > já impresso o script não tem como saber se a peça a mais entrou na caixa ou
 > continua na prateleira — e os dois mundos pedem coisas opostas. Se ela nunca
@@ -1444,7 +1476,7 @@ no servidor pela mesma régua, e **separa os dois casos, que não são o mesmo**
 > cliente — daqui a um mês ninguém lembra por que o saldo andou sem venda.
 
 ```bash
-node backfill_pacote.js                     # só mostra
+node backfill_pacote.js                     # só mostra — as DUAS formas
 node backfill_pacote.js --aplicar           # grava as peças
 node backfill_pacote.js --aplicar --baixar  # e acerta o saldo dos já impressos
 ```
@@ -2950,7 +2982,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (23 casos), `teste_carga.js` (49), `teste_divergencia.js` (51) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (50), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (49), `teste_divergencia.js` (53) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (50), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3061,6 +3093,19 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   marca só aparece quando ela separa alguma coisa (§5, #23)
 - ❌ Dividir o painel "depois" em colunas Agência e Coleta: em 23/09/2026 o
   futuro era 22 de 22 coleta, e coluna vazia todo dia vira paisagem (§5, #23)
+- ❌ Perguntar "quais peças vão nesta caixa?" fora do `folha.js → pecasDaCaixa`:
+  são DUAS formas (2 SKUs órfão, e 1 SKU com `Quantidade: N`), e a cópia que
+  fica para trás é a do script que ninguém roda todo dia (§5, #23)
+- ❌ Fazer o `backfill_pacote.js` voltar a varrer só `irmaosDoPacote`: ele
+  deixava de fora a forma COMUM, e foi assim que a NF 6986 ficou invisível para
+  o único reparo que existe (§5, #23)
+- ❌ Descartar o PDF inteiro porque ele não fecha: a licença gateia os ÓRFÃOS,
+  não a `Quantidade: N` escrita no próprio item — é a retenção em massa por
+  outra porta (§5, #23)
+- ❌ Escrever "gravado" numa linha de `qtd 2` no relatório do backfill: o
+  sistema conhece UMA, e é por isso que o script existe (§5, #23)
+- ❌ Deixar o "Já impressos" sem a tarja `📦 N persianas`: é o ÚLTIMO lugar em
+  que a caixa aparece, e é dali que se reimprime (§5, #23)
 - ❌ Escrever a instrução de embalagem diferente em cada tela: é uma frase só —
   *saco maior, as peças juntas com fita* (§5, #23)
 - ❌ Deixar cadastro de SKU soltar volume retido por `pacote:` — cadastro não

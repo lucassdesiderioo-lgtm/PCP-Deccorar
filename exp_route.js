@@ -696,8 +696,17 @@ module.exports=function(app,db){
        (carga.js): a lista de reimpressao e uma terceira tela perguntando "esta
        venda e de hoje?", e a terceira regua seria a que discorda das outras
        duas. */
+    /* ⚠️ `pecas` AQUI É O ÚLTIMO LUGAR EM QUE A CAIXA DE VÁRIAS APARECE, e até
+       23/09/2026 ele não existia. Depois de impressa, a caixa sai do card e da
+       lista por SKU (as duas listam o que FALTA), e o banner "FECHE A CAIXA COM
+       N PERSIANAS" some no bipe seguinte. Daí em diante o volume ficava
+       indistinguível de qualquer venda — e esta lista existe justamente para
+       alguém voltar e conferir, e para REIMPRIMIR: tirar de novo a etiqueta de
+       uma caixa de duas sem saber que são duas é a descoberta tardia um passo
+       adiante. Soma das `qtd`, nunca `COUNT(*)` (§5, #23). */
     res.json(db.prepare(`SELECT id,codigo,cor,buyer,city,nf,packId,venda,estagio,data,despachar_em,
         embalado_em,carregado_em,COALESCE(reimpressoes,0) reimpressoes,reimpresso_em,
+        COALESCE((SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=lote.id),1) pecas,
         CASE WHEN ${COLETA()} THEN 1 ELSE 0 END coleta
       FROM lote
       WHERE estagio IN ('embalado','carregado')

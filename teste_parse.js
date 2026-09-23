@@ -857,6 +857,61 @@ function conferir(nome, orders, esperado){
     else console.log('ok      o anuncio de catalogo entrega medida e titulo inteiros');
   }
 
+  /* ── caso 25: AS PECAS DA CAIXA TEM DONO UNICO, E O BACKFILL SO CONHECIA
+        METADE (23/09/2026) ──────────────────────────────────────────────────
+     A caixa de varias persianas tem DUAS formas (§5): dois SKUs com o de baixo
+     orfao, e UM SKU com `Quantidade: N` escrito nele. O commit de 16/09
+     consertou os quatro portoes do fluxo ao vivo para contarem PERSIANA em vez
+     de linha — e o `backfill_pacote.js` ficou para tras, varrendo so
+     `irmaosDoPacote`. Resultado em producao: a NF 6986 (Silvio, `Quantidade: 2`
+     de BK100100CINZA) entrou as 06:40, antes do deploy das 08:32, ficou com
+     ZERO peca gravada, e o unico script que existe para consertar isso nao a
+     enxergava.
+     A pergunta "quais pecas vao nesta caixa?" passou a ter dono unico
+     (`folha.js -> pecasDaCaixa`), e o parse e o backfill leem por ele — duas
+     copias divergem no dia em que uma das formas mudar, e a que fica para tras
+     e sempre a do script, que ninguem roda todo dia. */
+  {
+    casos++;
+    const FOLHA=require('./folha');
+    const erros=[];
+    const f=FOLHA.pecasDaCaixa;
+    if(typeof f!=='function') erros.push('folha.js nao exporta pecasDaCaixa');
+    else{
+      /* 1. O caso normal: uma etiqueta, uma persiana. `null`, e a tela nao muda
+            em nada — card, tarja e bipe so existem acima de uma peca. */
+      if(f({sku:'BK140140BEGE',qtd:1},[])!==null)
+        erros.push('venda comum virou caixa de varias');
+      if(f({sku:'BK140140BEGE'},[])!==null)
+        erros.push('item sem qtd lida virou caixa de varias');
+      /* 2. A forma do Silvio: UM SKU, `Quantidade: 2`. Uma linha e DUAS
+            persianas — contar `length` aqui foi o defeito da NF 6490. */
+      const so=f({sku:'BK100100CINZA',qtd:2,cor:'Cinza',desc:'Rolo'},[]);
+      if(!so || so.length!==1 || so[0].qtd!==2 || so[0].sku!=='BK100100CINZA')
+        erros.push('1 SKU com Quantidade 2 nao virou caixa de varias: '+JSON.stringify(so));
+      /* 3. A forma do Fabiano: dois SKUs, o de baixo orfao. O pai entra
+            primeiro, e a quantidade de cada um e respeitada. */
+      const irm=f({sku:'BK120120BEGE',qtd:1},[{sku:'BK140140BEGE',qtd:2}]);
+      if(!irm || irm.length!==2 || irm[0].sku!=='BK120120BEGE' || irm[1].qtd!==2)
+        erros.push('o pacote de 2 SKUs saiu errado: '+JSON.stringify(irm));
+      /* 4. As duas formas juntas: pai com 2 unidades E um irmao. A soma e 3. */
+      const dois=f({sku:'A',qtd:2},[{sku:'B',qtd:1}]);
+      if(!dois || dois.reduce((s,i)=>s+i.qtd,0)!==3)
+        erros.push('pai com qtd>1 e irmao nao somou 3: '+JSON.stringify(dois));
+      /* 5. Sem item casado nao ha caixa — nao se inventa peca sem bloco. */
+      if(f(null,[{sku:'B',qtd:2}])!==null) erros.push('inventou caixa sem item pai');
+    }
+    /* E ninguem pode ter a sua propria copia da conta — e a mesma trava do
+       caso 20, agora sobre a pergunta que o backfill errava. */
+    const src=x=>fs.readFileSync(path.join(__dirname,x),'utf8');
+    ['parse.js','backfill_pacote.js'].forEach(x=>{
+      if(!/pecasDaCaixa/.test(src(x))) erros.push(x+' nao usa a regua do folha.js');
+    });
+    if(erros.length){ falhas++; console.log('FALHOU  as pecas da caixa tem dono unico, nas DUAS formas');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      as pecas da caixa tem dono unico, nas DUAS formas');
+  }
+
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));
