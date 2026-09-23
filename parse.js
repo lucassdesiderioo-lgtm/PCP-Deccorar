@@ -2,7 +2,7 @@ const pdfjs = require('pdfjs-dist/legacy/build/pdf.js');
 pdfjs.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.js';
 /* A leitura crua do PDF mora toda no folha.js — inclusive "que pagina e esta" e
    "qual o numero desta nota". Aqui elas gravam; na auditoria elas conferem. */
-const {tipoDaPagina,nfDaNota,itensDaFolha,irmaosDe,irmaosDoPacote} = require('./folha');
+const {tipoDaPagina,nfDaNota,itensDaFolha,irmaosDe,irmaosDoPacote,etiquetasSemItem} = require('./folha');
 /* "Estes dois nomes sao a mesma pessoa?" e do nome.js, dono unico: a conferencia
    de NF faz a MESMA pergunta, e duas reguas discordariam sobre o mesmo cliente. */
 const {mesmoCliente} = require('./nome');
@@ -242,10 +242,9 @@ async function parsePdf(uint8){
     const g=re=>{ const mm=t.match(re); return mm?mm[1].replace(/\s+/g,''):null; };
     etiquetasDoPdf.push({packId:g(/Pack ID:\s*([\d ]+)/), venda:g(/Venda:\s*([\d ]+)/)});
   }
-  const semItem=etiquetasDoPdf.filter(e=>
-    !((e.venda&&leitura1.venda[e.venda])||(e.packId&&leitura1.pack[e.packId])));
-  /* `pdfFecha` e a licenca pra ler ausencia como pacote. Sem ela, ausencia
-     volta a significar so "nao deu pra ler", que e o que ela sempre foi. */
+  /* A conta sai do `folha.js` — a MESMA que o backfill_pacote.js usa. Duas
+     copias significaria o backfill gravar peca que o upload teria retido. */
+  const semItem = etiquetasSemItem(etiquetasDoPdf, itensFolha);
   const pdfFecha = semItem.length===0;
 
   const orders=[], seen=new Set();
@@ -282,16 +281,58 @@ async function parsePdf(uint8){
        "quantas persianas vao aqui" e a soma dos dois lados, e uma lista que
        comecasse nos irmaos leria como "1 + 2" em vez de "3". */
     const irmaos = (r1 && pdfFecha) ? irmaosDe(itensFolha, r1) : [];
-    const itensDoVolume = irmaos.length
-      ? [r1].concat(irmaos).map(b=>({sku:b.sku, qtd:b.qtd, cor:b.cor||null, descricao:b.desc||null}))
+    /* ⚠️ A CAIXA DE VARIAS PECAS TEM DUAS FORMAS, E A SEGUNDA E A MAIS COMUM.
+       Ate 15/09/2026 so a primeira era vista:
+
+         2 SKUs   dois itens na folha, o de baixo orfao      (caso Fabiano)
+         1 SKU    UM item, com `Quantidade: 2` escrito nele  (NF 6490)
+
+       A segunda passava limpo — imprimia uma etiqueta, baixava UMA persiana, e
+       o cliente recebia uma de duas. O dado sempre esteve aqui: o `folha.js` le
+       o `Quantidade:` e grava em `qtd`. O que faltava era ligar os dois.
+
+       Nao confundir com a armadilha #8: a quantidade NAO multiplica o VOLUME
+       (uma etiqueta continua sendo uma linha em `lote`, senao nascem etiquetas
+       que o ML nao despachou). Ela conta a PECA, que e o grao do `lote_item` —
+       e e essa separacao que esta tabela existe para carregar.
+
+       O `pdfFecha` nao entra aqui, e de proposito: ele e a licenca para ler
+       AUSENCIA como peca a mais (§5-B), e o irmao depende dele. A quantidade do
+       proprio item nao e lida por ausencia — esta escrita, com todas as letras,
+       no bloco daquele item. Exigir o documento fechar para acreditar num numero
+       que o documento afirma seria recusar a evidencia mais forte que existe. */
+    const pecasDoPai = r1 ? Math.max(1, r1.qtd||1) : 1;
+    const itensDoVolume = (r1 && (irmaos.length || pecasDoPai>1))
+      ? [r1].concat(irmaos).map(b=>({sku:b.sku, qtd:Math.max(1,b.qtd||1),
+                                     cor:b.cor||null, descricao:b.desc||null}))
       : null;
     /* O PDF NAO FECHOU E AINDA HA ITEM SEM DONO: nao da pra dizer se e peca a
        mais ou item que perdeu os identificadores na leitura. As duas respostas
        levam a caixas diferentes, entao o sistema nao escolhe — retem e conta o
-       que viu. E a mesma regra da modalidade desconhecida (#21). */
-    const folhaNaoFecha = !pdfFecha && irmaosDoPacote(itensFolha).length
-      ? 'a folha nao casa com as etiquetas: '+etiquetasDoPdf.length+' etiqueta(s), '
-        +itensFolha.length+' item(ns), e '+semItem.length+' etiqueta(s) sem item na folha'
+       que viu. E a mesma regra da modalidade desconhecida (#21).
+
+       ⚠️ A DUVIDA E DESTE VOLUME, NAO DO PDF INTEIRO — e `!r1` e o que diz isso.
+       A primeira versao (15/09/2026) olhava so `!pdfFecha`, que e uma condicao
+       GLOBAL: um PDF com 28 etiquetas e 5 leituras quebradas retinha os 28.
+       Vinte e tres deles tinham pack, venda e comprador lidos e nao tinham
+       duvida nenhuma — retencao em massa e a armadilha #6 na escala em que ela
+       mais machuca, e ainda esconderia da Etiqueta de Venda as caixas de varias
+       persianas do mesmo lote, que e justamente o que a trava veio proteger.
+
+       Quem tem duvida e a etiqueta que NAO ACHOU ITEM na folha (`!r1`): essa
+       nao sabe que peca leva, e um dos orfaos provavelmente e ela. As outras
+       casaram por pack ou por venda e seguem o caminho normal. */
+    /* `irmaosDoPacote` devolve GRUPOS, nao itens — no PDF de 23/09 eram 3 grupos
+       com 5 orfaos dentro, e escrever "3 itens" num motivo que a gestao vai ler
+       ao lado de "5 etiquetas sem item" faria os dois numeros brigarem. O que
+       importa para quem confere e quantos ITENS ficaram sem dono, porque e esse
+       que casa (ou nao) com as etiquetas orfas. */
+    const orfaosDaFolha = irmaosDoPacote(itensFolha).reduce((s,g)=>s+g.irmaos.length,0);
+    const folhaNaoFecha = !pdfFecha && !r1 && orfaosDaFolha
+      ? 'esta etiqueta nao achou item na folha de controle — '
+        +etiquetasDoPdf.length+' etiqueta(s), '+itensFolha.length+' item(ns), '
+        +semItem.length+' etiqueta(s) sem item e '+orfaosDaFolha
+        +' item(ns) sem identificacao no PDF'
         /* O QUE "SEM ITEM" QUER DIZER, escrito na propria mensagem. Sem esta
            frase o numero se le como quantidade de pecas faltando — foi a
            primeira pergunta de quem viu a tarja. Nao e peca: e etiqueta cujo

@@ -108,10 +108,61 @@ function tituloDoAnuncio(linha){
  * com a MESMA regua que a gravou. Duas reguas dariam dois numeros para a mesma
  * pergunta, e o errado seria sempre o que ninguem estivesse olhando.
  */
+/* ⚠️ A SEGUNDA PASSADA: O IDENTIFICADOR QUE FICOU ACIMA DO `SKU:` (23/09/2026).
+ *
+ * A leitura principal monta o item da linha do `SKU:` PARA BAIXO e nunca olha
+ * para tras — e a regra da armadilha #4, e ela existe porque olhar para tras
+ * herdou o Pack ID do vizinho e mandou a peca errada pro Abraao.
+ *
+ * Mas ha um caso em que o dado esta acima e e mesmo dele. Quando a descricao do
+ * anuncio e longa, ela quebra em duas linhas e desfaz o pareamento das colunas:
+ *
+ *     ...Blecaute Roller Cor Bege Claro -
+ *     Venda: 2000018596292056 Tóquio 002     <- a venda sobe
+ *     SKU: BK180150BEGE
+ *     Paula Cristine Lupepso
+ *
+ * Sao os produtos "Tóquio", e no PDF de 23/09 eram 5 em 28. A folha NAO esta
+ * sem o dado e a etiqueta tambem nao — e o pareamento que se desfez. Trata-los
+ * como leitura quebrada retem cinco volumes que nao tem duvida nenhuma, e
+ * mandar alguem reabrir cinco pedidos no ML para reler um numero que o
+ * documento ja traz e a armadilha #10: a trava que acusa o inocente.
+ *
+ * O QUE MANTEM O CASO ABRAAO FECHADO e a palavra REIVINDICADO. So entra aqui
+ * quem ficou sem pack E sem venda, e so se a janela acima tiver EXATAMENTE UMA
+ * linha cujo numero nenhum outro item pegou. No caso Abraao o pack de cima
+ * pertence ao vizinho — esta reivindicado, e por isso nao e oferecido. Duas
+ * livres tambem nao resolvem: ambiguidade nao se desempata por chute.
+ *
+ * E nao afrouxa o pacote (§5-B): o irmao de verdade nao tem venda em lugar
+ * nenhum, entao nao ha o que reivindicar e ele segue sendo peca a mais.
+ * Validado contra os dois PDFs reais — resolve os 5 Tóquio e nao toca no
+ * irmao `BK130130BRANCO`. Casos 22 e 23 do `teste_parse.js`.
+ */
+function reivindicarAcima(linhas, itens, janelas){
+  const usadas=new Set(), packs=new Set();
+  itens.forEach(it=>{ if(it.venda) usadas.add(it.venda); if(it.packId) packs.add(it.packId); });
+  itens.forEach((it,n)=>{
+    if(it.venda || it.packId) return;                 // ja se identifica sozinho
+    const j=janelas[n]; if(!j) return;
+    const livres=[];
+    for(let k=j.de; k<j.ate; k++){
+      const linha=String(linhas[k]||'');
+      const v=(linha.match(/Venda:\s*([\d ]+)/)||[])[1];
+      const p=(linha.match(/Pack ID:\s*([\d ]+)/)||[])[1];
+      if(v){ const x=v.replace(/\s+/g,''); if(x && !usadas.has(x)) livres.push({venda:x}); }
+      if(p){ const x=p.replace(/\s+/g,''); if(x && !packs.has(x)) livres.push({packId:x}); }
+    }
+    if(livres.length!==1) return;                     // zero ou ambiguo: nao mexe
+    if(livres[0].venda){ it.venda=livres[0].venda; usadas.add(it.venda); }
+    else { it.packId=livres[0].packId; packs.add(it.packId); }
+  });
+}
+
 function itensDaFolha(linhas){
   linhas=linhas||[];
   const idxSku=[]; linhas.forEach((l,k)=>{ if(/SKU:\s*\S/.test(l)) idxSku.push(k); });
-  const itens=[];
+  const itens=[], janelas=[];
   linhas.forEach((l,i)=>{
     const ms=l.match(/SKU:\s*(\S+)/); if(!ms) return;
     const j=idxSku.indexOf(i);
@@ -150,6 +201,32 @@ function itensDaFolha(linhas){
       const mm=x.match(/^(.+?)\s+(?:Cor:|Quantidade:)/);
       if(mm && !/^(Pack ID|Venda|SKU|Desenho)/.test(mm[1]) && !/Persiana/i.test(mm[1])){ comprador=mm[1].trim(); break; }
     }
+    /* O NOME SOZINHO NA LINHA (23/09/2026). A busca acima depende das duas
+       colunas da folha casarem — o nome a esquerda, `Cor:` ou `Quantidade:` a
+       direita. Quando a descricao do anuncio e longa e quebra linha, o
+       pareamento se desfaz e o comprador cai sozinho:
+
+         SKU: BK180150BEGE
+         Paula Cristine Lupepso      <- sem nada a direita
+         Quantidade: 1
+
+       Sao os produtos "Tóquio", cujo nome comercial de cor estoura a largura.
+       Sem isto o comprador vinha `null` e a conferencia 2 (§5) — a UNICA que
+       nao depende do Pack ID — ficava desligada justamente neles.
+
+       O criterio e estreito de proposito: so letras e espacos (nome nao tem
+       digito nem dois-pontos, o que ja derruba `Tóquio 002` e os codigos de
+       identificacao), duas palavras ou mais, e nunca a linha do proprio SKU.
+       Nome ilegivel continua virando `null`, nunca acusacao (regra dos dois
+       lados, armadilha #10). */
+    if(!comprador) for(const x of daqui.slice(1)){
+      const t=String(x||'').trim();
+      if(/[:0-9]/.test(t)) continue;
+      if(/persiana|cortina|blackout|rol[oô]/i.test(t)) continue;
+      if(!/^[A-Za-zÀ-ÿ'’.\- ]+$/.test(t)) continue;
+      if(t.split(/\s+/).length<2) continue;
+      comprador=t; break;
+    }
     const med=desc.match(/(\d)[,.](\d{2})\s*[xX]\s*(\d)[,.](\d{2})/);
     itens.push({
       packId:(pega(/Pack ID:\s*([\d ]+)/)||'').replace(/\s+/g,'')||null,
@@ -166,7 +243,9 @@ function itensDaFolha(linhas){
       qtd: Math.max(1, parseInt(pega(/Quantidade:\s*(\d+)/)||'1',10)||1),
       larg: med?+(med[1]+med[2]):null, alt: med?+(med[3]+med[4]):null
     });
+    janelas.push({de:antes, ate:i});
   });
+  reivindicarAcima(linhas, itens, janelas);
   return itens;
 }
 
@@ -244,6 +323,32 @@ function itemDaFolha(volume, itens){
       || null;
 }
 
+/* A LICENCA PRA LER AUSENCIA COMO PACOTE (§5, armadilha #23).
+ *
+ * Um item sem Pack ID, sem Venda e sem comprador tem duas leituras possiveis,
+ * e elas sao OPOSTAS:
+ *
+ *   pacote de verdade   1 etiqueta, 2 itens — TODA etiqueta achou o seu item
+ *   leitura quebrada    2 etiquetas, 2 itens — uma etiqueta ficou SEM item
+ *
+ * A evidencia que separa as duas nao esta no item: esta na conta do documento.
+ * O orfao so vale como irmao quando NENHUMA etiqueta do PDF ficou sem item na
+ * folha. Sobrou etiqueta orfa, o pdf.js comeu campo, e tratar aquilo como peca
+ * a mais juntaria duas vendas separadas numa caixa que nao existe — o erro
+ * contrario ao que o pacote veio consertar.
+ *
+ * DONO UNICO, e aqui isso nao e estilo: o upload (parse.js) e o
+ * backfill_pacote.js tem que ler pela MESMA regua. Uma copia solta no backfill
+ * grava peca que o upload teria retido — e o backfill grava em cima de volume
+ * que JA ANDOU, onde o erro custa baixa de estoque, nao um card na tela.
+ */
+function etiquetasSemItem(etiquetas, blocos){
+  const m=mapasDaFolha(blocos);
+  return (etiquetas||[]).filter(e =>
+    !((e.venda&&m.porVenda[e.venda])||(e.packId&&m.porPack[e.packId])));
+}
+function pdfFecha(etiquetas, blocos){ return etiquetasSemItem(etiquetas,blocos).length===0; }
+
 /* QUAIS TRAVAS ESTAO DE FATO ATIVAS NESTE VOLUME.
  *
  * Cada conferencia do §5 depende de um dado existir dos DOIS lados. Quando o
@@ -266,4 +371,5 @@ function travasAtivas(volume, item, coresConhecidas){
 }
 
 module.exports={lerFolha,mapasDaFolha,skuDaFolha,itemDaFolha,itensDaFolha,travasAtivas,pageLines,
-                tipoDaPagina,nfDaNota,irmaosDoPacote,irmaosDe,tituloDoAnuncio};
+                tipoDaPagina,nfDaNota,irmaosDoPacote,irmaosDe,tituloDoAnuncio,
+                etiquetasSemItem,pdfFecha};

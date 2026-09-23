@@ -256,6 +256,70 @@ function conferir(nome,cond,detalhe){
     fechar(ctx);
   }
 
+  /* ── A CAIXA DE VARIAS PERSIANAS NA TELA DE QUEM IMPRIME (16/09/2026) ──
+     A NF 6490 saiu com uma persiana de duas. A trava do bipe ja existia, mas a
+     pessoa so descobria DEPOIS de montar a caixa: a lista contava CAIXA, dizia
+     "1", e ela voltava da prateleira com uma peca. Estes casos travam os dois
+     numeros e o card que os separa. */
+  {
+    const ctx=await montar(); const db=ctx.db;
+    const ins=db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,estagio,modalidade) VALUES (?,?,?,?,'pendente',?)`);
+    const normal=ins.run('BK140140BEGE','Ana','1','p1','agencia').lastInsertRowid;
+    const dupla =ins.run('BK140140BEGE','Bruno','6490','p2','agencia').lastInsertRowid;
+    const pack  =ins.run('BK120120BEGE','Fabiano','6585','p3','coleta').lastInsertRowid;
+    // Sem nenhuma linha em lote_item: o volume de sempre, que e a esmagadora maioria.
+    ins.run('BK160160CINZA','Carla','9','p4','agencia');
+    // Bruno: 2 unidades do MESMO SKU (o caso da 6490). Fabiano: 2 SKUs.
+    db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK140140BEGE',2,'folha')").run(dupla);
+    db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK120120BEGE',1,'folha')").run(pack);
+    db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK140140BEGE',2,'folha')").run(pack);
+
+    const p=await chamar(ctx,'GET','/api/pendentes');
+    const linha=(p.body||[]).find(x=>x.codigo==='BK140140BEGE' && x.modalidade==='agencia')||{};
+    /* CAIXA e PERSIANA sao numeros diferentes, e so divergem aqui: 2 caixas
+       (Ana e Bruno) carregando 3 persianas. Se `pecas` copiasse `qtd`, a linha
+       voltaria a mandar a pessoa buscar 2 quando ela precisa de 3. */
+    conferir('a lista conta CAIXA e PERSIANA, e as duas contas convivem',
+      linha.qtd===2 && linha.pecas===3, JSON.stringify(linha));
+    /* O volume SEM linha em `lote_item` vale 1 — e o volume de sempre, e e ele
+       que nao pode ganhar linha ambar nem card por causa desta mudanca. */
+    const semItens=(p.body||[]).find(x=>x.codigo==='BK160160CINZA')||{};
+    conferir('volume sem linha em lote_item vale 1 peca, como sempre valeu',
+      semItens.qtd===1 && semItens.pecas===1, JSON.stringify(semItens));
+    // E o pai do pacote conta as 3 que vao na caixa dele, nao a 1 do lote.codigo.
+    const doPack=(p.body||[]).find(x=>x.codigo==='BK120120BEGE')||{};
+    conferir('a caixa de pacote conta as pecas que vao dentro, nao o codigo do volume',
+      doPack.qtd===1 && doPack.pecas===3, JSON.stringify(doPack));
+
+    const v=await chamar(ctx,'GET','/api/pendentes/varias');
+    const ids=(v.body||[]).map(x=>x.id).sort((a,b)=>a-b);
+    /* O card so mostra caixa com MAIS DE UMA persiana. A venda normal da Ana
+       nao pode aparecer: card que lista o dia inteiro nao separa nada. */
+    conferir('o card traz so as caixas de varias persianas, nunca a venda normal',
+      JSON.stringify(ids)===JSON.stringify([dupla,pack].sort((a,b)=>a-b)), JSON.stringify(ids));
+    const cx=(v.body||[]).find(x=>x.id===pack)||{};
+    /* Agrupado por VOLUME e trazendo as pecas: e uma caixa para uma pessoa, e
+       sem a lista das pecas a bancada nao sabe o que buscar na prateleira. */
+    conferir('cada caixa vem com o cliente e as pecas que vao dentro',
+      cx.buyer==='Fabiano' && cx.pecas===3 && (cx.itens||[]).length===2
+      && cx.itens[1].codigo==='BK140140BEGE' && cx.itens[1].qtd===2, JSON.stringify(cx));
+    const cy=(v.body||[]).find(x=>x.id===dupla)||{};
+    conferir('a caixa de 2 unidades do MESMO SKU tambem entra no card (NF 6490)',
+      cy.pecas===2 && (cy.itens||[]).length===1 && cy.itens[0].qtd===2, JSON.stringify(cy));
+    fechar(ctx);
+  }
+  /* Dia sem nenhuma caixa dupla: o card tem que vir VAZIO, para a tela poder
+     escondê-lo. Card vazio todo dia vira paisagem e ninguem le no dia em que
+     ele aparece cheio. */
+  {
+    const ctx=await montar(); const db=ctx.db;
+    db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,estagio) VALUES ('BK140140BEGE','Ana','1','p1','pendente')`).run();
+    const v=await chamar(ctx,'GET','/api/pendentes/varias');
+    conferir('dia normal devolve lista vazia — o card some, nao fica dizendo "nenhuma"',
+      Array.isArray(v.body) && v.body.length===0, JSON.stringify(v.body));
+    fechar(ctx);
+  }
+
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));
   process.exit(falhas?1:0);

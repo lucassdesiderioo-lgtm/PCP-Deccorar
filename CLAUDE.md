@@ -859,6 +859,41 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > `folha.js` → `itensDaFolha()` é o **dono único** dessa leitura: o `parse.js`
 > grava por ela e a auditoria relê por ela. Duas cópias significaria conferir com
 > uma régua diferente da que gravou.
+
+> ⚠️ **A ÚNICA EXCEÇÃO AO "NÃO OLHAR PARA TRÁS", E O QUE A TORNA SEGURA
+> (23/09/2026).** Quando a descrição do anúncio é longa, ela quebra em duas
+> linhas e **desfaz o pareamento das colunas** — a venda sobe para a linha
+> *acima* do `SKU:` e o comprador cai sozinho na de baixo:
+>
+> ```
+> ...Blecaute Roller Cor Bege Claro -
+> Venda: 2000018596292056 Tóquio 002     ← a venda sobe
+> SKU: BK180150BEGE
+> Paula Cristine Lupepso                 ← o comprador fica sozinho
+> ```
+>
+> São os produtos **Tóquio** — o mesmo nome comercial da armadilha #10, pela
+> terceira vez. No PDF de 23/09 eram **5 em 28**. A folha não está sem o dado e
+> a etiqueta também não: é a leitura que não pareia. Tratá-los como leitura
+> quebrada retinha cinco volumes sem dúvida nenhuma, e mandava alguém reabrir
+> cinco pedidos no ML para reler um número que o documento já traz — a armadilha
+> #10 outra vez, a trava que acusa o inocente.
+>
+> `reivindicarAcima()` é a segunda passada, e **a palavra que a torna segura é
+> REIVINDICADO**: só entra quem ficou sem pack **e** sem venda, e só se a janela
+> acima tiver **exatamente uma** linha cujo número **nenhum outro item pegou**.
+> No caso Abraão o pack de cima pertence ao vizinho — está reivindicado, e por
+> isso não é oferecido. Duas livres também não resolvem: ambiguidade não se
+> desempata por chute.
+>
+> E não afrouxa o pacote (#23): o irmão de verdade não tem venda em lugar
+> nenhum, então não há o que reivindicar. Casos 22 e 23 do `teste_parse.js`
+> travam a recuperação e as três guardas — **o caso 2 (Abraão) tem que passar
+> junto**, que é exatamente o ponto.
+>
+> **O ganho não é só destravar:** com o comprador lido, a conferência 2 do §5 —
+> a única que não depende do Pack ID — **volta a proteger** esses volumes, que
+> até aqui passavam sem ela por falta de dado dos dois lados.
 >
 > **Rode `node teste_parse.js` após qualquer mudança no `parse.js`, no `folha.js`
 > ou no `nome.js`** — os 18 casos montam a folha no formato REAL do ML, e o caso
@@ -978,6 +1013,105 @@ Desenho do tecido: Liso
 > lembrar de olhar o painel do ML. No estoque: duas peças saem da prateleira e
 > o saldo não anda. Nenhum aviso, em lugar nenhum.
 
+### ⚠️ A CAIXA DE VÁRIAS PERSIANAS TEM DUAS FORMAS, E A SEGUNDA É A COMUM
+
+**16/09/2026, NF 6490: o cliente comprou 2 e recebeu 1.** O conserto de 15/09
+cobria só metade do problema, porque nasceu de um caso só.
+
+| Forma | Como vem na folha | Etiquetas |
+|---|---|---|
+| **2 SKUs** | dois itens, o de baixo órfão (sem pack/venda/comprador) | 1 |
+| **1 SKU, N unidades** | **UM** item, com `Quantidade: 2` escrito nele | 1 |
+
+A segunda passava limpo. O dado sempre esteve lá — o `folha.js` lê `Quantidade:`
+e grava em `qtd` desde sempre —, mas **quatro portões decidiam "isto é caixa de
+várias?" contando LINHA em vez de PERSIANA**:
+
+| Onde | Era | O efeito |
+|---|---|---|
+| `parse.js` | a lista de peças só existia `if(irmaos.length)` | o item de 2 unidades não virava `lote_item` |
+| `etq_route.js` `/api/proximo` | `itens.length>1` | o bipe devolvia `[]` e a tela seguia normal |
+| `etq_route.js` `/api/lote/conferir` | `itens.length<2` recusa | não dava nem para conferir |
+| `etq_route.js` `/api/embalar` | `pacote = itens.length>1` | imprimia e baixava **uma** de duas |
+
+Uma linha com `qtd:2` é **uma linha e duas persianas**. Todo portão conta a
+soma das `qtd`, nunca `length` — é a mesma lição do bipe por unidade, uma
+camada abaixo.
+
+> ⚠️ **NÃO CONFUNDIR COM A ARMADILHA #8.** A quantidade **não** multiplica o
+> VOLUME: uma etiqueta continua sendo uma linha em `lote`. Ela conta a **PEÇA**,
+> que é o grão do `lote_item` — e essa separação é exatamente o que a tabela
+> existe para carregar. Caso 9 do `teste_parse.js` trava as duas metades juntas:
+> o volume continua **um**, e as três persianas têm que **chegar** em `itens`.
+
+> **O `pdfFecha` não entra no caso de 1 SKU, e é de propósito.** Ele é a licença
+> para ler **ausência** como peça a mais, e o irmão depende dele. A quantidade
+> do próprio item não é lida por ausência: está escrita, com todas as letras, no
+> bloco daquele item. Exigir o documento fechar para acreditar num número que o
+> documento afirma seria recusar a evidência mais forte que existe.
+
+### ⚠️ SÓ O PACOTE DE VÁRIOS SKUs RETÉM — a caixa de N unidades não
+
+As duas levam mais de uma persiana, mas a pergunta é outra:
+
+| | O que o sistema sabe | Decisão |
+|---|---|---|
+| 2 SKUs | leu a peça a mais por **ausência** — sinal fraco, pode estar errado | retém, a gestão assina |
+| 1 SKU | a folha **escreveu** `Quantidade: 2` | não retém |
+
+Reter o caso de 1 SKU seria parar a venda para alguém clicar "confirmo o que o
+documento já diz" — e venda de 2 unidades é rotina, não exceção. Trava que
+dispara no caso normal vira desvio que a equipe aprende a fazer (#6), e aí o
+pacote de verdade passa junto, no meio do que se destrava sem olhar.
+
+A proteção dele mora onde morde: as peças vão pro `lote_item`, a Etiqueta de
+Venda não imprime sem o bipe de **todas**, e o estoque baixa por peça.
+
+### ⚠️ A DESCOBERTA NÃO PODE SER NO BIPE — ali a caixa já está montada
+
+A lista "Faltam imprimir" conta **volume**. Uma caixa de três persianas aparecia
+como `1`, igual a qualquer venda: a pessoa ia à prateleira, trazia **uma**, e só
+no bipe a tela âmbar dizia que eram três. A trava segurava o erro — com o
+trabalho já feito. Retrabalho que se repete todo dia é como a equipe aprende a
+contornar a tela.
+
+A tela de quem imprime mostra isso em **três** momentos, do mais cedo ao mais
+tarde:
+
+| Onde | O quê |
+|---|---|
+| **Card próprio**, acima das duas listas (`GET /api/pendentes/varias`) | uma caixa por **cliente**, com as peças que vão dentro |
+| Linha da lista por SKU | `📦 4 persianas em 3 caixas — leve 4`, quando `pecas ≠ qtd` |
+| Bipe e pós-impressão | a tela âmbar que já existia |
+
+> **O card agrupa por VOLUME; a lista de baixo, por SKU.** São duas perguntas
+> diferentes — "o que vai junto nesta caixa" e "o que buscar na prateleira" — e
+> nenhum recorte serve para as duas. Agrupar o card por SKU desmontaria
+> justamente a informação que ele existe para dar.
+
+> **`qtd` é CAIXA, `pecas` é PERSIANA, e eles não se somam.** São iguais no dia
+> normal e divergem só aqui. O número grande da linha continua sendo caixa
+> (é o que ela fecha e o que zera a lista); a linha âmbar diz quantas peças
+> tirar da prateleira. Mesma regra do `faltaHoje` × `precisa` do §18.
+
+> ⚠️ **A INSTRUÇÃO DE EMBALAGEM É CONTEÚDO, NÃO ENFEITE.** Regra do dono
+> (16/09/2026): **saco maior, as peças juntas com fita** — não é o saco de uma
+> peça só. A cor diz "isto é diferente"; só a frase diz o que fazer, e é ela que
+> vale para quem nunca montou uma destas. Ela aparece **igual** nos três
+> lugares: escrevê-la diferente ensinaria a equipe a achar que são duas coisas.
+
+> **O card some quando não há nenhuma.** Card vazio todo dia vira paisagem, e aí
+> ninguém lê no dia em que ele aparece cheio. Ele é largo e fica em cima, então
+> surgir empurra as listas para baixo sem trocá-las de coluna — diferente da
+> coleta no carregamento (§8-B), que fica fixa justamente para a coluna do carro
+> não pular de lugar.
+
+**Rode `node teste_etiqueta.js` (os 12 últimos casos são a NF 6490),
+`node teste_divergencia.js` (os 6 últimos são as duas contas e o card) e
+`node teste_parse.js` (caso 9) após mexer nisso.**
+
+---
+
 **O irmão se reconhece por AUSÊNCIA**, e é a mesma família de sinal fraco da
 #21: ele não traz `Pack ID:`, nem `Venda:`, nem comprador — só descrição, SKU,
 quantidade, cor e tecido.
@@ -1009,8 +1143,20 @@ A evidência que separa os dois não está no item: está na **conta do document
 | **pacote de verdade** | 1 | 2 | nenhuma | o órfão é peça a mais |
 | **leitura quebrada** | 2 | 2 | **uma** | o órfão é item que perdeu os campos |
 
-Por isso `pdfFecha` (no `parse.js`) é a **licença** para ler ausência como
+Por isso `pdfFecha` (no `folha.js`) é a **licença** para ler ausência como
 pacote: o órfão só vira irmão quando **nenhuma etiqueta do PDF ficou sem item**.
+
+> ⚠️ **A LICENÇA É DO `folha.js`, E O BACKFILL LÊ POR ELA.** Ela nasceu dentro
+> do `parse.js`, e o `backfill_pacote.js` chamava o `irmaosDoPacote` **direto,
+> sem a licença** — gravava como peça a mais o órfão que o upload teria retido.
+> Ali o erro é mais caro que na tela: com `--baixar` ele tira do estoque uma
+> persiana que nunca saiu da prateleira. Foi achado em 15/09/2026, rodando o
+> backfill contra os PDFs reais, e o caso 20 do `teste_parse.js` trava as duas
+> pontas — a conta e a ausência de segunda cópia.
+>
+> O script **diz o que recusou**, num bloco próprio com a conta de cada PDF:
+> recusa calada faz o mesmo silêncio de "não achei nada", e o que ele recusa é
+> justamente o que mais parece pacote.
 Sobrou etiqueta órfã, o sistema **não inventa pacote** — retém dizendo a conta
 que não bateu (`2 etiqueta(s), 2 item(ns), e 1 etiqueta(s) sem item na folha`),
 e manda conferir o pedido no ML ou subir o PDF de novo.
@@ -1020,6 +1166,30 @@ e manda conferir o pedido no ML ou subir o PDF de novo.
 > conferência 1 —, e o card vermelho que já existe sabe resolvê-la. Prefixo novo
 > custaria mais uma tela, mais um resolvedor e mais uma guarda no `server.js`
 > para responder a pergunta que o de sempre já responde.
+
+> ⚠️ **A RETENÇÃO É DO VOLUME COM DÚVIDA, NUNCA DO PDF INTEIRO.** A primeira
+> versão (15/09/2026) olhava só `!pdfFecha`, que é condição **global ao
+> arquivo**. No PDF real de 23/09 — 28 etiquetas, 5 itens que perderam
+> pack/venda/comprador — ela retinha **os 28**, sendo que 23 tinham os três
+> campos lidos e não tinham dúvida nenhuma.
+>
+> Retenção em massa é a armadilha #6 na escala em que ela mais machuca: 23
+> destravamentos cegos por dia ensinam a equipe a destravar o 24º sem olhar, e
+> o 24º é o que importa. E havia um dano a mais, silencioso: **volume retido
+> não aparece na Etiqueta de Venda**, então a caixa de 2 persianas do Silvio
+> (`2× BK100100CINZA`, no mesmo lote) sumia da tela junto — a trava escondendo
+> justamente o que ela existe para proteger.
+>
+> Quem tem dúvida é a etiqueta que **não achou item** na folha (`!r1`): essa não
+> sabe que peça leva, e um dos órfãos provavelmente é ela. As outras casaram
+> por pack ou por venda e seguem o caminho normal. Caso 21 do `teste_parse.js`
+> trava isso com o lote de 23/09 em escala menor — 4 etiquetas, 1 leitura
+> quebrada, e a caixa de 2 unidades tem que **atravessar** o lote inteira.
+>
+> Os dois números do motivo contam a mesma história — `N etiqueta(s) sem item`
+> e `N item(ns) sem identificacao` —, e é a igualdade entre eles que diz que
+> são os mesmos volumes vistos dos dois lados. `irmaosDoPacote` devolve
+> **grupos**, não itens: somar `.irmaos.length` é o que faz os dois baterem.
 
 > ⚠️ **A BASE DESTE PADRÃO É UM PDF.** O `irmaosDoPacote` nasceu de **um** caso
 > (NF 6585). Compare com a conferência 5, que só vira regra depois de **5**
@@ -2676,7 +2846,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (49), `teste_divergencia.js` (34) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (41), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (113), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (22 casos), `teste_carga.js` (49), `teste_divergencia.js` (41) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (50), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2753,6 +2923,24 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   o caso Abraão, e herdar ali manda a peça errada pro cliente (§5, #4 e #23)
 - ❌ Ler ausência como pacote quando o PDF **não fecha** (sobrou etiqueta sem
   item na folha): ali é leitura quebrada, não peça a mais (§5, armadilha #23)
+- ❌ Chamar `irmaosDoPacote` sem a licença do `pdfFecha` — foi assim que o
+  `backfill_pacote.js` nasceu, e lá o erro **baixa estoque** (§5, #23)
+- ❌ Decidir "isto é caixa de várias persianas?" contando `itens.length` — uma
+  linha com `qtd:2` é UMA linha e DUAS persianas, e foi assim que a NF 6490 saiu
+  com uma de duas. Todo portão conta a soma das `qtd` (§5, #23)
+- ❌ Reter o PDF inteiro porque ele não fecha: a dúvida é do volume que **não
+  achou item** na folha. Um lote de 28 com 5 leituras quebradas retinha os 28,
+  e escondia da Etiqueta de Venda as caixas de várias peças (§5, #23)
+- ❌ Fazer o `reivindicarAcima` pegar identificador que **outro item já usou**:
+  é exatamente o caso Abraão, e ali o pack de cima é do vizinho (§5, #4)
+- ❌ Desempatar duas linhas livres acima do `SKU:` por proximidade ou por ordem
+  — ambiguidade sem resposta não vira palpite, fica como está (§5, #4)
+- ❌ Reter em Bloqueados a venda de N unidades do MESMO SKU: a folha escreveu a
+  quantidade, não há o que assinar, e travar o caso normal é a #6 (§5, #23)
+- ❌ Deixar a pessoa descobrir no BIPE que a caixa leva três — ali ela já montou;
+  o card e a linha âmbar existem para ela saber antes da prateleira (§5, #23)
+- ❌ Escrever a instrução de embalagem diferente em cada tela: é uma frase só —
+  *saco maior, as peças juntas com fita* (§5, #23)
 - ❌ Deixar cadastro de SKU soltar volume retido por `pacote:` — cadastro não
   responde quantas persianas vão na caixa (§5, armadilha #23)
 - ❌ Declarar chave nova em `permissoes.js` sem a linha no `permDaRota()` **e**

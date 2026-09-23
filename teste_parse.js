@@ -227,6 +227,19 @@ function conferir(nome, orders, esperado){
     if(pecas!==4) erros.push('pecas da folha: esperava 4, veio '+pecas);
     if(os_.length!==2) erros.push('volumes: esperava 2 (uma etiqueta por item), veio '+os_.length);
     if(os_.some(o=>o.conflito)) erros.push('marcou conflito a toa: '+os_.map(o=>o.conflito).filter(Boolean).join(' / '));
+    /* ⚠️ A OUTRA METADE, QUE FALTAVA ATE 16/09/2026. O volume continua UM — e
+       as tres persianas tem que CHEGAR nele, em `itens`. Ate aqui elas paravam
+       na folha: a lista so era montada quando havia irmao de outro SKU, e a
+       venda de N unidades do MESMO SKU passava limpa. Imprimia uma etiqueta,
+       baixava UMA persiana, e o cliente recebia uma de tres (NF 6490). */
+    const tres=os_.find(o=>o.packId==='111')||{};
+    const um  =os_.find(o=>o.packId==='222')||{};
+    const its=tres.itens||[];
+    if(its.length!==1) erros.push('o volume de 3 pecas devia trazer 1 item, veio '+its.length);
+    else if((its[0].qtd||1)!==3) erros.push('o item devia trazer qtd 3, veio '+its[0].qtd);
+    /* E o volume normal NAO pode ganhar lista de pecas: uma venda de 1 persiana
+       que virasse "pacote" cobraria bipe a mais e abriria card na tela toda vez. */
+    if(um.itens) erros.push('a venda de 1 peca virou pacote: '+JSON.stringify(um.itens));
     if(erros.length){ falhas++; console.log('FALHOU  item com Quantidade 3 e 3 pecas em 1 volume');
       erros.forEach(e=>console.log('        '+e)); }
     else console.log('ok      item com Quantidade 3 e 3 pecas em 1 volume');
@@ -523,14 +536,33 @@ function conferir(nome, orders, esperado){
     const os_=await parsePdf(new Uint8Array(fs.readFileSync(arq)));
     const erros=[];
     if(os_.length!==2) erros.push('esperava 2 volumes (2 etiquetas), veio '+os_.length);
+    /* Nenhum dos dois pode virar pacote: o PDF não fecha, e ali ausência é
+       leitura quebrada, não peça a mais. */
     os_.forEach(v=>{
       if(v.itens) erros.push(v.packId+' virou PACOTE sendo leitura quebrada: '+JSON.stringify(v.itens));
-      if(!v.folhaNaoFecha) erros.push(v.packId+' passou limpo — a folha não fechava e ninguém foi avisado');
     });
+    /* ⚠️ A RETENÇÃO É DO VOLUME COM DÚVIDA, NÃO DO PDF INTEIRO (23/09/2026).
+       A primeira versão retinha todo volume do arquivo, porque a condição era
+       global. Num PDF real de 28 etiquetas com 5 leituras quebradas isso
+       retinha os 28 — 23 deles com pack, venda e comprador lidos e sem dúvida
+       nenhuma. Retenção em massa é a armadilha #6 na escala em que ela mais
+       machuca, e ainda escondia da Etiqueta de Venda as caixas de várias
+       persianas do mesmo lote.
+       Aqui: o pack 111 achou o seu item na folha e segue; o 222 não achou, e é
+       só ele que para. */
+    const v111=os_.find(v=>v.packId==='111')||{};
+    const v222=os_.find(v=>v.packId==='222')||{};
+    if(v111.folhaNaoFecha)
+      erros.push('111 foi retido sem ter dúvida — ele achou o item dele na folha');
+    if(!v222.folhaNaoFecha)
+      erros.push('222 passou limpo — não achou item na folha e ninguém foi avisado');
     /* A mensagem tem que carregar a CONTA, não só "deu ruim": é ela que a
-       gestão lê pra decidir se sobe o PDF de novo ou abre o pedido no ML. */
-    const m=(os_[0]||{}).folhaNaoFecha||'';
-    if(!/2 etiqueta/.test(m) || !/1 etiqueta\(s\) sem item/.test(m))
+       gestão lê pra decidir se sobe o PDF de novo ou abre o pedido no ML. E os
+       dois números têm que contar a MESMA história — etiqueta órfã de um lado,
+       item sem identificação do outro. */
+    const m=v222.folhaNaoFecha||'';
+    if(!/2 etiqueta\(s\)/.test(m) || !/1 etiqueta\(s\) sem item/.test(m)
+       || !/1 item\(ns\) sem identificacao/.test(m))
       erros.push('a mensagem não diz a conta: '+JSON.stringify(m));
     if(erros.length){ falhas++; console.log('FALHOU  ausencia so vira pacote quando o PDF fecha');
       erros.forEach(e=>console.log('        '+e)); }
@@ -588,6 +620,177 @@ function conferir(nome, orders, esperado){
     if(erros.length){ falhas++; console.log('FALHOU  o anuncio sai inteiro quando "Persiana" vem no fim do titulo');
       erros.forEach(e=>console.log('        '+e)); }
     else console.log('ok      o anuncio sai inteiro quando "Persiana" vem no fim do titulo');
+  }
+
+  /* ── caso 21: O LOTE GRANDE NAO PARA POR CAUSA DE POUCAS LEITURAS QUEBRADAS
+        Copiado do PDF real de 23/09/2026: 28 etiquetas, 5 itens que perderam
+        pack/venda/comprador na leitura, e — no meio delas — uma venda de 2
+        unidades do MESMO SKU. Em escala menor, a mesma forma.
+
+        Este e o caso que a condicao global quebrava: as 5 leituras ruins
+        retinham o lote inteiro, inclusive a caixa de 2 persianas, que entao
+        nem chegava na Etiqueta de Venda. */
+  casos++;
+  {
+    const d=await PDFDocument.create();
+    const pag=linhas=>{ const p=d.addPage([600,900]); let y=860;
+      linhas.forEach(l=>{ p.drawText(String(l).slice(0,90),{x:20,y,size:9}); y-=14; }); };
+    /* 4 etiquetas: tres normais e uma cujo item perdeu os identificadores. */
+    ['111','222','333','444'].forEach((pk,i)=>
+      pag(etiqueta({pack:pk,nf:String(i+1),comprador:'Cliente '+pk})));
+    pag(['Despachem as suas vendas o quanto antes.','Identifiicação Produtos',
+      'A Cortina Rolo Blackout 1,60x1,60 Blecaute Persiana Bege',
+      'Pack ID: 111 SKU: BK160160BEGE','Venda: 901 Quantidade: 1',
+      'Cliente 111 Cor: Bege','Desenho do tecido: Liso',
+      /* a venda de DUAS unidades iguais, no meio do lote */
+      'B Cortina Rolo Blackout 1,00x1,00 Blecaute Persiana Cinza',
+      'Pack ID: 222 SKU: BK100100CINZA','Venda: 902 Quantidade: 2',
+      'Cliente 222 Cor: Cinza','Desenho do tecido: Liso',
+      'C Cortina Rolo Blackout 1,50x1,50 Blecaute Persiana Bege',
+      'Pack ID: 333 SKU: BK150150BEGE','Venda: 903 Quantidade: 1',
+      'Cliente 333 Cor: Bege','Desenho do tecido: Liso',
+      /* o item do pack 444 perdeu os tres identificadores */
+      'D Cortina Rolo Blackout 1,80x1,50 Blecaute Persiana Bege',
+      'SKU: BK180150BEGE','Quantidade: 1','Cor: Bege','Desenho do tecido: Liso']);
+    const arq=path.join(tmp,'t'+casos+'.pdf');
+    fs.writeFileSync(arq, await d.save());
+    const os_=await parsePdf(new Uint8Array(fs.readFileSync(arq)));
+    const erros=[];
+    const retidos=os_.filter(v=>v.folhaNaoFecha);
+    if(os_.length!==4) erros.push('esperava 4 volumes, veio '+os_.length);
+    if(retidos.length!==1)
+      erros.push('retidos: esperava 1 (so o que nao achou item), veio '+retidos.length
+        +' ['+retidos.map(v=>v.packId).join(',')+']');
+    if(retidos.length===1 && retidos[0].packId!=='444')
+      erros.push('reteve o volume errado: '+retidos[0].packId);
+    /* E A LINHA QUE IMPORTA PRA BANCADA: a caixa de 2 persianas atravessa o
+       lote quebrado e chega inteira na Etiqueta de Venda. */
+    const dois=os_.find(v=>v.packId==='222')||{};
+    if(!dois.itens || dois.itens.length!==1 || dois.itens[0].qtd!==2)
+      erros.push('a venda de 2 unidades iguais nao sobreviveu: '+JSON.stringify(dois.itens));
+    if(dois.folhaNaoFecha) erros.push('a caixa de 2 persianas foi retida a toa — nao chegaria na etiqueta');
+    /* E nenhum dos tres bons pode ter virado pacote por causa do orfao. */
+    ['111','333'].forEach(pk=>{
+      const v=os_.find(x=>x.packId===pk)||{};
+      if(v.itens) erros.push(pk+' virou pacote por causa do item orfao: '+JSON.stringify(v.itens));
+    });
+    if(erros.length){ falhas++; console.log('FALHOU  o lote grande nao para por 1 leitura quebrada');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      o lote grande nao para por 1 leitura quebrada');
+  }
+
+  /* ── caso 22: O IDENTIFICADOR QUE FICOU ACIMA DO SKU (produtos "Tóquio") ───
+        Copiado linha a linha do PDF real de 23/09/2026. A descricao longa
+        quebra em duas e desfaz o pareamento das colunas: a venda sobe pra linha
+        de cima do `SKU:`, e o comprador cai sozinho na de baixo.
+        A folha TEM os dados; era a leitura que nao pareava. */
+  casos++;
+  {
+    const {itensDaFolha}=require('./folha');
+    const folha=[
+      'Despachem as suas vendas o quanto antes.','Identifiicação Produtos',
+      'JTI4BDYZH5M4XMTGQRGEZUKA34 Cortina Rolo Blackout 1,60x1,40 Persiana Bege',
+      'Venda: 2000018594751248 SKU: BK160140BEGE',
+      'Biel Monteiro Quantidade: 1','Cor: Bege','Desenho do tecido: Liso',
+      /* o Tóquio: descricao transborda, venda ACIMA, comprador SOZINHO */
+      'VESVB5C3WNIZDI6OHWDAUYCWVY Cortina Rolo Blackout Medida L 1,80 X A 1,50 Blecaute Roller Cor Bege Claro -',
+      'Venda: 2000018596292056 Tóquio 002',
+      'SKU: BK180150BEGE',
+      'Paula Cristine Lupepso',
+      'Quantidade: 1','Cor: Bege claro - Tóquio 002','Desenho do tecido: Liso'];
+    const its=itensDaFolha(folha);
+    const erros=[];
+    const t=its.find(x=>x.sku==='BK180150BEGE')||{};
+    const n=its.find(x=>x.sku==='BK160140BEGE')||{};
+    if(its.length!==2) erros.push('esperava 2 itens, veio '+its.length);
+    if(t.venda!=='2000018596292056') erros.push('nao recuperou a venda de cima: '+JSON.stringify(t.venda));
+    if(t.comprador!=='Paula Cristine Lupepso') erros.push('nao leu o comprador sozinho na linha: '+JSON.stringify(t.comprador));
+    /* "Tóquio 002" tem digito e nao pode virar nome de gente. */
+    if(/Tóquio/.test(t.comprador||'')) erros.push('o nome comercial da cor virou comprador: '+t.comprador);
+    /* E o vizinho nao pode ter perdido nem ganhado nada com a segunda passada. */
+    if(n.venda!=='2000018594751248' || n.comprador!=='Biel Monteiro')
+      erros.push('o item normal mudou: '+JSON.stringify({v:n.venda,c:n.comprador}));
+    if(erros.length){ falhas++; console.log('FALHOU  o identificador acima do SKU volta pro item dele');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      o identificador acima do SKU volta pro item dele');
+  }
+
+  /* ── caso 23: AS TRES GUARDAS DA SEGUNDA PASSADA ──────────────────────────
+        Olhar para tras e o que mandou a peca errada pro Abraao (caso 2). O que
+        torna esta passada segura e a palavra REIVINDICADO: so sobra pro item
+        de baixo o numero que NENHUM outro pegou. */
+  casos++;
+  {
+    const {itensDaFolha}=require('./folha');
+    const erros=[];
+    /* (a) CASO ABRAAO: o pack de cima e do vizinho — esta reivindicado, e o
+           item sem pack NAO pode herda-lo. */
+    const abraao=itensDaFolha([
+      'X Cortina Rolo Blackout 1,60x1,40 Persiana Bege',
+      'Pack ID: 2000014610097547 SKU: BK160140BEGE',
+      'Venda: 2000018016683414 Quantidade: 1',
+      'Tiago Sanches Cor: Bege','Desenho do tecido: Blackout',
+      'Y Cortina Rolo Blackout 1,40x1,40 Persiana Bege',
+      'SKU: BK140140BEGE','Venda: 2000018999999999 Quantidade: 3',
+      'Abraao Amorim Cor: Bege','Desenho do tecido: Blackout']);
+    const ab=abraao.find(x=>x.sku==='BK140140BEGE')||{};
+    if(ab.packId) erros.push('o item do Abraao herdou o pack do vizinho: '+ab.packId);
+    /* (b) DUAS LIVRES NAO DESEMPATAM: ambiguidade nao se resolve por chute. */
+    const doisLivres=itensDaFolha([
+      'A descricao que transborda Cor Bege Claro -',
+      'Venda: 111 Tóquio 002','Venda: 222 sobra','SKU: BK180150BEGE','Quantidade: 1']);
+    if((doisLivres[0]||{}).venda)
+      erros.push('escolheu uma entre duas vendas livres: '+doisLivres[0].venda);
+    /* (c) O IRMAO DE PACOTE NAO GANHA VENDA: ele nao tem uma em lugar nenhum,
+           entao nao ha o que reivindicar e ele segue sendo peca a mais (§5-B). */
+    const pacote=itensDaFolha([
+      'X Cortina Rolo Blackout 1,20x1,20 Persiana Bege',
+      'Pack ID: 2000015040457349 SKU: BK120120BEGE',
+      'Venda: 2000018468081338 Quantidade: 1',
+      'Fabiano Pereira Cor: Bege','Desenho do tecido: Liso',
+      'Y Cortina Rolo Blackout 1,40x1,40 Persiana Bege',
+      'SKU: BK140140BEGE','Quantidade: 2','Cor: Bege','Desenho do tecido: Liso']);
+    const irmao=pacote.find(x=>x.sku==='BK140140BEGE')||{};
+    if(irmao.venda || irmao.packId || irmao.comprador)
+      erros.push('o irmao de pacote deixou de ser orfao: '+JSON.stringify(
+        {v:irmao.venda,p:irmao.packId,c:irmao.comprador}));
+    if(erros.length){ falhas++; console.log('FALHOU  a segunda passada nao reabre o caso Abraao');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      a segunda passada nao reabre o caso Abraao');
+  }
+
+  /* ── caso 20: a licenca do pacote tem DONO UNICO, e o backfill le por ele ──
+     O `pdfFecha` nasceu dentro do parse.js. O backfill_pacote.js chamava o
+     `irmaosDoPacote` direto, SEM a licenca — e gravava como peca a mais o
+     orfao que o upload teria retido. Ali o erro e mais caro que na tela: com
+     `--baixar` ele tira do estoque uma persiana que nunca saiu da prateleira.
+     Este caso trava as duas pontas: a conta em si, e que nao ha segunda copia. */
+  {
+    casos++;
+    const FOLHA=require('./folha');
+    const erros=[];
+    /* Uma etiqueta, dois itens, e o de baixo e orfao: o PDF FECHA. */
+    const fecha=[{packId:'111',venda:'222',sku:'A',comprador:'Fulano'},{sku:'B'}];
+    if(FOLHA.etiquetasSemItem([{packId:'111',venda:'222'}], fecha).length!==0)
+      erros.push('pacote de verdade foi acusado de nao fechar');
+    if(FOLHA.pdfFecha([{packId:'111',venda:'222'}], fecha)!==true)
+      erros.push('pdfFecha disse false num PDF que fecha');
+    /* Duas etiquetas, dois itens, e o de baixo perdeu os campos: NAO fecha —
+       a segunda etiqueta fica sem item, e o orfao e ela, nao peca a mais. */
+    const quebra=[{packId:'111',venda:'222',sku:'A',comprador:'Fulano'},{sku:'B'}];
+    const semItem=FOLHA.etiquetasSemItem(
+      [{packId:'111',venda:'222'},{packId:'333',venda:'444'}], quebra);
+    if(semItem.length!==1) erros.push('leitura quebrada passou como pacote: '+semItem.length+' orfa(s)');
+    if(FOLHA.pdfFecha([{packId:'111',venda:'222'},{packId:'333',venda:'444'}], quebra)!==false)
+      erros.push('pdfFecha disse true num PDF que nao fecha');
+    /* E ninguem pode ter a sua propria copia da conta. */
+    const src=f=>fs.readFileSync(path.join(__dirname,f),'utf8');
+    ['parse.js','backfill_pacote.js'].forEach(f=>{
+      if(!/etiquetasSemItem/.test(src(f))) erros.push(f+' nao usa a regua do folha.js');
+    });
+    if(erros.length){ falhas++; console.log('FALHOU  a licenca do pacote tem dono unico');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      a licenca do pacote tem dono unico');
   }
 
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}

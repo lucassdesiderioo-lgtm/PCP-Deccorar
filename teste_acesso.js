@@ -96,6 +96,10 @@ eq('o Codigo do kit continua em kit.editar',
   AC.permDaRota('/api/config/kit', 'POST'), 'kit.editar');
 eq('ler a etiqueta e leitura de tela (a Embalagem le o codigo no tablet)',
   AC.permDaRota('/api/config/kit/etiqueta', 'GET'), '@logado');
+/* O card das caixas de varias persianas carrega comprador e NF — dado de
+   cliente, como os impressos. Nao pode cair no '@logado'. */
+eq('o card das caixas de varias persianas e da bancada da etiqueta',
+  AC.permDaRota('/api/pendentes/varias', 'GET'), 'etiqueta.emitir');
 /* As outras duas travas da mesma aba nao podem ter mudado de dono. */
 eq('divergencia continua em sku.cadastrar',
   AC.permDaRota('/api/divergencias/resolver', 'POST'), 'sku.cadastrar');

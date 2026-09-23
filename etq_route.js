@@ -95,9 +95,13 @@ module.exports=function(app,db){
       WHERE i.lote_id=? ORDER BY i.id`).all(p.id) : [];
     res.json({cadastrado:true,estoque:s.estoque,total,pendentes:pend,futuros:fut,
               pedido:p||null,peca,sob_medida:!!s.sob_medida,adiantado,coleta,
-              /* Lista vazia e o caso normal (uma etiqueta, uma persiana) e a
-                 tela nao muda em nada por causa dela. */
-              itens: itens.length>1?itens:[],
+              /* ⚠️ O CRITERIO E PERSIANA, NAO LINHA. Uma caixa com 2 unidades do
+                 MESMO SKU tem UMA linha em `lote_item` — com `itens.length>1`
+                 ela devolvia lista vazia, a tela seguia o fluxo normal, imprimia
+                 e baixava uma persiana de duas. Foi a NF 6490.
+                 Lista vazia continua sendo o caso normal (uma etiqueta, uma
+                 persiana), e ai a tela nao muda em nada. */
+              itens: itens.reduce((s,i)=>s+Math.max(1,i.qtd||1),0)>1 ? itens : [],
               modo:(modo==='coleta'||modo==='agencia')?modo:'todas', na_outra_lista:outra});
   });
 
@@ -121,7 +125,10 @@ module.exports=function(app,db){
     if(o.estagio!=='pendente') return res.json({erro:'Esta venda ja foi processada ('+o.estagio+').'});
     const itens=db.prepare(`SELECT id,codigo,qtd,COALESCE(conferidos,0) conferidos
       FROM lote_item WHERE lote_id=? ORDER BY id`).all(id);
-    if(itens.length<2) return res.json({erro:'Esta caixa leva uma peca so — nao ha o que conferir.'});
+    /* Conta PERSIANA, nao linha: a caixa de 2 unidades do mesmo SKU tem uma
+       linha so, e recusar o bipe dela deixava a segunda peca na prateleira. */
+    if(itens.reduce((s,i)=>s+Math.max(1,i.qtd||1),0)<2)
+      return res.json({erro:'Esta caixa leva uma peca so — nao ha o que conferir.'});
     /* UM BIPE POR PERSIANA: o alvo e a primeira linha deste SKU que ainda tem
        unidade faltando. Duas persianas iguais tem a mesma etiqueta de SKU, e e
        por isso que a conta e de UNIDADE e nao de linha — conferir uma e deixar
@@ -161,11 +168,17 @@ module.exports=function(app,db){
     /* ── A CAIXA COM MAIS DE UMA PERSIANA (§5-B) ────────────────────────────
        Uma etiqueta, varias pecas. O que muda aqui e tudo o que depende de
        "quantas": a trava de estoque, a baixa e a conferencia por bipe.
-       A lista sai do `lote_item`; vazia (ou com um item so) e o caso normal, e
-       dali pra baixo nada muda em relacao ao que sempre existiu. */
+       A lista sai do `lote_item`; menos de duas PERSIANAS e o caso normal, e
+       dali pra baixo nada muda em relacao ao que sempre existiu.
+
+       ⚠️ O CRITERIO E PERSIANA, NAO LINHA, e esta e a terceira porta da mesma
+       doenca: `itens.length>1` deixava passar a caixa de 2 unidades do MESMO
+       SKU, que tem uma linha so. Ela nao pedia o bipe, nao travava o estoque e
+       baixava UMA peca de duas — a NF 6490. O resto deste bloco ja contava em
+       persiana; era so o portao que contava em linha. */
     const itens=db.prepare(`SELECT id,codigo,qtd,COALESCE(conferidos,0) conferidos
       FROM lote_item WHERE lote_id=? ORDER BY id`).all(id);
-    const pacote = itens.length>1;
+    const pacote = itens.reduce((s,i)=>s+Math.max(1,i.qtd||1),0) > 1;
 
     /* SEM O BIPE DE TODAS AS PECAS, NAO IMPRIME. E o mesmo desenho do kit na
        embalagem (§4): o bipe que falta recusa o passo seguinte, em vez de

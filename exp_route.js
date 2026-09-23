@@ -144,7 +144,7 @@ module.exports=function(app,db){
         ON CONFLICT(familia,prefixo) DO UPDATE SET vezes=vezes+1, visto_em=datetime('now','localtime')`);
       const insItem=db.prepare(`INSERT INTO lote_item (lote_id,codigo,qtd,cor,descricao,origem)
         VALUES (?,?,?,?,?,'folha')`);
-      let novos=0,rep=0,semsku=0,bloq=0,divs=0,coleta=0,modal=0,pacotes=0,naoFecha=0; const desconhecidos={};
+      let novos=0,rep=0,semsku=0,bloq=0,divs=0,coleta=0,modal=0,pacotes=0,naoFecha=0,variasPecas=0; const desconhecidos={};
       db.transaction(()=>{ for(const o of orders){
         if((o.packId&&seen.has('p:'+o.packId))||(o.venda&&seen.has('v:'+o.venda))){ rep++; continue; }
         if(o.packId)seen.add('p:'+o.packId); if(o.venda)seen.add('v:'+o.venda);
@@ -180,6 +180,22 @@ module.exports=function(app,db){
            irmaos sumiam sem uma linha de aviso. Reter e o que a regra do dono
            manda fazer com etiqueta que o sistema nao conhece (§8-B): a gestao
            abre o pedido no ML, confere os SKUs e assina. */
+        /* ⚠️ SO O PACOTE DE VARIOS SKUs RETEM — a caixa de N unidades do MESMO
+           SKU nao. As duas levam mais de uma persiana, mas a PERGUNTA e outra:
+
+             2 SKUs  o sistema leu a peca a mais por AUSENCIA de campos (§5-B).
+                     Sinal fraco, leitura que pode estar errada → a gestao assina.
+             1 SKU   a folha ESCREVEU `Quantidade: 2` no proprio item. Nao ha o
+                     que assinar: reter seria parar a venda para alguem clicar
+                     "confirmo o que o documento ja diz".
+
+           E venda de 2 unidades e rotina, nao excecao. Trava que dispara no caso
+           normal vira desvio que a equipe aprende a fazer (armadilha #6) — e ai
+           o pacote de verdade passa junto, no meio do que se destrava sem olhar.
+
+           A protecao do caso de 1 SKU mora onde ela morde: as pecas vao pro
+           `lote_item` logo abaixo, a Etiqueta de Venda nao imprime sem o bipe de
+           TODAS (§5-B, passo 3) e o estoque baixa por peca. */
         else if(o.itens && o.itens.length>1){
           est='bloqueado'; bloq++; pacotes++;
           const pecas=o.itens.reduce((s,i)=>s+(i.qtd||1),0);
@@ -229,16 +245,19 @@ module.exports=function(app,db){
            tela pra assinar os SKUs. `origem='folha'` marca que quem disse isso
            foi o documento, e nao uma pessoa; a decisao da gestao reescreve com
            `origem='gestao'`, e as duas se distinguem depois. */
-        if(o.itens && o.itens.length>1) for(const it of o.itens)
-          insItem.run(r.lastInsertRowid, String(it.sku||'').toUpperCase()||null,
-                      it.qtd||1, it.cor||null, it.descricao||null);
+        if(o.itens){
+          for(const it of o.itens)
+            insItem.run(r.lastInsertRowid, String(it.sku||'').toUpperCase()||null,
+                        it.qtd||1, it.cor||null, it.descricao||null);
+          variasPecas++;
+        }
       }})();
       /* `coleta` vai na resposta pra quem subiu o PDF ver na hora quantos
          volumes o caminhao vai buscar — e estranhar se der zero num PDF de
          coleta, ou o lote inteiro num PDF de agencia (a marca e fraca).
          `modalidade_duvida` e o que ficou retido por formato desconhecido. */
       res.json({ok:true,total:orders.length,novos,repetidas:rep,sem_sku:semsku,bloqueados:bloq,divergencias:divs,coleta,modalidade_duvida:modal,
-                pacotes, folha_nao_fecha:naoFecha,
+                pacotes, folha_nao_fecha:naoFecha, varias_pecas:variasPecas,
                 desconhecidos:Object.keys(desconhecidos).map(k=>({sku:k,qtd:desconhecidos[k]}))});
     }catch(e){ console.error(e); res.status(500).json({erro:String(e.message||e)}); }
   });
@@ -511,7 +530,14 @@ module.exports=function(app,db){
      ja resolvida ('agencia' | 'coleta') pela regua do carga.js: NULL e
      agencia, a tela nao precisa saber disso. */
   app.get('/api/pendentes',(req,res)=>{
+    /* `pecas` conta PERSIANA; `qtd` conta CAIXA. Eles sao iguais no dia normal e
+       divergem exatamente na venda de varias unidades — e e essa divergencia que
+       a tela escreve em ambar. Sem ela a lista dizia "1" para uma caixa de tres
+       persianas, e a bancada saia da prateleira com UMA: o erro so aparecia no
+       bipe, com a caixa ja montada (o defeito da NF 6490, 16/09/2026).
+       Volume sem linha em `lote_item` vale 1 — e o volume de sempre. */
     res.json(db.prepare(`SELECT l.codigo, COUNT(*) qtd,
+        SUM(COALESCE((SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id),1)) pecas,
         CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END modalidade,
         MIN(l.despachar_em) vence_em,
         SUM(CASE WHEN l.despachar_em IS NOT NULL AND l.despachar_em<date('now','localtime') THEN 1 ELSE 0 END) atrasados,
@@ -528,6 +554,41 @@ module.exports=function(app,db){
       WHERE ${filaDoDia('l')}
       GROUP BY l.codigo, CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END
       ORDER BY atrasados DESC, qtd DESC`).all());
+  });
+  /* ⚠️ AS CAIXAS DE VARIAS PERSIANAS TEM CARD PROPRIO, E POR UM MOTIVO FISICO.
+     A coleta ganhou card proprio porque e um LUGAR diferente (§8-B); esta ganha
+     porque e uma EMBALAGEM diferente — saco maior, as pecas juntas com fita, em
+     vez do saco preto de uma peca so. E trabalho de outra natureza, com outro
+     tempo, e quem monta precisa saber disso ANTES de ir na prateleira.
+
+     Agrupa por VOLUME (uma caixa, um cliente), nunca por SKU: o que a pessoa
+     monta e uma caixa para uma pessoa, e agrupar por SKU desmontaria justamente
+     a informacao que ela precisa — quais pecas vao juntas. E o contrario da
+     lista de baixo, que agrupa por SKU porque ali a pergunta e o que buscar na
+     prateleira. Duas perguntas, dois recortes, e nenhum serve para as duas. */
+  app.get('/api/pendentes/varias',(req,res)=>{
+    const vols=db.prepare(`SELECT l.id, l.codigo, l.buyer, l.nf, l.despachar_em,
+        CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END modalidade,
+        (SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id) pecas
+      FROM lote l
+      WHERE ${filaDoDia('l')}
+        AND (SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id) > 1
+      ORDER BY l.despachar_em IS NULL DESC, l.despachar_em, l.id`).all();
+    if(!vols.length) return res.json([]);
+    /* A peca vem com o que ela E (`pecaTexto`, o mesmo formatador da embalagem e
+       da revisao): so o codigo serve a quem decorou o catalogo, e esta tela e
+       usada por gente diferente a cada dia. */
+    const itens=db.prepare(`SELECT i.codigo, i.qtd,
+        s.largura_cm, s.altura_cm, COALESCE(c.nome,s.cor_codigo,s.cor) cor_nome,
+        COALESCE(t.nome,s.tecido_codigo) tecido_nome, m.nome modelo_nome,
+        COALESCE(m.exige_medida,1) exige_medida
+      FROM lote_item i
+      LEFT JOIN skus s ON s.codigo=UPPER(i.codigo)
+      LEFT JOIN cor c ON c.codigo=s.cor_codigo
+      LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
+      LEFT JOIN modelo m ON m.id=s.modelo_id
+      WHERE i.lote_id=? ORDER BY i.id`);
+    res.json(vols.map(v=>Object.assign({},v,{itens:itens.all(v.id)})));
   });
   /* O GROUP BY repete a expressao em vez de usar o apelido `modalidade`: com o
      apelido, o SQLite agrupava pela COLUNA l.modalidade e o NULL (= agencia)
