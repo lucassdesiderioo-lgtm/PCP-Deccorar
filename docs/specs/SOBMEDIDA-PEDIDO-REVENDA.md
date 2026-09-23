@@ -5,7 +5,8 @@ STATUS
 Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 22/09/2026
-Fase atual: 3 EM CÓDIGO (22/09/2026) — falta a semana em paralelo ao Decorsoft
+Fase atual: 3 EM CÓDIGO e CONFERIDA no deploy (23/09/2026) — falta a semana
+            em paralelo ao Decorsoft
             2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
             1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
 Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐
@@ -30,6 +31,32 @@ teste novos: `npm test` do módulo vai a **387**.
 > pedidos do WhatsApp lançada aqui, em paralelo ao Decorsoft, sem diferença de
 > preço nem de corte* — e isso é trabalho de tela, com os pedidos na frente.
 > Enquanto não estiver feito, a fase é **código entregue**.
+
+### ✅ CONFERIDA EM PRODUÇÃO EM 23/09/2026, COM A FOLHA NA MÃO
+
+O dono fez o deploy, lançou o número do Decorsoft (5000) e rodou o ciclo
+inteiro numa revenda de verdade: orçamento → transformar em pedido → enviar →
+aprovar → PDF. Saiu o **pedido 5001**, com duas persianas e duas coleções de
+preços diferentes na mesma folha. As contas foram refeitas **por fora do
+sistema**, contra o PDF gerado:
+
+| | |
+|---|---|
+| numeração | 5001 — o seguinte ao 5000 lançado (§4.18) |
+| peça 1 | 2,100 × 2,200 = **4,620 m²** → passou dos 3,5 m² do Tubo 38 e subiu para o **41** · 4,620 × R$ 110,00 = **R$ 508,20** · redução de peso **automática e cobrada** (+R$ 50,00) |
+| peça 2 | 1,000 × 1,000 = 1,000 m² real, e a folha cobra **1,500** — o mínimo faturado · 1,5 × R$ 140,00 = **R$ 210,00** · bandô 1,000 m × R$ 55,00 = **R$ 55,00** |
+| cascata (tabela B, −5,00%) | 558,20 × 0,95 = **530,29** · 265,00 × 0,95 = **251,75** |
+| totais | Deccorar **R$ 823,20** · a pagar **R$ 782,04** — a soma das peças, fechando com as parcelas impressas na folha |
+| prazo | enviado quarta 13:31, antes do corte das 18h → **quinta 01/10** (§4.9) |
+| sem tecido | a peça 2 é de tecido que não está na estante: **entrou marcada**, não travou (§4.10) |
+
+> ⚠️ **O QUE ESTA FOLHA PROVA, E O QUE ELA NÃO PROVA.** Ela prova o ciclo, a
+> aritmética, o mínimo faturado, a escada, a cascata, o prazo e o sinal de
+> tecido — tudo contra o papel, não contra o que o código disse de si mesmo.
+> Ela **não** prova que R$ 110,00 e R$ 140,00 são os preços certos daquelas
+> coleções: isso é cadastro, e quem lançou foi o dono. A prova que falta é a
+> **semana em paralelo ao Decorsoft**, comparando pedido a pedido — e é ela, e
+> só ela, que fecha a fase.
 
 **Conferido pelo fio, na tela de verdade** (navegador dirigido contra o
 servidor local, do orçamento até a aprovação):
