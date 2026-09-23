@@ -309,10 +309,30 @@ async function parsePdf(uint8){
     /* O PDF NAO FECHOU E AINDA HA ITEM SEM DONO: nao da pra dizer se e peca a
        mais ou item que perdeu os identificadores na leitura. As duas respostas
        levam a caixas diferentes, entao o sistema nao escolhe — retem e conta o
-       que viu. E a mesma regra da modalidade desconhecida (#21). */
-    const folhaNaoFecha = !pdfFecha && irmaosDoPacote(itensFolha).length
-      ? 'a folha nao casa com as etiquetas: '+etiquetasDoPdf.length+' etiqueta(s), '
-        +itensFolha.length+' item(ns), e '+semItem.length+' etiqueta(s) sem item na folha'
+       que viu. E a mesma regra da modalidade desconhecida (#21).
+
+       ⚠️ A DUVIDA E DESTE VOLUME, NAO DO PDF INTEIRO — e `!r1` e o que diz isso.
+       A primeira versao (15/09/2026) olhava so `!pdfFecha`, que e uma condicao
+       GLOBAL: um PDF com 28 etiquetas e 5 leituras quebradas retinha os 28.
+       Vinte e tres deles tinham pack, venda e comprador lidos e nao tinham
+       duvida nenhuma — retencao em massa e a armadilha #6 na escala em que ela
+       mais machuca, e ainda esconderia da Etiqueta de Venda as caixas de varias
+       persianas do mesmo lote, que e justamente o que a trava veio proteger.
+
+       Quem tem duvida e a etiqueta que NAO ACHOU ITEM na folha (`!r1`): essa
+       nao sabe que peca leva, e um dos orfaos provavelmente e ela. As outras
+       casaram por pack ou por venda e seguem o caminho normal. */
+    /* `irmaosDoPacote` devolve GRUPOS, nao itens — no PDF de 23/09 eram 3 grupos
+       com 5 orfaos dentro, e escrever "3 itens" num motivo que a gestao vai ler
+       ao lado de "5 etiquetas sem item" faria os dois numeros brigarem. O que
+       importa para quem confere e quantos ITENS ficaram sem dono, porque e esse
+       que casa (ou nao) com as etiquetas orfas. */
+    const orfaosDaFolha = irmaosDoPacote(itensFolha).reduce((s,g)=>s+g.irmaos.length,0);
+    const folhaNaoFecha = !pdfFecha && !r1 && orfaosDaFolha
+      ? 'esta etiqueta nao achou item na folha de controle — '
+        +etiquetasDoPdf.length+' etiqueta(s), '+itensFolha.length+' item(ns), '
+        +semItem.length+' etiqueta(s) sem item e '+orfaosDaFolha
+        +' item(ns) sem identificacao no PDF'
       : null;
 
     // 1. as duas leituras da folha discordam sobre o SKU deste volume

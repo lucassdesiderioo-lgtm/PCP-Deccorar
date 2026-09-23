@@ -554,6 +554,30 @@ e manda conferir o pedido no ML ou subir o PDF de novo.
 > custaria mais uma tela, mais um resolvedor e mais uma guarda no `server.js`
 > para responder a pergunta que o de sempre já responde.
 
+> ⚠️ **A RETENÇÃO É DO VOLUME COM DÚVIDA, NUNCA DO PDF INTEIRO.** A primeira
+> versão (15/09/2026) olhava só `!pdfFecha`, que é condição **global ao
+> arquivo**. No PDF real de 23/09 — 28 etiquetas, 5 itens que perderam
+> pack/venda/comprador — ela retinha **os 28**, sendo que 23 tinham os três
+> campos lidos e não tinham dúvida nenhuma.
+>
+> Retenção em massa é a armadilha #6 na escala em que ela mais machuca: 23
+> destravamentos cegos por dia ensinam a equipe a destravar o 24º sem olhar, e
+> o 24º é o que importa. E havia um dano a mais, silencioso: **volume retido
+> não aparece na Etiqueta de Venda**, então a caixa de 2 persianas do Silvio
+> (`2× BK100100CINZA`, no mesmo lote) sumia da tela junto — a trava escondendo
+> justamente o que ela existe para proteger.
+>
+> Quem tem dúvida é a etiqueta que **não achou item** na folha (`!r1`): essa não
+> sabe que peça leva, e um dos órfãos provavelmente é ela. As outras casaram
+> por pack ou por venda e seguem o caminho normal. Caso 21 do `teste_parse.js`
+> trava isso com o lote de 23/09 em escala menor — 4 etiquetas, 1 leitura
+> quebrada, e a caixa de 2 unidades tem que **atravessar** o lote inteira.
+>
+> Os dois números do motivo contam a mesma história — `N etiqueta(s) sem item`
+> e `N item(ns) sem identificacao` —, e é a igualdade entre eles que diz que
+> são os mesmos volumes vistos dos dois lados. `irmaosDoPacote` devolve
+> **grupos**, não itens: somar `.irmaos.length` é o que faz os dois baterem.
+
 > ⚠️ **A BASE DESTE PADRÃO É UM PDF.** O `irmaosDoPacote` nasceu de **um** caso
 > (NF 6585). Compare com a conferência 5, que só vira regra depois de **5**
 > ocorrências justamente porque *"uma folha sozinha não prova nada"*. Aqui o erro
@@ -1772,7 +1796,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (18 casos), `teste_carga.js` (44), `teste_divergencia.js` (41) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (45), `teste_ficha.js` (40), `teste_ordem_dia.js` (16) e `teste_acesso.js` (28); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (19 casos), `teste_carga.js` (44), `teste_divergencia.js` (41) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (45), `teste_ficha.js` (40), `teste_ordem_dia.js` (16) e `teste_acesso.js` (28); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
@@ -1811,6 +1835,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Decidir "isto é caixa de várias persianas?" contando `itens.length` — uma
   linha com `qtd:2` é UMA linha e DUAS persianas, e foi assim que a NF 6490 saiu
   com uma de duas. Todo portão conta a soma das `qtd` (§5, #23)
+- ❌ Reter o PDF inteiro porque ele não fecha: a dúvida é do volume que **não
+  achou item** na folha. Um lote de 28 com 5 leituras quebradas retinha os 28,
+  e escondia da Etiqueta de Venda as caixas de várias peças (§5, #23)
 - ❌ Reter em Bloqueados a venda de N unidades do MESMO SKU: a folha escreveu a
   quantidade, não há o que assinar, e travar o caso normal é a #6 (§5, #23)
 - ❌ Deixar a pessoa descobrir no BIPE que a caixa leva três — ali ela já montou;

@@ -536,18 +536,94 @@ function conferir(nome, orders, esperado){
     const os_=await parsePdf(new Uint8Array(fs.readFileSync(arq)));
     const erros=[];
     if(os_.length!==2) erros.push('esperava 2 volumes (2 etiquetas), veio '+os_.length);
+    /* Nenhum dos dois pode virar pacote: o PDF não fecha, e ali ausência é
+       leitura quebrada, não peça a mais. */
     os_.forEach(v=>{
       if(v.itens) erros.push(v.packId+' virou PACOTE sendo leitura quebrada: '+JSON.stringify(v.itens));
-      if(!v.folhaNaoFecha) erros.push(v.packId+' passou limpo — a folha não fechava e ninguém foi avisado');
     });
+    /* ⚠️ A RETENÇÃO É DO VOLUME COM DÚVIDA, NÃO DO PDF INTEIRO (23/09/2026).
+       A primeira versão retinha todo volume do arquivo, porque a condição era
+       global. Num PDF real de 28 etiquetas com 5 leituras quebradas isso
+       retinha os 28 — 23 deles com pack, venda e comprador lidos e sem dúvida
+       nenhuma. Retenção em massa é a armadilha #6 na escala em que ela mais
+       machuca, e ainda escondia da Etiqueta de Venda as caixas de várias
+       persianas do mesmo lote.
+       Aqui: o pack 111 achou o seu item na folha e segue; o 222 não achou, e é
+       só ele que para. */
+    const v111=os_.find(v=>v.packId==='111')||{};
+    const v222=os_.find(v=>v.packId==='222')||{};
+    if(v111.folhaNaoFecha)
+      erros.push('111 foi retido sem ter dúvida — ele achou o item dele na folha');
+    if(!v222.folhaNaoFecha)
+      erros.push('222 passou limpo — não achou item na folha e ninguém foi avisado');
     /* A mensagem tem que carregar a CONTA, não só "deu ruim": é ela que a
-       gestão lê pra decidir se sobe o PDF de novo ou abre o pedido no ML. */
-    const m=(os_[0]||{}).folhaNaoFecha||'';
-    if(!/2 etiqueta/.test(m) || !/1 etiqueta\(s\) sem item/.test(m))
+       gestão lê pra decidir se sobe o PDF de novo ou abre o pedido no ML. E os
+       dois números têm que contar a MESMA história — etiqueta órfã de um lado,
+       item sem identificação do outro. */
+    const m=v222.folhaNaoFecha||'';
+    if(!/2 etiqueta\(s\)/.test(m) || !/1 etiqueta\(s\) sem item/.test(m)
+       || !/1 item\(ns\) sem identificacao/.test(m))
       erros.push('a mensagem não diz a conta: '+JSON.stringify(m));
     if(erros.length){ falhas++; console.log('FALHOU  ausencia so vira pacote quando o PDF fecha');
       erros.forEach(e=>console.log('        '+e)); }
     else console.log('ok      ausencia so vira pacote quando o PDF fecha');
+  }
+
+  /* ── caso 21: O LOTE GRANDE NAO PARA POR CAUSA DE POUCAS LEITURAS QUEBRADAS
+        Copiado do PDF real de 23/09/2026: 28 etiquetas, 5 itens que perderam
+        pack/venda/comprador na leitura, e — no meio delas — uma venda de 2
+        unidades do MESMO SKU. Em escala menor, a mesma forma.
+
+        Este e o caso que a condicao global quebrava: as 5 leituras ruins
+        retinham o lote inteiro, inclusive a caixa de 2 persianas, que entao
+        nem chegava na Etiqueta de Venda. */
+  casos++;
+  {
+    const d=await PDFDocument.create();
+    const pag=linhas=>{ const p=d.addPage([600,900]); let y=860;
+      linhas.forEach(l=>{ p.drawText(String(l).slice(0,90),{x:20,y,size:9}); y-=14; }); };
+    /* 4 etiquetas: tres normais e uma cujo item perdeu os identificadores. */
+    ['111','222','333','444'].forEach((pk,i)=>
+      pag(etiqueta({pack:pk,nf:String(i+1),comprador:'Cliente '+pk})));
+    pag(['Despachem as suas vendas o quanto antes.','Identifiicação Produtos',
+      'A Cortina Rolo Blackout 1,60x1,60 Blecaute Persiana Bege',
+      'Pack ID: 111 SKU: BK160160BEGE','Venda: 901 Quantidade: 1',
+      'Cliente 111 Cor: Bege','Desenho do tecido: Liso',
+      /* a venda de DUAS unidades iguais, no meio do lote */
+      'B Cortina Rolo Blackout 1,00x1,00 Blecaute Persiana Cinza',
+      'Pack ID: 222 SKU: BK100100CINZA','Venda: 902 Quantidade: 2',
+      'Cliente 222 Cor: Cinza','Desenho do tecido: Liso',
+      'C Cortina Rolo Blackout 1,50x1,50 Blecaute Persiana Bege',
+      'Pack ID: 333 SKU: BK150150BEGE','Venda: 903 Quantidade: 1',
+      'Cliente 333 Cor: Bege','Desenho do tecido: Liso',
+      /* o item do pack 444 perdeu os tres identificadores */
+      'D Cortina Rolo Blackout 1,80x1,50 Blecaute Persiana Bege',
+      'SKU: BK180150BEGE','Quantidade: 1','Cor: Bege','Desenho do tecido: Liso']);
+    const arq=path.join(tmp,'t'+casos+'.pdf');
+    fs.writeFileSync(arq, await d.save());
+    const os_=await parsePdf(new Uint8Array(fs.readFileSync(arq)));
+    const erros=[];
+    const retidos=os_.filter(v=>v.folhaNaoFecha);
+    if(os_.length!==4) erros.push('esperava 4 volumes, veio '+os_.length);
+    if(retidos.length!==1)
+      erros.push('retidos: esperava 1 (so o que nao achou item), veio '+retidos.length
+        +' ['+retidos.map(v=>v.packId).join(',')+']');
+    if(retidos.length===1 && retidos[0].packId!=='444')
+      erros.push('reteve o volume errado: '+retidos[0].packId);
+    /* E A LINHA QUE IMPORTA PRA BANCADA: a caixa de 2 persianas atravessa o
+       lote quebrado e chega inteira na Etiqueta de Venda. */
+    const dois=os_.find(v=>v.packId==='222')||{};
+    if(!dois.itens || dois.itens.length!==1 || dois.itens[0].qtd!==2)
+      erros.push('a venda de 2 unidades iguais nao sobreviveu: '+JSON.stringify(dois.itens));
+    if(dois.folhaNaoFecha) erros.push('a caixa de 2 persianas foi retida a toa — nao chegaria na etiqueta');
+    /* E nenhum dos tres bons pode ter virado pacote por causa do orfao. */
+    ['111','333'].forEach(pk=>{
+      const v=os_.find(x=>x.packId===pk)||{};
+      if(v.itens) erros.push(pk+' virou pacote por causa do item orfao: '+JSON.stringify(v.itens));
+    });
+    if(erros.length){ falhas++; console.log('FALHOU  o lote grande nao para por 1 leitura quebrada');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      o lote grande nao para por 1 leitura quebrada');
   }
 
   /* ── caso 20: a licenca do pacote tem DONO UNICO, e o backfill le por ele ──
