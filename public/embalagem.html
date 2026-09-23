@@ -477,6 +477,8 @@ function setModo(m){
   if(d) d.textContent = MODO==='todas' ? 'o bipe pega a venda mais urgente do SKU, de qualquer lista'
     : (MODO==='coleta' ? 'o bipe só pega vendas de coleta' : 'o bipe só pega vendas de agência');
   confirmar=null; if(typeof idle==='function') idle();
+  // O painel do "depois" também segue o filtro — redesenha do cache, sem rede.
+  if(typeof renderFut==='function') renderFut();
 }
 document.addEventListener('click',function(e){
   var b=e.target.closest('#modoBar button'); if(b) setModo(b.getAttribute('data-modo'));
@@ -555,7 +557,13 @@ async function listaPend(){
   elAg.innerHTML=ag.length?linhasPend(ag):'<div class="vazio" style="color:var(--green)">✓ Nada faltando pra agência</div>';
   elCo.innerHTML=co.length?linhasPend(co):'<div class="vazio" style="color:var(--green)">✓ Nada faltando pra coleta</div>';
 }
-function linhasPend(l){
+/* `marcar` liga a etiqueta de modalidade na linha, e ela só é passada pelo
+   painel "Pra despachar depois" quando o que está à vista tem AGÊNCIA E COLETA
+   ao mesmo tempo. As duas listas do dia nunca passam: elas já estão separadas
+   por porta de saída, e repetir "coleta" em toda linha de uma lista chamada
+   Coleta é a marca que deixa de marcar. Regra: a marca só aparece quando ela
+   separa alguma coisa. */
+function linhasPend(l, marcar){
   var h='';
   for(var i=0;i<l.length;i++){
     var r=l[i];
@@ -578,7 +586,11 @@ function linhasPend(l){
     var multi=(pecas>r.qtd);
     h+='<div style="padding:11px 0;border-bottom:1px solid #d8dee6">'
       +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'
-      +'<b style="font-family:ui-monospace,monospace;font-size:15px">'+esc(r.codigo)+'</b>'
+      +'<b style="font-family:ui-monospace,monospace;font-size:15px">'+esc(r.codigo)
+      +(marcar?(r.modalidade==='coleta'
+        ? '<span style="font-family:inherit;font-weight:700;font-size:11px;color:#4b2a91;margin-left:6px">🚚 COLETA</span>'
+        : '<span style="font-family:inherit;font-weight:700;font-size:11px;color:#1f4b82;margin-left:6px">🚗 AGÊNCIA</span>'):'')
+      +'</b>'
       +'<b style="color:'+(atr?'#c0392b':'#b26a00')+';font-size:22px;line-height:1">'+r.qtd+'</b></div>'
       +(desc?'<div style="font-size:15px;font-weight:600;margin-top:2px">'+esc(desc)+'</div>':'')
       +(multi?'<div style="color:#8a5a00;font-size:13px;font-weight:700;margin-top:3px">'
@@ -621,16 +633,33 @@ function faltamDias(s){
    porta do "depois".
    `qtd` é CAIXA e `pecas` é PERSIANA — os dois números aparecem, e nunca um
    somado ao outro (mesma regra do `faltaHoje` × `precisa`, §18). */
+/* Busca e desenho separados, como o `listaImp`/`renderImp` logo abaixo: trocar
+   o filtro Agência/Coleta redesenha na hora, sem ida ao servidor. */
+var futCache=[], futCxCache=[];
 async function listaFut(){
-  var l=[], cx=[];
   try{
     var rs=await Promise.all([fetch("/api/pendentes/futuros"),
                               fetch("/api/pendentes/varias?quando=depois")]);
-    l=await rs[0].json(); cx=await rs[1].json();
-  }catch(e){}
-  if(!Array.isArray(l)) l=[];
-  if(!Array.isArray(cx)) cx=[];
+    var a=await rs[0].json(), b=await rs[1].json();
+    futCache=Array.isArray(a)?a:[]; futCxCache=Array.isArray(b)?b:[];
+  }catch(e){ return; }
+  renderFut();
+}
+function renderFut(){
   var el=document.getElementById("futBox"); if(!el) return;
+  /* ⚠️ ELA RODA ANTES DA PRIMEIRA BUSCA, e isso não é exceção: o `setModo` é
+     chamado no carregamento da tela, lá em cima, e o `var` destes caches só é
+     ATRIBUÍDO aqui embaixo — hoisting dá `undefined`, não `[]`. Sem as barras
+     o `.filter` estoura um TypeError no meio da execução do `<script>`, e
+     **tudo abaixo dele deixa de existir**: a tela abre sem as duas listas,
+     sem bipe e sem um único erro visível (§12). Foi assim que apareceu, na
+     primeira vez que esta tela foi aberta depois da mudança. */
+  var todas=futCache||[], todasCx=futCxCache||[];
+  /* O FILTRO DO TOPO VALE AQUI TAMBÉM. Até 23/09/2026 este painel ignorava o
+     Todas/Agência/Coleta: quem filtrava a tela pra Coleta continuava vendo
+     agência aqui embaixo, e a mesma tela passava a dizer duas coisas. */
+  var quer=function(r){ return MODO==='todas' || (r.modalidade==='coleta')===(MODO==='coleta'); };
+  var l=todas.filter(quer), cx=todasCx.filter(quer);
   if(!l.length){ el.style.display='none'; return; }
   el.style.display='';
   var por={}, ordem=[];
@@ -639,37 +668,48 @@ async function listaFut(){
   var caixasPor={};
   for(var i=0;i<cx.length;i++){ var dd=cx[i].despachar_em;
     (caixasPor[dd]=caixasPor[dd]||[]).push(cx[i]); }
+  /* O RESUMO DO TOPO responde "o que tem pra despachar" de uma olhada — a
+     pergunta que o painel não respondia, porque para saber o tamanho do que
+     vinha era preciso somar sete blocos com os olhos. Ele nomeia a PRÓXIMA
+     data, que é a única acionável hoje; o resto é planejamento. */
+  var totCx=0, totPc=0;
+  for(var i=0;i<l.length;i++){ totCx+=l[i].qtd; totPc+=(l[i].pecas!=null?l[i].pecas:l[i].qtd); }
+  var prox=ordem[0], nProx=0;
+  for(var i=0;i<(por[prox]||[]).length;i++) nProx+=por[prox][i].qtd;
   var h='<div class="ttl">Pra despachar depois</div>'
-    +'<div style="color:#1f4b82;font-size:13px;margin:-4px 0 8px">'
+    +'<div style="font-size:14px;font-weight:700;margin:-4px 0 2px">'
+    +totCx+' caixa'+(totCx>1?'s':'')+(totPc>totCx?' <span style="color:#8a5a00">· '+totPc+' peças</span>':'')
+    +' em '+ordem.length+' data'+(ordem.length>1?'s':'')
+    +' · a próxima é <b>'+esc(faltamDias(prox)||'')+'</b> ('+dataBR(prox)+', '+nProx+' caixa'+(nProx>1?'s':'')+')</div>'
+    +'<div style="color:#1f4b82;font-size:13px;margin:0 0 8px">'
     +'Dá pra adiantar: bipe o SKU e a etiqueta sai, se tiver peça na prateleira. '
     +'Não precisa entregar nessas datas.</div>';
   for(var k=0;k<ordem.length;k++){
-    var d=ordem[k], itens=por[d], tot=0, totPecas=0;
+    var d=ordem[k], itens=por[d], tot=0, totPecas=0, temAg=false, temCo=false;
     for(var j=0;j<itens.length;j++){
       tot+=itens[j].qtd;
       totPecas+=(itens[j].pecas!=null?itens[j].pecas:itens[j].qtd);
-    }
-    var skus=[];
-    for(var j=0;j<itens.length;j++){
-      var it=itens[j], p=(it.pecas!=null?it.pecas:it.qtd);
-      /* O SKU cuja caixa leva peça a mais sai marcado JÁ NA LINHA: quem lê de
-         relance conta caixa, e é esse relance que manda buscar uma peça só. */
-      skus.push(esc(it.codigo)+' ×'+it.qtd
-        +(p>it.qtd?'<b style="color:#8a5a00"> 📦 '+p+' peças</b>':''));
+      if(itens[j].modalidade==='coleta') temCo=true; else temAg=true;
     }
     var dias=faltamDias(d);
-    h+='<div style="padding:8px 0;border-bottom:1px solid #e6eaf0">'
-      +'<div style="display:flex;justify-content:space-between;align-items:baseline">'
-      +'<b>'+dataBR(d)+(dias?'<span style="font-weight:400;color:#5a6472;font-size:12px"> · '+dias+'</span>':'')+'</b>'
-      /* Quando os dois números divergem o total ganha a palavra "caixas": um
-         "2 · 3 peças" pelado se lê como "2 peças e 3 peças". Iguais, fica só o
-         número — é o dia normal, e não há o que distinguir. */
-      +'<b style="color:#5a6472">'+tot+(totPecas>tot
-        ? ' caixas<span style="color:#8a5a00"> · '+totPecas+' peças</span>' : '')+'</b></div>'
-      +'<div style="color:#5a6472;font-size:13px;font-family:ui-monospace,monospace">'+skus.join(' · ')+'</div>';
+    /* Cada data é um bloco com as MESMAS linhas da lista "Faltam imprimir" —
+       código, o que a peça é, e o vermelho de quem não tem estoque. Até
+       23/09/2026 aqui era um amontoado monoespaçado de `CODIGO ×N`: não dizia
+       o que buscar na prateleira nem o que já está lá. */
+    h+='<div style="margin-bottom:10px;border:1px solid #d8dee6;border-radius:8px;overflow:hidden">'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;'
+      +'padding:7px 10px;background:#eef2f7">'
+      +'<b style="font-size:15px">'+dataBR(d)
+      +(dias?'<span style="font-weight:400;color:#5a6472;font-size:12px"> · '+dias+'</span>':'')+'</b>'
+      /* O número vem SEMPRE com a palavra: um "11" pelado ao lado de uma data
+         se lê como qualquer coisa, e um "2 · 3 peças" se lê como duas contagens
+         de peça. */
+      +'<b style="color:#5a6472;font-size:15px">'+tot+' caixa'+(tot>1?'s':'')
+      +(totPecas>tot?'<span style="color:#8a5a00"> · '+totPecas+' peças</span>':'')+'</b></div>'
+      +'<div style="padding:0 10px">'+linhasPend(itens, temAg&&temCo)+'</div>';
     var cs=caixasPor[d]||[];
     if(cs.length){
-      h+='<div style="margin-top:8px;border:2px solid #e0a63f;border-radius:8px;padding:8px 10px;background:#fffdf7">'
+      h+='<div style="margin:8px 10px 10px;border:2px solid #e0a63f;border-radius:8px;padding:8px 10px;background:#fffdf7">'
         +'<div style="font-weight:800;color:#8a5a00;font-size:14px;margin-bottom:6px">'
         +'📦 '+cs.length+' caixa'+(cs.length>1?'s':'')+' com mais de uma persiana nesta data</div>'
         +avisoFita();

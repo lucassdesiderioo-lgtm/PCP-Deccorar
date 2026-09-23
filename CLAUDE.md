@@ -1138,6 +1138,45 @@ tarde:
 > Caso travando no `teste_divergencia.js` (os 5 últimos), conferido
 > reintroduzindo o `COUNT(*)`: reprova.
 >
+> ⚠️ **E O PAINEL INTEIRO ERA UM RESUMO CRU, NÃO UMA LISTA DE TRABALHO**
+> (23/09/2026, no mesmo dia). Consertado o `COUNT(*)`, sobrava o resto: três
+> colunas (data, código, contagem), sem medida, sem cor, sem modelo — *"só o
+> código serve a quem decorou o catálogo"*, que é o que o comentário da lista
+> do dia diz que não se faz — e **sem estoque**, enquanto a linha logo abaixo
+> do título promete *"bipe o SKU e a etiqueta sai, **se tiver peça na
+> prateleira**"*. Convite feito, resposta adiada para o bipe: a pessoa ia à
+> prateleira descobrir.
+>
+> Hoje a linha do painel e a da lista "Faltam imprimir" saem do **mesmo
+> `SELECT`** (`linhasDeSku(filtro, porData)`) e do **mesmo desenhista**
+> (`linhasPend`) — o painel só quebra por data. Ganhou também o resumo do topo
+> (*"22 caixas · 23 peças em 7 datas · a próxima é amanhã (24/09, 4 caixas)"*),
+> que é a pergunta "o que tem pra despachar" respondida de uma olhada, e passou
+> a respeitar o filtro **Todas / Agência / Coleta** do topo — antes ele o
+> ignorava, e quem filtrava a tela para Coleta continuava vendo agência ali
+> embaixo: a mesma tela dizendo duas coisas.
+>
+> ⚠️ **NÃO ESCREVA "✓ DÁ PRA ADIANTAR" NO SKU QUE TEM SALDO.** Parece o
+> complemento óbvio do vermelho e mente: o saldo é o **mesmo** da fila de hoje,
+> e prometer adiantamento de uma peça que a venda de hoje vai consumir manda a
+> bancada gastar peça de quem tem prazo curto. Quem impede isso é a trava de
+> estoque na hora de imprimir (§8) — não uma promessa na tela. Fica só o
+> vermelho de quem não tem, que é a mesma régua da lista do dia.
+>
+> ⚠️ **A MARCA DE MODALIDADE SÓ APARECE QUANDO ELA SEPARA ALGUMA COISA.** O
+> `linhasPend` recebe `marcar`, e só o painel do "depois" passa `true`, e só
+> quando o que está à vista tem agência **e** coleta. As duas listas do dia
+> nunca passam: elas já estão separadas por porta de saída, e repetir "coleta"
+> em toda linha de uma lista chamada Coleta é a marca que deixa de marcar. Onde
+> ela serve é óbvio no dia em que aparece — em 24/09 o mesmo `BK140140BEGE` sai
+> em **duas** linhas (2 de coleta, 1 de agência), e sem a marca as duas se leem
+> como um defeito de tela.
+>
+> ⚠️ **E EM 23/09/2026 O FUTURO INTEIRO ERA COLETA — 22 de 22.** Faz sentido:
+> agência despacha hoje, com hora; coleta é o caminhão marcado para um dia. Por
+> isso o painel **não** foi dividido em duas colunas como as listas de cima — a
+> coluna "Agência" nasceria vazia, e coluna vazia todo dia vira paisagem.
+
 > ⚠️ **E FOI RENDERIZANDO QUE APARECERAM AS DUAS ÚLTIMAS COISAS** — `📦2 peças`
 > grudado e um `2 · 3 peças` que se lê como *"2 peças e 3 peças"*. As duas
 > estavam sintaticamente perfeitas e nenhum teste de unidade as pegaria; é a
@@ -1169,7 +1208,7 @@ tarde:
 > não pular de lugar.
 
 **Rode `node teste_etiqueta.js` (os 12 últimos casos são a NF 6490),
-`node teste_divergencia.js` (11 últimos: as duas contas, o card e o painel do
+`node teste_divergencia.js` (16 últimos: as duas contas, o card e o painel do
 "depois") e `node teste_parse.js` (caso 9) após mexer nisso.** E **abra a
 tela**: o card, o painel e a linha por SKU são texto montado, e a §2 já ensinou
 que rota verde sem tela aberta não é regra pronta.
@@ -2780,6 +2819,7 @@ aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não sil
 |---|---|---|
 | **`node --check` obrigatório** | Um `}` sobrando derruba o `<script>` inteiro; a tela abre e nada funciona, sem erro visível | Rodar após toda edição de `.js` e do bloco `<script>` de `.html` |
 | **Código colado por cima do velho** | Linhas duplicadas sobram embaixo e quebram a sintaxe | Conferir o entorno do trecho editado |
+| **`var` lido antes de ser atribuído** | `node --check` passa (é sintaxe válida); no navegador o `.filter` de um `undefined` estoura **no meio** da execução do `<script>` e **tudo abaixo dele deixa de existir** — a tela abre sem as listas, sem bipe e sem erro visível. Aconteceu em 23/09/2026: o `setModo` roda no carregamento e chamava um desenhista cujo cache só é atribuído 150 linhas abaixo | Função chamada no carregamento não pode supor que o cache já existe: `(cache\|\|[])`. E **abrir a tela** — nenhum teste do projeto pega isto |
 | **WAL do SQLite** | `dados.db` tem ~4 KB; os dados estão em `dados.db-wal`. `cp dados.db` produz backup **vazio** | Usar `node backup.js`, que chama `db.backup()` |
 | **`pm2 restart` cacheia** | A alteração não aparece | `pm2 delete expedicao && pm2 start server.js --name expedicao` |
 | **`!` no bash** | Expansão de histórico quebra heredocs e `sed` | `set +H` antes de blocos com `!` |
@@ -2910,7 +2950,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (23 casos), `teste_carga.js` (49), `teste_divergencia.js` (46) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (50), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (23 casos), `teste_carga.js` (49), `teste_divergencia.js` (51) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (50), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3012,6 +3052,15 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   "depois", que ninguém olha todo dia (§5, #23)
 - ❌ Trocar o `?quando=` por uma rota nova, ou fazer o parâmetro ausente
   significar outra coisa: o tablet com a página em cache chama sem ele (§5, #23)
+- ❌ Escrever uma segunda consulta para a linha da lista de SKU: a do dia e a do
+  painel "depois" saem do mesmo `linhasDeSku`, e foi a cópia que ficou para trás
+  que deixou o painel sem medida, sem cor e **sem estoque** (§5, #23)
+- ❌ Escrever "✓ dá pra adiantar" no SKU com saldo: o saldo é o MESMO da fila de
+  hoje, e a promessa manda gastar peça de quem tem prazo curto (§5, #23)
+- ❌ Repetir a marca de modalidade numa lista que já é de uma modalidade só — a
+  marca só aparece quando ela separa alguma coisa (§5, #23)
+- ❌ Dividir o painel "depois" em colunas Agência e Coleta: em 23/09/2026 o
+  futuro era 22 de 22 coleta, e coluna vazia todo dia vira paisagem (§5, #23)
 - ❌ Escrever a instrução de embalagem diferente em cada tela: é uma frase só —
   *saco maior, as peças juntas com fita* (§5, #23)
 - ❌ Deixar cadastro de SKU soltar volume retido por `pacote:` — cadastro não

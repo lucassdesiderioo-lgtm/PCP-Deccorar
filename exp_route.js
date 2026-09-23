@@ -529,32 +529,43 @@ module.exports=function(app,db){
      mesmo SKU pode estar nas duas, cada um com a sua conta. `modalidade` vem
      ja resolvida ('agencia' | 'coleta') pela regua do carga.js: NULL e
      agencia, a tela nao precisa saber disso. */
-  app.get('/api/pendentes',(req,res)=>{
-    /* `pecas` conta PERSIANA; `qtd` conta CAIXA. Eles sao iguais no dia normal e
-       divergem exatamente na venda de varias unidades — e e essa divergencia que
-       a tela escreve em ambar. Sem ela a lista dizia "1" para uma caixa de tres
-       persianas, e a bancada saia da prateleira com UMA: o erro so aparecia no
-       bipe, com a caixa ja montada (o defeito da NF 6490, 16/09/2026).
-       Volume sem linha em `lote_item` vale 1 — e o volume de sempre. */
-    res.json(db.prepare(`SELECT l.codigo, COUNT(*) qtd,
-        SUM(COALESCE((SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id),1)) pecas,
-        CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END modalidade,
-        MIN(l.despachar_em) vence_em,
-        SUM(CASE WHEN l.despachar_em IS NOT NULL AND l.despachar_em<date('now','localtime') THEN 1 ELSE 0 END) atrasados,
-        s.largura_cm, s.altura_cm,
-        COALESCE(c.nome,s.cor_codigo,s.cor) cor_nome,
-        COALESCE(t.nome,s.tecido_codigo) tecido_nome,
-        m.nome modelo_nome, COALESCE(m.exige_medida,1) exige_medida,
-        s.estoque
-      FROM lote l
-      LEFT JOIN skus s ON s.codigo=l.codigo
-      LEFT JOIN cor c ON c.codigo=s.cor_codigo
-      LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
-      LEFT JOIN modelo m ON m.id=s.modelo_id
-      WHERE ${filaDoDia('l')}
-      GROUP BY l.codigo, CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END
-      ORDER BY atrasados DESC, qtd DESC`).all());
-  });
+  /* ⚠️ A LINHA DA LISTA DO DIA E A DO PAINEL "DEPOIS" SAO A MESMA LINHA — e o
+     SELECT e um so desde 23/09/2026. Ate ali o painel do depois tinha consulta
+     PROPRIA, com tres colunas (data, codigo, COUNT): sem medida, sem cor, sem
+     modelo e **sem estoque**. Duas consequencias, e a segunda e a cara:
+       - so o codigo, que serve a quem decorou o catalogo — a mesma coisa que o
+         comentario logo acima diz que nao se faz;
+       - o painel PROMETE "bipe o SKU e a etiqueta sai, se tiver peca na
+         prateleira" e nao dizia quais tinham peca. Convite feito, resposta
+         adiada pro bipe: a pessoa ia a prateleira descobrir.
+     `porData` e a unica diferenca: o painel quebra por dia, a lista do dia nao.
+
+     `pecas` conta PERSIANA; `qtd` conta CAIXA. Eles sao iguais no dia normal e
+     divergem exatamente na venda de varias unidades — e e essa divergencia que
+     a tela escreve em ambar. Sem ela a lista dizia "1" para uma caixa de tres
+     persianas, e a bancada saia da prateleira com UMA: o erro so aparecia no
+     bipe, com a caixa ja montada (o defeito da NF 6490, 16/09/2026).
+     Volume sem linha em `lote_item` vale 1 — e o volume de sempre. */
+  const linhasDeSku=(filtro,porData)=>db.prepare(`SELECT l.codigo, COUNT(*) qtd,
+      ${porData?'l.despachar_em,':''}
+      SUM(COALESCE((SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id),1)) pecas,
+      CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END modalidade,
+      MIN(l.despachar_em) vence_em,
+      SUM(CASE WHEN l.despachar_em IS NOT NULL AND l.despachar_em<date('now','localtime') THEN 1 ELSE 0 END) atrasados,
+      s.largura_cm, s.altura_cm,
+      COALESCE(c.nome,s.cor_codigo,s.cor) cor_nome,
+      COALESCE(t.nome,s.tecido_codigo) tecido_nome,
+      m.nome modelo_nome, COALESCE(m.exige_medida,1) exige_medida,
+      s.estoque
+    FROM lote l
+    LEFT JOIN skus s ON s.codigo=l.codigo
+    LEFT JOIN cor c ON c.codigo=s.cor_codigo
+    LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
+    LEFT JOIN modelo m ON m.id=s.modelo_id
+    WHERE ${filtro}
+    GROUP BY ${porData?'l.despachar_em, ':''}l.codigo, CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END
+    ORDER BY ${porData?'l.despachar_em, ':'atrasados DESC, '}qtd DESC`).all();
+  app.get('/api/pendentes',(req,res)=> res.json(linhasDeSku(filaDoDia('l'),false)));
   /* ⚠️ AS CAIXAS DE VARIAS PERSIANAS TEM CARD PROPRIO, E POR UM MOTIVO FISICO.
      A coleta ganhou card proprio porque e um LUGAR diferente (§8-B); esta ganha
      porque e uma EMBALAGEM diferente — saco maior, as pecas juntas com fita, em
@@ -664,12 +675,7 @@ module.exports=function(app,db){
      caixa ja esta montada".
      `qtd` continua sendo CAIXA e `pecas` e PERSIANA — os dois nomes, nunca um
      so, e eles nao se somam (mesma regra do `faltaHoje` x `precisa`, §18). */
-  app.get('/api/pendentes/futuros',(req,res)=>{
-    res.json(db.prepare(`SELECT l.despachar_em, l.codigo, COUNT(*) qtd,
-        SUM(COALESCE((SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id),1)) pecas
-      FROM lote l WHERE ${DEPOIS('l')}
-      GROUP BY l.despachar_em, l.codigo ORDER BY l.despachar_em, l.codigo`).all());
-  });
+  app.get('/api/pendentes/futuros',(req,res)=> res.json(linhasDeSku(DEPOIS('l'),true)));
   app.get('/api/lote',(req,res)=> res.json(db.prepare("SELECT id,codigo,cor,buyer,city,nf,estagio FROM lote WHERE data=date('now','localtime') ORDER BY id").all()));
 
   // ── Reimpressao ───────────────────────────────────────────────────────────

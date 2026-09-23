@@ -337,9 +337,16 @@ function conferir(nome,cond,detalhe){
     const dep =db.prepare("SELECT date('now','localtime','+8 days') d").get().d;
     const ins=db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,estagio,modalidade,despachar_em)
       VALUES (?,?,?,?,'pendente',?,?)`);
+    const dep2=db.prepare("SELECT date('now','localtime','+15 days') d").get().d;
     const silmara=ins.run('BK130130BEGE','Silmara','6959','p9','agencia',dep).lastInsertRowid;
     const futNormal=ins.run('BK140140BEGE','Ana','7000','p10','agencia',dep).lastInsertRowid;
     const hojeDupla=ins.run('BK160160CINZA','Carla','7001','p11','agencia',hoje).lastInsertRowid;
+    /* Uma segunda data e uma COLETA: o painel quebra por dia e a tela precisa do
+       `modalidade` pra respeitar o filtro do topo. Em producao (23/09/2026) o
+       futuro inteiro era coleta — 22 de 22. */
+    ins.run('BK140140BEGE','Joao','7002','p12','coleta',dep2);
+    db.prepare("UPDATE skus SET estoque=0 WHERE codigo='BK130130BEGE'").run();
+    db.prepare("UPDATE skus SET estoque=4 WHERE codigo='BK140140BEGE'").run();
     db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK130130BEGE',1,'folha')").run(silmara);
     db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK130130BRANCO',1,'folha')").run(silmara);
     db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK160160CINZA',2,'folha')").run(hojeDupla);
@@ -350,9 +357,40 @@ function conferir(nome,cond,detalhe){
        que diz quantas peças tirar da prateleira. */
     conferir('o painel do depois conta CAIXA e PERSIANA (NF 6959)',
       lin.qtd===1 && lin.pecas===2, JSON.stringify(lin));
-    const linN=(f.body||[]).find(x=>x.codigo==='BK140140BEGE')||{};
+    const linN=(f.body||[]).find(x=>x.codigo==='BK140140BEGE' && x.despachar_em===dep)||{};
     conferir('venda futura normal continua valendo 1 peca',
       linN.qtd===1 && linN.pecas===1, JSON.stringify(linN));
+
+    /* ── A REORGANIZACAO DO PAINEL (23/09/2026) ──
+       Ele era um resumo cru de tres colunas (data, codigo, COUNT). Sem medida,
+       sem cor, sem modelo e — o mais caro — SEM ESTOQUE, enquanto a propria
+       linha do painel promete "bipe o SKU e a etiqueta sai, se tiver peca na
+       prateleira". Hoje ele sai do MESMO `SELECT` da lista do dia. */
+    conferir('o painel traz o que a peca E, nao so o codigo (§7)',
+      lin.largura_cm===130 && lin.altura_cm===130 && lin.cor_nome==='Bege'
+      && lin.tecido_nome==='Blackout' && lin.modelo_nome==='Rolo', JSON.stringify(lin));
+    /* O vermelho de "sem estoque — precisa produzir" sai deste campo, e e a
+       resposta a pergunta que o painel fazia e nao respondia. */
+    conferir('o painel traz o estoque, que e o que responde "da pra adiantar?"',
+      lin.estoque===0 && linN.estoque===4, JSON.stringify({a:lin.estoque,b:linN.estoque}));
+    /* Uma linha por DATA: o mesmo SKU em dois dias sao duas linhas, senao o dia
+       grande (11 caixas em 28/09, em producao) se dilui no vizinho. */
+    const doJoao=(f.body||[]).filter(x=>x.codigo==='BK140140BEGE');
+    conferir('o mesmo SKU em duas datas vira DUAS linhas, uma por dia',
+      doJoao.length===2 && doJoao[0].despachar_em===dep && doJoao[1].despachar_em===dep2,
+      JSON.stringify(doJoao.map(x=>x.despachar_em)));
+    /* `modalidade` e o que faz o filtro Todas/Agencia/Coleta do topo valer aqui
+       embaixo tambem — ate 23/09 o painel o ignorava, e a mesma tela passava a
+       dizer duas coisas. */
+    conferir('cada linha diz por onde a caixa sai, pra o filtro do topo valer aqui',
+      doJoao[0].modalidade==='agencia' && doJoao[1].modalidade==='coleta',
+      JSON.stringify(doJoao.map(x=>x.modalidade)));
+    /* E a lista do DIA nao pode ter mudado de forma ao passar a dividir o
+       SELECT com o painel: ela nao quebra por data. */
+    const hj2=await chamar(ctx,'GET','/api/pendentes');
+    conferir('a lista do dia continua sem quebrar por data',
+      (hj2.body||[]).length>0 && (hj2.body||[]).every(x=>x.despachar_em===undefined),
+      JSON.stringify((hj2.body||[]).map(x=>x.codigo)));
 
     const d=await chamar(ctx,'GET','/api/pendentes/varias?quando=depois');
     const ids=(d.body||[]).map(x=>x.id);
