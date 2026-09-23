@@ -4291,6 +4291,24 @@ aprovado   a ficha é explodida e gravada — e nada mais muda
 > como "de graça". É a regra 4 na tela, e só apareceu **renderizando a tela**:
 > nenhum teste de unidade pega um total que está sintaticamente perfeito.
 
+> ✅ **CONFERIDA EM PRODUÇÃO EM 23/09/2026, COM A FOLHA NA MÃO.** O dono
+> lançou o número do Decorsoft e rodou o ciclo inteiro numa revenda de verdade
+> — orçamento, envio, aprovação e PDF. Saiu o **pedido 5001**, com duas
+> persianas e duas coleções de preços diferentes na mesma folha, e as contas
+> foram refeitas **por fora do sistema**, contra o papel: `4,620 m²` subindo
+> para o Tubo 41 com redução de peso automática cobrada, `1,000 × 1,000`
+> cobrando o mínimo faturado de `1,500 m²`, a cascata da tabela B dando
+> `530,29 + 251,75 = 782,04` — a soma das peças fechando com as parcelas
+> impressas —, o prazo de quarta 13:31 caindo na quinta 01/10 e a peça de
+> tecido fora da estante **entrando marcada**, sem travar.
+>
+> ⚠️ **E ELA NÃO PROVA O CADASTRO.** Que R$ 110,00 e R$ 140,00 sejam os preços
+> certos daquelas coleções é decisão de quem lançou; a folha prova o ciclo e a
+> aritmética. A prova que falta — e que fecha a fase — é a **semana em paralelo
+> ao Decorsoft**, pedido a pedido. Está escrito assim de propósito: o §10 chama
+> verde sem conferência de pior que vermelho, e meia prova escrita como prova
+> inteira fecha a pergunta para sempre.
+
 > ⚠️ **A ORDEM DOS `DELETE` DO PEDIDO É A DOS PONTEIROS**, e `sm_pedido_alteracao`
 > aponta para o **item** (a troca de degrau e a peça cancelada guardam qual peça
 > era). Ele sai antes dele, e não junto dos outros registros, que só apontam para

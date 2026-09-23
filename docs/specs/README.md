@@ -26,7 +26,7 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 
 | Spec | Status |
 |---|---|
-| `SOBMEDIDA-PEDIDO-REVENDA.md` | **Em construção** · módulo sob medida (`tecido/`) · **fase 1 em produção e conferida (22/09 — dez persianas reais no corte e dez no preço, as vinte bateram)** · **fase 2 em código (22/09 — revenda, carteira, tabelas A/B/C, feriados e prazo; falta cadastrar as revendas de hoje)** · **fase 3 em código (22/09 — pedido: orçamento, envio que congela preço e prazo, fila do vendedor, aprovação que explode a ficha, PDF; falta a semana em paralelo ao Decorsoft)** · fases 4–8 planejadas · as duas decisões da §8 anteriores à fase 1 estão respondidas |
+| `SOBMEDIDA-PEDIDO-REVENDA.md` | **Em construção** · módulo sob medida (`tecido/`) · **fase 1 em produção e conferida (22/09 — dez persianas reais no corte e dez no preço, as vinte bateram)** · **fase 2 em código (22/09 — revenda, carteira, tabelas A/B/C, feriados e prazo; falta cadastrar as revendas de hoje)** · **fase 3 em código e conferida no deploy (23/09 — o pedido 5001 saiu com duas persianas, duas coleções, mínimo faturado, cascata e prazo, tudo refeito por fora contra o PDF; falta a semana em paralelo ao Decorsoft)** · fases 4–8 planejadas · as duas decisões da §8 anteriores à fase 1 estão respondidas |
 | `ESTOQUE-LIVRO-E-CONFERENCIA.md` | **Em construção** · fase 0 e fase 1 em código (21/09) · fases 2–4 planejadas · uma decisão em aberto (§6.4) |
 | `VENDAS-E-MEDIA.md` | Planejado · nada no código · a troca da fonte da média (fase 3) espera o ok do dono |
 | `MESA-DE-CORRECOES.md` | Planejado · nada no código · depende do livro (Estoque F1) e das canceladas (Vendas F2) |

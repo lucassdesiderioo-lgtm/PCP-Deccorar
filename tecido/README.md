@@ -56,7 +56,7 @@ E, da spec `SOBMEDIDA-PEDIDO-REVENDA` (o segundo assunto do módulo — a venda)
 |---|---|---|
 | 1 | Catálogo de venda, ficha técnica e simulador | **pronta e conferida na fábrica** (22/09/2026) |
 | 2 | Revendas, carteiras, tabelas A/B/C, feriados e prazo | **em código** (22/09/2026) — falta cadastrar as revendas de hoje |
-| 3 | Pedido interno: orçamento, envio que congela, fila do vendedor, aprovação, PDF | **em código** (22/09/2026) — falta a semana em paralelo ao Decorsoft |
+| 3 | Pedido interno: orçamento, envio que congela, fila do vendedor, aprovação, PDF | **em código e conferida no deploy** (23/09/2026) — falta a semana em paralelo ao Decorsoft |
 
 ---
 
@@ -638,6 +638,20 @@ a peça ser cortada.
 > Helvetica escreve em **WinAnsi**, e a seta ou o emoji colado do WhatsApp na
 > observação fazem o `pdf-lib` estourar no meio da geração, com a folha pela
 > metade. Vira `?`, e a folha sai.
+
+### ✅ Conferida em produção em 23/09/2026 — o pedido 5001
+
+Ciclo inteiro numa revenda de verdade, e as contas refeitas **por fora**,
+contra o PDF: duas persianas e duas coleções de preços diferentes na mesma
+folha. `4,620 m² × R$ 110,00 = R$ 508,20` com redução de peso automática
+cobrada; `1,000 × 1,000` cobrando o **mínimo faturado de 1,500 m²**; a cascata
+da tabela B (−5%) dando `530,29 + 251,75 = R$ 782,04`, que é a soma das peças
+fechando com as parcelas impressas; prazo de quarta 13:31 caindo na quinta
+01/10; e a peça de tecido fora da estante **entrando marcada**, sem travar.
+
+> ⚠️ **A folha prova o ciclo e a aritmética, não o cadastro.** Que R$ 110,00 e
+> R$ 140,00 sejam os preços certos daquelas coleções é decisão de quem lançou.
+> A prova que falta é a semana em paralelo ao Decorsoft, pedido a pedido.
 
 ### Duas regras de tela que só apareceram renderizando
 
