@@ -4471,8 +4471,22 @@ imprimir →  marca, registra quem imprimiu, e a segunda vez sai com o MESMO có
 > redesenho.** A primeira versão punha o código numa coluna de 38 mm ao lado do
 > texto, e o módulo saía em **0,23 mm** — abaixo do que a ZD220 resolve numa
 > etiqueta amassada. Hoje ele é uma faixa de 66 mm no rodapé, com o código e o
-> setor escritos à direita. **Ainda não foi conferido no papel:** a régua final
-> de código de barras é o leitor bipando (§4), e isso depende do rolo impresso.
+> setor escritos à direita.
+
+> ✅ **CONFERIDO NO PAPEL EM 23/09/2026 — O LEITOR BIPOU.** O dono fez o deploy,
+> rodou o backfill (13 etiquetas do pedido 5001), imprimiu o maço da
+> Serralheria e passou o leitor da bancada: **bipou**. É a régua final de
+> código de barras, e ela vale mais que os 405 casos verdes — o QR do kit
+> passou por três rodadas verdes sem ler em celular nenhum (§4), e foi
+> justamente por isso que o "ainda não conferido" ficou escrito aqui até o
+> bipe existir.
+>
+> ⚠️ **E O BIPE PROVA UMA COISA SÓ: que a ZD220 imprime este CODE128 num módulo
+> que o leitor resolve.** Ele não prova que a medida escrita é a que a
+> serralheria corta — isso é a bancada, com o tubo na mão, e não aconteceu
+> ainda. Prova que não foi feita se escreve como não feita: é a lição do §4,
+> onde o bipe da etiqueta do kit quase foi dado por certo porque "não havia
+> motivo esperado para falhar".
 
 **Rode `cd tecido && npm test` (405 casos) ao mexer em etiqueta de produção,
 aprovação ou no plano vindo do pedido** — 16 casos são da etiqueta e travam o
