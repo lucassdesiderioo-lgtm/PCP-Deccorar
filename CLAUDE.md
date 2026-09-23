@@ -810,7 +810,7 @@ configuração é o que vai falhar.
 > (§8-B, armadilha #31) e o QR em si — que o teste não "olha": ele decodifica
 > de volta, confere a paridade Reed-Solomon e **remonta o QR a partir do PDF
 > gerado**. Mexeu na permissão?
-> **`node teste_acesso.js`** (113 casos). Mexeu no `barras.js`?
+> **`node teste_acesso.js`** (114 casos). Mexeu no `barras.js`?
 > **`cd tecido && npm test` também** — a etiqueta de prateleira do sob medida
 > lê o mesmo arquivo.
 
@@ -1377,7 +1377,7 @@ peça**, não só para o `lote.codigo`. A decisão vira história
 > `etiqueta.emitir` não conferiria nem imprimiria.
 >
 > **Rode `node teste_acesso.js` ao mexer em `permissoes.js` ou no `permDaRota()`**
-> — os 113 casos travam as três pontas, o backfill, a cobertura e as quatro
+> — os 114 casos travam as três pontas, o backfill, a cobertura e as quatro
 > portas de escalonamento da §10 (#28). **Rota nova pede uma linha no
 > `permDaRota()`**: sem ela a rota nasce NEGADA e o `teste_cobertura.js`
 > reprova (§10, armadilha #29).
@@ -3413,6 +3413,30 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   afirmação — e só a tela renderizada pega isso (§19)
 - ❌ Aceitar parâmetro de prazo fora da faixa (`prazoCorteHora` por extenso, dia
   da semana 7): aceito, ele muda a conta em silêncio (§19)
+- ❌ Dar o código da etiqueta de produção na IMPRESSÃO em vez da aprovação: ele
+  é da peça, e código novo a cada papel parte a história dela em duas (§19)
+- ❌ Tirar o número de uma etiqueta e devolvê-lo ao bolo — nem no cancelamento,
+  nem no backfill: número que volta é número que sai duas vezes (§19)
+- ❌ Ler o contador do setor num `SELECT` e gravar num `UPDATE` separado: a
+  janela entre os dois dá o mesmo código a duas aprovações (§19)
+- ❌ Usar um contador só para os cinco setores: o serralheiro leria saltos de
+  dezenas entre uma etiqueta e a seguinte, sem nada explicando (§19)
+- ❌ Escrever a medida ACABADA na etiqueta de produção ou na lista do corte: a
+  persiana de 1,000 manda cortar 0,970, e é a armadilha #18 na bancada (§19)
+- ❌ Escrever só "TUBO" na etiqueta da serralheria — o nome da peça é o degrau,
+  e Tubo 32 e Tubo 41 são peças diferentes, compradas e guardadas à parte (§19)
+- ❌ Dar código novo na reimpressão, ou pôr o aviso do já impresso DEPOIS do
+  botão: ali ele explica um maço que já saiu (§19, e a armadilha #1-B do §2)
+- ❌ Escrever uma segunda cópia da tabela CODE128 no PDF da etiqueta de
+  produção: o `public/barras.js` serve os três (§19, §4)
+- ❌ Estreitar o código de barras para caber texto ao lado: a 38 mm o módulo
+  cai a 0,23 mm e a ZD220 não resolve na etiqueta amassada (§19)
+- ❌ Escrever uma fileira de escolha própria em vez da do `base.css`: os botões
+  saem idênticos, sem o azul do escolhido, e o maço sai do setor errado (§19)
+- ❌ Pôr numa tabela um `<td>` que só existe em algumas linhas: a tabela sai
+  torta e a tarja aparece debaixo do cabeçalho de outra coluna (§19, §12)
+- ❌ Escrever a chave do setor na tela da bancada em vez do nome — chave de
+  banco em tela é o "— Correcao de contagem" do §2 outra vez (§19)
 
 ---
 
@@ -4148,7 +4172,7 @@ engano. Há caso travando.
 > silêncio — foi assim que o `resumo.valor_parado` do painel gerencial chegou à
 > bancada (§15). Há caso travando os dois nomes, o certo e o errado.
 
-**Rode `cd tecido && npm test` (387 casos) e `node teste_acesso.js` (113) ao
+**Rode `cd tecido && npm test` (405 casos) e `node teste_acesso.js` (114) ao
 mexer em revenda, prazo, preço, permissão ou no `server.js`.** Os casos do
 prazo saem das datas escritas na §4.9 da spec, e não da resposta que a função
 deu.
@@ -4316,10 +4340,148 @@ aprovado   a ficha é explodida e gravada — e nada mais muda
 > mais aponta (§12) — foi assim que a limpeza do teste reprovou na primeira
 > rodada.
 
-**Rode `cd tecido && npm test` (387 casos) ao mexer em pedido, preço, prazo ou
+**Rode `cd tecido && npm test` (405 casos) ao mexer em pedido, preço, prazo ou
 no catálogo** — 29 casos são do pedido e saem das seções 4.8 a 4.18 da spec, e
 3 do acesso (`acesso_operador.test.js`). Mexeu em permissão? **`node
-teste_acesso.js` (113) e `node teste_cobertura.js` (10) também.**
+teste_acesso.js` (114) e `node teste_cobertura.js` (10) também.**
+
+### ⚠️ A FASE 4-A (23/09/2026) — A ETIQUETA DE PRODUÇÃO, E O CÓDIGO QUE NASCE COM A PEÇA
+
+A fase 3 congela o pedido; a 4-A o entrega à fábrica. Migração 19 (`sm_setor`,
+quatro colunas em `sm_pedido_componente` e `sm_etiqueta_impressao`),
+`dominio/etiqueta_producao.js`, `dominio/etiqueta_producao_pdf.js`, a tela
+`/sobmedida/producao` e o `backfill_etiquetas.js`.
+
+```
+aprovar  →  cada componente que gera etiqueta ganha SER-000123 / COL-000045 / MON / REV / EMB
+            (na MESMA transação da ficha congelada)
+imprimir →  marca, registra quem imprimiu, e a segunda vez sai com o MESMO código
+```
+
+> ⚠️ **O CÓDIGO É DA PEÇA, NÃO DO PAPEL — e essa é a frase inteira da fase.**
+> Ele nasce na **aprovação**, junto com a ficha, e não na impressão. Código
+> novo a cada papel partiria a história da peça em duas e o tempo do setor
+> nunca fecharia; código reaproveitado sairia um dia em duas peças, e aí a
+> bancada bipa a peça errada com a etiqueta certa. `atribuirCodigos` é
+> **idempotente** (só olha quem tem etiqueta e não tem código), e é por isso
+> que o backfill pode ser o **mesmo caminho** da aprovação em vez de uma
+> segunda régua.
+
+> ⚠️ **O CONTADOR SOBE NUM `UPDATE ... RETURNING`, e não num `SELECT` seguido
+> de `UPDATE`.** Ler e escrever em dois passos abre uma janela entre eles, e
+> duas aprovações na mesma janela levam o mesmo número. Duas etiquetas iguais
+> em duas peças é exatamente o que a fase 5 (o bipe) não tem como desfazer. O
+> índice `UNIQUE` sobre `codigo_etiqueta` é a segunda tranca, não a primeira.
+
+> ⚠️ **O NÚMERO NUNCA VOLTA AO BOLO**, nem quando a peça é cancelada, nem
+> quando o código é reatribuído pelo backfill. É a mesma regra do número do
+> pedido (fase 3): número que volta é número que um dia sai duas vezes.
+
+> ⚠️ **CADA SETOR TEM O SEU CONTADOR, E ISSO É O DESENHO.** `SER-000001` e
+> `COL-000001` convivem, porque a serralheria e a coleção são duas filas
+> físicas diferentes e cada uma conta a sua. Um contador só faria o
+> serralheiro ler saltos de dezenas entre uma etiqueta e a seguinte, sem nada
+> explicando — e número com buraco é o que faz alguém achar que perdeu papel.
+
+> ⚠️ **O QUE VAI ESCRITO É A MEDIDA DE CORTE, NUNCA A ACABADA.** A persiana de
+> `1,000 × 1,000` manda a serralheria cortar `0,970` e a coleção cortar
+> `0,965 × 1,200`. É a armadilha #18 (§7-B) na bancada: cortar pela medida de
+> consumo faz a peça não entrar. A tela do corte escreve isso com todas as
+> letras — *"estas são as medidas de CORTE do tecido, não as acabadas"* —,
+> porque a lista sozinha tem cara de lista de pedidos.
+
+> ⚠️ **NO TUBO, O NOME DA PEÇA É O DEGRAU.** Sai `TUBO 32 · CORTAR 0,970`, não
+> `TUBO`. Tubo 32 e Tubo 41 são peças diferentes na serralheria — diâmetro
+> diferente, comprados separados, guardados em lugares diferentes. Escrever só
+> "TUBO" mandaria o serralheiro conferir na tela qual é, e a etiqueta existe
+> justamente para ele não precisar.
+
+> ⚠️ **REIMPRIMIR SAI COM O MESMO CÓDIGO, e a tela avisa ANTES do clique.** É a
+> armadilha #1-B do §2 pela porta da produção: o papel repetido não cria peça
+> nova, como a etiqueta de venda reimpressa não baixa estoque de novo. O que a
+> reimpressão grava é `reimpressoes` e uma linha em `sm_etiqueta_impressao` —
+> história, não peça. **O aviso vem antes do botão**: depois do clique ele
+> viraria explicação de um maço que já saiu, e o risco real é o rolo antigo
+> continuar na bancada com etiquetas iguais às do novo. Por isso a frase manda
+> jogar o anterior fora.
+
+> ⚠️ **A COLUNA DE CADA SETOR MOSTRA "FALTA DE TOTAL", não só o total.** Verde
+> quer dizer que já saiu tudo daquele setor; azul, que falta. É o número que
+> impede o maço sair duas vezes, e é a mesma ideia do `faltaHoje` do §18: quem
+> lê a tela de longe precisa ver o que falta, não o que existe.
+
+> ⚠️ **SÓ SAI ETIQUETA DE PEDIDO APROVADO, E SÓ COM CÓDIGO.** O enviado ainda
+> espera o vendedor, e a recusa diz isso. Componente sem código é ou peça que
+> não gera etiqueta (os kits), ou pedido aprovado **antes** desta fase — e esse
+> é o `backfill_etiquetas.js`, que roda pelo mesmo `atribuirCodigos`, faz
+> backup por `await db.backup()` e é idempotente. O pedido 5001, aprovado em
+> produção na manhã do dia 23, é exatamente esse caso: sem o backfill ele
+> ficaria para sempre sem etiqueta, invisível para a fábrica.
+
+> ⚠️ **SÃO 6 ETIQUETAS NA PERSIANA SIMPLES E 7 COM ADICIONAL — não 8.** A ficha
+> tem oito componentes com `gera_etiqueta=1`, e eu contei os oito no plano
+> desta fase. Estava errado: **bandô e barra nunca convivem**, e nenhum dos
+> dois entra quando `adicional='nenhum'`. O pedido 5001 conferiu o número
+> sozinho — 13 etiquetas para duas peças, 6 na lisa e 7 na de bandô. A regra
+> aprovada (uma etiqueta por componente que gera etiqueta) não mudou; o que
+> estava errado era a minha conta, e ela ficou escrita aqui porque número de
+> plano vira expectativa de quem confere o maço.
+
+> ⚠️ **A FILEIRA DE ESCOLHA DO SETOR É A DO `base.css`, E A PRIMEIRA VERSÃO
+> TINHA A DELA.** Os cinco botões saíam **idênticos**, sem o azul do escolhido
+> e sem o alvo de toque de tablet — só uma linha de texto ao lado dizia qual
+> era o setor. É o mecanismo da cor dos três modos da Revisão (§3): ela não é
+> decoração, é o que impede imprimir meia hora de maço no setor errado. **Só
+> apareceu abrindo a tela**, e nenhum teste do projeto pegaria: o `aria-pressed`
+> estava lá, certinho, e sem regra de CSS por trás não pintava nada.
+
+> ⚠️ **E MAIS TRÊS COISAS SÓ APARECERAM NO PRIMEIRO RENDER** — a mesma lição do
+> *"23,1 mm em vez de 23,1 mm"* do §4, três vezes no mesmo dia:
+> - a tarja **"sem tecido"** era uma coluna **sem cabeçalho**, e só existia na
+>   linha que a tinha: as outras ficavam com uma célula a menos e a tabela saía
+>   torta, com a tarja pendurada debaixo do cabeçalho de outro setor. Hoje ela
+>   mora na célula do pedido, que é de quem ela fala;
+> - *"**1 destes pedidos já tiveram** etiquetas"* — o aviso não concordava com o
+>   caso de um pedido, que é o normal;
+> - o histórico escrevia a **chave** do setor (`5 etiqueta(s) de serralheria`)
+>   em vez do nome. Chave de banco na tela da bancada é o *"— Correcao de
+>   contagem"* do §2 outra vez.
+
+> **O corte veio junto, e é o que fecha a metade do tecido.** `POST
+> /api/producao/para-cortar` devolve as peças dos pedidos escolhidos já em
+> **medida de corte**, agrupadas **por tecido** — `plano.calcular` recebe um
+> tecido por plano, porque não há emenda e bobina de cor diferente é outro
+> estoque. Era exatamente isto que o leitor da etiqueta do Decorsoft já fazia
+> (`etiqueta_corte.js`); agora o dado vem do próprio sistema, e o `pedido` que
+> vai para o tom único é o número do pedido — que a fase 3 já garantiu estar
+> acima do Decorsoft (§4.18).
+
+> ⚠️ **`etiqueta_producao.imprimir` NÃO É `etiqueta_producao.ler`.** Ler é a
+> lista, e o vendedor tem: ele precisa saber se a peça dele já foi para a
+> bancada. Imprimir é a chave do cortador — quem está com o rolo na
+> impressora. É o mesmo arranjo do `kit.imprimir` × `kit.editar` do §4.
+
+> ⚠️ **O DESENHO DO PAPEL MORA NUM ARQUIVO SÓ**, e o CODE128 é o **mesmo**
+> `public/barras.js` do PCP e do sob medida — `etiqueta_pdf.js` passou a
+> exportar o `desenharBarras` para o novo consumir. A primeira versão tinha uma
+> "cópia de emergência" da tabela lá dentro: é a segunda régua do §15 escrita à
+> mão, e duas tabelas CODE128 são duas etiquetas no dia em que uma mudar.
+
+> ⚠️ **O CÓDIGO DE BARRAS OCUPA A LARGURA INTEIRA DA ETIQUETA, e isso custou um
+> redesenho.** A primeira versão punha o código numa coluna de 38 mm ao lado do
+> texto, e o módulo saía em **0,23 mm** — abaixo do que a ZD220 resolve numa
+> etiqueta amassada. Hoje ele é uma faixa de 66 mm no rodapé, com o código e o
+> setor escritos à direita. **Ainda não foi conferido no papel:** a régua final
+> de código de barras é o leitor bipando (§4), e isso depende do rolo impresso.
+
+**Rode `cd tecido && npm test` (405 casos) ao mexer em etiqueta de produção,
+aprovação ou no plano vindo do pedido** — 16 casos são da etiqueta e travam o
+código na aprovação, a idempotência, a reimpressão com o mesmo código, a medida
+de corte no papel e a página de 100 × 35 mm (lida pelo `PDFDocument`, não por
+regex — pdf-lib comprime os objetos e a contagem por `/Contents` dava zero com
+o teste dizendo "passou"). Mexeu em permissão? **`node teste_acesso.js` (114) e
+`node teste_cobertura.js` (10) também.** E **abra a tela**: quatro dos defeitos
+desta fase não têm teste que os pegue.
 
 ### Três regras do sob medida que valem citar aqui
 
@@ -4345,7 +4507,7 @@ cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 387 casos
+cd tecido && npm test          # 405 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:

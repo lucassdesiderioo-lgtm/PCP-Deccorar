@@ -1222,6 +1222,74 @@ INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
  ('pedidoNumeroInicial','','texto','Ultimo numero de pedido do Decorsoft',
   'O primeiro pedido lancado aqui sai com o numero seguinte a este, e a numeracao nunca reinicia. Enquanto estiver em branco o envio e RECUSADO: numero repetido faz o plano de corte herdar o tom de um pedido de outra casa.','numero',20);
 `},
+
+{n:19, nome:'a etiqueta de producao — codigo sequencial por setor, que nasce na aprovacao', sql:`
+/* === A ETIQUETA DE PRODUCAO ==============================================
+   Fase 4-A da spec SOBMEDIDA-PEDIDO-REVENDA (secao 4.14). Uma etiqueta por
+   componente, 100 x 35 mm na ZD220, com codigo SEQUENCIAL POR SETOR.
+
+   ⚠️ O CODIGO NASCE NA APROVACAO, NAO NA IMPRESSAO. Imprimir so marca. E
+   REIMPRIMIR SAI COM O MESMO CODIGO: codigo novo para a mesma peca partiria
+   a historia dela em duas, e o tempo do setor nunca fecharia. E a armadilha
+   #1-B do CLAUDE.md (a reimpressao da etiqueta de venda que nao baixa
+   estoque) pela porta da producao. */
+
+/* O SETOR VIRA CADASTRO, e nao um mapa escrito no codigo. Ate aqui ele era
+   texto livre na coluna setor do sm_componente (serralheria, colecao, ...),
+   e o prefixo da etiqueta — SER, COL, MON, REV, EMB — nao tem como ser
+   deduzido do nome: "colecao" nao vira "COL" por regra nenhuma que
+   sobreviva ao proximo setor. Deduzir seria a segunda regua da armadilha
+   #12, e ela so apareceria no dia em que dois setores colidissem no mesmo
+   prefixo. */
+CREATE TABLE sm_setor (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chave TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  nome TEXT NOT NULL,
+  prefixo TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  /* ⚠️ O CONTADOR NUNCA DESCE, e e a mesma regra do numero do pedido
+     (secao 4.18): apagar uma peca nao devolve o codigo dela ao bolo. Codigo
+     reaproveitado e codigo que um dia sai em duas pecas diferentes, e ai a
+     bancada bipa a peca errada com a etiqueta certa. */
+  ultimo_numero INTEGER NOT NULL DEFAULT 0,
+  ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1
+);
+INSERT INTO sm_setor(chave,nome,prefixo,ordem) VALUES
+ ('serralheria','Serralheria','SER',1),
+ ('colecao','Coleção','COL',2),
+ ('montagem','Montagem','MON',3),
+ ('revisao','Revisão','REV',4),
+ ('embalagem','Embalagem','EMB',5);
+
+ALTER TABLE sm_pedido_componente ADD COLUMN codigo_etiqueta TEXT;
+ALTER TABLE sm_pedido_componente ADD COLUMN impresso_em TEXT;
+ALTER TABLE sm_pedido_componente ADD COLUMN impresso_por TEXT;
+ALTER TABLE sm_pedido_componente ADD COLUMN reimpressoes INTEGER NOT NULL DEFAULT 0;
+
+/* ⚠️ O UNIQUE E PARCIAL, e tem que ser. Componente que nao gera etiqueta
+   (a reducao de peso, os kits) fica com o codigo NULL — e um UNIQUE comum
+   no SQLite aceita varios NULL, mas o indice parcial deixa a intencao
+   escrita: o que e unico e o codigo que EXISTE. */
+CREATE UNIQUE INDEX idx_sm_pedido_componente_codigo
+  ON sm_pedido_componente(codigo_etiqueta) WHERE codigo_etiqueta IS NOT NULL;
+CREATE INDEX idx_sm_pedido_componente_setor ON sm_pedido_componente(setor);
+
+/* QUEM IMPRIMIU, QUANDO E O QUE (secao 4.14). Uma linha por lote impresso;
+   as etiquetas daquele lote se acham pela hora em impresso_em.
+
+   Reimpressao entra aqui tambem, marcada — e e justamente ela que interessa
+   depois: rolo que sai duas vezes e a chance de duas etiquetas iguais em
+   duas pecas, e sem registro ninguem sabe que houve a segunda. */
+CREATE TABLE sm_etiqueta_impressao (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  setor TEXT NOT NULL,
+  quantidade INTEGER NOT NULL,
+  pedidos TEXT,
+  reimpressao INTEGER NOT NULL DEFAULT 0,
+  usuario_nome TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX idx_sm_etiqueta_impressao ON sm_etiqueta_impressao(criado_em);
+`}
 ];
 
 // ─────────────────────────────────────────────────────────────────────────

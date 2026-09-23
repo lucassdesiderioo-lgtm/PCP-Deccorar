@@ -28,6 +28,10 @@ const config=require('../nucleo/config');
 const dia=require('../nucleo/dia');
 const u=require('../nucleo/unidade');
 const {pode}=require('../nucleo/permissoes');
+/* A etiqueta entra aqui por UMA linha, na aprovacao. O dono do codigo
+   sequencial e o `etiqueta_producao.js`; se ele morasse aqui, a numeracao
+   teria dois donos no dia em que o backfill precisasse dela. */
+const etiquetas=require('./etiqueta_producao');
 
 const TIPOS=['orcamento','pedido'];
 const ENTREGAS=['entrega','retira'];
@@ -401,6 +405,14 @@ function aprovar(id,usuario){
         largura_corte_mm:c.largura_corte_mm, altura_corte_mm:c.altura_corte_mm,
         consumo_largura_mm:c.consumo_largura_mm, consumo_altura_mm:c.consumo_altura_mm}));
     }
+    /* ⚠️ O CODIGO DA ETIQUETA NASCE AQUI, e nao na impressao (secao 4.14).
+       Junto com a ficha, na MESMA transacao: codigo gravado com a ficha
+       desfeita seria numero queimado sem peca atras, e codigo gerado so na
+       impressao mudaria a cada reimpressao — partindo a historia da peca em
+       duas, e o tempo do setor nunca fecharia. */
+    etiquetas.atribuirCodigos(d.itens(p.id).filter(ativo)
+      .flatMap(item=>d.componentes(item.id)));
+
     d.atualizar(p.id,{marco:'aprovado', aprovado_em:dia.agora(), aprovado_por:nome(usuario)});
     d.criarMarco({pedido_id:p.id, marco:'aprovado', detalhe:null, usuario_nome:nome(usuario)});
     return porId(p.id);
