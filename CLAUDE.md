@@ -281,6 +281,41 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > `folha.js` → `itensDaFolha()` é o **dono único** dessa leitura: o `parse.js`
 > grava por ela e a auditoria relê por ela. Duas cópias significaria conferir com
 > uma régua diferente da que gravou.
+
+> ⚠️ **A ÚNICA EXCEÇÃO AO "NÃO OLHAR PARA TRÁS", E O QUE A TORNA SEGURA
+> (23/09/2026).** Quando a descrição do anúncio é longa, ela quebra em duas
+> linhas e **desfaz o pareamento das colunas** — a venda sobe para a linha
+> *acima* do `SKU:` e o comprador cai sozinho na de baixo:
+>
+> ```
+> ...Blecaute Roller Cor Bege Claro -
+> Venda: 2000018596292056 Tóquio 002     ← a venda sobe
+> SKU: BK180150BEGE
+> Paula Cristine Lupepso                 ← o comprador fica sozinho
+> ```
+>
+> São os produtos **Tóquio** — o mesmo nome comercial da armadilha #10, pela
+> terceira vez. No PDF de 23/09 eram **5 em 28**. A folha não está sem o dado e
+> a etiqueta também não: é a leitura que não pareia. Tratá-los como leitura
+> quebrada retinha cinco volumes sem dúvida nenhuma, e mandava alguém reabrir
+> cinco pedidos no ML para reler um número que o documento já traz — a armadilha
+> #10 outra vez, a trava que acusa o inocente.
+>
+> `reivindicarAcima()` é a segunda passada, e **a palavra que a torna segura é
+> REIVINDICADO**: só entra quem ficou sem pack **e** sem venda, e só se a janela
+> acima tiver **exatamente uma** linha cujo número **nenhum outro item pegou**.
+> No caso Abraão o pack de cima pertence ao vizinho — está reivindicado, e por
+> isso não é oferecido. Duas livres também não resolvem: ambiguidade não se
+> desempata por chute.
+>
+> E não afrouxa o pacote (#23): o irmão de verdade não tem venda em lugar
+> nenhum, então não há o que reivindicar. Casos 22 e 23 do `teste_parse.js`
+> travam a recuperação e as três guardas — **o caso 2 (Abraão) tem que passar
+> junto**, que é exatamente o ponto.
+>
+> **O ganho não é só destravar:** com o comprador lido, a conferência 2 do §5 —
+> a única que não depende do Pack ID — **volta a proteger** esses volumes, que
+> até aqui passavam sem ela por falta de dado dos dois lados.
 >
 > **Rode `node teste_parse.js` após qualquer mudança no `parse.js`, no `folha.js`
 > ou no `nome.js`** — os 17 casos montam a folha no formato REAL do ML, e o caso
@@ -1796,7 +1831,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (19 casos), `teste_carga.js` (44), `teste_divergencia.js` (41) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (45), `teste_ficha.js` (40), `teste_ordem_dia.js` (16) e `teste_acesso.js` (28); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (21 casos), `teste_carga.js` (44), `teste_divergencia.js` (41) `teste_estoque.js` (56), `teste_cruzamento.js` (14), `teste_etiqueta.js` (45), `teste_ficha.js` (40), `teste_ordem_dia.js` (16) e `teste_acesso.js` (28); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; (c) registro de rotas em que **rota sem permissão declarada nasce negada**, que fecha o buraco de cobertura do `CONTROLE-DE-ACESSO.md` §1; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 
@@ -1838,6 +1873,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Reter o PDF inteiro porque ele não fecha: a dúvida é do volume que **não
   achou item** na folha. Um lote de 28 com 5 leituras quebradas retinha os 28,
   e escondia da Etiqueta de Venda as caixas de várias peças (§5, #23)
+- ❌ Fazer o `reivindicarAcima` pegar identificador que **outro item já usou**:
+  é exatamente o caso Abraão, e ali o pack de cima é do vizinho (§5, #4)
+- ❌ Desempatar duas linhas livres acima do `SKU:` por proximidade ou por ordem
+  — ambiguidade sem resposta não vira palpite, fica como está (§5, #4)
 - ❌ Reter em Bloqueados a venda de N unidades do MESMO SKU: a folha escreveu a
   quantidade, não há o que assinar, e travar o caso normal é a #6 (§5, #23)
 - ❌ Deixar a pessoa descobrir no BIPE que a caixa leva três — ali ela já montou;

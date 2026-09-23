@@ -626,6 +626,86 @@ function conferir(nome, orders, esperado){
     else console.log('ok      o lote grande nao para por 1 leitura quebrada');
   }
 
+  /* ── caso 22: O IDENTIFICADOR QUE FICOU ACIMA DO SKU (produtos "Tóquio") ───
+        Copiado linha a linha do PDF real de 23/09/2026. A descricao longa
+        quebra em duas e desfaz o pareamento das colunas: a venda sobe pra linha
+        de cima do `SKU:`, e o comprador cai sozinho na de baixo.
+        A folha TEM os dados; era a leitura que nao pareava. */
+  casos++;
+  {
+    const {itensDaFolha}=require('./folha');
+    const folha=[
+      'Despachem as suas vendas o quanto antes.','Identifiicação Produtos',
+      'JTI4BDYZH5M4XMTGQRGEZUKA34 Cortina Rolo Blackout 1,60x1,40 Persiana Bege',
+      'Venda: 2000018594751248 SKU: BK160140BEGE',
+      'Biel Monteiro Quantidade: 1','Cor: Bege','Desenho do tecido: Liso',
+      /* o Tóquio: descricao transborda, venda ACIMA, comprador SOZINHO */
+      'VESVB5C3WNIZDI6OHWDAUYCWVY Cortina Rolo Blackout Medida L 1,80 X A 1,50 Blecaute Roller Cor Bege Claro -',
+      'Venda: 2000018596292056 Tóquio 002',
+      'SKU: BK180150BEGE',
+      'Paula Cristine Lupepso',
+      'Quantidade: 1','Cor: Bege claro - Tóquio 002','Desenho do tecido: Liso'];
+    const its=itensDaFolha(folha);
+    const erros=[];
+    const t=its.find(x=>x.sku==='BK180150BEGE')||{};
+    const n=its.find(x=>x.sku==='BK160140BEGE')||{};
+    if(its.length!==2) erros.push('esperava 2 itens, veio '+its.length);
+    if(t.venda!=='2000018596292056') erros.push('nao recuperou a venda de cima: '+JSON.stringify(t.venda));
+    if(t.comprador!=='Paula Cristine Lupepso') erros.push('nao leu o comprador sozinho na linha: '+JSON.stringify(t.comprador));
+    /* "Tóquio 002" tem digito e nao pode virar nome de gente. */
+    if(/Tóquio/.test(t.comprador||'')) erros.push('o nome comercial da cor virou comprador: '+t.comprador);
+    /* E o vizinho nao pode ter perdido nem ganhado nada com a segunda passada. */
+    if(n.venda!=='2000018594751248' || n.comprador!=='Biel Monteiro')
+      erros.push('o item normal mudou: '+JSON.stringify({v:n.venda,c:n.comprador}));
+    if(erros.length){ falhas++; console.log('FALHOU  o identificador acima do SKU volta pro item dele');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      o identificador acima do SKU volta pro item dele');
+  }
+
+  /* ── caso 23: AS TRES GUARDAS DA SEGUNDA PASSADA ──────────────────────────
+        Olhar para tras e o que mandou a peca errada pro Abraao (caso 2). O que
+        torna esta passada segura e a palavra REIVINDICADO: so sobra pro item
+        de baixo o numero que NENHUM outro pegou. */
+  casos++;
+  {
+    const {itensDaFolha}=require('./folha');
+    const erros=[];
+    /* (a) CASO ABRAAO: o pack de cima e do vizinho — esta reivindicado, e o
+           item sem pack NAO pode herda-lo. */
+    const abraao=itensDaFolha([
+      'X Cortina Rolo Blackout 1,60x1,40 Persiana Bege',
+      'Pack ID: 2000014610097547 SKU: BK160140BEGE',
+      'Venda: 2000018016683414 Quantidade: 1',
+      'Tiago Sanches Cor: Bege','Desenho do tecido: Blackout',
+      'Y Cortina Rolo Blackout 1,40x1,40 Persiana Bege',
+      'SKU: BK140140BEGE','Venda: 2000018999999999 Quantidade: 3',
+      'Abraao Amorim Cor: Bege','Desenho do tecido: Blackout']);
+    const ab=abraao.find(x=>x.sku==='BK140140BEGE')||{};
+    if(ab.packId) erros.push('o item do Abraao herdou o pack do vizinho: '+ab.packId);
+    /* (b) DUAS LIVRES NAO DESEMPATAM: ambiguidade nao se resolve por chute. */
+    const doisLivres=itensDaFolha([
+      'A descricao que transborda Cor Bege Claro -',
+      'Venda: 111 Tóquio 002','Venda: 222 sobra','SKU: BK180150BEGE','Quantidade: 1']);
+    if((doisLivres[0]||{}).venda)
+      erros.push('escolheu uma entre duas vendas livres: '+doisLivres[0].venda);
+    /* (c) O IRMAO DE PACOTE NAO GANHA VENDA: ele nao tem uma em lugar nenhum,
+           entao nao ha o que reivindicar e ele segue sendo peca a mais (§5-B). */
+    const pacote=itensDaFolha([
+      'X Cortina Rolo Blackout 1,20x1,20 Persiana Bege',
+      'Pack ID: 2000015040457349 SKU: BK120120BEGE',
+      'Venda: 2000018468081338 Quantidade: 1',
+      'Fabiano Pereira Cor: Bege','Desenho do tecido: Liso',
+      'Y Cortina Rolo Blackout 1,40x1,40 Persiana Bege',
+      'SKU: BK140140BEGE','Quantidade: 2','Cor: Bege','Desenho do tecido: Liso']);
+    const irmao=pacote.find(x=>x.sku==='BK140140BEGE')||{};
+    if(irmao.venda || irmao.packId || irmao.comprador)
+      erros.push('o irmao de pacote deixou de ser orfao: '+JSON.stringify(
+        {v:irmao.venda,p:irmao.packId,c:irmao.comprador}));
+    if(erros.length){ falhas++; console.log('FALHOU  a segunda passada nao reabre o caso Abraao');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      a segunda passada nao reabre o caso Abraao');
+  }
+
   /* ── caso 20: a licenca do pacote tem DONO UNICO, e o backfill le por ele ──
      O `pdfFecha` nasceu dentro do parse.js. O backfill_pacote.js chamava o
      `irmaosDoPacote` direto, SEM a licenca — e gravava como peca a mais o
