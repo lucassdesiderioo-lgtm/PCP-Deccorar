@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Produção · Sob medida</title>
+<link rel="stylesheet" href="/sobmedida/base.css">
+<style>
+table.lista{width:100%; border-collapse:collapse; margin-top:10px; font-size:16px}
+table.lista th,table.lista td{padding:10px 8px; border-bottom:1px solid var(--linha); text-align:left}
+table.lista th{font-size:13px; color:var(--tinta-fraca); font-weight:600; text-transform:uppercase; letter-spacing:.04em}
+table.lista td.n{text-align:center; font-variant-numeric:tabular-nums}
+table.lista tr.escolhido{background:var(--linha)}
+.conta{display:inline-block; min-width:44px; border-radius:99px; padding:3px 10px;
+  font-size:14px; font-weight:700; background:var(--linha)}
+.conta.falta{background:#1565c0; color:#fff}
+.conta.feito{background:#2e7d32; color:#fff}
+.conta.zero{opacity:.35; font-weight:400}
+.atrasado{color:var(--erro); font-weight:700}
+.aperta{color:var(--alerta); font-weight:600}
+.acoes{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:12px}
+.acoes .bt{font-size:17px; padding:12px 18px}
+.aviso{background:var(--linha); border-left:4px solid var(--alerta);
+  border-radius:var(--raio); padding:10px 12px; margin-top:10px; font-size:15px}
+.previa{margin-top:12px; font-size:14px; color:var(--tinta-fraca); max-height:220px; overflow:auto}
+.previa div{padding:4px 0; border-bottom:1px solid var(--linha)}
+.previa b{color:var(--tinta)}
+.hist{font-size:14px; color:var(--tinta-fraca); margin-top:8px}
+.hist div{padding:4px 0; border-bottom:1px solid var(--linha)}
+.subtitulo{margin:14px 0 0; font-size:14px; color:var(--tinta-fraca);
+  text-transform:uppercase; letter-spacing:.05em}
+</style>
+</head>
+<body>
+<header class="topo">
+  <h1>Produção</h1>
+  <span class="espaco"></span>
+  <span class="quem" id="quem"></span>
+</header>
+
+<div class="corpo">
+  <div class="cartao"><h2>Etiquetas a imprimir</h2><div id="lista"></div></div>
+  <div class="cartao" id="cCorte" style="display:none"><h2>Mandar para o corte</h2><div id="corte"></div></div>
+  <div class="cartao"><h2>Últimas impressões</h2><div id="hist"></div></div>
+</div>
+
+<script src="/sobmedida/ui.js"></script>
+<script src="/sobmedida/nav.js"></script>
+<script>
+const {api,banner,el,limpar,$}=window.ui;
+const NAV_BASE='/sobmedida';
+
+let eu={permissoes:[]}, pedidos=[], setores=[], historico=[];
+let escolhidos=new Set(), setor=null, previa=[];
+const posso=k=>(eu.permissoes||[]).indexOf(k)>=0;
+
+/* Os mesmos "dias de fábrica" da fila do vendedor (§19, fase 3): três dias no
+   papel com um feriado no meio são zero dias de trabalho. Negativo fica
+   negativo — prazo vencido é o que esta lista existe para mostrar. */
+function diasTexto(n){
+  if(n==null) return el('span',{},['']);
+  if(n<0) return el('span',{class:'atrasado'},[Math.abs(n)+' dia(s) VENCIDO']);
+  if(n===0) return el('span',{class:'atrasado'},['vence hoje']);
+  if(n<=2) return el('span',{class:'aperta'},[n+' dia(s)']);
+  return el('span',{},[n+' dias']);
+}
+
+function desenhar(){
+  const c=limpar($('#lista'));
+  if(!pedidos.length){
+    c.appendChild(el('p',{class:'vazio'},[
+      'Nenhum pedido aprovado esperando etiqueta. O pedido aparece aqui quando o vendedor aprova.']));
+    return;
+  }
+
+  /* ⚠️ A COLUNA DE CADA SETOR MOSTRA "FALTA / TOTAL", e não só o total. É ela
+     que impede o lote sair duas vezes — imprimir de novo é a forma mais fácil
+     de ter duas etiquetas iguais em duas peças diferentes (§4.14). Verde quer
+     dizer que já saiu tudo; azul, que falta. */
+  const t=el('table',{class:'lista'});
+  t.appendChild(el('thead',{},[el('tr',{},
+    [el('th',{},['']),el('th',{},['Pedido']),el('th',{},['Revenda']),el('th',{},['Prazo'])]
+      .concat(setores.map(s=>el('th',{},[s.nome]))))]));
+  const corpo=el('tbody');
+  pedidos.forEach(p=>{
+    const tr=el('tr',{class:escolhidos.has(p.pedido_id)?'escolhido':''});
+    const cx=el('input',{type:'checkbox','aria-label':'Escolher o pedido '+p.pedido_numero});
+    cx.checked=escolhidos.has(p.pedido_id);
+    cx.onchange=()=>{ cx.checked?escolhidos.add(p.pedido_id):escolhidos.delete(p.pedido_id);
+                      previa=[]; desenhar(); };
+    tr.appendChild(el('td',{},[cx]));
+    /* ⚠️ A TARJA "SEM TECIDO" MORA NA CÉLULA DO PEDIDO, não numa coluna
+       própria. Como coluna ela só existia na linha que a tinha: as outras
+       linhas ficavam com uma célula a menos e a tabela saía torta, com a
+       tarja pendurada debaixo do cabeçalho de outro setor. É fato do pedido,
+       e o lugar dele é ao lado do número — como a tarja do "Já impressos" do
+       PCP (§5). */
+    const cel=el('td',{},[String(p.pedido_numero||('#'+p.pedido_id))]);
+    if(p.sem_tecido) cel.appendChild(el('div',{class:'aperta'},['sem tecido']));
+    tr.appendChild(cel);
+    tr.appendChild(el('td',{},[p.revenda_nome||'']));
+    const prazo=el('td');
+    if(p.prazo_extenso){
+      prazo.appendChild(el('div',{},[p.prazo_extenso]));
+      prazo.appendChild(el('div',{},[diasTexto(p.dias_uteis_restantes)]));
+    }
+    tr.appendChild(prazo);
+    setores.forEach(s=>{
+      const x=p.setores[s.chave]||{total:0,impressas:0};
+      const falta=x.total-x.impressas;
+      const classe=!x.total?'zero':(falta?'falta':'feito');
+      tr.appendChild(el('td',{class:'n'},[
+        el('span',{class:'conta '+classe},[!x.total?'—':(falta?falta+' de '+x.total:'✓ '+x.total)])]));
+    });
+    corpo.appendChild(tr);
+  });
+  t.appendChild(corpo);
+  c.appendChild(t);
+
+  // ── escolher o setor ──
+  /* ⚠️ A FILEIRA DE ESCOLHA É A DO `base.css`, e não uma cópia. A primeira
+     versão desta tela tinha `class:'setores'` própria: os cinco botões saíam
+     idênticos, sem o azul do escolhido e sem o alvo de toque de tablet — só a
+     linha de texto ao lado dizia qual era o setor. É o mesmo mecanismo da cor
+     dos três modos da Revisão (§3 do CLAUDE.md): ela não é decoração, é o que
+     impede a pessoa imprimir meia hora de maço no setor errado. */
+  const fs=el('div',{class:'fileira'});
+  setores.forEach(s=>{
+    const b=el('button',{class:'op',type:'button','aria-pressed':String(s.chave===setor)},[s.nome]);
+    b.onclick=()=>{ setor=s.chave; previa=[]; desenhar(); };
+    fs.appendChild(b);
+  });
+  c.appendChild(el('p',{class:'subtitulo'},['Setor']));
+  c.appendChild(fs);
+
+  const acoes=el('div',{class:'acoes'});
+  const quantos=escolhidos.size;
+  const bPrevia=el('button',{class:'bt',type:'button'},['Ver o que vai sair']);
+  bPrevia.onclick=verPrevia;
+  acoes.appendChild(bPrevia);
+
+  if(posso('etiqueta_producao.imprimir')){
+    const b=el('button',{class:'bt primario',type:'button'},['Imprimir']);
+    b.onclick=imprimir;
+    acoes.appendChild(b);
+  }
+  acoes.appendChild(el('span',{class:'quem'},[
+    quantos?(quantos+' pedido(s) escolhido(s)'+(setor?' · '+nomeSetor(setor):'')):'Escolha os pedidos e o setor']));
+  c.appendChild(acoes);
+
+  /* ⚠️ O AVISO DO JÁ IMPRESSO APARECE ANTES DO BOTÃO, e com o número. Depois
+     do clique ele viraria explicação de um rolo que já saiu. */
+  if(quantos&&setor){
+    const jaSaiu=[...escolhidos].map(id=>pedidos.find(p=>p.pedido_id===id))
+      .filter(p=>p&&p.setores[setor]&&p.setores[setor].impressas>0);
+    if(jaSaiu.length) c.appendChild(el('div',{class:'aviso'},[
+      (jaSaiu.length===1
+        ? 'O pedido '+(jaSaiu[0].pedido_numero||('#'+jaSaiu[0].pedido_id))+' já teve etiquetas de '
+        : jaSaiu.length+' destes pedidos já tiveram etiquetas de ')+nomeSetor(setor)+
+      ' impressas. Imprimir de novo sai com o MESMO código e conta como reimpressão — '+
+      'jogue fora o rolo anterior, senão ficam duas etiquetas iguais em duas peças.']));
+  }
+
+  if(previa.length){
+    const box=el('div',{class:'previa'});
+    previa.forEach(e=>box.appendChild(el('div',{},[
+      el('b',{},[e.codigo]),'  '+e.pedido_numero+' · peça '+e.peca+'  —  '+e.tarefa+
+      (e.extra?'  ('+e.extra+')':'')])));
+    c.appendChild(el('p',{class:'subtitulo'},[previa.length+' etiqueta(s)']));
+    c.appendChild(box);
+  }
+
+  desenharCorte();
+}
+
+const nomeSetor=ch=>(setores.find(s=>s.chave===ch)||{}).nome||ch;
+
+async function verPrevia(){
+  if(!escolhidos.size) return banner('Escolha ao menos um pedido.','alerta');
+  if(!setor) return banner('Escolha o setor.','alerta');
+  try{
+    previa=await api('/api/producao/etiquetas/previa',{metodo:'POST',silencioso:true,
+      corpo:{pedidos:[...escolhidos], setor}});
+    if(!previa.length) banner('Nenhuma etiqueta de '+nomeSetor(setor)+' nestes pedidos.','alerta');
+    desenhar();
+  }catch(e){ banner(e.message,'erro'); }
+}
+
+/* Imprimir abre o PDF numa aba. `fetch` + blob em vez de window.open porque a
+   rota é POST: ela MARCA a etiqueta, e um GET que marca é um GET que o
+   navegador repete sozinho ao recarregar. */
+async function imprimir(){
+  if(!escolhidos.size) return banner('Escolha ao menos um pedido.','alerta');
+  if(!setor) return banner('Escolha o setor.','alerta');
+  const r=await fetch(NAV_BASE+'/api/producao/etiquetas/imprimir',{
+    method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
+    body:JSON.stringify({pedidos:[...escolhidos], setor})});
+  if(!r.ok){
+    let msg='Não deu para imprimir.';
+    try{ const j=await r.json(); msg=j.mensagem||msg; }catch(e){}
+    return banner(msg,'erro');
+  }
+  const blob=await r.blob();
+  window.open(URL.createObjectURL(blob),'_blank');
+  banner('Etiquetas geradas. Confira a primeira antes de colar o maço.','ok',6);
+  previa=[]; await carregar();
+}
+
+// ── o corte ──
+function desenharCorte(){
+  if(!posso('plano.calcular')) return;
+  $('#cCorte').style.display='';
+  const c=limpar($('#corte'));
+  if(!escolhidos.size){
+    c.appendChild(el('p',{class:'vazio'},['Escolha os pedidos acima para ver o tecido a cortar.']));
+    return;
+  }
+  const b=el('button',{class:'bt',type:'button'},['Ver o tecido destes pedidos']);
+  b.onclick=async()=>{
+    const grupos=await api('/api/producao/para-cortar',{metodo:'POST',corpo:{pedidos:[...escolhidos]}});
+    const d=limpar($('#corte'));
+    if(!grupos.length){ d.appendChild(el('p',{class:'vazio'},['Nada a cortar nestes pedidos.'])); return; }
+    grupos.forEach(g=>{
+      d.appendChild(el('p',{class:'subtitulo'},[g.tecido_nome+' · '+g.pecas.length+' peça(s)']));
+      const box=el('div',{class:'previa'});
+      /* ⚠️ A MEDIDA AQUI É A DE CORTE, e a tela diz isso com todas as letras.
+         A persiana de 1,000 × 1,000 tem tecido de 0,965 × 1,200 — quem ler
+         esta lista achando que é a medida acabada corta a peça errada. */
+      g.pecas.forEach(p=>box.appendChild(el('div',{},[
+        el('b',{},[p.largura.toFixed(3).replace('.',',')+' × '+p.altura.toFixed(3).replace('.',',')]),
+        '  pedido '+p.pedido+' · '+p.cliente])));
+      d.appendChild(box);
+    });
+    d.appendChild(el('p',{class:'quem'},[
+      'Estas são as medidas de CORTE do tecido, não as acabadas. Leve-as para o Plano de corte.']));
+  };
+  c.appendChild(b);
+}
+
+function desenharHist(){
+  const h=limpar($('#hist'));
+  if(!historico.length){ h.appendChild(el('p',{class:'vazio'},['Nada impresso ainda.'])); return; }
+  historico.forEach(x=>h.appendChild(el('div',{},[
+    x.criado_em+' · '+x.quantidade+' etiqueta(s) de '+nomeSetor(x.setor)+
+    (x.pedidos?' · pedido '+x.pedidos:'')+
+    (x.reimpressao?'  ⟲ REIMPRESSÃO':'')+
+    (x.usuario_nome?' · '+x.usuario_nome:'')])));
+}
+
+async function carregar(){
+  eu=await api('/api/eu');
+  $('#quem').textContent=eu.nome+' · '+eu.papel;
+  [setores,pedidos,historico]=await Promise.all([
+    api('/api/producao/setores'),
+    api('/api/producao/etiquetas'),
+    api('/api/producao/impressoes?limite=15').catch(()=>[])
+  ]);
+  desenhar(); desenharHist();
+}
+
+carregar();
+</script>
+</body>
+</html>

@@ -318,5 +318,11 @@ function desenharRolo(pagina, rolo, m, mono, negrito, sans){
   });
 }
 
+/* ⚠️ `desenharBarras` SAI DAQUI PARA FORA (fase 4-A), e nao ganha copia. A
+   etiqueta de producao do sob medida passou a ser a TERCEIRA a desenhar
+   CODE128 — sobra, rolo e producao. Uma tabela por arquivo seria tres
+   etiquetas para divergir, e a divergencia so apareceria no bipe de uma
+   delas (§15 do CLAUDE.md, a mesma razao do public/barras.js servir o PCP e
+   o sob medida). */
 module.exports = {gerar, gerarRolo, moduloPara, medidas, medidasRolo,
-  conferir, conferirRolo, MODULO_MIN_MM, MODULO_MAX_MM};
+  conferir, conferirRolo, desenharBarras, MODULO_MIN_MM, MODULO_MAX_MM};

@@ -114,7 +114,20 @@ const CHAVES=[
   {chave:'pedido.aprovar',        nome:'Aprovar pedido da propria carteira'},
   {chave:'pedido.aprovar_qualquer', nome:'Aprovar pedido de qualquer carteira'},
   {chave:'pedido.prazo',          nome:'Negociar o prazo de um pedido (com motivo)'},
-  {chave:'pedido.cancelar',       nome:'Cancelar pedido ou peca de pedido'}
+  {chave:'pedido.cancelar',       nome:'Cancelar pedido ou peca de pedido'},
+
+  /* ── A ETIQUETA DE PRODUCAO (fase 4-A) ──────────────────────────────────
+     ⚠️ LER E IMPRIMIR SAO DUAS CHAVES, e a divisao e a do kit do PCP (§4):
+     ver o que falta imprimir e leitura de trabalho; imprimir GASTA ROLO,
+     marca a peca e — na reimpressao — cria a chance de duas etiquetas iguais
+     em duas pecas. Quem imprime e quem esta com a Zebra na frente.
+
+     ⚠️ E ELAS SAO DA BANCADA, nao do escritorio: o CORTADOR recebe as duas.
+     Foi o contrario do pedido, que e escritorio inteiro — aqui quem precisa
+     do papel e quem vai cortar, e mandar ele chamar alguem para imprimir e
+     a trava que dispara no caso normal (armadilha #6). */
+  {chave:'etiqueta_producao.ler',      nome:'Ver as etiquetas de producao a imprimir'},
+  {chave:'etiqueta_producao.imprimir', nome:'Imprimir etiquetas de producao (gasta rolo e marca a peca)'}
 ];
 
 const PAPEIS={
@@ -124,7 +137,9 @@ const PAPEIS={
     'cadastro.ler','endereco.criar',
     'parametro.ler','sobra.ler','sobra.criar','sobra.propor','etiqueta.imprimir',
     'rolo.ler','rolo.entrada','rolo.encerrar',
-    'plano.calcular','plano.confirmar'
+    'plano.calcular','plano.confirmar',
+    // A etiqueta de producao e da bancada: quem corta e quem precisa do papel.
+    'etiqueta_producao.ler','etiqueta_producao.imprimir'
     /* ⚠️ `painel.ler` SAIU DO CORTADOR em 04/09/2026, por decisao do dono.
        O painel e escritorio: tema escuro, muitos numeros juntos, e responde
        o que a fabrica CONSOME, quanto tem parado e onde esta o dinheiro. Sem
@@ -164,7 +179,10 @@ const PAPEIS={
     'revenda.ler',
     /* O pedido e o trabalho dele: lanca, envia, aprova a propria carteira e
        negocia prazo. Nao aprova a carteira do colega e nao cancela. */
-    'pedido.ler','pedido.lancar','pedido.aprovar','pedido.prazo'
+    'pedido.ler','pedido.lancar','pedido.aprovar','pedido.prazo',
+    /* Ele VE o que a fabrica tem a imprimir — e a resposta de "o meu pedido
+       entrou?" —, mas nao imprime: quem imprime esta com a Zebra na frente. */
+    'etiqueta_producao.ler'
   ]
 };
 

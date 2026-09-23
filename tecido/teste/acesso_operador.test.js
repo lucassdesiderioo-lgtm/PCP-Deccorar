@@ -380,6 +380,52 @@ module.exports=[
     'e nada disso sobra do lado da bancada');
   igual(dinheiroEm(custo.podar(VENDEDOR,amostra),'pedido').length,6,
     'enquanto quem vende recebe tudo');
+}},
+/* ═══ A ETIQUETA DE PRODUCAO (fase 4-A) ════════════════════════════════════
+   Ela inverte a regra das outras telas de venda: e da BANCADA, nao do
+   escritorio. Quem precisa do papel e quem vai cortar. */
+
+{nome:'⚠️ A ETIQUETA DE PRODUCAO E DA BANCADA — e e a primeira que o CORTADOR alcanca',
+ executar({igual}){
+  igual(pode(CORTADOR,TELAS['/producao'].permissao),true,
+    'o cortador abre a tela — mandar ele chamar alguem para imprimir e a armadilha #6');
+  igual(TELAS['/producao'].contexto,'operacao',
+    'e ela e CLARA: quem a abre esta em pe, sob a lampada de inspecao (§19)');
+  [['etiqueta_producao.ler','ver o que falta imprimir'],
+   ['etiqueta_producao.imprimir','imprimir, que gasta rolo e marca a peca']]
+    .forEach(([k,oque])=>{
+      igual(CHAVES.some(c=>c.chave===k),true,k+' esta declarada de verdade');
+      igual(pode(CORTADOR,k),true,'o cortador tem '+k+' — '+oque);
+    });
+
+  /* ⚠️ O VENDEDOR VE, E NAO IMPRIME. Ver e a resposta de "o meu pedido
+     entrou?"; imprimir e da pessoa que esta com a Zebra na frente, e a
+     reimpressao dela cria a chance de duas etiquetas iguais em duas pecas. */
+  igual(pode(VENDEDOR,'etiqueta_producao.ler'),true,'o vendedor ve a fila da fabrica');
+  igual(pode(VENDEDOR,'etiqueta_producao.imprimir'),false,'mas nao imprime');
+}},
+
+{nome:'⚠️ IMPRIMIR PEDE A CHAVE DE IMPRIMIR, e ler nao basta',
+ executar({igual}){
+  const rotas=require('../rotas/etiqueta_producao').rotas;
+  igual(rotas.length>0,true,'as rotas existem');
+  const imprimir=rotas.find(r=>r.caminho==='/api/producao/etiquetas/imprimir');
+  igual(imprimir.permissao,'etiqueta_producao.imprimir','a rota que marca pede a chave que marca');
+  igual(imprimir.metodo,'POST',
+    'e e POST: um GET que MARCA e um GET que o navegador repete ao recarregar');
+
+  /* A previa NAO marca, entao ela le. Pedir a chave de imprimir nela faria
+     quem so confere ter que pedir o rolo emprestado. */
+  const previa=rotas.find(r=>r.caminho==='/api/producao/etiquetas/previa');
+  igual(previa.permissao,'etiqueta_producao.ler','a previa e leitura');
+  igual(pode(VENDEDOR,previa.permissao),true,'e o vendedor alcanca a previa');
+  igual(pode(VENDEDOR,imprimir.permissao),false,'sem alcancar a impressao');
+
+  /* O que manda a peca para o corte pede a chave de QUEM CORTA, e nao a de
+     etiqueta: quem abre aquela lista esta indo cortar. */
+  const corte=rotas.find(r=>r.caminho==='/api/producao/para-cortar');
+  igual(corte.permissao,'plano.calcular','o corte pede a chave do plano');
+  igual(pode(VENDEDOR,corte.permissao),false,'e o vendedor nao corta');
 }}
 
 ];

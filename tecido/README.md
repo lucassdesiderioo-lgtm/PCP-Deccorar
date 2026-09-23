@@ -8,7 +8,7 @@ Este módulo **não sobe sozinho**. Ele é montado dentro do PCP, em `/sobmedida
 pelo `server.js` da raiz. Uma porta, um processo, um PIN.
 
 ```bash
-npm test          # daqui: 387 casos, banco temporário, sem servidor
+npm test          # daqui: 405 casos, banco temporário, sem servidor
 node server.js    # da RAIZ: sobe o PCP inteiro, com o sob medida junto
 ```
 
@@ -328,7 +328,7 @@ redução — os números das seções 4.4 a 4.8 da spec.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 387 casos
+cd tecido && npm test          # 405 casos
 ```
 
 **Rode ao mexer em `dominio/persiana.js`, `dominio/catalogo_sm.js`,
@@ -663,6 +663,94 @@ fechando com as parcelas impressas; prazo de quarta 13:31 caindo na quinta
 
 ---
 
+## A ETIQUETA DE PRODUÇÃO (fase 4-A da spec `SOBMEDIDA-PEDIDO-REVENDA`)
+
+A tela `/sobmedida/producao` é da **bancada**: ela lista os pedidos aprovados,
+diz quantas etiquetas cada setor tem e quantas já saíram, imprime o maço de um
+setor e manda o tecido para o plano de corte.
+
+```
+SER-000123   serralheria   tubo, base, bandô, barra
+COL-000045   coleção       o tecido
+MON / REV / EMB            montagem, revisão, embalagem
+```
+
+**O que vai escrito, nas cinco linhas de 100 × 35 mm:**
+
+```
+5001 · 1 de 2
+LAR DO CILAR · quinta 01/10
+1,000 × 1,000 · Rolô Screen 1% Branco · COMANDO DIREITO
+TUBO 32 · CORTAR 0,970
+▐▌▐▌▐▐▌▐▌▐▐▌▐▌▐▐▌▐▌▐▐▌▐▌▐▐▌▐▌▐▐▌▐▌▐   SER-000001
+                                      SERRALHERIA
+```
+
+### As regras que parecem bug e não são
+
+- **O código nasce na APROVAÇÃO, não na impressão.** Ele é da peça, e sai na
+  mesma transação da ficha congelada. Reimprimir sai com o **mesmo** código, e
+  conta como reimpressão — no contador da peça e numa linha de
+  `sm_etiqueta_impressao`. Código novo a cada papel partiria a história da peça
+  em duas; código reaproveitado sairia um dia em duas peças.
+- **O número nunca volta ao bolo.** Nem no cancelamento da peça, nem quando o
+  backfill reatribui. Mesma regra do número do pedido.
+- **Cada setor tem o seu contador.** `SER-000001` e `COL-000001` convivem
+  porque são duas filas físicas. Um contador só faria o serralheiro ler saltos
+  de dezenas entre uma etiqueta e a seguinte, sem nada explicando.
+- **A medida escrita é a de CORTE.** A persiana de `1,000 × 1,000` manda a
+  serralheria cortar `0,970` e a coleção cortar `0,965 × 1,200`. São os dois
+  números da linha da ficha, e eles nunca fecham.
+- **No tubo, o nome da peça é o degrau** — `TUBO 32`, nunca só `TUBO`. Tubo 32
+  e Tubo 41 são peças diferentes, compradas separadas e guardadas em lugares
+  diferentes.
+- **A coluna do setor mostra "falta de total"**, e fica verde quando saiu tudo.
+  É o número que impede o maço sair duas vezes.
+- **O aviso do já impresso aparece ANTES do botão**, com o número do pedido, e
+  manda jogar o rolo anterior fora. Depois do clique ele explicaria um maço que
+  já saiu.
+- **Só pedido aprovado tem etiqueta.** O enviado ainda espera o vendedor, e a
+  recusa diz isso.
+- **São 6 etiquetas na persiana simples e 7 com adicional.** A ficha tem oito
+  componentes que geram etiqueta, mas bandô e barra nunca convivem e nenhum dos
+  dois entra com `adicional='nenhum'`.
+- **`etiqueta_producao.imprimir` não é `etiqueta_producao.ler`.** O vendedor lê
+  (precisa saber se a peça dele foi para a bancada); quem imprime é quem está
+  com o rolo na impressora.
+
+### O corte
+
+`POST /api/producao/para-cortar` devolve as peças de tecido dos pedidos
+escolhidos **em medida de corte**, agrupadas **por tecido** — `plano.calcular`
+recebe um tecido por plano, porque não há emenda e bobina de cor diferente é
+outro estoque. O `pedido` que vai no tom único é o número do pedido, que a
+fase 3 já garantiu estar acima do Decorsoft.
+
+Era exatamente isto que o leitor da etiqueta do Decorsoft já fazia
+(`etiqueta_corte.js`); a diferença é que agora o dado vem do próprio sistema.
+
+### Os aprovados de antes: `backfill_etiquetas.js`
+
+```bash
+node backfill_etiquetas.js              # só mostra
+node backfill_etiquetas.js --aplicar    # grava, com backup por db.backup()
+```
+
+Ele roda pelo **mesmo** `atribuirCodigos` da aprovação — não é uma segunda
+régua — e é idempotente. O pedido 5001, aprovado em produção na manhã de
+23/09/2026, é exatamente o caso que ele existe para alcançar.
+
+### O que ainda não foi conferido
+
+**O rolo impresso.** A régua final de código de barras é o leitor bipando, e
+enquanto isso não acontecer o que existe é indício: 405 casos verdes e a tela
+aberta. O módulo do CODE128 é o `public/barras.js`, o mesmo do PCP e da
+etiqueta de sobra, numa faixa de 66 mm no rodapé — a primeira versão punha o
+código numa coluna de 38 mm e o módulo caía a 0,23 mm, abaixo do que a ZD220
+resolve numa etiqueta amassada.
+
+---
+
 ## As respostas que viraram regra (seção 11 da especificação)
 
 Estas decisões são do dono da operação. Mudar qualquer uma **muda o cálculo**,
@@ -747,6 +835,8 @@ nucleo/                infraestrutura — nao sabe nada de tecido
 dominio/               a regra — nao conhece Express, req nem res
   tecido · endereco · motivo · sobra · etiqueta
   rolo · encaixe (funcao pura) · plano · painel
+  persiana · revenda · prazo · pedido · pedido_pdf     a VENDA sob medida
+  etiqueta_producao · etiqueta_producao_pdf            a BANCADA
 dados/                 o SQL. Uma tabela, um arquivo. Nao decide nada
 rotas/                 declaracoes. Sem SQL, sem `if` de negocio
 public/                base.css (tokens) · ui.js · nav.js · telas/

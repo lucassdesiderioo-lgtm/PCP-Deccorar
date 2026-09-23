@@ -54,7 +54,13 @@ const TELAS={
      aprovacao e a lista de trabalho do vendedor, e quem so aprova tem que
      conseguir abrir a tela. Os botoes de lancar, enviar e cancelar aparecem
      por permissao, dentro dela. */
-  '/pedidos':   {arquivo:'telas/pedidos.html',   permissao:'pedido.ler',        contexto:'admin'}
+  '/pedidos':   {arquivo:'telas/pedidos.html',   permissao:'pedido.ler',        contexto:'admin'},
+
+  /* ⚠️ A PRODUCAO E A PRIMEIRA TELA DE VENDA EM CONTEXTO **OPERACAO**, e nao
+     por ser nova: ela e da bancada. Quem a abre esta em pe, perto da Zebra,
+     sob a lampada de inspecao — e ali tela escura vira espelho (§19). O
+     pedido e o catalogo continuam escuros porque sao escritorio. */
+  '/producao':  {arquivo:'telas/producao.html',  permissao:'etiqueta_producao.ler', contexto:'operacao'}
 };
 
 module.exports={TELAS};
