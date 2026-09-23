@@ -1487,6 +1487,22 @@ fica de fora — saiu por onde saiu, e mexer no saldo por causa dele hoje
 carimbaria uma saída que aconteceu noutro dia (a regra dos três scripts de
 passivo, §5).
 
+> ⚠️ **O REPARO TEM PRAZO DE VALIDADE: 7 DIAS.** O script **relê o PDF** — ele
+> não adivinha nada, e é isso que o torna confiável. Mas o cron apaga os PDFs de
+> `lotes/` em 7 dias, e a partir daí **as peças daquele volume não voltam por
+> script nenhum**: o documento que as afirmava não existe mais. Na rodada de
+> 23/09/2026 eram **82 volumes** nessa situação, contra 19 PDFs ainda no disco.
+>
+> A saída **diz o número** (`volumes cujo PDF ja saiu do disco`), e ele não é
+> decoração: é o tamanho do que já não dá para consertar assim. Volume fora da
+> janela só se acerta com o painel do ML na mão, por **Admin → Estoque**, com
+> motivo — o mesmo caminho do `--baixar`, e pela mesma razão (§18).
+>
+> **Consequência prática:** regra nova que dependa deste backfill tem uma semana
+> para ser rodada. Depois disso o passivo que ela pegaria vira permanente, e
+> nada em tela nenhuma diz que ele existiu — é a dívida 18 (§14) pela porta do
+> arquivo que expirou.
+
 **Rode `node teste_parse.js` (casos 17, 18 e 19), `node teste_divergencia.js` (os
 últimos 10 casos são o pacote) e `node teste_etiqueta.js` (os últimos 16) após
 mexer nisso.** Para achar os casos nos PDFs do servidor:
