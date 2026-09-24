@@ -5,12 +5,11 @@ STATUS
 Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 24/09/2026
-Fase atual: 5 INTEIRA EM PRODUÇÃO (24/09/2026) — 5-A (os cinco setores no
-            acesso), 5-B1 (o bipe, as filas e o Pronto) e 5-B2 (a recusa).
-            **Falta a conferência de fábrica das três** — ver as provas 8 e
-            8-b na lista única
-            6 NÃO COMEÇOU — o gerencial, e ela é grande: kanban, oito
-            indicadores, boleto e crédito. Ver a lista única
+Fase atual: 6-A EM CÓDIGO (24/09/2026) — o QUADRO: onde está cada pedido,
+            com a barrinha por setor. A etapa é derivada, nunca gravada, e o
+            `marco` continua sendo a trava (a dívida 15 decidida)
+            5 INTEIRA EM PRODUÇÃO (24/09/2026) — 5-A, 5-B1 e 5-B2.
+            **Falta a conferência de fábrica das três** — provas 8 e 8-b
             4-C EM PRODUÇÃO (24/09/2026) — o tubo chegando ao Compras do PCP;
             os quatro degraus JÁ apontados (24/09) — falta o primeiro pedido
             real aparecer lá, e o comprador comprar por ele
@@ -21,7 +20,7 @@ Fase atual: 5 INTEIRA EM PRODUÇÃO (24/09/2026) — 5-A (os cinco setores no
             em paralelo ao Decorsoft
             2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
             1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
-Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ☑ **em produção**, falta a prova de fábrica  6 ☐  7 ☐  8 ☐
+Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ☑ **em produção**, falta a prova de fábrica  6 ◐(6-A em código · 6-B e 6-C não começaram)  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
 Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) + 2 (fase 5-A) + 1 (5-B1) + 2 (5-B2) — ver abaixo
@@ -67,7 +66,7 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 | 11 | As **chaves de nível admin do PCP** continuam fazendo quem as tem entrar no sob medida como **diretor** — uma a menos desde 24/09, quando `sobmedida.cadastrar` baixou para `supervisor` (armadilha #34) | é anterior à fase 2 e estreitar aquela leitura muda quem pode o quê: é `REGRA`, uma chave por vez |
 | 12 | A `familia_sku` velha não é reescrita | é história do que o sistema viu; o aprendizado recomeça sozinho |
 | 13 | **Sexto setor de produção exige código** (a chave), e a tela deixa criar o setor | decisão de 24/09: setor é cadastro, chave é código — ver a 5-A |
-| 15 | **O "Pronto" não aparece no `marco`** — ele é `pronto_em` + linha de histórico | trocar o marco quebraria a reimpressão da etiqueta e mudaria em silêncio as contas da compra (4-B e 4-C). O kanban da fase 6 lê o histórico; se um dia o marco precisar do valor, é decisão de lá, com as três leituras na mesa |
+| ~~15~~ | ~~O "Pronto" não aparece no `marco`~~ **DECIDIDA em 24/09/2026, na 6-A: fica como está.** O quadro deriva a etapa de `marco` + `pronto_em` + os bipes e **só lê** — trocar o marco mudaria em silêncio os números que o comprador usa. A pergunta que esta dívida guardava para a fase 6 está respondida, e a resposta é NÃO |
 | 14 | **Editar um setor apaga, sem avisar, as permissões acima do nível dele.** A tela desenha `disabled` a caixinha acima do nível e o salvar regrava a lista inteira, então ela nunca é mandada e nunca volta | consertar é decidir o que a tela faz com a chave que não pode mostrar — avisar, preservar ou recusar o salvamento —, e as três mudam quem pode o quê: é `REGRA`. É a dívida 20 do `CLAUDE.md` §14 |
 
 ### O que ainda não foi construído
@@ -76,7 +75,7 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 |---|---|
 | ~~5-B2~~ | ~~a recusa com motivo → setor → pessoa~~ **EM PRODUÇÃO em 24/09/2026** — migração 22, `sm_motivo_producao`, `sm_recusa` e `refeitas`. Falta a prova 8-b |
 | ~~5-B1~~ | ~~o bipe, as filas por setor, o kit e o Pronto automático~~ **EM PRODUÇÃO em 24/09/2026** — era o pedaço que esta lista **não citava**, e sem ele a 5-B2 não tem de onde recusar. Falta a prova 8 |
-| **6-A** | **o kanban** — onde está cada pedido, com a barrinha por setor e o selo de retido. É o *"onde está o pedido X"* do "pronto quando" da fase 6, e é o que torna visível o bipe da 5-B1: hoje só se vê o andamento abrindo a bancada de cada setor, um por um |
+| ~~6-A~~ | ~~o kanban~~ **EM CÓDIGO em 24/09/2026** — migração 23, `sm_kanban_coluna`, `dominio/kanban.js` e a tela `/sobmedida/kanban` (no menu: **Quadro**). A etapa é derivada; o `marco` não se mexeu. Falta o dono abrir e dizer se responde "onde está o pedido X" |
 | **6-B** | **os sete indicadores que já têm dado** — tempo de aprovação por vendedor, pedidos parados, prazo cumprido, horas-homem, tempo por m², produtividade por pessoa e por setor, e recusas. Todos leem o que a 5-B1 e a 5-B2 passaram a gravar **ontem**: enquanto a fábrica não bipar, eles saem vazios — e a tela tem que dizer que vazio é isso, não tela quebrada (a lição da 4-C) |
 | **6-C** | **o dinheiro** — baixa de boletos pelo financeiro, crédito disponível (`limite − boletos em aberto`), revisão bimestral do limite, e só então o selo de NF e os filtros *"entregue sem NF"* / *"NF sem entrega"*. **Nada disso existe hoje**: não há boleto, não há NF e não há marco de `entregue` no sob medida |
 | 7 | o portal da revenda |
@@ -88,6 +87,48 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 > custo de uma fase grande: a linha da 5-B **omitia o bipe**, que era o pedaço
 > maior, e a lista que existe para ser o lugar único ficou sem ele. Aberta em
 > três, cada parte sobe sozinha e o que falta fica escrito aqui.
+
+## STATUS DA FASE 6-A — em código em 24/09/2026
+
+**O quadro (§4.17).** Onde está cada pedido, numa tela só — o *"onde está o
+pedido X"* do pronto-quando da fase 6. Migração 23 (`sm_kanban_coluna`),
+`dominio/kanban.js`, `dados/kanban.js`, `rotas/kanban.js` e a tela
+`/sobmedida/kanban`.
+
+### As três mudanças no caminho
+
+| # | O que a spec dizia | O que ficou | Por quê |
+|---|---|---|---|
+| 1 | *"cada coluna aponta para um **marco**"* | a coluna aponta para uma **etapa** — lista fechada em código, derivada de `marco` + `pronto_em` + os bipes | três dos seis marcos da spec não são marcos: `em produção` é derivado do bipe, `pronto` é a coluna `pronto_em` (e **não pode** virar marco — dívida 15) e `entregue` não existe. O `marco` continua sendo a trava que os três leitores usam |
+| 2 | os marcos são `orçamento, enviado, aprovado, em produção, pronto, entregue` | `edicao, enviado, aprovado, producao, pronto, cancelado` | `edicao` porque o pedido **reaberto** volta a `marco='rascunho'` **com o número dele** — chamar aquilo de "orçamento" seria mentira na tela. `cancelado` entrou porque é resposta legítima para "onde está o pedido X". `entregue` saiu porque nada o marca hoje, e coluna que nunca recebe cartão é paisagem (dívida 18) |
+| 3 | — | `pedido.porId` passou a devolver **`pronto_em`** | a coluna nasceu na 5-B1 e **nenhuma tela a lia**: quem abrisse o pedido não tinha como saber que ele estava pronto. É a dívida 18 pela porta do leitor que faltava, e o quadro foi o primeiro a precisar dele |
+
+### As decisões desta fase
+
+| # | Decisão | Por quê |
+|---|---|---|
+| 1 | **A etapa é derivada, nunca gravada** | uma coluna `etapa` no `sm_pedido` seria a segunda afirmação sobre o mesmo fato, e divergiria do `pronto_em` no primeiro bipe que ninguém replicasse — a armadilha #12 dentro do quadro. Há caso travando que a tabela não ganhou a coluna |
+| 2 | **O `marco` não se mexe, e o quadro só lê** | é a dívida 15 respondida: três lugares filtram por `marco='aprovado'` — a reimpressão da etiqueta e as duas contas da compra |
+| 3 | **Uma coluna por etapa** | duas mostrariam o mesmo cartão em dois lugares, e quem vê isso para de confiar na tela inteira |
+| 4 | **Pedido não some do quadro em silêncio** | desativar uma coluna vira **aviso** com a etapa nomeada e a contagem, e o total do título continua contando ele. Etapa vazia não vira aviso: aviso permanente é paisagem |
+| 5 | **A barrinha não conta o kit nem a peça cancelada**, e não existe antes da aprovação | o kit nunca é bipado (o defeito que a 5-B1 pegou no Pronto); a peça cancelada não é trabalho; e a ficha só é explodida na aprovação — barrinha zerada antes diria "nada foi feito" no lugar de "ainda não há o que fazer" |
+| 6 | **`painel.ler`, e nenhuma chave nova** | o quadro é a fábrica toda com o valor de cada carteira, e `pedido.ler` está no vendedor. O cadastro das colunas usa as chaves de quem já abre Cadastros |
+
+### O que foi conferido, e como
+
+- **25 casos novos** (`tecido/teste/kanban.test.js`), escritos **antes** do
+  código, e **sete defeitos reintroduzidos um a um**: o cancelado deixando de
+  vencer o pronto (reprova 1), a barrinha contando o kit (1), contando a peça
+  cancelada (1), o pedido sumindo em silêncio (1), duas colunas na mesma etapa
+  (1), etapa inexistente aceita (1) e a barrinha antes da aprovação (1).
+- **536** (tecido) + **168** (acesso) + **10** (cobertura) verdes, §10 verde.
+- **As duas telas abertas**, com pedido semeado em cada uma das seis etapas —
+  e foi assim que apareceram **cinco** defeitos que nenhum teste pega: o
+  `R$ 0,00` no orçamento, a barrinha cortada na borda, a largura de leitura
+  escondendo duas colunas, o selo de retido no cartão cancelado e o
+  *"1 pedido(s) em Em produção"*.
+- **Falta o dono abrir.** O pronto-quando da fase 6 é ele respondendo pela
+  tela; o que rodou foi num navegador meu, com dado semeado.
 
 ## STATUS DA FASE 5-B2 — em código em 24/09/2026
 

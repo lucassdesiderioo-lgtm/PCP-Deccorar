@@ -67,7 +67,13 @@ const TELAS={
      tela nem aparece no menu dele, e menu com tela inutil e o que ensina a
      nao clicar. Contexto OPERACAO pela mesma razao da producao: quem abre
      esta em pe na bancada, e ali tela escura vira espelho. */
-  '/bancada':   {arquivo:'telas/bancada.html',   permissao:'producao.bipar',        contexto:'operacao'}
+  '/bancada':   {arquivo:'telas/bancada.html',   permissao:'producao.bipar',        contexto:'operacao'},
+
+  /* ⚠️ O KANBAN E `painel.ler`, E CONTEXTO ADMIN. Ele responde "onde esta o
+     pedido X" para a fabrica inteira, com o valor de cada carteira — e isso
+     e escritorio, nao bancada. Declarado `pedido.ler` ele daria ao VENDEDOR
+     o quadro das revendas dos colegas; a fila dele continua em /pedidos. */
+  '/kanban':    {arquivo:'telas/kanban.html',    permissao:'painel.ler',            contexto:'admin'}
 };
 
 module.exports={TELAS};

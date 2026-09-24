@@ -3649,6 +3649,25 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   normal é a armadilha #6 (§19, 5-B1)
 - ❌ Escrever uma segunda frase de "o que fazer" na tela da bancada: ela sai
   do mesmo `tarefaDe` da etiqueta, e na bancada vence a etiqueta (§19)
+- ❌ Gravar a etapa do kanban numa coluna do `sm_pedido`: ela é DERIVADA, e a
+  coluna divergiria do `pronto_em` no primeiro bipe (§19, 6-A)
+- ❌ Trocar o `marco` para `pronto` "agora que o kanban existe" — a decisão da
+  dívida 15 foi NÃO, e os três leitores continuam de pé (§19, 6-A)
+- ❌ Deixar uma regra ler o NOME da coluna do quadro: o nome é cadastro, a
+  etapa é código, e renomear não pode desligar nada (§19, 6-A)
+- ❌ Aceitar duas colunas na mesma etapa: o mesmo pedido apareceria em dois
+  lugares, e quem vê isso para de confiar na tela inteira (§19, 6-A)
+- ❌ Criar coluna de `entregue` antes de existir o que marque entrega: coluna
+  que nunca recebe cartão é paisagem, que é a dívida 18 (§19, 6-A)
+- ❌ Deixar o pedido sumir do quadro quando a coluna é desativada: ele vira
+  AVISO, com a etapa nomeada e a contagem (§19, 6-A)
+- ❌ Contar o kit ou a peça cancelada na barrinha do cartão, ou desenhar
+  barrinha antes da aprovação — a ficha só é explodida ali (§19, 6-A)
+- ❌ Escrever `R$ 0,00` no cartão sem valor lançado: ele não vale nada AINDA,
+  e o total da coluna vira PISO quando falta algum (§19, 6-A, e a regra 4)
+- ❌ Declarar o quadro como `pedido.ler`: ele é a fábrica toda com o valor de
+  cada carteira, e o vendedor tem essa chave (§19, 6-A)
+- ❌ Pôr selo de retido em cartão cancelado — ele não espera nada (§19, 6-A)
 - ❌ Escrever uma segunda tabela de "o que vem antes" para a recusa: o `ANTES`
   lido ao contrário já responde, e duas divergem no dia em que o fluxo mudar
   (§19, 5-B2)
@@ -5438,6 +5457,123 @@ a montagem acha o tubo maior  →  escolhe o MOTIVO, e só ele
 > Mexeu em permissão? **`node teste_acesso.js` (168) e `node teste_cobertura.js`
 > (10) também.** E **abra as três telas**: a mudança da lista de motivos não tem
 > teste que a pegue.
+
+### ⚠️ A FASE 6-A (24/09/2026) — O QUADRO, E A ETAPA QUE NÃO SE GRAVA
+
+A fase 5 fez a peça andar; aqui o **pedido** aparece. Migração 23
+(`sm_kanban_coluna`), `dominio/kanban.js`, `dados/kanban.js`,
+`rotas/kanban.js` e a tela `/sobmedida/kanban`. É o *"onde está o pedido X"*
+do pronto-quando da fase 6 — e é o que torna visível o que a 5-B1 passou a
+gravar: até aqui o andamento de um pedido só se via abrindo a bancada de cada
+setor, um por um.
+
+```
+Em edição │ Enviado │ Aprovado │ Em produção │ Pronto │ Cancelado
+          │         │          │  Ser 2/2 Col 1/1     │
+          │         │          │  Mon 0/1 Rev 0/1 Emb 0/1
+```
+
+> ⚠️ **A ETAPA É DERIVADA, NUNCA GRAVADA — e isso é a dívida 15 da spec
+> vencendo.** Ela sai de `marco` + `pronto_em` + os bipes, e **não há coluna
+> `etapa` no `sm_pedido`**. Uma coluna gravada seria a segunda afirmação sobre
+> o mesmo fato, e divergiria do `pronto_em` no primeiro bipe que ninguém
+> replicasse: é a armadilha #12 dentro do quadro. Há caso travando que a
+> tabela não ganhou a coluna.
+>
+> **E o `marco` NÃO virou `pronto`.** A dívida 15 dizia *"o kanban da fase 6
+> lê o histórico; se um dia o marco precisar do valor, é decisão de lá, com as
+> três leituras na mesa"*. A decisão é **não**: três lugares filtram por
+> `marco='aprovado'` — a reimpressão da etiqueta e as **duas** contas do
+> comprometido e do material de compra (4-B e 4-C) —, e trocar mudaria em
+> silêncio os números que o comprador usa. O quadro **só lê**.
+
+> ⚠️ **AS COLUNAS SÃO LIVRES, AS ETAPAS NÃO.** É a frase da própria spec, e o
+> motivo está escrito lá: *"renomear 'Em produção' desligaria a trava em
+> silêncio"*. O **nome** é cadastro (`sm_kanban_coluna`); o que a coluna
+> **aponta** é a lista fechada do `dominio/kanban.js`, que é código. Renomear
+> não mexe na etapa, e há caso travando.
+>
+> **Etapa que não existe é recusada dizendo quais existem** — sem isso quem
+> cadastra tenta de novo com outro palpite, e a trava vira adivinhação. E
+> **duas colunas na mesma etapa** são recusadas: mostrariam o mesmo cartão
+> duas vezes, e quem vê o pedido em dois lugares para de confiar na tela
+> inteira.
+
+> ⚠️ **A LISTA DE ETAPAS NÃO É A LISTA DE MARCOS DA SPEC, e são três
+> diferenças, as três decisão:**
+>
+> | | |
+> |---|---|
+> | `edicao` no lugar de `orcamento` | o pedido **reaberto** (fase 3) volta a `marco='rascunho'` e **continua com o número dele**: chamar aquilo de "orçamento" seria mentira na tela. Os dois estão sendo editados e nada foi prometido — é a mesma etapa, e o número no cartão separa um do outro |
+> | `cancelado` **entrou** | não está na lista da spec, e é resposta legítima para "onde está o pedido X" — é o único estado em que um pedido some sem ter ido a lugar nenhum |
+> | `entregue` **não entrou** | nada no sob medida marca entrega hoje, e coluna que nunca recebe cartão é paisagem — a dívida 18. Ela nasce na 6-C, junto com o boleto e a NF, que são o que a torna verdadeira |
+
+> ⚠️ **PEDIDO NÃO SOME DO QUADRO EM SILÊNCIO.** Desativar uma coluna não pode
+> fazer trabalho desaparecer de uma tela que responde *"onde está o pedido
+> X"*: o pedido vira **aviso no topo**, com a etapa nomeada e a contagem, e o
+> total do título continua contando ele. **Etapa sem pedido nenhum não vira
+> aviso** — aviso que aparece todo dia sem nada atrás é paisagem, e aí ninguém
+> o lê no dia em que ele significa alguma coisa (a regra do card de caixa de
+> várias peças do §5).
+
+> ⚠️ **A BARRINHA NÃO CONTA O KIT NEM A PEÇA CANCELADA.** Cada persiana tem
+> **duas** linhas de setor `embalagem` — o trabalho e o kit que vai dentro —, e
+> o kit não tem código, não é bipado e nunca termina: contá-lo deixaria a
+> barrinha eternamente a uma peça do fim. Foi exatamente o defeito que o teste
+> da 5-B1 pegou no Pronto. A peça cancelada sai pela mesma razão: ela fica na
+> lista do pedido (§4.10) e não é trabalho.
+>
+> **E quem ainda não tem ficha não tem barrinha.** A ficha só é explodida na
+> **aprovação** (fase 3): antes disso não há componente nenhum, e uma barrinha
+> zerada diria *"nada foi feito"* quando a verdade é *"ainda não há o que
+> fazer"*.
+
+> ⚠️ **`pronto_em` NASCEU NA 5-B1 E NENHUMA TELA O LIA.** A coluna existia, o
+> bipe a gravava, e o `pedido.porId` não a devolvia — quem abrisse o pedido não
+> tinha como saber que ele estava pronto. É a dívida 18 pela porta do **leitor
+> que faltava**, e o quadro foi o primeiro a precisar dele: sem isso a etapa
+> `pronto` nunca aparecia. Achado com o teste vermelho na mão.
+
+> ⚠️ **O QUADRO É `painel.ler`, E NÃO `pedido.ler`.** Ele responde a pergunta
+> inteira — a fábrica toda, com o valor de cada carteira. `pedido.ler` está no
+> **vendedor**, e daria a ele o quadro das revendas dos colegas; a fila dele
+> continua em `/pedidos`, que é a lista de trabalho dele. O pronto-quando da
+> fase 6 é *"o DONO responde pela tela"*. **E não nasce chave nova**: o
+> cadastro das colunas é `cadastro.ler`/`cadastro.editar`, as mesmas de quem já
+> abre a tela de Cadastros, onde o card mora.
+
+> ⚠️ **CINCO COISAS SÓ APARECERAM ABRINDO A TELA — e nenhuma tem teste de
+> unidade que a pegue sem o render:**
+> - **`R$ 0,00` no orçamento.** O valor do cartão é o que o **envio** congelou
+>   (fase 3): o orçamento não tem nenhum e o reaberto perdeu o dele. Zero se lê
+>   como *"de graça"*, e a verdade é *"não vale nada AINDA"* — é a regra 4 do
+>   custo, e foi o mesmo defeito que só apareceu renderizando a tela na fase 3.
+>   Hoje a linha não existe, e o total da coluna é **piso** (`≥`) quando parte
+>   dos cartões não tem valor;
+> - **a barrinha cortada.** Cinco setores numa coluna de cartão não cabem numa
+>   linha só, e o último chip era empurrado para fora da borda — o número sumia
+>   e o cartão ficava com cara de certo. É o `ellipsis` que come a tarja (§12)
+>   por outra porta. Hoje ela **quebra**;
+> - **a largura de leitura.** O `.corpo` do `base.css` tem 1100 px porque é
+>   largura de **texto**; um quadro não é texto, e com ela o dono via quatro das
+>   seis colunas e tinha que rolar para achar "Pronto" e "Cancelado", que são as
+>   duas pontas da história. Esta é a única tela do módulo que sai dessa
+>   largura, e o porquê está escrito nela;
+> - **o selo de retido no cartão CANCELADO.** "Retido" quer dizer parado
+>   esperando alguma coisa, e o cancelado não espera nada;
+> - **"1 pedido(s) em Em produção"** no aviso — a concordância e a preposição
+>   colada no nome da etapa. É o *"1 destes pedidos já tiveram"* da 4-A outra
+>   vez.
+
+> **Rode `cd tecido && npm test` (536 casos) ao mexer no `kanban.js`, no que
+> move pedido, bipe ou coluna** — 25 são da 6-A, e **sete defeitos foram
+> reintroduzidos um a um** para provar que cada caso pega o seu: o cancelado
+> deixando de vencer o pronto, a barrinha contando o kit, a barrinha contando a
+> peça cancelada, o pedido sumindo em silêncio, duas colunas na mesma etapa,
+> etapa inexistente aceita e a barrinha aparecendo antes da aprovação. Mexeu em
+> permissão? **`node teste_acesso.js` (168) e `node teste_cobertura.js` (10)
+> também.** E **abra a tela**: cinco dos defeitos desta fase não têm teste que
+> os pegue.
 
 ### Três regras do sob medida que valem citar aqui
 

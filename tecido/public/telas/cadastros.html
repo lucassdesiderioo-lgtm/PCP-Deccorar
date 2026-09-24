@@ -751,6 +751,42 @@ async function telaMotivo(pai){
   ])));
   cP.appendChild(tP);
 
+  /* ── AS COLUNAS DO QUADRO (fase 6-A, secao 4.17) ───────────────────────
+     ⚠️ O NOME E CADASTRO; A ETAPA E CODIGO. E a frase da spec: "as colunas
+     sao livres, os marcos nao". Renomear "Em producao" nao desliga regra
+     nenhuma, porque nenhuma regra le o nome da coluna. */
+  const kb=await api('/api/kanban/colunas');
+  const cK=cartao(pai,'Colunas do quadro','Onde cada pedido aparece em Sob medida → Quadro.');
+  cK.appendChild(el('p',{class:'ajuda',texto:
+    'O NOME da coluna é livre; o que ela aponta — a etapa — é fixo no sistema, porque as regras leem a etapa e nunca o nome. Desativar uma coluna NÃO some com o pedido: ele vira aviso no topo do quadro, com a contagem. Cada etapa tem uma coluna só: duas mostrariam o mesmo pedido em dois lugares.'}));
+  const livres=(kb.etapas||[]).filter(e=>!(kb.colunas||[]).some(c=>c.etapa===e.chave));
+  if(livres.length) formulario(cK,[
+    {id:'nome',rotulo:'Nova coluna',dica:'Entregue',cresce:true},
+    {id:'etapa',rotulo:'Mostra a etapa',opcoes:livres.map(e=>({valor:e.chave,nome:e.nome}))}
+  ],'Adicionar coluna',
+    async(v,refs)=>{ if(!v.nome.trim()) return;
+      await api('/api/kanban/colunas',{metodo:'POST',corpo:{nome:v.nome, etapa:v.etapa}});
+      refs.nome.value=''; banner('Coluna cadastrada.'); await recarregar(); });
+  else cK.appendChild(el('p',{class:'ajuda',texto:
+    'Todas as etapas do sistema já têm coluna — por isso não há o que acrescentar aqui.'}));
+  const tK=el('table',{});
+  tK.appendChild(el('tr',{},[el('th',{texto:'Coluna'}),el('th',{texto:'Mostra a etapa'}),el('th',{texto:''})]));
+  (kb.colunas||[]).forEach(c=>{
+    const e=(kb.etapas||[]).find(x=>x.chave===c.etapa);
+    tK.appendChild(el('tr',{class:c.ativo?'':'inativo'},[
+      el('td',{texto:c.nome}),
+      /* O NOME da etapa, nunca a chave — chave de banco em tela e o
+         "— Correcao de contagem" do §2 do CLAUDE.md. */
+      el('td',{texto:(e&&e.nome)||c.etapa}),
+      el('td',{style:'text-align:right;white-space:nowrap'},[
+        botaoRenomear(c,'/api/kanban/colunas/'+c.id,recarregar),
+        el('span',{texto:' '}),
+        botaoAtivo(c,'/api/kanban/colunas/'+c.id,recarregar)
+      ])
+    ]));
+  });
+  cK.appendChild(tK);
+
   const cC=cartao(pai,'Condicao da sobra','Como a sobra chegou na prateleira — e o que isso faz no plano de corte.');
   cC.appendChild(el('p',{class:'ajuda',texto:
     'Estas duas colunas trabalham: "aproveitavel" tira a sobra das candidatas; "por ultimo" manda o defeito parcial ser tentado depois das integras. Mancha num canto de uma peca grande ainda serve para um corte menor.'}));

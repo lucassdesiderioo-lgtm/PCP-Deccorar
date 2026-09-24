@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quadro · Sob medida</title>
+<link rel="stylesheet" href="/sobmedida/base.css">
+<style>
+/* ⚠️ O QUADRO SAI DA LARGURA DE LEITURA, e é a única tela do módulo que
+   faz isso. O `.corpo` do base.css tem 1100 px porque é largura de TEXTO —
+   linha comprida demais ninguém lê. Um quadro não é texto: com 1100 px o
+   dono via quatro das seis colunas e tinha que rolar para achar "Pronto" e
+   "Cancelado", que são as duas pontas da história. Rolar para responder
+   "onde está o pedido X" é a pergunta ficando mais cara do que precisa.
+   **Só apareceu abrindo a tela.** */
+.corpo{max-width:none}
+
+/* ⚠️ O QUADRO ROLA NA HORIZONTAL, e as colunas têm largura FIXA. Com `1fr`
+   por coluna, seis colunas num monitor comum dão 200 px cada e o cartão sai
+   com o nome da revenda quebrado em quatro linhas — a tela fica bonita e não
+   se lê. Aqui a coluna tem tamanho de cartão, e quem tem seis colunas rola. */
+.quadro{display:flex; gap:14px; overflow-x:auto; padding-bottom:10px; align-items:flex-start}
+.col{flex:0 0 240px; background:var(--cartao); border:1px solid var(--linha);
+  border-radius:var(--raio); padding:12px}
+.col h3{margin:0; font-size:17px; display:flex; gap:8px; align-items:baseline}
+.col .qtd{font-size:14px; color:var(--tinta-fraca); font-weight:600}
+.col .soma{font-size:13px; color:var(--tinta-fraca); margin:2px 0 10px}
+.cartao-p{border:1px solid var(--linha-forte); border-radius:var(--raio);
+  padding:10px; margin-bottom:8px; background:var(--campo)}
+.cartao-p .topo2{display:flex; justify-content:space-between; gap:8px; align-items:baseline}
+.cartao-p .num{font-size:17px; font-weight:800}
+.cartao-p .rev{font-size:14px; color:var(--tinta-fraca); margin:2px 0 6px;
+  /* ⚠️ QUEBRA, não apara: `text-overflow:ellipsis` come o fim da linha, e é
+     lá que ficam as tarjas (§12 do CLAUDE.md). */
+  overflow-wrap:anywhere}
+.cartao-p .val{font-size:14px; font-weight:700}
+/* ⚠️ ELA QUEBRA, NUNCA É CORTADA. Cinco setores numa coluna de cartão não
+   cabem numa linha só, e `flex:1` sem quebra empurrava o último chip para
+   fora da borda — o número sumia e o cartão ficava com cara de certo. É o
+   mesmo defeito do `ellipsis` que come a tarja (§12 do CLAUDE.md), por outra
+   porta. **Só apareceu abrindo a tela.** */
+.barras{display:flex; flex-wrap:wrap; gap:4px; margin-top:8px}
+.barras .s{flex:1 1 42px; text-align:center; font-size:11px; padding:3px 2px;
+  border-radius:4px; background:var(--linha); color:var(--tinta-fraca)}
+.barras .s.andando{background:#1565c0; color:#fff; font-weight:700}
+.barras .s.feito{background:#2e7d32; color:#fff; font-weight:700}
+.selo{display:inline-block; font-size:11px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.04em; padding:2px 7px; border-radius:99px; margin-top:6px;
+  background:var(--alerta-fraca); color:var(--alerta); border:1px solid var(--alerta)}
+.vaziocol{color:var(--tinta-fraca); font-size:14px; padding:6px 0}
+.atrasado{color:var(--erro); font-weight:700}
+.aperta{color:var(--alerta); font-weight:700}
+</style>
+</head>
+<body>
+<header class="topo">
+  <h1>Quadro</h1>
+  <span class="espaco"></span>
+  <span class="quem" id="quem"></span>
+</header>
+
+<div class="corpo">
+  <!-- ⚠️ O AVISO DE "FORA DO QUADRO" FICA EM CIMA, e some quando não há
+       nenhum. Ele existe porque desativar uma coluna não pode fazer pedido
+       desaparecer de uma tela que responde "onde está o pedido X". -->
+  <div class="cartao" id="cFora" style="display:none">
+    <h2>Fora do quadro</h2>
+    <p class="nota">Estes pedidos estão numa etapa que não tem coluna ativa —
+      eles existem, e o quadro não os mostra. A coluna se reativa em
+      <b>Cadastros → Colunas do quadro</b>.</p>
+    <div id="fora"></div>
+  </div>
+
+  <div class="cartao">
+    <h2 id="titulo">Onde está cada pedido</h2>
+    <div class="quadro" id="quadro"></div>
+  </div>
+</div>
+
+<script src="/sobmedida/ui.js"></script>
+<script src="/sobmedida/nav.js"></script>
+<script>
+const {api,el,limpar,$,dinheiro}=window.ui;
+
+let EU={permissoes:[]};
+const posso=k=>(EU.permissoes||[]).indexOf(k)>=0;
+
+/* Os mesmos "dias de fábrica" da fila do vendedor (fase 3) e da tela de
+   produção (4-A): três dias no papel com um feriado no meio são zero dias de
+   trabalho. Negativo fica negativo — prazo vencido é o que a tela mostra. */
+function diasTexto(n){
+  if(n==null) return null;
+  if(n<0) return el('span',{class:'atrasado'},[Math.abs(n)+' dia(s) VENCIDO']);
+  if(n===0) return el('span',{class:'atrasado'},['vence hoje']);
+  if(n<=2) return el('span',{class:'aperta'},[n+' dia(s)']);
+  return el('span',{},[n+' dias']);
+}
+
+function desenharCartao(c){
+  const filhos=[
+    el('div',{class:'topo2'},[
+      el('span',{class:'num'},[c.numero?('#'+c.numero):'orçamento']),
+      /* ⚠️ Sem `custo.ver` o campo NÃO VEM no JSON (a poda do custo.js), e
+         aí a linha do valor simplesmente não existe — não é a tela que
+         esconde. */
+      /* Sem valor lançado, a linha simplesmente não existe — `R$ 0,00` se
+         lê como "de graça", e a verdade é "não vale nada AINDA". E sem
+         `custo.ver` o campo nem vem no JSON (a poda do custo.js). */
+      (c.valor_total_centavos!==undefined&&c.valor_total_centavos!==null)
+        ? el('span',{class:'val'},[dinheiro(c.valor_total_centavos/100)])
+        : el('span',{})
+    ]),
+    el('div',{class:'rev'},[String(c.revenda||'')+(c.vendedor?(' · '+c.vendedor):'')])
+  ];
+  const d=diasTexto(c.dias_uteis);
+  if(c.prazo) filhos.push(el('div',{class:'rev'},
+    d?[c.prazo_extenso||c.prazo,' · ',d]:[c.prazo_extenso||c.prazo]));
+
+  /* A BARRINHA POR SETOR. Ela só aparece depois da aprovação, quando a ficha
+     foi explodida — antes disso não há o que fazer, e uma barrinha zerada
+     diria "nada foi feito", que é outra afirmação. */
+  if((c.setores||[]).length){
+    const b=el('div',{class:'barras'});
+    c.setores.forEach(s=>{
+      const classe = s.feitos>=s.total ? 'feito' : (s.feitos>0?'andando':'');
+      b.appendChild(el('span',{class:'s '+classe,
+        title:s.nome+': '+s.feitos+' de '+s.total},
+        [s.nome.slice(0,3)+' '+s.feitos+'/'+s.total]));
+    });
+    filhos.push(b);
+  }
+  (c.retido||[]).forEach(r=>filhos.push(el('span',{class:'selo'},['retido · '+r])));
+  return el('div',{class:'cartao-p'},filhos);
+}
+
+function desenhar(q){
+  const alvo=limpar($('#quadro'));
+  q.colunas.forEach(col=>{
+    const c=el('div',{class:'col'});
+    c.appendChild(el('h3',{},[col.nome, el('span',{class:'qtd'},[String(col.quantidade)])]));
+    if(col.valor_total_centavos!==undefined&&col.valor_total_centavos!==null)
+      c.appendChild(el('div',{class:'soma'},[(col.valor_piso?'≥ ':'')+dinheiro(col.valor_total_centavos/100)]));
+    else c.appendChild(el('div',{class:'soma'},[' ']));
+    if(!col.cartoes.length)
+      /* ⚠️ COLUNA VAZIA DIZ O QUE O VAZIO SIGNIFICA. "Nada aqui" se parece
+         com tela quebrada — a lição da 4-C, onde a primeira leitura deu
+         vazio e estava certa. */
+      c.appendChild(el('div',{class:'vaziocol'},['Nenhum pedido nesta etapa.']));
+    else col.cartoes.forEach(x=>c.appendChild(desenharCartao(x)));
+    alvo.appendChild(c);
+  });
+
+  const cf=$('#cFora');
+  if(!(q.fora||[]).length){ cf.style.display='none'; }
+  else{
+    cf.style.display='';
+    const f=limpar($('#fora'));
+    /* ⚠️ A FRASE CONCORDA COM O NÚMERO, e o caso de UM é o normal aqui. O
+       "1 pedido(s) em Em produção" é o "1 destes pedidos já tiveram" da fase
+       4-A outra vez — e o "em Em produção" é a preposição colada no nome da
+       etapa. Nenhum teste de unidade pega: o texto está sintaticamente
+       perfeito. **Só apareceu abrindo a tela.** */
+    q.fora.forEach(x=>f.appendChild(el('p',{},[
+      el('b',{},[String(x.quantidade)]),
+      x.quantidade===1?' pedido na etapa ':' pedidos na etapa ',
+      el('b',{},['"'+(x.etapa_nome||x.etapa)+'"']), '.'
+    ])));
+  }
+}
+
+(async function(){
+  EU=await api('/api/eu');
+  $('#quem').textContent=(EU.nome||'')+' · '+(EU.papel||'');
+  const q=await api('/api/kanban');
+  const total=q.colunas.reduce((s,c)=>s+c.quantidade,0)
+    + (q.fora||[]).reduce((s,f)=>s+f.quantidade,0);
+  $('#titulo').textContent='Onde está cada pedido — '+total+' no total';
+  desenhar(q);
+})();
+</script>
+</body>
+</html>
