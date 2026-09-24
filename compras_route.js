@@ -67,32 +67,94 @@ module.exports = function(app, db){
   app.get('/api/componentes',(req,res)=>
     res.json(db.prepare('SELECT * FROM componente ORDER BY ativo DESC, nome').all()));
 
+  /* ── O CADASTRO DE MATERIAL ────────────────────────────────────────────
+     Cria (sem `id`) e edita (com `id`). Ate 24/09/2026 a rota CRIAVA e nenhuma
+     tela chamava ela sem id: o dono foi cadastrar os tubos da fase 4-C e nao
+     achou onde, porque nao existia. E a divida 18 na forma "rota que nenhuma
+     tela chama" — a mesma do extrato do livro (§2), que ficou um dia no ar sem
+     botao nenhum.
+
+     ⚠️ E INDO ESCREVER A TELA APARECEU O DEFEITO QUE IMPORTA MAIS: o `UPDATE`
+     escrevia TODOS os campos, sempre. Um POST com `id` e sem `familia` APAGAVA
+     a familia — e familia + cor + largura de bobina e exatamente como a ficha
+     resolve QUAL TECIDO a peca usa (§7-B). Some a familia, some o tecido da
+     ficha, e com ele o custo e a linha da lista de compras. Sem erro, sem log
+     e sem nada em tela nenhuma.
+
+     Ninguem caiu nisso ate hoje por ACASO: o unico chamador (o `change` da
+     tabela de minimos) reenvia todos os campos. A tela de cadastro manda nome,
+     unidade e os dois numeros — e nao manda familia, cor e bobina, que ela nem
+     mostra. No primeiro salvamento o tecido perderia o vinculo.
+
+     E a armadilha #25 / divida 15 (o POST /api/skus que zerava o estoque) viva
+     noutra rota, e as duas regras do §6 passam a valer aqui:
+
+       CAMPO AUSENTE NAO E CAMPO VAZIO — ausente preserva o gravado; mandar
+       vazio de proposito apaga, e isso e decisao de quem editou.
+
+       NUMERO IMPOSSIVEL E RECUSADO, NUNCA CLAMPADO — negativo e texto levam
+       400 com o nome do campo, e NADA e gravado. Clampar em zero seria apagar
+       em silencio, que e o defeito que se esta consertando.
+
+     ⚠️ `estoque` e `custo_medio` NAO estao aqui, e e de proposito: quem move
+     saldo de material e o `componente_dominio.js` (§7-B, dono unico), e o
+     custo medio so anda no recebimento. Cadastro nao mexe em saldo — a mesma
+     regra que o cadastro de SKU aprendeu em 21/09 (§2, o livro). */
   app.post('/api/componentes',(req,res)=>{
     const b=req.body||{};
-    const nome=txt(b.nome);
-    if(!nome) return res.status(400).json({erro:'nome obrigatório'});
-    const campos={ nome, codigo:txt(b.codigo), unidade:txt(b.unidade),
+    const tem = k => Object.prototype.hasOwnProperty.call(b,k);
+    const editando = !!b.id;
+
+    /* Numero: ausente fica de fora; vazio limpa; impossivel RECUSA dizendo
+       qual campo e. O rotulo e o que aparece na tela, nao o nome da coluna —
+       "estoque_minimo" nao diz nada a quem cadastra. */
+    const NUMS=[['estoque_minimo','o estoque mínimo'],['estoque_ideal','o estoque ideal'],
+                ['largura_bobina_cm','a largura de bobina'],['perda_pct','a perda de corte']];
+    const campos={};
+    for(const [k,rotulo] of NUMS){
+      if(!tem(k)) continue;
+      if(b[k]===''||b[k]===null){ campos[k]=null; continue; }
+      const n=num(b[k]);
+      if(n===null||n<0) return res.status(400).json({
+        erro:rotulo+' tem que ser um número maior ou igual a zero — veio "'+b[k]+'"'});
+      campos[k]=n;
+    }
+    for(const k of ['nome','codigo','unidade','familia']) if(tem(k)) campos[k]=txt(b[k]);
+    if(tem('cor')) campos.cor = txt(b.cor) && String(b.cor).toUpperCase();
+    if(tem('sobra_aproveitavel')) campos.sobra_aproveitavel = b.sobra_aproveitavel?1:0;
+    if(tem('ativo')) campos.ativo = b.ativo?1:0;
+
+    /* O nome e obrigatorio para NASCER, e so. Na edicao ele segue a regra de
+       cima: ausente preserva. Exigi-lo sempre era a mesma confusao entre
+       ausente e vazio pela outra ponta — e era o que fazia um POST parcial
+       morrer com "nome obrigatório" em vez de gravar o campo citado. */
+    if(!editando){
+      if(!campos.nome) return res.status(400).json({erro:'nome obrigatório'});
       /* §5: nasce aproveitavel. Errar para o lado seguro e comprar a embalagem
          maior, nao a menor. */
-      sobra_aproveitavel: ('sobra_aproveitavel' in b) ? (b.sobra_aproveitavel?1:0) : 1,
-      estoque_minimo:num(b.estoque_minimo)||0, estoque_ideal:num(b.estoque_ideal)||0,
-      familia:txt(b.familia), cor:txt(b.cor)&&String(b.cor).toUpperCase(),
-      largura_bobina_cm:num(b.largura_bobina_cm) };
+      if(campos.sobra_aproveitavel===undefined) campos.sobra_aproveitavel=1;
+      if(campos.estoque_minimo===undefined) campos.estoque_minimo=0;
+      if(campos.estoque_ideal===undefined)  campos.estoque_ideal=0;
+    }else if(tem('nome') && !campos.nome){
+      return res.status(400).json({erro:'o nome não pode ficar vazio'});
+    }
+
+    const unico = 'já existe um componente com este código' +
+      (campos.familia ? ', ou já existe esta combinação de família, cor e largura de bobina' : '');
+
     return protegido(res, ()=>{
-      if(b.id){
-        db.prepare(`UPDATE componente SET nome=@nome,codigo=@codigo,unidade=@unidade,
-          sobra_aproveitavel=@sobra_aproveitavel,estoque_minimo=@estoque_minimo,
-          estoque_ideal=@estoque_ideal,familia=@familia,cor=@cor,largura_bobina_cm=@largura_bobina_cm
-          WHERE id=@id`).run(Object.assign({id:+b.id},campos));
+      if(editando){
+        const cols=Object.keys(campos);
+        if(!cols.length) return res.json({ok:true, id:+b.id, nada_a_mudar:true});
+        db.prepare('UPDATE componente SET '+cols.map(c=>c+'=@'+c).join(', ')+' WHERE id=@id')
+          .run(Object.assign({id:+b.id},campos));
         return res.json({ok:true,id:+b.id});
       }
-      const r=db.prepare(`INSERT INTO componente (nome,codigo,unidade,sobra_aproveitavel,
-        estoque_minimo,estoque_ideal,familia,cor,largura_bobina_cm)
-        VALUES (@nome,@codigo,@unidade,@sobra_aproveitavel,@estoque_minimo,@estoque_ideal,
-        @familia,@cor,@largura_bobina_cm)`).run(campos);
+      const cols=Object.keys(campos);
+      const r=db.prepare('INSERT INTO componente ('+cols.join(',')+') VALUES ('+
+        cols.map(c=>'@'+c).join(',')+')').run(campos);
       res.json({ok:true,id:r.lastInsertRowid});
-    }, 'já existe um componente com este código' +
-       (campos.familia ? ', ou já existe esta combinação de família, cor e largura de bobina' : ''));
+    }, unico);
   });
 
   app.delete('/api/componentes/:id',(req,res)=>{

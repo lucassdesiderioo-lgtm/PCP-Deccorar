@@ -5,7 +5,8 @@ STATUS
 Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 24/09/2026
-Fase atual: 4-C EM CÓDIGO (24/09/2026) — o tubo chegando ao Compras do PCP
+Fase atual: 4-C EM PRODUÇÃO (24/09/2026) — o tubo chegando ao Compras do PCP;
+            falta apontar os degraus e o primeiro pedido real aparecer lá
             4-B EM CÓDIGO (24/09/2026) — o tecido, no painel do sob medida
             4-A EM PRODUÇÃO, o leitor bipou no papel (23/09/2026) — falta a
             peça real atravessando os cinco setores
@@ -19,7 +20,7 @@ Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
 Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) — ver abaixo
 ```
 
-## STATUS DA FASE 4-C — em código em 24/09/2026
+## STATUS DA FASE 4-C — em produção em 24/09/2026
 
 **O tubo da persiana sob medida chegou ao Compras do PCP.** É o outro lado da
 divisão que a 4-B fez: o tecido fica no painel do próprio módulo (estoque
@@ -60,10 +61,26 @@ existirem em Compras e não estiverem apontados, o tubo deles sai como
 | 1 | **Não há `fator_para_compra` digitado** | Quem responde como a peça vira quantidade é a **unidade** do item do PCP, lida ao vivo (`m` lê a medida de consumo, `un` conta peças). Um multiplicador digitado uma vez seria a segunda régua da mesma conta, e a que erra em silêncio. Unidade que a peça não sabe dizer é recusada no cadastro |
 | 2 | **O vínculo do tubo mora no DEGRAU**, e não no componente | Tubo 32 e Tubo 41 são itens de estoque diferentes: o material muda com o degrau, e o `sm_componente` tem uma linha só. O componente de chave `tubo` recusa o vínculo, dizendo para ir à escada |
 
-> ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA.** Os testes e as duas telas abertas
-> são indício. A prova é o comprador cadastrando os tubos 38, 41 e 56, vendo o
-> consumo do sob medida somar na linha certa e **comprando por ela**. Enquanto
-> isso não acontecer, está escrito aqui como não conferido.
+> **DEPLOY EM 24/09/2026, e ele foi limpo:** migração 20 aplicada, sob medida
+> montado, 172 rotas com permissão declarada, `/login` 200. Backup por
+> `db.backup()` antes (`backups/tecido-antes-4c.db`, com o pedido 5001 dentro).
+>
+> **A primeira leitura em produção deu `materiais: []` e `pendencias: []`, e é
+> o resultado certo** — vale escrito porque tela vazia se parece com tela
+> quebrada. O 5001 é o único pedido aprovado, e os dois tubos dele (um Tubo 41,
+> um Tubo 32) foram impressos em 23/09 às 14:49:33: pela regra desta fase, peça
+> com etiqueta impressa já saiu da conta. Quem vai aparecer é o **próximo**
+> pedido aprovado.
+
+> ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA.** Deploy não é conferência. A prova
+> é o comprador cadastrando os tubos 38, 41 e 56, apontando cada degrau, e
+> vendo o **próximo pedido aprovado** somar na linha certa do Compras — e
+> **comprando por ela**. Enquanto isso não acontecer, está escrito aqui como
+> não conferido.
+>
+> **E há um sinal de que ela ficou inerte, que é o que falta em quase todas as
+> regras novas (dívida 18):** apontados os degraus, o próximo pedido aprovado
+> que **não** aparecer no Compras é defeito, não silêncio normal.
 
 > **O que a tela mostrou, e nenhum teste de unidade pegaria** (três defeitos, os
 > três no primeiro render): a pendência é por **peça** no domínio — e tem que

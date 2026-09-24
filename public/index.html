@@ -220,8 +220,10 @@
       <button class="ghost" id="pdVer">Atualizar</button></div>
       <div id="pdRes" style="margin-top:14px"></div></div>
 
-    <div class="card"><div style="font-weight:700;margin-bottom:4px">Ponto de pedido por componente</div>
-      <div class="sub" style="margin-bottom:12px">Mínimo é quando disparar. Ideal é até onde encher.</div>
+    <div class="card"><div style="font-weight:700;margin-bottom:4px">Materiais</div>
+      <div class="sub" style="margin-bottom:12px">Os insumos que a ficha consome e que a lista de compras pede.
+        <b>Mínimo</b> é quando disparar; <b>ideal</b> é até onde encher.
+        O <b>estoque</b> não se edita aqui — ele entra pelo Recebimento e se corrige pela Contagem.</div>
       <div id="lcMin"></div></div>
   </div>
 
@@ -1188,15 +1190,56 @@ function pendenciasHTML(p){
     +p.map(x=>esc(x.sku)+' ('+x.precisa+' peça(s)): '+esc(x.motivo)+(x.expressao?' — <code>'+esc(x.expressao)+'</code>':'')).join('<br>')
     +'</div></div>';
 }
+/* O CADASTRO DE MATERIAL (24/09/2026). Até aqui este card só editava mínimo e
+   ideal de quem JÁ existia: a rota que CRIA existia e nenhuma tela chamava ela
+   — o dono foi cadastrar os tubos da fase 4-C e não achou onde, porque não
+   havia. É a dívida 18 na forma "rota que nenhuma tela chama", a mesma do
+   extrato do livro (§2).
+
+   ⚠️ A TELA NÃO MOSTRA FAMÍLIA, COR E LARGURA DE BOBINA, e é por isso que a
+   rota teve que aprender a preservar campo ausente ANTES desta tela existir:
+   os três são como a ficha resolve qual tecido a peça usa (§7-B), e um POST
+   sem eles os apagava. Com a regra nova, o que a tela não manda fica como
+   está. Editar tecido continua sendo assunto de quem cadastra tecido.
+
+   ⚠️ O ESTOQUE É SÓ LEITURA AQUI. Quem move saldo de material é o
+   `componente_dominio.js` (dono único, §7-B): entra pelo Recebimento, corrige
+   pela Contagem. Um campo editável nesta linha seria o oitavo dono da coluna,
+   que é a doença que o §2 levou meses para curar no saldo da persiana. */
+const UNIDADES=[['m','metro'],['un','unidade'],['kg','quilo']];
 async function verMinimos(){
   const box=$('#lcMin'); if(!box) return;
   if(!COMPS.length){ try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){} }
-  box.innerHTML='<table><thead><tr><th>Componente</th><th>Un</th><th>Estoque</th><th>Mínimo</th><th>Ideal</th></tr></thead><tbody>'
-    +COMPS.filter(c=>c.ativo).map(c=>'<tr><td>'+esc(c.nome)+'</td><td class="sub">'+esc(c.unidade)+'</td>'
+  const opts=(sel)=>UNIDADES.map(u=>'<option value="'+u[0]+'"'+(u[0]===sel?' selected':'')+'>'+u[1]+'</option>').join('');
+  const linha=c=>'<tr'+(c.ativo?'':' style="opacity:.55"')+'>'
+      +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="nome" value="'+esc(c.nome||'')+'" style="width:220px">'
+      +(c.familia?'<div class="sub">tecido · '+esc(c.familia)+' · '+esc(c.cor||'')+' · '+qtd(c.largura_bobina_cm)+' cm</div>':'')
+      +(c.ativo?'':'<div class="sub" style="color:var(--amber)">inativo</div>')+'</td>'
+      +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="codigo" value="'+esc(c.codigo||'')+'" style="width:175px"></td>'
+      +'<td><select class="lcCampo" data-id="'+c.id+'" data-campo="unidade" style="width:100px">'+opts(c.unidade)+'</select></td>'
       +'<td class="sub">'+qtd(c.estoque)+'</td>'
-      +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="estoque_minimo" type="number" step="0.01" value="'+(c.estoque_minimo||0)+'" style="width:110px"></td>'
-      +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="estoque_ideal" type="number" step="0.01" value="'+(c.estoque_ideal||0)+'" style="width:110px"></td></tr>').join('')
-    +'</tbody></table><span class="msg" id="lcMsg"></span>';
+      +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="estoque_minimo" type="number" step="0.01" min="0" value="'+(c.estoque_minimo||0)+'" style="width:100px"></td>'
+      +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="estoque_ideal" type="number" step="0.01" min="0" value="'+(c.estoque_ideal||0)+'" style="width:100px"></td>'
+      /* Desativar SEM caminho de volta é meia decisão — é a armadilha do
+         cadastro de SKU (§7), onde a linha inativa mostra só a palavra
+         "inativo" e ninguém acha como reativar. Aqui o botão troca de nome. */
+      +'<td><button class="ghost" data-comp-ativo="'+(c.ativo?0:1)+'" data-id="'+c.id+'">'
+      +(c.ativo?'Desativar':'Reativar')+'</button></td></tr>';
+  box.innerHTML='<table><thead><tr><th>Material</th><th>Código</th><th>Un</th>'
+    +'<th>Estoque</th><th>Mínimo</th><th>Ideal</th><th></th></tr></thead><tbody>'
+    +COMPS.map(linha).join('')
+    +'</tbody></table>'
+    /* A linha de criar fica EMBAIXO da lista, e não em cima: quem chega aqui
+       quase sempre vem ajustar mínimo, e um formulário em cima empurraria a
+       lista para fora da tela todo dia por causa do uso raro. */
+    +'<div class="row-actions" style="margin-top:14px;align-items:flex-end;flex-wrap:wrap;gap:8px">'
+    +'<div><label class="sub">Material novo</label><br><input id="cnNome" placeholder="Tubo 38 mm" style="width:220px"></div>'
+    +'<div><label class="sub">Código</label><br><input id="cnCod" placeholder="(opcional)" style="width:100px"></div>'
+    +'<div><label class="sub">Unidade</label><br><select id="cnUn" style="width:100px">'+opts('un')+'</select></div>'
+    +'<button class="primary" id="cnAdd">Adicionar</button>'
+    +'<span class="msg" id="lcMsg"></span></div>'
+    +'<div class="sub" style="margin-top:8px">A <b>unidade</b> é como a ficha gasta o material — metro para tubo, '
+    +'fita e tecido; unidade para comando, tampa e parafuso. Ela decide a conta, então trocar depois muda o que a lista de compras pede.</div>';
 }
 /* Pedidos (§8). O status conta a história: rascunho → enviado → parcial →
    recebido. Enviado, o item passa a contar como "a caminho" na lista. */
@@ -1255,6 +1298,33 @@ document.addEventListener('click',async function(e){
   const t=e.target; if(!t) return;
   if(t.id==='cpVer'){ compararItem(); return; }
   if(t.id==='lcVer'||t.id==='pdVer'){ carregarListaCompras(); return; }
+  if(t.id==='cnAdd'){
+    const nome=($('#cnNome').value||'').trim();
+    if(!nome){ aviso('#lcMsg','dê um nome ao material','var(--red)'); return; }
+    const r=await fetch('/api/componentes',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({nome, codigo:($('#cnCod').value||'').trim(), unidade:$('#cnUn').value})});
+    let d={}; try{ d=await r.json(); }catch(e){}
+    if(!r.ok){ aviso('#lcMsg', d.erro||'não criou','var(--red)'); return; }
+    $('#cnNome').value=''; $('#cnCod').value='';
+    /* O cache tem que cair, senão o material novo não aparece na própria tela
+       que acabou de criá-lo — e a pessoa clica de novo achando que falhou. */
+    COMPS=[]; carregarListaCompras();
+    aviso('#lcMsg','criado — agora defina o mínimo e o ideal','var(--green)');
+    return;
+  }
+  const at=t.closest&&t.closest('[data-comp-ativo]');
+  if(at){
+    const ligar=at.dataset.compAtivo==='1';
+    /* Desativar não apaga: há oferta, ficha e pedido apontando para a linha.
+       Some só da lista de opções — e o caminho de volta é o mesmo botão. */
+    const r=ligar
+      ? await fetch('/api/componentes',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({id:+at.dataset.id, ativo:1})})
+      : await fetch('/api/componentes/'+at.dataset.id,{method:'DELETE'});
+    let d={}; try{ d=await r.json(); }catch(e){}
+    if(!r.ok){ aviso('#lcMsg', d.erro||'não deu','var(--red)'); return; }
+    COMPS=[]; carregarListaCompras(); return;
+  }
   if(t.id==='lcGerar'){
     const sel=[...document.querySelectorAll('.lcSel:checked')]
       .map(c=>({oferta_id:+c.dataset.oferta, necessidade:+c.dataset.precisa}));
@@ -1306,13 +1376,43 @@ document.addEventListener('change',async function(e){
   const campo=t.closest&&t.closest('.lcCampo');
   if(campo){
     const c=COMPS.find(x=>x.id==campo.dataset.id); if(!c) return;
-    c[campo.dataset.campo]=parseFloat(campo.value)||0;
+    /* ⚠️ MANDA SÓ O CAMPO EDITADO. Até 24/09/2026 este bloco reenviava os nove
+       campos a cada tecla — e era isso, por acaso, que impedia a rota de apagar
+       família, cor e bobina, que ela sobrescrevia sempre. Hoje a rota preserva
+       o que não veio (§6, campo ausente não é campo vazio), então mandar um
+       campo é o certo: é o que a pessoa mexeu.
+
+       E o valor vai CRU, sem `parseFloat(...)||0`. Aquele `||0` transformava
+       "abc" e um negativo em zero em silêncio — o clamp que a armadilha #25
+       proíbe. Quem decide se o número é possível é o servidor, e ele responde
+       dizendo qual campo e o que veio. */
+    const corpo={id:c.id}; corpo[campo.dataset.campo]=campo.value;
     const r=await fetch('/api/componentes',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:c.id,nome:c.nome,codigo:c.codigo,unidade:c.unidade,
-        sobra_aproveitavel:c.sobra_aproveitavel,estoque_minimo:c.estoque_minimo,estoque_ideal:c.estoque_ideal,
-        familia:c.familia,cor:c.cor,largura_bobina_cm:c.largura_bobina_cm})});
-    aviso('#lcMsg', r.ok?'salvo':'não salvou', r.ok?'var(--green)':'var(--red)');
-    if(r.ok) verLista();   // o número mudou, a lista muda junto
+      body:JSON.stringify(corpo)});
+    let d={}; try{ d=await r.json(); }catch(e){}
+    /* ⚠️ A RESPOSTA APARECE NA PRÓPRIA LINHA, e o que foi digitado FICA.
+       A primeira versão escrevia a recusa no `#lcMsg`, que mora no rodapé do
+       card, ao lado do botão Adicionar — com quinze materiais na lista, quem
+       edita o mínimo da primeira linha vê o número voltar sozinho e a
+       explicação fora da tela, ou colada num formulário de criar que ele nem
+       abriu. Recusa que aparece em outro lugar é recusa que ninguém lê.
+
+       E repintar o valor velho por cima do digitado é o defeito que o §7-B já
+       descreve na ficha: quem editou vê a recusa e um número que não é o dele,
+       e não tem como saber o que foi que ele escreveu. O campo fica vermelho e
+       guarda o que a pessoa digitou — visivelmente NÃO salvo, e corrigível. */
+    const cel = (campo.closest && campo.closest('td')) || campo.parentNode;
+    let sp = cel.querySelector('.lcEco');
+    if(!sp){ sp=document.createElement('div'); sp.className='sub lcEco'; cel.appendChild(sp); }
+    if(r.ok){
+      campo.style.borderColor='';
+      sp.style.color='var(--green)'; sp.textContent='salvo';
+      c[campo.dataset.campo]=campo.value; verLista();
+      setTimeout(()=>{ if(sp.textContent==='salvo') sp.remove(); },2000);
+    }else{
+      campo.style.borderColor='var(--red)';
+      sp.style.color='var(--red)'; sp.textContent=d.erro||'não salvou';
+    }
   }
 });
 
