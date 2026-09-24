@@ -257,7 +257,64 @@ async function telaGerencial(pai){
     temCusto?piso+dinheiro(g.resumo.valor_parado):formatarArea(g.resumo.m2_parado),
     g.resumo.parados+' material(is) sem corte ha '+g.parametros.parado_dias+'+ dias',
     g.resumo.parados?'var(--sobra)':null));
+  /* ⚠️ O COMPROMETIDO NAO SE SOMA AO CONSUMO MEDIO, e por isso tem cartao
+     proprio: um olha para tras (o giro) e o outro para a frente (a venda
+     aprovada e nao cortada). Somados, o numero deixaria de responder
+     qualquer uma das duas perguntas — e o §18 do CLAUDE.md ja ensinou isso
+     com o `faltaHoje` e o `precisa`. */
+  cards.appendChild(cartaoNum('Vendido, nao cortado',
+    formatarArea(g.resumo.comprometido),
+    g.resumo.comprometido_pecas+' persiana(s) de pedido aprovado'+
+      (g.resumo.falta_comprometida>0
+        ? ' · faltam '+formatarArea(g.resumo.falta_comprometida)+' na estante' : ''),
+    g.resumo.falta_comprometida>0?'var(--erro)':null));
   pai.appendChild(cards);
+
+  /* ── O QUE JA ESTA VENDIDO ──────────────────────────────────────────────
+     Vem logo depois dos cartoes, antes dos graficos: e a unica secao desta
+     tela que fala de COMPRA em vez de gestao, e quem abre o painel para
+     decidir compra nao pode ter que rolar ate o fim para achar. O card some
+     quando nao ha nada aprovado — card vazio todo dia vira paisagem (§5). */
+  const comp=(g.por_tecido||[]).filter(t=>t.comprometido>0);
+  if(comp.length){
+    const cv=el('div',{class:'cartao'});
+    cv.appendChild(el('h2',{texto:'Vendido e ainda nao cortado'}));
+    cv.appendChild(el('p',{class:'nota',texto:
+      'Pedido APROVADO que ainda nao passou pelo plano de corte. O grao aqui e o '+
+      'tecido inteiro, somando as larguras — a pergunta e quanto comprar, e quem '+
+      'escolhe a bobina e o plano, na hora de cortar.'}));
+    const t=el('table');
+    t.appendChild(el('thead',{},[el('tr',{},[
+      el('th',{texto:'Tecido'}), el('th',{class:'num',texto:'Vendido'}),
+      el('th',{class:'num',texto:'Na estante'}), el('th',{class:'num',texto:'Falta comprar'}),
+      el('th',{texto:'Pedidos'})])]));
+    const corpo=el('tbody');
+    comp.slice().sort((a,b)=>b.falta-a.falta).forEach(x=>{
+      const tr=el('tr');
+      tr.appendChild(el('td',{},[
+        el('div',{texto:[x.linha_nome,x.abertura_nome,x.cor_nome].filter(Boolean).join(' ')}),
+        el('div',{class:'nota',texto:x.pecas+' persiana(s)'})]));
+      tr.appendChild(el('td',{class:'num',texto:formatarArea(x.comprometido)}));
+      /* Bobina sem nenhum rolo mostra TRACO, nunca "0 m²": zero se le como
+         "tem e acabou", e aqui a verdade e "nunca teve" (regra 4 do custo). */
+      tr.appendChild(el('td',{class:'num',texto:x.m2>0?formatarArea(x.m2):'—'}));
+      const falta=el('td',{class:'num'});
+      falta.appendChild(x.falta>0
+        ? el('b',{style:'color:var(--erro)',texto:formatarArea(x.falta)})
+        : el('span',{class:'nota',texto:'—'}));
+      tr.appendChild(falta);
+      tr.appendChild(el('td',{class:'nota',
+        texto:(x.pedidos||[]).map(p=>p.numero).join(', ')}));
+      corpo.appendChild(tr);
+    });
+    t.appendChild(corpo);
+    cv.appendChild(t);
+    if(g.resumo.falta_comprometida>0) cv.appendChild(el('p',{class:'nota',
+      style:'color:var(--erro);margin-top:10px', texto:
+      'O que falta ja foi VENDIDO: nao e ponto de pedido, e cliente esperando. '+
+      'O vendedor destes pedidos precisa saber para negociar o prazo.'}));
+    pai.appendChild(cv);
+  }
 
   /* ── PROBLEMAS ─────────────────────────────────────────────────────────
      Vem ANTES dos graficos, e nao no rodape: se o dado esta furado, ler o

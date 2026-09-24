@@ -4,18 +4,69 @@
 STATUS
 Situação: em construção
 Criada em: 22/09/2026
-Última atualização: 23/09/2026
-Fase atual: 4-A EM PRODUÇÃO, o leitor bipou no papel (23/09/2026) — falta a
+Última atualização: 24/09/2026
+Fase atual: 4-B EM CÓDIGO (24/09/2026) — o tecido; o tubo é a 4-C
+            4-A EM PRODUÇÃO, o leitor bipou no papel (23/09/2026) — falta a
             peça real atravessando os cinco setores
             3 EM CÓDIGO e CONFERIDA no deploy (23/09/2026) — falta a semana
             em paralelo ao Decorsoft
             2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
             1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
-Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ◐(4-A em produção · 4-B a fazer)  5 ☐  6 ☐  7 ☐  8 ☐
+Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ◐(4-A em produção · 4-B em código · 4-C a fazer)  5 ☐  6 ☐  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
-Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) — ver abaixo
+Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) — ver abaixo
 ```
+
+## STATUS DA FASE 4-B — em código em 24/09/2026
+
+**A fase 4 virou três, e a divisão saiu de uma pergunta que esta spec não
+respondia.** A 4-B pedia "consumo de material para Compras por porta única".
+Investigando o código: o `sm_componente` do sob medida (a peça que vira
+etiqueta) e o `componente` do PCP (o que se compra do fornecedor) são **dois
+cadastros que não se conhecem** — não há vínculo, e o próprio schema do sob
+medida já dizia, em comentário, que aquilo "não é o material de compra". Criar
+o vínculo é cadastro e decisão de negócio, não código.
+
+**As duas decisões do dono em 24/09/2026 (em `DECISOES.md`):**
+
+| | |
+|---|---|
+| **o tubo é o mesmo material** da medida padrão, e **Compras é um só** | mesmo com a produção sendo duas linhas de trabalho separadas. Separar as compras compraria o mesmo tubo duas vezes, perdendo escala |
+| **o tecido não vai para o Compras do PCP** | o estoque dele mora no `tecido.db` e já tem painel próprio. Mandá-lo também seria a segunda régua da armadilha #12 |
+
+Então: a **4-B é o tecido** (esta), e a **4-C é o tubo** — o vínculo
+`sm_componente` → `componente` do PCP, com fator de unidade, e a lista de
+compras somando as duas operações.
+
+**Entregue:** `tecido/dominio/consumo.js` (dono único do comprometido e dos
+pedidos em risco), o `gerencial.js` compondo o comprometido no resumo e numa
+lista `por_tecido`, `GET /api/pedidos/risco/tecido`, o card **Vendido e ainda
+não cortado** no painel e o card **Aprovados esperando tecido** na tela de
+pedidos. Sem migração e **sem chave de permissão nova** — `painel.ler` e
+`pedido.ler` já cobrem, e chave nova aqui seria a terceira ponta da armadilha
+#13 sem precisar. 14 casos novos: `npm test` do módulo vai a **419**.
+
+**As duas mudanças no caminho:**
+
+| # | Mudou | Por quê |
+|---|---|---|
+| 1 | **A fase virou 4-B (tecido) + 4-C (tubo)** | o vínculo com o Compras do PCP não existe e é decisão de cadastro. Entregar o tecido agora não depende dele, e o painel do sob medida era onde o número fazia falta |
+| 2 | **A porta para o Compras ficou de fora** | o plano previa uma porta que devolveria lista vazia até o vínculo existir. Regra escrita que não pega em ninguém é a dívida 18 — ela nasce na 4-C, junto com o cadastro que a torna verdadeira |
+
+> ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA.** Os 419 casos e as duas telas
+> abertas são indício. A prova é o comprador olhando o painel e **comprando por
+> ele** — e, do outro lado, o vendedor ligando para a revenda por causa do card.
+> Enquanto isso não acontecer, está escrito aqui como não conferido.
+
+> **O que a tela mostrou, e nenhum teste de unidade pegaria** (três defeitos, os
+> três no primeiro render): o aviso dizia *"Pedido 5001 precisa de 7,56 m²"* e
+> *"Pedido 5002 precisa de 7,56 m²"* — o total do **tecido** repetido em dois
+> pedidos de tamanhos diferentes, e quem somasse compraria o dobro; o filtro da
+> tela cortava a tabela e **não** o cartão do resumo, pondo dois recortes lado a
+> lado; e a tabela nasceu com classes de CSS da tela de produção, que não
+> existem no `base.css`. Os três estão consertados, com caso travando os dois
+> primeiros.
 
 ## STATUS DA FASE 4-A — em código em 23/09/2026
 
@@ -1089,7 +1140,7 @@ as revendas recebem acesso.
 | 3 | A revenda pode editar ou cancelar um pedido **enviado e ainda não aprovado**? Editar recalcula o prazo? | Pode; editar devolve para rascunho e o reenvio recalcula prazo e preço |
 | 3 | O admin altera um pedido aprovado até quando? | Até a primeira etiqueta impressa; depois, só cancelando o item com registro e lançando outro |
 | 3 | Feriado **no meio** da semana de produção também empurra o prazo, ou só o feriado no dia da entrega? | Só o dia da entrega (foi o exemplo do dono) |
-| 4 | Como Compras (`dados.db`) lê o consumo do sob medida (`tecido.db`)? | Uma função única no sob medida, chamada por Compras; nenhuma consulta cruzada espalhada |
+| ~~4~~ | ~~Como Compras (`dados.db`) lê o consumo do sob medida (`tecido.db`)?~~ | **RESPONDIDA em 24/09/2026, e em duas metades.** O **tecido** não vai para o Compras do PCP: o estoque dele mora no `tecido.db` e já tem painel — `dominio/consumo.js` é o dono único do comprometido, e ele aparece no painel do próprio sob medida (fase 4-B). O **tubo é o mesmo material** da medida padrão e **Compras é um só** (decisão do dono): ele entra por uma função única do sob medida, depois do vínculo `sm_componente` → `componente` do PCP — que não existe e é a fase 4-C |
 | 4 | As etiquetas de coleção saem na ordem do **pedido** ou na ordem do **plano de corte** (por bobina)? | Na ordem do plano, quando existir um plano confirmado |
 | 5 | Uma pessoa pode ter **mais de um bipe aberto** ao mesmo tempo (a serralheria corta em lote)? | Uma sessão por pessoa, como no motor; se a serralheria precisar de lote, o tempo do lote é repartido entre as peças — nunca somado em dobro |
 | 6 | O crédito disponível desconta só os boletos em aberto, ou também os pedidos aprovados ainda não faturados? | Os dois, mostrados separados |

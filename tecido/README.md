@@ -8,7 +8,7 @@ Este módulo **não sobe sozinho**. Ele é montado dentro do PCP, em `/sobmedida
 pelo `server.js` da raiz. Uma porta, um processo, um PIN.
 
 ```bash
-npm test          # daqui: 405 casos, banco temporário, sem servidor
+npm test          # daqui: 419 casos, banco temporário, sem servidor
 node server.js    # da RAIZ: sobe o PCP inteiro, com o sob medida junto
 ```
 
@@ -328,7 +328,7 @@ redução — os números das seções 4.4 a 4.8 da spec.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 405 casos
+cd tecido && npm test          # 419 casos
 ```
 
 **Rode ao mexer em `dominio/persiana.js`, `dominio/catalogo_sm.js`,
@@ -751,6 +751,44 @@ resolve numa etiqueta amassada.
 
 ---
 
+## O QUE JÁ ESTÁ VENDIDO E NÃO FOI CORTADO (fase 4-B)
+
+```
+giro.js       o que SAIU       (olha para trás)
+consumo.js    o que VAI SAIR   (olha para a frente)   ← novo
+gerencial.js  compõe os dois — e não calcula nenhum
+```
+
+O painel gerencial (Painel → Gerencial) ganhou o card **Vendido e ainda não
+cortado**, e a tela de Pedidos ganhou **Aprovados esperando tecido**.
+
+### As regras que parecem bug e não são
+
+- **É CONSUMO, nunca CORTE.** São os dois números da linha da ficha, e nunca
+  fecham. O corte é o mais apertado — comprar por ele compra **a menos**.
+- **Ele baixa quando a peça é cortada**, e só com o plano **confirmado**.
+  Plano calculado e não confirmado não consumiu rolo nenhum. O casamento é por
+  `(pedido, tecido, medida de corte)`, e é exato.
+- **Não é repartido entre as bobinas.** O pedido escolhe a cor; quem escolhe a
+  largura é o plano, na hora de cortar. Na conta de **compra** somar as bobinas
+  é legítimo; na de **cobertura**, não.
+- **Tecido comprometido e sem rolo nenhum aparece**, com **traço** na estante —
+  nunca `0 m²`, que se lê como "tinha e acabou".
+- **O "sem tecido" do pedido é uma foto do envio; o card é de hoje.** As duas
+  ficam: a foto explica o prazo que a revenda já ouviu.
+- **O pedido inteiro entra no aviso**, e não só a parte que não cabe — quando
+  dois disputam a mesma bobina, quem decide é quem corta.
+- **O filtro da tela corta o cartão e a tabela juntos.**
+- **Não há chave de permissão nova:** `painel.ler` e `pedido.ler` já cobrem.
+
+### O que NÃO está aqui
+
+O **tubo** e o resto do material. Ele é o mesmo da medida padrão e **Compras é
+um só** (decisão do dono, 24/09/2026) — mas o `sm_componente` e o `componente`
+do PCP não se conhecem, e o vínculo é cadastro. É a fase 4-C.
+
+---
+
 ## As respostas que viraram regra (seção 11 da especificação)
 
 Estas decisões são do dono da operação. Mudar qualquer uma **muda o cálculo**,
@@ -837,6 +875,7 @@ dominio/               a regra — nao conhece Express, req nem res
   rolo · encaixe (funcao pura) · plano · painel
   persiana · revenda · prazo · pedido · pedido_pdf     a VENDA sob medida
   etiqueta_producao · etiqueta_producao_pdf            a BANCADA
+  consumo      o que os aprovados ainda vao consumir (o gatilho 2)
 dados/                 o SQL. Uma tabela, um arquivo. Nao decide nada
 rotas/                 declaracoes. Sem SQL, sem `if` de negocio
 public/                base.css (tokens) · ui.js · nav.js · telas/

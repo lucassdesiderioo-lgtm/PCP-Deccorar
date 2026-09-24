@@ -28,6 +28,12 @@ const giro=require('./giro');
 // 'haste-andar-nivel' aqui seria uma segunda escrita do mesmo endereco, e as
 // duas divergiriam no dia em que o formato mudasse num lugar so.
 const endereco=require('./endereco');
+/* ⚠️ O COMPROMETIDO NAO E CALCULADO AQUI (fase 4-B). Este arquivo COMPOE os
+   donos unicos e nao tem conta propria — e a mesma razao pela qual o consumo
+   vem do `giro.js` e o valor do `custo.js`. No dia em que ele somar peca de
+   pedido por fora, a tela gerencial e a tela de pedidos divergem, e as duas
+   parecem certas (armadilha #12). */
+const consumo=require('./consumo');
 
 const arred=(v,c)=>v==null?null:Math.round(v*Math.pow(10,c==null?3:c))/Math.pow(10,c==null?3:c);
 const num=v=>Number(config.ler(v));
@@ -142,6 +148,18 @@ function agrupar(linhas,chaveDe,nomeDe){
 function painel(diasJanela,filtro){
   const j=giro.janela(diasJanela);
   const f=filtro||{};
+  // Uma leitura so por chamada: `comprometido()` varre pedido e plano, e a
+  // tela pergunta o mesmo numero em quatro lugares desta funcao.
+  /* ⚠️ E ELE PASSA PELO MESMO FILTRO DAS LINHAS. A primeira versao filtrava
+     so o `falta` e deixava o `vendido` somar tudo — abrindo a tela em "Cor:
+     Branco", o cartao dizia 9,54 m² vendidos e 1,96 de falta, numeros de
+     recortes diferentes lado a lado. E o que o comentario do `painel` ja
+     mandava nao fazer: o filtro corta as linhas, e o cabecalho conta o que
+     sobrou, senao a tela diz duas coisas. */
+  const comp=consumo.comprometido().filter(c=>
+    (!f.linha    ||c.linha_nome===f.linha)&&
+    (!f.abertura ||c.abertura_nome===f.abertura)&&
+    (!f.cor      ||c.cor_nome===f.cor));
   const dias=j.vazia?Math.max(1,j.pedidos):j.dias;
 
   let linhas=giro.porMaterial(dias)
@@ -220,12 +238,27 @@ function painel(diasJanela,filtro){
       m2_parado:arred(linhas.filter(l=>l.status==='parado')
         .reduce((s,l)=>s+(l.m2_parado||0),0)),
       valor_parado:arred(linhas.filter(l=>l.status==='parado')
-        .reduce((s,l)=>s+(l.valor||0),0),2)
+        .reduce((s,l)=>s+(l.valor||0),0),2),
+      /* O GATILHO 2 QUE FALTAVA AQUI: o que ja esta vendido e ainda nao foi
+         cortado. O minimo acima olha para tras (o giro); este olha para a
+         frente, e os dois nao se somam — sao duas perguntas, como o
+         `faltaHoje` e o `precisa` do §18 do CLAUDE.md. */
+      comprometido:arred(comp.reduce((s,l)=>s+(l.m2||0),0)),
+      comprometido_pecas:comp.reduce((s,l)=>s+(l.pecas||0),0),
+      // Quanto falta COMPRAR por causa de venda ja aprovada. Soma por tecido:
+      // somar os saldos antes faria a sobra de um cobrir a falta do outro.
+      falta_comprometida:arred(porTecido(linhas,comp)
+        .reduce((s,l)=>s+(l.falta||0),0))
     },
     linhas,
     por_colecao:agrupar(linhas,l=>l.linha_nome+' · '+l.abertura_nome,l=>l.linha_nome+' · '+l.abertura_nome),
     por_cor:agrupar(linhas,l=>l.cor_nome,l=>l.cor_nome),
     por_largura:agrupar(linhas,l=>String(l.largura),l=>l.largura),
+    /* ⚠️ O GRAO DO COMPROMETIDO E O TECIDO, e por isso ele tem lista PROPRIA
+       em vez de uma coluna em `linhas`. Aquela tabela e tecido x largura, e o
+       pedido nao escolhe largura — quem escolhe e o plano de corte, na hora
+       de cortar. Repartir seria inventar a escolha dele (armadilha #17). */
+    por_tecido:porTecido(linhas,comp),
     por_faixa:porFaixa,
     meses:giro.porMes(),
     // As opcoes dos filtros saem do PROPRIO resultado sem filtro de tela, e
@@ -234,6 +267,63 @@ function painel(diasJanela,filtro){
     opcoes:opcoes(),
     problemas:problemas()
   };
+}
+
+/* ── O TECIDO INTEIRO: o que tem, o que ja esta vendido, o que falta ──────
+   O grao aqui e o TECIDO (linha · abertura · cor), somando as larguras — e
+   e o unico lugar do painel onde somar bobina e legitimo, porque a pergunta
+   e "quanto deste tecido eu preciso comprar", e nao "esta bobina aguenta".
+   A #17 continua valendo para COBERTURA; para COMPRA, a bobina e detalhe do
+   plano de corte.
+
+   ⚠️ TECIDO COMPROMETIDO E SEM ROLO NENHUM TEM QUE APARECER. Ele nao esta em
+   `linhas` — aquele filtro tira quem nao tem estoque nem consumo, e esta
+   certo para gestao de estoque. Mas aqui ha venda aprovada esperando por ele,
+   e some-lo seria o silencio que a §4.10 da spec manda evitar: e justamente
+   o pedido "sem tecido" que o vendedor precisa ver para negociar prazo. */
+function porTecido(linhas,comp){
+  const mapa=new Map();
+  const poe=(id,base)=>{
+    if(!mapa.has(id)) mapa.set(id,Object.assign({tecido_id:id,
+      linha_nome:'', abertura_nome:'', cor_nome:'',
+      m2:0, metros:0, rolos:0, larguras:[], comprometido:0, pecas:0,
+      pedidos:[]},base||{}));
+    return mapa.get(id);
+  };
+
+  linhas.forEach(l=>{
+    const g=poe(l.tecido_id,{linha_nome:l.linha_nome,
+      abertura_nome:l.abertura_nome, cor_nome:l.cor_nome});
+    g.m2+=l.m2_parado||0; g.metros+=l.saldo||0; g.rolos+=l.rolos||0;
+    if(l.largura!=null&&g.larguras.indexOf(l.largura)<0) g.larguras.push(l.largura);
+  });
+
+  /* `comp` JA CHEGA FILTRADO pelo `painel`, e de proposito: filtrar aqui
+     dentro tambem deixaria o cartao do resumo e esta tabela com duas contas
+     do mesmo numero, que e como elas divergem.
+
+     ⚠️ A LARGURA NUNCA FILTRA O COMPROMETIDO: ele nao tem largura (regra 3 do
+     `consumo.js` — quem escolhe a bobina e o plano). Filtrar por ela o
+     zeraria, e zero ali seria mentira. */
+  comp.forEach(c=>{
+    const g=poe(c.tecido_id,{linha_nome:c.linha_nome,
+      abertura_nome:c.abertura_nome, cor_nome:c.cor_nome});
+    g.comprometido+=c.m2||0; g.pecas+=c.pecas||0;
+    g.pedidos=g.pedidos.concat(c.pedidos||[]);
+  });
+
+  return [...mapa.values()]
+    // Tecido sem estoque E sem venda aprovada nao e gestao, e ruido — a
+    // mesma regra da tabela de cima.
+    .filter(g=>g.m2>0||g.comprometido>0)
+    .map(g=>({...g,
+      m2:arred(g.m2), metros:arred(g.metros),
+      comprometido:arred(g.comprometido),
+      larguras:g.larguras.sort((a,b)=>a-b),
+      // ⚠️ FALTA NUNCA E NEGATIVA, e sobra nao e falta de outro: a conta e
+      // por tecido, e nao ha emenda entre cores.
+      falta:arred(Math.max(0,(g.comprometido||0)-(g.m2||0)))}))
+    .sort((a,b)=>(b.falta-a.falta)||(b.comprometido-a.comprometido));
 }
 
 /* Os valores que existem DE VERDADE no estoque ou no consumo. */
