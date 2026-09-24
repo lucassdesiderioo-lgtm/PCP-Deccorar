@@ -3602,6 +3602,22 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   tecido: dois pedidos mostram o mesmo número e quem soma compra o dobro (§19)
 - ❌ Fazer o filtro da tela cortar a tabela e não o cartão do resumo — dois
   recortes lado a lado é a mesma tela dizendo duas coisas (§19, 4-B)
+- ❌ Declarar chave de setor da produção sob medida como `nivel:'admin'`: a
+  área `admin` é lida como **diretor** pelo portão, e quem só embala sairia
+  com catálogo, parâmetros e descarte (§19, 5-A — e é a #28 por cinco portas)
+- ❌ Usar uma chave só para os cinco setores: o bipe grava QUEM fez, e a
+  recusa da 5-B acharia a pessoa errada — régua que acusa o inocente (§19)
+- ❌ Derivar os setores da pessoa do PAPEL dela: o papel é a área mais larga,
+  e o vendedor que também embala levaria 403 na bancada com a caixinha
+  marcada, sem ninguém entender por quê (§19, 5-A)
+- ❌ Gerar permissão do PCP a partir dos setores do `tecido.db`: acopla os
+  dois bancos e fura a porta única — setor é cadastro, CHAVE É CÓDIGO (§19)
+- ❌ Semear gente nos setores novos de produção: herdar por engano dá bipe de
+  serralheria a quem só revisa, e o bipe é o rastro (§19, 5-A)
+- ❌ Tirar o prefixo "Sob medida /" dos setores: "Revisão" e "Embalagem"
+  existem nos dois mundos e são trabalhos diferentes (§19, 5-A)
+- ❌ Dar por pronta a fase 5 enquanto os cinco setores estiverem com
+  `0 pessoa(s)`: é a #30 — a regra está escrita e não pega em ninguém (§19)
 
 ---
 
@@ -4929,6 +4945,116 @@ um a um para provar que cada caso pega o seu: ler corte em vez de consumo, não
 baixar na impressão, engolir o degrau sem material, sobrescrever em vez de
 somar, somar com unidade divergente e tirar o try/catch da porta. E **abra as
 duas telas**: três dos defeitos desta fase não têm teste que os pegue.
+
+### ⚠️ A FASE 5-A (24/09/2026) — OS CINCO SETORES NO CONTROLE DE ACESSO
+
+A 4-C fechou a compra. A 5 é o que faz o pedido **andar**: hoje ele para em
+`aprovado`, e a fábrica não tem como dizer que trabalhou. Esta é a primeira
+metade — **o acesso** —, e ela sobe sozinha de propósito: a regra só pega
+quando alguém estiver marcado, e regra que depende de caixinha marcada é a
+armadilha #30, que ficou três semanas inerte.
+
+**Decisão do dono, 24/09/2026:** *"tem que ser possível a gente criar cada
+setor no controle de acesso, e quem tem acesso dentro da empresa por login já
+pega seu tablet de manhã e vê o que tem para fazer"*.
+
+```
+Admin → Acessos → Setores        Sob medida / Serralheria    0 pessoa(s) · 1 perm.
+                                 Sob medida / Coleção        0 pessoa(s) · 1 perm.
+                                 Sob medida / Montagem       0 pessoa(s) · 1 perm.
+                                 Sob medida / Revisão        0 pessoa(s) · 1 perm.
+                                 Sob medida / Embalagem      0 pessoa(s) · 1 perm.
+```
+
+> ⚠️ **SÃO CINCO CHAVES, UMA POR SETOR — e não uma chave só de "produção".**
+> O bipe grava **quem fez** a peça, e é por ele que a recusa da 5-B vai achar
+> a pessoa certa. Uma chave única deixaria o serralheiro bipar a embalagem, e
+> a régua apontaria para quem não trabalhou ali. **Régua que aponta a pessoa
+> errada é pior que régua nenhuma** — ela acusa com autoridade.
+
+> ⚠️ **AS CINCO SÃO `operacao`, NUNCA `admin`, E ISSO É TRAVA.** É a mesma
+> razão da `sobmedida.vender` da fase 2: `sincronizarAreas` põe a área
+> `'admin'` em quem tem **qualquer** chave de nível admin, e o portão do
+> módulo lê `'admin'` como **diretor**. Um setor declarado admin entregaria
+> catálogo, parâmetros do encaixe e descarte de sobra a quem só embala — sem
+> ninguém pedir, e sem erro em tela nenhuma. É a porta A da armadilha #28 por
+> mais uma porta, e agora por cinco de uma vez.
+
+> ⚠️ **OS CINCO NASCEM VAZIOS, e cada um só com a chave do próprio setor.**
+> Ninguém é migrado: herdar gente por engano daria bipe de serralheria a quem
+> só revisa. É a mesma regra dos três setores de sob medida que já existiam, e
+> dos de Compras.
+
+> ⚠️ **"REVISÃO" E "EMBALAGEM" EXISTEM NOS DOIS MUNDOS, e são trabalhos
+> diferentes.** O `Operador / Revisão` revisa a persiana pronta do Mercado
+> Livre; o `Sob medida / Revisão` revisa a persiana sob medida antes de
+> embalar. O prefixo é o que separa os dois na tela de Acessos — tirá-lo faria
+> alguém marcar a caixinha errada e descobrir com o tablet na mão.
+>
+> Na tela de Acessos os cinco saem em **ordem alfabética** (Coleção,
+> Embalagem, Montagem, Revisão, Serralheria), como o resto da lista. Ali é
+> cadastro e está certo; **a ordem da fábrica só vale na fila da bancada**, e
+> é o `SETORES` do `tecido/nucleo/acesso.js` que a guarda.
+
+### ⚠️ SETOR É CADASTRO, CHAVE É CÓDIGO — e essa fronteira precisa estar escrita
+
+Nome, ordem e prefixo da etiqueta se editam no cadastro `sm_setor` do módulo
+(ele existe desde a fase 4-A). **Um sexto setor de produção exige chave nova**
+no `permissoes.js` do PCP.
+
+> Gerar a permissão a partir dos setores do `tecido.db` acoplaria os dois
+> bancos e furaria a porta única: o PCP passaria a depender do banco do sob
+> medida para saber quem pode o quê. E setor de produção novo é mudança de
+> **como a fábrica trabalha**, não configuração — passar por código é o certo.
+>
+> **Isto está escrito porque é exatamente onde alguém tenta "consertar"
+> depois**, e o resultado seria a tela deixar criar um setor que não libera
+> ninguém: nem erro, nem log, e a pessoa marcada sem conseguir bipar.
+
+### ⚠️ O PAPEL E OS SETORES SÃO DUAS CONTAS, e juntá-las tira a bancada de quem faz duas coisas
+
+| Pergunta | Quem responde | Quantas |
+|---|---|---|
+| que papel esta pessoa tem no módulo? | `papelDe()` — a área **mais larga** | uma só, sem soma |
+| que bancadas ela bipa? | `setoresDe()` — **todas** as áreas de setor | zero ou mais |
+
+```
+vende E embala   →  papel VENDEDOR   ·  setores [embalagem]   ·  bipa ✔
+corta E embala   →  papel CORTADOR   ·  setores [embalagem]   ·  bipa ✔
+só embala        →  papel PRODUCAO   ·  setores [embalagem]   ·  bipa ✔
+vendedor puro    →  papel VENDEDOR   ·  setores []            ·  bipa ✘
+```
+
+> ⚠️ **DERIVAR UM DO OUTRO É O DEFEITO, e ele só apareceria numa
+> segunda-feira.** O papel é sempre a área mais larga; o vendedor que também
+> embala sairia como `vendedor` e levaria **403 na bancada** — com o setor
+> marcado na tela de Acessos, e sem ninguém entender por quê. Por isso a chave
+> `producao.bipar` vem do **setor**, e não do papel.
+>
+> Isso não é exceção na regra de papel (que seria o começo do terceiro dono,
+> §2): é a **definição da chave**, que pergunta *"esta pessoa está em alguma
+> bancada?"*. Quem não tem setor nenhum continua sem ela, então a tela não
+> aparece no menu de quem não bipa — **menu com tela inútil é o que ensina a
+> não clicar**.
+
+> ⚠️ **O DIRETOR BIPA OS CINCO**, por coerência com o `*` das chaves dele:
+> recusar o dono numa bancada seria trava disparando no caso normal
+> (armadilha #6). O bipe grava o nome de quem fez de qualquer jeito.
+
+> **Rode `node teste_acesso.js` (154 casos, a seção 6-C é esta) e
+> `cd tecido && npm test` (450) ao mexer em setor, papel ou permissão.** Os
+> quatro defeitos que importam foram reintroduzidos um a um: tirar a linha do
+> `PERM_AREA` (a área some sozinha no salvamento), tirar `producao.bipar` do
+> `POR_SETOR` (quem vende e embala perde a bancada), o papel `producao` sem
+> `modulo.entrar` (o módulo abre em branco com 403 no console) e ordenar os
+> setores por nome (a fila leria a ordem do trabalho errada). Cada um reprova
+> o caso que existe para pegá-lo.
+
+> ⚠️ **E ELA NÃO PEGA EM NINGUÉM ATÉ ALGUÉM SER MARCADO.** É a armadilha #30
+> escrita antes de acontecer: os cinco setores estão na tela com `0 pessoa(s)`
+> — enquanto ficarem assim, a fase 5 inteira é texto. **O sinal de inerte é
+> este:** marcada a primeira pessoa, ela tem que ver a bancada dela no menu do
+> `/sobmedida`. Não ver é defeito, não é silêncio normal.
 
 ### Três regras do sob medida que valem citar aqui
 

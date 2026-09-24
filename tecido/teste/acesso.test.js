@@ -197,6 +197,61 @@ module.exports=[
   igual(acessoPcp.includes("Sob medida / Bancada"),true,'setor da bancada semeado');
   igual(acessoPcp.includes("Sob medida / Cadastros"),true,'setor da chefia semeado');
   igual(acessoPcp.includes("Sob medida / Venda"),true,'e o da venda tambem (fase 2)');
+
+  /* ── OS CINCO SETORES DE PRODUCAO (fase 5-A, 24/09/2026) ──────────────
+     As mesmas tres pontas, cinco vezes. A que some em silencio continua
+     sendo a do PERM_AREA: sem ela a caixinha e marcada e a area desaparece
+     no salvamento seguinte, sem erro e sem log. */
+  for(const [chave,area,setor] of [
+      ['sobmedida.serralheria','sobmedida_serralheria','Sob medida / Serralheria'],
+      ['sobmedida.colecao',    'sobmedida_colecao',    'Sob medida / Coleção'],
+      ['sobmedida.montagem',   'sobmedida_montagem',   'Sob medida / Montagem'],
+      ['sobmedida.revisao',    'sobmedida_revisao',    'Sob medida / Revisão'],
+      ['sobmedida.embalagem',  'sobmedida_embalagem',  'Sob medida / Embalagem']]){
+    igual(perms.includes("chave:'"+chave+"'"),true,'chave '+chave+' em permissoes.js');
+    igual(acessoPcp.includes("['"+chave+"',"),true,'a linha do PERM_AREA de '+chave);
+    igual(acessoPcp.includes("'"+area+"'"),true,'a area '+area);
+    igual(acessoPcp.includes(setor),true,'o setor "'+setor+'" semeado');
+  }
+}},
+
+{nome:'o SETOR nao sai do papel, e e isso que salva quem faz duas coisas', async executar({igual}){
+  const acesso=require('../nucleo/acesso');
+  const {pode}=require('../nucleo/permissoes');
+  const u=areas=>acesso.daSessaoDoPcp({id:1,nome:'x',areas});
+
+  igual(u(['sobmedida_embalagem']).papel,'producao','quem so tem setor e producao');
+  igual(u(['sobmedida_embalagem']).setores.join(','),'embalagem','e bipa a bancada dele');
+  igual(pode(u(['sobmedida_embalagem']),'modulo.entrar'),true,
+    'ele ENTRA — sem isto o modulo abre em branco com 403 no console');
+  igual(pode(u(['sobmedida_embalagem']),'producao.bipar'),true,'e bipa');
+
+  /* ⚠️ O CASO QUE IMPORTA MAIS: quem tem DUAS areas. O papel e sempre a mais
+     larga (uma so, sem soma), entao sem a segunda fonte de permissao o
+     vendedor que tambem embala sairia como `vendedor` e levaria 403 na
+     bancada — com o setor marcado na tela de Acessos, e sem ninguem
+     entender por que. */
+  const vendeEmbala=u(['sobmedida_venda','sobmedida_embalagem']);
+  igual(vendeEmbala.papel,'vendedor','o papel e o mais largo...');
+  igual(vendeEmbala.setores.join(','),'embalagem','...e a bancada dele continua de pe');
+  igual(pode(vendeEmbala,'producao.bipar'),true,'e ele BIPA, apesar do papel de venda');
+  const cortaEmbala=u(['sobmedida','sobmedida_embalagem']);
+  igual(cortaEmbala.papel,'cortador','o mesmo vale para quem corta e embala');
+  igual(pode(cortaEmbala,'producao.bipar'),true,'ele tambem bipa');
+
+  /* E o contrario: chave que nao abre tela para quem nao esta em bancada
+     nenhuma. Menu com tela inutil e o que ensina a nao clicar. */
+  igual(pode(u(['sobmedida_venda']),'producao.bipar'),false,'vendedor puro nao bipa');
+  igual(pode(u(['sobmedida']),'producao.bipar'),false,'cortador puro tambem nao');
+  igual(u(['sobmedida_venda']).setores.length,0,'nenhum dos dois esta em bancada');
+
+  /* A ordem e a da FABRICA, nao a de marcacao nem a alfabetica: a fila e
+     desenhada por ela, e "colecao" antes de "serralheria" leria como se a
+     ordem do trabalho fosse essa. */
+  igual(u(['sobmedida_embalagem','sobmedida_serralheria']).setores.join(','),
+    'serralheria,embalagem','dois setores saem na ordem da fabrica');
+  igual(u(['admin']).setores.join(','),
+    'serralheria,colecao,montagem,revisao,embalagem','e o diretor bipa os cinco');
 }},
 
 {nome:'o menu so oferece o que a pessoa alcanca', async executar({igual}){

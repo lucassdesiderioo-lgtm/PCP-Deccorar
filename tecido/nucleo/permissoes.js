@@ -127,7 +127,15 @@ const CHAVES=[
      do papel e quem vai cortar, e mandar ele chamar alguem para imprimir e
      a trava que dispara no caso normal (armadilha #6). */
   {chave:'etiqueta_producao.ler',      nome:'Ver as etiquetas de producao a imprimir'},
-  {chave:'etiqueta_producao.imprimir', nome:'Imprimir etiquetas de producao (gasta rolo e marca a peca)'}
+  {chave:'etiqueta_producao.imprimir', nome:'Imprimir etiquetas de producao (gasta rolo e marca a peca)'},
+
+  /* ── A BANCADA (fase 5-A, 24/09/2026) ─────────────────────────────────
+     UMA chave, e nao cinco. A rota tem uma permissao declarada e o setor vem
+     no corpo do bipe — conferir cinco chaves na rota seria conferir a
+     pergunta errada. Esta chave diz "esta tela e sua"; QUAL bancada a pessoa
+     bipa e outra pergunta, e quem responde e a lista de setores dela
+     (nucleo/acesso.js → setoresDe), conferida no dominio. */
+  {chave:'producao.bipar',    nome:'Bipar inicio e fim na bancada da producao sob medida'}
 ];
 
 const PAPEIS={
@@ -173,6 +181,19 @@ const PAPEIS={
      numero que ele foi buscar. O que ela abre alem disso (o painel, o valor
      do estoque) continua fechado por outra chave: `painel.ler` e
      `cadastro.ler` nao estao aqui. */
+  /* ── A BANCADA DA PRODUCAO (fase 5-A) ──────────────────────────────────
+     Quem so tem area de setor. Ele entra, ve a fila dele e bipa. Nao corta
+     tecido, nao mexe em rolo, nao abre catalogo, nao ve preco e nao imprime
+     etiqueta — quem imprime esta com a Zebra na frente, e e o cortador.
+
+     ⚠️ `modulo.entrar` ESTA AQUI, e sem ela o embalador abriria o modulo em
+     BRANCO, com 403 no console. Tela em branco nao se parece nem de longe
+     com "falta permissao" — e a licao que fez a chave nascer na fase 2. */
+  producao:[
+    'modulo.entrar',
+    'producao.bipar'
+  ],
+
   vendedor:[
     'modulo.entrar',
     'catalogo.ler','custo.ver',
@@ -186,10 +207,28 @@ const PAPEIS={
   ]
 };
 
+/* ⚠️ HA DUAS FONTES DE PERMISSAO DESDE A FASE 5-A, E A SEGUNDA E O SETOR.
+   Nao e excecao no papel: e a definicao da chave. `producao.bipar` pergunta
+   "esta pessoa esta em alguma bancada?", e isso nao sai do papel — sai das
+   areas de setor dela (nucleo/acesso.js → setoresDe).
+
+   Sem esta linha, quem tem DUAS areas perderia a bancada: o papel e sempre a
+   area mais larga (uma so, sem soma), entao o vendedor que tambem embala
+   sairia como `vendedor` e a tela da bancada daria 403 para ele — com o
+   setor marcado na tela de Acessos, e sem ninguem entender por que. A
+   fabrica descobriria isso com o tablet na mao numa segunda-feira.
+
+   Quem NAO tem setor nenhum continua sem a chave, entao a tela nao aparece
+   no menu de quem nao bipa: a lista vazia nao vira tela inutil. */
+const POR_SETOR=['producao.bipar'];
+
 function pode(usuario,chave){
   if(!usuario) return false;
   const lista=PAPEIS[usuario.papel]||[];
-  return lista.includes('*')||lista.includes(chave);
+  if(lista.includes('*')) return true;
+  if(lista.includes(chave)) return true;
+  if(POR_SETOR.includes(chave)) return ((usuario.setores||[]).length>0);
+  return false;
 }
 
-module.exports={CHAVES,PAPEIS,pode};
+module.exports={CHAVES,PAPEIS,POR_SETOR,pode};
