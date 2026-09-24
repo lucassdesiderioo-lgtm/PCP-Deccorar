@@ -4368,6 +4368,15 @@ encaixe"* dizia, de fato, **"é admin do PCP"**. Hoje ela é `supervisor`.
 > aparece `[BLOQUEADA] · acima do nível do setor`, que é o que o dono viu; com
 > o conserto ela é marcável, e salvar o setor mantém as duas chaves.
 
+> ✅ **NO AR E CONFERIDA EM PRODUÇÃO EM 24/09/2026, E A PROVA É UMA PESSOA.**
+> Depois do deploy o dono marcou a chave no setor: ele ficou `supervisor` com
+> as duas chaves, e os três membros ganharam `sobmedida_adm`. **Dois deles
+> também têm `admin`** — mas por outras chaves de nível admin que já tinham.
+> **O terceiro, não:** ele saiu com `sobmedida_adm` e **sem** `admin`, que era
+> impossível até hoje de manhã. É o vazamento fechado aparecendo em dado real,
+> e não em caso de teste. O `sobmedida.cortar` continuou marcado no mesmo
+> salvamento, que é a outra metade do que podia dar errado.
+
 > ⚠️ **`revenda.editar` E `credito.editar` NÃO SÃO DO VENDEDOR**, e isso é
 > decisão, não esquecimento. A spec diz que a tabela é decidida pela Deccorar
 > (§4.12) e que o limite é revisto de dois em dois meses (§4.13) — as duas são

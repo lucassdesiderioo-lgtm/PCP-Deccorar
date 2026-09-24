@@ -43,7 +43,7 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 | 3 | **Cadastrar as revendas de hoje**, com vendedor, tabela, desconto e limite | a carteira nasce vazia e o pedido não tem para quem ir | 2 |
 | 4 | **Cadastrar os feriados** do calendário | o prazo conta como se todo dia fosse útil, e a revenda ouve uma data que a fábrica não cumpre | 2 |
 | 5 | **Preencher mínimo e ideal** dos `Tubo 38/41/56` (nasceram em zero, de propósito) | o gatilho 1 não dispara para eles: a compra vem só do que está vendido | 4-C |
-| 5-b | **Marcar `sobmedida.cadastrar` no setor `Sob medida / Cadastros`** (Admin → Acessos → Setores), mantendo `sobmedida.cortar` marcada junto | as 3 pessoas do setor entram no sob medida como **bancada**, não como chefia: sem cadastro de tecido, sem parâmetros do encaixe e sem descarte de sobra. A chave saiu de lá em 19/09 num salvamento sobre outra coisa (dívida 20 do `CLAUDE.md` §14) | — |
+| ~~5-b~~ | ~~Marcar `sobmedida.cadastrar` no setor `Sob medida / Cadastros`~~ **FEITO em 24/09/2026** — o setor ficou `supervisor` com as duas chaves, e as 3 pessoas ganharam a área `sobmedida_adm`. **A prova de que o conserto pegou é o Fernando:** ele tem `sobmedida_adm` e **não** tem `admin` — antes da armadilha #34 a chave o teria promovido junto, e ele passaria nas 24 rotas `@admin` do PCP | — | — |
 
 ### Provas de fábrica — deploy não é conferência
 
