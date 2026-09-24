@@ -318,6 +318,12 @@ module.exports = function(app, db){
         manda: g2>g1 ? 'demanda' : 'minimo',
         // Para quem quiser abrir: de quais SKUs veio este consumo.
         origem: d ? d.origem.slice().sort((a,b)=>b.subtotal-a.subtotal) : [],
+        /* O sob medida vem em campo PROPRIO (fase 4-C): `origem` e por SKU e
+           esta e por PEDIDO de revenda. Por um campo so, a tela teria que
+           adivinhar qual frase escrever — e "pedido 5001" num campo chamado
+           `sku` e mentira de campo. O consumo, esse sim, ja esta somado no
+           mesmo numero: o tubo e o mesmo material dos dois lados. */
+        origem_sobmedida: d && d.origem_sobmedida ? d.origem_sobmedida : [],
         melhor: v ? { oferta_id:v.oferta_id, fornecedor:v.fornecedor, embalagens:v.embalagens,
                       embalagem:v.embalagem, desembolso:v.desembolso, sobra:v.sobra,
                       prazo:v.prazo, motivo:v.motivo } : null,
@@ -365,7 +371,14 @@ module.exports = function(app, db){
       demanda: { skus:nec.skus_a_produzir, pecas:nec.pecas_a_produzir },
       /* Venda sem ficha calculavel NAO some: ela e um buraco nesta lista, e o
          comprador precisa saber que o total esta incompleto. */
-      pendencias: nec.pendencias
+      pendencias: nec.pendencias,
+      /* O sob medida (fase 4-C). `sobmedida_fora` quer dizer que o modulo nao
+         subiu ou nao respondeu: a lista continua, mas DIZ que o material
+         vendido por ele ficou de fora. Silencio ali seria um total incompleto
+         com cara de completo. */
+      pendencias_sobmedida: nec.pendencias_sobmedida || [],
+      sobmedida_fora: !!nec.sobmedida_fora, sobmedida_motivo: nec.sobmedida_motivo || null,
+      sobmedida_pecas: nec.sobmedida_pecas || 0
     });
   });
 

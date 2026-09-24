@@ -76,7 +76,8 @@ module.exports={
   componentePorChave:chave=>um('SELECT * FROM sm_componente WHERE chave=? COLLATE NOCASE',chave),
   atualizarComponente(id,d){
     const cols=['nome','setor','gera_etiqueta','eh_kit','usa_faixa_suporte','codigo_barras',
-                'preco_centavos','unidade_cobranca','largura_max_mm','altura_max_mm','ordem','ativo'];
+                'preco_centavos','unidade_cobranca','largura_max_mm','altura_max_mm','ordem','ativo',
+                'componente_id'];
     const campos=[],vals=[];
     cols.forEach(c=>{ if(d[c]!==undefined){ campos.push(c+'=?'); vals.push(d[c]); } });
     if(campos.length) db.prepare('UPDATE sm_componente SET '+campos.join(', ')+' WHERE id=?').run(...vals,id);
@@ -96,7 +97,8 @@ module.exports={
   },
   atualizarDegrau(id,d){
     const cols=['ordem','nome','largura_max_mm','m2_max_mm2','desconto_mm',
-                'acrescimo_altura_tecido_mm','aceita_bando','aceita_reducao','ativo'];
+                'acrescimo_altura_tecido_mm','aceita_bando','aceita_reducao','ativo',
+                'componente_id'];
     const campos=[],vals=[];
     cols.forEach(c=>{ if(d[c]!==undefined){ campos.push(c+'=?'); vals.push(d[c]); } });
     if(campos.length) db.prepare('UPDATE sm_degrau_tubo SET '+campos.join(', ')+' WHERE id=?').run(...vals,id);
@@ -116,6 +118,12 @@ module.exports={
   fichaLinhaDe:(modelo_id,chave,quando)=>um(`SELECT f.*, c.chave FROM sm_ficha_linha f
     JOIN sm_componente c ON c.id=f.componente_id
     WHERE f.modelo_id=? AND c.chave=? COLLATE NOCASE AND f.quando=?`,modelo_id,chave,quando),
+  /* Todas as linhas de ficha de um componente, de qualquer modelo e qualquer
+     `quando`. O vinculo com o material de compra (fase 4-C) pergunta "ha
+     medida de consumo em ALGUMA delas?" — o bando so existe com `quando`
+     'bando', e olhar so a linha 'sempre' o daria como sem medida. */
+  fichaLinhasDoComponente:componente_id=>varios(
+    'SELECT * FROM sm_ficha_linha WHERE componente_id=?',componente_id),
   criarFichaLinha(d){
     const r=db.prepare(`INSERT INTO sm_ficha_linha(modelo_id,componente_id,ordem,quando,quantidade,
       ref_largura,ajuste_largura_mm,ref_altura,ajuste_altura_mm,

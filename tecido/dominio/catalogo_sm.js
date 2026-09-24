@@ -18,6 +18,7 @@ const u=require('../nucleo/unidade');
 const dCat=require('../dados/catalogo_sm');
 const dAbertura=require('../dados/abertura');
 const dCor=require('../dados/cor');
+const materiais=require('../nucleo/materiais');
 const dTecido=require('../dados/tecido');
 
 /* As duas palavras que uma referencia de ficha pode ter alem de uma chave de
@@ -218,6 +219,93 @@ function editarDegrau(id,d){
   return dCat.atualizarDegrau(id,campos);
 }
 
+/* ── O MATERIAL DE COMPRA DO PCP (fase 4-C) ────────────────────────────────
+   O tubo da persiana sob medida e o MESMO tubo da medida padrao, e Compras e
+   um so (decisao do dono, 24/09/2026). Aqui se aponta qual item do cadastro
+   de material do PCP corresponde a cada peca daqui.
+
+   ⚠️ O TUBO LIGA NO DEGRAU, O RESTO NO COMPONENTE. Tubo 32 e Tubo 41 sao
+   itens de estoque diferentes — o material MUDA com o degrau, e o
+   sm_componente tem uma linha so, chamada "Tubo". Deixar as duas pontas
+   aceitarem o tubo seria duas afirmacoes sobre o mesmo fato, e elas divergem
+   no primeiro dia em que alguem editar so uma.
+
+   ⚠️ NAO HA FATOR DIGITADO. Quem diz como a peca vira quantidade e a UNIDADE
+   do item do PCP: `m` le a medida de consumo da ficha (nunca a de corte —
+   armadilha #18), `un` conta pecas. Um numero digitado ao lado seria a
+   segunda regua da mesma conta, e erraria em silencio. Unidade que a peca
+   nao sabe dizer e RECUSADA, em vez de convertida por chute. */
+function materialOuErro(componente_id){
+  const m=materiais.porId(componente_id);
+  exigir(m,'material_inexistente',
+    'Não existe material com este id no cadastro de Compras do PCP. '+
+    'Cadastre-o em Admin → Compras → Componentes e escolha de novo.');
+  exigir(materiais.UNIDADES.indexOf(m.unidade)>=0,'unidade_nao_suportada',
+    'O material "'+m.nome+'" é comprado em "'+m.unidade+'", e uma persiana não sabe '+
+    'dizer quanto disso ela gasta. Só "m" (lê a medida de consumo da ficha) e '+
+    '"un" (conta peças) têm conversão decidida.');
+  return m;
+}
+
+/* Um item comprado em METRO precisa de uma linha de ficha com medida de
+   CONSUMO — senao a conta nao existe e o vinculo nasceria mudo, somando zero
+   para sempre sem ninguem saber. E a divida 18 do CLAUDE.md (a regra inerte)
+   barrada na hora do cadastro, que e o unico lugar onde alguem esta olhando. */
+function exigirMedida(m, linhas, oque){
+  if(m.unidade!=='m') return;
+  exigir(linhas.some(l=>l.consumo_ref_largura),'sem_medida_para_metro',
+    'O material "'+m.nome+'" é comprado em metro, e '+oque+' não tem medida de '+
+    'consumo na ficha. Sem ela não há o que converter em metro.');
+  /* Peca que tem largura E altura de consumo e um RETANGULO — metro linear
+     nao a descreve, e escolher um dos dois lados seria inventar. E o caso do
+     tecido, que por decisao do dono nem vai para o Compras do PCP (o estoque
+     dele mora aqui e ja tem painel). */
+  exigir(!linhas.some(l=>l.consumo_ref_largura&&l.consumo_ref_altura),'peca_e_retangulo',
+    oque.charAt(0).toUpperCase()+oque.slice(1)+' se mede por largura E altura, e o '+
+    'material "'+m.nome+'" é comprado em metro linear. Metro não descreve área — '+
+    'não há conversão a fazer aqui.');
+}
+
+/* Componente que nao gera etiqueta nunca sairia da conta de compra: quem tira
+   a peca de la e a impressao da etiqueta dela (fase 4-C). Ligado assim, o
+   material so subiria, para sempre — e numero que so sobe a equipe aprende a
+   ignorar. Recusar com o motivo escrito e melhor que entregar esse numero. */
+function exigirEtiqueta(c,m){
+  exigir(c.gera_etiqueta,'componente_sem_etiqueta',
+    'O componente "'+c.nome+'" não gera etiqueta de produção, então nada o tiraria '+
+    'da lista de compras depois — o material "'+m.nome+'" só subiria. Enquanto o bipe '+
+    'da bancada (fase 5) não existir, só peça com etiqueta pode apontar material.');
+}
+
+function ligarMaterialDoDegrau(id, componente_id, usuario){
+  const d=dCat.degrau(id);
+  exigir(d,'degrau_inexistente','Degrau nao encontrado.');
+  if(componente_id==null||componente_id==='')
+    return dCat.atualizarDegrau(id,{componente_id:null});
+  const m=materialOuErro(componente_id);
+  const linha=dCat.fichaLinhaDe(d.modelo_id,'tubo','sempre');
+  exigirMedida(m, linha?[linha]:[], 'o tubo');
+  return dCat.atualizarDegrau(id,{componente_id:m.id});
+}
+
+function ligarMaterialDoComponente(id, componente_id, usuario){
+  const c=dCat.componente(id);
+  exigir(c,'componente_inexistente','Componente nao encontrado.');
+  /* A recusa DIZ para onde ir. Trava que so nega ensina a equipe a tentar de
+     novo do mesmo jeito; esta manda para a tela da escada, que e onde a
+     resposta cabe. */
+  exigir(String(c.chave)!=='tubo','tubo_liga_no_degrau',
+    'O tubo não se liga aqui: o material muda com o degrau da escada '+
+    '(Tubo 32 e Tubo 41 são itens de estoque diferentes). Aponte o material '+
+    'em cada degrau, na escada de tubos.');
+  if(componente_id==null||componente_id==='')
+    return dCat.atualizarComponente(id,{componente_id:null});
+  const m=materialOuErro(componente_id);
+  exigirEtiqueta(c,m);
+  exigirMedida(m, dCat.fichaLinhasDoComponente(id), 'o componente "'+c.nome+'"');
+  return dCat.atualizarComponente(id,{componente_id:m.id});
+}
+
 // ── A ficha ───────────────────────────────────────────────────────────────
 const fichaDe=modelo_id=>dCat.ficha(modelo_id);
 const fichaLinhaDe=(modelo_id,chave,quando)=>dCat.fichaLinhaDe(modelo_id,chave,quando||'sempre');
@@ -338,6 +426,7 @@ module.exports={
   ligarCorAcessorio,
   listarComponentes, definirPrecoComponente,
   criarDegrau, editarDegrau,
+  ligarMaterialDoDegrau, ligarMaterialDoComponente,
   fichaDe, fichaLinhaDe, criarFichaLinha, editarFichaLinha,
   criarFaixaSuporte, apagarFaixaSuporte, definirReducaoRegra,
   historicoPreco, QUANDOS, REF_RESERVADAS
