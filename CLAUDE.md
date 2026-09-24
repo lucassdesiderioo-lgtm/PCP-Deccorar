@@ -2400,6 +2400,97 @@ duas bobinas são necessárias **pelo par, não pelo preço**.
 entre consumo e corte, a conta das duas bobinas SKU a SKU, as medidas de teste
 e a porta única do avaliador.
 
+### ⚠️ ARMADILHA #33 — NÃO HAVIA ONDE CADASTRAR MATERIAL, e a rota que existia apagava o tecido
+
+**24/09/2026.** A fase 4-C (§19) mandou o tubo do sob medida para a lista de
+compras, e o passo seguinte era óbvio: cadastrar `Tubo 38`, `Tubo 41` e
+`Tubo 56`, que a escada usa e o PCP não tinha. **Eu mandei o dono a uma tela
+que não existe** — "Admin → Compras → Ponto de pedido". Aquele card só editava
+mínimo e ideal de componente **já cadastrado**; em oito meses de Compras
+**nunca houve, em tela nenhuma, um lugar de criar material**. Os que existem
+nasceram por `INSERT` à mão.
+
+> ⚠️ **É A DÍVIDA 18 (§14) COM A CARA MAIS CARA: a rota estava lá, e a porta
+> não.** `POST /api/componentes` cria desde a fase 0 — responde 200 no `curl`,
+> tem permissão declarada, entra na cobertura do §10. O que faltava era alguém
+> conseguir chegar nela, que é o mesmo buraco do extrato do livro (§2) e do
+> chip "Negativo". A diferença é que aqui **ninguém foi procurar por um ano**:
+> não dá erro, não some da tela, simplesmente não existe — e o que se faz no
+> lugar é `INSERT` no banco, que é o desvio da armadilha #6 pela porta do
+> cadastro.
+
+**E abrir a tela em cima da rota teria estragado o tecido.** O `POST` lia
+`estoque=0`, `alvo`, `familia`, `cor` e `largura_bobina_cm` **do corpo, sempre**
+— campo ausente valia como vazio, que é a dívida 15 (§6, armadilha #25) viva
+numa segunda rota:
+
+```
+POST /api/componentes {id:3, estoque_minimo:45}     ← editar o mínimo do tecido
+                       familia, cor e largura_bobina_cm NÃO vieram
+ANTES:  familia := NULL, cor := NULL, largura_bobina_cm := NULL
+        o componente de tecido deixa de ser tecido, e a ficha para de resolver
+        por família + cor + largura de bobina (§7-B) — sem erro e sem aviso
+```
+
+O card antigo **reenviava os nove campos a cada tecla**, e era só isso que
+segurava o estrago — por acaso, como a tela do admin segurava o `POST /api/skus`
+da #25. A tela nova manda **só o campo editado**, que é o certo, e teria sido a
+primeira a cair nele. **O conserto foi achado escrevendo o teste antes do
+código**, que é o que a §0 pede no risco 🔴, e é a única razão de isto estar
+escrito como armadilha e não como incidente.
+
+As três regras da #25 valem aqui inteiras, e agora com teste:
+
+- **Campo ausente não é campo vazio** — preserva. **Vazio de propósito apaga**,
+  que é decisão de quem editou. São coisas diferentes e a rota separa as duas.
+- **Número impossível é recusado (400) dizendo QUAL campo, nunca clampado.**
+  `Math.max(0, parseFloat(x)||0)` transformava `"abc"` e `-5` em zero em
+  silêncio — o clamp que a #25 proíbe, porque apagar saldo caladinho é o mesmo
+  defeito por outra porta. O rótulo da recusa é o da **tela** ("o estoque
+  mínimo"), não o da coluna: `estoque_minimo` não diz nada a quem cadastra.
+- **`nome` é obrigatório só para NASCER.** Exigi-lo na edição era a confusão
+  entre ausente e vazio pela outra ponta: um POST parcial morria com "nome
+  obrigatório" em vez de gravar o campo citado.
+
+> ⚠️ **A RECUSA APARECE NA PRÓPRIA LINHA, E O DIGITADO FICA.** A primeira
+> versão da tela escrevia o motivo no rodapé do card, ao lado do botão
+> Adicionar, e repintava o valor velho por cima. Com quinze materiais na lista,
+> quem edita a primeira linha vê o número **voltar sozinho** e a explicação
+> fora da tela — ou colada num formulário de criar que ele nem abriu. É a regra
+> da ficha (*"recusar uma fórmula não pode repintar a antiga"*, logo abaixo)
+> pela porta do cadastro: o campo fica vermelho, com o motivo embaixo dele e o
+> que a pessoa digitou ainda lá, visivelmente **não salvo** e corrigível.
+> **Só apareceu abrindo a tela.**
+
+> ⚠️ **"DESATIVAR" GANHOU O CAMINHO DE VOLTA, e é o contrário do cadastro de
+> SKU.** Lá a linha inativa mostra só a palavra "inativo" e o caminho de volta
+> é **Adicionar com o mesmo código** — que ninguém adivinha (§7). Aqui o mesmo
+> botão troca de nome para **Reativar**, e a lista devolve os inativos
+> justamente para ele existir. Desativar não apaga: há oferta, ficha e pedido
+> apontando para a linha.
+
+> ⚠️ **O ESTOQUE NÃO SE EDITA AQUI, e está escrito na tela.** Ele entra pelo
+> Recebimento e se corrige pela Contagem, que grava em `movimento_componente`
+> com quem e por quê (§7-B, donos únicos). Um campo de saldo neste card seria
+> o oitavo dono da coluna que o §2 passou uma fase inteira reduzindo a um.
+
+> ⚠️ **A LINHA DE CRIAR FICA EMBAIXO DA LISTA.** Quem chega aqui quase sempre
+> vem ajustar mínimo; um formulário em cima empurraria a lista para fora da
+> tela todo dia por causa do uso raro.
+
+> **Rode `node teste_componentes.js` ao mexer no `POST /api/componentes` ou no
+> card Materiais** — os 38 casos travam os três pontos acima, e o que importa
+> mais é este: editar o mínimo de um componente de **tecido** e exigir que
+> família, cor e largura de bobina continuem lá. Foi conferido reintroduzindo
+> cada defeito, um a um — o wipe reprova 4 casos, o clamp reprova 9, ignorar o
+> `ativo` reprova 1.
+>
+> ⚠️ E o Express de mentira do teste **transforma rota que estoura em 500** em
+> vez de deixar a rodada morrer: com o wipe reintroduzido, um POST parcial bate
+> no `NOT NULL` do `nome` e a suíte inteira parava no caso 9 — o defeito
+> aparecia como *"travou"*, não como vermelho, e os 29 casos de baixo nunca
+> rodavam.
+
 ### Regras que parecem bug e não são
 
 - **Custo indefinido nunca vira zero.** Falta preço numa linha → o total é
@@ -3001,7 +3092,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (49), `teste_divergencia.js` (53) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (50), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (49), `teste_divergencia.js` (53) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (50), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3009,7 +3100,8 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 15 | ~~**`POST /api/skus` zera o estoque** quando o corpo não traz `estoque`~~ **RESOLVIDO em 17/09/2026** — campo ausente preserva os quatro campos soltos, número impossível é recusado (400) em vez de clampado, e as duas escritas viraram uma transação com o `catch` vazio fora. A rota saiu para `sku_cad_route.js` e tem `teste_skus.js` (60 casos) atrás — ver §6, armadilha #25. ~~**Fica aberto**: a rota ainda muda saldo com `sku.cadastrar`~~ **FECHADO em 21/09/2026** na fase 1 do livro: o cadastro não mexe em saldo, nem com o campo presente, nem no SKU novo — e a rota diz que ignorou (§2, o livro) | — |
 | 16 | ~~**Acesso: default `@logado` e cobertura mantida à mão**~~ **RESOLVIDO em 17/09/2026** — o padrão passou a ser **negar**, a cobertura varre o Express (a lista `TODAS_ROTAS` saiu) e o boot grita o nome da rota não declarada; as 28 leituras sem dono foram declaradas e as telas `.html` gêmeas herdaram a permissão da tela. Ver §10, armadilha #29 · `teste_cobertura.js` | — |
 | 17 | ~~**Acesso: duas travas faltando**~~ **RESOLVIDO em 17/09/2026** — a exceção recusa conceder chave `intransferivel`, a troca de setores tem a trava do último Admin Geral (mesma conta do `auth.js`, agora no `acesso.js`), setor novo não nasce `admin_geral` e a migração de `areas` virou evento de uma vez só (a porta A, que promovia a Admin Geral em silêncio). Ver §10, armadilha #28 | — |
-| 18 | **Nada acusa uma regra INERTE** — e ela tem pelo menos **duas formas**: dado que ninguém preencheu, e **rota que nenhuma tela chama** (o extrato do livro ficou um dia no ar sem botão, §2). `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
+| 19 | **`minimo.definir` é uma chave que nenhuma rota lê.** Ela está em `permissoes.js` e no setor de Compras do `acesso.js` desde a fase 0, dizendo *"Definir estoque mínimo — ponto de pedido e estoque ideal por componente"*. Quem manda de verdade no card Materiais é `componente.cadastrar` (escrita) e `compras.ver` (leitura). Então marcar a caixinha certa na tela de Acessos **não libera nada**, e a pessoa leva 403 numa tela que a permissão dela diz que ela pode — sem erro e sem log, que é a terceira ponta da armadilha #13 (§19). Juntar as duas ou apagar a chave muda **quem pode o quê**: é `REGRA`, não conserto | Baixo — hoje quem tem uma tem a outra, porque o seed de Compras dá as duas juntas |
+| 18 | **Nada acusa uma regra INERTE** — e ela tem pelo menos **três formas**: dado que ninguém preencheu, **rota que nenhuma tela chama** (o extrato do livro ficou um dia no ar sem botão, §2; o `POST /api/componentes` ficou **oito meses**, e no lugar dele se fazia `INSERT` à mão — §7-B, armadilha #33) e **chave de permissão que nenhuma rota lê** (a `minimo.definir` da linha abaixo). `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
 
 ---
 
@@ -3211,6 +3303,25 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   sempre o **Código do kit** salvo, senão o impresso e o bipe divergem (§4)
 - ❌ Fazer o `POST /api/config/kit/etiqueta` apagar campo que não veio no corpo
   — era a dívida 15 do §14 repetida em outra rota (§4, §6 #25)
+- ❌ Fazer o `POST /api/componentes` sobrescrever campo que não veio no corpo:
+  editar o mínimo de um material de tecido apagava família, cor e largura de
+  bobina, e a ficha parava de resolver a bobina (§7-B, armadilha #33)
+- ❌ Clampar mínimo, ideal, bobina ou perda em zero naquela rota: `parseFloat`
+  com `||0` faz de `"abc"` e de `-5` um zero em silêncio — é a #25 outra vez,
+  e quem decide se o número é possível é o servidor, dizendo qual campo (§7-B)
+- ❌ Exigir `nome` na EDIÇÃO de um componente: um POST parcial morria com "nome
+  obrigatório" em vez de gravar o campo citado — obrigatório é para nascer
+- ❌ Mandar os nove campos a cada tecla "porque sempre foi assim": era só isso
+  que segurava o wipe, por acaso, como a tela do admin segurava o §6 (#33)
+- ❌ Escrever a recusa de uma linha no rodapé do card, ou repintar o valor velho
+  por cima do digitado — o motivo fica na linha, e o que a pessoa digitou fica
+  no campo, em vermelho (§7-B, armadilha #33, e a regra da ficha)
+- ❌ Pôr campo de estoque no card Materiais: o saldo entra pelo Recebimento e se
+  corrige pela Contagem, que gravam movimento — seria mais um dono (§7-B)
+- ❌ Deixar "Desativar" sem o caminho de volta: é a linha inativa do cadastro de
+  SKU, onde reativar é um Adicionar que ninguém adivinha (§7, §7-B #33)
+- ❌ Deixar um Express de mentira propagar o estouro da rota num teste: a suíte
+  morre no meio e o defeito aparece como "travou", não como vermelho (#33)
 - ❌ Deixar campo ausente valer como zero no `POST /api/skus`: um POST só com
   código e descrição apagava o saldo, sem erro e sem rastro (§6, armadilha #25)
 - ❌ Clampar estoque ou alvo impossível em zero "para não recusar": clampar é
@@ -4765,6 +4876,18 @@ necessidade_dominio.js           soma no mesmo gatilho 2 da medida padrão
 > os outros três não existirem em Compras e não estiverem apontados, o tubo
 > deles sai como **pendência** na lista — que é o certo, e é o sinal de que
 > falta cadastro, não de que falta código.
+>
+> ⚠️ **E NÃO HAVIA ONDE FAZER ESSE CADASTRO — eu mandei o dono a uma tela que
+> não existe.** "Admin → Compras → Ponto de pedido" só editava mínimo e ideal
+> de material já cadastrado; criar material nunca teve tela em lugar nenhum, e
+> os que existem nasceram por `INSERT` à mão. O card **Materiais**
+> (Admin → Compras) é de 24/09/2026 e é a armadilha **#33** do §7-B — junto
+> com o defeito que abrir a tela teria destapado: a rota apagava família, cor e
+> bobina do material de tecido a cada edição de mínimo.
+>
+> **O caminho, hoje:** Admin → Compras → **Materiais**, criar `Tubo 38 mm`,
+> `Tubo 41 mm` e `Tubo 56 mm` em **metro**; depois Sob medida → Catálogo →
+> **Escada de tubos**, apontar o material de cada degrau.
 
 > **EM PRODUÇÃO DESDE 24/09/2026, E A PRIMEIRA LEITURA DEU VAZIO — o que está
 > certo, e por isso ficou escrito.** `materiais: []` e `pendencias: []`: o 5001
