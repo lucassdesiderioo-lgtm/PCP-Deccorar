@@ -19,6 +19,7 @@ const db=require('../nucleo/db');
 const d=require('../dados/producao');
 const etq=require('./etiqueta_producao');
 const dpedido=require('../dados/pedido');
+const motivos=require('./motivo_producao');
 const permissoes=require('../nucleo/permissoes');
 const dia=require('../nucleo/dia');
 
@@ -261,7 +262,12 @@ function fila(setor,usuario){
     item_n:c.item_n,
     o_que_fazer:etq.tarefaDe(c),
     em_andamento:!!c.iniciado_em,
-    iniciado_em:c.iniciado_em, iniciado_por:c.iniciado_por
+    iniciado_em:c.iniciado_em, iniciado_por:c.iniciado_por,
+    /* ⚠️ A PECA RECUSADA VOLTA MARCADA. Sem isso ela fica identica a
+       qualquer outra na lista, e o serralheiro corta de novo sem saber que
+       ja cortou uma que foi para o lixo — e sem saber que ha uma etiqueta
+       igual a esta em algum lugar da bancada (fase 4-A). */
+    refeitas:c.refeitas||0
   }));
 }
 
@@ -275,4 +281,186 @@ function oQueSegura(codigo){
   }));
 }
 
-module.exports={fila,bipar,biparKit,oQueSegura,fecharPendencia,ANTES};
+/* ── A RECUSA (fase 5-B2, secao 4.16) ─────────────────────────────────────
+   Qualquer bancada recusa a peca por defeito do trabalho ANTERIOR, e quem
+   recusa escolhe SO O MOTIVO — o motivo ja diz qual peca volta.
+
+   ⚠️ ELA ANDA PARA TRAS PELA MESMA TABELA QUE LIBERA PARA A FRENTE. O
+   `ANTES` diz o que libera o que; lido de tras para a frente diz o que e
+   "trabalho anterior", e lido no sentido normal diz o que tem que voltar
+   para "aguardando". Uma segunda tabela divergiria no dia em que o fluxo
+   mudasse, e as duas estariam "certas" — armadilha #12 do CLAUDE.md. */
+
+/* O QUE VEM ANTES DESTA BANCADA, direta ou indiretamente. A embalagem
+   alcanca a revisao, a montagem e, por ela, o tubo, a base e o tecido. A
+   serralheria e a colecao nao alcancam nada: elas sao as primeiras. */
+function anteriores(setor,irmaos){
+  const setorDe={}; irmaos.forEach(x=>{ setorDe[x.chave]=x.setor; });
+  const vistos=new Set(), pilha=[setor];
+  while(pilha.length){
+    const s=pilha.pop();
+    for(const k of (ANTES[s]||[])){
+      if(vistos.has(k)) continue;
+      vistos.add(k);
+      if(setorDe[k]) pilha.push(setorDe[k]);
+    }
+  }
+  return vistos;
+}
+
+/* O QUE FOI FEITO EM CIMA DESTA PECA — o culpado mais tudo que depende dele.
+   ⚠️ NEM MAIS, NEM MENOS. A mais, a serralheria refaz a base porque o tubo
+   veio errado: trabalho jogado fora todo dia, que e a armadilha #6. A menos,
+   a persiana continua montada em cima de um tubo que ja foi para o lixo. */
+function posteriores(chave,irmaos){
+  const alcanca=new Set([chave]);
+  let mudou=true;
+  while(mudou){
+    mudou=false;
+    for(const x of irmaos){
+      if(alcanca.has(x.chave)) continue;
+      if((ANTES[x.setor]||[]).some(k=>alcanca.has(k))){ alcanca.add(x.chave); mudou=true; }
+    }
+  }
+  return irmaos.filter(x=>alcanca.has(x.chave));
+}
+
+function recusar(codigo,dados,usuario){
+  const c=achar(codigo);
+  exigir(podeNoSetor(usuario,c.setor),'setor_errado',
+    'Esta etiqueta é da '+nomeDoSetor(c.setor)+', e você não está nessa bancada. '+
+    'Quem recusa é quem está com a peça na mão.');
+  exigir(!c.item_cancelado_em,'peca_cancelada','Esta peça foi cancelada e não deve ser feita.');
+
+  const motivo_id=Number((dados&&dados.motivo_id)||0);
+  exigir(motivo_id,'motivo_obrigatorio','Escolha o motivo: é ele que diz qual peça volta.');
+  const m=motivos.porId(motivo_id);
+  exigir(m,'motivo_inexistente','Este motivo não está mais no cadastro. Avise a chefia.');
+  exigir(m.ativo,'motivo_inativo','O motivo "'+m.nome+'" foi desativado. Escolha outro.');
+
+  const irmaos=d.doItem(c.item_id);
+  const culpado=irmaos.find(x=>x.chave===m.componente_chave);
+  exigir(culpado,'peca_sem_esse_componente',
+    'Esta persiana não leva '+(m.componente_nome||m.componente_chave)+', então não há o que refazer. '+
+    'Confira se o motivo é o certo.');
+
+  /* ⚠️ NAO SE RECUSA O PROPRIO TRABALHO. Refazer o que acabei de fazer nao e
+     recusa — e so refazer. Aceitar aqui daria a quem errou o caminho de
+     apagar o proprio bipe, e o bipe e o rastro de quem fez. */
+  exigir(culpado.id!==c.id,'recusa_do_proprio',
+    'Refazer o próprio trabalho não é recusa. A recusa é para o defeito que veio do setor de trás.');
+
+  /* ⚠️ E SO DO QUE VEM ANTES. A colecao recusando o tubo seria uma bancada
+     mandando refazer uma peca que ela nunca viu. */
+  exigir(anteriores(c.setor,irmaos).has(culpado.chave),'nao_e_anterior',
+    (culpado.nome||culpado.chave)+' não é trabalho anterior à '+nomeDoSetor(c.setor)+
+    ' — a peça não passa por aqui depois dele. A recusa é para o defeito que veio do setor de trás.');
+
+  exigir(culpado.terminado_em,'culpado_nao_terminado',
+    (culpado.nome||culpado.chave)+' ainda não foi terminado, então não há trabalho para refazer. '+
+    (culpado.iniciado_em?'Ele está em andamento na '+nomeDoSetor(culpado.setor)+'.'
+                        :'Ele nem começou na '+nomeDoSetor(culpado.setor)+'.'));
+
+  const volta=posteriores(culpado.chave,irmaos);
+  return db.transaction(()=>{
+    d.reabrir(volta.map(x=>x.id));
+    d.contarRefeita(culpado.id);
+    /* O pedido que estava pronto deixa de estar: ha peca voltando para a
+       bancada. O `marco` continua `aprovado` (migracao 21). */
+    if(c.pronto_em) d.desfazerPronto(c.pedido_id);
+    d.criarRecusa({
+      item_id:c.item_id, componente_id:culpado.id,
+      codigo_etiqueta:culpado.codigo_etiqueta,
+      motivo_id:m.id, motivo_nome:m.nome,
+      observacao:String((dados&&dados.observacao)||'').trim()||null,
+      recusado_de:c.setor, recusado_codigo:c.codigo_etiqueta,
+      recusado_por:nome(usuario),
+      /* ⚠️ QUEM FEZ E RETRATO, e este e o unico lugar onde ele sobra: a
+         reabertura acabou de apagar o bipe do culpado. Sem esta linha,
+         "recusas por pessoa" (secao 4.17) nao tem de onde sair. */
+      feito_por:culpado.terminado_por, feito_em:culpado.terminado_em,
+      reabertos:volta.length
+    });
+    /* A recusa vai para o historico do PEDIDO, que e onde alguem olha quando
+       pergunta por que a persiana demorou. */
+    dpedido.criarMarco({pedido_id:c.pedido_id, marco:'recusa',
+      detalhe:(culpado.nome||culpado.chave)+' · '+m.nome+
+        ' · recusado na '+nomeDoSetor(c.setor),
+      usuario_nome:nome(usuario)});
+    return {ok:true,
+      culpado:{codigo:culpado.codigo_etiqueta, chave:culpado.chave,
+               nome:culpado.nome, setor:culpado.setor,
+               setor_nome:nomeDoSetor(culpado.setor)},
+      motivo:m.nome,
+      reabertos:volta.map(x=>x.codigo_etiqueta||x.chave)};
+  })();
+}
+
+/* O que a bancada ve na hora de recusar. Ela le por AQUI e nao por
+   /api/cadastros: mandar quem so bipa na tela de cadastros daria a ela a
+   lista inteira de tecido, endereco e motivo de sobra para responder uma
+   pergunta de tres palavras — e a licao da porta das cores da fase 3.
+
+   ⚠️ A LISTA E DESTA PECA, E NAO O CADASTRO INTEIRO — e isso SO APARECEU
+   ABRINDO A TELA. A primeira versao oferecia os oito motivos cadastrados na
+   bancada da Montagem, dois deles impossiveis dali: "Montagem torta" e o
+   PROPRIO trabalho e "Revisao deixou passar" vem DEPOIS. Quem esta de luva
+   toca "Montagem torta" achando que e "a montagem esta torta, refaz" — e
+   leva recusa. Escolha que so serve para dar erro e a armadilha #6 dentro de
+   uma lista, e nenhum caso de unidade a pega: as guardas estavam certas e
+   verdes.
+
+   As guardas do servidor FICAM (a rota e chamavel por fora, e e a licao do
+   `kit_ok` da armadilha #26 do PCP). O que muda e a tela parar de oferecer o
+   que ela ja sabe que nao passa. Tres filtros, e os tres sao os mesmos que
+   o `recusar` confere: vir ANTES, EXISTIR nesta persiana, e estar PRONTO. */
+function listarMotivos(codigo){
+  const c=achar(codigo);
+  const irmaos=d.doItem(c.item_id);
+  const antes=anteriores(c.setor,irmaos);
+  const porChave={}; irmaos.forEach(x=>{ porChave[x.chave]=x; });
+
+  const lista=motivos.ativos().filter(m=>{
+    const irmao=porChave[m.componente_chave];
+    return antes.has(m.componente_chave) && irmao && irmao.terminado_em;
+  }).map(m=>({
+    id:m.id, nome:m.nome,
+    componente_chave:m.componente_chave, componente_nome:m.componente_nome,
+    setor:m.setor, setor_nome:m.setor_nome||nomeDoSetor(m.setor)
+  }));
+
+  /* ⚠️ LISTA VAZIA DIZ POR QUE. "Nada aqui" se parece com tela quebrada, e
+     quem esta com a peca na mao nao tem como saber a diferenca entre "nao ha
+     motivo cadastrado" e "a tela nao carregou". As tres razoes sao
+     diferentes, e cada uma manda para um lugar diferente. */
+  let sem_motivo=null;
+  if(!lista.length){
+    if(!antes.size)
+      sem_motivo='A '+nomeDoSetor(c.setor)+' é a primeira bancada desta persiana — '+
+        'não há trabalho anterior para recusar.';
+    else if(!motivos.ativos().length)
+      sem_motivo='Não há motivo de recusa cadastrado. Quem cadastra é a chefia, em Cadastros.';
+    else
+      sem_motivo='Nada do que vem antes desta peça está pronto para ser recusado. '+
+        'Se falta alguém bipar o fim, a chefia resolve pela pendência.';
+  }
+  return {codigo:c.codigo_etiqueta, setor:c.setor,
+          setor_nome:nomeDoSetor(c.setor), motivos:lista, sem_motivo};
+}
+
+/* AS PECAS A REFAZER — o card de quem esta na Zebra. A etiqueta sai com o
+   MESMO codigo (ele e da peca, nao do papel) e marcada como refeita. */
+function aRefazer(){
+  return d.aRefazer().map(c=>({
+    codigo:c.codigo_etiqueta, chave:c.chave,
+    setor:c.setor, setor_nome:nomeDoSetor(c.setor),
+    pedido_id:c.pedido_id, pedido_numero:c.pedido_numero,
+    revenda:c.revenda_nome, item_n:c.item_n,
+    o_que_fazer:etq.tarefaDe(c),
+    refeitas:c.refeitas, motivo:c.motivo, recusado_por:c.recusado_por
+  }));
+}
+
+module.exports={fila,bipar,biparKit,oQueSegura,fecharPendencia,
+  recusar,motivos:listarMotivos,aRefazer,
+  ANTES,anteriores,posteriores};

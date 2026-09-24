@@ -3,6 +3,7 @@
 const tecido=require('../dominio/tecido');
 const endereco=require('../dominio/endereco');
 const motivo=require('../dominio/motivo');
+const motivoProd=require('../dominio/motivo_producao');
 const largura=require('../dominio/largura');
 const exclusao=require('../dominio/exclusao');
 
@@ -174,6 +175,24 @@ module.exports={rotas:[
    detalhe:(req)=>'motivo '+req.body.nome},
   {metodo:'PUT', caminho:'/api/motivos/:id', permissao:EDITAR,
    manipulador:({params,corpo})=>motivo.atualizarMotivo(params.id,corpo)},
+
+  /* ── Motivos da recusa da PRODUCAO (fase 5-B2, secao 4.16) ─────────────
+     ⚠️ SAO OUTROS MOTIVOS, e a rota e outra. Os de cima (`/api/motivos`) sao
+     do PLANO DE CORTE — por que o cortador nao usou a sobra sugerida. Estes
+     sao da bancada: por que a peca voltou para o setor de tras. Juntar os
+     dois cadastros erraria os dois relatorios, e esta escrito assim na spec.
+     A BANCADA nao le por aqui: ela le /api/producao/motivos, que so devolve
+     os ativos e nao pede `cadastro.ler`. */
+  {metodo:'GET', caminho:'/api/recusa/motivos', permissao:LER,
+   /* A lista de pecas vem pela MESMA porta, para a tela nao precisar de uma
+      segunda chave (`catalogo.ler`) so para montar o seletor. */
+   manipulador:()=>({motivos:motivoProd.listar(),
+                     componentes:motivoProd.componentesPossiveis()})},
+  {metodo:'POST', caminho:'/api/recusa/motivos', permissao:EDITAR,
+   manipulador:({corpo})=>motivoProd.criar(corpo),
+   detalhe:(req)=>'motivo de producao '+req.body.nome+' -> '+req.body.componente_chave},
+  {metodo:'PUT', caminho:'/api/recusa/motivos/:id', permissao:EDITAR,
+   manipulador:({params,corpo})=>motivoProd.atualizar(params.id,corpo)},
 
   {metodo:'GET', caminho:'/api/condicoes', permissao:LER,
    manipulador:()=>motivo.listarCondicoes()},

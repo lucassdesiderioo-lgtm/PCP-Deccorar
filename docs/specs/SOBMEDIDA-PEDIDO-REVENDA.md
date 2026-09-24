@@ -5,7 +5,11 @@ STATUS
 Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 24/09/2026
-Fase atual: 5-A EM CÓDIGO (24/09/2026) — os cinco setores da produção no
+Fase atual: 5-B2 EM CÓDIGO (24/09/2026) — a recusa: qualquer bancada devolve
+            a peça por defeito do trabalho anterior, o que depende dela volta
+            junto, e a refeita reimprime a MESMA etiqueta, marcada
+            5-B1 EM CÓDIGO (24/09/2026) — o bipe, as filas e o Pronto
+            5-A EM CÓDIGO (24/09/2026) — os cinco setores da produção no
             controle de acesso do PCP; sobe SOZINHA para o dono marcar as
             pessoas enquanto o bipe é construído
             4-C EM PRODUÇÃO (24/09/2026) — o tubo chegando ao Compras do PCP;
@@ -18,10 +22,10 @@ Fase atual: 5-A EM CÓDIGO (24/09/2026) — os cinco setores da produção no
             em paralelo ao Decorsoft
             2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
             1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
-Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ◐(5-A em produção · 5-B1 em código · 5-B2 não começou)  6 ☐  7 ☐  8 ☐
+Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ☑(código — 5-A em produção · 5-B1 e 5-B2 em código)  6 ☐  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
-Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) + 2 (fase 5-A) — ver abaixo
+Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) + 2 (fase 5-A) + 1 (5-B1) + 2 (5-B2) — ver abaixo
 ```
 
 ## 📌 O QUE ESTÁ PENDENTE — a lista única
@@ -52,6 +56,7 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 | 6 | O **próximo pedido aprovado** somando na linha certa do Compras, e o comprador comprando por ela | a 4-C |
 | 7 | A **semana em paralelo ao Decorsoft**, pedido a pedido | a 3 — a folha do 5001 provou o ciclo e a aritmética, não o cadastro |
 | 8 | A **peça real atravessando os cinco setores** | a 4-A e a 5 |
+| 8-b | A **bancada de verdade recusando uma peça**, com o maço de refazer saindo da Zebra | a 5-B2 — a rodada de 24/09 foi num navegador meu |
 | 9 | O **serralheiro cortando pela medida da etiqueta** | a 4-A — o bipe provou o código de barras, não a medida |
 | 10 | O **comprador comprando pelo painel de tecido** (o comprometido da 4-B) | a 4-B |
 
@@ -69,11 +74,64 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 
 | Fase | O que é |
 |---|---|
-| **5-B2** | a recusa com motivo → setor → pessoa: qualquer setor recusa a peça por defeito do trabalho ANTERIOR, o sistema acha pelos bipes quem fez, reabre o trabalho dele e devolve os setores seguintes para "aguardando". A peça refeita reimprime a **mesma** etiqueta, marcada como refeita. Motivo é **tabela nova** — a `motivo_recusa` que já existe é do plano de corte, e juntar as duas erraria os dois relatórios (§4.16) |
+| ~~5-B2~~ | ~~a recusa com motivo → setor → pessoa~~ **EM CÓDIGO em 24/09/2026** — migração 22, `sm_motivo_producao`, `sm_recusa` e `refeitas`. Falta a bancada de verdade recusar uma peça |
 | ~~5-B1~~ | ~~o bipe, as filas por setor, o kit e o Pronto automático~~ **EM CÓDIGO em 24/09/2026** — era o pedaço que esta lista **não citava**, e sem ele a 5-B2 não tem de onde recusar |
 | 6 | o gerencial (kanban com colunas cadastráveis) |
 | 7 | o portal da revenda |
 | 8 | segurança e abertura |
+
+## STATUS DA FASE 5-B2 — em código em 24/09/2026
+
+**A recusa (§4.16).** A 5-B1 fez a peça andar para a frente; aqui ela sabe
+voltar. Migração 22 (`sm_motivo_producao`, `sm_recusa` e a coluna `refeitas`),
+`dominio/motivo_producao.js`, a recusa no `dominio/producao.js`, o botão na
+bancada, o card de cadastro em Cadastros e o card **Refazer** na Produção.
+
+```
+a montagem acha o tubo maior  →  escolhe o MOTIVO (e só ele)
+                              →  o tubo volta para a Serralheria, marcado REFAZER
+                              →  o que foi feito EM CIMA dele volta para "aguardando"
+                              →  a etiqueta sai com o MESMO código, em vermelho
+```
+
+### As duas mudanças no caminho
+
+| # | O que a spec dizia | O que ficou | Por quê |
+|---|---|---|---|
+| 1 | o motivo aponta o **setor** (*"Tubo maior → Serralheria"*) | o motivo aponta o **componente**, e o setor sai dele | a serralheria faz **quatro** peças. Apontar o setor ou é ambíguo, ou refaz as quatro — refazer a base porque o tubo veio errado é trabalho jogado fora todo dia (armadilha #6). E dois campos dizendo o mesmo fato divergem no dia em que alguém editar só um (armadilha #12) |
+| 2 | — | a lista de motivos da bancada é **desta peça**, não o cadastro inteiro | **só apareceu abrindo a tela**: a Montagem via os oito cadastrados, dois deles impossíveis dali (o próprio trabalho e o que vem depois). Quem está de luva toca "Montagem torta" achando que é *"a montagem está torta, refaz"* — e leva recusa. As guardas do servidor ficam; a tela parou de oferecer o que já sabe que não passa |
+
+### As decisões desta fase
+
+| # | Decisão | Por quê |
+|---|---|---|
+| 1 | **Volta o culpado e tudo que depende dele — nem mais, nem menos** | a mais, a serralheria refaz a base por causa do tubo (armadilha #6); a menos, a persiana continua montada em cima de um tubo que foi para o lixo. A conta sai do **mesmo `ANTES`** que libera para a frente — uma segunda tabela divergiria no dia em que o fluxo mudasse |
+| 2 | **O bandô recusado não derruba a montagem** | ele não a segura (5-B1), então também não a derruba: ele entra na hora de fechar a caixa |
+| 3 | **`refeitas` sobe só no CULPADO** | ela responde *quantas vezes esta peça física foi feita*. O que volta atrás dele é trabalho refeito, não peça refeita. Quem conta recusa por setor, por pessoa e por motivo é a `sm_recusa` (o indicador da §4.17) |
+| 4 | **Quem recusa é `producao.bipar`, não a chefia** | a §4.16 diz que *qualquer* setor recusa. O que impede o abuso não é permissão, é o rastro: cada recusa grava quem recusou, de que bancada, o motivo e **quem tinha feito** |
+| 5 | **O `kit_conferido_em` é limpo junto** | senão a persiana refeita fecharia a caixa sem o terceiro bipe — a trava do kit deixando de existir justamente na peça que já deu problema uma vez |
+| 6 | **O pedido pronto deixa de estar pronto**, e o `marco` não se mexe | há peça voltando para a bancada. Trocar o `marco` quebraria a reimpressão da etiqueta e as duas contas da compra (4-B e 4-C) — é a dívida 15 desta spec |
+| 7 | **A reimpressão é por CÓDIGO**, e não pelo maço do pedido | reimprimir o maço inteiro para refazer uma peça põe etiquetas repetidas na bancada, que é o que a 4-A existe para impedir |
+| 8 | **O motivo e quem fez são RETRATO** na `sm_recusa` | a reabertura acaba de apagar o bipe do culpado: sem o retrato, *"recusas por pessoa"* não tem de onde sair. E renomear o cadastro amanhã não reescreve o que aconteceu hoje |
+| 9 | **O cadastro nasce com os oito motivos da própria spec** | tabela vazia faria o botão "Recusar" abrir uma lista sem nada — regra escrita que não pega em ninguém, a dívida 18 pela porta do cadastro |
+
+### O que foi conferido, e como
+
+- **29 casos novos** (`tecido/teste/recusa.test.js`), escritos **antes** do
+  código, e **nove defeitos reintroduzidos um a um** para provar que cada caso
+  pega o seu: recusar o próprio trabalho (reprova 1), recusar o que não é
+  anterior (2), reabrir só o culpado (4), reabrir demais (4), não desfazer o
+  `pronto_em` (1), não limpar o kit (1), motivo de peça sem etiqueta (1),
+  `refeitas` em todos os reabertos (2) e não gravar quem tinha feito (1).
+- **As três telas abertas**, e foi assim que a mudança nº 2 apareceu. O ciclo
+  inteiro rodou: bipe na Montagem → Recusar → os quatro motivos possíveis →
+  confirmar → o tubo de volta na fila da Serralheria com a tarja vermelha
+  **REFAZER** → o card Refazer na Produção → o PDF com **REFAZER 2ª VEZ** em
+  vermelho e o mesmo `SER-000001`.
+- **Não é a conferência da fábrica.** Provou o fluxo e as frases num navegador
+  meu. A prova que fecha a fase é a bancada de verdade — é a lição do §4 do
+  `CLAUDE.md`, onde o QR passou por três rodadas verdes sem ler em celular
+  nenhum.
 
 ## STATUS DA FASE 5-B1 — em código em 24/09/2026
 

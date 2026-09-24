@@ -1375,6 +1375,81 @@ CREATE TABLE sm_pendencia (
   criado_em TEXT DEFAULT (datetime('now','localtime'))
 );
 CREATE INDEX idx_sm_pendencia ON sm_pendencia(componente_id);
+`},
+
+{n:22, nome:'a recusa — o motivo aponta a peca que volta, e o que depende dela volta junto', sql:`
+/* === A RECUSA ============================================================
+   Fase 5-B2 da spec SOBMEDIDA-PEDIDO-REVENDA (secao 4.16). A 5-B1 fez a
+   peca andar para a frente; aqui ela sabe voltar.
+
+   Qualquer bancada recusa a peca por defeito do trabalho ANTERIOR, e quem
+   recusa escolhe SO O MOTIVO — quem esta de luva nao faz duas escolhas, e a
+   segunda errada e trabalho perdido. O motivo ja diz qual peca volta. */
+
+/* ⚠️ E TABELA NOVA, E NAO A \`motivo_recusa\` QUE JA EXISTE. Aquela e o motivo
+   de o CORTADOR nao usar a sobra que o plano sugeriu. Juntar as duas
+   misturaria "o plano nao conseguiu cortar" com "a montagem achou o tubo
+   maior", e os relatorios das duas ficariam errados — esta escrito com todas
+   as letras na secao 4.16 da spec.
+
+   ⚠️ O MOTIVO APONTA O COMPONENTE, E NAO O SETOR. A spec escreve
+   "Tubo maior -> Serralheria", mas a serralheria faz QUATRO pecas (tubo,
+   base, bandô, barra): mandar de volta "para a serralheria" ou e ambiguo, ou
+   refaz as quatro — e refazer a base porque o tubo veio errado e trabalho
+   jogado fora todo dia, que e a armadilha #6. O setor e CONSEQUENCIA do
+   componente, entao nao e um segundo campo: duas afirmacoes sobre o mesmo
+   fato divergem no dia em que alguem editar so uma (armadilha #12). */
+CREATE TABLE sm_motivo_producao (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  componente_chave TEXT NOT NULL REFERENCES sm_componente(chave),
+  ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1
+);
+
+/* ⚠️ O CADASTRO NASCE COM OS EXEMPLOS DA PROPRIA SPEC, e isso e decisao.
+   Tabela vazia faria a fase subir com o botao "Recusar" abrindo uma lista
+   sem nada — regra escrita, codificada, e que nao pega em ninguem: a divida
+   18 do CLAUDE.md (armadilha #30) pela porta do cadastro. A chefia edita,
+   acrescenta e desativa; o que ela apagar fica apagado. */
+INSERT INTO sm_motivo_producao(nome,componente_chave,ordem) VALUES
+ ('Tubo maior ou menor','tubo',1),
+ ('Tecido com defeito','tecido',2),
+ ('Corte de tecido torto','tecido',3),
+ ('Base inferior errada','base',4),
+ ('Bandô torto ou amassado','bando',5),
+ ('Barra niveladora errada','barra',6),
+ ('Montagem torta','montagem',7),
+ ('Revisão deixou passar','revisao',8);
+
+/* ⚠️ \`refeitas\` RESPONDE UMA COISA SO: quantas vezes ESTA peca fisica foi
+   feita. Ela sobe no CULPADO e em mais ninguem — o que volta atras dele e
+   trabalho refeito, nao peca refeita, e contar os dois na mesma coluna e a
+   armadilha #12 dentro de um numero. Quem conta recusa por setor, por pessoa
+   e por motivo (o indicador da secao 4.17) e a \`sm_recusa\` abaixo. */
+ALTER TABLE sm_pedido_componente ADD COLUMN refeitas INTEGER NOT NULL DEFAULT 0;
+
+/* O RASTRO. Ele e o unico lugar onde QUEM FEZ sobrevive: a reabertura apaga
+   o bipe do culpado, que e justamente o dado de que o indicador precisa.
+   Nome do motivo e nome de quem fez entram como RETRATO — renomear o
+   cadastro amanha nao pode reescrever o que aconteceu hoje, que e a mesma
+   regra do \`vendedor_nome\` da revenda (fase 2). */
+CREATE TABLE sm_recusa (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL REFERENCES sm_pedido_item(id),
+  componente_id INTEGER NOT NULL REFERENCES sm_pedido_componente(id),
+  codigo_etiqueta TEXT,
+  motivo_id INTEGER REFERENCES sm_motivo_producao(id),
+  motivo_nome TEXT NOT NULL,
+  observacao TEXT,
+  recusado_de TEXT,                 -- a bancada de quem recusou
+  recusado_codigo TEXT,             -- a etiqueta que ela estava com a mao
+  recusado_por TEXT,
+  feito_por TEXT, feito_em TEXT,    -- retrato de quem tinha feito o culpado
+  reabertos INTEGER NOT NULL DEFAULT 0,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX idx_sm_recusa_item ON sm_recusa(item_id);
+CREATE INDEX idx_sm_recusa_componente ON sm_recusa(componente_id);
 `}
 ];
 

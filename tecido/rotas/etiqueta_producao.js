@@ -38,8 +38,14 @@ module.exports={rotas:[
      return {arquivo:await pdf.gerar(r.etiquetas),
              nome:'etiquetas-'+(corpo.setor||'todos')+'.pdf'};
    },
-   detalhe:(req)=>'etiquetas de '+(req.body&&req.body.setor)+
-     ' dos pedidos '+((req.body&&req.body.pedidos)||[]).join(', ')},
+   /* A reimpressao da peca REFEITA vem por `codigos` (fase 5-B2) e nao por
+      pedido: reimprimir o maco inteiro para refazer uma peca poe etiquetas
+      repetidas na bancada. O detalhe da auditoria diz qual dos dois foi. */
+   detalhe:(req)=>{
+     const b=req.body||{};
+     if((b.codigos||[]).length) return 'reimpressao de refeita: '+b.codigos.join(', ');
+     return 'etiquetas de '+b.setor+' dos pedidos '+((b.pedidos)||[]).join(', ');
+   }},
 
   /* ── O PLANO DE CORTE ───────────────────────────────────────────────────
      As pecas de tecido dos aprovados, ja com a medida de CORTE e agrupadas

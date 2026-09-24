@@ -3649,6 +3649,33 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   normal é a armadilha #6 (§19, 5-B1)
 - ❌ Escrever uma segunda frase de "o que fazer" na tela da bancada: ela sai
   do mesmo `tarefaDe` da etiqueta, e na bancada vence a etiqueta (§19)
+- ❌ Escrever uma segunda tabela de "o que vem antes" para a recusa: o `ANTES`
+  lido ao contrário já responde, e duas divergem no dia em que o fluxo mudar
+  (§19, 5-B2)
+- ❌ Fazer o motivo da recusa apontar o SETOR: a serralheria faz quatro peças,
+  e voltar "para a serralheria" refaz as quatro (§19, 5-B2)
+- ❌ Reabrir mais que o culpado e o que depende dele — nem menos: a mais é
+  trabalho jogado fora, a menos é persiana montada sobre peça que foi pro lixo
+- ❌ Deixar o bandô recusado derrubar a montagem: ele não a segura, então não a
+  derruba (§19, 5-B1 e 5-B2)
+- ❌ Subir `refeitas` em tudo que foi reaberto: ela conta quantas vezes a PEÇA
+  FÍSICA foi feita, e quem conta recusa é a `sm_recusa` (§19, 5-B2)
+- ❌ Deixar de limpar o `kit_conferido_em` na reabertura: a persiana refeita
+  fecharia a caixa sem o terceiro bipe (§19, 5-B2)
+- ❌ Trocar o `marco` para desfazer o pronto numa recusa: quem desfaz é o
+  `pronto_em` — o marco é lido pela reimpressão e pelas duas contas da compra
+- ❌ Reimprimir o maço do pedido inteiro para refazer UMA peça: sobram
+  etiquetas repetidas na bancada, que é o que a 4-A impede (§19, 5-B2)
+- ❌ Dar código novo à peça refeita, ou tirar a marca vermelha do papel: o
+  código é da peça, e sem a marca ficam duas etiquetas iguais na bancada
+- ❌ Oferecer à bancada o motivo que a rota vai recusar — o próprio trabalho e o
+  que vem depois. Escolha que só serve para dar erro é a #6 numa lista (§19)
+- ❌ Devolver lista de motivos vazia sem dizer por quê: são três razões e cada
+  uma manda para um lugar diferente (§19, 5-B2)
+- ❌ Reaproveitar a `motivo_recusa` do plano de corte para a recusa da produção:
+  os relatórios das duas ficariam errados (§19, 5-B2, e a §4.16 da spec)
+- ❌ Apagar motivo de recusa com história atrás, ou deixar o cadastro nascer
+  vazio: o vazio faz o botão "Recusar" abrir uma lista sem nada (§19, 5-B2)
 
 ---
 
@@ -5273,6 +5300,144 @@ SERRALHERIA: bandô · barra ─────────────────
 > vazio (6) e o kit contando no pronto (3). Mexeu em permissão?
 > **`node teste_acesso.js` (168) e `node teste_cobertura.js` (10) também.**
 > E **abra a tela**: três dos defeitos desta fase não têm teste que os pegue.
+
+### ⚠️ A FASE 5-B2 (24/09/2026) — A RECUSA, E ELA ANDA PARA TRÁS PELA MESMA TABELA
+
+A 5-B1 fez a peça andar para a frente; aqui ela sabe voltar. Migração 22
+(`sm_motivo_producao`, `sm_recusa` e a coluna `refeitas`),
+`dominio/motivo_producao.js`, a recusa no `dominio/producao.js`, o botão na
+bancada, o card em Cadastros e o card **Refazer** na Produção.
+
+```
+a montagem acha o tubo maior  →  escolhe o MOTIVO, e só ele
+                              →  o tubo volta para a Serralheria, marcado REFAZER
+                              →  o que foi feito EM CIMA dele volta para "aguardando"
+                              →  a etiqueta sai com o MESMO código, em vermelho
+```
+
+> ⚠️ **O `ANTES` LIDO NOS DOIS SENTIDOS, e é isso que impede a segunda régua.**
+> A mesma tabela que diz *o que libera o quê* (5-B1) diz, lida de trás para a
+> frente, **o que é trabalho anterior** — e no sentido normal, **o que tem que
+> voltar para "aguardando"**. Uma segunda tabela para a recusa divergiria no
+> dia em que o fluxo mudasse, e as duas estariam "certas", cada uma na sua
+> régua: é a armadilha #12 dentro da produção.
+
+> ⚠️ **O MOTIVO APONTA O COMPONENTE, E NÃO O SETOR — e isso é divergência da
+> letra da spec, anotada lá.** A §4.16 escreve *"Tubo maior → Serralheria"*,
+> mas a serralheria faz **quatro** peças (tubo, base, bandô, barra): mandar de
+> volta "para a serralheria" ou é ambíguo, ou refaz as quatro — e refazer a
+> base porque o tubo veio errado é trabalho jogado fora todo dia, que é a
+> armadilha #6. O setor é **consequência** do componente, então não é um
+> segundo campo: duas afirmações sobre o mesmo fato divergem no dia em que
+> alguém editar só uma.
+
+> ⚠️ **VOLTA O CULPADO E TUDO QUE DEPENDE DELE — NEM MAIS, NEM MENOS.** A mais,
+> a serralheria refaz a base por causa do tubo. A menos, a persiana continua
+> montada em cima de um tubo que já foi para o lixo. **O bandô recusado não
+> derruba a montagem**, pelo mesmo motivo de ele não a segurar na 5-B1: ele
+> entra na hora de fechar a caixa, e derrubar ali desmontaria uma persiana
+> inteira por uma peça que só é necessária no fim.
+
+> ⚠️ **`refeitas` RESPONDE UMA COISA SÓ: quantas vezes ESTA peça física foi
+> feita.** Ela sobe no culpado e em mais ninguém — o que volta atrás dele é
+> trabalho refeito, não peça refeita. Quem conta recusa **por setor, por pessoa
+> e por motivo** (o indicador da §4.17) é a `sm_recusa`. Duas contas na mesma
+> coluna é a armadilha #12 dentro de um número só.
+
+> ⚠️ **QUEM FEZ É RETRATO NA `sm_recusa`, e é o único lugar onde ele sobra.** A
+> reabertura acaba de apagar o bipe do culpado — que é justamente o dado de que
+> o indicador precisa. O nome do motivo também é retrato: renomear o cadastro
+> amanhã não pode reescrever o que aconteceu hoje, que é a mesma regra do
+> `vendedor_nome` da revenda (fase 2).
+
+> ⚠️ **O `kit_conferido_em` É LIMPO JUNTO.** Sem isso a persiana refeita
+> fecharia a caixa sem o terceiro bipe, e a trava do kit deixaria de existir
+> justamente na peça que já deu problema uma vez. Há caso travando que, refeita
+> a peça, o kit é cobrado outra vez.
+
+> ⚠️ **O PEDIDO PRONTO DEIXA DE ESTAR PRONTO, E O `marco` NÃO SE MEXE.** Há peça
+> voltando para a bancada, então `pronto_em` volta a ser nulo. O `marco`
+> continua `aprovado` pela mesma razão da 5-B1: três lugares filtram por ele — a
+> reimpressão da etiqueta e as **duas** contas do comprometido e do material de
+> compra (fases 4-B e 4-C). A linha `pronto` do histórico **fica**: ela diz que
+> o pedido esteve pronto, o que é verdade.
+
+> ⚠️ **A REIMPRESSÃO DA REFEITA É POR CÓDIGO, e não pelo maço do pedido.**
+> Reimprimir o maço inteiro para refazer uma peça põe etiquetas repetidas na
+> bancada — e duas etiquetas iguais em duas peças é exatamente o que a fase 4-A
+> existe para impedir. O **código é o mesmo de sempre** (ele é da peça, não do
+> papel), e é justamente por isso que o papel sai **marcado em vermelho**:
+> `REFAZER 2ª VEZ`, no canto de cima. Sem a marca ficam duas etiquetas iguais na
+> bancada e nada dizendo qual é a da peça boa.
+
+> ⚠️ **RECUSAR É `producao.bipar`, E NÃO CHAVE DA CHEFIA.** A §4.16 diz, com
+> todas as letras, que **qualquer** setor recusa por defeito do trabalho
+> anterior — quem está com a peça na mão é a bancada. O que impede o abuso não é
+> permissão, é o rastro. (Fechar **pendência** continua sendo da chefia, que é
+> outra coisa: ali a peça é dada como feita **sem** o bipe de quem fez.)
+
+> ⚠️ **A LISTA DE MOTIVOS DA BANCADA É DESTA PEÇA, E ISSO SÓ APARECEU ABRINDO A
+> TELA.** A primeira versão oferecia os oito motivos cadastrados na bancada da
+> Montagem, dois deles impossíveis dali: *"Montagem torta"* é o **próprio**
+> trabalho e *"Revisão deixou passar"* vem **depois**. Quem está de luva toca
+> "Montagem torta" achando que é *"a montagem está torta, refaz"* — e leva
+> recusa. **Escolha que só serve para dar erro é a armadilha #6 dentro de uma
+> lista**, e nenhum caso de unidade a pega: as guardas do servidor estavam
+> certas e verdes.
+>
+> As guardas **ficam** (a rota é chamável por fora — é a lição do `kit_ok` da
+> armadilha #26). O que mudou é a tela parar de oferecer o que ela já sabe que
+> não passa: três filtros, os mesmos três que o `recusar` confere — vir
+> **antes**, **existir** nesta persiana e estar **pronto**.
+>
+> ⚠️ **E LISTA VAZIA DIZ POR QUÊ.** São três razões diferentes e cada uma manda
+> para um lugar diferente: *esta é a primeira bancada desta persiana* · *não há
+> motivo cadastrado, quem cadastra é a chefia* · *nada do que vem antes está
+> pronto, a chefia resolve pela pendência*. "Nada aqui" se parece com tela
+> quebrada, e quem está com a peça na mão não tem como saber a diferença.
+
+> ⚠️ **O CADASTRO NASCE COM OS OITO MOTIVOS DA PRÓPRIA SPEC.** Tabela vazia
+> faria o botão "Recusar" abrir uma lista sem nada — regra escrita, codificada,
+> e que não pega em ninguém: a dívida 18 (§14) pela porta do cadastro. A chefia
+> edita, acrescenta e desativa; o que ela apagar fica apagado. **Motivo com
+> recusa atrás não se apaga** — a exclusão recusa dizendo quantas, como todo
+> cadastro do módulo.
+
+> ⚠️ **E SÃO DOIS CADASTROS DE MOTIVO QUE NÃO SE MISTURAM.** A `motivo_recusa`
+> que já existia é do **plano de corte** (por que o cortador não usou a sobra
+> sugerida); a `sm_motivo_producao` é da **bancada**. Juntar as duas misturaria
+> *"o plano não conseguiu cortar"* com *"a montagem achou o tubo maior"*, e os
+> relatórios das duas ficariam errados. Está escrito assim na §4.16 da spec, e
+> os dois cards ficam na mesma tela com o subtítulo dizendo de qual mundo cada
+> um é.
+
+> ⚠️ **AS FRASES DO DOMÍNIO SAEM ACENTUADAS.** Elas aparecem numa tela do PCP e
+> do módulo que são todas acentuadas, e a primeira versão saiu em ASCII —
+> *"A peca nao tem etiqueta"* ao lado de *"Redução de peso"* na mesma frase. É a
+> armadilha da fase 4-C outra vez, e ela só aparece com a tela aberta.
+
+> ✅ **O CICLO INTEIRO RODOU NA TELA EM 24/09/2026** — bipe na Montagem →
+> Recusar → os **quatro** motivos possíveis (dos oito cadastrados) → confirmar →
+> o tubo de volta na fila da Serralheria com a tarja vermelha **REFAZER**, e as
+> outras três peças sem marca → o card **Refazer** na Produção com o motivo e
+> quem recusou → o PDF com **REFAZER 2ª VEZ** em vermelho e o mesmo
+> `SER-000001`.
+>
+> ⚠️ **E ISSO NÃO É A CONFERÊNCIA DA FÁBRICA.** Provou o fluxo e as frases, num
+> navegador meu. A prova que fecha a fase é a bancada de verdade recusando uma
+> peça, com o maço de refazer saindo da Zebra — é a lição do §4, onde o QR
+> passou por três rodadas verdes sem ler em celular nenhum.
+
+> **Rode `cd tecido && npm test` (511 casos) ao mexer em `producao.js`, no
+> `motivo_producao.js`, nas liberações ou na etiqueta de produção** — 29 são da
+> 5-B2, e **nove defeitos foram reintroduzidos um a um** para provar que cada
+> caso pega o seu: recusar o próprio trabalho (reprova 1), recusar o que não é
+> anterior (2), reabrir só o culpado (4), reabrir demais (4), não desfazer o
+> `pronto_em` (1), não limpar o kit (1), motivo de peça sem etiqueta (1),
+> `refeitas` em todos os reabertos (2) e não gravar quem tinha feito (1).
+> Mexeu em permissão? **`node teste_acesso.js` (168) e `node teste_cobertura.js`
+> (10) também.** E **abra as três telas**: a mudança da lista de motivos não tem
+> teste que a pegue.
 
 ### Três regras do sob medida que valem citar aqui
 

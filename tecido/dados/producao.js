@@ -75,4 +75,56 @@ const criarPendencia=x=>db.prepare(
   'INSERT INTO sm_pendencia(componente_id,codigo_etiqueta,motivo,usuario_nome) VALUES(?,?,?,?)')
   .run(x.componente_id,x.codigo_etiqueta,x.motivo,x.usuario_nome);
 
-module.exports={porCodigo,doSetor,doItem,marcar,faltamEmbalar,marcarPronto,criarPendencia};
+/* ── A RECUSA (fase 5-B2, secao 4.16) ─────────────────────────────────────
+   REABRIR e apagar o bipe: a peca volta para a fila do setor dela e sera
+   bipada de novo, por quem a refizer. O `kit_conferido_em` vai junto — senao
+   a proxima embalagem daquela persiana fecharia a caixa sem o terceiro bipe,
+   e a trava do kit deixaria de existir justamente na peca que ja deu
+   problema uma vez. */
+const listaDe=n=>Array.from({length:n},()=>'?').join(',');
+
+const reabrir=ids=>{
+  if(!ids.length) return 0;
+  return db.prepare(
+    'UPDATE sm_pedido_componente SET iniciado_em=NULL, iniciado_por=NULL, '+
+    'terminado_em=NULL, terminado_por=NULL, kit_conferido_em=NULL '+
+    'WHERE id IN ('+listaDe(ids.length)+')').run(...ids).changes;
+};
+
+/* ⚠️ `refeitas` SOBE SO NO CULPADO. Ele responde "quantas vezes esta peca
+   FISICA foi feita" — o tubo que foi para o lixo e o que sera cortado de
+   novo. O que volta atras dele e trabalho refeito, nao peca refeita. */
+const contarRefeita=id=>db.prepare(
+  'UPDATE sm_pedido_componente SET refeitas=refeitas+1 WHERE id=?').run(id);
+
+/* O pedido que ja estava pronto deixa de estar: ha peca voltando para a
+   bancada. O `marco` NAO se mexe (a razao esta na migracao 21), e a linha
+   'pronto' do historico fica — ela diz que o pedido ESTEVE pronto, o que e
+   verdade e e o que alguem vai querer saber depois. */
+const desfazerPronto=pedido_id=>db.prepare(
+  'UPDATE sm_pedido SET pronto_em=NULL WHERE id=?').run(pedido_id);
+
+const criarRecusa=x=>db.prepare(
+  'INSERT INTO sm_recusa(item_id,componente_id,codigo_etiqueta,motivo_id,motivo_nome,'+
+  'observacao,recusado_de,recusado_codigo,recusado_por,feito_por,feito_em,reabertos) '+
+  'VALUES(@item_id,@componente_id,@codigo_etiqueta,@motivo_id,@motivo_nome,'+
+  '@observacao,@recusado_de,@recusado_codigo,@recusado_por,@feito_por,@feito_em,@reabertos)')
+  .run(x);
+
+/* O CARD REFAZER: as pecas que voltaram e ainda nao foram refeitas, com o
+   motivo da ULTIMA recusa de cada uma. Ela e a lista de quem esta na Zebra —
+   e por codigo, nunca pelo maco do pedido, porque reimprimir o maco inteiro
+   para refazer uma peca poe etiquetas repetidas na bancada, que e o que a
+   fase 4-A existe para impedir. */
+const aRefazer=()=>db.prepare(
+  'SELECT '+CAMPOS+', ('+
+  '  SELECT r.motivo_nome FROM sm_recusa r WHERE r.componente_id=c.id '+
+  '   ORDER BY r.id DESC LIMIT 1) AS motivo, ('+
+  '  SELECT r.recusado_por FROM sm_recusa r WHERE r.componente_id=c.id '+
+  '   ORDER BY r.id DESC LIMIT 1) AS recusado_por '+
+  DE+' WHERE '+VIVOS+
+  ' AND c.refeitas>0 AND c.terminado_em IS NULL AND c.codigo_etiqueta IS NOT NULL'+
+  ' ORDER BY (p.prazo_atual IS NULL), p.prazo_atual, p.numero, i.n, c.ordem').all();
+
+module.exports={porCodigo,doSetor,doItem,marcar,faltamEmbalar,marcarPronto,criarPendencia,
+  reabrir,contarRefeita,desfazerPronto,criarRecusa,aRefazer};

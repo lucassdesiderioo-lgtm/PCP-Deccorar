@@ -54,6 +54,15 @@ const componentes=(pedidos,filtroSetor)=>db.prepare(
   ' ORDER BY p.numero, i.n, c.ordem')
   .all(...pedidos, ...(filtroSetor?[filtroSetor]:[]));
 
+/* ⚠️ A REIMPRESSAO DA PECA REFEITA E POR CODIGO (fase 5-B2). Reimprimir o
+   maco do pedido inteiro para refazer UMA peca poe na bancada etiquetas
+   repetidas das pecas que nao foram recusadas — e duas etiquetas iguais em
+   duas pecas e justamente o que a fase 4-A existe para impedir. */
+const porCodigos=codigos=>db.prepare(
+  'SELECT '+CAMPOS+' '+DE+' WHERE '+VIVOS+
+  ' AND c.codigo_etiqueta COLLATE NOCASE IN ('+listaDe(codigos.length)+')'+
+  ' ORDER BY p.numero, i.n, c.ordem').all(...codigos);
+
 // Quantas pecas VIVAS o pedido tem — o "3 de 10" da etiqueta.
 const pecasDoPedido=pedidos=>db.prepare(
   'SELECT i.pedido_id, COUNT(*) AS total FROM sm_pedido_item i '+
@@ -91,5 +100,5 @@ const registrar=d=>db.prepare(
 const impressoes=limite=>db.prepare(
   'SELECT * FROM sm_etiqueta_impressao ORDER BY id DESC LIMIT ?').all(limite||30);
 
-module.exports={setores,setor,proximoNumero,componentes,pecasDoPedido,
+module.exports={setores,setor,proximoNumero,componentes,porCodigos,pecasDoPedido,
   aImprimir,semCodigo,gravarCodigo,marcarImpresso,registrar,impressoes};

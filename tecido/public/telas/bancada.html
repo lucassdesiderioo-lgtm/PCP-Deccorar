@@ -25,6 +25,19 @@
 .segura{background:var(--linha); border-left:4px solid var(--alerta);
   border-radius:var(--raio); padding:10px 12px; margin-top:10px; font-size:16px}
 .segura b{color:var(--tinta)}
+/* A recusa desfaz trabalho, entao ela nao e um botao discreto nem um botao
+   que se toca sem querer: ele mora ABAIXO da resposta do bipe, e so aparece
+   quando ha peca na mao. */
+#recusar{margin-top:12px}
+.motivos{display:grid; gap:8px; margin-top:10px}
+.motivos button{font-size:17px; padding:14px 12px; text-align:left}
+.motivos .destino{color:var(--tinta-fraca); font-size:14px}
+.fila .refeita{background:#b3261e}
+.caixa{border:1px solid var(--linha); border-radius:var(--raio);
+  padding:12px; margin-top:12px}
+.caixa h3{margin:0 0 4px; font-size:17px}
+.caixa input{width:100%; font-size:17px; padding:12px; margin:10px 0}
+.caixa .bt{margin-right:8px}
 </style>
 </head>
 <body>
@@ -40,6 +53,7 @@
     <input id="bipe" autocomplete="off" autocorrect="off" autocapitalize="off"
            spellcheck="false" placeholder="bipe a etiqueta">
     <div id="resposta"></div>
+    <div id="recusar"></div>
   </div>
   <div class="cartao"><h2 id="tituloFila">Fila</h2><div id="fila"></div></div>
 </div>
@@ -49,7 +63,7 @@
 <script>
 const {api,banner,beep,el,limpar,$}=window.ui;
 
-let SETOR=null, EU=null, EMBALANDO=null;
+let SETOR=null, EU=null, EMBALANDO=null, NA_MAO=null;
 
 /* ⚠️ A COR/ESTADO DO SETOR ESCOLHIDO SAI DO `base.css`, e nao de uma fileira
    propria. Foi o defeito da fase 4-A: cinco botoes identicos, sem o azul do
@@ -60,8 +74,9 @@ function desenharSetores(){
   const fs=$('#setores'); limpar(fs);
   (EU.setores||[]).forEach(s=>{
     const b=el('button',{class:'op',type:'button','aria-pressed':String(s.chave===SETOR)},[s.nome]);
-    b.onclick=()=>{ SETOR=s.chave; EMBALANDO=null;
-      localStorage.setItem('sm_bancada',s.chave); desenharSetores(); verFila(); };
+    b.onclick=()=>{ SETOR=s.chave; EMBALANDO=null; NA_MAO=null;
+      localStorage.setItem('sm_bancada',s.chave);
+      limpar($('#resposta')); desenharSetores(); desenharRecusa(); verFila(); };
     fs.appendChild(b);
   });
 }
@@ -83,6 +98,11 @@ async function verFila(){
   const ul=el('ul',{class:'fila'});
   linhas.forEach(l=>{
     const marcas=[];
+    /* ⚠️ REFAZER VEM PRIMEIRO E EM VERMELHO. Sem a marca, a peca recusada
+       fica identica a qualquer outra da lista — e quem corta corta de novo
+       sem saber que ja existe uma etiqueta igual a esta na bancada. */
+    if(l.refeitas) marcas.push(el('span',{class:'marca refeita'},
+      [l.refeitas>1?('refazer · '+(l.refeitas+1)+'ª vez'):'refazer']));
     if(l.em_andamento) marcas.push(el('span',{class:'marca'},['em andamento']));
     ul.appendChild(el('li',{class:l.em_andamento?'andando':''},[
       el('span',{class:'tarefa'},[l.o_que_fazer]),
@@ -113,6 +133,7 @@ async function bipou(codigo){
     }
     const d=await api('/api/producao/bipe',{metodo:'POST',corpo:{codigo:limpoCod},silencioso:true});
     beep();
+    NA_MAO={codigo:limpoCod, o_que_fazer:d.o_que_fazer||''};
     if(d.acao==='iniciado'){
       r.appendChild(el('div',{class:'grande'},['COMEÇOU']));
       r.appendChild(el('div',{class:'de'},[d.o_que_fazer||'']));
@@ -132,8 +153,104 @@ async function bipou(codigo){
     if(e.motivo==='aguardando'||e.motivo==='faltou_kit'||e.motivo==='kit_errado')
       r.appendChild(el('div',{class:'segura'},[e.message]));
     if(e.motivo==='faltou_kit') EMBALANDO=limpoCod;
+    /* ⚠️ A PECA RECUSADA PELA TRAVA TAMBEM ESTA NA MAO — e e JUSTAMENTE ela
+       que costuma virar recusa: a embalagem abre a caixa, ve o defeito e
+       para. Se so o bipe que passa desse direito a recusar, quem precisa
+       dela nao a teria. */
+    if(e.motivo!=='codigo_desconhecido'&&e.motivo!=='setor_errado')
+      NA_MAO={codigo:limpoCod, o_que_fazer:''};
   }
+  desenharRecusa();
   verFila();
+}
+
+/* ── A RECUSA (secao 4.16) ───────────────────────────────────────────────
+   Quem recusa escolhe SO O MOTIVO — o motivo ja diz qual peca volta. Duas
+   escolhas na bancada e uma a mais para quem esta de luva, e a segunda
+   errada e trabalho perdido.
+
+   ⚠️ O BOTAO SO APARECE COM PECA NA MAO. Antes do bipe nao ha o que recusar,
+   e um botao que so serve para dar erro ensina a nao clicar. */
+function desenharRecusa(){
+  const alvo=limpar($('#recusar'));
+  if(!NA_MAO) return;
+  const b=el('button',{class:'bt alerta',type:'button'},['Recusar peça']);
+  b.onclick=abrirMotivos;
+  alvo.appendChild(b);
+}
+
+/* ⚠️ A LISTA E DESTA PECA, e nao o cadastro inteiro — nao ha cache. Cada
+   persiana tem as suas: a lisa nao tem bandô, e o que ainda nao foi feito
+   nao tem o que refazer. Guardar a primeira resposta faria a segunda peca
+   ver a lista da primeira. */
+async function abrirMotivos(){
+  const alvo=limpar($('#recusar'));
+  let r;
+  try{ r=await api('/api/producao/motivos/'+encodeURIComponent(NA_MAO.codigo)); }
+  catch(e){ desenharRecusa(); return; }
+  const caixa=el('div',{class:'caixa'});
+  caixa.appendChild(el('h3',{},['O que está errado?']));
+  caixa.appendChild(el('div',{class:'de'},
+    ['A peça volta para o setor que a fez. O que veio depois dela é refeito.']));
+  /* ⚠️ LISTA VAZIA DIZ POR QUE, e a frase vem do servidor: as razoes sao
+     tres (esta e a primeira bancada · nao ha motivo cadastrado · nada do que
+     vem antes esta pronto) e cada uma manda para um lugar diferente. */
+  if(r.sem_motivo) caixa.appendChild(el('div',{class:'segura'},[r.sem_motivo]));
+  const g=el('div',{class:'motivos'});
+  (r.motivos||[]).forEach(m=>{
+    const bt=el('button',{class:'bt',type:'button'},[
+      el('div',{},[m.nome]),
+      el('div',{class:'destino'},['volta para '+(m.setor_nome||m.setor)+' · '+m.componente_nome])
+    ]);
+    bt.onclick=()=>confirmar(m);
+    g.appendChild(bt);
+  });
+  caixa.appendChild(g);
+  const volta=el('button',{class:'bt',type:'button'},['Deixa pra lá']);
+  volta.onclick=()=>{ desenharRecusa(); campo.focus(); };
+  caixa.appendChild(volta);
+  alvo.appendChild(caixa);
+}
+
+function confirmar(m){
+  const alvo=limpar($('#recusar'));
+  const caixa=el('div',{class:'caixa'});
+  caixa.appendChild(el('h3',{},[m.nome]));
+  caixa.appendChild(el('div',{class:'de'},
+    [(m.componente_nome||'')+' volta para '+(m.setor_nome||m.setor)+
+     '. O que foi feito em cima dela é refeito.']));
+  const obs=el('input',{type:'text',placeholder:'o que houve (opcional)',
+    autocomplete:'off',autocorrect:'off',spellcheck:'false'});
+  caixa.appendChild(obs);
+  /* O confirmar e VERMELHO porque desfaz trabalho: a peca volta para tras e
+     o que foi feito em cima dela e refeito. Botao de desfazer com cara de
+     botao de seguir e o que faz alguem tocar sem ler. */
+  const ok=el('button',{class:'bt perigo',type:'button'},['Confirmar a recusa']);
+  ok.onclick=()=>enviar(m,obs.value);
+  const nao=el('button',{class:'bt',type:'button'},['Voltar']);
+  nao.onclick=abrirMotivos;
+  caixa.appendChild(ok); caixa.appendChild(nao);
+  alvo.appendChild(caixa);
+}
+
+async function enviar(m,observacao){
+  const r=limpar($('#resposta'));
+  try{
+    const d=await api('/api/producao/recusa',{metodo:'POST',silencioso:true,
+      corpo:{codigo:NA_MAO.codigo, motivo_id:m.id, observacao:observacao||''}});
+    beep();
+    r.appendChild(el('div',{class:'grande'},['RECUSADA']));
+    r.appendChild(el('div',{class:'segura'},[
+      d.culpado.nome+' voltou para '+d.culpado.setor_nome+
+      ' com a etiqueta '+d.culpado.codigo+'. '+
+      'Mande a peça para lá — e a etiqueta sai de novo, com o mesmo código, marcada.'
+    ]));
+    NA_MAO=null; EMBALANDO=null;
+  }catch(e){
+    beep('erro'); banner(e.message,'erro',9);
+    r.appendChild(el('div',{class:'segura'},[e.message]));
+  }
+  desenharRecusa(); verFila(); campo.focus();
 }
 
 /* ⚠️ O LEITOR MANDA Tab OU Enter, e as vezes manda o codigo picado (§12).
@@ -155,7 +272,7 @@ function disparar(){ const v=campo.value; campo.value=''; campo.focus(); if(v.tr
   const salvo=localStorage.getItem('sm_bancada');
   const meus=(EU.setores||[]).map(s=>s.chave);
   SETOR = meus.includes(salvo) ? salvo : (meus.length===1?meus[0]:null);
-  desenharSetores(); verFila(); campo.focus();
+  desenharSetores(); desenharRecusa(); verFila(); campo.focus();
 })();
 </script>
 </body>

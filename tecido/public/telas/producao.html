@@ -40,6 +40,14 @@ table.lista tr.escolhido{background:var(--linha)}
 
 <div class="corpo">
   <div class="cartao"><h2>Etiquetas a imprimir</h2><div id="lista"></div></div>
+  <div class="cartao" id="cRefazer" style="display:none">
+    <h2>Refazer</h2>
+    <!-- ⚠️ A NOTA E FILHA DIRETA DO CARTAO: o seletor do base.css e
+         `.cartao > .nota`, e dentro do #refazer ela sairia sem estilo
+         nenhum. Só apareceu abrindo a tela. -->
+    <p class="nota">Peças recusadas na bancada. Elas voltam com o MESMO código de
+      etiqueta, marcado em vermelho como refazer — jogue fora o papel anterior.</p>
+    <div id="refazer"></div></div>
   <div class="cartao" id="cCorte" style="display:none"><h2>Mandar para o corte</h2><div id="corte"></div></div>
   <div class="cartao"><h2>Últimas impressões</h2><div id="hist"></div></div>
 </div>
@@ -50,7 +58,7 @@ table.lista tr.escolhido{background:var(--linha)}
 const {api,banner,el,limpar,$}=window.ui;
 const NAV_BASE='/sobmedida';
 
-let eu={permissoes:[]}, pedidos=[], setores=[], historico=[];
+let eu={permissoes:[]}, pedidos=[], setores=[], historico=[], refazer=[];
 let escolhidos=new Set(), setor=null, previa=[];
 const posso=k=>(eu.permissoes||[]).indexOf(k)>=0;
 
@@ -206,6 +214,65 @@ async function imprimir(){
   previa=[]; await carregar();
 }
 
+/* ── REFAZER (fase 5-B2, secao 4.16) ─────────────────────────────────────
+   As pecas que uma bancada recusou e que voltaram para o setor de tras.
+
+   ⚠️ A ETIQUETA SAI COM O MESMO CODIGO. Ele e da PECA e nasce na aprovacao
+   (fase 4-A) — codigo novo partiria a historia dela em duas, e o tempo do
+   setor nunca fecharia. E e por isso que ela sai MARCADA em vermelho: sem a
+   marca ficam duas etiquetas iguais na bancada e nada dizendo qual e a boa.
+
+   ⚠️ O CARD SOME QUANDO NAO HA NENHUMA. Card vazio todo dia vira paisagem, e
+   ai ninguem o le no dia em que ele aparece cheio — a mesma regra do card de
+   caixa de varias pecas do PCP (§5). */
+function desenharRefazer(){
+  const cartao=$('#cRefazer');
+  if(!refazer.length){ cartao.style.display='none'; return; }
+  cartao.style.display='';
+  const c=limpar($('#refazer'));
+  const t=el('table',{});
+  t.appendChild(el('tr',{},[el('th',{},['Etiqueta']),el('th',{},['O que refazer']),
+    el('th',{},['De onde']),el('th',{},['Por quê'])]));
+  refazer.forEach(x=>t.appendChild(el('tr',{},[
+    el('td',{},[x.codigo]),
+    el('td',{},[x.o_que_fazer]),
+    el('td',{},['pedido '+x.pedido_numero+' · peça '+x.item_n+' · '+(x.revenda||'')]),
+    el('td',{},[(x.motivo||'—')+(x.recusado_por?' · recusou: '+x.recusado_por:'')])
+  ])));
+  c.appendChild(t);
+  if(!posso('etiqueta_producao.imprimir')) return;
+  /* Um botao por SETOR, e nao um botao so: cada maço vai para uma bancada
+     diferente, e quem esta na Zebra imprime o de quem esta esperando. */
+  const fileira=el('div',{class:'fileira'});
+  const porSetor=new Map();
+  refazer.forEach(x=>{
+    if(!porSetor.has(x.setor)) porSetor.set(x.setor,{nome:x.setor_nome||x.setor,codigos:[]});
+    porSetor.get(x.setor).codigos.push(x.codigo);
+  });
+  porSetor.forEach((g,chave)=>{
+    const bt=el('button',{class:'bt',type:'button'},
+      ['Imprimir '+g.codigos.length+' de '+g.nome]);
+    bt.onclick=()=>imprimirRefeitas(chave,g.codigos);
+    fileira.appendChild(bt);
+  });
+  c.appendChild(fileira);
+}
+
+async function imprimirRefeitas(chave,codigos){
+  const r=await fetch(NAV_BASE+'/api/producao/etiquetas/imprimir',{
+    method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
+    body:JSON.stringify({codigos, setor:chave})});
+  if(!r.ok){
+    let msg='Não deu para imprimir.';
+    try{ const j=await r.json(); msg=j.mensagem||msg; }catch(e){}
+    return banner(msg,'erro');
+  }
+  window.open(URL.createObjectURL(await r.blob()),'_blank');
+  banner('Etiqueta de refazer gerada — o código é o mesmo, e o papel sai marcado. '+
+         'Jogue o anterior fora.','ok',9);
+  await carregar();
+}
+
 // ── o corte ──
 function desenharCorte(){
   if(!posso('plano.calcular')) return;
@@ -250,12 +317,13 @@ function desenharHist(){
 async function carregar(){
   eu=await api('/api/eu');
   $('#quem').textContent=eu.nome+' · '+eu.papel;
-  [setores,pedidos,historico]=await Promise.all([
+  [setores,pedidos,historico,refazer]=await Promise.all([
     api('/api/producao/setores'),
     api('/api/producao/etiquetas'),
-    api('/api/producao/impressoes?limite=15').catch(()=>[])
+    api('/api/producao/impressoes?limite=15').catch(()=>[]),
+    api('/api/producao/refazer').catch(()=>[])
   ]);
-  desenhar(); desenharHist();
+  desenhar(); desenharRefazer(); desenharHist();
 }
 
 carregar();

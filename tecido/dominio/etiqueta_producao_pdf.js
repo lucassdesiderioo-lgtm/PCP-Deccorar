@@ -97,8 +97,22 @@ function desenhar(pagina, e, f){
   /* ── DE CIMA PARA BAIXO, na ordem em que a bancada procura ──────────────
      de quem e (pedido e peca), para quem e quando, o que a peca e, e so
      entao o trabalho. */
+  /* ⚠️ A PECA REFEITA SAI MARCADA, EM VERMELHO E NO CANTO DE CIMA (fase
+     5-B2, secao 4.16). O CODIGO e o mesmo de sempre — ele e da peca, nao do
+     papel, e codigo novo partiria a historia dela em duas —, e e justamente
+     por isso que a marca importa: sem ela ficam duas etiquetas IGUAIS na
+     bancada e nada dizendo qual e a da peca boa. O vermelho vai no canto de
+     cima porque e o primeiro lugar onde o olho cai; embaixo, junto do
+     codigo, ele disputaria espaco com o "CONFERIR LEITURA". */
+  const marca = e.refeitas>0 ? ('REFAZER '+(e.refeitas+1)+'\u00AA VEZ') : '';
+  let reservado = 0;
+  if(marca){
+    const larg = f.forte.widthOfTextAtSize(txt(marca), 9) * PT_MM;
+    escreve(marca, {x:ETQ.largura-m-larg, y:28, tam:9, fonte:f.forte, cor:rgb(.72,0,0)});
+    reservado = larg + 3;
+  }
   escreve(e.pedido_numero+'  ·  '+e.peca,
-    {x:m, y:27.5, tam:11, fonte:f.forte, largura:L});
+    {x:m, y:27.5, tam:11, fonte:f.forte, largura:L-reservado});
   escreve([e.revenda, e.prazo].filter(Boolean).join('  ·  '),
     {x:m, y:23.5, tam:7.5, fonte:f.normal, cor:cinza, largura:L});
   escreve([e.medida, e.colecao, e.comando].filter(Boolean).join('  ·  '),
