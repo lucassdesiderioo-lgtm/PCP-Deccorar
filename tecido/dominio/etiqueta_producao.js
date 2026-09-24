@@ -104,7 +104,12 @@ function montar(c,totalDoPedido,doItem){
     comando:COMANDO[c.comando]||'',
     tarefa:tarefaDe(c),
     extra:extraDe(c,doItem),
-    impresso_em:c.impresso_em, reimpressoes:c.reimpressoes
+    impresso_em:c.impresso_em, reimpressoes:c.reimpressoes,
+    /* ⚠️ A PECA REFEITA SAI MARCADA NO PAPEL (fase 5-B2, secao 4.16). O
+       CODIGO e o mesmo de sempre — ele e da peca, nao do papel —, e e
+       justamente por isso que a marca importa: sem ela ha duas etiquetas
+       iguais na bancada e nada dizendo qual e a da peca boa. */
+    refeitas:c.refeitas||0
   };
 }
 
@@ -115,14 +120,26 @@ const idsDe=pedidos=>(pedidos||[]).map(Number).filter(n=>Number.isInteger(n)&&n>
    backfill resolve. Imprimir um papel sem codigo seria uma etiqueta que a
    fase 5 nao consegue bipar. */
 function paraImprimir(filtro){
-  const pedidos=idsDe(filtro&&filtro.pedidos);
-  exigir(pedidos.length,'sem_pedido','Escolha ao menos um pedido.');
   const setor=String((filtro&&filtro.setor)||'').trim();
   if(setor) exigir(d.setor(setor),'setor_inexistente','O setor "'+setor+'" nao existe no cadastro.');
 
-  const todos=d.componentes(pedidos,null);
+  /* DOIS RECORTES, e o segundo nasceu na fase 5-B2: o maco do PEDIDO (o
+     normal, quando a fabrica recebe o trabalho) e a peca por CODIGO (a
+     refeita, que volta sozinha depois de uma recusa). Sem o segundo, o jeito
+     de reimprimir uma peca seria reimprimir o maco do pedido — e ai sobram
+     etiquetas repetidas das pecas que nao foram recusadas. */
+  const codigos=[...new Set((filtro&&filtro.codigos||[])
+    .map(x=>String(x||'').trim()).filter(Boolean))];
+  const pedidos=idsDe(filtro&&filtro.pedidos);
+  exigir(pedidos.length||codigos.length,'sem_pedido','Escolha ao menos um pedido.');
+
+  const todos=codigos.length?d.porCodigos(codigos):d.componentes(pedidos,null);
+  const daLista=[...new Set(todos.map(c=>c.pedido_id))];
   const totais={};
-  d.pecasDoPedido(pedidos).forEach(x=>{ totais[x.pedido_id]=x.total; });
+  // Lista vazia nao vai ao banco: `IN ()` nao e SQL valido, e a recusa certa
+  // aqui e a do `imprimir`, que diz por que nao ha etiqueta.
+  const deQuem=daLista.length?daLista:pedidos;
+  if(deQuem.length) d.pecasDoPedido(deQuem).forEach(x=>{ totais[x.pedido_id]=x.total; });
 
   const porItem=new Map();
   todos.forEach(c=>{

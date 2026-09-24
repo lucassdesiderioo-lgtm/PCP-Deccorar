@@ -717,6 +717,40 @@ async function telaMotivo(pai){
   ])));
   cM.appendChild(tM);
 
+  /* ── OS MOTIVOS DA RECUSA DA PRODUCAO (fase 5-B2, secao 4.16) ──────────
+     ⚠️ SAO OUTROS MOTIVOS, e nao os de cima. Os de cima sao do PLANO DE
+     CORTE — por que o cortador nao usou a sobra sugerida. Estes sao da
+     bancada: por que a peca voltou para o setor de tras. Juntar os dois
+     erraria os dois relatorios. Os dois cards ficam nesta tela e por isso o
+     subtitulo de cada um diz de qual mundo ele e. */
+  const dados=await api('/api/recusa/motivos');
+  const cP=cartao(pai,'Motivos da recusa da produção',
+    'Por que uma bancada devolveu a persiana para o setor de trás.');
+  cP.appendChild(el('p',{class:'ajuda',texto:
+    'O motivo já diz PARA ONDE a peça volta — quem recusa escolhe só ele, porque quem está de luva não faz duas escolhas. O setor sai da peça escolhida aqui: a serralheria faz quatro peças, e mandar de volta "para a serralheria" faria refazer as quatro.'}));
+  const pecas=dados.componentes||[];
+  formulario(cP,[
+    {id:'nome',rotulo:'Novo motivo',dica:'Tubo maior ou menor',cresce:true},
+    {id:'componente_chave',rotulo:'Manda refazer',
+     opcoes:pecas.map(k=>({valor:k.chave,nome:k.nome+' · '+(k.setor_nome||k.setor)}))}
+  ],'Adicionar motivo',
+    async(v,refs)=>{ if(!v.nome.trim()) return;
+      await api('/api/recusa/motivos',{metodo:'POST',
+        corpo:{nome:v.nome, componente_chave:v.componente_chave}});
+      refs.nome.value=''; banner('Motivo cadastrado.'); await recarregar(); });
+  const tP=el('table',{});
+  tP.appendChild(el('tr',{},[el('th',{texto:'Motivo'}),el('th',{texto:'Manda refazer'}),
+    el('th',{texto:'Volta para'}),el('th',{texto:''})]));
+  (dados.motivos||[]).forEach(m=>tP.appendChild(el('tr',{class:m.ativo?'':'inativo'},[
+    el('td',{texto:m.nome}),
+    el('td',{texto:m.componente_nome}),
+    /* O setor sai pelo NOME. Chave de banco em tela e o "— Correcao de
+       contagem" do §2 do CLAUDE.md. */
+    el('td',{texto:m.setor_nome||m.setor}),
+    acoes(m,'/api/recusa/motivos/'+m.id,recarregar,'sm_motivo_producao')
+  ])));
+  cP.appendChild(tP);
+
   const cC=cartao(pai,'Condicao da sobra','Como a sobra chegou na prateleira — e o que isso faz no plano de corte.');
   cC.appendChild(el('p',{class:'ajuda',texto:
     'Estas duas colunas trabalham: "aproveitavel" tira a sobra das candidatas; "por ultimo" manda o defeito parcial ser tentado depois das integras. Mancha num canto de uma peca grande ainda serve para um corte menor.'}));

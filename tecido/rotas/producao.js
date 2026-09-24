@@ -38,6 +38,34 @@ module.exports={rotas:[
   {metodo:'GET', caminho:'/api/producao/segura/:codigo', permissao:BIPAR,
    manipulador:({params})=>prod.oQueSegura(params.codigo)},
 
+  /* ── A RECUSA (fase 5-B2, secao 4.16) ───────────────────────────────────
+     ⚠️ OS MOTIVOS SAEM POR AQUI, e nao por /api/cadastros. Mandar quem so
+     bipa na tela de cadastros daria a ela a lista inteira de tecido,
+     endereco e motivo de sobra para responder uma pergunta de tres palavras
+     — e a licao da porta das cores da fase 3. */
+  /* ⚠️ A LISTA E SEMPRE DE UMA PECA, e por isso o codigo vem no caminho e
+     nao e opcional. Uma rota que devolve ora o cadastro inteiro, ora o
+     recorte da peca, e duas respostas na mesma porta — e a tela acabaria
+     oferecendo o motivo que a rota vai recusar. */
+  {metodo:'GET', caminho:'/api/producao/motivos/:codigo', permissao:BIPAR,
+   manipulador:({params})=>prod.motivos(params.codigo)},
+
+  /* ⚠️ RECUSAR E `producao.bipar`, e nao chave da chefia. A spec diz, com
+     todas as letras, que QUALQUER setor pode recusar a peca por defeito do
+     trabalho anterior — quem esta com a peca na mao e a bancada. O que
+     impede o abuso nao e permissao, e o rastro: cada recusa grava quem
+     recusou, de que bancada, o motivo e quem tinha feito. */
+  {metodo:'POST', caminho:'/api/producao/recusa', permissao:BIPAR,
+   manipulador:({corpo,usuario})=>prod.recusar(corpo.codigo,corpo,usuario),
+   detalhe:(req,dados)=>'recusou '+(req.body&&req.body.codigo)+
+     ' — volta '+((dados&&dados.culpado&&dados.culpado.codigo)||'?')+
+     ': '+((dados&&dados.motivo)||'')},
+
+  /* AS PECAS A REFAZER. A chave e a do PAPEL (`etiqueta_producao.ler`) e nao
+     a do bipe: este card e da tela de producao, de quem esta na Zebra. */
+  {metodo:'GET', caminho:'/api/producao/refazer', permissao:'etiqueta_producao.ler',
+   manipulador:()=>prod.aRefazer()},
+
   {metodo:'POST', caminho:'/api/producao/pendencia', permissao:PENDENCIA,
    manipulador:({corpo,usuario})=>prod.fecharPendencia(corpo.codigo,corpo,usuario),
    detalhe:(req)=>'fechou a pendencia de '+(req.body&&req.body.codigo)+

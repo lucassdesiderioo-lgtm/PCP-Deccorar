@@ -91,6 +91,16 @@ const MAPA={
        frase:n=>n+' andar(es) nesta haste'}
     ]
   },
+  /* ⚠️ SAO DOIS CADASTROS DE MOTIVO, e eles nao se misturam. Este e o da
+     PRODUCAO (fase 5-B2): por que a bancada devolveu a peca para o setor de
+     tras. O de baixo e o do PLANO DE CORTE. */
+  sm_motivo_producao:{
+    tabela:'sm_motivo_producao', oque:'o motivo',
+    dependentes:[
+      {sql:'SELECT COUNT(*) c FROM sm_recusa WHERE motivo_id=?',
+       frase:n=>n+' recusa(s) de producao foram registradas com este motivo'}
+    ]
+  },
   motivo_recusa:{
     tabela:'motivo_recusa', oque:'o motivo',
     dependentes:[
