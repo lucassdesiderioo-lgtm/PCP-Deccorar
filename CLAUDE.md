@@ -4766,6 +4766,19 @@ necessidade_dominio.js           soma no mesmo gatilho 2 da medida padrão
 > deles sai como **pendência** na lista — que é o certo, e é o sinal de que
 > falta cadastro, não de que falta código.
 
+> **EM PRODUÇÃO DESDE 24/09/2026, E A PRIMEIRA LEITURA DEU VAZIO — o que está
+> certo, e por isso ficou escrito.** `materiais: []` e `pendencias: []`: o 5001
+> é o único pedido aprovado, e os dois tubos dele (um Tubo 41, um Tubo 32)
+> foram impressos em 23/09 às 14:49:33 — pela regra desta fase já saíram da
+> conta. Tela vazia se parece com tela quebrada, e quem abrisse sem saber disso
+> concluiria que a fase não pegou.
+>
+> ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA, e deploy não é conferência.** A
+> prova é o próximo pedido aprovado somando na linha certa do Compras, com o
+> comprador comprando por ela. **O sinal de inerte existe e é este:** apontados
+> os degraus, o próximo pedido aprovado que **não** aparecer ali é defeito — é
+> a dívida 18 (§14) com a lâmpada que quase nenhuma regra nova tem.
+
 **Rode `cd tecido && npm test` (449 casos) e `node teste_compras_sobmedida.js`
 (29) ao mexer no vínculo, no `consumo.js`, no `necessidade_dominio.js` ou na
 lista de compras** — 30 casos são da 4-C, e seis defeitos foram reintroduzidos
