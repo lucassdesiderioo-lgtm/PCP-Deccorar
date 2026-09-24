@@ -176,4 +176,125 @@ function pedidosEmRisco(){
   return [...risco.values()];
 }
 
-module.exports={comprometido, porTecido, pedidosEmRisco};
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   O MATERIAL DE COMPRA — fase 4-C, a metade do TUBO.
+
+   O tecido do sob medida NAO vai para o Compras do PCP: o estoque dele mora
+   aqui, ja tem painel, e mandar tambem seria a segunda regua da armadilha
+   #12. O tubo e o contrario — e o MESMO material da medida padrao, comprado
+   do mesmo fornecedor, e Compras e um so (decisao do dono, 24/09/2026).
+
+   ⚠️ A PECA SAI DA CONTA QUANDO A ETIQUETA DELA E IMPRESSA — decisao do
+   dono, 24/09/2026. Na medida padrao isso se resolve sozinho (a peca e
+   embalada, vira estoque, e o `precisa` cai); aqui o pedido PARA em
+   'aprovado', porque o marco seguinte e o bipe da bancada, que e a fase 5.
+   Sem um sinal de saida o numero so subiria, e numero que so sobe e numero
+   que a equipe aprende a ignorar — e a regra 2 la de cima, pela porta do
+   material. A impressao e o evento mais proximo do tubo que existe hoje: a
+   linha do proprio tubo carimba `impresso_em` desde a fase 4-A.
+
+   Custo assumido, escrito aqui para nao se descobrir depois: o maco impresso
+   e ainda nao cortado conta como produzido. Sao horas, nao dias.
+
+   ⚠️ E CONSUMO, NAO CORTE — a mesma armadilha #18 da metade do tecido. Ha
+   caso travando: dobrar a medida de corte nao pode mexer num milimetro.
+
+   ⚠️ DEGRAU SEM MATERIAL APONTADO VIRA PENDENCIA, NUNCA ZERO. Uma persiana
+   sempre tem tubo, entao o tubo sempre e esperado: ele nao aparecer e um
+   BURACO na lista de compras, e o comprador precisa saber que o total esta
+   incompleto (regra 4 do custo). Os outros componentes sao o contrario — a
+   maioria e mao de obra (montagem, revisao, embalagem) e nunca vai virar
+   compra. Cobrar link para todos poria seis pendencias por peca na tela do
+   comprador, todo dia, e ruido permanente e a armadilha #6: ele aprende a
+   nao ler a lista. Quem os mostra e a tela de cadastro, onde alguem esta
+   olhando para eles. */
+const materiais=require('../nucleo/materiais');
+
+const LINHAS=`
+  SELECT i.id AS item_id, i.n, i.modelo_id, i.degrau_nome,
+         p.id AS pedido_id, p.numero AS pedido_numero,
+         r.nome_fantasia AS revenda_nome,
+         c.chave, c.nome AS peca_nome, c.quantidade,
+         c.consumo_largura_mm AS cl, c.consumo_altura_mm AS ca
+    FROM sm_pedido_item i
+    JOIN sm_pedido p ON p.id=i.pedido_id
+    LEFT JOIN sm_revenda r ON r.id=p.revenda_id
+    JOIN sm_pedido_componente c ON c.item_id=i.id
+   WHERE p.marco='aprovado' AND p.cancelado_em IS NULL
+     AND i.cancelado_em IS NULL
+     AND c.gera_etiqueta=1 AND c.impresso_em IS NULL
+   ORDER BY p.numero, i.n, c.ordem`;
+
+function materialDeCompra(){
+  // Recusa aqui, e nao lista vazia: sem a porta o resultado seria "o sob
+  // medida nao compra nada", que e indistinguivel de "nao ha venda".
+  const doPcp=new Map();
+  for(const m of materiais.listar()) doPcp.set(m.id,m);
+
+  const porDegrau=new Map();   // modelo_id|NOME -> {nome, componente_id}
+  for(const d of db.prepare('SELECT modelo_id,nome,componente_id FROM sm_degrau_tubo').all())
+    porDegrau.set(d.modelo_id+'|'+String(d.nome).toUpperCase().trim(),d);
+
+  const porChave=new Map();    // chave do componente -> componente_id do PCP
+  for(const c of db.prepare('SELECT chave,componente_id FROM sm_componente').all())
+    porChave.set(String(c.chave).toLowerCase(),c.componente_id);
+
+  const saida=new Map(), pendencias=[];
+  const pendencia=(l,motivo)=>pendencias.push({pedido_id:l.pedido_id,
+    numero:l.pedido_numero, item_n:l.n, chave:l.chave, motivo});
+
+  for(const l of db.prepare(LINHAS).all()){
+    const ehTubo=String(l.chave).toLowerCase()==='tubo';
+    let id=null;
+
+    if(ehTubo){
+      /* O degrau se acha pelo NOME que o pedido congelou. Renomear o degrau
+         depois nao pode fazer a peca sumir em silencio — vira pendencia com
+         o nome congelado, que e o unico que aquele pedido conhece. */
+      const d=porDegrau.get(l.modelo_id+'|'+String(l.degrau_nome||'').toUpperCase().trim());
+      if(!d){ pendencia(l,'o degrau "'+(l.degrau_nome||'(sem nome)')+'" que este pedido '+
+        'congelou não existe mais na escada — foi renomeado ou desativado'); continue; }
+      if(d.componente_id==null){ pendencia(l,'o degrau "'+d.nome+'" não tem material do '+
+        'PCP apontado — o tubo dele não entra na lista de compras'); continue; }
+      id=d.componente_id;
+    }else{
+      id=porChave.get(String(l.chave).toLowerCase());
+      if(id==null) continue;   // sem link = nao e material de compra (ver acima)
+    }
+
+    const m=doPcp.get(id);
+    if(!m){ pendencia(l,'o material apontado (id '+id+') não está mais no cadastro de '+
+      'Compras do PCP'); continue; }
+
+    let quantidade;
+    if(m.unidade==='m'){
+      if(l.cl==null){ pendencia(l,'o material "'+m.nome+'" é comprado em metro e esta '+
+        'peça não tem medida de consumo na ficha'); continue; }
+      quantidade=(l.cl/1000)*(l.quantidade||1);
+    }else{
+      quantidade=(l.quantidade||1);
+    }
+
+    if(!saida.has(id)) saida.set(id,{componente_id:id, nome:m.nome, unidade:m.unidade,
+      quantidade:0, pecas:0, _ped:new Map()});
+    const g=saida.get(id);
+    g.quantidade+=quantidade; g.pecas++;
+    if(!g._ped.has(l.pedido_id)) g._ped.set(l.pedido_id,{pedido_id:l.pedido_id,
+      numero:l.pedido_numero, revenda:l.revenda_nome||'', pecas:0, quantidade:0});
+    const e=g._ped.get(l.pedido_id); e.pecas++; e.quantidade+=quantidade;
+  }
+
+  return {
+    materiais:[...saida.values()].map(g=>({
+      componente_id:g.componente_id, nome:g.nome, unidade:g.unidade,
+      quantidade:arred(g.quantidade), pecas:g.pecas,
+      origem:[...g._ped.values()].map(x=>({...x,quantidade:arred(x.quantidade)}))
+                                 .sort((a,b)=>(a.numero||0)-(b.numero||0))
+    })).sort((a,b)=>String(a.nome).localeCompare(String(b.nome))),
+    pendencias
+  };
+}
+
+module.exports={comprometido, porTecido, pedidosEmRisco, materialDeCompra};

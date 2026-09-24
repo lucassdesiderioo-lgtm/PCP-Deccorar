@@ -1067,12 +1067,24 @@ async function compararItem(){
 async function verLista(){
   const box=$('#lcRes'); if(!box) return;
   let d; try{ d=await (await fetch('/api/compras/lista')).json(); }catch(e){ return; }
-  const cab=(d.demanda&&d.demanda.pecas>0)
-    ? '<div class="sub" style="margin-bottom:12px">Demanda no horizonte: <b>'+d.demanda.pecas+'</b> peça(s) de <b>'+d.demanda.skus+'</b> SKU(s) para produzir.</div>'
+  /* As duas operações aparecem lado a lado e NÃO se somam num número só: a
+     primeira é peça do catálogo a produzir, a segunda é peça vendida sob
+     medida e ainda não produzida. Somar inventaria uma terceira régua, que é
+     a lição do `faltaHoje` × `precisa` da §18. */
+  const cabSM=(d.sobmedida_pecas>0)
+    ? ' <b>'+d.sobmedida_pecas+'</b> peça(s) vendida(s) no sob medida entram na mesma conta.' : '';
+  const cab=((d.demanda&&d.demanda.pecas>0)||cabSM)
+    ? '<div class="sub" style="margin-bottom:12px">'
+      +((d.demanda&&d.demanda.pecas>0)
+        ? 'Demanda no horizonte: <b>'+d.demanda.pecas+'</b> peça(s) de <b>'+d.demanda.skus+'</b> SKU(s) para produzir.'
+        : '')+cabSM+'</div>'
     : '';
   if(!d.linhas.length){
     box.innerHTML=cab+'<div class="sub" style="color:var(--green)">✓ Nada abaixo do mínimo e nada pedido pela demanda. Nenhuma compra necessária agora.</div>'
-      +pendenciasHTML(d.pendencias); return; }
+      /* O "nada a comprar" é justamente onde o aviso mais importa: sem ele, a
+         lista vazia porque o sob medida não respondeu parece lista vazia
+         porque não há o que comprar. */
+      +pendenciasHTML(d.pendencias)+sobMedidaHTML(d); return; }
   let h=cab+'<table><thead><tr><th style="width:26px"></th><th>Componente</th><th>Disponível</th><th>Precisa</th><th>Melhor</th><th>Desembolso</th><th>Sobra</th></tr></thead><tbody>';
   for(const l of d.linhas){
     const un=l.unidade||'';
@@ -1088,10 +1100,21 @@ async function verLista(){
       +'<div class="sub">'+manda+'</div>'
       +'<div class="sub">mínimo '+qtd(l.minimo)+' · ideal '+qtd(l.ideal)
       +(l.a_caminho>0?' · a caminho '+qtd(l.a_caminho):'')+'</div>'
-      +(l.origem&&l.origem.length
+      +((l.origem&&l.origem.length)||(l.origem_sobmedida&&l.origem_sobmedida.length)
          ? '<details><summary class="sub" style="cursor:pointer">de onde vem</summary><div class="sub" style="margin-top:4px">'
            +l.origem.slice(0,6).map(o=>esc(o.sku)+': '+o.precisa+' peça(s) × '+qtd(o.por_peca)+' = '+qtd(o.subtotal)+' '+esc(un)).join('<br>')
-           +(l.origem.length>6?'<br>… e mais '+(l.origem.length-6):'')+'</div></details>'
+           +(l.origem.length>6?'<br>… e mais '+(l.origem.length-6):'')
+           /* O sob medida em bloco próprio, e rotulado: o grão dele é o PEDIDO
+              da revenda, não o SKU. Misturado na mesma lista, o número do
+              pedido se leria como um código de produto. */
+           +((l.origem_sobmedida&&l.origem_sobmedida.length)
+              ? (l.origem.length?'<div style="height:6px"></div>':'')
+                +'<b>sob medida</b><br>'
+                +l.origem_sobmedida.slice(0,6).map(o=>'pedido '+esc(o.numero)
+                   +(o.revenda?' · '+esc(o.revenda):'')+': '+o.pecas+' peça(s) = '+qtd(o.quantidade)+' '+esc(un)).join('<br>')
+                +(l.origem_sobmedida.length>6?'<br>… e mais '+(l.origem_sobmedida.length-6):'')
+              : '')
+           +'</div></details>'
          : '')
       +'</td>'
       +'<td'+(l.disponivel<=l.minimo?' style="color:var(--amber)"':'')+'>'+qtd(l.disponivel)+' '+esc(un)+'</td>'
@@ -1112,7 +1135,47 @@ async function verLista(){
     +'<span class="msg" id="lcGerMsg"></span></div>';
   h+='<div class="sub" style="margin-top:10px">A necessidade é o <b>maior</b> dos dois gatilhos, nunca a soma. O mínimo existe para cobrir a venda que ainda não apareceu; quando ela aparece, substitui o mínimo em vez de somar a ele.</div>';
   h+=pendenciasHTML(d.pendencias);
+  h+=sobMedidaHTML(d);
   box.innerHTML=h;
+}
+/* O SOB MEDIDA (fase 4-C). Duas coisas diferentes, e as duas são buracos:
+   `sobmedida_fora` é o módulo inteiro que não respondeu; `pendencias_sobmedida`
+   são peças que o módulo conhece e não soube apontar a material nenhum. Nos
+   dois casos o total acima está incompleto, e quem compra precisa saber disso
+   antes de fechar pedido. */
+function sobMedidaHTML(d){
+  let h='';
+  if(d.sobmedida_fora)
+    h+='<div style="margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:9px">'
+      +'<b style="color:var(--amber)">⚠ o sob medida ficou de fora desta lista</b>'
+      +'<div class="sub" style="margin-top:6px">'+esc(d.sobmedida_motivo||'')+'</div></div>';
+  const p=d.pendencias_sobmedida||[];
+  if(p.length){
+    /* AGRUPADO PELO MOTIVO, e não uma linha por peça. O grão do domínio é a
+       peça — e tem que ser, porque é ela que some da conta —, mas na tela um
+       pedido de quatro persianas do mesmo degrau escrevia a MESMA frase quatro
+       vezes. Lista que repete o mesmo texto ensina a equipe a não lê-la, e aí
+       o dia em que aparece um motivo diferente passa batido. Só apareceu
+       abrindo a tela. */
+    const g={};
+    p.forEach(x=>{ const k=String(x.motivo||'');
+      (g[k]=g[k]||{pecas:0,pedidos:{}}); g[k].pecas++;
+      if(x.numero) g[k].pedidos[x.numero]=true; });
+    const chaves=Object.keys(g);
+    h+='<div style="margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:9px">'
+      +'<b style="color:var(--amber)">⚠ '+p.length+' peça(s) vendida(s) no sob medida sem material apontado '
+      +'— o material delas NÃO está somado acima:</b>'
+      +'<div class="sub" style="margin-top:6px">'
+      +chaves.slice(0,12).map(k=>{
+          const x=g[k], peds=Object.keys(x.pedidos);
+          return '<b>'+x.pecas+' peça(s)</b>'
+            +(peds.length?' · pedido'+(peds.length>1?'s':'')+' '+peds.map(esc).join(', '):'')
+            +': '+esc(k); }).join('<br>')
+      +(chaves.length>12?'<br>… e mais '+(chaves.length-12)+' motivo(s)':'')
+      +'<div style="margin-top:6px">Aponte o material em <b>Sob medida → Catálogo</b>, '
+      +'na escada de tubos.</div></div></div>';
+  }
+  return h;
 }
 /* Venda sem ficha calculável é um BURACO nesta lista, não um zero: o material
    daquela peça simplesmente não foi somado. Some da tela = o comprador confia

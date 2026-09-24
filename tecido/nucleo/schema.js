@@ -1289,6 +1289,41 @@ CREATE TABLE sm_etiqueta_impressao (
   criado_em TEXT DEFAULT (datetime('now','localtime'))
 );
 CREATE INDEX idx_sm_etiqueta_impressao ON sm_etiqueta_impressao(criado_em);
+`},
+
+{n:20, nome:'o vinculo com o material de compra do PCP — o tubo e o mesmo dos dois lados', sql:`
+/* === O TUBO DO SOB MEDIDA CHEGANDO AO COMPRAS DO PCP =====================
+   Fase 4-C da spec SOBMEDIDA-PEDIDO-REVENDA. Decisao do dono, 24/09/2026:
+   "e o mesmo tubo, e o compras deveria ser o mesmo" — mesmo com a producao
+   sendo duas linhas de trabalho separadas. Separar as compras compraria o
+   mesmo tubo duas vezes, perdendo escala.
+
+   A fase 1 ja tinha escrito, no comentario do sm_degrau_tubo, que esta
+   coluna entraria por ALTER "quando houver o que ligar". Ha.
+
+   ⚠️ NAO HA "REFERENCES", E ISSO NAO E DESCUIDO: o numero que vai aqui e o
+   id de um componente do OUTRO banco (dados.db). O SQLite nao tem como
+   conferi-lo, e fingir que tem com um REFERENCES para uma tabela local que
+   nao existe quebraria o schema. Quem confere e o cadastro, contra a lista
+   que atravessa a porta — e o que ele nao achar vira PENDENCIA na lista de
+   compras, nunca um zero (regra 4 do custo).
+
+   ⚠️ O TUBO LIGA NO DEGRAU, E O RESTO NO COMPONENTE. Tubo 32 e Tubo 41 sao
+   itens de estoque diferentes, comprados e guardados a parte: o material
+   MUDA com o degrau, entao a resposta nao cabe no sm_componente, que tem
+   uma linha so chamada "Tubo". Por isso a coluna existe nas duas tabelas, e
+   a do componente e recusada justamente para a chave "tubo" — duas
+   afirmacoes sobre o mesmo fato divergem no primeiro dia em que alguem
+   editar so uma.
+
+   ⚠️ NAO HA COLUNA DE FATOR, e isso mudou no caminho. O plano previa um
+   "fator_para_compra" digitado; a unidade do componente do PCP ja responde
+   a pergunta (metro le a medida de consumo, unidade conta pecas), e um
+   numero digitado ao lado seria a segunda afirmacao sobre a mesma conta —
+   com a diferenca de que ela erra em silencio. Unidade que a peca nao sabe
+   dizer (kg) e RECUSADA no cadastro, em vez de convertida por chute. */
+ALTER TABLE sm_degrau_tubo ADD COLUMN componente_id INTEGER;
+ALTER TABLE sm_componente  ADD COLUMN componente_id INTEGER;
 `}
 ];
 

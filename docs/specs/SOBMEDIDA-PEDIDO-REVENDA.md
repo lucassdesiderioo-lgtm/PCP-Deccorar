@@ -5,18 +5,74 @@ STATUS
 Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 24/09/2026
-Fase atual: 4-B EM CÓDIGO (24/09/2026) — o tecido; o tubo é a 4-C
+Fase atual: 4-C EM CÓDIGO (24/09/2026) — o tubo chegando ao Compras do PCP
+            4-B EM CÓDIGO (24/09/2026) — o tecido, no painel do sob medida
             4-A EM PRODUÇÃO, o leitor bipou no papel (23/09/2026) — falta a
             peça real atravessando os cinco setores
             3 EM CÓDIGO e CONFERIDA no deploy (23/09/2026) — falta a semana
             em paralelo ao Decorsoft
             2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
             1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
-Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ◐(4-A em produção · 4-B em código · 4-C a fazer)  5 ☐  6 ☐  7 ☐  8 ☐
+Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ☐  6 ☐  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
-Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) — ver abaixo
+Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) — ver abaixo
 ```
+
+## STATUS DA FASE 4-C — em código em 24/09/2026
+
+**O tubo da persiana sob medida chegou ao Compras do PCP.** É o outro lado da
+divisão que a 4-B fez: o tecido fica no painel do próprio módulo (estoque
+próprio, painel próprio), e o tubo vai para o Compras do PCP porque é o
+**mesmo material** da medida padrão, comprado do mesmo fornecedor — decisão do
+dono em 24/09/2026, *"é o mesmo tubo, e o compras deveria ser o mesmo"*, mesmo
+com a produção sendo duas linhas de trabalho separadas.
+
+**A regra nova, e ela é do dono:** a peça **sai da conta de compra quando a
+etiqueta dela é impressa**. Na medida padrão isso se resolve sozinho (a peça é
+embalada, vira estoque, e o `precisa` cai); aqui o pedido para em `aprovado`,
+porque o marco seguinte é o bipe da bancada, que é a fase 5. Sem sinal de saída
+o número só subiria, e número que só sobe é número que a equipe aprende a
+ignorar. **Custo assumido:** o maço impresso e ainda não cortado conta como
+produzido — são horas, não dias. As alternativas na mesa eram o corte do tecido
+(outra bancada, régua emprestada) e "nada até a fase 5" (honesta e inútil).
+
+**Entregue:** migração 20 (`componente_id` em `sm_degrau_tubo` e em
+`sm_componente`, por `ALTER`, como a fase 1 já prometia), `tecido/nucleo/
+materiais.js` (a porta de ida), `consumo.materialDeCompra()`,
+`catalogo.ligarMaterialDoDegrau` / `ligarMaterialDoComponente`, três rotas
+novas, a coluna **Material de compra** na escada e nos componentes,
+`sobmedida_material.js` (a porta de volta, no PCP), o
+`necessidade_dominio.somarSobMedida()` e os dois blocos novos na tela de
+Compras. **Sem chave de permissão nova** — `catalogo.ler` e `catalogo.editar`
+já cobrem. 30 + 29 casos novos: `npm test` do módulo vai a **449** e nasce o
+`teste_compras_sobmedida.js`.
+
+**O que falta, e não é código:** o PCP tem **um** tubo cadastrado
+(`Tubo 32 mm`); a escada usa 32, 38, 41 e 56. Enquanto os outros três não
+existirem em Compras e não estiverem apontados, o tubo deles sai como
+**pendência** na lista — que é o certo, e é o sinal de que falta cadastro.
+
+**As duas mudanças no caminho:**
+
+| # | Mudou | Por quê |
+|---|---|---|
+| 1 | **Não há `fator_para_compra` digitado** | Quem responde como a peça vira quantidade é a **unidade** do item do PCP, lida ao vivo (`m` lê a medida de consumo, `un` conta peças). Um multiplicador digitado uma vez seria a segunda régua da mesma conta, e a que erra em silêncio. Unidade que a peça não sabe dizer é recusada no cadastro |
+| 2 | **O vínculo do tubo mora no DEGRAU**, e não no componente | Tubo 32 e Tubo 41 são itens de estoque diferentes: o material muda com o degrau, e o `sm_componente` tem uma linha só. O componente de chave `tubo` recusa o vínculo, dizendo para ir à escada |
+
+> ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA.** Os testes e as duas telas abertas
+> são indício. A prova é o comprador cadastrando os tubos 38, 41 e 56, vendo o
+> consumo do sob medida somar na linha certa e **comprando por ela**. Enquanto
+> isso não acontecer, está escrito aqui como não conferido.
+
+> **O que a tela mostrou, e nenhum teste de unidade pegaria** (três defeitos, os
+> três no primeiro render): a pendência é por **peça** no domínio — e tem que
+> ser —, e a tela escrevia a mesma frase uma vez por peça, quatro linhas
+> idênticas num pedido de quatro persianas do mesmo degrau; as frases do domínio
+> do sob medida saíam **sem acento** numa tela do PCP que é toda acentuada; e o
+> jar de cookie do `curl` marca o cookie de sessão com `#HttpOnly_`, que o
+> filtro de comentário do script de tela jogava fora — a tela abria no login e
+> parecia permissão trocada. Os três estão consertados.
 
 ## STATUS DA FASE 4-B — em código em 24/09/2026
 

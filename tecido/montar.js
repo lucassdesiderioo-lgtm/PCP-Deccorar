@@ -27,6 +27,7 @@ const acesso=require('./nucleo/acesso');
 const {TELAS}=require('./nucleo/telas');
 const {pode}=require('./nucleo/permissoes');
 const pessoas=require('./nucleo/pessoas');
+const materiais=require('./nucleo/materiais');
 
 /* A LISTA DE MODULOS DE ROTA, e ela e EXPORTADA de proposito.
    O `teste/acesso_operador.js` conferia "toda rota declara permissao" por uma
@@ -94,6 +95,11 @@ function servir(tela){
 function montar(app, prefixo, opcoes){
   const pre=prefixo||'/sobmedida';
   pessoas.ligar(opcoes&&opcoes.pessoas);
+  /* `opcoes.materiais` e a porta do material de compra do PCP (fase 4-C): o
+     tubo da persiana sob medida e o MESMO da medida padrao, e Compras e um
+     so. Ela entra para o cadastro poder apontar; o caminho de VOLTA e o
+     `consumoDeMaterial` devolvido la embaixo. */
+  materiais.ligar(opcoes&&opcoes.materiais);
   schema.aplicar(db);
 
   // ── O PORTAO ──────────────────────────────────────────────────────────
@@ -142,6 +148,18 @@ function montar(app, prefixo, opcoes){
   }
 
   console.log('[sobmedida] montado em '+pre+' — banco '+db.arquivo);
+
+  /* ── O CAMINHO DE VOLTA (fase 4-C) ──────────────────────────────────────
+     Quanto de cada material do PCP ja esta vendido aqui e ainda nao foi
+     produzido. Quem a recebe e o `sobmedida_material.js` do PCP, e e ele que
+     decide o que fazer quando ela falha — a lista de compras nao pode cair
+     porque o tecido.db tropecou, mas tambem nao pode calar sobre isso.
+
+     Sai como RETORNO do montar(), e nao como um require direto do outro
+     lado: este modulo sobe dentro de um try/catch justamente para que uma
+     falha aqui nao derrube a expedicao (o comentario do topo). Um require
+     desfaria isso em silencio. */
+  return { consumoDeMaterial: ()=>require('./dominio/consumo').materialDeCompra() };
 }
 
 module.exports={montar, MODULOS, AREAS_PCP:acesso.AREAS_PCP, PREFIXO:'/sobmedida'};

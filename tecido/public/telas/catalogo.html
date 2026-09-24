@@ -17,7 +17,10 @@ table.lista tr.inativa td{opacity:.55}
   border-radius:var(--raio); padding:12px; margin-top:10px}
 .editor .campos{align-items:flex-end}
 .editor .campo{min-width:130px}
-.editor input{width:100%}
+.editor input,.editor select{width:100%}
+/* O campo de escolha do material cabe um nome de item de estoque inteiro —
+   "Base redonda branca" cortado ao meio faz escolher o item errado. */
+.editor .campo.largo{min-width:280px}
 .erro-linha{color:var(--erro); font-size:14px; font-weight:600; margin:8px 0 0}
 .setor{font-size:12px; color:var(--tinta-fraca); text-transform:uppercase; letter-spacing:.05em}
 .hist{font-size:14px; color:var(--tinta-fraca); margin-top:8px}
@@ -81,9 +84,16 @@ function editor(campos, aoSalvar, aoCancelar){
   const linha=el('div',{class:'campos'});
   const entradas={};
   campos.forEach(c=>{
-    const b=el('div',{class:'campo'},[el('label',{},[c.rotulo])]);
-    const i=el('input',{type:'text', value:c.valor==null?'':String(c.valor),
-      placeholder:c.dica||'', 'aria-label':c.rotulo});
+    const b=el('div',{class:'campo'+(c.opcoes?' largo':'')},[el('label',{},[c.rotulo])]);
+    /* Campo de ESCOLHA quando a resposta é uma lista fechada. Digitar o id de
+       um material à mão seria um número sem significado na tela, e o erro só
+       apareceria na lista de compras, dias depois. */
+    const i=c.opcoes
+      ? el('select',{'aria-label':c.rotulo},
+          c.opcoes.map(o=>el('option',{value:String(o.valor==null?'':o.valor),
+            selected:String(o.valor==null?'':o.valor)===String(c.valor==null?'':c.valor)?'selected':null},[o.rotulo])))
+      : el('input',{type:'text', value:c.valor==null?'':String(c.valor),
+          placeholder:c.dica||'', 'aria-label':c.rotulo});
     entradas[c.chave]=i; b.appendChild(i); linha.appendChild(b);
   });
   const salvar=el('button',{class:'bt primario',type:'button'},['Salvar']);
@@ -258,6 +268,45 @@ function cores(){
   return box;
 }
 
+/* ── O MATERIAL DE COMPRA DO PCP (fase 4-C) ────────────────────────────────
+   O tubo da persiana sob medida é o MESMO tubo da medida padrão, e Compras é
+   um só. Aqui se aponta qual item do cadastro de material do PCP corresponde
+   a cada degrau da escada — e a peças que tenham material próprio.
+
+   ⚠️ O TUBO SE APONTA NO DEGRAU, e é por isso que esta coluna mora na escada:
+   Tubo 32 e Tubo 41 são itens de estoque diferentes, comprados e guardados à
+   parte. O material muda com o degrau. */
+const MATERIAIS=()=>(window.__materiais&&window.__materiais.materiais)||[];
+const PORTA_LIGADA=()=>!!(window.__materiais&&window.__materiais.ligada);
+
+function celulaMaterial(id){
+  if(id==null) return el('span',{class:'setor'},['— não aponta —']);
+  const m=MATERIAIS().find(x=>x.id===id);
+  /* Apontado para um material que sumiu do PCP: a tela DIZ, em vez de mostrar
+     um branco. É o mesmo buraco que vira pendência na lista de compras, visto
+     do lado onde alguém pode consertá-lo. */
+  return m ? el('span',{},[m.nome+' · '+m.unidade])
+           : el('span',{class:'aviso'},['id '+id+' — não está mais em Compras']);
+}
+
+function opcoesDeMaterial(){
+  return [{valor:'',rotulo:'— não aponta material —'}]
+    .concat(MATERIAIS().map(m=>({valor:m.id, rotulo:m.nome+'  ('+m.unidade+')'})));
+}
+
+/* A mesma linha de edição para o degrau e para o componente — são a mesma
+   pergunta, e duas cópias divergiriam no dia em que a regra mudasse numa só. */
+function editorMaterial(url, atual){
+  if(!PORTA_LIGADA()) return el('p',{class:'erro-linha'},[
+    'A lista de materiais do PCP não está ligada neste servidor, então não há '+
+    'o que escolher. Quem a liga é o server.js, na chamada de montar() do /sobmedida.']);
+  return editor([{chave:'componente_id', rotulo:'Material de compra (PCP)',
+    valor:atual, opcoes:opcoesDeMaterial()}],
+    v=>tentar(()=>api(url,{metodo:'PUT',silencioso:true,
+      corpo:{componente_id:v.componente_id===''?null:Number(v.componente_id)}})),
+    ()=>{ editando=null; erro=null; desenhar(); });
+}
+
 // ── Escada de tubos ────────────────────────────────────────────────────────
 function abaEscada(){
   const c=el('div',{class:'cartao'},[
@@ -270,7 +319,8 @@ function abaEscada(){
   t.appendChild(el('thead',{},[el('tr',{},[
     el('th',{},['Degrau']),el('th',{class:'n'},['Largura até']),el('th',{class:'n'},['m² até']),
     el('th',{class:'n'},['Desconto do tubo']),el('th',{class:'n'},['Altura do tecido']),
-    el('th',{},['Bandô']),el('th',{},['Redução']),el('th',{},[''])])]));
+    el('th',{},['Bandô']),el('th',{},['Redução']),
+    el('th',{},['Material de compra']),el('th',{},[''])])]));
   const tb=el('tbody');
   modelo.degraus.forEach(d=>{
     tb.appendChild(el('tr',{class:d.ativo?'':'inativa'},[
@@ -281,9 +331,13 @@ function abaEscada(){
       el('td',{class:'n medida'},['final + '+d.acrescimo_altura_tecido_mm+' mm']),
       el('td',{},[d.aceita_bando?'sim':'não']),
       el('td',{},[d.aceita_reducao?'pode pedir':'não tem']),
-      el('td',{},[botao('Editar',()=>{ editando='deg-'+d.id; erro=null; desenhar(); })])
+      el('td',{},[celulaMaterial(d.componente_id)]),
+      el('td',{},[botao('Editar',()=>{ editando='deg-'+d.id; erro=null; desenhar(); }),
+                  botao('Material',()=>{ editando='degmat-'+d.id; erro=null; desenhar(); })])
     ]));
-    if(editando==='deg-'+d.id) tb.appendChild(el('tr',{},[el('td',{colspan:'8'},[editor([
+    if(editando==='degmat-'+d.id) tb.appendChild(el('tr',{},[el('td',{colspan:'9'},[
+      editorMaterial('/api/sm/degraus/'+d.id+'/material', d.componente_id)])]));
+    if(editando==='deg-'+d.id) tb.appendChild(el('tr',{},[el('td',{colspan:'9'},[editor([
       {chave:'nome',rotulo:'Nome',valor:d.nome},
       {chave:'largura_max_mm',rotulo:'Largura até (m)',valor:emMetros(d.largura_max_mm)},
       {chave:'m2_max_mm2',rotulo:'m² até',valor:emM2(d.m2_max_mm2)},
@@ -418,7 +472,8 @@ function abaComponentes(){
   const t=el('table',{class:'lista'});
   t.appendChild(el('thead',{},[el('tr',{},[
     el('th',{},['Componente']),el('th',{},['Setor']),el('th',{},['Cobrança']),
-    el('th',{class:'n'},['Preço']),el('th',{},['Código de barras']),el('th',{},[''])])]));
+    el('th',{class:'n'},['Preço']),el('th',{},['Código de barras']),
+    el('th',{},['Material de compra']),el('th',{},[''])])]));
   const tb=el('tbody');
   (window.__componentes||[]).forEach(comp=>{
     const temPreco='preco_centavos' in comp;
@@ -429,10 +484,21 @@ function abaComponentes(){
       el('td',{class:'n'},[ temPreco
         ? (comp.preco_centavos==null?'—':'R$ '+emReais(comp.preco_centavos)) : '·' ]),
       el('td',{class:'medida'},[comp.codigo_barras||'—']),
+      /* O tubo aparece aqui com a resposta e o caminho, em vez de um botão que
+         só recusa: ele se aponta na escada, porque o material muda com o
+         degrau. Trava que nega sem dizer para onde ir é trava que a equipe
+         aprende a contornar. */
+      el('td',{},[ comp.chave==='tubo'
+        ? el('span',{class:'setor'},['na escada de tubos'])
+        : celulaMaterial(comp.componente_id) ]),
       el('td',{},[ temPreco&&comp.unidade_cobranca&&comp.unidade_cobranca!=='m2_colecao'
-        ? botao('Preço',()=>{ editando='comp-'+comp.id; erro=null; desenhar(); }) : '' ])
+          ? botao('Preço',()=>{ editando='comp-'+comp.id; erro=null; desenhar(); }) : '',
+        comp.chave==='tubo' ? ''
+          : botao('Material',()=>{ editando='compmat-'+comp.id; erro=null; desenhar(); }) ])
     ]));
-    if(editando==='comp-'+comp.id) tb.appendChild(el('tr',{},[el('td',{colspan:'6'},[
+    if(editando==='compmat-'+comp.id) tb.appendChild(el('tr',{},[el('td',{colspan:'7'},[
+      editorMaterial('/api/sm/componentes/'+comp.id+'/material', comp.componente_id)])]));
+    if(editando==='comp-'+comp.id) tb.appendChild(el('tr',{},[el('td',{colspan:'7'},[
       editor([{chave:'preco',rotulo:'R$ por '+comp.unidade_cobranca,
         valor:emReais(comp.preco_centavos),dica:'55,00'}],
         v=>tentar(()=>api('/api/sm/componentes/'+comp.id+'/preco',
@@ -467,6 +533,7 @@ function desenhar(){
 async function recarregar(){
   modelo=await api('/api/sm/modelos/'+modelo.id);
   window.__componentes=await api('/api/sm/componentes');
+  window.__materiais=await api('/api/sm/materiais');
   desenhar();
 }
 

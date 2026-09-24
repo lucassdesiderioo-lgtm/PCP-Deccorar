@@ -201,9 +201,22 @@ try{
      modulo abre o tecido.db e nunca o dados.db. Uma porta so, com id e nome
      — o `nucleo/pessoas.js` remapeia o que recebe, entao PIN, salt e areas
      nao atravessam nem por engano. */
-  require('./tecido/montar').montar(app, null, {
-    pessoas: () => db.prepare('SELECT id,nome FROM usuarios WHERE ativo=1 ORDER BY nome').all()
+  /* A PORTA DE MATERIAL (fase 4-C da mesma spec) vai nos DOIS sentidos, e as
+     duas metades se ligam aqui, numa chamada so.
+
+     IDA: a lista de material de compra do PCP entra no sob medida, para o
+     cadastro apontar qual tubo cada degrau da escada usa. So id, nome e
+     unidade atravessam — preco, estoque e fornecedor sao assunto daqui.
+
+     VOLTA: o `consumoDeMaterial` diz quanto de cada material ja esta vendido
+     la e ainda nao foi produzido, e entra na lista de compras pelo mesmo
+     gatilho 2 da medida padrao. O tubo e o MESMO material dos dois lados, e
+     Compras e um so — decisao do dono, 24/09/2026. */
+  const sm = require('./tecido/montar').montar(app, null, {
+    pessoas: () => db.prepare('SELECT id,nome FROM usuarios WHERE ativo=1 ORDER BY nome').all(),
+    materiais: () => db.prepare('SELECT id,nome,unidade FROM componente WHERE ativo=1 ORDER BY nome').all()
   });
+  require('./sobmedida_material').ligar(sm && sm.consumoDeMaterial);
 }catch(e){
   console.error('[sobmedida] NAO SUBIU:',e);
   app.use('/sobmedida',(req,res)=>res.status(503).send(

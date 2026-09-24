@@ -11,6 +11,7 @@ const persiana=require('../dominio/persiana');
    Por isso todo campo de dinheiro daqui se chama `preco_*` ou `valor_*`: um
    `total_centavos` NAO casaria com o padrao e vazaria em silencio. */
 const custo=require('../dominio/custo');
+const materiais=require('../nucleo/materiais');
 
 const LER='catalogo.ler', EDITAR='catalogo.editar';
 
@@ -69,6 +70,30 @@ module.exports={rotas:[
   {metodo:'PUT', caminho:'/api/sm/degraus/:id', permissao:EDITAR,
    manipulador:({params,corpo})=>catalogo.editarDegrau(params.id,corpo),
    detalhe:(req,d)=>'degrau '+(d&&d.nome)},
+
+  /* ── O MATERIAL DE COMPRA DO PCP (fase 4-C) ──────────────────────────────
+     A lista e de LEITURA do catalogo, e nao pede chave nova: quem abre esta
+     tela ja tem `catalogo.ler`, e uma chave a mais aqui seria a terceira
+     ponta da armadilha #13 sem precisar — mais uma caixinha para alguem
+     esquecer de marcar. Ligar e `catalogo.editar`, como todo o resto. */
+  {metodo:'GET', caminho:'/api/sm/materiais', permissao:LER,
+   manipulador:()=>materiais.ligada()
+     ? {ligada:true, materiais:materiais.listar()}
+     /* Aqui NAO se recusa, e a diferenca com o `materiais.listar()` e de
+        lugar: a tela precisa abrir para mostrar o resto do cadastro. O que
+        ela nao pode e mostrar um seletor vazio com cara de "o PCP nao tem
+        material" — por isso vem `ligada:false` e ela escreve onde se liga. */
+     : {ligada:false, materiais:[]}},
+  {metodo:'PUT', caminho:'/api/sm/degraus/:id/material', permissao:EDITAR,
+   manipulador:({params,corpo,usuario})=>
+     catalogo.ligarMaterialDoDegrau(params.id,corpo.componente_id,usuario),
+   detalhe:(req,d)=>'material do degrau '+(d&&d.nome)+': '+
+     (req.body.componente_id==null?'desligado':'id '+req.body.componente_id)},
+  {metodo:'PUT', caminho:'/api/sm/componentes/:id/material', permissao:EDITAR,
+   manipulador:({params,corpo,usuario})=>
+     catalogo.ligarMaterialDoComponente(params.id,corpo.componente_id,usuario),
+   detalhe:(req,d)=>'material do componente '+(d&&d.nome)+': '+
+     (req.body.componente_id==null?'desligado':'id '+req.body.componente_id)},
 
   // ── Ficha tecnica ───────────────────────────────────────────────────────
   {metodo:'POST', caminho:'/api/sm/modelos/:id/ficha', permissao:EDITAR,

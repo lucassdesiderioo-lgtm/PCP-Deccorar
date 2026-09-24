@@ -26,6 +26,7 @@
  */
 const DEMANDA = require('./demanda_dominio');
 const FICHA   = require('./ficha_dominio');
+const SOBMED  = require('./sobmedida_material');
 
 const q3 = n => Math.round((+n||0)*1000)/1000;
 
@@ -79,11 +80,74 @@ function porItem(db){
     }
   }
 
+  /* O SOB MEDIDA ENTRA AQUI, no mesmo mapa — nao numa lista ao lado. O tubo e
+     o mesmo material dos dois lados, e duas linhas para o mesmo componente na
+     tela de compras fariam o comprador pedir duas vezes. */
+  const sm = somarSobMedida(db, componentes);
+
   for(const id in componentes) componentes[id].consumo = q3(componentes[id].consumo);
 
   return { componentes, revenda, pendencias,
            skus_a_produzir: aProduzir.length,
-           pecas_a_produzir: aProduzir.reduce((a,b)=>a+b.precisa,0) };
+           pecas_a_produzir: aProduzir.reduce((a,b)=>a+b.precisa,0),
+           /* Separada da pendencia de SKU sem ficha de proposito: aquela fala
+              de uma peca do catalogo, esta fala de um PEDIDO de revenda. Uma
+              lista so obrigaria a tela a adivinhar qual frase escrever. */
+           pendencias_sobmedida: sm.pendencias,
+           sobmedida_fora: sm.fora, sobmedida_motivo: sm.motivo,
+           sobmedida_pecas: sm.pecas };
 }
 
-module.exports = { porItem };
+/* ─────────────────────────────────────────────────────────────────────────────
+ * O MATERIAL VENDIDO PELO SOB MEDIDA (fase 4-C da SOBMEDIDA-PEDIDO-REVENDA).
+ *
+ * O tubo da persiana sob medida e o MESMO tubo da medida padrao — decisao do
+ * dono, 24/09/2026 —, comprado do mesmo fornecedor, e Compras e um so. Ate
+ * aqui a lista nao o enxergava: sao dois bancos, e nao havia vinculo entre o
+ * que a etiqueta do sob medida manda cortar e o que se compra.
+ *
+ * ⚠️ SOMA, NUNCA SOBRESCREVE. Os dois lados pedem o mesmo componente, e quem
+ * chegasse depois apagaria o outro — a fabrica compraria metade, e o lado que
+ * some e sempre o que chega por ultimo.
+ *
+ * ⚠️ A ORIGEM VAI EM CAMPO PROPRIO. `origem` e por SKU e `origem_sobmedida` e
+ * por PEDIDO. Enfiar "pedido 5001" num campo chamado `sku` seria mentira de
+ * campo, e a tela escreveria uma frase que nao se confere em lugar nenhum.
+ *
+ * ⚠️ O QUE NAO DA PARA SOMAR VIRA PENDENCIA, NUNCA NUMERO. Unidade divergente,
+ * componente que sumiu do cadastro ou que foi desativado: somar ali seria
+ * inventar uma conversao que ninguem decidiu. E a regra 4 do custo — indefinido
+ * nao vira zero, e tambem nao vira palpite.
+ * ────────────────────────────────────────────────────────────────────────── */
+function somarSobMedida(db, componentes){
+  const r = SOBMED.consumo();
+  const pendencias = (r.pendencias||[]).slice();
+  if(r.fora) return { fora:true, motivo:r.motivo, pendencias, pecas:0 };
+
+  let pecas = 0;
+  for(const m of (r.materiais||[])){
+    const c = db.prepare('SELECT id,nome,unidade,ativo FROM componente WHERE id=?').get(m.componente_id);
+    const comoOSobMedidaChama = m.nome || ('id '+m.componente_id);
+
+    if(!c){ pendencias.push({ motivo:'o material "'+comoOSobMedidaChama+'" está apontado no '+
+      'cadastro do sob medida mas não existe mais em Compras' }); continue; }
+
+    /* Inativo nao e inexistente: o material existe e ALGUEM o desativou. Somar
+       em silencio deixaria a venda sem compra; a pendencia diz "desativado"
+       para o comprador nao ir procurar o erro no sob medida, onde ele nao esta. */
+    if(!c.ativo){ pendencias.push({ motivo:'o material "'+c.nome+'" está desativado em '+
+      'Compras, e o sob medida continua vendendo peça que o usa' }); continue; }
+
+    if(c.unidade !== m.unidade){ pendencias.push({ motivo:'o material "'+c.nome+'" é '+
+      'comprado em "'+c.unidade+'" e o sob medida calculou em "'+m.unidade+'" — não há '+
+      'conversão decidida entre os dois, então ele NÃO foi somado' }); continue; }
+
+    const e = componentes[c.id] || (componentes[c.id] = { consumo:0, origem:[] });
+    e.consumo += (+m.quantidade||0);
+    e.origem_sobmedida = (e.origem_sobmedida||[]).concat(m.origem||[]);
+    pecas += (+m.pecas||0);
+  }
+  return { fora:false, motivo:null, pendencias, pecas };
+}
+
+module.exports = { porItem, somarSobMedida };

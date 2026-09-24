@@ -783,9 +783,55 @@ cortado**, e a tela de Pedidos ganhou **Aprovados esperando tecido**.
 
 ### O que NÃO está aqui
 
-O **tubo** e o resto do material. Ele é o mesmo da medida padrão e **Compras é
-um só** (decisão do dono, 24/09/2026) — mas o `sm_componente` e o `componente`
-do PCP não se conhecem, e o vínculo é cadastro. É a fase 4-C.
+O **tubo** e o resto do material — eles vão para o Compras do PCP, na fase 4-C
+logo abaixo.
+
+---
+
+## O TUBO CHEGANDO AO COMPRAS DO PCP (fase 4-C)
+
+O tecido fica aqui; o **tubo** é o **mesmo material** da medida padrão,
+comprado do mesmo fornecedor, e **Compras é um só** — decisão do dono,
+24/09/2026. Duas portas, uma em cada sentido:
+
+```
+nucleo/materiais.js    IDA    a lista de material do PCP entra (id, nome, unidade)
+consumo.js             conta  materialDeCompra()
+montar()               VOLTA  devolve consumoDeMaterial ao server.js do PCP
+```
+
+Onde se aponta: **Catálogo → Escada de tubos**, coluna *Material de compra*
+(e, para as demais peças, em *Componentes e preços*).
+
+### As regras que parecem bug e não são
+
+- **A peça sai da conta quando a ETIQUETA DELA é impressa** — regra do dono. O
+  pedido para em `aprovado` (o bipe da bancada é a fase 5), e sem sinal de
+  saída o número só subiria. É a linha do **próprio** componente: imprimir a
+  Coleção não baixa o tubo, e a irmã não impressa continua. Reimprimir não muda
+  nada.
+- **O tubo se aponta no DEGRAU**, nunca no componente — Tubo 32 e Tubo 41 são
+  itens de estoque diferentes, e o `sm_componente` tem uma linha só.
+- **Não há fator digitado.** Quem responde é a **unidade** do item do PCP:
+  `m` lê a medida de **consumo** (nunca a de corte), `un` conta peças. `kg` é
+  recusado no cadastro, em vez de convertido por chute.
+- **Três recusas no cadastro:** metro sem medida de consumo (somaria zero para
+  sempre), metro numa peça que é **retângulo** (o tecido), e componente que
+  **não gera etiqueta** (nunca sairia da conta).
+- **Degrau sem material vira PENDÊNCIA, nunca zero** — uma persiana sempre tem
+  tubo. Os demais componentes **não** são cobrados: a maioria é mão de obra, e
+  seis pendências por peça todo dia é ruído que ensina a não ler a lista.
+- **Degrau renomeado depois do pedido** vira pendência com o nome congelado.
+- **Sem a porta, a lista de compras do PCP não cala nem recusa:** ela diz que o
+  sob medida ficou de fora, com o motivo real. Recusar deixaria o comprador sem
+  lista por causa deste módulo.
+- **Não há chave de permissão nova:** `catalogo.ler` e `catalogo.editar` cobrem.
+
+### O que falta, e não é código
+
+O PCP tem **um** tubo cadastrado (`Tubo 32 mm`); a escada usa 32, 38, 41 e 56.
+Enquanto os outros três não existirem em Compras e não estiverem apontados, o
+tubo deles sai como **pendência** — que é o certo.
 
 ---
 

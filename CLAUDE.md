@@ -2870,6 +2870,7 @@ aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não sil
 | **`var` lido antes de ser atribuído** | `node --check` passa (é sintaxe válida); no navegador o `.filter` de um `undefined` estoura **no meio** da execução do `<script>` e **tudo abaixo dele deixa de existir** — a tela abre sem as listas, sem bipe e sem erro visível. Aconteceu em 23/09/2026: o `setModo` roda no carregamento e chamava um desenhista cujo cache só é atribuído 150 linhas abaixo | Função chamada no carregamento não pode supor que o cache já existe: `(cache\|\|[])`. E **abrir a tela** — nenhum teste do projeto pega isto |
 | **Coluna `fr` não desce abaixo do conteúdo** | `grid-template-columns:1.1fr 1.6fr` é uma proporção que o navegador **ignora** quando uma coluna tem conteúdo largo: `fr` tem mínimo automático de `min-content`. Uma única linha `white-space:nowrap` lá dentro vira o piso da coluna inteira, e a proporção escrita no CSS nunca chega a valer — sem erro, sem aviso, e ninguém lê CSS procurando isso. Em 23/09/2026 a Etiqueta de Venda estava com 972 px de um lado e 362 do outro, com `1.1fr 1.6fr` no arquivo | `minmax(0,1fr)` quando a proporção **tem** que valer. E **medir a tela** (`getBoundingClientRect`), não ler o CSS: o número medido é o único que diz se a regra pegou |
 | **`text-overflow:ellipsis` corta a tarja, não só o texto** | Ele apara o **fim da linha**, e o fim da linha é onde ficam as tarjas. Um nome de cliente comprido apagava da tela o `📦 N persianas` — o último lugar em que a caixa de várias aparece (§5). A tela fica bonita e a informação some | Onde a linha tem tarja, o texto **quebra** em vez de aparar; nowrap fica só dentro de cada tarja |
+| **Cookie httpOnly no jar do `curl`** | Abrir a tela com Playwright usando `-c jar.txt` do `curl`: o jar marca o cookie de sessão com `#HttpOnly_` no início da linha, e um filtro de comentário ingênuo (`l.startsWith('#')`) o joga fora. A tela abre no **login** — e "abriu no login" não se parece nem de longe com "o cookie não foi lido": parece permissão trocada | Tirar o prefixo antes de filtrar (`l.replace(/^#HttpOnly_/,'')`) |
 | **WAL do SQLite** | `dados.db` tem ~4 KB; os dados estão em `dados.db-wal`. `cp dados.db` produz backup **vazio** | Usar `node backup.js`, que chama `db.backup()` |
 | **`pm2 restart` cacheia** | A alteração não aparece | `pm2 delete expedicao && pm2 start server.js --name expedicao` |
 | **`!` no bash** | Expansão de histórico quebra heredocs e `sed` | `set +H` antes de blocos com `!` |
@@ -3000,7 +3001,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (49), `teste_divergencia.js` (53) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (50), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (49), `teste_divergencia.js` (53) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (50), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3439,6 +3440,37 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   banco em tela é o "— Correcao de contagem" do §2 outra vez (§19)
 - ❌ Mandar o tecido do sob medida para a lista de compras do PCP: o estoque
   dele mora no `tecido.db` e já tem painel — seria a segunda régua (§19, 4-B)
+- ❌ Deixar o tubo do sob medida fora do Compras do PCP: é o MESMO material da
+  medida padrão, e comprar em dois lugares compra duas vezes (§19, 4-C)
+- ❌ Apontar o material do tubo no `sm_componente`: ele muda com o DEGRAU, e
+  Tubo 32 e Tubo 41 são itens de estoque diferentes (§19, 4-C)
+- ❌ Digitar um fator de unidade ao lado do vínculo — quem responde é a unidade
+  do item do PCP, lida ao vivo; fator digitado erra em silêncio (§19, 4-C)
+- ❌ Converter por chute a unidade que a peça não sabe dizer (kg), em vez de
+  recusar o vínculo dizendo qual ela é (§19, 4-C)
+- ❌ Ligar material a componente que não gera etiqueta: nada o tiraria da conta
+  depois, e ele subiria para sempre (§19, 4-C)
+- ❌ Ler a medida de CORTE no consumo de compra do sob medida — é a armadilha
+  #18 pela porta do Compras, e comprar pelo corte compra A MENOS (§19, 4-C)
+- ❌ Fazer o degrau sem material apontado sumir em silêncio: uma persiana sempre
+  tem tubo, então ele é sempre esperado (§19, 4-C)
+- ❌ Cobrar vínculo de TODO componente: a maioria é mão de obra, e seis
+  pendências por peça todo dia é a armadilha #6 (§19, 4-C)
+- ❌ Sobrescrever o consumo de um lado com o do outro no `necessidade_dominio`:
+  os dois pedem o mesmo tubo, e a fábrica compraria metade (§19, 4-C)
+- ❌ Pôr o pedido do sob medida no campo `origem` (que é por SKU) em vez do
+  `origem_sobmedida` — número de pedido com cara de código de produto (§19)
+- ❌ Somar quando a unidade do PCP e a do sob medida divergem: vira pendência
+  dizendo as duas, nunca uma conversão que ninguém decidiu (§19, 4-C)
+- ❌ Fazer a porta do sob medida RECUSAR a lista de compras quando ela não está
+  ligada: o comprador ficaria sem lista por causa do outro módulo — ela DIZ
+  que ele ficou de fora, com o motivo real (§19, 4-C)
+- ❌ Tirar o try/catch da porta: o sob medida é montado com try/catch para não
+  derrubar a expedição, e a lista de compras cai pela mesma razão (§19, 4-C)
+- ❌ Escrever uma frase de tela sem acento no sob medida: ela sai numa tela do
+  PCP que é toda acentuada, e aparece quebrada (§19, 4-C)
+- ❌ Repetir a mesma pendência uma vez por peça na tela: o grão do domínio é a
+  peça, mas a tela agrupa pelo motivo — lista que se repete ninguém lê (§19)
 - ❌ Calcular o comprometido de tecido fora do `tecido/dominio/consumo.js`, ou
   deixar o `gerencial.js` somar peça de pedido por conta própria (§19, 4-B)
 - ❌ Ler a medida de CORTE no comprometido: ela é a mais apertada, e comprar
@@ -4194,7 +4226,7 @@ engano. Há caso travando.
 > silêncio — foi assim que o `resumo.valor_parado` do painel gerencial chegou à
 > bancada (§15). Há caso travando os dois nomes, o certo e o errado.
 
-**Rode `cd tecido && npm test` (419 casos) e `node teste_acesso.js` (114) ao
+**Rode `cd tecido && npm test` (449 casos) e `node teste_acesso.js` (114) ao
 mexer em revenda, prazo, preço, permissão ou no `server.js`.** Os casos do
 prazo saem das datas escritas na §4.9 da spec, e não da resposta que a função
 deu.
@@ -4362,7 +4394,7 @@ aprovado   a ficha é explodida e gravada — e nada mais muda
 > mais aponta (§12) — foi assim que a limpeza do teste reprovou na primeira
 > rodada.
 
-**Rode `cd tecido && npm test` (419 casos) ao mexer em pedido, preço, prazo ou
+**Rode `cd tecido && npm test` (449 casos) ao mexer em pedido, preço, prazo ou
 no catálogo** — 29 casos são do pedido e saem das seções 4.8 a 4.18 da spec, e
 3 do acesso (`acesso_operador.test.js`). Mexeu em permissão? **`node
 teste_acesso.js` (114) e `node teste_cobertura.js` (10) também.**
@@ -4510,7 +4542,7 @@ imprimir →  marca, registra quem imprimiu, e a segunda vez sai com o MESMO có
 > onde o bipe da etiqueta do kit quase foi dado por certo porque "não havia
 > motivo esperado para falhar".
 
-**Rode `cd tecido && npm test` (419 casos) ao mexer em etiqueta de produção,
+**Rode `cd tecido && npm test` (449 casos) ao mexer em etiqueta de produção,
 aprovação ou no plano vindo do pedido** — 16 casos são da etiqueta e travam o
 código na aprovação, a idempotência, a reimpressão com o mesmo código, a medida
 de corte no papel e a página de 100 × 35 mm (lida pelo `PDFDocument`, não por
@@ -4611,12 +4643,136 @@ gerencial.js  compõe os dois — e não calcula nenhum
 > pega em ninguém, que é a dívida 18 outra vez. Ela nasce na 4-C, junto com o
 > cadastro que a torna verdadeira.
 
-**Rode `cd tecido && npm test` (419 casos) ao mexer em `consumo.js`, no
+**Rode `cd tecido && npm test` (449 casos) ao mexer em `consumo.js`, no
 `gerencial.js` ou no que move pedido e plano** — 14 casos são da 4-B, e os dois
 que mais importam foram conferidos **reintroduzindo o defeito**: ler corte em
 vez de consumo, e não descontar o que já foi cortado. Cada um reprova o caso
 que existe para pegá-lo, e só ele. E **abra as duas telas**: três dos defeitos
 desta fase só apareceram no primeiro render.
+
+### ⚠️ A FASE 4-C (24/09/2026) — O TUBO CHEGANDO AO COMPRAS, E ELE É UM SÓ
+
+A 4-B mandou o **tecido** para o painel do próprio sob medida. O **tubo** é o
+contrário, e a diferença é de dono: ele é o **mesmo material** da medida
+padrão, comprado do mesmo fornecedor — decisão do dono em 24/09/2026, *"é o
+mesmo tubo, e o compras deveria ser o mesmo"*, mesmo com a produção sendo duas
+linhas de trabalho separadas. Separar as compras compraria o mesmo tubo duas
+vezes, perdendo escala.
+
+```
+tecido/nucleo/materiais.js       IDA:    a lista de material do PCP entra aqui
+tecido/dominio/consumo.js        a conta: materialDeCompra()
+sobmedida_material.js            VOLTA:  o consumo entra no Compras do PCP
+necessidade_dominio.js           soma no mesmo gatilho 2 da medida padrão
+```
+
+> ⚠️ **A PEÇA SAI DA CONTA QUANDO A ETIQUETA DELA É IMPRESSA — decisão do dono,
+> 24/09/2026, e é a regra desta fase.** Na medida padrão isso se resolve
+> sozinho: a peça é embalada, vira estoque, e o `precisa` cai. Aqui o pedido
+> **para em `aprovado`**, porque o marco seguinte é o bipe da bancada, que é a
+> fase 5. Sem sinal de saída o número **só subiria** — e número que só sobe é
+> número que a equipe aprende a ignorar, que é a regra 2 do `consumo.js` pela
+> porta do material.
+>
+> A impressão é o evento mais próximo do tubo que existe hoje: a linha do
+> **próprio tubo** carimba `impresso_em` desde a 4-A, então imprimir o maço da
+> Coleção não baixa o tubo, e a irmã não impressa do mesmo pedido continua na
+> conta. **Custo assumido, escrito aqui para não se descobrir depois:** o maço
+> impresso e ainda não cortado conta como produzido. São horas, não dias.
+>
+> Reimprimir não muda nada — é a armadilha #1-B do §2 pela porta da compra,
+> como já era pela porta da produção.
+
+> ⚠️ **O TUBO SE APONTA NO DEGRAU, E O RESTO NO COMPONENTE.** Tubo 32 e Tubo 41
+> são itens de estoque diferentes: o material **muda com o degrau**, e o
+> `sm_componente` tem uma linha só, chamada "Tubo". Por isso a coluna
+> `componente_id` existe nas duas tabelas e a do componente **recusa justamente
+> a chave `tubo`**, dizendo para ir à escada — duas afirmações sobre o mesmo
+> fato divergem no primeiro dia em que alguém editar só uma. A recusa diz para
+> onde ir: trava que só nega é trava que a equipe aprende a contornar (§5).
+
+> ⚠️ **NÃO HÁ FATOR DIGITADO, e isso mudou no caminho.** O plano previa um
+> `fator_para_compra` ao lado do vínculo. Quem responde como a peça vira
+> quantidade é a **unidade do item do PCP**, lida ao vivo: `m` lê a medida de
+> **consumo** da ficha (nunca a de corte — armadilha #18), `un` conta peças. Um
+> multiplicador digitado uma vez seria a segunda régua da mesma conta, e a que
+> erra em silêncio, porque ninguém o confere depois. Unidade que a peça não
+> sabe dizer (kg) é **recusada** no cadastro em vez de convertida por chute.
+
+> ⚠️ **TRÊS COISAS SÃO RECUSADAS NO CADASTRO, E AS TRÊS EVITAM UM NÚMERO QUE
+> MENTE.** Material em metro num componente **sem medida de consumo** (somaria
+> zero para sempre — a dívida 18 barrada onde alguém está olhando); material em
+> metro numa peça que se mede por **largura E altura** (é um retângulo, e metro
+> linear não descreve área — é o caso do tecido, que nem vai ao Compras do PCP);
+> e componente que **não gera etiqueta**, que nunca sairia da conta.
+
+> ⚠️ **DEGRAU SEM MATERIAL APONTADO VIRA PENDÊNCIA, NUNCA ZERO.** Uma persiana
+> sempre tem tubo, então o tubo sempre é esperado: ele não aparecer é um buraco
+> na lista de compras, e o comprador precisa saber que o total está incompleto
+> (regra 4 do custo). Os outros componentes são o contrário — a maioria é mão de
+> obra (montagem, revisão, embalagem) e nunca vira compra: cobrar vínculo para
+> todos poria seis pendências por peça na tela, todo dia, e ruído permanente é a
+> armadilha #6. Quem os mostra é a **tela de cadastro**, onde alguém está
+> olhando para eles.
+>
+> O mesmo vale para o degrau **renomeado** depois do pedido: o nome que o pedido
+> congelou não é achado na escada, e a peça vira pendência com esse nome — em vez
+> de sumir da conta em silêncio.
+
+> ⚠️ **SEM A PORTA, A LISTA DE COMPRAS NÃO CALA — MAS TAMBÉM NÃO RECUSA.** Aqui
+> a regra do `pessoas.js` ("sem a porta, recusa") **não cabe**: recusar deixaria
+> o comprador sem lista nenhuma por causa do sob medida, e o módulo sobe dentro
+> de um try/catch justamente para não derrubar a expedição. O que a porta faz é
+> **dizer** que o sob medida ficou de fora, com o motivo real — "falhou" sem
+> dizer o quê faz alguém procurar no lugar errado a tarde inteira. Caso travando:
+> tirar o try/catch reprova três casos.
+
+> ⚠️ **SOMA NO MESMO COMPONENTE, E A ORIGEM VAI EM CAMPO PRÓPRIO.** Os dois lados
+> pedem o mesmo tubo, e quem chegasse depois **apagaria** o outro — a fábrica
+> compraria metade, e o lado que some é sempre o que chega por último. Já a
+> origem é separada: `origem` é por **SKU** e `origem_sobmedida` é por **PEDIDO**.
+> Enfiar "pedido 5001" num campo chamado `sku` é mentira de campo, e a tela
+> escreveria uma frase que não se confere em lugar nenhum.
+
+> ⚠️ **UNIDADE DIVERGENTE VIRA PENDÊNCIA, NUNCA NÚMERO.** O PCP relê a unidade
+> do próprio cadastro e compara com a que o sob medida calculou. Divergiu, não
+> soma e diz as duas — somar seria inventar uma conversão que ninguém decidiu.
+> O mesmo para material **desativado** em Compras: a pendência diz "desativado",
+> senão o comprador vai procurar o erro no sob medida, onde ele não está.
+
+> ⚠️ **E TRÊS COISAS SÓ APARECERAM COM A TELA ABERTA — de novo, e é sempre o
+> mesmo tipo:**
+> - a pendência é por **peça** no domínio (e tem que ser, porque é a peça que sai
+>   da conta), e a tela escrevia a **mesma frase uma vez por peça**: um pedido de
+>   quatro persianas do mesmo degrau saía com quatro linhas idênticas. Hoje ela
+>   agrupa pelo motivo — *"2 peça(s) · pedido 5002: …"*. Lista que repete o mesmo
+>   texto ensina a não lê-la, e aí o motivo diferente passa batido (§7);
+> - as frases do domínio do sob medida saíam **sem acento** numa tela do PCP que
+>   é toda acentuada. Texto que chega à tela vai acentuado, como o `persiana.js`
+>   já fazia;
+> - o jar de cookie do `curl` marca o cookie de sessão com `#HttpOnly_`, e o
+>   filtro de comentário do script de tela o jogava fora: a tela abria no
+>   **login** e parecia que a permissão tinha mudado. Ficou na §12, porque é
+>   armadilha de ambiente e custa meia hora toda vez.
+
+> **Não há chave de permissão nova**, e é de propósito: `GET /api/sm/materiais`
+> é leitura do catálogo (`catalogo.ler`) e ligar é `catalogo.editar` — as duas
+> que quem abre aquela tela já tem. Chave nova aqui seria a terceira ponta da
+> armadilha #13 sem precisar.
+
+> ⚠️ **O CADASTRO É O QUE FALTA, E ELE NÃO É CÓDIGO.** Em produção o PCP tem
+> **um** tubo cadastrado (`Tubo 32 mm`); a escada usa 32, 38, 41 e 56. Enquanto
+> os outros três não existirem em Compras e não estiverem apontados, o tubo
+> deles sai como **pendência** na lista — que é o certo, e é o sinal de que
+> falta cadastro, não de que falta código.
+
+**Rode `cd tecido && npm test` (449 casos) e `node teste_compras_sobmedida.js`
+(29) ao mexer no vínculo, no `consumo.js`, no `necessidade_dominio.js` ou na
+lista de compras** — 30 casos são da 4-C, e seis defeitos foram reintroduzidos
+um a um para provar que cada caso pega o seu: ler corte em vez de consumo, não
+baixar na impressão, engolir o degrau sem material, sobrescrever em vez de
+somar, somar com unidade divergente e tirar o try/catch da porta. E **abra as
+duas telas**: três dos defeitos desta fase não têm teste que os pegue.
 
 ### Três regras do sob medida que valem citar aqui
 
@@ -4642,7 +4798,7 @@ cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 419 casos
+cd tecido && npm test          # 449 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
