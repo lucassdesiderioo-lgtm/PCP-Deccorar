@@ -827,11 +827,20 @@ Onde se aponta: **Catálogo → Escada de tubos**, coluna *Material de compra*
   lista por causa deste módulo.
 - **Não há chave de permissão nova:** `catalogo.ler` e `catalogo.editar` cobrem.
 
-### O que falta, e não é código
+### O cadastro que faltava — feito em 24/09/2026
 
-O PCP tem **um** tubo cadastrado (`Tubo 32 mm`); a escada usa 32, 38, 41 e 56.
-Enquanto os outros três não existirem em Compras e não estiverem apontados, o
-tubo deles sai como **pendência** — que é o certo.
+O PCP tinha **um** tubo (`Tubo 32 mm`) e a escada usa 32, 38, 41 e 56. Os três
+novos foram criados em **metro** no card Materiais do Compras, e os quatro
+degraus apontados: `Tubo 32 → 1`, `38 → 27`, `41 → 28`, `56 → 29`.
+
+**Quem provou o cadastro foi a pendência SUMIR**, e não a lista encher: sem o
+vínculo, o tubo de um pedido aprovado sai como *"degrau sem material
+apontado"*, que é o certo e é o sinal de que falta cadastro — nunca um zero.
+
+⚠️ **Degrau novo na escada pede material novo em Compras**, e em **metro**: é a
+unidade que decide a conta (`m` lê a medida de **consumo** da ficha, nunca a de
+corte; `un` contaria peças). Cadastrar em `un` faz o tubo entrar errado na
+lista de compras sem nada acusar.
 
 ---
 
