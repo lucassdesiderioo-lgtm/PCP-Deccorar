@@ -5,12 +5,13 @@ STATUS
 Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 23/09/2026
-Fase atual: 4-A EM CÓDIGO (23/09/2026) — falta o rolo impresso e o leitor bipando
+Fase atual: 4-A EM PRODUÇÃO, o leitor bipou no papel (23/09/2026) — falta a
+            peça real atravessando os cinco setores
             3 EM CÓDIGO e CONFERIDA no deploy (23/09/2026) — falta a semana
             em paralelo ao Decorsoft
             2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
             1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
-Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ◐(4-A em código · 4-B a fazer)  5 ☐  6 ☐  7 ☐  8 ☐
+Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ◐(4-A em produção · 4-B a fazer)  5 ☐  6 ☐  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
 Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) — ver abaixo
@@ -43,12 +44,19 @@ dentro da transação da aprovação. 16 casos novos: `npm test` do módulo vai 
 | 1 | **São 6 etiquetas na persiana simples e 7 com adicional — não 8** | O plano desta fase dizia oito, e o dono aprovou com esse número. Estava errado: a ficha tem oito componentes com `gera_etiqueta=1`, mas **bandô e barra nunca convivem** e nenhum dos dois entra quando `adicional='nenhum'`. A regra aprovada (uma etiqueta por componente que gera etiqueta) não mudou — o que estava errado era a conta. O pedido 5001 conferiu sozinho: 13 etiquetas para duas peças |
 | 2 | **O código de barras ocupa a largura inteira, numa faixa no rodapé** | O desenho de duas colunas (texto à esquerda, código nos 38 mm da direita) dava módulo de **0,23 mm** — abaixo do que a ZD220 resolve numa etiqueta amassada. A faixa de 66 mm no rodapé sobe o módulo e não tira nada do texto, que ganhou as linhas de cima |
 
-> ⚠️ **AINDA NÃO ESTÁ PRONTA, e o que falta é papel.** A régua final de código
-> de barras é o **leitor bipando** — é o que a §4 do `CLAUDE.md` ensina com o
-> QR do kit, que passou por três rodadas verdes sem ler em celular nenhum. Os
-> 405 casos e a tela aberta são indício; a etiqueta impressa na ZD220, lida
-> pelo leitor da bancada, é a prova. **Enquanto não houver, está escrito aqui
-> como não conferido.**
+> ✅ **EM PRODUÇÃO E CONFERIDA NO PAPEL EM 23/09/2026 — O LEITOR BIPOU.** Deploy,
+> backfill (13 etiquetas do pedido 5001 — 6 na persiana lisa e 7 na de bandô),
+> maço da Serralheria impresso na ZD220, e o leitor da bancada **bipou**. É a
+> régua final de código de barras, a mesma que a §4 do `CLAUDE.md` ensina com o
+> QR do kit — que passou por três rodadas verdes sem ler em celular nenhum. Os
+> 405 casos e a tela aberta eram indício; o bipe é a prova.
+
+> ⚠️ **E O QUE O BIPE NÃO PROVA, escrito aqui porque meia prova dada como prova
+> inteira fecha a pergunta para sempre.** Ele diz que a ZD220 imprime este
+> CODE128 num módulo que o leitor resolve — e mais nada. **Continua por
+> conferir:** que a medida escrita é a que a serralheria corta de verdade (isso
+> é a bancada, com o tubo na mão) e que o maço inteiro atravessa os cinco
+> setores. Essas só a primeira peça real responde.
 
 > **O que a tela mostrou, e nenhum teste pegaria** (quatro defeitos, todos no
 > primeiro render): a fileira de escolha do setor saía com os cinco botões
