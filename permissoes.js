@@ -57,6 +57,38 @@ module.exports = [
   { chave:'sobmedida.vender',     grupo:'Sob medida', nivel:'operacao',
     rotulo:'Vender sob medida',   desc:'Simulador, catalogo de venda e a carteira de revendas' },
 
+  /* ── OS CINCO SETORES DE PRODUCAO (fase 5-A, 24/09/2026) ────────────────
+     Decisao do dono: "tem que ser possivel criar cada setor no controle de
+     acesso, e quem tem acesso pega o tablet de manha e ve o que tem para
+     fazer". Sao cinco chaves, UMA POR SETOR, e nao uma chave so de
+     "producao": o bipe grava QUEM fez a peca, e na fase 5-B e por ele que a
+     recusa acha a pessoa certa — uma chave unica deixaria o serralheiro
+     bipar a embalagem, e a regua apontaria para quem nao trabalhou ali.
+
+     ⚠️ SETOR E CADASTRO, CHAVE E CODIGO — e essa fronteira precisa estar
+     escrita, senao vira "a tela deixa criar e nao funciona". Nome, ordem e
+     prefixo da etiqueta se editam no cadastro `sm_setor` do modulo; um SEXTO
+     setor de producao exige chave nova aqui. Gerar permissao a partir do
+     `tecido.db` acoplaria os dois bancos e furaria a porta unica — e setor
+     novo e mudanca de como a fabrica trabalha, que passar por codigo e o
+     certo.
+
+     ⚠️ E AS CINCO SAO `operacao`, PELA MESMA RAZAO DA `vender` ACIMA:
+     `sincronizarAreas` poe a area 'admin' em quem tem qualquer chave de
+     nivel admin, e o portao do modulo le 'admin' como DIRETOR. Um setor
+     declarado admin entregaria o modulo inteiro — catalogo, parametros do
+     encaixe, descarte de sobra — a quem so embala. */
+  { chave:'sobmedida.serralheria', grupo:'Sob medida', nivel:'operacao',
+    rotulo:'Sob medida — serralheria', desc:'Bipar tubo, base, bandô e barra na produção sob medida' },
+  { chave:'sobmedida.colecao',     grupo:'Sob medida', nivel:'operacao',
+    rotulo:'Sob medida — coleção',     desc:'Bipar o corte do tecido na produção sob medida' },
+  { chave:'sobmedida.montagem',    grupo:'Sob medida', nivel:'operacao',
+    rotulo:'Sob medida — montagem',    desc:'Bipar a montagem da persiana sob medida' },
+  { chave:'sobmedida.revisao',     grupo:'Sob medida', nivel:'operacao',
+    rotulo:'Sob medida — revisão',     desc:'Bipar a revisão da persiana sob medida' },
+  { chave:'sobmedida.embalagem',   grupo:'Sob medida', nivel:'operacao',
+    rotulo:'Sob medida — embalagem',   desc:'Bipar a embalagem da persiana sob medida (com o kit)' },
+
   // ─── DEVOLUÇÕES ─────────────────────────────────────────────
   { chave:'devolucao.registrar',  grupo:'Devoluções', nivel:'operacao',
     rotulo:'Registrar devolução', desc:'Receber e fazer a triagem física' },

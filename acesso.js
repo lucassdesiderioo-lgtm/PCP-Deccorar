@@ -58,6 +58,30 @@ function setoresNativos(){
        setor existe justamente para ele parar de precisar daquela. */
     { nome:'Sob medida / Venda',             nivel:'operacao',
       perms:['sobmedida.vender'] },
+    /* PRODUCAO SOB MEDIDA (fase 5-A, 24/09/2026). Cinco setores, um por
+       bancada — o fluxo fisico da secao 4.15 da spec. Nascem VAZIOS como os
+       tres de cima: ninguem e migrado, porque herdar gente por engano daria
+       bipe de serralheria a quem so revisa, e o bipe e o que grava QUEM fez.
+
+       ⚠️ "Revisao" e "Embalagem" EXISTEM NOS DOIS MUNDOS, e sao trabalhos
+       diferentes: o "Operador / Revisao" la em cima revisa a persiana pronta
+       do Mercado Livre, e este revisa a persiana sob medida antes de
+       embalar. O prefixo "Sob medida /" e o que separa os dois na tela de
+       Acessos — tirar o prefixo faria alguem marcar a caixinha errada e so
+       descobrir com o tablet na mao.
+
+       Cada um nasce SO com a chave do proprio setor. Quem embala nao corta
+       tecido e nao vende; quem precisa de dois setores recebe dois. */
+    { nome:'Sob medida / Serralheria',       nivel:'operacao',
+      perms:['sobmedida.serralheria'] },
+    { nome:'Sob medida / Coleção',           nivel:'operacao',
+      perms:['sobmedida.colecao'] },
+    { nome:'Sob medida / Montagem',          nivel:'operacao',
+      perms:['sobmedida.montagem'] },
+    { nome:'Sob medida / Revisão',           nivel:'operacao',
+      perms:['sobmedida.revisao'] },
+    { nome:'Sob medida / Embalagem',         nivel:'operacao',
+      perms:['sobmedida.embalagem'] },
     { nome:'Supervisor',                     nivel:'supervisor',
       perms:['painel.ver','produtividade.propria','produtividade.equipe','relatorios.ver','necessidade.ver'] },
     // COMPRAS.md §10 — os tres papeis nascem separados mesmo sendo uma pessoa
@@ -798,7 +822,17 @@ module.exports = function(app, db){
        nao esta neste mapa e apagada no primeiro salvamento — o acesso seria
        concedido na tela e sumiria sozinho depois. */
     ['sobmedida.cortar','sobmedida'], ['sobmedida.cadastrar','sobmedida_adm'],
-    ['sobmedida.vender','sobmedida_venda']
+    ['sobmedida.vender','sobmedida_venda'],
+    /* Os cinco setores de producao (fase 5-A). Uma area por setor, e nao uma
+       area so: e ela que o modulo le para saber QUAIS bancadas a pessoa
+       bipa. Sem a linha aqui a caixinha e marcada na tela e a area some
+       sozinha no salvamento seguinte — o acesso seria concedido e perdido
+       sem erro, sem log e sem ninguem saber por que. */
+    ['sobmedida.serralheria','sobmedida_serralheria'],
+    ['sobmedida.colecao',    'sobmedida_colecao'],
+    ['sobmedida.montagem',   'sobmedida_montagem'],
+    ['sobmedida.revisao',    'sobmedida_revisao'],
+    ['sobmedida.embalagem',  'sobmedida_embalagem']
   ];
   function sincronizarAreas(uid){
     try{
@@ -958,5 +992,10 @@ module.exports = function(app, db){
   });
 
   // exposto para o auth.js (Fase 3) e demais rotas (Fases 5/6)
-  app.locals.acesso = { permissoesDe, compararDivergencias, AREA_CHAVE, decidir, modoAcesso, permDaRota, auditar, podePermissao, ehAdminGeral, ehUltimoAdminGeral, coberturaDeRotas };
+  /* `sincronizarAreas` entrou aqui em 24/09/2026 para o teste poder perguntar a
+   QUEM GRAVA a coluna `areas`, em vez de refazer a conta por fora. Um teste
+   que remonta a coluna pela propria leitura concorda com o defeito — e a
+   licao do QR (§4 do CLAUDE.md): ele pergunta a si mesmo. Nenhuma rota usa
+   este campo; ele e leitura para teste e diagnostico. */
+  app.locals.acesso = { permissoesDe, compararDivergencias, AREA_CHAVE, decidir, modoAcesso, permDaRota, auditar, podePermissao, ehAdminGeral, ehUltimoAdminGeral, coberturaDeRotas, sincronizarAreas };
 };

@@ -276,6 +276,115 @@ eq('o modulo traduz essa area em "vendedor"',
 eq('...e "admin" continuaria valendo diretor, que e o motivo da trava acima',
   acessoSM.papelDe({ areas: ['admin'] }), 'diretor');
 
+console.log('\n── 6-C. os CINCO SETORES DE PRODUCAO do sob medida (fase 5-A) ──');
+/* Decisao do dono, 24/09/2026: "tem que ser possivel a gente criar cada setor
+   no controle de acesso, e quem tem acesso pega o tablet de manha e ve o que
+   tem para fazer". Ate aqui o modulo traduzia area em UM papel, e "quais
+   setores esta pessoa bipa" nao era pergunta que o sistema soubesse responder.
+
+   ⚠️ SAO CINCO CHAVES, UMA POR SETOR, e nao uma chave so de "producao". Uma
+   chave unica deixaria o serralheiro bipar a embalagem, e o bipe e o que
+   grava QUEM fez a peca — na fase 5-B e por ele que a recusa acha a pessoa
+   certa. Uma regua que aponta a pessoa errada e pior que nenhuma. */
+const SETORES_SM = [
+  ['serralheria','Sob medida / Serralheria','sobmedida_serralheria'],
+  ['colecao',    'Sob medida / Coleção',    'sobmedida_colecao'],
+  ['montagem',   'Sob medida / Montagem',   'sobmedida_montagem'],
+  ['revisao',    'Sob medida / Revisão',    'sobmedida_revisao'],
+  ['embalagem',  'Sob medida / Embalagem',  'sobmedida_embalagem']
+];
+
+for(const [chaveCurta, nomeSetor] of SETORES_SM){
+  const chave = 'sobmedida.' + chaveCurta;
+  const info = P.find(p => p.chave === chave);
+  ok('a chave ' + chave + ' esta declarada em permissoes.js', !!info);
+  /* ⚠️ O NIVEL E `operacao`, e pela MESMA razao da sobmedida.vender logo
+     acima: `sincronizarAreas` poe a area 'admin' em quem tem qualquer chave
+     de nivel admin, e o portao do modulo le 'admin' como DIRETOR. Um setor
+     declarado como admin entregaria o modulo inteiro a quem so embala. */
+  if(info) eq('  e o nivel dela e operacao — admin faria o operador virar diretor',
+    info.nivel, 'operacao');
+  ok('o setor "' + nomeSetor + '" foi semeado',
+    !!db.prepare('SELECT 1 FROM setores WHERE nome=?').get(nomeSetor));
+  const perms = db.prepare(`SELECT sp.chave FROM setores s
+    JOIN setor_permissao sp ON sp.setor_id=s.id WHERE s.nome=?`).all(nomeSetor).map(r => r.chave);
+  /* Nasce SO com a chave do proprio setor. Quem embala nao corta tecido, nao
+     cadastra e nao vende — e a mesma regra dos tres setores de sob medida
+     que ja existiam, que nascem vazios de gente e estreitos de chave. */
+  eq('  e ele nasce SO com a chave do proprio setor',
+    perms.sort().join(','), chave);
+  eq('  e NINGUEM foi migrado para ele — setor de sob medida nasce vazio',
+    db.prepare(`SELECT COUNT(*) c FROM usuario_setor us
+      JOIN setores s ON s.id=us.setor_id WHERE s.nome=?`).get(nomeSetor).c, 0);
+}
+
+/* A TERCEIRA PONTA: a area tem que voltar para `usuarios.areas`, que e o que
+   o portao do modulo le. Sem a linha no PERM_AREA o acesso e concedido na
+   tela e SOME SOZINHO no primeiro salvamento seguinte (armadilha #13). */
+const uEmb = db.prepare("INSERT INTO usuarios (nome,pin_hash,salt,areas,ativo) VALUES ('Embalador teste','x','y','',1)")
+  .run().lastInsertRowid;
+const sEmb = db.prepare("SELECT id FROM setores WHERE nome='Sob medida / Embalagem'").get();
+if(sEmb){
+  db.prepare('INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)').run(uEmb, sEmb.id);
+  const permsEmb = AC.permissoesDe(uEmb);
+  ok('quem esta no setor de embalagem ganha sobmedida.embalagem',
+    permsEmb.has('sobmedida.embalagem'));
+  ok('e NAO ganha os outros quatro setores',
+    !permsEmb.has('sobmedida.serralheria') && !permsEmb.has('sobmedida.colecao') &&
+    !permsEmb.has('sobmedida.montagem') && !permsEmb.has('sobmedida.revisao'));
+  ok('nem corta tecido, nem cadastra, nem vende',
+    !permsEmb.has('sobmedida.cortar') && !permsEmb.has('sobmedida.cadastrar') &&
+    !permsEmb.has('sobmedida.vender'));
+  const admDoEmb = [...permsEmb].filter(c => { const i = P.find(x => x.chave === c); return i && (i.nivel === 'admin' || i.nivel === 'admin_geral'); });
+  eq('e NENHUMA permissao dele e de nivel admin — e isso que mantem a area "admin" fora',
+    admDoEmb.join(', '), '');
+  /* A area de verdade, depois do sincronizarAreas — este e o texto que o
+     portao do modulo vai ler. */
+  /* ⚠️ Pergunta ao codigo que GRAVA, em vez de refazer a conta aqui. Um teste
+     que remonta `usuarios.areas` pela propria leitura concordaria com o
+     defeito — e a licao do QR (§4): ele perguntaria a si mesmo. */
+  ok('o acesso.js expoe o sincronizarAreas para dar para conferir a 3a ponta',
+    typeof AC.sincronizarAreas === 'function');
+  if(typeof AC.sincronizarAreas === 'function') AC.sincronizarAreas(uEmb);
+  const areasEmb = (db.prepare('SELECT areas FROM usuarios WHERE id=?').get(uEmb).areas || '').split(',').filter(Boolean);
+  ok('a area sobmedida_embalagem chega em usuarios.areas (a linha do PERM_AREA)',
+    areasEmb.includes('sobmedida_embalagem'),
+    'areas: ' + (areasEmb.join(',') || '(vazio)'));
+  ok('e a area "admin" NAO vem junto', !areasEmb.includes('admin'));
+}
+
+/* E O QUE O MODULO FAZ COM ISSO — a conta de verdade, feita pelo tradutor
+   dele, e nao uma releitura dela aqui. */
+const acessoProd = require('./tecido/nucleo/acesso');
+eq('o modulo traduz area de setor em papel "producao"',
+  acessoProd.papelDe({ areas: ['sobmedida_embalagem'] }), 'producao');
+/* ⚠️ Funcao que ainda nao existe tem que dar VERMELHO, nunca derrubar a
+   rodada: suite que morre no meio faz o defeito aparecer como "travou" em vez
+   de falhar, e os casos de baixo nunca rodam. E a licao do teste_componentes
+   de hoje de manha, um andar acima. */
+ok('o modulo sabe responder QUAIS setores a pessoa bipa (setoresDe)',
+  typeof acessoProd.setoresDe === 'function');
+const setoresDe = a => { try{ return (acessoProd.setoresDe({areas:a})||[]); }catch(e){ return ['(estourou: '+e.message+')']; } };
+eq('quem so embala bipa UM setor',
+  setoresDe(['sobmedida_embalagem']).join(','), 'embalagem');
+eq('quem tem dois setores bipa os dois, na ordem da fabrica',
+  setoresDe(['sobmedida_embalagem','sobmedida_serralheria']).join(','),
+  'serralheria,embalagem');
+eq('quem nao tem setor nenhum nao bipa nada',
+  setoresDe(['sobmedida_venda']).length, 0);
+/* ⚠️ O SETOR NAO DEPENDE DO PAPEL, e e isso que faz o vendedor que tambem
+   embala continuar embalando. O papel sai da area MAIS LARGA (uma so), os
+   setores saem de TODAS as areas de setor — sao duas contas diferentes, e
+   juntar as duas faria a pessoa perder a bancada ao ganhar a carteira. */
+eq('quem vende E embala tem o papel mais largo...',
+  acessoProd.papelDe({ areas: ['sobmedida_venda','sobmedida_embalagem'] }), 'vendedor');
+eq('...e continua bipando a embalagem do mesmo jeito',
+  setoresDe(['sobmedida_venda','sobmedida_embalagem']).join(','), 'embalagem');
+/* O diretor bipa todos, por coerencia com o `*` das chaves dele: recusar o
+   dono numa bancada seria trava disparando no caso normal (armadilha #6). */
+eq('o diretor bipa os cinco',
+  setoresDe(['admin']).length, 5);
+
 /* ═══════════ AS TRAVAS DE ESCALONAMENTO (divida 17, 17/09/2026) ═══════════
    Tudo daqui pra baixo responde a mesma pergunta: DA PRA SUBIR DE NIVEL PELA
    TELA OFICIAL? Enquanto desse, a tela de Acessos era o caminho mais curto

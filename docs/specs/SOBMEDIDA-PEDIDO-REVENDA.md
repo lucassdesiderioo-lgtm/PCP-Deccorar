@@ -5,7 +5,10 @@ STATUS
 Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 24/09/2026
-Fase atual: 4-C EM PRODUÇÃO (24/09/2026) — o tubo chegando ao Compras do PCP;
+Fase atual: 5-A EM CÓDIGO (24/09/2026) — os cinco setores da produção no
+            controle de acesso do PCP; sobe SOZINHA para o dono marcar as
+            pessoas enquanto o bipe é construído
+            4-C EM PRODUÇÃO (24/09/2026) — o tubo chegando ao Compras do PCP;
             os quatro degraus JÁ apontados (24/09) — falta o primeiro pedido
             real aparecer lá, e o comprador comprar por ele
             4-B EM CÓDIGO (24/09/2026) — o tecido, no painel do sob medida
@@ -15,11 +18,113 @@ Fase atual: 4-C EM PRODUÇÃO (24/09/2026) — o tubo chegando ao Compras do PCP
             em paralelo ao Decorsoft
             2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
             1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
-Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ☐  6 ☐  7 ☐  8 ☐
+Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ◐(5-A em código · 5-B não começou)  6 ☐  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
-Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) — ver abaixo
+Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) + 2 (fase 5-A) — ver abaixo
 ```
+
+## 📌 O QUE ESTÁ PENDENTE — a lista única
+
+> Pedido do dono em 24/09/2026: *"vai deixando escrito e anotado tudo que está
+> pendente"*. **Este bloco é o lugar único.** Cada linha diz o que falta, de
+> quem é e o que acontece se ficar parada — e o resto do arquivo detalha.
+>
+> ⚠️ **Pendência escrita em quatro lugares é pendência que ninguém lê inteira.**
+> Quem fechar uma delas risca **aqui**, no mesmo commit — e é daqui que sai a
+> resposta de "o que falta para a spec fechar".
+
+### Cadastro e conferência — é do dono, e sem isso a regra fica INERTE
+
+| # | O que falta | Sem isso | Fase |
+|---|---|---|---|
+| 1 | **Marcar as pessoas nos cinco setores** de produção (Admin → Acessos → Setores) | a fase 5 inteira é texto: os cinco estão com `0 pessoa(s)`. É a armadilha #30 do `CLAUDE.md` | 5-A |
+| 2 | **Lançar o percentual das tabelas A e C** | o simulador recusa dizer o preço das revendas dessas tabelas — e **está certo** recusando (regra 4) | 2 |
+| 3 | **Cadastrar as revendas de hoje**, com vendedor, tabela, desconto e limite | a carteira nasce vazia e o pedido não tem para quem ir | 2 |
+| 4 | **Cadastrar os feriados** do calendário | o prazo conta como se todo dia fosse útil, e a revenda ouve uma data que a fábrica não cumpre | 2 |
+| 5 | **Preencher mínimo e ideal** dos `Tubo 38/41/56` (nasceram em zero, de propósito) | o gatilho 1 não dispara para eles: a compra vem só do que está vendido | 4-C |
+
+### Provas de fábrica — deploy não é conferência
+
+| # | A prova que falta | O que ela fecha |
+|---|---|---|
+| 6 | O **próximo pedido aprovado** somando na linha certa do Compras, e o comprador comprando por ela | a 4-C |
+| 7 | A **semana em paralelo ao Decorsoft**, pedido a pedido | a 3 — a folha do 5001 provou o ciclo e a aritmética, não o cadastro |
+| 8 | A **peça real atravessando os cinco setores** | a 4-A e a 5 |
+| 9 | O **serralheiro cortando pela medida da etiqueta** | a 4-A — o bipe provou o código de barras, não a medida |
+| 10 | O **comprador comprando pelo painel de tecido** (o comprometido da 4-B) | a 4-B |
+
+### Dívida técnica que esta spec deixou aberta
+
+| # | O que é | Por que ficou |
+|---|---|---|
+| 11 | As **23 chaves de nível admin do PCP** continuam fazendo quem as tem entrar no sob medida como **diretor** | é anterior à fase 2 e estreitar aquela leitura muda quem pode o quê: é `REGRA`, não conserto |
+| 12 | A `familia_sku` velha não é reescrita | é história do que o sistema viu; o aprendizado recomeça sozinho |
+| 13 | **Sexto setor de produção exige código** (a chave), e a tela deixa criar o setor | decisão de 24/09: setor é cadastro, chave é código — ver a 5-A |
+
+### O que ainda não foi construído
+
+| Fase | O que é |
+|---|---|
+| **5-B** | a recusa com motivo → setor → pessoa, e o fechamento de pendência pela chefia |
+| 6 | o gerencial (kanban com colunas cadastráveis) |
+| 7 | o portal da revenda |
+| 8 | segurança e abertura |
+
+## STATUS DA FASE 5-A — em código em 24/09/2026
+
+**Os cinco setores da produção no controle de acesso do PCP.** O pedido parava
+em `aprovado` e a fábrica não tinha como dizer que trabalhou. Esta é a primeira
+metade da fase 5 — **o acesso** —, e ela sobe sozinha por uma razão: a regra só
+pega quando alguém estiver marcado, e o dono marca enquanto o bipe é
+construído. Regra que depende de caixinha marcada é a armadilha #30, que
+deixou `modelo.sob_medida` três semanas inerte.
+
+**Decisão do dono:** *"tem que ser possível a gente criar cada setor no
+controle de acesso, e quem tem acesso dentro da empresa por login já pega seu
+tablet de manhã e vê o que tem para fazer"*.
+
+```
+permissoes.js (PCP)      sobmedida.serralheria · .colecao · .montagem
+                         .revisao · .embalagem        — cinco, nivel operacao
+acesso.js (PCP)          cinco setores nativos, VAZIOS + cinco linhas no PERM_AREA
+tecido/nucleo/acesso.js  setoresDe() — quais bancadas esta pessoa bipa
+tecido/nucleo/permissoes.js  o papel `producao` e a chave `producao.bipar`
+```
+
+### As duas mudanças no caminho (fase 5-A)
+
+| # | Mudou | Por quê |
+|---|---|---|
+| 1 | **Cinco chaves, e não uma de "produção"** | o bipe grava **quem fez**, e é por ele que a recusa da 5-B acha a pessoa certa. Uma chave só deixaria o serralheiro bipar a embalagem, e a régua apontaria para quem não trabalhou ali — régua que acusa o inocente é pior que régua nenhuma |
+| 2 | **`producao.bipar` vem do SETOR, não do papel** | o papel é sempre a área mais larga (uma só, sem soma). Sem isso, o vendedor que também embala sairia como `vendedor` e levaria 403 na bancada, com o setor marcado na tela e sem ninguém entender por quê |
+
+> ⚠️ **SETOR É CADASTRO, CHAVE É CÓDIGO.** Nome, ordem e prefixo da etiqueta se
+> editam em `sm_setor`; um **sexto** setor exige chave nova no PCP. Gerar a
+> permissão a partir do `tecido.db` acoplaria os dois bancos e furaria a porta
+> única. Está escrito porque é onde alguém tenta "consertar" depois — e o
+> resultado seria a tela deixar criar um setor que não libera ninguém.
+
+> ⚠️ **AS CINCO SÃO `operacao`, NUNCA `admin`.** `sincronizarAreas` põe a área
+> `admin` em quem tem qualquer chave de nível admin, e o portão do módulo lê
+> `admin` como **diretor**: um setor declarado admin entregaria catálogo,
+> parâmetros do encaixe e descarte de sobra a quem só embala. É a porta A da
+> armadilha #28 por cinco portas de uma vez.
+
+> **Conferido reintroduzindo cada defeito:** tirar a linha do `PERM_AREA` (a
+> área some sozinha no salvamento seguinte), tirar `producao.bipar` do
+> `POR_SETOR` (quem vende e embala perde a bancada), o papel `producao` sem
+> `modulo.entrar` (o módulo abre em branco com 403 no console) e ordenar os
+> setores por nome (a fila leria a ordem do trabalho errada). Cada um reprova o
+> caso que existe para pegá-lo. `teste_acesso.js` 154 · `npm test` 450.
+
+> **E a tela foi aberta:** os cinco aparecem em Admin → Acessos → Setores, cada
+> um com `0 pessoa(s) · 1 perm.`, e as cinco caixinhas na ficha da pessoa.
+
+> ⚠️ **AINDA NÃO PEGA EM NINGUÉM, e isso é a pendência 1 da lista do topo.**
+> Enquanto os cinco ficarem com `0 pessoa(s)`, a fase 5 inteira é texto. **O
+> sinal de inerte:** marcada a primeira pessoa, ela tem que ver a bancada dela
+> no menu do `/sobmedida`. Não ver é defeito.
 
 ## STATUS DA FASE 4-C — em produção em 24/09/2026
 
