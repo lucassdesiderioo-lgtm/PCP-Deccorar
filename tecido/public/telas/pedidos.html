@@ -50,6 +50,8 @@ table.lista tr.cancelado td{opacity:.55; text-decoration:line-through}
 </header>
 
 <div class="corpo">
+  <div class="cartao" id="cRisco" style="display:none;border-color:var(--erro)">
+    <h2>Aprovados esperando tecido</h2><div id="risco"></div></div>
   <div class="cartao" id="cFila"><h2>Esperando a sua aprovação</h2><div id="fila"></div></div>
   <div class="cartao" id="cLista"><h2>Pedidos e orçamentos</h2><div id="lista"></div></div>
   <div class="cartao" id="cAberto" style="display:none"><h2 id="tituloAberto"></h2><div id="aberto"></div></div>
@@ -75,6 +77,7 @@ const emMetros=mm=>mm==null?'':(mm/1000).toFixed(3).replace('.',',');
 const reais=t=>t==null?'—':'R$ '+t;
 
 let eu={permissoes:[]}, fila=[], lista=[], revendas=[], modelo=null, cores=[];
+let risco=[];
 let aberto=null, erro=null, novaPeca=null;
 const posso=k=>(eu.permissoes||[]).indexOf(k)>=0;
 
@@ -485,16 +488,63 @@ const NAV_BASE='/sobmedida';
 async function carregar(){
   eu=await api('/api/eu');
   $('#quem').textContent=eu.nome+' · '+eu.papel;
-  [fila,lista]=await Promise.all([
+  [fila,lista,risco]=await Promise.all([
     api('/api/pedidos/fila').catch(()=>[]),
-    api('/api/pedidos')
+    api('/api/pedidos'),
+    api('/api/pedidos/risco/tecido',{silencioso:true}).catch(()=>[])
   ]);
   if(posso('pedido.lancar')){
     revendas=await api('/api/revendas?ativo=1',{silencioso:true}).catch(()=>[]);
     if(!modelo) await carregarCatalogo().catch(()=>{});
   }
+  desenharRisco();
   desenharListas();
 }
+
+/* ── OS APROVADOS QUE ESTAO ESPERANDO TECIDO (fase 4-B) ───────────────────
+   A §4.10 promete isto desde a fase 3: "o item sai marcado sem tecido, entra
+   na necessidade de compra e o VENDEDOR RECEBE O AVISO para negociar prazo
+   maior com a revenda". Ate aqui a marca era uma foto do dia do envio, e
+   nenhuma tela olhava para ela depois — regra escrita, codificada e que nao
+   pegava em ninguem, que e a divida 18 do CLAUDE.md.
+
+   ⚠️ E ELE MEDE HOJE, NAO O DIA DO ENVIO. O rolo pode ter chegado depois — ou
+   o pedido de ontem pode ter comido a bobina que este esperava, e aI o pedido
+   nasceu com tecido e esta sem. A foto continua no pedido, porque ela explica
+   a conversa que o vendedor ja teve com a revenda; esta linha diz o que esta
+   parado agora. */
+function desenharRisco(){
+  const c=limpar($('#risco'));
+  // Card vazio todo dia vira paisagem, e aI ninguem le no dia em que ele
+  // aparece cheio (§5 do CLAUDE.md).
+  $('#cRisco').style.display=(risco||[]).length?'':'none';
+  if(!(risco||[]).length) return;
+
+  c.appendChild(el('p',{class:'nota',texto:
+    'Pedido já aprovado cujo tecido não está na estante HOJE. A fábrica não corta '+
+    'sem bobina — quem avisa a revenda do prazo é o vendedor. A marca "sem tecido" '+
+    'da lista abaixo é outra coisa: ela é do dia do envio, e explica o prazo que a '+
+    'revenda já ouviu.'}));
+  risco.forEach(p=>{
+    const d=el('div',{style:'padding:8px 0;border-bottom:1px solid var(--linha)'});
+    d.appendChild(el('div',{},[
+      el('b',{texto:'Pedido '+(p.numero||('#'+p.pedido_id))}),
+      document.createTextNode('  '+(p.revenda||''))]));
+    (p.tecidos||[]).forEach(t=>{
+      d.appendChild(el('div',{class:'nota',
+        texto:t.nome+' — este pedido usa '+area(t.usa)}));
+      /* A linha de baixo e do TECIDO, e diz isso: sem ela, dois pedidos do
+         mesmo tecido mostrariam o mesmo "precisa" e quem lesse compraria o
+         dobro. Com ela, o total aparece uma vez por pedido mas nomeado. */
+      d.appendChild(el('div',{class:'nota'},[
+        document.createTextNode('deste tecido a fábrica deve '+area(t.vendido)+' e tem '),
+        el('b',{style:'color:var(--erro)'},[t.tem>0?area(t.tem):'nada']),
+        document.createTextNode(' na estante')]));
+    });
+    c.appendChild(d);
+  });
+}
+const area=v=>(Math.round((v||0)*100)/100).toFixed(2).replace('.',',')+' m²';
 
 carregar();
 </script>

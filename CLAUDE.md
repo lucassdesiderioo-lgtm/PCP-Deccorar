@@ -3437,6 +3437,28 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   torta e a tarja aparece debaixo do cabeçalho de outra coluna (§19, §12)
 - ❌ Escrever a chave do setor na tela da bancada em vez do nome — chave de
   banco em tela é o "— Correcao de contagem" do §2 outra vez (§19)
+- ❌ Mandar o tecido do sob medida para a lista de compras do PCP: o estoque
+  dele mora no `tecido.db` e já tem painel — seria a segunda régua (§19, 4-B)
+- ❌ Calcular o comprometido de tecido fora do `tecido/dominio/consumo.js`, ou
+  deixar o `gerencial.js` somar peça de pedido por conta própria (§19, 4-B)
+- ❌ Ler a medida de CORTE no comprometido: ela é a mais apertada, e comprar
+  por ela compra A MENOS — a bobina acaba no meio de um pedido (§19, 4-B)
+- ❌ Deixar o comprometido sem descontar o que já foi cortado: número que só
+  sobe é número que a equipe aprende a ignorar (§19, 4-B)
+- ❌ Baixar o comprometido por plano só CALCULADO: quem consome rolo é o plano
+  confirmado (§19, 4-B)
+- ❌ Repartir o comprometido entre as larguras de bobina: o pedido escolhe a
+  COR, e quem escolhe a largura é o plano, na hora de cortar (§19, e a #17)
+- ❌ Tirar do painel o tecido que tem venda aprovada e nenhum rolo — é
+  justamente o que precisa ser comprado (§19, 4-B)
+- ❌ Escrever `0 m²` na estante de um tecido que nunca teve rolo: zero se lê
+  como "tinha e acabou", e ali a verdade é "nunca teve" (§19, 4-B)
+- ❌ Trocar a foto do "sem tecido" do envio pelo aviso de hoje, ou o contrário:
+  a foto explica o prazo que a revenda já ouviu (§19, 4-B)
+- ❌ Escrever o total do TECIDO na linha de um pedido sem dizer que é do
+  tecido: dois pedidos mostram o mesmo número e quem soma compra o dobro (§19)
+- ❌ Fazer o filtro da tela cortar a tabela e não o cartão do resumo — dois
+  recortes lado a lado é a mesma tela dizendo duas coisas (§19, 4-B)
 
 ---
 
@@ -4172,7 +4194,7 @@ engano. Há caso travando.
 > silêncio — foi assim que o `resumo.valor_parado` do painel gerencial chegou à
 > bancada (§15). Há caso travando os dois nomes, o certo e o errado.
 
-**Rode `cd tecido && npm test` (405 casos) e `node teste_acesso.js` (114) ao
+**Rode `cd tecido && npm test` (419 casos) e `node teste_acesso.js` (114) ao
 mexer em revenda, prazo, preço, permissão ou no `server.js`.** Os casos do
 prazo saem das datas escritas na §4.9 da spec, e não da resposta que a função
 deu.
@@ -4340,7 +4362,7 @@ aprovado   a ficha é explodida e gravada — e nada mais muda
 > mais aponta (§12) — foi assim que a limpeza do teste reprovou na primeira
 > rodada.
 
-**Rode `cd tecido && npm test` (405 casos) ao mexer em pedido, preço, prazo ou
+**Rode `cd tecido && npm test` (419 casos) ao mexer em pedido, preço, prazo ou
 no catálogo** — 29 casos são do pedido e saem das seções 4.8 a 4.18 da spec, e
 3 do acesso (`acesso_operador.test.js`). Mexeu em permissão? **`node
 teste_acesso.js` (114) e `node teste_cobertura.js` (10) também.**
@@ -4488,7 +4510,7 @@ imprimir →  marca, registra quem imprimiu, e a segunda vez sai com o MESMO có
 > onde o bipe da etiqueta do kit quase foi dado por certo porque "não havia
 > motivo esperado para falhar".
 
-**Rode `cd tecido && npm test` (405 casos) ao mexer em etiqueta de produção,
+**Rode `cd tecido && npm test` (419 casos) ao mexer em etiqueta de produção,
 aprovação ou no plano vindo do pedido** — 16 casos são da etiqueta e travam o
 código na aprovação, a idempotência, a reimpressão com o mesmo código, a medida
 de corte no papel e a página de 100 × 35 mm (lida pelo `PDFDocument`, não por
@@ -4496,6 +4518,105 @@ regex — pdf-lib comprime os objetos e a contagem por `/Contents` dava zero com
 o teste dizendo "passou"). Mexeu em permissão? **`node teste_acesso.js` (114) e
 `node teste_cobertura.js` (10) também.** E **abra a tela**: quatro dos defeitos
 desta fase não têm teste que os pegue.
+
+### ⚠️ A FASE 4-B (24/09/2026) — O QUE JÁ ESTÁ VENDIDO E AINDA NÃO FOI CORTADO
+
+O painel de tecido sabia quanto tem na estante e quanto **girou** (`giro.js`), e
+dizia, com todas as letras, que não faz ponto de pedido. Faltava ali o outro
+lado da mesma pergunta: **quanto já está vendido e ainda não foi cortado.**
+`dominio/consumo.js` é o dono único disso.
+
+```
+giro.js       o que SAIU       (olha para trás)
+consumo.js    o que VAI SAIR   (olha para a frente)
+gerencial.js  compõe os dois — e não calcula nenhum
+```
+
+> ⚠️ **O TECIDO DO SOB MEDIDA NÃO VAI PARA A LISTA DE COMPRAS DO PCP, e isso é
+> decisão, não esquecimento.** O estoque dele mora no `tecido.db` e já tem
+> painel, mínimo e status. Mandá-lo também para o Compras seria a segunda régua
+> da armadilha #12 — duas telas dizendo quanto tecido falta, cada uma certa na
+> sua conta, e a divergência aparecendo só no dia da compra. O tubo é outra
+> história: **ele é o mesmo material da medida padrão, e Compras é um só**
+> (decisão do dono, 24/09/2026) — é a fase 4-C, e depende do vínculo
+> `sm_componente` → `componente` do PCP, que hoje não existe.
+
+> ⚠️ **É CONSUMO, NUNCA CORTE.** São os dois números da linha da ficha
+> (armadilha #18), e eles nunca fecham. O corte é sempre o mais apertado —
+> comprar por ele compra **a menos**, e a bobina acaba no meio de um pedido.
+> Caso travando: dobrar a medida de corte não pode mexer num metro do
+> comprometido, e foi conferido reintroduzindo o defeito.
+
+> ⚠️ **ELE BAIXA QUANDO A PEÇA É CORTADA.** Número que só sobe vira número que
+> a equipe aprende a ignorar, e aí não compra nada. Quem baixa é o plano
+> **confirmado** — plano só calculado não consumiu rolo nenhum. O casamento é
+> por `(pedido, tecido, medida de corte)`, e é **exato**: a 4-A manda a peça ao
+> plano com `largura_corte_mm/1000`, então a medida que chega em `plano_peca` é
+> a mesma da ficha congelada. Duas persianas idênticas do mesmo pedido têm a
+> mesma chave, e aí tanto faz qual das duas foi cortada.
+
+> ⚠️ **O COMPROMETIDO NÃO É REPARTIDO ENTRE AS BOBINAS.** O pedido escolhe a
+> **cor**; quem escolhe a **largura** é o plano de corte, e só na hora de
+> cortar. Por isso ele tem lista própria (`por_tecido`) em vez de uma coluna na
+> tabela `tecido × largura` — repartir seria inventar a escolha do plano, e é a
+> armadilha #17 por dentro. **Na conta de COMPRA somar as bobinas é legítimo**
+> (a pergunta é quanto comprar); na de **cobertura**, não (a pergunta é se
+> aquela bobina aguenta). São duas perguntas, e o painel responde as duas em
+> lugares diferentes.
+
+> ⚠️ **TECIDO COMPROMETIDO E SEM ROLO NENHUM APARECE, em vez de sumir.** O
+> filtro da tabela de estoque tira quem não tem saldo nem consumo, e está certo
+> para gestão de estoque — mas aqui há venda aprovada esperando por ele, e
+> sumir é o silêncio que a §4.10 da spec manda evitar. Na coluna "na estante"
+> ele mostra **traço**, nunca `0 m²`: zero se lê como "tinha e acabou", e a
+> verdade é "nunca teve" (regra 4 do custo).
+
+> ⚠️ **O "SEM TECIDO" DO PEDIDO É UMA FOTO; O AVISO AO VENDEDOR É DE HOJE — e
+> as duas coisas ficam.** A marca gravada no envio explica o prazo que a
+> revenda já ouviu. O card **Aprovados esperando tecido** olha a estante
+> agora: o rolo pode ter chegado depois, ou — pior — o pedido de ontem pode ter
+> comido a bobina que este esperava, e aí o pedido nasceu com tecido e está
+> sem. Trocar uma pela outra apagaria a conversa que o vendedor já teve. Era a
+> promessa da §4.10 que ficava sem cumprir desde a fase 3: regra escrita,
+> codificada, e que não pegava em ninguém — a dívida 18.
+
+> ⚠️ **O PEDIDO INTEIRO ENTRA NO AVISO, e não só a parte que não cabe.** Quando
+> dois pedidos disputam a mesma bobina, não dá para dizer qual fica sem: quem
+> decide é quem corta, na ordem em que cortar. Escolher no código seria
+> inventar uma fila que não existe.
+
+> ⚠️ **E FORAM TRÊS DEFEITOS SÓ NO PRIMEIRO RENDER — de novo, e nenhum tem
+> teste de unidade que o pegue:**
+> - o aviso dizia *"Pedido 5001 precisa de 7,56 m²"* **e** *"Pedido 5002
+>   precisa de 7,56 m²"* — o mesmo número em dois pedidos de tamanhos
+>   diferentes, porque era o total do **tecido**. Quem somasse compraria o
+>   dobro. Hoje a linha diz o que **este** pedido usa, e o total do tecido vai
+>   nomeado embaixo;
+> - o **filtro da tela cortava a tabela e não o cartão**: em "Cor: Branco" o
+>   cartão somava os 9,54 m² de tudo e a falta só do Branco — dois recortes
+>   lado a lado. É o que o comentário do próprio `painel()` já mandava não
+>   fazer;
+> - a tabela nasceu com `class:'lista'` e `class:'n'`, que são CSS da tela de
+>   **produção** e não existem aqui. É a fileira de escolha da 4-A outra vez:
+>   classe própria em vez da do `base.css`.
+
+> **Não há chave de permissão nova, e isso é de propósito.** O comprometido
+> viaja no `GET /api/painel/gerencial` (`painel.ler`) e o aviso em
+> `/api/pedidos/risco/tecido` (`pedido.ler`) — as duas chaves que quem abre
+> aquelas telas já tem. Chave nova aqui seria a terceira ponta da armadilha #13
+> sem precisar: mais uma coisa para marcar, que ninguém marcaria.
+
+> **A porta para o Compras do PCP ficou de fora, e não é falta.** Sem o vínculo
+> do `sm_componente`, ela devolveria uma lista vazia — regra escrita que não
+> pega em ninguém, que é a dívida 18 outra vez. Ela nasce na 4-C, junto com o
+> cadastro que a torna verdadeira.
+
+**Rode `cd tecido && npm test` (419 casos) ao mexer em `consumo.js`, no
+`gerencial.js` ou no que move pedido e plano** — 14 casos são da 4-B, e os dois
+que mais importam foram conferidos **reintroduzindo o defeito**: ler corte em
+vez de consumo, e não descontar o que já foi cortado. Cada um reprova o caso
+que existe para pegá-lo, e só ele. E **abra as duas telas**: três dos defeitos
+desta fase só apareceram no primeiro render.
 
 ### Três regras do sob medida que valem citar aqui
 
@@ -4521,7 +4642,7 @@ cadastrar a largura *útil* do rolo — não há desconto automático a fazer.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 405 casos
+cd tecido && npm test          # 419 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:

@@ -6,6 +6,7 @@
 // aprovacao que manda a peca para a fabrica; cancelar e a terceira, porque
 // desfaz o que a fabrica ja viu.
 const pedido=require('../dominio/pedido');
+const consumo=require('../dominio/consumo');
 const pdf=require('../dominio/pedido_pdf');
 const custo=require('../dominio/custo');
 
@@ -33,6 +34,15 @@ module.exports={rotas:[
    manipulador:({query,usuario})=>podar(usuario,pedido.listar({
      marco:query.marco, tipo:query.tipo,
      revenda_id:query.revenda_id, vendedor_usuario_id:query.vendedor_usuario_id}))},
+
+  /* ── OS APROVADOS QUE ESTAO ESPERANDO TECIDO (fase 4-B) ─────────────────
+     O aviso que a §4.10 promete ao vendedor: "entra marcado, e o vendedor
+     negocia prazo maior". Ate aqui a marca era so a foto do envio, e ninguem
+     mais olhava para ela — regra escrita que nao pegava em ninguem, que e a
+     divida 18 do CLAUDE.md. Rota de LEITURA, com a chave que o vendedor ja
+     tem: chave nova aqui seria a terceira ponta da armadilha #13 sem precisar. */
+  {metodo:'GET', caminho:'/api/pedidos/risco/tecido', permissao:LER,
+   manipulador:()=>consumo.pedidosEmRisco()},
   {metodo:'GET', caminho:'/api/pedidos/:id', permissao:LER,
    manipulador:({params,usuario})=>podar(usuario,pedido.porId(Number(params.id)))},
 
