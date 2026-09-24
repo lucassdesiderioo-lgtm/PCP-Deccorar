@@ -528,6 +528,11 @@ function porId(id){
     sem_tecido:p.sem_tecido,
     enviado_em:p.enviado_em, enviado_por:p.enviado_por,
     aprovado_em:p.aprovado_em, aprovado_por:p.aprovado_por,
+    /* ⚠️ `pronto_em` NASCEU NA FASE 5-B1 E NENHUMA TELA O LIA — a coluna
+       existia, o bipe a gravava, e quem abrisse o pedido nao tinha como
+       saber que ele estava pronto. E a divida 18 do CLAUDE.md pela porta do
+       leitor que faltava; o kanban da 6-A e o primeiro a precisar dele. */
+    pronto_em:p.pronto_em,
     cancelado_em:p.cancelado_em, cancelado_por:p.cancelado_por, cancelado_motivo:p.cancelado_motivo,
     criado_em:p.criado_em, criado_por:p.criado_por,
     itens,

@@ -1450,6 +1450,51 @@ CREATE TABLE sm_recusa (
 );
 CREATE INDEX idx_sm_recusa_item ON sm_recusa(item_id);
 CREATE INDEX idx_sm_recusa_componente ON sm_recusa(componente_id);
+`},
+
+{n:23, nome:'o kanban — as colunas sao cadastro, as etapas sao codigo', sql:`
+/* === O KANBAN =============================================================
+   Fase 6-A da spec SOBMEDIDA-PEDIDO-REVENDA (secao 4.17). Onde esta cada
+   pedido, numa tela so — o "onde esta o pedido X" do pronto-quando da fase.
+
+   ⚠️ AS COLUNAS SAO LIVRES, AS ETAPAS NAO — e a frase da spec, e esta tabela
+   e a metade livre. O NOME se edita; o que a coluna APONTA e uma lista
+   fechada no \`dominio/kanban.js\`. Renomear "Em producao" nao pode desligar
+   regra nenhuma, porque nenhuma regra le o nome.
+
+   ⚠️ E A ETAPA E DERIVADA, NUNCA GRAVADA. Nao ha coluna \`etapa\` no
+   \`sm_pedido\`, e nao pode haver: ela sai de \`marco\` + \`pronto_em\` + os
+   bipes, e uma coluna gravada seria a segunda afirmacao sobre o mesmo fato —
+   ela divergiria do \`pronto_em\` no primeiro bipe que ninguem replicasse.
+   E a armadilha #12 do CLAUDE.md dentro do quadro.
+
+   ⚠️ O \`marco\` CONTINUA SENDO A TRAVA. Tres lugares filtram por
+   \`marco='aprovado'\` — a reimpressao da etiqueta e as DUAS contas do
+   comprometido e do material de compra (fases 4-B e 4-C). A divida 15 desta
+   spec dizia que "o kanban da fase 6 le o historico; se um dia o marco
+   precisar do valor, e decisao de la": a decisao e esta, e e NAO. */
+CREATE TABLE sm_kanban_coluna (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL,
+  /* ⚠️ UNIQUE, e nao por capricho: duas colunas na mesma etapa mostrariam o
+     MESMO cartao duas vezes, e quem ve o pedido em dois lugares para de
+     confiar na tela inteira. O dominio recusa antes, com a frase; isto e a
+     segunda tranca. */
+  etapa TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  ordem INTEGER NOT NULL DEFAULT 0,
+  ativo INTEGER NOT NULL DEFAULT 1
+);
+
+/* A ORDEM E A DO FLUXO, e nao a alfabetica: o quadro e lido da esquerda para
+   a direita, e alfabetico poria "Aprovado" antes de "Em edicao". E a mesma
+   razao do \`SETORES\` da 5-A. */
+INSERT INTO sm_kanban_coluna(nome,etapa,ordem) VALUES
+ ('Em edição','edicao',1),
+ ('Enviado','enviado',2),
+ ('Aprovado','aprovado',3),
+ ('Em produção','producao',4),
+ ('Pronto','pronto',5),
+ ('Cancelado','cancelado',6);
 `}
 ];
 
