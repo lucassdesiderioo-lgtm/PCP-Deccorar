@@ -3629,6 +3629,26 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   existem nos dois mundos e são trabalhos diferentes (§19, 5-A)
 - ❌ Dar por pronta a fase 5 enquanto os cinco setores estiverem com
   `0 pessoa(s)`: é a #30 — a regra está escrita e não pega em ninguém (§19)
+- ❌ Trocar o `marco` do pedido para `'pronto'`: três lugares filtram por
+  `marco='aprovado'` — a reimpressão da etiqueta e as DUAS contas do
+  comprometido e do material. O pronto é `pronto_em` (§19, 5-B1)
+- ❌ Fazer bandô ou barra segurarem a MONTAGEM: eles vão na caixa, e pô-los
+  lá pararia a linha por uma peça que só é necessária no fim (§19, 5-B1)
+- ❌ Deixar a redução de peso — ou qualquer componente sem etiqueta — segurar
+  alguém: sem bipe ela nunca termina, e a espera é eterna (§19, 5-B1)
+- ❌ Contar o KIT na conta do pronto: cada persiana tem DUAS linhas de setor
+  `embalagem`, e a do kit nunca é bipada (§19, 5-B1)
+- ❌ Recusar um bipe sem dizer o que segura a peça: "não aparece" vira
+  "ninguém sabe por quê", e a equipe para de usar a tela (§19, 5-B1)
+- ❌ Deixar a bancada fechar a própria pendência, ou fechá-la sem motivo: a
+  trava deixaria de existir, e fechamento sem porquê não é rastro (§19)
+- ❌ Escrever a chave do setor na recusa em vez do nome: `colecao` numa tela
+  de bancada é chave de banco em tela (§19, 5-B1, e o §2)
+- ❌ Dizer "sem quantidade de suportes cadastrada" no kit tradicional: ele
+  não usa faixa de suporte por regra (§4.7), e aviso que dispara no caso
+  normal é a armadilha #6 (§19, 5-B1)
+- ❌ Escrever uma segunda frase de "o que fazer" na tela da bancada: ela sai
+  do mesmo `tarefaDe` da etiqueta, e na bancada vence a etiqueta (§19)
 
 ---
 
@@ -5132,6 +5152,127 @@ vendedor puro    →  papel VENDEDOR   ·  setores []            ·  bipa ✘
 > — enquanto ficarem assim, a fase 5 inteira é texto. **O sinal de inerte é
 > este:** marcada a primeira pessoa, ela tem que ver a bancada dela no menu do
 > `/sobmedida`. Não ver é defeito, não é silêncio normal.
+
+
+### ⚠️ A FASE 5-B1 (24/09/2026) — O BIPE, E A FILA QUE SÓ MOSTRA O QUE PODE SER FEITO
+
+A 5-A pôs os cinco setores no controle de acesso; aqui eles ganham o que
+bipar. Migração 21 (estado do bipe em `sm_pedido_componente`, `pronto_em` e
+`sm_pendencia`), `dominio/producao.js`, `dados/producao.js`,
+`rotas/producao.js` e a tela `/sobmedida/bancada`.
+
+```
+SERRALHERIA: tubo · base ─┐
+COLEÇÃO: tecido ──────────┴─▶ MONTAGEM ─▶ REVISÃO ─▶ EMBALAGEM ─▶ PRONTO
+SERRALHERIA: bandô · barra ──────────────────────────────▲
+```
+
+> ⚠️ **A 5-B COMO ESTAVA ESCRITA NÃO PODIA VIR PRIMEIRO, e a lista de
+> pendências não dizia isso.** A linha dela prometia *"a recusa com motivo →
+> setor → pessoa"*, e a §4.16 diz, com todas as letras, que **o sistema sabe
+> pelos bipes quem fez aquele componente**. Sem bipe não há quem fez, não há o
+> que reabrir e não há de onde recusar. A lista que existe para ser o lugar
+> único estava **sem o pedaço maior do que falta** — e a `producao.bipar`
+> criada na 5-A era, até aqui, uma chave que nenhuma rota lia (dívida 18).
+
+> ⚠️ **AS LIBERAÇÕES SÃO DADO, NÃO CADEIA DE `if`** — `ANTES`, uma linha por
+> setor. A cadeia esconde a regra dentro do código, e a próxima mudança de
+> fluxo vira remendo no meio dela.
+
+> ⚠️ **BANDÔ E BARRA NÃO SEGURAM A MONTAGEM, SÓ A EMBALAGEM.** Eles são da
+> serralheria, como o tubo — mas entram na hora de fechar a caixa. Pô-los
+> também na montagem pararia a linha inteira por uma peça que só é necessária
+> no fim. Dois casos travam isso, e reintroduzir o defeito reprova os dois.
+
+> ⚠️ **SÓ SEGURA QUEM EXISTE NAQUELA PERSIANA, E SÓ QUEM GERA ETIQUETA.** A
+> peça sem adicional não tem bandô, e exigi-lo a deixaria esperando para
+> sempre. A **redução de peso** é componente da montagem e **não tem código**
+> (fase 4-A): sem bipe ela nunca termina, e se pudesse segurar alguém a
+> montagem esperaria a vida toda.
+
+> ⚠️ **O PRONTO É `pronto_em`, E NÃO UM VALOR NOVO EM `marco` — esta é a
+> decisão de risco da fase.** Três lugares filtram por `marco='aprovado'`: a
+> reimpressão da etiqueta (`dados/etiqueta_producao.js`) e as **duas** contas
+> do comprometido e do material de compra (`dominio/consumo.js`, fases 4-B e
+> 4-C). Trocar o marco faria a etiqueta parar de reimprimir e mudaria **em
+> silêncio** os números que o comprador usa — um pedido pronto sumiria da
+> conta por uma porta que ninguém abriu de propósito. O histórico registra o
+> pronto em `sm_pedido_marco`, então o kanban da fase 6 tem de onde ler sem
+> que nada mude hoje. **Há caso travando o `marco`.**
+
+> ⚠️ **UM CAMPO SÓ E UM BIPE SÓ: o primeiro inicia, o segundo termina.** Dois
+> botões seriam uma escolha a mais para quem está de luva, e a escolha errada
+> é trabalho perdido. Na embalagem são **três** (início · kit · fim), pelo
+> mesmo campo — o desenho da Embalagem do PCP (§4).
+
+> ⚠️ **O KIT PROVA QUE ENTROU O CERTO, e não que entrou ALGUM.** Na medida
+> padrão o QR é fixo e só garante que alguém bipou um kit (§4); aqui cada tipo
+> tem código próprio (§4.7), então o kit bandô numa peça lisa é recusado
+> dizendo qual é o certo. **Kit sem código cadastrado é recusa, nunca
+> "passou"** — deixar passar faria a conferência existir no papel e não pegar
+> em ninguém, na peça que já está dentro do plástico.
+>
+> A comparação **não** é o `public/kit_bipe.js` do PCP, de propósito: lá a
+> pergunta é *"isto é o kit?"* contra um link do Drive, aqui é *"é o kit DESTA
+> peça?"* contra um CODE128. Duas perguntas diferentes — juntá-las faria a
+> regra de uma valer para a outra no dia em que uma mudasse.
+
+> ⚠️ **"NÃO APARECE" NUNCA VIRA "NINGUÉM SABE POR QUÊ".** Bipar um código não
+> liberado **responde o que o segura**, com a peça, o setor, quem está com ela
+> e desde quando. A frase é parte da regra, não texto de erro — sem ela a
+> montagem fica esperando um tubo que já está na bancada.
+
+> ⚠️ **A PENDÊNCIA É DA CHEFIA (`producao.pendencia`), E NÃO FECHA SEM
+> MOTIVO.** Se quem bipa pudesse fechar a própria, a trava deixaria de existir:
+> bastaria fechar tudo e seguir. E fechamento sem porquê não é rastro — é só
+> destravar, e daqui a um mês ninguém sabe o que aconteceu com a peça.
+>
+> A chave é do **módulo**, não do PCP, e o diretor a recebe pelo `*`: ela não
+> tem a terceira ponta da armadilha #13, porque não há caixinha para ninguém
+> marcar. Ela não nasce inerte.
+
+> ⚠️ **TRÊS DEFEITOS SÓ APARECERAM ABRINDO A TELA — de novo, e dois deles
+> tinham teste VERDE por cima:**
+> - a frase escrevia **`colecao`**, a chave do banco, em vez de "Coleção". É o
+>   *"— Correcao de contagem"* do §2 outra vez — e o caso que existia passava
+>   com o defeito de pé, porque o regex `/colecao/i` casa com os dois. O caso
+>   que o pega foi escrito **depois**, e conferido reintroduzindo;
+> - a recusa do kit dizia *"sem quantidade de suportes cadastrada"* no **kit
+>   tradicional**, que por regra não usa faixa de suporte (§4.7). Aviso que
+>   dispara no caso normal é a armadilha #6. Pior: **o caso de teste estava
+>   travando o defeito** — ele conferia a palavra "suporte", que só aparecia
+>   por causa da frase errada, e reprovou no dia em que ela foi consertada;
+> - a ordem dos `DELETE` da limpeza do teste ignorava que `sm_pendencia`
+>   aponta para o **componente**: 12 casos reprovaram com `FOREIGN KEY
+>   constraint failed` em lugares que não tinham nada a ver com pendência
+>   (§12, e é a pegadinha que o `sm_pedido_alteracao` pregou na fase 3).
+
+> ⚠️ **E UM DEFEITO DE VERDADE O TESTE PEGOU SOZINHO: o kit contava no
+> PRONTO.** Cada persiana tem **duas** linhas de setor `embalagem` — o
+> trabalho de embalar e o **kit** que vai dentro. O kit não tem código, não é
+> bipado e nunca termina, então contá-lo deixava o pedido eternamente a uma
+> peça do pronto. Os três casos do pronto reprovaram na primeira rodada.
+
+> ✅ **RODADA COMPLETA NA TELA, DAS DUAS FORMAS.** Uma persiana lisa
+> atravessou os cinco setores só com bipe (kit errado recusado, kit certo
+> aceito), e a do **bandô** provou as duas metades da regra: a montagem andou
+> sem ele e a embalagem foi segurada por ele (*"aguardando: Bandô ·
+> Serralheria · nem começou"*). Na última persiana saiu **PEDIDO PRONTO**, com
+> `pronto_em` gravado e `marco` intacto em `aprovado`. Zero erro de página.
+>
+> ⚠️ **E ISSO NÃO É A CONFERÊNCIA DA FÁBRICA.** Provou o fluxo e as frases,
+> num navegador meu. A prova que fecha a fase é a bancada de verdade, com o
+> leitor na mão e a peça na bancada — é a lição do §4, onde o QR passou por
+> três rodadas verdes sem ler em celular nenhum.
+
+> **Rode `cd tecido && npm test` (482 casos) ao mexer em `producao.js`, nas
+> liberações ou no que move pedido e componente** — 32 são da 5-B1, e cinco
+> defeitos foram reintroduzidos um a um para provar que cada caso pega o seu:
+> a montagem sem esperar o tecido (reprova 2), o bandô segurando a montagem
+> (2), a embalagem aceitando qualquer kit (1), o "o que segura" respondendo
+> vazio (6) e o kit contando no pronto (3). Mexeu em permissão?
+> **`node teste_acesso.js` (168) e `node teste_cobertura.js` (10) também.**
+> E **abra a tela**: três dos defeitos desta fase não têm teste que os pegue.
 
 ### Três regras do sob medida que valem citar aqui
 

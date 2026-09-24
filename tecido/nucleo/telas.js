@@ -60,7 +60,14 @@ const TELAS={
      por ser nova: ela e da bancada. Quem a abre esta em pe, perto da Zebra,
      sob a lampada de inspecao — e ali tela escura vira espelho (§19). O
      pedido e o catalogo continuam escuros porque sao escritorio. */
-  '/producao':  {arquivo:'telas/producao.html',  permissao:'etiqueta_producao.ler', contexto:'operacao'}
+  '/producao':  {arquivo:'telas/producao.html',  permissao:'etiqueta_producao.ler', contexto:'operacao'},
+
+  /* ⚠️ A BANCADA PEDE `producao.bipar`, E ESSA CHAVE VEM DO SETOR, nao do
+     papel (fase 5-A). Quem nao esta em bancada nenhuma nao a tem — entao a
+     tela nem aparece no menu dele, e menu com tela inutil e o que ensina a
+     nao clicar. Contexto OPERACAO pela mesma razao da producao: quem abre
+     esta em pe na bancada, e ali tela escura vira espelho. */
+  '/bancada':   {arquivo:'telas/bancada.html',   permissao:'producao.bipar',        contexto:'operacao'}
 };
 
 module.exports={TELAS};

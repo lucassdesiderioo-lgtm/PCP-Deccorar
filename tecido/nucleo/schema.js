@@ -1324,6 +1324,57 @@ CREATE INDEX idx_sm_etiqueta_impressao ON sm_etiqueta_impressao(criado_em);
    dizer (kg) e RECUSADA no cadastro, em vez de convertida por chute. */
 ALTER TABLE sm_degrau_tubo ADD COLUMN componente_id INTEGER;
 ALTER TABLE sm_componente  ADD COLUMN componente_id INTEGER;
+`},
+
+{n:21, nome:'a producao bipada — inicio, fim, kit e a pendencia que a chefia fecha', sql:`
+/* === A PRODUCAO BIPADA ===================================================
+   Fase 5-B1 da spec SOBMEDIDA-PEDIDO-REVENDA (secao 4.15). A 5-A pos os
+   cinco setores no controle de acesso; aqui eles passam a ter o que bipar.
+
+     SERRALHERIA: tubo · base ─┐
+     COLECAO: tecido ──────────┴─▶ MONTAGEM ─▶ REVISAO ─▶ EMBALAGEM ─▶ PRONTO
+     SERRALHERIA: bandô · barra ──────────────────────────────▲
+
+   ⚠️ O ESTADO MORA NO COMPONENTE, e nao numa tabela de sessao. O grao do
+   trabalho e a PECA de uma persiana — e o codigo de etiqueta ja e dela
+   desde a fase 4-A. Uma tabela de sessao a parte seria a segunda afirmacao
+   sobre o mesmo fato: "este tubo esta pronto?" teria duas respostas, e elas
+   divergiriam no dia em que uma linha ficasse para tras.
+
+   ⚠️ O KIT TEM COLUNA PROPRIA, e nao e o mesmo "terminado". Na embalagem
+   sao TRES bipes (inicio · kit · fim), e sem a coluna o fim nao teria como
+   saber se o kit passou — viraria um if do navegador, que e exatamente o
+   que a armadilha #26 do PCP corrigiu no \`kit_ok\`. */
+ALTER TABLE sm_pedido_componente ADD COLUMN iniciado_em TEXT;
+ALTER TABLE sm_pedido_componente ADD COLUMN iniciado_por TEXT;
+ALTER TABLE sm_pedido_componente ADD COLUMN terminado_em TEXT;
+ALTER TABLE sm_pedido_componente ADD COLUMN terminado_por TEXT;
+ALTER TABLE sm_pedido_componente ADD COLUMN kit_conferido_em TEXT;
+
+/* ⚠️ O PRONTO E \`pronto_em\`, E NAO UM VALOR NOVO EM \`marco\`. Tres lugares
+   filtram por \`marco='aprovado'\`: a reimpressao da etiqueta
+   (dados/etiqueta_producao.js, o VIVOS) e as DUAS contas do comprometido e
+   do material de compra (dominio/consumo.js, fases 4-B e 4-C). Trocar o
+   marco para 'pronto' faria a etiqueta parar de reimprimir e mudaria EM
+   SILENCIO os numeros que o comprador usa — um pedido pronto sumiria da
+   conta por uma porta que ninguem abriu de proposito.
+   O historico continua registrando o pronto em sm_pedido_marco, entao o
+   kanban da fase 6 tem de onde ler sem que nada mude hoje. */
+ALTER TABLE sm_pedido ADD COLUMN pronto_em TEXT;
+
+/* A PENDENCIA: a serralheria esqueceu de bipar o fim e foi embora, e a
+   montagem fica esperando uma peca que ja esta na bancada. A chefia fecha,
+   e o fechamento deixa rastro — sem o porque, fechar e so destravar, e a
+   trava deixa de existir na pratica. */
+CREATE TABLE sm_pendencia (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  componente_id INTEGER NOT NULL REFERENCES sm_pedido_componente(id),
+  codigo_etiqueta TEXT,
+  motivo TEXT NOT NULL,
+  usuario_nome TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX idx_sm_pendencia ON sm_pendencia(componente_id);
 `}
 ];
 

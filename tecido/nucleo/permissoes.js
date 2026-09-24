@@ -135,7 +135,17 @@ const CHAVES=[
      pergunta errada. Esta chave diz "esta tela e sua"; QUAL bancada a pessoa
      bipa e outra pergunta, e quem responde e a lista de setores dela
      (nucleo/acesso.js → setoresDe), conferida no dominio. */
-  {chave:'producao.bipar',    nome:'Bipar inicio e fim na bancada da producao sob medida'}
+  {chave:'producao.bipar',    nome:'Bipar inicio e fim na bancada da producao sob medida'},
+  /* ⚠️ FECHAR PENDENCIA NAO E BIPAR, e por isso e chave separada (fase 5-B1).
+     Bipar e dizer "eu fiz"; fechar pendencia e dizer "alguem fez e nao bipou"
+     — e quem responde por uma peca dada como feita sem o bipe de quem fez e a
+     chefia. Se a bancada pudesse fechar a propria, a trava deixaria de
+     existir: bastaria fechar tudo e seguir.
+
+     ⚠️ E ELA NAO TEM O PROBLEMA DA TERCEIRA PONTA (armadilha #13): esta lista
+     e do MODULO, nao do PCP, e o diretor recebe qualquer chave nova pelo `*`.
+     Nao ha caixinha para alguem marcar, entao ela nao nasce inerte. */
+  {chave:'producao.pendencia',nome:'Fechar pendencia de producao sob medida — a peca feita sem bipe'}
 ];
 
 const PAPEIS={
