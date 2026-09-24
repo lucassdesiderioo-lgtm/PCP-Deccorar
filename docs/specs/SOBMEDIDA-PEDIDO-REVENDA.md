@@ -5,13 +5,12 @@ STATUS
 Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 24/09/2026
-Fase atual: 5-B2 EM CÓDIGO (24/09/2026) — a recusa: qualquer bancada devolve
-            a peça por defeito do trabalho anterior, o que depende dela volta
-            junto, e a refeita reimprime a MESMA etiqueta, marcada
-            5-B1 EM CÓDIGO (24/09/2026) — o bipe, as filas e o Pronto
-            5-A EM CÓDIGO (24/09/2026) — os cinco setores da produção no
-            controle de acesso do PCP; sobe SOZINHA para o dono marcar as
-            pessoas enquanto o bipe é construído
+Fase atual: 5 INTEIRA EM PRODUÇÃO (24/09/2026) — 5-A (os cinco setores no
+            acesso), 5-B1 (o bipe, as filas e o Pronto) e 5-B2 (a recusa).
+            **Falta a conferência de fábrica das três** — ver as provas 8 e
+            8-b na lista única
+            6 NÃO COMEÇOU — o gerencial, e ela é grande: kanban, oito
+            indicadores, boleto e crédito. Ver a lista única
             4-C EM PRODUÇÃO (24/09/2026) — o tubo chegando ao Compras do PCP;
             os quatro degraus JÁ apontados (24/09) — falta o primeiro pedido
             real aparecer lá, e o comprador comprar por ele
@@ -22,7 +21,7 @@ Fase atual: 5-B2 EM CÓDIGO (24/09/2026) — a recusa: qualquer bancada devolve
             em paralelo ao Decorsoft
             2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
             1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
-Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ☑(código — 5-A em produção · 5-B1 e 5-B2 em código)  6 ☐  7 ☐  8 ☐
+Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ☑ **em produção**, falta a prova de fábrica  6 ☐  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
 Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) + 2 (fase 5-A) + 1 (5-B1) + 2 (5-B2) — ver abaixo
@@ -42,7 +41,8 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 
 | # | O que falta | Sem isso | Fase |
 |---|---|---|---|
-| 1 | **Marcar as pessoas nos cinco setores** de produção (Admin → Acessos → Setores) | a fase 5 inteira é texto: os cinco estão com `0 pessoa(s)`. É a armadilha #30 do `CLAUDE.md` | 5-A |
+| ~~1~~ | ~~Marcar as pessoas nos cinco setores de produção~~ **FEITO em 24/09/2026** — uma pessoa marcada em cada. A lâmpada da armadilha #30 apagou: elas veem a bancada no menu do `/sobmedida` | — | — |
+| 1-b | **Revisar os oito motivos de recusa** que a migração 22 semeou (Sob medida → Cadastros → Motivos da recusa da produção) | eles vieram dos exemplos da spec, não da fábrica. Motivo que ninguém usa vira lista que a bancada rola sem ler; motivo que falta vira recusa que não acontece | 5-B2 |
 | 2 | **Lançar o percentual das tabelas A e C** | o simulador recusa dizer o preço das revendas dessas tabelas — e **está certo** recusando (regra 4) | 2 |
 | 3 | **Cadastrar as revendas de hoje**, com vendedor, tabela, desconto e limite | a carteira nasce vazia e o pedido não tem para quem ir | 2 |
 | 4 | **Cadastrar os feriados** do calendário | o prazo conta como se todo dia fosse útil, e a revenda ouve uma data que a fábrica não cumpre | 2 |
@@ -55,7 +55,7 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 |---|---|---|
 | 6 | O **próximo pedido aprovado** somando na linha certa do Compras, e o comprador comprando por ela | a 4-C |
 | 7 | A **semana em paralelo ao Decorsoft**, pedido a pedido | a 3 — a folha do 5001 provou o ciclo e a aritmética, não o cadastro |
-| 8 | A **peça real atravessando os cinco setores** | a 4-A e a 5 |
+| 8 | A **peça real atravessando os cinco setores**, com o leitor na mão | a 4-A e a 5-B1 — o código está no ar desde 24/09, e ninguém bipou uma peça de verdade ainda |
 | 8-b | A **bancada de verdade recusando uma peça**, com o maço de refazer saindo da Zebra | a 5-B2 — a rodada de 24/09 foi num navegador meu |
 | 9 | O **serralheiro cortando pela medida da etiqueta** | a 4-A — o bipe provou o código de barras, não a medida |
 | 10 | O **comprador comprando pelo painel de tecido** (o comprometido da 4-B) | a 4-B |
@@ -74,11 +74,20 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 
 | Fase | O que é |
 |---|---|
-| ~~5-B2~~ | ~~a recusa com motivo → setor → pessoa~~ **EM CÓDIGO em 24/09/2026** — migração 22, `sm_motivo_producao`, `sm_recusa` e `refeitas`. Falta a bancada de verdade recusar uma peça |
-| ~~5-B1~~ | ~~o bipe, as filas por setor, o kit e o Pronto automático~~ **EM CÓDIGO em 24/09/2026** — era o pedaço que esta lista **não citava**, e sem ele a 5-B2 não tem de onde recusar |
-| 6 | o gerencial (kanban com colunas cadastráveis) |
+| ~~5-B2~~ | ~~a recusa com motivo → setor → pessoa~~ **EM PRODUÇÃO em 24/09/2026** — migração 22, `sm_motivo_producao`, `sm_recusa` e `refeitas`. Falta a prova 8-b |
+| ~~5-B1~~ | ~~o bipe, as filas por setor, o kit e o Pronto automático~~ **EM PRODUÇÃO em 24/09/2026** — era o pedaço que esta lista **não citava**, e sem ele a 5-B2 não tem de onde recusar. Falta a prova 8 |
+| **6-A** | **o kanban** — onde está cada pedido, com a barrinha por setor e o selo de retido. É o *"onde está o pedido X"* do "pronto quando" da fase 6, e é o que torna visível o bipe da 5-B1: hoje só se vê o andamento abrindo a bancada de cada setor, um por um |
+| **6-B** | **os sete indicadores que já têm dado** — tempo de aprovação por vendedor, pedidos parados, prazo cumprido, horas-homem, tempo por m², produtividade por pessoa e por setor, e recusas. Todos leem o que a 5-B1 e a 5-B2 passaram a gravar **ontem**: enquanto a fábrica não bipar, eles saem vazios — e a tela tem que dizer que vazio é isso, não tela quebrada (a lição da 4-C) |
+| **6-C** | **o dinheiro** — baixa de boletos pelo financeiro, crédito disponível (`limite − boletos em aberto`), revisão bimestral do limite, e só então o selo de NF e os filtros *"entregue sem NF"* / *"NF sem entrega"*. **Nada disso existe hoje**: não há boleto, não há NF e não há marco de `entregue` no sob medida |
 | 7 | o portal da revenda |
 | 8 | segurança e abertura |
+
+> ⚠️ **A FASE 6 FOI ABERTA EM TRÊS EM 24/09/2026, e o motivo é o mesmo da
+> fase 5.** A entrega escrita na §7 junta quatro coisas que não dependem umas
+> das outras — kanban, indicadores, boleto e crédito — e a 5 já mostrou o
+> custo de uma fase grande: a linha da 5-B **omitia o bipe**, que era o pedaço
+> maior, e a lista que existe para ser o lugar único ficou sem ele. Aberta em
+> três, cada parte sobe sozinha e o que falta fica escrito aqui.
 
 ## STATUS DA FASE 5-B2 — em código em 24/09/2026
 
