@@ -43,6 +43,7 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 | 3 | **Cadastrar as revendas de hoje**, com vendedor, tabela, desconto e limite | a carteira nasce vazia e o pedido não tem para quem ir | 2 |
 | 4 | **Cadastrar os feriados** do calendário | o prazo conta como se todo dia fosse útil, e a revenda ouve uma data que a fábrica não cumpre | 2 |
 | 5 | **Preencher mínimo e ideal** dos `Tubo 38/41/56` (nasceram em zero, de propósito) | o gatilho 1 não dispara para eles: a compra vem só do que está vendido | 4-C |
+| 5-b | **Marcar `sobmedida.cadastrar` no setor `Sob medida / Cadastros`** (Admin → Acessos → Setores), mantendo `sobmedida.cortar` marcada junto | as 3 pessoas do setor entram no sob medida como **bancada**, não como chefia: sem cadastro de tecido, sem parâmetros do encaixe e sem descarte de sobra. A chave saiu de lá em 19/09 num salvamento sobre outra coisa (dívida 20 do `CLAUDE.md` §14) | — |
 
 ### Provas de fábrica — deploy não é conferência
 
@@ -58,9 +59,10 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 
 | # | O que é | Por que ficou |
 |---|---|---|
-| 11 | As **23 chaves de nível admin do PCP** continuam fazendo quem as tem entrar no sob medida como **diretor** | é anterior à fase 2 e estreitar aquela leitura muda quem pode o quê: é `REGRA`, não conserto |
+| 11 | As **chaves de nível admin do PCP** continuam fazendo quem as tem entrar no sob medida como **diretor** — uma a menos desde 24/09, quando `sobmedida.cadastrar` baixou para `supervisor` (armadilha #34) | é anterior à fase 2 e estreitar aquela leitura muda quem pode o quê: é `REGRA`, uma chave por vez |
 | 12 | A `familia_sku` velha não é reescrita | é história do que o sistema viu; o aprendizado recomeça sozinho |
 | 13 | **Sexto setor de produção exige código** (a chave), e a tela deixa criar o setor | decisão de 24/09: setor é cadastro, chave é código — ver a 5-A |
+| 14 | **Editar um setor apaga, sem avisar, as permissões acima do nível dele.** A tela desenha `disabled` a caixinha acima do nível e o salvar regrava a lista inteira, então ela nunca é mandada e nunca volta | consertar é decidir o que a tela faz com a chave que não pode mostrar — avisar, preservar ou recusar o salvamento —, e as três mudam quem pode o quê: é `REGRA`. É a dívida 20 do `CLAUDE.md` §14 |
 
 ### O que ainda não foi construído
 

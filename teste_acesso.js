@@ -385,6 +385,92 @@ eq('...e continua bipando a embalagem do mesmo jeito',
 eq('o diretor bipa os cinco',
   setoresDe(['admin']).length, 5);
 
+console.log('\n── 6-D. cadastrar sob medida e CHEFIA DO MODULO, nao admin do PCP ──');
+/* 24/09/2026. `sobmedida.cadastrar` era declarada `nivel:'admin'`, e isso
+   dizia duas coisas que ninguem pediu:
+
+     sincronizarAreas  -> area 'admin' em quem tem QUALQUER chave admin
+     temAdmin(perms)   -> as 24 rotas '@admin' do PCP liberam pela mesma regua
+
+   Entao a chave que devia dizer "mexe no cadastro do sob medida" dizia, de
+   fato, "e admin do PCP". E o espelho exato da trava que a fase 2 pos na
+   `sobmedida.vender` (secao 6-B) — la a chave de VENDER daria o modulo
+   inteiro; aqui a chave do modulo da um pedaco do PCP.
+
+   ⚠️ O QUE ISTO NAO MUDA: dentro do modulo a chefia JA E diretor — o
+   `papelDe` devolve 'diretor' para 'admin' e para AREA_CHEFIA, e nunca
+   houve papel "chefia" separado. O que sai e o PCP, e so ele. Esta escrito
+   porque e exatamente onde alguem le a intencao errada depois. */
+const chaveCad = P.find(p => p.chave === 'sobmedida.cadastrar');
+ok('a chave sobmedida.cadastrar esta declarada', !!chaveCad);
+if(chaveCad)
+  eq('e o nivel dela e supervisor — admin a faria valer como admin do PCP inteiro',
+    chaveCad.nivel, 'supervisor');
+
+/* A PROVA DE VERDADE nao e o rotulo: e o que chega em usuarios.areas depois
+   do sincronizarAreas, que e o texto que o portao do modulo le. Pergunto ao
+   codigo que GRAVA, nunca refazendo a conta aqui (a licao do QR, §4). */
+const uCad = db.prepare("INSERT INTO usuarios (nome,pin_hash,salt,areas,ativo) VALUES ('Chefia sob medida','x','y','',1)")
+  .run().lastInsertRowid;
+const sCad = db.prepare("SELECT id,nivel FROM setores WHERE nome='Sob medida / Cadastros'").get();
+ok('o setor "Sob medida / Cadastros" existe', !!sCad);
+if(sCad){
+  /* ⚠️ O NIVEL DO SETOR TEM QUE CABER A CHAVE. A guarda da rota de salvar
+     recusa permissao acima do nivel do setor, e a TELA nem desenha a
+     caixinha — foi por isso que, em producao, a chave nao dava para marcar.
+     Declarar o setor como `admin` e a chave como `supervisor` deixaria a
+     declaracao mentindo sobre o proprio par. */
+  eq('  e o nivel dele e supervisor, igual ao da chave que ele carrega',
+    sCad.nivel, 'supervisor');
+  const permsCad = db.prepare(`SELECT sp.chave FROM setores s
+    JOIN setor_permissao sp ON sp.setor_id=s.id WHERE s.nome='Sob medida / Cadastros'`)
+    .all().map(r => r.chave).sort();
+  eq('  e ele carrega as duas chaves declaradas',
+    permsCad.join(','), 'sobmedida.cadastrar,sobmedida.cortar');
+
+  db.prepare('INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)').run(uCad, sCad.id);
+  const pc = AC.permissoesDe(uCad);
+  ok('quem esta nele ganha sobmedida.cadastrar', pc.has('sobmedida.cadastrar'));
+  const admDoCad = [...pc].filter(c => { const i = P.find(x => x.chave === c); return i && (i.nivel === 'admin' || i.nivel === 'admin_geral'); });
+  eq('e NENHUMA das permissoes dele e de nivel admin — e isso que segura a area "admin" fora',
+    admDoCad.join(', '), '');
+
+  if(typeof AC.sincronizarAreas === 'function') AC.sincronizarAreas(uCad);
+  const areasCad = (db.prepare('SELECT areas FROM usuarios WHERE id=?').get(uCad).areas || '').split(',').filter(Boolean);
+  ok('a area sobmedida_adm chega em usuarios.areas (a linha do PERM_AREA continua de pe)',
+    areasCad.includes('sobmedida_adm'),
+    'areas: ' + (areasCad.join(',') || '(vazio)'));
+  ok('e a area "admin" do PCP NAO vem junto — e este e o caso que a mudanca existe para travar',
+    !areasCad.includes('admin'),
+    'areas: ' + (areasCad.join(',') || '(vazio)'));
+
+  /* As 24 rotas '@admin' liberam por temAdmin(perms). Sem chave admin, a
+     chefia do sob medida para de passar nelas — que e o ponto. */
+  ok('a chefia do sob medida NAO passa numa rota @admin do PCP',
+    AC.decidir({ id:uCad, nome:'Chefia sob medida' }, '/api/divergencias', 'GET').ok === false);
+}
+
+/* E O QUE O MODULO FAZ COM ISSO — pelo tradutor dele, nao por uma releitura
+   aqui. A chefia continua entrando como diretor: e o que a area sempre
+   significou, e nao e isso que esta sendo mexido. */
+eq('o modulo continua lendo sobmedida_adm como diretor',
+  acessoProd.papelDe({ areas: ['sobmedida_adm'] }), 'diretor');
+eq('e quem nao tem area nenhuma continua sem entrar',
+  acessoProd.papelDe({ areas: [] }), null);
+
+/* ⚠️ O SETOR NATIVO `Admin` DEIXA DE CARREGAR A CHAVE, e isso e DECISAO, nao
+   efeito colateral. A lista de permissoes dele e calculada — "toda chave de
+   nivel admin" (acesso.js, linha 38) —, entao baixar o nivel a tira de la na
+   instalacao limpa. Em producao nada muda (ninguem a tinha), e o lugar dela
+   passa a ser o setor dedicado. Esta afirmado aqui para nunca voltar por
+   acidente no dia em que alguem reler a lista calculada. */
+const permsAdmin = db.prepare(`SELECT sp.chave FROM setores s
+  JOIN setor_permissao sp ON sp.setor_id=s.id WHERE s.nome='Admin'`).all().map(r => r.chave);
+ok('o setor nativo Admin existe', permsAdmin.length > 0);
+ok('e ele NAO carrega mais sobmedida.cadastrar — quem cadastra sob medida e o setor dedicado',
+  permsAdmin.indexOf('sobmedida.cadastrar') < 0,
+  'chaves admin: ' + permsAdmin.filter(c => c.indexOf('sobmedida') === 0).join(',' ));
+
 /* ═══════════ AS TRAVAS DE ESCALONAMENTO (divida 17, 17/09/2026) ═══════════
    Tudo daqui pra baixo responde a mesma pergunta: DA PRA SUBIR DE NIVEL PELA
    TELA OFICIAL? Enquanto desse, a tela de Acessos era o caminho mais curto

@@ -42,7 +42,24 @@ module.exports = [
   // todo mundo.
   { chave:'sobmedida.cortar',     grupo:'Sob medida', nivel:'operacao',
     rotulo:'Cortar tecido',       desc:'Plano de corte, rolos, sobras e etiquetas de prateleira' },
-  { chave:'sobmedida.cadastrar',  grupo:'Sob medida', nivel:'admin',
+  /* ⚠️ CADASTRAR E `supervisor`, E NAO `admin` — 24/09/2026, e e o espelho da
+     trava da `sobmedida.vender` logo abaixo. Declarada como admin, esta chave
+     dizia duas coisas que ninguem pediu: `sincronizarAreas` poe a area 'admin'
+     em quem tem QUALQUER chave de nivel admin, e as 24 rotas '@admin' do PCP
+     liberam por `temAdmin(perms)`. Entao a chave do CADASTRO DO SOB MEDIDA
+     valia como "e admin do PCP" — a fase 2 fechou o vazamento no sentido
+     venda→modulo, e este fecha no sentido modulo→PCP.
+
+     ⚠️ DENTRO DO MODULO NAO MUDA NADA: `papelDe` devolve 'diretor' tanto para
+     'admin' quanto para AREA_CHEFIA ('sobmedida_adm'), e nunca houve papel
+     "chefia" separado. Quem tem esta chave continua entrando como diretor la
+     dentro — e o que a area sempre significou. O que sai e o PCP.
+
+     ⚠️ E O SETOR NATIVO `Admin` DEIXOU DE CARREGA-LA, por consequencia: a
+     lista dele e calculada ("toda chave de nivel admin", acesso.js). Isso e
+     decisao — quem cadastra sob medida e o setor dedicado, nao o Admin do PCP
+     por tabela. Ha caso travando em teste_acesso.js (secao 6-D). */
+  { chave:'sobmedida.cadastrar',  grupo:'Sob medida', nivel:'supervisor',
     rotulo:'Cadastrar sob medida',desc:'Tecidos, enderecos, motivos e os parametros do encaixe' },
   /* ⚠️ VENDER E `operacao`, E NAO `admin` — e isto nao e classificacao, e
      trava. `sincronizarAreas` poe a area 'admin' em quem tem QUALQUER chave
