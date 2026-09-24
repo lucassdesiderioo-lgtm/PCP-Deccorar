@@ -4871,11 +4871,25 @@ necessidade_dominio.js           soma no mesmo gatilho 2 da medida padrão
 > que quem abre aquela tela já tem. Chave nova aqui seria a terceira ponta da
 > armadilha #13 sem precisar.
 
-> ⚠️ **O CADASTRO É O QUE FALTA, E ELE NÃO É CÓDIGO.** Em produção o PCP tem
-> **um** tubo cadastrado (`Tubo 32 mm`); a escada usa 32, 38, 41 e 56. Enquanto
-> os outros três não existirem em Compras e não estiverem apontados, o tubo
-> deles sai como **pendência** na lista — que é o certo, e é o sinal de que
-> falta cadastro, não de que falta código.
+> ✅ **O CADASTRO ESTAVA FALTANDO, E FOI FEITO EM 24/09/2026.** A escada usa
+> 32, 38, 41 e 56, e o PCP tinha **um** tubo cadastrado. O dono criou os três
+> em **metro** pelo card Materiais e apontou os quatro degraus:
+>
+> ```
+> Tubo 32 → componente 1 (Tubo 32 mm)     Tubo 41 → componente 28
+> Tubo 38 → componente 27                 Tubo 56 → componente 29
+> ```
+>
+> **Quem provou o cadastro foi a pendência sumir**, e não a lista encher:
+> antes disso o tubo do 5001 sairia como *"degrau sem material apontado"*.
+> Depois, a porta responde `fora:false` com `materiais: []` e
+> `pendencias: []` — o vazio do bloco abaixo, agora sem buraco atrás.
+>
+> ⚠️ **Os três nasceram com mínimo e ideal em ZERO**, e o `Tubo 32 mm` tem 75.
+> É intencional enquanto ninguém revisar: zero quer dizer que o gatilho 1 não
+> dispara sozinho e a necessidade vem só do que está vendido. São os mínimos
+> placeholder das dívidas do §7-B pela porta nova — o dia em que alguém
+> preencher os três é uma decisão, não um conserto.
 >
 > ⚠️ **E NÃO HAVIA ONDE FAZER ESSE CADASTRO — eu mandei o dono a uma tela que
 > não existe.** "Admin → Compras → Ponto de pedido" só editava mínimo e ideal
@@ -4885,9 +4899,10 @@ necessidade_dominio.js           soma no mesmo gatilho 2 da medida padrão
 > com o defeito que abrir a tela teria destapado: a rota apagava família, cor e
 > bobina do material de tecido a cada edição de mínimo.
 >
-> **O caminho, hoje:** Admin → Compras → **Materiais**, criar `Tubo 38 mm`,
-> `Tubo 41 mm` e `Tubo 56 mm` em **metro**; depois Sob medida → Catálogo →
-> **Escada de tubos**, apontar o material de cada degrau.
+> **O caminho, quando entrar um tubo novo na escada:** Admin → Compras →
+> **Materiais**, criar em **metro**; depois Sob medida → Catálogo → **Escada de
+> tubos**, apontar o material do degrau. A unidade decide a conta — em `un` o
+> Compras contaria peças em vez de ler a medida de consumo da ficha.
 
 > **EM PRODUÇÃO DESDE 24/09/2026, E A PRIMEIRA LEITURA DEU VAZIO — o que está
 > certo, e por isso ficou escrito.** `materiais: []` e `pendencias: []`: o 5001
@@ -4898,9 +4913,14 @@ necessidade_dominio.js           soma no mesmo gatilho 2 da medida padrão
 >
 > ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA, e deploy não é conferência.** A
 > prova é o próximo pedido aprovado somando na linha certa do Compras, com o
-> comprador comprando por ela. **O sinal de inerte existe e é este:** apontados
-> os degraus, o próximo pedido aprovado que **não** aparecer ali é defeito — é
-> a dívida 18 (§14) com a lâmpada que quase nenhuma regra nova tem.
+> comprador comprando por ela.
+>
+> **A LÂMPADA ESTÁ ARMADA desde 24/09/2026, e é o que quase nenhuma regra nova
+> tem.** Com os quatro degraus apontados, pedido aprovado que ainda tenha peça
+> **não impressa** *tem* que aparecer na lista de compras, somando no tubo do
+> degrau dele. Não aparecer é **defeito**, não é silêncio normal — e essa é a
+> diferença entre esta fase e as três semanas em que `modelo.sob_medida` ficou
+> inerte sem nada acusar (§7, armadilha #30 · dívida 18 do §14).
 
 **Rode `cd tecido && npm test` (449 casos) e `node teste_compras_sobmedida.js`
 (29) ao mexer no vínculo, no `consumo.js`, no `necessidade_dominio.js` ou na

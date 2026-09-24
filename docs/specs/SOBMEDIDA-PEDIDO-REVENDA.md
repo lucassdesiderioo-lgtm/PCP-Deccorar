@@ -6,7 +6,8 @@ Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 24/09/2026
 Fase atual: 4-C EM PRODUÇÃO (24/09/2026) — o tubo chegando ao Compras do PCP;
-            falta apontar os degraus e o primeiro pedido real aparecer lá
+            os quatro degraus JÁ apontados (24/09) — falta o primeiro pedido
+            real aparecer lá, e o comprador comprar por ele
             4-B EM CÓDIGO (24/09/2026) — o tecido, no painel do sob medida
             4-A EM PRODUÇÃO, o leitor bipou no papel (23/09/2026) — falta a
             peça real atravessando os cinco setores
@@ -49,10 +50,21 @@ Compras. **Sem chave de permissão nova** — `catalogo.ler` e `catalogo.editar`
 já cobrem. 30 + 29 casos novos: `npm test` do módulo vai a **449** e nasce o
 `teste_compras_sobmedida.js`.
 
-**O que falta, e não é código:** o PCP tem **um** tubo cadastrado
-(`Tubo 32 mm`); a escada usa 32, 38, 41 e 56. Enquanto os outros três não
-existirem em Compras e não estiverem apontados, o tubo deles sai como
-**pendência** na lista — que é o certo, e é o sinal de que falta cadastro.
+**O cadastro que faltava foi feito em 24/09/2026.** O PCP tinha **um** tubo
+(`Tubo 32 mm`) e a escada usa 32, 38, 41 e 56; os três novos foram criados em
+**metro** pelo card Materiais — que nasceu no mesmo dia, porque **não havia
+tela para criar material em lugar nenhum** (`CLAUDE.md` §7-B, armadilha #33) —
+e os quatro degraus foram apontados:
+
+```
+Tubo 32 → componente 1     Tubo 38 → 27     Tubo 41 → 28     Tubo 56 → 29
+```
+
+**Quem provou o cadastro foi a pendência SUMIR**, e não a lista encher: sem o
+vínculo, o tubo do 5001 sairia como *"degrau sem material apontado"*. Os três
+nasceram com mínimo e ideal em **zero** (o `Tubo 32 mm` tem 75), de propósito:
+o gatilho 1 não dispara sozinho e a necessidade vem só do que está vendido —
+preencher é decisão, não conserto.
 
 **As duas mudanças no caminho:**
 
@@ -72,15 +84,17 @@ existirem em Compras e não estiverem apontados, o tubo deles sai como
 > com etiqueta impressa já saiu da conta. Quem vai aparecer é o **próximo**
 > pedido aprovado.
 
-> ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA.** Deploy não é conferência. A prova
-> é o comprador cadastrando os tubos 38, 41 e 56, apontando cada degrau, e
-> vendo o **próximo pedido aprovado** somar na linha certa do Compras — e
-> **comprando por ela**. Enquanto isso não acontecer, está escrito aqui como
-> não conferido.
+> ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA.** Deploy não é conferência, e
+> cadastro também não. Metade da prova foi feita em 24/09 — os tubos estão em
+> Compras e os quatro degraus apontados. **O que falta é o próximo pedido
+> aprovado somar na linha certa, e o comprador comprar por ela.** Enquanto isso
+> não acontecer, está escrito aqui como não conferido.
 >
-> **E há um sinal de que ela ficou inerte, que é o que falta em quase todas as
-> regras novas (dívida 18):** apontados os degraus, o próximo pedido aprovado
-> que **não** aparecer no Compras é defeito, não silêncio normal.
+> **E o sinal de inerte está ARMADO desde 24/09** — é o que falta em quase
+> todas as regras novas (dívida 18). Com os degraus apontados, pedido aprovado
+> que ainda tenha peça **não impressa** que **não** apareça no Compras é
+> **defeito**, não silêncio normal. É a diferença entre esta fase e as três
+> semanas em que `modelo.sob_medida` ficou inerte sem nada acusar.
 
 > **O que a tela mostrou, e nenhum teste de unidade pegaria** (três defeitos, os
 > três no primeiro render): a pendência é por **peça** no domínio — e tem que
