@@ -50,7 +50,13 @@ function setoresNativos(){
     // herdar gente por engano daria acesso de corte a quem so revisa.
     { nome:'Sob medida / Bancada',           nivel:'operacao',
       perms:['sobmedida.cortar','painel.ver','produtividade.propria'] },
-    { nome:'Sob medida / Cadastros',         nivel:'admin',
+    /* ⚠️ NIVEL `supervisor`, e ele tem que CABER a chave que o setor carrega.
+       A rota de salvar recusa permissao acima do nivel do setor, e a tela nem
+       desenha a caixinha — entao o par declarado errado nao da erro: ele faz a
+       chave sumir em silencio no primeiro salvamento do setor. Foi o que
+       aconteceu em producao (19/09/2026), com o setor em `supervisor` e a
+       chave em `admin`: editar o setor regravou a lista sem ela. */
+    { nome:'Sob medida / Cadastros',         nivel:'supervisor',
       perms:['sobmedida.cortar','sobmedida.cadastrar'] },
     /* VENDA (fase 2 da SOBMEDIDA-PEDIDO-REVENDA). Nasce vazio como os dois
        de cima, e SO com a chave de vender: o vendedor nao corta. Ate esta

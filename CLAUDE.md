@@ -3101,6 +3101,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 16 | ~~**Acesso: default `@logado` e cobertura mantida à mão**~~ **RESOLVIDO em 17/09/2026** — o padrão passou a ser **negar**, a cobertura varre o Express (a lista `TODAS_ROTAS` saiu) e o boot grita o nome da rota não declarada; as 28 leituras sem dono foram declaradas e as telas `.html` gêmeas herdaram a permissão da tela. Ver §10, armadilha #29 · `teste_cobertura.js` | — |
 | 17 | ~~**Acesso: duas travas faltando**~~ **RESOLVIDO em 17/09/2026** — a exceção recusa conceder chave `intransferivel`, a troca de setores tem a trava do último Admin Geral (mesma conta do `auth.js`, agora no `acesso.js`), setor novo não nasce `admin_geral` e a migração de `areas` virou evento de uma vez só (a porta A, que promovia a Admin Geral em silêncio). Ver §10, armadilha #28 | — |
 | 19 | **`minimo.definir` é uma chave que nenhuma rota lê.** Ela está em `permissoes.js` e no setor de Compras do `acesso.js` desde a fase 0, dizendo *"Definir estoque mínimo — ponto de pedido e estoque ideal por componente"*. Quem manda de verdade no card Materiais é `componente.cadastrar` (escrita) e `compras.ver` (leitura). Então marcar a caixinha certa na tela de Acessos **não libera nada**, e a pessoa leva 403 numa tela que a permissão dela diz que ela pode — sem erro e sem log, que é a terceira ponta da armadilha #13 (§19). Juntar as duas ou apagar a chave muda **quem pode o quê**: é `REGRA`, não conserto | Baixo — hoje quem tem uma tem a outra, porque o seed de Compras dá as duas juntas |
+| 20 | **Editar um setor APAGA, sem avisar, as permissões que ele tem acima do próprio nível.** O `POST /api/acesso/setores` faz `DELETE` + `INSERT` da lista inteira, e a tela só manda as caixinhas **marcadas** — as que estão acima do nível do setor ela desenha `disabled`, então nunca são mandadas. Não há recusa: a chave simplesmente não volta. Foi assim que `sobmedida.cadastrar` saiu do `Sob medida / Cadastros` em 19/09/2026, num salvamento que era sobre outra coisa (§19, armadilha #34). O conserto de 24/09 igualou aquele par, mas o mecanismo continua valendo para qualquer setor. Consertar é decidir o que a tela faz com a chave que ela não pode mostrar — avisar, preservar ou recusar o salvamento —, e as três mudam quem pode o quê: é `REGRA` | Médio — o modo de falhar é silencioso, e quem salva não fez nada de errado |
 | 18 | **Nada acusa uma regra INERTE** — e ela tem pelo menos **três formas**: dado que ninguém preencheu, **rota que nenhuma tela chama** (o extrato do livro ficou um dia no ar sem botão, §2; o `POST /api/componentes` ficou **oito meses**, e no lugar dele se fazia `INSERT` à mão — §7-B, armadilha #33) e **chave de permissão que nenhuma rota lê** (a `minimo.definir` da linha abaixo). `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
 
 ---
@@ -3475,6 +3476,16 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   tabela: desconto só faz o número descer, então ali ele é um TETO (§19)
 - ❌ Semear as tabelas A/B/C com zero por cento: zero é "sem desconto", que é
   decisão; em branco é "ainda não se sabe", e só ele cala a tela (§19)
+- ❌ Declarar `sobmedida.cadastrar` como `nivel:'admin'` no PCP: nível admin
+  vale como "é admin do PCP" — são as 24 rotas `@admin` e a área `'admin'`
+  (§19, armadilha #34)
+- ❌ Declarar um setor com nível que não caiba a chave que ele carrega: a tela
+  não desenha a caixinha, o salvar regrava a lista sem ela, e a permissão some
+  sem ninguém desmarcar nada (§19, armadilha #34)
+- ❌ Ler "chefia do sob medida" como algo menor que diretor: o `papelDe`
+  devolve `diretor` para `sobmedida_adm`, e sempre devolveu (§19, #34)
+- ❌ Devolver `sobmedida.cadastrar` ao setor nativo `Admin`: a lista dele é
+  calculada, e quem cadastra sob medida é o setor dedicado (§19, #34)
 - ❌ Declarar `sobmedida.vender` (ou qualquer chave de venda) como `nivel:
   'admin'` no PCP — a área `'admin'` é lida como **diretor** pelo portão do
   sob medida, e o vendedor sairia com o módulo inteiro (§19)
@@ -4299,6 +4310,63 @@ Parâmetro fora da faixa é **recusado** (`prazoCorteHora` por extenso,
 > medida como **diretor**. Isso é anterior a esta fase e **não foi mexido
 > aqui**: estreitar aquela leitura muda quem pode o quê e é `REGRA`, não
 > conserto. Está escrito para não se descobrir por acidente.
+
+### ⚠️ ARMADILHA #34 — a chave do CADASTRO deste módulo valia como admin do PCP
+
+**24/09/2026.** A fase 2 travou o vazamento no sentido **venda → módulo** (logo
+acima). Faltava o de volta, e ele estava aberto desde sempre:
+`sobmedida.cadastrar` era `nivel:'admin'`, e nível admin no PCP não é rótulo —
+é duas afirmações:
+
+```
+sincronizarAreas   → área 'admin' em quem tem QUALQUER chave de nível admin
+temAdmin(perms)    → as 24 rotas '@admin' do PCP liberam pela MESMA régua
+```
+
+Então a chave que diz *"mexe no cadastro de tecido e nos parâmetros do
+encaixe"* dizia, de fato, **"é admin do PCP"**. Hoje ela é `supervisor`.
+
+> ⚠️ **DENTRO DO MÓDULO NÃO MUDOU NADA, e escrever isso importa mais que o
+> conserto.** O `papelDe` devolve `'diretor'` tanto para `'admin'` quanto para
+> `AREA_CHEFIA` — **nunca houve papel "chefia" separado**. Quem tem a chave
+> continua entrando como diretor lá dentro; é o que a área sempre significou.
+> O que saiu foi o PCP. Eu mesmo descrevi isto errado ao dono antes de ler o
+> `papelDe`, e a decisão foi tomada com a descrição corrigida na mesa.
+
+> ⚠️ **O SETOR NATIVO `Admin` DEIXOU DE CARREGAR A CHAVE, e isso é decisão.**
+> A lista de permissões dele é **calculada** — *"toda chave de nível admin"*
+> (`acesso.js`, linha 38) —, então baixar o nível a tira de lá na instalação
+> limpa. Em produção nada muda, porque **ninguém a tinha**. O lugar dela passa
+> a ser o setor dedicado. Há caso afirmando isso, para não voltar por acidente
+> no dia em que alguém reler a lista calculada.
+
+> ⚠️ **E O SETOR PRECISA TER NÍVEL QUE CAIBA A CHAVE — o par declarado errado
+> não dá erro: ele APAGA a chave em silêncio.** O `Sob medida / Cadastros`
+> estava declarado `admin` e a produção tinha `supervisor`; a chave era
+> `admin`. A rota de salvar recusa permissão acima do nível do setor, **e a
+> tela nem desenha a caixinha** — então ela não é recusada, ela simplesmente
+> nunca é mandada. E como o salvar **apaga e regrava a lista inteira**,
+> editar o setor por qualquer outro motivo a remove.
+>
+> Foi o que aconteceu: a auditoria traz `2026-09-19 07:29 · Lucas ·
+> setor_editado · Sob medida / Cadastros · sobmedida.cortar`. Ninguém
+> desmarcou nada. Hoje os dois são `supervisor`, e o caso confere o **par**,
+> não cada um por si.
+>
+> **O defeito de tela continua de pé e é dívida** (linha 20 do §14): editar
+> qualquer setor remove, sem avisar, as permissões que ele tenha acima do
+> próprio nível.
+
+> **O que isso NÃO conserta:** as outras 23 chaves de nível admin do PCP
+> continuam entrando no sob medida como diretor (o bloco acima). Estreitar
+> aquela leitura é `REGRA`, uma chave por vez.
+
+> **Rode `node teste_acesso.js` (168 casos, a seção 6-D é esta) e
+> `cd tecido && npm test` (450) ao mexer no nível de qualquer chave.**
+> Conferido reintroduzindo o `nivel:'admin'`: reprova **6 casos** no primeiro
+> e **1** no segundo. E **abrindo a tela** — com o defeito de volta a caixinha
+> aparece `[BLOQUEADA] · acima do nível do setor`, que é o que o dono viu; com
+> o conserto ela é marcável, e salvar o setor mantém as duas chaves.
 
 > ⚠️ **`revenda.editar` E `credito.editar` NÃO SÃO DO VENDEDOR**, e isso é
 > decisão, não esquecimento. A spec diz que a tabela é decidida pela Deccorar

@@ -77,6 +77,17 @@ module.exports=[
   const linha=perms.split('\n').filter(l=>l.indexOf("chave:'sobmedida.vender'")>=0).join('');
   igual(linha.indexOf("nivel:'operacao'")>=0,true,
     'sobmedida.vender e declarada como operacao no PCP, e nao como admin: '+linha.trim());
+
+  /* ⚠️ E O MESMO VALE PARA A CHEFIA, NO SENTIDO CONTRARIO (24/09/2026).
+     `sobmedida.cadastrar` era `nivel:'admin'` — e como o PCP libera as rotas
+     '@admin' por "tem alguma chave de nivel admin", a chave do CADASTRO DESTE
+     MODULO dava um pedaco do admin do PCP a quem a tivesse. Aqui dentro nada
+     muda (AREA_CHEFIA ja e diretor, tres casos acima); o que sai e o PCP. */
+  const linhaCad=perms.split('\n').filter(l=>l.indexOf("chave:'sobmedida.cadastrar'")>=0).join('');
+  igual(linhaCad.indexOf("nivel:'admin'")>=0,false,
+    'sobmedida.cadastrar NAO e declarada como admin no PCP: '+linhaCad.trim());
+  igual(linhaCad.indexOf("nivel:'supervisor'")>=0,true,
+    'ela e supervisor — chefia DESTE modulo, nao admin do PCP: '+linhaCad.trim());
 }},
 
 {nome:'o cortador nao descarta sobra, e e por isso que o papel existe', executar({igual}){
