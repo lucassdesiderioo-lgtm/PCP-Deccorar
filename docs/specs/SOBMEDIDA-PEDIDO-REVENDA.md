@@ -18,7 +18,7 @@ Fase atual: 5-A EM CÓDIGO (24/09/2026) — os cinco setores da produção no
             em paralelo ao Decorsoft
             2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
             1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
-Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ◐(5-A em código · 5-B não começou)  6 ☐  7 ☐  8 ☐
+Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ◐(5-A em produção · 5-B1 em código · 5-B2 não começou)  6 ☐  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
 Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) + 2 (fase 5-A) — ver abaixo
@@ -62,16 +62,79 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 | 11 | As **chaves de nível admin do PCP** continuam fazendo quem as tem entrar no sob medida como **diretor** — uma a menos desde 24/09, quando `sobmedida.cadastrar` baixou para `supervisor` (armadilha #34) | é anterior à fase 2 e estreitar aquela leitura muda quem pode o quê: é `REGRA`, uma chave por vez |
 | 12 | A `familia_sku` velha não é reescrita | é história do que o sistema viu; o aprendizado recomeça sozinho |
 | 13 | **Sexto setor de produção exige código** (a chave), e a tela deixa criar o setor | decisão de 24/09: setor é cadastro, chave é código — ver a 5-A |
+| 15 | **O "Pronto" não aparece no `marco`** — ele é `pronto_em` + linha de histórico | trocar o marco quebraria a reimpressão da etiqueta e mudaria em silêncio as contas da compra (4-B e 4-C). O kanban da fase 6 lê o histórico; se um dia o marco precisar do valor, é decisão de lá, com as três leituras na mesa |
 | 14 | **Editar um setor apaga, sem avisar, as permissões acima do nível dele.** A tela desenha `disabled` a caixinha acima do nível e o salvar regrava a lista inteira, então ela nunca é mandada e nunca volta | consertar é decidir o que a tela faz com a chave que não pode mostrar — avisar, preservar ou recusar o salvamento —, e as três mudam quem pode o quê: é `REGRA`. É a dívida 20 do `CLAUDE.md` §14 |
 
 ### O que ainda não foi construído
 
 | Fase | O que é |
 |---|---|
-| **5-B** | a recusa com motivo → setor → pessoa, e o fechamento de pendência pela chefia |
+| **5-B2** | a recusa com motivo → setor → pessoa: qualquer setor recusa a peça por defeito do trabalho ANTERIOR, o sistema acha pelos bipes quem fez, reabre o trabalho dele e devolve os setores seguintes para "aguardando". A peça refeita reimprime a **mesma** etiqueta, marcada como refeita. Motivo é **tabela nova** — a `motivo_recusa` que já existe é do plano de corte, e juntar as duas erraria os dois relatórios (§4.16) |
+| ~~5-B1~~ | ~~o bipe, as filas por setor, o kit e o Pronto automático~~ **EM CÓDIGO em 24/09/2026** — era o pedaço que esta lista **não citava**, e sem ele a 5-B2 não tem de onde recusar |
 | 6 | o gerencial (kanban com colunas cadastráveis) |
 | 7 | o portal da revenda |
 | 8 | segurança e abertura |
+
+## STATUS DA FASE 5-B1 — em código em 24/09/2026
+
+**O bipe e as filas (§4.15).** A 5-A pôs os cinco setores no controle de
+acesso; aqui eles ganham o que bipar. Migração 21, `dominio/producao.js`,
+`dados/producao.js`, `rotas/producao.js` e a tela `/sobmedida/bancada`.
+
+```
+SERRALHERIA: tubo · base ─┐
+COLEÇÃO: tecido ──────────┴─▶ MONTAGEM ─▶ REVISÃO ─▶ EMBALAGEM ─▶ PRONTO
+SERRALHERIA: bandô · barra ──────────────────────────────▲
+```
+
+### A mudança de ordem, e por que ela foi necessária
+
+A lista de pendências prometia a 5-B como *"a recusa com motivo → setor →
+pessoa"*. Ela **não podia vir primeiro**: a §4.16 diz que o sistema acha
+**pelos bipes** quem fez o componente, e o bipe não existia. A linha da lista
+omitia o pedaço maior, e a `producao.bipar` criada na 5-A era uma chave que
+nenhuma rota lia — a dívida 18 pela porta da fase nova.
+
+### As decisões desta fase
+
+| # | Decisão | Por quê |
+|---|---|---|
+| 1 | **O "Pronto" é `pronto_em`, não um valor novo em `marco`** | três lugares filtram por `marco='aprovado'` — a reimpressão da etiqueta e as duas contas do comprometido e do material (4-B e 4-C). Trocar faria a etiqueta parar de reimprimir e mudaria em silêncio os números da compra |
+| 2 | **Bandô e barra não seguram a montagem, só a embalagem** | são da caixa, não do conjunto; pô-los na montagem pararia a linha por uma peça necessária só no fim (§4.15) |
+| 3 | **Um campo, um bipe: o primeiro inicia, o segundo termina** | dois botões são uma escolha a mais para quem está de luva, e a errada é trabalho perdido. Na embalagem são três pelo mesmo campo, como no PCP |
+| 4 | **`producao.pendencia` é chave do MÓDULO, e da chefia** | se a bancada fechasse a própria pendência a trava deixaria de existir. Sendo do módulo, o diretor a recebe pelo `*` — ela não nasce inerte |
+| 5 | **Kit sem código cadastrado é recusa, nunca "passou"** | deixar passar faria a conferência existir no papel e não pegar em ninguém, na peça que já está dentro do plástico |
+
+### O que só apareceu abrindo a tela — três coisas, duas com teste verde por cima
+
+- a frase escrevia **`colecao`**, a chave do banco, em vez de "Coleção"; o caso
+  que existia **passava com o defeito** (o regex casava com os dois);
+- a recusa do kit dizia *"sem quantidade de suportes cadastrada"* no kit
+  tradicional, que por regra não usa faixa (§4.7) — e o caso de teste estava
+  **travando o defeito**, conferindo a palavra "suporte";
+- a ordem dos `DELETE` da limpeza do teste ignorava que `sm_pendencia` aponta
+  para o componente: 12 casos reprovaram com erro de chave estrangeira.
+
+E um defeito de verdade o teste pegou sozinho: **o kit contava na conta do
+Pronto** (cada persiana tem duas linhas de setor `embalagem`), e o pedido
+ficava eternamente a uma peça de fechar.
+
+### ✅ Rodada completa na tela — e o que ela NÃO prova
+
+Uma persiana lisa atravessou os cinco setores só com bipe, com o kit errado
+recusado e o certo aceito; a do bandô provou as duas metades da regra (a
+montagem andou sem ele, a embalagem foi segurada por ele); na última persiana
+saiu **PEDIDO PRONTO**, com `pronto_em` gravado e `marco` intacto.
+
+**Isso não é a conferência da fábrica.** Provou o fluxo e as frases num
+navegador. A prova que fecha a fase é a bancada de verdade, com o leitor na
+mão — é a lição do §4 do `CLAUDE.md`, onde o QR passou por três rodadas verdes
+sem ler em celular nenhum.
+
+**Testes:** `cd tecido && npm test` — 482 casos, 32 desta fase. Cinco defeitos
+foram reintroduzidos um a um para provar que cada caso pega o seu.
+
+---
 
 ## STATUS DA FASE 5-A — em código em 24/09/2026
 

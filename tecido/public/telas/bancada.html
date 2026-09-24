@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bancada · Sob medida</title>
+<link rel="stylesheet" href="/sobmedida/base.css">
+<style>
+/* ⚠️ O CAMPO DE BIPE E GRANDE E FICA VISIVEL, e isso nao e estetica: no iPad
+   o iOS tira o foco de campo fora da tela e o leitor bipa sem nada acontecer
+   (§12 do CLAUDE.md). Ele tambem e o primeiro elemento do corpo — quem chega
+   na bancada ja bipa. */
+#bipe{width:100%; font-size:26px; padding:16px; text-align:center; letter-spacing:.06em}
+.fila{list-style:none; padding:0; margin:10px 0 0}
+.fila li{padding:12px 10px; border-bottom:1px solid var(--linha); display:flex;
+  gap:12px; align-items:baseline; flex-wrap:wrap}
+.fila .tarefa{font-size:19px; font-weight:700; flex:1 1 320px}
+.fila .de{font-size:14px; color:var(--tinta-fraca)}
+.fila li.andando{background:var(--linha)}
+.fila .marca{font-size:12px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.05em; padding:3px 9px; border-radius:99px;
+  background:#1565c0; color:#fff}
+.vazia{color:var(--tinta-fraca); padding:14px 0; font-size:16px}
+.grande{font-size:30px; font-weight:800; margin:6px 0}
+.segura{background:var(--linha); border-left:4px solid var(--alerta);
+  border-radius:var(--raio); padding:10px 12px; margin-top:10px; font-size:16px}
+.segura b{color:var(--tinta)}
+</style>
+</head>
+<body>
+<header class="topo">
+  <h1>Bancada</h1>
+  <span class="espaco"></span>
+  <span class="quem" id="quem"></span>
+</header>
+
+<div class="corpo">
+  <div class="cartao">
+    <div class="fileira" id="setores"></div>
+    <input id="bipe" autocomplete="off" autocorrect="off" autocapitalize="off"
+           spellcheck="false" placeholder="bipe a etiqueta">
+    <div id="resposta"></div>
+  </div>
+  <div class="cartao"><h2 id="tituloFila">Fila</h2><div id="fila"></div></div>
+</div>
+
+<script src="/sobmedida/ui.js"></script>
+<script src="/sobmedida/nav.js"></script>
+<script>
+const {api,banner,beep,el,limpar,$}=window.ui;
+
+let SETOR=null, EU=null, EMBALANDO=null;
+
+/* ⚠️ A COR/ESTADO DO SETOR ESCOLHIDO SAI DO `base.css`, e nao de uma fileira
+   propria. Foi o defeito da fase 4-A: cinco botoes identicos, sem o azul do
+   escolhido, e so um texto ao lado dizendo qual era — e o maco saia do setor
+   errado. E o mesmo mecanismo da cor dos tres modos da Revisao do PCP (§3):
+   nao e decoracao, e o que impede meia hora de trabalho no lugar errado. */
+function desenharSetores(){
+  const fs=$('#setores'); limpar(fs);
+  (EU.setores||[]).forEach(s=>{
+    const b=el('button',{class:'op',type:'button','aria-pressed':String(s.chave===SETOR)},[s.nome]);
+    b.onclick=()=>{ SETOR=s.chave; EMBALANDO=null;
+      localStorage.setItem('sm_bancada',s.chave); desenharSetores(); verFila(); };
+    fs.appendChild(b);
+  });
+}
+
+async function verFila(){
+  const alvo=$('#fila'); limpar(alvo);
+  $('#tituloFila').textContent='Fila'+(SETOR?' · '+nomeDo(SETOR):'');
+  if(!SETOR){ alvo.appendChild(el('div',{class:'vazia'},['Escolha a bancada acima.'])); return; }
+  let linhas=[];
+  try{ linhas=await api('/api/producao/fila/'+encodeURIComponent(SETOR)); }catch(e){ return; }
+  if(!linhas.length){
+    /* ⚠️ "NADA AQUI" NAO E "ESTA QUEBRADO". Tela vazia se parece com tela
+       quebrada — a licao da 4-C, onde a primeira leitura deu vazio e estava
+       certa. Por isso a frase diz o que o vazio significa. */
+    alvo.appendChild(el('div',{class:'vazia'},
+      ['Nada liberado para esta bancada agora — ou tudo já foi feito, ou as peças estão esperando o setor anterior.']));
+    return;
+  }
+  const ul=el('ul',{class:'fila'});
+  linhas.forEach(l=>{
+    const marcas=[];
+    if(l.em_andamento) marcas.push(el('span',{class:'marca'},['em andamento']));
+    ul.appendChild(el('li',{class:l.em_andamento?'andando':''},[
+      el('span',{class:'tarefa'},[l.o_que_fazer]),
+      el('span',{class:'de'},['pedido '+l.pedido_numero+' · peça '+l.item_n+' · '+(l.revenda||'')]),
+      ...marcas
+    ]));
+  });
+  alvo.appendChild(ul);
+}
+
+const nomeDo=chave=>((EU.setores||[]).find(s=>s.chave===chave)||{}).nome||chave;
+
+/* ── O BIPE ──────────────────────────────────────────────────────────────
+   Um campo so. Se ha uma embalagem esperando o kit, o proximo bipe e lido
+   como kit; senao e a peca. E o mesmo desenho da Embalagem do PCP (§4), onde
+   os tres bipes entram pelo mesmo campo — quem esta de luva nao troca de
+   campo entre um codigo e outro. */
+async function bipou(codigo){
+  const limpoCod=String(codigo||'').replace(/[^A-Za-z0-9-]/g,'');
+  if(!limpoCod) return;
+  const r=$('#resposta'); limpar(r);
+  try{
+    if(EMBALANDO){
+      await api('/api/producao/kit',{metodo:'POST',corpo:{codigo:EMBALANDO,kit:limpoCod}});
+      beep(); r.appendChild(el('div',{class:'grande'},['KIT CONFERIDO ✓']));
+      r.appendChild(el('div',{class:'de'},['Agora bipe a etiqueta da peça de novo para fechar.']));
+      EMBALANDO=null; return;
+    }
+    const d=await api('/api/producao/bipe',{metodo:'POST',corpo:{codigo:limpoCod},silencioso:true});
+    beep();
+    if(d.acao==='iniciado'){
+      r.appendChild(el('div',{class:'grande'},['COMEÇOU']));
+      r.appendChild(el('div',{class:'de'},[d.o_que_fazer||'']));
+      if(SETOR==='embalagem'){ EMBALANDO=limpoCod;
+        r.appendChild(el('div',{class:'segura'},['Bipe o KIT desta peça antes de fechar.'])); }
+    } else {
+      r.appendChild(el('div',{class:'grande'},['TERMINOU ✓']));
+      if(d.pronto) r.appendChild(el('div',{class:'grande'},['PEDIDO PRONTO 🎉']));
+    }
+  }catch(e){
+    beep('erro');
+    banner(e.message,'erro',7);
+    /* ⚠️ "NAO APARECE" NUNCA VIRA "NINGUEM SABE POR QUE". Na recusa por
+       aguardando, a tela mostra o que segura NA PROPRIA TELA e nao so num
+       banner que some em 7 segundos — quem esta com a peca na mao precisa
+       poder ler de novo. */
+    if(e.motivo==='aguardando'||e.motivo==='faltou_kit'||e.motivo==='kit_errado')
+      r.appendChild(el('div',{class:'segura'},[e.message]));
+    if(e.motivo==='faltou_kit') EMBALANDO=limpoCod;
+  }
+  verFila();
+}
+
+/* ⚠️ O LEITOR MANDA Tab OU Enter, e as vezes manda o codigo picado (§12).
+   Por isso: aceita os dois, e processa por TIMEOUT depois da ultima tecla —
+   sem o timeout o codigo entra pela metade no dia em que o leitor respirar. */
+let t=null;
+const campo=$('#bipe');
+campo.addEventListener('keydown',ev=>{
+  if(ev.key==='Enter'||ev.key==='Tab'){ ev.preventDefault(); clearTimeout(t); disparar(); }
+});
+campo.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(disparar,120); });
+function disparar(){ const v=campo.value; campo.value=''; campo.focus(); if(v.trim()) bipou(v); }
+
+(async function(){
+  EU=await api('/api/eu');
+  $('#quem').textContent=EU.nome||'';
+  /* O setor fica salvo POR APARELHO, como o modo da Revisao do PCP (§3): o
+     tablet da serralheria reabre na serralheria. */
+  const salvo=localStorage.getItem('sm_bancada');
+  const meus=(EU.setores||[]).map(s=>s.chave);
+  SETOR = meus.includes(salvo) ? salvo : (meus.length===1?meus[0]:null);
+  desenharSetores(); verFila(); campo.focus();
+})();
+</script>
+</body>
+</html>
