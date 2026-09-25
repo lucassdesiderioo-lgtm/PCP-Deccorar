@@ -2846,6 +2846,15 @@ Relatório que um dia quiser esse número lê de lá.
 > **Só a tela: não há relatório nem gráfico.** São hoje e 30 dias, no próprio
 > quadro. Se precisar de série por dia, ela sai do mesmo `saidasAdiantadas`.
 
+> ✅ **NO AR E CONFERIDO PELO DONO EM 25/09/2026** (PR #132): fez o deploy e
+> disse *"ficou certo"*. A spec curta foi para `docs/arquivo/`.
+>
+> ⚠️ **A METADE DA COLETA SÓ SE PROVA NO DIA EM QUE UMA CAIXA FUTURA FOR NO
+> CAMINHÃO.** O quadro só conta a coleta depois do fechamento com o motorista,
+> e isso depende de haver caixa adiantada no canto na hora em que ele chega. A
+> conferência de hoje não disse se esse caso passou pela tela; se o número não
+> andar nesse dia, é defeito, não silêncio normal.
+
 **Rode `node teste_carga.js` (60 casos; 24 são de coleta, 5 são a
 trava do volume não embalado, §5 #27, e 11 são o adiantado — um no começo e os 10 últimos),
 `node teste_parse.js` (caso 15), `node teste_divergencia.js` (os dois últimos
