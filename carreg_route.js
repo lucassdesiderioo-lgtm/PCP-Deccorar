@@ -1,4 +1,4 @@
-const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro,ehColeta,AGENCIA,AGUARDA_CAMINHAO}=require('./carga');
+const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro,ehColeta,AGENCIA,AGUARDA_CAMINHAO,saidasAdiantadas}=require('./carga');
 const fs=require('fs'), path=require('path');
 /* Onde ficam as fotos da conferencia com o motorista. Fora do git e FORA de
    lotes/ (que o cron apaga em 7 dias): a foto e prova, e prova nao expira
@@ -152,8 +152,15 @@ module.exports=function(app,db){
        o caminhao sair. `carregados`/`total` continuam sendo do CARRO: a caixa
        de coleta nao entra nessa conta, senao o "12 de 12" fecharia o carro
        com caixa da agencia ainda no chao. */
+    /* ADIANTADO: a etiqueta manda despachar num dia que ainda nao chegou. O
+       bipe nao recusa (adiantar e permitido), mas DIZ — quem esta com a caixa
+       na mao tem que saber que ela esta saindo antes do combinado. Na coleta a
+       caixa ainda vai pro canto; a conta do adiantado so anda quando o
+       caminhao leva (carga.js), mas o aviso vale desde ja. */
+    const hojeD=db.prepare("SELECT date('now','localtime') d").get().d;
     res.json({ok:true,pedido:alvo,carregados:p.carregados,total:p.total,
-              coleta:ehColeta(alvo), coleta_aguardando:p.coleta.aguardando.length});
+              coleta:ehColeta(alvo), coleta_aguardando:p.coleta.aguardando.length,
+              adiantado:futuro(alvo,hojeD)});
   });
   /* O PROGRESSO DA CARGA — o mesmo numero pras duas rotas.
      "Carregados X de Y" e a lista tem que falar do mesmo universo, senao o
@@ -196,6 +203,10 @@ module.exports=function(app,db){
     return {total:car+faltam.length, carregados:car, faltam,
             atrasados:faltam.filter(f=>f.atrasado).length,
             depois, adiantadas:depois.length,
+            /* O que JA SAIU adiantado (hoje e nos ultimos 30 dias), em pecas.
+               Nao confundir com `adiantadas`, que e o que PODE sair adiantado:
+               etiqueta impressa, despacho pra frente, ainda na fabrica. */
+            saiu_adiantado:saidasAdiantadas(db,30),
             coleta:{faltam:coletaFaltam, aguardando, retiradas_hoje:retiradas, fechamentos}};
   }
   // conferencia: o que falta carregar — todo `embalado`, com o atrasado marcado

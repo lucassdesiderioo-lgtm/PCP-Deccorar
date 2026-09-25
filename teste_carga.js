@@ -29,7 +29,8 @@ const FOTO='data:image/jpeg;base64,'+Buffer.alloc(4000,7).toString('base64');
 const db=new Database(path.join(tmp,'t.db'));
 db.exec(`CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT, buyer TEXT,
   city TEXT, nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', estagio TEXT, data TEXT,
-  carregado_em TEXT, despachar_em TEXT, modalidade TEXT, retirado_em TEXT);`);
+  carregado_em TEXT, despachar_em TEXT, modalidade TEXT, retirado_em TEXT);
+  CREATE TABLE lote_item (id INTEGER PRIMARY KEY AUTOINCREMENT, lote_id INTEGER, codigo TEXT, qtd INTEGER DEFAULT 1);`);
 const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
 const ontem=db.prepare("SELECT date('now','localtime','-1 day') d").get().d;
 const ins=db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,codes,estagio,data)
@@ -100,6 +101,9 @@ const ok=(n,c,extra)=>{ casos++;
   ok('o prazo vencido conta como atrasado', (d.faltam.find(f=>f.buyer==='Maria Rita')||{}).atrasado===1,
      'veio '+JSON.stringify(d.faltam.find(f=>f.buyer==='Maria Rita')));
   ok('carregados conta por carregado_em, nao por dia de importacao', d.carregados===1, 'veio '+d.carregados);
+  ok('sem nada adiantado, a conta do adiantado nasce zerada',
+     !!d.saiu_adiantado && d.saiu_adiantado.hoje.pecas===0 && d.saiu_adiantado.periodo.pecas===0,
+     'veio '+JSON.stringify(d.saiu_adiantado));
 
   /* O CASO QUE ORIGINOU TUDO: antes disto a resposta era "nao_encontrado". */
   let r=await chamar('POST /api/carregar',{code:'2000018114406178'});
@@ -243,6 +247,67 @@ const ok=(n,c,extra)=>{ casos++;
   r=await chamar('POST /api/carregar',{code:'7781'});
   ok('entre irmaos, o embalado ainda manda', r.ok===true && r.pedido.nf==='7003',
      'veio '+JSON.stringify(r.pedido&&r.pedido.nf));
+
+  /* ── O QUE SAI ADIANTADO (25/09/2026) ─────────────────────────────────────
+     Adiantado = saiu da fabrica ANTES da data de despacho da etiqueta. A saida
+     da agencia e o bipe no carro; a da coleta e o caminhao levando
+     (`retirado_em`), nao a caixa indo pro canto. Conta PECA (a caixa de 2
+     persianas conta 2), com a caixa ao lado. Ate aqui nenhum volume do dia
+     saiu adiantado: todos tinham prazo de hoje, vencido ou nenhum. */
+  d=await chamar('GET /api/carregamento');
+  ok('o que saiu no prazo nao conta como adiantado', d.saiu_adiantado.hoje.pecas===0,
+     'veio '+JSON.stringify(d.saiu_adiantado));
+
+  r=await chamar('POST /api/carregar',{code:'777'});
+  ok('bipar venda futura no carro avisa que e adiantado', r.ok===true && r.adiantado===true
+     && r.pedido.despachar_em===setembro, 'veio '+JSON.stringify({ok:r.ok,ad:r.adiantado,p:r.pedido&&r.pedido.despachar_em}));
+  r=await chamar('POST /api/carregar',{code:'888'});
+  ok('o atrasado NAO e adiantado', r.ok===true && r.adiantado===false, 'veio '+JSON.stringify(r.adiantado));
+  d=await chamar('GET /api/carregamento');
+  ok('a venda futura carregada conta 1 peca adiantada hoje, na agencia',
+     d.saiu_adiantado.hoje.pecas===1 && d.saiu_adiantado.hoje.agencia===1 && d.saiu_adiantado.hoje.coleta===0,
+     'veio '+JSON.stringify(d.saiu_adiantado));
+
+  /* A caixa de 2 persianas conta DUAS pecas e UMA caixa (§5, #23). */
+  ins.run('BK140140BEGE','Silvio Duas','7101','7811','9111','["7811","9111"]','embalado',hoje);
+  const silvio=db.prepare("SELECT id FROM lote WHERE nf='7101'").get().id;
+  db.prepare("UPDATE lote SET despachar_em=date('now','localtime','+3 day') WHERE id=?").run(silvio);
+  db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd) VALUES (?,?,2)").run(silvio,'BK140140BEGE');
+  await chamar('POST /api/carregar',{code:'7811'});
+  d=await chamar('GET /api/carregamento');
+  ok('a caixa de 2 persianas conta 2 pecas e 1 caixa',
+     d.saiu_adiantado.hoje.pecas===3 && d.saiu_adiantado.hoje.caixas===2,
+     'veio '+JSON.stringify(d.saiu_adiantado.hoje));
+
+  /* COLETA: ir pro canto NAO e sair. So conta quando o caminhao leva. */
+  r=await chamar('POST /api/carregar',{code:'2000014948199999'});
+  ok('a coleta futura avisa adiantado no bipe', r.ok===true && r.coleta===true && r.adiantado===true,
+     'veio '+JSON.stringify({ok:r.ok,col:r.coleta,ad:r.adiantado}));
+  d=await chamar('GET /api/carregamento');
+  ok('mas no canto ainda nao saiu: a conta nao anda', d.saiu_adiantado.hoje.pecas===3 && d.saiu_adiantado.hoje.coleta===0,
+     'veio '+JSON.stringify(d.saiu_adiantado.hoje));
+  r=await chamar('POST /api/coleta/fechar',{motorista:1,foto:FOTO});
+  d=await chamar('GET /api/carregamento');
+  ok('o caminhao levou: conta 1 peca de coleta', r.ok===true && d.saiu_adiantado.hoje.pecas===4
+     && d.saiu_adiantado.hoje.coleta===1, 'veio '+JSON.stringify(d.saiu_adiantado.hoje));
+
+  /* O PERIODO: ontem conta nos 30 dias e nao hoje; 40 dias atras fica fora; e
+     o fechamento a mao dos scripts do §5 (carimbado NA data do despacho, as
+     15:00) nunca e adiantado. */
+  const insC=db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,codes,estagio,data,despachar_em,carregado_em)
+    VALUES ('BK100100BEGE',?,?,?,?,'[]','carregado',?,?,?)`);
+  insC.run('Ontem Adiantado','7201','72011','72012',ontem,
+    db.prepare("SELECT date('now','localtime','+1 day') d").get().d, ontem+' 10:00:00');
+  insC.run('Muito Antigo','7202','72021','72022',ontem,
+    db.prepare("SELECT date('now','localtime','-30 day') d").get().d,
+    db.prepare("SELECT date('now','localtime','-40 day') d").get().d+' 10:00:00');
+  insC.run('Fechado Script','7203','72031','72032',ontem, ontem, ontem+' 15:00:00');
+  d=await chamar('GET /api/carregamento');
+  ok('adiantado de ontem conta no periodo e nao no dia',
+     d.saiu_adiantado.hoje.pecas===4 && d.saiu_adiantado.periodo.pecas===5 && d.saiu_adiantado.periodo.dias===30,
+     'veio '+JSON.stringify(d.saiu_adiantado));
+  ok('o periodo e de 30 dias, o de 40 dias atras fica fora e o fechamento a mao nao conta',
+     d.saiu_adiantado.periodo.caixas===4, 'veio '+JSON.stringify(d.saiu_adiantado.periodo));
 
   db.close();
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
