@@ -2,12 +2,12 @@
 
 ```
 STATUS
-Situação: IMPLEMENTADA em 25/09/2026 — falta conferir em produção
+Situação: ARQUIVADA — implementada e conferida pelo dono em 25/09/2026
 Criada em: 25/09/2026 (o plano aprovado com "pode seguir" é esta spec)
 Fases: 1 ☑ (fase única)
 Risco: 🟡 (cálculo exibido e bipe — não mexe em estoque nem em schema)
-Quando conferida: vai para docs/arquivo/. As regras que valem estão no
-CLAUDE.md §8-B.
+⚠️ ESTE DOCUMENTO É HISTÓRICO. As regras que valem estão no CLAUDE.md §8-B —
+não use daqui como fonte de regra (CLAUDE.md §13, regra 4).
 ```
 
 ## O pedido
@@ -45,8 +45,9 @@ CLAUDE.md §8-B.
 - Série por dia, gráfico ou relatório — se for pedido, sai do mesmo
   `saidasAdiantadas`.
 
-## Falta
+## Conferência
 
-- **Conferir em produção:** bipar uma caixa de despacho futuro e ver o aviso e
-  o quadro andar; fechar uma coleta com caixa futura e ver a coleta contar só
-  depois do fechamento.
+- 25/09/2026: deploy feito pelo dono, que conferiu na tela e disse "ficou
+  certo" (PR #132).
+- A contagem da coleta só anda no fechamento com o motorista; esse caso só se
+  prova no dia em que uma caixa futura for no caminhão.
