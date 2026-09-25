@@ -332,6 +332,35 @@ const ok = (n, c, extra) => { casos++;
        db.prepare("SELECT COUNT(*) c FROM lote WHERE packId='pk6490'").get().c === 1);
   }
 
+  /* ── A TELA TAMBÉM DECIDE "ISTO É CAIXA DE VÁRIAS?" (NF 7031, 25/09/2026) ──
+     O conserto de 16/09 ensinou os quatro portões do SERVIDOR a contar
+     persiana. A tela tinha mais dois — o que abre a tela âmbar e o que decide
+     se o bipe CONFERE ou IMPRIME —, e os dois continuaram em `itens.length>1`.
+     Na caixa de 1 SKU × 2 a tela seguia o fluxo normal, o 2º bipe mandava
+     imprimir, o servidor recusava ("falta conferir 2 de 2") e a tela esquecia
+     a venda: um laço sem saída na bancada, com a cliente esperando.
+     Os casos acima provam que o servidor entrega as peças; estes provam que a
+     tela USA a mesma régua — sem eles, o servidor certo não chega a ninguém. */
+  {
+    const html = fs.readFileSync(path.join(__dirname, 'public', 'embalagem.html'), 'utf8');
+    const a = html.indexOf('<script>') + 8, b = html.indexOf('</script>', a);
+    const js = html.slice(a, b);
+    ok('a tela não decide "caixa de várias" contando LINHA (`itens.length>1`)',
+       !/itens(\|\|\[\])?\)?\.length\s*>\s*1/.test(js),
+       (js.match(/.{0,40}itens(\|\|\[\])?\)?\.length\s*>\s*1.{0,20}/g)||[]).join(' | '));
+    /* E a régua positiva: a conta da tela é a mesma do etq_route — soma das
+       `qtd`, com piso 1 por linha. Executada, não só procurada no texto. */
+    const m = js.match(/function pecasDe\([\s\S]*?\n\}/);
+    ok('a tela tem a conta de persianas (`pecasDe`)', !!m);
+    if(m){
+      const pecasDe = new Function(m[0] + '; return pecasDe;')();
+      ok('1 linha de qtd 2 = 2 persianas (a NF 7031)', pecasDe([{codigo:'X', qtd:2}]) === 2);
+      ok('2 linhas de qtd 1 = 2 persianas (o pacote de 2 SKUs)', pecasDe([{qtd:1},{qtd:1}]) === 2);
+      ok('1 linha de qtd 1 = 1 persiana (a venda normal, que não muda)', pecasDe([{qtd:1}]) === 1);
+      ok('lista vazia = 0, e qtd ausente vale 1', pecasDe([]) === 0 && pecasDe(null) === 0 && pecasDe([{}]) === 1);
+    }
+  }
+
   console.log('');
   console.log(falhas ? ('FALHARAM ' + falhas + ' de ' + casos)
                      : ('todos os ' + casos + ' casos passaram'));

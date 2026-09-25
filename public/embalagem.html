@@ -219,6 +219,16 @@ function pecaTxt(p){ return (p && typeof pecaTexto==='function') ? (pecaTexto(p)
    fecha com dois bipes, e por isso ela mostra "1 de 2": marcar a linha inteira
    no primeiro bipe deixaria a persiana irmã na prateleira, que é o erro que a
    caixa de várias peças traz de volta. */
+/* QUANTAS PERSIANAS A CAIXA LEVA — a MESMA conta do etq_route.js: soma das
+   `qtd`, piso 1 por linha. É por ela que a tela decide "caixa de várias?", e
+   nunca por `itens.length`: a caixa de 1 SKU × 2 tem UMA linha e DUAS peças.
+   Contando linha, a tela seguia o fluxo normal, o 2º bipe mandava imprimir, o
+   servidor recusava ("falta conferir 2 de 2") e a venda entrava em laço — a
+   NF 7031, em 25/09/2026. O servidor tinha sido consertado em 16/09; os dois
+   portões da tela ficaram para trás. */
+function pecasDe(itens){
+  return (itens||[]).reduce(function(s,i){ return s+Math.max(1,(i&&i.qtd)||1); },0);
+}
 function linhaItem(i){
   var qtd=i.qtd||1, feitos=i.conferidos||0, ok=feitos>=qtd;
   var peca=pecaTxt({medida:(i.exige_medida&&i.largura_cm&&i.altura_cm)?(i.largura_cm+' × '+i.altura_cm):null,
@@ -304,7 +314,7 @@ async function scanSku(sku){
      o mesmo SKU de novo é a pessoa conferindo a segunda peça, e mandar isso
      pra impressora pularia as outras duas. Só quando não falta nenhuma o bipe
      volta a significar "imprime". */
-  if(confirmar && confirmar._itens && confirmar._itens.length>1){
+  if(confirmar && pecasDe(confirmar._itens)>1){
     var faltamAntes=confirmar._itens.reduce(function(s,i){ return s+Math.max(0,(i.qtd||1)-(i.conferidos||0)); },0);
     if(faltamAntes){
       var c=await (await fetch('/api/lote/conferir',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -380,7 +390,7 @@ async function scanSku(sku){
   /* A caixa com mais de uma persiana tem tela própria: ali o que decide não é
      "confira esta venda", é "confira as PEÇAS". Os avisos de coleta e de
      adiantamento vão junto, no topo — eles continuam valendo. */
-  if((r.itens||[]).length>1){ telaPacote(r, col+adiant); return; }
+  if(pecasDe(r.itens)>1){ telaPacote(r, col+adiant); return; }
   banner((r.coleta?'col':(r.adiantado?'warn':'cfm'))+' rotulo','Confira esta venda', col+adiant
     +'<div style="font-size:30px;font-weight:800;color:var(--txt);line-height:1.15;letter-spacing:-.5px;margin:2px 0 6px">'+esc(r.pedido.buyer)+'</div>'
     +'<div style="font-size:16px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+'</div>'
