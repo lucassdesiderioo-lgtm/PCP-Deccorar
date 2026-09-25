@@ -251,9 +251,9 @@ function telaPacote(r,extras){
     /* A EMBALAGEM É OUTRA, e isso não é detalhe: quem monta pelo automático
        pega o saco de uma peça só. A frase repete a do card da lista — é a mesma
        instrução, e escrevê-la diferente nos dois lugares ensinaria a equipe a
-       achar que são duas coisas. Por isso sai do `FITA`, e não de uma cópia. */
+       achar que são duas coisas. Por isso sai do `fita()`, e não de uma cópia. */
     +'<div style="font-weight:700;font-size:13px;margin-top:6px;border-top:1px solid #e0a63f;padding-top:6px">'
-    +FITA+'</div></div>'
+    +fita(total)+'</div></div>'
     +'<div style="font-size:26px;font-weight:800;color:var(--txt);line-height:1.15;margin:2px 0 4px">'+esc(r.pedido.buyer)+'</div>'
     +'<div style="font-size:15px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+'</div>'
     +itens.map(linhaItem).join('')
@@ -422,7 +422,7 @@ async function imprimir(){
        colada por fora não diz quantas peças tem dentro. */
     var quantas = r.pecas ? '<div style="margin:6px 0 8px;padding:8px 10px;border-radius:8px;background:#fff4e5;border:2px solid #e0a63f;color:#8a5a00;font-weight:800">'
         +'📦 FECHE A CAIXA COM '+r.pecas+' PERSIANAS — uma etiqueta, '+r.pecas+' peças.'
-        +'<div style="font-weight:400;font-size:13px;margin-top:2px">'+FITA+'</div></div>' : '';
+        +'<div style="font-weight:700;font-size:13px;margin-top:2px">'+fita(r.pecas)+'</div></div>' : '';
     banner(r.coleta?'col':'ok','Impresso ✓ — '+esc(o.buyer), quantas+ondeVai+'NF <b>'+esc(o.nf||'—')+'</b> · <span class="sku">'+esc(o.codigo||'')+'</span> · estoque agora: '+r.estoque+'<br>Saiu borrada ou o papel enroscou? Reimprima aqui — o estoque não muda.',
       '<button class="rebt" onclick="reimprimir('+o.id+',this)">🖨 Reimprimir esta</button>');
     beep(true); stats(); listaImp();
@@ -509,11 +509,15 @@ setModo(MODO);
    Aqui ela lê antes, por cliente, com a instrução de embalagem junto. */
 /* A INSTRUÇÃO DE EMBALAGEM É O CONTEÚDO, NÃO O ENFEITE. A cor diz "isto é
    diferente"; só a frase diz o que fazer, e é ela que vale para quem nunca
-   montou uma destas. Ela aparece em QUATRO lugares desta tela — o card de hoje,
-   o painel do "depois", a tela do bipe e o "Impresso ✓" — e sai de uma
-   constante só: escrevê-la diferente ensinaria a equipe a achar que são duas
-   coisas (§5, armadilha #23). */
-var FITA='Saco maior, as peças juntas com fita — não é o saco de uma peça só.';
+   montou uma destas. Ela aparece em QUATRO lugares desta tela — o bloco da
+   caixa na coluna, o painel do "depois", a tela do bipe e o "Impresso ✓" — e
+   sai de uma função só: escrevê-la diferente ensinaria a equipe a achar que
+   são duas coisas (§5, armadilha #23).
+   Texto do dono (25/09/2026), com o número da caixa: 2, 3, 4… Até aqui era
+   a instrução de qual saco usar, e o dono a tirou. */
+function fita(n){
+  return '⚠ Atenção: vão '+n+' persianas no mesmo pacote — embalar junto.';
+}
 
 /* O BLOCO DE UMA CAIXA, NUM LUGAR SÓ. O card de hoje e o painel do "depois"
    escrevem a MESMA caixa; duas cópias divergiriam no dia em que uma delas
@@ -547,14 +551,17 @@ function blocoCaixa(v, sep, naColuna){
       +((it.estoque!=null && it.estoque<(it.qtd||1))?'<div style="color:#c0392b;font-size:12px;font-weight:700">sem estoque — precisa produzir</div>':'')
       +'</span></div>';
   }
-  return h+(naColuna?'</div>':'<div style="text-align:right;font-size:13px;font-weight:700;color:#8a5a00;margin-top:4px">'
-    +'→ '+v.pecas+' persianas numa caixa</div></div>');
+  /* No painel do "depois" a frase vai POR CAIXA — o número é de cada uma, e
+     numa data com uma caixa de 2 e outra de 3 uma frase só no topo mentiria
+     para uma delas. Na coluna ela vem logo abaixo, em `caixaNaColuna`. */
+  return h+(naColuna?'</div>':'<div style="background:#fff4e5;border-radius:6px;padding:6px 8px;margin-top:6px;'
+    +'font-size:13px;font-weight:700;color:#8a5a00">'+fita(v.pecas)+'</div></div>');
 }
 /* A CAIXA DE VÁRIAS DENTRO DA COLUNA DELA (opção B, 25/09/2026). Até aqui ela
    aparecia duas vezes — no quadro do topo, por cliente, e na linha do SKU — e
    o dono leu as duas como duas vendas. Hoje é um bloco só, na coluna da porta
    de saída, com o número "1" à direita como qualquer linha: é uma caixa, e é
-   ela que zera a lista. A frase da fita vem junto, porque é a coluna que a
+   ela que zera a lista. A frase da caixa (`fita`) vem junto, porque é a coluna que a
    pessoa está olhando quando vai à prateleira. */
 /* O mesmo "fora do prazo" da linha (`atrasados` do `linhasDeSku`): o prazo do
    ML passou e a caixa continua aqui. Data local, como o servidor conta. */
@@ -573,12 +580,8 @@ function caixaNaColuna(v){
     +'<b style="color:'+(atrasada(v)?'#c0392b':'#b26a00')+';font-size:22px;line-height:1">1</b></div>'
     +(atrasada(v)?'<div style="color:#c0392b;font-size:12px;font-weight:700;margin-top:3px">⚠ fora do prazo</div>':'')
     +blocoCaixa(v,false,true)
-    +'<div style="background:#fff4e5;border-radius:6px;padding:6px 8px;font-size:13px;font-weight:700;color:#8a5a00">'+FITA+'</div>'
+    +'<div style="background:#fff4e5;border-radius:6px;padding:6px 8px;font-size:13px;font-weight:700;color:#8a5a00">'+fita(v.pecas)+'</div>'
     +'</div>';
-}
-function avisoFita(){
-  return '<div style="background:#fff6e5;border-radius:6px;padding:8px 10px;margin-bottom:10px;'
-    +'font-size:14px;font-weight:600;color:#8a5a00">'+FITA+'</div>';
 }
 async function listaPend(){
   var l=[], cx=[];
@@ -763,8 +766,7 @@ function renderFut(){
     if(cs.length){
       h+='<div style="margin:8px 10px 10px;border:2px solid #e0a63f;border-radius:8px;padding:8px 10px;background:#fffdf7">'
         +'<div style="font-weight:800;color:#8a5a00;font-size:14px;margin-bottom:6px">'
-        +'📦 '+cs.length+' caixa'+(cs.length>1?'s':'')+' com mais de uma persiana nesta data</div>'
-        +avisoFita();
+        +'📦 '+cs.length+' caixa'+(cs.length>1?'s':'')+' com mais de uma persiana nesta data</div>';
       for(var c=0;c<cs.length;c++) h+=blocoCaixa(cs[c], c>0);
       h+='</div>';
     }
