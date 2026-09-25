@@ -25,6 +25,12 @@
      E a segunda porta de saida da fabrica, e a caixa dela NAO vai no carro:
      uma cor que nao se confunde com "carregado" (verde) nem "falta" (ambar). */
   .stat.col{border-color:#b9a3e6;background:#f6f2fd}.stat.col .n{color:var(--violet)}
+  /* ADIANTADO em azul: e a mesma cor do quadro "so despacham depois" logo
+     abaixo — os dois falam da venda de prazo futuro, um do que pode sair e o
+     outro do que ja saiu. O detalhe vem numa linha menor, sem caixa-alta. */
+  .stat.adi{border-color:#c9d8ee;background:#eef3fb}.stat.adi .n{color:var(--blue)}
+  .stat .s{font-size:12px;color:var(--muted);margin-top:4px}
+  .adiant{margin-top:10px;font-size:18px;font-weight:800;color:var(--blue)}
   .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:26px;text-align:center;margin-bottom:14px}
   .banner.ok{background:#e7f5eb;border-color:#a9d8b4}.banner.err{background:#fbe9e8;border-color:#efb1ad}.banner.warn{background:#fbf1db;border-color:#e7cb8c}
   .banner.col{background:#efe9fb;border-color:#b9a3e6}
@@ -64,6 +70,7 @@
     <div class="stat car"><div class="n" id="nCar">0</div><div class="l">No carro</div></div>
     <div class="stat fal"><div class="n" id="nFal">0</div><div class="l">Faltam no carro</div></div>
     <div class="stat col"><div class="n" id="nCol">0</div><div class="l">Coleta esperando</div></div>
+    <div class="stat adi"><div class="n" id="nAdi">0</div><div class="l">Peças adiantadas hoje</div><div class="s" id="sAdi"></div></div>
   </div>
   <div class="banner" id="banner"><div class="bt">Pronto</div><div class="bs">Bipe o QR ou código de barras da etiqueta de venda.</div></div>
   <input id="scan" autocomplete="off">
@@ -95,6 +102,13 @@
 <script>
 const $=s=>document.querySelector(s);
 let last={c:null,t:0};
+/* "⏩ ADIANTADO — despacha qui 02/10": a caixa esta saindo antes do dia que a
+   etiqueta manda. Nao e erro nem recusa (adiantar e permitido); e informacao
+   pra quem esta com ela na mao. */
+const DSEM=['dom','seg','ter','qua','qui','sex','sáb'];
+function diaSemBR(s){ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m) return '';
+  return DSEM[new Date(+m[1],+m[2]-1,+m[3]).getDay()]+' '+m[3]+'/'+m[2]; }
+function linhaAdiant(r){ return r&&r.adiantado ? '<div class="adiant">⏩ ADIANTADO — despacha '+diaSemBR(r.pedido&&r.pedido.despachar_em)+'</div>' : ''; }
 function banner(kind,title,sub){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'; }
 function esc0(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
@@ -115,13 +129,14 @@ async function bip(code){
     var n=r.coleta_aguardando||0;
     banner('col','COLETA ✓ — '+esc0(r.pedido.buyer),
       'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · <span class="c">'+esc0(r.pedido.codigo||'')+'</span> · <b>não vai no carro</b>: deixe no lugar reservado.'
+      +linhaAdiant(r)
       +'<div class="indo">Está indo '+n+' peça'+(n===1?'':'s')+'</div>'
       +'<div style="color:#4b2a91;font-weight:700">Peça ao motorista o número de caixas que ele bipou antes de sair.</div>');
     beep(true);
   }
   else if(r.ok){
     aguardando=null;
-    banner('ok','Carregado ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · <span class="c">'+esc0(r.pedido.codigo||'')+'</span> · No carro <b>'+r.carregados+'</b> de '+r.total); beep(true);
+    banner('ok','Carregado ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · <span class="c">'+esc0(r.pedido.codigo||'')+'</span> · No carro <b>'+r.carregados+'</b> de '+r.total+linhaAdiant(r)); beep(true);
   }
   else if(r.motivo==='falta_sku'){
     // 1o bipe aceito. NAO mostramos qual SKU esperar — a conferencia e cega.
@@ -172,6 +187,21 @@ async function carregar(){
   const col=d.coleta||{faltam:[],aguardando:[],fechamentos:[],retiradas_hoje:0};
   $('#nCar').textContent=d.carregados; $('#nFal').textContent=d.faltam.length;
   $('#nCol').textContent=col.aguardando.length;
+  /* PECAS QUE SAIRAM ADIANTADAS (carga.js): agencia pelo bipe no carro,
+     coleta quando o caminhao leva. A linha de baixo diz de qual porta vieram
+     e os 30 dias; as caixas so aparecem quando nao batem com as pecas. */
+  var ad=d.saiu_adiantado||{hoje:{pecas:0,caixas:0,agencia:0,coleta:0},periodo:{dias:30,pecas:0,caixas:0}};
+  $('#nAdi').textContent=ad.hoje.pecas;
+  /* Duas linhas, e cada pedaco inteiro: no card estreito do tablet a quebra
+     caia no meio ("coleta / 1", "5 / pecas") e o numero se separava do que
+     ele conta. */
+  var pedaco=function(t){ return '<span style="white-space:nowrap">'+t+'</span>'; };
+  var partes=[];
+  if(ad.hoje.pecas && ad.hoje.caixas!==ad.hoje.pecas) partes.push(pedaco(ad.hoje.caixas+' caixa'+(ad.hoje.caixas===1?'':'s')));
+  if(ad.hoje.agencia && ad.hoje.coleta) partes.push(pedaco('carro '+ad.hoje.agencia)+' · '+pedaco('coleta '+ad.hoje.coleta));
+  else if(ad.hoje.coleta) partes.push(pedaco('todas pela coleta'));
+  $('#sAdi').innerHTML=(partes.length?'<div>'+partes.join(' · ')+'</div>':'')
+    +'<div>'+pedaco('últimos '+ad.periodo.dias+' dias: '+ad.periodo.pecas+' peça'+(ad.periodo.pecas===1?'':'s'))+'</div>';
   $('#lista').innerHTML = d.faltam.length ? d.faltam.map(linha).join('') : '<div class="empty">✅ Nada faltando — carro completo!</div>';
   /* A venda futura aparece, mas fora da cobranca: ela existe e esta na
      fabrica (nao pode sumir, foi esse o buraco), so nao e carga de hoje. */

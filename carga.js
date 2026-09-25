@@ -93,5 +93,50 @@ function ehColeta(volume){
    e nao retirada esta fisicamente no canto da coleta ate alguem levar. */
 const AGUARDA_CAMINHAO = "estagio='carregado' AND " + COLETA() + " AND retirado_em IS NULL";
 
+/* O QUE SAIU ADIANTADO (25/09/2026).
+   Adiantado e o volume que saiu da fabrica ANTES da data de despacho que a
+   etiqueta traz. Esta e a unica definicao — a tela do carregamento le daqui, e
+   um relatorio amanha tem que ler daqui tambem.
+
+   A SAIDA DEPENDE DA PORTA. Na agencia a caixa sai quando sobe no carro
+   (`carregado_em`). Na coleta, o bipe so a leva pro canto reservado: ela sai
+   quando o caminhao leva (`retirado_em`). Contar a coleta pelo bipe diria
+   "saiu adiantado" de uma caixa que continua na fabrica.
+
+   CONTA PECA, NAO CAIXA. A caixa de varias persianas (§5, #23) leva N pecas
+   de uma vez; a caixa vai junto, para a diferenca aparecer quando existir.
+
+   O FECHAMENTO A MAO NAO ENTRA SOZINHO. Os scripts do §5 carimbam a saida NA
+   data do despacho (`COALESCE(despachar_em,data)` as 15:00), entao
+   `despachar_em > date(saida)` nunca e verdade para eles — e e para isso que
+   eles carimbam assim. Volume sem data de despacho lida nao e adiantado de
+   ninguem: nao ha prazo contra o qual medir. */
+function SAIDA(alias){
+  const p = alias ? alias+'.' : '';
+  return `CASE WHEN ${COLETA(alias)} THEN ${p}retirado_em ELSE ${p}carregado_em END`;
+}
+function saidasAdiantadas(db, dias){
+  const n = Math.max(1, parseInt(dias,10) || 30);
+  const linhas = db.prepare(`SELECT ${COLETA('l')} AS coleta,
+      date(${SAIDA('l')}) AS dia,
+      MAX(1, COALESCE((SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id),1)) AS pecas
+    FROM lote l
+    WHERE l.estagio='carregado' AND l.despachar_em IS NOT NULL
+      AND ${SAIDA('l')} IS NOT NULL
+      AND l.despachar_em > date(${SAIDA('l')})
+      AND date(${SAIDA('l')}) >= date('now','localtime',?)`).all('-'+(n-1)+' day');
+  const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
+  const r = { hoje:{pecas:0,caixas:0,agencia:0,coleta:0}, periodo:{dias:n,pecas:0,caixas:0} };
+  for(const l of linhas){
+    r.periodo.pecas += l.pecas; r.periodo.caixas++;
+    if(l.dia === hoje){
+      r.hoje.pecas += l.pecas; r.hoje.caixas++;
+      if(l.coleta) r.hoje.coleta += l.pecas; else r.hoje.agencia += l.pecas;
+    }
+  }
+  return r;
+}
+
 module.exports = { PRA_CARREGAR, DO_DIA, ORDEM_CARGA, atrasado, futuro,
-                   COLETA, AGENCIA, ehColeta, AGUARDA_CAMINHAO };
+                   COLETA, AGENCIA, ehColeta, AGUARDA_CAMINHAO,
+                   SAIDA, saidasAdiantadas };

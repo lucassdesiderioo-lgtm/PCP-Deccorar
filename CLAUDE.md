@@ -1854,7 +1854,7 @@ Desligável (Admin → Cadastros) porque custa um bipe por volume, todo dia. Nas
 > zera ninguém lê até o fim — que é o mesmo fim de esconder.
 >
 > **Rode `node teste_carga.js` após qualquer mudança no `carreg_route.js`** —
-> os 49 casos incluem o dos seis volumes de 26/08, e cobrem que a busca larga
+> os 60 casos incluem o dos seis volumes de 26/08, e cobrem que a busca larga
 > não virou "acha qualquer coisa" (código inexistente ainda dá `nao_encontrado`)
 > e que `bloqueado` continua recusado.
 
@@ -2805,8 +2805,49 @@ canto na outra.
 > saída por `carregado_em` continua certo (é o mesmo dia); quem precisar da
 > hora real da retirada lê `retirado_em`.
 
-**Rode `node teste_carga.js` (49 casos; 24 são de coleta e os 5 últimos são a
-trava do volume não embalado, §5 #27),
+### ⚠️ O QUE SAI ADIANTADO — contado em peças, na tela do Carregamento (25/09/2026)
+
+Pedido do dono: *"mensurar e mostrar na tela de carregamento a quantidade de
+peças que estamos enviando como adiantado"*. **Adiantado é o volume que sai da
+fábrica ANTES da data de despacho que a etiqueta traz** (`despachar_em`). O bipe
+continua aceitando — adiantar é permitido (§8, *venda futura é trabalho
+adiantável*) — e passou a **dizer** e a **contar**.
+
+| Onde | O quê |
+|---|---|
+| 4º quadro do topo, azul | **Peças adiantadas hoje**, com carro × coleta, as caixas quando não batem com as peças, e os **últimos 30 dias** |
+| Banner do bipe | `⏩ ADIANTADO — despacha sex 02/10` na caixa futura, no carro **e** na coleta |
+| `GET /api/carregamento` | `saiu_adiantado: {hoje:{pecas,caixas,agencia,coleta}, periodo:{dias,pecas,caixas}}` |
+| `POST /api/carregar` | `adiantado: true/false` |
+
+**`carga.js` → `saidasAdiantadas(db, dias)` e `SAIDA()` são o dono único.**
+Relatório que um dia quiser esse número lê de lá.
+
+> ⚠️ **NA COLETA A SAÍDA É O CAMINHÃO LEVANDO (`retirado_em`), NÃO O BIPE.** O
+> bloco logo acima diz que contar saída por `carregado_em` "é o mesmo dia" — e
+> para o adiantado **não é**: a caixa de despacho sexta vai pro canto na
+> terça e fica lá. Contada pelo bipe, ela seria "adiantada" sem ter saído da
+> fábrica. O banner avisa no bipe; a conta só anda quando o caminhão leva.
+> Caso travando.
+
+> ⚠️ **NÃO CONFUNDIR `adiantadas` COM `saiu_adiantado`.** O primeiro já existia
+> e é o que **pode** sair adiantado (etiqueta impressa, despacho pra frente,
+> ainda na fábrica — o quadro azul *"só despacham depois"*). O segundo é o que
+> **já saiu**. Os dois ficam na mesma cor de propósito: falam da mesma venda de
+> prazo futuro, antes e depois.
+
+> **Conta PEÇA, com a caixa ao lado** — a caixa de várias persianas (§5, #23)
+> conta N. **O fechamento à mão dos scripts do §5 nunca entra**: eles carimbam
+> a saída NA data do despacho, às 15:00, e `despachar_em > dia da saída` não
+> fecha para eles. Volume sem `despachar_em` lido também fica fora — não há
+> prazo contra o qual medir. E a caixa adiantada **continua** entrando no
+> "No carro X de Y", como sempre entrou.
+
+> **Só a tela: não há relatório nem gráfico.** São hoje e 30 dias, no próprio
+> quadro. Se precisar de série por dia, ela sai do mesmo `saidasAdiantadas`.
+
+**Rode `node teste_carga.js` (60 casos; 24 são de coleta, 5 são a
+trava do volume não embalado, §5 #27, e 11 são o adiantado — um no começo e os 10 últimos),
 `node teste_parse.js` (caso 15), `node teste_divergencia.js` (os dois últimos
 casos são a decisão da gestão) e `node teste_etiqueta.js` após mexer nisso.**
 Volumes anteriores à coluna: `node backfill_modalidade.js` (simula) e
@@ -3152,7 +3193,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (49), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3337,6 +3378,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   da janela: o primeiro esconde furo que ninguém vai procurar, o segundo faz o
   volume mudar de classificação conforme o argumento da linha de comando
   (§5, armadilha #27)
+- ❌ Contar como adiantada a caixa de coleta que só foi pro canto: a saída da
+  coleta é o caminhão levando (`retirado_em`), e o bipe não é saída (§8-B)
+- ❌ Escrever uma segunda conta de "saiu adiantado", ou contar caixa em vez de
+  peça: é o `saidasAdiantadas` do `carga.js`, e a caixa de várias conta N (§8-B)
 - ❌ Pôr a caixa de coleta na lista ou no contador do carro, ou somar a coleta
   no relógio de despacho — são duas portas de saída, e `carga.js` é o dono
   único de "isto é coleta?" (§8-B, armadilha #21)
@@ -3782,6 +3827,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | **Reposição** | Produção para refazer o estoque consumido por uma venda |
 | **Urgente** | Venda sem estoque — cliente esperando, sai no mesmo dia |
 | **Adiantamento** | Ordem de amanhã produzida hoje, se sobrar tempo |
+| **Saiu adiantado** | Volume que saiu da fábrica antes da data de despacho da etiqueta — carro pelo bipe, coleta quando o caminhão leva (§8-B). Não é o mesmo que "adiantamento" |
 
 ---
 
