@@ -546,9 +546,19 @@ module.exports=function(app,db){
      persianas, e a bancada saia da prateleira com UMA: o erro so aparecia no
      bipe, com a caixa ja montada (o defeito da NF 6490, 16/09/2026).
      Volume sem linha em `lote_item` vale 1 — e o volume de sempre. */
+  /* `clientes_varias`: QUEM E A CAIXA DE VARIAS PERSIANAS DESTA LINHA
+     (25/09/2026, NF 7044). A mesma caixa aparece no card de cima (por cliente) e
+     aqui (por SKU) — duas perguntas, e as duas ficam (§5). Mas quem le de relance
+     via o mesmo SKU duas vezes e achava que eram duas vendas. O nome do cliente,
+     escrito igual ao do card, e o que liga as duas. So entra quem leva MAIS DE
+     UMA persiana: a venda comum da mesma linha nao esta no card, e nomea-la
+     apontaria uma caixa que ninguem acharia la. O separador e o char(31) porque
+     nome de cliente pode ter virgula. */
   const linhasDeSku=(filtro,porData)=>db.prepare(`SELECT l.codigo, COUNT(*) qtd,
       ${porData?'l.despachar_em,':''}
       SUM(COALESCE((SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id),1)) pecas,
+      GROUP_CONCAT(CASE WHEN (SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id)>1
+        THEN COALESCE(NULLIF(TRIM(l.buyer),''),'NF '||l.nf) END, char(31)) clientes_varias,
       CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END modalidade,
       MIN(l.despachar_em) vence_em,
       SUM(CASE WHEN l.despachar_em IS NOT NULL AND l.despachar_em<date('now','localtime') THEN 1 ELSE 0 END) atrasados,
@@ -564,7 +574,8 @@ module.exports=function(app,db){
     LEFT JOIN modelo m ON m.id=s.modelo_id
     WHERE ${filtro}
     GROUP BY ${porData?'l.despachar_em, ':''}l.codigo, CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END
-    ORDER BY ${porData?'l.despachar_em, ':'atrasados DESC, '}qtd DESC`).all();
+    ORDER BY ${porData?'l.despachar_em, ':'atrasados DESC, '}qtd DESC`).all()
+    .map(r=>Object.assign(r,{clientes_varias: r.clientes_varias ? r.clientes_varias.split('\x1f') : []}));
   app.get('/api/pendentes',(req,res)=> res.json(linhasDeSku(filaDoDia('l'),false)));
   /* ⚠️ AS CAIXAS DE VARIAS PERSIANAS TEM CARD PROPRIO, E POR UM MOTIVO FISICO.
      A coleta ganhou card proprio porque e um LUGAR diferente (§8-B); esta ganha
