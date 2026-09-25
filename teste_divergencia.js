@@ -267,6 +267,8 @@ function conferir(nome,cond,detalhe){
     const normal=ins.run('BK140140BEGE','Ana','1','p1','agencia').lastInsertRowid;
     const dupla =ins.run('BK140140BEGE','Bruno','6490','p2','agencia').lastInsertRowid;
     const pack  =ins.run('BK120120BEGE','Fabiano','6585','p3','coleta').lastInsertRowid;
+    // Toda peca de caixa e cadastrada (a trava do §6 vale por peca, §5 #23).
+    db.prepare("INSERT INTO skus (codigo,largura_cm,altura_cm,cor_codigo,tecido_codigo,modelo_id,estoque) VALUES ('BK120120BEGE',120,120,'BEGE','BLACKOUT',1,3)").run();
     // Sem nenhuma linha em lote_item: o volume de sempre, que e a esmagadora maioria.
     ins.run('BK160160CINZA','Carla','9','p4','agencia');
     // Bruno: 2 unidades do MESMO SKU (o caso da 6490). Fabiano: 2 SKUs.
@@ -276,34 +278,22 @@ function conferir(nome,cond,detalhe){
 
     const p=await chamar(ctx,'GET','/api/pendentes');
     const linha=(p.body||[]).find(x=>x.codigo==='BK140140BEGE' && x.modalidade==='agencia')||{};
-    /* CAIXA e PERSIANA sao numeros diferentes, e so divergem aqui: 2 caixas
-       (Ana e Bruno) carregando 3 persianas. Se `pecas` copiasse `qtd`, a linha
-       voltaria a mandar a pessoa buscar 2 quando ela precisa de 3. */
-    conferir('a lista conta CAIXA e PERSIANA, e as duas contas convivem',
-      linha.qtd===2 && linha.pecas===3, JSON.stringify(linha));
+    /* A CAIXA DE VARIAS APARECE UMA VEZ SO (25/09/2026, opcao B do dono). Ate
+       aqui ela saia no quadro (por cliente) E na linha do SKU — e o dono leu as
+       duas como duas vendas. Hoje a lista por SKU conta so as caixas COMUNS; a
+       de varias vem inteira do `/api/pendentes/varias` e a tela a desenha dentro
+       da coluna da porta de saida dela. A Ana (comum) fica na linha; o Bruno (2
+       unidades) sai dela. */
+    conferir('a linha por SKU conta so a caixa comum — a de varias nao se repete',
+      linha.qtd===1 && linha.pecas===1, JSON.stringify(linha));
     /* O volume SEM linha em `lote_item` vale 1 — e o volume de sempre, e e ele
        que nao pode ganhar linha ambar nem card por causa desta mudanca. */
     const semItens=(p.body||[]).find(x=>x.codigo==='BK160160CINZA')||{};
     conferir('volume sem linha em lote_item vale 1 peca, como sempre valeu',
       semItens.qtd===1 && semItens.pecas===1, JSON.stringify(semItens));
-    // E o pai do pacote conta as 3 que vao na caixa dele, nao a 1 do lote.codigo.
-    const doPack=(p.body||[]).find(x=>x.codigo==='BK120120BEGE')||{};
-    conferir('a caixa de pacote conta as pecas que vao dentro, nao o codigo do volume',
-      doPack.qtd===1 && doPack.pecas===3, JSON.stringify(doPack));
-
-    /* A MESMA CAIXA APARECE NO CARD E NA LISTA, E A LINHA TEM QUE DIZER ISSO
-       (25/09/2026, NF 7044). O card agrupa por cliente e a lista por SKU — duas
-       perguntas, e as duas ficam. Mas quem le de relance via o mesmo SKU duas
-       vezes e achava que eram duas vendas. A linha passa a nomear QUEM e a caixa
-       de varias persianas, com o mesmo nome escrito no card: o nome e o que liga
-       as duas. So o cliente dessa caixa — a Ana, venda comum na mesma linha,
-       nao pode aparecer, senao a frase aponta uma caixa que nao esta no card. */
-    conferir('a linha nomeia o cliente da caixa de varias persianas, e so ele',
-      JSON.stringify(linha.clientes_varias)===JSON.stringify(['Bruno']), JSON.stringify(linha.clientes_varias));
-    conferir('a linha do pacote de 2 SKUs nomeia o cliente dele',
-      JSON.stringify(doPack.clientes_varias)===JSON.stringify(['Fabiano']), JSON.stringify(doPack.clientes_varias));
-    conferir('a linha sem caixa de varias nao nomeia ninguem',
-      (semItens.clientes_varias||[]).length===0, JSON.stringify(semItens.clientes_varias));
+    // O pacote de 2 SKUs (Fabiano) tambem nao vira linha: ele e so caixa de varias.
+    conferir('o pacote de 2 SKUs nao vira linha por SKU',
+      !(p.body||[]).some(x=>x.codigo==='BK120120BEGE'), JSON.stringify((p.body||[]).map(x=>x.codigo)));
 
     const v=await chamar(ctx,'GET','/api/pendentes/varias');
     const ids=(v.body||[]).map(x=>x.id).sort((a,b)=>a-b);
@@ -320,6 +310,19 @@ function conferir(nome,cond,detalhe){
     const cy=(v.body||[]).find(x=>x.id===dupla)||{};
     conferir('a caixa de 2 unidades do MESMO SKU tambem entra no card (NF 6490)',
       cy.pecas===2 && (cy.itens||[]).length===1 && cy.itens[0].qtd===2, JSON.stringify(cy));
+    /* A CONTA FECHA: linhas (caixas comuns) + caixas de varias = todos os
+       volumes pendentes. Nenhum some e nenhum aparece duas vezes — e e isso que
+       faz o numero da coluna bater com o "pra imprimir agora". */
+    const somaLinhas=(p.body||[]).reduce((t,x)=>t+x.qtd,0);
+    conferir('linhas + caixas de varias = volumes pendentes, sem sobra nem falta',
+      somaLinhas+(v.body||[]).length===4, JSON.stringify({linhas:somaLinhas,caixas:(v.body||[]).length}));
+    /* A caixa vem com a modalidade: e ela que diz em qual coluna a tela a desenha. */
+    conferir('a caixa diz por onde sai, pra cair na coluna certa',
+      cx.modalidade==='coleta' && cy.modalidade==='agencia', JSON.stringify([cx.modalidade,cy.modalidade]));
+    /* E com o estoque de cada peca: sem isso a linha perderia o "sem estoque —
+       precisa produzir" ao virar bloco, e a pessoa iria a prateleira descobrir. */
+    conferir('cada peca da caixa traz o estoque dela',
+      (cx.itens||[]).every(i=>typeof i.estoque==='number'), JSON.stringify((cx.itens||[]).map(i=>i.estoque)));
     fechar(ctx);
   }
   /* Dia sem nenhuma caixa dupla: o card tem que vir VAZIO, para a tela poder
@@ -359,6 +362,9 @@ function conferir(nome,cond,detalhe){
        `modalidade` pra respeitar o filtro do topo. Em producao (23/09/2026) o
        futuro inteiro era coleta — 22 de 22. */
     ins.run('BK140140BEGE','Joao','7002','p12','coleta',dep2);
+    // Uma venda COMUM de hoje: a lista do dia so tem linha de caixa comum
+    // (a de varias, como a da Carla, vai inteira para o bloco da coluna).
+    ins.run('BK140140BEGE','Pedro','7003','p13','agencia',hoje);
     db.prepare("UPDATE skus SET estoque=0 WHERE codigo='BK130130BEGE'").run();
     db.prepare("UPDATE skus SET estoque=4 WHERE codigo='BK140140BEGE'").run();
     db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK130130BEGE',1,'folha')").run(silmara);
@@ -366,15 +372,11 @@ function conferir(nome,cond,detalhe){
     db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK160160CINZA',2,'folha')").run(hojeDupla);
 
     const f=await chamar(ctx,'GET','/api/pendentes/futuros');
-    const lin=(f.body||[]).find(x=>x.codigo==='BK130130BEGE')||{};
-    /* UMA caixa, DUAS persianas. Os dois numeros, nunca um so — e `pecas` e o
-       que diz quantas peças tirar da prateleira. */
-    conferir('o painel do depois conta CAIXA e PERSIANA (NF 6959)',
-      lin.qtd===1 && lin.pecas===2, JSON.stringify(lin));
-    /* O painel do "depois" usa o mesmo desenhista e a mesma consulta: a caixa
-       dele tambem aparece duas vezes, e a linha tambem tem que dizer de quem e. */
-    conferir('o painel do depois nomeia o cliente da caixa de varias',
-      JSON.stringify(lin.clientes_varias)===JSON.stringify(['Silmara']), JSON.stringify(lin.clientes_varias));
+    /* A caixa da Silmara (2 persianas) NAO vira linha do painel: ela sai inteira
+       no bloco da data dela, com as duas pecas. Na linha ela apareceria uma
+       segunda vez (opcao B, 25/09/2026). */
+    conferir('a caixa de varias nao vira linha no painel do depois (NF 6959)',
+      !(f.body||[]).some(x=>x.codigo==='BK130130BEGE'), JSON.stringify((f.body||[]).map(x=>x.codigo)));
     const linN=(f.body||[]).find(x=>x.codigo==='BK140140BEGE' && x.despachar_em===dep)||{};
     conferir('venda futura normal continua valendo 1 peca',
       linN.qtd===1 && linN.pecas===1, JSON.stringify(linN));
@@ -385,12 +387,12 @@ function conferir(nome,cond,detalhe){
        linha do painel promete "bipe o SKU e a etiqueta sai, se tiver peca na
        prateleira". Hoje ele sai do MESMO `SELECT` da lista do dia. */
     conferir('o painel traz o que a peca E, nao so o codigo (§7)',
-      lin.largura_cm===130 && lin.altura_cm===130 && lin.cor_nome==='Bege'
-      && lin.tecido_nome==='Blackout' && lin.modelo_nome==='Rolo', JSON.stringify(lin));
+      linN.largura_cm===140 && linN.altura_cm===140 && linN.cor_nome==='Bege'
+      && linN.tecido_nome==='Blackout' && linN.modelo_nome==='Rolo', JSON.stringify(linN));
     /* O vermelho de "sem estoque — precisa produzir" sai deste campo, e e a
        resposta a pergunta que o painel fazia e nao respondia. */
     conferir('o painel traz o estoque, que e o que responde "da pra adiantar?"',
-      lin.estoque===0 && linN.estoque===4, JSON.stringify({a:lin.estoque,b:linN.estoque}));
+      linN.estoque===4, JSON.stringify({b:linN.estoque}));
     /* Uma linha por DATA: o mesmo SKU em dois dias sao duas linhas, senao o dia
        grande (11 caixas em 28/09, em producao) se dilui no vizinho. */
     const doJoao=(f.body||[]).filter(x=>x.codigo==='BK140140BEGE');
@@ -424,6 +426,10 @@ function conferir(nome,cond,detalhe){
       cx.buyer==='Silmara' && cx.pecas===2 && cx.despachar_em===dep
       && (cx.itens||[]).length===2 && cx.itens[1].codigo==='BK130130BRANCO'
       && cx.itens[1].cor_nome==='Branco', JSON.stringify(cx));
+    /* O "sem estoque" que a linha tinha passa para a peca da caixa: a bege
+       esta zerada, e e isso que responde "da pra adiantar esta caixa?". */
+    conferir('a caixa futura traz o estoque de cada peca (a bege esta zerada)',
+      cx.itens[0].estoque===0, JSON.stringify(cx.itens.map(i=>i.estoque)));
 
     /* SEM o parametro a rota responde o de HOJE, exatamente como respondia —
        e um tablet com a pagina em cache continua chamando assim. */

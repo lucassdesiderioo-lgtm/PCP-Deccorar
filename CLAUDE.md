@@ -1127,20 +1127,19 @@ no bipe a tela âmbar dizia que eram três. A trava segurava o erro — com o
 trabalho já feito. Retrabalho que se repete todo dia é como a equipe aprende a
 contornar a tela.
 
-A tela de quem imprime mostra isso em **cinco** momentos, do mais cedo ao mais
-tarde:
+A tela de quem imprime mostra isso em **quatro** momentos, do mais cedo ao mais
+tarde — e em cada um a caixa aparece **uma vez só** (opção B, 25/09/2026):
 
 | Onde | O quê |
 |---|---|
-| **Card próprio**, acima das duas listas (`GET /api/pendentes/varias`) | uma caixa por **cliente**, com as peças que vão dentro |
-| **Painel "Pra despachar depois"** (`?quando=depois`) | a mesma caixa, dentro da data em que ela vence |
-| Linha da lista por SKU | `📦 4 persianas em 3 caixas — leve 4`, quando `pecas ≠ qtd` |
+| **Bloco dentro da coluna** Agência ou Coleta (`GET /api/pendentes/varias`) | a caixa inteira: cliente, NF, as peças com o que cada uma é, o "sem estoque" **por peça** e a frase da fita |
+| **Painel "Pra despachar depois"** (`?quando=depois`) | a mesma caixa, só no bloco da data em que ela vence — **não** nas linhas da data |
 | Bipe e pós-impressão | a tela âmbar que já existia |
 | **"Já impressos"** (`GET /api/impressos`) | tarja `📦 N persianas` na linha — o **último** lugar |
 
 > ⚠️ **O "JÁ IMPRESSOS" É O ÚLTIMO LUGAR, E ERA O ÚNICO SEM NADA (23/09/2026).**
-> Depois de impressa, a caixa sai do card e da lista por SKU — as duas mostram o
-> que **falta** — e o banner *"FECHE A CAIXA COM N PERSIANAS"* some no bipe
+> Depois de impressa, a caixa sai do bloco da coluna (até 25/09, do card e da
+> lista por SKU) — ali só aparece o que **falta** — e o banner *"FECHE A CAIXA COM N PERSIANAS"* some no bipe
 > seguinte. Dali em diante o volume ficava idêntico a qualquer venda. E esta
 > lista tem dois usos em que isso pesa: é onde alguém **volta para conferir**, e
 > é de onde se **reimprime** — tirar de novo a etiqueta de uma caixa de duas sem
@@ -1212,32 +1211,40 @@ tarde:
 > mesma lição do *"23,1 mm em vez de 23,1 mm"* do §4. Hoje sai `2 caixas · 3
 > peças`, e só quando os dois números divergem.
 
-> **O card agrupa por VOLUME; a lista de baixo, por SKU.** São duas perguntas
-> diferentes — "o que vai junto nesta caixa" e "o que buscar na prateleira" — e
-> nenhum recorte serve para as duas. Agrupar o card por SKU desmontaria
-> justamente a informação que ele existe para dar.
+> ⚠️ **A CAIXA DE VÁRIAS APARECE UMA VEZ SÓ, DENTRO DA COLUNA DA PORTA DE
+> SAÍDA DELA — decisão do dono, 25/09/2026 (opção B).** Até aqui ela saía em
+> **dois** lugares: num quadro largo acima das duas listas (por cliente) e na
+> linha do SKU (por persiana). O dono viu a Joverlandia no quadro e o mesmo
+> `SCREEN1-120120CINZA` na lista da Coleta, e leu *"duas coisas iguais"* — é
+> assim que se lê de relance, e foi assim que foi lido. Nomear o cliente na
+> linha (a opção A, do mesmo dia de manhã) não bastou: a tela continuava
+> dizendo a mesma coisa duas vezes.
 >
-> ⚠️ **E POR ISSO A MESMA CAIXA APARECE DUAS VEZES — a linha diz que é a mesma
-> (25/09/2026, NF 7044).** O dono viu a Joverlandia no card e o mesmo
-> `SCREEN1-120120CINZA` na lista da Coleta, e leu *"duas coisas iguais"*. As
-> duas ficam (é a decisão acima, reafirmada — opção A); o que mudou é que a
-> linha âmbar da lista passou a **nomear o cliente**, com o mesmo nome do card:
-> *"é a caixa de Joverlandia Ferreti — a mesma do quadro 📦"*. O nome é o que
-> liga as duas leituras. Vem de `clientes_varias` (no `linhasDeSku`, então vale
-> para a lista do dia **e** para o painel do "depois").
+> Hoje o `linhasDeSku` **tira a caixa de várias das linhas** (`VARIAS()` no
+> `exp_route.js`, a MESMA régua `SUM(qtd) > 1` do `caixasDeVarias` — com duas
+> réguas a caixa sumiria das duas listas ou apareceria nas duas), e a tela a
+> desenha como bloco âmbar **dentro** da coluna Agência ou Coleta
+> (`caixaNaColuna`), com o número **1** à direita como qualquer linha.
 >
-> - **Só o cliente da caixa de várias**, nunca a venda comum da mesma linha: ela
->   não está no card, e nomeá-la apontaria uma caixa que ninguém acharia lá.
-> - **Linha mista** (*"3 persianas em 2 caixas"*, uma comum e uma de várias)
->   escreve *"a de várias persianas é de…"*: *"é a caixa de X"* não diria qual
->   das duas. Apareceu renderizando, não em teste.
-> - **"o quadro 📦", e não "o card acima"**: no painel do "depois" o quadro das
->   caixas fica **abaixo** das linhas.
-
-> **`qtd` é CAIXA, `pecas` é PERSIANA, e eles não se somam.** São iguais no dia
-> normal e divergem só aqui. O número grande da linha continua sendo caixa
-> (é o que ela fecha e o que zera a lista); a linha âmbar diz quantas peças
-> tirar da prateleira. Mesma regra do `faltaHoje` × `precisa` do §18.
+> - **A conta fecha:** o número da coluna é linhas comuns + caixas de várias,
+>   e bate com o *"pra imprimir agora"*. Há caso travando que linhas + caixas =
+>   volumes pendentes, sem sobra nem falta.
+> - **O "sem estoque" foi junto, por peça e contra a quantidade dela** — a
+>   mesma conta da trava do `/api/embalar`: com 1 na prateleira, a linha de 2
+>   unidades não imprime, e dizer "tem estoque" ali seria mentira. Sem isso a
+>   caixa perderia o aviso ao sair da linha, e a pessoa iria à prateleira
+>   descobrir.
+> - **O quadro do topo saiu.** Num notebook de 15" (1440 × 900) ele ocupava
+>   218 px e empurrava as listas para 462 px de 760 visíveis; hoje elas começam
+>   em 251. A coluna tem ~270 px de largura, e por isso o título da caixa é só
+>   *"📦 N PERSIANAS"* — os mais longos quebravam em duas linhas.
+> - **Dentro da coluna a caixa não repete "coleta"/"agência"** (a coluna já é
+>   isso); no painel do "depois", que mistura as duas, a marca continua.
+> - **Data que só tem caixa de várias ganha bloco no "depois"**: como ela saiu
+>   das linhas, sem isso a data sumiria do painel.
+> - **Tablet com a página antiga em cache** passa a ver a caixa só no quadro
+>   velho do topo (a linha já não vem do servidor) — nada some, e o refresh
+>   forçado do deploy acerta o resto.
 
 > ⚠️ **A INSTRUÇÃO DE EMBALAGEM É CONTEÚDO, NÃO ENFEITE.** Regra do dono
 > (16/09/2026): **saco maior, as peças juntas com fita** — não é o saco de uma
@@ -1247,14 +1254,9 @@ tarde:
 > divergir. Ela aparece **igual** nos quatro
 > lugares: escrevê-la diferente ensinaria a equipe a achar que são duas coisas.
 
-> **O card some quando não há nenhuma.** Card vazio todo dia vira paisagem, e aí
-> ninguém lê no dia em que ele aparece cheio. Ele é largo e fica em cima, então
-> surgir empurra as listas para baixo sem trocá-las de coluna — diferente da
-> coleta no carregamento (§8-B), que fica fixa justamente para a coluna do carro
-> não pular de lugar.
 
 **Rode `node teste_etiqueta.js` (12 casos são a NF 6490 e os 6 últimos, a NF 7031 — a tela),
-`node teste_divergencia.js` (20 casos: as duas contas, o card, o nome do cliente na linha e o painel do
+`node teste_divergencia.js` (20 casos: a caixa uma vez só, a conta que fecha, o estoque por peça e o painel do
 "depois") e `node teste_parse.js` (caso 9) após mexer nisso.** E **abra a
 tela**: o card, o painel e a linha por SKU são texto montado, e a §2 já ensinou
 que rota verde sem tela aberta não é regra pronta.
@@ -3227,7 +3229,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Reter em Bloqueados a venda de N unidades do MESMO SKU: a folha escreveu a
   quantidade, não há o que assinar, e travar o caso normal é a #6 (§5, #23)
 - ❌ Deixar a pessoa descobrir no BIPE que a caixa leva três — ali ela já montou;
-  o card e a linha âmbar existem para ela saber antes da prateleira (§5, #23)
+  o bloco da caixa na coluna existe para ela saber antes da prateleira (§5, #23)
 - ❌ Deixar o painel "Pra despachar depois" contar `COUNT(*)` e ler só o
   `lote.codigo`: o número mente e o segundo SKU não aparece em tela nenhuma —
   e aquele painel CONVIDA a adiantar, com o bipe que não filtra por prazo
@@ -3262,10 +3264,12 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Pôr a tarja numa linha com `white-space:nowrap` e `text-overflow:ellipsis`:
   o nome comprido do cliente apaga a tarja do fim da linha — e ainda vira o
   piso da coluna inteira, porque `fr` não desce abaixo do min-content (§12)
-- ❌ Tirar a caixa de várias persianas da lista por SKU (ou tirar o card) "porque
-  aparece duas vezes": são duas perguntas; o que liga as duas é o nome do
-  cliente na linha âmbar (`clientes_varias`), e ele só nomeia a caixa de várias
-  (§5, #23)
+- ❌ Devolver a caixa de várias persianas à linha por SKU, ou recriar o quadro
+  do topo: ela aparece UMA vez, dentro da coluna da porta de saída — em dois
+  lugares o dono leu duas vendas (§5, #23, opção B de 25/09/2026)
+- ❌ Escrever uma segunda régua de "caixa de várias" para tirá-la das linhas:
+  é o `VARIAS()` do `exp_route.js`, o mesmo do `caixasDeVarias` — com duas, a
+  caixa some das duas listas ou aparece nas duas (§5, #23)
 - ❌ Escrever a instrução de embalagem diferente em cada tela: é uma frase só —
   *saco maior, as peças juntas com fita* (§5, #23)
 - ❌ Deixar cadastro de SKU soltar volume retido por `pacote:` — cadastro não

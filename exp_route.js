@@ -546,19 +546,18 @@ module.exports=function(app,db){
      persianas, e a bancada saia da prateleira com UMA: o erro so aparecia no
      bipe, com a caixa ja montada (o defeito da NF 6490, 16/09/2026).
      Volume sem linha em `lote_item` vale 1 — e o volume de sempre. */
-  /* `clientes_varias`: QUEM E A CAIXA DE VARIAS PERSIANAS DESTA LINHA
-     (25/09/2026, NF 7044). A mesma caixa aparece no card de cima (por cliente) e
-     aqui (por SKU) — duas perguntas, e as duas ficam (§5). Mas quem le de relance
-     via o mesmo SKU duas vezes e achava que eram duas vendas. O nome do cliente,
-     escrito igual ao do card, e o que liga as duas. So entra quem leva MAIS DE
-     UMA persiana: a venda comum da mesma linha nao esta no card, e nomea-la
-     apontaria uma caixa que ninguem acharia la. O separador e o char(31) porque
-     nome de cliente pode ter virgula. */
+  /* ⚠️ A CAIXA DE VARIAS PERSIANAS NAO ENTRA AQUI (25/09/2026, opcao B do
+     dono). Ela aparecia duas vezes na tela — no quadro de cima, por cliente, e
+     nesta linha, por SKU — e o dono leu as duas como duas vendas (NF 7044).
+     Hoje ela vem inteira do `caixasDeVarias` e a tela a desenha DENTRO da
+     coluna da porta de saida dela. Aqui fica so a caixa comum; `pecas` segue na
+     resposta (vale `qtd` agora) para tablet com a pagina antiga em cache.
+     A regua "mais de uma persiana" e a MESMA do `caixasDeVarias` (SUM(qtd) > 1):
+     com duas reguas a caixa sumiria das duas listas, ou apareceria nas duas. */
+  const VARIAS=alias=>`(SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=${alias}.id) > 1`;
   const linhasDeSku=(filtro,porData)=>db.prepare(`SELECT l.codigo, COUNT(*) qtd,
       ${porData?'l.despachar_em,':''}
       SUM(COALESCE((SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id),1)) pecas,
-      GROUP_CONCAT(CASE WHEN (SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id)>1
-        THEN COALESCE(NULLIF(TRIM(l.buyer),''),'NF '||l.nf) END, char(31)) clientes_varias,
       CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END modalidade,
       MIN(l.despachar_em) vence_em,
       SUM(CASE WHEN l.despachar_em IS NOT NULL AND l.despachar_em<date('now','localtime') THEN 1 ELSE 0 END) atrasados,
@@ -572,10 +571,9 @@ module.exports=function(app,db){
     LEFT JOIN cor c ON c.codigo=s.cor_codigo
     LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
     LEFT JOIN modelo m ON m.id=s.modelo_id
-    WHERE ${filtro}
+    WHERE ${filtro} AND NOT COALESCE(${VARIAS('l')},0)
     GROUP BY ${porData?'l.despachar_em, ':''}l.codigo, CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END
-    ORDER BY ${porData?'l.despachar_em, ':'atrasados DESC, '}qtd DESC`).all()
-    .map(r=>Object.assign(r,{clientes_varias: r.clientes_varias ? r.clientes_varias.split('\x1f') : []}));
+    ORDER BY ${porData?'l.despachar_em, ':'atrasados DESC, '}qtd DESC`).all();
   app.get('/api/pendentes',(req,res)=> res.json(linhasDeSku(filaDoDia('l'),false)));
   /* ⚠️ AS CAIXAS DE VARIAS PERSIANAS TEM CARD PROPRIO, E POR UM MOTIVO FISICO.
      A coleta ganhou card proprio porque e um LUGAR diferente (§8-B); esta ganha
@@ -614,7 +612,7 @@ module.exports=function(app,db){
         (SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id) pecas
       FROM lote l
       WHERE ${filtro}
-        AND (SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id) > 1
+        AND ${VARIAS('l')}
       ORDER BY l.despachar_em IS NULL DESC, l.despachar_em, l.id`).all();
     if(!vols.length) return [];
     /* A peca vem com o que ela E (`pecaTexto`, o mesmo formatador da embalagem e
@@ -623,7 +621,7 @@ module.exports=function(app,db){
     const itens=db.prepare(`SELECT i.codigo, i.qtd,
         s.largura_cm, s.altura_cm, COALESCE(c.nome,s.cor_codigo,s.cor) cor_nome,
         COALESCE(t.nome,s.tecido_codigo) tecido_nome, m.nome modelo_nome,
-        COALESCE(m.exige_medida,1) exige_medida
+        COALESCE(m.exige_medida,1) exige_medida, s.estoque
       FROM lote_item i
       LEFT JOIN skus s ON s.codigo=UPPER(i.codigo)
       LEFT JOIN cor c ON c.codigo=s.cor_codigo
