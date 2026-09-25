@@ -1070,6 +1070,26 @@ Uma linha com `qtd:2` é **uma linha e duas persianas**. Todo portão conta a
 soma das `qtd`, nunca `length` — é a mesma lição do bipe por unidade, uma
 camada abaixo.
 
+> ⚠️ **ERAM SEIS PORTÕES, NÃO QUATRO — os dois da TELA ficaram para trás, e
+> custaram a NF 7031 (25/09/2026).** O conserto de 16/09 ensinou o servidor a
+> contar persiana; o `embalagem.html` continuou com `itens.length>1` em dois
+> lugares: o que abre a tela âmbar e o que decide se o bipe **confere** ou
+> **imprime**. Na caixa de 1 SKU × 2 a tela seguia o fluxo normal, o 2º bipe
+> mandava imprimir, o servidor recusava (*"falta conferir 2 de 2"*) e a tela
+> esquecia a venda — um **laço sem saída** na bancada, sem nenhum jeito de
+> destravar pela tela. O estoque ficou certo (a trava do servidor segurou); a
+> venda é que não saía.
+>
+> Hoje a tela decide por `pecasDe()` — a mesma conta do `etq_route.js` — e o
+> `teste_etiqueta.js` (os 6 últimos casos) **varre o `<script>` da tela**
+> recusando `itens.length>1` e executa a `pecasDe` de verdade. Os casos do
+> servidor provavam que ele entregava as peças; nenhum provava que a tela as
+> usava — é a §2 outra vez: rota verde sem tela aberta não é regra pronta.
+>
+> ⚠️ **O `exp_route.js` (upload) conta LINHA de propósito**, e não é este
+> defeito: ali a pergunta é *"são vários SKUs?"*, porque só o pacote de
+> vários SKUs fica retido (logo abaixo).
+
 > ⚠️ **NÃO CONFUNDIR COM A ARMADILHA #8.** A quantidade **não** multiplica o
 > VOLUME: uma etiqueta continua sendo uma linha em `lote`. Ela conta a **PEÇA**,
 > que é o grão do `lote_item` — e essa separação é exatamente o que a tabela
@@ -1216,7 +1236,7 @@ tarde:
 > coleta no carregamento (§8-B), que fica fixa justamente para a coluna do carro
 > não pular de lugar.
 
-**Rode `node teste_etiqueta.js` (os 12 últimos casos são a NF 6490),
+**Rode `node teste_etiqueta.js` (12 casos são a NF 6490 e os 6 últimos, a NF 7031 — a tela),
 `node teste_divergencia.js` (16 últimos: as duas contas, o card e o painel do
 "depois") e `node teste_parse.js` (caso 9) após mexer nisso.** E **abra a
 tela**: o card, o painel e a linha por SKU são texto montado, e a §2 já ensinou
@@ -3092,7 +3112,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (49), `teste_divergencia.js` (53) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (50), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (49), `teste_divergencia.js` (53) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (56), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3175,7 +3195,11 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   `backfill_pacote.js` nasceu, e lá o erro **baixa estoque** (§5, #23)
 - ❌ Decidir "isto é caixa de várias persianas?" contando `itens.length` — uma
   linha com `qtd:2` é UMA linha e DUAS persianas, e foi assim que a NF 6490 saiu
-  com uma de duas. Todo portão conta a soma das `qtd` (§5, #23)
+  com uma de duas. Todo portão conta a soma das `qtd` (§5, #23) — **inclusive
+  os da TELA**: o `embalagem.html` ficou em `length` e a NF 7031 entrou em laço
+  no bipe; lá a conta é a `pecasDe()`, e há varredura recusando
+- ❌ Dar por consertada uma regra do servidor sem procurar a MESMA pergunta na
+  tela: a tela tem os portões dela, e nenhum teste de rota os enxerga (§5, #23)
 - ❌ Reter o PDF inteiro porque ele não fecha: a dúvida é do volume que **não
   achou item** na folha. Um lote de 28 com 5 leituras quebradas retinha os 28,
   e escondia da Etiqueta de Venda as caixas de várias peças (§5, #23)
