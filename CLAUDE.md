@@ -1263,6 +1263,18 @@ tarde — e em cada um a caixa aparece **uma vez só** (opção B, 25/09/2026):
 >   O `teste_etiqueta.js` recusa a frase antiga em qualquer ponto da tela e
 >   confere o número da nova com 2 e com 3.
 
+> ✅ **AS DUAS NO AR E CONFERIDAS PELO DONO EM 25/09/2026** — a caixa uma vez
+> só, dentro da coluna (opção B, PR #129), e a frase `fita(n)` nos quatro
+> lugares (PR #130). Ele fez os dois deploys e disse, nas duas vezes, *"ficou
+> certo"*.
+>
+> ⚠️ **ISSO PROVA A TELA, E NÃO O ESTOQUE DA NF 7031.** Se aquela caixa de 2
+> baixou 2 do saldo continua sem conferência no dado real: é a consulta ao
+> `movimento_estoque` do lote dela, que o dono ainda não rodou. A trava do
+> servidor segura o caso daqui para a frente, com caso travando; o volume de
+> antes do conserto é outra pergunta, e prova que não foi feita se escreve
+> como não feita (§4).
+
 
 **Rode `node teste_etiqueta.js` (12 casos são a NF 6490; depois vêm 6 da NF 7031 — a tela — e os 4 últimos, a frase da caixa),
 `node teste_divergencia.js` (20 casos: a caixa uma vez só, a conta que fecha, o estoque por peça e o painel do
