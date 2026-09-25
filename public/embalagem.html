@@ -586,6 +586,28 @@ async function listaPend(){
    por porta de saída, e repetir "coleta" em toda linha de uma lista chamada
    Coleta é a marca que deixa de marcar. Regra: a marca só aparece quando ela
    separa alguma coisa. */
+/* DE QUEM É A CAIXA DE VÁRIAS PERSIANAS DESTA LINHA (25/09/2026, NF 7044).
+   A mesma caixa aparece no quadro 📦 (por cliente) e aqui (por SKU): são duas
+   perguntas, e as duas ficam (§5). Mas quem lê de relance via o mesmo SKU duas
+   vezes e achava que eram duas vendas. O nome, escrito igual ao do quadro, é o
+   que liga as duas. "O quadro 📦" e não "o card acima": no painel do "depois"
+   ele fica ABAIXO das linhas. Mais de três nomes viram "e mais N" — a linha
+   é de SKU, não uma segunda lista de clientes. */
+function deQuemE(nomes, caixas){
+  nomes=(nomes||[]).filter(Boolean); if(!nomes.length) return '';
+  /* Linha com caixa comum E caixa de várias ("3 persianas em 2 caixas"):
+     "é a caixa de X" não diz QUAL das duas — então a frase nomeia só a de
+     várias. Apareceu renderizando, com a Joverlandia e o Marcos na mesma linha. */
+  var mista=(caixas||0)>nomes.length;
+  var vis=nomes.slice(0,3).map(function(n){ return '<b>'+esc(n)+'</b>'; });
+  var resto=nomes.length-vis.length;
+  var lista=vis.length>1 ? vis.slice(0,-1).join(', ')+' e '+vis[vis.length-1] : vis[0];
+  if(resto) lista=vis.join(', ')+' e mais '+resto;
+  return '<div style="color:#8a5a00;font-size:13px;margin-top:1px">'
+    +(mista ? (nomes.length>1?'as de várias persianas são de ':'a de várias persianas é de ')
+            : (nomes.length>1?'são as caixas de ':'é a caixa de '))
+    +lista+' — a mesma do quadro 📦</div>';
+}
 function linhasPend(l, marcar){
   var h='';
   for(var i=0;i<l.length;i++){
@@ -617,7 +639,8 @@ function linhasPend(l, marcar){
       +'<b style="color:'+(atr?'#c0392b':'#b26a00')+';font-size:22px;line-height:1">'+r.qtd+'</b></div>'
       +(desc?'<div style="font-size:15px;font-weight:600;margin-top:2px">'+esc(desc)+'</div>':'')
       +(multi?'<div style="color:#8a5a00;font-size:13px;font-weight:700;margin-top:3px">'
-        +'📦 '+pecas+' persianas em '+r.qtd+' caixa'+(r.qtd>1?'s':'')+' — leve '+pecas+'</div>':'')
+        +'📦 '+pecas+' persianas em '+r.qtd+' caixa'+(r.qtd>1?'s':'')+' — leve '+pecas+'</div>'
+        +deQuemE(r.clientes_varias, r.qtd):'')
       +(atr?'<div style="color:#c0392b;font-size:12px;font-weight:700;margin-top:3px">⚠ '+r.atrasados+' fora do prazo</div>':'')
       +(semEst?'<div style="color:#c0392b;font-size:12px;font-weight:700;margin-top:3px">sem estoque — precisa produzir</div>':'')
       +'</div>';

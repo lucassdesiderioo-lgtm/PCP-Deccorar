@@ -291,6 +291,20 @@ function conferir(nome,cond,detalhe){
     conferir('a caixa de pacote conta as pecas que vao dentro, nao o codigo do volume',
       doPack.qtd===1 && doPack.pecas===3, JSON.stringify(doPack));
 
+    /* A MESMA CAIXA APARECE NO CARD E NA LISTA, E A LINHA TEM QUE DIZER ISSO
+       (25/09/2026, NF 7044). O card agrupa por cliente e a lista por SKU — duas
+       perguntas, e as duas ficam. Mas quem le de relance via o mesmo SKU duas
+       vezes e achava que eram duas vendas. A linha passa a nomear QUEM e a caixa
+       de varias persianas, com o mesmo nome escrito no card: o nome e o que liga
+       as duas. So o cliente dessa caixa — a Ana, venda comum na mesma linha,
+       nao pode aparecer, senao a frase aponta uma caixa que nao esta no card. */
+    conferir('a linha nomeia o cliente da caixa de varias persianas, e so ele',
+      JSON.stringify(linha.clientes_varias)===JSON.stringify(['Bruno']), JSON.stringify(linha.clientes_varias));
+    conferir('a linha do pacote de 2 SKUs nomeia o cliente dele',
+      JSON.stringify(doPack.clientes_varias)===JSON.stringify(['Fabiano']), JSON.stringify(doPack.clientes_varias));
+    conferir('a linha sem caixa de varias nao nomeia ninguem',
+      (semItens.clientes_varias||[]).length===0, JSON.stringify(semItens.clientes_varias));
+
     const v=await chamar(ctx,'GET','/api/pendentes/varias');
     const ids=(v.body||[]).map(x=>x.id).sort((a,b)=>a-b);
     /* O card so mostra caixa com MAIS DE UMA persiana. A venda normal da Ana
@@ -357,6 +371,10 @@ function conferir(nome,cond,detalhe){
        que diz quantas peças tirar da prateleira. */
     conferir('o painel do depois conta CAIXA e PERSIANA (NF 6959)',
       lin.qtd===1 && lin.pecas===2, JSON.stringify(lin));
+    /* O painel do "depois" usa o mesmo desenhista e a mesma consulta: a caixa
+       dele tambem aparece duas vezes, e a linha tambem tem que dizer de quem e. */
+    conferir('o painel do depois nomeia o cliente da caixa de varias',
+      JSON.stringify(lin.clientes_varias)===JSON.stringify(['Silmara']), JSON.stringify(lin.clientes_varias));
     const linN=(f.body||[]).find(x=>x.codigo==='BK140140BEGE' && x.despachar_em===dep)||{};
     conferir('venda futura normal continua valendo 1 peca',
       linN.qtd===1 && linN.pecas===1, JSON.stringify(linN));

@@ -1216,6 +1216,23 @@ tarde:
 > diferentes — "o que vai junto nesta caixa" e "o que buscar na prateleira" — e
 > nenhum recorte serve para as duas. Agrupar o card por SKU desmontaria
 > justamente a informação que ele existe para dar.
+>
+> ⚠️ **E POR ISSO A MESMA CAIXA APARECE DUAS VEZES — a linha diz que é a mesma
+> (25/09/2026, NF 7044).** O dono viu a Joverlandia no card e o mesmo
+> `SCREEN1-120120CINZA` na lista da Coleta, e leu *"duas coisas iguais"*. As
+> duas ficam (é a decisão acima, reafirmada — opção A); o que mudou é que a
+> linha âmbar da lista passou a **nomear o cliente**, com o mesmo nome do card:
+> *"é a caixa de Joverlandia Ferreti — a mesma do quadro 📦"*. O nome é o que
+> liga as duas leituras. Vem de `clientes_varias` (no `linhasDeSku`, então vale
+> para a lista do dia **e** para o painel do "depois").
+>
+> - **Só o cliente da caixa de várias**, nunca a venda comum da mesma linha: ela
+>   não está no card, e nomeá-la apontaria uma caixa que ninguém acharia lá.
+> - **Linha mista** (*"3 persianas em 2 caixas"*, uma comum e uma de várias)
+>   escreve *"a de várias persianas é de…"*: *"é a caixa de X"* não diria qual
+>   das duas. Apareceu renderizando, não em teste.
+> - **"o quadro 📦", e não "o card acima"**: no painel do "depois" o quadro das
+>   caixas fica **abaixo** das linhas.
 
 > **`qtd` é CAIXA, `pecas` é PERSIANA, e eles não se somam.** São iguais no dia
 > normal e divergem só aqui. O número grande da linha continua sendo caixa
@@ -1237,7 +1254,7 @@ tarde:
 > não pular de lugar.
 
 **Rode `node teste_etiqueta.js` (12 casos são a NF 6490 e os 6 últimos, a NF 7031 — a tela),
-`node teste_divergencia.js` (16 últimos: as duas contas, o card e o painel do
+`node teste_divergencia.js` (20 casos: as duas contas, o card, o nome do cliente na linha e o painel do
 "depois") e `node teste_parse.js` (caso 9) após mexer nisso.** E **abra a
 tela**: o card, o painel e a linha por SKU são texto montado, e a §2 já ensinou
 que rota verde sem tela aberta não é regra pronta.
@@ -3112,7 +3129,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (49), `teste_divergencia.js` (53) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (56), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (49), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (56), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3245,6 +3262,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Pôr a tarja numa linha com `white-space:nowrap` e `text-overflow:ellipsis`:
   o nome comprido do cliente apaga a tarja do fim da linha — e ainda vira o
   piso da coluna inteira, porque `fr` não desce abaixo do min-content (§12)
+- ❌ Tirar a caixa de várias persianas da lista por SKU (ou tirar o card) "porque
+  aparece duas vezes": são duas perguntas; o que liga as duas é o nome do
+  cliente na linha âmbar (`clientes_varias`), e ele só nomeia a caixa de várias
+  (§5, #23)
 - ❌ Escrever a instrução de embalagem diferente em cada tela: é uma frase só —
   *saco maior, as peças juntas com fita* (§5, #23)
 - ❌ Deixar cadastro de SKU soltar volume retido por `pacote:` — cadastro não
