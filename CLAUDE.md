@@ -2805,6 +2805,29 @@ canto na outra.
 > saída por `carregado_em` continua certo (é o mesmo dia); quem precisar da
 > hora real da retirada lê `retirado_em`.
 
+> ⚠️ **O CAMINHÃO LEVA ANTES DA DATA, E O CANTO CHEIO DE CAIXA FUTURA É NORMAL**
+> (dono, 25/09/2026). A equipe imprime a etiqueta da coleta e já bipa a caixa
+> pro canto, mesmo com despacho semanas à frente. Em 25/09 eram **28 caixas** no
+> canto, com despacho de 28/09 a 08/10, e o motorista leva todas. Por isso:
+>
+> - **O fechamento fecha o canto INTEIRO, sem olhar a data** (`AGUARDA_CAMINHAO`
+>   não filtra dia), e isso está certo. Filtrar por vencimento faria o
+>   fechamento divergir toda vez que o motorista levasse as futuras.
+> - Essas caixas **somem da faixa azul** do Carregamento (ela só conta o
+>   `embalado` futuro ainda na prateleira) e **só entram em "Peças adiantadas"
+>   no dia do fechamento**, todas de uma vez. Faixa azul pequena com canto cheio
+>   não é número errado.
+> - O painel "Pra despachar depois" da Etiqueta de Venda só lista o `pendente`:
+>   com as etiquetas futuras já impressas, ele **some**, e também não é defeito.
+>
+> ⚠️ **E ÀS VEZES O CAMINHÃO LEVA TAMBÉM CAIXA DA AGÊNCIA, e isso o sistema
+> ainda não sabe registrar.** A caixa da agência é bipada no carro e nunca entra
+> no canto. O motorista mostra mais caixas do que o sistema tem, e o fechamento
+> acusa divergência sem ter o que explicar. Para fechar, alguém usa o "liberar
+> assim mesmo", e a divergência de verdade (caixa sumida) passa a se misturar com
+> essa. É uma mudança de regra, com rascunho em
+> `docs/specs/COLETA-LEVA-AGENCIA.md`: **não "conserte" sem a spec aprovada.**
+
 ### ⚠️ O QUE SAI ADIANTADO — contado em peças, na tela do Carregamento (25/09/2026)
 
 Pedido do dono: *"mensurar e mostrar na tela de carregamento a quantidade de
