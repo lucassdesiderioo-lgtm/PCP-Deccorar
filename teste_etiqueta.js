@@ -359,6 +359,19 @@ const ok = (n, c, extra) => { casos++;
       ok('1 linha de qtd 1 = 1 persiana (a venda normal, que não muda)', pecasDe([{qtd:1}]) === 1);
       ok('lista vazia = 0, e qtd ausente vale 1', pecasDe([]) === 0 && pecasDe(null) === 0 && pecasDe([{}]) === 1);
     }
+    /* A INSTRUÇÃO DA CAIXA É UMA FRASE SÓ, COM O NÚMERO (25/09/2026, regra do
+       dono): "Atenção: vão N persianas no mesmo pacote — embalar junto". Ela sai
+       de uma função só (`fita`) nos quatro lugares da tela; a frase antiga do
+       "saco maior" saiu, e não pode sobrar em nenhum deles. */
+    const f = js.match(/function fita\([\s\S]*?\n\}/);
+    ok('a tela tem a frase da caixa com o número (`fita`)', !!f);
+    if(f){
+      const fita = new Function(f[0] + '; return fita;')();
+      ok('2 persianas: "vão 2 persianas no mesmo pacote — embalar junto"',
+         /Atenção: vão 2 persianas no mesmo pacote — embalar junto/.test(fita(2)), fita(2));
+      ok('3 persianas: o número acompanha a caixa', /vão 3 persianas/.test(fita(3)), fita(3));
+    }
+    ok('a frase antiga do "saco maior" não sobrou na tela', !/Saco maior/i.test(html));
   }
 
   console.log('');
