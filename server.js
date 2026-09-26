@@ -153,6 +153,11 @@ app.get('/admin',(req,res)=> res.sendFile(path.join(__dirname,'public','index.ht
 require('./modo_route')(app, db);
 require('./cruz_route')(app, db);
 require('./cont_route')(app, db);
+/* A conferencia de estoque em tres papeis (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA,
+   26/09/2026): contar cego, recontar por outra pessoa, aprovar por quem nao
+   contou. A tela e de tablet, em /inventario. */
+require('./inventario_route')(app, db);
+app.get('/inventario',(req,res)=> res.sendFile(path.join(__dirname,'public','inventario.html')));
 require('./etq_route')(app, db);
 require('./dev_route')(app, db);
 app.get('/devolucao',(req,res)=> res.sendFile(path.join(__dirname,'public','devolucao.html')));

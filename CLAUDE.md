@@ -3554,9 +3554,10 @@ material, `componente.estoque`/`custo_medio`. Apagar as linhas de
 `movimento_componente` não desfaz o saldo pela mesma razão de sempre — quem
 guarda o saldo é a coluna, o movimento é só a história dela.
 
-**Cobertura atual (11 tabelas):** `revisao`, `producao`, `montagem`, `lote`,
+**Cobertura atual:** `revisao`, `producao`, `montagem`, `lote`,
 `lote_item`, `fila`, `devolucao`, `rejeicao`, `contagem`, `contagem_pendente` e
-`movimento_componente`. (`foto_estoque` saiu na Fase 3.)
+`movimento_componente` — e depois `movimento_estoque` (fase 1 do livro) e
+`inventario_ciclo`/`inventario_item` (fase 2, 26/09/2026). (`foto_estoque` saiu na Fase 3.)
 
 A lista fica em `TABELAS`, no topo do `teste_route.js`. Cada entrada traz a coluna
 de chave primária — hoje todas usam `id`. O campo ficou genérico por causa da
@@ -3715,7 +3716,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (73), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (204), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (242), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3792,6 +3793,18 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   pela foto e deixaria as linhas de teste descrevendo o que não existe (§11)
 - ❌ Isentar o `teste_route.js` de uma varredura por causa do prefixo: ele NÃO é
   teste, é o módulo do modo teste, e é dono de verdade da coluna (§2)
+- ❌ Devolver o saldo, a contagem anterior ou o "bateu/não bateu" a quem conta ou
+  reconta — nem no JSON: quem sabe a resposta conta até chegar nela (§18, fase 2)
+- ❌ Deixar a mesma pessoa recontar ou aprovar o que contou, ou abrir exceção para o
+  Admin Geral: a pergunta é de PESSOA, não de chave (`outraPessoa`, §18)
+- ❌ Deixar o aprovador único aprovar sozinho "com motivo": a decisão do dono é
+  ESPERAR (§6.4 da spec, 26/09/2026)
+- ❌ Comparar a recontagem pelo número contado em vez da diferença contra o saldo
+  do momento: a embalagem no meio mandaria todo SKU para a 3ª contagem (§18)
+- ❌ Voltar a contar peça pela aba Contagem (`/api/contagem`), ou gravar a parte de
+  material de um corpo que trouxe SKU — recusa inteira, e manda ao Inventário (§18)
+- ❌ Ler a idade da conferência de uma fonte só, ou fora do
+  `inventario_dominio.conferencias()` (§18, #32)
 - ❌ Fazer a revisão somar estoque "porque parece que falta"
 - ❌ Fazer a reimpressão baixar estoque "porque imprimiu de novo"
 - ❌ Multiplicar volume por "quantidade" em qualquer lugar — uma venda é uma
@@ -4671,10 +4684,149 @@ também o lado que faz a equipe parar de ler a coluna.
 > verdade e só então pergunta a idade ao painel.
 
 > **Rode `node teste_contagem.js` e `node teste_estoque.js` ao mexer no
-> `cont_route.js` ou na idade do inventário do `est_route.js`** — 32 + 62 casos.
+> `cont_route.js` ou na idade do inventário do `est_route.js`** — 36 + 72 casos.
 > A idade é uma pergunta que atravessa os dois módulos: quem conta é o
 > `cont_route`, quem mostra é o `est_route`, e testar cada um com a sua régua foi
 > o que deixou o defeito de pé.
+>
+> ⚠️ **Desde 26/09/2026 a peça não se conta mais pelo `cont_route`** (bloco logo
+> abaixo). O que esta armadilha descreve continua valendo para o **material** e
+> para a **fila antiga de peça** que já estava pendente no deploy — ela é drenada
+> pela tela antiga, pela regra antiga, porque não tem outro caminho para sair.
+
+### ⚠️ A CONFERÊNCIA EM TRÊS PAPÉIS — ninguém aprova o próprio trabalho (26/09/2026)
+
+**Fase 2 da spec `ESTOQUE-LIVRO-E-CONFERENCIA.md`.** A contagem de **peça** saiu da
+aba Contagem do admin e virou um fluxo de três papéis:
+
+```
+PLANEJAR (abre a conferência do dia) ─▶ CONTAR CEGO (tablet, /inventario)
+   bateu ──────────▶ CONFIRMADO, sozinho, sem movimento
+   diferente ─▶ RECONTAR CEGO (outra pessoa) ─┬─ achou a MESMA diferença ─▶ APROVAR
+                                               └─ outra ─▶ 3ª contagem (3ª pessoa) ─▶ APROVAR
+APROVAR (quem não contou) ─▶ movimento `inventario` = a diferença, sobre o saldo de agora
+```
+
+`inventario_dominio.js` é o **dono único** do ciclo; `inventario_route.js` é a
+porta; `outraPessoa()` mora no `estoque_dominio.js` e responde *"esta pessoa já
+mexeu neste item?"* para a recontagem, para a aprovação e, na fase 3, para o
+ajuste manual. A contagem de **material** continua na aba Contagem, como era.
+
+> ⚠️ **QUEM CONTA NUNCA RECEBE O SALDO, E NÃO É A TELA QUE ESCONDE.** A lista, o
+> bipe e o "terminei" não trazem `estoque`, `saldo` nem a contagem anterior — o
+> campo não viaja (regra 14 do §13), e há caso varrendo o JSON inteiro atrás
+> deles. Nem o "terminei" diz se bateu: dizer *"não bateu"* a quem conta é
+> convidar a recontar de cabeça. Quem sabe a resposta conta até chegar nela, e a
+> conferência vira confirmação — era o que a tela antiga fazia.
+>
+> **E ISSO NÃO É CEGUEIRA CONTRA O ADMIN:** quem tem a aba Estoque vê o saldo lá.
+> A regra é das rotas de contar; quem planeja e aprova vê os números.
+
+> ⚠️ **NINGUÉM APROVA O PRÓPRIO TRABALHO, E ISSO VALE PARA O ADMIN GERAL.** A
+> pergunta não é *"tem a chave?"* — o Admin Geral tem todas por nível (§10) — e sim
+> *"esta pessoa contou ou recontou este item?"*. Compara pelo id, e pelo nome
+> normalizado quando falta id; **vazio nunca é igual a vazio** (a guarda do "sem
+> segunda pessoa", §8-B), e quem pergunta sem nome e sem id não é ninguém.
+>
+> **O APROVADOR ÚNICO ESPERA** — decisão do dono, 26/09/2026 (§6.4 da spec). Num
+> dia de uma pessoa só, a divergência fica em `aprovar` até outra pessoa chegar. A
+> trava segura só a **correção** do saldo, nunca a operação; aprovar sozinho "com
+> motivo" seria a mesma regra com uma porta dos fundos, e a porta dos fundos é a
+> que se usa no dia corrido. **Não crie a exceção.**
+
+> ⚠️ **O QUE AS CONTAGENS COMPARAM É A DIFERENÇA, NÃO O NÚMERO CONTADO.** Cada
+> contagem guarda o saldo do momento em que terminou (`saldo_na_contagem`,
+> `saldo2`, `saldo3`). Entre a 1ª e a recontagem a bancada embala e a Etiqueta de
+> Venda imprime: a prateleira e o saldo andam juntos. Com 10 no sistema e 8 na
+> prateleira, embalar 2 e imprimir 1 leva a 11 e 9 — a recontagem que acha **9**
+> concorda com a 1ª, porque as duas acharam **−2**. Comparar o número cru (9 ≠ 8)
+> mandaria para a terceira contagem todo SKU com trabalho legítimo no meio. Sem
+> nada no meio, é exatamente a regra da spec.
+>
+> **A 3ª decide pelo acordo:** vale a diferença em que duas das três concordam. Se
+> o acordo é **zero**, o sistema estava certo e quem errou foi a 1ª contagem —
+> confirma sem movimento. Sem acordo, vai para a aprovação com a da 3ª, e a tela
+> diz em âmbar que as três não concordam.
+
+> ⚠️ **APROVAR APLICA A DIFERENÇA SOBRE O SALDO DE AGORA** — a armadilha #32
+> outra vez, agora de nascença. A aprovação grava no livro (`inventario`,
+> `referencia inventario:<id>`, `usuario_nome` = quem contou, `aprovado_por` =
+> quem aprovou) e também em `ajuste_estoque`, que é o que o botão "histórico" da
+> aba Estoque lê. Motivo é obrigatório, da lista `motivo_estoque` (Admin →
+> Cadastros), e "Outro" exige observação. A fila mostra o que mexeu no saldo desde
+> a 1ª contagem — e que **continua valendo**.
+
+> ⚠️ **REJEITAR NÃO APAGA.** O item fica `rejeitado`, com motivo, e nasce um item
+> novo **a contar do zero** no mesmo ciclo, apontando para o rejeitado
+> (`anterior_id`). A spec dizia "recontar"; quem rejeita está dizendo que não
+> confia nas contagens, e uma recontagem compararia de novo com a 1ª.
+
+> **Regras de bancada que parecem detalhe e não são:**
+> - **uma pessoa por vez no mesmo SKU.** Duas contando a mesma prateleira
+>   somariam num número só, e ninguém saberia. A recusa diz quem está contando;
+> - **terminar sem bipe nenhum é contagem ZERO** — é assim que "não tem nenhuma"
+>   entra, como no material;
+> - **SKU fora do plano entra** na conferência aberta, marcado. A peça está na
+>   prateleira; recusar seria mandar a pessoa ignorar o que ela está vendo. **Sob
+>   medida é recusado**: não tem estoque para conferir (§7);
+> - **o que se conta é só a peça EMBALADA, com etiqueta de SKU e SEM etiqueta de
+>   venda** — em letra grande no topo da tela. Sem essa regra a contagem "acha"
+>   peça a mais em todo SKU com caixa esperando o carro;
+> - **o guard de 700 ms** do bipe está na tela, pelo mesmo motivo do §5: aqui a
+>   leitura repetida contaria uma peça a mais;
+> - **encerrar** tira como `nao_contado` o que ninguém contou; o que já achou
+>   diferença continua até ser decidido — fechar ali seria esquecer uma peça que
+>   falta. O ciclo fecha sozinho quando nada mais anda nele;
+> - **a sugestão do dia** põe o nunca conferido em cima, depois dias sem
+>   conferência × giro, e não repete o que foi conferido hoje nem o que está num
+>   item aberto.
+
+> ⚠️ **A IDADE DA CONFERÊNCIA MUDOU DE CASA, E GANHOU UMA TERCEIRA FONTE.**
+> `inventario_dominio.conferencias()` é o dono único; a aba Estoque e a sugestão
+> do ciclo leem dela. Valem o item `confirmado` ou `aprovado`, datado pela **1ª**
+> contagem. `contagem` e `contagem_pendente` continuam como história de antes do
+> deploy, **cada fonte no seu try**: tabela que não existe num banco não pode
+> apagar a idade que as outras sabem. A spec punha isto na fase 4; sem ele, a
+> idade congelaria no dia do deploy.
+
+> ⚠️ **AS TRÊS PONTAS DAS CHAVES NOVAS** (#13): `contagem.recontar` (operação —
+> se fosse admin, todo operador do estoque viraria admin do PCP), `contagem.planejar`
+> e `contagem.aprovar` (admin, sensível); as linhas no `permDaRota()`; e o
+> backfill de uma vez só (`config.seed_inventario`, seção 3-D do `acesso.js`):
+> quem tinha `contagem.ajustar` passa a aprovar e planejar, quem tinha
+> `contagem.contar` passa a recontar, exceção concedida vai junto. **Terminar**
+> aceita as duas chaves na rota e o handler confere a da rodada. A tela
+> `/inventario` tem área própria (`inventario`) só para ficar na lista protegida
+> do `auth.js` (#3) e no fallback — quem decide é a chave.
+
+> ⚠️ **A CONTAGEM ANTIGA DE PEÇA RECUSA E DIZ PARA ONDE IR.** `/api/contagem/bipe`
+> de SKU, e `ajustar`/`lancar` com SKU no corpo, respondem 409 `use_inventario` e
+> **não gravam nada** — nem a parte de material do mesmo corpo, senão a pessoa
+> acharia que a contagem inteira entrou. O "lançar (soma)" de peça deixou de
+> existir: peça entra no estoque pela embalagem, e o que sobra na prateleira sem
+> registro é diferença de conferência, com motivo. `contagem.ajustar` continua
+> valendo só para material e para drenar a fila antiga; ela sai do cadastro na
+> fase 3, com o ajuste manual em duas pessoas.
+
+> ⚠️ **MODO TESTE:** `inventario_ciclo` e `inventario_item` entraram em
+> `TABELAS`. Sem elas, "apagar tudo" apagaria o movimento do livro e deixaria o
+> item `aprovado` de pé, e a idade contaria um inventário que o saldo já não tem.
+
+**Rode `node teste_inventario.js` (80 casos) ao mexer no `inventario_dominio.js`,
+no `inventario_route.js`, no `outraPessoa` ou na tela `/inventario`.** Nove
+defeitos foram reintroduzidos um a um: a lista trazendo o saldo (reprova 2), o bipe
+devolvendo o saldo (1), bateu sem confirmar sozinho (3), `outraPessoa` frouxa (24),
+a aprovação sem perguntar pessoa — o Admin Geral dispensado (14), aprovar gravando
+o contado como saldo (3), comparar o número em vez da diferença (13), rejeitar
+apagando (4) e aprovar sem motivo (3). Mexeu nas chaves? **`node teste_acesso.js`
+(242, a seção 6-F é esta) e `node teste_cobertura.js` (10).**
+
+> ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA, e deploy não é conferência.** A rodada
+> foi num navegador meu, a 1440, 1024 e 400 px, com três logins: a Ana contou e
+> terminou pelo leitor, o João recontou, o Lucas aprovou pela tela e o saldo foi a
+> 11 + (−2) = 9. A prova que fecha a fase é **a primeira conferência de verdade**:
+> o tablet do estoque contando sem ver o saldo, uma divergência recontada por
+> outra pessoa e aprovada por uma terceira.
 
 > ⚠️ **O botão "aplicar alvo" diz quantos ele NÃO resolve.** O "Aplicar todos" do
 > Planejamento só grava em SKU **com venda na janela** — proposital: sem dado de
@@ -4713,11 +4865,11 @@ também o lado que faz a equipe parar de ler a coluna.
 
 **Rode `node teste_estoque.js` após qualquer mudança no `est_route.js`, no
 `fluxo_estoque.js`, no `demanda_dominio.js`, no `painel_route.js`, no
-`ger_route.js` ou no `cont_route.js`** — os 73 casos travam a conta única nas
+`ger_route.js`, no `cont_route.js` ou no `inventario_dominio.js`** — os 72 casos travam a conta única nas
 quatro telas, o sob medida, o parado, a série do gráfico, a idade do inventário
 (de ponta a ponta, pelo fluxo real — armadilha #32), o gate do custo e o acordo
 com o fechamento diário do Planejamento. Mexeu na contagem?
-**`node teste_contagem.js` também** (32 casos).
+**`node teste_contagem.js` e `node teste_inventario.js` também** (36 + 80 casos).
 
 ### A TV e o gerencial entraram na mesma régua (01/09/2026)
 

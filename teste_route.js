@@ -35,7 +35,13 @@ module.exports=function(app, db){
        foto, e sem esta cobertura as linhas de teste ficariam de pe descrevendo
        movimentos que o saldo ja nao tem — e a soma do livro, que e a guarda
        contra a volta dos sete donos, pararia de bater no dia seguinte. */
-    {nome:'movimento_estoque',    pk:'id', rotulo:'livro do estoque'}
+    {nome:'movimento_estoque',    pk:'id', rotulo:'livro do estoque'},
+    /* A CONFERENCIA (fase 2, 26/09/2026). Ela aprova movimento no livro, e o
+       livro de teste e apagado ali em cima: sem estas duas, "apagar tudo"
+       deixaria o item APROVADO de pe sem a linha que ele aprovou — e a idade
+       da conferencia contaria um inventario que o saldo ja nao tem. */
+    {nome:'inventario_ciclo',     pk:'id', rotulo:'conferencia (ciclos)'},
+    {nome:'inventario_item',      pk:'id', rotulo:'conferencia (SKUs)'}
   ];
 
   // Fase 3: foto_estoque saiu da cobertura; limpa o trigger antigo em bancos

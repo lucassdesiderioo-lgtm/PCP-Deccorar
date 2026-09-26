@@ -110,14 +110,38 @@ const ajustes = c => db.prepare('SELECT * FROM ajuste_estoque WHERE codigo=? ORD
 const linha   = (c,i) => ajustes(c)[i||0] || {};
 const bipar   = (cod, ses, vezes) => { for(let i=0;i<vezes;i++) chamar('POST','/api/contagem/bipe',{codigo:cod,sessao:ses}); };
 const pendentes = () => chamar('GET','/api/contagem/pendentes').body.linhas;
+/* A CONTAGEM DE PECA NAO ENTRA MAIS POR AQUI (fase 2 da conferencia,
+   26/09/2026): ela e do inventario_route, as cegas. O que sobra neste modulo,
+   para peca, e DRENAR a fila que ja existia no deploy — contagens feitas pela
+   regra antiga, que nao tem outro caminho para sair. Os casos abaixo semeiam
+   essa fila como o `enfileirar` antigo gravava, e conferem que a aprovacao
+   dela continua certa (a diferenca contra o sistema_era, e o rastro). */
+function pendenteAntigo(codigo, contado, sistemaEra, operacao, quem){
+  return db.prepare(`INSERT INTO contagem_pendente (sessao,codigo,contado,sistema_era,operacao,contado_por,tipo)
+    VALUES ('legado',?,?,?,?,?,'sku')`).run(codigo, contado, sistemaEra, operacao||'ajustar', quem||'Joao').lastInsertRowid;
+}
+
+console.log('\n=== 0. A CONTAGEM DE PECA SAIU DESTA TELA ===\n');
+
+let r0 = chamar('POST','/api/contagem/bipe',{codigo:'BK140140BEGE',sessao:'x'});
+eq('bipar SKU aqui e recusado', r0.status, 409);
+eq('   dizendo para onde ir', r0.body.motivo, 'use_inventario');
+ok('   e sem mostrar o saldo', !('estoque' in (r0.body||{})), JSON.stringify(r0.body));
+eq('   e nada foi contado', db.prepare("SELECT COUNT(*) n FROM contagem WHERE sessao='x'").get().n, 0);
+r0 = chamar('POST','/api/contagem/ajustar',{sessao:'x',itens:[{tipo:'sku',codigo:'BK140140BEGE'},{tipo:'componente',componente_id:1,codigo:'Tubo 32 mm'}]});
+eq('ajustar com SKU no corpo e recusado INTEIRO', r0.status, 409);
+r0 = chamar('POST','/api/contagem/lancar',{sessao:'x',codigos:['BK140140BEGE']});
+eq('lancar SKU tambem', r0.status, 409);
+eq('   e o saldo nao andou', db.prepare("SELECT estoque FROM skus WHERE codigo='BK140140BEGE'").get().estoque, 10);
+r0 = chamar('POST','/api/contagem/bipe',{codigo:'TUBO32',sessao:'x'});
+ok('bipar codigo de MATERIAL continua mandando para o campo certo', r0.body.ehComponente === true);
 
 console.log('\n=== 1. A APROVACAO NAO PODE APAGAR O QUE ANDOU NO MEIO ===\n');
 
 // Saldo 10, a prateleira tem 8. A contagem vira pendente (quem contou nao
 // aprova) e o `sistema_era` guarda o 10.
 TEM_AJUSTAR = false;
-bipar('BK140140BEGE','s1',8);
-chamar('POST','/api/contagem/ajustar',{sessao:'s1',codigos:['BK140140BEGE']},{id:2,nome:'Joao'});
+pendenteAntigo('BK140140BEGE', 8, 10);
 let pend = pendentes();
 eq('a contagem virou pendente, com o saldo do momento guardado', pend.length, 1);
 eq('   sistema_era = 10', pend[0].sistema_era, 10);
@@ -134,15 +158,13 @@ eq('APROVAR aplica a DIFERENCA (8-10) sobre o saldo de agora, e nao o numero con
 
 // Sem nada andando no meio, a diferenca leva ao numero contado — e e isso que
 // faz o caso acima ser um conserto, e nao uma conta nova.
-bipar('BK160160CINZA','s2',3);
-chamar('POST','/api/contagem/ajustar',{sessao:'s2',codigos:['BK160160CINZA']},{id:2,nome:'Joao'});
+pendenteAntigo('BK160160CINZA', 3, 4);
 pend = pendentes();
 chamar('POST','/api/contagem/pendentes/aprovar',{ids:[pend[0].id]},{id:1,nome:'Ana'});
 eq('sem movimento no meio, aprovar chega no numero contado', saldo('BK160160CINZA'), 3);
 
 // `lancar` SOMA, e ja era um delta — a trava aqui e de nao-regressao.
-bipar('BK120120BEGE','s3',2);
-chamar('POST','/api/contagem/lancar',{sessao:'s3',codigos:['BK120120BEGE']},{id:2,nome:'Joao'});
+pendenteAntigo('BK120120BEGE', 2, 6, 'lancar');
 pend = pendentes();
 db.prepare("UPDATE skus SET estoque=estoque+1 WHERE codigo='BK120120BEGE'").run();  // 6 -> 7
 chamar('POST','/api/contagem/pendentes/aprovar',{ids:[pend[0].id]},{id:1,nome:'Ana'});
@@ -157,17 +179,6 @@ eq('material tambem guarda o saldo do momento', pend[0].sistema_era, 10);
 db.prepare("UPDATE componente SET estoque=estoque+2 WHERE codigo='TUBO32'").run();
 chamar('POST','/api/contagem/pendentes/aprovar',{ids:[pend[0].id]},{id:1,nome:'Ana'});
 eq('material: aprovar aplica a diferenca, nao o numero contado', material(), 10);
-
-console.log('\n=== 3. O CAMINHO DIRETO NAO TEM SALDO GUARDADO, E ESTA CERTO ===\n');
-
-/* Quem tem `contagem.ajustar` aplica no mesmo instante em que conta: nao ha
-   espera, entao nao ha nada a preservar. A diferenca e contra o saldo de agora,
-   e o resultado E o numero contado. */
-TEM_AJUSTAR = true;
-db.prepare("UPDATE skus SET estoque=9 WHERE codigo='BK160160CINZA'").run();
-bipar('BK160160CINZA','s5',5);
-chamar('POST','/api/contagem/ajustar',{sessao:'s5',codigos:['BK160160CINZA']},{id:1,nome:'Ana'});
-eq('caminho direto: substitui pelo contado', saldo('BK160160CINZA'), 5);
 
 console.log('\n=== 4. TODA CONTAGEM DE PECA DEIXA RASTRO EM `ajuste_estoque` ===\n');
 
@@ -186,18 +197,7 @@ eq('`lancar` tambem deixa rastro', a.length, 1);
 eq('   delta do lancamento', linha('BK120120BEGE').delta, 2);
 
 a = ajustes('BK160160CINZA');
-eq('o caminho direto tambem grava (duas contagens: a pendente e a direta)', a.length, 2);
-eq('   a direta assina com quem aplicou', linha('BK160160CINZA',1).usuario_nome, 'Ana');
-
-console.log('\n=== 5. CONTAGEM QUE BATEU NAO INVENTA LINHA ===\n');
-
-TEM_AJUSTAR = true;
-db.prepare("UPDATE skus SET estoque=4 WHERE codigo='BK120120BEGE'").run();
-const antesN = ajustes('BK120120BEGE').length;
-bipar('BK120120BEGE','s6',4);
-chamar('POST','/api/contagem/ajustar',{sessao:'s6',codigos:['BK120120BEGE']},{id:1,nome:'Ana'});
-eq('bateu: o saldo nao se mexe', saldo('BK120120BEGE'), 4);
-eq('bateu: nenhuma linha nova em ajuste_estoque', ajustes('BK120120BEGE').length, antesN);
+eq('a aprovacao do pendente antigo grava a sua linha', a.length, 1);
 
 console.log('\n=== 6. MATERIAL NAO ENTRA EM `ajuste_estoque` ===\n');
 
@@ -214,14 +214,18 @@ console.log('\n=== 7. A CONTAGEM APROVADA FICA DE PE (a idade le dali) ===\n');
 /* `contagem` e rascunho: o `enfileirar` e o `lancar` apagam a sessao. Quem
    sobrevive e `contagem_pendente` — e por isso o caminho DIRETO tambem passou a
    gravar la, ja aprovado. Sem isso, metade das contagens nao deixava data. */
-eq('a sessao de rascunho foi limpa', db.prepare("SELECT COUNT(*) n FROM contagem WHERE sessao='s1'").get().n, 0);
 const reg = db.prepare("SELECT * FROM contagem_pendente WHERE codigo='BK140140BEGE' ORDER BY id").all();
 eq('a contagem pendente continua registrada depois de aprovada', reg.length, 1);
 eq('   marcada como aprovada', reg[0].aprovado, 1);
-const direto = db.prepare("SELECT * FROM contagem_pendente WHERE codigo='BK160160CINZA' ORDER BY id").all();
-eq('o caminho DIRETO tambem deixa registro', direto.length, 2);
+/* O caminho DIRETO de material tambem deixa registro, ja aprovado. */
+TEM_AJUSTAR = true;
+chamar('POST','/api/contagem/componente',{sessao:'s9',componente_id:1,quantidade:4});
+chamar('POST','/api/contagem/ajustar',{sessao:'s9',itens:[{tipo:'componente',componente_id:1,codigo:'Tubo 32 mm'}]},{id:1,nome:'Ana'});
+const direto = db.prepare("SELECT * FROM contagem_pendente WHERE tipo='componente' ORDER BY id").all();
+eq('o caminho DIRETO de material deixa registro', direto.length, 2);
 eq('   e ele ja nasce aprovado', direto[1].aprovado, 1);
 ok('   assinado por quem aplicou', direto[1].aprovado_por === 'Ana', 'veio: '+direto[1].aprovado_por);
+eq('   e o saldo do material e o contado', material(), 4);
 
 console.log('\n' + (falhas ? 'FALHARAM ' + falhas + ' de ' + n : 'TODOS OS ' + n + ' CASOS PASSARAM') + '\n');
 db.close(); fs.rmSync(tmp, {recursive:true, force:true});

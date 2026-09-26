@@ -20,6 +20,10 @@ const AREAS=[
   // no next() e a pagina seria servida do disco (armadilha #3 da secao 10 do
   // CLAUDE.md). Quem decide de verdade e a permissao pedido.receber.
   {id:'recebimento', nome:'Recebimento de compras'},
+  /* A conferencia de estoque no tablet (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA,
+     26/09/2026). Mesma razao do recebimento: sem a area, /inventario ficaria
+     fora de TELAS e o express.static a serviria sem sessao. */
+  {id:'inventario',  nome:'Conferencia de estoque (contar e recontar)'},
   /* SOB MEDIDA (02/09/2026). A fabrica tem duas operacoes: a de medida padrao,
      que vende pelo Mercado Livre, e a sob medida, que corta tecido contra o
      pedido do cliente. Ate aqui a segunda vivia num segundo servidor, com um
@@ -49,6 +53,7 @@ const TELAS={
   '/expedicao':'expedicao','/expedicao.html':'expedicao',
   '/carregamento':'carregamento','/carregamento.html':'carregamento',
   '/recebimento':'recebimento','/recebimento.html':'recebimento',
+  '/inventario':'inventario','/inventario.html':'inventario',
   /* A escolha de setor. O '*' quer dizer QUALQUER SESSAO: nao ha area para
      escolher onde trabalhar. Ela precisa estar nesta lista de todo jeito —
      fora dela, o pedido cairia no next() e o express.static entregaria o

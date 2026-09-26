@@ -1,0 +1,193 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conferência de estoque</title>
+<!-- A CONFERENCIA EM TRES PAPEIS (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA,
+     26/09/2026). Tela de TABLET, fundo claro (DESIGN §2).
+
+     ⚠️ ELA NUNCA MOSTRA O SALDO, e nao e so esconder: as rotas que ela chama
+     nao trazem o campo. Quem sabe a resposta conta ate chegar nela, e a
+     conferencia vira confirmacao. Nem o "terminei" diz se bateu.
+
+     ⚠️ O CAMPO DE BIPE E VISIVEL (§12): no iPad, campo fora da tela perde o
+     foco e o leitor bipa no vazio. -->
+<style>
+  :root{--bg:#ffffff;--panel:#f4f6f8;--line:#d8dee6;--txt:#1a1d23;--muted:#5a6472;--amber:#b26a00;--green:#2e7d32;--red:#c62828;--blue:#1565c0;--violet:#6a3fb5}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .mark{width:34px;height:34px;border-radius:8px;background:var(--blue);display:grid;place-items:center;color:#fff;font-weight:800}
+  h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
+  .wrap{max-width:820px;margin:0 auto;padding:16px}
+  .regra{border:2px solid #e7cb8c;background:#fbf1db;border-radius:14px;padding:14px 16px;font-size:17px;line-height:1.45;margin-bottom:14px}
+  .regra b{font-size:19px}
+  .modos{display:flex;gap:8px;margin-bottom:14px}
+  .modo{flex:1;min-height:52px;font-size:17px;font-weight:700;border-radius:12px;border:2px solid var(--line);background:var(--panel);color:var(--muted);cursor:pointer}
+  .modo.on{background:var(--blue);border-color:var(--blue);color:#fff}
+  .modo.on.re{background:var(--violet);border-color:var(--violet)}
+  .bipe{display:flex;gap:8px;margin-bottom:12px}
+  #scan{flex:1;min-width:0;min-height:56px;font-size:20px;padding:10px 14px;border:2px solid var(--line);border-radius:12px;font-family:ui-monospace,monospace;text-align:center}
+  #scan:focus{outline:none;border-color:var(--blue)}
+  .msg{border-radius:12px;padding:12px 14px;font-size:16px;margin-bottom:12px;display:none}
+  .msg.err{display:block;background:#fbe9e8;border:1px solid #efb1ad;color:var(--red)}
+  .msg.ok{display:block;background:#e7f5eb;border:1px solid #a9d8b4;color:var(--green)}
+  .atual{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:18px;text-align:center;margin-bottom:14px}
+  .atual.re{background:#f1ecfa;border-color:#cbb8ec}
+  .cod{font-family:ui-monospace,monospace;font-size:18px;font-weight:700;color:var(--muted)}
+  .peca{font-size:28px;font-weight:800;line-height:1.2;margin:6px 0 2px}
+  .num{font-size:78px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;margin:8px 0 2px}
+  .numl{font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .acoes{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+  button.b{min-height:52px;padding:0 18px;font-size:16px;font-weight:700;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--txt);cursor:pointer}
+  button.b.pri{background:var(--green);border-color:var(--green);color:#fff;font-size:18px}
+  .qtd{display:flex;gap:6px;align-items:center}
+  .qtd input{width:90px;min-height:52px;font-size:18px;text-align:center;border:1px solid var(--line);border-radius:12px}
+  .lista{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+  .lt{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+  .li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+  .li:last-child{border-bottom:0}
+  .lc{font-family:ui-monospace,monospace;font-weight:700;font-size:15px}
+  .ld{font-size:14px;color:var(--muted)}
+  .tag{font-size:13px;padding:4px 10px;border-radius:20px;white-space:nowrap}
+  .tag.meu{background:#e8f0fb;color:var(--blue)}
+  .tag.outro{background:#fbf1db;color:var(--amber)}
+  .vazio{color:var(--muted);font-size:15px;padding:8px 0}
+  @media (max-width:600px){ .num{font-size:64px} .peca{font-size:22px} .regra{font-size:15px} .regra b{font-size:16px} }
+</style></head><body>
+<header><div class="mark">C</div><div><h1>Conferência de estoque</h1>
+<div class="sub">Conte o que está na prateleira. O sistema não mostra o saldo — a comparação é dele.</div></div></header>
+<div class="wrap">
+  <div class="regra"><b>Conte só a peça EMBALADA, com etiqueta de SKU e SEM etiqueta de venda.</b><br>
+    Caixa com etiqueta de venda já saiu do estoque. Peça revisada e ainda não embalada ainda não é estoque.</div>
+  <div class="modos" id="modos"></div>
+  <div class="bipe"><input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="bipe a etiqueta de SKU"></div>
+  <div class="msg" id="msg"></div>
+  <div id="atual"></div>
+  <div class="lista"><div class="lt" id="lt"></div><div id="lista"></div></div>
+</div>
+<script src="/sku.js"></script>
+<script>
+var MODO=null, PODE={contar:false, recontar:false}, ITENS=[], ATUAL=null, ULT={c:null,t:0};
+function el(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function pecaDe(i){ return (typeof pecaTexto==='function'&&typeof pecaDeSku==='function') ? pecaTexto(pecaDeSku(i)) : ''; }
+function msg(tipo, texto){ var m=el('msg'); m.className='msg '+(tipo||''); m.textContent=texto||''; }
+function foco(){ var s=el('scan'); if(s && document.activeElement!==s && !(document.activeElement&&document.activeElement.tagName==='INPUT')) s.focus(); }
+
+async function pegar(url){
+  var r=await fetch(url); if(r.status===403) return null;
+  var d=await r.json(); return d;
+}
+async function iniciar(){
+  var a=await pegar('/api/inventario/minha-lista'), b=await pegar('/api/inventario/recontagem');
+  PODE.contar=!!a; PODE.recontar=!!b;
+  var salvo=null; try{ salvo=localStorage.getItem('inv_modo'); }catch(e){}
+  MODO = (salvo==='recontar'&&PODE.recontar) ? 'recontar' : (PODE.contar ? 'contar' : (PODE.recontar ? 'recontar' : null));
+  desenharModos();
+  if(!MODO){ el('lista').innerHTML='<div class="vazio">Você não tem permissão para contar nem recontar. Peça ao responsável em Admin → Acessos.</div>'; return; }
+  await carregar();
+}
+function desenharModos(){
+  var h='';
+  if(PODE.contar) h+='<button class="modo'+(MODO==='contar'?' on':'')+'" onclick="trocar(\'contar\')">Contar</button>';
+  if(PODE.recontar) h+='<button class="modo re'+(MODO==='recontar'?' on':'')+'" onclick="trocar(\'recontar\')">Recontar o que não bateu</button>';
+  el('modos').innerHTML=h;
+  el('modos').style.display = (PODE.contar&&PODE.recontar) ? 'flex' : 'none';
+}
+function trocar(m){
+  if(m===MODO) return;
+  MODO=m; ATUAL=null; try{ localStorage.setItem('inv_modo',m); }catch(e){}
+  desenharModos(); msg(); carregar();
+}
+async function carregar(){
+  var d=await pegar(MODO==='recontar' ? '/api/inventario/recontagem' : '/api/inventario/minha-lista');
+  ITENS=(d&&d.itens)||[];
+  if(ATUAL){ var a=ITENS.find(function(i){ return i.codigo===ATUAL.codigo; }); ATUAL = a ? Object.assign(ATUAL,a) : null; }
+  else { var meu=ITENS.find(function(i){ return i.contando!=null; }); if(meu) ATUAL=meu; }
+  desenhar();
+}
+function desenhar(){
+  var re=MODO==='recontar';
+  if(ATUAL){
+    var n=ATUAL.contando||0;
+    el('atual').innerHTML='<div class="atual'+(re?' re':'')+'">'+
+      '<div class="cod">'+esc(ATUAL.codigo)+(re?' · RECONTAGEM':'')+'</div>'+
+      '<div class="peca">'+esc(pecaDe(ATUAL)||ATUAL.descricao||'')+'</div>'+
+      '<div class="num">'+n+'</div><div class="numl">'+(n===1?'peça contada':'peças contadas')+' por você</div>'+
+      '<div class="acoes">'+
+        '<span class="qtd"><input id="qtd" type="number" min="0" step="1" inputmode="numeric" placeholder="qtd"><button class="b" onclick="somarQtd()">Somar</button></span>'+
+        '<button class="b" onclick="recomecar()">Recomeçar este SKU</button>'+
+        '<button class="b pri" onclick="terminar()">Terminei este SKU</button>'+
+      '</div></div>';
+  } else {
+    el('atual').innerHTML='<div class="atual'+(re?' re':'')+'"><div class="peca" style="font-size:22px">'+
+      (ITENS.length ? 'Bipe a etiqueta de SKU de uma peça da prateleira' : '')+'</div>'+
+      (ITENS.length ? '<div class="numl" style="margin-top:6px">ou toque num SKU da lista para contar zero</div>' : '')+'</div>';
+    if(!ITENS.length) el('atual').innerHTML='';
+  }
+  el('lt').textContent = re ? 'Para recontar ('+ITENS.length+')' : 'Para contar hoje ('+ITENS.length+')';
+  if(!ITENS.length){
+    el('lista').innerHTML='<div class="vazio">'+(re
+      ? 'Nada para você recontar. O que você mesmo contou não aparece aqui: a recontagem é sempre de outra pessoa.'
+      : 'Nenhuma conferência aberta para você. O responsável abre a conferência do dia em Admin → Contagem.')+'</div>';
+    return;
+  }
+  el('lista').innerHTML=ITENS.map(function(i){
+    var tag = i.contando!=null ? '<span class="tag meu">você: '+i.contando+'</span>'
+            : (i.ocupado_por ? '<span class="tag outro">'+esc(i.ocupado_por)+' está contando</span>' : '');
+    return '<div class="li" data-c="'+esc(i.codigo)+'"><div><div class="lc">'+esc(i.codigo)+'</div><div class="ld">'+esc(pecaDe(i)||i.descricao||'')+'</div></div>'+tag+'</div>';
+  }).join('');
+  Array.prototype.forEach.call(document.querySelectorAll('.li'),function(d){
+    d.onclick=function(){ var c=d.getAttribute('data-c'); ATUAL=ITENS.find(function(i){ return i.codigo===c; })||null; msg(); desenhar(); };
+  });
+}
+async function mandar(corpo){
+  var url = MODO==='recontar' ? '/api/inventario/recontar' : '/api/inventario/contar';
+  var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)});
+  var d={}; try{ d=await r.json(); }catch(e){}
+  if(!r.ok || d.ok===false){ msg('err', d.erro||('falhou ('+r.status+')')); return null; }
+  return d;
+}
+async function bipar(cod){
+  if(!cod||cod.length<3) return;
+  /* 700 ms: o leitor as vezes manda o mesmo codigo duas vezes numa leitura
+     so (§12). Aqui isso contaria uma peca a mais. Duas pecas de verdade exigem
+     largar uma e pegar a outra, e isso nunca leva menos de 0,7 s. */
+  var agora=Date.now(); if(ULT.c===cod && agora-ULT.t<700) return; ULT={c:cod,t:agora};
+  var d=await mandar({codigo:cod}); if(!d) return;
+  msg();
+  ATUAL={codigo:d.codigo}; await carregar();
+  if(ATUAL) ATUAL.contando=d.contado;
+  desenhar();
+}
+async function somarQtd(){
+  if(!ATUAL) return;
+  var q=el('qtd'); var n=Number(q&&q.value);
+  if(!q||q.value===''||!Number.isInteger(n)||n<0){ msg('err','Digite quantas peças (número inteiro).'); return; }
+  var d=await mandar({codigo:ATUAL.codigo, quantidade:n}); if(!d) return;
+  msg(); ATUAL.contando=d.contado; await carregar(); desenhar();
+}
+async function recomecar(){
+  if(!ATUAL) return;
+  if(!confirm('Recomeçar a contagem de '+ATUAL.codigo+' do zero?')) return;
+  var d=await mandar({codigo:ATUAL.codigo, zerar:true}); if(!d) return;
+  ATUAL.contando=0; await carregar(); desenhar();
+}
+async function terminar(){
+  if(!ATUAL) return;
+  var n=ATUAL.contando||0;
+  if(!confirm('Terminar '+ATUAL.codigo+' com '+n+' '+(n===1?'peça':'peças')+'?\n\nDepois de terminar, esta contagem não se muda.')) return;
+  var r=await fetch('/api/inventario/terminar-sku',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({codigo:ATUAL.codigo, papel:MODO})});
+  var d={}; try{ d=await r.json(); }catch(e){}
+  if(!r.ok||d.ok===false){ msg('err', d.erro||('falhou ('+r.status+')')); return; }
+  msg('ok', ATUAL.codigo+': contagem registrada ('+n+'). Pode seguir para o próximo.');
+  ATUAL=null; await carregar(); foco();
+}
+el('scan').addEventListener('keydown',function(e){
+  if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); var v=el('scan').value.replace(/[^A-Za-z0-9]/g,'').toUpperCase(); el('scan').value=''; bipar(v); }
+});
+setInterval(function(){ if(MODO && !(document.activeElement&&document.activeElement.id==='qtd')) carregar(); }, 8000);
+document.addEventListener('click',function(e){ if(!e.target.closest('input,button,.li')) foco(); });
+iniciar().then(foco);
+</script>
+<script src="/nav.js"></script>
+</body></html>

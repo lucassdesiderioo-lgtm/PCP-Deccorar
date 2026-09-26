@@ -18,6 +18,12 @@
  * Daqui para frente e o mesmo caminho: mesma sessao, mesma tela, mesma fila de
  * aprovacao. Uma mecanica so no sistema inteiro.
  *
+ * ⚠️ DESDE 26/09/2026 ESTA ROTA CONTA SO MATERIAL. A contagem de PECA passou
+ * para a conferencia em tres papeis (inventario_route.js, fase 2 da
+ * ESTOQUE-LIVRO-E-CONFERENCIA). A fila de pendentes continua aprovando as
+ * contagens de peca que ja estavam nela no deploy — elas foram feitas pela
+ * regra antiga e nao tem outro caminho para sair.
+ *
  * REGRA 10 (§13): componente.estoque NUNCA muda por UPDATE daqui. Todo ajuste
  * de material passa por componente_dominio.movimentar(), que deixa o registro em
  * movimento_componente. E por isso que a contagem de material da para auditar e
@@ -213,9 +219,15 @@ module.exports=function(app,db){
       if(c) return res.json({ok:false, codigo:cod, cadastrado:false, ehComponente:true,
         componente_id:c.id, nome:c.nome, unidade:c.unidade||'un'});
     }
-    db.prepare("INSERT INTO contagem (codigo,sessao,tipo,qtd) VALUES (?,?,'sku',1)").run(cod,ses);
-    const n=contadoNaSessao(ses,{tipo:'sku',codigo:cod});
-    res.json({ok:true,codigo:cod,cadastrado:!!existe,contado:n,estoque:existe?existe.estoque:null,cor:existe?existe.cor:''});
+    /* ⚠️ A CONTAGEM DE PECA SAIU DAQUI (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA,
+       26/09/2026). Ela mostrava o saldo a quem contava e deixava a mesma pessoa
+       contar e aplicar — as duas coisas que a conferencia nova existe para
+       impedir. Peca se conta na tela Inventario, as cegas, e quem aprova e
+       outra pessoa. A recusa diz para onde ir: trava que so nega e trava que a
+       equipe aprende a contornar (§5). Material continua aqui. */
+    return res.status(409).json({ok:false, codigo:cod, motivo:'use_inventario',
+      erro: existe ? 'Peca se conta na tela Inventario (/inventario), as cegas — esta tela conta so material.'
+                   : cod+' nao e material cadastrado. Peca se conta na tela Inventario (/inventario).'});
   });
 
   /* Lista de materiais para a tela de contagem. Nome, unidade e saldo — NUNCA
@@ -320,8 +332,9 @@ module.exports=function(app,db){
     });
     linhas.sort((a,b)=> a.tipo===b.tipo ? String(a.codigo).localeCompare(String(b.codigo)) : (a.tipo==='sku'?-1:1));
 
-    const naoContados=db.prepare('SELECT codigo,estoque FROM skus WHERE estoque>0 ORDER BY codigo').all()
-      .filter(s=>!vistoSku[s.codigo]).map(s=>({tipo:'sku',codigo:s.codigo,sistema:s.estoque}));
+    /* Peca saiu desta tela (fase 2 da conferencia): cobrar aqui "ainda nao
+       contados" de SKU mandaria a pessoa contar peca num lugar que recusa. */
+    const naoContados=[];
     /* Material so entra em "ainda nao contados" quando a contagem JA tem
        material. Uma contagem de pecas nao deve cobrar as 22 linhas de materia
        prima — o aviso viraria ruido e o operador pararia de ler. */
@@ -332,12 +345,25 @@ module.exports=function(app,db){
     res.json({linhas,desconhecidos,naoContados});
   });
 
+  /* Peca nao passa mais por aqui (fase 2 da conferencia). Um corpo com SKU —
+     uma aba aberta antes do deploy, ou alguem chamando por fora — e recusado
+     inteiro, e NADA e gravado: aplicar so a parte de material faria a pessoa
+     achar que a contagem inteira entrou. */
+  function recusaPeca(res, itens){
+    const pecas=itens.filter(i=>i.tipo!=='componente').map(i=>i.codigo);
+    if(!pecas.length) return false;
+    res.status(409).json({ok:false, motivo:'use_inventario', pecas,
+      erro:'Peca se conta na tela Inventario (/inventario): '+pecas.join(', ')+'. Nada foi gravado.'});
+    return true;
+  }
+
   // ajustar = SUBSTITUI (estoque := contado). Direto p/ quem tem contagem.ajustar;
   // senao vira pendente.
   app.post('/api/contagem/ajustar',(req,res)=>{
     const ses=((req.body&&req.body.sessao)||'').trim();
     const itens=itensDoCorpo(req.body);
     if(!ses||!itens.length) return res.status(400).json({erro:'faltam dados'});
+    if(recusaPeca(res, itens)) return;
     if(!podeAjustar(req)){
       const pend=enfileirar(req,ses,itens,'ajustar');
       return res.json({ok:true,pendente:pend});
@@ -365,6 +391,7 @@ module.exports=function(app,db){
     const ses=((req.body&&req.body.sessao)||'').trim();
     const itens=itensDoCorpo(req.body);
     if(!ses||!itens.length) return res.status(400).json({erro:'faltam dados'});
+    if(recusaPeca(res, itens)) return;
     if(!podeAjustar(req)){
       const pend=enfileirar(req,ses,itens,'lancar');
       return res.json({ok:true,pendente:pend});

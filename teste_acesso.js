@@ -686,6 +686,79 @@ console.log('\n── 6-E. saida.liberar: liberar o caminhão com número difere
      !db.prepare("SELECT 1 FROM setor_permissao WHERE setor_id=? AND chave='saida.liberar'").get(idSup));
 }
 
+console.log('\n── 6-F. a conferência em três papéis (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA) ──');
+{
+  /* As três pontas de cada chave nova (#13) e a quarta, o NÍVEL (#34): o
+     recontar é da bancada e tem que ser `operacao` — se fosse admin, todo
+     operador do estoque viraria admin do PCP pelo sincronizarAreas. */
+  const nivel = { 'contagem.recontar':'operacao', 'contagem.planejar':'admin', 'contagem.aprovar':'admin' };
+  for(const c in nivel){
+    const ch = PERMISSOES.find(p => p.chave === c);
+    ok(c + ' está declarada em permissoes.js', !!ch);
+    if(ch){ eq(c + ' tem nível ' + nivel[c], ch.nivel, nivel[c]); ok(c + ' tem rótulo e descrição', !!ch.rotulo && !!ch.desc); }
+  }
+  ok('aprovar é sensível: mexe no saldo, e a decisão precisa ter nome',
+     (PERMISSOES.find(p => p.chave === 'contagem.aprovar') || {}).sensivel === true);
+
+  eq('a tela /inventario: quem conta OU quem reconta',
+     JSON.stringify(AC.permDaRota('/inventario','GET')), JSON.stringify(['contagem.contar','contagem.recontar']));
+  eq('a gêmea .html herda a tela',
+     JSON.stringify(AC.permDaRota('/inventario.html','GET')), JSON.stringify(['contagem.contar','contagem.recontar']));
+  for(const [r,m,c] of [['/api/inventario/sugestao','GET','contagem.planejar'], ['/api/inventario/abrir','POST','contagem.planejar'],
+                        ['/api/inventario/encerrar','POST','contagem.planejar'],
+                        ['/api/inventario/minha-lista','GET','contagem.contar'], ['/api/inventario/contar','POST','contagem.contar'],
+                        ['/api/inventario/recontagem','GET','contagem.recontar'], ['/api/inventario/recontar','POST','contagem.recontar'],
+                        ['/api/inventario/aprovacao','GET','contagem.aprovar'], ['/api/inventario/aprovar','POST','contagem.aprovar'],
+                        ['/api/inventario/rejeitar','POST','contagem.aprovar']])
+    eq(m + ' ' + r + ' pede ' + c, AC.permDaRota(r, m), c);
+  eq('terminar serve as duas rodadas',
+     JSON.stringify(AC.permDaRota('/api/inventario/terminar-sku','POST')), JSON.stringify(['contagem.contar','contagem.recontar']));
+
+  const perm = nome => db.prepare(`SELECT sp.chave FROM setor_permissao sp JOIN setores s ON s.id=sp.setor_id
+    WHERE s.nome=?`).all(nome).map(r => r.chave);
+  ok('o setor Operador / Controle de Estoque nasce recontando', perm('Operador / Controle de Estoque').includes('contagem.recontar'));
+  ok('   e NÃO aprova nem planeja',
+     !perm('Operador / Controle de Estoque').includes('contagem.aprovar') && !perm('Operador / Controle de Estoque').includes('contagem.planejar'));
+
+  /* O BACKFILL, num banco que já existia: um setor que aprovava pelo caminho
+     antigo (contagem.ajustar) e um que só contava. Tira a marca, sobe o
+     acesso.js de novo, e confere que a chave nova chegou — e só a certa. */
+  const sA = db.prepare("INSERT INTO setores (nome,nivel,nativo) VALUES ('Estoque antigo','admin',0)").run().lastInsertRowid;
+  const sC = db.prepare("INSERT INTO setores (nome,nivel,nativo) VALUES ('Contagem antiga','operacao',0)").run().lastInsertRowid;
+  db.prepare("INSERT INTO setor_permissao (setor_id,chave) VALUES (?, 'contagem.ajustar')").run(sA);
+  db.prepare("INSERT INTO setor_permissao (setor_id,chave) VALUES (?, 'contagem.contar')").run(sC);
+  const uX = db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('Excecao','')").run().lastInsertRowid;
+  db.prepare("INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,'contagem.ajustar',1)").run(uX);
+  db.prepare("DELETE FROM config WHERE chave='seed_inventario'").run();
+  const app3 = { locals:{}, router:{ stack:[] }, get(){}, post(){}, delete(){} };
+  require('./acesso')(app3, db);
+  const tem = (sid, c) => !!db.prepare('SELECT 1 FROM setor_permissao WHERE setor_id=? AND chave=?').get(sid, c);
+  ok('backfill: quem tinha contagem.ajustar passa a aprovar', tem(sA, 'contagem.aprovar'));
+  ok('backfill: e a planejar', tem(sA, 'contagem.planejar'));
+  ok('backfill: quem só contava passa a recontar', tem(sC, 'contagem.recontar'));
+  ok('backfill: e NÃO ganha aprovar nem planejar', !tem(sC, 'contagem.aprovar') && !tem(sC, 'contagem.planejar'));
+  ok('backfill: a exceção que concedia contagem.ajustar concede aprovar',
+     !!db.prepare("SELECT 1 FROM usuario_excecao WHERE usuario_id=? AND chave='contagem.aprovar' AND concede=1").get(uX));
+  ok('o backfill ficou marcado para rodar uma vez só', !!db.prepare("SELECT 1 FROM config WHERE chave='seed_inventario'").get());
+  db.prepare("DELETE FROM setor_permissao WHERE setor_id=? AND chave='contagem.recontar'").run(sC);
+  require('./acesso')({ locals:{}, router:{ stack:[] }, get(){}, post(){}, delete(){} }, db);
+  ok('desmarcada, a chave não volta no boot seguinte', !tem(sC, 'contagem.recontar'));
+
+  /* A TERCEIRA PONTA: alguém que só conta e reconta ganha a área da tela, e
+     NÃO a área admin. */
+  const uC = db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('Conta','')").run().lastInsertRowid;
+  db.prepare("INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)")
+    .run(uC, db.prepare("SELECT id FROM setores WHERE nome='Operador / Controle de Estoque'").get().id);
+  AC.sincronizarAreas(uC);
+  const areasC = (db.prepare('SELECT areas FROM usuarios WHERE id=?').get(uC).areas || '').split(',').filter(Boolean);
+  ok('quem conta ganha a área "inventario" (a tela fica na lista protegida)', areasC.includes('inventario'), areasC.join(','));
+  eq('   uma vez só, mesmo com duas chaves levando a ela', areasC.filter(a => a === 'inventario').length, 1);
+  ok('   e NÃO a área admin', !areasC.includes('admin'), areasC.join(','));
+  ok('decidir(): quem conta abre a tela', AC.decidir({id:uC, nome:'Conta'}, '/inventario', 'GET').ok === true);
+  ok('decidir(): quem conta NÃO aprova', AC.decidir({id:uC, nome:'Conta'}, '/api/inventario/aprovar', 'POST').ok === false);
+  ok('decidir(): quem conta NÃO abre a conferência', AC.decidir({id:uC, nome:'Conta'}, '/api/inventario/abrir', 'POST').ok === false);
+}
+
 console.log('\n── 16. a cobertura passou a VARRER o app ──');
 const cob = AC.coberturaDeRotas ? AC.coberturaDeRotas() : null;
 ok('existe a varredura das rotas registradas', !!cob, 'coberturaDeRotas() nao existe');

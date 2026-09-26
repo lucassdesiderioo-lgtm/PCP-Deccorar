@@ -54,6 +54,11 @@ var FONT=(function(){
   // precisa achar a tela sem decorar URL.
   var onRec=(cur==='/recebimento');
   html+='<a href="/recebimento" style="text-decoration:none;font-size:12px;padding:6px 12px;border-radius:7px;color:'+(onRec?CH.planTx:CH.off)+';background:'+(onRec?CH.planBg:'transparent')+';font-weight:'+(onRec?'700':'500')+'">Recebimento</a>';
+  // Inventario (a conferencia de estoque as cegas, fase 2 da
+  // ESTOQUE-LIVRO-E-CONFERENCIA) — idem: o tablet do estoque precisa achar a
+  // tela sem decorar URL. Sem ele a rota existiria e ninguem chegaria nela (§2).
+  var onInv=(cur==='/inventario');
+  html+='<a href="/inventario" style="text-decoration:none;font-size:12px;padding:6px 12px;border-radius:7px;color:'+(onInv?CH.planTx:CH.off)+';background:'+(onInv?CH.planBg:'transparent')+';font-weight:'+(onInv?'700':'500')+'">Inventário</a>';
   bar.innerHTML=html;
   document.body.appendChild(bar);
   document.body.style.paddingBottom='52px';

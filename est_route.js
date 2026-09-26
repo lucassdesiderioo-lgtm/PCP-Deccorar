@@ -38,6 +38,7 @@ const DEMANDA = require('./demanda_dominio');
 const FLUXO   = require('./fluxo_estoque');
 const FICHA   = require('./ficha_dominio');
 const ESTOQUE = require('./estoque_dominio');
+const INV     = require('./inventario_dominio');
 
 module.exports = function(app, db){
 
@@ -172,21 +173,15 @@ module.exports = function(app, db){
        (`criado_em`), nunca a da aprovacao: quem olhou a prateleira olhou
        naquele dia, e uma aprovacao que demora duas semanas nao rejuvenesce a
        conferencia. */
-    const contagem = {};
-    try{
-      db.prepare(`SELECT UPPER(codigo) c, MAX(em) em,
-          CAST(julianday('now','localtime') - julianday(MAX(em)) AS INTEGER) dias
-        FROM (
-          SELECT codigo, contado_em em FROM contagem
-           WHERE COALESCE(tipo,'sku')='sku' AND COALESCE(teste,0)=0
-          UNION ALL
-          SELECT codigo, criado_em em FROM contagem_pendente
-           WHERE COALESCE(tipo,'sku')='sku' AND COALESCE(teste,0)=0 AND aprovado=1
-        )
-        WHERE em IS NOT NULL
-        GROUP BY UPPER(codigo)`).all()
-        .forEach(r => contagem[r.c] = r);
-    }catch(e){}
+    /* DESDE A FASE 2 DA CONFERENCIA (26/09/2026) SAO TRES FONTES, e a conta
+       mudou de casa: `inventario_dominio.conferencias()` e o dono unico da
+       idade, e a sugestao do ciclo diario le a MESMA conta. A contagem de peca
+       passou para o inventario_item; a `contagem` e a `contagem_pendente`
+       continuam como historia de antes do deploy (a idade so pode ficar mais
+       completa, nunca menos). Sem a terceira fonte, a idade CONGELARIA no dia
+       do deploy, porque a contagem velha de peca deixou de existir. */
+    let contagem = {};
+    try{ contagem = INV.conferencias(db); }catch(e){}
 
     const verCusto = podeVerCusto(req);
     const custo = verCusto ? mapaCusto() : null;

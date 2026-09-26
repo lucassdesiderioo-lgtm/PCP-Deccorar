@@ -113,6 +113,7 @@ require('./ger_route')(app, db);     // o gerencial
 const ESTOQUE = require('./estoque_dominio');
 ESTOQUE.garantirSchema(db);
 require('./cont_route')(app, db);
+require('./inventario_route')(app, db);
 try{ db.exec('ALTER TABLE contagem_pendente ADD COLUMN teste INTEGER DEFAULT 0'); }catch(e){}
 
 // --- vendas: a janela (media) e o comprometido (envio futuro) ---
@@ -310,23 +311,24 @@ const ok = (n, c, extra) => { casos++;
      e a que mais some, porque nao mexe no saldo e nao deixa linha em
      `ajuste_estoque`. Ainda assim alguem olhou a prateleira, e a data e a
      unica coisa que prova isso. */
+  /* DESDE A FASE 2 DA CONFERENCIA (26/09/2026) a peca se conta no inventario,
+     as cegas. O fluxo real agora e: abrir, bipar, terminar. A contagem que
+     BATE confirma sozinha — sem aprovacao, sem linha no livro — e tem que
+     virar conferencia do mesmo jeito. */
   const usuario = {id:9, nome:'Joao'};
-  for(let i=0;i<7;i++) await chamar('POST /api/contagem/bipe', {codigo:'BK160160CINZA', sessao:'inv1'}, usuario);
-  await chamar('POST /api/contagem/ajustar', {sessao:'inv1', codigos:['BK160160CINZA']}, usuario);
-  ok('o fluxo real apagou a tabela de rascunho',
-     db.prepare("SELECT COUNT(*) n FROM contagem WHERE sessao='inv1'").get().n === 0);
-  const pend = db.prepare("SELECT id FROM contagem_pendente WHERE codigo='BK160160CINZA' AND aprovado=0").all();
-  ok('e deixou a contagem esperando aprovacao', pend.length === 1);
-
+  await chamar('POST /api/inventario/abrir', {tipo:'ciclico', codigos:['BK160160CINZA']}, {id:1, nome:'Ana'});
   const meio = await chamar('GET /api/estoque/painel');
   const meioPor = {}; meio.linhas.forEach(l => meioPor[l.codigo] = l);
-  ok('enquanto ninguém aprovou, o saldo ainda não foi conferido',
+  ok('conferencia aberta e ainda nao contada nao conta como conferencia',
      meioPor.BK160160CINZA.contado_em === null, 'veio ' + meioPor.BK160160CINZA.contado_em);
+  for(let i=0;i<7;i++) await chamar('POST /api/inventario/contar', {codigo:'BK160160CINZA'}, usuario);
+  await chamar('POST /api/inventario/terminar-sku', {codigo:'BK160160CINZA'}, usuario);
+  ok('o fluxo real deixou o item confirmado (7 com 7)',
+     db.prepare("SELECT status FROM inventario_item WHERE codigo='BK160160CINZA'").get().status === 'confirmado');
 
-  await chamar('POST /api/contagem/pendentes/aprovar', {ids:[pend[0].id]}, {id:1, nome:'Ana'});
   const depois = await chamar('GET /api/estoque/painel');
   const depPor = {}; depois.linhas.forEach(l => depPor[l.codigo] = l);
-  ok('depois de aprovada, a idade da conferência EXISTE — era aqui que ela mentia',
+  ok('depois da conferencia, a idade EXISTE — lida do inventario_item',
      depPor.BK160160CINZA.contado_em !== null && depPor.BK160160CINZA.contado_ha === 0,
      'contado_em=' + depPor.BK160160CINZA.contado_em + ' ha=' + depPor.BK160160CINZA.contado_ha);
   ok('contagem que BATEU não mexe no saldo e mesmo assim conta como conferência',
