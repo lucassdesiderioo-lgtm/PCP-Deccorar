@@ -14,6 +14,7 @@ const express = require('express');
 const { lerPlanilha, parseDataVenda, parseDataEnvio } = require('./planilha');
 const DEMANDA = require('./demanda_dominio');
 const FLUXO = require('./fluxo_estoque');
+const MEDIA = require('./media_dominio');
 
 module.exports = function(app, db){
   // Schema no mesmo commit em que o codigo passa a usar (CLAUDE.md secao 17).
@@ -185,6 +186,17 @@ module.exports = function(app, db){
       estoque_total:estoqueTotal, media_dia_total:+mediaDiaTotal.toFixed(2),
       cobertura_dias:cobertura, cobertura_ontem: ontem&&ontem.cobertura!=null ? ontem.cobertura : null,
       dias_cobertura_alvo: cfgNum('dias_cobertura',10) });
+  });
+
+  /* VENDAS-E-MEDIA, fase 1: a media contada pelo sistema (os PDFs), ao lado da
+     da planilha. So conferencia — a producao continua lendo a planilha. A
+     janela e a mesma do parametro "Janela da media", senao a diferenca da
+     tabela seria so a borda. */
+  app.get('/api/planejamento/media/comparar',(req,res)=>{
+    try{
+      const { linhas } = calcular();
+      res.json(MEDIA.comparar(db, linhas, { janela: cfgNum('janela_media', 30) }));
+    }catch(e){ console.error(e); res.status(500).json({ erro:String(e.message||e) }); }
   });
 
   // Tarja de lembrete no admin: ha quantos dias foi a ultima importacao da

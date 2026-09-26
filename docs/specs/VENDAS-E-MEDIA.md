@@ -1,7 +1,28 @@
-> **STATUS · 21/09/2026 — PLANEJADO** · nada no código
-> Fase 1 pode começar logo depois da fase 1 de `ESTOQUE-LIVRO-E-CONFERENCIA.md`
-> (não depende dela para funcionar, mas a ordem do pacote é essa).
+> **STATUS · 26/09/2026 — EM CONSTRUÇÃO** · **fase 1 em código** · fases 2 e 3 planejadas
 > A troca da fonte da média (fase 3) só acontece com o ok do dono depois de conferir.
+>
+> **Fase 1 (26/09/2026):** `media_dominio.js`, `GET /api/planejamento/media/comparar`
+> e a tabela "Média: planilha × sistema" em Admin → Planejamento, com
+> `teste_media.js` (25 casos). A produção **não** mudou de fonte, e
+> `config.media_fonte` **não** foi criada — ela nasce com a fase 3, que é quem a lê.
+>
+> **Mudou na construção:**
+> - **A janela usa a mesma borda da planilha** (`data >= hoje − N`, dividido por N).
+>   A spec não dizia; com borda diferente, a diferença da tabela seria só a borda.
+> - **"PDF repetido não dobra" ganhou guarda própria na conta**, e não só a dedup
+>   do upload: até 25/08/2026 a dedup olhava o dia, e sobraram volumes repetidos.
+>   A conta agrupa por pack/venda, fica com o mais antigo e **olha antes da janela**
+>   (a cópia de dentro cujo original entrou antes não é venda nova). A tela diz
+>   quantos descartou.
+> - **O volume sem SKU lido** não vira peça de ninguém: sai contado à parte.
+> - **`comparar()` recebe as linhas do `demanda_dominio` por parâmetro**, em vez
+>   de chamá-lo: na fase 3 é o `demanda_dominio` que vai ler daqui, e o `require`
+>   de volta fecharia um ciclo.
+> - A cancelada entra na conta **se a coluna existir**: ela nasce na fase 2, e a
+>   fase 1 já a respeita sem esperar.
+>
+> **Falta:** o dono conferir a tabela com o dado real por alguns dias — é essa
+> conferência que libera a fase 3.
 
 ---
 
@@ -169,7 +190,7 @@ Colunas novas em `lote` (por `ALTER`, no fim, no `exp_route.js` — §17):
 
 ## 8. Fases
 
-### Fase 1 — a média do sistema, lado a lado 🟡
+### Fase 1 — a média do sistema, lado a lado 🟡 ☑ em código (26/09/2026)
 
 - `media_dominio.js` e `GET /api/planejamento/media/comparar`.
 - Em Admin → Planejamento, uma tabela "Média: planilha × sistema", com a diferença

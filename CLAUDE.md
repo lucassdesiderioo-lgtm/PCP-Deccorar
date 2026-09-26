@@ -319,6 +319,58 @@ precisa = comprometido + alvo − estoque
 A janela não é fixa em 30 dias — é o campo "Janela da média" na própria tela. Se
 ela virar 60, a planilha precisa cobrir 60.
 
+### ⚠️ A SEGUNDA MÉDIA, CONTADA PELO SISTEMA — só ao lado, por enquanto (26/09/2026)
+
+**Fase 1 da spec `VENDAS-E-MEDIA.md`.** Toda venda do ML passa pelo PDF que a
+expedição sobe todo dia, então **a história de vendas já está em `lote`**, e ela
+não depende de ninguém subir planilha inteira. `media_dominio.js` é o **dono
+único** dessa conta, e Admin → Planejamento mostra embaixo da tabela a
+**"Média: planilha × sistema"**, SKU a SKU, com os maiores desvios em cima
+(`GET /api/planejamento/media/comparar`, `@admin`).
+
+> ⚠️ **NÃO MUDOU A PRODUÇÃO.** A tabela de cima, a tela azul, a aba Estoque, a
+> TV e a compra continuam lendo a **planilha**, pelo `demanda_dominio`. Não
+> existe ainda `config.media_fonte`: a troca é a fase 3, e espera o ok do dono
+> depois de conferir esta tabela por alguns dias. Há caso travando.
+
+| Regra da conta | Por quê |
+|---|---|
+| conta **peça**: `lote_item` soma o `qtd` de cada SKU; sem `lote_item`, 1 do `lote.codigo` | a caixa de várias persianas (#23) e *uma venda = uma etiqueta = uma persiana* (§5) |
+| **bloqueado conta** | é venda; o bloqueio é dúvida de leitura, não de existência |
+| teste e cancelada ficam fora | a cancelada só nasce na fase 2 — até lá a conta roda sem a coluna |
+| a data é `lote.data`, o dia em que o PDF entrou | não depende de nada que alguém precise subir |
+| a janela é a **mesma** da planilha (`data >= hoje − N`, ÷ N) | com borda diferente, a diferença da tabela seria só a borda |
+| janela maior que a história é **cortada** no primeiro volume, e a tela diz em âmbar | 12 dias de venda ÷ 30 dá um número 2,5× menor com cara de fato (a #16 do sob medida) |
+
+> ⚠️ **A COLUNA "PLANILHA" É O NÚMERO DO `demanda_dominio`, e não uma consulta
+> da comparação.** O `comparar()` recebe as linhas do domínio por parâmetro:
+> conferir contra um número que a produção não lê confirmaria com autoridade o
+> que ninguém usa (#12). E é por parâmetro, e não por `require`, porque na fase
+> 3 é o `demanda_dominio` que vai ler do `media_dominio` — a volta fecharia um
+> ciclo.
+
+> ⚠️ **PDF REPETIDO NÃO DOBRA, e a conta tem a sua própria guarda.** Na entrada
+> quem garante é a dedup do upload (#5), mas até 25/08/2026 ela olhava só o dia,
+> e sobraram volumes repetidos no banco. A conta agrupa pela identidade do volume
+> (pack, ou venda, ou o próprio id) e fica com o **mais antigo**, a regra do
+> `limpar_fantasmas.js` — **olhando antes da janela também**: a cópia de dentro
+> cujo original entrou no dia 31 não é venda nova. A tela diz quantos descartou.
+
+> ⚠️ **AS DUAS COLUNAS NÃO MEDEM A MESMA COISA, e a diferença não é defeito por
+> si.** A planilha conta **venda** (linha do arquivo) pela data da venda; o
+> sistema conta **peça** pela data do PDF. A caixa de 2 persianas é 1 na
+> planilha e 2 aqui. É exatamente isso que o dono vai conferir antes da troca.
+
+> **O render achou duas coisas:** o resumo escrevia "últimos 18 dias" na frente
+> dos dois números com a janela do sistema cortada — a planilha parecia contada
+> em 18 —, e a 400 px o código do SKU quebrava no meio (`CINZ` / `A`). Hoje cada
+> número diz a sua janela, e no celular a letra do código diminui.
+
+**Rode `node teste_media.js` (25 casos) ao mexer no `media_dominio.js` ou na
+rota.** Sete defeitos foram reintroduzidos um a um: a caixa contando 1 (reprova
+9), sem a dedup (6), a dedup só dentro da janela (4), a janela sem corte (2), a
+cancelada contando (1), o teste contando (2) e o bloqueado ficando fora (4).
+
 ### A ordem é de prioridade, não de quantidade
 
 Ordenar por `precisa` põe em cima o SKU que gira mais — que quase nunca é o que
@@ -3550,7 +3602,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (49), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (204), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (49), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (204), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3572,6 +3624,11 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   (`/200`) — quem decide quantas cabem é a `largura_bobina` (§7-B, armadilha #19)
 - ❌ Voltar a testar fórmula contra uma lista fixa de medidas: a de 3,00 m não
   cabe em bobina nenhuma e reprovava a fórmula certa (§7-B, armadilha #19)
+- ❌ Contar venda por dia a partir de `lote` fora do `media_dominio.js`, ou fazer
+  a comparação ler a planilha por consulta própria — a coluna planilha é a do
+  `demanda_dominio`, a mesma da tela azul (§3, VENDAS F1)
+- ❌ Trocar a produção para a média do sistema sem o ok do dono: a fase 1 é só
+  conferência, e a troca é a fase 3 (§3)
 - ❌ Calcular a falta de estoque fora do `demanda_dominio.js` — a aba Estoque e a
   tela azul do operador têm que dizer o mesmo número (§18)
 - ❌ Fazer a aprovação da contagem gravar o **número contado** como saldo: entre
