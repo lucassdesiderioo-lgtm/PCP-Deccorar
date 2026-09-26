@@ -176,7 +176,8 @@ d2.exec(`
   CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT, buyer TEXT,
     city TEXT, nf TEXT, packId TEXT, venda TEXT, estagio TEXT DEFAULT 'pendente',
     embalado_em TEXT, data TEXT DEFAULT (date('now','localtime')), despachar_em TEXT,
-    modalidade TEXT, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, teste INTEGER DEFAULT 0);
+    modalidade TEXT, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, teste INTEGER DEFAULT 0,
+    impresso_por TEXT);
   CREATE TABLE lote_item (id INTEGER PRIMARY KEY AUTOINCREMENT, lote_id INTEGER NOT NULL,
     codigo TEXT, qtd INTEGER DEFAULT 1, cor TEXT, descricao TEXT, origem TEXT DEFAULT 'folha',
     conferido_em TEXT, conferido_por TEXT, teste INTEGER DEFAULT 0, conferidos INTEGER DEFAULT 0);

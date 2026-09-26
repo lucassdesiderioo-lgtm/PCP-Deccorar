@@ -2,7 +2,11 @@
 
 ```
 STATUS
-Situação: RASCUNHO — aguarda as decisões do dono (§5) e a aprovação
+Situação: ARQUIVADO SEM CONSTRUIR (26/09/2026) — substituído pela spec
+          SAIDA-E-DUPLA-CONFERENCIA.md, que resolve o mesmo caso pela "troca de
+          porta" (saiu_por) SEM mudar lote.modalidade, que era o centro desta
+          proposta. As 4 perguntas da §5 não foram respondidas e não precisam ser.
+⚠️ ESTE DOCUMENTO É HISTÓRICO — não use como fonte de regra (CLAUDE.md §13).
 Criada em: 25/09/2026
 Fases: 1 ☐ (fase única)
 Risco: 🔴 (dado de produção e schema: muda a modalidade de um volume e a conta
