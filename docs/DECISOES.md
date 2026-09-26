@@ -95,3 +95,20 @@
 | 26/09/2026 | **Boleto sem pedido continua possível, mas nasce AVULSO** — marcado e separado na tela | Acerto e frete existem, e exigir pedido em todo título seria trava disparando no caso legítimo (armadilha #6). O normal passa a ser o vínculo; a exceção fica visível em vez de silenciosa | Lucas (dono) | `CLAUDE.md` §19, 6-C1b |
 | 26/09/2026 | **O título que soma mais que os pedidos AVISA e não trava — e o aviso diz quanto** | Travar quebraria o parcelamento (3× de R$ 3.000 são três títulos que nunca "batem"). E o aviso binário acendia por vinte centavos de arredondamento do financeiro, virando paisagem: a tarja escreve "⚠ R$ 0,20 acima dos pedidos" e quem lê julga sozinho | Claude, com a regra do dono na mesa | `CLAUDE.md` §19, 6-C1b |
 
+
+## 26/09/2026 — o pedido só está titulado quando a soma dos títulos alcança o valor dele (fase 6-C1c)
+Antes: um boleto de qualquer valor apontando o pedido o tirava da cobrança, e o que
+faltava não aparecia em tela nenhuma — nem era possível apontar o mesmo pedido numa
+segunda parcela. Depois: a régua é o dinheiro; abaixo do valor o pedido continua na
+lista, com o que falta. Decisão do dono, com o caso na mão (boleto de R$ 49,50 num
+pedido de R$ 165,00).
+
+## 26/09/2026 — o título que cobre vários pedidos é rateado proporcionalmente
+Decisão do dono. O título não diz de qual pedido é o buraco; repartir pelo valor de
+cada pedido é a única forma que não privilegia ninguém, e quando o título fecha com a
+soma cada pedido fica coberto exatamente, sem fração.
+
+## 26/09/2026 — o que falta titular NÃO entra no crédito em aberto
+Decisão do dono. "Em aberto" continua sendo só título lançado; o que falta titular fica
+ao lado, como o "aprovado sem boleto" — a regra "os dois, mostrados separados" da §8 da
+spec. Somá-lo faria o disponível mudar de significado sem ninguém lançar nada.

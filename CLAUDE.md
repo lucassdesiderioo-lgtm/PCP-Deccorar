@@ -4421,6 +4421,25 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Ler o CSS para saber se a regra pegou: `.form label` tem especificidade
   maior que `.marca`, e a regra escrita não valia — quem diz é a tela MEDIDA
   (§19, 6-C1b, e a coluna `fr` do §12)
+- ❌ Dar um pedido por titulado só porque existe UM boleto apontando para ele:
+  a régua é o dinheiro — a soma dos títulos ativos contra o valor do pedido
+  (§19, 6-C1c)
+- ❌ Tirar da lista de marcar o pedido parcialmente titulado: sem ele a
+  parcela 2 não tem onde ser apontada, e o parcelamento deixa de ser
+  lançável pela tela (§19, 6-C1c)
+- ❌ Repartir por outro critério que não o proporcional quando um título
+  cobre vários pedidos, ou escrever uma segunda conta de "quanto já foi
+  titulado" fora do `TITULADO` (§19, 6-C1c)
+- ❌ Somar o que falta titular dentro do "em aberto": é compromisso, não
+  dívida, e o disponível mudaria de valor sem ninguém lançar nada (§19)
+- ❌ Somar o valor CHEIO do pedido parcial: o pedaço que já virou título já
+  está no em aberto, e o cheio o conta duas vezes (§19, 6-C1c)
+- ❌ Deixar o título PAGO parar de titular: o pedido voltaria à cobrança no
+  dia em que a revenda pagasse (§19, 6-C1c)
+- ❌ Chamar de "falta" o que a linha de UM título mostra: título menor é o
+  parcelamento, e quem sabe a falta é a lista, que olha todos (§19, 6-C1c)
+- ❌ Escrever um número e a palavra que o qualifica em linhas diferentes:
+  "#5001 · R$ 115,50" se lê como o valor do pedido (§19, 6-C1c, e o §4)
 - ❌ Escrever uma segunda tabela de "o que vem antes" para a recusa: o `ANTES`
   lido ao contrário já responde, e duas divergem no dia em que o fluxo mudar
   (§19, 5-B2)
@@ -6702,6 +6721,103 @@ construir justamente porque a diferença entre elas é schema:
 > a marca com nome de dinheiro, que a poda come (4), e o boleto cancelado
 > continuar cobrindo o pedido (1). Mexeu em permissão? **`node
 > teste_acesso.js` (204) e `node teste_cobertura.js` (10) também.**
+
+### ⚠️ A FASE 6-C1c (26/09/2026) — O QUE FALTA TITULAR, E O PARCELAMENTO QUE NÃO ERA LANÇÁVEL
+
+Horas depois do deploy da 6-C1b, o dono lançou um boleto **menor** que o
+pedido e perguntou: *"onde que ficou o saldo devedor?"*. Em lugar nenhum — e
+havia um segundo defeito colado, pior que o primeiro:
+
+```
+pedido aprovado   R$ 165,00
+boleto lançado    R$  49,50   ← aponta o pedido
+                  R$ 115,50   ← não existia em tela nenhuma
+```
+
+| Onde | O que dizia | Por quê |
+|---|---|---|
+| **em aberto** | R$ 49,50 | soma o valor dos **títulos**, nunca o do pedido |
+| **aprovado sem boleto** | o pedido **sumiu** | a consulta era `NOT EXISTS (vínculo)`: **um** título de qualquer valor bastava |
+| a tarja de valor | nada | ela só acende no lado de cima, título **maior** que os pedidos |
+
+> ⚠️ **E O PARCELAMENTO NÃO ERA LANÇÁVEL PELA TELA — este é o defeito maior,
+> e ninguém tinha esbarrado nele.** A lista que a tela oferece para marcar é
+> a mesma consulta. Lançada a parcela 1 de 3, o pedido saía dela e **não
+> havia como apontá-lo na parcela 2**. A regra que o "avisa, nunca trava" da
+> 6-C1b existe para proteger (3× de R$ 3.000, e nenhum título "bate") era
+> justamente a que a tela impedia de registrar.
+
+**A régua passou a ser o dinheiro, e não a existência do vínculo:** um pedido
+está titulado quando a **soma dos títulos ativos alcança o valor dele**.
+Abaixo disso ele continua na cobrança e na lista de marcar, com o que falta.
+
+> ⚠️ **COM RATEIO PROPORCIONAL, e a razão é o título que cobre VÁRIOS
+> pedidos** (decisão do dono, 26/09/2026). Ali o título não diz de qual
+> pedido é o buraco, e repartir proporcionalmente ao valor de cada um é a
+> única repartição que não privilegia ninguém. Quando o título **fecha** com
+> a soma, a quota de cada pedido dá exatamente o valor dele, sem fração:
+> fração só aparece quando falta dinheiro, que é o caso em que um centavo a
+> mais ou a menos na falta não decide nada. `TITULADO`, no `dados/boleto.js`,
+> é o dono único dessa conta — a lista, a contagem e o dinheiro saem dela.
+
+> ⚠️ **O CRÉDITO NÃO MUDOU, e isso é decisão do dono.** `em aberto` continua
+> sendo só **título lançado**, e o que falta titular aparece **ao lado**, em
+> linha própria — a regra *"os dois, mostrados separados"* da §8 da spec, que
+> já valia para o "aprovado sem boleto". Somá-lo faria o disponível mudar de
+> valor sem ninguém ter lançado nada, e quem já lê a tela veria o número
+> andar sozinho.
+
+> ⚠️ **"SEM BOLETO" E "PARCIALMENTE TITULADO" SÃO DUAS LINHAS, NUNCA UMA
+> SOMA.** São fatos diferentes, e juntá-los apagaria justamente o caso que o
+> dono perguntou. O valor do parcial é a **falta**, nunca o valor cheio do
+> pedido: o pedaço que já virou título já está no `em aberto`, e somar o
+> cheio o contaria duas vezes.
+
+> ⚠️ **TÍTULO CANCELADO NÃO TITULA** (o pedido volta inteiro à cobrança), e
+> **título PAGO continua titulando** — a pergunta aqui é *"já virou título?"*,
+> não *"já foi pago?"*. Tirar o pago faria o pedido reaparecer na cobrança no
+> dia em que a revenda pagasse.
+
+> ⚠️ **A FALTA É CORTADA EM ZERO, e isso NÃO é o `MAX(0, …)` proibido do §2.**
+> Lá o negativo é o sinal de peça que saiu sem registro; aqui "título maior
+> que os pedidos" já tem aviso próprio — a tarja `excede_pedidos` da 6-C1b,
+> que continua de pé e é o lado de cima da mesma linha.
+
+> ⚠️ **O LADO DE BAIXO NA LINHA DO TÍTULO NÃO SE CHAMA "FALTA".** Ele escreve
+> *"cobre R$ 49,50 de R$ 165,00 em pedidos"* e descreve, em vez de acusar:
+> título menor é o **parcelamento**, o caso legítimo, e as outras parcelas
+> ainda vão ser lançadas. Quem responde quanto falta de verdade é a lista de
+> cobrança, que olha **todos** os títulos do pedido; aquela linha fala de um
+> título só.
+
+> ⚠️ **E DUAS COISAS SÓ APARECERAM NO RENDER, de novo:**
+> - a lista de marcar escrevia `#5001 · R$ 115,50` com a palavra **"faltam"**
+>   na linha de baixo (a tarja é um bloco). Lido de relance, aquele número
+>   parece o **valor do pedido** — que é R$ 165,00. Hoje sai `#5001 · faltam
+>   R$ 115,50 de R$ 165,00`, com a palavra colada no número que ela qualifica;
+> - a linha do crédito dizia *"fora do disponível"* no "sem boleto" e **não**
+>   dizia no parcial, sendo que os dois ficam fora. As duas telas (Financeiro
+>   e a ficha da revenda) escrevem a frase **igual** — diferente, ensinariam a
+>   equipe a achar que são coisas diferentes (§4).
+>
+> E a primeira correção disso saiu *"faltam R$ 115,50 em título (R$ 115,50
+> fora do disponível)"* — o **"23,1 mm em vez de 23,1 mm"** do §4 escrito por
+> mim no mesmo dia em que citei a lição. Pegou antes de renderizar, relendo a
+> própria frase.
+
+> **Rode `cd tecido && npm test` (627 casos) ao mexer no `TITULADO`, no
+> `credito` ou na lista de marcar** — 10 são da 6-C1c, e **seis defeitos foram
+> reintroduzidos um a um** para provar que cada caso pega o seu: voltar o
+> `NOT EXISTS` (reprova 4), tirar o rateio (1), deixar o cancelado titular
+> (1), não cortar a falta em zero (3), somar o valor cheio do parcial (2) e
+> nomear o campo sem o prefixo `valor_`, que a poda deixa passar (6).
+> E **abra as duas telas**: as duas coisas acima não têm teste que as pegue.
+
+> ⚠️ **AINDA NÃO FOI CONFERIDA COM O DADO REAL.** A rodada foi na minha tela,
+> com pedido semeado — o caso do dono reproduzido (R$ 165,00 com título de
+> R$ 49,50 dando R$ 115,50 de falta). A prova que fecha é **o financeiro
+> lançando um parcelamento de verdade**, com a 2ª parcela apontando o mesmo
+> pedido. Prova que não foi feita se escreve como não feita (§4).
 
 ### Três regras do sob medida que valem citar aqui
 

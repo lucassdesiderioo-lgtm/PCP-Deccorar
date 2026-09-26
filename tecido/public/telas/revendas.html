@@ -258,6 +258,18 @@ function credito(r){
       c.aprovados_sem_boleto+(c.aprovados_sem_boleto===1
         ? ' pedido aprovado ainda sem boleto'
         : ' pedidos aprovados ainda sem boleto')+' — fora do disponível']));
+    /* ⚠️ O PARCIAL É LINHA PRÓPRIA, aqui como no Financeiro: as duas telas
+       escrevem a mesma coisa do mesmo jeito, senão a equipe aprende que são
+       coisas diferentes (§4). Ele também fica FORA do disponível — o pedaço
+       que já virou título já está no "em aberto". */
+    if(c.parcialmente_titulados) linhas.push(el('div',{class:'nota'},[
+      c.parcialmente_titulados+(c.parcialmente_titulados===1
+        ? ' pedido parcialmente titulado'
+        : ' pedidos parcialmente titulados')
+      +(emReais(c.valor_falta_titular_centavos)
+        ? ' — faltam R$ '+emReais(c.valor_falta_titular_centavos)+' em título'
+        : ' — falta título para parte do valor')
+      +' — fora do disponível']));
     /* ⚠️ A JANELA SÓ APARECE QUANDO INFORMA, e é a MESMA regra da tela de
        Financeiro — o sinal é o dado VELHO, não o fresco. Escrever "último
        lançamento em 26/09" em toda revenda vira paisagem, e aí ninguém a lê

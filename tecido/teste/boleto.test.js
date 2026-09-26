@@ -830,6 +830,158 @@ module.exports=[
   igual(l.valor_pedidos_centavos,undefined,'o valor foi podado');
   igual(l.excede_pedidos,true,'a marca sobreviveu');
   igual(l.pedidos.length,1,'e os pedidos continuam nomeados');
+ }},
+
+/* ═══ 7. O QUE FALTA TITULAR (fase 6-C1c) ═══════════════════════════════
+   O dono lancou um titulo MENOR que o pedido e perguntou onde ficou o saldo
+   devedor. Ele nao ficava em lugar nenhum: a consulta era `NOT EXISTS
+   (vinculo)`, entao UM titulo de qualquer valor tirava o pedido da cobranca
+   — e, pior, tirava tambem da lista que a tela oferece para marcar, o que
+   tornava o PARCELAMENTO impossivel de lancar pela tela. */
+
+{nome:'6-C1c — titulo MENOR: a falta e exata, e o pedido continua cobravel',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000, forma:'Boleto'});
+  const p=aprovado(r.id);
+  const v=valorDo(p);
+  lancar(r.id,{pedido_ids:[p.id], valor_centavos:Math.round(v*0.3)});
+
+  const lista=bol('pedidosSemBoleto',r.id);
+  igual(lista.length,1,'o pedido CONTINUA na lista de marcar');
+  igual(lista[0].valor_titulado_centavos,Math.round(v*0.3),'o que ja foi titulado');
+  igual(lista[0].valor_falta_centavos,v-Math.round(v*0.3),'e o que falta');
+
+  const c=bol('credito',r.id);
+  igual(c.parcialmente_titulados,1,'o credito conta o parcial');
+  igual(c.valor_falta_titular_centavos,v-Math.round(v*0.3),'e diz quanto falta');
+  /* ⚠️ O CREDITO NAO MUDOU (decisao do dono): `em aberto` continua sendo so
+     TITULO LANCADO, e o que falta titular aparece AO LADO. Sem isso o
+     numero do disponivel mudaria de significado sem ninguem lancar nada. */
+  igual(c.valor_em_aberto_centavos,Math.round(v*0.3),'em aberto = so o titulo');
+  igual(c.aprovados_sem_boleto,0,'e ele nao e "sem boleto": tem um');
+ }},
+
+{nome:'6-C1c — o PARCELAMENTO 3x: cobravel ate a ultima parcela entrar',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000, forma:'Boleto'});
+  const p=aprovado(r.id);
+  const v=valorDo(p), parcela=Math.floor(v/3);
+
+  lancar(r.id,{pedido_ids:[p.id], valor_centavos:parcela});
+  igual(bol('pedidosSemBoleto',r.id).length,1,'depois da 1a, ainda marcavel');
+  lancar(r.id,{pedido_ids:[p.id], valor_centavos:parcela});
+  igual(bol('pedidosSemBoleto',r.id).length,1,'depois da 2a, ainda marcavel');
+  /* a ultima leva o resto, porque v nem sempre divide por 3 */
+  lancar(r.id,{pedido_ids:[p.id], valor_centavos:v-parcela*2});
+  igual(bol('pedidosSemBoleto',r.id).length,0,'fechou: sai da lista');
+  igual(bol('credito',r.id).parcialmente_titulados,0,'e do parcial tambem');
+ }},
+
+{nome:'6-C1c — titulo EXATO nao deixa sobra de arredondamento',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000, forma:'Boleto'});
+  const p=aprovado(r.id);
+  lancar(r.id,{pedido_ids:[p.id], valor_centavos:valorDo(p)});
+  igual(bol('pedidosSemBoleto',r.id).length,0,'coberto');
+  igual(bol('credito',r.id).valor_falta_titular_centavos,0,'e falta zero');
+ }},
+
+{nome:'6-C1c — titulo MAIOR nao vira falta negativa',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:9000000, forma:'Boleto'});
+  const p=aprovado(r.id);
+  lancar(r.id,{pedido_ids:[p.id], valor_centavos:valorDo(p)*2});
+  igual(bol('pedidosSemBoleto',r.id).length,0,'coberto de sobra');
+  /* a falta e cortada em zero, e isso NAO e o MAX(0,…) proibido do §2: la
+     o negativo e sinal de peca que saiu sem registro; aqui "titulo maior"
+     ja tem aviso proprio — a tarja `excede_pedidos`, que continua de pe. */
+  igual(bol('credito',r.id).valor_falta_titular_centavos,0,'falta nao fica negativa');
+  igual(bol('listar',{revenda_id:r.id})[0].excede_pedidos,true,'e a tarja de cima fica');
+ }},
+
+{nome:'6-C1c — titulo CANCELADO devolve o pedido inteiro a cobranca',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000, forma:'Boleto'});
+  const p=aprovado(r.id);
+  const v=valorDo(p);
+  const b=lancar(r.id,{pedido_ids:[p.id], valor_centavos:Math.round(v*0.3)});
+  bol('cancelar',b.id,'lancado errado',DIRETOR);
+  const lista=bol('pedidosSemBoleto',r.id);
+  igual(lista.length,1,'volta a lista');
+  igual(lista[0].valor_titulado_centavos,0,'com zero titulado');
+  igual(lista[0].valor_falta_centavos,v,'e a falta cheia');
+ }},
+
+{nome:'6-C1c — o RATEIO e proporcional quando um titulo cobre varios',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:9000000, forma:'Boleto'});
+  const p1=aprovado(r.id), p2=aprovado(r.id);
+  const v1=valorDo(p1), v2=valorDo(p2);
+  /* METADE da soma, num titulo so: o sistema nao tem como saber de qual
+     pedido e o buraco, entao reparte proporcional ao valor de cada um —
+     a unica reparticao que nao privilegia ninguem (decisao do dono,
+     26/09/2026). */
+  lancar(r.id,{pedido_ids:[p1.id,p2.id], valor_centavos:Math.round((v1+v2)/2)});
+  const m=new Map(bol('pedidosSemBoleto',r.id).map(x=>[x.id,x]));
+  igual(m.size,2,'os dois continuam cobraveis');
+  igual(m.get(p1.id).valor_falta_centavos,v1-Math.round(v1/2),'p1 falta metade');
+  igual(m.get(p2.id).valor_falta_centavos,v2-Math.round(v2/2),'p2 falta metade');
+ }},
+
+{nome:'6-C1c — RATEIO que FECHA cobre os dois por inteiro, sem centavo solto',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:9000000, forma:'Boleto'});
+  const p1=aprovado(r.id), p2=aprovado(r.id);
+  lancar(r.id,{pedido_ids:[p1.id,p2.id],
+    valor_centavos:valorDo(p1)+valorDo(p2)});
+  igual(bol('pedidosSemBoleto',r.id).length,0,'nenhum sobra');
+  igual(bol('credito',r.id).valor_falta_titular_centavos,0,'e falta zero redondo');
+ }},
+
+{nome:'6-C1c — o AVULSO nao titula pedido nenhum',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000, forma:'Boleto'});
+  const p=aprovado(r.id);
+  lancar(r.id,{valor_centavos:valorDo(p)});      // sem pedido_ids
+  const c=bol('credito',r.id);
+  igual(c.aprovados_sem_boleto,1,'o pedido continua sem titulo');
+  igual(c.parcialmente_titulados,0,'e nao e parcial: o avulso nao o toca');
+ }},
+
+{nome:'6-C1c — a lista e a contagem do credito continuam sendo a MESMA regua',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:9000000, forma:'Boleto'});
+  const p1=aprovado(r.id), p2=aprovado(r.id), p3=aprovado(r.id);
+  lancar(r.id,{pedido_ids:[p1.id], valor_centavos:Math.round(valorDo(p1)*0.4)});
+  lancar(r.id,{pedido_ids:[p2.id], valor_centavos:valorDo(p2)});
+  const c=bol('credito',r.id), lista=bol('pedidosSemBoleto',r.id);
+  /* p1 parcial + p3 sem nada = 2 na lista; p2 fechou e saiu. */
+  igual(lista.length,2,'a lista traz o parcial e o sem titulo');
+  igual(c.aprovados_sem_boleto+c.parcialmente_titulados,lista.length,
+    'e as duas contagens do credito somam o mesmo');
+  igual(lista.reduce((s,x)=>s+x.valor_falta_centavos,0),
+    c.valor_aprovado_sem_boleto_centavos+c.valor_falta_titular_centavos,
+    'e o dinheiro tambem fecha');
+ }},
+
+{nome:'6-C1c — a poda corta o dinheiro da falta e deixa a contagem',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000, forma:'Boleto'});
+  const p=aprovado(r.id);
+  lancar(r.id,{pedido_ids:[p.id], valor_centavos:Math.round(valorDo(p)*0.3)});
+  const c=custo.podar({papel:'producao'},bol('credito',r.id));
+  igual(c.valor_falta_titular_centavos,undefined,'o valor foi podado');
+  igual(c.parcialmente_titulados,1,'a contagem sobreviveu');
  }}
 
 ];
