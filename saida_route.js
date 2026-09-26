@@ -33,7 +33,7 @@
  * reencontra com as sobras já bipadas.
  */
 const fs = require('fs'), path = require('path');
-const { acharVolumes, naSaida, podeTerIdo, PODE_TER_IDO, nomeIgual } = require('./carga');
+const { acharVolumes, naSaida, podeTerIdo, PODE_TER_IDO, PRONTA_PRO_CARRO, nomeIgual, ehColeta } = require('./carga');
 const { decodificarFoto, tipoDaFoto } = require('./foto');
 const FOTOS_DIR = require('./caminhos').COLETAS;
 
@@ -229,4 +229,146 @@ module.exports = function(app, db){
     res.setHeader('Content-Type', tipoDaFoto(r.foto));
     res.send(fs.readFileSync(r.foto));
   });
+
+  /* ════════════ A VIAGEM À AGÊNCIA — fase 4 (26/09/2026) ════════════
+     A caixa de agência tem dois bipes (decisão D1 do dono): o da ÁREA confere
+     (carreg_route.js), o do CARRO põe na viagem aberta — e só aceita caixa
+     conferida. A viagem fecha com a foto da tela do atendente e o número dele:
+
+         saíram = as caixas bipadas no carro NESTA viagem
+
+     A caixa fica ligada à viagem pelo `saida_id` desde o bipe no carro (e
+     `saiu_em` vazio até fechar): é assim que ela sai da conta do caminhão e do
+     canto da coleta, e é assim que "tirar do carro" sabe o que desfazer.
+
+     A FOTO VEM DE QUALQUER APARELHO (decisão D3): o servidor está na rede da
+     fábrica e a agência não o alcança. O normal é o motorista fechar pelo
+     celular quando volta, com a foto que tirou no balcão — por isso aqui a
+     foto pode vir da galeria. Enquanto não fecha, a viagem fica aberta com as
+     caixas no carro, e a tela avisa se ela atravessar a noite. */
+  const viagemAberta = () => db.prepare("SELECT * FROM saida WHERE tipo='agencia' AND fechada_em IS NULL ORDER BY id DESC").get() || null;
+  const semViagem = res => res.json({ ok:false, motivo:'sem_viagem',
+    aviso:'Nenhuma viagem à agência aberta. Toque em "Viagem à agência" antes de bipar no carro.' });
+  function retratoViagem(v){
+    if(!v) return { viagem:null };
+    const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
+    const noCarro = db.prepare(`SELECT id,codigo,buyer,nf,modalidade,despachar_em,no_carro_em,no_carro_por,impresso_por,conferido_por
+      FROM lote WHERE saida_id=? AND saiu_em IS NULL ORDER BY no_carro_em, id`).all(v.id)
+      .map(x => Object.assign(x, { troca_de_porta: ehColeta(x) }));
+    const prontas = db.prepare(`SELECT id,codigo,buyer,nf,despachar_em FROM lote WHERE ${PRONTA_PRO_CARRO}
+      ORDER BY COALESCE(despachar_em,data), id`).all();
+    return {
+      viagem: { id:v.id, tipo:v.tipo, aberta_em:v.aberta_em, aberta_por:v.aberta_por,
+                antiga: !!(v.aberta_em && String(v.aberta_em).slice(0,10) < hoje) },
+      sistema: noCarro.length, lista: noCarro, prontas
+    };
+  }
+  app.get('/api/viagem/aberta', (req, res) => res.json(retratoViagem(viagemAberta())));
+  app.post('/api/viagem/abrir', (req, res) => {
+    let v = viagemAberta();
+    if(!v){
+      const id = db.prepare("INSERT INTO saida (tipo, aberta_por) VALUES ('agencia', ?)").run(quem(req)).lastInsertRowid;
+      v = db.prepare('SELECT * FROM saida WHERE id=?').get(id);
+    }
+    res.json(Object.assign({ ok:true }, retratoViagem(v)));
+  });
+
+  /* O BIPE NO CARRO. A ordem das recusas é a da caixa na mão: não existe,
+     sem etiqueta, já saiu, já está no carro, não foi conferida. */
+  app.post('/api/viagem/carro', (req, res) => {
+    const v = viagemAberta(); if(!v) return semViagem(res);
+    const code = String((req.body && req.body.code) || '').trim();
+    if(!code) return res.status(400).json({ erro:'sem codigo' });
+    const batem = acharVolumes(db, code);
+    if(!batem.length) return res.json({ ok:false, motivo:'nao_encontrado', lido:code });
+    const pronta = x => (x.estagio === 'embalado' && x.conferido_em && !ehColeta(x))
+                     || (x.estagio === 'carregado' && ehColeta(x) && !x.retirado_em && !x.saida_id);
+    const alvo = batem.find(pronta) || batem.find(x => x.saida_id === v.id && !x.saiu_em) || batem[0];
+    const ped = { id:alvo.id, buyer:alvo.buyer, nf:alvo.nf, codigo:alvo.codigo };
+    if(alvo.estagio === 'bloqueado') return res.json({ ok:false, motivo:'bloqueado', pedido:ped,
+      aviso:'SKU "'+(alvo.codigo||'(vazio)')+'" não está no cadastro. Não pode sair.' });
+    if(alvo.estagio === 'pendente') return res.json({ ok:false, motivo:'nao_embalado', pedido:ped,
+      aviso:'Esta caixa ainda não passou pela ETIQUETA DE VENDA. Imprima a etiqueta por lá antes.' });
+    if(alvo.saida_id === v.id && !alvo.saiu_em) return res.json(Object.assign({ ok:false, motivo:'ja_no_carro', pedido:ped },
+      retratoViagem(v)));
+    if(!pronta(alvo)){
+      if(alvo.estagio === 'embalado') return res.json({ ok:false, motivo:'nao_conferida', pedido:ped,
+        aviso:'Esta caixa não foi conferida na área. Toque em "Conferir na área", bipe ela, e depois ponha no carro.' });
+      return res.json({ ok:false, motivo:'duplicado', pedido:ped,
+        aviso:'Esta caixa já saiu da fábrica (ou já foi carregada antes das viagens existirem).' });
+    }
+    db.prepare(`UPDATE lote SET estagio='carregado', carregado_em=COALESCE(carregado_em, datetime('now','localtime')),
+        no_carro_em=datetime('now','localtime'), no_carro_por=?, saida_id=? WHERE id=?`)
+      .run(quem(req) || null, v.id, alvo.id);
+    res.json(Object.assign({ ok:true, pedido:ped, troca_de_porta: ehColeta(alvo) }, retratoViagem(v)));
+  });
+
+  /* TIRAR DO CARRO: desfaz o bipe. A de agência volta à área, conferida; a de
+     coleta volta ao canto. Só vale para a viagem aberta. */
+  app.post('/api/viagem/tirar', (req, res) => {
+    const v = viagemAberta(); if(!v) return semViagem(res);
+    const id = parseInt(req.body && req.body.id, 10);
+    const x = db.prepare('SELECT * FROM lote WHERE id=? AND saida_id=? AND saiu_em IS NULL').get(id, v.id);
+    if(!x) return res.json(Object.assign({ ok:false, motivo:'fora_do_carro' }, retratoViagem(v)));
+    if(ehColeta(x)) db.prepare('UPDATE lote SET no_carro_em=NULL, no_carro_por=NULL, saida_id=NULL WHERE id=?').run(id);
+    else db.prepare(`UPDATE lote SET estagio='embalado', carregado_em=NULL, no_carro_em=NULL, no_carro_por=NULL,
+        saida_id=NULL WHERE id=?`).run(id);
+    res.json(Object.assign({ ok:true }, retratoViagem(v)));
+  });
+
+  app.post('/api/viagem/cancelar', (req, res) => {
+    const v = viagemAberta(); if(!v) return semViagem(res);
+    const r = retratoViagem(v);
+    if(r.sistema) return res.json(Object.assign({ ok:false, motivo:'carro_cheio',
+      aviso:'Há caixas no carro desta viagem. Tire-as do carro antes de cancelar — ou feche a viagem.' }, r));
+    db.prepare('DELETE FROM saida WHERE id=? AND fechada_em IS NULL').run(v.id);
+    auditar(req, 'viagem_cancelada', 'saida '+v.id, 'aberta por '+(v.aberta_por||'?'));
+    res.json({ ok:true });
+  });
+
+  function fecharViagem(req, res, liberar){
+    const v = viagemAberta(); if(!v) return semViagem(res);
+    const b = req.body || {};
+    const at = parseInt(b.atendente, 10);
+    if(!(at >= 0)) return res.status(400).json({ erro:'informe quantas caixas o atendente bipou' });
+    const r = retratoViagem(v);
+    if(!r.sistema && !at) return res.json(Object.assign({ ok:false, motivo:'vazia',
+      aviso:'Esta viagem não tem caixa nenhuma. Cancele a viagem em vez de fechar.' }, r));
+    const foto = decodificarFoto(b.foto);
+    if(!foto) return res.json(Object.assign({ ok:false, motivo:'sem_foto', atendente:at,
+      aviso:'Falta a foto da tela do atendente mostrando quantas caixas ele bipou. Sem a foto a viagem não fecha.' }, r));
+    const divergente = at !== r.sistema;
+    const motivo = String(b.motivo || '').trim().slice(0, 300);
+    if(divergente && !liberar){
+      auditar(req, 'viagem_divergente', 'saida '+v.id, 'carro '+r.sistema+' x atendente '+at+' — não fechou');
+      return res.json(Object.assign({ ok:false, motivo:'divergente', atendente:at }, r));
+    }
+    if(liberar && divergente && !motivo) return res.json(Object.assign({ ok:false, motivo:'sem_motivo', atendente:at,
+      aviso:'Para liberar a viagem com número diferente, escreva o motivo.' }, r));
+    const ids = r.lista.map(x => x.id);
+    const autor = quem(req);
+    db.transaction(() => {
+      /* `retirado_em` só na de coleta: é o que diz, para ela, que saiu da
+         fábrica ("Peças adiantadas" e o canto da coleta leem dali). */
+      db.prepare(`UPDATE lote SET saiu_em=datetime('now','localtime'), saiu_por='agencia',
+          retirado_em=CASE WHEN COALESCE(modalidade,'agencia')='coleta' THEN COALESCE(retirado_em, datetime('now','localtime'))
+                           ELSE retirado_em END
+        WHERE saida_id=? AND saiu_em IS NULL`).run(v.id);
+      const sem2 = r.lista.filter(x => String(x.impresso_por||'').trim() && String(x.conferido_por||'').trim()
+                                    && nomeIgual(x.impresso_por, x.conferido_por)).length;
+      const arq = path.join(FOTOS_DIR, 'saida-' + v.id + '.' + foto.ext);
+      fs.writeFileSync(arq, foto.buf);
+      db.prepare(`UPDATE saida SET fechada_em=datetime('now','localtime'), fechado_por=?, qtd_sistema=?, qtd_externa=?,
+          divergente=?, liberado_por=?, motivo=?, foto=?, ids=?, sem_segunda_pessoa=? WHERE id=?`)
+        .run(autor, r.sistema, at, divergente?1:0, divergente ? autor : null, motivo || null, arq,
+             JSON.stringify(ids), sem2, v.id);
+    })();
+    if(divergente) auditar(req, 'viagem_liberada_divergente', 'saida '+v.id, 'carro '+r.sistema+' / atendente '+at+' — '+motivo);
+    const troca = r.lista.filter(x => x.troca_de_porta).length;
+    if(troca) auditar(req, 'viagem_troca_de_porta', 'saida '+v.id, troca+' caixa(s) de coleta foram pela agência');
+    res.json({ ok:true, id:v.id, sistema:r.sistema, atendente:at, divergente, troca_de_porta:troca,
+      foto:'/api/saida/foto/'+v.id });
+  }
+  app.post('/api/viagem/fechar', (req, res) => fecharViagem(req, res, false));
+  app.post('/api/viagem/liberar', (req, res) => fecharViagem(req, res, true));
 };

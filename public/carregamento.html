@@ -18,6 +18,10 @@
   .duas{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;align-items:start}
   @media(max-width:900px){ .duas{grid-template-columns:1fr} }
   .stats{display:flex;gap:12px;margin-bottom:14px}
+  /* No CELULAR (a viagem fecha por ele, decisao D3 da fase 4) os quatro
+     quadros nao cabem numa linha: sem quebrar, a pagina inteira rolava de
+     lado (481 px num celular de 400). */
+  @media(max-width:600px){ .stats{flex-wrap:wrap} .stat{flex:1 1 40%} }
   .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
   .stat .n{font-size:34px;font-weight:800}.stat .l{font-size:12px;color:var(--muted);text-transform:uppercase}
   .stat.car .n{color:var(--green)}.stat.fal .n{color:var(--amber)}
@@ -68,6 +72,20 @@
      carro (e o mesmo mecanismo dos tres modos da Revisao, §3). */
   body.modo-saida header{background:#efe9fb;border-bottom:3px solid var(--violet)}
   body.modo-saida .banner:not(.ok):not(.err):not(.warn){background:#efe9fb;border-color:#b9a3e6}
+  /* A VIAGEM A AGENCIA (fase 4) tem a cor do carro: azul. O bipe da tela vai
+     para UM lugar de cada vez — a area, o carro ou as sobras do caminhao — e
+     a faixa #modoBar diz qual, na cor dele. */
+  body.modo-viagem header{background:#e8f0fb;border-bottom:3px solid var(--blue)}
+  .viagemhead{background:var(--blue);color:#fff;font-weight:800;padding:12px 14px;font-size:15px}
+  .saidaconta.viagemconta .big{color:var(--blue)}
+  .modobar{border-radius:10px;padding:8px 14px;font-weight:800;font-size:14px;margin:-6px 0 14px;text-align:center}
+  .modobar.area{background:#f4f6f8;color:var(--muted);border:1px solid var(--line)}
+  .modobar.carro{background:#e8f0fb;color:var(--blue);border:2px solid var(--blue)}
+  .modobar.sobra{background:#efe9fb;color:#4b2a91;border:2px solid var(--violet)}
+  .tagok{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;margin-right:4px;
+    background:#e7f5eb;color:var(--green);border:1px solid #a9d8b4;white-space:nowrap}
+  .tagfalta{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;margin-right:4px;
+    background:#fbf1db;color:var(--amber);border:1px solid #e7cb8c;white-space:nowrap}
   .saidahead{background:var(--violet);color:#fff;font-weight:800;padding:12px 14px;font-size:15px}
   .saidaconta{padding:12px 14px;font-size:15px;border-bottom:1px solid #e3d9f5}
   .saidaconta .big{font-size:34px;font-weight:900;color:var(--violet);line-height:1.1}
@@ -112,6 +130,7 @@
     <div class="stat adi"><div class="n" id="nAdi">0</div><div class="l">Peças adiantadas hoje</div><div class="s" id="sAdi"></div></div>
   </div>
   <div class="banner" id="banner"><div class="bt">Pronto</div><div class="bs">Bipe o QR ou código de barras da etiqueta de venda.</div></div>
+  <div class="modobar area" id="modoBar">O bipe agora: CONFERIR NA ÁREA</div>
   <input id="scan" autocomplete="off">
   <button class="btn conf" onclick="conferir()" style="width:100%">✓ Conferir carga do carro</button>
   <div class="card pilha" id="pilhaCard"><h3>📋 Conferência da pilha — etiquetas impressas hoje</h3>
@@ -120,7 +139,36 @@
     <details id="pFalD"><summary id="pFalS"></summary><div id="pFaltam"></div></details>
     <div id="pVazio"></div><div id="pSeg"></div></div>
   <div class="duas">
-  <div class="card"><h3>🚗 Faltam carregar no carro (agência)</h3><div id="lista"></div><div id="depois"></div></div>
+  <div class="card"><h3>🚗 Faltam carregar no carro (agência)</h3>
+    <!-- A VIAGEM A AGENCIA (fase 4): fechada, so o botao; aberta, o bipe poe no carro. -->
+    <div class="fechbox" id="viagemBtnBox" style="border-top:0;border-bottom:1px solid var(--line)">
+      <button class="btn" style="background:var(--blue);color:#fff" onclick="abrirViagem()">🚗 Viagem à agência</button>
+      <span style="font-size:13px;color:var(--muted)">Confira as caixas na área; na hora de sair, abra a viagem e bipe o que <b>entra no carro</b>.</span>
+    </div>
+    <div id="viagemBox" style="display:none">
+      <div class="viagemhead" id="viagemHead">🚗 VIAGEM À AGÊNCIA ABERTA — BIPE O QUE ENTRA NO CARRO</div>
+      <div class="saidaconta viagemconta" id="viagemConta"></div>
+      <div id="viagemLista"></div>
+      <div class="fechbox">
+        <button class="btn ghost" id="btnModoCarro" onclick="escolherModo('carro')">Bipar no carro</button>
+        <button class="btn ghost" id="btnModoArea" onclick="escolherModo('area')">Conferir na área</button>
+        <button class="btn ghost" onclick="cancelarViagem()">Cancelar viagem</button>
+      </div>
+      <!-- A foto vem da CAMERA OU DA GALERIA (decisao D3): o motorista tira no
+           balcao da agencia e fecha quando volta, pelo celular dele. Por isso
+           este campo NAO tem capture — com ele o celular so abriria a camera. -->
+      <div class="fechbox">
+        <label class="fotobtn" id="fotoBtnV" style="border-color:var(--blue);color:var(--blue)">📷 <span id="fotoTxtV">Foto da tela do atendente</span>
+          <input type="file" id="fotoInV" accept="image/*"></label>
+        <img class="fotoprev" id="fotoPrevV" alt="">
+        <span style="font-weight:700">Atendente bipou</span>
+        <input id="atQtd" type="number" min="0" inputmode="numeric" placeholder="0" style="font-size:24px;font-weight:800;width:110px;padding:10px;text-align:center;border:2px solid #c9d8ee;border-radius:10px">
+        <span style="font-weight:700">caixas</span>
+        <button class="btn" style="background:var(--blue);color:#fff" onclick="fecharViagem(false)">Fechar viagem</button>
+      </div>
+      <div id="viagemDiv"></div>
+    </div>
+    <div id="lista"></div><div id="depois"></div><div id="viagemHist"></div></div>
 
   <!-- A COLETA: a segunda porta de saida. O caminhao do Mercado Livre vem
        buscar; a caixa vai pro lugar reservado, nunca pro carro. Bipa-se igual —
@@ -180,7 +228,12 @@ async function bip(code){
   const now=Date.now(); if(last.c===code && now-last.t<600) return; last={c:code,t:now};
   /* Com a saida do caminhao aberta, o bipe quer dizer UMA coisa so: esta
      caixa FICOU no canto. Nunca "foi no caminhao" — essa e por botao. */
-  if(saidaAtual && saidaAtual.saida){ await bipSobra(code); return; }
+  /* O bipe vai para UM lugar de cada vez (modoAtual): a area (conferir), o
+     carro (viagem aberta) ou as sobras do caminhao (saida aberta). A faixa
+     #modoBar diz qual, na cor dele. */
+  var m=modoAtual();
+  if(m==='sobra'){ await bipSobra(code); return; }
+  if(m==='carro'){ await bipCarro(code); return; }
   const corpo = aguardando ? {code:aguardando.code, sku:code} : {code:code};
   const r=await (await fetch('/api/carregar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)})).json();
   if(r.ok && r.coleta){
@@ -196,6 +249,14 @@ async function bip(code){
       +'<div style="color:#4b2a91;font-weight:700">Peça ao motorista o número de caixas que ele bipou antes de sair.</div>');
     beep(true);
   }
+  else if(r.ok && r.conferida){
+    /* AGENCIA: o bipe da area so CONFERE (fase 4, D1). A caixa fica na area
+       esperando a viagem; quem a poe no carro e o bipe da viagem. */
+    aguardando=null;
+    banner('ok','Conferida ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · <span class="c">'+esc0(r.pedido.codigo||'')+'</span> · <b>fica na área</b>: prontas pro carro <b>'+r.prontas+'</b>'+linhaAdiant(r)); beep(true);
+  }
+  else if(r.motivo==='ja_conferida'){ aguardando=null;
+    banner('warn','Essa já foi conferida',(r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
   else if(r.ok){
     aguardando=null;
     banner('ok','Carregado ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · <span class="c">'+esc0(r.pedido.codigo||'')+'</span> · No carro <b>'+r.carregados+'</b> de '+r.total+linhaAdiant(r)); beep(true);
@@ -242,6 +303,8 @@ function horaDe(s){ var p=String(s||'').split(' '); return (p[1]||'').slice(0,5)
 function linha(f){
   return '<div class="row"><span class="who">'
     +(f.atrasado?'<b style="color:var(--amber)">⏳ de '+dataBR(f.data)+'</b> · ':'')
+    +(f.modalidade!=='coleta' && f.conferida===1?'<span class="tagok">✓ na área</span>':'')
+    +(f.modalidade!=='coleta' && f.conferida===0?'<span class="tagfalta">falta conferir</span>':'')
     +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+'</span></span></div>';
 }
 /* A PILHA (carga.js → pilhaDaArea). A caixa conferida e a que foi bipada aqui
@@ -338,7 +401,18 @@ async function carregar(){
   if(col.saida_aberta){
     try{ saidaAtual=await (await fetch('/api/saida/aberta')).json(); }catch(e){}
   } else { saidaAtual=null; divergPend=null; }
-  desenharSaida();
+  var car=d.carro||{prontas:0,viagem_aberta:null,viagens_hoje:[]};
+  if(car.viagem_aberta){
+    try{ viagemAtual=await (await fetch('/api/viagem/aberta')).json(); }catch(e){}
+  } else { viagemAtual=null; divergV=null; }
+  desenharSaida(); desenharViagem();
+  $('#viagemHist').innerHTML=(car.viagens_hoje||[]).map(function(f){
+    return '<div class="hist">🚗 '+horaDe(f.fechada_em)+' — '
+      +(f.divergente ? '<b class="div">⛔ LIBERADA COM DIVERGÊNCIA</b>: carro '+f.qtd_sistema+', atendente '+f.qtd_externa
+                     : '<b class="ok">✓ bateu</b>: '+f.qtd_sistema+' caixa'+(f.qtd_sistema===1?'':'s'))
+      +(f.fechado_por?' · '+esc0(f.fechado_por):'')+(f.motivo?' · '+esc0(f.motivo):'')
+      +(f.tem_foto?' · <a href="/api/saida/foto/'+f.id+'" target="_blank" style="color:var(--blue);font-weight:700">📷 ver a foto</a>':'')+'</div>';
+  }).join('');
   $('#colHist').innerHTML = (col.saidas_hoje||[]).map(function(f){
     return '<div class="hist">🚚 '+horaDe(f.fechada_em)+' — '
       +(f.divergente ? '<b class="div">⛔ LIBERADO COM DIVERGÊNCIA</b>: sistema '+f.qtd_sistema+', motorista '+f.qtd_externa
@@ -402,7 +476,26 @@ function limparFoto(){
   fotoDataUrl=null; $('#fotoIn').value=''; $('#fotoPrev').className='fotoprev'; $('#fotoPrev').src='';
   $('#fotoBtn').className='fotobtn'; $('#fotoTxt').textContent='Foto da tela do motorista';
 }
-let divergPend=null, saidaAtual=null;
+let divergPend=null, saidaAtual=null, viagemAtual=null, divergV=null, modoEscolhido=null, fotoV=null;
+/* PARA ONDE VAI O BIPE. Sem nada aberto, e a area. Com a saida do caminhao
+   aberta, as sobras; com a viagem aberta, o carro. Quando as duas estao
+   abertas vale a ultima escolhida, e a faixa diz qual. */
+function modoAtual(){
+  var sa=!!(saidaAtual&&saidaAtual.saida), vi=!!(viagemAtual&&viagemAtual.viagem);
+  if(modoEscolhido==='sobra'&&sa) return 'sobra';
+  if(modoEscolhido==='carro'&&vi) return 'carro';
+  if(modoEscolhido==='area') return 'area';
+  return sa?'sobra':(vi?'carro':'area');
+}
+function escolherModo(m){ modoEscolhido=m; pintarModo(); desenharViagem();
+  banner('',({area:'Bipe para CONFERIR na área',carro:'Bipe para PÔR NO CARRO',sobra:'Bipe o que FICOU no canto'})[m],''); }
+function pintarModo(){
+  var m=modoAtual();
+  document.body.classList.toggle('modo-saida',m==='sobra');
+  document.body.classList.toggle('modo-viagem',m==='carro');
+  var bar=$('#modoBar'); bar.className='modobar '+m;
+  bar.textContent='O bipe agora: '+({area:'CONFERIR NA ÁREA',carro:'PÔR NO CARRO DA AGÊNCIA',sobra:'SOBRA DO CAMINHÃO (o que ficou no canto)'})[m];
+}
 const postJ=async function(url,corpo){
   const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo||{})});
   let j={}; try{ j=await resp.json(); }catch(e){}
@@ -419,7 +512,7 @@ function linhaSaida(f, extra){
    caixas desta saida e as impressas FORA da conta que podem ter ido. */
 function desenharSaida(){
   var ab=!!(saidaAtual&&saidaAtual.saida);
-  document.body.classList.toggle('modo-saida',ab);
+  pintarModo();
   $('#saidaBtnBox').style.display=ab?'none':'';
   /* Aberta, as listas do canto somem: elas repetiam as mesmas caixas da conta
      e empurravam o painel da saida para fora da tela (1440 x 900). A conta e
@@ -455,7 +548,7 @@ function desenharSaida(){
 }
 async function abrirSaida(){
   const r=await postJ('/api/saida/abrir',{});
-  if(r.ok){ divergPend=null; limparFoto();
+  if(r.ok){ divergPend=null; limparFoto(); modoEscolhido='sobra';
     banner('col','🚚 SAÍDA DO CAMINHÃO ABERTA','Vão no caminhão <b>'+r.sistema+'</b>. Agora <b>bipe as caixas que FICARAM</b> no canto — ou toque em "Não ficou nada". Depois, foto e número do motorista.');
     beep(true); }
   else banner('err','Não deu pra abrir a saída', esc0(r.erro||r.aviso||''));
@@ -483,6 +576,91 @@ async function cancelarSaida(){
   await postJ('/api/saida/cancelar',{}); divergPend=null; limparFoto();
   banner('','Saída cancelada','Nada foi gravado nas caixas.'); carregar();
 }
+
+/* ── A VIAGEM À AGÊNCIA (fase 4) ── */
+function desenharViagem(){
+  var ab=!!(viagemAtual&&viagemAtual.viagem);
+  $('#viagemBtnBox').style.display=ab?'none':'';
+  $('#viagemBox').style.display=ab?'':'none';
+  pintarModo();
+  if(!ab){ $('#viagemDiv').innerHTML=''; return; }
+  var vi=viagemAtual, m=modoAtual();
+  $('#btnModoCarro').style.display=m==='carro'?'none':'';
+  $('#btnModoArea').style.display=m==='carro'?'':'none';
+  $('#viagemHead').textContent=m==='carro'?'🚗 VIAGEM À AGÊNCIA ABERTA — BIPE O QUE ENTRA NO CARRO'
+                                          :'🚗 VIAGEM À AGÊNCIA ABERTA — o bipe agora está conferindo na área';
+  $('#viagemConta').innerHTML='No carro:<div class="big">'+vi.sistema+' caixa'+(vi.sistema===1?'':'s')+'</div>'
+    +'<b>'+vi.prontas.length+'</b> pronta'+(vi.prontas.length===1?'':'s')+' na área'
+    +(vi.viagem.antiga?' · <b style="color:var(--red)">⚠ viagem aberta desde '+dataBR(String(vi.viagem.aberta_em).slice(0,10))+' — feche com a foto do atendente</b>':'');
+  $('#viagemLista').innerHTML=vi.lista.map(function(f){
+    return '<div class="row"><span class="who">'+(f.troca_de_porta?'<span class="tagtroca">troca de porta · era coleta</span>':'')
+      +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+'</span></span>'
+      +'<button class="mini" onclick="tirarDoCarro('+f.id+')">tirar do carro</button></div>'; }).join('');
+  if(!divergV){ $('#viagemDiv').innerHTML=''; return; }
+  var at=divergV.atendente;
+  $('#viagemDiv').innerHTML='<div class="divbox"><h4>⛔ NÃO BATEU — carro '+vi.sistema+', atendente '+at+'</h4>'
+    +(vi.sistema>at?'O carro tem <b>'+(vi.sistema-at)+'</b> a mais: alguma ficou no carro ou o atendente deixou passar.'
+                    :(vi.sistema<at?'O atendente bipou <b>'+(at-vi.sistema)+'</b> a mais: alguma caixa foi no carro sem bipe.'
+                                   :'Agora bate. Toque em <b>Fechar viagem</b> de novo.'))
+    +'<div style="margin-top:12px"><b>Liberar a viagem assim mesmo</b> — só supervisor ou admin, e fica registrado com o seu nome:'
+    +'<input class="motivo" id="motivoLibV" placeholder="Por que está liberando com número diferente?" maxlength="300">'
+    +'<button class="btn ghost" style="margin-top:8px" onclick="fecharViagem(true)">Liberar com divergência</button></div></div>';
+}
+async function abrirViagem(){
+  const r=await postJ('/api/viagem/abrir',{});
+  if(r.ok){ divergV=null; limparFotoV(); modoEscolhido='carro';
+    banner('ok','🚗 VIAGEM À AGÊNCIA ABERTA','Prontas na área: <b>'+r.prontas.length+'</b>. Agora <b>bipe cada caixa que entra no carro</b>. Na agência, fotografe a tela do atendente.');
+    beep(true); }
+  else banner('err','Não deu pra abrir a viagem', esc0(r.erro||r.aviso||''));
+  carregar();
+}
+async function bipCarro(code){
+  const r=await postJ('/api/viagem/carro',{code:code});
+  if(r.ok){ banner('ok','No carro ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · no carro agora <b>'+r.sistema+'</b>'
+      +(r.troca_de_porta?'<br><b>Troca de porta:</b> esta era de coleta e vai pela agência.':'')); beep(true); }
+  else if(r.motivo==='nao_conferida'){ banner('warn','⚠ FALTA CONFERIR NA ÁREA',(r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
+  else if(r.motivo==='ja_no_carro'){ banner('warn','Essa já está no carro', esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'. Não contou de novo.'); beep(false); }
+  else if(r.motivo==='nao_encontrado'){ banner('err','Etiqueta não reconhecida','Lido: '+esc0(code)+'. Bipe a etiqueta de VENDA.'); beep(false); }
+  else { banner('err',({nao_embalado:'⚠ FALTA A ETIQUETA DE VENDA',bloqueado:'Volume bloqueado',duplicado:'⚠ Essa caixa já saiu'})[r.motivo]||'Não entrou no carro',
+    (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
+  carregar();
+}
+async function tirarDoCarro(id){ await postJ('/api/viagem/tirar',{id:id}); carregar(); }
+async function cancelarViagem(){
+  if(!confirm('Cancelar esta viagem?')) return;
+  const r=await postJ('/api/viagem/cancelar',{});
+  if(!r.ok){ banner('warn','Há caixas no carro', esc0(r.aviso||'')); return; }
+  divergV=null; limparFotoV(); modoEscolhido=null; banner('','Viagem cancelada','Nada foi gravado.'); carregar();
+}
+async function fecharViagem(liberar){
+  if(!fotoV){ banner('warn','Falta a foto da tela do atendente','Toque em <b>📷 Foto da tela do atendente</b> e escolha a foto (da câmera ou da galeria). Sem a foto a viagem não fecha.'); beep(false); return; }
+  var q=$('#atQtd').value;
+  if(q==='' || !(parseInt(q,10)>=0)){ banner('warn','Quantas caixas o atendente bipou?','Digite o número que está na foto antes de fechar.'); return; }
+  var corpo={atendente:parseInt(q,10),foto:fotoV};
+  if(liberar){ var m=document.getElementById('motivoLibV'); corpo.motivo=m?m.value:''; }
+  const r=await postJ(liberar?'/api/viagem/liberar':'/api/viagem/fechar',corpo);
+  if(r.__status===403){ banner('err','Só supervisor ou admin libera com divergência','Chame quem pode liberar — ou confira as caixas até o número bater.'); beep(false); return; }
+  if(r.ok){ divergV=null; $('#atQtd').value=''; limparFotoV(); modoEscolhido=null;
+    if(r.divergente){ banner('err','Viagem liberada COM DIVERGÊNCIA','Carro <b>'+r.sistema+'</b> · atendente <b>'+r.atendente+'</b>. Ficou registrado com o seu nome, o motivo e a foto.'); beep(false); }
+    else { banner('ok','Viagem conferida ✓ — '+r.sistema+' = '+r.atendente,'O número do atendente bateu e a foto ficou guardada.'
+      +(r.troca_de_porta?' <b>'+r.troca_de_porta+'</b> caixa'+(r.troca_de_porta===1?'':'s')+' de coleta foi pela agência.':'')); beep(true); } }
+  else if(r.motivo==='divergente'){ divergV=r;
+    banner('err','⛔ NÃO BATEU — carro '+r.sistema+', atendente '+r.atendente,'Confira as caixas logo abaixo, no card do carro.'); beep(false); }
+  else { banner('warn',({sem_foto:'Falta a foto',sem_motivo:'Escreva o motivo',vazia:'Viagem vazia',sem_viagem:'Nenhuma viagem aberta'})[r.motivo]||'Não deu pra fechar',
+    esc0(r.aviso||r.erro||'')); beep(false); }
+  carregar();
+}
+function limparFotoV(){
+  fotoV=null; $('#fotoInV').value=''; $('#fotoPrevV').className='fotoprev'; $('#fotoPrevV').src='';
+  $('#fotoTxtV').textContent='Foto da tela do atendente';
+}
+$('#fotoInV').addEventListener('change',async function(){
+  var f=this.files&&this.files[0]; if(!f) return;
+  try{ fotoV=await reduzirFoto(f); }
+  catch(e){ fotoV=null; banner('err','Não deu pra ler a foto','Escolha de novo.'); return; }
+  $('#fotoPrevV').src=fotoV; $('#fotoPrevV').className='fotoprev on';
+  $('#fotoTxtV').textContent='Foto escolhida ✓ — trocar'; $('#atQtd').focus();
+});
 /* FECHAR A SAIDA. A foto da tela do motorista e a prova do numero (regra do
    dono, 09/09/2026); sem ela o servidor recusa. Nao bateu, NADA anda: a tela
    mostra as caixas desta saida e as de fora que podem ter ido. Liberar com
@@ -515,7 +693,7 @@ const scan=$('#scan');
    BIPE cair no lugar certo, nao pra mexer no que a pessoa esta olhando.
    O campo do motorista e a excecao: enquanto a pessoa digita ali, o foco
    fica ali. */
-const keep=()=>{ const a=document.activeElement; if(a===scan) return; if(a && (a.id==='motQtd'||a.id==='fotoIn'||a.id==='motivoLib')) return; scan.focus({preventScroll:true}); };
+const keep=()=>{ const a=document.activeElement; if(a===scan) return; if(a && (a.id==='motQtd'||a.id==='fotoIn'||a.id==='motivoLib'||a.id==='atQtd'||a.id==='fotoInV'||a.id==='motivoLibV')) return; scan.focus({preventScroll:true}); };
 scan.addEventListener('blur',()=>setTimeout(keep,50));
 document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input,label')) keep(); });
 scan.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=scan.value.trim(); scan.value=''; bip(v); } });

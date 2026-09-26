@@ -91,7 +91,11 @@ function ehColeta(volume){
    este conjunto que a conferencia com o motorista fecha, TODO de uma vez.
    Sem filtro por dia, pela mesma razao do PRA_CARREGAR: caixa separada ontem
    e nao retirada esta fisicamente no canto da coleta ate alguem levar. */
-const AGUARDA_CAMINHAO = "estagio='carregado' AND " + COLETA() + " AND retirado_em IS NULL";
+const AGUARDA_CAMINHAO = "estagio='carregado' AND " + COLETA() + " AND retirado_em IS NULL AND saida_id IS NULL";
+/* `saida_id IS NULL` desde a fase 4 (26/09/2026): a caixa de coleta posta no
+   CARRO de uma viagem a agencia aberta (troca de porta) ganha a saida da
+   viagem e deixa de estar no canto — senao ela apareceria nos dois lugares, e
+   entraria na conta do caminhao estando no carro. */
 
 /* O QUE SAIU ADIANTADO (25/09/2026).
    Adiantado e o volume que saiu da fabrica ANTES da data de despacho que a
@@ -236,14 +240,23 @@ function naSaida(db){
     .map(v => Object.assign(v, { antiga: !!(v.carregado_em && String(v.carregado_em).slice(0,10) < hoje) }));
 }
 /* "FOI NO CAMINHAO": a caixa com etiqueta impressa, FORA da conta, que o
-   motorista levou mesmo assim — a de agencia que ainda estava na pilha, a de
-   coleta que foi direto da impressora, a de agencia ja posta no carro hoje. E
-   a troca de porta da decisao 6: nao e erro, e o motorista levar o que esta
-   pronto. `pendente` nunca: sem etiqueta a caixa nao baixou do estoque (§5,
-   #27). A agencia no carro so a de HOJE — a de ontem ja foi para a agencia. */
-const PODE_TER_IDO = "((estagio='embalado' AND conferido_em IS NULL) OR " +
-  "(estagio='carregado' AND " + AGENCIA() + " AND saida_id IS NULL AND retirado_em IS NULL " +
-  "AND date(carregado_em)=date('now','localtime')))";
+   motorista levou mesmo assim — a de agencia na area (conferida ou nao) e a
+   de coleta que foi direto da impressora. E a troca de porta da decisao 6:
+   nao e erro, e o motorista levar o que esta pronto. `pendente` nunca: sem
+   etiqueta a caixa nao baixou do estoque (§5, #27).
+   Desde a fase 4 (decisao D2, 26/09/2026) a agencia conferida FICA NA AREA
+   (`embalado` com `conferido_em`), e por isso esta aqui e nao na conta do
+   caminhao: somada, obrigaria a bipar como sobra cada caixa de agencia parada
+   no chao, a cada caminhao. A que ja esta no CARRO (`carregado`) nao entra:
+   o caminhao nao leva o que esta dentro do carro. */
+const PODE_TER_IDO = "estagio='embalado'";
+
+/* A VIAGEM A AGENCIA (spec SAIDA-E-DUPLA-CONFERENCIA, fase 4, 26/09/2026).
+   A caixa de agencia tem dois bipes (decisao D1): a area confere, o carro
+   carrega. PRONTA_PRO_CARRO e o que esta na area esperando o carro: agencia,
+   com etiqueta, conferida. O carro so aceita isto — e a caixa de coleta do
+   canto, que e troca de porta. */
+const PRONTA_PRO_CARRO = "estagio='embalado' AND conferido_em IS NOT NULL AND " + AGENCIA();
 function podeTerIdo(db){
   return db.prepare(`SELECT id,codigo,buyer,nf,modalidade,estagio,despachar_em FROM lote
     WHERE ${PODE_TER_IDO} ORDER BY buyer, id`).all()
@@ -253,4 +266,4 @@ function podeTerIdo(db){
 module.exports = { PRA_CARREGAR, DO_DIA, ORDEM_CARGA, atrasado, futuro,
                    COLETA, AGENCIA, ehColeta, AGUARDA_CAMINHAO,
                    SAIDA, saidasAdiantadas, pilhaDaArea, nomeIgual,
-                   acharVolumes, NA_SAIDA, naSaida, PODE_TER_IDO, podeTerIdo };
+                   acharVolumes, NA_SAIDA, naSaida, PODE_TER_IDO, podeTerIdo, PRONTA_PRO_CARRO };

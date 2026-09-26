@@ -125,9 +125,11 @@ const noCanto = (buyer, extra) => vol(buyer, 'carregado',
      r.ok === false && r.motivo === 'divergente' && r.sistema === 5 && r.motorista === 7, JSON.stringify(r));
   ok('...e lista as caixas desta saída, com nome e NF',
      Array.isArray(r.lista) && r.lista.length === 5 && r.lista.every(v => v.buyer && v.nf), JSON.stringify(r.lista));
+  /* Desde a fase 4 (D2) a agência que já está no CARRO não é candidata: o
+     caminhão não leva o que está dentro do carro. */
   ok('...e oferece as impressas fora da conta, que podem ter ido no caminhão',
-     Array.isArray(r.candidatos) && [agPilha, agCarro, colPilha].every(i => r.candidatos.some(c => c.id === i))
-     && !r.candidatos.some(c => c.id === pend), JSON.stringify(r.candidatos));
+     Array.isArray(r.candidatos) && [agPilha, colPilha].every(i => r.candidatos.some(c => c.id === i))
+     && !r.candidatos.some(c => c.id === pend) && !r.candidatos.some(c => c.id === agCarro), JSON.stringify(r.candidatos));
   ok('divergência não grava nada nas caixas', lote(c1).saida_id === null && lote(c1).retirado_em === null);
   ok('divergência vai para a auditoria', auditado.some(a => a[0] === 'saida_divergente'));
 

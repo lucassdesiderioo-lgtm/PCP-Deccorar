@@ -666,6 +666,15 @@ console.log('\n── 6-E. saida.liberar: liberar o caminhão com número difere
   ok('decidir(): a bancada NÃO libera a divergente', AC.decidir(banc,'/api/saida/liberar','POST').ok === false);
   ok('decidir(): o supervisor libera', AC.decidir(sup,'/api/saida/liberar','POST').ok === true);
   ok('decidir(): o Admin Geral libera', AC.decidir(ger,'/api/saida/liberar','POST').ok === true);
+  /* A viagem à agência (fase 4) usa a mesma chave para liberar. */
+  eq('liberar a viagem pede a mesma chave', AC.permDaRota('/api/viagem/liberar','POST'), 'saida.liberar');
+  for(const r of ['/api/viagem/abrir','/api/viagem/carro','/api/viagem/tirar','/api/viagem/fechar','/api/viagem/cancelar'])
+    eq('a bancada opera a viagem: POST '+r, AC.permDaRota(r,'POST'), 'carregamento.executar');
+  eq('ler a viagem aberta: a bancada ou o admin',
+     JSON.stringify(AC.permDaRota('/api/viagem/aberta','GET')), JSON.stringify(['carregamento.executar','@admin']));
+  ok('decidir(): a bancada fecha a viagem que bateu', AC.decidir(banc,'/api/viagem/fechar','POST').ok === true);
+  ok('decidir(): a bancada NÃO libera a viagem divergente', AC.decidir(banc,'/api/viagem/liberar','POST').ok === false);
+  ok('decidir(): o supervisor libera a viagem', AC.decidir(sup,'/api/viagem/liberar','POST').ok === true);
   ok('a chave não faz do supervisor um admin do PCP (#34)', AC.decidir(sup,'/api/bloqueados','GET').ok === false);
 
   /* Quem desmarcar a caixinha não a vê voltar no próximo boot. */

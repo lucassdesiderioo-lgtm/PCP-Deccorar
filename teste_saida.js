@@ -117,13 +117,15 @@ function montar(db, modulos){
   r = await chamar('POST /api/carregar', {code:'9001'}, BETO);
   ok('o bipe do carregamento grava QUEM bipou e QUANDO',
      r.ok && l(id1).conferido_por === 'Beto' && !!l(id1).conferido_em, JSON.stringify(r));
-  ok('e continua fazendo o que sempre fez (carregado, com carregado_em)',
-     l(id1).estagio === 'carregado' && !!l(id1).carregado_em);
+  /* Desde a fase 4 (D1, 26/09/2026) a caixa de AGÊNCIA fica na área depois
+     deste bipe: quem a põe no carro é o bipe da viagem. */
+  ok('na agência o bipe só confere: a caixa fica na área (fase 4)',
+     l(id1).estagio === 'embalado' && !l(id1).carregado_em);
   ok('quem imprimiu continua sendo quem imprimiu', l(id1).impresso_por === 'Ana');
   const antes = l(id1).conferido_em;
   r = await chamar('POST /api/carregar', {code:'9001'}, ANA);
-  ok('bipar de novo é recusado (duplicado) e não troca quem conferiu',
-     r.motivo === 'duplicado' && l(id1).conferido_por === 'Beto' && l(id1).conferido_em === antes);
+  ok('bipar de novo é recusado (já conferida) e não troca quem conferiu',
+     r.motivo === 'ja_conferida' && l(id1).conferido_por === 'Beto' && l(id1).conferido_em === antes);
 
   // ── 4. O SCRIPT DO PASSIVO ───────────────────────────────────────────────
   const { fecharPassivo } = require('./fechar_saida_passivo');
