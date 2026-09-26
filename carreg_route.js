@@ -1,4 +1,4 @@
-const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro,ehColeta,AGENCIA,AGUARDA_CAMINHAO,saidasAdiantadas}=require('./carga');
+const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro,ehColeta,AGENCIA,AGUARDA_CAMINHAO,saidasAdiantadas,pilhaDaArea}=require('./carga');
 const fs=require('fs'), path=require('path');
 /* Onde ficam as fotos da conferencia com o motorista. Fora do git e FORA de
    lotes/ (que o cron apaga em 7 dias): a foto e prova, e prova nao expira
@@ -215,7 +215,11 @@ module.exports=function(app,db){
                Nao confundir com `adiantadas`, que e o que PODE sair adiantado:
                etiqueta impressa, despacho pra frente, ainda na fabrica. */
             saiu_adiantado:saidasAdiantadas(db,30),
-            coleta:{faltam:coletaFaltam, aguardando, retiradas_hoje:retiradas, fechamentos}};
+            coleta:{faltam:coletaFaltam, aguardando, retiradas_hoje:retiradas, fechamentos},
+            /* A conferencia da pilha (fase 2 da spec SAIDA-E-DUPLA-CONFERENCIA):
+               impressas hoje x conferidas, caixa a caixa. A conta mora no
+               carga.js; aqui so vai junto. */
+            pilha:pilhaDaArea(db)};
   }
   // conferencia: o que falta carregar — todo `embalado`, com o atrasado marcado
   app.get('/api/carregamento',(req,res)=> res.json(progresso()));
