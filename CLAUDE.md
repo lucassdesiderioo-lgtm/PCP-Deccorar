@@ -1854,7 +1854,7 @@ Desligável (Admin → Cadastros) porque custa um bipe por volume, todo dia. Nas
 > zera ninguém lê até o fim — que é o mesmo fim de esconder.
 >
 > **Rode `node teste_carga.js` após qualquer mudança no `carreg_route.js`** —
-> os 60 casos incluem o dos seis volumes de 26/08, e cobrem que a busca larga
+> os 48 casos incluem o dos seis volumes de 26/08, e cobrem que a busca larga
 > não virou "acha qualquer coisa" (código inexistente ainda dá `nao_encontrado`)
 > e que `bloqueado` continua recusado.
 
@@ -2769,7 +2769,10 @@ canto na outra.
    a coluna do carro não mudar de lugar.
    O operador bipa ao levar pro lugar reservado — o mesmo `POST /api/carregar`,
    que marca `carregado` e responde `coleta:true` com **"Está indo N peças"**.
-3. **Fechar coleta com o motorista** (`POST /api/coleta/fechar`): o caminhão
+3. ~~**Fechar coleta com o motorista**~~ — **aposentado em 26/09/2026**, virou a
+   **Saída do caminhão** (bloco "A SAÍDA DO CAMINHÃO" logo abaixo). A rota
+   `POST /api/coleta/fechar` só recusa, dizendo onde é agora; o que segue é a
+   história de como ele funcionava. O caminhão
    do ML bipa cada caixa que leva. O operador **fotografa a tela do celular
    do motorista** com a contagem do sistema dele (o tablet abre a câmera
    direto), digita o número e fecha. **Bateu** → todas ganham `retirado_em` e
@@ -2834,7 +2837,8 @@ canto na outra.
 > `docs/specs/SAIDA-E-DUPLA-CONFERENCIA.md` (fases 3 e 4): a caixa sai por onde
 > saiu de verdade (`saiu_por`), e `lote.modalidade` **não muda**. O rascunho
 > `COLETA-LEVA-AGENCIA.md`, que propunha trocar a modalidade, foi substituído e
-> está em `docs/arquivo/`. **Não "conserte" antes das fases.**
+> está em `docs/arquivo/`. **Pelo caminhão, isso existe desde a fase 3
+> (26/09/2026, botão "foi no caminhão", logo abaixo); pelo carro, é a fase 4.**
 
 ### ⚠️ QUEM FEZ, E A LIMPEZA DO PASSIVO (26/09/2026, fase 1 da spec `SAIDA-E-DUPLA-CONFERENCIA`)
 
@@ -2975,6 +2979,89 @@ vazio virando "mesma pessoa" (1).
 > prova pendente da fase 1. Prova que não foi feita se escreve como não feita
 > (§4).
 
+### ⚠️ A SAÍDA DO CAMINHÃO (26/09/2026, fase 3 da spec `SAIDA-E-DUPLA-CONFERENCIA`)
+
+O "Fechar coleta" de 10/09 comparava o **canto inteiro** com o motorista: um dia
+sem fechar estragava todos os seguintes, a equipe não aderiu, e 399 caixas
+acumularam. No lugar dele, **uma saída por caminhão**, no card da coleta do
+Carregamento (`saida_route.js`):
+
+```
+🚚 Saída do caminhão  →  a tela fica violeta e o bipe passa a querer dizer SOBROU
+bipe o que ficou       →  ou "Não ficou nada" — um dos dois é obrigatório
+foto + número          →  da tela do celular do motorista
+fechar                 →  saíram = no canto sem saída − sobras + "foi no caminhão"
+```
+
+**Bateu:** cada caixa grava `saida_id`, `saiu_em`, `saiu_por='coleta'` e
+`retirado_em`, que continua alimentando "Peças adiantadas". **Não bateu:** nada
+anda, e a tela mostra as caixas da saída, com nome e NF, e as impressas fora da
+conta. **Liberar com divergência** é outra rota, com a chave `saida.liberar` e
+motivo obrigatório; grava quem liberou e vai para a auditoria (decisão 7).
+
+A régua do universo é do `carga.js` (`NA_SAIDA`, `PODE_TER_IDO`), e a busca
+pelo código bipado virou `acharVolumes`, a mesma do bipe do carro. A foto é do
+`foto.js`, a mesma régua do fechamento antigo.
+
+> ⚠️ **O PASSO DAS SOBRAS É DECLARADO, NUNCA SUPOSTO.** Fechar sem bipar sobra
+> nem tocar "não ficou nada" é recusado. Se valesse, quem pula o passo diria
+> "saiu tudo" sem saber, e a divergência de verdade viraria ruído.
+
+> ⚠️ **ATÉ A FASE 4 A CONTA DO CAMINHÃO SÓ OLHA O CANTO DA COLETA** (decisão A,
+> 26/09/2026). Com o bipe único (opção A da fase 2), a caixa de agência
+> conferida já está **no carro**, e não no chão da área. Somada, ela obrigaria
+> a bipar como "sobra" uma caixa que nem está ali.
+
+> ⚠️ **O BIPE SÓ QUER DIZER "SOBROU". A TROCA DE PORTA É POR BOTÃO** (decisão B,
+> 26/09/2026). A caixa impressa fora da conta que o motorista levou (de agência
+> ainda na pilha, de coleta que foi direto da impressora, de agência já no carro
+> **hoje**) entra pelo botão **"foi no caminhão"** da lista de divergência. O
+> mesmo bipe querendo dizer duas coisas conforme o estado da caixa é como se erra
+> de luva na mão. Ela sai com `saiu_por='coleta'`, vira `carregado`, é conferida
+> por quem fechou, e **a `modalidade` não muda** (decisão 6). `pendente` nunca
+> entra: sem etiqueta, não baixou do estoque (§5, #27).
+
+> ⚠️ **E A CAIXA DE AGÊNCIA QUE O CAMINHÃO LEVOU NÃO CONTA NO "NO CARRO".** Achado
+> abrindo a tela: o contador do carro contava `carregado_em` de hoje da agência,
+> e a troca de porta o inflava. Com isso o carro fecharia com uma caixa a menos
+> dentro. Hoje ele ignora quem saiu com `saiu_por='coleta'`, e há caso travando.
+
+> ⚠️ **COM A SAÍDA ABERTA, AS LISTAS DO CANTO SOMEM DA TELA.** Elas repetiam as
+> mesmas caixas da conta e empurravam o painel da saída para fora da tela num
+> notebook de 15". A conta e as sobras são o que importa naquela hora, e a lista
+> volta quando a saída fecha ou é cancelada.
+
+> ⚠️ **A CAIXA ESQUECIDA NO CANTO AINDA ENTRA NA CONTA SEGUINTE, MARCADA.** Caixa
+> bipada pro canto num dia anterior e sem saída (um caminhão que ninguém
+> registrou) aparece com a tarja `⏳ bipada dd/mm`. A saída não sabe se ela foi
+> num caminhão não registrado ou se ainda está lá; quem sabe é quem olha o
+> canto. Se foi, a conta não bate, e o caminho é **liberar com motivo**.
+
+> **`saida.liberar` é nível `supervisor`, sensível, e nasceu nos setores
+> `Supervisor` e `Admin`** (backfill de uma vez só, marcado em
+> `config.seed_saida_liberar`, seção 3-C do `acesso.js`). Não vai para "todo
+> setor de nível alto": a chefia do sob medida e o Comprador não têm nada a ver
+> com o caminhão. Supervisor, e não admin, pela lição da #34 (§19). O Admin
+> Geral passa por nível.
+
+> Uma saída aberta por vez, guardada no banco: o tablet que recarrega a
+> reencontra com as sobras já bipadas. **Cancelar** apaga a saída aberta e não
+> mexe em caixa nenhuma. Os fechamentos antigos (`coleta_fechamento`) continuam
+> na tela como história, com a foto.
+
+**Rode `node teste_saida_coleta.js` (50 casos) ao mexer no `saida_route.js`, no
+`NA_SAIDA`/`PODE_TER_IDO` do `carga.js` ou no card da coleta.** Seis defeitos
+foram reintroduzidos, um de cada vez, para provar que o teste pega cada um:
+fechar sem o passo das sobras (29 casos), agência no carro na conta (6),
+divergência andando (17), liberar sem motivo (5), troca de porta reescrevendo a
+modalidade (1) e fechar sem foto (15). Mexeu na chave? **`node teste_acesso.js`
+(194, a seção 6-E é esta) e `node teste_cobertura.js` (10).**
+
+> ⚠️ **ISSO NÃO É A CONFERÊNCIA NO CAMINHÃO.** A rodada foi na minha tela: abrir,
+> bipar uma sobra, fechar divergente, "foi no caminhão", fechar batendo. A prova
+> que fecha a fase é **o primeiro caminhão de verdade** saindo por ela, com a
+> foto do motorista e o número batendo.
+
 ### ⚠️ O QUE SAI ADIANTADO — contado em peças, na tela do Carregamento (25/09/2026)
 
 Pedido do dono: *"mensurar e mostrar na tela de carregamento a quantidade de
@@ -3025,8 +3112,9 @@ Relatório que um dia quiser esse número lê de lá.
 > conferência de hoje não disse se esse caso passou pela tela; se o número não
 > andar nesse dia, é defeito, não silêncio normal.
 
-**Rode `node teste_carga.js` (60 casos; 24 são de coleta, 5 são a
-trava do volume não embalado, §5 #27, e 11 são o adiantado — um no começo e os 10 últimos),
+**Rode `node teste_carga.js` (48 casos; os de coleta, 5 são a
+trava do volume não embalado, §5 #27, e 11 são o adiantado — um no começo e os 10 últimos;
+os do fechamento com o motorista foram para o `teste_saida_coleta.js` em 26/09/2026),
 `node teste_parse.js` (caso 15), `node teste_divergencia.js` (os dois últimos
 casos são a decisão da gestão) e `node teste_etiqueta.js` após mexer nisso.**
 Volumes anteriores à coluna: `node backfill_modalidade.js` (simula) e
@@ -3372,7 +3460,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (48), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (194), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26), `teste_saida_coleta.js` (50) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3572,6 +3660,18 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   diz uma coisa, a saída diz outra, e as duas são verdade (§8-B, #21)
 - ❌ Carimbar em `now` a saída do passivo da coleta: cada caixa sai na data do
   bipe dela, como todo script de passivo (§5, §8-B)
+- ❌ Voltar a fechar a coleta comparando o canto INTEIRO com o motorista: um dia
+  sem fechar estraga todos os seguintes. É uma saída por caminhão (§8-B, fase 3)
+- ❌ Fechar a saída do caminhão sem o passo das sobras: "não ficou nada" é
+  resposta, e o silêncio não é (§8-B, fase 3)
+- ❌ Fazer o bipe da saída querer dizer "foi no caminhão" para caixa fora da
+  conta: o bipe só diz SOBROU, e a troca de porta é por botão (§8-B, fase 3)
+- ❌ Pôr a agência conferida na conta do caminhão antes da fase 4: com o bipe
+  único ela está no carro, não no canto (§8-B, fase 3)
+- ❌ Contar no "No carro" a caixa de agência que saiu pelo caminhão
+  (`saiu_por='coleta'`): o carro fecharia com uma a menos (§8-B, fase 3)
+- ❌ Dar `saida.liberar` a todo setor de nível alto, ou declará-la `admin`: é
+  Supervisor e Admin, e nível admin vira admin do PCP (§8-B, §19 #34)
 - ❌ Contar como adiantada a caixa de coleta que só foi pro canto: a saída da
   coleta é o caminhão levando (`retirado_em`), e o bipe não é saída (§8-B)
 - ❌ Escrever uma segunda conta de "saiu adiantado", ou contar caixa em vez de

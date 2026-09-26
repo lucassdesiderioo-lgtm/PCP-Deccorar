@@ -626,6 +626,57 @@ for(const r of ['/api/skus','/api/cores','/api/modelos','/api/tecidos','/api/lis
 eq('/login continua aberto', AC.permDaRota('/login','GET'), '@logado');
 eq('o healthcheck tambem', AC.permDaRota('/status','GET'), '@logado');
 
+console.log('\n── 6-E. saida.liberar: liberar o caminhão com número diferente (fase 3 da saída) ──');
+{
+  /* Spec SAIDA-E-DUPLA-CONFERENCIA, decisão 7: liberar a saída divergente é
+     só de supervisor e admin. As três pontas, e a quarta que a #34 ensinou:
+     o NÍVEL da chave, porque nível admin viraria "é admin do PCP". */
+  const ch = PERMISSOES.find(p => p.chave === 'saida.liberar');
+  ok('saida.liberar está declarada em permissoes.js', !!ch);
+  if(ch){
+    eq('nível supervisor — admin viraria admin do PCP inteiro (#34)', ch.nivel, 'supervisor');
+    ok('marcada como sensível: é a decisão que precisa ter nome', ch.sensivel === true);
+    ok('tem rótulo e descrição', !!ch.rotulo && !!ch.desc);
+  }
+  eq('liberar a saída pede a chave própria', AC.permDaRota('/api/saida/liberar','POST'), 'saida.liberar');
+  for(const r of ['/api/saida/abrir','/api/saida/sobra','/api/saida/sobra/tirar','/api/saida/nada',
+                  '/api/saida/levou','/api/saida/levou/tirar','/api/saida/fechar','/api/saida/cancelar'])
+    eq('a bancada do carregamento opera a saída: POST '+r, AC.permDaRota(r,'POST'), 'carregamento.executar');
+  eq('ler a saída aberta: a bancada ou o admin',
+     JSON.stringify(AC.permDaRota('/api/saida/aberta','GET')), JSON.stringify(['carregamento.executar','@admin']));
+  eq('a foto da saída é prova, com o mesmo dono',
+     JSON.stringify(AC.permDaRota('/api/saida/foto/7','GET')), JSON.stringify(['carregamento.executar','@admin']));
+
+  const comChave = db.prepare(`SELECT s.nome FROM setores s JOIN setor_permissao sp ON sp.setor_id=s.id
+    WHERE sp.chave='saida.liberar' ORDER BY s.nome`).all().map(r => r.nome);
+  ok('o setor Supervisor recebe a chave', comChave.includes('Supervisor'), comChave.join(', '));
+  ok('o setor Admin recebe a chave', comChave.includes('Admin'), comChave.join(', '));
+  ok('a bancada de expedição NÃO recebe', !comChave.includes('Operador / Expedição'));
+  ok('a chefia do sob medida e as Compras NÃO recebem (nível alto não é ser da expedição)',
+     !comChave.includes('Sob medida / Cadastros') && !comChave.includes('Comprador') && !comChave.includes('Financeiro'),
+     comChave.join(', '));
+  ok('o backfill ficou marcado para rodar uma vez só',
+     !!db.prepare("SELECT 1 FROM config WHERE chave='seed_saida_liberar'").get());
+
+  const us = db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('Sup','')").run().lastInsertRowid;
+  db.prepare("INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)")
+    .run(us, db.prepare("SELECT id FROM setores WHERE nome='Supervisor'").get().id);
+  const sup = { id:us, nome:'Sup' }, banc = { id:uo, nome:'Bancada' }, ger = { id:ug, nome:'Geral' };
+  ok('decidir(): a bancada FECHA a saída que bateu', AC.decidir(banc,'/api/saida/fechar','POST').ok === true);
+  ok('decidir(): a bancada NÃO libera a divergente', AC.decidir(banc,'/api/saida/liberar','POST').ok === false);
+  ok('decidir(): o supervisor libera', AC.decidir(sup,'/api/saida/liberar','POST').ok === true);
+  ok('decidir(): o Admin Geral libera', AC.decidir(ger,'/api/saida/liberar','POST').ok === true);
+  ok('a chave não faz do supervisor um admin do PCP (#34)', AC.decidir(sup,'/api/bloqueados','GET').ok === false);
+
+  /* Quem desmarcar a caixinha não a vê voltar no próximo boot. */
+  const idSup = db.prepare("SELECT id FROM setores WHERE nome='Supervisor'").get().id;
+  db.prepare("DELETE FROM setor_permissao WHERE setor_id=? AND chave='saida.liberar'").run(idSup);
+  const app2 = { locals:{}, router:{ stack:[] }, get(){}, post(){}, delete(){} };
+  require('./acesso')(app2, db);
+  ok('desmarcada, a chave não volta no boot seguinte',
+     !db.prepare("SELECT 1 FROM setor_permissao WHERE setor_id=? AND chave='saida.liberar'").get(idSup));
+}
+
 console.log('\n── 16. a cobertura passou a VARRER o app ──');
 const cob = AC.coberturaDeRotas ? AC.coberturaDeRotas() : null;
 ok('existe a varredura das rotas registradas', !!cob, 'coberturaDeRotas() nao existe');

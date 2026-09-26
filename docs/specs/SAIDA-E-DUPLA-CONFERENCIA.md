@@ -9,11 +9,17 @@
 > (`carga.js → pilhaDaArea`), o card na tela e o `teste_area.js` (26 casos). Divergência:
 > as listas da pilha nascem **recolhidas** — com o bipe único elas repetem as do carro e da
 > coleta (ver `CLAUDE.md` §8-B). **No ar em 26/09 (PR #138), deploy conferido pelo dono;**
-> falta ver a conta fechar num dia real de expedição. Fases 3 e 4.
+> falta ver a conta fechar num dia real de expedição.
+> **Fase 3 em código (26/09):** a saída do caminhão no card da coleta (`saida_route.js`),
+> `saida.liberar` (supervisor, setores Supervisor e Admin), o "Fechar coleta" aposentado
+> (a rota recusa dizendo onde é agora) e o `teste_saida_coleta.js` (50 casos). Decisões na
+> construção: a conta só olha o canto da coleta até a fase 4 (a agência conferida está no
+> carro), e a troca de porta é por botão, não por bipe. A tela é um modo do card da coleta,
+> e não uma tela própria. Falta o primeiro caminhão de verdade. Fase 4.
 > Criada em 25/09/2026 · PLANEJADO até a fase 1
 > Nasceu da conversa no Projeto "PCP - Deccorar" em 25/09/2026 (NOVIDADE).
 > Substitui o "Fechar coleta" de 10/09/2026 (`CLAUDE.md` §8-B), que não foi adotado pela equipe.
-> Fases: 1 ☑ (no ar) · 2 ☑ (no ar) · 3 ☐ · 4 ☐
+> Fases: 1 ☑ (no ar) · 2 ☑ (no ar) · 3 ☑ (em código, falta produção) · 4 ☐
 
 ---
 

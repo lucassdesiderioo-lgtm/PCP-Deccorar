@@ -235,6 +235,23 @@ module.exports = function(app, db){
     }
   }catch(e){ console.log('[acesso] seed de pacote.assinar falhou: '+e.message); }
 
+  /* ── 3-C. 'saida.liberar' (fase 3 da SAIDA-E-DUPLA-CONFERENCIA, 26/09/2026) ──
+     Mesma razao do 3-B: chave nova em banco que ja existe nao chega a ninguem.
+     Quem recebe: os setores nativos 'Supervisor' e 'Admin' — "supervisor e
+     admin", decisao 7 do dono. NAO e "todo setor de nivel supervisor ou admin":
+     a chefia do sob medida e o Comprador tem nivel alto e nada a ver com o
+     caminhao da coleta. Admin Geral passa por nivel. Uma vez so (marca em
+     `config`): quem desmarcar a caixinha nao a ve voltar no proximo boot. */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='seed_saida_liberar'").get()){
+      db.transaction(() => {
+        db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
+          SELECT id,'saida.liberar' FROM setores WHERE nome IN ('Supervisor','Admin')`).run();
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('seed_saida_liberar','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[acesso] seed de saida.liberar falhou: '+e.message); }
+
   // ── resolvedor do modelo NOVO: permissoes efetivas de um usuario (secao 2) ──
   function permissoesDe(uid){
     const setores = db.prepare(`SELECT s.nivel FROM usuario_setor us
@@ -576,6 +593,12 @@ module.exports = function(app, db){
     if(M !== 'GET' && eq('/api/montagem')) return 'embalagem.executar';
     if(M !== 'GET' && eq('/api/embalar')) return 'etiqueta.emitir';
     if(M !== 'GET' && eq('/api/carregar')) return 'carregamento.executar';
+    /* A SAIDA DO CAMINHAO (fase 3 da SAIDA-E-DUPLA-CONFERENCIA): abrir, bipar
+       as sobras e fechar a que BATEU sao da bancada que bipa a caixa. Liberar
+       com numero diferente do motorista tem chave propria, e vem ANTES do
+       `pre` — atras dele a chave seria engolida e nao mandaria em nada. */
+    if(M !== 'GET' && eq('/api/saida/liberar')) return 'saida.liberar';
+    if(M !== 'GET' && pre('/api/saida')) return 'carregamento.executar';
     // Fechar a coleta com o motorista e ato da mesma bancada que bipa a caixa:
     // quem carrega e quem confere o numero na frente do caminhao.
     if(M !== 'GET' && pre('/api/coleta')) return 'carregamento.executar';
@@ -738,7 +761,7 @@ module.exports = function(app, db){
     if(eq('/api/fila') || eq('/api/montagem/hoje')) return ['embalagem.executar','etiqueta.emitir','@admin'];
     /* A FOTO DA COLETA É PROVA (§8-B), e estava legível por qualquer pessoa
        logada: é a tela do celular do motorista, com a contagem dele. */
-    if(eq('/api/carregamento') || pre('/api/coleta')) return ['carregamento.executar','@admin'];
+    if(eq('/api/carregamento') || pre('/api/coleta') || pre('/api/saida')) return ['carregamento.executar','@admin'];
     if(pre('/api/revisao')) return ['revisao.executar','@admin'];
     /* A lista de ordens do dia: a tela vermelha do operador mostra o que foi
        lançado, e o admin mostra a mesma coisa na aba de lançar. Lançar (POST)

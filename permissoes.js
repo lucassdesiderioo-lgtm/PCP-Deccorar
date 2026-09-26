@@ -23,6 +23,16 @@ module.exports = [
     rotulo:'Emitir NF de venda',  desc:'Imprimir etiqueta e dar baixa no estoque' },
   { chave:'carregamento.executar',grupo:'Expedição',  nivel:'operacao',
     rotulo:'Carregar veículo',    desc:'Conferir volumes por bipe' },
+  /* SAIDA DO CAMINHAO (spec SAIDA-E-DUPLA-CONFERENCIA, fase 3, 26/09/2026).
+     Fechar a saida que BATEU e da bancada ('carregamento.executar'). Liberar o
+     caminhao com numero DIFERENTE do motorista e a decisao que precisa ter
+     nome — decisao 7 do dono: so supervisor e admin, com motivo, na auditoria.
+     ⚠️ NIVEL `supervisor`, e nao `admin`: nivel admin no PCP vale como "e admin
+     do PCP" (as rotas '@admin' e a area 'admin', §19 armadilha #34). */
+  { chave:'saida.liberar',        grupo:'Expedição',  nivel:'supervisor',
+    rotulo:'Liberar caminhão com divergência',
+    desc:'Fechar a saída da coleta quando o número do motorista não bate, com motivo',
+    sensivel:true },
   /* Pacote (§5, armadilha #23). Quem ASSINA nao esta destravando um volume: esta
      dizendo QUANTAS persianas e QUAIS vao dentro da caixa — e e essa lista que
      a Etiqueta de Venda cobra no bipe e que baixa do estoque, peca por peca.

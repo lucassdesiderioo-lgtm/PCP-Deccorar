@@ -29,7 +29,17 @@ function garantirSaida(db){
     foto TEXT,
     sobras TEXT DEFAULT '[]',
     ids TEXT DEFAULT '[]',
-    sem_segunda_pessoa INTEGER DEFAULT 0);`);
+    sem_segunda_pessoa INTEGER DEFAULT 0,
+    aberta_por TEXT DEFAULT '',
+    levou TEXT DEFAULT '[]',
+    nada_ficou INTEGER DEFAULT 0);`);
+  /* Fase 3 (26/09/2026): quem abriu, as caixas de fora que "foram no
+     caminhao" (troca de porta) e o "nao ficou nada" — o passo das sobras
+     precisa ser DECLARADO, senao pular o bipe das sobras passaria calado.
+     No fim, pelo ALTER, como manda o §17: o banco de producao ja tem a tabela. */
+  for(const c of ["aberta_por TEXT DEFAULT ''", "levou TEXT DEFAULT '[]'", "nada_ficou INTEGER DEFAULT 0"]){
+    try{ db.exec('ALTER TABLE saida ADD COLUMN ' + c); }catch(e){}
+  }
 }
 
 module.exports = { garantirSaida };
