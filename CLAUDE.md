@@ -4362,6 +4362,35 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   deixar a frase concordar só no começo (§19, 6-B, e o §2)
 - ❌ Esticar com `flex:1` dois números que existem para serem lidos juntos —
   os percentuais do prazo iam para pontas opostas de 1100 px (§19, 6-B)
+- ❌ Gerar boleto dentro do PCP: o título nasce no banco, e um número
+  inventado aqui é a segunda régua contra o extrato (§19, 6-C1)
+- ❌ Travar pedido por crédito estourado: mostra e não trava, e a decisão é do
+  dono desde 22/09/2026 — não se perde venda (§19, 6-C1)
+- ❌ Cortar o disponível negativo em zero: dois mil estourados e um real
+  estourado ficariam iguais na tela (§19, 6-C1, e o §2)
+- ❌ Escrever zero no disponível de quem não tem limite lançado — é `null`, e
+  não se estoura um limite que não existe (§19, 6-C1)
+- ❌ Tirar o boleto VENCIDO da soma do em aberto: o limite de quem não paga
+  pareceria mais folgado que o de quem paga em dia (§19, 6-C1)
+- ❌ Aceitar número de boleto repetido na mesma revenda: é o mesmo título duas
+  vezes, e ele come o limite em dobro (§19, 6-C1)
+- ❌ Cobrar "aprovado sem boleto" de quem paga em PIX ou cartão — a fábrica
+  recebe dos três jeitos (dono, 26/09/2026), e aviso no caso normal é a #6
+- ❌ Somar "aprovado sem boleto" no disponível: não é dívida, é compromisso
+  que ainda não virou título — "os dois, mostrados separados" (§19, 6-C1)
+- ❌ Deixar a baixa sem caminho de volta, ou desfazê-la sem motivo: sem ele o
+  jeito vira lançar o título de novo, e aí a conta dobra (§19, 6-C1)
+- ❌ Nomear campo de dinheiro do boleto sem o prefixo `valor_`, ou pôr
+  `valor_` em `estourado` — a marca tem que sobreviver à poda (§19, 6-C1)
+- ❌ Ordenar a tarefa semanal por nome: quem estourou tem que estar em cima
+  (§19, 6-C1, e a §3)
+- ❌ Escrever a data do último movimento em toda revenda: o sinal é o dado
+  VELHO, e a linha repetida vira paisagem (§19, 6-C1)
+- ❌ Pedir dinheiro em centavos numa tela e em reais na outra (§19, 6-C1, §4)
+- ❌ Pôr dois selos no cartão do Quadro sem container: eles saem grudados, e
+  nenhum teste pega — o texto está certo, a distância é que não (§19, 6-C1)
+- ❌ Construir a coluna `entregue` ou o selo de NF antes de existir quem marque
+  a entrega: é a coluna-paisagem que a 6-A recusou (§19, 6-C2)
 - ❌ Escrever uma segunda tabela de "o que vem antes" para a recusa: o `ANTES`
   lido ao contrário já responde, e duas divergem no dia em que o fluxo mudar
   (§19, 5-B2)
@@ -6403,6 +6432,136 @@ produtividade · recusas          (o crédito é boleto, e boleto é a 6-C)
 > Mexeu em permissão? **`node teste_acesso.js` (204) e `node teste_cobertura.js`
 > (10) também.** E **abra a tela, cheia E vazia**: sete dos defeitos desta fase
 > não têm teste que os pegue.
+
+### ⚠️ A FASE 6-C1 (26/09/2026) — O BOLETO, E O NÚMERO QUE MENTE PARA CIMA
+
+```
+limite disponível = limite − boletos em aberto      ← MOSTRA, NÃO TRAVA
+```
+
+Migração 25 (`sm_boleto`), `dominio/boleto.js`, `dados/boleto.js`,
+`rotas/boleto.js`, a tela `/sobmedida/financeiro`, o crédito na ficha da
+revenda e o **selo de crédito estourado** no Quadro — o gancho que a 6-A
+deixou escrito.
+
+> **A revisão bimestral do limite JÁ EXISTIA desde a fase 2** e não foi
+> refeita: `limite_revisado_em`, o parâmetro `creditoRevisaoMeses`, o cálculo
+> de `limite_vencido` e o botão *"Revisei — está bom assim"*. Está escrito
+> porque a linha da fase prometia as três coisas, e quem lesse o plano
+> esperaria trabalho onde não havia.
+
+> ⚠️ **O TÍTULO É LANÇADO À MÃO, NUNCA GERADO AQUI.** O boleto de verdade
+> nasce no banco, com número e código de barras próprios; um número inventado
+> nesta casa seria a **segunda régua contra o extrato** (armadilha #12), e a
+> que erra se descobre na cobrança de um cliente.
+>
+> O caminho do **espelho** — o outro sistema exporta os títulos em aberto e
+> este lê, como a planilha do ML no Planejamento (#11) e o PDF do ML na
+> expedição — foi posto na mesa em 26/09/2026 e **o dono decidiu lançar aqui**.
+> Se um dia ele voltar, o importador se escreve **contra um arquivo real**: o
+> `parse.js` nasceu do PDF de verdade, e leitor feito contra formato imaginado
+> é régua própria, que funciona no teste e quebra no arquivo.
+
+> ⚠️ **O MODO DE FALHAR DESTE DESENHO É O OTIMISTA, E ESTÁ ESCRITO ANTES DE
+> ACONTECER.** A §4.13 da spec avisa que *"sem baixa, o limite de todo mundo
+> zera"*. Com lançamento à mão o risco é o **contrário e pior**: ninguém
+> lança, o "em aberto" fica zero e o disponível fica **igual ao limite** — uma
+> mentira que **não parece erro**, porque o número só fica maior. Por isso o
+> crédito devolve `ultimo_movimento`, e as duas telas escrevem, **só quando o
+> dado é velho**, há quantos dias ninguém mexe naquela revenda: número sem a
+> janela ao lado engana (armadilha #16).
+
+> ⚠️ **MOSTRA, NÃO TRAVA — decisão do dono de 22/09/2026.** Não há uma linha
+> no domínio do pedido que leia crédito, e isso não é esquecimento: não se
+> perde venda. Pedido de revenda estourada entra e é aprovado do mesmo jeito;
+> o que muda é a **cor**. Há caso travando, para ninguém acrescentar a trava
+> depois sem decidir — e a §4.13 explica por que ela não entra antes de a
+> baixa estar sendo feita de verdade (é a armadilha #6).
+
+> ⚠️ **NEGATIVO FICA NEGATIVO.** Zerar apagaria o **tamanho** do buraco: dois
+> mil estourados e um real estourado ficariam iguais na tela. É o `MAX(0, …)`
+> do saldo do PCP (§2) pela porta do crédito, e a mesma regra do prazo vencido
+> da fase 3.
+
+> ⚠️ **SEM LIMITE LANÇADO, O DISPONÍVEL É `null`** — nunca zero e nunca "o que
+> ela deve". É a regra 4 do custo (§7-B): número indefinido não vira número
+> certo. E **não se estoura um limite que não existe**: a revenda sem limite
+> não ganha selo no Quadro.
+
+> ⚠️ **PAGO E CANCELADO SAEM DA CONTA; VENCIDO FICA.** Tirar o vencido faria o
+> limite de quem **não** paga parecer mais folgado que o de quem paga em dia —
+> exatamente ao contrário. O vencimento é **marca**, não segunda conta, e o
+> valor vencido sai à parte. E a `situacao` é **derivada** de `cancelado_em` e
+> `pago_em`, nunca uma coluna: duas afirmações sobre o mesmo fato divergem no
+> dia em que alguém escrever numa só.
+
+> ⚠️ **NÚMERO REPETIDO NA MESMA REVENDA É O MESMO TÍTULO LANÇADO DUAS VEZES**,
+> e ele come o limite dela em dobro. O modo de falhar é **pessimista**: o
+> vendedor para de vender achando que a revenda estourou, e ninguém procura o
+> motivo num boleto a mais. Em **outra** revenda o mesmo número passa — o
+> número é do banco dela, e dois bancos repetem número sem erro nenhum.
+
+> ⚠️ **"APROVADO SEM BOLETO" SÓ VALE PARA QUEM PAGA EM BOLETO.** *"Nem todo
+> pedido fazemos boleto — às vezes o cliente paga por PIX, às vezes por
+> cartão"* (dono, 26/09/2026). Cobrar título de quem paga no cartão é aviso
+> disparando no caso normal, e aviso assim some junto com a lista inteira
+> (armadilha #6). É a segunda metade da pergunta 6 da §8 da spec — *"os dois,
+> mostrados separados"* —, e ele **não entra no disponível**: não é dívida, é
+> compromisso que ainda não virou título.
+
+> ⚠️ **A BAIXA SE DESFAZ, E COM MOTIVO.** Baixa dada na linha errada acontece,
+> e sem caminho de volta o jeito vira lançar o título de novo — que é número
+> repetido, e aí a conta dobra. Trava que sabe acusar e não sabe liberar é
+> trava que a equipe contorna (§5). Baixar **duas vezes** é recusado: a
+> segunda sobrescreveria quem deu a primeira, e o rastro viraria dois.
+
+> ⚠️ **TODO CAMPO DE DINHEIRO COMEÇA COM `valor_`, e `estourado` NÃO.** A poda
+> do `custo.js` corta por **padrão de nome** (§19): um `em_aberto_centavos`
+> não casaria com `preco|valor|custo|nf|fornecedor` e viajaria pelo fio para
+> quem não tem `custo.ver`. E a **marca** não é dinheiro de propósito: ela
+> sobrevive à poda e acende o selo para quem só vê a cor.
+
+> **Duas chaves: `boleto.ler` (o vendedor, pela tarefa semanal da §4.13) e
+> `boleto.editar`.** A segunda **não está em papel nenhum** — hoje quem lança
+> e baixa é o diretor, pelo `*`. Inventar um papel "financeiro" exigiria área
+> no PCP, linha no `PERM_AREA` e alguém marcado (as três pontas da armadilha
+> #13) para uma caixinha que ninguém marcaria. O dia em que houver financeiro
+> com login próprio, a área nasce lá.
+
+> ⚠️ **E QUATRO COISAS SÓ APARECERAM ABRINDO A TELA:**
+> - **a tarefa semanal saía em ordem ALFABÉTICA**, com quem está em dia acima
+>   de quem estourou. Lista de trabalho se lê de cima para baixo — é a regra
+>   da tela azul do operador (§3) e do atrasado do Carregamento (#9);
+> - **a janela escrita em toda revenda virava paisagem**: quatro linhas
+>   idênticas de *"último lançamento em 26/09"*. O sinal é o dado **velho**,
+>   não o fresco;
+> - **o formulário pedia o valor em CENTAVOS**, enquanto o catálogo, o
+>   simulador e as revendas pedem em reais e convertem por soma — duas telas
+>   pedindo o mesmo dinheiro de jeitos diferentes ensinam a equipe a achar que
+>   são coisas diferentes (§4);
+> - **os dois selos do Quadro saíam GRUDADOS**
+>   (`RETIDO · SEM TECIDORETIDO · CRÉDITO ESTOURADO`). Enquanto havia um selo
+>   só, o espaçamento nunca tinha sido exercitado: é o `📦2 peças` grudado do
+>   §5, e nenhum teste de unidade o pega — o texto está perfeito, quem está
+>   errado é a distância.
+
+> ⚠️ **A 6-C2 (NF E ENTREGA) NÃO FOI CONSTRUÍDA, e isso é decisão.** Não há
+> faturamento no sob medida, a §5 da spec diz que o ERP é outro projeto, e
+> **ninguém marca entrega**. Construir a coluna `entregue` sem quem a marque é
+> exatamente a coluna-paisagem que a 6-A recusou, e a NF digitada sem
+> responsável por digitá-la é a dívida 18. Ela nasce quando o dono disser
+> quem faz as duas coisas.
+
+> **Rode `cd tecido && npm test` (602 casos) ao mexer em `boleto.js`, no
+> crédito da revenda ou no selo do Quadro** — 35 são da 6-C1, e **oito
+> defeitos foram reintroduzidos um a um** para provar que cada caso pega o
+> seu: disponível zero sem limite (reprova 1), cortar o estourado em zero (3),
+> contar o boleto pago (1), contar o cancelado (1), aceitar número repetido
+> (1), cobrar "sem boleto" de quem paga em PIX (1), ordenar a carteira por
+> nome (1) e pôr o selo no cartão cancelado (1). Mexeu em permissão?
+> **`node teste_acesso.js` (204) e `node teste_cobertura.js` (10) também.**
+> E **abra as três telas**: quatro dos defeitos desta fase não têm teste que
+> os pegue.
 
 ### Três regras do sob medida que valem citar aqui
 

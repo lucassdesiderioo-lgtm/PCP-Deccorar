@@ -1520,6 +1520,71 @@ INSERT INTO sm_kanban_coluna(nome,etapa,ordem) VALUES
 INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
  ('bipeAbertoMaxHoras','2','numero','Tempo maximo de um bipe',
   'Acima disto o bipe deixa de ser tempo de trabalho: ele sai das medias (horas-homem, tempo por m² e produtividade) e vira pendencia para alguem corrigir. Serve para o caso de esquecer de bipar o fim — a peca "leva" tres horas e envenena a media. Nao e meta de producao: e o teto acima do qual o numero deixa de ser acreditavel.','horas',21);
+`},
+
+{n:25, nome:'o boleto — o titulo em aberto que come o limite de credito da revenda', sql:`
+/* === O BOLETO ============================================================
+   Fase 6-C1 da spec SOBMEDIDA-PEDIDO-REVENDA (secao 4.13).
+
+     limite disponivel = limite − boletos em aberto
+
+   ⚠️ MOSTRA, NAO TRAVA. Nao ha nada nesta fase que recuse pedido por credito
+   — decisao do dono em 22/09/2026, e o motivo esta na spec: nao se perde
+   venda. O que muda e a cor do cartao e a linha da carteira.
+
+   ⚠️ O TITULO E LANCADO A MAO, e nao gerado aqui. O boleto de verdade nasce
+   no banco, com numero e codigo de barras proprios; um numero inventado
+   nesta casa seria uma segunda regua contra o extrato (armadilha #12), e a
+   que erra e descoberta na cobranca de um cliente.
+
+   ⚠️ E O MODO DE FALHAR DESTE DESENHO E O OTIMISTA, escrito aqui para nao se
+   descobrir depois: se ninguem lancar, o "em aberto" fica zero e o
+   disponivel fica igual ao limite — uma mentira que NAO PARECE ERRO, porque
+   o numero so fica maior. Por isso o credito devolve \`ultimo_movimento\`, e a
+   tela escreve desde quando ninguem mexe: numero sem a janela ao lado engana
+   (armadilha #16 do §19).
+
+   ⚠️ NEM TODO PEDIDO TEM BOLETO (dono, 26/09/2026): a fabrica recebe em PIX e
+   em cartao tambem. Por isso o \`pedido_id\` e OPCIONAL — ha parcela e ha
+   titulo de varios pedidos — e por isso a conta de "aprovado sem boleto" so
+   existe para a revenda cuja forma de pagamento E boleto. Cobra-la de quem
+   paga no PIX seria aviso disparando no caso normal, que e a armadilha #6. */
+CREATE TABLE sm_boleto (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  revenda_id INTEGER NOT NULL REFERENCES sm_revenda(id),
+  /* Opcional de proposito — ver o bloco acima. Quando vem, tem que ser
+     pedido DAQUELA revenda: apontar o do vizinho faria a conta de uma
+     aparecer na carteira da outra. O dominio confere. */
+  pedido_id INTEGER REFERENCES sm_pedido(id),
+  numero TEXT NOT NULL,
+  valor_centavos INTEGER NOT NULL,
+  vencimento TEXT NOT NULL,                 -- 'AAAA-MM-DD'
+  emitido_em TEXT,
+  observacao TEXT,
+
+  /* A BAIXA. Quem e quando, porque o credito de todo mundo depende de ela
+     acontecer — e a §4.13 avisa que boleto que ninguem baixa fica "em
+     aberto" para sempre. */
+  pago_em TEXT, pago_por TEXT,
+  /* Baixa dada na linha errada acontece. Sem caminho de volta, o jeito vira
+     lancar o titulo de novo — que e numero repetido, e o repetido come o
+     limite duas vezes. Trava que nao sabe liberar e trava que a equipe
+     contorna (§5 do CLAUDE.md). */
+  reaberto_em TEXT, reaberto_por TEXT, reaberto_motivo TEXT,
+
+  cancelado_em TEXT, cancelado_por TEXT, cancelado_motivo TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime')), criado_por TEXT,
+
+  /* ⚠️ O NUMERO E UNICO POR REVENDA, e nao no sistema inteiro: o numero e do
+     banco DELA, e dois bancos repetem numero sem nenhum erro no meio.
+     Lancado duas vezes na mesma revenda, o titulo zera o limite dela por
+     engano — e o modo de falhar e o pessimista: o vendedor para de vender
+     achando que ela estourou. O dominio recusa antes, com a frase; isto e a
+     segunda tranca. */
+  UNIQUE(revenda_id, numero)
+);
+CREATE INDEX idx_sm_boleto_revenda ON sm_boleto(revenda_id);
+CREATE INDEX idx_sm_boleto_pedido ON sm_boleto(pedido_id);
 `}
 ];
 

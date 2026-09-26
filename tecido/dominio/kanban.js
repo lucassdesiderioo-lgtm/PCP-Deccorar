@@ -77,6 +77,11 @@ function quadro(){
   }
 
   const hoje=dia.hoje();
+  /* UMA consulta para todas as revendas estouradas — o selo nao pode custar
+     uma ida ao banco por cartao, pela mesma razao do `comBipe` e do
+     `porSetor` logo acima. */
+  const estouradas=require('./boleto').estouradas();
+
   const cartaoDe=p=>{
     const b=barras.get(p.id)||{};
     /* ⚠️ SEM FICHA, SEM BARRINHA. A ficha so e explodida na APROVACAO (fase
@@ -86,9 +91,8 @@ function quadro(){
       setor:s.chave, nome:s.nome,
       total:b[s.chave].total, feitos:b[s.chave].feitos
     }));
-    /* O selo de RETIDO. Hoje so o "sem tecido" do envio — credito estourado
-       e o outro selo da spec e depende do boleto, que e a fase 6-C. Selo que
-       nunca acende seria regra escrita sem ninguem atras. */
+    /* Os dois selos de RETIDO da spec: o "sem tecido" do envio e o CREDITO
+       ESTOURADO, que nasceu com o boleto na fase 6-C1. */
     const retido=[];
     /* ⚠️ CANCELADO NÃO ESTÁ RETIDO, ELE ESTÁ MORTO. "Retido" quer dizer
        parado esperando alguma coisa, e o cancelado não espera nada: o selo
@@ -97,6 +101,11 @@ function quadro(){
        ele significa alguma coisa (§5). **Só apareceu abrindo a tela.** */
     const morto=p.cancelado_em||p.marco==='cancelado';
     if(p.sem_tecido&&!morto) retido.push('sem tecido');
+    /* ⚠️ O SELO DE CREDITO NAO E DINHEIRO, e por isso ele sobrevive a poda do
+       `custo.js` e acende para quem nao ve preco. Ele diz que a revenda
+       passou do limite, nao quanto — e quem precisa do numero tem a chave.
+       ⚠️ E ele nao trava nada (§4.13): o pedido entrou e foi aprovado. */
+    if(estouradas.has(p.revenda_id)&&!morto) retido.push('crédito estourado');
     return {
       pedido_id:p.id, numero:p.numero, tipo:p.tipo,
       revenda:p.revenda_nome, vendedor:p.vendedor_nome,
