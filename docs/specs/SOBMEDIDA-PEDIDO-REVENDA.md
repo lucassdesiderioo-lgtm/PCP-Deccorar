@@ -5,7 +5,9 @@ STATUS
 Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 26/09/2026
-Fase atual: 6-C1b EM CÓDIGO (26/09/2026) — o boleto aponta os PEDIDOS que
+Fase atual: 6-C1c EM CÓDIGO (26/09/2026) — o que FALTA titular, e o
+parcelamento que a tela não deixava lançar. Antes dela, 6-C1b EM PRODUÇÃO
+(26/09/2026) — o boleto aponta os PEDIDOS que
 cobre. Migração 26. Antes dela, a 6-C1 (o boleto e o crédito), migração 25,
             `sm_boleto`, a tarefa semanal da carteira e o selo de crédito
             estourado no Quadro. Mostra, não trava
@@ -27,10 +29,10 @@ cobre. Migração 26. Antes dela, a 6-C1 (o boleto e o crédito), migração 25,
             em paralelo ao Decorsoft
             2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
             1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
-Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ☑ **em produção**, falta a prova de fábrica  6 ◐(6-A em produção · 6-B em código · 6-C1 em produção · 6-C1b em código · 6-C2 não começou)  7 ☐  8 ☐
+Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ☑ **em produção**, falta a prova de fábrica  6 ◐(6-A em produção · 6-B em código · 6-C1 e 6-C1b em produção · 6-C1c em código · 6-C2 não começou)  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
-Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) + 2 (fase 5-A) + 1 (5-B1) + 2 (5-B2) + 3 (6-A) + 2 (6-B) + 2 (6-C1) + 2 (6-C1b) — ver abaixo
+Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) + 2 (fase 5-A) + 1 (5-B1) + 2 (5-B2) + 3 (6-A) + 2 (6-B) + 2 (6-C1) + 2 (6-C1b) + 2 (6-C1c) — ver abaixo
 ```
 
 ## 📌 O QUE ESTÁ PENDENTE — a lista única
@@ -89,6 +91,7 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 | ~~6-B~~ | ~~os sete indicadores~~ **EM CÓDIGO em 26/09/2026** — migração 24 (só o parâmetro do limite), `dominio/indicadores.js`, `dados/indicadores.js`, `rotas/indicadores.js` e a tela `/sobmedida/indicadores` (no menu: **Indicadores**). Nenhuma tabela nova. Falta a prova 10-c — e ela depende da 8 |
 | ~~6-A~~ | ~~o kanban~~ **EM CÓDIGO em 24/09/2026** — migração 23, `sm_kanban_coluna`, `dominio/kanban.js` e a tela `/sobmedida/kanban` (no menu: **Quadro**). A etapa é derivada; o `marco` não se mexeu. Falta o dono abrir e dizer se responde "onde está o pedido X" |
 | ~~6-C1b~~ | ~~o vínculo boleto ↔ pedidos~~ **EM CÓDIGO em 26/09/2026** — migração 26 (`sm_boleto_pedido`), a coluna `pedido_id` saiu, a tela lista os pedidos para marcar. Decisão do dono no mesmo dia do deploy da 6-C1: *"um recebimento tem que ser sempre atrelado a um pedido"*. Um título cobre **vários** pedidos; sem nenhum ele nasce **avulso** |
+| ~~6-C1c~~ | ~~o que falta titular~~ **EM CÓDIGO em 26/09/2026** — o dono lançou um boleto MENOR que o pedido e perguntou onde ficou o saldo devedor: em lugar nenhum, porque a régua era `NOT EXISTS (vínculo)` e **um** título de qualquer valor tirava o pedido da cobrança. Pior, tirava também da lista de marcar — então o **parcelamento não era lançável pela tela**. Hoje a régua é o dinheiro (soma dos títulos ativos × valor do pedido), com **rateio proporcional** quando um título cobre vários, e o crédito **não mudou**: o que falta titular fica ao lado do `em aberto`, nunca dentro |
 | ~~6-C1~~ | ~~o boleto e o crédito~~ **EM PRODUÇÃO em 26/09/2026** — migração 25 (`sm_boleto`), `dominio/boleto.js`, a tela `/sobmedida/financeiro` (no menu: **Financeiro**), o disponível na ficha da revenda e o selo de crédito estourado no Quadro. A **revisão bimestral do limite já existia desde a fase 2** e não foi refeita. Falta a prova 10-d |
 | **6-C2** | **NF e entrega** — selo de NF, marco `entregue`, os filtros *"entregue sem NF"* / *"NF sem entrega"* e a coluna `entregue` do Quadro. **Não tem quem marque**: não há faturamento no sob medida e a §5 diz que o ERP é outro projeto. Construir `entregue` sem quem o marque é a coluna-paisagem que a 6-A recusou — é decisão do dono, não trabalho parado |
 | 7 | o portal da revenda |
@@ -204,7 +207,8 @@ cancelado (1), aceitar número repetido (1), cobrar "sem boleto" de quem paga
 em PIX (1), ordenar a carteira por nome (1) e pôr o selo no cartão cancelado
 (1).
 
-**Testes:** `cd tecido && npm test` — **617 casos**, 35 da 6-C1 e 15 da 6-C1b.
+**Testes:** `cd tecido && npm test` — **627 casos**, 35 da 6-C1, 15 da 6-C1b e
+10 da 6-C1c (seis defeitos reintroduzidos um a um).
 
 ## STATUS DA FASE 6-C1b — em código em 26/09/2026
 
