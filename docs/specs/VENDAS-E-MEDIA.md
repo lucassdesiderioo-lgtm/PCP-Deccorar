@@ -1,4 +1,4 @@
-> **STATUS · 26/09/2026 — EM CONSTRUÇÃO** · **fase 1 no ar (PR #144, deploy conferido pelo dono em 26/09)** · **fase 2 construída (26/09), falta merge e deploy** · fase 3 planejada
+> **STATUS · 26/09/2026 — EM CONSTRUÇÃO** · **fase 1 no ar (PR #144, deploy conferido pelo dono em 26/09)** · **fase 2 no ar (PR #148, deploy em 26/09; o recorte provado, a cancelada ainda sem caso real)** · fase 3 planejada
 > A troca da fonte da média (fase 3) só acontece com o ok do dono depois de conferir.
 >
 > **Fase 1 (26/09/2026):** `media_dominio.js`, `GET /api/planejamento/media/comparar`
@@ -69,10 +69,16 @@
 >   recorte deixou de apagar história aqui. No lugar dela a tarja diz o que o
 >   import fez com os volumes cancelados.
 >
-> **Falta (fase 2):** merge, deploy e rodar `conferir_canceladas.js` com o
-> relatório antes do primeiro import — ele acha os cancelamentos de 14 meses
-> de uma vez. A prova é o primeiro import real: as canceladas saírem de
-> "Faltam imprimir" e as impressas aparecerem no card.
+> **No ar em 26/09/2026 (PR #148).** O primeiro import (relatório das 09:18,
+> ~130 vendas) manteve as **4.777** da base — pela regra antiga, ~4.650 teriam
+> sido apagadas. Não cancelou volume nenhum: as 12 linhas canceladas ou
+> devolvidas do arquivo não tinham volume na fábrica.
+>
+> **Falta (fase 2):** o primeiro cliente que cancelar depois de o PDF subir —
+> a venda tem que sair de "Faltam imprimir", ou ir para o card se a etiqueta
+> já saiu. E os 14 meses de cancelamentos antigos só são varridos quando
+> alguém importar um relatório de período longo (o `conferir_canceladas.js`
+> não chegou a rodar).
 
 ---
 
