@@ -12,7 +12,7 @@ const db=require('../nucleo/db');
    razao do `dados/producao.js`. */
 const CAMPOS=`p.id, p.numero, p.tipo, p.marco, p.pronto_em, p.sem_tecido,
   p.prazo_prometido, p.prazo_atual, p.valor_total_centavos,
-  p.enviado_em, p.aprovado_em, p.cancelado_em,
+  p.enviado_em, p.aprovado_em, p.cancelado_em, p.revenda_id,
   r.nome_fantasia AS revenda_nome, r.vendedor_nome`;
 
 const pedidos=()=>db.prepare(

@@ -44,8 +44,17 @@
   border-radius:4px; background:var(--linha); color:var(--tinta-fraca)}
 .barras .s.andando{background:#1565c0; color:#fff; font-weight:700}
 .barras .s.feito{background:#2e7d32; color:#fff; font-weight:700}
+/* ⚠️ OS SELOS SÃO DOIS DESDE A 6-C1, E ELES SAÍAM GRUDADOS:
+   `RETIDO · SEM TECIDORETIDO · CRÉDITO ESTOURADO`. Enquanto havia um só, o
+   espaçamento nunca foi exercitado — é o `📦2 peças` grudado do §5, e nenhum
+   teste de unidade o pega: o texto está perfeito, quem está errado é a
+   distância. **Só apareceu com o segundo selo na tela.** */
+/* ⚠️ ELES QUEBRAM NUMA LINHA PRÓPRIA, e não ficam lado a lado por
+   `inline-block`. A coluna tem 240 px: dois selos na mesma linha estouram a
+   borda, e é o mesmo defeito da barrinha cortada que a 6-A já consertou. */
+.selos{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px}
 .selo{display:inline-block; font-size:11px; font-weight:700; text-transform:uppercase;
-  letter-spacing:.04em; padding:2px 7px; border-radius:99px; margin-top:6px;
+  letter-spacing:.04em; padding:2px 7px; border-radius:99px;
   background:var(--alerta-fraca); color:var(--alerta); border:1px solid var(--alerta)}
 .vaziocol{color:var(--tinta-fraca); font-size:14px; padding:6px 0}
 .atrasado{color:var(--erro); font-weight:700}
@@ -129,7 +138,13 @@ function desenharCartao(c){
     });
     filhos.push(b);
   }
-  (c.retido||[]).forEach(r=>filhos.push(el('span',{class:'selo'},['retido · '+r])));
+  /* ⚠️ SÃO DOIS SELOS DESDE A 6-C1 (sem tecido e crédito estourado), e sem
+     um container eles saíam GRUDADOS: `SEM TECIDORETIDO · CRÉDITO`. Enquanto
+     havia um só, o espaçamento nunca foi exercitado — é o `📦2 peças` grudado
+     do §5, e nenhum teste de unidade o pega: o texto está perfeito, quem
+     está errado é a distância. **Só apareceu com o segundo selo na tela.** */
+  if((c.retido||[]).length) filhos.push(el('div',{class:'selos'},
+    c.retido.map(r=>el('span',{class:'selo'},['retido · '+r]))));
   return el('div',{class:'cartao-p'},filhos);
 }
 

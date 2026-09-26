@@ -79,7 +79,14 @@ const TELAS={
      6-B): a tela diz quanto cada vendedor leva para aprovar e quanto cada
      pessoa da bancada produz. Medir gente e escritorio, e a pergunta e da
      fabrica inteira — nao da carteira de quem abre. */
-  '/indicadores':{arquivo:'telas/indicadores.html', permissao:'painel.ler',           contexto:'admin'}
+  '/indicadores':{arquivo:'telas/indicadores.html', permissao:'painel.ler',           contexto:'admin'},
+
+  /* ⚠️ O FINANCEIRO PEDE `boleto.ler`, E NAO `boleto.editar` — e a mesma
+     razao de `/pedidos` pedir `pedido.ler`: o VENDEDOR vive nesta tela, pela
+     tarefa semanal da §4.13 (rever os boletos em aberto da carteira dele).
+     Os botoes de lancar, baixar e cancelar aparecem por permissao, dentro.
+     Pedir `editar` daria 403 a quem a tela existe para servir. */
+  '/financeiro':{arquivo:'telas/financeiro.html', permissao:'boleto.ler',            contexto:'admin'}
 };
 
 module.exports={TELAS};

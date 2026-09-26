@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Financeiro · Sob medida</title>
+<link rel="stylesheet" href="/sobmedida/base.css">
+<style>
+.numerao{display:flex; flex-wrap:wrap; gap:16px 40px; margin:4px 0 6px}
+.bloco{flex:0 0 auto; min-width:120px}
+.bloco .n{font-size:28px; font-weight:800; line-height:1.1; font-variant-numeric:tabular-nums}
+.bloco .r{font-size:13px; color:var(--tinta-fraca); text-transform:uppercase;
+  letter-spacing:.04em; margin-top:2px}
+.vazio{color:var(--tinta-fraca); font-size:15px; margin:6px 0 0;
+  border-left:3px solid var(--linha-forte); padding-left:10px}
+.atrasado{color:var(--erro); font-weight:700}
+.aperta{color:var(--alerta); font-weight:700}
+.sub{font-size:14px; color:var(--tinta-fraca)}
+.janela{font-size:13px; color:var(--tinta-fraca)}
+.rev{border:1px solid var(--linha); border-radius:var(--raio); padding:12px; margin-bottom:12px}
+.rev h3{margin:0 0 2px; font-size:17px}
+.erro-linha{color:var(--erro); font-size:14px; margin-top:6px}
+.form{display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; margin-top:10px}
+.form label{font-size:13px; color:var(--tinta-fraca); display:block}
+.form input,.form select{min-width:0}
+.mini{font-size:13px; padding:6px 10px}
+</style>
+</head>
+<body>
+<header class="topo">
+  <h1>Financeiro</h1>
+  <span class="espaco"></span>
+  <span class="quem" id="quem"></span>
+</header>
+
+<div class="corpo">
+
+  <div class="cartao">
+    <h2 id="titulo">Boletos em aberto</h2>
+    <p class="nota">O limite <b>mostra, não trava</b>: pedido de revenda
+      estourada entra e é aprovado do mesmo jeito — o que muda é a cor.
+      Esta é a lista da <b>tarefa semanal</b> com o financeiro.</p>
+    <div id="resumo"></div>
+    <div id="carteira"></div>
+  </div>
+
+  <!-- ⚠️ LANÇAR FICA EMBAIXO DA LISTA, e por trás da permissão. Quem abre
+       esta tela quase sempre vem revisar o que está em aberto; um formulário
+       em cima empurraria a lista para fora da tela todo dia por causa do uso
+       raro. É a mesma decisão do card Materiais do PCP (§7-B, #33). -->
+  <div class="cartao" id="cLancar" style="display:none">
+    <h2>Lançar boleto</h2>
+    <p class="nota">O número é o <b>do banco</b> — o sistema não gera boleto.
+      Lançado duas vezes na mesma revenda, o título come o limite dela em
+      dobro, e por isso o número repetido é recusado.</p>
+    <div class="form" id="form"></div>
+    <div class="erro-linha" id="erro" style="display:none"></div>
+  </div>
+
+</div>
+
+<script src="/sobmedida/ui.js"></script>
+<script src="/sobmedida/nav.js"></script>
+<script>
+const {api,el,limpar,$,dinheiro,banner}=window.ui;
+
+let EU={permissoes:[]}, REVENDAS=[];
+const posso=k=>(EU.permissoes||[]).indexOf(k)>=0;
+
+const data=v=>{
+  const t=String(v||'').slice(0,10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t.split('-').reverse().join('/') : '—';
+};
+const plural=(n,um,varios)=>n+' '+(n===1?um:varios);
+/* ⚠️ SEM `custo.ver` O CAMPO NÃO VEM NO JSON (a poda do custo.js), e aí a
+   linha do dinheiro simplesmente não existe — não é a tela que esconde. */
+const reais=c=>(c===null||c===undefined)?null:dinheiro(c/100);
+
+/* ⚠️ DINHEIRO ENTRA COMO TEXTO E VIRA INTEIRO POR SOMA, nunca por
+   `Number(x)*100`: `1,07*100` dá 107.00000000000001 e o servidor recusa —
+   com razão — o que não é inteiro (§19). São as mesmas conversões exatas do
+   catálogo, do simulador e das revendas, e é de propósito que a pessoa digite
+   `1000,00` aqui como digita lá: duas telas pedindo o mesmo dinheiro de
+   jeitos diferentes ensinam a equipe a achar que são coisas diferentes (§4).
+   **A quarta cópia deste helper está anotada no fechamento.** */
+function paraInteiro(texto,casas){
+  const t=String(texto==null?'':texto).trim().replace('.',',');
+  if(!t) return null;
+  const m=new RegExp('^(\\d+)(?:,(\\d{0,'+casas+'}))?$').exec(t);
+  if(!m) return NaN;
+  return Number(m[1])*Math.pow(10,casas)+Number((m[2]||'').padEnd(casas,'0'));
+}
+const paraCentavos=t=>paraInteiro(t,2);
+
+const grande=(valor,rotulo)=>el('div',{class:'bloco'},[
+  el('div',{class:'n'},[valor===null||valor===undefined?'—':String(valor)]),
+  el('div',{class:'r'},[rotulo])]);
+
+function tabela(colunas,linhas,celulas){
+  const t=el('table');
+  t.appendChild(el('thead',{},[el('tr',{},colunas.map(c=>
+    el('th',{class:c.num?'num':null},[c.nome])))]));
+  const tb=el('tbody');
+  linhas.forEach(l=>tb.appendChild(el('tr',{},celulas(l).map((c,i)=>
+    el('td',{class:colunas[i].num?'num':null},
+      [typeof c==='string'||typeof c==='number'?String(c):(c||'')])))));
+  t.appendChild(tb);
+  return t;
+}
+
+/* A LINHA DO CRÉDITO de uma revenda. O disponível nulo sai como frase, nunca
+   como `R$ 0,00`: sem limite lançado não há o que dizer (regra 4 do custo). */
+function creditoTexto(c){
+  if(c.valor_limite_credito_centavos===undefined) return null;   // podado
+  if(c.valor_limite_credito_centavos===null)
+    return el('span',{class:'sub'},['sem limite lançado — não dá para dizer o disponível']);
+  const d=reais(c.valor_disponivel_centavos);
+  return el('span',{},[
+    'limite ',reais(c.valor_limite_credito_centavos),' · ',
+    c.estourado
+      ? el('b',{class:'atrasado'},['ESTOUROU '+reais(-c.valor_disponivel_centavos)])
+      : el('b',{},['disponível '+d]),
+    c.limite_vencido?el('span',{class:'aperta'},[' · revisão do limite vencida']):el('span',{})
+  ]);
+}
+
+const DIAS_FRESCO=30;
+function avisoDaJanela(quando){
+  if(!quando) return el('div',{class:'janela aperta'},
+    ['nenhum boleto foi lançado nesta revenda ainda']);
+  const dias=Math.floor((Date.now()-Date.parse(String(quando).replace(' ','T')))/86400000);
+  if(!(dias>DIAS_FRESCO)) return null;
+  return el('div',{class:'janela aperta'},
+    ['ninguém mexe nos boletos desta revenda há '+plural(dias,'dia','dias')+
+     ' — o disponível pode estar velho']);
+}
+
+function desenharRevenda(c){
+  const caixa=el('div',{class:'rev'});
+  caixa.appendChild(el('h3',{},[c.revenda_nome]));
+  const credito=creditoTexto(c);
+  if(credito) caixa.appendChild(el('div',{class:'sub'},[credito]));
+
+  /* ⚠️ A JANELA SÓ APARECE QUANDO ELA INFORMA ALGUMA COISA — e isso só
+     apareceu com a tela aberta: escrita em toda revenda, "último lançamento
+     em 26/09" repetia a mesma linha quatro vezes e virava paisagem, e aí
+     ninguém a lê no dia em que ela diz "há dois meses". O modo de falhar
+     deste desenho é o OTIMISTA (ninguém lança, e o disponível fica igual ao
+     limite), então o sinal é o dado VELHO, não o fresco. */
+  const janela=avisoDaJanela(c.ultimo_movimento);
+  if(janela) caixa.appendChild(janela);
+
+  if(c.aprovados_sem_boleto) caixa.appendChild(el('div',{class:'sub'},[
+    /* Os dois, mostrados separados (§8, pergunta 6): isto NÃO entra no
+       disponível — não é dívida, é compromisso que ainda não virou título. */
+    el('b',{},[plural(c.aprovados_sem_boleto,'pedido aprovado','pedidos aprovados')]),
+    ' ainda sem boleto lançado',
+    reais(c.valor_aprovado_sem_boleto_centavos)
+      ? ' ('+reais(c.valor_aprovado_sem_boleto_centavos)+', fora do disponível)' : '']));
+
+  caixa.appendChild(el('div',{id:'bol'+c.revenda_id}));
+  carregarBoletos(c.revenda_id);
+  return caixa;
+}
+
+async function carregarBoletos(revenda_id){
+  const lista=await api('/api/boletos?situacao=aberto&revenda='+revenda_id);
+  const alvo=limpar($('#bol'+revenda_id));
+  if(!lista.length) return alvo.appendChild(el('p',{class:'vazio'},
+    ['Nada em aberto nesta revenda.']));
+  const colunas=[{nome:'Boleto'},{nome:'Pedido'},{nome:'Vencimento'},{nome:'Valor',num:true}];
+  if(posso('boleto.editar')) colunas.push({nome:''});
+  alvo.appendChild(tabela(colunas,lista,b=>{
+    const cel=[
+      b.numero,
+      b.pedido_numero?('#'+b.pedido_numero):'—',
+      b.vencido
+        ? el('span',{class:'atrasado'},[data(b.vencimento)+' · VENCIDO'])
+        : data(b.vencimento),
+      reais(b.valor_centavos)||'—'
+    ];
+    if(posso('boleto.editar')) cel.push(el('span',{},[
+      el('button',{class:'mini', type:'button',
+        onclick:()=>agir('/api/boletos/'+b.id+'/baixa',{},'Baixa dada.')},['Dar baixa']),
+      ' ',
+      el('button',{class:'mini secundario', type:'button', onclick:()=>{
+        /* Cancelar sem motivo é apagar — a regra de todo cancelamento do
+           módulo, e o servidor recusa de qualquer jeito. */
+        const m=prompt('Por que este título saiu?');
+        if(m===null) return;
+        agir('/api/boletos/'+b.id+'/cancelar',{motivo:m},'Título cancelado.');
+      }},['Cancelar'])
+    ]));
+    return cel;
+  }));
+}
+
+async function agir(caminho,corpo,ok){
+  try{
+    await api(caminho,{metodo:'POST',corpo});
+    banner(ok,'bom');
+    await carregar();
+  }catch(e){ /* o `api` já mostrou o banner com o motivo do servidor */ }
+}
+
+function desenharForm(){
+  const f=limpar($('#form'));
+  const campo=(id,rotulo,attrs)=>el('div',{},[
+    el('label',{for:id},[rotulo]),
+    el('input',Object.assign({id,type:'text'},attrs||{}))]);
+  const sel=el('select',{id:'f_revenda'});
+  REVENDAS.forEach(r=>sel.appendChild(el('option',{value:String(r.id)},[r.nome_fantasia])));
+  f.appendChild(el('div',{},[el('label',{for:'f_revenda'},['Revenda']),sel]));
+  f.appendChild(campo('f_numero','Número do boleto'));
+  f.appendChild(campo('f_valor','Valor (R$)',{placeholder:'1000,00'}));
+  f.appendChild(campo('f_venc','Vencimento',{type:'date'}));
+  f.appendChild(campo('f_pedido','Pedido (opcional)',{placeholder:'nº'}));
+  f.appendChild(el('button',{type:'button',onclick:lancar},['Lançar']));
+}
+
+async function lancar(){
+  const erro=$('#erro');
+  erro.style.display='none';
+  const pedidoNum=$('#f_pedido').value.trim();
+  const centavos=paraCentavos($('#f_valor').value);
+  if(centavos!==null&&isNaN(centavos)){
+    erro.textContent='O valor se escreve como 1000,00.';
+    erro.style.display=''; return;
+  }
+  const corpo={
+    revenda_id:Number($('#f_revenda').value),
+    numero:$('#f_numero').value,
+    valor_centavos:centavos,
+    vencimento:$('#f_venc').value
+  };
+  /* O NÚMERO vai como número: quem resolve é o servidor, que é quem sabe de
+     quem o pedido é. */
+  if(pedidoNum) corpo.pedido_numero=pedidoNum;
+  try{
+    /* ⚠️ `silencioso` PORQUE A RECUSA FICA NA LINHA, e não num banner que
+       some em três segundos: o motivo tem que estar ao lado do campo, com o
+       que a pessoa digitou ainda nele (§7-B, #33). */
+    await api('/api/boletos',{metodo:'POST',corpo,silencioso:true});
+    banner('Boleto lançado.','bom');
+    ['f_numero','f_valor','f_venc','f_pedido'].forEach(i=>{ $('#'+i).value=''; });
+    await carregar();
+  }catch(e){
+    erro.textContent=e.mensagem||e.message||'Não deu para lançar.';
+    erro.style.display='';
+  }
+}
+
+async function carregar(){
+  const c=await api('/api/boletos/carteira');
+  $('#titulo').textContent = c.carteira_inteira
+    ? 'Boletos em aberto — a casa inteira'
+    : 'Boletos em aberto — a sua carteira';
+
+  const resumo=limpar($('#resumo'));
+  const alvo=limpar($('#carteira'));
+  if(!c.revendas.length){
+    /* ⚠️ VAZIO DIZ O QUE O VAZIO SIGNIFICA. "Nada aqui" se parece com tela
+       quebrada — e aqui ele tem DOIS sentidos opostos: ou está tudo pago, ou
+       ninguém lançou nada. A frase diz os dois. */
+    alvo.appendChild(el('p',{class:'vazio'},
+      ['Nenhuma revenda com boleto em aberto. Ou está tudo pago, ou nada foi '+
+       'lançado ainda — e as duas coisas se parecem nesta tela.']));
+  }else{
+    const blocos=[grande(c.revendas.length,'revendas com título em aberto')];
+    if(reais(c.valor_em_aberto_centavos)) blocos.push(grande(reais(c.valor_em_aberto_centavos),'em aberto'));
+    if(c.valor_vencido_centavos) blocos.push(grande(reais(c.valor_vencido_centavos),'vencido'));
+    if(c.estouradas) blocos.push(grande(c.estouradas,'com limite estourado'));
+    resumo.appendChild(el('div',{class:'numerao'},blocos));
+    c.revendas.forEach(r=>alvo.appendChild(desenharRevenda(r)));
+  }
+
+  if(posso('boleto.editar')){
+    $('#cLancar').style.display='';
+    REVENDAS=await api('/api/revendas');
+    desenharForm();
+  }
+}
+
+(async function(){
+  EU=await api('/api/eu');
+  $('#quem').textContent=(EU.nome||'')+' · '+(EU.papel||'');
+  await carregar();
+})();
+</script>
+</body>
+</html>
