@@ -2965,6 +2965,16 @@ reintroduzidos um a um: a adiantada fora da pilha (6 casos), a de ontem sumindo
 (1), o nome sem normalizar (1), a conta sem andar no bipe (7) e vazio igual a
 vazio virando "mesma pessoa" (1).
 
+> ✅ **NO AR EM 26/09/2026** (PR #138): o dono fez o deploy e disse *"ficou
+> certo"*.
+>
+> ⚠️ **Isso prova que a tela abre e o card aparece; ainda não prova a conta
+> com o dia real.** O teste é que as `impressas` de um dia de expedição
+> fechem com `conferidas + faltam`, e que os nomes de quem imprimiu e de quem
+> conferiu apareçam no "sem segunda pessoa" quando for o caso — é a mesma
+> prova pendente da fase 1. Prova que não foi feita se escreve como não feita
+> (§4).
+
 ### ⚠️ O QUE SAI ADIANTADO — contado em peças, na tela do Carregamento (25/09/2026)
 
 Pedido do dono: *"mensurar e mostrar na tela de carregamento a quantidade de
