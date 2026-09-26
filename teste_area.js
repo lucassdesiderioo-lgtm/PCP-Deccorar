@@ -36,7 +36,7 @@ const db = new Database(path.join(tmp, 't.db'));
 db.exec(`CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT, buyer TEXT,
   city TEXT, nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', estagio TEXT, data TEXT,
   embalado_em TEXT, carregado_em TEXT, despachar_em TEXT, modalidade TEXT, retirado_em TEXT,
-  impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT);
+  impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT, no_carro_em TEXT);
   CREATE TABLE lote_item (id INTEGER PRIMARY KEY AUTOINCREMENT, lote_id INTEGER, codigo TEXT, qtd INTEGER DEFAULT 1);`);
 const q1 = s => db.prepare(s).get();
 const hoje = q1("SELECT date('now','localtime') d").d;

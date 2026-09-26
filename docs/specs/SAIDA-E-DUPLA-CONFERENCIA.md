@@ -16,11 +16,18 @@
 > construção: a conta só olha o canto da coleta até a fase 4 (a agência conferida está no
 > carro), e a troca de porta é por botão, não por bipe. A tela é um modo do card da coleta,
 > e não uma tela própria. **No ar em 26/09 (PR #140), deploy conferido pelo dono.** Falta o
-> primeiro caminhão de verdade. Fase 4.
+> primeiro caminhão de verdade.
+> **Fase 4 em código (26/09):** a viagem à agência (`/api/viagem/*` no `saida_route.js`), a
+> caixa de agência com dois bipes (a área confere, a viagem põe no carro — D1), a conta do
+> caminhão mantida só no canto da coleta (D2), a viagem fechando de qualquer aparelho com
+> foto da galeria (D3), e o `teste_saida_agencia.js` (43 casos). Divergências na construção:
+> "No carro" conta também a coleta que foi no carro, e a página passou a caber no celular.
+> **Com as quatro fases em código, a spec vai para `docs/arquivo/` quando a fase 4 estiver
+> no ar e a primeira viagem e o primeiro caminhão tiverem saído por ela.**
 > Criada em 25/09/2026 · PLANEJADO até a fase 1
 > Nasceu da conversa no Projeto "PCP - Deccorar" em 25/09/2026 (NOVIDADE).
 > Substitui o "Fechar coleta" de 10/09/2026 (`CLAUDE.md` §8-B), que não foi adotado pela equipe.
-> Fases: 1 ☑ (no ar) · 2 ☑ (no ar) · 3 ☑ (no ar) · 4 ☐
+> Fases: 1 ☑ (no ar) · 2 ☑ (no ar) · 3 ☑ (no ar) · 4 ☑ (em código, falta produção)
 
 ---
 

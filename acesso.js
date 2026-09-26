@@ -599,6 +599,11 @@ module.exports = function(app, db){
        `pre` — atras dele a chave seria engolida e nao mandaria em nada. */
     if(M !== 'GET' && eq('/api/saida/liberar')) return 'saida.liberar';
     if(M !== 'GET' && pre('/api/saida')) return 'carregamento.executar';
+    /* A VIAGEM A AGENCIA (fase 4): a mesma regra da saida do caminhao — a
+       bancada opera, e liberar com numero diferente do atendente e da mesma
+       chave `saida.liberar`, de novo ANTES do `pre`. */
+    if(M !== 'GET' && eq('/api/viagem/liberar')) return 'saida.liberar';
+    if(M !== 'GET' && pre('/api/viagem')) return 'carregamento.executar';
     // Fechar a coleta com o motorista e ato da mesma bancada que bipa a caixa:
     // quem carrega e quem confere o numero na frente do caminhao.
     if(M !== 'GET' && pre('/api/coleta')) return 'carregamento.executar';
@@ -761,7 +766,7 @@ module.exports = function(app, db){
     if(eq('/api/fila') || eq('/api/montagem/hoje')) return ['embalagem.executar','etiqueta.emitir','@admin'];
     /* A FOTO DA COLETA É PROVA (§8-B), e estava legível por qualquer pessoa
        logada: é a tela do celular do motorista, com a contagem dele. */
-    if(eq('/api/carregamento') || pre('/api/coleta') || pre('/api/saida')) return ['carregamento.executar','@admin'];
+    if(eq('/api/carregamento') || pre('/api/coleta') || pre('/api/saida') || pre('/api/viagem')) return ['carregamento.executar','@admin'];
     if(pre('/api/revisao')) return ['revisao.executar','@admin'];
     /* A lista de ordens do dia: a tela vermelha do operador mostra o que foi
        lançado, e o admin mostra a mesma coisa na aba de lançar. Lançar (POST)

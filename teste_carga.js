@@ -31,7 +31,7 @@ db.exec(`CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, c
   city TEXT, nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', estagio TEXT, data TEXT,
   carregado_em TEXT, despachar_em TEXT, modalidade TEXT, retirado_em TEXT,
   conferido_por TEXT, conferido_em TEXT, embalado_em TEXT, impresso_por TEXT,
-  saida_id INTEGER, saiu_em TEXT, saiu_por TEXT);
+  saida_id INTEGER, saiu_em TEXT, saiu_por TEXT, no_carro_em TEXT, no_carro_por TEXT);
   CREATE TABLE lote_item (id INTEGER PRIMARY KEY AUTOINCREMENT, lote_id INTEGER, codigo TEXT, qtd INTEGER DEFAULT 1);`);
 const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
 const ontem=db.prepare("SELECT date('now','localtime','-1 day') d").get().d;
@@ -85,7 +85,19 @@ const ok=(n,c,extra)=>{ casos++;
   if(c) console.log('ok      '+n);
   else { falhas++; console.log('FALHOU  '+n+(extra?'   '+extra:'')); } };
 
+/* DESDE A FASE 4 (D1, 26/09/2026) a caixa de AGENCIA tem dois bipes: o da
+   area confere e o da viagem poe no carro. "Carregar", para a agencia, e
+   passar pelos dois — este ajudante faz isso e devolve o que o bipe da area
+   dizia (pedido, adiantado) com o contador do carro depois. */
+async function noCarro(code){
+  const a=await chamar('POST /api/carregar',{code});
+  if(!a.ok) return a;
+  const c=await chamar('POST /api/viagem/carro',{code});
+  const dd=await chamar('GET /api/carregamento');
+  return Object.assign({},a,{ok:c.ok===true, carro:c, carregados:dd.carregados});
+}
 (async()=>{
+  await chamar('POST /api/viagem/abrir',{});
   let d=await chamar('GET /api/carregamento');
   ok('a lista mostra o atrasado junto com o de hoje', d.faltam.length===5,
      'veio '+JSON.stringify(d.faltam.map(f=>f.buyer)));
@@ -109,16 +121,18 @@ const ok=(n,c,extra)=>{ casos++;
      'veio '+JSON.stringify(d.saiu_adiantado));
 
   /* O CASO QUE ORIGINOU TUDO: antes disto a resposta era "nao_encontrado". */
-  let r=await chamar('POST /api/carregar',{code:'2000018114406178'});
+  let r=await noCarro('2000018114406178');
   ok('bipe de volume embalado ONTEM carrega', r.ok===true && r.pedido.buyer==='Giovane Teixeira',
      'veio '+JSON.stringify(r.motivo||(r.pedido||{}).buyer));
   ok('o contador anda ao carregar um atrasado', r.carregados===2, 'veio '+r.carregados);
 
-  r=await chamar('POST /api/carregar',{code:'2000014702772477'});
+  r=await noCarro('2000014702772477');
   ok('acha pelo Pack ID tambem', r.ok===true && r.pedido.buyer==='Bruno Golin', 'veio '+JSON.stringify(r.motivo));
 
   r=await chamar('POST /api/carregar',{code:'2000014702772477'});
-  ok('bipar duas vezes acusa duplicado', r.ok===false && r.motivo==='duplicado', 'veio '+JSON.stringify(r.motivo));
+  ok('bipar na area a caixa que ja esta no carro acusa duplicado', r.ok===false && r.motivo==='duplicado', 'veio '+JSON.stringify(r.motivo));
+  r=await chamar('POST /api/viagem/carro',{code:'2000014702772477'});
+  ok('e bipar de novo no carro nao conta duas vezes', r.ok===false && r.motivo==='ja_no_carro', 'veio '+JSON.stringify(r.motivo));
 
   r=await chamar('POST /api/carregar',{code:'555'});
   ok('bloqueado continua recusado (§6)', r.ok===false && r.motivo==='bloqueado', 'veio '+JSON.stringify(r.motivo));
@@ -128,7 +142,7 @@ const ok=(n,c,extra)=>{ casos++;
   r=await chamar('POST /api/carregar',{code:'999999999'});
   ok('codigo inexistente segue nao_encontrado', r.ok===false && r.motivo==='nao_encontrado', 'veio '+JSON.stringify(r.motivo));
 
-  r=await chamar('POST /api/carregar',{code:'333'});
+  r=await noCarro('333');
   ok('o volume do proprio dia carrega como sempre', r.ok===true && r.pedido.buyer==='Ana Costa', 'veio '+JSON.stringify(r.motivo));
 
   /* Sobram os dois que ninguem bipou — os dois atrasados de verdade — e a
@@ -234,10 +248,10 @@ const ok=(n,c,extra)=>{ casos++;
   ok('o que saiu no prazo nao conta como adiantado', d.saiu_adiantado.hoje.pecas===0,
      'veio '+JSON.stringify(d.saiu_adiantado));
 
-  r=await chamar('POST /api/carregar',{code:'777'});
+  r=await noCarro('777');
   ok('bipar venda futura no carro avisa que e adiantado', r.ok===true && r.adiantado===true
      && r.pedido.despachar_em===setembro, 'veio '+JSON.stringify({ok:r.ok,ad:r.adiantado,p:r.pedido&&r.pedido.despachar_em}));
-  r=await chamar('POST /api/carregar',{code:'888'});
+  r=await noCarro('888');
   ok('o atrasado NAO e adiantado', r.ok===true && r.adiantado===false, 'veio '+JSON.stringify(r.adiantado));
   d=await chamar('GET /api/carregamento');
   ok('a venda futura carregada conta 1 peca adiantada hoje, na agencia',
@@ -249,7 +263,7 @@ const ok=(n,c,extra)=>{ casos++;
   const silvio=db.prepare("SELECT id FROM lote WHERE nf='7101'").get().id;
   db.prepare("UPDATE lote SET despachar_em=date('now','localtime','+3 day') WHERE id=?").run(silvio);
   db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd) VALUES (?,?,2)").run(silvio,'BK140140BEGE');
-  await chamar('POST /api/carregar',{code:'7811'});
+  await noCarro('7811');
   d=await chamar('GET /api/carregamento');
   ok('a caixa de 2 persianas conta 2 pecas e 1 caixa',
      d.saiu_adiantado.hoje.pecas===3 && d.saiu_adiantado.hoje.caixas===2,

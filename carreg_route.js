@@ -1,4 +1,4 @@
-const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro,ehColeta,AGENCIA,AGUARDA_CAMINHAO,saidasAdiantadas,pilhaDaArea,acharVolumes}=require('./carga');
+const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro,ehColeta,AGENCIA,COLETA,AGUARDA_CAMINHAO,saidasAdiantadas,pilhaDaArea,acharVolumes,PRONTA_PRO_CARRO}=require('./carga');
 const fs=require('fs'), path=require('path');
 /* Onde ficam as fotos da conferencia com o motorista. Fora do git e FORA de
    lotes/ (que o cron apaga em 7 dias): a foto e prova, e prova nao expira
@@ -104,6 +104,14 @@ module.exports=function(app,db){
         aviso:'Esta caixa ainda nao passou pela ETIQUETA DE VENDA. Imprima a etiqueta por la '+
               '(bipando o SKU) e depois carregue — e a impressao que baixa a peca do estoque.'});
     }
+    /* A CAIXA DE AGENCIA JA CONFERIDA (fase 4): ela esta na area esperando o
+       carro, e bipa-la de novo aqui nao a poe no carro — isso e o bipe da
+       viagem. Dizer "ja conferida" em vez de conferir outra vez impede o nome
+       de quem conferiu de ser trocado por quem so esbarrou na caixa. */
+    if(!ehColeta(alvo) && alvo.conferido_em){
+      return res.json({ok:false,motivo:'ja_conferida',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
+        aviso:'Esta caixa ja foi conferida e esta na area. Para por no carro, abra a Viagem a agencia e bipe por la.'});
+    }
     if(conferenciaLigada()){
       const esperado=soCodigo(alvo.codigo);
       if(!esperado) return res.json({ok:false,motivo:'volume_sem_sku',
@@ -121,12 +129,24 @@ module.exports=function(app,db){
           pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city}});
       }
     }
-    /* QUEM BIPOU (spec SAIDA-E-DUPLA-CONFERENCIA, fase 1): o bipe de hoje no
-       carregamento e o que vira o bipe 2 — a conferencia da pilha — na fase 2.
-       Por ora so grava o nome e a hora; o comportamento da tela nao muda. */
+    /* O BIPE DA AREA E A CONFERENCIA (bipe 2). Fase 4 da spec
+       SAIDA-E-DUPLA-CONFERENCIA, decisao D1 do dono (26/09/2026): a caixa de
+       AGENCIA ganhou um segundo bipe. Aqui ela e so CONFERIDA e fica na area;
+       quem a poe no carro e o bipe da viagem (saida_route.js), que so aceita
+       caixa conferida. Na COLETA nada muda: conferir e levar pro canto, e o
+       canto e o lugar de onde o caminhao leva. */
+    const quemBipou=(req.usuario&&req.usuario.nome)||null;
+    if(!ehColeta(alvo)){
+      db.prepare(`UPDATE lote SET conferido_por=?, conferido_em=datetime('now','localtime') WHERE id=?`)
+        .run(quemBipou, alvo.id);
+      const p2=progresso();
+      const hoje2=db.prepare("SELECT date('now','localtime') d").get().d;
+      return res.json({ok:true,conferida:true,pedido:alvo,carregados:p2.carregados,total:p2.total,
+        prontas:p2.carro.prontas,coleta:false,adiantado:futuro(alvo,hoje2)});
+    }
     db.prepare(`UPDATE lote SET estagio='carregado', carregado_em=datetime('now','localtime'),
         conferido_por=?, conferido_em=datetime('now','localtime') WHERE id=?`)
-      .run((req.usuario&&req.usuario.nome)||null, alvo.id);
+      .run(quemBipou, alvo.id);
     const p=progresso();
     /* A COLETA RESPONDE COM O NUMERO QUE O MOTORISTA VAI TER QUE BATER.
        "Esta indo N" depois de cada bipe e o que faz a pessoa saber, na hora,
@@ -156,7 +176,8 @@ module.exports=function(app,db){
      agencia no "esta indo" inflaria o numero que o motorista tem que bater. */
   function progresso(){
     const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
-    const todos=db.prepare(`SELECT id,codigo,cor,buyer,nf,data,despachar_em,modalidade FROM lote
+    const todos=db.prepare(`SELECT id,codigo,cor,buyer,nf,data,despachar_em,modalidade,
+        CASE WHEN conferido_em IS NOT NULL THEN 1 ELSE 0 END conferida FROM lote
       WHERE ${PRA_CARREGAR} ORDER BY ${ORDEM_CARGA}`).all()
       .map(v=>Object.assign({},v,{atrasado: atrasado(v,hoje)?1:0}));
     /* A VENDA FUTURA SAI DA CARGA DE HOJE, mas nao volta a sumir (#9): vai
@@ -174,9 +195,14 @@ module.exports=function(app,db){
     /* E a caixa de agencia que o CAMINHAO levou (troca de porta, fase 3) nao
        esta no carro: ela saiu com saiu_por='coleta' e nao pode inflar o "No
        carro X de Y" — o carro fecharia com uma caixa a menos dentro. */
-    const car=db.prepare(`SELECT COUNT(*) n FROM lote WHERE carregado_em IS NOT NULL
-      AND date(carregado_em)=date('now','localtime') AND ${AGENCIA()}
-      AND COALESCE(saiu_por,'')<>'coleta'`).get().n;
+    /* E a de COLETA que foi no carro (troca de porta pela viagem, fase 4)
+       conta: ela esta dentro do carro, e a tela da viagem a mostra la — o
+       topo dizendo 2 com a viagem dizendo 3 seria a mesma tela com duas
+       reguas. Ela conta pela hora em que entrou no carro (`no_carro_em`). */
+    const car=db.prepare(`SELECT COUNT(*) n FROM lote WHERE
+      (carregado_em IS NOT NULL AND date(carregado_em)=date('now','localtime') AND ${AGENCIA()}
+        AND COALESCE(saiu_por,'')<>'coleta')
+      OR (no_carro_em IS NOT NULL AND date(no_carro_em)=date('now','localtime') AND ${COLETA()})`).get().n;
     /* O canto da coleta: o que esta la esperando o caminhao (carga.js), o que
        o caminhao ja levou hoje e os fechamentos do dia, com o resultado. */
     const aguardando=db.prepare(`SELECT id,codigo,buyer,nf,data,despachar_em,carregado_em FROM lote
@@ -194,6 +220,15 @@ module.exports=function(app,db){
       ORDER BY id DESC`).all();
     const aberta=db.prepare(`SELECT id,aberta_em,aberta_por FROM saida WHERE tipo='coleta' AND fechada_em IS NULL
       ORDER BY id DESC`).get()||null;
+    /* A VIAGEM A AGENCIA (fase 4): quantas estao prontas na area (conferidas,
+       fora do carro), a viagem aberta e as fechadas hoje. */
+    const prontas=db.prepare(`SELECT COUNT(*) n FROM lote WHERE ${PRONTA_PRO_CARRO}`).get().n;
+    const viagensHoje=db.prepare(`SELECT id,fechada_em,fechado_por,qtd_sistema,qtd_externa,divergente,liberado_por,motivo,
+        CASE WHEN foto IS NOT NULL THEN 1 ELSE 0 END tem_foto
+      FROM saida WHERE tipo='agencia' AND fechada_em IS NOT NULL AND date(fechada_em)=date('now','localtime')
+      ORDER BY id DESC`).all();
+    const viagem=db.prepare(`SELECT id,aberta_em,aberta_por FROM saida WHERE tipo='agencia' AND fechada_em IS NULL
+      ORDER BY id DESC`).get()||null;
     return {total:car+faltam.length, carregados:car, faltam,
             atrasados:faltam.filter(f=>f.atrasado).length,
             depois, adiantadas:depois.length,
@@ -203,6 +238,7 @@ module.exports=function(app,db){
             saiu_adiantado:saidasAdiantadas(db,30),
             coleta:{faltam:coletaFaltam, aguardando, retiradas_hoje:retiradas, fechamentos,
                     saidas_hoje:saidasHoje, saida_aberta:aberta},
+            carro:{prontas, viagem_aberta:viagem, viagens_hoje:viagensHoje},
             /* A conferencia da pilha (fase 2 da spec SAIDA-E-DUPLA-CONFERENCIA):
                impressas hoje x conferidas, caixa a caixa. A conta mora no
                carga.js; aqui so vai junto. */
