@@ -1495,6 +1495,31 @@ INSERT INTO sm_kanban_coluna(nome,etapa,ordem) VALUES
  ('Em produção','producao',4),
  ('Pronto','pronto',5),
  ('Cancelado','cancelado',6);
+`},
+
+{n:24, nome:'o limite do bipe aberto — o tempo que deixa de ser tempo de trabalho', sql:`
+/* === OS INDICADORES ======================================================
+   Fase 6-B da spec SOBMEDIDA-PEDIDO-REVENDA (secao 4.17). Os sete
+   indicadores nao precisam de tabela nenhuma: eles somam o que a 5-B1 e a
+   5-B2 ja gravam. O que falta e UM numero, e ele e cadastro.
+
+   ⚠️ "BIPE QUE ABRE E NAO FECHA SAI DA MEDIA" — esta escrito na propria
+   §4.17, com o exemplo: esqueceu de bipar o fim e foi almocar, a peca
+   "levou" tres horas. Media com esse ruido dentro e pior que nenhuma:
+   confirma com autoridade um numero falso.
+
+   ⚠️ E ELE E PARAMETRO, NAO CONSTANTE NO CODIGO, pela mesma razao do corte
+   do Mercado Livre (CLAUDE.md §8) e do prazo da revenda: o numero certo e
+   da fabrica, e hoje NINGUEM SABE QUAL E — a bancada comecou a bipar em
+   24/09/2026. Escrever 2 aqui e chutar um teto para o ruido, nao medir o
+   trabalho; escrever no codigo faria o chute parecer decidido.
+
+   Por que 2 e nao 4: o exemplo da spec e de TRES horas, e um limite acima
+   dele nao pegaria o caso que a regra existe para pegar. O teto vive abaixo
+   do exemplo ate alguem medir. */
+INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
+ ('bipeAbertoMaxHoras','2','numero','Tempo maximo de um bipe',
+  'Acima disto o bipe deixa de ser tempo de trabalho: ele sai das medias (horas-homem, tempo por m² e produtividade) e vira pendencia para alguem corrigir. Serve para o caso de esquecer de bipar o fim — a peca "leva" tres horas e envenena a media. Nao e meta de producao: e o teto acima do qual o numero deixa de ser acreditavel.','horas',21);
 `}
 ];
 

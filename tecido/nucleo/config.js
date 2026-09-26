@@ -50,7 +50,13 @@ const FAIXA={
   pesoSobra:      n=>n<=1||'O peso da sobra vai de 0 a 1 — 0,50 quer dizer metade.',
   prazoCorteDiaSemana:   n=>(Number.isInteger(n)&&n>=0&&n<=6)||'O dia da semana vai de 0 (domingo) a 6 (sabado).',
   prazoEntregaDiaSemana: n=>(Number.isInteger(n)&&n>=0&&n<=6)||'O dia da semana vai de 0 (domingo) a 6 (sabado).',
-  prazoSemanas:   n=>(Number.isInteger(n)&&n>=0&&n<=12)||'Semanas ate a entrega: um inteiro de 0 a 12.'
+  prazoSemanas:   n=>(Number.isInteger(n)&&n>=0&&n<=12)||'Semanas ate a entrega: um inteiro de 0 a 12.',
+  /* ⚠️ ZERO E O PIOR VALOR POSSIVEL AQUI, e por isso ele esta fora da faixa:
+     com o limite em zero TODO bipe vira suspeito, os tres indicadores de
+     tempo nascem vazios e a tela diz "ninguem bipou ainda" com a fabrica
+     trabalhando. O teto de 24 e o outro lado: acima de um dia o limite deixa
+     de filtrar o esquecimento, que e o que ele existe para pegar. */
+  bipeAbertoMaxHoras: n=>(n>0&&n<=24)||'O tempo maximo de um bipe vai de 0 a 24 horas — zero descartaria todos, e acima de um dia ele deixa de pegar o bipe esquecido.'
 };
 const FORMATO={
   prazoCorteHora: v=>/^([01]\d|2[0-3]):[0-5]\d$/.test(v)||'A hora do corte se escreve hh:mm, de 00:00 a 23:59.'

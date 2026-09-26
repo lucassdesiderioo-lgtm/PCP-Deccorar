@@ -4,8 +4,11 @@
 STATUS
 Situação: em construção
 Criada em: 22/09/2026
-Última atualização: 24/09/2026
-Fase atual: 6-A EM CÓDIGO (24/09/2026) — o QUADRO: onde está cada pedido,
+Última atualização: 26/09/2026
+Fase atual: 6-B EM CÓDIGO (26/09/2026) — os SETE INDICADORES. Nenhuma tabela
+            nova: eles somam o que a 5-B1 e a 5-B2 gravam. A migração 24 traz
+            UM número, e ele é cadastro — o limite do bipe aberto
+            6-A EM PRODUÇÃO (26/09/2026) — o QUADRO: onde está cada pedido,
             com a barrinha por setor. A etapa é derivada, nunca gravada, e o
             `marco` continua sendo a trava (a dívida 15 decidida)
             5 INTEIRA EM PRODUÇÃO (24/09/2026) — 5-A, 5-B1 e 5-B2.
@@ -20,10 +23,10 @@ Fase atual: 6-A EM CÓDIGO (24/09/2026) — o QUADRO: onde está cada pedido,
             em paralelo ao Decorsoft
             2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
             1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
-Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ☑ **em produção**, falta a prova de fábrica  6 ◐(6-A em código · 6-B e 6-C não começaram)  7 ☐  8 ☐
+Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ☑ **em produção**, falta a prova de fábrica  6 ◐(6-A em produção · 6-B em código · 6-C não começou)  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
-Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) + 2 (fase 5-A) + 1 (5-B1) + 2 (5-B2) — ver abaixo
+Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) + 2 (fase 5-A) + 1 (5-B1) + 2 (5-B2) + 3 (6-A) + 2 (6-B) — ver abaixo
 ```
 
 ## 📌 O QUE ESTÁ PENDENTE — a lista única
@@ -45,6 +48,7 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 | 2 | **Lançar o percentual das tabelas A e C** | o simulador recusa dizer o preço das revendas dessas tabelas — e **está certo** recusando (regra 4) | 2 |
 | 3 | **Cadastrar as revendas de hoje**, com vendedor, tabela, desconto e limite | a carteira nasce vazia e o pedido não tem para quem ir | 2 |
 | 4 | **Cadastrar os feriados** do calendário | o prazo conta como se todo dia fosse útil, e a revenda ouve uma data que a fábrica não cumpre | 2 |
+| 5-c | **Medir e lançar o limite do bipe** (Sob medida → Cadastros → Parâmetros, *Tempo máximo de um bipe*). Nasceu em **2 h**, que é um teto chutado para o ruído — ninguém sabe ainda quanto leva cada bancada | baixo demais, trabalho de verdade some das médias como se fosse esquecimento; alto demais, o bipe esquecido entra e envenena a média. Os dois erram calados | 6-B |
 | 5 | **Preencher mínimo e ideal** dos `Tubo 38/41/56` (nasceram em zero, de propósito) | o gatilho 1 não dispara para eles: a compra vem só do que está vendido | 4-C |
 | ~~5-b~~ | ~~Marcar `sobmedida.cadastrar` no setor `Sob medida / Cadastros`~~ **FEITO em 24/09/2026** — o setor ficou `supervisor` com as duas chaves, e as 3 pessoas ganharam a área `sobmedida_adm`. **A prova de que o conserto pegou é o Fernando:** ele tem `sobmedida_adm` e **não** tem `admin` — antes da armadilha #34 a chave o teria promovido junto, e ele passaria nas 24 rotas `@admin` do PCP | — | — |
 
@@ -58,6 +62,8 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 | 8-b | A **bancada de verdade recusando uma peça**, com o maço de refazer saindo da Zebra | a 5-B2 — a rodada de 24/09 foi num navegador meu |
 | 9 | O **serralheiro cortando pela medida da etiqueta** | a 4-A — o bipe provou o código de barras, não a medida |
 | 10 | O **comprador comprando pelo painel de tecido** (o comprometido da 4-B) | a 4-B |
+| 10-b | O dono abrindo o **Quadro** e respondendo *"onde está o pedido X"* | a 6-A — o que rodou em 24/09 foi num navegador meu, com pedido semeado em cada etapa |
+| 10-c | O dono respondendo, **pela tela de Indicadores**, *"quanto o Renato leva para aprovar"* e *"quanto tempo leva uma persiana por m²"* — as duas frases do pronto-quando da §7 | a 6-B. **Ela depende da prova 8**: enquanto a bancada não bipar de verdade, os três indicadores de tempo saem vazios, e vazio ali é a verdade, não defeito |
 
 ### Dívida técnica que esta spec deixou aberta
 
@@ -75,8 +81,8 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 |---|---|
 | ~~5-B2~~ | ~~a recusa com motivo → setor → pessoa~~ **EM PRODUÇÃO em 24/09/2026** — migração 22, `sm_motivo_producao`, `sm_recusa` e `refeitas`. Falta a prova 8-b |
 | ~~5-B1~~ | ~~o bipe, as filas por setor, o kit e o Pronto automático~~ **EM PRODUÇÃO em 24/09/2026** — era o pedaço que esta lista **não citava**, e sem ele a 5-B2 não tem de onde recusar. Falta a prova 8 |
+| ~~6-B~~ | ~~os sete indicadores~~ **EM CÓDIGO em 26/09/2026** — migração 24 (só o parâmetro do limite), `dominio/indicadores.js`, `dados/indicadores.js`, `rotas/indicadores.js` e a tela `/sobmedida/indicadores` (no menu: **Indicadores**). Nenhuma tabela nova. Falta a prova 10-c — e ela depende da 8 |
 | ~~6-A~~ | ~~o kanban~~ **EM CÓDIGO em 24/09/2026** — migração 23, `sm_kanban_coluna`, `dominio/kanban.js` e a tela `/sobmedida/kanban` (no menu: **Quadro**). A etapa é derivada; o `marco` não se mexeu. Falta o dono abrir e dizer se responde "onde está o pedido X" |
-| **6-B** | **os sete indicadores que já têm dado** — tempo de aprovação por vendedor, pedidos parados, prazo cumprido, horas-homem, tempo por m², produtividade por pessoa e por setor, e recusas. Todos leem o que a 5-B1 e a 5-B2 passaram a gravar **ontem**: enquanto a fábrica não bipar, eles saem vazios — e a tela tem que dizer que vazio é isso, não tela quebrada (a lição da 4-C) |
 | **6-C** | **o dinheiro** — baixa de boletos pelo financeiro, crédito disponível (`limite − boletos em aberto`), revisão bimestral do limite, e só então o selo de NF e os filtros *"entregue sem NF"* / *"NF sem entrega"*. **Nada disso existe hoje**: não há boleto, não há NF e não há marco de `entregue` no sob medida |
 | 7 | o portal da revenda |
 | 8 | segurança e abertura |
@@ -88,7 +94,94 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 > maior, e a lista que existe para ser o lugar único ficou sem ele. Aberta em
 > três, cada parte sobe sozinha e o que falta fica escrito aqui.
 
-## STATUS DA FASE 6-A — em código em 24/09/2026
+## STATUS DA FASE 6-B — em código em 26/09/2026
+
+**Os sete indicadores (§4.17).** Nenhuma tabela nova: todos somam o que as
+fases 3, 5-B1 e 5-B2 já gravam. A migração 24 traz **um** número, e ele é
+cadastro. `dominio/indicadores.js`, `dados/indicadores.js`,
+`rotas/indicadores.js` e a tela `/sobmedida/indicadores`.
+
+| Indicador | De onde sai |
+|---|---|
+| Tempo de aprovação por vendedor | `enviado_em` → `aprovado_em`, por `vendedor_nome` |
+| Pedidos parados na aprovação | `marco='enviado'` + dias de fábrica restantes |
+| Prazo cumprido | `pronto_em` contra `prazo_prometido` **e** `prazo_atual` |
+| Horas-homem por peça e por pedido | soma de `terminado_em − iniciado_em` |
+| Tempo médio por m² | por setor e no total |
+| Produtividade por pessoa e por setor | pelos bipes (`terminado_por`) |
+| Recusas | `sm_recusa`, por setor · por pessoa · por motivo |
+
+O **crédito** — a oitava linha da tabela da §4.17 — fica de fora: é boleto, e
+boleto é a 6-C.
+
+### As cinco definições de medida, e por que elas moram num lugar só
+
+Nenhuma delas muda como a fábrica trabalha; todas mudam **o que o número
+diz**. Medida escrita em dois lugares vira dois números com a mesma
+autoridade, que é a armadilha #12 — por isso as cinco estão no
+`dominio/indicadores.js` e em mais lugar nenhum.
+
+| # | A definição | O que ela evita |
+|---|---|---|
+| 1 | **A régua do bipe suspeito é UMA SÓ**, e vale para os três indicadores de tempo | a nota da própria §4.17: esqueceu de bipar o fim e foi almoçar, a peça "levou" três horas. Duas réguas para *"este tempo presta?"* divergiriam no dia em que alguém mexesse numa |
+| 2 | **Peça com bipe descartado é INCOMPLETA**, e sai da média em vez de entrar com a soma menor | ela puxaria a média para baixo sem nada dizer por quê. É a regra 4 do custo pela porta do tempo, e o número de incompletas é **dito**, não escondido |
+| 3 | **O m² é o REAL, nunca o cobrado** | o cobrado carrega o mínimo faturado de 1,5 m² (§4.8): a persiana de 1,000 × 1,000 pareceria mais rápida por m² do que é. A bancada corta o real |
+| 4 | **Prazo cumprido são DOIS números** | somados, o pedido empurrado pareceria entregue em dia. É a mesma razão de o prometido não ser sobrescrito na renegociação (§4.9) |
+| 5 | **A recusa conta no setor do CULPADO**, não no de quem recusou | a pergunta é de onde **vem** o defeito; `recusado_de` é a bancada que o **achou**, e contar nela seria uma régua que acusa o inocente |
+
+### As duas mudanças no caminho
+
+| # | O que a spec dizia | O que ficou | Por quê |
+|---|---|---|---|
+| 1 | *"tempo de aprovação por vendedor"*, sem dizer qual estatística | **mediana**, com o pior caso ao lado, em **tempo corrido** | um pedido enviado sexta 18h e aprovado segunda 9h leva 63 h de relógio e cerca de uma de expediente. Numa amostra de cinco a **média** dispara para 13 h — maior que quatro dos cinco casos — e nada na tela diria por quê. "Horas úteis" exigiria um cadastro de expediente que não existe, e inventá-lo seria um número com cara de medido; os **dias de fábrica** vão ao lado, porque é assim que a pergunta é feita em voz alta |
+| 2 | *"tempo aberto acima de um limite cadastrável"* | o limite pega **também o bipe que FECHOU demorando demais**, e não só o que ficou aberto | o exemplo da própria §4.17 é de um bipe que **fechou**: a pessoa voltou do almoço e bipou o fim. Um limite que só olhasse o aberto não pegaria o caso que a regra existe para pegar |
+
+### O que a tela faz e nenhum teste pega
+
+⚠️ **EM PRODUÇÃO ELA NASCE VAZIA, E ISSO É A VERDADE.** A bancada começou a
+bipar em 24/09/2026 e ninguém bipou uma peça real ainda (prova 8). Os sete
+blocos saem sem número — e vazio se parece com tela quebrada, que é a lição
+da 4-C. A tela separa **duas causas** com conselhos opostos: *"ainda não há
+pedido aprovado"* manda esperar; *"houve, mas nenhum nos últimos 90 dias"*
+manda mudar o filtro.
+
+A explicação longa aparece **uma vez**, num cartão no topo, e só quando a
+tela inteira está vazia — repetida nos sete blocos virava um muro do mesmo
+parágrafo, e texto que se repete ensina a não lê-lo. Ela também diz **quando
+o vazio é defeito**: se a bancada já está trabalhando e nada aparece, o lugar
+de olhar é Admin → Acessos.
+
+⚠️ **E SETE COISAS SÓ APARECERAM ABRINDO A TELA** — nenhuma tem teste de
+unidade que a pegue, e a lista é sempre do mesmo tipo:
+- datas em `2026-09-20` numa tela de fábrica brasileira (o formato do banco
+  vazando para quem lê — o *"— Correcao de contagem"* do `CLAUDE.md` §2);
+- *"1 bipe(s) continuam abertos"* e *"2 persianas ficaram de fora: ou ainda
+  não **passou**"* — concordância, e meia concordância lê-se pior que
+  nenhuma. É o *"1 destes pedidos já tiveram"* da 4-A;
+- *"parado há **266,87 h**"* — número que ninguém segura na cabeça;
+- os **dois percentuais do prazo**, que existem para serem lidos juntos,
+  esticados para as pontas opostas de 1100 px por um `flex:1`;
+- **"Serralheria" com dois totais de horas na mesma tela** — 2,17 h no bloco
+  de m² e 3,25 h na Produtividade. As duas estão certas (lá é todo bipe
+  válido, aqui só o de persiana inteira), e sem a frase que diz isso é a
+  mesma tela dizendo duas coisas — o `faltaHoje` × `precisa` do §18;
+- o muro do parágrafo repetido no estado vazio, acima.
+
+### Os oito defeitos reintroduzidos
+
+Cada um reprova o caso que existe para pegá-lo, e só ele — conferido um a um:
+contar o bipe suspeito (4), usar o m² cobrado (2), juntar prometido e
+negociado (1), contar a recusa em quem recusou (1), média no lugar da
+mediana (1), contar o kit como peça da persiana (8), apagar a diferença
+entre *"nunca"* e *"no período"* (1) e deixar a peça com bipe descartado
+entrar na média (2).
+
+**Testes:** `cd tecido && npm test` — **567 casos**, 31 da 6-B.
+`node teste_acesso.js` (204) e `node teste_cobertura.js` (10).
+
+---
+
+## STATUS DA FASE 6-A — em produção em 26/09/2026
 
 **O quadro (§4.17).** Onde está cada pedido, numa tela só — o *"onde está o
 pedido X"* do pronto-quando da fase 6. Migração 23 (`sm_kanban_coluna`),

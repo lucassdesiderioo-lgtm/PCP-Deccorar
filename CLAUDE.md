@@ -4235,6 +4235,32 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Declarar o quadro como `pedido.ler`: ele é a fábrica toda com o valor de
   cada carteira, e o vendedor tem essa chave (§19, 6-A)
 - ❌ Pôr selo de retido em cartão cancelado — ele não espera nada (§19, 6-A)
+- ❌ Filtrar o bipe suspeito em cada indicador de tempo por conta própria: a
+  régua é UMA e roda uma vez sobre a lista — três filtros divergem (§19, 6-B)
+- ❌ Escrever o limite do bipe no código: ele é cadastro, e nasce CHUTADO
+  porque ninguém mediu a bancada ainda (§19, 6-B)
+- ❌ Aceitar limite de bipe zero: com ele todo bipe vira suspeito e a tela diz
+  "ninguém bipou ainda" com a fábrica trabalhando (§19, 6-B)
+- ❌ Fazer o limite olhar só o bipe ABERTO: o exemplo da §4.17 é de um que
+  FECHOU — voltou do almoço e bipou o fim (§19, 6-B)
+- ❌ Deixar a persiana com bipe descartado entrar na média: a soma dela é menor
+  do que foi, e puxa a média para baixo em silêncio (§19, 6-B)
+- ❌ Medir tempo por m² pelo m² COBRADO: ele carrega o mínimo faturado de
+  1,5 m², e a peça pequena pareceria mais rápida do que é (§19, 6-B)
+- ❌ Exigir persiana completa na PRODUTIVIDADE: o grão dela é o bipe, e cobrar
+  a persiana inteira mede uma pessoa pelo trabalho das outras quatro (§19, 6-B)
+- ❌ Juntar prazo prometido e negociado num número, ou escrever `0%` sem pedido
+  pronto — "cumpriu zero por cento" é uma afirmação falsa (§19, 6-B)
+- ❌ Contar a recusa em `recusado_de`: essa é a bancada que ACHOU o erro, e a
+  pergunta é de onde ele VEIO (§19, 6-B)
+- ❌ Apagar a diferença entre "ninguém bipou ainda" e "nada no período": são
+  conselhos opostos — esperar ou mudar o filtro (§19, 6-B)
+- ❌ Repetir a explicação do vazio nos sete blocos: vira um muro do mesmo
+  parágrafo, e texto que se repete ensina a não lê-lo (§19, 6-B)
+- ❌ Escrever data no formato do banco (`2026-09-20`) em tela de fábrica, ou
+  deixar a frase concordar só no começo (§19, 6-B, e o §2)
+- ❌ Esticar com `flex:1` dois números que existem para serem lidos juntos —
+  os percentuais do prazo iam para pontas opostas de 1100 px (§19, 6-B)
 - ❌ Escrever uma segunda tabela de "o que vem antes" para a recusa: o `ANTES`
   lido ao contrário já responde, e duas divergem no dia em que o fluxo mudar
   (§19, 5-B2)
@@ -6142,6 +6168,140 @@ Em edição │ Enviado │ Aprovado │ Em produção │ Pronto │ Cancelado
 > permissão? **`node teste_acesso.js` (168) e `node teste_cobertura.js` (10)
 > também.** E **abra a tela**: cinco dos defeitos desta fase não têm teste que
 > os pegue.
+
+### ⚠️ A FASE 6-B (26/09/2026) — OS SETE INDICADORES, E A RÉGUA DO BIPE QUE NÃO PRESTA
+
+A 6-A respondeu *onde está o pedido*; aqui vêm os números. **Nenhuma tabela
+nova**: os sete somam o que as fases 3, 5-B1 e 5-B2 já gravam. Migração 24
+(só o parâmetro `bipeAbertoMaxHoras`), `dominio/indicadores.js`,
+`dados/indicadores.js`, `rotas/indicadores.js` e a tela
+`/sobmedida/indicadores`.
+
+```
+aprovação · parados · prazo cumprido · horas-homem · tempo por m²
+produtividade · recusas          (o crédito é boleto, e boleto é a 6-C)
+```
+
+> ⚠️ **A RÉGUA DO BIPE SUSPEITO É UMA SÓ, e é por isso que ela é aplicada uma
+> vez sobre a lista.** *"Esqueceu de bipar o fim e foi almoçar: a peça levou
+> três horas"* está escrito na própria §4.17 da spec. Horas-homem, tempo por
+> m² e produtividade são **três perguntas sobre a mesma lista de bipes**; três
+> filtros separados seriam três réguas para *"este tempo presta?"*, e elas
+> divergiriam no dia em que alguém mexesse numa só — a armadilha #12 dentro de
+> um número. `marcarSuspeitos` roda uma vez, e os três leem a marca.
+>
+> E ela pega **também o bipe que FECHOU demorando demais**, não só o que ficou
+> aberto — divergência anotada na spec. O exemplo da §4.17 é de um bipe que
+> fechou: a pessoa voltou do almoço e bipou o fim. Um limite que só olhasse o
+> aberto não pegaria o caso que a regra existe para pegar.
+
+> ⚠️ **O LIMITE É CADASTRO, E NASCE CHUTADO — está escrito assim de propósito.**
+> `bipeAbertoMaxHoras` nasce em **2 h**, e esse número não mede nada: é um teto
+> para o ruído, abaixo do exemplo de três horas da spec. **Ninguém sabe ainda
+> quanto leva cada bancada**, porque ela começou a bipar em 24/09/2026.
+> Escrevê-lo no código faria o chute parecer decidido, que é a doença dos
+> *"mínimos são placeholder"* do `COMPRAS.md`. A faixa recusa **zero** (com ele
+> TODO bipe vira suspeito, os três indicadores nascem vazios e a tela diz
+> "ninguém bipou ainda" com a fábrica trabalhando) e recusa acima de **24 h**
+> (aí ele deixa de pegar o esquecimento).
+
+> ⚠️ **NÚMERO INCOMPLETO NÃO VIRA NÚMERO CERTO.** Persiana com bipe descartado
+> tem a soma **menor** do que foi; entrar na média a puxa para baixo em
+> silêncio. Ela é contada à parte e **dita** na tela — é a regra 4 do custo
+> (§7-B) pela porta do tempo. A produtividade é a exceção, e é definição: o
+> grão dela é o **bipe**, não a peça completa. Cobrar de quem corta tubo que a
+> persiana tenha chegado à embalagem seria medir uma pessoa pelo trabalho das
+> outras quatro.
+
+> ⚠️ **O m² É O REAL, NUNCA O COBRADO.** `m2_cobrado_mm2` carrega o mínimo
+> faturado de 1,5 m² (§4.8 da spec): pelo cobrado, a persiana de 1,000 × 1,000
+> — 1 m² de trabalho e 1,5 de fatura — pareceria mais rápida por m² do que é.
+> A bancada corta o real. É a armadilha #18 (corte × consumo) numa terceira
+> porta: dois números na mesma linha, e usar um no lugar do outro.
+
+> ⚠️ **PRAZO CUMPRIDO SÃO DOIS NÚMEROS, NUNCA UM.** Prometido e negociado
+> separados — somados, o pedido empurrado pareceria entregue em dia. É a mesma
+> razão de o prometido não ser sobrescrito quando alguém renegocia (§4.9). E
+> porcentagem sem pedido pronto é **`null`**, nunca zero: *"cumpriu 0%"* é uma
+> afirmação, e ela seria falsa.
+
+> ⚠️ **A RECUSA CONTA NO SETOR DO CULPADO.** A `sm_recusa` guarda `recusado_de`
+> (a bancada que **achou** o erro) e o `componente_id` (o culpado); o setor sai
+> do JOIN. A pergunta é *de onde vem o defeito* — contar em quem recusou seria
+> uma régua que acusa justamente quem fez o trabalho de pegar o erro. A
+> **pessoa** é `feito_por`, que só sobrevive ali: a reabertura apaga o bipe do
+> culpado, que é o dado de que o indicador precisa (§19, 5-B2).
+
+> ⚠️ **A JANELA NÃO PRECISA DO CORTE DO `giro.janela()`, e saber por quê é o
+> ponto.** Lá a janela apara no primeiro consumo porque o divisor é **dias**:
+> janela maior que a história divide por dias que não existiram e o número sai
+> menor que a verdade (armadilha #16). Aqui nenhum indicador divide por dia —
+> divide-se por peça, por m² e por pessoa. Janela larga só inclui trabalho
+> velho. Mas ela **vai escrita ao lado dos números** do mesmo jeito.
+>
+> Os **parados na aprovação** ficam de fora do filtro, de propósito: pedido
+> parado há dois meses é justamente o que não pode sumir por causa de um
+> recorte. O mesmo vale para o bipe esquecido em aberto — ele é pendência
+> hoje.
+
+> ⚠️ **TEMPO DE APROVAÇÃO É MEDIANA, E É TEMPO CORRIDO.** Um pedido enviado
+> sexta 18h e aprovado segunda 9h leva 63 h de relógio e cerca de uma de
+> expediente. Numa amostra de cinco, a **média** dispara para 13 h — maior que
+> quatro dos cinco casos — e nada na tela diria por quê. O **maior** vai ao
+> lado, para ninguém confundir mediana com teto. *"Horas úteis"* exigiria um
+> cadastro de expediente que não existe, e inventá-lo seria um número com cara
+> de medido; os **dias de fábrica** vão junto, porque é assim que a pergunta é
+> feita em voz alta: *"leva um dia"*.
+
+> ⚠️ **EM PRODUÇÃO A TELA NASCE VAZIA, E ISSO É A VERDADE.** A bancada começou
+> a bipar em 24/09/2026 e ninguém bipou uma peça real ainda. Os sete blocos
+> saem sem número — e vazio se parece com tela quebrada, que é a lição da 4-C.
+> A tela separa **duas causas com conselhos opostos**: *"ainda não há pedido
+> aprovado"* manda esperar; *"houve, mas nenhum nos últimos 90 dias"* manda
+> mudar o filtro. E a explicação longa aparece **uma vez**, num cartão no topo,
+> só quando a tela inteira está vazia: repetida nos sete blocos virava um muro
+> do mesmo parágrafo, e texto que se repete ensina a não lê-lo. Ela também diz
+> **quando o vazio é defeito** — se a bancada já trabalha e nada aparece, o
+> lugar de olhar é Admin → Acessos.
+
+> ⚠️ **E SETE COISAS SÓ APARECERAM ABRINDO A TELA** — nenhuma tem teste de
+> unidade que a pegue, e é sempre o mesmo tipo:
+> - datas em `2026-09-20` numa tela brasileira — o formato do banco vazando
+>   para quem lê, que é o *"— Correcao de contagem"* do §2;
+> - *"1 bipe(s) continuam abertos"* e *"2 persianas ficaram de fora: ou ainda
+>   não **passou**"* — concordância, e **meia** concordância lê-se pior que
+>   nenhuma. É o *"1 destes pedidos já tiveram"* da 4-A;
+> - *"parado há **266,87 h**"* — número que ninguém segura na cabeça;
+> - os **dois percentuais do prazo**, que existem para serem lidos juntos,
+>   esticados para as pontas opostas de 1100 px por um `flex:1`;
+> - **"Serralheria" com dois totais de horas na mesma tela** — 2,17 h no bloco
+>   de m² e 3,25 h na Produtividade. As duas estão certas (lá é todo bipe
+>   válido, aqui só o de persiana inteira), e sem a frase que diz isso é a
+>   mesma tela dizendo duas coisas — o `faltaHoje` × `precisa` do §18;
+> - o muro do parágrafo repetido no estado vazio, acima.
+
+> **Não há chave de permissão nova**, e é de propósito: a tela é `painel.ler`,
+> a mesma do Quadro. Chave nova seria a terceira ponta da armadilha #13 sem
+> precisar. E é **uma rota só** para as sete perguntas: sete rotas seriam sete
+> idas com sete janelas podendo divergir.
+
+> ⚠️ **AINDA NÃO FOI CONFERIDA PELO DONO, e deploy não é conferência.** O
+> pronto-quando da fase 6 é ele respondendo *pela tela* *"quanto o Renato leva
+> para aprovar"* e *"quanto tempo leva uma persiana por m²"*. O que rodei foi
+> num navegador meu, com pedido semeado — e a prova **depende da bancada bipar
+> de verdade**: enquanto isso não acontecer, os três indicadores de tempo saem
+> vazios, e ali o vazio é a verdade, não defeito.
+
+> **Rode `cd tecido && npm test` (567 casos) ao mexer em `indicadores.js`, no
+> `config.js` ou no que grava bipe, prazo e recusa** — 31 são da 6-B, e **oito
+> defeitos foram reintroduzidos um a um** para provar que cada caso pega o seu:
+> contar o bipe suspeito (reprova 4), usar o m² cobrado (2), juntar prometido e
+> negociado (1), contar a recusa em quem recusou (1), média no lugar da mediana
+> (1), contar o kit como peça da persiana (8), apagar a diferença entre "nunca"
+> e "no período" (1) e deixar a peça com bipe descartado entrar na média (2).
+> Mexeu em permissão? **`node teste_acesso.js` (204) e `node teste_cobertura.js`
+> (10) também.** E **abra a tela, cheia E vazia**: sete dos defeitos desta fase
+> não têm teste que os pegue.
 
 ### Três regras do sob medida que valem citar aqui
 

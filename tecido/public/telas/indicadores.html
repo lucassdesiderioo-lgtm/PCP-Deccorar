@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Indicadores · Sob medida</title>
+<link rel="stylesheet" href="/sobmedida/base.css">
+<style>
+/* Aqui a largura de leitura do base.css VALE — diferente do Quadro. Isto é
+   texto e tabela curta, não um trilho de colunas: esticar só afastaria o
+   rótulo do número. */
+/* ⚠️ OS NÚMEROS FICAM JUNTOS, e não esticados pela largura da tela. Com
+   `flex:1` os dois percentuais do Prazo cumprido — que existem justamente
+   para serem lidos **um ao lado do outro** — iam parar nas pontas opostas de
+   1100 px, e quem lê um sem o outro lê a metade boa da história. É a mesma
+   razão de eles estarem no mesmo cartão. **Só apareceu abrindo a tela.** */
+.numerao{display:flex; flex-wrap:wrap; gap:16px 40px; margin:4px 0 6px}
+.bloco{flex:0 0 auto; min-width:120px}
+.bloco .n{font-size:30px; font-weight:800; line-height:1.1;
+  font-variant-numeric:tabular-nums}
+.bloco .r{font-size:13px; color:var(--tinta-fraca); text-transform:uppercase;
+  letter-spacing:.04em; margin-top:2px}
+/* ⚠️ O VAZIO TEM COR PRÓPRIA, e não é um número apagado: ele é uma FRASE.
+   `0 h` e `0%` se leem como "levou zero" e "cumpriu zero por cento", e as
+   duas são afirmações falsas enquanto ninguém bipou. */
+.vazio{color:var(--tinta-fraca); font-size:15px; margin:6px 0 0;
+  border-left:3px solid var(--linha-forte); padding-left:10px}
+.atrasado{color:var(--erro); font-weight:700}
+.aperta{color:var(--alerta); font-weight:700}
+.sub{font-size:14px; color:var(--tinta-fraca)}
+.pend{border-left:3px solid var(--alerta); padding-left:10px}
+</style>
+</head>
+<body>
+<header class="topo">
+  <h1>Indicadores</h1>
+  <span class="espaco"></span>
+  <span class="quem" id="quem"></span>
+</header>
+
+<div class="corpo">
+
+  <!-- ⚠️ A JANELA FICA EM CIMA DE TUDO, e não no rodapé. Média sem a janela
+       ao lado é número que engana (armadilha #16), e quem lê a tela de cima
+       para baixo tem que topar com ela antes do primeiro número. -->
+  <div class="cartao">
+    <div class="fileira" id="janela">
+      <span class="rotulo">Período</span>
+    </div>
+    <p class="nota" id="notaJanela"></p>
+  </div>
+
+  <!-- ⚠️ A EXPLICAÇÃO DO VAZIO APARECE UMA VEZ, e só quando a tela INTEIRA
+       está vazia — que é como ela nasce em produção, porque a bancada só
+       começou a bipar em 24/09/2026. Repetida em cada um dos sete blocos
+       ela virava um muro do mesmo parágrafo, e texto que se repete ensina a
+       não lê-lo (§7-B). Cada bloco fica com a linha curta, que diz o que
+       falta ali. **Só apareceu abrindo a tela vazia.** -->
+  <div class="cartao" id="cNasc" style="display:none">
+    <h2>A fábrica ainda não registrou nada</h2>
+    <p class="nota">Estes sete números nascem do trabalho de verdade: do
+      envio e da aprovação do pedido, e do <b>bipe da bancada</b>. Enquanto
+      ninguém registrar, eles não existem — <b>isto não é tela quebrada</b>.
+      Se a bancada já está trabalhando e mesmo assim não aparece nada, aí é
+      defeito: confira em <b>Admin → Acessos</b> se as pessoas estão marcadas
+      nos setores do sob medida.</p>
+  </div>
+
+  <!-- A PENDÊNCIA VEM ANTES DOS NÚMEROS. Ela é o que diz se dá para
+       acreditar neles: bipe esquecido lá dentro e a média inteira mente. -->
+  <div class="cartao" id="cSusp" style="display:none">
+    <h2>Bipes para corrigir</h2>
+    <p class="nota" id="notaSusp"></p>
+    <div id="tSusp"></div>
+  </div>
+
+  <div class="cartao">
+    <h2>Tempo de aprovação</h2>
+    <p class="nota">Do <b>envio</b> até a aprovação — nunca da aprovação em
+      diante. É <b>tempo corrido</b>, com noite e fim de semana dentro: o
+      pedido enviado na sexta à noite e aprovado na segunda conta o fim de
+      semana. Por isso o número é a <b>mediana</b>, e o pior caso vai ao
+      lado.</p>
+    <div id="aprov"></div>
+  </div>
+
+  <div class="cartao">
+    <h2>Esperando aprovação</h2>
+    <p class="nota">Em <b>dias de fábrica</b>: feriado e fim de semana não
+      contam. Prazo vencido conta para baixo.</p>
+    <div id="parados"></div>
+  </div>
+
+  <div class="cartao">
+    <h2>Prazo cumprido</h2>
+    <p class="nota">São <b>dois números, nunca um</b>. O prometido é o que a
+      revenda ouviu no envio; o negociado é o que foi combinado depois.
+      Somados, o pedido empurrado pareceria entregue em dia.</p>
+    <div id="prazo"></div>
+  </div>
+
+  <div class="cartao">
+    <h2>Horas-homem</h2>
+    <p class="nota">A soma dos cinco setores de cada persiana. Peça com bipe
+      descartado não entra: a soma dela é menor do que foi, e entrar na média
+      a puxaria para baixo sem nada dizer por quê.</p>
+    <div id="esforco"></div>
+  </div>
+
+  <div class="cartao">
+    <h2>Tempo por m²</h2>
+    <p class="nota">Pelo m² <b>real</b> da persiana, nunca pelo cobrado — o
+      cobrado carrega o mínimo faturado de 1,5 m², e a peça pequena pareceria
+      mais rápida do que é.
+      <!-- ⚠️ AS HORAS AQUI E AS DA PRODUTIVIDADE NÃO BATEM, E É DE PROPÓSITO:
+           são duas perguntas. Ali é quanto cada bancada produziu; aqui é
+           quanto custa uma persiana inteira, e por isso só entram as que
+           passaram pelas cinco. Duas linhas dizendo "Serralheria" com
+           números diferentes, sem esta frase, é a mesma tela dizendo duas
+           coisas — o `faltaHoje` × `precisa` do §18. **Só apareceu abrindo a
+           tela.** -->
+      <b>Só entram as persianas que passaram pelas cinco bancadas</b>, então
+      as horas daqui são menores que as da Produtividade abaixo: lá se conta
+      todo bipe válido, aqui só o de persiana inteira.</p>
+    <div id="porm2"></div>
+  </div>
+
+  <div class="cartao">
+    <h2>Produtividade</h2>
+    <p class="nota">Pelos bipes. Duas perguntas diferentes: quanto cada
+      pessoa produz, e quanto cada bancada produz — um serralheiro a mais
+      muda a segunda e não a primeira.</p>
+    <div id="prod"></div>
+  </div>
+
+  <div class="cartao">
+    <h2>Recusas</h2>
+    <p class="nota">Contadas na bancada de <b>onde veio o defeito</b>, e não
+      na que o achou. A pessoa é quem tinha feito a peça recusada.</p>
+    <div id="recusas"></div>
+  </div>
+
+</div>
+
+<script src="/sobmedida/ui.js"></script>
+<script src="/sobmedida/nav.js"></script>
+<script>
+const {api,el,limpar,$,dinheiro}=window.ui;
+
+const DIAS=[7,30,90,365];
+let dias=90, EU={};
+
+/* ⚠️ A FRASE DO VAZIO É DIFERENTE PARA CADA CAUSA, e é a coisa mais
+   importante desta tela hoje (24/09/2026): a bancada começou a bipar
+   ontem, e em produção TODOS estes blocos saem vazios. "Ninguém bipou
+   ainda" manda esperar; "o período não teve" manda mudar o filtro. São
+   conselhos opostos, e sem a diferença a tela parece quebrada nos dois
+   casos — a lição da fase 4-C. */
+function vazio(nada,oque){
+  if(nada==='nunca') return el('p',{class:'vazio'},['Ainda não há '+oque+'.']);
+  return el('p',{class:'vazio'},
+    ['Houve '+oque+', mas nenhum nos últimos '+dias+' dias — '+
+     'o filtro do período é que está escondendo, não a fábrica que parou. '+
+     'Aumente o período aí em cima.']);
+}
+
+const n2=v=>(v===null||v===undefined)?'—':String(v).replace('.',',');
+const hora=v=>(v===null||v===undefined)?'—':(n2(v)+' h');
+
+/* ⚠️ DATA EM dd/mm/aaaa, e não como o banco a guarda. `2026-09-20` numa tela
+   de fábrica brasileira é o "— Correcao de contagem" do §2 outra vez: o
+   formato do banco vazando para quem lê. **Só apareceu abrindo a tela.** */
+const data=v=>{
+  const t=String(v||'').slice(0,10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t.split('-').reverse().join('/') : '—';
+};
+
+/* ⚠️ A FRASE CONCORDA COM O NÚMERO. "1 bipe(s) continuam abertos" é o
+   "1 destes pedidos já tiveram" da fase 4-A, e o caso de UM é o normal numa
+   fábrica que acabou de começar a bipar. */
+const plural=(n,um,varios)=>n+' '+(n===1?um:varios);
+
+/* ⚠️ 266 HORAS NÃO É UM NÚMERO QUE ALGUÉM SEGURA NA CABEÇA. Acima de dois
+   dias a espera vira dias corridos — quem lê a lista quer saber se é de
+   ontem ou da semana passada, e 266,87 h não responde isso de relance. */
+function espera(h){
+  if(h===null||h===undefined) return '—';
+  if(h<48) return n2(Math.round(h*10)/10)+' h';
+  const d=Math.floor(h/24);
+  return plural(d,'dia','dias');
+}
+
+// O bloco de número grande. Valor nulo sai como travessão, nunca como zero.
+const grande=(valor,rotulo)=>el('div',{class:'bloco'},[
+  el('div',{class:'n'},[valor===null||valor===undefined?'—':String(valor)]),
+  el('div',{class:'r'},[rotulo])]);
+
+function tabela(colunas,linhas,celulas){
+  const t=el('table');
+  t.appendChild(el('thead',{},[el('tr',{},colunas.map(c=>
+    el('th',{class:c.num?'num':null},[c.nome])))]));
+  const tb=el('tbody');
+  linhas.forEach(l=>tb.appendChild(el('tr',{},celulas(l).map((c,i)=>
+    el('td',{class:colunas[i].num?'num':null},
+      [typeof c==='string'||typeof c==='number'?String(c):(c||'')])))));
+  t.appendChild(tb);
+  return t;
+}
+
+function diasTexto(v){
+  if(v==null) return '—';
+  if(v<0) return el('span',{class:'atrasado'},
+    ['VENCIDO há '+plural(Math.abs(v),'dia','dias')]);
+  if(v===0) return el('span',{class:'atrasado'},['vence hoje']);
+  if(v<=2) return el('span',{class:'aperta'},[plural(v,'dia','dias')]);
+  return plural(v,'dia','dias');
+}
+
+/* ── Os oito blocos ───────────────────────────────────────────────────── */
+
+function desAprov(a){
+  const alvo=limpar($('#aprov'));
+  if(a.nada) return alvo.appendChild(vazio(a.nada,'pedido aprovado'));
+  alvo.appendChild(tabela(
+    [{nome:'Vendedor'},{nome:'Pedidos',num:true},{nome:'Mediana',num:true},
+     {nome:'Pior caso',num:true},{nome:'Dias de fábrica',num:true}],
+    a.vendedores,
+    v=>[v.vendedor,v.pedidos,hora(v.horas_mediana),hora(v.horas_maior),
+        v.dias_uteis_mediana===null?'—':String(v.dias_uteis_mediana)]));
+}
+
+function desParados(p){
+  const alvo=limpar($('#parados'));
+  if(p.nada) return alvo.appendChild(vazio(p.nada,'pedido esperando aprovação'));
+  alvo.appendChild(el('div',{class:'numerao'},[
+    grande(p.lista.length,'esperando'),
+    grande(p.vencidos,'com prazo vencido')]));
+  alvo.appendChild(tabela(
+    [{nome:'Pedido'},{nome:'Revenda'},{nome:'Vendedor'},
+     {nome:'Parado há',num:true},{nome:'Prazo'}],
+    p.lista,
+    l=>['#'+(l.numero||'—'),l.revenda_nome||'',l.vendedor||'',
+        espera(l.horas_parado),diasTexto(l.dias_uteis_restantes)]));
+}
+
+function desPrazo(p){
+  const alvo=limpar($('#prazo'));
+  if(p.nada) return alvo.appendChild(vazio(p.nada,'pedido pronto'));
+  alvo.appendChild(el('div',{class:'numerao'},[
+    grande(p.prontos,'pedidos prontos'),
+    /* ⚠️ `pct` nulo sai como travessão. `0%` se lê como "cumpriu zero por
+       cento", que é uma afirmação — e ela seria falsa. */
+    grande(p.pct_prometido===null?null:(p.pct_prometido+'%'),'cumpriu o prometido'),
+    grande(p.pct_negociado===null?null:(p.pct_negociado+'%'),'cumpriu o negociado')]));
+  if(p.sem_prazo) alvo.appendChild(el('p',{class:'sub'},
+    [plural(p.sem_prazo,'pedido ficou','pedidos ficaram')+
+     ' fora da conta, por não ter prazo gravado.']));
+  if(p.atrasados.length) alvo.appendChild(tabela(
+    [{nome:'Pedido'},{nome:'Revenda'},{nome:'Prometido'},{nome:'Negociado'},
+     {nome:'Ficou pronto'},{nome:'Atraso',num:true}],
+    p.atrasados,
+    l=>['#'+(l.numero||'—'),l.revenda_nome||'',data(l.prazo_prometido),
+        data(l.prazo_atual),data(l.pronto_em),
+        l.dias_uteis===null?'—':plural(l.dias_uteis,'dia','dias')]));
+}
+
+function desEsforco(e){
+  const alvo=limpar($('#esforco'));
+  if(e.nada) return alvo.appendChild(vazio(e.nada,'bipe na bancada'));
+  alvo.appendChild(el('div',{class:'numerao'},[
+    grande(e.pecas_completas,'persianas completas'),
+    grande(hora(e.horas_por_peca),'por persiana'),
+    grande(hora(e.horas_total),'no total')]));
+  /* Peça incompleta é DITA, não escondida: ela é a razão de o número de cima
+     estar menor do que a fábrica trabalhou. */
+  /* A frase inteira concorda, e não só o começo dela: "2 persianas ficaram
+     de fora: ou ainda não passou..." é meia concordância, que se lê pior que
+     nenhuma. */
+  if(e.pecas_incompletas) alvo.appendChild(el('p',{class:'sub'},
+    [e.pecas_incompletas===1
+      ? '1 persiana ficou de fora: ou ainda não passou por todas as bancadas, '+
+        'ou tem bipe descartado.'
+      : e.pecas_incompletas+' persianas ficaram de fora: ou ainda não passaram '+
+        'por todas as bancadas, ou têm bipe descartado.',
+     ' Soma incompleta não vira média.']));
+  if(e.por_pedido.length) alvo.appendChild(tabela(
+    [{nome:'Pedido'},{nome:'Persianas',num:true},{nome:'Horas',num:true},
+     {nome:'Por persiana',num:true}],
+    e.por_pedido,
+    l=>['#'+(l.numero||'—'),l.pecas,hora(l.horas),hora(l.horas_por_peca)]));
+}
+
+function desPorM2(m){
+  const alvo=limpar($('#porm2'));
+  if(m.nada) return alvo.appendChild(vazio(m.nada,'bipe na bancada'));
+  if(m.total===null) return alvo.appendChild(el('p',{class:'vazio'},
+    ['Nenhuma persiana completou as cinco bancadas no período — persiana pela '+
+     'metade não diz quanto tempo leva uma persiana.']));
+  alvo.appendChild(el('div',{class:'numerao'},[
+    grande(hora(m.total),'por m² no total'),
+    grande(n2(m.m2)+' m²','medidos'),
+    grande(m.pecas,'persianas')]));
+  alvo.appendChild(tabela(
+    [{nome:'Bancada'},{nome:'Horas',num:true},{nome:'Por m²',num:true}],
+    m.setores,
+    s=>[s.setor_nome,hora(s.horas),hora(s.horas_por_m2)]));
+}
+
+function desProd(p){
+  const alvo=limpar($('#prod'));
+  if(p.nada) return alvo.appendChild(vazio(p.nada,'bipe na bancada'));
+  alvo.appendChild(el('h3',{},['Por pessoa']));
+  alvo.appendChild(tabela(
+    [{nome:'Pessoa'},{nome:'Bancadas'},{nome:'Peças',num:true},
+     {nome:'Horas',num:true},{nome:'Por peça',num:true}],
+    p.pessoas,
+    x=>[x.pessoa,(x.setores||[]).join(', '),x.pecas,hora(x.horas),hora(x.horas_por_peca)]));
+  alvo.appendChild(el('h3',{},['Por bancada']));
+  alvo.appendChild(tabela(
+    [{nome:'Bancada'},{nome:'Pessoas',num:true},{nome:'Peças',num:true},
+     {nome:'Horas',num:true},{nome:'Por peça',num:true}],
+    p.setores,
+    x=>[x.setor_nome,x.pessoas,x.pecas,hora(x.horas),hora(x.horas_por_peca)]));
+}
+
+function desRecusas(r){
+  const alvo=limpar($('#recusas'));
+  if(r.nada) return alvo.appendChild(vazio(r.nada,'recusa'));
+  alvo.appendChild(el('div',{class:'numerao'},[grande(r.total,'recusas')]));
+  alvo.appendChild(el('h3',{},['De onde veio o defeito']));
+  alvo.appendChild(tabela([{nome:'Bancada'},{nome:'Recusas',num:true}],
+    r.setores, x=>[x.setor_nome,x.recusas]));
+  alvo.appendChild(el('h3',{},['Por motivo']));
+  alvo.appendChild(tabela([{nome:'Motivo'},{nome:'Recusas',num:true}],
+    r.motivos, x=>[x.motivo,x.recusas]));
+  alvo.appendChild(el('h3',{},['Por pessoa']));
+  alvo.appendChild(el('p',{class:'sub'},
+    ['Quem tinha feito a peça recusada — a reabertura apaga o bipe, e este é '+
+     'o único lugar onde o nome sobrevive.']));
+  alvo.appendChild(tabela([{nome:'Pessoa'},{nome:'Recusas',num:true}],
+    r.pessoas, x=>[x.pessoa,x.recusas]));
+}
+
+function desSusp(s){
+  const c=$('#cSusp');
+  if(!s.lista.length){ c.style.display='none'; return; }
+  c.style.display='';
+  $('#notaSusp').textContent=
+    'Bipe que passa de '+n2(s.limite_horas)+' h deixa de ser tempo de trabalho e '+
+    'sai das médias — quem esquece de bipar o fim e volta do almoço faz a peça '+
+    '"levar" três horas. '+
+    (s.horas_descartadas?('Foram '+n2(s.horas_descartadas)+' h descartadas. '):'')+
+    (s.abertos?(plural(s.abertos,'bipe continua aberto','bipes continuam abertos')+
+      ': alguém precisa ir fechar.'):'')+
+    ' O limite se muda em Cadastros → Parâmetros.';
+  limpar($('#tSusp')).appendChild(tabela(
+    [{nome:'Etiqueta'},{nome:'Peça'},{nome:'Bancada'},{nome:'Quem'},
+     {nome:'Horas',num:true},{nome:'Situação'}],
+    s.lista,
+    l=>[l.codigo||'—',l.peca||'',l.setor_nome,l.pessoa||'—',hora(l.horas),
+        l.aberto?el('span',{class:'atrasado'},['ainda aberto']):'demorou demais']));
+}
+
+/* ── A tela ───────────────────────────────────────────────────────────── */
+
+function botoes(){
+  const f=$('#janela');
+  DIAS.forEach(d=>{
+    const b=el('button',{class:'op', type:'button',
+      'aria-pressed':String(d===dias),
+      onclick:()=>{ dias=d; carregar(); }},
+      [d===365?'1 ano':(d+' dias')]);
+    f.appendChild(b);
+  });
+}
+
+async function carregar(){
+  [...$('#janela').querySelectorAll('.op')].forEach((b,i)=>
+    b.setAttribute('aria-pressed',String(DIAS[i]===dias)));
+  const r=await api('/api/indicadores?dias='+dias);
+  $('#notaJanela').textContent=
+    'Tudo nesta tela olha os últimos '+r.janela.dias+' dias, desde '+
+    r.janela.desde.slice(0,10).split('-').reverse().join('/')+
+    '. Os pedidos esperando aprovação são a exceção: parado há dois meses é '+
+    'justamente o que não pode sumir por causa de um filtro.';
+  /* O cartão de nascimento só aparece quando NADA foi registrado ainda. Com
+     um único número na tela ele some, porque aí a explicação já não é o
+     assunto. */
+  const blocos=[r.aprovacao,r.parados,r.prazo,r.esforco,r.produtividade,r.recusas];
+  $('#cNasc').style.display=blocos.every(b=>b.nada==='nunca')?'':'none';
+  desSusp(r.suspeitos);
+  desAprov(r.aprovacao);
+  desParados(r.parados);
+  desPrazo(r.prazo);
+  desEsforco(r.esforco);
+  desPorM2(r.porM2);
+  desProd(r.produtividade);
+  desRecusas(r.recusas);
+}
+
+(async function(){
+  EU=await api('/api/eu');
+  $('#quem').textContent=(EU.nome||'')+' · '+(EU.papel||'');
+  botoes();
+  await carregar();
+})();
+</script>
+</body>
+</html>

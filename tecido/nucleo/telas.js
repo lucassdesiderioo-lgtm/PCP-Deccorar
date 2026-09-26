@@ -73,7 +73,13 @@ const TELAS={
      pedido X" para a fabrica inteira, com o valor de cada carteira — e isso
      e escritorio, nao bancada. Declarado `pedido.ler` ele daria ao VENDEDOR
      o quadro das revendas dos colegas; a fila dele continua em /pedidos. */
-  '/kanban':    {arquivo:'telas/kanban.html',    permissao:'painel.ler',            contexto:'admin'}
+  '/kanban':    {arquivo:'telas/kanban.html',    permissao:'painel.ler',            contexto:'admin'},
+
+  /* ⚠️ OS INDICADORES SAO `painel.ler` PELA MESMA RAZAO DO QUADRO (fase
+     6-B): a tela diz quanto cada vendedor leva para aprovar e quanto cada
+     pessoa da bancada produz. Medir gente e escritorio, e a pergunta e da
+     fabrica inteira — nao da carteira de quem abre. */
+  '/indicadores':{arquivo:'telas/indicadores.html', permissao:'painel.ler',           contexto:'admin'}
 };
 
 module.exports={TELAS};
