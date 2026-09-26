@@ -2,8 +2,8 @@
 > impressão (a reimpressão não mexe), `conferido_por`/`conferido_em` no bipe atual do
 > carregamento, colunas e tabela `saida` criadas (`saida_schema.js`), e o
 > `fechar_saida_passivo.js` com `teste_saida.js` (26 casos). **No ar em 26/09 (PR #135),
-> deploy conferido pelo dono.** Falta conferir no dado real o script do passivo e os nomes
-> gravados; fases 2 a 4.
+> deploy conferido pelo dono.** Passivo fechado em 26/09: **399 caixas** (10/09 a 25/09) na
+> saída #1, com backup. Falta ver os nomes gravados numa caixa impressa e bipada; fases 2 a 4.
 > Criada em 25/09/2026 · PLANEJADO até a fase 1
 > Nasceu da conversa no Projeto "PCP - Deccorar" em 25/09/2026 (NOVIDADE).
 > Substitui o "Fechar coleta" de 10/09/2026 (`CLAUDE.md` §8-B), que não foi adotado pela equipe.
