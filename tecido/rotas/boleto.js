@@ -28,11 +28,24 @@ module.exports={rotas:[
   {metodo:'GET', caminho:'/api/boletos', permissao:LER,
    manipulador:({query,usuario})=>podar(usuario,boleto.listar({
      revenda_id:query.revenda!==undefined?Number(query.revenda):undefined,
-     situacao:query.situacao
+     situacao:query.situacao,
+     /* Parametro AUSENTE devolve tudo, como sempre — a tela antiga em cache
+        continua chamando sem ele e recebe o que recebia (§5, #23). */
+     avulso:query.avulso===undefined?undefined:query.avulso==='1'
    }))},
 
   {metodo:'GET', caminho:'/api/revendas/:id/credito', permissao:LER,
    manipulador:({params,usuario})=>podar(usuario,boleto.credito(Number(params.id)))},
+
+  /* Os pedidos aprovados desta revenda que ainda nao tem titulo — a lista que
+     a tela MARCA ao lancar, em vez de pedir o numero digitado. Digitar e onde
+     nasce o vinculo errado, e a lista ja e exatamente o que o sistema sabe.
+     E `boleto.ler` de proposito: mandar a tela a `/api/pedidos` exigiria dela
+     `pedido.ler`, que quem lanca boleto pode nao ter — e o efeito seria um
+     seletor vazio com 403 no console, que nao se parece com "falta permissao"
+     (§10, armadilha #29). */
+  {metodo:'GET', caminho:'/api/revendas/:id/pedidos-sem-boleto', permissao:LER,
+   manipulador:({params,usuario})=>podar(usuario,boleto.pedidosSemBoleto(Number(params.id)))},
 
   {metodo:'POST', caminho:'/api/boletos', permissao:EDITAR,
    manipulador:({corpo,usuario})=>podar(usuario,boleto.lancar(corpo,usuario)),

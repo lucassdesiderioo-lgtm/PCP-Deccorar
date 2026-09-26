@@ -20,11 +20,48 @@ const CAMPOS=`b.*, ${SITUACAO} AS situacao,
         AND b.vencimento < date('now','localtime')
        THEN 1 ELSE 0 END AS vencido,
   r.nome_fantasia AS revenda_nome, r.vendedor_usuario_id, r.vendedor_nome,
-  p.numero AS pedido_numero`;
+  /* ⚠️ A SOMA DOS PEDIDOS QUE O TITULO CITA — e NULL quando ele nao cita
+     nenhum, nunca zero: sem pedido nao ha contra o que comparar, e a
+     pergunta nem se faz (regra 4 do custo, §7-B). E por isso a subconsulta
+     usa SUM sem COALESCE.
+     (O comentario vive dentro de um template literal: crase aqui fecharia a
+      string, e foi o que aconteceu na primeira escrita.) */
+  (SELECT SUM(p.valor_total_centavos) FROM sm_boleto_pedido bp
+     JOIN sm_pedido p ON p.id=bp.pedido_id
+    WHERE bp.boleto_id=b.id) AS valor_pedidos_centavos,
+  (SELECT COUNT(*) FROM sm_boleto_pedido bp WHERE bp.boleto_id=b.id) AS pedidos_n`;
 
 const DE=`FROM sm_boleto b
-  JOIN sm_revenda r ON r.id=b.revenda_id
-  LEFT JOIN sm_pedido p ON p.id=b.pedido_id`;
+  JOIN sm_revenda r ON r.id=b.revenda_id`;
+
+/* Os pedidos de um titulo, na ordem em que a revenda os reconhece — pelo
+   NUMERO, que e o que esta escrito no papel dela, e nao pelo id de banco. */
+const pedidosDe=boleto_id=>db.prepare(
+  'SELECT p.id, p.numero, p.valor_total_centavos, p.marco, p.cancelado_em '+
+  '  FROM sm_boleto_pedido bp JOIN sm_pedido p ON p.id=bp.pedido_id '+
+  ' WHERE bp.boleto_id=? ORDER BY p.numero').all(boleto_id);
+
+/* Os vinculos de VARIOS titulos numa consulta so — a lista da tela nao pode
+   custar uma ida por linha, pela mesma razao do `estouradas` logo abaixo. */
+const pedidosDeVarios=ids=>{
+  if(!ids.length) return new Map();
+  const m=new Map();
+  for(const r of db.prepare(
+    'SELECT bp.boleto_id, p.id, p.numero, p.valor_total_centavos '+
+    '  FROM sm_boleto_pedido bp JOIN sm_pedido p ON p.id=bp.pedido_id '+
+    ' WHERE bp.boleto_id IN ('+ids.map(()=>'?').join(',')+') '+
+    ' ORDER BY p.numero').all(...ids)){
+    if(!m.has(r.boleto_id)) m.set(r.boleto_id,[]);
+    m.get(r.boleto_id).push({id:r.id, numero:r.numero,
+      valor_total_centavos:r.valor_total_centavos});
+  }
+  return m;
+};
+
+const ligarPedidos=(boleto_id,pedido_ids)=>{
+  const ins=db.prepare('INSERT OR IGNORE INTO sm_boleto_pedido(boleto_id,pedido_id) VALUES(?,?)');
+  for(const id of pedido_ids) ins.run(boleto_id,id);
+};
 
 const porId=id=>db.prepare('SELECT '+CAMPOS+' '+DE+' WHERE b.id=?').get(id);
 
@@ -35,7 +72,14 @@ const porNumero=(revenda_id,numero)=>db.prepare(
 const listar=filtro=>{
   const f=filtro||{}, onde=[], v=[];
   if(f.revenda_id!==undefined){ onde.push('b.revenda_id=?'); v.push(f.revenda_id); }
-  if(f.pedido_id!==undefined){ onde.push('b.pedido_id=?'); v.push(f.pedido_id); }
+  if(f.pedido_id!==undefined){
+    onde.push('EXISTS (SELECT 1 FROM sm_boleto_pedido bp WHERE bp.boleto_id=b.id AND bp.pedido_id=?)');
+    v.push(f.pedido_id);
+  }
+  /* O avulso a parte, porque e a excecao que tem que ficar visivel — e nao
+     se misturar com os que tem pedido (decisao do dono, 26/09/2026). */
+  if(f.avulso===true)  onde.push('NOT EXISTS (SELECT 1 FROM sm_boleto_pedido bp WHERE bp.boleto_id=b.id)');
+  if(f.avulso===false) onde.push('EXISTS (SELECT 1 FROM sm_boleto_pedido bp WHERE bp.boleto_id=b.id)');
   if(f.vendedor_usuario_id!==undefined){
     onde.push('r.vendedor_usuario_id=?'); v.push(f.vendedor_usuario_id);
   }
@@ -75,9 +119,22 @@ const aprovadosSemBoleto=revenda_id=>db.prepare(
   "SELECT COUNT(*) AS quantos, COALESCE(SUM(p.valor_total_centavos),0) AS valor "+
   "  FROM sm_pedido p "+
   " WHERE p.revenda_id=? AND p.marco='aprovado' AND p.cancelado_em IS NULL "+
-  "   AND NOT EXISTS (SELECT 1 FROM sm_boleto b "+
-  "                    WHERE b.pedido_id=p.id AND b.cancelado_em IS NULL)")
+  "   AND NOT EXISTS (SELECT 1 FROM sm_boleto_pedido bp "+
+  "                     JOIN sm_boleto b ON b.id=bp.boleto_id "+
+  "                    WHERE bp.pedido_id=p.id AND b.cancelado_em IS NULL)")
   .get(revenda_id);
+
+/* A LISTA que a tela marca — e nao so a contagem. Digitar numero de pedido e
+   onde nasce o vinculo errado; a lista ja e exatamente o que o sistema sabe,
+   como o card de pacote do §5, que nasce preenchido. */
+const pedidosSemBoleto=revenda_id=>db.prepare(
+  "SELECT p.id, p.numero, p.valor_total_centavos, p.criado_em "+
+  "  FROM sm_pedido p "+
+  " WHERE p.revenda_id=? AND p.marco='aprovado' AND p.cancelado_em IS NULL "+
+  "   AND NOT EXISTS (SELECT 1 FROM sm_boleto_pedido bp "+
+  "                     JOIN sm_boleto b ON b.id=bp.boleto_id "+
+  "                    WHERE bp.pedido_id=p.id AND b.cancelado_em IS NULL) "+
+  " ORDER BY p.numero").all(revenda_id);
 
 // As revendas que TEM boleto em aberto, para a tarefa semanal da carteira.
 const revendasComAberto=vendedor_usuario_id=>db.prepare(
@@ -101,10 +158,11 @@ const estouradas=()=>new Set(db.prepare(
 
 const criar=x=>{
   const r=db.prepare(
-    'INSERT INTO sm_boleto(revenda_id,pedido_id,numero,valor_centavos,vencimento,'+
-    ' emitido_em,observacao,criado_por) VALUES(?,?,?,?,?,?,?,?)')
-    .run(x.revenda_id,x.pedido_id||null,x.numero,x.valor_centavos,x.vencimento,
+    'INSERT INTO sm_boleto(revenda_id,numero,valor_centavos,vencimento,'+
+    ' emitido_em,observacao,criado_por) VALUES(?,?,?,?,?,?,?)')
+    .run(x.revenda_id,x.numero,x.valor_centavos,x.vencimento,
          x.emitido_em||null,x.observacao||null,x.criado_por||null);
+  if(x.pedido_ids&&x.pedido_ids.length) ligarPedidos(r.lastInsertRowid,x.pedido_ids);
   return porId(r.lastInsertRowid);
 };
 
@@ -117,4 +175,5 @@ const atualizar=(id,campos)=>{
 };
 
 module.exports={porId,porNumero,listar,emAberto,ultimoMovimento,
-  aprovadosSemBoleto,revendasComAberto,estouradas,criar,atualizar};
+  aprovadosSemBoleto,pedidosSemBoleto,revendasComAberto,estouradas,
+  pedidosDe,pedidosDeVarios,ligarPedidos,criar,atualizar};

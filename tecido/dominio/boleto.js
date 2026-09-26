@@ -37,7 +37,7 @@ const nome=usuario=>(usuario&&usuario.nome)||null;
 const porId=id=>{
   const b=d.porId(id);
   exigir(b,'boleto_inexistente','Este boleto nao existe.');
-  return b;
+  return comPedidos(b);
 };
 
 /* ── O LANCAMENTO ─────────────────────────────────────────────────────────
@@ -58,6 +58,88 @@ function vencimentoOuErro(v){
     (v===undefined||v===null?'':v)+'".');
   return data;
 }
+
+/* ── OS PEDIDOS QUE O TITULO COBRE (fase 6-C1b) ───────────────────────────
+   Decisao do dono em 26/09/2026: "um recebimento tem que ser sempre atrelado
+   a um pedido — dessa forma ele conversa com o contas a receber e tambem com
+   o que ja foi acordado ao pedido".
+
+   ⚠️ SAO VARIOS, E POR ISSO NAO E MAIS UMA COLUNA. O financeiro junta os
+   pedidos da semana num titulo so; `pedido_id` cabia um, e o resto ficava de
+   fora em silencio — com ela, o "aprovado sem boleto" continuaria cobrando
+   para sempre os pedidos que o titulo ja cobriu. Ha caso travando.
+
+   ⚠️ ID E NUMERO SAO CAMPOS DIFERENTES, E NAO SE ADIVINHA QUAL E QUAL. Os
+   numeros de pedido comecam em 5001 e os ids comecam em 1: um dia os dois
+   intervalos se cruzam, e ai um "5001" e os dois ao mesmo tempo. Heuristica
+   ali seria regua que erra em SILENCIO, mandando o titulo para o pedido de
+   outra venda — e o erro so apareceria na conferencia da revenda. A tela usa
+   `pedido_ids` (ela marca o que o servidor mandou); `pedido_numeros` existe
+   para quem digita, porque o numero e o que esta escrito no papel.
+
+   ⚠️ E UM ERRADO DERRUBA A LISTA INTEIRA. Aceitar os certos e descartar o
+   errado deixaria o titulo cobrindo menos do que quem lancou acha — e
+   ninguem confere um boleto que "deu certo". */
+function resolverPedidos(x,rev){
+  const ids=[].concat(x.pedido_ids||[], (x.pedido_id===undefined||x.pedido_id===null||String(x.pedido_id)==='')?[]:[x.pedido_id]);
+  const nums=[].concat(x.pedido_numeros||[], (x.pedido_numero===undefined||x.pedido_numero===null||String(x.pedido_numero).trim()==='')?[]:[x.pedido_numero]);
+
+  const achados=[];
+  for(const id of ids){
+    achados.push([id, db.prepare('SELECT id,revenda_id,numero,marco,cancelado_em FROM sm_pedido WHERE id=?')
+      .get(Number(id))]);
+  }
+  for(const n of nums){
+    achados.push([n, db.prepare('SELECT id,revenda_id,numero,marco,cancelado_em FROM sm_pedido WHERE numero=?')
+      .get(Number(String(n).trim()))]);
+  }
+
+  const vistos=new Set();
+  for(const [pedido,p] of achados){
+    exigir(p,'pedido_inexistente','O pedido '+pedido+' nao existe.');
+    /* Apontar o pedido do vizinho faria a conta de uma revenda aparecer na
+       carteira da outra — e o vendedor cobraria quem nao deve. */
+    exigir(p.revenda_id===rev.id,'pedido_de_outra_revenda',
+      'O pedido '+p.numero+' nao e da '+rev.nome_fantasia+'.');
+    /* Cancelado nao e compromisso (a mesma regra do "aprovado sem boleto"), e
+       titulo apontando pedido morto e conta que ninguem explica depois. */
+    exigir(!p.cancelado_em,'pedido_cancelado',
+      'O pedido '+p.numero+' foi cancelado — nao ha o que cobrar nele.');
+    /* Citar o mesmo pedido duas vezes e ruido da tela (ela pode mandar o id e
+       o numero do mesmo), nao decisao de quem lanca: recusar seria trava no
+       caso inocente. A chave primaria composta e a segunda tranca. */
+    vistos.add(p.id);
+  }
+  return [...vistos];
+}
+
+/* ⚠️ O AVULSO E DERIVADO, e a conferencia de valor tambem. Nenhum dos dois
+   ganha coluna: "avulso" e nao ter linha de pedido nenhuma, e `excede_pedidos`
+   e uma comparacao entre dois numeros que ja estao gravados. Coluna ao lado
+   seria a segunda afirmacao sobre o mesmo fato (armadilha #12), e divergiria
+   no primeiro vinculo que alguem acrescentasse depois.
+
+   ⚠️ E O QUE ELE ACUSA E SO O LADO IMPOSSIVEL: o titulo somar MAIS que os
+   pedidos que cita — o zero a mais, R$ 8.000 num pedido de R$ 782,04. O lado
+   de baixo e o parcelamento, que e o caso normal: 3x de um pedido de R$ 3.000
+   sao tres titulos de R$ 1.000, e nenhum "bate". Recusar ali seria trava
+   disparando no caso normal, que e a armadilha #6.
+
+   ⚠️ `excede_pedidos` NAO leva `valor_` no nome, de proposito: ele e MARCA, e
+   a poda do `custo.js` corta por padrao de nome. Assim o aviso continua
+   acendendo para quem nao tem `custo.ver` — a mesma regra do `estourado`. */
+function decorar(b,pedidos){
+  const soma=b.valor_pedidos_centavos===null||b.valor_pedidos_centavos===undefined
+    ? null : b.valor_pedidos_centavos;
+  return Object.assign({},b,{
+    vencido:!!b.vencido,
+    pedidos:pedidos||[],
+    avulso:!(pedidos&&pedidos.length),
+    valor_pedidos_centavos:soma,
+    excede_pedidos: soma!==null && b.valor_centavos>soma
+  });
+}
+const comPedidos=b=>decorar(b,d.pedidosDe(b.id));
 
 function lancar(dados,usuario){
   const x=dados||{};
@@ -80,35 +162,16 @@ function lancar(dados,usuario){
     'A revenda '+rev.nome_fantasia+' ja tem o boleto '+numero+' lancado. '+
     'Numero repetido come o limite dela duas vezes.');
 
-  /* ⚠️ O NUMERO DO PEDIDO TAMBEM SERVE, e e o que quem lanca tem na mao: o
-     id e de banco, e ninguem o le no papel do boleto. Resolver isso aqui
-     evita a tela ter que varrer `/api/pedidos` — o que exigiria dela uma
-     chave que quem lanca boleto pode nao ter, e daria 403 numa tela que abre
-     (§10, armadilha #29). */
-  let pedido_id=null;
-  const temId=x.pedido_id!==undefined&&x.pedido_id!==null&&String(x.pedido_id)!=='';
-  const temNum=x.pedido_numero!==undefined&&x.pedido_numero!==null&&String(x.pedido_numero).trim()!=='';
-  if(temId||temNum){
-    const p=temId
-      ? db.prepare('SELECT id,revenda_id,numero FROM sm_pedido WHERE id=?').get(x.pedido_id)
-      : db.prepare('SELECT id,revenda_id,numero FROM sm_pedido WHERE numero=?')
-          .get(Number(String(x.pedido_numero).trim()));
-    exigir(p,'pedido_inexistente','Este pedido nao existe.');
-    /* Apontar o pedido do vizinho faria a conta de uma revenda aparecer na
-       carteira da outra — e o vendedor cobraria quem nao deve. */
-    exigir(p.revenda_id===rev.id,'pedido_de_outra_revenda',
-      'O pedido '+p.numero+' nao e da '+rev.nome_fantasia+'.');
-    pedido_id=p.id;
-  }
+  const pedido_ids=resolverPedidos(x,rev);
 
   const emitido=x.emitido_em?prazo.dataValida(x.emitido_em):null;
   exigir(!(x.emitido_em&&!emitido),'data_invalida',
     'A data de emissao tem que existir, no formato AAAA-MM-DD.');
 
-  return d.criar({revenda_id:rev.id, pedido_id, numero, valor_centavos:valor,
-    vencimento, emitido_em:emitido,
+  return comPedidos(d.criar({revenda_id:rev.id, pedido_ids, numero,
+    valor_centavos:valor, vencimento, emitido_em:emitido,
     observacao:String(x.observacao||'').trim()||null,
-    criado_por:nome(usuario)});
+    criado_por:nome(usuario)}));
 }
 
 /* ── A BAIXA ──────────────────────────────────────────────────────────────
@@ -154,8 +217,25 @@ function cancelar(id,motivo,usuario){
 
 /* ⚠️ O SQLite DEVOLVE 0 e 1, e a tela le booleano. Converter aqui, e nao em
    cada tela, e o que impede uma escrever `if(b.vencido)` e a outra
-   `if(b.vencido===true)` — a segunda daria sempre falso. */
-const listar=filtro=>d.listar(filtro).map(b=>Object.assign({},b,{vencido:!!b.vencido}));
+   `if(b.vencido===true)` — a segunda daria sempre falso.
+
+   Os pedidos de todos os titulos vem numa consulta so: uma ida por linha
+   faria a lista da tela custar dezenas de idas ao banco. */
+const listar=filtro=>{
+  const linhas=d.listar(filtro);
+  const porBoleto=d.pedidosDeVarios(linhas.map(b=>b.id));
+  return linhas.map(b=>decorar(b,porBoleto.get(b.id)||[]));
+};
+
+/* A lista que a tela marca ao lancar. Ela e a mesma pergunta do
+   `aprovados_sem_boleto` do credito, respondida com os pedidos em vez da
+   contagem — e sai do MESMO criterio, senao a tela ofereceria para marcar um
+   pedido que a conta nao considera coberto (armadilha #12). */
+function pedidosSemBoleto(revenda_id){
+  const rev=dRevenda.porId(revenda_id);
+  exigir(rev,'revenda_inexistente','Revenda nao encontrada.');
+  return d.pedidosSemBoleto(rev.id);
+}
 
 /* ── O CREDITO ────────────────────────────────────────────────────────────
    A conta da §4.13, e as tres regras que ela carrega. */
@@ -242,4 +322,5 @@ function carteira(usuario){
 // As revendas estouradas, num conjunto — o selo do Quadro le daqui.
 const estouradas=()=>d.estouradas();
 
-module.exports={lancar,baixar,reabrir,cancelar,listar,porId,credito,carteira,estouradas};
+module.exports={lancar,baixar,reabrir,cancelar,listar,porId,credito,carteira,
+  pedidosSemBoleto,estouradas};

@@ -3481,6 +3481,7 @@ aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não sil
 | **Coluna `fr` não desce abaixo do conteúdo** | `grid-template-columns:1.1fr 1.6fr` é uma proporção que o navegador **ignora** quando uma coluna tem conteúdo largo: `fr` tem mínimo automático de `min-content`. Uma única linha `white-space:nowrap` lá dentro vira o piso da coluna inteira, e a proporção escrita no CSS nunca chega a valer — sem erro, sem aviso, e ninguém lê CSS procurando isso. Em 23/09/2026 a Etiqueta de Venda estava com 972 px de um lado e 362 do outro, com `1.1fr 1.6fr` no arquivo | `minmax(0,1fr)` quando a proporção **tem** que valer. E **medir a tela** (`getBoundingClientRect`), não ler o CSS: o número medido é o único que diz se a regra pegou |
 | **`text-overflow:ellipsis` corta a tarja, não só o texto** | Ele apara o **fim da linha**, e o fim da linha é onde ficam as tarjas. Um nome de cliente comprido apagava da tela o `📦 N persianas` — o último lugar em que a caixa de várias aparece (§5). A tela fica bonita e a informação some | Onde a linha tem tarja, o texto **quebra** em vez de aparar; nowrap fica só dentro de cada tarja |
 | **Cookie httpOnly no jar do `curl`** | Abrir a tela com Playwright usando `-c jar.txt` do `curl`: o jar marca o cookie de sessão com `#HttpOnly_` no início da linha, e um filtro de comentário ingênuo (`l.startsWith('#')`) o joga fora. A tela abre no **login** — e "abriu no login" não se parece nem de longe com "o cookie não foi lido": parece permissão trocada | Tirar o prefixo antes de filtrar (`l.replace(/^#HttpOnly_/,'')`) |
+| **A tela servida é a lida no BOOT** | Editar o `.html` de uma tela do `/sobmedida` e recarregar o navegador não mostra nada: o módulo lê o arquivo quando sobe e o guarda. O sintoma engana — o CSS novo está no arquivo, o `grep` confirma, e a tela continua com o antigo, então a suspeita cai na especificidade ou no cache do navegador. Custou três rodadas em 26/09/2026 | Reiniciar o servidor. E conferir pelo fio, não pelo disco: `curl … \| grep a-regra-nova` diz o que a tela está mesmo recebendo |
 | **WAL do SQLite** | `dados.db` tem ~4 KB; os dados estão em `dados.db-wal`. `cp dados.db` produz backup **vazio** | Usar `node backup.js`, que chama `db.backup()` |
 | **`pm2 restart` cacheia** | A alteração não aparece | `pm2 delete expedicao && pm2 start server.js --name expedicao` |
 | **`!` no bash** | Expansão de histórico quebra heredocs e `sed` | `set +H` antes de blocos com `!` |
@@ -4299,6 +4300,35 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   nenhum teste pega — o texto está certo, a distância é que não (§19, 6-C1)
 - ❌ Construir a coluna `entregue` ou o selo de NF antes de existir quem marque
   a entrega: é a coluna-paisagem que a 6-A recusou (§19, 6-C2)
+- ❌ Guardar o pedido do boleto numa COLUNA: um título cobre vários pedidos, e
+  a coluna grava um e esquece o resto em silêncio (§19, 6-C1b)
+- ❌ Deixar `sm_boleto.pedido_id` de pé ao lado da tabela de vínculo: duas
+  afirmações sobre o mesmo fato divergem no primeiro título de dois (§19)
+- ❌ Adivinhar se um número é ID ou NÚMERO de pedido: os intervalos se cruzam,
+  e o título vai para a venda de outra pessoa sem erro nenhum (§19, 6-C1b)
+- ❌ Aceitar os pedidos certos e descartar o errado da lista: o título cobre
+  menos do que quem lançou acha, e ninguém confere o que "deu certo" (§19)
+- ❌ Apontar pedido CANCELADO num boleto — ele não é compromisso, e a conta
+  não se explica depois (§19, 6-C1b)
+- ❌ Exigir pedido em TODO boleto: acerto e frete existem, e a trava no caso
+  legítimo é a #6. Ele passa marcado como AVULSO (§19, 6-C1b)
+- ❌ Dar coluna ao `avulso` ou à conferência de valor: os dois são derivados,
+  como a `situacao` do próprio boleto (§19, 6-C1b)
+- ❌ TRAVAR o título que não bate com a soma dos pedidos: o parcelamento nunca
+  bate, e recusá-lo pararia o caso normal (§19, 6-C1b)
+- ❌ Deixar o aviso de valor BINÁRIO: ele acende por vinte centavos de
+  arredondamento, e marca que aparece no caso normal vira paisagem (§19)
+- ❌ Pôr `COALESCE(…,0)` na soma dos pedidos do título: o avulso passaria a
+  "exceder" qualquer valor — é a regra 4 do custo (§19, 6-C1b)
+- ❌ Escrever a lista de pedidos da tela com critério próprio: ela é a mesma
+  pergunta do "aprovado sem boleto", e duas réguas divergem (§19, 6-C1b)
+- ❌ Pedir `pedido.ler` na lista que a tela marca: quem lança boleto pode não
+  ter, e o seletor abriria vazio com 403 no console (§19, 6-C1b)
+- ❌ Deixar o lançamento resetar a revenda escolhida no formulário: quem lança
+  cinco da mesma revenda manda o quinto para a errada (§19, 6-C1b)
+- ❌ Ler o CSS para saber se a regra pegou: `.form label` tem especificidade
+  maior que `.marca`, e a regra escrita não valia — quem diz é a tela MEDIDA
+  (§19, 6-C1b, e a coluna `fr` do §12)
 - ❌ Escrever uma segunda tabela de "o que vem antes" para a recusa: o `ANTES`
   lido ao contrário já responde, e duas divergem no dia em que o fluxo mudar
   (§19, 5-B2)
@@ -6470,6 +6500,116 @@ deixou escrito.
 > **`node teste_acesso.js` (204) e `node teste_cobertura.js` (10) também.**
 > E **abra as três telas**: quatro dos defeitos desta fase não têm teste que
 > os pegue.
+
+### ⚠️ A FASE 6-C1b (26/09/2026) — O BOLETO APONTA OS PEDIDOS QUE COBRE
+
+No mesmo dia do deploy da 6-C1, o dono leu a tela e disse o que faltava:
+*"um recebimento tem que ser sempre atrelado a um pedido — dessa forma ele
+conversa com o contas a receber e também com o que já foi acordado ao
+pedido"*. Migração 26 (`sm_boleto_pedido`), e a coluna `pedido_id` **saiu**.
+
+```
+um boleto → N pedidos      o financeiro junta os pedidos da semana num título
+um pedido → N boletos      o parcelamento, que já cabia
+nenhum pedido              existe, e passa — mas nasce AVULSO, visível
+```
+
+**Duas respostas do dono mudaram o FORMATO, e não o texto.** Perguntei antes de
+construir justamente porque a diferença entre elas é schema:
+
+| Pergunta | Resposta | O que ela decidiu |
+|---|---|---|
+| um boleto pode cobrir vários pedidos? | **sim**, o financeiro junta | a coluna não serve; nasce a tabela de vínculo |
+| existe boleto sem pedido (acerto, frete)? | **às vezes** | não dá para exigir sempre; ele vira `avulso` |
+
+> ⚠️ **A COLUNA `pedido_id` SAIU, E NÃO FICOU "POR VIA DAS DÚVIDAS".** Com a
+> tabela de vínculo de pé, ela passaria a ser a segunda afirmação sobre o
+> mesmo fato (armadilha #12) e divergiria no primeiro título de dois pedidos.
+> O `INSERT … SELECT` que copia o que havia nela **não é enfeite**: em 26/09
+> não havia boleto lançado, mas migração que confia nisso quebra no dia em que
+> alguém lançar um antes do deploy.
+
+> ⚠️ **O QUE A COLUNA ÚNICA FAZIA DE ERRADO, e é o caso que trava a fase:** um
+> título cobrindo três pedidos gravava **um**, e os outros dois continuavam
+> para sempre em *"aprovado sem boleto"*. A lista cobraria um título que já
+> existe, e ninguém procura o motivo numa lista que só cresce.
+
+> ⚠️ **ID E NÚMERO SÃO CAMPOS SEPARADOS, E NÃO SE ADIVINHA QUAL É QUAL.** Os
+> números de pedido começam em 5001 (§4.18 da spec) e os ids em 1: um dia os
+> dois intervalos se cruzam, e aí um `5001` é os dois ao mesmo tempo.
+> Heurística ali seria régua que erra **em silêncio**, mandando o título para
+> a venda de outra pessoa — e o erro só apareceria na conferência da revenda.
+> A tela manda `pedido_ids` (ela marca o que o servidor mandou);
+> `pedido_numeros` existe para quem digita.
+
+> ⚠️ **UM PEDIDO ERRADO DERRUBA A LISTA INTEIRA, e nada é gravado.** Aceitar os
+> certos e descartar o errado deixaria o título cobrindo menos do que quem
+> lançou acha que cobriu — e ninguém confere um boleto que "deu certo". O
+> pedido **cancelado** também é recusado: ele não é compromisso (a mesma régua
+> do "aprovado sem boleto"), e título apontando pedido morto é conta que
+> ninguém explica depois.
+
+> ⚠️ **O AVULSO NÃO GANHA COLUNA, E A CONFERÊNCIA DE VALOR TAMBÉM NÃO.** Os
+> dois são derivados — "avulso" é não ter linha de vínculo nenhuma, e
+> `excede_pedidos` é uma comparação entre dois números já gravados. É a mesma
+> razão de a `situacao` do boleto já sair de `pago_em` e `cancelado_em`.
+
+> ⚠️ **O VALOR AVISA, NUNCA TRAVA — e o aviso diz QUANTO.** Recusar o título
+> que não bate com a soma quebraria o parcelamento: 3× de um pedido de
+> R$ 3.000 são três títulos de R$ 1.000, e nenhum "bate". O sistema acusa só o
+> lado impossível, o título somar **mais** que os pedidos que cita.
+>
+> E aí veio o que **só apareceu abrindo a tela**: um título de R$ 493,00 para
+> R$ 492,80 de pedidos acendia o aviso por **vinte centavos**. O financeiro
+> arredonda, e marca que aparece no caso normal vira paisagem — a mesma razão
+> de a modalidade só ser escrita quando separa alguma coisa (§5). Um limiar em
+> centavos seria chute escondido no código, que é o que a 6-B recusa; hoje a
+> tarja escreve **"⚠ R$ 0,20 acima dos pedidos"** e quem lê julga sozinho:
+> R$ 0,20 se ignora, R$ 7.217,96 se investiga. Marca que deixa de ser binária
+> se explica.
+
+> ⚠️ **A TELA NÃO PEDE PARA DIGITAR NÚMERO DE PEDIDO.** Escolhida a revenda,
+> ela **lista os pedidos aprovados sem título**, com número e valor, e o
+> financeiro marca os que aquele boleto cobre. Digitar é onde nasce o vínculo
+> errado, e a lista já é exatamente o que o sistema sabe — a lição do card de
+> pacote do §5, que nasce preenchido.
+>
+> E ela sai do **mesmo critério** do `aprovados_sem_boleto` do crédito. Com
+> critérios diferentes a tela ofereceria para marcar um pedido que a conta não
+> considera coberto, e as duas estariam certas, cada uma na sua régua (#12).
+> **Esse caso nasceu de um defeito que passou:** ao reintroduzir os defeitos um
+> a um, a lista com `marco IN ('aprovado','enviado')` não reprovou nada — o
+> teste que faltava foi escrito ali, e só então o defeito reprovou.
+
+> ⚠️ **A ROTA DA LISTA É `boleto.ler`, E NÃO `pedido.ler`.** Mandar a tela a
+> `/api/pedidos` exigiria dela uma chave que quem lança boleto pode não ter, e
+> o efeito seria um seletor vazio com 403 no console — que não se parece com
+> "falta permissão" (§10, armadilha #29). **Não nasce chave nova:** ler a
+> lista é a mesma pergunta de ler o crédito.
+
+> ⚠️ **TRÊS COISAS SÓ APARECERAM COM A TELA ABERTA, e a terceira é de CSS:**
+> - **lançar perdia a revenda escolhida.** O formulário era redesenhado do zero
+>   e o select voltava para a primeira da lista. O financeiro lança cinco
+>   títulos da mesma revenda em seguida, e o quinto sairia na revenda errada —
+>   o erro mais caro que esta tela permite, e ele acontece na pressa;
+> - **os vinte centavos** do aviso, acima;
+> - **a caixinha saía em cima e o texto embaixo.** Duas causas empilhadas: o
+>   `input` do `base.css` tem `min-height` de alvo de toque (e `min-height`
+>   vence `height`), e `.form label` tem especificidade **maior** que `.marca`
+>   (0,1,1 contra 0,1,0), então o `display:flex` escrito no arquivo nunca
+>   chegou a valer. É a armadilha da coluna `fr` do §12 por outra porta: **o
+>   CSS lido não diz se a regra pegou — quem diz é a tela medida**
+>   (`getComputedStyle` + `getBoundingClientRect`).
+
+> **Rode `cd tecido && npm test` (617 casos) ao mexer no vínculo, no
+> `dominio/boleto.js` ou no card do Financeiro** — 15 são da 6-C1b, e **nove
+> defeitos foram reintroduzidos um a um**: aceitar os certos e descartar o
+> errado (reprova 2), não deduplicar (15), deixar passar pedido cancelado (1),
+> o avulso sempre falso (1), travar em vez de avisar (11), `COALESCE 0` na soma
+> — que faria o avulso "exceder" (1), a lista da tela com critério próprio (1),
+> a marca com nome de dinheiro, que a poda come (4), e o boleto cancelado
+> continuar cobrindo o pedido (1). Mexeu em permissão? **`node
+> teste_acesso.js` (204) e `node teste_cobertura.js` (10) também.**
 
 ### Três regras do sob medida que valem citar aqui
 

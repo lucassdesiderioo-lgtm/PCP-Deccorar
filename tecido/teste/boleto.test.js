@@ -70,6 +70,11 @@ const peca=b=>({modelo_id:b.m.id, abertura_id:b.screen1.id,
   comando:'direito', rolamento:'frente', adicional:'nenhum', reducao:'nao'});
 
 function limpar(db){
+  /* ⚠️ A ORDEM E A DOS PONTEIROS (§12 do CLAUDE.md): `sm_boleto_pedido`
+     aponta para o boleto E para o pedido, entao ele sai antes dos dois. Com
+     `foreign_keys = ON` um DELETE filtrado com a filha de pe e recusado, e
+     foi assim que a limpeza da fase 3 e a da 5-B1 reprovaram. */
+  try{ db.prepare('DELETE FROM sm_boleto_pedido').run(); }catch(e){}
   try{ db.prepare('DELETE FROM sm_boleto').run(); }catch(e){}
   for(const t of ['sm_recusa','sm_pendencia']){ try{ db.prepare('DELETE FROM '+t).run(); }catch(e){} }
   for(const t of ['sm_pedido_componente','sm_pedido_item_preco','sm_pedido_alteracao',
@@ -113,6 +118,13 @@ const lancar=(revenda_id,extra)=>bol('lancar',Object.assign({
   revenda_id, numero:'B'+String(++nBol).padStart(5,'0'),
   valor_centavos:100000, vencimento:'2026-12-31'
 },extra||{}),DIRETOR);
+
+/* O valor que o ENVIO congelou — a coluna `sm_pedido.valor_total_centavos`.
+   E ele que a conta do boleto soma, e nao o total recalculado de hoje: o
+   titulo foi emitido contra o que FOI ACORDADO (a frase do dono em
+   26/09/2026). Se uma peca for cancelada depois, o total atual cai e o
+   boleto ja saiu — sao dois numeros, como o prometido x atual do prazo. */
+const valorDo=p=>pedido.porId(p.id).preco.valor_enviado_centavos;
 
 const hoje=db=>db.prepare("SELECT date('now','localtime') v").get().v;
 const dmenos=(db,n)=>db.prepare("SELECT date('now','localtime','-'||?||' days') v").get(String(n)).v;
@@ -314,19 +326,17 @@ module.exports=[
   recusa(()=>lancar(99999,{}),'revenda_inexistente','revenda que nao existe');
  }},
 
-{nome:'4.13 — o PEDIDO e opcional, e quando vem tem que ser DAQUELA revenda',
+{nome:'4.13 — o pedido apontado tem que ser DAQUELA revenda',
  executar({igual,recusa,db}){
   limpar(db);
   const a=revendaCom({limite:500000}), b=revendaCom({limite:500000});
   const p=aprovado(a.id);
-  /* Nem todo titulo e de um pedido so — ha parcela e ha boleto de varios.
-     Por isso o campo e opcional; o que nao pode e apontar o pedido de
-     OUTRA revenda, que faria a conta de uma aparecer na carteira da outra. */
-  const semPedido=lancar(a.id,{});
-  igual(semPedido.pedido_id,null,'sem pedido, passa');
-  const comPedido=lancar(a.id,{pedido_id:p.id});
-  igual(comPedido.pedido_numero,pedido.porId(p.id).numero,'com pedido, ele e nomeado');
-  recusa(()=>lancar(b.id,{pedido_id:p.id}),'pedido_de_outra_revenda','o pedido do vizinho');
+  const comPedido=lancar(a.id,{pedido_ids:[p.id]});
+  igual(comPedido.pedidos.map(x=>x.numero).join(),String(pedido.porId(p.id).numero),
+    'com pedido, ele e nomeado');
+  /* Apontar o pedido do vizinho faria a conta de uma revenda aparecer na
+     carteira da outra — e o vendedor cobraria quem nao deve. */
+  recusa(()=>lancar(b.id,{pedido_ids:[p.id]}),'pedido_de_outra_revenda','o pedido do vizinho');
  }},
 
 {nome:'4.13 — o pedido tambem se aponta pelo NUMERO, que e o que quem lanca tem na mao',
@@ -338,8 +348,8 @@ module.exports=[
   /* O id e de banco e ninguem o le no papel do boleto. Resolver o numero no
      servidor evita a tela varrer /api/pedidos — o que pediria dela uma chave
      que quem lanca boleto pode nao ter, e daria 403 numa tela que abre. */
-  igual(lancar(r.id,{pedido_numero:String(num)}).pedido_numero,num,'pelo numero');
-  recusa(()=>lancar(r.id,{pedido_numero:'999999'}),'pedido_inexistente','numero que nao existe');
+  igual(lancar(r.id,{pedido_numeros:[String(num)]}).pedidos[0].numero,num,'pelo numero');
+  recusa(()=>lancar(r.id,{pedido_numeros:['999999']}),'pedido_inexistente','numero que nao existe');
  }},
 
 /* ═══ 4. APROVADO SEM BOLETO — e ele so vale para quem paga em boleto ════ */
@@ -379,7 +389,7 @@ module.exports=[
   const r=revendaCom({limite:500000, forma:'Boleto'});
   const p=aprovado(r.id);
   igual(bol('credito',r.id).aprovados_sem_boleto,1,'antes');
-  lancar(r.id,{pedido_id:p.id});
+  lancar(r.id,{pedido_ids:[p.id]});
   igual(bol('credito',r.id).aprovados_sem_boleto,0,'depois');
  }},
 
@@ -584,11 +594,242 @@ module.exports=[
   limpar(db);
   const r=revendaCom({limite:500000});
   const p=aprovado(r.id);
-  lancar(r.id,{pedido_id:p.id});
+  lancar(r.id,{pedido_ids:[p.id]});
   const l=bol('listar',{revenda_id:r.id})[0];
   /* Id de banco em tela e o "— Correcao de contagem" do §2 outra vez. */
   igual(l.revenda_nome,revendas.porId(r.id).nome_fantasia,'o nome da revenda');
-  igual(l.pedido_numero,pedido.porId(p.id).numero,'e o numero do pedido');
+  igual(l.pedidos[0].numero,pedido.porId(p.id).numero,'e o numero do pedido');
+ }},
+
+/* ═══ 8. O BOLETO APONTA OS PEDIDOS QUE COBRE (fase 6-C1b) ═══════════════
+   Decisao do dono em 26/09/2026, depois do deploy da 6-C1: "um recebimento
+   tem que ser sempre atrelado a um pedido — dessa forma ele conversa com o
+   contas a receber e com o que ja foi acordado ao pedido".
+
+   Duas respostas dele mudaram o FORMATO, e nao so o texto:
+     · um boleto PODE cobrir varios pedidos (o financeiro junta), entao a
+       coluna `pedido_id` deixou de descrever o fato — viraria a segunda
+       afirmacao sobre ele (armadilha #12) e nao caberia o caso comum;
+     · boleto SEM pedido as vezes existe (acerto, frete), entao exigir
+       sempre seria trava disparando no caso legitimo (armadilha #6). Ele
+       passa, mas nasce AVULSO: visivel, em vez de silencioso. */
+
+{nome:'6-C1b — UM boleto cobre VARIOS pedidos da mesma revenda',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000});
+  const p1=aprovado(r.id), p2=aprovado(r.id), p3=aprovado(r.id);
+  const b=lancar(r.id,{pedido_ids:[p1.id,p2.id,p3.id]});
+  igual(b.pedidos.length,3,'os tres pedidos ficam no titulo');
+  igual(b.pedidos.map(x=>x.numero).join(','),
+    [p1,p2,p3].map(p=>pedido.porId(p.id).numero).join(','),'e em ordem de numero');
+  igual(b.avulso,false,'e ele nao e avulso');
+ }},
+
+{nome:'6-C1b — o pedido de OUTRA revenda no meio da lista recusa o boleto INTEIRO',
+ executar({igual,recusa,db}){
+  limpar(db);
+  const a=revendaCom({limite:5000000}), b=revendaCom({limite:5000000});
+  const meu=aprovado(a.id), doVizinho=aprovado(b.id);
+  /* ⚠️ UM ERRADO DERRUBA A LISTA TODA, e nada e gravado. Aceitar os certos e
+     descartar o errado em silencio deixaria o titulo cobrindo menos do que
+     quem lancou acha que cobriu — e ninguem confere um boleto que "deu
+     certo". */
+  recusa(()=>lancar(a.id,{pedido_ids:[meu.id,doVizinho.id]}),
+    'pedido_de_outra_revenda','o vizinho no meio da lista');
+  igual(bol('listar',{revenda_id:a.id}).length,0,'e NADA foi gravado');
+ }},
+
+{nome:'6-C1b — pedido que nao existe, e pedido CANCELADO, sao recusados',
+ executar({recusa,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000});
+  const p=aprovado(r.id);
+  recusa(()=>lancar(r.id,{pedido_ids:[p.id,99999]}),'pedido_inexistente','id que nao existe');
+  pedido.cancelar(p.id,'desistiu',DIRETOR);
+  /* Cancelado nao e compromisso — e titulo apontando pedido morto e conta
+     que ninguem consegue explicar depois. */
+  recusa(()=>lancar(r.id,{pedido_ids:[p.id]}),'pedido_cancelado','pedido cancelado');
+ }},
+
+{nome:'6-C1b — o MESMO pedido citado duas vezes conta UMA',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000});
+  const p=aprovado(r.id);
+  const num=pedido.porId(p.id).numero;
+  /* A tela pode mandar o id e o numero do mesmo pedido; isso e ruido dela,
+     nao decisao de quem lanca. Recusar seria trava no caso inocente. */
+  const b=lancar(r.id,{pedido_ids:[p.id,p.id], pedido_numeros:[String(num)]});
+  igual(b.pedidos.length,1,'uma linha so');
+ }},
+
+{nome:'6-C1b — sem pedido nenhum o boleto nasce AVULSO, e isso e MARCA, nao ausencia',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000});
+  const b=lancar(r.id,{});
+  /* ⚠️ O AVULSO NAO GANHA COLUNA: ele e "nao tem nenhuma linha de pedido".
+     Uma coluna `avulso` ao lado seria a segunda afirmacao sobre o mesmo fato
+     e divergiria no primeiro vinculo que alguem acrescentasse depois — a
+     mesma razao de a `situacao` ja ser derivada. */
+  igual(b.avulso,true,'ele e avulso');
+  igual(b.pedidos.length,0,'sem pedido nenhum');
+  igual(bol('listar',{revenda_id:r.id, avulso:true}).length,1,'e da para listar so eles');
+  igual(bol('listar',{revenda_id:r.id, avulso:false}).length,0,'e separa dos outros');
+ }},
+
+{nome:'6-C1b — a coluna `pedido_id` SAIU: um fato, um lugar',
+ executar({igual,db}){
+  const tem=db.prepare("SELECT COUNT(*) n FROM pragma_table_info('sm_boleto') "+
+    "WHERE name='pedido_id'").get().n;
+  igual(tem,0,'a coluna antiga nao existe mais');
+  const t=db.prepare("SELECT COUNT(*) n FROM sqlite_master "+
+    "WHERE type='table' AND name='sm_boleto_pedido'").get().n;
+  igual(t,1,'e a tabela de vinculo existe');
+ }},
+
+/* ═══ 9. O QUE O VINCULO PASSA A RESPONDER ══════════════════════════════ */
+
+{nome:'6-C1b — "aprovado sem boleto" para de cobrar o pedido coberto por um titulo de VARIOS',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000, forma:'Boleto'});
+  const p1=aprovado(r.id), p2=aprovado(r.id), p3=aprovado(r.id);
+  igual(bol('credito',r.id).aprovados_sem_boleto,3,'os tres cobrados');
+  lancar(r.id,{pedido_ids:[p1.id,p2.id]});
+  /* Era aqui que a coluna unica mentia: com `pedido_id` o titulo cobria UM,
+     e os outros dois continuariam cobrados para sempre. */
+  igual(bol('credito',r.id).aprovados_sem_boleto,1,'sobra o que nao foi coberto');
+  igual(bol('credito',r.id).valor_aprovado_sem_boleto_centavos,
+    valorDo(p3),'e o valor e o dele');
+ }},
+
+{nome:'6-C1b — boleto CANCELADO devolve os pedidos para o "sem boleto"',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000, forma:'Boleto'});
+  const p1=aprovado(r.id), p2=aprovado(r.id);
+  const b=lancar(r.id,{pedido_ids:[p1.id,p2.id]});
+  igual(bol('credito',r.id).aprovados_sem_boleto,0,'cobertos');
+  bol('cancelar',b.id,'emitido errado',DIRETOR);
+  /* O titulo saiu da conta do credito; ele tem que sair da cobertura
+     tambem, senao o pedido fica invisivel para quem emite. */
+  igual(bol('credito',r.id).aprovados_sem_boleto,2,'voltam a ser cobrados');
+ }},
+
+{nome:'6-C1b — PARCELAMENTO: tres titulos do MESMO pedido, e ele fica coberto uma vez',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000, forma:'Boleto'});
+  const p=aprovado(r.id);
+  const v=valorDo(p);
+  /* 3x nao e erro nem repeticao: e o normal. O que o sistema recusa e o
+     NUMERO repetido, que e outra coisa. */
+  lancar(r.id,{pedido_ids:[p.id], valor_centavos:Math.floor(v/3)});
+  lancar(r.id,{pedido_ids:[p.id], valor_centavos:Math.floor(v/3)});
+  lancar(r.id,{pedido_ids:[p.id], valor_centavos:v-2*Math.floor(v/3)});
+  igual(bol('listar',{revenda_id:r.id}).length,3,'os tres titulos existem');
+  igual(bol('credito',r.id).aprovados_sem_boleto,0,'e o pedido esta coberto');
+  igual(bol('credito',r.id).valor_em_aberto_centavos,v,'a divida e o pedido inteiro');
+ }},
+
+{nome:'6-C1b — o titulo que soma MAIS que os pedidos AVISA, e nao trava',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:50000000, forma:'Boleto'});
+  const p=aprovado(r.id);
+  const v=valorDo(p);
+  /* O zero a mais: R$ 8.000 num pedido de R$ 782,04. E o erro de digitacao
+     que so o vinculo torna visivel. */
+  const b=lancar(r.id,{pedido_ids:[p.id], valor_centavos:v*10});
+  igual(b.excede_pedidos,true,'o titulo avisa que passou do pedido');
+  igual(b.valor_pedidos_centavos,v,'e diz contra o que foi comparado');
+  /* ⚠️ AVISA, NUNCA TRAVA: recusar quebraria o parcelamento do caso acima,
+     e trava que dispara no caso normal vira desvio (armadilha #6). */
+  igual(bol('listar',{revenda_id:r.id}).length,1,'e o titulo foi gravado do mesmo jeito');
+ }},
+
+{nome:'6-C1b — a PARCELA (valor menor que o pedido) nao avisa nada',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000, forma:'Boleto'});
+  const p=aprovado(r.id);
+  const v=valorDo(p);
+  const b=lancar(r.id,{pedido_ids:[p.id], valor_centavos:Math.floor(v/3)});
+  igual(b.excede_pedidos,false,'parcela e o caso normal');
+ }},
+
+{nome:'6-C1b — o AVULSO nao tem contra o que comparar, entao nunca avisa',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000});
+  const b=lancar(r.id,{valor_centavos:99999999});
+  /* Sem pedido citado nao ha soma; `null` aqui e "a pergunta nem se faz",
+     que nao e zero (a regra 4 do custo). */
+  igual(b.valor_pedidos_centavos,null,'nao ha soma');
+  igual(b.excede_pedidos,false,'e nao ha o que acusar');
+ }},
+
+{nome:'6-C1b — a tela recebe a LISTA de pedidos a marcar, com numero e valor',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000, forma:'Boleto'});
+  const p1=aprovado(r.id), p2=aprovado(r.id);
+  /* ⚠️ A TELA NAO PEDE PARA DIGITAR NUMERO DE PEDIDO. Digitar e onde nasce o
+     vinculo errado; a lista ja e exatamente o que o sistema sabe — a mesma
+     licao do card de pacote do §5, que nasce preenchido. */
+  const antes=bol('pedidosSemBoleto',r.id);
+  igual(antes.length,2,'os dois aprovados');
+  igual(antes[0].numero,pedido.porId(p1.id).numero,'com o numero');
+  igual(antes[0].valor_total_centavos,valorDo(p1),'e o valor');
+  lancar(r.id,{pedido_ids:[p1.id]});
+  const depois=bol('pedidosSemBoleto',r.id);
+  igual(depois.length,1,'o coberto sai da lista');
+  igual(depois[0].numero,pedido.porId(p2.id).numero,'sobra o outro');
+ }},
+
+{nome:'6-C1b — a lista da tela sai do MESMO criterio do credito, e nao de um proprio',
+ executar({igual,db}){
+  limpar(db);
+  const b=cena();
+  const r=revendaCom({limite:5000000, forma:'Boleto'});
+  const ap=aprovado(r.id);
+  // um ENVIADO, que ainda espera o vendedor
+  const env=pedido.criar({revenda_id:r.id, tipo:'pedido'},DIRETOR);
+  pedido.acrescentarItem(env.id,peca(b),DIRETOR);
+  pedido.enviar(env.id,DIRETOR,'2026-09-22 10:00');
+  // e um CANCELADO, que nao e compromisso
+  const can=aprovado(r.id);
+  pedido.cancelar(can.id,'desistiu',DIRETOR);
+
+  /* ⚠️ AS DUAS PERGUNTAS SAO A MESMA, e por isso saem do mesmo criterio: a
+     tela OFERECE para marcar exatamente o que a conta do credito chama de
+     "aprovado sem boleto". Com criterios diferentes, a tela ofereceria um
+     pedido que a conta nao conta — e as duas estariam certas, cada uma na
+     sua regua (armadilha #12). Este caso nasceu de um defeito que passou:
+     a lista com `marco IN ('aprovado','enviado')` nao reprovava nada. */
+  const lista=bol('pedidosSemBoleto',r.id);
+  igual(lista.length,1,'so o aprovado, vivo e sem titulo');
+  igual(lista[0].numero,pedido.porId(ap.id).numero,'e e ele');
+  igual(lista.length,bol('credito',r.id).aprovados_sem_boleto,
+    'a lista e a contagem do credito dizem o MESMO numero');
+ }},
+
+{nome:'6-C1b — a poda: o valor dos pedidos sai, a MARCA fica',
+ executar({igual,db}){
+  limpar(db);
+  const r=revendaCom({limite:5000000, forma:'Boleto'});
+  const p=aprovado(r.id);
+  const v=valorDo(p);
+  lancar(r.id,{pedido_ids:[p.id], valor_centavos:v*10});
+  const l=custo.podar({papel:'producao'},bol('listar',{revenda_id:r.id}))[0];
+  /* `valor_pedidos_centavos` comeca com `valor_` e por isso a poda o corta;
+     `excede_pedidos` NAO e dinheiro, e e ela que acende o aviso para quem so
+     ve a cor — a mesma regra do `estourado`. */
+  igual(l.valor_pedidos_centavos,undefined,'o valor foi podado');
+  igual(l.excede_pedidos,true,'a marca sobreviveu');
+  igual(l.pedidos.length,1,'e os pedidos continuam nomeados');
  }}
 
 ];

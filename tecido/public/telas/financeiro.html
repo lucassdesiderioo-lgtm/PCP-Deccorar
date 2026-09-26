@@ -24,6 +24,29 @@
 .form label{font-size:13px; color:var(--tinta-fraca); display:block}
 .form input,.form select{min-width:0}
 .mini{font-size:13px; padding:6px 10px}
+/* ⚠️ CLASSE QUE NAO EXISTE NAO PINTA NADA, e nada avisa: o `aria-pressed` da
+   fase 4-A estava certinho e os cinco botoes saiam identicos. Estas duas
+   nascem aqui junto com o codigo que as usa. */
+.avulso{font-size:12px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.04em; color:var(--tinta-fraca);
+  border:1px solid var(--linha-forte); border-radius:999px; padding:1px 8px}
+/* A lista de pedidos a marcar: alvo de toque de tablet, e uma por linha —
+   duas na mesma linha fazem marcar o vizinho por engano. */
+#f_pedidos{flex:1 1 100%; margin-top:4px}
+/* ⚠️ `.form label` TEM ESPECIFICIDADE MAIOR QUE `.marca` (0,1,1 contra
+   0,1,0), e por isso o `display:block` dele vencia o `flex` daqui — a regra
+   escrita no arquivo simplesmente nao valia, sem erro e sem aviso. E a
+   armadilha da coluna `fr` do §12 por outra porta: o CSS lido nao diz se a
+   regra pegou; quem diz e a tela medida. */
+.form .marca{display:flex; align-items:center; gap:8px; font-size:15px;
+  padding:7px 2px; cursor:pointer; color:var(--tinta)}
+/* ⚠️ A REGRA GLOBAL DE CAMPO NAO SERVE PARA CAIXINHA, e o efeito so aparece
+   no render: `input` do base.css tem `min-height` de alvo de toque e padding,
+   feitos para campo de texto. O `min-height` VENCE o `height`, entao a
+   caixinha saia com 44px de altura e empurrava o texto para a linha de baixo
+   — o rotulo desgarrado da propria caixa que ele nomeia. */
+.form .marca input{min-height:0; padding:0; margin:0; width:18px; height:18px;
+  flex:0 0 auto}
 </style>
 </head>
 <body>
@@ -172,8 +195,12 @@ async function carregarBoletos(revenda_id){
   if(posso('boleto.editar')) colunas.push({nome:''});
   alvo.appendChild(tabela(colunas,lista,b=>{
     const cel=[
-      b.numero,
-      b.pedido_numero?('#'+b.pedido_numero):'—',
+      /* ⚠️ O TÍTULO QUE EXCEDE OS PEDIDOS QUE CITA É MARCADO AQUI, e o aviso
+         sobrevive à poda porque `excede_pedidos` não é dinheiro — quem não vê
+         preço continua vendo a marca (a mesma regra do `estourado`). */
+      b.excede_pedidos ? el('span',{},[b.numero,' ',
+        el('span',{class:'atrasado'},[avisoExcede(b)])]) : b.numero,
+      pedidosDoTitulo(b),
       b.vencido
         ? el('span',{class:'atrasado'},[data(b.vencimento)+' · VENCIDO'])
         : data(b.vencimento),
@@ -195,6 +222,32 @@ async function carregarBoletos(revenda_id){
   }));
 }
 
+/* ⚠️ A MARCA DIZ QUANTO PASSOU, E NÃO SÓ QUE PASSOU — e isso só apareceu com
+   a tela aberta. Um título de R$ 493,00 para R$ 492,80 de pedidos acende o
+   aviso por VINTE CENTAVOS: o financeiro arredonda, e marca que aparece no
+   caso normal vira paisagem, que é a mesma razão de a modalidade só ser
+   escrita quando separa alguma coisa (§5).
+   Um limiar em centavos seria chute escondido no código (o que a 6-B recusa);
+   o número ao lado deixa a marca de ser binária e quem lê julga sozinho —
+   R$ 0,20 ele ignora, R$ 7.217,96 ele investiga. Quem não tem `custo.ver`
+   perde o valor na poda e fica com a frase, que continua verdadeira. */
+function avisoExcede(b){
+  const dif=b.valor_pedidos_centavos===undefined||b.valor_pedidos_centavos===null
+    ? null : b.valor_centavos-b.valor_pedidos_centavos;
+  return dif===null ? '⚠ passa dos pedidos' : ('⚠ '+reais(dif)+' acima dos pedidos');
+}
+
+/* ⚠️ "AVULSO" É A EXCEÇÃO, E ELA APARECE COMO TAL. Boleto sem pedido às vezes
+   existe (acerto, frete) — decisão do dono em 26/09/2026 —, mas um traço mudo
+   o faria parecer igual aos outros, e é justamente ele que alguém precisa
+   olhar. Com pedido, saem os números: é o que a revenda reconhece no papel
+   dela, e id de banco em tela é o "— Correcao de contagem" do §2. */
+function pedidosDoTitulo(b){
+  const ps=b.pedidos||[];
+  if(!ps.length) return el('span',{class:'avulso'},['avulso']);
+  return el('span',{},[ps.map(p=>'#'+p.numero).join(' · ')]);
+}
+
 async function agir(caminho,corpo,ok){
   try{
     await api(caminho,{metodo:'POST',corpo});
@@ -203,6 +256,13 @@ async function agir(caminho,corpo,ok){
   }catch(e){ /* o `api` já mostrou o banner com o motivo do servidor */ }
 }
 
+/* ⚠️ LANÇAR NÃO PODE PERDER A REVENDA ESCOLHIDA. O financeiro lança cinco
+   títulos da mesma revenda em seguida; redesenhar o formulário do zero
+   devolvia o select para a primeira da lista, e o quinto sairia na revenda
+   errada — o erro mais caro que esta tela permite, e ele acontece na pressa,
+   sem nada avisar. **Só apareceu abrindo a tela.** */
+let revendaEscolhida=null;
+
 function desenharForm(){
   const f=limpar($('#form'));
   const campo=(id,rotulo,attrs)=>el('div',{},[
@@ -210,18 +270,47 @@ function desenharForm(){
     el('input',Object.assign({id,type:'text'},attrs||{}))]);
   const sel=el('select',{id:'f_revenda'});
   REVENDAS.forEach(r=>sel.appendChild(el('option',{value:String(r.id)},[r.nome_fantasia])));
+  if(revendaEscolhida&&REVENDAS.some(r=>String(r.id)===String(revendaEscolhida)))
+    sel.value=String(revendaEscolhida);
   f.appendChild(el('div',{},[el('label',{for:'f_revenda'},['Revenda']),sel]));
   f.appendChild(campo('f_numero','Número do boleto'));
   f.appendChild(campo('f_valor','Valor (R$)',{placeholder:'1000,00'}));
   f.appendChild(campo('f_venc','Vencimento',{type:'date'}));
-  f.appendChild(campo('f_pedido','Pedido (opcional)',{placeholder:'nº'}));
+  /* ⚠️ A LISTA É MARCADA, NÃO DIGITADA. Digitar número de pedido é onde nasce
+     o vínculo errado — e a lista já é exatamente o que o sistema sabe, como o
+     card de pacote do §5, que nasce preenchido. Ela troca junto com a
+     revenda, senão ofereceria os pedidos da anterior. */
+  f.appendChild(el('div',{id:'f_pedidos'},[]));
+  sel.addEventListener('change',()=>{ revendaEscolhida=sel.value; carregarPedidosDaRevenda(); });
   f.appendChild(el('button',{type:'button',onclick:lancar},['Lançar']));
+  carregarPedidosDaRevenda();
+}
+
+async function carregarPedidosDaRevenda(){
+  const alvo=limpar($('#f_pedidos'));
+  const id=Number(($('#f_revenda')||{}).value||0);
+  if(!id) return;
+  let lista=[];
+  try{ lista=await api('/api/revendas/'+id+'/pedidos-sem-boleto'); }catch(e){ return; }
+  alvo.appendChild(el('label',{},['Pedidos que este boleto cobre']));
+  if(!lista.length) return alvo.appendChild(el('p',{class:'nota'},
+    ['Esta revenda não tem pedido aprovado esperando título. O boleto pode ser '+
+     'lançado assim mesmo — ele fica marcado como avulso.']));
+  lista.forEach(p=>{
+    const cx=el('label',{class:'marca'},[
+      el('input',{type:'checkbox', class:'f_ped', value:String(p.id)}),
+      '#'+p.numero,
+      reais(p.valor_total_centavos)?(' · '+reais(p.valor_total_centavos)):''
+    ]);
+    alvo.appendChild(cx);
+  });
 }
 
 async function lancar(){
   const erro=$('#erro');
   erro.style.display='none';
-  const pedidoNum=$('#f_pedido').value.trim();
+  const marcados=[].slice.call(document.querySelectorAll('.f_ped:checked'))
+    .map(i=>Number(i.value));
   const centavos=paraCentavos($('#f_valor').value);
   if(centavos!==null&&isNaN(centavos)){
     erro.textContent='O valor se escreve como 1000,00.';
@@ -233,16 +322,20 @@ async function lancar(){
     valor_centavos:centavos,
     vencimento:$('#f_venc').value
   };
-  /* O NÚMERO vai como número: quem resolve é o servidor, que é quem sabe de
-     quem o pedido é. */
-  if(pedidoNum) corpo.pedido_numero=pedidoNum;
+  /* ⚠️ VÃO OS IDS, E NÃO OS NÚMEROS: eles vieram do próprio servidor nesta
+     mesma tela. O número existe na rota para quem digita, e os dois são campos
+     SEPARADOS de propósito — os números de pedido começam em 5001 e os ids em
+     1, então um dia os intervalos se cruzam e adivinhar qual é qual mandaria o
+     título para a venda de outra pessoa, em silêncio. */
+  if(marcados.length) corpo.pedido_ids=marcados;
   try{
     /* ⚠️ `silencioso` PORQUE A RECUSA FICA NA LINHA, e não num banner que
        some em três segundos: o motivo tem que estar ao lado do campo, com o
        que a pessoa digitou ainda nele (§7-B, #33). */
     await api('/api/boletos',{metodo:'POST',corpo,silencioso:true});
     banner('Boleto lançado.','bom');
-    ['f_numero','f_valor','f_venc','f_pedido'].forEach(i=>{ $('#'+i).value=''; });
+    ['f_numero','f_valor','f_venc'].forEach(i=>{ $('#'+i).value=''; });
+    await carregarPedidosDaRevenda();
     await carregar();
   }catch(e){
     erro.textContent=e.mensagem||e.message||'Não deu para lançar.';
