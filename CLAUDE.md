@@ -458,8 +458,30 @@ confirmação (3), aceitar arquivo sem futura (2), o bipe aceitando a cancelada
 (2), a cancelada ficando na viagem (1) e a reimpressão aceitando a cancelada (1). `teste_carga`, `teste_ordem_dia` e
 `teste_estoque` ganharam um caso de cancelada cada.
 
-> ⚠️ **AINDA NÃO ESTÁ NO AR.** A prova é o primeiro import real: as canceladas
-> saírem de "Faltam imprimir" e as impressas aparecerem no card.
+> ✅ **NO AR EM 26/09/2026** (PR #148). O dono fez o deploy e importou o
+> relatório das 09:18 pela tela: *84 futuras · 0 novas · 131 atualizadas · 0
+> futuras saíram*, e a base **continuou com 4.777 vendas**.
+>
+> ✅ **A METADE DO RECORTE ESTÁ PROVADA COM DADO REAL.** Aquele arquivo tinha
+> ~130 vendas, e não os 14 meses do relatório de antes. Pela regra antiga ele
+> teria apagado ~4.650 vendas passadas e zerado a média da tela azul — a
+> armadilha #11 acontecendo no primeiro dia. Pela nova, a história ficou, e a
+> comparação planilha × sistema continuou cheia (1.312 vendas × 1.422 peças).
+>
+> ⚠️ **A METADE DA CANCELADA NÃO ESTÁ PROVADA, e prova que não foi feita se
+> escreve como não feita (§4).** O primeiro import não cancelou volume nenhum:
+> sem tarja, sem card. As 12 linhas canceladas ou devolvidas daquele arquivo
+> ou nunca viraram volume (canceladas antes do PDF), ou já tinham saído, ou
+> eram devolução — a spec já dizia que o cancelamento entre o PDF e o envio é
+> raro. A prova é o **primeiro cliente que cancelar depois de o PDF subir**:
+> a venda tem que sair de "Faltam imprimir", ou aparecer no card se a
+> etiqueta já saiu. Se nesse dia ela continuar pendente, é defeito, não
+> silêncio normal.
+>
+> O `conferir_canceladas.js` **não rodou** antes do import (o relatório não
+> chegou ao servidor), e o primeiro import foi um arquivo curto. Nenhum dos
+> 14 meses de cancelamentos antigos foi varrido ainda: isso acontece no dia em
+> que alguém importar um relatório de período longo, e aí o resumo diz quantos.
 
 ### A ordem é de prioridade, não de quantidade
 
