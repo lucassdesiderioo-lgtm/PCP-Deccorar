@@ -94,6 +94,23 @@ const CHAVES=[
   {chave:'revenda.editar',    nome:'Cadastrar revenda, enderecos, contatos, tabela e desconto'},
   {chave:'credito.editar',    nome:'Definir e revisar o limite de credito da revenda'},
 
+  /* ── O BOLETO (fase 6-C1, 26/09/2026) ──────────────────────────────────
+     ⚠️ LER E EDITAR SAO DUAS CHAVES, e os publicos sao diferentes de
+     verdade. A §4.13 da spec manda uma "tarefa semanal do vendedor com o
+     financeiro: revisar os boletos em aberto da carteira" — entao o VENDEDOR
+     le. Lancar o titulo e dar baixa e de quem responde pelo dinheiro, e e
+     isso que decide o limite de todo mundo. E o mesmo arranjo do
+     `kit.imprimir` x `kit.editar` do §4 do CLAUDE.md.
+
+     ⚠️ E `boleto.editar` NAO ESTA EM PAPEL NENHUM: hoje quem lanca e baixa e
+     o diretor, que a recebe pelo `*`. Nao ha papel "financeiro" no modulo, e
+     inventar um exigiria area no PCP, linha no PERM_AREA e alguem marcado —
+     as tres pontas da armadilha #13 — para uma caixinha que hoje ninguem
+     marcaria. O dia em que houver financeiro com login proprio, a area nasce
+     ali; ate la a chave tem dono, e nao nasce inerte. */
+  {chave:'boleto.ler',        nome:'Ver os boletos em aberto e o credito da revenda'},
+  {chave:'boleto.editar',     nome:'Lancar boleto, dar baixa e cancelar titulo'},
+
   /* ── O PEDIDO (fase 3) ──────────────────────────────────────────────────
      Seis chaves, e a divisao e a de sempre: quanto custa errar.
 
@@ -211,6 +228,10 @@ const PAPEIS={
     /* O pedido e o trabalho dele: lanca, envia, aprova a propria carteira e
        negocia prazo. Nao aprova a carteira do colega e nao cancela. */
     'pedido.ler','pedido.lancar','pedido.aprovar','pedido.prazo',
+    /* A tarefa semanal da §4.13 e dele: rever os boletos em aberto da
+       carteira, com o financeiro. Ele LE — lancar e baixar nao sao dele,
+       pela mesma razao que `revenda.editar` e `credito.editar` nao sao. */
+    'boleto.ler',
     /* Ele VE o que a fabrica tem a imprimir — e a resposta de "o meu pedido
        entrou?" —, mas nao imprime: quem imprime esta com a Zebra na frente. */
     'etiqueta_producao.ler'

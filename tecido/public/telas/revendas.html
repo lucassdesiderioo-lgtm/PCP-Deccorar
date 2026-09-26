@@ -218,6 +218,67 @@ function formularioNova(){
   }, ()=>{ abertaId=null; aberta=null; erro=null; desenhar(); });
 }
 
+/* O CRÉDITO DA REVENDA (fase 6-C1). Bloco de leitura, carregado sob demanda
+   quando a ficha abre — a lista não pode pagar uma ida por linha.
+
+   ⚠️ O QUE ELE ESCREVE É A VERDADE DE HOJE, com a JANELA ao lado. O modo de
+   falhar deste desenho é o otimista: ninguém lança boleto, o "em aberto" fica
+   zero e o disponível fica igual ao limite — uma mentira que não parece erro,
+   porque o número só fica maior. Por isso a data do último movimento vai
+   colada nele (armadilha #16 do §19). */
+function credito(r){
+  const box=el('div',{});
+  box.appendChild(el('p',{class:'subtitulo'},['Crédito hoje']));
+  const alvo=el('div',{},[el('span',{class:'nota'},['carregando…'])]);
+  box.appendChild(alvo);
+  api('/api/revendas/'+r.id+'/credito',{silencioso:true}).then(c=>{
+    while(alvo.firstChild) alvo.removeChild(alvo.firstChild);
+    if(!c) return alvo.appendChild(el('span',{class:'nota'},['—']));
+    const linhas=[];
+    if(!('valor_em_aberto_centavos' in c)){
+      /* Sem `custo.ver` o campo nem vem (a poda) — o que sobra é a marca. */
+      linhas.push(c.estourado
+        ? el('b',{class:'falta'},['limite estourado'])
+        : el('span',{class:'nota'},['dentro do limite']));
+    }else if(c.valor_limite_credito_centavos==null){
+      linhas.push(el('span',{class:'nota'},[
+        'sem limite lançado — não dá para dizer o disponível. Em aberto: R$ '+
+        emReais(c.valor_em_aberto_centavos)]));
+    }else{
+      linhas.push(el('span',{},[
+        'em aberto R$ '+emReais(c.valor_em_aberto_centavos)+' · ',
+        c.estourado
+          ? el('b',{class:'falta'},['ESTOUROU R$ '+emReais(-c.valor_disponivel_centavos)])
+          : el('b',{},['disponível R$ '+emReais(c.valor_disponivel_centavos)])
+      ]));
+    }
+    if(c.vencidos) linhas.push(el('div',{class:'falta'},
+      [c.vencidos+(c.vencidos===1?' boleto vencido':' boletos vencidos')]));
+    if(c.aprovados_sem_boleto) linhas.push(el('div',{class:'nota'},[
+      c.aprovados_sem_boleto+(c.aprovados_sem_boleto===1
+        ? ' pedido aprovado ainda sem boleto'
+        : ' pedidos aprovados ainda sem boleto')+' — fora do disponível']));
+    /* ⚠️ A JANELA SÓ APARECE QUANDO INFORMA, e é a MESMA regra da tela de
+       Financeiro — o sinal é o dado VELHO, não o fresco. Escrever "último
+       lançamento em 26/09" em toda revenda vira paisagem, e aí ninguém a lê
+       no dia em que ela diz "há dois meses". As duas telas com regras
+       diferentes para a mesma linha ensinariam a equipe a achar que são
+       coisas diferentes (§4). */
+    if(!c.ultimo_movimento){
+      linhas.push(el('div',{class:'falta'},['nenhum boleto foi lançado nesta revenda ainda']));
+    }else{
+      const dias=Math.floor((Date.now()-Date.parse(String(c.ultimo_movimento).replace(' ','T')))/86400000);
+      if(dias>30) linhas.push(el('div',{class:'falta'},
+        ['ninguém mexe nos boletos desta revenda há '+dias+' dias — o disponível pode estar velho']));
+    }
+    linhas.forEach(l=>alvo.appendChild(el('div',{},[l])));
+  }).catch(()=>{
+    while(alvo.firstChild) alvo.removeChild(alvo.firstChild);
+    alvo.appendChild(el('span',{class:'nota'},['—']));
+  });
+  return box;
+}
+
 function ficha(r){
   const box=el('div');
   const pode=posso('revenda.editar');
@@ -263,12 +324,17 @@ function ficha(r){
     }, ()=>{ abertaId=null; aberta=null; erro=null; desenhar(); }));
   }
 
+  /* ⚠️ O DISPONÍVEL É DE QUEM TEM `boleto.ler`, e o limite é de quem tem
+     `credito.editar` — são duas coisas e dois públicos. O vendedor lê o
+     disponível (é a tarefa semanal da §4.13) e não mexe no limite. */
+  if(posso('boleto.ler')) box.appendChild(credito(r));
+
   if(posso('credito.editar')){
     box.appendChild(el('p',{class:'subtitulo'},['Limite de crédito']));
     box.appendChild(el('p',{class:'nota'},[
-      'O limite é mostrado, não trava pedido. O disponível (limite − boletos em aberto) '+
-      'chega quando a baixa de boleto existir — até lá, mostrar o limite cheio como '+
-      '"disponível" seria número mentindo.']));
+      'O limite é mostrado, não trava pedido: pedido de revenda estourada entra '+
+      'e é aprovado do mesmo jeito. O disponível é '+
+      'limite − boletos em aberto, e quem lança e dá baixa é o Financeiro.']));
     box.appendChild(editor([
       {chave:'valor_limite_credito_centavos',rotulo:'Limite (R$)',
        valor:emReais(r.valor_limite_credito_centavos),dica:'5000,00'}

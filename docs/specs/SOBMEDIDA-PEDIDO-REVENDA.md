@@ -5,7 +5,10 @@ STATUS
 Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 26/09/2026
-Fase atual: 6-B EM CÓDIGO (26/09/2026) — os SETE INDICADORES. Nenhuma tabela
+Fase atual: 6-C1 EM CÓDIGO (26/09/2026) — o BOLETO e o CRÉDITO. Migração 25,
+            `sm_boleto`, a tarefa semanal da carteira e o selo de crédito
+            estourado no Quadro. Mostra, não trava
+            6-B EM CÓDIGO (26/09/2026) — os SETE INDICADORES. Nenhuma tabela
             nova: eles somam o que a 5-B1 e a 5-B2 gravam. A migração 24 traz
             UM número, e ele é cadastro — o limite do bipe aberto
             6-A EM PRODUÇÃO (26/09/2026) — o QUADRO: onde está cada pedido,
@@ -23,10 +26,10 @@ Fase atual: 6-B EM CÓDIGO (26/09/2026) — os SETE INDICADORES. Nenhuma tabela
             em paralelo ao Decorsoft
             2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
             1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
-Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ☑ **em produção**, falta a prova de fábrica  6 ◐(6-A em produção · 6-B em código · 6-C não começou)  7 ☐  8 ☐
+Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ☑ **em produção**, falta a prova de fábrica  6 ◐(6-A em produção · 6-B em código · 6-C1 em código · 6-C2 não começou)  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
-Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) + 2 (fase 5-A) + 1 (5-B1) + 2 (5-B2) + 3 (6-A) + 2 (6-B) — ver abaixo
+Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) + 2 (fase 5-A) + 1 (5-B1) + 2 (5-B2) + 3 (6-A) + 2 (6-B) + 2 (6-C1) — ver abaixo
 ```
 
 ## 📌 O QUE ESTÁ PENDENTE — a lista única
@@ -63,6 +66,7 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 | 9 | O **serralheiro cortando pela medida da etiqueta** | a 4-A — o bipe provou o código de barras, não a medida |
 | 10 | O **comprador comprando pelo painel de tecido** (o comprometido da 4-B) | a 4-B |
 | 10-b | O dono abrindo o **Quadro** e respondendo *"onde está o pedido X"* | a 6-A — o que rodou em 24/09 foi num navegador meu, com pedido semeado em cada etapa |
+| 10-d | O **financeiro lançando um boleto de verdade** e dando a baixa dele, e o vendedor usando a lista da carteira na conversa semanal | a 6-C1. **O modo de falhar dela é o otimista**: se ninguém lançar, o "em aberto" fica zero e o disponível fica igual ao limite — uma mentira que não parece erro, porque o número só fica maior |
 | 10-c | O dono respondendo, **pela tela de Indicadores**, *"quanto o Renato leva para aprovar"* e *"quanto tempo leva uma persiana por m²"* — as duas frases do pronto-quando da §7 | a 6-B. **Ela depende da prova 8**: enquanto a bancada não bipar de verdade, os três indicadores de tempo saem vazios, e vazio ali é a verdade, não defeito |
 
 ### Dívida técnica que esta spec deixou aberta
@@ -83,7 +87,8 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 | ~~5-B1~~ | ~~o bipe, as filas por setor, o kit e o Pronto automático~~ **EM PRODUÇÃO em 24/09/2026** — era o pedaço que esta lista **não citava**, e sem ele a 5-B2 não tem de onde recusar. Falta a prova 8 |
 | ~~6-B~~ | ~~os sete indicadores~~ **EM CÓDIGO em 26/09/2026** — migração 24 (só o parâmetro do limite), `dominio/indicadores.js`, `dados/indicadores.js`, `rotas/indicadores.js` e a tela `/sobmedida/indicadores` (no menu: **Indicadores**). Nenhuma tabela nova. Falta a prova 10-c — e ela depende da 8 |
 | ~~6-A~~ | ~~o kanban~~ **EM CÓDIGO em 24/09/2026** — migração 23, `sm_kanban_coluna`, `dominio/kanban.js` e a tela `/sobmedida/kanban` (no menu: **Quadro**). A etapa é derivada; o `marco` não se mexeu. Falta o dono abrir e dizer se responde "onde está o pedido X" |
-| **6-C** | **o dinheiro** — baixa de boletos pelo financeiro, crédito disponível (`limite − boletos em aberto`), revisão bimestral do limite, e só então o selo de NF e os filtros *"entregue sem NF"* / *"NF sem entrega"*. **Nada disso existe hoje**: não há boleto, não há NF e não há marco de `entregue` no sob medida |
+| ~~6-C1~~ | ~~o boleto e o crédito~~ **EM CÓDIGO em 26/09/2026** — migração 25 (`sm_boleto`), `dominio/boleto.js`, a tela `/sobmedida/financeiro` (no menu: **Financeiro**), o disponível na ficha da revenda e o selo de crédito estourado no Quadro. A **revisão bimestral do limite já existia desde a fase 2** e não foi refeita. Falta a prova 10-d |
+| **6-C2** | **NF e entrega** — selo de NF, marco `entregue`, os filtros *"entregue sem NF"* / *"NF sem entrega"* e a coluna `entregue` do Quadro. **Não tem quem marque**: não há faturamento no sob medida e a §5 diz que o ERP é outro projeto. Construir `entregue` sem quem o marque é a coluna-paisagem que a 6-A recusou — é decisão do dono, não trabalho parado |
 | 7 | o portal da revenda |
 | 8 | segurança e abertura |
 
@@ -93,6 +98,115 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 > custo de uma fase grande: a linha da 5-B **omitia o bipe**, que era o pedaço
 > maior, e a lista que existe para ser o lugar único ficou sem ele. Aberta em
 > três, cada parte sobe sozinha e o que falta fica escrito aqui.
+
+## STATUS DA FASE 6-C1 — em código em 26/09/2026
+
+**O boleto e o crédito (§4.13).** Migração 25 (`sm_boleto`),
+`dominio/boleto.js`, `dados/boleto.js`, `rotas/boleto.js`, a tela
+`/sobmedida/financeiro`, o crédito na ficha da revenda e o **selo de crédito
+estourado** no Quadro — o gancho que a 6-A deixou escrito.
+
+```
+limite disponível = limite − boletos em aberto        ← MOSTRA, NÃO TRAVA
+```
+
+> ⚠️ **UM TERÇO DA LINHA DA 6-C JÁ ESTAVA NO AR.** A **revisão bimestral do
+> limite** existe desde a fase 2: `limite_revisado_em`, o parâmetro
+> `creditoRevisaoMeses`, o cálculo de `limite_vencido`, a rota
+> `/api/revendas/limites-vencidos` e o botão *"Revisei — está bom assim"*.
+> Nada disso foi refeito, e está escrito aqui porque a linha da fase prometia
+> as três coisas e quem lesse o plano esperaria trabalho onde não havia.
+
+### A decisão que a spec não tomava: **de onde nasce o boleto**
+
+A §4.13 diz `disponível = limite − boletos em aberto` e diz que *"o financeiro
+dá baixa"*. **Ela não diz como o título entra**, e a §5 fecha a porta óbvia:
+*"o ERP é outro projeto"*.
+
+**Decisão do dono, 26/09/2026: lançado à mão, aqui.** O caminho do espelho (o
+outro sistema exporta, este lê) foi posto na mesa com a recomendação de
+esperar um arquivo real, e o dono decidiu seguir o plano original.
+
+> ⚠️ **O TÍTULO É LANÇADO, NUNCA GERADO.** O boleto de verdade nasce no banco,
+> com número e código de barras próprios. Um número inventado nesta casa seria
+> a segunda régua contra o extrato (armadilha #12), e a que erra se descobre
+> na cobrança de um cliente.
+
+> ⚠️ **E O MODO DE FALHAR DESTE DESENHO É O OTIMISTA — escrito antes, não
+> depois.** A §4.13 avisa que *"sem baixa, o limite de todo mundo zera"*. Com
+> lançamento à mão o risco é o **contrário e pior**: ninguém lança, o "em
+> aberto" fica zero e o disponível fica **igual ao limite** — uma mentira que
+> não parece erro, porque o número só fica maior. Por isso o crédito devolve
+> `ultimo_movimento`, e as duas telas escrevem, **só quando o dado é velho**,
+> há quantos dias ninguém mexe naquela revenda.
+
+### As seis regras que ficam
+
+| # | A regra | O que ela evita |
+|---|---|---|
+| 1 | **Mostra, não trava** | decisão do dono de 22/09. Não há uma linha que recuse pedido por crédito; o que muda é a cor. A §4.13 explica por que a trava não entra antes de a baixa estar sendo feita de verdade — é a armadilha #6 |
+| 2 | **Negativo fica negativo** | zerar apagaria o **tamanho** do buraco: R$ 2.000 estourados e R$ 1 estourado ficariam iguais na tela. É o `MAX(0, …)` do saldo do PCP (§2) pela porta do crédito |
+| 3 | **Sem limite lançado, o disponível é `null`** | não é zero nem "o que ela deve". Regra 4 do custo: número indefinido não vira número certo — e não se estoura um limite que não existe |
+| 4 | **Pago e cancelado saem da conta; vencido FICA** | tirar o vencido faria o limite de quem **não** paga parecer mais folgado que o de quem paga em dia. O vencimento é **marca**, não segunda conta |
+| 5 | **Número repetido na mesma revenda é recusado** | é o mesmo título lançado duas vezes, e ele come o limite em dobro. O modo de falhar é pessimista: o vendedor para de vender achando que a revenda estourou. Em **outra** revenda o mesmo número passa — o número é do banco dela |
+| 6 | **"Aprovado sem boleto" só vale para quem paga em boleto** | *"nem todo pedido fazemos boleto — às vezes o cliente paga por PIX, às vezes por cartão"* (dono, 26/09/2026). Cobrar título de quem paga no cartão é aviso disparando no caso normal, e aviso assim some junto com a lista (armadilha #6). É a segunda metade da pergunta 6 da §8, *"os dois, mostrados separados"* — e ele **não entra no disponível** |
+
+### As duas mudanças no caminho
+
+| # | O que o plano dizia | O que ficou | Por quê |
+|---|---|---|---|
+| 1 | a fase 6-C inteira | **6-C1** (boleto e crédito) sobe; **6-C2** (NF e entrega) espera | NF e entrega **não têm quem as marque**: não há faturamento no sob medida. Construir `entregue` sem quem o marque é a coluna-paisagem que a 6-A recusou, e a NF digitada sem responsável é a dívida 18. É decisão do dono, não trabalho parado |
+| 2 | o pedido se aponta pelo `id` | também pelo **número** | o id é de banco, e ninguém o lê no papel do boleto. Resolver o número na tela exigiria dela varrer `/api/pedidos` — uma chave que quem lança boleto pode não ter, e 403 numa tela que abre (§10, #29) |
+
+### Quem vê o quê
+
+`boleto.ler` (o **vendedor**, pela tarefa semanal da §4.13) e `boleto.editar`
+(lançar, baixar, cancelar). **`boleto.editar` não está em papel nenhum**: hoje
+quem lança é o diretor, que a recebe pelo `*`. Inventar um papel "financeiro"
+exigiria área no PCP, linha no `PERM_AREA` e alguém marcado — as três pontas
+da armadilha #13 — para uma caixinha que ninguém marcaria. O dia em que houver
+financeiro com login próprio, a área nasce ali.
+
+E a resposta inteira passa pela **poda do `custo.js`**: quem não tem
+`custo.ver` recebe o JSON sem os campos de dinheiro. Por isso todo campo
+começa com `valor_` — a poda corta por padrão de nome, e um
+`em_aberto_centavos` viajaria pelo fio em silêncio. **`estourado` não é
+dinheiro**, e é de propósito: a marca sobrevive à poda e acende o selo para
+quem só vê a cor.
+
+### O que só apareceu abrindo a tela
+
+- **a lista da tarefa semanal saía em ordem ALFABÉTICA**, com quem está em dia
+  em cima de quem estourou o limite. Lista de trabalho se lê de cima para
+  baixo — é a regra da tela azul do operador (§3) e do atrasado do
+  Carregamento (#9). Hoje: estourado · mais vencido · mais em aberto · nome;
+- **a janela escrita em toda revenda virava paisagem** — quatro linhas
+  idênticas de *"último lançamento em 26/09"*. O sinal é o dado **velho**, não
+  o fresco: hoje ela só aparece acima de 30 dias, ou quando nunca se lançou
+  nada, e com a **mesma regra nas duas telas**;
+- **o formulário pedia o valor em centavos.** O resto do módulo (catálogo,
+  simulador, revendas) pede em reais e converte por soma — duas telas pedindo
+  o mesmo dinheiro de jeitos diferentes ensinam a equipe a achar que são
+  coisas diferentes (§4);
+- **os dois selos do Quadro saíam GRUDADOS** —
+  `RETIDO · SEM TECIDORETIDO · CRÉDITO ESTOURADO`. Enquanto havia um selo só,
+  o espaçamento nunca tinha sido exercitado: é o `📦2 peças` grudado do §5, e
+  nenhum teste de unidade o pega, porque o texto está perfeito e quem está
+  errado é a distância.
+
+### Os oito defeitos reintroduzidos
+
+Cada um reprova o caso que existe para pegá-lo, e só ele: disponível zero sem
+limite (1), cortar o estourado em zero (3), contar o boleto pago (1), contar o
+cancelado (1), aceitar número repetido (1), cobrar "sem boleto" de quem paga
+em PIX (1), ordenar a carteira por nome (1) e pôr o selo no cartão cancelado
+(1).
+
+**Testes:** `cd tecido && npm test` — **602 casos**, 35 da 6-C1.
+`node teste_acesso.js` (204) e `node teste_cobertura.js` (10). §10 verde, com
+`/sobmedida/telas/financeiro.html` em **403 mesmo para o diretor logado**.
+
+---
 
 ## STATUS DA FASE 6-B — em código em 26/09/2026
 
