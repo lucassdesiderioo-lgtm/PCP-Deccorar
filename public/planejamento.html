@@ -40,6 +40,13 @@
   .dim{color:var(--muted)}
   tr.deg td{background:#11161d;font-size:11px;text-transform:uppercase;letter-spacing:.5px;
             font-weight:700;padding:7px 11px;text-align:left}
+  .cmp{margin-top:26px}
+  .cmp h2{font-size:15px;margin:0 0 4px}
+  .cmp table{min-width:0}
+  .cmp th,.cmp td{padding:9px 8px}
+  .cmp td.code{white-space:normal}
+  @media(max-width:500px){.cmp td.code{font-size:12px}.cmp th{font-size:10px}}
+  .dpos{color:#7ee2a0}.dneg{color:#ffb4ae}
   .apl{background:transparent;color:var(--blue);border:1px solid var(--line);border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}.apl:hover{border-color:var(--blue)}
 </style></head><body>
 <header><div class="mark">P</div>
@@ -101,6 +108,26 @@
   <div style="margin-top:10px"><button class="ghost" id="verTodos" style="font-size:12px">ver todos os SKUs</button></div>
   <div style="margin-top:12px"><button class="prim" onclick="aplicarTodos()">Aplicar alvo em todos (com venda na janela)</button>
     <span class="sub" style="margin-left:8px">grava o alvo sugerido nos SKUs que tiveram venda na janela</span></div>
+
+  <!-- VENDAS-E-MEDIA, fase 1: a media contada pelo sistema, AO LADO da planilha.
+       So conferencia: a tabela de cima, a tela azul e a compra continuam lendo a
+       planilha. A troca (fase 3) espera o ok do dono depois de alguns dias disto. -->
+  <div class="cmp">
+    <h2>Média: planilha × sistema</h2>
+    <div class="sub">Só para conferir — <b style="color:#e6edf3">a produção continua pela planilha</b>.
+      O sistema conta as <b style="color:#e6edf3">peças</b> dos PDFs que a expedição sobe todo dia
+      (a caixa de várias persianas conta cada uma); a planilha conta as vendas do arquivo.
+      Os maiores desvios vêm primeiro.</div>
+    <div class="aviso" id="cmpAviso" style="margin-top:10px"></div>
+    <div class="meta" id="cmpMeta" style="margin-top:8px"></div>
+    <div class="tbwrap"><table>
+      <thead><tr class="cols">
+        <th class="l">SKU</th><th>Planilha</th><th>Sistema</th><th>Diferença</th>
+      </tr></thead>
+      <tbody id="cmpCorpo"><tr><td colspan="4" class="dim" style="text-align:center;padding:18px">carregando…</td></tr></tbody>
+    </table></div>
+    <div style="margin-top:10px"><button class="ghost" id="cmpTodos" style="font-size:12px;display:none"></button></div>
+  </div>
 
   <div class="sub" style="margin-top:12px">
     <b style="color:var(--blue)">A ordem é de prioridade, não de quantidade:</b>
@@ -271,7 +298,7 @@ async function importar(){
         +' a média cai a zero, o alvo desce para o mínimo e a tela azul do operador para de pedir produção.'
         +'<br>Se foi recorte, <b>suba a planilha completa de novo</b> — o import é espelho e reconstrói sozinho.';
     } else rec.style.display='none';
-    load(); fechamento();
+    load(); fechamento(); comparar();
   }catch(e){ $('#msgImp').style.color='#f85149'; $('#msgImp').textContent='falha: '+e; }
 }
 
@@ -279,9 +306,65 @@ async function salvarConfig(){
   const body={dias_cobertura:+$('#diasCob').value||10, janela_media:+$('#janela').value||30, alvo_minimo:+$('#alvoMin').value||0};
   await fetch('/api/planejamento/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   $('#msgCfg').textContent='recalculado'; setTimeout(()=>$('#msgCfg').textContent='',2000);
-  load(); fechamento();
+  load(); fechamento(); comparar();
 }
-load(); fechamento();
+/* A tabela da comparacao. Mostra os 12 maiores desvios; o resto a um clique —
+   lista cheia de "igual" ensina a passar o olho por cima de onde importa. */
+let CMP=null, CMPTODOS=false;
+const dec=v=>(Math.round(v*100)/100).toFixed(2).replace('.',',');
+async function comparar(){
+  try{ CMP=await (await fetch('/api/planejamento/media/comparar')).json(); }catch(e){ CMP=null; }
+  desenharCmp();
+}
+function desenharCmp(){
+  const corpo=$('#cmpCorpo'), av=$('#cmpAviso');
+  if(!CMP || !CMP.janela){
+    corpo.innerHTML='<tr><td colspan="4" class="dim" style="text-align:center;padding:18px">Não foi possível carregar a comparação.</td></tr>';
+    return;
+  }
+  const j=CMP.janela;
+  if(j.usada==null){
+    av.style.display='none'; $('#cmpMeta').textContent='';
+    corpo.innerHTML='<tr><td colspan="4" class="dim" style="text-align:center;padding:18px">Nenhum volume registrado ainda — a média do sistema nasce com o primeiro PDF.</td></tr>';
+    $('#cmpTodos').style.display='none';
+    return;
+  }
+  /* Janela cortada: 12 dias de venda divididos por 30 dariam um numero menor
+     que a verdade, com cara de fato. A tela diz o que foi usado. */
+  if(j.cortada){
+    av.style.display='block';
+    av.innerHTML='<b>⚠ Média do sistema de '+j.usada+' dia'+(j.usada===1?'':'s')+', não '+j.pedida+'.</b> '
+      +'O primeiro volume registrado é de '+j.primeiro.split('-').reverse().join('/')
+      +' — antes disso o sistema não tem história. A planilha continua dividindo por '+j.pedida+'.';
+  } else av.style.display='none';
+  const t=CMP.totais, extra=[];
+  if(CMP.repetidos) extra.push(CMP.repetidos+' volume'+(CMP.repetidos===1?'':'s')+' repetido'+(CMP.repetidos===1?'':'s')+' (mesmo pack ou venda) contado'+(CMP.repetidos===1?'':'s')+' uma vez só');
+  if(CMP.sem_codigo) extra.push(CMP.sem_codigo+' volume'+(CMP.sem_codigo===1?'':'s')+' sem SKU lido, fora da conta');
+  /* Cada numero com a SUA janela: com a do sistema cortada, "ultimos 18 dias"
+     na frente dos dois fazia a planilha parecer contada em 18 (achado no render). */
+  $('#cmpMeta').innerHTML='Planilha: <b style="color:#e6edf3">'+t.planilha_vendas+'</b> vendas em '+j.pedida+' dias'
+    +' · sistema: <b style="color:#e6edf3">'+t.sistema_pecas+'</b> peças ('+CMP.volumes+' volume'+(CMP.volumes===1?'':'s')+') em '+j.usada+' dia'+(j.usada===1?'':'s')
+    +(extra.length?' · '+extra.join(' · '):'');
+  const L=CMP.linhas||[];
+  const mostrar=CMPTODOS?L:L.slice(0,12);
+  if(!L.length){
+    corpo.innerHTML='<tr><td colspan="4" class="dim" style="text-align:center;padding:18px">Nenhuma venda na janela, nem na planilha nem no sistema.</td></tr>';
+  } else corpo.innerHTML=mostrar.map(function(l){
+    const d=l.diferenca;
+    const dif = d===0 ? '<span class="dim">igual</span>'
+      : '<b class="'+(d>0?'dpos':'dneg')+'">'+(d>0?'+':'−')+dec(Math.abs(d))+'</b><span class="dim">/d</span>';
+    const p = l.planilha.vendas ? l.planilha.vendas+'<div class="dim" style="font-size:11px">'+dec(l.planilha.media)+'/d</div>' : '<span class="dim">—</span>';
+    const q = l.sistema.pecas ? l.sistema.pecas+'<div class="dim" style="font-size:11px">'+dec(l.sistema.media)+'/d</div>' : '<span class="dim">—</span>';
+    return '<tr><td class="l code">'+l.codigo+'</td><td>'+p+'</td><td>'+q+'</td><td>'+dif+'</td></tr>';
+  }).join('');
+  const b=$('#cmpTodos');
+  if(L.length>12){ b.style.display=''; b.textContent=CMPTODOS?'ver só os 12 maiores desvios':'ver todos os SKUs ('+L.length+')'; }
+  else b.style.display='none';
+}
+document.addEventListener('click',function(e){
+  if(e.target.id==='cmpTodos'){ CMPTODOS=!CMPTODOS; desenharCmp(); }
+});
+load(); fechamento(); comparar();
 </script>
 <script src="/nav.js"></script>
 </body></html>
