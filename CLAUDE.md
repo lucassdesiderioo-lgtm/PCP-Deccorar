@@ -371,6 +371,15 @@ rota.** Sete defeitos foram reintroduzidos um a um: a caixa contando 1 (reprova
 9), sem a dedup (6), a dedup só dentro da janela (4), a janela sem corte (2), a
 cancelada contando (1), o teste contando (2) e o bloqueado ficando fora (4).
 
+> ✅ **NO AR EM 26/09/2026** (PR #144): o dono fez o deploy e disse *"ficou
+> certo"*.
+>
+> ⚠️ **ISSO PROVA QUE A TABELA APARECE, E NÃO QUE A MÉDIA DO SISTEMA ESTÁ
+> CERTA.** A prova que libera a fase 3 é o dono conferir a tabela com o dado
+> real por alguns dias — e dizer se os desvios têm explicação (caixa de várias,
+> borda da data, venda cancelada). Prova que não foi feita se escreve como não
+> feita (§4).
+
 ### A ordem é de prioridade, não de quantidade
 
 Ordenar por `precisa` põe em cima o SKU que gira mais — que quase nunca é o que
