@@ -5,7 +5,8 @@ STATUS
 Situação: em construção
 Criada em: 22/09/2026
 Última atualização: 26/09/2026
-Fase atual: 6-C1 EM CÓDIGO (26/09/2026) — o BOLETO e o CRÉDITO. Migração 25,
+Fase atual: 6-C1b EM CÓDIGO (26/09/2026) — o boleto aponta os PEDIDOS que
+cobre. Migração 26. Antes dela, a 6-C1 (o boleto e o crédito), migração 25,
             `sm_boleto`, a tarefa semanal da carteira e o selo de crédito
             estourado no Quadro. Mostra, não trava
             6-B EM CÓDIGO (26/09/2026) — os SETE INDICADORES. Nenhuma tabela
@@ -26,10 +27,10 @@ Fase atual: 6-C1 EM CÓDIGO (26/09/2026) — o BOLETO e o CRÉDITO. Migração 2
             em paralelo ao Decorsoft
             2 EM CÓDIGO (22/09/2026) — falta cadastrar as revendas de hoje
             1 PRONTA e CONFERIDA em produção, corte e preço (22/09/2026)
-Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ☑ **em produção**, falta a prova de fábrica  6 ◐(6-A em produção · 6-B em código · 6-C1 em código · 6-C2 não começou)  7 ☐  8 ☐
+Fases: 1 ☑  2 ☑(código)  3 ☑(código)  4 ☑(código — 4-A em produção · 4-B e 4-C em código)  5 ☑ **em produção**, falta a prova de fábrica  6 ◐(6-A em produção · 6-B em código · 6-C1 em produção · 6-C1b em código · 6-C2 não começou)  7 ☐  8 ☐
 Risco: 🔴 (schema novo, preço, etiqueta de produção, acesso de gente de fora)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
-Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) + 2 (fase 5-A) + 1 (5-B1) + 2 (5-B2) + 3 (6-A) + 2 (6-B) + 2 (6-C1) — ver abaixo
+Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (fase 4-B) + 2 (fase 4-C) + 2 (fase 5-A) + 1 (5-B1) + 2 (5-B2) + 3 (6-A) + 2 (6-B) + 2 (6-C1) + 2 (6-C1b) — ver abaixo
 ```
 
 ## 📌 O QUE ESTÁ PENDENTE — a lista única
@@ -87,7 +88,8 @@ Mudanças no caminho: 5 (fase 1) + 4 (fase 2) + 3 (fase 3) + 2 (fase 4-A) + 2 (f
 | ~~5-B1~~ | ~~o bipe, as filas por setor, o kit e o Pronto automático~~ **EM PRODUÇÃO em 24/09/2026** — era o pedaço que esta lista **não citava**, e sem ele a 5-B2 não tem de onde recusar. Falta a prova 8 |
 | ~~6-B~~ | ~~os sete indicadores~~ **EM CÓDIGO em 26/09/2026** — migração 24 (só o parâmetro do limite), `dominio/indicadores.js`, `dados/indicadores.js`, `rotas/indicadores.js` e a tela `/sobmedida/indicadores` (no menu: **Indicadores**). Nenhuma tabela nova. Falta a prova 10-c — e ela depende da 8 |
 | ~~6-A~~ | ~~o kanban~~ **EM CÓDIGO em 24/09/2026** — migração 23, `sm_kanban_coluna`, `dominio/kanban.js` e a tela `/sobmedida/kanban` (no menu: **Quadro**). A etapa é derivada; o `marco` não se mexeu. Falta o dono abrir e dizer se responde "onde está o pedido X" |
-| ~~6-C1~~ | ~~o boleto e o crédito~~ **EM CÓDIGO em 26/09/2026** — migração 25 (`sm_boleto`), `dominio/boleto.js`, a tela `/sobmedida/financeiro` (no menu: **Financeiro**), o disponível na ficha da revenda e o selo de crédito estourado no Quadro. A **revisão bimestral do limite já existia desde a fase 2** e não foi refeita. Falta a prova 10-d |
+| ~~6-C1b~~ | ~~o vínculo boleto ↔ pedidos~~ **EM CÓDIGO em 26/09/2026** — migração 26 (`sm_boleto_pedido`), a coluna `pedido_id` saiu, a tela lista os pedidos para marcar. Decisão do dono no mesmo dia do deploy da 6-C1: *"um recebimento tem que ser sempre atrelado a um pedido"*. Um título cobre **vários** pedidos; sem nenhum ele nasce **avulso** |
+| ~~6-C1~~ | ~~o boleto e o crédito~~ **EM PRODUÇÃO em 26/09/2026** — migração 25 (`sm_boleto`), `dominio/boleto.js`, a tela `/sobmedida/financeiro` (no menu: **Financeiro**), o disponível na ficha da revenda e o selo de crédito estourado no Quadro. A **revisão bimestral do limite já existia desde a fase 2** e não foi refeita. Falta a prova 10-d |
 | **6-C2** | **NF e entrega** — selo de NF, marco `entregue`, os filtros *"entregue sem NF"* / *"NF sem entrega"* e a coluna `entregue` do Quadro. **Não tem quem marque**: não há faturamento no sob medida e a §5 diz que o ERP é outro projeto. Construir `entregue` sem quem o marque é a coluna-paisagem que a 6-A recusou — é decisão do dono, não trabalho parado |
 | 7 | o portal da revenda |
 | 8 | segurança e abertura |
@@ -202,7 +204,45 @@ cancelado (1), aceitar número repetido (1), cobrar "sem boleto" de quem paga
 em PIX (1), ordenar a carteira por nome (1) e pôr o selo no cartão cancelado
 (1).
 
-**Testes:** `cd tecido && npm test` — **602 casos**, 35 da 6-C1.
+**Testes:** `cd tecido && npm test` — **617 casos**, 35 da 6-C1 e 15 da 6-C1b.
+
+## STATUS DA FASE 6-C1b — em código em 26/09/2026
+
+**O boleto aponta os pedidos que cobre.** Migração 26 (`sm_boleto_pedido`), e
+a coluna `sm_boleto.pedido_id` **saiu** — com a tabela de vínculo de pé ela
+seria a segunda afirmação sobre o mesmo fato.
+
+```
+um boleto → N pedidos      o financeiro junta os pedidos da semana
+um pedido → N boletos      o parcelamento, que já cabia
+nenhum pedido              existe, passa, e nasce AVULSO — visível
+```
+
+**Duas perguntas ao dono decidiram o formato**, e por isso elas foram feitas
+antes de construir: um boleto pode cobrir vários (**sim**), e existe boleto
+sem pedido (**às vezes**). A primeira tirou a coluna; a segunda impediu a
+trava.
+
+**O que a coluna única fazia de errado:** um título cobrindo três pedidos
+gravava **um**, e os outros dois continuavam para sempre em *"aprovado sem
+boleto"* — a lista cobrando um título que já existe.
+
+**Divergências da letra da spec, anotadas aqui:**
+
+| # | A spec diz | O que foi feito | Por quê |
+|---|---|---|---|
+| 1 | a §4.13 não fala de vínculo boleto ↔ pedido | ele nasceu, e como N:N | pedido do dono em 26/09/2026, depois de ler a tela da 6-C1 |
+| 2 | — | o valor do título **avisa** quando passa dos pedidos, e diz quanto | é o que o vínculo torna possível: o zero a mais (R$ 8.000 num pedido de R$ 782,04). Travar quebraria o parcelamento, e o aviso binário acendia por R$ 0,20 de arredondamento |
+
+**Três defeitos só apareceram com a tela aberta:** lançar perdia a revenda
+escolhida (o quinto título sairia na revenda errada), o aviso de vinte
+centavos, e a caixinha renderizada em cima do texto — esta por duas causas
+empilhadas, o `min-height` de alvo de toque do `input` global e a
+especificidade de `.form label` (0,1,1) vencendo `.marca` (0,1,0).
+
+**Nove defeitos foram reintroduzidos um a um**, e um deles **não foi pego**: a
+lista da tela com critério próprio passava limpa. O caso que faltava foi
+escrito ali, e só então o defeito reprovou.
 `node teste_acesso.js` (204) e `node teste_cobertura.js` (10). §10 verde, com
 `/sobmedida/telas/financeiro.html` em **403 mesmo para o diretor logado**.
 

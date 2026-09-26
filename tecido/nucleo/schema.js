@@ -1585,6 +1585,45 @@ CREATE TABLE sm_boleto (
 );
 CREATE INDEX idx_sm_boleto_revenda ON sm_boleto(revenda_id);
 CREATE INDEX idx_sm_boleto_pedido ON sm_boleto(pedido_id);
+`},
+
+{n:26, nome:'o boleto aponta os PEDIDOS que cobre — um titulo pode cobrir varios', sql:`
+/* === O VINCULO BOLETO ↔ PEDIDO ===========================================
+   Fase 6-C1b. Decisao do dono em 26/09/2026, no mesmo dia do deploy da
+   6-C1: "um recebimento tem que ser sempre atrelado a um pedido — dessa
+   forma ele conversa com o contas a receber e tambem com o que ja foi
+   acordado ao pedido".
+
+   Duas respostas dele mudaram o FORMATO, e nao o texto:
+
+   ⚠️ UM BOLETO PODE COBRIR VARIOS PEDIDOS — o financeiro junta os pedidos
+   da semana num titulo so. A coluna \`pedido_id\` nao descreve isso: ela
+   cabe um, e o que sobra fica de fora em silencio. Pior, ela passaria a
+   ser a segunda afirmacao sobre o mesmo fato assim que a tabela nascesse
+   (armadilha #12), entao ela SAI. O que ja estava apontado e copiado
+   primeiro — o \`INSERT ... SELECT\` nao e enfeite: em 26/09 nao havia
+   boleto lancado, mas migracao que confia nisso quebra no dia em que
+   alguem lancar um antes do deploy.
+
+   ⚠️ E O AVULSO NAO GANHA COLUNA. Boleto sem pedido as vezes existe
+   (acerto, frete), e exigir pedido sempre seria trava disparando no caso
+   legitimo (armadilha #6). Mas "avulso" e DERIVADO — e o titulo que nao
+   tem nenhuma linha aqui. Uma coluna \`avulso\` ao lado divergiria no
+   primeiro vinculo acrescentado depois, que e a mesma razao de a
+   \`situacao\` do boleto ja ser derivada de \`pago_em\` e \`cancelado_em\`.
+
+   A chave primaria composta e o que impede o mesmo pedido entrar duas
+   vezes no mesmo titulo — o dominio ja deduplica, isto e a segunda tranca. */
+CREATE TABLE sm_boleto_pedido (
+  boleto_id INTEGER NOT NULL REFERENCES sm_boleto(id) ON DELETE CASCADE,
+  pedido_id INTEGER NOT NULL REFERENCES sm_pedido(id),
+  PRIMARY KEY (boleto_id, pedido_id)
+);
+INSERT INTO sm_boleto_pedido(boleto_id,pedido_id)
+  SELECT id, pedido_id FROM sm_boleto WHERE pedido_id IS NOT NULL;
+DROP INDEX idx_sm_boleto_pedido;
+ALTER TABLE sm_boleto DROP COLUMN pedido_id;
+CREATE INDEX idx_sm_boleto_pedido ON sm_boleto_pedido(pedido_id);
 `}
 ];
 
