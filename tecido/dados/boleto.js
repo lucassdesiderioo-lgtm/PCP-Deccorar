@@ -111,6 +111,30 @@ const ultimoMovimento=revenda_id=>db.prepare(
   '       MAX(COALESCE(reaberto_em,\'\')), MAX(COALESCE(cancelado_em,\'\'))) v '+
   '  FROM sm_boleto WHERE revenda_id=?').get(revenda_id).v||null;
 
+/* ── QUANTO DE UM PEDIDO JA FOI TITULADO (fase 6-C1c) ───────────────────
+   ⚠️ COM RATEIO PROPORCIONAL, e a razao esta no caso de um titulo so
+   cobrindo VARIOS pedidos: o titulo nao diz de qual pedido e o buraco. A
+   reparticao proporcional ao valor de cada pedido e a unica que nao
+   privilegia ninguem (decisao do dono, 26/09/2026) — e quando o titulo
+   FECHA com a soma, a quota de cada pedido da exatamente o valor dele, sem
+   fracao nenhuma. Fracao so aparece quando falta dinheiro, que e o caso em
+   que um centavo a mais ou a menos na falta nao decide nada.
+
+   ⚠️ TITULO CANCELADO NAO TITULA. Ele saiu da conta de vez (a mesma regra
+   da `situacao`), e o pedido volta a ser cobravel inteiro.
+
+   ⚠️ O PAGO CONTINUA TITULANDO, e isso NAO e esquecimento: a pergunta aqui
+   e "este pedido ja virou titulo?", nao "ja foi pago?". Titulo pago sai do
+   `em aberto` do credito, que e outra conta — tira-lo daqui faria o pedido
+   voltar a cobranca no dia em que a revenda pagasse. */
+const TITULADO=`COALESCE((
+  SELECT ROUND(SUM(b.valor_centavos * 1.0 * p.valor_total_centavos /
+      (SELECT SUM(p2.valor_total_centavos)
+         FROM sm_boleto_pedido bp2 JOIN sm_pedido p2 ON p2.id=bp2.pedido_id
+        WHERE bp2.boleto_id=b.id)))
+    FROM sm_boleto_pedido bp JOIN sm_boleto b ON b.id=bp.boleto_id
+   WHERE bp.pedido_id=p.id AND b.cancelado_em IS NULL), 0)`;
+
 /* OS PEDIDOS APROVADOS SEM BOLETO APONTADO — a segunda metade da pergunta 6
    da §8, que a spec responde com "os dois, mostrados separados".
    ⚠️ Cancelado fora: ele nao e compromisso. E `marco='aprovado'` e nao
@@ -128,13 +152,26 @@ const aprovadosSemBoleto=revenda_id=>db.prepare(
    onde nasce o vinculo errado; a lista ja e exatamente o que o sistema sabe,
    como o card de pacote do §5, que nasce preenchido. */
 const pedidosSemBoleto=revenda_id=>db.prepare(
-  "SELECT p.id, p.numero, p.valor_total_centavos, p.criado_em "+
+  "SELECT p.id, p.numero, p.valor_total_centavos, p.criado_em, "+
+  "       "+TITULADO+" AS valor_titulado_centavos, "+
+  "       p.valor_total_centavos - "+TITULADO+" AS valor_falta_centavos "+
   "  FROM sm_pedido p "+
   " WHERE p.revenda_id=? AND p.marco='aprovado' AND p.cancelado_em IS NULL "+
-  "   AND NOT EXISTS (SELECT 1 FROM sm_boleto_pedido bp "+
-  "                     JOIN sm_boleto b ON b.id=bp.boleto_id "+
-  "                    WHERE bp.pedido_id=p.id AND b.cancelado_em IS NULL) "+
+  "   AND "+TITULADO+" < p.valor_total_centavos "+
   " ORDER BY p.numero").all(revenda_id);
+
+/* OS PARCIALMENTE TITULADOS — a contagem e o dinheiro que faltam ao lado do
+   `aprovadosSemBoleto`, e nao dentro dele: sao duas coisas diferentes e a
+   tela as escreve separadas. Somar o valor CHEIO do pedido parcial seria
+   contar duas vezes o pedaco que ja virou titulo e ja esta no `em aberto`;
+   por isso aqui se soma a FALTA. */
+const parcialmenteTitulados=revenda_id=>db.prepare(
+  "SELECT COUNT(*) AS quantos, "+
+  "       COALESCE(SUM(p.valor_total_centavos - "+TITULADO+"),0) AS falta "+
+  "  FROM sm_pedido p "+
+  " WHERE p.revenda_id=? AND p.marco='aprovado' AND p.cancelado_em IS NULL "+
+  "   AND "+TITULADO+" > 0 "+
+  "   AND "+TITULADO+" < p.valor_total_centavos").get(revenda_id);
 
 // As revendas que TEM boleto em aberto, para a tarefa semanal da carteira.
 const revendasComAberto=vendedor_usuario_id=>db.prepare(
@@ -175,5 +212,6 @@ const atualizar=(id,campos)=>{
 };
 
 module.exports={porId,porNumero,listar,emAberto,ultimoMovimento,
-  aprovadosSemBoleto,pedidosSemBoleto,revendasComAberto,estouradas,
+  aprovadosSemBoleto,pedidosSemBoleto,parcialmenteTitulados,
+  revendasComAberto,estouradas,
   pedidosDe,pedidosDeVarios,ligarPedidos,criar,atualizar};

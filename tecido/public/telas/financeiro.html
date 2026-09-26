@@ -181,6 +181,20 @@ function desenharRevenda(c){
     reais(c.valor_aprovado_sem_boleto_centavos)
       ? ' ('+reais(c.valor_aprovado_sem_boleto_centavos)+', fora do disponível)' : '']));
 
+  /* ⚠️ O PARCIAL É UMA LINHA PRÓPRIA, e não um número somado ao de cima:
+     "3 pedidos sem boleto" e "1 parcialmente titulado" são fatos diferentes,
+     e juntá-los apagaria justamente o caso que o dono perguntou. Como o de
+     cima, ele fica FORA do disponível — o que já virou título já está lá. */
+  if(c.parcialmente_titulados) caixa.appendChild(el('div',{class:'sub'},[
+    el('b',{},[plural(c.parcialmente_titulados,
+      'pedido parcialmente titulado','pedidos parcialmente titulados')]),
+    /* A MESMA cauda da linha de cima: as duas ficam fora do disponível, e
+       escrever só numa delas faz a outra parecer que entra. */
+    reais(c.valor_falta_titular_centavos)
+      ? ' — faltam '+reais(c.valor_falta_titular_centavos)
+        +' em título, fora do disponível'
+      : ' — falta título para parte do valor, fora do disponível']));
+
   caixa.appendChild(el('div',{id:'bol'+c.revenda_id}));
   carregarBoletos(c.revenda_id);
   return caixa;
@@ -200,7 +214,9 @@ async function carregarBoletos(revenda_id){
          preço continua vendo a marca (a mesma regra do `estourado`). */
       b.excede_pedidos ? el('span',{},[b.numero,' ',
         el('span',{class:'atrasado'},[avisoExcede(b)])]) : b.numero,
-      pedidosDoTitulo(b),
+      el('span',{},[pedidosDoTitulo(b),
+        /* O lado de baixo, em cinza: descreve, não acusa — ver `quantoCobre`. */
+        quantoCobre(b) ? el('div',{class:'nota'},[quantoCobre(b)]) : '']),
       b.vencido
         ? el('span',{class:'atrasado'},[data(b.vencimento)+' · VENCIDO'])
         : data(b.vencimento),
@@ -231,6 +247,18 @@ async function carregarBoletos(revenda_id){
    o número ao lado deixa a marca de ser binária e quem lê julga sozinho —
    R$ 0,20 ele ignora, R$ 7.217,96 ele investiga. Quem não tem `custo.ver`
    perde o valor na poda e fica com a frase, que continua verdadeira. */
+/* ⚠️ O LADO DE BAIXO NÃO SE CHAMA "FALTA", e a diferença importa: um título
+   menor que os pedidos é o PARCELAMENTO, o caso legítimo — as outras parcelas
+   ainda vão ser lançadas. Quem responde quanto falta de verdade é a lista de
+   cobrança, que olha TODOS os títulos do pedido; esta linha fala de um título
+   só, e por isso ela descreve, em vez de acusar. */
+function quantoCobre(b){
+  const v=b.valor_pedidos_centavos;
+  if(v===undefined||v===null||!(b.valor_centavos<v)) return '';
+  return reais(b.valor_centavos)&&reais(v)
+    ? 'cobre '+reais(b.valor_centavos)+' de '+reais(v)+' em pedidos' : '';
+}
+
 function avisoExcede(b){
   const dif=b.valor_pedidos_centavos===undefined||b.valor_pedidos_centavos===null
     ? null : b.valor_centavos-b.valor_pedidos_centavos;
@@ -297,10 +325,28 @@ async function carregarPedidosDaRevenda(){
     ['Esta revenda não tem pedido aprovado esperando título. O boleto pode ser '+
      'lançado assim mesmo — ele fica marcado como avulso.']));
   lista.forEach(p=>{
+    /* ⚠️ O PEDIDO PARCIALMENTE TITULADO CONTINUA AQUI, e mostra O QUE FALTA
+       — não o valor cheio. Enquanto ele saía da lista no primeiro título, o
+       PARCELAMENTO não era lançável por esta tela: com a parcela 1 de 3
+       lançada, não havia como apontar o pedido na parcela 2. */
+    const parcial=p.valor_titulado_centavos>0;
+    /* ⚠️ "FALTAM" FICA COLADO NO NÚMERO, e isso só apareceu no render: a
+       tarja é um bloco e caía na linha de baixo, então a linha lia
+       "#5001 · R$ 115,50" — que se entende como o VALOR do pedido, e o
+       valor dele é R$ 165,00. Número sem a palavra que o qualifica ao lado
+       é o "23,1 mm em vez de 23,1 mm" do §4 por outra porta. */
+    const quanto = parcial
+      ? (reais(p.valor_falta_centavos)
+          ? ' · faltam '+reais(p.valor_falta_centavos)
+            +(reais(p.valor_total_centavos)?' de '+reais(p.valor_total_centavos):'')
+          : '')
+      : (reais(p.valor_total_centavos)?' · '+reais(p.valor_total_centavos):'');
     const cx=el('label',{class:'marca'},[
       el('input',{type:'checkbox', class:'f_ped', value:String(p.id)}),
-      '#'+p.numero,
-      reais(p.valor_total_centavos)?(' · '+reais(p.valor_total_centavos)):''
+      '#'+p.numero, quanto,
+      parcial&&reais(p.valor_titulado_centavos)
+        ? el('span',{class:'tarja am'},['já titulado '+reais(p.valor_titulado_centavos)])
+        : ''
     ]);
     alvo.appendChild(cx);
   });

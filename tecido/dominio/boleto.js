@@ -263,6 +263,14 @@ function credito(revenda_id){
   const ehBoleto=/boleto/i.test(String(rev.forma_pagamento_nome||''));
   const ap=ehBoleto?d.aprovadosSemBoleto(rev.id):null;
 
+  /* ⚠️ O QUE FALTA TITULAR FICA AO LADO DO "EM ABERTO", NUNCA DENTRO DELE
+     (decisao do dono, 26/09/2026). `em aberto` continua sendo so TITULO
+     LANCADO; a parte do pedido que ainda nao virou titulo e compromisso, e
+     nao divida — e a mesma regra "os dois, mostrados separados" da §8 da
+     spec, que ja vale para o `aprovado sem boleto`. Somar aqui faria o
+     disponivel mudar de valor sem ninguem lancar nada. */
+  const pt=ehBoleto?d.parcialmenteTitulados(rev.id):null;
+
   return {
     revenda_id:rev.id, revenda_nome:rev.nome_fantasia,
     vendedor_usuario_id:rev.vendedor_usuario_id, vendedor_nome:rev.vendedor_nome,
@@ -278,6 +286,11 @@ function credito(revenda_id){
     estourado: disponivel!==null && disponivel<0,
     aprovados_sem_boleto: ap?ap.quantos:null,
     valor_aprovado_sem_boleto_centavos: ap?ap.valor:null,
+    /* `parcialmente_titulados` e CONTAGEM, e por isso o nome nao leva
+       `valor_`: ele sobrevive a poda e acende o aviso para quem nao ve
+       preco — a mesma regra do `estourado` e do `excede_pedidos`. */
+    parcialmente_titulados: pt?pt.quantos:null,
+    valor_falta_titular_centavos: pt?pt.falta:null,
     ultimo_movimento:d.ultimoMovimento(rev.id)||null
   };
 }

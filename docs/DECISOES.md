@@ -98,3 +98,21 @@
 | 26/09/2026 | **O aprovador único ESPERA** (§6.4 da spec, opção A). Não há motivo que dispense a segunda pessoa, nem para o Admin Geral | A trava só segura a *correção* do saldo, nunca a operação. Aprovar sozinho com motivo seria a regra com uma porta dos fundos, e a porta dos fundos é a que se usa no dia corrido | Lucas (dono) | `inventario_dominio.js` · `CLAUDE.md` §18 |
 | 26/09/2026 | **O que as contagens comparam é a DIFERENÇA contra o sistema, e não o número contado** — divergência da letra da §5.1 da spec | A fábrica embala e imprime entre a 1ª contagem e a recontagem: a prateleira muda junto com o saldo, e comparar o número cru mandaria para a 3ª contagem todo SKU que teve trabalho legítimo no meio. Sem nada no meio, é exatamente a regra da spec | Claude, dentro da regra aprovada | `inventario_dominio.js` · `CLAUDE.md` §18 |
 | 26/09/2026 | **Rejeitar faz o SKU voltar a ser contado DO ZERO** (item novo `a_contar`), e não "recontar" — divergência da letra da §5.6 | Quem rejeita está dizendo que não confia nas contagens; uma recontagem compararia de novo com a 1ª. O rejeitado fica de pé, com motivo | Claude, dentro da regra aprovada | `inventario_dominio.js` |
+
+
+## 26/09/2026 — o pedido só está titulado quando a soma dos títulos alcança o valor dele (fase 6-C1c)
+Antes: um boleto de qualquer valor apontando o pedido o tirava da cobrança, e o que
+faltava não aparecia em tela nenhuma — nem era possível apontar o mesmo pedido numa
+segunda parcela. Depois: a régua é o dinheiro; abaixo do valor o pedido continua na
+lista, com o que falta. Decisão do dono, com o caso na mão (boleto de R$ 49,50 num
+pedido de R$ 165,00).
+
+## 26/09/2026 — o título que cobre vários pedidos é rateado proporcionalmente
+Decisão do dono. O título não diz de qual pedido é o buraco; repartir pelo valor de
+cada pedido é a única forma que não privilegia ninguém, e quando o título fecha com a
+soma cada pedido fica coberto exatamente, sem fração.
+
+## 26/09/2026 — o que falta titular NÃO entra no crédito em aberto
+Decisão do dono. "Em aberto" continua sendo só título lançado; o que falta titular fica
+ao lado, como o "aprovado sem boleto" — a regra "os dois, mostrados separados" da §8 da
+spec. Somá-lo faria o disponível mudar de significado sem ninguém lançar nada.
