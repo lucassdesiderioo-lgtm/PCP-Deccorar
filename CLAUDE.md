@@ -2889,11 +2889,27 @@ em `now` (2), o critério largo pegando o `embalado` (4) e o bipe sem gravar que
 > ✅ **NO AR EM 26/09/2026** (PR #135): o dono fez o deploy e disse *"ficou
 > certo"*.
 >
-> ⚠️ **ISSO PROVA O DEPLOY, E NÃO AS DUAS COISAS QUE A FASE GRAVA.** Ainda não
-> foram conferidas no dado real: (1) se o `fechar_saida_passivo.js --aplicar`
-> rodou e quantas caixas fechou, e (2) se `impresso_por` e `conferido_por` estão
-> saindo com o nome de quem fez numa caixa impressa e bipada depois do deploy.
-> Prova que não foi feita se escreve como não feita (§4).
+> ✅ **O PASSIVO FOI FECHADO EM 26/09/2026: 399 CAIXAS, e não 28.** Saída #1
+> (`tipo='passivo'`), com backup em
+> `backups/antes-saida-passivo-2026-09-26T10-36-34-486Z.db`. As caixas iam de
+> 10/09 a 25/09, de 14 a 46 por dia: **o "Fechar coleta" não foi usado nem uma
+> vez desde que nasceu**, e o canto nunca esvaziou no sistema. As 28 de 25/09
+> eram só as de despacho futuro; o resto já tinha vencido e não aparecia na
+> faixa azul, que só olha o futuro.
+>
+> ⚠️ **A simulação e o `--aplicar` rodaram colados** (os dois comandos foram
+> colados juntos no terminal), então a lista não foi conferida antes de
+> gravar. A decisão 8 da spec cobre o que estava no canto em 25/09; se alguma
+> caixa bipada no fim do dia 25 ainda estiver fisicamente lá, o caminho de
+> volta é pelo backup acima ou reabrindo só aquele id.
+>
+> ✅ **O dono conferiu o canto depois: está vazio** (26/09/2026). As 399 saíram
+> de verdade, e nada precisou ser reaberto.
+>
+> ⚠️ **Os nomes (`impresso_por`, `conferido_por`) ainda não foram vistos no
+> dado real:** até a conferência não houve caixa impressa nem bipada depois do
+> deploy. As colunas e a tabela `saida` existem no banco de produção. Prova que
+> não foi feita se escreve como não feita (§4).
 
 ### ⚠️ O QUE SAI ADIANTADO — contado em peças, na tela do Carregamento (25/09/2026)
 
