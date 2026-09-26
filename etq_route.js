@@ -223,7 +223,12 @@ module.exports=function(app,db){
           ? ('Sem estoque de '+l.codigo+' (precisa de '+l.qtd+', tem '+l.estoque+').')
           : 'Sem estoque desse SKU.'});
     db.transaction(()=>{
-      db.prepare("UPDATE lote SET estagio='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(id);
+      /* O BIPE 1 DA DUPLA CONFERENCIA: quem imprimiu (spec SAIDA-E-DUPLA-
+         CONFERENCIA). So aqui, na primeira impressao — o /api/reimprimir nao
+         toca neste campo, porque papel repetido nao e outra contagem. Sem
+         ninguem logado fica vazio: nome inventado mentiria no fechamento. */
+      db.prepare("UPDATE lote SET estagio='embalado', embalado_em=datetime('now','localtime'), impresso_por=? WHERE id=?")
+        .run((req.usuario&&req.usuario.nome)||null, id);
       /* UMA LINHA DE LIVRO POR SKU DA CAIXA, com a mesma referencia do volume
          (spec §3.3.4). Numa caixa de pacote sao N baixas que valem como uma: a
          transacao e de quem chama, e o `estoque_dominio` nao abre a dele.

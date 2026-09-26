@@ -2,7 +2,7 @@ const express=require('express'); const fs=require('fs');
 const {parsePdf}=require('./parse'); const {PDFDocument}=require('pdf-lib');
 const {futuro,COLETA}=require('./carga');
 module.exports=function(app,db){
-  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT);");
+  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT, impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, no_carro_em TEXT, no_carro_por TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
   // sao so historia: quantas vezes o volume voltou pra impressora e quando foi a
   // ultima. O ALTER mora aqui, no dono da tabela (§17 do CLAUDE.md), com a
@@ -43,6 +43,20 @@ module.exports=function(app,db){
      no fechamento da conferencia com o motorista (carreg_route.js). */
   try{ db.exec("ALTER TABLE lote ADD COLUMN modalidade TEXT"); }catch(e){}
   try{ db.exec("ALTER TABLE lote ADD COLUMN retirado_em TEXT"); }catch(e){}
+  /* QUEM FEZ, E POR ONDE SAIU (spec SAIDA-E-DUPLA-CONFERENCIA, 25/09/2026).
+     A dupla conferencia sao duas contagens por logins que podem ser diferentes:
+     `impresso_por` e o bipe 1 (a PRIMEIRA impressao da etiqueta de venda — a
+     reimpressao nao mexe nele) e `conferido_por`/`conferido_em` o bipe 2. Sem
+     o nome de quem fez nao ha "sem segunda pessoa" para marcar, nem a quem
+     perguntar pela caixa que ficou para tras.
+     `no_carro_*` e o bipe ao entrar no carro da agencia (fase 4), e
+     `saida_id`/`saiu_em`/`saiu_por` dizem em qual saida (tabela `saida`,
+     saida_schema.js) a caixa foi embora e por qual porta — que pode nao ser a
+     da etiqueta: `modalidade` e o que a etiqueta disse, `saiu_por` e o que
+     aconteceu, e uma coluna nao escreve na outra. */
+  for(const c of ['impresso_por TEXT','conferido_por TEXT','conferido_em TEXT','no_carro_em TEXT',
+                  'no_carro_por TEXT','saida_id INTEGER','saiu_em TEXT','saiu_por TEXT'])
+    try{ db.exec("ALTER TABLE lote ADD COLUMN "+c); }catch(e){}
 
   /* ── AS PECAS DENTRO DA CAIXA (§5-B, desde 15/09/2026) ─────────────────────
      Ate aqui uma etiqueta era uma persiana, e por isso `lote.codigo` bastava.

@@ -22,13 +22,12 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 3. **Onde a spec e o `CLAUDE.md` divergirem, vale o `CLAUDE.md`** — ele descreve o
    que está em produção. A divergência é anotada no status da spec.
 
-## Índice — situação em 25/09/2026
+## Índice — situação em 26/09/2026
 
 | Spec | Status |
 |---|---|
 | `SOBMEDIDA-PEDIDO-REVENDA.md` | **Em construção** · módulo sob medida (`tecido/`) · **fase 1 em produção e conferida (22/09 — dez persianas reais no corte e dez no preço, as vinte bateram)** · **fase 2 em código (22/09 — revenda, carteira, tabelas A/B/C, feriados e prazo; falta cadastrar as revendas de hoje)** · **fase 3 em código e conferida no deploy (23/09 — o pedido 5001 saiu com duas persianas, duas coleções, mínimo faturado, cascata e prazo, tudo refeito por fora contra o PDF; falta a semana em paralelo ao Decorsoft)** · **fase 4-A em código (23/09 — a etiqueta de produção com código por setor que nasce na aprovação, a reimpressão com o mesmo código e as peças indo para o plano de corte em medida de CORTE — **o leitor bipou no papel**; falta a peça real atravessando os cinco setores)** · **fase 4-B em código (24/09 — o comprometido de tecido: o que está vendido e ainda não foi cortado, no painel do sob medida, e o aviso ao vendedor de pedido aprovado esperando tecido; falta o comprador comprar por ele)** · **fase 4-C em produção (24/09 — o tubo do sob medida chegando ao MESMO Compras do PCP, pela porta única; a peça sai da conta quando a etiqueta dela é impressa; deploy limpo, e a primeira leitura deu vazio porque os tubos do 5001 já tinham sido impressos; **os tubos 38, 41 e 56 cadastrados e os quatro degraus apontados em 24/09** — falta o primeiro pedido real aparecer lá e o comprador comprar por ele)** · **fase 5-A em código (24/09 — os cinco setores da produção no controle de acesso do PCP, um por bancada, nascendo vazios; o papel e os setores viraram duas contas, para quem faz duas coisas não perder a bancada; sobe sozinha para o dono marcar as pessoas)** · **fase 5-A EM PRODUÇÃO (24/09 — os cinco setores no ar, com uma pessoa marcada em cada)** · **fase 5-B1 em código (24/09 — o bipe: as filas por setor com as liberações do §4.15, bandô e barra segurando só a embalagem, o kit conferido contra o kit CERTO, a pendência que a chefia fecha com motivo e o Pronto automático — que é `pronto_em` e NÃO o `marco`, para não quebrar a reimpressão da etiqueta nem as contas da compra; falta a bancada de verdade com o leitor na mão)** · **fase 5 INTEIRA EM PRODUÇÃO (24/09 — 5-A, 5-B1 e 5-B2 no ar; falta a conferência de fábrica das três: a peça atravessando os cinco setores com o leitor na mão, e a bancada recusando uma de verdade)** · **fase 5-B2 em código (24/09 — a recusa: qualquer bancada devolve a peça por defeito do trabalho ANTERIOR escolhendo só o motivo; o motivo aponta o COMPONENTE e o setor sai dele, porque a serralheria faz quatro peças; volta o culpado e tudo que depende dele, pela mesma tabela que libera para a frente; a refeita reimprime a MESMA etiqueta, marcada em vermelho; falta a bancada de verdade recusar uma peça)** · **fase 6-A em código (24/09 — o QUADRO: onde está cada pedido, com a barrinha por setor e o selo de retido; a etapa é DERIVADA de marco + pronto_em + bipes e o `marco` não se mexeu, que é a dívida 15 respondida; desativar coluna não some com o pedido, ele vira aviso)** · fases 6-B, 6-C, 7 e 8 planejadas · **a lista única do que está pendente fica no topo da spec** · as duas decisões da §8 anteriores à fase 1 estão respondidas |
-| `SAIDA-E-DUPLA-CONFERENCIA.md` | Planejado · 4 fases · substitui o Fechar coleta de 10/09 |
-| `COLETA-LEVA-AGENCIA.md` | **Rascunho (25/09)** · o caminhão da coleta levando caixa da agência · nada no código · 4 decisões do dono em aberto (§5) |
+| `SAIDA-E-DUPLA-CONFERENCIA.md` | **Em construção** · 4 fases · substitui o Fechar coleta de 10/09 · **fase 1 em código (26/09): quem imprimiu e quem bipou gravados, tabela `saida` e o script do passivo — falta deploy e rodar o script** · fases 2–4 planejadas |
 | `ESTOQUE-LIVRO-E-CONFERENCIA.md` | **Em construção** · fase 0 e fase 1 em código (21/09) · fases 2–4 planejadas · uma decisão em aberto (§6.4) |
 | `VENDAS-E-MEDIA.md` | Planejado · nada no código · a troca da fonte da média (fase 3) espera o ok do dono |
 | `MESA-DE-CORRECOES.md` | Planejado · nada no código · depende do livro (Estoque F1) e das canceladas (Vendas F2) |
@@ -69,7 +68,12 @@ conferidas em produção. As regras estão no `CLAUDE.md` §4.
 peças que saem adiantadas, no quadro do Carregamento. As regras estão no
 `CLAUDE.md` §8-B.
 
-Em `docs/arquivo/`: `CARREGAMENTO-ADIANTADO.md`, `GERADOR-ETIQUETA-KIT.md`, `REVISAO-COMPLETA.md`,
+**Arquivado sem construir em 26/09/2026:** `COLETA-LEVA-AGENCIA.md` — o
+rascunho de 25/09 que trocava a modalidade da caixa da agência levada pelo
+caminhão. Substituído pela `SAIDA-E-DUPLA-CONFERENCIA.md`, que resolve pela
+troca de porta (`saiu_por`) sem mexer na modalidade.
+
+Em `docs/arquivo/`: `COLETA-LEVA-AGENCIA.md`, `CARREGAMENTO-ADIANTADO.md`, `GERADOR-ETIQUETA-KIT.md`, `REVISAO-COMPLETA.md`,
 `ESTOQUE-TECIDO-E-SOBRAS.md`, `PROMPT-ESTOQUE-TECIDO-E-SOBRAS.md`,
 `PROMPT-FASE-0.md`, `PERGUNTAS-COMPRAS.md`, `GESTAO-DE-TAREFAS.md` e
 `MELHORIAS.md` (os sete últimos arquivados por decisão do dono em 17/09/2026).

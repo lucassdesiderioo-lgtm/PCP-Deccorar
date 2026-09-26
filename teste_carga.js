@@ -29,7 +29,8 @@ const FOTO='data:image/jpeg;base64,'+Buffer.alloc(4000,7).toString('base64');
 const db=new Database(path.join(tmp,'t.db'));
 db.exec(`CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT, buyer TEXT,
   city TEXT, nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', estagio TEXT, data TEXT,
-  carregado_em TEXT, despachar_em TEXT, modalidade TEXT, retirado_em TEXT);
+  carregado_em TEXT, despachar_em TEXT, modalidade TEXT, retirado_em TEXT,
+  conferido_por TEXT, conferido_em TEXT);
   CREATE TABLE lote_item (id INTEGER PRIMARY KEY AUTOINCREMENT, lote_id INTEGER, codigo TEXT, qtd INTEGER DEFAULT 1);`);
 const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
 const ontem=db.prepare("SELECT date('now','localtime','-1 day') d").get().d;

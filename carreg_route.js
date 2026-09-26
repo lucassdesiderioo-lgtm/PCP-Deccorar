@@ -6,6 +6,9 @@ const fs=require('fs'), path=require('path');
    /opt. */
 const FOTOS_DIR=require('./caminhos').COLETAS;
 module.exports=function(app,db){
+  /* A tabela das saidas (caminhao e agencia) tem dono proprio: o script do
+     passivo tambem a cria, e duas copias do CREATE divergem. */
+  require('./saida_schema').garantirSaida(db);
   /* ── CONFERENCIA DUPLA (etiqueta de venda + SKU da caixa) ──────────────────
      A ultima rede antes do carro. Bipe 1 = a etiqueta de venda JA COLADA;
      bipe 2 = o codigo de barras do SKU na propria caixa (que continua visivel,
@@ -144,7 +147,12 @@ module.exports=function(app,db){
           pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city}});
       }
     }
-    db.prepare("UPDATE lote SET estagio='carregado', carregado_em=datetime('now','localtime') WHERE id=?").run(alvo.id);
+    /* QUEM BIPOU (spec SAIDA-E-DUPLA-CONFERENCIA, fase 1): o bipe de hoje no
+       carregamento e o que vira o bipe 2 — a conferencia da pilha — na fase 2.
+       Por ora so grava o nome e a hora; o comportamento da tela nao muda. */
+    db.prepare(`UPDATE lote SET estagio='carregado', carregado_em=datetime('now','localtime'),
+        conferido_por=?, conferido_em=datetime('now','localtime') WHERE id=?`)
+      .run((req.usuario&&req.usuario.nome)||null, alvo.id);
     const p=progresso();
     /* A COLETA RESPONDE COM O NUMERO QUE O MOTORISTA VAI TER QUE BATER.
        "Esta indo N" depois de cada bipe e o que faz a pessoa saber, na hora,

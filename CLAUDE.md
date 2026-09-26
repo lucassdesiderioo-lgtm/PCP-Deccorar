@@ -2810,9 +2810,14 @@ canto na outra.
 > pro canto, mesmo com despacho semanas à frente. Em 25/09 eram **28 caixas** no
 > canto, com despacho de 28/09 a 08/10, e o motorista leva todas. Por isso:
 >
-> - **O fechamento fecha o canto INTEIRO, sem olhar a data** (`AGUARDA_CAMINHAO`
->   não filtra dia), e isso está certo. Filtrar por vencimento faria o
->   fechamento divergir toda vez que o motorista levasse as futuras.
+> - **O fechamento não olha a data de despacho** (`AGUARDA_CAMINHAO` não filtra
+>   dia), e nisso está certo: filtrar por vencimento faria o fechamento divergir
+>   toda vez que o motorista levasse as futuras. **O defeito é outro, e é o que a
+>   spec `SAIDA-E-DUPLA-CONFERENCIA` veio corrigir:** ele compara o canto
+>   **inteiro** com o motorista, então um dia sem fechar contamina todos os
+>   seguintes. Foi o que aconteceu — o "Fechar coleta" de 10/09 não foi adotado,
+>   o canto acumulou, e o número nunca mais bateu. A fase 3 troca isso por uma
+>   saída por caminhão, que só olha o que saiu nela.
 > - Essas caixas **somem da faixa azul** do Carregamento (ela só conta o
 >   `embalado` futuro ainda na prateleira) e **só entram em "Peças adiantadas"
 >   no dia do fechamento**, todas de uma vez. Faixa azul pequena com canto cheio
@@ -2825,8 +2830,61 @@ canto na outra.
 > no canto. O motorista mostra mais caixas do que o sistema tem, e o fechamento
 > acusa divergência sem ter o que explicar. Para fechar, alguém usa o "liberar
 > assim mesmo", e a divergência de verdade (caixa sumida) passa a se misturar com
-> essa. É uma mudança de regra, com rascunho em
-> `docs/specs/COLETA-LEVA-AGENCIA.md`: **não "conserte" sem a spec aprovada.**
+> essa. A resposta aprovada é a **troca de porta** da spec
+> `docs/specs/SAIDA-E-DUPLA-CONFERENCIA.md` (fases 3 e 4): a caixa sai por onde
+> saiu de verdade (`saiu_por`), e `lote.modalidade` **não muda**. O rascunho
+> `COLETA-LEVA-AGENCIA.md`, que propunha trocar a modalidade, foi substituído e
+> está em `docs/arquivo/`. **Não "conserte" antes das fases.**
+
+### ⚠️ QUEM FEZ, E A LIMPEZA DO PASSIVO (26/09/2026, fase 1 da spec `SAIDA-E-DUPLA-CONFERENCIA`)
+
+A spec troca o "Fechar coleta" por uma **dupla conferência** (duas contagens,
+por logins que podem ser diferentes) e uma **saída com foto por caminhão e por
+viagem à agência**. A fase 1 é o chão disso, e **não muda nada na tela**:
+
+| Onde | O quê |
+|---|---|
+| `lote.impresso_por` | quem imprimiu — o **bipe 1**. Gravado no `POST /api/embalar` |
+| `lote.conferido_por`, `conferido_em` | quem bipou a caixa no Carregamento de hoje — vira o **bipe 2** na fase 2 |
+| `lote.no_carro_*`, `saida_id`, `saiu_em`, `saiu_por` | nascem vazias; são das fases 2 a 4 |
+| tabela `saida` (`saida_schema.js`, dono único do CREATE) | uma linha por caminhão ou viagem. O `coleta_fechamento` fica como história |
+
+> ⚠️ **`impresso_por` É A PRIMEIRA IMPRESSÃO, E A REIMPRESSÃO NÃO O TOCA.** É a
+> armadilha #1-B pela porta do nome: papel repetido não é outra contagem. Se a
+> reimpressão sobrescrevesse, a caixa passaria a dizer que foi impressa por quem
+> só destravou a impressora — e a "segunda pessoa" da fase 2 apareceria onde não
+> houve. Sem ninguém logado o campo fica **vazio**, nunca um nome inventado.
+
+> ⚠️ **`saiu_por` NÃO É `modalidade`, E UMA NÃO ESCREVE NA OUTRA.** A modalidade
+> é o que a etiqueta disse (armadilha #21) e continua decidida pela etiqueta ou
+> pela gestão; `saiu_por` é por onde a caixa saiu de verdade. O motorista levar
+> caixa da agência é **bom** (decisão 6 da spec), e não reescreve a etiqueta.
+
+**O passivo:** `node fechar_saida_passivo.js` (simula) e `--aplicar` (faz
+`await db.backup()` antes). Fecha numa única saída `tipo='passivo'` as caixas de
+coleta paradas em "esperando o caminhão" — o dono confirmou em 25/09/2026 que
+todas já saíram. A régua é o `AGUARDA_CAMINHAO` do `carga.js`, a mesma do card da
+tela, e fica de fora o volume do modo teste.
+
+> ⚠️ **CADA CAIXA SAI NA DATA DO BIPE DELA (`carregado_em`), NUNCA HOJE** — a
+> regra dos scripts de passivo do §5. É o limite de baixo honesto: a caixa não
+> saiu antes de ir pro canto, e a hora real da retirada não existe em lugar
+> nenhum. `retirado_em` recebe o mesmo carimbo, e por isso **essas caixas entram
+> em "Peças adiantadas" nas datas do bipe** (as de 25/09 tinham despacho de
+> 28/09 a 08/10: adiantadas de verdade). Um pico nos "últimos 30 dias" logo
+> depois do `--aplicar` é isto, não defeito.
+
+> O script **recusa** banco sem as colunas novas, dizendo para subir o servidor
+> antes: rodá-lo antes do deploy fecharia caixa sem ter onde gravar a saída. E é
+> idempotente — depois de aplicado as caixas ganham `retirado_em` e saem do
+> critério.
+
+**Rode `node teste_saida.js` (26 casos) ao mexer no `POST /api/embalar`, no
+`POST /api/reimprimir`, no bipe do `carreg_route.js`, no `saida_schema.js` ou no
+script.** Quatro defeitos foram reintroduzidos um a um para provar que o teste
+pega cada um: a reimpressão sobrescrevendo o nome (3 casos), a saída carimbada
+em `now` (2), o critério largo pegando o `embalado` (4) e o bipe sem gravar quem
+(2).
 
 ### ⚠️ O QUE SAI ADIANTADO — contado em peças, na tela do Carregamento (25/09/2026)
 
@@ -3225,7 +3283,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3410,6 +3468,12 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   da janela: o primeiro esconde furo que ninguém vai procurar, o segundo faz o
   volume mudar de classificação conforme o argumento da linha de comando
   (§5, armadilha #27)
+- ❌ Fazer a reimpressão gravar `impresso_por`: o bipe 1 é a PRIMEIRA
+  impressão, e papel repetido não é outra contagem (§8-B, fase 1 da saída)
+- ❌ Fazer `saiu_por` reescrever `lote.modalidade`, ou o contrário: a etiqueta
+  diz uma coisa, a saída diz outra, e as duas são verdade (§8-B, #21)
+- ❌ Carimbar em `now` a saída do passivo da coleta: cada caixa sai na data do
+  bipe dela, como todo script de passivo (§5, §8-B)
 - ❌ Contar como adiantada a caixa de coleta que só foi pro canto: a saída da
   coleta é o caminhão levando (`retirado_em`), e o bipe não é saída (§8-B)
 - ❌ Escrever uma segunda conta de "saiu adiantado", ou contar caixa em vez de
