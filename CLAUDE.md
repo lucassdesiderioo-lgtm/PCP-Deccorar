@@ -2886,6 +2886,15 @@ pega cada um: a reimpressão sobrescrevendo o nome (3 casos), a saída carimbada
 em `now` (2), o critério largo pegando o `embalado` (4) e o bipe sem gravar quem
 (2).
 
+> ✅ **NO AR EM 26/09/2026** (PR #135): o dono fez o deploy e disse *"ficou
+> certo"*.
+>
+> ⚠️ **ISSO PROVA O DEPLOY, E NÃO AS DUAS COISAS QUE A FASE GRAVA.** Ainda não
+> foram conferidas no dado real: (1) se o `fechar_saida_passivo.js --aplicar`
+> rodou e quantas caixas fechou, e (2) se `impresso_por` e `conferido_por` estão
+> saindo com o nome de quem fez numa caixa impressa e bipada depois do deploy.
+> Prova que não foi feita se escreve como não feita (§4).
+
 ### ⚠️ O QUE SAI ADIANTADO — contado em peças, na tela do Carregamento (25/09/2026)
 
 Pedido do dono: *"mensurar e mostrar na tela de carregamento a quantidade de
