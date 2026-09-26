@@ -2903,6 +2903,9 @@ em `now` (2), o critério largo pegando o `embalado` (4) e o bipe sem gravar que
 > caixa bipada no fim do dia 25 ainda estiver fisicamente lá, o caminho de
 > volta é pelo backup acima ou reabrindo só aquele id.
 >
+> ✅ **O dono conferiu o canto depois: está vazio** (26/09/2026). As 399 saíram
+> de verdade, e nada precisou ser reaberto.
+>
 > ⚠️ **Os nomes (`impresso_por`, `conferido_por`) ainda não foram vistos no
 > dado real:** até a conferência não houve caixa impressa nem bipada depois do
 > deploy. As colunas e a tabela `saida` existem no banco de produção. Prova que
