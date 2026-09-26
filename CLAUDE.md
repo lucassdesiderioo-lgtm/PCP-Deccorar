@@ -3057,6 +3057,9 @@ divergência andando (17), liberar sem motivo (5), troca de porta reescrevendo a
 modalidade (1) e fechar sem foto (15). Mexeu na chave? **`node teste_acesso.js`
 (194, a seção 6-E é esta) e `node teste_cobertura.js` (10).**
 
+> ✅ **NO AR EM 26/09/2026** (PR #140): o dono fez o deploy e disse *"ficou
+> certo"*.
+>
 > ⚠️ **ISSO NÃO É A CONFERÊNCIA NO CAMINHÃO.** A rodada foi na minha tela: abrir,
 > bipar uma sobra, fechar divergente, "foi no caminhão", fechar batendo. A prova
 > que fecha a fase é **o primeiro caminhão de verdade** saindo por ela, com a
