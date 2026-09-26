@@ -298,6 +298,19 @@
   <div id="divLista"></div>
 </div>
 <div class="card"><div id="blqEstado"></div><table><thead><tr><th>SKU</th><th>Volumes</th><th></th></tr></thead><tbody id="blqLista"></tbody></table></div>
+<div class="card" id="cancCard" style="display:none;border:2px solid #b26a00">
+  <!-- VENDAS-E-MEDIA fase 2 (D3 do dono, 26/09/2026). SO MOSTRA: decidir o que
+       fazer com a persiana e da Mesa de correcoes, que ainda nao existe. Fica
+       fora do numero da aba de proposito — nada aqui esta retido, e um numero
+       que nao zera vira paisagem. -->
+  <div style="font-weight:800;color:#b26a00;font-size:16px;margin-bottom:6px">CANCELADAS DEPOIS DA ETIQUETA</div>
+  <div style="font-size:13px;color:#5a6472;margin-bottom:12px">
+    O Mercado Livre cancelou estas vendas <b>depois</b> que a etiqueta saiu. A caixa não carrega mais
+    (o bipe recusa), mas o estoque dela <b>já tinha baixado e não volta sozinho</b>: confira se a
+    persiana voltou para a prateleira e, se voltou, acerte o saldo em <i>Estoque</i>, com o motivo.
+  </div>
+  <div id="cancLista"></div>
+</div>
 <div class="card" style="margin-top:14px">
   <div style="font-weight:700;font-size:15px;margin-bottom:6px">Conferir o que já foi impresso</div>
   <div class="sub" style="margin-bottom:12px">Relê a folha de controle de cada PDF do período e compara com o SKU que ficou gravado em cada volume. A trava do upload só vale para o que entra dali em diante — <b>isto olha para trás</b>, e é o que pega o volume que subiu antes de uma correção.</div>
@@ -2404,7 +2417,41 @@ document.addEventListener("click",async function(e){
   try{ if(typeof verCruz==="function") verCruz(); }catch(e){}
 });
 
+/* CANCELADAS DEPOIS DA ETIQUETA (VENDAS-E-MEDIA fase 2). Cada linha diz onde a
+   caixa estava quando o ML cancelou, porque e isso que manda onde procura-la. */
+async function carregarCanc(){
+  var r={}; try{ r=await (await fetch("/api/canceladas")).json(); }catch(e){}
+  var card=document.getElementById("cancCard"), lis=document.getElementById("cancLista");
+  if(!card||!lis) return;
+  var l=(r&&r.volumes)||[];
+  if(!l.length){ card.style.display="none"; lis.innerHTML=""; return; }
+  card.style.display="";
+  /* `carregado` so chega aqui de dois lugares (cancelada_dominio.onde): o canto
+     da coleta, ou o carro de uma viagem ainda aberta — a modalidade separa. */
+  var onde=function(v){
+    if(v.cancelada_estagio==="embalado") return "etiqueta impressa, na área";
+    if(v.cancelada_estagio==="carregado") return v.modalidade==="coleta" ? "no canto da coleta" : "dentro do carro da viagem — tirada da viagem";
+    return v.cancelada_estagio||"—";
+  };
+  var h="";
+  for(var i=0;i<l.length;i++){
+    var v=l[i], dt=String(v.cancelada_em||v.cancelada_aviso_em||"").slice(0,16);
+    var quando=dt?(dt.slice(8,10)+"/"+dt.slice(5,7)+" "+dt.slice(11,16)):"";
+    h+='<div style="border-top:1px solid #d8dee6;padding:10px 0">'
+      +'<div style="font-weight:700">'+esc(v.buyer||"—")+' · NF '+esc(v.nf||"—")+' · <span style="font-family:monospace">'+esc(v.codigo||"")+'</span></div>'
+      +'<div style="font-size:13px;margin-top:3px">'
+      +(v.cancelada_varias
+        ? '<b style="color:#b26a00">📦 caixa de '+(v.pecas>1?v.pecas+' persianas':'vários produtos')+'</b> — um item foi cancelado, e a caixa <b>não</b> foi: o cliente ainda quer o resto. Confira no ML o que sai.'
+        : 'Estava: <b>'+esc(onde(v))+'</b>')
+      +'</div>'
+      +'<div style="font-size:12px;color:#5a6472;margin-top:3px">ML: “'+esc(v.cancelada_motivo||"cancelada")+'”'
+      +(quando?' · visto no import de '+quando:'')+(v.venda?' · venda '+esc(v.venda):'')+(v.packId?' · pack '+esc(v.packId):'')+'</div>'
+      +'</div>';
+  }
+  lis.innerHTML=h;
+}
 async function carregarBloq(){
+carregarCanc();
 var l=[]; try{ l=await (await fetch("/api/bloqueados")).json(); }catch(e){}
 var n=0; for(var i=0;i<l.length;i++) n+=l[i].qtd;
 var nd=await carregarDiv();

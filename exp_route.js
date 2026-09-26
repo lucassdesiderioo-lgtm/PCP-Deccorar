@@ -2,7 +2,7 @@ const express=require('express'); const fs=require('fs');
 const {parsePdf}=require('./parse'); const {PDFDocument}=require('pdf-lib');
 const {futuro,COLETA}=require('./carga');
 module.exports=function(app,db){
-  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT, impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, no_carro_em TEXT, no_carro_por TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT);");
+  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT, impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, no_carro_em TEXT, no_carro_por TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT, cancelada_em TEXT, cancelada_origem TEXT, cancelada_estagio TEXT, cancelada_motivo TEXT, cancelada_varias INTEGER DEFAULT 0, cancelada_aviso_em TEXT);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
   // sao so historia: quantas vezes o volume voltou pra impressora e quando foi a
   // ultima. O ALTER mora aqui, no dono da tabela (§17 do CLAUDE.md), com a
@@ -56,6 +56,15 @@ module.exports=function(app,db){
      aconteceu, e uma coluna nao escreve na outra. */
   for(const c of ['impresso_por TEXT','conferido_por TEXT','conferido_em TEXT','no_carro_em TEXT',
                   'no_carro_por TEXT','saida_id INTEGER','saiu_em TEXT','saiu_por TEXT'])
+    try{ db.exec("ALTER TABLE lote ADD COLUMN "+c); }catch(e){}
+  /* A VENDA CANCELADA NO ML (spec VENDAS-E-MEDIA, fase 2, 26/09/2026). Quem
+     escreve aqui e so o cancelada_dominio.js, pelo import da planilha. O
+     volume cancelado ganha `estagio='cancelado'`, e o estagio de antes fica em
+     `cancelada_estagio` — historia, como `bloqueio_resolvido`. A caixa de
+     varias persianas nunca e cancelada sozinha: ganha `cancelada_varias=1` e
+     vai para o card, com a frase do ML em `cancelada_motivo`. */
+  for(const c of ['cancelada_em TEXT','cancelada_origem TEXT','cancelada_estagio TEXT','cancelada_motivo TEXT',
+                  'cancelada_varias INTEGER DEFAULT 0','cancelada_aviso_em TEXT'])
     try{ db.exec("ALTER TABLE lote ADD COLUMN "+c); }catch(e){}
 
   /* ── AS PECAS DENTRO DA CAIXA (§5-B, desde 15/09/2026) ─────────────────────
@@ -747,6 +756,8 @@ module.exports=function(app,db){
     const o=db.prepare('SELECT id,codigo,buyer,nf,estagio,srcfile FROM lote WHERE id=?').get(id);
     if(!o) return res.status(404).json({erro:'venda nao encontrada'});
     if(o.estagio==='bloqueado') return res.json({erro:'Volume bloqueado: SKU fora do cadastro.'});
+    // VENDAS-E-MEDIA fase 2: papel de venda cancelada no ML e caixa indo pro cliente errado.
+    if(o.estagio==='cancelado') return res.json({erro:'Venda cancelada no Mercado Livre — não imprimir. Separe a caixa e avise o admin.'});
     if(o.estagio==='pendente') return res.json({erro:'Essa venda ainda nao foi impressa. Bipe o SKU pra imprimir a primeira vez.'});
     if(!temPdf(o)) return res.json({erro:PDF_SUMIU});
     db.prepare("UPDATE lote SET reimpressoes=COALESCE(reimpressoes,0)+1, reimpresso_em=datetime('now','localtime') WHERE id=?").run(o.id);
@@ -759,6 +770,7 @@ module.exports=function(app,db){
       const o=db.prepare('SELECT * FROM lote WHERE id=?').get(req.params.id);
       if(!o) return res.status(404).send('nao encontrado');
       if(o.estagio==='bloqueado') return res.status(409).send('BLOQUEADO: o SKU "'+(o.codigo||'(vazio)')+'" nao esta no cadastro. Cadastre no Admin antes de imprimir.');
+      if(o.estagio==='cancelado') return res.status(409).send('CANCELADA: esta venda foi cancelada no Mercado Livre. Nao imprimir — separe a caixa e avise o admin.');
       /* ⚠️ ETIQUETA DE VENDA SO DEPOIS DA BAIXA (divida 13, 17/09/2026).
          Esta rota imprimia a etiqueta de QUALQUER volume, inclusive o
          'pendente' — e era ela que punha etiqueta na mao do operador sem que o

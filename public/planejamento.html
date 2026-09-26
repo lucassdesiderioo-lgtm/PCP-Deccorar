@@ -65,22 +65,25 @@
   </div>
 
   <div class="bar">
-    <span class="sub">Planilha do ML</span>
+    <span class="sub">Vendas futuras — planilha do ML</span>
     <input type="file" id="arq" class="file" accept=".xlsx,.csv">
     <button class="prim" onclick="importar()">Importar</button>
     <span class="msg" id="msgImp"></span>
     <span class="sub" style="width:100%;margin-top:2px">
-      A planilha precisa vir <b style="color:#e6edf3">inteira</b>: a janela toda de vendas
-      <b style="color:#e6edf3">mais</b> as ainda não despachadas. A data da venda alimenta a média;
-      o campo <i>Estado</i> alimenta o comprometido. O import é espelho —
-      <b style="color:#ffd85c">o que não vier no arquivo é apagado</b>, então um recorte apaga o histórico.
+      O arquivo precisa ter <b style="color:#e6edf3">as vendas ainda não enviadas</b> — qualquer período
+      que cubra todas elas. O campo <i>Estado</i> alimenta o comprometido e diz quais vendas foram
+      <b style="color:#e6edf3">canceladas</b>: o volume cancelado sai de "Faltam imprimir" sozinho.
+      Só a venda <b style="color:#e6edf3">futura</b> que não vier no arquivo sai do sistema;
+      a venda passada nunca é apagada, então um recorte não estraga a média.
     </span>
   </div>
   <div class="meta" id="meta">Nenhuma planilha importada ainda.</div>
 
-  <!-- Duas tarjas ambar, e sao coisas diferentes: `recorte` acusa o import que
-       encolheu a base (some no proximo import bom); `aviso` lista SKU da
-       planilha fora do cadastro (some quando alguem cadastra). -->
+  <!-- Duas tarjas, e sao coisas diferentes: `recorte` diz o que o import fez
+       com os volumes cancelados (some no proximo import); `aviso` lista SKU da
+       planilha fora do cadastro (some quando alguem cadastra). O id ficou
+       `recorte` por historia: a tarja do recorte saiu na fase 2 de
+       VENDAS-E-MEDIA, quando o import parou de apagar a venda passada. -->
   <div class="aviso" id="recorte" style="border-color:#8a5a12;background:#2e2008"></div>
   <div class="aviso" id="aviso"></div>
 
@@ -261,43 +264,40 @@ async function aplicarTodos(){
 }
 document.addEventListener('click',function(e){ var b=e.target.closest('.apl'); if(b) aplicarUm(b.getAttribute('data-cod')); });
 
-async function importar(){
+async function importar(confirmar){
   const f=$('#arq').files[0];
   if(!f){ alert('Escolha o arquivo da planilha (.xlsx ou .csv).'); return; }
   $('#msgImp').textContent='importando…'; $('#msgImp').style.color='#8b97a5';
   const b64=await new Promise((ok,err)=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.onerror=err; fr.readAsDataURL(f); });
   try{
-    const r=await (await fetch('/api/planejamento/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({arquivo:b64,nome:f.name})})).json();
+    const r=await (await fetch('/api/planejamento/importar',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({arquivo:b64,nome:f.name,confirmar:!!confirmar})})).json();
+    /* TIRAR MAIS DA METADE DAS FUTURAS PEDE CONFIRMACAO (spec §5.2). Nada foi
+       gravado ainda: a pergunta vem antes, com o numero na frente. */
+    if(r.motivo==='confirmar'){
+      $('#msgImp').textContent='';
+      if(confirm(r.aviso+'\n\nImportar mesmo assim?')) return importar(true);
+      $('#msgImp').style.color='#d29922'; $('#msgImp').textContent='não importado — nada mudou'; return;
+    }
     if(r.erro){ $('#msgImp').style.color='#f85149'; $('#msgImp').textContent='erro: '+r.erro; return; }
     $('#msgImp').style.color='#2ea043';
-    $('#msgImp').textContent=`${r.novas} novas · ${r.atualizadas} atualizadas · ${r.removidas} removidas`
+    $('#msgImp').textContent=`${r.futuras} futuras no arquivo · ${r.novas} novas · ${r.atualizadas} atualizadas · ${r.removidas} futuras saíram`
       +(r.canceladas?` · ${r.canceladas} fora da média (cancel./devol.)`:'')
       +(r.sem_sku?` · ${r.sem_sku} sem SKU`:'');
-    /* RECORTE TEM ASSINATURA, E ELA E MEDIVEL.
-       O import e espelho: o que nao veio no arquivo e apagado. Planilha completa
-       remove pouco (venda cancelada, venda ja despachada). Planilha recortada
-       remove quase tudo — e o estrago (media zerada, alvo no minimo, tela azul
-       vazia) nao emite erro nenhum, so um numero menor que ninguem compara.
-       `atualizadas + removidas` e o tamanho da base ANTES deste import.
-
-       O QUE ACUSA E A BASE TER ENCOLHIDO, nao ter sido substituida. Trocar 65
-       vendas velhas por 96 novas remove 100% da base e esta CERTO — planilha
-       nova, periodo novo. Olhar so o quanto foi removido acusaria esse caso, e
-       trava que acusa o inocente e trava que se aprende a ignorar. O recorte
-       tem outra assinatura: a base fica MENOR do que era. */
-    const antes  = r.atualizadas + r.removidas;
-    const depois = r.novas + r.atualizadas;
-    const rec = $('#recorte');
-    if(antes > 20 && depois < antes/2){
-      /* Tarja PROPRIA, nao a do #aviso: aquela e recarregada pelo load() a cada
-         chamada e apagaria esta. E o load() tem que rodar mesmo assim — a
-         pessoa precisa ver a tabela no estado em que ficou. */
-      rec.style.display='block';
-      rec.innerHTML='<b>⚠ A base caiu de '+antes+' para '+depois+' vendas.</b>'
-        +' Isso tem cara de planilha recortada, e não de vendas que saíram: sem o histórico da janela'
-        +' a média cai a zero, o alvo desce para o mínimo e a tela azul do operador para de pedir produção.'
-        +'<br>Se foi recorte, <b>suba a planilha completa de novo</b> — o import é espelho e reconstrói sozinho.';
-    } else rec.style.display='none';
+    /* O QUE O IMPORT FEZ COM OS VOLUMES CANCELADOS (fase 2). Cada estagio tem a
+       sua frase, porque cada um pede uma coisa diferente de quem le. */
+    const c=r.canceladas_volumes||{}, rec=$('#recorte'), l=[];
+    const q=(n,um,varios)=>n+' '+(n===1?um:varios);
+    const tirou=(c.pendente||0)+(c.bloqueado||0);
+    if(tirou) l.push(q(tirou,'volume cancelado ainda não impresso saiu','volumes cancelados ainda não impressos saíram')+' de "Faltam imprimir" — o estoque não mexe.');
+    const fab=(c.embalado||0)+(c.no_canto||0)+(c.no_carro||0);
+    if(fab) l.push('<b>'+q(fab,'caixa cancelada já tinha etiqueta','caixas canceladas já tinham etiqueta')+'</b>'
+      +(c.no_carro?' ('+c.no_carro+' dentro do carro — tire)':'')
+      +': separe e confira em Admin → Bloqueados → <i>Canceladas depois da etiqueta</i>. O estoque delas <b>não volta sozinho</b>.');
+    if(c.varias) l.push('<b>'+q(c.varias,'caixa de várias persianas tem','caixas de várias persianas têm')+' um item cancelado</b> — '
+      +(c.varias===1?'ela não foi cancelada':'elas não foram canceladas')+', porque o cliente ainda quer o resto; confira no mesmo card.');
+    if(l.length){ rec.style.display='block'; rec.innerHTML=l.join('<br>'); }
+    else rec.style.display='none';
     load(); fechamento(); comparar();
   }catch(e){ $('#msgImp').style.color='#f85149'; $('#msgImp').textContent='falha: '+e; }
 }

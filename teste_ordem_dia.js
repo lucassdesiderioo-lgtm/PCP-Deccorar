@@ -51,6 +51,10 @@ rev.run('BK140140BEGE','hoje');
 vol.run('BK140140BEGE','21','81','embalado');
 vol.run('BK140140BEGE','22','82','pendente');
 vol.run('BK140140BEGE','23','83','pendente');
+/* VENDAS-E-MEDIA fase 2: uma terceira venda que o ML CANCELOU. O import da
+   planilha a tirou de 'pendente' (estagio 'cancelado') — ela nao pode virar
+   peca a produzir nem aparecer como pendente. */
+vol.run('BK140140BEGE','24','84','cancelado');
 
 /* Coberto por estoque que ENTROU depois do lançamento: 2 urgentes, nenhuma
    revisão vermelha, 2 pendentes e 2 na prateleira. */
@@ -111,6 +115,9 @@ const j = o => JSON.stringify(o);
   const t = por.BK140140BEGE;
   ok('2 pendentes sem estoque e 2 por revisar: 2 a produzir, 0 atendidas',
      t.falta === 2 && t.a_produzir === 2 && t.atendidas === 0, j(t));
+
+  ok('a venda cancelada no ML não é cobrada: continuam 2 pendentes e 2 a produzir',
+     t.pendentes === 2 && t.a_produzir === 2, j(t));
 
   // ── Coberto por estoque: também não é trabalho ───────────────────────────
   const e = por.BK160160CINZA;

@@ -630,6 +630,8 @@ module.exports = function(app, db){
     // decisao, "qual peca e essa", tomada olhando o pedido no Mercado Livre.
     if(M !== 'GET' && pre('/api/divergencias')) return 'sku.cadastrar';
     if(eq('/api/divergencias')) return '@admin';
+    // Canceladas depois da etiqueta (VENDAS-E-MEDIA fase 2): o card de Bloqueados, so leitura.
+    if(eq('/api/canceladas')) return '@admin';
     // Etiqueta em formato desconhecido (§8-B): ver e decidir se a caixa vai
     // pro carro ou pro caminhao da coleta e da GESTAO, por regra do dono.
     if(pre('/api/modalidade')) return '@admin';

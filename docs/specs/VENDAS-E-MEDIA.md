@@ -1,4 +1,4 @@
-> **STATUS · 26/09/2026 — EM CONSTRUÇÃO** · **fase 1 no ar (PR #144, deploy conferido pelo dono em 26/09)** · fases 2 e 3 planejadas
+> **STATUS · 26/09/2026 — EM CONSTRUÇÃO** · **fase 1 no ar (PR #144, deploy conferido pelo dono em 26/09)** · **fase 2 construída (26/09), falta merge e deploy** · fase 3 planejada
 > A troca da fonte da média (fase 3) só acontece com o ok do dono depois de conferir.
 >
 > **Fase 1 (26/09/2026):** `media_dominio.js`, `GET /api/planejamento/media/comparar`
@@ -23,6 +23,56 @@
 >
 > **Falta:** o dono conferir a tabela com o dado real por alguns dias — é essa
 > conferência que libera a fase 3.
+>
+> **Fase 2 (26/09/2026):** `cancelada_dominio.js` (dono único do cancelamento),
+> o import de `plan_route.js` com as duas guardas, as colunas `cancelada_*` em
+> `lote`, a recusa no bipe do Carregamento e da viagem, `GET /api/canceladas`
+> (`@admin`) com o card em Admin → Bloqueados, e `conferir_canceladas.js` (só
+> lê: roda a conta numa transação desfeita). `teste_cancelada.js` (38 casos),
+> mais um caso de cancelada em `teste_carga`, `teste_ordem_dia` e `teste_estoque`.
+> Decisões do dono: **D1 A** (estágio próprio `cancelado`), **D2** (o bipe
+> recusa) e **D3** (card só mostrando, até a Mesa de correções).
+>
+> **O relatório real respondeu o ⚠️ do §6** (arquivo de 26/09/2026, 4.867
+> linhas): a coluna "N.º de venda" traz a **venda** na venda comum e o **pack**
+> na venda em pacote, e o pacote de vários produtos vem com uma **linha de
+> cabeçalho** ("Pacote de 2 produtos", o pack, sem SKU) e um item por linha
+> embaixo, cada um com a venda e o Estado dele. O cruzamento olha `lote.venda`
+> **e** `lote.packId`, e o item herda o pack do cabeçalho.
+>
+> **Mudou na construção (aprovado pelo dono em 26/09/2026):**
+> - **§5.1: a venda PASSADA continua sendo gravada** em `venda_futura` — só não
+>   é mais apagada por ausência. Até a fase 3 a produção lê a média da
+>   planilha, e ela sai dessas linhas: tirá-las na fase 2 faria a tela azul
+>   perder média antes da troca, sem erro nenhum (a armadilha #11 por outra
+>   porta). "Não entra" e a limpeza das vencidas ficam para a fase 3.
+> - **§6: só `/cancel/` mexe no volume.** As três frases de cancelamento do
+>   relatório real dizem "cancel"; devolução e reembolso (≈260 linhas) são
+>   **depois de entregue**, assunto da §9. A regra larga
+>   (`cancel|devolu|reembols`) continua valendo para tirar a venda da média.
+> - **§6: o estágio `cancelado`** (D1 A) no lugar de `cancelada_em IS NULL`
+>   nos donos únicos — doze arquivos perguntam `estagio='pendente'`, e um
+>   estágio novo sai de todos de uma vez. `cancelada_em` continua sendo a
+>   régua da média.
+> - **§6: "na fábrica" inclui o canto da coleta e o carro de uma viagem
+>   aberta.** A tabela da spec dizia `carregado → ignora`; a caixa de coleta
+>   bipada pro canto ainda não saiu. Ela é cancelada e vai ao card (e a do
+>   carro sai da viagem).
+> - **§6: a caixa de várias persianas nunca é cancelada sozinha** — cada item
+>   tem o seu Estado. Ela ganha `cancelada_varias=1` e vai ao card. O item que
+>   veio debaixo de um cabeçalho de pacote conta como caixa de várias mesmo sem
+>   `lote_item` (volume anterior a 15/09/2026).
+> - **§7: não nasceu `POST /api/vendas-futuras/importar`.** A rota de sempre
+>   (`/api/planejamento/importar`) ganhou as regras — uma porta só, sem duas
+>   réguas, e o tablet com a página em cache continua chamando a mesma.
+> - **§5.2: a tarja âmbar do recorte saiu já na fase 2**, e não na 3: o
+>   recorte deixou de apagar história aqui. No lugar dela a tarja diz o que o
+>   import fez com os volumes cancelados.
+>
+> **Falta (fase 2):** merge, deploy e rodar `conferir_canceladas.js` com o
+> relatório antes do primeiro import — ele acha os cancelamentos de 14 meses
+> de uma vez. A prova é o primeiro import real: as canceladas saírem de
+> "Faltam imprimir" e as impressas aparecerem no card.
 
 ---
 
@@ -200,7 +250,7 @@ Colunas novas em `lote` (por `ALTER`, no fim, no `exp_route.js` — §17):
   conta 1; teste e cancelada ficam fora; bloqueado conta; janela maior que a
   história é cortada e avisada; PDF repetido não dobra.
 
-### Fase 2 — planilha só de futuras, e as canceladas 🟡
+### Fase 2 — planilha só de futuras, e as canceladas 🔴 ☑ construída (26/09/2026, falta deploy)
 
 - §5 e §6. Colunas em `lote`. `fila_dia`, `carga`, `urgencia`, `ordem_dia` e a média
   ignoram cancelada.

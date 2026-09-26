@@ -303,18 +303,16 @@ alvo    = max(alvo_minimo, média_na_janela × dias_cobertura)
 precisa = comprometido + alvo − estoque
 ```
 
-> ⚠️ **O import APAGA o que não veio no arquivo** (`plan_route.js`, ao fim da
-> transação): venda cancelada some da planilha e tem que sumir da conta. A
-> consequência é que a planilha precisa vir **inteira, sempre** — cobrindo a
-> janela toda e incluindo as vendas ainda não despachadas.
+> ⚠️ **ATÉ 26/09/2026 O IMPORT APAGAVA o que não veio no arquivo**, e um
+> recorte só com os próximos dias apagava os 30 dias de histórico: a média de
+> todo SKU caía a zero, o alvo despencava para o `alvo_minimo`, e a tela azul
+> parava de pedir produção. Sem erro e sem aviso — o número só encolhia.
 >
-> Subir um recorte só com os próximos dias **apaga os 30 dias de histórico**. A
-> média de todo SKU cai a zero, o alvo despenca para o `alvo_minimo`, e a tela
-> azul para de pedir produção. Não dá erro e não dá aviso — o número só encolhe.
->
-> Por isso a tela acusa: quando um import remove mais da metade da base, ela
-> mostra tarja âmbar dizendo que aquilo tem cara de recorte. **Reparo: subir a
-> planilha completa de novo.** Como o import é espelho, ele reconstrói sozinho.
+> **Desde a fase 2 de VENDAS-E-MEDIA o espelho vale só entre as FUTURAS**
+> (bloco "A PLANILHA SÓ ESPELHA AS FUTURAS", logo abaixo): a venda passada
+> nunca é apagada por ausência, e o recorte deixou de estragar a média. A tarja
+> âmbar do recorte saiu junto. O que continua valendo: **a venda passada ainda
+> é gravada**, porque até a fase 3 é dela que sai a média da planilha.
 
 A janela não é fixa em 30 dias — é o campo "Janela da média" na própria tela. Se
 ela virar 60, a planilha precisa cobrir 60.
@@ -379,6 +377,89 @@ cancelada contando (1), o teste contando (2) e o bloqueado ficando fora (4).
 > real por alguns dias — e dizer se os desvios têm explicação (caixa de várias,
 > borda da data, venda cancelada). Prova que não foi feita se escreve como não
 > feita (§4).
+
+### ⚠️ A PLANILHA SÓ ESPELHA AS FUTURAS, E A VENDA CANCELADA SAI DAS LISTAS (26/09/2026)
+
+**Fase 2 da spec `VENDAS-E-MEDIA.md`.** O import de Admin → Planejamento
+(`POST /api/planejamento/importar`) mudou em duas coisas:
+
+| | Antes | Depois |
+|---|---|---|
+| venda que não veio no arquivo | apagada, passada ou futura | só a **futura** sai; a passada fica |
+| arquivo sem nenhuma venda futura | aceito — apagava o comprometido | **recusado** (400, `sem_futura`) |
+| arquivo que tira mais da metade das futuras | aceito | pede `confirmar` (409), **nada gravado** antes |
+| venda cancelada no ML | ficava `pendente` para sempre | o volume sai das listas |
+
+> ⚠️ **A VENDA PASSADA CONTINUA SENDO GRAVADA, e isso diverge da spec (§5.1).**
+> Até a fase 3 a produção lê a média da **planilha**, e ela sai dessas linhas.
+> Tirá-las agora faria a tela azul perder média antes da troca — a armadilha
+> #11 por outra porta. "Não entra" e a limpeza das vencidas são da fase 3.
+
+**`cancelada_dominio.js` é o dono único do cancelamento.** Ele lê as linhas do
+relatório (`daPlanilha`) e marca os volumes (`marcar`); o import e o
+`conferir_canceladas.js` usam os dois.
+
+**O relatório real (4.867 linhas, 26/09/2026) respondeu como achar o volume:**
+
+- a coluna "N.º de venda" traz a **venda** (`2000018…`) na venda comum e o
+  **pack** (`2000015…`) na venda em pacote — o cruzamento olha `lote.venda`
+  **e** `lote.packId`;
+- o pacote de vários produtos vem com uma **linha de cabeçalho** (*"Pacote de
+  2 produtos"*, o pack, sem SKU) e um item por linha embaixo, cada um com a
+  venda e o **Estado** dele. O item herda o pack do cabeçalho.
+
+| Onde o volume estava | O que acontece |
+|---|---|
+| `pendente`, `bloqueado` | `estagio='cancelado'` — sai de "Faltam imprimir", da fila, da urgência, dos Bloqueados e da média. **Estoque não mexe** |
+| `embalado` (etiqueta impressa) | `cancelado` e vai para o card **Canceladas depois da etiqueta** (Admin → Bloqueados). **O estoque não volta sozinho** |
+| no canto da coleta (`carregado`, sem caminhão) | idem — a caixa ainda está na fábrica |
+| no carro de uma viagem aberta | idem, e sai da viagem (`saida_id` limpo) |
+| `carregado` que já saiu | ignorado — se voltar, é devolução (§9) |
+| **caixa de várias persianas** | **nunca é cancelada sozinha**: `cancelada_varias=1`, e vai para o card |
+
+> ⚠️ **ESTÁGIO PRÓPRIO, E NÃO `cancelada_em IS NULL` ESPALHADO** — decisão D1 A
+> do dono. Doze arquivos perguntam `estagio='pendente'`; um estágio novo sai de
+> todos de uma vez. O estágio de antes fica em `cancelada_estagio` (história,
+> como `bloqueio_resolvido`), e `cancelada_em` é a régua da média do sistema.
+>
+> ⚠️ **SÓ "CANCEL" CANCELA VOLUME.** As três frases do relatório (*"Cancelada
+> pelo comprador"*, *"Venda cancelada. Não envie."*, *"Pacote cancelado pelo
+> Mercado Livre"*) dizem "cancel". Devolução e reembolso (~260 linhas) são
+> **depois de entregue**: continuam só fora da média da planilha, como sempre.
+>
+> ⚠️ **A CAIXA DE VÁRIAS NUNCA É CANCELADA SOZINHA**, porque cada item do
+> pacote tem o seu Estado: cancelar a caixa inteira tiraria da fila as
+> persianas que o cliente ainda quer. O item que veio debaixo de um cabeçalho
+> de pacote conta como caixa de várias **mesmo sem `lote_item`** — o volume
+> anterior a 15/09/2026 só conhece uma peça, e o arquivo diz que são várias.
+>
+> ⚠️ **O CARD SÓ MOSTRA** (D3), e fica fora do número da aba Bloqueados: nada
+> ali está retido, e número que não zera vira paisagem. Decidir o que fazer
+> com a persiana é da Mesa de correções, que ainda não existe.
+>
+> ⚠️ **O BIPE RECUSA A CAIXA CANCELADA** (D2) — no Carregamento
+> (`motivo:'cancelada'`, com auditoria), na viagem à agência e nas sobras do
+> caminhão, e a reimpressão e o `GET /api/print/:id` também recusam — e diz o que fazer: *"Não carregar: separe a caixa e avise o
+> admin"*. A venda cancelada **continua** sendo saída no gráfico de estoque
+> (§18): o −1 aconteceu na impressão.
+
+**Antes do primeiro import depois do deploy, rode
+`node conferir_canceladas.js <relatório.xlsx>`** — ele roda a mesma conta numa
+transação desfeita e lista volume a volume o que o import faria. O relatório
+de 26/09 cobre 14 meses, e o primeiro import acha todos os cancelamentos
+antigos de uma vez.
+
+**Rode `node teste_cancelada.js` (38 casos) ao mexer no `cancelada_dominio.js`,
+no import do `plan_route.js` ou nas recusas do bipe.** Onze defeitos foram
+reintroduzidos um a um: devolução cancelando volume (reprova 3), sem olhar o
+pack (3), caixa de várias cancelada (5), sem o cabeçalho do pacote (4),
+cancelar o que já saiu (2), o espelho apagando a passada (4), sem pedir
+confirmação (3), aceitar arquivo sem futura (2), o bipe aceitando a cancelada
+(2), a cancelada ficando na viagem (1) e a reimpressão aceitando a cancelada (1). `teste_carga`, `teste_ordem_dia` e
+`teste_estoque` ganharam um caso de cancelada cada.
+
+> ⚠️ **AINDA NÃO ESTÁ NO AR.** A prova é o primeiro import real: as canceladas
+> saírem de "Faltam imprimir" e as impressas aparecerem no card.
 
 ### A ordem é de prioridade, não de quantidade
 
@@ -1915,7 +1996,7 @@ Desligável (Admin → Cadastros) porque custa um bipe por volume, todo dia. Nas
 > zera ninguém lê até o fim — que é o mesmo fim de esconder.
 >
 > **Rode `node teste_carga.js` após qualquer mudança no `carreg_route.js`** —
-> os 49 casos incluem o dos seis volumes de 26/08, e cobrem que a busca larga
+> os 51 casos incluem o dos seis volumes de 26/08, e cobrem que a busca larga
 > não virou "acha qualquer coisa" (código inexistente ainda dá `nao_encontrado`)
 > e que `bloqueado` continua recusado.
 
@@ -3263,8 +3344,8 @@ Relatório que um dia quiser esse número lê de lá.
 > conferência de hoje não disse se esse caso passou pela tela; se o número não
 > andar nesse dia, é defeito, não silêncio normal.
 
-**Rode `node teste_carga.js` (49 casos; os de coleta, 5 são a
-trava do volume não embalado, §5 #27, e 11 são o adiantado — um no começo e os 10 últimos;
+**Rode `node teste_carga.js` (51 casos; os de coleta, 5 são a
+trava do volume não embalado, §5 #27, e 11 são o adiantado — um no começo e os 10 antes dos 2 últimos, que são a venda cancelada (VENDAS F2);
 os do fechamento com o motorista foram para o `teste_saida_coleta.js` em 26/09/2026),
 `node teste_parse.js` (caso 15), `node teste_divergencia.js` (os dois últimos
 casos são a decisão da gestão) e `node teste_etiqueta.js` após mexer nisso.**
@@ -3611,7 +3692,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (49), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (204), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (73), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (204), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3638,6 +3719,17 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   `demanda_dominio`, a mesma da tela azul (§3, VENDAS F1)
 - ❌ Trocar a produção para a média do sistema sem o ok do dono: a fase 1 é só
   conferência, e a troca é a fase 3 (§3)
+- ❌ Voltar a apagar a venda PASSADA por ausência no import da planilha: o
+  recorte volta a zerar a média — e até a fase 3 ela ainda é gravada (§3, VENDAS F2)
+- ❌ Deixar `devolu|reembols` cancelar volume: é depois de entregue, e o card
+  encheria de caixa que o cliente recebeu (§3, VENDAS F2)
+- ❌ Cancelar sozinha a caixa de várias persianas, ou procurar o volume só por
+  `lote.venda`: no pacote o relatório traz o PACK, e cada item tem o seu Estado (§3)
+- ❌ Escrever `cancelada_em IS NULL` pelas rotas em vez de usar o estágio
+  `cancelado` (D1 A), ou uma segunda leitura das linhas canceladas fora do
+  `cancelada_dominio.js` (§3, VENDAS F2)
+- ❌ Devolver ao estoque sozinho a venda cancelada depois da etiqueta: o sistema
+  não sabe se a persiana voltou — o card só mostra (§3, D3)
 - ❌ Calcular a falta de estoque fora do `demanda_dominio.js` — a aba Estoque e a
   tela azul do operador têm que dizer o mesmo número (§18)
 - ❌ Fazer a aprovação da contagem gravar o **número contado** como saldo: entre
@@ -4540,7 +4632,7 @@ também o lado que faz a equipe parar de ler a coluna.
 
 **Rode `node teste_estoque.js` após qualquer mudança no `est_route.js`, no
 `fluxo_estoque.js`, no `demanda_dominio.js`, no `painel_route.js`, no
-`ger_route.js` ou no `cont_route.js`** — os 72 casos travam a conta única nas
+`ger_route.js` ou no `cont_route.js`** — os 73 casos travam a conta única nas
 quatro telas, o sob medida, o parado, a série do gráfico, a idade do inventário
 (de ponta a ponta, pelo fluxo real — armadilha #32), o gate do custo e o acordo
 com o fechamento diário do Planejamento. Mexeu na contagem?

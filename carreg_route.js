@@ -80,6 +80,17 @@ module.exports=function(app,db){
        so porque um irmao fantasma andou antes. */
     const alvo = batem.find(r=>r.estagio==='embalado') || batem[0] || null;
     if(!alvo) return res.json({ok:false,motivo:'nao_encontrado',lido:code});
+    /* A VENDA CANCELADA NO ML NAO SOBE NO CARRO (VENDAS-E-MEDIA fase 2, D2).
+       O import da planilha tirou a caixa das listas; se ela chegar aqui mesmo
+       assim, a pessoa esta com ela na mao — a recusa diz o que fazer com ela. */
+    if(alvo.estagio==='cancelado'){
+      try{ const ac=app.locals.acesso;
+           if(ac&&ac.auditar) ac.auditar(req,'expedicao','carregar_cancelada',
+             'NF '+(alvo.nf||alvo.id), (alvo.cancelada_motivo||'cancelada')+' — bipada no carregamento'); }catch(e){}
+      return res.json({ok:false,motivo:'cancelada',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
+        aviso:'Venda cancelada no Mercado Livre. Não carregar: separe a caixa e avise o admin — ela está no card '+
+              '"Canceladas depois da etiqueta".'+(alvo.cancelada_motivo?' ML: “'+alvo.cancelada_motivo+'”':'')});
+    }
     if(alvo.estagio==='bloqueado') return res.json({ok:false,motivo:'bloqueado',pedido:alvo,
         aviso:'SKU "'+(alvo.codigo||'(vazio)')+'" nao esta no cadastro. Nao pode ser carregado.'});
     if(alvo.estagio==='carregado') return res.json({ok:false,motivo:'duplicado',pedido:alvo,coleta:ehColeta(alvo)});
