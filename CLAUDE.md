@@ -3145,6 +3145,9 @@ continuando no canto (1, e esse caso só existe porque a primeira rodada deixou
 passar), "tirar do carro" sem devolver à área (4), a divergência andando (5) e o
 contador do carro com régua própria (1).
 
+> ✅ **NO AR EM 26/09/2026** (PR #142): o dono fez o deploy e disse *"ficou
+> certo"*.
+>
 > ⚠️ **ISSO NÃO É A CONFERÊNCIA NA AGÊNCIA.** A rodada foi na minha tela, a 1440
 > e a 400 px. A prova que fecha a fase é **a primeira viagem de verdade**,
 > fechada pelo celular do motorista com a foto do balcão.
