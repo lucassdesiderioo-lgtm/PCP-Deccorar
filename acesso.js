@@ -44,7 +44,7 @@ function setoresNativos(){
     { nome:'Operador / Expedição',           nivel:'operacao',
       perms:['pdf.subir','etiqueta.emitir','carregamento.executar','painel.ver','produtividade.propria'] },
     { nome:'Operador / Controle de Estoque', nivel:'operacao',
-      perms:['contagem.contar','painel.ver','produtividade.propria'] },
+      perms:['contagem.contar','contagem.recontar','painel.ver','produtividade.propria'] },
     // SOB MEDIDA — nascem VAZIOS, como o de montagem e os de compras:
     // ninguem e migrado para ca. A operacao sob medida e outra equipe, e
     // herdar gente por engano daria acesso de corte a quem so revisa.
@@ -251,6 +251,33 @@ module.exports = function(app, db){
       })();
     }
   }catch(e){ console.log('[acesso] seed de saida.liberar falhou: '+e.message); }
+
+  /* ── 3-D. A CONFERENCIA EM TRES PAPEIS (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA,
+     26/09/2026) ──
+     Mesma razao do 3-B: chave nova em banco que ja existe nao chega a ninguem,
+     e a tela nova daria 403 para toda a equipe de estoque no primeiro dia.
+     Quem recebe e a spec §6.3, e ninguem ganha trabalho que nao fazia:
+       contagem.ajustar -> contagem.aprovar + contagem.planejar
+       contagem.contar  -> contagem.recontar
+     A recontagem de uma pessoa que tambem conta nao abre porta nenhuma: a
+     regra "quem contou nao reconta" e do codigo (outraPessoa), nao da chave.
+     Excecao CONCEDIDA vai junto — quem recebeu contagem.ajustar por excecao
+     aprovava ate ontem. Uma vez so (marca em `config`). */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='seed_inventario'").get()){
+      db.transaction(() => {
+        for(const [de, para] of [['contagem.ajustar','contagem.aprovar'], ['contagem.ajustar','contagem.planejar'],
+                                 ['contagem.contar','contagem.recontar']]){
+          db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
+            SELECT setor_id, ? FROM setor_permissao WHERE chave=?`).run(para, de);
+          db.prepare(`INSERT OR IGNORE INTO usuario_excecao (usuario_id,chave,concede)
+            SELECT usuario_id, ?, 1 FROM usuario_excecao e WHERE chave=? AND concede=1
+              AND NOT EXISTS (SELECT 1 FROM usuario_excecao x WHERE x.usuario_id=e.usuario_id AND x.chave=?)`).run(para, de, para);
+        }
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('seed_inventario','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[acesso] seed da conferencia falhou: '+e.message); }
 
   // ── resolvedor do modelo NOVO: permissoes efetivas de um usuario (secao 2) ──
   function permissoesDe(uid){
@@ -579,6 +606,8 @@ module.exports = function(app, db){
     if(eq('/painel')) return 'painel.ver';
     if(eq('/relatorios')) return 'relatorios.ver';
     if(eq('/planejamento')) return 'planilha.importar';
+    // A conferencia de estoque no tablet: quem conta OU quem reconta.
+    if(eq('/inventario')) return ['contagem.contar','contagem.recontar'];
     if(eq('/baixar-backup')) return '@ag';
     // ── acoes/admin por API ──
     if(pre('/api/teste')) return 'teste.operar';
@@ -715,6 +744,16 @@ module.exports = function(app, db){
     if(pre('/api/pedidos')) return 'pedido.ver';
     if(eq('/api/fornecedores') || eq('/api/componentes')) return 'compras.ver';
     if(M !== 'GET' && eq('/api/cruzamento/aplicar')) return 'producao.lancar';
+    /* A CONFERENCIA EM TRES PAPEIS (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA). Cada
+       rota com a chave do papel; `terminar-sku` serve as duas rodadas e aceita
+       as duas chaves — o handler confere a da rodada em que o item esta. O
+       andamento e lido por quem planeja E por quem aprova: e a mesma tela. */
+    if(eq('/api/inventario/sugestao') || eq('/api/inventario/abrir') || eq('/api/inventario/encerrar')) return 'contagem.planejar';
+    if(eq('/api/inventario/andamento')) return ['contagem.planejar','contagem.aprovar'];
+    if(eq('/api/inventario/minha-lista') || eq('/api/inventario/contar')) return 'contagem.contar';
+    if(eq('/api/inventario/recontagem') || eq('/api/inventario/recontar')) return 'contagem.recontar';
+    if(eq('/api/inventario/terminar-sku')) return ['contagem.contar','contagem.recontar'];
+    if(eq('/api/inventario/aprovacao') || eq('/api/inventario/aprovar') || eq('/api/inventario/rejeitar')) return 'contagem.aprovar';
     // contagem em dois passos (secao 9): aprovar/rejeitar o pendente exige
     // contagem.ajustar; contar e ENVIAR (que pode virar pendente) exige so
     // contagem.contar — o handler decide aplicar direto ou enfileirar.
@@ -852,6 +891,11 @@ module.exports = function(app, db){
     ['pdf.subir','expedicao'], ['devolucao.registrar','devolucao'],
     ['painel.ver','painel'], ['relatorios.ver','relatorios'], ['necessidade.ver','necessidade'],
     ['pedido.receber','recebimento'],
+    /* A tela de conferencia (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA). A area
+       existe para a tela ficar na lista protegida do auth.js (armadilha #3) e
+       para o fallback do modelo antigo; quem decide e a chave. Duas chaves
+       levam a mesma area, e ela entra uma vez so. */
+    ['contagem.contar','inventario'], ['contagem.recontar','inventario'],
     /* SOB MEDIDA. Sem estas duas linhas a integracao NAO FUNCIONA, e falha em
        silencio: o portao em tecido/montar.js le `usuarios.areas`, e no modo
        novo esta coluna e recalculada aqui a cada mudanca de setor. Area que
@@ -876,7 +920,7 @@ module.exports = function(app, db){
       const perms = permissoesDe(uid);
       const areas = [];
       if(ag || temAdmin(perms)) areas.push('admin');   // landing /admin + fallback
-      PERM_AREA.forEach(([chave,area]) => { if(ag || perms.has(chave)) areas.push(area); });
+      PERM_AREA.forEach(([chave,area]) => { if((ag || perms.has(chave)) && areas.indexOf(area) < 0) areas.push(area); });
       db.prepare("UPDATE usuarios SET areas=? WHERE id=?").run(areas.join(','), uid);
     }catch(e){}
   }

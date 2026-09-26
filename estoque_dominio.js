@@ -173,4 +173,36 @@ function restaurarFoto(db, linhas){
   return n;
 }
 
-module.exports = { TIPOS, garantirSchema, abertura, saldo, movimentar, extrato, restaurarFoto };
+/* "NINGUEM APROVA O PROPRIO TRABALHO" — spec §6.2, fase 2 (26/09/2026).
+ *
+ * Uma funcao so, usada pela recontagem, pela aprovacao de inventario e (na
+ * fase 3) pela aprovacao de ajuste. Tres copias desta pergunta seriam tres
+ * reguas, e a que ficasse frouxa seria justamente a que alguem usaria.
+ *
+ * ⚠️ VALE PARA O ADMIN GERAL. Nao ha permissao que dispense: o Admin Geral
+ * passa em toda CHAVE por nivel (§10), e se passasse aqui tambem a regra
+ * deixaria de existir para a unica pessoa que consegue aprovar qualquer coisa.
+ *
+ * `quem` e {id, nome}; `pessoas` e a lista de quem ja fez alguma coisa no item
+ * ({id, nome} cada). Compara pelo id quando os dois lados tem, e pelo nome
+ * normalizado quando falta id — mas VAZIO NUNCA E IGUAL A VAZIO: sem saber
+ * quem fez, a resposta e "outra pessoa", porque recusar ai travaria a
+ * conferencia por falta de dado (a mesma guarda do "sem segunda pessoa", §8-B).
+ * E quem pergunta sem nome e sem id nao e ninguem: recusado. */
+function normNome(n){ return String(n || '').trim().replace(/\s+/g,' ').toLowerCase(); }
+function outraPessoa(quem, pessoas){
+  const q = quem || {};
+  const qid = q.id != null && q.id !== '' ? String(q.id) : '';
+  const qn  = normNome(q.nome);
+  if(!qid && !qn) return false;
+  for(const p of (pessoas || [])){
+    if(!p) continue;
+    const pid = p.id != null && p.id !== '' ? String(p.id) : '';
+    const pn  = normNome(p.nome);
+    if(qid && pid){ if(qid === pid) return false; continue; }
+    if(qn && pn && qn === pn) return false;
+  }
+  return true;
+}
+
+module.exports = { TIPOS, garantirSchema, abertura, saldo, movimentar, extrato, restaurarFoto, outraPessoa };

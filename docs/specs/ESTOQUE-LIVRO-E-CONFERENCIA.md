@@ -1,4 +1,47 @@
-> **STATUS · 21/09/2026 — EM CONSTRUÇÃO** · fase 0 e **fase 1 feitas**; fases 2 a 4 planejadas
+> **STATUS · 26/09/2026 — EM CONSTRUÇÃO** · fases 0 e 1 no ar; **fase 2 em código (26/09)**; fases 3 e 4 planejadas
+>
+> **Fase 2 (a conferência nova)** entrou em 26/09/2026: `inventario_dominio.js` (dono
+> único do ciclo), `inventario_route.js`, a tela de tablet `/inventario`, os cards de
+> andamento e de aprovação na aba Contagem do admin, as chaves `contagem.recontar`,
+> `contagem.planejar` e `contagem.aprovar` com backfill de uma vez só
+> (`config.seed_inventario`), `outraPessoa()` no `estoque_dominio.js` e a contagem de
+> peça desligada em `/api/contagem` (material continua). `teste_inventario.js`, 80
+> casos, nove defeitos reintroduzidos um a um.
+>
+> **§6.4 decidida pelo dono em 26/09/2026: ESPERA.** O aprovador único não aprova o
+> que contou, nem com motivo, nem sendo Admin Geral.
+>
+> **O que mudou na construção, e vale mais que a spec:**
+> - **o que se compara é a DIFERENÇA, não o número contado** (§5.1). Cada contagem
+>   guarda o saldo do momento em que terminou (`saldo_na_contagem`, `saldo2`,
+>   `saldo3`), e a recontagem "concorda" quando acha a mesma diferença. Entre a 1ª e
+>   a 2ª a fábrica embala e imprime; comparar o número cru mandaria para a 3ª
+>   contagem todo SKU com trabalho no meio;
+> - **a 3ª contagem decide pelo acordo**: vale a diferença em que duas das três
+>   concordam. Se o acordo é zero, o sistema estava certo e o item confirma sem
+>   movimento. Sem acordo nenhum, vai para aprovação com a da 3ª, marcado;
+> - **rejeitar faz o SKU voltar a ser contado do zero** (item novo `a_contar`, com
+>   `anterior_id`), e não "recontar" (§5.6): quem rejeita não confia nas contagens;
+> - **nem o "terminei" diz se bateu** — dizer "não bateu" a quem conta é convidar a
+>   recontar de cabeça;
+> - **uma pessoa por vez no mesmo SKU** (`rascunho_por`): duas contando a mesma
+>   prateleira somariam num número só;
+> - **SKU fora do plano entra** na conferência aberta, marcado (`fora_do_plano`);
+>   sob medida é recusado (não tem estoque, §7);
+> - **encerrar** (`POST /api/inventario/encerrar`, rota a mais) tira o que ninguém
+>   contou como `nao_contado`; divergência em andamento continua até ser decidida;
+> - **a idade da conferência já lê `inventario_item` nesta fase** (a spec punha na 4):
+>   sem isso ela congelaria no dia do deploy, porque a contagem velha de peça morreu.
+>   A conta mudou de casa para `inventario_dominio.conferencias()`, e a sugestão do
+>   ciclo lê a mesma;
+> - **as contagens de peça que já estavam na fila antiga** (`contagem_pendente`)
+>   continuam aprováveis pela tela antiga: foram feitas pela regra velha e não têm
+>   outro caminho para sair;
+> - **a aprovação grava também em `ajuste_estoque`** (o botão "histórico" da aba
+>   Estoque), como a fase 0 deixou a contagem — a fase 3 troca aquele card para o livro;
+> - `inventario_ciclo` e `inventario_item` entraram na cobertura do modo teste.
+>
+> **Fase 1 — o que ficou registrado em 21/09:**
 > **Fase 0 (consertos)** entrou em 21/09/2026: a aprovação da contagem passou a
 > aplicar a diferença contra o `sistema_era` em vez do número contado, a contagem
 > de peça passou a gravar em `ajuste_estoque`, e a idade da conferência deixou de
@@ -39,9 +82,8 @@
 >
 > Fase 1 é a base das outras duas specs deste pacote
 > (`VENDAS-E-MEDIA.md` e `MESA-DE-CORRECOES.md`), e as duas estão liberadas.
-> **Uma decisão em aberto, agora da fase 2:** o que fazer quando só há uma pessoa
-> com `contagem.aprovar` no dia (§6.4). Padrão proposto até o dono decidir:
-> **espera**.
+> ~~**Uma decisão em aberto, agora da fase 2:** o que fazer quando só há uma pessoa
+> com `contagem.aprovar` no dia (§6.4).~~ **Decidida em 26/09/2026: espera.**
 >
 > ⚠️ **Divergência com o código, anotada em 21/09/2026** (regra 3 da §13 do
 > `CLAUDE.md`: onde a spec e ele divergirem, vale ele). A linha *"cadastro de SKU
@@ -292,7 +334,7 @@ Para cada chave: a linha em `permissoes.js`, a rota em `permDaRota()` do
 `contagem.ajustar` e `estoque.editar` deixam de ser usadas por rota nenhuma; saem
 do cadastro na fase em que suas rotas são desligadas.
 
-### 6.4 ⚠️ Decisão em aberto — o aprovador único
+### 6.4 ~~Decisão em aberto~~ — o aprovador único · **DECIDIDA em 26/09/2026: A, espera**
 
 Num time de oito, pode haver um dia com uma pessoa só com `contagem.aprovar`.
 

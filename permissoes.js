@@ -124,7 +124,19 @@ module.exports = [
 
   // ─── ESTOQUE ────────────────────────────────────────────────
   { chave:'contagem.contar',      grupo:'Estoque',    nivel:'operacao',
-    rotulo:'Contar estoque',      desc:'Bipar peças na conferência' },
+    rotulo:'Contar estoque',      desc:'Contar às cegas a prateleira na conferência (e contar material)' },
+  /* A CONFERENCIA EM TRES PAPEIS (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA,
+     26/09/2026). Tres chaves porque sao tres trabalhos, e "ninguem aprova o
+     proprio trabalho" e regra de CODIGO (outraPessoa, no estoque_dominio), que
+     vale ate para o Admin Geral: a chave diz o que a pessoa pode fazer, e a
+     regra diz em QUAL item. */
+  { chave:'contagem.recontar',    grupo:'Estoque',    nivel:'operacao',
+    rotulo:'Recontar divergência', desc:'Recontar às cegas o SKU que não bateu (nunca o que a própria pessoa contou)' },
+  { chave:'contagem.planejar',    grupo:'Estoque',    nivel:'admin',
+    rotulo:'Planejar conferência', desc:'Abrir a conferência do dia ou o inventário geral' },
+  { chave:'contagem.aprovar',     grupo:'Estoque',    nivel:'admin',
+    rotulo:'Aprovar conferência', desc:'Aprovar ou rejeitar a diferença achada (nunca a que a própria pessoa contou)',
+    sensivel:true },
   { chave:'contagem.ajustar',     grupo:'Estoque',    nivel:'admin',
     rotulo:'Aprovar ajuste de estoque', desc:'Aplicar a contagem ao estoque',
     sensivel:true },

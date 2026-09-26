@@ -228,23 +228,29 @@
   </div>
 
   <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide">
+  <!-- A CONFERENCIA DE PECA (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA, 26/09/2026).
+       Contar e no tablet, as cegas, em /inventario; aqui fica o que e de quem
+       planeja e de quem aprova. A contagem de MATERIAL continua logo abaixo,
+       como era. -->
+  <div class="card" id="invAprov" style="display:none"></div>
+  <div class="card" id="invConf" style="display:none"></div>
   <div class="card">
+    <div style="font-weight:700;margin-bottom:4px">Material</div>
+    <div class="sub" style="margin-bottom:12px">Pe&ccedil;a n&atilde;o se conta mais aqui: ela se conta &agrave;s cegas na tela
+      <a href="/inventario" style="color:#4493f8">Invent&aacute;rio</a>, e quem aprova &eacute; outra pessoa. Esta parte conta s&oacute; material.</div>
+    <div class="sub" style="margin-bottom:10px">Material n&atilde;o tem etiqueta: escolha na lista e digite quanto tem. Cada lan&ccedil;amento SOMA &mdash; contou duas prateleiras, lance duas vezes. <b>Zero vale</b>: &eacute; assim que um material que acabou entra na contagem.</div>
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-      <input id="ctBipe" placeholder="bipe as pecas aqui" style="flex:1;min-width:260px;padding:14px;font-size:17px;font-family:ui-monospace,monospace;text-align:center">
-      <button class="ghost" onclick="ctNova()">Nova contagem</button>
-      <button class="primary" onclick="ctLancar()">Lancar no estoque (soma)</button><button class="ghost" onclick="ctAjustar()">Ajustar (substitui)</button>
+      <select id="ctComp" onchange="ctCompUnidade()" style="flex:1;min-width:260px;padding:12px;font-size:15px"></select>
+      <input id="ctCompQtd" type="number" min="0" step="0.001" placeholder="quanto tem" style="width:150px;padding:12px;font-size:15px;text-align:center">
+      <span class="sub" id="ctCompUn" style="min-width:64px"></span>
+      <button class="ghost" onclick="ctLancarComp()">Lan&ccedil;ar na contagem</button>
     </div>
-    <div id="ctUlt" style="margin-top:12px;font-size:15px"></div>
-    <div style="margin-top:16px;padding-top:14px;border-top:1px solid #30363d">
-      <div style="font-weight:700;margin-bottom:4px">Material</div>
-      <div class="sub" style="margin-bottom:10px">Material n&atilde;o tem etiqueta: escolha na lista e digite quanto tem. Cada lan&ccedil;amento SOMA, igual ao bipe &mdash; contou duas prateleiras, lance duas vezes. <b>Zero vale</b>: &eacute; assim que um material que acabou entra na contagem.</div>
-      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-        <select id="ctComp" onchange="ctCompUnidade()" style="flex:1;min-width:260px;padding:12px;font-size:15px"></select>
-        <input id="ctCompQtd" type="number" min="0" step="0.001" placeholder="quanto tem" style="width:150px;padding:12px;font-size:15px;text-align:center">
-        <span class="sub" id="ctCompUn" style="min-width:64px"></span>
-        <button class="ghost" onclick="ctLancarComp()">Lan&ccedil;ar na contagem</button>
-      </div>
-      <div id="ctCompUlt" style="margin-top:10px;font-size:15px"></div>
+    <div id="ctCompUlt" style="margin-top:10px;font-size:15px"></div>
+    <div id="ctUlt" style="margin-top:6px;font-size:15px"></div>
+    <!-- Os botoes que aplicam vem DEPOIS de contar: e a ordem em que se usa. -->
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid #30363d">
+      <button class="primary" onclick="ctLancar()">Lancar no estoque (soma)</button><button class="ghost" onclick="ctAjustar()">Ajustar (substitui)</button>
+      <button class="ghost" onclick="ctNova()">Nova contagem</button>
     </div>
   </div>
   <div class="card">
@@ -397,7 +403,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.t==="ficha") carregarFicha();
   var vcp=$("#v-compras"); if(vcp) vcp.classList.toggle("hide",t.dataset.t!=="compras");
   if(t.dataset.t==="compras"){ carregarCompras(); carregarListaCompras(); }
-  if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); setTimeout(function(){var b=document.getElementById("ctBipe"); if(b) b.focus();},100); }
+  if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); invCarregar(); }
   var ifn=$("#ifPlan"), ifr=$("#ifRel"), ifa=$("#ifAcs");
   if(t.dataset.t==="plan" && ifn && !ifn.dataset.l){ ifn.src="/planejamento"; ifn.dataset.l=1; }
   if(t.dataset.t==="rel" && ifr && !ifr.dataset.l){ ifr.src="/relatorios"; ifr.dataset.l=1; }
@@ -2748,7 +2754,8 @@ document.addEventListener('click',function(e){
 
 var CDTIPOS=[
   {t:'rejeicao',n:'Motivos de peça com problema (revisão)'},
-  {t:'motivo_devolucao',n:'Motivos de devolução (admin)'}
+  {t:'motivo_devolucao',n:'Motivos de devolução (admin)'},
+  {t:'motivo_estoque',n:'Motivos da conferência de estoque (quem aprova a diferença escolhe um)'}
 ];
 async function carregarCad(){
   var el=document.getElementById('cdBox');
@@ -3168,6 +3175,109 @@ async function ctRejeitar(ids){
   ctPendentes();
 }
 function ctAprovarTodos(){ if(ctPendIds.length && confirm("Aprovar TODOS os "+ctPendIds.length+" ajustes pendentes?")) ctAprovar(ctPendIds); }
+
+// ── A CONFERENCIA DE PECA (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA) ─────────────
+// Dois cards: a APROVACAO (quem tem contagem.aprovar) e o ANDAMENTO (quem
+// planeja). Cada um some quando a rota diz 403: tela com botao que so da erro
+// ensina a nao clicar. Nao entram no AUTO_ADMIN de 4 s: a aprovacao tem campo
+// de motivo aberto, e redesenhar por cima tiraria o texto da mao de quem digita.
+var INV_MOT=[], INV_VIS=0;
+function invEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function invSinal(n){ return n>0 ? '+'+n : String(n); }
+function invData(s){ if(!s) return ''; var m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/); return m ? m[3]+'/'+m[2]+' '+m[4]+':'+m[5] : s; }
+function invPeca(i){ return (typeof pecaTexto==='function'&&typeof pecaDeSku==='function') ? pecaTexto(pecaDeSku(i)) : (i.descricao||''); }
+var INV_STATUS={a_contar:'a contar',recontar:'recontagem',terceira:'3ª contagem',aprovar:'esperando aprovação',
+  confirmado:'bateu',aprovado:'aprovado',rejeitado:'rejeitado',nao_contado:'não contado'};
+async function invCarregar(){
+  if(!INV_MOT.length){ try{ INV_MOT=await (await fetch('/api/listas/motivo_estoque')).json(); }catch(e){ INV_MOT=[]; } }
+  await Promise.all([invAprovacao(), invAndamento()]);
+}
+async function invAprovacao(){
+  var box=document.getElementById('invAprov'); if(!box) return;
+  var r; try{ r=await fetch('/api/inventario/aprovacao'); }catch(e){ return; }
+  if(r.status!==200){ box.style.display='none'; return; }
+  var d=await r.json(); var it=d.itens||[];
+  box.style.display='block';
+  var h='<div style="font-weight:700;margin-bottom:4px">Conferência — diferenças esperando aprovação ('+it.length+')</div>'+
+    '<div class="sub" style="margin-bottom:10px">Cada uma foi achada por duas contagens às cegas, de pessoas diferentes. Aprovar grava no livro a <b>diferença</b> que elas acharam, sobre o saldo de agora — o que foi embalado ou impresso depois da contagem continua valendo. Quem contou não aprova.</div>';
+  if(!it.length){ box.innerHTML=h+'<div class="sub">Nenhuma diferença esperando.</div>'; return; }
+  var opts='<option value="">motivo…</option>'+INV_MOT.map(function(m){ return '<option>'+invEsc(m.valor)+'</option>'; }).join('');
+  it.forEach(function(i){
+    h+='<div style="border-top:1px solid var(--line);padding:12px 0">'+
+      '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b style="font-family:ui-monospace,monospace">'+invEsc(i.codigo)+'</b> <span class="sub">'+invEsc(invPeca(i))+'</span></div>'+
+      '<div><b style="font-size:18px;color:'+(i.diferenca<0?'#ff6b6b':'#4493f8')+'">'+invSinal(i.diferenca)+'</b> <span class="sub">saldo '+i.saldo_agora+' → '+i.saldo_depois+
+      (i.valor_diferenca!=null&&i.valor_diferenca!==undefined ? ' · R$ '+Number(i.valor_diferenca).toFixed(2).replace('.',',') : '')+'</span></div></div>'+
+      '<table style="margin-top:6px"><thead><tr><th>Contagem</th><th>Contou</th><th>Sistema dizia</th><th>Diferença</th><th>Quem</th><th>Quando</th></tr></thead><tbody>'+
+      i.contagens.map(function(c){ return '<tr><td>'+c.rodada+'ª</td><td align=center><b>'+c.contado+'</b></td><td align=center>'+c.saldo+'</td><td align=center>'+invSinal(c.diferenca)+'</td><td>'+invEsc(c.por||'—')+'</td><td class="sub">'+invData(c.em)+'</td></tr>'; }).join('')+
+      '</tbody></table>'+
+      (i.sem_acordo ? '<div style="color:#d29922;margin-top:6px">⚠ As três contagens não concordam: vale a da 3ª. Na dúvida, rejeite — o SKU volta a ser contado do zero.</div>' : '')+
+      (function(){ var mx=(i.extrato||[]).filter(function(m){ return m.tipo!=='abertura'; });
+        return mx.length ? '<div class="sub" style="margin-top:6px">Mexeu no saldo desde a 1ª contagem (e continua valendo): '+mx.map(function(m){ return invSinal(m.delta)+' '+m.tipo; }).join(' · ')+'</div>' : ''; })()+
+      (i.pode_aprovar
+        ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><select id="invMot'+i.id+'">'+opts+'</select><input id="invObs'+i.id+'" placeholder="observação (obrigatória em Outro)" style="flex:1;min-width:200px">'+
+          '<button class="primary" onclick="invDecidir('+i.id+',\'aprovar\')">Aprovar</button><button class="ghost" onclick="invDecidir('+i.id+',\'rejeitar\')">Rejeitar e recontar</button></div>'
+        : '<div class="sub" style="margin-top:8px;color:#d29922">Você não pode decidir esta: '+invEsc(i.por_que_nao)+'. Ela espera outra pessoa com a permissão.</div>')+
+      '<div id="invErr'+i.id+'" style="color:#ff6b6b;margin-top:6px"></div></div>';
+  });
+  box.innerHTML=h;
+}
+async function invDecidir(id, acao){
+  var m=(document.getElementById('invMot'+id)||{}).value||'', o=(document.getElementById('invObs'+id)||{}).value||'';
+  var err=document.getElementById('invErr'+id);
+  var r=await fetch('/api/inventario/'+acao,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,motivo:m,obs:o})});
+  var d={}; try{ d=await r.json(); }catch(e){}
+  if(!r.ok||d.ok===false){ if(err) err.textContent=d.erro||('falhou ('+r.status+')'); return; }
+  invCarregar(); carregar();
+}
+async function invAndamento(){
+  var box=document.getElementById('invConf'); if(!box) return;
+  var r; try{ r=await fetch('/api/inventario/andamento'); }catch(e){ return; }
+  if(r.status!==200){ box.style.display='none'; return; }
+  var d=await r.json(); box.style.display='block';
+  var sug=null; try{ var rs=await fetch('/api/inventario/sugestao'); if(rs.status===200) sug=(await rs.json()).sugestao; }catch(e){}
+  var h='<div style="font-weight:700;margin-bottom:4px">Conferência de peças</div>'+
+    '<div class="sub" style="margin-bottom:10px">Contar é no tablet, às cegas, na tela <a href="/inventario" style="color:#4493f8">Inventário</a>. O que bateu confirma sozinho; o que não bateu é recontado por outra pessoa e só então vem para aprovação.</div>';
+  if(sug){
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'+
+      (sug.length ? '<button class="primary" onclick="invAbrir(\'ciclico\')">Abrir a conferência do dia ('+sug.length+(sug.length===1?' SKU':' SKUs')+')</button>' : '<span class="sub">Nenhum SKU para sugerir hoje.</span>')+
+      '<button class="ghost" onclick="invAbrir(\'geral\')">Inventário geral</button></div>';
+    if(sug.length) h+='<div class="sub" style="margin-bottom:10px">Sugestão de hoje: '+sug.map(function(x){ return invEsc(x.codigo)+(x.nunca?' <span style="color:#d29922">(nunca conferido)</span>':(x.dias===0?' (conferido hoje)':' (há '+x.dias+(x.dias===1?' dia':' dias')+')')); }).join(', ')+'</div>';
+  }
+  if(!d.ciclos.length) h+='<div class="sub">Nenhuma conferência aberta.</div>';
+  d.ciclos.forEach(function(c){
+    var its=d.itens.filter(function(i){ return i.ciclo_id===c.id; });
+    h+='<div style="border-top:1px solid var(--line);padding:10px 0"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">'+
+      '<b>Conferência #'+c.id+' · '+(c.tipo==='geral'?'inventário geral':'do dia')+'</b><span class="sub">aberta por '+invEsc(c.aberto_por||'—')+' em '+invData(c.aberto_em)+'</span></div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">'+its.map(function(i){
+        var cor = i.status==='confirmado'||i.status==='aprovado' ? '#2ea043' : (i.status==='aprovar'||i.status==='recontar'||i.status==='terceira' ? '#d29922' : '#8b97a5');
+        var quem = i.contando ? ' · '+invEsc(i.rascunho_por)+' contando' : '';
+        return '<span style="border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:13px"><b style="font-family:ui-monospace,monospace">'+invEsc(i.codigo)+'</b> <span style="color:'+cor+'">'+(INV_STATUS[i.status]||i.status)+'</span>'+quem+(i.fora_do_plano?' <span class="sub">(fora do plano)</span>':'')+'</span>';
+      }).join('')+'</div>'+
+      (its.some(function(i){ return i.status==='a_contar'; }) ? '<div style="margin-top:8px"><button class="ghost small" onclick="invEncerrar('+c.id+')">Encerrar: o que ninguém contou sai como não contado</button></div>' : '')+
+      '</div>';
+  });
+  if(d.recentes && d.recentes.length){
+    h+='<div style="border-top:1px solid var(--line);padding-top:10px;margin-top:4px"><div class="sub" style="margin-bottom:6px">Últimas decisões</div>'+
+      d.recentes.slice(0,10).map(function(x){ return '<div style="font-size:13px;padding:3px 0"><b style="font-family:ui-monospace,monospace">'+invEsc(x.codigo)+'</b> — '+(INV_STATUS[x.status]||x.status)+
+        (x.status==='aprovado' ? ' ('+invSinal(x.diferenca)+', '+invEsc(x.motivo||'')+')' : x.status==='rejeitado' ? ' ('+invEsc(x.motivo||'')+')' : '')+
+        ' <span class="sub">'+(x.decidido_por ? invEsc(x.decidido_por)+' · ' : '')+invData(x.decidido_em||x.em1)+'</span></div>'; }).join('')+'</div>';
+  }
+  box.innerHTML=h;
+}
+async function invAbrir(tipo){
+  if(tipo==='geral' && !confirm('Abrir um inventário GERAL? Entra todo SKU com saldo ou com movimento nos últimos 30 dias.')) return;
+  var r=await fetch('/api/inventario/abrir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo:tipo})});
+  var d={}; try{ d=await r.json(); }catch(e){}
+  if(!r.ok||d.ok===false){ alert(d.erro||('falhou ('+r.status+')')); return; }
+  invAndamento();
+}
+async function invEncerrar(id){
+  if(!confirm('Encerrar a conferência #'+id+'? O que ninguém contou sai como não contado. O que já achou diferença continua até ser decidido.')) return;
+  var r=await fetch('/api/inventario/encerrar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ciclo_id:id})});
+  var d={}; try{ d=await r.json(); }catch(e){}
+  if(!r.ok||d.ok===false){ alert(d.erro||('falhou ('+r.status+')')); return; }
+  invAndamento();
+}
 
 /*AUTO_ADMIN*/ setInterval(function(){ var a=document.activeElement; if(a && a.tagName==='INPUT') return; carregar(); },4000);
 </script>
