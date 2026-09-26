@@ -8,11 +8,12 @@
 > conferir e pôr no carro seguem juntos até a fase 4); nasceu a conta da pilha
 > (`carga.js → pilhaDaArea`), o card na tela e o `teste_area.js` (26 casos). Divergência:
 > as listas da pilha nascem **recolhidas** — com o bipe único elas repetem as do carro e da
-> coleta (ver `CLAUDE.md` §8-B). Fases 3 e 4.
+> coleta (ver `CLAUDE.md` §8-B). **No ar em 26/09 (PR #138), deploy conferido pelo dono;**
+> falta ver a conta fechar num dia real de expedição. Fases 3 e 4.
 > Criada em 25/09/2026 · PLANEJADO até a fase 1
 > Nasceu da conversa no Projeto "PCP - Deccorar" em 25/09/2026 (NOVIDADE).
 > Substitui o "Fechar coleta" de 10/09/2026 (`CLAUDE.md` §8-B), que não foi adotado pela equipe.
-> Fases: 1 ☑ (no ar) · 2 ☑ (em código, falta produção) · 3 ☐ · 4 ☐
+> Fases: 1 ☑ (no ar) · 2 ☑ (no ar) · 3 ☐ · 4 ☐
 
 ---
 
