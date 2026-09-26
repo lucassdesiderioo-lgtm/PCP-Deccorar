@@ -137,6 +137,58 @@ function saidasAdiantadas(db, dias){
   return r;
 }
 
+/* A CONFERENCIA DA PILHA (spec SAIDA-E-DUPLA-CONFERENCIA, fase 2, 26/09/2026).
+   Dupla conferencia sao duas contagens por caixa: a impressao da etiqueta de
+   venda (bipe 1, `impresso_por`) e a conferencia na area de expedicao (bipe 2,
+   `conferido_por`). Nesta fase o bipe 2 e o bipe que o Carregamento ja tinha —
+   opcao A, decidida pelo dono: na agencia conferir e por no carro seguem sendo
+   o mesmo bipe ate a fase 4, que os separa. O que nasce aqui e a CONTA:
+
+       impressas hoje 70 · conferidas 68 · faltam 2   (com nome de cada uma)
+
+   O UNIVERSO E O DIA DA IMPRESSAO (`embalado_em`), porque e isso que torna a
+   conta verificavel caixa a caixa: impressas = conferidas + faltam, sempre.
+   A caixa impressa num dia anterior e ainda nao conferida NAO some (armadilha
+   #9): sai numa lista a parte, `anteriores`, em cima e marcada.
+
+   A ADIANTADA ENTRA NA PILHA (decisao 4 da spec): esta fisicamente na area e
+   o motorista pode leva-la. Sai marcada, com a data do despacho.
+
+   "SEM SEGUNDA PESSOA" E MARCA, NUNCA TRAVA (decisao 2): quem imprimiu e quem
+   conferiu sao o mesmo nome. Travar, com pouca gente na expedicao, ensinaria
+   a entrar com o login do colega — e ai o registro mentiria (armadilha #6).
+   Caixa sem um dos dois nomes (impressa antes da fase 1, ou sem ninguem
+   logado) e "sem registro": nao se sabe, e nao-saber nao vira acusacao. */
+const CONFERIDA = "(conferido_em IS NOT NULL OR estagio='carregado')";
+const PILHA_HOJE = "estagio IN ('embalado','carregado') AND date(embalado_em)=date('now','localtime')";
+const nomeIgual = (a, b) => String(a||'').trim().toLowerCase() === String(b||'').trim().toLowerCase();
+function pilhaDaArea(db){
+  const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
+  const cols = 'id, codigo, buyer, nf, despachar_em, modalidade, embalado_em, impresso_por, conferido_por';
+  const doDia = db.prepare(`SELECT ${cols}, ${CONFERIDA} AS conferida FROM lote
+    WHERE ${PILHA_HOJE} ORDER BY embalado_em, id`).all();
+  const anteriores = db.prepare(`SELECT ${cols} FROM lote
+    WHERE estagio='embalado' AND conferido_em IS NULL
+      AND (embalado_em IS NULL OR date(embalado_em) < date('now','localtime'))
+    ORDER BY embalado_em, id`).all();
+  const marca = v => ({ id:v.id, codigo:v.codigo, buyer:v.buyer, nf:v.nf,
+    despachar_em:v.despachar_em, embalado_em:v.embalado_em,
+    coleta: ehColeta(v), adiantada: futuro(v, hoje) });
+  const conferidas = doDia.filter(v => v.conferida);
+  const temNome = s => String(s||'').trim() !== '';
+  const semSegunda = conferidas.filter(v => temNome(v.impresso_por) && temNome(v.conferido_por)
+                                        && nomeIgual(v.impresso_por, v.conferido_por));
+  const semRegistro = conferidas.filter(v => !temNome(v.impresso_por) || !temNome(v.conferido_por));
+  const faltam = doDia.filter(v => !v.conferida).map(marca);
+  return {
+    hoje: { impressas: doDia.length, conferidas: conferidas.length, faltam: faltam.length,
+            sem_segunda: semSegunda.length, sem_registro: semRegistro.length },
+    faltam,
+    anteriores: anteriores.map(marca),
+    sem_segunda: semSegunda.map(v => Object.assign(marca(v), { quem: String(v.conferido_por).trim() }))
+  };
+}
+
 module.exports = { PRA_CARREGAR, DO_DIA, ORDEM_CARGA, atrasado, futuro,
                    COLETA, AGENCIA, ehColeta, AGUARDA_CAMINHAO,
-                   SAIDA, saidasAdiantadas };
+                   SAIDA, saidasAdiantadas, pilhaDaArea };

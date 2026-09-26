@@ -3,11 +3,16 @@
 > carregamento, colunas e tabela `saida` criadas (`saida_schema.js`), e o
 > `fechar_saida_passivo.js` com `teste_saida.js` (26 casos). **No ar em 26/09 (PR #135),
 > deploy conferido pelo dono.** Passivo fechado em 26/09: **399 caixas** (10/09 a 25/09) na
-> saída #1, com backup. Falta ver os nomes gravados numa caixa impressa e bipada; fases 2 a 4.
+> saída #1, com backup. Falta ver os nomes gravados numa caixa impressa e bipada.
+> **Fase 2 em código (26/09), opção A:** o bipe do Carregamento continua um só (na agência,
+> conferir e pôr no carro seguem juntos até a fase 4); nasceu a conta da pilha
+> (`carga.js → pilhaDaArea`), o card na tela e o `teste_area.js` (26 casos). Divergência:
+> as listas da pilha nascem **recolhidas** — com o bipe único elas repetem as do carro e da
+> coleta (ver `CLAUDE.md` §8-B). Fases 3 e 4.
 > Criada em 25/09/2026 · PLANEJADO até a fase 1
 > Nasceu da conversa no Projeto "PCP - Deccorar" em 25/09/2026 (NOVIDADE).
 > Substitui o "Fechar coleta" de 10/09/2026 (`CLAUDE.md` §8-B), que não foi adotado pela equipe.
-> Fases: 1 ☑ (em código, falta produção) · 2 ☐ · 3 ☐ · 4 ☐
+> Fases: 1 ☑ (no ar) · 2 ☑ (em código, falta produção) · 3 ☐ · 4 ☐
 
 ---
 

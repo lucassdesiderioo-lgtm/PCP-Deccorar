@@ -2911,6 +2911,60 @@ em `now` (2), o critério largo pegando o `embalado` (4) e o bipe sem gravar que
 > deploy. As colunas e a tabela `saida` existem no banco de produção. Prova que
 > não foi feita se escreve como não feita (§4).
 
+### ⚠️ A CONFERÊNCIA DA PILHA (26/09/2026, fase 2 da spec `SAIDA-E-DUPLA-CONFERENCIA`)
+
+O Carregamento ganhou, acima das duas portas, o card **"Conferência da pilha —
+etiquetas impressas hoje"**: `impressas 70 · conferidas 68 · faltam 2`. É a
+segunda contagem da dupla conferência: o bipe 1 é a impressão (`impresso_por`),
+o bipe 2 é o bipe **desta tela** (`conferido_por`). A conta fecha caixa a caixa
+— `impressas = conferidas + faltam` —, e o que falta tem nome.
+
+`carga.js → pilhaDaArea(db)` é o dono único; o `GET /api/carregamento` a devolve
+em `pilha`. Tablet com a página antiga ignora o campo; servidor antigo não o
+manda, e o card some.
+
+> ⚠️ **OPÇÃO A, DECIDIDA PELO DONO EM 26/09/2026: O BIPE CONTINUA UM SÓ.** Na
+> coleta, conferir é levar pro canto, como sempre foi. **Na agência, conferir e
+> pôr no carro continuam sendo o mesmo bipe** até a fase 4 separar os dois (a
+> viagem à agência com foto). Nada mudou para quem bipa: o que nasceu foi a
+> conta. Caixa conferida é a que tem `conferido_em` **ou** está `carregado` —
+> a segunda metade cobre o que foi bipado antes da fase 1 gravar o nome.
+
+> ⚠️ **A PILHA É O DIA DA IMPRESSÃO (`embalado_em`), e a de ontem não some.**
+> Caixa impressa num dia anterior e ainda não conferida sai numa linha âmbar
+> própria, em cima — é a armadilha #9 pela porta da conferência: volume com
+> etiqueta está fisicamente na fábrica, e não existe hora em que ele deixe de
+> estar. Ela **não** entra na conta de hoje: a conta de hoje fala das
+> etiquetas de hoje, e misturar faria o número nunca fechar.
+
+> ⚠️ **A ADIANTADA ENTRA NA PILHA, MARCADA** (decisão 4 da spec). Ela foi
+> impressa e tem que ser contada; a tarja `adiantada · despacha 02/10` diz que
+> ela não é carga de hoje. `pendente` e `bloqueado` não entram — não têm
+> etiqueta —, e o bipe continua recusando o `pendente` (§5, #27).
+
+> ⚠️ **"SEM SEGUNDA PESSOA" SÓ MARCA, NUNCA TRAVA** (decisão 2). Quem imprimiu
+> e quem conferiu foram o mesmo login: o bipe é aceito e a caixa é contada à
+> parte, com o nome. Travar seria a armadilha #6 — num dia de uma pessoa só, a
+> expedição parava. A comparação ignora espaço e maiúscula (`" ana "` é
+> `"Ana"`). **Faltando qualquer um dos dois nomes a caixa é "sem registro",
+> nunca "mesma pessoa"**: vazio igual a vazio não é a mesma pessoa, é não
+> saber quem fez — e sem essa guarda dois bipes sem login batiam.
+
+> ⚠️ **AS LISTAS DA PILHA NASCEM RECOLHIDAS, e isso só apareceu abrindo a
+> tela.** Com o bipe único, as caixas que faltam conferir são **as mesmas** das
+> listas do carro e da coleta logo abaixo: aberta, a tela dizia a mesma coisa
+> duas vezes — o que o dono leu como "duas vendas" na caixa de várias (opção B,
+> §5, 25/09/2026). O número fica sempre à vista; a lista abre com um toque e
+> continua aberta nos refreshes de 4 s (o `<details>` não é redesenhado). Na
+> fase 4, quando conferir e pôr no carro se separarem, as listas deixam de
+> coincidir e isso pode ser revisto.
+
+**Rode `node teste_area.js` (26 casos) ao mexer no `pilhaDaArea`, no bipe do
+`carreg_route.js` ou no `GET /api/carregamento`.** Cinco defeitos foram
+reintroduzidos um a um: a adiantada fora da pilha (6 casos), a de ontem sumindo
+(1), o nome sem normalizar (1), a conta sem andar no bipe (7) e vazio igual a
+vazio virando "mesma pessoa" (1).
+
 ### ⚠️ O QUE SAI ADIANTADO — contado em peças, na tela do Carregamento (25/09/2026)
 
 Pedido do dono: *"mensurar e mostrar na tela de carregamento a quantidade de
@@ -3308,7 +3362,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (32), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (16), `teste_acesso.js` (114), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3495,6 +3549,15 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   (§5, armadilha #27)
 - ❌ Fazer a reimpressão gravar `impresso_por`: o bipe 1 é a PRIMEIRA
   impressão, e papel repetido não é outra contagem (§8-B, fase 1 da saída)
+- ❌ Travar o bipe quando quem imprimiu e quem conferiu são a mesma pessoa: é
+  "sem segunda pessoa", que só MARCA — num dia de uma pessoa só a expedição
+  parava (§8-B, fase 2 da saída)
+- ❌ Contar como "mesma pessoa" a caixa sem um dos dois nomes: vazio igual a
+  vazio é não saber quem fez, e vai para "sem registro" (§8-B)
+- ❌ Deixar a pilha esquecer a caixa impressa ontem e não conferida, ou somá-la
+  na conta de hoje — ela vai à parte, em cima (§8-B, armadilha #9)
+- ❌ Abrir por padrão a lista da pilha enquanto o bipe for um só: são as mesmas
+  caixas das listas do carro e da coleta, e a tela diria tudo duas vezes (§8-B)
 - ❌ Fazer `saiu_por` reescrever `lote.modalidade`, ou o contrário: a etiqueta
   diz uma coisa, a saída diz outra, e as duas são verdade (§8-B, #21)
 - ❌ Carimbar em `now` a saída do passivo da coleta: cada caixa sai na data do

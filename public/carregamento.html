@@ -62,6 +62,29 @@
   .fotoprev.on{display:inline-block}
   .hist{padding:8px 14px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)}
   .hist b.ok{color:var(--green)}.hist b.div{color:var(--red)}
+  /* A CONFERENCIA DA PILHA (fase 2 da spec SAIDA-E-DUPLA-CONFERENCIA): as
+     caixas com etiqueta impressa HOJE contra as que ja foram bipadas aqui.
+     A conta fecha caixa a caixa — impressas = conferidas + faltam — e o que
+     falta vem com nome. Fica acima das duas portas porque vale para as duas. */
+  .pilha{margin-top:14px}
+  .pconta{display:flex;gap:18px;flex-wrap:wrap;padding:12px 14px;font-size:15px;align-items:baseline}
+  .pconta b{font-size:24px;font-weight:800}
+  .pconta .pf b{color:var(--amber)}.pconta .pc b{color:var(--green)}
+  .pconta .zero b{color:var(--green)}
+  .tag{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;margin-right:4px;white-space:nowrap}
+  .tag.adi{background:#eef3fb;color:var(--blue);border:1px solid #c9d8ee}
+  .tag.col{background:#efe9fb;color:#4b2a91;border:1px solid #b9a3e6}
+  .tag.ant{background:#fbf1db;color:var(--amber);border:1px solid #e7cb8c}
+  .pnota{padding:8px 14px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)}
+  /* As listas da pilha ficam RECOLHIDAS: com o bipe unico (opcao A) as caixas
+     que faltam conferir sao as mesmas das listas do carro e da coleta logo
+     abaixo, e aberta a tela diria a mesma coisa duas vezes — que foi o que o
+     dono leu como "duas vendas" na caixa de varias (opcao B, 25/09/2026).
+     O numero fica sempre a vista; a lista abre com um toque, e continua
+     aberta nos refreshes de 4 s (o <details> nao e redesenhado). */
+  .pilha details{border-top:1px solid var(--line)}
+  .pilha summary{padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;list-style:revert}
+  .pilha details.ant summary{background:#fbf1db;color:var(--amber)}
 </style></head><body>
 <header><div class="mark">C</div><div><h1>Carregamento</h1><div class="sub">Bipe a etiqueta de venda ao pôr no carro — ou ao separar pra coleta</div></div>
 <div class="links"><a class="link" href="/embalagem">Expedição</a><a class="link" href="/painel">Painel</a></div></header>
@@ -75,6 +98,11 @@
   <div class="banner" id="banner"><div class="bt">Pronto</div><div class="bs">Bipe o QR ou código de barras da etiqueta de venda.</div></div>
   <input id="scan" autocomplete="off">
   <button class="btn conf" onclick="conferir()" style="width:100%">✓ Conferir carga do carro</button>
+  <div class="card pilha" id="pilhaCard"><h3>📋 Conferência da pilha — etiquetas impressas hoje</h3>
+    <div class="pconta" id="pConta"></div>
+    <details id="pAntD"><summary id="pAntS"></summary><div id="pAnt"></div></details>
+    <details id="pFalD"><summary id="pFalS"></summary><div id="pFaltam"></div></details>
+    <div id="pVazio"></div><div id="pSeg"></div></div>
   <div class="duas">
   <div class="card"><h3>🚗 Faltam carregar no carro (agência)</h3><div id="lista"></div><div id="depois"></div></div>
 
@@ -182,8 +210,49 @@ function linha(f){
     +(f.atrasado?'<b style="color:var(--amber)">⏳ de '+dataBR(f.data)+'</b> · ':'')
     +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+'</span></span></div>';
 }
+/* A PILHA (carga.js → pilhaDaArea). A caixa conferida e a que foi bipada aqui
+   — no carro ou no canto da coleta. "Sem segunda pessoa" so MARCA (decisao 2
+   da spec): quem imprimiu e quem conferiu foram o mesmo login, e o bipe foi
+   aceito. A caixa impressa em dia anterior e nao conferida vem em cima: ela
+   esta na fabrica e nao pode sumir (armadilha #9). Tablet com a pagina antiga
+   nao chama isto; servidor antigo nao manda `pilha`, e o card some. */
+function tagsPilha(f){
+  return (f.coleta?'<span class="tag col">coleta</span>':'')
+    +(f.adiantada?'<span class="tag adi">adiantada · despacha '+dataBR(f.despachar_em)+'</span>':'');
+}
+function linhaPilha(f, ant){
+  return '<div class="row"><span class="who">'
+    +(ant?'<span class="tag ant">⏳ impressa '+dataBR(String(f.embalado_em||'').slice(0,10))+'</span>':'')
+    +tagsPilha(f)+esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+'</span></span></div>';
+}
+function desenharPilha(p){
+  var card=$('#pilhaCard'); if(!p||!p.hoje){ card.style.display='none'; return; }
+  card.style.display='';
+  var h=p.hoje, na=p.anteriores.length;
+  $('#pConta').innerHTML='<span>impressas <b>'+h.impressas+'</b></span>'
+    +'<span class="pc">conferidas <b>'+h.conferidas+'</b></span>'
+    +'<span class="pf'+(h.faltam?'':' zero')+'">faltam <b>'+h.faltam+'</b></span>';
+  var ad=$('#pAntD'); ad.style.display=na?'':'none'; ad.className=na?'ant':'';
+  $('#pAntS').textContent='⏳ '+na+(na===1?' caixa impressa em dia anterior e ainda não conferida'
+                                        :' caixas impressas em dias anteriores e ainda não conferidas');
+  $('#pAnt').innerHTML=p.anteriores.map(function(f){ return linhaPilha(f,true); }).join('');
+  var fd=$('#pFalD'); fd.style.display=h.faltam?'':'none';
+  $('#pFalS').textContent='Ver as '+h.faltam+' que faltam conferir';
+  if(h.faltam===1) $('#pFalS').textContent='Ver a que falta conferir';
+  $('#pFaltam').innerHTML=p.faltam.map(function(f){ return linhaPilha(f,false); }).join('');
+  $('#pVazio').innerHTML = h.faltam ? ''
+    : (h.impressas ? '<div class="empty">✅ Todas as impressas hoje foram conferidas.</div>'
+                   : '<div class="empty" style="color:var(--muted)">Nenhuma etiqueta impressa hoje ainda.</div>');
+  var notas=[];
+  if(h.sem_segunda) notas.push('<b>'+h.sem_segunda+'</b> sem segunda pessoa (quem imprimiu também conferiu): '
+    +p.sem_segunda.slice(0,8).map(function(f){ return esc0(f.buyer)+' ('+esc0(f.quem)+')'; }).join(', ')
+    +(p.sem_segunda.length>8?'…':''));
+  if(h.sem_registro) notas.push('<b>'+h.sem_registro+'</b> sem registro de quem imprimiu ou de quem conferiu');
+  $('#pSeg').innerHTML = notas.map(function(n){ return '<div class="pnota">'+n+'</div>'; }).join('');
+}
 async function carregar(){
   const d=await (await fetch('/api/carregamento')).json();
+  desenharPilha(d.pilha);
   const col=d.coleta||{faltam:[],aguardando:[],fechamentos:[],retiradas_hoje:0};
   $('#nCar').textContent=d.carregados; $('#nFal').textContent=d.faltam.length;
   $('#nCol').textContent=col.aguardando.length;
