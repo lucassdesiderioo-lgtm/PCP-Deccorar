@@ -143,6 +143,11 @@ lote.run('BK140140BEGE','embalado', hoje +' 09:10:00', hoje, 0);
 lote.run('BK140140BEGE','carregado',hoje +' 11:20:00', hoje, 0);
 lote.run('BK140140BEGE','embalado', hoje +' 12:00:00', hoje, 1);   // teste
 lote.run('BK160160CINZA','carregado',ontem+' 16:40:00', ontem, 0);
+/* VENDAS-E-MEDIA fase 2: a venda cancelada DEPOIS da etiqueta. O estoque ja
+   baixou na impressao e nao volta sozinho — entao ela continua sendo uma saida
+   no grafico, mesmo com o estagio 'cancelado'. */
+const tres = db.prepare("SELECT date('now','localtime','-3 day') d").get().d;
+lote.run('BK160160CINZA','cancelado', tres+' 10:00:00', tres, 0);
 
 // --- dois ajustes manuais no mesmo SKU: vale o ultimo ---
 const aj = db.prepare(`INSERT INTO ajuste_estoque (codigo,antes,depois,delta,motivo,usuario_nome,criado_em)
@@ -257,6 +262,8 @@ const ok = (n, c, extra) => { casos++;
      JSON.stringify(p.serie[29]));
   ok('ontem: entraram 2 e saiu 1', p.serie[28].entrou === 2 && p.serie[28].saiu === 1,
      JSON.stringify(p.serie[28]));
+  ok('venda cancelada depois da etiqueta continua sendo SAÍDA (o estoque já tinha baixado)',
+     p.serie[26].data === tres && p.serie[26].saiu === 1, JSON.stringify(p.serie[26]));
   ok('dia sem movimento entra como ZERO, nao como buraco',
      p.serie[10].entrou === 0 && p.serie[10].saiu === 0 && p.serie[10].data);
 

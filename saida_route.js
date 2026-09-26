@@ -98,6 +98,10 @@ module.exports = function(app, db){
     const alvo = batem.find(v => conta.has(v.id));
     if(!alvo){
       const v = batem[0];
+      /* A cancelada ja saiu da conta pelo import: bipa-la como sobra so
+         confirma que ela ficou, que e o certo. */
+      if(v.estagio === 'cancelado') return res.json({ ok:false, motivo:'cancelada', pedido:{ id:v.id, buyer:v.buyer, nf:v.nf },
+        aviso:'Venda cancelada no Mercado Livre — ela já está fora da conta do caminhão. Deixe separada e avise o admin.' });
       return res.json({ ok:false, motivo:'fora_da_conta', pedido:{ id:v.id, buyer:v.buyer, nf:v.nf },
         aviso:'Esta caixa não está na conta deste caminhão (não foi bipada no canto da coleta). ' +
               'Se ela ficou aqui, não precisa fazer nada.' });
@@ -285,6 +289,10 @@ module.exports = function(app, db){
                      || (x.estagio === 'carregado' && ehColeta(x) && !x.retirado_em && !x.saida_id);
     const alvo = batem.find(pronta) || batem.find(x => x.saida_id === v.id && !x.saiu_em) || batem[0];
     const ped = { id:alvo.id, buyer:alvo.buyer, nf:alvo.nf, codigo:alvo.codigo };
+    /* Venda cancelada no ML nao vai no carro (VENDAS-E-MEDIA fase 2, D2). */
+    if(alvo.estagio === 'cancelado') return res.json({ ok:false, motivo:'cancelada', pedido:ped,
+      aviso:'Venda cancelada no Mercado Livre. Não carregar: separe a caixa e avise o admin.'
+            +(alvo.cancelada_motivo?' ML: “'+alvo.cancelada_motivo+'”':'') });
     if(alvo.estagio === 'bloqueado') return res.json({ ok:false, motivo:'bloqueado', pedido:ped,
       aviso:'SKU "'+(alvo.codigo||'(vazio)')+'" não está no cadastro. Não pode sair.' });
     if(alvo.estagio === 'pendente') return res.json({ ok:false, motivo:'nao_embalado', pedido:ped,

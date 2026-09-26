@@ -278,6 +278,11 @@ async function bip(code){
   /* A caixa que nunca passou pela Etiqueta de Venda (dívida 13). A recusa tem
      que dizer o CAMINHO: a pessoa está com a caixa na mão, na frente do carro,
      e "não pode" sem saída é o que ensina a empurrar do jeito que der. */
+  /* Venda cancelada no Mercado Livre (VENDAS-E-MEDIA fase 2, D2): a caixa
+     esta na mao da pessoa, e a recusa diz o que fazer com ela. */
+  else if(r.motivo==='cancelada'){ aguardando=null;
+    banner('err','⛔ VENDA CANCELADA — NÃO CARREGAR',
+      (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
   else if(r.motivo==='nao_embalado'){ aguardando=null;
     banner('err','⚠ FALTA A ETIQUETA DE VENDA',
       (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
@@ -559,6 +564,7 @@ async function bipSobra(code){
   if(r.ok){ banner('col','Ficou no canto ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · agora vão no caminhão <b>'+r.sistema+'</b>'); beep(true); }
   else if(r.motivo==='ja_sobra'){ banner('warn','Essa já estava nas sobras', esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'. Não contou de novo.'); beep(false); }
   else if(r.motivo==='fora_da_conta'){ banner('warn','Fora da conta deste caminhão', (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
+  else if(r.motivo==='cancelada'){ banner('warn','Venda cancelada — deixe separada', (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
   else if(r.motivo==='nao_encontrado'){ banner('err','Etiqueta não reconhecida','Lido: '+esc0(code)+'. Bipe a etiqueta de VENDA da caixa que ficou.'); beep(false); }
   else { banner('err','Não deu', esc0(r.aviso||r.erro||'')); beep(false); }
   carregar();
@@ -621,7 +627,7 @@ async function bipCarro(code){
   else if(r.motivo==='nao_conferida'){ banner('warn','⚠ FALTA CONFERIR NA ÁREA',(r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
   else if(r.motivo==='ja_no_carro'){ banner('warn','Essa já está no carro', esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'. Não contou de novo.'); beep(false); }
   else if(r.motivo==='nao_encontrado'){ banner('err','Etiqueta não reconhecida','Lido: '+esc0(code)+'. Bipe a etiqueta de VENDA.'); beep(false); }
-  else { banner('err',({nao_embalado:'⚠ FALTA A ETIQUETA DE VENDA',bloqueado:'Volume bloqueado',duplicado:'⚠ Essa caixa já saiu'})[r.motivo]||'Não entrou no carro',
+  else { banner('err',({nao_embalado:'⚠ FALTA A ETIQUETA DE VENDA',bloqueado:'Volume bloqueado',duplicado:'⚠ Essa caixa já saiu',cancelada:'⛔ VENDA CANCELADA — NÃO CARREGAR'})[r.motivo]||'Não entrou no carro',
     (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
   carregar();
 }

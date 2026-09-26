@@ -303,6 +303,16 @@ async function noCarro(code){
   ok('o periodo e de 30 dias, o de 40 dias atras fica fora e o fechamento a mao nao conta',
      d.saiu_adiantado.periodo.caixas===4, 'veio '+JSON.stringify(d.saiu_adiantado.periodo));
 
+  /* VENDAS-E-MEDIA fase 2 (D2): a venda cancelada no ML depois da etiqueta.
+     O import tirou a caixa de 'embalado'; ela nao aparece para carregar, e se
+     alguem a bipar mesmo assim, a recusa diz para nao carregar. */
+  ins.run('BK140140BEGE','Cancelou Depois','7301','73011','73012','["73011","73012"]','cancelado',hoje);
+  d=await chamar('GET /api/carregamento');
+  ok('a caixa cancelada nao aparece para carregar', !JSON.stringify(d).includes('Cancelou Depois'));
+  r=await chamar('POST /api/carregar',{code:'73011'});
+  ok('o bipe recusa a caixa cancelada, dizendo para nao carregar',
+     r.ok===false && r.motivo==='cancelada' && /carregar/i.test(r.aviso||''), 'veio '+JSON.stringify(r));
+
   db.close();
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
   console.log('');

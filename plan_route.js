@@ -15,6 +15,7 @@ const { lerPlanilha, parseDataVenda, parseDataEnvio } = require('./planilha');
 const DEMANDA = require('./demanda_dominio');
 const FLUXO = require('./fluxo_estoque');
 const MEDIA = require('./media_dominio');
+const CANC = require('./cancelada_dominio');
 
 module.exports = function(app, db){
   // Schema no mesmo commit em que o codigo passa a usar (CLAUDE.md secao 17).
@@ -80,39 +81,87 @@ module.exports = function(app, db){
       const skuExiste= db.prepare("SELECT 1 FROM skus WHERE codigo=?");
       const del      = db.prepare("DELETE FROM venda_futura WHERE venda_id=? AND teste=0");
 
-      let novas=0, atualizadas=0, semSku=0, semData=0, removidas=0, canceladas=0;
-      const vistos = new Set();
-      const desconhecidos = {};
+      /* ── 1. LER O ARQUIVO INTEIRO ANTES DE GRAVAR NADA ─────────────────────
+         As duas guardas (arquivo sem futura, tirar mais da metade) precisam da
+         conta pronta: decidir no meio da gravacao deixaria meio arquivo no banco. */
+      const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
+      let semSku=0, semData=0, canceladas=0;
+      const regs = [];
+      /* As linhas canceladas saem do dono unico, com o pack do cabecalho no
+         item do pacote de varios produtos (cancelada_dominio.js). */
+      const cancelVol = CANC.daPlanilha(linhas, { venda:IV, estado:IE, sku:ISKU });
+      for(const l of linhas){
+        const vid = String(l[IV] || '').trim();
+        // cabecalho e lixo caem aqui: N.o de venda do ML e numero longo
+        if(!/^\d{6,}$/.test(vid)) continue;
+        const estado = String(l[IE] || '');
+        const sku = String(l[ISKU] || '').replace(/\s+/g,'').toUpperCase();
+        /* O cabecalho do pacote de varios produtos ("Pacote de 2 produtos",
+           sem SKU) nao e venda: os itens vem nas linhas de baixo. */
+        if(!sku && CANC.cabecalhoDePacote(estado)) continue;
+        if(!sku){ semSku++; continue; }
+        const de = parseDataEnvio(estado);
+        // venda cancelada/devolvida/reembolsada nao e demanda real -> fora da media
+        const cancelada = /cancel|devolu|reembols/i.test(estado) ? 1 : 0;
+        if(!de) semData++;
+        if(cancelada) canceladas++;
+        regs.push({ vid, sku, dv: parseDataVenda(l[IDV]), de, cancelada });
+      }
 
+      /* ── 2. AS GUARDAS (spec VENDAS-E-MEDIA §5.2) ──────────────────────────
+         A planilha deixou de ser espelho da HISTORIA: ela so espelha as vendas
+         FUTURAS. Um arquivo sem nenhuma e quase sempre o periodo errado
+         exportado — e aceito, ele apagaria todo o comprometido. */
+      const futuras = regs.filter(r => r.de && r.de >= hoje).length;
+      if(!futuras) return res.status(400).json({ ok:false, motivo:'sem_futura',
+        erro:'Este arquivo não tem venda com envio futuro — confira o período exportado. '+
+             'Ele precisa ter as vendas ainda não enviadas.' });
+      const vistos = new Set(regs.map(r => r.vid));
+      const futurasHoje = db.prepare("SELECT venda_id FROM venda_futura WHERE teste=0 AND data_envio >= ?").all(hoje);
+      const sairiam = futurasHoje.filter(r => !vistos.has(r.venda_id)).map(r => r.venda_id);
+      const confirmar = !!(req.body && req.body.confirmar);
+      if(futurasHoje.length && sairiam.length * 2 > futurasHoje.length && !confirmar)
+        return res.status(409).json({ ok:false, motivo:'confirmar', sairiam: sairiam.length,
+          futuras_hoje: futurasHoje.length,
+          aviso:'Este arquivo tira '+sairiam.length+' de '+futurasHoje.length+' vendas futuras do sistema. '+
+                'Se ele é um recorte, falta período. Confirme só se essas vendas foram mesmo enviadas ou canceladas.' });
+
+      /* ── 3. GRAVAR, TUDO OU NADA ──────────────────────────────────────────── */
+      let novas=0, atualizadas=0, removidas=0, cancVol = null;
+      const desconhecidos = {};
       db.transaction(()=>{
-        for(const l of linhas){
-          const vid = String(l[IV] || '').trim();
-          // cabecalho e lixo caem aqui: N.o de venda do ML e numero longo
-          if(!/^\d{6,}$/.test(vid)) continue;
-          const sku = String(l[ISKU] || '').replace(/\s+/g,'').toUpperCase();
-          if(!sku){ semSku++; continue; }
-          const dv = parseDataVenda(l[IDV]);
-          const estado = String(l[IE] || '');
-          const de = parseDataEnvio(estado);
-          // venda cancelada/devolvida/reembolsada nao e demanda real -> fora da media
-          const cancelada = /cancel|devolu|reembols/i.test(estado) ? 1 : 0;
-          if(!de) semData++;
-          if(cancelada) canceladas++;
-          if(existe.get(vid)) atualizadas++; else novas++;
-          up.run(vid, sku, dv, de, cancelada);
-          vistos.add(vid);
-          if(!skuExiste.get(sku)) desconhecidos[sku] = (desconhecidos[sku]||0) + 1;
+        for(const r of regs){
+          if(existe.get(r.vid)) atualizadas++; else novas++;
+          up.run(r.vid, r.sku, r.dv, r.de, r.cancelada);
+          if(!skuExiste.get(r.sku)) desconhecidos[r.sku] = (desconhecidos[r.sku]||0) + 1;
         }
-        // vendas que sumiram da planilha: canceladas ou ja enviadas
-        for(const r of db.prepare("SELECT venda_id FROM venda_futura WHERE teste=0").all()){
-          if(!vistos.has(r.venda_id)){ del.run(r.venda_id); removidas++; }
-        }
+        /* O ESPELHO VALE SO ENTRE AS FUTURAS. A venda futura que nao veio no
+           arquivo saiu (foi cancelada ou despachada); a PASSADA nunca e apagada
+           por ausencia — e historia, e ate a fase 3 e dela que sai a media da
+           planilha. Era esta linha que fazia o recorte zerar a media (#11). */
+        for(const v of sairiam){ del.run(v); removidas++; }
+        cancVol = CANC.marcar(db, cancelVol, { origem:'planilha' });
       })();
 
+      if(cancVol && (cancVol.embalado || cancVol.no_canto || cancVol.no_carro || cancVol.varias)){
+        try{ const ac = app.locals.acesso;
+             if(ac && ac.auditar) ac.auditar(req, 'planejamento', 'canceladas_importadas', 'planilha do ML',
+               JSON.stringify(cancVol)); }catch(e){}
+      }
       res.json({ ok:true, linhas_arquivo:linhas.length, novas, atualizadas,
-        removidas, sem_sku:semSku, sem_data_envio:semData, canceladas,
+        removidas, sem_sku:semSku, sem_data_envio:semData, canceladas, futuras,
+        canceladas_volumes: cancVol,
         desconhecidos: Object.keys(desconhecidos).map(k=>({sku:k, qtd:desconhecidos[k]})) });
     }catch(e){ console.error(e); res.status(500).json({ erro:String(e.message||e) }); }
+  });
+
+  /* CANCELADAS DEPOIS DA ETIQUETA (spec VENDAS-E-MEDIA §6, decisao D3 do dono).
+     O card de Admin -> Bloqueados le daqui. SO MOSTRA: o estoque dessas ja
+     baixou, e so quem olhar a prateleira sabe se a persiana voltou. Decidir e
+     da Mesa de correcoes, que ainda nao existe. */
+  app.get('/api/canceladas', (req,res)=>{
+    try{ res.json({ ok:true, volumes: CANC.listar(db) }); }
+    catch(e){ console.error(e); res.status(500).json({ erro:String(e.message||e) }); }
   });
 
   // Calculo compartilhado entre a tela de comparacao (/api/planejamento) e a
