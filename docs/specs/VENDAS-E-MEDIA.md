@@ -1,4 +1,4 @@
-> **STATUS · 26/09/2026 — EM CONSTRUÇÃO** · **fase 1 em código** · fases 2 e 3 planejadas
+> **STATUS · 26/09/2026 — EM CONSTRUÇÃO** · **fase 1 no ar (PR #144, deploy conferido pelo dono em 26/09)** · fases 2 e 3 planejadas
 > A troca da fonte da média (fase 3) só acontece com o ok do dono depois de conferir.
 >
 > **Fase 1 (26/09/2026):** `media_dominio.js`, `GET /api/planejamento/media/comparar`
@@ -190,7 +190,7 @@ Colunas novas em `lote` (por `ALTER`, no fim, no `exp_route.js` — §17):
 
 ## 8. Fases
 
-### Fase 1 — a média do sistema, lado a lado 🟡 ☑ em código (26/09/2026)
+### Fase 1 — a média do sistema, lado a lado 🟡 ☑ no ar (26/09/2026, PR #144)
 
 - `media_dominio.js` e `GET /api/planejamento/media/comparar`.
 - Em Admin → Planejamento, uma tabela "Média: planilha × sistema", com a diferença
