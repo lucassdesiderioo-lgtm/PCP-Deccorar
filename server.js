@@ -127,6 +127,7 @@ app.get('/montagem',(req,res)=>res.sendFile(require('path').join(__dirname,'publ
 app.get('/painel',(req,res)=>res.sendFile(path.join(__dirname,'public','painel.html')));
 app.get('/embalagem',(req,res)=>res.sendFile(path.join(__dirname,'public','embalagem.html')));
 require('./carreg_route')(app, db);
+require('./saida_route')(app, db);   // a saida do caminhao da coleta (fase 3 da SAIDA-E-DUPLA-CONFERENCIA)
 app.get('/carregamento',(req,res)=>res.sendFile(path.join(__dirname,'public','carregamento.html')));
 require('./backup_route')(app, db);
 require('./rel_route')(app, db);

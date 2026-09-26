@@ -62,6 +62,22 @@
   .fotoprev.on{display:inline-block}
   .hist{padding:8px 14px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)}
   .hist b.ok{color:var(--green)}.hist b.div{color:var(--red)}
+  /* A SAIDA DO CAMINHAO (fase 3 da spec SAIDA-E-DUPLA-CONFERENCIA). Aberta, a
+     tela inteira muda de cor e o bipe passa a querer dizer SOBROU. A cor nao
+     e enfeite: e o que impede bipar meia hora achando que esta carregando o
+     carro (e o mesmo mecanismo dos tres modos da Revisao, §3). */
+  body.modo-saida header{background:#efe9fb;border-bottom:3px solid var(--violet)}
+  body.modo-saida .banner:not(.ok):not(.err):not(.warn){background:#efe9fb;border-color:#b9a3e6}
+  .saidahead{background:var(--violet);color:#fff;font-weight:800;padding:12px 14px;font-size:15px}
+  .saidaconta{padding:12px 14px;font-size:15px;border-bottom:1px solid #e3d9f5}
+  .saidaconta .big{font-size:34px;font-weight:900;color:var(--violet);line-height:1.1}
+  .mini{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer;margin-left:auto}
+  .tagtroca{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;margin-right:4px;
+    background:#fbf1db;color:var(--amber);border:1px solid #e7cb8c;white-space:nowrap}
+  .divbox{padding:12px 14px;background:#fbe9e8;border-top:1px solid #efb1ad}
+  .divbox h4{margin:0 0 6px;color:var(--red);font-size:15px}
+  .divbox .row{background:#fff}
+  .motivo{width:100%;font-size:15px;padding:10px;border:2px solid #efb1ad;border-radius:10px;margin-top:8px}
   /* A CONFERENCIA DA PILHA (fase 2 da spec SAIDA-E-DUPLA-CONFERENCIA): as
      caixas com etiqueta impressa HOJE contra as que ja foram bipadas aqui.
      A conta fecha caixa a caixa — impressas = conferidas + faltam — e o que
@@ -111,17 +127,32 @@
        o bipe e o que poe a caixa na conta que o motorista tem que bater. -->
   <div class="card col" id="colCard">
     <h3>🚚 Coleta — o caminhão do Mercado Livre vem buscar</h3>
-    <div class="sub2">Essas caixas <b>não vão no carro</b>. Bipe cada uma ao levar pro lugar reservado. Quando o motorista chegar, <b>tire a foto da tela do celular dele</b> mostrando quantas caixas ele bipou, digite o número e feche a coleta.</div>
+    <div class="sub2">Essas caixas <b>não vão no carro</b>. Bipe cada uma ao levar pro lugar reservado. Quando o caminhão chegar, abra a <b>Saída do caminhão</b>: bipe o que ficou, tire a foto da tela do celular do motorista e digite o número.</div>
     <div id="colFaltam"></div>
     <div id="colAguard"></div>
-    <div class="fechbox" id="fechBox">
-      <label class="fotobtn" id="fotoBtn">📷 <span id="fotoTxt">Foto da tela do motorista</span>
-        <input type="file" id="fotoIn" accept="image/*" capture="environment"></label>
-      <img class="fotoprev" id="fotoPrev" alt="">
-      <span style="font-weight:700">Motorista bipou</span>
-      <input id="motQtd" type="number" min="0" inputmode="numeric" placeholder="0">
-      <span style="font-weight:700">caixas</span>
-      <button class="btn fech" onclick="fecharColeta(false)">Fechar coleta</button>
+    <!-- A SAIDA DO CAMINHAO: fechada, so o botao; aberta, o bipe vira SOBRA. -->
+    <div class="fechbox" id="saidaBtnBox">
+      <button class="btn fech" onclick="abrirSaida()">🚚 Saída do caminhão</button>
+      <span style="font-size:13px;color:#4b2a91">Quando o caminhão chegar: bipe o que <b>ficou</b>, foto e número do motorista.</span>
+    </div>
+    <div id="saidaBox" style="display:none">
+      <div class="saidahead">🚚 SAÍDA DO CAMINHÃO ABERTA — BIPE O QUE FICOU NO CANTO</div>
+      <div class="saidaconta" id="saidaConta"></div>
+      <div id="saidaSobras"></div>
+      <div class="fechbox" id="saidaPasso">
+        <button class="btn ghost" id="btnNada" onclick="naoFicouNada()">Não ficou nada</button>
+        <button class="btn ghost" onclick="cancelarSaida()">Cancelar saída</button>
+      </div>
+      <div class="fechbox" id="fechBox">
+        <label class="fotobtn" id="fotoBtn">📷 <span id="fotoTxt">Foto da tela do motorista</span>
+          <input type="file" id="fotoIn" accept="image/*" capture="environment"></label>
+        <img class="fotoprev" id="fotoPrev" alt="">
+        <span style="font-weight:700">Motorista bipou</span>
+        <input id="motQtd" type="number" min="0" inputmode="numeric" placeholder="0">
+        <span style="font-weight:700">caixas</span>
+        <button class="btn fech" onclick="fecharSaida(false)">Fechar saída</button>
+      </div>
+      <div id="saidaDiv"></div>
     </div>
     <div id="colHist"></div>
   </div>
@@ -147,6 +178,9 @@ let aguardando=null;   // {code, buyer, nf}
 async function bip(code){
   code=(code||'').trim(); if(!code) return;
   const now=Date.now(); if(last.c===code && now-last.t<600) return; last={c:code,t:now};
+  /* Com a saida do caminhao aberta, o bipe quer dizer UMA coisa so: esta
+     caixa FICOU no canto. Nunca "foi no caminhao" — essa e por botao. */
+  if(saidaAtual && saidaAtual.saida){ await bipSobra(code); return; }
   const corpo = aguardando ? {code:aguardando.code, sku:code} : {code:code};
   const r=await (await fetch('/api/carregar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)})).json();
   if(r.ok && r.coleta){
@@ -299,8 +333,19 @@ async function carregar(){
       +col.aguardando.map(function(f){ return '<div class="row"><span class="who">'+esc0(f.buyer)
         +' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+' · '+horaDe(f.carregado_em)+'</span></span></div>'; }).join('')
     : '<div class="empty" style="color:var(--muted)">Nenhuma caixa esperando o caminhão'+(col.retiradas_hoje?' — '+col.retiradas_hoje+' já retirada'+(col.retiradas_hoje===1?'':'s')+' hoje':'')+'.</div>';
-  $('#fechBox').style.display = col.aguardando.length ? '' : 'none';
-  $('#colHist').innerHTML = col.fechamentos.map(function(f){
+  /* A saida do caminhao: aberta no banco, a tela entra no modo e busca o
+     retrato (a conta, as sobras e o que pode ter ido fora da conta). */
+  if(col.saida_aberta){
+    try{ saidaAtual=await (await fetch('/api/saida/aberta')).json(); }catch(e){}
+  } else { saidaAtual=null; divergPend=null; }
+  desenharSaida();
+  $('#colHist').innerHTML = (col.saidas_hoje||[]).map(function(f){
+    return '<div class="hist">🚚 '+horaDe(f.fechada_em)+' — '
+      +(f.divergente ? '<b class="div">⛔ LIBERADO COM DIVERGÊNCIA</b>: sistema '+f.qtd_sistema+', motorista '+f.qtd_externa
+                     : '<b class="ok">✓ bateu</b>: '+f.qtd_sistema+' caixa'+(f.qtd_sistema===1?'':'s'))
+      +(f.fechado_por?' · '+esc0(f.fechado_por):'')+(f.motivo?' · '+esc0(f.motivo):'')
+      +(f.tem_foto?' · <a href="/api/saida/foto/'+f.id+'" target="_blank" style="color:#4b2a91;font-weight:700">📷 ver a foto</a>':'')+'</div>';
+  }).join('') + col.fechamentos.map(function(f){
     return '<div class="hist">'+horaDe(f.fechado_em)+' — '
       +(f.divergente ? '<b class="div">⛔ DIVERGENTE</b>: sistema '+f.qtd_sistema+', motorista '+f.qtd_motorista
                      : '<b class="ok">✓ bateu</b>: '+f.qtd_sistema+' caixas')
@@ -357,31 +402,110 @@ function limparFoto(){
   fotoDataUrl=null; $('#fotoIn').value=''; $('#fotoPrev').className='fotoprev'; $('#fotoPrev').src='';
   $('#fotoBtn').className='fotobtn'; $('#fotoTxt').textContent='Foto da tela do motorista';
 }
-let divergPend=null;
-async function fecharColeta(confirmar){
-  if(!fotoDataUrl){ banner('warn','Falta a foto da tela do motorista','Toque em <b>📷 Foto da tela do motorista</b> e fotografe o celular dele mostrando quantas caixas ele bipou. Sem a foto a coleta não fecha.'); beep(false); return; }
+let divergPend=null, saidaAtual=null;
+const postJ=async function(url,corpo){
+  const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo||{})});
+  let j={}; try{ j=await resp.json(); }catch(e){}
+  j.__status=resp.status; return j;
+};
+function linhaSaida(f, extra){
+  return '<div class="row"><span class="who">'
+    +(f.antiga?'<span class="tagtroca">⏳ bipada '+dataBR(String(f.carregado_em||'').slice(0,10))+'</span>':'')
+    +(f.troca_de_porta?'<span class="tagtroca">troca de porta · era agência</span>':'')
+    +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+'</span></span>'+(extra||'')+'</div>';
+}
+/* O QUE A TELA MOSTRA DA SAIDA ABERTA: quantas vao no caminhao (a conta que
+   o motorista tem que bater), as sobras bipadas e, se a conta nao bateu, as
+   caixas desta saida e as impressas FORA da conta que podem ter ido. */
+function desenharSaida(){
+  var ab=!!(saidaAtual&&saidaAtual.saida);
+  document.body.classList.toggle('modo-saida',ab);
+  $('#saidaBtnBox').style.display=ab?'none':'';
+  /* Aberta, as listas do canto somem: elas repetiam as mesmas caixas da conta
+     e empurravam o painel da saida para fora da tela (1440 x 900). A conta e
+     as sobras sao o que importa agora; a lista volta quando a saida fecha. */
+  $('#colFaltam').style.display=ab?'none':'';
+  $('#colAguard').style.display=ab?'none':'';
+  $('#saidaBox').style.display=ab?'':'none';
+  if(!ab){ $('#saidaDiv').innerHTML=''; return; }
+  var sa=saidaAtual, nS=(sa.sobras||[]).length;
+  $('#saidaConta').innerHTML='Vão no caminhão:<div class="big">'+sa.sistema+' caixa'+(sa.sistema===1?'':'s')+'</div>'
+    +(nS?'<b>'+nS+'</b> sobra'+(nS===1?'':'s')+' bipada'+(nS===1?'':'s')
+        :(sa.saida.nada_ficou?'<b style="color:var(--green)">✓ não ficou nada no canto</b>'
+                             :'<b style="color:var(--amber)">Bipe as caixas que FICARAM — ou toque em "Não ficou nada".</b>'))
+    +((sa.levou||[]).length?' · <b>'+sa.levou.length+'</b> fora da conta foi no caminhão':'');
+  $('#saidaSobras').innerHTML=(nS?'<div class="hist" style="border-top:0"><b>Ficaram no canto:</b></div>'
+      +sa.sobras.map(function(f){ return linhaSaida(f,'<button class="mini" onclick="tirarSobra('+f.id+')">tirar</button>'); }).join(''):'')
+    +((sa.levou||[]).length?'<div class="hist"><b>Fora da conta, foram no caminhão:</b></div>'
+      +sa.levou.map(function(f){ return linhaSaida(f,'<button class="mini" onclick="tirarLevou('+f.id+')">tirar</button>'); }).join(''):'');
+  $('#btnNada').style.display=nS?'none':'';
+  if(!divergPend){ $('#saidaDiv').innerHTML=''; return; }
+  var mot=divergPend.motorista, dif=sa.sistema-mot;
+  $('#saidaDiv').innerHTML='<div class="divbox"><h4>⛔ NÃO BATEU — sistema '+sa.sistema+', motorista '+mot+'</h4>'
+    +(dif>0?'O sistema tem <b>'+dif+'</b> a mais. Alguma destas <b>ficou no canto</b> (bipe como sobra) ou o motorista deixou passar:'
+           :(dif<0?'O motorista levou <b>'+(-dif)+'</b> a mais. Veja na lista de baixo se alguma caixa <b>fora da conta</b> foi no caminhão:'
+                  :'Agora bate. Toque em <b>Fechar saída</b> de novo.'))
+    +'<div style="margin-top:8px"><b>Nesta saída ('+sa.lista.length+'):</b></div>'+sa.lista.map(function(f){ return linhaSaida(f); }).join('')
+    +((sa.candidatos||[]).length?'<div style="margin-top:10px"><b>Impressas fora da conta, que podem ter ido no caminhão:</b></div>'
+      +sa.candidatos.map(function(f){ return linhaSaida(Object.assign({},f,{troca_de_porta:!f.coleta}),
+          '<button class="mini" onclick="foiNoCaminhao('+f.id+')">foi no caminhão</button>'); }).join(''):'')
+    +'<div style="margin-top:12px"><b>Liberar o caminhão assim mesmo</b> — só supervisor ou admin, e fica registrado com o seu nome:'
+    +'<input class="motivo" id="motivoLib" placeholder="Por que está liberando com número diferente?" maxlength="300">'
+    +'<button class="btn ghost" style="margin-top:8px" onclick="fecharSaida(true)">Liberar com divergência</button></div></div>';
+}
+async function abrirSaida(){
+  const r=await postJ('/api/saida/abrir',{});
+  if(r.ok){ divergPend=null; limparFoto();
+    banner('col','🚚 SAÍDA DO CAMINHÃO ABERTA','Vão no caminhão <b>'+r.sistema+'</b>. Agora <b>bipe as caixas que FICARAM</b> no canto — ou toque em "Não ficou nada". Depois, foto e número do motorista.');
+    beep(true); }
+  else banner('err','Não deu pra abrir a saída', esc0(r.erro||r.aviso||''));
+  carregar();
+}
+async function bipSobra(code){
+  const r=await postJ('/api/saida/sobra',{code:code});
+  if(r.ok){ banner('col','Ficou no canto ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · agora vão no caminhão <b>'+r.sistema+'</b>'); beep(true); }
+  else if(r.motivo==='ja_sobra'){ banner('warn','Essa já estava nas sobras', esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'. Não contou de novo.'); beep(false); }
+  else if(r.motivo==='fora_da_conta'){ banner('warn','Fora da conta deste caminhão', (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
+  else if(r.motivo==='nao_encontrado'){ banner('err','Etiqueta não reconhecida','Lido: '+esc0(code)+'. Bipe a etiqueta de VENDA da caixa que ficou.'); beep(false); }
+  else { banner('err','Não deu', esc0(r.aviso||r.erro||'')); beep(false); }
+  carregar();
+}
+async function naoFicouNada(){ const r=await postJ('/api/saida/nada',{}); if(!r.ok) banner('warn','Há sobras bipadas', esc0(r.aviso||'')); carregar(); }
+async function tirarSobra(id){ await postJ('/api/saida/sobra/tirar',{id:id}); carregar(); }
+async function tirarLevou(id){ await postJ('/api/saida/levou/tirar',{id:id}); carregar(); }
+async function foiNoCaminhao(id){
+  const r=await postJ('/api/saida/levou',{id:id});
+  if(!r.ok) banner('err','Não entrou na saída', esc0(r.aviso||''));
+  carregar();
+}
+async function cancelarSaida(){
+  if(!confirm('Cancelar esta saída? As sobras bipadas se perdem, e nenhuma caixa é mexida.')) return;
+  await postJ('/api/saida/cancelar',{}); divergPend=null; limparFoto();
+  banner('','Saída cancelada','Nada foi gravado nas caixas.'); carregar();
+}
+/* FECHAR A SAIDA. A foto da tela do motorista e a prova do numero (regra do
+   dono, 09/09/2026); sem ela o servidor recusa. Nao bateu, NADA anda: a tela
+   mostra as caixas desta saida e as de fora que podem ter ido. Liberar com
+   numero diferente e so de supervisor ou admin, com motivo. */
+async function fecharSaida(liberar){
+  if(!fotoDataUrl){ banner('warn','Falta a foto da tela do motorista','Toque em <b>📷 Foto da tela do motorista</b> e fotografe o celular dele mostrando quantas caixas ele bipou. Sem a foto a saída não fecha.'); beep(false); return; }
   var q=$('#motQtd').value;
   if(q==='' || !(parseInt(q,10)>=0)){ banner('warn','Quantas caixas o motorista bipou?','Digite o número que está na foto antes de fechar.'); return; }
   var corpo={motorista:parseInt(q,10),foto:fotoDataUrl};
-  if(confirmar){ corpo.confirmar=true; corpo.obs=String(prompt('Por que está liberando com número diferente? (fica registrado)')||'').slice(0,300); }
-  const r=await (await fetch('/api/coleta/fechar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)})).json();
+  if(liberar){ var m=document.getElementById('motivoLib'); corpo.motivo=m?m.value:''; }
+  const r=await postJ(liberar?'/api/saida/liberar':'/api/saida/fechar',corpo);
+  if(r.__status===403){ banner('err','Só supervisor ou admin libera com divergência','Chame quem pode liberar — ou confira as caixas com o motorista até o número bater.'); beep(false); return; }
   if(r.ok){
     divergPend=null; $('#motQtd').value=''; limparFoto();
-    if(r.divergente){ banner('err','Coleta fechada COM DIVERGÊNCIA','Sistema <b>'+r.sistema+'</b> · motorista <b>'+r.motorista+'</b>. Ficou registrado com o seu nome e com a foto.'); beep(false); }
-    else { banner('ok','Coleta conferida ✓ — '+r.sistema+' = '+r.motorista,'O número do motorista bateu e a foto ficou guardada. Pode liberar o caminhão.'); beep(true); }
+    if(r.divergente){ banner('err','Caminhão liberado COM DIVERGÊNCIA','Sistema <b>'+r.sistema+'</b> · motorista <b>'+r.motorista+'</b>. Ficou registrado com o seu nome, o motivo e a foto.'); beep(false); }
+    else { banner('ok','Saída conferida ✓ — '+r.sistema+' = '+r.motorista,'O número do motorista bateu e a foto ficou guardada.'
+      +(r.troca_de_porta?' <b>'+r.troca_de_porta+'</b> caixa'+(r.troca_de_porta===1?'':'s')+' de agência foi pela coleta.':'')+' Pode liberar o caminhão.'); beep(true); }
   }
-  else if(r.motivo==='sem_foto'){ banner('warn','Falta a foto da tela do motorista', esc0(r.aviso||'')); beep(false); }
-  else if(r.motivo==='divergente'){
-    divergPend=r;
-    banner('err','⛔ NÃO BATEU — sistema '+r.sistema+', motorista '+r.motorista,
-      'Diferença de <b>'+Math.abs(r.sistema-r.motorista)+'</b>. <b>Não libere o caminhão.</b> Confira caixa por caixa com o motorista:<br>'
-      +'<div style="text-align:left;margin:8px auto 0;max-width:520px;font-size:13px">'
-      +r.lista.map(function(f){ return '☐ '+esc0(f.buyer)+' · NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||''); }).join('<br>')+'</div>'
-      +'<div style="margin-top:12px"><button class="btn ghost" onclick="fecharColeta(true)">Liberar mesmo assim (fica registrado)</button></div>');
-    beep(false);
-  }
-  else if(r.motivo==='nada'){ banner('warn','Nada pra fechar', r.aviso||''); }
-  else { banner('err','Não deu pra fechar', esc0(r.erro||JSON.stringify(r))); beep(false); }
+  else if(r.motivo==='divergente'){ divergPend=r;
+    banner('err','⛔ NÃO BATEU — sistema '+r.sistema+', motorista '+r.motorista,'<b>Não libere o caminhão.</b> Confira as caixas logo abaixo, no card da coleta, com o motorista na frente.'); beep(false); }
+  else if(r.motivo==='sobras'||r.motivo==='sem_foto'||r.motivo==='sem_motivo'||r.motivo==='vazia'||r.motivo==='sem_saida'){
+    banner('warn',({sobras:'Falta o passo das sobras',sem_foto:'Falta a foto',sem_motivo:'Escreva o motivo',vazia:'Saída vazia',sem_saida:'Nenhuma saída aberta'})[r.motivo], esc0(r.aviso||'')); beep(false); }
+  else { banner('err','Não deu pra fechar', esc0(r.erro||r.aviso||JSON.stringify(r))); beep(false); }
   carregar();
 }
 const scan=$('#scan');
@@ -391,11 +515,11 @@ const scan=$('#scan');
    BIPE cair no lugar certo, nao pra mexer no que a pessoa esta olhando.
    O campo do motorista e a excecao: enquanto a pessoa digita ali, o foco
    fica ali. */
-const keep=()=>{ const a=document.activeElement; if(a===scan) return; if(a && (a.id==='motQtd'||a.id==='fotoIn')) return; scan.focus({preventScroll:true}); };
+const keep=()=>{ const a=document.activeElement; if(a===scan) return; if(a && (a.id==='motQtd'||a.id==='fotoIn'||a.id==='motivoLib')) return; scan.focus({preventScroll:true}); };
 scan.addEventListener('blur',()=>setTimeout(keep,50));
 document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input,label')) keep(); });
 scan.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=scan.value.trim(); scan.value=''; bip(v); } });
-$('#motQtd').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); fecharColeta(false); } });
+$('#motQtd').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); fecharSaida(false); } });
 scan.focus();
 function beep(ok){ try{const a=new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=ok?820:240;g.gain.value=.05;o.start();setTimeout(()=>{o.stop();a.close();},ok?100:220);}catch(e){} }
 carregar(); setInterval(carregar,4000);

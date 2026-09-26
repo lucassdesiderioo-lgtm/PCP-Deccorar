@@ -189,6 +189,68 @@ function pilhaDaArea(db){
   };
 }
 
+/* ACHAR O VOLUME PELO CODIGO BIPADO — dono unico (26/09/2026).
+   O bipe do carregamento e o bipe das sobras da saida do caminhao fazem a
+   mesma pergunta; duas copias achariam caixas diferentes para o mesmo codigo.
+   PROCURA PELO CODIGO, NAO PELO DIA: enquanto isto era `WHERE data=hoje`, o
+   volume embalado ontem respondia "nao encontrado" com a caixa na mao (#9).
+   A busca larga primeiro (a chave e o codigo do ML, que e unico) e so depois
+   confere o codigo exato. Devolve TODOS os que batem: entre duplicatas (§5,
+   os fantasmas) quem chama decide qual manda. */
+function acharVolumes(db, code){
+  code = String(code||'').trim();
+  if(!code) return [];
+  const digits = code.replace(/\D/g,'');
+  const jid = (code.match(/"id"\s*:\s*"?(\d+)/)||[])[1] || null;
+  const cands = [code, digits, jid].filter(Boolean);
+  const vistos = new Set(), achados = [];
+  for(const c of cands){
+    for(const r of db.prepare('SELECT * FROM lote WHERE packId=? OR venda=? OR codes LIKE ?').all(c,c,'%'+c+'%')){
+      if(vistos.has(r.id)) continue;
+      vistos.add(r.id); achados.push(r);
+    }
+  }
+  return achados.filter(r => {
+    let cs = []; try{ cs = JSON.parse(r.codes||'[]'); }catch(e){}
+    cs = cs.concat([r.packId, r.venda].filter(Boolean));
+    return cs.some(c => cands.includes(String(c)));
+  });
+}
+
+/* A SAIDA DO CAMINHAO DA COLETA (spec SAIDA-E-DUPLA-CONFERENCIA, fase 3).
+   Uma saida por caminhao, e ela so olha o que estava no canto e AINDA NAO
+   TINHA SAIDA — o "Fechar coleta" de 10/09 comparava o canto inteiro, e um dia
+   sem fechar estragava todos os seguintes:
+
+       sairam = NA_SAIDA − sobras + "foi no caminhao"
+
+   NA_SAIDA e o AGUARDA_CAMINHAO (a regua do card da tela) sem saida gravada.
+   ATE A FASE 4 A AGENCIA FICA DE FORA DA CONTA: com o bipe unico (opcao A) a
+   caixa de agencia conferida ja esta no CARRO, nao no chao da area — somada
+   aqui, o operador teria que bipar como "sobra" uma caixa que nem esta ali. */
+const NA_SAIDA = AGUARDA_CAMINHAO + " AND saida_id IS NULL";
+function naSaida(db){
+  const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
+  return db.prepare(`SELECT id,codigo,buyer,nf,modalidade,despachar_em,carregado_em,impresso_por,conferido_por
+    FROM lote WHERE ${NA_SAIDA} ORDER BY carregado_em, id`).all()
+    .map(v => Object.assign(v, { antiga: !!(v.carregado_em && String(v.carregado_em).slice(0,10) < hoje) }));
+}
+/* "FOI NO CAMINHAO": a caixa com etiqueta impressa, FORA da conta, que o
+   motorista levou mesmo assim — a de agencia que ainda estava na pilha, a de
+   coleta que foi direto da impressora, a de agencia ja posta no carro hoje. E
+   a troca de porta da decisao 6: nao e erro, e o motorista levar o que esta
+   pronto. `pendente` nunca: sem etiqueta a caixa nao baixou do estoque (§5,
+   #27). A agencia no carro so a de HOJE — a de ontem ja foi para a agencia. */
+const PODE_TER_IDO = "((estagio='embalado' AND conferido_em IS NULL) OR " +
+  "(estagio='carregado' AND " + AGENCIA() + " AND saida_id IS NULL AND retirado_em IS NULL " +
+  "AND date(carregado_em)=date('now','localtime')))";
+function podeTerIdo(db){
+  return db.prepare(`SELECT id,codigo,buyer,nf,modalidade,estagio,despachar_em FROM lote
+    WHERE ${PODE_TER_IDO} ORDER BY buyer, id`).all()
+    .map(v => Object.assign(v, { coleta: ehColeta(v) }));
+}
+
 module.exports = { PRA_CARREGAR, DO_DIA, ORDEM_CARGA, atrasado, futuro,
                    COLETA, AGENCIA, ehColeta, AGUARDA_CAMINHAO,
-                   SAIDA, saidasAdiantadas, pilhaDaArea };
+                   SAIDA, saidasAdiantadas, pilhaDaArea, nomeIgual,
+                   acharVolumes, NA_SAIDA, naSaida, PODE_TER_IDO, podeTerIdo };
