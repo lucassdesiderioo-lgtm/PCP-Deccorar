@@ -175,6 +175,15 @@ th{font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--t
 tr.inativo td{opacity:.45}
 td.num,th.num{text-align:right; font-variant-numeric:tabular-nums}
 
+/* ⚠️ TABELA QUE NAO CABE ROLA SOZINHA — a PAGINA nunca rola de lado.
+   `table{width:100%}` e uma proporcao que o navegador ignora quando o
+   conteudo e mais largo (a coluna `fr` do CLAUDE.md §12, pela porta da
+   tabela): a tabela empurra o corpo e, num celular, a tela inteira anda para
+   o lado. Quem rola passa a ser este recipiente, e o resto da pagina fica
+   parado. Mora aqui, e nao na tela, pela licao da fileira de escolha da fase
+   4-A: classe propria de tela e a segunda regua do CSS. */
+.rolaH{overflow-x:auto; -webkit-overflow-scrolling:touch}
+
 /* ── Etiquetas de estado ──────────────────────────────────────────────── */
 .tag{display:inline-block; padding:3px 10px; border-radius:999px;
   font-size:13px; font-weight:700; letter-spacing:.02em}

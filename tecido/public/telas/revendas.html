@@ -46,7 +46,7 @@ table.lista tr.inativa td{opacity:.55}
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,banner,el,limpar,$}=window.ui;
+const {api,banner,el,limpar,$,dinheiro}=window.ui;
 
 /* As mesmas conversoes exatas do catalogo e do simulador: dinheiro e
    percentual entram como TEXTO e viram inteiro por soma, nunca por
@@ -60,7 +60,22 @@ function paraInteiro(texto,casas){
   return Number(m[1])*Math.pow(10,casas)+Number((m[2]||'').padEnd(casas,'0'));
 }
 const paraCentavos=t=>paraInteiro(t,2);
-const emReais=v=>v==null?'':(v/100).toFixed(2).replace('.',',');
+/* ⚠️ SÃO DOIS PAPÉIS, E POR ISSO SÃO DUAS FUNÇÕES COM NOME QUE DIZ QUAL É
+   QUAL. O que se LÊ sai do `dinheiro` do ui.js, o dono único do módulo: ele
+   escreve `R$ 4.785,50`, com o ponto do milhar, igual à tela do Financeiro.
+   Um formatador local para ler era a armadilha #12 em miniatura — a mesma
+   revenda mostrando o mesmo dinheiro de dois jeitos em duas telas.
+
+   O que PRÉ-PREENCHE o campo do limite continua SEM o separador, e por isso
+   tem nome próprio: aquele valor volta pelo `paraCentavos`, e um `5.000,00`
+   no campo gravaria outro número — seria trocar um defeito de leitura por um
+   de escrita, no crédito. */
+const reais=c=>(c===null||c===undefined)?null:dinheiro(c/100);
+/* ⚠️ `reais` devolve NULL no ausente, e não `—`, porque os chamadores testam
+   a verdade dele (`reais(x)?…:…` e `reais(x)||'—'`). Quem CONCATENA escreve
+   o `||'—'`: a poda do custo.js tira os campos `valor_*` de quem não vê
+   custo, e sem ele a frase sairia com a palavra `null` na tela. */
+const paraCampo=v=>v==null?'':(v/100).toFixed(2).replace('.',',');
 const emPct=v=>v==null?'':(v/100).toFixed(2).replace('.',',');
 
 let eu={permissoes:[]}, dados={}, abertaId=null, aberta=null, erro=null;
@@ -174,7 +189,7 @@ function desRevendas(){
        (a poda do custo.js). Por isso o teste e por `in`, e nao por valor. */
     tr.appendChild(el('td',{class:'n'},[
       ('valor_limite_credito_centavos' in r)
-        ? (r.valor_limite_credito_centavos==null?'—':'R$ '+emReais(r.valor_limite_credito_centavos))
+        ? (reais(r.valor_limite_credito_centavos)||'—')
         : '·']));
     tr.appendChild(el('td',{},[r.limite_revisado_em
       ? el('span',{class:r.limite_vencido?'falta':''},[r.limite_revisado_em+(r.limite_vencido?' (vencida)':'')])
@@ -242,14 +257,14 @@ function credito(r){
         : el('span',{class:'nota'},['dentro do limite']));
     }else if(c.valor_limite_credito_centavos==null){
       linhas.push(el('span',{class:'nota'},[
-        'sem limite lançado — não dá para dizer o disponível. Em aberto: R$ '+
-        emReais(c.valor_em_aberto_centavos)]));
+        'sem limite lançado — não dá para dizer o disponível. Em aberto: '+
+        (reais(c.valor_em_aberto_centavos)||'—')]));
     }else{
       linhas.push(el('span',{},[
-        'em aberto R$ '+emReais(c.valor_em_aberto_centavos)+' · ',
+        'em aberto '+(reais(c.valor_em_aberto_centavos)||'—')+' · ',
         c.estourado
-          ? el('b',{class:'falta'},['ESTOUROU R$ '+emReais(-c.valor_disponivel_centavos)])
-          : el('b',{},['disponível R$ '+emReais(c.valor_disponivel_centavos)])
+          ? el('b',{class:'falta'},['ESTOUROU '+reais(-c.valor_disponivel_centavos)])
+          : el('b',{},['disponível '+(reais(c.valor_disponivel_centavos)||'—')])
       ]));
     }
     if(c.vencidos) linhas.push(el('div',{class:'falta'},
@@ -266,8 +281,8 @@ function credito(r){
       c.parcialmente_titulados+(c.parcialmente_titulados===1
         ? ' pedido parcialmente titulado'
         : ' pedidos parcialmente titulados')
-      +(emReais(c.valor_falta_titular_centavos)
-        ? ' — faltam R$ '+emReais(c.valor_falta_titular_centavos)+' em título'
+      +(reais(c.valor_falta_titular_centavos)
+        ? ' — faltam '+reais(c.valor_falta_titular_centavos)+' em título'
         : ' — falta título para parte do valor')
       +' — fora do disponível']));
     /* ⚠️ A JANELA SÓ APARECE QUANDO INFORMA, e é a MESMA regra da tela de
@@ -349,7 +364,7 @@ function ficha(r){
       'limite − boletos em aberto, e quem lança e dá baixa é o Financeiro.']));
     box.appendChild(editor([
       {chave:'valor_limite_credito_centavos',rotulo:'Limite (R$)',
-       valor:emReais(r.valor_limite_credito_centavos),dica:'5000,00'}
+       valor:paraCampo(r.valor_limite_credito_centavos),dica:'5000,00'}
     ], async v=>{
       erro=null;
       const c=paraCentavos(v.valor_limite_credito_centavos);
