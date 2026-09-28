@@ -6835,11 +6835,29 @@ Abaixo disso ele continua na cobrança e na lista de marcar, com o que falta.
 > nomear o campo sem o prefixo `valor_`, que a poda deixa passar (6).
 > E **abra as duas telas**: as duas coisas acima não têm teste que as pegue.
 
-> ⚠️ **AINDA NÃO FOI CONFERIDA COM O DADO REAL.** A rodada foi na minha tela,
-> com pedido semeado — o caso do dono reproduzido (R$ 165,00 com título de
-> R$ 49,50 dando R$ 115,50 de falta). A prova que fecha é **o financeiro
-> lançando um parcelamento de verdade**, com a 2ª parcela apontando o mesmo
-> pedido. Prova que não foi feita se escreve como não feita (§4).
+> ✅ **NO AR E CONFERIDA COM DADO REAL EM 26/09/2026, PELO CAMINHO QUE A TELA
+> NÃO DEIXAVA PERCORRER.** O dono fez o deploy e **lançou a 2ª parcela
+> apontando o mesmo pedido**: *"entrou, e a falta caiu"*. São as duas metades
+> provadas por um gesto só — para marcar o pedido na 2ª parcela ele **tinha**
+> que continuar na lista depois do primeiro título (a régua do dinheiro), e a
+> falta tinha que andar com o segundo.
+>
+> ⚠️ **E É JUSTAMENTE O CASO QUE ERA IMPOSSÍVEL ATÉ O DEPLOY DESTA FASE.** Com
+> o `NOT EXISTS (vínculo)`, a parcela 1 tirava o pedido da lista e a parcela 2
+> não tinha onde ser apontada — o parcelamento, que o "avisa, nunca trava" da
+> 6-C1b existe para proteger, era o que a tela impedia de registrar. Um
+> parcelamento de verdade, lançado pela tela, prova isso de um jeito que
+> nenhum caso semeado provaria.
+>
+> ⚠️ **O QUE ELE NÃO DISSE, E POR ISSO NÃO ESTÁ ESCRITO COMO DITO:** dos
+> quatro pontos que pedi para conferir na tela, ele relatou este. Os outros
+> três (a tarja `já titulado`, a linha do crédito e o *"cobre R$ X de R$ Y"*
+> na linha do título) não foram confirmados um a um — e o lançamento da
+> parcela não passa por todos eles.
+>
+> **O que continua pendente é da 6-C1, e não desta:** o financeiro dando uma
+> **baixa** de verdade, e o vendedor usando a carteira na conversa semanal.
+> Prova que não foi feita se escreve como não feita (§4).
 
 ### Três regras do sob medida que valem citar aqui
 
