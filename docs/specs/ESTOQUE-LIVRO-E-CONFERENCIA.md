@@ -1,4 +1,22 @@
-> **STATUS · 26/09/2026 — EM CONSTRUÇÃO** · fases 0 e 1 no ar; **fase 2 em código (26/09)**; fases 3 e 4 planejadas
+> **STATUS · 28/09/2026 — EM CONSTRUÇÃO** · fases 0, 1 e 2 no ar; **fase 3 em código (28/09)**; fase 4 planejada
+>
+> **Fase 3 (ajuste em duas pessoas)** entrou em 28/09/2026: `ajuste_dominio.js`,
+> `ajuste_route.js`, o `POST /api/estoque` antigo recusando (410, `use_pedido`), o
+> botão "pedir ajuste" e o card "Ajustes esperando aprovação" na aba Estoque,
+> `estoque.ajustar` e `estoque.aprovar_ajuste` com backfill (`seed_ajuste_duas`) e
+> `estoque.editar` fora do cadastro. `teste_ajuste.js`, 53 casos, escrito antes do
+> código, oito defeitos reintroduzidos.
+>
+> **O que mudou na construção:**
+> - **os pedidos moram em `ajuste_pedido`**, e não em colunas novas do
+>   `ajuste_estoque` (§7): cinco lugares leem aquela tabela como "o que foi
+>   aplicado". A aprovação grava lá, como sempre — decisão do dono;
+> - **o pedido é em DELTA**, com `saldo_no_pedido` ao lado; "saldo novo" vira delta
+>   contra aquele saldo — decisão do dono (a armadilha #32 pela porta do ajuste);
+> - **um pendente por SKU**, e **quem pediu pode desistir** (`desistido`): sem isso
+>   um pedido errado travaria o SKU até outra pessoa aparecer;
+> - o card "Últimos ajustes" **não** passou a ler do livro: o `ajuste_estoque` já
+>   recebe ajuste, contagem e inventário, e não falta nada nele.
 >
 > **Fase 2 (a conferência nova)** entrou em 26/09/2026: `inventario_dominio.js` (dono
 > único do ciclo), `inventario_route.js`, a tela de tablet `/inventario`, os cards de

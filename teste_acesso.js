@@ -759,6 +759,46 @@ console.log('\n── 6-F. a conferência em três papéis (fase 2 da ESTOQUE-LI
   ok('decidir(): quem conta NÃO abre a conferência', AC.decidir({id:uC, nome:'Conta'}, '/api/inventario/abrir', 'POST').ok === false);
 }
 
+console.log('\n── 6-G. o ajuste em duas pessoas (fase 3 da ESTOQUE-LIVRO-E-CONFERENCIA) ──');
+{
+  ok('estoque.editar saiu do cadastro (aplicava sozinho)', !PERMISSOES.find(p => p.chave === 'estoque.editar'));
+  for(const c of ['estoque.ajustar','estoque.aprovar_ajuste']){
+    const ch = PERMISSOES.find(p => p.chave === c);
+    ok(c + ' está declarada em permissoes.js', !!ch);
+    if(ch){ eq(c + ' é nível admin', ch.nivel, 'admin'); ok(c + ' tem rótulo e descrição', !!ch.rotulo && !!ch.desc); }
+  }
+  ok('aprovar ajuste é sensível', (PERMISSOES.find(p => p.chave === 'estoque.aprovar_ajuste') || {}).sensivel === true);
+
+  eq('POST /api/estoque/ajuste pede estoque.ajustar', AC.permDaRota('/api/estoque/ajuste','POST'), 'estoque.ajustar');
+  eq('aprovar pede estoque.aprovar_ajuste', AC.permDaRota('/api/estoque/ajuste/12/aprovar','POST'), 'estoque.aprovar_ajuste');
+  eq('recusar: quem pede (desiste) ou quem aprova',
+     JSON.stringify(AC.permDaRota('/api/estoque/ajuste/12/recusar','POST')), JSON.stringify(['estoque.ajustar','estoque.aprovar_ajuste']));
+  eq('a fila: quem pede ou quem aprova',
+     JSON.stringify(AC.permDaRota('/api/estoque/ajuste/pendentes','GET')), JSON.stringify(['estoque.ajustar','estoque.aprovar_ajuste']));
+  eq('o POST /api/estoque antigo (que só recusa) fica com a chave de quem pede', AC.permDaRota('/api/estoque','POST'), 'estoque.ajustar');
+  eq('o histórico continua @admin', AC.permDaRota('/api/estoque/ajustes','GET'), '@admin');
+
+  /* O BACKFILL, num banco que já existia: um setor que editava estoque direto. */
+  const sE = db.prepare("INSERT INTO setores (nome,nivel,nativo) VALUES ('Estoque direto','admin',0)").run().lastInsertRowid;
+  db.prepare("INSERT INTO setor_permissao (setor_id,chave) VALUES (?, 'estoque.editar')").run(sE);
+  const uE = db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('ExcecaoEstoque','')").run().lastInsertRowid;
+  db.prepare("INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,'estoque.editar',1)").run(uE);
+  db.prepare("DELETE FROM config WHERE chave='seed_ajuste_duas'").run();
+  require('./acesso')({ locals:{}, router:{ stack:[] }, get(){}, post(){}, delete(){} }, db);
+  const tem = (sid, c) => !!db.prepare('SELECT 1 FROM setor_permissao WHERE setor_id=? AND chave=?').get(sid, c);
+  ok('backfill: quem editava estoque passa a PEDIR', tem(sE, 'estoque.ajustar'));
+  ok('backfill: e a APROVAR (a regra de pessoa é do código)', tem(sE, 'estoque.aprovar_ajuste'));
+  ok('backfill: a exceção vai junto',
+     !!db.prepare("SELECT 1 FROM usuario_excecao WHERE usuario_id=? AND chave='estoque.aprovar_ajuste' AND concede=1").get(uE));
+  ok('marcado para rodar uma vez só', !!db.prepare("SELECT 1 FROM config WHERE chave='seed_ajuste_duas'").get());
+  db.prepare("DELETE FROM setor_permissao WHERE setor_id=? AND chave='estoque.aprovar_ajuste'").run(sE);
+  require('./acesso')({ locals:{}, router:{ stack:[] }, get(){}, post(){}, delete(){} }, db);
+  ok('desmarcada, a chave não volta no boot seguinte', !tem(sE, 'estoque.aprovar_ajuste'));
+  ok('o setor Admin nativo nasce com as duas',
+     (function(){ const id = db.prepare("SELECT id FROM setores WHERE nome='Admin'").get().id;
+       return tem(id,'estoque.ajustar') && tem(id,'estoque.aprovar_ajuste'); })());
+}
+
 console.log('\n── 16. a cobertura passou a VARRER o app ──');
 const cob = AC.coberturaDeRotas ? AC.coberturaDeRotas() : null;
 ok('existe a varredura das rotas registradas', !!cob, 'coberturaDeRotas() nao existe');

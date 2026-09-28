@@ -45,41 +45,10 @@ db.exec(`CREATE TABLE IF NOT EXISTS ajuste_estoque (
   teste        INTEGER DEFAULT 0
 );`);
 
-app.post('/api/estoque',(req,res)=>{
-  const {codigo,estoque,delta,motivo,obs}=req.body||{};
-  if(!codigo) return res.status(400).json({erro:'codigo'});
-  /* O MOTIVO E OBRIGATORIO, e e o ponto todo desta rota. Ajuste sem motivo e
-     exatamente o que existia antes: um numero que mudou e ninguem sabe por que. */
-  const mot=String(motivo||'').trim();
-  if(!mot) return res.status(400).json({erro:'informe o motivo do ajuste'});
-
-  const linha=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(codigo);
-  if(!linha) return res.status(404).json({erro:'SKU nao cadastrado: '+codigo});
-  const antes=+linha.estoque||0;
-  /* O `MAX(0, ...)` SAIU na fase 1 do livro (21/09/2026). Ele fazia o ajuste
-     mentir em silencio: pedir -5 num saldo de 3 gravava 0 e a linha de
-     auditoria dizia "-3", entao nem o rastro contava o que foi pedido. Hoje o
-     numero pedido e o numero aplicado, e saldo negativo acende alerta em vez
-     de sumir. */
-  const depois = (delta!==undefined)
-    ? antes + Math.trunc(+delta||0)
-    : Math.trunc(+estoque||0);
-  if(depois===antes) return res.json({ok:true,estoque:antes,sem_mudanca:true});
-
-  const u=req.usuario||{};
-  db.transaction(()=>{
-    /* O saldo passa pelo dono unico; `ajuste_estoque` continua guardando o
-       MOTIVO, que e o que o livro nao pergunta. */
-    ESTOQUE.movimentar(db,{codigo, delta:depois-antes, tipo:'ajuste',
-      referencia:'ajuste manual', motivo:mot, usuario:u});
-    db.prepare(`INSERT INTO ajuste_estoque (codigo,antes,depois,delta,motivo,obs,usuario_id,usuario_nome)
-      VALUES (?,?,?,?,?,?,?,?)`).run(codigo,antes,depois,depois-antes,mot,
-        String(obs||'').trim()||null,u.id||null,u.nome||'');
-  })();
-  try{ app.locals.acesso.auditar(req,'estoque','ajuste_manual',codigo,
-    antes+' -> '+depois+'  ('+mot+')'); }catch(e){}
-  res.json({ok:true,estoque:depois,antes:antes});
-});
+/* O AJUSTE MANUAL virou pedido + aprovacao em duas pessoas (fase 3 da
+   ESTOQUE-LIVRO-E-CONFERENCIA, 28/09/2026). O `POST /api/estoque` antigo mora
+   no ajuste_route.js e so recusa, dizendo o caminho. */
+require('./ajuste_route')(app, db);
 
 /* O historico de um SKU — e o que transforma o ajuste em algo conferivel. */
 app.get('/api/estoque/ajustes',(req,res)=>{

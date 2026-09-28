@@ -155,6 +155,10 @@
       <div class="sub" id="estRodape" style="margin-top:10px"></div>
     </div>
 
+    <!-- O AJUSTE EM DUAS PESSOAS (fase 3 da ESTOQUE-LIVRO-E-CONFERENCIA): os
+         pedidos esperando aprovacao. Some quando a rota diz 403 e quando nao
+         ha pedido — card vazio todo dia vira paisagem. -->
+    <div class="card" id="estPedidos" style="display:none"></div>
     <div class="card" id="estAjustes"></div>
   </div>
 
@@ -1512,6 +1516,38 @@ async function carregarEst(){
     return;
   }
   renderEst();
+  estPedidos();
+}
+/* A FILA DE AJUSTES PEDIDOS. Aprovar aplica o DELTA sobre o saldo de agora —
+   o que foi embalado ou impresso depois do pedido continua valendo. Quem pediu
+   nao aprova (nem o Admin Geral), mas pode desistir do proprio pedido. */
+async function estPedidos(){
+  const box=$('#estPedidos'); if(!box) return;
+  let r; try{ r=await fetch('/api/estoque/ajuste/pendentes'); }catch(e){ return; }
+  if(r.status!==200){ box.style.display='none'; return; }
+  const it=((await r.json()).itens)||[];
+  if(!it.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='block';
+  const sn=n=>(n>0?'+':'')+n;
+  box.innerHTML='<div style="font-weight:700;margin-bottom:4px">Ajustes esperando aprovação ('+it.length+')</div>'
+    +'<div class="sub" style="margin-bottom:10px">Quem pediu não aprova o próprio pedido. Aprovar aplica a diferença pedida sobre o saldo de <b>agora</b>: o que foi embalado ou impresso depois do pedido continua valendo.</div>'
+    +it.map(p=>{
+      const mx=(p.extrato||[]).filter(m=>m.tipo!=='abertura');
+      return '<div style="border-top:1px solid var(--line);padding:10px 0">'
+        +'<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">'
+        +'<div><b class="code">'+esc(p.codigo)+'</b> <b style="font-size:17px" class="'+(p.delta<0?'baixo':'ok')+'">'+sn(p.delta)+'</b>'
+        +' <span class="sub">'+esc(p.motivo||'')+(p.obs?' — '+esc(p.obs):'')+'</span></div>'
+        +'<div class="sub">saldo agora <b>'+p.saldo_agora+'</b> → <b>'+p.saldo_depois+'</b></div></div>'
+        +'<div class="sub" style="margin-top:4px">pedido por '+esc(p.pedido_por||'—')+' em '+esc(estQuando(p.pedido_em))
+        +' · o saldo era '+p.saldo_no_pedido
+        +(mx.length?' · mexeu desde o pedido (e continua valendo): '+mx.map(m=>sn(m.delta)+' '+esc(m.tipo)).join(' · '):'')+'</div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">'
+        +(p.pode_aprovar?'<button class="primary small" data-pedaprovar="'+p.id+'">Aprovar</button>':'')
+        +'<input class="setin" id="pedResp'+p.id+'" placeholder="'+(p.pode_aprovar?'por que recusar':'por que desistir')+'" style="width:240px">'
+        +'<button class="ghost small" data-pedrecusar="'+p.id+'">'+(p.pode_aprovar?'Recusar':'Desistir do pedido')+'</button>'
+        +(p.pode_aprovar?'':'<span class="sub" style="color:#d29922">'+esc(p.por_que_nao||'')+'</span>')
+        +'<span class="baixo" id="pedErr'+p.id+'"></span></div></div>';
+    }).join('');
 }
 /* O admin inteiro se recarrega de 4 em 4 segundos (AUTO_ADMIN la embaixo). Este
    painel calcula a demanda do catalogo todo, entao ele NAO entra nessa cadencia:
@@ -1752,7 +1788,7 @@ function renderEst(){
       +'<td class="n">'+(l.cobertura_dias==null?'<span class="zero">—</span>':(l.cobertura_dias+'d'))+'</td>'
       +'<td>'+(pct==null?'<span class="zero">—</span>'
         :'<span class="barmini"><i style="width:'+pct+'%;background:'+corBarra+'"></i></span>')+'</td>'
-      +'<td style="white-space:nowrap"><button class="ghost small" data-ajustar="'+esc(l.codigo)+'">ajustar</button> '
+      +'<td style="white-space:nowrap"><button class="ghost small" data-ajustar="'+esc(l.codigo)+'">pedir ajuste</button> '
       +'<button class="ghost small" data-hist="'+esc(l.codigo)+'">histórico</button> '
       +'<button class="ghost small" data-extrato="'+esc(l.codigo)+'">extrato</button></td>'
     +'</tr>';
@@ -1938,17 +1974,32 @@ document.addEventListener("click",async e=>{
     linha.innerHTML='<td colspan="'+estColunas()+'" style="background:#0f141b">'
       +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0">'
       +'<b style="font-family:ui-monospace,monospace">'+esc(cod)+'</b>'
-      +'<span class="sub">de <b>'+atual+'</b> para</span>'
-      +'<input class="setin" type="number" id="ajQtd" value="'+atual+'" style="width:80px">'
+      +'<span class="sub">saldo agora <b>'+atual+'</b> · pedir</span>'
+      +'<input class="setin" type="number" step="1" id="ajDelta" placeholder="+1 / −2" style="width:100px">'
+      +'<span class="sub">ou o saldo novo</span>'
+      +'<input class="setin" type="number" step="1" id="ajQtd" placeholder="'+atual+'" style="width:80px">'
       +'<select id="ajMotivo" class="setin" style="width:auto;min-width:190px">'
       +'<option value="">— motivo —</option>'
       +motivos.map(m=>'<option>'+esc(m.valor||m)+'</option>').join('')
       +'</select>'
       +'<input class="setin" id="ajObs" placeholder="observação (opcional)" style="width:210px">'
-      +'<button class="ghost small" data-ajsalvar="'+esc(cod)+'">salvar</button>'
+      +'<button class="ghost small" data-ajsalvar="'+esc(cod)+'">pedir</button>'
       +'<span class="sub" id="ajMsg"></span></div>'
-      +'<div class="sub">O ajuste fica gravado com quem fez, quando, o valor anterior e o motivo.</div></td>';
+      +'<div class="sub">O saldo <b>não muda agora</b>: o pedido vai para "Ajustes esperando aprovação", e outra pessoa aprova. O saldo novo vira a diferença contra o saldo de agora.</div></td>';
     tr.after(linha);
+    return;
+  }
+  const pa=e.target.closest("[data-pedaprovar]"), pr=e.target.closest("[data-pedrecusar]");
+  if(pa||pr){
+    const id=(pa||pr).getAttribute(pa?"data-pedaprovar":"data-pedrecusar");
+    const url="/api/estoque/ajuste/"+id+(pa?"/aprovar":"/recusar");
+    const resp=(document.getElementById("pedResp"+id)||{}).value||"";
+    (pa||pr).disabled=true;
+    const res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({resposta:resp})});
+    let d={}; try{ d=await res.json(); }catch(err){}
+    (pa||pr).disabled=false;
+    if(!res.ok||d.ok===false){ const el=document.getElementById("pedErr"+id); if(el) el.textContent=d.erro||("falhou ("+res.status+")"); return; }
+    carregarEst(); carregar();
     return;
   }
   const ajs=e.target.closest("[data-ajsalvar]");
@@ -1956,10 +2007,13 @@ document.addEventListener("click",async e=>{
     const cod=ajs.getAttribute("data-ajsalvar");
     const motivo=document.getElementById("ajMotivo").value;
     if(!motivo){ document.getElementById("ajMsg").textContent="escolha o motivo"; return; }
+    const dv=document.getElementById("ajDelta").value, qv=document.getElementById("ajQtd").value;
+    if(dv===""&&qv===""){ document.getElementById("ajMsg").textContent="diga quantas peças a mais ou a menos, ou o saldo novo"; return; }
+    const corpo={codigo:cod, motivo:motivo, obs:document.getElementById("ajObs").value};
+    if(dv!=="") corpo.delta=+dv; else corpo.estoque=+qv;
     ajs.disabled=true;
-    const r=await (await fetch("/api/estoque",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({codigo:cod, estoque:+document.getElementById("ajQtd").value||0,
-                           motivo:motivo, obs:document.getElementById("ajObs").value})})).json();
+    const r=await (await fetch("/api/estoque/ajuste",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(corpo)})).json();
     ajs.disabled=false;
     if(r.erro){ document.getElementById("ajMsg").textContent=r.erro; return; }
     /* Recarrega o painel NA HORA (o estAuto segura por 12 s, e aqui o saldo
