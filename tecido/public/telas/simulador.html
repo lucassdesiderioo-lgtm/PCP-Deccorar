@@ -51,7 +51,7 @@ table.lista td.n{text-align:right; font-variant-numeric:tabular-nums}
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,banner,el,limpar,$,dinheiro}=window.ui;
+const {api,banner,el,limpar,$,dinheiro,rolaH}=window.ui;
 
 /* ⚠️ A CONVERSAO METRO → MILIMETRO E EXATA, e nao `Number(x)*1000`.
    `1.007 * 1000` da 1007.0000000000001 em ponto flutuante, e o servidor — que
@@ -195,7 +195,7 @@ function desenhar(r){
     ]));
   });
   t.appendChild(tb);
-  esq.appendChild(t);
+  esq.appendChild(rolaH(t));
   if(r.kit) esq.appendChild(el('p',{class:'nota'},
     [r.kit.nome+(r.kit.suportes?(' · '+r.kit.suportes+' suportes'):'')+' · código '+r.kit.codigo_barras]));
   grade.appendChild(esq);
@@ -215,7 +215,7 @@ function desenhar(r){
       el('td',{class:'n'+(l.valor_centavos==null?' piso':'')},[reais(l.valor_centavos)])
     ])));
     tp.appendChild(tpb);
-    dir.appendChild(tp);
+    dir.appendChild(rolaH(tp));
     dir.appendChild(el('div',{class:'total'+(r.preco.sem_preco.length?' piso':'')},[
       el('span',{},[r.preco.sem_preco.length?'No mínimo':'Subtotal']),
       el('span',{},[(r.preco.sem_preco.length?'≥ ':'')+

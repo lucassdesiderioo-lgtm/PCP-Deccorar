@@ -32,7 +32,7 @@ tr.soRetalho td{background:var(--alerta-fraca); font-weight:600}
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,el,limpar,$,num,formatarMedida,formatarMetros,formatarArea}=window.ui;
+const {api,el,limpar,$,num,formatarMedida,formatarMetros,formatarArea,rolaH}=window.ui;
 
 let aba='gerencial';
 /* A ABA GERENCIAL E A PRIMEIRA, e "O que sai" saiu — o conteudo dela esta
@@ -68,7 +68,10 @@ function tabela(cabecalho,linhas){
   const t=el('table',{});
   t.appendChild(el('tr',{},cabecalho.map(h=>el('th',{class:h.num?'num':'',texto:h.nome||h}))));
   linhas.forEach(l=>t.appendChild(l));
-  return t;
+  /* A do Gerencial tem doze colunas e mede 1013 px: sem o recipiente quem anda
+     de lado e a PAGINA (§12). O embrulho vai DENTRO do helper, e por isso
+     alcanca as seis abas de uma vez — inclusive as que hoje cabem. */
+  return rolaH(t);
 }
 
 function desenhar(){
@@ -311,7 +314,7 @@ async function telaGerencial(pai){
       corpo.appendChild(tr);
     });
     t.appendChild(corpo);
-    cv.appendChild(t);
+    cv.appendChild(rolaH(t));   // montada a mao, fora do helper — embrulha igual
     if(g.resumo.falta_comprometida>0) cv.appendChild(el('p',{class:'nota',
       style:'color:var(--erro);margin-top:10px', texto:
       'O que falta ja foi VENDIDO: nao e ponto de pedido, e cliente esperando. '+

@@ -1,4 +1,8 @@
-// COMO O DINHEIRO CHEGA NA TELA — e a tabela que rola sozinha.
+// COMO O DINHEIRO CHEGA NA TELA.
+//
+// ⚠️ A TABELA QUE ROLA SOZINHA MUDOU DE CASA em 29/09/2026: os dois casos
+// dela viraram varredura no `rola_tela.test.js`, quando a medicao disse que
+// eram SETE as telas que rolavam de lado, e nao duas.
 //
 // Nasceu em 28/09/2026, de dois defeitos achados ABRINDO a tela do Financeiro:
 // a ficha da revenda escrevia `R$ 4785,50` enquanto o Financeiro, na mesma
@@ -117,26 +121,6 @@ module.exports=[
   const m=/const paraCampo=(v=>[^;]+);/.exec(t);
   igual(!!m,true,'achei o corpo da funcao');
   igual(eval('('+m[1]+')')(500000),'5000,00','cinco mil sem ponto nenhum');
-}},
-
-{nome:'a tabela de boletos rola sozinha, e a classe existe no base.css',
- executar({igual}){
-  /* ⚠️ SAO DUAS PONTAS, e a que some em silencio e a segunda: classe usada e
-     nao declarada nao pinta nada, e a tela continua rolando de lado sem erro
-     nenhum. E a licao da fileira de escolha da fase 4-A, onde o `aria-pressed`
-     estava certo e sem CSS por tras. */
-  igual(/class:'rolaH'/.test(tela('financeiro.html')),true,
-    'o recipiente existe na tela');
-  /* ⚠️ E A TABELA TEM QUE ENTRAR NELE. A primeira versao deste caso conferia
-     so que a classe aparecia no arquivo — e passou verde com o recipiente
-     criado e VAZIO, com a tabela pendurada no card como antes. Foi a rodada
-     de reintroduzir os defeitos que achou: tirar a tabela de dentro nao
-     reprovou nada. Classe declarada que nao embrulha ninguem e a terceira
-     ponta da mesma armadilha. */
-  igual(/rola\.appendChild\(/.test(tela('financeiro.html')),true,
-    'a tabela de boletos vai DENTRO do recipiente');
-  igual(/\.rolaH\s*\{[^}]*overflow-x:\s*auto/.test(ler('base.css')),true,
-    'o base.css declara a classe, e ela rola no eixo x');
 }},
 
 {nome:'nenhuma tela NOVA monta "R$ " a mao', executar({igual}){
@@ -275,15 +259,6 @@ module.exports=[
   igual(/centavos\s*\/\s*100\s*\)\s*\.toFixed/.test(t),false,
     'voltou a converter centavo em reais dentro da tela');
   igual(/dinheiro\(/.test(t),true,'a linha do boleto passou a usar o dinheiro do ui');
-}},
-
-{nome:'a lista de revendas tambem rola sozinha', executar({igual}){
-  // Mesmo defeito da tabela de boletos, terceira tela: sete colunas nao cabem
-  // em 400 px, e sem recipiente quem anda de lado e a PAGINA.
-  igual(/class:'rolaH'/.test(tela('revendas.html')),true,
-    'o recipiente existe na tela');
-  igual(/rola\.appendChild\(t\)/.test(tela('revendas.html')),true,
-    'a lista vai DENTRO do recipiente, e nao ao lado dele');
 }},
 
 {nome:'a lista de excecoes nao envelhece calada', executar({igual}){

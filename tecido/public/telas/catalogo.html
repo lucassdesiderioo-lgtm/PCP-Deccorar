@@ -51,7 +51,7 @@ table.lista tr.inativa td{opacity:.55}
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,banner,el,limpar,$,dinheiro}=window.ui;
+const {api,banner,el,limpar,$,dinheiro,rolaH}=window.ui;
 
 /* As mesmas conversoes exatas do simulador: metro e reais entram como TEXTO e
    viram inteiro por soma, nunca por `Number(x)*1000`. `1.007*1000` da
@@ -202,7 +202,9 @@ function abaColecoes(){
     }
   });
   t.appendChild(tb);
-  c.appendChild(t);
+  /* Sem o recipiente do `rolaH` a tabela mais larga que a janela empurra a
+     PAGINA inteira, e num celular o topo do card sai de vista (§12). */
+  c.appendChild(rolaH(t));
   c.appendChild(ligarColecao());
   c.appendChild(cores());
   return c;
@@ -362,7 +364,7 @@ function abaEscada(){
     }})),()=>{ editando=null; erro=null; desenhar(); })])]));
   });
   t.appendChild(tb);
-  c.appendChild(t);
+  c.appendChild(rolaH(t));
   return c;
 }
 
@@ -413,7 +415,7 @@ function abaFicha(){
     },()=>{ editando=null; erro=null; desenhar(); })])]));
   });
   t.appendChild(tb);
-  c.appendChild(t);
+  c.appendChild(rolaH(t));
   return c;
 }
 
@@ -435,7 +437,7 @@ function abaKit(){
     el('td',{},[botao('Apagar',()=>tentar(()=>api('/api/sm/faixas/'+f.id,{metodo:'DELETE',silencioso:true})),'perigo')])
   ])));
   t.appendChild(tb);
-  c.appendChild(t);
+  c.appendChild(rolaH(t));
 
   const nova=el('div',{class:'editor'});
   const l=el('input',{type:'text',placeholder:'3,000','aria-label':'Largura até'});
@@ -518,7 +520,7 @@ function abaComponentes(){
     ])]));
   });
   t.appendChild(tb);
-  c.appendChild(t);
+  c.appendChild(rolaH(t));
   return c;
 }
 

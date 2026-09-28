@@ -46,7 +46,7 @@ table.lista tr.inativa td{opacity:.55}
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,banner,el,limpar,$,dinheiro}=window.ui;
+const {api,banner,el,limpar,$,dinheiro,rolaH}=window.ui;
 
 /* As mesmas conversoes exatas do catalogo e do simulador: dinheiro e
    percentual entram como TEXTO e viram inteiro por soma, nunca por
@@ -175,12 +175,9 @@ function desRevendas(){
   }
   if(abertaId==='nova') c.appendChild(formularioNova());
 
-  /* ⚠️ SETE COLUNAS NAO CABEM NUM CELULAR, e sem este recipiente quem anda
-     para o lado e a PAGINA inteira — o mesmo defeito da tabela de boletos do
-     Financeiro (CLAUDE.md §12 e §19). O `.rolaH` e do base.css: classe
-     propria de tela e a segunda regua do CSS. */
-  const rola=el('div',{class:'rolaH'},[]);
-  c.appendChild(rola);
+  /* ⚠️ SETE COLUNAS NAO CABEM NUM CELULAR, e sem o recipiente do `rolaH` quem
+     anda para o lado e a PAGINA inteira — o mesmo defeito da tabela de boletos
+     do Financeiro (CLAUDE.md §12 e §19). */
   const t=el('table',{class:'lista'});
   t.appendChild(el('tr',{},['Revenda','Vendedor','Tabela','Desconto','Limite','Revisão',''].map(
     h=>el('th',{},[h]))));
@@ -215,7 +212,7 @@ function desRevendas(){
       t.appendChild(el('tr',{},[td]));
     }
   });
-  rola.appendChild(t);
+  c.appendChild(rolaH(t));
 }
 
 const opcoesTabela=()=>[{valor:'',texto:'— sem tabela —'}].concat(
@@ -478,7 +475,7 @@ function desTabelas(){
       t.appendChild(el('tr',{},[td]));
     }
   });
-  c.appendChild(t);
+  c.appendChild(rolaH(t));
 }
 
 // ── Calendário e prazo ────────────────────────────────────────────────────
@@ -518,7 +515,7 @@ function desPrazo(){
       t.appendChild(el('tr',{},[td]));
     }
   });
-  c.appendChild(t);
+  c.appendChild(rolaH(t));
 
   c.appendChild(el('p',{class:'subtitulo'},['Feriados']));
   if(!dados.feriados.length) c.appendChild(el('p',{class:'nota'},['Nenhum cadastrado.']));

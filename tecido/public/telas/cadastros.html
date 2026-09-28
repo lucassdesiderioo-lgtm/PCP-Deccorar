@@ -23,7 +23,7 @@
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,banner,el,limpar,$,num,comoNumero,formatarMetros}=window.ui;
+const {api,banner,el,limpar,$,num,comoNumero,formatarMetros,rolaH}=window.ui;
 
 let eu={}, aba='tecido';
 const estado={linhas:[],aberturas:[],cores:[],tecidos:[],linhaSel:null,armazem:'ROLO',arvore:[],
@@ -217,7 +217,10 @@ async function cartaoConferir(){
         await cartaoConferir();
       }})])
   ])));
-  c.appendChild(t);
+  /* As treze tabelas desta tela passam pelo `rolaH`. Duas abas rolavam a
+     PAGINA a 400 px (Tecido 766 px, Motivos 692), e embrulhar so essas
+     faria a proxima pessoa perguntar quais tem e quais nao tem (§12). */
+  c.appendChild(rolaH(t));
   pai.appendChild(c);
 }
 
@@ -323,7 +326,7 @@ async function telaTecido(pai){
     el('td',{texto:l.nome}),
     acoes(l,'/api/linhas/'+l.id,()=>telaTecido($('#conteudo')),'linha')
   ])));
-  cL.appendChild(estado.linhas.length?tL:el('div',{class:'vazio',texto:'Nenhuma linha ainda.'}));
+  cL.appendChild(estado.linhas.length?rolaH(tL):el('div',{class:'vazio',texto:'Nenhuma linha ainda.'}));
 
   // Abertura (pendurada na linha escolhida)
   const cA=cartao(pai,'Colecao','Napoles, Pinpoint, 1%, 3%, 5%, Blackout. A colecao pertence a uma LINHA — a de uma nao e a da outra.');
@@ -343,7 +346,7 @@ async function telaTecido(pai){
       el('td',{texto:a.nome}),
       acoes(a,'/api/aberturas/'+a.id,()=>telaTecido($('#conteudo')),'abertura')
     ])));
-    cA.appendChild(estado.aberturas.length?tA:el('div',{class:'vazio',texto:'Esta linha ainda nao tem colecao.'}));
+    cA.appendChild(estado.aberturas.length?rolaH(tA):el('div',{class:'vazio',texto:'Esta linha ainda nao tem colecao.'}));
   }
 
   // Cor
@@ -357,7 +360,7 @@ async function telaTecido(pai){
     el('td',{texto:c.nome}),
     acoes(c,'/api/cores/'+c.id,()=>telaTecido($('#conteudo')),'cor')
   ])));
-  cC.appendChild(estado.cores.length?tC:el('div',{class:'vazio',texto:'Nenhuma cor ainda.'}));
+  cC.appendChild(estado.cores.length?rolaH(tC):el('div',{class:'vazio',texto:'Nenhuma cor ainda.'}));
 
   /* AS LARGURAS DE BOBINA.
      Fica nesta aba, logo antes do item de tecido, porque e a resposta da
@@ -390,7 +393,7 @@ async function telaTecido(pai){
         el('td',{style:'text-align:right'},[podeEditar()?bt:el('span',{})])
       ]));
     });
-    cLarg.appendChild(tL);
+    cLarg.appendChild(rolaH(tL));
     cLarg.appendChild(el('p',{class:'ajuda',texto:
       'Largura com rolo em uso nao sai da lista: ela ainda descreve a prateleira, e tira-la faria a proxima entrada daquela bobina cair no campo livre com aviso de "nao cadastrada".'}));
   } else cLarg.appendChild(el('div',{class:'vazio',
@@ -421,7 +424,7 @@ async function telaTecido(pai){
       el('td',{class:'num',texto:String(f.em_estoque||0)}),
       acoes(f,'/api/fornecedores/'+f.id,()=>telaTecido($('#conteudo')),'fornecedor')
     ])));
-    cF.appendChild(tF);
+    cF.appendChild(rolaH(tF));
     cF.appendChild(el('p',{class:'ajuda',texto:
       'A coluna Rolos e o que separa fornecedor de verdade de linha duplicada: "Ecotex" com 12 rolos e "ecotex" com 1 diz sozinho qual e qual. Para juntar os dois, renomeie o certo e apague o errado — o sistema recusa apagar quem tem rolo, dizendo quantos.'}));
   } else cF.appendChild(el('div',{class:'vazio',texto:'Nenhum fornecedor ainda.'}));
@@ -520,7 +523,7 @@ async function telaTecido(pai){
       el('span',{texto:' '}),
       botaoAtivo(t,'/api/tecidos/'+t.id,()=>telaTecido($('#conteudo')))])
   ])));
-  cT.appendChild(estado.tecidos.length?tT:el('div',{class:'vazio',texto:'Nenhum tecido cadastrado ainda.'}));
+  cT.appendChild(estado.tecidos.length?rolaH(tT):el('div',{class:'vazio',texto:'Nenhum tecido cadastrado ainda.'}));
 
   if(veCusto){
     const semPreco=estado.tecidos.filter(t=>t.ativo&&t.preco_m2==null).length;
@@ -601,7 +604,7 @@ async function cartaoPreco(pai,t){
         el('td',{class:'quem',texto:x.usuario_nome||''})
       ])));
       c.appendChild(el('h2',{style:'margin-top:14px;font-size:16px',texto:'Mudancas do preco'}));
-      c.appendChild(tb);
+      c.appendChild(rolaH(tb));
     }
   }catch(e){}
   pai.appendChild(c);
@@ -670,7 +673,12 @@ async function telaEndereco(pai){
          digitado errado ficava para sempre na estante do sistema, e o
          operador procurava um buraco que nao existe. */
       a.niveis.forEach(n=>{
-        const cx=el('span',{style:'display:inline-flex;align-items:center;gap:4px;margin:0 10px 6px 0'});
+        /* ⚠️ `inline-flex` SEM `wrap` NAO QUEBRA, e a 400 px esta linha (a tarja
+           do endereco mais os tres botoes) media 379 px e punha a PAGINA em
+           416 — a mesma doenca da tabela larga (§12), por um elemento que nao
+           e tabela e que o `rolaH` nao alcanca. So apareceu com endereco
+           cadastrado: em banco vazio a aba nao desenha nivel nenhum. */
+        const cx=el('span',{style:'display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0 10px 6px 0'});
         cx.appendChild(el('span',{class:'tag '+(n.ativo?'bom':'off'),
           texto:estado.armazem+' · '+h.nome+'-'+a.nome+'-'+n.nome}));
         if(podeEditar()){
@@ -715,7 +723,7 @@ async function telaMotivo(pai){
     el('td',{texto:m.nome}),
     acoes(m,'/api/motivos/'+m.id,recarregar,'motivo_recusa')
   ])));
-  cM.appendChild(tM);
+  cM.appendChild(rolaH(tM));
 
   /* ── OS MOTIVOS DA RECUSA DA PRODUCAO (fase 5-B2, secao 4.16) ──────────
      ⚠️ SAO OUTROS MOTIVOS, e nao os de cima. Os de cima sao do PLANO DE
@@ -749,7 +757,7 @@ async function telaMotivo(pai){
     el('td',{texto:m.setor_nome||m.setor}),
     acoes(m,'/api/recusa/motivos/'+m.id,recarregar,'sm_motivo_producao')
   ])));
-  cP.appendChild(tP);
+  cP.appendChild(rolaH(tP));
 
   /* ── AS COLUNAS DO QUADRO (fase 6-A, secao 4.17) ───────────────────────
      ⚠️ O NOME E CADASTRO; A ETAPA E CODIGO. E a frase da spec: "as colunas
@@ -785,7 +793,7 @@ async function telaMotivo(pai){
       ])
     ]));
   });
-  cK.appendChild(tK);
+  cK.appendChild(rolaH(tK));
 
   const cC=cartao(pai,'Condicao da sobra','Como a sobra chegou na prateleira — e o que isso faz no plano de corte.');
   cC.appendChild(el('p',{class:'ajuda',texto:
@@ -805,7 +813,7 @@ async function telaMotivo(pai){
         : el('span',{texto:c.prioridade?'por ultimo':'primeiro'}) ])
     ]));
   });
-  cC.appendChild(tC);
+  cC.appendChild(rolaH(tC));
 }
 
 // ── ABA PARAMETROS ───────────────────────────────────────────────────────
@@ -865,7 +873,7 @@ async function telaAcesso(pai){
       el('td',{texto:p?p.permissoes.join(' · '):''})
     ]));
   });
-  c.appendChild(t);
+  c.appendChild(rolaH(t));
   c.appendChild(el('p',{class:'ajuda',texto:
     'Repare que "Descartar sobra" nao esta no cortador: baixa de sobra sem trava e o furo classico de inventario.'}));
 

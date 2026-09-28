@@ -85,7 +85,7 @@
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,el,limpar,$,dinheiro,banner}=window.ui;
+const {api,el,limpar,$,dinheiro,banner,rolaH}=window.ui;
 
 let EU={permissoes:[]}, REVENDAS=[];
 const posso=k=>(EU.permissoes||[]).indexOf(k)>=0;
@@ -128,7 +128,12 @@ function tabela(colunas,linhas,celulas){
     el('td',{class:colunas[i].num?'num':null},
       [typeof c==='string'||typeof c==='number'?String(c):(c||'')])))));
   t.appendChild(tb);
-  return t;
+  /* ⚠️ A TABELA ROLA SOZINHA, E A PAGINA NAO. Sao cinco colunas (numero,
+     pedidos, vencimento, valor e os dois botoes) e num celular elas nao cabem:
+     sem este recipiente quem anda para o lado e a tela inteira, e o topo do
+     card sai de vista (§12). O embrulho mora no helper, e nao no chamador —
+     o padrao de dois passos que estava aqui ja nasceu OCO uma vez. */
+  return rolaH(t);
 }
 
 /* A LINHA DO CRÉDITO de uma revenda. O disponível nulo sai como frase, nunca
@@ -207,14 +212,7 @@ async function carregarBoletos(revenda_id){
     ['Nada em aberto nesta revenda.']));
   const colunas=[{nome:'Boleto'},{nome:'Pedido'},{nome:'Vencimento'},{nome:'Valor',num:true}];
   if(posso('boleto.editar')) colunas.push({nome:''});
-  /* ⚠️ A TABELA ROLA SOZINHA, E A PAGINA NAO. Sao cinco colunas (numero,
-     pedidos, vencimento, valor e os dois botoes) e num celular elas nao cabem:
-     sem este recipiente quem anda para o lado e a tela inteira, e o topo do
-     card sai de vista. O `.rolaH` e do base.css — classe propria de tela e a
-     segunda regua do CSS (a licao da fileira de escolha da 4-A). */
-  const rola=el('div',{class:'rolaH'},[]);
-  alvo.appendChild(rola);
-  rola.appendChild(tabela(colunas,lista,b=>{
+  alvo.appendChild(tabela(colunas,lista,b=>{
     const cel=[
       /* ⚠️ O TÍTULO QUE EXCEDE OS PEDIDOS QUE CITA É MARCADO AQUI, e o aviso
          sobrevive à poda porque `excede_pedidos` não é dinheiro — quem não vê
