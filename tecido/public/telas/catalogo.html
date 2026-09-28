@@ -51,7 +51,7 @@ table.lista tr.inativa td{opacity:.55}
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,banner,el,limpar,$}=window.ui;
+const {api,banner,el,limpar,$,dinheiro}=window.ui;
 
 /* As mesmas conversoes exatas do simulador: metro e reais entram como TEXTO e
    viram inteiro por soma, nunca por `Number(x)*1000`. `1.007*1000` da
@@ -67,7 +67,17 @@ const paraMm=t=>paraInteiro(t,3);
 const paraCentavos=t=>paraInteiro(t,2);
 const emMetros=v=>v==null?'':(v/1000).toFixed(3).replace('.',',');
 const emM2=v=>v==null?'':(v/1000000).toFixed(3).replace('.',',');
-const emReais=v=>v==null?'':(v/100).toFixed(2).replace('.',',');
+/* ⚠️ SAO DOIS PAPEIS, E POR ISSO SAO DUAS FUNCOES. O que se LE sai do
+   `dinheiro` do ui.js, o dono unico do modulo — um formatador proprio aqui
+   e a armadilha #12 em miniatura, o mesmo preco escrito de dois jeitos em
+   duas telas.
+
+   O que PRE-PREENCHE os campos `R$ por m²` e `R$ por unidade` continua SEM
+   o separador: aquele valor volta pelo `paraCentavos`, e `1.234,56` ali vira
+   NaN — a tela recusaria o numero que ela mesma acabou de escrever. E a
+   mesma separacao da ficha da revenda (CLAUDE.md §19). */
+const reais=c=>(c===null||c===undefined)?null:dinheiro(c/100);
+const paraCampo=v=>v==null?'':(v/100).toFixed(2).replace('.',',');
 
 let modelo=null, aba='colecoes', editando=null, erro=null;
 
@@ -134,7 +144,7 @@ function abaColecoes(){
   ]);
   const t=el('table',{class:'lista'});
   t.appendChild(el('thead',{},[el('tr',{},[
-    el('th',{},['Coleção']),el('th',{},['Linha']),el('th',{class:'n'},['R$/m²']),
+    el('th',{},['Coleção']),el('th',{},['Linha']),el('th',{class:'n'},['Preço por m²']),
     el('th',{class:'n'},['Largura máx']),el('th',{class:'n'},['m² máx']),
     el('th',{class:'n'},['Mín. faturado']),el('th',{},[''])])]));
   const tb=el('tbody');
@@ -146,7 +156,7 @@ function abaColecoes(){
     const temPreco='preco_m2_centavos' in col;
     tr.appendChild(el('td',{class:'n'},[ temPreco
       ? (col.preco_m2_centavos==null?el('span',{class:'falta'},['sem preço'])
-                                    :emReais(col.preco_m2_centavos)) : '·' ]));
+                                    :reais(col.preco_m2_centavos)) : '·' ]));
     tr.appendChild(el('td',{class:'n medida'},[col.largura_max_mm==null?'—':emMetros(col.largura_max_mm)]));
     tr.appendChild(el('td',{class:'n medida'},[col.m2_max_mm2==null?'—':emM2(col.m2_max_mm2)]));
     tr.appendChild(el('td',{class:'n medida'},[col.m2_min_faturado_mm2==null
@@ -182,7 +192,7 @@ function abaColecoes(){
     }
     if(editando==='preco-'+col.id){
       const box=el('tr',{},[el('td',{colspan:'7'},[
-        editor([{chave:'preco',rotulo:'R$ por m²',valor:emReais(col.preco_m2_centavos),dica:'110,00'}],
+        editor([{chave:'preco',rotulo:'R$ por m²',valor:paraCampo(col.preco_m2_centavos),dica:'110,00'}],
           v=>tentar(()=>api('/api/sm/colecoes/'+col.id+'/preco',
             {metodo:'PUT',corpo:{preco_m2_centavos:paraCentavos(v.preco)},silencioso:true})),
           ()=>{ editando=null; erro=null; desenhar(); }),
@@ -205,7 +215,7 @@ function historico(alvo,id){
       limpar(box);
       if(!linhas.length) return box.appendChild(el('div',{},['Sem mudança de preço registrada.']));
       linhas.forEach(l=>box.appendChild(el('div',{},[
-        l.criado_em+' · '+(l.de==null?'sem preço':'R$ '+emReais(l.de))+' → R$ '+emReais(l.para)+
+        l.criado_em+' · '+(l.de==null?'sem preço':reais(l.de))+' → '+reais(l.para)+
         ' · '+(l.usuario_nome||'—')])));
     })
     .catch(()=>{ limpar(box); });   // quem nao ve custo simplesmente nao ve isto
@@ -482,7 +492,7 @@ function abaComponentes(){
       el('td',{class:'setor'},[comp.setor]),
       el('td',{},[comp.unidade_cobranca||'não cobra']),
       el('td',{class:'n'},[ temPreco
-        ? (comp.preco_centavos==null?'—':'R$ '+emReais(comp.preco_centavos)) : '·' ]),
+        ? (reais(comp.preco_centavos)||'—') : '·' ]),
       el('td',{class:'medida'},[comp.codigo_barras||'—']),
       /* O tubo aparece aqui com a resposta e o caminho, em vez de um botão que
          só recusa: ele se aponta na escada, porque o material muda com o
@@ -500,7 +510,7 @@ function abaComponentes(){
       editorMaterial('/api/sm/componentes/'+comp.id+'/material', comp.componente_id)])]));
     if(editando==='comp-'+comp.id) tb.appendChild(el('tr',{},[el('td',{colspan:'7'},[
       editor([{chave:'preco',rotulo:'R$ por '+comp.unidade_cobranca,
-        valor:emReais(comp.preco_centavos),dica:'55,00'}],
+        valor:paraCampo(comp.preco_centavos),dica:'55,00'}],
         v=>tentar(()=>api('/api/sm/componentes/'+comp.id+'/preco',
           {metodo:'PUT',corpo:{preco_centavos:paraCentavos(v.preco)},silencioso:true})),
         ()=>{ editando=null; erro=null; desenhar(); }),

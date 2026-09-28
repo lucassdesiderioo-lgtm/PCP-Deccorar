@@ -68,10 +68,25 @@ const M2=1000000;
 
 const emMetros=v=>v==null?null:(v/1000).toFixed(3).replace('.',',');
 const emM2=v=>v==null?null:(v/M2).toFixed(3).replace('.',',');
-const emReais=v=>v==null?null:(v/100).toFixed(2).replace('.',',');
+/* ⚠️ O PONTO DO MILHAR E ESCRITO A MAO, e nao por `toLocaleString('pt-BR')`.
+   Um Node compilado com ICU pequeno nao tem pt-BR: ele nao da erro, ele CAI
+   em en-US — e o que sai e `4,785.50` na folha que a revenda confere, sem
+   nada em lugar nenhum dizendo que aconteceu. No navegador o `dinheiro` do
+   ui.js pode usar o Intl porque pt-BR vem sempre; aqui depende de como o
+   servidor foi compilado, e isso e ambiente, nao regra.
+
+   Quem confere os dois lados e o `teste/dinheiro_tela.test.js`, contra
+   LITERAIS do portugues do Brasil — e nao um contra o outro, que seria os
+   dois errando juntos (a licao do QR, CLAUDE.md §4). */
+const milhar=s=>s.replace(/\d+/,d=>d.replace(/\B(?=(\d{3})+(?!\d))/g,'.'));
+const emReais=v=>v==null?null:milhar((v/100).toFixed(2).replace('.',','));
 /* Percentual guardado em CENTESIMOS de por cento: 500 vira '5,00'. Duas
    casas sempre, pelo mesmo motivo das tres da medida — '5,0' faz quem le
-   parar para pensar se o numero esta completo. */
+   parar para pensar se o numero esta completo.
+
+   ⚠️ E ele NAO ganha o ponto do milhar do `emReais`: desconto nao passa de
+   100%, entao o separador nunca apareceria — e ponto num percentual se le
+   como casa decimal. */
 const emPercentual=v=>v==null?null:(v/100).toFixed(2).replace('.',',');
 
 module.exports={mm,ajuste,centavos,areaMm2,M2,emMetros,emM2,emReais,emPercentual};

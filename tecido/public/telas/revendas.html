@@ -175,6 +175,12 @@ function desRevendas(){
   }
   if(abertaId==='nova') c.appendChild(formularioNova());
 
+  /* ⚠️ SETE COLUNAS NAO CABEM NUM CELULAR, e sem este recipiente quem anda
+     para o lado e a PAGINA inteira — o mesmo defeito da tabela de boletos do
+     Financeiro (CLAUDE.md §12 e §19). O `.rolaH` e do base.css: classe
+     propria de tela e a segunda regua do CSS. */
+  const rola=el('div',{class:'rolaH'},[]);
+  c.appendChild(rola);
   const t=el('table',{class:'lista'});
   t.appendChild(el('tr',{},['Revenda','Vendedor','Tabela','Desconto','Limite','Revisão',''].map(
     h=>el('th',{},[h]))));
@@ -209,7 +215,7 @@ function desRevendas(){
       t.appendChild(el('tr',{},[td]));
     }
   });
-  c.appendChild(t);
+  rola.appendChild(t);
 }
 
 const opcoesTabela=()=>[{valor:'',texto:'— sem tabela —'}].concat(

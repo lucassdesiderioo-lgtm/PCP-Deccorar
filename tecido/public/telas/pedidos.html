@@ -60,7 +60,7 @@ table.lista tr.cancelado td{opacity:.55; text-decoration:line-through}
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,banner,el,limpar,$}=window.ui;
+const {api,banner,el,limpar,$,dinheiro}=window.ui;
 
 /* A mesma conversao exata do simulador e do catalogo: metro entra como TEXTO
    e vira milimetro inteiro por soma, nunca por `Number(x)*1000`.
@@ -74,6 +74,10 @@ function paraMm(texto){
   return Number(m[1])*1000+Number((m[2]||'').padEnd(3,'0'));
 }
 const emMetros=mm=>mm==null?'':(mm/1000).toFixed(3).replace('.',',');
+/* ⚠️ AQUI O DINHEIRO JA VEM ESCRITO DO SERVIDOR (`nucleo/unidade.js`), que
+   e quem congela o preco do pedido e escreve a folha da revenda. Esta funcao
+   so pendura o `R$` — e por isso o ponto do milhar foi consertado LA, e nao
+   nesta tela: arrumar so aqui deixaria o total certo e o PDF errado. */
 const reais=t=>t==null?'—':'R$ '+t;
 
 let eu={permissoes:[]}, fila=[], lista=[], revendas=[], modelo=null, cores=[];
@@ -272,7 +276,7 @@ function desenharPeca(p,item){
     const l=el('div',{class:'linhas'});
     item.linhas.forEach(x=>l.appendChild(el('div',{},[
       el('span',{},[x.nome+(x.base?' · '+x.base:'')]),
-      el('span',{},[x.valor_centavos==null?'—':('R$ '+(x.valor_centavos/100).toFixed(2).replace('.',','))])])));
+      el('span',{},[dinheiro(x.valor_centavos==null?null:x.valor_centavos/100)])])));
     box.appendChild(l);
   }
   if(!item.cancelado_em){

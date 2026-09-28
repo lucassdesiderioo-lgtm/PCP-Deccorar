@@ -51,7 +51,7 @@ table.lista td.n{text-align:right; font-variant-numeric:tabular-nums}
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,banner,el,limpar,$}=window.ui;
+const {api,banner,el,limpar,$,dinheiro}=window.ui;
 
 /* ⚠️ A CONVERSAO METRO → MILIMETRO E EXATA, e nao `Number(x)*1000`.
    `1.007 * 1000` da 1007.0000000000001 em ponto flutuante, e o servidor — que
@@ -66,7 +66,10 @@ function paraMm(texto){
   return Number(m[1])*1000+Number((m[2]||'').padEnd(3,'0'));
 }
 const emMetros=mm=>mm==null?'':(mm/1000).toFixed(3).replace('.',',');
-const reais=c=>c==null?'—':'R$ '+(c/100).toFixed(2).replace('.',',');
+/* O dinheiro sai do `dinheiro` do ui.js, o dono unico do modulo. Aqui nao ha
+   campo de preco: esta tela so LE, entao nao existe a segunda funcao que o
+   catalogo e a ficha da revenda precisam ter. */
+const reais=c=>c==null?'—':dinheiro(c/100);
 
 const estado={modelo:null, abertura_id:null, cor_acessorio_id:null,
   largura:'1,000', altura:'1,000', comando:'direito', rolamento:'frente',

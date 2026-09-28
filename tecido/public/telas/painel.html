@@ -47,8 +47,11 @@ const ABAS=[
   {id:'recusas', nome:'Recusas'},
   {id:'cortes',  nome:'Cortes'}
 ];
-const dinheiro=v=>v==null?'—':'R$ '+Number(v).toLocaleString('pt-BR',
-  {minimumFractionDigits:2,maximumFractionDigits:2});
+/* O dinheiro e o do ui.js — esta tela tinha uma COPIA literal dele. Mesmo
+   valor, e mesmo assim segunda regua: no dia em que uma das duas mudasse, a
+   outra ficaria, e as duas estariam "certas" (armadilha #12). O `rolos.html`
+   ja lia por aqui. */
+const dinheiro=window.ui.dinheiro;
 
 function montarAbas(){
   const c=limpar($('#abas'));
