@@ -1,10 +1,11 @@
 // Conexao unica com o banco PROPRIO deste modulo.
 // Nao ha nenhuma ligacao com o dados.db do PCP do Mercado Livre — bancos
 // separados, aplicacoes separadas, por decisao de escopo.
-const path=require('path');
 const Database=require('better-sqlite3');
 
-const arquivo=process.env.BANCO_TECIDO||path.join(__dirname,'..','tecido.db');
+// Onde o arquivo fica e pergunta do `caminho.js` — o `backup.js` da raiz faz a
+// mesma pergunta sem abrir o banco, e duas contas divergiriam em silencio.
+const arquivo=require('./caminho').BANCO;
 const db=new Database(arquivo);
 
 // WAL: mesma armadilha do PCP — os dados vivem no -wal, entao backup e

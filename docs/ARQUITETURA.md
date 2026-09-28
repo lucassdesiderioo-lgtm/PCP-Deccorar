@@ -14,7 +14,7 @@
 ├── db.js                  Conexão SQLite (better-sqlite3, modo WAL)
 ├── auth.js                Login, sessão, permissões  ⚠️ CRÍTICO — ver ordem
 ├── parse.js               Extração dos PDFs do Mercado Livre (pdfjs-dist)
-├── backup.js              Backup do banco via db.backup()
+├── backup.js              Backup dos DOIS bancos via db.backup()
 │
 ├── Rotas (cada uma exporta function(app, db))
 │   ├── sku_cad_route.js   Cadastro de SKU (GET/POST/DELETE /api/skus) — saiu do
@@ -599,12 +599,24 @@ e todas pausam enquanto há operação em andamento.
 
 - `backup.js` usa `db.backup()` do better-sqlite3 — **consolida o WAL**
 - Executado diariamente às 23:30 (cron)
-- Destino: `/opt/expedicao/backups/dados-AAAA-MM-DD.db`
-- Download em `/baixar-backup`, protegido por token em `config.backup_token`
+- Cobre os **dois bancos**, com rotação de 30 para **cada um**:
+  - `/opt/expedicao/backups/dados-AAAA-MM-DD.db` — o PCP
+  - `/opt/expedicao/backups/tecido-AAAA-MM-DD.db` — o sob medida (desde 28/09/2026)
+- Uma linha de saída por banco, com a contagem dele
+- Download em `/baixar-backup`, protegido por token em `config.backup_token` —
+  **só o `dados-*.db`**; o do tecido sai por `scp`
 - PDFs em `lotes/` são removidos após 7 dias
 
 > ⚠️ `cp dados.db` produz um arquivo de ~4 KB, praticamente vazio. No modo WAL os
 > dados vivem em `dados.db-wal` (que chega a vários MB). Use sempre `node backup.js`.
+> Vale igual para o `tecido.db`.
+
+> ⚠️ **Até 28/09/2026 o cron copiava só o `dados.db`.** O `tecido.db` — pedidos
+> da revenda, boletos, etiquetas de produção, bipes da bancada — nunca entrou
+> numa cópia diária, e nada dava erro: a saída dizia "backup ok" e trinta cópias
+> se empilhavam na pasta. Onde o arquivo fica é pergunta do
+> `tecido/nucleo/caminho.js`, o dono único; `teste_backup.js` (10 casos) trava a
+> cobertura, as duas rotações e o aviso quando o banco não está lá.
 
 ---
 

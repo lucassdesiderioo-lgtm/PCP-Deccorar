@@ -103,7 +103,7 @@ Sem build. Sem transpilação. O que está no repositório é o que roda.
 | Diretório | `/opt/expedicao/` |
 | Processo PM2 | `expedicao` |
 | Banco | `/opt/expedicao/dados.db` |
-| Backups | `/opt/expedicao/backups/` (diário, 23:30) |
+| Backups | `/opt/expedicao/backups/` (diário, 23:30 — `dados-*.db` **e** `tecido-*.db`, 30 de cada) |
 | PDFs recebidos | `/opt/expedicao/lotes/` (limpeza automática em 7 dias) |
 
 **Outros processos no mesmo servidor — não interferir:**
@@ -159,11 +159,20 @@ pm2 logs expedicao --lines 30 --nostream
 cd /opt/expedicao && pm2 delete expedicao && pm2 start server.js --name expedicao
 
 # Backup manual — use SEMPRE este, nunca `cp dados.db`
+# Copia os DOIS bancos: dados.db (PCP) e tecido.db (sob medida)
 cd /opt/expedicao && node backup.js
 
-# Restaurar um backup
+# Restaurar um backup — o do PCP
 pm2 stop expedicao
 cp /opt/expedicao/backups/dados-AAAA-MM-DD.db /opt/expedicao/dados.db
+pm2 start expedicao
+
+# Restaurar um backup — o do sob medida
+# (o -wal e o -shm do banco velho tem que sair junto, senao o SQLite
+#  remonta por cima do arquivo restaurado)
+pm2 stop expedicao
+rm -f /opt/expedicao/tecido/tecido.db-wal /opt/expedicao/tecido/tecido.db-shm
+cp /opt/expedicao/backups/tecido-AAAA-MM-DD.db /opt/expedicao/tecido/tecido.db
 pm2 start expedicao
 ```
 
