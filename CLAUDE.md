@@ -3587,7 +3587,7 @@ aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não sil
 | **`text-overflow:ellipsis` corta a tarja, não só o texto** | Ele apara o **fim da linha**, e o fim da linha é onde ficam as tarjas. Um nome de cliente comprido apagava da tela o `📦 N persianas` — o último lugar em que a caixa de várias aparece (§5). A tela fica bonita e a informação some | Onde a linha tem tarja, o texto **quebra** em vez de aparar; nowrap fica só dentro de cada tarja |
 | **Cookie httpOnly no jar do `curl`** | Abrir a tela com Playwright usando `-c jar.txt` do `curl`: o jar marca o cookie de sessão com `#HttpOnly_` no início da linha, e um filtro de comentário ingênuo (`l.startsWith('#')`) o joga fora. A tela abre no **login** — e "abriu no login" não se parece nem de longe com "o cookie não foi lido": parece permissão trocada | Tirar o prefixo antes de filtrar (`l.replace(/^#HttpOnly_/,'')`) |
 | **A tela servida é a lida no BOOT** | Editar o `.html` de uma tela do `/sobmedida` e recarregar o navegador não mostra nada: o módulo lê o arquivo quando sobe e o guarda. O sintoma engana — o CSS novo está no arquivo, o `grep` confirma, e a tela continua com o antigo, então a suspeita cai na especificidade ou no cache do navegador. Custou três rodadas em 26/09/2026 | Reiniciar o servidor. E conferir pelo fio, não pelo disco: `curl … \| grep a-regra-nova` diz o que a tela está mesmo recebendo |
-| **WAL do SQLite** | `dados.db` tem ~4 KB; os dados estão em `dados.db-wal`. `cp dados.db` produz backup **vazio** | Usar `node backup.js`, que chama `db.backup()` |
+| **WAL do SQLite** | `dados.db` tem ~4 KB; os dados estão em `dados.db-wal`. `cp dados.db` produz backup **vazio** — e vale igual para o `tecido.db` | Usar `node backup.js`, que chama `db.backup()` **nos dois bancos** (§13) |
 | **`pm2 restart` cacheia** | A alteração não aparece | `pm2 delete expedicao && pm2 start server.js --name expedicao` |
 | **`!` no bash** | Expansão de histórico quebra heredocs e `sed` | `set +H` antes de blocos com `!` |
 | **`express.json()` 100 kb** | Bloqueia upload de PDF | Já elevado para 25 mb — não reduzir |
@@ -3661,9 +3661,14 @@ restart`, ninguém edita variável de ambiente no servidor.
 | `BANCO` | `dados.db` | `PCP_DB` |
 | `LOTES` | os PDFs do ML (o cron apaga em 7 dias) | `PCP_LOTES` |
 | `COLETAS` | as fotos da conferência com o motorista (§8-B) | `PCP_COLETAS_DIR` |
-| `BACKUPS` | as cópias do `backup.js` | `PCP_BACKUPS` |
+| `BACKUPS` | as cópias do `backup.js` — dos **dois** bancos | `PCP_BACKUPS` |
 
 `PCP_DIR` move as quatro de uma vez; a variável específica ganha da geral.
+
+> O **`tecido.db` não está nesta tabela**, e não é esquecimento: ele mora ao
+> lado do módulo e quem responde por ele é `tecido/nucleo/caminho.js`
+> (`BANCO_TECIDO`). O bloco *"O backup diário cobre os DOIS bancos"*, logo
+> abaixo, explica por que os dois caminhos continuam separados.
 
 > ⚠️ **O CAMINHO ESTAVA COLADO EM 29 LUGARES, e o efeito não era feiura: o PCP
 > só subia naquela pasta.** `db.js` abria `/opt/expedicao/dados.db` sem escape,
@@ -3697,6 +3702,72 @@ script, porque script novo se escreve copiando o de cima.
 > `db.js` conseguir abrir o banco. Quem continua conferindo o **padrão** é o
 > primeiro caso do `teste_caminhos.js`, não o CI.
 
+### O backup diário cobre os DOIS bancos (28/09/2026)
+
+`node backup.js` copia o `dados.db` **e** o `tecido.db`, os dois pela mesma
+pasta `BACKUPS`, com nomes próprios e **uma rotação de 30 para cada**:
+
+```
+backup ok -> /opt/expedicao/backups/dados-2026-09-28.db  | copias: 30
+backup ok -> /opt/expedicao/backups/tecido-2026-09-28.db | copias: 30
+```
+
+> ⚠️ **ATÉ AQUI ELE COPIAVA SÓ METADE DO SISTEMA, E NADA DAVA ERRO.** A fábrica
+> tem duas operações (§19) e dois bancos; o cron das 23:30 levava um. Pedidos da
+> revenda, boletos, etiquetas de produção e os bipes da bancada nunca entraram
+> numa cópia diária — as únicas do `tecido.db` eram as de *"antes de"* que o
+> `limpar_sobras.js` e o `backfill_etiquetas.js` gravam à mão, quando alguém
+> lembra de rodar um deles.
+>
+> O modo de falhar é o pior que existe: o cron roda, a saída diz **"backup ok"**,
+> trinta cópias se empilham na pasta. Só se descobre no dia em que o banco se
+> perde, que é o único dia em que não há o que fazer.
+
+> ⚠️ **`tecido/nucleo/caminho.js` É O DONO ÚNICO DE "ONDE O `tecido.db` FICA",
+> e ele nasceu por causa disto.** Até aqui só o `nucleo/db.js` sabia responder —
+> e ele só responde **abrindo** o banco. O `backup.js` precisa do caminho sem
+> abrir nada (ele copia em readonly), e repetir a conta seriam duas réguas para
+> a mesma pergunta: no dia em que uma mudasse, o backup ficaria **verde copiando
+> um arquivo que o servidor não usa**. Backup que copia o banco errado é pior
+> que nenhum, porque ninguém vai procurar. Há varredura recusando o literal
+> `'tecido.db'` em código fora dele.
+
+> ⚠️ **O PADRÃO DO TECIDO NÃO SEGUE O `PCP_DIR`, e isso é de propósito.** Ele
+> continua em `<o módulo>/tecido.db` (ou `BANCO_TECIDO`), exatamente como
+> estava. No servidor os dois coincidem por acaso — o repo **é** a pasta de
+> produção —, e juntá-los agora seria mover o arquivo de lugar, que é o defeito
+> que o bloco acima descreve em maiúsculas.
+
+> ⚠️ **AUSÊNCIA NÃO É FALHA, MAS TAMBÉM NÃO É SILÊNCIO.** Clone limpo, runner de
+> CI e um PCP sem sob medida não têm `tecido.db`; derrubar o backup por isso
+> seria trava disparando no caso normal (#6). Pular **calado** seria a dívida 18
+> em pessoa — foi assim que este banco ficou um ano de fora. O script diz que
+> pulou **e onde procurou**: "pulei o tecido" sem o caminho manda conferir o
+> lugar errado. Banco que **existe** e não copia é erro de verdade, sai
+> diferente de zero — e sai **depois** de o backup do PCP já estar no disco,
+> porque é ele que despacha o dia.
+
+> ⚠️ **A ROTAÇÃO É UMA POR BANCO.** Uma só, olhando `*.db`, deixaria 30 arquivos
+> no **total** — quinze dias de história de cada um no lugar de trinta, com o
+> corte caindo no banco que por acaso ordenasse depois. Pela mesma razão a saída
+> tem **uma linha por banco**: somar as contagens faria o número dobrar no dia
+> do deploy, e quem lê "copias: 60" com o teto de 30 na cabeça conclui que a
+> rotação parou de funcionar.
+
+> ⚠️ **O `/baixar-backup` CONTINUA SERVINDO SÓ O `dados-*.db`** — ponta que
+> ficou aberta de propósito em 28/09/2026. O backup do tecido existe no
+> servidor e se copia por `scp`; mudar o que aquela URL entrega é outra
+> decisão, e não estava no plano.
+
+**Rode `node teste_backup.js` (10 casos) ao mexer no `backup.js`, no
+`caminhos.js` ou no `tecido/nucleo/caminho.js`** — ele monta bancos de verdade
+em pasta temporária, com WAL e **sem checkpoint**, e exige que os dados cheguem
+na cópia (é o caso que separa `db.backup()` de `cp`). Oito defeitos foram
+reintroduzidos um a um: não copiar o tecido (reprova 6), rotação única (2),
+pular calado (1), ausência virando erro (1), `catch` vazio no tecido quebrado
+(1), o tecido copiado antes do `dados` (2), a contagem somada (1) e o `db.js`
+resolvendo o caminho sozinho (2).
+
 ---
 
 ## 14. Dívidas técnicas conhecidas
@@ -3717,7 +3788,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -5061,6 +5132,16 @@ try{ require('./tecido/montar').montar(app); }catch(e){ /* 503 só no /sobmedida
 > (`better-sqlite3`, `express`) são as mesmas versões da raiz, e o Node resolve
 > subindo. Uma segunda árvore de dependências é uma segunda coisa para
 > atualizar e esquecer.
+
+> ⚠️ **O BACKUP DIÁRIO COBRE ESTE BANCO DESDE 28/09/2026 — e antes disso não
+> cobria.** Banco próprio é a decisão certa, e ela tem um custo que ficou um ano
+> sem ser pago: tudo que é feito para o `dados.db` **não** acontece aqui de
+> graça. O `backup.js` das 23:30 copiava só o do PCP, sem erro nenhum. Detalhe e
+> regras em §13, *"O backup diário cobre os DOIS bancos"*.
+>
+> **A pergunta que fica para a próxima coisa que nascer aqui:** o que mais o PCP
+> tem e este módulo não? O caminho dos dados é o `caminho.js`; o backup, o
+> `backup.js`. O download por token (`/baixar-backup`) ainda é só do PCP.
 
 ### ⚠️ ARMADILHA #13 — a área de acesso é SOMBRA, e sombra se apaga sozinha
 
