@@ -3768,6 +3768,28 @@ pular calado (1), ausência virando erro (1), `catch` vazio no tecido quebrado
 (1), o tecido copiado antes do `dados` (2), a contagem somada (1) e o `db.js`
 resolvendo o caminho sozinho (2).
 
+> ✅ **NO AR E CONFERIDO COM DADO REAL EM 28/09/2026** (PR #155). O dono fez o
+> deploy e rodou `node backup.js` à mão, sem esperar o cron: saíram as **duas**
+> linhas, e o `tecido-2026-09-28.db` nasceu com **668 KB** — o banco do sob
+> medida inteiro, que nunca tinha entrado numa cópia diária. O teste da §10
+> passou depois do restart (telas 302, API 401, `/login` 200).
+>
+> ⚠️ **O PRIMEIRO `ls` DA CONFERÊNCIA OLHAVA PARA O LUGAR ERRADO, e quase
+> passou por prova.** Pedi `ls backups/ | tail -4`, que ordena por nome:
+> `tecido-antes-…` vem **depois** de `tecido-2026-…`, então a cópia nova ficou
+> fora do recorte e a tela mostrou só arquivo velho. Comando de conferência que
+> não olha para o que se quer provar é o verde sem conferência do §10 por uma
+> porta nova — quem confere é `ls backups/tecido-????-??-??.db`.
+>
+> ⚠️ **E O `copias: 3` DA PRIMEIRA RODADA ESTÁ CERTO.** Na primeira cópia o
+> número devia ser **1**, e não foi. A causa: já existiam
+> `tecido-2026-09-03.db` e `tecido-2026-09-22.db`, duas cópias manuais antigas
+> que por acaso usam o **mesmo formato de nome** que a rotação conta. Elas
+> entram no teto de 30 e um dia sairão por ele — o que está certo, são cópias
+> do mesmo banco. **O número foi investigado antes de a fase ser dada por
+> fechada:** número de diagnóstico que ninguém sabe explicar não vira "deu
+> certo" (§5, #27).
+
 ---
 
 ## 14. Dívidas técnicas conhecidas
