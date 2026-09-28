@@ -36,7 +36,8 @@ module.exports = [
   /* Pacote (§5, armadilha #23). Quem ASSINA nao esta destravando um volume: esta
      dizendo QUANTAS persianas e QUAIS vao dentro da caixa — e e essa lista que
      a Etiqueta de Venda cobra no bipe e que baixa do estoque, peca por peca.
-     Chave propria, nivel admin e `sensivel` pelo mesmo motivo de 'estoque.editar':
+     Chave propria, nivel admin e `sensivel` pelo mesmo motivo do antigo 'estoque.editar'
+     (hoje 'estoque.aprovar_ajuste'):
      a assinatura mexe no saldo sem venda na frente, e o unico rastro do porque e
      quem assinou. Ver a caixa retida continua sendo '@admin' (a aba Bloqueados). */
   { chave:'pacote.assinar',       grupo:'Expedição',  nivel:'admin',
@@ -140,8 +141,14 @@ module.exports = [
   { chave:'contagem.ajustar',     grupo:'Estoque',    nivel:'admin',
     rotulo:'Aprovar ajuste de estoque', desc:'Aplicar a contagem ao estoque',
     sensivel:true },
-  { chave:'estoque.editar',       grupo:'Estoque',    nivel:'admin',
-    rotulo:'Editar estoque direto', desc:'Alterar quantidade manualmente',
+  /* O AJUSTE MANUAL EM DUAS PESSOAS (fase 3 da ESTOQUE-LIVRO-E-CONFERENCIA,
+     28/09/2026). Substituem `estoque.editar`, que aplicava sozinho. Pedir nao
+     mexe no saldo; aprovar e de outra pessoa (outraPessoa, no estoque_dominio),
+     e isso vale ate para o Admin Geral. */
+  { chave:'estoque.ajustar',      grupo:'Estoque',    nivel:'admin',
+    rotulo:'Pedir ajuste de estoque', desc:'Pedir um ajuste manual do saldo (quantas peças a mais ou a menos, com motivo) — não muda o saldo sozinho' },
+  { chave:'estoque.aprovar_ajuste', grupo:'Estoque',  nivel:'admin',
+    rotulo:'Aprovar ajuste de estoque', desc:'Aprovar ou recusar o ajuste pedido por outra pessoa (nunca o próprio)',
     sensivel:true },
   { chave:'alvo.editar',          grupo:'Estoque',    nivel:'admin',
     rotulo:'Definir alvo',        desc:'Travar o alvo de um SKU' },

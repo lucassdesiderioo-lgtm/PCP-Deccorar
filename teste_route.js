@@ -41,7 +41,10 @@ module.exports=function(app, db){
        deixaria o item APROVADO de pe sem a linha que ele aprovou — e a idade
        da conferencia contaria um inventario que o saldo ja nao tem. */
     {nome:'inventario_ciclo',     pk:'id', rotulo:'conferencia (ciclos)'},
-    {nome:'inventario_item',      pk:'id', rotulo:'conferencia (SKUs)'}
+    {nome:'inventario_item',      pk:'id', rotulo:'conferencia (SKUs)'},
+    /* O PEDIDO DE AJUSTE (fase 3, 28/09/2026), pela mesma razao: aprovar gera
+       movimento no livro, e o livro de teste e apagado ali em cima. */
+    {nome:'ajuste_pedido',        pk:'id', rotulo:'pedidos de ajuste'}
   ];
 
   // Fase 3: foto_estoque saiu da cobertura; limpa o trigger antigo em bancos

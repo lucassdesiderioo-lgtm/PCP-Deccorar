@@ -279,6 +279,29 @@ module.exports = function(app, db){
     }
   }catch(e){ console.log('[acesso] seed da conferencia falhou: '+e.message); }
 
+  /* ── 3-E. O AJUSTE EM DUAS PESSOAS (fase 3 da ESTOQUE-LIVRO-E-CONFERENCIA,
+     28/09/2026) ──
+     `estoque.editar` saiu do cadastro; quem a tinha passa a PEDIR e a APROVAR
+     (spec §6.3). As duas juntas nao devolvem o poder de antes: a regra
+     "ninguem aprova o proprio pedido" e do codigo (outraPessoa), nao da chave.
+     As linhas de `estoque.editar` em setor_permissao ficam de pe (nao ha chave
+     estrangeira) — e e delas que este backfill le. Excecao concedida vai
+     junto. Uma vez so (marca em `config`). */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='seed_ajuste_duas'").get()){
+      db.transaction(() => {
+        for(const para of ['estoque.ajustar','estoque.aprovar_ajuste']){
+          db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
+            SELECT setor_id, ? FROM setor_permissao WHERE chave='estoque.editar'`).run(para);
+          db.prepare(`INSERT OR IGNORE INTO usuario_excecao (usuario_id,chave,concede)
+            SELECT usuario_id, ?, 1 FROM usuario_excecao e WHERE chave='estoque.editar' AND concede=1
+              AND NOT EXISTS (SELECT 1 FROM usuario_excecao x WHERE x.usuario_id=e.usuario_id AND x.chave=?)`).run(para, para);
+        }
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('seed_ajuste_duas','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[acesso] seed do ajuste em duas pessoas falhou: '+e.message); }
+
   // ── resolvedor do modelo NOVO: permissoes efetivas de um usuario (secao 2) ──
   function permissoesDe(uid){
     const setores = db.prepare(`SELECT s.nivel FROM usuario_setor us
@@ -674,7 +697,17 @@ module.exports = function(app, db){
     if(eq('/api/auditoria/skus')) return '@admin';
     if(M !== 'GET' && eq('/api/devolucao')) return 'devolucao.registrar';
     if(M !== 'GET' && eq('/api/devolucao/baixa')) return 'devolucao.baixar';
-    if(M !== 'GET' && eq('/api/estoque')) return 'estoque.editar';
+    /* O AJUSTE EM DUAS PESSOAS (fase 3 da ESTOQUE-LIVRO-E-CONFERENCIA). Pedir e
+       estoque.ajustar; aprovar e estoque.aprovar_ajuste; recusar e das duas —
+       quem pediu desiste do proprio, e o handler exige a de aprovar para o
+       pedido de outra pessoa. A fila e lida por quem pede e por quem aprova.
+       O POST /api/estoque antigo so recusa, e fica com a chave de quem pede:
+       e para essa pessoa que a recusa diz o caminho. */
+    if(M !== 'GET' && eq('/api/estoque/ajuste')) return 'estoque.ajustar';
+    if(eq('/api/estoque/ajuste/pendentes')) return ['estoque.ajustar','estoque.aprovar_ajuste'];
+    if(M !== 'GET' && pre('/api/estoque/ajuste') && /\/aprovar$/.test(p)) return 'estoque.aprovar_ajuste';
+    if(M !== 'GET' && pre('/api/estoque/ajuste') && /\/recusar$/.test(p)) return ['estoque.ajustar','estoque.aprovar_ajuste'];
+    if(M !== 'GET' && eq('/api/estoque')) return 'estoque.ajustar';
     // A aba Estoque do admin: o painel e o historico de ajustes sao leitura de
     // GESTAO, nao de operacao. O painel carrega alvo, cobertura e o que falta
     // produzir do catalogo inteiro; o historico diz quem mexeu no saldo e por

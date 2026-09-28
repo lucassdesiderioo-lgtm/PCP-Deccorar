@@ -3557,7 +3557,8 @@ guarda o saldo é a coluna, o movimento é só a história dela.
 **Cobertura atual:** `revisao`, `producao`, `montagem`, `lote`,
 `lote_item`, `fila`, `devolucao`, `rejeicao`, `contagem`, `contagem_pendente` e
 `movimento_componente` — e depois `movimento_estoque` (fase 1 do livro) e
-`inventario_ciclo`/`inventario_item` (fase 2, 26/09/2026). (`foto_estoque` saiu na Fase 3.)
+`inventario_ciclo`/`inventario_item` (fase 2, 26/09/2026) e `ajuste_pedido` (fase 3,
+28/09/2026). (`foto_estoque` saiu na Fase 3.)
 
 A lista fica em `TABELAS`, no topo do `teste_route.js`. Cada entrada traz a coluna
 de chave primária — hoje todas usam `id`. O campo ficou genérico por causa da
@@ -3716,7 +3717,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (242), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3805,6 +3806,14 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   material de um corpo que trouxe SKU — recusa inteira, e manda ao Inventário (§18)
 - ❌ Ler a idade da conferência de uma fonte só, ou fora do
   `inventario_dominio.conferencias()` (§18, #32)
+- ❌ Voltar a aplicar ajuste de saldo na hora, pela mão de uma pessoa só: pedir não
+  mexe no saldo, e quem pediu não aprova — nem o Admin Geral (§18, fase 3)
+- ❌ Pedir ajuste em "saldo novo" e aprová-lo como saldo: a aprovação aplica o
+  DELTA sobre o saldo de agora, senão apaga o que andou no meio (§18, #32)
+- ❌ Guardar o pedido pendente em `ajuste_estoque`: cinco lugares o leem como
+  ajuste JÁ aplicado (§18, fase 3)
+- ❌ Aceitar dois pedidos pendentes do mesmo SKU: aprovados em sequência, aplicam
+  a mesma correção duas vezes (§18, fase 3)
 - ❌ Fazer a revisão somar estoque "porque parece que falta"
 - ❌ Fazer a reimpressão baixar estoque "porque imprimiu de novo"
 - ❌ Multiplicar volume por "quantidade" em qualquer lugar — uma venda é uma
@@ -4846,6 +4855,79 @@ apagando (4) e aprovar sem motivo (3). Mexeu nas chaves? **`node teste_acesso.js
 > 11 + (−2) = 9. A prova que fecha a fase é **a primeira conferência de verdade**:
 > o tablet do estoque contando sem ver o saldo, uma divergência recontada por
 > outra pessoa e aprovada por uma terceira.
+
+### ⚠️ O AJUSTE MANUAL EM DUAS PESSOAS — pedir não mexe no saldo (28/09/2026)
+
+**Fase 3 da spec `ESTOQUE-LIVRO-E-CONFERENCIA.md`.** Até aqui quem tinha
+`estoque.editar` mudava o saldo sozinho, na hora (`POST /api/estoque`). Agora:
+
+```
+PEDIR   (estoque.ajustar)          quantas peças a mais ou a menos + motivo  → o saldo NÃO anda
+APROVAR (estoque.aprovar_ajuste)   outra pessoa                              → `ajuste` no livro
+RECUSAR (quem aprova, com o porquê) · DESISTIR (quem pediu, com o porquê)   → o pedido fica
+```
+
+`ajuste_dominio.js` é o **dono único** do pedido; `ajuste_route.js` é a porta; a
+pergunta *"é outra pessoa?"* é o **mesmo** `outraPessoa()` da conferência.
+Na aba Estoque o botão da linha virou **"pedir ajuste"**, e a fila aparece no card
+**"Ajustes esperando aprovação"** — que some quando não há pedido.
+
+> ⚠️ **O PEDIDO É EM DELTA, NUNCA EM "SALDO NOVO"** — decisão do dono, 28/09/2026.
+> Um pedido de "o saldo é 8" aprovado dois dias depois apagaria o que a bancada
+> embalou no meio: é a armadilha #32 pela porta do ajuste. Quem pede pode digitar o
+> saldo novo, e ele vira delta **contra o saldo daquele momento**
+> (`saldo_no_pedido`, guardado ao lado). A aprovação aplica o delta sobre o saldo
+> de **agora**, e a fila mostra o que mexeu no saldo desde o pedido.
+
+> ⚠️ **OS PEDIDOS MORAM EM `ajuste_pedido`, E NÃO EM `ajuste_estoque`** — decisão
+> do dono, divergência da §7 da spec. Cinco lugares leem o `ajuste_estoque` como
+> *"o que foi aplicado"* (o histórico da linha, o último ajuste, o card, o número da
+> faixa e o `comparar_inventario.js`): um pedido pendente ali apareceria como ajuste
+> feito, sem erro nenhum. **A aprovação grava lá como sempre** — quem pediu assina
+> a linha, e quem aprovou vai na observação.
+
+> ⚠️ **NINGUÉM APROVA O PRÓPRIO PEDIDO, NEM O ADMIN GERAL, E O APROVADOR ÚNICO
+> ESPERA** — a mesma decisão A da conferência (§6.4). A tela mostra ao dono do
+> pedido o motivo, em vez de um botão que só daria erro.
+
+> ⚠️ **UM PEDIDO PENDENTE POR SKU.** Dois pedidos abertos do mesmo SKU, aprovados em
+> sequência, aplicariam a mesma correção duas vezes — e cada um parece certo
+> sozinho. O segundo é recusado dizendo quem fez o primeiro.
+>
+> **E QUEM PEDIU PODE DESISTIR** (`desistido`, com o porquê). Sem isso, um pedido
+> errado travaria o SKU até outra pessoa aparecer — a trava que só sabe acusar
+> (§5). Recusar o pedido de **outra** pessoa exige a chave de aprovar.
+
+> ⚠️ **O `POST /api/estoque` ANTIGO SÓ RECUSA** (410, `use_pedido`), dizendo o
+> caminho e **sem gravar nada**. Sumir com a rota daria 404 à aba aberta antes do
+> deploy, e alguém iria procurar o defeito no lugar errado.
+
+> ⚠️ **AS CHAVES:** `estoque.ajustar` (admin) e `estoque.aprovar_ajuste` (admin,
+> sensível). `estoque.editar` **saiu do cadastro**; o backfill de uma vez só
+> (`config.seed_ajuste_duas`, seção 3-E do `acesso.js`) dá as duas a quem a tinha,
+> inclusive por exceção. As duas juntas **não** devolvem o poder de antes: a regra
+> de pessoa é do código, não da chave. As linhas antigas de `estoque.editar` ficam
+> em `setor_permissao` (não há chave estrangeira) — é delas que o backfill lê.
+> `ajuste_pedido` entrou em `TABELAS` do modo teste (§11).
+
+> **O que NÃO passa por aqui, e é de propósito:** o `backfill_pacote.js --baixar`
+> (§5, #23) continua aplicando direto — é script rodado à mão, com backup e decisão
+> humana, e o motivo vai na linha. A contagem de **material** continua na aba
+> Contagem, como era.
+
+**Rode `node teste_ajuste.js` (53 casos) ao mexer no `ajuste_dominio.js`, no
+`ajuste_route.js` ou no card da aba Estoque.** Escrito **antes** do código, e oito
+defeitos foram reintroduzidos um a um: pedir já aplicando (reprova 15), quem pediu
+aprovando (4), aprovar como saldo absoluto (5), recusar apagando (4), dois pendentes
+do mesmo SKU (1), aprovar duas vezes (3), pedido sem motivo (10) e o saldo novo
+gravado como delta cru (11). Mexeu nas chaves? **`node teste_acesso.js` (262, a
+seção 6-G é esta) e `node teste_cobertura.js` (10).**
+
+> ⚠️ **AINDA NÃO FOI CONFERIDO NA FÁBRICA.** A rodada foi num navegador meu, a 1440
+> e a 400 px: o Lucas pediu −2 pela linha da aba Estoque, a fila disse a ele que a
+> aprovação é de outra pessoa, o João aprovou e o saldo foi de 9 a 7, com a linha
+> no histórico. A prova é o **primeiro ajuste de verdade** pedido por uma pessoa e
+> aprovado por outra.
 
 > ⚠️ **O botão "aplicar alvo" diz quantos ele NÃO resolve.** O "Aplicar todos" do
 > Planejamento só grava em SKU **com venda na janela** — proposital: sem dado de
