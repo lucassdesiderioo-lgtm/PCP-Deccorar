@@ -3584,6 +3584,7 @@ aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não sil
 | **Código colado por cima do velho** | Linhas duplicadas sobram embaixo e quebram a sintaxe | Conferir o entorno do trecho editado |
 | **`var` lido antes de ser atribuído** | `node --check` passa (é sintaxe válida); no navegador o `.filter` de um `undefined` estoura **no meio** da execução do `<script>` e **tudo abaixo dele deixa de existir** — a tela abre sem as listas, sem bipe e sem erro visível. Aconteceu em 23/09/2026: o `setModo` roda no carregamento e chamava um desenhista cujo cache só é atribuído 150 linhas abaixo | Função chamada no carregamento não pode supor que o cache já existe: `(cache\|\|[])`. E **abrir a tela** — nenhum teste do projeto pega isto |
 | **Coluna `fr` não desce abaixo do conteúdo** | `grid-template-columns:1.1fr 1.6fr` é uma proporção que o navegador **ignora** quando uma coluna tem conteúdo largo: `fr` tem mínimo automático de `min-content`. Uma única linha `white-space:nowrap` lá dentro vira o piso da coluna inteira, e a proporção escrita no CSS nunca chega a valer — sem erro, sem aviso, e ninguém lê CSS procurando isso. Em 23/09/2026 a Etiqueta de Venda estava com 972 px de um lado e 362 do outro, com `1.1fr 1.6fr` no arquivo | `minmax(0,1fr)` quando a proporção **tem** que valer. E **medir a tela** (`getBoundingClientRect`), não ler o CSS: o número medido é o único que diz se a regra pegou |
+| **Tabela mais larga que a janela rola a PÁGINA** | `table{width:100%}` não impede nada: mais largo que o corpo, ele empurra a página inteira, e num celular a tela anda de lado com o topo do card saindo de vista. É a coluna `fr` acima por outra porta — a proporção escrita no CSS não vale quando o conteúdo é maior. A 400 px a tabela de boletos punha a página em 684 px | Pôr a tabela num recipiente que role sozinho (`.rolaH` do `base.css`, nunca uma classe da própria tela). E **medir** `scrollWidth` contra `clientWidth`, não ler o CSS |
 | **`text-overflow:ellipsis` corta a tarja, não só o texto** | Ele apara o **fim da linha**, e o fim da linha é onde ficam as tarjas. Um nome de cliente comprido apagava da tela o `📦 N persianas` — o último lugar em que a caixa de várias aparece (§5). A tela fica bonita e a informação some | Onde a linha tem tarja, o texto **quebra** em vez de aparar; nowrap fica só dentro de cada tarja |
 | **Cookie httpOnly no jar do `curl`** | Abrir a tela com Playwright usando `-c jar.txt` do `curl`: o jar marca o cookie de sessão com `#HttpOnly_` no início da linha, e um filtro de comentário ingênuo (`l.startsWith('#')`) o joga fora. A tela abre no **login** — e "abriu no login" não se parece nem de longe com "o cookie não foi lido": parece permissão trocada | Tirar o prefixo antes de filtrar (`l.replace(/^#HttpOnly_/,'')`) |
 | **A tela servida é a lida no BOOT** | Editar o `.html` de uma tela do `/sobmedida` e recarregar o navegador não mostra nada: o módulo lê o arquivo quando sobe e o guarda. O sintoma engana — o CSS novo está no arquivo, o `grep` confirma, e a tela continua com o antigo, então a suspeita cai na especificidade ou no cache do navegador. Custou três rodadas em 26/09/2026 | Reiniciar o servidor. E conferir pelo fio, não pelo disco: `curl … \| grep a-regra-nova` diz o que a tela está mesmo recebendo |
@@ -4577,6 +4578,12 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   parcelamento, e quem sabe a falta é a lista, que olha todos (§19, 6-C1c)
 - ❌ Escrever um número e a palavra que o qualifica em linhas diferentes:
   "#5001 · R$ 115,50" se lê como o valor do pedido (§19, 6-C1c, e o §4)
+- ❌ Deixar uma tabela larga empurrar a PÁGINA de lado: ela rola dentro do
+  `.rolaH` do `base.css` — e quem diz se pegou é a tela MEDIDA (§19, §12)
+- ❌ Escrever dinheiro com formatador próprio de tela no sob medida: o dono
+  único é o `dinheiro` do `ui.js`, e a cópia local é a #12 em miniatura (§19)
+- ❌ Pré-preencher com o `dinheiro` um campo que volta pelo `paraCentavos`: o
+  ponto do milhar vira NaN, e a tela recusa o valor que ela mesma escreveu (§19)
 - ❌ Escrever uma segunda tabela de "o que vem antes" para a recusa: o `ANTES`
   lido ao contrário já responde, e duas divergem no dia em que o fluxo mudar
   (§19, 5-B2)
@@ -7195,6 +7202,64 @@ Abaixo disso ele continua na cobrança e na lista de marcar, com o que falta.
 > **O que continua pendente é da 6-C1, e não desta:** o financeiro dando uma
 > **baixa** de verdade, e o vendedor usando a carteira na conversa semanal.
 > Prova que não foi feita se escreve como não feita (§4).
+
+### ⚠️ OS DOIS DEFEITOS DE TELA DO FINANCEIRO (28/09/2026)
+
+Dois consertos de tela, achados **abrindo as telas** da fase 6-C1 — nenhum
+deles tem teste de unidade que o pegue sozinho, e é sempre o mesmo tipo:
+o código está sintaticamente perfeito e a tela é que está errada.
+
+| Onde | O que era |
+|---|---|
+| **Financeiro, a 400 px** | a tabela de boletos tem cinco colunas e não cabe: a **página inteira** andava de lado (`scrollWidth` 684 contra 400) e o topo do card saía de vista |
+| **Ficha da revenda** | escrevia `R$ 4785,50`, **sem o ponto do milhar**, enquanto o Financeiro, com o mesmo dinheiro da mesma revenda, escreve `R$ 4.785,50` |
+
+> ⚠️ **A TABELA QUE NÃO CABE ROLA SOZINHA — A PÁGINA NUNCA ROLA DE LADO.** É a
+> coluna `fr` do §12 pela porta da tabela: `table{width:100%}` é uma proporção
+> que o navegador **ignora** quando o conteúdo é mais largo, e aí a tabela
+> empurra o corpo. Quem passa a rolar é um recipiente (`.rolaH`), e o resto da
+> página fica parado. Medido, não lido: a 400 px a página saiu de 684 px para
+> **400**, e o `.rolaH` ficou com `scroll 634 × cliente 300` — que é o certo.
+>
+> **Ela mora no `base.css`, e não na tela**, pela lição da fileira de escolha
+> da fase 4-A (§19): classe própria de tela é a segunda régua do CSS.
+
+> ⚠️ **ERAM DOIS PAPÉIS NA MESMA FUNÇÃO, E POR ISSO A TROCA INGÊNUA QUEBRARIA O
+> CRÉDITO.** O `emReais` da ficha fazia duas coisas: escrevia o dinheiro que se
+> **lê** e pré-preenchia o campo **Limite (R$)**, que volta pelo `paraCentavos`.
+> Trocar os dois pelo `dinheiro` do `ui.js` (o dono único do módulo) faria o
+> campo nascer com `4.785,50` — e `paraInteiro` devolve **NaN** para isso, com
+> a tela recusando, com a frase *"o limite se escreve como 5000,00"*, um valor
+> que ela mesma acabara de escrever. Seria trocar um defeito de **leitura** por
+> um de **escrita**, no crédito.
+>
+> Hoje são **duas funções com nome que diz qual é qual**: `reais` (lê, pelo
+> `dinheiro`) e `paraCampo` (pré-preenche, sem separador). Conferido gravando
+> o campo de verdade: abriu com `4785,50`, salvou `5000,00`, recarregou com
+> `5000,00` e o banco ficou com `500000` centavos.
+
+> ⚠️ **UM FORMATADOR LOCAL PARA LER É A ARMADILHA #12 EM MINIATURA** — a mesma
+> revenda mostrando o mesmo dinheiro de dois jeitos em duas telas, e as duas
+> "certas", cada uma na sua régua. A varredura do `dinheiro_tela.test.js` recusa
+> `R$ ` montado à mão numa tela nova, com **lista de isentos nomeados** (a forma
+> do `teste_*.js` na varredura do estoque, §2): seis telas ainda montam, e três
+> delas — `catalogo.html`, `pedidos.html` e `simulador.html` — escrevem dinheiro
+> **sem o separador de milhar**. Está escrito porque é o mesmo defeito, e não
+> foi consertado aqui.
+>
+> A lista tem guarda contra **isento zumbi**: tela que sai da lista sem sair do
+> defeito, ou que é consertada e fica isenta, reprova.
+
+> ⚠️ **E A LISTA DE REVENDAS TAMBÉM ROLA A PÁGINA DE LADO a 400 px**
+> (`table.lista`, 660 px) — mesmo defeito, terceira tela, **não consertado
+> aqui**: não estava no plano, e §0 manda anotar em vez de consertar junto. O
+> reparo é o mesmo `.rolaH`, que já existe.
+
+> **Rode `cd tecido && npm test` (634 casos) ao mexer no dinheiro de qualquer
+> tela do módulo, no `.rolaH` ou na tabela do Financeiro** — 7 são desta, e os
+> sete defeitos foram reintroduzidos um a um. E **abra as telas, e MEÇA**: a
+> 400 px quem diz se a regra pegou é `scrollWidth` contra `clientWidth`, nunca
+> o CSS lido (§12).
 
 ### Três regras do sob medida que valem citar aqui
 
