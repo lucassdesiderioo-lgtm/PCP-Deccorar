@@ -20,7 +20,7 @@
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,banner,el,limpar,$,num,comoNumero,formatarMetros,formatarArea}=window.ui;
+const {api,banner,el,limpar,$,num,comoNumero,formatarMetros,formatarArea,rolaH}=window.ui;
 
 let eu={}, aba='estoque';
 const estado={tecidos:[],arvore:[],ocupacao:[],tecido_id:null,nivel_id:null,
@@ -212,7 +212,7 @@ async function cartaoValor(pai){
       el('td',{class:'num',texto:formatarArea(l.m2)}),
       el('td',{class:'num',texto:(l.rolos_sem_preco?'≥ ':'')+dinheiro(l.valor)})
     ])));
-    c.appendChild(t);
+    c.appendChild(rolaH(t));
   };
   tabela('Tecido',p.tecidos,l=>[l.linha_nome,l.abertura_nome,l.cor_nome].join(' · '));
   tabela('Bobina',p.larguras,l=>num(l.chave)+' m');
@@ -235,7 +235,7 @@ async function cartaoValor(pai){
       el('td',{texto:String(f.ultima_compra||'').slice(0,10)})
     ])));
     c.appendChild(el('h2',{style:'margin-top:20px;font-size:16px',texto:'Quanto cada fornecedor cobrou'}));
-    c.appendChild(t);
+    c.appendChild(rolaH(t));
     c.appendChild(el('p',{class:'ajuda',texto:
       'Media ponderada pelo m² comprado, e nao pela quantidade de compras — uma barra de 5 m e uma de 200 m nao pesam igual. Passe o mouse no preco para ver a faixa.'}));
   }
@@ -263,7 +263,7 @@ async function cartaoValor(pai){
           onclick:()=>abrirNota(r)})])
       ]));
     });
-    cs.appendChild(t);
+    cs.appendChild(rolaH(t));
     pai.appendChild(cs);
   }
 }
@@ -289,7 +289,7 @@ async function telaEstoque(pai){
     el('td',{class:'num',texto:formatarArea(s.m2)}),
     el('td',{texto:(s.abertos||0)+' aberto(s) + '+(s.fechados||0)+' fechado(s)'})
   ])));
-  cS.appendChild(saldo.some(s=>s.saldo>0)?tS:el('div',{class:'vazio',texto:'Nenhum rolo em estoque.'}));
+  cS.appendChild(saldo.some(s=>s.saldo>0)?rolaH(tS):el('div',{class:'vazio',texto:'Nenhum rolo em estoque.'}));
   pai.appendChild(cS);
 
   const c=el('div',{class:'cartao'});
@@ -408,7 +408,7 @@ async function telaEstoque(pai){
       el('td',{style:'text-align:right'},acoes)
     ]));
   });
-  c.appendChild(rolos.length?t:el('div',{class:'vazio',texto:'Nenhum rolo cadastrado.'}));
+  c.appendChild(rolos.length?rolaH(t):el('div',{class:'vazio',texto:'Nenhum rolo cadastrado.'}));
   pai.appendChild(c);
 }
 

@@ -145,7 +145,7 @@
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,el,limpar,$,dinheiro}=window.ui;
+const {api,el,limpar,$,dinheiro,rolaH}=window.ui;
 
 const DIAS=[7,30,90,365];
 let dias=90, EU={};
@@ -204,7 +204,8 @@ function tabela(colunas,linhas,celulas){
     el('td',{class:colunas[i].num?'num':null},
       [typeof c==='string'||typeof c==='number'?String(c):(c||'')])))));
   t.appendChild(tb);
-  return t;
+  // Sem o recipiente, a tabela mais larga que a janela empurra a PAGINA (§12).
+  return rolaH(t);
 }
 
 function diasTexto(v){

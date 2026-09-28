@@ -3584,7 +3584,7 @@ aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não sil
 | **Código colado por cima do velho** | Linhas duplicadas sobram embaixo e quebram a sintaxe | Conferir o entorno do trecho editado |
 | **`var` lido antes de ser atribuído** | `node --check` passa (é sintaxe válida); no navegador o `.filter` de um `undefined` estoura **no meio** da execução do `<script>` e **tudo abaixo dele deixa de existir** — a tela abre sem as listas, sem bipe e sem erro visível. Aconteceu em 23/09/2026: o `setModo` roda no carregamento e chamava um desenhista cujo cache só é atribuído 150 linhas abaixo | Função chamada no carregamento não pode supor que o cache já existe: `(cache\|\|[])`. E **abrir a tela** — nenhum teste do projeto pega isto |
 | **Coluna `fr` não desce abaixo do conteúdo** | `grid-template-columns:1.1fr 1.6fr` é uma proporção que o navegador **ignora** quando uma coluna tem conteúdo largo: `fr` tem mínimo automático de `min-content`. Uma única linha `white-space:nowrap` lá dentro vira o piso da coluna inteira, e a proporção escrita no CSS nunca chega a valer — sem erro, sem aviso, e ninguém lê CSS procurando isso. Em 23/09/2026 a Etiqueta de Venda estava com 972 px de um lado e 362 do outro, com `1.1fr 1.6fr` no arquivo | `minmax(0,1fr)` quando a proporção **tem** que valer. E **medir a tela** (`getBoundingClientRect`), não ler o CSS: o número medido é o único que diz se a regra pegou |
-| **Tabela mais larga que a janela rola a PÁGINA** | `table{width:100%}` não impede nada: mais largo que o corpo, ele empurra a página inteira, e num celular a tela anda de lado com o topo do card saindo de vista. É a coluna `fr` acima por outra porta — a proporção escrita no CSS não vale quando o conteúdo é maior. A 400 px a tabela de boletos punha a página em 684 px, a do catálogo em 633, a do painel em 1050 | Pôr a tabela num recipiente que role sozinho (`.rolaH` do `base.css`, nunca uma classe da própria tela) — e **a tabela tem que entrar nele**: recipiente criado e vazio passa em teste e não conserta nada. E **medir** `scrollWidth` contra `clientWidth`, não ler o CSS |
+| **Tabela mais larga que a janela rola a PÁGINA** | `table{width:100%}` não impede nada: mais largo que o corpo, ele empurra a página inteira, e num celular a tela anda de lado com o topo do card saindo de vista. É a coluna `fr` acima por outra porta — a proporção escrita no CSS não vale quando o conteúdo é maior. Medidas a 400 px: boletos 684, catálogo 810, painel 1050, produção 820, corte 660. Das dezesseis telas do sob medida, **sete** rolavam (§19) | Embrulhar com o `window.ui.rolaH(tabela)`, que devolve o recipiente (`.rolaH` do `base.css`, nunca classe da própria tela) **com a tabela já dentro** — o padrão de dois passos nasceu oco uma vez e passou verde. E **medir** `scrollWidth` contra `clientWidth`, não ler o CSS. ⚠️ Nem toda página que rola tem tabela: um `inline-flex` sem `wrap` faz igual (§19) |
 | **`text-overflow:ellipsis` corta a tarja, não só o texto** | Ele apara o **fim da linha**, e o fim da linha é onde ficam as tarjas. Um nome de cliente comprido apagava da tela o `📦 N persianas` — o último lugar em que a caixa de várias aparece (§5). A tela fica bonita e a informação some | Onde a linha tem tarja, o texto **quebra** em vez de aparar; nowrap fica só dentro de cada tarja |
 | **Cookie httpOnly no jar do `curl`** | Abrir a tela com Playwright usando `-c jar.txt` do `curl`: o jar marca o cookie de sessão com `#HttpOnly_` no início da linha, e um filtro de comentário ingênuo (`l.startsWith('#')`) o joga fora. A tela abre no **login** — e "abriu no login" não se parece nem de longe com "o cookie não foi lido": parece permissão trocada | Tirar o prefixo antes de filtrar (`l.replace(/^#HttpOnly_/,'')`) |
 | **A tela servida é a lida no BOOT** | Editar o `.html` de uma tela do `/sobmedida` e recarregar o navegador não mostra nada: o módulo lê o arquivo quando sobe e o guarda. O sintoma engana — o CSS novo está no arquivo, o `grep` confirma, e a tela continua com o antigo, então a suspeita cai na especificidade ou no cache do navegador. Custou três rodadas em 26/09/2026 | Reiniciar o servidor. E conferir pelo fio, não pelo disco: `curl … \| grep a-regra-nova` diz o que a tela está mesmo recebendo |
@@ -4589,7 +4589,17 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Consertar o dinheiro só na tela quando ele vem escrito do servidor: o
   simulador mostra os dois na mesma linha, e um deles ficaria para trás (§19)
 - ❌ Conferir o `.rolaH` só pela classe: recipiente criado e VAZIO fica verde
-  com a tabela pendurada fora dele — é o `rola.appendChild(` que prova (§19)
+  com a tabela pendurada fora dele — é rodar o `rolaH` de verdade que prova (§19)
+- ❌ Montar o recipiente do `.rolaH` na tela, em dois passos: quem embrulha é o
+  `window.ui.rolaH(tabela)`, e ele não tem segundo passo para esquecer (§19)
+- ❌ Deixar de embrulhar a tabela que HOJE cabe: o recipiente é inerte sem
+  transbordo, e a lista de isentos envelhece antes da tela (§19)
+- ❌ Procurar só TABELA quando a página rola de lado: um `inline-flex` sem
+  `wrap` faz igual, e o `rolaH` não alcança (§19, a aba Endereços)
+- ❌ Medir tela com banco VAZIO e dar a conta por feita: sem rolo, sem sobra e
+  sem endereço a tela não desenha o que rola — mede-se o vazio (§19)
+- ❌ Contar telas com defeito pelas que estavam abertas em vez das medidas: foi
+  assim que "sete" virou "três" num relatório meu (§19, §12)
 - ❌ Escrever varredura que lê o comentário que a explica, ou que procura
   `/100).toFixed` sem nomear o centavo: as duas acusam o inocente (§19)
 - ❌ Escrever uma segunda tabela de "o que vem antes" para a recusa: o `ANTES`
@@ -7331,18 +7341,96 @@ O bloco acima deixou escrito que `catalogo.html`, `pedidos.html` e
 > reprovou nada. Hoje os dois casos exigem o `rola.appendChild(`. **Classe
 > declarada que não embrulha ninguém é a terceira ponta da mesma armadilha.**
 
-> **Rode `cd tecido && npm test` (643 casos) ao mexer no `emReais`, no dinheiro
-> de qualquer tela ou no `.rolaH`** — 16 são do `dinheiro_tela.test.js`, e sete
+> **Rode `cd tecido && npm test` (647 casos) ao mexer no `emReais` ou no
+> dinheiro de qualquer tela** — 14 são do `dinheiro_tela.test.js`, e sete
 > defeitos foram reintroduzidos um a um: o servidor sem o milhar (reprova 2),
 > o `Intl` de volta (1), o catálogo com um papel só (1), a cópia do `dinheiro`
 > no painel (2), a lista de revendas fora do recipiente (1), a conta própria no
 > `pedidos` (1) e a tabela de boletos fora do recipiente (1).
+>
+> ⚠️ **Os dois últimos mudaram de casa em 29/09/2026** — os casos do `.rolaH`
+> viraram varredura no `rola_tela.test.js`, no bloco abaixo.
 
-> ⚠️ **QUATRO TELAS AINDA ROLAM A PÁGINA DE LADO a 400 px, e não foram
-> consertadas aqui** — não estavam no plano, e §0 manda anotar em vez de
-> consertar junto. Medidas: `catalogo` 633 px, `painel` 1050, `pedidos` 503 e
-> a **lista de revendas**, que entrou no plano e foi consertada. O reparo das
-> três é o mesmo `.rolaH`, que já existe.
+> ⚠️ ~~**QUATRO TELAS AINDA ROLAM A PÁGINA DE LADO**~~ — **eram SETE, e a
+> conta estava errada porque eu contei as telas que tinha aberto, e não as que
+> medi.** Ver o bloco logo abaixo; consertadas em 29/09/2026.
+
+### ⚠️ AS SETE TELAS QUE ROLAVAM DE LADO — e o número que eu tinha dado era três (29/09/2026)
+
+O bloco acima prometia três reparos de uma linha. Ao medir as **dezesseis**
+telas do módulo a 400 px, antes de encostar no código, eram **sete**:
+
+```
+/corte        660 px   ← bancada do corte, o operador digitando medida
+/cadastros    766 (aba Tecido) · 692 (Motivos) · 416 (Endereços)
+/painel      1050 (Gerencial)
+/catalogo     618 · 810 · 582 · 767   (quatro das cinco abas)
+/pedidos      485
+/producao     820   ← quem imprime o maço
+/indicadores  479
+```
+
+> ⚠️ **O NÚMERO ERRADO NÃO VEIO DE UMA CONTA ERRADA: VEIO DE NÃO TER MEDIDO.**
+> As três que eu nomeei foram as que abri durante a entrega anterior, e as
+> outras quatro nunca tinham sido abertas num celular. É o §12 dizendo, pela
+> enésima vez, que **quem responde é a tela medida** — e desta vez o que ele
+> pegou não foi o CSS, foi o meu relatório. Número de diagnóstico que saiu do
+> que estava à mão vira fato na linha seguinte, e o dono planeja em cima dele.
+
+**`window.ui.rolaH(tabela)` passou a ser o dono único do embrulho**, e as
+**47 tabelas** das treze telas com tabela passam por ele:
+
+```js
+const rolaH=t=>el('div',{class:'rolaH'},[t]);   // devolve o recipiente COM a tabela dentro
+```
+
+> ⚠️ **ELE RECEBE A TABELA, e isso é o conserto de um defeito que esteve no
+> ar.** O padrão anterior era de dois passos — criar o recipiente, e depois
+> lembrar de pendurar a tabela nele —, e foi assim que o recipiente do
+> Financeiro nasceu **oco** e passou verde num caso que conferia só a classe
+> (bloco acima). Uma função que recebe a tabela não tem segundo passo para
+> esquecer. Copiar o padrão de dois passos numa tela nova é recusado por
+> varredura.
+
+> ⚠️ **TABELA QUE HOJE CABE ENTRA JUNTO, de propósito.** O recipiente é inerte
+> quando o conteúdo cabe — `overflow-x:auto` não desenha barra sem transbordo.
+> Deixar de fora as que cabem faz a próxima pessoa perguntar quais têm e quais
+> não têm, e a que crescer amanhã volta a empurrar a página. É por isso que a
+> varredura é uma regra de contagem (`N tabelas → N embrulhos`) e **não tem
+> lista de isentos**: lista de isentos envelhece, e a do dinheiro já provou.
+
+> ⚠️ **E UMA DAS SETE NÃO ERA TABELA.** A aba **Endereços** do `/cadastros`
+> punha a página em 416 px por um `display:inline-flex` **sem `wrap`**: a tarja
+> do endereço mais os três botões (`ROLO · A-1-1 · Renomear · Apagar ·
+> Desativar`) numa linha de 379 px que não quebra. O `rolaH` não alcança isso —
+> **o sintoma é o mesmo e a causa é outra**, e procurar só tabela teria deixado
+> a aba rolando depois de a tela ser dada por consertada.
+>
+> Ela **só apareceu com endereço cadastrado**: em banco vazio a aba não desenha
+> nível nenhum, e a medição passava limpa. Foi semear um rolo e uma sobra no
+> banco de teste — para exercitar `/rolos` e `/sobras`, que também não
+> desenhavam tabela nenhuma — que a destapou. **Tela medida com banco vazio
+> mede o vazio**, e isso vale para toda medição de tela daqui para a frente.
+
+> ⚠️ **O RISCO DO CONSERTO É VERTICAL, E FOI MEDIDO.** `overflow-x:auto` faz o
+> `overflow-y` virar `auto` — e o editor do catálogo mora **dentro** da tabela,
+> num `<td colspan>`. Um recipiente que cortasse no eixo Y esconderia o botão
+> de salvar. A medição confere os quatro, tela a tela e aba a aba: a página não
+> rola, nenhuma tabela ficou fora do recipiente, nenhum recipiente nasceu oco e
+> **nenhum ganhou barra vertical**.
+
+**Rode `node teste/rola_tela.test.js` pelo `npm test` ao criar tabela em
+qualquer tela do módulo, ao mexer no `rolaH` ou no `.rolaH` do `base.css`** —
+os 6 casos travam as cinco pontas, e o primeiro **roda a função de verdade**
+num DOM de mentira que guarda os filhos: conferir por texto é o que deixou o
+recipiente oco passar. Seis defeitos foram reintroduzidos um a um, e cada um
+reprova só o caso que existe para pegá-lo (o do recipiente à mão reprova dois,
+porque perde a contagem **e** cai na varredura do padrão de dois passos).
+
+> ⚠️ **E ISSO NÃO É A CONFERÊNCIA NA FÁBRICA.** A medição foi num navegador
+> meu, a 400 e a 1440 px, com as dezesseis telas e todas as abas. A prova que
+> fecha é **alguém abrindo o `/corte` no celular da bancada** e a página não
+> andando de lado com a medida sendo digitada.
 
 ### Três regras do sob medida que valem citar aqui
 

@@ -54,7 +54,7 @@
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,banner,beep,el,limpar,$,num,comoNumero,formatarMedida,formatarMetros,formatarArea}=window.ui;
+const {api,banner,beep,el,limpar,$,num,comoNumero,formatarMedida,formatarMetros,formatarArea,rolaH}=window.ui;
 
 const memoria={
   get(c){ try{ return JSON.parse(localStorage.getItem('corte_'+c)); }catch(e){ return null; } },
@@ -157,7 +157,10 @@ async function telaEntrada(){
         telaEntrada(); }})])
     ]));
   });
-  c.appendChild(tab);
+  /* Sem o recipiente do `rolaH` a grade empurra a PAGINA inteira, e esta e a
+     tela da BANCADA: a 400 px ela media 623 px e a pagina andava de lado com
+     o operador digitando medida (§12). */
+  c.appendChild(rolaH(tab));
 
   const acoes=el('div',{class:'campos',style:'margin-top:10px;align-items:center'});
   acoes.appendChild(el('button',{class:'bt',texto:'+ linha',onclick:()=>{
@@ -314,7 +317,7 @@ function desenharPlano(){
         el('td',{texto:formatarMetros(g.largura)}),
         el('td',{class:'num',texto:String(g.pecas)}),
         el('td',{class:'num',texto:formatarArea(g.area_m2)})])));
-      av.appendChild(t);
+      av.appendChild(rolaH(t));
     }
     av.appendChild(el('p',{class:'ajuda',style:'margin-bottom:0',
       texto:'Não há emenda: ou existe bobina larga o bastante, ou a peça não sai. '+
@@ -503,7 +506,7 @@ function desenharPlano(){
       el('td',{class:'num',texto:formatarArea(s.desperdicio)}),
       el('td',{},[i===0?el('span',{class:'tag bom',texto:'escolhida'}):el('span',{})])
     ])));
-    cs.appendChild(t);
+    cs.appendChild(rolaH(t));
     c.appendChild(cs);
   }
 

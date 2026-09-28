@@ -34,7 +34,7 @@
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,banner,beep,el,limpar,$,num,comoNumero,formatarMedida,formatarArea,dinheiro}=window.ui;
+const {api,banner,beep,el,limpar,$,num,comoNumero,formatarMedida,formatarArea,dinheiro,rolaH}=window.ui;
 
 let eu={}, aba='lancar';
 /* QUEM VE DINHEIRO. O servidor ja mandou o JSON sem preco e valor para quem
@@ -364,7 +364,7 @@ async function telaLancar(pai){
       el('td',{class:'num',texto:formatarArea(s.area)}),
       el('td',{class:'quem',texto:s.endereco||''})
     ])));
-    cU.appendChild(t);
+    cU.appendChild(rolaH(t));
     pai.appendChild(cU);
   }
 
@@ -424,7 +424,7 @@ async function telaLista(pai){
     }
     tR.appendChild(el('tr',{},celulas));
   });
-  cR.appendChild(comSobra.length?tR:el('div',{class:'vazio',texto:'Nenhuma sobra catalogada ainda.'}));
+  cR.appendChild(comSobra.length?rolaH(tR):el('div',{class:'vazio',texto:'Nenhuma sobra catalogada ainda.'}));
   pai.appendChild(cR);
 
   // O cartao de preco abre logo abaixo do resumo, para a linha continuar a vista.
@@ -544,7 +544,7 @@ async function telaLista(pai){
   busca.addEventListener('input',filtrar);
   busca.addEventListener('keydown',ev=>{ if(ev.key==='Enter'||ev.key==='Tab'){ ev.preventDefault(); filtrar(); } });
   filtrar();
-  c.appendChild(sobras.length?t:el('div',{class:'vazio',texto:'Nada catalogado ainda.'}));
+  c.appendChild(sobras.length?rolaH(t):el('div',{class:'vazio',texto:'Nada catalogado ainda.'}));
   pai.appendChild(c);
 }
 
@@ -616,7 +616,7 @@ async function cartaoPreco(pai,r){
         el('td',{class:'quem',texto:x.usuario_nome||''})
       ])));
       c.appendChild(el('h2',{style:'margin-top:14px;font-size:16px',texto:'Mudancas do preco'}));
-      c.appendChild(t);
+      c.appendChild(rolaH(t));
     }
   }catch(e){}
   c.appendChild(el('div',{class:'campos'},[bt,
@@ -646,7 +646,7 @@ function cartaoApontamentos(pai,pend){
       el('td',{texto:'→'}),
       el('td',{},[el('b',{texto:fmtVal(i.campo,i.para)})])
     ])));
-    bloco.appendChild(t);
+    bloco.appendChild(rolaH(t));
     bloco.appendChild(el('p',{class:'ajuda',texto:
       (p.motivo?'"'+p.motivo+'" — ':'')+'apontado por '+(p.criado_por||'?')+' em '+String(p.criado_em).slice(0,16)}));
     const btOk=el('button',{class:'bt primario pequeno',texto:'Aceitar',onclick:async()=>{
@@ -826,7 +826,7 @@ async function cartaoCorrigir(pai,s,modo){
           ? 'apontado por '+h.proposto_por+', aceito por '+(h.usuario_nome||'?')
           : (h.usuario_nome||'')})
       ])));
-      c.appendChild(t);
+      c.appendChild(rolaH(t));
     }
 
     // 7. os apontamentos — pendentes, aceitos e recusados. E AQUI que a
@@ -846,7 +846,7 @@ async function cartaoCorrigir(pai,s,modo){
             texto:estadoTxt})])
         ]));
       });
-      c.appendChild(t);
+      c.appendChild(rolaH(t));
     }
   }
   function faltou(msg){ banner(msg,'alerta',3); beep('erro'); }

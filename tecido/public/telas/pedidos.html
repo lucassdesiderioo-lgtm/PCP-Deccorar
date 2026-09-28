@@ -60,7 +60,7 @@ table.lista tr.cancelado td{opacity:.55; text-decoration:line-through}
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,banner,el,limpar,$,dinheiro}=window.ui;
+const {api,banner,el,limpar,$,dinheiro,rolaH}=window.ui;
 
 /* A mesma conversao exata do simulador e do catalogo: metro entra como TEXTO
    e vira milimetro inteiro por soma, nunca por `Number(x)*1000`.
@@ -122,7 +122,10 @@ function tabela(linhas, aoClicar){
     corpo.appendChild(tr);
   });
   t.appendChild(corpo);
-  return t;
+  /* Cinco colunas nao cabem em 400 px: sem o recipiente quem anda de lado e a
+     PAGINA (§12). O embrulho vai DENTRO do helper, e por isso alcanca os dois
+     chamadores de uma vez — a fila e a lista. */
+  return rolaH(t);
 }
 
 // ── A fila e a lista ──────────────────────────────────────────────────────

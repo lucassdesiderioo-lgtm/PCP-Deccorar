@@ -52,7 +52,7 @@
 <script src="/sobmedida/nav.js"></script>
 <script src="/barras.js"></script>
 <script>
-const {api,banner,el,limpar,$}=window.ui;
+const {api,banner,el,limpar,$,rolaH}=window.ui;
 
 async function desenhar(){
   const lotes=await api('/api/etiquetas/lotes');
@@ -98,7 +98,7 @@ async function desenhar(){
     t.appendChild(el('tr',{},[el('th',{texto:'Codigo'}),el('th',{texto:'Impressa em'}),el('th',{class:'num',texto:'Dias'})]));
     pendentes.slice(0,40).forEach(e=>t.appendChild(el('tr',{},[
       el('td',{texto:e.codigo}), el('td',{texto:e.criado_em}), el('td',{class:'num',texto:String(e.dias)})])));
-    cP.appendChild(t);
+    cP.appendChild(rolaH(t));
     if(pendentes.length>40) cP.appendChild(el('p',{class:'ajuda',texto:'…e mais '+(pendentes.length-40)+'.'}));
   } else cP.appendChild(el('div',{class:'vazio',texto:'Nenhuma etiqueta solta.'}));
   p.appendChild(cP);
@@ -119,7 +119,7 @@ async function desenhar(){
         montarFolha(etqs.map(e=>e.codigo),l);
       }})])
     ])));
-    cL.appendChild(t);
+    cL.appendChild(rolaH(t));
   } else cL.appendChild(el('div',{class:'vazio',texto:'Nenhum lote impresso ainda.'}));
   p.appendChild(cL);
 }

@@ -55,7 +55,7 @@ table.lista tr.escolhido{background:var(--linha)}
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
-const {api,banner,el,limpar,$}=window.ui;
+const {api,banner,el,limpar,$,rolaH}=window.ui;
 const NAV_BASE='/sobmedida';
 
 let eu={permissoes:[]}, pedidos=[], setores=[], historico=[], refazer=[];
@@ -123,7 +123,9 @@ function desenhar(){
     corpo.appendChild(tr);
   });
   t.appendChild(corpo);
-  c.appendChild(t);
+  /* Sem o recipiente do `rolaH` a tabela mais larga que a janela empurra a
+     PAGINA inteira, e num celular o topo do card sai de vista (§12). */
+  c.appendChild(rolaH(t));
 
   // ── escolher o setor ──
   /* ⚠️ A FILEIRA DE ESCOLHA É A DO `base.css`, e não uma cópia. A primeira
@@ -239,7 +241,7 @@ function desenharRefazer(){
     el('td',{},['pedido '+x.pedido_numero+' · peça '+x.item_n+' · '+(x.revenda||'')]),
     el('td',{},[(x.motivo||'—')+(x.recusado_por?' · recusou: '+x.recusado_por:'')])
   ])));
-  c.appendChild(t);
+  c.appendChild(rolaH(t));
   if(!posso('etiqueta_producao.imprimir')) return;
   /* Um botao por SETOR, e nao um botao so: cada maço vai para uma bancada
      diferente, e quem esta na Zebra imprime o de quem esta esperando. */

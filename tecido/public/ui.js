@@ -85,6 +85,21 @@ function el(tag,attrs,filhos){
 }
 const limpar=n=>{ while(n.firstChild) n.removeChild(n.firstChild); return n; };
 
+/* ⚠️ TABELA QUE NAO CABE ROLA DENTRO DESTE RECIPIENTE — a PAGINA nunca anda
+   de lado. `table{width:100%}` nao impede nada: mais larga que o corpo, ela
+   empurra a pagina inteira, e num celular o topo do card sai de vista (§12).
+
+   ⚠️ E A FUNCAO DEVOLVE O RECIPIENTE COM A TABELA JA DENTRO, de proposito.
+   O padrao de dois passos — criar o recipiente, e depois lembrar de pendurar
+   a tabela nele — nasceu OCO uma vez e passou verde num caso de teste que
+   conferia so a classe. Aqui nao ha o segundo passo para esquecer.
+
+   Embrulhar tabela que CABE nao custa nada (sem transbordo, `auto` nao
+   desenha barra), e e por isso que toda tabela passa por aqui: deixar de
+   fora as que cabem hoje faz a proxima pessoa perguntar quais tem e quais
+   nao tem — e a que crescer amanha volta a empurrar a pagina. */
+const rolaH=t=>el('div',{class:'rolaH'},[t]);
+
 // Numero digitado na fabrica vem com virgula. Uma porta so para converter.
 function comoNumero(texto){
   const n=Number(String(texto==null?'':texto).replace(',','.').trim());
@@ -131,5 +146,5 @@ function avisoCorSemItem(cadastradas, naFileira, nomeLinha, nomeColecao){
     '(linha · colecao · cor) — cadastre em Cadastros → Tecido → Item de tecido.'});
 }
 
-window.ui={api,banner,beep,formatarMedida,formatarMetros,formatarArea,dinheiro,num,$,$$,el,limpar,comoNumero,avisoCorSemItem};
+window.ui={api,banner,beep,formatarMedida,formatarMetros,formatarArea,dinheiro,num,$,$$,el,limpar,rolaH,comoNumero,avisoCorSemItem};
 })();
