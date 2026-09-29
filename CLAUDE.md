@@ -3597,6 +3597,60 @@ aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não sil
 | **Leitor manda Tab ou espaço** | Código chega picado ou o Enter cai no vazio | Aceitar Enter **e** Tab; limpar com `replace(/[^A-Za-z0-9]/g,'')`; processar por timeout após a última tecla |
 | **`DELETE` em tabela que se auto-referencia** | Com `foreign_keys = ON`, `DELETE FROM t` (todas) **passa** — o FK imediato é conferido no **fim da instrução** —, mas `DELETE ... WHERE id=1` com a filha de pé é **recusado**. Um `DELETE` filtrado que hoje casa com tudo passa por sorte, e quebra no dia em que o filtro deixar alguém | Soltar o ponteiro antes, e **só de quem aponta para linha que vai sair** — limpar o ponteiro de quem fica apaga o vínculo em silêncio (`tecido/limpar_sobras.js`, §19) |
 
+### ⚠️ AS TELAS DO PCP FORAM MEDIDAS, E ELAS NÃO TÊM O DEFEITO (29/09/2026)
+
+Depois de consertar as sete do sob medida (§19), a pergunta óbvia era se o
+PCP tinha o mesmo. **Tem, e não importa** — e o "não importa" é decisão do
+dono, não conclusão minha.
+
+As **13 telas** de `public/` foram abertas com o banco semeado (SKU de código
+comprido, cliente de nome comprido, 24 volumes nos seis estágios, caixa de
+várias persianas, componentes) e medidas por `scrollWidth` contra
+`clientWidth`:
+
+| Largura | O que é | Rola de lado |
+|---|---|---|
+| **1440** · 1366 · 1280 px | notebook — o alvo do `DESIGN.md` §7 para admin | **nada** |
+| **1024 px** (iPad deitado) | a bancada do `DESIGN.md` | só o admin: Estoque e Compras |
+| **768 px** (iPad em pé) | a bancada | só o admin: + Cadastro de SKU e Cadastros |
+| **400 px** (celular) | ninguém abre o PCP assim hoje | 18 tela/aba |
+
+> ⚠️ **NENHUMA TELA DE OPERAÇÃO ROLA EM TABLET.** `/operador`, `/montagem`,
+> `/carregamento`, `/inventario`, `/painel` (a TV), `/embalagem`, `/devolucao`,
+> `/setor`, `/planejamento`, `/recebimento`: limpas a 768 **e** a 1024. Elas
+> foram desenhadas para o iPad da bancada, e a medição confirma. É o contrário
+> do sob medida, onde `/corte` e `/producao` — as duas de bancada — rolavam.
+
+> ✅ **E O ADMIN SE ABRE SÓ NO COMPUTADOR — decisão do dono, 29/09/2026.** Com
+> isso as abas **Estoque** (tabela de 9 colunas, 1115 px, a página precisa de
+> 1156) e **Compras** (994 px, precisa de 1035) **deixam de ser defeito**: o
+> alvo delas é 1440 px, onde estão certas, e o próprio `index.html` já dizia
+> isso no comentário da linha 11. Ficam **medidas e dispensadas**, e não como
+> dívida — dívida que ninguém vai pagar é a lista que a equipe aprende a não
+> ler (§5, #10).
+
+**O que continua rolando a 400 px, anotado e NÃO consertado** (não estava em
+plano nenhum, e o §0 manda anotar em vez de consertar junto):
+
+| Onde | px | Quem empurra |
+|---|---|---|
+| o admin, **nas 15 abas** | 413 | o card `#mlTask` "Abrir Planejamento" — **13 px, sempre os mesmos**. É UM defeito, não quinze |
+| `/relatorios` | 526 | duas tabelas (432 e 489) |
+| `/expedicao` | 524 | a tabela do lote (502) |
+| `/embalagem` | 485 | as duas colunas (Agência · Coleta) não quebram |
+| admin → Cadastros | 859 | a **prévia da etiqueta do kit** — o SVG de 100 × 35 mm (§4) |
+
+> ⚠️ **O `.rolaH` NÃO EXISTE NO `public/` DA RAIZ.** O recipiente que conserta
+> isso no sob medida mora no `tecido/public/base.css`; são duas folhas de
+> estilo diferentes. Levá-lo para cá é trabalho de verdade — 4 abas do admin,
+> 3 telas e o `#mlTask` —, e não uma linha.
+
+> ⚠️ **E A MEDIÇÃO É DE UM BANCO SEMEADO, NÃO DA PRODUÇÃO.** O número de
+> coluna não muda, mas o conteúdo empurra: um cliente de nome mais comprido ou
+> um SKU novo pode passar dos 1156 px da aba Estoque. O que está medido é
+> **esta** amostra — e dizer isso é a diferença entre um número e um fato
+> (§19, "o número errado não veio de uma conta errada: veio de não ter medido").
+
 ### Como verificar a sintaxe do `<script>` de um HTML
 
 ```bash
@@ -4600,6 +4654,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   sem endereço a tela não desenha o que rola — mede-se o vazio (§19)
 - ❌ Contar telas com defeito pelas que estavam abertas em vez das medidas: foi
   assim que "sete" virou "três" num relatório meu (§19, §12)
+- ❌ Reabrir como dívida as abas Estoque e Compras do admin: elas foram MEDIDAS
+  e dispensadas — o admin só se abre no computador (§12, decisão de 29/09/2026)
+- ❌ Dizer que levar o `.rolaH` ao `public/` da raiz é "uma linha": são duas
+  base.css diferentes, 4 abas do admin e 3 telas (§12)
 - ❌ Escrever varredura que lê o comentário que a explica, ou que procura
   `/100).toFixed` sem nomear o centavo: as duas acusam o inocente (§19)
 - ❌ Escrever uma segunda tabela de "o que vem antes" para a recusa: o `ANTES`
