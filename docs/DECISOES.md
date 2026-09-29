@@ -119,3 +119,11 @@ soma cada pedido fica coberto exatamente, sem fração.
 Decisão do dono. "Em aberto" continua sendo só título lançado; o que falta titular fica
 ao lado, como o "aprovado sem boleto" — a regra "os dois, mostrados separados" da §8 da
 spec. Somá-lo faria o disponível mudar de significado sem ninguém lançar nada.
+
+## 29/09/2026 — o admin se abre só no computador, e isso dispensa duas abas
+Decisão do dono, ao ler a medição das 13 telas do PCP. As abas **Estoque** (tabela de
+9 colunas, 1115 px) e **Compras** (994 px) rolam a página abaixo de ~1160 px, mas o
+alvo delas é o notebook de 1440, onde estão certas. Ficam **medidas e dispensadas** —
+não entram como dívida. Dívida que ninguém vai pagar é a lista que a equipe aprende a
+não ler. As telas de operação do PCP não rolam em tablet nenhum (768 e 1024 limpos),
+que era a pergunta que importava. Detalhe e números no `CLAUDE.md` §12.
