@@ -703,6 +703,10 @@ module.exports = function(app, db){
        pedido de outra pessoa. A fila e lida por quem pede e por quem aprova.
        O POST /api/estoque antigo so recusa, e fica com a chave de quem pede:
        e para essa pessoa que a recusa diz o caminho. */
+    /* A MESA DE CORRECOES (MESA-DE-CORRECOES F1, 29/09/2026). Tudo nela — ate a
+       busca e o historico — pede a mesma chave: ver o passivo e o antes/depois
+       de cada correcao e parte de corrigir. */
+    if(pre('/api/correcao')) return 'correcao.executar';
     if(M !== 'GET' && eq('/api/estoque/ajuste')) return 'estoque.ajustar';
     if(eq('/api/estoque/ajuste/pendentes')) return ['estoque.ajustar','estoque.aprovar_ajuste'];
     if(M !== 'GET' && pre('/api/estoque/ajuste') && /\/aprovar$/.test(p)) return 'estoque.aprovar_ajuste';

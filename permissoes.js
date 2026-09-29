@@ -150,6 +150,13 @@ module.exports = [
   { chave:'estoque.aprovar_ajuste', grupo:'Estoque',  nivel:'admin',
     rotulo:'Aprovar ajuste de estoque', desc:'Aprovar ou recusar o ajuste pedido por outra pessoa (nunca o próprio)',
     sensivel:true },
+  /* A MESA DE CORRECOES (29/09/2026). Corrige passivo pela tela, com previa,
+     motivo e desfazer — e mexe em estoque na cancelada que voltou. Sensivel, e
+     SEM backfill: o Admin Geral passa por nivel, e os outros sao marcados pelo
+     nome. */
+  { chave:'correcao.executar',    grupo:'Estoque',    nivel:'admin',
+    rotulo:'Mesa de correções', desc:'Corrigir passivo pela Mesa (fantasma, cancelada depois da etiqueta) — com prévia, motivo e desfazer',
+    sensivel:true },
   { chave:'alvo.editar',          grupo:'Estoque',    nivel:'admin',
     rotulo:'Definir alvo',        desc:'Travar o alvo de um SKU' },
 

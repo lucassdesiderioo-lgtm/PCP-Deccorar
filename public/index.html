@@ -99,7 +99,7 @@
   <div class="tab" data-t="pend" id="tabPend">Pendências de SKU</div>
   <div class="tab" data-t="ficha">Ficha técnica</div>
   <div class="tab" data-t="compras">Compras</div>
-  <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="blq" id="tabBlq">Bloqueados</div><div class="tab" data-t="tst">Modo teste</div>
+  <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="blq" id="tabBlq">Bloqueados</div><div class="tab" data-t="cor" id="tabCor">Correções</div><div class="tab" data-t="tst">Modo teste</div>
 </div>
 <div class="wrap">
   <!-- PRODUÇÃO -->
@@ -264,6 +264,32 @@
   <div class="card" id="ctPend" style="display:none"></div>
 </div>
 
+<!-- A MESA DE CORRECOES (MESA-DE-CORRECOES F1, 29/09/2026). Nao e um editor
+     de linhas do banco: cada volume mostra so as acoes que valem para o estado
+     dele, e a que nao vale aparece com o motivo, em vez de sumir. Previa antes,
+     motivo obrigatorio, e desfazer enquanto o volume nao andou. -->
+<div id="v-cor" class="hide">
+<div class="card">
+  <div style="font-weight:800;font-size:16px;margin-bottom:4px">Mesa de correções</div>
+  <div class="estq" style="margin-bottom:12px">Ache o volume pelo número, venda, pack, NF, cliente ou bipe da etiqueta de venda.
+    Cada correção mostra antes o que vai mudar, pede o motivo e pode ser desfeita enquanto o volume não andar.</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <input id="corBusca" placeholder="volume, venda, NF, cliente ou bipe" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:220px">
+    <button class="primary" id="corBuscar">Buscar</button>
+  </div>
+  <div id="corAchados" style="margin-top:10px"></div>
+</div>
+<div class="card">
+  <div style="font-weight:700;margin-bottom:8px">O que espera correção</div>
+  <div id="corContadores" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+  <div id="corPassivo" style="margin-top:10px"></div>
+</div>
+<div class="card hide" id="corObjeto"></div>
+<div class="card">
+  <div style="font-weight:700;margin-bottom:8px">Últimas correções</div>
+  <div id="corHist"></div>
+</div>
+</div>
 <div id="v-blq" class="hide">
 <!-- A ETIQUETA MUDOU DE FORMATO (§8-B, armadilha #21). O sistema le se a caixa
      e do carro (agencia) ou do caminhao (coleta) pela linha "Despachar:" da
@@ -310,14 +336,14 @@
 <div class="card"><div id="blqEstado"></div><table><thead><tr><th>SKU</th><th>Volumes</th><th></th></tr></thead><tbody id="blqLista"></tbody></table></div>
 <div class="card" id="cancCard" style="display:none;border:2px solid #b26a00">
   <!-- VENDAS-E-MEDIA fase 2 (D3 do dono, 26/09/2026). SO MOSTRA: decidir o que
-       fazer com a persiana e da Mesa de correcoes, que ainda nao existe. Fica
+       fazer com a persiana e da Mesa de correcoes (aba Correcoes). Fica
        fora do numero da aba de proposito — nada aqui esta retido, e um numero
        que nao zera vira paisagem. -->
   <div style="font-weight:800;color:#b26a00;font-size:16px;margin-bottom:6px">CANCELADAS DEPOIS DA ETIQUETA</div>
   <div style="font-size:13px;color:#5a6472;margin-bottom:12px">
     O Mercado Livre cancelou estas vendas <b>depois</b> que a etiqueta saiu. A caixa não carrega mais
     (o bipe recusa), mas o estoque dela <b>já tinha baixado e não volta sozinho</b>: confira se a
-    persiana voltou para a prateleira e, se voltou, acerte o saldo em <i>Estoque</i>, com o motivo.
+    persiana voltou para a prateleira e decida em <b>decidir na Mesa</b> — a venda sai daqui depois de decidida.
   </div>
   <div id="cancLista"></div>
 </div>
@@ -392,6 +418,8 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(va) va.classList.toggle("hide",t.dataset.t!=="acs");
   var vt=$("#v-tst"); if(vt) vt.classList.toggle("hide",t.dataset.t!=="tst");
   if(t.dataset.t==="tst") carregarTeste();
+  var vco=$("#v-cor"); if(vco) vco.classList.toggle("hide",t.dataset.t!=="cor");
+  if(t.dataset.t==="cor") corCarregar();
   var vb=$("#v-blq"); if(vb) vb.classList.toggle("hide",t.dataset.t!=="blq");
   if(t.dataset.t==="blq") carregarBloq();
   var vc=$("#v-ct"); if(vc) vc.classList.toggle("hide",t.dataset.t!=="ct");
@@ -2506,10 +2534,218 @@ async function carregarCanc(){
       +'</div>'
       +'<div style="font-size:12px;color:#5a6472;margin-top:3px">ML: “'+esc(v.cancelada_motivo||"cancelada")+'”'
       +(quando?' · visto no import de '+quando:'')+(v.venda?' · venda '+esc(v.venda):'')+(v.packId?' · pack '+esc(v.packId):'')+'</div>'
+      +(v.cancelada_varias?'':'<div style="margin-top:6px"><button class="ghost small" data-mesa="'+v.id+'">decidir na Mesa →</button></div>')
       +'</div>';
   }
   lis.innerHTML=h;
 }
+/* ─── A MESA DE CORRECOES (MESA-DE-CORRECOES F1, 29/09/2026) ─────────────────
+   A regra mora no correcoes.js; a tela so pergunta e mostra. A acao que nao
+   vale aparece DESABILITADA com o motivo escrito, em vez de sumir. */
+var COR={obj:null, previa:null};
+function corData(s){ s=String(s||""); return s.length>=16 ? s.slice(8,10)+"/"+s.slice(5,7)+" "+s.slice(11,16) : (s.length>=10 ? s.slice(8,10)+"/"+s.slice(5,7) : s); }
+var COR_ESTAGIO={pendente:"pendente (falta imprimir)",embalado:"etiqueta impressa",carregado:"carregado",bloqueado:"bloqueado",cancelado:"cancelado"};
+function corEstagio(e){ return COR_ESTAGIO[e]||e||"—"; }
+async function corJson(url, corpo){
+  var r, j={};
+  try{
+    r = corpo ? await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(corpo)}) : await fetch(url);
+    try{ j=await r.json(); }catch(e){}
+  }catch(e){ return {ok:false, erro:"sem conexão com o servidor"}; }
+  if(r.status===403) return {ok:false, erro:"sem permissão: a Mesa de correções pede a chave “Mesa de correções” (Acessos)"};
+  if(!r.ok && !j.erro) j.erro="falhou ("+r.status+")";
+  if(!r.ok) j.ok=false;
+  return j;
+}
+function corLinhaVol(v, extra){
+  return '<div class="selrow" style="cursor:pointer" data-corabre="'+v.id+'">'
+    +'<div style="flex:1;min-width:0"><b>#'+v.id+'</b> · '+esc(v.buyer||"—")+' · NF '+esc(v.nf||"—")
+    +' · <span style="font-family:ui-monospace,monospace">'+esc(v.codigo||"")+'</span>'
+    +'<div class="estq">'+esc(corEstagio(v.estagio))+(v.data?' · entrou '+esc(corData(v.data)):'')+(extra||"")+'</div></div>'
+    +'<span class="estq">abrir →</span></div>';
+}
+async function corCarregar(){ corPassivo(); corHistorico(); }
+async function corPassivo(){
+  var j=await corJson("/api/correcao/passivo");
+  var box=$("#corContadores"), lis=$("#corPassivo");
+  if(!j.ok){ box.innerHTML='<span class="baixo">'+esc(j.erro)+'</span>'; lis.innerHTML=""; return; }
+  var f=j.fantasmas||[], c=j.canceladas||[];
+  var chip=function(k,rot,n){ return '<button class="ghost small" data-corpas="'+k+'" style="'+(n?'color:var(--amber);border-color:var(--amber)':'')+'">'+rot+' · <b>'+n+'</b></button>'; };
+  box.innerHTML=chip("fantasmas","Fantasmas",f.length)+chip("canceladas","Canceladas a decidir",c.length);
+  var tb=$("#tabCor"); if(tb) tb.textContent=(f.length+c.length)?("Correções ("+(f.length+c.length)+")"):"Correções";
+  COR.passivo=j;
+  if(COR.abertaPas) corMostraPas(COR.abertaPas);
+}
+function corMostraPas(k){
+  COR.abertaPas=k;
+  var l=(COR.passivo||{})[k]||[], lis=$("#corPassivo");
+  if(!l.length){ lis.innerHTML='<div class="estq">'+(k==="fantasmas"?"Nenhum fantasma para descartar.":"Nenhuma cancelada esperando decisão.")+'</div>'; return; }
+  lis.innerHTML=l.map(function(v){
+    return corLinhaVol(v, k==="fantasmas"
+      ? ' · o mesmo volume já entrou como #'+v.irmao+' ('+esc(corEstagio(v.irmao_estagio))+')'
+      : ' · estava '+esc(v.cancelada_estagio==="carregado"?(v.modalidade==="coleta"?"no canto da coleta":"no carro"):"na área, com etiqueta")
+        +' · ML: “'+esc(v.cancelada_motivo||"cancelada")+'”');
+  }).join("");
+}
+async function corBuscar(){
+  var q=$("#corBusca").value.trim(), box=$("#corAchados");
+  if(!q){ box.innerHTML=""; return; }
+  var j=await corJson("/api/correcao/buscar?q="+encodeURIComponent(q));
+  if(!j.ok){ box.innerHTML='<span class="baixo">'+esc(j.erro)+'</span>'; return; }
+  var l=j.volumes||[];
+  if(!l.length){ box.innerHTML='<div class="estq">Nenhum volume com “'+esc(q)+'”.</div>'; return; }
+  if(l.length===1){ box.innerHTML=""; corAbrir(l[0].id); return; }
+  box.innerHTML='<div class="estq" style="margin-bottom:4px">'+l.length+' volumes:</div>'+l.map(function(v){ return corLinhaVol(v); }).join("");
+}
+async function corAbrir(id){
+  var box=$("#corObjeto");
+  box.classList.remove("hide");
+  box.innerHTML='<div class="estq">abrindo #'+esc(id)+'…</div>';
+  var j=await corJson("/api/correcao/lote/"+encodeURIComponent(id));
+  if(!j.ok){ box.innerHTML='<span class="baixo">'+esc(j.erro)+'</span>'; return; }
+  COR.obj=j; COR.previa=null;
+  corDesenha();
+  box.scrollIntoView({behavior:"smooth",block:"start"});
+}
+function corDesenha(){
+  var j=COR.obj, v=j.dados, box=$("#corObjeto");
+  var h='<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><div style="font-weight:800;font-size:17px">Volume #'+v.id+'</div>'
+    +'<div class="estq">'+esc(corEstagio(v.estagio))+'</div>'
+    +'<button class="ghost small" style="margin-left:auto" id="corFechar">fechar</button></div>';
+  h+='<div style="margin-top:6px"><b>'+esc(v.buyer||"—")+'</b> · NF '+esc(v.nf||"—")+' · <span style="font-family:ui-monospace,monospace">'+esc(v.codigo||"")+'</span></div>';
+  var det=[];
+  if(v.venda) det.push("venda "+esc(v.venda)); if(v.packId) det.push("pack "+esc(v.packId));
+  if(v.data) det.push("entrou "+esc(corData(v.data))); if(v.despachar_em) det.push("despacha "+esc(corData(v.despachar_em)));
+  if(v.embalado_em) det.push("etiqueta "+esc(corData(v.embalado_em))); if(v.carregado_em) det.push("carregado "+esc(corData(v.carregado_em)));
+  if(v.modalidade) det.push(esc(v.modalidade));
+  h+='<div class="estq" style="margin-top:3px">'+det.join(" · ")+'</div>';
+  if(v.estagio==="cancelado"||v.cancelada_varias)
+    h+='<div style="margin-top:6px;color:var(--amber);font-size:13px">Cancelada no ML'+(v.cancelada_em?' (visto em '+esc(corData(v.cancelada_em))+')':'')
+      +(v.cancelada_estagio?' — estava '+esc(corEstagio(v.cancelada_estagio)):'')+': “'+esc(v.cancelada_motivo||"cancelada")+'”</div>';
+  if((j.itens||[]).length>1||((j.itens||[])[0]||{}).qtd>1)
+    h+='<div class="estq" style="margin-top:4px">Peças: '+j.itens.map(function(i){ return i.qtd+" × "+esc(i.codigo); }).join(" + ")+'</div>';
+  if((j.livro||[]).length)
+    h+='<div style="margin-top:10px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">No livro de estoque</div>'
+      +j.livro.map(function(m){ return '<div style="font-size:13px">'+esc(corData(m.criado_em))+' · '+esc(m.tipo)+' · <b>'+(m.delta>0?"+":"")+m.delta+'</b> '+esc(m.codigo)+'</div>'; }).join("");
+
+  // As acoes
+  h+='<div style="margin-top:14px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">O que dá para fazer</div>';
+  (j.acoes||[]).forEach(function(a){
+    h+='<div style="border-top:1px solid var(--line);padding:10px 0">';
+    h+='<div style="font-weight:700">'+esc(a.rotulo)+(a.estoque?' <span class="estq">· pode mexer no estoque</span>':'')+'</div>';
+    if(!a.vale){ h+='<div class="estq" style="margin-top:3px">Não vale aqui: '+esc(a.motivo)+'</div></div>'; return; }
+    h+='<div class="row-actions" style="margin-top:8px">';
+    if(a.id==="cancelada"){
+      h+= a.voltou_vale===true
+        ? '<button class="primary small" data-corprev="cancelada" data-voltou="1">A persiana voltou — devolver ao estoque</button>'
+        : '<button class="ghost small" disabled style="opacity:.45;cursor:not-allowed" title="'+esc(a.voltou_vale)+'">A persiana voltou</button>';
+      h+='<button class="ghost small" data-corprev="cancelada" data-voltou="0">Não voltou — só registrar</button>';
+      h+='</div>';
+      if(a.voltou_vale!==true) h+='<div class="estq" style="margin-top:4px">“Voltou” não vale: '+esc(a.voltou_vale)+'</div>';
+    } else {
+      h+='<button class="primary small" data-corprev="'+a.id+'">'+esc(a.rotulo)+'</button></div>';
+    }
+    h+='</div>';
+  });
+  h+='<div id="corPrevia"></div>';
+  if((j.historico||[]).length)
+    h+='<div style="margin-top:12px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Correções deste volume</div>'
+      +j.historico.map(corLinhaHist).join("");
+  box.innerHTML=h;
+  if(COR.previa) corDesenhaPrevia();
+}
+function corTextoEstoque(l){
+  return (l||[]).map(function(m){ return '<b>'+(m.delta>0?"+":"")+m.delta+'</b> '+esc(m.codigo); }).join(" · ");
+}
+async function corPrevia(acao, voltou){
+  var params = acao==="cancelada" ? {voltou:voltou} : {};
+  var j=await corJson("/api/correcao/previa",{acao:acao, tipo:"lote", id:COR.obj.dados.id, params:params});
+  COR.previa = j.ok ? {acao:acao, params:params, r:j} : {erro:j.erro};
+  corDesenhaPrevia();
+}
+function corDesenhaPrevia(){
+  var p=COR.previa, box=$("#corPrevia"); if(!box) return;
+  if(!p){ box.innerHTML=""; return; }
+  if(p.erro){ box.innerHTML='<div class="baixo" style="margin-top:10px">'+esc(p.erro)+'</div>'; return; }
+  var r=p.r, titulo;
+  if(p.acao==="fantasma") titulo="Descartar o volume #"+r.alvo_id;
+  else titulo = p.params.voltou ? "A persiana voltou — devolver ao estoque" : "Não voltou — só registrar";
+  var h='<div style="margin-top:12px;border:2px solid var(--amber);border-radius:12px;padding:14px">'
+    +'<div style="font-weight:800;color:var(--amber)">PRÉVIA · '+esc(titulo)+'</div>'
+    +'<div style="font-size:14px;margin-top:6px">Estoque: '+((r.estoque||[]).length?corTextoEstoque(r.estoque):'não muda')+'</div>';
+  (r.avisos||[]).forEach(function(a){ h+='<div class="estq" style="margin-top:4px">'+esc(a)+'</div>'; });
+  h+='<div class="estq" style="margin-top:4px">Nada foi gravado ainda.</div>'
+    +'<label style="margin-top:10px">Motivo (obrigatório)</label><input id="corMotivo" placeholder="o que aconteceu — quem ler daqui a um mês precisa entender">'
+    +'<div class="row-actions"><button class="primary" id="corConfirmar">Confirmar</button><button class="ghost" id="corCancelar">Cancelar</button>'
+    +'<span id="corMsg" class="estq"></span></div></div>';
+  box.innerHTML=h;
+  var mi=$("#corMotivo"); if(mi) mi.focus();
+}
+async function corConfirmar(){
+  var p=COR.previa, m=($("#corMotivo").value||"").trim(), msg=$("#corMsg");
+  if(!m){ msg.innerHTML='<span class="baixo">escreva o motivo</span>'; return; }
+  var bt=$("#corConfirmar"); bt.disabled=true;
+  var j=await corJson("/api/correcao/executar",{acao:p.acao, tipo:"lote", id:COR.obj.dados.id, params:p.params, motivo:m});
+  bt.disabled=false;
+  if(!j.ok){ msg.innerHTML='<span class="baixo">'+esc(j.erro)+'</span>'; return; }
+  var id=COR.obj.dados.id;
+  COR.previa=null;
+  corCarregar();
+  if(p.acao==="fantasma"){
+    $("#corObjeto").innerHTML='<div class="ok"><b>Volume #'+id+' descartado</b> (correção #'+j.correcao_id+'). Dá para desfazer em “Últimas correções”, logo abaixo.</div>';
+    return;
+  }
+  await corAbrir(id);
+}
+function corLinhaHist(c){
+  var o = c.acao==="cancelada" ? (c.decisao==="voltou"?"voltou":"não voltou") : (c.acao==="fantasma"?"descartado"+(c.fica?" (ficou o #"+c.fica+")":""):"");
+  return '<div style="border-top:1px solid var(--line);padding:8px 0;font-size:13.5px'+(c.desfeita_em?';opacity:.6':'')+'">'
+    +'<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><b>#'+c.id+' · '+esc(c.rotulo)+'</b>'
+    +'<span>volume <a href="#" data-corabre="'+c.alvo_id+'" style="color:var(--blue)">#'+c.alvo_id+'</a> · '+esc(o)+(c.movimentos&&c.movimentos.length?' ·':'')+'</span>'
+    +(c.movimentos&&c.movimentos.length?'<span>'+corTextoEstoque(c.movimentos)+'</span>':'')
+    +(c.desfeita_em?'':'<button class="ghost small" style="margin-left:auto" data-cordesf="'+c.id+'">desfazer</button>')+'</div>'
+    +'<div class="estq">'+esc(corData(c.criado_em))+' · '+esc(c.usuario_nome||"?")+' — “'+esc(c.motivo||"")+'”</div>'
+    +(c.desfeita_em?'<div class="estq">desfeita em '+esc(corData(c.desfeita_em))+' por '+esc(c.desfeita_por||"?")+' — “'+esc(c.desfeita_motivo||"")+'”</div>':'')
+    +'<div id="corDesf'+c.id+'"></div></div>';
+}
+async function corHistorico(){
+  var j=await corJson("/api/correcao/historico?limite=30"), box=$("#corHist");
+  if(!j.ok){ box.innerHTML='<span class="baixo">'+esc(j.erro)+'</span>'; return; }
+  box.innerHTML=(j.itens||[]).length ? j.itens.map(corLinhaHist).join("") : '<div class="estq">Nenhuma correção ainda.</div>';
+}
+function corPedeDesfazer(id){
+  document.querySelectorAll('[id="corDesf'+id+'"]').forEach(function(box){
+    box.innerHTML='<div class="row-actions" style="margin-top:6px"><input placeholder="por que desfazer? (obrigatório)" data-cordmot="'+id+'" style="flex:1;min-width:200px">'
+      +'<button class="primary small" data-cordok="'+id+'">Desfazer</button><span class="estq" data-cordmsg="'+id+'"></span></div>';
+  });
+}
+async function corDesfazer(id, inp){
+  var m=(inp&&inp.value||"").trim(), msg=inp&&inp.parentNode.querySelector('[data-cordmsg]');
+  if(!m){ if(msg) msg.innerHTML='<span class="baixo">escreva o porquê</span>'; return; }
+  var j=await corJson("/api/correcao/"+id+"/desfazer",{motivo:m});
+  if(!j.ok){ if(msg) msg.innerHTML='<span class="baixo">'+esc(j.erro)+'</span>'; return; }
+  corCarregar();
+  if(COR.obj) corAbrir(j.alvo_id);
+}
+document.addEventListener("click",function(e){
+  var t=e.target;
+  var ab=t.closest&&t.closest("[data-corabre]"); if(ab){ e.preventDefault(); corAbrir(ab.getAttribute("data-corabre")); return; }
+  var pa=t.closest&&t.closest("[data-corpas]"); if(pa){ corMostraPas(pa.getAttribute("data-corpas")); return; }
+  var pr=t.closest&&t.closest("[data-corprev]"); if(pr){ corPrevia(pr.getAttribute("data-corprev"), pr.getAttribute("data-voltou")==="1"); return; }
+  if(t.id==="corConfirmar"){ corConfirmar(); return; }
+  if(t.id==="corCancelar"){ COR.previa=null; corDesenhaPrevia(); return; }
+  if(t.id==="corFechar"){ COR.obj=null; COR.previa=null; $("#corObjeto").classList.add("hide"); return; }
+  if(t.id==="corBuscar"){ corBuscar(); return; }
+  var df=t.closest&&t.closest("[data-cordesf]"); if(df){ corPedeDesfazer(df.getAttribute("data-cordesf")); return; }
+  var dk=t.closest&&t.closest("[data-cordok]"); if(dk){ corDesfazer(dk.getAttribute("data-cordok"), dk.parentNode.querySelector("[data-cordmot]")); return; }
+  var me=t.closest&&t.closest("[data-mesa]");
+  if(me){ var tc=document.querySelector('.tab[data-t="cor"]'); if(tc) tc.click(); corAbrir(me.getAttribute("data-mesa")); return; }
+});
+/* A busca aceita bipe: o leitor manda Enter (ou Tab) no fim. */
+document.addEventListener("keydown",function(e){
+  if(e.target&&e.target.id==="corBusca"&&(e.key==="Enter"||e.key==="Tab")){ e.preventDefault(); corBuscar(); }
+  if(e.target&&e.target.id==="corMotivo"&&e.key==="Enter"){ e.preventDefault(); corConfirmar(); }
+});
 async function carregarBloq(){
 carregarCanc();
 var l=[]; try{ l=await (await fetch("/api/bloqueados")).json(); }catch(e){}

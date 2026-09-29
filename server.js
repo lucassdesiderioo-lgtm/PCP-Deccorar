@@ -126,6 +126,9 @@ require('./cont_route')(app, db);
    26/09/2026): contar cego, recontar por outra pessoa, aprovar por quem nao
    contou. A tela e de tablet, em /inventario. */
 require('./inventario_route')(app, db);
+// A Mesa de correcoes (MESA-DE-CORRECOES F1, 29/09/2026). Le lote, lote_item e
+// o livro: vem depois do exp_route e do estoque_dominio.
+require('./correcao_route')(app, db);
 app.get('/inventario',(req,res)=> res.sendFile(path.join(__dirname,'public','inventario.html')));
 require('./etq_route')(app, db);
 require('./dev_route')(app, db);

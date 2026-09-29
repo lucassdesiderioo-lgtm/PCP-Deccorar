@@ -799,6 +799,26 @@ console.log('\n── 6-G. o ajuste em duas pessoas (fase 3 da ESTOQUE-LIVRO-E-C
        return tem(id,'estoque.ajustar') && tem(id,'estoque.aprovar_ajuste'); })());
 }
 
+console.log('\n── 6-H. a Mesa de correções (MESA-DE-CORRECOES F1) ──');
+{
+  const ch = PERMISSOES.find(p => p.chave === 'correcao.executar') || {};
+  eq('correcao.executar é nível admin', ch.nivel, 'admin');
+  ok('   e sensível (mexe em estoque na cancelada que voltou)', ch.sensivel === true);
+  ok('   com rótulo e descrição', !!ch.rotulo && !!ch.desc);
+  for(const [r, m] of [['/api/correcao/buscar','GET'], ['/api/correcao/passivo','GET'], ['/api/correcao/historico','GET'],
+                       ['/api/correcao/lote/12','GET'], ['/api/correcao/previa','POST'], ['/api/correcao/executar','POST'],
+                       ['/api/correcao/7/desfazer','POST']])
+    eq(m + ' ' + r + ' pede correcao.executar', AC.permDaRota(r, m), 'correcao.executar');
+
+  /* SEM BACKFILL: um setor que ja existia, de nivel admin, NAO ganha a chave no
+     boot. O Admin Geral passa por nivel; os outros sao marcados pelo nome. */
+  const sM = db.prepare("INSERT INTO setores (nome,nivel,nativo) VALUES ('Admin antigo','admin',0)").run().lastInsertRowid;
+  db.prepare("INSERT INTO setor_permissao (setor_id,chave) VALUES (?, 'estoque.ajustar')").run(sM);
+  require('./acesso')({ locals:{}, router:{ stack:[] }, get(){}, post(){}, delete(){} }, db);
+  ok('sem backfill: o setor que já existia não ganha a chave no boot',
+     !db.prepare("SELECT 1 FROM setor_permissao WHERE setor_id=? AND chave='correcao.executar'").get(sM));
+}
+
 console.log('\n── 16. a cobertura passou a VARRER o app ──');
 const cob = AC.coberturaDeRotas ? AC.coberturaDeRotas() : null;
 ok('existe a varredura das rotas registradas', !!cob, 'coberturaDeRotas() nao existe');

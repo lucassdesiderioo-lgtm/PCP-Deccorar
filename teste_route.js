@@ -44,7 +44,12 @@ module.exports=function(app, db){
     {nome:'inventario_item',      pk:'id', rotulo:'conferencia (SKUs)'},
     /* O PEDIDO DE AJUSTE (fase 3, 28/09/2026), pela mesma razao: aprovar gera
        movimento no livro, e o livro de teste e apagado ali em cima. */
-    {nome:'ajuste_pedido',        pk:'id', rotulo:'pedidos de ajuste'}
+    {nome:'ajuste_pedido',        pk:'id', rotulo:'pedidos de ajuste'},
+    /* A MESA DE CORRECOES (29/09/2026). O "voltou" gera movimento no livro, e o
+       livro de teste e apagado ali em cima: sem esta, "apagar tudo" deixaria a
+       correcao de pe — e o card de canceladas continuaria achando que a venda
+       foi decidida. */
+    {nome:'correcao',             pk:'id', rotulo:'correções (Mesa)'}
   ];
 
   // Fase 3: foto_estoque saiu da cobertura; limpa o trigger antigo em bancos

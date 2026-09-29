@@ -1,7 +1,25 @@
-> **STATUS · 21/09/2026 — PLANEJADO** · nada no código
-> Depende da fase 1 de `ESTOQUE-LIVRO-E-CONFERENCIA.md` (livro de movimentos) e, para a
-> ação "Canceladas depois da etiqueta", da fase 2 de `VENDAS-E-MEDIA.md`.
-
+> **STATUS · 29/09/2026 — FASE 1 CONSTRUÍDA** · fases 2 e 3 planejadas
+>
+> **Fase 1:** `correcoes.js` (dono único das ações), `correcao_route.js`, tabela
+> `correcao`, chave `correcao.executar`, aba **Correções** do admin e o botão
+> "decidir na Mesa" no card de canceladas. Ações: **Cancelada depois da etiqueta** e
+> **Descartar fantasma**. `teste_correcao.js` (96 casos). **Ainda não conferida na
+> fábrica.**
+>
+> **Decisões do dono na construção (29/09/2026):**
+> - "voltou" desfaz as baixas que o **livro** registrou (`lote:<id>`); volume impresso
+>   antes do livro volta pela peça, e a prévia avisa;
+> - sob medida: "voltou" é recusado (nunca baixou, §7 do CLAUDE.md);
+> - a caixa de várias persianas cancelada em parte fica **fora** da fase 1;
+> - "já decidida" se lê da tabela `correcao` — **sem coluna nova no `lote`**;
+> - descartar fantasma **apaga** a linha (como o script), e o desfazer a devolve com o
+>   mesmo id;
+> - os contadores do topo são só os das ações que existem (fantasmas, canceladas);
+> - `correcao.executar` **sem backfill** (a §5.4 falava em backfill para o Admin
+>   Geral, que já passa por nível).
+>
+> **Divergências:** busca só por volume na fase 1 (SKU e fila entram com as ações
+> deles, fase 2); há a rota extra `GET /api/correcao/passivo` para os contadores.
 ---
 
 # Mesa de correções — o dono corrige sem pedir ao Claude Code

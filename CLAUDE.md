@@ -411,7 +411,7 @@ relatório (`daPlanilha`) e marca os volumes (`marcar`); o import e o
 | Onde o volume estava | O que acontece |
 |---|---|
 | `pendente`, `bloqueado` | `estagio='cancelado'` — sai de "Faltam imprimir", da fila, da urgência, dos Bloqueados e da média. **Estoque não mexe** |
-| `embalado` (etiqueta impressa) | `cancelado` e vai para o card **Canceladas depois da etiqueta** (Admin → Bloqueados). **O estoque não volta sozinho** |
+| `embalado` (etiqueta impressa) | `cancelado` e vai para o card **Canceladas depois da etiqueta** (Admin → Bloqueados). **O estoque não volta sozinho** — decide-se na **Mesa de correções** (§5) |
 | no canto da coleta (`carregado`, sem caminhão) | idem — a caixa ainda está na fábrica |
 | no carro de uma viagem aberta | idem, e sai da viagem (`saida_id` limpo) |
 | `carregado` que já saiu | ignorado — se voltar, é devolução (§9) |
@@ -435,7 +435,9 @@ relatório (`daPlanilha`) e marca os volumes (`marcar`); o import e o
 >
 > ⚠️ **O CARD SÓ MOSTRA** (D3), e fica fora do número da aba Bloqueados: nada
 > ali está retido, e número que não zera vira paisagem. Decidir o que fazer
-> com a persiana é da Mesa de correções, que ainda não existe.
+> com a persiana é da **Mesa de correções** (desde 29/09/2026, bloco "A MESA DE
+> CORREÇÕES" no §5): cada linha tem o botão *decidir na Mesa*, e a venda
+> decidida sai do card.
 >
 > ⚠️ **O BIPE RECUSA A CAIXA CANCELADA** (D2) — no Carregamento
 > (`motivo:'cancelada'`, com auditoria), na viagem à agência e nas sobras do
@@ -2160,6 +2162,85 @@ número — o volume processado sai de `pendente` e o estoque baixa junto.
 > duplicata com irmão `pendente` ou `bloqueado` sai numa lista à parte, para
 > alguém olhar. O que fica é sempre o mais antigo, que é quem carrega a história.
 
+### ⚠️ A MESA DE CORREÇÕES — o dono corrige pela tela (29/09/2026, fase 1 da spec `MESA-DE-CORRECOES`)
+
+Admin → **Correções**. Até aqui todo passivo se corrigia pedindo ao Claude Code
+para rodar um script no servidor. A Mesa **não é um editor de linhas do banco**:
+cada volume mostra só as ações que valem para o estado dele, e a que não vale
+aparece **desabilitada com o motivo**, em vez de sumir.
+
+```
+BUSCAR ─▶ VER O VOLUME ─▶ PRÉVIA (nada gravado) ─▶ EXECUTAR (motivo) ─▶ DESFAZER (se nada andou)
+```
+
+`correcoes.js` é o **dono único** de cada ação (`valePara`, `previa`, `executar`,
+`desfazer`); `correcao_route.js` é a porta; a tabela `correcao` guarda o antes, o
+depois, o motivo e quem fez. Tudo pede `correcao.executar` (admin, sensível),
+**sem backfill**: o Admin Geral passa por nível, e os outros são marcados pelo
+nome — com backfill a chave iria para o setor Admin inteiro.
+
+| Ação (fase 1) | Vale para | O que faz | Estoque |
+|---|---|---|---|
+| **Cancelada depois da etiqueta** | `cancelado` que estava `embalado`/`carregado` | "a persiana voltou" → movimento `cancelamento` no livro; "não voltou" → só registra | só no "voltou" |
+| **Descartar fantasma** | `pendente` cujo irmão mais antigo (mesma venda/pack) está `embalado`/`carregado` | apaga a linha e as peças; fica o mais antigo (#5) | não |
+
+> ⚠️ **"VOLTOU" DESFAZ AS BAIXAS QUE O LIVRO REGISTROU**, e não "uma peça do
+> código": as linhas `etiqueta` com `referencia 'lote:<id>'`, com o sinal
+> trocado. Volume impresso **antes do livro** (21/09/2026) não tem linha — aí a
+> volta sai pela peça do volume, e a **prévia diz isso**, porque o número deixou
+> de ser leitura e passou a ser suposição. A referência do movimento é
+> `correcao:<id>`, e o motivo leva volume, cliente e NF.
+>
+> ⚠️ **SOB MEDIDA: "VOLTOU" É RECUSADO.** Nunca baixou (§7); somar ali abriria
+> furo para cima em cada cancelada sob medida. "Não voltou" continua valendo.
+>
+> ⚠️ **A CAIXA DE VÁRIAS PERSIANAS CANCELADA EM PARTE FICA FORA DA FASE 1** —
+> não dá para saber qual peça voltou sem escolher peça a peça. Ela continua no
+> card, e a ação aparece desabilitada dizendo por quê.
+>
+> ⚠️ **"JÁ DECIDIDA" SE LÊ DA TABELA `correcao`, SEM COLUNA NO `lote`.** O card
+> de Bloqueados (`cancelada_dominio.listar`) tira a venda que tem correção
+> ativa; desfeita a correção, ela volta. Uma coluna seria a segunda afirmação
+> sobre o mesmo fato, e divergiria no primeiro "desfazer".
+>
+> ⚠️ **DESCARTAR FANTASMA APAGA, COMO O SCRIPT** — a linha inteira e as peças
+> ficam no `antes`, e o desfazer as devolve com o **mesmo id** (o SQLite nunca
+> reaproveita id de `AUTOINCREMENT`). Botão e script fazendo coisas diferentes
+> seria a fase 3 nascendo com duas réguas. O fantasma com **movimento no livro**
+> apontando para ele é recusado: apagá-lo deixaria o livro falando de um volume
+> que não existe.
+>
+> ⚠️ **DESFAZER SÓ SE O VOLUME NÃO ANDOU.** Compara o estado de agora (estágio,
+> datas, saída, bloqueio, cancelamento) com o `depois` gravado; diferente,
+> recusa **dizendo o campo**. Desfazer o "voltou" não apaga a linha do livro:
+> grava outra, tipo `correcao`, com o sinal contrário. Motivo obrigatório nos
+> dois sentidos.
+>
+> ⚠️ **OS CONTADORES DO TOPO SÃO SÓ DAS AÇÕES QUE EXISTEM** (fantasmas e
+> canceladas a decidir), e contam pela **mesma** `valePara` do botão: contador
+> sem botão que resolva é a trava que acusa e não sabe liberar, e contador com
+> régua própria contaria volume que o botão recusa.
+
+> **O render achou:** "volume #undefined" no histórico do próprio volume (a
+> consulta não trazia o id), o "§7" escrito numa frase de tela, e o botão
+> desabilitado idêntico ao habilitado.
+
+**Rode `node teste_correcao.js` (96 casos) ao mexer no `correcoes.js`, no
+`correcao_route.js` ou no `cancelada_dominio.listar`.** Nove defeitos foram
+reintroduzidos um a um: o "voltou" ignorando o livro (reprova 1), o sob medida
+voltando (2), o fantasma com irmão pendente (5), desfazer sem olhar se andou (3),
+o card sem tirar a decidida (2), a caixa de várias aceita (1), o movimento com
+tipo errado (1), decidir duas vezes (4) e o desfazer sem movimento (11). Mexeu
+na chave? **`node teste_acesso.js` (273, a seção 6-H é esta) e
+`node teste_cobertura.js` (10).**
+
+> ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA.** A rodada foi num navegador meu, a
+> 1440 e a 400 px: fantasma descartado e desfeito, cancelada "voltou" com +1 no
+> livro, a pré-livro pela peça, o sob medida recusando o "voltou". A prova é a
+> **primeira cancelada de verdade** decidida pela Mesa, com a persiana na mão.
+> **Fases 2 e 3** (as outras cinco ações, e os scripts chamando o `correcoes.js`)
+> continuam planejadas; até lá os scripts abaixo seguem sendo o caminho delas.
+
 ### Os três scripts que fecham passivo — e as duas regras que valem para todos
 
 | Script | Fecha | Critério |
@@ -3558,7 +3639,7 @@ guarda o saldo é a coluna, o movimento é só a história dela.
 `lote_item`, `fila`, `devolucao`, `rejeicao`, `contagem`, `contagem_pendente` e
 `movimento_componente` — e depois `movimento_estoque` (fase 1 do livro) e
 `inventario_ciclo`/`inventario_item` (fase 2, 26/09/2026) e `ajuste_pedido` (fase 3,
-28/09/2026). (`foto_estoque` saiu na Fase 3.)
+28/09/2026), e `correcao` (a Mesa, 29/09/2026). (`foto_estoque` saiu na Fase 3.)
 
 A lista fica em `TABELAS`, no topo do `teste_route.js`. Cada entrada traz a coluna
 de chave primária — hoje todas usam `id`. O campo ficou genérico por causa da
@@ -3717,7 +3798,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (273), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_correcao.js` (96) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3754,7 +3835,16 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   `cancelado` (D1 A), ou uma segunda leitura das linhas canceladas fora do
   `cancelada_dominio.js` (§3, VENDAS F2)
 - ❌ Devolver ao estoque sozinho a venda cancelada depois da etiqueta: o sistema
-  não sabe se a persiana voltou — o card só mostra (§3, D3)
+  não sabe se a persiana voltou — quem decide é a Mesa, com motivo (§3, D3, §5)
+- ❌ Fazer o "voltou" da Mesa somar uma peça do código em vez de desfazer as
+  baixas que o livro registrou para o volume — ou aceitar "voltou" em sob medida,
+  que nunca baixou (§5, a Mesa)
+- ❌ Guardar "cancelada já decidida" numa coluna do `lote`: é a correção ativa
+  na tabela `correcao`, e a coluna divergiria no primeiro desfazer (§5, a Mesa)
+- ❌ Mostrar na Mesa contador de passivo que não tem ação que resolva, ou contar
+  com régua diferente da `valePara` do botão (§5, a Mesa)
+- ❌ Escrever uma segunda regra de "é fantasma?" fora do `correcoes.js` — o
+  script vai chamar a mesma na fase 3 (§5, a Mesa)
 - ❌ Calcular a falta de estoque fora do `demanda_dominio.js` — a aba Estoque e a
   tela azul do operador têm que dizer o mesmo número (§18)
 - ❌ Fazer a aprovação da contagem gravar o **número contado** como saldo: entre

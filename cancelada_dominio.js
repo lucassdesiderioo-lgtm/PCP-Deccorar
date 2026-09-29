@@ -146,16 +146,25 @@ function marcar(db, lista, opts){
 
 /* O CARD (D3): o que ja tinha baixado do estoque, ou esta na fabrica, e a caixa
    de varias persianas com um item cancelado. So mostra — decidir e da Mesa de
-   correcoes, que ainda nao existe. */
+   correcoes (correcoes.js, acao `cancelada`). */
 function listar(db){
   if(!pronto(db)) return [];
+  /* O QUE A MESA JA DECIDIU SAI DO CARD (MESA-DE-CORRECOES F1, 29/09/2026).
+     "Ja decidida" se le da tabela `correcao`, e nao de uma coluna no `lote`:
+     duas afirmacoes sobre o mesmo fato divergiriam no primeiro "desfazer". */
+  let decidida = '';
+  try{
+    if(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='correcao'").get())
+      decidida = ` AND NOT EXISTS (SELECT 1 FROM correcao k WHERE k.acao='cancelada' AND k.alvo_tipo='lote'
+        AND k.alvo_id=lote.id AND k.desfeita_em IS NULL)`;
+  }catch(e){}
   return db.prepare(`SELECT id, codigo, buyer, nf, venda, packId, modalidade, despachar_em, embalado_em,
       estagio, cancelada_estagio, cancelada_em, cancelada_motivo, cancelada_varias, cancelada_aviso_em,
       (SELECT SUM(qtd) FROM lote_item i WHERE i.lote_id=lote.id) pecas
     FROM lote
     WHERE COALESCE(teste,0)=0 AND (
       (estagio='${ESTAGIO}' AND cancelada_estagio IN ('embalado','carregado'))
-      OR (cancelada_varias=1 AND estagio<>'carregado'))
+      OR (cancelada_varias=1 AND estagio<>'carregado'))${decidida}
     ORDER BY COALESCE(cancelada_em, cancelada_aviso_em) DESC, id DESC`).all();
 }
 
