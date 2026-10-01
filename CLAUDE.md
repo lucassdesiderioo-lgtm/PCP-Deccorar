@@ -3133,9 +3133,26 @@ carro fechadas (3), `retirado_em` na agência (1), a coleta sem `retirado_em`
 (1) e o carimbo antes da impressão (1). Tirar a exigência da data só reprova
 quando a recusa do formato sai junto, porque são duas camadas.
 
-> ⚠️ **AINDA NÃO RODOU EM PRODUÇÃO.** Quando rodar: a simulação e o
-> `--aplicar` **separados**, com a lista conferida no meio. Em 26/09 os dois
-> foram colados juntos.
+> ✅ **APLICADO EM PRODUÇÃO EM 01/10/2026 (PR #162): 485 CAIXAS, saída #3.**
+> Desta vez a simulação e o `--aplicar` rodaram **separados**, com a lista
+> conferida no meio: `485 (coleta 459 · agência 26)`, e a diferença para os
+> 460 da contagem era exatamente a **1 caixa de despacho futuro**, que ficou de
+> fora. Backup em `backups/antes-nao-bipadas-2026-10-01T10-34-17-249Z.db`.
+> A segunda rodada respondeu *"Nada a fechar"* (idempotente), e a contagem por
+> fila depois do `--aplicar` ficou só com aquela caixa (coleta impressa em
+> 29/09, despacho futuro): agência e canto zerados.
+>
+> ⚠️ **COLAR A SAÍDA DO SCRIPT DE VOLTA NO TERMINAL EXECUTA AS LINHAS.** Na
+> conferência, o texto da simulação foi colado no shell, e o bash tentou rodar
+> cada linha. A linha *"Para gravar: node … --aplicar"* só não gravou porque
+> começa com `Para`, que não é comando. Por isso a última linha da simulação
+> **não** deve ser um comando executável sozinho, e a conferência de que nada
+> foi gravado foi a simulação seguinte ainda dizer 485.
+>
+> ⚠️ **ISSO LIMPA O PASSADO, E NÃO O HÁBITO.** A prova que importa é a fila 3
+> (*coleta impressa e não bipada pro canto*) **não voltar a crescer** nos
+> próximos dias. Se crescer, a equipe continua imprimindo sem bipar, e a Saída
+> do caminhão segue sem o que contar.
 
 ### ⚠️ A CONFERÊNCIA DA PILHA (26/09/2026, fase 2 da spec `SAIDA-E-DUPLA-CONFERENCIA`)
 
