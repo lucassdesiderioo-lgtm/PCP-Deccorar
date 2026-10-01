@@ -1,5 +1,6 @@
-> **STATUS · 01/10/2026 — RASCUNHO, ESPERANDO APROVAÇÃO DO DONO**
-> Nada no código. Nasceu da conversa de 01/10/2026 (tipo `REGRA` + `NOVIDADE`).
+> **STATUS · 01/10/2026 — APROVADA PELO DONO, NADA NO CÓDIGO**
+> P1 a P5 respondidas em 01/10/2026 (§4). P6 (de onde vêm as etiquetas de fora) em aberto,
+> e só a fase 2 depende dela. Nasceu da conversa de 01/10/2026 (tipo `REGRA` + `NOVIDADE`).
 > **Muda uma decisão de 25/09/2026:** a decisão 2 da `SAIDA-E-DUPLA-CONFERENCIA`
 > ("sem segunda pessoa só MARCA, nunca trava"). Quando aprovada, a mudança vai para
 > o `CLAUDE.md` §8-B e para uma linha em `docs/DECISOES.md`, no mesmo commit do código.
@@ -54,7 +55,7 @@ Caixa de várias = `SUM(lote_item.qtd) > 1` (a mesma régua `VARIAS()` do `exp_r
 que passa a morar num lugar só).
 
 1. Bipe da etiqueta de venda → a tela fica âmbar: **"📦 Esta caixa leva 3 persianas —
-   abra e bipe a etiqueta de SKU de cada uma."** Não mostra **quais** SKUs (resposta 2
+   bipe a etiqueta de SKU de cada uma (coladas por fora da caixa)."** Não mostra **quais** SKUs (resposta 2
    do dono: aprovado). Mostrar a lista faria a pessoa bipar o que estivesse escrito,
    como o segundo bipe cego do carregamento já ensinou (§5).
 2. Cada bipe de SKU conta **uma** persiana. A tela mostra só **"2 de 3"**.
@@ -76,24 +77,32 @@ mesmo código duas vezes numa leitura, e aqui isso contaria uma persiana a mais.
   do `conf_carregamento` continua como está, desligado.
 - Estoque não se mexe em nada: a baixa continua na impressão.
 
-## 4. Perguntas que o dono precisa responder antes de construir
+## 4. Respostas do dono (01/10/2026)
 
-| # | Pergunta | Proposta |
+| # | Pergunta | Resposta |
 |---|---|---|
-| P1 | **Dia de uma pessoa só** (ou só uma pessoa na expedição de manhã): a caixa fica parada? | **Liberar com motivo** por quem tem `saida.liberar` (Supervisor/Admin), como a saída divergente do caminhão. Grava quem liberou e vai para a auditoria. Sem essa porta, a equipe aprende a entrar com o login do colega — e aí a Regra 1 passa a mentir em vez de proteger (armadilha #6). |
-| P2 | O tablet do Carregamento fica logado o dia inteiro com um login só? | Se sim, toda caixa impressa por aquela pessoa vai ser recusada. A tela precisa de um **"Trocar de pessoa"** rápido (grade de nomes + PIN), sem sair da tela. |
-| P3 | Caixa **sem** `lote_item` (entrou antes de 15/09) que o sistema não sabe que é de várias? | Segue o fluxo de uma persiana. Hoje não deve haver nenhuma ainda na fábrica — confirmo pela consulta antes do deploy. |
-| P4 | A peça bipada duas vezes (a mesma etiqueta de SKU passada duas vezes) | O sistema não tem como separar "duas persianas iguais" de "a mesma etiqueta duas vezes" — é o mesmo limite da Etiqueta de Venda. O que protege é ser **outra pessoa** abrindo a caixa. Fica escrito como limite, não como garantia. |
-| P5 | Na coleta, a regra trava também a caixa já impressa e ainda não bipada no dia do deploy? | Sim — vale para todo bipe depois do deploy. As impressas antes também têm `impresso_por`. |
+| P1 | Dia de uma pessoa só | **Liberar com motivo**, por quem tem `saida.liberar` (Supervisor/Admin). Grava quem liberou e vai para a auditoria |
+| P2 | O tablet do Carregamento fica com um login só o dia todo? | **Sim.** A tela ganha **"Trocar de pessoa"** (nome + PIN) sem sair dela |
+| P3 | Caixa sem `lote_item` (antes de 15/09) | Segue o fluxo de uma persiana |
+| P4 | A mesma etiqueta de SKU bipada duas vezes | **Concordo** — fica escrito como limite: o que protege é ser outra pessoa olhando a caixa |
+| P5 | Caixas já impressas antes do deploy | A regra vale para todo bipe depois do deploy |
+| P6 | **Novo ponto do dono:** na Etiqueta de Venda, avisar quem imprime para colar **por fora da caixa** as etiquetas de SKU de cada persiana — facilita a conferência no carregamento | **Aceito, falta uma resposta:** as etiquetas de fora são **as que estavam no saco** de cada persiana, ou **cópias impressas a mais**? Proposta: as do saco. Cópia não prova que a persiana entrou — dá para colar três etiquetas numa caixa com uma persiana só, e a conferência do carregamento passa a conferir papel |
+
+> Com as etiquetas por fora, o bipe da Regra 2 é feito **sem abrir a caixa**. A tela
+> continua sem listar os SKUs esperados: quem confere bipa o que **está colado**, e o
+> sistema compara com o que a caixa **deveria** levar.
 
 ## 5. Fases
 
 **Fase 1 — a Regra 1 (outra pessoa).** Recusa no `POST /api/carregar` (área e canto),
-a tarja, o "Trocar de pessoa" (P2) e a liberação com motivo (P1). Teste escrito antes:
+a tarja, o "Trocar de pessoa" (P2) e a liberação com motivo (P1). Quem libera não pode
+ser quem imprimiu (senão a liberação vira o caminho de sempre). Teste escrito antes:
 mesmo login recusado, outro login aceito, vazio ≠ vazio, viagem e sobras não travam,
 liberação exige chave e motivo e vai para a auditoria.
 
-**Fase 2 — a Regra 2 (caixa de várias às cegas).** Contagem por caixa
+**Fase 2 — a Regra 2 (caixa de várias às cegas) e o aviso na impressão (P6).** Na
+Etiqueta de Venda, ao lado da frase `fita(n)`, a instrução de colar por fora as
+etiquetas de SKU — nos quatro lugares onde a caixa aparece, igual em todos. Contagem por caixa
 (`lote_item.conferidos_carga` ou tabela própria — decidir na construção), a tela âmbar
 sem a lista, a divergência com os dois lados, o "Recomeçar", a auditoria. Teste
 escrito antes, incluindo varredura de que a resposta do bipe **não traz** os SKUs
