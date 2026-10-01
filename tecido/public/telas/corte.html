@@ -71,7 +71,10 @@ const estado={
   tecido_id:memoria.get('tecido'),
   linhas:[{pedido:'',largura:'',altura:''},{pedido:'',largura:'',altura:''},{pedido:'',largura:'',altura:''}],
   recusadas:[], proposta:null,
-  nivelSobra:memoria.get('nivelSobra')
+  nivelSobra:memoria.get('nivelSobra'),
+  // O corte aberto (fase 2): confirmado ou cortando. Enquanto ele existir a
+  // tela mostra ELE, e nao a grade de planejar (R2: um aberto por operador).
+  aberto:null, aGuardar:[], todas:null, gerir:false, parametros:{}
 };
 
 function fileira(rotulo,itens,sel,aoEscolher){
@@ -93,8 +96,12 @@ async function telaEntrada(){
     // guardada como eles: as duas listas tem que envelhecer no mesmo passo,
     // senao o aviso cobraria uma cor que a fileira ja mostra.
     estado.cores=await api('/api/cores');
+    try{ (await api('/api/parametros',{silencioso:true})).forEach(x=>{ estado.parametros[x.chave]=x.valor; }); }catch(e){}
   }
+  await carregarAberto();
+  if(estado.aberto) return telaCorteAberto();
   const pai=limpar($('#entrada'));
+  desenharAGuardar(pai);
   const c=el('div',{class:'cartao naoImprime'});
   pai.appendChild(c);
 
@@ -246,21 +253,27 @@ function lerArquivo(texto){
 }
 
 // ── O CALCULO ────────────────────────────────────────────────────────────
+/* ⚠️ LINHA VAZIA NAO E MEDIDA. `comoNumero('')` devolve 0, e nao null — e o
+   filtro antigo deixava passar as linhas em branco da grade (ela nasce com
+   tres): quem preenchia uma so levava "A linha 2 esta sem medida valida". */
+const temMedida=l=>String(l.largura||'').trim()!==''&&String(l.altura||'').trim()!==''&&
+  comoNumero(l.largura)!==null&&comoNumero(l.altura)!==null;
 async function calcular(){
-  const pecas=estado.linhas.filter(l=>comoNumero(l.largura)!==null&&comoNumero(l.altura)!==null)
+  const pecas=estado.linhas.filter(temMedida)
     .map(l=>({pedido:l.pedido||'', cliente:l.cliente||'', largura:l.largura, altura:l.altura}));
   if(!pecas.length) return banner('Digite pelo menos uma medida.','alerta');
   if(!estado.tecido_id) return banner('Escolha o tecido.','alerta');
   try{
     estado.proposta=await api('/api/planos/calcular',{metodo:'POST',corpo:{
       tecido_id:estado.tecido_id, pecas, recusadas:estado.recusadas}});
-    desenharPlano();
+    desenharPlano('planejar');
   }catch(e){ beep('erro'); }
 }
 
 // ── O DESENHO ────────────────────────────────────────────────────────────
-function desenharPlano(){
-  const p=estado.proposta;
+function desenharPlano(modo){
+  const cortando=modo==='cortando';
+  const p=cortando?estado.aberto.proposta:estado.proposta;
   const pai=limpar($('#saida'));
   if(!p) return;
 
@@ -408,7 +421,7 @@ function desenharPlano(){
       texto:'puxar '+formatarMetros(puxarTotal)+(g.faixas.length>1?' em '+g.faixas.length+' puxadas':'')}));
 
     // A recusa (R16): so faz sentido em sobra, e so antes de confirmar.
-    if(f0.fonte==='sobra'){
+    if(f0.fonte==='sobra'&&!cortando){
       const s=p.sobras_sugeridas.find(x=>x.id===f0.fonte_id);
       if(s) cb.appendChild(el('button',{class:'bt pequeno naoImprime',texto:'não usar',
         onclick:()=>recusarSobra(s)}));
@@ -441,36 +454,18 @@ function desenharPlano(){
   });
 
   // ── AS SOBRAS QUE VAO NASCER ──────────────────────────────────────────
-  // O cadastro acontece DENTRO do Confirmar, com a medida ja calculada. E
-  // isto que fecha o ciclo sozinho: nao ha tela separada para esquecer.
-  const campos={};
+  /* ⚠️ ETIQUETA E ENDERECO SAIRAM DAQUI (fase 2, R13). Antes o Confirmar
+     exigia os dois ANTES do corte, e a sobra era cadastrada na prateleira sem
+     existir. Agora ela nasce "a guardar" no Corte feito, em nome de quem
+     cortou, e e guardada depois — medida, etiqueta e endereco juntos. */
   if(p.sobras_geradas.length){
     const cs=el('div',{class:'cartao',style:'background:var(--alerta-fraca);border-color:var(--alerta)'});
-    cs.appendChild(el('h2',{texto:p.sobras_geradas.length+' sobra(s) vao nascer deste corte'}));
-    cs.appendChild(el('p',{class:'nota',texto:'Cole uma etiqueta em cada uma e bipe o codigo aqui. A medida o sistema ja sabe.'}));
-
-    const hastes=estado.arvoreSobra.filter(h=>h.ativo);
-    p.sobras_geradas.forEach(s=>{
-      const linha=el('div',{class:'campos',style:'align-items:flex-end;border-top:1px solid var(--linha);padding-top:10px'});
-      linha.appendChild(el('div',{class:'campo'},[
-        el('label',{texto:'RESTO'}),
-        el('div',{style:'font-size:19px;font-weight:700;padding:10px 0',
-          texto:formatarMedida(s.largura,s.altura)+'  ·  '+formatarArea(s.area)})]));
-      const iCod=el('input',{type:'text',placeholder:'bipe a etiqueta',autocomplete:'off',
-        autocorrect:'off',autocapitalize:'off',style:'font-size:20px;letter-spacing:.06em'});
-      linha.appendChild(el('div',{class:'campo cresce'},[el('label',{texto:'ETIQUETA'}),iCod]));
-
-      const sel=el('select',{});
-      hastes.forEach(h=>h.andares.forEach(a=>a.niveis.forEach(n=>
-        sel.appendChild(el('option',{value:n.id,
-          texto:'SOBRA · '+h.nome+'-'+a.nome+'-'+n.nome,
-          selected:String(n.id)===String(estado.nivelSobra)?'selected':null})))));
-      sel.addEventListener('change',()=>memoria.set('nivelSobra',sel.value));
-      linha.appendChild(el('div',{class:'campo'},[el('label',{texto:'ONDE GUARDAR'}),sel]));
-
-      campos[s.indice]={codigo:iCod,nivel:sel};
-      cs.appendChild(linha);
-    });
+    cs.appendChild(el('h2',{texto:p.sobras_geradas.length===1?'1 sobra vai nascer deste corte'
+      :p.sobras_geradas.length+' sobras vão nascer deste corte'}));
+    p.sobras_geradas.forEach(s=>cs.appendChild(el('div',{style:'font-size:17px;font-weight:600',
+      texto:'• '+formatarMedida(s.largura,s.altura)+'  ·  '+formatarArea(s.area)})));
+    cs.appendChild(el('p',{class:'nota',style:'margin:8px 0 0',texto:
+      'Depois do Corte feito ela fica na sua lista de sobras a guardar: você mede, cola a etiqueta e escolhe onde guardar.'}));
     c.appendChild(cs);
   }
 
@@ -491,10 +486,19 @@ function desenharPlano(){
   if(p.area_sobras>0) resumo.appendChild(dado('vira sobra',formatarArea(p.area_sobras)));
   resumo.appendChild(el('span',{class:'espaco',style:'flex:1'}));
   resumo.appendChild(el('button',{class:'bt naoImprime',texto:'Imprimir',onclick:()=>window.print()}));
-  const btOk=el('button',{class:'bt primario naoImprime',style:'min-height:56px;font-size:18px',
-    texto:'Confirmar e baixar',onclick:()=>confirmar(campos,btOk)});
-  resumo.appendChild(btOk);
+  if(cortando){
+    resumo.appendChild(el('button',{class:'bt perigo naoImprime',texto:'Cancelar corte',onclick:cancelarCorte}));
+    const btF=el('button',{class:'bt primario naoImprime',style:'min-height:56px;font-size:18px',
+      texto:'Corte feito',onclick:()=>corteFeito(btF)});
+    resumo.appendChild(btF);
+  } else {
+    const btOk=el('button',{class:'bt primario naoImprime',style:'min-height:56px;font-size:18px',
+      texto:'Confirmar',onclick:()=>confirmar(btOk)});
+    resumo.appendChild(btOk);
+  }
   c.appendChild(resumo);
+  if(!cortando) c.appendChild(el('p',{class:'ajuda naoImprime',style:'text-align:right;max-width:none',
+    texto:'Confirmar não baixa nada: ele separa as fontes deste corte para você. O estoque só anda no Corte feito.'}));
 
   // As simulacoes: mostrar POR QUE esta bobina venceu.
   if(p.simulacoes.length>1){
@@ -517,7 +521,7 @@ function desenharPlano(){
   }
 
   pai.appendChild(c);
-  c.scrollIntoView({behavior:'smooth',block:'start'});
+  if(!cortando) c.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 // ── A RECUSA ─────────────────────────────────────────────────────────────
@@ -539,35 +543,187 @@ async function recusarSobra(s){
 }
 
 // ── O CONFIRMAR ──────────────────────────────────────────────────────────
-async function confirmar(campos,bt){
+// Grava o corte e reserva as fontes. NADA BAIXA (fase 2, R1).
+async function confirmar(bt){
   const p=estado.proposta;
   if(!p) return;
-  const etiquetas={};
-  for(const s of p.sobras_geradas){
-    const cp=campos[s.indice];
-    if(!cp||!cp.codigo.value.trim()){
-      beep('erro');
-      banner('Falta a etiqueta da sobra de '+formatarMedida(s.largura,s.altura)+'.','alerta');
-      if(cp) cp.codigo.focus();
-      return;
-    }
-    etiquetas[s.indice]={codigo:cp.codigo.value, nivel_id:Number(cp.nivel.value)};
-  }
   bt.disabled=true;
   try{
-    const r=await api('/api/planos/confirmar',{metodo:'POST',corpo:{
+    await api('/api/planos/confirmar',{metodo:'POST',corpo:{
       tecido_id:estado.tecido_id,
-      pecas:estado.linhas.filter(l=>comoNumero(l.largura)!==null&&comoNumero(l.altura)!==null)
+      pecas:estado.linhas.filter(temMedida)
         .map(l=>({pedido:l.pedido||'', cliente:l.cliente||'', largura:l.largura, altura:l.altura})),
-      recusadas:estado.recusadas, assinatura:p.assinatura, etiquetas, origem:'digitado'}});
+      recusadas:estado.recusadas, assinatura:p.assinatura, origem:'digitado'}});
     beep();
-    banner('Plano '+r.plano_id+' confirmado: '+formatarMetros(r.consumo_linear)+
-      ' do rolo e '+r.sobras_criadas+' sobra(s) nova(s) na prateleira.','bom',6);
     estado.proposta=null; estado.recusadas=[];
     estado.linhas=[{pedido:'',largura:'',altura:''}];
-    limpar($('#saida')); telaEntrada();
+    limpar($('#saida')); await telaEntrada();
   }catch(e){ beep('erro'); }
   bt.disabled=false;
+}
+
+// ── O CORTE ABERTO (fase 2) ───────────────────────────────────────────────
+async function carregarAberto(){
+  try{
+    const r=await api('/api/planos/aberto',{silencioso:true});
+    estado.aberto=r.corte; estado.aGuardar=r.a_guardar||[]; estado.todas=r.todas; estado.gerir=r.gerir;
+  }catch(e){ estado.aberto=null; }
+}
+
+const hora=t=>t?String(t).slice(11,16):'';
+const itensTxt=l=>l.length===1?'item '+l[0]:'itens '+l.slice(0,-1).join(', ')+' e '+l[l.length-1];
+
+function telaCorteAberto(){
+  const a=estado.aberto;
+  const pai=limpar($('#entrada')); limpar($('#saida'));
+  desenharAGuardar(pai);
+  const c=el('div',{class:'cartao'});
+  pai.appendChild(c);
+  const tecido=a.proposta.tecido.nome;
+
+  if(a.etapa==='confirmado'){
+    /* ② O RESUMO. A ultima olhada antes de ir buscar o tecido: uma linha por
+       fonte, com o ENDERECO — e o que o operador precisa para achar o rolo e
+       a sobra na prateleira. Nada baixou ainda. */
+    c.appendChild(el('h2',{style:'margin-top:0',texto:'Confira antes de cortar — corte '+a.plano_id}));
+    c.appendChild(el('p',{class:'nota',texto:tecido+' · nada saiu do estoque ainda. As fontes abaixo estão separadas para você.'}));
+    a.fontes.forEach(f=>{
+      const bx=el('div',{class:'blocoFonte '+f.fonte,style:'margin:10px 0'});
+      bx.appendChild(el('div',{style:'font-size:19px;font-weight:700',
+        // O endereco vem como "ROLO · A-2-1": aqui o tipo ja esta escrito na frente.
+        texto:(f.fonte==='rolo'?'Rolo ':'Sobra ')+f.codigo+(f.endereco?'  ·  '+f.endereco.replace(/^(ROLO|SOBRA) · /,''):'')}));
+      bx.appendChild(el('div',{style:'font-size:17px',texto:a.proposta.tecido.nome.split(' · ').pop()+'  →  '+itensTxt(f.itens)+
+        (f.pedidos.length?'  ·  pedido '+f.pedidos.join(', '):'')+
+        (f.fonte==='rolo'?'  ·  puxar '+formatarMetros(f.puxar):'')}));
+      c.appendChild(bx);
+    });
+    const ac=el('div',{class:'campos',style:'margin-top:16px;align-items:center'});
+    const btC=el('button',{class:'bt primario',style:'flex:1;min-height:64px;font-size:21px',texto:'CORTAR',
+      onclick:async()=>{ btC.disabled=true;
+        try{ estado.aberto=await api('/api/planos/'+a.plano_id+'/cortar',{metodo:'POST',corpo:{}}); beep(); telaCorteAberto(); }
+        catch(e){ beep('erro'); btC.disabled=false; } }});
+    ac.appendChild(el('button',{class:'bt',texto:'Voltar ao plano',onclick:async()=>{
+      try{
+        const r=await api('/api/planos/'+a.plano_id+'/voltar',{metodo:'POST',corpo:{}});
+        // A grade volta com o que foi lancado, para ajustar e calcular de novo.
+        const e=r.entrada||{};
+        if(e.tecido_id){ estado.tecido_id=e.tecido_id; }
+        estado.linhas=(e.pecas||[]).map(x=>({pedido:x.pedido||'',cliente:x.cliente||'',
+          largura:String(x.largura),altura:String(x.altura)}));
+        if(!estado.linhas.length) estado.linhas=[{pedido:'',largura:'',altura:''}];
+        estado.recusadas=e.recusadas||[];
+        estado.aberto=null; await telaEntrada();
+      }catch(e){ beep('erro'); } }}));
+    ac.appendChild(btC);
+    c.appendChild(ac);
+    return;
+  }
+
+  // ③ CORTANDO
+  c.appendChild(el('h2',{style:'margin-top:0',texto:'Cortando — corte '+a.plano_id}));
+  c.appendChild(el('p',{class:'nota',style:'margin-bottom:0',texto:tecido+' · começou às '+hora(a.cortar_em)+
+    '. Quando terminar, toque em Corte feito: é aí que o estoque baixa.'}));
+  desenharPlano('cortando');
+}
+
+async function cancelarCorte(){
+  const a=estado.aberto;
+  const motivo=prompt('Por que o corte '+a.plano_id+' está sendo cancelado? (fica no histórico)');
+  if(motivo===null) return;
+  if(!motivo.trim()) return banner('Diga o motivo do cancelamento.','alerta');
+  try{
+    await api('/api/planos/'+a.plano_id+'/cancelar',{metodo:'POST',corpo:{motivo}});
+    banner('Corte '+a.plano_id+' cancelado. Nada baixou, e as fontes voltaram a ficar livres.','alerta',6);
+    estado.aberto=null; await telaEntrada();
+  }catch(e){ beep('erro'); }
+}
+
+async function corteFeito(bt){
+  const a=estado.aberto;
+  bt.disabled=true;
+  try{
+    const r=await api('/api/planos/'+a.plano_id+'/feito',{metodo:'POST',corpo:{}});
+    beep();
+    banner('Corte '+r.plano_id+' feito: '+formatarMetros(r.consumo_linear)+' do rolo'+
+      (r.sobras_a_guardar?' e '+(r.sobras_a_guardar===1?'1 sobra':r.sobras_a_guardar+' sobras')+' para guardar':'')+'.','bom',6);
+    estado.aberto=null; limpar($('#saida')); await telaEntrada();
+  }catch(e){ beep('erro'); bt.disabled=false; }
+}
+
+// ── ⑤ AS SOBRAS A GUARDAR (R13, R15) ──────────────────────────────────────
+/* A lista do operador no topo, sempre. Ela nao trava o proximo corte, mas
+   nao some: sobra sem etiqueta e retalho que ninguem acha na prateleira.
+
+   A MEDIDA VEM ESCRITA, E A LISTA VEM VAZIA. O sistema calculou a sobra, e a
+   tela diz quanto; mas quem vale e a fita, e medida ja marcada e medida que
+   alguem salva sem olhar (README, "a medida da sobra e lista"). */
+function listaMedida(min,max){
+  const sel=el('select',{});
+  sel.appendChild(el('option',{value:'',texto:'— escolha —'}));
+  for(let cm=Math.round(min*100); cm<=Math.round(max*100); cm++){
+    const m=(cm/100).toFixed(2);
+    sel.appendChild(el('option',{value:m, texto:m.replace('.',',')+' m'}));
+  }
+  return sel;
+}
+function desenharAGuardar(pai){
+  const minhas=estado.aGuardar||[];
+  const outras=(estado.todas||[]).filter(g=>!minhas.some(m=>m.id===g.id));
+  if(!minhas.length&&!outras.length) return;
+  const c=el('div',{class:'cartao naoImprime',style:'border-color:var(--sobra)'});
+  pai.appendChild(c);
+  if(minhas.length){
+    c.appendChild(el('h2',{style:'margin-top:0;color:var(--sobra)',texto:minhas.length===1
+      ?'1 sobra sua para guardar':minhas.length+' sobras suas para guardar'}));
+    c.appendChild(el('p',{class:'nota',texto:'Meça, cole a etiqueta e escolha onde guardar — as três coisas juntas. Enquanto não for guardada, ela não entra em plano.'}));
+    const P=estado.parametros;
+    const hastes=estado.arvoreSobra.filter(h=>h.ativo);
+    minhas.forEach(g=>{
+      const linha=el('div',{style:'border-top:1px solid var(--linha);padding:12px 0'});
+      linha.appendChild(el('div',{style:'font-weight:700;font-size:17px',
+        texto:'O sistema calculou '+formatarMedida(g.largura,g.altura)+(g.cortada_errada?'  ·  CORTADA ERRADA':'')}));
+      linha.appendChild(el('div',{class:'quem',texto:g.tecido_nome+' · corte '+g.plano_id+
+        (g.origem_codigo?' · saiu de '+g.origem_codigo:'')+(g.dias>0?' · há '+(g.dias===1?'1 dia':g.dias+' dias'):'')}));
+      const larg=listaMedida(Number(P.sobraLarguraMin||0.5),Number(P.sobraLarguraMax||3));
+      const alt=listaMedida(Number(P.sobraAlturaMin||0.5),Number(P.sobraAlturaMax||6));
+      const cod=el('input',{type:'text',placeholder:'bipe a etiqueta',autocomplete:'off',autocorrect:'off',
+        autocapitalize:'off',style:'font-size:20px;letter-spacing:.06em'});
+      const sel=el('select',{});
+      hastes.forEach(h=>h.andares.forEach(a=>a.niveis.forEach(n=>
+        sel.appendChild(el('option',{value:n.id,texto:'SOBRA · '+h.nome+'-'+a.nome+'-'+n.nome,
+          selected:String(n.id)===String(estado.nivelSobra)?'selected':null})))));
+      sel.addEventListener('change',()=>memoria.set('nivelSobra',sel.value));
+      const campos=el('div',{class:'campos',style:'margin-top:8px'});
+      [['LARGURA',larg],['ALTURA',alt],['ETIQUETA',cod],['ONDE GUARDAR',sel]].forEach(([r,i])=>
+        campos.appendChild(el('div',{class:'campo'+(r==='ETIQUETA'?' cresce':'')},[el('label',{texto:r}),i])));
+      const bt=el('button',{class:'bt primario',texto:'Guardar',onclick:async()=>{
+        if(!larg.value||!alt.value){ beep('erro'); return banner('Meça a sobra e escolha a largura e a altura.','alerta'); }
+        if(!cod.value.trim()){ beep('erro'); cod.focus(); return banner('Bipe a etiqueta colada na sobra.','alerta'); }
+        bt.disabled=true;
+        try{
+          const r=await api('/api/sobras-a-guardar/'+g.id+'/guardar',{metodo:'POST',corpo:{
+            largura:larg.value, altura:alt.value, codigo:cod.value, nivel_id:Number(sel.value)}});
+          beep(); banner('Sobra '+r.sobra.codigo+' guardada em '+r.sobra.endereco+'.','bom',5);
+          await carregarAberto();
+          if(estado.aberto) telaCorteAberto(); else telaEntrada();
+        }catch(e){ beep('erro'); bt.disabled=false; }
+      }});
+      campos.appendChild(bt);
+      linha.appendChild(campos);
+      c.appendChild(linha);
+    });
+  }
+  // A CHEFIA VE TODAS (R15): quem cortou e ha quanto tempo. So le — quem
+  // guarda e quem esta com o retalho na mao.
+  if(outras.length){
+    c.appendChild(el('h3',{style:'margin:14px 0 6px',texto:'Sobras a guardar de outras pessoas ('+outras.length+')'}));
+    const t=el('table',{});
+    t.appendChild(el('tr',{},['Quem cortou','Corte','Medida calculada','Tecido','Há'].map(h=>el('th',{texto:h}))));
+    outras.forEach(g=>t.appendChild(el('tr',{},[el('td',{texto:g.cortado_por||'—'}),el('td',{texto:String(g.plano_id)}),
+      el('td',{texto:formatarMedida(g.largura,g.altura)}),el('td',{texto:g.tecido_nome}),
+      el('td',{texto:g.dias>0?(g.dias===1?'1 dia':g.dias+' dias'):'hoje'})])));
+    c.appendChild(rolaH(t));
+  }
 }
 
 // ── O HISTORICO DE CORTES (spec CORTE-EM-ETAPAS, fase 1) ─────────────────
@@ -582,6 +738,7 @@ const quando=t=>{ if(!t) return '—'; const [d,h]=String(t).split(' ');
 const STATUS_SOBRA={disponivel:'disponível na prateleira',usada:'usada',descartada:'descartada'};
 const STATUS_ROLO={aberto:'aberto',fechado:'fechado',encerrado:'encerrado'};
 const plural=(n,um,varios)=>n+' '+(n===1?um:varios);
+const ETAPA={confirmado:'confirmado',cortando:'cortando',feito:'feito',cancelado:'cancelado'};
 
 document.getElementById('btModo').addEventListener('click',()=>{
   const indo=$('#historico').hidden;
@@ -644,19 +801,20 @@ async function telaHistorico(){
     '. Toque num corte para ver o detalhe.'}));
 
   const t=el('table',{class:'hist'});
-  t.appendChild(el('tr',{},['Corte','Quando','Quem','Tecido','Pedidos','Peças','Do rolo','Sobras usadas','Nasceram']
-    .map((h,i)=>el('th',{class:[5,6,8].includes(i)?'num':null,texto:h}))));
+  t.appendChild(el('tr',{},['Corte','Etapa','Quando','Quem','Tecido','Pedidos','Peças','Do rolo','Sobras usadas','Nasceram']
+    .map((h,i)=>el('th',{class:[6,7,9].includes(i)?'num':null,texto:h}))));
   r.cortes.forEach(k=>{
     const tr=el('tr',{class:'abre',onclick:()=>{ hist.aberto=hist.aberto===k.id?null:k.id; telaHistorico(); }},[
       el('td',{texto:String(k.id)}),
-      el('td',{texto:quando(k.criado_em)}),
+      el('td',{},[el('span',{class:'tag '+(k.etapa==='feito'?'bom':k.etapa==='cancelado'?'off':'sobra'),texto:ETAPA[k.etapa]||k.etapa})]),
+      el('td',{texto:quando(k.feito_em||k.criado_em)}),
       el('td',{texto:k.usuario_nome||'—'}),
       el('td',{texto:k.tecido_nome}),
       el('td',{texto:(k.pedidos||'—').split(',').join(', ')}),
       el('td',{class:'num',texto:String(k.pecas)+(k.pecas_sem_lugar?' ('+k.pecas_sem_lugar+' sem lugar)':'')}),
       el('td',{class:'num',texto:k.consumo_linear>0.0005?formatarMetros(k.consumo_linear):'—'}),
       el('td',{texto:(k.sobras_usadas||'—').split(',').join(', ')}),
-      el('td',{class:'num',texto:String(k.sobras_nascidas)})]);
+      el('td',{class:'num',texto:String(k.sobras_nascidas)+(k.a_guardar?' (+'+k.a_guardar+' a guardar)':'')})]);
     if(hist.aberto===k.id) tr.style.background='var(--acao-fraca)';
     t.appendChild(tr);
   });
@@ -680,8 +838,15 @@ async function detalheCorte(id,pai){
   const c=el('div',{class:'det'});
   pai.appendChild(c);
   c.appendChild(el('h2',{style:'margin:0',texto:'Corte '+d.id}));
-  c.appendChild(el('p',{class:'nota',style:'margin:4px 0',texto:'Confirmado por '+(d.usuario_nome||'—')+' em '+
-    quando(d.criado_em)+' · '+d.tecido_nome}));
+  c.appendChild(el('p',{class:'nota',style:'margin:4px 0',texto:d.tecido_nome+' · '+(d.usuario_nome||'—')}));
+  // As etapas com hora (fase 2). O corte de antes dela so tem a confirmacao:
+  // ele baixou o estoque ali mesmo, e por isso entra como feito (R28).
+  const etapas=[['Confirmado',d.criado_em],['Começou a cortar',d.cortar_em],['Corte feito',d.feito_em],['Cancelado',d.cancelado_em]]
+    .filter(([,t])=>t).map(([r,t])=>r+' '+quando(t));
+  c.appendChild(el('p',{class:'nota',style:'margin:2px 0'},[el('b',{texto:(ETAPA[d.etapa]||d.etapa).toUpperCase()}),
+    el('span',{texto:'  ·  '+etapas.join('  ·  ')+(!d.cortar_em&&d.etapa==='feito'?'  (corte de antes das etapas: baixou na confirmação)':'')})]));
+  if(d.cancelado_motivo) c.appendChild(el('p',{class:'nota',style:'margin:2px 0',
+    texto:'Motivo do cancelamento: '+d.cancelado_motivo+(d.cancelado_por?' — '+d.cancelado_por:'')}));
 
   c.appendChild(el('h3',{texto:'Fontes'}));
   if(!d.fontes.length) c.appendChild(el('p',{class:'nota',texto:'Nenhuma fonte: o corte não encaixou peça.'}));
@@ -698,6 +863,9 @@ async function detalheCorte(id,pai){
       if(f.marcada_usada_por_este) bx.appendChild(el('div',{style:'font-weight:600;color:var(--sobra)',
         texto:'Este corte deu a sobra como usada'+(f.baixado_em?' em '+quando(f.baixado_em):'')+
           (f.baixado_por?', por '+f.baixado_por:'')+'.'}));
+    } else if(d.etapa!=='feito'){
+      bx.appendChild(el('div',{texto:(d.etapa==='cancelado'?'Nada baixou (cancelado)':'Reservado: '+formatarMetros(f.metros_puxados)+' — baixa no Corte feito')+
+        ' · saldo hoje '+formatarMetros(f.saldo_hoje)}));
     } else {
       bx.appendChild(el('div',{texto:'Este corte baixou '+formatarMetros(f.metros_baixados)+
         ' do rolo · saldo hoje '+formatarMetros(f.saldo_hoje)+' ('+(STATUS_ROLO[f.status_hoje]||f.status_hoje)+')'}));
@@ -715,7 +883,10 @@ async function detalheCorte(id,pai){
   c.appendChild(rolaH(t));
 
   c.appendChild(el('h3',{texto:'Sobras que nasceram'}));
-  if(!d.sobras_nascidas.length) c.appendChild(el('p',{class:'nota',texto:'Nenhuma.'}));
+  const pend=d.a_guardar.filter(g=>!g.guardada_em&&!g.cancelada_em);
+  if(!d.sobras_nascidas.length&&!pend.length) c.appendChild(el('p',{class:'nota',texto:'Nenhuma.'}));
+  pend.forEach(g=>c.appendChild(el('div',{style:'color:var(--sobra);font-weight:600',
+    texto:'• '+formatarMedida(g.largura,g.altura)+' · a guardar, por '+(g.cortado_por||'—')})));
   d.sobras_nascidas.forEach(s=>c.appendChild(el('div',{texto:'• '+s.codigo+'   '+formatarMedida(s.largura,s.altura)+
     ' · hoje: '+(STATUS_SOBRA[s.status_hoje]||s.status_hoje)+(s.endereco?' · '+s.endereco:'')})));
 

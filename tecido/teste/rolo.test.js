@@ -1,6 +1,7 @@
 // Fases 5 e 6 — o rolo e o plano de corte inteiro.
 const rolo=require('../dominio/rolo');
 const plano=require('../dominio/plano');
+const corte=require('../dominio/corte');
 const sobra=require('../dominio/sobra');
 const etiqueta=require('../dominio/etiqueta');
 const tecido=require('../dominio/tecido');
@@ -160,17 +161,18 @@ module.exports=[
   igual(!!gravada,true,'a recusa ficou gravada — e diagnostico, nao papelada');
 }},
 
-{nome:'CONFIRMAR baixa tudo junto: sobra, rolo, sobra nova e refugo', executar({igual,perto}){
+{nome:'o CORTE FEITO baixa tudo junto: sobra, rolo, sobra a guardar e refugo', executar({igual,perto}){
+  /* Desde a fase 2 da CORTE-EM-ETAPAS o Confirmar so grava e reserva; quem
+     baixa e o Corte feito. O caso e o mesmo de antes, pelo caminho de agora. */
   const x=cena();
   const pecas=[{largura:'0,90',altura:'2,50'},{largura:'0,90',altura:'2,50'},{largura:'0,90',altura:'2,50'}];
   const p=plano.calcular({tecido_id:x.t.id,pecas});
   const saldoAntes=rolo.porId(p.faixas.find(f=>f.fonte==='rolo').fonte_id).saldo;
 
-  const etiquetas={};
-  p.sobras_geradas.forEach(s=>{ etiquetas[s.indice]={codigo:etiquetaLivre(),nivel_id:x.nivelSobra}; });
-
-  const r=plano.confirmar({tecido_id:x.t.id,pecas,assinatura:p.assinatura,etiquetas},'Cortador');
-  igual(r.plano_id>0,true,'o plano foi gravado');
+  const r=corte.confirmar({tecido_id:x.t.id,pecas,assinatura:p.assinatura},'Cortador');
+  igual(r.plano_id>0,true,'o corte foi gravado');
+  perto(rolo.porId(p.faixas.find(f=>f.fonte==='rolo').fonte_id).saldo,saldoAntes,'o Confirmar nao baixou');
+  corte.cortar(r.plano_id,'Cortador'); corte.feito(r.plano_id,'Cortador');
 
   const rl=rolo.porId(p.faixas.find(f=>f.fonte==='rolo').fonte_id);
   perto(rl.saldo,saldoAntes-p.consumo_linear,'o rolo baixou o consumo linear');
@@ -179,23 +181,25 @@ module.exports=[
 
   const refugo=db.prepare('SELECT COUNT(*) c FROM refugo WHERE plano_id=?').get(r.plano_id).c;
   igual(refugo,p.refugos.length,'o refugo ficou medido, nao sumiu');
+  igual(corte.doCorte(r.plano_id).length,p.sobras_geradas.length,'cada sobra nova virou "a guardar"');
 }},
 
-{nome:'confirmar SEM a etiqueta da sobra nova e recusado', executar({recusa}){
+{nome:'confirmar NAO pede etiqueta: a sobra nova nasce "a guardar" no Corte feito', executar({igual}){
   const x=cena();
   // Peca estreita e ALTA numa bobina larga: a tira lateral tem largura e
-  // altura de sobra (a altura minima e 1,00 m), entao nasce uma sobra que
-  // pede etiqueta. As sobras da prateleira sao recusadas para o corte cair
-  // no rolo, onde a tira lateral e larga.
+  // altura de sobra (a altura minima e 1,00 m), entao nasce uma sobra.
   const pecas=[{largura:'0,90',altura:'2,00'}];
   const recusadas=sobra.candidatas(x.t.id).map(s=>s.id);
   const p=plano.calcular({tecido_id:x.t.id,pecas,recusadas});
   if(!p.sobras_geradas.length) throw new Error('o cenario deveria gerar sobra');
-  recusa(()=>plano.confirmar({tecido_id:x.t.id,pecas,recusadas,assinatura:p.assinatura,etiquetas:{}},'Cortador'),
-    'etiqueta_faltando');
+  const r=corte.confirmar({tecido_id:x.t.id,pecas,recusadas,assinatura:p.assinatura},'Cortador2');
+  corte.cortar(r.plano_id,'Cortador2'); corte.feito(r.plano_id,'Cortador2');
+  const g=corte.doCorte(r.plano_id);
+  igual(g.length,p.sobras_geradas.length,'as sobras nasceram a guardar');
+  igual(g.every(z=>z.cortado_por==='Cortador2'),true,'em nome de quem cortou');
 }},
 
-{nome:'CONFIRMAR E ATOMICO: se uma linha falha, nada baixa', executar({recusa,igual,perto}){
+{nome:'O CORTE FEITO E ATOMICO: se uma linha falha, nada baixa', executar({recusa,igual,perto}){
   const x=cena();
   const pecas=[{largura:'0,90',altura:'2,00'}];
   // Recusa as sobras para forcar o caminho do ROLO: o que se quer provar e
@@ -203,33 +207,27 @@ module.exports=[
   const recusadas=sobra.candidatas(x.t.id).map(s=>s.id);
   const p=plano.calcular({tecido_id:x.t.id,pecas,recusadas});
   const alvo=rolo.porId(p.faixas.find(f=>f.fonte==='rolo').fonte_id);
-  const saldoAntes=alvo.saldo;
-  const sobrasAntes=db.prepare("SELECT COUNT(*) c FROM sobra").get().c;
-  const planosAntes=db.prepare("SELECT COUNT(*) c FROM plano").get().c;
-
-  // Etiqueta que ja tem dona: a ultima linha da transacao falha.
-  const usada=db.prepare("SELECT codigo FROM etiqueta WHERE sobra_id IS NOT NULL LIMIT 1").get().codigo;
-  const etiquetas={};
-  p.sobras_geradas.forEach(s=>{ etiquetas[s.indice]={codigo:usada,nivel_id:x.nivelSobra}; });
-
-  recusa(()=>plano.confirmar({tecido_id:x.t.id,pecas,recusadas,assinatura:p.assinatura,etiquetas},'Cortador'),
-    'etiqueta_ja_usada');
-
-  perto(rolo.porId(alvo.id).saldo,saldoAntes,'o rolo NAO baixou');
-  igual(db.prepare("SELECT COUNT(*) c FROM sobra").get().c,sobrasAntes,'nenhuma sobra nova');
-  igual(db.prepare("SELECT COUNT(*) c FROM plano").get().c,planosAntes,'nenhum plano gravado');
+  const r=corte.confirmar({tecido_id:x.t.id,pecas,recusadas,assinatura:p.assinatura},'Cortador3');
+  corte.cortar(r.plano_id,'Cortador3');
+  // O saldo foi corrigido por fora no meio do corte e nao cobre mais o puxado.
+  rolo.ajustar(alvo.id,'1,00','contagem','Outro');
+  const sobrasAntes=db.prepare("SELECT COUNT(*) c FROM sobra_a_guardar").get().c;
+  recusa(()=>corte.feito(r.plano_id,'Cortador3'),'saldo_insuficiente');
+  perto(rolo.porId(alvo.id).saldo,1,'o rolo NAO baixou');
+  igual(db.prepare("SELECT COUNT(*) c FROM sobra_a_guardar").get().c,sobrasAntes,'nenhuma sobra a guardar');
+  igual(db.prepare("SELECT COUNT(*) c FROM refugo WHERE plano_id=?").get(r.plano_id).c,0,'nenhum refugo');
+  igual(corte.porId(r.plano_id).etapa,'cortando','o corte continua aberto');
 }},
 
-{nome:'plano calculado que o estoque mudou nao confirma as cegas', executar({recusa,igual}){
+{nome:'plano calculado que o estoque mudou nao confirma as cegas', executar({recusa}){
   const x=cena();
   const pecas=[{largura:'0,90',altura:'2,00'}];
   const p=plano.calcular({tecido_id:x.t.id,pecas});
-  // Outra pessoa usa uma sobra / muda o estoque no meio do caminho.
+  // Outra pessoa cadastra uma sobra no meio do caminho.
   const cod=etiquetaLivre();
   sobra.criar({codigo:cod,tecido_id:x.t.id,largura:'1,00',altura:'2,50',
     condicao:'integra',nivel_id:x.nivelSobra},'Outro');
-  const etiquetas={}; p.sobras_geradas.forEach(s=>{ etiquetas[s.indice]={codigo:etiquetaLivre(),nivel_id:x.nivelSobra}; });
-  recusa(()=>plano.confirmar({tecido_id:x.t.id,pecas,assinatura:p.assinatura,etiquetas},'Cortador'),
+  recusa(()=>corte.confirmar({tecido_id:x.t.id,pecas,assinatura:p.assinatura},'Cortador4'),
     'plano_mudou');
 }},
 

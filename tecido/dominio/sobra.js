@@ -87,7 +87,9 @@ function criar(dados,usuarioNome){
       nivel_id:dados.nivel_id,
       origem:dados.origem||'inventario',
       origem_rolo_id:dados.origem_rolo_id, origem_sobra_id:dados.origem_sobra_id,
-      criado_por:usuarioNome, preco_m2:preco
+      criado_por:usuarioNome, preco_m2:preco,
+      // De qual corte ela nasceu — so a sobra guardada depois do corte traz.
+      plano_id:dados.plano_id||null
     });
     // Dentro da mesma transacao: se a reserva falhar, a sobra nao acontece.
     etiqueta.reservar(codigo,id);

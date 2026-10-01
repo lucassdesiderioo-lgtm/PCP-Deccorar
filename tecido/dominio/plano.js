@@ -1,5 +1,7 @@
 // Orquestra o plano de corte: busca candidatos, chama o encaixe, monta a
-// proposta — e, so no Confirmar, baixa o estoque.
+// proposta. Desde a fase 2 da spec CORTE-EM-ETAPAS (01/10/2026) o Confirmar
+// NAO baixa mais nada: ele grava o corte e reserva as fontes. Quem baixa e o
+// Corte feito, em dominio/corte.js.
 //
 // A ORDEM E A POLITICA DA CASA (6.6):
 //   1. SOBRA PRIMEIRO, sempre. E a unica razao de o cortador descer ate a
@@ -7,7 +9,7 @@
 //   2. O que sobrou vai para o rolo, simulando TODAS as larguras que existem.
 //   3. Peca que nao cabe volta MARCADA, com o motivo. Nunca some em silencio.
 //
-// R17: NADA BAIXA ANTES DO CONFIRMAR. O plano e proposta.
+// R17: NADA BAIXA ANTES DO CORTE FEITO. O plano e proposta.
 const crypto=require('crypto');
 const db=require('../nucleo/db');
 const dia=require('../nucleo/dia');
@@ -99,15 +101,45 @@ const pHistorico=db.prepare(`
     FROM plano_peca pp
     JOIN plano p ON p.id=pp.plano_id
     JOIN plano_faixa pf ON pf.id=pp.faixa_id
-   WHERE p.confirmado=1 AND pp.pedido IS NOT NULL AND pp.pedido<>''
+   WHERE p.etapa IN ('confirmado','cortando','feito') AND p.id<>?
+     AND pp.pedido IS NOT NULL AND pp.pedido<>''
    GROUP BY pp.pedido, pf.fonte, pf.rolo_id, pf.sobra_id
    ORDER BY p.id DESC`);
 
-function cortesAnteriores(pedidos){
+/* Conta o corte AINDA ABERTO de outra pessoa como corte anterior: o rolo que
+   ele reservou e onde o pedido vai sair, mesmo antes do Corte feito. O
+   cancelado nao conta — nada saiu dele. E o proprio corte nunca e "anterior"
+   de si mesmo: as edicoes da fase 3 recalculam o plano gravado. */
+function cortesAnteriores(pedidos,exceto){
   if(!pedidos.length) return [];
   const alvo=new Set(pedidos.map(x=>String(x).toUpperCase()));
-  return pHistorico.all().filter(h=>alvo.has(String(h.pedido).toUpperCase()));
+  return pHistorico.all(exceto||-1).filter(h=>alvo.has(String(h.pedido).toUpperCase()));
 }
+
+/* ── A RESERVA (R3) ───────────────────────────────────────────────────────
+   O corte aberto (confirmado ou cortando) segura as fontes dele: a sobra nao
+   e oferecida a outro plano, e o rolo aparece para os outros com o saldo
+   menos os metros reservados. Sem isso dois operadores pegariam a mesma
+   sobra — e agora que a baixa so acontece no Corte feito, o intervalo entre
+   confirmar e baixar e de horas, e nao de um clique.
+
+   A reserva NAO tem tabela: ela e a faixa gravada de um corte aberto. Uma
+   tabela de reserva ao lado seria a segunda afirmacao sobre o mesmo fato, e
+   a que fica para tras e a que deixa a sobra presa para sempre. */
+const pReservas=db.prepare(`
+  SELECT pf.sobra_id, pf.rolo_id, pf.altura, p.id AS plano_id, p.usuario_nome
+    FROM plano_faixa pf JOIN plano p ON p.id=pf.plano_id
+   WHERE p.etapa IN ('confirmado','cortando') AND p.id<>?`);
+function reservas(exceto){
+  const sobras=new Map(), rolos=new Map();
+  for(const r of pReservas.all(exceto||-1)){
+    if(r.sobra_id) sobras.set(r.sobra_id,{plano_id:r.plano_id, usuario_nome:r.usuario_nome});
+    if(r.rolo_id) rolos.set(r.rolo_id,arred((rolos.get(r.rolo_id)||0)+r.altura));
+  }
+  return {sobras,rolos};
+}
+// O rolo como os OUTROS cortes o enxergam: saldo menos o reservado.
+const livreDe=(r,res)=>r?{...r, saldo:arred(r.saldo-(res.rolos.get(r.id)||0))}:r;
 
 // Uma peca cabe numa fonte quando as DUAS dimensoes passam. Area nao decide
 // nada aqui: uma sobra de 0,50 x 4,00 tem 2,00 m2 e nao serve para uma peca
@@ -165,15 +197,21 @@ function faltaBobina(naoAlocadas, tecido, larguraMaxima){
  * Monta a proposta. NAO grava nada.
  * @param {{tecido_id, pecas:[{largura,altura}], recusadas:[sobra_id]}} pedido
  */
-function calcular(pedido){
+function calcular(pedido,opcoes){
+  const op=opcoes||{};
   const tecido=dTecido.porId(pedido.tecido_id);
   exigir(tecido,'tecido_inexistente','Escolha o tecido.');
   const pecas=lerPecas(pedido.pecas);
   const params=config.paramsDeCorte();
   const recusadas=new Set((pedido.recusadas||[]).map(Number));
+  // O que os OUTROS cortes abertos seguram. O proprio corte (op.plano_id)
+  // nao se reserva de si mesmo.
+  const res=reservas(op.plano_id);
 
   // ── 1. SOBRAS PRIMEIRO, e por GRUPO INTEIRO ───────────────────────────
-  const todasSobras=sobra.candidatas(tecido.id);
+  const candidatasTodas=sobra.candidatas(tecido.id);
+  const reservadas=candidatasTodas.filter(s=>res.sobras.has(s.id));
+  const todasSobras=candidatasTodas.filter(s=>!res.sobras.has(s.id));
   const disponiveis=todasSobras.filter(s=>!recusadas.has(s.id));
 
   let grupos=agrupar(pecas);
@@ -181,11 +219,11 @@ function calcular(pedido){
   const usadas=[];
 
   // O que ja foi cortado deste(s) pedido(s), em outro dia.
-  const anteriores=cortesAnteriores([...new Set(pecas.map(p=>p.pedido).filter(Boolean))]);
+  const anteriores=cortesAnteriores([...new Set(pecas.map(p=>p.pedido).filter(Boolean))],op.plano_id);
   const roloAnterior=(()=>{
     for(const h of anteriores){
       if(h.fonte!=='rolo'||!h.rolo_id) continue;
-      const r=rolo.porId(h.rolo_id);
+      const r=livreDe(rolo.porId(h.rolo_id),res);
       if(r&&r.status!=='encerrado'&&r.saldo>TOL) return {ref:r, historico:h};
     }
     return null;
@@ -219,7 +257,7 @@ function calcular(pedido){
   }
 
   // ── 2. O QUE SOBROU VAI PARA O ROLO ───────────────────────────────────
-  const rolos=rolo.disponiveis(tecido.id);
+  const rolos=rolo.disponiveis(tecido.id).map(r=>livreDe(r,res)).filter(r=>r.saldo>TOL);
   let simulacoes=[], bobina=null;
 
   if(grupos.length&&rolos.length){
@@ -398,6 +436,15 @@ function calcular(pedido){
       .map(([s,quais])=>explicar(s,quais,'recusada',m=>
         'serve a peca '+medida(m.largura,m.altura)+' — recusada neste plano')),
 
+    /* RESERVADA NOUTRO CORTE ABERTO (R3). Sem esta linha a sobra do tamanho
+       certo sumia do plano sem explicacao — e quem esta com o retalho na mao
+       conclui que o sistema errou. */
+    ...reservadas.map(s=>[s,pecasQueCabem(s)]).filter(([,quais])=>quais.length)
+      .map(([s,quais])=>{ const r=res.sobras.get(s.id);
+        return explicar(s,quais,'reservada',m=>
+          'serve a peca '+medida(m.largura,m.altura)+', mas esta reservada no corte '+r.plano_id+
+          (r.usuario_nome?' de '+r.usuario_nome:'')+', que ainda nao terminou'); }),
+
     ...naoAprov.map(s=>[s,pecasQueCabem(s)]).filter(([,quais])=>quais.length)
       .map(([s,quais])=>explicar(s,quais,'nao_aproveitavel',m=>
         'serve a peca '+medida(m.largura,m.altura)+', mas a condicao "'+
@@ -412,6 +459,9 @@ function calcular(pedido){
   // A LISTA explica melhor, e com nome e medida. Frase ao lado dela seria a
   // segunda regua da mesma pergunta, dizendo menos.
   else if(sobrasQueServem.length) sobreSobras=null;
+  else if(!todasSobras.length&&!naoAprov.length&&reservadas.length)
+    sobreSobras=(reservadas.length===1?'A unica sobra deste tecido esta reservada':
+      'As '+reservadas.length+' sobras deste tecido estao reservadas')+' em cortes que ainda nao terminaram.';
   else if(!todasSobras.length&&!naoAprov.length)
     sobreSobras='Nao ha nenhuma sobra deste tecido catalogada.';
   else if(disponiveis.length){
@@ -534,102 +584,9 @@ function recusar(dados,usuarioNome){
   return {sobra_id:s.id, codigo:s.codigo};
 }
 
-// ── O CONFIRMAR (R17) ────────────────────────────────────────────────────
-// Tudo numa transacao. Se uma linha falhar, NENHUMA baixa acontece.
-function confirmar(pedido,usuarioNome){
-  // Recalcula do zero e compara com o que a tela mostrou. O cliente nao
-  // manda o plano: manda o pedido. Assim ninguem confirma um plano fabricado.
-  const p=calcular(pedido);
-  exigir(p.assinatura===pedido.assinatura,'plano_mudou',
-    'O estoque mudou desde que este plano foi calculado (outra pessoa pode ter usado uma destas sobras). Confira o plano de novo antes de confirmar.');
-  exigir(p.faixas.length,'plano_vazio','Este plano nao encaixa nenhuma peca — nao ha o que confirmar.');
-
-  const etiquetas=pedido.etiquetas||{};
-  // Toda sobra que vai nascer precisa de etiqueta E endereco ANTES de comecar
-  // a baixar. Conferir aqui evita descobrir no meio da transacao.
-  p.sobras_geradas.forEach(s=>{
-    const e=etiquetas[s.indice];
-    exigir(e&&e.codigo,'etiqueta_faltando',
-      'Falta a etiqueta da sobra de '+medida(s.largura,s.altura)+'. Cole uma e bipe o codigo.');
-    exigir(e.nivel_id,'endereco_faltando',
-      'Diga onde a sobra de '+medida(s.largura,s.altura)+' vai ser guardada.');
-    etiqueta.conferir(e.codigo);
-    endereco.exigirArmazem(e.nivel_id,'SOBRA');
-  });
-
-  return db.transaction(()=>{
-    const info=db.prepare(`INSERT INTO plano
-      (tecido_id,origem,consumo_linear,consumo_m2,area_pecas,area_sobra_gerada,desperdicio,
-       usuario_nome,confirmado)
-      VALUES(?,?,?,?,?,?,?,?,1)`).run(
-        p.tecido.id, pedido.origem||'digitado', p.consumo_linear, p.consumo_m2,
-        p.area_pecas, p.area_sobras, p.desperdicio, usuarioNome||null);
-    const plano_id=info.lastInsertRowid;
-
-    const gravaFaixa=db.prepare(`INSERT INTO plano_faixa
-      (plano_id,ordem,fonte,rolo_id,sobra_id,largura_disponivel,altura,largura_usada,sobra_gerada_codigo)
-      VALUES(?,?,?,?,?,?,?,?,?)`);
-    const gravaPeca=db.prepare(`INSERT INTO plano_peca
-      (plano_id,ordem,tecido_id,largura,altura,faixa_id,pos_x,nao_alocada_motivo,pedido)
-      VALUES(?,?,?,?,?,?,?,?,?)`);
-    const pedidoDe=id=>{ const x=p.pecas.find(y=>y.id===id); return x&&x.pedido?x.pedido:null; };
-
-    const faixaIds=[];
-    p.faixas.forEach(f=>{
-      const r=gravaFaixa.run(plano_id,f.ordem,f.fonte,
-        f.fonte==='rolo'?f.fonte_id:null, f.fonte==='sobra'?f.fonte_id:null,
-        f.largura_disponivel,f.altura,f.largura_usada,null);
-      faixaIds[f.ordem]=r.lastInsertRowid;
-      f.pecas.forEach(pc=>gravaPeca.run(plano_id,pc.id,p.tecido.id,pc.largura,pc.altura,
-        r.lastInsertRowid,pc.x,null,pedidoDe(pc.id)));
-    });
-    // A peca que nao coube fica gravada com o motivo — o plano guarda o que
-    // NAO deu certo tambem, senao o historico so conta a metade boa.
-    p.pecas_nao_alocadas.forEach(pc=>
-      gravaPeca.run(plano_id,pc.id,p.tecido.id,pc.largura,pc.altura,null,null,pc.motivo,pedidoDe(pc.id)));
-
-    // As sobras usadas saem INTEIRAS (R12), mesmo carregando varias pecas.
-    p.sobras_sugeridas.forEach(s=>sobra.marcarUsada(s.id,plano_id,usuarioNome));
-
-    // O rolo baixa metro linear, com referencia ao plano.
-    const porRolo=new Map();
-    p.faixas.filter(f=>f.fonte==='rolo').forEach(f=>
-      porRolo.set(f.fonte_id,arred((porRolo.get(f.fonte_id)||0)+f.altura)));
-    for(const [rolo_id,metros] of porRolo) rolo.consumir(rolo_id,metros,plano_id,usuarioNome);
-
-    // As sobras que nascem: cadastradas AQUI DENTRO, com a medida ja
-    // calculada e a etiqueta que o operador colou. E isto que faz o modulo
-    // se manter em dia sem depender de disciplina.
-    p.sobras_geradas.forEach(s=>{
-      const e=etiquetas[s.indice];
-      const nova=sobra.criar({
-        codigo:e.codigo, tecido_id:p.tecido.id, largura:s.largura, altura:s.altura,
-        condicao:e.condicao||'integra', nivel_id:e.nivel_id,
-        origem:s.origem?s.origem.tipo:'rolo',
-        origem_rolo_id:s.origem&&s.origem.tipo==='rolo'?s.origem.id:null,
-        origem_sobra_id:s.origem&&s.origem.tipo==='sobra'?s.origem.id:null
-      },usuarioNome);
-      if(s.faixa!=null&&faixaIds[s.faixa])
-        db.prepare('UPDATE plano_faixa SET sobra_gerada_codigo=? WHERE id=?')
-          .run(nova.codigo,faixaIds[s.faixa]);
-    });
-
-    // O refugo fica MEDIDO. Perda que some do sistema some tambem do
-    // relatorio que explicaria o desperdicio do mes.
-    const gravaRefugo=db.prepare(`INSERT INTO refugo
-      (tecido_id,largura,altura,area,motivo,plano_id,usuario_nome) VALUES(?,?,?,?,?,?,?)`);
-    p.refugos.forEach(x=>gravaRefugo.run(p.tecido.id,x.largura,x.altura,x.area,
-      x.largura<p.parametros.larguraMinimaSobra?'tira_estreita':x.de,plano_id,usuarioNome||null));
-
-    // As recusas deste plano ganham o vinculo, agora que ele existe.
-    if(p.recusadas.length)
-      db.prepare('UPDATE plano_recusa SET plano_id=? WHERE plano_id IS NULL AND sobra_id IN ('+
-        p.recusadas.map(()=>'?').join(',')+')').run(plano_id,...p.recusadas);
-
-    return {plano_id, consumo_linear:p.consumo_linear, desperdicio:p.desperdicio,
-      sobras_criadas:p.sobras_geradas.length, faixas:p.faixas.length};
-  })();
-}
+// O Confirmar, o Cortar, o Corte feito e o Guardar moram em dominio/corte.js
+// (spec CORTE-EM-ETAPAS, fase 2). Aqui fica a CONTA — e ela e uma so para o
+// plano novo e para as edicoes do corte aberto.
 
 // A LEITURA do que foi cortado mora em dominio/corte_historico.js (fase 1 da
 // spec CORTE-EM-ETAPAS). Ela saiu daqui para nao haver duas listas de cortes.
@@ -638,4 +595,4 @@ function confirmar(pedido,usuarioNome){
 // montar um pedido inteiro. Ela e o que vira decisao de compra, e a conta de
 // "quantas pecas por largura" e o tipo de coisa que se quebra numa refatoracao
 // sem ninguem notar — a tela continuaria mostrando um numero, so que errado.
-module.exports={calcular, confirmar, recusar, faltaBobina};
+module.exports={calcular, recusar, faltaBobina, reservas};

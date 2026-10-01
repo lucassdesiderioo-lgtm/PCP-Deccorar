@@ -7623,6 +7623,63 @@ porque perde a contagem **e** cai na varredura do padrão de dois passos).
 > fecha é **alguém abrindo o `/corte` no celular da bancada** e a página não
 > andando de lado com a medida sendo digitada.
 
+### ⚠️ O CORTE EM ETAPAS — o estoque só anda no CORTE FEITO (01/10/2026, spec `CORTE-EM-ETAPAS`)
+
+Em 01/10/2026 um corte foi confirmado rápido: o plano mandava parte do pedido
+para uma sobra, o tom não bateu e o operador cortou tudo do rolo. O Confirmar
+**já tinha baixado** — a sobra ficou "usada" inteira na mão de alguém e o rolo
+baixou a menos. Desde a fase 2 da spec:
+
+```
+① planejar   ② confirmar      ③ cortando      ④ corte feito     ⑤ guardar
+  (calcula)    grava e RESERVA   relógio corre   AQUI BAIXA tudo   medida+etiqueta+endereço
+```
+
+`tecido/dominio/corte.js` é o **dono único** das etapas e da baixa de rolo e
+sobra; `plano.js` ficou só com a conta. O histórico de cada corte está no botão
+**Histórico** da tela de corte (fase 1, `dominio/corte_historico.js`).
+
+> ⚠️ **`plano.confirmado` CONTINUA DIZENDO "BAIXOU O ESTOQUE"**, e por isso só
+> vira 1 no Corte feito. O painel de Cortes, o comprometido de tecido (4-B) e a
+> checagem do gerencial leem `confirmado=1` com esse sentido; a etapa mora em
+> coluna nova (`etapa`). Os cortes de antes viraram `feito` na migração 27 (R28).
+
+> ⚠️ **O CORTE FEITO BAIXA O QUE ESTÁ GRAVADO (`plano.proposta`), nunca um plano
+> recalculado na hora** — entre confirmar e terminar pode ter entrado sobra nova,
+> e recalcular escolheria uma fonte que ninguém cortou.
+
+> ⚠️ **A RESERVA NÃO TEM TABELA: ela é a faixa de um corte aberto.** Sobra de
+> corte aberto (confirmado ou cortando) não é oferecida a outro plano — e o
+> plano diz por quê (`reservada`, com o corte e a pessoa) —, e o rolo aparece
+> para os outros com o saldo menos os metros reservados. Uma tabela de reserva
+> ao lado seria a segunda afirmação sobre o mesmo fato, e a que fica para trás
+> é a que prende a sobra para sempre.
+
+> ⚠️ **A SOBRA NASCIDA NÃO É LINHA DE `sobra` ATÉ SER GUARDADA**, e mora em
+> `sobra_a_guardar`, em nome de quem cortou (R13). Sem etiqueta ninguém a acha
+> na prateleira, e por isso ela não entra em plano (R14) — morando à parte,
+> nenhuma consulta de candidatas precisa lembrar de filtrá-la. Guardar exige
+> medida, etiqueta e endereço juntos. **A medida calculada vem escrita e a
+> lista vem vazia**: medida pré-marcada é medida que se salva sem olhar (a regra
+> das sobras do `tecido/README.md`), e quem vale é a fita.
+
+> ⚠️ **UM CORTE ABERTO POR OPERADOR (R2)**, e a pendência de guardar não conta.
+> Quem mexe no corte aberto é quem o abriu, ou a chefia (`corte.gerir`, que só o
+> diretor tem pelo `*`); a chefia vê as sobras a guardar de todos (R15).
+
+> ⚠️ **"VOLTAR AO PLANO" APAGA O CORTE DO ②, e CANCELAR fica no histórico.**
+> No ② nada foi cortado; um "cancelado" por cada vez que alguém conferiu o
+> resumo e voltou encheria o histórico de cortes que nunca existiram. Do ③ em
+> diante só se cancela, com motivo.
+
+> ⚠️ **A LINHA VAZIA DA GRADE NÃO É MEDIDA.** `comoNumero('')` devolve **0**, e
+> não `null`: o filtro antigo da tela deixava as linhas em branco irem para o
+> servidor, e quem preenchia uma só das três linhas da grade levava *"A linha 2
+> esta sem medida valida"*. Achado abrindo a tela, consertado no `temMedida`.
+
+**Rode `cd tecido && npm test` ao mexer em `corte.js`, no `plano.js` ou na tela
+de corte** — `corte_etapas.test.js` (18) e `historico_corte.test.js` (15).
+
 ### Três regras do sob medida que valem citar aqui
 
 **Cada nível guarda um rolo só.** Regra do dono, 15/09/2026: `Haste A · Andar 1

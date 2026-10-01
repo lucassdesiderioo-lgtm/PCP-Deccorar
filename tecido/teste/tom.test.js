@@ -4,6 +4,7 @@
 // cortadas em fontes diferentes chegam com tom diferente, e o cliente ve as
 // duas lado a lado na mesma parede.
 const plano=require('../dominio/plano');
+const corte=require('../dominio/corte');
 const sobra=require('../dominio/sobra');
 const rolo=require('../dominio/rolo');
 const etiqueta=require('../dominio/etiqueta');
@@ -145,9 +146,8 @@ module.exports=[
               {pedido:'4272',largura:'1,495',altura:'2,730'}];
   const p1=plano.calcular({tecido_id:x.t.id,pecas:dia1});
   igual(p1.faixas[0].codigo,bom.codigo,'o dia 1 escolheu a bobina de 3,00 (duas por faixa)');
-  const etiquetas={};
-  p1.sobras_geradas.forEach(sg=>{ etiquetas[sg.indice]={codigo:etiquetaLivre(),nivel_id:x.nivelSobra}; });
-  plano.confirmar({tecido_id:x.t.id,pecas:dia1,assinatura:p1.assinatura,etiquetas},'teste');
+  const c1=corte.confirmar({tecido_id:x.t.id,pecas:dia1,assinatura:p1.assinatura},'teste');
+  corte.cortar(c1.plano_id,'teste'); corte.feito(c1.plano_id,'teste');
 
   // DIA 2: o resto do pedido. Sem olhar para tras, o plano poderia mudar de
   // rolo — e o cliente veria a diferenca na parede.

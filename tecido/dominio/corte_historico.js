@@ -39,15 +39,23 @@ const pNascidas=db.prepare(`
        AND s.criado_por IS p.usuario_nome
        AND ABS(julianday(s.criado_em)-julianday(p.criado_em))*86400 <= 5 ))
    WHERE p.id=?
-   ORDER BY s.id`);
-const nascidas=plano_id=>pNascidas.all(plano_id);
+   UNION
+  SELECT s.id, s.codigo, s.largura, s.altura, s.area, s.status, s.nivel_id,
+         s.baixado_em, s.baixa_motivo, s.criado_em
+    FROM sobra s WHERE s.plano_id=?
+   ORDER BY 1`);
+/* A sobra guardada depois do corte (fase 2) grava o corte de onde nasceu em
+   `sobra.plano_id`, e essa e a resposta direta. A regua de cima fica para os
+   cortes de antes, que nao gravavam. */
+const nascidas=plano_id=>pNascidas.all(plano_id,plano_id);
 
 /* De qual corte esta sobra nasceu. A mesma regua de cima, lida do outro
    lado: o corte confirmado cujas nascidas contem esta sobra. */
 function nasceuEm(s){
+  if(s.plano_id) return s.plano_id;
   const cands=db.prepare(`SELECT DISTINCT p.id FROM plano p
      LEFT JOIN plano_faixa pf ON pf.plano_id=p.id
-    WHERE p.confirmado=1 AND (pf.sobra_gerada_codigo=? OR pf.rolo_id=? OR pf.sobra_id=?)
+    WHERE p.etapa IS NOT NULL AND (pf.sobra_gerada_codigo=? OR pf.rolo_id=? OR pf.sobra_id=?)
     ORDER BY p.id`).all(s.codigo,s.origem_rolo_id||-1,s.origem_sobra_id||-1);
   const achado=cands.find(c=>nascidas(c.id).some(x=>x.id===s.id));
   return achado?achado.id:null;
@@ -58,7 +66,7 @@ function nasceuEm(s){
    operador e sobra. Sem filtro devolve os mais recentes, o mais novo em cima. */
 function listar(filtros){
   const f=filtros||{};
-  const onde=['p.confirmado=1'], vals=[];
+  const onde=['p.etapa IS NOT NULL'], vals=[];
 
   const pedido=String(f.pedido||'').trim();
   if(pedido){
@@ -82,7 +90,7 @@ function listar(filtros){
     const s=db.prepare('SELECT * FROM sobra WHERE codigo=?').get(cod);
     exigir(s,'sobra_inexistente','Nao ha sobra com o codigo '+cod+'.');
     const usadaEm=db.prepare(`SELECT DISTINCT p.id FROM plano_faixa pf JOIN plano p ON p.id=pf.plano_id
-      WHERE pf.sobra_id=? AND p.confirmado=1 ORDER BY p.id`).all(s.id).map(r=>r.id);
+      WHERE pf.sobra_id=? AND p.etapa IS NOT NULL ORDER BY p.id`).all(s.id).map(r=>r.id);
     const nasceu=nasceuEm(s);
     sobra={id:s.id, codigo:s.codigo, largura:s.largura, altura:s.altura,
       status:s.status, endereco:endDe(s.nivel_id), nasceu_em:nasceu, usada_em:usadaEm};
@@ -96,6 +104,9 @@ function listar(filtros){
 
   const cortes=db.prepare(`
     SELECT p.id, p.data, p.criado_em, p.usuario_nome, p.tecido_id,
+           p.etapa, p.cortar_em, p.feito_em, p.cancelado_em, p.cancelado_motivo,
+           (SELECT COUNT(*) FROM sobra_a_guardar g WHERE g.plano_id=p.id
+             AND g.guardada_em IS NULL AND g.cancelada_em IS NULL) AS a_guardar,
            p.consumo_linear, p.consumo_m2, p.area_pecas, p.desperdicio,
            l.nome AS linha_nome, a.nome AS abertura_nome, c.nome AS cor_nome,
            (SELECT GROUP_CONCAT(DISTINCT pp.pedido) FROM plano_peca pp
@@ -119,7 +130,7 @@ function listar(filtros){
       sobras_nascidas:nascidas(c.id).length}));
 
   const operadores=db.prepare(`SELECT DISTINCT usuario_nome AS n FROM plano
-     WHERE confirmado=1 AND usuario_nome IS NOT NULL AND usuario_nome<>'' ORDER BY usuario_nome`)
+     WHERE etapa IS NOT NULL AND usuario_nome IS NOT NULL AND usuario_nome<>'' ORDER BY usuario_nome`)
     .all().map(r=>r.n);
 
   return {cortes, operadores, sobra, filtrado:!!filtrado, limite};
@@ -133,7 +144,7 @@ function detalhe(id){
       LEFT JOIN linha l ON l.id=t.linha_id
       LEFT JOIN abertura a ON a.id=t.abertura_id
       LEFT JOIN cor c ON c.id=t.cor_id
-     WHERE p.id=? AND p.confirmado=1`).get(Number(id));
+     WHERE p.id=? AND p.etapa IS NOT NULL`).get(Number(id));
   exigir(p,'corte_inexistente','Corte '+id+' nao encontrado.');
 
   const faixas=db.prepare(`SELECT pf.*, r.codigo AS rolo_codigo, s.codigo AS sobra_codigo
@@ -205,8 +216,18 @@ function detalhe(id){
       LEFT JOIN sobra s ON s.id=pr.sobra_id
      WHERE pr.plano_id=? ORDER BY pr.id`).all(p.id);
 
+  // A sobra que nasceu e ainda espera alguem guarda-la (fase 2).
+  const aGuardar=db.prepare(`SELECT id, largura, altura, area, de, cortada_errada, cortado_por,
+      criado_em, guardada_em, guardada_por, cancelada_em, cancelada_motivo,
+      (SELECT codigo FROM sobra WHERE id=g.sobra_id) AS sobra_codigo
+     FROM sobra_a_guardar g WHERE plano_id=? ORDER BY id`).all(p.id);
+
   return {
     id:p.id, data:p.data, criado_em:p.criado_em, usuario_nome:p.usuario_nome, origem:p.origem,
+    etapa:p.etapa, cortar_em:p.cortar_em, cortar_por:p.cortar_por,
+    feito_em:p.feito_em, feito_por:p.feito_por,
+    cancelado_em:p.cancelado_em, cancelado_por:p.cancelado_por, cancelado_motivo:p.cancelado_motivo,
+    a_guardar:aGuardar,
     tecido_nome:[p.linha_nome,p.abertura_nome,p.cor_nome].filter(Boolean).join(' · '),
     consumo_linear:p.consumo_linear, consumo_m2:p.consumo_m2, area_pecas:p.area_pecas,
     area_sobra_gerada:p.area_sobra_gerada, desperdicio:p.desperdicio,

@@ -2431,11 +2431,22 @@ ENTRADA: tecido (3 toques) + medidas (grade ou arquivo)
 2. o que sobrou vai para o rolo, simulando TODAS as larguras
 3. peça que não cabe volta MARCADA, com o motivo
    ↓
-proposta desenhada  →  [não usar] recalcula  →  [Confirmar] baixa tudo
+proposta desenhada  →  [não usar] recalcula  →  [Confirmar] grava e reserva
+   ↓
+② resumo por fonte (com endereço)  →  [CORTAR]  ou  [Voltar ao plano] (apaga)
+③ cortando  →  [Corte feito] BAIXA  ou  [Cancelar corte] (com motivo)
+⑤ sobras a guardar: medida + etiqueta + endereço
 ```
 
-**Nada baixa antes do Confirmar**, e o Confirmar é uma transação só: sobra
-usada, rolo consumido, sobras novas cadastradas e refugo medido — ou nada.
+> ⚠️ **DESDE 01/10/2026 (fase 2 da spec `CORTE-EM-ETAPAS`) NADA BAIXA ANTES DO
+> CORTE FEITO.** O Confirmar grava o corte e reserva as fontes; o Corte feito
+> (`dominio/corte.js`) é uma transação só — sobra usada, rolo consumido, sobras
+> nascidas "a guardar" e refugo medido — ou nada. A regra completa, e as que
+> parecem bug, está no `CLAUDE.md` §19, *"O CORTE EM ETAPAS"*.
+
+O texto abaixo descreve o Confirmar até 30/09/2026 e continua valendo para a
+assinatura; onde ele fala em baixar e cadastrar a sobra no Confirmar, leia
+Corte feito e Guardar.
 
 **A proposta é assinada.** Entre calcular e confirmar, outra pessoa pode ter
 usado a mesma sobra; o Confirmar recalcula, compara a assinatura, e recusa se

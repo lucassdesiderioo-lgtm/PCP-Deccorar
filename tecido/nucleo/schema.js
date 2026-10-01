@@ -1624,6 +1624,64 @@ INSERT INTO sm_boleto_pedido(boleto_id,pedido_id)
 DROP INDEX idx_sm_boleto_pedido;
 ALTER TABLE sm_boleto DROP COLUMN pedido_id;
 CREATE INDEX idx_sm_boleto_pedido ON sm_boleto_pedido(pedido_id);
+`},
+
+/* ── O CORTE EM ETAPAS (spec CORTE-EM-ETAPAS, fase 2, 01/10/2026) ─────────
+   confirmado -> cortando -> feito   (ou cancelado)
+
+   ⚠️ `confirmado` CONTINUA DIZENDO "BAIXOU O ESTOQUE", e por isso ele so
+   vira 1 no CORTE FEITO. Cinco lugares leem `confirmado=1` como "este corte
+   tirou material da prateleira" (o painel de Cortes, o comprometido do
+   tecido, a checagem do gerencial, o historico). Mudar o sentido dele seria
+   mudar os cinco em silencio; a etapa nova mora em coluna nova.
+
+   ⚠️ OS CORTES DE ANTES VIRAM "feito" (R28): eles baixaram o estoque no
+   Confirmar antigo, e as sobras deles ja nasceram com etiqueta e endereco.
+
+   A PROPOSTA INTEIRA FICA GRAVADA (`proposta`, JSON). O Corte feito baixa o
+   que esta nela — nunca um plano recalculado na hora, que poderia escolher
+   outra sobra que apareceu na prateleira enquanto o operador cortava.
+   `entrada` e o que o operador lancou, para as edicoes da fase 3 recalcularem
+   pela MESMA conta do plano. */
+{n:27, nome:'o corte em etapas — a baixa passa para o Corte feito, e a sobra nasce a guardar', sql:`
+ALTER TABLE plano ADD COLUMN etapa TEXT;
+UPDATE plano SET etapa='feito' WHERE confirmado=1;
+ALTER TABLE plano ADD COLUMN entrada TEXT;
+ALTER TABLE plano ADD COLUMN proposta TEXT;
+ALTER TABLE plano ADD COLUMN cortar_em TEXT;
+ALTER TABLE plano ADD COLUMN cortar_por TEXT;
+ALTER TABLE plano ADD COLUMN feito_em TEXT;
+ALTER TABLE plano ADD COLUMN feito_por TEXT;
+ALTER TABLE plano ADD COLUMN cancelado_em TEXT;
+ALTER TABLE plano ADD COLUMN cancelado_por TEXT;
+ALTER TABLE plano ADD COLUMN cancelado_motivo TEXT;
+CREATE INDEX idx_plano_etapa ON plano(etapa, usuario_nome);
+
+-- De qual corte a sobra nasceu. Os cortes antigos nao gravavam: para eles a
+-- leitura (dominio/corte_historico.js) usa a regua de antes.
+ALTER TABLE sobra ADD COLUMN plano_id INTEGER;
+
+/* A SOBRA QUE NASCEU E AINDA NAO FOI GUARDADA (R13). Ela nao e uma linha de
+   'sobra' ainda, e e de proposito: sem etiqueta e sem endereco ninguem a acha
+   na prateleira, e por isso ela nao pode entrar em plano (R14). Morando em
+   tabela propria, nenhuma consulta de candidatas precisa lembrar de filtra-la. */
+CREATE TABLE sobra_a_guardar (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plano_id INTEGER NOT NULL REFERENCES plano(id),
+  tecido_id INTEGER NOT NULL REFERENCES tecido(id),
+  largura REAL NOT NULL, altura REAL NOT NULL,
+  area REAL GENERATED ALWAYS AS (largura * altura) STORED,
+  de TEXT,                      -- tira_lateral | resto_de_pe | cortada_errada
+  cortada_errada INTEGER DEFAULT 0,
+  origem TEXT, origem_rolo_id INTEGER REFERENCES rolo(id),
+  origem_sobra_id INTEGER REFERENCES sobra(id),
+  cortado_por TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime')),
+  guardada_em TEXT, guardada_por TEXT,
+  sobra_id INTEGER REFERENCES sobra(id),
+  cancelada_em TEXT, cancelada_por TEXT, cancelada_motivo TEXT
+);
+CREATE INDEX idx_sobra_a_guardar ON sobra_a_guardar(guardada_em, cancelada_em, cortado_por);
 `}
 ];
 

@@ -4,6 +4,7 @@
 // sobra o sistema deu como usada?" — e o detalhe tem que dizer isso com o
 // status de HOJE da sobra, nao com o que o plano previu.
 const plano=require('../dominio/plano');
+const corte=require('../dominio/corte');
 const historico=require('../dominio/corte_historico');
 const sobra=require('../dominio/sobra');
 const rolo=require('../dominio/rolo');
@@ -32,13 +33,14 @@ function cena(){
   return {...base,t};
 }
 
-// Confirma como a tela faz: etiqueta e endereco para cada sobra que nasce.
-function confirmar(x,pecas,quem){
-  const p=plano.calcular({tecido_id:x.t.id,pecas});
-  const livres=etiqueta.pendentes().map(e=>e.codigo);
-  const etiquetas={};
-  p.sobras_geradas.forEach((s,i)=>{ etiquetas[s.indice]={codigo:livres[i],nivel_id:x.nivelSobra}; });
-  const r=plano.confirmar({tecido_id:x.t.id,pecas,assinatura:p.assinatura,etiquetas},quem||'teste');
+// O corte inteiro, como a bancada faz: confirmar, cortar, Corte feito e
+// guardar cada sobra que nasceu, com a medida calculada.
+function confirmar(x,pecas,quem,extra){
+  const p=plano.calcular({tecido_id:x.t.id,pecas,...(extra||{})});
+  const r=corte.confirmar({tecido_id:x.t.id,pecas,assinatura:p.assinatura,...(extra||{})},quem||'teste');
+  corte.cortar(r.plano_id,quem||'teste'); corte.feito(r.plano_id,quem||'teste');
+  corte.doCorte(r.plano_id).forEach(g=>corte.guardar(g.id,{largura:g.largura,altura:g.altura,
+    codigo:etiqueta.pendentes()[0].codigo,nivel_id:x.nivelSobra},quem||'teste'));
   return {...r, proposta:p};
 }
 
@@ -180,11 +182,7 @@ module.exports=[
   const s=sobra.criar({codigo:livre,tecido_id:x.t.id,largura:2,altura:2,condicao:'integra',nivel_id:x.nivelSobra},'teste');
   const motivo=db.prepare('SELECT id FROM motivo_recusa ORDER BY id LIMIT 1').get().id;
   plano.recusar({sobra_id:s.id,motivo_id:motivo},'teste');
-  const pecas=[{pedido:'P9',largura:'1,00',altura:'1,00'}];
-  const p=plano.calcular({tecido_id:x.t.id,pecas,recusadas:[s.id]});
-  const et={}; const livres=etiqueta.pendentes().map(e=>e.codigo);
-  p.sobras_geradas.forEach((g,i)=>{ et[g.indice]={codigo:livres[i],nivel_id:x.nivelSobra}; });
-  const r=plano.confirmar({tecido_id:x.t.id,pecas,recusadas:[s.id],assinatura:p.assinatura,etiquetas:et},'teste');
+  const r=confirmar(x,[{pedido:'P9',largura:'1,00',altura:'1,00'}],'teste',{recusadas:[s.id]});
   const d=historico.detalhe(r.plano_id);
   igual(d.recusas.length,1,'a recusa');
   igual(d.recusas[0].sobra_codigo,s.codigo,'de qual sobra');

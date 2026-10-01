@@ -22,6 +22,7 @@ const catalogo=require('../dominio/catalogo_sm');
 const tecidoDom=require('../dominio/tecido');
 const rolo=require('../dominio/rolo');
 const plano=require('../dominio/plano');
+const corte=require('../dominio/corte');
 const config=require('../nucleo/config');
 const pessoas=require('../nucleo/pessoas');
 
@@ -205,21 +206,24 @@ module.exports=[
   const porPeca=linha.m2/2;
 
   const t=p.itens[0].componentes.find(c=>c.chave==='tecido');
-  const corte={largura:t.largura_corte_mm/1000, altura:t.altura_corte_mm/1000};
+  const medidaCorte={largura:t.largura_corte_mm/1000, altura:t.altura_corte_mm/1000};
   /* Bobina da largura EXATA da peca: assim o corte nao gera sobra lateral, e
      o caso confirma o plano pelo caminho de verdade sem precisar montar
      etiqueta e endereco de sobra — que sao outro assunto e ja tem teste. */
   rolo.entrada({tecido_id:b.tBranco.id,
-    largura:String(corte.largura).replace('.',','),
+    largura:String(medidaCorte.largura).replace('.',','),
     metragem:'50',preco_m2:'25'},DIRETOR.nome);
 
   /* UMA das duas. Elas sao identicas, entao qual das duas foi nao muda nada —
      e e por isso que o casamento por MEDIDA e exato aqui, e nao um chute. */
   const calc=plano.calcular({tecido_id:b.tBranco.id,
-    pecas:[{pedido:String(p.numero),cliente:'LAR',largura:corte.largura,altura:corte.altura}]});
-  plano.confirmar({tecido_id:b.tBranco.id, assinatura:calc.assinatura,
-    pecas:[{pedido:String(p.numero),cliente:'LAR',largura:corte.largura,altura:corte.altura}],
-    etiquetas:{}}, 'Lucas');
+    pecas:[{pedido:String(p.numero),cliente:'LAR',largura:medidaCorte.largura,altura:medidaCorte.altura}]});
+  const aberto=corte.confirmar({tecido_id:b.tBranco.id, assinatura:calc.assinatura,
+    pecas:[{pedido:String(p.numero),cliente:'LAR',largura:medidaCorte.largura,altura:medidaCorte.altura}]}, 'Lucas');
+  /* So o CORTE FEITO tira do comprometido: o corte confirmado e ainda nao
+     terminado nao consumiu rolo nenhum (fase 2 da CORTE-EM-ETAPAS). */
+  igual(doTecido(consumo.comprometido(),b.tBranco.id).pecas,2,'confirmado nao e cortado');
+  corte.cortar(aberto.plano_id,'Lucas'); corte.feito(aberto.plano_id,'Lucas');
 
   const depois=doTecido(consumo.comprometido(),b.tBranco.id);
   igual(depois.pecas,1,'sobra uma');

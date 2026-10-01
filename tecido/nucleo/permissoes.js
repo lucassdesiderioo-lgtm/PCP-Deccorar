@@ -58,7 +58,14 @@ const CHAVES=[
   {chave:'rolo.encerrar',     nome:'Encerrar rolo (acerto de fim)'},
   {chave:'rolo.ajustar',      nome:'Ajustar saldo de rolo'},
   {chave:'plano.calcular',    nome:'Calcular plano de corte'},
-  {chave:'plano.confirmar',   nome:'Confirmar plano (baixa o estoque)'},
+  {chave:'plano.confirmar',   nome:'Confirmar, cortar e dar o Corte feito (o Corte feito baixa o estoque)'},
+  /* ⚠️ A CHEFIA DO CORTE (spec CORTE-EM-ETAPAS, fase 2). O corte aberto e de
+     quem o abriu: so ele corta, termina, cancela e guarda as sobras que
+     nasceram. Esta chave e a de mexer no corte de OUTRA pessoa — o turno que
+     acabou, o tablet que ficou com o corte aberto — e a de ver as pendencias
+     de guardar sobra de TODO MUNDO (R15). Nao esta no cortador: e da chefia,
+     que a recebe pelo `*` do diretor, entao ela nao nasce inerte. */
+  {chave:'corte.gerir',       nome:'Mexer no corte aberto de outra pessoa e ver as sobras a guardar de todos'},
   {chave:'painel.ler',        nome:'Painel e relatorios'},
 
   /* ── O CATALOGO DO SOB MEDIDA (spec SOBMEDIDA-PEDIDO-REVENDA, fase 1) ────

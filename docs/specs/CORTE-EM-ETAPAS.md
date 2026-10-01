@@ -5,8 +5,8 @@ STATUS
 Situação: em construção
 Criada em: 01/10/2026
 Última atualização: 01/10/2026
-Fase atual: 2 (corte em etapas) — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
-Fases: 1 ☑  2 ☐  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐
+Fase atual: 3 (edição durante o corte e correção depois) — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
+Fases: 1 ☑  2 ☑  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐
 Risco: 🔴 (muda o momento da baixa de rolo e sobra; correção de estoque depois do corte)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
 Substitui: SOBRAS-TOM-E-DESPERDICIO.md (18/09/2026), que foi para docs/arquivo/
@@ -18,6 +18,27 @@ Mudanças no caminho:
     faixa e, para o resto de pé de uma sobra (que não tem faixa), a origem +
     quem + o mesmo segundo. Falta o deploy e a prova: o corte de 01/10 no
     histórico, com a sobra que o sistema deu como usada.
+  · Fase 2 em código (01/10/2026), com as decisões técnicas que a spec
+    deixou para o PLANO dela (§6):
+      - a etapa mora em `plano.etapa`; `plano.confirmado` continua dizendo
+        "baixou o estoque" e só vira 1 no Corte feito (cinco leitores contam
+        com esse sentido). Migração 27: os cortes antigos viram `feito` (R28);
+      - a RESERVA não tem tabela: é a faixa de um corte aberto;
+      - a sobra nascida mora em `sobra_a_guardar` até ser guardada, e não
+        como um status novo de `sobra` (que exige endereço NOT NULL);
+      - o Corte feito baixa a proposta GRAVADA no corte (`plano.proposta`),
+        nunca um plano recalculado na hora;
+      - "Voltar ao plano" no ② APAGA o corte (nada foi cortado); cancelar,
+        com motivo, é do ③;
+      - quem mexe no corte é quem o abriu ou a chefia (chave nova
+        `corte.gerir`, do diretor pelo `*`);
+      - guardar mostra a medida calculada como texto e a lista vazia — a regra
+        "nada pré-selecionado" das sobras (tecido/README.md);
+      - a recusa "não usar" continua no planejar; ela vira edição do ③ na
+        fase 3.
+    Consertado no caminho, porque era o mesmo filtro do Confirmar novo: a
+    linha vazia da grade ia para o servidor (`comoNumero('')` é 0) e quem
+    preenchia uma linha só levava "A linha 2 esta sem medida valida".
   · Achado na fase 1, para a fase 4: o plano que continua o pedido no rolo do
     corte anterior (R12) NÃO confere o tecido — pedido com persianas de duas
     cores pode mandar puxar do rolo da outra cor.
