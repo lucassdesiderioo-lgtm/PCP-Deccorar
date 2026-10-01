@@ -3,7 +3,7 @@ const db=require('../nucleo/db');
 
 const CAMPOS=`s.id, s.codigo, s.tecido_id, s.largura, s.altura, s.area, s.condicao,
   s.nivel_id, s.origem, s.origem_rolo_id, s.origem_sobra_id, s.status,
-  s.criado_em, s.criado_por, s.baixado_em, s.baixado_por, s.baixa_motivo,
+  s.criado_em, s.criado_por, s.baixado_em, s.baixado_por, s.baixa_motivo, s.plano_id,
   /* QUANTO VALE ESTA SOBRA: area x preco do m². O preco e o DO ROLO quando a
      sobra nasceu de um rolo com nota (s.preco_m2, herdado — e o que se pagou),
      e o DO TECIDO (t.preco_m2, a estimativa da chefia) para todas as outras.
@@ -59,11 +59,11 @@ const naoAproveitaveis=tecido_id=>db.prepare('SELECT '+CAMPOS+' '+DE+`
 
 function criar(d){
   const r=db.prepare(`INSERT INTO sobra
-    (codigo,tecido_id,largura,altura,condicao,nivel_id,origem,origem_rolo_id,origem_sobra_id,criado_por,preco_m2)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(
+    (codigo,tecido_id,largura,altura,condicao,nivel_id,origem,origem_rolo_id,origem_sobra_id,criado_por,preco_m2,plano_id)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       d.codigo,d.tecido_id,d.largura,d.altura,d.condicao,d.nivel_id,
       d.origem||null,d.origem_rolo_id||null,d.origem_sobra_id||null,d.criado_por||null,
-      d.preco_m2==null?null:d.preco_m2);
+      d.preco_m2==null?null:d.preco_m2, d.plano_id||null);
   return r.lastInsertRowid;
 }
 

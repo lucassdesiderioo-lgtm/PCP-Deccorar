@@ -31,6 +31,7 @@
   <div id="conteudo"></div>
 </div>
 
+<script src="/barras.js"></script><script src="/barras_ler.js"></script>
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
@@ -225,7 +226,7 @@ async function telaLancar(pai){
   cod.addEventListener('input',()=>{ estado.codigo=cod.value; });
   const boxCod=el('div',{class:'campo cresce'});
   boxCod.appendChild(el('label',{texto:'CODIGO DA ETIQUETA'}));
-  boxCod.appendChild(cod);
+  boxCod.appendChild(window.ui.comCamera(cod));
   c.appendChild(el('div',{class:'campos'},[boxCod]));
 
   const aviso=el('p',{class:'ajuda',texto:
@@ -474,7 +475,7 @@ async function telaLista(pai){
     style:'font-size:20px;min-height:52px',value:estado.filtro||''});
   const boxBusca=el('div',{class:'campo cresce'});
   boxBusca.appendChild(el('label',{texto:'PROCURAR'}));
-  boxBusca.appendChild(busca);
+  boxBusca.appendChild(window.ui.comCamera(busca));
   c.appendChild(el('div',{class:'campos'},[boxBusca]));
 
   // O leitor manda o codigo com Tab, espaco ou quebra no meio, e o hifen do

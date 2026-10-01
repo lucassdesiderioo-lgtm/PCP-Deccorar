@@ -146,5 +146,60 @@ function avisoCorSemItem(cadastradas, naFileira, nomeLinha, nomeColecao){
     '(linha · colecao · cor) — cadastre em Cadastros → Tecido → Item de tecido.'});
 }
 
-window.ui={api,banner,beep,formatarMedida,formatarMetros,formatarArea,dinheiro,num,$,$$,el,limpar,rolaH,comoNumero,avisoCorSemItem};
+/* ── LER A ETIQUETA PELA CAMERA (spec CORTE-EM-ETAPAS, fase 6, R27) ───────
+   O iPad sem leitor tira a foto da etiqueta e o /barras_ler.js acha o codigo
+   na imagem. E o DONO UNICO do botao: as telas com campo de bipe de sobra
+   chamam este, e o leitor de foto mora ao lado do barras.js, com a mesma
+   tabela de padroes.
+
+   Foto, e nao camera ao vivo: a camera ao vivo pede HTTPS, que e outra tarefa
+   (spec, §5). O `capture` abre a camera direto no iPad.
+
+   Nao leu, DIZ — e o campo continua la para tentar de novo ou digitar. Um
+   codigo errado lido "com confianca" seria uma sobra trocada na prateleira,
+   e quem impede isso e o digito verificador do CODE128, dentro do leitor. */
+async function imagemDe(arquivo){
+  const url=URL.createObjectURL(arquivo);
+  try{
+    const im=new Image();
+    await new Promise((ok,erro)=>{ im.onload=ok; im.onerror=erro; im.src=url; });
+    const k=Math.min(1,1600/Math.max(im.naturalWidth,im.naturalHeight));
+    const c=document.createElement('canvas');
+    c.width=Math.round(im.naturalWidth*k); c.height=Math.round(im.naturalHeight*k);
+    const ctx=c.getContext('2d'); ctx.drawImage(im,0,0,c.width,c.height);
+    return ctx.getImageData(0,0,c.width,c.height);
+  } finally { URL.revokeObjectURL(url); }
+}
+function botaoCamera(aoLer){
+  const arq=el('input',{type:'file',accept:'image/*',capture:'environment',style:'display:none'});
+  const bt=el('button',{class:'bt',type:'button',title:'Ler a etiqueta pela câmera',
+    'aria-label':'Ler a etiqueta pela câmera',style:'min-width:56px;font-size:22px',texto:'📷'});
+  bt.addEventListener('click',()=>arq.click());
+  arq.addEventListener('change',async()=>{
+    const f=arq.files&&arq.files[0]; arq.value='';
+    if(!f) return;
+    if(!window.barrasLer){ banner('A leitura por foto não carregou nesta tela. Recarregue a página.','erro'); return; }
+    bt.disabled=true; bt.textContent='…';
+    try{
+      const r=window.barrasLer.ler(await imagemDe(f));
+      if(!r){ beep('erro');
+        banner('Não consegui ler o código nesta foto. Tente de novo, mais perto e com a etiqueta inteira na foto — ou digite o código.','alerta',7);
+        return; }
+      beep(); banner('Li '+r.codigo+' na foto.','bom',3);
+      aoLer(r.codigo,r);
+    }catch(e){ banner('Não consegui abrir a foto. Tente de novo.','erro'); }
+    finally{ bt.disabled=false; bt.textContent='📷'; }
+  });
+  return el('span',{style:'display:contents'},[bt,arq]);
+}
+/* O campo de bipe com a camera ao lado. O codigo lido entra NO CAMPO, e a tela
+   segue pelo mesmo caminho do bipe: quem leu pela foto e quem bipou caem na
+   mesma conferencia, e nao existe um segundo caminho para divergir. */
+function comCamera(campo,aoLer){
+  campo.style.flex='1'; campo.style.minWidth='0';
+  return el('div',{style:'display:flex;gap:8px;align-items:stretch'},[campo,
+    botaoCamera(codigo=>{ campo.value=codigo; campo.dispatchEvent(new Event('input',{bubbles:true})); if(aoLer) aoLer(codigo); })]);
+}
+
+window.ui={api,banner,beep,formatarMedida,formatarMetros,formatarArea,dinheiro,num,$,$$,el,limpar,rolaH,comoNumero,avisoCorSemItem,botaoCamera,comCamera};
 })();

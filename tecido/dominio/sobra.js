@@ -87,7 +87,9 @@ function criar(dados,usuarioNome){
       nivel_id:dados.nivel_id,
       origem:dados.origem||'inventario',
       origem_rolo_id:dados.origem_rolo_id, origem_sobra_id:dados.origem_sobra_id,
-      criado_por:usuarioNome, preco_m2:preco
+      criado_por:usuarioNome, preco_m2:preco,
+      // De qual corte ela nasceu — so a sobra guardada depois do corte traz.
+      plano_id:dados.plano_id||null
     });
     // Dentro da mesma transacao: se a reserva falhar, a sobra nao acontece.
     etiqueta.reservar(codigo,id);
@@ -270,6 +272,39 @@ function marcarUsada(id,plano_id,usuarioNome){
   return dSobra.porId(id);
 }
 
+/* ── A CORRECAO DE UM CORTE JA FEITO (spec CORTE-EM-ETAPAS, fase 3) ──────
+   So a aprovacao da correcao (dominio/corte.js) chama estas duas, dentro da
+   transacao dela. Cada uma deixa linha em sobra_correcao, como toda mudanca
+   de sobra: o status mudou sem corte na frente, e o rastro e o porque.
+
+   DEVOLVER: o corte deu a sobra como usada e ela nao foi. Volta a disponivel
+   no MESMO endereco em que estava — `nivel_id` nunca saiu da linha. So a
+   sobra que ESTE corte baixou volta: devolver a baixa de outro seria mexer
+   numa historia que nao e desta correcao. */
+function devolver(id,plano_id,motivo,usuarioNome){
+  const s=dSobra.porId(id);
+  exigir(s,'sobra_inexistente','Sobra nao encontrada.');
+  exigir(s.status==='usada'&&s.baixa_motivo==='plano '+plano_id,'sobra_nao_deste_corte',
+    'A sobra '+s.codigo+' nao foi dada como usada pelo corte '+plano_id+'.');
+  db.prepare("UPDATE sobra SET status='disponivel', baixado_em=NULL, baixado_por=NULL, baixa_motivo=NULL WHERE id=?").run(id);
+  dSobra.registrarCorrecao({sobra_id:id,campo:'status',de:'usada (corte '+plano_id+')',
+    para:'disponivel — '+String(motivo||'correcao do corte'),usuario_nome:usuarioNome});
+  return comEndereco(dSobra.porId(id));
+}
+/* ANULAR: a sobra foi cadastrada como nascida de um corte e nao nasceu (o
+   corte foi outro). Nao e descarte — descartar mede a peca como PERDA no
+   refugo, e ela nunca existiu. Status proprio, `anulada`, que nenhuma
+   consulta de candidatas le. */
+function anular(id,motivo,usuarioNome){
+  const s=dSobra.porId(id);
+  exigir(s,'sobra_inexistente','Sobra nao encontrada.');
+  exigir(s.status==='disponivel','sobra_indisponivel',
+    'A sobra '+s.codigo+' esta como "'+s.status+'" — ela ja foi usada e nao da para dizer que nao nasceu.');
+  dSobra.baixar(id,'anulada',dia.agora(),usuarioNome,String(motivo||'correcao do corte'));
+  dSobra.registrarCorrecao({sobra_id:id,campo:'status',de:'disponivel',para:'anulada — '+String(motivo||''),usuario_nome:usuarioNome});
+  return comEndereco(dSobra.porId(id));
+}
+
 // Descarte. So a chefia chega aqui (a rota pede 'sobra.descartar', que nao
 // esta no papel do cortador) — baixa de sobra sem trava e o furo classico de
 // inventario. E a perda fica MEDIDA em refugo: sobra que some sem linha
@@ -298,7 +333,7 @@ function descartar(id,motivo,usuarioNome){
 const comEndereco=s=>s?{...s, endereco:s.nivel_id?endereco.descrever(s.nivel_id):''}:s;
 
 module.exports={
-  criar, corrigir, propor, aceitar, recusar, marcarUsada, descartar,
+  criar, corrigir, propor, aceitar, recusar, marcarUsada, descartar, devolver, anular,
   // A nota do rolo chegou DEPOIS do corte: as sobras que ja nasceram dele e
   // valiam pela estimativa do tecido passam a valer pelo preco pago. Chamado
   // por dominio/rolo.js — sobra.preco_m2 continua com um dono so (este).

@@ -2088,6 +2088,36 @@ com a folha já impressa e colada.
 > Ao imprimir: margens **"Nenhuma"** e escala **100%**. "Ajustar à página"
 > deforma as barras e o leitor recusa — a mesma regra da etiqueta de SKU no PCP.
 
+### A etiqueta lida pela FOTO (spec `CORTE-EM-ETAPAS`, fase 6, R27)
+
+Em todo campo que aceita bipe de sobra — o **lançar sobra** e o **procurar** do
+catálogo (Sobras), o **guardar** da sobra que nasceu e o filtro **SOBRA** do
+histórico (Corte) — há um botão **📷**. O iPad sem leitor tira a foto e o
+`../public/barras_ler.js` acha o código na imagem. Ele mora ao lado do
+`barras.js` e lê pela **mesma tabela de padrões**: duas tabelas CODE128 seriam
+um leitor que não reconhece a etiqueta que o gerador imprimiu.
+
+- **Foto, e não câmera ao vivo.** A câmera ao vivo pede HTTPS, que é outra
+  tarefa (dívida 2 do CLAUDE.md). O `capture` abre a câmera direto no iPad.
+- **Só vale o que fecha o dígito verificador do CODE128.** É ele que torna
+  seguro ler de foto: não há "melhor palpite". Não leu, a tela **diz** e o campo
+  continua ali para tentar de novo ou digitar. Um código errado lido "com
+  confiança" seria uma sobra trocada na prateleira.
+- **O código lido entra NO CAMPO**, e a tela segue pelo caminho do bipe
+  (`ui.comCamera`): quem leu pela foto e quem bipou caem na mesma conferência.
+  Um segundo caminho seria uma segunda régua.
+- O leitor passa linhas em vários ângulos e nos dois sentidos (etiqueta torta e
+  de cabeça para baixo são o caso normal), e o limiar claro/escuro é **local**,
+  para a sombra de um lado da foto não virar barra.
+
+> ⚠️ **OS TESTES SÃO COM IMAGENS SINTÉTICAS, NÃO COM FOTOS.** A spec pede fotos
+> reais de etiqueta (boa, tremida, torta), e elas não existem no repositório.
+> `barras_ler.test.js` desenha o código com o mesmo `barras.js` e o estraga do
+> jeito que a câmera estraga — borrada, girada, invertida, com sombra, em
+> perspectiva, pequena. **Isso é indício, não prova**: a prova é o iPad da
+> bancada achando a sobra pela foto. O QR do kit passou por três rodadas verdes
+> sem ler em celular nenhum (CLAUDE.md §4).
+
 ## ⚠️ A MEDIDA DA SOBRA É LISTA, e não campo digitado
 
 O campo aceitava `1,90`, `1.90` e `190` — e **só o terceiro é visivelmente
@@ -2431,11 +2461,22 @@ ENTRADA: tecido (3 toques) + medidas (grade ou arquivo)
 2. o que sobrou vai para o rolo, simulando TODAS as larguras
 3. peça que não cabe volta MARCADA, com o motivo
    ↓
-proposta desenhada  →  [não usar] recalcula  →  [Confirmar] baixa tudo
+proposta desenhada  →  [não usar] recalcula  →  [Confirmar] grava e reserva
+   ↓
+② resumo por fonte (com endereço)  →  [CORTAR]  ou  [Voltar ao plano] (apaga)
+③ cortando  →  [Corte feito] BAIXA  ou  [Cancelar corte] (com motivo)
+⑤ sobras a guardar: medida + etiqueta + endereço
 ```
 
-**Nada baixa antes do Confirmar**, e o Confirmar é uma transação só: sobra
-usada, rolo consumido, sobras novas cadastradas e refugo medido — ou nada.
+> ⚠️ **DESDE 01/10/2026 (fase 2 da spec `CORTE-EM-ETAPAS`) NADA BAIXA ANTES DO
+> CORTE FEITO.** O Confirmar grava o corte e reserva as fontes; o Corte feito
+> (`dominio/corte.js`) é uma transação só — sobra usada, rolo consumido, sobras
+> nascidas "a guardar" e refugo medido — ou nada. A regra completa, e as que
+> parecem bug, está no `CLAUDE.md` §19, *"O CORTE EM ETAPAS"*.
+
+O texto abaixo descreve o Confirmar até 30/09/2026 e continua valendo para a
+assinatura; onde ele fala em baixar e cadastrar a sobra no Confirmar, leia
+Corte feito e Guardar.
 
 **A proposta é assinada.** Entre calcular e confirmar, outra pessoa pode ter
 usado a mesma sobra; o Confirmar recalcula, compara a assinatura, e recusa se
@@ -2508,8 +2549,26 @@ e outra, e o cliente vê as duas persianas lado a lado na mesma parede. A regra
 vale também entre **dois rolos**: rolos diferentes são lotes diferentes.
 
 Na prática, um grupo que entraria pela metade numa fonte é desfeito e tentado
-na fonte seguinte. Se o pedido inteiro não couber em lugar nenhum, ele volta
-marcado com esse motivo — nunca dividido.
+na fonte seguinte.
+
+> ⚠️ **DESDE 01/10/2026 (fase 4 da `CORTE-EM-ETAPAS`) O TOM É PELA ORIGEM, e o
+> pedido desce três degraus** (R10) antes de voltar sem lugar:
+>
+> | Degrau | O pedido | Conferência no corte |
+> |---|---|---|
+> | 1 | inteiro numa fonte só (sobra primeiro) | não |
+> | 2 | dividido entre fontes da **mesma origem** (a sobra que nasceu do rolo R e o próprio R) | não |
+> | 3 | dividido entre **origens diferentes** | **sim**, "Conferi o tecido" em cada fonte |
+>
+> `dominio/tom.js` é o dono único da origem (R9): o rolo é a própria origem; a
+> sobra que nasceu de rolo tem a dele; a de sobra sobe pela `origem_sobra_id`
+> até achar o rolo; e a do mutirão, sem rolo na cadeia, é **sozinha** — duas do
+> mutirão não têm a mesma origem, porque ninguém sabe se têm o mesmo tom.
+>
+> O pedido só se divide se couber **inteiro** na divisão. E o pedido já cortado
+> noutro dia de outra origem também pede conferência (R12). Sem as conferências
+> o Corte feito é recusado dizendo quais faltam; mudar a fonte numa edição zera
+> a conferência dela.
 
 **O que agrupa é o PEDIDO, não o item.** O pedido `4272` do arquivo real tem
 onze persianas em quatro itens — e são todas da mesma casa. O item `4272-14`
@@ -2526,7 +2585,12 @@ tudo de uma vez. Duas peças na terça, nove na quinta: cada plano, sozinho,
 estava certo, e mesmo assim a casa receberia dois tons.
 
 Então o plano **olha para trás**. Antes de escolher a bobina, pergunta em que
-fonte esse pedido já foi cortado:
+fonte esse pedido já foi cortado — **no mesmo tecido**:
+
+> ⚠️ **Até 01/10/2026 a pergunta não olhava o tecido**, e um pedido com
+> persianas de duas cores, cortada a primeira, mandava a segunda continuar no
+> rolo da **primeira cor**. Achado pelo teste do histórico (fase 1 da
+> `CORTE-EM-ETAPAS`), consertado na fase 4, e há caso travando no `tom.test.js`.
 
 - **O rolo ainda tem saldo** → continua nele, mesmo que outra bobina rendesse
   mais. Deixou de ser escolha de aproveitamento e virou escolha de tom.
@@ -2605,6 +2669,61 @@ silêncio no caso normal.
 > por acaso. A cena hoje põe a menor na frente. É a lição do QR do PCP (§4 do
 > `CLAUDE.md`) por outra porta: **teste verde só vale depois de você ver ele
 > ficar vermelho.**
+
+### O HISTÓRICO DE CORTES (01/10/2026, fase 1 da spec `CORTE-EM-ETAPAS`)
+
+O botão **Histórico**, no topo da tela de corte, lista os cortes confirmados
+e abre o detalhe de cada um: as linhas (medida, pedido e de onde saiu), as
+fontes, os metros que **este** corte baixou de cada rolo (lidos do
+`movimento_rolo`), as sobras que nasceram, o refugo e as recusas. Filtra por
+**dia, pedido** (pelo começo do número: `4292` acha `4292-1`), **operador** e
+**sobra** — bipar a sobra mostra o corte em que ela foi usada **e** o corte de
+onde ela nasceu.
+
+`dominio/corte_historico.js` é o dono único da leitura; `GET /api/planos` e
+`GET /api/planos/:id` (`plano.calcular`, a chave de quem abre a tela de corte).
+O antigo `plano.historico()`, que nenhuma tela lia, saiu: duas listas de cortes
+seriam duas réguas.
+
+> ⚠️ **O DETALHE MOSTRA O STATUS DE HOJE DA SOBRA, e não o que o plano
+> previu.** É a pergunta que abriu a spec: em 01/10/2026 o plano mandou parte
+> de um pedido para uma sobra, o tom não bateu e o operador cortou tudo do
+> rolo — mas o Confirmar já tinha dado a sobra como **usada**. A tela escreve
+> *"Este corte deu a sobra como usada em …, por …"* quando a baixa foi dele
+> (`baixa_motivo = 'plano N'`).
+
+> ⚠️ **A SOBRA NASCIDA SE RECONHECE POR DUAS PORTAS, e as duas são
+> necessárias.** O Confirmar grava o código da sobra nascida na faixa
+> (`sobra_gerada_codigo`) — mas só da que nasceu de uma **faixa**. O resto de pé
+> embaixo da última faixa de uma sobra não tem faixa, e o código dele não ficou
+> no plano. A segunda porta é o que o Confirmar grava junto, na mesma
+> transação: origem na fonte do corte, mesma pessoa, mesmo segundo. Há caso
+> travando, e foi ele que pegou a régua que só olhava a faixa.
+
+> ⚠️ **DIA FORA DO FORMATO É RECUSADO, e não vira "nada encontrado"** — a
+> pessoa concluiria que não houve corte naquele dia.
+
+> ⚠️ **O DETALHE FICA FORA DA TABELA.** A primeira versão o abria dentro de uma
+> linha da lista; a 400 px ele herdava a largura da tabela e saía cortado de
+> lado dentro do recipiente que rola. **Só apareceu abrindo a tela.**
+
+**Teste:** `teste/historico_corte.test.js` (15 casos). Quatro defeitos foram
+reintroduzidos um a um: a marca "deu como usada" sempre falsa, a busca por
+sobra sem o corte de onde ela nasceu, o pedido exigindo o número inteiro e a
+sobra nascida reconhecida só pela faixa — cada um reprova o caso dele.
+
+## A escolha da sobra e o desperdício de cada uma (CORTE-EM-ETAPAS, fase 7)
+
+- **Vence a sobra que gera menos refugo**, depois de a condição empatar
+  (íntegra antes de defeito); empate no refugo, a de menor área. O refugo é o
+  que não vira peça nem sobra nova.
+- **Toda sobra que comporta uma peça e não entrou diz por quê** — o pedido não
+  cabe inteiro nela, foi recusada, está reservada, está com condição não
+  aproveitável, ou a peça foi para outra sobra (que a frase nomeia, com o
+  critério). Vale também quando o plano usou sobra.
+- **Cada sobra sugerida mostra usa · vira sobra · refugo**, somando 100%, e o
+  resumo mostra o refugo do corte contra a média dos últimos 30 dias (lida da
+  tabela `refugo`, a mesma do painel de Refugo).
 
 ## O upload (fase 8)
 

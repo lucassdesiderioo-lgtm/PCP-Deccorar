@@ -51,6 +51,8 @@ const FAIXA={
   prazoCorteDiaSemana:   n=>(Number.isInteger(n)&&n>=0&&n<=6)||'O dia da semana vai de 0 (domingo) a 6 (sabado).',
   prazoEntregaDiaSemana: n=>(Number.isInteger(n)&&n>=0&&n<=6)||'O dia da semana vai de 0 (domingo) a 6 (sabado).',
   prazoSemanas:   n=>(Number.isInteger(n)&&n>=0&&n<=12)||'Semanas ate a entrega: um inteiro de 0 a 12.',
+  // O mesmo raciocinio do bipe: zero descartaria todo corte do tempo por m².
+  corteTempoMaxHoras: n=>(n>0&&n<=24)||'O tempo maximo de um corte vai de 0 a 24 horas — zero tiraria todos os cortes da media.',
   /* ⚠️ ZERO E O PIOR VALOR POSSIVEL AQUI, e por isso ele esta fora da faixa:
      com o limite em zero TODO bipe vira suspeito, os tres indicadores de
      tempo nascem vazios e a tela diz "ninguem bipou ainda" com a fabrica

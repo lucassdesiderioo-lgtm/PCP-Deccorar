@@ -7623,6 +7623,197 @@ porque perde a contagem **e** cai na varredura do padrão de dois passos).
 > fecha é **alguém abrindo o `/corte` no celular da bancada** e a página não
 > andando de lado com a medida sendo digitada.
 
+### ⚠️ O CORTE EM ETAPAS — o estoque só anda no CORTE FEITO (01/10/2026, spec `CORTE-EM-ETAPAS`)
+
+Em 01/10/2026 um corte foi confirmado rápido: o plano mandava parte do pedido
+para uma sobra, o tom não bateu e o operador cortou tudo do rolo. O Confirmar
+**já tinha baixado** — a sobra ficou "usada" inteira na mão de alguém e o rolo
+baixou a menos. Desde a fase 2 da spec:
+
+```
+① planejar   ② confirmar      ③ cortando      ④ corte feito     ⑤ guardar
+  (calcula)    grava e RESERVA   relógio corre   AQUI BAIXA tudo   medida+etiqueta+endereço
+```
+
+`tecido/dominio/corte.js` é o **dono único** das etapas e da baixa de rolo e
+sobra; `plano.js` ficou só com a conta. O histórico de cada corte está no botão
+**Histórico** da tela de corte (fase 1, `dominio/corte_historico.js`).
+
+> ⚠️ **`plano.confirmado` CONTINUA DIZENDO "BAIXOU O ESTOQUE"**, e por isso só
+> vira 1 no Corte feito. O painel de Cortes, o comprometido de tecido (4-B) e a
+> checagem do gerencial leem `confirmado=1` com esse sentido; a etapa mora em
+> coluna nova (`etapa`). Os cortes de antes viraram `feito` na migração 27 (R28).
+
+> ⚠️ **O CORTE FEITO BAIXA O QUE ESTÁ GRAVADO (`plano.proposta`), nunca um plano
+> recalculado na hora** — entre confirmar e terminar pode ter entrado sobra nova,
+> e recalcular escolheria uma fonte que ninguém cortou.
+
+> ⚠️ **A RESERVA NÃO TEM TABELA: ela é a faixa de um corte aberto.** Sobra de
+> corte aberto (confirmado ou cortando) não é oferecida a outro plano — e o
+> plano diz por quê (`reservada`, com o corte e a pessoa) —, e o rolo aparece
+> para os outros com o saldo menos os metros reservados. Uma tabela de reserva
+> ao lado seria a segunda afirmação sobre o mesmo fato, e a que fica para trás
+> é a que prende a sobra para sempre.
+
+> ⚠️ **A SOBRA NASCIDA NÃO É LINHA DE `sobra` ATÉ SER GUARDADA**, e mora em
+> `sobra_a_guardar`, em nome de quem cortou (R13). Sem etiqueta ninguém a acha
+> na prateleira, e por isso ela não entra em plano (R14) — morando à parte,
+> nenhuma consulta de candidatas precisa lembrar de filtrá-la. Guardar exige
+> medida, etiqueta e endereço juntos. **A medida calculada vem escrita e a
+> lista vem vazia**: medida pré-marcada é medida que se salva sem olhar (a regra
+> das sobras do `tecido/README.md`), e quem vale é a fita.
+
+> ⚠️ **UM CORTE ABERTO POR OPERADOR (R2)**, e a pendência de guardar não conta.
+> Quem mexe no corte aberto é quem o abriu, ou a chefia (`corte.gerir`, que só o
+> diretor tem pelo `*`); a chefia vê as sobras a guardar de todos (R15).
+
+> ⚠️ **"VOLTAR AO PLANO" APAGA O CORTE DO ②, e CANCELAR fica no histórico.**
+> No ② nada foi cortado; um "cancelado" por cada vez que alguém conferiu o
+> resumo e voltou encheria o histórico de cortes que nunca existiram. Do ③ em
+> diante só se cancela, com motivo.
+
+> ⚠️ **A LINHA VAZIA DA GRADE NÃO É MEDIDA.** `comoNumero('')` devolve **0**, e
+> não `null`: o filtro antigo da tela deixava as linhas em branco irem para o
+> servidor, e quem preenchia uma só das três linhas da grade levava *"A linha 2
+> esta sem medida valida"*. Achado abrindo a tela, consertado no `temMedida`.
+
+### ⚠️ MUDAR O CORTE: livre durante, aprovado depois (fase 3, R5–R8, R16–R17)
+
+**Durante o corte (③)** o operador muda o plano sozinho, sempre com motivo da
+lista de **Cadastros → Motivos** (a mesma do "não usar"; a migração 28 só
+acrescentou *Rolo acabou* e *Medida errada*): **não usar** a fonte, **o item
+saiu de outra fonte** (bipa o código; o sistema conta os metros), **rolo
+acabou** (o que já saiu fica nele, o resto muda, e no Corte feito ele é
+encerrado) e **cortado errado** (o pedaço vira sobra marcada "cortada errada",
+ou refugo, e o item volta a ser cortado). Cada mudança vira linha em
+`plano_edicao`.
+
+> ⚠️ **A EDIÇÃO NÃO TEM CONTA PRÓPRIA.** Ela vira restrição da entrada
+> (`fixadas`, `erradas`, `excluir_rolos`, `recusadas`) e o plano é recalculado
+> pelo mesmo `plano.calcular`. Fonte onde o item não cabe é recusada dizendo
+> qual, e nada muda.
+
+**Depois do Corte feito** o operador **pede** correção pelo histórico
+(`corte.pedir_correcao`), dizendo de onde cada item saiu de verdade; a tela
+mostra antes o que a aprovação faria. **Pendente, nada no estoque muda.** A
+chefia (`corte.aprovar_correcao`) aprova e o sistema aplica a **diferença**: a
+sobra que não foi usada volta a disponível **no endereço onde estava**, o rolo
+acerta o saldo como consumo (o giro soma certo), as sobras que não nasceram
+saem (a guardar é cancelada; a já guardada vira `anulada`, que não é descarte
+nem refugo), as que nasceram de verdade ficam a guardar, e o refugo é refeito.
+
+> ⚠️ **NA CORREÇÃO TODO ITEM TEM FONTE FIXA**, a do corte menos o que a pessoa
+> disse que mudou. Deixar o plano escolher ali inventaria um corte que ninguém
+> fez. E o item que mudou de fonte é **outra puxada**: encaixá-lo junto com o
+> que já tinha saído do rolo o poria na mesma faixa, e o rolo baixaria 0,50 m
+> em vez dos 2,50 que saíram. Achado pelo teste, antes da tela.
+
+> ⚠️ **A VERDADE DO QUE O CORTE BAIXOU É O MOVIMENTO, não a proposta.** Os cortes
+> de antes das etapas (R28) nem têm proposta; o metro de cada rolo está no
+> `movimento_rolo` com a referência do corte. É assim que o corte de 01/10/2026
+> se corrige.
+
+> ⚠️ **QUEM PEDIU NÃO APROVA, nem o diretor** — a regra da casa para mexer em
+> saldo (§18, ajuste em duas pessoas), aplicada aqui por analogia: a spec diz
+> só "a gestão aprova". Está em `DECISOES.md` para o dono confirmar.
+
+> ⚠️ **A CORREÇÃO É BLOQUEADA** quando uma sobra "que não nasceu" já foi usada
+> noutro corte, ou quando o rolo está encerrado e não tem onde pôr ou tirar
+> metro. A frase diz o que fazer.
+
+### ⚠️ O TOM É PELA ORIGEM, e o pedido dividido entre origens se confere no corte (fase 4, R9–R12)
+
+`tecido/dominio/tom.js` é o dono único da **origem de tom**: o rolo; a sobra
+que nasceu dele; a de sobra sobe até o rolo; e a do mutirão é **sozinha**. O
+pedido que não cabe inteiro numa fonte se divide — primeiro entre fontes da
+**mesma origem** (sem nada a conferir), depois entre **origens diferentes** —
+e só se couber inteiro na divisão. Dividido entre origens, cada fonte pede
+**"Conferi o tecido"** no Cortando, gravado com quem, quando, pedido e fonte; o
+Corte feito é recusado sem elas, dizendo quais; e mudar a fonte numa edição
+zera a conferência dela.
+
+> ⚠️ **O "PEDIDO JÁ CORTADO" SÓ CONTA NO MESMO TECIDO.** Até 01/10/2026 a
+> consulta olhava só o número do pedido, e o pedido de duas cores mandava a
+> segunda cor continuar no rolo da primeira. Consertado no `cortesAnteriores`
+> do `plano.js`, com caso travando.
+
+### O TIPO DE CADA LINHA E O TEMPO POR m² (fase 5, R18–R21)
+
+Cada linha do corte diz para quem é — **cliente final, revenda ou ML sob
+medida** —, e o Confirmar recusa linha sem tipo. A revenda é escolhida da
+**carteira que já existe** (`sm_revenda`), por uma porta própria do corte
+(`GET /api/planos/revendas`, só id e nome, com a chave de quem corta: o
+cortador não tem `revenda.ler`). O nome dela fica como retrato na linha.
+
+O relógio corre do **CORTAR ao Corte feito, menos as pausas** (Pausar/Retomar
+no ③; pausa esquecida aberta fecha no Corte feito), e o tempo líquido fica no
+corte. `dominio/tempo_corte.js` é o dono do **minuto por m² por tipo** (Painel →
+Tempo de corte): corte misturado divide o tempo **pela área das peças**, e corte
+acima de `corteTempoMaxHoras` (parâmetro, nasce em 3 h, zero é recusado) fica
+fora da média — e a tela diz quantos e quais.
+
+> ⚠️ **O m² É O DAS PEÇAS, não o puxado do rolo**: o tecido que virou sobra ou
+> refugo não é trabalho de cortar peça, e somado faria o corte com muito
+> desperdício parecer mais rápido.
+
+> ⚠️ **CORTE SEM RELÓGIO NÃO É CORTE RÁPIDO.** Os cortes feitos antes deste
+> deploy não têm tempo medido: ficam fora, contados à parte, nunca como zero.
+
+**Rode `cd tecido && npm test` ao mexer em `corte.js`, no `plano.js`, no
+`tom.js`, no `tempo_corte.js` ou na tela de corte** — `tempo_corte.test.js` (8), `corte_etapas.test.js` (18),
+`corte_correcao.test.js` (17), `historico_corte.test.js` (15) e
+`tom.test.js` (27).
+
+### A ETIQUETA DA SOBRA LIDA PELA FOTO (fase 6, R27)
+
+Todo campo de bipe de sobra (lançar e procurar em Sobras; guardar e o filtro do
+histórico no Corte) ganhou o botão **📷**: o iPad tira a foto e
+`public/barras_ler.js` — na raiz, ao lado do `barras.js`, lendo pela **mesma
+tabela** — acha o código. O código lido entra **no campo** (`ui.comCamera`) e
+segue pelo caminho do bipe; não há segundo caminho.
+
+> ⚠️ **SÓ VALE O QUE FECHA O DÍGITO VERIFICADOR, e não há "melhor palpite".**
+> Não leu, a tela diz e deixa tentar de novo ou digitar. Código errado lido com
+> confiança é sobra trocada na prateleira.
+
+> ⚠️ **FOTO, NÃO CÂMERA AO VIVO** — a ao vivo pede HTTPS (dívida 2 do §14).
+
+> ⚠️ **OS TESTES SÃO COM IMAGENS SINTÉTICAS**, desenhadas pelo `barras.js` e
+> estragadas como a câmera estraga (borrada, torta, invertida, sombra,
+> perspectiva, pequena). A spec pedia fotos reais, que não existem no
+> repositório. **A prova é o iPad da bancada achando a sobra pela foto** — é a
+> lição do QR do §4.
+
+**Rode `cd tecido && npm test` ao mexer no `barras_ler.js`, no `barras.js` ou no
+`comCamera`** — `barras_ler.test.js` (11). Três defeitos foram reintroduzidos:
+o limiar fixo (a sombra reprova), a parada lida sem o silêncio depois e tirar o
+script da tela.
+
+### O PLANO MAIS CLARO (fase 7, R22–R25)
+
+> ⚠️ **ENTRE AS SOBRAS QUE SERVEM, VENCE A DE MENOS REFUGO, e não a menor.**
+> A ordem é condição (íntegra antes de defeito) → menor refugo → menor área. A
+> de 1,05 × 1,05 para uma peça de 1,00 × 1,00 vira tira de refugo; a de
+> 1,00 × 2,10 devolve um pé de 1,10 que é sobra nova — e ganha.
+
+> ⚠️ **A SOBRA QUE SERVE E NÃO ENTROU DIZ POR QUÊ TAMBÉM QUANDO O PLANO USOU
+> OUTRA.** Até aqui a lista só existia sem sobra nenhuma no plano — e o caso de
+> 01/10/2026 era o outro. O motivo `outra_sobra` nomeia a escolhida e o degrau
+> que decidiu; a gêmea (mesma medida, mesmo refugo) diz que é gêmea, e não que
+> a outra "é menor".
+
+**Cada sobra usada mostra `usa N% · N% vira sobra · N% refugo`, somando 100**
+(o refugo é o resto, e não uma terceira soma), e o resumo mostra o refugo do
+corte ao lado da **média dos cortes dos últimos 30 dias** —
+`painel.refugoMedio`, da mesma tabela `refugo` do painel, só o refugo de corte.
+Sem corte na janela a média é `null`, nunca zero. **Não há limite de perda:** o
+número existe para o dono decidir um.
+
+**Rode `cd tecido && npm test`** — `plano_claro.test.js` (12). Seis defeitos
+foram reintroduzidos um a um: sem o critério do refugo, sem a condição, a lista
+sumindo com sobra usada, o descarte entrando na média, a média zero e a
+porcentagem errada.
+
 ### Três regras do sob medida que valem citar aqui
 
 **Cada nível guarda um rolo só.** Regra do dono, 15/09/2026: `Haste A · Andar 1

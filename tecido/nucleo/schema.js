@@ -1624,6 +1624,150 @@ INSERT INTO sm_boleto_pedido(boleto_id,pedido_id)
 DROP INDEX idx_sm_boleto_pedido;
 ALTER TABLE sm_boleto DROP COLUMN pedido_id;
 CREATE INDEX idx_sm_boleto_pedido ON sm_boleto_pedido(pedido_id);
+`},
+
+/* ── O CORTE EM ETAPAS (spec CORTE-EM-ETAPAS, fase 2, 01/10/2026) ─────────
+   confirmado -> cortando -> feito   (ou cancelado)
+
+   ⚠️ `confirmado` CONTINUA DIZENDO "BAIXOU O ESTOQUE", e por isso ele so
+   vira 1 no CORTE FEITO. Cinco lugares leem `confirmado=1` como "este corte
+   tirou material da prateleira" (o painel de Cortes, o comprometido do
+   tecido, a checagem do gerencial, o historico). Mudar o sentido dele seria
+   mudar os cinco em silencio; a etapa nova mora em coluna nova.
+
+   ⚠️ OS CORTES DE ANTES VIRAM "feito" (R28): eles baixaram o estoque no
+   Confirmar antigo, e as sobras deles ja nasceram com etiqueta e endereco.
+
+   A PROPOSTA INTEIRA FICA GRAVADA (`proposta`, JSON). O Corte feito baixa o
+   que esta nela — nunca um plano recalculado na hora, que poderia escolher
+   outra sobra que apareceu na prateleira enquanto o operador cortava.
+   `entrada` e o que o operador lancou, para as edicoes da fase 3 recalcularem
+   pela MESMA conta do plano. */
+{n:27, nome:'o corte em etapas — a baixa passa para o Corte feito, e a sobra nasce a guardar', sql:`
+ALTER TABLE plano ADD COLUMN etapa TEXT;
+UPDATE plano SET etapa='feito' WHERE confirmado=1;
+ALTER TABLE plano ADD COLUMN entrada TEXT;
+ALTER TABLE plano ADD COLUMN proposta TEXT;
+ALTER TABLE plano ADD COLUMN cortar_em TEXT;
+ALTER TABLE plano ADD COLUMN cortar_por TEXT;
+ALTER TABLE plano ADD COLUMN feito_em TEXT;
+ALTER TABLE plano ADD COLUMN feito_por TEXT;
+ALTER TABLE plano ADD COLUMN cancelado_em TEXT;
+ALTER TABLE plano ADD COLUMN cancelado_por TEXT;
+ALTER TABLE plano ADD COLUMN cancelado_motivo TEXT;
+CREATE INDEX idx_plano_etapa ON plano(etapa, usuario_nome);
+
+-- De qual corte a sobra nasceu. Os cortes antigos nao gravavam: para eles a
+-- leitura (dominio/corte_historico.js) usa a regua de antes.
+ALTER TABLE sobra ADD COLUMN plano_id INTEGER;
+
+/* A SOBRA QUE NASCEU E AINDA NAO FOI GUARDADA (R13). Ela nao e uma linha de
+   'sobra' ainda, e e de proposito: sem etiqueta e sem endereco ninguem a acha
+   na prateleira, e por isso ela nao pode entrar em plano (R14). Morando em
+   tabela propria, nenhuma consulta de candidatas precisa lembrar de filtra-la. */
+CREATE TABLE sobra_a_guardar (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plano_id INTEGER NOT NULL REFERENCES plano(id),
+  tecido_id INTEGER NOT NULL REFERENCES tecido(id),
+  largura REAL NOT NULL, altura REAL NOT NULL,
+  area REAL GENERATED ALWAYS AS (largura * altura) STORED,
+  de TEXT,                      -- tira_lateral | resto_de_pe | cortada_errada
+  cortada_errada INTEGER DEFAULT 0,
+  origem TEXT, origem_rolo_id INTEGER REFERENCES rolo(id),
+  origem_sobra_id INTEGER REFERENCES sobra(id),
+  cortado_por TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime')),
+  guardada_em TEXT, guardada_por TEXT,
+  sobra_id INTEGER REFERENCES sobra(id),
+  cancelada_em TEXT, cancelada_por TEXT, cancelada_motivo TEXT
+);
+CREATE INDEX idx_sobra_a_guardar ON sobra_a_guardar(guardada_em, cancelada_em, cortado_por);
+`},
+
+/* ── A EDICAO DURANTE O CORTE E A CORRECAO DEPOIS (fase 3, R5–R8, R16) ────
+   Toda edicao do corte aberto vira uma linha aqui, com quem, quando, qual
+   item e o motivo — e o plano e recalculado pela mesma conta. Depois do Corte
+   feito, a correcao e PEDIDA e APROVADA, e enquanto pendente nada no estoque
+   muda. A edicao aprovada numa correcao aponta para ela (`correcao_id`).
+
+   OS MOTIVOS SAO A LISTA QUE JA EXISTIA, a de Cadastros → Motivos (R6): ela
+   ja e a lista editavel de "por que esta fonte nao serve" do plano de corte,
+   e duas listas para o mesmo corte seriam duas reguas. Entram as duas que a
+   spec pede e nao havia; "Tonalidade diferente" ja e o "Tom diferente". */
+{n:28, nome:'a edicao do corte aberto e a correcao depois do corte feito', sql:`
+CREATE TABLE plano_edicao (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plano_id INTEGER NOT NULL REFERENCES plano(id),
+  tipo TEXT NOT NULL,           -- nao_usar | trocar | rolo_acabou | medida_errada
+  peca INTEGER,                 -- o item da lista do corte
+  fonte TEXT, fonte_id INTEGER, fonte_codigo TEXT,
+  detalhe TEXT,                 -- a frase que a tela mostra
+  motivo_id INTEGER REFERENCES motivo_recusa(id), motivo_nome TEXT,
+  observacao TEXT, usuario_nome TEXT,
+  correcao_id INTEGER,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX idx_plano_edicao ON plano_edicao(plano_id);
+CREATE TABLE plano_correcao (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plano_id INTEGER NOT NULL REFERENCES plano(id),
+  status TEXT NOT NULL DEFAULT 'pendente',    -- pendente | aprovada | recusada
+  edicoes TEXT NOT NULL,        -- JSON: o que o operador disse que mudou
+  previa TEXT,                  -- JSON: o que a aprovacao faria, quando foi pedida
+  motivo_id INTEGER REFERENCES motivo_recusa(id), motivo_nome TEXT,
+  observacao TEXT,
+  pedida_por TEXT, pedida_em TEXT DEFAULT (datetime('now','localtime')),
+  decidida_por TEXT, decidida_em TEXT, decisao_motivo TEXT
+);
+CREATE INDEX idx_plano_correcao ON plano_correcao(status, plano_id);
+INSERT OR IGNORE INTO motivo_recusa(nome,ordem) VALUES('Rolo acabou',90);
+INSERT OR IGNORE INTO motivo_recusa(nome,ordem) VALUES('Medida errada',91);
+`},
+
+/* ── "CONFERI O TECIDO" (fase 4, R11) ─────────────────────────────────────
+   Pedido dividido entre fontes de origens diferentes: o operador compara o
+   tecido de cada fonte, com as duas na mao, e diz que bateu. A conferencia
+   e a prova se o cliente reclamar do tom — por isso grava quem, quando, o
+   pedido e a fonte. Mudar a fonte numa edicao ZERA a conferencia dela
+   (`invalidada_em`): a conferencia era de outro tecido. */
+{n:29, nome:'a conferencia de tom no Cortando', sql:`
+CREATE TABLE plano_conferencia (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plano_id INTEGER NOT NULL REFERENCES plano(id),
+  pedido TEXT NOT NULL,
+  fonte TEXT NOT NULL, fonte_id INTEGER NOT NULL, fonte_codigo TEXT,
+  itens TEXT,                   -- os itens do pedido naquela fonte, quando conferiu
+  usuario_nome TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime')),
+  invalidada_em TEXT, invalidada_motivo TEXT
+);
+CREATE INDEX idx_plano_conferencia ON plano_conferencia(plano_id, invalidada_em);
+`},
+
+/* ── O TIPO DE CADA LINHA E O RELOGIO DO CORTE (fase 5, R18–R21) ──────────
+   Cada linha do corte diz para quem e: cliente final, revenda (escolhida da
+   CARTEIRA que ja existe — `sm_revenda`, nunca uma segunda lista) ou Mercado
+   Livre sob medida. O nome da revenda vai como RETRATO, como no pedido: o
+   historico do corte continua legivel se a revenda mudar de nome.
+
+   O relogio corre do Cortar ao Corte feito, menos as pausas (R19), e o tempo
+   liquido fica gravado no corte. O limite do tempo absurdo e PARAMETRO (R21):
+   nasce em 3 h porque a spec disse 3 h, e ninguem mediu a bancada ainda. */
+{n:30, nome:'o tipo de cada linha do corte, e o relogio com pausa', sql:`
+ALTER TABLE plano_peca ADD COLUMN tipo TEXT;          -- cliente_final | revenda | ml
+ALTER TABLE plano_peca ADD COLUMN revenda_id INTEGER;
+ALTER TABLE plano_peca ADD COLUMN revenda_nome TEXT;
+ALTER TABLE plano ADD COLUMN tempo_liquido_s INTEGER;
+CREATE TABLE plano_pausa (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plano_id INTEGER NOT NULL REFERENCES plano(id),
+  inicio TEXT NOT NULL, fim TEXT,
+  usuario_nome TEXT
+);
+CREATE INDEX idx_plano_pausa ON plano_pausa(plano_id);
+INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
+ ('corteTempoMaxHoras','3','numero','Tempo maximo de um corte',
+  'Corte com tempo liquido (do Cortar ao Corte feito, menos as pausas) acima disto aparece no historico, mas fica FORA do tempo por m² do painel. Serve para o corte esquecido aberto de um dia para o outro, que envenenaria a media. Nao e meta: e o teto acima do qual o numero deixa de ser acreditavel.','horas',22);
 `}
 ];
 
