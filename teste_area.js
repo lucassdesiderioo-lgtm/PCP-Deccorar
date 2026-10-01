@@ -16,9 +16,10 @@
  * - caixa impressa num dia anterior e não conferida não some (armadilha #9);
  * - pendente continua recusado no bipe e não entra na conta;
  * - mesmo login nos dois bipes é RECUSADO desde 01/10/2026 (spec
- *   CARREGAMENTO-SEGUNDA-PESSOA, fase 1 — a decisão 2 de 25/09 mudou); com a
- *   liberação do dia ele passa e fica MARCADO "sem segunda pessoa" (o caso
- *   inteiro da recusa mora no teste_segunda_pessoa.js);
+ *   CARREGAMENTO-SEGUNDA-PESSOA, fase 1 — a decisão 2 de 25/09 mudou), sem
+ *   liberação; o "sem segunda pessoa" da pilha ficou como HISTÓRIA da caixa
+ *   conferida antes da trava (o caso inteiro da recusa mora no
+ *   teste_segunda_pessoa.js);
  * - caixa sem o nome de quem imprimiu é "sem registro", nunca "mesma pessoa".
  *
  * Sobe um banco temporário e chama os módulos de verdade, com um `app` de
@@ -100,13 +101,12 @@ const pilha = async () => (await chamar('GET /api/carregamento')).pilha;
   ok('o bipe confere (pessoa diferente)', r.ok, JSON.stringify(r));
   r = await chamar('POST /api/carregar', {code:'PDois'}, ANA);             // Ana imprimiu e Ana confere
   ok('mesmo login nos dois bipes é RECUSADO desde 01/10/2026', r.motivo === 'mesma_pessoa', JSON.stringify(r));
-  /* O dia de uma pessoa só: o supervisor libera a Ana para hoje, com motivo.
-     A partir daí ela confere — e a pilha MARCA, que é o rastro. */
-  db.prepare("INSERT INTO carga_liberacao (dia,pessoa,motivo,liberado_por) VALUES (date('now','localtime'),'Ana','sozinha','Sup')").run();
-  r = await chamar('POST /api/carregar', {code:'PDois'}, ANA);
-  ok('liberada no dia, a mesma pessoa confere', r.ok, JSON.stringify(r));
   r = await chamar('POST /api/carregar', {code:'PTres'}, ANA);             // coleta, mesma pessoa
-  ok('a caixa de coleta também é conferida pelo mesmo bipe', r.ok && r.coleta, JSON.stringify(r));
+  ok('na coleta também', r.motivo === 'mesma_pessoa', JSON.stringify(r));
+  /* "Sem segunda pessoa" continua existindo como HISTÓRIA: a caixa conferida
+     pelo mesmo login ANTES da trava. Monta-se aqui como ela ficou no banco. */
+  db.prepare("UPDATE lote SET conferido_por='Ana', conferido_em=datetime('now','localtime') WHERE id=?").run(a2);
+  db.prepare("UPDATE lote SET conferido_por='Ana', conferido_em=datetime('now','localtime'), estagio='carregado', carregado_em=datetime('now','localtime') WHERE id=?").run(a3);
   r = await chamar('POST /api/carregar', {code:'PFutura'}, BETO);          // a adiantada, conferida
   ok('a adiantada é conferida como qualquer caixa', r.ok, JSON.stringify(r));
   r = await chamar('POST /api/carregar', {code:'PSemNome'}, ANA);          // sem nome de quem imprimiu
@@ -136,8 +136,10 @@ const pilha = async () => (await chamar('GET /api/carregamento')).pilha;
      cadastro de login, e " ana" x "Ana" não é segunda pessoa. */
   db.prepare("UPDATE lote SET impresso_por=' ana ' WHERE id=?").run(b1);
   r = await chamar('POST /api/carregar', {code:'PBeto'}, ANA);
+  ok('" ana " imprimiu, "Ana" é recusada no bipe', r.motivo === 'mesma_pessoa', JSON.stringify(r));
+  db.prepare("UPDATE lote SET conferido_por='Ana', conferido_em=datetime('now','localtime') WHERE id=?").run(b1);
   p = await pilha();
-  ok('"Ana" e " ana " são a mesma pessoa', p.hoje.sem_segunda === 3, JSON.stringify(p.hoje));
+  ok('e na pilha "Ana" e " ana " são a mesma pessoa', p.hoje.sem_segunda === 3, JSON.stringify(p.hoje));
   ok('tudo de hoje conferido: faltam 0', p.hoje.faltam === 0 && p.faltam.length === 0);
 
   /* Ninguém logado nos DOIS bipes: vazio igual a vazio não é "a mesma pessoa",

@@ -1,8 +1,8 @@
 > **STATUS · 01/10/2026 — EM CONSTRUÇÃO** · **fase 1 em código (01/10):** o bipe da área e do
-> canto recusa quem imprimiu, com o nome dele; liberação do dia por pessoa (não por caixa,
-> divergência da construção — 40 caixas uma a uma de outro aparelho seria a trava que se
-> contorna); quem tem `saida.liberar` passou a abrir a tela do Carregamento (sem isso não
-> havia porta até a liberação); `teste_segunda_pessoa.js` (34 casos). Falta o deploy e o
+> canto recusa quem imprimiu, com o nome dele, **sem liberação nenhuma** — o dono mudou a
+> P1 em 01/10/2026: *"tem que ter esse cruzamento, não tem que ter liberações"*. A
+> liberação por pessoa e dia chegou a ser construída e saiu antes do deploy;
+> `teste_segunda_pessoa.js` (24 casos). Falta o deploy e o
 > primeiro dia real. P6 respondida: as etiquetas de fora são **as do saco**. Fase 2 planejada. Nasceu da conversa de 01/10/2026 (tipo `REGRA` + `NOVIDADE`).
 > **Muda uma decisão de 25/09/2026:** a decisão 2 da `SAIDA-E-DUPLA-CONFERENCIA`
 > ("sem segunda pessoa só MARCA, nunca trava"). Quando aprovada, a mudança vai para
@@ -84,7 +84,7 @@ mesmo código duas vezes numa leitura, e aqui isso contaria uma persiana a mais.
 
 | # | Pergunta | Resposta |
 |---|---|---|
-| P1 | Dia de uma pessoa só | **Liberar com motivo**, por quem tem `saida.liberar` (Supervisor/Admin). Grava quem liberou e vai para a auditoria |
+| P1 | Dia de uma pessoa só | ~~Liberar com motivo~~ → **sem liberação** (dono, 01/10/2026, depois de ver a primeira versão): o cruzamento é automático, e a caixa espera outra pessoa |
 | P2 | O tablet do Carregamento fica com um login só o dia todo? | **Sim.** A tela ganha **"Trocar de pessoa"** (nome + PIN) sem sair dela |
 | P3 | Caixa sem `lote_item` (antes de 15/09) | Segue o fluxo de uma persiana |
 | P4 | A mesma etiqueta de SKU bipada duas vezes | **Concordo** — fica escrito como limite: o que protege é ser outra pessoa olhando a caixa |
@@ -98,10 +98,9 @@ mesmo código duas vezes numa leitura, e aqui isso contaria uma persiana a mais.
 ## 5. Fases
 
 **Fase 1 — a Regra 1 (outra pessoa).** Recusa no `POST /api/carregar` (área e canto),
-a tarja, o "Trocar de pessoa" (P2) e a liberação com motivo (P1). Quem libera não pode
-ser quem imprimiu (senão a liberação vira o caminho de sempre). Teste escrito antes:
-mesmo login recusado, outro login aceito, vazio ≠ vazio, viagem e sobras não travam,
-liberação exige chave e motivo e vai para a auditoria.
+a tarja com o nome de quem imprimiu e o "Trocar de pessoa" (P2). Sem liberação (P1).
+Teste escrito antes: mesmo login recusado, outro login aceito, vazio ≠ vazio, e a rota de
+liberação não existe.
 
 **Fase 2 — a Regra 2 (caixa de várias às cegas) e o aviso na impressão (P6).** Na
 Etiqueta de Venda, ao lado da frase `fita(n)`, a instrução de colar por fora as

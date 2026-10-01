@@ -13,10 +13,10 @@
  * - mesmo login recusado nos dois bipes, e nada é gravado na caixa;
  * - outro login confere, e a resposta traz quem imprimiu;
  * - " ana " é "Ana", e vazio nunca é igual a vazio;
- * - a liberação do dia (dia de uma pessoa só) exige a chave, o motivo, uma
- *   pessoa que existe, e NÃO pode ser dada por quem vai ser liberado;
- * - liberação de ontem não vale hoje;
- * - a caixa conferida sob liberação continua marcada "sem segunda pessoa".
+ * - NÃO há liberação nenhuma (decisão do dono, 01/10/2026): o cruzamento é
+ *   automático e vale para todo login, inclusive o de quem tem acesso total —
+ *   uma porta de liberação vira o caminho de todo dia;
+ * - a recusa vai para a auditoria, e a pilha diz quem imprimiu cada caixa.
  *
  * Banco temporário, módulos de verdade, `app` de mentira. Não abre porta.
  */
@@ -41,7 +41,6 @@ db.exec(`CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, c
   INSERT INTO usuarios (nome) VALUES ('Ana'),('Beto'),('Sup'),('Carla');`);
 const q1 = (s, ...a) => db.prepare(s).get(...a);
 const hoje = q1("SELECT date('now','localtime') d").d;
-const ontem = q1("SELECT date('now','localtime','-1 day') d").d;
 
 const vol = (buyer, impresso, coleta) => db.prepare(`INSERT INTO lote
     (codigo,buyer,nf,packId,codes,estagio,data,despachar_em,embalado_em,impresso_por,modalidade)
@@ -50,19 +49,17 @@ const vol = (buyer, impresso, coleta) => db.prepare(`INSERT INTO lote
   .lastInsertRowid;
 
 const auditoria = [];
-const PODE = { Sup:['saida.liberar'], Ana:['saida.liberar'] };   // a Ana é supervisora num dia: nem assim libera a si
 const rotas = {};
 const app = { get:(p,...h)=>{ rotas['GET '+p]=h[h.length-1]; }, post:(p,...h)=>{ rotas['POST '+p]=h[h.length-1]; },
   locals:{ acesso:{
-    auditar(req, cat, acao, alvo, det){ auditoria.push({acao, alvo, det, quem:req.usuario&&req.usuario.nome}); },
-    podePermissao(u, chave){ return !!u && (PODE[u.nome]||[]).includes(chave); } } } };
+    auditar(req, cat, acao, alvo, det){ auditoria.push({acao, alvo, det, quem:req.usuario&&req.usuario.nome}); } } } };
 require('./carreg_route')(app, db);
 const chamar = (k, body, usuario) => new Promise(r => {
   let cod = 200;
   const res = { json:o=>r(Object.assign({_status:cod}, o)), status(c){ cod = c; return res; }, send:o=>r(o) };
   rotas[k]({ body:body||{}, headers:{}, usuario:usuario||null }, res);
 });
-const ANA = {id:1,nome:'Ana'}, BETO = {id:2,nome:'Beto'}, SUP = {id:3,nome:'Sup'}, CARLA = {id:4,nome:'Carla'};
+const ANA = {id:1,nome:'Ana'}, BETO = {id:2,nome:'Beto'};
 const lote = id => q1('SELECT * FROM lote WHERE id=?', id);
 
 (async () => {
@@ -110,51 +107,20 @@ const lote = id => q1('SELECT * FROM lote WHERE id=?', id);
   r = await chamar('POST /api/carregar', {code:'PNinguem'}, null);
   ok('sem nome dos DOIS lados não é "mesma pessoa": vazio não é igual a vazio', r.ok === true, JSON.stringify(r));
 
-  // ── a liberação do dia ──
-  r = await chamar('POST /api/carregar/liberar', {pessoa:'Ana', motivo:'sozinha na expedição'}, BETO);
-  ok('liberar sem a chave saida.liberar é recusado', r.ok === false && r._status === 403, JSON.stringify(r));
-  r = await chamar('POST /api/carregar/liberar', {pessoa:'Ana', motivo:'   '}, SUP);
-  ok('liberar sem motivo é recusado', r.ok === false && r.motivo === 'sem_motivo', JSON.stringify(r));
-  r = await chamar('POST /api/carregar/liberar', {pessoa:'Ana', motivo:'sozinha'}, ANA);
-  ok('ninguém libera a si mesmo, nem com a chave', r.ok === false && r.motivo === 'propria', JSON.stringify(r));
-  r = await chamar('POST /api/carregar/liberar', {pessoa:'Fulano', motivo:'sozinho'}, SUP);
-  ok('pessoa que não existe no cadastro é recusada', r.ok === false && r.motivo === 'pessoa_inexistente', JSON.stringify(r));
-  ok('nenhuma das recusas gravou liberação',
-     q1('SELECT COUNT(*) n FROM carga_liberacao').n === 0);
-
-  r = await chamar('POST /api/carregar/liberar', {pessoa:'Ana', motivo:'sozinha na expedição'}, SUP);
-  ok('o supervisor libera a Ana para hoje, com motivo', r.ok === true, JSON.stringify(r));
-  const lib = q1('SELECT * FROM carga_liberacao');
-  ok('a liberação guarda dia, pessoa, motivo e quem liberou',
-     lib && lib.dia === hoje && lib.pessoa === 'Ana' && lib.motivo === 'sozinha na expedição' && lib.liberado_por === 'Sup',
-     JSON.stringify(lib));
-  ok('a liberação vai para a auditoria', auditoria.some(a => a.acao === 'liberar_mesma_pessoa' && a.quem === 'Sup'));
-  r = await chamar('POST /api/carregar/liberar', {pessoa:'ana', motivo:'de novo'}, SUP);
-  ok('liberar de novo no mesmo dia não duplica', r.ok === true && q1('SELECT COUNT(*) n FROM carga_liberacao').n === 1,
-     JSON.stringify(r));
-
+  // ── sem liberação: o cruzamento é automático ──
+  ok('não existe rota de liberação', !rotas['POST /api/carregar/liberar'], Object.keys(rotas).join(' '));
   r = await chamar('POST /api/carregar', {code:'PAgencia2'}, ANA);
-  ok('liberada, a Ana confere a caixa que ela mesma imprimiu', r.ok === true && r.conferida === true, JSON.stringify(r));
-  const p = (await chamar('GET /api/carregamento')).pilha;
-  ok('e a caixa continua marcada "sem segunda pessoa" na pilha', p.sem_segunda.some(s => s.id === ag2), JSON.stringify(p.sem_segunda));
-
-  // ── ontem não vale hoje ──
-  db.prepare("INSERT INTO carga_liberacao (dia,pessoa,motivo,liberado_por) VALUES (?,?,?,?)").run(ontem, 'Carla', 'ontem', 'Sup');
-  vol('DaCarla', 'Carla', false);
-  r = await chamar('POST /api/carregar', {code:'PDaCarla'}, CARLA);
-  ok('a liberação de ontem não vale hoje', r.ok === false && r.motivo === 'mesma_pessoa', JSON.stringify(r));
+  ok('quem imprimiu continua recusado, sem porta de liberar', r.ok === false && r.motivo === 'mesma_pessoa', JSON.stringify(r));
+  r = await chamar('POST /api/carregar', {code:'PAgencia2'}, BETO);
+  ok('e outra pessoa confere a mesma caixa', r.ok === true && r.conferida === true && r.impresso_por === 'ana', JSON.stringify(r));
 
   // ── o GET da tela ──
-  let g = await chamar('GET /api/carregamento', {}, SUP);
-  ok('o GET traz as liberações de hoje, com motivo e quem liberou',
-     Array.isArray(g.liberacoes_hoje) && g.liberacoes_hoje.length === 1 && g.liberacoes_hoje[0].pessoa === 'Ana'
-       && g.liberacoes_hoje[0].liberado_por === 'Sup' && g.liberacoes_hoje[0].motivo === 'sozinha na expedição',
-     JSON.stringify(g.liberacoes_hoje));
-  ok('o GET diz que o supervisor pode liberar', g.pode_liberar === true);
-  g = await chamar('GET /api/carregamento', {}, BETO);
-  ok('e que a bancada não pode', g.pode_liberar === false);
+  vol('Nova', ' Ana ', false);                                   // uma que ainda falta conferir
+  const g = await chamar('GET /api/carregamento', {}, BETO);
+  ok('o GET não fala de liberação', !('liberacoes_hoje' in g) && !('pode_liberar' in g), Object.keys(g).join(' '));
   ok('as linhas da pilha trazem quem imprimiu', (g.pilha.faltam||[]).every(f => 'impresso_por' in f) && g.pilha.faltam.length > 0,
      JSON.stringify(g.pilha.faltam));
+  ok('e o nome vem limpo', g.pilha.faltam.some(f => f.impresso_por === 'Ana'), JSON.stringify(g.pilha.faltam));
 
   console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'tudo certo') + ' — ' + casos + ' casos');
   process.exit(falhas ? 1 : 0);

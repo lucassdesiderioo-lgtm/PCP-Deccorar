@@ -115,11 +115,7 @@
   .quem{display:inline-block;margin-top:6px;font-size:15px}
   .tag.quem2{background:#eef1f6;color:#3a4250}
   .btroca{margin-top:12px;background:#1a1d23;color:#fff;font-size:17px;padding:13px 20px}
-  .libcard h3{margin:0;padding:12px 14px;font-size:15px}
-  .libcard .lin{padding:8px 14px;font-size:14px;border-top:1px solid var(--line)}
-  .libform{display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px;border-top:1px solid var(--line);align-items:center}
-  .libform select,.libform input{font-size:15px;padding:9px;border:1px solid var(--line);border-radius:9px}
-  .libform input{flex:1;min-width:200px}
+
   /* As listas da pilha ficam RECOLHIDAS: com o bipe unico (opcao A) as caixas
      que faltam conferir sao as mesmas das listas do carro e da coleta logo
      abaixo, e aberta a tela diria a mesma coisa duas vezes — que foi o que o
@@ -148,18 +144,6 @@
     <details id="pAntD"><summary id="pAntS"></summary><div id="pAnt"></div></details>
     <details id="pFalD"><summary id="pFalS"></summary><div id="pFaltam"></div></details>
     <div id="pVazio"></div><div id="pSeg"></div></div>
-  <!-- O DIA DE UMA PESSOA SO (CARREGAMENTO-SEGUNDA-PESSOA, fase 1): quem tem
-       saida.liberar libera uma pessoa a conferir o que ela mesma imprimiu,
-       HOJE, com motivo. Some quando nao ha liberacao e a pessoa nao pode liberar. -->
-  <div class="card libcard" id="libCard" style="display:none;margin-bottom:14px">
-    <h3>🔓 Conferir o que a própria pessoa imprimiu — só hoje</h3>
-    <div id="libLista"></div>
-    <div class="libform" id="libForm" style="display:none">
-      <select id="libPessoa"></select>
-      <input id="libMotivo" maxlength="300" placeholder="Motivo (ex.: só uma pessoa na expedição hoje)">
-      <button class="btn" style="background:#1a1d23;color:#fff" onclick="liberarPessoa()">Liberar hoje</button>
-    </div>
-  </div>
   <div class="duas">
   <div class="card"><h3>🚗 Faltam carregar no carro (agência)</h3>
     <!-- A VIAGEM A AGENCIA (fase 4): fechada, so o botao; aberta, o bipe poe no carro. -->
@@ -244,32 +228,6 @@ function linhaQuem(r){ return r&&r.impresso_por ? '<div class="quem">Etiqueta fe
    aqui dentro seria a segunda porta de entrada. */
 function trocarPessoa(){
   fetch('/api/auth/logout',{method:'POST'}).then(function(){ location.href='/login?r=/carregamento'; });
-}
-async function liberarPessoa(){
-  var pessoa=$('#libPessoa').value, motivo=$('#libMotivo').value.trim();
-  if(!pessoa){ banner('warn','Escolha a pessoa',''); return; }
-  if(!motivo){ banner('warn','Escreva o motivo','Por que esta pessoa vai conferir o que ela mesma imprimiu?'); return; }
-  var r=await (await fetch('/api/carregar/liberar',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({pessoa:pessoa,motivo:motivo})})).json();
-  if(r.ok){ $('#libMotivo').value=''; banner('ok','Liberada hoje — '+esc0(r.pessoa),'Ela pode conferir o que imprimiu até o fim do dia. Fica registrado.'); }
-  else banner('err','Não liberou', esc0(r.aviso||r.erro||''));
-  carregar();
-}
-var pessoasLib=null;
-async function desenharLib(d){
-  var lib=d.liberacoes_hoje||[], pode=!!d.pode_liberar, card=$('#libCard');
-  if(!lib.length && !pode){ card.style.display='none'; return; }
-  card.style.display='';
-  $('#libLista').innerHTML = lib.length
-    ? lib.map(function(l){ return '<div class="lin"><b>'+esc0(l.pessoa)+'</b> liberada por '+esc0(l.liberado_por)
-        +' às '+horaDe(l.liberado_em)+' — <i>'+esc0(l.motivo)+'</i></div>'; }).join('')
-    : '<div class="lin" style="color:var(--muted)">Ninguém liberado hoje. Use só no dia em que não há outra pessoa para conferir.</div>';
-  $('#libForm').style.display = pode ? '' : 'none';
-  if(pode && !pessoasLib){
-    try{ pessoasLib=await (await fetch('/api/auth/pessoas')).json(); }catch(e){ pessoasLib=[]; }
-    $('#libPessoa').innerHTML='<option value="">Quem vai conferir…</option>'
-      +pessoasLib.map(function(p){ return '<option>'+esc0(p.nome)+'</option>'; }).join('');
-  }
 }
 function banner(kind,title,sub){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'; }
 function esc0(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
@@ -377,9 +335,9 @@ function linha(f){
     +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+'</span></span></div>';
 }
 /* A PILHA (carga.js → pilhaDaArea). A caixa conferida e a que foi bipada aqui
-   — no carro ou no canto da coleta. "Sem segunda pessoa" e a caixa que a
-   propria pessoa conferiu SOB A LIBERACAO DO DIA: desde 01/10/2026 o bipe
-   recusa o mesmo login (CARREGAMENTO-SEGUNDA-PESSOA, fase 1). A caixa impressa em dia anterior e nao conferida vem em cima: ela
+   — no carro ou no canto da coleta. "Sem segunda pessoa" e HISTORIA: a caixa
+   que a propria pessoa conferiu antes de 01/10/2026, quando o bipe passou a
+   recusar o mesmo login, sem liberacao (CARREGAMENTO-SEGUNDA-PESSOA). A caixa impressa em dia anterior e nao conferida vem em cima: ela
    esta na fabrica e nao pode sumir (armadilha #9). Tablet com a pagina antiga
    nao chama isto; servidor antigo nao manda `pilha`, e o card some. */
 function tagsPilha(f){
@@ -411,7 +369,7 @@ function desenharPilha(p){
     : (h.impressas ? '<div class="empty">✅ Todas as impressas hoje foram conferidas.</div>'
                    : '<div class="empty" style="color:var(--muted)">Nenhuma etiqueta impressa hoje ainda.</div>');
   var notas=[];
-  if(h.sem_segunda) notas.push('<b>'+h.sem_segunda+'</b> conferidas por quem imprimiu, com a liberação do dia: '
+  if(h.sem_segunda) notas.push('<b>'+h.sem_segunda+'</b> conferidas por quem imprimiu, antes da trava de 01/10: '
     +p.sem_segunda.slice(0,8).map(function(f){ return esc0(f.buyer)+' ('+esc0(f.quem)+')'; }).join(', ')
     +(p.sem_segunda.length>8?'…':''));
   if(h.sem_registro) notas.push('<b>'+h.sem_registro+'</b> sem registro de quem imprimiu ou de quem conferiu');
@@ -419,7 +377,7 @@ function desenharPilha(p){
 }
 async function carregar(){
   const d=await (await fetch('/api/carregamento')).json();
-  desenharPilha(d.pilha); desenharLib(d);
+  desenharPilha(d.pilha);
   const col=d.coleta||{faltam:[],aguardando:[],fechamentos:[],retiradas_hoje:0};
   $('#nCar').textContent=d.carregados; $('#nFal').textContent=d.faltam.length;
   $('#nCol').textContent=col.aguardando.length;

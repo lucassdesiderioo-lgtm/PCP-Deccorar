@@ -3187,9 +3187,9 @@ manda, e o card some.
 > etiqueta —, e o bipe continua recusando o `pendente` (§5, #27).
 
 > ⚠️ ~~**"SEM SEGUNDA PESSOA" SÓ MARCA, NUNCA TRAVA** (decisão 2)~~ — **MUDOU
-> EM 01/10/2026: hoje o bipe RECUSA**, e a marca ficou só para a caixa conferida
-> sob a liberação do dia (bloco "QUEM IMPRIMIU NÃO CONFERE", logo abaixo). A
-> comparação ignora espaço e maiúscula (`" ana "` é
+> EM 01/10/2026: hoje o bipe RECUSA, sem liberação**, e a marca ficou só como
+> história da caixa conferida antes disso (bloco "QUEM IMPRIMIU NÃO CONFERE",
+> logo abaixo). A comparação ignora espaço e maiúscula (`" ana "` é
 > `"Ana"`). **Faltando qualquer um dos dois nomes a caixa é "sem registro",
 > nunca "mesma pessoa"**: vazio igual a vazio não é a mesma pessoa, é não
 > saber quem fez — e sem essa guarda dois bipes sem login batiam.
@@ -3247,21 +3247,19 @@ Etiqueta feita por Ana Paula — o mesmo login que está nesta tela.
 > ⚠️ **SÓ A ÁREA E O CANTO.** O bipe da viagem (pôr no carro) e as sobras do
 > caminhão **não** travam: ali a caixa já foi conferida por outra pessoa.
 
-> ⚠️ **O DIA DE UMA PESSOA SÓ: liberação por PESSOA e por DIA, não por caixa.**
-> Quem tem `saida.liberar` (Supervisor/Admin) libera uma pessoa a conferir o que
-> ela mesma imprimiu, **até a meia-noite**, com motivo (`carga_liberacao`,
-> `POST /api/carregar/liberar`, auditoria `liberar_mesma_pessoa`). Por caixa, de
-> outro aparelho, seriam 40 liberações num dia — a trava que se contorna (#6).
-> A caixa conferida assim continua **marcada** na pilha (*"conferidas por quem
-> imprimiu, com a liberação do dia"*), que é o rastro.
+> ⚠️ **NÃO HÁ LIBERAÇÃO, E ISSO É DECISÃO DO DONO (01/10/2026).** O cruzamento
+> é automático e vale para todo login, inclusive o de acesso total: *"vão ter
+> pessoas que podem imprimir etiqueta de venda e pessoas que podem fazer
+> conferência — a única coisa é esse cruzamento"*. A primeira versão tinha uma
+> liberação por pessoa e por dia, com motivo, e saiu antes do deploy: porta de
+> liberar é o caminho que vira rotina, e aí a regra deixa de existir.
 >
-> ⚠️ **NINGUÉM LIBERA A SI MESMO, nem o Supervisor.** Senão a liberação vira o
-> caminho de todo dia. Quem está sozinho chama quem tem a chave — pelo celular.
+> **O custo, escrito para não se descobrir na expedição:** num dia em que só
+> uma pessoa trabalha na expedição, as caixas que ela imprimiu esperam outra
+> pessoa para serem conferidas. Não existe botão para isso, de propósito.
 >
-> ⚠️ **E POR ISSO QUEM TEM `saida.liberar` ABRE A TELA.** `/carregamento` e o
-> `GET /api/carregamento` passaram a aceitar a chave: o Supervisor que não é da
-> bancada tinha a chave e **nenhuma porta** até a liberação (a lição do extrato,
-> §2). Ele lê a tela; o bipe continua não sendo dele.
+> A marca *"sem segunda pessoa"* da pilha continua existindo, mas só como
+> **história**: caixa conferida pelo mesmo login antes de 01/10/2026.
 
 > **"Trocar de pessoa" sai e volta pela MESMA tela de login** (`/login?r=/carregamento`):
 > uma segunda grade de nomes e PIN aqui dentro seria uma segunda porta de entrada.
@@ -3269,17 +3267,14 @@ Etiqueta feita por Ana Paula — o mesmo login que está nesta tela.
 > ⚠️ **TABLET COM A PÁGINA ANTIGA EM CACHE** mostraria a recusa como "Etiqueta não
 > reconhecida". O refresh forçado no deploy é obrigatório.
 
-**Rode `node teste_segunda_pessoa.js` (34 casos) ao mexer no bipe do
-`carreg_route.js`, no `mesmaPessoa` ou na liberação.** Seis defeitos foram
-reintroduzidos um a um: sem a trava (reprova 14), liberar a si mesmo (5), a
-liberação de ontem valendo (2), vazio igual a vazio (1), liberar sem motivo (4) e
-liberar sem a chave (5). Mexeu na chave ou na tela? `node teste_acesso.js` (269)
-e `node teste_cobertura.js` (10).
+**Rode `node teste_segunda_pessoa.js` (24 casos) ao mexer no bipe do
+`carreg_route.js` ou no `mesmaPessoa`.** Três defeitos foram reintroduzidos um a
+um: sem a trava (reprova 13), vazio igual a vazio (1) e o bipe aceito sem o nome
+de quem imprimiu (3). E há caso travando que a rota de liberação **não existe**.
 
 > ⚠️ **AINDA NÃO FOI CONFERIDO NA FÁBRICA.** A rodada foi num navegador meu, a
-> 1440, 1024 e 400 px: a Ana Paula foi recusada, o Sup a liberou com motivo, e
-> ela conferiu com a marca na pilha. A prova é o primeiro dia de expedição com a
-> regra.
+> 1440, 1024 e 400 px. A prova é o primeiro dia de expedição com a regra: a
+> caixa recusada para quem imprimiu e conferida por outra pessoa.
 
 **A fase 2 (a caixa de várias conferida peça a peça, às cegas, e as etiquetas de
 SKU coladas por fora da caixa — as do saco de cada persiana) ainda não existe.**
@@ -4002,7 +3997,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (269), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (27), `teste_segunda_pessoa.js` (34), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (27), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4225,10 +4220,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   (§5, armadilha #27)
 - ❌ Fazer a reimpressão gravar `impresso_por`: o bipe 1 é a PRIMEIRA
   impressão, e papel repetido não é outra contagem (§8-B, fase 1 da saída)
-- ❌ Deixar quem imprimiu conferir no Carregamento sem a liberação do dia — desde
-  01/10/2026 o bipe da área e do canto RECUSA (§8-B, CARREGAMENTO-SEGUNDA-PESSOA)
-- ❌ Liberar por caixa em vez de por pessoa e dia, ou deixar alguém liberar a si
-  mesmo: a primeira vira 40 cliques, a segunda vira o caminho de todo dia (§8-B)
+- ❌ Deixar quem imprimiu conferir no Carregamento — desde 01/10/2026 o bipe da
+  área e do canto RECUSA (§8-B, CARREGAMENTO-SEGUNDA-PESSOA)
+- ❌ Criar porta de liberação para quem imprimiu conferir, nem para o Admin
+  Geral: o cruzamento é automático por decisão do dono, e liberação vira rotina (§8-B)
 - ❌ Contar como "mesma pessoa" a caixa sem um dos dois nomes: vazio igual a
   vazio é não saber quem fez, e vai para "sem registro" (§8-B)
 - ❌ Deixar a pilha esquecer a caixa impressa ontem e não conferida, ou somá-la
