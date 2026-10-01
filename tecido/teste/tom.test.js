@@ -5,6 +5,8 @@
 // duas lado a lado na mesma parede.
 const plano=require('../dominio/plano');
 const corte=require('../dominio/corte');
+const tom=require('../dominio/tom');
+const db=require('../nucleo/db');
 const sobra=require('../dominio/sobra');
 const rolo=require('../dominio/rolo');
 const etiqueta=require('../dominio/etiqueta');
@@ -45,6 +47,25 @@ function novaSobra(x,largura,altura){
     condicao:'integra',nivel_id:x.nivelSobra},'teste');
 }
 const fontesDe=p=>p.faixas.map(f=>f.fonte+':'+f.fonte_id);
+
+/* O cenario dos degraus: tres pecas do mesmo pedido que nao cabem inteiras em
+   fonte nenhuma. O rolo tem uma puxada so (2,60 m) — cabem duas lado a lado.
+   A terceira so sai numa sobra. */
+function degraus(x,origemDaSobra){
+  const r=rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'2,60',nivel_id:x.buraco()},'teste');
+  const dados={codigo:etiqueta.pendentes()[0].codigo,tecido_id:x.t.id,largura:1.50,altura:2.60,
+    condicao:'integra',nivel_id:x.nivelSobra};
+  if(origemDaSobra==='mesmo') Object.assign(dados,{origem:'rolo',origem_rolo_id:r.id});
+  let r2=null;
+  if(origemDaSobra==='outro'){
+    r2=rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'1,00',nivel_id:x.buraco()},'teste');
+    Object.assign(dados,{origem:'rolo',origem_rolo_id:r2.id});
+  }
+  const s=sobra.criar(dados,'teste');
+  const pecas=[1,2,3].map(()=>({pedido:'TOM'+x.t.id,largura:'1,40',altura:'2,50'}));
+  return {r,r2,s,pecas};
+}
+
 
 module.exports=[
 
@@ -357,6 +378,140 @@ module.exports=[
   igual(p.sobre_sobras,null,'e nenhuma frase');
   // Aviso que aparece no caso normal e aviso que a equipe aprende a fechar
   // (armadilha #6) — e ai o da lista de verdade passa batido.
+}}
+,
+
+/* ═══ FASE 4 DA CORTE-EM-ETAPAS — o tom pela ORIGEM (R9–R12) ══════════════ */
+
+{nome:'R9 — a sobra que nasceu do rolo tem a origem dele; a de sobra sobe ate o rolo; a do mutirao e sozinha', executar({igual}){
+  const x=cena();
+  const r=rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
+  const filha=sobra.criar({codigo:etiqueta.pendentes()[0].codigo,tecido_id:x.t.id,largura:1,altura:2,
+    condicao:'integra',nivel_id:x.nivelSobra,origem:'rolo',origem_rolo_id:r.id},'teste');
+  const neta=sobra.criar({codigo:etiqueta.pendentes()[0].codigo,tecido_id:x.t.id,largura:1,altura:1,
+    condicao:'integra',nivel_id:x.nivelSobra,origem:'sobra',origem_sobra_id:filha.id},'teste');
+  const m1=novaSobra(x,1,1), m2=novaSobra(x,1,1);
+  igual(tom.origem('rolo',r.id).chave,'rolo:'+r.id,'o rolo e a propria origem');
+  igual(tom.origem('sobra',filha.id).chave,'rolo:'+r.id,'a sobra que nasceu do rolo');
+  igual(tom.origem('sobra',neta.id).chave,'rolo:'+r.id,'a sobra de sobra sobe ate o rolo');
+  igual(tom.origem('sobra',m1.id).chave==='sobra:'+m1.id,true,'a do mutirao e sozinha');
+  igual(tom.origem('sobra',m1.id).chave!==tom.origem('sobra',m2.id).chave,true,'e duas do mutirao NAO tem a mesma origem');
+}},
+
+{nome:'R10 — degrau 2: dividido entre a sobra que nasceu do rolo e o proprio rolo, SEM conferencia', executar({igual}){
+  const x=cena(); const {r,s,pecas}=degraus(x,'mesmo');
+  const p=plano.calcular({tecido_id:x.t.id,pecas});
+  igual(p.pecas_nao_alocadas.length,0,'as tres pecas tem lugar');
+  igual(p.divididos.length,1,'o pedido foi dividido');
+  igual(p.divididos[0].grau,2,'no degrau 2 — mesma origem');
+  igual(new Set(p.faixas.map(f=>f.fonte+':'+f.fonte_id)).size,2,'duas fontes');
+  igual(p.faixas.some(f=>f.fonte==='sobra'&&f.fonte_id===s.id)&&p.faixas.some(f=>f.fonte==='rolo'&&f.fonte_id===r.id),true,'a sobra e o rolo dela');
+  igual(p.conferencias.length,0,'e nao pede conferencia: o tom e o do rolo');
+}},
+
+{nome:'R10 — degrau 3: dividido entre origens diferentes, e cada fonte pede conferencia', executar({igual}){
+  const x=cena(); const {r,s,pecas}=degraus(x,'outro');
+  const p=plano.calcular({tecido_id:x.t.id,pecas});
+  igual(p.pecas_nao_alocadas.length,0,'as tres tem lugar');
+  igual(p.divididos[0].grau,3,'no degrau 3 — origens diferentes');
+  igual(p.conferencias.length,2,'as duas fontes pedem conferencia');
+  igual(p.conferencias.some(c=>c.fonte==='sobra'&&c.fonte_id===s.id),true,'a sobra');
+  igual(p.conferencias.some(c=>c.fonte==='rolo'&&c.fonte_id===r.id),true,'e o rolo');
+}},
+
+{nome:'R10 — o degrau 1 continua vencendo: o pedido que cabe inteiro nao se divide', executar({igual}){
+  const x=cena();
+  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
+  novaSobra(x,1.50,2.60);
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[1,2,3].map(()=>({pedido:'UM'+x.t.id,largura:'1,40',altura:'2,50'}))});
+  igual(p.divididos.length,0,'nao dividiu');
+  igual(new Set(p.faixas.map(f=>f.fonte+':'+f.fonte_id)).size,1,'uma fonte so');
+}},
+
+{nome:'R10 — o pedido so se divide se couber INTEIRO na divisao', executar({igual}){
+  const x=cena();
+  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'2,60',nivel_id:x.buraco()},'teste');
+  // Quatro pecas: o rolo leva duas, a sobra uma, e a quarta nao tem lugar.
+  novaSobra(x,1.50,2.60);
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[1,2,3,4].map(()=>({pedido:'Q'+x.t.id,largura:'1,40',altura:'2,50'}))});
+  igual(p.divididos.length,0,'nao divide pela metade');
+  igual(p.pecas_nao_alocadas.length,4,'o pedido inteiro volta marcado');
+}},
+
+{nome:'R11 — O CORTE FEITO E RECUSADO SEM A CONFERENCIA, e a frase diz qual', executar({igual,recusa}){
+  const x=cena(); const {s,pecas}=degraus(x,'outro');
+  const p=plano.calcular({tecido_id:x.t.id,pecas});
+  const c=corte.confirmar({tecido_id:x.t.id,pecas,assinatura:p.assinatura},'Tom'+x.t.id);
+  corte.cortar(c.plano_id,'Tom'+x.t.id);
+  const e=recusa(()=>corte.feito(c.plano_id,'Tom'+x.t.id),'falta_conferir');
+  igual(new RegExp(s.codigo).test(e.mensagem),true,'a frase nomeia a fonte: '+e.mensagem);
+  const a=corte.aberto('Tom'+x.t.id);
+  a.conferencias.forEach(k=>corte.conferir(c.plano_id,{pedido:k.pedido,fonte:k.fonte,fonte_id:k.fonte_id},'Tom'+x.t.id));
+  igual(corte.aberto('Tom'+x.t.id).conferencias.every(k=>k.conferida),true,'todas conferidas');
+  igual(corte.feito(c.plano_id,'Tom'+x.t.id).etapa,'feito','e agora sai');
+  const grav=db.prepare('SELECT * FROM plano_conferencia WHERE plano_id=? AND invalidada_em IS NULL').all(c.plano_id);
+  igual(grav.length,2,'as duas conferencias ficaram gravadas');
+  igual(grav.every(g=>g.usuario_nome==='Tom'+x.t.id&&g.pedido===pecas[0].pedido),true,'com quem e o pedido');
+}},
+
+{nome:'R11 — conferir so no Cortando', executar({recusa}){
+  const x=cena(); const {pecas}=degraus(x,'outro');
+  const p=plano.calcular({tecido_id:x.t.id,pecas});
+  const c=corte.confirmar({tecido_id:x.t.id,pecas,assinatura:p.assinatura},'Tc'+x.t.id);
+  const k=p.conferencias[0];
+  recusa(()=>corte.conferir(c.plano_id,{pedido:k.pedido,fonte:k.fonte,fonte_id:k.fonte_id},'Tc'+x.t.id),'etapa_errada');
+}},
+
+{nome:'R11 — "tom diferente" troca a fonte ali mesmo, e a conferencia da fonte que mudou zera', executar({igual}){
+  const x=cena(); const {r,r2,s,pecas}=degraus(x,'outro');
+  // Uma segunda sobra, do mutirao (sem origem), para onde a peca pode ir.
+  novaSobra(x,1.50,2.60);
+  const quem='Tz'+x.t.id;
+  const p=plano.calcular({tecido_id:x.t.id,pecas});
+  const c=corte.confirmar({tecido_id:x.t.id,pecas,assinatura:p.assinatura},quem);
+  corte.cortar(c.plano_id,quem);
+  let a=corte.aberto(quem);
+  a.conferencias.forEach(k=>corte.conferir(c.plano_id,{pedido:k.pedido,fonte:k.fonte,fonte_id:k.fonte_id},quem));
+  igual(a.conferencias.length>=2,true,'o pedido dividido entre origens pede conferencias');
+  const sobraNoPlano=s.id;
+  const tom_=db.prepare("SELECT id FROM motivo_recusa WHERE nome='Tonalidade diferente'").get().id;
+  a=corte.editar(c.plano_id,{tipo:'nao_usar',fonte:'sobra',fonte_id:sobraNoPlano,motivo_id:tom_},quem);
+  igual(a.proposta.faixas.some(f=>f.fonte==='sobra'&&f.fonte_id===sobraNoPlano),false,'a sobra saiu do corte');
+  igual(a.conferencias.filter(k=>k.conferida).every(k=>!(k.fonte==='sobra'&&k.fonte_id===sobraNoPlano)),true,
+    'a conferencia da sobra que saiu nao vale mais');
+  igual(db.prepare("SELECT COUNT(*) n FROM plano_conferencia WHERE plano_id=? AND invalidada_em IS NOT NULL").get(c.plano_id).n>=1,true,
+    'ela ficou registrada como invalidada');
+}},
+
+{nome:'R12 — O PEDIDO CORTADO ANTES SO CONTINUA NO MESMO TECIDO (o rolo de outra cor nao serve)', executar({igual}){
+  /* O defeito achado na fase 1: o pedido de persianas de duas cores, cortada
+     a primeira, mandava a segunda continuar no rolo da PRIMEIRA cor. */
+  const x=cena(); const y=cena();
+  const rx=rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
+  const ry=rolo.entrada({tecido_id:y.t.id,largura:'3,00',metragem:'50',nivel_id:y.buraco()},'teste');
+  const pedido='DUASCORES'+x.t.id;
+  const p1=plano.calcular({tecido_id:x.t.id,pecas:[{pedido,largura:'1,00',altura:'2,00'}]});
+  const c1=corte.confirmar({tecido_id:x.t.id,pecas:[{pedido,largura:'1,00',altura:'2,00'}],assinatura:p1.assinatura},'D'+x.t.id);
+  corte.cortar(c1.plano_id,'D'+x.t.id); corte.feito(c1.plano_id,'D'+x.t.id);
+  const p2=plano.calcular({tecido_id:y.t.id,pecas:[{pedido,largura:'1,00',altura:'2,00'}]});
+  igual(p2.continuando_em,null,'nao "continua" no rolo da outra cor');
+  igual(p2.faixas.every(f=>f.fonte_id===ry.id),true,'e corta no rolo deste tecido');
+  igual(p2.cortes_anteriores.length,0,'o corte da outra cor nao e corte anterior deste tecido');
+}},
+
+{nome:'R12 — o pedido ja cortado de OUTRA origem pede conferencia mesmo numa fonte so', executar({igual}){
+  const x=cena();
+  const r1=rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'2,10',nivel_id:x.buraco()},'teste');
+  const pedido='ANTES'+x.t.id;
+  const p1=plano.calcular({tecido_id:x.t.id,pecas:[{pedido,largura:'1,00',altura:'2,00'}]});
+  const c1=corte.confirmar({tecido_id:x.t.id,pecas:[{pedido,largura:'1,00',altura:'2,00'}],assinatura:p1.assinatura},'A'+x.t.id);
+  corte.cortar(c1.plano_id,'A'+x.t.id); corte.feito(c1.plano_id,'A'+x.t.id);
+  // O rolo do dia 1 nao tem mais como dar a peca; entra outro rolo.
+  rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
+  const p2=plano.calcular({tecido_id:x.t.id,pecas:[{pedido,largura:'1,00',altura:'2,00'}]});
+  igual(p2.faixas.length>=1&&p2.faixas[0].fonte_id!==r1.id,true,'o corte de hoje sai de outro rolo');
+  igual(p2.conferencias.length,1,'e pede conferencia: o tom tem que bater com o do dia 1');
+  igual(p2.conferencias[0].com_corte_anterior,true,'dizendo que e por causa do corte anterior');
 }}
 
 ];

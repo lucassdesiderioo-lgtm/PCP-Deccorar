@@ -222,8 +222,13 @@ function detalhe(id){
       (SELECT codigo FROM sobra WHERE id=g.sobra_id) AS sobra_codigo
      FROM sobra_a_guardar g WHERE plano_id=? ORDER BY id`).all(p.id);
 
+  // As conferencias de tom (fase 4) — inclusive as que uma edicao invalidou.
+  const conferencias=db.prepare(`SELECT pedido, fonte, fonte_codigo, itens, usuario_nome, criado_em,
+      invalidada_em, invalidada_motivo FROM plano_conferencia WHERE plano_id=? ORDER BY id`).all(p.id);
+
   return {
     id:p.id, data:p.data, criado_em:p.criado_em, usuario_nome:p.usuario_nome, origem:p.origem,
+    conferencias,
     etapa:p.etapa, cortar_em:p.cortar_em, cortar_por:p.cortar_por,
     feito_em:p.feito_em, feito_por:p.feito_por,
     cancelado_em:p.cancelado_em, cancelado_por:p.cancelado_por, cancelado_motivo:p.cancelado_motivo,

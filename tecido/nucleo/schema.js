@@ -1722,6 +1722,26 @@ CREATE TABLE plano_correcao (
 CREATE INDEX idx_plano_correcao ON plano_correcao(status, plano_id);
 INSERT OR IGNORE INTO motivo_recusa(nome,ordem) VALUES('Rolo acabou',90);
 INSERT OR IGNORE INTO motivo_recusa(nome,ordem) VALUES('Medida errada',91);
+`},
+
+/* ── "CONFERI O TECIDO" (fase 4, R11) ─────────────────────────────────────
+   Pedido dividido entre fontes de origens diferentes: o operador compara o
+   tecido de cada fonte, com as duas na mao, e diz que bateu. A conferencia
+   e a prova se o cliente reclamar do tom — por isso grava quem, quando, o
+   pedido e a fonte. Mudar a fonte numa edicao ZERA a conferencia dela
+   (`invalidada_em`): a conferencia era de outro tecido. */
+{n:29, nome:'a conferencia de tom no Cortando', sql:`
+CREATE TABLE plano_conferencia (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plano_id INTEGER NOT NULL REFERENCES plano(id),
+  pedido TEXT NOT NULL,
+  fonte TEXT NOT NULL, fonte_id INTEGER NOT NULL, fonte_codigo TEXT,
+  itens TEXT,                   -- os itens do pedido naquela fonte, quando conferiu
+  usuario_nome TEXT,
+  criado_em TEXT DEFAULT (datetime('now','localtime')),
+  invalidada_em TEXT, invalidada_motivo TEXT
+);
+CREATE INDEX idx_plano_conferencia ON plano_conferencia(plano_id, invalidada_em);
 `}
 ];
 

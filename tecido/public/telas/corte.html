@@ -398,6 +398,20 @@ function desenharPlano(modo){
     c.appendChild(bx);
   }
 
+  /* O PEDIDO QUE SO COUBE DIVIDIDO (R10). Diz em que degrau: mesma origem
+     nao pede nada; origens diferentes pedem a conferencia de tom no corte. */
+  (p.divididos||[]).forEach(dv=>{
+    const mesma=dv.grau===2;
+    const av=el('div',{style:'background:'+(mesma?'var(--cartao)':'var(--alerta-fraca)')+';border:1px solid '+
+      (mesma?'var(--linha-forte)':'var(--alerta)')+';border-radius:var(--raio);padding:12px;margin:12px 0'});
+    av.appendChild(el('strong',{texto:'O pedido '+dv.pedido+' não coube inteiro numa fonte: foi dividido'}));
+    dv.fontes.forEach(f=>av.appendChild(el('div',{texto:'• '+(f.fonte==='rolo'?'rolo ':'sobra ')+f.codigo+' → '+itensTxt(f.itens)})));
+    av.appendChild(el('p',{class:'ajuda',style:'margin-bottom:0',texto:mesma
+      ?'As fontes têm a mesma origem (a sobra nasceu deste rolo): o tom é o mesmo.'
+      :'As fontes têm origens diferentes: no corte, compare o tecido de cada uma e toque em "Conferi o tecido". Sem isso o Corte feito não sai.'}));
+    c.appendChild(av);
+  });
+
   // As faixas AGRUPADAS POR FONTE. Um rolo que leva sete puxadas e um rolo
   // so: repetir o cabecalho sete vezes faria o cortador procurar sete rolos
   // na prateleira.
@@ -429,6 +443,15 @@ function desenharPlano(modo){
     /* NO CORTANDO, a fonte na mao (fase 3, R5): nao serviu, ou o rolo acabou.
        As duas sao edicoes com motivo, e o plano e recalculado ali mesmo. */
     if(cortando){
+      /* "CONFERI O TECIDO" (R11), uma vez por pedido nesta fonte. So aparece
+         quando o pedido esta em origens diferentes — no caso normal, nada. */
+      (estado.aberto.conferencias||[]).filter(k=>k.fonte===f0.fonte&&k.fonte_id===f0.fonte_id).forEach(k=>{
+        if(k.conferida) cb.appendChild(el('span',{class:'tag bom',texto:'✓ tom conferido · pedido '+k.pedido+' · '+(k.conferida_por||'')}));
+        else cb.appendChild(el('button',{class:'bt pequeno alerta naoImprime',texto:'Conferi o tecido · pedido '+k.pedido,
+          onclick:async()=>{ try{
+            estado.aberto=await api('/api/planos/'+estado.aberto.plano_id+'/conferir',{metodo:'POST',corpo:{pedido:k.pedido,fonte:k.fonte,fonte_id:k.fonte_id}});
+            beep(); telaCorteAberto(); }catch(e){ beep('erro'); } }}));
+      });
       cb.appendChild(el('button',{class:'bt pequeno naoImprime',texto:'não usar esta '+(f0.fonte==='rolo'?'bobina':'sobra'),
         onclick:()=>editarCorte({tipo:'nao_usar',fonte:f0.fonte,fonte_id:f0.fonte_id},'Tonalidade diferente')}));
       if(f0.fonte==='rolo') cb.appendChild(el('button',{class:'bt pequeno alerta naoImprime',texto:'rolo acabou',
@@ -638,6 +661,9 @@ function telaCorteAberto(){
       bx.appendChild(el('div',{style:'font-size:19px;font-weight:700',
         // O endereco vem como "ROLO · A-2-1": aqui o tipo ja esta escrito na frente.
         texto:(f.fonte==='rolo'?'Rolo ':'Sobra ')+f.codigo+(f.endereco?'  ·  '+f.endereco.replace(/^(ROLO|SOBRA) · /,''):'')}));
+      const conf=(a.conferencias||[]).filter(k=>k.fonte===f.fonte&&k.fonte_id===f.fonte_id);
+      if(conf.length) bx.appendChild(el('div',{style:'color:var(--alerta);font-weight:700',
+        texto:'⚠ tom a conferir no corte · '+conf[0].origem_texto+(conf.some(k=>k.com_corte_anterior)?' · o pedido já foi cortado antes':'')}));
       bx.appendChild(el('div',{style:'font-size:17px',texto:a.proposta.tecido.nome.split(' · ').pop()+'  →  '+itensTxt(f.itens)+
         (f.pedidos.length?'  ·  pedido '+f.pedidos.join(', '):'')+
         (f.fonte==='rolo'?'  ·  puxar '+formatarMetros(f.puxar):'')}));
@@ -669,6 +695,9 @@ function telaCorteAberto(){
   c.appendChild(el('h2',{style:'margin-top:0',texto:'Cortando — corte '+a.plano_id}));
   c.appendChild(el('p',{class:'nota',style:'margin-bottom:0',texto:tecido+' · começou às '+hora(a.cortar_em)+
     '. Quando terminar, toque em Corte feito: é aí que o estoque baixa.'}));
+  const falta=(a.conferencias||[]).filter(k=>!k.conferida);
+  if(falta.length) c.appendChild(el('p',{style:'color:var(--alerta);font-weight:700;margin:8px 0 0',
+    texto:'⚠ Antes do Corte feito, confira o tom: '+falta.map(k=>'pedido '+k.pedido+' na '+(k.fonte==='rolo'?'bobina ':'sobra ')+k.codigo).join(' · ')+'.'}));
   desenharPlano('cortando');
 }
 
@@ -975,6 +1004,13 @@ async function detalheCorte(id,pai){
   c.appendChild(el('p',{class:'nota',style:'margin:0',texto:d.refugo.length
     ?d.refugo.map(x=>formatarMedida(x.largura,x.altura)).join(' · ')+' — '+formatarArea(d.refugo.reduce((s,x)=>s+x.area,0))+' no total'
     :'Nenhum.'}));
+
+  if((d.conferencias||[]).length){
+    c.appendChild(el('h3',{texto:'Conferências de tom'}));
+    d.conferencias.forEach(k=>c.appendChild(el('div',{style:k.invalidada_em?'color:var(--tinta-fraca)':'',
+      texto:'• pedido '+k.pedido+' na '+(k.fonte==='rolo'?'bobina ':'sobra ')+k.fonte_codigo+' (itens '+k.itens+') — '+
+        (k.usuario_nome||'—')+', '+quando(k.criado_em)+(k.invalidada_em?' · deixou de valer: '+(k.invalidada_motivo||''):'')})));
+  }
 
   // ── AS MUDANCAS E AS CORRECOES (fase 3) ─────────────────────────────
   if(d.edicoes.length){

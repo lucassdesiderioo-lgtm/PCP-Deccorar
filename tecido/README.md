@@ -2519,8 +2519,26 @@ e outra, e o cliente vê as duas persianas lado a lado na mesma parede. A regra
 vale também entre **dois rolos**: rolos diferentes são lotes diferentes.
 
 Na prática, um grupo que entraria pela metade numa fonte é desfeito e tentado
-na fonte seguinte. Se o pedido inteiro não couber em lugar nenhum, ele volta
-marcado com esse motivo — nunca dividido.
+na fonte seguinte.
+
+> ⚠️ **DESDE 01/10/2026 (fase 4 da `CORTE-EM-ETAPAS`) O TOM É PELA ORIGEM, e o
+> pedido desce três degraus** (R10) antes de voltar sem lugar:
+>
+> | Degrau | O pedido | Conferência no corte |
+> |---|---|---|
+> | 1 | inteiro numa fonte só (sobra primeiro) | não |
+> | 2 | dividido entre fontes da **mesma origem** (a sobra que nasceu do rolo R e o próprio R) | não |
+> | 3 | dividido entre **origens diferentes** | **sim**, "Conferi o tecido" em cada fonte |
+>
+> `dominio/tom.js` é o dono único da origem (R9): o rolo é a própria origem; a
+> sobra que nasceu de rolo tem a dele; a de sobra sobe pela `origem_sobra_id`
+> até achar o rolo; e a do mutirão, sem rolo na cadeia, é **sozinha** — duas do
+> mutirão não têm a mesma origem, porque ninguém sabe se têm o mesmo tom.
+>
+> O pedido só se divide se couber **inteiro** na divisão. E o pedido já cortado
+> noutro dia de outra origem também pede conferência (R12). Sem as conferências
+> o Corte feito é recusado dizendo quais faltam; mudar a fonte numa edição zera
+> a conferência dela.
 
 **O que agrupa é o PEDIDO, não o item.** O pedido `4272` do arquivo real tem
 onze persianas em quatro itens — e são todas da mesma casa. O item `4272-14`
@@ -2537,7 +2555,12 @@ tudo de uma vez. Duas peças na terça, nove na quinta: cada plano, sozinho,
 estava certo, e mesmo assim a casa receberia dois tons.
 
 Então o plano **olha para trás**. Antes de escolher a bobina, pergunta em que
-fonte esse pedido já foi cortado:
+fonte esse pedido já foi cortado — **no mesmo tecido**:
+
+> ⚠️ **Até 01/10/2026 a pergunta não olhava o tecido**, e um pedido com
+> persianas de duas cores, cortada a primeira, mandava a segunda continuar no
+> rolo da **primeira cor**. Achado pelo teste do histórico (fase 1 da
+> `CORTE-EM-ETAPAS`), consertado na fase 4, e há caso travando no `tom.test.js`.
 
 - **O rolo ainda tem saldo** → continua nele, mesmo que outra bobina rendesse
   mais. Deixou de ser escolha de aproveitamento e virou escolha de tom.

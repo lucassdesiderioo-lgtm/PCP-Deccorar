@@ -45,6 +45,10 @@ module.exports={rotas:[
   {metodo:'POST', caminho:'/api/planos/:id/editar', permissao:'plano.confirmar',
    manipulador:({params,corpo,usuario})=>corte.editar(params.id,corpo,usuario.nome,op(usuario)),
    detalhe:(req,d)=>'corte '+req.params.id+' editado: '+(d&&d.mudou)},
+  {metodo:'POST', caminho:'/api/planos/:id/conferir', permissao:'plano.confirmar',
+   manipulador:({params,corpo,usuario})=>corte.conferir(params.id,corpo,usuario.nome,op(usuario)),
+   detalhe:req=>'conferiu o tecido do pedido '+req.body.pedido+' na fonte '+req.body.fonte+' '+req.body.fonte_id+
+     ' (corte '+req.params.id+')'},
   {metodo:'POST', caminho:'/api/planos/:id/correcao/previa', permissao:'corte.pedir_correcao',
    manipulador:({params,corpo})=>corte.previaCorrecao(params.id,corpo.edicoes)},
   {metodo:'POST', caminho:'/api/planos/:id/correcao', permissao:'corte.pedir_correcao',

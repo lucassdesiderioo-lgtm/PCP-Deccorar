@@ -5,8 +5,8 @@ STATUS
 Situação: em construção
 Criada em: 01/10/2026
 Última atualização: 01/10/2026
-Fase atual: 4 (tom pela origem e Conferi o tecido) — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
-Fases: 1 ☑  2 ☑  3 ☑  4 ☐  5 ☐  6 ☐  7 ☐
+Fase atual: 5 (tipo por linha e tempo por m²) — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
+Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☐  6 ☐  7 ☐
 Risco: 🔴 (muda o momento da baixa de rolo e sobra; correção de estoque depois do corte)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
 Substitui: SOBRAS-TOM-E-DESPERDICIO.md (18/09/2026), que foi para docs/arquivo/
@@ -53,9 +53,15 @@ Mudanças no caminho:
       - o "não usar" do planejar (antes de confirmar) continua: a spec o
         move para o ③, e no ③ ele existe agora; no ① ele não faz mal e
         poupa um corte confirmado só para recusar uma sobra.
-  · Achado na fase 1, para a fase 4: o plano que continua o pedido no rolo do
-    corte anterior (R12) NÃO confere o tecido — pedido com persianas de duas
-    cores pode mandar puxar do rolo da outra cor.
+  · Achado na fase 1 e CONSERTADO na fase 4: o plano que continua o pedido no
+    rolo do corte anterior (R12) não conferia o tecido — pedido com persianas
+    de duas cores mandava puxar do rolo da outra cor.
+  · Fase 4 em código (01/10/2026): `dominio/tom.js` (R9), os três degraus da
+    divisão (R10) — o pedido só se divide se couber INTEIRO —, a conferência
+    no Cortando gravada em `plano_conferencia` (migração 29) e zerada quando
+    a edição muda a fonte (R11), e o corte anterior de outra origem pedindo
+    conferência mesmo numa fonte só (R12). A sobra do mutirão é sozinha: duas
+    do mutirão não têm a mesma origem.
   · 01/10/2026, ao salvar — DIVERGÊNCIA DE FATO, anotada e não corrigida no
     texto: o §1 diz que a SOBRAS-TOM-E-DESPERDICIO "não foi começada". Ela
     teve DUAS fases feitas: a fase 1 (a limpeza) RODOU em produção em

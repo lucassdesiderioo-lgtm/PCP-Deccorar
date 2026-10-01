@@ -7721,9 +7721,26 @@ nem refugo), as que nasceram de verdade ficam a guardar, e o refugo é refeito.
 > noutro corte, ou quando o rolo está encerrado e não tem onde pôr ou tirar
 > metro. A frase diz o que fazer.
 
-**Rode `cd tecido && npm test` ao mexer em `corte.js`, no `plano.js` ou na tela
-de corte** — `corte_etapas.test.js` (18), `corte_correcao.test.js` (17) e
-`historico_corte.test.js` (15).
+### ⚠️ O TOM É PELA ORIGEM, e o pedido dividido entre origens se confere no corte (fase 4, R9–R12)
+
+`tecido/dominio/tom.js` é o dono único da **origem de tom**: o rolo; a sobra
+que nasceu dele; a de sobra sobe até o rolo; e a do mutirão é **sozinha**. O
+pedido que não cabe inteiro numa fonte se divide — primeiro entre fontes da
+**mesma origem** (sem nada a conferir), depois entre **origens diferentes** —
+e só se couber inteiro na divisão. Dividido entre origens, cada fonte pede
+**"Conferi o tecido"** no Cortando, gravado com quem, quando, pedido e fonte; o
+Corte feito é recusado sem elas, dizendo quais; e mudar a fonte numa edição
+zera a conferência dela.
+
+> ⚠️ **O "PEDIDO JÁ CORTADO" SÓ CONTA NO MESMO TECIDO.** Até 01/10/2026 a
+> consulta olhava só o número do pedido, e o pedido de duas cores mandava a
+> segunda cor continuar no rolo da primeira. Consertado no `cortesAnteriores`
+> do `plano.js`, com caso travando.
+
+**Rode `cd tecido && npm test` ao mexer em `corte.js`, no `plano.js`, no
+`tom.js` ou na tela de corte** — `corte_etapas.test.js` (18),
+`corte_correcao.test.js` (17), `historico_corte.test.js` (15) e
+`tom.test.js` (27).
 
 ### Três regras do sob medida que valem citar aqui
 

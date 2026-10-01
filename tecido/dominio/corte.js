@@ -188,8 +188,13 @@ function cancelar(id,motivo,usuarioNome,op){
 function feito(id,usuarioNome,op){
   const c=exigirCorte(id); exigirDono(c,usuarioNome,op);
   exigirEtapa(c,['cortando'],'dar o Corte feito'+(c.etapa==='confirmado'?' (toque em CORTAR antes)':''));
-  if(op&&op.antesDaBaixa) op.antesDaBaixa(c);   // as travas das fases seguintes (conferencia de tom)
   const p=JSON.parse(c.proposta);
+  // R11 — sem a conferencia de cada fonte de um pedido dividido entre origens,
+  // o Corte feito nao sai. A frase diz quais.
+  const falta=faltandoConferir(c,p);
+  exigir(!falta.length,'falta_conferir','Falta conferir o tecido: '+falta.map(x=>
+    'pedido '+x.pedido+' na '+(x.fonte==='rolo'?'bobina ':'sobra ')+x.codigo).join('; ')+
+    '. Compare o tom com as fontes na mao e toque em "Conferi o tecido" em cada uma.');
   const quem=usuarioNome||null;
 
   return db.transaction(()=>{
@@ -248,7 +253,8 @@ function aberto(usuarioNome,id){
   const p=JSON.parse(c.proposta);
   return {plano_id:c.id, etapa:c.etapa, usuario_nome:c.usuario_nome,
     criado_em:c.criado_em, cortar_em:c.cortar_em,
-    entrada:JSON.parse(c.entrada||'{}'), proposta:p, fontes:resumo(p), edicoes:edicoes(c.id)};
+    entrada:JSON.parse(c.entrada||'{}'), proposta:p, fontes:resumo(p), edicoes:edicoes(c.id),
+    conferencias:estadoConferencias(c,p)};
 }
 
 const CAMPOS_GUARDAR=`g.*, p.criado_em AS corte_em, t.id AS t_id,
@@ -436,6 +442,12 @@ function editar(id,ed,usuarioNome,op){
       area_sobra_gerada=?, desperdicio=? WHERE id=?`).run(JSON.stringify(entrada),JSON.stringify(p),
       p.consumo_linear,p.consumo_m2,p.area_pecas,p.area_sobras,p.desperdicio,c.id);
     gravarPlano(c.id,p);
+    // Editar ZERA a conferencia da fonte que mudou (R11): ela era de outro
+    // conjunto de itens, ou de uma fonte que nem esta mais no corte.
+    const valem=new Set((p.conferencias||[]).map(x=>chaveConf(x)+'#'+x.itens.join(',')));
+    conferenciasFeitas(c.id).filter(k=>!valem.has(chaveConf(k)+'#'+k.itens)).forEach(k=>
+      db.prepare("UPDATE plano_conferencia SET invalidada_em=?, invalidada_motivo='o plano mudou' WHERE id=?")
+        .run(dia.agora(),k.id));
     db.prepare(`INSERT INTO plano_edicao(plano_id,tipo,peca,fonte,fonte_id,fonte_codigo,detalhe,
       motivo_id,motivo_nome,observacao,usuario_nome) VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(
       c.id,ed.tipo,alvo.peca||null,alvo.fonte||null,alvo.fonte_id||null,alvo.codigo||null,frase,
@@ -679,7 +691,44 @@ const correcoes=filtro=>{
     .all(...vals).map(k=>({...k, edicoes:JSON.parse(k.edicoes), previa:k.previa?JSON.parse(k.previa):null}));
 };
 
+/* ── "CONFERI O TECIDO" (fase 4, R11) ─────────────────────────────────────
+   So no Cortando: e quando o operador tem a fonte na mao. A conferencia vale
+   para a fonte COM os itens que ela tinha quando foi conferida — se uma
+   edicao muda os itens do pedido naquela fonte, ela deixa de valer. */
+const chaveConf=c=>String(c.pedido).toUpperCase()+'|'+c.fonte+':'+Number(c.fonte_id);
+const conferenciasFeitas=plano_id=>db.prepare(`SELECT * FROM plano_conferencia
+   WHERE plano_id=? AND invalidada_em IS NULL ORDER BY id`).all(plano_id);
+
+function estadoConferencias(c,prop){
+  const feitas=conferenciasFeitas(c.id);
+  return (prop.conferencias||[]).map(x=>{
+    const f=feitas.find(k=>chaveConf(k)===chaveConf(x)&&k.itens===x.itens.join(','));
+    return {...x, conferida:!!f, conferida_por:f?f.usuario_nome:null, conferida_em:f?f.criado_em:null};
+  });
+}
+// A frase que recusa o Corte feito diz QUAIS faltam — "falta conferir" sem
+// dizer o que manda a pessoa procurar no escuro.
+function faltandoConferir(c,prop){
+  return estadoConferencias(c,prop).filter(x=>!x.conferida);
+}
+
+function conferir(id,dados,usuarioNome,op){
+  const c=exigirCorte(id); exigirDono(c,usuarioNome,op);
+  exigirEtapa(c,['cortando'],'conferir o tecido (so no Cortando, com a fonte na mao)');
+  const prop=JSON.parse(c.proposta);
+  const alvo=(prop.conferencias||[]).find(x=>chaveConf(x)===chaveConf(dados||{}));
+  exigir(alvo,'conferencia_nao_pedida','Esta fonte nao precisa de conferencia neste corte.');
+  db.transaction(()=>{
+    db.prepare(`UPDATE plano_conferencia SET invalidada_em=?, invalidada_motivo='conferida de novo'
+      WHERE plano_id=? AND pedido=? AND fonte=? AND fonte_id=? AND invalidada_em IS NULL`)
+      .run(dia.agora(),c.id,alvo.pedido,alvo.fonte,alvo.fonte_id);
+    db.prepare(`INSERT INTO plano_conferencia(plano_id,pedido,fonte,fonte_id,fonte_codigo,itens,usuario_nome)
+      VALUES(?,?,?,?,?,?,?)`).run(c.id,alvo.pedido,alvo.fonte,alvo.fonte_id,alvo.codigo,alvo.itens.join(','),usuarioNome||null);
+  })();
+  return aberto(usuarioNome,c.id);
+}
+
 module.exports={confirmar, voltar, cortar, cancelar, feito, aberto, aGuardar, doCorte, guardar,
-  editar, edicoes, previaCorrecao:(id,eds)=>previaParaTela(previa(exigirCorte(id),eds)),
+  editar, edicoes, conferir, estadoConferencias, previaCorrecao:(id,eds)=>previaParaTela(previa(exigirCorte(id),eds)),
   pedirCorrecao, aprovarCorrecao, recusarCorrecao, correcoes,
   resumo, gravarPlano, porId, abertoDe, ABERTAS, NOME_ETAPA, exigirCorte, exigirDono, exigirEtapa};
