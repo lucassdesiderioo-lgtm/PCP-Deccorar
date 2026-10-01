@@ -32,6 +32,10 @@
 .resumo{display:flex; gap:22px; flex-wrap:wrap; align-items:center;
   border-top:1px solid var(--linha); padding-top:14px; margin-top:14px}
 .resumo .n{font-size:22px; font-weight:700}
+.hist td{vertical-align:top}
+.hist tr.abre{cursor:pointer}
+.hist tr.abre:hover td{background:var(--papel)}
+.det h3{margin:18px 0 6px; font-size:16px}
 .resumo .r{font-size:13px; color:var(--tinta-fraca); text-transform:uppercase; letter-spacing:.05em}
 @media print{
   .topo,.naoImprime{display:none !important}
@@ -42,13 +46,15 @@
 </head>
 <body>
 <header class="topo">
-  <h1>Plano de corte</h1>
+  <h1 id="titulo">Plano de corte</h1>
   <span class="espaco"></span>
+  <button class="bt pequeno naoImprime" id="btModo">Histórico</button>
 </header>
 
 <div class="corpo">
   <div id="entrada"></div>
   <div id="saida"></div>
+  <div id="historico" hidden></div>
 </div>
 
 <script src="/sobmedida/ui.js"></script>
@@ -562,6 +568,167 @@ async function confirmar(campos,bt){
     limpar($('#saida')); telaEntrada();
   }catch(e){ beep('erro'); }
   bt.disabled=false;
+}
+
+// ── O HISTORICO DE CORTES (spec CORTE-EM-ETAPAS, fase 1) ─────────────────
+/* So leitura. Mora na MESMA tela do corte porque quem precisa rever um corte
+   e quem cortou, com a peca na mao; uma tela separada no menu seria mais um
+   lugar para procurar. O detalhe mostra o status de HOJE de cada sobra — e
+   a pergunta do corte de 01/10/2026: qual sobra o sistema deu como usada. */
+const hist={filtros:{dia:'',pedido:'',operador:'',sobra:''}, aberto:null};
+
+const quando=t=>{ if(!t) return '—'; const [d,h]=String(t).split(' ');
+  const [a,m,dd]=d.split('-'); return dd+'/'+m+'/'+a+(h?' '+h.slice(0,5):''); };
+const STATUS_SOBRA={disponivel:'disponível na prateleira',usada:'usada',descartada:'descartada'};
+const STATUS_ROLO={aberto:'aberto',fechado:'fechado',encerrado:'encerrado'};
+const plural=(n,um,varios)=>n+' '+(n===1?um:varios);
+
+document.getElementById('btModo').addEventListener('click',()=>{
+  const indo=$('#historico').hidden;
+  $('#historico').hidden=!indo;
+  $('#entrada').hidden=indo; $('#saida').hidden=indo;
+  $('#btModo').textContent=indo?'Voltar ao corte':'Histórico';
+  $('#titulo').textContent=indo?'Histórico de cortes':'Plano de corte';
+  if(indo) telaHistorico();
+});
+
+async function telaHistorico(){
+  const pai=limpar($('#historico'));
+  const c=el('div',{class:'cartao'});
+  pai.appendChild(c);
+
+  const f=hist.filtros;
+  const campo=(rot,inp)=>el('div',{class:'campo'},[el('label',{texto:rot}),inp]);
+  const iDia=el('input',{type:'date',value:f.dia});
+  const iPed=el('input',{type:'text',value:f.pedido,placeholder:'4292'});
+  const sOp=el('select',{});
+  const iSob=el('input',{type:'text',value:f.sobra,placeholder:'bipe ou digite S-000014',
+    autocomplete:'off',autocorrect:'off',autocapitalize:'off'});
+  const linhaF=el('div',{class:'campos'});
+  [campo('DIA',iDia),campo('PEDIDO',iPed),campo('OPERADOR',sOp),campo('SOBRA',iSob)].forEach(x=>linhaF.appendChild(x));
+  const buscar=()=>{ hist.filtros={dia:iDia.value,pedido:iPed.value.trim(),operador:sOp.value,sobra:iSob.value.trim()};
+    hist.aberto=null; telaHistorico(); };
+  linhaF.appendChild(el('button',{class:'bt primario',texto:'Buscar',onclick:buscar}));
+  linhaF.appendChild(el('button',{class:'bt',texto:'Limpar',onclick:()=>{
+    hist.filtros={dia:'',pedido:'',operador:'',sobra:''}; hist.aberto=null; telaHistorico(); }}));
+  [iPed,iSob].forEach(i=>i.addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); buscar(); }}));
+  c.appendChild(linhaF);
+
+  let r;
+  try{ r=await api('/api/planos?'+new URLSearchParams(Object.entries(hist.filtros).filter(([,v])=>v))); }
+  catch(e){ beep('erro'); return; }
+
+  sOp.appendChild(el('option',{value:'',texto:'todos'}));
+  r.operadores.forEach(o=>sOp.appendChild(el('option',{value:o,texto:o,selected:o===f.operador?'selected':null})));
+
+  // A sobra procurada: de onde nasceu e onde foi usada, antes da lista.
+  if(r.sobra){
+    const s=r.sobra;
+    const bx=el('div',{style:'border-left:4px solid var(--sobra);padding:8px 12px;margin:14px 0;background:var(--cartao)'});
+    bx.appendChild(el('strong',{texto:'Sobra '+s.codigo+'   '+formatarMedida(s.largura,s.altura)}));
+    bx.appendChild(el('div',{texto:'Hoje: '+(STATUS_SOBRA[s.status]||s.status)+(s.endereco?' · '+s.endereco:'')}));
+    bx.appendChild(el('div',{texto:s.nasceu_em?'Nasceu do corte '+s.nasceu_em+'.':'Não nasceu de corte registrado (cadastro direto).'}));
+    bx.appendChild(el('div',{texto:s.usada_em.length?'Usada no corte '+s.usada_em.join(', ')+'.':'Nenhum corte usou esta sobra.'}));
+    c.appendChild(bx);
+  }
+
+  if(!r.cortes.length){
+    c.appendChild(el('p',{class:'nota',style:'margin-top:16px',texto:r.filtrado
+      ?'Nenhum corte com estes filtros.':'Ainda não há corte confirmado.'}));
+    return;
+  }
+  c.appendChild(el('p',{class:'nota',style:'margin:14px 0 6px',texto:
+    (r.filtrado?plural(r.cortes.length,'corte encontrado','cortes encontrados')
+               :'Os '+r.cortes.length+' cortes mais recentes')+
+    (r.cortes.length>=r.limite?' (mostrando no máximo '+r.limite+' — use os filtros para achar um mais antigo)':'')+
+    '. Toque num corte para ver o detalhe.'}));
+
+  const t=el('table',{class:'hist'});
+  t.appendChild(el('tr',{},['Corte','Quando','Quem','Tecido','Pedidos','Peças','Do rolo','Sobras usadas','Nasceram']
+    .map((h,i)=>el('th',{class:[5,6,8].includes(i)?'num':null,texto:h}))));
+  r.cortes.forEach(k=>{
+    const tr=el('tr',{class:'abre',onclick:()=>{ hist.aberto=hist.aberto===k.id?null:k.id; telaHistorico(); }},[
+      el('td',{texto:String(k.id)}),
+      el('td',{texto:quando(k.criado_em)}),
+      el('td',{texto:k.usuario_nome||'—'}),
+      el('td',{texto:k.tecido_nome}),
+      el('td',{texto:(k.pedidos||'—').split(',').join(', ')}),
+      el('td',{class:'num',texto:String(k.pecas)+(k.pecas_sem_lugar?' ('+k.pecas_sem_lugar+' sem lugar)':'')}),
+      el('td',{class:'num',texto:k.consumo_linear>0.0005?formatarMetros(k.consumo_linear):'—'}),
+      el('td',{texto:(k.sobras_usadas||'—').split(',').join(', ')}),
+      el('td',{class:'num',texto:String(k.sobras_nascidas)})]);
+    if(hist.aberto===k.id) tr.style.background='var(--acao-fraca)';
+    t.appendChild(tr);
+  });
+  c.appendChild(rolaH(t));
+
+  /* O DETALHE FICA FORA DA TABELA. Dentro de uma linha dela ele herdava a
+     largura da tabela inteira e, a 400 px, saia cortado de lado dentro do
+     recipiente que rola — o texto do "deu a sobra como usada" partido ao
+     meio. Num cartao proprio ele quebra linha como qualquer texto. */
+  if(hist.aberto){
+    const cd=el('div',{class:'cartao'});
+    pai.appendChild(cd);
+    await detalheCorte(hist.aberto,cd);
+    cd.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+}
+
+async function detalheCorte(id,pai){
+  let d;
+  try{ d=await api('/api/planos/'+id); }catch(e){ beep('erro'); return; }
+  const c=el('div',{class:'det'});
+  pai.appendChild(c);
+  c.appendChild(el('h2',{style:'margin:0',texto:'Corte '+d.id}));
+  c.appendChild(el('p',{class:'nota',style:'margin:4px 0',texto:'Confirmado por '+(d.usuario_nome||'—')+' em '+
+    quando(d.criado_em)+' · '+d.tecido_nome}));
+
+  c.appendChild(el('h3',{texto:'Fontes'}));
+  if(!d.fontes.length) c.appendChild(el('p',{class:'nota',texto:'Nenhuma fonte: o corte não encaixou peça.'}));
+  d.fontes.forEach(f=>{
+    const bx=el('div',{class:'blocoFonte '+f.fonte,style:'margin:8px 0'});
+    bx.appendChild(el('div',{class:'cabFonte'},[
+      el('span',{class:'tag '+f.fonte,texto:f.fonte.toUpperCase()}),
+      el('b',{texto:f.codigo||'?'}),
+      f.endereco?el('span',{class:'quem',texto:f.endereco}):el('span',{}),
+      el('span',{class:'quem',texto:(f.pecas.length===1?'item ':'itens ')+f.pecas.join(', ')})]));
+    if(f.fonte==='sobra'){
+      bx.appendChild(el('div',{texto:formatarMedida(f.medida.largura,f.medida.altura)+' · hoje: '+
+        (STATUS_SOBRA[f.status_hoje]||f.status_hoje||'?')}));
+      if(f.marcada_usada_por_este) bx.appendChild(el('div',{style:'font-weight:600;color:var(--sobra)',
+        texto:'Este corte deu a sobra como usada'+(f.baixado_em?' em '+quando(f.baixado_em):'')+
+          (f.baixado_por?', por '+f.baixado_por:'')+'.'}));
+    } else {
+      bx.appendChild(el('div',{texto:'Este corte baixou '+formatarMetros(f.metros_baixados)+
+        ' do rolo · saldo hoje '+formatarMetros(f.saldo_hoje)+' ('+(STATUS_ROLO[f.status_hoje]||f.status_hoje)+')'}));
+    }
+    c.appendChild(bx);
+  });
+
+  c.appendChild(el('h3',{texto:'Linhas'}));
+  const t=el('table',{});
+  t.appendChild(el('tr',{},[el('th',{texto:'Item'}),el('th',{texto:'Pedido'}),el('th',{texto:'Medida do corte'}),el('th',{texto:'Saiu de'})]));
+  d.linhas.forEach(l=>t.appendChild(el('tr',{},[
+    el('td',{texto:String(l.ordem)}), el('td',{texto:l.pedido||'—'}),
+    el('td',{texto:formatarMedida(l.largura,l.altura)}),
+    el('td',{texto:l.fonte?(l.fonte==='rolo'?'rolo ':'sobra ')+l.fonte_codigo:'sem lugar — '+(l.nao_alocada_motivo||'')})])));
+  c.appendChild(rolaH(t));
+
+  c.appendChild(el('h3',{texto:'Sobras que nasceram'}));
+  if(!d.sobras_nascidas.length) c.appendChild(el('p',{class:'nota',texto:'Nenhuma.'}));
+  d.sobras_nascidas.forEach(s=>c.appendChild(el('div',{texto:'• '+s.codigo+'   '+formatarMedida(s.largura,s.altura)+
+    ' · hoje: '+(STATUS_SOBRA[s.status_hoje]||s.status_hoje)+(s.endereco?' · '+s.endereco:'')})));
+
+  c.appendChild(el('h3',{texto:'Refugo'}));
+  c.appendChild(el('p',{class:'nota',style:'margin:0',texto:d.refugo.length
+    ?d.refugo.map(x=>formatarMedida(x.largura,x.altura)).join(' · ')+' — '+formatarArea(d.refugo.reduce((s,x)=>s+x.area,0))+' no total'
+    :'Nenhum.'}));
+
+  if(d.recusas.length){
+    c.appendChild(el('h3',{texto:'Sobras recusadas antes de confirmar'}));
+    d.recusas.forEach(x=>c.appendChild(el('div',{texto:'• '+(x.sobra_codigo||'?')+' — '+(x.motivo||'sem motivo')+
+      (x.observacao?' ('+x.observacao+')':'')+' · '+(x.usuario_nome||'—')+', '+quando(x.criado_em)})));
+  }
 }
 
 telaEntrada();

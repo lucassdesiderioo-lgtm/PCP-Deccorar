@@ -2,15 +2,25 @@
 
 ```
 STATUS
-Situação: planejado
+Situação: em construção
 Criada em: 01/10/2026
 Última atualização: 01/10/2026
-Fase atual: 1 (histórico de cortes) — PLANO apresentado, aguardando "pode seguir"
-Fases: 1 ☐  2 ☐  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐
+Fase atual: 2 (corte em etapas) — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
+Fases: 1 ☑  2 ☐  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐
 Risco: 🔴 (muda o momento da baixa de rolo e sobra; correção de estoque depois do corte)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
 Substitui: SOBRAS-TOM-E-DESPERDICIO.md (18/09/2026), que foi para docs/arquivo/
 Mudanças no caminho:
+  · Fase 1 em código (01/10/2026): `dominio/corte_historico.js`, GET
+    /api/planos com filtros e GET /api/planos/:id, botão Histórico na tela de
+    corte. O detalhe ficou num cartão FORA da tabela (a 400 px, dentro dela,
+    saía cortado). A sobra nascida se reconhece por duas portas: o código na
+    faixa e, para o resto de pé de uma sobra (que não tem faixa), a origem +
+    quem + o mesmo segundo. Falta o deploy e a prova: o corte de 01/10 no
+    histórico, com a sobra que o sistema deu como usada.
+  · Achado na fase 1, para a fase 4: o plano que continua o pedido no rolo do
+    corte anterior (R12) NÃO confere o tecido — pedido com persianas de duas
+    cores pode mandar puxar do rolo da outra cor.
   · 01/10/2026, ao salvar — DIVERGÊNCIA DE FATO, anotada e não corrigida no
     texto: o §1 diz que a SOBRAS-TOM-E-DESPERDICIO "não foi começada". Ela
     teve DUAS fases feitas: a fase 1 (a limpeza) RODOU em produção em
@@ -281,7 +291,7 @@ Cada fase é entregue e testada sozinha.
 - **Pronto quando:** o corte de 01/10/2026 aparece e dá para ver qual sobra o
   sistema marcou como usada.
 
-> **PLANO da fase 1 (01/10/2026) — aguardando o "pode seguir" do dono.**
+> **PLANO da fase 1 (01/10/2026) — aprovado ("pode seguir") e construído.**
 >
 > - **Só leitura.** Nenhuma escrita, nenhuma tabela nova, nenhuma migração.
 >   Risco 🟢 como a spec diz, mas com teste escrito antes, porque a tela vai

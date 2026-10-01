@@ -631,17 +631,11 @@ function confirmar(pedido,usuarioNome){
   })();
 }
 
-const historico=limite=>db.prepare(`
-  SELECT p.*, t.codigo AS tecido_codigo, l.nome AS linha_nome, a.nome AS abertura_nome, c.nome AS cor_nome
-    FROM plano p
-    LEFT JOIN tecido t ON t.id=p.tecido_id
-    LEFT JOIN linha l ON l.id=t.linha_id
-    LEFT JOIN abertura a ON a.id=t.abertura_id
-    LEFT JOIN cor c ON c.id=t.cor_id
-   WHERE p.confirmado=1 ORDER BY p.id DESC LIMIT ?`).all(limite||30);
+// A LEITURA do que foi cortado mora em dominio/corte_historico.js (fase 1 da
+// spec CORTE-EM-ETAPAS). Ela saiu daqui para nao haver duas listas de cortes.
 
 // faltaBobina sai exportada para o teste alcancar a REGRA DE AGRUPAMENTO sem
 // montar um pedido inteiro. Ela e o que vira decisao de compra, e a conta de
 // "quantas pecas por largura" e o tipo de coisa que se quebra numa refatoracao
 // sem ninguem notar — a tela continuaria mostrando um numero, so que errado.
-module.exports={calcular, confirmar, recusar, historico, faltaBobina};
+module.exports={calcular, confirmar, recusar, faltaBobina};

@@ -2606,6 +2606,48 @@ silêncio no caso normal.
 > `CLAUDE.md`) por outra porta: **teste verde só vale depois de você ver ele
 > ficar vermelho.**
 
+### O HISTÓRICO DE CORTES (01/10/2026, fase 1 da spec `CORTE-EM-ETAPAS`)
+
+O botão **Histórico**, no topo da tela de corte, lista os cortes confirmados
+e abre o detalhe de cada um: as linhas (medida, pedido e de onde saiu), as
+fontes, os metros que **este** corte baixou de cada rolo (lidos do
+`movimento_rolo`), as sobras que nasceram, o refugo e as recusas. Filtra por
+**dia, pedido** (pelo começo do número: `4292` acha `4292-1`), **operador** e
+**sobra** — bipar a sobra mostra o corte em que ela foi usada **e** o corte de
+onde ela nasceu.
+
+`dominio/corte_historico.js` é o dono único da leitura; `GET /api/planos` e
+`GET /api/planos/:id` (`plano.calcular`, a chave de quem abre a tela de corte).
+O antigo `plano.historico()`, que nenhuma tela lia, saiu: duas listas de cortes
+seriam duas réguas.
+
+> ⚠️ **O DETALHE MOSTRA O STATUS DE HOJE DA SOBRA, e não o que o plano
+> previu.** É a pergunta que abriu a spec: em 01/10/2026 o plano mandou parte
+> de um pedido para uma sobra, o tom não bateu e o operador cortou tudo do
+> rolo — mas o Confirmar já tinha dado a sobra como **usada**. A tela escreve
+> *"Este corte deu a sobra como usada em …, por …"* quando a baixa foi dele
+> (`baixa_motivo = 'plano N'`).
+
+> ⚠️ **A SOBRA NASCIDA SE RECONHECE POR DUAS PORTAS, e as duas são
+> necessárias.** O Confirmar grava o código da sobra nascida na faixa
+> (`sobra_gerada_codigo`) — mas só da que nasceu de uma **faixa**. O resto de pé
+> embaixo da última faixa de uma sobra não tem faixa, e o código dele não ficou
+> no plano. A segunda porta é o que o Confirmar grava junto, na mesma
+> transação: origem na fonte do corte, mesma pessoa, mesmo segundo. Há caso
+> travando, e foi ele que pegou a régua que só olhava a faixa.
+
+> ⚠️ **DIA FORA DO FORMATO É RECUSADO, e não vira "nada encontrado"** — a
+> pessoa concluiria que não houve corte naquele dia.
+
+> ⚠️ **O DETALHE FICA FORA DA TABELA.** A primeira versão o abria dentro de uma
+> linha da lista; a 400 px ele herdava a largura da tabela e saía cortado de
+> lado dentro do recipiente que rola. **Só apareceu abrindo a tela.**
+
+**Teste:** `teste/historico_corte.test.js` (15 casos). Quatro defeitos foram
+reintroduzidos um a um: a marca "deu como usada" sempre falsa, a busca por
+sobra sem o corte de onde ela nasceu, o pedido exigindo o número inteiro e a
+sobra nascida reconhecida só pela faixa — cada um reprova o caso dele.
+
 ## O upload (fase 8)
 
 **O PDF de etiquetas de produção** (Decorsoft) é lido direto: o sistema pega a

@@ -1,6 +1,7 @@
 // O plano de corte. Repare que CALCULAR e CONFIRMAR sao permissoes
 // diferentes: propor um corte e barato, baixar o estoque nao e.
 const plano=require('../dominio/plano');
+const historico=require('../dominio/corte_historico');
 const etiquetaCorte=require('../dominio/etiqueta_corte');
 const dTecido=require('../dados/tecido');
 
@@ -17,8 +18,14 @@ module.exports={rotas:[
    detalhe:(req,d)=>'plano '+(d&&d.plano_id)+' confirmado · '+(d&&d.consumo_linear)+' m · '+
      (d&&d.sobras_criadas)+' sobra(s) nova(s)'},
 
+  /* O HISTORICO DE CORTES (spec CORTE-EM-ETAPAS, fase 1). A mesma chave de
+     quem abre a tela de corte: e la que o historico mora, e quem cortou e
+     quem precisa rever o proprio corte. Chave nova seria a terceira ponta da
+     armadilha #13 sem precisar. */
   {metodo:'GET', caminho:'/api/planos', permissao:'plano.calcular',
-   manipulador:({query})=>plano.historico(query.limite)},
+   manipulador:({query})=>historico.listar(query)},
+  {metodo:'GET', caminho:'/api/planos/:id', permissao:'plano.calcular',
+   manipulador:({params})=>historico.detalhe(params.id)},
 
   // Le o PDF de etiquetas de producao e devolve as pecas para a MESMA grade
   // da digitacao — editaveis antes de calcular. O arquivo acelera a tela;
