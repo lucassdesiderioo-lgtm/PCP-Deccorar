@@ -3048,7 +3048,7 @@ tela, e fica de fora o volume do modo teste.
 > idempotente — depois de aplicado as caixas ganham `retirado_em` e saem do
 > critério.
 
-**Rode `node teste_saida.js` (26 casos) ao mexer no `POST /api/embalar`, no
+**Rode `node teste_saida.js` (47 casos) ao mexer no `POST /api/embalar`, no
 `POST /api/reimprimir`, no bipe do `carreg_route.js`, no `saida_schema.js` ou no
 script.** Quatro defeitos foram reintroduzidos um a um para provar que o teste
 pega cada um: a reimpressão sobrescrevendo o nome (3 casos), a saída carimbada
@@ -3079,6 +3079,63 @@ em `now` (2), o critério largo pegando o `embalado` (4) e o bipe sem gravar que
 > dado real:** até a conferência não houve caixa impressa nem bipada depois do
 > deploy. As colunas e a tabela `saida` existem no banco de produção. Prova que
 > não foi feita se escreve como não feita (§4).
+
+### ⚠️ O SEGUNDO PASSIVO: CAIXAS QUE NUNCA FORAM BIPADAS (01/10/2026)
+
+A contagem por fila no servidor, em 01/10/2026, mostrou o canto **vazio** (a
+limpeza de 26/09 segurou) e duas outras filas cheias:
+
+| Fila | Caixas | Período |
+|---|---|---|
+| coleta com etiqueta impressa e **nunca bipada pro canto** | **460** | 10/09 → 30/09 |
+| agência com etiqueta impressa e **nunca bipada** (nem área, nem carro) | 26 | 04/09 → 30/09 |
+
+> ⚠️ **460 CAIXAS EM TRÊS SEMANAS É PRATICAMENTE TODA A COLETA: A EQUIPE
+> IMPRIMIA E O CAMINHÃO LEVAVA SEM NINGUÉM BIPAR PRO CANTO.** Esse é o sinal
+> que importa mais que o passivo. Sem o bipe pro canto a Saída do caminhão
+> (fase 3) não tem o que contar, e esta lista volta a crescer no dia seguinte
+> à limpeza. **Limpar só vale junto com o bipe acontecendo.**
+
+**A limpeza de 26/09 não as acha, e é por desenho:** ela fecha o
+`AGUARDA_CAMINHAO`, que é caixa **bipada** pro canto (`carregado`). Estas
+pararam um passo antes (`embalado`). E o `regularizar_saida.js` também não
+serve: ele marca `carregado` sem gravar saída, e as 460 iriam todas parar no
+card "esperando o caminhão". A tela trocaria uma lista imensa por outra.
+
+`node fechar_saida_passivo.js --nao-bipadas --ate AAAA-MM-DD` (simula) e
+`--aplicar` (com `await db.backup()` antes). Grava **uma** saída
+`tipo='passivo'` e, em cada caixa, `carregado`, `saida_id` e `saiu_por` (coleta
+ou agência, pela modalidade).
+
+> ⚠️ **A DATA DE CORTE É OBRIGATÓRIA, E É DE QUEM VIU AS CAIXAS SAÍREM.**
+> "Etiqueta impressa e sem bipe" também descreve a caixa impressa hoje cedo,
+> que está na pilha esperando o caminhão de hoje. O dono deu **30/09/2026**. O
+> script recusa sem a data, com data fora do formato e com data no futuro.
+
+> ⚠️ **O CARIMBO É O DIA DO DESPACHO ÀS 15:00 (§5), COM DUAS GUARDAS.**
+> Despacho **anterior** à impressão vale o dia da impressão: a caixa não saiu
+> antes de ter etiqueta. E o carimbo nunca fica antes do próprio `embalado_em`
+> (a impressa às 17:20 sai às 17:20). Sem despacho lido, vale o dia da
+> impressão. Com isso nenhuma conta como "saiu adiantado": saiu no dia dela, que
+> é o que se sabe. Não há hora real da retirada em lugar nenhum.
+
+> ⚠️ **FICAM DE FORA:** despacho depois de hoje (venda futura não foi
+> despachada, §5; em 01/10 era **1** caixa), a agência já **conferida** na área
+> ou no carro (essa tem bipe, e o lugar dela é a viagem), caixa já ligada a uma
+> saída e o modo teste. `retirado_em` só na coleta, como a viagem e o caminhão
+> fazem. `conferido_em` **fica vazio**: ninguém conferiu, e o campo diz isso.
+> Estoque e modalidade não se mexem, porque a baixa aconteceu na impressão.
+
+**Rode `node teste_saida.js` (47 casos; os 21 últimos são este grupo)** ao
+mexer no script. Oito defeitos foram reintroduzidos um a um: carimbo em `now`
+(reprova 4), corte ignorado (3), despacho futuro fechado (3), conferida e no
+carro fechadas (3), `retirado_em` na agência (1), a coleta sem `retirado_em`
+(1) e o carimbo antes da impressão (1). Tirar a exigência da data só reprova
+quando a recusa do formato sai junto, porque são duas camadas.
+
+> ⚠️ **AINDA NÃO RODOU EM PRODUÇÃO.** Quando rodar: a simulação e o
+> `--aplicar` **separados**, com a lista conferida no meio. Em 26/09 os dois
+> foram colados juntos.
 
 ### ⚠️ A CONFERÊNCIA DA PILHA (26/09/2026, fase 2 da spec `SAIDA-E-DUPLA-CONFERENCIA`)
 
@@ -3865,7 +3922,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (26), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
