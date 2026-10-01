@@ -1,4 +1,4 @@
-const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro,ehColeta,AGENCIA,COLETA,AGUARDA_CAMINHAO,saidasAdiantadas,pilhaDaArea,acharVolumes,PRONTA_PRO_CARRO}=require('./carga');
+const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro,ehColeta,AGENCIA,COLETA,AGUARDA_CAMINHAO,saidasAdiantadas,pilhaDaArea,acharVolumes,PRONTA_PRO_CARRO,mesmaPessoa,nomeIgual}=require('./carga');
 const fs=require('fs'), path=require('path');
 /* Onde ficam as fotos da conferencia com o motorista. Fora do git e FORA de
    lotes/ (que o cron apaga em 7 dias): a foto e prova, e prova nao expira
@@ -9,6 +9,15 @@ module.exports=function(app,db){
   /* A tabela das saidas (caminhao e agencia) tem dono proprio: o script do
      passivo tambem a cria, e duas copias do CREATE divergem. */
   require('./saida_schema').garantirSaida(db);
+  require('./saida_schema').garantirLiberacao(db);
+  /* A LIBERACAO DE HOJE para esta pessoa (dia de uma pessoa so). A comparacao
+     do nome e a mesma do bipe: " ana " e "Ana". */
+  const liberadaHoje=quem=>{
+    if(!String(quem||'').trim()) return null;
+    return db.prepare("SELECT * FROM carga_liberacao WHERE dia=date('now','localtime') ORDER BY id").all()
+      .find(l=>nomeIgual(l.pessoa,quem))||null;
+  };
+  const nomeLimpo=s=>{ const t=String(s||'').trim(); return t||null; };
   /* ── CONFERENCIA DUPLA (etiqueta de venda + SKU da caixa) ──────────────────
      A ultima rede antes do carro. Bipe 1 = a etiqueta de venda JA COLADA;
      bipe 2 = o codigo de barras do SKU na propria caixa (que continua visivel,
@@ -123,6 +132,27 @@ module.exports=function(app,db){
       return res.json({ok:false,motivo:'ja_conferida',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
         aviso:'Esta caixa ja foi conferida e esta na area. Para por no carro, abra a Viagem a agencia e bipe por la.'});
     }
+    /* ⚠️ QUEM IMPRIMIU NAO CONFERE (spec CARREGAMENTO-SEGUNDA-PESSOA, fase 1,
+       decisao do dono em 01/10/2026). Ate aqui o "sem segunda pessoa" so
+       MARCAVA (decisao 2 da SAIDA-E-DUPLA-CONFERENCIA) e ninguem olhava a
+       marca: a mesma atencao que deixou passar a caixa de varias persianas na
+       bancada a conferia no Carregamento. Vale no bipe da AREA (agencia) e no
+       do CANTO (coleta) — e so neles: a viagem e as sobras do caminhao ja
+       recebem caixa conferida por outra pessoa.
+       A recusa DIZ QUEM IMPRIMIU: e o nome que a pessoa ve no login, e e o
+       que ela precisa para saber que tem que chamar outra.
+       Unica porta: a liberacao do dia (dia de uma pessoa so), dada por quem
+       tem `saida.liberar`, com motivo. A caixa conferida assim continua
+       aparecendo como "sem segunda pessoa" na pilha. */
+    const quemBipou=(req.usuario&&req.usuario.nome)||null;
+    if(mesmaPessoa(alvo.impresso_por, quemBipou) && !liberadaHoje(quemBipou)){
+      try{ const ac=app.locals.acesso;
+           if(ac&&ac.auditar) ac.auditar(req,'expedicao','carregar_mesma_pessoa',
+             'NF '+(alvo.nf||alvo.id), 'impressa por '+nomeLimpo(alvo.impresso_por)+' — bipada pela mesma pessoa'); }catch(e){}
+      return res.json({ok:false,motivo:'mesma_pessoa',impresso_por:nomeLimpo(alvo.impresso_por),
+        pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city,codigo:alvo.codigo},coleta:ehColeta(alvo),
+        aviso:'Você imprimiu esta etiqueta. O carregamento tem que ser feito por outra pessoa, com o login dela.'});
+    }
     if(conferenciaLigada()){
       const esperado=soCodigo(alvo.codigo);
       if(!esperado) return res.json({ok:false,motivo:'volume_sem_sku',
@@ -146,14 +176,13 @@ module.exports=function(app,db){
        quem a poe no carro e o bipe da viagem (saida_route.js), que so aceita
        caixa conferida. Na COLETA nada muda: conferir e levar pro canto, e o
        canto e o lugar de onde o caminhao leva. */
-    const quemBipou=(req.usuario&&req.usuario.nome)||null;
     if(!ehColeta(alvo)){
       db.prepare(`UPDATE lote SET conferido_por=?, conferido_em=datetime('now','localtime') WHERE id=?`)
         .run(quemBipou, alvo.id);
       const p2=progresso();
       const hoje2=db.prepare("SELECT date('now','localtime') d").get().d;
       return res.json({ok:true,conferida:true,pedido:alvo,carregados:p2.carregados,total:p2.total,
-        prontas:p2.carro.prontas,coleta:false,adiantado:futuro(alvo,hoje2)});
+        prontas:p2.carro.prontas,coleta:false,adiantado:futuro(alvo,hoje2),impresso_por:nomeLimpo(alvo.impresso_por)});
     }
     db.prepare(`UPDATE lote SET estagio='carregado', carregado_em=datetime('now','localtime'),
         conferido_por=?, conferido_em=datetime('now','localtime') WHERE id=?`)
@@ -173,7 +202,7 @@ module.exports=function(app,db){
     const hojeD=db.prepare("SELECT date('now','localtime') d").get().d;
     res.json({ok:true,pedido:alvo,carregados:p.carregados,total:p.total,
               coleta:ehColeta(alvo), coleta_aguardando:p.coleta.aguardando.length,
-              adiantado:futuro(alvo,hojeD)});
+              adiantado:futuro(alvo,hojeD), impresso_por:nomeLimpo(alvo.impresso_por)});
   });
   /* O PROGRESSO DA CARGA — o mesmo numero pras duas rotas.
      "Carregados X de Y" e a lista tem que falar do mesmo universo, senao o
@@ -256,7 +285,43 @@ module.exports=function(app,db){
             pilha:pilhaDaArea(db)};
   }
   // conferencia: o que falta carregar — todo `embalado`, com o atrasado marcado
-  app.get('/api/carregamento',(req,res)=> res.json(progresso()));
+  app.get('/api/carregamento',(req,res)=>{
+    const p=progresso();
+    p.liberacoes_hoje=db.prepare(`SELECT pessoa,motivo,liberado_por,liberado_em FROM carga_liberacao
+      WHERE dia=date('now','localtime') ORDER BY id`).all();
+    let pode=false;
+    try{ const ac=app.locals.acesso; pode=!!(ac&&ac.podePermissao&&ac.podePermissao(req.usuario,'saida.liberar')); }catch(e){}
+    p.pode_liberar=pode;
+    res.json(p);
+  });
+
+  /* A LIBERACAO DO DIA (fase 1 da CARREGAMENTO-SEGUNDA-PESSOA). Dia de uma
+     pessoa so na expedicao: quem tem `saida.liberar` libera AQUELA pessoa a
+     conferir o que ela mesma imprimiu, HOJE, com motivo. A chave e conferida
+     tambem aqui dentro, e nao so no permDaRota: a rota e chamavel por fora
+     (a licao do kit_ok, #26).
+     ⚠️ NINGUEM LIBERA A SI MESMO, nem o supervisor: senao a liberacao vira o
+     caminho de todo dia e a regra deixa de existir. Quem esta sozinho chama
+     quem tem a chave — pelo celular, de qualquer lugar. */
+  app.post('/api/carregar/liberar',(req,res)=>{
+    const ac=app.locals.acesso;
+    let pode=false; try{ pode=!!(ac&&ac.podePermissao&&ac.podePermissao(req.usuario,'saida.liberar')); }catch(e){}
+    if(!pode) return res.status(403).json({ok:false,motivo:'sem_permissao',
+      aviso:'Só quem pode liberar a saída (Supervisor ou Admin) libera esta conferência.'});
+    const pessoa=String((req.body&&req.body.pessoa)||'').trim();
+    const motivo=String((req.body&&req.body.motivo)||'').trim();
+    const quem=(req.usuario&&req.usuario.nome)||'';
+    if(!motivo) return res.json({ok:false,motivo:'sem_motivo',aviso:'Escreva o motivo: por que esta pessoa vai conferir o que ela mesma imprimiu?'});
+    const u=db.prepare('SELECT nome FROM usuarios WHERE ativo=1').all().find(x=>nomeIgual(x.nome,pessoa));
+    if(!u) return res.json({ok:false,motivo:'pessoa_inexistente',aviso:'Escolha a pessoa na lista.'});
+    if(nomeIgual(u.nome,quem)) return res.json({ok:false,motivo:'propria',
+      aviso:'Ninguém libera a si mesmo. Peça a outra pessoa com acesso de Supervisor ou Admin.'});
+    if(liberadaHoje(u.nome)) return res.json({ok:true,ja:true,pessoa:u.nome});
+    db.prepare('INSERT INTO carga_liberacao (dia,pessoa,motivo,liberado_por) VALUES (date(\'now\',\'localtime\'),?,?,?)')
+      .run(u.nome, motivo, quem);
+    try{ if(ac&&ac.auditar) ac.auditar(req,'expedicao','liberar_mesma_pessoa',u.nome,motivo); }catch(e){}
+    res.json({ok:true,pessoa:u.nome});
+  });
 
   /* O "FECHAR COLETA" DE 10/09/2026 FOI APOSENTADO (fase 3 da spec
      SAIDA-E-DUPLA-CONFERENCIA, 26/09/2026). Ele fechava o canto INTEIRO de uma

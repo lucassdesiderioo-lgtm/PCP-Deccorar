@@ -1,10 +1,13 @@
-> **STATUS · 01/10/2026 — APROVADA PELO DONO, NADA NO CÓDIGO**
-> P1 a P5 respondidas em 01/10/2026 (§4). P6 (de onde vêm as etiquetas de fora) em aberto,
-> e só a fase 2 depende dela. Nasceu da conversa de 01/10/2026 (tipo `REGRA` + `NOVIDADE`).
+> **STATUS · 01/10/2026 — EM CONSTRUÇÃO** · **fase 1 em código (01/10):** o bipe da área e do
+> canto recusa quem imprimiu, com o nome dele; liberação do dia por pessoa (não por caixa,
+> divergência da construção — 40 caixas uma a uma de outro aparelho seria a trava que se
+> contorna); quem tem `saida.liberar` passou a abrir a tela do Carregamento (sem isso não
+> havia porta até a liberação); `teste_segunda_pessoa.js` (34 casos). Falta o deploy e o
+> primeiro dia real. P6 respondida: as etiquetas de fora são **as do saco**. Fase 2 planejada. Nasceu da conversa de 01/10/2026 (tipo `REGRA` + `NOVIDADE`).
 > **Muda uma decisão de 25/09/2026:** a decisão 2 da `SAIDA-E-DUPLA-CONFERENCIA`
 > ("sem segunda pessoa só MARCA, nunca trava"). Quando aprovada, a mudança vai para
 > o `CLAUDE.md` §8-B e para uma linha em `docs/DECISOES.md`, no mesmo commit do código.
-> Fases: 1 ☐ · 2 ☐
+> Fases: 1 ☑ (em código) · 2 ☐
 
 ---
 
@@ -86,7 +89,7 @@ mesmo código duas vezes numa leitura, e aqui isso contaria uma persiana a mais.
 | P3 | Caixa sem `lote_item` (antes de 15/09) | Segue o fluxo de uma persiana |
 | P4 | A mesma etiqueta de SKU bipada duas vezes | **Concordo** — fica escrito como limite: o que protege é ser outra pessoa olhando a caixa |
 | P5 | Caixas já impressas antes do deploy | A regra vale para todo bipe depois do deploy |
-| P6 | **Novo ponto do dono:** na Etiqueta de Venda, avisar quem imprime para colar **por fora da caixa** as etiquetas de SKU de cada persiana — facilita a conferência no carregamento | **Aceito, falta uma resposta:** as etiquetas de fora são **as que estavam no saco** de cada persiana, ou **cópias impressas a mais**? Proposta: as do saco. Cópia não prova que a persiana entrou — dá para colar três etiquetas numa caixa com uma persiana só, e a conferência do carregamento passa a conferir papel |
+| P6 | **Novo ponto do dono:** na Etiqueta de Venda, avisar quem imprime para colar **por fora da caixa** as etiquetas de SKU de cada persiana — facilita a conferência no carregamento | **As do saco** de cada persiana (dono, 01/10/2026), e não cópias. Cópia não prova que a persiana entrou — dá para colar três etiquetas numa caixa com uma persiana só, e a conferência do carregamento passa a conferir papel |
 
 > Com as etiquetas por fora, o bipe da Regra 2 é feito **sem abrir a caixa**. A tela
 > continua sem listar os SKUs esperados: quem confere bipa o que **está colado**, e o

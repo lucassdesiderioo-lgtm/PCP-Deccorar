@@ -5,11 +5,11 @@
   /* Operacao: fundo CLARO (DESIGN secao 2) — tela usada sob luz de fabrica, escuro vira espelho */
   :root{--bg:#ffffff;--panel:#f4f6f8;--line:#d8dee6;--txt:#1a1d23;--muted:#5a6472;--amber:#b26a00;--green:#2e7d32;--red:#c62828;--blue:#1565c0;--violet:#6f42c1}
   *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
-  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
   .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
   h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
   .link{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
-  .links{margin-left:auto;display:flex;gap:8px}
+  .links{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
   .wrap{max-width:1180px;margin:0 auto;padding:18px 18px 110px}
   /* AS DUAS PORTAS LADO A LADO: carro (agência) à esquerda, coleta à direita.
      São dois lugares físicos diferentes, e uma lista embaixo da outra fazia o
@@ -110,6 +110,16 @@
   .tag.col{background:#efe9fb;color:#4b2a91;border:1px solid #b9a3e6}
   .tag.ant{background:#fbf1db;color:var(--amber);border:1px solid #e7cb8c}
   .pnota{padding:8px 14px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)}
+  /* QUEM IMPRIMIU (CARREGAMENTO-SEGUNDA-PESSOA, fase 1): o nome do login de
+     quem fez a etiqueta de venda, na recusa, no bipe aceito e na pilha. */
+  .quem{display:inline-block;margin-top:6px;font-size:15px}
+  .tag.quem2{background:#eef1f6;color:#3a4250}
+  .btroca{margin-top:12px;background:#1a1d23;color:#fff;font-size:17px;padding:13px 20px}
+  .libcard h3{margin:0;padding:12px 14px;font-size:15px}
+  .libcard .lin{padding:8px 14px;font-size:14px;border-top:1px solid var(--line)}
+  .libform{display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px;border-top:1px solid var(--line);align-items:center}
+  .libform select,.libform input{font-size:15px;padding:9px;border:1px solid var(--line);border-radius:9px}
+  .libform input{flex:1;min-width:200px}
   /* As listas da pilha ficam RECOLHIDAS: com o bipe unico (opcao A) as caixas
      que faltam conferir sao as mesmas das listas do carro e da coleta logo
      abaixo, e aberta a tela diria a mesma coisa duas vezes — que foi o que o
@@ -121,7 +131,7 @@
   .pilha details.ant summary{background:#fbf1db;color:var(--amber)}
 </style></head><body>
 <header><div class="mark">C</div><div><h1>Carregamento</h1><div class="sub">Bipe a etiqueta de venda ao pôr no carro — ou ao separar pra coleta</div></div>
-<div class="links"><a class="link" href="/embalagem">Expedição</a><a class="link" href="/painel">Painel</a></div></header>
+<div class="links"><button class="link" style="background:none;cursor:pointer" onclick="trocarPessoa()">👤 Trocar de pessoa</button><a class="link" href="/embalagem">Expedição</a><a class="link" href="/painel">Painel</a></div></header>
 <div class="wrap">
   <div class="stats">
     <div class="stat car"><div class="n" id="nCar">0</div><div class="l">No carro</div></div>
@@ -138,6 +148,18 @@
     <details id="pAntD"><summary id="pAntS"></summary><div id="pAnt"></div></details>
     <details id="pFalD"><summary id="pFalS"></summary><div id="pFaltam"></div></details>
     <div id="pVazio"></div><div id="pSeg"></div></div>
+  <!-- O DIA DE UMA PESSOA SO (CARREGAMENTO-SEGUNDA-PESSOA, fase 1): quem tem
+       saida.liberar libera uma pessoa a conferir o que ela mesma imprimiu,
+       HOJE, com motivo. Some quando nao ha liberacao e a pessoa nao pode liberar. -->
+  <div class="card libcard" id="libCard" style="display:none;margin-bottom:14px">
+    <h3>🔓 Conferir o que a própria pessoa imprimiu — só hoje</h3>
+    <div id="libLista"></div>
+    <div class="libform" id="libForm" style="display:none">
+      <select id="libPessoa"></select>
+      <input id="libMotivo" maxlength="300" placeholder="Motivo (ex.: só uma pessoa na expedição hoje)">
+      <button class="btn" style="background:#1a1d23;color:#fff" onclick="liberarPessoa()">Liberar hoje</button>
+    </div>
+  </div>
   <div class="duas">
   <div class="card"><h3>🚗 Faltam carregar no carro (agência)</h3>
     <!-- A VIAGEM A AGENCIA (fase 4): fechada, so o botao; aberta, o bipe poe no carro. -->
@@ -216,6 +238,39 @@ const DSEM=['dom','seg','ter','qua','qui','sex','sáb'];
 function diaSemBR(s){ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m) return '';
   return DSEM[new Date(+m[1],+m[2]-1,+m[3]).getDay()]+' '+m[3]+'/'+m[2]; }
 function linhaAdiant(r){ return r&&r.adiantado ? '<div class="adiant">⏩ ADIANTADO — despacha '+diaSemBR(r.pedido&&r.pedido.despachar_em)+'</div>' : ''; }
+function linhaQuem(r){ return r&&r.impresso_por ? '<div class="quem">Etiqueta feita por <b>'+esc0(r.impresso_por)+'</b></div>' : ''; }
+/* TROCAR DE PESSOA: sai e volta pela MESMA tela de login (grade de nomes +
+   PIN), que ja traz de volta para o Carregamento. Uma segunda tela de login
+   aqui dentro seria a segunda porta de entrada. */
+function trocarPessoa(){
+  fetch('/api/auth/logout',{method:'POST'}).then(function(){ location.href='/login?r=/carregamento'; });
+}
+async function liberarPessoa(){
+  var pessoa=$('#libPessoa').value, motivo=$('#libMotivo').value.trim();
+  if(!pessoa){ banner('warn','Escolha a pessoa',''); return; }
+  if(!motivo){ banner('warn','Escreva o motivo','Por que esta pessoa vai conferir o que ela mesma imprimiu?'); return; }
+  var r=await (await fetch('/api/carregar/liberar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({pessoa:pessoa,motivo:motivo})})).json();
+  if(r.ok){ $('#libMotivo').value=''; banner('ok','Liberada hoje — '+esc0(r.pessoa),'Ela pode conferir o que imprimiu até o fim do dia. Fica registrado.'); }
+  else banner('err','Não liberou', esc0(r.aviso||r.erro||''));
+  carregar();
+}
+var pessoasLib=null;
+async function desenharLib(d){
+  var lib=d.liberacoes_hoje||[], pode=!!d.pode_liberar, card=$('#libCard');
+  if(!lib.length && !pode){ card.style.display='none'; return; }
+  card.style.display='';
+  $('#libLista').innerHTML = lib.length
+    ? lib.map(function(l){ return '<div class="lin"><b>'+esc0(l.pessoa)+'</b> liberada por '+esc0(l.liberado_por)
+        +' às '+horaDe(l.liberado_em)+' — <i>'+esc0(l.motivo)+'</i></div>'; }).join('')
+    : '<div class="lin" style="color:var(--muted)">Ninguém liberado hoje. Use só no dia em que não há outra pessoa para conferir.</div>';
+  $('#libForm').style.display = pode ? '' : 'none';
+  if(pode && !pessoasLib){
+    try{ pessoasLib=await (await fetch('/api/auth/pessoas')).json(); }catch(e){ pessoasLib=[]; }
+    $('#libPessoa').innerHTML='<option value="">Quem vai conferir…</option>'
+      +pessoasLib.map(function(p){ return '<option>'+esc0(p.nome)+'</option>'; }).join('');
+  }
+}
 function banner(kind,title,sub){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'; }
 function esc0(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
@@ -244,7 +299,7 @@ async function bip(code){
     var n=r.coleta_aguardando||0;
     banner('col','COLETA ✓ — '+esc0(r.pedido.buyer),
       'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · <span class="c">'+esc0(r.pedido.codigo||'')+'</span> · <b>não vai no carro</b>: deixe no lugar reservado.'
-      +linhaAdiant(r)
+      +linhaQuem(r)+linhaAdiant(r)
       +'<div class="indo">Está indo '+n+' peça'+(n===1?'':'s')+'</div>'
       +'<div style="color:#4b2a91;font-weight:700">Peça ao motorista o número de caixas que ele bipou antes de sair.</div>');
     beep(true);
@@ -253,8 +308,17 @@ async function bip(code){
     /* AGENCIA: o bipe da area so CONFERE (fase 4, D1). A caixa fica na area
        esperando a viagem; quem a poe no carro e o bipe da viagem. */
     aguardando=null;
-    banner('ok','Conferida ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · <span class="c">'+esc0(r.pedido.codigo||'')+'</span> · <b>fica na área</b>: prontas pro carro <b>'+r.prontas+'</b>'+linhaAdiant(r)); beep(true);
+    banner('ok','Conferida ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · <span class="c">'+esc0(r.pedido.codigo||'')+'</span> · <b>fica na área</b>: prontas pro carro <b>'+r.prontas+'</b>'+linhaQuem(r)+linhaAdiant(r)); beep(true);
   }
+  /* QUEM IMPRIMIU NAO CONFERE (CARREGAMENTO-SEGUNDA-PESSOA, fase 1). A tarja
+     diz o nome do login que fez a etiqueta e o caminho: outra pessoa entra
+     com o login dela. */
+  else if(r.motivo==='mesma_pessoa'){ aguardando=null;
+    banner('err','✋ OUTRA PESSOA TEM QUE CONFERIR',
+      (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+' · <span class="c">'+esc0(r.pedido.codigo||'')+'</span><br>':'')
+      +'Etiqueta feita por <b>'+esc0(r.impresso_por||'')+'</b> — o mesmo login que está nesta tela.<br>'
+      +esc0(r.aviso||'')
+      +'<br><button class="btn btroca" onclick="trocarPessoa()">👤 Trocar de pessoa</button>'); beep(false); }
   else if(r.motivo==='ja_conferida'){ aguardando=null;
     banner('warn','Essa já foi conferida',(r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
   else if(r.ok){
@@ -313,9 +377,9 @@ function linha(f){
     +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+'</span></span></div>';
 }
 /* A PILHA (carga.js → pilhaDaArea). A caixa conferida e a que foi bipada aqui
-   — no carro ou no canto da coleta. "Sem segunda pessoa" so MARCA (decisao 2
-   da spec): quem imprimiu e quem conferiu foram o mesmo login, e o bipe foi
-   aceito. A caixa impressa em dia anterior e nao conferida vem em cima: ela
+   — no carro ou no canto da coleta. "Sem segunda pessoa" e a caixa que a
+   propria pessoa conferiu SOB A LIBERACAO DO DIA: desde 01/10/2026 o bipe
+   recusa o mesmo login (CARREGAMENTO-SEGUNDA-PESSOA, fase 1). A caixa impressa em dia anterior e nao conferida vem em cima: ela
    esta na fabrica e nao pode sumir (armadilha #9). Tablet com a pagina antiga
    nao chama isto; servidor antigo nao manda `pilha`, e o card some. */
 function tagsPilha(f){
@@ -325,7 +389,8 @@ function tagsPilha(f){
 function linhaPilha(f, ant){
   return '<div class="row"><span class="who">'
     +(ant?'<span class="tag ant">⏳ impressa '+dataBR(String(f.embalado_em||'').slice(0,10))+'</span>':'')
-    +tagsPilha(f)+esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+'</span></span></div>';
+    +tagsPilha(f)+esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+'</span>'
+    +(f.impresso_por?' <span class="tag quem2">feita por '+esc0(f.impresso_por)+'</span>':'')+'</span></div>';
 }
 function desenharPilha(p){
   var card=$('#pilhaCard'); if(!p||!p.hoje){ card.style.display='none'; return; }
@@ -346,7 +411,7 @@ function desenharPilha(p){
     : (h.impressas ? '<div class="empty">✅ Todas as impressas hoje foram conferidas.</div>'
                    : '<div class="empty" style="color:var(--muted)">Nenhuma etiqueta impressa hoje ainda.</div>');
   var notas=[];
-  if(h.sem_segunda) notas.push('<b>'+h.sem_segunda+'</b> sem segunda pessoa (quem imprimiu também conferiu): '
+  if(h.sem_segunda) notas.push('<b>'+h.sem_segunda+'</b> conferidas por quem imprimiu, com a liberação do dia: '
     +p.sem_segunda.slice(0,8).map(function(f){ return esc0(f.buyer)+' ('+esc0(f.quem)+')'; }).join(', ')
     +(p.sem_segunda.length>8?'…':''));
   if(h.sem_registro) notas.push('<b>'+h.sem_registro+'</b> sem registro de quem imprimiu ou de quem conferiu');
@@ -354,7 +419,7 @@ function desenharPilha(p){
 }
 async function carregar(){
   const d=await (await fetch('/api/carregamento')).json();
-  desenharPilha(d.pilha);
+  desenharPilha(d.pilha); desenharLib(d);
   const col=d.coleta||{faltam:[],aguardando:[],fechamentos:[],retiradas_hoje:0};
   $('#nCar').textContent=d.carregados; $('#nFal').textContent=d.faltam.length;
   $('#nCol').textContent=col.aguardando.length;

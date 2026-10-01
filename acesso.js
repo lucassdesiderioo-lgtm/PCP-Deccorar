@@ -623,7 +623,11 @@ module.exports = function(app, db){
     if(eq('/operador')) return 'revisao.executar';
     if(eq('/montagem')) return 'embalagem.executar';
     if(eq('/embalagem')) return 'etiqueta.emitir';
-    if(eq('/carregamento')) return 'carregamento.executar';
+    /* Quem tem `saida.liberar` abre o Carregamento para LIBERAR (a saida
+       divergente e o dia de uma pessoa so — CARREGAMENTO-SEGUNDA-PESSOA,
+       fase 1). Sem isso o Supervisor que nao e da bancada tinha a chave e
+       nenhuma porta ate ela: a rota respondia e ninguem chegava nela (§2). */
+    if(eq('/carregamento')) return ['carregamento.executar','saida.liberar'];
     if(eq('/expedicao')) return 'pdf.subir';
     if(eq('/devolucao')) return 'devolucao.registrar';
     if(eq('/painel')) return 'painel.ver';
@@ -645,6 +649,10 @@ module.exports = function(app, db){
     if(M !== 'GET' && eq('/api/montagem')) return 'embalagem.executar';
     if(M !== 'GET' && eq('/api/embalar')) return 'etiqueta.emitir';
     if(M !== 'GET' && eq('/api/carregar')) return 'carregamento.executar';
+    /* A liberacao do dia de uma pessoa so (CARREGAMENTO-SEGUNDA-PESSOA, fase 1):
+       quem imprimiu passa a poder conferir, HOJE. E a mesma decisao de liberar
+       a saida divergente — a mesma chave. */
+    if(M !== 'GET' && eq('/api/carregar/liberar')) return 'saida.liberar';
     /* A SAIDA DO CAMINHAO (fase 3 da SAIDA-E-DUPLA-CONFERENCIA): abrir, bipar
        as sobras e fechar a que BATEU sao da bancada que bipa a caixa. Liberar
        com numero diferente do motorista tem chave propria, e vem ANTES do
@@ -840,7 +848,8 @@ module.exports = function(app, db){
     if(eq('/api/fila') || eq('/api/montagem/hoje')) return ['embalagem.executar','etiqueta.emitir','@admin'];
     /* A FOTO DA COLETA É PROVA (§8-B), e estava legível por qualquer pessoa
        logada: é a tela do celular do motorista, com a contagem dele. */
-    if(eq('/api/carregamento') || pre('/api/coleta') || pre('/api/saida') || pre('/api/viagem')) return ['carregamento.executar','@admin'];
+    if(eq('/api/carregamento')) return ['carregamento.executar','saida.liberar','@admin'];
+    if(pre('/api/coleta') || pre('/api/saida') || pre('/api/viagem')) return ['carregamento.executar','@admin'];
     if(pre('/api/revisao')) return ['revisao.executar','@admin'];
     /* A lista de ordens do dia: a tela vermelha do operador mostra o que foi
        lançado, e o admin mostra a mesma coisa na aba de lançar. Lançar (POST)

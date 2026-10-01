@@ -575,14 +575,15 @@ eq('mas .html NAO e arquivo de apoio — herda a tela', AC.permDaRota('/operador
 
 console.log('\n── 13. a gemea .html vale o mesmo que a tela ──');
 const GEMEAS = [['/operador','revisao.executar'],['/montagem','embalagem.executar'],
-  ['/embalagem','etiqueta.emitir'],['/carregamento','carregamento.executar'],
+  ['/embalagem','etiqueta.emitir'],['/carregamento',['carregamento.executar','saida.liberar']],
   ['/expedicao','pdf.subir'],['/devolucao','devolucao.registrar'],
   ['/painel','painel.ver'],['/relatorios','relatorios.ver'],
   ['/planejamento','planilha.importar'],['/recebimento','pedido.receber']];
 let gemeasOk = 0;
 for(const [rota,chave] of GEMEAS){
-  if(AC.permDaRota(rota,'GET') === chave && AC.permDaRota(rota+'.html','GET') === chave) gemeasOk++;
-  else console.log('       ' + rota + ': rota=' + AC.permDaRota(rota,'GET') + ' gemea=' + AC.permDaRota(rota+'.html','GET'));
+  const J = x => JSON.stringify(x);
+  if(J(AC.permDaRota(rota,'GET')) === J(chave) && J(AC.permDaRota(rota+'.html','GET')) === J(chave)) gemeasOk++;
+  else console.log('       ' + rota + ': rota=' + J(AC.permDaRota(rota,'GET')) + ' gemea=' + J(AC.permDaRota(rota+'.html','GET')));
 }
 eq('as 10 telas e as 10 gemeas pedem a MESMA chave', gemeasOk, GEMEAS.length);
 eq('/index.html continua sendo o admin', AC.permDaRota('/index.html','GET'), '@admin');
@@ -666,6 +667,17 @@ console.log('\n── 6-E. saida.liberar: liberar o caminhão com número difere
   ok('decidir(): a bancada NÃO libera a divergente', AC.decidir(banc,'/api/saida/liberar','POST').ok === false);
   ok('decidir(): o supervisor libera', AC.decidir(sup,'/api/saida/liberar','POST').ok === true);
   ok('decidir(): o Admin Geral libera', AC.decidir(ger,'/api/saida/liberar','POST').ok === true);
+  /* Quem imprimiu não confere no Carregamento (CARREGAMENTO-SEGUNDA-PESSOA,
+     fase 1): liberar a pessoa no dia de uma pessoa só é a mesma chave. */
+  eq('liberar quem imprimiu a conferir pede saida.liberar', AC.permDaRota('/api/carregar/liberar','POST'), 'saida.liberar');
+  eq('o bipe continua da bancada', AC.permDaRota('/api/carregar','POST'), 'carregamento.executar');
+  ok('decidir(): a bancada NÃO libera a si mesma', AC.decidir(banc,'/api/carregar/liberar','POST').ok === false);
+  ok('decidir(): o supervisor libera', AC.decidir(sup,'/api/carregar/liberar','POST').ok === true);
+  /* E ele tem PORTA até a liberação: abre o Carregamento e lê a tela, sem
+     virar bancada — o bipe continua não sendo dele. */
+  ok('decidir(): o supervisor abre a tela do Carregamento', AC.decidir(sup,'/carregamento','GET').ok === true);
+  ok('decidir(): e lê o GET dela', AC.decidir(sup,'/api/carregamento','GET').ok === true);
+  ok('decidir(): mas não bipa a caixa', AC.decidir(sup,'/api/carregar','POST').ok === false);
   /* A viagem à agência (fase 4) usa a mesma chave para liberar. */
   eq('liberar a viagem pede a mesma chave', AC.permDaRota('/api/viagem/liberar','POST'), 'saida.liberar');
   for(const r of ['/api/viagem/abrir','/api/viagem/carro','/api/viagem/tirar','/api/viagem/fechar','/api/viagem/cancelar'])

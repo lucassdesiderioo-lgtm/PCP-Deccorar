@@ -15,8 +15,11 @@
  * - a adiantada ENTRA na pilha, marcada (decisão 4 da spec);
  * - caixa impressa num dia anterior e não conferida não some (armadilha #9);
  * - pendente continua recusado no bipe e não entra na conta;
- * - mesmo login nos dois bipes é ACEITO e marcado, nunca bloqueado (decisão 2),
- *   e caixa sem o nome de quem imprimiu é "sem registro", nunca "mesma pessoa".
+ * - mesmo login nos dois bipes é RECUSADO desde 01/10/2026 (spec
+ *   CARREGAMENTO-SEGUNDA-PESSOA, fase 1 — a decisão 2 de 25/09 mudou); com a
+ *   liberação do dia ele passa e fica MARCADO "sem segunda pessoa" (o caso
+ *   inteiro da recusa mora no teste_segunda_pessoa.js);
+ * - caixa sem o nome de quem imprimiu é "sem registro", nunca "mesma pessoa".
  *
  * Sobe um banco temporário e chama os módulos de verdade, com um `app` de
  * mentira que só guarda as rotas. Não abre porta, não toca no banco de produção.
@@ -96,7 +99,12 @@ const pilha = async () => (await chamar('GET /api/carregamento')).pilha;
   let r = await chamar('POST /api/carregar', {code:'PUm'}, BETO);          // Ana imprimiu, Beto confere
   ok('o bipe confere (pessoa diferente)', r.ok, JSON.stringify(r));
   r = await chamar('POST /api/carregar', {code:'PDois'}, ANA);             // Ana imprimiu e Ana confere
-  ok('mesmo login nos dois bipes é ACEITO, nunca bloqueado (decisão 2)', r.ok, JSON.stringify(r));
+  ok('mesmo login nos dois bipes é RECUSADO desde 01/10/2026', r.motivo === 'mesma_pessoa', JSON.stringify(r));
+  /* O dia de uma pessoa só: o supervisor libera a Ana para hoje, com motivo.
+     A partir daí ela confere — e a pilha MARCA, que é o rastro. */
+  db.prepare("INSERT INTO carga_liberacao (dia,pessoa,motivo,liberado_por) VALUES (date('now','localtime'),'Ana','sozinha','Sup')").run();
+  r = await chamar('POST /api/carregar', {code:'PDois'}, ANA);
+  ok('liberada no dia, a mesma pessoa confere', r.ok, JSON.stringify(r));
   r = await chamar('POST /api/carregar', {code:'PTres'}, ANA);             // coleta, mesma pessoa
   ok('a caixa de coleta também é conferida pelo mesmo bipe', r.ok && r.coleta, JSON.stringify(r));
   r = await chamar('POST /api/carregar', {code:'PFutura'}, BETO);          // a adiantada, conferida

@@ -42,4 +42,20 @@ function garantirSaida(db){
   }
 }
 
-module.exports = { garantirSaida };
+/* A LIBERACAO DO DIA (spec CARREGAMENTO-SEGUNDA-PESSOA, fase 1, 01/10/2026).
+ * O bipe do Carregamento recusa quem imprimiu a etiqueta. No dia de uma
+ * pessoa so, quem tem `saida.liberar` libera AQUELA pessoa para HOJE, com
+ * motivo — por pessoa e por dia, e nao por caixa: liberar 40 caixas uma a uma,
+ * de outro aparelho, e a trava que a equipe aprende a contornar (#6).
+ * Uma linha por pessoa por dia; ela vence sozinha a meia-noite. */
+function garantirLiberacao(db){
+  db.exec(`CREATE TABLE IF NOT EXISTS carga_liberacao (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dia TEXT NOT NULL,
+    pessoa TEXT NOT NULL,
+    motivo TEXT NOT NULL,
+    liberado_por TEXT NOT NULL,
+    liberado_em TEXT DEFAULT (datetime('now','localtime')));`);
+}
+
+module.exports = { garantirSaida, garantirLiberacao };
