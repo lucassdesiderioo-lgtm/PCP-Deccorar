@@ -43,8 +43,11 @@ function lerPecas(lista){
        a peca que nao saiu naquele corte fica de fora, e sem o numero o "item
        4" da tela viraria "item 3" no meio da correcao. */
     const id=p.item!=null&&Number.isInteger(Number(p.item))&&Number(p.item)>0?Number(p.item):i+1;
+    // O tipo da linha (fase 5) viaja junto e nao muda a conta: quem o exige
+    // e o Confirmar (dominio/corte.js), e quem o le e o tempo por m².
     return {id, largura:arred(largura), altura:arred(altura), pedido,
-      cliente:String(p.cliente||'').trim()||null};
+      cliente:String(p.cliente||'').trim()||null,
+      tipo:p.tipo||null, revenda_id:p.revenda_id?Number(p.revenda_id):null};
   });
 }
 

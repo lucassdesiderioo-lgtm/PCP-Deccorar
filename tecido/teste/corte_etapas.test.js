@@ -47,7 +47,7 @@ module.exports=[
 {nome:'CONFIRMAR NAO BAIXA NADA: rolo, sobra, refugo e sobra nova ficam como estavam', executar({igual,perto}){
   const x=cena(); const r=novoRolo(x); const s=novaSobra(x,2.00,2.60);
   const sobrasAntes=db.prepare('SELECT COUNT(*) n FROM sobra').get().n;
-  const c=abrir(x,[{pedido:x.pedido,largura:'0,90',altura:'2,50'},{pedido:x.pedido+'b',largura:'1,00',altura:'1,20'}]);
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'0,90',altura:'2,50'},{pedido:x.pedido+'b',tipo:'cliente_final',largura:'1,00',altura:'1,20'}]);
   igual(c.etapa,'confirmado','o corte esta confirmado');
   perto(rolo.porId(r.id).saldo,50,'o rolo nao baixou');
   igual(movRolo(r.id),0,'nenhum movimento de consumo');
@@ -59,7 +59,7 @@ module.exports=[
 
 {nome:'cortar tambem nao baixa — so liga o relogio', executar({igual,perto}){
   const x=cena(); const r=novoRolo(x);
-  const c=abrir(x,[{pedido:x.pedido,largura:'1,00',altura:'2,00'}]);
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'1,00',altura:'2,00'}]);
   const a=corte.cortar(c.plano_id,x.quem);
   igual(a.etapa,'cortando','cortando');
   igual(!!a.cortar_em,true,'a hora do Cortar');
@@ -68,7 +68,7 @@ module.exports=[
 
 {nome:'O CORTE FEITO BAIXA TUDO JUNTO: sobra usada, rolo, refugo e sobra a guardar', executar({igual,perto}){
   const x=cena(); const r=novoRolo(x); const s=novaSobra(x,1.00,2.60);
-  const c=abrir(x,[{pedido:x.pedido,largura:'0,95',altura:'2,50'},{pedido:x.pedido+'b',largura:'1,00',altura:'2,00'}]);
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'0,95',altura:'2,50'},{pedido:x.pedido+'b',tipo:'cliente_final',largura:'1,00',altura:'2,00'}]);
   corte.cortar(c.plano_id,x.quem);
   const f=corte.feito(c.plano_id,x.quem);
   igual(f.etapa,'feito','feito');
@@ -84,7 +84,7 @@ module.exports=[
   // Entre confirmar e terminar entra uma sobra nova que serviria melhor.
   // Recalcular escolheria essa sobra — que ninguem cortou.
   const x=cena(); novoRolo(x);
-  const c=abrir(x,[{pedido:x.pedido,largura:'1,00',altura:'2,00'}]);
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'1,00',altura:'2,00'}]);
   corte.cortar(c.plano_id,x.quem);
   const nova=novaSobra(x,1.10,2.10);
   corte.feito(c.plano_id,x.quem);
@@ -93,7 +93,7 @@ module.exports=[
 
 {nome:'Corte feito so sai do CORTANDO', executar({recusa}){
   const x=cena(); novoRolo(x);
-  const c=abrir(x,[{pedido:x.pedido,largura:'1,00',altura:'2,00'}]);
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'1,00',altura:'2,00'}]);
   recusa(()=>corte.feito(c.plano_id,x.quem),'etapa_errada');
   corte.cortar(c.plano_id,x.quem); corte.feito(c.plano_id,x.quem);
   recusa(()=>corte.feito(c.plano_id,x.quem),'etapa_errada','nem duas vezes');
@@ -101,7 +101,7 @@ module.exports=[
 
 {nome:'O CORTE FEITO E ATOMICO: se uma linha falha, nada baixa e o corte continua aberto', executar({recusa,igual,perto}){
   const x=cena(); const r=novoRolo(x); const s=novaSobra(x,1.00,2.60);
-  const c=abrir(x,[{pedido:x.pedido,largura:'0,95',altura:'2,50'},{pedido:x.pedido+'b',largura:'1,00',altura:'2,00'}]);
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'0,95',altura:'2,50'},{pedido:x.pedido+'b',tipo:'cliente_final',largura:'1,00',altura:'2,00'}]);
   corte.cortar(c.plano_id,x.quem);
   // O rolo foi encerrado por fora no meio do corte: a baixa dele falha.
   rolo.encerrar(r.id,'Outro');
@@ -114,9 +114,9 @@ module.exports=[
 
 {nome:'A SOBRA RESERVADA NAO APARECE EM OUTRO PLANO, e o plano diz por que', executar({igual}){
   const x=cena(); const s=novaSobra(x,1.00,2.60);
-  const c=abrir(x,[{pedido:x.pedido,largura:'0,95',altura:'2,50'}],x.quem);
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'0,95',altura:'2,50'}],x.quem);
   igual(c.proposta.sobras_sugeridas[0].id,s.id,'o corte da Ana pegou a sobra');
-  const outro=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido+'z',largura:'0,95',altura:'2,50'}]});
+  const outro=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido+'z',tipo:'cliente_final',largura:'0,95',altura:'2,50'}]});
   igual(outro.sobras_sugeridas.length,0,'o plano do outro nao a oferece');
   const e=outro.sobras_que_servem.find(z=>z.id===s.id);
   igual(!!e&&e.motivo_codigo,'reservada','e explica que esta reservada');
@@ -125,23 +125,23 @@ module.exports=[
 
 {nome:'O ROLO RESERVADO aparece para os outros com o saldo menos os metros reservados', executar({igual,perto}){
   const x=cena(); const r=novoRolo(x);
-  const c=abrir(x,[{pedido:x.pedido,largura:'1,00',altura:'20,00'}],x.quem);
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'1,00',altura:'20,00'}],x.quem);
   perto(c.proposta.consumo_linear,20,'a Ana reservou 20 m');
-  const outro=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido+'z',largura:'1,00',altura:'35,00'}]});
+  const outro=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido+'z',tipo:'cliente_final',largura:'1,00',altura:'35,00'}]});
   igual(outro.faixas.length,0,'35 m nao cabem nos 30 que sobram livres');
   igual(outro.pecas_nao_alocadas.length,1,'a peca volta marcada');
-  const cabe=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido+'y',largura:'1,00',altura:'29,00'}]});
+  const cabe=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido+'y',tipo:'cliente_final',largura:'1,00',altura:'29,00'}]});
   igual(cabe.faixas.length,1,'29 m cabem');
   perto(rolo.porId(r.id).saldo,50,'e o saldo de verdade nao andou');
 }},
 
 {nome:'CANCELAR SOLTA TUDO: a reserva sai, nada baixa, e o motivo fica', executar({igual,recusa,perto}){
   const x=cena(); const r=novoRolo(x); const s=novaSobra(x,1.00,2.60);
-  const c=abrir(x,[{pedido:x.pedido,largura:'0,95',altura:'2,50'},{pedido:x.pedido+'b',largura:'1,00',altura:'2,00'}],x.quem);
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'0,95',altura:'2,50'},{pedido:x.pedido+'b',tipo:'cliente_final',largura:'1,00',altura:'2,00'}],x.quem);
   corte.cortar(c.plano_id,x.quem);
   recusa(()=>corte.cancelar(c.plano_id,'  ',x.quem),'motivo_obrigatorio');
   corte.cancelar(c.plano_id,'tom nao bateu e o pedido foi adiado',x.quem);
-  const outro=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido+'z',largura:'0,95',altura:'2,50'}]});
+  const outro=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido+'z',tipo:'cliente_final',largura:'0,95',altura:'2,50'}]});
   igual(outro.sobras_sugeridas[0]&&outro.sobras_sugeridas[0].id,s.id,'a sobra voltou a ser oferecida');
   perto(rolo.porId(r.id).saldo,50,'o rolo nao baixou');
   const h=historico.detalhe(c.plano_id);
@@ -152,33 +152,33 @@ module.exports=[
 
 {nome:'R2 — UM CORTE ABERTO POR OPERADOR; a pendencia de guardar nao conta', executar({recusa,igual}){
   const x=cena(); novoRolo(x);
-  const c=abrir(x,[{pedido:x.pedido,largura:'1,00',altura:'2,00'}],'Bia');
-  const e=recusa(()=>abrir(x,[{pedido:x.pedido+'b',largura:'1,00',altura:'1,00'}],'Bia'),'corte_aberto');
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'1,00',altura:'2,00'}],'Bia');
+  const e=recusa(()=>abrir(x,[{pedido:x.pedido+'b',tipo:'cliente_final',largura:'1,00',altura:'1,00'}],'Bia'),'corte_aberto');
   igual(new RegExp(String(c.plano_id)).test(e.mensagem),true,'a recusa diz qual corte esta aberto');
-  abrir(x,[{pedido:x.pedido+'c',largura:'0,50',altura:'1,00'}],'Caio');   // outra pessoa abre o dela
+  abrir(x,[{pedido:x.pedido+'c',tipo:'cliente_final',largura:'0,50',altura:'1,00'}],'Caio');   // outra pessoa abre o dela
   corte.cortar(c.plano_id,'Bia'); corte.feito(c.plano_id,'Bia');
   igual(corte.aGuardar({usuarioNome:'Bia'}).length>0,true,'a Bia tem sobra a guardar');
-  const d=abrir(x,[{pedido:x.pedido+'d',largura:'1,00',altura:'1,00'}],'Bia');
+  const d=abrir(x,[{pedido:x.pedido+'d',tipo:'cliente_final',largura:'1,00',altura:'1,00'}],'Bia');
   igual(d.etapa,'confirmado','e mesmo assim abre outro corte');
 }},
 
 {nome:'VOLTAR AO PLANO apaga o corte do ② e solta a reserva; do ③ so cancelando', executar({recusa,igual}){
   const x=cena(); const s=novaSobra(x,1.00,2.60);
-  const c=abrir(x,[{pedido:x.pedido,largura:'0,95',altura:'2,50'}],'Duda');
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'0,95',altura:'2,50'}],'Duda');
   const v=corte.voltar(c.plano_id,'Duda');
   igual(v.apagado,true,'apagado');
   igual(corte.porId(c.plano_id),undefined,'o corte nao existe mais');
   igual(v.entrada.pecas.length,1,'e devolve o que foi lancado, para a tela voltar com a grade');
-  const outro=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido+'z',largura:'0,95',altura:'2,50'}]});
+  const outro=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido+'z',tipo:'cliente_final',largura:'0,95',altura:'2,50'}]});
   igual(outro.sobras_sugeridas[0].id,s.id,'a sobra voltou a ser livre');
-  const c2=abrir(x,[{pedido:x.pedido,largura:'0,95',altura:'2,50'}],'Duda');
+  const c2=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'0,95',altura:'2,50'}],'Duda');
   corte.cortar(c2.plano_id,'Duda');
   recusa(()=>corte.voltar(c2.plano_id,'Duda'),'etapa_errada');
 }},
 
 {nome:'quem mexe no corte e quem o abriu, ou a chefia', executar({recusa,igual}){
   const x=cena(); novoRolo(x);
-  const c=abrir(x,[{pedido:x.pedido,largura:'1,00',altura:'2,00'}],'Eva');
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'1,00',altura:'2,00'}],'Eva');
   recusa(()=>corte.cortar(c.plano_id,'Fabio'),'corte_de_outro');
   igual(corte.cortar(c.plano_id,'Fabio',{gerir:true}).etapa,'cortando','a chefia pode');
 }},
@@ -186,41 +186,41 @@ module.exports=[
 {nome:'A SOBRA "A GUARDAR" NAO ENTRA EM PLANO', executar({igual}){
   const x=cena(); novoRolo(x);
   // Peca estreita e alta numa bobina de 3,00: nasce uma tira lateral larga.
-  const c=abrir(x,[{pedido:x.pedido,largura:'0,90',altura:'2,00'}],'Gil');
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'0,90',altura:'2,00'}],'Gil');
   corte.cortar(c.plano_id,'Gil'); corte.feito(c.plano_id,'Gil');
   const pend=corte.aGuardar({usuarioNome:'Gil'});
   igual(pend.length>=1,true,'nasceu sobra a guardar');
   const g=pend.find(z=>z.largura>=2);
-  const p=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido+'z',largura:'1,00',altura:'1,50'}]});
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido+'z',tipo:'cliente_final',largura:'1,00',altura:'1,50'}]});
   igual(p.faixas.every(f=>f.fonte!=='sobra'),true,'nenhuma sobra no plano: a nascida ainda nao foi guardada');
   igual(!!g,true,'a tira de 2,10 esta na pendencia');
 }},
 
 {nome:'GUARDAR EXIGE MEDIDA, ETIQUETA E ENDERECO — e so entao a sobra entra em plano', executar({recusa,igual,perto}){
   const x=cena(); novoRolo(x);
-  const c=abrir(x,[{pedido:x.pedido,largura:'0,90',altura:'2,00'}],'Hugo');
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'0,90',altura:'2,00'}],'Hugo');
   corte.cortar(c.plano_id,'Hugo'); corte.feito(c.plano_id,'Hugo');
   const g=corte.aGuardar({usuarioNome:'Hugo'}).find(z=>z.largura>=2);
   const cod=etiqueta.pendentes()[0].codigo;
   recusa(()=>corte.guardar(g.id,{codigo:cod,nivel_id:x.nivelSobra},'Hugo'),'medida_faltando');
-  recusa(()=>corte.guardar(g.id,{largura:'2,10',altura:'2,00',nivel_id:x.nivelSobra},'Hugo'),'etiqueta_faltando');
-  recusa(()=>corte.guardar(g.id,{largura:'2,10',altura:'2,00',codigo:cod},'Hugo'),'endereco_faltando');
-  recusa(()=>corte.guardar(g.id,{largura:'2,10',altura:'2,00',codigo:cod,nivel_id:x.nivelSobra},'Iris'),'a_guardar_de_outro');
+  recusa(()=>corte.guardar(g.id,{tipo:'cliente_final',largura:'2,10',altura:'2,00',nivel_id:x.nivelSobra},'Hugo'),'etiqueta_faltando');
+  recusa(()=>corte.guardar(g.id,{tipo:'cliente_final',largura:'2,10',altura:'2,00',codigo:cod},'Hugo'),'endereco_faltando');
+  recusa(()=>corte.guardar(g.id,{tipo:'cliente_final',largura:'2,10',altura:'2,00',codigo:cod,nivel_id:x.nivelSobra},'Iris'),'a_guardar_de_outro');
   // A fita disse 2,08 e nao 2,10: vale a da fita.
-  const r=corte.guardar(g.id,{largura:'2,08',altura:'2,00',codigo:cod,nivel_id:x.nivelSobra},'Hugo');
+  const r=corte.guardar(g.id,{tipo:'cliente_final',largura:'2,08',altura:'2,00',codigo:cod,nivel_id:x.nivelSobra},'Hugo');
   perto(r.sobra.largura,2.08,'a medida que vale e a medida da fita');
   igual(r.medida_mudou,true,'e a resposta diz que mudou');
   igual(r.sobra.plano_id,c.plano_id,'a sobra sabe de que corte nasceu');
   igual(corte.aGuardar({usuarioNome:'Hugo'}).some(z=>z.id===g.id),false,'a pendencia some');
-  recusa(()=>corte.guardar(g.id,{largura:'2,08',altura:'2,00',codigo:etiqueta.pendentes()[0].codigo,nivel_id:x.nivelSobra},'Hugo'),'ja_guardada');
-  const p=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido+'z',largura:'1,00',altura:'1,50'}]});
+  recusa(()=>corte.guardar(g.id,{tipo:'cliente_final',largura:'2,08',altura:'2,00',codigo:etiqueta.pendentes()[0].codigo,nivel_id:x.nivelSobra},'Hugo'),'ja_guardada');
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido+'z',tipo:'cliente_final',largura:'1,00',altura:'1,50'}]});
   igual(p.faixas[0].fonte,'sobra','agora sim a sobra entra em plano');
   igual(historico.listar({sobra:cod}).sobra.nasceu_em,c.plano_id,'e o historico acha de onde ela nasceu');
 }},
 
 {nome:'a chefia ve TODAS as pendencias, com quem cortou', executar({igual}){
   const x=cena(); novoRolo(x);
-  const c=abrir(x,[{pedido:x.pedido,largura:'0,90',altura:'2,00'}],'Joao');
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'0,90',altura:'2,00'}],'Joao');
   corte.cortar(c.plano_id,'Joao'); corte.feito(c.plano_id,'Joao');
   const todas=corte.aGuardar({todas:true});
   igual(todas.some(z=>z.cortado_por==='Joao'),true,'a do Joao aparece para a chefia');
@@ -229,7 +229,7 @@ module.exports=[
 
 {nome:'o corte aberto se reencontra depois de recarregar a tela', executar({igual}){
   const x=cena(); novoRolo(x);
-  const c=abrir(x,[{pedido:x.pedido,largura:'1,00',altura:'2,00'}],'Kai');
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'1,00',altura:'2,00'}],'Kai');
   const a=corte.aberto('Kai');
   igual(a.plano_id,c.plano_id,'o corte do Kai');
   igual(a.fontes.length,1,'com o resumo por fonte');
@@ -242,16 +242,16 @@ module.exports=[
   // O rolo reservado pelo corte aberto do pedido e onde o resto do pedido
   // tem que sair — o tom e o do rolo, nao o do Corte feito.
   const x=cena(); const bom=novoRolo(x,'3,00'); novoRolo(x,'2,00');
-  abrir(x,[{pedido:x.pedido,largura:'1,495',altura:'2,730'},{pedido:x.pedido,largura:'1,495',altura:'2,730'}],'Lia');
-  const p2=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido,largura:'1,495',altura:'2,730'}]});
+  abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'1,495',altura:'2,730'},{pedido:x.pedido,tipo:'cliente_final',largura:'1,495',altura:'2,730'}],'Lia');
+  const p2=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido,tipo:'cliente_final',largura:'1,495',altura:'2,730'}]});
   igual(p2.continuando_em&&p2.continuando_em.codigo,bom.codigo,'continua no rolo do corte aberto');
 }},
 
 {nome:'o corte cancelado NAO conta como ja cortado', executar({igual}){
   const x=cena(); novoRolo(x,'3,00'); novoRolo(x,'2,00');
-  const c=abrir(x,[{pedido:x.pedido,largura:'1,495',altura:'2,730'},{pedido:x.pedido,largura:'1,495',altura:'2,730'}],'Mel');
+  const c=abrir(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'1,495',altura:'2,730'},{pedido:x.pedido,tipo:'cliente_final',largura:'1,495',altura:'2,730'}],'Mel');
   corte.cancelar(c.plano_id,'desisti','Mel');
-  const p2=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido,largura:'1,495',altura:'2,730'}]});
+  const p2=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido,tipo:'cliente_final',largura:'1,495',altura:'2,730'}]});
   igual(p2.cortes_anteriores.length,0,'nada saiu do cancelado');
 }}
 

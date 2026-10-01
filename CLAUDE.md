@@ -7737,8 +7737,30 @@ zera a conferência dela.
 > segunda cor continuar no rolo da primeira. Consertado no `cortesAnteriores`
 > do `plano.js`, com caso travando.
 
+### O TIPO DE CADA LINHA E O TEMPO POR m² (fase 5, R18–R21)
+
+Cada linha do corte diz para quem é — **cliente final, revenda ou ML sob
+medida** —, e o Confirmar recusa linha sem tipo. A revenda é escolhida da
+**carteira que já existe** (`sm_revenda`), por uma porta própria do corte
+(`GET /api/planos/revendas`, só id e nome, com a chave de quem corta: o
+cortador não tem `revenda.ler`). O nome dela fica como retrato na linha.
+
+O relógio corre do **CORTAR ao Corte feito, menos as pausas** (Pausar/Retomar
+no ③; pausa esquecida aberta fecha no Corte feito), e o tempo líquido fica no
+corte. `dominio/tempo_corte.js` é o dono do **minuto por m² por tipo** (Painel →
+Tempo de corte): corte misturado divide o tempo **pela área das peças**, e corte
+acima de `corteTempoMaxHoras` (parâmetro, nasce em 3 h, zero é recusado) fica
+fora da média — e a tela diz quantos e quais.
+
+> ⚠️ **O m² É O DAS PEÇAS, não o puxado do rolo**: o tecido que virou sobra ou
+> refugo não é trabalho de cortar peça, e somado faria o corte com muito
+> desperdício parecer mais rápido.
+
+> ⚠️ **CORTE SEM RELÓGIO NÃO É CORTE RÁPIDO.** Os cortes feitos antes deste
+> deploy não têm tempo medido: ficam fora, contados à parte, nunca como zero.
+
 **Rode `cd tecido && npm test` ao mexer em `corte.js`, no `plano.js`, no
-`tom.js` ou na tela de corte** — `corte_etapas.test.js` (18),
+`tom.js`, no `tempo_corte.js` ou na tela de corte** — `tempo_corte.test.js` (8), `corte_etapas.test.js` (18),
 `corte_correcao.test.js` (17), `historico_corte.test.js` (15) e
 `tom.test.js` (27).
 

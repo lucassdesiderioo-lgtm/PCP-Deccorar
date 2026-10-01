@@ -53,11 +53,11 @@ let k=0;
 function doisCortes(){
   const x=cena(); k++;
   const r=rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
-  const a=confirmar(x,[{pedido:'P100'+'x'+k,largura:'1,00',altura:'2,00'}],'Ana');
+  const a=confirmar(x,[{pedido:'P100'+'x'+k,tipo:'cliente_final',largura:'1,00',altura:'2,00'}],'Ana');
   const nascida=db.prepare("SELECT * FROM sobra WHERE origem_rolo_id=? ORDER BY id").all(r.id)
     .find(s=>s.largura>=1.9);
-  const b=confirmar(x,[{pedido:'P200-'+k,largura:'1,50',altura:'1,80'},
-                       {pedido:'P300x'+k,largura:'3,50',altura:'1,00'}],'Bruno');
+  const b=confirmar(x,[{pedido:'P200-'+k,tipo:'cliente_final',largura:'1,50',altura:'1,80'},
+                       {pedido:'P300x'+k,tipo:'cliente_final',largura:'3,50',altura:'1,00'}],'Bruno');
   return {x,r,a,b,nascida};
 }
 
@@ -166,7 +166,7 @@ module.exports=[
   const x=cena(); k++;
   const livre=etiqueta.pendentes()[0].codigo;
   const mae=sobra.criar({codigo:livre,tecido_id:x.t.id,largura:2,altura:3,condicao:'integra',nivel_id:x.nivelSobra},'Carla');
-  const r=confirmar(x,[{pedido:'PE'+k,largura:'1,50',altura:'1,00'}],'Carla');
+  const r=confirmar(x,[{pedido:'PE'+k,tipo:'cliente_final',largura:'1,50',altura:'1,00'}],'Carla');
   const ligadas=db.prepare('SELECT sobra_gerada_codigo c FROM plano_faixa WHERE plano_id=?').all(r.plano_id).map(f=>f.c);
   const filha=db.prepare('SELECT * FROM sobra WHERE origem_sobra_id=? AND altura>1.9').get(mae.id);
   igual(!!filha,true,'o resto de pe virou sobra');
@@ -182,7 +182,7 @@ module.exports=[
   const s=sobra.criar({codigo:livre,tecido_id:x.t.id,largura:2,altura:2,condicao:'integra',nivel_id:x.nivelSobra},'teste');
   const motivo=db.prepare('SELECT id FROM motivo_recusa ORDER BY id LIMIT 1').get().id;
   plano.recusar({sobra_id:s.id,motivo_id:motivo},'teste');
-  const r=confirmar(x,[{pedido:'P9',largura:'1,00',altura:'1,00'}],'teste',{recusadas:[s.id]});
+  const r=confirmar(x,[{pedido:'P9',tipo:'cliente_final',largura:'1,00',altura:'1,00'}],'teste',{recusadas:[s.id]});
   const d=historico.detalhe(r.plano_id);
   igual(d.recusas.length,1,'a recusa');
   igual(d.recusas[0].sobra_codigo,s.codigo,'de qual sobra');

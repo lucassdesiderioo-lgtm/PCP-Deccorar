@@ -1742,6 +1742,32 @@ CREATE TABLE plano_conferencia (
   invalidada_em TEXT, invalidada_motivo TEXT
 );
 CREATE INDEX idx_plano_conferencia ON plano_conferencia(plano_id, invalidada_em);
+`},
+
+/* ── O TIPO DE CADA LINHA E O RELOGIO DO CORTE (fase 5, R18–R21) ──────────
+   Cada linha do corte diz para quem e: cliente final, revenda (escolhida da
+   CARTEIRA que ja existe — `sm_revenda`, nunca uma segunda lista) ou Mercado
+   Livre sob medida. O nome da revenda vai como RETRATO, como no pedido: o
+   historico do corte continua legivel se a revenda mudar de nome.
+
+   O relogio corre do Cortar ao Corte feito, menos as pausas (R19), e o tempo
+   liquido fica gravado no corte. O limite do tempo absurdo e PARAMETRO (R21):
+   nasce em 3 h porque a spec disse 3 h, e ninguem mediu a bancada ainda. */
+{n:30, nome:'o tipo de cada linha do corte, e o relogio com pausa', sql:`
+ALTER TABLE plano_peca ADD COLUMN tipo TEXT;          -- cliente_final | revenda | ml
+ALTER TABLE plano_peca ADD COLUMN revenda_id INTEGER;
+ALTER TABLE plano_peca ADD COLUMN revenda_nome TEXT;
+ALTER TABLE plano ADD COLUMN tempo_liquido_s INTEGER;
+CREATE TABLE plano_pausa (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plano_id INTEGER NOT NULL REFERENCES plano(id),
+  inicio TEXT NOT NULL, fim TEXT,
+  usuario_nome TEXT
+);
+CREATE INDEX idx_plano_pausa ON plano_pausa(plano_id);
+INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
+ ('corteTempoMaxHoras','3','numero','Tempo maximo de um corte',
+  'Corte com tempo liquido (do Cortar ao Corte feito, menos as pausas) acima disto aparece no historico, mas fica FORA do tempo por m² do painel. Serve para o corte esquecido aberto de um dia para o outro, que envenenaria a media. Nao e meta: e o teto acima do qual o numero deixa de ser acreditavel.','horas',22);
 `}
 ];
 

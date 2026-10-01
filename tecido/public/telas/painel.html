@@ -45,7 +45,8 @@ const ABAS=[
   {id:'encalhe', nome:'Encalhe'},
   {id:'refugo',  nome:'Refugo'},
   {id:'recusas', nome:'Recusas'},
-  {id:'cortes',  nome:'Cortes'}
+  {id:'cortes',  nome:'Cortes'},
+  {id:'tempo',   nome:'Tempo de corte'}
 ];
 /* O dinheiro e o do ui.js — esta tela tinha uma COPIA literal dele. Mesmo
    valor, e mesmo assim segunda regua: no dia em que uma das duas mudasse, a
@@ -78,7 +79,7 @@ function desenhar(){
   montarAbas();
   const c=limpar($('#conteudo'));
   return ({gerencial:telaGerencial,estoque:telaEstoque,encalhe:telaEncalhe,
-    refugo:telaRefugo,recusas:telaRecusas,cortes:telaCortes})[aba](c);
+    refugo:telaRefugo,recusas:telaRecusas,cortes:telaCortes,tempo:telaTempo})[aba](c);
 }
 
 // ── ESTOQUE — o cruzamento que da razao ao painel ────────────────────────
@@ -478,6 +479,33 @@ async function telaRecusas(pai){
     ])));
   c.appendChild(linhas.length?t:el('div',{class:'vazio',
     texto:'Nenhuma recusa ainda — e isso e uma boa noticia.'}));
+}
+
+// ── TEMPO DE CORTE POR m² (CORTE-EM-ETAPAS, fase 5) ─────────────────────
+/* Minutos por m² de PECA, por tipo de pedido. O corte misturado divide o
+   tempo pela area (R20), e o corte acima do limite fica fora (R21) — e a tela
+   DIZ quantos ficaram fora, senao a media parece maior amostra do que e. */
+async function telaTempo(pai){
+  const r=await api('/api/painel/tempo-corte?dias=30');
+  pai=limpar(pai);
+  const c=cartao(pai,'Tempo de corte por m², últimos '+r.dias+' dias',
+    'Do CORTAR ao Corte feito, menos as pausas. O m² é o das peças cortadas, e corte de vários tipos divide o tempo pela área de cada um.');
+  if(!r.linhas.length){
+    c.appendChild(el('div',{class:'vazio',texto:r.sem_relogio
+      ?'Ainda não há corte com relógio: '+(r.sem_relogio===1?'o corte do período foi feito':'os '+r.sem_relogio+' cortes do período foram feitos')+' antes de o relógio existir, e não têm tempo medido.'
+      :'Nenhum corte feito no período.'}));
+  } else {
+    c.appendChild(tabela([{nome:'Tipo'},{nome:'Cortes',num:true},{nome:'m² de peças',num:true},
+      {nome:'Minutos',num:true},{nome:'Minutos por m²',num:true}],
+      r.linhas.map(l=>el('tr',{},[el('td',{texto:l.nome}),el('td',{class:'num',texto:String(l.cortes)}),
+        el('td',{class:'num',texto:formatarArea(l.area_m2)}),el('td',{class:'num',texto:num(l.minutos,1)}),
+        el('td',{class:'num',texto:l.min_por_m2==null?'—':num(l.min_por_m2,1)})]))));
+  }
+  const notas=[];
+  if(r.fora_da_media.length) notas.push((r.fora_da_media.length===1?'1 corte ficou fora':r.fora_da_media.length+' cortes ficaram fora')+
+    ' da média por passar de '+num(r.limite_horas,0)+' h (corte '+r.fora_da_media.map(f=>f.id+', '+num(f.horas,1)+' h').join(' · ')+'). O limite fica em Cadastros → Parâmetros.');
+  if(r.sem_relogio&&r.linhas.length) notas.push((r.sem_relogio===1?'1 corte do período foi feito':r.sem_relogio+' cortes do período foram feitos')+' antes de o relógio existir: sem tempo medido, ficam fora.');
+  notas.forEach(n=>c.appendChild(el('p',{class:'nota',style:'color:var(--alerta)',texto:n})));
 }
 
 // ── CORTES ───────────────────────────────────────────────────────────────

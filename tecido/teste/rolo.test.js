@@ -121,7 +121,7 @@ module.exports=[
   rolo.entrada({tecido_id:x.t.id,largura:'2,00',metragem:'40',nivel_id:x.buraco()},'Diretor');
 
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
-    {largura:'0,90',altura:'2,50'},{largura:'0,90',altura:'2,50'},{largura:'0,90',altura:'2,50'}]});
+    {tipo:'cliente_final',largura:'0,90',altura:'2,50'},{tipo:'cliente_final',largura:'0,90',altura:'2,50'},{tipo:'cliente_final',largura:'0,90',altura:'2,50'}]});
   igual(p.simulacoes.length,3,'simulou as tres larguras');
   perto(p.bobina.largura,3.00,'venceu a de 3,00');
   perto(p.desperdicio,0.75,'o desperdicio da tabela do 6.4');
@@ -138,7 +138,7 @@ module.exports=[
     condicao:'integra',nivel_id:x.nivelSobra},'Cortador');
 
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
-    {largura:'0,90',altura:'2,50'},{largura:'0,90',altura:'2,50'}]});
+    {tipo:'cliente_final',largura:'0,90',altura:'2,50'},{tipo:'cliente_final',largura:'0,90',altura:'2,50'}]});
   igual(p.faixas[0].fonte,'sobra','a primeira faixa e da sobra');
   igual(p.sobras_sugeridas.length,1,'uma sobra sugerida');
   perto(p.consumo_linear,0,'nao puxou rolo nenhum');
@@ -153,7 +153,7 @@ module.exports=[
 
   plano.recusar({sobra_id:s.id,motivo_id:mot.id,observacao:'tom puxado'},'Cortador');
   const p=plano.calcular({tecido_id:x.t.id,recusadas:[s.id],pecas:[
-    {largura:'0,90',altura:'2,50'},{largura:'0,90',altura:'2,50'}]});
+    {tipo:'cliente_final',largura:'0,90',altura:'2,50'},{tipo:'cliente_final',largura:'0,90',altura:'2,50'}]});
 
   igual(p.faixas[0].fonte,'rolo','sem a sobra, o plano vai para o rolo');
   igual(sobra.porId(s.id).status,'disponivel','a sobra recusada NAO baixou');
@@ -165,7 +165,7 @@ module.exports=[
   /* Desde a fase 2 da CORTE-EM-ETAPAS o Confirmar so grava e reserva; quem
      baixa e o Corte feito. O caso e o mesmo de antes, pelo caminho de agora. */
   const x=cena();
-  const pecas=[{largura:'0,90',altura:'2,50'},{largura:'0,90',altura:'2,50'},{largura:'0,90',altura:'2,50'}];
+  const pecas=[{tipo:'cliente_final',largura:'0,90',altura:'2,50'},{tipo:'cliente_final',largura:'0,90',altura:'2,50'},{tipo:'cliente_final',largura:'0,90',altura:'2,50'}];
   const p=plano.calcular({tecido_id:x.t.id,pecas});
   const saldoAntes=rolo.porId(p.faixas.find(f=>f.fonte==='rolo').fonte_id).saldo;
 
@@ -188,7 +188,7 @@ module.exports=[
   const x=cena();
   // Peca estreita e ALTA numa bobina larga: a tira lateral tem largura e
   // altura de sobra (a altura minima e 1,00 m), entao nasce uma sobra.
-  const pecas=[{largura:'0,90',altura:'2,00'}];
+  const pecas=[{tipo:'cliente_final',largura:'0,90',altura:'2,00'}];
   const recusadas=sobra.candidatas(x.t.id).map(s=>s.id);
   const p=plano.calcular({tecido_id:x.t.id,pecas,recusadas});
   if(!p.sobras_geradas.length) throw new Error('o cenario deveria gerar sobra');
@@ -201,7 +201,7 @@ module.exports=[
 
 {nome:'O CORTE FEITO E ATOMICO: se uma linha falha, nada baixa', executar({recusa,igual,perto}){
   const x=cena();
-  const pecas=[{largura:'0,90',altura:'2,00'}];
+  const pecas=[{tipo:'cliente_final',largura:'0,90',altura:'2,00'}];
   // Recusa as sobras para forcar o caminho do ROLO: o que se quer provar e
   // que a baixa de metro linear tambem volta atras.
   const recusadas=sobra.candidatas(x.t.id).map(s=>s.id);
@@ -221,7 +221,7 @@ module.exports=[
 
 {nome:'plano calculado que o estoque mudou nao confirma as cegas', executar({recusa}){
   const x=cena();
-  const pecas=[{largura:'0,90',altura:'2,00'}];
+  const pecas=[{tipo:'cliente_final',largura:'0,90',altura:'2,00'}];
   const p=plano.calcular({tecido_id:x.t.id,pecas});
   // Outra pessoa cadastra uma sobra no meio do caminho.
   const cod=etiquetaLivre();
@@ -234,7 +234,7 @@ module.exports=[
 {nome:'peca larga demais nao impede o plano das outras', executar({igual}){
   const x=cena();
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
-    {largura:'4,50',altura:'2,00'},{largura:'0,90',altura:'2,00'}]});
+    {tipo:'cliente_final',largura:'4,50',altura:'2,00'},{tipo:'cliente_final',largura:'0,90',altura:'2,00'}]});
   igual(p.pecas_nao_alocadas.length,1,'so a larga ficou de fora');
   igual(p.faixas.length>0,true,'o plano saiu assim mesmo');
   igual(/largura/.test(p.pecas_nao_alocadas[0].motivo),true,'com o motivo em metros');
@@ -245,7 +245,7 @@ module.exports=[
   const ab=tecido.listarAberturas(linha.id)[0];
   const cor=tecido.criarCor({nome:'Terracota'});
   const vazio=tecido.criarTecido({linha_id:linha.id,abertura_id:ab.id,cor_id:cor.id});
-  const p=plano.calcular({tecido_id:vazio.id,pecas:[{largura:'1,00',altura:'2,00'}]});
+  const p=plano.calcular({tecido_id:vazio.id,pecas:[{tipo:'cliente_final',largura:'1,00',altura:'2,00'}]});
   igual(p.faixas.length,0,'nenhuma faixa');
   igual(p.pecas_nao_alocadas.length,1,'a peca voltou marcada');
   igual(/nenhuma sobra/i.test(p.sobre_sobras),true,'e o plano explica: '+p.sobre_sobras);

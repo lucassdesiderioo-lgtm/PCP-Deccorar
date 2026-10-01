@@ -97,6 +97,7 @@ async function telaEntrada(){
     // senao o aviso cobraria uma cor que a fileira ja mostra.
     estado.cores=await api('/api/cores');
     try{ (await api('/api/parametros',{silencioso:true})).forEach(x=>{ estado.parametros[x.chave]=x.valor; }); }catch(e){}
+    try{ estado.revendas=await api('/api/planos/revendas',{silencioso:true}); }catch(e){ estado.revendas=[]; }
   }
   await carregarAberto();
   if(estado.aberto) return telaCorteAberto();
@@ -143,8 +144,26 @@ async function telaEntrada(){
   const tab=el('table',{class:'grade'});
   tab.appendChild(el('tr',{},[el('th',{texto:'#'}),el('th',{texto:'Pedido'}),
     el('th',{texto:'Largura do corte (m)'}),
-    el('th',{texto:'Altura do corte (m)'}),el('th',{texto:'Item / etiqueta'}),
+    el('th',{texto:'Altura do corte (m)'}),el('th',{texto:'Tipo'}),el('th',{texto:'Item / etiqueta'}),
     el('th',{texto:'Cliente'}),el('th',{texto:''})]));
+  /* O TIPO DA LINHA (fase 5, R18): para quem e a peca. A revenda sai da
+     CARTEIRA que ja existe; o tempo por m² do painel e dividido por isto. */
+  const TIPOS=[['','— tipo —'],['cliente_final','Cliente final'],['revenda','Revenda'],['ml','ML sob medida']];
+  const seletorTipo=lin=>{
+    const box=el('div',{style:'display:flex;flex-direction:column;gap:4px'});
+    const st=el('select',{style:'min-width:140px'});
+    TIPOS.forEach(([v,n])=>st.appendChild(el('option',{value:v,texto:n,selected:lin.tipo===v?'selected':null})));
+    box.appendChild(st);
+    const sr=el('select',{style:'min-width:140px'+(lin.tipo==='revenda'?'':';display:none')});
+    sr.appendChild(el('option',{value:'',texto:'— qual revenda —'}));
+    (estado.revendas||[]).forEach(r=>sr.appendChild(el('option',{value:r.id,texto:r.nome,
+      selected:String(lin.revenda_id)===String(r.id)?'selected':null})));
+    box.appendChild(sr);
+    st.addEventListener('change',()=>{ lin.tipo=st.value; if(st.value!=='revenda') lin.revenda_id=null;
+      sr.style.display=st.value==='revenda'?'':'none'; });
+    sr.addEventListener('change',()=>{ lin.revenda_id=sr.value?Number(sr.value):null; });
+    return box;
+  };
   estado.linhas.forEach((lin,i)=>{
     const iP=el('input',{type:'text',value:lin.pedido||'',placeholder:'4292-1',
       style:'width:120px;font-size:16px'});
@@ -161,7 +180,7 @@ async function telaEntrada(){
       } else { const ins=$('#entrada').querySelectorAll('.grade input'); ins[(i+1)*3].focus(); }
     }});
     tab.appendChild(el('tr',{},[
-      el('td',{texto:String(i+1)}), el('td',{},[iP]), el('td',{},[iL]), el('td',{},[iA]),
+      el('td',{texto:String(i+1)}), el('td',{},[iP]), el('td',{},[iL]), el('td',{},[iA]), el('td',{},[seletorTipo(lin)]),
       el('td',{class:'quem',texto:[lin.item?('item '+lin.item):'',lin.codigo||''].filter(Boolean).join(' · ')}),
       el('td',{class:'quem',texto:lin.cliente||''}),
       el('td',{},[el('button',{class:'bt pequeno',texto:'✕',onclick:()=>{
@@ -173,6 +192,16 @@ async function telaEntrada(){
   /* Sem o recipiente do `rolaH` a grade empurra a PAGINA inteira, e esta e a
      tela da BANCADA: a 400 px ela media 623 px e a pagina andava de lado com
      o operador digitando medida (§12). */
+  // O mesmo tipo para todas as linhas: o corte do dia quase sempre e de um tipo so.
+  const todas=el('select',{});
+  todas.appendChild(el('option',{value:'',texto:'— o mesmo tipo para todas as linhas —'}));
+  TIPOS.slice(1).forEach(([v,n])=>todas.appendChild(el('option',{value:v,texto:n})));
+  (estado.revendas||[]).forEach(r=>todas.appendChild(el('option',{value:'revenda:'+r.id,texto:'Revenda · '+r.nome})));
+  todas.addEventListener('change',()=>{ if(!todas.value) return;
+    const [t,rid]=todas.value.split(':');
+    estado.linhas.forEach(l=>{ l.tipo=t; l.revenda_id=rid?Number(rid):null; });
+    telaEntrada(); });
+  c.appendChild(el('div',{class:'campos',style:'margin:10px 0 4px'},[el('div',{class:'campo'},[el('label',{texto:'TIPO'}),todas])]));
   c.appendChild(rolaH(tab));
 
   const acoes=el('div',{class:'campos',style:'margin-top:10px;align-items:center'});
@@ -260,7 +289,8 @@ const temMedida=l=>String(l.largura||'').trim()!==''&&String(l.altura||'').trim(
   comoNumero(l.largura)!==null&&comoNumero(l.altura)!==null;
 async function calcular(){
   const pecas=estado.linhas.filter(temMedida)
-    .map(l=>({pedido:l.pedido||'', cliente:l.cliente||'', largura:l.largura, altura:l.altura}));
+    .map(l=>({pedido:l.pedido||'', cliente:l.cliente||'', tipo:l.tipo||null, revenda_id:l.revenda_id||null,
+      largura:l.largura, altura:l.altura}));
   if(!pecas.length) return banner('Digite pelo menos uma medida.','alerta');
   if(!estado.tecido_id) return banner('Escolha o tecido.','alerta');
   try{
@@ -621,7 +651,8 @@ async function confirmar(bt){
     await api('/api/planos/confirmar',{metodo:'POST',corpo:{
       tecido_id:estado.tecido_id,
       pecas:estado.linhas.filter(temMedida)
-        .map(l=>({pedido:l.pedido||'', cliente:l.cliente||'', largura:l.largura, altura:l.altura})),
+        .map(l=>({pedido:l.pedido||'', cliente:l.cliente||'', tipo:l.tipo||null, revenda_id:l.revenda_id||null,
+          largura:l.largura, altura:l.altura})),
       recusadas:estado.recusadas, assinatura:p.assinatura, origem:'digitado'}});
     beep();
     estado.proposta=null; estado.recusadas=[];
@@ -681,7 +712,7 @@ function telaCorteAberto(){
         const e=r.entrada||{};
         if(e.tecido_id){ estado.tecido_id=e.tecido_id; }
         estado.linhas=(e.pecas||[]).map(x=>({pedido:x.pedido||'',cliente:x.cliente||'',
-          largura:String(x.largura),altura:String(x.altura)}));
+          tipo:x.tipo||'', revenda_id:x.revenda_id||null, largura:String(x.largura),altura:String(x.altura)}));
         if(!estado.linhas.length) estado.linhas=[{pedido:'',largura:'',altura:''}];
         estado.recusadas=e.recusadas||[];
         estado.aberto=null; await telaEntrada();
@@ -695,6 +726,22 @@ function telaCorteAberto(){
   c.appendChild(el('h2',{style:'margin-top:0',texto:'Cortando — corte '+a.plano_id}));
   c.appendChild(el('p',{class:'nota',style:'margin-bottom:0',texto:tecido+' · começou às '+hora(a.cortar_em)+
     '. Quando terminar, toque em Corte feito: é aí que o estoque baixa.'}));
+  /* O RELOGIO (fase 5, R19): do Cortar ao Corte feito, menos as pausas. */
+  const rel=el('div',{class:'campos',style:'align-items:center;margin-top:8px'});
+  const mostrador=el('span',{style:'font-size:24px;font-weight:700;font-variant-numeric:tabular-nums'});
+  const t0=Date.now(), base=a.tempo_s||0;
+  const fmtT=x=>{ const h=Math.floor(x/3600), m=Math.floor(x%3600/60), sg=x%60;
+    return (h?h+':':'')+String(m).padStart(h?2:1,'0')+':'+String(sg).padStart(2,'0'); };
+  const tic=()=>{ if(!document.body.contains(mostrador)) return clearInterval(estado.relogio);
+    mostrador.textContent=(a.pausado?'⏸ ':'⏱ ')+fmtT(base+(a.pausado?0:Math.round((Date.now()-t0)/1000))); };
+  rel.appendChild(mostrador);
+  // So depois de o mostrador estar na pagina: o tic se desliga quando ele sai.
+  clearInterval(estado.relogio); estado.relogio=setInterval(tic,1000); tic();
+  rel.appendChild(el('button',{class:'bt pequeno',texto:a.pausado?'Retomar':'Pausar',onclick:async()=>{
+    try{ estado.aberto=await api('/api/planos/'+a.plano_id+'/'+(a.pausado?'retomar':'pausar'),{metodo:'POST',corpo:{}}); telaCorteAberto(); }
+    catch(e){ beep('erro'); } }}));
+  if(a.pausado) rel.appendChild(el('span',{class:'quem',texto:'pausado — o tempo parado não conta'}));
+  c.appendChild(rel);
   const falta=(a.conferencias||[]).filter(k=>!k.conferida);
   if(falta.length) c.appendChild(el('p',{style:'color:var(--alerta);font-weight:700;margin:8px 0 0',
     texto:'⚠ Antes do Corte feito, confira o tom: '+falta.map(k=>'pedido '+k.pedido+' na '+(k.fonte==='rolo'?'bobina ':'sobra ')+k.codigo).join(' · ')+'.'}));

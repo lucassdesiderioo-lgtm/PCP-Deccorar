@@ -62,7 +62,7 @@ function degraus(x,origemDaSobra){
     Object.assign(dados,{origem:'rolo',origem_rolo_id:r2.id});
   }
   const s=sobra.criar(dados,'teste');
-  const pecas=[1,2,3].map(()=>({pedido:'TOM'+x.t.id,largura:'1,40',altura:'2,50'}));
+  const pecas=[1,2,3].map(()=>({pedido:'TOM'+x.t.id,tipo:'cliente_final',largura:'1,40',altura:'2,50'}));
   return {r,r2,s,pecas};
 }
 
@@ -75,9 +75,9 @@ module.exports=[
   novaSobra(x,2.90,2.60);      // comporta as tres lado a lado
 
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
-    {pedido:'4292',largura:'0,90',altura:'2,50'},
-    {pedido:'4292',largura:'0,90',altura:'2,50'},
-    {pedido:'4292',largura:'0,90',altura:'2,50'}]});
+    {pedido:'4292',tipo:'cliente_final',largura:'0,90',altura:'2,50'},
+    {pedido:'4292',tipo:'cliente_final',largura:'0,90',altura:'2,50'},
+    {pedido:'4292',tipo:'cliente_final',largura:'0,90',altura:'2,50'}]});
 
   igual(new Set(fontesDe(p)).size,1,'uma fonte so');
   igual(p.faixas[0].fonte,'sobra','e a sobra');
@@ -92,9 +92,9 @@ module.exports=[
   novaSobra(x,1.00,2.60);
 
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
-    {pedido:'5000',largura:'0,90',altura:'2,50'},
-    {pedido:'5000',largura:'0,90',altura:'2,50'},
-    {pedido:'5000',largura:'0,90',altura:'2,50'}]});
+    {pedido:'5000',tipo:'cliente_final',largura:'0,90',altura:'2,50'},
+    {pedido:'5000',tipo:'cliente_final',largura:'0,90',altura:'2,50'},
+    {pedido:'5000',tipo:'cliente_final',largura:'0,90',altura:'2,50'}]});
 
   const fontes=new Set(fontesDe(p));
   igual(fontes.size,1,'o pedido inteiro saiu de uma fonte so');
@@ -109,9 +109,9 @@ module.exports=[
   // quem combinar tom.
   novaSobra(x,1.00,2.60);
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
-    {pedido:'6001',largura:'0,90',altura:'2,50'},
-    {pedido:'6002',largura:'0,90',altura:'2,50'},
-    {pedido:'6002',largura:'0,90',altura:'2,50'}]});
+    {pedido:'6001',tipo:'cliente_final',largura:'0,90',altura:'2,50'},
+    {pedido:'6002',tipo:'cliente_final',largura:'0,90',altura:'2,50'},
+    {pedido:'6002',tipo:'cliente_final',largura:'0,90',altura:'2,50'}]});
 
   const porPedido={};
   p.faixas.forEach(f=>f.pecas.forEach(pc=>{
@@ -127,9 +127,9 @@ module.exports=[
   rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
   novaSobra(x,1.00,2.60);
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
-    {largura:'0,90',altura:'2,50'},
-    {largura:'0,90',altura:'2,50'},
-    {largura:'0,90',altura:'2,50'}]});
+    {tipo:'cliente_final',largura:'0,90',altura:'2,50'},
+    {tipo:'cliente_final',largura:'0,90',altura:'2,50'},
+    {tipo:'cliente_final',largura:'0,90',altura:'2,50'}]});
   igual(p.pecas_nao_alocadas.length,0,'todas alocadas');
   // Sem pedido informado, cada peca e um grupo de uma so: o plano pode
   // espalhar como for melhor.
@@ -144,8 +144,8 @@ module.exports=[
   const r=rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'3',nivel_id:x.buraco()},'teste');
 
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
-    {pedido:'7777',largura:'2,90',altura:'2,40'},
-    {pedido:'7777',largura:'2,90',altura:'2,40'}]});
+    {pedido:'7777',tipo:'cliente_final',largura:'2,90',altura:'2,40'},
+    {pedido:'7777',tipo:'cliente_final',largura:'2,90',altura:'2,40'}]});
 
   igual(p.pecas_nao_alocadas.length,2,'o pedido inteiro voltou');
   igual(/mesmo pedido/.test(p.pecas_nao_alocadas[0].motivo)||
@@ -163,8 +163,8 @@ module.exports=[
   rolo.entrada({tecido_id:x.t.id,largura:'2,00',metragem:'50',nivel_id:x.buraco()},'teste');
 
   // DIA 1: as duas primeiras pecas do pedido.
-  const dia1=[{pedido:'4272',largura:'1,495',altura:'2,730'},
-              {pedido:'4272',largura:'1,495',altura:'2,730'}];
+  const dia1=[{pedido:'4272',tipo:'cliente_final',largura:'1,495',altura:'2,730'},
+              {pedido:'4272',tipo:'cliente_final',largura:'1,495',altura:'2,730'}];
   const p1=plano.calcular({tecido_id:x.t.id,pecas:dia1});
   igual(p1.faixas[0].codigo,bom.codigo,'o dia 1 escolheu a bobina de 3,00 (duas por faixa)');
   const c1=corte.confirmar({tecido_id:x.t.id,pecas:dia1,assinatura:p1.assinatura},'teste');
@@ -173,8 +173,8 @@ module.exports=[
   // DIA 2: o resto do pedido. Sem olhar para tras, o plano poderia mudar de
   // rolo — e o cliente veria a diferenca na parede.
   const p2=plano.calcular({tecido_id:x.t.id,pecas:[
-    {pedido:'4272',largura:'1,495',altura:'2,730'},
-    {pedido:'4272',largura:'1,615',altura:'2,540'}]});
+    {pedido:'4272',tipo:'cliente_final',largura:'1,495',altura:'2,730'},
+    {pedido:'4272',tipo:'cliente_final',largura:'1,615',altura:'2,540'}]});
 
   igual(p2.continuando_em!==null,true,'o plano reconheceu o corte anterior');
   igual(p2.continuando_em.codigo,bom.codigo,'e continua no MESMO rolo');
@@ -188,7 +188,7 @@ module.exports=[
   const x=cena();
   rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
-    {pedido:'9999',largura:'1,00',altura:'2,00'}]});
+    {pedido:'9999',tipo:'cliente_final',largura:'1,00',altura:'2,00'}]});
   igual(p.continuando_em,null,'sem historico, escolhe livremente');
   igual(p.cortes_anteriores.length,0,'e nao inventa aviso');
 }},
@@ -202,8 +202,8 @@ module.exports=[
   // A largura passa folgado; a altura, nao.
   novaSobra(x,1.90,2.60);
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
-    {pedido:'8001',largura:'0,90',altura:'2,50'},
-    {pedido:'8001',largura:'0,90',altura:'2,50'}]});
+    {pedido:'8001',tipo:'cliente_final',largura:'0,90',altura:'2,50'},
+    {pedido:'8001',tipo:'cliente_final',largura:'0,90',altura:'2,50'}]});
   const pe=p.sobras_geradas.concat(p.refugos).find(s=>Math.abs(s.altura-0.10)<0.001);
   igual(!!pe,true,'o pe de 0,10 existe');
   igual(p.sobras_geradas.some(s=>Math.abs(s.altura-0.10)<0.001),false,
@@ -220,9 +220,9 @@ module.exports=[
   rolo.entrada({tecido_id:x.t.id,largura:'2,00',metragem:'50',nivel_id:x.buraco()},'teste');
 
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
-    {largura:'1,20',altura:'2,00'},     // esta sai
-    {largura:'2,40',altura:'1,50'},     // esta nao tem bobina
-    {largura:'2,40',altura:'1,00'}]});  // nem esta
+    {tipo:'cliente_final',largura:'1,20',altura:'2,00'},     // esta sai
+    {tipo:'cliente_final',largura:'2,40',altura:'1,50'},     // esta nao tem bobina
+    {tipo:'cliente_final',largura:'2,40',altura:'1,00'}]});  // nem esta
 
   igual(p.faixas.length>0,true,'o resto do plano continua saindo');
   igual(!!p.falta_bobina,true,'e a falta vem separada, nao so numa linha de texto');
@@ -240,7 +240,7 @@ module.exports=[
 {nome:'com bobina larga o bastante, nao ha falta nenhuma', executar({igual}){
   const x=cena();
   rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
-  const p=plano.calcular({tecido_id:x.t.id,pecas:[{largura:'2,40',altura:'1,50'}]});
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[{tipo:'cliente_final',largura:'2,40',altura:'1,50'}]});
   igual(p.falta_bobina,null,'null, e nao um objeto vazio');
   // Tarja de alarme que aparece sem alarme e tarja que a equipe aprende a
   // ignorar — e ai a de verdade passa batida.
@@ -264,8 +264,8 @@ module.exports=[
   novaSobra(x,'0,40','0,40'); novaSobra(x,'0,50','0,60');
 
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
-    {largura:'0,90',altura:'1,60',pedido:'1'},
-    {largura:'0,92',altura:'1,50',pedido:'1'}]});
+    {tipo:'cliente_final',largura:'0,90',altura:'1,60',pedido:'1'},
+    {tipo:'cliente_final',largura:'0,92',altura:'1,50',pedido:'1'}]});
 
   igual(p.faixas.length,0,'nada foi cortado — o pedido nao cabe inteiro');
   // ISTO E O DEFEITO QUE A FASE 2 CONSERTA: a frase negava e nomeava a
@@ -297,8 +297,8 @@ module.exports=[
      conferencia por mutacao mostrou: trocar a regra por `lista[0]` passava
      com 17 verdes. A ordem da cena e o que da sentido a asserção. */
   const p=plano.calcular({tecido_id:x.t.id,pecas:[
-    {largura:'0,92',altura:'1,50',pedido:'7'},
-    {largura:'0,90',altura:'1,60',pedido:'7'}]});
+    {tipo:'cliente_final',largura:'0,92',altura:'1,50',pedido:'7'},
+    {tipo:'cliente_final',largura:'0,90',altura:'1,60',pedido:'7'}]});
   igual(p.sobras_que_servem.length,1,'uma linha');
   const e=p.sobras_que_servem[0];
   // A MAIOR EM AREA: 0,90 × 1,60 = 1,44 m² contra 1,38 m². E ela que responde
@@ -312,7 +312,7 @@ module.exports=[
  executar({igual}){
   const x=cena();
   novaSobra(x,'0,40','0,40');
-  const p=plano.calcular({tecido_id:x.t.id,pecas:[{largura:'1,00',altura:'2,00',pedido:'9'}]});
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[{tipo:'cliente_final',largura:'1,00',altura:'2,00',pedido:'9'}]});
   igual(p.sobras_que_servem.length,0,'nenhuma serve, nada a listar');
   igual(/Nenhuma das 1 sobras/.test(p.sobre_sobras),true,'a negativa volta: '+p.sobre_sobras);
   igual(/comporta/.test(p.sobre_sobras),true,'com a palavra de sempre');
@@ -323,7 +323,7 @@ module.exports=[
   const x=cena();
   const s=novaSobra(x,'1,20','2,20');           // comporta a peca com folga
   const p=plano.calcular({tecido_id:x.t.id,
-    pecas:[{largura:'1,00',altura:'2,00',pedido:'11'}], recusadas:[s.id]});
+    pecas:[{tipo:'cliente_final',largura:'1,00',altura:'2,00',pedido:'11'}], recusadas:[s.id]});
   igual(p.faixas.length,0,'sem fonte, porque a unica foi recusada');
   igual(p.sobras_que_servem.length,1,'ela aparece');
   igual(p.sobras_que_servem[0].motivo_codigo,'recusada','com o motivo certo');
@@ -344,7 +344,7 @@ module.exports=[
   sobra.criar({codigo:cod,tecido_id:x.t.id,largura:'1,20',altura:'2,20',
     condicao:'inservivel',nivel_id:x.nivelSobra},'teste');
 
-  const p=plano.calcular({tecido_id:x.t.id,pecas:[{largura:'1,00',altura:'2,00',pedido:'13'}]});
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[{tipo:'cliente_final',largura:'1,00',altura:'2,00',pedido:'13'}]});
   igual(p.sobras_que_servem.length,1,'ela aparece na explicacao');
   igual(p.sobras_que_servem[0].motivo_codigo,'nao_aproveitavel','com o motivo certo');
   igual(/nao aproveitavel/.test(p.sobras_que_servem[0].motivo),true,
@@ -361,7 +361,7 @@ module.exports=[
   const grande=novaSobra(x,'2,50','1,00');
   const pequena=novaSobra(x,'0,50','2,00');     // tambem nao serve (largura)
   const p=plano.calcular({tecido_id:x.t.id,
-    pecas:[{largura:'0,90',altura:'2,00',pedido:'15'}], recusadas:[grande.id]});
+    pecas:[{tipo:'cliente_final',largura:'0,90',altura:'2,00',pedido:'15'}], recusadas:[grande.id]});
   igual(p.sobras_que_servem.length,0,'nenhuma serve esta peca');
   igual(p.sobre_sobras.includes(pequena.codigo),true,
     'a maior citada e a disponivel: '+p.sobre_sobras);
@@ -372,7 +372,7 @@ module.exports=[
 {nome:'R4 — plano que USOU sobra nao ganha lista nem frase', executar({igual}){
   const x=cena();
   novaSobra(x,'1,20','2,20');
-  const p=plano.calcular({tecido_id:x.t.id,pecas:[{largura:'1,00',altura:'2,00',pedido:'17'}]});
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[{tipo:'cliente_final',largura:'1,00',altura:'2,00',pedido:'17'}]});
   igual(p.faixas.length,1,'cortou na sobra');
   igual(p.sobras_que_servem.length,0,'nada a explicar');
   igual(p.sobre_sobras,null,'e nenhuma frase');
@@ -423,7 +423,7 @@ module.exports=[
   const x=cena();
   rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
   novaSobra(x,1.50,2.60);
-  const p=plano.calcular({tecido_id:x.t.id,pecas:[1,2,3].map(()=>({pedido:'UM'+x.t.id,largura:'1,40',altura:'2,50'}))});
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[1,2,3].map(()=>({pedido:'UM'+x.t.id,tipo:'cliente_final',largura:'1,40',altura:'2,50'}))});
   igual(p.divididos.length,0,'nao dividiu');
   igual(new Set(p.faixas.map(f=>f.fonte+':'+f.fonte_id)).size,1,'uma fonte so');
 }},
@@ -433,7 +433,7 @@ module.exports=[
   rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'2,60',nivel_id:x.buraco()},'teste');
   // Quatro pecas: o rolo leva duas, a sobra uma, e a quarta nao tem lugar.
   novaSobra(x,1.50,2.60);
-  const p=plano.calcular({tecido_id:x.t.id,pecas:[1,2,3,4].map(()=>({pedido:'Q'+x.t.id,largura:'1,40',altura:'2,50'}))});
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[1,2,3,4].map(()=>({pedido:'Q'+x.t.id,tipo:'cliente_final',largura:'1,40',altura:'2,50'}))});
   igual(p.divididos.length,0,'nao divide pela metade');
   igual(p.pecas_nao_alocadas.length,4,'o pedido inteiro volta marcado');
 }},
@@ -490,10 +490,10 @@ module.exports=[
   const rx=rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
   const ry=rolo.entrada({tecido_id:y.t.id,largura:'3,00',metragem:'50',nivel_id:y.buraco()},'teste');
   const pedido='DUASCORES'+x.t.id;
-  const p1=plano.calcular({tecido_id:x.t.id,pecas:[{pedido,largura:'1,00',altura:'2,00'}]});
-  const c1=corte.confirmar({tecido_id:x.t.id,pecas:[{pedido,largura:'1,00',altura:'2,00'}],assinatura:p1.assinatura},'D'+x.t.id);
+  const p1=plano.calcular({tecido_id:x.t.id,pecas:[{pedido,tipo:'ml',largura:'1,00',altura:'2,00'}]});
+  const c1=corte.confirmar({tecido_id:x.t.id,pecas:[{pedido,tipo:'ml',largura:'1,00',altura:'2,00'}],assinatura:p1.assinatura},'D'+x.t.id);
   corte.cortar(c1.plano_id,'D'+x.t.id); corte.feito(c1.plano_id,'D'+x.t.id);
-  const p2=plano.calcular({tecido_id:y.t.id,pecas:[{pedido,largura:'1,00',altura:'2,00'}]});
+  const p2=plano.calcular({tecido_id:y.t.id,pecas:[{pedido,tipo:'ml',largura:'1,00',altura:'2,00'}]});
   igual(p2.continuando_em,null,'nao "continua" no rolo da outra cor');
   igual(p2.faixas.every(f=>f.fonte_id===ry.id),true,'e corta no rolo deste tecido');
   igual(p2.cortes_anteriores.length,0,'o corte da outra cor nao e corte anterior deste tecido');
@@ -503,12 +503,12 @@ module.exports=[
   const x=cena();
   const r1=rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'2,10',nivel_id:x.buraco()},'teste');
   const pedido='ANTES'+x.t.id;
-  const p1=plano.calcular({tecido_id:x.t.id,pecas:[{pedido,largura:'1,00',altura:'2,00'}]});
-  const c1=corte.confirmar({tecido_id:x.t.id,pecas:[{pedido,largura:'1,00',altura:'2,00'}],assinatura:p1.assinatura},'A'+x.t.id);
+  const p1=plano.calcular({tecido_id:x.t.id,pecas:[{pedido,tipo:'ml',largura:'1,00',altura:'2,00'}]});
+  const c1=corte.confirmar({tecido_id:x.t.id,pecas:[{pedido,tipo:'ml',largura:'1,00',altura:'2,00'}],assinatura:p1.assinatura},'A'+x.t.id);
   corte.cortar(c1.plano_id,'A'+x.t.id); corte.feito(c1.plano_id,'A'+x.t.id);
   // O rolo do dia 1 nao tem mais como dar a peca; entra outro rolo.
   rolo.entrada({tecido_id:x.t.id,largura:'3,00',metragem:'50',nivel_id:x.buraco()},'teste');
-  const p2=plano.calcular({tecido_id:x.t.id,pecas:[{pedido,largura:'1,00',altura:'2,00'}]});
+  const p2=plano.calcular({tecido_id:x.t.id,pecas:[{pedido,tipo:'ml',largura:'1,00',altura:'2,00'}]});
   igual(p2.faixas.length>=1&&p2.faixas[0].fonte_id!==r1.id,true,'o corte de hoje sai de outro rolo');
   igual(p2.conferencias.length,1,'e pede conferencia: o tom tem que bater com o do dia 1');
   igual(p2.conferencias[0].com_corte_anterior,true,'dizendo que e por causa do corte anterior');

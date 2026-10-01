@@ -52,7 +52,7 @@ const fontesDe=a=>a.proposta.faixas.map(f=>f.fonte+':'+f.codigo);
 function casoDoDia(x,larguraSobra){
   const r=novoRolo(x);
   const s=novaSobra(x,larguraSobra||1.00,2.60);
-  const c=cortando(x,[{pedido:x.pedido,largura:'0,95',altura:'2,50'},{pedido:x.pedido+'b',largura:'1,00',altura:'2,00'}]);
+  const c=cortando(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'0,95',altura:'2,50'},{pedido:x.pedido+'b',tipo:'cliente_final',largura:'1,00',altura:'2,00'}]);
   const naSobra=c.proposta.faixas.find(f=>f.fonte==='sobra');
   if(!naSobra) throw new Error('o cenario deveria usar a sobra');
   corte.feito(c.plano_id,x.quem);
@@ -65,7 +65,7 @@ module.exports=[
 
 {nome:'TROCAR A FONTE RECALCULA OS METROS: "o item saiu do rolo R"', executar({igual,perto}){
   const x=cena(); const r=novoRolo(x); const s=novaSobra(x,1.00,2.60);
-  const c=cortando(x,[{pedido:x.pedido,largura:'0,95',altura:'2,50'}]);
+  const c=cortando(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'0,95',altura:'2,50'}]);
   igual(c.proposta.faixas[0].fonte,'sobra','o plano mandou para a sobra');
   const a=corte.editar(c.plano_id,{tipo:'trocar',peca:1,codigo:r.codigo,motivo_id:TOM()},x.quem);
   igual(a.proposta.faixas.length,1,'uma faixa');
@@ -77,20 +77,20 @@ module.exports=[
   igual(a.edicoes[0].usuario_nome,x.quem,'com quem');
   igual(a.edicoes[0].motivo_nome,'Tonalidade diferente','e o motivo');
   // E a sobra fica livre para outro plano.
-  const outro=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:'z'+x.pedido,largura:'0,95',altura:'2,50'}]});
+  const outro=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:'z'+x.pedido,tipo:'cliente_final',largura:'0,95',altura:'2,50'}]});
   igual(outro.sobras_sugeridas[0]&&outro.sobras_sugeridas[0].id,s.id,'a sobra voltou a ser livre');
 }},
 
 {nome:'toda edicao exige motivo, e a recusada nao muda nada', executar({recusa,igual}){
   const x=cena(); const r=novoRolo(x); novaSobra(x,1.00,2.60);
-  const c=cortando(x,[{pedido:x.pedido,largura:'0,95',altura:'2,50'}]);
+  const c=cortando(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'0,95',altura:'2,50'}]);
   recusa(()=>corte.editar(c.plano_id,{tipo:'trocar',peca:1,codigo:r.codigo},x.quem),'motivo_obrigatorio');
   igual(corte.edicoes(c.plano_id).length,0,'nada gravado');
 }},
 
 {nome:'apontar uma fonte onde o item NAO cabe e recusado dizendo por que', executar({recusa,igual}){
   const x=cena(); novoRolo(x); const pequena=novaSobra(x,0.90,1.00);
-  const c=cortando(x,[{pedido:x.pedido,largura:'1,50',altura:'2,00'}]);
+  const c=cortando(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'1,50',altura:'2,00'}]);
   const e=recusa(()=>corte.editar(c.plano_id,{tipo:'trocar',peca:1,codigo:pequena.codigo,motivo_id:TOM()},x.quem),'nao_cabe_na_fonte');
   igual(new RegExp(pequena.codigo).test(e.mensagem),true,'a frase diz a fonte: '+e.mensagem);
   igual(corte.edicoes(c.plano_id).length,0,'e nada muda');
@@ -98,7 +98,7 @@ module.exports=[
 
 {nome:'NAO USAR a sobra (tom diferente) manda as pecas para outra fonte e vira recusa do painel', executar({igual}){
   const x=cena(); novoRolo(x); const s=novaSobra(x,1.00,2.60);
-  const c=cortando(x,[{pedido:x.pedido,largura:'0,95',altura:'2,50'}]);
+  const c=cortando(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'0,95',altura:'2,50'}]);
   const a=corte.editar(c.plano_id,{tipo:'nao_usar',fonte:'sobra',fonte_id:s.id,motivo_id:TOM()},x.quem);
   igual(a.proposta.faixas.every(f=>f.fonte==='rolo'),true,'foi tudo para o rolo');
   igual(db.prepare('SELECT COUNT(*) n FROM plano_recusa WHERE plano_id=? AND sobra_id=?').get(c.plano_id,s.id).n,1,
@@ -107,7 +107,7 @@ module.exports=[
 
 {nome:'MEDIDA ERRADA: o pedaco vira sobra "cortada errada" e o item volta a ser cortado', executar({igual,perto}){
   const x=cena(); const r=novoRolo(x);
-  const c=cortando(x,[{pedido:x.pedido,largura:'1,00',altura:'2,00'}]);
+  const c=cortando(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'1,00',altura:'2,00'}]);
   const a=corte.editar(c.plano_id,{tipo:'medida_errada',peca:1,motivo_id:motivo('Medida errada')},x.quem);
   perto(a.proposta.consumo_linear,4.00,'o rolo puxa as duas vezes');
   const errada=a.proposta.sobras_geradas.find(g=>g.cortada_errada);
@@ -122,7 +122,7 @@ module.exports=[
 
 {nome:'medida errada pequena demais para sobra vira REFUGO, medido', executar({igual,perto}){
   const x=cena(); novoRolo(x);
-  const c=cortando(x,[{pedido:x.pedido,largura:'0,50',altura:'1,20'}]);
+  const c=cortando(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'0,50',altura:'1,20'}]);
   const a=corte.editar(c.plano_id,{tipo:'medida_errada',peca:1,motivo_id:motivo('Medida errada')},x.quem);
   igual(a.proposta.sobras_geradas.some(g=>g.cortada_errada),false,'nao vira sobra (abaixo da largura minima)');
   const rf=a.proposta.refugos.find(z=>z.motivo==='cortada_errada');
@@ -133,7 +133,7 @@ module.exports=[
 
 {nome:'ROLO ACABOU: o que ja saiu fica nele, o resto muda, e no Corte feito ele e encerrado', executar({igual}){
   const x=cena(); const r1=novoRolo(x); const r2=novoRolo(x);
-  const c=cortando(x,[{pedido:x.pedido,largura:'1,00',altura:'2,00'},{pedido:x.pedido+'b',largura:'1,00',altura:'2,00'}]);
+  const c=cortando(x,[{pedido:x.pedido,tipo:'cliente_final',largura:'1,00',altura:'2,00'},{pedido:x.pedido+'b',tipo:'cliente_final',largura:'1,00',altura:'2,00'}]);
   const usado=c.proposta.faixas[0].fonte_id, outro=usado===r1.id?r2.id:r1.id;
   const a=corte.editar(c.plano_id,{tipo:'rolo_acabou',fonte_id:usado,itens_saidos:[1],motivo_id:motivo('Rolo acabou')},x.quem);
   const do1=a.proposta.faixas.find(f=>f.pecas.some(p=>p.id===1));
@@ -147,8 +147,8 @@ module.exports=[
 
 {nome:'so se edita o corte que esta CORTANDO', executar({recusa}){
   const x=cena(); const r=novoRolo(x);
-  const p=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido,largura:'1,00',altura:'2,00'}]});
-  const c=corte.confirmar({tecido_id:x.t.id,pecas:[{pedido:x.pedido,largura:'1,00',altura:'2,00'}],assinatura:p.assinatura},x.quem);
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:x.pedido,tipo:'cliente_final',largura:'1,00',altura:'2,00'}]});
+  const c=corte.confirmar({tecido_id:x.t.id,pecas:[{pedido:x.pedido,tipo:'cliente_final',largura:'1,00',altura:'2,00'}],assinatura:p.assinatura},x.quem);
   recusa(()=>corte.editar(c.plano_id,{tipo:'trocar',peca:1,codigo:r.codigo,motivo_id:TOM()},x.quem),'etapa_errada');
 }},
 
@@ -179,7 +179,7 @@ module.exports=[
   igual(d.fontes.every(f=>f.fonte==='rolo'),true,'o historico mostra o corte como foi');
   igual(db.prepare("SELECT COUNT(*) n FROM sobra_correcao WHERE sobra_id=? AND campo='status'").get(s.id).n,1,'a sobra tem o rastro');
   // A sobra que voltou entra em plano de novo.
-  const p=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:'z'+x.pedido,largura:'0,95',altura:'2,50'}]});
+  const p=plano.calcular({tecido_id:x.t.id,pecas:[{pedido:'z'+x.pedido,tipo:'cliente_final',largura:'0,95',altura:'2,50'}]});
   igual(p.sobras_sugeridas[0]&&p.sobras_sugeridas[0].id,s.id,'e volta a ser oferecida');
 }},
 
@@ -220,7 +220,7 @@ module.exports=[
   corte.pedirCorrecao(c.plano_id,{edicoes:[{tipo:'trocar',peca:itemNaSobra,codigo:r.codigo}],motivo_id:TOM()},x.quem);
   recusa(()=>corte.pedirCorrecao(c.plano_id,{edicoes:[{tipo:'trocar',peca:itemNaSobra,codigo:r.codigo}],motivo_id:TOM()},x.quem),'correcao_pendente');
   const y=cena(); novoRolo(y);
-  const aberto=cortando(y,[{pedido:y.pedido,largura:'1,00',altura:'2,00'}]);
+  const aberto=cortando(y,[{pedido:y.pedido,tipo:'cliente_final',largura:'1,00',altura:'2,00'}]);
   recusa(()=>corte.pedirCorrecao(aberto.plano_id,{edicoes:[{tipo:'medida_errada',peca:1}],motivo_id:TOM()},y.quem),'etapa_errada');
 }},
 

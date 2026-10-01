@@ -45,6 +45,19 @@ module.exports={rotas:[
   {metodo:'POST', caminho:'/api/planos/:id/editar', permissao:'plano.confirmar',
    manipulador:({params,corpo,usuario})=>corte.editar(params.id,corpo,usuario.nome,op(usuario)),
    detalhe:(req,d)=>'corte '+req.params.id+' editado: '+(d&&d.mudou)},
+  // O relogio do corte (fase 5, R19): pausar e retomar sao do dono do corte.
+  {metodo:'POST', caminho:'/api/planos/:id/pausar', permissao:'plano.confirmar',
+   manipulador:({params,usuario})=>corte.pausar(params.id,usuario.nome,op(usuario)),
+   detalhe:req=>'pausou o corte '+req.params.id},
+  {metodo:'POST', caminho:'/api/planos/:id/retomar', permissao:'plano.confirmar',
+   manipulador:({params,usuario})=>corte.retomar(params.id,usuario.nome,op(usuario)),
+   detalhe:req=>'retomou o corte '+req.params.id},
+  /* A carteira de revendas, so com id e nome, para a coluna Tipo da grade.
+     Porta propria com a chave de quem corta: mandar a tela a /api/revendas
+     exigiria `revenda.ler`, que o cortador nao tem, e o seletor abriria vazio
+     com 403 no console (§10, armadilha #29). Vem antes de /api/planos/:id. */
+  {metodo:'GET', caminho:'/api/planos/revendas', permissao:'plano.calcular',
+   manipulador:()=>corte.revendas()},
   {metodo:'POST', caminho:'/api/planos/:id/conferir', permissao:'plano.confirmar',
    manipulador:({params,corpo,usuario})=>corte.conferir(params.id,corpo,usuario.nome,op(usuario)),
    detalhe:req=>'conferiu o tecido do pedido '+req.body.pedido+' na fonte '+req.body.fonte+' '+req.body.fonte_id+

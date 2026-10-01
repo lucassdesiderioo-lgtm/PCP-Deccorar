@@ -5,8 +5,8 @@ STATUS
 Situação: em construção
 Criada em: 01/10/2026
 Última atualização: 01/10/2026
-Fase atual: 5 (tipo por linha e tempo por m²) — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
-Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☐  6 ☐  7 ☐
+Fase atual: 6 (leitura da etiqueta por foto) — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
+Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☐  7 ☐
 Risco: 🔴 (muda o momento da baixa de rolo e sobra; correção de estoque depois do corte)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
 Substitui: SOBRAS-TOM-E-DESPERDICIO.md (18/09/2026), que foi para docs/arquivo/
@@ -53,6 +53,13 @@ Mudanças no caminho:
       - o "não usar" do planejar (antes de confirmar) continua: a spec o
         move para o ③, e no ③ ele existe agora; no ① ele não faz mal e
         poupa um corte confirmado só para recusar uma sobra.
+  · Fase 5 em código (01/10/2026). O cadastro de revendas (§6, "o PLANO da
+    fase 5 confirma onde ele mora") é a tabela `sm_revenda` do módulo,
+    lida por uma porta própria do corte (só id e nome). O tipo é exigido no
+    Confirmar, não no calcular: o plano se simula sem tipo. O m² que divide o
+    tempo é o das PEÇAS, não o puxado. O painel ganhou a aba "Tempo de corte"
+    com os últimos 30 dias. Migração 30 (tipo na linha, plano_pausa,
+    tempo_liquido_s e o parâmetro corteTempoMaxHoras = 3 h).
   · Achado na fase 1 e CONSERTADO na fase 4: o plano que continua o pedido no
     rolo do corte anterior (R12) não conferia o tecido — pedido com persianas
     de duas cores mandava puxar do rolo da outra cor.

@@ -81,6 +81,22 @@ function resumo(prop){
   return fontes;
 }
 
+/* ── O TIPO DE CADA LINHA (fase 5, R18) ───────────────────────────────────
+   Revenda e escolhida da CARTEIRA que ja existe (`sm_revenda`): uma segunda
+   lista de clientes aqui seria o lugar onde a revenda nova e esquecida. */
+const TIPOS_PEDIDO={cliente_final:'Cliente final', revenda:'Revenda', ml:'ML sob medida'};
+const revendas=()=>db.prepare(`SELECT id, nome_fantasia AS nome FROM sm_revenda
+  WHERE ativo=1 ORDER BY nome_fantasia`).all();
+function exigirTipos(pecas){
+  (pecas||[]).forEach((p,i)=>{
+    exigir(TIPOS_PEDIDO[p.tipo],'tipo_faltando','A linha '+(i+1)+' esta sem o tipo: cliente final, revenda ou ML sob medida.');
+    if(p.tipo==='revenda'){
+      const r=p.revenda_id&&db.prepare('SELECT id, ativo FROM sm_revenda WHERE id=?').get(Number(p.revenda_id));
+      exigir(r&&r.ativo,'revenda_faltando','A linha '+(i+1)+' e de revenda: escolha qual, da carteira.');
+    }
+  });
+}
+
 /* ── ② CONFIRMAR ──────────────────────────────────────────────────────────
    Grava o corte, trava o plano e reserva as fontes. NADA BAIXA.
    Recalcula do zero e compara a assinatura com o que a tela mostrou: o
@@ -92,6 +108,9 @@ function confirmar(pedido,usuarioNome){
     'Voce ja tem o corte '+(aberto&&aberto.id)+' aberto ('+(aberto&&NOME_ETAPA[aberto.etapa])+
     '). Termine ou cancele esse antes de abrir outro.');
 
+  // R18 — cada linha diz para quem e. E aqui, e nao no calcular: o plano se
+  // simula sem tipo, mas o corte que vai para o historico tem que ter.
+  exigirTipos(pedido.pecas);
   const p=plano.calcular(pedido);
   exigir(p.assinatura===pedido.assinatura,'plano_mudou',
     'O estoque mudou desde que este plano foi calculado (outra pessoa pode ter usado ou reservado uma destas sobras). Confira o plano de novo antes de confirmar.');
@@ -129,20 +148,51 @@ function gravarPlano(plano_id,p){
     (plano_id,ordem,fonte,rolo_id,sobra_id,largura_disponivel,altura,largura_usada,sobra_gerada_codigo)
     VALUES(?,?,?,?,?,?,?,?,NULL)`);
   const gravaPeca=db.prepare(`INSERT INTO plano_peca
-    (plano_id,ordem,tecido_id,largura,altura,faixa_id,pos_x,nao_alocada_motivo,pedido)
-    VALUES(?,?,?,?,?,?,?,?,?)`);
-  const pedidoDe=id=>{ const x=p.pecas.find(y=>y.id===id); return x&&x.pedido?x.pedido:null; };
+    (plano_id,ordem,tecido_id,largura,altura,faixa_id,pos_x,nao_alocada_motivo,pedido,tipo,revenda_id,revenda_nome)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`);
+  const nomeRevenda=id=>{ if(!id) return null; const r=db.prepare('SELECT nome_fantasia n FROM sm_revenda WHERE id=?').get(id); return r?r.n:null; };
+  const da=id=>{ const x=p.pecas.find(y=>y.id===id)||{};
+    return [x.pedido||null, x.tipo||null, x.revenda_id||null, nomeRevenda(x.revenda_id)]; };
   p.faixas.forEach(f=>{
     const r=gravaFaixa.run(plano_id,f.ordem,f.fonte,
       f.fonte==='rolo'?f.fonte_id:null, f.fonte==='sobra'?f.fonte_id:null,
       f.largura_disponivel,f.altura,f.largura_usada);
-    f.pecas.forEach(pc=>gravaPeca.run(plano_id,pc.id,p.tecido.id,pc.largura,pc.altura,
-      r.lastInsertRowid,pc.x,null,pedidoDe(pc.id)));
+    // O pedaco cortado errado (fase 3) nao e linha do corte: ele vive na faixa
+    // da proposta, onde gastou tecido, e no historico das edicoes.
+    f.pecas.filter(pc=>!pc.errada).forEach(pc=>gravaPeca.run(plano_id,pc.id,p.tecido.id,pc.largura,pc.altura,
+      r.lastInsertRowid,pc.x,null,...da(pc.id)));
   });
   // A peca que nao coube fica gravada com o motivo — o corte guarda o que NAO
   // deu certo tambem, senao o historico so conta a metade boa.
   p.pecas_nao_alocadas.forEach(pc=>
-    gravaPeca.run(plano_id,pc.id,p.tecido.id,pc.largura,pc.altura,null,null,pc.motivo,pedidoDe(pc.id)));
+    gravaPeca.run(plano_id,pc.id,p.tecido.id,pc.largura,pc.altura,null,null,pc.motivo,...da(pc.id)));
+}
+
+/* ── O RELOGIO (fase 5, R19) ──────────────────────────────────────────────
+   Do Cortar ao Corte feito, menos as pausas. A pausa e do operador: almoco,
+   o rolo que foi buscar no estoque de cima, a maquina parada. */
+const pausaAberta=plano_id=>db.prepare('SELECT * FROM plano_pausa WHERE plano_id=? AND fim IS NULL').get(plano_id);
+function pausar(id,usuarioNome,op){
+  const c=exigirCorte(id); exigirDono(c,usuarioNome,op); exigirEtapa(c,['cortando'],'pausar');
+  exigir(!pausaAberta(c.id),'ja_pausado','O corte '+c.id+' ja esta pausado.');
+  db.prepare('INSERT INTO plano_pausa(plano_id,inicio,usuario_nome) VALUES(?,?,?)').run(c.id,dia.agora(),usuarioNome||null);
+  return aberto(usuarioNome,c.id);
+}
+function retomar(id,usuarioNome,op){
+  const c=exigirCorte(id); exigirDono(c,usuarioNome,op); exigirEtapa(c,['cortando'],'retomar');
+  const pa=pausaAberta(c.id);
+  exigir(pa,'nao_pausado','O corte '+c.id+' nao esta pausado.');
+  db.prepare('UPDATE plano_pausa SET fim=? WHERE id=?').run(dia.agora(),pa.id);
+  return aberto(usuarioNome,c.id);
+}
+// Segundos: o corte inteiro, menos cada pausa. Pausa ainda aberta conta ate `ate`.
+function tempoLiquido(c,ate){
+  if(!c.cortar_em) return null;
+  const fim=ate||dia.agora();
+  const bruto=db.prepare("SELECT CAST(ROUND((julianday(?)-julianday(?))*86400) AS INTEGER) s").get(fim,c.cortar_em).s;
+  const pausas=db.prepare(`SELECT COALESCE(SUM(CAST(ROUND((julianday(COALESCE(fim,?))-julianday(inicio))*86400) AS INTEGER)),0) s
+     FROM plano_pausa WHERE plano_id=?`).get(fim,c.id).s;
+  return Math.max(0,bruto-pausas);
 }
 
 /* VOLTAR AO PLANO — so do ②, antes de cortar. Apaga o corte em vez de
@@ -235,8 +285,11 @@ function feito(id,usuarioNome,op){
       if(r&&r.status!=='encerrado') rolo.encerrar(rid,quem);
     });
 
-    db.prepare(`UPDATE plano SET etapa='feito', confirmado=1, feito_em=?, feito_por=?,
-       data=date('now','localtime') WHERE id=?`).run(dia.agora(),quem,c.id);
+    // O relogio para no Corte feito; pausa esquecida aberta fecha aqui (R19).
+    const agora=dia.agora();
+    db.prepare('UPDATE plano_pausa SET fim=? WHERE plano_id=? AND fim IS NULL').run(agora,c.id);
+    db.prepare(`UPDATE plano SET etapa='feito', confirmado=1, feito_em=?, feito_por=?, tempo_liquido_s=?,
+       data=date('now','localtime') WHERE id=?`).run(agora,quem,tempoLiquido(c,agora),c.id);
 
     return {plano_id:c.id, etapa:'feito', consumo_linear:p.consumo_linear,
       sobras_a_guardar:(p.sobras_geradas||[]).length};
@@ -254,7 +307,8 @@ function aberto(usuarioNome,id){
   return {plano_id:c.id, etapa:c.etapa, usuario_nome:c.usuario_nome,
     criado_em:c.criado_em, cortar_em:c.cortar_em,
     entrada:JSON.parse(c.entrada||'{}'), proposta:p, fontes:resumo(p), edicoes:edicoes(c.id),
-    conferencias:estadoConferencias(c,p)};
+    conferencias:estadoConferencias(c,p),
+    pausado:!!pausaAberta(c.id), tempo_s:tempoLiquido(c)};
 }
 
 const CAMPOS_GUARDAR=`g.*, p.criado_em AS corte_em, t.id AS t_id,
@@ -729,6 +783,6 @@ function conferir(id,dados,usuarioNome,op){
 }
 
 module.exports={confirmar, voltar, cortar, cancelar, feito, aberto, aGuardar, doCorte, guardar,
-  editar, edicoes, conferir, estadoConferencias, previaCorrecao:(id,eds)=>previaParaTela(previa(exigirCorte(id),eds)),
+  editar, edicoes, conferir, estadoConferencias, pausar, retomar, tempoLiquido, revendas, TIPOS_PEDIDO, previaCorrecao:(id,eds)=>previaParaTela(previa(exigirCorte(id),eds)),
   pedirCorrecao, aprovarCorrecao, recusarCorrecao, correcoes,
   resumo, gravarPlano, porId, abertoDe, ABERTAS, NOME_ETAPA, exigirCorte, exigirDono, exigirEtapa};
