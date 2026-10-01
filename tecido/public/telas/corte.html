@@ -57,6 +57,7 @@
   <div id="historico" hidden></div>
 </div>
 
+<script src="/barras.js"></script><script src="/barras_ler.js"></script>
 <script src="/sobmedida/ui.js"></script>
 <script src="/sobmedida/nav.js"></script>
 <script>
@@ -840,7 +841,7 @@ function desenharAGuardar(pai){
       sel.addEventListener('change',()=>memoria.set('nivelSobra',sel.value));
       const campos=el('div',{class:'campos',style:'margin-top:8px'});
       [['LARGURA',larg],['ALTURA',alt],['ETIQUETA',cod],['ONDE GUARDAR',sel]].forEach(([r,i])=>
-        campos.appendChild(el('div',{class:'campo'+(r==='ETIQUETA'?' cresce':'')},[el('label',{texto:r}),i])));
+        campos.appendChild(el('div',{class:'campo'+(r==='ETIQUETA'?' cresce':'')},[el('label',{texto:r}),r==='ETIQUETA'?window.ui.comCamera(i):i])));
       const bt=el('button',{class:'bt primario',texto:'Guardar',onclick:async()=>{
         if(!larg.value||!alt.value){ beep('erro'); return banner('Meça a sobra e escolha a largura e a altura.','alerta'); }
         if(!cod.value.trim()){ beep('erro'); cod.focus(); return banner('Bipe a etiqueta colada na sobra.','alerta'); }
@@ -907,7 +908,7 @@ async function telaHistorico(){
   const iSob=el('input',{type:'text',value:f.sobra,placeholder:'bipe ou digite S-000014',
     autocomplete:'off',autocorrect:'off',autocapitalize:'off'});
   const linhaF=el('div',{class:'campos'});
-  [campo('DIA',iDia),campo('PEDIDO',iPed),campo('OPERADOR',sOp),campo('SOBRA',iSob)].forEach(x=>linhaF.appendChild(x));
+  [campo('DIA',iDia),campo('PEDIDO',iPed),campo('OPERADOR',sOp),campo('SOBRA',window.ui.comCamera(iSob,()=>buscar()))].forEach(x=>linhaF.appendChild(x));
   const buscar=()=>{ hist.filtros={dia:iDia.value,pedido:iPed.value.trim(),operador:sOp.value,sobra:iSob.value.trim()};
     hist.aberto=null; telaHistorico(); };
   linhaF.appendChild(el('button',{class:'bt primario',texto:'Buscar',onclick:buscar}));

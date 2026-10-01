@@ -2088,6 +2088,36 @@ com a folha já impressa e colada.
 > Ao imprimir: margens **"Nenhuma"** e escala **100%**. "Ajustar à página"
 > deforma as barras e o leitor recusa — a mesma regra da etiqueta de SKU no PCP.
 
+### A etiqueta lida pela FOTO (spec `CORTE-EM-ETAPAS`, fase 6, R27)
+
+Em todo campo que aceita bipe de sobra — o **lançar sobra** e o **procurar** do
+catálogo (Sobras), o **guardar** da sobra que nasceu e o filtro **SOBRA** do
+histórico (Corte) — há um botão **📷**. O iPad sem leitor tira a foto e o
+`../public/barras_ler.js` acha o código na imagem. Ele mora ao lado do
+`barras.js` e lê pela **mesma tabela de padrões**: duas tabelas CODE128 seriam
+um leitor que não reconhece a etiqueta que o gerador imprimiu.
+
+- **Foto, e não câmera ao vivo.** A câmera ao vivo pede HTTPS, que é outra
+  tarefa (dívida 2 do CLAUDE.md). O `capture` abre a câmera direto no iPad.
+- **Só vale o que fecha o dígito verificador do CODE128.** É ele que torna
+  seguro ler de foto: não há "melhor palpite". Não leu, a tela **diz** e o campo
+  continua ali para tentar de novo ou digitar. Um código errado lido "com
+  confiança" seria uma sobra trocada na prateleira.
+- **O código lido entra NO CAMPO**, e a tela segue pelo caminho do bipe
+  (`ui.comCamera`): quem leu pela foto e quem bipou caem na mesma conferência.
+  Um segundo caminho seria uma segunda régua.
+- O leitor passa linhas em vários ângulos e nos dois sentidos (etiqueta torta e
+  de cabeça para baixo são o caso normal), e o limiar claro/escuro é **local**,
+  para a sombra de um lado da foto não virar barra.
+
+> ⚠️ **OS TESTES SÃO COM IMAGENS SINTÉTICAS, NÃO COM FOTOS.** A spec pede fotos
+> reais de etiqueta (boa, tremida, torta), e elas não existem no repositório.
+> `barras_ler.test.js` desenha o código com o mesmo `barras.js` e o estraga do
+> jeito que a câmera estraga — borrada, girada, invertida, com sombra, em
+> perspectiva, pequena. **Isso é indício, não prova**: a prova é o iPad da
+> bancada achando a sobra pela foto. O QR do kit passou por três rodadas verdes
+> sem ler em celular nenhum (CLAUDE.md §4).
+
 ## ⚠️ A MEDIDA DA SOBRA É LISTA, e não campo digitado
 
 O campo aceitava `1,90`, `1.90` e `190` — e **só o terceiro é visivelmente

@@ -7764,6 +7764,31 @@ fora da média — e a tela diz quantos e quais.
 `corte_correcao.test.js` (17), `historico_corte.test.js` (15) e
 `tom.test.js` (27).
 
+### A ETIQUETA DA SOBRA LIDA PELA FOTO (fase 6, R27)
+
+Todo campo de bipe de sobra (lançar e procurar em Sobras; guardar e o filtro do
+histórico no Corte) ganhou o botão **📷**: o iPad tira a foto e
+`public/barras_ler.js` — na raiz, ao lado do `barras.js`, lendo pela **mesma
+tabela** — acha o código. O código lido entra **no campo** (`ui.comCamera`) e
+segue pelo caminho do bipe; não há segundo caminho.
+
+> ⚠️ **SÓ VALE O QUE FECHA O DÍGITO VERIFICADOR, e não há "melhor palpite".**
+> Não leu, a tela diz e deixa tentar de novo ou digitar. Código errado lido com
+> confiança é sobra trocada na prateleira.
+
+> ⚠️ **FOTO, NÃO CÂMERA AO VIVO** — a ao vivo pede HTTPS (dívida 2 do §14).
+
+> ⚠️ **OS TESTES SÃO COM IMAGENS SINTÉTICAS**, desenhadas pelo `barras.js` e
+> estragadas como a câmera estraga (borrada, torta, invertida, sombra,
+> perspectiva, pequena). A spec pedia fotos reais, que não existem no
+> repositório. **A prova é o iPad da bancada achando a sobra pela foto** — é a
+> lição do QR do §4.
+
+**Rode `cd tecido && npm test` ao mexer no `barras_ler.js`, no `barras.js` ou no
+`comCamera`** — `barras_ler.test.js` (11). Três defeitos foram reintroduzidos:
+o limiar fixo (a sombra reprova), a parada lida sem o silêncio depois e tirar o
+script da tela.
+
 ### Três regras do sob medida que valem citar aqui
 
 **Cada nível guarda um rolo só.** Regra do dono, 15/09/2026: `Haste A · Andar 1

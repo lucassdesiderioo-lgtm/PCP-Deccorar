@@ -5,8 +5,8 @@ STATUS
 Situação: em construção
 Criada em: 01/10/2026
 Última atualização: 01/10/2026
-Fase atual: 6 (leitura da etiqueta por foto) — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
-Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☐  7 ☐
+Fase atual: 7 (plano mais claro) — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
+Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☐
 Risco: 🔴 (muda o momento da baixa de rolo e sobra; correção de estoque depois do corte)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
 Substitui: SOBRAS-TOM-E-DESPERDICIO.md (18/09/2026), que foi para docs/arquivo/
@@ -60,6 +60,14 @@ Mudanças no caminho:
     tempo é o das PEÇAS, não o puxado. O painel ganhou a aba "Tempo de corte"
     com os últimos 30 dias. Migração 30 (tipo na linha, plano_pausa,
     tempo_liquido_s e o parâmetro corteTempoMaxHoras = 3 h).
+  · Fase 6 em código (01/10/2026). Sem biblioteca: `public/barras_ler.js`, ao
+    lado do `barras.js` e lendo pela mesma tabela, aceita só o que fecha o
+    dígito verificador do CODE128. Botão 📷 nos quatro campos de bipe de
+    sobra, pelo `ui.comCamera` (o código lido entra no campo e segue o
+    caminho do bipe). DIVERGÊNCIA: a fase pede testes com FOTOS REAIS (boa,
+    tremida, torta), e elas não existem no repositório — os testes desenham
+    a etiqueta e a estragam como a câmera estraga. É indício; a prova é o
+    iPad da bancada achando a sobra pela foto.
   · Achado na fase 1 e CONSERTADO na fase 4: o plano que continua o pedido no
     rolo do corte anterior (R12) não conferia o tecido — pedido com persianas
     de duas cores mandava puxar do rolo da outra cor.
