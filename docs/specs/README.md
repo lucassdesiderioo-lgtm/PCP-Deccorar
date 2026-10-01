@@ -32,7 +32,7 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 | `ESTOQUE-LIVRO-E-CONFERENCIA.md` | **Em construção** · fases 0 e 1 no ar (21/09) · fase 2 no ar (26/09) — a conferência em três papéis · **fase 3 em código (28/09)** — o ajuste em duas pessoas · fase 4 planejada |
 | `VENDAS-E-MEDIA.md` | **Em construção** · **fase 1 no ar (26/09, PR #144): a média contada pelo sistema, ao lado da planilha, em Admin → Planejamento — só conferência, a produção não mudou; falta o dono conferir a tabela com o dado real** · **fase 2 no ar (26/09, PR #148): a planilha só espelha as futuras (o recorte não apagou as 4.777 vendas da base), e a venda cancelada no ML sai das listas — falta o primeiro caso real de cancelada** · a troca da fonte (fase 3) espera o ok do dono depois de conferir a tabela |
 | `MESA-DE-CORRECOES.md` | Planejado · nada no código · depende do livro (Estoque F1) e das canceladas (Vendas F2) |
-| `SOBRAS-TOM-E-DESPERDICIO.md` | Em construção · Fase 1 em produção (19/09) · **Fase 2 feita** (21/09, a mensagem do plano) · fases 3–4 planejadas |
+| `CORTE-EM-ETAPAS.md` | **Planejado** (01/10) · módulo sob medida (`tecido/`) · 7 fases · o corte vira etapas (confirmar → cortando → corte feito → guardar) e o estoque de rolo e sobra passa a baixar no **Corte feito** · substitui a `SOBRAS-TOM-E-DESPERDICIO.md` · **fase 1 (histórico de cortes): PLANO apresentado, aguardando o "pode seguir"** · fase 2 em diante só com aprovação do dono |
 | `COMPRAS.md` | Implementado (fases 0–6) · fase 7 pendente · com mudanças na construção |
 | `ARQUITETURA-ALVO.md` | Parcial — só no módulo sob medida (`tecido/`) |
 | `PCP-CONTROLE-E-VISAO.md` | Parcial e divergente · decisão pendente |
@@ -69,12 +69,17 @@ conferidas em produção. As regras estão no `CLAUDE.md` §4.
 peças que saem adiantadas, no quadro do Carregamento. As regras estão no
 `CLAUDE.md` §8-B.
 
+**Substituída e arquivada em 01/10/2026:** `SOBRAS-TOM-E-DESPERDICIO.md` — a
+limpeza (fase 1, rodada em produção em 19/09) e a mensagem do plano (fase 2)
+foram feitas; o resto (tom pela origem, desperdício por sobra, menor refugo)
+entrou na `CORTE-EM-ETAPAS.md`, fases 4 e 7.
+
 **Arquivado sem construir em 26/09/2026:** `COLETA-LEVA-AGENCIA.md` — o
 rascunho de 25/09 que trocava a modalidade da caixa da agência levada pelo
 caminhão. Substituído pela `SAIDA-E-DUPLA-CONFERENCIA.md`, que resolve pela
 troca de porta (`saiu_por`) sem mexer na modalidade.
 
-Em `docs/arquivo/`: `COLETA-LEVA-AGENCIA.md`, `CARREGAMENTO-ADIANTADO.md`, `GERADOR-ETIQUETA-KIT.md`, `REVISAO-COMPLETA.md`,
+Em `docs/arquivo/`: `SOBRAS-TOM-E-DESPERDICIO.md`, `COLETA-LEVA-AGENCIA.md`, `CARREGAMENTO-ADIANTADO.md`, `GERADOR-ETIQUETA-KIT.md`, `REVISAO-COMPLETA.md`,
 `ESTOQUE-TECIDO-E-SOBRAS.md`, `PROMPT-ESTOQUE-TECIDO-E-SOBRAS.md`,
 `PROMPT-FASE-0.md`, `PERGUNTAS-COMPRAS.md`, `GESTAO-DE-TAREFAS.md` e
 `MELHORIAS.md` (os sete últimos arquivados por decisão do dono em 17/09/2026).

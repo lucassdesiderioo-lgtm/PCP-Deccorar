@@ -2,10 +2,14 @@
 
 ```
 STATUS
-Situação: em construção
+Situação: arquivada — substituída por CORTE-EM-ETAPAS.md em 01/10/2026
 Criada em: 18/09/2026
-Última atualização: 21/09/2026
-Fase atual: 2 (mensagem do plano) — feita e testada; falta subir
+Última atualização: 01/10/2026
+Fase atual: nenhuma — as fases 1 e 2 foram feitas; 3 e 4 foram absorvidas
+  pela CORTE-EM-ETAPAS.md (tom pela origem → fase 4 de lá; desperdício e
+  menor refugo → fase 7 de lá). A limpeza (fase 1) rodou em 19/09/2026 e
+  NÃO se repete: a nova spec decidiu que nada mais é zerado.
+  Arquivo histórico — não use como fonte de regra (docs/specs/README.md).
 Fases: 1 ☑  2 ☑  3 ☐  4 ☐
 Risco: 🔴 (dados de sobra e baixa no Confirmar do plano)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
