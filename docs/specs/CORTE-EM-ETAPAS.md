@@ -5,8 +5,8 @@ STATUS
 Situação: em construção
 Criada em: 01/10/2026
 Última atualização: 01/10/2026
-Fase atual: 3 (edição durante o corte e correção depois) — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
-Fases: 1 ☑  2 ☑  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐
+Fase atual: 4 (tom pela origem e Conferi o tecido) — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
+Fases: 1 ☑  2 ☑  3 ☑  4 ☐  5 ☐  6 ☐  7 ☐
 Risco: 🔴 (muda o momento da baixa de rolo e sobra; correção de estoque depois do corte)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
 Substitui: SOBRAS-TOM-E-DESPERDICIO.md (18/09/2026), que foi para docs/arquivo/
@@ -39,6 +39,20 @@ Mudanças no caminho:
     Consertado no caminho, porque era o mesmo filtro do Confirmar novo: a
     linha vazia da grade ia para o servidor (`comoNumero('')` é 0) e quem
     preenchia uma linha só levava "A linha 2 esta sem medida valida".
+  · Fase 3 em código (01/10/2026). Decisões da construção:
+      - os motivos são a lista que já existia (Cadastros → Motivos, a do
+        "não usar"); a migração 28 acrescentou "Rolo acabou" e "Medida
+        errada". "Tom diferente" já existia como "Tonalidade diferente";
+      - a edição vira restrição da entrada e o plano é recalculado pela mesma
+        conta; na correção todo item fica preso à sua fonte, e o que mudou de
+        fonte é uma PUXADA à parte (junto, o rolo baixaria a menos);
+      - a sobra guardada que não nasceu vira `anulada` (não é descarte nem
+        refugo); a devolvida volta ao mesmo nível;
+      - quem pediu a correção não a aprova — regra da casa aplicada por
+        analogia, registrada em DECISOES.md para o dono confirmar;
+      - o "não usar" do planejar (antes de confirmar) continua: a spec o
+        move para o ③, e no ③ ele existe agora; no ① ele não faz mal e
+        poupa um corte confirmado só para recusar uma sobra.
   · Achado na fase 1, para a fase 4: o plano que continua o pedido no rolo do
     corte anterior (R12) NÃO confere o tecido — pedido com persianas de duas
     cores pode mandar puxar do rolo da outra cor.

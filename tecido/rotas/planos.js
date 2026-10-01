@@ -38,6 +38,27 @@ module.exports={rotas:[
    detalhe:(req,d)=>'corte '+req.params.id+' feito · '+(d&&d.consumo_linear)+' m do rolo · '+
      (d&&d.sobras_a_guardar)+' sobra(s) a guardar'},
 
+  /* ── A EDICAO DO CORTE ABERTO E A CORRECAO DEPOIS (fase 3) ─────────────
+     Editar e da bancada, com a chave de cortar. Depois do Corte feito a
+     correcao e PEDIDA (corte.pedir_correcao, da bancada) e APROVADA pela
+     chefia (corte.aprovar_correcao) — enquanto pendente nada no estoque anda. */
+  {metodo:'POST', caminho:'/api/planos/:id/editar', permissao:'plano.confirmar',
+   manipulador:({params,corpo,usuario})=>corte.editar(params.id,corpo,usuario.nome,op(usuario)),
+   detalhe:(req,d)=>'corte '+req.params.id+' editado: '+(d&&d.mudou)},
+  {metodo:'POST', caminho:'/api/planos/:id/correcao/previa', permissao:'corte.pedir_correcao',
+   manipulador:({params,corpo})=>corte.previaCorrecao(params.id,corpo.edicoes)},
+  {metodo:'POST', caminho:'/api/planos/:id/correcao', permissao:'corte.pedir_correcao',
+   manipulador:({params,corpo,usuario})=>corte.pedirCorrecao(params.id,corpo,usuario.nome),
+   detalhe:(req,d)=>'pediu a correcao '+(d&&d.correcao_id)+' do corte '+req.params.id},
+  {metodo:'GET', caminho:'/api/planos/correcoes', permissao:'plano.calcular',
+   manipulador:({query})=>corte.correcoes({status:query.status||null, plano_id:query.plano_id||null})},
+  {metodo:'POST', caminho:'/api/planos/correcoes/:cid/aprovar', permissao:'corte.aprovar_correcao',
+   manipulador:({params,usuario})=>corte.aprovarCorrecao(params.cid,usuario.nome),
+   detalhe:req=>'aprovou a correcao '+req.params.cid+' (mexeu no saldo de rolo e sobra)'},
+  {metodo:'POST', caminho:'/api/planos/correcoes/:cid/recusar', permissao:'corte.aprovar_correcao',
+   manipulador:({params,corpo,usuario})=>corte.recusarCorrecao(params.cid,corpo.motivo,usuario.nome),
+   detalhe:req=>'recusou a correcao '+req.params.cid+': '+String(req.body.motivo||'').slice(0,120)},
+
   /* O corte aberto de quem pergunta, e as sobras a guardar dele. A tela de
      corte abre DIRETO nele: o tablet que recarregou no meio do corte nao pode
      cair na tela de planejar. Vem ANTES de /api/planos/:id — senao "aberto"
@@ -78,5 +99,7 @@ module.exports={rotas:[
   {metodo:'GET', caminho:'/api/planos', permissao:'plano.calcular',
    manipulador:({query})=>historico.listar(query)},
   {metodo:'GET', caminho:'/api/planos/:id', permissao:'plano.calcular',
-   manipulador:({params})=>historico.detalhe(params.id)}
+   manipulador:({params,usuario})=>({...historico.detalhe(params.id),
+     edicoes:corte.edicoes(Number(params.id)), correcoes:corte.correcoes({plano_id:params.id}),
+     pode_pedir:pode(usuario,'corte.pedir_correcao'), pode_aprovar:pode(usuario,'corte.aprovar_correcao')})}
 ]};

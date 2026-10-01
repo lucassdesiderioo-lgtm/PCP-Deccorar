@@ -158,7 +158,7 @@ function detalhe(id){
     .map(pc=>{
       const f=pc.faixa_id?faixaPorId.get(pc.faixa_id):null;
       return {ordem:pc.ordem, largura:pc.largura, altura:pc.altura, pedido:pc.pedido||null,
-        fonte:f?f.fonte:null,
+        fonte:f?f.fonte:null, fonte_id:f?(f.rolo_id||f.sobra_id):null,
         fonte_codigo:f?(f.fonte==='rolo'?f.rolo_codigo:f.sobra_codigo):null,
         nao_alocada_motivo:pc.nao_alocada_motivo||null};
     });

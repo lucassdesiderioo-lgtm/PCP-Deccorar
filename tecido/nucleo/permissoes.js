@@ -66,6 +66,14 @@ const CHAVES=[
      de guardar sobra de TODO MUNDO (R15). Nao esta no cortador: e da chefia,
      que a recebe pelo `*` do diretor, entao ela nao nasce inerte. */
   {chave:'corte.gerir',       nome:'Mexer no corte aberto de outra pessoa e ver as sobras a guardar de todos'},
+  /* ⚠️ PEDIR E APROVAR CORRECAO SAO DUAS CHAVES (R17). Depois do Corte feito
+     o estoque ja andou, e corrigir mexe no saldo SEM corte na frente — o tipo
+     de mexida que se quer com alguem olhando. Quem pede e a bancada, que viu
+     o erro com a peca na mao; quem aprova e a chefia. E quem pediu nao aprova
+     o proprio pedido, nem o diretor: e a regra da casa para ajuste de saldo
+     (CLAUDE.md §18, ajuste em duas pessoas). */
+  {chave:'corte.pedir_correcao',   nome:'Pedir correcao de um corte ja feito'},
+  {chave:'corte.aprovar_correcao', nome:'Aprovar ou recusar correcao de corte (mexe no saldo de rolo e sobra)'},
   {chave:'painel.ler',        nome:'Painel e relatorios'},
 
   /* ── O CATALOGO DO SOB MEDIDA (spec SOBMEDIDA-PEDIDO-REVENDA, fase 1) ────
@@ -179,7 +187,7 @@ const PAPEIS={
     'cadastro.ler','endereco.criar',
     'parametro.ler','sobra.ler','sobra.criar','sobra.propor','etiqueta.imprimir',
     'rolo.ler','rolo.entrada','rolo.encerrar',
-    'plano.calcular','plano.confirmar',
+    'plano.calcular','plano.confirmar','corte.pedir_correcao',
     // A etiqueta de producao e da bancada: quem corta e quem precisa do papel.
     'etiqueta_producao.ler','etiqueta_producao.imprimir'
     /* ⚠️ `painel.ler` SAIU DO CORTADOR em 04/09/2026, por decisao do dono.

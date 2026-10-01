@@ -163,3 +163,11 @@ sobra como usada e baixado o rolo a menos.
 - A spec `SOBRAS-TOM-E-DESPERDICIO.md` é absorvida por esta e vai para `docs/arquivo/`;
   continuam valendo dela o tom pela origem, a mensagem certa, o desperdício visível e a
   escolha pelo menor refugo.
+
+## 01/10/2026 — na correção de corte, quem pediu não aprova (A CONFIRMAR PELO DONO)
+Decisão técnica tomada na construção da fase 3 da `CORTE-EM-ETAPAS`, que a spec deixou
+em aberto ("o operador pede e a gestão aprova"). Aplicada a regra da casa para mexer em
+saldo sem venda na frente (o ajuste em duas pessoas da `ESTOQUE-LIVRO-E-CONFERENCIA`):
+quem pediu a correção não a aprova, nem o diretor. Custo: se o dono pedir a correção ele
+mesmo, outra pessoa com `corte.aprovar_correcao` precisa aprovar. Se o dono preferir que
+a gestão possa aprovar o próprio pedido, é uma linha em `tecido/dominio/corte.js`.

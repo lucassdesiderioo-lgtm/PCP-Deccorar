@@ -426,6 +426,20 @@ function desenharPlano(modo){
       if(s) cb.appendChild(el('button',{class:'bt pequeno naoImprime',texto:'não usar',
         onclick:()=>recusarSobra(s)}));
     }
+    /* NO CORTANDO, a fonte na mao (fase 3, R5): nao serviu, ou o rolo acabou.
+       As duas sao edicoes com motivo, e o plano e recalculado ali mesmo. */
+    if(cortando){
+      cb.appendChild(el('button',{class:'bt pequeno naoImprime',texto:'não usar esta '+(f0.fonte==='rolo'?'bobina':'sobra'),
+        onclick:()=>editarCorte({tipo:'nao_usar',fonte:f0.fonte,fonte_id:f0.fonte_id},'Tonalidade diferente')}));
+      if(f0.fonte==='rolo') cb.appendChild(el('button',{class:'bt pequeno alerta naoImprime',texto:'rolo acabou',
+        onclick:()=>{
+          const itens=g.faixas.flatMap(f=>f.pecas.filter(x=>!x.errada).map(x=>x.id));
+          const r=prompt('O rolo '+f0.codigo+' acabou.\n\nQuais itens JÁ saíram dele? (ex.: 1, 3 — deixe vazio se nenhum)\n\nItens deste rolo: '+itens.join(', '));
+          if(r===null) return;
+          const saidos=(r.match(/\d+/g)||[]).map(Number).filter(n=>itens.includes(n));
+          editarCorte({tipo:'rolo_acabou',fonte_id:f0.fonte_id,itens_saidos:saidos},'Rolo acabou');
+        }}));
+    }
     bloco.appendChild(cb);
 
     g.faixas.forEach((f,n)=>{
@@ -440,8 +454,9 @@ function desenharPlano(modo){
           'left:'+(pc.x/f.largura_disponivel*100)+'%;'+
           'width:'+(pc.largura/f.largura_disponivel*100)+'%;'+
           'height:'+(pc.altura/f.altura*100)+'%;'});
-        d.appendChild(el('span',{texto:num(pc.largura)}));
-        d.appendChild(el('small',{texto:num(pc.altura)}));
+        if(pc.errada){ d.style.background='var(--erro-fraca)'; d.style.borderColor='var(--erro)'; }
+        d.appendChild(el('span',{texto:(pc.errada?'errada ':'')+num(pc.largura)}));
+        d.appendChild(el('small',{texto:num(pc.altura)+(pc.errada?' · item '+pc.de_item:' · item '+pc.id)}));
         cx.appendChild(d);
       });
       bloco.appendChild(cx);
@@ -463,9 +478,10 @@ function desenharPlano(modo){
     cs.appendChild(el('h2',{texto:p.sobras_geradas.length===1?'1 sobra vai nascer deste corte'
       :p.sobras_geradas.length+' sobras vão nascer deste corte'}));
     p.sobras_geradas.forEach(s=>cs.appendChild(el('div',{style:'font-size:17px;font-weight:600',
-      texto:'• '+formatarMedida(s.largura,s.altura)+'  ·  '+formatarArea(s.area)})));
+      texto:'• '+formatarMedida(s.largura,s.altura)+'  ·  '+formatarArea(s.area)+(s.cortada_errada?'  ·  CORTADA ERRADA':'')})));
+    const uma=p.sobras_geradas.length===1;
     cs.appendChild(el('p',{class:'nota',style:'margin:8px 0 0',texto:
-      'Depois do Corte feito ela fica na sua lista de sobras a guardar: você mede, cola a etiqueta e escolhe onde guardar.'}));
+      'Depois do Corte feito '+(uma?'ela fica':'elas ficam')+' na sua lista de sobras a guardar: você mede, cola a etiqueta e escolhe onde guardar.'}));
     c.appendChild(cs);
   }
 
@@ -473,6 +489,36 @@ function desenharPlano(modo){
     c.appendChild(el('p',{class:'ajuda',texto:'Refugo: '+p.refugos.map(r=>
       formatarMedida(r.largura,r.altura)).join(' · ')+' — abaixo de '+
       num(p.parametros.larguraMinimaSobra)+' m de largura nao vira sobra, mas fica medido.'}));
+  }
+
+  /* ── ③ MUDOU ALGUMA COISA? (fase 3, R5–R8) ───────────────────────────
+     Um botao por item: saiu de outra fonte, ou foi cortado errado. O
+     operador aponta o item e a fonte; os metros, quem conta e o sistema (R7). */
+  if(cortando){
+    const ce=el('div',{class:'cartao naoImprime'});
+    ce.appendChild(el('h2',{style:'margin-top:0',texto:'Mudou alguma coisa no corte?'}));
+    ce.appendChild(el('p',{class:'nota',texto:'Aponte o item e de onde ele saiu: o plano é recalculado e a mudança fica no histórico, com o motivo.'}));
+    const t=el('table',{});
+    t.appendChild(el('tr',{},['Item','Pedido','Medida','Saindo de',''].map(h=>el('th',{texto:h}))));
+    const ondeEsta=id=>{ const f=p.faixas.find(f=>f.pecas.some(x=>x.id===id&&!x.errada)); return f?(f.fonte==='rolo'?'rolo ':'sobra ')+f.codigo:'sem lugar'; };
+    p.pecas.forEach(pc=>t.appendChild(el('tr',{},[
+      el('td',{texto:String(pc.id)}), el('td',{texto:pc.pedido||'—'}), el('td',{texto:formatarMedida(pc.largura,pc.altura)}),
+      el('td',{texto:ondeEsta(pc.id)}),
+      el('td',{},[el('button',{class:'bt pequeno',texto:'saiu de outra fonte',onclick:()=>{
+          const cod=prompt('De onde saiu o item '+pc.id+' ('+formatarMedida(pc.largura,pc.altura)+')?\nBipe ou digite o código do rolo ou da sobra (ex.: R-000032).');
+          if(cod&&cod.trim()) editarCorte({tipo:'trocar',peca:pc.id,codigo:cod.trim()},'Tonalidade diferente');
+        }}),
+        el('button',{class:'bt pequeno alerta',style:'margin-left:6px',texto:'cortado errado',onclick:()=>
+          editarCorte({tipo:'medida_errada',peca:pc.id},'Medida errada')})])
+    ])));
+    ce.appendChild(rolaH(t));
+    const eds=estado.aberto.edicoes||[];
+    if(eds.length){
+      ce.appendChild(el('h3',{style:'margin:14px 0 4px',texto:'O que já mudou neste corte'}));
+      eds.forEach(e=>ce.appendChild(el('div',{texto:'• '+hora(e.criado_em)+' — '+e.detalhe+' · '+(e.motivo_nome||'')+
+        (e.observacao?' ('+e.observacao+')':'')+' · '+(e.usuario_nome||'')})));
+    }
+    c.appendChild(ce);
   }
 
   // ── O RESUMO E OS BOTOES ──────────────────────────────────────────────
@@ -626,6 +672,29 @@ function telaCorteAberto(){
   desenharPlano('cortando');
 }
 
+/* O motivo sai da lista de Cadastros → Motivos (R6). A sugestao ja vem
+   escolhida pelo tipo da mudanca, e Enter aceita — mas a lista inteira esta
+   ali, porque "tom diferente" nao e o unico motivo de nao usar uma sobra. */
+function escolherMotivo(sugestao){
+  const nomes=estado.motivos.filter(m=>m.ativo);
+  const i0=Math.max(0,nomes.findIndex(m=>m.nome===sugestao));
+  const r=prompt('Motivo:\n\n'+nomes.map((m,i)=>(i+1)+') '+m.nome).join('\n')+'\n\nDigite o número:',String(i0+1));
+  if(r===null) return null;
+  const m=nomes[Number(r)-1];
+  if(!m){ banner('Motivo não reconhecido.','alerta'); return null; }
+  const obs=m.nome==='Outro'?(prompt('Diga o que aconteceu:')||''):'';
+  return {motivo_id:m.id, observacao:obs};
+}
+async function editarCorte(ed,sugestao){
+  const m=escolherMotivo(sugestao);
+  if(!m) return;
+  try{
+    estado.aberto=await api('/api/planos/'+estado.aberto.plano_id+'/editar',{metodo:'POST',corpo:{...ed,...m}});
+    beep(); banner('Plano refeito: '+estado.aberto.mudou+'.','bom',5);
+    telaCorteAberto();
+  }catch(e){ beep('erro'); }
+}
+
 async function cancelarCorte(){
   const a=estado.aberto;
   const motivo=prompt('Por que o corte '+a.plano_id+' está sendo cancelado? (fica no histórico)');
@@ -774,6 +843,18 @@ async function telaHistorico(){
   let r;
   try{ r=await api('/api/planos?'+new URLSearchParams(Object.entries(hist.filtros).filter(([,v])=>v))); }
   catch(e){ beep('erro'); return; }
+  // AS CORRECOES ESPERANDO DECISAO, em cima: e trabalho da chefia, e corte
+  // com correcao pendente esta com o estoque dizendo o que nao aconteceu.
+  try{
+    const pend=await api('/api/planos/correcoes?status=pendente',{silencioso:true});
+    if(pend.length){
+      const bx=el('div',{style:'border-left:4px solid var(--alerta);background:var(--alerta-fraca);padding:8px 12px;margin:14px 0'});
+      bx.appendChild(el('strong',{texto:pend.length===1?'1 correção esperando decisão':pend.length+' correções esperando decisão'}));
+      pend.forEach(k=>bx.appendChild(el('div',{},[el('a',{href:'#',texto:'corte '+k.plano_id,onclick:ev=>{ ev.preventDefault();
+        hist.aberto=k.plano_id; telaHistorico(); }}),el('span',{texto:' — pedida por '+(k.pedida_por||'—')+' em '+quando(k.pedida_em)+' · '+(k.motivo_nome||'')})])));
+      c.appendChild(bx);
+    }
+  }catch(e){}
 
   sOp.appendChild(el('option',{value:'',texto:'todos'}));
   r.operadores.forEach(o=>sOp.appendChild(el('option',{value:o,texto:o,selected:o===f.operador?'selected':null})));
@@ -895,11 +976,133 @@ async function detalheCorte(id,pai){
     ?d.refugo.map(x=>formatarMedida(x.largura,x.altura)).join(' · ')+' — '+formatarArea(d.refugo.reduce((s,x)=>s+x.area,0))+' no total'
     :'Nenhum.'}));
 
+  // ── AS MUDANCAS E AS CORRECOES (fase 3) ─────────────────────────────
+  if(d.edicoes.length){
+    c.appendChild(el('h3',{texto:'O que mudou durante o corte'}));
+    d.edicoes.filter(e=>!e.correcao_id).forEach(e=>c.appendChild(el('div',{texto:'• '+quando(e.criado_em)+' — '+e.detalhe+
+      ' · '+(e.motivo_nome||'')+(e.observacao?' ('+e.observacao+')':'')+' · '+(e.usuario_nome||'')})));
+  }
+  if(d.correcoes.length){
+    c.appendChild(el('h3',{texto:'Correções depois do corte'}));
+    d.correcoes.forEach(k=>{
+      const bx=el('div',{style:'border-left:4px solid '+(k.status==='pendente'?'var(--alerta)':k.status==='aprovada'?'var(--bom)':'var(--linha-forte)')+
+        ';padding:6px 12px;margin:8px 0'});
+      bx.appendChild(el('div',{style:'font-weight:600',texto:'Correção '+k.id+' · '+({pendente:'esperando a chefia',aprovada:'aprovada',recusada:'recusada'})[k.status]+
+        ' · pedida por '+(k.pedida_por||'—')+' em '+quando(k.pedida_em)+(k.decidida_por?' · '+k.status+' por '+k.decidida_por+' em '+quando(k.decidida_em):'')}));
+      bx.appendChild(el('div',{class:'quem',texto:'Motivo: '+(k.motivo_nome||'—')+(k.observacao?' — '+k.observacao:'')}));
+      if(k.decisao_motivo) bx.appendChild(el('div',{class:'quem',texto:'Recusada porque: '+k.decisao_motivo}));
+      if(k.previa) bx.appendChild(desenharPrevia(k.previa));
+      if(k.status==='pendente'&&d.pode_aprovar){
+        const ac=el('div',{class:'campos',style:'margin-top:8px'});
+        ac.appendChild(el('button',{class:'bt',texto:'Recusar',onclick:async()=>{
+          const m=prompt('Por que a correção está sendo recusada? (quem pediu vai ler)'); if(!m||!m.trim()) return;
+          try{ await api('/api/planos/correcoes/'+k.id+'/recusar',{metodo:'POST',corpo:{motivo:m}}); beep(); telaHistorico(); }catch(e){ beep('erro'); } }}));
+        ac.appendChild(el('button',{class:'bt primario',texto:'Aprovar — o estoque anda agora',onclick:async()=>{
+          if(!confirm('Aprovar a correção '+k.id+'? O saldo de rolo e sobra muda agora, pela diferença mostrada.')) return;
+          try{ await api('/api/planos/correcoes/'+k.id+'/aprovar',{metodo:'POST',corpo:{}}); beep();
+            banner('Correção '+k.id+' aprovada.','bom',5); telaHistorico(); }catch(e){ beep('erro'); } }}));
+        bx.appendChild(ac);
+      }
+      c.appendChild(bx);
+    });
+  }
+  if(d.etapa==='feito'&&d.pode_pedir&&!d.correcoes.some(k=>k.status==='pendente'))
+    c.appendChild(el('button',{class:'bt alerta',style:'margin-top:14px',texto:'Pedir correção deste corte',
+      onclick:()=>formCorrecao(d,c)}));
+
   if(d.recusas.length){
     c.appendChild(el('h3',{texto:'Sobras recusadas antes de confirmar'}));
     d.recusas.forEach(x=>c.appendChild(el('div',{texto:'• '+(x.sobra_codigo||'?')+' — '+(x.motivo||'sem motivo')+
       (x.observacao?' ('+x.observacao+')':'')+' · '+(x.usuario_nome||'—')+', '+quando(x.criado_em)})));
   }
+}
+
+/* ── O PEDIDO DE CORRECAO (fase 3, R16) ──────────────────────────────────
+   Uma linha por item: de onde ele SAIU de verdade, e se foi cortado errado.
+   Tudo ja foi cortado, entao todo item tem fonte — o padrao e a do plano, e a
+   pessoa so mexe no que mudou. Antes de enviar, a tela mostra o que a
+   aprovacao faria; enviar nao mexe no estoque. */
+function formCorrecao(d,pai){
+  const bx=el('div',{class:'cartao',style:'border-color:var(--alerta);margin-top:14px'});
+  pai.appendChild(bx);
+  bx.appendChild(el('h3',{style:'margin-top:0',texto:'Pedir correção do corte '+d.id}));
+  bx.appendChild(el('p',{class:'nota',texto:'Diga de onde cada item saiu de verdade. Enquanto a chefia não aprovar, nada no estoque muda.'}));
+  const opcoesFonte=d.fontes.map(f=>({valor:f.fonte+':'+f.id, nome:(f.fonte==='rolo'?'rolo ':'sobra ')+f.codigo}));
+  const linhas=[];
+  const t=el('table',{});
+  t.appendChild(el('tr',{},['Item','Medida','Saiu de','Cortado errado?'].map(h=>el('th',{texto:h}))));
+  d.linhas.forEach(l=>{
+    const sel=el('select',{});
+    sel.appendChild(el('option',{value:'',texto:l.fonte?'— como o plano disse —':'não saiu neste corte'}));
+    opcoesFonte.forEach(o=>sel.appendChild(el('option',{value:o.valor,texto:o.nome})));
+    sel.appendChild(el('option',{value:'outro',texto:'outro código…'}));
+    const outro=el('input',{type:'text',placeholder:'R-000032',style:'width:120px;display:none'});
+    sel.addEventListener('change',()=>{ outro.style.display=sel.value==='outro'?'':'none'; });
+    const errada=el('input',{type:'checkbox'});
+    linhas.push({l,sel,outro,errada});
+    t.appendChild(el('tr',{},[el('td',{texto:String(l.ordem)}),el('td',{texto:formatarMedida(l.largura,l.altura)}),
+      el('td',{},[sel,outro]),el('td',{},l.fonte?[errada]:[])]));
+  });
+  bx.appendChild(rolaH(t));
+  const rolosDoCorte=d.fontes.filter(f=>f.fonte==='rolo');
+  const acabou=rolosDoCorte.map(f=>{ const cb=el('input',{type:'checkbox'});
+    bx.appendChild(el('label',{style:'display:block;margin:6px 0'},[cb,el('span',{texto:' o rolo '+f.codigo+' acabou neste corte'})]));
+    return {f,cb}; });
+  const sm=el('select',{});
+  estado.motivos.filter(m=>m.ativo).forEach(m=>sm.appendChild(el('option',{value:m.id,texto:m.nome})));
+  const obs=el('input',{type:'text',placeholder:'o que aconteceu (ex.: o tom da sobra não bateu e cortei tudo do rolo)'});
+  bx.appendChild(el('div',{class:'campos',style:'margin-top:10px'},[
+    el('div',{class:'campo'},[el('label',{texto:'MOTIVO'}),sm]),
+    el('div',{class:'campo cresce'},[el('label',{texto:'O QUE ACONTECEU'}),obs])]));
+  const saida=el('div',{});
+  const edicoes=()=>{
+    const eds=[];
+    for(const x of linhas){
+      let f=null;
+      if(x.sel.value==='outro'){ if(!x.outro.value.trim()) throw new Error('Diga o código de onde saiu o item '+x.l.ordem+'.');
+        f={codigo:x.outro.value.trim()}; }
+      else if(x.sel.value){ const [fonte,id]=x.sel.value.split(':'); f={fonte, fonte_id:Number(id)}; }
+      if(x.errada.checked){
+        eds.push({tipo:'medida_errada', peca:x.l.ordem, fonte:x.l.fonte, fonte_id:x.l.fonte_id,
+          refeito_em:f&&f.fonte_id?{fonte:f.fonte, fonte_id:f.fonte_id}:{fonte:x.l.fonte, fonte_id:x.l.fonte_id}});
+      } else if(f&&!(f.fonte===x.l.fonte&&f.fonte_id===x.l.fonte_id)) eds.push({tipo:'trocar', peca:x.l.ordem, ...f});
+    }
+    acabou.filter(a=>a.cb.checked).forEach(a=>eds.push({tipo:'rolo_acabou',fonte_id:a.f.id,
+      itens_saidos:d.linhas.filter(l=>l.fonte==='rolo'&&l.fonte_id===a.f.id).map(l=>l.ordem)}));
+    return eds;
+  };
+  const btVer=el('button',{class:'bt',texto:'Ver o que muda',onclick:async()=>{
+    let eds; try{ eds=edicoes(); }catch(e){ return banner(e.message,'alerta'); }
+    if(!eds.length) return banner('Nada mudou: escolha de onde algum item saiu, ou marque o que foi cortado errado.','alerta');
+    try{ const v=await api('/api/planos/'+d.id+'/correcao/previa',{metodo:'POST',corpo:{edicoes:eds}});
+      limpar(saida).appendChild(desenharPrevia(v)); btEnviar.disabled=false; }catch(e){ beep('erro'); }
+  }});
+  const btEnviar=el('button',{class:'bt primario',disabled:'disabled',texto:'Enviar para a chefia',onclick:async()=>{
+    let eds; try{ eds=edicoes(); }catch(e){ return banner(e.message,'alerta'); }
+    try{ await api('/api/planos/'+d.id+'/correcao',{metodo:'POST',corpo:{edicoes:eds,motivo_id:Number(sm.value),observacao:obs.value}});
+      beep(); banner('Pedido de correção enviado. Nada mudou no estoque até a chefia aprovar.','bom',6); telaHistorico();
+    }catch(e){ beep('erro'); }
+  }});
+  bx.appendChild(el('div',{class:'campos',style:'margin-top:10px'},[btVer,btEnviar]));
+  bx.appendChild(saida);
+  bx.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// O que a aprovacao faria (ou fez): a diferenca, linha por linha.
+function desenharPrevia(v){
+  const d=el('div',{style:'margin-top:8px'});
+  const li=t=>d.appendChild(el('div',{texto:'• '+t}));
+  v.sobras_voltam.forEach(x=>li('a sobra '+x.codigo+' volta a disponível'+(x.endereco?' em '+x.endereco:'')));
+  v.sobras_usadas.forEach(x=>li('a sobra '+x.codigo+' passa a usada'));
+  v.rolos.forEach(r=>li('rolo '+r.codigo+': '+(r.delta>0?'baixa mais '+formatarMetros(r.delta):'volta '+formatarMetros(-r.delta))+
+    ' (o corte baixou '+formatarMetros(r.antes)+', o certo é '+formatarMetros(r.depois)+')'));
+  v.nascidas_saem.forEach(h=>li((h.codigo?'a sobra '+h.codigo:'a sobra a guardar de '+formatarMedida(h.largura,h.altura))+' não nasceu — sai'));
+  v.nascidas_novas.forEach(n=>li('nasce '+(n.cortada_errada?'a sobra cortada errada ':'a sobra ')+formatarMedida(n.largura,n.altura)+', a guardar'));
+  if(Math.abs(v.refugo.antes-v.refugo.depois)>0.0005) li('refugo: '+formatarArea(v.refugo.antes)+' → '+formatarArea(v.refugo.depois));
+  (v.rolos_acabados||[]).length&&li('o rolo que acabou é encerrado');
+  if(d.children.length===0) li('nada muda no estoque');
+  (v.bloqueios||[]).forEach(b=>d.appendChild(el('div',{style:'color:var(--erro);font-weight:600',texto:'⚠ '+b})));
+  return d;
 }
 
 telaEntrada();

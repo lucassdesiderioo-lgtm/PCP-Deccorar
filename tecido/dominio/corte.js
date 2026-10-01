@@ -28,6 +28,8 @@ const {ErroDeRegra,exigir}=require('../nucleo/erros');
 const plano=require('./plano');
 const sobra=require('./sobra');
 const rolo=require('./rolo');
+const etiqueta=require('./etiqueta');
+const historico=require('./corte_historico');
 
 const ABERTAS=['confirmado','cortando'];
 const NOME_ETAPA={confirmado:'confirmado — esperando o Cortar',cortando:'cortando',
@@ -220,6 +222,14 @@ function feito(id,usuarioNome,op){
 
     // `confirmado=1` continua dizendo "baixou o estoque", e so agora e verdade.
     // A data do corte passa a ser o dia em que ele foi FEITO.
+    // O rolo que ACABOU no meio do corte (edicao da fase 3) e encerrado depois
+    // de baixar o que saiu dele: e o acerto de fim (R9 do rolo), na hora certa.
+    const entrada=JSON.parse(c.entrada||'{}');
+    (entrada.rolos_acabados||[]).forEach(rid=>{
+      const r=rolo.porId(rid);
+      if(r&&r.status!=='encerrado') rolo.encerrar(rid,quem);
+    });
+
     db.prepare(`UPDATE plano SET etapa='feito', confirmado=1, feito_em=?, feito_por=?,
        data=date('now','localtime') WHERE id=?`).run(dia.agora(),quem,c.id);
 
@@ -238,7 +248,7 @@ function aberto(usuarioNome,id){
   const p=JSON.parse(c.proposta);
   return {plano_id:c.id, etapa:c.etapa, usuario_nome:c.usuario_nome,
     criado_em:c.criado_em, cortar_em:c.cortar_em,
-    entrada:JSON.parse(c.entrada||'{}'), proposta:p, fontes:resumo(p)};
+    entrada:JSON.parse(c.entrada||'{}'), proposta:p, fontes:resumo(p), edicoes:edicoes(c.id)};
 }
 
 const CAMPOS_GUARDAR=`g.*, p.criado_em AS corte_em, t.id AS t_id,
@@ -257,6 +267,7 @@ const vestir=g=>({id:g.id, plano_id:g.plano_id, tecido_id:g.tecido_id,
   tecido_nome:nomeTecido(g), largura:g.largura, altura:g.altura, area:g.area,
   de:g.de, cortada_errada:!!g.cortada_errada,
   origem_codigo:g.origem_rolo_codigo||g.origem_sobra_codigo||null,
+  origem_rolo_id:g.origem_rolo_id, origem_sobra_id:g.origem_sobra_id,
   cortado_por:g.cortado_por, criado_em:g.criado_em, dias:g.dias,
   guardada_em:g.guardada_em, sobra_id:g.sobra_id});
 
@@ -304,5 +315,371 @@ function guardar(id,dados,usuarioNome,op){
   })();
 }
 
+/* ── ③ AS EDICOES DO CORTE ABERTO (fase 3, R5–R8) ─────────────────────────
+   Edicao livre, sempre com motivo. Cada uma muda a ENTRADA do corte (o que o
+   operador lancou mais o que ele ja disse) e o plano e recalculado pela MESMA
+   conta do plano novo — nenhuma edicao tem conta propria. A tela recebe o
+   corte aberto de volta, ja recalculado.
+
+     nao_usar      a fonte nao serve (tom diferente, defeito…): sai do plano e
+                   as pecas dela vao para onde o plano escolher
+     trocar        o item saiu de OUTRA fonte (R7): o operador aponta o codigo,
+                   o sistema recalcula os metros
+     rolo_acabou   o rolo acabou: o que ja saiu dele fica nele, o resto muda de
+                   fonte, e no Corte feito o rolo e encerrado
+     medida_errada o item foi cortado errado (R8): o pedaco gastou tecido e vira
+                   sobra "cortada errada" (ou refugo); o item volta a ser cortado */
+const TIPOS=['nao_usar','trocar','rolo_acabou','medida_errada'];
+
+function motivoDe(motivo_id){
+  const m=db.prepare('SELECT * FROM motivo_recusa WHERE id=?').get(Number(motivo_id));
+  exigir(m,'motivo_obrigatorio','Escolha o motivo da mudanca — fica no historico do corte.');
+  return m;
+}
+// O codigo bipado diz a fonte: R-000032 e rolo, S-000014 e sobra.
+function fontePorCodigo(codigo,tecido_id){
+  const c=etiqueta.limpar(codigo);
+  exigir(c,'codigo_vazio','Bipe ou digite o codigo do rolo ou da sobra de onde o item saiu.');
+  const r=rolo.porCodigo(c);
+  if(r){ exigir(r.tecido_id===tecido_id,'fonte_outro_tecido','O rolo '+r.codigo+' e de outro tecido.');
+    return {fonte:'rolo', fonte_id:r.id, codigo:r.codigo}; }
+  const sb=sobra.porCodigo(c);
+  if(sb&&sb.id){ exigir(sb.tecido_id===tecido_id,'fonte_outro_tecido','A sobra '+sb.codigo+' e de outro tecido.');
+    return {fonte:'sobra', fonte_id:sb.id, codigo:sb.codigo}; }
+  throw new ErroDeRegra('fonte_inexistente','Nao ha rolo nem sobra com o codigo '+c+'.');
+}
+// Onde o item esta HOJE no plano gravado.
+function fonteDoItem(prop,peca){
+  for(const f of prop.faixas||[]) if(f.pecas.some(pc=>pc.id===Number(peca)&&!pc.errada))
+    return {fonte:f.fonte, fonte_id:f.fonte_id, codigo:f.codigo};
+  return null;
+}
+const semDup=a=>[...new Set(a.map(Number))];
+
+/* Aplica UMA edicao sobre uma entrada e devolve a entrada nova e a frase.
+   E a mesma funcao para o corte aberto e para a correcao depois — a correcao
+   so difere em quem confere e quando o estoque anda. */
+function aplicarEdicao(entrada,prop,ed,tecido_id){
+  const e=JSON.parse(JSON.stringify(entrada));
+  e.recusadas=e.recusadas||[]; e.excluir_rolos=e.excluir_rolos||[];
+  e.fixadas=e.fixadas||{}; e.erradas=e.erradas||[]; e.rolos_acabados=e.rolos_acabados||[];
+  const tipo=ed.tipo;
+  exigir(TIPOS.includes(tipo),'edicao_invalida','Tipo de mudanca desconhecido.');
+  const presoEm=(fonte,fonte_id)=>Object.entries(e.fixadas)
+    .filter(([,f])=>f.fonte===fonte&&Number(f.fonte_id)===Number(fonte_id)).map(([k])=>Number(k));
+  let frase, alvo={};
+
+  if(tipo==='nao_usar'){
+    const f={fonte:ed.fonte, fonte_id:Number(ed.fonte_id)};
+    exigir(f.fonte==='rolo'||f.fonte==='sobra','fonte_invalida','Diga qual fonte nao serve.');
+    const presos=presoEm(f.fonte,f.fonte_id);
+    exigir(!presos.length,'fonte_com_item_preso',
+      'O '+(presos.length===1?'item '+presos[0]+' esta marcado':'itens '+presos.join(', ')+' estao marcados')+
+      ' como saido desta fonte. Mude a fonte '+(presos.length===1?'dele':'deles')+' antes.');
+    if(f.fonte==='sobra') e.recusadas=semDup([...e.recusadas,f.fonte_id]);
+    else e.excluir_rolos=semDup([...e.excluir_rolos,f.fonte_id]);
+    const cod=f.fonte==='rolo'?(rolo.porId(f.fonte_id)||{}).codigo:(sobra.porId(f.fonte_id)||{}).codigo;
+    alvo={fonte:f.fonte, fonte_id:f.fonte_id, codigo:cod};
+    frase=(f.fonte==='rolo'?'rolo ':'sobra ')+cod+' saiu do corte';
+  }
+  else if(tipo==='trocar'){
+    const peca=Number(ed.peca);
+    exigir((e.pecas||[]).length>=1,'item_inexistente','Corte sem itens.');
+    const f=ed.fonte_id?{fonte:ed.fonte, fonte_id:Number(ed.fonte_id)}:fontePorCodigo(ed.codigo,tecido_id);
+    e.fixadas[peca]={fonte:f.fonte, fonte_id:f.fonte_id, puxada:ed.puxada||undefined};
+    // Se a pessoa diz que o item saiu dali, aquela fonte deixa de estar fora.
+    if(f.fonte==='sobra') e.recusadas=e.recusadas.filter(x=>Number(x)!==f.fonte_id);
+    else e.excluir_rolos=e.excluir_rolos.filter(x=>Number(x)!==f.fonte_id);
+    const cod=f.codigo||(f.fonte==='rolo'?(rolo.porId(f.fonte_id)||{}).codigo:(sobra.porId(f.fonte_id)||{}).codigo);
+    alvo={peca, fonte:f.fonte, fonte_id:f.fonte_id, codigo:cod};
+    frase='item '+peca+' saiu '+(f.fonte==='rolo'?'do rolo ':'da sobra ')+cod;
+  }
+  else if(tipo==='rolo_acabou'){
+    const rid=Number(ed.fonte_id);
+    const r=rolo.porId(rid);
+    exigir(r,'rolo_inexistente','Rolo nao encontrado.');
+    // O que JA saiu deste rolo fica nele; o resto vai para onde o plano escolher.
+    (ed.itens_saidos||[]).map(Number).forEach(i=>{ e.fixadas[i]={fonte:'rolo', fonte_id:rid}; });
+    e.excluir_rolos=semDup([...e.excluir_rolos,rid]);
+    e.rolos_acabados=semDup([...e.rolos_acabados,rid]);
+    alvo={fonte:'rolo', fonte_id:rid, codigo:r.codigo};
+    const ja=(ed.itens_saidos||[]);
+    frase='rolo '+r.codigo+' acabou'+(ja.length?' — '+(ja.length===1?'o item '+ja[0]+' ja tinha saido dele':'os itens '+ja.join(', ')+' ja tinham saido dele'):'');
+  }
+  else if(tipo==='medida_errada'){
+    const peca=Number(ed.peca);
+    const onde=ed.fonte_id?{fonte:ed.fonte, fonte_id:Number(ed.fonte_id)}:fonteDoItem(prop,peca);
+    exigir(onde,'item_sem_fonte','O item '+peca+' nao foi cortado de fonte nenhuma neste plano.');
+    e.erradas.push({peca, fonte:onde.fonte, fonte_id:onde.fonte_id,
+      largura:ed.largura||undefined, altura:ed.altura||undefined});
+    delete e.fixadas[peca];
+    // Na correcao o item ja foi refeito em algum lugar, e a pessoa diz onde.
+    if(ed.refeito_em) e.fixadas[peca]={fonte:ed.refeito_em.fonte, fonte_id:Number(ed.refeito_em.fonte_id), puxada:'refeito'};
+    const cod=onde.codigo||(onde.fonte==='rolo'?(rolo.porId(onde.fonte_id)||{}).codigo:(sobra.porId(onde.fonte_id)||{}).codigo);
+    alvo={peca, fonte:onde.fonte, fonte_id:onde.fonte_id, codigo:cod};
+    frase='item '+peca+' cortado errado '+(onde.fonte==='rolo'?'no rolo ':'na sobra ')+cod+' — volta a ser cortado';
+  }
+  return {entrada:e, frase, alvo};
+}
+
+function editar(id,ed,usuarioNome,op){
+  const c=exigirCorte(id); exigirDono(c,usuarioNome,op);
+  exigirEtapa(c,['cortando'],'mudar o plano'+(c.etapa==='confirmado'?' (toque em CORTAR, ou volte ao plano)':''));
+  const m=motivoDe(ed&&ed.motivo_id);
+  const prop=JSON.parse(c.proposta);
+  const {entrada,frase,alvo}=aplicarEdicao(JSON.parse(c.entrada||'{}'),prop,ed||{},c.tecido_id);
+  // A MESMA conta do plano novo. Se ela recusa (a peca nao cabe na fonte
+  // apontada), nada muda e a frase dela chega na bancada.
+  const p=plano.calcular(entrada,{plano_id:c.id});
+  return db.transaction(()=>{
+    db.prepare(`UPDATE plano SET entrada=?, proposta=?, consumo_linear=?, consumo_m2=?, area_pecas=?,
+      area_sobra_gerada=?, desperdicio=? WHERE id=?`).run(JSON.stringify(entrada),JSON.stringify(p),
+      p.consumo_linear,p.consumo_m2,p.area_pecas,p.area_sobras,p.desperdicio,c.id);
+    gravarPlano(c.id,p);
+    db.prepare(`INSERT INTO plano_edicao(plano_id,tipo,peca,fonte,fonte_id,fonte_codigo,detalhe,
+      motivo_id,motivo_nome,observacao,usuario_nome) VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(
+      c.id,ed.tipo,alvo.peca||null,alvo.fonte||null,alvo.fonte_id||null,alvo.codigo||null,frase,
+      m.id,m.nome,String(ed.observacao||'').trim()||null,usuarioNome||null);
+    // A sobra que nao serviu continua sendo diagnostico do painel de Recusas.
+    if(ed.tipo==='nao_usar'&&alvo.fonte==='sobra')
+      db.prepare(`INSERT INTO plano_recusa(plano_id,sobra_id,motivo_id,observacao,usuario_nome)
+        VALUES(?,?,?,?,?)`).run(c.id,alvo.fonte_id,m.id,String(ed.observacao||'').trim()||null,usuarioNome||null);
+    return {...aberto(usuarioNome,c.id), mudou:frase};
+  })();
+}
+
+const edicoes=plano_id=>db.prepare('SELECT * FROM plano_edicao WHERE plano_id=? ORDER BY id').all(plano_id);
+
+/* ── A CORRECAO DEPOIS DO CORTE FEITO (fase 3, R16–R17) ────────────────────
+   O operador PEDE dizendo o que mudou (as mesmas edicoes); enquanto pendente
+   NADA no estoque muda. A chefia aprova e o sistema aplica a DIFERENCA:
+   a sobra que nao foi usada volta a disponivel no endereco onde estava, o
+   rolo acerta o saldo, as sobras que nao nasceram saem, as que nasceram de
+   verdade ficam a guardar, e o refugo e refeito.
+
+   ⚠️ NA CORRECAO TUDO JA FOI CORTADO, e por isso todo item tem fonte fixa:
+   a do plano gravado, menos o que a pessoa disse que mudou. Deixar o plano
+   escolher fonte aqui inventaria um corte que ninguem fez.
+
+   ⚠️ A VERDADE DO QUE O CORTE BAIXOU E O MOVIMENTO, nao a proposta. Os cortes
+   de antes das etapas (R28) nem tem proposta gravada; e para todos, o metro
+   que saiu de cada rolo esta no movimento_rolo com a referencia do corte. */
+function baseDaCorrecao(c){
+  const linhas=db.prepare(`SELECT pp.ordem, pp.largura, pp.altura, pp.pedido, pf.fonte, pf.rolo_id, pf.sobra_id
+      FROM plano_peca pp LEFT JOIN plano_faixa pf ON pf.id=pp.faixa_id
+     WHERE pp.plano_id=? ORDER BY pp.ordem`).all(c.id);
+  const ent=JSON.parse(c.entrada||'{}');
+  const fixadas={};
+  linhas.filter(l=>l.fonte).forEach(l=>{ fixadas[l.ordem]={fonte:l.fonte,
+    fonte_id:l.fonte==='rolo'?l.rolo_id:l.sobra_id, puxada:'corte'}; });
+  return {tecido_id:c.tecido_id,
+    // So o que saiu de alguma fonte foi cortado; o item sem lugar naquele corte
+    // nao entra — a nao ser que a correcao diga de onde ele saiu.
+    pecas:linhas.map(l=>({item:l.ordem, largura:l.largura, altura:l.altura, pedido:l.pedido||''})),
+    semFonte:linhas.filter(l=>!l.fonte).map(l=>l.ordem),
+    recusadas:[], excluir_rolos:[], fixadas, erradas:ent.erradas||[], rolos_acabados:[],
+    origem:c.origem};
+}
+
+function oQueEsteCorteBaixou(c){
+  const sobras=new Set(db.prepare(`SELECT id FROM sobra WHERE status='usada' AND baixa_motivo=?`)
+    .all('plano '+c.id).map(r=>r.id));
+  const rolos=new Map(db.prepare(`SELECT rolo_id, ROUND(SUM(-delta),6) m FROM movimento_rolo
+     WHERE motivo='consumo' AND referencia=? GROUP BY rolo_id`).all(String(c.id))
+    .filter(r=>r.m>0.0005).map(r=>[r.rolo_id,r.m]));
+  return {sobras,rolos};
+}
+
+/* As sobras que nasceram deste corte, do jeito que estao hoje: as a guardar
+   (fase 2) e as cadastradas pelo Confirmar antigo (a regua do historico). */
+function nascidasDeHoje(c){
+  const lista=[];
+  db.prepare(`SELECT g.*, s.status AS s_status, s.codigo AS s_codigo FROM sobra_a_guardar g
+      LEFT JOIN sobra s ON s.id=g.sobra_id WHERE g.plano_id=? AND g.cancelada_em IS NULL`).all(c.id)
+    .forEach(g=>lista.push({tipo:'a_guardar', id:g.id, sobra_id:g.sobra_id, codigo:g.s_codigo,
+      largura:g.largura, altura:g.altura, cortada_errada:!!g.cortada_errada,
+      origem_rolo_id:g.origem_rolo_id, origem_sobra_id:g.origem_sobra_id,
+      status:g.sobra_id?g.s_status:'a guardar'}));
+  const jaContadas=new Set(lista.map(x=>x.sobra_id).filter(Boolean));
+  historico.nascidas(c.id).filter(s=>!jaContadas.has(s.id)).forEach(s=>{
+    const full=db.prepare('SELECT * FROM sobra WHERE id=?').get(s.id);
+    if(full.status==='anulada') return;
+    lista.push({tipo:'sobra', sobra_id:s.id, codigo:s.codigo, largura:s.largura, altura:s.altura,
+      cortada_errada:false, origem_rolo_id:full.origem_rolo_id, origem_sobra_id:full.origem_sobra_id,
+      status:s.status});
+  });
+  return lista;
+}
+
+function previa(c,eds){
+  exigir(Array.isArray(eds)&&eds.length,'correcao_vazia','Diga o que mudou no corte.');
+  let ent=baseDaCorrecao(c);
+  const prop=c.proposta?JSON.parse(c.proposta):{faixas:[]};
+  for(const ed0 of eds){
+    // O que a correcao move foi cortado DEPOIS do plano: e uma puxada propria.
+    const ed={...ed0, puxada:'correcao'};
+    // O item sem lugar naquele corte so entra se a correcao disser de onde saiu.
+    if(ed.tipo==='trocar'&&ent.semFonte.includes(Number(ed.peca)))
+      ent.semFonte=ent.semFonte.filter(x=>x!==Number(ed.peca));
+    ent=Object.assign(aplicarEdicao(ent,prop,ed,c.tecido_id).entrada,{semFonte:ent.semFonte});
+  }
+  const fora=new Set(ent.semFonte);
+  const entrada={...ent, pecas:ent.pecas.filter(p=>!fora.has(p.item))};
+  delete entrada.semFonte;
+  // Uma sobra que nao serviu so sai do corte se os itens dela forem para outra
+  // fonte: aqui tudo ja foi cortado, e "nao usei" sem "usei esta" nao fecha.
+  const baixou=oQueEsteCorteBaixou(c);
+  const p=plano.calcular(entrada,{plano_id:c.id, correcao:true, devolvido:baixou});
+
+  // ── a diferenca, item por item ────────────────────────────────────────
+  const usadasNovas=new Set((p.sobras_sugeridas||[]).map(x=>x.id));
+  const devolver=[...baixou.sobras].filter(id=>!usadasNovas.has(id));
+  const usar=[...usadasNovas].filter(id=>!baixou.sobras.has(id));
+  const metrosNovos=new Map();
+  p.faixas.filter(f=>f.fonte==='rolo').forEach(f=>metrosNovos.set(f.fonte_id,
+    Math.round(((metrosNovos.get(f.fonte_id)||0)+f.altura)*1e6)/1e6));
+  const rolosIds=new Set([...baixou.rolos.keys(),...metrosNovos.keys()]);
+  const rolos=[...rolosIds].map(id=>{
+    const r=rolo.porId(id), antes=baixou.rolos.get(id)||0, depois=metrosNovos.get(id)||0;
+    return {id, codigo:r&&r.codigo, antes, depois, delta:Math.round((depois-antes)*1e6)/1e6,
+      saldo_hoje:r&&r.saldo, status:r&&r.status};
+  }).filter(x=>Math.abs(x.delta)>0.0005);
+
+  // As nascidas: casa a de hoje com a nova pela origem e pela medida (1 mm).
+  const hoje=nascidasDeHoje(c);
+  const novas=(p.sobras_geradas||[]).map(g=>({...g,
+    origem_rolo_id:g.origem&&g.origem.tipo==='rolo'?g.origem.id:null,
+    origem_sobra_id:g.origem&&g.origem.tipo==='sobra'?g.origem.id:null}));
+  const fica=[], nasce=[];
+  const livres=hoje.slice();
+  for(const n of novas){
+    const i=livres.findIndex(h=>(h.origem_rolo_id||null)===(n.origem_rolo_id||null)&&
+      (h.origem_sobra_id||null)===(n.origem_sobra_id||null)&&
+      Math.abs(h.largura-n.largura)<0.0015&&Math.abs(h.altura-n.altura)<0.0015&&
+      !!h.cortada_errada===!!n.cortada_errada);
+    if(i>=0) fica.push(livres.splice(i,1)[0]); else nasce.push(n);
+  }
+  const saem=livres;
+  const bloqueios=[];
+  saem.filter(h=>h.sobra_id&&h.status!=='disponivel').forEach(h=>bloqueios.push(
+    'A sobra '+h.codigo+' nao nasceu deste corte pela correcao, mas ja esta "'+h.status+
+    '". Corrija primeiro o corte que a usou.'));
+  rolos.filter(x=>x.status==='encerrado').forEach(x=>bloqueios.push(
+    'O rolo '+x.codigo+' esta encerrado: a correcao nao tem onde por ou tirar '+Math.abs(x.delta).toFixed(2).replace('.',',')+' m. Acerte o saldo dele a mao, com motivo.'));
+  rolos.filter(x=>x.delta>0&&x.status!=='encerrado'&&x.delta>x.saldo_hoje+0.001).forEach(x=>bloqueios.push(
+    'O rolo '+x.codigo+' tem '+Number(x.saldo_hoje).toFixed(2).replace('.',',')+' m e a correcao pede mais '+x.delta.toFixed(2).replace('.',',')+' m.'));
+  const refugoAntes=db.prepare('SELECT COALESCE(SUM(area),0) a FROM refugo WHERE plano_id=?').get(c.id).a;
+  const desc=id=>{ const x=sobra.porId(id)||{}; return {id, codigo:x.codigo, endereco:x.endereco,
+    largura:x.largura, altura:x.altura}; };
+  return {entrada, proposta:p,
+    sobras_voltam:devolver.map(desc), sobras_usadas:usar.map(desc), rolos,
+    nascidas_ficam:fica, nascidas_saem:saem, nascidas_novas:nasce.map(n=>({largura:n.largura, altura:n.altura,
+      cortada_errada:!!n.cortada_errada, origem:n.origem})),
+    refugo:{antes:Math.round(refugoAntes*1e4)/1e4, depois:Math.round((p.refugos||[]).reduce((t,x)=>t+x.area,0)*1e4)/1e4},
+    rolos_acabados:entrada.rolos_acabados||[],
+    bloqueios};
+}
+// O que viaja para a tela: a previa sem a proposta inteira.
+const previaParaTela=v=>{ const {entrada,proposta,...resto}=v; return resto; };
+
+function pedirCorrecao(id,dados,usuarioNome){
+  const c=exigirCorte(id);
+  exigirEtapa(c,['feito'],'pedir correcao'+(ABERTAS.includes(c.etapa)?' (o corte ainda esta aberto: mude o plano direto nele)':''));
+  const pend=db.prepare("SELECT * FROM plano_correcao WHERE plano_id=? AND status='pendente'").get(c.id);
+  exigir(!pend,'correcao_pendente','O corte '+c.id+' ja tem uma correcao esperando a chefia, pedida por '+
+    ((pend&&pend.pedida_por)||'alguem')+'. Espere a decisao, ou fale com quem pediu.');
+  const m=motivoDe(dados&&dados.motivo_id);
+  const v=previa(c,(dados||{}).edicoes);
+  const info=db.prepare(`INSERT INTO plano_correcao(plano_id,edicoes,previa,motivo_id,motivo_nome,observacao,pedida_por)
+    VALUES(?,?,?,?,?,?,?)`).run(c.id,JSON.stringify(dados.edicoes),JSON.stringify(previaParaTela(v)),
+    m.id,m.nome,String(dados.observacao||'').trim()||null,usuarioNome||null);
+  return {correcao_id:Number(info.lastInsertRowid), status:'pendente', previa:previaParaTela(v)};
+}
+
+function correcaoPendente(cid){
+  const k=db.prepare('SELECT * FROM plano_correcao WHERE id=?').get(Number(cid));
+  exigir(k,'correcao_inexistente','Correcao nao encontrada.');
+  exigir(k.status==='pendente','correcao_decidida','Esta correcao ja foi '+(k.status==='aprovada'?'aprovada':'recusada')+
+    ' por '+(k.decidida_por||'alguem')+'.');
+  return k;
+}
+
+function aprovarCorrecao(cid,usuarioNome){
+  const k=correcaoPendente(cid);
+  // Quem pediu nao aprova, nem o diretor: a regra da casa para mexer em saldo.
+  exigir(!(k.pedida_por&&usuarioNome&&k.pedida_por.trim().toUpperCase()===String(usuarioNome).trim().toUpperCase()),
+    'mesma_pessoa','Voce pediu esta correcao — quem aprova e outra pessoa.');
+  const c=exigirCorte(k.plano_id);
+  // A previa e refeita AGORA: entre pedir e aprovar o estoque andou.
+  const v=previa(c,JSON.parse(k.edicoes));
+  exigir(!v.bloqueios.length,'correcao_bloqueada',v.bloqueios.join(' '));
+  const p=v.proposta, quem=usuarioNome||null, ref='correcao '+k.id+' do corte '+c.id;
+
+  return db.transaction(()=>{
+    // 1. as sobras: a que nao foi usada volta para o endereco onde estava
+    v.sobras_voltam.forEach(s=>sobra.devolver(s.id,c.id,ref,quem));
+    v.sobras_usadas.forEach(s=>sobra.marcarUsada(s.id,c.id,quem));
+    // 2. o rolo acerta o saldo pela diferenca
+    v.rolos.forEach(r=>rolo.corrigirConsumo(r.id,-r.delta,c.id,ref,quem));
+    // 3. as sobras que nao nasceram saem; as que nasceram de verdade ficam a guardar
+    v.nascidas_saem.forEach(h=>{
+      if(h.tipo==='a_guardar'&&!h.sobra_id)
+        db.prepare('UPDATE sobra_a_guardar SET cancelada_em=?, cancelada_por=?, cancelada_motivo=? WHERE id=?')
+          .run(dia.agora(),quem,ref,h.id);
+      else sobra.anular(h.sobra_id,ref,quem);
+    });
+    // A sobra antiga que FICA ganha o vinculo direto com o corte: a regua de
+    // antes (codigo na faixa) nao sobrevive a reescrita das faixas.
+    v.nascidas_ficam.concat(v.nascidas_saem).filter(h=>h.sobra_id)
+      .forEach(h=>db.prepare('UPDATE sobra SET plano_id=? WHERE id=? AND plano_id IS NULL').run(c.id,h.sobra_id));
+    const ag=db.prepare(`INSERT INTO sobra_a_guardar
+      (plano_id,tecido_id,largura,altura,de,cortada_errada,origem,origem_rolo_id,origem_sobra_id,cortado_por)
+      VALUES(?,?,?,?,?,?,?,?,?,?)`);
+    v.nascidas_novas.forEach(n=>{ const o=n.origem||{};
+      ag.run(c.id,c.tecido_id,n.largura,n.altura,n.cortada_errada?'cortada_errada':null,n.cortada_errada?1:0,
+        o.tipo||'rolo',o.tipo==='rolo'?o.id:null,o.tipo==='sobra'?o.id:null,c.usuario_nome||null); });
+    // 4. o refugo e refeito
+    db.prepare('DELETE FROM refugo WHERE plano_id=?').run(c.id);
+    const gr=db.prepare(`INSERT INTO refugo(tecido_id,largura,altura,area,motivo,plano_id,usuario_nome) VALUES(?,?,?,?,?,?,?)`);
+    const minLarg=(p.parametros||{}).larguraMinimaSobra||0;
+    (p.refugos||[]).forEach(x=>gr.run(c.tecido_id,x.largura,x.altura,x.area,
+      x.motivo||(x.largura<minLarg?'tira_estreita':x.de),c.id,quem));
+    // 5. o rolo que acabou e encerrado, depois de baixar o que saiu dele
+    (v.rolos_acabados||[]).forEach(rid=>{ const r=rolo.porId(rid); if(r&&r.status!=='encerrado') rolo.encerrar(rid,quem); });
+    // 6. o corte passa a dizer o que aconteceu
+    db.prepare(`UPDATE plano SET entrada=?, proposta=?, consumo_linear=?, consumo_m2=?, area_pecas=?,
+      area_sobra_gerada=?, desperdicio=? WHERE id=?`).run(JSON.stringify(v.entrada),JSON.stringify(p),
+      p.consumo_linear,p.consumo_m2,p.area_pecas,p.area_sobras,p.desperdicio,c.id);
+    gravarPlano(c.id,p);
+    const ins=db.prepare(`INSERT INTO plano_edicao(plano_id,tipo,peca,fonte,fonte_id,detalhe,motivo_id,motivo_nome,
+      observacao,usuario_nome,correcao_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)`);
+    JSON.parse(k.edicoes).forEach(ed=>ins.run(c.id,ed.tipo,ed.peca||null,ed.fonte||null,ed.fonte_id||null,
+      'correcao '+k.id,k.motivo_id,k.motivo_nome,k.observacao,k.pedida_por,k.id));
+    db.prepare("UPDATE plano_correcao SET status='aprovada', decidida_por=?, decidida_em=?, previa=? WHERE id=?")
+      .run(quem,dia.agora(),JSON.stringify(previaParaTela(v)),k.id);
+    return {correcao_id:k.id, status:'aprovada', previa:previaParaTela(v)};
+  })();
+}
+
+function recusarCorrecao(cid,motivo,usuarioNome){
+  const k=correcaoPendente(cid);
+  const t=String(motivo||'').trim();
+  exigir(t,'motivo_obrigatorio','Diga por que a correcao foi recusada — quem pediu vai ler.');
+  db.prepare("UPDATE plano_correcao SET status='recusada', decidida_por=?, decidida_em=?, decisao_motivo=? WHERE id=?")
+    .run(usuarioNome||null,dia.agora(),t,k.id);
+  return {correcao_id:k.id, status:'recusada'};
+}
+
+const correcoes=filtro=>{
+  const f=filtro||{}; const onde=[], vals=[];
+  if(f.plano_id){ onde.push('k.plano_id=?'); vals.push(Number(f.plano_id)); }
+  if(f.status){ onde.push('k.status=?'); vals.push(f.status); }
+  return db.prepare(`SELECT k.*, p.usuario_nome AS cortado_por, p.tecido_id FROM plano_correcao k
+     JOIN plano p ON p.id=k.plano_id ${onde.length?'WHERE '+onde.join(' AND '):''} ORDER BY k.id DESC`)
+    .all(...vals).map(k=>({...k, edicoes:JSON.parse(k.edicoes), previa:k.previa?JSON.parse(k.previa):null}));
+};
+
 module.exports={confirmar, voltar, cortar, cancelar, feito, aberto, aGuardar, doCorte, guardar,
+  editar, edicoes, previaCorrecao:(id,eds)=>previaParaTela(previa(exigirCorte(id),eds)),
+  pedirCorrecao, aprovarCorrecao, recusarCorrecao, correcoes,
   resumo, gravarPlano, porId, abertoDe, ABERTAS, NOME_ETAPA, exigirCorte, exigirDono, exigirEtapa};

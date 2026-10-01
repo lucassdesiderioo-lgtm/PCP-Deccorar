@@ -1682,6 +1682,46 @@ CREATE TABLE sobra_a_guardar (
   cancelada_em TEXT, cancelada_por TEXT, cancelada_motivo TEXT
 );
 CREATE INDEX idx_sobra_a_guardar ON sobra_a_guardar(guardada_em, cancelada_em, cortado_por);
+`},
+
+/* ── A EDICAO DURANTE O CORTE E A CORRECAO DEPOIS (fase 3, R5–R8, R16) ────
+   Toda edicao do corte aberto vira uma linha aqui, com quem, quando, qual
+   item e o motivo — e o plano e recalculado pela mesma conta. Depois do Corte
+   feito, a correcao e PEDIDA e APROVADA, e enquanto pendente nada no estoque
+   muda. A edicao aprovada numa correcao aponta para ela (`correcao_id`).
+
+   OS MOTIVOS SAO A LISTA QUE JA EXISTIA, a de Cadastros → Motivos (R6): ela
+   ja e a lista editavel de "por que esta fonte nao serve" do plano de corte,
+   e duas listas para o mesmo corte seriam duas reguas. Entram as duas que a
+   spec pede e nao havia; "Tonalidade diferente" ja e o "Tom diferente". */
+{n:28, nome:'a edicao do corte aberto e a correcao depois do corte feito', sql:`
+CREATE TABLE plano_edicao (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plano_id INTEGER NOT NULL REFERENCES plano(id),
+  tipo TEXT NOT NULL,           -- nao_usar | trocar | rolo_acabou | medida_errada
+  peca INTEGER,                 -- o item da lista do corte
+  fonte TEXT, fonte_id INTEGER, fonte_codigo TEXT,
+  detalhe TEXT,                 -- a frase que a tela mostra
+  motivo_id INTEGER REFERENCES motivo_recusa(id), motivo_nome TEXT,
+  observacao TEXT, usuario_nome TEXT,
+  correcao_id INTEGER,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX idx_plano_edicao ON plano_edicao(plano_id);
+CREATE TABLE plano_correcao (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plano_id INTEGER NOT NULL REFERENCES plano(id),
+  status TEXT NOT NULL DEFAULT 'pendente',    -- pendente | aprovada | recusada
+  edicoes TEXT NOT NULL,        -- JSON: o que o operador disse que mudou
+  previa TEXT,                  -- JSON: o que a aprovacao faria, quando foi pedida
+  motivo_id INTEGER REFERENCES motivo_recusa(id), motivo_nome TEXT,
+  observacao TEXT,
+  pedida_por TEXT, pedida_em TEXT DEFAULT (datetime('now','localtime')),
+  decidida_por TEXT, decidida_em TEXT, decisao_motivo TEXT
+);
+CREATE INDEX idx_plano_correcao ON plano_correcao(status, plano_id);
+INSERT OR IGNORE INTO motivo_recusa(nome,ordem) VALUES('Rolo acabou',90);
+INSERT OR IGNORE INTO motivo_recusa(nome,ordem) VALUES('Medida errada',91);
 `}
 ];
 

@@ -250,6 +250,29 @@ function consumir(rolo_id,metros,referencia,usuarioNome){
   return dRolo.porId(rolo_id);
 }
 
+/* ── A CORRECAO DO CONSUMO DE UM CORTE JA FEITO (fase 3 da CORTE-EM-ETAPAS)
+   O corte baixou X e na verdade saiu Y: a diferenca vai como CONSUMO, com o
+   sinal dela — positivo devolve metro ao rolo, negativo baixa o que faltou.
+   E consumo, e nao ajuste, porque e o corte que mudou: o giro (giro.js) soma
+   `-delta` dos consumos, e assim o tecido que de fato saiu e o que fica na
+   conta. Ajuste seria dizer que o saldo estava errado, e ele nao estava. */
+function corrigirConsumo(rolo_id,delta,referencia,observacao,usuarioNome){
+  const r=dRolo.porId(rolo_id);
+  exigir(r,'rolo_inexistente','Rolo nao encontrado.');
+  exigir(r.status!=='encerrado','rolo_encerrado',
+    'O rolo '+r.codigo+' esta encerrado: a correcao nao tem onde por ou tirar metro. Acerte o saldo dele a mao, com motivo.');
+  const d=arred(Number(delta));
+  if(Math.abs(d)<=0.001) return dRolo.porId(rolo_id);
+  const saldo=arred(r.saldo+d);
+  exigir(saldo>=-0.001,'saldo_insuficiente',
+    'O rolo '+r.codigo+' tem '+r.saldo.toFixed(2).replace('.',',')+' m e a correcao pede mais '+
+    (-d).toFixed(2).replace('.',',')+' m.');
+  dRolo.gravarSaldo(rolo_id,Math.max(0,saldo),d<0?'aberto':r.status);
+  dRolo.movimentar({rolo_id,delta:d,saldo_apos:Math.max(0,saldo),motivo:'consumo',
+    referencia:referencia==null?null:String(referencia),observacao:observacao||null,usuario_nome:usuarioNome});
+  return dRolo.porId(rolo_id);
+}
+
 // ── AJUSTE ───────────────────────────────────────────────────────────────
 function ajustar(rolo_id,novoSaldo,observacao,usuarioNome){
   const r=dRolo.porId(rolo_id);
@@ -313,7 +336,7 @@ function conferirSaldos(){
 const comEndereco=r=>r?{...r, endereco:r.nivel_id?endereco.descrever(r.nivel_id):''}:r;
 
 module.exports={mover,editarDados,
-  entrada, consumir, ajustar, encerrar, conferirSaldos, formatar,
+  entrada, consumir, corrigirConsumo, ajustar, encerrar, conferirSaldos, formatar,
   // A leitura do preco digitado e uma so: a sobra usa a mesma regua do rolo.
   precoDe,
   // A estante do jeito que ela esta agora: nivel -> rolo que o ocupa. A tela

@@ -7677,8 +7677,53 @@ sobra; `plano.js` ficou só com a conta. O histórico de cada corte está no bot
 > servidor, e quem preenchia uma só das três linhas da grade levava *"A linha 2
 > esta sem medida valida"*. Achado abrindo a tela, consertado no `temMedida`.
 
+### ⚠️ MUDAR O CORTE: livre durante, aprovado depois (fase 3, R5–R8, R16–R17)
+
+**Durante o corte (③)** o operador muda o plano sozinho, sempre com motivo da
+lista de **Cadastros → Motivos** (a mesma do "não usar"; a migração 28 só
+acrescentou *Rolo acabou* e *Medida errada*): **não usar** a fonte, **o item
+saiu de outra fonte** (bipa o código; o sistema conta os metros), **rolo
+acabou** (o que já saiu fica nele, o resto muda, e no Corte feito ele é
+encerrado) e **cortado errado** (o pedaço vira sobra marcada "cortada errada",
+ou refugo, e o item volta a ser cortado). Cada mudança vira linha em
+`plano_edicao`.
+
+> ⚠️ **A EDIÇÃO NÃO TEM CONTA PRÓPRIA.** Ela vira restrição da entrada
+> (`fixadas`, `erradas`, `excluir_rolos`, `recusadas`) e o plano é recalculado
+> pelo mesmo `plano.calcular`. Fonte onde o item não cabe é recusada dizendo
+> qual, e nada muda.
+
+**Depois do Corte feito** o operador **pede** correção pelo histórico
+(`corte.pedir_correcao`), dizendo de onde cada item saiu de verdade; a tela
+mostra antes o que a aprovação faria. **Pendente, nada no estoque muda.** A
+chefia (`corte.aprovar_correcao`) aprova e o sistema aplica a **diferença**: a
+sobra que não foi usada volta a disponível **no endereço onde estava**, o rolo
+acerta o saldo como consumo (o giro soma certo), as sobras que não nasceram
+saem (a guardar é cancelada; a já guardada vira `anulada`, que não é descarte
+nem refugo), as que nasceram de verdade ficam a guardar, e o refugo é refeito.
+
+> ⚠️ **NA CORREÇÃO TODO ITEM TEM FONTE FIXA**, a do corte menos o que a pessoa
+> disse que mudou. Deixar o plano escolher ali inventaria um corte que ninguém
+> fez. E o item que mudou de fonte é **outra puxada**: encaixá-lo junto com o
+> que já tinha saído do rolo o poria na mesma faixa, e o rolo baixaria 0,50 m
+> em vez dos 2,50 que saíram. Achado pelo teste, antes da tela.
+
+> ⚠️ **A VERDADE DO QUE O CORTE BAIXOU É O MOVIMENTO, não a proposta.** Os cortes
+> de antes das etapas (R28) nem têm proposta; o metro de cada rolo está no
+> `movimento_rolo` com a referência do corte. É assim que o corte de 01/10/2026
+> se corrige.
+
+> ⚠️ **QUEM PEDIU NÃO APROVA, nem o diretor** — a regra da casa para mexer em
+> saldo (§18, ajuste em duas pessoas), aplicada aqui por analogia: a spec diz
+> só "a gestão aprova". Está em `DECISOES.md` para o dono confirmar.
+
+> ⚠️ **A CORREÇÃO É BLOQUEADA** quando uma sobra "que não nasceu" já foi usada
+> noutro corte, ou quando o rolo está encerrado e não tem onde pôr ou tirar
+> metro. A frase diz o que fazer.
+
 **Rode `cd tecido && npm test` ao mexer em `corte.js`, no `plano.js` ou na tela
-de corte** — `corte_etapas.test.js` (18) e `historico_corte.test.js` (15).
+de corte** — `corte_etapas.test.js` (18), `corte_correcao.test.js` (17) e
+`historico_corte.test.js` (15).
 
 ### Três regras do sob medida que valem citar aqui
 
