@@ -21,11 +21,13 @@ const rolo=require('./rolo');
 const etiqueta=require('./etiqueta');
 const endereco=require('./endereco');
 const config=require('../nucleo/config');
+const painel=require('./painel');
 const dTecido=require('../dados/tecido');
 
 const TOL=0.001;
 const arred=v=>Math.round(v*1e6)/1e6;
 const fmt=v=>(Math.round(v*100)/100).toFixed(2).replace('.',',');
+const fmtM2=v=>(Math.round(v*100)/100).toFixed(2).replace('.',',')+' m²';
 const medida=(l,a)=>fmt(l)+' × '+fmt(a);
 
 // ── as pecas que o operador digitou ──────────────────────────────────────
@@ -333,24 +335,50 @@ function calcular(pedido,opcoes){
      seria uma segunda conta, e as duas divergiriam no primeiro ajuste. */
   const naoEntraram=[];
 
-  for(const s of disponiveis){
-    if(!grupos.length) break;
-    const fonte={id:'sobra:'+s.id, fonte:'sobra', largura:s.largura, alturaMax:s.altura};
-    // SEM ROTACAO quando o tecido tem sentido: uma sobra 0,70 x 3,00 nunca
-    // serve para uma peca 3,00 x 0,70. Girar resolveria no papel; no tecido
-    // muda o desenho, o brilho e o caimento.
-    const cabem=grupos.flatMap(g=>g.pecas).filter(p=>serve(p,fonte));
+  /* ── A ESCOLHA ENTRE AS SOBRAS QUE SERVEM (R24 da CORTE-EM-ETAPAS) ──────
+     Antes a ordem era a da consulta — condicao, depois menor area — e a
+     primeira que coubesse levava. A menor area nao e a que aproveita melhor o
+     tecido: a sobra de 1,05 x 1,05 para uma peca de 1,00 x 1,00 vira tira
+     de refugo, e a de 1,00 x 2,10 devolve um pe de 1,10 que e sobra nova.
+     Agora, a cada rodada, todas as que comportam grupos INTEIROS sao medidas e
+     vence:  condicao (integra antes de defeito) → menor refugo → menor area.
+     O refugo e o que nao vira peca nem sobra nova (a margem entra nele). */
+  const refugoDe=t=>arred(t.resultado.consumoM2-t.resultado.areaPecas-t.resultado.areaSobras);
+  const escolhidaPor=new Map();     // id da peca -> sobra que a levou
+  let restamSobras=disponiveis.slice();
+  while(grupos.length){
+    let melhor=null;
+    for(const s of restamSobras){
+      const fonte={id:'sobra:'+s.id, fonte:'sobra', largura:s.largura, alturaMax:s.altura};
+      // SEM ROTACAO quando o tecido tem sentido: uma sobra 0,70 x 3,00 nunca
+      // serve para uma peca 3,00 x 0,70. Girar resolveria no papel; no tecido
+      // muda o desenho, o brilho e o caimento.
+      if(!grupos.some(g=>g.pecas.some(p=>serve(p,fonte)))) continue;
+      const t=encaixarGruposCompletos(grupos,fonte,params);
+      if(!t) continue;
+      const c={s, fonte, t, pri:Number(s.prioridade||0), refugo:refugoDe(t), area:s.largura*s.altura};
+      if(!melhor||c.pri-melhor.pri<0||(c.pri===melhor.pri&&(c.refugo<melhor.refugo-TOL||
+         (Math.abs(c.refugo-melhor.refugo)<=TOL&&c.area<melhor.area-TOL)))) melhor=c;
+    }
+    if(!melhor) break;
+    grupos=grupos.filter(g=>!melhor.t.grupos.includes(g));
+    restamSobras=restamSobras.filter(x=>x!==melhor.s);
+    melhor.t.grupos.forEach(g=>g.pecas.forEach(pc=>escolhidaPor.set(pc.id,melhor)));
+    fontes.push(melhor.fonte);
+    usadas.push({tipo:'sobra', ref:melhor.s, fonteId:melhor.fonte.id, fonte:melhor.fonte, grupos:melhor.t.grupos});
+  }
+  /* AS QUE SERVIAM E NAO LEVARAM NADA (R22). Duas razoes, e cada uma tem a
+     sua frase: a peca que ela comporta ainda esta sem sobra (o pedido inteiro
+     nao cabe nela — pecas do mesmo pedido nao se separam), ou a peca foi para
+     OUTRA sobra, que ganhou pela regra de cima. Medido depois da escolha: a
+     frase diz o que o plano final fez, e nao o que uma rodada do meio viu. */
+  for(const s of restamSobras){
+    const fonte={largura:s.largura, alturaMax:s.altura};
+    const cabem=pecasLivres.filter(p=>serve(p,fonte));
     if(!cabem.length) continue;
-
-    const tentativa=encaixarGruposCompletos(grupos,fonte,params);
-    // Nao entrou, mas serve alguma peca: o `null` aqui quer dizer que todo
-    // grupo ou nao cabe, ou ficaria DIVIDIDO — e dividir pedido e o que o tom
-    // unico proibe. E isso que a tela passa a dizer.
-    if(!tentativa){ naoEntraram.push({sobra:s, pecas:cabem}); continue; }
-
-    grupos=grupos.filter(g=>!tentativa.grupos.includes(g));
-    fontes.push(fonte);
-    usadas.push({tipo:'sobra', ref:s, fonteId:fonte.id, fonte, grupos:tentativa.grupos});
+    const semSobra=cabem.filter(p=>!escolhidaPor.has(p.id));
+    if(semSobra.length) naoEntraram.push({sobra:s, pecas:semSobra, codigo:'pedido_nao_separa'});
+    else naoEntraram.push({sobra:s, pecas:cabem, codigo:'outra_sobra', escolhidaPor});
   }
 
   // ── 2. O QUE SOBROU VAI PARA O ROLO ───────────────────────────────────
@@ -580,8 +608,12 @@ function calcular(pedido,opcoes){
      recebe a sobra, A PECA que ela comporta e o porque — e a negativa
      categorica so sai quando e verdade. */
   const usouSobra=usadas.some(u=>u.tipo==='sobra');
-  // Usou sobra? Nao ha o que explicar, e nao se gasta consulta para isso.
-  const naoAprov=usouSobra?[]:sobra.naoAproveitaveis(tecido.id);
+  /* ⚠️ USOU SOBRA E AINDA ASSIM EXPLICA (R22 da CORTE-EM-ETAPAS). Ate a fase 7
+     a lista so existia quando o plano nao usava sobra nenhuma — e o caso de
+     01/10/2026 era exatamente o outro: uma sobra levou parte do corte, e a
+     S que servia o resto sumiu da tela sem uma palavra. */
+  const naoAprov=sobra.naoAproveitaveis(tecido.id);
+  const usadasIds=new Set(usadas.filter(u=>u.tipo==='sobra').map(u=>u.ref.id));
 
   // A MAIOR peca que a sobra comporta: e ela que responde "ate onde essa
   // sobra da". Citar a primeira responderia outra pergunta, menor.
@@ -611,8 +643,26 @@ function calcular(pedido,opcoes){
     };
   };
 
-  const sobrasQueServem=usouSobra?[]:[
-    ...naoEntraram.map(x=>explicar(x.sobra,x.pecas,'pedido_nao_separa',m=>
+  const sobrasQueServem=[
+    ...naoEntraram.filter(x=>!usadasIds.has(x.sobra.id)).map(x=>x.codigo==='outra_sobra'
+      ? explicar(x.sobra,x.pecas,'outra_sobra',m=>{
+          // O PORQUE e o degrau da regra que decidiu — nunca um palpite.
+          const o=x.escolhidaPor.get(m.id);
+          const g=agrupar(pecasLivres).find(gg=>gg.pecas.some(pc=>pc.id===m.id));
+          const t=g&&encaixarGruposCompletos([g],{id:'sobra:'+x.sobra.id, fonte:'sobra',
+            largura:x.sobra.largura, alturaMax:x.sobra.altura},params);
+          const aqui=t?refugoDe(t):null;
+          const porque=o.pri<Number(x.sobra.prioridade||0)
+              ? ', que e '+(o.s.condicao_nome||o.s.condicao).toLowerCase()+' (vem antes de sobra com defeito)'
+            : aqui!=null&&aqui>o.refugo+TOL
+              ? ', que deixa menos refugo ('+fmtM2(o.refugo)+' contra '+fmtM2(aqui)+')'
+              : o.area<x.sobra.largura*x.sobra.altura-TOL
+                ? ', que deixa o mesmo refugo e e menor'
+                // Mesma condicao, mesmo refugo, mesma area: e a gemea. Dizer
+                // "menor" aqui seria a frase inventando um porque.
+                : ', igual a esta (mesma medida e mesmo refugo) — o plano usa uma so';
+          return 'serve a peca '+medida(m.largura,m.altura)+', mas ela foi para a sobra '+o.s.codigo+porque; })
+      : explicar(x.sobra,x.pecas,'pedido_nao_separa',m=>
       m.pedido
         ? 'serve a peca '+medida(m.largura,m.altura)+', mas o pedido '+m.pedido+
           ' inteiro nao cabe nela — pecas do mesmo pedido nao se separam'
@@ -695,6 +745,25 @@ function calcular(pedido,opcoes){
     }
   }
 
+  /* QUANTO DE CADA SOBRA VIRA O QUE (R23): usa nas pecas · vira sobra nova ·
+     vira refugo, em % da area dela, SOMANDO 100. O refugo e o resto, e nao uma
+     terceira soma: o que nao virou peca nem sobra nova se perdeu (a margem
+     entre pecas entra aqui). O pedaco cortado errado nao e peca — ja foi
+     contado como sobra ou refugo. */
+  const aproveitamento=u=>{
+    const area=arred(u.ref.largura*u.ref.altura);
+    const idx=new Set(); r.faixas.forEach((f,i)=>{ if(f.fonteId===u.fonteId) idx.add(i); });
+    const daFonte=x=>(x.faixa!=null&&idx.has(x.faixa))||x.fonteId===u.fonteId;
+    const aPecas=[...idx].reduce((t,i)=>t+r.faixas[i].pecas.filter(pc=>!pc.errada)
+      .reduce((a,pc)=>a+pc.largura*pc.altura,0),0);
+    const aSobra=r.sobrasGeradas.filter(daFonte).reduce((t,x)=>t+x.area,0);
+    if(area<=TOL) return null;
+    const usa=Math.round(aPecas/area*100);
+    const sob=Math.min(100-usa,Math.round(aSobra/area*100));
+    return {area, usa, sobra:sob, refugo:100-usa-sob,
+      area_pecas:arred(aPecas), area_sobra:arred(aSobra), area_refugo:arred(Math.max(0,area-aPecas-aSobra))};
+  };
+
   const proposta={
     tecido:{id:tecido.id, codigo:tecido.codigo,
       nome:[tecido.linha_nome,tecido.abertura_nome,tecido.cor_nome].join(' · ')},
@@ -749,7 +818,12 @@ function calcular(pedido,opcoes){
     sobras_sugeridas:usadas.filter(u=>u.tipo==='sobra').map(u=>({
       id:u.ref.id, codigo:u.ref.codigo, largura:u.ref.largura, altura:u.ref.altura,
       condicao:u.ref.condicao_nome||u.ref.condicao,
-      endereco:endereco.descrever(u.ref.nivel_id)})),
+      endereco:endereco.descrever(u.ref.nivel_id),
+      aproveitamento:aproveitamento(u)})),
+    /* O refugo do corte inteiro, em % do que ele consome (R23), e a media dos
+       cortes dos ultimos 30 dias (R25), para ter com o que comparar. */
+    refugo_pct:r.consumoM2>TOL?Math.round((r.consumoM2-r.areaPecas-r.areaSobras)/r.consumoM2*100):null,
+    refugo_medio:painel.refugoMedio(30),
     recusadas:[...recusadas],
     parametros:params
   };

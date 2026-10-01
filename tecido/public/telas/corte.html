@@ -465,6 +465,13 @@ function desenharPlano(modo){
     if(puxarTotal>0.001) cb.appendChild(el('span',{class:'tag bom',
       texto:'puxar '+formatarMetros(puxarTotal)+(g.faixas.length>1?' em '+g.faixas.length+' puxadas':'')}));
 
+    /* QUANTO DESTA SOBRA VIRA O QUE (R23): as tres partes somam 100. O corte
+       aberto antes da fase 7 nao tem o numero — e a tag simplesmente nao sai. */
+    const sug=f0.fonte==='sobra'&&(p.sobras_sugeridas||[]).find(x=>x.id===f0.fonte_id);
+    if(sug&&sug.aproveitamento){ const a=sug.aproveitamento;
+      cb.appendChild(el('span',{class:'tag off',
+        title:'Da área desta sobra: o que vira peça, o que vira sobra nova e o que vira refugo.',
+        texto:'usa '+a.usa+'% · '+a.sobra+'% vira sobra · '+a.refugo+'% refugo'})); }
     // A recusa (R16): so faz sentido em sobra, e so antes de confirmar.
     if(f0.fonte==='sobra'&&!cortando){
       const s=p.sobras_sugeridas.find(x=>x.id===f0.fonte_id);
@@ -584,6 +591,16 @@ function desenharPlano(modo){
   resumo.appendChild(dado('desperdício',formatarArea(p.desperdicio)));
   resumo.appendChild(dado('peças',formatarArea(p.area_pecas)));
   if(p.area_sobras>0) resumo.appendChild(dado('vira sobra',formatarArea(p.area_sobras)));
+  /* O REFUGO DO CORTE E A MEDIA DOS 30 DIAS (R23, R25). Nao ha limite de perda
+     ainda: a media esta aqui para o dono decidir um, com numero na mao. Sem
+     corte na janela a media diz isso, e nunca "0%". */
+  if(p.refugo_pct!=null){
+    const m=p.refugo_medio;
+    resumo.appendChild(dado(m&&m.pct!=null
+        ? 'refugo · média de 30 dias '+String(m.pct).replace('.',',')+'%'
+        : 'refugo · sem corte nos últimos 30 dias para comparar',
+      p.refugo_pct+'%'));
+  }
   resumo.appendChild(el('span',{class:'espaco',style:'flex:1'}));
   resumo.appendChild(el('button',{class:'bt naoImprime',texto:'Imprimir',onclick:()=>window.print()}));
   if(cortando){

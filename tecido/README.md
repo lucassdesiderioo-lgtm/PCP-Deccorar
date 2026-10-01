@@ -2712,6 +2712,19 @@ reintroduzidos um a um: a marca "deu como usada" sempre falsa, a busca por
 sobra sem o corte de onde ela nasceu, o pedido exigindo o número inteiro e a
 sobra nascida reconhecida só pela faixa — cada um reprova o caso dele.
 
+## A escolha da sobra e o desperdício de cada uma (CORTE-EM-ETAPAS, fase 7)
+
+- **Vence a sobra que gera menos refugo**, depois de a condição empatar
+  (íntegra antes de defeito); empate no refugo, a de menor área. O refugo é o
+  que não vira peça nem sobra nova.
+- **Toda sobra que comporta uma peça e não entrou diz por quê** — o pedido não
+  cabe inteiro nela, foi recusada, está reservada, está com condição não
+  aproveitável, ou a peça foi para outra sobra (que a frase nomeia, com o
+  critério). Vale também quando o plano usou sobra.
+- **Cada sobra sugerida mostra usa · vira sobra · refugo**, somando 100%, e o
+  resumo mostra o refugo do corte contra a média dos últimos 30 dias (lida da
+  tabela `refugo`, a mesma do painel de Refugo).
+
 ## O upload (fase 8)
 
 **O PDF de etiquetas de produção** (Decorsoft) é lido direto: o sistema pega a

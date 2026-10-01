@@ -7789,6 +7789,31 @@ segue pelo caminho do bipe; não há segundo caminho.
 o limiar fixo (a sombra reprova), a parada lida sem o silêncio depois e tirar o
 script da tela.
 
+### O PLANO MAIS CLARO (fase 7, R22–R25)
+
+> ⚠️ **ENTRE AS SOBRAS QUE SERVEM, VENCE A DE MENOS REFUGO, e não a menor.**
+> A ordem é condição (íntegra antes de defeito) → menor refugo → menor área. A
+> de 1,05 × 1,05 para uma peça de 1,00 × 1,00 vira tira de refugo; a de
+> 1,00 × 2,10 devolve um pé de 1,10 que é sobra nova — e ganha.
+
+> ⚠️ **A SOBRA QUE SERVE E NÃO ENTROU DIZ POR QUÊ TAMBÉM QUANDO O PLANO USOU
+> OUTRA.** Até aqui a lista só existia sem sobra nenhuma no plano — e o caso de
+> 01/10/2026 era o outro. O motivo `outra_sobra` nomeia a escolhida e o degrau
+> que decidiu; a gêmea (mesma medida, mesmo refugo) diz que é gêmea, e não que
+> a outra "é menor".
+
+**Cada sobra usada mostra `usa N% · N% vira sobra · N% refugo`, somando 100**
+(o refugo é o resto, e não uma terceira soma), e o resumo mostra o refugo do
+corte ao lado da **média dos cortes dos últimos 30 dias** —
+`painel.refugoMedio`, da mesma tabela `refugo` do painel, só o refugo de corte.
+Sem corte na janela a média é `null`, nunca zero. **Não há limite de perda:** o
+número existe para o dono decidir um.
+
+**Rode `cd tecido && npm test`** — `plano_claro.test.js` (12). Seis defeitos
+foram reintroduzidos um a um: sem o critério do refugo, sem a condição, a lista
+sumindo com sobra usada, o descarte entrando na média, a média zero e a
+porcentagem errada.
+
 ### Três regras do sob medida que valem citar aqui
 
 **Cada nível guarda um rolo só.** Regra do dono, 15/09/2026: `Haste A · Andar 1

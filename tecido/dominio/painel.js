@@ -64,4 +64,19 @@ const cortes=()=>db.prepare(`
          ROUND(SUM(desperdicio),2) AS desperdicio
     FROM plano WHERE confirmado=1 GROUP BY mes ORDER BY mes DESC`).all();
 
-module.exports={estoque,encalhe,refugo,recusas,cortes};
+/* O REFUGO MEDIO DOS CORTES (R25 da CORTE-EM-ETAPAS). Da MESMA tabela do
+   painel de Refugo — uma segunda conta seria a regua da tela do plano contra
+   a do painel. So o refugo de CORTE entra (o descarte de sobra nao tem
+   plano), sobre o m² que aqueles cortes consumiram. Sem corte na janela e
+   `null`, nunca zero: zero diria "nao perdemos nada", e nao se mediu.
+   Nao ha limite de perda ainda: este numero existe para o dono decidir um. */
+function refugoMedio(dias){
+  const d=dias||30;
+  const x=db.prepare(`SELECT COUNT(*) cortes, SUM(p.consumo_m2) consumo,
+      SUM((SELECT COALESCE(SUM(r.area),0) FROM refugo r WHERE r.plano_id=p.id)) refugo
+    FROM plano p WHERE p.etapa='feito' AND p.feito_em>=datetime('now','localtime',?)`).get('-'+d+' days');
+  return {dias:d, cortes:x.cortes,
+    pct:x.cortes&&x.consumo>0?Math.round(x.refugo/x.consumo*1000)/10:null};
+}
+
+module.exports={estoque,encalhe,refugo,recusas,cortes,refugoMedio};

@@ -2,11 +2,11 @@
 
 ```
 STATUS
-Situação: em construção
+Situação: código completo (7 fases) — falta o deploy e as provas na fábrica
 Criada em: 01/10/2026
 Última atualização: 01/10/2026
-Fase atual: 7 (plano mais claro) — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
-Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☐
+Fase atual: nenhuma — as sete em código; a spec vai para docs/arquivo/ depois do deploy conferido — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
+Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☑
 Risco: 🔴 (muda o momento da baixa de rolo e sobra; correção de estoque depois do corte)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
 Substitui: SOBRAS-TOM-E-DESPERDICIO.md (18/09/2026), que foi para docs/arquivo/
@@ -68,6 +68,16 @@ Mudanças no caminho:
     tremida, torta), e elas não existem no repositório — os testes desenham
     a etiqueta e a estragam como a câmera estraga. É indício; a prova é o
     iPad da bancada achando a sobra pela foto.
+  · Fase 7 em código (01/10/2026). R24: a cada rodada todas as sobras que
+    comportam grupos INTEIROS são medidas, e vence condição → menor refugo →
+    menor área (o refugo é o que não vira peça nem sobra nova). R22: a lista
+    "serve e não entrou" passou a existir também quando o plano usou outra
+    sobra, com o motivo novo `outra_sobra` (nomeia a escolhida e o degrau da
+    regra que decidiu; gêmea diz que é gêmea). R23: cada sobra usada traz
+    `aproveitamento` (usa · vira sobra · refugo, somando 100 — o refugo é o
+    resto) e o plano traz `refugo_pct`. R25: `painel.refugoMedio(30)`, da
+    tabela `refugo`, só o refugo de corte sobre o consumo dos cortes feitos;
+    sem corte na janela é null.
   · Achado na fase 1 e CONSERTADO na fase 4: o plano que continua o pedido no
     rolo do corte anterior (R12) não conferia o tecido — pedido com persianas
     de duas cores mandava puxar do rolo da outra cor.
