@@ -127,3 +127,13 @@ alvo delas é o notebook de 1440, onde estão certas. Ficam **medidas e dispensa
 não entram como dívida. Dívida que ninguém vai pagar é a lista que a equipe aprende a
 não ler. As telas de operação do PCP não rolam em tablet nenhum (768 e 1024 limpos),
 que era a pergunta que importava. Detalhe e números no `CLAUDE.md` §12.
+
+## 01/10/2026 — quem imprimiu a etiqueta de venda não confere no Carregamento
+Decisão do dono, e muda a decisão 2 de 25/09/2026 ("sem segunda pessoa só marca").
+O bipe da área (agência) e do canto (coleta) recusa o mesmo login de quem imprimiu, e a
+tela diz o nome de quem fez a etiqueta. **Sem liberação nenhuma**: o cruzamento é
+automático e vale para todo login. A primeira versão tinha liberação por pessoa e dia, e o
+dono a tirou antes do deploy — quem imprime e quem confere são pessoas diferentes pelo
+desenho da equipe. Custo aceito: num dia de uma pessoa só, a caixa espera outra pessoa.
+Motivo: a bancada não repara na caixa de várias persianas, e só marcar deixava a mesma
+atenção conferir. Spec `CARREGAMENTO-SEGUNDA-PESSOA`, fase 1.

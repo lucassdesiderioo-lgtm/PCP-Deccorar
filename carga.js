@@ -166,6 +166,12 @@ function saidasAdiantadas(db, dias){
 const CONFERIDA = "(conferido_em IS NOT NULL OR estagio='carregado')";
 const PILHA_HOJE = "estagio IN ('embalado','carregado') AND date(embalado_em)=date('now','localtime')";
 const nomeIgual = (a, b) => String(a||'').trim().toLowerCase() === String(b||'').trim().toLowerCase();
+/* "ESTA PESSOA IMPRIMIU ESTA CAIXA?" — a pergunta do bipe do Carregamento
+   (spec CARREGAMENTO-SEGUNDA-PESSOA, fase 1, 01/10/2026). Os DOIS nomes tem
+   que existir: vazio igual a vazio nao e a mesma pessoa, e nao saber quem fez
+   (a mesma guarda do "sem segunda pessoa" da pilha). */
+const temNomeP = s => String(s||'').trim() !== '';
+const mesmaPessoa = (impresso, quem) => temNomeP(impresso) && temNomeP(quem) && nomeIgual(impresso, quem);
 function pilhaDaArea(db){
   const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
   const cols = 'id, codigo, buyer, nf, despachar_em, modalidade, embalado_em, impresso_por, conferido_por';
@@ -177,6 +183,7 @@ function pilhaDaArea(db){
     ORDER BY embalado_em, id`).all();
   const marca = v => ({ id:v.id, codigo:v.codigo, buyer:v.buyer, nf:v.nf,
     despachar_em:v.despachar_em, embalado_em:v.embalado_em,
+    impresso_por: temNomeP(v.impresso_por) ? String(v.impresso_por).trim() : null,
     coleta: ehColeta(v), adiantada: futuro(v, hoje) });
   const conferidas = doDia.filter(v => v.conferida);
   const temNome = s => String(s||'').trim() !== '';
@@ -265,5 +272,5 @@ function podeTerIdo(db){
 
 module.exports = { PRA_CARREGAR, DO_DIA, ORDEM_CARGA, atrasado, futuro,
                    COLETA, AGENCIA, ehColeta, AGUARDA_CAMINHAO,
-                   SAIDA, saidasAdiantadas, pilhaDaArea, nomeIgual,
+                   SAIDA, saidasAdiantadas, pilhaDaArea, nomeIgual, mesmaPessoa,
                    acharVolumes, NA_SAIDA, naSaida, PODE_TER_IDO, podeTerIdo, PRONTA_PRO_CARRO };

@@ -1,4 +1,4 @@
-const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro,ehColeta,AGENCIA,COLETA,AGUARDA_CAMINHAO,saidasAdiantadas,pilhaDaArea,acharVolumes,PRONTA_PRO_CARRO}=require('./carga');
+const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro,ehColeta,AGENCIA,COLETA,AGUARDA_CAMINHAO,saidasAdiantadas,pilhaDaArea,acharVolumes,PRONTA_PRO_CARRO,mesmaPessoa}=require('./carga');
 const fs=require('fs'), path=require('path');
 /* Onde ficam as fotos da conferencia com o motorista. Fora do git e FORA de
    lotes/ (que o cron apaga em 7 dias): a foto e prova, e prova nao expira
@@ -9,6 +9,7 @@ module.exports=function(app,db){
   /* A tabela das saidas (caminhao e agencia) tem dono proprio: o script do
      passivo tambem a cria, e duas copias do CREATE divergem. */
   require('./saida_schema').garantirSaida(db);
+  const nomeLimpo=s=>{ const t=String(s||'').trim(); return t||null; };
   /* ── CONFERENCIA DUPLA (etiqueta de venda + SKU da caixa) ──────────────────
      A ultima rede antes do carro. Bipe 1 = a etiqueta de venda JA COLADA;
      bipe 2 = o codigo de barras do SKU na propria caixa (que continua visivel,
@@ -123,6 +124,29 @@ module.exports=function(app,db){
       return res.json({ok:false,motivo:'ja_conferida',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
         aviso:'Esta caixa ja foi conferida e esta na area. Para por no carro, abra a Viagem a agencia e bipe por la.'});
     }
+    /* ⚠️ QUEM IMPRIMIU NAO CONFERE (spec CARREGAMENTO-SEGUNDA-PESSOA, fase 1,
+       decisao do dono em 01/10/2026). Ate aqui o "sem segunda pessoa" so
+       MARCAVA (decisao 2 da SAIDA-E-DUPLA-CONFERENCIA) e ninguem olhava a
+       marca: a mesma atencao que deixou passar a caixa de varias persianas na
+       bancada a conferia no Carregamento. Vale no bipe da AREA (agencia) e no
+       do CANTO (coleta) — e so neles: a viagem e as sobras do caminhao ja
+       recebem caixa conferida por outra pessoa.
+       A recusa DIZ QUEM IMPRIMIU: e o nome que a pessoa ve no login, e e o
+       que ela precisa para saber que tem que chamar outra.
+       ⚠️ NAO HA LIBERACAO, e isso e decisao do dono (01/10/2026): o
+       cruzamento e automatico e vale para todo login, inclusive o de acesso
+       total. Uma porta de liberar vira o caminho de todo dia, e ai a regra
+       deixa de existir. Quem imprime e quem confere sao pessoas diferentes
+       por desenho da equipe, nao por excecao. */
+    const quemBipou=(req.usuario&&req.usuario.nome)||null;
+    if(mesmaPessoa(alvo.impresso_por, quemBipou)){
+      try{ const ac=app.locals.acesso;
+           if(ac&&ac.auditar) ac.auditar(req,'expedicao','carregar_mesma_pessoa',
+             'NF '+(alvo.nf||alvo.id), 'impressa por '+nomeLimpo(alvo.impresso_por)+' — bipada pela mesma pessoa'); }catch(e){}
+      return res.json({ok:false,motivo:'mesma_pessoa',impresso_por:nomeLimpo(alvo.impresso_por),
+        pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city,codigo:alvo.codigo},coleta:ehColeta(alvo),
+        aviso:'Você imprimiu esta etiqueta. O carregamento tem que ser feito por outra pessoa, com o login dela.'});
+    }
     if(conferenciaLigada()){
       const esperado=soCodigo(alvo.codigo);
       if(!esperado) return res.json({ok:false,motivo:'volume_sem_sku',
@@ -146,14 +170,13 @@ module.exports=function(app,db){
        quem a poe no carro e o bipe da viagem (saida_route.js), que so aceita
        caixa conferida. Na COLETA nada muda: conferir e levar pro canto, e o
        canto e o lugar de onde o caminhao leva. */
-    const quemBipou=(req.usuario&&req.usuario.nome)||null;
     if(!ehColeta(alvo)){
       db.prepare(`UPDATE lote SET conferido_por=?, conferido_em=datetime('now','localtime') WHERE id=?`)
         .run(quemBipou, alvo.id);
       const p2=progresso();
       const hoje2=db.prepare("SELECT date('now','localtime') d").get().d;
       return res.json({ok:true,conferida:true,pedido:alvo,carregados:p2.carregados,total:p2.total,
-        prontas:p2.carro.prontas,coleta:false,adiantado:futuro(alvo,hoje2)});
+        prontas:p2.carro.prontas,coleta:false,adiantado:futuro(alvo,hoje2),impresso_por:nomeLimpo(alvo.impresso_por)});
     }
     db.prepare(`UPDATE lote SET estagio='carregado', carregado_em=datetime('now','localtime'),
         conferido_por=?, conferido_em=datetime('now','localtime') WHERE id=?`)
@@ -173,7 +196,7 @@ module.exports=function(app,db){
     const hojeD=db.prepare("SELECT date('now','localtime') d").get().d;
     res.json({ok:true,pedido:alvo,carregados:p.carregados,total:p.total,
               coleta:ehColeta(alvo), coleta_aguardando:p.coleta.aguardando.length,
-              adiantado:futuro(alvo,hojeD)});
+              adiantado:futuro(alvo,hojeD), impresso_por:nomeLimpo(alvo.impresso_por)});
   });
   /* O PROGRESSO DA CARGA — o mesmo numero pras duas rotas.
      "Carregados X de Y" e a lista tem que falar do mesmo universo, senao o
