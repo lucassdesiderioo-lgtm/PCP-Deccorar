@@ -207,6 +207,103 @@ function montar(db, modulos){
      texto.indexOf('await db.backup(') < texto.lastIndexOf('fecharPassivo(db,{aplicar:true})'),
      'o backup tem que vir antes da chamada que grava');
 
+  // ── 7. O PASSIVO DAS CAIXAS NUNCA BIPADAS (01/10/2026) ───────────────────
+  /* 460 caixas de coleta e 26 de agência com a etiqueta impressa e NUNCA
+     bipadas — nem pro canto, nem na área. O dono confirmou que saíram todas
+     até 30/09. Elas param um passo antes do que o grupo de cima fecha
+     (`embalado`, não `carregado`), e por isso aquele critério não as acha. */
+  const { fecharNaoBipadas } = require('./fechar_saida_passivo');
+  const dia = n => db.prepare("SELECT date('now','localtime',?) d").get((n >= 0 ? '-' + n : '+' + (-n)) + ' day').d;
+  const ATE = dia(1);
+  const nb = (buyer, modalidade, embalado_em, despachar_em, extra) => {
+    const id = vol.run('BK140140BEGE',buyer,'3'+buyer.length,'Q'+buyer,'W'+buyer,'[]','embalado',
+      embalado_em.slice(0,10), despachar_em, pdf, modalidade).lastInsertRowid;
+    db.prepare('UPDATE lote SET embalado_em=? WHERE id=?').run(embalado_em, id);
+    if(extra) db.prepare('UPDATE lote SET '+extra+' WHERE id=?').run(id);
+    return id;
+  };
+  const nCol   = nb('NB Coleta',   'coleta',  dia(9)+' 09:10:00', dia(7));
+  const nColAt = nb('NB Atrasada', 'coleta',  dia(6)+' 11:00:00', dia(8));          // despacho ANTES da impressão
+  const nTarde = nb('NB Tarde',    'coleta',  dia(5)+' 17:20:00', dia(5));          // impressa depois das 15:00
+  const nAg    = nb('NB Agencia',  'agencia', dia(4)+' 08:00:00', dia(4));
+  const nNull  = nb('NB SemModal', null,      dia(3)+' 08:30:00', null);            // sem data de despacho lida
+  const xHoje  = nb('X Depois',    'coleta',  dia(0)+' 08:00:00', dia(0));          // impressa DEPOIS do corte
+  const xFut   = nb('X Futura',    'coleta',  dia(3)+' 08:00:00', dia(-5));         // despacho futuro: está na fábrica
+  const xConf  = nb('X Conferida', 'agencia', dia(3)+' 08:00:00', dia(3), "conferido_em='"+dia(3)+" 09:00:00', conferido_por='Ana'");
+  const xCarro = nb('X No Carro',  'agencia', dia(3)+' 08:00:00', dia(3), "conferido_em='"+dia(3)+" 09:00:00', no_carro_em='"+dia(3)+" 10:00:00'");
+  const xTeste = nb('X Teste',     'coleta',  dia(3)+' 08:00:00', dia(3), 'teste=1');
+  const xPend  = vol.run('BK140140BEGE','X Pendente','399','QP','WP','[]','pendente',dia(3),dia(3),pdf,'coleta').lastInsertRowid;
+  const fechadas = [nCol,nColAt,nTarde,nAg,nNull];
+  const fora = [xHoje,xFut,xConf,xCarro,xTeste,xPend];
+  const foraAntes = fora.map(foto);
+  const modAntes2 = db.prepare('SELECT id,modalidade FROM lote ORDER BY id').all();
+  const estoqueAntes = db.prepare("SELECT estoque FROM skus WHERE codigo='BK140140BEGE'").get().estoque;
+  const saidasAntes = db.prepare('SELECT COUNT(*) n FROM saida').get().n;
+
+  let erroAte = null;
+  try{ fecharNaoBipadas(db, {aplicar:false}); }catch(e){ erroAte = e.message; }
+  ok('sem data de corte é recusado: a data é decisão de quem viu as caixas saírem',
+     !!erroAte && /corte|--ate/i.test(erroAte), erroAte || 'não recusou');
+  erroAte = null;
+  try{ fecharNaoBipadas(db, {aplicar:false, ate:'30/09'}); }catch(e){ erroAte = e.message; }
+  ok('data fora do formato AAAA-MM-DD é recusada', !!erroAte, 'aceitou 30/09');
+  erroAte = null;
+  try{ fecharNaoBipadas(db, {aplicar:false, ate:dia(-1)}); }catch(e){ erroAte = e.message; }
+  ok('corte no futuro é recusado: ninguém viu sair o que ainda nem foi impresso', !!erroAte, 'aceitou amanhã');
+
+  let sn = fecharNaoBipadas(db, {aplicar:false, ate:ATE});
+  const achou = sn.caixas.map(c => c.id).sort((a,b)=>a-b);
+  ok('simulação acha exatamente as 5 nunca bipadas até o corte',
+     achou.join() === fechadas.slice().sort((a,b)=>a-b).join(), JSON.stringify(achou));
+  ok('simulação não grava nada',
+     !sn.saida_id && db.prepare('SELECT COUNT(*) n FROM saida').get().n === saidasAntes && l(nCol).estagio === 'embalado');
+
+  sn = fecharNaoBipadas(db, {aplicar:true, ate:ATE});
+  const sdn = db.prepare('SELECT * FROM saida WHERE id=?').get(sn.saida_id);
+  ok('aplicar cria UMA saída passivo com as 5 caixas',
+     !!sdn && sdn.tipo === 'passivo' && sdn.qtd_sistema === 5 &&
+     JSON.parse(sdn.ids).sort((a,b)=>a-b).join() === fechadas.slice().sort((a,b)=>a-b).join(),
+     JSON.stringify(sdn));
+  ok('cada caixa vira carregada e aponta para a saída',
+     fechadas.every(i => l(i).estagio === 'carregado' && l(i).saida_id === sn.saida_id));
+  ok('coleta sai pela coleta e agência (e sem modalidade) pela agência',
+     ['coleta','coleta','coleta'].join() === [nCol,nColAt,nTarde].map(i => l(i).saiu_por).join() &&
+     l(nAg).saiu_por === 'agencia' && l(nNull).saiu_por === 'agencia',
+     fechadas.map(i => l(i).saiu_por).join());
+  ok('carimbo = o dia do despacho às 15:00 — nunca hoje',
+     l(nCol).carregado_em === dia(7)+' 15:00:00' && l(nAg).carregado_em === dia(4)+' 15:00:00',
+     l(nCol).carregado_em + ' | ' + l(nAg).carregado_em);
+  ok('despacho anterior à impressão: a caixa não saiu antes de ter etiqueta',
+     l(nColAt).carregado_em === dia(6)+' 15:00:00', l(nColAt).carregado_em);
+  ok('impressa depois das 15:00: o carimbo não fica antes da impressão',
+     l(nTarde).carregado_em === dia(5)+' 17:20:00', l(nTarde).carregado_em);
+  ok('sem despacho lido: o dia da impressão, às 15:00',
+     l(nNull).carregado_em === dia(3)+' 15:00:00', l(nNull).carregado_em);
+  ok('saiu_em = carregado_em em todas',
+     fechadas.every(i => l(i).saiu_em === l(i).carregado_em));
+  ok('retirado_em só na coleta (é o que diz, para ela, que o caminhão levou)',
+     [nCol,nColAt,nTarde].every(i => l(i).retirado_em === l(i).carregado_em) &&
+     !l(nAg).retirado_em && !l(nNull).retirado_em);
+  ok('nenhuma vai parar no "esperando o caminhão"',
+     !fechadas.some(i => db.prepare(`SELECT 1 FROM lote WHERE id=? AND ${require('./carga').AGUARDA_CAMINHAO}`).get(i)));
+  ok('conferido_em continua vazio: ninguém conferiu, e o campo diz isso',
+     fechadas.every(i => !l(i).conferido_em && !l(i).conferido_por));
+  ok('não contam como saída adiantada (saíram no dia do despacho)',
+     db.prepare(`SELECT COUNT(*) n FROM lote WHERE id IN (${fechadas.join(',')})
+       AND despachar_em > date(${require('./carga').SAIDA()})`).get().n === 0);
+  ok('não toca em quem fica: depois do corte, despacho futuro, conferida, no carro, teste, pendente',
+     fora.map(foto).join() === foraAntes.join());
+  ok('não mexe em modalidade nem em estoque (a baixa foi na impressão)',
+     JSON.stringify(db.prepare('SELECT id,modalidade FROM lote ORDER BY id').all()) === JSON.stringify(modAntes2) &&
+     db.prepare("SELECT estoque FROM skus WHERE codigo='BK140140BEGE'").get().estoque === estoqueAntes);
+  const sn2 = fecharNaoBipadas(db, {aplicar:true, ate:ATE});
+  ok('rodar de novo não acha nada e não cria outra saída',
+     sn2.caixas.length === 0 && !sn2.saida_id &&
+     db.prepare('SELECT COUNT(*) n FROM saida').get().n === saidasAntes + 1);
+  ok('o script tem o modo --nao-bipadas, exige --ate e faz backup antes de gravar',
+     /--nao-bipadas/.test(texto) && /--ate/.test(texto) &&
+     texto.indexOf('await db.backup(') < texto.lastIndexOf('fecharNaoBipadas(db,{aplicar:true'));
+
   console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'tudo certo') + ' — ' + casos + ' casos');
   process.exit(falhas ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });
