@@ -2395,6 +2395,8 @@ sem a guarda da futura (5), fila embalada tirável (4), o sem-data sem corte
 (1 — o caso nasceu dessa rodada); na fase 3, cada um dos cinco scripts na versão
 antiga reprova de 2 a 4 casos.
 
+> ✅ **NO AR** (PR #183), confirmado pelo dono em 02/10/2026.
+>
 > ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA.** A rodada foi num navegador meu, a
 > 1440 px, com banco semeado: os cinco contadores, o bloco de vencidos com a
 > prévia, a busca por SKU, o pedido de ajuste, a saída executada e o histórico.
@@ -3536,6 +3538,8 @@ caso olhava só o número "700", que também está no comentário, e foi apertad
 nessa rodada). O `teste_carga.js` passou a conferir a caixa de várias peça a
 peça no cenário do adiantado.
 
+> ✅ **NO AR** (PR #183), confirmado pelo dono em 02/10/2026.
+>
 > ⚠️ **AINDA NÃO FOI CONFERIDO NA FÁBRICA.** A rodada foi num navegador meu, a
 > 1024 e 400 px. A prova é a primeira caixa de várias conferida por outra pessoa
 > com as etiquetas do saco coladas por fora.
@@ -4046,6 +4050,11 @@ Adicionada à Tela de Início, cada uma abre em tela cheia, direto na estação.
 **Rode `node teste_tablets.js` (83 casos) ao mexer no cabeçalho de uma estação,
 no `ipad.css` ou nos manifests**, e `node teste_acesso.js` se mexer na regra das
 extensões.
+
+> ✅ **NO AR** (PR #183), confirmado pelo dono em 02/10/2026.
+>
+> ⚠️ **AINDA NÃO FOI CONFERIDA NOS TABLETS.** A prova é cada estação adicionada à
+> Tela de Início abrindo em tela cheia, com o ícone dela, direto na estação.
 
 ### ⚠️ AS TELAS DO PCP FORAM MEDIDAS, E ELAS NÃO TÊM O DEFEITO (29/09/2026)
 
@@ -5646,6 +5655,11 @@ acuracidade ou no `est_route.js`.** Sete defeitos reintroduzidos: contar linha
 em vez de peça (reprova 3), modo teste reservando (3), sob medida com reservado
 (3), o R$ viajando sem `custo.ver` (1), acuracidade 0% sem contagem (1), o
 confirmado pela 3ª contando como acerto (3) e a conta sem o corte do mês (4).
+
+> ✅ **NO AR** (PR #183), confirmado pelo dono em 02/10/2026.
+>
+> ⚠️ **A ACURACIDADE SÓ TEM NÚMERO DEPOIS DA PRIMEIRA CONFERÊNCIA DO MÊS.** Até
+> lá o quadro mostra traço, e isso é a verdade, não defeito.
 
 > ⚠️ **O botão "aplicar alvo" diz quantos ele NÃO resolve.** O "Aplicar todos" do
 > Planejamento só grava em SKU **com venda na janela** — proposital: sem dado de

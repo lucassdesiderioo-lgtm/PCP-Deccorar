@@ -1,4 +1,4 @@
-> **STATUS · 02/10/2026 — EM CONSTRUÇÃO** · **camada 2 em código (02/10/2026)**: as seis estações
+> **STATUS · 02/10/2026 — EM CONSTRUÇÃO** · **camada 2 no ar (PR #183, 02/10/2026)**: as seis estações
 > (`operador`, `montagem`, `embalagem`, `carregamento`, `inventario`, `devolucao`) com as meta tags,
 > ícone e **manifest próprios** e o `ipad.css`; `.webmanifest` na regra das extensões de apoio do
 > `acesso.js`; `teste_tablets.js` (83). **Divergência:** a §5 escrevia um `/app.webmanifest` único,

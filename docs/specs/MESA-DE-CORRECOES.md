@@ -1,5 +1,5 @@
-> **STATUS · 02/10/2026 — EM CONSTRUÇÃO** · **fase 1 no ar (PR #174)** · **fases 2 e 3 em código
-> (02/10/2026)**: as cinco ações da §4 que faltavam, os três contadores que faltavam e os cinco
+> **STATUS · 02/10/2026 — EM CONSTRUÇÃO** · **fase 1 no ar (PR #174)** · **fases 2 e 3 no ar
+> (PR #183, 02/10/2026)**: as cinco ações da §4 que faltavam, os três contadores que faltavam e os cinco
 > scripts chamando o `correcoes.js` e gravando em `correcao`. `teste_correcao2.js` (98) e
 > `teste_correcao3.js` (23, o mesmo cenário pelo botão e pelo terminal, os dois iguais linha a
 > linha). **Mudanças na construção:** a venda futura reaberta sem etiqueta volta a `pendente`

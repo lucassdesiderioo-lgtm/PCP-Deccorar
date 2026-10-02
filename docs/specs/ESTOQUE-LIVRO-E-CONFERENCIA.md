@@ -1,8 +1,8 @@
-> **STATUS · 02/10/2026 — EM CONSTRUÇÃO** · fases 0, 1, 2 e 3 no ar; **fase 4 em código (02/10)**:
+> **STATUS · 02/10/2026 — EM CONSTRUÇÃO** · fases 0, 1, 2 e 3 no ar; **fase 4 no ar (PR #183, 02/10)**:
 > reservado e disponível na linha da aba Estoque, acuracidade do mês e diferença por motivo
 > (R$ só com `custo.ver`). A idade da conferência já lia do `inventario_item` desde a fase 2, e o
 > alerta de negativo é da fase 1. **Divergência:** os casos foram para `teste_acuracidade.js`
-> (23), e não para o `teste_estoque.js` — o cenário daquele é outro. Falta o deploy.
+> (23), e não para o `teste_estoque.js` — o cenário daquele é outro. No ar, confirmado pelo dono.
 >
 > **Fase 3 (ajuste em duas pessoas)** entrou em 28/09/2026: `ajuste_dominio.js`,
 > `ajuste_route.js`, o `POST /api/estoque` antigo recusando (410, `use_pedido`), o

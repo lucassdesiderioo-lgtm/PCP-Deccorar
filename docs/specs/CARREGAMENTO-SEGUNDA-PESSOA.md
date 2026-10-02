@@ -3,18 +3,18 @@
 > P1 em 01/10/2026: *"tem que ter esse cruzamento, não tem que ter liberações"*. A
 > liberação por pessoa e dia chegou a ser construída e saiu antes do deploy;
 > `teste_segunda_pessoa.js` (24 casos). No ar, confirmado pelo dono em 02/10/2026;
-> falta o primeiro dia real de expedição com a regra. P6 respondida: as etiquetas de fora são **as do saco**. Fase 2 planejada. Nasceu da conversa de 01/10/2026 (tipo `REGRA` + `NOVIDADE`).
+> falta o primeiro dia real de expedição com a regra. P6 respondida: as etiquetas de fora são **as do saco**. Fase 2 no ar (PR #183). Nasceu da conversa de 01/10/2026 (tipo `REGRA` + `NOVIDADE`).
 > **Muda uma decisão de 25/09/2026:** a decisão 2 da `SAIDA-E-DUPLA-CONFERENCIA`
 > ("sem segunda pessoa só MARCA, nunca trava"). Quando aprovada, a mudança vai para
 > o `CLAUDE.md` §8-B e para uma linha em `docs/DECISOES.md`, no mesmo commit do código.
 > Fases: 1 ☑ (no ar) · 2 ☑ (em código em 02/10/2026)
 >
-> **Fase 2 em código (02/10/2026):** `POST /api/carregar/peca` e `/recomecar`, a tela âmbar
+> **Fase 2 no ar (PR #183, 02/10/2026):** `POST /api/carregar/peca` e `/recomecar`, a tela âmbar
 > sem a lista, a divergência com os dois lados e a auditoria, e a frase `fita(n)` com a
 > instrução de colar por fora as etiquetas do saco (P6). **Decidido na construção:** a
 > contagem é `lote_item.conferidos_carga` (coluna, não tabela); a divergência não zera, quem
 > zera é o "Recomeçar"; e há um "deixar esta caixa" que larga sem apagar. O `VARIAS` foi para
-> o `carga.js`. `teste_pecas_carga.js` (37). Falta o deploy e a primeira caixa real.
+> o `carga.js`. `teste_pecas_carga.js` (37). No ar, confirmado pelo dono; falta a primeira caixa real.
 
 ---
 
