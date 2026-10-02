@@ -91,6 +91,13 @@
   .modobar.area{background:#f4f6f8;color:var(--muted);border:1px solid var(--line)}
   .modobar.carro{background:#e8f0fb;color:var(--blue);border:2px solid var(--blue)}
   .modobar.sobra{background:#efe9fb;color:#4b2a91;border:2px solid var(--violet)}
+  /* A RECUSA DO MOTORISTA (RECUSA-DO-MOTORISTA, 02/10/2026): vermelho, porque
+     o bipe para de querer dizer "conferir" e passa a tirar a caixa da venda. */
+  .modobar.recusa{background:#fbe9e8;color:var(--red);border:2px solid var(--red)}
+  .recusabox{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .recusabox .btn{flex:1 1 200px}
+  .btn.recusar{background:#fff;color:var(--red);border:2px solid var(--red)}
+  .volta{margin-top:12px;font-size:22px;font-weight:800;color:var(--red);line-height:1.3}
   .tagok{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;margin-right:4px;
     background:#e7f5eb;color:var(--green);border:1px solid #a9d8b4;white-space:nowrap}
   .tagfalta{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;margin-right:4px;
@@ -148,6 +155,7 @@
   <div class="modobar area" id="modoBar">O bipe agora: CONFERIR NA ÁREA</div>
   <input id="scan" autocomplete="off">
   <button class="btn conf" onclick="conferir()" style="width:100%">✓ Conferir carga do carro</button>
+  <button class="btn recusar" id="btnRecusa" onclick="modoRecusa()" style="width:100%;margin-top:8px">🚫 Motorista recusou</button>
   <div class="card pilha" id="pilhaCard"><h3>📋 Conferência da pilha — etiquetas impressas hoje</h3>
     <div class="pconta" id="pConta"></div>
     <details id="pAntD"><summary id="pAntS"></summary><div id="pAnt"></div></details>
@@ -253,6 +261,7 @@ async function bip(code){
   /* O bipe vai para UM lugar de cada vez (modoAtual): a area (conferir), o
      carro (viagem aberta) ou as sobras do caminhao (saida aberta). A faixa
      #modoBar diz qual, na cor dele. */
+  if(recusa){ await bipRecusa(code); return; }
   var m=modoAtual();
   if(m==='sobra'){ await bipSobra(code); return; }
   if(m==='carro'){ await bipCarro(code); return; }
@@ -314,6 +323,47 @@ async function recomecarCaixa(){
    a etiqueta de venda) continua de onde parou. */
 function sairDaCaixa(){ caixaPecas=null; banner('','Pronto para bipar',''); }
 
+/* ── O MOTORISTA RECUSOU (RECUSA-DO-MOTORISTA, 02/10/2026) ──────────────────
+   O motorista bipa e o sistema dele diz "recusada": a venda foi cancelada
+   depois da etiqueta. Aqui a expedicao SO MARCA — o bipe mostra a caixa, a
+   pessoa confirma, e a tela manda voltar a peca a prateleira. Quem confirma a
+   volta ao estoque e o admin, pela Mesa de correcoes: o saldo nao anda aqui. */
+let recusa=false, recusaPend=null;
+function modoRecusa(){
+  recusa=!recusa; recusaPend=null; aguardando=null; caixaPecas=null; pintarModo();
+  if(recusa) banner('err','🚫 Motorista recusou','Bipe a etiqueta de VENDA da caixa que o motorista recusou.');
+  else banner('','Pronto para bipar','');
+  $('#scan').focus();
+}
+function linhasPecas(l){
+  return (l||[]).map(function(p){ return '<span class="c">'+(p.qtd>1?p.qtd+' × ':'')+esc0(p.codigo)+'</span>'; }).join(' · ');
+}
+async function bipRecusa(code){
+  var r=await postJ('/api/carregamento/recusa',{code:code});
+  if(!r.ok){ recusaPend=null;
+    banner('err','Não dá para marcar esta caixa',(r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); return; }
+  recusaPend=r;
+  var n=(r.pecas||[]).reduce(function(s,p){ return s+p.qtd; },0);
+  banner('warn','O motorista recusou esta caixa?',
+    '<b>'+esc0(r.pedido.buyer)+'</b> · NF <b>'+esc0(r.pedido.nf||'—')+'</b><br>'
+    +(n>1?'<b>'+n+' persianas</b>: ':'')+linhasPecas(r.pecas)
+    +(r.sob_medida?'<br><b>Sob medida</b>: não volta para a prateleira.':'')
+    +'<div class="recusabox"><button class="btn" style="background:var(--red);color:#fff" onclick="confirmarRecusa()">Sim, o motorista recusou</button>'
+    +'<button class="btn ghost" onclick="desistirRecusa()">Não — bipei a caixa errada</button></div>');
+  beep(true);
+}
+function desistirRecusa(){ recusaPend=null; banner('err','🚫 Motorista recusou','Bipe a etiqueta de VENDA da caixa que o motorista recusou.'); $('#scan').focus(); }
+async function confirmarRecusa(){
+  if(!recusaPend) return;
+  var r=await postJ('/api/carregamento/recusa',{id:recusaPend.pedido.id,confirmar:true});
+  recusaPend=null;
+  if(!r.ok){ banner('err','Não marquei',esc0(r.aviso||'Tente de novo.')); beep(false); return; }
+  recusa=false; pintarModo();
+  banner('err','🚫 Recusada — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · '+linhasPecas(r.pecas)
+    +'<div class="volta">'+esc0(r.aviso||'')+'</div>');
+  beep(true); carregar(); $('#scan').focus();
+}
+
 function mostrar(r,code){
   if(r.motivo==='conferir_pecas'){
     aguardando=null;
@@ -374,7 +424,7 @@ function mostrar(r,code){
   /* Venda cancelada no Mercado Livre (VENDAS-E-MEDIA fase 2, D2): a caixa
      esta na mao da pessoa, e a recusa diz o que fazer com ela. */
   else if(r.motivo==='cancelada'){ aguardando=null;
-    banner('err','⛔ VENDA CANCELADA — NÃO CARREGAR',
+    banner('err',r.origem==='motorista'?'🚫 RECUSADA PELO MOTORISTA — NÃO CARREGAR':'⛔ VENDA CANCELADA — NÃO CARREGAR',
       (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
   else if(r.motivo==='nao_embalado'){ aguardando=null;
     banner('err','⚠ FALTA A ETIQUETA DE VENDA',
@@ -600,8 +650,10 @@ function pintarModo(){
   var m=modoAtual();
   document.body.classList.toggle('modo-saida',m==='sobra');
   document.body.classList.toggle('modo-viagem',m==='carro');
-  var bar=$('#modoBar'); bar.className='modobar '+m;
-  bar.textContent='O bipe agora: '+({area:'CONFERIR NA ÁREA',carro:'PÔR NO CARRO DA AGÊNCIA',sobra:'SOBRA DO CAMINHÃO (o que ficou no canto)'})[m];
+  var bar=$('#modoBar'); bar.className='modobar '+(recusa?'recusa':m);
+  bar.textContent='O bipe agora: '+(recusa?'CAIXA RECUSADA PELO MOTORISTA':
+    ({area:'CONFERIR NA ÁREA',carro:'PÔR NO CARRO DA AGÊNCIA',sobra:'SOBRA DO CAMINHÃO (o que ficou no canto)'})[m]);
+  var bt=$('#btnRecusa'); if(bt) bt.textContent=recusa?'✕ Sair da recusa — voltar a conferir':'🚫 Motorista recusou';
 }
 const postJ=async function(url,corpo){
   const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo||{})});

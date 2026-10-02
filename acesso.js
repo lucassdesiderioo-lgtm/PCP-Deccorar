@@ -648,6 +648,10 @@ module.exports = function(app, db){
     /* A caixa de varias peca a peca e o "Recomecar" (CARREGAMENTO-SEGUNDA-PESSOA
        fase 2): o mesmo bipe da area e do canto, com a mesma chave. */
     if(M !== 'GET' && (eq('/api/carregar/peca') || eq('/api/carregar/recomecar'))) return 'carregamento.executar';
+    /* "Motorista recusou" (RECUSA-DO-MOTORISTA, 02/10/2026): quem marca e a
+       mesma bancada que confere a caixa. Ela NAO mexe no saldo — a volta ao
+       estoque e da Mesa de correcoes, com `correcao.executar`. */
+    if(M !== 'GET' && eq('/api/carregamento/recusa')) return 'carregamento.executar';
     /* A SAIDA DO CAMINHAO (fase 3 da SAIDA-E-DUPLA-CONFERENCIA): abrir, bipar
        as sobras e fechar a que BATEU sao da bancada que bipa a caixa. Liberar
        com numero diferente do motorista tem chave propria, e vem ANTES do
