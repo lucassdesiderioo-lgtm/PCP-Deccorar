@@ -20,7 +20,7 @@ var BASE='/sobmedida';
 // sem log, e so quem souber o endereco de cor chega nela. E a armadilha #13
 // do CLAUDE.md por mais uma porta: a ponta que some em silencio e sempre a
 // ultima. Tela nova pede a linha aqui, no mesmo commit.
-var NOMES={'/':'Inicio','/corte':'Plano de corte','/sobras':'Sobras',
+var NOMES={'/':'Inicio','/bancada':'Bancada','/corte':'Plano de corte','/sobras':'Sobras',
            '/rolos':'Rolos','/etiquetas':'Etiquetas','/cadastros':'Cadastros',
            '/painel':'Painel','/simulador':'Simulador','/catalogo':'Catalogo',
            '/revendas':'Revendas','/pedidos':'Pedidos','/producao':'Produção',

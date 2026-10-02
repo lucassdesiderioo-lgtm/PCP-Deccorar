@@ -36,7 +36,6 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 | `COMPRAS.md` | Implementado (fases 0–6) · fase 7 pendente · com mudanças na construção |
 | `ARQUITETURA-ALVO.md` | Parcial — só no módulo sob medida (`tecido/`) |
 | `PCP-CONTROLE-E-VISAO.md` | Parcial e divergente · decisão pendente |
-| `NAVEGACAO-E-LINGUAGEM.md` | **Implementada** (aprovada em 02/10) · **fase 1 no ar (02/10, PR #169 — o botão nas duas barras e o destino com dono único; o dono disse "deu bom")** · **fases 2 a 4 em código (02/10 — os textos sem hierarquia, 34 trocas em 16 arquivos; o `teste_linguagem.js` que barra palavra proibida e tela sem barra; `CLAUDE.md` §20); falta o deploy** · vai para o arquivo depois do deploy conferido |
 | `TABLETS-E-KIOSK.md` | Planejado · nada no código · camada 1 (iPad) pode ir já |
 | `PRODUCAO-MAPA-E-MOTOR.md` | Planejado · não iniciado · depois da fila de consertos |
 | `PRODUCAO-MONTAGEM.md` | Planejado · não iniciado · depois da fila de consertos |
@@ -70,6 +69,12 @@ conferidas em produção. As regras estão no `CLAUDE.md` §4.
 peças que saem adiantadas, no quadro do Carregamento. As regras estão no
 `CLAUDE.md` §8-B.
 
+**Implementada e arquivada em 02/10/2026:** `NAVEGACAO-E-LINGUAGEM.md` — o
+"Trocar setor" e o atalho entre as duas operações nas duas barras, o destino com
+dono único (`destino.js`) e os textos sem hierarquia, com o `teste_linguagem.js`
+travando as duas regras. Fase 1 no PR #169, fases 2 a 4 no #173. As regras estão
+no `CLAUDE.md` §20.
+
 **Substituída e arquivada em 01/10/2026:** `SOBRAS-TOM-E-DESPERDICIO.md` — a
 limpeza (fase 1, rodada em produção em 19/09) e a mensagem do plano (fase 2)
 foram feitas; o resto (tom pela origem, desperdício por sobra, menor refugo)
@@ -80,7 +85,7 @@ rascunho de 25/09 que trocava a modalidade da caixa da agência levada pelo
 caminhão. Substituído pela `SAIDA-E-DUPLA-CONFERENCIA.md`, que resolve pela
 troca de porta (`saiu_por`) sem mexer na modalidade.
 
-Em `docs/arquivo/`: `SOBRAS-TOM-E-DESPERDICIO.md`, `COLETA-LEVA-AGENCIA.md`, `CARREGAMENTO-ADIANTADO.md`, `GERADOR-ETIQUETA-KIT.md`, `REVISAO-COMPLETA.md`,
+Em `docs/arquivo/`: `NAVEGACAO-E-LINGUAGEM.md`, `SOBRAS-TOM-E-DESPERDICIO.md`, `COLETA-LEVA-AGENCIA.md`, `CARREGAMENTO-ADIANTADO.md`, `GERADOR-ETIQUETA-KIT.md`, `REVISAO-COMPLETA.md`,
 `ESTOQUE-TECIDO-E-SOBRAS.md`, `PROMPT-ESTOQUE-TECIDO-E-SOBRAS.md`,
 `PROMPT-FASE-0.md`, `PERGUNTAS-COMPRAS.md`, `GESTAO-DE-TAREFAS.md` e
 `MELHORIAS.md` (os sete últimos arquivados por decisão do dono em 17/09/2026).
