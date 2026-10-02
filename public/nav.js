@@ -59,6 +59,10 @@ var FONT=(function(){
   // tela sem decorar URL. Sem ele a rota existiria e ninguem chegaria nela (§2).
   var onInv=(cur==='/inventario');
   html+='<a href="/inventario" style="text-decoration:none;font-size:12px;padding:6px 12px;border-radius:7px;color:'+(onInv?CH.planTx:CH.off)+';background:'+(onInv?CH.planBg:'transparent')+';font-weight:'+(onInv?'700':'500')+'">Inventário</a>';
+  // Devolucoes (divida 8 do §14) — a tela existia e so se chegava pela URL ou
+  // pelo modo amarelo da Revisao. Sem atalho Alt, como os de cima.
+  var onDev=(cur==='/devolucao');
+  html+='<a href="/devolucao" style="text-decoration:none;font-size:12px;padding:6px 12px;border-radius:7px;color:'+(onDev?CH.planTx:CH.off)+';background:'+(onDev?CH.planBg:'transparent')+';font-weight:'+(onDev?'700':'500')+'">Devoluções</a>';
   bar.innerHTML=html;
   document.body.appendChild(bar);
   document.body.style.paddingBottom='52px';
