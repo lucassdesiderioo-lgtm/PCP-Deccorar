@@ -113,6 +113,35 @@ module.exports = function(app, db){
       soma_livro:soma, bate:(+s.estoque||0) === soma, linhas});
   });
 
+  /* A ACURACIDADE DA CONFERENCIA (fase 4, §8 da spec) — o indicador do mes e
+     a serie semanal, do `inventario_dominio`. A DIFERENCA EM R$ so viaja para
+     quem tem `custo.ver` (regra 14 do §13), e custo indefinido nao vira zero:
+     o SKU sem custo sai contado a parte e o total e PISO (regra 4 do §7-B). */
+  app.get('/api/estoque/acuracidade', (req,res)=>{
+    let a;
+    try{ a = INV.acuracidade(db); }
+    catch(e){ return res.status(500).json({ erro:'não consegui calcular a acuracidade: ' + e.message }); }
+    const r = { desde:a.desde, mes:a.mes, semanas:a.semanas, aprovadas:a.aprovadas.length };
+    if(podeVerCusto(req)){
+      const custo = mapaCusto();
+      const por = {}; let total = 0, semCusto = 0;
+      for(const i of a.aprovadas){
+        const cu = custo[String(i.codigo).toUpperCase()];
+        if(cu == null){ semCusto++; continue; }
+        const v = Math.abs(+i.diferenca || 0) * cu;
+        total += v;
+        const k = i.motivo || '(sem motivo)';
+        por[k] = (por[k] || 0) + v;
+      }
+      r.valor_diferenca = +total.toFixed(2);
+      r.valor_sem_custo = semCusto;
+      r.por_motivo = Object.keys(por).sort((x, y) => por[y] - por[x])
+        .map(k => ({ motivo:k, valor:+por[k].toFixed(2) }));
+      auditarCusto(req);
+    }
+    res.json(r);
+  });
+
   app.get('/api/estoque/painel', (req,res)=>{
     const { config, linhas } = DEMANDA.calcular(db);
 
@@ -182,6 +211,14 @@ module.exports = function(app, db){
        do deploy, porque a contagem velha de peca deixou de existir. */
     let contagem = {};
     try{ contagem = INV.conferencias(db); }catch(e){}
+
+    /* Os tres estados do saldo (fase 4): so leitura, e nao entram em conta
+       nenhuma — o `precisa` continua sendo do `demanda_dominio`. Em try: um
+       banco antigo sem `lote_item` nao pode derrubar a aba por uma coluna de
+       apoio. */
+    let reserva = {};
+    try{ reserva = ESTOQUE.reservados(db); }catch(e){}
+    let pecasReservadas = 0;
 
     const verCusto = podeVerCusto(req);
     const custo = verCusto ? mapaCusto() : null;
@@ -253,6 +290,12 @@ module.exports = function(app, db){
       const cont = contagem[l.codigo] || null;
       if(!cont) nuncaContados++;
 
+      /* Sob medida nao tem disponivel: ela nao tem estoque por definicao (§7),
+         e "disponivel −2" ali se leria como peca faltando na prateleira. */
+      const reservado = reserva[l.codigo] || 0;
+      if(!e.sob_medida) pecasReservadas += reservado;   // o resumo fala do saldo que existe
+      const disponivel = e.sob_medida ? null : estoque - reservado;
+
       /* Valor da linha. So conta quem TEM peca: SKU zerado sem custo nao e
          buraco na conta — nao ha o que valorizar ali. */
       let cu = null, valor = null;
@@ -267,7 +310,7 @@ module.exports = function(app, db){
 
       return {
         codigo: l.codigo, descricao: l.descricao, cor: l.cor,
-        estoque, alvo: l.alvo, alvo_salvo: alvoSalvo, alvo_defasado: defasado,
+        estoque, reservado, disponivel, alvo: l.alvo, alvo_salvo: alvoSalvo, alvo_defasado: defasado,
         alvo_aplicavel: aplicavel,
         contado_em: cont ? cont.em : null, contado_ha: cont ? cont.dias : null,
         /* Campos de custo SO existem quando quem pergunta pode ver. Ausente e
@@ -322,6 +365,7 @@ module.exports = function(app, db){
       resumo: {
         skus: lista.length,
         pecas_estoque: pecas,
+        pecas_reservadas: pecasReservadas,
         skus_falta: skusFalta,
         pecas_precisa: precisaTotal,
         zerados, baixos, ok, excesso, parados, negativos,

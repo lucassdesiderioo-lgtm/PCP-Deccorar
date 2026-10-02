@@ -244,3 +244,18 @@ construção, e os quatro fecham um defeito que o script tinha:
 dos fundos dessa chave — e o saldo não anda: outra pessoa aprova na aba Estoque. Os
 três contadores que faltavam (vencidos, saídas no futuro, fila velha) chegam junto com
 o botão deles, como a decisão 3 da fase 1 mandava.
+
+## 02/10/2026 — Estoque, fase 4: o que é acerto, e quem reserva
+
+Fase 4 da `ESTOQUE-LIVRO-E-CONFERENCIA` (só leitura), aprovada no plano. Quatro
+definições que a spec deixava abertas:
+
+1. **Acerto é "bateu na 1ª contagem"** (`confirmado` sem recontagem). O confirmado que
+   só fechou na 3ª contagem teve a 1ª errada: conta como contado, não como acerto.
+2. **O item rejeitado sai da conta** — ele nasce de novo como item novo no mesmo ciclo,
+   e contar os dois poria o mesmo SKU duas vezes no denominador. Teste também sai.
+3. **Reserva só o volume `pendente`**, por peça (a caixa de várias soma o `qtd`).
+   Bloqueado não reserva: está retido e a peça ainda não se sabe. **Sob medida não tem
+   disponível**, porque não tem estoque (§7).
+4. **Sem contagem no mês o percentual é nulo**, nunca zero; e diferença sem custo
+   cadastrado fica fora da soma, dita à parte — nunca R$ 0.

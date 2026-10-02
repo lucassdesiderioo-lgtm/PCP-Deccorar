@@ -496,6 +496,75 @@ const ok = (n, c, extra) => { casos++;
      comNeg.resumo.ok + comNeg.resumo.excesso === comNeg.resumo.skus,
      JSON.stringify(comNeg.resumo));
 
+  // ── 17. OS TRÊS ESTADOS DO SALDO (fase 4 da ESTOQUE-LIVRO, 02/10/2026) ──
+  /* físico = o livro; reservado = peças de volumes PENDENTES (vendidos, sem
+     etiqueta impressa); disponível = físico − reservado, e pode ficar negativo:
+     é o que falta produzir. Só leitura — não entram em conta nenhuma. */
+  try{ db.exec(`CREATE TABLE IF NOT EXISTS lote_item (id INTEGER PRIMARY KEY AUTOINCREMENT, lote_id INTEGER,
+    codigo TEXT, qtd INTEGER DEFAULT 1)`); }catch(e){}
+  const antesF4 = await chamar('GET /api/estoque/painel');
+  const precAntes = {}; antesF4.linhas.forEach(l => precAntes[l.codigo] = l.precisa);
+  const pend = db.prepare("INSERT INTO lote (codigo,estagio,data,teste) VALUES (?,?,?,?)");
+  pend.run('BK140140BEGE','pendente', hoje, 0);                     // 1 peça
+  const caixa = pend.run('KIT32','pendente', hoje, 0).lastInsertRowid; // caixa de várias
+  db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd) VALUES (?, 'BK140140BEGE', 2)").run(caixa);
+  db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd) VALUES (?, 'KIT32', 1)").run(caixa);
+  pend.run('BK140140BEGE','pendente', hoje, 1);                     // teste: não reserva
+  pend.run('BK140140BEGE','bloqueado', hoje, 0);                    // retido: não reserva
+  pend.run('BK140140BEGE','embalado', hoje, 0);                     // já baixou: não reserva
+  pend.run('SOBMEDIDA2','pendente', hoje, 0);                       // sob medida
+  const f4 = await chamar('GET /api/estoque/painel');
+  const por4 = {}; f4.linhas.forEach(l => por4[l.codigo] = l);
+  ok('reservado conta PEÇA: 1 volume solto + 2 de uma caixa de várias = 3',
+     por4.BK140140BEGE.reservado === 3, 'veio ' + por4.BK140140BEGE.reservado);
+  ok('a outra peça da caixa reserva no SKU dela', por4.KIT32.reservado === 1, 'veio ' + por4.KIT32.reservado);
+  ok('disponível = físico − reservado', por4.BK140140BEGE.disponivel === por4.BK140140BEGE.estoque - 3,
+     JSON.stringify({e:por4.BK140140BEGE.estoque, d:por4.BK140140BEGE.disponivel}));
+  ok('disponível pode ficar negativo (é o que falta produzir)', por4.BK140140BEGE.disponivel < 0 ||
+     por4.BK140140BEGE.estoque >= 3, 'estoque ' + por4.BK140140BEGE.estoque);
+  ok('sob medida não tem disponível (não tem estoque por definição)', por4.SOBMEDIDA2.disponivel === null,
+     'veio ' + por4.SOBMEDIDA2.disponivel);
+  ok('SKU sem venda pendente reserva zero', por4.BK160160CINZA.reservado === 0);
+  ok('os estados não mexem no "precisa" (quem manda é o demanda_dominio)',
+     Object.keys(precAntes).every(c => por4[c].precisa === precAntes[c]));
+  ok('o resumo soma as peças reservadas do saldo que existe (sob medida fora)', f4.resumo.pecas_reservadas === 4,
+     'veio ' + f4.resumo.pecas_reservadas);
+
+  // ── 18. A ACURACIDADE DO MÊS ──────────────────────────────────────────────
+  const ini = db.prepare("SELECT date('now','localtime','start of month') d").get().d;
+  const mesPassado = db.prepare("SELECT date('now','localtime','start of month','-3 day') d").get().d;
+  db.exec("DELETE FROM inventario_item");   // as seções de cima contaram pelo fluxo real
+  const ciclo = db.prepare("INSERT INTO inventario_ciclo (status) VALUES ('encerrado')").run().lastInsertRowid;
+  const it = db.prepare(`INSERT INTO inventario_item (ciclo_id,codigo,status,contado1,em1,contado2,diferenca,
+    motivo,decidido_em,teste) VALUES (?,?,?,?,?,?,?,?,?,?)`);
+  it.run(ciclo,'BK140140BEGE','confirmado',4, ini+' 09:00:00', null, 0, null, null, 0);   // bateu na 1ª
+  it.run(ciclo,'KIT32','confirmado',3, ini+' 09:10:00', 2, 0, null, null, 0);            // bateu só na 3ª
+  it.run(ciclo,'BK160160CINZA','aprovado',3, ini+' 09:20:00', 3, -2, 'Perda ou avaria', ini+' 10:00:00', 0);
+  it.run(ciclo,'BK140140BEGE','rejeitado',9, ini+' 09:30:00', null, null, null, null, 0); // sai da conta
+  it.run(ciclo,'BK140140BEGE','confirmado',4, mesPassado+' 09:00:00', null, 0, null, null, 0); // outro mês
+  it.run(ciclo,'KIT32','confirmado',4, ini+' 11:00:00', null, 0, null, null, 1);         // teste
+  PERMITE_CUSTO = false;
+  const ac = await chamar('GET /api/estoque/acuracidade', null, {id:1, nome:'Ana'});
+  ok('a acuracidade conta só o mês, sem teste e sem rejeitado: 3 contados', ac.mes && ac.mes.contados === 3,
+     JSON.stringify(ac.mes));
+  ok('acerto é o que bateu na PRIMEIRA contagem: 1 de 3', ac.mes && ac.mes.acertos === 1);
+  ok('o percentual sai 33%', ac.mes && ac.mes.percentual === 33, 'veio ' + (ac.mes && ac.mes.percentual));
+  ok('a série semanal tem 8 semanas', Array.isArray(ac.semanas) && ac.semanas.length === 8,
+     'veio ' + (ac.semanas && ac.semanas.length));
+  ok('sem custo.ver, a diferença em R$ nem viaja', !('valor_diferenca' in ac) && !('por_motivo' in ac),
+     Object.keys(ac).join(','));
+  PERMITE_CUSTO = true;
+  const ac2 = await chamar('GET /api/estoque/acuracidade', null, {id:1, nome:'Ana'});
+  ok('com custo.ver: |−2| × R$ 120,00 = R$ 240,00 de diferença no mês', ac2.valor_diferenca === 240,
+     'veio ' + ac2.valor_diferenca);
+  ok('e a diferença sai por motivo', (ac2.por_motivo||[]).some(m => m.motivo === 'Perda ou avaria' && m.valor === 240),
+     JSON.stringify(ac2.por_motivo));
+  PERMITE_CUSTO = false;
+  db.exec("DELETE FROM inventario_item");
+  const ac3 = await chamar('GET /api/estoque/acuracidade', null, {id:1, nome:'Ana'});
+  ok('mês sem contagem: percentual nulo, nunca zero', ac3.mes && ac3.mes.percentual === null,
+     'veio ' + (ac3.mes && ac3.mes.percentual));
+
   console.log('');
   console.log(falhas ? ('FALHARAM ' + falhas + ' de ' + casos)
                      : ('todos os ' + casos + ' casos passaram'));

@@ -97,6 +97,31 @@ function saldo(db, codigo){
   return s ? (+s.estoque || 0) : null;         // null = SKU nao existe
 }
 
+/* OS TRES ESTADOS DO SALDO (fase 4 da spec, §4) — SO LEITURA.
+     fisico      = o livro (a coluna, que e o cache dele)
+     reservado   = pecas de volumes PENDENTES: vendidos, sem etiqueta impressa
+     disponivel  = fisico − reservado, e pode ficar negativo (e o que falta)
+   Conta PECA, nunca linha: a caixa de varias persianas soma o `qtd` de cada
+   SKU do `lote_item` (§5, #23); sem `lote_item`, 1 do `lote.codigo`.
+   Bloqueado nao reserva — esta retido, e ainda nao se sabe a peca; embalado ja
+   teve a baixa; teste e ensaio.
+   ⚠️ NAO ENTRA EM CONTA NENHUMA: quem diz "quanto produzir" e o
+   `demanda_dominio` (armadilha #12). Isto e o que a aba Estoque MOSTRA. */
+function reservados(db){
+  const m = {};
+  const somar = (c, n) => { const k = String(c || '').toUpperCase(); if(k) m[k] = (m[k] || 0) + n; };
+  let temItem = true;
+  try{ db.prepare('SELECT 1 FROM lote_item LIMIT 1').get(); }catch(e){ temItem = false; }
+  const vols = db.prepare("SELECT id, codigo FROM lote WHERE estagio='pendente' AND COALESCE(teste,0)=0").all();
+  const itens = temItem ? db.prepare('SELECT codigo, qtd FROM lote_item WHERE lote_id=?') : null;
+  for(const v of vols){
+    const li = itens ? itens.all(v.id) : [];
+    if(li.length) li.forEach(i => somar(i.codigo, Math.max(1, i.qtd || 1)));
+    else somar(v.codigo, 1);
+  }
+  return m;
+}
+
 /* O UNICO lugar do sistema que escreve em `skus.estoque`.
  *
  * ⚠️ NAO HA `MAX(0, ...)`, E ISSO E A REGRA, NAO UM ESQUECIMENTO (spec §3.3.1).
@@ -205,4 +230,4 @@ function outraPessoa(quem, pessoas){
   return true;
 }
 
-module.exports = { TIPOS, garantirSchema, abertura, saldo, movimentar, extrato, restaurarFoto, outraPessoa };
+module.exports = { TIPOS, garantirSchema, abertura, saldo, reservados, movimentar, extrato, restaurarFoto, outraPessoa };

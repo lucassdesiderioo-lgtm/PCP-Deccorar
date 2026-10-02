@@ -1,4 +1,25 @@
-> **STATUS · 28/09/2026 — EM CONSTRUÇÃO** · fases 0, 1 e 2 no ar; **fase 3 em código (28/09)**; fase 4 planejada
+> **STATUS · 02/10/2026 — CONSTRUÍDA INTEIRA** · fases 0 a 3 no ar · **fase 4 em código (02/10)** ·
+> vai para `docs/arquivo/` depois da conferência na fábrica das fases 2, 3 e 4
+>
+> **Fase 4 (acuracidade e estados)** entrou em 02/10/2026, só leitura: na aba Estoque,
+> embaixo do saldo, **quantas peças já estão vendidas sem etiqueta e quantas sobram
+> livres** (`estoque_dominio.reservados`), e o card **Conferência — acuracidade do mês**
+> (`inventario_dominio.acuracidade`, `GET /api/estoque/acuracidade`, `@admin`), com a
+> série das semanas e a diferença aprovada em R$ por motivo para quem tem `custo.ver`.
+> A idade da conferência e o alerta de negativo já tinham entrado nas fases 1 e 2.
+> `teste_estoque.js` ganhou 16 casos (88), sete defeitos reintroduzidos.
+>
+> **O que mudou na construção** (em `docs/DECISOES.md`, 02/10/2026):
+> - **acerto é "bateu na 1ª contagem"**: o confirmado que só fechou na 3ª (duas
+>   acharam zero) conta como contado, não como acerto;
+> - **o rejeitado sai da conta** — ele nasce de novo como item novo, e contar os dois
+>   poria o SKU duas vezes no denominador; teste também sai;
+> - **bloqueado não reserva** (está retido, a peça ainda não se sabe) e **sob medida não
+>   tem disponível** (não tem estoque, §7);
+> - **sem contagem no mês o percentual é nulo**, nunca zero; e diferença sem custo
+>   cadastrado não vira R$ 0 — a tela diz quantas ficaram sem custo.
+>
+> *Status da fase 3, que fica como história:*
 >
 > **Fase 3 (ajuste em duas pessoas)** entrou em 28/09/2026: `ajuste_dominio.js`,
 > `ajuste_route.js`, o `POST /api/estoque` antigo recusando (410, `use_pedido`), o
@@ -454,7 +475,7 @@ ler do livro (inventário + ajuste + correção).
 - Rotas de pedido e aprovação; desliga `POST /api/estoque`; tela na aba Estoque.
 - **Testes:** pedir não mexe no saldo; quem pediu não aprova; aprovar grava no livro.
 
-### Fase 4 — acuracidade e estados 🟡
+### Fase 4 ☑ — acuracidade e estados 🟡 (em código em 02/10/2026)
 
 - §4 e §8 na aba Estoque.
 - **Testes:** `teste_estoque.js` ganha os casos de acuracidade e idade da conferência.

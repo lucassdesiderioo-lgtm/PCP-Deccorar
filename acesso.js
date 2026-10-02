@@ -716,7 +716,7 @@ module.exports = function(app, db){
     /* O extrato vem ANTES da linha de escrita de `/api/estoque` la em cima? Nao
        precisa: aquela so pega `M !== 'GET'`. Aqui e leitura, e e `@admin` como
        o resto da aba — quem abre Estoque ve o livro do SKU que esta olhando. */
-    if(eq('/api/estoque/painel') || eq('/api/estoque/ajustes') ||
+    if(eq('/api/estoque/painel') || eq('/api/estoque/ajustes') || eq('/api/estoque/acuracidade') ||
        pre('/api/estoque/extrato')) return '@admin';
     if(M !== 'GET' && eq('/api/alvo')) return 'alvo.editar';
     if(M !== 'GET' && eq('/api/producao')) return 'producao.lancar';

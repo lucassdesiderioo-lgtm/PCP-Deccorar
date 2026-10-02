@@ -4248,7 +4248,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13), `teste_correcao.js` (115), `teste_correcao_f2.js` (96) e `teste_correcao_f3.js` (44); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (88), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13), `teste_correcao.js` (115), `teste_correcao_f2.js` (96) e `teste_correcao_f3.js` (44); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4374,6 +4374,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   material de um corpo que trouxe SKU — recusa inteira, e manda ao Inventário (§18)
 - ❌ Ler a idade da conferência de uma fonte só, ou fora do
   `inventario_dominio.conferencias()` (§18, #32)
+- ❌ Fazer o reservado ou o disponível entrar em conta de produção ou compra: são
+  só leitura, e quem manda é o `demanda_dominio` (§18, fase 4 · #12)
+- ❌ Contar como acerto da conferência o confirmado que só fechou na 3ª contagem,
+  ou escrever 0% num mês sem contagem (§18, fase 4)
 - ❌ Voltar a aplicar ajuste de saldo na hora, pela mão de uma pessoa só: pedir não
   mexe no saldo, e quem pediu não aprova — nem o Admin Geral (§18, fase 3)
 - ❌ Pedir ajuste em "saldo novo" e aprová-lo como saldo: a aprovação aplica o
@@ -5539,6 +5543,37 @@ seção 6-G é esta) e `node teste_cobertura.js` (10).**
 > no histórico. A prova é o **primeiro ajuste de verdade** pedido por uma pessoa e
 > aprovado por outra.
 
+### A ACURACIDADE E OS TRÊS ESTADOS DO SALDO — só leitura (02/10/2026)
+
+**Fase 4 da spec `ESTOQUE-LIVRO-E-CONFERENCIA.md`.** Na aba Estoque:
+
+| Onde | O quê | Dono |
+|---|---|---|
+| embaixo do saldo | *"3 vendidas sem etiqueta · livres −1"* — só quando há reserva | `estoque_dominio.reservados` |
+| card **Conferência — acuracidade do mês** | % dos SKUs que bateram na **1ª** contagem cega, a série das semanas e, com `custo.ver`, a diferença aprovada em R$ por motivo | `inventario_dominio.acuracidade` · `GET /api/estoque/acuracidade` (`@admin`) |
+
+> ⚠️ **O RESERVADO NÃO ENTRA EM CONTA NENHUMA.** O número grande continua sendo o
+> físico (o livro), e quem diz *quanto produzir* é o `demanda_dominio` (#12). O
+> reservado é **peça** de volume **pendente** — vendido e sem etiqueta impressa;
+> a caixa de várias soma o `qtd` (§5, #23). Bloqueado não reserva, embalado já
+> baixou, teste é ensaio, e **sob medida não tem disponível** (§7). Há caso
+> travando que os estados não mexem no `precisa`.
+
+> ⚠️ **ACERTO É "BATEU NA PRIMEIRA CONTAGEM"**: o confirmado que só fechou na 3ª
+> (duas acharam zero) teve a 1ª errada e conta como contado. **O rejeitado sai**
+> — ele nasce de novo como item novo, e contar os dois poria o SKU duas vezes.
+> Sem contagem no mês o percentual é **nulo**, nunca zero; diferença sem custo
+> sai dita à parte, nunca como R$ 0. Datado pela 1ª contagem, como a idade.
+
+> **O render achou três coisas:** o card escrevia *"≥ R$ 0,00"* quando nenhuma
+> diferença tinha custo (piso de zero não diz nada); a série mostrava oito traços
+> seguidos (hoje só as semanas com contagem); e a linha das reservadas com
+> `nowrap` empurrava a tabela para fora do card (§12, a coluna `fr`).
+
+> ⚠️ **AINDA NÃO FOI CONFERIDO NA FÁBRICA.** A prova é a acuracidade depois da
+> primeira conferência de verdade, e o "vendidas sem etiqueta" batendo com a
+> lista "Faltam imprimir" do dia.
+
 > ⚠️ **O botão "aplicar alvo" diz quantos ele NÃO resolve.** O "Aplicar todos" do
 > Planejamento só grava em SKU **com venda na janela** — proposital: sem dado de
 > venda ele zeraria o alvo de quem tem história e não vendeu no período. Então a
@@ -5576,7 +5611,7 @@ seção 6-G é esta) e `node teste_cobertura.js` (10).**
 
 **Rode `node teste_estoque.js` após qualquer mudança no `est_route.js`, no
 `fluxo_estoque.js`, no `demanda_dominio.js`, no `painel_route.js`, no
-`ger_route.js`, no `cont_route.js` ou no `inventario_dominio.js`** — os 72 casos travam a conta única nas
+`ger_route.js`, no `cont_route.js` ou no `inventario_dominio.js`** — os 88 casos travam a conta única nas
 quatro telas, o sob medida, o parado, a série do gráfico, a idade do inventário
 (de ponta a ponta, pelo fluxo real — armadilha #32), o gate do custo e o acordo
 com o fechamento diário do Planejamento. Mexeu na contagem?

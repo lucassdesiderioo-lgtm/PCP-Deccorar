@@ -162,6 +162,43 @@ function conferencias(db){
   return m;
 }
 
+/* A ACURACIDADE (fase 4 da spec, §8) — SO LEITURA.
+   Acuracidade do mes = itens que BATERAM NA 1ª CONTAGEM ÷ itens contados.
+   "Bateu na 1ª" e `confirmado` sem recontagem (`contado2` vazio): o confirmado
+   que so fechou na 3ª contagem — duas acharam zero — teve a 1ª errada, e conta
+   como contado, nao como acerto. O REJEITADO sai: ele nasce de novo como item
+   novo no mesmo ciclo, e contar os dois poria o mesmo SKU duas vezes no
+   denominador. Teste e ensaio.
+   Sem item contado o percentual e NULL, nunca zero: "acertou 0%" e uma
+   afirmacao, e ela seria falsa (a regra do prazo cumprido, §19 6-B).
+   Datado pela 1ª contagem (`em1`), como a idade da conferencia. */
+function acuracidade(db, opcoes){
+  const o = opcoes || {};
+  const ini = o.desde || db.prepare("SELECT date('now','localtime','start of month') d").get().d;
+  const base = `FROM inventario_item WHERE em1 IS NOT NULL AND status<>'rejeitado' AND COALESCE(teste,0)=0`;
+  const conta = (de, ate) => db.prepare(`SELECT COUNT(*) contados,
+      SUM(CASE WHEN status='confirmado' AND contado2 IS NULL THEN 1 ELSE 0 END) acertos
+    ${base} AND date(em1)>=? AND date(em1)<?`).get(de, ate);
+  const pct = r => r.contados ? Math.round(100 * (r.acertos || 0) / r.contados) : null;
+  const fim = db.prepare("SELECT date(?, '+1 month') d").get(ini).d;
+  const mes = conta(ini, fim);
+  /* As 8 ultimas semanas, de segunda a domingo, a mais antiga primeiro. */
+  const segunda = db.prepare("SELECT date('now','localtime','weekday 1','-7 day') d").get().d;
+  const semanas = [];
+  for(let i = 7; i >= 0; i--){
+    const de = db.prepare("SELECT date(?, ?) d").get(segunda, '-' + (7 * i) + ' day').d;
+    const ate = db.prepare("SELECT date(?, '+7 day') d").get(de).d;
+    const r = conta(de, ate);
+    semanas.push({ de, contados:r.contados, acertos:r.acertos || 0, percentual:pct(r) });
+  }
+  /* As diferencas APROVADAS no mes, com o motivo: e delas que sai o R$ — a
+     conta do dinheiro e da rota, que sabe quem pode ver custo. */
+  const aprovadas = db.prepare(`SELECT codigo, diferenca, motivo FROM inventario_item
+    WHERE status='aprovado' AND COALESCE(teste,0)=0 AND date(decidido_em)>=? AND date(decidido_em)<?`).all(ini, fim);
+  return { desde:ini, mes:{ contados:mes.contados, acertos:mes.acertos || 0, percentual:pct(mes) },
+           semanas, aprovadas };
+}
+
 /* O SKU ja esta num item que anda? Um SKU so pode estar em UM item aberto por
    vez: dois itens abertos do mesmo SKU seriam duas contagens da mesma
    prateleira disputando a mesma diferenca. */
@@ -541,5 +578,5 @@ function andamento(db){
   return { ciclos, itens, conta, recentes, ciclo_qtd: cicloQtd(db) };
 }
 
-module.exports = { ABERTOS, CONFERIU, MOTIVOS, garantirSchema, conferencias, sugestao, abrir, encerrar,
+module.exports = { ABERTOS, CONFERIU, MOTIVOS, garantirSchema, conferencias, acuracidade, sugestao, abrir, encerrar,
   contar, terminar, lista, aprovacao, aprovar, rejeitar, andamento, itemAberto, erro };
