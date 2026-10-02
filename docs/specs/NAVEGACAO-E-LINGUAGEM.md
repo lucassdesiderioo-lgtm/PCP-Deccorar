@@ -1,13 +1,13 @@
 # Navegação entre operações e linguagem do sistema
 
-> **STATUS: em construção** · fase 1 em código (02/10/2026), falta o deploy · fases 2 a 4 planejadas
+> **STATUS: em construção** · **fase 1 no ar (02/10/2026, PR #169)** · fases 2 a 4 planejadas
 > Desenhada no Projeto do Claude com o Lucas, em 02/10/2026.
 > Tipo: AJUSTE (telas atuais) + duas REGRAS de desenvolvimento (valem para toda tela nova).
 > Risco: 🟢 nos textos e 🟡 no botão, porque ele lê as áreas de acesso para decidir se aparece. Nenhuma fase mexe em estoque, banco ou permissão.
 
 | Fase | O quê | Situação |
 |---|---|---|
-| 1 | Botão de troca de operação nas duas barras | **em código (02/10)** — ver nota abaixo |
+| 1 | Botão de troca de operação nas duas barras | **no ar (02/10, PR #169)** — ver nota abaixo |
 | 2 | Troca dos textos de hierarquia | planejado |
 | 3 | Testes de proteção das duas regras | planejado |
 | 4 | Regras no papel (`CLAUDE.md`, `DECISOES.md`) | planejado |
@@ -18,6 +18,8 @@
 > - No sob medida o "Trocar setor" virou link com o mesmo visual do bloco do PCP; o "← Medida padrão" do rodapé saiu.
 > - A 400 px a barra de cima quebra em duas ou três linhas (são 4 a 5 botões). Em tablet e notebook fica numa linha só.
 > - `teste_destino.js` (15 casos).
+> - ✅ **No ar em 02/10/2026 (PR #169):** o dono fez o deploy e disse *"ficou lindo, deu bom"*.
+> - ⚠️ **Isso prova que a barra sobe e aparece; os três perfis não foram relatados um a um** (só medida padrão sem o atalho, o vendedor só do sob medida entrando direto depois do PIN, e o atalho nos dois sentidos para quem tem as duas). Prova que não foi feita se escreve como não feita.
 
 ---
 
