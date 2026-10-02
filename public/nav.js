@@ -90,6 +90,16 @@ var FONT=(function(){
     'background:transparent;border-radius:8px;font:800 15px system-ui;cursor:pointer}'+
     '#fadj .fbtn:active{opacity:.7}'+
     '#flab{color:'+CH.sTx+';min-width:28px;text-align:center;font-weight:800}'+
+    /* A TROCA DE OPERACAO (spec NAVEGACAO-E-LINGUAGEM, fase 1). Mesmo lugar,
+       mesmo tamanho e mesmas cores do bloco no tecido/public/base.css: a
+       pessoa que trabalha nas duas operacoes acha o botao onde ele sempre
+       esteve. A cor e o azul de acao do PCP (planBg), nenhuma cor nova. */
+    '#sessBar .sessOp{display:inline-flex;align-items:center;min-height:36px;padding:0 14px;'+
+    'border-radius:8px;border:1px solid '+CH.planBg+';color:'+CH.planBg+';background:transparent;'+
+    'font:700 14px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;text-decoration:none;white-space:nowrap}'+
+    '#sessBar .sessOp.atalho{background:'+CH.planBg+';color:'+CH.planTx+'}'+
+    '#sessBar .sessOp:active{opacity:.75}'+
+    '@media (max-width:600px){#sessBar{flex-wrap:wrap}}'+
     '@media print{#sessBar{display:none}}';
   document.head.appendChild(css);
 
@@ -104,7 +114,13 @@ var FONT=(function(){
     d.id='sessBar';
     var fadj = CH.light ? '<div id="fadj"><button class="fbtn" data-fd="-1" aria-label="Diminuir a fonte">A−</button>'+
       '<b id="flab">'+FONT.label()+'</b><button class="fbtn" data-fd="1" aria-label="Aumentar a fonte">A+</button></div>' : '';
-    d.innerHTML=fadj+'<span><b style="color:'+CH.sName+'">'+u.nome+'</b></span><button id="sessSair">Sair</button>';
+    // "Trocar setor" sempre; o atalho direto so para quem alcanca as duas
+    // operacoes. Quem decide e o servidor (destino.js) — esconder aqui nao e
+    // seguranca, so evita mostrar um caminho que da "sem permissao".
+    var dest=u.destino||{};
+    var atalho=(dest.duas&&dest.sobmedida) ? '<a class="sessOp atalho" href="'+dest.sobmedida+'">Sob medida →</a>' : '';
+    d.innerHTML=fadj+'<span><b style="color:'+CH.sName+'">'+u.nome+'</b></span>'+
+      atalho+'<a class="sessOp" id="sessSetor" href="/setor">Trocar setor</a><button id="sessSair">Sair</button>';
     document.body.insertBefore(d, document.body.firstChild);
     document.getElementById('sessSair').onclick=sair;
     var fa=document.getElementById('fadj');

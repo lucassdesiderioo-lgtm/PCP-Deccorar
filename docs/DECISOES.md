@@ -101,6 +101,8 @@
 | 28/09/2026 | **O ajuste manual de estoque passa a ser em duas pessoas** (fase 3 da ESTOQUE-LIVRO-E-CONFERENCIA): pedir não mexe no saldo, outra pessoa aprova, quem pediu pode desistir. `estoque.editar` sai; `estoque.ajustar` e `estoque.aprovar_ajuste` entram, com backfill. O aprovador único espera | Ajuste feito por uma pessoa só, na hora, é o número que mudou e ninguém conferiu — e é o que a conferência em três papéis já não aceita para a contagem | Lucas (dono), spec aprovada | `ajuste_dominio.js` · `CLAUDE.md` §18 |
 | 28/09/2026 | **O pedido de ajuste é em DELTA**, com o saldo do momento guardado ao lado; "saldo novo" digitado vira delta contra aquele saldo | Um "o saldo é 8" aprovado dois dias depois apagaria o que foi embalado no meio — a armadilha #32 pela porta do ajuste | Lucas (dono) | `ajuste_dominio.js` |
 | 28/09/2026 | **Os pedidos de ajuste moram em `ajuste_pedido`, e não em colunas novas do `ajuste_estoque`** — divergência da §7 da spec | Cinco lugares leem o `ajuste_estoque` como "o que foi aplicado"; um pedido pendente ali apareceria como ajuste feito, sem erro. A aprovação continua gravando lá | Lucas (dono) | `ajuste_dominio.js` · spec §7 |
+| 02/10/2026 | Toda tela interna das duas operações tem, no canto superior direito, "Trocar setor" (sempre, para todos) e o atalho direto para a outra operação (só para quem tem acesso às duas). Tela nova usa o nav.js da sua operação. Ficam fora login, /setor e o portal da revenda | Não havia como ir e voltar entre medida padrão e sob medida; o único link existente levava ao admin | Lucas | docs/specs/NAVEGACAO-E-LINGUAGEM.md |
+| 02/10/2026 | Texto visível ao usuário não usa chefia, chefe, patrão, dono ou gestão: nomeia a etapa ("Aguardando aprovação"), e quando precisa nomear alguém usa o nível de acesso (Operação, Supervisor, Admin, Admin Geral) | Termos de hierarquia não são profissionais, e quem aprova é definido pela permissão, não pelo cargo | Lucas | docs/specs/NAVEGACAO-E-LINGUAGEM.md |
 
 
 ## 26/09/2026 — o pedido só está titulado quando a soma dos títulos alcança o valor dele (fase 6-C1c)
@@ -127,6 +129,59 @@ alvo delas é o notebook de 1440, onde estão certas. Ficam **medidas e dispensa
 não entram como dívida. Dívida que ninguém vai pagar é a lista que a equipe aprende a
 não ler. As telas de operação do PCP não rolam em tablet nenhum (768 e 1024 limpos),
 que era a pergunta que importava. Detalhe e números no `CLAUDE.md` §12.
+
+## 01/10/2026 — quem imprimiu a etiqueta de venda não confere no Carregamento
+Decisão do dono, e muda a decisão 2 de 25/09/2026 ("sem segunda pessoa só marca").
+O bipe da área (agência) e do canto (coleta) recusa o mesmo login de quem imprimiu, e a
+tela diz o nome de quem fez a etiqueta. **Sem liberação nenhuma**: o cruzamento é
+automático e vale para todo login. A primeira versão tinha liberação por pessoa e dia, e o
+dono a tirou antes do deploy — quem imprime e quem confere são pessoas diferentes pelo
+desenho da equipe. Custo aceito: num dia de uma pessoa só, a caixa espera outra pessoa.
+Motivo: a bancada não repara na caixa de várias persianas, e só marcar deixava a mesma
+atenção conferir. Spec `CARREGAMENTO-SEGUNDA-PESSOA`, fase 1.
+
+## 02/10/2026 — a caixa que foi no caminhão sem conferência fica sem conferente
+Decisão do dono, depois da revisão do Carregamento. O botão "foi no caminhão" da Saída do
+caminhão gravava como conferente **quem fechou a saída**, pessoa que nunca bipou aquela
+caixa — e se fosse quem imprimiu, a pilha a chamava de "conferida pela mesma pessoa".
+Hoje a caixa sai **sem conferência** (campo vazio), e a pilha a mostra numa linha própria,
+separada de "sem registro". A agência já conferida na área mantém quem conferiu. As que
+saíram antes ficam como estão. Fica anotado, sem mudar: a pilha ainda a conta em
+"conferidas" (fase 2 da `SAIDA-E-DUPLA-CONFERENCIA`).
+
+## 01/10/2026 — o corte do sob medida passa a ter etapas (spec `CORTE-EM-ETAPAS`)
+Decisões do dono, da §8 da spec, depois de um corte confirmado rápido em que a sobra
+não tinha o tom do pedido e o operador cortou tudo do rolo: o sistema já tinha dado a
+sobra como usada e baixado o rolo a menos.
+- O corte passa a ter etapas (confirmar → cortando → corte feito → guardar); o estoque
+  de rolo e sobra baixa no **Corte feito**, não mais no Confirmar.
+- Durante o corte o operador edita o plano livremente, com motivo de uma lista
+  editável; depois do Corte feito, a correção é pedida pelo operador e aprovada pela
+  gestão.
+- Etiqueta e endereço da sobra deixam de ser exigidos no Confirmar; a sobra nasce
+  "a guardar" em nome de quem cortou, fora do plano até ser guardada, e a gestão vê as
+  pendências.
+- Um corte aberto por operador; o corte aberto reserva suas sobras e metros de rolo.
+- Peça cortada na medida errada vira sobra marcada "cortada errada".
+- "Conferi o tecido" sai de antes do Confirmar e vai para o Cortando; o Corte feito só
+  libera com todas as fontes conferidas.
+- Cada linha do corte tem tipo (cliente final, revenda da carteira, ML sob medida); o
+  tempo do corte, menos pausas, é dividido entre os tipos pela área, e cortes acima de
+  um limite (padrão 3 h) ficam fora da média.
+- A limpeza das sobras prevista em 18/09 é cancelada; nada é zerado. **Anotação ao
+  registrar:** a limpeza de 18/09 já tinha rodado em produção em 19/09/2026 (96 sobras,
+  150 etiquetas); o que fica cancelado é zerar de novo.
+- A spec `SOBRAS-TOM-E-DESPERDICIO.md` é absorvida por esta e vai para `docs/arquivo/`;
+  continuam valendo dela o tom pela origem, a mensagem certa, o desperdício visível e a
+  escolha pelo menor refugo.
+
+## 01/10/2026 — na correção de corte, quem pediu não aprova (A CONFIRMAR PELO DONO)
+Decisão técnica tomada na construção da fase 3 da `CORTE-EM-ETAPAS`, que a spec deixou
+em aberto ("o operador pede e a gestão aprova"). Aplicada a regra da casa para mexer em
+saldo sem venda na frente (o ajuste em duas pessoas da `ESTOQUE-LIVRO-E-CONFERENCIA`):
+quem pediu a correção não a aprova, nem o diretor. Custo: se o dono pedir a correção ele
+mesmo, outra pessoa com `corte.aprovar_correcao` precisa aprovar. Se o dono preferir que
+a gestão possa aprovar o próprio pedido, é uma linha em `tecido/dominio/corte.js`.
 
 ## 02/10/2026 — a Mesa de correções, e as três decisões que mudaram o caminho
 

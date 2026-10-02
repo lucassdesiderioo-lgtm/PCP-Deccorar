@@ -3187,7 +3187,7 @@ tela, e fica de fora o volume do modo teste.
 > idempotente — depois de aplicado as caixas ganham `retirado_em` e saem do
 > critério.
 
-**Rode `node teste_saida.js` (26 casos) ao mexer no `POST /api/embalar`, no
+**Rode `node teste_saida.js` (47 casos) ao mexer no `POST /api/embalar`, no
 `POST /api/reimprimir`, no bipe do `carreg_route.js`, no `saida_schema.js` ou no
 script.** Quatro defeitos foram reintroduzidos um a um para provar que o teste
 pega cada um: a reimpressão sobrescrevendo o nome (3 casos), a saída carimbada
@@ -3218,6 +3218,80 @@ em `now` (2), o critério largo pegando o `embalado` (4) e o bipe sem gravar que
 > dado real:** até a conferência não houve caixa impressa nem bipada depois do
 > deploy. As colunas e a tabela `saida` existem no banco de produção. Prova que
 > não foi feita se escreve como não feita (§4).
+
+### ⚠️ O SEGUNDO PASSIVO: CAIXAS QUE NUNCA FORAM BIPADAS (01/10/2026)
+
+A contagem por fila no servidor, em 01/10/2026, mostrou o canto **vazio** (a
+limpeza de 26/09 segurou) e duas outras filas cheias:
+
+| Fila | Caixas | Período |
+|---|---|---|
+| coleta com etiqueta impressa e **nunca bipada pro canto** | **460** | 10/09 → 30/09 |
+| agência com etiqueta impressa e **nunca bipada** (nem área, nem carro) | 26 | 04/09 → 30/09 |
+
+> ⚠️ **460 CAIXAS EM TRÊS SEMANAS É PRATICAMENTE TODA A COLETA: A EQUIPE
+> IMPRIMIA E O CAMINHÃO LEVAVA SEM NINGUÉM BIPAR PRO CANTO.** Esse é o sinal
+> que importa mais que o passivo. Sem o bipe pro canto a Saída do caminhão
+> (fase 3) não tem o que contar, e esta lista volta a crescer no dia seguinte
+> à limpeza. **Limpar só vale junto com o bipe acontecendo.**
+
+**A limpeza de 26/09 não as acha, e é por desenho:** ela fecha o
+`AGUARDA_CAMINHAO`, que é caixa **bipada** pro canto (`carregado`). Estas
+pararam um passo antes (`embalado`). E o `regularizar_saida.js` também não
+serve: ele marca `carregado` sem gravar saída, e as 460 iriam todas parar no
+card "esperando o caminhão". A tela trocaria uma lista imensa por outra.
+
+`node fechar_saida_passivo.js --nao-bipadas --ate AAAA-MM-DD` (simula) e
+`--aplicar` (com `await db.backup()` antes). Grava **uma** saída
+`tipo='passivo'` e, em cada caixa, `carregado`, `saida_id` e `saiu_por` (coleta
+ou agência, pela modalidade).
+
+> ⚠️ **A DATA DE CORTE É OBRIGATÓRIA, E É DE QUEM VIU AS CAIXAS SAÍREM.**
+> "Etiqueta impressa e sem bipe" também descreve a caixa impressa hoje cedo,
+> que está na pilha esperando o caminhão de hoje. O dono deu **30/09/2026**. O
+> script recusa sem a data, com data fora do formato e com data no futuro.
+
+> ⚠️ **O CARIMBO É O DIA DO DESPACHO ÀS 15:00 (§5), COM DUAS GUARDAS.**
+> Despacho **anterior** à impressão vale o dia da impressão: a caixa não saiu
+> antes de ter etiqueta. E o carimbo nunca fica antes do próprio `embalado_em`
+> (a impressa às 17:20 sai às 17:20). Sem despacho lido, vale o dia da
+> impressão. Com isso nenhuma conta como "saiu adiantado": saiu no dia dela, que
+> é o que se sabe. Não há hora real da retirada em lugar nenhum.
+
+> ⚠️ **FICAM DE FORA:** despacho depois de hoje (venda futura não foi
+> despachada, §5; em 01/10 era **1** caixa), a agência já **conferida** na área
+> ou no carro (essa tem bipe, e o lugar dela é a viagem), caixa já ligada a uma
+> saída e o modo teste. `retirado_em` só na coleta, como a viagem e o caminhão
+> fazem. `conferido_em` **fica vazio**: ninguém conferiu, e o campo diz isso.
+> Estoque e modalidade não se mexem, porque a baixa aconteceu na impressão.
+
+**Rode `node teste_saida.js` (47 casos; os 21 últimos são este grupo)** ao
+mexer no script. Oito defeitos foram reintroduzidos um a um: carimbo em `now`
+(reprova 4), corte ignorado (3), despacho futuro fechado (3), conferida e no
+carro fechadas (3), `retirado_em` na agência (1), a coleta sem `retirado_em`
+(1) e o carimbo antes da impressão (1). Tirar a exigência da data só reprova
+quando a recusa do formato sai junto, porque são duas camadas.
+
+> ✅ **APLICADO EM PRODUÇÃO EM 01/10/2026 (PR #162): 485 CAIXAS, saída #3.**
+> Desta vez a simulação e o `--aplicar` rodaram **separados**, com a lista
+> conferida no meio: `485 (coleta 459 · agência 26)`, e a diferença para os
+> 460 da contagem era exatamente a **1 caixa de despacho futuro**, que ficou de
+> fora. Backup em `backups/antes-nao-bipadas-2026-10-01T10-34-17-249Z.db`.
+> A segunda rodada respondeu *"Nada a fechar"* (idempotente), e a contagem por
+> fila depois do `--aplicar` ficou só com aquela caixa (coleta impressa em
+> 29/09, despacho futuro): agência e canto zerados.
+>
+> ⚠️ **COLAR A SAÍDA DO SCRIPT DE VOLTA NO TERMINAL EXECUTA AS LINHAS.** Na
+> conferência, o texto da simulação foi colado no shell, e o bash tentou rodar
+> cada linha. A linha *"Para gravar: node … --aplicar"* só não gravou porque
+> começa com `Para`, que não é comando. Por isso a última linha da simulação
+> **não** deve ser um comando executável sozinho, e a conferência de que nada
+> foi gravado foi a simulação seguinte ainda dizer 485.
+>
+> ⚠️ **ISSO LIMPA O PASSADO, E NÃO O HÁBITO.** A prova que importa é a fila 3
+> (*coleta impressa e não bipada pro canto*) **não voltar a crescer** nos
+> próximos dias. Se crescer, a equipe continua imprimindo sem bipar, e a Saída
+> do caminhão segue sem o que contar.
 
 ### ⚠️ A CONFERÊNCIA DA PILHA (26/09/2026, fase 2 da spec `SAIDA-E-DUPLA-CONFERENCIA`)
 
@@ -3251,10 +3325,10 @@ manda, e o card some.
 > ela não é carga de hoje. `pendente` e `bloqueado` não entram — não têm
 > etiqueta —, e o bipe continua recusando o `pendente` (§5, #27).
 
-> ⚠️ **"SEM SEGUNDA PESSOA" SÓ MARCA, NUNCA TRAVA** (decisão 2). Quem imprimiu
-> e quem conferiu foram o mesmo login: o bipe é aceito e a caixa é contada à
-> parte, com o nome. Travar seria a armadilha #6 — num dia de uma pessoa só, a
-> expedição parava. A comparação ignora espaço e maiúscula (`" ana "` é
+> ⚠️ ~~**"SEM SEGUNDA PESSOA" SÓ MARCA, NUNCA TRAVA** (decisão 2)~~ — **MUDOU
+> EM 01/10/2026: hoje o bipe RECUSA, sem liberação**, e a marca ficou só como
+> história da caixa conferida antes disso (bloco "QUEM IMPRIMIU NÃO CONFERE",
+> logo abaixo). A comparação ignora espaço e maiúscula (`" ana "` é
 > `"Ana"`). **Faltando qualquer um dos dois nomes a caixa é "sem registro",
 > nunca "mesma pessoa"**: vazio igual a vazio não é a mesma pessoa, é não
 > saber quem fez — e sem essa guarda dois bipes sem login batiam.
@@ -3270,7 +3344,7 @@ manda, e o card some.
 > recolhidas mesmo assim**: a lista do carro passou a marcar cada caixa como
 > `✓ na área` ou `falta conferir`, e é ela que a bancada lê.
 
-**Rode `node teste_area.js` (26 casos) ao mexer no `pilhaDaArea`, no bipe do
+**Rode `node teste_area.js` (29 casos) ao mexer no `pilhaDaArea`, no bipe do
 `carreg_route.js` ou no `GET /api/carregamento`.** Cinco defeitos foram
 reintroduzidos um a um: a adiantada fora da pilha (6 casos), a de ontem sumindo
 (1), o nome sem normalizar (1), a conta sem andar no bipe (7) e vazio igual a
@@ -3285,6 +3359,64 @@ vazio virando "mesma pessoa" (1).
 > conferiu apareçam no "sem segunda pessoa" quando for o caso — é a mesma
 > prova pendente da fase 1. Prova que não foi feita se escreve como não feita
 > (§4).
+
+### ⚠️ QUEM IMPRIMIU NÃO CONFERE (01/10/2026, fase 1 da spec `CARREGAMENTO-SEGUNDA-PESSOA`)
+
+**Decisão do dono, e é a decisão 2 de 25/09 mudando.** O bipe do Carregamento —
+o da **área** (agência) e o do **canto** (coleta) — recusa quando o login é o
+mesmo de quem imprimiu a etiqueta de venda (`impresso_por`):
+
+```
+✋ OUTRA PESSOA TEM QUE CONFERIR
+Maria Souza · NF 7011 · BK140140BEGE
+Etiqueta feita por Ana Paula — o mesmo login que está nesta tela.
+[👤 Trocar de pessoa]
+```
+
+> **Por que mudou:** a bancada imprime e não repara que a venda leva mais de uma
+> persiana. Só marcar deixava a **mesma atenção** conferir no Carregamento, e
+> ninguém olhava a marca depois. O Carregamento é a última vez que alguém está
+> com a caixa na mão antes do carro ou do caminhão.
+
+> ⚠️ **O NOME DE QUEM IMPRIMIU APARECE** (pedido do dono): na recusa, no bipe
+> aceito (*"Etiqueta feita por Ana Paula"*) e em cada linha da pilha. É o nome do
+> login. A régua é `carga.js → mesmaPessoa`: ignora espaço e maiúscula, e **vazio
+> nunca é igual a vazio** — caixa sem `impresso_por` (ou bipe sem login) passa.
+
+> ⚠️ **SÓ A ÁREA E O CANTO.** O bipe da viagem (pôr no carro) e as sobras do
+> caminhão **não** travam: ali a caixa já foi conferida por outra pessoa.
+
+> ⚠️ **NÃO HÁ LIBERAÇÃO, E ISSO É DECISÃO DO DONO (01/10/2026).** O cruzamento
+> é automático e vale para todo login, inclusive o de acesso total: *"vão ter
+> pessoas que podem imprimir etiqueta de venda e pessoas que podem fazer
+> conferência — a única coisa é esse cruzamento"*. A primeira versão tinha uma
+> liberação por pessoa e por dia, com motivo, e saiu antes do deploy: porta de
+> liberar é o caminho que vira rotina, e aí a regra deixa de existir.
+>
+> **O custo, escrito para não se descobrir na expedição:** num dia em que só
+> uma pessoa trabalha na expedição, as caixas que ela imprimiu esperam outra
+> pessoa para serem conferidas. Não existe botão para isso, de propósito.
+>
+> A marca *"sem segunda pessoa"* da pilha continua existindo, mas só como
+> **história**: caixa conferida pelo mesmo login antes de 01/10/2026.
+
+> **"Trocar de pessoa" sai e volta pela MESMA tela de login** (`/login?r=/carregamento`):
+> uma segunda grade de nomes e PIN aqui dentro seria uma segunda porta de entrada.
+
+> ⚠️ **TABLET COM A PÁGINA ANTIGA EM CACHE** mostraria a recusa como "Etiqueta não
+> reconhecida". O refresh forçado no deploy é obrigatório.
+
+**Rode `node teste_segunda_pessoa.js` (24 casos) ao mexer no bipe do
+`carreg_route.js` ou no `mesmaPessoa`.** Três defeitos foram reintroduzidos um a
+um: sem a trava (reprova 13), vazio igual a vazio (1) e o bipe aceito sem o nome
+de quem imprimiu (3). E há caso travando que a rota de liberação **não existe**.
+
+> ⚠️ **AINDA NÃO FOI CONFERIDO NA FÁBRICA.** A rodada foi num navegador meu, a
+> 1440, 1024 e 400 px. A prova é o primeiro dia de expedição com a regra: a
+> caixa recusada para quem imprimiu e conferida por outra pessoa.
+
+**A fase 2 (a caixa de várias conferida peça a peça, às cegas, e as etiquetas de
+SKU coladas por fora da caixa — as do saco de cada persiana) ainda não existe.**
 
 ### ⚠️ A SAÍDA DO CAMINHÃO (26/09/2026, fase 3 da spec `SAIDA-E-DUPLA-CONFERENCIA`)
 
@@ -3328,9 +3460,30 @@ pelo código bipado virou `acharVolumes`, a mesma do bipe do carro. A foto é do
 > A que já está **no carro** não entra desde a fase 4: o caminhão não leva o que
 > está dentro do carro. O
 > mesmo bipe querendo dizer duas coisas conforme o estado da caixa é como se erra
-> de luva na mão. Ela sai com `saiu_por='coleta'`, vira `carregado`, é conferida
-> por quem fechou, e **a `modalidade` não muda** (decisão 6). `pendente` nunca
-> entra: sem etiqueta, não baixou do estoque (§5, #27).
+> de luva na mão. Ela sai com `saiu_por='coleta'`, vira `carregado`, e **a
+> `modalidade` não muda** (decisão 6). `pendente` nunca entra: sem etiqueta, não
+> baixou do estoque (§5, #27).
+
+> ⚠️ **QUEM FECHOU A SAÍDA NÃO CONFERIU A CAIXA (02/10/2026).** Até aqui a caixa
+> que ninguém tinha conferido saía com `conferido_por` = **quem fechou a saída** —
+> uma pessoa que nunca a bipou. E se fosse quem imprimiu, a pilha ainda a chamava
+> de *"conferida por quem imprimiu, antes da trava de 01/10"*, falso duas vezes.
+> Hoje ela sai **sem conferência**: `conferido_por` e `conferido_em` ficam
+> vazios, como no passivo das não bipadas. A agência **já conferida** na área
+> mantém quem a conferiu.
+>
+> A pilha a mostra numa **linha própria** da nota — *"N foram no caminhão sem
+> conferência: cliente (NF)"* —, separada de "sem registro": lá é não saber quem
+> fez; aqui se sabe que **ninguém** conferiu, e é a única das duas que interessa
+> olhar. A régua é `carregado`, **numa saída**, sem `conferido_em`; a caixa
+> carregada **sem** saída e sem conferência (anterior aos nomes) continua "sem
+> registro". As que já saíram antes de 02/10 ficam como estão — com o nome de
+> quem fechou; o histórico não foi reescrito.
+>
+> ⚠️ **E ELA AINDA CONTA EM "CONFERIDAS"** — anotado, não consertado: a pilha
+> conta `carregado` como conferida (fase 2), então a tela pode dizer *"Todas as
+> impressas hoje foram conferidas"* logo acima da linha que diz que ninguém
+> conferiu. Mudar a conta da pilha é outra decisão.
 
 > ⚠️ **E A CAIXA DE AGÊNCIA QUE O CAMINHÃO LEVOU NÃO CONTA NO "NO CARRO".** Achado
 > abrindo a tela: o contador do carro contava `carregado_em` de hoje da agência,
@@ -3360,12 +3513,15 @@ pelo código bipado virou `acharVolumes`, a mesma do bipe do carro. A foto é do
 > mexe em caixa nenhuma. Os fechamentos antigos (`coleta_fechamento`) continuam
 > na tela como história, com a foto.
 
-**Rode `node teste_saida_coleta.js` (50 casos) ao mexer no `saida_route.js`, no
+**Rode `node teste_saida_coleta.js` (57 casos) ao mexer no `saida_route.js`, no
 `NA_SAIDA`/`PODE_TER_IDO` do `carga.js` ou no card da coleta.** Seis defeitos
 foram reintroduzidos, um de cada vez, para provar que o teste pega cada um:
 fechar sem o passo das sobras (29 casos), agência no carro na conta (6),
 divergência andando (17), liberar sem motivo (5), troca de porta reescrevendo a
-modalidade (1) e fechar sem foto (15). Mexeu na chave? **`node teste_acesso.js`
+modalidade (1) e fechar sem foto (15). Em 02/10/2026, mais quatro: gravar quem
+fechou como conferente (4), apagar o conferente da agência já conferida (3),
+misturar a caixa sem conferência com "sem registro" (1) e ela deixar de virar
+carregada (5); no `teste_area`, exigir a saída na régua (2). Mexeu na chave? **`node teste_acesso.js`
 (194, a seção 6-E é esta) e `node teste_cobertura.js` (10).**
 
 > ✅ **NO AR EM 26/09/2026** (PR #140): o dono fez o deploy e disse *"ficou
@@ -4005,7 +4161,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (26), `teste_area.js` (26), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_correcao.js` (115) e `teste_caminhos.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) e `teste_correcao.js` (115); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4253,9 +4409,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   (§5, armadilha #27)
 - ❌ Fazer a reimpressão gravar `impresso_por`: o bipe 1 é a PRIMEIRA
   impressão, e papel repetido não é outra contagem (§8-B, fase 1 da saída)
-- ❌ Travar o bipe quando quem imprimiu e quem conferiu são a mesma pessoa: é
-  "sem segunda pessoa", que só MARCA — num dia de uma pessoa só a expedição
-  parava (§8-B, fase 2 da saída)
+- ❌ Deixar quem imprimiu conferir no Carregamento — desde 01/10/2026 o bipe da
+  área e do canto RECUSA (§8-B, CARREGAMENTO-SEGUNDA-PESSOA)
+- ❌ Criar porta de liberação para quem imprimiu conferir, nem para o Admin
+  Geral: o cruzamento é automático por decisão do dono, e liberação vira rotina (§8-B)
 - ❌ Contar como "mesma pessoa" a caixa sem um dos dois nomes: vazio igual a
   vazio é não saber quem fez, e vai para "sem registro" (§8-B)
 - ❌ Deixar a pilha esquecer a caixa impressa ontem e não conferida, ou somá-la
@@ -4272,6 +4429,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   resposta, e o silêncio não é (§8-B, fase 3)
 - ❌ Fazer o bipe da saída querer dizer "foi no caminhão" para caixa fora da
   conta: o bipe só diz SOBROU, e a troca de porta é por botão (§8-B, fase 3)
+- ❌ Gravar quem fechou a saída como conferente da caixa que foi no caminhão sem
+  ninguém bipar: ela sai SEM conferência, com linha própria na pilha (§8-B)
+- ❌ Misturar a caixa que foi sem conferência com "sem registro" na pilha: lá é
+  não saber quem fez, aqui se sabe que ninguém conferiu (§8-B)
 - ❌ Pôr a agência conferida na conta do caminhão: ela fica na área, e cada
   caminhão obrigaria a bipar dezenas de "sobras" (§8-B, fases 3 e 4, D2)
 - ❌ Deixar o bipe da ÁREA pôr a caixa de agência no carro: desde a fase 4 são
@@ -4852,6 +5013,12 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   os relatórios das duas ficariam errados (§19, 5-B2, e a §4.16 da spec)
 - ❌ Apagar motivo de recusa com história atrás, ou deixar o cadastro nascer
   vazio: o vazio faz o botão "Recusar" abrir uma lista sem nada (§19, 5-B2)
+- ❌ Criar tela interna sem o `nav.js` da operação: ela nasce sem "Trocar
+  setor" e sem o atalho, e a pessoa só sai pelo login (§20, Regra A)
+- ❌ Escrever chefia, chefe, patrão, dono ou gestão em texto que aparece para
+  quem usa o sistema — nomeie a etapa, ou o nível de acesso (§20, Regra B)
+- ❌ Escrever uma segunda lista de "para onde a pessoa vai": é o `destino.js`,
+  e foi a cópia do login que mandava o vendedor de volta ao PIN (§20)
 
 ---
 
@@ -7655,6 +7822,219 @@ porque perde a contagem **e** cai na varredura do padrão de dois passos).
 > fecha é **alguém abrindo o `/corte` no celular da bancada** e a página não
 > andando de lado com a medida sendo digitada.
 
+### ⚠️ O CORTE EM ETAPAS — o estoque só anda no CORTE FEITO (01/10/2026, spec `CORTE-EM-ETAPAS`)
+
+Em 01/10/2026 um corte foi confirmado rápido: o plano mandava parte do pedido
+para uma sobra, o tom não bateu e o operador cortou tudo do rolo. O Confirmar
+**já tinha baixado** — a sobra ficou "usada" inteira na mão de alguém e o rolo
+baixou a menos. Desde a fase 2 da spec:
+
+```
+① planejar   ② confirmar      ③ cortando      ④ corte feito     ⑤ guardar
+  (calcula)    grava e RESERVA   relógio corre   AQUI BAIXA tudo   medida+etiqueta+endereço
+```
+
+`tecido/dominio/corte.js` é o **dono único** das etapas e da baixa de rolo e
+sobra; `plano.js` ficou só com a conta. O histórico de cada corte está no botão
+**Histórico** da tela de corte (fase 1, `dominio/corte_historico.js`).
+
+> ⚠️ **`plano.confirmado` CONTINUA DIZENDO "BAIXOU O ESTOQUE"**, e por isso só
+> vira 1 no Corte feito. O painel de Cortes, o comprometido de tecido (4-B) e a
+> checagem do gerencial leem `confirmado=1` com esse sentido; a etapa mora em
+> coluna nova (`etapa`). Os cortes de antes viraram `feito` na migração 27 (R28).
+
+> ⚠️ **O CORTE FEITO BAIXA O QUE ESTÁ GRAVADO (`plano.proposta`), nunca um plano
+> recalculado na hora** — entre confirmar e terminar pode ter entrado sobra nova,
+> e recalcular escolheria uma fonte que ninguém cortou.
+
+> ⚠️ **A RESERVA NÃO TEM TABELA: ela é a faixa de um corte aberto.** Sobra de
+> corte aberto (confirmado ou cortando) não é oferecida a outro plano — e o
+> plano diz por quê (`reservada`, com o corte e a pessoa) —, e o rolo aparece
+> para os outros com o saldo menos os metros reservados. Uma tabela de reserva
+> ao lado seria a segunda afirmação sobre o mesmo fato, e a que fica para trás
+> é a que prende a sobra para sempre.
+
+> ⚠️ **A SOBRA NASCIDA NÃO É LINHA DE `sobra` ATÉ SER GUARDADA**, e mora em
+> `sobra_a_guardar`, em nome de quem cortou (R13). Sem etiqueta ninguém a acha
+> na prateleira, e por isso ela não entra em plano (R14) — morando à parte,
+> nenhuma consulta de candidatas precisa lembrar de filtrá-la. Guardar exige
+> medida, etiqueta e endereço juntos. **A medida calculada vem escrita e a
+> lista vem vazia**: medida pré-marcada é medida que se salva sem olhar (a regra
+> das sobras do `tecido/README.md`), e quem vale é a fita.
+
+> ⚠️ **UM CORTE ABERTO POR OPERADOR (R2)**, e a pendência de guardar não conta.
+> Quem mexe no corte aberto é quem o abriu, ou a chefia (`corte.gerir`, que só o
+> diretor tem pelo `*`); a chefia vê as sobras a guardar de todos (R15).
+
+> ⚠️ **"VOLTAR AO PLANO" APAGA O CORTE DO ②, e CANCELAR fica no histórico.**
+> No ② nada foi cortado; um "cancelado" por cada vez que alguém conferiu o
+> resumo e voltou encheria o histórico de cortes que nunca existiram. Do ③ em
+> diante só se cancela, com motivo.
+
+> ⚠️ **A LINHA VAZIA DA GRADE NÃO É MEDIDA.** `comoNumero('')` devolve **0**, e
+> não `null`: o filtro antigo da tela deixava as linhas em branco irem para o
+> servidor, e quem preenchia uma só das três linhas da grade levava *"A linha 2
+> esta sem medida valida"*. Achado abrindo a tela, consertado no `temMedida`.
+
+### ⚠️ MUDAR O CORTE: livre durante, aprovado depois (fase 3, R5–R8, R16–R17)
+
+**Durante o corte (③)** o operador muda o plano sozinho, sempre com motivo da
+lista de **Cadastros → Motivos** (a mesma do "não usar"; a migração 28 só
+acrescentou *Rolo acabou* e *Medida errada*): **não usar** a fonte, **o item
+saiu de outra fonte** (bipa o código; o sistema conta os metros), **rolo
+acabou** (o que já saiu fica nele, o resto muda, e no Corte feito ele é
+encerrado) e **cortado errado** (o pedaço vira sobra marcada "cortada errada",
+ou refugo, e o item volta a ser cortado). Cada mudança vira linha em
+`plano_edicao`.
+
+> ⚠️ **A EDIÇÃO NÃO TEM CONTA PRÓPRIA.** Ela vira restrição da entrada
+> (`fixadas`, `erradas`, `excluir_rolos`, `recusadas`) e o plano é recalculado
+> pelo mesmo `plano.calcular`. Fonte onde o item não cabe é recusada dizendo
+> qual, e nada muda.
+
+**Depois do Corte feito** o operador **pede** correção pelo histórico
+(`corte.pedir_correcao`), dizendo de onde cada item saiu de verdade; a tela
+mostra antes o que a aprovação faria. **Pendente, nada no estoque muda.** A
+chefia (`corte.aprovar_correcao`) aprova e o sistema aplica a **diferença**: a
+sobra que não foi usada volta a disponível **no endereço onde estava**, o rolo
+acerta o saldo como consumo (o giro soma certo), as sobras que não nasceram
+saem (a guardar é cancelada; a já guardada vira `anulada`, que não é descarte
+nem refugo), as que nasceram de verdade ficam a guardar, e o refugo é refeito.
+
+> ⚠️ **NA CORREÇÃO TODO ITEM TEM FONTE FIXA**, a do corte menos o que a pessoa
+> disse que mudou. Deixar o plano escolher ali inventaria um corte que ninguém
+> fez. E o item que mudou de fonte é **outra puxada**: encaixá-lo junto com o
+> que já tinha saído do rolo o poria na mesma faixa, e o rolo baixaria 0,50 m
+> em vez dos 2,50 que saíram. Achado pelo teste, antes da tela.
+
+> ⚠️ **A VERDADE DO QUE O CORTE BAIXOU É O MOVIMENTO, não a proposta.** Os cortes
+> de antes das etapas (R28) nem têm proposta; o metro de cada rolo está no
+> `movimento_rolo` com a referência do corte. É assim que o corte de 01/10/2026
+> se corrige.
+
+> ⚠️ **QUEM PEDIU NÃO APROVA, nem o diretor** — a regra da casa para mexer em
+> saldo (§18, ajuste em duas pessoas), aplicada aqui por analogia: a spec diz
+> só "a gestão aprova". Está em `DECISOES.md` para o dono confirmar.
+
+> ⚠️ **A CORREÇÃO É BLOQUEADA** quando uma sobra "que não nasceu" já foi usada
+> noutro corte, ou quando o rolo está encerrado e não tem onde pôr ou tirar
+> metro. A frase diz o que fazer.
+
+### ⚠️ O TOM É PELA ORIGEM, e o pedido dividido entre origens se confere no corte (fase 4, R9–R12)
+
+`tecido/dominio/tom.js` é o dono único da **origem de tom**: o rolo; a sobra
+que nasceu dele; a de sobra sobe até o rolo; e a do mutirão é **sozinha**. O
+pedido que não cabe inteiro numa fonte se divide — primeiro entre fontes da
+**mesma origem** (sem nada a conferir), depois entre **origens diferentes** —
+e só se couber inteiro na divisão. Dividido entre origens, cada fonte pede
+**"Conferi o tecido"** no Cortando, gravado com quem, quando, pedido e fonte; o
+Corte feito é recusado sem elas, dizendo quais; e mudar a fonte numa edição
+zera a conferência dela.
+
+> ⚠️ **O "PEDIDO JÁ CORTADO" SÓ CONTA NO MESMO TECIDO.** Até 01/10/2026 a
+> consulta olhava só o número do pedido, e o pedido de duas cores mandava a
+> segunda cor continuar no rolo da primeira. Consertado no `cortesAnteriores`
+> do `plano.js`, com caso travando.
+
+### O TIPO DE CADA LINHA E O TEMPO POR m² (fase 5, R18–R21)
+
+Cada linha do corte diz para quem é — **cliente final, revenda ou ML sob
+medida** —, e o Confirmar recusa linha sem tipo. A revenda é escolhida da
+**carteira que já existe** (`sm_revenda`), por uma porta própria do corte
+(`GET /api/planos/revendas`, só id e nome, com a chave de quem corta: o
+cortador não tem `revenda.ler`). O nome dela fica como retrato na linha.
+
+O relógio corre do **CORTAR ao Corte feito, menos as pausas** (Pausar/Retomar
+no ③; pausa esquecida aberta fecha no Corte feito), e o tempo líquido fica no
+corte. `dominio/tempo_corte.js` é o dono do **minuto por m² por tipo** (Painel →
+Tempo de corte): corte misturado divide o tempo **pela área das peças**, e corte
+acima de `corteTempoMaxHoras` (parâmetro, nasce em 3 h, zero é recusado) fica
+fora da média — e a tela diz quantos e quais.
+
+> ⚠️ **O m² É O DAS PEÇAS, não o puxado do rolo**: o tecido que virou sobra ou
+> refugo não é trabalho de cortar peça, e somado faria o corte com muito
+> desperdício parecer mais rápido.
+
+> ⚠️ **CORTE SEM RELÓGIO NÃO É CORTE RÁPIDO.** Os cortes feitos antes deste
+> deploy não têm tempo medido: ficam fora, contados à parte, nunca como zero.
+
+**Rode `cd tecido && npm test` ao mexer em `corte.js`, no `plano.js`, no
+`tom.js`, no `tempo_corte.js` ou na tela de corte** — `tempo_corte.test.js` (8), `corte_etapas.test.js` (18),
+`corte_correcao.test.js` (17), `historico_corte.test.js` (15) e
+`tom.test.js` (27).
+
+### A ETIQUETA DA SOBRA LIDA PELA FOTO (fase 6, R27)
+
+Todo campo de bipe de sobra (lançar e procurar em Sobras; guardar e o filtro do
+histórico no Corte) ganhou o botão **📷**: o iPad tira a foto e
+`public/barras_ler.js` — na raiz, ao lado do `barras.js`, lendo pela **mesma
+tabela** — acha o código. O código lido entra **no campo** (`ui.comCamera`) e
+segue pelo caminho do bipe; não há segundo caminho.
+
+> ⚠️ **SÓ VALE O QUE FECHA O DÍGITO VERIFICADOR, e não há "melhor palpite".**
+> Não leu, a tela diz e deixa tentar de novo ou digitar. Código errado lido com
+> confiança é sobra trocada na prateleira.
+
+> ⚠️ **FOTO, NÃO CÂMERA AO VIVO** — a ao vivo pede HTTPS (dívida 2 do §14).
+
+> ⚠️ **OS TESTES SÃO COM IMAGENS SINTÉTICAS**, desenhadas pelo `barras.js` e
+> estragadas como a câmera estraga (borrada, torta, invertida, sombra,
+> perspectiva, pequena). A spec pedia fotos reais, que não existem no
+> repositório. **A prova é o iPad da bancada achando a sobra pela foto** — é a
+> lição do QR do §4.
+
+**Rode `cd tecido && npm test` ao mexer no `barras_ler.js`, no `barras.js` ou no
+`comCamera`** — `barras_ler.test.js` (11). Três defeitos foram reintroduzidos:
+o limiar fixo (a sombra reprova), a parada lida sem o silêncio depois e tirar o
+script da tela.
+
+### O PLANO MAIS CLARO (fase 7, R22–R25)
+
+> ⚠️ **ENTRE AS SOBRAS QUE SERVEM, VENCE A DE MENOS REFUGO, e não a menor.**
+> A ordem é condição (íntegra antes de defeito) → menor refugo → menor área. A
+> de 1,05 × 1,05 para uma peça de 1,00 × 1,00 vira tira de refugo; a de
+> 1,00 × 2,10 devolve um pé de 1,10 que é sobra nova — e ganha.
+
+> ⚠️ **A SOBRA QUE SERVE E NÃO ENTROU DIZ POR QUÊ TAMBÉM QUANDO O PLANO USOU
+> OUTRA.** Até aqui a lista só existia sem sobra nenhuma no plano — e o caso de
+> 01/10/2026 era o outro. O motivo `outra_sobra` nomeia a escolhida e o degrau
+> que decidiu; a gêmea (mesma medida, mesmo refugo) diz que é gêmea, e não que
+> a outra "é menor".
+
+**Cada sobra usada mostra `usa N% · N% vira sobra · N% refugo`, somando 100**
+(o refugo é o resto, e não uma terceira soma), e o resumo mostra o refugo do
+corte ao lado da **média dos cortes dos últimos 30 dias** —
+`painel.refugoMedio`, da mesma tabela `refugo` do painel, só o refugo de corte.
+Sem corte na janela a média é `null`, nunca zero. **Não há limite de perda:** o
+número existe para o dono decidir um.
+
+**Rode `cd tecido && npm test`** — `plano_claro.test.js` (12). Seis defeitos
+foram reintroduzidos um a um: sem o critério do refugo, sem a condição, a lista
+sumindo com sobra usada, o descarte entrando na média, a média zero e a
+porcentagem errada.
+
+> ✅ **NO AR EM 01/10/2026** (PR #165): o dono fez o deploy e disse *"ficou
+> certo"*.
+>
+> ⚠️ **ISSO PROVA QUE O SISTEMA SUBIU, E NÃO QUE O CORTE EM ETAPAS FUNCIONA NA
+> BANCADA.** Faltam quatro provas, e a spec só vai para `docs/arquivo/` depois
+> delas: um corte inteiro pelas etapas, com rolo e sobra baixando **só no Corte
+> feito**; a correção do corte de 01/10 pedida pelo Histórico e aprovada por
+> outra pessoa; o iPad achando a sobra pela foto; e o caso da S-000091 no plano.
+> Prova que não foi feita se escreve como não feita (§4).
+>
+> ✅ **PROVA 1 DE 4, EM 02/10/2026: UM CORTE INTEIRO PELAS ETAPAS, NA BANCADA.**
+> O dono fez o corte do começo ao fim e disse *"baixou certo"*. Faltam as outras
+> três: a correção do corte de 01/10, a foto no iPad e o caso da S-000091.
+>
+> ✅ **PROVA 2 DE 4, EM 02/10/2026: A CORREÇÃO DO CORTE DE 01/10.** O dono fez a
+> correção pelo Histórico e disse *"deu certo"*. Faltam a foto no iPad e o caso
+> da S-000091.
+>
+> ✅ **PROVA 3 DE 4, EM 02/10/2026: A SOBRA LIDA PELA FOTO NO iPad.** O dono leu
+> a etiqueta de uma sobra pelo 📷 e disse *"deu certo"*. É a prova que os
+> testes com imagens sintéticas não davam (fase 6). Falta o caso da S-000091.
+
 ### Três regras do sob medida que valem citar aqui
 
 **Cada nível guarda um rolo só.** Regra do dono, 15/09/2026: `Haste A · Andar 1
@@ -7694,4 +8074,97 @@ done
 Telas `302`, API `401`, `/login` `200`. E `/sobmedida/telas/corte.html` tem que
 dar **403 mesmo para o diretor logado** — se der `200`, o `express.static` do
 módulo furou o portão, que é a armadilha #3 por outra porta.
+
+---
+
+## 20. Navegação e linguagem — as duas regras de toda tela (02/10/2026)
+
+Spec `docs/specs/NAVEGACAO-E-LINGUAGEM.md`, decidida pelo Lucas em 02/10/2026,
+com as duas linhas em `docs/DECISOES.md`.
+
+### Regra A — toda tela interna tem a troca de operação
+
+No **canto superior direito** de toda tela interna das duas operações, com o
+mesmo lugar e o mesmo visual:
+
+| Botão | Aparece para | Leva a |
+|---|---|---|
+| **Trocar setor** | todo mundo | `/setor` |
+| **Sob medida →** (na medida padrão) | só quem alcança as duas operações | `/sobmedida` |
+| **Medida padrão →** (no sob medida) | idem | a **primeira tela da medida padrão que a pessoa alcança** |
+
+Ficam fora: o `/login`, a própria `/setor` e o portal da revenda (quando
+existir). **Tela nova usa o `nav.js` da sua operação** (`/nav.js` no PCP,
+`/sobmedida/nav.js` no módulo) e com isso já nasce com o botão.
+
+> ⚠️ **ESCONDER O BOTÃO NÃO É SEGURANÇA.** Quem tranca continua sendo o
+> `auth.js` e o portão do `tecido/montar.js`. O botão só evita mostrar um
+> caminho que dá "sem permissão".
+
+> ⚠️ **`destino.js` É O DONO ÚNICO DE "PARA ONDE A PESSOA VAI"**, e o
+> `/api/auth/eu` e a resposta do login o devolvem em `destino` (`padrao`,
+> `sobmedida`, `duas`, `inicial`). O login, a `/setor` e as duas barras leem
+> dali. **A lista existia em duas cópias e elas já tinham divergido**: a do
+> `login.html` só reconhecia `sobmedida` e `sobmedida_adm` como sob medida, e
+> quem tinha só a área de **vendedor** ou de um dos **cinco setores da
+> produção** voltava ao login depois de digitar o PIN. Tela nova da medida
+> padrão entra na lista `PADRAO` de lá.
+
+> ⚠️ **O "← Medida padrão" DO RODAPÉ DO SOB MEDIDA SAIU.** Ele apontava para
+> `/`, que é o admin, e quem não tinha admin caía em "sem permissão".
+
+### Regra B — o texto não nomeia hierarquia
+
+Em texto que **quem usa o sistema vê** — tela, botão, selo, erro, ajuda, nome
+de permissão e o que os scripts escrevem no terminal — não entram **chefia,
+chefe, patrão, dono, gestão**. O texto **nomeia a etapa** (*Enviar para
+aprovação · Aguardando aprovação · Pendente de conferência*); quando precisa
+nomear alguém, usa o **nível de acesso** (Operação, Supervisor, Admin, Admin
+Geral) ou a **permissão** (*quem tem permissão para gerir cortes*).
+
+> **Por quê:** quem aprova é decidido pela permissão, não pelo cargo. "Enviar
+> para o admin" passa a mentir no dia em que a permissão vai para um
+> Supervisor.
+
+Ficam fora: comentário de código, este arquivo, `docs/` e o termo técnico
+**"dono único"**.
+
+> ⚠️ **TROCAR O TEXTO DE UMA PERMISSÃO É SÓ O `nome`, NUNCA A CHAVE.** A chave
+> `sobra.propor` continua igual e o rótulo virou *"Propor correção de sobra"*:
+> mudar a chave tiraria a permissão de quem já a tem, em silêncio (armadilha
+> #13, §19).
+
+> ⚠️ **TRÊS COISAS COM A PALAVRA FICAM, E O TESTE AS NOMEIA:** o valor gravado
+> `origem='gestao'` em `lote_item` (é dado, não aparece em tela nenhuma) e os
+> nomes das migrações 8, 13 e 21 do `tecido.db` (história do banco, já
+> aplicada). As duas saídas de passivo já gravadas (#1 e #3) também ficam como
+> estão; o que mudou foi o texto de uma rodada futura do script.
+
+### O teste que segura as duas — `teste_linguagem.js` (13 casos)
+
+Ele lê **o texto que pode chegar à tela** pelo `texto_visivel.js`: literais de
+texto dos `.js`, texto e `<script>` dos `.html`, e deixa de fora comentário,
+`<style>`, expressão regular e o comentário `/* */` do SQL dentro de template.
+E confere que toda tela interna carrega o `nav.js` **da sua operação**.
+
+> ⚠️ **O LEITOR TEM QUE SABER O QUE É REGEX, E O PRIMEIRO NÃO SABIA.** A
+> varredura improvisada da fase 2 tratava a aspa de `/'/g` como começo de
+> string e passava a ler comentário como texto — acusou dez comentários. Os
+> seis primeiros casos travam o leitor (comentário, regex, divisão, HTML, SQL
+> e "dono único") antes de confiar no que ele acha.
+
+> ⚠️ **AS EXCEÇÕES SÃO NOMEADAS, E A ZUMBI REPROVA.** Cada uma tem arquivo,
+> trecho e motivo; exceção que deixou de existir no código reprova o caso.
+> Lista de exceção que só cresce é onde o texto proibido entra sem ninguém ver.
+
+**Rode `node teste_linguagem.js` e `node teste_destino.js` ao criar tela, mexer
+em texto de tela, mensagem de erro, nome de permissão, nas barras ou no
+login.** Cinco defeitos foram reintroduzidos um a um e cada um reprova o seu
+caso: texto de tela de volta, mensagem de domínio, nome de permissão, tela sem
+barra e tela com a barra da outra operação. Um comentário com a palavra
+**passa**, como deve.
+
+> ✅ **A FASE 1 ESTÁ NO AR DESDE 02/10/2026** (PR #169), e o dono disse *"deu
+> bom"*. Os três perfis (só medida padrão, só sob medida, as duas) não foram
+> relatados um a um.
 

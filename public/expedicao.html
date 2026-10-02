@@ -49,7 +49,7 @@ async function upMany(fileList){
   }
   $('#res').innerHTML='<b>'+ok+' PDF(s) processado(s)</b> · '+totNov+' vendas adicionadas · '+totPdf+' no total · '+totRep+' repetidas ignoradas · '+totSem+' sem SKU'
     +(totCol?' · <b style="color:#b9a3e6">🚚 '+totCol+' pra coleta (o caminhão do ML vem buscar)</b>':'')
-    +(totMod?'<div style="margin-top:8px;color:#d2b8ff;font-weight:700">⚠ '+totMod+' etiqueta(s) num formato desconhecido — retidas. A gestão decide agência ou coleta em Admin → Bloqueados.</div>':'');
+    +(totMod?'<div style="margin-top:8px;color:#d2b8ff;font-weight:700">⚠ '+totMod+' etiqueta(s) num formato desconhecido — retidas. Defina agência ou coleta em Admin → Bloqueados.</div>':'');
   lista();
 }
 async function lista(){

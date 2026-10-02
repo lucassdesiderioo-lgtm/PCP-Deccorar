@@ -79,6 +79,10 @@ const noCanto = (buyer, extra) => vol(buyer, 'carregado',
   /* Fora do canto: agência ainda na pilha (etiqueta impressa, sem bipe),
      agência no carro, coleta impressa e não bipada, e um pendente. */
   const agPilha = vol('AgPilha', 'embalado', "modalidade='agencia'");
+  /* Agência JÁ conferida na área (bipe da área, pela Ana), ainda no chão:
+     se o motorista a levar, quem conferiu continua sendo a Ana. */
+  const agConf = vol('AgConf', 'embalado',
+    "modalidade='agencia', impresso_por='Beto', conferido_em=datetime('now','localtime'), conferido_por='Ana'");
   const agCarro = vol('AgCarro', 'carregado',
     "modalidade='agencia', carregado_em=datetime('now','localtime'), conferido_em=datetime('now','localtime'), conferido_por='Ana'");
   const colPilha = vol('ColPilha', 'embalado', null);
@@ -140,20 +144,23 @@ const noCanto = (buyer, extra) => vol(buyer, 'carregado',
   ok('a caixa de agência que o motorista levou entra na conta', r.ok && r.sistema === 6, JSON.stringify(r));
   r = await chamar('POST /api/saida/levou', {id:agPilha}, ANA);
   ok('...uma vez só', r.ok === false && r.motivo === 'ja_levou', JSON.stringify(r));
+  r = await chamar('POST /api/saida/levou', {id:agConf}, ANA);
+  ok('a de agência já conferida na área também pode ter ido', r.ok && r.sistema === 7, JSON.stringify(r));
+  const pilhaAntes = (await chamar('GET /api/carregamento')).pilha;
 
   // ── liberar sem motivo, e fechar batendo ──
-  r = await chamar('POST /api/saida/liberar', {motorista:7, foto:FOTO}, ANA);
+  r = await chamar('POST /api/saida/liberar', {motorista:9, foto:FOTO}, ANA);
   ok('liberar sem motivo é recusado', r.ok === false && r.motivo === 'sem_motivo', JSON.stringify(r));
-  r = await chamar('POST /api/saida/fechar', {motorista:6, foto:FOTO}, BETO);
-  ok('bateu: fecha', r.ok && r.id === s1 && r.sistema === 6 && r.divergente === false, JSON.stringify(r));
-  ok('...e diz a troca de porta', r.troca_de_porta === 1, JSON.stringify(r));
+  r = await chamar('POST /api/saida/fechar', {motorista:7, foto:FOTO}, BETO);
+  ok('bateu: fecha', r.ok && r.id === s1 && r.sistema === 7 && r.divergente === false, JSON.stringify(r));
+  ok('...e diz a troca de porta', r.troca_de_porta === 2, JSON.stringify(r));
   const sd = db.prepare('SELECT * FROM saida WHERE id=?').get(s1);
   ok('a saída grava quem fechou, os dois números e a hora',
-     sd.fechada_em && sd.fechado_por === 'Beto' && sd.qtd_sistema === 6 && sd.qtd_externa === 6 && sd.divergente === 0,
+     sd.fechada_em && sd.fechado_por === 'Beto' && sd.qtd_sistema === 7 && sd.qtd_externa === 7 && sd.divergente === 0,
      JSON.stringify(sd));
   ok('a foto vai para o disco com o nome da saída', !!sd.foto && fs.existsSync(sd.foto) && /saida-/.test(sd.foto));
   ok('a saída guarda as sobras e as caixas que saíram',
-     JSON.parse(sd.sobras).includes(c4) && JSON.parse(sd.ids).length === 6 && JSON.parse(sd.ids).includes(agPilha));
+     JSON.parse(sd.sobras).includes(c4) && JSON.parse(sd.ids).length === 7 && JSON.parse(sd.ids).includes(agPilha));
   ok('"sem segunda pessoa" conta a caixa que Ana imprimiu e conferiu', sd.sem_segunda_pessoa === 1, sd.sem_segunda_pessoa);
   const l1 = lote(c1);
   ok('cada caixa que saiu grava a saída, a hora e a porta',
@@ -162,10 +169,26 @@ const noCanto = (buyer, extra) => vol(buyer, 'carregado',
   const ag = lote(agPilha);
   ok('a caixa de agência saiu pela coleta, e a modalidade NÃO mudou (decisão 6)',
      ag.saida_id === s1 && ag.saiu_por === 'coleta' && ag.modalidade === 'agencia', JSON.stringify(ag));
-  ok('...e saiu da pilha: virou carregada e conferida por quem fechou',
-     ag.estagio === 'carregado' && ag.conferido_por === 'Beto' && !!ag.carregado_em, JSON.stringify(ag));
+  /* QUEM FECHOU A SAÍDA NÃO CONFERIU A CAIXA (02/10/2026). Ninguém bipou esta
+     caixa: ela saiu SEM conferência, e o registro diz isso — sem nome, sem hora. */
+  ok('...e saiu da pilha: virou carregada, SEM conferente (ninguém a conferiu)',
+     ag.estagio === 'carregado' && !!ag.carregado_em && ag.conferido_por === null && ag.conferido_em === null,
+     JSON.stringify(ag));
+  const agc = lote(agConf);
+  ok('a de agência já conferida na área mantém quem conferiu (a Ana), e não quem fechou',
+     agc.estagio === 'carregado' && agc.conferido_por === 'Ana' && !!agc.conferido_em, JSON.stringify(agc));
   ok('as caixas de fora que ninguém marcou não se mexem', lote(agCarro).saida_id === null && lote(colPilha).estagio === 'embalado');
   r = await chamar('GET /api/carregamento');
+  const ph = r.pilha.hoje;
+  ok('a pilha diz quantas foram no caminhão SEM conferência', ph.sem_conferencia === 1, JSON.stringify(ph));
+  ok('...e quais (com o nome do cliente)',
+     (r.pilha.sem_conferencia||[]).length === 1 && r.pilha.sem_conferencia[0].id === agPilha
+     && r.pilha.sem_conferencia[0].buyer === 'AgPilha', JSON.stringify(r.pilha.sem_conferencia));
+  ok('...e ela NÃO entra em "sem registro" (que continua igual a antes de fechar)',
+     ph.sem_registro === pilhaAntes.hoje.sem_registro, ph.sem_registro + ' vs ' + pilhaAntes.hoje.sem_registro);
+  ok('...nem em "sem segunda pessoa"', !r.pilha.sem_segunda.some(f => f.id === agPilha || f.id === agConf));
+  ok('a conta da pilha continua fechando: impressas = conferidas + faltam',
+     ph.impressas === ph.conferidas + ph.faltam && ph.faltam === pilhaAntes.hoje.faltam - 1, JSON.stringify(ph));
   ok('a adiantada que o caminhão levou conta em "Peças adiantadas"', r.saiu_adiantado.hoje.coleta >= 1, JSON.stringify(r.saiu_adiantado));
   ok('a caixa de agência que foi no caminhão NÃO conta no "No carro" (só a que está no carro conta)',
      r.carregados === 1, 'carregados=' + r.carregados);

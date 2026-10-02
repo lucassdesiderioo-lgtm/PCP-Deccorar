@@ -54,5 +54,8 @@ module.exports={rotas:[
   {metodo:'GET', caminho:'/api/painel/encalhe',  permissao:'painel.ler', manipulador:({query})=>painel.encalhe(query.limite)},
   {metodo:'GET', caminho:'/api/painel/refugo',   permissao:'painel.ler', manipulador:()=>painel.refugo()},
   {metodo:'GET', caminho:'/api/painel/recusas',  permissao:'painel.ler', manipulador:()=>painel.recusas()},
-  {metodo:'GET', caminho:'/api/painel/cortes',   permissao:'painel.ler', manipulador:()=>painel.cortes()}
+  {metodo:'GET', caminho:'/api/painel/cortes',   permissao:'painel.ler', manipulador:()=>painel.cortes()},
+  // O tempo de corte por m², por tipo de pedido (CORTE-EM-ETAPAS, fase 5).
+  {metodo:'GET', caminho:'/api/painel/tempo-corte', permissao:'painel.ler',
+   manipulador:({query})=>require('../dominio/tempo_corte').porTipo(query.dias)}
 ]};

@@ -166,9 +166,16 @@ function saidasAdiantadas(db, dias){
 const CONFERIDA = "(conferido_em IS NOT NULL OR estagio='carregado')";
 const PILHA_HOJE = "estagio IN ('embalado','carregado') AND date(embalado_em)=date('now','localtime')";
 const nomeIgual = (a, b) => String(a||'').trim().toLowerCase() === String(b||'').trim().toLowerCase();
+/* "ESTA PESSOA IMPRIMIU ESTA CAIXA?" — a pergunta do bipe do Carregamento
+   (spec CARREGAMENTO-SEGUNDA-PESSOA, fase 1, 01/10/2026). Os DOIS nomes tem
+   que existir: vazio igual a vazio nao e a mesma pessoa, e nao saber quem fez
+   (a mesma guarda do "sem segunda pessoa" da pilha). */
+const temNomeP = s => String(s||'').trim() !== '';
+const mesmaPessoa = (impresso, quem) => temNomeP(impresso) && temNomeP(quem) && nomeIgual(impresso, quem);
 function pilhaDaArea(db){
   const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
-  const cols = 'id, codigo, buyer, nf, despachar_em, modalidade, embalado_em, impresso_por, conferido_por';
+  const cols = 'id, codigo, buyer, nf, despachar_em, modalidade, embalado_em, impresso_por, conferido_por, '
+             + 'conferido_em, estagio, saida_id';
   const doDia = db.prepare(`SELECT ${cols}, ${CONFERIDA} AS conferida FROM lote
     WHERE ${PILHA_HOJE} ORDER BY embalado_em, id`).all();
   const anteriores = db.prepare(`SELECT ${cols} FROM lote
@@ -177,19 +184,29 @@ function pilhaDaArea(db){
     ORDER BY embalado_em, id`).all();
   const marca = v => ({ id:v.id, codigo:v.codigo, buyer:v.buyer, nf:v.nf,
     despachar_em:v.despachar_em, embalado_em:v.embalado_em,
+    impresso_por: temNomeP(v.impresso_por) ? String(v.impresso_por).trim() : null,
     coleta: ehColeta(v), adiantada: futuro(v, hoje) });
   const conferidas = doDia.filter(v => v.conferida);
   const temNome = s => String(s||'').trim() !== '';
   const semSegunda = conferidas.filter(v => temNome(v.impresso_por) && temNome(v.conferido_por)
                                         && nomeIgual(v.impresso_por, v.conferido_por));
-  const semRegistro = conferidas.filter(v => !temNome(v.impresso_por) || !temNome(v.conferido_por));
+  /* FOI NO CAMINHAO SEM CONFERENCIA (02/10/2026): saiu numa saida, carregada,
+     e ninguem bipou — o botao "foi no caminhao" deixa a conferencia vazia de
+     proposito. E linha propria, e nao "sem registro": la e nao saber quem
+     fez; aqui se sabe que NINGUEM conferiu, e e esta que interessa olhar. */
+  const semConferencia = conferidas.filter(v => v.estagio === 'carregado' && !v.conferido_em && v.saida_id);
+  const semConfIds = new Set(semConferencia.map(v => v.id));
+  const semRegistro = conferidas.filter(v => !semConfIds.has(v.id)
+                                          && (!temNome(v.impresso_por) || !temNome(v.conferido_por)));
   const faltam = doDia.filter(v => !v.conferida).map(marca);
   return {
     hoje: { impressas: doDia.length, conferidas: conferidas.length, faltam: faltam.length,
-            sem_segunda: semSegunda.length, sem_registro: semRegistro.length },
+            sem_segunda: semSegunda.length, sem_registro: semRegistro.length,
+            sem_conferencia: semConferencia.length },
     faltam,
     anteriores: anteriores.map(marca),
-    sem_segunda: semSegunda.map(v => Object.assign(marca(v), { quem: String(v.conferido_por).trim() }))
+    sem_segunda: semSegunda.map(v => Object.assign(marca(v), { quem: String(v.conferido_por).trim() })),
+    sem_conferencia: semConferencia.map(marca)
   };
 }
 
@@ -265,5 +282,5 @@ function podeTerIdo(db){
 
 module.exports = { PRA_CARREGAR, DO_DIA, ORDEM_CARGA, atrasado, futuro,
                    COLETA, AGENCIA, ehColeta, AGUARDA_CAMINHAO,
-                   SAIDA, saidasAdiantadas, pilhaDaArea, nomeIgual,
+                   SAIDA, saidasAdiantadas, pilhaDaArea, nomeIgual, mesmaPessoa,
                    acharVolumes, NA_SAIDA, naSaida, PODE_TER_IDO, podeTerIdo, PRONTA_PRO_CARRO };

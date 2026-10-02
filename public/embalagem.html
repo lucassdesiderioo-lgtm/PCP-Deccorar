@@ -918,7 +918,7 @@ async function upMany(fileList){
   // E se a etiqueta mudou de formato, o aviso é aqui — a gestão decide em Bloqueados.
   document.getElementById('upRes').innerHTML='<b>'+ok+' PDF(s)</b> · '+totNov+' vendas adicionadas · '+totPdf+' no total · '+totRep+' repetidas · '+totSem+' sem SKU'
     +(totCol?' · <span class="tagC" style="margin-left:0">🚚 '+totCol+' pra coleta</span>':'')
-    +(totMod?'<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#efe9fb;border:2px solid #6f42c1;color:#4b2a91;font-weight:700">⚠ '+totMod+' etiqueta(s) num formato que o sistema não conhece — retidas. A gestão decide se é agência ou coleta em Admin → Bloqueados.</div>':'');
+    +(totMod?'<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#efe9fb;border:2px solid #6f42c1;color:#4b2a91;font-weight:700">⚠ '+totMod+' etiqueta(s) num formato que o sistema não conhece — retidas. Defina agência ou coleta em Admin → Bloqueados.</div>':'');
   stats(); listaPend();
 }
 (async function(){

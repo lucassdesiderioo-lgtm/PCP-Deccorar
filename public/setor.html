@@ -51,16 +51,14 @@
   <div class="rodape"><a href="/login">Nao sou eu &mdash; trocar de pessoa</a></div>
 </div>
 <script>
-// O destino do lado PADRAO e a primeira tela que a pessoa alcanca — o mesmo
-// calculo do login. Mandar todo mundo para /admin daria "sem permissao" na
+// O destino do lado PADRAO e a primeira tela que a pessoa alcanca. Quem
+// responde e o servidor (`destino.js`, o dono unico): a mesma conta do login
+// e das duas barras. Mandar todo mundo para /admin daria "sem permissao" na
 // cara de quem so revisa.
-var ORDEM={admin:'/admin',painel:'/painel',operador:'/operador',montagem:'/montagem',
-           embalagem:'/embalagem',carregamento:'/carregamento',expedicao:'/expedicao',
-           relatorios:'/relatorios',necessidade:'/planejamento',recebimento:'/recebimento'};
 fetch('/api/auth/eu',{credentials:'same-origin'}).then(function(r){return r.json();})
  .then(function(u){
    if(!u.logado){ location.href='/login'; return; }
    document.getElementById('oi').textContent='Ola, '+u.nome+'. Onde voce vai trabalhar?';
-   for(var k in ORDEM) if(u.areas.indexOf(k)>=0){ document.getElementById('opPadrao').href=ORDEM[k]; break; }
+   if(u.destino&&u.destino.padrao) document.getElementById('opPadrao').href=u.destino.padrao;
  });
 </script></body></html>

@@ -86,7 +86,7 @@ function porChave(coluna,rotulo,artigo){
 
 tit('1. UMA VENDA COM MAIS DE UM SKU');
 T('');
-T('A regra do dono: uma venda = uma etiqueta = uma persiana. Aqui isso e medido');
+T('Regra da operação: uma venda = uma etiqueta = uma persiana. Aqui isso e medido');
 T('contra o que ficou GRAVADO — e a dedup do upload ja recusa venda repetida,');
 T('entao o esperado e vazio. O que a folha do PDF diz esta na secao 4.');
 T('');

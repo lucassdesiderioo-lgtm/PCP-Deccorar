@@ -214,7 +214,7 @@ function relatar(l){
     console.log('⚠ PARA AQUI — '+l.impedidas.length+' sobra(s) com corte confirmado atras:');
     l.impedidas.forEach(s=>console.log('   '+s.codigo+' — '+s.motivos.join('; ')));
     console.log('');
-    console.log('   Estas tem historia de corte. A decisao e do dono, caso a caso.');
+    console.log('   Estas têm história de corte. A decisão é caso a caso.');
     return;
   }
   if(l.fora.length){
