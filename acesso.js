@@ -645,6 +645,9 @@ module.exports = function(app, db){
     if(M !== 'GET' && eq('/api/montagem')) return 'embalagem.executar';
     if(M !== 'GET' && eq('/api/embalar')) return 'etiqueta.emitir';
     if(M !== 'GET' && eq('/api/carregar')) return 'carregamento.executar';
+    /* A caixa de varias peca a peca e o "Recomecar" (CARREGAMENTO-SEGUNDA-PESSOA
+       fase 2): o mesmo bipe da area e do canto, com a mesma chave. */
+    if(M !== 'GET' && (eq('/api/carregar/peca') || eq('/api/carregar/recomecar'))) return 'carregamento.executar';
     /* A SAIDA DO CAMINHAO (fase 3 da SAIDA-E-DUPLA-CONFERENCIA): abrir, bipar
        as sobras e fechar a que BATEU sao da bancada que bipa a caixa. Liberar
        com numero diferente do motorista tem chave propria, e vem ANTES do

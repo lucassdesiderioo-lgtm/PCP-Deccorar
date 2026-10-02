@@ -515,8 +515,14 @@ setModo(MODO);
    são duas coisas (§5, armadilha #23).
    Texto do dono (25/09/2026), com o número da caixa: 2, 3, 4… Até aqui era
    a instrução de qual saco usar, e o dono a tirou. */
+/* P6 da spec CARREGAMENTO-SEGUNDA-PESSOA (01/10/2026): as etiquetas de SKU
+   vão POR FORA da caixa, e são as do SACO de cada persiana — não cópias. Cópia
+   não prova que a persiana entrou; com a do saco por fora, o Carregamento
+   confere peça a peça sem abrir a caixa. Fica na mesma frase para aparecer
+   igual nos quatro lugares. */
 function fita(n){
-  return '⚠ Atenção: vão '+n+' persianas no mesmo pacote — embalar junto.';
+  return '⚠ Atenção: vão '+n+' persianas no mesmo pacote — embalar junto. '
+    +'Tire a etiqueta de SKU do saco de cada persiana e cole por fora da caixa.';
 }
 
 /* O BLOCO DE UMA CAIXA, NUM LUGAR SÓ. O card de hoje e o painel do "depois"

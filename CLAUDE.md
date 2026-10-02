@@ -3486,8 +3486,59 @@ de quem imprimiu (3). E há caso travando que a rota de liberação **não exist
 > 1440, 1024 e 400 px. A prova é o primeiro dia de expedição com a regra: a
 > caixa recusada para quem imprimiu e conferida por outra pessoa.
 
-**A fase 2 (a caixa de várias conferida peça a peça, às cegas, e as etiquetas de
-SKU coladas por fora da caixa — as do saco de cada persiana) ainda não existe.**
+### ⚠️ A CAIXA DE VÁRIAS, PEÇA A PEÇA E ÀS CEGAS (02/10/2026, fase 2 da spec `CARREGAMENTO-SEGUNDA-PESSOA`)
+
+```
+bipe da etiqueta de venda  →  📦 ESTA CAIXA LEVA 3 PERSIANAS · 0 de 3   (âmbar, SEM a lista)
+bipe de cada etiqueta de SKU, colada por fora  →  1 de 3 · 2 de 3 · 3 de 3
+bateu tudo  →  conferida (agência, fica na área) ou vai pro canto (coleta), como sempre
+SKU que não está na caixa, ou um a mais  →  PARA, e só agora mostra os dois lados
+```
+
+`POST /api/carregar/peca` (`{lote_id, sku}`) e `POST /api/carregar/recomecar`,
+com a chave do bipe (`carregamento.executar`). O contador é
+`lote_item.conferidos_carga`, coluna própria (o `conferidos` é o bipe da
+Etiqueta de Venda, de outra pessoa e outro momento). A régua de "caixa de
+várias" é o `VARIAS()`, que **saiu do `exp_route.js` e mora no `carga.js`**.
+
+> ⚠️ **A RESPOSTA NÃO TRAZ OS SKUs** — nem o `lote.codigo`, que é o SKU de uma
+> das peças e bastaria para entregar a primeira resposta. É a lição do inventário
+> cego (§18): quem sabe a resposta bipa até chegar nela. Os dois lados só
+> aparecem na divergência, como alarme, e a divergência vai para a auditoria.
+
+> ⚠️ **AS BARREIRAS SÃO AS MESMAS NO BIPE DE PEÇA** (`barrar()` no
+> `carreg_route.js`): cancelada, retida, já saída, sem etiqueta, já conferida e
+> **quem imprimiu** não andam nem peça a peça. E a caixa de várias **substitui**
+> o segundo bipe cego do `conf_carregamento` — aquele compara com um SKU só.
+
+> ⚠️ **O GUARD DE 700 ms ESTÁ NA TELA**, pela mesma razão da Etiqueta de Venda
+> (§5, #23): o leitor repete o código numa leitura só, e aqui isso contaria uma
+> persiana a mais. **A divergência não zera a contagem**; quem zera é o
+> "Recomeçar esta caixa". **"Deixar esta caixa"** larga a caixa sem apagar o que
+> foi bipado: voltar a ela continua de onde parou.
+
+> ⚠️ **NA IMPRESSÃO, A FRASE DA CAIXA (`fita(n)`) GANHOU A SEGUNDA PARTE** (P6):
+> *"Tire a etiqueta de SKU do saco de cada persiana e cole por fora da caixa."*
+> São as **do saco**, e não cópias — cópia não prova que a persiana entrou. Na
+> mesma função, para sair igual nos quatro lugares.
+
+> ⚠️ **A CAIXA DE UMA PERSIANA NÃO MUDOU**, e a de **1 SKU × 2** é caixa de
+> várias (conta persiana, nunca linha). Tablet com a página antiga em cache
+> mostraria "Etiqueta não reconhecida" no lugar da tela âmbar: **refresh forçado
+> no deploy**.
+
+**Rode `node teste_pecas_carga.js` (37 casos) ao mexer no bipe do
+`carreg_route.js`, no `VARIAS` ou na tela do Carregamento.** Seis defeitos
+reintroduzidos: a resposta entregando o SKU (reprova 1), o bipe de peça sem as
+barreiras (2), contar linha em vez de persiana (4), o "um a mais" passando (2),
+a caixa de várias andando direto (19) e a tela sem o guard de 700 ms (1 — o
+caso olhava só o número "700", que também está no comentário, e foi apertado
+nessa rodada). O `teste_carga.js` passou a conferir a caixa de várias peça a
+peça no cenário do adiantado.
+
+> ⚠️ **AINDA NÃO FOI CONFERIDO NA FÁBRICA.** A rodada foi num navegador meu, a
+> 1024 e 400 px. A prova é a primeira caixa de várias conferida por outra pessoa
+> com as etiquetas do saco coladas por fora.
 
 ### ⚠️ A SAÍDA DO CAMINHÃO (26/09/2026, fase 3 da spec `SAIDA-E-DUPLA-CONFERENCIA`)
 
@@ -4234,7 +4285,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23) e `teste_acuracidade.js` (23); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23) e `teste_pecas_carga.js` (37); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4493,6 +4544,12 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   (§5, armadilha #27)
 - ❌ Fazer a reimpressão gravar `impresso_por`: o bipe 1 é a PRIMEIRA
   impressão, e papel repetido não é outra contagem (§8-B, fase 1 da saída)
+- ❌ Devolver os SKUs esperados na resposta do bipe da caixa de várias antes da
+  divergência — nem o `lote.codigo`: a conferência é cega (§8-B, CARREGAMENTO F2)
+- ❌ Escrever uma segunda régua de "caixa de várias" no Carregamento: é o
+  `VARIAS()` do `carga.js` (§8-B, CARREGAMENTO F2)
+- ❌ Colar cópia da etiqueta de SKU por fora da caixa: são as do saco de cada
+  persiana, e cópia não prova que a persiana entrou (§8-B, P6)
 - ❌ Deixar quem imprimiu conferir no Carregamento — desde 01/10/2026 o bipe da
   área e do canto RECUSA (§8-B, CARREGAMENTO-SEGUNDA-PESSOA)
 - ❌ Criar porta de liberação para quem imprimiu conferir, nem para o Admin
