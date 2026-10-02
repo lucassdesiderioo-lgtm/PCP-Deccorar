@@ -189,15 +189,18 @@ module.exports = function(app, db){
     const autor = quem(req);
     let arq = null;
     db.transaction(() => {
-      /* A troca de porta sai da pilha: a caixa foi embora, então é carregada, e
-         quem fechou é quem a conferiu — sem isso ela ficaria para sempre em
-         "faltam conferir" na conta da pilha (fase 2). */
+      /* A troca de porta sai da pilha: a caixa foi embora, então é carregada
+         (a pilha conta `carregado` como fora de "faltam conferir").
+         ⚠️ QUEM FECHOU A SAÍDA NÃO É QUEM CONFERIU (02/10/2026). Até aqui o
+         nome de quem fechou ia para `conferido_por` da caixa que ninguém
+         bipou — e, se fosse quem imprimiu, a pilha ainda a chamava de
+         "conferida pela mesma pessoa". Hoje ela sai SEM conferência: o campo
+         fica vazio, como no passivo das não bipadas, e a pilha a mostra numa
+         linha própria. A agência já conferida na área mantém quem conferiu. */
       const saiu = db.prepare(`UPDATE lote SET estagio='carregado',
-          carregado_em=COALESCE(carregado_em, datetime('now','localtime')),
-          conferido_por=CASE WHEN conferido_em IS NULL THEN ? ELSE conferido_por END,
-          conferido_em=COALESCE(conferido_em, datetime('now','localtime'))
+          carregado_em=COALESCE(carregado_em, datetime('now','localtime'))
         WHERE id=? AND ${PODE_TER_IDO}`);
-      for(const id of levouIds) saiu.run(autor || null, id);
+      for(const id of levouIds) saiu.run(id);
       const up = db.prepare(`UPDATE lote SET saida_id=?, saiu_em=datetime('now','localtime'), saiu_por='coleta',
           retirado_em=COALESCE(retirado_em, datetime('now','localtime')) WHERE id=? AND saida_id IS NULL`);
       for(const id of ids) up.run(s.id, id);

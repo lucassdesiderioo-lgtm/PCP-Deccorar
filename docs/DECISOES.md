@@ -140,6 +140,15 @@ desenho da equipe. Custo aceito: num dia de uma pessoa só, a caixa espera outra
 Motivo: a bancada não repara na caixa de várias persianas, e só marcar deixava a mesma
 atenção conferir. Spec `CARREGAMENTO-SEGUNDA-PESSOA`, fase 1.
 
+## 02/10/2026 — a caixa que foi no caminhão sem conferência fica sem conferente
+Decisão do dono, depois da revisão do Carregamento. O botão "foi no caminhão" da Saída do
+caminhão gravava como conferente **quem fechou a saída**, pessoa que nunca bipou aquela
+caixa — e se fosse quem imprimiu, a pilha a chamava de "conferida pela mesma pessoa".
+Hoje a caixa sai **sem conferência** (campo vazio), e a pilha a mostra numa linha própria,
+separada de "sem registro". A agência já conferida na área mantém quem conferiu. As que
+saíram antes ficam como estão. Fica anotado, sem mudar: a pilha ainda a conta em
+"conferidas" (fase 2 da `SAIDA-E-DUPLA-CONFERENCIA`).
+
 ## 01/10/2026 — o corte do sob medida passa a ter etapas (spec `CORTE-EM-ETAPAS`)
 Decisões do dono, da §8 da spec, depois de um corte confirmado rápido em que a sobra
 não tinha o tom do pedido e o operador cortou tudo do rolo: o sistema já tinha dado a

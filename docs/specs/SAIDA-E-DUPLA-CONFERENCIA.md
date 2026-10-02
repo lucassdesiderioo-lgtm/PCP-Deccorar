@@ -29,6 +29,9 @@
 > Nasceu da conversa no Projeto "PCP - Deccorar" em 25/09/2026 (NOVIDADE).
 > Substitui o "Fechar coleta" de 10/09/2026 (`CLAUDE.md` §8-B), que não foi adotado pela equipe.
 > Fases: 1 ☑ (no ar) · 2 ☑ (no ar) · 3 ☑ (no ar) · 4 ☑ (no ar)
+> **02/10/2026:** o "foi no caminhão" deixou de gravar quem fechou a saída como conferente
+> da caixa que ninguém bipou — ela sai sem conferência, com linha própria na nota da pilha
+> (ver `CLAUDE.md` §8-B e `DECISOES.md`).
 
 ---
 
