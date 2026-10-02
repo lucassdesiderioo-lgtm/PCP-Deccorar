@@ -2381,8 +2381,8 @@ exige o módulo novo na varredura dele, e foi ele que cobrou. E mexeu no saldo?
 > ⚠️ **NO TERMINAL, QUEM FEZ É O SCRIPT** (`terminal: limpar_fila.js`), e não um
 > nome inventado; o motivo é `--motivo "texto"`, ou *"rodado pelo terminal:
 > <script>"* sem ele. **O `limpar_fantasmas.js` agora apaga as peças junto**, que
-> era a divergência de efeito da fase 1. Quatro escolhas da construção esperam a
-> confirmação do dono em `docs/DECISOES.md` (02/10/2026).
+> era a divergência de efeito da fase 1. As quatro escolhas da construção foram
+> confirmadas pelo dono em 02/10/2026 (`docs/DECISOES.md`).
 
 **Rode `node teste_correcao2.js` (98 casos) ao mexer nas ações da fase 2 e
 `node teste_correcao3.js` (23) ao mexer nos scripts** — o segundo monta o mesmo
