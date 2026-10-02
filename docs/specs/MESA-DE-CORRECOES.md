@@ -1,6 +1,38 @@
-> **STATUS · 21/09/2026 — PLANEJADO** · nada no código
-> Depende da fase 1 de `ESTOQUE-LIVRO-E-CONFERENCIA.md` (livro de movimentos) e, para a
-> ação "Canceladas depois da etiqueta", da fase 2 de `VENDAS-E-MEDIA.md`.
+> **STATUS · 02/10/2026 — EM CONSTRUÇÃO** · **fase 1 em código**; fases 2 e 3 planejadas
+>
+> **Fase 1** entrou em 02/10/2026: `correcoes.js` (dono único de cada ação),
+> `correcao_route.js` (7 rotas), a tabela `correcao`, a aba **Correções** no admin, a
+> chave `correcao.executar` e as duas ações que mais pesam — **Descartar fantasma** e
+> **Cancelada depois da etiqueta**. `teste_correcao.js`, 115 casos, escrito antes do
+> código, doze defeitos reintroduzidos um a um.
+>
+> As duas dependências estão no ar: o livro (ESTOQUE F1, 21/09) e as canceladas
+> (VENDAS F2, 26/09).
+>
+> **O que mudou na construção:**
+> - **a régua do fantasma saiu do script já nesta fase** (a spec punha na 3):
+>   `classificarFantasmas` é dela, e o `limpar_fantasmas.js` lê de lá. Duas cópias
+>   seriam o botão e o terminal apagando linhas diferentes. **O efeito ainda diverge
+>   num ponto** — a Mesa apaga o `lote_item` do volume e o script não —, e isso só se
+>   unifica na fase 3;
+> - **o "voltou" devolve POR PEÇA, e não `+1`** (§4): a etiqueta de uma caixa de
+>   pacote baixou N. **Sob medida fica de fora**, porque nunca baixou;
+> - **a caixa de várias persianas não tem o "voltou"**: o ML cancela um item e o
+>   sistema não sabe qual peça é. Sobra o "registrar", com a frase que manda separar a
+>   caixa e corrigir por Admin → Estoque;
+> - **sem backfill da chave** (§5.4): o Admin Geral passa por nível;
+> - **os contadores são os DOIS que têm botão** (§5.5); os outros três chegam na fase
+>   2, junto com a ação deles;
+> - **o `lote` ganhou três colunas** (`cancelada_resolvida_em`,
+>   `cancelada_resolvida_por`, `cancelada_voltou`) para o card de Bloqueados **esvaziar**
+>   — sem a marca ele nunca zerava;
+> - **uma rota a mais que as seis da §5.3**: `GET /api/correcao/passivo`, que serve os
+>   contadores do topo.
+>
+> ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA.** A rodada foi num navegador, a 1440 px,
+> com banco semeado. A prova que fecha a fase é o dono corrigindo um passivo de
+> verdade pela tela — e a **primeira cancelada real depois da etiqueta**, que é a prova
+> que a VENDAS F2 deixou pendente.
 
 ---
 
@@ -62,12 +94,19 @@ BUSCAR ──▶ VER O OBJETO ──▶ PRÉVIA ──▶ EXECUTAR (motivo) ─�
 | **Fechar vencidos** | `pendente` vencido, em bloco, por período conferido | a do `fechar_vencidos.js` | não |
 | **Reabrir venda futura** | volume com `carregado_em > hoje` | a do `reabrir_futuros.js` | não |
 | **Tirar da fila** | linha de `fila` `aguardando` | nunca toca `embalado`; mostra a idade da linha | não |
-| **Cancelada depois da etiqueta** | volume `embalado` com `cancelada_em` | duas saídas: **"a persiana voltou"** → movimento `cancelamento` +1; **"não voltou"** → só registra | **sim**, no "voltou" |
+| **Cancelada depois da etiqueta** | volume `embalado` com `cancelada_em` | duas saídas: **"a persiana voltou"** → movimento `cancelamento` ~~+1~~ **por peça** (ver abaixo); **"não voltou"** → só registra | **sim**, no "voltou" |
 | **Pedir ajuste de saldo** | SKU | abre um pedido em `estoque.ajustar` — **outra pessoa aprova** | só depois da aprovação |
 
 > **A Mesa não tem ação de estoque direto.** Mexer em saldo sem venda na frente é o
 > que as duas pessoas existem para vigiar. A única exceção é a cancelada que voltou:
 > ali o movimento desfaz uma baixa conhecida, com volume e cliente na referência.
+
+> ⚠️ **DIVERGÊNCIA RESOLVIDA EM 02/10/2026 (fase 1):** o "voltou" devolve **a soma
+> das `qtd` do `lote_item`, SKU por SKU**, e não `+1` — a etiqueta de uma caixa de
+> pacote baixou N (`CLAUDE.md` §5, #23). **Sob medida não recebe devolução** (§7). E a
+> **caixa de várias persianas** (`cancelada_varias=1`) **não tem a saída "voltou"**: o
+> ML cancela um item e o sistema não sabe qual peça da caixa é. Lá só existe o
+> "registrar", com a frase que manda separar a caixa.
 
 Ações que ficam **de fora** desta versão: editar SKU de volume (é a tela de
 Bloqueados que resolve), apagar volume, mexer em `revisao`/`montagem`.
@@ -113,8 +152,11 @@ Entra em `TABELAS` do `teste_route.js`.
 
 ### 5.4 Permissão
 
-`correcao.executar` — nível admin, **sensível**. Backfill só para o setor Admin Geral
-(as três pontas: `permissoes.js`, `permDaRota()`, backfill marcado em `config`).
+`correcao.executar` — nível admin, **sensível**. ~~Backfill só para o setor Admin
+Geral~~ — **não há backfill (02/10/2026)**: o Admin Geral recebe toda chave **por
+nível** (`CLAUDE.md` §10), então ela chega ao dono no primeiro boot, e um backfill para
+ele seria redundante. É a mesma decisão do `kit.imprimir` (§4). As duas pontas que
+sobram são `permissoes.js` e a linha no `permDaRota()`.
 "Pedir ajuste de saldo" ainda exige `estoque.ajustar`, e a aprovação continua com
 outra pessoa (`ESTOQUE-LIVRO-E-CONFERENCIA.md` §6.2).
 
@@ -124,7 +166,10 @@ Aba nova **"Correções"** no admin, fundo escuro (DESIGN.md §1):
 
 - campo de busca que aceita bipe (etiqueta de venda ou SKU);
 - no topo, os **contadores de passivo**: fantasmas, vencidos, futuras fechadas, fila
-  velha, canceladas depois da etiqueta — cada um abre a lista;
+  velha, canceladas depois da etiqueta — cada um abre a lista. **Na fase 1 entram só
+  os dois que têm botão** (fantasmas e canceladas): os outros três chegam na fase 2
+  junto com a ação deles, porque contador que acusa e não sabe liberar é a trava que a
+  equipe aprende a contornar;
 - o objeto em cartão, com as ações como botões; ação que não vale aparece
   desabilitada com o motivo escrito (em vez de sumir);
 - prévia em painel antes de confirmar; motivo obrigatório;
@@ -134,7 +179,7 @@ Aba nova **"Correções"** no admin, fundo escuro (DESIGN.md §1):
 
 ## 6. Fases
 
-### Fase 1 — a mesa e as duas ações que mais pesam 🔴
+### Fase 1 ☑ — a mesa e as duas ações que mais pesam 🔴 (em código em 02/10/2026)
 
 - `correcoes.js`, tabela, rotas, tela, permissão.
 - Ações: **Cancelada depois da etiqueta** e **Descartar fantasma**.

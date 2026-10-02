@@ -44,7 +44,13 @@ module.exports=function(app, db){
     {nome:'inventario_item',      pk:'id', rotulo:'conferencia (SKUs)'},
     /* O PEDIDO DE AJUSTE (fase 3, 28/09/2026), pela mesma razao: aprovar gera
        movimento no livro, e o livro de teste e apagado ali em cima. */
-    {nome:'ajuste_pedido',        pk:'id', rotulo:'pedidos de ajuste'}
+    {nome:'ajuste_pedido',        pk:'id', rotulo:'pedidos de ajuste'},
+    /* A Mesa de correcoes (fase 1). Sem cobertura, "apagar tudo" deixaria a
+       linha de correcao de pe descrevendo um volume que ja nao existe — e,
+       pior, a cancelada que "voltou" devolveria saldo pela foto E a correcao
+       continuaria dizendo que foi ela quem devolveu. Mesma razao do
+       `movimento_estoque` (§2). */
+    {nome:'correcao',             pk:'id', rotulo:'correcoes'}
   ];
 
   // Fase 3: foto_estoque saiu da cobertura; limpa o trigger antigo em bancos

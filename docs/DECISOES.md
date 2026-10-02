@@ -127,3 +127,37 @@ alvo delas é o notebook de 1440, onde estão certas. Ficam **medidas e dispensa
 não entram como dívida. Dívida que ninguém vai pagar é a lista que a equipe aprende a
 não ler. As telas de operação do PCP não rolam em tablet nenhum (768 e 1024 limpos),
 que era a pergunta que importava. Detalhe e números no `CLAUDE.md` §12.
+
+## 02/10/2026 — a Mesa de correções, e as três decisões que mudaram o caminho
+
+Fase 1 da spec `MESA-DE-CORRECOES.md`. O passivo da operação passa a se corrigir
+**pela tela**, item por item, com motivo obrigatório e desfazer — e não mais pedindo
+ao Claude Code para rodar script no servidor. Duas ações nesta fase: **descartar
+fantasma** e **cancelada depois da etiqueta**, que até aqui não se corrigia de jeito
+nenhum (o card de Bloqueados só mostrava, decisão D3 da VENDAS F2).
+
+**1. A régua do fantasma sai do script já nesta fase** (a spec punha na 3). O laço
+estava escrito no `limpar_fantasmas.js` e seria copiado para a Mesa: duas cópias são
+o botão e o terminal apagando linhas diferentes no dia em que uma delas mudar — a
+armadilha #12 na porta que apaga linha. Hoje a régua é
+`correcoes.classificarFantasmas` e o script lê dela. **O efeito ainda diverge num
+ponto:** a Mesa apaga as peças do volume junto, e o script não — isso só se
+unifica na fase 3.
+
+**2. O "a persiana voltou" devolve POR PEÇA, nunca `+1`** — divergência da §4 da
+spec. A etiqueta de uma caixa de pacote baixou N (`CLAUDE.md` §5, #23): devolver 1 de
+2 deixaria o buraco pela metade e ninguém procuraria. Sob medida fica de fora, porque
+nunca baixou. **E a caixa de várias persianas não tem essa saída:** ali o volume nem é
+cancelado, o ML cancelou um item e o sistema não sabe qual peça é — inventar somaria
+saldo de uma persiana que está a caminho do cliente. Sobra o "só registrar", com a
+frase que manda separar a caixa e corrigir por Admin → Estoque.
+
+**3. A chave `correcao.executar` não tem backfill, e os contadores são dois.** O Admin
+Geral recebe toda chave por nível, então ela chega ao dono no primeiro boot (a mesma
+decisão do `kit.imprimir`). E dos cinco contadores de passivo da §5.5 da spec entram
+os **dois que têm botão**: vencidos, futuras fechadas e fila velha chegam na fase 2
+junto com a ação deles, porque contador que acusa e não sabe liberar é a trava que a
+equipe aprende a contornar.
+
+Decidido por Lucas, ao aprovar o plano. Detalhe no `CLAUDE.md` §5 ("A Mesa de
+correções") e §3 (o card que agora decide).

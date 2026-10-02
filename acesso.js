@@ -781,6 +781,10 @@ module.exports = function(app, db){
        rota com a chave do papel; `terminar-sku` serve as duas rodadas e aceita
        as duas chaves — o handler confere a da rodada em que o item esta. O
        andamento e lido por quem planeja E por quem aprova: e a mesma tela. */
+    /* A MESA DE CORRECOES (fase 1, 02/10/2026). As LEITURAS tambem pedem a
+       chave: o `passivo` e a lista de tudo que esta errado na operacao, e o
+       `/:tipo/:id` devolve a historia do volume. */
+    if(pre('/api/correcao')) return 'correcao.executar';
     if(eq('/api/inventario/sugestao') || eq('/api/inventario/abrir') || eq('/api/inventario/encerrar')) return 'contagem.planejar';
     if(eq('/api/inventario/andamento')) return ['contagem.planejar','contagem.aprovar'];
     if(eq('/api/inventario/minha-lista') || eq('/api/inventario/contar')) return 'contagem.contar';

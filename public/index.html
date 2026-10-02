@@ -99,7 +99,7 @@
   <div class="tab" data-t="pend" id="tabPend">Pendências de SKU</div>
   <div class="tab" data-t="ficha">Ficha técnica</div>
   <div class="tab" data-t="compras">Compras</div>
-  <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="blq" id="tabBlq">Bloqueados</div><div class="tab" data-t="tst">Modo teste</div>
+  <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="cor" id="tabCor">Correções</div><div class="tab" data-t="blq" id="tabBlq">Bloqueados</div><div class="tab" data-t="tst">Modo teste</div>
 </div>
 <div class="wrap">
   <!-- PRODUÇÃO -->
@@ -331,7 +331,39 @@
   </div>
   <div id="audCob" class="sub" style="margin-top:10px;font-size:13px"></div>
   <div id="audRes" style="margin-top:12px"></div>
-</div></div><div id="v-tst" class="hide">
+</div></div>
+
+<!-- ═══ A MESA DE CORRECOES (fase 1 da spec MESA-DE-CORRECOES, 02/10/2026) ═══
+     O passivo da operacao se corrigia pedindo ao Claude Code para rodar script
+     no servidor, e a cancelada depois da etiqueta nao se corrigia de jeito
+     nenhum: o card de Bloqueados so MOSTRAVA. Aqui ele decide.
+     ⚠️ NAO E UM EDITOR DE LINHAS DO BANCO: cada objeto mostra so as acoes que
+     valem para o estado dele, e a que nao vale aparece DESABILITADA com o
+     motivo escrito — trava que some nao ensina nada a quem procurava por ela. -->
+<div id="v-cor" class="hide">
+  <div class="card">
+    <h3 style="margin:0 0 4px">Mesa de correções</h3>
+    <div class="sub" style="margin-bottom:12px">Corrige o passivo da operação item por item: a prévia
+      mostra o que vai mudar antes de gravar, o motivo é obrigatório, e dá para desfazer enquanto o
+      volume não andou.</div>
+    <div id="corPassivo" class="sub">carregando…</div>
+  </div>
+  <div class="card">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <input id="corBusca" placeholder="volume, venda, pack, NF, cliente ou SKU — aceita bipe"
+             autocorrect="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:240px">
+      <button class="btn" onclick="corBuscar()">Buscar</button>
+    </div>
+    <div id="corResultado" style="margin-top:12px"></div>
+  </div>
+  <div id="corObjeto"></div>
+  <div class="card">
+    <h3 style="margin:0 0 10px">Últimas correções</h3>
+    <div id="corHist" class="sub">—</div>
+  </div>
+</div>
+
+<div id="v-tst" class="hide">
   <div class="card">
     <div id="tstEstado" style="font-size:16px;margin-bottom:14px"></div>
     <div class="row-actions" id="tstBotoes"></div>
@@ -394,6 +426,8 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.t==="tst") carregarTeste();
   var vb=$("#v-blq"); if(vb) vb.classList.toggle("hide",t.dataset.t!=="blq");
   if(t.dataset.t==="blq") carregarBloq();
+  var vco=$("#v-cor"); if(vco) vco.classList.toggle("hide",t.dataset.t!=="cor");
+  if(t.dataset.t==="cor") corCarregar();
   var vc=$("#v-ct"); if(vc) vc.classList.toggle("hide",t.dataset.t!=="ct");
   var vp=$("#v-pb"); if(vp) vp.classList.toggle("hide",t.dataset.t!=="pb");
   if(t.dataset.t==="pb") carregarProb();
@@ -3331,6 +3365,223 @@ async function invEncerrar(id){
   var d={}; try{ d=await r.json(); }catch(e){}
   if(!r.ok||d.ok===false){ alert(d.erro||('falhou ('+r.status+')')); return; }
   invAndamento();
+}
+
+
+/* ═══ A MESA DE CORRECOES (fase 1, 02/10/2026) ═══════════════════════════════
+   ⚠️ FORA DO AUTO_ADMIN DE 4 s, pela mesma razao do painel de Estoque: a
+   previa e o motivo sao campos abertos, e redesenhar tiraria da mao de quem
+   esta preenchendo. Ela se atualiza no clique da aba, depois de executar e
+   depois de desfazer — e so. */
+var COR_OBJ=null, COR_PREVIA=null;
+
+/* ⚠️ "1 VOLUMES FANTASMAS" — a concordancia so apareceu ABRINDO A TELA, e e o
+   mesmo defeito do "1 destes pedidos ja tiveram" do sob medida (§19, fase
+   4-A): o texto esta sintaticamente perfeito e nenhum teste de unidade o pega.
+   Numa tela de fabrica, meia concordancia se le pior que nenhuma. */
+function corPl(n, um, muitos){ return n===1 ? um : muitos; }
+
+function corFrase(v){
+  return '#'+v.id+' · '+esc(v.codigo||'(sem SKU)')+(v.buyer?' · '+esc(v.buyer):'')
+    +(v.nf?' · NF '+esc(v.nf):'')+' · '+esc(v.estagio||'')+' · '+esc(v.data||'');
+}
+async function corCarregar(){ corPassivo(); corHistorico(); }
+
+async function corPassivo(){
+  var box=$('#corPassivo'); if(!box) return;
+  var r; try{ r=await fetch('/api/correcao/passivo'); }catch(e){ box.textContent='não consegui carregar.'; return; }
+  if(r.status===403){ box.innerHTML='<span class="baixo">Você não tem a permissão da Mesa de correções.</span>'; return; }
+  var d={}; try{ d=await r.json(); }catch(e){}
+  /* SO OS DOIS CONTADORES QUE TEM BOTAO (decisao do dono, 02/10/2026).
+     Vencidos, futuras fechadas e fila velha chegam na fase 2 JUNTO com a acao
+     deles: contador que acusa e nao sabe liberar e a trava que a equipe
+     aprende a contornar, e numero que nao zera vira paisagem. */
+  var blocos=[
+    {k:'fantasmas', um:'volume fantasma', muitos:'volumes fantasmas', lista:'os volumes fantasmas',
+     ajuda:'duplicatas do PDF reenviado cobrando etiqueta de peça que já saiu',
+     linha:function(x){ return corFrase(x)+' <span class="sub">já era #'+x.ja_era+' de '+esc(x.ja_era_data||'')+' ('+esc(x.ja_era_estagio||'')+')</span>'; }},
+    {k:'canceladas', um:'cancelada depois da etiqueta', muitos:'canceladas depois da etiqueta',
+     lista:'as canceladas', ajuda:'o cliente cancelou com a baixa do estoque já feita — falta dizer se a persiana voltou',
+     linha:function(x){ return corFrase(x)+(x.pecas>1?' <span class="tag">📦 '+x.pecas+' persianas</span>':'')
+       +(x.cancelada_varias?' <span class="sub">(caixa de várias — só um item cancelado)</span>':''); }}
+  ];
+  var h='<div style="display:flex;gap:12px;flex-wrap:wrap">';
+  blocos.forEach(function(b){
+    var n=(d[b.k]||{}).n||0;
+    h+='<div style="border:1px solid var(--bd);border-radius:8px;padding:10px 14px;min-width:200px;'
+      +(n?'border-color:#d29922':'')+'">'
+      +'<div style="font-size:22px;font-weight:700">'+n+'</div>'
+      +'<div style="font-size:13px">'+corPl(n, b.um, b.muitos)+'</div>'
+      +'<div class="sub" style="font-size:11px;margin-top:2px">'+b.ajuda+'</div></div>';
+  });
+  h+='</div>';
+  blocos.forEach(function(b){
+    var it=(d[b.k]||{}).itens||[];
+    if(!it.length) return;
+    /* ⚠️ O SUMMARY NAO REPETE O TEXTO DO CONTADOR. Com "1 volume fantasma"
+       escrito duas vezes, a tela dizia a mesma coisa duas vezes — foi assim que
+       o dono leu "duas vendas" na caixa de varias persianas (§5, opcao B). O
+       numero fica em cima; aqui o convite e para ABRIR. */
+    h+='<details style="margin-top:12px"><summary style="cursor:pointer">ver '
+      +esc(b.lista)+'</summary>'
+      +'<div style="margin-top:8px">'+it.map(function(x){
+          return '<div style="padding:5px 0;border-bottom:1px solid var(--bd)">'
+            +'<a href="#" onclick="corAbrir(\'lote\','+x.id+');return false">'+b.linha(x)+'</a></div>'; }).join('')
+      +'</div></details>';
+  });
+  if(!blocos.some(function(b){ return ((d[b.k]||{}).n||0)>0; }))
+    h+='<div class="sub" style="margin-top:12px">Nada a corrigir agora. Os dois contadores acima são os que têm botão '
+      +'nesta fase; os outros chegam junto com a ação deles.</div>';
+  box.innerHTML=h;
+}
+
+async function corBuscar(){
+  var q=($('#corBusca').value||'').trim(), box=$('#corResultado');
+  $('#corBusca').value='';
+  if(!q){ box.innerHTML='<span class="sub">escreva ou bipe algo para buscar.</span>'; return; }
+  var r=await fetch('/api/correcao/buscar?q='+encodeURIComponent(q));
+  var d={}; try{ d=await r.json(); }catch(e){}
+  if(r.status!==200){ box.innerHTML='<span class="baixo">'+esc(d.erro||('falhou ('+r.status+')'))+'</span>'; return; }
+  var v=d.volumes||[];
+  if(!v.length){ box.innerHTML='<span class="sub">não achei volume com <b>'+esc(q)+'</b>. '
+    +'A busca olha número do volume, venda, pack, NF, nome do cliente e SKU (inclusive o segundo SKU de uma caixa de várias).</span>'; return; }
+  if(v.length===1){ box.innerHTML=''; corAbrir('lote', v[0].id); return; }
+  box.innerHTML='<div class="sub" style="margin-bottom:6px">'+v.length+' volume(s):</div>'+v.map(function(x){
+    return '<div style="padding:5px 0;border-bottom:1px solid var(--bd)">'
+      +'<a href="#" onclick="corAbrir(\'lote\','+x.id+');return false">'+corFrase(x)+'</a></div>'; }).join('');
+}
+
+async function corAbrir(tipo, id){
+  COR_PREVIA=null;
+  var box=$('#corObjeto');
+  var r=await fetch('/api/correcao/'+tipo+'/'+id);
+  var d={}; try{ d=await r.json(); }catch(e){}
+  if(r.status!==200){ box.innerHTML='<div class="card baixo">'+esc(d.erro||('falhou ('+r.status+')'))+'</div>'; return; }
+  COR_OBJ=d;
+  var v=d.volume||{};
+  var h='<div class="card"><h3 style="margin:0 0 8px">Volume #'+v.id+'</h3>'
+    +'<div class="sub" style="margin-bottom:10px">'
+    +[esc(v.codigo||'(sem SKU)'), v.buyer?esc(v.buyer):'', v.nf?'NF '+esc(v.nf):'',
+      v.venda?'venda '+esc(v.venda):'', v.packId?'pack '+esc(v.packId):'',
+      'estágio <b>'+esc(v.estagio||'')+'</b>', v.modalidade?esc(v.modalidade):'',
+      v.data?'entrou '+esc(v.data):'', v.despachar_em?'despacha '+esc(v.despachar_em):'',
+      v.cancelada_em?'cancelada em '+esc(v.cancelada_em):'',
+      v.bloqueio?'<span style="color:#d29922">retido: '+esc(v.bloqueio)+'</span>':''
+     ].filter(Boolean).join(' · ')+'</div>';
+  /* O QUE VAI DENTRO DA CAIXA. Uma linha de `qtd:2` e UMA linha e DUAS
+     persianas (§5, #23) — e e a soma que manda em tudo que depende de "quantas". */
+  var pc=d.pecas||[], tot=pc.reduce(function(s,l){ return s+l.qtd; },0);
+  if(tot>1 || pc.length>1)
+    h+='<div style="margin-bottom:10px"><span class="tag">📦 '+tot+' persianas</span> '
+      +pc.map(function(l){ return esc(l.codigo)+' ×'+l.qtd+(l.sob_medida?' <span class="sub">(sob medida — não baixa estoque)</span>':''); }).join(' · ')
+      +'</div>';
+  h+='<div style="display:flex;gap:10px;flex-wrap:wrap">';
+  (d.acoes||[]).forEach(function(a){
+    if(a.vale && a.opcoes && a.opcoes.length){
+      a.opcoes.forEach(function(o){
+        h+='<button class="btn" onclick="corPrevia(\''+a.id+'\',\''+o.id+'\')">'+esc(o.rotulo)+'</button>';
+      });
+    } else if(a.vale){
+      h+='<button class="btn" onclick="corPrevia(\''+a.id+'\',\'\')">'+esc(a.rotulo)+'</button>';
+    } else {
+      /* ACAO QUE NAO VALE APARECE, DESABILITADA, COM O MOTIVO ESCRITO (§5.5 da
+         spec). Sumir com o botao deixa quem procurava por ele sem resposta. */
+      h+='<button class="btn" disabled title="'+esc(a.por_que_nao||'')+'" style="opacity:.45;cursor:not-allowed">'
+        +esc(a.rotulo)+'</button>';
+    }
+  });
+  h+='</div>';
+  (d.acoes||[]).forEach(function(a){
+    if(!a.vale && a.por_que_nao)
+      h+='<div class="sub" style="margin-top:8px"><b>'+esc(a.rotulo)+'</b> não vale aqui: '+esc(a.por_que_nao)+'</div>';
+    if(a.vale && a.nota_voltou)
+      h+='<div class="sub" style="margin-top:8px;color:#d29922">⚠ '+esc(a.nota_voltou)+'</div>';
+  });
+  h+='<div id="corPainel" style="margin-top:14px"></div>';
+  if((d.historia||[]).length)
+    h+='<div class="sub" style="margin-top:14px">Já passou por aqui: '+d.historia.map(function(c){
+      return '#'+c.id+' '+esc(c.acao)+' ('+esc(c.usuario_nome||'')+', '+esc(c.criado_em||'')+')'
+        +(c.desfeita_em?' — desfeita':''); }).join(' · ')+'</div>';
+  h+='</div>';
+  box.innerHTML=h;
+}
+
+async function corPrevia(acao, opcao){
+  if(!COR_OBJ) return;
+  var params=(opcao==='voltou')?{voltou:true}:(opcao==='registrar'?{voltou:false}:null);
+  var r=await fetch('/api/correcao/previa',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({acao:acao,tipo:COR_OBJ.tipo,id:COR_OBJ.id,params:params})});
+  var d={}; try{ d=await r.json(); }catch(e){}
+  var box=$('#corPainel');
+  if(r.status!==200){ box.innerHTML='<span class="baixo">'+esc(d.erro||('falhou ('+r.status+')'))+'</span>'; return; }
+  COR_PREVIA={acao:acao, params:params};
+  var est=d.estoque||[];
+  box.innerHTML='<div style="border:1px solid #d29922;border-radius:8px;padding:12px">'
+    +'<div style="font-weight:600;margin-bottom:6px">O que vai acontecer</div>'
+    +'<div style="margin-bottom:8px">'+esc(d.resumo||'')+'</div>'
+    +(est.length
+      ? '<div style="margin-bottom:8px">Estoque: '+est.map(function(l){
+          return '<b>'+esc(l.codigo)+' '+(l.delta>0?'+':'')+l.delta+'</b>'; }).join(' · ')+'</div>'
+      : '<div class="sub" style="margin-bottom:8px">Não mexe em estoque.</div>')
+    +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+    +'<input id="corMotivo" placeholder="por que você está corrigindo isto? (obrigatório)" style="flex:1;min-width:260px">'
+    +'<button class="btn" onclick="corExecutar()">Confirmar</button>'
+    +'<button class="btn" onclick="$(\'#corPainel\').innerHTML=\'\'">Cancelar</button>'
+    +'</div><div class="baixo" id="corErr"></div></div>';
+  var m=$('#corMotivo'); if(m) m.focus();
+}
+
+async function corExecutar(){
+  if(!COR_OBJ || !COR_PREVIA) return;
+  var motivo=(($('#corMotivo')||{}).value||'').trim();
+  if(!motivo){ $('#corErr').textContent='escreva o motivo — ele é o único rastro de por quê.'; return; }
+  var r=await fetch('/api/correcao/executar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({acao:COR_PREVIA.acao,tipo:COR_OBJ.tipo,id:COR_OBJ.id,params:COR_PREVIA.params,motivo:motivo})});
+  var d={}; try{ d=await r.json(); }catch(e){}
+  if(r.status!==200){ $('#corErr').textContent=d.erro||('falhou ('+r.status+')'); return; }
+  /* ⚠️ O RESUMO DA PREVIA ESTA NO PRESENTE ("apaga o volume"), e repeti-lo
+     aqui faria a tela dizer, DEPOIS do efeito, o que ela ia fazer. Escrever o
+     que JA aconteceu e a mesma licao do "23,1 mm em vez de 23,1 mm" (§4): a
+     frase estava perfeita e so o render mostrou que ela mentia no tempo. */
+  var fez=(d.estoque||[]).length
+    ? 'O estoque andou: '+d.estoque.map(function(l){ return esc(l.codigo)+' '+(l.delta>0?'+':'')+l.delta; }).join(' · ')
+      +' — com movimento no livro, referenciado nesta correção.'
+    : 'Nada mexeu em estoque.';
+  $('#corObjeto').innerHTML='<div class="card"><div style="color:#3fb950;font-weight:600">Corrigido ✓</div>'
+    +'<div class="sub" style="margin-top:6px">'+fez+'</div>'
+    +'<div class="sub" style="margin-top:6px">Correção #'+d.correcao_id+'. Dá para desfazer na lista abaixo, '
+    +'enquanto o volume não andar.</div></div>';
+  COR_OBJ=null; COR_PREVIA=null;
+  corCarregar();
+}
+
+async function corDesfazer(id){
+  if(!confirm('Desfazer a correção #'+id+'?')) return;
+  var r=await fetch('/api/correcao/'+id+'/desfazer',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+  var d={}; try{ d=await r.json(); }catch(e){}
+  if(r.status!==200){ alert(d.erro||('falhou ('+r.status+')')); return; }
+  corCarregar();
+}
+
+async function corHistorico(){
+  var box=$('#corHist'); if(!box) return;
+  var r; try{ r=await fetch('/api/correcao/historico'); }catch(e){ return; }
+  if(r.status!==200){ box.textContent='—'; return; }
+  var it=((await r.json()).itens)||[];
+  if(!it.length){ box.innerHTML='<span class="sub">nenhuma correção ainda.</span>'; return; }
+  box.innerHTML=it.map(function(c){
+    var est=(c.estoque||[]).map(function(l){ return esc(l.codigo)+' '+(l.delta>0?'+':'')+l.delta; }).join(', ');
+    return '<div style="padding:7px 0;border-bottom:1px solid var(--bd);display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">'
+      +'<span style="min-width:46px" class="sub">#'+c.id+'</span>'
+      +'<span><b>'+esc(c.rotulo||c.acao)+'</b> · '+esc(c.alvo_tipo)+' #'+c.alvo_id
+      +(est?' · <span style="color:#d29922">'+est+'</span>':'')+'</span>'
+      +'<span class="sub">'+esc(c.usuario_nome||'')+' · '+esc(c.criado_em||'')+'</span>'
+      +'<span style="flex:1">'+esc(c.motivo||'')+'</span>'
+      +(c.desfeita_em
+        ? '<span class="sub">desfeita por '+esc(c.desfeita_por||'')+' em '+esc(c.desfeita_em)+'</span>'
+        : '<button class="btn" onclick="corDesfazer('+c.id+')">desfazer</button>')
+      +'</div>';
+  }).join('');
 }
 
 /*AUTO_ADMIN*/ setInterval(function(){ var a=document.activeElement; if(a && a.tagName==='INPUT') return; carregar(); },4000);

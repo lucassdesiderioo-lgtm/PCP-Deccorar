@@ -145,15 +145,23 @@ function marcar(db, lista, opts){
 }
 
 /* O CARD (D3): o que ja tinha baixado do estoque, ou esta na fabrica, e a caixa
-   de varias persianas com um item cancelado. So mostra — decidir e da Mesa de
-   correcoes, que ainda nao existe. */
+   de varias persianas com um item cancelado.
+   DESDE 02/10/2026 ELE ESVAZIA: a Mesa de correcoes (fase 1) decide cada caixa,
+   e o volume decidido sai daqui. Ate aqui o card so MOSTRAVA, e por isso nunca
+   zerava — numero que nao zera vira paisagem, e aí ninguem o le no dia em que
+   ele significa alguma coisa. Quem escreve a marca e o `correcoes.js`.
+   ⚠️ A clausula entra so quando a coluna existe: um banco que nao passou pelo
+   boot do `exp_route` (um script, um teste) nao pode perder a lista inteira por
+   causa de uma coluna que ninguem criou ainda. */
 function listar(db){
   if(!pronto(db)) return [];
+  const decidida = colunas(db).indexOf('cancelada_resolvida_em') >= 0
+    ? 'AND cancelada_resolvida_em IS NULL' : '';
   return db.prepare(`SELECT id, codigo, buyer, nf, venda, packId, modalidade, despachar_em, embalado_em,
       estagio, cancelada_estagio, cancelada_em, cancelada_motivo, cancelada_varias, cancelada_aviso_em,
       (SELECT SUM(qtd) FROM lote_item i WHERE i.lote_id=lote.id) pecas
     FROM lote
-    WHERE COALESCE(teste,0)=0 AND (
+    WHERE COALESCE(teste,0)=0 ${decidida} AND (
       (estagio='${ESTAGIO}' AND cancelada_estagio IN ('embalado','carregado'))
       OR (cancelada_varias=1 AND estagio<>'carregado'))
     ORDER BY COALESCE(cancelada_em, cancelada_aviso_em) DESC, id DESC`).all();

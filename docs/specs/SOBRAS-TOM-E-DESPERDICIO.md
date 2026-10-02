@@ -5,7 +5,9 @@ STATUS
 Situação: em construção
 Criada em: 18/09/2026
 Última atualização: 21/09/2026
-Fase atual: 2 (mensagem do plano) — feita e testada; falta subir
+Fase atual: 2 (mensagem do plano) — NO AR desde o PR #105 (21/09/2026)
+  · esta linha dizia "falta subir" ate 02/10/2026, e era papel mentindo:
+    o codigo estava no `main` e o dono ja tinha puxado varias vezes
 Fases: 1 ☑  2 ☑  3 ☐  4 ☐
 Risco: 🔴 (dados de sobra e baixa no Confirmar do plano)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer

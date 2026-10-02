@@ -128,6 +128,11 @@ require('./cont_route')(app, db);
 require('./inventario_route')(app, db);
 app.get('/inventario',(req,res)=> res.sendFile(path.join(__dirname,'public','inventario.html')));
 require('./etq_route')(app, db);
+/* A MESA DE CORRECOES (fase 1, 02/10/2026). Depois do `exp_route`, que e o dono
+   da tabela `lote` e cria as colunas da decisao da cancelada — carregada antes,
+   a Mesa leria uma coluna que ainda nao existe (§17, a licao do ALTER de
+   `contagem_pendente` guardado no modulo errado). */
+require('./correcao_route')(app, db);
 require('./dev_route')(app, db);
 app.get('/devolucao',(req,res)=> res.sendFile(path.join(__dirname,'public','devolucao.html')));
 require('./cad_route')(app, db);

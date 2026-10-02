@@ -150,6 +150,16 @@ module.exports = [
   { chave:'estoque.aprovar_ajuste', grupo:'Estoque',  nivel:'admin',
     rotulo:'Aprovar ajuste de estoque', desc:'Aprovar ou recusar o ajuste pedido por outra pessoa (nunca o próprio)',
     sensivel:true },
+  /* A MESA DE CORRECOES (fase 1, 02/10/2026). Uma chave para a mesa inteira, e
+     nao uma por acao: todas respondem a mesma pergunta — "esta pessoa corrige
+     passivo da operacao?" — e uma por acao seria caixinha a mais para marcar
+     sem nada mudar de quem pode o que. `sensivel` porque a cancelada que voltou
+     mexe em saldo sem venda na frente, e o motivo e o unico rastro de por que.
+     NAO HA BACKFILL: o Admin Geral recebe toda chave por nivel (§10), entao ela
+     chega ao dono no primeiro boot — a mesma decisao do `kit.imprimir` (§4). */
+  { chave:'correcao.executar',    grupo:'Estoque',    nivel:'admin',
+    rotulo:'Mesa de correções',   desc:'Corrigir passivo da operação item por item — descartar volume fantasma e decidir a venda cancelada depois da etiqueta, com motivo e desfazer',
+    sensivel:true },
   { chave:'alvo.editar',          grupo:'Estoque',    nivel:'admin',
     rotulo:'Definir alvo',        desc:'Travar o alvo de um SKU' },
 
