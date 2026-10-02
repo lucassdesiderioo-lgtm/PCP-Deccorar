@@ -2321,6 +2321,8 @@ esvaziando (3), a régua copiada de volta no script (1), a prévia **gravando**
 exige o módulo novo na varredura dele, e foi ele que cobrou. E mexeu no saldo?
 **`node teste_livro.js` (60)**, que é quem trava `SUM(delta) = skus.estoque`.
 
+> ✅ **NO AR** (PR #174), confirmado pelo dono em 02/10/2026.
+>
 > ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA, e deploy não é conferência.** A
 > rodada foi num navegador meu, a 1440 px (o admin se abre só no computador —
 > §12, 29/09/2026), com banco semeado: o fantasma descartado e desfeito, a
@@ -3411,6 +3413,8 @@ Etiqueta feita por Ana Paula — o mesmo login que está nesta tela.
 um: sem a trava (reprova 13), vazio igual a vazio (1) e o bipe aceito sem o nome
 de quem imprimiu (3). E há caso travando que a rota de liberação **não existe**.
 
+> ✅ **NO AR** (PR #164), confirmado pelo dono em 02/10/2026.
+>
 > ⚠️ **AINDA NÃO FOI CONFERIDO NA FÁBRICA.** A rodada foi num navegador meu, a
 > 1440, 1024 e 400 px. A prova é o primeiro dia de expedição com a regra: a
 > caixa recusada para quem imprimiu e conferida por outra pessoa.

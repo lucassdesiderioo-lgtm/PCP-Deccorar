@@ -1,13 +1,13 @@
-> **STATUS · 01/10/2026 — EM CONSTRUÇÃO** · **fase 1 em código (01/10):** o bipe da área e do
+> **STATUS · 02/10/2026 — EM CONSTRUÇÃO** · **fase 1 no ar (PR #164):** o bipe da área e do
 > canto recusa quem imprimiu, com o nome dele, **sem liberação nenhuma** — o dono mudou a
 > P1 em 01/10/2026: *"tem que ter esse cruzamento, não tem que ter liberações"*. A
 > liberação por pessoa e dia chegou a ser construída e saiu antes do deploy;
-> `teste_segunda_pessoa.js` (24 casos). Falta o deploy e o
-> primeiro dia real. P6 respondida: as etiquetas de fora são **as do saco**. Fase 2 planejada. Nasceu da conversa de 01/10/2026 (tipo `REGRA` + `NOVIDADE`).
+> `teste_segunda_pessoa.js` (24 casos). No ar, confirmado pelo dono em 02/10/2026;
+> falta o primeiro dia real de expedição com a regra. P6 respondida: as etiquetas de fora são **as do saco**. Fase 2 planejada. Nasceu da conversa de 01/10/2026 (tipo `REGRA` + `NOVIDADE`).
 > **Muda uma decisão de 25/09/2026:** a decisão 2 da `SAIDA-E-DUPLA-CONFERENCIA`
 > ("sem segunda pessoa só MARCA, nunca trava"). Quando aprovada, a mudança vai para
 > o `CLAUDE.md` §8-B e para uma linha em `docs/DECISOES.md`, no mesmo commit do código.
-> Fases: 1 ☑ (em código) · 2 ☐
+> Fases: 1 ☑ (no ar) · 2 ☐
 
 ---
 
