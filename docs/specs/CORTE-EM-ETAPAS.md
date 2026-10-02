@@ -2,10 +2,10 @@
 
 ```
 STATUS
-Situação: código completo (7 fases) — falta o deploy e as provas na fábrica
+Situação: no ar desde 01/10/2026 (PR #165, o dono: "ficou certo") — faltam as provas na fábrica
 Criada em: 01/10/2026
-Última atualização: 01/10/2026
-Fase atual: nenhuma — as sete em código; a spec vai para docs/arquivo/ depois do deploy conferido — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
+Última atualização: 02/10/2026
+Fase atual: nenhuma — as sete no ar; a spec vai para docs/arquivo/ depois das quatro provas na fábrica (corte inteiro pelas etapas, correção do corte de 01/10, foto no iPad, S-000091) — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
 Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☑
 Risco: 🔴 (muda o momento da baixa de rolo e sobra; correção de estoque depois do corte)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
