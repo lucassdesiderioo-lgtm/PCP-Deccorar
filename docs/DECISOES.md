@@ -175,13 +175,15 @@ sobra como usada e baixado o rolo a menos.
   continuam valendo dela o tom pela origem, a mensagem certa, o desperdício visível e a
   escolha pelo menor refugo.
 
-## 01/10/2026 — na correção de corte, quem pediu não aprova (A CONFIRMAR PELO DONO)
+## 01/10/2026 — na correção de corte, quem pediu não aprova (CONFIRMADA PELO DONO EM 02/10/2026)
 Decisão técnica tomada na construção da fase 3 da `CORTE-EM-ETAPAS`, que a spec deixou
 em aberto ("o operador pede e a gestão aprova"). Aplicada a regra da casa para mexer em
 saldo sem venda na frente (o ajuste em duas pessoas da `ESTOQUE-LIVRO-E-CONFERENCIA`):
 quem pediu a correção não a aprova, nem o diretor. Custo: se o dono pedir a correção ele
 mesmo, outra pessoa com `corte.aprovar_correcao` precisa aprovar. Se o dono preferir que
 a gestão possa aprovar o próprio pedido, é uma linha em `tecido/dominio/corte.js`.
+**Confirmada pelo dono em 02/10/2026:** *"concordo, quem pediu não aprova"*. A regra fica
+como foi construída.
 
 ## 02/10/2026 — a Mesa de correções, e as três decisões que mudaram o caminho
 

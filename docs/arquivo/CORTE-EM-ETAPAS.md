@@ -5,7 +5,7 @@ STATUS
 Situação: arquivada — implementada, no ar desde 01/10/2026 (PR #165) e conferida na fábrica nas quatro provas em 02/10/2026
 Criada em: 01/10/2026
 Última atualização: 02/10/2026
-Fase atual: nenhuma — as sete no ar e as quatro provas feitas em 02/10 (☑ corte inteiro pelas etapas, "baixou certo" · ☑ correção do corte de 01/10, "deu certo" · ☑ foto no iPad, "deu certo" · ☑ S-000091 no plano, "deu certo"). As regras estão no CLAUDE.md §19 e no tecido/README.md. Fica aberto: a confirmação do dono de que "quem pediu a correção não aprova" (DECISOES.md). Arquivo histórico — não use como fonte de regra (docs/specs/README.md)
+Fase atual: nenhuma — as sete no ar e as quatro provas feitas em 02/10 (☑ corte inteiro pelas etapas, "baixou certo" · ☑ correção do corte de 01/10, "deu certo" · ☑ foto no iPad, "deu certo" · ☑ S-000091 no plano, "deu certo"). As regras estão no CLAUDE.md §19 e no tecido/README.md. Confirmada pelo dono em 02/10: "quem pediu a correção não aprova" (DECISOES.md). Arquivo histórico — não use como fonte de regra (docs/specs/README.md)
 Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☑
 Risco: 🔴 (muda o momento da baixa de rolo e sobra; correção de estoque depois do corte)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
@@ -49,7 +49,7 @@ Mudanças no caminho:
       - a sobra guardada que não nasceu vira `anulada` (não é descarte nem
         refugo); a devolvida volta ao mesmo nível;
       - quem pediu a correção não a aprova — regra da casa aplicada por
-        analogia, registrada em DECISOES.md para o dono confirmar;
+        analogia, registrada em DECISOES.md e confirmada pelo dono em 02/10;
       - o "não usar" do planejar (antes de confirmar) continua: a spec o
         move para o ③, e no ③ ele existe agora; no ① ele não faz mal e
         poupa um corte confirmado só para recusar uma sobra.

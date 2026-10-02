@@ -72,8 +72,8 @@ peças que saem adiantadas, no quadro do Carregamento. As regras estão no
 fases no ar desde 01/10 (PR #165) e as quatro provas de fábrica feitas em 02/10
 (corte inteiro pelas etapas, correção do corte de 01/10, sobra lida pela foto no
 iPad e o caso da S-000091 no plano). As regras estão no `CLAUDE.md` §19 e no
-`tecido/README.md`. Fica aberta a confirmação do dono de que quem pede a
-correção não a aprova (`docs/DECISOES.md`).
+`tecido/README.md`. O dono confirmou em 02/10 que quem pede a correção não a
+aprova (`docs/DECISOES.md`).
 
 **Implementada e arquivada em 02/10/2026:** `NAVEGACAO-E-LINGUAGEM.md` — o
 "Trocar setor" e o atalho entre as duas operações nas duas barras, o destino com
