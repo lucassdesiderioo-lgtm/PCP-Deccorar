@@ -280,7 +280,14 @@ function podeTerIdo(db){
     .map(v => Object.assign(v, { coleta: ehColeta(v) }));
 }
 
-module.exports = { PRA_CARREGAR, DO_DIA, ORDEM_CARGA, atrasado, futuro,
+/* A CAIXA DE VARIAS PERSIANAS — a regua de um lugar so (spec
+   CARREGAMENTO-SEGUNDA-PESSOA, fase 2, 02/10/2026). Era o `VARIAS` do
+   exp_route.js; o bipe do Carregamento passou a fazer a mesma pergunta, e duas
+   copias divergem no dia em que uma mudar. Conta PERSIANA (SUM(qtd) > 1),
+   nunca linha: uma linha de `qtd:2` e uma linha e duas persianas (§5, #23). */
+const VARIAS = alias => `(SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=${alias}.id) > 1`;
+
+module.exports = { VARIAS, PRA_CARREGAR, DO_DIA, ORDEM_CARGA, atrasado, futuro,
                    COLETA, AGENCIA, ehColeta, AGUARDA_CAMINHAO,
                    SAIDA, saidasAdiantadas, pilhaDaArea, nomeIgual, mesmaPessoa,
                    acharVolumes, NA_SAIDA, naSaida, PODE_TER_IDO, podeTerIdo, PRONTA_PRO_CARRO };

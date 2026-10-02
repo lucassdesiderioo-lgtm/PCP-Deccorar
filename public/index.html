@@ -66,6 +66,8 @@
   .mltask.late{background:#3a1513;color:#ffb0a8}.mltask.late a{background:#f85149;color:#fff}
   .mltask.warn{background:#2a2410;color:#ffd85c}.mltask.warn a{background:#ffb800;color:#1a1300}
   .mltask.ok{background:#10241a;color:#8ce0ad}.mltask.ok a{background:transparent;color:#8ce0ad;border:1px solid #1f6f37}
+/* Os links da Mesa: o azul padrao do navegador some no fundo escuro do admin. */
+a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:underline}
 </style></head><body>
 <header><div class="mark">E</div><div><h1>Admin — Produção &amp; Estoque</h1><div class="sub">Lance o dia · corrija o estoque · cadastre SKUs</div></div>
 <a class="link" href="/painel">Painel</a></header>
@@ -344,8 +346,8 @@
   <div class="card">
     <h3 style="margin:0 0 4px">Mesa de correções</h3>
     <div class="sub" style="margin-bottom:12px">Corrige o passivo da operação item por item: a prévia
-      mostra o que vai mudar antes de gravar, o motivo é obrigatório, e dá para desfazer enquanto o
-      volume não andou.</div>
+      mostra o que vai mudar antes de gravar, o motivo é obrigatório, e dá para desfazer enquanto
+      nada andar depois da correção.</div>
     <div id="corPassivo" class="sub">carregando…</div>
   </div>
   <div class="card">
@@ -1708,6 +1710,24 @@ async function estAplicarAlvo(){
   await carregarEst();
 }
 
+function estAcuracidade(r){
+  const a=r.acuracidade||{};
+  const dif=r.diferenca_mes||[];
+  const ver=estVerCusto();
+  let d=a.contados?(a.certos+' de '+a.contados+' bateram na 1ª contagem'):'nenhuma contagem neste mês';
+  let d2='';
+  if(dif.length){
+    d2=dif.slice(0,3).map(function(x){ return esc(x.motivo)+' '+x.pecas+' pç'
+      +(ver&&x.valor!=null?' ('+estRS(x.valor,0)+')':''); }).join(' · ');
+    /* Sem nenhum SKU com custo o total seria "≥ R$ 0", que se lê como "não
+       custou nada" — só aparece quando há valor de verdade (regra 4). */
+    if(ver && r.diferenca_valor>0) d2='diferença '+(r.diferenca_sem_custo?'≥ ':'')+estRS(r.diferenca_valor,0)+': '+d2;
+    else d2='diferença: '+d2;
+  }
+  return '<div class="sumbox big"><div class="n">'+(a.pct==null?'—':(String(a.pct).replace('.',',')+'%'))+'</div>'
+    +'<div class="l">Acuracidade do mês</div><div class="d">'+d+'</div>'
+    +(d2?'<div class="d">'+d2+'</div>':'')+'</div>';
+}
 function renderEst(){
   if(!PAINEL || !PAINEL.resumo) return;
   const r=PAINEL.resumo;
@@ -1721,7 +1741,15 @@ function renderEst(){
   }
   $('#estResumo').innerHTML=
      '<div class="sumbox big"><div class="n">'+r.pecas_estoque+'</div><div class="l">Peças em estoque</div>'
-       +'<div class="d">'+r.skus+' SKUs cadastrados</div></div>'
+       +'<div class="d">'+r.skus+' SKUs cadastrados</div>'
+       /* RESERVADO (fase 4, §4 da spec): peças vendidas que ainda não têm
+          etiqueta. Só leitura — não entra em conta nenhuma (armadilha #12). */
+       +(r.pecas_reservadas?'<div class="d">'+r.pecas_reservadas+' '+(r.pecas_reservadas===1?'vendida':'vendidas')
+         +' ainda sem etiqueta</div>':'')+'</div>'
+    /* A ACURACIDADE DO MÊS (fase 4, §8): quantos itens contados bateram na 1ª
+       contagem. Sem contagem no mês é traço, nunca "0%" — zero seria uma
+       afirmação, e falsa. A diferença em R$ só vem para quem tem custo.ver. */
+    +estAcuracidade(r)
     /* O DINHEIRO. Com um SKU sem custo o total deixa de ser o valor do estoque
        e passa a ser um PISO — daí o "≥" e o aviso em âmbar. Custo indefinido
        nunca vira zero (regra 4 do §7-B): zero faria o estoque parecer mais
@@ -1803,7 +1831,16 @@ function renderEst(){
            fecha, e a cor tem que ser outra — o âmbar de "abaixo do alvo" se lê
            como rotina. */
         ? '<b style="font-size:17px;color:#da3633" title="Saiu mais do que entrou. Confira a prateleira e veja o extrato — o saldo negativo é sinal de peça que saiu sem registro.">'+l.estoque+'</b>'
-        : '<b style="font-size:17px" class="'+(l.precisa>0?'baixo':'ok')+'">'+l.estoque+'</b>')+ujTxt+ct+'</td>'
+        : '<b style="font-size:17px" class="'+(l.precisa>0?'baixo':'ok')+'">'+l.estoque+'</b>')
+        /* físico − reservado = disponível, só quando há venda sem etiqueta. */
+        +(l.reservado?'<div class="estq" style="white-space:nowrap" title="Peças vendidas que ainda não têm etiqueta: '
+          +'estão prometidas da prateleira. Só leitura — a conta do que produzir continua a da tela azul.">'
+          /* "sem etiqueta", e não "vendida": a coluna ao lado se chama
+             "Vendido a despachar" (o comprometido da planilha), e as duas
+             palavras iguais se leriam como o mesmo número. */
+          +l.reservado+' sem etiqueta · <span'+(l.disponivel<0?' style="color:#da3633"':'')+'>'
+          +l.disponivel+' livre'+(Math.abs(l.disponivel)===1?'':'s')+'</span></div>':'')
+        +ujTxt+ct+'</td>'
       /* Sem peça na prateleira não há valor a mostrar: "R$ 0,00" se lê como
          "não vale nada", que é outra afirmação. O custo unitário fica, porque
          esse continua verdadeiro e é o que interessa quando a peça voltar. */
@@ -3392,10 +3429,10 @@ async function corPassivo(){
   var r; try{ r=await fetch('/api/correcao/passivo'); }catch(e){ box.textContent='não consegui carregar.'; return; }
   if(r.status===403){ box.innerHTML='<span class="baixo">Você não tem a permissão da Mesa de correções.</span>'; return; }
   var d={}; try{ d=await r.json(); }catch(e){}
-  /* SO OS DOIS CONTADORES QUE TEM BOTAO (decisao do dono, 02/10/2026).
-     Vencidos, futuras fechadas e fila velha chegam na fase 2 JUNTO com a acao
-     deles: contador que acusa e nao sabe liberar e a trava que a equipe
-     aprende a contornar, e numero que nao zera vira paisagem. */
+  /* CADA CONTADOR TEM O BOTAO QUE O ZERA (decisao do dono, 02/10/2026). Na
+     fase 1 eram dois; vencidos, futuras fechadas e fila velha chegaram na fase
+     2 JUNTO com a acao deles: contador que acusa e nao sabe liberar e a trava
+     que a equipe aprende a contornar, e numero que nao zera vira paisagem. */
   var blocos=[
     {k:'fantasmas', um:'volume fantasma', muitos:'volumes fantasmas', lista:'os volumes fantasmas',
      ajuda:'duplicatas do PDF reenviado cobrando etiqueta de peça que já saiu',
@@ -3403,7 +3440,20 @@ async function corPassivo(){
     {k:'canceladas', um:'cancelada depois da etiqueta', muitos:'canceladas depois da etiqueta',
      lista:'as canceladas', ajuda:'o cliente cancelou com a baixa do estoque já feita — falta dizer se a persiana voltou',
      linha:function(x){ return corFrase(x)+(x.pecas>1?' <span class="tag">📦 '+x.pecas+' persianas</span>':'')
-       +(x.cancelada_varias?' <span class="sub">(caixa de várias — só um item cancelado)</span>':''); }}
+       +(x.cancelada_varias?' <span class="sub">(caixa de várias — só um item cancelado)</span>':''); }},
+    {k:'vencidos', um:'pendente vencido', muitos:'pendentes vencidos', lista:'os vencidos',
+     ajuda:'despacho já passou e a etiqueta nunca saiu — ou saiu por fora, ou é venda atrasada',
+     extra:'<div style="margin:8px 0"><button class="btn" onclick="corVencidos()">Fechar vencidos em bloco…</button> '
+       +'<span class="sub">ou abra um volume para dar saída só nele</span></div>',
+     linha:function(x){ return corFrase(x)+(x.despachar_em?' <span class="sub">despachava '+esc(x.despachar_em)+'</span>'
+       :' <span class="sub">sem despacho lido</span>'); }},
+    {k:'futuras', um:'venda futura fechada', muitos:'vendas futuras fechadas', lista:'as futuras fechadas',
+     ajuda:'fechadas com uma data de saída que ainda não chegou — somem do Carregamento no dia certo',
+     linha:function(x){ return corFrase(x)+' <span class="sub">saída em '+esc(String(x.carregado_em||'').slice(0,10))+'</span>'; }},
+    {k:'fila', tipo:'fila', um:'linha velha na fila', muitos:'linhas velhas na fila', lista:'a fila velha',
+     ajuda:'revisadas há mais de 30 dias e nunca embaladas — quase sempre sem peça atrás',
+     linha:function(x){ return '#'+x.id+' · '+esc(x.codigo||'')+' · revisada '+esc(String(x.revisado_em||x.data||'').slice(0,10))
+       +(x.modo==='devolucao'?' <span class="sub">(devolução)</span>':''); }}
   ];
   var h='<div style="display:flex;gap:12px;flex-wrap:wrap">';
   blocos.forEach(function(b){
@@ -3423,15 +3473,14 @@ async function corPassivo(){
        o dono leu "duas vendas" na caixa de varias persianas (§5, opcao B). O
        numero fica em cima; aqui o convite e para ABRIR. */
     h+='<details style="margin-top:12px"><summary style="cursor:pointer">ver '
-      +esc(b.lista)+'</summary>'
+      +esc(b.lista)+'</summary>'+(b.extra||'')
       +'<div style="margin-top:8px">'+it.map(function(x){
           return '<div style="padding:5px 0;border-bottom:1px solid var(--bd)">'
-            +'<a href="#" onclick="corAbrir(\'lote\','+x.id+');return false">'+b.linha(x)+'</a></div>'; }).join('')
+            +'<a href="#" class="corLink" onclick="corAbrir(\''+(b.tipo||'lote')+'\','+x.id+');return false">'+b.linha(x)+'</a></div>'; }).join('')
       +'</div></details>';
   });
   if(!blocos.some(function(b){ return ((d[b.k]||{}).n||0)>0; }))
-    h+='<div class="sub" style="margin-top:12px">Nada a corrigir agora. Os dois contadores acima são os que têm botão '
-      +'nesta fase; os outros chegam junto com a ação deles.</div>';
+    h+='<div class="sub" style="margin-top:12px">Nada a corrigir agora.</div>';
   box.innerHTML=h;
 }
 
@@ -3442,24 +3491,103 @@ async function corBuscar(){
   var r=await fetch('/api/correcao/buscar?q='+encodeURIComponent(q));
   var d={}; try{ d=await r.json(); }catch(e){}
   if(r.status!==200){ box.innerHTML='<span class="baixo">'+esc(d.erro||('falhou ('+r.status+')'))+'</span>'; return; }
-  var v=d.volumes||[];
-  if(!v.length){ box.innerHTML='<span class="sub">não achei volume com <b>'+esc(q)+'</b>. '
+  var v=d.volumes||[], sk=d.skus||[], fl=d.fila||[];
+  if(!v.length && !sk.length && !fl.length){ box.innerHTML='<span class="sub">não achei nada com <b>'+esc(q)+'</b>. '
     +'A busca olha número do volume, venda, pack, NF, nome do cliente e SKU (inclusive o segundo SKU de uma caixa de várias).</span>'; return; }
-  if(v.length===1){ box.innerHTML=''; corAbrir('lote', v[0].id); return; }
-  box.innerHTML='<div class="sub" style="margin-bottom:6px">'+v.length+' volume(s):</div>'+v.map(function(x){
-    return '<div style="padding:5px 0;border-bottom:1px solid var(--bd)">'
-      +'<a href="#" onclick="corAbrir(\'lote\','+x.id+');return false">'+corFrase(x)+'</a></div>'; }).join('');
+  if(v.length===1 && !sk.length && !fl.length){ box.innerHTML=''; corAbrir('lote', v[0].id); return; }
+  if(!v.length && sk.length===1 && !fl.length){ box.innerHTML=''; corAbrir('sku', sk[0].codigo); return; }
+  var lin=function(tipo,id,txt){ return '<div style="padding:5px 0;border-bottom:1px solid var(--bd)">'
+    +'<a href="#" class="corLink" onclick="corAbrir(\''+tipo+'\',\''+esc(String(id))+'\');return false">'+txt+'</a></div>'; };
+  var h='';
+  if(sk.length) h+='<div class="sub" style="margin:6px 0">'+sk.length+' '+corPl(sk.length,'SKU','SKUs')+':</div>'
+    +sk.map(function(x){ return lin('sku',x.codigo,'<b>'+esc(x.codigo)+'</b> · '+esc(x.descricao||'')+' · saldo '+x.estoque); }).join('');
+  if(fl.length) h+='<div class="sub" style="margin:10px 0 6px">'+fl.length+' '+corPl(fl.length,'linha','linhas')
+    +' na fila de embalagem:</div>'
+    +fl.map(function(x){ return lin('fila',x.id,'#'+x.id+' · '+esc(x.codigo)+' · revisada '+esc(String(x.revisado_em||x.data||'').slice(0,10))
+      +(x.modo==='devolucao'?' (devolução)':'')); }).join('');
+  if(v.length) h+='<div class="sub" style="margin:10px 0 6px">'+v.length+' '+corPl(v.length,'volume','volumes')+':</div>'
+    +v.map(function(x){ return lin('lote',x.id,corFrase(x)); }).join('');
+  box.innerHTML=h;
+}
+
+/* FECHAR VENCIDOS: a acao e do BLOCO, e nao de um volume. A data de corte e
+   obrigatoria e nasce VAZIA de proposito — pre-preenchida, ela seria clicada
+   sem conferir o Mercado Livre, que e justamente o que ela existe para cobrar. */
+function corVencidos(){
+  COR_PREVIA=null;
+  COR_OBJ={tipo:'bloco', id:0, acoes:[]};
+  $('#corObjeto').innerHTML='<div class="card"><h3 style="margin:0 0 8px">Fechar vencidos em bloco</h3>'
+    +'<div class="sub" style="margin-bottom:10px">Fecha os volumes pendentes com despacho até a data escolhida, cada um '
+    +'na data de despacho dele. <b>Só use depois de conferir no Mercado Livre que não há venda pendente nesse período</b>: '
+    +'uma venda atrasada de verdade sumiria da fila junto. Bloqueados e vendas futuras ficam de fora.</div>'
+    +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+    +'<span>Fechar até</span><input id="corAte" type="date" style="width:auto">'
+    +'<button class="btn" onclick="corPrevia(\'vencidos\',\'\')">Ver o que fecha</button></div>'
+    +'<div id="corPainel" style="margin-top:14px"></div></div>';
+}
+
+/* O PEDIDO DE AJUSTE NAO PASSA PELA MESA: vai pela porta do ajuste em duas
+   pessoas (§18, fase 3), e outra pessoa aprova na aba Estoque. */
+async function corAjusteForm(cod, saldo){
+  var motivos=[]; try{ motivos=await (await fetch('/api/listas/ajuste_estoque')).json(); }catch(e){}
+  $('#corPainel').innerHTML='<div style="border:1px solid #d29922;border-radius:8px;padding:12px">'
+    +'<div style="font-weight:600;margin-bottom:6px">Pedir ajuste de '+esc(cod)+' — saldo agora '+saldo+'</div>'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+    +'<input type="number" step="1" id="corAjDelta" placeholder="+1 / −2" style="width:110px">'
+    +'<span class="sub">ou o saldo novo</span>'
+    +'<input type="number" step="1" id="corAjQtd" placeholder="'+saldo+'" style="width:90px">'
+    +'<select id="corAjMotivo" style="width:auto;min-width:190px"><option value="">— motivo —</option>'
+    +motivos.map(function(m){ return '<option>'+esc(m.valor||m)+'</option>'; }).join('')+'</select>'
+    +'<input id="corAjObs" placeholder="observação (opcional)" style="width:210px">'
+    +'<button class="btn" onclick="corAjustePedir(\''+esc(cod)+'\')">Pedir</button></div>'
+    +'<div class="sub" style="margin-top:6px">O saldo <b>não muda agora</b>: o pedido vai para "Ajustes esperando aprovação", '
+    +'na aba Estoque, e outra pessoa aprova.</div><div class="baixo" id="corErr"></div></div>';
+}
+async function corAjustePedir(cod){
+  var motivo=$('#corAjMotivo').value, dv=$('#corAjDelta').value, qv=$('#corAjQtd').value;
+  if(!motivo){ $('#corErr').textContent='escolha o motivo'; return; }
+  if(dv==='' && qv===''){ $('#corErr').textContent='diga quantas peças a mais ou a menos, ou o saldo novo'; return; }
+  var corpo={codigo:cod, motivo:motivo, obs:$('#corAjObs').value};
+  if(dv!=='') corpo.delta=+dv; else corpo.estoque=+qv;
+  var r=await fetch('/api/estoque/ajuste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)});
+  var d={}; try{ d=await r.json(); }catch(e){}
+  if(r.status!==200 || d.ok===false){ $('#corErr').textContent=d.erro||('falhou ('+r.status+')'); return; }
+  $('#corObjeto').innerHTML='<div class="card"><div style="color:#3fb950;font-weight:600">Pedido de ajuste feito ✓</div>'
+    +'<div class="sub" style="margin-top:6px">'+esc(d.codigo)+' '+(d.delta>0?'+':'')+d.delta
+    +'. O saldo não mudou: o pedido espera outra pessoa aprovar, na aba Estoque.</div></div>';
+  COR_OBJ=null;
 }
 
 async function corAbrir(tipo, id){
   COR_PREVIA=null;
   var box=$('#corObjeto');
-  var r=await fetch('/api/correcao/'+tipo+'/'+id);
+  var r=await fetch('/api/correcao/'+tipo+'/'+encodeURIComponent(id));
   var d={}; try{ d=await r.json(); }catch(e){}
   if(r.status!==200){ box.innerHTML='<div class="card baixo">'+esc(d.erro||('falhou ('+r.status+')'))+'</div>'; return; }
   COR_OBJ=d;
+  var h;
+  if(tipo==='fila'){
+    var f=d.fila||{};
+    h='<div class="card"><h3 style="margin:0 0 8px">Linha #'+f.id+' da fila de embalagem</h3>'
+      +'<div class="sub" style="margin-bottom:10px">'+[esc(f.codigo||''), 'situação <b>'+esc(f.situacao||'')+'</b>',
+        f.modo?'modo '+esc(f.modo):'', 'revisada '+esc(f.revisado_em||f.data||''),
+        f.embalado_em?'embalada '+esc(f.embalado_em):''].filter(Boolean).join(' · ')+'</div>';
+  } else if(tipo==='sku'){
+    var k=d.sku||{};
+    h='<div class="card"><h3 style="margin:0 0 8px">SKU '+esc(k.codigo)+'</h3>'
+      +'<div class="sub" style="margin-bottom:10px">'+[esc(k.descricao||''), 'saldo <b>'+k.estoque+'</b>',
+        k.sob_medida?'sob medida':'', d.na_fila?d.na_fila+' '+corPl(d.na_fila,'peça','peças')+' na fila de embalagem':'',
+        d.pedido_pendente?'<span style="color:#d29922">ajuste pendente de '+esc(d.pedido_pendente.pedido_por||'')+' ('
+          +(d.pedido_pendente.delta>0?'+':'')+d.pedido_pendente.delta+')</span>':''].filter(Boolean).join(' · ')+'</div>';
+    var ex=d.extrato||[];
+    if(ex.length) h+='<details style="margin-bottom:10px"><summary style="cursor:pointer">o que moveu o saldo (últimos '+ex.length+')</summary>'
+      +ex.map(function(m){ return '<div class="sub" style="padding:3px 0">'+esc(m.criado_em||'')+' · '+esc(m.tipo)+' · '
+        +(m.delta>0?'+':'')+m.delta+' → '+m.saldo_depois+(m.referencia?' · '+esc(m.referencia):'')
+        +(m.usuario_nome?' · '+esc(m.usuario_nome):'')+'</div>'; }).join('')+'</details>';
+    else h+='<div class="sub" style="margin-bottom:10px">Nenhum movimento no livro ainda.</div>';
+  }
   var v=d.volume||{};
-  var h='<div class="card"><h3 style="margin:0 0 8px">Volume #'+v.id+'</h3>'
+  if(tipo==='lote') h='<div class="card"><h3 style="margin:0 0 8px">Volume #'+v.id+'</h3>'
     +'<div class="sub" style="margin-bottom:10px">'
     +[esc(v.codigo||'(sem SKU)'), v.buyer?esc(v.buyer):'', v.nf?'NF '+esc(v.nf):'',
       v.venda?'venda '+esc(v.venda):'', v.packId?'pack '+esc(v.packId):'',
@@ -3471,7 +3599,7 @@ async function corAbrir(tipo, id){
   /* O QUE VAI DENTRO DA CAIXA. Uma linha de `qtd:2` e UMA linha e DUAS
      persianas (§5, #23) — e e a soma que manda em tudo que depende de "quantas". */
   var pc=d.pecas||[], tot=pc.reduce(function(s,l){ return s+l.qtd; },0);
-  if(tot>1 || pc.length>1)
+  if(tipo==='lote' && (tot>1 || pc.length>1))
     h+='<div style="margin-bottom:10px"><span class="tag">📦 '+tot+' persianas</span> '
       +pc.map(function(l){ return esc(l.codigo)+' ×'+l.qtd+(l.sob_medida?' <span class="sub">(sob medida — não baixa estoque)</span>':''); }).join(' · ')
       +'</div>';
@@ -3481,6 +3609,8 @@ async function corAbrir(tipo, id){
       a.opcoes.forEach(function(o){
         h+='<button class="btn" onclick="corPrevia(\''+a.id+'\',\''+o.id+'\')">'+esc(o.rotulo)+'</button>';
       });
+    } else if(a.vale && a.porta){
+      h+='<button class="btn" onclick="corAjusteForm(\''+esc(String(d.id))+'\','+((d.sku||{}).estoque||0)+')">'+esc(a.rotulo)+'</button>';
     } else if(a.vale){
       h+='<button class="btn" onclick="corPrevia(\''+a.id+'\',\'\')">'+esc(a.rotulo)+'</button>';
     } else {
@@ -3509,6 +3639,7 @@ async function corAbrir(tipo, id){
 async function corPrevia(acao, opcao){
   if(!COR_OBJ) return;
   var params=(opcao==='voltou')?{voltou:true}:(opcao==='registrar'?{voltou:false}:null);
+  if(acao==='vencidos') params={ate:(($('#corAte')||{}).value||'')};
   var r=await fetch('/api/correcao/previa',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({acao:acao,tipo:COR_OBJ.tipo,id:COR_OBJ.id,params:params})});
   var d={}; try{ d=await r.json(); }catch(e){}
@@ -3550,7 +3681,7 @@ async function corExecutar(){
   $('#corObjeto').innerHTML='<div class="card"><div style="color:#3fb950;font-weight:600">Corrigido ✓</div>'
     +'<div class="sub" style="margin-top:6px">'+fez+'</div>'
     +'<div class="sub" style="margin-top:6px">Correção #'+d.correcao_id+'. Dá para desfazer na lista abaixo, '
-    +'enquanto o volume não andar.</div></div>';
+    +'enquanto nada andar depois dela.</div></div>';
   COR_OBJ=null; COR_PREVIA=null;
   corCarregar();
 }
@@ -3573,7 +3704,7 @@ async function corHistorico(){
     var est=(c.estoque||[]).map(function(l){ return esc(l.codigo)+' '+(l.delta>0?'+':'')+l.delta; }).join(', ');
     return '<div style="padding:7px 0;border-bottom:1px solid var(--bd);display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">'
       +'<span style="min-width:46px" class="sub">#'+c.id+'</span>'
-      +'<span><b>'+esc(c.rotulo||c.acao)+'</b> · '+esc(c.alvo_tipo)+' #'+c.alvo_id
+      +'<span><b>'+esc(c.rotulo||c.acao)+'</b> · '+(c.alvo_tipo==='bloco'?'em bloco':esc(c.alvo_tipo)+' #'+c.alvo_id)
       +(est?' · <span style="color:#d29922">'+est+'</span>':'')+'</span>'
       +'<span class="sub">'+esc(c.usuario_nome||'')+' · '+esc(c.criado_em||'')+'</span>'
       +'<span style="flex:1">'+esc(c.motivo||'')+'</span>'

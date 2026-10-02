@@ -3,6 +3,7 @@
  *
  *   node reabrir_futuros.js               so mostra
  *   node reabrir_futuros.js --aplicar     faz backup e grava
+ *   ... --aplicar --motivo "texto"         o motivo que vai para o historico da Mesa
  *
  * POR QUE EXISTE
  * Em 26/08/2026 o regularizar_saida.js fechou 27 volumes de um passivo antigo.
@@ -24,9 +25,9 @@
  * HOJE. Nao ha volume que tenha saido amanha; nao existe interpretacao
  * alternativa dessa linha, e por isso ela pode ser corrigida sem perguntar.
  *
- * VOLTA PARA `embalado`, que e de onde esses volumes vieram: a etiqueta de
- * venda ja tinha sido impressa (e por isso o estoque ja baixou). A simulacao
- * mostra volume por volume antes de gravar.
+ * VOLTA PARA `embalado` quando a etiqueta de venda ja tinha sido impressa (o
+ * estoque ja baixou), e para `pendente` quando nunca foi (desde 02/10/2026 —
+ * antes voltava tudo a embalado). A simulacao mostra volume por volume.
  *
  * NAO MEXE NO ESTOQUE: carregar nunca mexeu, entao descarregar tambem nao.
  */
@@ -39,7 +40,7 @@ const APLICAR=process.argv.slice(2).includes('--aplicar');
 (async()=>{
 const db=new Database(DB);
 const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
-const alvo=db.prepare(`SELECT id,data,codigo,buyer,nf,estagio,carregado_em,despachar_em
+const alvo=db.prepare(`SELECT id,data,codigo,buyer,nf,estagio,carregado_em,despachar_em,embalado_em
   FROM lote
   WHERE carregado_em IS NOT NULL AND date(carregado_em) > date('now','localtime')
   ORDER BY date(carregado_em), id`).all();
@@ -55,7 +56,7 @@ alvo.forEach(v=>{
   console.log('#'+v.id+'  '+(v.codigo||'(sem SKU)')+'  NF '+(v.nf||'-')+'  '+(v.buyer||''));
   console.log('    carregado_em '+v.carregado_em+'  ← data que ainda nao chegou');
   console.log('    despacho previsto: '+(v.despachar_em||'(nao lido na etiqueta)'));
-  console.log('    '+v.estagio+' -> embalado, carregado_em -> vazio');
+  console.log('    '+v.estagio+' -> '+(v.embalado_em?'embalado':'pendente (a etiqueta nunca saiu)')+', carregado_em -> vazio');
 });
 console.log('');
 console.log('resumo: '+alvo.length+' volume(s) a reabrir');
@@ -72,9 +73,20 @@ const arq=path.join(dest,'antes-reabrir-'+new Date().toISOString().replace(/[:.]
 await db.backup(arq);
 console.log(''); console.log('backup ->',arq);
 
-const abrir=db.prepare(`UPDATE lote SET estagio='embalado', carregado_em=NULL WHERE id=?`);
-db.transaction(()=>{ alvo.forEach(v=>abrir.run(v.id)); })();
-console.log('reabertos:',alvo.length);
+/* Quem reabre e a acao "Reabrir venda futura" da Mesa de correcoes (fase 3,
+   02/10/2026), com uma linha em `correcao` por volume. Ela volta a EMBALADO so
+   o volume cuja etiqueta saiu; o que foi fechado direto de pendente volta a
+   pendente — embalado sem o −1 da etiqueta e a armadilha #27. */
+const COR=require('./correcoes');
+COR.garantirSchema(db);
+const T=COR.terminal('reabrir_futuros.js', process.argv);
+const recusados=[]; let n=0;
+db.transaction(()=>{ alvo.forEach(v=>{
+  try{ COR.executar(db,{acao:'reabrir',tipo:'lote',id:v.id,motivo:T.motivo,quem:T.quem}); n++; }
+  catch(e){ recusados.push('#'+v.id+' — '+e.message); }
+}); })();
+console.log('reabertos:',n);
+if(recusados.length){ console.log('NAO reabertos:'); recusados.forEach(r=>console.log('  '+r)); }
 
 const esperando=db.prepare(`SELECT COUNT(*) c FROM lote WHERE estagio='embalado'`).get().c;
 console.log('volumes embalados esperando carregamento, agora:',esperando);

@@ -645,6 +645,9 @@ module.exports = function(app, db){
     if(M !== 'GET' && eq('/api/montagem')) return 'embalagem.executar';
     if(M !== 'GET' && eq('/api/embalar')) return 'etiqueta.emitir';
     if(M !== 'GET' && eq('/api/carregar')) return 'carregamento.executar';
+    /* A caixa de varias peca a peca e o "Recomecar" (CARREGAMENTO-SEGUNDA-PESSOA
+       fase 2): o mesmo bipe da area e do canto, com a mesma chave. */
+    if(M !== 'GET' && (eq('/api/carregar/peca') || eq('/api/carregar/recomecar'))) return 'carregamento.executar';
     /* A SAIDA DO CAMINHAO (fase 3 da SAIDA-E-DUPLA-CONFERENCIA): abrir, bipar
        as sobras e fechar a que BATEU sao da bancada que bipa a caixa. Liberar
        com numero diferente do motorista tem chave propria, e vem ANTES do
@@ -878,7 +881,9 @@ module.exports = function(app, db){
        com 403 no console, para todo mundo menos o Admin Geral, e o sintoma não
        se pareceria nem de longe com "mexeram na permissão".
        `.html` NÃO entra aqui de propósito: ele é tela, e cai na regra abaixo. */
-    if(/\.(js|mjs|css|map|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot)$/i.test(p)) return '@logado';
+    /* `.webmanifest` entrou em 02/10/2026 (camada 2 da spec TABLETS-E-KIOSK):
+       e o arquivo que faz a estacao virar app no iPad, e nao tem dado nenhum. */
+    if(/\.(js|mjs|css|map|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot|webmanifest)$/i.test(p)) return '@logado';
     /* A GÊMEA `.html` VALE O MESMO QUE A TELA. `/operador` exigia
        `revisao.executar` e `/operador.html` — o mesmo arquivo, servido pelo
        `express.static` — exigia só estar logado. Ninguém navega por ela (o

@@ -3,7 +3,8 @@
  *
  *   node limpar_fila.js                  simula, nao muda nada
  *   node limpar_fila.js --confirmar      faz backup e apaga
- *   node limpar_fila.js --db <caminho>   outro banco (padrao /opt/expedicao/dados.db)
+ *   node limpar_fila.js --db <caminho>   outro banco (padrao: o do caminhos.js)
+ *   ... --confirmar --motivo "texto"     o motivo que vai para o historico da Mesa
  *
  * QUANDO ISTO E CORRETO — E SO ENTAO
  * A `fila` guarda a peca que foi REVISADA e ainda nao foi EMBALADA. Ela nao e
@@ -139,7 +140,18 @@ const arqCsv = path.join(SAIDA, 'antes_fila_' + CARIMBO + '.csv');
 fs.writeFileSync(arqCsv, ['id,codigo,modo,revisado_em,data']
   .concat(linhas.map(l => [l.id,l.codigo,l.modo,l.revisado_em,l.data].map(csv).join(','))).join('\n') + '\n', 'utf8');
 
-const n = db.prepare("DELETE FROM fila WHERE situacao='aguardando'").run().changes;
+/* Quem tira e a acao "Tirar da fila" da Mesa de correcoes (fase 3,
+   02/10/2026): uma linha em `correcao` por peca, com desfazer pela tela. A
+   regra e a mesma — so `aguardando`; a linha `embalado` e recusada. */
+const COR = require('./correcoes');
+COR.garantirSchema(db);
+const T = COR.terminal('limpar_fila.js', argv);
+let n = 0; const recusadas = [];
+db.transaction(() => { linhas.forEach(l => {
+  try{ COR.executar(db, { acao:'fila', tipo:'fila', id:l.id, motivo:T.motivo, quem:T.quem }); n++; }
+  catch(e){ recusadas.push('#' + l.id + ' — ' + e.message); }
+}); })();
+if(recusadas.length){ console.log('  NAO tiradas:'); recusadas.forEach(r => console.log('    ' + r)); }
 console.log('');
 console.log('  LIMPO.');
 console.log('  - ' + n + ' linha(s) apagada(s) da fila');

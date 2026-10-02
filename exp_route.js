@@ -1,6 +1,6 @@
 const express=require('express'); const fs=require('fs');
 const {parsePdf}=require('./parse'); const {PDFDocument}=require('pdf-lib');
-const {futuro,COLETA}=require('./carga');
+const {futuro,COLETA,VARIAS}=require('./carga');
 module.exports=function(app,db){
   db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT, impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, no_carro_em TEXT, no_carro_por TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT, cancelada_em TEXT, cancelada_origem TEXT, cancelada_estagio TEXT, cancelada_motivo TEXT, cancelada_varias INTEGER DEFAULT 0, cancelada_aviso_em TEXT, cancelada_resolvida_em TEXT, cancelada_resolvida_por TEXT, cancelada_voltou INTEGER);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
@@ -118,6 +118,10 @@ module.exports=function(app,db){
   /* No fim e por ALTER, como manda o §17: e onde o SQLite poe a coluna nova, e
      e o que mantem a ordem igual a do banco de producao. */
   try{ db.exec("ALTER TABLE lote_item ADD COLUMN conferidos INTEGER DEFAULT 0"); }catch(e){}
+  /* Quantas persianas desta linha foram bipadas NO CARREGAMENTO (spec
+     CARREGAMENTO-SEGUNDA-PESSOA, fase 2). Coluna propria, e nao o `conferidos`:
+     aquele e o bipe da Etiqueta de Venda, de outra pessoa e outro momento. */
+  try{ db.exec("ALTER TABLE lote_item ADD COLUMN conferidos_carga INTEGER DEFAULT 0"); }catch(e){}
   try{ db.exec("CREATE INDEX IF NOT EXISTS ix_lote_item_lote ON lote_item(lote_id)"); }catch(e){}
 
   /* ── O QUE O SISTEMA APRENDE SOBRE FAMILIA x PREFIXO DE SKU ────────────────
@@ -585,7 +589,7 @@ module.exports=function(app,db){
      resposta (vale `qtd` agora) para tablet com a pagina antiga em cache.
      A regua "mais de uma persiana" e a MESMA do `caixasDeVarias` (SUM(qtd) > 1):
      com duas reguas a caixa sumiria das duas listas, ou apareceria nas duas. */
-  const VARIAS=alias=>`(SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=${alias}.id) > 1`;
+  // a regua mora no carga.js desde 02/10/2026: o Carregamento faz a mesma pergunta
   const linhasDeSku=(filtro,porData)=>db.prepare(`SELECT l.codigo, COUNT(*) qtd,
       ${porData?'l.despachar_em,':''}
       SUM(COALESCE((SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id),1)) pecas,

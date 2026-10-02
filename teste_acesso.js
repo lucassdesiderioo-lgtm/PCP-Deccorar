@@ -569,7 +569,8 @@ console.log('\n── 12. o ARQUIVO da tela nao e a tela ──');
    `/favicon.ico`, `/login` e `/login.html` estão na lista LIVRE do auth.js.
    Negar por padrão sem esta regra tiraria o JavaScript de TODAS as telas: elas
    abririam em branco, com 403 no console, para todo mundo menos o Admin Geral. */
-for(const a of ['/sku.js','/barras.js','/kit_bipe.js','/qr.js','/base.css','/favicon.png','/img/logo.svg'])
+for(const a of ['/sku.js','/barras.js','/kit_bipe.js','/qr.js','/base.css','/favicon.png','/img/logo.svg',
+                '/ipad.css','/icones/embalagem-180.png','/app/embalagem.webmanifest'])
   eq('arquivo de apoio continua @logado: '+a, AC.permDaRota(a,'GET'), '@logado');
 eq('mas .html NAO e arquivo de apoio — herda a tela', AC.permDaRota('/operador.html','GET'), 'revisao.executar');
 

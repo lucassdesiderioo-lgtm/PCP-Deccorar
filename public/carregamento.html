@@ -1,5 +1,14 @@
 <!DOCTYPE html><html lang="pt-BR"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<!-- A estação vira app instalado no iPad (camada 2 da spec TABLETS-E-KIOSK): em tela cheia, sem barra de
+     endereço nem abas. Um manifest e um ícone POR ESTAÇÃO, para cada tablet abrir direto na dele. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Carregamento">
+<link rel="apple-touch-icon" href="/icones/carregamento-180.png">
+<link rel="manifest" href="/app/carregamento.webmanifest">
+<link rel="stylesheet" href="/ipad.css">
 <title>Carregamento</title>
 <style>
   /* Operacao: fundo CLARO (DESIGN secao 2) — tela usada sob luz de fabrica, escuro vira espelho */
@@ -247,9 +256,71 @@ async function bip(code){
   var m=modoAtual();
   if(m==='sobra'){ await bipSobra(code); return; }
   if(m==='carro'){ await bipCarro(code); return; }
+  if(caixaPecas){ await bipPeca(code); return; }
   const corpo = aguardando ? {code:aguardando.code, sku:code} : {code:code};
   const r=await (await fetch('/api/carregar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)})).json();
-  if(r.ok && r.coleta){
+  mostrar(r,code);
+}
+
+/* ── A CAIXA DE VÁRIAS PERSIANAS, PEÇA A PEÇA (CARREGAMENTO-SEGUNDA-PESSOA,
+   fase 2, 02/10/2026) ───────────────────────────────────────────────────────
+   O bipe da etiqueta de venda NÃO confere a caixa de várias: ela fica em
+   âmbar, e cada persiana é bipada pela etiqueta de SKU colada por fora da
+   caixa (a do saco, P6). A tela diz só "2 de 3" — NUNCA quais SKUs: quem sabe
+   a resposta bipa até chegar nela (a lição do inventário cego, §18). Os SKUs
+   só aparecem quando divergem, e aí como alarme. */
+let caixaPecas=null;   // {lote_id, buyer, nf, total, bipadas}
+let ultimaPeca={c:'',t:0};
+function bannerPecas(){
+  var c=caixaPecas;
+  banner('warn','📦 ESTA CAIXA LEVA '+c.total+' PERSIANAS',
+    '<b>'+esc0(c.buyer)+'</b> · NF <b>'+esc0(c.nf||'—')+'</b><br>'
+    +'Bipe a etiqueta de SKU de <b>cada</b> persiana (coladas por fora da caixa).'
+    +'<div class="indo" style="color:#8a5a00">'+c.bipadas+' de '+c.total+'</div>'
+    +'<button class="btn" onclick="recomecarCaixa()">↺ Recomeçar esta caixa</button> '
+    +'<button class="mini" style="margin-left:6px" onclick="sairDaCaixa()">deixar esta caixa</button>');
+}
+async function bipPeca(code){
+  /* ⚠️ O GUARD DE 700 ms (§5, #23 e §12): o leitor às vezes manda o mesmo
+     código duas vezes numa leitura só, e aqui isso contaria uma persiana a
+     mais. Duas persianas de verdade exigem largar uma e pegar a outra, o que
+     nunca leva menos de 0,7 s. */
+  var agora=Date.now();
+  if(ultimaPeca.c===code && agora-ultimaPeca.t<700) return;
+  ultimaPeca={c:code,t:agora};
+  var r=await (await fetch('/api/carregar/peca',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({lote_id:caixaPecas.lote_id, sku:code})})).json();
+  if(r.ok && r.bipadas<r.pecas_total){
+    caixaPecas.bipadas=r.bipadas; bannerPecas(); beep(true); return;
+  }
+  if(r.motivo==='peca_divergente'){
+    banner('err','⛔ PARE — A CAIXA NÃO BATE',
+      '<b>'+esc0(caixaPecas.buyer)+'</b> · NF <b>'+esc0(caixaPecas.nf||'—')+'</b><br>'
+      +'A caixa devia ter <span class="c">'+esc0(r.esperado)+'</span>;<br>foi bipado <span class="c">'+esc0(r.bipado)+'</span>.<br>'
+      +'<b>Não carregue.</b> Confira as persianas e bipe de novo.'
+      +'<br><button class="btn" onclick="recomecarCaixa()">↺ Recomeçar esta caixa</button>');
+    beep(false); return;
+  }
+  caixaPecas=null;
+  mostrar(r,code);
+}
+async function recomecarCaixa(){
+  if(!caixaPecas) return;
+  var r=await (await fetch('/api/carregar/recomecar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({lote_id:caixaPecas.lote_id})})).json();
+  caixaPecas.bipadas=r.bipadas||0; ultimaPeca={c:'',t:0}; bannerPecas();
+}
+/* Largar a caixa no meio não apaga o que já foi bipado: voltar a ela (bipando
+   a etiqueta de venda) continua de onde parou. */
+function sairDaCaixa(){ caixaPecas=null; banner('','Pronto para bipar',''); }
+
+function mostrar(r,code){
+  if(r.motivo==='conferir_pecas'){
+    aguardando=null;
+    caixaPecas={lote_id:r.pedido.id, buyer:r.pedido.buyer, nf:r.pedido.nf, total:r.pecas_total, bipadas:r.bipadas||0};
+    bannerPecas(); beep(true);
+  }
+  else if(r.ok && r.coleta){
     /* ESTA INDO N. Depois de cada bipe de coleta a tela diz quantas caixas
        estao no canto — e o numero que o motorista tem que bater. Sai em letra
        grande porque e o que a pessoa vai falar em voz alta pra ele. */

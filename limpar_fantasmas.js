@@ -3,6 +3,7 @@
  *
  *   node limpar_fantasmas.js              so mostra (nao apaga nada)
  *   node limpar_fantasmas.js --aplicar    faz backup e apaga
+ *   ... --aplicar --motivo "texto"        o motivo que vai para o historico da Mesa
  *
  * O QUE E UM FANTASMA
  * Ate 25/08/2026 a deduplicacao do upload so comparava com os volumes do
@@ -94,9 +95,18 @@ const arq=path.join(dest,'antes-limpeza-'+new Date().toISOString().replace(/[:.]
 await db.backup(arq);
 console.log(''); console.log('backup ->',arq);
 
-const del=db.prepare('DELETE FROM lote WHERE id=?');
-db.transaction(()=>{ fantasmas.forEach(o=>del.run(o.v.id)); })();
-console.log('apagados:',fantasmas.length);
+/* FASE 3 DA MESA (02/10/2026): o EFEITO tambem e o da Mesa, e nao so a
+   regua. Antes o script so apagava o `lote` e deixava o `lote_item` orfao; a
+   acao da Mesa apaga os dois e grava cada volume em `correcao`, com desfazer. */
+CORRECOES.garantirSchema(db);
+const T=CORRECOES.terminal('limpar_fantasmas.js', process.argv);
+let n=0; const recusados=[];
+db.transaction(()=>{ fantasmas.forEach(o=>{
+  try{ CORRECOES.executar(db,{acao:'fantasma',tipo:'lote',id:o.v.id,motivo:T.motivo,quem:T.quem}); n++; }
+  catch(e){ recusados.push('#'+o.v.id+' — '+e.message); }
+}); })();
+console.log('apagados:',n,'(cada um com a sua linha no historico da Mesa de correcoes)');
+if(recusados.length){ console.log('NAO apagados:'); recusados.forEach(r=>console.log('  '+r)); }
 
 const resta=db.prepare(`SELECT COUNT(*) c FROM lote
   WHERE data=date('now','localtime') AND estagio='pendente'`).get().c;

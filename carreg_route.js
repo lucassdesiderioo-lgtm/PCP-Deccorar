@@ -81,6 +81,46 @@ module.exports=function(app,db){
        so porque um irmao fantasma andou antes. */
     const alvo = batem.find(r=>r.estagio==='embalado') || batem[0] || null;
     if(!alvo) return res.json({ok:false,motivo:'nao_encontrado',lido:code});
+    const barra=barrar(req,alvo);
+    if(barra) return res.json(barra);
+    /* A CAIXA DE VARIAS PERSIANAS E CONFERIDA PECA A PECA, AS CEGAS (spec
+       CARREGAMENTO-SEGUNDA-PESSOA, fase 2, 02/10/2026). A bancada imprime e
+       nao repara que a venda leva mais de uma persiana; aqui, com outra pessoa
+       e a caixa na mao, cada persiana e bipada pela etiqueta de SKU colada por
+       fora (a do saco, P6). A resposta NAO diz quais SKUs a caixa leva: quem
+       sabe a resposta bipa ate chegar nela (a licao do inventario cego, §18).
+       Ela substitui o segundo bipe cego do `conf_carregamento` nesta caixa —
+       aquele compara com UM SKU so, e nao sabe que existe `lote_item`. */
+    const pc=pecasCarga(alvo.id);
+    if(pc.total>1){
+      if(pc.bipadas<pc.total) return res.json(pedirPecas(alvo,pc));
+      return res.json(db.transaction(()=>concluir(req,alvo))());
+    }
+    if(conferenciaLigada()){
+      const esperado=soCodigo(alvo.codigo);
+      if(!esperado) return res.json({ok:false,motivo:'volume_sem_sku',
+        pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf},
+        aviso:'Esse volume nao tem SKU no sistema. Resolva no Admin antes de carregar.'});
+      /* Sem o 2o bipe o volume nao passa — e a resposta NAO leva o SKU esperado,
+         pra conferencia continuar cega. */
+      if(!skuLido) return res.json({ok:false,motivo:'falta_sku',
+        pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city}});
+      if(skuLido!==esperado){
+        try{ const ac=app.locals.acesso;
+             if(ac&&ac.auditar) ac.auditar(req,'expedicao','sku_divergente_carregamento',
+               'NF '+(alvo.nf||alvo.id), 'esperado '+alvo.codigo+' / lido '+skuLido); }catch(e){}
+        return res.json({ok:false,motivo:'sku_divergente',esperado:alvo.codigo,lido:skuLido,
+          pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city}});
+      }
+    }
+    res.json(concluir(req,alvo));
+  });
+
+  /* As barreiras do bipe, na ordem de sempre — e as MESMAS no bipe de peca:
+     uma caixa cancelada, retida, ja saida, sem etiqueta, ja conferida, ou com
+     quem imprimiu no login, nao anda nem peca a peca. Devolve a resposta da
+     recusa, ou null. */
+  function barrar(req,alvo){
     /* A VENDA CANCELADA NO ML NAO SOBE NO CARRO (VENDAS-E-MEDIA fase 2, D2).
        O import da planilha tirou a caixa das listas; se ela chegar aqui mesmo
        assim, a pessoa esta com ela na mao — a recusa diz o que fazer com ela. */
@@ -88,13 +128,13 @@ module.exports=function(app,db){
       try{ const ac=app.locals.acesso;
            if(ac&&ac.auditar) ac.auditar(req,'expedicao','carregar_cancelada',
              'NF '+(alvo.nf||alvo.id), (alvo.cancelada_motivo||'cancelada')+' — bipada no carregamento'); }catch(e){}
-      return res.json({ok:false,motivo:'cancelada',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
+      return ({ok:false,motivo:'cancelada',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
         aviso:'Venda cancelada no Mercado Livre. Não carregar: separe a caixa e avise o admin — ela está no card '+
               '"Canceladas depois da etiqueta".'+(alvo.cancelada_motivo?' ML: “'+alvo.cancelada_motivo+'”':'')});
     }
-    if(alvo.estagio==='bloqueado') return res.json({ok:false,motivo:'bloqueado',pedido:alvo,
+    if(alvo.estagio==='bloqueado') return ({ok:false,motivo:'bloqueado',pedido:alvo,
         aviso:'SKU "'+(alvo.codigo||'(vazio)')+'" nao esta no cadastro. Nao pode ser carregado.'});
-    if(alvo.estagio==='carregado') return res.json({ok:false,motivo:'duplicado',pedido:alvo,coleta:ehColeta(alvo)});
+    if(alvo.estagio==='carregado') return ({ok:false,motivo:'duplicado',pedido:alvo,coleta:ehColeta(alvo)});
     /* ⚠️ SO CARREGA O QUE FOI EMBALADO (divida 13, 17/09/2026).
        Ate aqui a rota recusava so 'bloqueado' e 'carregado' — entao um volume
        'pendente' virava 'carregado' e a peca saia da fabrica SEM o -1 da
@@ -112,7 +152,7 @@ module.exports=function(app,db){
       try{ const ac=app.locals.acesso;
            if(ac&&ac.auditar) ac.auditar(req,'expedicao','carregar_nao_embalado',
              'NF '+(alvo.nf||alvo.id), 'estagio '+alvo.estagio+' — bipado no carregamento'); }catch(e){}
-      return res.json({ok:false,motivo:'nao_embalado',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
+      return ({ok:false,motivo:'nao_embalado',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
         aviso:'Esta caixa ainda nao passou pela ETIQUETA DE VENDA. Imprima a etiqueta por la '+
               '(bipando o SKU) e depois carregue — e a impressao que baixa a peca do estoque.'});
     }
@@ -121,7 +161,7 @@ module.exports=function(app,db){
        viagem. Dizer "ja conferida" em vez de conferir outra vez impede o nome
        de quem conferiu de ser trocado por quem so esbarrou na caixa. */
     if(!ehColeta(alvo) && alvo.conferido_em){
-      return res.json({ok:false,motivo:'ja_conferida',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
+      return ({ok:false,motivo:'ja_conferida',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
         aviso:'Esta caixa ja foi conferida e esta na area. Para por no carro, abra a Viagem a agencia e bipe por la.'});
     }
     /* ⚠️ QUEM IMPRIMIU NAO CONFERE (spec CARREGAMENTO-SEGUNDA-PESSOA, fase 1,
@@ -143,27 +183,17 @@ module.exports=function(app,db){
       try{ const ac=app.locals.acesso;
            if(ac&&ac.auditar) ac.auditar(req,'expedicao','carregar_mesma_pessoa',
              'NF '+(alvo.nf||alvo.id), 'impressa por '+nomeLimpo(alvo.impresso_por)+' — bipada pela mesma pessoa'); }catch(e){}
-      return res.json({ok:false,motivo:'mesma_pessoa',impresso_por:nomeLimpo(alvo.impresso_por),
+      return ({ok:false,motivo:'mesma_pessoa',impresso_por:nomeLimpo(alvo.impresso_por),
         pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city,codigo:alvo.codigo},coleta:ehColeta(alvo),
         aviso:'Você imprimiu esta etiqueta. O carregamento tem que ser feito por outra pessoa, com o login dela.'});
     }
-    if(conferenciaLigada()){
-      const esperado=soCodigo(alvo.codigo);
-      if(!esperado) return res.json({ok:false,motivo:'volume_sem_sku',
-        pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf},
-        aviso:'Esse volume nao tem SKU no sistema. Resolva no Admin antes de carregar.'});
-      /* Sem o 2o bipe o volume nao passa — e a resposta NAO leva o SKU esperado,
-         pra conferencia continuar cega. */
-      if(!skuLido) return res.json({ok:false,motivo:'falta_sku',
-        pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city}});
-      if(skuLido!==esperado){
-        try{ const ac=app.locals.acesso;
-             if(ac&&ac.auditar) ac.auditar(req,'expedicao','sku_divergente_carregamento',
-               'NF '+(alvo.nf||alvo.id), 'esperado '+alvo.codigo+' / lido '+skuLido); }catch(e){}
-        return res.json({ok:false,motivo:'sku_divergente',esperado:alvo.codigo,lido:skuLido,
-          pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city}});
-      }
-    }
+    return null;
+  }
+
+  /* O fim do bipe: a caixa conferida (agencia, fica na area) ou levada pro
+     canto (coleta). Devolve a resposta. */
+  function concluir(req,alvo){
+    const quemBipou=(req.usuario&&req.usuario.nome)||null;
     /* O BIPE DA AREA E A CONFERENCIA (bipe 2). Fase 4 da spec
        SAIDA-E-DUPLA-CONFERENCIA, decisao D1 do dono (26/09/2026): a caixa de
        AGENCIA ganhou um segundo bipe. Aqui ela e so CONFERIDA e fica na area;
@@ -175,7 +205,7 @@ module.exports=function(app,db){
         .run(quemBipou, alvo.id);
       const p2=progresso();
       const hoje2=db.prepare("SELECT date('now','localtime') d").get().d;
-      return res.json({ok:true,conferida:true,pedido:alvo,carregados:p2.carregados,total:p2.total,
+      return ({ok:true,conferida:true,pedido:alvo,carregados:p2.carregados,total:p2.total,
         prontas:p2.carro.prontas,coleta:false,adiantado:futuro(alvo,hoje2),impresso_por:nomeLimpo(alvo.impresso_por)});
     }
     db.prepare(`UPDATE lote SET estagio='carregado', carregado_em=datetime('now','localtime'),
@@ -194,9 +224,83 @@ module.exports=function(app,db){
        caixa ainda vai pro canto; a conta do adiantado so anda quando o
        caminhao leva (carga.js), mas o aviso vale desde ja. */
     const hojeD=db.prepare("SELECT date('now','localtime') d").get().d;
-    res.json({ok:true,pedido:alvo,carregados:p.carregados,total:p.total,
+    return ({ok:true,pedido:alvo,carregados:p.carregados,total:p.total,
               coleta:ehColeta(alvo), coleta_aguardando:p.coleta.aguardando.length,
               adiantado:futuro(alvo,hojeD), impresso_por:nomeLimpo(alvo.impresso_por)});
+  }
+
+  /* ── A CAIXA DE VARIAS, PECA A PECA (fase 2) ─────────────────────────────
+     `conferidos_carga` e o contador por linha do `lote_item` — coluna propria,
+     e nao o `conferidos` da Etiqueta de Venda, que e outro bipe de outra
+     pessoa. O ALTER mora no exp_route.js (dono da tabela, §17); aqui ele e
+     repetido, guardado, para o modulo subir sozinho num teste. */
+  try{ db.exec("ALTER TABLE lote_item ADD COLUMN conferidos_carga INTEGER DEFAULT 0"); }catch(e){}
+  function pecasCarga(loteId){
+    let itens=[];
+    try{ itens=db.prepare('SELECT id,codigo,qtd,COALESCE(conferidos_carga,0) bip FROM lote_item WHERE lote_id=? ORDER BY id').all(loteId); }
+    catch(e){ itens=[]; }
+    const total=itens.reduce((s,i)=>s+Math.max(1,i.qtd||1),0);
+    const bipadas=itens.reduce((s,i)=>s+(i.bip||0),0);
+    return {itens,total,bipadas};
+  }
+  /* A RESPOSTA SEM OS SKUs. Nem o `lote.codigo` vai: ele e o SKU de uma das
+     pecas, e bastaria para entregar a primeira resposta. */
+  function pedirPecas(alvo,pc){
+    return {ok:false,motivo:'conferir_pecas',pecas_total:pc.total,bipadas:pc.bipadas,coleta:ehColeta(alvo),
+      pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
+      aviso:'Esta caixa leva '+pc.total+' persianas — bipe a etiqueta de SKU de cada uma (coladas por fora da caixa).'};
+  }
+  const listaPecas=l=>l.filter(x=>x.n>0).map(x=>x.n+' × '+x.codigo).join(' + ')||'nada';
+  const loteDoCorpo=req=>{ const id=+((req.body||{}).lote_id);
+    return id ? db.prepare('SELECT * FROM lote WHERE id=?').get(id) : null; };
+
+  app.post('/api/carregar/peca',(req,res)=>{
+    const alvo=loteDoCorpo(req);
+    if(!alvo) return res.json({ok:false,motivo:'nao_encontrado'});
+    const barra=barrar(req,alvo);
+    if(barra) return res.json(barra);
+    const pc=pecasCarga(alvo.id);
+    if(pc.total<=1) return res.json({ok:false,motivo:'nao_varias',
+      aviso:'Esta caixa leva uma persiana só: bipe a etiqueta de venda dela.'});
+    const sku=soCodigo((req.body||{}).sku);
+    if(!sku) return res.json({ok:false,motivo:'sem_sku'});
+    const linha=pc.itens.find(i=>soCodigo(i.codigo)===sku && (i.bip||0)<Math.max(1,i.qtd||1));
+    if(!linha){
+      /* PARA, E SO AGORA MOSTRA OS DOIS LADOS. Um SKU que nao esta na caixa,
+         ou um a mais do que ela leva, e a peca errada (ou a persiana a mais)
+         dentro da caixa — e e o unico momento em que dizer o esperado ajuda. */
+      const esperado=listaPecas(pc.itens.map(i=>({codigo:i.codigo,n:Math.max(1,i.qtd||1)})));
+      const bip=pc.itens.map(i=>({codigo:i.codigo,n:i.bip||0}));
+      const ja=bip.find(x=>soCodigo(x.codigo)===sku);
+      if(ja) ja.n++; else bip.push({codigo:sku,n:1});
+      const bipado=listaPecas(bip);
+      try{ const ac=app.locals.acesso;
+           if(ac&&ac.auditar) ac.auditar(req,'expedicao','carregar_peca_divergente','NF '+(alvo.nf||alvo.id),
+             'devia ter '+esperado+' / bipado '+bipado); }catch(e){}
+      return res.json({ok:false,motivo:'peca_divergente',esperado,bipado,pecas_total:pc.total,bipadas:pc.bipadas,
+        pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
+        aviso:'A caixa devia ter '+esperado+'; foi bipado '+bipado+'. A caixa não anda: confira as persianas, '+
+              'e use "Recomeçar esta caixa" para bipar de novo.'});
+    }
+    const r=db.transaction(()=>{
+      db.prepare('UPDATE lote_item SET conferidos_carga=COALESCE(conferidos_carga,0)+1 WHERE id=?').run(linha.id);
+      const agora=pecasCarga(alvo.id);
+      if(agora.bipadas<agora.total)
+        return {ok:true,bipadas:agora.bipadas,pecas_total:agora.total,coleta:ehColeta(alvo),
+          pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city}};
+      return Object.assign(concluir(req,alvo),{bipadas:agora.bipadas,pecas_total:agora.total});
+    })();
+    res.json(r);
+  });
+
+  app.post('/api/carregar/recomecar',(req,res)=>{
+    const alvo=loteDoCorpo(req);
+    if(!alvo) return res.json({ok:false,motivo:'nao_encontrado'});
+    db.prepare('UPDATE lote_item SET conferidos_carga=0 WHERE lote_id=?').run(alvo.id);
+    try{ const ac=app.locals.acesso;
+         if(ac&&ac.auditar) ac.auditar(req,'expedicao','carregar_recomecou','NF '+(alvo.nf||alvo.id),'contagem da caixa zerada'); }catch(e){}
+    const pc=pecasCarga(alvo.id);
+    res.json({ok:true,bipadas:pc.bipadas,pecas_total:pc.total});
   });
   /* O PROGRESSO DA CARGA — o mesmo numero pras duas rotas.
      "Carregados X de Y" e a lista tem que falar do mesmo universo, senao o

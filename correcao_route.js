@@ -40,8 +40,18 @@ module.exports = function(app, db){
     ({ itens: COR.historico(db, { limite:(req.query || {}).limite, acao:(req.query || {}).acao,
                                   pessoa:(req.query || {}).pessoa }) })));
 
-  app.get('/api/correcao/:tipo/:id', (req,res) => responder(req, res, () =>
-    COR.objeto(db, req.params.tipo, req.params.id)));
+  /* A acao que vai por outra porta (o pedido de ajuste) pede a permissao
+     DELA: sem `estoque.ajustar` o botao sai desabilitado dizendo o que falta,
+     em vez de abrir um formulario que a outra rota recusa com 403. */
+  app.get('/api/correcao/:tipo/:id', (req,res) => responder(req, res, () => {
+    const o = COR.objeto(db, req.params.tipo, req.params.id);
+    (o.acoes || []).forEach(a => {
+      let tem = true;
+      if(a.exige){ try{ tem = !!app.locals.acesso.podePermissao(req.usuario, a.exige); }catch(e){ tem = false; } }
+      if(a.exige && !tem && a.vale){ a.vale = false; a.por_que_nao = 'falta a permissão "Pedir ajuste de estoque"'; }
+    });
+    return o;
+  }));
 
   /* A PREVIA NAO GRAVA — e ela que faz a Mesa nao ser um editor de linhas do
      banco (§2 da spec). Nem transacao precisa. */

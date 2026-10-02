@@ -2166,6 +2166,14 @@ número — o volume processado sai de `pendente` e o estoque baixa junto.
 
 ### Os três scripts que fecham passivo — e as duas regras que valem para todos
 
+> ⚠️ **DESDE 02/10/2026 O CAMINHO NORMAL É A MESA DE CORREÇÕES** (fases 2 e 3,
+> logo abaixo): Admin → Correções tem "Dar saída", "Fechar vencidos", "Reabrir
+> venda futura" e "Tirar da fila", com prévia, motivo e desfazer. **Os scripts
+> continuam existindo para a operação em massa, e chamam as MESMAS ações** —
+> cada volume que o terminal corrige grava a sua linha em `correcao` e aparece
+> no histórico da Mesa, com desfazer. As regras abaixo continuam valendo; quem
+> as aplica é o `correcoes.js`.
+
 | Script | Fecha | Critério |
 |---|---|---|
 | `limpar_fantasmas.js` | duplicata `pendente` | irmão mais antigo já andou |
@@ -2332,6 +2340,65 @@ exige o módulo novo na varredura dele, e foi ele que cobrou. E mexeu no saldo?
 > passivo de verdade pela tela** — e, principalmente, a **primeira cancelada
 > real depois da etiqueta**, que é a prova que a VENDAS F2 deixou pendente (§3).
 > Prova que não foi feita se escreve como não feita (§4).
+
+### ⚠️ A MESA, FASES 2 E 3 — as outras ações, e o terminal com a mesma régua (02/10/2026)
+
+| Ação | Vale para | O que faz | Era o script |
+|---|---|---|---|
+| **Dar saída** | volume não carregado que saiu de fato | `carregado` na data de despacho dele, às 15:00; coleta ganha `retirado_em` | `regularizar_saida.js` |
+| **Fechar vencidos** | `pendente` com despacho até a data de corte | o mesmo, **em bloco**: uma correção só, que desfaz inteira ou não desfaz | `fechar_vencidos.js` |
+| **Reabrir venda futura** | `carregado_em` com data que não chegou | volta a `embalado` — ou a `pendente`, se a etiqueta nunca saiu | `reabrir_futuros.js` |
+| **Tirar da fila** | linha `aguardando` da fila | apaga a linha; a `embalado` é recusada | `limpar_fila.js` |
+| **Pedir ajuste de saldo** | SKU | abre o pedido pela porta do ajuste em duas pessoas | — |
+
+> ⚠️ **NENHUMA DELAS MEXE EM ESTOQUE.** A peça que saiu sem etiqueta nunca somou
+> +1, e a fila nunca somou. O "Pedir ajuste" **não é exceção**: a Mesa não aplica
+> nada, ela abre o pedido (`POST /api/estoque/ajuste`) e outra pessoa aprova na
+> aba Estoque (§18, fase 3). A ação tem `porta` e não tem `executar`, e a prévia e
+> a execução pela Mesa recusam dizendo a porta.
+
+> ⚠️ **A DATA DE CORTE DE "FECHAR VENCIDOS" É OBRIGATÓRIA E NASCE VAZIA.**
+> Fechar o que venceu só vale depois de alguém conferir no Mercado Livre que não
+> há venda pendente no período — a venda atrasada de verdade some da fila junto
+> com o ruído. Pré-preenchida, a data seria clicada sem conferir. O volume sem
+> despacho lido só entra se **entrou** até o corte, e o modo teste fica fora.
+
+> ⚠️ **"DAR SAÍDA" NÃO APAGA AS CÓPIAS do volume**, ao contrário do script
+> antigo: depois da saída elas viram fantasmas, a prévia diz quantas, e saem
+> pelo contador de fantasmas. O script `regularizar_saida.js` faz os dois passos
+> (saída e fantasma) pela Mesa, e lista a cópia que **não** é fantasma — a mais
+> antiga do par, que é a original e não se apaga.
+
+> ⚠️ **O DESFAZER COMPARA COM O DEPOIS GRAVADO.** Nas ações que mudam o próprio
+> estágio, o `depois` é relido do banco depois do efeito, e desfazer recusa se
+> algum dos sete campos de "andou" mudou desde então. O bloco é **tudo ou
+> nada**: um volume que andou trava o bloco inteiro, e a recusa diz qual.
+
+> ⚠️ **OS CINCO CONTADORES TÊM BOTÃO.** Vencidos (despacho antes de hoje), futuras
+> fechadas e **fila velha (mais de 30 dias)** se juntaram aos dois da fase 1. O
+> de vencidos não conta o que vence hoje: é trabalho do dia.
+
+> ⚠️ **NO TERMINAL, QUEM FEZ É O SCRIPT** (`terminal: limpar_fila.js`), e não um
+> nome inventado; o motivo é `--motivo "texto"`, ou *"rodado pelo terminal:
+> <script>"* sem ele. **O `limpar_fantasmas.js` agora apaga as peças junto**, que
+> era a divergência de efeito da fase 1. Quatro escolhas da construção esperam a
+> confirmação do dono em `docs/DECISOES.md` (02/10/2026).
+
+**Rode `node teste_correcao2.js` (98 casos) ao mexer nas ações da fase 2 e
+`node teste_correcao3.js` (23) ao mexer nos scripts** — o segundo monta o mesmo
+cenário em dois bancos, corrige um pelo botão e o outro **rodando os scripts de
+verdade**, e exige os dois iguais linha a linha, com o mesmo antes e depois em
+cada correção. Defeitos reintroduzidos: na fase 2, carimbo em hoje (reprova 7),
+sem a guarda da futura (5), fila embalada tirável (4), o sem-data sem corte
+(15), desfazer sem o "andou" (3), reabrir sempre embalado (1), coleta sem
+`retirado_em` (2), o bloco desfazendo metade (5) e a prévia do ajuste pela Mesa
+(1 — o caso nasceu dessa rodada); na fase 3, cada um dos cinco scripts na versão
+antiga reprova de 2 a 4 casos.
+
+> ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA.** A rodada foi num navegador meu, a
+> 1440 px, com banco semeado: os cinco contadores, o bloco de vencidos com a
+> prévia, a busca por SKU, o pedido de ajuste, a saída executada e o histórico.
+> A prova é o dono fechar um passivo de verdade pela tela, sem pedir script.
 
 > ⚠️ **Lançamento manual e PDF não se conversam.** O manual (`origem='manual'`)
 > não é apagado pelo recálculo. Usar os dois no mesmo SKU **duplica a ordem**.
@@ -3419,8 +3486,59 @@ de quem imprimiu (3). E há caso travando que a rota de liberação **não exist
 > 1440, 1024 e 400 px. A prova é o primeiro dia de expedição com a regra: a
 > caixa recusada para quem imprimiu e conferida por outra pessoa.
 
-**A fase 2 (a caixa de várias conferida peça a peça, às cegas, e as etiquetas de
-SKU coladas por fora da caixa — as do saco de cada persiana) ainda não existe.**
+### ⚠️ A CAIXA DE VÁRIAS, PEÇA A PEÇA E ÀS CEGAS (02/10/2026, fase 2 da spec `CARREGAMENTO-SEGUNDA-PESSOA`)
+
+```
+bipe da etiqueta de venda  →  📦 ESTA CAIXA LEVA 3 PERSIANAS · 0 de 3   (âmbar, SEM a lista)
+bipe de cada etiqueta de SKU, colada por fora  →  1 de 3 · 2 de 3 · 3 de 3
+bateu tudo  →  conferida (agência, fica na área) ou vai pro canto (coleta), como sempre
+SKU que não está na caixa, ou um a mais  →  PARA, e só agora mostra os dois lados
+```
+
+`POST /api/carregar/peca` (`{lote_id, sku}`) e `POST /api/carregar/recomecar`,
+com a chave do bipe (`carregamento.executar`). O contador é
+`lote_item.conferidos_carga`, coluna própria (o `conferidos` é o bipe da
+Etiqueta de Venda, de outra pessoa e outro momento). A régua de "caixa de
+várias" é o `VARIAS()`, que **saiu do `exp_route.js` e mora no `carga.js`**.
+
+> ⚠️ **A RESPOSTA NÃO TRAZ OS SKUs** — nem o `lote.codigo`, que é o SKU de uma
+> das peças e bastaria para entregar a primeira resposta. É a lição do inventário
+> cego (§18): quem sabe a resposta bipa até chegar nela. Os dois lados só
+> aparecem na divergência, como alarme, e a divergência vai para a auditoria.
+
+> ⚠️ **AS BARREIRAS SÃO AS MESMAS NO BIPE DE PEÇA** (`barrar()` no
+> `carreg_route.js`): cancelada, retida, já saída, sem etiqueta, já conferida e
+> **quem imprimiu** não andam nem peça a peça. E a caixa de várias **substitui**
+> o segundo bipe cego do `conf_carregamento` — aquele compara com um SKU só.
+
+> ⚠️ **O GUARD DE 700 ms ESTÁ NA TELA**, pela mesma razão da Etiqueta de Venda
+> (§5, #23): o leitor repete o código numa leitura só, e aqui isso contaria uma
+> persiana a mais. **A divergência não zera a contagem**; quem zera é o
+> "Recomeçar esta caixa". **"Deixar esta caixa"** larga a caixa sem apagar o que
+> foi bipado: voltar a ela continua de onde parou.
+
+> ⚠️ **NA IMPRESSÃO, A FRASE DA CAIXA (`fita(n)`) GANHOU A SEGUNDA PARTE** (P6):
+> *"Tire a etiqueta de SKU do saco de cada persiana e cole por fora da caixa."*
+> São as **do saco**, e não cópias — cópia não prova que a persiana entrou. Na
+> mesma função, para sair igual nos quatro lugares.
+
+> ⚠️ **A CAIXA DE UMA PERSIANA NÃO MUDOU**, e a de **1 SKU × 2** é caixa de
+> várias (conta persiana, nunca linha). Tablet com a página antiga em cache
+> mostraria "Etiqueta não reconhecida" no lugar da tela âmbar: **refresh forçado
+> no deploy**.
+
+**Rode `node teste_pecas_carga.js` (37 casos) ao mexer no bipe do
+`carreg_route.js`, no `VARIAS` ou na tela do Carregamento.** Seis defeitos
+reintroduzidos: a resposta entregando o SKU (reprova 1), o bipe de peça sem as
+barreiras (2), contar linha em vez de persiana (4), o "um a mais" passando (2),
+a caixa de várias andando direto (19) e a tela sem o guard de 700 ms (1 — o
+caso olhava só o número "700", que também está no comentário, e foi apertado
+nessa rodada). O `teste_carga.js` passou a conferir a caixa de várias peça a
+peça no cenário do adiantado.
+
+> ⚠️ **AINDA NÃO FOI CONFERIDO NA FÁBRICA.** A rodada foi num navegador meu, a
+> 1024 e 400 px. A prova é a primeira caixa de várias conferida por outra pessoa
+> com as etiquetas do saco coladas por fora.
 
 ### ⚠️ A SAÍDA DO CAMINHÃO (26/09/2026, fase 3 da spec `SAIDA-E-DUPLA-CONFERENCIA`)
 
@@ -3897,6 +4015,38 @@ aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não sil
 | **Leitor manda Tab ou espaço** | Código chega picado ou o Enter cai no vazio | Aceitar Enter **e** Tab; limpar com `replace(/[^A-Za-z0-9]/g,'')`; processar por timeout após a última tecla |
 | **`DELETE` em tabela que se auto-referencia** | Com `foreign_keys = ON`, `DELETE FROM t` (todas) **passa** — o FK imediato é conferido no **fim da instrução** —, mas `DELETE ... WHERE id=1` com a filha de pé é **recusado**. Um `DELETE` filtrado que hoje casa com tudo passa por sorte, e quebra no dia em que o filtro deixar alguém | Soltar o ponteiro antes, e **só de quem aponta para linha que vai sair** — limpar o ponteiro de quem fica apaga o vínculo em silêncio (`tecido/limpar_sobras.js`, §19) |
 
+### ⚠️ A ESTAÇÃO VIRA APP NO iPad — camada 2 da spec `TABLETS-E-KIOSK` (02/10/2026)
+
+As seis estações de tablet (`/operador`, `/montagem`, `/embalagem`,
+`/carregamento`, `/inventario`, `/devolucao`) têm as meta tags de app, o nome da
+estação, **o ícone dela** (`public/icones/<estação>-180|192|512.png`), **o
+manifest dela** (`public/app/<estação>.webmanifest`) e o `public/ipad.css`.
+Adicionada à Tela de Início, cada uma abre em tela cheia, direto na estação.
+
+> ⚠️ **UM MANIFEST POR ESTAÇÃO, E NÃO UM SÓ.** A spec escrevia um
+> `/app.webmanifest` único com `start_url` fixo **e** pedia um ícone por estação
+> — as duas coisas não cabem juntas: com um manifest só, todo tablet abriria na
+> mesma tela.
+
+> ⚠️ **`.webmanifest` ENTROU NA REGRA DAS EXTENSÕES DE APOIO** do `acesso.js`
+> (`@logado`). Com sessão aberta todo arquivo passa pelo `decidir` (§10, #29), e
+> sem a extensão o manifest levaria 403 — e o iPad o ignoraria **em silêncio**.
+
+> ⚠️ **O `ipad.css` TIRA A SELEÇÃO DO CORPO E DEVOLVE AOS CAMPOS.** Sem a segunda
+> regra o campo de bipe e o de digitar ficariam presos. É só das estações: as
+> telas de escritório (admin, relatórios) continuam selecionáveis.
+
+> ⚠️ **A CAMADA 1 É CONFIGURAÇÃO DO iPad, E NÃO TEM CÓDIGO** — bloqueio
+> automático em Nunca, notificações desligadas, Adicionar à Tela de Início,
+> Acesso Guiado com código. Está na §4 da spec, e é feita no tablet. **E o
+> `target="_blank"` das fotos no Carregamento ficou como está**: em tela cheia ele
+> abre o Safari, mas trocar por um link na mesma janela deixaria o operador sem
+> botão de voltar — é decisão de tela, anotada na spec.
+
+**Rode `node teste_tablets.js` (83 casos) ao mexer no cabeçalho de uma estação,
+no `ipad.css` ou nos manifests**, e `node teste_acesso.js` se mexer na regra das
+extensões.
+
 ### ⚠️ AS TELAS DO PCP FORAM MEDIDAS, E ELAS NÃO TÊM O DEFEITO (29/09/2026)
 
 Depois de consertar as sete do sob medida (§19), a pergunta óbvia era se o
@@ -4165,9 +4315,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 5 | Upload não permite escolher a data das vendas | Médio — vendas de amanhã entram como hoje |
 | 6 | `POST /api/revisao` retorna campos obsoletos (`estoque`, `pedido`, `feito`) | Baixo — confunde quem lê a API |
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
-| 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
+| 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) e `teste_correcao.js` (115); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37) e `teste_tablets.js` (83); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4230,6 +4380,17 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   que a equipe aprende a contornar (§5, a Mesa, e Bloqueados → escolher)
 - ❌ Dar backfill a `correcao.executar`: o Admin Geral passa por nível, e a chave
   chega ao dono no primeiro boot (§5, a Mesa · §4, o `kit.imprimir`)
+- ❌ Fazer um script de passivo escrever no `lote` ou na `fila` por conta própria:
+  ele chama a ação do `correcoes.js` e grava em `correcao` — terminal e botão com
+  a mesma régua (§5, a Mesa F3)
+- ❌ Pré-preencher a data de corte de "Fechar vencidos": ela é a prova de que
+  alguém conferiu o Mercado Livre (§5, a Mesa F2)
+- ❌ Reabrir como `embalado` a venda futura que nunca teve etiqueta: embalado sem
+  o −1 é a armadilha #27 (§5, a Mesa F2)
+- ❌ Fazer a Mesa aplicar ajuste de saldo: ela abre o pedido, e outra pessoa
+  aprova (§5, a Mesa F2 · §18)
+- ❌ Desfazer metade de um bloco: um volume que andou trava o bloco inteiro
+  (§5, a Mesa F2)
 - ❌ Calcular a falta de estoque fora do `demanda_dominio.js` — a aba Estoque e a
   tela azul do operador têm que dizer o mesmo número (§18)
 - ❌ Fazer a aprovação da contagem gravar o **número contado** como saldo: entre
@@ -4415,6 +4576,12 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   (§5, armadilha #27)
 - ❌ Fazer a reimpressão gravar `impresso_por`: o bipe 1 é a PRIMEIRA
   impressão, e papel repetido não é outra contagem (§8-B, fase 1 da saída)
+- ❌ Devolver os SKUs esperados na resposta do bipe da caixa de várias antes da
+  divergência — nem o `lote.codigo`: a conferência é cega (§8-B, CARREGAMENTO F2)
+- ❌ Escrever uma segunda régua de "caixa de várias" no Carregamento: é o
+  `VARIAS()` do `carga.js` (§8-B, CARREGAMENTO F2)
+- ❌ Colar cópia da etiqueta de SKU por fora da caixa: são as do saco de cada
+  persiana, e cópia não prova que a persiana entrou (§8-B, P6)
 - ❌ Deixar quem imprimiu conferir no Carregamento — desde 01/10/2026 o bipe da
   área e do canto RECUSA (§8-B, CARREGAMENTO-SEGUNDA-PESSOA)
 - ❌ Criar porta de liberação para quem imprimiu conferir, nem para o Admin
@@ -5445,6 +5612,40 @@ seção 6-G é esta) e `node teste_cobertura.js` (10).**
 > aprovação é de outra pessoa, o João aprovou e o saldo foi de 9 a 7, com a linha
 > no histórico. A prova é o **primeiro ajuste de verdade** pedido por uma pessoa e
 > aprovado por outra.
+
+### ⚠️ A ACURACIDADE E O RESERVADO — fase 4 do livro (02/10/2026)
+
+**Fase 4 da spec `ESTOQUE-LIVRO-E-CONFERENCIA.md`.** A aba Estoque ganhou duas
+leituras, e **nenhuma entra em conta nenhuma**:
+
+| | O que é | Onde |
+|---|---|---|
+| **reservado** | peças de volumes `pendente` (vendidos, ainda **sem etiqueta**) do SKU | sob o saldo, na linha: *"2 sem etiqueta · 3 livres"*, e no primeiro quadro |
+| **disponível** | físico − reservado; **pode ficar negativo** (é o que falta produzir) | idem |
+| **acuracidade do mês** | itens que **bateram na 1ª contagem** ÷ itens contados no mês | quadro próprio |
+| **diferença por motivo** | o \|delta\| aprovado no mês, por motivo, em peças — e em R$ só com `custo.ver` | no mesmo quadro |
+
+> ⚠️ **O RESERVADO NÃO MEXE NO `precisa`.** Quem decide quanto produzir continua
+> sendo o `demanda_dominio` (armadilha #12); há caso travando que o `precisa` é o
+> mesmo com e sem volume pendente. Conta **peça** (a caixa de várias reserva a
+> soma das `qtd`), deixa de fora modo teste, bloqueado e cancelado, e **sob
+> medida não tem reservado** — o saldo dela é sempre zero (§7).
+
+> ⚠️ **"SEM ETIQUETA", E NÃO "VENDIDA".** A coluna ao lado se chama "Vendido a
+> despachar" (o comprometido da planilha) e é outro número. Com a mesma palavra
+> nos dois, a tela diria uma coisa duas vezes — só apareceu abrindo a tela.
+
+> ⚠️ **ACERTO É O DA 1ª CONTAGEM.** O item que errou na 1ª e foi confirmado pela
+> 3ª não conta como acerto: a pergunta é se o saldo estava certo quando alguém foi
+> olhar. Sem contagem no mês a acuracidade é **traço**, nunca "0%". O SKU sem
+> custo deixa o valor da diferença como **piso**, e sem nenhum valor a linha fica
+> só com as peças — *"≥ R$ 0"* se leria como "não custou nada".
+
+**Rode `node teste_acuracidade.js` (23 casos) ao mexer no reservado, na
+acuracidade ou no `est_route.js`.** Sete defeitos reintroduzidos: contar linha
+em vez de peça (reprova 3), modo teste reservando (3), sob medida com reservado
+(3), o R$ viajando sem `custo.ver` (1), acuracidade 0% sem contagem (1), o
+confirmado pela 3ª contando como acerto (3) e a conta sem o corte do mês (4).
 
 > ⚠️ **O botão "aplicar alvo" diz quantos ele NÃO resolve.** O "Aplicar todos" do
 > Planejamento só grava em SKU **com venda na janela** — proposital: sem dado de

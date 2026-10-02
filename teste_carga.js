@@ -90,7 +90,14 @@ const ok=(n,c,extra)=>{ casos++;
    passar pelos dois — este ajudante faz isso e devolve o que o bipe da area
    dizia (pedido, adiantado) com o contador do carro depois. */
 async function noCarro(code){
-  const a=await chamar('POST /api/carregar',{code});
+  let a=await chamar('POST /api/carregar',{code});
+  /* A caixa de varias persianas e conferida PECA A PECA no Carregamento desde
+     02/10/2026 (CARREGAMENTO-SEGUNDA-PESSOA, fase 2): o teste bipa cada
+     persiana pela etiqueta de SKU, como a tela faz. */
+  if(!a.ok && a.motivo==='conferir_pecas'){
+    for(const i of db.prepare('SELECT codigo,qtd FROM lote_item WHERE lote_id=?').all(a.pedido.id))
+      for(let k=0;k<i.qtd;k++) a=await chamar('POST /api/carregar/peca',{lote_id:a.pedido.id,sku:i.codigo});
+  }
   if(!a.ok) return a;
   const c=await chamar('POST /api/viagem/carro',{code});
   const dd=await chamar('GET /api/carregamento');

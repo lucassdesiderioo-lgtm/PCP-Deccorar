@@ -158,7 +158,7 @@ module.exports = [
      NAO HA BACKFILL: o Admin Geral recebe toda chave por nivel (§10), entao ela
      chega ao dono no primeiro boot — a mesma decisao do `kit.imprimir` (§4). */
   { chave:'correcao.executar',    grupo:'Estoque',    nivel:'admin',
-    rotulo:'Mesa de correções',   desc:'Corrigir passivo da operação item por item — descartar volume fantasma e decidir a venda cancelada depois da etiqueta, com motivo e desfazer',
+    rotulo:'Mesa de correções',   desc:'Corrigir passivo da operação item por item — fantasma, cancelada depois da etiqueta, saída, vencidos, venda futura fechada e fila velha — com motivo e desfazer',
     sensivel:true },
   { chave:'alvo.editar',          grupo:'Estoque',    nivel:'admin',
     rotulo:'Definir alvo',        desc:'Travar o alvo de um SKU' },

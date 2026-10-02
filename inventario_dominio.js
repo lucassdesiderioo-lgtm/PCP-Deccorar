@@ -541,5 +541,32 @@ function andamento(db){
   return { ciclos, itens, conta, recentes, ciclo_qtd: cicloQtd(db) };
 }
 
-module.exports = { ABERTOS, CONFERIU, MOTIVOS, garantirSchema, conferencias, sugestao, abrir, encerrar,
+/* ─── A ACURACIDADE (fase 4 da spec, §8, 02/10/2026) ─────────────────────────
+   Itens que BATERAM na 1ª contagem ÷ itens contados, no mes corrente. "Bateu"
+   e o contado1 igual ao saldo guardado daquela contagem — a mesma pergunta que
+   decide o `confirmado` sozinho. A recontagem que acertou depois NAO conta como
+   acerto: a pergunta e se o saldo estava certo quando alguem foi olhar.
+   Sem contagem no periodo e NULL, nunca zero: "acuracidade 0%" e uma afirmacao
+   falsa (a licao do prazo cumprido, §19, 6-B). Modo teste fica fora. */
+function acuracidade(db, opcoes){
+  const desde = (opcoes && opcoes.desde) || db.prepare("SELECT date('now','localtime','start of month') d").get().d;
+  const r = db.prepare(`SELECT COUNT(*) contados,
+      SUM(CASE WHEN contado1 = saldo_na_contagem THEN 1 ELSE 0 END) certos
+    FROM inventario_item
+    WHERE contado1 IS NOT NULL AND em1 >= ? AND COALESCE(teste,0)=0`).get(desde);
+  const contados = r.contados || 0, certos = r.certos || 0;
+  return { desde, contados, certos, pct: contados ? Math.round(certos / contados * 1000) / 10 : null };
+}
+
+/* A diferenca aprovada no mes, por motivo, em PECAS (|delta|). O valor em R$ e
+   da rota, porque so ela sabe se quem pergunta tem `custo.ver` e qual o custo
+   de cada SKU (ficha_dominio, dono unico). */
+function diferencaPorMotivo(db, opcoes){
+  const desde = (opcoes && opcoes.desde) || db.prepare("SELECT date('now','localtime','start of month') d").get().d;
+  return db.prepare(`SELECT codigo, motivo, ABS(diferenca) pecas FROM inventario_item
+    WHERE status='aprovado' AND diferenca IS NOT NULL AND diferenca<>0
+      AND decidido_em >= ? AND COALESCE(teste,0)=0`).all(desde);
+}
+
+module.exports = { ABERTOS, CONFERIU, MOTIVOS, garantirSchema, acuracidade, diferencaPorMotivo, conferencias, sugestao, abrir, encerrar,
   contar, terminar, lista, aprovacao, aprovar, rejeitar, andamento, itemAberto, erro };

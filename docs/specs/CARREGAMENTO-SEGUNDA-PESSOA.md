@@ -7,7 +7,14 @@
 > **Muda uma decisão de 25/09/2026:** a decisão 2 da `SAIDA-E-DUPLA-CONFERENCIA`
 > ("sem segunda pessoa só MARCA, nunca trava"). Quando aprovada, a mudança vai para
 > o `CLAUDE.md` §8-B e para uma linha em `docs/DECISOES.md`, no mesmo commit do código.
-> Fases: 1 ☑ (no ar) · 2 ☐
+> Fases: 1 ☑ (no ar) · 2 ☑ (em código em 02/10/2026)
+>
+> **Fase 2 em código (02/10/2026):** `POST /api/carregar/peca` e `/recomecar`, a tela âmbar
+> sem a lista, a divergência com os dois lados e a auditoria, e a frase `fita(n)` com a
+> instrução de colar por fora as etiquetas do saco (P6). **Decidido na construção:** a
+> contagem é `lote_item.conferidos_carga` (coluna, não tabela); a divergência não zera, quem
+> zera é o "Recomeçar"; e há um "deixar esta caixa" que larga sem apagar. O `VARIAS` foi para
+> o `carga.js`. `teste_pecas_carga.js` (37). Falta o deploy e a primeira caixa real.
 
 ---
 
