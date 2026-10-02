@@ -7831,6 +7831,10 @@ porcentagem errada.
 > ✅ **PROVA 2 DE 4, EM 02/10/2026: A CORREÇÃO DO CORTE DE 01/10.** O dono fez a
 > correção pelo Histórico e disse *"deu certo"*. Faltam a foto no iPad e o caso
 > da S-000091.
+>
+> ✅ **PROVA 3 DE 4, EM 02/10/2026: A SOBRA LIDA PELA FOTO NO iPad.** O dono leu
+> a etiqueta de uma sobra pelo 📷 e disse *"deu certo"*. É a prova que os
+> testes com imagens sintéticas não davam (fase 6). Falta o caso da S-000091.
 
 ### Três regras do sob medida que valem citar aqui
 
