@@ -97,7 +97,7 @@ function fileira(rotulo,itens,sel,aoEscolher,novo){
       if(nome===null||!nome.trim()) return;
       try{
         const criado=await api(novo.rota,{metodo:'POST',corpo:{...novo.corpo,nome:nome.trim()}});
-        banner(novo.rotulo+' "'+criado.nome+'" criada. A chefia confere depois — o rolo nao espera.');
+        banner(novo.rotulo+' "'+criado.nome+'" criada. Fica pendente de conferência — o rolo não espera.');
         await novo.aoCriar(criado);
       }catch(e){}
     }}));
@@ -526,7 +526,7 @@ async function telaEntrada(pai){
       i.value=estado.larguraOutra||'';
       i.addEventListener('input',()=>{ estado.larguraOutra=i.value; estado.largura=null;
         aviso.textContent=i.value.trim()&&!larguras.some(l=>l.valor===dLargura.arred(i.value))
-          ? 'Esta bobina ainda nao esta na lista. Ela entra junto com o rolo e vira botao na proxima entrada — a chefia confere depois. Confira a virgula: o campo e em METROS (2,50 e nao 250).'
+          ? 'Esta bobina ainda nao esta na lista. Ela entra junto com o rolo e vira botao na proxima entrada — fica pendente de conferência. Confira a virgula: o campo e em METROS (2,50 e nao 250).'
           : ''; });
     }
     b.appendChild(i); campos[id]=i; linha.appendChild(b);

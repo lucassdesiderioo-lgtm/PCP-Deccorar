@@ -1088,7 +1088,7 @@ async function detalheCorte(id,pai){
     d.correcoes.forEach(k=>{
       const bx=el('div',{style:'border-left:4px solid '+(k.status==='pendente'?'var(--alerta)':k.status==='aprovada'?'var(--bom)':'var(--linha-forte)')+
         ';padding:6px 12px;margin:8px 0'});
-      bx.appendChild(el('div',{style:'font-weight:600',texto:'Correção '+k.id+' · '+({pendente:'esperando a chefia',aprovada:'aprovada',recusada:'recusada'})[k.status]+
+      bx.appendChild(el('div',{style:'font-weight:600',texto:'Correção '+k.id+' · '+({pendente:'aguardando aprovação',aprovada:'aprovada',recusada:'recusada'})[k.status]+
         ' · pedida por '+(k.pedida_por||'—')+' em '+quando(k.pedida_em)+(k.decidida_por?' · '+k.status+' por '+k.decidida_por+' em '+quando(k.decidida_em):'')}));
       bx.appendChild(el('div',{class:'quem',texto:'Motivo: '+(k.motivo_nome||'—')+(k.observacao?' — '+k.observacao:'')}));
       if(k.decisao_motivo) bx.appendChild(el('div',{class:'quem',texto:'Recusada porque: '+k.decisao_motivo}));
@@ -1127,7 +1127,7 @@ function formCorrecao(d,pai){
   const bx=el('div',{class:'cartao',style:'border-color:var(--alerta);margin-top:14px'});
   pai.appendChild(bx);
   bx.appendChild(el('h3',{style:'margin-top:0',texto:'Pedir correção do corte '+d.id}));
-  bx.appendChild(el('p',{class:'nota',texto:'Diga de onde cada item saiu de verdade. Enquanto a chefia não aprovar, nada no estoque muda.'}));
+  bx.appendChild(el('p',{class:'nota',texto:'Diga de onde cada item saiu de verdade. Enquanto a correção não for aprovada, nada no estoque muda.'}));
   const opcoesFonte=d.fontes.map(f=>({valor:f.fonte+':'+f.id, nome:(f.fonte==='rolo'?'rolo ':'sobra ')+f.codigo}));
   const linhas=[];
   const t=el('table',{});
@@ -1178,10 +1178,10 @@ function formCorrecao(d,pai){
     try{ const v=await api('/api/planos/'+d.id+'/correcao/previa',{metodo:'POST',corpo:{edicoes:eds}});
       limpar(saida).appendChild(desenharPrevia(v)); btEnviar.disabled=false; }catch(e){ beep('erro'); }
   }});
-  const btEnviar=el('button',{class:'bt primario',disabled:'disabled',texto:'Enviar para a chefia',onclick:async()=>{
+  const btEnviar=el('button',{class:'bt primario',disabled:'disabled',texto:'Enviar para aprovação',onclick:async()=>{
     let eds; try{ eds=edicoes(); }catch(e){ return banner(e.message,'alerta'); }
     try{ await api('/api/planos/'+d.id+'/correcao',{metodo:'POST',corpo:{edicoes:eds,motivo_id:Number(sm.value),observacao:obs.value}});
-      beep(); banner('Pedido de correção enviado. Nada mudou no estoque até a chefia aprovar.','bom',6); telaHistorico();
+      beep(); banner('Pedido de correção enviado. Nada mudou no estoque até a correção ser aprovada.','bom',6); telaHistorico();
     }catch(e){ beep('erro'); }
   }});
   bx.appendChild(el('div',{class:'campos',style:'margin-top:10px'},[btVer,btEnviar]));

@@ -320,7 +320,7 @@ function camposContato(dados){
   for(const c of ['papel','telefone','email']) if(dados[c]!==undefined) fora[c]=texto(dados[c]);
   if(dados.nome!==undefined){
     const n=texto(dados.nome);
-    exigir(n,'nome_obrigatorio','O contato precisa de um nome — telefone sem dono nao se usa.');
+    exigir(n,'nome_obrigatorio','O contato precisa de um nome — telefone sem nome não se usa.');
     fora.nome=n;
   }
   if(dados.principal!==undefined) fora.principal=dados.principal?1:0;

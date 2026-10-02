@@ -148,7 +148,7 @@ function biparKit(codigo,codigoKit,usuario){
      dentro do plastico. */
   exigir(kit&&kit.codigo_barras,'kit_sem_codigo',
     'Esta peça leva '+descreveKit(kit)+', e esse kit está sem código de barras no cadastro. '+
-    'Sem ele não dá para conferir — avise a chefia antes de fechar a caixa.');
+    'Sem ele não dá para conferir — avise quem cuida do catálogo antes de fechar a caixa.');
 
   exigir(limpo(codigoKit)===limpo(kit.codigo_barras),'kit_errado',
     'Kit errado. Esta persiana leva '+descreveKit(kit)+'.');
@@ -221,7 +221,7 @@ function bipar(codigo,usuario){
 function fecharPendencia(codigo,dados,usuario){
   const c=achar(codigo);
   exigir(permissoes.pode(usuario,'producao.pendencia'),'sem_permissao',
-    'Fechar pendência é da chefia: é ela que responde por uma peça dada como '+
+    'Fechar pendência pede permissão própria: quem fecha responde por uma peça dada como '+
     'feita sem o bipe de quem fez.');
   const motivo=String((dados&&dados.motivo)||'').trim();
   exigir(motivo,'motivo_obrigatorio','Diga por que esta peça está sendo fechada sem o bipe. '+
@@ -335,7 +335,7 @@ function recusar(codigo,dados,usuario){
   const motivo_id=Number((dados&&dados.motivo_id)||0);
   exigir(motivo_id,'motivo_obrigatorio','Escolha o motivo: é ele que diz qual peça volta.');
   const m=motivos.porId(motivo_id);
-  exigir(m,'motivo_inexistente','Este motivo não está mais no cadastro. Avise a chefia.');
+  exigir(m,'motivo_inexistente','Este motivo não está mais no cadastro. Avise quem cuida dos cadastros.');
   exigir(m.ativo,'motivo_inativo','O motivo "'+m.nome+'" foi desativado. Escolha outro.');
 
   const irmaos=d.doItem(c.item_id);
@@ -439,10 +439,10 @@ function listarMotivos(codigo){
       sem_motivo='A '+nomeDoSetor(c.setor)+' é a primeira bancada desta persiana — '+
         'não há trabalho anterior para recusar.';
     else if(!motivos.ativos().length)
-      sem_motivo='Não há motivo de recusa cadastrado. Quem cadastra é a chefia, em Cadastros.';
+      sem_motivo='Não há motivo de recusa cadastrado. O cadastro é em Cadastros → Motivos.';
     else
       sem_motivo='Nada do que vem antes desta peça está pronto para ser recusado. '+
-        'Se falta alguém bipar o fim, a chefia resolve pela pendência.';
+        'Se falta alguém bipar o fim, o caminho é fechar pela pendência.';
   }
   return {codigo:c.codigo_etiqueta, setor:c.setor,
           setor_nome:nomeDoSetor(c.setor), motivos:lista, sem_motivo};

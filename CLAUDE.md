@@ -3997,7 +3997,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (27), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6) e `teste_destino.js` (15); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (27), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15) e `teste_linguagem.js` (13); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4820,6 +4820,12 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   os relatórios das duas ficariam errados (§19, 5-B2, e a §4.16 da spec)
 - ❌ Apagar motivo de recusa com história atrás, ou deixar o cadastro nascer
   vazio: o vazio faz o botão "Recusar" abrir uma lista sem nada (§19, 5-B2)
+- ❌ Criar tela interna sem o `nav.js` da operação: ela nasce sem "Trocar
+  setor" e sem o atalho, e a pessoa só sai pelo login (§20, Regra A)
+- ❌ Escrever chefia, chefe, patrão, dono ou gestão em texto que aparece para
+  quem usa o sistema — nomeie a etapa, ou o nível de acesso (§20, Regra B)
+- ❌ Escrever uma segunda lista de "para onde a pessoa vai": é o `destino.js`,
+  e foi a cópia do login que mandava o vendedor de volta ao PIN (§20)
 
 ---
 
@@ -7871,4 +7877,97 @@ done
 Telas `302`, API `401`, `/login` `200`. E `/sobmedida/telas/corte.html` tem que
 dar **403 mesmo para o diretor logado** — se der `200`, o `express.static` do
 módulo furou o portão, que é a armadilha #3 por outra porta.
+
+---
+
+## 20. Navegação e linguagem — as duas regras de toda tela (02/10/2026)
+
+Spec `docs/specs/NAVEGACAO-E-LINGUAGEM.md`, decidida pelo Lucas em 02/10/2026,
+com as duas linhas em `docs/DECISOES.md`.
+
+### Regra A — toda tela interna tem a troca de operação
+
+No **canto superior direito** de toda tela interna das duas operações, com o
+mesmo lugar e o mesmo visual:
+
+| Botão | Aparece para | Leva a |
+|---|---|---|
+| **Trocar setor** | todo mundo | `/setor` |
+| **Sob medida →** (na medida padrão) | só quem alcança as duas operações | `/sobmedida` |
+| **Medida padrão →** (no sob medida) | idem | a **primeira tela da medida padrão que a pessoa alcança** |
+
+Ficam fora: o `/login`, a própria `/setor` e o portal da revenda (quando
+existir). **Tela nova usa o `nav.js` da sua operação** (`/nav.js` no PCP,
+`/sobmedida/nav.js` no módulo) e com isso já nasce com o botão.
+
+> ⚠️ **ESCONDER O BOTÃO NÃO É SEGURANÇA.** Quem tranca continua sendo o
+> `auth.js` e o portão do `tecido/montar.js`. O botão só evita mostrar um
+> caminho que dá "sem permissão".
+
+> ⚠️ **`destino.js` É O DONO ÚNICO DE "PARA ONDE A PESSOA VAI"**, e o
+> `/api/auth/eu` e a resposta do login o devolvem em `destino` (`padrao`,
+> `sobmedida`, `duas`, `inicial`). O login, a `/setor` e as duas barras leem
+> dali. **A lista existia em duas cópias e elas já tinham divergido**: a do
+> `login.html` só reconhecia `sobmedida` e `sobmedida_adm` como sob medida, e
+> quem tinha só a área de **vendedor** ou de um dos **cinco setores da
+> produção** voltava ao login depois de digitar o PIN. Tela nova da medida
+> padrão entra na lista `PADRAO` de lá.
+
+> ⚠️ **O "← Medida padrão" DO RODAPÉ DO SOB MEDIDA SAIU.** Ele apontava para
+> `/`, que é o admin, e quem não tinha admin caía em "sem permissão".
+
+### Regra B — o texto não nomeia hierarquia
+
+Em texto que **quem usa o sistema vê** — tela, botão, selo, erro, ajuda, nome
+de permissão e o que os scripts escrevem no terminal — não entram **chefia,
+chefe, patrão, dono, gestão**. O texto **nomeia a etapa** (*Enviar para
+aprovação · Aguardando aprovação · Pendente de conferência*); quando precisa
+nomear alguém, usa o **nível de acesso** (Operação, Supervisor, Admin, Admin
+Geral) ou a **permissão** (*quem tem permissão para gerir cortes*).
+
+> **Por quê:** quem aprova é decidido pela permissão, não pelo cargo. "Enviar
+> para o admin" passa a mentir no dia em que a permissão vai para um
+> Supervisor.
+
+Ficam fora: comentário de código, este arquivo, `docs/` e o termo técnico
+**"dono único"**.
+
+> ⚠️ **TROCAR O TEXTO DE UMA PERMISSÃO É SÓ O `nome`, NUNCA A CHAVE.** A chave
+> `sobra.propor` continua igual e o rótulo virou *"Propor correção de sobra"*:
+> mudar a chave tiraria a permissão de quem já a tem, em silêncio (armadilha
+> #13, §19).
+
+> ⚠️ **TRÊS COISAS COM A PALAVRA FICAM, E O TESTE AS NOMEIA:** o valor gravado
+> `origem='gestao'` em `lote_item` (é dado, não aparece em tela nenhuma) e os
+> nomes das migrações 8, 13 e 21 do `tecido.db` (história do banco, já
+> aplicada). As duas saídas de passivo já gravadas (#1 e #3) também ficam como
+> estão; o que mudou foi o texto de uma rodada futura do script.
+
+### O teste que segura as duas — `teste_linguagem.js` (13 casos)
+
+Ele lê **o texto que pode chegar à tela** pelo `texto_visivel.js`: literais de
+texto dos `.js`, texto e `<script>` dos `.html`, e deixa de fora comentário,
+`<style>`, expressão regular e o comentário `/* */` do SQL dentro de template.
+E confere que toda tela interna carrega o `nav.js` **da sua operação**.
+
+> ⚠️ **O LEITOR TEM QUE SABER O QUE É REGEX, E O PRIMEIRO NÃO SABIA.** A
+> varredura improvisada da fase 2 tratava a aspa de `/'/g` como começo de
+> string e passava a ler comentário como texto — acusou dez comentários. Os
+> seis primeiros casos travam o leitor (comentário, regex, divisão, HTML, SQL
+> e "dono único") antes de confiar no que ele acha.
+
+> ⚠️ **AS EXCEÇÕES SÃO NOMEADAS, E A ZUMBI REPROVA.** Cada uma tem arquivo,
+> trecho e motivo; exceção que deixou de existir no código reprova o caso.
+> Lista de exceção que só cresce é onde o texto proibido entra sem ninguém ver.
+
+**Rode `node teste_linguagem.js` e `node teste_destino.js` ao criar tela, mexer
+em texto de tela, mensagem de erro, nome de permissão, nas barras ou no
+login.** Cinco defeitos foram reintroduzidos um a um e cada um reprova o seu
+caso: texto de tela de volta, mensagem de domínio, nome de permissão, tela sem
+barra e tela com a barra da outra operação. Um comentário com a palavra
+**passa**, como deve.
+
+> ✅ **A FASE 1 ESTÁ NO AR DESDE 02/10/2026** (PR #169), e o dono disse *"deu
+> bom"*. Os três perfis (só medida padrão, só sob medida, as duas) não foram
+> relatados um a um.
 

@@ -102,7 +102,7 @@ function fileira(rotulo,itens,selecionado,aoEscolher,novo){
       if(nome===null||!nome.trim()) return;
       try{
         const criado=await api(novo.rota,{metodo:'POST',corpo:{...novo.corpo,nome:nome.trim()}});
-        banner(novo.rotulo+' "'+criado.nome+'" criada. A chefia confere depois.','bom',3);
+        banner(novo.rotulo+' "'+criado.nome+'" criada. Fica pendente de conferência.','bom',3);
         await novo.aoCriar(criado);
       }catch(e){}
     }}));
@@ -511,8 +511,8 @@ async function telaLista(pai){
     // linha ja foi outra coisa, e o historico esta a um toque no Corrigir.
     const celCod=el('td',{},[s.codigo]);
     if(s.propostas_pendentes) celCod.appendChild(el('span',{class:'tag rolo',style:'margin-left:8px',
-      title:'a bancada apontou um erro nesta sobra; a chefia ainda nao decidiu',
-      texto:'aguardando chefia'}));
+      title:'a bancada propôs uma correção nesta sobra; aguardando aprovação',
+      texto:'Aguardando aprovação'}));
     if(s.correcoes) celCod.appendChild(el('span',{class:'tag sobra',style:'margin-left:8px',
       title:s.correcoes+' correcao(oes) — abra a sobra para ver o historico',
       texto:'corrigida'}));
@@ -724,7 +724,7 @@ async function cartaoCorrigir(pai,s,modo){
     limpar(c);
     c.appendChild(el('h2',{texto:(propondo?'Apontar erro na sobra ':'Corrigir sobra ')+s.codigo}));
     if(propondo) c.appendChild(el('p',{class:'nota',texto:
-      'Marque como a sobra deveria estar. Nada muda agora: a chefia recebe o apontamento, confere e aceita ou recusa — e a resposta aparece nesta sobra.'}));
+      'Marque como a sobra deveria estar. Nada muda agora: a correção vai para aprovação e a resposta aparece nesta sobra.'}));
     c.appendChild(el('p',{class:'nota',texto:'Hoje: '+[s.linha_nome,s.abertura_nome,s.cor_nome].join(' · ')+
       '  ·  '+formatarMedida(s.largura,s.altura)+'  ·  '+(s.condicao_nome||s.condicao)+
       (s.endereco?'  ·  '+s.endereco:'')+
@@ -779,11 +779,11 @@ async function cartaoCorrigir(pai,s,modo){
         value:ed.motivo||'',style:'font-size:18px;min-height:52px'});
       motivo.addEventListener('input',()=>{ ed.motivo=motivo.value; });
       const b=el('div',{class:'campo cresce'});
-      b.appendChild(el('label',{texto:'MOTIVO (a chefia le isto)'})); b.appendChild(motivo);
+      b.appendChild(el('label',{texto:'MOTIVO · visível para quem aprova'})); b.appendChild(motivo);
       c.appendChild(el('div',{class:'campos'},[b]));
     }
     const bt=el('button',{class:'bt primario',style:'min-height:56px',
-      texto:propondo?'Enviar para a chefia':'Salvar correcao'});
+      texto:propondo?'Enviar para aprovação':'Salvar correcao'});
     bt.onclick=async()=>{
       if(!ed.tecido_id) return faltou('Escolha o tecido.');
       if(comoNumero(larg.value)===null) return faltou('Escolha a largura.');
@@ -797,7 +797,7 @@ async function cartaoCorrigir(pai,s,modo){
         if(propondo){
           const p=await api('/api/sobras/'+s.id+'/propostas',{metodo:'POST',corpo:{...corpo,motivo:motivo.value}});
           beep();
-          banner(s.codigo+' apontada para a chefia: '+p.itens.map(m=>fmtMud(m)).join(' · '),'bom',6);
+          banner(s.codigo+' enviada para aprovação: '+p.itens.map(m=>fmtMud(m)).join(' · '),'bom',6);
         }else{
           const r=await api('/api/sobras/'+s.id,{metodo:'PUT',corpo});
           if(!r.mudancas.length){ banner('Nada mudou na sobra '+s.codigo+'.','alerta',3); }
@@ -836,7 +836,7 @@ async function cartaoCorrigir(pai,s,modo){
       c.appendChild(el('h2',{style:'margin-top:16px',texto:'Apontamentos da bancada'}));
       const t=el('table',{});
       apontamentos.forEach(p=>{
-        const estadoTxt=p.status==='pendente'?'aguardando chefia'
+        const estadoTxt=p.status==='pendente'?'Aguardando aprovação'
           :p.status==='aceita'?'aceito por '+(p.decidido_por||'?')+' em '+String(p.decidido_em||'').slice(0,16)
           :'recusado por '+(p.decidido_por||'?')+(p.decisao_motivo?': "'+p.decisao_motivo+'"':'');
         t.appendChild(el('tr',{},[
