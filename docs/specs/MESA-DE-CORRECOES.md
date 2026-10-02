@@ -1,4 +1,4 @@
-> **STATUS · 02/10/2026 — EM CONSTRUÇÃO** · **fase 1 em código**; fases 2 e 3 planejadas
+> **STATUS · 02/10/2026 — EM CONSTRUÇÃO** · **fase 1 no ar (PR #174)**; fases 2 e 3 planejadas
 >
 > **Fase 1** entrou em 02/10/2026: `correcoes.js` (dono único de cada ação),
 > `correcao_route.js` (7 rotas), a tabela `correcao`, a aba **Correções** no admin, a
@@ -28,6 +28,8 @@
 >   — sem a marca ele nunca zerava;
 > - **uma rota a mais que as seis da §5.3**: `GET /api/correcao/passivo`, que serve os
 >   contadores do topo.
+>
+> ✅ **NO AR**, confirmado pelo dono em 02/10/2026.
 >
 > ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA.** A rodada foi num navegador, a 1440 px,
 > com banco semeado. A prova que fecha a fase é o dono corrigindo um passivo de
