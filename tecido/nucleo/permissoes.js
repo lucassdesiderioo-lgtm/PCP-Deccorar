@@ -44,7 +44,7 @@ const CHAVES=[
      nao tem onde registrar, o erro fica na cabeca dela ate a chefia passar
      por ali — dado na memoria em vez de no sistema, a doenca de sempre. O
      apontamento nao muda a sobra: vira correcao so quando a chefia aceita. */
-  {chave:'sobra.propor',      nome:'Apontar erro numa sobra para a chefia corrigir'},
+  {chave:'sobra.propor',      nome:'Propor correção de sobra'},
   {chave:'sobra.descartar',   nome:'Descartar sobra'},
   {chave:'etiqueta.imprimir', nome:'Imprimir lote de etiquetas de sobra'},
   /* VER PRECO E CHAVE SEPARADA, e quem nao tem NAO RECEBE OS CAMPOS — o JSON
