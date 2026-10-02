@@ -364,7 +364,7 @@ function reabrir(id,motivo,usuario){
 function exigirCarteira(p,usuario){
   if(pode(usuario,'pedido.aprovar_qualquer')) return;
   exigir(p.vendedor_usuario_id,'revenda_sem_vendedor',
-    'A revenda "'+p.revenda_nome+'" nao tem vendedor apontado. Quem aprova, entao, e a chefia.');
+    'A revenda "'+p.revenda_nome+'" não tem vendedor apontado. Quem aprova, então, é quem tem permissão para aprovar pedidos de qualquer carteira.');
   exigir(usuario&&Number(usuario.id)===Number(p.vendedor_usuario_id),'carteira_de_outro',
     'A revenda "'+p.revenda_nome+'" e da carteira de '+p.vendedor_nome+'.');
 }

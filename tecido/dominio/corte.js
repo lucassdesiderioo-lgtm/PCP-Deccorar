@@ -52,7 +52,7 @@ function exigirCorte(id){
 function exigirDono(p,usuarioNome,op){
   if((op&&op.gerir)||p.usuario_nome===usuarioNome) return;
   throw new ErroDeRegra('corte_de_outro',
-    'O corte '+p.id+' e de '+(p.usuario_nome||'outra pessoa')+'. So quem abriu o corte, ou a chefia, mexe nele.');
+    'O corte '+p.id+' e de '+(p.usuario_nome||'outra pessoa')+'. Só quem abriu o corte, ou quem tem permissão para gerir cortes, mexe nele.');
 }
 function exigirEtapa(p,etapas,oque){
   exigir(etapas.includes(p.etapa),'etapa_errada',
@@ -356,7 +356,7 @@ function guardar(id,dados,usuarioNome,op){
   exigir(!g.cancelada_em,'a_guardar_cancelada','Esta sobra saiu numa correcao do corte e nao existe mais.');
   if(!((op&&op.gerir)||g.cortado_por===usuarioNome))
     throw new ErroDeRegra('a_guardar_de_outro',
-      'Esta sobra e de '+(g.cortado_por||'outra pessoa')+'. Quem guarda e quem cortou, ou a chefia.');
+      'Esta sobra e de '+(g.cortado_por||'outra pessoa')+'. Quem guarda é quem cortou, ou quem tem permissão para gerir cortes.');
   const veio=k=>d[k]!==undefined&&d[k]!==null&&String(d[k]).trim()!=='';
   exigir(veio('largura')&&veio('altura'),'medida_faltando',
     'Meca a sobra e escolha a largura e a altura — a do sistema e calculada, a que vale e a da fita.');
@@ -652,7 +652,7 @@ function pedirCorrecao(id,dados,usuarioNome){
   const c=exigirCorte(id);
   exigirEtapa(c,['feito'],'pedir correcao'+(ABERTAS.includes(c.etapa)?' (o corte ainda esta aberto: mude o plano direto nele)':''));
   const pend=db.prepare("SELECT * FROM plano_correcao WHERE plano_id=? AND status='pendente'").get(c.id);
-  exigir(!pend,'correcao_pendente','O corte '+c.id+' ja tem uma correcao esperando a chefia, pedida por '+
+  exigir(!pend,'correcao_pendente','O corte '+c.id+' já tem uma correção aguardando aprovação, pedida por '+
     ((pend&&pend.pedida_por)||'alguem')+'. Espere a decisao, ou fale com quem pediu.');
   const m=motivoDe(dados&&dados.motivo_id);
   const v=previa(c,(dados||{}).edicoes);

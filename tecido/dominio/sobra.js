@@ -219,7 +219,7 @@ function propor(sobra_id,dados,usuarioNome){
     'Nada esta diferente do que ja esta gravado. Marque o que esta errado antes de enviar.');
   const pend=dProposta.pendenteDe(s.id);
   exigir(!pend,'proposta_pendente',
-    'A sobra '+s.codigo+' ja tem um apontamento esperando a chefia. Fale com quem apontou, ou espere a decisao.');
+    'A sobra '+s.codigo+' já tem uma correção aguardando aprovação. Fale com quem propôs, ou espere a decisão.');
 
   const id=dProposta.criar({sobra_id:s.id, ...novo,
     motivo:String(dados.motivo||'').trim()||null, criado_por:usuarioNome});

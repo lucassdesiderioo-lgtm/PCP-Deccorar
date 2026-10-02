@@ -1,6 +1,6 @@
 # Navegação entre operações e linguagem do sistema
 
-> **STATUS: em construção** · **fase 1 no ar (02/10/2026, PR #169)** · fases 2 a 4 planejadas
+> **STATUS: implementada** · **fase 1 no ar (02/10/2026, PR #169)** · **fases 2, 3 e 4 em código (02/10/2026), falta o deploy** · vai para `docs/arquivo/` depois do deploy conferido
 > Desenhada no Projeto do Claude com o Lucas, em 02/10/2026.
 > Tipo: AJUSTE (telas atuais) + duas REGRAS de desenvolvimento (valem para toda tela nova).
 > Risco: 🟢 nos textos e 🟡 no botão, porque ele lê as áreas de acesso para decidir se aparece. Nenhuma fase mexe em estoque, banco ou permissão.
@@ -8,9 +8,9 @@
 | Fase | O quê | Situação |
 |---|---|---|
 | 1 | Botão de troca de operação nas duas barras | **no ar (02/10, PR #169)** — ver nota abaixo |
-| 2 | Troca dos textos de hierarquia | planejado |
-| 3 | Testes de proteção das duas regras | planejado |
-| 4 | Regras no papel (`CLAUDE.md`, `DECISOES.md`) | planejado |
+| 2 | Troca dos textos de hierarquia | **em código (02/10)** — ver nota abaixo |
+| 3 | Testes de proteção das duas regras | **em código (02/10)** — `teste_linguagem.js` |
+| 4 | Regras no papel (`CLAUDE.md`, `DECISOES.md`) | **em código (02/10)** — `CLAUDE.md` §20 |
 
 > **Fase 1, como foi construída (02/10/2026):**
 > - O dono único do destino é o `destino.js`, na raiz do projeto, usado pelo `auth.js`: o `/api/auth/eu` e a resposta do login trazem `destino` (`padrao`, `sobmedida`, `duas`, `inicial`). As duas barras, a `/setor` e **o login** leem dali.
@@ -20,6 +20,13 @@
 > - `teste_destino.js` (15 casos).
 > - ✅ **No ar em 02/10/2026 (PR #169):** o dono fez o deploy e disse *"ficou lindo, deu bom"*.
 > - ⚠️ **Isso prova que a barra sobe e aparece; os três perfis não foram relatados um a um** (só medida padrão sem o atalho, o vendedor só do sob medida entrando direto depois do PIN, e o atalho nos dois sentidos para quem tem as duas). Prova que não foi feita se escreve como não feita.
+
+> **Fases 2 a 4, como foram construídas (02/10/2026):**
+> - **A busca refeita achou 17 textos além dos 14 da tabela da §4**, quase todos de 01/10 (tela de Corte em etapas e bancada da produção). Os textos novos foram aprovados pelo Lucas; onde era preciso nomear alguém, o texto nomeia a **permissão** ("quem tem permissão para gerir cortes").
+> - `texto_visivel.js` é o leitor do teste: separa comentário, string, regex e o comentário `/* */` do SQL em template. O leitor improvisado da busca acusava comentários como texto, porque não sabia o que é regex.
+> - **Quatro exceções nomeadas no teste:** `origem='gestao'` (dado) e os nomes das migrações 8, 13 e 21 do `tecido.db`. Exceção que some do código reprova.
+> - A Regra A também confere `views/acessos.html` (a tela de Acessos), que a spec não citava, e que a tela do sob medida carrega o `nav.js` **do módulo**, e não o do PCP.
+> - Fica para o deploy: abrir as telas de Sobras (propor correção) e Corte (pedir correção) com dado de verdade — as trocas ali estão em fluxos que pedem uma sobra e um corte feito.
 
 ---
 

@@ -59,7 +59,7 @@ function fecharPassivo(db, opcoes){
     saida_id = db.prepare(`INSERT INTO saida (tipo, fechada_em, fechado_por, qtd_sistema, ids, motivo)
       VALUES ('passivo', datetime('now','localtime'), 'fechar_saida_passivo.js', ?, ?, ?)`)
       .run(caixas.length, JSON.stringify(caixas.map(c => c.id)),
-           'limpeza de 25/09/2026: o dono confirmou que as caixas esperando o caminhao ja sairam')
+           'limpeza de 25/09/2026: confirmado em 25/09/2026 que as caixas esperando o caminhao ja sairam')
       .lastInsertRowid;
     /* `retirado_em IS NULL` na guarda: duas rodadas ao mesmo tempo nao fecham
        a mesma caixa duas vezes. */
@@ -138,7 +138,7 @@ function fecharNaoBipadas(db, opcoes){
       VALUES ('passivo', datetime('now','localtime'), 'fechar_saida_passivo.js --nao-bipadas', ?, ?, ?)`)
       .run(caixas.length, JSON.stringify(caixas.map(c => c.id)),
            'limpeza de 01/10/2026: caixas com etiqueta impressa e nunca bipadas, ate ' + ate +
-           '; o dono confirmou que todas ja sairam').lastInsertRowid;
+           '; confirmado em 01/10/2026 que todas ja sairam').lastInsertRowid;
     /* A guarda repete o criterio: duas rodadas ao mesmo tempo nao fecham a
        mesma caixa duas vezes, e uma caixa bipada no meio nao e atropelada. */
     const up = db.prepare(`UPDATE lote SET estagio='carregado', carregado_em=@t, saida_id=@s,
