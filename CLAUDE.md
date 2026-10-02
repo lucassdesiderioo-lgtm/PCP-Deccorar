@@ -8217,3 +8217,11 @@ reintroduzidos, e cada um reprova o seu caso.
 > server.js --name expedicao`. É a armadilha do §12 acontecendo de verdade —
 > por isso o deploy do §13 passa a usar o par.
 
+> ⚠️ **O CARTÃO "O CAMINHO DE UMA PEÇA" SÓ APARECE A QUEM CORTA TECIDO**
+> (02/10/2026, PR #178). Ele descreve rolo → plano de corte → sobra →
+> etiqueta, e aparecia também para o vendedor, que não faz esse trabalho.
+> Hoje ele aparece só para quem alcança `/corte`, `/rolos`, `/sobras` ou
+> `/etiquetas` (`ESTOQUE_TECIDO`, na `inicio.html`), e nasce escondido para não
+> piscar antes do `/api/eu`. Ajuda que fala do trabalho de outra pessoa é
+> texto que se aprende a não ler. ✅ No ar e conferido pelo dono no mesmo dia.
+
