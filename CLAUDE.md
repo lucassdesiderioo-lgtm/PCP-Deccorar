@@ -7814,6 +7814,16 @@ foram reintroduzidos um a um: sem o critério do refugo, sem a condição, a lis
 sumindo com sobra usada, o descarte entrando na média, a média zero e a
 porcentagem errada.
 
+> ✅ **NO AR EM 01/10/2026** (PR #165): o dono fez o deploy e disse *"ficou
+> certo"*.
+>
+> ⚠️ **ISSO PROVA QUE O SISTEMA SUBIU, E NÃO QUE O CORTE EM ETAPAS FUNCIONA NA
+> BANCADA.** Faltam quatro provas, e a spec só vai para `docs/arquivo/` depois
+> delas: um corte inteiro pelas etapas, com rolo e sobra baixando **só no Corte
+> feito**; a correção do corte de 01/10 pedida pelo Histórico e aprovada por
+> outra pessoa; o iPad achando a sobra pela foto; e o caso da S-000091 no plano.
+> Prova que não foi feita se escreve como não feita (§4).
+
 ### Três regras do sob medida que valem citar aqui
 
 **Cada nível guarda um rolo só.** Regra do dono, 15/09/2026: `Haste A · Andar 1
