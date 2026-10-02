@@ -101,8 +101,8 @@
 | 28/09/2026 | **O ajuste manual de estoque passa a ser em duas pessoas** (fase 3 da ESTOQUE-LIVRO-E-CONFERENCIA): pedir não mexe no saldo, outra pessoa aprova, quem pediu pode desistir. `estoque.editar` sai; `estoque.ajustar` e `estoque.aprovar_ajuste` entram, com backfill. O aprovador único espera | Ajuste feito por uma pessoa só, na hora, é o número que mudou e ninguém conferiu — e é o que a conferência em três papéis já não aceita para a contagem | Lucas (dono), spec aprovada | `ajuste_dominio.js` · `CLAUDE.md` §18 |
 | 28/09/2026 | **O pedido de ajuste é em DELTA**, com o saldo do momento guardado ao lado; "saldo novo" digitado vira delta contra aquele saldo | Um "o saldo é 8" aprovado dois dias depois apagaria o que foi embalado no meio — a armadilha #32 pela porta do ajuste | Lucas (dono) | `ajuste_dominio.js` |
 | 28/09/2026 | **Os pedidos de ajuste moram em `ajuste_pedido`, e não em colunas novas do `ajuste_estoque`** — divergência da §7 da spec | Cinco lugares leem o `ajuste_estoque` como "o que foi aplicado"; um pedido pendente ali apareceria como ajuste feito, sem erro. A aprovação continua gravando lá | Lucas (dono) | `ajuste_dominio.js` · spec §7 |
-| 02/10/2026 | Toda tela interna das duas operações tem, no canto superior direito, "Trocar setor" (sempre, para todos) e o atalho direto para a outra operação (só para quem tem acesso às duas). Tela nova usa o nav.js da sua operação. Ficam fora login, /setor e o portal da revenda | Não havia como ir e voltar entre medida padrão e sob medida; o único link existente levava ao admin | Lucas | docs/specs/NAVEGACAO-E-LINGUAGEM.md |
-| 02/10/2026 | Texto visível ao usuário não usa chefia, chefe, patrão, dono ou gestão: nomeia a etapa ("Aguardando aprovação"), e quando precisa nomear alguém usa o nível de acesso (Operação, Supervisor, Admin, Admin Geral) | Termos de hierarquia não são profissionais, e quem aprova é definido pela permissão, não pelo cargo | Lucas | docs/specs/NAVEGACAO-E-LINGUAGEM.md |
+| 02/10/2026 | Toda tela interna das duas operações tem, no canto superior direito, "Trocar setor" (sempre, para todos) e o atalho direto para a outra operação (só para quem tem acesso às duas). Tela nova usa o nav.js da sua operação. Ficam fora login, /setor e o portal da revenda | Não havia como ir e voltar entre medida padrão e sob medida; o único link existente levava ao admin | Lucas | docs/arquivo/NAVEGACAO-E-LINGUAGEM.md |
+| 02/10/2026 | Texto visível ao usuário não usa chefia, chefe, patrão, dono ou gestão: nomeia a etapa ("Aguardando aprovação"), e quando precisa nomear alguém usa o nível de acesso (Operação, Supervisor, Admin, Admin Geral) | Termos de hierarquia não são profissionais, e quem aprova é definido pela permissão, não pelo cargo | Lucas | docs/arquivo/NAVEGACAO-E-LINGUAGEM.md |
 
 
 ## 26/09/2026 — o pedido só está titulado quando a soma dos títulos alcança o valor dele (fase 6-C1c)
@@ -182,3 +182,37 @@ saldo sem venda na frente (o ajuste em duas pessoas da `ESTOQUE-LIVRO-E-CONFEREN
 quem pediu a correção não a aprova, nem o diretor. Custo: se o dono pedir a correção ele
 mesmo, outra pessoa com `corte.aprovar_correcao` precisa aprovar. Se o dono preferir que
 a gestão possa aprovar o próprio pedido, é uma linha em `tecido/dominio/corte.js`.
+
+## 02/10/2026 — a Mesa de correções, e as três decisões que mudaram o caminho
+
+Fase 1 da spec `MESA-DE-CORRECOES.md`. O passivo da operação passa a se corrigir
+**pela tela**, item por item, com motivo obrigatório e desfazer — e não mais pedindo
+ao Claude Code para rodar script no servidor. Duas ações nesta fase: **descartar
+fantasma** e **cancelada depois da etiqueta**, que até aqui não se corrigia de jeito
+nenhum (o card de Bloqueados só mostrava, decisão D3 da VENDAS F2).
+
+**1. A régua do fantasma sai do script já nesta fase** (a spec punha na 3). O laço
+estava escrito no `limpar_fantasmas.js` e seria copiado para a Mesa: duas cópias são
+o botão e o terminal apagando linhas diferentes no dia em que uma delas mudar — a
+armadilha #12 na porta que apaga linha. Hoje a régua é
+`correcoes.classificarFantasmas` e o script lê dela. **O efeito ainda diverge num
+ponto:** a Mesa apaga as peças do volume junto, e o script não — isso só se
+unifica na fase 3.
+
+**2. O "a persiana voltou" devolve POR PEÇA, nunca `+1`** — divergência da §4 da
+spec. A etiqueta de uma caixa de pacote baixou N (`CLAUDE.md` §5, #23): devolver 1 de
+2 deixaria o buraco pela metade e ninguém procuraria. Sob medida fica de fora, porque
+nunca baixou. **E a caixa de várias persianas não tem essa saída:** ali o volume nem é
+cancelado, o ML cancelou um item e o sistema não sabe qual peça é — inventar somaria
+saldo de uma persiana que está a caminho do cliente. Sobra o "só registrar", com a
+frase que manda separar a caixa e corrigir por Admin → Estoque.
+
+**3. A chave `correcao.executar` não tem backfill, e os contadores são dois.** O Admin
+Geral recebe toda chave por nível, então ela chega ao dono no primeiro boot (a mesma
+decisão do `kit.imprimir`). E dos cinco contadores de passivo da §5.5 da spec entram
+os **dois que têm botão**: vencidos, futuras fechadas e fila velha chegam na fase 2
+junto com a ação deles, porque contador que acusa e não sabe liberar é a trava que a
+equipe aprende a contornar.
+
+Decidido por Lucas, ao aprovar o plano. Detalhe no `CLAUDE.md` §5 ("A Mesa de
+correções") e §3 (o card que agora decide).
