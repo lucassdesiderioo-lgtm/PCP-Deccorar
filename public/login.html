@@ -76,27 +76,11 @@ function enviar(){
    .then(r=>r.json().then(j=>({ok:r.ok,j:j})))
    .then(function(r){
      if(!r.ok){ $('#err').textContent=r.j.erro||'Erro'; pin=''; pontos(); return; }
-     location.href=destino||primeira(r.j.areas);
+     location.href=destino||((r.j.destino&&r.j.destino.inicial)||'/login');
    });
 }
-// PARA ONDE A PESSOA VAI DEPOIS DO PIN.
-//
-// A fabrica tem duas operacoes. Quem alcanca as DUAS escolhe em /setor; quem
-// alcanca uma so vai direto para ela. Escolha de uma opcao so nao e escolha —
-// e um toque a mais, todo dia, para quem nao tem alternativa.
-var SOB_MEDIDA=['sobmedida','sobmedida_adm'];
-var PADRAO={admin:'/admin',painel:'/painel',operador:'/operador',montagem:'/montagem',
-            embalagem:'/embalagem',carregamento:'/carregamento',expedicao:'/expedicao',
-            relatorios:'/relatorios',necessidade:'/planejamento',recebimento:'/recebimento',
-            inventario:'/inventario'};
-function primeira(a){
-  a=a||[];
-  // 'admin' alcanca tudo, inclusive o sob medida — entao ele SEMPRE escolhe.
-  var temSob = a.indexOf('admin')>=0 || SOB_MEDIDA.some(function(x){ return a.indexOf(x)>=0; });
-  var telaPadrao=null;
-  for(var k in PADRAO) if(a.indexOf(k)>=0){ telaPadrao=PADRAO[k]; break; }
-  if(temSob&&telaPadrao) return '/setor';
-  if(temSob) return '/sobmedida';
-  return telaPadrao||'/login';
-}
+// PARA ONDE A PESSOA VAI DEPOIS DO PIN: quem responde e o servidor
+// (`destino.js`, o dono unico), na propria resposta do login. A copia que
+// morava aqui tinha divergido da /setor e deixava o vendedor e a bancada do
+// sob medida sem destino — voltavam para o login depois do PIN.
 </script></body></html>

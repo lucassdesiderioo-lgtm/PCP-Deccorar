@@ -62,16 +62,13 @@ function rodape(telas){
   bar.setAttribute('aria-label','Atalhos do sob medida');
   ORDEM.filter(function(c){ return telas.indexOf(c)>=0; })
        .forEach(function(c){ bar.appendChild(elo(c,rel)); });
-  // A volta para a outra operacao. Fica no rodape, junto dos atalhos, porque
-  // e o mesmo gesto: mudar de tela. E escrito por extenso — "medida padrao"
-  // e o nome que a equipe usa, nao "PCP".
-  var v=document.createElement('a');
-  v.className='volta'; v.href='/'; v.textContent='← Medida padrao';
-  bar.appendChild(v);
+  // A volta para a medida padrao SAIU daqui (spec NAVEGACAO-E-LINGUAGEM,
+  // fase 1): ela apontava para '/', que e o admin, e quem nao tem admin caia
+  // em "sem permissao". Ela mora agora na barra de cima, com destino calculado.
   document.body.appendChild(bar);
 }
 
-function sessao(eu){
+function sessao(eu,dest){
   var b=document.createElement('div');
   b.className='sessao';
 
@@ -93,9 +90,18 @@ function sessao(eu){
     b.appendChild(f);
   }
 
-  var trocar=document.createElement('button');
-  trocar.textContent='Trocar setor';
-  trocar.onclick=function(){ location.href='/setor'; };
+  // A TROCA DE OPERACAO (spec NAVEGACAO-E-LINGUAGEM, fase 1): o atalho
+  // direto so para quem alcanca as duas, e "Trocar setor" sempre. Mesmo lugar
+  // e mesmo visual do bloco no public/nav.js. O destino vem do servidor
+  // (destino.js, o dono unico) — a primeira tela da medida padrao que a
+  // pessoa alcanca, nunca o admin para todo mundo.
+  if(dest&&dest.duas&&dest.padrao){
+    var at=document.createElement('a');
+    at.className='trocaOp atalho'; at.href=dest.padrao; at.textContent='Medida padrão →';
+    b.appendChild(at);
+  }
+  var trocar=document.createElement('a');
+  trocar.className='trocaOp'; trocar.href='/setor'; trocar.textContent='Trocar setor';
   b.appendChild(trocar);
 
   // Sair e do PCP: a sessao e uma so, e sair "so do sob medida" nao existe
@@ -115,8 +121,15 @@ fetch(BASE+'/api/eu',{credentials:'same-origin'})
   .then(function(r){ return r.json(); })
   .then(function(j){
     if(!j||!j.ok) return;
-    sessao(j.dados);
-    rodape(j.dados.telas||[]);
+    // O destino da medida padrao e conta do PCP, nao do modulo: vem do
+    // /api/auth/eu. Se falhar, a barra sai so com "Trocar setor".
+    fetch('/api/auth/eu',{credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .catch(function(){ return {}; })
+      .then(function(u){
+        sessao(j.dados,(u&&u.destino)||null);
+        rodape(j.dados.telas||[]);
+      });
   })
   .catch(function(){ /* moldura e conforto: a tela funciona sem ela */ });
 })();

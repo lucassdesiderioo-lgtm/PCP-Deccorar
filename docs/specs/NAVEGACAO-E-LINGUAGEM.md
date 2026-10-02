@@ -1,16 +1,23 @@
 # Navegação entre operações e linguagem do sistema
 
-> **STATUS: planejado** · 02/10/2026
+> **STATUS: em construção** · fase 1 em código (02/10/2026), falta o deploy · fases 2 a 4 planejadas
 > Desenhada no Projeto do Claude com o Lucas, em 02/10/2026.
 > Tipo: AJUSTE (telas atuais) + duas REGRAS de desenvolvimento (valem para toda tela nova).
 > Risco: 🟢 nos textos e 🟡 no botão, porque ele lê as áreas de acesso para decidir se aparece. Nenhuma fase mexe em estoque, banco ou permissão.
 
 | Fase | O quê | Situação |
 |---|---|---|
-| 1 | Botão de troca de operação nas duas barras | planejado |
+| 1 | Botão de troca de operação nas duas barras | **em código (02/10)** — ver nota abaixo |
 | 2 | Troca dos textos de hierarquia | planejado |
 | 3 | Testes de proteção das duas regras | planejado |
 | 4 | Regras no papel (`CLAUDE.md`, `DECISOES.md`) | planejado |
+
+> **Fase 1, como foi construída (02/10/2026):**
+> - O dono único do destino é o `destino.js`, na raiz do projeto, usado pelo `auth.js`: o `/api/auth/eu` e a resposta do login trazem `destino` (`padrao`, `sobmedida`, `duas`, `inicial`). As duas barras, a `/setor` e **o login** leem dali.
+> - **O login entrou, e a spec não o citava.** Ele tinha uma segunda cópia da lista (`PADRAO`), já diferente da `/setor` (tinha o inventário), e só reconhecia `sobmedida` e `sobmedida_adm` como sob medida: o vendedor e os cinco setores da produção sem área da medida padrão voltavam ao login depois do PIN. Com o dono único isso deixa de acontecer. `devolucao` também passou a ter destino.
+> - No sob medida o "Trocar setor" virou link com o mesmo visual do bloco do PCP; o "← Medida padrão" do rodapé saiu.
+> - A 400 px a barra de cima quebra em duas ou três linhas (são 4 a 5 botões). Em tablet e notebook fica numa linha só.
+> - `teste_destino.js` (15 casos).
 
 ---
 

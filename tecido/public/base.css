@@ -220,7 +220,6 @@ td.num,th.num{text-align:right; font-variant-numeric:tabular-nums}
   padding:9px 14px; border-radius:8px; color:var(--tinta-fraca);
 }
 .rodape a[aria-current="page"]{background:var(--alerta); color:var(--papel)}
-.rodape .volta{color:var(--acao)}
 /* O rodape e fixo: sem esta folga ele cobre a ultima linha da tabela, e a
    linha coberta e justamente a que a pessoa rolou ate o fim para ler. */
 body{padding-bottom:64px}
@@ -239,6 +238,16 @@ body{padding-bottom:64px}
   border:1px solid var(--linha-forte); border-radius:8px;
   background:var(--campo); color:var(--tinta); cursor:pointer;
 }
+/* A TROCA DE OPERACAO (spec NAVEGACAO-E-LINGUAGEM, fase 1). Mesmo tamanho e
+   mesmas cores do bloco no public/nav.js do PCP (o azul de acao), para o botao
+   estar no mesmo lugar e com a mesma cara nas duas operacoes. */
+.sessao .trocaOp{
+  display:inline-flex; align-items:center; min-height:36px; padding:0 14px;
+  border-radius:8px; border:1px solid var(--acao); color:var(--acao); background:transparent;
+  font-size:14px; font-weight:700; text-decoration:none; white-space:nowrap;
+}
+.sessao .trocaOp.atalho{background:var(--acao); color:var(--acao-tinta)}
+.sessao .trocaOp:active{opacity:.75}
 /* A faixa que diz em que operacao a pessoa esta. Ela existe porque agora ha
    duas, e entrar na errada so se descobre depois de lancar alguma coisa. */
 .sessao .setor{

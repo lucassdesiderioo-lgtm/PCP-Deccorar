@@ -36,7 +36,7 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 | `COMPRAS.md` | Implementado (fases 0–6) · fase 7 pendente · com mudanças na construção |
 | `ARQUITETURA-ALVO.md` | Parcial — só no módulo sob medida (`tecido/`) |
 | `PCP-CONTROLE-E-VISAO.md` | Parcial e divergente · decisão pendente |
-| `NAVEGACAO-E-LINGUAGEM.md` | Planejado (aprovada em 02/10) · 4 fases · o botão de troca de operação nas duas barras e a linguagem sem hierarquia nos textos de tela |
+| `NAVEGACAO-E-LINGUAGEM.md` | **Em construção** (aprovada em 02/10) · **fase 1 em código (02/10 — o botão nas duas barras e o destino com dono único, que também conserta o login do vendedor e da bancada do sob medida; falta o deploy)** · 4 fases · o botão de troca de operação nas duas barras e a linguagem sem hierarquia nos textos de tela |
 | `TABLETS-E-KIOSK.md` | Planejado · nada no código · camada 1 (iPad) pode ir já |
 | `PRODUCAO-MAPA-E-MOTOR.md` | Planejado · não iniciado · depois da fila de consertos |
 | `PRODUCAO-MONTAGEM.md` | Planejado · não iniciado · depois da fila de consertos |
