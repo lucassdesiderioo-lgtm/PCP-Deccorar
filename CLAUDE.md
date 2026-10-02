@@ -7827,6 +7827,10 @@ porcentagem errada.
 > ✅ **PROVA 1 DE 4, EM 02/10/2026: UM CORTE INTEIRO PELAS ETAPAS, NA BANCADA.**
 > O dono fez o corte do começo ao fim e disse *"baixou certo"*. Faltam as outras
 > três: a correção do corte de 01/10, a foto no iPad e o caso da S-000091.
+>
+> ✅ **PROVA 2 DE 4, EM 02/10/2026: A CORREÇÃO DO CORTE DE 01/10.** O dono fez a
+> correção pelo Histórico e disse *"deu certo"*. Faltam a foto no iPad e o caso
+> da S-000091.
 
 ### Três regras do sob medida que valem citar aqui
 
