@@ -7920,7 +7920,8 @@ nem refugo), as que nasceram de verdade ficam a guardar, e o refugo é refeito.
 
 > ⚠️ **QUEM PEDIU NÃO APROVA, nem o diretor** — a regra da casa para mexer em
 > saldo (§18, ajuste em duas pessoas), aplicada aqui por analogia: a spec diz
-> só "a gestão aprova". Está em `DECISOES.md` para o dono confirmar.
+> só "a gestão aprova". **Confirmada pelo dono em 02/10/2026** (*"concordo, quem
+> pediu não aprova"*), e registrada em `DECISOES.md`.
 
 > ⚠️ **A CORREÇÃO É BLOQUEADA** quando uma sobra "que não nasceu" já foi usada
 > noutro corte, ou quando o rolo está encerrado e não tem onde pôr ou tirar
@@ -8044,8 +8045,8 @@ porcentagem errada.
 > ✅ **PROVA 4 DE 4, EM 02/10/2026: O CASO DA S-000091 NO PLANO.** O dono
 > testou e disse *"deu certo"*. Com as quatro provas feitas, a spec foi para
 > `docs/arquivo/CORTE-EM-ETAPAS.md`; as regras que valem são as desta seção e
-> as do `tecido/README.md`. Fica aberta a confirmação de que quem pede a
-> correção não a aprova (`docs/DECISOES.md`).
+> as do `tecido/README.md`. E o dono confirmou no mesmo dia que quem pede a
+> correção não a aprova (`docs/DECISOES.md`): nada ficou aberto.
 
 ### Três regras do sob medida que valem citar aqui
 
