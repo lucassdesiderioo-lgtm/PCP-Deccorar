@@ -446,6 +446,11 @@ relatório (`daPlanilha`) e marca os volumes (`marcar`); o import e o
 > caminhão, e a reimpressão e o `GET /api/print/:id` também recusam — e diz o que fazer: *"Não carregar: separe a caixa e avise o
 > admin"*. A venda cancelada **continua** sendo saída no gráfico de estoque
 > (§18): o −1 aconteceu na impressão.
+>
+> ⚠️ **E A VENDA TAMBÉM SE CANCELA PELA RECUSA DO MOTORISTA, desde 02/10/2026**
+> (bloco "O MOTORISTA RECUSOU" no §8-B). Só o relatório não bastava: quando o
+> motorista recusa no bipe dele, o relatório ainda não chegou. Esse volume
+> chega ao card e à Mesa com `cancelada_origem='motorista'` e quem marcou.
 
 **Antes do primeiro import depois do deploy, rode
 `node conferir_canceladas.js <relatório.xlsx>`** — ele roda a mesma conta numa
@@ -3544,6 +3549,54 @@ peça no cenário do adiantado.
 > 1024 e 400 px. A prova é a primeira caixa de várias conferida por outra pessoa
 > com as etiquetas do saco coladas por fora.
 
+### ⚠️ O MOTORISTA RECUSOU — a caixa volta ao estoque em dois passos (02/10/2026, spec `RECUSA-DO-MOTORISTA`)
+
+O motorista do ML bipa a caixa e o sistema dele diz **recusada**: a venda foi
+cancelada depois da etiqueta sair, e o relatório ainda não chegou. Até aqui a
+caixa ficava `embalado`/`carregado` e a Mesa recusava a volta ao estoque com
+*"este volume não está cancelado"*. Decisão do dono, dois passos:
+
+```
+1. EXPEDIÇÃO  Carregamento → 🚫 Motorista recusou → bipe → confere cliente/NF/peças → confirma
+              → `cancelado`, origem `motorista`, `cancelada_por` · sai do canto, do carro e da saída
+              → aviso: "Volte a peça ao estoque: tire a etiqueta de venda e ponha a persiana na prateleira"
+2. ADMIN      Correções (Mesa) → "A persiana voltou" → `cancelamento` POR PEÇA no livro
+```
+
+`cancelada_dominio.recusar` é a régua (a mesma do cancelamento do relatório:
+`cancelada_estagio`, o carro limpo); `POST /api/carregamento/recusa` é a porta,
+com `carregamento.executar` — **não nasceu chave nova**. Sem `confirmar` ela só
+mostra a caixa; com `{id, confirmar:true}` ela marca.
+
+> ⚠️ **A MARCAÇÃO NÃO MEXE NO SALDO.** Quem diz que a persiana está na
+> prateleira é uma pessoa, pela Mesa, com motivo — é a D3 da VENDAS F2 (§3). A
+> Mesa mostra a nota *"o motorista recusou… confira antes de dizer que voltou"*.
+
+> ⚠️ **SÓ A CAIXA COM ETIQUETA E AINDA NA FÁBRICA** (área, canto ou carro de
+> viagem aberta), e cada recusa diz o porquê: sem etiqueta (nada baixou), já
+> saiu (é devolução, §9), já cancelada (está no card).
+
+> ⚠️ **A CAIXA DE VÁRIAS É CANCELADA INTEIRA, com `cancelada_varias=0`**, e a
+> Mesa oferece o "voltou" por peça. Não contradiz a regra do relatório: lá o ML
+> cancela UM item e não diz qual peça é; aqui o motorista recusou a caixa toda.
+
+> ⚠️ **SOB MEDIDA É MARCADA, MAS O AVISO NÃO MANDA PÔR NA PRATELEIRA** — ela
+> não tem estoque (§7), e a Mesa não gera movimento.
+
+> O bipe normal do Carregamento continua recusando a caixa, com o título
+> **RECUSADA PELO MOTORISTA** e quem marcou. O relatório que chegar depois acha
+> a venda já marcada (`ja_marcada`) e não mexe na origem.
+
+**Rode `node teste_recusa_motorista.js` (59 casos) ao mexer no `recusar`, na
+rota ou no botão.** Escrito antes do código; sete defeitos reintroduzidos um a
+um: não tirar do carro (reprova 1), aceitar pendente (2), aceitar a que já saiu
+(1), mexer no saldo ao marcar (8), mandar o sob medida para a prateleira (1),
+não gravar quem marcou (2) e não auditar (1).
+
+> ⚠️ **AINDA NÃO FOI CONFERIDO NA FÁBRICA.** A rodada foi num navegador meu, a
+> 1440 e a 400 px. A prova é a **primeira caixa recusada de verdade**, marcada
+> pela expedição e aceita pelo admin na Mesa.
+
 ### ⚠️ A SAÍDA DO CAMINHÃO (26/09/2026, fase 3 da spec `SAIDA-E-DUPLA-CONFERENCIA`)
 
 O "Fechar coleta" de 10/09 comparava o **canto inteiro** com o motorista: um dia
@@ -4326,7 +4379,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37) e `teste_tablets.js` (83); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83) e `teste_recusa_motorista.js` (59); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4364,6 +4417,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   `cancelada_dominio.js` (§3, VENDAS F2)
 - ❌ Devolver ao estoque **sozinho** a venda cancelada depois da etiqueta: quem
   decide é uma pessoa, pela Mesa, com motivo (§3 D3 · §5, a Mesa)
+- ❌ Fazer a marcação "Motorista recusou" mexer no saldo: a expedição só marca,
+  e o admin aceita a volta pela Mesa (§8-B, RECUSA-DO-MOTORISTA)
+- ❌ Marcar como `cancelada_varias` a caixa de várias que o motorista recusou: ele
+  recusou a caixa inteira, e o "voltou" tem que existir por peça (§8-B)
 - ❌ Escrever uma segunda régua de "isto é fantasma?": ela é o
   `correcoes.classificarFantasmas`, e o `limpar_fantasmas.js` lê dela — duas
   cópias são o botão e o terminal apagando linhas diferentes (§5, a Mesa)

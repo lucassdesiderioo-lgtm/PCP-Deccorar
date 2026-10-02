@@ -210,6 +210,13 @@ const ACOES = {
        sistema nao sabe, e inventar seria somar saldo de uma persiana que esta
        dentro de uma caixa a caminho do cliente. */
     nota(db, v){
+      /* A RECUSA DO MOTORISTA (02/10/2026): quem marcou foi a expedicao, que
+         recebeu o aviso de pôr a peca na prateleira. A Mesa so diz isso — quem
+         confere que ela esta la e quem aceita. */
+      if(v.cancelada_origem === 'motorista' && !v.cancelada_varias)
+        return 'O motorista recusou esta caixa no carregamento' +
+          (v.cancelada_por ? ' (marcada por ' + v.cancelada_por + ')' : '') +
+          '. A expedição foi avisada para pôr a peça na prateleira: confira antes de dizer que voltou.';
       return v.cancelada_varias
         ? 'Esta caixa leva mais de uma persiana e o Mercado Livre cancelou só um item — o sistema não sabe ' +
           'qual peça é. Separe a caixa, confira na mão, e o saldo se corrige por Admin → Estoque, com motivo.'

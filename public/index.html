@@ -317,9 +317,10 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
        que nao zera vira paisagem. -->
   <div style="font-weight:800;color:#b26a00;font-size:16px;margin-bottom:6px">CANCELADAS DEPOIS DA ETIQUETA</div>
   <div style="font-size:13px;color:#5a6472;margin-bottom:12px">
-    O Mercado Livre cancelou estas vendas <b>depois</b> que a etiqueta saiu. A caixa não carrega mais
-    (o bipe recusa), mas o estoque dela <b>já tinha baixado e não volta sozinho</b>: confira se a
-    persiana voltou para a prateleira e, se voltou, acerte o saldo em <i>Estoque</i>, com o motivo.
+    Estas vendas foram canceladas <b>depois</b> que a etiqueta saiu — pelo relatório do Mercado Livre
+    ou pela recusa do motorista, marcada no Carregamento. A caixa não carrega mais (o bipe recusa), mas o
+    estoque dela <b>já tinha baixado e não volta sozinho</b>: confira se a persiana voltou para a
+    prateleira e decida na aba <i>Correções</i>.
   </div>
   <div id="cancLista"></div>
 </div>
@@ -2575,8 +2576,10 @@ async function carregarCanc(){
         ? '<b style="color:#b26a00">📦 caixa de '+(v.pecas>1?v.pecas+' persianas':'vários produtos')+'</b> — um item foi cancelado, e a caixa <b>não</b> foi: o cliente ainda quer o resto. Confira no ML o que sai.'
         : 'Estava: <b>'+esc(onde(v))+'</b>')
       +'</div>'
-      +'<div style="font-size:12px;color:#5a6472;margin-top:3px">ML: “'+esc(v.cancelada_motivo||"cancelada")+'”'
-      +(quando?' · visto no import de '+quando:'')+(v.venda?' · venda '+esc(v.venda):'')+(v.packId?' · pack '+esc(v.packId):'')+'</div>'
+      +'<div style="font-size:12px;color:#5a6472;margin-top:3px">'
+      +(v.cancelada_origem==="motorista"
+        ? '<b>Recusada pelo motorista</b>'+(v.cancelada_por?' · marcada por '+esc(v.cancelada_por):'')+(quando?' em '+quando:'')
+        : 'ML: “'+esc(v.cancelada_motivo||"cancelada")+'”'+(quando?' · visto no import de '+quando:''))+(v.venda?' · venda '+esc(v.venda):'')+(v.packId?' · pack '+esc(v.packId):'')+'</div>'
       +'</div>';
   }
   lis.innerHTML=h;

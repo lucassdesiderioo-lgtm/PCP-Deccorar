@@ -140,6 +140,17 @@ desenho da equipe. Custo aceito: num dia de uma pessoa só, a caixa espera outra
 Motivo: a bancada não repara na caixa de várias persianas, e só marcar deixava a mesma
 atenção conferir. Spec `CARREGAMENTO-SEGUNDA-PESSOA`, fase 1.
 
+## 02/10/2026 — a caixa que o motorista recusou volta ao estoque em dois passos (spec `RECUSA-DO-MOTORISTA`)
+Decisão do Lucas. Até aqui só o relatório do ML cancelava o volume, e a caixa que o motorista
+recusava no bipe dele não tinha caminho de volta ao estoque. Agora a **expedição marca
+"Motorista recusou"** no Carregamento: o volume vira cancelado (origem `motorista`, com quem
+marcou), sai do canto, do carro e da conta da saída, e a tela manda voltar a peça à prateleira.
+**O saldo não anda nesse passo.** O **admin aceita** a volta pela Mesa de correções, e o saldo
+volta por peça. Escolhas da construção, para o dono confirmar: a caixa de várias recusada é
+cancelada **inteira** (o motorista recusou a caixa, não um item), a chave é a mesma
+`carregamento.executar` de quem confere, e a expedição não desfaz a marcação — o engano se
+resolve pela Mesa.
+
 ## 02/10/2026 — a caixa que foi no caminhão sem conferência fica sem conferente
 Decisão do dono, depois da revisão do Carregamento. O botão "foi no caminhão" da Saída do
 caminhão gravava como conferente **quem fechou a saída**, pessoa que nunca bipou aquela

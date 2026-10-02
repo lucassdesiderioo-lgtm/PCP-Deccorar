@@ -128,6 +128,12 @@ module.exports=function(app,db){
       try{ const ac=app.locals.acesso;
            if(ac&&ac.auditar) ac.auditar(req,'expedicao','carregar_cancelada',
              'NF '+(alvo.nf||alvo.id), (alvo.cancelada_motivo||'cancelada')+' — bipada no carregamento'); }catch(e){}
+      /* A recusa do motorista ja foi marcada aqui por alguem: a frase repete o
+         que a pessoa tem que fazer com a caixa, e quem marcou. */
+      if(alvo.cancelada_origem==='motorista')
+        return ({ok:false,motivo:'cancelada',origem:'motorista',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
+          aviso:'O motorista recusou esta caixa'+(alvo.cancelada_por?' (marcada por '+alvo.cancelada_por+')':'')+
+                '. Não carregar: volte a peça ao estoque — o admin confirma a volta pela Mesa de correções.'});
       return ({ok:false,motivo:'cancelada',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
         aviso:'Venda cancelada no Mercado Livre. Não carregar: separe a caixa e avise o admin — ela está no card '+
               '"Canceladas depois da etiqueta".'+(alvo.cancelada_motivo?' ML: “'+alvo.cancelada_motivo+'”':'')});
@@ -302,6 +308,51 @@ module.exports=function(app,db){
     const pc=pecasCarga(alvo.id);
     res.json({ok:true,bipadas:pc.bipadas,pecas_total:pc.total});
   });
+  /* ── O MOTORISTA RECUSOU (spec RECUSA-DO-MOTORISTA, 02/10/2026) ────────────
+     O motorista bipa a caixa e o sistema do ML diz "recusada": a venda foi
+     cancelada depois da etiqueta sair. Dois passos, decisao do dono:
+       1. aqui a EXPEDICAO marca — sem `confirmar`, so a previa (a caixa, o
+          cliente, as pecas); com `{id, confirmar:true}`, marca. O volume vira
+          cancelado (origem 'motorista'), sai do canto/do carro e da conta da
+          saida, e a tela manda voltar a peca a prateleira;
+       2. o ADMIN aceita a volta ao estoque pela Mesa de correcoes.
+     ⚠️ O SALDO NAO SE MEXE AQUI: quem decide que a persiana voltou e uma
+     pessoa, pela Mesa, com motivo — a regra do card D3. */
+  app.post('/api/carregamento/recusa',(req,res)=>{
+    const CANC=require('./cancelada_dominio');
+    const quem=req.usuario||null;
+    if(!quem || (quem.id==null && !quem.nome)) return res.status(401).json({ok:false,motivo:'sem_login',aviso:'Entre com o seu login para marcar a recusa.'});
+    const b=req.body||{};
+    let alvo=null;
+    if(b.id!=null) alvo=db.prepare('SELECT * FROM lote WHERE id=?').get(+b.id)||null;
+    else{
+      const code=String(b.code||'').trim();
+      if(!code) return res.status(400).json({ok:false,motivo:'sem_codigo',aviso:'Bipe a etiqueta de venda da caixa recusada.'});
+      /* Entre irmaos duplicados (§5, os fantasmas), o que a recusa aceita manda. */
+      const batem=acharVolumes(db,code);
+      alvo=batem.find(v=>!CANC.naoRecusa(v))||batem[0]||null;
+    }
+    const pedido=v=>({id:v.id,buyer:v.buyer,nf:v.nf,codigo:v.codigo,city:v.city,modalidade:v.modalidade});
+    const nao=CANC.naoRecusa(alvo);
+    if(nao) return res.json(Object.assign({ok:false},nao,alvo?{pedido:pedido(alvo)}:{}));
+    const pecas=CANC.pecasDaCaixa(db,alvo);
+    const sob=pecas.some(p=>p.sob_medida);
+    if(!b.confirmar) return res.json({ok:true,previa:true,pedido:pedido(alvo),pecas,sob_medida:sob,lugar:CANC.onde(alvo)});
+    const r=db.transaction(()=>CANC.recusar(db,alvo.id,quem))();
+    if(!r.ok) return res.json(Object.assign({ok:false},r,{pedido:pedido(alvo)}));
+    const n=pecas.reduce((s,p)=>s+p.qtd,0);
+    try{ const ac=app.locals.acesso;
+         if(ac&&ac.auditar) ac.auditar(req,'expedicao','recusa_motorista','NF '+(alvo.nf||alvo.id),
+           'volume #'+alvo.id+' ('+(r.lugar||'')+'): '+pecas.map(p=>p.qtd+'x '+p.codigo).join(', ')); }catch(e){}
+    /* O aviso e a regra inteira: sem ele a caixa fica no chao da area. O sob
+       medida nao tem estoque (§7) — mandar "por na prateleira" seria mentira. */
+    const aviso=sob
+      ? 'Peça sob medida: ela não tem estoque. Separe a peça e avise o admin.'
+      : 'Volte a peça ao estoque: tire a etiqueta de venda e ponha '+(n===1?'a persiana':'as '+n+' persianas')+
+        ' na prateleira. O admin confirma a volta ao estoque pela Mesa de correções.';
+    res.json({ok:true,pedido:pedido(alvo),pecas,sob_medida:sob,aviso});
+  });
+
   /* O PROGRESSO DA CARGA — o mesmo numero pras duas rotas.
      "Carregados X de Y" e a lista tem que falar do mesmo universo, senao o
      banner diz 12 de 12 com a lista mostrando 3 faltando. Y e o que ha pra

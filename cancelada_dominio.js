@@ -144,6 +144,72 @@ function marcar(db, lista, opts){
   return r;
 }
 
+/* ── A RECUSA DO MOTORISTA (spec RECUSA-DO-MOTORISTA, 02/10/2026) ─────────────
+   O motorista do ML bipa a caixa e o sistema dele diz "recusada": a venda foi
+   cancelada depois da etiqueta sair, e o relatorio ainda nao foi importado.
+   Quem esta com a caixa na mao e a expedicao, e ela MARCA aqui. Decisao do
+   dono: dois passos — a expedicao so diz "o motorista recusou", e o admin
+   aceita a volta ao estoque pela Mesa de correcoes.
+
+   ⚠️ O SALDO NAO SE MEXE AQUI. Quem decide se a persiana voltou para a
+   prateleira e uma pessoa, pela Mesa, com motivo (D3). A marcacao so tira a
+   caixa das listas e a poe no card.
+
+   ⚠️ A CAIXA DE VARIAS E CANCELADA INTEIRA, e isso nao contradiz a regra do
+   relatorio. La o ML cancela UM item e nao diz qual peca e; aqui o motorista
+   recusou a CAIXA, com tudo dentro. Por isso `cancelada_varias` fica 0, e a
+   Mesa oferece o "voltou" por peca.
+
+   Recusa (devolve {motivo, aviso}) ou null. A frase diz o que fazer: a pessoa
+   esta com a caixa na mao, na frente do motorista. */
+const ORIGEM_MOTORISTA = 'motorista';
+function naoRecusa(v){
+  if(!v) return { motivo:'nao_encontrado', aviso:'Etiqueta não encontrada. Bipe a etiqueta de VENDA da caixa recusada.' };
+  if(v.estagio === ESTAGIO || v.cancelada_varias)
+    return { motivo:'ja_cancelada', aviso:'Esta venda já está cancelada no sistema (' +
+      (v.cancelada_origem === ORIGEM_MOTORISTA ? 'recusa do motorista' : 'relatório do Mercado Livre') +
+      '). Separe a caixa: ela está no card "Canceladas depois da etiqueta", e o admin decide a volta ao estoque.' };
+  const lugar = onde(v);
+  if(lugar === 'pendente' || lugar === 'bloqueado')
+    return { motivo:'sem_etiqueta', aviso:'Esta venda ainda não teve a etiqueta impressa: nada baixou do ' +
+      'estoque, então não há o que voltar. Separe a caixa e avise o admin.' };
+  if(lugar === 'carregado')
+    return { motivo:'ja_saiu', aviso:'O sistema diz que esta caixa já saiu da fábrica. Se ela voltou, ' +
+      'é devolução: lance pela tela de Devoluções.' };
+  if(!lugar) return { motivo:'nao_cabe', aviso:'Esta caixa não está num lugar em que a recusa vale.' };
+  return null;
+}
+
+/* As pecas da caixa, para a tela mostrar o que a pessoa tem na mao (a soma das
+   qtd do lote_item; sem lote_item, uma do lote.codigo), e se e sob medida —
+   que nao tem estoque, e nao volta para prateleira nenhuma (§7). */
+function pecasDaCaixa(db, v){
+  let l = [];
+  try{ l = db.prepare('SELECT codigo, SUM(qtd) qtd FROM lote_item WHERE lote_id=? GROUP BY codigo ORDER BY MIN(id)').all(v.id); }catch(e){}
+  if(!l.length) l = [{ codigo:v.codigo, qtd:1 }];
+  const sm = db.prepare(`SELECT COALESCE(m.sob_medida,0) s FROM skus k LEFT JOIN modelo m ON m.id=k.modelo_id
+    WHERE UPPER(k.codigo)=UPPER(?)`);
+  return l.map(p => { let s = 0; try{ const r = sm.get(p.codigo); s = r ? r.s : 0; }catch(e){}
+    return { codigo:p.codigo, qtd:p.qtd, sob_medida:s ? 1 : 0 }; });
+}
+
+/* Marca. NAO abre transacao (a regra do §2): a rota abre. Devolve o volume
+   como estava, para a auditoria dizer de onde ele saiu. */
+function recusar(db, id, quem){
+  const v = db.prepare('SELECT * FROM lote WHERE id=?').get(+id);
+  const nao = naoRecusa(v);
+  if(nao) return Object.assign({ ok:false }, nao);
+  const lugar = onde(v), tirar = lugar === 'no_carro' ? 1 : 0;
+  db.prepare(`UPDATE lote SET estagio='${ESTAGIO}', cancelada_estagio=estagio,
+      cancelada_em=datetime('now','localtime'), cancelada_origem=?, cancelada_motivo=?, cancelada_por=?,
+      saida_id=CASE WHEN ? THEN NULL ELSE saida_id END,
+      no_carro_em=CASE WHEN ? THEN NULL ELSE no_carro_em END,
+      no_carro_por=CASE WHEN ? THEN NULL ELSE no_carro_por END
+    WHERE id=?`).run(ORIGEM_MOTORISTA, 'Recusada pelo motorista do Mercado Livre no carregamento',
+      String((quem && quem.nome) || '').trim() || null, tirar, tirar, tirar, v.id);
+  return { ok:true, antes:v, lugar };
+}
+
 /* O CARD (D3): o que ja tinha baixado do estoque, ou esta na fabrica, e a caixa
    de varias persianas com um item cancelado.
    DESDE 02/10/2026 ELE ESVAZIA: a Mesa de correcoes (fase 1) decide cada caixa,
@@ -155,10 +221,13 @@ function marcar(db, lista, opts){
    causa de uma coluna que ninguem criou ainda. */
 function listar(db){
   if(!pronto(db)) return [];
-  const decidida = colunas(db).indexOf('cancelada_resolvida_em') >= 0
+  const cols = colunas(db);
+  const decidida = cols.indexOf('cancelada_resolvida_em') >= 0
     ? 'AND cancelada_resolvida_em IS NULL' : '';
+  const porCol = cols.indexOf('cancelada_por') >= 0 ? 'cancelada_por' : 'NULL cancelada_por';
   return db.prepare(`SELECT id, codigo, buyer, nf, venda, packId, modalidade, despachar_em, embalado_em,
       estagio, cancelada_estagio, cancelada_em, cancelada_motivo, cancelada_varias, cancelada_aviso_em,
+      cancelada_origem, ${porCol},
       (SELECT SUM(qtd) FROM lote_item i WHERE i.lote_id=lote.id) pecas
     FROM lote
     WHERE COALESCE(teste,0)=0 ${decidida} AND (
@@ -167,4 +236,5 @@ function listar(db){
     ORDER BY COALESCE(cancelada_em, cancelada_aviso_em) DESC, id DESC`).all();
 }
 
-module.exports = { ESTAGIO, ehCancelamento, cabecalhoDePacote, daPlanilha, marcar, listar, onde };
+module.exports = { ESTAGIO, ORIGEM_MOTORISTA, ehCancelamento, cabecalhoDePacote, daPlanilha, marcar, listar, onde,
+                   naoRecusa, pecasDaCaixa, recusar };
