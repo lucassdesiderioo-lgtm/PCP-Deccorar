@@ -6,9 +6,9 @@
 > (a §4 dizia só "reabrir"); "Fechar vencidos" exige a data de corte e só pega o sem-despacho
 > que entrou até ela; a coleta fechada ganha `retirado_em`; a fila velha é a de mais de 30 dias;
 > "Dar saída" não apaga as cópias (elas viram fantasmas, e saem pelo contador); "Pedir ajuste"
-> abre o pedido pela porta do ajuste (não grava em `correcao`). Quatro delas esperam a
-> confirmação do dono em `docs/DECISOES.md`. Falta: deploy, e o dono fechar um passivo de
-> verdade pela tela.
+> abre o pedido pela porta do ajuste (não grava em `correcao`). Quatro delas foram
+> confirmadas pelo dono em 02/10/2026 (`docs/DECISOES.md`). No ar (PR #183). Falta: o dono
+> fechar um passivo de verdade pela tela.
 >
 > **Fase 1** entrou em 02/10/2026: `correcoes.js` (dono único de cada ação),
 > `correcao_route.js` (7 rotas), a tabela `correcao`, a aba **Correções** no admin, a

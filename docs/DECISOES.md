@@ -219,7 +219,7 @@ equipe aprende a contornar.
 Decidido por Lucas, ao aprovar o plano. Detalhe no `CLAUDE.md` §5 ("A Mesa de
 correções") e §3 (o card que agora decide).
 
-## 02/10/2026 — a Mesa de correções fases 2 e 3, e as quatro escolhas que pedem confirmação (A CONFIRMAR PELO DONO)
+## 02/10/2026 — a Mesa de correções fases 2 e 3, e as quatro escolhas da construção (CONFIRMADAS PELO DONO em 02/10/2026)
 
 A fase 2 trouxe as outras cinco ações (Dar saída, Fechar vencidos, Reabrir venda
 futura, Tirar da fila, Pedir ajuste), e a fase 3 fez os cinco scripts de passivo
@@ -239,5 +239,8 @@ decididos por mim na construção:
 
 E uma que é da spec: **a Mesa não aplica ajuste de estoque**; o "Pedir ajuste"
 abre o pedido pela porta do ajuste em duas pessoas, e outra pessoa aprova.
+
+**Confirmadas por Lucas em 02/10/2026** (*"concordo com as quatro"*), depois do
+deploy do PR #183.
 
 Detalhe no `CLAUDE.md` §5 ("A Mesa de correções").
