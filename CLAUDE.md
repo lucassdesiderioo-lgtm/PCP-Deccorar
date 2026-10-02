@@ -4852,6 +4852,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   setor" e sem o atalho, e a pessoa só sai pelo login (§20, Regra A)
 - ❌ Escrever chefia, chefe, patrão, dono ou gestão em texto que aparece para
   quem usa o sistema — nomeie a etapa, ou o nível de acesso (§20, Regra B)
+- ❌ Declarar tela no `tecido/nucleo/telas.js` sem a porta na `inicio.html` e
+  o nome no `NOMES` do `nav.js` — o vendedor lia "nenhuma tela" com as telas
+  dele no rodapé (§20)
 - ❌ Escrever uma segunda lista de "para onde a pessoa vai": é o `destino.js`,
   e foi a cópia do login que mandava o vendedor de volta ao PIN (§20)
 
@@ -5638,7 +5641,8 @@ régua e o cliente cobrado pela outra.
 > ⚠️ **Tela nova pede a linha em `nucleo/telas.js` E em `public/nav.js`.** O
 > rodapé monta `ORDEM.filter(...)`: tela declarada e liberada mas fora daquele
 > mapa **não tem botão**, sem erro e sem log. É a armadilha #13 por mais uma
-> porta, e a ponta que some em silêncio é sempre a última.
+> porta, e a ponta que some em silêncio é sempre a última. **E na porta da
+> `inicio.html` também** — são três listas, e desde 02/10/2026 há teste (§20).
 
 > ✅ **EM PRODUÇÃO E CONFERIDA NA FÁBRICA EM 22/09/2026, NAS DUAS METADES.** O
 > dono fez o deploy e simulou **dez persianas reais do WhatsApp: as dez
@@ -7914,7 +7918,7 @@ módulo furou o portão, que é a armadilha #3 por outra porta.
 
 ## 20. Navegação e linguagem — as duas regras de toda tela (02/10/2026)
 
-Spec `docs/specs/NAVEGACAO-E-LINGUAGEM.md`, decidida pelo Lucas em 02/10/2026,
+Spec `docs/arquivo/NAVEGACAO-E-LINGUAGEM.md` (arquivada), decidida pelo Lucas em 02/10/2026,
 com as duas linhas em `docs/DECISOES.md`.
 
 ### Regra A — toda tela interna tem a troca de operação
@@ -7999,7 +8003,34 @@ caso: texto de tela de volta, mensagem de domínio, nome de permissão, tela sem
 barra e tela com a barra da outra operação. Um comentário com a palavra
 **passa**, como deve.
 
-> ✅ **A FASE 1 ESTÁ NO AR DESDE 02/10/2026** (PR #169), e o dono disse *"deu
-> bom"*. Os três perfis (só medida padrão, só sob medida, as duas) não foram
-> relatados um a um.
+> ✅ **AS QUATRO FASES ESTÃO NO AR DESDE 02/10/2026** — o botão pelo PR #169,
+> os textos, o teste e este papel pelo #173 —, e o dono disse *"deu bom"* nas
+> duas vezes. A spec foi para `docs/arquivo/`.
+>
+> ⚠️ **O QUE NÃO FOI RELATADO UM A UM:** os três perfis da barra (só medida
+> padrão, só sob medida, as duas) e as frases novas dos fluxos de Sobras
+> (propor correção) e Corte (pedir correção), que pedem uma sobra e um corte
+> feito de verdade para aparecer. Prova que não foi feita se escreve como não
+> feita (§4).
+
+### ⚠️ TRÊS LISTAS DE TELAS NO SOB MEDIDA, e a tela nova entra nas três (02/10/2026)
+
+O módulo diz que telas existem em **três** lugares: `tecido/nucleo/telas.js`
+(a declaração, com a permissão), as **portas** da tela inicial
+(`telas/inicio.html`) e o `NOMES`/`ORDEM` do `tecido/public/nav.js` (o
+rodapé). Tela nova que entra só na primeira nasce com dois defeitos, e os dois
+estiveram no ar até 02/10/2026:
+
+- **O vendedor abria o sob medida e lia "Seu acesso ainda não alcança nenhuma
+  tela"**, com Simulador, Pedidos e Revendas no rodapé da mesma página. A
+  inicial tinha só as sete portas do estoque de tecido; as nove telas que
+  vieram depois nunca ganharam porta, e quem não tem tela de estoque via a
+  tela inicial dizendo que ele não tem acesso a nada.
+- **O botão da bancada saía no rodapé escrito `/bancada`**: estava no `ORDEM`
+  e não no `NOMES`.
+
+**Rode `cd tecido && npm test` ao criar tela** — o `telas_listas.test.js`
+(4 casos) recusa tela declarada sem porta na inicial ou sem nome no rodapé, e
+porta que aponta para tela que não existe. Os dois defeitos foram
+reintroduzidos, e cada um reprova o seu caso.
 

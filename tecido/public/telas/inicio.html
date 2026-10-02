@@ -30,7 +30,7 @@
 </head>
 <body>
 <header class="topo">
-  <h1>Sob medida &mdash; corte de tecido</h1>
+  <h1>Sob medida</h1>
 </header>
 
 <div class="corpo">
@@ -54,17 +54,35 @@ const {api,el,limpar,$}=window.ui;
 // instrucao — e quem chega no primeiro dia le a segunda.
 const PORTAS=[
   {caminho:'/corte',     passo:'1 · pedido',   nome:'Plano de corte',
-   texto:'Suba as etiquetas do pedido e veja de onde cortar cada peca.'},
+   texto:'Suba as etiquetas do pedido e veja de onde cortar cada peça.'},
   {caminho:'/rolos',     passo:'2 · estoque',  nome:'Rolos',
    texto:'Entrada de rolo, saldo em metros e acerto de fim de rolo.'},
   {caminho:'/sobras',    passo:'3 · retalho',  nome:'Sobras', classe:'sobra',
-   texto:'O que sobrou do corte, com medida, endereco e condicao.'},
+   texto:'O que sobrou do corte, com medida, endereço e condição.'},
   {caminho:'/etiquetas', passo:'4 · prateleira', nome:'Etiquetas', classe:'sobra',
    texto:'Imprime o lote de etiquetas para colar nas sobras.'},
-  {caminho:'/painel',    passo:'escritorio',   nome:'Painel', classe:'painel',
-   texto:'Cortes do periodo, desperdicio, encalhe e recusas.'},
-  {caminho:'/cadastros', passo:'escritorio',   nome:'Cadastros', classe:'cadastros',
-   texto:'Tecidos, enderecos, motivos e os parametros do calculo.'}
+  {caminho:'/bancada',   passo:'produção',     nome:'Bancada',
+   texto:'A fila do seu setor: bipe a etiqueta para começar e terminar cada peça.'},
+  {caminho:'/producao',  passo:'produção',     nome:'Produção',
+   texto:'Imprime as etiquetas de produção dos pedidos aprovados e manda o tecido para o corte.'},
+  {caminho:'/simulador', passo:'venda',        nome:'Simulador',
+   texto:'Monte a persiana e veja o tubo, os cortes e o preço antes de vender.'},
+  {caminho:'/pedidos',   passo:'venda',        nome:'Pedidos',
+   texto:'Orçamentos e pedidos das revendas: lançar, enviar e aprovar.'},
+  {caminho:'/revendas',  passo:'venda',        nome:'Revendas',
+   texto:'As revendas da carteira, com tabela, crédito e endereços de entrega.'},
+  {caminho:'/financeiro',passo:'escritório',   nome:'Financeiro', classe:'painel',
+   texto:'Boletos lançados, baixas e o crédito de cada revenda.'},
+  {caminho:'/kanban',    passo:'escritório',   nome:'Quadro', classe:'painel',
+   texto:'Onde está cada pedido, da edição ao pronto.'},
+  {caminho:'/indicadores',passo:'escritório',  nome:'Indicadores', classe:'painel',
+   texto:'Aprovação, prazo cumprido, tempo por m² e recusas.'},
+  {caminho:'/painel',    passo:'escritório',   nome:'Painel', classe:'painel',
+   texto:'Cortes do período, desperdício, encalhe e recusas.'},
+  {caminho:'/catalogo',  passo:'escritório',   nome:'Catálogo', classe:'cadastros',
+   texto:'Coleções, modelos, componentes, escada de tubos e preços.'},
+  {caminho:'/cadastros', passo:'escritório',   nome:'Cadastros', classe:'cadastros',
+   texto:'Tecidos, endereços, motivos e os parâmetros do cálculo.'}
 ];
 
 api('/api/eu').then(eu=>{
@@ -80,7 +98,7 @@ api('/api/eu').then(eu=>{
   // Sem porta nenhuma nao deveria acontecer — o portao ja barraria antes.
   // Mas se acontecer, a tela diz o que fazer em vez de ficar vazia.
   if(!minhas.length) c.appendChild(el('div',{class:'vazio',
-    texto:'Seu acesso ainda nao alcanca nenhuma tela do sob medida. Peca ao admin em Admin -> Acessos.'}));
+    texto:'Seu acesso ainda não alcança nenhuma tela do sob medida. Quem tem permissão para gerenciar acessos libera em Admin → Acessos.'}));
 
   /* O QUE A BANCADA APONTOU E ESPERA A CHEFIA. A bancada nao corrige sobra:
      ela aponta, e a correcao so acontece quando alguem com `sobra.corrigir`

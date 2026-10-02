@@ -1,6 +1,6 @@
 # Navegação entre operações e linguagem do sistema
 
-> **STATUS: implementada** · **fase 1 no ar (02/10/2026, PR #169)** · **fases 2, 3 e 4 em código (02/10/2026), falta o deploy** · vai para `docs/arquivo/` depois do deploy conferido
+> **STATUS: arquivada (02/10/2026)** · **as quatro fases no ar** — fase 1 pelo PR #169, fases 2 a 4 pelo PR #173; o dono fez os dois deploys e disse *"deu bom"* · as regras vivem no `CLAUDE.md` §20 · **isto é histórico: não use como fonte de regra**
 > Desenhada no Projeto do Claude com o Lucas, em 02/10/2026.
 > Tipo: AJUSTE (telas atuais) + duas REGRAS de desenvolvimento (valem para toda tela nova).
 > Risco: 🟢 nos textos e 🟡 no botão, porque ele lê as áreas de acesso para decidir se aparece. Nenhuma fase mexe em estoque, banco ou permissão.
@@ -8,9 +8,9 @@
 | Fase | O quê | Situação |
 |---|---|---|
 | 1 | Botão de troca de operação nas duas barras | **no ar (02/10, PR #169)** — ver nota abaixo |
-| 2 | Troca dos textos de hierarquia | **em código (02/10)** — ver nota abaixo |
-| 3 | Testes de proteção das duas regras | **em código (02/10)** — `teste_linguagem.js` |
-| 4 | Regras no papel (`CLAUDE.md`, `DECISOES.md`) | **em código (02/10)** — `CLAUDE.md` §20 |
+| 2 | Troca dos textos de hierarquia | **no ar (02/10, PR #173)** — ver nota abaixo |
+| 3 | Testes de proteção das duas regras | **no ar (02/10, PR #173)** — `teste_linguagem.js` |
+| 4 | Regras no papel (`CLAUDE.md`, `DECISOES.md`) | **no ar (02/10, PR #173)** — `CLAUDE.md` §20 |
 
 > **Fase 1, como foi construída (02/10/2026):**
 > - O dono único do destino é o `destino.js`, na raiz do projeto, usado pelo `auth.js`: o `/api/auth/eu` e a resposta do login trazem `destino` (`padrao`, `sobmedida`, `duas`, `inicial`). As duas barras, a `/setor` e **o login** leem dali.
@@ -27,6 +27,13 @@
 > - **Quatro exceções nomeadas no teste:** `origem='gestao'` (dado) e os nomes das migrações 8, 13 e 21 do `tecido.db`. Exceção que some do código reprova.
 > - A Regra A também confere `views/acessos.html` (a tela de Acessos), que a spec não citava, e que a tela do sob medida carrega o `nav.js` **do módulo**, e não o do PCP.
 > - Fica para o deploy: abrir as telas de Sobras (propor correção) e Corte (pedir correção) com dado de verdade — as trocas ali estão em fluxos que pedem uma sobra e um corte feito.
+> - ✅ **No ar em 02/10/2026 (PR #173):** o dono fez o deploy e disse *"deu bom"*.
+> - ⚠️ **Os fluxos de Sobras (propor correção) e Corte (pedir correção) não foram relatados um a um** depois do deploy. O teste garante que o texto mudou; ver a frase na tela, com o fluxo de verdade, não foi confirmado. Prova que não foi feita se escreve como não feita.
+
+> **Dois consertos achados na rodada de tela, depois do deploy (02/10/2026):**
+> - O botão **Bancada** saía no rodapé do sob medida escrito `/bancada`: a tela estava no `ORDEM` do `tecido/public/nav.js` e não no `NOMES`.
+> - **O vendedor abria o sob medida e lia "Seu acesso ainda não alcança nenhuma tela"**, com Simulador, Pedidos e Revendas no rodapé da mesma página. A tela inicial tinha as sete portas do estoque de tecido; as nove telas que vieram depois (venda, produção, escritório) nunca ganharam porta. Hoje as dezesseis têm.
+> - `tecido/teste/telas_listas.test.js` (4 casos) trava que toda tela declarada no `nucleo/telas.js` tem porta na inicial e nome no rodapé. São três listas da mesma coisa, e tela nova se escreve copiando a de cima.
 
 ---
 
