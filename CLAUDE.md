@@ -7823,6 +7823,10 @@ porcentagem errada.
 > feito**; a correção do corte de 01/10 pedida pelo Histórico e aprovada por
 > outra pessoa; o iPad achando a sobra pela foto; e o caso da S-000091 no plano.
 > Prova que não foi feita se escreve como não feita (§4).
+>
+> ✅ **PROVA 1 DE 4, EM 02/10/2026: UM CORTE INTEIRO PELAS ETAPAS, NA BANCADA.**
+> O dono fez o corte do começo ao fim e disse *"baixou certo"*. Faltam as outras
+> três: a correção do corte de 01/10, a foto no iPad e o caso da S-000091.
 
 ### Três regras do sob medida que valem citar aqui
 
