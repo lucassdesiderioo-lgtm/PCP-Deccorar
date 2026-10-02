@@ -311,7 +311,7 @@ function desenharPlano(modo){
   const c=el('div',{class:'cartao'});
   const cab=el('div',{class:'campos',style:'align-items:baseline'});
   cab.appendChild(el('h2',{style:'flex:1;margin:0',texto:'PLANO DE CORTE — '+p.tecido.nome}));
-  cab.appendChild(el('span',{class:'quem',texto:p.pecas.length+' peças · '+formatarArea(p.area_pecas)}));
+  cab.appendChild(el('span',{class:'quem',texto:p.pecas.length+(p.pecas.length===1?' peça · ':' peças · ')+formatarArea(p.area_pecas)}));
   c.appendChild(cab);
 
   // O CORTE ANTERIOR DESTE PEDIDO. Vem antes de tudo: e a informacao que
