@@ -2,10 +2,10 @@
 
 ```
 STATUS
-Situação: no ar desde 01/10/2026 (PR #165, o dono: "ficou certo") — provas 1 e 2 de 4 feitas em 02/10 (corte inteiro pelas etapas, "baixou certo"; correção do corte de 01/10, "deu certo"); faltam 2
+Situação: no ar desde 01/10/2026 (PR #165, o dono: "ficou certo") — provas 1, 2 e 3 de 4 feitas em 02/10 (corte inteiro pelas etapas, "baixou certo"; correção do corte de 01/10, "deu certo"; sobra lida pela foto no iPad, "deu certo"); falta 1
 Criada em: 01/10/2026
 Última atualização: 02/10/2026
-Fase atual: nenhuma — as sete no ar; a spec vai para docs/arquivo/ depois das quatro provas na fábrica (☑ corte inteiro pelas etapas, 02/10 · ☑ correção do corte de 01/10, 02/10 · ☐ foto no iPad · ☐ S-000091) — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
+Fase atual: nenhuma — as sete no ar; a spec vai para docs/arquivo/ depois das quatro provas na fábrica (☑ corte inteiro pelas etapas, 02/10 · ☑ correção do corte de 01/10, 02/10 · ☑ foto no iPad, 02/10 · ☐ S-000091) — o dono mandou seguir com TODAS as fases e subir no fim (01/10/2026)
 Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☑
 Risco: 🔴 (muda o momento da baixa de rolo e sobra; correção de estoque depois do corte)
 Módulo: sob medida (tecido/) — ler tecido/README.md antes de mexer
