@@ -32,7 +32,6 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 | `ESTOQUE-LIVRO-E-CONFERENCIA.md` | **Em construção** · fases 0 e 1 no ar (21/09) · fase 2 no ar (26/09) — a conferência em três papéis · **fase 3 no ar (28/09)** — o ajuste em duas pessoas; falta o primeiro ajuste real pedido por um e aprovado por outro · fase 4 planejada |
 | `VENDAS-E-MEDIA.md` | **Em construção** · **fase 1 no ar (26/09, PR #144): a média contada pelo sistema, ao lado da planilha, em Admin → Planejamento — só conferência, a produção não mudou; falta o dono conferir a tabela com o dado real** · **fase 2 no ar (26/09, PR #148): a planilha só espelha as futuras (o recorte não apagou as 4.777 vendas da base), e a venda cancelada no ML sai das listas — falta o primeiro caso real de cancelada** · a troca da fonte (fase 3) espera o ok do dono depois de conferir a tabela |
 | `MESA-DE-CORRECOES.md` | **Em construção** · 3 fases · **fase 1 em código (02/10)**: a mesa, a tabela `correcao`, a aba Correções no admin, a chave `correcao.executar` e as duas ações que mais pesam — **descartar fantasma** e **cancelada depois da etiqueta**, que até aqui não se corrigia de jeito nenhum (o card de Bloqueados só mostrava, e agora ele **esvazia**). Três decisões do dono mudaram o caminho: a **régua do fantasma saiu do script já nesta fase** (duas cópias seriam o botão e o terminal apagando linhas diferentes — o EFEITO só se unifica na fase 3), o **"voltou" devolve POR PEÇA e não `+1`** (a caixa de pacote baixou N; sob medida fica de fora), e a **caixa de várias persianas não tem o "voltou"** (o ML cancela um item e o sistema não sabe qual peça é). Sem backfill da chave — o Admin Geral passa por nível — e **os contadores são os dois que têm botão**, porque contador que acusa e não sabe liberar é trava que se contorna. `teste_correcao.js` (115 casos, escrito antes do código, 12 defeitos reintroduzidos); falta a conferência de fábrica, e a **primeira cancelada real depois da etiqueta** |
-| `CORTE-EM-ETAPAS.md` | **No ar** (01/10, PR #165 — provas 1, 2 e 3 de 4 feitas em 02/10, falta 1) · módulo sob medida (`tecido/`) · 7 fases · o corte vira etapas (confirmar → cortando → corte feito → guardar) e o estoque de rolo e sobra passa a baixar no **Corte feito** · substitui a `SOBRAS-TOM-E-DESPERDICIO.md` · **fase 1 em código (01/10 — o histórico de cortes na tela de corte, com a busca por sobra)** · **fase 2 em código (01/10 — confirmar → cortar → corte feito → guardar; a baixa saiu do Confirmar, o corte aberto reserva as fontes, a sobra nasce "a guardar")** · **fase 3 em código (01/10 — mudar o plano durante o corte, com motivo, e pedir correção depois, que a chefia aprova; quem pediu não aprova)** · **fase 4 em código (01/10 — o tom pela origem, o pedido dividido em três degraus e o "Conferi o tecido" no corte; consertado o pedido de duas cores que continuava no rolo da outra cor)** · **fase 5 em código (01/10 — o tipo de cada linha, da carteira de revendas; o relógio com pausa; o minuto por m² por tipo no Painel)** · **fase 6 em código (01/10 — o 📷 nos campos de bipe de sobra; a foto da etiqueta lida sem biblioteca, só com o dígito verificador fechado; testes com imagens sintéticas, a prova é o iPad)** · **fase 7 em código (01/10 — a sobra de menos refugo vence; toda sobra que serve e não entrou diz por quê, mesmo com outra sobra usada; usa · sobra · refugo em cada sobra; refugo médio de 30 dias)** · no ar em 01/10 · provas 1, 2 e 3 de 4 (corte inteiro pelas etapas, a correção do 01/10 e a foto no iPad) feitas em 02/10; falta a S-000091 |
 | `COMPRAS.md` | Implementado (fases 0–6) · fase 7 pendente · com mudanças na construção |
 | `ARQUITETURA-ALVO.md` | Parcial — só no módulo sob medida (`tecido/`) |
 | `PCP-CONTROLE-E-VISAO.md` | Parcial e divergente · decisão pendente |
@@ -69,6 +68,13 @@ conferidas em produção. As regras estão no `CLAUDE.md` §4.
 peças que saem adiantadas, no quadro do Carregamento. As regras estão no
 `CLAUDE.md` §8-B.
 
+**Implementada e arquivada em 02/10/2026:** `CORTE-EM-ETAPAS.md` — as sete
+fases no ar desde 01/10 (PR #165) e as quatro provas de fábrica feitas em 02/10
+(corte inteiro pelas etapas, correção do corte de 01/10, sobra lida pela foto no
+iPad e o caso da S-000091 no plano). As regras estão no `CLAUDE.md` §19 e no
+`tecido/README.md`. Fica aberta a confirmação do dono de que quem pede a
+correção não a aprova (`docs/DECISOES.md`).
+
 **Implementada e arquivada em 02/10/2026:** `NAVEGACAO-E-LINGUAGEM.md` — o
 "Trocar setor" e o atalho entre as duas operações nas duas barras, o destino com
 dono único (`destino.js`) e os textos sem hierarquia, com o `teste_linguagem.js`
@@ -78,14 +84,14 @@ no `CLAUDE.md` §20.
 **Substituída e arquivada em 01/10/2026:** `SOBRAS-TOM-E-DESPERDICIO.md` — a
 limpeza (fase 1, rodada em produção em 19/09) e a mensagem do plano (fase 2)
 foram feitas; o resto (tom pela origem, desperdício por sobra, menor refugo)
-entrou na `CORTE-EM-ETAPAS.md`, fases 4 e 7.
+entrou na `CORTE-EM-ETAPAS.md` (hoje também arquivada), fases 4 e 7.
 
 **Arquivado sem construir em 26/09/2026:** `COLETA-LEVA-AGENCIA.md` — o
 rascunho de 25/09 que trocava a modalidade da caixa da agência levada pelo
 caminhão. Substituído pela `SAIDA-E-DUPLA-CONFERENCIA.md`, que resolve pela
 troca de porta (`saiu_por`) sem mexer na modalidade.
 
-Em `docs/arquivo/`: `NAVEGACAO-E-LINGUAGEM.md`, `SOBRAS-TOM-E-DESPERDICIO.md`, `COLETA-LEVA-AGENCIA.md`, `CARREGAMENTO-ADIANTADO.md`, `GERADOR-ETIQUETA-KIT.md`, `REVISAO-COMPLETA.md`,
+Em `docs/arquivo/`: `CORTE-EM-ETAPAS.md`, `NAVEGACAO-E-LINGUAGEM.md`, `SOBRAS-TOM-E-DESPERDICIO.md`, `COLETA-LEVA-AGENCIA.md`, `CARREGAMENTO-ADIANTADO.md`, `GERADOR-ETIQUETA-KIT.md`, `REVISAO-COMPLETA.md`,
 `ESTOQUE-TECIDO-E-SOBRAS.md`, `PROMPT-ESTOQUE-TECIDO-E-SOBRAS.md`,
 `PROMPT-FASE-0.md`, `PERGUNTAS-COMPRAS.md`, `GESTAO-DE-TAREFAS.md` e
 `MELHORIAS.md` (os sete últimos arquivados por decisão do dono em 17/09/2026).

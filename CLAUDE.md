@@ -8040,6 +8040,12 @@ porcentagem errada.
 > ✅ **PROVA 3 DE 4, EM 02/10/2026: A SOBRA LIDA PELA FOTO NO iPad.** O dono leu
 > a etiqueta de uma sobra pelo 📷 e disse *"deu certo"*. É a prova que os
 > testes com imagens sintéticas não davam (fase 6). Falta o caso da S-000091.
+>
+> ✅ **PROVA 4 DE 4, EM 02/10/2026: O CASO DA S-000091 NO PLANO.** O dono
+> testou e disse *"deu certo"*. Com as quatro provas feitas, a spec foi para
+> `docs/arquivo/CORTE-EM-ETAPAS.md`; as regras que valem são as desta seção e
+> as do `tecido/README.md`. Fica aberta a confirmação de que quem pede a
+> correção não a aprova (`docs/DECISOES.md`).
 
 ### Três regras do sob medida que valem citar aqui
 
