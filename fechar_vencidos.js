@@ -4,6 +4,7 @@
  *   node fechar_vencidos.js               so mostra
  *   node fechar_vencidos.js --aplicar     faz backup e grava
  *   node fechar_vencidos.js --ate 2026-08-24 [--aplicar]
+ *   ... --aplicar --motivo "texto"    o motivo que vai para o historico da Mesa
  *
  * QUANDO ISTO E CORRETO — E SO ENTAO
  * Existe um passivo de volumes que sairam de verdade e o sistema nunca soube:
@@ -47,14 +48,15 @@ const db=new Database(DB);
 const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
 const limite=ATE||hoje;
 
-/* Vencidos ou de hoje. O que vence depois nao entra: nao foi despachado. E
-   volume sem data lida entra tambem — ele e do mesmo passivo, so que de um lote
-   cujo PDF sumiu do disco. */
-const alvo=db.prepare(`SELECT id,data,codigo,buyer,nf,despachar_em
-  FROM lote
-  WHERE estagio='pendente'
-    AND (despachar_em IS NULL OR despachar_em<=?)
-  ORDER BY COALESCE(despachar_em,data), id`).all(limite);
+/* A LISTA E A DA MESA DE CORRECOES (fase 3, 02/10/2026): pendente, fora do
+   modo teste, com despacho ate o corte — e o sem despacho lido entra se ENTROU
+   ate o corte (o que entrou hoje cedo ainda e trabalho). Botao e terminal com
+   a mesma regua. */
+const COR=require('./correcoes');
+COR.garantirSchema(db);
+let alvo=[];
+try{ alvo=COR.previa(db,{acao:'vencidos',tipo:'bloco',id:0,params:{ate:limite}}).lista; }
+catch(e){ if(e.status!==409) throw e; alvo=[]; }
 
 console.log('banco:',DB);
 console.log('fechando o que vence ate:',limite,(ATE?'(--ate)':'(hoje)'));
@@ -97,11 +99,13 @@ const bkp=path.join(dest,'antes-fechar-'+new Date().toISOString().replace(/[:.]/
 await db.backup(bkp);
 console.log(''); console.log('backup ->',bkp);
 
-/* 15:00 e o horario limite do despacho (§8) — convencao, nao medicao. */
-const up=db.prepare(`UPDATE lote SET estagio='carregado',
-  carregado_em=COALESCE(despachar_em,data)||' 15:00:00' WHERE id=? AND estagio='pendente'`);
-let n=0; db.transaction(()=>{ alvo.forEach(v=>{ n+=up.run(v.id).changes; }); })();
-console.log('fechados:',n);
+/* Quem fecha e a acao "Fechar vencidos" da Mesa: UMA linha em `correcao`
+   para o bloco, com desfazer pela tela. Ela carimba na data do volume as 15:00
+   (§8) e grava o `retirado_em` da coleta, que este script nao gravava. */
+const T=COR.terminal('fechar_vencidos.js', process.argv);
+const r=db.transaction(()=>COR.executar(db,{acao:'vencidos',tipo:'bloco',id:0,params:{ate:limite},
+  motivo:T.motivo,quem:T.quem}))();
+console.log('fechados:',alvo.length,'· correcao #'+r.correcao_id+' (desfaz pela Mesa de correcoes)');
 
 const {VENCE_HOJE}=require('./fila_dia');
 const resta=db.prepare(`SELECT COUNT(*) c FROM lote WHERE estagio='pendente' AND `+VENCE_HOJE).get().c;

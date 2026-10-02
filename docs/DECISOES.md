@@ -216,3 +216,26 @@ equipe aprende a contornar.
 
 Decidido por Lucas, ao aprovar o plano. Detalhe no `CLAUDE.md` §5 ("A Mesa de
 correções") e §3 (o card que agora decide).
+
+## 02/10/2026 — a Mesa de correções fases 2 e 3, e as quatro escolhas que pedem confirmação (A CONFIRMAR PELO DONO)
+
+A fase 2 trouxe as outras cinco ações (Dar saída, Fechar vencidos, Reabrir venda
+futura, Tirar da fila, Pedir ajuste), e a fase 3 fez os cinco scripts de passivo
+chamarem as **mesmas** ações, gravando em `correcao`. Ao unificar a régua do botão
+e do terminal, quatro pontos ficaram diferentes do que os scripts faziam, e foram
+decididos por mim na construção:
+
+1. **A venda futura reaberta que nunca teve etiqueta volta a `pendente`**, e não a
+   `embalado` como o `reabrir_futuros.js` fazia. Embalado sem o −1 da etiqueta é
+   a armadilha #27: a caixa apareceria no Carregamento sem ter baixado estoque.
+2. **Fechar vencidos só pega o volume sem despacho lido se ele ENTROU até a data
+   de corte**, e deixa o modo teste de fora. O script pegava todos os sem data.
+3. **A coleta fechada por "Dar saída" ou "Fechar vencidos" ganha `retirado_em`**
+   no mesmo carimbo. Sem ele a caixa cairia no card "esperando o caminhão".
+4. **O contador de fila velha conta linhas com mais de 30 dias**, a faixa que o
+   `limpar_fila.js` já chamava de passivo.
+
+E uma que é da spec: **a Mesa não aplica ajuste de estoque**; o "Pedir ajuste"
+abre o pedido pela porta do ajuste em duas pessoas, e outra pessoa aprova.
+
+Detalhe no `CLAUDE.md` §5 ("A Mesa de correções").

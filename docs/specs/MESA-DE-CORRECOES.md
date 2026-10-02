@@ -1,4 +1,14 @@
-> **STATUS · 02/10/2026 — EM CONSTRUÇÃO** · **fase 1 no ar (PR #174)**; fases 2 e 3 planejadas
+> **STATUS · 02/10/2026 — EM CONSTRUÇÃO** · **fase 1 no ar (PR #174)** · **fases 2 e 3 em código
+> (02/10/2026)**: as cinco ações da §4 que faltavam, os três contadores que faltavam e os cinco
+> scripts chamando o `correcoes.js` e gravando em `correcao`. `teste_correcao2.js` (98) e
+> `teste_correcao3.js` (23, o mesmo cenário pelo botão e pelo terminal, os dois iguais linha a
+> linha). **Mudanças na construção:** a venda futura reaberta sem etiqueta volta a `pendente`
+> (a §4 dizia só "reabrir"); "Fechar vencidos" exige a data de corte e só pega o sem-despacho
+> que entrou até ela; a coleta fechada ganha `retirado_em`; a fila velha é a de mais de 30 dias;
+> "Dar saída" não apaga as cópias (elas viram fantasmas, e saem pelo contador); "Pedir ajuste"
+> abre o pedido pela porta do ajuste (não grava em `correcao`). Quatro delas esperam a
+> confirmação do dono em `docs/DECISOES.md`. Falta: deploy, e o dono fechar um passivo de
+> verdade pela tela.
 >
 > **Fase 1** entrou em 02/10/2026: `correcoes.js` (dono único de cada ação),
 > `correcao_route.js` (7 rotas), a tabela `correcao`, a aba **Correções** no admin, a
@@ -190,13 +200,13 @@ Aba nova **"Correções"** no admin, fundo escuro (DESIGN.md §1):
   movimento +1 e a soma do livro bate; desfazer recusa objeto que andou; fantasma
   mantém o mais antigo.
 
-### Fase 2 — as outras ações 🔴
+### Fase 2 ☑ — as outras ações 🔴 (em código em 02/10/2026)
 
 - Dar saída, Fechar vencidos, Reabrir futura, Tirar da fila, Pedir ajuste.
 - **Testes:** os casos que travam as regras dos scripts — saída carimbada na data do
   volume, nunca hoje; venda futura recusada; fila `embalado` intocável.
 
-### Fase 3 — scripts com a mesma régua 🟡
+### Fase 3 ☑ — scripts com a mesma régua 🟡 (em código em 02/10/2026)
 
 - `limpar_fantasmas.js`, `regularizar_saida.js`, `fechar_vencidos.js`,
   `reabrir_futuros.js`, `limpar_fila.js` passam a chamar `correcoes.js` e a gravar
