@@ -218,3 +218,29 @@ equipe aprende a contornar.
 
 Decidido por Lucas, ao aprovar o plano. Detalhe no `CLAUDE.md` §5 ("A Mesa de
 correções") e §3 (o card que agora decide).
+
+## 02/10/2026 — Mesa de correções, fases 2 e 3: os cinco scripts viram ações da tela
+
+As cinco correções que só existiam como script no servidor (dar saída, fechar
+vencidos, reabrir venda futura, tirar da fila, pedir ajuste) passam a ser **ações da
+Mesa**, e os cinco scripts **chamam as mesmas funções** e gravam em `correcao` — botão e
+terminal deixam o banco igual no mesmo caso (`teste_correcao_f3.js`). Aprovado por
+Lucas no plano ("pode seguir"). As regras são as dos scripts; quatro pontos mudaram na
+construção, e os quatro fecham um defeito que o script tinha:
+
+1. **A caixa de COLETA que "sai" ganha `retirado_em`** (o mesmo carimbo) e `saiu_por`
+   pela modalidade, como o `fechar_saida_passivo.js` já fazia. Sem isso ela ficava
+   parada no card "esperando o caminhão" de um caminhão que já foi.
+2. **Reabrir venda futura devolve a `pendente` o volume que nunca teve etiqueta
+   impressa** (o script devolvia todos a `embalado`). Embalado sem a baixa da etiqueta
+   é a armadilha #27: a caixa entraria no Carregamento sem o −1.
+3. **Dar saída recusa a venda cancelada**, e **fechar vencidos recusa data de corte no
+   futuro** — inclusive no terminal, onde antes o `--ate` futuro fecharia venda que
+   não foi despachada.
+4. **A cópia apagada e o fantasma levam as peças junto** (`lote_item`): o script deixava
+   linha órfã, que o próximo volume com o mesmo id herdaria.
+
+**Pedir ajuste pela Mesa exige também `estoque.ajustar`** — a Mesa não pode ser a porta
+dos fundos dessa chave — e o saldo não anda: outra pessoa aprova na aba Estoque. Os
+três contadores que faltavam (vencidos, saídas no futuro, fila velha) chegam junto com
+o botão deles, como a decisão 3 da fase 1 mandava.

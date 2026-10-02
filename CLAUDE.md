@@ -2172,6 +2172,13 @@ número — o volume processado sai de `pendente` e o estoque baixa junto.
 | `fechar_vencidos.js` | `pendente` vencido | em bloco, por período conferido |
 | `regularizar_saida.js` | qualquer não-carregado | por id, um a um, decisão humana |
 
+> ✅ **DESDE 02/10/2026 O CAMINHO NORMAL É A MESA DE CORREÇÕES** (Admin →
+> Correções, bloco logo abaixo), e os scripts — estes três, o
+> `reabrir_futuros.js` e o `limpar_fila.js` — **chamam as mesmas funções dela**
+> (`correcoes.js`) e gravam em `correcao`. Eles continuam úteis para a operação
+> em massa; o que perderam foi a régua própria. As duas regras abaixo moram hoje
+> no `correcoes.js`.
+
 > ⚠️ **A saída é carimbada na data DO VOLUME** — `COALESCE(despachar_em, data)`
 > às 15:00 (§8) —, nunca em `datetime('now')`. Fechar um passivo antigo com a
 > data de hoje cria um pico falso de dezenas de carregamentos num dia em que
@@ -2274,7 +2281,9 @@ Aba **Correções** no admin, ao lado de Bloqueados — ela acusa, a Mesa corrig
 > vez de sobrescrever. O `antes` carrega o `lote` **e as peças**, porque é delas
 > que o desfazer precisa.
 
-> ⚠️ **O FANTASMA APAGA AS PEÇAS JUNTO, E O SCRIPT AINDA NÃO.** O
+> ✅ ~~**O FANTASMA APAGA AS PEÇAS JUNTO, E O SCRIPT AINDA NÃO.**~~ **Unificado na
+> fase 3 (02/10/2026):** o script chama o `executar` da Mesa e apaga as peças
+> junto. O que segue é a história. O
 > `limpar_fantasmas.js` faz `DELETE FROM lote` e deixa o `lote_item` órfão — o
 > próprio comentário do `TABELAS` do modo teste avisa que *"o próximo volume com
 > o mesmo id herdaria peças que nunca foram dele"*. A Mesa apaga os dois. **Os
@@ -2282,7 +2291,8 @@ Aba **Correções** no admin, ao lado de Bloqueados — ela acusa, a Mesa corrig
 > chamar o `correcoes.js` inteiro, e não só a régua. As órfãs que já existem no
 > banco são passivo anterior a isto.
 
-> ⚠️ **OS CONTADORES SÃO OS DOIS QUE TÊM BOTÃO** (decisão do dono). Vencidos,
+> ⚠️ ~~**OS CONTADORES SÃO OS DOIS QUE TÊM BOTÃO**~~ — **são cinco desde a fase 2
+> (02/10/2026)**, cada um com o seu botão; a regra é a mesma. (decisão do dono). Vencidos,
 > futuras fechadas e fila velha chegam na **fase 2**, junto com a ação deles:
 > contador que acusa e não sabe liberar é a trava que a equipe aprende a
 > contornar (§5, Bloqueados → escolher).
@@ -2332,6 +2342,77 @@ exige o módulo novo na varredura dele, e foi ele que cobrou. E mexeu no saldo?
 > passivo de verdade pela tela** — e, principalmente, a **primeira cancelada
 > real depois da etiqueta**, que é a prova que a VENDAS F2 deixou pendente (§3).
 > Prova que não foi feita se escreve como não feita (§4).
+
+### ⚠️ AS FASES 2 E 3 DA MESA — os cinco scripts viraram ações da tela (02/10/2026)
+
+**Fase 2:** as cinco correções que só existiam como script no servidor viraram
+ações da aba Correções, com prévia, motivo e desfazer. **Fase 3:** os cinco
+scripts passaram a chamar as mesmas funções, e o `teste_correcao_f3.js` exige
+que **script e botão deixem o banco igual no mesmo caso** — inclusive a linha
+gravada em `correcao`.
+
+| Ação | Alvo | A regra (a do script) |
+|---|---|---|
+| **Dar saída** | volume | carimba `COALESCE(despachar_em,data)` às 15:00, nunca hoje; recusa venda futura, já carregado e **cancelada**; as cópias pendentes do mesmo volume saem **com as peças** |
+| **Fechar vencidos** | bloco, até uma data | pendente com despacho até a data (ou sem data lida); **data de corte obrigatória e nunca no futuro**; bloqueado, embalado e futuro ficam de fora |
+| **Reabrir venda futura** | volume | só `carregado_em` depois de hoje; volta a `embalado` **se teve etiqueta**, senão a `pendente`; saída registrada (`saida_id`) é recusada |
+| **Tirar da fila** | linha da fila, ou bloco até uma data | só `aguardando`; a `embalado` é história e nunca é tocada |
+| **Pedir ajuste de saldo** | SKU | abre o pedido do `ajuste_dominio` — **o saldo não anda**, outra pessoa aprova (§18, fase 3) |
+
+> ⚠️ **NA COLETA, "SAIR" É O CAMINHÃO LEVANDO** — a ação grava `retirado_em` com o
+> mesmo carimbo e `saiu_por` pela modalidade, como o `fechar_saida_passivo.js`
+> já fazia (§8-B). O `regularizar_saida.js` marcava só `carregado`, e a caixa
+> ficava no card "esperando o caminhão" de um caminhão que já foi. A
+> `modalidade` nunca é reescrita.
+
+> ⚠️ **REABRIR NÃO PÕE NO CARREGAMENTO O QUE NUNCA TEVE ETIQUETA.** O script
+> devolvia todo volume a `embalado`; o que nunca teve a etiqueta impressa
+> (`embalado_em` vazio) não teve o −1, e embalado sem baixa é a armadilha #27.
+> Hoje ele volta a `pendente`, que é de onde veio.
+
+> ⚠️ **O PEDIDO DE AJUSTE PELA MESA EXIGE TAMBÉM `estoque.ajustar`**, conferido
+> na rota (`exige` na ação): sem isso a Mesa seria a porta dos fundos da chave
+> do ajuste. Desfazer é **desistir** do pedido, e só enquanto ele está pendente
+> — aprovado, o saldo já andou, e o caminho é outro pedido.
+
+> ⚠️ **O BLOCO É UMA CORREÇÃO SÓ, E O DESFAZER É TUDO OU NADA.** Fechar 40
+> vencidos grava **uma** linha em `correcao`, com os 40 no `antes`; um que tenha
+> andado recusa o desfazer inteiro, dizendo qual. Desfazer metade deixaria o
+> bloco descrito por uma correção que já não é verdade.
+
+> ⚠️ **OS CINCO CONTADORES TÊM BOTÃO** (a decisão 3 da fase 1 valendo inteira):
+> vencidos e fila velha abrem o bloco com a data de corte já sugerida (ontem, e
+> 31 dias atrás); as saídas no futuro abrem o volume, onde mora o "Reabrir".
+> **Vencido é despacho JÁ PASSADO** — o volume sem data lida está na fila de hoje
+> por regra (§8, #7) e não é contado como vencido, mas a ação em bloco o inclui,
+> como o script, e a prévia diz quantos.
+
+> ⚠️ **NO TERMINAL, QUEM FEZ É "terminal (nome do script)"** e o motivo é
+> `--motivo "texto"`, com um padrão que diz o comando. A correção aparece na aba
+> Correções e se desfaz por lá, como a do botão.
+
+> **O render achou quatro coisas, e nenhuma tem teste de unidade que a pegue:** a
+> prévia dizia *"1 com despacho futuro"* contando a venda de **hoje** (a frase
+> certa é "com despacho depois de" a data de corte); o painel repetia *"Não mexe
+> em estoque"* logo abaixo do *"O saldo não se mexe"* do resumo; o cartão do
+> volume e o histórico escreviam data e hora no formato do banco; e o histórico
+> do bloco dizia *"3 itens"* — são volumes no de vencidos e peças no da fila.
+
+**Rode `node teste_correcao_f2.js` (96 casos) ao mexer nas ações da fase 2, e
+`node teste_correcao_f3.js` (44) ao mexer em qualquer dos cinco scripts** — os
+dois foram escritos antes do código. Dez defeitos foram reintroduzidos um a um
+na fase 2 (o carimbo em `now` reprova 10, a saída sem a guarda do futuro 4, os
+vencidos pegando bloqueado 2, a fila aceitando embalado 3, o ajuste sem
+`estoque.ajustar` 6, a cópia sem as peças 7, reabrir sempre a embalado 1, a
+coleta sem `retirado_em` 2, o bloco desfazendo metade 3 e a prévia gravando 6),
+e dois na fase 3 (o fantasma com a régua velha reprova 5, os vencidos com
+`UPDATE` próprio 4). A varredura do f3 recusa `UPDATE lote`, `DELETE FROM lote`
+e `DELETE FROM fila` dentro dos cinco scripts.
+
+> ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA.** A rodada foi num navegador meu, a
+> 1440 px, com banco semeado: o bloco de vencidos fechado pela tela, a fila velha
+> tirada, a saída no futuro aberta e o pedido de ajuste até a prévia. A prova é
+> **o dono corrigindo um passivo de verdade pela tela**, sem pedir script.
 
 > ⚠️ **Lançamento manual e PDF não se conversam.** O manual (`origem='manual'`)
 > não é apagado pelo recálculo. Usar os dois no mesmo SKU **duplica a ordem**.
@@ -4167,7 +4248,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) e `teste_correcao.js` (115); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13), `teste_correcao.js` (115), `teste_correcao_f2.js` (96) e `teste_correcao_f3.js` (44); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4230,6 +4311,18 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   que a equipe aprende a contornar (§5, a Mesa, e Bloqueados → escolher)
 - ❌ Dar backfill a `correcao.executar`: o Admin Geral passa por nível, e a chave
   chega ao dono no primeiro boot (§5, a Mesa · §4, o `kit.imprimir`)
+- ❌ Fazer um dos cinco scripts de passivo voltar a escrever em `lote` ou `fila`
+  por conta própria: eles chamam o `correcoes.js`, e o `teste_correcao_f3.js`
+  varre (§5, a Mesa fase 3)
+- ❌ Deixar "Dar saída" na coleta sem `retirado_em`: a caixa fica no card do
+  caminhão que já foi (§5, a Mesa fase 2 · §8-B)
+- ❌ Reabrir a `embalado` o volume que nunca teve etiqueta: é a armadilha #27 pela
+  porta da Mesa (§5, a Mesa fase 2)
+- ❌ Fechar vencidos sem data de corte, ou com ela no futuro — nem pelo terminal
+  (§5, a Mesa fase 2)
+- ❌ Deixar a Mesa pedir ajuste sem a chave `estoque.ajustar`, ou aplicar o saldo
+  na hora: ela abre o pedido, e outra pessoa aprova (§5, a Mesa · §18)
+- ❌ Desfazer metade de um bloco: um que andou recusa o desfazer inteiro (§5, a Mesa)
 - ❌ Calcular a falta de estoque fora do `demanda_dominio.js` — a aba Estoque e a
   tela azul do operador têm que dizer o mesmo número (§18)
 - ❌ Fazer a aprovação da contagem gravar o **número contado** como saldo: entre

@@ -32,29 +32,38 @@
  * NAO TOCA EM `bloqueado`: aquilo e outro problema (SKU fora do cadastro ou
  * divergencia de leitura) e se resolve por outro caminho.
  * NAO TOCA NO QUE VENCE DEPOIS DE HOJE: venda futura nao foi despachada.
+ *
+ * ⚠️ DESDE 02/10/2026 (fase 3 da Mesa de correcoes) A REGRA E O EFEITO MORAM NO
+ * `correcoes.js` — acao "Fechar vencidos", a mesma do botao da aba Correcoes.
+ * Mudou junto: `--ate` no futuro e RECUSADO (antes ele fecharia venda futura),
+ * e a caixa de COLETA sai com `retirado_em`. O bloco vira UMA linha em
+ * `correcao`, que se desfaz pela tela.
  */
 const Database=require('better-sqlite3');
 const path=require('path'); const fs=require('fs');
+const COR=require('./correcoes');
 
 const DB=require('./caminhos').BANCO;
 const args=process.argv.slice(2);
 const APLICAR=args.includes('--aplicar');
 const iAte=args.indexOf('--ate');
 const ATE=(iAte>=0 && args[iAte+1] && /^\d{4}-\d{2}-\d{2}$/.test(args[iAte+1])) ? args[iAte+1] : null;
+const iMot=args.indexOf('--motivo');
+const MOTIVO=(iMot>=0&&args[iMot+1])?args[iMot+1]:'fechado em bloco pelo terminal (node fechar_vencidos.js --aplicar)';
+const QUEM={id:null,nome:'terminal (fechar_vencidos.js)'};
 
 (async()=>{
 const db=new Database(DB);
 const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
 const limite=ATE||hoje;
 
-/* Vencidos ou de hoje. O que vence depois nao entra: nao foi despachado. E
-   volume sem data lida entra tambem — ele e do mesmo passivo, so que de um lote
-   cujo PDF sumiu do disco. */
-const alvo=db.prepare(`SELECT id,data,codigo,buyer,nf,despachar_em
-  FROM lote
-  WHERE estagio='pendente'
-    AND (despachar_em IS NULL OR despachar_em<=?)
-  ORDER BY COALESCE(despachar_em,data), id`).all(limite);
+/* Data de corte no futuro: venda futura nao foi despachada. A recusa e a da
+   Mesa, com a frase dela. */
+if(limite>hoje){ console.log('erro: a data de corte ('+limite+') está no futuro — venda futura não foi despachada'); db.close(); process.exit(1); }
+COR.garantirSchema(db);
+/* Vencidos ou de hoje, e o volume sem data lida — a regua e a da Mesa
+   (`vencidosAte`), a mesma do botao. */
+const alvo=COR.vencidosAte(db,limite);
 
 console.log('banco:',DB);
 console.log('fechando o que vence ate:',limite,(ATE?'(--ate)':'(hoje)'));
@@ -97,11 +106,9 @@ const bkp=path.join(dest,'antes-fechar-'+new Date().toISOString().replace(/[:.]/
 await db.backup(bkp);
 console.log(''); console.log('backup ->',bkp);
 
-/* 15:00 e o horario limite do despacho (§8) — convencao, nao medicao. */
-const up=db.prepare(`UPDATE lote SET estagio='carregado',
-  carregado_em=COALESCE(despachar_em,data)||' 15:00:00' WHERE id=? AND estagio='pendente'`);
-let n=0; db.transaction(()=>{ alvo.forEach(v=>{ n+=up.run(v.id).changes; }); })();
-console.log('fechados:',n);
+/* A data da saida e a do volume, as 15:00 (§8) — o carimbo e da Mesa. */
+db.transaction(()=>{ COR.executar(db,{acao:'vencidos',tipo:'periodo',id:0,params:{ate:limite},motivo:MOTIVO,quem:QUEM}); })();
+console.log('fechados:',alvo.length,'· o bloco virou uma correção na aba Correções (dá para desfazer lá)');
 
 const {VENCE_HOJE}=require('./fila_dia');
 const resta=db.prepare(`SELECT COUNT(*) c FROM lote WHERE estagio='pendente' AND `+VENCE_HOJE).get().c;

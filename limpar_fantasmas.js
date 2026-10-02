@@ -43,6 +43,9 @@ const CORRECOES=require('./correcoes');
 
 const DB=require('./caminhos').BANCO;
 const APLICAR=process.argv.includes('--aplicar');
+const valorDe=(f,padrao)=>{ const i=process.argv.indexOf(f); return i>=0&&process.argv[i+1]?process.argv[i+1]:padrao; };
+/* Quem fez, na correcao: o terminal nao tem pessoa logada. */
+const QUEM={id:null,nome:'terminal (limpar_fantasmas.js)'};
 
 (async()=>{
 const db=new Database(DB);
@@ -94,9 +97,15 @@ const arq=path.join(dest,'antes-limpeza-'+new Date().toISOString().replace(/[:.]
 await db.backup(arq);
 console.log(''); console.log('backup ->',arq);
 
-const del=db.prepare('DELETE FROM lote WHERE id=?');
-db.transaction(()=>{ fantasmas.forEach(o=>del.run(o.v.id)); })();
-console.log('apagados:',fantasmas.length);
+/* O EFEITO TAMBEM E DA MESA desde a fase 3 (02/10/2026): cada fantasma passa
+   pelo MESMO `executar` do botao — apaga o volume E as pecas dele (este script
+   deixava o `lote_item` orfao), e grava uma linha em `correcao`, com motivo,
+   que se desfaz pela aba Correcoes. Botao e terminal deixam o banco igual. */
+CORRECOES.garantirSchema(db);
+const MOTIVO=valorDe('--motivo','limpeza em massa pelo terminal (node limpar_fantasmas.js --aplicar)');
+db.transaction(()=>{ fantasmas.forEach(o=>CORRECOES.executar(db,{acao:'fantasma',tipo:'lote',id:o.v.id,
+  motivo:MOTIVO,quem:QUEM})); })();
+console.log('apagados:',fantasmas.length,'· cada um virou uma correção na aba Correções (dá para desfazer lá)');
 
 const resta=db.prepare(`SELECT COUNT(*) c FROM lote
   WHERE data=date('now','localtime') AND estagio='pendente'`).get().c;

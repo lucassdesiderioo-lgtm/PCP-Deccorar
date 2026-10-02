@@ -22,56 +22,53 @@
  *   2. apaga as duplicatas `pendente` do MESMO volume (mesmo packId ou venda),
  *      que sao as copias que os PDFs seguintes criaram
  *
+ * ⚠️ DESDE 02/10/2026 (fase 3 da Mesa de correcoes) A REGRA E O EFEITO MORAM NO
+ * `correcoes.js` — acao "Dar saida", a mesma do botao da aba Correcoes. Este
+ * script so escolhe os ids, mostra, faz o backup e chama a Mesa. Mudou junto,
+ * e de proposito: a caixa de COLETA sai com `retirado_em` (sem ele ficava no
+ * card "esperando o caminhao" de um caminhao que ja foi), a venda cancelada e
+ * recusada, e a copia sai com as pecas dela. Cada volume vira uma linha em
+ * `correcao`, que se desfaz pela tela.
+ *
  * O QUE ELE NAO FAZ: mexer no estoque. A peca nunca somou +1 (nao passou pela
  * embalagem) e por isso nao pode baixar -1 agora. Os dois lados faltaram, e o
  * saldo ja esta certo. Descontar aqui abriria um buraco de uma peca no SKU.
  */
 const Database=require('better-sqlite3');
 const path=require('path');
+const COR=require('./correcoes');
 
 const DB=require('./caminhos').BANCO;
 const args=process.argv.slice(2);
 const APLICAR=args.includes('--aplicar');
-const ids=args.filter(a=>/^\d+$/.test(a)).map(Number);
+const iMot=args.indexOf('--motivo');
+const MOTIVO=(iMot>=0&&args[iMot+1])?args[iMot+1]:'regularizado pelo terminal (node regularizar_saida.js --aplicar)';
+const ids=args.filter((a,i)=>/^\d+$/.test(a)&&args[i-1]!=='--motivo').map(Number);
+const QUEM={id:null,nome:'terminal (regularizar_saida.js)'};
 
 if(!ids.length){
-  console.log('uso: node regularizar_saida.js <id> [<id>...] [--aplicar]');
+  console.log('uso: node regularizar_saida.js <id> [<id>...] [--aplicar] [--motivo "texto"]');
   console.log('     os ids saem da lista "Faltam imprimir" ou do limpar_fantasmas.js');
   process.exit(1);
 }
 
 (async()=>{
 const db=new Database(DB);
-const HOJE=db.prepare("SELECT date('now','localtime') d").get().d;
-const achar=db.prepare('SELECT id,data,codigo,buyer,nf,packId,venda,estagio,despachar_em FROM lote WHERE id=?');
+COR.garantirSchema(db);
 const plano=[], recusados=[];
 
+/* A PREVIA DA MESA para cada id: e ela que diz se vale (venda futura, ja
+   carregado, cancelada) e o que vai acontecer. Nenhuma regra mora aqui. */
 for(const id of ids){
-  const v=achar.get(id);
-  if(!v){ recusados.push({id,por:'nao existe'}); continue; }
-  if(v.estagio==='carregado'){ recusados.push({id,por:'ja esta carregado'}); continue; }
-  /* VENDA FUTURA NAO FOI DESPACHADA — a mesma guarda do fechar_vencidos.js.
-     Volume com etiqueta ja impressa e despacho marcado pra frente esta na
-     fabrica esperando o prazo, nao saiu: ele so foi adiantado na impressao.
-     Fechar um desses carimba uma saida que ainda nao aconteceu — em 26/08/2026
-     quatro volumes foram fechados com data de setembro antes desta guarda
-     existir. E o volume some da tela de carregamento no dia em que ele
-     realmente tiver que sair, que e o dano de verdade. */
-  if(v.despachar_em && v.despachar_em>HOJE){
-    recusados.push({id,por:'so despacha em '+v.despachar_em+' — nao saiu ainda'}); continue; }
-  /* Copias do mesmo volume que os PDFs seguintes criaram. So as `pendente`
-     saem: uma copia que andou e historia de verdade, nao ruido. */
-  const copias=db.prepare(`SELECT id,data,estagio FROM lote
-    WHERE id<>? AND estagio='pendente'
-      AND ((packId IS NOT NULL AND packId=?) OR (venda IS NOT NULL AND venda=?))`).all(v.id,v.packId,v.venda);
-  plano.push({v,copias});
+  try{ plano.push({id, p:COR.previa(db,{acao:'saida',tipo:'lote',id})}); }
+  catch(e){ recusados.push({id,por:e.message}); }
 }
 
 console.log('banco:',DB); console.log('');
-for(const {v,copias} of plano){
-  console.log('#'+v.id+'  '+v.data+'  '+(v.codigo||'(sem SKU)')+'  NF '+(v.nf||'-')+'  '+(v.buyer||''));
-  console.log('    '+v.estagio+' -> carregado');
-  console.log('    copias a apagar: '+(copias.length? copias.map(c=>'#'+c.id+' de '+c.data).join(', ') : 'nenhuma'));
+for(const {id,p} of plano){
+  const v=p.antes.lote;
+  console.log('#'+id+'  '+v.data+'  '+(v.codigo||'(sem SKU)')+'  NF '+(v.nf||'-')+'  '+(v.buyer||''));
+  console.log('    '+p.resumo);
 }
 if(recusados.length){
   console.log('');
@@ -79,7 +76,7 @@ if(recusados.length){
   recusados.forEach(r=>console.log('  #'+r.id+' — '+r.por));
 }
 
-const nCop=plano.reduce((s,p)=>s+p.copias.length,0);
+const nCop=plano.reduce((s,x)=>s+x.p.antes.copias.length,0);
 console.log('');
 console.log('resumo: '+plano.length+' volume(s) a fechar, '+nCop+' copia(s) a apagar');
 
@@ -92,20 +89,10 @@ const arq=path.join(dest,'antes-regularizar-'+new Date().toISOString().replace(/
 await db.backup(arq);
 console.log(''); console.log('backup ->',arq);
 
-/* A DATA DA SAIDA E A DO VOLUME, NAO HOJE — mesma regra do fechar_vencidos.js.
-   Enquanto era datetime('now'), fechar um passivo antigo carimbava tudo com a
-   data de hoje: um pico falso de dezenas de carregamentos num dia em que nao
-   saiu nada, e os dias em que as pecas realmente sairam continuavam vazios.
-   Passava despercebido enquanto o uso era de dois ou tres ids por vez, que foi
-   pra que ele nasceu; com 27 volumes de treze dias o relatorio vira ficcao.
-   A HORA (15:00) e o limite do despacho (§8) — convencao, nao medicao. */
-const fechar=db.prepare(`UPDATE lote SET estagio='carregado',
-  carregado_em=COALESCE(despachar_em,data)||' 15:00:00' WHERE id=?`);
-const del=db.prepare('DELETE FROM lote WHERE id=?');
 db.transaction(()=>{
-  for(const {v,copias} of plano){ fechar.run(v.id); copias.forEach(c=>del.run(c.id)); }
+  for(const {id} of plano) COR.executar(db,{acao:'saida',tipo:'lote',id,motivo:MOTIVO,quem:QUEM});
 })();
-console.log('fechados:',plano.length,'· copias apagadas:',nCop);
+console.log('fechados:',plano.length,'· copias apagadas:',nCop,'· cada um virou uma correção na aba Correções');
 
 const resta=db.prepare(`SELECT COUNT(*) c FROM lote
   WHERE data=date('now','localtime') AND estagio='pendente'`).get().c;

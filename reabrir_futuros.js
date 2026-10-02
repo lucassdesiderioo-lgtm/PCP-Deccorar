@@ -29,34 +29,57 @@
  * mostra volume por volume antes de gravar.
  *
  * NAO MEXE NO ESTOQUE: carregar nunca mexeu, entao descarregar tambem nao.
+ *
+ * ⚠️ DESDE 02/10/2026 (fase 3 da Mesa de correcoes) A REGRA E O EFEITO MORAM NO
+ * `correcoes.js` — acao "Reabrir venda futura", a mesma do botao. Mudou junto:
+ * o volume que NUNCA teve etiqueta impressa volta a `pendente`, e nao a
+ * `embalado` (embalado sem a baixa da etiqueta e a armadilha #27), e o que
+ * saiu numa saida registrada e recusado. Cada um vira uma linha em `correcao`.
  */
 const Database=require('better-sqlite3');
 const path=require('path'), fs=require('fs');
+const COR=require('./correcoes');
 
 const DB=require('./caminhos').BANCO;
 const APLICAR=process.argv.slice(2).includes('--aplicar');
+const iMot=process.argv.indexOf('--motivo');
+const MOTIVO=(iMot>=0&&process.argv[iMot+1])?process.argv[iMot+1]:'reaberto pelo terminal (node reabrir_futuros.js --aplicar)';
+const QUEM={id:null,nome:'terminal (reabrir_futuros.js)'};
 
 (async()=>{
 const db=new Database(DB);
 const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
-const alvo=db.prepare(`SELECT id,data,codigo,buyer,nf,estagio,carregado_em,despachar_em
-  FROM lote
+COR.garantirSchema(db);
+/* Os candidatos sao os de saida no futuro; quem decide se vale e o que
+   acontece com cada um e a previa da Mesa. */
+const candidatos=db.prepare(`SELECT id FROM lote
   WHERE carregado_em IS NOT NULL AND date(carregado_em) > date('now','localtime')
   ORDER BY date(carregado_em), id`).all();
+const alvo=[], recusados=[];
+for(const c of candidatos){
+  try{ const p=COR.previa(db,{acao:'reabrir',tipo:'lote',id:c.id}); alvo.push(Object.assign({resumo:p.resumo},p.antes.lote)); }
+  catch(e){ recusados.push({id:c.id,por:e.message}); }
+}
 
 console.log('banco:',DB);
 console.log('hoje :',hoje);
 console.log('');
 if(!alvo.length){
-  console.log('Nenhum volume carregado em data futura. Nada a fazer.');
+  console.log(recusados.length ? 'Nada a reabrir. Recusados: '+recusados.map(r=>'#'+r.id+' — '+r.por).join('; ')
+                               : 'Nenhum volume carregado em data futura. Nada a fazer.');
   db.close(); return;
 }
 alvo.forEach(v=>{
   console.log('#'+v.id+'  '+(v.codigo||'(sem SKU)')+'  NF '+(v.nf||'-')+'  '+(v.buyer||''));
   console.log('    carregado_em '+v.carregado_em+'  ← data que ainda nao chegou');
   console.log('    despacho previsto: '+(v.despachar_em||'(nao lido na etiqueta)'));
-  console.log('    '+v.estagio+' -> embalado, carregado_em -> vazio');
+  console.log('    '+v.resumo);
 });
+if(recusados.length){
+  console.log('');
+  console.log('NAO SERAO TOCADOS:');
+  recusados.forEach(r=>console.log('  #'+r.id+' — '+r.por));
+}
 console.log('');
 console.log('resumo: '+alvo.length+' volume(s) a reabrir');
 
@@ -72,9 +95,8 @@ const arq=path.join(dest,'antes-reabrir-'+new Date().toISOString().replace(/[:.]
 await db.backup(arq);
 console.log(''); console.log('backup ->',arq);
 
-const abrir=db.prepare(`UPDATE lote SET estagio='embalado', carregado_em=NULL WHERE id=?`);
-db.transaction(()=>{ alvo.forEach(v=>abrir.run(v.id)); })();
-console.log('reabertos:',alvo.length);
+db.transaction(()=>{ alvo.forEach(v=>COR.executar(db,{acao:'reabrir',tipo:'lote',id:v.id,motivo:MOTIVO,quem:QUEM})); })();
+console.log('reabertos:',alvo.length,'· cada um virou uma correção na aba Correções');
 
 const esperando=db.prepare(`SELECT COUNT(*) c FROM lote WHERE estagio='embalado'`).get().c;
 console.log('volumes embalados esperando carregamento, agora:',esperando);

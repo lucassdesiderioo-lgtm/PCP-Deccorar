@@ -36,12 +36,20 @@
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
+/* ⚠️ DESDE 02/10/2026 (fase 3 da Mesa de correcoes) A REGRA E O EFEITO MORAM NO
+   `correcoes.js` — acao "Tirar a fila velha", a mesma do botao da aba
+   Correcoes, com a data de corte HOJE (este script sempre tirou tudo que
+   esta aguardando). O apagamento vira UMA linha em `correcao`, que guarda as
+   linhas e se desfaz pela tela. */
+const COR = require('./correcoes');
 
 const argv = process.argv.slice(2);
 const temFlag = f => argv.indexOf(f) >= 0;
 const valorDe = (f, padrao) => { const i = argv.indexOf(f); return i >= 0 && argv[i+1] ? argv[i+1] : padrao; };
 
 const CONFIRMAR = temFlag('--confirmar');
+const MOTIVO    = valorDe('--motivo', 'limpeza da fila pelo terminal (node limpar_fila.js --confirmar)');
+const QUEM      = { id:null, nome:'terminal (limpar_fila.js)' };
 const CAMINHO   = valorDe('--db', require('./caminhos').BANCO);
 const SAIDA     = valorDe('--saida', path.join(path.dirname(CAMINHO), 'backups'));
 
@@ -56,8 +64,10 @@ const p2 = n => String(n).padStart(2,'0');
 const agora = new Date();
 const CARIMBO = agora.getFullYear()+'-'+p2(agora.getMonth()+1)+'-'+p2(agora.getDate())+'_'+p2(agora.getHours())+p2(agora.getMinutes());
 
-const linhas = db.prepare(`SELECT id, codigo, modo, revisado_em, data
-  FROM fila WHERE situacao='aguardando' ORDER BY revisado_em, id`).all();
+COR.garantirSchema(db);
+const HOJE_ = db.prepare("SELECT date('now','localtime') d").get().d;
+/* A regua e a da Mesa: tudo que esta `aguardando`, revisado ate hoje. */
+const linhas = COR.filaAte(db, HOJE_);
 
 console.log('');
 console.log('  Banco : ' + CAMINHO);
@@ -139,12 +149,17 @@ const arqCsv = path.join(SAIDA, 'antes_fila_' + CARIMBO + '.csv');
 fs.writeFileSync(arqCsv, ['id,codigo,modo,revisado_em,data']
   .concat(linhas.map(l => [l.id,l.codigo,l.modo,l.revisado_em,l.data].map(csv).join(','))).join('\n') + '\n', 'utf8');
 
-const n = db.prepare("DELETE FROM fila WHERE situacao='aguardando'").run().changes;
+let n = 0;
+db.transaction(() => {
+  COR.executar(db, { acao:'fila_velha', tipo:'periodo', id:0, params:{ ate:HOJE_ }, motivo:MOTIVO, quem:QUEM });
+  n = linhas.length;
+})();
 console.log('');
 console.log('  LIMPO.');
 console.log('  - ' + n + ' linha(s) apagada(s) da fila');
 console.log('  - backup do banco : ' + bkp);
 console.log('  - foto do antes   : ' + arqCsv);
+console.log('  - virou uma correção na aba Correções (dá para desfazer lá)');
 console.log('');
 console.log('  A tela de Embalagem abre vazia agora. Peca revisada de verdade que');
 console.log('  tenha sobrado no carrinho precisa passar pela revisao de novo (dois');
