@@ -1,4 +1,6 @@
 const crypto=require('crypto'), fs=require('fs'), path=require('path');
+// Para onde a pessoa vai (login, /setor e as duas barras): dono unico.
+const {destino}=require('./destino');
 
 const AREAS=[
   {id:'admin',       nome:'Admin (controle geral)'},
@@ -180,7 +182,8 @@ module.exports=function(app, db){
     const corpo=Buffer.from(JSON.stringify({id:u.id})).toString('base64');
     res.setHeader('Set-Cookie','sess='+encodeURIComponent(corpo+'.'+assina(corpo))+'; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax');
     aud({usuario:{id:u.id,nome:u.nome},headers:req.headers,socket:req.socket},'acesso','login',u.nome,'');
-    res.json({ok:true,nome:u.nome,areas:u.areas.split(',').filter(Boolean)});
+    const areasU=u.areas.split(',').filter(Boolean);
+    res.json({ok:true,nome:u.nome,areas:areasU,destino:destino(areasU)});
   });
 
   app.post('/api/auth/logout',(req,res)=>{
@@ -192,7 +195,7 @@ module.exports=function(app, db){
 
   app.get('/api/auth/eu',(req,res)=>{
     const u=lerSessao(req);
-    res.json(u?{logado:true,...u}:{logado:false});
+    res.json(u?{logado:true,...u,destino:destino(u.areas)}:{logado:false});
   });
 
   app.get('/api/auth/areas',(req,res)=>res.json(AREAS));
