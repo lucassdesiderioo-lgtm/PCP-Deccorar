@@ -1,7 +1,13 @@
-> **STATUS · 17/09/2026 — PLANEJADO** · mantido pelo dono; a camada 1 (ajustes do iPad, sem código) pode ser feita já
-> Nada das camadas 2 e 3 está no código: sem `app.webmanifest`, sem meta tags de app,
-> sem `bipe.js` único, sem fila offline (`evento_recebido`), sem service worker.
-> A camada 1 (ajustes do iPad) não aparece no código — conferir nos tablets.
+> **STATUS · 02/10/2026 — EM CONSTRUÇÃO** · **camada 2 em código (02/10/2026)**: as seis estações
+> (`operador`, `montagem`, `embalagem`, `carregamento`, `inventario`, `devolucao`) com as meta tags,
+> ícone e **manifest próprios** e o `ipad.css`; `.webmanifest` na regra das extensões de apoio do
+> `acesso.js`; `teste_tablets.js` (83). **Divergência:** a §5 escrevia um `/app.webmanifest` único,
+> e a mesma seção pede um ícone por estação — com um manifest só todo tablet abriria na mesma tela,
+> então são seis. O `target="_blank"` das fotos do Carregamento ficou: na mesma janela, em tela
+> cheia, o operador ficaria sem como voltar — decidir com o dono.
+> **Camada 1** é configuração do iPad (§4), sem código: é com o dono, tablet a tablet.
+> **Camada 3** (bipe único, áudio, fila offline, service worker) depende da `ARQUITETURA-ALVO.md`
+> (registro de rotas e `ui.js`) e não começou. Camada 4 (medir a latência) é medição na fábrica.
 > Movido do Projeto "PCP - Deccorar" para o repositório em 17/09/2026.
 
 ---

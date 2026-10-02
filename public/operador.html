@@ -1,5 +1,14 @@
 <!DOCTYPE html><html lang="pt-BR"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<!-- A estação vira app instalado no iPad (camada 2 da spec TABLETS-E-KIOSK): em tela cheia, sem barra de
+     endereço nem abas. Um manifest e um ícone POR ESTAÇÃO, para cada tablet abrir direto na dele. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Revisão">
+<link rel="apple-touch-icon" href="/icones/operador-180.png">
+<link rel="manifest" href="/app/operador.webmanifest">
+<link rel="stylesheet" href="/ipad.css">
 <title>Revisão — Operador</title>
 <style>
   :root{--bg:#ffffff;--panel:#f4f6f8;--line:#d8dee6;--txt:#1a1d23;--muted:#5a6472;--amber:#b26a00;--green:#2e7d32;--red:#c62828;--blue:#1565c0}

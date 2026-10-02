@@ -1,5 +1,14 @@
 <!DOCTYPE html><html lang="pt-BR"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<!-- A estação vira app instalado no iPad (camada 2 da spec TABLETS-E-KIOSK): em tela cheia, sem barra de
+     endereço nem abas. Um manifest e um ícone POR ESTAÇÃO, para cada tablet abrir direto na dele. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Conferência">
+<link rel="apple-touch-icon" href="/icones/inventario-180.png">
+<link rel="manifest" href="/app/inventario.webmanifest">
+<link rel="stylesheet" href="/ipad.css">
 <title>Conferência de estoque</title>
 <!-- A CONFERENCIA EM TRES PAPEIS (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA,
      26/09/2026). Tela de TABLET, fundo claro (DESIGN §2).

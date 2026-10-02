@@ -1,0 +1,14 @@
+/* O iPad da bancada — camada 2 da spec TABLETS-E-KIOSK (02/10/2026).
+   Só nas telas de operação (as estações dos tablets). O toque duplo dava zoom,
+   arrastar dava o efeito elástico, e o toque longo abria a lupa e o "Copiar"
+   em cima do botão — três jeitos de o operador perder a tela sem querer. */
+html { -webkit-text-size-adjust: 100%; }
+body {
+  touch-action: manipulation;      /* mata o zoom por toque duplo */
+  overscroll-behavior: none;       /* mata o efeito elástico ao arrastar */
+  -webkit-user-select: none;       /* mata a lupa e o "Copiar" no toque longo */
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* campo de digitar e de bipe continua selecionável */
+input, textarea, select { -webkit-user-select: text; user-select: text; }

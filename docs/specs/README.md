@@ -35,7 +35,7 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 | `COMPRAS.md` | Implementado (fases 0–6) · fase 7 pendente · com mudanças na construção |
 | `ARQUITETURA-ALVO.md` | Parcial — só no módulo sob medida (`tecido/`) |
 | `PCP-CONTROLE-E-VISAO.md` | Parcial e divergente · decisão pendente |
-| `TABLETS-E-KIOSK.md` | Planejado · nada no código · camada 1 (iPad) pode ir já |
+| `TABLETS-E-KIOSK.md` | **Em construção** · **camada 2 em código (02/10)**: cada estação vira app com ícone e manifest próprios, e o `ipad.css`; camada 1 é configuração do iPad (com o dono); camada 3 depende da arquitetura-alvo; falta o deploy |
 | `PRODUCAO-MAPA-E-MOTOR.md` | Planejado · não iniciado · depois da fila de consertos |
 | `PRODUCAO-MONTAGEM.md` | Planejado · não iniciado · depois da fila de consertos |
 

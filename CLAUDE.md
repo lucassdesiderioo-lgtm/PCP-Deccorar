@@ -4015,6 +4015,38 @@ aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não sil
 | **Leitor manda Tab ou espaço** | Código chega picado ou o Enter cai no vazio | Aceitar Enter **e** Tab; limpar com `replace(/[^A-Za-z0-9]/g,'')`; processar por timeout após a última tecla |
 | **`DELETE` em tabela que se auto-referencia** | Com `foreign_keys = ON`, `DELETE FROM t` (todas) **passa** — o FK imediato é conferido no **fim da instrução** —, mas `DELETE ... WHERE id=1` com a filha de pé é **recusado**. Um `DELETE` filtrado que hoje casa com tudo passa por sorte, e quebra no dia em que o filtro deixar alguém | Soltar o ponteiro antes, e **só de quem aponta para linha que vai sair** — limpar o ponteiro de quem fica apaga o vínculo em silêncio (`tecido/limpar_sobras.js`, §19) |
 
+### ⚠️ A ESTAÇÃO VIRA APP NO iPad — camada 2 da spec `TABLETS-E-KIOSK` (02/10/2026)
+
+As seis estações de tablet (`/operador`, `/montagem`, `/embalagem`,
+`/carregamento`, `/inventario`, `/devolucao`) têm as meta tags de app, o nome da
+estação, **o ícone dela** (`public/icones/<estação>-180|192|512.png`), **o
+manifest dela** (`public/app/<estação>.webmanifest`) e o `public/ipad.css`.
+Adicionada à Tela de Início, cada uma abre em tela cheia, direto na estação.
+
+> ⚠️ **UM MANIFEST POR ESTAÇÃO, E NÃO UM SÓ.** A spec escrevia um
+> `/app.webmanifest` único com `start_url` fixo **e** pedia um ícone por estação
+> — as duas coisas não cabem juntas: com um manifest só, todo tablet abriria na
+> mesma tela.
+
+> ⚠️ **`.webmanifest` ENTROU NA REGRA DAS EXTENSÕES DE APOIO** do `acesso.js`
+> (`@logado`). Com sessão aberta todo arquivo passa pelo `decidir` (§10, #29), e
+> sem a extensão o manifest levaria 403 — e o iPad o ignoraria **em silêncio**.
+
+> ⚠️ **O `ipad.css` TIRA A SELEÇÃO DO CORPO E DEVOLVE AOS CAMPOS.** Sem a segunda
+> regra o campo de bipe e o de digitar ficariam presos. É só das estações: as
+> telas de escritório (admin, relatórios) continuam selecionáveis.
+
+> ⚠️ **A CAMADA 1 É CONFIGURAÇÃO DO iPad, E NÃO TEM CÓDIGO** — bloqueio
+> automático em Nunca, notificações desligadas, Adicionar à Tela de Início,
+> Acesso Guiado com código. Está na §4 da spec, e é feita no tablet. **E o
+> `target="_blank"` das fotos no Carregamento ficou como está**: em tela cheia ele
+> abre o Safari, mas trocar por um link na mesma janela deixaria o operador sem
+> botão de voltar — é decisão de tela, anotada na spec.
+
+**Rode `node teste_tablets.js` (83 casos) ao mexer no cabeçalho de uma estação,
+no `ipad.css` ou nos manifests**, e `node teste_acesso.js` se mexer na regra das
+extensões.
+
 ### ⚠️ AS TELAS DO PCP FORAM MEDIDAS, E ELAS NÃO TÊM O DEFEITO (29/09/2026)
 
 Depois de consertar as sete do sob medida (§19), a pergunta óbvia era se o
@@ -4285,7 +4317,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23) e `teste_pecas_carga.js` (37); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37) e `teste_tablets.js` (83); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |

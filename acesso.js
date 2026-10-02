@@ -881,7 +881,9 @@ module.exports = function(app, db){
        com 403 no console, para todo mundo menos o Admin Geral, e o sintoma não
        se pareceria nem de longe com "mexeram na permissão".
        `.html` NÃO entra aqui de propósito: ele é tela, e cai na regra abaixo. */
-    if(/\.(js|mjs|css|map|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot)$/i.test(p)) return '@logado';
+    /* `.webmanifest` entrou em 02/10/2026 (camada 2 da spec TABLETS-E-KIOSK):
+       e o arquivo que faz a estacao virar app no iPad, e nao tem dado nenhum. */
+    if(/\.(js|mjs|css|map|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot|webmanifest)$/i.test(p)) return '@logado';
     /* A GÊMEA `.html` VALE O MESMO QUE A TELA. `/operador` exigia
        `revisao.executar` e `/operador.html` — o mesmo arquivo, servido pelo
        `express.static` — exigia só estar logado. Ninguém navega por ela (o
