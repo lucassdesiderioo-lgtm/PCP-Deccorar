@@ -33,6 +33,17 @@ module.exports = function(app, db){
     }
   }
   const tx = fn => db.transaction(fn)();
+  function temChave(req, chave){
+    try{ return !!app.locals.acesso.podePermissao(req.usuario, chave); }catch(e){ return false; }
+  }
+  /* A acao que pede uma chave a mais (o pedido de ajuste pede
+     `estoque.ajustar`) e conferida AQUI, alem da chave da Mesa: sem isso a
+     Mesa seria a porta dos fundos da chave do ajuste (§18, fase 3). */
+  function exigeDaAcao(req, nome){
+    const A = COR.ACOES[nome];
+    if(A && A.exige && !temChave(req, A.exige))
+      throw COR.erro(403, 'esta ação pede também a permissão ' + A.exige);
+  }
 
   app.get('/api/correcao/passivo',   (req,res) => responder(req, res, () => COR.contadores(db)));
   app.get('/api/correcao/buscar',    (req,res) => responder(req, res, () => COR.buscar(db, (req.query || {}).q)));
@@ -47,11 +58,13 @@ module.exports = function(app, db){
      banco (§2 da spec). Nem transacao precisa. */
   app.post('/api/correcao/previa', (req,res) => responder(req, res, () => {
     const b = req.body || {};
+    exigeDaAcao(req, b.acao);
     return COR.previa(db, { acao:b.acao, tipo:b.tipo, id:b.id, params:b.params });
   }));
 
   app.post('/api/correcao/executar', (req,res) => responder(req, res, () => {
     const b = req.body || {};
+    exigeDaAcao(req, b.acao);
     const r = tx(() => COR.executar(db, { acao:b.acao, tipo:b.tipo, id:b.id, params:b.params,
       motivo:b.motivo, quem:quem(req) }));
     auditar(req, r.acao, r.alvo, [b.motivo, r.estoque.length
@@ -61,7 +74,8 @@ module.exports = function(app, db){
   }));
 
   app.post('/api/correcao/:id/desfazer', (req,res) => responder(req, res, () => {
-    const r = tx(() => COR.desfazer(db, { id:req.params.id, quem:quem(req) }));
+    const r = tx(() => COR.desfazer(db, { id:req.params.id, quem:quem(req),
+      podeAprovar:temChave(req, 'estoque.aprovar_ajuste') }));
     auditar(req, 'desfeita', r.alvo, 'correção #' + r.id + ' (' + r.acao + ')');
     return r;
   }));
