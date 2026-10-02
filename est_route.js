@@ -187,6 +187,24 @@ module.exports = function(app, db){
     const custo = verCusto ? mapaCusto() : null;
     if(verCusto) auditarCusto(req);
 
+    /* RESERVADO (fase 4 da spec ESTOQUE-LIVRO-E-CONFERENCIA, §4): as pecas dos
+       volumes `pendente` — vendidos e ainda sem etiqueta — de cada SKU. Conta
+       PECA: a caixa de varias persianas reserva a soma das `qtd` do
+       `lote_item` (§5, #23); sem `lote_item`, 1 pelo `lote.codigo`.
+       ⚠️ SO APARECE NA TELA, E NAO ENTRA EM CONTA NENHUMA. Quem decide quanto
+       produzir continua sendo o `demanda_dominio` (armadilha #12): o reservado
+       e uma leitura do que ja esta prometido da prateleira, ao lado do saldo. */
+    const reservado = {};
+    try{
+      db.prepare(`SELECT UPPER(COALESCE(i.codigo, l.codigo)) c,
+          SUM(CASE WHEN i.id IS NULL THEN 1 ELSE MAX(1, COALESCE(i.qtd,1)) END) n
+        FROM lote l LEFT JOIN lote_item i ON i.lote_id = l.id
+        WHERE l.estagio='pendente' AND COALESCE(l.teste,0)=0
+        GROUP BY UPPER(COALESCE(i.codigo, l.codigo))`).all()
+        .forEach(r => reservado[r.c] = r.n);
+    }catch(e){}
+    let pecasReservadas = 0;
+
     let zerados=0, baixos=0, ok=0, excesso=0, parados=0, sobMedida=0, defasados=0, negativos=0;
     let pecas=0, precisaTotal=0, skusFalta=0, aplicaveis=0, nuncaContados=0;
     let valorTotal=0, valorParado=0, semCusto=0;
@@ -253,6 +271,11 @@ module.exports = function(app, db){
       const cont = contagem[l.codigo] || null;
       if(!cont) nuncaContados++;
 
+      /* Sob medida nao tem reservado nem disponivel: o saldo dela e sempre
+         zero (§7), e um "disponivel -3" ali seria falta que nao existe. */
+      const resv = e.sob_medida ? null : (reservado[l.codigo] || 0);
+      if(resv) pecasReservadas += resv;
+
       /* Valor da linha. So conta quem TEM peca: SKU zerado sem custo nao e
          buraco na conta — nao ha o que valorizar ali. */
       let cu = null, valor = null;
@@ -267,7 +290,8 @@ module.exports = function(app, db){
 
       return {
         codigo: l.codigo, descricao: l.descricao, cor: l.cor,
-        estoque, alvo: l.alvo, alvo_salvo: alvoSalvo, alvo_defasado: defasado,
+        estoque, reservado: resv, disponivel: resv == null ? null : estoque - resv,
+        alvo: l.alvo, alvo_salvo: alvoSalvo, alvo_defasado: defasado,
         alvo_aplicavel: aplicavel,
         contado_em: cont ? cont.em : null, contado_ha: cont ? cont.dias : null,
         /* Campos de custo SO existem quando quem pergunta pode ver. Ausente e
@@ -317,9 +341,37 @@ module.exports = function(app, db){
       if(t && t.m) alvoAplicadoEm = t.m;
     }catch(e){}
 
+    /* ACURACIDADE DO MES e a DIFERENCA aprovada, por motivo (fase 4, §8). O
+       valor em R$ so viaja para quem tem `custo.ver` (regra 14 do §13), e o SKU
+       sem custo fica NULL e faz do total um piso (regra 4 do §7-B). */
+    let acur = null; const difMes = []; let difValor = 0, difSemCusto = 0;
+    try{
+      acur = INV.acuracidade(db);
+      const por = {};
+      for(const r of INV.diferencaPorMotivo(db)){
+        const k = r.motivo || '(sem motivo)';
+        const g = por[k] || (por[k] = { motivo:k, itens:0, pecas:0, valor:0, sem_custo:0 });
+        g.itens++; g.pecas += r.pecas;
+        if(verCusto){
+          const cu = custo[String(r.codigo).toUpperCase()];
+          if(cu != null){ g.valor += cu * r.pecas; difValor += cu * r.pecas; }
+          else { g.sem_custo++; difSemCusto++; }
+        }
+      }
+      Object.values(por).sort((x, y) => y.pecas - x.pecas).forEach(g => {
+        const o = { motivo:g.motivo, itens:g.itens, pecas:g.pecas };
+        if(verCusto){ o.valor = g.sem_custo && !g.valor ? null : +g.valor.toFixed(2); o.sem_custo = g.sem_custo; }
+        difMes.push(o);
+      });
+    }catch(e){}
+
     res.json({
       config,
       resumo: {
+        pecas_reservadas: pecasReservadas,
+        acuracidade: acur,
+        diferenca_mes: difMes,
+        ...(verCusto ? { diferenca_valor: +difValor.toFixed(2), diferenca_sem_custo: difSemCusto } : {}),
         skus: lista.length,
         pecas_estoque: pecas,
         skus_falta: skusFalta,

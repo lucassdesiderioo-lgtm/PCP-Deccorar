@@ -1,4 +1,8 @@
-> **STATUS · 28/09/2026 — EM CONSTRUÇÃO** · fases 0, 1 e 2 no ar; **fase 3 em código (28/09)**; fase 4 planejada
+> **STATUS · 02/10/2026 — EM CONSTRUÇÃO** · fases 0, 1, 2 e 3 no ar; **fase 4 em código (02/10)**:
+> reservado e disponível na linha da aba Estoque, acuracidade do mês e diferença por motivo
+> (R$ só com `custo.ver`). A idade da conferência já lia do `inventario_item` desde a fase 2, e o
+> alerta de negativo é da fase 1. **Divergência:** os casos foram para `teste_acuracidade.js`
+> (23), e não para o `teste_estoque.js` — o cenário daquele é outro. Falta o deploy.
 >
 > **Fase 3 (ajuste em duas pessoas)** entrou em 28/09/2026: `ajuste_dominio.js`,
 > `ajuste_route.js`, o `POST /api/estoque` antigo recusando (410, `use_pedido`), o
@@ -454,7 +458,7 @@ ler do livro (inventário + ajuste + correção).
 - Rotas de pedido e aprovação; desliga `POST /api/estoque`; tela na aba Estoque.
 - **Testes:** pedir não mexe no saldo; quem pediu não aprova; aprovar grava no livro.
 
-### Fase 4 — acuracidade e estados 🟡
+### Fase 4 ☑ — acuracidade e estados 🟡 (em código em 02/10/2026)
 
 - §4 e §8 na aba Estoque.
 - **Testes:** `teste_estoque.js` ganha os casos de acuracidade e idade da conferência.

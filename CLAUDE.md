@@ -4234,7 +4234,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98) e `teste_correcao3.js` (23); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23) e `teste_acuracidade.js` (23); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -5523,6 +5523,40 @@ seção 6-G é esta) e `node teste_cobertura.js` (10).**
 > aprovação é de outra pessoa, o João aprovou e o saldo foi de 9 a 7, com a linha
 > no histórico. A prova é o **primeiro ajuste de verdade** pedido por uma pessoa e
 > aprovado por outra.
+
+### ⚠️ A ACURACIDADE E O RESERVADO — fase 4 do livro (02/10/2026)
+
+**Fase 4 da spec `ESTOQUE-LIVRO-E-CONFERENCIA.md`.** A aba Estoque ganhou duas
+leituras, e **nenhuma entra em conta nenhuma**:
+
+| | O que é | Onde |
+|---|---|---|
+| **reservado** | peças de volumes `pendente` (vendidos, ainda **sem etiqueta**) do SKU | sob o saldo, na linha: *"2 sem etiqueta · 3 livres"*, e no primeiro quadro |
+| **disponível** | físico − reservado; **pode ficar negativo** (é o que falta produzir) | idem |
+| **acuracidade do mês** | itens que **bateram na 1ª contagem** ÷ itens contados no mês | quadro próprio |
+| **diferença por motivo** | o \|delta\| aprovado no mês, por motivo, em peças — e em R$ só com `custo.ver` | no mesmo quadro |
+
+> ⚠️ **O RESERVADO NÃO MEXE NO `precisa`.** Quem decide quanto produzir continua
+> sendo o `demanda_dominio` (armadilha #12); há caso travando que o `precisa` é o
+> mesmo com e sem volume pendente. Conta **peça** (a caixa de várias reserva a
+> soma das `qtd`), deixa de fora modo teste, bloqueado e cancelado, e **sob
+> medida não tem reservado** — o saldo dela é sempre zero (§7).
+
+> ⚠️ **"SEM ETIQUETA", E NÃO "VENDIDA".** A coluna ao lado se chama "Vendido a
+> despachar" (o comprometido da planilha) e é outro número. Com a mesma palavra
+> nos dois, a tela diria uma coisa duas vezes — só apareceu abrindo a tela.
+
+> ⚠️ **ACERTO É O DA 1ª CONTAGEM.** O item que errou na 1ª e foi confirmado pela
+> 3ª não conta como acerto: a pergunta é se o saldo estava certo quando alguém foi
+> olhar. Sem contagem no mês a acuracidade é **traço**, nunca "0%". O SKU sem
+> custo deixa o valor da diferença como **piso**, e sem nenhum valor a linha fica
+> só com as peças — *"≥ R$ 0"* se leria como "não custou nada".
+
+**Rode `node teste_acuracidade.js` (23 casos) ao mexer no reservado, na
+acuracidade ou no `est_route.js`.** Sete defeitos reintroduzidos: contar linha
+em vez de peça (reprova 3), modo teste reservando (3), sob medida com reservado
+(3), o R$ viajando sem `custo.ver` (1), acuracidade 0% sem contagem (1), o
+confirmado pela 3ª contando como acerto (3) e a conta sem o corte do mês (4).
 
 > ⚠️ **O botão "aplicar alvo" diz quantos ele NÃO resolve.** O "Aplicar todos" do
 > Planejamento só grava em SKU **com venda na janela** — proposital: sem dado de

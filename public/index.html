@@ -1710,6 +1710,24 @@ async function estAplicarAlvo(){
   await carregarEst();
 }
 
+function estAcuracidade(r){
+  const a=r.acuracidade||{};
+  const dif=r.diferenca_mes||[];
+  const ver=estVerCusto();
+  let d=a.contados?(a.certos+' de '+a.contados+' bateram na 1ª contagem'):'nenhuma contagem neste mês';
+  let d2='';
+  if(dif.length){
+    d2=dif.slice(0,3).map(function(x){ return esc(x.motivo)+' '+x.pecas+' pç'
+      +(ver&&x.valor!=null?' ('+estRS(x.valor,0)+')':''); }).join(' · ');
+    /* Sem nenhum SKU com custo o total seria "≥ R$ 0", que se lê como "não
+       custou nada" — só aparece quando há valor de verdade (regra 4). */
+    if(ver && r.diferenca_valor>0) d2='diferença '+(r.diferenca_sem_custo?'≥ ':'')+estRS(r.diferenca_valor,0)+': '+d2;
+    else d2='diferença: '+d2;
+  }
+  return '<div class="sumbox big"><div class="n">'+(a.pct==null?'—':(String(a.pct).replace('.',',')+'%'))+'</div>'
+    +'<div class="l">Acuracidade do mês</div><div class="d">'+d+'</div>'
+    +(d2?'<div class="d">'+d2+'</div>':'')+'</div>';
+}
 function renderEst(){
   if(!PAINEL || !PAINEL.resumo) return;
   const r=PAINEL.resumo;
@@ -1723,7 +1741,15 @@ function renderEst(){
   }
   $('#estResumo').innerHTML=
      '<div class="sumbox big"><div class="n">'+r.pecas_estoque+'</div><div class="l">Peças em estoque</div>'
-       +'<div class="d">'+r.skus+' SKUs cadastrados</div></div>'
+       +'<div class="d">'+r.skus+' SKUs cadastrados</div>'
+       /* RESERVADO (fase 4, §4 da spec): peças vendidas que ainda não têm
+          etiqueta. Só leitura — não entra em conta nenhuma (armadilha #12). */
+       +(r.pecas_reservadas?'<div class="d">'+r.pecas_reservadas+' '+(r.pecas_reservadas===1?'vendida':'vendidas')
+         +' ainda sem etiqueta</div>':'')+'</div>'
+    /* A ACURACIDADE DO MÊS (fase 4, §8): quantos itens contados bateram na 1ª
+       contagem. Sem contagem no mês é traço, nunca "0%" — zero seria uma
+       afirmação, e falsa. A diferença em R$ só vem para quem tem custo.ver. */
+    +estAcuracidade(r)
     /* O DINHEIRO. Com um SKU sem custo o total deixa de ser o valor do estoque
        e passa a ser um PISO — daí o "≥" e o aviso em âmbar. Custo indefinido
        nunca vira zero (regra 4 do §7-B): zero faria o estoque parecer mais
@@ -1805,7 +1831,16 @@ function renderEst(){
            fecha, e a cor tem que ser outra — o âmbar de "abaixo do alvo" se lê
            como rotina. */
         ? '<b style="font-size:17px;color:#da3633" title="Saiu mais do que entrou. Confira a prateleira e veja o extrato — o saldo negativo é sinal de peça que saiu sem registro.">'+l.estoque+'</b>'
-        : '<b style="font-size:17px" class="'+(l.precisa>0?'baixo':'ok')+'">'+l.estoque+'</b>')+ujTxt+ct+'</td>'
+        : '<b style="font-size:17px" class="'+(l.precisa>0?'baixo':'ok')+'">'+l.estoque+'</b>')
+        /* físico − reservado = disponível, só quando há venda sem etiqueta. */
+        +(l.reservado?'<div class="estq" style="white-space:nowrap" title="Peças vendidas que ainda não têm etiqueta: '
+          +'estão prometidas da prateleira. Só leitura — a conta do que produzir continua a da tela azul.">'
+          /* "sem etiqueta", e não "vendida": a coluna ao lado se chama
+             "Vendido a despachar" (o comprometido da planilha), e as duas
+             palavras iguais se leriam como o mesmo número. */
+          +l.reservado+' sem etiqueta · <span'+(l.disponivel<0?' style="color:#da3633"':'')+'>'
+          +l.disponivel+' livre'+(Math.abs(l.disponivel)===1?'':'s')+'</span></div>':'')
+        +ujTxt+ct+'</td>'
       /* Sem peça na prateleira não há valor a mostrar: "R$ 0,00" se lê como
          "não vale nada", que é outra afirmação. O custo unitário fica, porque
          esse continua verdadeiro e é o que interessa quando a peça voltar. */
