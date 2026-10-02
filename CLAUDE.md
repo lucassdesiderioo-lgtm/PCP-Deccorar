@@ -3205,7 +3205,7 @@ manda, e o card some.
 > recolhidas mesmo assim**: a lista do carro passou a marcar cada caixa como
 > `✓ na área` ou `falta conferir`, e é ela que a bancada lê.
 
-**Rode `node teste_area.js` (26 casos) ao mexer no `pilhaDaArea`, no bipe do
+**Rode `node teste_area.js` (29 casos) ao mexer no `pilhaDaArea`, no bipe do
 `carreg_route.js` ou no `GET /api/carregamento`.** Cinco defeitos foram
 reintroduzidos um a um: a adiantada fora da pilha (6 casos), a de ontem sumindo
 (1), o nome sem normalizar (1), a conta sem andar no bipe (7) e vazio igual a
@@ -3321,9 +3321,30 @@ pelo código bipado virou `acharVolumes`, a mesma do bipe do carro. A foto é do
 > A que já está **no carro** não entra desde a fase 4: o caminhão não leva o que
 > está dentro do carro. O
 > mesmo bipe querendo dizer duas coisas conforme o estado da caixa é como se erra
-> de luva na mão. Ela sai com `saiu_por='coleta'`, vira `carregado`, é conferida
-> por quem fechou, e **a `modalidade` não muda** (decisão 6). `pendente` nunca
-> entra: sem etiqueta, não baixou do estoque (§5, #27).
+> de luva na mão. Ela sai com `saiu_por='coleta'`, vira `carregado`, e **a
+> `modalidade` não muda** (decisão 6). `pendente` nunca entra: sem etiqueta, não
+> baixou do estoque (§5, #27).
+
+> ⚠️ **QUEM FECHOU A SAÍDA NÃO CONFERIU A CAIXA (02/10/2026).** Até aqui a caixa
+> que ninguém tinha conferido saía com `conferido_por` = **quem fechou a saída** —
+> uma pessoa que nunca a bipou. E se fosse quem imprimiu, a pilha ainda a chamava
+> de *"conferida por quem imprimiu, antes da trava de 01/10"*, falso duas vezes.
+> Hoje ela sai **sem conferência**: `conferido_por` e `conferido_em` ficam
+> vazios, como no passivo das não bipadas. A agência **já conferida** na área
+> mantém quem a conferiu.
+>
+> A pilha a mostra numa **linha própria** da nota — *"N foram no caminhão sem
+> conferência: cliente (NF)"* —, separada de "sem registro": lá é não saber quem
+> fez; aqui se sabe que **ninguém** conferiu, e é a única das duas que interessa
+> olhar. A régua é `carregado`, **numa saída**, sem `conferido_em`; a caixa
+> carregada **sem** saída e sem conferência (anterior aos nomes) continua "sem
+> registro". As que já saíram antes de 02/10 ficam como estão — com o nome de
+> quem fechou; o histórico não foi reescrito.
+>
+> ⚠️ **E ELA AINDA CONTA EM "CONFERIDAS"** — anotado, não consertado: a pilha
+> conta `carregado` como conferida (fase 2), então a tela pode dizer *"Todas as
+> impressas hoje foram conferidas"* logo acima da linha que diz que ninguém
+> conferiu. Mudar a conta da pilha é outra decisão.
 
 > ⚠️ **E A CAIXA DE AGÊNCIA QUE O CAMINHÃO LEVOU NÃO CONTA NO "NO CARRO".** Achado
 > abrindo a tela: o contador do carro contava `carregado_em` de hoje da agência,
@@ -3353,12 +3374,15 @@ pelo código bipado virou `acharVolumes`, a mesma do bipe do carro. A foto é do
 > mexe em caixa nenhuma. Os fechamentos antigos (`coleta_fechamento`) continuam
 > na tela como história, com a foto.
 
-**Rode `node teste_saida_coleta.js` (50 casos) ao mexer no `saida_route.js`, no
+**Rode `node teste_saida_coleta.js` (57 casos) ao mexer no `saida_route.js`, no
 `NA_SAIDA`/`PODE_TER_IDO` do `carga.js` ou no card da coleta.** Seis defeitos
 foram reintroduzidos, um de cada vez, para provar que o teste pega cada um:
 fechar sem o passo das sobras (29 casos), agência no carro na conta (6),
 divergência andando (17), liberar sem motivo (5), troca de porta reescrevendo a
-modalidade (1) e fechar sem foto (15). Mexeu na chave? **`node teste_acesso.js`
+modalidade (1) e fechar sem foto (15). Em 02/10/2026, mais quatro: gravar quem
+fechou como conferente (4), apagar o conferente da agência já conferida (3),
+misturar a caixa sem conferência com "sem registro" (1) e ela deixar de virar
+carregada (5); no `teste_area`, exigir a saída na régua (2). Mexeu na chave? **`node teste_acesso.js`
 (194, a seção 6-E é esta) e `node teste_cobertura.js` (10).**
 
 > ✅ **NO AR EM 26/09/2026** (PR #140): o dono fez o deploy e disse *"ficou
@@ -3997,7 +4021,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | `/devolucao` não está no menu do rodapé (`nav.js`) | Baixo |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (27), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (50), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15) e `teste_linguagem.js` (13); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (262), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15) e `teste_linguagem.js` (13); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4240,6 +4264,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   resposta, e o silêncio não é (§8-B, fase 3)
 - ❌ Fazer o bipe da saída querer dizer "foi no caminhão" para caixa fora da
   conta: o bipe só diz SOBROU, e a troca de porta é por botão (§8-B, fase 3)
+- ❌ Gravar quem fechou a saída como conferente da caixa que foi no caminhão sem
+  ninguém bipar: ela sai SEM conferência, com linha própria na pilha (§8-B)
+- ❌ Misturar a caixa que foi sem conferência com "sem registro" na pilha: lá é
+  não saber quem fez, aqui se sabe que ninguém conferiu (§8-B)
 - ❌ Pôr a agência conferida na conta do caminhão: ela fica na área, e cada
   caminhão obrigaria a bipar dezenas de "sobras" (§8-B, fases 3 e 4, D2)
 - ❌ Deixar o bipe da ÁREA pôr a caixa de agência no carro: desde a fase 4 são

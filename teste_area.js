@@ -156,6 +156,20 @@ const pilha = async () => (await chamar('GET /api/carregamento')).pilha;
   ok('conferida a de ontem, ela sai da lista das anteriores', r.ok && p.anteriores.length === 0);
   ok('e não entra na conta de hoje (foi impressa ontem)', p.hoje.impressas === 7);
 
+  /* FOI NO CAMINHÃO SEM CONFERÊNCIA (02/10/2026): carregada, numa saída e
+     sem conferência é linha própria. Carregada SEM saída e sem conferência
+     (a caixa antiga, de antes dos nomes) continua "sem registro". */
+  const semConf = vol('Caminhao', 'carregado', agora,
+    "impresso_por='Ana', carregado_em=datetime('now','localtime'), saida_id=9, saiu_por='coleta'");
+  const antiga = vol('Antiga', 'carregado', agora, "impresso_por='Ana', carregado_em=datetime('now','localtime')");
+  p = await pilha();
+  ok('a que foi no caminhão sem conferência tem linha própria, e não é "sem registro"',
+     p.hoje.sem_conferencia === 1 && (p.sem_conferencia||[]).length === 1 && p.sem_conferencia[0].id === semConf
+     && p.hoje.sem_registro === 3, JSON.stringify(p.hoje));
+  ok('a carregada sem saída e sem conferência continua "sem registro"',
+     !(p.sem_conferencia||[]).some(f => f.id === antiga) && p.hoje.impressas === p.hoje.conferidas + p.hoje.faltam,
+     JSON.stringify(p.hoje));
+
   // ── o que o bipe já fazia continua ──
   const c = await chamar('GET /api/carregamento');
   ok('o "No carro" e a coleta continuam no mesmo GET', typeof c.carregados === 'number' && !!c.coleta);

@@ -372,6 +372,14 @@ function desenharPilha(p){
   if(h.sem_segunda) notas.push('<b>'+h.sem_segunda+'</b> conferidas por quem imprimiu, antes da trava de 01/10: '
     +p.sem_segunda.slice(0,8).map(function(f){ return esc0(f.buyer)+' ('+esc0(f.quem)+')'; }).join(', ')
     +(p.sem_segunda.length>8?'…':''));
+  /* FOI NO CAMINHAO SEM CONFERENCIA (02/10/2026): linha propria, separada de
+     "sem registro" — aqui se sabe que ninguem conferiu. Servidor antigo nao
+     manda o campo, e a linha simplesmente nao aparece. */
+  var sc=p.sem_conferencia||[];
+  if(h.sem_conferencia) notas.push('<b>'+h.sem_conferencia+'</b> '+(h.sem_conferencia===1?'foi':'foram')
+    +' no caminhão sem conferência: '
+    +sc.slice(0,8).map(function(f){ return esc0(f.buyer)+(f.nf?' (NF '+esc0(f.nf)+')':''); }).join(', ')
+    +(sc.length>8?'…':''));
   if(h.sem_registro) notas.push('<b>'+h.sem_registro+'</b> sem registro de quem imprimiu ou de quem conferiu');
   $('#pSeg').innerHTML = notas.map(function(n){ return '<div class="pnota">'+n+'</div>'; }).join('');
 }
