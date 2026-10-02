@@ -3981,7 +3981,9 @@ open('/tmp/chk.js','w',encoding='utf-8').write(s[a:b])
 git add -A && git commit -m "..." && git push
 
 # no servidor
-cd /opt/expedicao && git pull && node --check server.js && pm2 restart expedicao
+cd /opt/expedicao && git pull && node --check server.js \
+  && pm2 delete expedicao && pm2 start server.js --name expedicao
+sleep 5   # o curl logo depois do start chega antes de a porta abrir
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3010/login   # tem que dar 200
 ```
 
@@ -8198,4 +8200,14 @@ estiveram no ar até 02/10/2026:
 (4 casos) recusa tela declarada sem porta na inicial ou sem nome no rodapé, e
 porta que aponta para tela que não existe. Os dois defeitos foram
 reintroduzidos, e cada um reprova o seu caso.
+
+> ✅ **NO AR E CONFERIDO EM 02/10/2026** (PR #176). O dono fez o deploy e
+> conferiu as duas telas: o vendedor passou a ver as portas dele na tela
+> inicial do sob medida, e o rodapé mostra **Bancada**. O teste da §10 passou
+> depois do deploy (telas 302, API 401, `/login` 200).
+>
+> ⚠️ **O `pm2 restart` NÃO PEGOU NESTE DEPLOY**: o `curl` do `/login` deu
+> `000`, e o servidor só voltou com `pm2 delete expedicao && pm2 start
+> server.js --name expedicao`. É a armadilha do §12 acontecendo de verdade —
+> por isso o deploy do §13 passa a usar o par.
 
