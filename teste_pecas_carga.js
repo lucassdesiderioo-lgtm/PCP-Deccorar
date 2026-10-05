@@ -7,8 +7,9 @@
  * Escrito ANTES do código (§0, risco vermelho). O que estes casos travam:
  * - a caixa de várias (SUM(qtd) > 1, a régua VARIAS, agora num lugar só) não
  *   anda no bipe da etiqueta: pede o bipe de cada persiana;
- * - a resposta NÃO TRAZ os SKUs esperados antes da divergência — a lição do
- *   inventário cego (§18): quem sabe a resposta bipa até chegar nela;
+ * - a resposta TRAZ os SKUs da caixa, com quantos já foram bipados — mudou em
+ *   05/10/2026, decisão do dono (era cega desde 02/10): quem confere precisa
+ *   saber o que procurar nas etiquetas coladas por fora. A trava é o BIPE;
  * - cada bipe conta UMA persiana; bateu tudo, a caixa é conferida (agência)
  *   ou vai pro canto (coleta), como sempre;
  * - SKU que não está na caixa, ou um a mais, PARA e aí mostra os dois lados,
@@ -66,7 +67,6 @@ const chamar = (k, body, usuario) => new Promise(r => {
 const ANA = {id:1,nome:'Ana'}, BETO = {id:2,nome:'Beto'};
 const lote = id => q1('SELECT * FROM lote WHERE id=?', id);
 const A = 'BK120120BEGE', B = 'BK140140BEGE', C = 'BK160160CINZA';
-const semSku = (r, cods) => { const s = JSON.stringify(r); return cods.every(c => s.indexOf(c) < 0); };
 
 (async () => {
   // ── a régua num lugar só ──
@@ -80,12 +80,15 @@ const semSku = (r, cods) => { const s = JSON.stringify(r); return cods.every(c =
   let r = await chamar('POST /api/carregar', {code:'PFabiano'}, BETO);
   ok('caixa de várias: o bipe da etiqueta NÃO confere — pede as peças', r.ok === false && r.motivo === 'conferir_pecas', JSON.stringify(r));
   ok('diz quantas persianas a caixa leva', r.pecas_total === 3 && r.bipadas === 0, JSON.stringify(r));
-  ok('e NÃO TRAZ os SKUs esperados (conferência cega)', semSku(r, [A, B]), JSON.stringify(r));
+  /* 05/10/2026, decisão do dono: a lista APARECE (era cega). Todas as linhas
+     da caixa, com a quantidade de cada uma e zero bipadas. */
+  const lista = x => (x.pecas||[]).map(p => p.codigo+':'+p.qtd+':'+p.bipadas).join(',');
+  ok('e TRAZ a lista dos SKUs da caixa, com quantas de cada', lista(r) === A+':1:0,'+B+':2:0', JSON.stringify(r));
   ok('a caixa não andou', !lote(cx).conferido_em);
 
   r = await chamar('POST /api/carregar/peca', {lote_id:cx, sku:B}, BETO);
   ok('o bipe da peça conta uma persiana', r.ok === true && r.bipadas === 1 && r.pecas_total === 3, JSON.stringify(r));
-  ok('e continua sem dizer os SKUs', semSku(r, [A, B]), JSON.stringify(r));
+  ok('e a lista marca a peça bipada na linha certa', lista(r) === A+':1:0,'+B+':2:1', JSON.stringify(r));
   ok('a caixa ainda não andou', !lote(cx).conferido_em);
   r = await chamar('POST /api/carregar/peca', {lote_id:cx, sku:A}, BETO);
   ok('2 de 3', r.bipadas === 2, JSON.stringify(r));

@@ -30,7 +30,7 @@ const CRUA=`SELECT codigo, COALESCE(qtd,1) qtd FROM lote_item WHERE lote_id=? OR
 
 module.exports=function(db){
   let st=null;
-  return function pecasDaCaixa(loteId){
+  function pecasDaCaixa(loteId){
     let itens;
     try{
       if(!st){ try{ st=db.prepare(COMPLETA); }catch(e){ st=db.prepare(CRUA); } }
@@ -38,5 +38,9 @@ module.exports=function(db){
     }catch(e){ return []; }   // sem `lote_item`: volume anterior a tabela, uma persiana
     const pecas=itens.reduce((s,i)=>s+Math.max(1,i.qtd||1),0);
     return pecas>1 ? itens : [];
-  };
+  }
+  /* As listas do Carregamento (05/10/2026): cada volume ganha `itens`, vazio
+     na venda comum. Mesma pergunta, mesma regua — sem segunda consulta. */
+  pecasDaCaixa.anotar=arr=>(arr||[]).map(v=>Object.assign(v,{itens:pecasDaCaixa(v.id)}));
+  return pecasDaCaixa;
 };

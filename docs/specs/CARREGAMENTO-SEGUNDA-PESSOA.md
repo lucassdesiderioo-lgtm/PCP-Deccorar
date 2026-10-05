@@ -15,6 +15,11 @@
 > contagem é `lote_item.conferidos_carga` (coluna, não tabela); a divergência não zera, quem
 > zera é o "Recomeçar"; e há um "deixar esta caixa" que larga sem apagar. O `VARIAS` foi para
 > o `carga.js`. `teste_pecas_carga.js` (37). No ar, confirmado pelo dono; falta a primeira caixa real.
+>
+> **Mudou em 05/10/2026 (decisão do dono, `DECISOES.md`): a lista APARECE.** A tela âmbar e as
+> listas do Carregamento mostram os SKUs da caixa de várias; a conferência deixou de ser cega,
+> e a trava continua sendo o bipe de cada peça. Onde esta spec diz "sem a tela dizer antes
+> quais são", vale o `CLAUDE.md` §8-B.
 
 ---
 

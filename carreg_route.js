@@ -211,7 +211,7 @@ module.exports=function(app,db){
         .run(quemBipou, alvo.id);
       const p2=progresso();
       const hoje2=db.prepare("SELECT date('now','localtime') d").get().d;
-      return ({ok:true,conferida:true,pedido:alvo,carregados:p2.carregados,total:p2.total,
+      return ({ok:true,conferida:true,pedido:alvo,itens:pecasDaCaixa(alvo.id),carregados:p2.carregados,total:p2.total,
         prontas:p2.carro.prontas,coleta:false,adiantado:futuro(alvo,hoje2),impresso_por:nomeLimpo(alvo.impresso_por)});
     }
     db.prepare(`UPDATE lote SET estagio='carregado', carregado_em=datetime('now','localtime'),
@@ -230,7 +230,7 @@ module.exports=function(app,db){
        caixa ainda vai pro canto; a conta do adiantado so anda quando o
        caminhao leva (carga.js), mas o aviso vale desde ja. */
     const hojeD=db.prepare("SELECT date('now','localtime') d").get().d;
-    return ({ok:true,pedido:alvo,carregados:p.carregados,total:p.total,
+    return ({ok:true,pedido:alvo,itens:pecasDaCaixa(alvo.id),carregados:p.carregados,total:p.total,
               coleta:ehColeta(alvo), coleta_aguardando:p.coleta.aguardando.length,
               adiantado:futuro(alvo,hojeD), impresso_por:nomeLimpo(alvo.impresso_por)});
   }
@@ -249,10 +249,20 @@ module.exports=function(app,db){
     const bipadas=itens.reduce((s,i)=>s+(i.bip||0),0);
     return {itens,total,bipadas};
   }
-  /* A RESPOSTA SEM OS SKUs. Nem o `lote.codigo` vai: ele e o SKU de uma das
-     pecas, e bastaria para entregar a primeira resposta. */
+  /* ⚠️ A RESPOSTA TRAZ OS SKUs — mudou em 05/10/2026, decisao do dono (era
+     cega desde 02/10). Quem confere tem a caixa na mao e precisa saber o que
+     procurar nas etiquetas coladas por fora; a lista vem com o que cada peca E
+     e quantas ja foram bipadas. O que continua sendo a trava e o BIPE: SKU fora
+     da caixa, ou um a mais, para — e a caixa nao anda sem todas as pecas. */
+  const pecasDaCaixa=require('./pecas_caixa')(db);
+  function pecasVistas(alvo,pc){
+    const desc=pecasDaCaixa(alvo.id);
+    return pc.itens.map((i,k)=>Object.assign({},desc[k]&&desc[k].codigo===i.codigo?desc[k]:{codigo:i.codigo},
+      {qtd:Math.max(1,i.qtd||1),bipadas:i.bip||0}));
+  }
   function pedirPecas(alvo,pc){
     return {ok:false,motivo:'conferir_pecas',pecas_total:pc.total,bipadas:pc.bipadas,coleta:ehColeta(alvo),
+      pecas:pecasVistas(alvo,pc),
       pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
       aviso:'Esta caixa leva '+pc.total+' persianas — bipe a etiqueta de SKU de cada uma (coladas por fora da caixa).'};
   }
@@ -284,6 +294,7 @@ module.exports=function(app,db){
            if(ac&&ac.auditar) ac.auditar(req,'expedicao','carregar_peca_divergente','NF '+(alvo.nf||alvo.id),
              'devia ter '+esperado+' / bipado '+bipado); }catch(e){}
       return res.json({ok:false,motivo:'peca_divergente',esperado,bipado,pecas_total:pc.total,bipadas:pc.bipadas,
+        pecas:pecasVistas(alvo,pc),
         pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
         aviso:'A caixa devia ter '+esperado+'; foi bipado '+bipado+'. A caixa não anda: confira as persianas, '+
               'e use "Recomeçar esta caixa" para bipar de novo.'});
@@ -293,6 +304,7 @@ module.exports=function(app,db){
       const agora=pecasCarga(alvo.id);
       if(agora.bipadas<agora.total)
         return {ok:true,bipadas:agora.bipadas,pecas_total:agora.total,coleta:ehColeta(alvo),
+          pecas:pecasVistas(alvo,agora),
           pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city}};
       return Object.assign(concluir(req,alvo),{bipadas:agora.bipadas,pecas_total:agora.total});
     })();
@@ -306,7 +318,7 @@ module.exports=function(app,db){
     try{ const ac=app.locals.acesso;
          if(ac&&ac.auditar) ac.auditar(req,'expedicao','carregar_recomecou','NF '+(alvo.nf||alvo.id),'contagem da caixa zerada'); }catch(e){}
     const pc=pecasCarga(alvo.id);
-    res.json({ok:true,bipadas:pc.bipadas,pecas_total:pc.total});
+    res.json({ok:true,bipadas:pc.bipadas,pecas_total:pc.total,pecas:pecasVistas(alvo,pc)});
   });
   /* ── O MOTORISTA RECUSOU (spec RECUSA-DO-MOTORISTA, 02/10/2026) ────────────
      O motorista bipa a caixa e o sistema do ML diz "recusada": a venda foi
@@ -365,10 +377,10 @@ module.exports=function(app,db){
      agencia no "esta indo" inflaria o numero que o motorista tem que bater. */
   function progresso(){
     const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
-    const todos=db.prepare(`SELECT id,codigo,cor,buyer,nf,data,despachar_em,modalidade,
+    const todos=pecasDaCaixa.anotar(db.prepare(`SELECT id,codigo,cor,buyer,nf,data,despachar_em,modalidade,
         CASE WHEN conferido_em IS NOT NULL THEN 1 ELSE 0 END conferida FROM lote
       WHERE ${PRA_CARREGAR} ORDER BY ${ORDEM_CARGA}`).all()
-      .map(v=>Object.assign({},v,{atrasado: atrasado(v,hoje)?1:0}));
+      .map(v=>Object.assign({},v,{atrasado: atrasado(v,hoje)?1:0})));
     /* A VENDA FUTURA SAI DA CARGA DE HOJE, mas nao volta a sumir (#9): vai
        numa linha a parte. Cobra-la junto mandaria por no carro hoje um volume
        que so despacha semanas depois — a etiqueta foi impressa adiantada, a
@@ -394,8 +406,8 @@ module.exports=function(app,db){
       OR (no_carro_em IS NOT NULL AND date(no_carro_em)=date('now','localtime') AND ${COLETA()})`).get().n;
     /* O canto da coleta: o que esta la esperando o caminhao (carga.js), o que
        o caminhao ja levou hoje e os fechamentos do dia, com o resultado. */
-    const aguardando=db.prepare(`SELECT id,codigo,buyer,nf,data,despachar_em,carregado_em FROM lote
-      WHERE ${AGUARDA_CAMINHAO} ORDER BY carregado_em ASC, id ASC`).all();
+    const aguardando=pecasDaCaixa.anotar(db.prepare(`SELECT id,codigo,buyer,nf,data,despachar_em,carregado_em FROM lote
+      WHERE ${AGUARDA_CAMINHAO} ORDER BY carregado_em ASC, id ASC`).all());
     const retiradas=db.prepare(`SELECT COUNT(*) n FROM lote WHERE retirado_em IS NOT NULL
       AND date(retirado_em)=date('now','localtime')`).get().n;
     const fechamentos=db.prepare(`SELECT id,fechado_em,fechado_por,qtd_sistema,qtd_motorista,divergente,obs,
