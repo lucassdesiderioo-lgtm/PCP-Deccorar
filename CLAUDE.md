@@ -3506,7 +3506,8 @@ Etiqueta feita por Ana Paula — o mesmo login que está nesta tela.
 > ⚠️ **O "ETIQUETA FEITA POR" TEM LINHA PRÓPRIA (05/10/2026).** Ele saía em
 > `inline-block`, grudado no número de antes: *"prontas pro carro 1Etiqueta
 > feita por Ana Paula"* — o "1" se lia junto com o nome. Achado abrindo a tela;
-> o último caso do teste lê o CSS da `.quem`.
+> o último caso do teste lê o CSS da `.quem`. ✅ **No ar e conferido pelo dono
+> em 05/10/2026** (PR #190): *"ficou certo"*.
 
 **Rode `node teste_segunda_pessoa.js` (25 casos) ao mexer no bipe do
 `carreg_route.js` ou no `mesmaPessoa`.** Três defeitos foram reintroduzidos um a
