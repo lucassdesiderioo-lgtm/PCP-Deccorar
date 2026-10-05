@@ -3503,7 +3503,12 @@ Etiqueta feita por Ana Paula — o mesmo login que está nesta tela.
 > ⚠️ **TABLET COM A PÁGINA ANTIGA EM CACHE** mostraria a recusa como "Etiqueta não
 > reconhecida". O refresh forçado no deploy é obrigatório.
 
-**Rode `node teste_segunda_pessoa.js` (24 casos) ao mexer no bipe do
+> ⚠️ **O "ETIQUETA FEITA POR" TEM LINHA PRÓPRIA (05/10/2026).** Ele saía em
+> `inline-block`, grudado no número de antes: *"prontas pro carro 1Etiqueta
+> feita por Ana Paula"* — o "1" se lia junto com o nome. Achado abrindo a tela;
+> o último caso do teste lê o CSS da `.quem`.
+
+**Rode `node teste_segunda_pessoa.js` (25 casos) ao mexer no bipe do
 `carreg_route.js` ou no `mesmaPessoa`.** Três defeitos foram reintroduzidos um a
 um: sem a trava (reprova 13), vazio igual a vazio (1) e o bipe aceito sem o nome
 de quem imprimiu (3). E há caso travando que a rota de liberação **não existe**.
@@ -3548,6 +3553,14 @@ várias" é o `VARIAS()`, que **saiu do `exp_route.js` e mora no `carga.js`**.
 >   saber quais eram; agora, que **cada peça foi bipada**. A trava continua
 >   inteira: SKU fora da caixa ou um a mais PARA e vai para a auditoria, a caixa
 >   não anda sem todas, e quem imprimiu continua sem conferir.
+>
+> ✅ **NO AR EM 05/10/2026** (PR #189): o dono fez o deploy e disse *"apareceu a
+> lista no carregamento"*.
+>
+> ⚠️ **ISSO PROVA A LISTA, E NÃO OS OUTROS DOIS LUGARES.** A tela âmbar marcando
+> ✓ a cada SKU bipado e a lista no "Conferida ✓" não foram relatados um a um, e
+> pedem uma caixa de várias conferida de verdade por outra pessoa. Prova que não
+> foi feita se escreve como não feita (§4).
 
 > ⚠️ **AS BARREIRAS SÃO AS MESMAS NO BIPE DE PEÇA** (`barrar()` no
 > `carreg_route.js`): cancelada, retida, já saída, sem etiqueta, já conferida e
@@ -4418,7 +4431,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83) e `teste_recusa_motorista.js` (59); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83) e `teste_recusa_motorista.js` (59); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
