@@ -128,7 +128,9 @@
   .pnota{padding:8px 14px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)}
   /* QUEM IMPRIMIU (CARREGAMENTO-SEGUNDA-PESSOA, fase 1): o nome do login de
      quem fez a etiqueta de venda, na recusa, no bipe aceito e na pilha. */
-  .quem{display:inline-block;margin-top:6px;font-size:15px}
+  /* linha própria: em inline-block ele grudava no número de antes
+     ("prontas pro carro 1Etiqueta feita por …") — 05/10/2026 */
+  .quem{display:block;margin-top:6px;font-size:15px}
   .tag.quem2{background:#eef1f6;color:#3a4250}
   .btroca{margin-top:12px;background:#1a1d23;color:#fff;font-size:17px;padding:13px 20px}
 

@@ -122,6 +122,12 @@ const lote = id => q1('SELECT * FROM lote WHERE id=?', id);
      JSON.stringify(g.pilha.faltam));
   ok('e o nome vem limpo', g.pilha.faltam.some(f => f.impresso_por === 'Ana'), JSON.stringify(g.pilha.faltam));
 
+  // ── a tela: o "Etiqueta feita por" tem linha própria (05/10/2026) ──
+  // Em inline-block ele grudava no número de antes: "prontas pro carro 1Etiqueta feita por …".
+  const css = require('fs').readFileSync(require('path').join(__dirname, 'public/carregamento.html'), 'utf8');
+  const quem = (css.match(/\.quem\s*\{([^}]*)\}/) || [])[1] || '';
+  ok('"Etiqueta feita por" sai em linha própria, não grudado no número', /display\s*:\s*block/.test(quem), quem);
+
   console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'tudo certo') + ' — ' + casos + ' casos');
   process.exit(falhas ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });
