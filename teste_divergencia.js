@@ -453,6 +453,35 @@ function conferir(nome,cond,detalhe){
        linha e viraria paisagem. */
     conferir('a venda comum ja impressa continua valendo 1 peca',
       soloImp.pecas===1, JSON.stringify({id:soloImp.id,pecas:soloImp.pecas}));
+
+    /* ── E QUAIS PERSIANAS, NAO SO QUANTAS (05/10/2026, NF 7449) ──
+       A tarja dizia "2 persianas" ao lado do `lote.codigo`, que e o PRIMEIRO
+       item: na caixa de dois SKUs DIFERENTES quem voltou pra conferir leu um
+       SKU so, e uma persiana repetida. A lista tem que vir inteira. */
+    db.prepare("UPDATE lote SET estagio='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(silmara);
+    const imp2=await chamar(ctx,'GET','/api/impressos?dias=2');
+    const sil=(imp2.body||[]).find(x=>x.id===silmara)||{};
+    conferir('o ja impresso da caixa de 2 SKUs traz OS DOIS SKUs, e nao so o primeiro',
+      (sil.itens||[]).map(i=>i.codigo).join(',')==='BK130130BEGE,BK130130BRANCO',
+      JSON.stringify(sil.itens));
+    conferir('cada peca vem com o que ela e (a cor do segundo SKU)',
+      (sil.itens||[])[1] && sil.itens[1].cor_nome==='Branco', JSON.stringify(sil.itens));
+    const solo2=(imp2.body||[]).find(x=>x.id===futNormal)||{};
+    conferir('a venda comum nao leva lista: a linha dela nao muda',
+      Array.isArray(solo2.itens) && solo2.itens.length===0, JSON.stringify(solo2.itens));
+    const dup2=(imp2.body||[]).find(x=>x.id===hojeDupla)||{};
+    conferir('a caixa de 1 SKU x 2 tambem leva a lista (conta persiana, nao linha)',
+      (dup2.itens||[]).length===1 && dup2.itens[0].qtd===2, JSON.stringify(dup2.itens));
+
+    /* A REIMPRESSAO devolve a mesma lista: o papel repetido e da caixa inteira. */
+    const pdf=require('path').join(require('os').tmpdir(),'pcp-div-'+process.pid+'.pdf');
+    require('fs').writeFileSync(pdf,'%PDF-1.4');
+    db.prepare('UPDATE lote SET srcfile=? WHERE id=?').run(pdf,silmara);
+    const re=await chamar(ctx,'POST','/api/reimprimir',{id:silmara});
+    conferir('a reimpressao da caixa de 2 SKUs traz os dois SKUs',
+      re.body.ok && (re.body.itens||[]).map(i=>i.codigo).join(',')==='BK130130BEGE,BK130130BRANCO',
+      JSON.stringify(re.body));
+    try{ require('fs').unlinkSync(pdf); }catch(e){}
     fechar(ctx);
   }
 

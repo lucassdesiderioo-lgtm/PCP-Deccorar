@@ -333,6 +333,50 @@ const ok = (n, c, extra) => { casos++;
        db.prepare("SELECT COUNT(*) c FROM lote WHERE packId='pk6490'").get().c === 1);
   }
 
+  /* ── O "IMPRESSO ✓" DIZ QUAIS PERSIANAS (05/10/2026, NF 7449) ──
+     A caixa levava 2 persianas de SKUs DIFERENTES, e depois de impressa a
+     tela escrevia só o `lote.codigo` — o primeiro. Quem conferia via uma
+     persiana repetida. A resposta da impressão traz a lista inteira. */
+  {
+    db.prepare("INSERT OR REPLACE INTO skus (codigo,estoque,modelo_id,largura_cm,altura_cm,cor_codigo) VALUES ('BK120120BEGE',3,1,120,120,'BEGE')").run();
+    sku.run('BK100100BEGE', 3, 1, 100, 100, 'BEGE');
+    const NF = db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data,modalidade)
+      VALUES ('BK120120BEGE','Cliente 7449','7449','pk7449','vd7449','pendente',date('now','localtime'),'agencia')`).run().lastInsertRowid;
+    db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK120120BEGE',1,'folha')").run(NF);
+    db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK100100BEGE',1,'folha')").run(NF);
+    await chamar('POST /api/lote/conferir', {id:NF, codigo:'BK120120BEGE'});
+    await chamar('POST /api/lote/conferir', {id:NF, codigo:'BK100100BEGE'});
+    const imp = await chamar('POST /api/embalar', {id:NF});
+    ok('o "Impresso ✓" da caixa de 2 SKUs traz OS DOIS, e não só o primeiro',
+       !!imp.ok && (imp.itens||[]).map(i=>i.codigo).join(',') === 'BK120120BEGE,BK100100BEGE',
+       JSON.stringify(imp));
+    ok('cada peça vem com a medida dela (é o que separa os dois SKUs na tela)',
+       (imp.itens||[]).map(i=>i.largura_cm).join(',') === '120,100', JSON.stringify(imp.itens));
+    const UMA = db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data,modalidade)
+      VALUES ('BK100100BEGE','Cliente comum','7450','pk7450','vd7450','pendente',date('now','localtime'),'agencia')`).run().lastInsertRowid;
+    const comum = await chamar('POST /api/embalar', {id:UMA});
+    ok('a venda comum imprime e não leva lista', !!comum.ok && Array.isArray(comum.itens) && comum.itens.length === 0,
+       JSON.stringify(comum));
+  }
+
+  /* E A TELA ESCREVE A LISTA, executada e não só procurada no texto. */
+  {
+    const html = fs.readFileSync(path.join(__dirname, 'public', 'embalagem.html'), 'utf8');
+    const a = html.indexOf('<script>') + 8, b = html.indexOf('</script>', a);
+    const js = html.slice(a, b);
+    const pc = js.match(/function pecasCaixa\([\s\S]*?\n\}/);
+    const pd = js.match(/function pecasDe\([\s\S]*?\n\}/);
+    ok('a tela tem a lista única das peças da caixa (`pecasCaixa`)', !!pc);
+    if(pc && pd){
+      const f = new Function('esc','pecaTxt', pd[0] + pc[0] + '; return pecasCaixa;')(s=>String(s), ()=> '');
+      const h = f([{codigo:'BK120120BEGE',qtd:1},{codigo:'BK100100BEGE',qtd:1}]);
+      ok('a lista escreve os DOIS SKUs da caixa', /BK120120BEGE/.test(h) && /BK100100BEGE/.test(h), h);
+      ok('a venda comum não ganha lista', f([{codigo:'X',qtd:1}]) === '' && f([]) === '');
+    }
+    ok('o "Já impressos" usa a lista', /pecasCaixa\(r\.itens,true\)/.test(js));
+    ok('o "Reimpresso ✓" usa a lista', /pecasCaixa\(r\.itens\)/.test(js));
+  }
+
   /* ── A TELA TAMBÉM DECIDE "ISTO É CAIXA DE VÁRIAS?" (NF 7031, 25/09/2026) ──
      O conserto de 16/09 ensinou os quatro portões do SERVIDOR a contar
      persiana. A tela tinha mais dois — o que abre a tela âmbar e o que decide

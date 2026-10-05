@@ -2,6 +2,7 @@ const {VENCE_HOJE,ORDEM_URGENCIA}=require('./fila_dia');
 const {ehColeta,COLETA,AGENCIA}=require('./carga');
 const ESTOQUE=require('./estoque_dominio');
 module.exports=function(app,db){
+  const pecasDaCaixa=require('./pecas_caixa')(db);
   app.get('/api/proximo/:sku',(req,res)=>{
     const sku=(req.params.sku||'').trim().toUpperCase();
     /* O FILTRO DA TELA: Todas / Agencia / Coleta (§8-B). A Etiqueta de Venda
@@ -245,6 +246,10 @@ module.exports=function(app,db){
     res.json({ok:true,estoque:e?e.estoque:0,coleta:ehColeta(o),
       /* `pecas` so vem quando a caixa leva mais de uma: e o numero que a tela
          escreve no "Impresso ✓", pra quem fecha a caixa conferir na mao. */
-      pecas: pacote ? linhas.reduce((t,l)=>t+l.qtd,0) : undefined});
+      pecas: pacote ? linhas.reduce((t,l)=>t+l.qtd,0) : undefined,
+      /* E QUAIS sao (05/10/2026, NF 7449): o numero sozinho, ao lado do
+         `lote.codigo`, deixava a caixa de dois SKUs diferentes parecer duas
+         persianas iguais. */
+      itens: pacote ? pecasDaCaixa(id) : []});
   });
 };

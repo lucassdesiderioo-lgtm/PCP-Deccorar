@@ -731,6 +731,7 @@ module.exports=function(app,db){
   // guarda o reimprimir estoura 500 com "ENOENT" na cara do operador, que nao
   // tem como saber que a saida e subir o PDF de novo.
   const PDF_SUMIU='O PDF de origem nao esta mais no servidor (os arquivos saem depois de 7 dias). Suba o PDF do Mercado Livre de novo pra reimprimir.';
+  const pecasDaCaixa=require('./pecas_caixa')(db);
   const temPdf=o=>{ try{ return !!o.srcfile && fs.existsSync(o.srcfile); }catch(e){ return false; } };
 
   // Notas e clientes ja impressos. Serve a UMA pergunta: "a impressora enroscou,
@@ -760,7 +761,12 @@ module.exports=function(app,db){
       WHERE estagio IN ('embalado','carregado')
         AND data >= date('now','localtime','-'||?||' day')
       ORDER BY COALESCE(embalado_em,criado_em) DESC, id DESC LIMIT 400`).all(dias-1)
-      .map(v=>Object.assign({},v,{adiantada: futuro(v,hoje)?1:0})));
+      /* E AS PECAS, NAO SO A CONTA (05/10/2026, NF 7449). A tarja dizia "2
+         persianas" ao lado de UM codigo — o `lote.codigo`, que e o primeiro
+         item —, e numa caixa de dois SKUs diferentes quem voltou pra conferir
+         leu uma persiana repetida. So a caixa de varias leva a lista. */
+      .map(v=>Object.assign({},v,{adiantada: futuro(v,hoje)?1:0,
+        itens: v.pecas>1 ? pecasDaCaixa(v.id) : []})));
   });
 
   // Reimprimir NAO mexe no estoque. A baixa (-1) acontece uma unica vez, no
@@ -778,7 +784,9 @@ module.exports=function(app,db){
     if(!temPdf(o)) return res.json({erro:PDF_SUMIU});
     db.prepare("UPDATE lote SET reimpressoes=COALESCE(reimpressoes,0)+1, reimpresso_em=datetime('now','localtime') WHERE id=?").run(o.id);
     const n=db.prepare('SELECT COALESCE(reimpressoes,0) v FROM lote WHERE id=?').get(o.id);
-    res.json({ok:true,id:o.id,codigo:o.codigo,buyer:o.buyer,nf:o.nf,vezes:n?n.v:1});
+    // As pecas da caixa de varias vao junto: o papel repetido e da caixa INTEIRA.
+    res.json({ok:true,id:o.id,codigo:o.codigo,buyer:o.buyer,nf:o.nf,vezes:n?n.v:1,
+      itens:pecasDaCaixa(o.id)});
   });
 
   app.get('/api/print/:id', async (req,res)=>{
