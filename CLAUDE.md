@@ -3558,10 +3558,10 @@ várias" é o `VARIAS()`, que **saiu do `exp_route.js` e mora no `carga.js`**.
 > ✅ **NO AR EM 05/10/2026** (PR #189): o dono fez o deploy e disse *"apareceu a
 > lista no carregamento"*.
 >
-> ⚠️ **ISSO PROVA A LISTA, E NÃO OS OUTROS DOIS LUGARES.** A tela âmbar marcando
-> ✓ a cada SKU bipado e a lista no "Conferida ✓" não foram relatados um a um, e
-> pedem uma caixa de várias conferida de verdade por outra pessoa. Prova que não
-> foi feita se escreve como não feita (§4).
+> ✅ **E A CAIXA DE VÁRIAS FOI CONFERIDA DE VERDADE EM 05/10/2026:** o dono
+> conferiu uma no Carregamento e disse *"ficou certo"* — a tela âmbar marcando
+> os SKUs bipados e a lista no "Conferida ✓", que eram os dois lugares que
+> faltavam.
 
 > ⚠️ **AS BARREIRAS SÃO AS MESMAS NO BIPE DE PEÇA** (`barrar()` no
 > `carreg_route.js`): cancelada, retida, já saída, sem etiqueta, já conferida e
@@ -3598,9 +3598,13 @@ peça no cenário do adiantado.
 
 > ✅ **NO AR** (PR #183), confirmado pelo dono em 02/10/2026.
 >
-> ⚠️ **AINDA NÃO FOI CONFERIDO NA FÁBRICA.** A rodada foi num navegador meu, a
-> 1024 e 400 px. A prova é a primeira caixa de várias conferida por outra pessoa
-> com as etiquetas do saco coladas por fora.
+> ✅ **CONFERIDO NA FÁBRICA EM 05/10/2026:** a primeira caixa de várias passou
+> peça a peça pelo Carregamento, e o dono disse *"ficou certo"*.
+>
+> ⚠️ **O QUE ELE NÃO DISSE, E POR ISSO NÃO ESTÁ ESCRITO COMO DITO:** se as
+> etiquetas coladas por fora eram as do saco (P6), e a divergência (SKU fora da
+> caixa ou um a mais) ainda não apareceu num caso real. Prova que não foi feita
+> se escreve como não feita (§4).
 
 ### ⚠️ O MOTORISTA RECUSOU — a caixa volta ao estoque em dois passos (02/10/2026, spec `RECUSA-DO-MOTORISTA`)
 
