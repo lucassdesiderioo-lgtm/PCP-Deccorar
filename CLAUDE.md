@@ -3516,9 +3516,14 @@ de quem imprimiu (3). E há caso travando que a rota de liberação **não exist
 
 > ✅ **NO AR** (PR #164), confirmado pelo dono em 02/10/2026.
 >
-> ⚠️ **AINDA NÃO FOI CONFERIDO NA FÁBRICA.** A rodada foi num navegador meu, a
-> 1440, 1024 e 400 px. A prova é o primeiro dia de expedição com a regra: a
-> caixa recusada para quem imprimiu e conferida por outra pessoa.
+> ✅ **METADE CONFERIDA NA FÁBRICA EM 05/10/2026:** a primeira caixa de várias
+> foi conferida no Carregamento por **outra pessoa**, que não imprimiu a
+> etiqueta, e passou (bloco abaixo).
+>
+> ⚠️ **A OUTRA METADE AINDA NÃO:** ninguém relatou o bipe **recusado** para quem
+> imprimiu (*"OUTRA PESSOA TEM QUE CONFERIR"*). A prova é essa recusa
+> aparecendo de verdade num dia de expedição. Prova que não foi feita se
+> escreve como não feita (§4).
 
 ### ⚠️ A CAIXA DE VÁRIAS, PEÇA A PEÇA (02/10/2026, fase 2 da spec `CARREGAMENTO-SEGUNDA-PESSOA`; a lista aparece desde 05/10/2026)
 
@@ -3599,7 +3604,8 @@ peça no cenário do adiantado.
 > ✅ **NO AR** (PR #183), confirmado pelo dono em 02/10/2026.
 >
 > ✅ **CONFERIDO NA FÁBRICA EM 05/10/2026:** a primeira caixa de várias passou
-> peça a peça pelo Carregamento, e o dono disse *"ficou certo"*.
+> peça a peça pelo Carregamento, **conferida por outra pessoa** (não a que
+> imprimiu), e o dono disse *"ficou certo"*.
 >
 > ⚠️ **O QUE ELE NÃO DISSE, E POR ISSO NÃO ESTÁ ESCRITO COMO DITO:** se as
 > etiquetas coladas por fora eram as do saco (P6), e a divergência (SKU fora da
