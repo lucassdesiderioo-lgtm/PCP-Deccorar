@@ -14,7 +14,7 @@
 > instrução de colar por fora as etiquetas do saco (P6). **Decidido na construção:** a
 > contagem é `lote_item.conferidos_carga` (coluna, não tabela); a divergência não zera, quem
 > zera é o "Recomeçar"; e há um "deixar esta caixa" que larga sem apagar. O `VARIAS` foi para
-> o `carga.js`. `teste_pecas_carga.js` (37). No ar, confirmado pelo dono; falta a primeira caixa real.
+> o `carga.js`. `teste_pecas_carga.js` (37). No ar, confirmado pelo dono. **Primeira caixa real conferida em 05/10/2026** (*"ficou certo"*), já com a lista.
 >
 > **Mudou em 05/10/2026 (decisão do dono, `DECISOES.md`): a lista APARECE.** A tela âmbar e as
 > listas do Carregamento mostram os SKUs da caixa de várias; a conferência deixou de ser cega,
