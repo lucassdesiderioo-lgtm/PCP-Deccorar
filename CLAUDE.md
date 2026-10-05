@@ -3548,6 +3548,14 @@ várias" é o `VARIAS()`, que **saiu do `exp_route.js` e mora no `carga.js`**.
 >   saber quais eram; agora, que **cada peça foi bipada**. A trava continua
 >   inteira: SKU fora da caixa ou um a mais PARA e vai para a auditoria, a caixa
 >   não anda sem todas, e quem imprimiu continua sem conferir.
+>
+> ✅ **NO AR EM 05/10/2026** (PR #189): o dono fez o deploy e disse *"apareceu a
+> lista no carregamento"*.
+>
+> ⚠️ **ISSO PROVA A LISTA, E NÃO OS OUTROS DOIS LUGARES.** A tela âmbar marcando
+> ✓ a cada SKU bipado e a lista no "Conferida ✓" não foram relatados um a um, e
+> pedem uma caixa de várias conferida de verdade por outra pessoa. Prova que não
+> foi feita se escreve como não feita (§4).
 
 > ⚠️ **AS BARREIRAS SÃO AS MESMAS NO BIPE DE PEÇA** (`barrar()` no
 > `carreg_route.js`): cancelada, retida, já saída, sem etiqueta, já conferida e
