@@ -1448,10 +1448,26 @@ tarde — e em cada um a caixa aparece **uma vez só** (opção B, 25/09/2026):
 > antes do conserto é outra pergunta, e prova que não foi feita se escreve
 > como não feita (§4).
 
+> ⚠️ **DEPOIS DE IMPRESSA, A CAIXA DIZ QUAIS PERSIANAS, E NÃO SÓ QUANTAS
+> (05/10/2026, NF 7449).** O `lote.codigo` é o **primeiro** item da folha. O
+> "Impresso ✓", o "Reimpresso ✓" e a lista "Já impressos" escreviam só ele, ao
+> lado de "2 persianas" — e na caixa de dois SKUs **diferentes** quem voltou
+> para conferir leu uma persiana repetida. É o tipo de leitura que põe a peça
+> errada no saco.
+>
+> Hoje `pecas_caixa.js` é o dono único de *"que peças vão nesta caixa, depois
+> de impressa"* (soma das `qtd`, nunca `length`; venda comum devolve `[]`), e
+> `/api/embalar`, `/api/reimprimir` e `/api/impressos` devolvem `itens`. A
+> tela escreve a lista pela função `pecasCaixa` do `embalagem.html` — uma
+> linha por SKU, com a medida e a cor — e, na caixa de várias, **tira** o
+> código do volume da linha: sozinho, ele é o que fazia dois SKUs parecerem um.
+> A busca do "Já impressos" acha a venda pelo segundo SKU também. **Nada mudou
+> no estoque, na impressão nem no bipe**, e o Carregamento continua cego (§8-B).
 
-**Rode `node teste_etiqueta.js` (12 casos são a NF 6490; depois vêm 6 da NF 7031 — a tela — e os 4 últimos, a frase da caixa),
-`node teste_divergencia.js` (20 casos: a caixa uma vez só, a conta que fecha, o estoque por peça e o painel do
-"depois") e `node teste_parse.js` (caso 9) após mexer nisso.** E **abra a
+
+**Rode `node teste_etiqueta.js` (12 casos são a NF 6490; depois vêm 6 da NF 7031 — a tela —, os 4 da frase da caixa e os 6 últimos, a NF 7449),
+`node teste_divergencia.js` (25 casos: a caixa uma vez só, a conta que fecha, o estoque por peça, o painel do
+"depois" e, nos 5 últimos, as peças da caixa já impressa) e `node teste_parse.js` (caso 9) após mexer nisso.** E **abra a
 tela**: o card, o painel e a linha por SKU são texto montado, e a §2 já ensinou
 que rota verde sem tela aberta não é regra pronta.
 
@@ -4379,7 +4395,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (57) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (60), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83) e `teste_recusa_motorista.js` (59); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (51), `teste_divergencia.js` (62) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (24), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83) e `teste_recusa_motorista.js` (59); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4594,6 +4610,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Escrever uma segunda régua de "caixa de várias" para tirá-la das linhas:
   é o `VARIAS()` do `exp_route.js`, o mesmo do `caixasDeVarias` — com duas, a
   caixa some das duas listas ou aparece nas duas (§5, #23)
+- ❌ Escrever só o `lote.codigo` na caixa de várias persianas já impressa: ele
+  é o PRIMEIRO item, e dois SKUs diferentes se leem como um repetido — a lista
+  sai do `pecas_caixa.js` e da `pecasCaixa` da tela (§5, NF 7449)
 - ❌ Escrever a instrução de embalagem diferente em cada tela, ou sem o número:
   é uma frase só, a `fita(n)` — *"Atenção: vão N persianas no mesmo pacote —
   embalar junto"* (§5, #23)

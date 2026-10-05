@@ -231,6 +231,22 @@ function pecaTxt(p){ return (p && typeof pecaTexto==='function') ? (pecaTexto(p)
 function pecasDe(itens){
   return (itens||[]).reduce(function(s,i){ return s+Math.max(1,(i&&i.qtd)||1); },0);
 }
+/* AS PEÇAS DA CAIXA JÁ IMPRESSA, num lugar só (05/10/2026, NF 7449). Depois
+   de impressa a tela escrevia só o `codigo` do volume — o PRIMEIRO item —, e a
+   caixa de dois SKUs diferentes parecia duas persianas iguais. O "Impresso ✓",
+   o "Reimpresso ✓" e o "Já impressos" escrevem a lista inteira por esta
+   função: três cópias seriam três jeitos de a mesma caixa aparecer.
+   `compacta` é a linha da lista "Já impressos", que é estreita. */
+function pecasCaixa(itens, compacta){
+  if(pecasDe(itens)<2) return '';
+  return (itens||[]).map(function(i){
+    var peca=pecaTxt({medida:(i.exige_medida&&i.largura_cm&&i.altura_cm)?(i.largura_cm+' × '+i.altura_cm):null,
+                      cor:i.cor_nome||null, tecido:i.tecido_nome||null, modelo:i.modelo_nome||null});
+    return '<div style="'+(compacta?'font-size:12px;margin-top:2px':'font-size:15px;margin-top:4px')+'">'
+      +'<b>'+Math.max(1,i.qtd||1)+' ×</b> <span class="sku"'+(compacta?' style="font-size:12px"':'')+'>'+esc(i.codigo||'')+'</span>'
+      +(peca?' <span style="color:var(--muted)">· '+esc(peca)+'</span>':'')+'</div>';
+  }).join('');
+}
 function linhaItem(i){
   var qtd=i.qtd||1, feitos=i.conferidos||0, ok=feitos>=qtd;
   var peca=pecaTxt({medida:(i.exige_medida&&i.largura_cm&&i.altura_cm)?(i.largura_cm+' × '+i.altura_cm):null,
@@ -429,10 +445,14 @@ async function imprimir(){
     /* A caixa com várias persianas repete a conta DEPOIS de imprimir: é a
        última vez que alguém olha antes de fechar o saco preto, e a etiqueta
        colada por fora não diz quantas peças tem dentro. */
+    /* A caixa de várias escreve QUAIS persianas, e não só quantas: com o SKU
+       do volume sozinho ao lado, dois SKUs diferentes pareciam duas iguais. */
+    var lista = r.pecas ? pecasCaixa(r.itens||o._itens) : '';
     var quantas = r.pecas ? '<div style="margin:6px 0 8px;padding:8px 10px;border-radius:8px;background:#fff4e5;border:2px solid #e0a63f;color:#8a5a00;font-weight:800">'
         +'📦 FECHE A CAIXA COM '+r.pecas+' PERSIANAS — uma etiqueta, '+r.pecas+' peças.'
-        +'<div style="font-weight:700;font-size:13px;margin-top:2px">'+fita(r.pecas)+'</div></div>' : '';
-    banner(r.coleta?'col':'ok','Impresso ✓ — '+esc(o.buyer), quantas+ondeVai+'NF <b>'+esc(o.nf||'—')+'</b> · <span class="sku">'+esc(o.codigo||'')+'</span> · estoque agora: '+r.estoque+'<br>Saiu borrada ou o papel enroscou? Reimprima aqui — o estoque não muda.',
+        +(lista?'<div style="font-weight:400;color:var(--txt);margin-top:4px">'+lista+'</div>':'')
+        +'<div style="font-weight:700;font-size:13px;margin-top:6px">'+fita(r.pecas)+'</div></div>' : '';
+    banner(r.coleta?'col':'ok','Impresso ✓ — '+esc(o.buyer), quantas+ondeVai+'NF <b>'+esc(o.nf||'—')+'</b>'+(lista?'':' · <span class="sku">'+esc(o.codigo||'')+'</span>')+' · estoque agora: '+r.estoque+'<br>Saiu borrada ou o papel enroscou? Reimprima aqui — o estoque não muda.',
       '<button class="rebt" onclick="reimprimir('+o.id+',this)">🖨 Reimprimir esta</button>');
     beep(true); stats(); listaImp();
   }catch(e){ banner('err','Falha de conexão', String(e)); beep(false); }
@@ -446,7 +466,11 @@ async function reimprimir(id,btn){
     const r=await (await fetch('/api/reimprimir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})})).json();
     if(r.erro){ banner('err','Não deu pra reimprimir', esc(r.erro)); beep(false); listaImp(); return; }
     mandarPraImpressora(id);
-    banner('ok','Reimpresso ✓ — '+esc(r.buyer), 'NF <b>'+esc(r.nf||'—')+'</b> · <span class="sku">'+esc(r.codigo||'')+'</span> · '+r.vezes+'ª reimpressão · <b>o estoque não mudou</b>',
+    var listaR=pecasCaixa(r.itens);
+    banner('ok','Reimpresso ✓ — '+esc(r.buyer), 'NF <b>'+esc(r.nf||'—')+'</b>'
+      +(listaR?'':' · <span class="sku">'+esc(r.codigo||'')+'</span>')+' · '+r.vezes+'ª reimpressão · <b>o estoque não mudou</b>'
+      +(listaR?'<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#fff4e5;border:2px solid #e0a63f">'
+        +'<b style="color:#8a5a00">📦 Esta caixa leva '+pecasDe(r.itens)+' persianas:</b>'+listaR+'</div>':''),
       '<button class="rebt" onclick="reimprimir('+id+',this)">🖨 Reimprimir de novo</button>');
     beep(true); listaImp();
   }catch(e){ banner('err','Falha de conexão', String(e)); beep(false); }
@@ -819,7 +843,10 @@ function renderImp(){
   var qs=q.replace(/[^a-z0-9]/g,'');
   var l=impCache.filter(function(r){
     if(!q) return true;
-    var alvo=[r.buyer,r.nf,r.codigo,r.city,r.packId,r.venda].join(' ').toLowerCase();
+    // Os SKUs da caixa de várias entram na busca: quem tem na mão a etiqueta
+    // da SEGUNDA persiana tem que achar a venda por ela também.
+    var alvo=[r.buyer,r.nf,r.codigo,r.city,r.packId,r.venda]
+      .concat((r.itens||[]).map(function(i){ return i.codigo; })).join(' ').toLowerCase();
     if(alvo.indexOf(q)>=0) return true;
     return !!qs && alvo.replace(/[^a-z0-9]/g,'').indexOf(qs)>=0;
   });
@@ -849,9 +876,12 @@ function renderImp(){
          Aqui é onde alguém volta pra conferir, e é daqui que se reimprime. */
       +(r.pecas>1?'<span class="tag" style="background:#fff4e5;border-color:#e0a63f;color:#8a5a00;font-weight:800">📦 '+r.pecas+' persianas</span>':'')
       +(r.reimpressoes>0?'<span class="tag">reimpressa '+r.reimpressoes+'x</span>':'')+'</div>'
-      +'<div class="meta">NF <b>'+esc(r.nf||'—')+'</b> · <b>'+esc(r.codigo||'—')+'</b> · '+horaDe(r.embalado_em)
+      /* Na caixa de várias o código do volume sai da linha e entra a lista:
+         ele é o PRIMEIRO item, e sozinho fazia dois SKUs parecerem um. */
+      +'<div class="meta">NF <b>'+esc(r.nf||'—')+'</b>'+(pecasDe(r.itens)>1?'':' · <b>'+esc(r.codigo||'—')+'</b>')+' · '+horaDe(r.embalado_em)
       +(r.city?' · '+esc(r.city):'')
-      +(r.estagio==='carregado'?' · <span style="color:#2e7d32">carregado</span>':'')+'</div></div>'
+      +(r.estagio==='carregado'?' · <span style="color:#2e7d32">carregado</span>':'')+'</div>'
+      +pecasCaixa(r.itens,true)+'</div>'
       +'<button class="rebt'+(eh?' forte':'')+'" onclick="reimprimir('+r.id+',this)">🖨 Reimprimir'+(eh?' a última':'')+'</button></div>';
   }
   if(l.length>mostra.length) h+='<div class="vazio" style="padding-top:10px">Mostrando '+mostra.length+' de '+l.length+' — use a busca pra achar a venda.</div>';
