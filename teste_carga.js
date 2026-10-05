@@ -320,6 +320,46 @@ async function noCarro(code){
   ok('o bipe recusa a caixa cancelada, dizendo para nao carregar',
      r.ok===false && r.motivo==='cancelada' && /carregar/i.test(r.aviso||''), 'veio '+JSON.stringify(r));
 
+  /* ── AS PECAS DA CAIXA DE VARIAS NAS LISTAS (05/10/2026, decisao do dono) ──
+     A linha mostrava so o `lote.codigo` — o PRIMEIRO item —, e na caixa de dois
+     SKUs diferentes quem procurava a caixa via um SKU so. Agora a lista vem
+     inteira, nas listas e na pilha; a venda comum continua sem lista. */
+  const dois=ins.run('BK120120BEGE','Juliana Lista','7446','74461','74462','["74461","74462"]','embalado',hoje).lastInsertRowid;
+  db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd) VALUES (?,?,1)").run(dois,'BK140140BEGE');
+  db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd) VALUES (?,?,1)").run(dois,'BK140140CINZA');
+  d=await chamar('GET /api/carregamento');
+  const todasL=[].concat(d.faltam||[],d.depois||[],(d.coleta||{}).faltam||[]);
+  const jl=todasL.find(v=>v.id===dois)||{};
+  ok('na lista do Carregamento a caixa de 2 SKUs traz OS DOIS',
+     (jl.itens||[]).map(i=>i.codigo).join(',')==='BK140140BEGE,BK140140CINZA', JSON.stringify(jl));
+  const comum=todasL.find(v=>v.id!==dois)||{};
+  ok('e a venda comum nao leva lista', Array.isArray(comum.itens) && comum.itens.length===0, JSON.stringify(comum.itens));
+  const pl=[].concat((d.pilha||{}).faltam||[],(d.pilha||{}).anteriores||[]).find(v=>v.id===dois)||{};
+  ok('a pilha tambem traz os dois SKUs',
+     (pl.itens||[]).map(i=>i.codigo).join(',')==='BK140140BEGE,BK140140CINZA', JSON.stringify(pl));
+  r=await chamar('POST /api/carregar',{code:'74461'});
+  ok('o bipe da etiqueta pede as pecas e traz a lista',
+     r.motivo==='conferir_pecas' && (r.pecas||[]).map(i=>i.codigo).join(',')==='BK140140BEGE,BK140140CINZA', JSON.stringify(r));
+  /* E A TELA ESCREVE a lista: executada, nao so procurada no texto. */
+  {
+    const html=fs.readFileSync(path.join(__dirname,'public','carregamento.html'),'utf8');
+    const m1=html.match(/function pecasDeC\([\s\S]*?\n\}/), m2=html.match(/function ehVarias\([\s\S]*?\}/),
+          m3=html.match(/function skuDaLinha\([\s\S]*?\}/), m4=html.match(/function pecasLinhas\([\s\S]*?\n\}/);
+    ok('a tela tem a lista das pecas (`pecasLinhas`)', !!(m1&&m2&&m3&&m4));
+    if(m1&&m2&&m3&&m4){
+      const f=new Function('esc0','pecaTexto', m1[0]+m2[0]+m3[0]+m4[0]+'; return {skuDaLinha,pecasLinhas};')(x=>String(x),()=> '');
+      const v={codigo:'BK140140BEGE',itens:[{codigo:'BK140140BEGE',qtd:1},{codigo:'BK140140CINZA',qtd:1}]};
+      const h=f.pecasLinhas(v.itens);
+      ok('a tela escreve os DOIS SKUs da caixa', /BK140140BEGE/.test(h) && /BK140140CINZA/.test(h), h);
+      ok('e tira o codigo solto da linha da caixa de varias', f.skuDaLinha(v)==='');
+      ok('a venda comum continua com o codigo e sem lista',
+         f.skuDaLinha({codigo:'X1',itens:[]})===' · X1' && f.pecasLinhas([])==='');
+    }
+    /* Nenhuma linha escreve o codigo solto por conta propria: so o `skuDaLinha`. */
+    ok('nenhuma lista escreve o codigo do volume por fora do `skuDaLinha`',
+       (html.match(/esc0\(f\.codigo/g)||[]).length===1 && (html.match(/skuDaLinha\(f\)/g)||[]).length===6);
+  }
+
   db.close();
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
   console.log('');

@@ -44,6 +44,8 @@ module.exports = function(app, db){
     try{ const ac = app.locals.acesso; if(ac && ac.auditar) ac.auditar(req, 'expedicao', acao, alvo, det); }catch(e){}
   };
   const quem = req => (req.usuario && req.usuario.nome) || '';
+  // As pecas da caixa de varias nas listas da saida e da viagem (05/10/2026).
+  const pecasDaCaixa = require('./pecas_caixa')(db);
   const lista = s => { try{ const v = JSON.parse(s||'[]'); return Array.isArray(v) ? v : []; }catch(e){ return []; } };
   const aberta = () => db.prepare("SELECT * FROM saida WHERE tipo='coleta' AND fechada_em IS NULL ORDER BY id DESC").get() || null;
 
@@ -51,7 +53,7 @@ module.exports = function(app, db){
   function retrato(s){
     if(!s) return { saida:null };
     const sobras = lista(s.sobras), levou = lista(s.levou);
-    const canto = naSaida(db);
+    const canto = pecasDaCaixa.anotar(naSaida(db));
     const noCanto = new Set(canto.map(v => v.id));
     /* Sobra que deixou de estar na conta (saiu por outra saída, voltou para o
        carro) não vale mais nada: não entra na subtração. */
@@ -59,7 +61,7 @@ module.exports = function(app, db){
     const levouLinhas = levou.length
       ? db.prepare(`SELECT id,codigo,buyer,nf,modalidade,despachar_em,impresso_por,conferido_por FROM lote
           WHERE id IN (${levou.map(()=>'?').join(',')}) AND ${PODE_TER_IDO}`).all(...levou)
-          .map(v => Object.assign(v, { troca_de_porta: v.modalidade !== 'coleta' }))
+          .map(v => Object.assign(v, { troca_de_porta: v.modalidade !== 'coleta' }, { itens: pecasDaCaixa(v.id) }))
       : [];
     const saem = canto.filter(v => !sobrasValidas.includes(v.id)).concat(levouLinhas);
     const pegar = id => canto.find(v => v.id === id);
@@ -69,7 +71,7 @@ module.exports = function(app, db){
       lista: saem,
       sobras: sobrasValidas.map(pegar),
       levou: levouLinhas,
-      candidatos: podeTerIdo(db).filter(v => !levou.includes(v.id))
+      candidatos: pecasDaCaixa.anotar(podeTerIdo(db).filter(v => !levou.includes(v.id)))
     };
   }
 
@@ -261,9 +263,9 @@ module.exports = function(app, db){
     const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
     const noCarro = db.prepare(`SELECT id,codigo,buyer,nf,modalidade,despachar_em,no_carro_em,no_carro_por,impresso_por,conferido_por
       FROM lote WHERE saida_id=? AND saiu_em IS NULL ORDER BY no_carro_em, id`).all(v.id)
-      .map(x => Object.assign(x, { troca_de_porta: ehColeta(x) }));
-    const prontas = db.prepare(`SELECT id,codigo,buyer,nf,despachar_em FROM lote WHERE ${PRONTA_PRO_CARRO}
-      ORDER BY COALESCE(despachar_em,data), id`).all();
+      .map(x => Object.assign(x, { troca_de_porta: ehColeta(x), itens: pecasDaCaixa(x.id) }));
+    const prontas = pecasDaCaixa.anotar(db.prepare(`SELECT id,codigo,buyer,nf,despachar_em FROM lote WHERE ${PRONTA_PRO_CARRO}
+      ORDER BY COALESCE(despachar_em,data), id`).all());
     return {
       viagem: { id:v.id, tipo:v.tipo, aberta_em:v.aberta_em, aberta_por:v.aberta_por,
                 antiga: !!(v.aberta_em && String(v.aberta_em).slice(0,10) < hoje) },

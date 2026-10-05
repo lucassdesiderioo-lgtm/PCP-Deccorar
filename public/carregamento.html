@@ -229,6 +229,7 @@
   </div>
   </div>
 </div>
+<script src="/sku.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 let last={c:null,t:0};
@@ -247,6 +248,32 @@ function trocarPessoa(){
   fetch('/api/auth/logout',{method:'POST'}).then(function(){ location.href='/login?r=/carregamento'; });
 }
 function banner(kind,title,sub){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'; }
+/* AS PEÇAS DA CAIXA DE VÁRIAS PERSIANAS (05/10/2026, decisão do dono). Até
+   aqui a linha da caixa mostrava só o `lote.codigo`, que é o PRIMEIRO item, e
+   a tela do bipe peça a peça não dizia quais eram (a conferência era cega,
+   02/10). O dono decidiu mostrar: quem confere tem a caixa na mão e precisa
+   saber o que procurar nas etiquetas coladas por fora. A trava continua sendo
+   o BIPE de cada peça. Conta persiana (soma das `qtd`), nunca linha. */
+function pecasDeC(itens){ return (itens||[]).reduce(function(s,i){ return s+Math.max(1,(i&&i.qtd)||1); },0); }
+function ehVarias(f){ return pecasDeC(f&&f.itens)>1; }
+/* O código ao lado da NF: na caixa de várias ele sai, porque sozinho fazia dois
+   SKUs parecerem um; a lista vem embaixo, por `pecasLinhas`. */
+function skuDaLinha(f){ return ehVarias(f) ? '' : ' · '+esc0(f.codigo||''); }
+function pecasLinhas(itens, grande){
+  if(pecasDeC(itens)<2) return '';
+  return '<div style="margin-top:3px">'
+    +(grande?'':'<span class="tagtroca" style="background:#fff4e5;border-color:#e0a63f;color:#8a5a00">📦 '+pecasDeC(itens)+' persianas</span>')
+    +(itens||[]).map(function(i){
+      var q=Math.max(1,i.qtd||1), b=(i.bipadas==null?null:i.bipadas), ok=(b!=null && b>=q);
+      var peca=(typeof pecaTexto==='function') ? pecaTexto({
+        medida:(i.exige_medida&&i.largura_cm&&i.altura_cm)?(i.largura_cm+' × '+i.altura_cm):null,
+        cor:i.cor_nome||null, tecido:i.tecido_nome||null, modelo:i.modelo_nome||null}) : '';
+      return '<div style="font-size:'+(grande?'16px':'12px')+';margin-top:2px'+(ok?';color:#2e7d32':'')+'">'
+        +(b!=null?(ok?'✓ ':'○ '):'')+'<b>'+q+' ×</b> <span style="font-family:ui-monospace,monospace">'+esc0(i.codigo||'')+'</span>'
+        +(peca?' <span style="color:var(--muted)">· '+esc0(peca)+'</span>':'')
+        +(b!=null && q>1?' <b>'+b+' de '+q+'</b>':'')+'</div>';
+    }).join('')+'</div>';
+}
 function esc0(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 /* Quando a conferencia dupla esta ligada, o bipe da etiqueta nao carrega
@@ -275,16 +302,17 @@ async function bip(code){
    fase 2, 02/10/2026) ───────────────────────────────────────────────────────
    O bipe da etiqueta de venda NÃO confere a caixa de várias: ela fica em
    âmbar, e cada persiana é bipada pela etiqueta de SKU colada por fora da
-   caixa (a do saco, P6). A tela diz só "2 de 3" — NUNCA quais SKUs: quem sabe
-   a resposta bipa até chegar nela (a lição do inventário cego, §18). Os SKUs
-   só aparecem quando divergem, e aí como alarme. */
-let caixaPecas=null;   // {lote_id, buyer, nf, total, bipadas}
+   caixa (a do saco, P6). Desde 05/10/2026 (decisão do dono) a tela MOSTRA
+   quais SKUs a caixa leva, com o que cada um é e quantos já foram bipados; a
+   trava é o bipe de cada peça, e o SKU fora da caixa continua parando. */
+let caixaPecas=null;   // {lote_id, buyer, nf, total, bipadas, pecas}
 let ultimaPeca={c:'',t:0};
 function bannerPecas(){
   var c=caixaPecas;
   banner('warn','📦 ESTA CAIXA LEVA '+c.total+' PERSIANAS',
     '<b>'+esc0(c.buyer)+'</b> · NF <b>'+esc0(c.nf||'—')+'</b><br>'
     +'Bipe a etiqueta de SKU de <b>cada</b> persiana (coladas por fora da caixa).'
+    +pecasLinhas(c.pecas,true)
     +'<div class="indo" style="color:#8a5a00">'+c.bipadas+' de '+c.total+'</div>'
     +'<button class="btn" onclick="recomecarCaixa()">↺ Recomeçar esta caixa</button> '
     +'<button class="mini" style="margin-left:6px" onclick="sairDaCaixa()">deixar esta caixa</button>');
@@ -300,7 +328,7 @@ async function bipPeca(code){
   var r=await (await fetch('/api/carregar/peca',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({lote_id:caixaPecas.lote_id, sku:code})})).json();
   if(r.ok && r.bipadas<r.pecas_total){
-    caixaPecas.bipadas=r.bipadas; bannerPecas(); beep(true); return;
+    caixaPecas.bipadas=r.bipadas; if(r.pecas) caixaPecas.pecas=r.pecas; bannerPecas(); beep(true); return;
   }
   if(r.motivo==='peca_divergente'){
     banner('err','⛔ PARE — A CAIXA NÃO BATE',
@@ -317,7 +345,7 @@ async function recomecarCaixa(){
   if(!caixaPecas) return;
   var r=await (await fetch('/api/carregar/recomecar',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({lote_id:caixaPecas.lote_id})})).json();
-  caixaPecas.bipadas=r.bipadas||0; ultimaPeca={c:'',t:0}; bannerPecas();
+  caixaPecas.bipadas=r.bipadas||0; if(r.pecas) caixaPecas.pecas=r.pecas; ultimaPeca={c:'',t:0}; bannerPecas();
 }
 /* Largar a caixa no meio não apaga o que já foi bipado: voltar a ela (bipando
    a etiqueta de venda) continua de onde parou. */
@@ -367,7 +395,7 @@ async function confirmarRecusa(){
 function mostrar(r,code){
   if(r.motivo==='conferir_pecas'){
     aguardando=null;
-    caixaPecas={lote_id:r.pedido.id, buyer:r.pedido.buyer, nf:r.pedido.nf, total:r.pecas_total, bipadas:r.bipadas||0};
+    caixaPecas={lote_id:r.pedido.id, buyer:r.pedido.buyer, nf:r.pedido.nf, total:r.pecas_total, bipadas:r.bipadas||0, pecas:r.pecas||[]};
     bannerPecas(); beep(true);
   }
   else if(r.ok && r.coleta){
@@ -377,8 +405,8 @@ function mostrar(r,code){
     aguardando=null;
     var n=r.coleta_aguardando||0;
     banner('col','COLETA ✓ — '+esc0(r.pedido.buyer),
-      'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · <span class="c">'+esc0(r.pedido.codigo||'')+'</span> · <b>não vai no carro</b>: deixe no lugar reservado.'
-      +linhaQuem(r)+linhaAdiant(r)
+      'NF <b>'+esc0(r.pedido.nf||'—')+'</b>'+(ehVarias(r)?'':' · <span class="c">'+esc0(r.pedido.codigo||'')+'</span>')+' · <b>não vai no carro</b>: deixe no lugar reservado.'
+      +pecasLinhas(r.itens)+linhaQuem(r)+linhaAdiant(r)
       +'<div class="indo">Está indo '+n+' peça'+(n===1?'':'s')+'</div>'
       +'<div style="color:#4b2a91;font-weight:700">Peça ao motorista o número de caixas que ele bipou antes de sair.</div>');
     beep(true);
@@ -387,7 +415,7 @@ function mostrar(r,code){
     /* AGENCIA: o bipe da area so CONFERE (fase 4, D1). A caixa fica na area
        esperando a viagem; quem a poe no carro e o bipe da viagem. */
     aguardando=null;
-    banner('ok','Conferida ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · <span class="c">'+esc0(r.pedido.codigo||'')+'</span> · <b>fica na área</b>: prontas pro carro <b>'+r.prontas+'</b>'+linhaQuem(r)+linhaAdiant(r)); beep(true);
+    banner('ok','Conferida ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b>'+(ehVarias(r)?'':' · <span class="c">'+esc0(r.pedido.codigo||'')+'</span>')+' · <b>fica na área</b>: prontas pro carro <b>'+r.prontas+'</b>'+linhaQuem(r)+linhaAdiant(r)+pecasLinhas(r.itens)); beep(true);
   }
   /* QUEM IMPRIMIU NAO CONFERE (CARREGAMENTO-SEGUNDA-PESSOA, fase 1). A tarja
      diz o nome do login que fez a etiqueta e o caminho: outra pessoa entra
@@ -402,7 +430,7 @@ function mostrar(r,code){
     banner('warn','Essa já foi conferida',(r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
   else if(r.ok){
     aguardando=null;
-    banner('ok','Carregado ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · <span class="c">'+esc0(r.pedido.codigo||'')+'</span> · No carro <b>'+r.carregados+'</b> de '+r.total+linhaAdiant(r)); beep(true);
+    banner('ok','Carregado ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b>'+(ehVarias(r)?'':' · <span class="c">'+esc0(r.pedido.codigo||'')+'</span>')+' · No carro <b>'+r.carregados+'</b> de '+r.total+linhaAdiant(r)+pecasLinhas(r.itens)); beep(true);
   }
   else if(r.motivo==='falta_sku'){
     // 1o bipe aceito. NAO mostramos qual SKU esperar — a conferencia e cega.
@@ -453,7 +481,7 @@ function linha(f){
     +(f.atrasado?'<b style="color:var(--amber)">⏳ de '+dataBR(f.data)+'</b> · ':'')
     +(f.modalidade!=='coleta' && f.conferida===1?'<span class="tagok">✓ na área</span>':'')
     +(f.modalidade!=='coleta' && f.conferida===0?'<span class="tagfalta">falta conferir</span>':'')
-    +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+'</span></span></div>';
+    +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+skuDaLinha(f)+'</span>'+pecasLinhas(f.itens)+'</span></div>';
 }
 /* A PILHA (carga.js → pilhaDaArea). A caixa conferida e a que foi bipada aqui
    — no carro ou no canto da coleta. "Sem segunda pessoa" e HISTORIA: a caixa
@@ -468,8 +496,8 @@ function tagsPilha(f){
 function linhaPilha(f, ant){
   return '<div class="row"><span class="who">'
     +(ant?'<span class="tag ant">⏳ impressa '+dataBR(String(f.embalado_em||'').slice(0,10))+'</span>':'')
-    +tagsPilha(f)+esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+'</span>'
-    +(f.impresso_por?' <span class="tag quem2">feita por '+esc0(f.impresso_por)+'</span>':'')+'</span></div>';
+    +tagsPilha(f)+esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+skuDaLinha(f)+'</span>'
+    +(f.impresso_por?' <span class="tag quem2">feita por '+esc0(f.impresso_por)+'</span>':'')+pecasLinhas(f.itens)+'</span></div>';
 }
 function desenharPilha(p){
   var card=$('#pilhaCard'); if(!p||!p.hoje){ card.style.display='none'; return; }
@@ -551,7 +579,7 @@ async function carregar(){
   $('#colAguard').innerHTML = col.aguardando.length
     ? '<div class="hist"><b style="color:#4b2a91">No lugar reservado, esperando o caminhão: '+col.aguardando.length+'</b></div>'
       +col.aguardando.map(function(f){ return '<div class="row"><span class="who">'+esc0(f.buyer)
-        +' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+' · '+horaDe(f.carregado_em)+'</span></span></div>'; }).join('')
+        +' <span class="c">NF '+esc0(f.nf||'—')+skuDaLinha(f)+' · '+horaDe(f.carregado_em)+'</span>'+pecasLinhas(f.itens)+'</span></div>'; }).join('')
     : '<div class="empty" style="color:var(--muted)">Nenhuma caixa esperando o caminhão'+(col.retiradas_hoje?' — '+col.retiradas_hoje+' já retirada'+(col.retiradas_hoje===1?'':'s')+' hoje':'')+'.</div>';
   /* A saida do caminhao: aberta no banco, a tela entra no modo e busca o
      retrato (a conta, as sobras e o que pode ter ido fora da conta). */
@@ -664,7 +692,7 @@ function linhaSaida(f, extra){
   return '<div class="row"><span class="who">'
     +(f.antiga?'<span class="tagtroca">⏳ bipada '+dataBR(String(f.carregado_em||'').slice(0,10))+'</span>':'')
     +(f.troca_de_porta?'<span class="tagtroca">troca de porta · era agência</span>':'')
-    +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+'</span></span>'+(extra||'')+'</div>';
+    +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+skuDaLinha(f)+'</span>'+pecasLinhas(f.itens)+'</span>'+(extra||'')+'</div>';
 }
 /* O QUE A TELA MOSTRA DA SAIDA ABERTA: quantas vao no caminhao (a conta que
    o motorista tem que bater), as sobras bipadas e, se a conta nao bateu, as
@@ -754,7 +782,7 @@ function desenharViagem(){
     +(vi.viagem.antiga?' · <b style="color:var(--red)">⚠ viagem aberta desde '+dataBR(String(vi.viagem.aberta_em).slice(0,10))+' — feche com a foto do atendente</b>':'');
   $('#viagemLista').innerHTML=vi.lista.map(function(f){
     return '<div class="row"><span class="who">'+(f.troca_de_porta?'<span class="tagtroca">troca de porta · era coleta</span>':'')
-      +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+' · '+esc0(f.codigo||'')+'</span></span>'
+      +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+skuDaLinha(f)+'</span>'+pecasLinhas(f.itens)+'</span>'
       +'<button class="mini" onclick="tirarDoCarro('+f.id+')">tirar do carro</button></div>'; }).join('');
   if(!divergV){ $('#viagemDiv').innerHTML=''; return; }
   var at=divergV.atendente;

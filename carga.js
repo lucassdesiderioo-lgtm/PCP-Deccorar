@@ -182,7 +182,10 @@ function pilhaDaArea(db){
     WHERE estagio='embalado' AND conferido_em IS NULL
       AND (embalado_em IS NULL OR date(embalado_em) < date('now','localtime'))
     ORDER BY embalado_em, id`).all();
-  const marca = v => ({ id:v.id, codigo:v.codigo, buyer:v.buyer, nf:v.nf,
+  /* As pecas da caixa de varias vao junto (05/10/2026): a lista do
+     Carregamento mostra os SKUs, e nao so o `lote.codigo`, que e o primeiro. */
+  const pecasDaCaixa = require('./pecas_caixa')(db);
+  const marca = v => ({ id:v.id, codigo:v.codigo, buyer:v.buyer, nf:v.nf, itens:pecasDaCaixa(v.id),
     despachar_em:v.despachar_em, embalado_em:v.embalado_em,
     impresso_por: temNomeP(v.impresso_por) ? String(v.impresso_por).trim() : null,
     coleta: ehColeta(v), adiantada: futuro(v, hoje) });

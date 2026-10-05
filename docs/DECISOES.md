@@ -255,3 +255,13 @@ abre o pedido pela porta do ajuste em duas pessoas, e outra pessoa aprova.
 deploy do PR #183.
 
 Detalhe no `CLAUDE.md` §5 ("A Mesa de correções").
+
+## 05/10/2026 — no Carregamento, a caixa de várias persianas mostra a lista de SKUs
+Decisão do dono, depois de ver a lista na Etiqueta de Venda (NF 7446): *"no carregamento
+tem que bipar os SKUs das embalagens com mais de um — então o certo seria aparecer a lista"*.
+**Antes** (02/10/2026, fase 2 da `CARREGAMENTO-SEGUNDA-PESSOA`): a conferência peça a peça
+era cega — a tela dizia só "0 de 3", e os SKUs apareciam só na divergência; a linha das
+listas mostrava o `lote.codigo`, que é o primeiro item. **Depois:** a tela âmbar e todas as
+listas do Carregamento mostram cada SKU da caixa, com medida, cor e o que já foi bipado.
+A trava continua sendo o bipe de cada peça (SKU fora da caixa ou um a mais para, e vai para
+a auditoria). Detalhe no `CLAUDE.md` §8-B.
