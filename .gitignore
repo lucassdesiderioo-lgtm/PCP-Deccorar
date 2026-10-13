@@ -39,3 +39,6 @@ kit/
 
 # fotos da conferencia da coleta (prova do numero do motorista) - FORA DO GIT
 coletas/
+
+# relatorios da coleta de auditoria da VPS (scripts/auditoria/) - ficam so no Mac
+auditoria_coletas/
