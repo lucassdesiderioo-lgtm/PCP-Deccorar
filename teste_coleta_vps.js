@@ -87,7 +87,12 @@ w(path.join(PROJ, 'server.js'), "app.get('/baixar-backup', x)\n");
 w(path.join(PROJ, 'caminhos.js'), '//\n');
 w(path.join(PROJ, 'dados.db'), 'x'.repeat(4096));
 w(path.join(PROJ, 'dados.db-wal'), 'y'.repeat(9000));
-w(path.join(PROJ, 'tecido', 'tecido.db'), 'z'.repeat(2048));
+// onde o tecido.db fica pergunta-se ao DONO ÚNICO (tecido/nucleo/caminho.js),
+// nunca a um literal aqui — é a varredura do teste_backup.js. O caminho
+// relativo dele é o que o remoto_leitura.sh procura dentro do projeto.
+delete process.env.BANCO_TECIDO;
+const TECIDO_REL = path.relative(__dirname, require('./tecido/nucleo/caminho.js').BANCO);
+w(path.join(PROJ, TECIDO_REL), 'z'.repeat(2048));
 w(path.join(PROJ, 'lotes', 'a.pdf'), 'pdf');
 const ymd = d => new Date(Date.now() - d * 864e5).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
 const FALTAM = [3, 7, 12];
@@ -162,6 +167,7 @@ caso('o aviso "indício não é prova" está lá', /INDÍCIO NÃO É PROVA/.test
 caso(`conta ${FALTAM.length} dias sem cópia do dados nos últimos 30`, new RegExp(`\\[dados\\][^]*?dias sem cópia nos últimos 30 \\(ontem para trás\\): ${FALTAM.length}`).test(out), out.match(/\[dados\][^]*?dias sem cópia[^\n]*/));
 caso('conta 25 dias sem cópia do tecido', /\[tecido\][^]*?dias sem cópia nos últimos 30 \(ontem para trás\): 25/.test(out));
 caso('acha o arquivo manual da pasta de backups', /outros arquivos na pasta[^:]*: 1/.test(out));
+caso(`o remoto procura o tecido onde o caminho.js manda (${TECIDO_REL})`, fs.readFileSync(REMOTO, 'utf8').includes(' ' + TECIDO_REL + ' ') && new RegExp(TECIDO_REL.replace(/[./]/g, '\\$&') + '\\s+2048 bytes').test(out));
 caso('mostra o WAL do dados.db com tamanho', /dados\.db-wal\s+9000 bytes/.test(out));
 caso('git: 1 arquivo versionado modificado no servidor, com o nome', /modificados no servidor: 1\n\s+M server\.js/.test(out), out.match(/modificados[^\n]*\n[^\n]*/));
 caso('log do backup lido por contagem e data', /linhas 'backup ok' = 1/.test(out) && /2026-10-12/.test(out));

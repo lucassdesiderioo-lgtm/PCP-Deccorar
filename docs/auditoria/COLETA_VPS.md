@@ -3,7 +3,7 @@
 > Ferramenta de **leitura**. Ela não muda nada na produção: não reinicia,
 > não atualiza, não instala, não grava arquivo e não copia banco. Ela também
 > não usa sudo. Os scripts estão em `scripts/auditoria/`, e o
-> `node teste_coleta_vps.js` (75 casos) trava cada uma dessas promessas.
+> `node teste_coleta_vps.js` (76 casos) trava cada uma dessas promessas.
 
 ## 1. Antes da primeira vez: o alias SSH no Mac
 
