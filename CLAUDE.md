@@ -4133,6 +4133,7 @@ aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não sil
 | **pdf.js quebra números** | Pack IDs vêm com espaços no meio | Regex que rejunta dígitos (já em `parse.js`) |
 | **Campo invisível no iPad** | Leitor bipa e nada acontece — iOS tira o foco de campos fora da tela | Campos de bipe devem ser **visíveis**, com `autocorrect="off"` |
 | **Leitor manda Tab ou espaço** | Código chega picado ou o Enter cai no vazio | Aceitar Enter **e** Tab; limpar com `replace(/[^A-Za-z0-9]/g,'')`; processar por timeout após a última tecla |
+| **`Cannot find module 'canvas'` no log do pm2** | Parece módulo faltando, e é o pdf.js: o `exp_route.js` carrega o `parse.js` na subida, o `pdfjs-dist` tenta o pacote opcional `canvas` e escreve **duas** linhas (`DOMMatrix` e `Path2D`) a cada start. Na coleta de 14/10/2026 eram 28 linhas, que dão 14 subidas. Ninguém instala o `canvas`, e nada quebra | Contar por nome de módulo (`grep -ho "Cannot find module '[^']*'" ~/.pm2/logs/*.log \| sort \| uniq -c`). Só um módulo que **não** seja o `canvas` é erro de verdade (`docs/auditoria/27`, ponto 6) |
 | **`DELETE` em tabela que se auto-referencia** | Com `foreign_keys = ON`, `DELETE FROM t` (todas) **passa** — o FK imediato é conferido no **fim da instrução** —, mas `DELETE ... WHERE id=1` com a filha de pé é **recusado**. Um `DELETE` filtrado que hoje casa com tudo passa por sorte, e quebra no dia em que o filtro deixar alguém | Soltar o ponteiro antes, e **só de quem aponta para linha que vai sair** — limpar o ponteiro de quem fica apaga o vínculo em silêncio (`tecido/limpar_sobras.js`, §19) |
 
 ### ⚠️ A ESTAÇÃO VIRA APP NO iPad — camada 2 da spec `TABLETS-E-KIOSK` (02/10/2026)
@@ -4449,6 +4450,12 @@ trava as quatro:
 > `backup.js` já faz pela API de backup do SQLite. Ela não grava nada na VPS
 > e não toca o banco em uso. A coleta nunca transfere banco: isso é um passo
 > à parte, com autorização explícita.
+
+> **A primeira coleta real (14/10/2026) e a análise dela** estão em
+> `docs/auditoria/27_ANALISE_COLETA_REAL_VPS.md`, com o plano de validação dos
+> bancos (`28`) e as correções priorizadas (`29`). Ela rodou pelo console do
+> painel, numa linha com `git fetch` antes. Esse `fetch` gravou no `.git` da
+> VPS (só ali), e a fase 4 da auditoria o proíbe daqui em diante.
 
 **Rode `node teste_coleta_vps.js` (76 casos) ao mexer em
 `scripts/auditoria/`.** Sete defeitos foram reintroduzidos um a um: sem
