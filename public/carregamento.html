@@ -447,6 +447,14 @@ function mostrar(r,code){
       'mas a caixa que ela está colada é <span class="c">'+esc0(r.lido)+'</span>.<br><b>Não carregue.</b> Separe e confira antes de despachar.');
     beep(false);
   }
+  /* VOLUME BLOQUEADO (SKU fora do cadastro, §6). O servidor sempre mandou o
+     motivo, mas a tela nao tinha este caso e caia no "Etiqueta nao
+     reconhecida — bipe a etiqueta de VENDA": a pessoa, com a etiqueta certa na
+     mao, era mandada procurar outra. */
+  else if(r.motivo==='bloqueado'){ aguardando=null;
+    banner('err','⛔ VOLUME BLOQUEADO — NÃO CARREGAR',
+      (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')
+      +'<br>Separe a caixa e avise o admin: o SKU precisa ser cadastrado.'); beep(false); }
   else if(r.motivo==='volume_sem_sku'){ aguardando=null; banner('err','Volume sem SKU', r.aviso||''); beep(false); }
   /* A caixa que nunca passou pela Etiqueta de Venda (dívida 13). A recusa tem
      que dizer o CAMINHO: a pessoa está com a caixa na mão, na frente do carro,
@@ -696,6 +704,15 @@ function linhaSaida(f, extra){
     +(f.troca_de_porta?'<span class="tagtroca">troca de porta · era agência</span>':'')
     +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+skuDaLinha(f)+'</span>'+pecasLinhas(f.itens)+'</span>'+(extra||'')+'</div>';
 }
+/* ⚠️ O MOTIVO SOBREVIVE AO REDESENHO (20/10/2026, teste_carregamento_tela.js).
+   O card da divergencia e redesenhado a cada atualizacao, e o campo do motivo
+   mora dentro dele: trocar o innerHTML recria o campo vazio. O texto que a
+   pessoa estava escrevendo sumia, e no iPad o teclado fechava no meio da
+   frase. Quem redesenha guarda o que estava escrito e devolve, com o foco. */
+function digitado(id){ var e=document.getElementById(id);
+  return e ? {valor:e.value, foco:document.activeElement===e} : null; }
+function devolverDigitado(id,antes){ var e=document.getElementById(id); if(!e||!antes) return;
+  e.value=antes.valor; if(antes.foco) e.focus({preventScroll:true}); }
 /* O QUE A TELA MOSTRA DA SAIDA ABERTA: quantas vao no caminhao (a conta que
    o motorista tem que bater), as sobras bipadas e, se a conta nao bateu, as
    caixas desta saida e as impressas FORA da conta que podem ter ido. */
@@ -722,7 +739,7 @@ function desenharSaida(){
       +sa.levou.map(function(f){ return linhaSaida(f,'<button class="mini" onclick="tirarLevou('+f.id+')">tirar</button>'); }).join(''):'');
   $('#btnNada').style.display=nS?'none':'';
   if(!divergPend){ $('#saidaDiv').innerHTML=''; return; }
-  var mot=divergPend.motorista, dif=sa.sistema-mot;
+  var mot=divergPend.motorista, dif=sa.sistema-mot, motivoAntes=digitado('motivoLib');
   $('#saidaDiv').innerHTML='<div class="divbox"><h4>⛔ NÃO BATEU — sistema '+sa.sistema+', motorista '+mot+'</h4>'
     +(dif>0?'O sistema tem <b>'+dif+'</b> a mais. Alguma destas <b>ficou no canto</b> (bipe como sobra) ou o motorista deixou passar:'
            :(dif<0?'O motorista levou <b>'+(-dif)+'</b> a mais. Veja na lista de baixo se alguma caixa <b>fora da conta</b> foi no caminhão:'
@@ -734,6 +751,7 @@ function desenharSaida(){
     +'<div style="margin-top:12px"><b>Liberar o caminhão assim mesmo</b> — só supervisor ou admin, e fica registrado com o seu nome:'
     +'<input class="motivo" id="motivoLib" placeholder="Por que está liberando com número diferente?" maxlength="300">'
     +'<button class="btn ghost" style="margin-top:8px" onclick="fecharSaida(true)">Liberar com divergência</button></div></div>';
+  devolverDigitado('motivoLib',motivoAntes);
 }
 async function abrirSaida(){
   const r=await postJ('/api/saida/abrir',{});
@@ -787,7 +805,7 @@ function desenharViagem(){
       +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+skuDaLinha(f)+'</span>'+pecasLinhas(f.itens)+'</span>'
       +'<button class="mini" onclick="tirarDoCarro('+f.id+')">tirar do carro</button></div>'; }).join('');
   if(!divergV){ $('#viagemDiv').innerHTML=''; return; }
-  var at=divergV.atendente;
+  var at=divergV.atendente, motivoAntes=digitado('motivoLibV');
   $('#viagemDiv').innerHTML='<div class="divbox"><h4>⛔ NÃO BATEU — carro '+vi.sistema+', atendente '+at+'</h4>'
     +(vi.sistema>at?'O carro tem <b>'+(vi.sistema-at)+'</b> a mais: alguma ficou no carro ou o atendente deixou passar.'
                     :(vi.sistema<at?'O atendente bipou <b>'+(at-vi.sistema)+'</b> a mais: alguma caixa foi no carro sem bipe.'
@@ -795,6 +813,7 @@ function desenharViagem(){
     +'<div style="margin-top:12px"><b>Liberar a viagem assim mesmo</b> — só supervisor ou admin, e fica registrado com o seu nome:'
     +'<input class="motivo" id="motivoLibV" placeholder="Por que está liberando com número diferente?" maxlength="300">'
     +'<button class="btn ghost" style="margin-top:8px" onclick="fecharViagem(true)">Liberar com divergência</button></div></div>';
+  devolverDigitado('motivoLibV',motivoAntes);
 }
 async function abrirViagem(){
   const r=await postJ('/api/viagem/abrir',{});
@@ -886,10 +905,30 @@ const scan=$('#scan');
 const keep=()=>{ const a=document.activeElement; if(a===scan) return; if(a && (a.id==='motQtd'||a.id==='fotoIn'||a.id==='motivoLib'||a.id==='atQtd'||a.id==='fotoInV'||a.id==='motivoLibV')) return; scan.focus({preventScroll:true}); };
 scan.addEventListener('blur',()=>setTimeout(keep,50));
 document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input,label')) keep(); });
-scan.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=scan.value.trim(); scan.value=''; bip(v); } });
+/* ⚠️ O BIPE QUE NAO CHEGA AVISA (20/10/2026). Sem rede, ou com o servidor
+   devolvendo pagina de erro, o bipe morria calado: nada na tela, nenhum som,
+   e a pessoa concluia que o leitor tinha falhado. Nao da para saber se o
+   servidor gravou antes de a resposta se perder — por isso a frase manda
+   bipar de novo (a caixa que ja entrou e avisada como repetida) e, na caixa
+   de varias, recomecar a caixa, porque ali o bipe repetido contaria uma
+   persiana a mais. */
+function semConexao(){
+  banner('err','⚠ SEM CONEXÃO — O BIPE NÃO CHEGOU',
+    caixaPecas
+      ? 'Não sei se a última persiana contou. Toque em <b>↺ Recomeçar esta caixa</b> e bipe todas de novo.'
+        +'<br><button class="btn" onclick="recomecarCaixa()">↺ Recomeçar esta caixa</button>'
+      : 'Confira o Wi-Fi e <b>bipe a mesma caixa de novo</b>. Se ela já tiver entrado, o sistema avisa que é repetida.');
+  beep(false);
+}
+scan.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=scan.value.trim(); scan.value=''; bip(v).catch(semConexao); } });
 $('#motQtd').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); fecharSaida(false); } });
 scan.focus();
 function beep(ok){ try{const a=new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=ok?820:240;g.gain.value=.05;o.start();setTimeout(()=>{o.stop();a.close();},ok?100:220);}catch(e){} }
-carregar(); setInterval(carregar,4000);
+/* A atualizacao de 4 s espera quem esta digitando: redesenhar por baixo de um
+   campo com foco fecha o teclado do iPad. O campo do bipe nao conta — ele
+   esta sempre com o foco, e a tela tem que andar com ele. */
+const DIGITACAO=['motQtd','motivoLib','atQtd','motivoLibV'];
+function digitando(){ var a=document.activeElement; return !!(a && DIGITACAO.indexOf(a.id)>=0); }
+carregar(); setInterval(function(){ if(!digitando()) carregar(); },4000);
 </script><script src="/nav.js"></script>
 </body></html>
