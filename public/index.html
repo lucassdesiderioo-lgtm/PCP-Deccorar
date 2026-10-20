@@ -2155,83 +2155,30 @@ async function manterTeste(){
 }
 
 
-/* ---- Etiqueta Zebra ZD220 (100x35mm / 203dpi) ---- */
-/* medidaDe() saiu daqui para /sku.js (carregado logo acima), que passou a ser o
-   parser unico do projeto — a migracao da Fase 0 roda em Node e precisava da
-   mesma funcao. Mesmo nome, mesma assinatura, mesmo retorno: nenhuma chamada
-   deste arquivo mudou. */
-/* A etiqueta le das COLUNAS do SKU, nao do codigo. Antes ela recusava qualquer
-   codigo fora de BK180150BRANCO — o que fazia do "padrao de SKU" uma regra de
-   verdade, e nao uma convencao. Agora o codigo pode ser o que a gente quiser;
-   o que a etiqueta precisa e medida e cor cadastradas. */
-function etiqueta(cod){
-  var s=SKUS.find(function(x){return x.codigo===cod;})||{};
-  /* PRODUTO SEM MEDIDA EXISTE (§7): kit e acessorio nao sao persianas, o modelo
-     deles tem exige_medida = 0. Cobrar largura e altura deles era um beco sem
-     saida — nao ha o que preencher em "Pendencias de SKU", e a etiqueta nunca
-     saia. A medida so e obrigatoria pra quem o modelo diz que tem medida. */
-  var exigeMedida = (s.exige_medida===undefined||s.exige_medida===null) ? 1 : s.exige_medida;
-  var temMedida = (s.largura_cm!=null && s.altura_cm!=null);
-  if(exigeMedida && !temMedida){
-    alert("Este SKU nao tem medida cadastrada.\n\nAbra a aba \"Pendencias de SKU\" ou edite o produto e\npreencha largura e altura antes de imprimir.");
-    return;
-  }
+/* ---- Etiqueta de SKU — Zebra ZD220 (100 x 35 mm / 203 dpi) ---- */
+/* ⚠️ O PDF SAI DO SERVIDOR (20/10/2026, sku_etq_pdf.js). Ate aqui esta funcao
+   montava uma pagina HTML com @page de 100 x 35 mm e mandava o navegador
+   imprimir: so encaixava no rolo com margens "Nenhuma" e escala 100% acertadas
+   a cada vez, baixava o gerador de barras da internet (sem internet, sem
+   barras) e podia soltar uma etiqueta em branco no fim. O que vai escrito nao
+   mudou — titulo, medida, M², cor, barras e codigo — e a regra da medida
+   (persiana sem medida nao imprime, acessorio sai sem M²) mora agora num lugar
+   so, no servidor, que responde a recusa com o caminho. */
+async function etiqueta(cod){
   var q=prompt("Quantas etiquetas de "+cod+"?","1");
   if(q===null) return;
   q=Math.max(1,Math.min(200,parseInt(q,10)||1));
-  var corEtq=s.cor_codigo||"";
-  var desc=(s.descricao||"").trim();
-  /* Fallback do titulo: "BLACKOUT" era literal no codigo, o que imprimia
-     BLACKOUT numa persiana de screen. Com o tecido em coluna, usa o tecido. */
-  var tec=TECIDOS.find(function(x){return x.codigo===s.tecido_codigo;});
-  var miolo, titulo;
-  if(temMedida){
-    var L=(s.largura_cm/100).toFixed(2), A=(s.altura_cm/100).toFixed(2);
-    var m2=((s.largura_cm/100)*(s.altura_cm/100)).toFixed(2);
-    titulo="ROLO SOBRE MEDIDA - "+(desc||(((tec&&(tec.nome||tec.codigo))||"BLACKOUT")+" ML "+corEtq));
-    miolo='<div class="med">'+L+' X '+A+'</div>'+
-          '<div class="inf">M&sup2; '+m2+' &nbsp;&middot;&nbsp; '+corEtq+'</div>';
-  } else {
-    /* Sem medida, o lugar de destaque e a descricao — e ela que diz o que a
-       pessoa tem na mao ("Kit 32 mm completo"). Sem M2: area de acessorio nao
-       existe, e imprimir "M² 0.00" seria um numero falso na etiqueta. */
-    var nomeModelo=(s.modelo_nome||"").trim();
-    titulo=nomeModelo||"ACESSORIO";
-    miolo='<div class="med sem">'+(desc||cod)+'</div>'+
-          (corEtq?'<div class="inf">'+corEtq+'</div>':'<div class="inf">&nbsp;</div>');
-  }
-  var uma='<div class="etq">'+
-      '<div class="tit">'+titulo+'</div>'+
-      miolo+
-      '<svg class="bc" data-c="'+cod+'"></svg>'+
-      '<div class="cod">'+cod+'</div>'+
-    '</div>';
-  var todas=""; for(var i=0;i<q;i++) todas+=uma;
-  var w=window.open("","etq","width=520,height=280");
-  if(!w){ alert("O navegador bloqueou a janela. Libere o pop-up e tente de novo."); return; }
-  var css='@page{size:100mm 35mm;margin:0}'+
-   'html,body{margin:0;padding:0;background:#fff}'+
-   '.etq{width:100mm;height:35mm;box-sizing:border-box;padding:1.5mm 2mm;'+
-   'page-break-after:always;font-family:Arial,Helvetica,sans-serif;color:#000;'+
-   'display:flex;flex-direction:column;align-items:center;justify-content:space-between;overflow:hidden}'+
-   '.tit{font-size:8pt;font-weight:700;text-align:center;line-height:1.1;white-space:nowrap}'+
-   '.med{font-size:19pt;font-weight:800;line-height:1}'+
-   /* Sem medida, o destaque vira a descricao: texto e mais comprido que
-      "1.40 X 1.40", entao cabe menor e pode quebrar em duas linhas. */
-   '.med.sem{font-size:12pt;text-align:center;line-height:1.15;max-width:94mm}'+
-   '.inf{font-size:7.5pt;font-weight:600}'+
-   '.bc{height:9mm;width:74mm}'+
-   '.cod{font-size:8pt;font-weight:700;letter-spacing:.4px;margin-top:-1mm}';
-  var lib="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js";
-  var doc='<!doctype html><html><head><meta charset="utf-8"><title>'+cod+'</title>'+
-   '<scr'+'ipt src="'+lib+'"></scr'+'ipt><style>'+css+'</style></head><body>'+todas+
-   '<scr'+'ipt>window.onload=function(){'+
-   'var el=document.querySelectorAll(".bc");'+
-   'for(var i=0;i<el.length;i++){'+
-   'JsBarcode(el[i],el[i].getAttribute("data-c"),'+
-   '{format:"CODE128B",displayValue:false,margin:0,height:70,width:2});}'+
-   'setTimeout(function(){window.print();},400);};</scr'+'ipt></body></html>';
-  w.document.write(doc); w.document.close();
+  var r;
+  try{ r=await (await fetch("/api/skus/etiqueta",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({codigo:cod,quantidade:q})})).json(); }
+  catch(e){ alert("Não deu para falar com o servidor. Confira a conexão e tente de novo."); return; }
+  if(r.erro){ alert("Não imprimiu: "+r.erro); return; }
+  // Abre o PDF numa aba: a impressão é do navegador, com a Zebra no USB.
+  var bin=atob(r.arquivo), u8=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+  var url=URL.createObjectURL(new Blob([u8],{type:"application/pdf"}));
+  var w=window.open(url,"_blank");
+  if(!w) alert("O navegador bloqueou a janela. Libere o pop-up e tente de novo.");
 }
 document.addEventListener("click",function(e){
   var b=e.target.closest("[data-etq]");

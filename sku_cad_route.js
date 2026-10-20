@@ -211,6 +211,37 @@ app.post('/api/skus', (req,res)=>{
              ', use Admin → Estoque, que exige motivo e deixa rastro.'}
     : {ok:true, destravados});
 });
+/* ── A ETIQUETA DE SKU (100 x 35 mm) EM PDF (20/10/2026) ───────────────────
+   Era uma pagina HTML impressa pelo navegador, e so encaixava no rolo com
+   margens e escala acertadas a mao (sku_etq_pdf.js explica). Agora o PDF sai
+   do servidor ja no tamanho da etiqueta. O SKU e lido do BANCO, como o
+   GET /api/skus o entrega — o corpo so diz QUAL e QUANTAS.
+
+   So le: imprimir etiqueta de SKU nao mexe em saldo nem em cadastro. A
+   permissao e `@logado`, a mesma do GET /api/skus de onde a pagina antiga
+   tirava tudo o que imprimia: ninguem que imprimia deixa de imprimir, e
+   ninguem novo passa a ver o que ja nao via (acesso.js). */
+const ETQ_SKU = require('./sku_etq_pdf.js');
+app.post('/api/skus/etiqueta', async (req,res)=>{
+  const b = req.body||{};
+  const codigo = String(b.codigo==null?'':b.codigo);
+  const quantidade = Number(b.quantidade);
+  const sku = db.prepare(`SELECT s.*, COALESCE(t.nome, t.codigo) tecido_nome, m.nome modelo_nome,
+      COALESCE(m.exige_medida,1) exige_medida
+    FROM skus s LEFT JOIN tecido t ON t.codigo=s.tecido_codigo LEFT JOIN modelo m ON m.id=s.modelo_id
+    WHERE s.codigo=?`).get(codigo);
+  if(!sku) return res.status(404).json({ erro:'SKU não encontrado: '+codigo });
+  if(!Number.isInteger(quantidade) || quantidade < 1 || quantidade > ETQ_SKU.MAX)
+    return res.status(400).json({ erro:'A quantidade tem que ser um número de 1 a '+ETQ_SKU.MAX+'.' });
+  // 409 e nao 400: o pedido esta certo, o que falta e o CADASTRO (a medida).
+  const v = ETQ_SKU.conferir(sku, quantidade);
+  if(!v.pronta) return res.status(409).json({ erro:v.problemas[0], problemas:v.problemas });
+  let pdf;
+  try{ pdf = await ETQ_SKU.gerar(sku, quantidade); }
+  catch(e){ return res.status(500).json({ erro:'Não deu para gerar o PDF: '+e.message }); }
+  res.json({ tipo:'pdf', quantidade, nome:'etiqueta-'+codigo.replace(/[^A-Za-z0-9_-]+/g,'_')+'.pdf',
+             arquivo:pdf.toString('base64') });
+});
 app.delete('/api/skus/:codigo',(req,res)=>{ db.prepare('DELETE FROM skus WHERE codigo=?').run(req.params.codigo); res.json({ok:true}); });
 
 };
