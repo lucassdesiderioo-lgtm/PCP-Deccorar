@@ -70,8 +70,9 @@ Necessidade (ABC) · Relatórios · Pessoas & Acessos · Cadastros · Devoluçõ
 Problemas · Contagem · Bloqueados · Modo teste
 
 **Atalhos:** `Alt+1` a `Alt+9` trocam de tela · `Alt+0` sai do sistema.
-Exigem a tecla Alt — leitores de código de barras digitam números soltos e por
-isso nunca disparam atalho por acidente.
+Exigem a tecla Alt **e o número da fileira de cima** — o leitor de código de barras
+digita número solto, ou, no modo "Alt + teclado numérico" do Windows, números do
+teclado numérico, e nenhum dos dois dispara atalho (`teste_atalho.js`).
 
 ---
 
