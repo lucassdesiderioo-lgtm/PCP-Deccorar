@@ -85,7 +85,7 @@ teclado numérico, e nenhum dos dois dispara atalho (`teste_atalho.js`).
 | Banco | SQLite (`better-sqlite3`), modo WAL |
 | Frontend | HTML + JavaScript puro, sem framework |
 | Gráficos | Chart.js 4.4.1 (CDN) |
-| Código de barras | JsBarcode (CDN), CODE128B |
+| Código de barras | CODE128B próprio (`public/barras.js`); etiquetas da Zebra em PDF do servidor (`pdf-lib`) |
 | PDF | `pdfjs-dist` (leitura) + `pdf-lib` (montagem para impressão) |
 | Processo | PM2 |
 | Sessão | Cookie assinado HMAC-SHA256 · PIN com `scrypt` + salt |

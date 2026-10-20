@@ -729,6 +729,11 @@ module.exports = function(app, db){
     if(M !== 'GET' && eq('/api/producao')) return 'producao.lancar';
     if(M !== 'GET' && pre('/api/planejamento')) return 'planilha.importar';
     if(M !== 'GET' && eq('/api/skus')) return 'sku.cadastrar';
+    /* A etiqueta de SKU em PDF (20/10/2026) e LEITURA, apesar do POST: ela so
+       desenha o que o GET /api/skus ja entrega a qualquer logado — e era dali
+       que a pagina antiga, impressa pelo navegador, tirava tudo. `@logado`
+       mantem exatamente quem imprimia; uma chave nova mudaria quem pode o quê. */
+    if(eq('/api/skus/etiqueta')) return '@logado';
     // Antes do DELETE generico: /api/skus/pendencias e leitura da tela de
     // cadastro, nao exclusao de SKU.
     if(eq('/api/skus/pendencias')) return 'sku.cadastrar';

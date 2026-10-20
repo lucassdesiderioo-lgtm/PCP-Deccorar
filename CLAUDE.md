@@ -2670,15 +2670,26 @@ peça no SKU.
 **A trava do §6 continua valendo.** "Sem formato" não é "sem cadastro": o SKU
 tem que existir em `skus`, senão o volume fica bloqueado. São coisas diferentes.
 
-**A etiqueta impressa (Zebra ZD220, 100×35 mm, 203 dpi)** é gerada no navegador
-com JsBarcode em CODE128B, a partir da aba Cadastro de SKU. Impressão exige
-margens "Nenhuma" e escala 100% — "Ajustar à página" deforma as barras e o leitor
-recusa.
-
-**A etiqueta impressa (Zebra ZD220, 100×35 mm, 203 dpi)** é gerada no navegador
-com JsBarcode em CODE128B, a partir da aba Cadastro de SKU. Impressão exige
-margens "Nenhuma" e escala 100% — "Ajustar à página" deforma as barras e o leitor
-recusa.
+**A etiqueta impressa (Zebra ZD220, 100×35 mm, 203 dpi)** sai em **PDF do
+servidor** desde 20/10/2026 (`sku_etq_pdf.js`, `POST /api/skus/etiqueta`, botão
+"etiqueta" da aba Cadastro de SKU), com a página **já** no tamanho do rolo — uma
+página por etiqueta. Até ali era uma página HTML impressa pelo navegador, com
+JsBarcode baixado da internet: só encaixava com margens "Nenhuma" e escala 100%
+acertadas a cada vez, saía sem barras sem internet e podia soltar uma em branco
+no fim. É a mesma porta do kit (`kit_pdf.js`) e do sob medida.
+- **O que vai escrito não mudou:** título, medida em metros, M², cor, barras
+  CODE128-B (do `public/barras.js`, o mesmo do kit e do sob medida) e o código.
+  Persiana sem medida é recusada (409, mandando à Pendências de SKU); acessório
+  sai com a descrição em destaque e sem M². A regra mora **só no servidor**.
+- O módulo da barra cai em **ponto inteiro** da ZD220 (múltiplo de 0,125 mm), de
+  0,25 a 0,5 mm, com 10 módulos de silêncio; código que só caberia abaixo de
+  0,25 mm é **recusado**, não impresso ilegível. Texto que não cabe encolhe e,
+  no limite, termina em "…"; caractere que a fonte não tem (seta, emoji) sai.
+- A rota é `@logado`: é leitura, a mesma do `GET /api/skus` de onde a página
+  antiga tirava tudo. Não mexe em saldo.
+- `teste_etiqueta_sku.js` (54) trava o tamanho da página, o conteúdo, as bordas e
+  **lê as barras de volta do PDF**. Conferido também com um leitor de código
+  independente (zxing) na imagem renderizada a 203 dpi.
 
 ---
 
@@ -4479,7 +4490,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_recusa_motorista.js` (59), `teste_coleta_vps.js` (76), `teste_atalho.js` (10) e `teste_carregamento_tela.js` (10); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_recusa_motorista.js` (59), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10) e `teste_etiqueta_sku.js` (54); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
