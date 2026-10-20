@@ -9,8 +9,8 @@
 > regra sem perceber.
 >
 > Formato: [`README.md`](README.md). Estoque, revisão e embalagem:
-> [`estoque.md`](estoque.md). Coleta, carregamento e saídas continuam no
-> `CLAUDE.md` §8-B.
+> [`estoque.md`](estoque.md). Coleta, carregamento e saídas:
+> [`carregamento.md`](carregamento.md).
 
 ---
 
