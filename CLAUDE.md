@@ -2691,6 +2691,10 @@ no fim. É a mesma porta do kit (`kit_pdf.js`) e do sob medida.
   **lê as barras de volta do PDF**. Conferido também com um leitor de código
   independente (zxing) na imagem renderizada a 203 dpi.
 
+> ✅ **NO AR E CONFERIDA NA FÁBRICA EM 20/10/2026** (PR #198): o dono fez o
+> deploy, imprimiu na ZD220 e conferiu que a etiqueta encaixa no rolo de 100 × 35
+> e bipa.
+
 ---
 
 ## 7-B. Compras — o módulo novo
@@ -4148,6 +4152,12 @@ aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não sil
 | **`fetch` que falha some calado** | Sem rede, ou com o servidor devolvendo página de erro, o `await fetch(...).json()` lança e a promessa morre sem ninguém ver: nada na tela, nenhum som. No Carregamento a pessoa concluía que o leitor tinha falhado (20/10/2026) | O bipe passa por um `.catch` que **avisa** (`semConexao()`). A frase não promete que nada foi gravado — a resposta pode se perder depois da gravação —: manda bipar de novo, e na caixa de várias recomeçar a caixa |
 | **Leitor manda Tab ou espaço** | Código chega picado ou o Enter cai no vazio | Aceitar Enter **e** Tab; limpar com `replace(/[^A-Za-z0-9]/g,'')`; processar por timeout após a última tecla |
 | **`DELETE` em tabela que se auto-referencia** | Com `foreign_keys = ON`, `DELETE FROM t` (todas) **passa** — o FK imediato é conferido no **fim da instrução** —, mas `DELETE ... WHERE id=1` com a filha de pé é **recusado**. Um `DELETE` filtrado que hoje casa com tudo passa por sorte, e quebra no dia em que o filtro deixar alguém | Soltar o ponteiro antes, e **só de quem aponta para linha que vai sair** — limpar o ponteiro de quem fica apaga o vínculo em silêncio (`tecido/limpar_sobras.js`, §19) |
+
+> ✅ **AS LINHAS DO LEITOR NO MODO ALT, DO REDESENHO E DO `fetch` CALADO ESTÃO
+> NO AR E CONFERIDAS NA FÁBRICA EM 20/10/2026**
+> (PRs #196 e #197): o dono fez o deploy e conferiu que o bipe no computador
+> não muda mais de tela, que o motivo do "Liberar com divergência" fica no
+> campo e que o "SEM CONEXÃO" aparece quando o bipe não chega.
 
 ### ⚠️ A ESTAÇÃO VIRA APP NO iPad — camada 2 da spec `TABLETS-E-KIOSK` (02/10/2026)
 
