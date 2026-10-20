@@ -8,6 +8,7 @@ que provocou a regra, as datas, as conferências na fábrica — fica em
 |---|---|---|
 | Estoque, revisão e embalagem | [`estoque.md`](estoque.md) | [`historia/estoque.md`](../historia/estoque.md) |
 | Expedição: do PDF do ML à etiqueta de venda | [`expedicao.md`](expedicao.md) | [`historia/expedicao.md`](../historia/expedicao.md) |
+| Coleta, carregamento e saída da fábrica | [`carregamento.md`](carregamento.md) | [`historia/carregamento.md`](../historia/carregamento.md) |
 
 As outras áreas continuam no `CLAUDE.md` até serem passadas para cá, uma por vez.
 
