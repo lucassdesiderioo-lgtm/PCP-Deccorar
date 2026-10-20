@@ -68,22 +68,12 @@ app.post('/api/producao',(req,res)=>{
 app.get('/api/producao',(req,res)=> res.json(db.prepare(`SELECT p.*, s.estoque, s.alvo, s.cor FROM producao p
   LEFT JOIN skus s ON s.codigo=p.codigo WHERE p.data=date('now','localtime') ORDER BY p.id DESC`).all()));
 
-// revisao: registra tempo e joga na fila de embalagem
-app.post('/api/revisao',(req,res)=>{
-  const {codigo,segundos=0,inicio=null,fim=null}=req.body||{};
-  if(!codigo) return res.status(400).json({erro:'codigo'});
-  const cod=codigo.trim().toUpperCase();
-  if(!db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(cod)) return res.status(404).json({erro:'SKU não cadastrado: '+cod});
-  db.transaction(()=>{
-    db.prepare('INSERT INTO revisao (codigo,inicio,fim,segundos) VALUES (?,?,?,?)').run(cod,inicio,fim,Math.round(+segundos||0));
-    const modo=(req.body&&req.body.modo)==='estoque'?'estoque':'hoje';
-    db.prepare(`UPDATE revisao SET modo=? WHERE id=(SELECT MAX(id) FROM revisao)`).run(modo);
-    db.prepare('INSERT INTO fila (codigo,modo) VALUES (?,?)').run(cod,modo);
-  })();
-  const est=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(cod);
-  const prog=db.prepare(`SELECT COALESCE(SUM(qtd),0) pedido, COALESCE(SUM(produzido),0) feito FROM producao WHERE codigo=? AND data=date('now','localtime')`).get(cod);
-  res.json({ok:true,codigo:cod,estoque:est?est.estoque:null,pedido:prog.pedido,feito:prog.feito});
-});
+/* A revisao (POST /api/revisao) mora no revisao_route.js desde 20/10/2026, e
+   o require fica EXATAMENTE onde a rota estava, pela mesma razao do
+   sku_cad_route: a ordem de registro no Express nao muda. Saiu daqui so para
+   ter teste atras (teste_revisao.js) — e a rota da armadilha #1 do CLAUDE.md:
+   revisar NAO mexe no estoque. */
+require('./revisao_route')(app, db);
 app.get('/api/revisao/hoje',(req,res)=> res.json(db.prepare(`SELECT codigo, COUNT(*) qtd, ROUND(AVG(segundos)) tmedio
   FROM revisao WHERE data=date('now','localtime') GROUP BY codigo ORDER BY qtd DESC`).all()));
 
