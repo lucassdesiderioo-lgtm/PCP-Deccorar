@@ -218,7 +218,8 @@ que use em outro lugar.
 | Arquivo | Conteúdo |
 |---|---|
 | [`CLAUDE.md`](CLAUDE.md) | **Leia primeiro.** Regras que parecem bugs e não são, armadilhas, protocolo |
-| [`docs/REGRAS-DE-NEGOCIO.md`](docs/REGRAS-DE-NEGOCIO.md) | O fluxo completo com todas as exceções |
+| [`docs/regras/`](docs/regras/) | As regras de negócio por área, uma por cartão, com o teste que trava cada uma |
+| [`docs/historia/`](docs/historia/) | O porquê de cada regra: o defeito que a provocou, as datas e as conferências |
 | [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) | Banco de dados, rotas, dependências |
 
 ---
