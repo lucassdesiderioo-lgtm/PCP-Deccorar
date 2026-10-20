@@ -30,6 +30,23 @@ var FONT=(function(){
     set:function(v){ v=Math.max(0,Math.min(2,v)); try{ localStorage.setItem('op_font',String(v)); }catch(e){} apply(); } };
 })();
 
+/* ⚠️ ATALHO E SO O NUMERO DA FILEIRA DE CIMA (20/10/2026, teste_atalho.js).
+   O leitor de codigo no modo "Alt + teclado numerico" (o jeito do Windows de
+   digitar um caractere pelo codigo, comum em PC com teclado ABNT2) manda cada
+   caractere como Alt segurado + digitos do teclado NUMERICO: o "5" vira
+   Alt+5-3. Aceitando qualquer digito com Alt, o primeiro digito do codigo era
+   um atalho — bipar jogava a pessoa na Etiqueta de Venda, no Carregamento ou
+   no "Sair do sistema?". Pessoa aperta o numero de cima (`Digit1`); o teclado
+   numerico com Alt e do leitor e nunca dispara atalho. Devolve o digito, ou
+   null quando a tecla nao e atalho. Aparelho que nao informa a tecla fisica
+   (`code` vazio) fica como era antes. */
+function digitoDoAtalho(e){
+  if(!e.altKey || e.ctrlKey || e.metaKey) return null;
+  var c=e.code||'';
+  if(c) return /^Digit[0-9]$/.test(c) ? c.slice(5) : null;
+  return /^[0-9]$/.test(e.key||'') ? e.key : null;
+}
+
 (function(){
   // Saíram do menu (rotas seguem vivas por URL):
   //  '/expedicao' (Subir PDFs) -> upload agora fica na Etiqueta de Venda.
@@ -68,10 +85,11 @@ var FONT=(function(){
   document.body.style.paddingBottom='52px';
   // atalhos de teclado
   document.addEventListener('keydown',function(e){
-    if(e.altKey && !e.ctrlKey && !e.metaKey && MAP[e.key]){
+    var n=digitoDoAtalho(e);
+    if(n!==null && MAP[n]){
       e.preventDefault();
-      if((MAP[e.key]===cur)||(MAP[e.key]==='/'&&cur==='/')) return;
-      location.href=MAP[e.key];
+      if((MAP[n]===cur)||(MAP[n]==='/'&&cur==='/')) return;
+      location.href=MAP[n];
     }
   });
 })();
@@ -134,7 +152,7 @@ var FONT=(function(){
   });
 
   document.addEventListener('keydown',function(e){
-    if(e.altKey && !e.ctrlKey && !e.metaKey && (e.key==='0'||e.code==='Digit0')){
+    if(digitoDoAtalho(e)==='0'){
       e.preventDefault(); sair();
     }
   });
