@@ -7,6 +7,7 @@ que provocou a regra, as datas, as conferências na fábrica — fica em
 | Área | Regras | História |
 |---|---|---|
 | Estoque, revisão e embalagem | [`estoque.md`](estoque.md) | [`historia/estoque.md`](../historia/estoque.md) |
+| Expedição: do PDF do ML à etiqueta de venda | [`expedicao.md`](expedicao.md) | [`historia/expedicao.md`](../historia/expedicao.md) |
 
 As outras áreas continuam no `CLAUDE.md` até serem passadas para cá, uma por vez.
 
