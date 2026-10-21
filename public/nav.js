@@ -142,7 +142,11 @@ function digitoDoAtalho(e){
     var dest=u.destino||{};
     var atalho=(dest.duas&&dest.sobmedida) ? '<a class="sessOp atalho" href="'+dest.sobmedida+'">Sob medida →</a>' : '';
     d.innerHTML=fadj+'<span><b style="color:'+CH.sName+'">'+u.nome+'</b></span>'+
-      atalho+'<a class="sessOp" id="sessSetor" href="/setor">Trocar setor</a><button id="sessSair">Sair</button>';
+      atalho+'<a class="sessOp" id="sessSetor" href="/setor">Trocar setor</a>'+
+      // A pessoa troca o proprio PIN (ACESSOS-UNIFICADOS fase 5-A2): pede o PIN
+      // de hoje, na tela de login, e volta para esta tela depois.
+      '<a class="sessOp" id="sessPin" href="/login?trocar=1&r='+encodeURIComponent(location.pathname+location.search)+'">Trocar PIN</a>'+
+      '<button id="sessSair">Sair</button>';
     document.body.insertBefore(d, document.body.firstChild);
     document.getElementById('sessSair').onclick=sair;
     var fa=document.getElementById('fadj');
