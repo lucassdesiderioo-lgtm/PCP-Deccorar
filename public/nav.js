@@ -130,8 +130,35 @@ function digitoDoAtalho(e){
     fetch('/api/auth/logout',{method:'POST'}).then(function(){ location.href='/login'; });
   }
 
-  fetch('/api/auth/eu').then(function(r){return r.json();}).then(function(u){
+
+  /* 1 HORA SEM USO (ACESSOS-UNIFICADOS fase 5-A3). Quem tranca e o servidor;
+     isto so evita a tela parada num estado que ja nao funciona. Toque, tecla
+     ou bipe contam como uso e avisam o servidor (no maximo um aviso a cada 2
+     minutos) — e o que renova a sessao de quem so bipa numa tela cujo bipe e
+     uma leitura. Passada a hora sem nada, sai e vai ao login. A TV e o quadro
+     do sob medida (`exibicao`) ficam de fora. A MESMA regra mora no nav.js da
+     outra operacao. */
+  function vigiarUso(min){
+    if(!(min>0)) return;
+    var ultimo=Date.now(), avisado=Date.now();
+    function uso(){
+      ultimo=Date.now();
+      if(ultimo-avisado>120000){ avisado=ultimo;
+        fetch('/api/auth/ativo',{method:'POST',credentials:'same-origin'}).catch(function(){}); }
+    }
+    ['keydown','pointerdown','touchstart'].forEach(function(ev){
+      document.addEventListener(ev,uso,{capture:true,passive:true}); });
+    setInterval(function(){
+      if(Date.now()-ultimo<min*60000) return;
+      var volta='/login?r='+encodeURIComponent(location.pathname+location.search);
+      fetch('/api/auth/logout',{method:'POST',credentials:'same-origin'})
+        .catch(function(){}).then(function(){ location.href=volta; });
+    },30000);
+  }
+
+  fetch('/api/auth/eu?tela='+encodeURIComponent(location.pathname)).then(function(r){return r.json();}).then(function(u){
     if(!u.logado) return;
+    if(!u.exibicao) vigiarUso(u.inativoMin);
     var d=document.createElement('div');
     d.id='sessBar';
     var fadj = CH.light ? '<div id="fadj"><button class="fbtn" data-fd="-1" aria-label="Diminuir a fonte">A−</button>'+

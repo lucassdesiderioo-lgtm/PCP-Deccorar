@@ -117,16 +117,42 @@ function sessao(eu,dest){
   document.body.insertBefore(b,document.body.firstChild);
 }
 
+/* 1 HORA SEM USO (ACESSOS-UNIFICADOS fase 5-A3). Quem tranca e o servidor;
+   isto so evita a tela parada num estado que ja nao funciona. Toque, tecla
+   ou bipe contam como uso e avisam o servidor (no maximo um aviso a cada 2
+   minutos) — e o que renova a sessao de quem so bipa numa tela cujo bipe e
+   uma leitura. Passada a hora sem nada, sai e vai ao login. A TV e o quadro
+   do sob medida (`exibicao`) ficam de fora. A MESMA regra mora no nav.js da
+   outra operacao. */
+function vigiarUso(min){
+  if(!(min>0)) return;
+  var ultimo=Date.now(), avisado=Date.now();
+  function uso(){
+    ultimo=Date.now();
+    if(ultimo-avisado>120000){ avisado=ultimo;
+      fetch('/api/auth/ativo',{method:'POST',credentials:'same-origin'}).catch(function(){}); }
+  }
+  ['keydown','pointerdown','touchstart'].forEach(function(ev){
+    document.addEventListener(ev,uso,{capture:true,passive:true}); });
+  setInterval(function(){
+    if(Date.now()-ultimo<min*60000) return;
+    var volta='/login?r='+encodeURIComponent(location.pathname+location.search);
+    fetch('/api/auth/logout',{method:'POST',credentials:'same-origin'})
+      .catch(function(){}).then(function(){ location.href=volta; });
+  },30000);
+}
+
 fetch(BASE+'/api/eu',{credentials:'same-origin'})
   .then(function(r){ return r.json(); })
   .then(function(j){
     if(!j||!j.ok) return;
     // O destino da medida padrao e conta do PCP, nao do modulo: vem do
     // /api/auth/eu. Se falhar, a barra sai so com "Trocar setor".
-    fetch('/api/auth/eu',{credentials:'same-origin'})
+    fetch('/api/auth/eu?tela='+encodeURIComponent(location.pathname),{credentials:'same-origin'})
       .then(function(r){ return r.json(); })
       .catch(function(){ return {}; })
       .then(function(u){
+        if(u&&u.logado&&!u.exibicao) vigiarUso(u.inativoMin);
         sessao(j.dados,(u&&u.destino)||null);
         rodape(j.dados.telas||[]);
       });

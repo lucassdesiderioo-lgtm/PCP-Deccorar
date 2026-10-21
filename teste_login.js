@@ -18,7 +18,9 @@
  *     troca exige o PIN atual; o cadastro so aceita 6 digitos (ACESSOS-UNIFICADOS
  *     fase 5-A, 21/10/2026);
  *   - esqueci meu PIN: quem tem `pessoas.gerenciar` autoriza com o proprio PIN,
- *     nunca para si mesmo, e o PIN dele conta na trava dele (fase 5-A2).
+ *     nunca para si mesmo, e o PIN dele conta na trava dele (fase 5-A2);
+ *   - 1 hora sem uso encerra a sessao; leitura automatica nao renova; a TV e o
+ *     quadro do sob medida ficam de fora so para ler (fase 5-A3).
  *
  * Ate 20/10/2026 nenhum teste do projeto passava pelo POST /api/auth/login.
  *
@@ -59,6 +61,9 @@ app.use(express.json());
 require('./auth')(app, db);
 app.get('/api/coisa', (req,res) => res.json({ ok:true, quem: req.usuario && req.usuario.nome }));
 app.get('/painel', (req,res) => res.send('painel'));
+app.get('/api/painel', (req,res) => res.json({ ok:true }));
+app.get('/setor', (req,res) => res.send('tela de setor'));
+app.post('/api/acao', (req,res) => res.json({ ok:true }));
 /* O modelo de permissoes (acesso.js) nao sobe neste teste. Para o "Esqueci
    meu PIN" (fase 5-A2) basta a pergunta que o auth.js faz a ele: quem tem
    `pessoas.gerenciar`. O stub responde por id, e guarda o que foi auditado. */
@@ -303,6 +308,79 @@ async function main(){
     GERENCIA.clear();
     eq('sem o modelo de permissoes respondendo, ninguem autoriza',
        (await recuperar({ id:ANA, autorizador:BETO, autorizador_pin:'424242' })).status, 403);
+
+    console.log('\n── 11. 1 hora sem uso encerra a sessao (fase 5-A3) ──');
+    /* A sessao durava 1 ano: o tablet ficava com o nome da ultima pessoa ate
+       alguem tocar em Sair. Agora vale 1 hora desde o ultimo USO. A
+       atualizacao automatica das telas (o Carregamento pergunta a cada 4 s)
+       NAO conta como uso — senao o tablet nunca sairia. */
+    const MIN = 60 * 1000;
+    const get = (path, cookie, extra) => fetch(base + path, { redirect:'manual',
+      headers: Object.assign(cookie ? { cookie } : {}, extra || {}) });
+    const novoCookie = q => { const c = q.headers.get('set-cookie') || ''; return c ? c.split(';')[0] : null; };
+    let cCaio = sess((await login(CAIO, '123456')).cookie);
+    desvio += 59 * MIN;
+    eq('59 minutos depois do login, a sessao vale', (await get('/api/coisa', cCaio)).status, 200);
+    let q = await get('/api/coisa', cCaio);
+    eq('e a leitura automatica nao renova (sem cookie novo)', novoCookie(q), null);
+    desvio += 2 * MIN;
+    eq('61 minutos sem uso: a API responde 401', (await get('/api/coisa', cCaio)).status, 401);
+    q = await get('/setor', cCaio);
+    eq('a tela manda para o login', q.status, 302);
+    ok('levando a tela de volta', /^\/login\?r=/.test(q.headers.get('location') || ''), q.headers.get('location'));
+    eq('e o /api/auth/eu diz que nao esta logado', (await eu(cCaio)).logado, false);
+
+    cCaio = sess((await login(CAIO, '123456')).cookie);
+    desvio += 50 * MIN;
+    q = await fetch(base + '/api/auth/ativo', { method:'POST', headers:{ cookie: cCaio } });
+    eq('o aviso de uso da tela (toque, bipe) responde 200', q.status, 200);
+    let c2 = novoCookie(q);
+    ok('e renova a sessao', !!c2);
+    desvio += 50 * MIN;
+    eq('100 minutos depois do login, mas 50 do ultimo uso: vale', (await get('/api/coisa', c2)).status, 200);
+    q = await fetch(base + '/api/acao', { method:'POST', headers:{ cookie: c2 } });
+    eq('uma acao (POST) responde', q.status, 200);
+    const c3 = novoCookie(q);
+    ok('e tambem renova', !!c3);
+    desvio += 50 * MIN;
+    q = await get('/setor', c3);
+    eq('abrir uma tela 50 minutos depois: abre', q.status, 200);
+    const c4 = novoCookie(q);
+    ok('e renova', !!c4);
+    desvio += 50 * MIN;
+    eq('e a sessao renovada pela tela segue valendo', (await get('/api/coisa', c4)).status, 200);
+    eq('o cookie de antes da renovacao, sozinho, ja venceu', (await get('/api/coisa', c2)).status, 401);
+    desvio += 61 * MIN;
+    eq('sem uso de novo por 61 minutos: sai', (await get('/api/coisa', c4)).status, 401);
+    eq('o aviso de uso com a sessao vencida nao ressuscita ninguem',
+       (await fetch(base + '/api/auth/ativo', { method:'POST', headers:{ cookie: c4 } })).status, 401);
+
+    /* A sessao aberta antes desta fase nao tem a hora do ultimo uso: ela vence. */
+    const corpoVelho = Buffer.from(JSON.stringify({ id: CAIO })).toString('base64');
+    const assinaVelho = crypto.createHmac('sha256', fs.readFileSync(SEGREDO, 'utf8').trim()).update(corpoVelho).digest('hex').slice(0, 32);
+    const cVelho = 'sess=' + encodeURIComponent(corpoVelho + '.' + assinaVelho);
+    eq('cookie de antes da fase (sem hora de uso) nao vale', (await get('/api/coisa', cVelho)).status, 401);
+
+    console.log('\n── 12. a TV e o quadro do sob medida ficam de fora, so para LER (opcao A) ──');
+    const cTv = sess((await login(ANA, '777888')).cookie);   // a Ana tem a area do painel
+    desvio += 5 * 60 * MIN;
+    eq('5 horas depois, a TV (/painel) abre', (await get('/painel', cTv)).status, 200);
+    eq('e o numero dela (/api/painel) responde', (await get('/api/painel', cTv)).status, 200);
+    q = await get('/sobmedida/kanban', cTv);
+    ok('o quadro do sob medida nao vai para o login', q.status !== 302 && q.status !== 401, 'veio ' + q.status);
+    q = await get('/sobmedida/api/kanban', cTv);
+    ok('nem a leitura dele', q.status !== 401 && q.status !== 302, 'veio ' + q.status);
+    ok('nem o arquivo de apoio dele', ![302,401].includes((await get('/sobmedida/nav.js', cTv)).status));
+    eq('mas qualquer outra API recusa', (await get('/api/coisa', cTv)).status, 401);
+    eq('e qualquer outra tela vai para o login', (await get('/setor', cTv)).status, 302);
+    eq('mesmo vindo da TV (Referer /painel)', (await get('/setor', cTv, { referer: base + '/painel' })).status, 302);
+    eq('e escrever, nem pela API da TV (POST)',
+       (await fetch(base + '/api/painel', { method:'POST', headers:{ cookie: cTv } })).status, 401);
+    let euTv = await (await fetch(base + '/api/auth/eu?tela=%2Fpainel', { headers:{ cookie: cTv } })).json();
+    eq('o /api/auth/eu diz a tela que e de exibicao', euTv.exibicao, true);
+    euTv = await (await fetch(base + '/api/auth/eu?tela=%2Fsetor', { headers:{ cookie: cTv } })).json();
+    eq('e a que nao e', euTv.exibicao, false);
+    eq('e diz o tempo sem uso, em minutos', euTv.inativoMin, 60);
   } finally {
     srv.close();
   }
