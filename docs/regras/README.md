@@ -9,6 +9,7 @@ que provocou a regra, as datas, as conferências na fábrica — fica em
 | Estoque, revisão e embalagem | [`estoque.md`](estoque.md) | [`historia/estoque.md`](../historia/estoque.md) |
 | Expedição: do PDF do ML à etiqueta de venda | [`expedicao.md`](expedicao.md) | [`historia/expedicao.md`](../historia/expedicao.md) |
 | Coleta, carregamento e saída da fábrica | [`carregamento.md`](carregamento.md) | [`historia/carregamento.md`](../historia/carregamento.md) |
+| Sob medida (parte 1 de 4: módulo, acesso, design e estante) | [`sobmedida.md`](sobmedida.md) | [`historia/sobmedida.md`](../historia/sobmedida.md) |
 
 As outras áreas continuam no `CLAUDE.md` até serem passadas para cá, uma por vez.
 
