@@ -1313,8 +1313,10 @@ de 6 pela própria tela de login (`POST /api/auth/trocar-pin`).
 > tamanho do PIN de cada nome seria dizer a quem chuta quem ainda tem 4.
 
 > ⚠️ **A PRÓPRIA PESSOA TROCA O PIN, E O ESQUECIDO NÃO PASSA PELO `/acessos`**
-> (fase 5-A2, 21/10/2026). O botão **"Trocar PIN"** das duas barras leva a
-> `/login?trocar=1`, que pede o PIN de hoje. No login, **"Esqueci meu PIN"**: quem
+> (fase 5-A2, 21/10/2026). Os dois ficam **só na tela do PIN**, depois de tocar
+> no nome — **não há botão nas barras das telas**, por decisão do dono.
+> **"Trocar meu PIN"** pede o PIN de hoje (conferido pelo próprio login) e o
+> novo duas vezes. **"Esqueci meu PIN"**: quem
 > tem `pessoas.gerenciar` (hoje só o Admin Geral) toca no próprio nome e digita
 > **o próprio PIN** no aparelho da pessoa, e ela cria o novo
 > (`POST /api/auth/recuperar-pin`). **Não existe senha de recuperação**, por

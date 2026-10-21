@@ -103,12 +103,6 @@ function sessao(eu,dest){
   var trocar=document.createElement('a');
   trocar.className='trocaOp'; trocar.href='/setor'; trocar.textContent='Trocar setor';
   b.appendChild(trocar);
-  // A pessoa troca o proprio PIN (ACESSOS-UNIFICADOS fase 5-A2). O PIN e do
-  // PCP, entao a troca e na tela de login de la; volta para esta tela depois.
-  var tpin=document.createElement('a');
-  tpin.className='trocaOp'; tpin.textContent='Trocar PIN';
-  tpin.href='/login?trocar=1&r='+encodeURIComponent(location.pathname+location.search);
-  b.appendChild(tpin);
 
   // Sair e do PCP: a sessao e uma so, e sair "so do sob medida" nao existe
   // mais — era justamente a confusao dos dois PINs.
