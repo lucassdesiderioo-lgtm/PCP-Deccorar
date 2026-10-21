@@ -374,6 +374,8 @@ Ficam aqui para virar trabalho, e não esquecimento.
 > Vieram do CLAUDE.md §15 sem alteração, na ordem em que estavam. As
 > referências entre parênteses (§N) apontam para a seção do CLAUDE.md onde
 > a regra morava, hoje em cartão neste arquivo ou na história da área.
+> Os dois últimos vieram depois, e ganharam a referência (§2) que não
+> traziam.
 
 - ❌ Calcular a falta de estoque fora do `demanda_dominio.js` — a aba Estoque e a
   tela azul do operador têm que dizer o mesmo número (§18)
@@ -494,3 +496,7 @@ Ficam aqui para virar trabalho, e não esquecimento.
 - ❌ Recriar o upload de etiqueta do kit (`/api/kit/label`) ou qualquer segundo
   caminho de impressão: o arquivo enviado não acompanha o Código do kit, e o
   rolo impresso por ele para de bipar sem ninguém saber por quê (§4)
+- ❌ Fazer a revisão somar estoque "porque parece que falta"
+  (§2, armadilha #1)
+- ❌ Fazer a reimpressão baixar estoque "porque imprimiu de novo"
+  (§2, armadilha #1-B)

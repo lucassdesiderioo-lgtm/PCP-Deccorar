@@ -285,6 +285,7 @@ segundo bipe cego do carregamento).
 > Vieram do CLAUDE.md §15 sem alteração, na ordem em que estavam. As
 > referências entre parênteses (§N) apontam para a seção do CLAUDE.md onde
 > a regra morava, hoje em cartão neste arquivo ou na história da área.
+> O último veio depois, e ganhou a referência (§5) que não trazia.
 
 - ❌ Escrever uma segunda régua de "isto é fantasma?": ela é o
   `correcoes.classificarFantasmas`, e o `limpar_fantasmas.js` lê dela — duas
@@ -421,3 +422,6 @@ segundo bipe cego do carregamento).
   da janela: o primeiro esconde furo que ninguém vai procurar, o segundo faz o
   volume mudar de classificação conforme o argumento da linha de comando
   (§5, armadilha #27)
+- ❌ Desfazer uma correção sem comparar o estado: o volume pode ter andado, e
+  desfazer por cima de trabalho novo é a armadilha #32 pela porta da Mesa
+  (§5, a Mesa)
