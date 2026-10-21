@@ -817,6 +817,8 @@ da R-SML-03.
 > Vieram do CLAUDE.md §15 sem alteração, na ordem em que estavam. As
 > referências entre parênteses (§N) apontam para a seção do CLAUDE.md onde
 > a regra morava, hoje em cartão neste arquivo ou na história da área.
+> Os cinco últimos vieram depois, e ganharam a referência (§19) que não
+> traziam.
 
 - ❌ Separar o sob medida de novo em outro servidor/porta — já foi, durou um
   dia, e o beco sem saída da liberação está descrito na §19
@@ -1178,3 +1180,17 @@ da R-SML-03.
   os relatórios das duas ficariam errados (§19, 5-B2, e a §4.16 da spec)
 - ❌ Apagar motivo de recusa com história atrás, ou deixar o cadastro nascer
   vazio: o vazio faz o botão "Recusar" abrir uma lista sem nada (§19, 5-B2)
+- ❌ Somar zero pelo rolo sem nota lançada: o total é PISO, com o `≥` na frente
+  (§19)
+- ❌ Cobrar "aprovado sem boleto" de quem paga em PIX ou cartão — a fábrica
+  recebe dos três jeitos (dono, 26/09/2026), e aviso no caso normal é a #6
+  (§19, 6-C1)
+- ❌ Reabrir mais que o culpado e o que depende dele — nem menos: a mais é
+  trabalho jogado fora, a menos é persiana montada sobre peça que foi pro lixo
+  (§19, 5-B2)
+- ❌ Trocar o `marco` para desfazer o pronto numa recusa: quem desfaz é o
+  `pronto_em` — o marco é lido pela reimpressão e pelas duas contas da compra
+  (§19, 5-B2)
+- ❌ Dar código novo à peça refeita, ou tirar a marca vermelha do papel: o
+  código é da peça, e sem a marca ficam duas etiquetas iguais na bancada
+  (§19, 5-B2)
