@@ -9,11 +9,12 @@
 > regra sem perceber.
 >
 > Formato: [`README.md`](README.md). O módulo tem regras próprias também no
-> [`tecido/README.md`](../../tecido/README.md). **Partes 1 e 2 de 4:** o
+> [`tecido/README.md`](../../tecido/README.md). **Partes 1 a 3 de 4:** o
 > módulo, o acesso, o design e a estante de tecido (parte 1); o catálogo, a
-> revenda, o pedido e a etiqueta de produção (parte 2). Consumo, produção,
-> quadro, indicadores, financeiro e o corte em etapas continuam no `CLAUDE.md`
-> §19 até serem passados para cá.
+> revenda, o pedido e a etiqueta de produção (parte 2); o consumo, a compra, os
+> setores, o bipe, a recusa, o quadro e os indicadores (parte 3). O financeiro,
+> as telas e o corte em etapas continuam no `CLAUDE.md` §19 até serem passados
+> para cá.
 
 ---
 
@@ -346,8 +347,273 @@
 
 ---
 
-## O que ainda não tem teste nas partes 1 e 2
+## O consumo e a compra (fases 4-B e 4-C)
+
+### R-SMU-01 · O comprometido de tecido é conta do `consumo.js`, e lê o CONSUMO, nunca o corte
+- **Regra:** "quanto já está vendido e ainda não foi cortado" sai só do `dominio/consumo.js`; o `gerencial.js` compõe giro e consumo e não calcula nenhum. Só pedido **aprovado** compromete; peça cancelada sai. A medida lida é a de consumo da ficha congelada.
+- **Por quê:** a medida de corte é a mais apertada, e comprar por ela compra a menos (armadilha #18). Duas contas do mesmo número divergem no dia da compra (#12).
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/consumo.test.js` (dobrar a medida de corte não mexe no comprometido).
+- **Status:** no ar desde 24/09/2026.
+- **História:** "A fase 4-B".
+
+### R-SMU-02 · O comprometido baixa no corte confirmado, peça a peça
+- **Regra:** quem baixa é o plano **confirmado** (o corte feito); plano só calculado não baixa nada. O casamento é exato por `(pedido, tecido, medida de corte)`, e a irmã não cortada continua na conta.
+- **Por quê:** número que só sobe vira número que a equipe aprende a ignorar.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/consumo.test.js`.
+- **Status:** no ar desde 24/09/2026.
+
+### R-SMU-03 · O comprometido não se reparte entre bobinas, e o tecido sem rolo aparece
+- **Regra:** o comprometido tem lista própria por tecido (`por_tecido`), fora da tabela tecido × largura. Tecido com venda aprovada e nenhum rolo aparece no painel, com **traço** na estante, nunca `0 m²`. O filtro da tela corta o cartão e a tabela juntos.
+- **Por quê:** o pedido escolhe a cor; a largura é o plano que escolhe, na hora de cortar (armadilha #17). Zero se lê como "tinha e acabou", e a verdade é "nunca teve".
+- **Exceções:** na conta de **compra** somar as bobinas é legítimo; na de cobertura, não.
+- **Teste que trava:** `tecido/teste/consumo.test.js` (repartição, tecido sem rolo, filtro). ⚠ O traço no lugar do `0 m²` é de tela e **não tem teste**.
+- **Status:** no ar desde 24/09/2026.
+
+### R-SMU-04 · O "sem tecido" do envio é foto; o aviso ao vendedor é de hoje, e os dois ficam
+- **Regra:** a marca gravada no envio continua; o card **Aprovados esperando tecido** olha a estante agora. O pedido entra inteiro no aviso, e a linha diz o que **este** pedido usa, com o total do tecido nomeado embaixo.
+- **Por quê:** a foto explica o prazo que a revenda já ouviu; o rolo pode ter chegado ou ter sido comido por outro pedido. Escrever o total do tecido em cada pedido faria quem soma comprar o dobro.
+- **Exceções:** pedido com tecido de sobra não entra no aviso.
+- **Teste que trava:** `tecido/teste/consumo.test.js`.
+- **Status:** no ar desde 24/09/2026.
+
+### R-SMU-05 · O tecido do sob medida não vai ao Compras do PCP; o tubo vai, e é um só
+- **Regra:** o tecido tem painel, mínimo e status no `tecido.db` e fica lá. O tubo é o mesmo material da medida padrão e entra no Compras do PCP (`sobmedida_material.js` → `necessidade_dominio.js`), somando no mesmo componente, com a origem em `origem_sobmedida` (por pedido), nunca em `origem` (por SKU).
+- **Por quê:** decisão do dono, 24/09/2026 — "é o mesmo tubo, e o compras deveria ser o mesmo". Comprar em dois lugares compra duas vezes; quem chega por último apagaria o outro e a fábrica compraria metade.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `teste_compras_sobmedida.js` · `tecido/teste/material_compra.test.js`.
+- **Status:** no ar desde 24/09/2026 · os quatro degraus estão apontados (Tubo 32, 38, 41 e 56) · a primeira compra pela lista ainda não foi conferida na fábrica.
+- **História:** "A fase 4-C".
+
+### R-SMU-06 · A peça sai da conta de compra quando a etiqueta do próprio tubo é impressa
+- **Regra:** a linha do tubo sai quando ela é impressa (`impresso_em`); imprimir o maço da Coleção não baixa o tubo, e a irmã não impressa continua. Reimprimir não muda nada. Pedido só enviado não conta.
+- **Por quê:** o pedido para em `aprovado`, e sem sinal de saída o número só subiria. O custo assumido: o maço impresso e ainda não cortado conta como produzido (horas, não dias).
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/material_compra.test.js`.
+- **Status:** no ar desde 24/09/2026.
+
+### R-SMU-07 · O tubo se aponta no degrau, o resto no componente, e quem converte é a unidade do PCP
+- **Regra:** o componente recusa a chave `tubo` e manda à escada. Não há fator digitado: em `m` lê-se a medida de **consumo**, em `un` contam-se peças. O cadastro recusa unidade que a peça não sabe dizer (kg), material em metro em peça sem medida de consumo ou medida por largura **e** altura, e componente que não gera etiqueta.
+- **Por quê:** Tubo 32 e Tubo 41 são itens diferentes. Um multiplicador digitado é a segunda régua que erra em silêncio; cada recusa evita um número que mente.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/material_compra.test.js`.
+- **Status:** no ar desde 24/09/2026.
+
+### R-SMU-08 · O que falta vira pendência, nunca zero, e a lista de compras não cala
+- **Regra:** degrau sem material apontado, material apagado e degrau renomeado depois do pedido viram **pendência** com o nome e o pedido. Os outros componentes não cobram vínculo. Unidade divergente entre os dois lados vira pendência dizendo as duas. Sem a porta do sob medida, a lista de compras do PCP **diz** que ele ficou de fora, com o motivo — não recusa e não cala; a porta de ida (`nucleo/materiais.js`) sem ligação recusa, nunca lista vazia. A tela agrupa a pendência pelo motivo.
+- **Por quê:** uma persiana sempre tem tubo, então ele faltar é buraco na lista (regra 4 do custo). Cobrar vínculo de mão de obra seria a armadilha #6. Recusar a lista inteira deixaria o comprador sem lista por causa do outro módulo.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/material_compra.test.js` · `teste_compras_sobmedida.js` (tirar o try/catch reprova três casos).
+- **Status:** no ar desde 24/09/2026.
+
+---
+
+## Os setores da produção (fase 5-A)
+
+### R-SMS-01 · São cinco chaves de setor, de nível `operacao`, e os setores nascem vazios
+- **Regra:** Serralheria, Coleção, Montagem, Revisão e Embalagem são cinco setores `Sob medida / …`, cada um só com a chave dele, sem ninguém migrado. As chaves são `operacao`, nunca `admin`.
+- **Por quê:** o bipe grava quem fez, e uma chave só faria a recusa acusar a pessoa errada. Nível admin vira **diretor** no portão do módulo (a porta A da #28). O prefixo separa "Revisão" e "Embalagem" dos setores de mesmo nome da medida padrão.
+- **Exceções:** na tela de Acessos eles saem em ordem alfabética; a ordem da fábrica é o `SETORES` do `tecido/nucleo/acesso.js`.
+- **Teste que trava:** `teste_acesso.js` (seção 6-C) · `tecido/teste/acesso.test.js`.
+- **Status:** no ar desde 24/09/2026 · a regra só pega quando alguém é marcado num dos cinco (armadilha #30); a marcação não foi conferida aqui.
+- **História:** "A fase 5-A".
+
+### R-SMS-02 · Setor é cadastro, chave é código
+- **Regra:** nome, ordem e prefixo da etiqueta se editam em `sm_setor`; um sexto setor de produção exige chave nova no `permissoes.js`. A permissão nunca é gerada a partir do `tecido.db`.
+- **Por quê:** gerar a chave do banco do sob medida acoplaria os dois bancos e furaria a porta única. Setor novo é mudança de como a fábrica trabalha.
+- **Exceções:** nenhuma.
+- **Teste que trava:** ⚠ **sem teste** — nada impede alguém de gerar chave a partir do cadastro.
+- **Status:** no ar desde 24/09/2026.
+
+### R-SMS-03 · Papel e setores são duas contas, e a bancada vem do setor
+- **Regra:** `papelDe()` dá um papel só (a área mais larga); `setoresDe()` dá todas as áreas de setor. `producao.bipar` vem do setor, e quem não tem setor não a tem. O diretor bipa os cinco.
+- **Por quê:** derivar uma conta da outra daria 403 na bancada ao vendedor que também embala, com a caixinha marcada. Recusar o dono na bancada seria a armadilha #6.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/acesso.test.js` · `tecido/teste/producao.test.js` · `teste_acesso.js` (seção 6-C).
+- **Status:** no ar desde 24/09/2026.
+
+---
+
+## O bipe da bancada (fase 5-B1)
+
+### R-SMB-01 · As liberações são dado, e só segura quem existe e gera etiqueta
+- **Regra:** a tabela `ANTES` diz o que libera o quê: tubo, base e tecido seguram a montagem; bandô e barra seguram **só** a embalagem. Componente que a persiana não leva, ou que não gera etiqueta (a redução de peso), não segura ninguém. A fila vem na ordem do prazo e diz o que fazer, na medida de corte.
+- **Por quê:** cadeia de `if` esconde a regra; bandô na montagem pararia a linha por uma peça que só vai na caixa; componente sem bipe nunca termina.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/producao.test.js`.
+- **Status:** no ar desde 24/09/2026 · rodado na tela com uma persiana lisa e uma com bandô · a bancada de verdade ainda não.
+- **História:** "A fase 5-B1".
+
+### R-SMB-02 · O pronto é `pronto_em`, e o `marco` não muda
+- **Regra:** o pedido fica pronto quando a última persiana é embalada; grava `pronto_em` e uma linha em `sm_pedido_marco`. O `marco` continua `aprovado`. O kit não conta no pronto; peça cancelada não segura.
+- **Por quê:** três lugares filtram `marco='aprovado'` — a reimpressão da etiqueta e as duas contas do comprometido e do material. Cada persiana tem duas linhas de embalagem, e a do kit nunca termina.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/producao.test.js`.
+- **Status:** no ar desde 24/09/2026.
+
+### R-SMB-03 · Um campo e um bipe: o primeiro inicia, o segundo termina; na embalagem o kit é o do tipo certo
+- **Regra:** o bipe grava quem; bipar o que já terminou é recusado dizendo quem fez. Na embalagem são três bipes (início · kit · fim): o kit errado é recusado dizendo qual é o certo, e kit sem código cadastrado é recusa, nunca "passou". Só a embalagem cobra kit.
+- **Por quê:** dois botões são uma escolha a mais para quem está de luva. O kit prova que entrou o **certo**; não é o `public/kit_bipe.js` do PCP, que responde outra pergunta.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/producao.test.js`.
+- **Status:** no ar desde 24/09/2026.
+
+### R-SMB-04 · Bipar o que não está liberado responde o que segura, com o nome do setor
+- **Regra:** a recusa diz a peça, o setor (pelo **nome**, nunca a chave do banco), quem está com ela e desde quando, e lista tudo que segura. Quem não é do setor não bipa a bancada do outro.
+- **Por quê:** "não aparece" vira "ninguém sabe por quê", e a equipe para de usar a tela. Chave de banco em tela é o "— Correcao de contagem" do §2.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/producao.test.js`.
+- **Status:** no ar desde 24/09/2026.
+
+### R-SMB-05 · A pendência se fecha com `producao.pendencia` e com motivo
+- **Regra:** a peça dada como feita sem o bipe de quem fez é fechada por quem tem `producao.pendencia` (o diretor, pelo `*`), com motivo; o fechamento grava quem, quando e por quê. A bancada não fecha a própria.
+- **Por quê:** se quem bipa fechasse a própria, a trava deixaria de existir; fechamento sem porquê não é rastro.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/producao.test.js`.
+- **Status:** no ar desde 24/09/2026.
+
+---
+
+## A recusa e o refazer (fase 5-B2)
+
+### R-SMX-01 · O motivo aponta o componente, e volta o culpado e o que depende dele
+- **Regra:** cada motivo (`sm_motivo_producao`) aponta um **componente**, e o setor sai dele. Recusar reabre o culpado e tudo que foi feito em cima dele, pelo mesmo `ANTES` lido ao contrário — nem mais, nem menos. O bandô recusado não derruba a montagem.
+- **Por quê:** a serralheria faz quatro peças, e mandar "para a serralheria" refaria as quatro (armadilha #6). Uma segunda tabela de "o que vem antes" divergiria no dia em que o fluxo mudasse (#12).
+- **Exceções:** diverge da letra da §4.16 da spec ("Tubo maior → Serralheria"), anotado lá.
+- **Teste que trava:** `tecido/teste/recusa.test.js`.
+- **Status:** no ar desde 24/09/2026 · rodado na tela · a bancada de verdade recusando uma peça ainda não.
+- **História:** "A fase 5-B2".
+
+### R-SMX-02 · Só se recusa o trabalho anterior que existe e já terminou
+- **Regra:** recusar é `producao.bipar`. É recusado: o próprio trabalho, o que vem depois, a peça que esta persiana não leva, o culpado que ainda não terminou, a peça cancelada e quem não está naquela bancada. A tela só oferece os motivos que passam, e a lista vazia diz qual das três razões a esvaziou.
+- **Por quê:** quem está com a peça na mão é a bancada; o que impede o abuso é o rastro. Escolha que só serve para dar erro é a armadilha #6 dentro de uma lista.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/recusa.test.js`.
+- **Status:** no ar desde 24/09/2026.
+
+### R-SMX-03 · `refeitas` conta a peça física, e a `sm_recusa` guarda o retrato
+- **Regra:** `refeitas` sobe só no culpado. A `sm_recusa` grava quem tinha feito, quem recusou, de onde e o nome do motivo daquele dia. A reabertura limpa o `kit_conferido_em` e desfaz o `pronto_em`; o `marco` não se mexe, e a linha `pronto` do histórico fica. A recusa que falha no meio não grava metade.
+- **Por quê:** a reabertura apaga o bipe do culpado, que é o dado do indicador; sem limpar o kit, a refeita fecharia a caixa sem o terceiro bipe.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/recusa.test.js`.
+- **Status:** no ar desde 24/09/2026.
+
+### R-SMX-04 · A refeita reimprime por código, com o mesmo código e a marca vermelha
+- **Regra:** a reimpressão é da peça, não do maço do pedido; sai com o mesmo código e `REFAZER Nª VEZ` em vermelho. A peça volta marcada na fila, e o card **Refazer** da Produção lista só ela.
+- **Por quê:** o maço inteiro deixaria etiquetas repetidas na bancada; sem a marca, duas etiquetas iguais e nada dizendo qual é a boa.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/recusa.test.js`.
+- **Status:** no ar desde 24/09/2026.
+
+### R-SMX-05 · O cadastro de motivos nasce cheio, e não se mistura com o do corte
+- **Regra:** a `sm_motivo_producao` nasce com os oito motivos da spec; a lista edita, acrescenta e desativa, e motivo com recusa atrás não se apaga. A bancada lê só os ativos. Ela não é a `motivo_recusa` do plano de corte.
+- **Por quê:** tabela vazia faria o botão "Recusar" abrir uma lista sem nada (dívida 18). Juntar os dois cadastros estragaria os relatórios dos dois.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/recusa.test.js` (só os ativos; motivo sem nome ou de peça sem etiqueta é recusado). ⚠ Os oito semeados, a exclusão recusada com história e a separação dos dois cadastros **não têm teste**.
+- **Status:** no ar desde 24/09/2026.
+
+---
+
+## O quadro (fase 6-A)
+
+### R-SMQ-01 · A etapa é derivada, nunca gravada, e o quadro só lê
+- **Regra:** a etapa sai de `marco` + `pronto_em` + os bipes; não há coluna `etapa` no `sm_pedido`. O `marco` não virou `pronto`. Cancelado vence todas as outras.
+- **Por quê:** coluna gravada divergiria do `pronto_em` no primeiro bipe (#12); trocar o marco mudaria em silêncio os números da compra.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/kanban.test.js`.
+- **Status:** no ar desde 24/09/2026.
+- **História:** "A fase 6-A".
+
+### R-SMQ-02 · As colunas são livres, as etapas não
+- **Regra:** o nome é cadastro (`sm_kanban_coluna`); a etapa é a lista fechada do `dominio/kanban.js`: `edicao`, `enviado`, `aprovado`, `producao`, `pronto` e `cancelado`. Etapa que não existe é recusada dizendo quais existem; duas colunas na mesma etapa são recusadas; renomear não mexe na etapa. Não há `entregue`.
+- **Por quê:** renomear "Em produção" não pode desligar nada. O mesmo pedido em dois lugares faz desconfiar da tela inteira. Coluna que nunca recebe cartão é paisagem (dívida 18).
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/kanban.test.js`.
+- **Status:** no ar desde 24/09/2026.
+
+### R-SMQ-03 · Pedido não some do quadro, e etapa sem pedido não vira aviso
+- **Regra:** desativar a coluna faz o pedido virar **aviso** no topo, com a etapa nomeada e a contagem; reativar devolve os cartões.
+- **Por quê:** o quadro responde "onde está o pedido X". Aviso que aparece todo dia sem nada atrás é paisagem.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/kanban.test.js`.
+- **Status:** no ar desde 24/09/2026.
+
+### R-SMQ-04 · A barrinha não conta o kit nem a cancelada, e não existe antes da aprovação
+- **Regra:** a barrinha conta o que falta por setor, sem o kit e sem peça cancelada; pedido sem ficha (antes da aprovação) não tem barrinha.
+- **Por quê:** o kit nunca termina; a cancelada não é trabalho; barrinha zerada antes da ficha diria "nada foi feito" em vez de "ainda não há o que fazer".
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/kanban.test.js`.
+- **Status:** no ar desde 24/09/2026.
+
+### R-SMQ-05 · O quadro é `painel.ler`, e cartão sem valor não vale `R$ 0,00`
+- **Regra:** o quadro é a fábrica toda com o valor de cada carteira, e pede `painel.ler`, nunca `pedido.ler`. O cartão sem valor lançado não mostra valor, e o total da coluna vira piso (`≥`). Cartão cancelado não leva selo de retido.
+- **Por quê:** o vendedor tem `pedido.ler`. Zero se lê como "de graça" (regra 4 do custo).
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/kanban.test.js`.
+- **Status:** no ar desde 24/09/2026.
+
+---
+
+## Os indicadores (fase 6-B)
+
+### R-SMI-01 · A régua do bipe suspeito é uma só, e o limite é cadastro
+- **Regra:** `marcarSuspeitos` roda uma vez sobre a lista de bipes, e horas-homem, tempo por m² e produtividade leem a marca. Pega o bipe aberto **e** o que fechou acima de `bipeAbertoMaxHoras`. O parâmetro nasce em 2 h (chutado) e é recusado em zero, negativo ou acima de 24 h. O bipe descartado aparece, com peça, quem e quanto.
+- **Por quê:** três filtros seriam três réguas (#12). O exemplo da §4.17 é de um bipe que fechou. Limite zero tornaria todo bipe suspeito.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/indicadores.test.js`.
+- **Status:** no ar desde 26/09/2026 · ainda não conferido pelo dono · depende de a bancada bipar de verdade.
+- **História:** "A fase 6-B".
+
+### R-SMI-02 · Número incompleto não vira número certo
+- **Regra:** a persiana com bipe descartado, incompleta ou cancelada fica fora da média de tempo e é contada à parte; o kit não entra. A produtividade é a exceção: o grão dela é o bipe.
+- **Por quê:** a soma menor puxaria a média para baixo em silêncio (regra 4 do custo); cobrar a persiana inteira mediria uma pessoa pelo trabalho das outras quatro.
+- **Exceções:** produtividade, como acima.
+- **Teste que trava:** `tecido/teste/indicadores.test.js`.
+- **Status:** no ar desde 26/09/2026.
+
+### R-SMI-03 · O tempo por m² usa o m² real, nunca o cobrado
+- **Regra:** o divisor é o m² da peça, nunca o `m2_cobrado_mm2`, que carrega o mínimo faturado de 1,5 m².
+- **Por quê:** pelo cobrado a peça pequena pareceria mais rápida do que é (armadilha #18 por outra porta).
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/indicadores.test.js`.
+- **Status:** no ar desde 26/09/2026.
+
+### R-SMI-04 · Prazo cumprido são dois números, e sem pedido pronto não há porcentagem
+- **Regra:** prometido e negociado saem separados; pedido sem `pronto_em` não entra; sem pedido pronto a porcentagem é `null`, nunca `0%`. Prazo vencido fica negativo.
+- **Por quê:** somados, o pedido empurrado pareceria entregue em dia. "Cumpriu 0%" seria uma afirmação falsa.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/indicadores.test.js`.
+- **Status:** no ar desde 26/09/2026.
+
+### R-SMI-05 · A recusa conta no setor do culpado, e a pessoa é quem tinha feito
+- **Regra:** o setor sai do componente culpado, nunca do `recusado_de`; a pessoa é o `feito_por` da `sm_recusa`; o motivo sai com o nome que tinha no dia.
+- **Por quê:** contar em quem recusou acusaria quem pegou o erro.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/indicadores.test.js`.
+- **Status:** no ar desde 26/09/2026.
+
+### R-SMI-06 · A aprovação é mediana, em tempo corrido, com o maior ao lado
+- **Regra:** o tempo de aprovação é a **mediana** em horas corridas, por vendedor, com o maior e os dias de fábrica ao lado; só entra pedido aprovado. Os parados na aprovação são os enviados, fora do filtro de período, com os dias de fábrica restantes.
+- **Por quê:** a sexta à noite envenena a média. "Horas úteis" exigiria um cadastro de expediente que não existe. Pedido parado há meses não pode sumir por causa de um recorte.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/indicadores.test.js`.
+- **Status:** no ar desde 26/09/2026.
+
+### R-SMI-07 · O vazio diz qual é, e a janela vai escrita
+- **Regra:** sem bipe nenhum os blocos dizem "ninguém bipou ainda", e com bipe fora do período mandam mudar o filtro — nunca zero. A janela vem ao lado dos números. A tela é `painel.ler`, numa rota só para as sete perguntas.
+- **Por quê:** os dois vazios pedem conselhos opostos (esperar ou mudar o filtro). Sete rotas teriam sete janelas.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/indicadores.test.js`. ⚠ A explicação longa aparecer uma vez só, as datas e a concordância são de tela e **não têm teste**.
+- **Status:** no ar desde 26/09/2026.
+
+---
+
+## O que ainda não tem teste nas partes 1 a 3
 
 R-SMM-01 (o try/catch que protege a expedição), R-SMD-01 (a paleta igual à do
-PCP), R-SME-04 (sem ourela) e a parte de tela da R-SMP-06 (o pedido sem peça não
-mostra `R$ 0,00`).
+PCP), R-SME-04 (sem ourela), a parte de tela da R-SMP-06 (o pedido sem peça não
+mostra `R$ 0,00`), a parte de tela da R-SMU-03 (o traço no lugar do `0 m²`),
+R-SMS-02 (setor é cadastro, chave é código), parte da R-SMX-05 (os oito motivos
+semeados, a exclusão recusada e os dois cadastros separados) e a parte de tela
+da R-SMI-07.
