@@ -1,9 +1,12 @@
-> **STATUS · 21/10/2026 — RASCUNHO PARA APROVAÇÃO** · tipo `REGRA` · nada construído.
+> **STATUS · 21/10/2026 — APROVADA, NÃO INICIADA** · tipo `REGRA` · nada construído.
 > Nasceu da entrevista do guardião de 21/10/2026. O dono pediu: *"avalie se o
 > nosso controle de acesso é condizente com o que estamos criando … daqui a
 > alguns dias vamos estar com todo o time cadastrado, mais ou menos 20 logins"*.
-> Ele aprovou a direção (os sete princípios da §3) no mesmo dia. As perguntas
-> da §6 ainda esperam resposta.
+> Ele aprovou a direção (os sete princípios da §3) e respondeu as quatro
+> perguntas da §6 no mesmo dia. **Ordem de construção: fase 1, fase 5, fase 2,
+> fase 3, fase 6, fase 4** (§5) — a 1 e a 5 entram antes de o time inteiro
+> ser cadastrado. Cada fase é um PR, e a linha em `docs/DECISOES.md` entra no
+> commit do código de cada uma.
 
 ---
 
@@ -108,6 +111,12 @@ sob medida trata a pessoa como dono.
   antes de confirmar (R-ACE-03, dívida 20).
 - Sai a permissão "Definir estoque mínimo", que nenhuma tela usa (dívida 19).
 
+**Fase 6 — duas pessoas no boleto e na sobra** (🔴 dinheiro e estoque) — nasceu da resposta P2
+- Dar baixa em boleto e descartar sobra passam a ser **pedir** e **aprovar**,
+  como o ajuste de estoque: quem pede não aprova, nem o Admin Geral.
+- Enquanto estiver pendente, nada muda: o boleto continua em aberto e a sobra
+  continua disponível.
+
 **Fase 4 — quem fez** (🟡)
 - Revisão e embalagem gravam a pessoa (R-ACE-06, dívida 9).
 
@@ -117,17 +126,14 @@ sob medida trata a pessoa como dono.
   aceitar 4. HTTPS no servidor (R-ACE-07, dívida 2). Precisa de configuração
   no servidor, além do código.
 
-## 6. Perguntas ao dono
+## 6. Perguntas ao dono — respondidas em 21/10/2026
 
-- **P1.** Na fase 1, quem hoje está no setor **Admin** (não Admin Geral)
-  continua diretor no sob medida, ou passa a precisar do setor
-  "Sob medida / Cadastros"? Recomendação: passa a precisar, porque é o
-  único jeito de o setor dizer a verdade.
-- **P2.** "Quem pede não aprova" deve valer também para **baixa de boleto** e
-  **descarte de sobra**? Hoje esses dois são feitos por uma pessoa só.
-- **P3.** Na fase 2, o vendedor continua **aprovando o pedido da própria
-  carteira**, como hoje?
-- **P4.** A fase 5 entra antes do time inteiro, ou depois?
+| | Pergunta | Resposta do dono |
+|---|---|---|
+| P1 | Quem está no setor **Admin** (não Admin Geral) deixa de ser diretor no sob medida e passa a precisar do setor "Sob medida / Cadastros"? | **Sim** |
+| P2 | "Quem pede não aprova" vale também para **baixa de boleto** e **descarte de sobra**? | **Sim** → fase 6 |
+| P3 | O vendedor continua **aprovando o pedido da própria carteira**? | **Sim** |
+| P4 | A fase 5 (PIN de 6 dígitos e HTTPS) entra antes do time inteiro? | **Antes** |
 
 ## 7. Fica de fora (ideias anotadas, não são desta spec)
 
