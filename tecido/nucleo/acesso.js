@@ -10,9 +10,14 @@
 // conhecem. Trocar o modelo de acesso do PCP amanha mexe neste arquivo, e em
 // nenhum outro.
 //
-// ⚠️ ORDEM IMPORTA: 'admin' e o dono do PCP e entra como diretor. Quem tem
-// so 'sobmedida' e bancada. Nenhuma area = NAO ENTRA — fechado por padrao,
-// que e a regra 4 do docs/CONTROLE-DE-ACESSO.md.
+// ⚠️ A AREA 'admin' DO PCP NAO ABRE ESTE MODULO (fase 1 da spec
+// ACESSOS-UNIFICADOS, 21/10/2026). O PCP grava 'admin' em quem tem QUALQUER
+// chave de nivel admin — Comprador, Financeiro, uma excecao de "Ver custo" —, e
+// ler isso como diretor dava o modulo inteiro a quem foi posto la para comprar
+// material. Diretor e quem tem sobmedida_adm: o setor "Sob medida / Cadastros"
+// ou o Admin Geral, que recebe todas as areas pelo sincronizarAreas.
+// Quem tem so 'sobmedida' e bancada. Nenhuma area = NAO ENTRA — fechado por
+// padrao, que e a regra 4 do docs/CONTROLE-DE-ACESSO.md.
 
 const AREA_BANCADA = 'sobmedida';        // corta, bipa sobra, imprime etiqueta
 const AREA_CHEFIA  = 'sobmedida_adm';    // + cadastros, parametros, descarte
@@ -60,7 +65,7 @@ const AREAS_PCP = [
 function papelDe(usuario){
   if(!usuario) return null;
   const areas=usuario.areas||[];
-  if(areas.includes('admin')||areas.includes(AREA_CHEFIA)) return 'diretor';
+  if(areas.includes(AREA_CHEFIA)) return 'diretor';
   if(areas.includes(AREA_BANCADA)) return 'cortador';
   if(areas.includes(AREA_VENDA)) return 'vendedor';
   /* PRODUCAO vem por ultimo, e isso nao e ranking: quem tem duas areas fica
@@ -88,7 +93,7 @@ function papelDe(usuario){
 function setoresDe(usuario){
   if(!usuario) return [];
   const areas=usuario.areas||[];
-  const tudo = areas.includes('admin') || areas.includes(AREA_CHEFIA);
+  const tudo = areas.includes(AREA_CHEFIA);
   return SETORES.filter(s => tudo || areas.includes(s.area)).map(s => s.chave);
 }
 

@@ -50,7 +50,17 @@ module.exports=[
 {nome:'a area da bancada vira cortador; a de cadastros, diretor', executar({igual}){
   igual(acesso.papelDe({areas:['sobmedida']}),'cortador','bancada');
   igual(acesso.papelDe({areas:['sobmedida_adm']}),'diretor','chefia');
-  igual(acesso.papelDe({areas:['admin']}),'diretor','o admin do PCP alcanca tudo');
+  /* ⚠️ A AREA 'admin' SOZINHA NAO ABRE O MODULO (fase 1 da ACESSOS-UNIFICADOS,
+     21/10/2026). O PCP grava 'admin' em quem tem QUALQUER chave de nivel admin
+     — Comprador, Financeiro, uma excecao de "Ver custo" — e ler isso como
+     diretor dava o modulo inteiro a quem foi posto la para comprar material.
+     Diretor e quem tem sobmedida_adm: o setor "Sob medida / Cadastros" ou o
+     Admin Geral, que recebe todas as areas. */
+  igual(acesso.papelDe({areas:['admin']}),null,'admin do PCP, sozinho, nao entra');
+  igual(acesso.setoresDe({areas:['admin']}).join(','),'','nem bipa setor nenhum');
+  igual(acesso.papelDe({areas:['admin','sobmedida_adm']}),'diretor','o Admin Geral entra como diretor');
+  igual(acesso.papelDe({areas:['admin','sobmedida_venda']}),'vendedor','admin + venda e vendedor, nao diretor de carona');
+  igual(acesso.papelDe({areas:['admin','sobmedida']}),'cortador','admin + bancada e cortador');
   // Quem tem as duas fica com a maior: acumular area nunca pode TIRAR acesso.
   igual(acesso.papelDe({areas:['sobmedida','sobmedida_adm']}),'diretor','as duas juntas');
 }},
@@ -68,10 +78,10 @@ module.exports=[
   igual(pode(v,'credito.editar'),false,'nem mexe no limite de credito');
 
   /* ⚠️ E A AREA DE VENDA NAO PODE VIRAR 'admin' NO PCP. `sincronizarAreas`
-     poe a area 'admin' em quem tem QUALQUER chave de nivel admin, e a linha
-     acima mostra que 'admin' aqui e lido como DIRETOR. Se `sobmedida.vender`
-     fosse declarada como admin no PCP, o vendedor entraria com o modulo
-     inteiro na mao — sem ninguem pedir, e sem erro em tela nenhuma. */
+     poe a area 'admin' em quem tem QUALQUER chave de nivel admin. Ate 21/10
+     'admin' aqui era lido como DIRETOR, e o vendedor entraria com o modulo
+     inteiro na mao. Hoje 'admin' nao abre o modulo, mas a chave continua
+     operacao: nivel admin daria a ele o /admin do PCP. */
   const fs=require('fs'), path=require('path');
   const perms=fs.readFileSync(path.join(__dirname,'..','..','permissoes.js'),'utf8');
   const linha=perms.split('\n').filter(l=>l.indexOf("chave:'sobmedida.vender'")>=0).join('');
@@ -102,7 +112,7 @@ module.exports=[
 }},
 
 {nome:'o nome vem do PCP, o papel e daqui', executar({igual}){
-  const u=acesso.daSessaoDoPcp({id:3,nome:'Lucas',areas:['admin']});
+  const u=acesso.daSessaoDoPcp({id:3,nome:'Lucas',areas:['admin','sobmedida_adm']});
   igual(u.nome,'Lucas','nome do PCP');
   igual(u.papel,'diretor','papel traduzido aqui');
   igual(u.via,'pcp','marcado como vindo de la');
@@ -116,9 +126,14 @@ module.exports=[
   const s=await subir(()=>quem);
   servidor=s.servidor; porta=s.porta;
 
-  quem={id:1,nome:'Lucas',areas:['admin']};
+  quem={id:1,nome:'Lucas',areas:['admin','sobmedida_adm']};
   const bom=await pedir(porta,'/sobmedida');
   igual(bom.status,200,'diretor abre o inicio');
+
+  /* O Comprador: a area 'admin' que o PCP grava para ele NAO abre a porta. */
+  quem={id:9,nome:'Comprador',areas:['admin','recebimento']};
+  igual((await pedir(porta,'/sobmedida')).status,403,'quem so tem admin do PCP e barrado');
+  igual((await pedir(porta,'/sobmedida/api/eu')).status,403,'e a API tambem');
 
   quem={id:2,nome:'Ze',areas:['operador']};
   const barrado=await pedir(porta,'/sobmedida');
@@ -158,7 +173,7 @@ module.exports=[
 }},
 
 {nome:'NENHUM .html sai do disco por caminho direto', async executar({igual}){
-  quem={id:1,nome:'Lucas',areas:['admin']};
+  quem={id:1,nome:'Lucas',areas:['admin','sobmedida_adm']};
   const r=await pedir(porta,'/sobmedida/telas/cadastros.html');
   igual(r.status,403,'nem para o diretor');
   // E a armadilha #3 do CLAUDE.md por dentro deste modulo: o static existe
@@ -167,7 +182,7 @@ module.exports=[
 }},
 
 {nome:'o TEMA vem do servidor: bancada clara, escritorio escuro', async executar({igual}){
-  quem={id:1,nome:'Lucas',areas:['admin']};
+  quem={id:1,nome:'Lucas',areas:['admin','sobmedida_adm']};
   const corte=await pedir(porta,'/sobmedida/corte');
   const cad=await pedir(porta,'/sobmedida/cadastros');
   igual(corte.corpo.includes('data-contexto="operacao"'),true,'corte e de bancada');
@@ -261,7 +276,7 @@ module.exports=[
      ordem do trabalho fosse essa. */
   igual(u(['sobmedida_embalagem','sobmedida_serralheria']).setores.join(','),
     'serralheria,embalagem','dois setores saem na ordem da fabrica');
-  igual(u(['admin']).setores.join(','),
+  igual(u(['admin','sobmedida_adm']).setores.join(','),
     'serralheria,colecao,montagem,revisao,embalagem','e o diretor bipa os cinco');
 }},
 

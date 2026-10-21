@@ -31,8 +31,11 @@ const SOBMEDIDA='/sobmedida';
 // 'admin' alcanca o sob medida: o portao do modulo le a area 'admin' como
 // diretor (tecido/nucleo/acesso.js). Toda area do modulo comeca com
 // 'sobmedida' — a de bancada, a de cadastros, a de venda e as cinco da producao.
+/* A area 'admin' sozinha NAO alcanca o sob medida (fase 1 da ACESSOS-UNIFICADOS):
+   o portao do modulo deixou de le-la como diretor, e o botao levaria a "sem
+   acesso". O Admin Geral alcanca, porque recebe sobmedida_adm. */
 function alcancaSobMedida(areas){
-  return (areas||[]).some(a=>a==='admin' || /^sobmedida(_|$)/.test(a));
+  return (areas||[]).some(a=>/^sobmedida(_|$)/.test(a));
 }
 
 function telaPadrao(areas){

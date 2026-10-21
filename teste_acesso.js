@@ -273,8 +273,8 @@ ok('ele nao corta nem cadastra tecido',
 const acessoSM = require('./tecido/nucleo/acesso');
 eq('o modulo traduz essa area em "vendedor"',
   acessoSM.papelDe({ areas: ['sobmedida_venda'] }), 'vendedor');
-eq('...e "admin" continuaria valendo diretor, que e o motivo da trava acima',
-  acessoSM.papelDe({ areas: ['admin'] }), 'diretor');
+eq('...e "admin" sozinha NAO abre o sob medida (fase 1 da ACESSOS-UNIFICADOS)',
+  acessoSM.papelDe({ areas: ['admin'] }), null);
 
 console.log('\n── 6-C. os CINCO SETORES DE PRODUCAO do sob medida (fase 5-A) ──');
 /* Decisao do dono, 24/09/2026: "tem que ser possivel a gente criar cada setor
@@ -383,7 +383,7 @@ eq('...e continua bipando a embalagem do mesmo jeito',
 /* O diretor bipa todos, por coerencia com o `*` das chaves dele: recusar o
    dono numa bancada seria trava disparando no caso normal (armadilha #6). */
 eq('o diretor bipa os cinco',
-  setoresDe(['admin']).length, 5);
+  setoresDe(['admin','sobmedida_adm']).length, 5);
 
 console.log('\n── 6-D. cadastrar sob medida e CHEFIA DO MODULO, nao admin do PCP ──');
 /* 24/09/2026. `sobmedida.cadastrar` era declarada `nivel:'admin'`, e isso
@@ -798,6 +798,53 @@ console.log('\n── 6-G. o ajuste em duas pessoas (fase 3 da ESTOQUE-LIVRO-E-C
   ok('o setor Admin nativo nasce com as duas',
      (function(){ const id = db.prepare("SELECT id FROM setores WHERE nome='Admin'").get().id;
        return tem(id,'estoque.ajustar') && tem(id,'estoque.aprovar_ajuste'); })());
+}
+
+console.log('\n── 6-H. a area "admin" nao abre o sob medida (fase 1 da ACESSOS-UNIFICADOS) ──');
+/* Ate 21/10/2026 quem tinha QUALQUER chave de nivel admin entrava no sob
+   medida como DIRETOR: o `sincronizarAreas` grava a area 'admin' e o
+   `papelDe` lia essa area como diretor. Os setores Comprador e Financeiro sao
+   de nivel admin, entao quem fosse posto la para comprar material ou pagar
+   fornecedor lancava boleto, descartava sobra e aprovava correcao de corte.
+   Decisao do dono (P1): diretor e so o Admin Geral e o setor
+   "Sob medida / Cadastros".
+   ⚠️ A prova pergunta ao codigo que GRAVA a area (sincronizarAreas) e ao que
+   a LE (papelDe e destino), e nunca remonta a conta aqui. */
+{
+  const SM = require('./tecido/nucleo/acesso');
+  const { destino } = require('./destino');
+  const areasDe = id => { AC.sincronizarAreas(id);
+    return (db.prepare('SELECT areas FROM usuarios WHERE id=?').get(id).areas || '').split(',').filter(Boolean); };
+  const noSetor = (nome, setor) => {
+    const id = db.prepare("INSERT INTO usuarios (nome,pin_hash,salt,areas,ativo) VALUES (?,'x','y','',1)").run(nome).lastInsertRowid;
+    if(setor) db.prepare("INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,(SELECT id FROM setores WHERE nome=?))").run(id, setor);
+    return id;
+  };
+  for(const setor of ['Comprador','Financeiro','Admin']){
+    const id = noSetor('So ' + setor, setor);
+    const areas = areasDe(id);
+    ok('  ' + setor + ': o PCP ainda grava a area "admin" (ela abre o /admin)', areas.includes('admin'),
+      'areas: ' + areas.join(','));
+    eq('  ' + setor + ': e o sob medida NAO o recebe como diretor', SM.papelDe({ areas }), null);
+    eq('  ' + setor + ': nem como bancada de setor nenhum', SM.setoresDe({ areas }).join(','), '');
+    eq('  ' + setor + ': e a barra nao oferece o "Sob medida"', destino(areas).sobmedida, null);
+  }
+  /* A excecao solta pela mesma porta: "Ver custo" e de nivel admin. */
+  const uCusto = noSetor('So custo', null);
+  db.prepare("INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,'custo.ver',1)").run(uCusto);
+  eq('  a excecao "Ver custo" tambem nao vira diretor', SM.papelDe({ areas: areasDe(uCusto) }), null);
+  /* Os que CONTINUAM diretor. */
+  const uAG = noSetor('Geral da fase 1', 'Admin Geral');
+  const aAG = areasDe(uAG);
+  eq('  o Admin Geral continua diretor (ele recebe sobmedida_adm)', SM.papelDe({ areas: aAG }), 'diretor');
+  eq('  e bipa os cinco setores', SM.setoresDe({ areas: aAG }).length, 5);
+  const uCadF1 = noSetor('Cadastros da fase 1', 'Sob medida / Cadastros');
+  eq('  o setor "Sob medida / Cadastros" continua diretor', SM.papelDe({ areas: areasDe(uCadF1) }), 'diretor');
+  /* Quem tem admin E uma area do sob medida fica com o papel DA AREA, e nao
+     com o de diretor por carona. */
+  const uCompVend = noSetor('Comprador que vende', 'Comprador');
+  db.prepare("INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,(SELECT id FROM setores WHERE nome='Sob medida / Venda'))").run(uCompVend);
+  eq('  Comprador + Venda vira vendedor, e nao diretor', SM.papelDe({ areas: areasDe(uCompVend) }), 'vendedor');
 }
 
 console.log('\n── 16. a cobertura passou a VARRER o app ──');
