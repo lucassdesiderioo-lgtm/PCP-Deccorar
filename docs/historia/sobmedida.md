@@ -2590,3 +2590,7 @@ Os testes foram escritos antes do conserto e reprovaram com o código de então
 de um `SELECT` só de leitura, para o dono decidir quem precisa do setor de
 cadastros.
 
+> ✅ **No ar e conferida em 21/10/2026** (PR #212). O `SELECT` de antes do
+> deploy não listou ninguém — nenhuma pessoa ativa tinha a área `admin` sem
+> `sobmedida_adm` —, e o dono entrou como Admin Geral e conferiu que o sob
+> medida abriu inteiro.

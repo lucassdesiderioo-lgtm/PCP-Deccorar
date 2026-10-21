@@ -53,7 +53,7 @@
       <h2>Pessoas</h2>
       <div style="display:flex;gap:6px;margin-bottom:6px">
         <input class="tin" id="npNome" placeholder="Nova pessoa" style="flex:1;min-width:0">
-        <input class="tin" id="npPin" placeholder="PIN" maxlength="6" inputmode="numeric" style="width:70px">
+        <input class="tin" id="npPin" placeholder="PIN (6)" maxlength="6" inputmode="numeric" style="width:80px">
         <button class="primary" style="padding:9px 12px" onclick="criarPessoa()">+</button>
       </div>
       <div class="msg" id="npMsg" style="margin:0 0 8px"></div>
@@ -134,7 +134,7 @@ async function criarPessoa(){
   var nome=$('#npNome').value.trim(), pin=$('#npPin').value.trim();
   $('#npMsg').style.color='#f85149';
   if(!nome){ $('#npMsg').textContent='Informe o nome'; return; }
-  if(pin.length<4){ $('#npMsg').textContent='PIN de 4 dígitos'; return; }
+  if(!/^[0-9]{6}$/.test(pin)){ $('#npMsg').textContent='O PIN tem que ter 6 números.'; return; }
   var r=await jpost('/api/usuarios',{nome:nome,pin:pin});
   if(r.erro){ $('#npMsg').textContent=r.erro; return; }
   $('#npNome').value=''; $('#npPin').value=''; $('#npMsg').textContent='';
@@ -144,6 +144,7 @@ async function criarPessoa(){
 async function salvarPessoa(){
   var nome=$('#pNome').value.trim(), pin=$('#pPin').value.trim();
   if(!nome){ $('#pMsg').style.color='#f85149'; $('#pMsg').textContent='Informe o nome'; return; }
+  if(pin&&!/^[0-9]{6}$/.test(pin)){ $('#pMsg').style.color='#f85149'; $('#pMsg').textContent='O PIN tem que ter 6 números.'; return; }
   var body={id:SEL,nome:nome}; if(pin) body.pin=pin;
   var r=await jpost('/api/usuarios',body);
   if(r.erro){ $('#pMsg').style.color='#f85149'; $('#pMsg').textContent=r.erro; return; }
@@ -238,7 +239,7 @@ function renderDetalhe(){
   var isAG=EST.setores.some(function(s){return s.nivel==='admin_geral';});
   var h='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'
     +'<input class="tin" id="pNome" value="'+String(p.nome).replace(/"/g,"&quot;")+'" style="flex:1;min-width:150px">'
-    +'<input class="tin" id="pPin" placeholder="novo PIN (vazio = mantém)" maxlength="6" inputmode="numeric" style="width:190px">'
+    +'<input class="tin" id="pPin" placeholder="novo PIN de 6 (vazio = mantém)" maxlength="6" inputmode="numeric" style="width:190px">'
     +'<button class="primary" onclick="salvarPessoa()">Salvar</button>'
     +'<button class="ghost" onclick="toggleAtivo()">'+(p.ativo?'Desativar':'Reativar')+'</button>'
     +'<button class="del" onclick="excluirPessoa()">Excluir</button>'

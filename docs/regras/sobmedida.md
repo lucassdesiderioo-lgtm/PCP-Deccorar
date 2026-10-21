@@ -77,7 +77,7 @@
 - **Por quê:** o PCP grava a área `admin` em quem tem **qualquer** chave de nível admin. Os setores Comprador e Financeiro são de nível admin, e uma exceção de "Ver custo" também. Ler isso como diretor dava a quem foi posto lá para comprar material o direito de lançar e baixar boleto, mexer em preço e parâmetro, descartar sobra e aprovar correção de corte — sem ninguém pedir e sem aviso.
 - **Exceções:** o "modo antigo" de acesso (reversão de emergência) não recalcula as áreas; quem já era Admin Geral continua com `sobmedida_adm` gravada.
 - **Teste que trava:** `teste_acesso.js` (seção 6-H: Comprador, Financeiro, Admin e a exceção "Ver custo" pelo `sincronizarAreas` de verdade) · `tecido/teste/acesso.test.js` (a conta e o portão pelo fio) · `teste_destino.js`.
-- **Status:** em código desde 21/10/2026 (fase 1 da spec `ACESSOS-UNIFICADOS`); ainda não está no ar.
+- **Status:** no ar e conferida em 21/10/2026 (fase 1 da spec `ACESSOS-UNIFICADOS`, PR #212).
 - **História:** decisão do dono P1 de 21/10/2026, em `docs/historia/sobmedida.md` e `docs/DECISOES.md`.
 
 ---

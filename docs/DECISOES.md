@@ -274,3 +274,12 @@ tudo lá. **Depois:** diretor é só o Admin Geral e quem está no setor "Sob me
 Cadastros"; quem tem só a área `admin` não entra no módulo e não vê o botão
 "Sob medida →". Detalhe no `CLAUDE.md` §19 (R-SMA-03).
 
+## 21/10/2026 — o PIN passa a ter 6 dígitos, e quem tem 4 troca no próximo uso
+Decisão do dono (pergunta P4 e fase 5-A da spec `ACESSOS-UNIFICADOS`), antes de o
+time inteiro (cerca de 20 logins) ser cadastrado. **Antes:** PIN de 4 dígitos,
+criado pelo cadastro e nunca trocado pela pessoa. **Depois:** pessoa nova e PIN
+trocado no `/acessos` só com **6 números**; quem ainda entra com 4 é levado a criar
+o de 6 **na próxima vez que usar o sistema** — inclusive com a sessão já aberta,
+porque a sessão dura 1 ano e os tablets quase nunca passam pelo login. A troca
+pede o **PIN de hoje**, e o PIN de hoje errado conta na mesma trava de 5 erros do
+login. Detalhe no `CLAUDE.md` §10.

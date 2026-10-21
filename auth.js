@@ -67,7 +67,18 @@ const API_ADMIN=['/api/teste','/api/usuarios','/api/estoque','/api/alvo','/api/b
 const LIVRE=['/login','/login.html','/nav.js','/favicon.ico'];
 
 module.exports=function(app, db){
-  db.exec("CREATE TABLE IF NOT EXISTS usuarios(id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, salt TEXT NOT NULL, pin_hash TEXT NOT NULL, areas TEXT NOT NULL DEFAULT '', ativo INTEGER NOT NULL DEFAULT 1, criado_em TEXT DEFAULT (datetime('now','localtime')))");
+  db.exec("CREATE TABLE IF NOT EXISTS usuarios(id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, salt TEXT NOT NULL, pin_hash TEXT NOT NULL, areas TEXT NOT NULL DEFAULT '', ativo INTEGER NOT NULL DEFAULT 1, criado_em TEXT DEFAULT (datetime('now','localtime')), pin_curto INTEGER NOT NULL DEFAULT 1)");
+  /* PIN DE 6 DIGITOS (ACESSOS-UNIFICADOS fase 5-A, 21/10/2026). `pin_curto=1`
+     quer dizer "esta pessoa ainda entra com o PIN de 4 e tem que trocar". O
+     hash nao diz o tamanho do PIN, entao a marca e uma coluna: quem ja estava
+     no banco nasce marcado, porque ate aqui todo PIN era de 4. Ela so vira 0
+     quando um PIN de 6 e gravado (troca pela pessoa ou pelo cadastro).
+
+     A troca e cobrada no USO, nao so no login: a sessao dura 1 ano e os
+     tablets quase nunca passam pela tela de PIN. */
+  try{ db.exec('ALTER TABLE usuarios ADD COLUMN pin_curto INTEGER NOT NULL DEFAULT 1'); }catch(e){ /* ja existe */ }
+  const PIN_OK=/^[0-9]{6}$/;
+  const ERRO_PIN='O PIN tem que ter 6 números.';
 
   const arqSeg=path.join(__dirname,'.session_secret');
   let SEG;
@@ -77,10 +88,16 @@ module.exports=function(app, db){
   const hash=(pin,salt)=>crypto.scryptSync(String(pin),salt,32).toString('hex');
   const assina=v=>crypto.createHmac('sha256',SEG).update(v).digest('hex').slice(0,32);
 
+  // O seed do Administrador (1234) e a unica pessoa criada com PIN curto: ele
+  // nasce marcado e cai na troca no primeiro uso.
   function criar(nome,pin,areas){
     const salt=crypto.randomBytes(16).toString('hex');
-    return db.prepare('INSERT INTO usuarios(nome,salt,pin_hash,areas) VALUES(?,?,?,?)')
-      .run(nome,salt,hash(pin,salt),(areas||[]).join(','));
+    return db.prepare('INSERT INTO usuarios(nome,salt,pin_hash,areas,pin_curto) VALUES(?,?,?,?,?)')
+      .run(nome,salt,hash(pin,salt),(areas||[]).join(','),PIN_OK.test(String(pin))?0:1);
+  }
+  function gravarPin(id,pin){
+    const salt=crypto.randomBytes(16).toString('hex');
+    db.prepare('UPDATE usuarios SET salt=?,pin_hash=?,pin_curto=0 WHERE id=?').run(salt,hash(pin,salt),id);
   }
 
   if(db.prepare('SELECT COUNT(*) c FROM usuarios').get().c===0){
@@ -99,9 +116,9 @@ module.exports=function(app, db){
     if(assina(corpo)!==sig) return null;
     try{
       const o=JSON.parse(Buffer.from(corpo,'base64').toString('utf8'));
-      const u=db.prepare('SELECT id,nome,areas,ativo FROM usuarios WHERE id=?').get(o.id);
+      const u=db.prepare('SELECT id,nome,areas,ativo,pin_curto FROM usuarios WHERE id=?').get(o.id);
       if(!u||!u.ativo) return null;
-      return {id:u.id,nome:u.nome,areas:u.areas.split(',').filter(Boolean)};
+      return {id:u.id,nome:u.nome,areas:u.areas.split(',').filter(Boolean),trocarPin:!!u.pin_curto};
     }catch(e){ return null; }
   }
 
@@ -125,6 +142,16 @@ module.exports=function(app, db){
     if(LIVRE.includes(p)||p.startsWith('/api/auth/')) return next();
     const u=lerSessao(req);
     req.usuario=u;
+    /* PIN DE 4 DIGITOS: ate trocar, nada alem do login e da propria troca
+       (fase 5-A). Fica ANTES do desvio do sob medida, para valer la tambem.
+       Arquivo de apoio (.js, .css, imagem) segue o caminho normal: so tela
+       e API sao barradas. A tela leva o `r`, para o tablet voltar a estacao
+       dele depois da troca. */
+    if(u&&u.trocarPin){
+      if(p.startsWith('/api/')||p.startsWith(SOBMEDIDA+'/api/'))
+        return res.status(403).json({erro:'trocar_pin'});
+      if(!/\.[a-z0-9]+$/i.test(p)||/\.html$/i.test(p)) return res.redirect('/login?trocar=1&r='+encodeURIComponent(req.originalUrl));
+    }
     /* SOB MEDIDA — o modulo montado em /sobmedida tem portao proprio
        (tecido/montar.js): ele traduz area do PCP em papel e confere permissao
        por chave, tela a tela. Aqui so se passa a sessao adiante.
@@ -183,7 +210,31 @@ module.exports=function(app, db){
     res.setHeader('Set-Cookie','sess='+encodeURIComponent(corpo+'.'+assina(corpo))+'; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax');
     aud({usuario:{id:u.id,nome:u.nome},headers:req.headers,socket:req.socket},'acesso','login',u.nome,'');
     const areasU=u.areas.split(',').filter(Boolean);
-    res.json({ok:true,nome:u.nome,areas:areasU,destino:destino(areasU)});
+    res.json({ok:true,nome:u.nome,areas:areasU,destino:destino(areasU),trocar_pin:!!u.pin_curto});
+  });
+
+  /* A pessoa troca o proprio PIN. Exige o PIN ATUAL: num tablet deixado
+     logado, qualquer um que passasse trocaria o PIN de quem esta na sessao.
+     O PIN atual errado conta na MESMA trava do login (5 erros, 1 minuto),
+     senao esta rota viraria a porta para chutar PIN. */
+  app.post('/api/auth/trocar-pin',(req,res)=>{
+    const s=lerSessao(req);
+    if(!s) return res.status(401).json({erro:'nao_logado'});
+    const {atual,novo}=req.body||{};
+    const quem={usuario:{id:s.id,nome:s.nome},headers:req.headers,socket:req.socket};
+    if(bloqueado(s.id)) return res.status(429).json({erro:'Muitas tentativas. Aguarde 1 minuto.'});
+    const u=db.prepare('SELECT * FROM usuarios WHERE id=? AND ativo=1').get(s.id);
+    if(!u||hash(atual,u.salt)!==u.pin_hash){
+      const f=falhas[s.id]||{n:0,t:0};
+      falhas[s.id]={n:(Date.now()-f.t<60000?f.n:0)+1,t:Date.now()};
+      aud(quem,'acesso','pin_errado',String(s.id),'troca de PIN');
+      return res.status(401).json({erro:'PIN atual incorreto'});
+    }
+    delete falhas[s.id];
+    if(!PIN_OK.test(String(novo==null?'':novo))) return res.status(400).json({erro:ERRO_PIN});
+    gravarPin(s.id,String(novo));
+    aud(quem,'acesso','troca_pin',s.nome,'');
+    res.json({ok:true,destino:destino(s.areas)});
   });
 
   app.post('/api/auth/logout',(req,res)=>{
@@ -211,15 +262,16 @@ module.exports=function(app, db){
       // nome/PIN sem tocar neles (areas passou a ser derivada dos setores).
       if(ativo!==undefined && !ativo && ehUltimoAdminGeral(id))
         return res.status(400).json({erro:'Esta é a única pessoa com acesso total (Admin Geral). Dê esse acesso a outra pessoa antes de bloquear esta.'});
+      // PIN vazio ou ausente = mantem. PIN mandado e fora do formato e
+      // RECUSADO antes de gravar qualquer coisa — ate 21/10/2026 um PIN de 3
+      // digitos era ignorado em silencio e a tela dizia "salvo".
+      if(pin!==undefined&&pin!==null&&pin!==''&&!PIN_OK.test(String(pin))) return res.status(400).json({erro:ERRO_PIN});
       db.prepare('UPDATE usuarios SET nome=? WHERE id=?').run(nome,id);
       if(areas!==undefined) db.prepare('UPDATE usuarios SET areas=? WHERE id=?').run((areas||[]).join(','),id);
       if(ativo!==undefined) db.prepare('UPDATE usuarios SET ativo=? WHERE id=?').run(ativo?1:0,id);
-      if(pin&&String(pin).length>=4){
-        const salt=crypto.randomBytes(16).toString('hex');
-        db.prepare('UPDATE usuarios SET salt=?,pin_hash=? WHERE id=?').run(salt,hash(pin,salt),id);
-      }
+      if(pin) gravarPin(id,String(pin));
     } else {
-      if(!pin||String(pin).length<4) return res.status(400).json({erro:'PIN de 4 digitos obrigatorio'});
+      if(!PIN_OK.test(String(pin==null?'':pin))) return res.status(400).json({erro:ERRO_PIN});
       const r=criar(nome,pin,areas||[]);
       return res.json({ok:true,id:r.lastInsertRowid});
     }

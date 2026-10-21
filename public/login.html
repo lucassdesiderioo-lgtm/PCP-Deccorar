@@ -30,8 +30,8 @@
   </div>
   <div id="etapa2" class="hide">
     <h1 id="oi"></h1>
-    <div class="sub">Digite seu PIN de 4 digitos</div>
-    <div class="dots"><div class="d"></div><div class="d"></div><div class="d"></div><div class="d"></div></div>
+    <div class="sub" id="pede">Digite seu PIN</div>
+    <div class="dots"><div class="d"></div><div class="d"></div><div class="d"></div><div class="d"></div><div class="d"></div><div class="d"></div></div>
     <div class="pad">
       <div class="k">1</div><div class="k">2</div><div class="k">3</div>
       <div class="k">4</div><div class="k">5</div><div class="k">6</div>
@@ -43,41 +43,110 @@
   </div>
 </div>
 <script>
-var alvo=null, pin='';
-var destino=new URLSearchParams(location.search).get('r')||'';
+/* PIN DE 6 DIGITOS (ACESSOS-UNIFICADOS fase 5-A, 21/10/2026).
+   A tela nao sabe o tamanho do PIN de cada pessoa: quem ja tem 6 entra
+   sozinho no sexto digito, e quem ainda tem 4 toca OK. Quem entra com 4 e
+   levado a criar o de 6 — e quem tem sessao aberta com PIN de 4 chega aqui
+   pelo /login?trocar=1, mandado pelo servidor.
+
+   As etapas usam o mesmo teclado:
+     pin   — o PIN de entrar
+     atual — o PIN de hoje, para trocar (so quando chegou ja logado)
+     novo  — o PIN novo de 6
+     conf  — o PIN novo de novo, para conferir */
+var alvo=null, pin='', etapa='pin', atual='', novoPin='';
+var q=new URLSearchParams(location.search);
+var destino=q.get('r')||'';
+var MAX=6;
 function $(s){return document.querySelector(s);}
+var TEXTO={
+  pin:'Digite seu PIN. Se ele tem 4 números, toque OK.',
+  atual:'O PIN agora tem 6 números. Para trocar, digite o seu PIN de hoje e toque OK.',
+  novo:'Crie seu PIN novo, com 6 números.',
+  conf:'Digite o PIN novo de novo, para conferir.'
+};
+function mostrar(e){
+  etapa=e; pin=''; pontos();
+  $('#pede').textContent=TEXTO[e];
+  $('#volta').textContent=(e==='pin')?'Nao sou eu \u2014 trocar':'Entrar com outro usuario';
+  $('#etapa1').classList.add('hide'); $('#etapa2').classList.remove('hide');
+}
 fetch('/api/auth/pessoas').then(r=>r.json()).then(function(l){
   $('#nomes').innerHTML=l.map(p=>'<div class="nome" data-id="'+p.id+'">'+p.nome+'</div>').join('');
 });
+/* Chegou com a sessao aberta e o PIN ainda de 4: pede o de hoje e troca. */
+fetch('/api/auth/eu').then(r=>r.json()).then(function(e){
+  if(e&&e.logado&&e.trocarPin){
+    alvo={id:e.id,nome:e.nome}; $('#oi').textContent='Ola, '+e.nome; mostrar('atual');
+  }
+}).catch(function(){});
 document.addEventListener('click',function(e){
   var n=e.target.closest('.nome');
-  if(n){ alvo={id:+n.dataset.id,nome:n.textContent}; pin=''; pontos();
-         $('#oi').textContent='Ola, '+alvo.nome; $('#etapa1').classList.add('hide'); $('#etapa2').classList.remove('hide'); return; }
-  if(e.target.id==='volta'){ $('#etapa2').classList.add('hide'); $('#etapa1').classList.remove('hide'); return; }
+  if(n){ alvo={id:+n.dataset.id,nome:n.textContent}; $('#err').textContent='';
+         $('#oi').textContent='Ola, '+alvo.nome; mostrar('pin'); return; }
+  if(e.target.id==='volta'){
+    if(etapa==='pin'){ $('#etapa2').classList.add('hide'); $('#etapa1').classList.remove('hide'); return; }
+    fetch('/api/auth/logout',{method:'POST'}).finally(function(){ location.href='/login'; });
+    return;
+  }
   var k=e.target.closest('.k'); if(!k) return;
   var a=k.dataset.a;
-  if(a==='del'){ pin=pin.slice(0,-1); }
-  else if(a==='ok'){ enviar(); }
-  else if(pin.length<4){ pin+=k.textContent.trim(); }
-  pontos();
-  if(pin.length===4) setTimeout(enviar,120);
+  if(a==='del'){ pin=pin.slice(0,-1); pontos(); return; }
+  if(a==='ok'){ enviar(); return; }
+  digito(k.textContent.trim());
 });
 document.addEventListener('keydown',function(e){
-  if(/^[0-9]$/.test(e.key)&&pin.length<4&&alvo){ pin+=e.key; pontos(); if(pin.length===4) setTimeout(enviar,120); }
-  if(e.key==='Backspace'&&alvo){ pin=pin.slice(0,-1); pontos(); }
+  if(!alvo) return;
+  if(/^[0-9]$/.test(e.key)) digito(e.key);
+  if(e.key==='Backspace'){ pin=pin.slice(0,-1); pontos(); }
+  if(e.key==='Enter') enviar();
 });
+function digito(c){
+  if(pin.length>=MAX) return;
+  pin+=c; pontos();
+  if(pin.length===MAX) setTimeout(enviar,120);
+}
 function pontos(){
   document.querySelectorAll('.d').forEach(function(d,i){ d.classList.toggle('on',i<pin.length); });
 }
+function erro(t){ $('#err').textContent=t; pin=''; pontos(); }
+function seguir(d){ location.href=destino||((d&&d.inicial)||'/login'); }
 function enviar(){
-  if(!alvo||pin.length<4) return;
-  fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({id:alvo.id,pin:pin})})
-   .then(r=>r.json().then(j=>({ok:r.ok,j:j})))
-   .then(function(r){
-     if(!r.ok){ $('#err').textContent=r.j.erro||'Erro'; pin=''; pontos(); return; }
-     location.href=destino||((r.j.destino&&r.j.destino.inicial)||'/login');
-   });
+  if(!alvo) return;
+  $('#err').textContent='';
+  if(etapa==='pin'){
+    if(pin.length<4) return;
+    var digitado=pin;
+    fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:alvo.id,pin:digitado})})
+     .then(r=>r.json().then(j=>({ok:r.ok,j:j})))
+     .then(function(r){
+       if(!r.ok) return erro(r.j.erro||'Erro');
+       /* Entrou com o PIN de 4: o de hoje ja foi digitado, vai direto ao novo. */
+       if(r.j.trocar_pin){ atual=digitado; return mostrar('novo'); }
+       seguir(r.j.destino);
+     });
+    return;
+  }
+  if(etapa==='atual'){ if(pin.length<4) return; atual=pin; return mostrar('novo'); }
+  if(etapa==='novo'){
+    if(pin.length<MAX) return erro('O PIN novo tem que ter 6 números.');
+    novoPin=pin; return mostrar('conf');
+  }
+  if(etapa==='conf'){
+    if(pin.length<MAX) return;
+    if(pin!==novoPin){ mostrar('novo'); return erro('Os dois PINs não batem. Crie de novo.'); }
+    fetch('/api/auth/trocar-pin',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({atual:atual,novo:novoPin})})
+     .then(r=>r.json().then(j=>({ok:r.ok,status:r.status,j:j})))
+     .then(function(r){
+       if(r.ok) return seguir(r.j.destino);
+       /* O PIN de hoje estava errado: volta a pedi-lo. Os outros erros
+          (429, formato) voltam ao PIN novo, com a frase do servidor. */
+       if(r.status===401){ mostrar('atual'); return erro(r.j.erro||'PIN atual incorreto'); }
+       mostrar(r.status===429?'atual':'novo'); erro(r.j.erro||'Erro');
+     });
+  }
 }
 // PARA ONDE A PESSOA VAI DEPOIS DO PIN: quem responde e o servidor
 // (`destino.js`, o dono unico), na propria resposta do login. A copia que
