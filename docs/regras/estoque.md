@@ -368,3 +368,129 @@ R-EST-04 (reimpressão não baixa), R-REV-01 (os três modos), R-REV-02 (SKU for
 da lista), R-REV-03 (ordem da tela azul), R-REV-06 (peça com problema),
 R-EMB-05 (conferência no bipe 1) e as partes de tela de R-EST-11 e R-EST-17.
 Ficam aqui para virar trabalho, e não esquecimento.
+
+## O que NÃO fazer
+
+> Vieram do CLAUDE.md §15 sem alteração, na ordem em que estavam. As
+> referências entre parênteses (§N) apontam para a seção do CLAUDE.md onde
+> a regra morava, hoje em cartão neste arquivo ou na história da área.
+
+- ❌ Calcular a falta de estoque fora do `demanda_dominio.js` — a aba Estoque e a
+  tela azul do operador têm que dizer o mesmo número (§18)
+- ❌ Fazer a aprovação da contagem gravar o **número contado** como saldo: entre
+  contar e aprovar a fábrica embala e imprime, e o que andou no meio some sem
+  erro e sem aviso. A conta é a DIFERENÇA contra o `sistema_era` (§18, #32)
+- ❌ Deixar a contagem de **peça** mexer no saldo sem gravar em `ajuste_estoque`:
+  a de material sempre gravou, e a peça era a metade sem auditoria (§18, #32)
+- ❌ Ler a idade da conferência da tabela `contagem`: ela é RASCUNHO, e o
+  `enfileirar` a apaga — o SKU contado ontem volta a aparecer como nunca
+  conferido (§18, armadilha #32)
+- ❌ Trocar as duas fontes da idade por uma só, ou datá-la pela **aprovação**: a
+  troca apaga a história anterior ao registro do caminho direto, e a data da
+  aprovação rejuvenesce uma conferência que foi feita semanas antes (§18, #32)
+- ❌ Amarrar a conferência ao rastro do ajuste: a contagem que **bateu** não gera
+  linha nenhuma, e é justamente o SKU cujo saldo estava certo que apareceria
+  como nunca conferido (§18, armadilha #32)
+- ❌ Dar por pronta uma fase que tem tela sem ABRIR a tela: a rota do extrato
+  ficou um dia no ar, testada e documentada como pronta, sem botão nenhum que
+  chegasse nela (§2, e é a #30 por outra ponta)
+- ❌ Escrever em `skus.estoque` fora do `estoque_dominio.js` — o saldo tinha
+  SETE donos e por isso não se reconstruía; há varredura recusando (§2, o livro)
+- ❌ Devolver o `MAX(0, …)` a qualquer escrita de saldo: ele apaga justamente o
+  sinal de peça que saiu sem registro, que é o passivo da dívida 13 (§2)
+- ❌ Misturar saldo negativo com "zerado" na aba Estoque: zerado é SKU que
+  acabou, e ninguém investiga o normal (§2, o livro)
+- ❌ Abrir transação dentro do `estoque_dominio`: a embalagem são quatro
+  escritas e a caixa de pacote são N baixas que valem como uma (§2)
+- ❌ Fazer o cadastro de SKU gravar saldo de novo — nem com o campo presente,
+  nem no SKU novo: livro vazio com coluna em 5 quebra a soma na 1ª linha (§2)
+- ❌ Deixar a abertura do livro virar rotina: sem a marca em `config` ela roda a
+  cada boot e o livro passa a dizer o dobro do saldo (§2)
+- ❌ Isentar o `teste_route.js` de uma varredura por causa do prefixo: ele NÃO é
+  teste, é o módulo do modo teste, e é dono de verdade da coluna (§2)
+- ❌ Devolver o saldo, a contagem anterior ou o "bateu/não bateu" a quem conta ou
+  reconta — nem no JSON: quem sabe a resposta conta até chegar nela (§18, fase 2)
+- ❌ Deixar a mesma pessoa recontar ou aprovar o que contou, ou abrir exceção para o
+  Admin Geral: a pergunta é de PESSOA, não de chave (`outraPessoa`, §18)
+- ❌ Comparar a recontagem pelo número contado em vez da diferença contra o saldo
+  do momento: a embalagem no meio mandaria todo SKU para a 3ª contagem (§18)
+- ❌ Voltar a contar peça pela aba Contagem (`/api/contagem`), ou gravar a parte de
+  material de um corpo que trouxe SKU — recusa inteira, e manda ao Inventário (§18)
+- ❌ Ler a idade da conferência de uma fonte só, ou fora do
+  `inventario_dominio.conferencias()` (§18, #32)
+- ❌ Voltar a aplicar ajuste de saldo na hora, pela mão de uma pessoa só: pedir não
+  mexe no saldo, e quem pediu não aprova — nem o Admin Geral (§18, fase 3)
+- ❌ Pedir ajuste em "saldo novo" e aprová-lo como saldo: a aprovação aplica o
+  DELTA sobre o saldo de agora, senão apaga o que andou no meio (§18, #32)
+- ❌ Guardar o pedido pendente em `ajuste_estoque`: cinco lugares o leem como
+  ajuste JÁ aplicado (§18, fase 3)
+- ❌ Aceitar dois pedidos pendentes do mesmo SKU: aprovados em sequência, aplicam
+  a mesma correção duas vezes (§18, fase 3)
+- ❌ Deixar a troca do `kit_codigo` salvar sem `confirmar`, ou mover essa guarda
+  para o `confirm()` da tela — o rolo já impresso para de bipar e ninguém sabe
+  por quê (§4)
+- ❌ Aceitar um SKU de persiana como `kit_codigo`: a partir dali aquela persiana
+  fica **inembalável para sempre**, porque o bipe dela passa a ser lido como o
+  kit — e ninguém liga isso a uma edição feita no Admin (§4, armadilha #26)
+- ❌ Devolver as quatro escritas da embalagem para fora de uma transação, ou
+  voltar a aceitar SKU sem cadastro ali: é a porta de ENTRADA do estoque, e o
+  estado quebrado dela é peça na prateleira que não existe no sistema (§4, #26)
+- ❌ Confiar no `kit_ok` que a tela manda sem conferir nada — o "⚠ FALTOU O KIT"
+  precisa existir no servidor, senão é um `if` de navegador (§4, armadilha #26)
+- ❌ Escrever uma segunda cópia do `kitBate`/`kitNorm`: a tela e o servidor leem
+  o `public/kit_bipe.js`, e duas réguas divergem no dia da troca (§4, #26)
+- ❌ Fazer a embalagem em modo teste consumir a fila REAL — era a dívida 1c, e a
+  peça de verdade sumia quando os testes eram apagados (§4, armadilha #26)
+- ❌ "Consertar" a embalagem para exigir que a peça esteja na fila: a fila não é
+  obrigatória, é regra do §4, e é o que torna o `limpar_fila.js` seguro
+- ❌ Criar um campo separado para o código de barras da etiqueta do kit: ele é
+  sempre o **Código do kit** salvo, senão o impresso e o bipe divergem (§4)
+- ❌ Decidir "cabe na etiqueta?" contando caracteres: 16 letras estreitas cabem
+  e 16 `M` não — quem responde é a medida do `kit_etiqueta.js` (§4)
+- ❌ Escrever as medidas da etiqueta do kit na tela ou no ZPL: elas moram no
+  `public/kit_etiqueta.js`, em milímetros, e a fase 3 sai de lá (§4)
+- ❌ Dizer que a prévia prova a etiqueta impressa: ela prova o CONTEÚDO e o
+  LUGAR — quem desenha o QR e as barras no papel é a impressora (§4)
+- ❌ Desenhar o QR da tela com módulo em pixel quebrado: a grade sai com 2 e 3
+  px alternando e o celular não lê — e o desenho continua com cara de QR (§4)
+- ❌ Arredondar o módulo do QR para CIMA: ele passa do espaço reservado e come a
+  folga do silêncio, que é o que o leitor precisa para achar o código (§4)
+- ❌ Pedir para conferir o QR com o celular só no QR pequeno da prévia: nesse
+  tamanho a câmera não fecha a leitura — é para isso que existe o ampliado (§4)
+- ❌ Ler o tamanho da CAIXA do QR como o tamanho que sai da impressora: o módulo
+  arredonda para ponto cheio e o resto é jogado fora — a caixa dizia 20 mm e a
+  ZD220 imprimia 15,4 (§4, armadilha #31)
+- ❌ Limitar o módulo do QR só pela caixa, sem o `envelope`: link curto tem
+  módulo maior, e o QR cresceria empurrando o próprio silêncio para fora da
+  etiqueta — QR sem silêncio não é lido (§4, armadilha #31)
+- ❌ Fazer a folga da legenda voltar a ser um número fixo: ela é **4 × o
+  módulo**, e o módulo muda com o comprimento do link (§4, armadilha #31)
+- ❌ Estreitar o bloco das barras para dar espaço ao QR: o QR cresce por cima,
+  onde não há barra — afinar a barra é mexer no que a Embalagem bipa (§4, #31)
+- ❌ Montar a zona de silêncio de um caso de teste com um número de módulos
+  escrito ao lado em vez do link do próprio caso — régua própria acusa o
+  inocente hoje e deixa passar o culpado amanhã (§4, armadilha #31)
+- ❌ Mandar tirar o `?usp=drive_link` do link "para o QR ficar melhor": com a
+  caixa de 26 mm o módulo é o mesmo e o QR sai 2,5 mm MENOR. Quem responde é a
+  medida, não a versão — e conselho que sobrevive à trava que o justificava
+  vira conselho errado (§4)
+- ❌ Aprovar texto de tela sem renderizar os casos: a frase que dizia "sai
+  menor — 23,1 mm em vez de 23,1 mm" está sintaticamente perfeita, e nenhum
+  teste de unidade a pega (§4)
+- ❌ Conferir o QR relendo com a mesma convenção com que ele foi escrito: o
+  formato invertido passou por três rodadas verdes assim (§4)
+- ❌ Escrever a área de formato do QR fora da ordem do padrão — o leitor acha o
+  código, não fecha o BCH e desiste sem dizer nada (§4)
+- ❌ Escrever medida dentro do `kit_pdf.js` ou do desenhista de SVG: os dois
+  consomem a lista do `elementos()`, e a segunda régua só aparece no rolo
+  impresso (§4)
+- ❌ Desenhar o QR do PDF fora da grade de 8 pontos/mm: agora quem desenha o QR
+  no papel somos nós, e módulo em ponto quebrado a Zebra rasteriza alternando
+  4 e 5 pontos — o defeito da fase 2, no rolo (§4)
+- ❌ Fazer a impressão do kit usar o texto que veio da tela em vez do salvo no
+  banco: o rolo sairia diferente do que a Embalagem bipa (§4)
+- ❌ Dar `kit.imprimir` a quem já tem `kit.editar` "para facilitar": o dono
+  assinala nome por nome, e isso foi decidido em 17/09/2026 (§4)
+- ❌ Recriar o upload de etiqueta do kit (`/api/kit/label`) ou qualquer segundo
+  caminho de impressão: o arquivo enviado não acompanha o Código do kit, e o
+  rolo impresso por ele para de bipar sem ninguém saber por quê (§4)

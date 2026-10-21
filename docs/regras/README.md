@@ -13,6 +13,10 @@ que provocou a regra, as datas, as conferências na fábrica — fica em
 
 As outras áreas continuam no `CLAUDE.md` até serem passadas para cá, uma por vez.
 
+No fim de cada arquivo de regras fica a seção **"O que NÃO fazer"** da área,
+que veio do §15 do `CLAUDE.md`. O que cita mais de uma área, ou nenhuma,
+continua no §15.
+
 ## O cartão
 
 ```
