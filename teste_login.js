@@ -13,7 +13,10 @@
  *   - o cookie e assinado: mudar o id dentro dele nao vira outra pessoa, e
  *     cortar a assinatura derruba a sessao;
  *   - quem e bloqueado no cadastro perde a sessao que ja tinha;
- *   - sem sessao, API responde 401 e tela manda para o login (302).
+ *   - sem sessao, API responde 401 e tela manda para o login (302);
+ *   - PIN de 4 digitos pede troca no USO, inclusive na sessao ja aberta, e a
+ *     troca exige o PIN atual; o cadastro so aceita 6 digitos (ACESSOS-UNIFICADOS
+ *     fase 5-A, 21/10/2026).
  *
  * Ate 20/10/2026 nenhum teste do projeto passava pelo POST /api/auth/login.
  *
@@ -142,9 +145,97 @@ async function main(){
     s = await fetch(base + '/painel', { redirect:'manual' });
     eq('tela sem sessao responde 302', s.status, 302);
     ok('para o /login', /\/login/.test(s.headers.get('location') || ''), s.headers.get('location'));
+
+    console.log('\n── 7. o PIN de 4 digitos pede troca, inclusive na sessao aberta (fase 5-A) ──');
+    /* Todo mundo de hoje tem 4 digitos, e a sessao dura 1 ano: os tablets quase
+       nunca passam pelo login. Por isso a troca e cobrada no USO, e nao so no
+       login — senao a bancada ficaria um ano com o PIN curto. */
+    r = await login(ANA, '4321');
+    eq('o PIN de 4 digitos ainda entra', r.status, 200);
+    eq('mas a resposta pede a troca', r.body.trocar_pin, true);
+    eq('o /api/auth/eu tambem diz que falta trocar', (await eu(cAna)).trocarPin, true);
     s = await fetch(base + '/api/coisa', { headers:{ cookie: cAna } });
-    eq('com a sessao da Ana, a API responde', s.status, 200);
+    eq('com a sessao ja aberta, a API recusa (403)', s.status, 403);
+    eq('dizendo que e para trocar o PIN', (await s.json()).erro, 'trocar_pin');
+    s = await fetch(base + '/painel', { headers:{ cookie: cAna }, redirect:'manual' });
+    eq('a tela manda para a troca (302)', s.status, 302);
+    eq('no /login?trocar=1, levando a tela de volta', s.headers.get('location'), '/login?trocar=1&r=%2Fpainel');
+    s = await fetch(base + '/sobmedida/corte', { headers:{ cookie: cAna }, redirect:'manual' });
+    ok('vale no sob medida tambem: a tela vai para a troca', /^\/login\?trocar=1/.test(s.headers.get('location') || ''), s.headers.get('location'));
+    s = await fetch(base + '/sobmedida/api/eu', { headers:{ cookie: cAna } });
+    eq('e a API do sob medida recusa', s.status, 403);
+
+    const trocar = async (cookie, atual, novo) => {
+      const q = await fetch(base + '/api/auth/trocar-pin', { method:'POST',
+        headers: Object.assign({ 'content-type':'application/json' }, cookie ? { cookie } : {}),
+        body: JSON.stringify({ atual, novo }) });
+      return { status: q.status, body: await q.json() };
+    };
+    eq('trocar sem sessao: 401', (await trocar(null, '4321', '246810')).status, 401);
+    r = await trocar(cAna, '0000', '246810');
+    eq('trocar com o PIN atual errado: 401', r.status, 401);
+    eq('e o PIN antigo continua valendo', (await login(ANA, '4321')).status, 200);
+    eq('PIN novo de 5 digitos: recusado', (await trocar(cAna, '4321', '24681')).status, 400);
+    eq('PIN novo de 7 digitos: recusado', (await trocar(cAna, '4321', '2468101')).status, 400);
+    r = await trocar(cAna, '4321', '24681a');
+    eq('PIN novo com letra: recusado', r.status, 400);
+    ok('e a recusa diz que sao 6 numeros', /6/.test(r.body.erro || ''), JSON.stringify(r.body));
+    r = await trocar(cAna, '4321', '246810');
+    eq('PIN atual certo e novo de 6 digitos: trocado', r.status, 200);
+    eq('o /api/auth/eu deixa de pedir a troca', (await eu(cAna)).trocarPin, false);
+    s = await fetch(base + '/api/coisa', { headers:{ cookie: cAna } });
+    eq('a MESMA sessao volta a usar a API', s.status, 200);
     eq('e sabe que e ela', (await s.json()).quem, 'Ana');
+    eq('o PIN antigo deixou de entrar', (await login(ANA, '4321')).status, 401);
+    r = await login(ANA, '246810');
+    eq('o novo entra', r.status, 200);
+    eq('e nao pede troca', r.body.trocar_pin, false);
+    eq('quem ja tem 6 pode trocar de novo', (await trocar(cAna, '246810', '135791')).status, 200);
+
+    /* O PIN atual errado conta na mesma trava do login: senao a troca
+       viraria a porta para chutar o PIN de quem deixou o tablet logado. */
+    const cBia = sess((await login(pessoa('Bia', '8080', 'painel'), '8080')).cookie);
+    for(let i=1;i<=5;i++) await trocar(cBia, '0000', '112233');
+    eq('5 PINs atuais errados na troca seguram a pessoa (429)', (await trocar(cBia, '8080', '112233')).status, 429);
+
+    console.log('\n── 8. o cadastro so aceita PIN de 6 digitos ──');
+    let cAdm = sess((await login(ADMIN, '1234')).cookie);
+    eq('o Administrador da instalacao (1234) tambem cai na troca',
+       (await fetch(base + '/api/usuarios', { headers:{ cookie: cAdm } })).status, 403);
+    eq('e troca', (await trocar(cAdm, '1234', '975310')).status, 200);
+    const usuarios = async body => {
+      const q = await fetch(base + '/api/usuarios', { method:'POST',
+        headers:{ 'content-type':'application/json', cookie: cAdm }, body: JSON.stringify(body) });
+      return { status: q.status, body: await q.json() };
+    };
+    r = await usuarios({ nome:'Caio', pin:'1234' });
+    eq('pessoa nova com PIN de 4: recusada', r.status, 400);
+    ok('dizendo que sao 6 numeros', /6/.test(r.body.erro || ''), JSON.stringify(r.body));
+    eq('pessoa nova com PIN de 7: recusada', (await usuarios({ nome:'Caio', pin:'1234567' })).status, 400);
+    r = await usuarios({ nome:'Caio', pin:'123456' });
+    eq('pessoa nova com PIN de 6: criada', r.status, 200);
+    const CAIO = r.body.id;
+    r = await login(CAIO, '123456');
+    eq('ela entra', r.status, 200);
+    eq('e nao cai na troca', r.body.trocar_pin, false);
+    eq('trocar o PIN de alguem para 4 digitos: recusado', (await usuarios({ id:CAIO, nome:'Caio', pin:'9999' })).status, 400);
+    eq('e o PIN dela nao mudou', (await login(CAIO, '123456')).status, 200);
+    eq('editar so o nome, sem PIN: continua valendo', (await usuarios({ id:CAIO, nome:'Caio Silva' })).status, 200);
+    eq('trocar o PIN do Joao para 6 digitos: aceito', (await usuarios({ id:JOAO, nome:'Joao', pin:'555666', ativo:1 })).status, 200);
+    r = await login(JOAO, '555666');
+    eq('o Joao entra com o novo', r.status, 200);
+    eq('e nao cai na troca', r.body.trocar_pin, false);
+
+    console.log('\n── 9. banco antigo ganha a coluna, e todo mundo nasce marcado ──');
+    const dbVelho = new Database(path.join(tmp, 'velho.db'));
+    dbVelho.exec("CREATE TABLE usuarios(id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, salt TEXT NOT NULL, pin_hash TEXT NOT NULL, areas TEXT NOT NULL DEFAULT '', ativo INTEGER NOT NULL DEFAULT 1, criado_em TEXT)");
+    dbVelho.prepare("INSERT INTO usuarios(nome,salt,pin_hash) VALUES('Velho','s','h')").run();
+    require('./auth')(express(), dbVelho);
+    const col = dbVelho.prepare("SELECT name FROM pragma_table_info('usuarios') WHERE name='pin_curto'").get();
+    ok('a coluna pin_curto existe depois do boot', !!col);
+    eq('e quem ja estava la fica marcado para trocar',
+       dbVelho.prepare("SELECT pin_curto FROM usuarios WHERE nome='Velho'").get().pin_curto, 1);
+    dbVelho.close();
   } finally {
     srv.close();
   }

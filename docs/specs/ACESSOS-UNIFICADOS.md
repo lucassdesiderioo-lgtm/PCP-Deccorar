@@ -1,4 +1,4 @@
-> **STATUS · 21/10/2026 — EM CONSTRUÇÃO** · tipo `REGRA` · **fase 1 em código (21/10):** a área `admin` deixou de abrir o sob medida como diretor (`CLAUDE.md` §19, R-SMA-03); falta subir e conferir a lista de quem deixa de ser diretor · fases 5, 2, 3, 6 e 4 não iniciadas.
+> **STATUS · 21/10/2026 — EM CONSTRUÇÃO** · tipo `REGRA` · **fase 1 no ar e conferida (21/10, PR #212):** a área `admin` deixou de abrir o sob medida como diretor (`CLAUDE.md` §19, R-SMA-03); a lista de quem deixava de ser diretor saiu vazia · **fase 5 dividida em duas:** **5-A em código (21/10)** — PIN de 6 dígitos e troca no próximo uso (`CLAUDE.md` §10); falta subir · **5-B (HTTPS)** espera saber se o sistema é aberto por nome ou por IP · fases 2, 3, 6 e 4 não iniciadas.
 > Nasceu da entrevista do guardião de 21/10/2026. O dono pediu: *"avalie se o
 > nosso controle de acesso é condizente com o que estamos criando … daqui a
 > alguns dias vamos estar com todo o time cadastrado, mais ou menos 20 logins"*.
@@ -125,6 +125,15 @@ sob medida trata a pessoa como dono.
   login de quem tem 4. O campo da tela já aceita até 6; o que muda é deixar de
   aceitar 4. HTTPS no servidor (R-ACE-07, dívida 2). Precisa de configuração
   no servidor, além do código.
+- **Dividida em duas na construção (21/10/2026):**
+  - **5-A — o PIN.** ⚠️ *"A tela já aceita até 6"* valia só para o campo do
+    `/acessos`: o login entrava sozinho no 4º dígito e o servidor aceitava
+    qualquer PIN de 4 ou mais. E "troca no próximo **login**" não pegaria a
+    bancada — a sessão dura 1 ano —, então a troca é cobrada no **próximo
+    uso**, com sessão aberta ou não, pedindo o PIN de hoje.
+  - **5-B — o HTTPS.** Configuração do servidor (nginx + certificado) e a
+    marca `Secure` no cookie. Espera a resposta: o sistema é aberto por nome
+    ou por IP?
 
 ## 6. Perguntas ao dono — respondidas em 21/10/2026
 
