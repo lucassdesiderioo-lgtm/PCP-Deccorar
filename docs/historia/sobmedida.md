@@ -10,7 +10,8 @@
 > armadilha #34 e as três regras do fim. Parte 2 (21/10/2026): o catálogo, a
 > revenda, o pedido e a etiqueta de produção (fases 1 a 4-A). Parte 3 (21/10/2026):
 o consumo, a compra, os setores, o bipe, a recusa, o quadro e os indicadores
-(fases 4-B a 6-B). As referências do tipo "§10" ou
+(fases 4-B a 6-B). Parte 4 (21/10/2026): o financeiro, as telas e o corte em
+etapas. As referências do tipo "§10" ou
 > "armadilha #6" apontam para o `CLAUDE.md` ou para os outros arquivos de
 > [`docs/historia/`](.). Quando um cartão mudar, a história nova entra **no
 > fim** desta página, com data; o que está escrito não se reescreve.
@@ -1772,3 +1773,793 @@ produtividade · recusas          (o crédito é boleto, e boleto é a 6-C)
 > Mexeu em permissão? **`node teste_acesso.js` (204) e `node teste_cobertura.js`
 > (10) também.** E **abra a tela, cheia E vazia**: sete dos defeitos desta fase
 > não têm teste que os pegue.
+
+---
+
+<!-- Do CLAUDE.md §19 — parte 4: o financeiro (6-C1, 6-C1b, 6-C1c), as telas e o corte em etapas -->
+
+### ⚠️ A FASE 6-C1 (26/09/2026) — O BOLETO, E O NÚMERO QUE MENTE PARA CIMA
+
+```
+limite disponível = limite − boletos em aberto      ← MOSTRA, NÃO TRAVA
+```
+
+Migração 25 (`sm_boleto`), `dominio/boleto.js`, `dados/boleto.js`,
+`rotas/boleto.js`, a tela `/sobmedida/financeiro`, o crédito na ficha da
+revenda e o **selo de crédito estourado** no Quadro — o gancho que a 6-A
+deixou escrito.
+
+> **A revisão bimestral do limite JÁ EXISTIA desde a fase 2** e não foi
+> refeita: `limite_revisado_em`, o parâmetro `creditoRevisaoMeses`, o cálculo
+> de `limite_vencido` e o botão *"Revisei — está bom assim"*. Está escrito
+> porque a linha da fase prometia as três coisas, e quem lesse o plano
+> esperaria trabalho onde não havia.
+
+> ⚠️ **O TÍTULO É LANÇADO À MÃO, NUNCA GERADO AQUI.** O boleto de verdade
+> nasce no banco, com número e código de barras próprios; um número inventado
+> nesta casa seria a **segunda régua contra o extrato** (armadilha #12), e a
+> que erra se descobre na cobrança de um cliente.
+>
+> O caminho do **espelho** — o outro sistema exporta os títulos em aberto e
+> este lê, como a planilha do ML no Planejamento (#11) e o PDF do ML na
+> expedição — foi posto na mesa em 26/09/2026 e **o dono decidiu lançar aqui**.
+> Se um dia ele voltar, o importador se escreve **contra um arquivo real**: o
+> `parse.js` nasceu do PDF de verdade, e leitor feito contra formato imaginado
+> é régua própria, que funciona no teste e quebra no arquivo.
+
+> ⚠️ **O MODO DE FALHAR DESTE DESENHO É O OTIMISTA, E ESTÁ ESCRITO ANTES DE
+> ACONTECER.** A §4.13 da spec avisa que *"sem baixa, o limite de todo mundo
+> zera"*. Com lançamento à mão o risco é o **contrário e pior**: ninguém
+> lança, o "em aberto" fica zero e o disponível fica **igual ao limite** — uma
+> mentira que **não parece erro**, porque o número só fica maior. Por isso o
+> crédito devolve `ultimo_movimento`, e as duas telas escrevem, **só quando o
+> dado é velho**, há quantos dias ninguém mexe naquela revenda: número sem a
+> janela ao lado engana (armadilha #16).
+
+> ⚠️ **MOSTRA, NÃO TRAVA — decisão do dono de 22/09/2026.** Não há uma linha
+> no domínio do pedido que leia crédito, e isso não é esquecimento: não se
+> perde venda. Pedido de revenda estourada entra e é aprovado do mesmo jeito;
+> o que muda é a **cor**. Há caso travando, para ninguém acrescentar a trava
+> depois sem decidir — e a §4.13 explica por que ela não entra antes de a
+> baixa estar sendo feita de verdade (é a armadilha #6).
+
+> ⚠️ **NEGATIVO FICA NEGATIVO.** Zerar apagaria o **tamanho** do buraco: dois
+> mil estourados e um real estourado ficariam iguais na tela. É o `MAX(0, …)`
+> do saldo do PCP (§2) pela porta do crédito, e a mesma regra do prazo vencido
+> da fase 3.
+
+> ⚠️ **SEM LIMITE LANÇADO, O DISPONÍVEL É `null`** — nunca zero e nunca "o que
+> ela deve". É a regra 4 do custo (§7-B): número indefinido não vira número
+> certo. E **não se estoura um limite que não existe**: a revenda sem limite
+> não ganha selo no Quadro.
+
+> ⚠️ **PAGO E CANCELADO SAEM DA CONTA; VENCIDO FICA.** Tirar o vencido faria o
+> limite de quem **não** paga parecer mais folgado que o de quem paga em dia —
+> exatamente ao contrário. O vencimento é **marca**, não segunda conta, e o
+> valor vencido sai à parte. E a `situacao` é **derivada** de `cancelado_em` e
+> `pago_em`, nunca uma coluna: duas afirmações sobre o mesmo fato divergem no
+> dia em que alguém escrever numa só.
+
+> ⚠️ **NÚMERO REPETIDO NA MESMA REVENDA É O MESMO TÍTULO LANÇADO DUAS VEZES**,
+> e ele come o limite dela em dobro. O modo de falhar é **pessimista**: o
+> vendedor para de vender achando que a revenda estourou, e ninguém procura o
+> motivo num boleto a mais. Em **outra** revenda o mesmo número passa — o
+> número é do banco dela, e dois bancos repetem número sem erro nenhum.
+
+> ⚠️ **"APROVADO SEM BOLETO" SÓ VALE PARA QUEM PAGA EM BOLETO.** *"Nem todo
+> pedido fazemos boleto — às vezes o cliente paga por PIX, às vezes por
+> cartão"* (dono, 26/09/2026). Cobrar título de quem paga no cartão é aviso
+> disparando no caso normal, e aviso assim some junto com a lista inteira
+> (armadilha #6). É a segunda metade da pergunta 6 da §8 da spec — *"os dois,
+> mostrados separados"* —, e ele **não entra no disponível**: não é dívida, é
+> compromisso que ainda não virou título.
+
+> ⚠️ **A BAIXA SE DESFAZ, E COM MOTIVO.** Baixa dada na linha errada acontece,
+> e sem caminho de volta o jeito vira lançar o título de novo — que é número
+> repetido, e aí a conta dobra. Trava que sabe acusar e não sabe liberar é
+> trava que a equipe contorna (§5). Baixar **duas vezes** é recusado: a
+> segunda sobrescreveria quem deu a primeira, e o rastro viraria dois.
+
+> ⚠️ **TODO CAMPO DE DINHEIRO COMEÇA COM `valor_`, e `estourado` NÃO.** A poda
+> do `custo.js` corta por **padrão de nome** (§19): um `em_aberto_centavos`
+> não casaria com `preco|valor|custo|nf|fornecedor` e viajaria pelo fio para
+> quem não tem `custo.ver`. E a **marca** não é dinheiro de propósito: ela
+> sobrevive à poda e acende o selo para quem só vê a cor.
+
+> **Duas chaves: `boleto.ler` (o vendedor, pela tarefa semanal da §4.13) e
+> `boleto.editar`.** A segunda **não está em papel nenhum** — hoje quem lança
+> e baixa é o diretor, pelo `*`. Inventar um papel "financeiro" exigiria área
+> no PCP, linha no `PERM_AREA` e alguém marcado (as três pontas da armadilha
+> #13) para uma caixinha que ninguém marcaria. O dia em que houver financeiro
+> com login próprio, a área nasce lá.
+
+> ⚠️ **E QUATRO COISAS SÓ APARECERAM ABRINDO A TELA:**
+> - **a tarefa semanal saía em ordem ALFABÉTICA**, com quem está em dia acima
+>   de quem estourou. Lista de trabalho se lê de cima para baixo — é a regra
+>   da tela azul do operador (§3) e do atrasado do Carregamento (#9);
+> - **a janela escrita em toda revenda virava paisagem**: quatro linhas
+>   idênticas de *"último lançamento em 26/09"*. O sinal é o dado **velho**,
+>   não o fresco;
+> - **o formulário pedia o valor em CENTAVOS**, enquanto o catálogo, o
+>   simulador e as revendas pedem em reais e convertem por soma — duas telas
+>   pedindo o mesmo dinheiro de jeitos diferentes ensinam a equipe a achar que
+>   são coisas diferentes (§4);
+> - **os dois selos do Quadro saíam GRUDADOS**
+>   (`RETIDO · SEM TECIDORETIDO · CRÉDITO ESTOURADO`). Enquanto havia um selo
+>   só, o espaçamento nunca tinha sido exercitado: é o `📦2 peças` grudado do
+>   §5, e nenhum teste de unidade o pega — o texto está perfeito, quem está
+>   errado é a distância.
+
+> ⚠️ **A 6-C2 (NF E ENTREGA) NÃO FOI CONSTRUÍDA, e isso é decisão.** Não há
+> faturamento no sob medida, a §5 da spec diz que o ERP é outro projeto, e
+> **ninguém marca entrega**. Construir a coluna `entregue` sem quem a marque é
+> exatamente a coluna-paisagem que a 6-A recusou, e a NF digitada sem
+> responsável por digitá-la é a dívida 18. Ela nasce quando o dono disser
+> quem faz as duas coisas.
+
+> **Rode `cd tecido && npm test` (602 casos) ao mexer em `boleto.js`, no
+> crédito da revenda ou no selo do Quadro** — 35 são da 6-C1, e **oito
+> defeitos foram reintroduzidos um a um** para provar que cada caso pega o
+> seu: disponível zero sem limite (reprova 1), cortar o estourado em zero (3),
+> contar o boleto pago (1), contar o cancelado (1), aceitar número repetido
+> (1), cobrar "sem boleto" de quem paga em PIX (1), ordenar a carteira por
+> nome (1) e pôr o selo no cartão cancelado (1). Mexeu em permissão?
+> **`node teste_acesso.js` (204) e `node teste_cobertura.js` (10) também.**
+> E **abra as três telas**: quatro dos defeitos desta fase não têm teste que
+> os pegue.
+
+### ⚠️ A FASE 6-C1b (26/09/2026) — O BOLETO APONTA OS PEDIDOS QUE COBRE
+
+No mesmo dia do deploy da 6-C1, o dono leu a tela e disse o que faltava:
+*"um recebimento tem que ser sempre atrelado a um pedido — dessa forma ele
+conversa com o contas a receber e também com o que já foi acordado ao
+pedido"*. Migração 26 (`sm_boleto_pedido`), e a coluna `pedido_id` **saiu**.
+
+```
+um boleto → N pedidos      o financeiro junta os pedidos da semana num título
+um pedido → N boletos      o parcelamento, que já cabia
+nenhum pedido              existe, e passa — mas nasce AVULSO, visível
+```
+
+**Duas respostas do dono mudaram o FORMATO, e não o texto.** Perguntei antes de
+construir justamente porque a diferença entre elas é schema:
+
+| Pergunta | Resposta | O que ela decidiu |
+|---|---|---|
+| um boleto pode cobrir vários pedidos? | **sim**, o financeiro junta | a coluna não serve; nasce a tabela de vínculo |
+| existe boleto sem pedido (acerto, frete)? | **às vezes** | não dá para exigir sempre; ele vira `avulso` |
+
+> ⚠️ **A COLUNA `pedido_id` SAIU, E NÃO FICOU "POR VIA DAS DÚVIDAS".** Com a
+> tabela de vínculo de pé, ela passaria a ser a segunda afirmação sobre o
+> mesmo fato (armadilha #12) e divergiria no primeiro título de dois pedidos.
+> O `INSERT … SELECT` que copia o que havia nela **não é enfeite**: em 26/09
+> não havia boleto lançado, mas migração que confia nisso quebra no dia em que
+> alguém lançar um antes do deploy.
+
+> ⚠️ **O QUE A COLUNA ÚNICA FAZIA DE ERRADO, e é o caso que trava a fase:** um
+> título cobrindo três pedidos gravava **um**, e os outros dois continuavam
+> para sempre em *"aprovado sem boleto"*. A lista cobraria um título que já
+> existe, e ninguém procura o motivo numa lista que só cresce.
+
+> ⚠️ **ID E NÚMERO SÃO CAMPOS SEPARADOS, E NÃO SE ADIVINHA QUAL É QUAL.** Os
+> números de pedido começam em 5001 (§4.18 da spec) e os ids em 1: um dia os
+> dois intervalos se cruzam, e aí um `5001` é os dois ao mesmo tempo.
+> Heurística ali seria régua que erra **em silêncio**, mandando o título para
+> a venda de outra pessoa — e o erro só apareceria na conferência da revenda.
+> A tela manda `pedido_ids` (ela marca o que o servidor mandou);
+> `pedido_numeros` existe para quem digita.
+
+> ⚠️ **UM PEDIDO ERRADO DERRUBA A LISTA INTEIRA, e nada é gravado.** Aceitar os
+> certos e descartar o errado deixaria o título cobrindo menos do que quem
+> lançou acha que cobriu — e ninguém confere um boleto que "deu certo". O
+> pedido **cancelado** também é recusado: ele não é compromisso (a mesma régua
+> do "aprovado sem boleto"), e título apontando pedido morto é conta que
+> ninguém explica depois.
+
+> ⚠️ **O AVULSO NÃO GANHA COLUNA, E A CONFERÊNCIA DE VALOR TAMBÉM NÃO.** Os
+> dois são derivados — "avulso" é não ter linha de vínculo nenhuma, e
+> `excede_pedidos` é uma comparação entre dois números já gravados. É a mesma
+> razão de a `situacao` do boleto já sair de `pago_em` e `cancelado_em`.
+
+> ⚠️ **O VALOR AVISA, NUNCA TRAVA — e o aviso diz QUANTO.** Recusar o título
+> que não bate com a soma quebraria o parcelamento: 3× de um pedido de
+> R$ 3.000 são três títulos de R$ 1.000, e nenhum "bate". O sistema acusa só o
+> lado impossível, o título somar **mais** que os pedidos que cita.
+>
+> E aí veio o que **só apareceu abrindo a tela**: um título de R$ 493,00 para
+> R$ 492,80 de pedidos acendia o aviso por **vinte centavos**. O financeiro
+> arredonda, e marca que aparece no caso normal vira paisagem — a mesma razão
+> de a modalidade só ser escrita quando separa alguma coisa (§5). Um limiar em
+> centavos seria chute escondido no código, que é o que a 6-B recusa; hoje a
+> tarja escreve **"⚠ R$ 0,20 acima dos pedidos"** e quem lê julga sozinho:
+> R$ 0,20 se ignora, R$ 7.217,96 se investiga. Marca que deixa de ser binária
+> se explica.
+
+> ⚠️ **A TELA NÃO PEDE PARA DIGITAR NÚMERO DE PEDIDO.** Escolhida a revenda,
+> ela **lista os pedidos aprovados sem título**, com número e valor, e o
+> financeiro marca os que aquele boleto cobre. Digitar é onde nasce o vínculo
+> errado, e a lista já é exatamente o que o sistema sabe — a lição do card de
+> pacote do §5, que nasce preenchido.
+>
+> E ela sai do **mesmo critério** do `aprovados_sem_boleto` do crédito. Com
+> critérios diferentes a tela ofereceria para marcar um pedido que a conta não
+> considera coberto, e as duas estariam certas, cada uma na sua régua (#12).
+> **Esse caso nasceu de um defeito que passou:** ao reintroduzir os defeitos um
+> a um, a lista com `marco IN ('aprovado','enviado')` não reprovou nada — o
+> teste que faltava foi escrito ali, e só então o defeito reprovou.
+
+> ⚠️ **A ROTA DA LISTA É `boleto.ler`, E NÃO `pedido.ler`.** Mandar a tela a
+> `/api/pedidos` exigiria dela uma chave que quem lança boleto pode não ter, e
+> o efeito seria um seletor vazio com 403 no console — que não se parece com
+> "falta permissão" (§10, armadilha #29). **Não nasce chave nova:** ler a
+> lista é a mesma pergunta de ler o crédito.
+
+> ⚠️ **TRÊS COISAS SÓ APARECERAM COM A TELA ABERTA, e a terceira é de CSS:**
+> - **lançar perdia a revenda escolhida.** O formulário era redesenhado do zero
+>   e o select voltava para a primeira da lista. O financeiro lança cinco
+>   títulos da mesma revenda em seguida, e o quinto sairia na revenda errada —
+>   o erro mais caro que esta tela permite, e ele acontece na pressa;
+> - **os vinte centavos** do aviso, acima;
+> - **a caixinha saía em cima e o texto embaixo.** Duas causas empilhadas: o
+>   `input` do `base.css` tem `min-height` de alvo de toque (e `min-height`
+>   vence `height`), e `.form label` tem especificidade **maior** que `.marca`
+>   (0,1,1 contra 0,1,0), então o `display:flex` escrito no arquivo nunca
+>   chegou a valer. É a armadilha da coluna `fr` do §12 por outra porta: **o
+>   CSS lido não diz se a regra pegou — quem diz é a tela medida**
+>   (`getComputedStyle` + `getBoundingClientRect`).
+
+> **Rode `cd tecido && npm test` (617 casos) ao mexer no vínculo, no
+> `dominio/boleto.js` ou no card do Financeiro** — 15 são da 6-C1b, e **nove
+> defeitos foram reintroduzidos um a um**: aceitar os certos e descartar o
+> errado (reprova 2), não deduplicar (15), deixar passar pedido cancelado (1),
+> o avulso sempre falso (1), travar em vez de avisar (11), `COALESCE 0` na soma
+> — que faria o avulso "exceder" (1), a lista da tela com critério próprio (1),
+> a marca com nome de dinheiro, que a poda come (4), e o boleto cancelado
+> continuar cobrindo o pedido (1). Mexeu em permissão? **`node
+> teste_acesso.js` (204) e `node teste_cobertura.js` (10) também.**
+
+### ⚠️ A FASE 6-C1c (26/09/2026) — O QUE FALTA TITULAR, E O PARCELAMENTO QUE NÃO ERA LANÇÁVEL
+
+Horas depois do deploy da 6-C1b, o dono lançou um boleto **menor** que o
+pedido e perguntou: *"onde que ficou o saldo devedor?"*. Em lugar nenhum — e
+havia um segundo defeito colado, pior que o primeiro:
+
+```
+pedido aprovado   R$ 165,00
+boleto lançado    R$  49,50   ← aponta o pedido
+                  R$ 115,50   ← não existia em tela nenhuma
+```
+
+| Onde | O que dizia | Por quê |
+|---|---|---|
+| **em aberto** | R$ 49,50 | soma o valor dos **títulos**, nunca o do pedido |
+| **aprovado sem boleto** | o pedido **sumiu** | a consulta era `NOT EXISTS (vínculo)`: **um** título de qualquer valor bastava |
+| a tarja de valor | nada | ela só acende no lado de cima, título **maior** que os pedidos |
+
+> ⚠️ **E O PARCELAMENTO NÃO ERA LANÇÁVEL PELA TELA — este é o defeito maior,
+> e ninguém tinha esbarrado nele.** A lista que a tela oferece para marcar é
+> a mesma consulta. Lançada a parcela 1 de 3, o pedido saía dela e **não
+> havia como apontá-lo na parcela 2**. A regra que o "avisa, nunca trava" da
+> 6-C1b existe para proteger (3× de R$ 3.000, e nenhum título "bate") era
+> justamente a que a tela impedia de registrar.
+
+**A régua passou a ser o dinheiro, e não a existência do vínculo:** um pedido
+está titulado quando a **soma dos títulos ativos alcança o valor dele**.
+Abaixo disso ele continua na cobrança e na lista de marcar, com o que falta.
+
+> ⚠️ **COM RATEIO PROPORCIONAL, e a razão é o título que cobre VÁRIOS
+> pedidos** (decisão do dono, 26/09/2026). Ali o título não diz de qual
+> pedido é o buraco, e repartir proporcionalmente ao valor de cada um é a
+> única repartição que não privilegia ninguém. Quando o título **fecha** com
+> a soma, a quota de cada pedido dá exatamente o valor dele, sem fração:
+> fração só aparece quando falta dinheiro, que é o caso em que um centavo a
+> mais ou a menos na falta não decide nada. `TITULADO`, no `dados/boleto.js`,
+> é o dono único dessa conta — a lista, a contagem e o dinheiro saem dela.
+
+> ⚠️ **O CRÉDITO NÃO MUDOU, e isso é decisão do dono.** `em aberto` continua
+> sendo só **título lançado**, e o que falta titular aparece **ao lado**, em
+> linha própria — a regra *"os dois, mostrados separados"* da §8 da spec, que
+> já valia para o "aprovado sem boleto". Somá-lo faria o disponível mudar de
+> valor sem ninguém ter lançado nada, e quem já lê a tela veria o número
+> andar sozinho.
+
+> ⚠️ **"SEM BOLETO" E "PARCIALMENTE TITULADO" SÃO DUAS LINHAS, NUNCA UMA
+> SOMA.** São fatos diferentes, e juntá-los apagaria justamente o caso que o
+> dono perguntou. O valor do parcial é a **falta**, nunca o valor cheio do
+> pedido: o pedaço que já virou título já está no `em aberto`, e somar o
+> cheio o contaria duas vezes.
+
+> ⚠️ **TÍTULO CANCELADO NÃO TITULA** (o pedido volta inteiro à cobrança), e
+> **título PAGO continua titulando** — a pergunta aqui é *"já virou título?"*,
+> não *"já foi pago?"*. Tirar o pago faria o pedido reaparecer na cobrança no
+> dia em que a revenda pagasse.
+
+> ⚠️ **A FALTA É CORTADA EM ZERO, e isso NÃO é o `MAX(0, …)` proibido do §2.**
+> Lá o negativo é o sinal de peça que saiu sem registro; aqui "título maior
+> que os pedidos" já tem aviso próprio — a tarja `excede_pedidos` da 6-C1b,
+> que continua de pé e é o lado de cima da mesma linha.
+
+> ⚠️ **O LADO DE BAIXO NA LINHA DO TÍTULO NÃO SE CHAMA "FALTA".** Ele escreve
+> *"cobre R$ 49,50 de R$ 165,00 em pedidos"* e descreve, em vez de acusar:
+> título menor é o **parcelamento**, o caso legítimo, e as outras parcelas
+> ainda vão ser lançadas. Quem responde quanto falta de verdade é a lista de
+> cobrança, que olha **todos** os títulos do pedido; aquela linha fala de um
+> título só.
+
+> ⚠️ **E DUAS COISAS SÓ APARECERAM NO RENDER, de novo:**
+> - a lista de marcar escrevia `#5001 · R$ 115,50` com a palavra **"faltam"**
+>   na linha de baixo (a tarja é um bloco). Lido de relance, aquele número
+>   parece o **valor do pedido** — que é R$ 165,00. Hoje sai `#5001 · faltam
+>   R$ 115,50 de R$ 165,00`, com a palavra colada no número que ela qualifica;
+> - a linha do crédito dizia *"fora do disponível"* no "sem boleto" e **não**
+>   dizia no parcial, sendo que os dois ficam fora. As duas telas (Financeiro
+>   e a ficha da revenda) escrevem a frase **igual** — diferente, ensinariam a
+>   equipe a achar que são coisas diferentes (§4).
+>
+> E a primeira correção disso saiu *"faltam R$ 115,50 em título (R$ 115,50
+> fora do disponível)"* — o **"23,1 mm em vez de 23,1 mm"** do §4 escrito por
+> mim no mesmo dia em que citei a lição. Pegou antes de renderizar, relendo a
+> própria frase.
+
+> **Rode `cd tecido && npm test` (627 casos) ao mexer no `TITULADO`, no
+> `credito` ou na lista de marcar** — 10 são da 6-C1c, e **seis defeitos foram
+> reintroduzidos um a um** para provar que cada caso pega o seu: voltar o
+> `NOT EXISTS` (reprova 4), tirar o rateio (1), deixar o cancelado titular
+> (1), não cortar a falta em zero (3), somar o valor cheio do parcial (2) e
+> nomear o campo sem o prefixo `valor_`, que a poda deixa passar (6).
+> E **abra as duas telas**: as duas coisas acima não têm teste que as pegue.
+
+> ✅ **NO AR E CONFERIDA COM DADO REAL EM 26/09/2026, PELO CAMINHO QUE A TELA
+> NÃO DEIXAVA PERCORRER.** O dono fez o deploy e **lançou a 2ª parcela
+> apontando o mesmo pedido**: *"entrou, e a falta caiu"*. São as duas metades
+> provadas por um gesto só — para marcar o pedido na 2ª parcela ele **tinha**
+> que continuar na lista depois do primeiro título (a régua do dinheiro), e a
+> falta tinha que andar com o segundo.
+>
+> ⚠️ **E É JUSTAMENTE O CASO QUE ERA IMPOSSÍVEL ATÉ O DEPLOY DESTA FASE.** Com
+> o `NOT EXISTS (vínculo)`, a parcela 1 tirava o pedido da lista e a parcela 2
+> não tinha onde ser apontada — o parcelamento, que o "avisa, nunca trava" da
+> 6-C1b existe para proteger, era o que a tela impedia de registrar. Um
+> parcelamento de verdade, lançado pela tela, prova isso de um jeito que
+> nenhum caso semeado provaria.
+>
+> ⚠️ **O QUE ELE NÃO DISSE, E POR ISSO NÃO ESTÁ ESCRITO COMO DITO:** dos
+> quatro pontos que pedi para conferir na tela, ele relatou este. Os outros
+> três (a tarja `já titulado`, a linha do crédito e o *"cobre R$ X de R$ Y"*
+> na linha do título) não foram confirmados um a um — e o lançamento da
+> parcela não passa por todos eles.
+>
+> **O que continua pendente é da 6-C1, e não desta:** o financeiro dando uma
+> **baixa** de verdade, e o vendedor usando a carteira na conversa semanal.
+> Prova que não foi feita se escreve como não feita (§4).
+
+### ⚠️ OS DOIS DEFEITOS DE TELA DO FINANCEIRO (28/09/2026)
+
+Dois consertos de tela, achados **abrindo as telas** da fase 6-C1 — nenhum
+deles tem teste de unidade que o pegue sozinho, e é sempre o mesmo tipo:
+o código está sintaticamente perfeito e a tela é que está errada.
+
+| Onde | O que era |
+|---|---|
+| **Financeiro, a 400 px** | a tabela de boletos tem cinco colunas e não cabe: a **página inteira** andava de lado (`scrollWidth` 684 contra 400) e o topo do card saía de vista |
+| **Ficha da revenda** | escrevia `R$ 4785,50`, **sem o ponto do milhar**, enquanto o Financeiro, com o mesmo dinheiro da mesma revenda, escreve `R$ 4.785,50` |
+
+> ⚠️ **A TABELA QUE NÃO CABE ROLA SOZINHA — A PÁGINA NUNCA ROLA DE LADO.** É a
+> coluna `fr` do §12 pela porta da tabela: `table{width:100%}` é uma proporção
+> que o navegador **ignora** quando o conteúdo é mais largo, e aí a tabela
+> empurra o corpo. Quem passa a rolar é um recipiente (`.rolaH`), e o resto da
+> página fica parado. Medido, não lido: a 400 px a página saiu de 684 px para
+> **400**, e o `.rolaH` ficou com `scroll 634 × cliente 300` — que é o certo.
+>
+> **Ela mora no `base.css`, e não na tela**, pela lição da fileira de escolha
+> da fase 4-A (§19): classe própria de tela é a segunda régua do CSS.
+
+> ⚠️ **ERAM DOIS PAPÉIS NA MESMA FUNÇÃO, E POR ISSO A TROCA INGÊNUA QUEBRARIA O
+> CRÉDITO.** O `emReais` da ficha fazia duas coisas: escrevia o dinheiro que se
+> **lê** e pré-preenchia o campo **Limite (R$)**, que volta pelo `paraCentavos`.
+> Trocar os dois pelo `dinheiro` do `ui.js` (o dono único do módulo) faria o
+> campo nascer com `4.785,50` — e `paraInteiro` devolve **NaN** para isso, com
+> a tela recusando, com a frase *"o limite se escreve como 5000,00"*, um valor
+> que ela mesma acabara de escrever. Seria trocar um defeito de **leitura** por
+> um de **escrita**, no crédito.
+>
+> Hoje são **duas funções com nome que diz qual é qual**: `reais` (lê, pelo
+> `dinheiro`) e `paraCampo` (pré-preenche, sem separador). Conferido gravando
+> o campo de verdade: abriu com `4785,50`, salvou `5000,00`, recarregou com
+> `5000,00` e o banco ficou com `500000` centavos.
+
+> ⚠️ **UM FORMATADOR LOCAL PARA LER É A ARMADILHA #12 EM MINIATURA** — a mesma
+> revenda mostrando o mesmo dinheiro de dois jeitos em duas telas, e as duas
+> "certas", cada uma na sua régua. A varredura do `dinheiro_tela.test.js` recusa
+> `R$ ` montado à mão numa tela nova, com **lista de isentos nomeados** (a forma
+> do `teste_*.js` na varredura do estoque, §2): seis telas ainda montam, e três
+> delas — `catalogo.html`, `pedidos.html` e `simulador.html` — escrevem dinheiro
+> **sem o separador de milhar**. Está escrito porque é o mesmo defeito, e não
+> foi consertado aqui.
+>
+> A lista tem guarda contra **isento zumbi**: tela que sai da lista sem sair do
+> defeito, ou que é consertada e fica isenta, reprova.
+
+> ⚠️ **E A LISTA DE REVENDAS TAMBÉM ROLA A PÁGINA DE LADO a 400 px**
+> (`table.lista`, 660 px) — mesmo defeito, terceira tela, **não consertado
+> aqui**: não estava no plano, e §0 manda anotar em vez de consertar junto. O
+> reparo é o mesmo `.rolaH`, que já existe.
+
+> **Rode `cd tecido && npm test` ao mexer no dinheiro de qualquer tela do
+> módulo, no `.rolaH` ou na tabela do Financeiro.** E **abra as telas, e
+> MEÇA**: a 400 px quem diz se a regra pegou é `scrollWidth` contra
+> `clientWidth`, nunca o CSS lido (§12).
+
+### ⚠️ E O SEPARADOR DE MILHAR NÃO ERA DE TRÊS TELAS: ERA DO SERVIDOR (28/09/2026)
+
+O bloco acima deixou escrito que `catalogo.html`, `pedidos.html` e
+`simulador.html` escreviam dinheiro sem o ponto do milhar. Ao consertar,
+**duas das três não formatavam nada**:
+
+| Onde | O que era |
+|---|---|
+| **`nucleo/unidade.js → emReais`** | o **dono único** de centavo→reais do servidor. Escreve o total congelado do pedido, o `base` do simulador (*"4,320 m² × R$ 2.000,50/m²"*), o texto da auditoria e **o PDF que a revenda confere** |
+| **`catalogo.html`** | `emReais` local com **os dois papéis** — lê o preço **e** pré-preenche os campos `R$ por m²` e `R$ por unidade` |
+| `simulador.html` | `reais` local, só leitura |
+| `pedidos.html` | **não formata**: recebe a string pronta e só pendura o `R$` |
+
+> ⚠️ **CONSERTAR SÓ A TELA DEIXARIA O NÚMERO CERTO NUMA LINHA E ERRADO NA DE
+> BAIXO.** O simulador mostra as duas coisas juntas: o `R$ 8.642,16` que o
+> navegador escreve e o `× R$ 2.000,50/m²` que veio do servidor dentro da
+> frase. Com o conserto só de um lado, a mesma tela diria o mesmo dinheiro de
+> dois jeitos — a armadilha #12 com uma régua de cada lado do fio.
+
+> ⚠️ **O SERVIDOR NÃO USA `toLocaleString`, E ISSO É TRAVA DE AMBIENTE.** Um
+> Node compilado com **ICU pequeno** não tem `pt-BR`: ele não dá erro, ele
+> **cai em en-US**, e a folha da revenda sai com `R$ 4,785.50`. No navegador
+> isso não existe (pt-BR vem sempre); aqui depende de como o servidor foi
+> compilado, e o sintoma aparece no papel já impresso. O ponto do milhar é
+> escrito à mão deste lado do fio, e **há varredura recusando o `Intl` no
+> `unidade.js`**.
+>
+> Os dois lados são conferidos contra **literais do português do Brasil**, e
+> não um contra o outro — a lição do QR (§4): teste que relê com a mesma
+> convenção com que escreveu pergunta a si mesmo.
+
+> ⚠️ **O `emPercentual` FICA COMO ESTÁ.** Desconto não passa de 100%, então o
+> separador nunca apareceria — e ponto num percentual se lê como casa decimal.
+
+> ⚠️ **O CATÁLOGO ERA A OUTRA TELA COM OS DOIS PAPÉIS**, e a troca ingênua
+> quebraria o preço como quebraria o crédito: `1.234,56` no campo vira **NaN**
+> no `paraCentavos`, e a tela recusa o número que ela mesma escreveu. Hoje são
+> `reais` (lê) e `paraCampo` (pré-preenche). Conferido gravando de verdade:
+> abriu `1234,56`, salvou `2000,50`, a célula virou `R$ 2.000,50` e o banco
+> ficou com `200050`.
+>
+> **O cabeçalho da coluna mudou junto:** dizia `R$/m²` porque a célula vinha
+> sem o `R$`. Com a célula escrevendo `R$ 2.000,50`, o rótulo repetia a moeda
+> — hoje é **`Preço por m²`**, como o `Preço` da tabela de componentes ao lado.
+
+> ⚠️ **DUAS RÉGUAS ACUSARAM O INOCENTE NA MESMA RODADA, e as duas só
+> apareceram porque o teste rodou:**
+> - a varredura que proíbe o `Intl` no servidor **achou o próprio comentário**
+>   que explica por que ele não entra. Régua que se acusa sozinha só fica
+>   verde se alguém apagar a explicação — hoje ela lê o código sem comentário;
+> - o guard que proíbe conta de dinheiro no `pedidos.html` procurava
+>   `/100).toFixed` e pegou o formatador de **área**
+>   (`(Math.round(v*100)/100).toFixed(2)`). Hoje ele **nomeia o centavo**:
+>   dividir por 100 continua certo (é assim que se entrega reais ao
+>   `dinheiro`); o que não pode é o `toFixed` depois da divisão.
+
+> ⚠️ **E O CASO DO RECIPIENTE ESTAVA OCO — inclusive o que já existia.** Ele
+> conferia que `class:'rolaH'` aparecia no arquivo, e passava verde com o
+> recipiente criado e **vazio**, a tabela pendurada no card como antes. Quem
+> achou foi a rodada de reintroduzir os defeitos: tirar a tabela de dentro não
+> reprovou nada. Hoje os dois casos exigem o `rola.appendChild(`. **Classe
+> declarada que não embrulha ninguém é a terceira ponta da mesma armadilha.**
+
+> **Rode `cd tecido && npm test` (647 casos) ao mexer no `emReais` ou no
+> dinheiro de qualquer tela** — 14 são do `dinheiro_tela.test.js`, e sete
+> defeitos foram reintroduzidos um a um: o servidor sem o milhar (reprova 2),
+> o `Intl` de volta (1), o catálogo com um papel só (1), a cópia do `dinheiro`
+> no painel (2), a lista de revendas fora do recipiente (1), a conta própria no
+> `pedidos` (1) e a tabela de boletos fora do recipiente (1).
+>
+> ⚠️ **Os dois últimos mudaram de casa em 29/09/2026** — os casos do `.rolaH`
+> viraram varredura no `rola_tela.test.js`, no bloco abaixo.
+
+> ⚠️ ~~**QUATRO TELAS AINDA ROLAM A PÁGINA DE LADO**~~ — **eram SETE, e a
+> conta estava errada porque eu contei as telas que tinha aberto, e não as que
+> medi.** Ver o bloco logo abaixo; consertadas em 29/09/2026.
+
+### ⚠️ AS SETE TELAS QUE ROLAVAM DE LADO — e o número que eu tinha dado era três (29/09/2026)
+
+O bloco acima prometia três reparos de uma linha. Ao medir as **dezesseis**
+telas do módulo a 400 px, antes de encostar no código, eram **sete**:
+
+```
+/corte        660 px   ← bancada do corte, o operador digitando medida
+/cadastros    766 (aba Tecido) · 692 (Motivos) · 416 (Endereços)
+/painel      1050 (Gerencial)
+/catalogo     618 · 810 · 582 · 767   (quatro das cinco abas)
+/pedidos      485
+/producao     820   ← quem imprime o maço
+/indicadores  479
+```
+
+> ⚠️ **O NÚMERO ERRADO NÃO VEIO DE UMA CONTA ERRADA: VEIO DE NÃO TER MEDIDO.**
+> As três que eu nomeei foram as que abri durante a entrega anterior, e as
+> outras quatro nunca tinham sido abertas num celular. É o §12 dizendo, pela
+> enésima vez, que **quem responde é a tela medida** — e desta vez o que ele
+> pegou não foi o CSS, foi o meu relatório. Número de diagnóstico que saiu do
+> que estava à mão vira fato na linha seguinte, e o dono planeja em cima dele.
+
+**`window.ui.rolaH(tabela)` passou a ser o dono único do embrulho**, e as
+**47 tabelas** das treze telas com tabela passam por ele:
+
+```js
+const rolaH=t=>el('div',{class:'rolaH'},[t]);   // devolve o recipiente COM a tabela dentro
+```
+
+> ⚠️ **ELE RECEBE A TABELA, e isso é o conserto de um defeito que esteve no
+> ar.** O padrão anterior era de dois passos — criar o recipiente, e depois
+> lembrar de pendurar a tabela nele —, e foi assim que o recipiente do
+> Financeiro nasceu **oco** e passou verde num caso que conferia só a classe
+> (bloco acima). Uma função que recebe a tabela não tem segundo passo para
+> esquecer. Copiar o padrão de dois passos numa tela nova é recusado por
+> varredura.
+
+> ⚠️ **TABELA QUE HOJE CABE ENTRA JUNTO, de propósito.** O recipiente é inerte
+> quando o conteúdo cabe — `overflow-x:auto` não desenha barra sem transbordo.
+> Deixar de fora as que cabem faz a próxima pessoa perguntar quais têm e quais
+> não têm, e a que crescer amanhã volta a empurrar a página. É por isso que a
+> varredura é uma regra de contagem (`N tabelas → N embrulhos`) e **não tem
+> lista de isentos**: lista de isentos envelhece, e a do dinheiro já provou.
+
+> ⚠️ **E UMA DAS SETE NÃO ERA TABELA.** A aba **Endereços** do `/cadastros`
+> punha a página em 416 px por um `display:inline-flex` **sem `wrap`**: a tarja
+> do endereço mais os três botões (`ROLO · A-1-1 · Renomear · Apagar ·
+> Desativar`) numa linha de 379 px que não quebra. O `rolaH` não alcança isso —
+> **o sintoma é o mesmo e a causa é outra**, e procurar só tabela teria deixado
+> a aba rolando depois de a tela ser dada por consertada.
+>
+> Ela **só apareceu com endereço cadastrado**: em banco vazio a aba não desenha
+> nível nenhum, e a medição passava limpa. Foi semear um rolo e uma sobra no
+> banco de teste — para exercitar `/rolos` e `/sobras`, que também não
+> desenhavam tabela nenhuma — que a destapou. **Tela medida com banco vazio
+> mede o vazio**, e isso vale para toda medição de tela daqui para a frente.
+
+> ⚠️ **O RISCO DO CONSERTO É VERTICAL, E FOI MEDIDO.** `overflow-x:auto` faz o
+> `overflow-y` virar `auto` — e o editor do catálogo mora **dentro** da tabela,
+> num `<td colspan>`. Um recipiente que cortasse no eixo Y esconderia o botão
+> de salvar. A medição confere os quatro, tela a tela e aba a aba: a página não
+> rola, nenhuma tabela ficou fora do recipiente, nenhum recipiente nasceu oco e
+> **nenhum ganhou barra vertical**.
+
+**Rode `node teste/rola_tela.test.js` pelo `npm test` ao criar tabela em
+qualquer tela do módulo, ao mexer no `rolaH` ou no `.rolaH` do `base.css`** —
+os 6 casos travam as cinco pontas, e o primeiro **roda a função de verdade**
+num DOM de mentira que guarda os filhos: conferir por texto é o que deixou o
+recipiente oco passar. Seis defeitos foram reintroduzidos um a um, e cada um
+reprova só o caso que existe para pegá-lo (o do recipiente à mão reprova dois,
+porque perde a contagem **e** cai na varredura do padrão de dois passos).
+
+> ⚠️ **E ISSO NÃO É A CONFERÊNCIA NA FÁBRICA.** A medição foi num navegador
+> meu, a 400 e a 1440 px, com as dezesseis telas e todas as abas. A prova que
+> fecha é **alguém abrindo o `/corte` no celular da bancada** e a página não
+> andando de lado com a medida sendo digitada.
+
+### ⚠️ O CORTE EM ETAPAS — o estoque só anda no CORTE FEITO (01/10/2026, spec `CORTE-EM-ETAPAS`)
+
+Em 01/10/2026 um corte foi confirmado rápido: o plano mandava parte do pedido
+para uma sobra, o tom não bateu e o operador cortou tudo do rolo. O Confirmar
+**já tinha baixado** — a sobra ficou "usada" inteira na mão de alguém e o rolo
+baixou a menos. Desde a fase 2 da spec:
+
+```
+① planejar   ② confirmar      ③ cortando      ④ corte feito     ⑤ guardar
+  (calcula)    grava e RESERVA   relógio corre   AQUI BAIXA tudo   medida+etiqueta+endereço
+```
+
+`tecido/dominio/corte.js` é o **dono único** das etapas e da baixa de rolo e
+sobra; `plano.js` ficou só com a conta. O histórico de cada corte está no botão
+**Histórico** da tela de corte (fase 1, `dominio/corte_historico.js`).
+
+> ⚠️ **`plano.confirmado` CONTINUA DIZENDO "BAIXOU O ESTOQUE"**, e por isso só
+> vira 1 no Corte feito. O painel de Cortes, o comprometido de tecido (4-B) e a
+> checagem do gerencial leem `confirmado=1` com esse sentido; a etapa mora em
+> coluna nova (`etapa`). Os cortes de antes viraram `feito` na migração 27 (R28).
+
+> ⚠️ **O CORTE FEITO BAIXA O QUE ESTÁ GRAVADO (`plano.proposta`), nunca um plano
+> recalculado na hora** — entre confirmar e terminar pode ter entrado sobra nova,
+> e recalcular escolheria uma fonte que ninguém cortou.
+
+> ⚠️ **A RESERVA NÃO TEM TABELA: ela é a faixa de um corte aberto.** Sobra de
+> corte aberto (confirmado ou cortando) não é oferecida a outro plano — e o
+> plano diz por quê (`reservada`, com o corte e a pessoa) —, e o rolo aparece
+> para os outros com o saldo menos os metros reservados. Uma tabela de reserva
+> ao lado seria a segunda afirmação sobre o mesmo fato, e a que fica para trás
+> é a que prende a sobra para sempre.
+
+> ⚠️ **A SOBRA NASCIDA NÃO É LINHA DE `sobra` ATÉ SER GUARDADA**, e mora em
+> `sobra_a_guardar`, em nome de quem cortou (R13). Sem etiqueta ninguém a acha
+> na prateleira, e por isso ela não entra em plano (R14) — morando à parte,
+> nenhuma consulta de candidatas precisa lembrar de filtrá-la. Guardar exige
+> medida, etiqueta e endereço juntos. **A medida calculada vem escrita e a
+> lista vem vazia**: medida pré-marcada é medida que se salva sem olhar (a regra
+> das sobras do `tecido/README.md`), e quem vale é a fita.
+
+> ⚠️ **UM CORTE ABERTO POR OPERADOR (R2)**, e a pendência de guardar não conta.
+> Quem mexe no corte aberto é quem o abriu, ou a chefia (`corte.gerir`, que só o
+> diretor tem pelo `*`); a chefia vê as sobras a guardar de todos (R15).
+
+> ⚠️ **"VOLTAR AO PLANO" APAGA O CORTE DO ②, e CANCELAR fica no histórico.**
+> No ② nada foi cortado; um "cancelado" por cada vez que alguém conferiu o
+> resumo e voltou encheria o histórico de cortes que nunca existiram. Do ③ em
+> diante só se cancela, com motivo.
+
+> ⚠️ **A LINHA VAZIA DA GRADE NÃO É MEDIDA.** `comoNumero('')` devolve **0**, e
+> não `null`: o filtro antigo da tela deixava as linhas em branco irem para o
+> servidor, e quem preenchia uma só das três linhas da grade levava *"A linha 2
+> esta sem medida valida"*. Achado abrindo a tela, consertado no `temMedida`.
+
+### ⚠️ MUDAR O CORTE: livre durante, aprovado depois (fase 3, R5–R8, R16–R17)
+
+**Durante o corte (③)** o operador muda o plano sozinho, sempre com motivo da
+lista de **Cadastros → Motivos** (a mesma do "não usar"; a migração 28 só
+acrescentou *Rolo acabou* e *Medida errada*): **não usar** a fonte, **o item
+saiu de outra fonte** (bipa o código; o sistema conta os metros), **rolo
+acabou** (o que já saiu fica nele, o resto muda, e no Corte feito ele é
+encerrado) e **cortado errado** (o pedaço vira sobra marcada "cortada errada",
+ou refugo, e o item volta a ser cortado). Cada mudança vira linha em
+`plano_edicao`.
+
+> ⚠️ **A EDIÇÃO NÃO TEM CONTA PRÓPRIA.** Ela vira restrição da entrada
+> (`fixadas`, `erradas`, `excluir_rolos`, `recusadas`) e o plano é recalculado
+> pelo mesmo `plano.calcular`. Fonte onde o item não cabe é recusada dizendo
+> qual, e nada muda.
+
+**Depois do Corte feito** o operador **pede** correção pelo histórico
+(`corte.pedir_correcao`), dizendo de onde cada item saiu de verdade; a tela
+mostra antes o que a aprovação faria. **Pendente, nada no estoque muda.** A
+chefia (`corte.aprovar_correcao`) aprova e o sistema aplica a **diferença**: a
+sobra que não foi usada volta a disponível **no endereço onde estava**, o rolo
+acerta o saldo como consumo (o giro soma certo), as sobras que não nasceram
+saem (a guardar é cancelada; a já guardada vira `anulada`, que não é descarte
+nem refugo), as que nasceram de verdade ficam a guardar, e o refugo é refeito.
+
+> ⚠️ **NA CORREÇÃO TODO ITEM TEM FONTE FIXA**, a do corte menos o que a pessoa
+> disse que mudou. Deixar o plano escolher ali inventaria um corte que ninguém
+> fez. E o item que mudou de fonte é **outra puxada**: encaixá-lo junto com o
+> que já tinha saído do rolo o poria na mesma faixa, e o rolo baixaria 0,50 m
+> em vez dos 2,50 que saíram. Achado pelo teste, antes da tela.
+
+> ⚠️ **A VERDADE DO QUE O CORTE BAIXOU É O MOVIMENTO, não a proposta.** Os cortes
+> de antes das etapas (R28) nem têm proposta; o metro de cada rolo está no
+> `movimento_rolo` com a referência do corte. É assim que o corte de 01/10/2026
+> se corrige.
+
+> ⚠️ **QUEM PEDIU NÃO APROVA, nem o diretor** — a regra da casa para mexer em
+> saldo (§18, ajuste em duas pessoas), aplicada aqui por analogia: a spec diz
+> só "a gestão aprova". **Confirmada pelo dono em 02/10/2026** (*"concordo, quem
+> pediu não aprova"*), e registrada em `DECISOES.md`.
+
+> ⚠️ **A CORREÇÃO É BLOQUEADA** quando uma sobra "que não nasceu" já foi usada
+> noutro corte, ou quando o rolo está encerrado e não tem onde pôr ou tirar
+> metro. A frase diz o que fazer.
+
+### ⚠️ O TOM É PELA ORIGEM, e o pedido dividido entre origens se confere no corte (fase 4, R9–R12)
+
+`tecido/dominio/tom.js` é o dono único da **origem de tom**: o rolo; a sobra
+que nasceu dele; a de sobra sobe até o rolo; e a do mutirão é **sozinha**. O
+pedido que não cabe inteiro numa fonte se divide — primeiro entre fontes da
+**mesma origem** (sem nada a conferir), depois entre **origens diferentes** —
+e só se couber inteiro na divisão. Dividido entre origens, cada fonte pede
+**"Conferi o tecido"** no Cortando, gravado com quem, quando, pedido e fonte; o
+Corte feito é recusado sem elas, dizendo quais; e mudar a fonte numa edição
+zera a conferência dela.
+
+> ⚠️ **O "PEDIDO JÁ CORTADO" SÓ CONTA NO MESMO TECIDO.** Até 01/10/2026 a
+> consulta olhava só o número do pedido, e o pedido de duas cores mandava a
+> segunda cor continuar no rolo da primeira. Consertado no `cortesAnteriores`
+> do `plano.js`, com caso travando.
+
+### O TIPO DE CADA LINHA E O TEMPO POR m² (fase 5, R18–R21)
+
+Cada linha do corte diz para quem é — **cliente final, revenda ou ML sob
+medida** —, e o Confirmar recusa linha sem tipo. A revenda é escolhida da
+**carteira que já existe** (`sm_revenda`), por uma porta própria do corte
+(`GET /api/planos/revendas`, só id e nome, com a chave de quem corta: o
+cortador não tem `revenda.ler`). O nome dela fica como retrato na linha.
+
+O relógio corre do **CORTAR ao Corte feito, menos as pausas** (Pausar/Retomar
+no ③; pausa esquecida aberta fecha no Corte feito), e o tempo líquido fica no
+corte. `dominio/tempo_corte.js` é o dono do **minuto por m² por tipo** (Painel →
+Tempo de corte): corte misturado divide o tempo **pela área das peças**, e corte
+acima de `corteTempoMaxHoras` (parâmetro, nasce em 3 h, zero é recusado) fica
+fora da média — e a tela diz quantos e quais.
+
+> ⚠️ **O m² É O DAS PEÇAS, não o puxado do rolo**: o tecido que virou sobra ou
+> refugo não é trabalho de cortar peça, e somado faria o corte com muito
+> desperdício parecer mais rápido.
+
+> ⚠️ **CORTE SEM RELÓGIO NÃO É CORTE RÁPIDO.** Os cortes feitos antes deste
+> deploy não têm tempo medido: ficam fora, contados à parte, nunca como zero.
+
+**Rode `cd tecido && npm test` ao mexer em `corte.js`, no `plano.js`, no
+`tom.js`, no `tempo_corte.js` ou na tela de corte** — `tempo_corte.test.js` (8), `corte_etapas.test.js` (18),
+`corte_correcao.test.js` (17), `historico_corte.test.js` (15) e
+`tom.test.js` (27).
+
+### A ETIQUETA DA SOBRA LIDA PELA FOTO (fase 6, R27)
+
+Todo campo de bipe de sobra (lançar e procurar em Sobras; guardar e o filtro do
+histórico no Corte) ganhou o botão **📷**: o iPad tira a foto e
+`public/barras_ler.js` — na raiz, ao lado do `barras.js`, lendo pela **mesma
+tabela** — acha o código. O código lido entra **no campo** (`ui.comCamera`) e
+segue pelo caminho do bipe; não há segundo caminho.
+
+> ⚠️ **SÓ VALE O QUE FECHA O DÍGITO VERIFICADOR, e não há "melhor palpite".**
+> Não leu, a tela diz e deixa tentar de novo ou digitar. Código errado lido com
+> confiança é sobra trocada na prateleira.
+
+> ⚠️ **FOTO, NÃO CÂMERA AO VIVO** — a ao vivo pede HTTPS (dívida 2 do §14).
+
+> ⚠️ **OS TESTES SÃO COM IMAGENS SINTÉTICAS**, desenhadas pelo `barras.js` e
+> estragadas como a câmera estraga (borrada, torta, invertida, sombra,
+> perspectiva, pequena). A spec pedia fotos reais, que não existem no
+> repositório. **A prova é o iPad da bancada achando a sobra pela foto** — é a
+> lição do QR do §4.
+
+**Rode `cd tecido && npm test` ao mexer no `barras_ler.js`, no `barras.js` ou no
+`comCamera`** — `barras_ler.test.js` (11). Três defeitos foram reintroduzidos:
+o limiar fixo (a sombra reprova), a parada lida sem o silêncio depois e tirar o
+script da tela.
+
+### O PLANO MAIS CLARO (fase 7, R22–R25)
+
+> ⚠️ **ENTRE AS SOBRAS QUE SERVEM, VENCE A DE MENOS REFUGO, e não a menor.**
+> A ordem é condição (íntegra antes de defeito) → menor refugo → menor área. A
+> de 1,05 × 1,05 para uma peça de 1,00 × 1,00 vira tira de refugo; a de
+> 1,00 × 2,10 devolve um pé de 1,10 que é sobra nova — e ganha.
+
+> ⚠️ **A SOBRA QUE SERVE E NÃO ENTROU DIZ POR QUÊ TAMBÉM QUANDO O PLANO USOU
+> OUTRA.** Até aqui a lista só existia sem sobra nenhuma no plano — e o caso de
+> 01/10/2026 era o outro. O motivo `outra_sobra` nomeia a escolhida e o degrau
+> que decidiu; a gêmea (mesma medida, mesmo refugo) diz que é gêmea, e não que
+> a outra "é menor".
+
+**Cada sobra usada mostra `usa N% · N% vira sobra · N% refugo`, somando 100**
+(o refugo é o resto, e não uma terceira soma), e o resumo mostra o refugo do
+corte ao lado da **média dos cortes dos últimos 30 dias** —
+`painel.refugoMedio`, da mesma tabela `refugo` do painel, só o refugo de corte.
+Sem corte na janela a média é `null`, nunca zero. **Não há limite de perda:** o
+número existe para o dono decidir um.
+
+**Rode `cd tecido && npm test`** — `plano_claro.test.js` (12). Seis defeitos
+foram reintroduzidos um a um: sem o critério do refugo, sem a condição, a lista
+sumindo com sobra usada, o descarte entrando na média, a média zero e a
+porcentagem errada.
+
+> ✅ **NO AR EM 01/10/2026** (PR #165): o dono fez o deploy e disse *"ficou
+> certo"*.
+>
+> ⚠️ **ISSO PROVA QUE O SISTEMA SUBIU, E NÃO QUE O CORTE EM ETAPAS FUNCIONA NA
+> BANCADA.** Faltam quatro provas, e a spec só vai para `docs/arquivo/` depois
+> delas: um corte inteiro pelas etapas, com rolo e sobra baixando **só no Corte
+> feito**; a correção do corte de 01/10 pedida pelo Histórico e aprovada por
+> outra pessoa; o iPad achando a sobra pela foto; e o caso da S-000091 no plano.
+> Prova que não foi feita se escreve como não feita (§4).
+>
+> ✅ **PROVA 1 DE 4, EM 02/10/2026: UM CORTE INTEIRO PELAS ETAPAS, NA BANCADA.**
+> O dono fez o corte do começo ao fim e disse *"baixou certo"*. Faltam as outras
+> três: a correção do corte de 01/10, a foto no iPad e o caso da S-000091.
+>
+> ✅ **PROVA 2 DE 4, EM 02/10/2026: A CORREÇÃO DO CORTE DE 01/10.** O dono fez a
+> correção pelo Histórico e disse *"deu certo"*. Faltam a foto no iPad e o caso
+> da S-000091.
+>
+> ✅ **PROVA 3 DE 4, EM 02/10/2026: A SOBRA LIDA PELA FOTO NO iPad.** O dono leu
+> a etiqueta de uma sobra pelo 📷 e disse *"deu certo"*. É a prova que os
+> testes com imagens sintéticas não davam (fase 6). Falta o caso da S-000091.
+>
+> ✅ **PROVA 4 DE 4, EM 02/10/2026: O CASO DA S-000091 NO PLANO.** O dono
+> testou e disse *"deu certo"*. Com as quatro provas feitas, a spec foi para
+> `docs/arquivo/CORTE-EM-ETAPAS.md`; as regras que valem são as desta seção e
+> as do `tecido/README.md`. E o dono confirmou no mesmo dia que quem pede a
+> correção não a aprova (`docs/DECISOES.md`): nada ficou aberto.
