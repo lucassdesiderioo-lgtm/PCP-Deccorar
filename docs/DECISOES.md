@@ -265,3 +265,12 @@ listas mostrava o `lote.codigo`, que é o primeiro item. **Depois:** a tela âmb
 listas do Carregamento mostram cada SKU da caixa, com medida, cor e o que já foi bipado.
 A trava continua sendo o bipe de cada peça (SKU fora da caixa ou um a mais para, e vai para
 a auditoria). Detalhe no `CLAUDE.md` §8-B.
+
+## 21/10/2026 — a área `admin` do PCP deixa de abrir o sob medida como diretor
+Decisão do dono (pergunta P1 da spec `ACESSOS-UNIFICADOS`). **Antes:** quem tinha
+qualquer permissão de nível Admin no PCP — setores Comprador, Financeiro e Admin,
+ou uma exceção como "Ver custo" — entrava no sob medida como diretor, podendo
+tudo lá. **Depois:** diretor é só o Admin Geral e quem está no setor "Sob medida /
+Cadastros"; quem tem só a área `admin` não entra no módulo e não vê o botão
+"Sob medida →". Detalhe no `CLAUDE.md` §19 (R-SMA-03).
+

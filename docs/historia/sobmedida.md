@@ -2563,3 +2563,30 @@ porcentagem errada.
 > `docs/arquivo/CORTE-EM-ETAPAS.md`; as regras que valem são as desta seção e
 > as do `tecido/README.md`. E o dono confirmou no mesmo dia que quem pede a
 > correção não a aprova (`docs/DECISOES.md`): nada ficou aberto.
+
+---
+
+## 21/10/2026 — a área `admin` deixa de abrir o sob medida (fase 1 da `ACESSOS-UNIFICADOS`)
+
+Achado na entrevista do guardião, ao avaliar o controle de acesso para cerca de
+20 logins: o `sincronizarAreas` (`acesso.js`) grava a área `admin` em quem tem
+**qualquer** chave de nível admin, e o `papelDe` (`tecido/nucleo/acesso.js`) lia
+essa área como **diretor**. Comprador e Financeiro são setores de nível admin;
+uma exceção de "Ver custo" também dá a área. Quem fosse posto lá para comprar
+material entrava no sob medida podendo tudo — boleto, preço, parâmetro,
+descarte e aprovação de correção de corte — e a tela de Acessos mostrava só
+"Comprador". Era a armadilha #34 por outra porta, e não aparecia porque quase
+ninguém estava nesses setores.
+
+O dono decidiu (P1) que diretor é só o Admin Geral e o setor "Sob medida /
+Cadastros". O `papelDe` e o `setoresDe` deixaram de ler `admin`, e o
+`destino.js` deixou de oferecer o botão "Sob medida →" a quem só tem `admin`,
+porque ele levaria a "sem acesso". O Admin Geral não perde nada: ele recebe
+`sobmedida_adm` pelo mesmo `sincronizarAreas`.
+
+Os testes foram escritos antes do conserto e reprovaram com o código de então
+(12 casos no `teste_acesso.js`, 2 no `tecido/teste/acesso.test.js` e 1 no
+`teste_destino.js`). Antes do deploy, a lista de quem deixa de ser diretor sai
+de um `SELECT` só de leitura, para o dono decidir quem precisa do setor de
+cadastros.
+

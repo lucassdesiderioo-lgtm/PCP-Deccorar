@@ -67,10 +67,18 @@
 ### R-SMA-02 · A chave do cadastro do sob medida é `supervisor`, nunca `admin`
 - **Regra:** `sobmedida.cadastrar` é `nivel:'supervisor'`, e o setor `Sob medida / Cadastros` também. O setor nativo `Admin` **não** a carrega (a lista dele é calculada como "toda chave de nível admin").
 - **Por quê:** nível admin no PCP é "admin do PCP": `sincronizarAreas` dá a área `'admin'` e as 24 rotas `@admin` liberam. E o setor com nível menor que a chave que carrega a apaga em silêncio no próximo salvamento (a tela não desenha a caixinha). Dentro do módulo nada mudou: o `papelDe` devolve `diretor` para `sobmedida_adm`, como sempre.
-- **Exceções:** as outras 23 chaves de nível admin do PCP continuam entrando no sob medida como diretor; estreitar isso é `REGRA`.
+- **Exceções:** nenhuma. Até 21/10/2026 as outras chaves de nível admin do PCP entravam no sob medida como diretor; desde então não entram (R-SMA-03).
 - **Teste que trava:** `teste_acesso.js` (seção 6-D) · `tecido/teste/acesso.test.js`.
 - **Status:** no ar e conferida em produção em 24/09/2026 (uma pessoa saiu com `sobmedida_adm` e sem `admin`).
 - **História:** armadilha #34. O defeito de tela que apaga a chave continua aberto (dívida 20 do §14).
+
+### R-SMA-03 · A área `admin` do PCP não abre o sob medida; diretor é só o Admin Geral e o setor de cadastros
+- **Regra:** o papel `diretor` (e os cinco setores de produção junto) vem **só** da área `sobmedida_adm`, que é do setor "Sob medida / Cadastros" e do Admin Geral (que recebe todas as áreas). A área `admin` sozinha não entra no módulo, e a barra não oferece "Sob medida →" a quem só tem ela. Quem tem `admin` **e** outra área do sob medida fica com o papel daquela área (venda → vendedor, bancada → cortador).
+- **Por quê:** o PCP grava a área `admin` em quem tem **qualquer** chave de nível admin. Os setores Comprador e Financeiro são de nível admin, e uma exceção de "Ver custo" também. Ler isso como diretor dava a quem foi posto lá para comprar material o direito de lançar e baixar boleto, mexer em preço e parâmetro, descartar sobra e aprovar correção de corte — sem ninguém pedir e sem aviso.
+- **Exceções:** o "modo antigo" de acesso (reversão de emergência) não recalcula as áreas; quem já era Admin Geral continua com `sobmedida_adm` gravada.
+- **Teste que trava:** `teste_acesso.js` (seção 6-H: Comprador, Financeiro, Admin e a exceção "Ver custo" pelo `sincronizarAreas` de verdade) · `tecido/teste/acesso.test.js` (a conta e o portão pelo fio) · `teste_destino.js`.
+- **Status:** em código desde 21/10/2026 (fase 1 da spec `ACESSOS-UNIFICADOS`); ainda não está no ar.
+- **História:** decisão do dono P1 de 21/10/2026, em `docs/historia/sobmedida.md` e `docs/DECISOES.md`.
 
 ---
 
@@ -219,7 +227,7 @@
 ### R-SMR-04 · O vendedor tem área própria, `sobmedida.vender` é `operacao`, e não edita revenda nem crédito
 - **Regra:** a área "Sob medida — venda" dá o papel `vendedor` (simulador, catálogo de leitura, a carteira dele). A chave é `nivel:'operacao'`. O papel tem `custo.ver` e `modulo.entrar`, e **não** tem `revenda.editar` nem `credito.editar`.
 - **Por quê:** declarada como admin, a área `'admin'` viraria **diretor** no portão e devolveria o módulo inteiro (porta A da #28). Sem `custo.ver` o simulador chegaria sem o preço; sem `modulo.entrar` o módulo abriria em branco. Tabela, desconto e limite são decisão de quem responde pelo dinheiro.
-- **Exceções:** as outras 23 chaves de nível admin do PCP continuam entrando como diretor (R-SMA-02).
+- **Exceções:** nenhuma. Desde 21/10/2026 nenhuma chave de nível admin do PCP abre o sob medida como diretor (R-SMA-03).
 - **Teste que trava:** `teste_acesso.js` (seção 6-B, confere o nível declarado) · `tecido/teste/acesso_operador.test.js`.
 - **Status:** no ar desde 22/09/2026.
 

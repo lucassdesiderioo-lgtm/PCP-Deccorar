@@ -55,8 +55,17 @@ caso('O ATALHO PARA A MEDIDA PADRAO NUNCA E O ADMIN para quem nao tem admin (o d
   igual(destino(['carregamento','sobmedida']).padrao,'/carregamento');
 });
 
-caso('ADMIN alcanca as duas: o portao do sob medida le admin como diretor', ()=>{
+caso('ADMIN SOZINHO NAO alcanca o sob medida (fase 1 da ACESSOS-UNIFICADOS)', ()=>{
+  /* O PCP grava 'admin' em quem tem qualquer chave de nivel admin (Comprador,
+     Financeiro). O portao do sob medida deixou de ler isso como diretor, e a
+     barra nao pode oferecer um caminho que da "sem acesso". */
   const d=destino(['admin']);
+  igual(d.sobmedida,null,'sem sob medida'); igual(d.duas,false,'nao sao duas');
+  igual(d.padrao,'/admin','padrao'); igual(d.inicial,'/admin','vai direto ao admin');
+});
+
+caso('O ADMIN GERAL alcanca as duas (ele recebe sobmedida_adm)', ()=>{
+  const d=destino(['admin','sobmedida_adm']);
   igual(d.duas,true,'duas'); igual(d.padrao,'/admin','padrao');
 });
 

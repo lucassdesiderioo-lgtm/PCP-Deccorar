@@ -1,4 +1,4 @@
-> **STATUS · 21/10/2026 — APROVADA, NÃO INICIADA** · tipo `REGRA` · nada construído.
+> **STATUS · 21/10/2026 — EM CONSTRUÇÃO** · tipo `REGRA` · **fase 1 em código (21/10):** a área `admin` deixou de abrir o sob medida como diretor (`CLAUDE.md` §19, R-SMA-03); falta subir e conferir a lista de quem deixa de ser diretor · fases 5, 2, 3, 6 e 4 não iniciadas.
 > Nasceu da entrevista do guardião de 21/10/2026. O dono pediu: *"avalie se o
 > nosso controle de acesso é condizente com o que estamos criando … daqui a
 > alguns dias vamos estar com todo o time cadastrado, mais ou menos 20 logins"*.

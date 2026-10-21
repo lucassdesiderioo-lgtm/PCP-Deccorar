@@ -2149,6 +2149,7 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 | R-SMM-03 | O backup diário cobre o `tecido.db` |
 | R-SMA-01 | A área é SOMBRA: chave, setor e linha no `PERM_AREA` andam juntos (#13) |
 | R-SMA-02 | `sobmedida.cadastrar` é `supervisor`, nunca `admin` (#34) |
+| R-SMA-03 | A área `admin` do PCP não abre o sob medida; diretor é só o Admin Geral e o setor de cadastros |
 | R-SMD-01 | O contexto é por tela, e a paleta é a mesma do PCP |
 | R-SME-01 | A bancada cria largura e endereço, e o cadastro nasce marcado para conferir (#14) |
 | R-SME-02 | Cada nível guarda um rolo só |
