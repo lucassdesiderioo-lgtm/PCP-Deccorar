@@ -1878,8 +1878,6 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Fazer o "voltou" da cancelada devolver `+1` em vez de POR PEÇA, ou devolver
   saldo de sob medida: a caixa de pacote baixou N, e o sob medida nunca
   baixou (§5, a Mesa · §7)
-- ❌ Desfazer uma correção sem comparar o estado: o volume pode ter andado, e
-  desfazer por cima de trabalho novo é a armadilha #32 pela porta da Mesa
 - ❌ Deixar o card de canceladas sem a marca de decidido: ele nunca zera, e
   número que não zera vira paisagem (§3 D3 · §5, a Mesa)
 - ❌ Dar backfill a `correcao.executar`: o Admin Geral passa por nível, e a chave
@@ -1894,8 +1892,6 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   pela foto e deixaria as linhas de teste descrevendo o que não existe (§11)
 - ❌ Deixar o aprovador único aprovar sozinho "com motivo": a decisão do dono é
   ESPERAR (§6.4 da spec, 26/09/2026)
-- ❌ Fazer a revisão somar estoque "porque parece que falta"
-- ❌ Fazer a reimpressão baixar estoque "porque imprimiu de novo"
 - ❌ Afrouxar o guard de 700 ms do bipe na Etiqueta de Venda: com o bipe por
   unidade, a repetição do leitor vira persiana a mais (§5, #23 e §12)
 - ❌ Pôr a tarja numa linha com `white-space:nowrap` e `text-overflow:ellipsis`:
