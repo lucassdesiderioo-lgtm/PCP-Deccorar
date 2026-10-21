@@ -381,3 +381,76 @@ Etiqueta de Venda ────┤
 R-COL-02 (o relógio de despacho é só da agência), R-PIL-05 (as listas da pilha
 nascem recolhidas), a exceção da R-SEG-01 (a viagem e as sobras não travam por
 "quem imprimiu") e R-VIA-05 (a foto da viagem sem `capture`).
+
+## O que NÃO fazer
+
+> Vieram do CLAUDE.md §15 sem alteração, na ordem em que estavam. As
+> referências entre parênteses (§N) apontam para a seção do CLAUDE.md onde
+> a regra morava, hoje em cartão neste arquivo ou na história da área.
+
+- ❌ Fazer a marcação "Motorista recusou" mexer no saldo: a expedição só marca,
+  e o admin aceita a volta pela Mesa (§8-B, RECUSA-DO-MOTORISTA)
+- ❌ Marcar como `cancelada_varias` a caixa de várias que o motorista recusou: ele
+  recusou a caixa inteira, e o "voltou" tem que existir por peça (§8-B)
+- ❌ Fazer a reimpressão gravar `impresso_por`: o bipe 1 é a PRIMEIRA
+  impressão, e papel repetido não é outra contagem (§8-B, fase 1 da saída)
+- ❌ Voltar a esconder os SKUs da caixa de várias no Carregamento, ou mostrar só
+  o `lote.codigo` na linha dela: a lista aparece desde 05/10/2026, por decisão
+  do dono, e a trava é o bipe de cada peça (§8-B)
+- ❌ Escrever uma segunda régua de "caixa de várias" no Carregamento: é o
+  `VARIAS()` do `carga.js` (§8-B, CARREGAMENTO F2)
+- ❌ Colar cópia da etiqueta de SKU por fora da caixa: são as do saco de cada
+  persiana, e cópia não prova que a persiana entrou (§8-B, P6)
+- ❌ Deixar quem imprimiu conferir no Carregamento — desde 01/10/2026 o bipe da
+  área e do canto RECUSA (§8-B, CARREGAMENTO-SEGUNDA-PESSOA)
+- ❌ Criar porta de liberação para quem imprimiu conferir, nem para o Admin
+  Geral: o cruzamento é automático por decisão do dono, e liberação vira rotina (§8-B)
+- ❌ Contar como "mesma pessoa" a caixa sem um dos dois nomes: vazio igual a
+  vazio é não saber quem fez, e vai para "sem registro" (§8-B)
+- ❌ Deixar a pilha esquecer a caixa impressa ontem e não conferida, ou somá-la
+  na conta de hoje — ela vai à parte, em cima (§8-B, armadilha #9)
+- ❌ Abrir por padrão a lista da pilha enquanto o bipe for um só: são as mesmas
+  caixas das listas do carro e da coleta, e a tela diria tudo duas vezes (§8-B)
+- ❌ Fazer `saiu_por` reescrever `lote.modalidade`, ou o contrário: a etiqueta
+  diz uma coisa, a saída diz outra, e as duas são verdade (§8-B, #21)
+- ❌ Voltar a fechar a coleta comparando o canto INTEIRO com o motorista: um dia
+  sem fechar estraga todos os seguintes. É uma saída por caminhão (§8-B, fase 3)
+- ❌ Fechar a saída do caminhão sem o passo das sobras: "não ficou nada" é
+  resposta, e o silêncio não é (§8-B, fase 3)
+- ❌ Fazer o bipe da saída querer dizer "foi no caminhão" para caixa fora da
+  conta: o bipe só diz SOBROU, e a troca de porta é por botão (§8-B, fase 3)
+- ❌ Gravar quem fechou a saída como conferente da caixa que foi no caminhão sem
+  ninguém bipar: ela sai SEM conferência, com linha própria na pilha (§8-B)
+- ❌ Misturar a caixa que foi sem conferência com "sem registro" na pilha: lá é
+  não saber quem fez, aqui se sabe que ninguém conferiu (§8-B)
+- ❌ Pôr a agência conferida na conta do caminhão: ela fica na área, e cada
+  caminhão obrigaria a bipar dezenas de "sobras" (§8-B, fases 3 e 4, D2)
+- ❌ Deixar o bipe da ÁREA pôr a caixa de agência no carro: desde a fase 4 são
+  dois bipes, e o do carro só aceita caixa conferida (§8-B, fase 4, D1)
+- ❌ Aceitar no carro caixa não conferida na área, ou recusar sem dizer o que
+  fazer — a recusa manda conferir e voltar (§8-B, fase 4)
+- ❌ Deixar a caixa de coleta que está no carro aparecer no canto ou na conta do
+  caminhão: ela está no carro (`saida_id` da viagem) (§8-B, fase 4)
+- ❌ Pôr `capture` no campo da foto da viagem: a foto vem da GALERIA do celular
+  do motorista, tirada no balcão (§8-B, fase 4, D3)
+- ❌ Deixar o "No carro" do topo e a viagem dizerem números diferentes: a de
+  coleta que entrou no carro conta nos dois (§8-B, fase 4)
+- ❌ Contar no "No carro" a caixa de agência que saiu pelo caminhão
+  (`saiu_por='coleta'`): o carro fecharia com uma a menos (§8-B, fase 3)
+- ❌ Contar como adiantada a caixa de coleta que só foi pro canto: a saída da
+  coleta é o caminhão levando (`retirado_em`), e o bipe não é saída (§8-B)
+- ❌ Escrever uma segunda conta de "saiu adiantado", ou contar caixa em vez de
+  peça: é o `saidasAdiantadas` do `carga.js`, e a caixa de várias conta N (§8-B)
+- ❌ Pôr a caixa de coleta na lista ou no contador do carro, ou somar a coleta
+  no relógio de despacho — são duas portas de saída, e `carga.js` é o dono
+  único de "isto é coleta?" (§8-B, armadilha #21)
+- ❌ Tratar `modalidade=NULL` como coleta: sem dado é agência, que é o que
+  sempre existiu (§8-B)
+- ❌ Afrouxar o `modalidadeDespacho()` para "parecido com coleta" passar como
+  coleta — formato que o sistema não conhece vai para Bloqueados e a gestão
+  decide, por regra do dono (§8-B, armadilha #21)
+- ❌ Deixar cadastro de SKU soltar volume retido por `modalidade:` — cadastro
+  não responde por onde a caixa sai (§8-B)
+- ❌ Fechar a coleta sem a foto da tela do motorista, ou com número diferente
+  sem `confirmar` e sem registro — a foto é a prova, e a divergência é a
+  única chance de achar a caixa (§8-B)

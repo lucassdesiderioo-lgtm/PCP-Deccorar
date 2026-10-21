@@ -811,3 +811,370 @@ semeados, a exclusão recusada e os dois cadastros separados), a parte de tela
 da R-SMI-07, as frases da R-SMF-09, as duas partes de tela da R-SMF-10 (a
 revenda que se mantém depois de lançar e os selos separados) e o `inline-flex`
 da R-SML-03.
+
+## O que NÃO fazer
+
+> Vieram do CLAUDE.md §15 sem alteração, na ordem em que estavam. As
+> referências entre parênteses (§N) apontam para a seção do CLAUDE.md onde
+> a regra morava, hoje em cartão neste arquivo ou na história da área.
+
+- ❌ Separar o sob medida de novo em outro servidor/porta — já foi, durou um
+  dia, e o beco sem saída da liberação está descrito na §19
+- ❌ Acrescentar área de sob medida sem pôr a linha correspondente no
+  `PERM_AREA` do `acesso.js` — o acesso some sozinho, em silêncio (§19)
+- ❌ Escrever cor nova no `tecido/public/base.css` sem que ela exista nas telas
+  do PCP — paleta "quase igual" é o que faz parecer outro sistema (§19)
+- ❌ Guardar preço no cadastro do fornecedor para multiplicar na hora de mostrar
+  — o estoque comprado antes muda de valor no dia do reajuste (§19, armadilha #15)
+- ❌ Dividir a média diária por uma janela maior que a história registrada — o
+  número sai menor que a verdade, sem erro e sem aviso (§19, armadilha #16)
+- ❌ Contar `ajuste` ou `encerramento` como saída de tecido: nenhum dos dois é
+  corte (§19, armadilha #16)
+- ❌ Somar as larguras de bobina do mesmo tecido numa conta de cobertura — não
+  há emenda, são estoques diferentes (§19, armadilha #17)
+- ❌ Pôr o estoque parado no numerador da cobertura do conjunto: a folga dobra
+  justamente porque há dinheiro dormindo (§19, armadilha #17)
+- ❌ Podar preço por LISTA de nomes: ela envelhece em uma semana e o campo novo
+  viaja pelo fio até a bancada (§19, quem vê o quê)
+- ❌ Começar a lista de medida da sobra no mínimo do refugo — o `sobra.criar`
+  não exige esse mínimo, e o operador com a peça menor na mão escolheria o
+  valor errado de propósito (§19, a medida vira lista)
+- ❌ Deixar a bancada criar um cadastro **sem** marcá-lo para conferência, ou
+  marcar **sem** ele aparecer na lista de Cadastros — meia decisão é pior que
+  a trava que existia antes (§19, armadilha #14)
+- ❌ Calcular "o que esta persiana é" fora do `tecido/dominio/persiana.js` — o
+  simulador, o pedido, a ficha congelada e a etiqueta leem a MESMA conta (§19)
+- ❌ Guardar medida do sob medida em metro `REAL` ou dinheiro em reais: é
+  milímetro e centavo inteiros, e a conta da ficha EMPILHA (§19)
+- ❌ Converter metro em milímetro por `Number(x)*1000` na tela: `1,007` vira
+  1006,9999… e o servidor recusa, com razão, a medida que a pessoa acertou (§19)
+- ❌ Somar consumo com corte no sob medida, ou usar um no lugar do outro — são
+  os dois números da linha, e nunca fecham (§19, e a armadilha #18)
+- ❌ Guardar `linha` no modelo de venda: ela já está dentro da coleção, e a
+  segunda afirmação sobre o mesmo fato diverge (§19)
+- ❌ Duplicar o cadastro de coleção, cor ou tecido para a venda — a coleção de
+  venda APONTA para o cadastro de tecido (§19)
+- ❌ Escolher o tubo por outro caminho que não a escada, ou cadastrar degrau que
+  não sobe nos dois limites: a persiana pula o tubo em silêncio (§19)
+- ❌ Tirar o bandô, pôr a redução de peso ou recusar a medida **sem dizer por
+  quê** — a frase é parte da regra, não texto de erro (§19)
+- ❌ Nomear campo de dinheiro fora do padrão `preco_*`/`valor_*` no sob medida:
+  a poda corta por NOME, e um `total_centavos` vaza em silêncio (§19)
+- ❌ Declarar tela em `tecido/nucleo/telas.js` sem a linha no `public/nav.js` —
+  ela nasce sem botão, sem erro e sem log (§19)
+- ❌ Somar a tabela A/B/C com o desconto da revenda em vez de aplicar em
+  cascata: 10% + 5% não é 15%, e somados dois percentuais grandes zeram a
+  venda sem ninguém notar (§19)
+- ❌ Arredondar o preço da revenda em cada degrau: dois arredondamentos em
+  cadeia erram um centavo sem regra, e é o centavo que a revenda confere (§19)
+- ❌ Deixar a tabela ou o desconto da revenda encostarem no **subtotal
+  Deccorar** — ele vai para faturamento, Compras, crédito e relatório (§19)
+- ❌ Mostrar o subtotal Deccorar como **piso** quando falta o percentual da
+  tabela: desconto só faz o número descer, então ali ele é um TETO (§19)
+- ❌ Semear as tabelas A/B/C com zero por cento: zero é "sem desconto", que é
+  decisão; em branco é "ainda não se sabe", e só ele cala a tela (§19)
+- ❌ Declarar `sobmedida.cadastrar` como `nivel:'admin'` no PCP: nível admin
+  vale como "é admin do PCP" — são as 24 rotas `@admin` e a área `'admin'`
+  (§19, armadilha #34)
+- ❌ Declarar um setor com nível que não caiba a chave que ele carrega: a tela
+  não desenha a caixinha, o salvar regrava a lista sem ela, e a permissão some
+  sem ninguém desmarcar nada (§19, armadilha #34)
+- ❌ Ler "chefia do sob medida" como algo menor que diretor: o `papelDe`
+  devolve `diretor` para `sobmedida_adm`, e sempre devolveu (§19, #34)
+- ❌ Devolver `sobmedida.cadastrar` ao setor nativo `Admin`: a lista dele é
+  calculada, e quem cadastra sob medida é o setor dedicado (§19, #34)
+- ❌ Declarar `sobmedida.vender` (ou qualquer chave de venda) como `nivel:
+  'admin'` no PCP — a área `'admin'` é lida como **diretor** pelo portão do
+  sob medida, e o vendedor sairia com o módulo inteiro (§19)
+- ❌ Dar `revenda.editar` ou `credito.editar` ao vendedor "para facilitar": a
+  tabela, o desconto e o limite são decisão de quem responde pelo dinheiro (§19)
+- ❌ Tirar `custo.ver` do papel do vendedor — o simulador chegaria nele sem o
+  preço, que é justamente o número que ele foi buscar (§19)
+- ❌ Voltar a pedir `cadastro.ler` na tela inicial ou no `/api/eu` do sob
+  medida: com três papéis ela deixou de ser a chave que todos têm, e o efeito
+  é tela em branco com 403 no console (§19)
+- ❌ Criar um cadastro de vendedor dentro do sob medida — são dois lugares para
+  lembrar de desligar alguém, e foi por isso que o módulo perdeu o dele (§19)
+- ❌ Fazer a porta de pessoas devolver lista vazia quando não estiver ligada, ou
+  deixar passar mais que `id` e `nome` (§19)
+- ❌ Contar o prazo pela APROVAÇÃO em vez do envio, ou recalcular um prazo já
+  congelado com o relógio de hoje (§19)
+- ❌ Fazer o pedido ENVIADO reler o catálogo ou o cadastro da revenda: o
+  reajuste de terça mudaria o que foi vendido na segunda (§19, fase 3)
+- ❌ Reler a ficha de um pedido APROVADO: a persiana é cortada como a etiqueta
+  dela já diz, e na bancada vence a etiqueta (§19, e a §4.11 da spec)
+- ❌ Deixar o tubo mudar entre o envio e a aprovação sem gravar linha: a fábrica
+  corta um tubo diferente do que foi vendido, e ninguém procura depois (§19)
+- ❌ Gravar preço no rascunho do orçamento: ele envelhece calado, e quem abrir
+  amanhã lê o número de ontem com cara de atual (§19, fase 3)
+- ❌ Numerar o rascunho, ou deixar o envio passar com `pedidoNumeroInicial` em
+  branco — o plano de corte herdaria o tom de um pedido do Decorsoft (§19)
+- ❌ Fazer a numeração do pedido descer quando alguém baixar o parâmetro: quem
+  manda é o MAIOR entre ele e o que já foi usado (§19, e a §4.18 da spec)
+- ❌ Devolver o número ao bolo quando o pedido volta a rascunho, ou apagar peça
+  de pedido que já teve número — ela sai CANCELADA, com motivo (§19)
+- ❌ Alterar pedido aprovado, nem pelo admin: corrige-se cancelando a peça com
+  motivo e lançando outra (§19, decisão de 22/09/2026)
+- ❌ Aceitar item de pedido sem a cor do tecido, ou reencontrar o `tecido_id`
+  pelo nome da cor depois — a segunda régua é a que manda o rolo errado (§19)
+- ❌ Travar o pedido de tecido que não está na estante: ele entra MARCADO, e o
+  vendedor negocia prazo — travar é a armadilha #6 (§19, e a §4.10 da spec)
+- ❌ Somar as peças de um pedido sem arredondar na peça, ou guardar um total só:
+  a folha impressa deixaria de fechar com as parcelas dela (§19)
+- ❌ Declarar `pedido.aprovar_qualquer` na rota de aprovar: o vendedor perderia
+  a própria fila, com 403 numa tela que abre (§19, fase 3)
+- ❌ Medir a fila do vendedor em dias de calendário, ou cortar o vencido em
+  zero: prazo vencido é o que a lista existe para mostrar (§19)
+- ❌ Imprimir a folha de um pedido em rascunho, ou tirar o higienizador de texto
+  do PDF — Helvetica é WinAnsi, e o emoji derruba a geração no meio (§19)
+- ❌ Mostrar `R$ 0,00` num pedido sem peça: ele não vale nada AINDA, que é outra
+  afirmação — e só a tela renderizada pega isso (§19)
+- ❌ Aceitar parâmetro de prazo fora da faixa (`prazoCorteHora` por extenso, dia
+  da semana 7): aceito, ele muda a conta em silêncio (§19)
+- ❌ Dar o código da etiqueta de produção na IMPRESSÃO em vez da aprovação: ele
+  é da peça, e código novo a cada papel parte a história dela em duas (§19)
+- ❌ Tirar o número de uma etiqueta e devolvê-lo ao bolo — nem no cancelamento,
+  nem no backfill: número que volta é número que sai duas vezes (§19)
+- ❌ Ler o contador do setor num `SELECT` e gravar num `UPDATE` separado: a
+  janela entre os dois dá o mesmo código a duas aprovações (§19)
+- ❌ Usar um contador só para os cinco setores: o serralheiro leria saltos de
+  dezenas entre uma etiqueta e a seguinte, sem nada explicando (§19)
+- ❌ Escrever a medida ACABADA na etiqueta de produção ou na lista do corte: a
+  persiana de 1,000 manda cortar 0,970, e é a armadilha #18 na bancada (§19)
+- ❌ Escrever só "TUBO" na etiqueta da serralheria — o nome da peça é o degrau,
+  e Tubo 32 e Tubo 41 são peças diferentes, compradas e guardadas à parte (§19)
+- ❌ Estreitar o código de barras para caber texto ao lado: a 38 mm o módulo
+  cai a 0,23 mm e a ZD220 não resolve na etiqueta amassada (§19)
+- ❌ Escrever uma fileira de escolha própria em vez da do `base.css`: os botões
+  saem idênticos, sem o azul do escolhido, e o maço sai do setor errado (§19)
+- ❌ Mandar o tecido do sob medida para a lista de compras do PCP: o estoque
+  dele mora no `tecido.db` e já tem painel — seria a segunda régua (§19, 4-B)
+- ❌ Deixar o tubo do sob medida fora do Compras do PCP: é o MESMO material da
+  medida padrão, e comprar em dois lugares compra duas vezes (§19, 4-C)
+- ❌ Apontar o material do tubo no `sm_componente`: ele muda com o DEGRAU, e
+  Tubo 32 e Tubo 41 são itens de estoque diferentes (§19, 4-C)
+- ❌ Digitar um fator de unidade ao lado do vínculo — quem responde é a unidade
+  do item do PCP, lida ao vivo; fator digitado erra em silêncio (§19, 4-C)
+- ❌ Converter por chute a unidade que a peça não sabe dizer (kg), em vez de
+  recusar o vínculo dizendo qual ela é (§19, 4-C)
+- ❌ Ligar material a componente que não gera etiqueta: nada o tiraria da conta
+  depois, e ele subiria para sempre (§19, 4-C)
+- ❌ Ler a medida de CORTE no consumo de compra do sob medida — é a armadilha
+  #18 pela porta do Compras, e comprar pelo corte compra A MENOS (§19, 4-C)
+- ❌ Fazer o degrau sem material apontado sumir em silêncio: uma persiana sempre
+  tem tubo, então ele é sempre esperado (§19, 4-C)
+- ❌ Cobrar vínculo de TODO componente: a maioria é mão de obra, e seis
+  pendências por peça todo dia é a armadilha #6 (§19, 4-C)
+- ❌ Sobrescrever o consumo de um lado com o do outro no `necessidade_dominio`:
+  os dois pedem o mesmo tubo, e a fábrica compraria metade (§19, 4-C)
+- ❌ Pôr o pedido do sob medida no campo `origem` (que é por SKU) em vez do
+  `origem_sobmedida` — número de pedido com cara de código de produto (§19)
+- ❌ Somar quando a unidade do PCP e a do sob medida divergem: vira pendência
+  dizendo as duas, nunca uma conversão que ninguém decidiu (§19, 4-C)
+- ❌ Fazer a porta do sob medida RECUSAR a lista de compras quando ela não está
+  ligada: o comprador ficaria sem lista por causa do outro módulo — ela DIZ
+  que ele ficou de fora, com o motivo real (§19, 4-C)
+- ❌ Tirar o try/catch da porta: o sob medida é montado com try/catch para não
+  derrubar a expedição, e a lista de compras cai pela mesma razão (§19, 4-C)
+- ❌ Escrever uma frase de tela sem acento no sob medida: ela sai numa tela do
+  PCP que é toda acentuada, e aparece quebrada (§19, 4-C)
+- ❌ Repetir a mesma pendência uma vez por peça na tela: o grão do domínio é a
+  peça, mas a tela agrupa pelo motivo — lista que se repete ninguém lê (§19)
+- ❌ Calcular o comprometido de tecido fora do `tecido/dominio/consumo.js`, ou
+  deixar o `gerencial.js` somar peça de pedido por conta própria (§19, 4-B)
+- ❌ Ler a medida de CORTE no comprometido: ela é a mais apertada, e comprar
+  por ela compra A MENOS — a bobina acaba no meio de um pedido (§19, 4-B)
+- ❌ Deixar o comprometido sem descontar o que já foi cortado: número que só
+  sobe é número que a equipe aprende a ignorar (§19, 4-B)
+- ❌ Baixar o comprometido por plano só CALCULADO: quem consome rolo é o plano
+  confirmado (§19, 4-B)
+- ❌ Repartir o comprometido entre as larguras de bobina: o pedido escolhe a
+  COR, e quem escolhe a largura é o plano, na hora de cortar (§19, e a #17)
+- ❌ Tirar do painel o tecido que tem venda aprovada e nenhum rolo — é
+  justamente o que precisa ser comprado (§19, 4-B)
+- ❌ Escrever `0 m²` na estante de um tecido que nunca teve rolo: zero se lê
+  como "tinha e acabou", e ali a verdade é "nunca teve" (§19, 4-B)
+- ❌ Trocar a foto do "sem tecido" do envio pelo aviso de hoje, ou o contrário:
+  a foto explica o prazo que a revenda já ouviu (§19, 4-B)
+- ❌ Escrever o total do TECIDO na linha de um pedido sem dizer que é do
+  tecido: dois pedidos mostram o mesmo número e quem soma compra o dobro (§19)
+- ❌ Fazer o filtro da tela cortar a tabela e não o cartão do resumo — dois
+  recortes lado a lado é a mesma tela dizendo duas coisas (§19, 4-B)
+- ❌ Declarar chave de setor da produção sob medida como `nivel:'admin'`: a
+  área `admin` é lida como **diretor** pelo portão, e quem só embala sairia
+  com catálogo, parâmetros e descarte (§19, 5-A — e é a #28 por cinco portas)
+- ❌ Usar uma chave só para os cinco setores: o bipe grava QUEM fez, e a
+  recusa da 5-B acharia a pessoa errada — régua que acusa o inocente (§19)
+- ❌ Derivar os setores da pessoa do PAPEL dela: o papel é a área mais larga,
+  e o vendedor que também embala levaria 403 na bancada com a caixinha
+  marcada, sem ninguém entender por quê (§19, 5-A)
+- ❌ Gerar permissão do PCP a partir dos setores do `tecido.db`: acopla os
+  dois bancos e fura a porta única — setor é cadastro, CHAVE É CÓDIGO (§19)
+- ❌ Semear gente nos setores novos de produção: herdar por engano dá bipe de
+  serralheria a quem só revisa, e o bipe é o rastro (§19, 5-A)
+- ❌ Tirar o prefixo "Sob medida /" dos setores: "Revisão" e "Embalagem"
+  existem nos dois mundos e são trabalhos diferentes (§19, 5-A)
+- ❌ Dar por pronta a fase 5 enquanto os cinco setores estiverem com
+  `0 pessoa(s)`: é a #30 — a regra está escrita e não pega em ninguém (§19)
+- ❌ Trocar o `marco` do pedido para `'pronto'`: três lugares filtram por
+  `marco='aprovado'` — a reimpressão da etiqueta e as DUAS contas do
+  comprometido e do material. O pronto é `pronto_em` (§19, 5-B1)
+- ❌ Fazer bandô ou barra segurarem a MONTAGEM: eles vão na caixa, e pô-los
+  lá pararia a linha por uma peça que só é necessária no fim (§19, 5-B1)
+- ❌ Deixar a redução de peso — ou qualquer componente sem etiqueta — segurar
+  alguém: sem bipe ela nunca termina, e a espera é eterna (§19, 5-B1)
+- ❌ Contar o KIT na conta do pronto: cada persiana tem DUAS linhas de setor
+  `embalagem`, e a do kit nunca é bipada (§19, 5-B1)
+- ❌ Recusar um bipe sem dizer o que segura a peça: "não aparece" vira
+  "ninguém sabe por quê", e a equipe para de usar a tela (§19, 5-B1)
+- ❌ Deixar a bancada fechar a própria pendência, ou fechá-la sem motivo: a
+  trava deixaria de existir, e fechamento sem porquê não é rastro (§19)
+- ❌ Escrever uma segunda frase de "o que fazer" na tela da bancada: ela sai
+  do mesmo `tarefaDe` da etiqueta, e na bancada vence a etiqueta (§19)
+- ❌ Gravar a etapa do kanban numa coluna do `sm_pedido`: ela é DERIVADA, e a
+  coluna divergiria do `pronto_em` no primeiro bipe (§19, 6-A)
+- ❌ Trocar o `marco` para `pronto` "agora que o kanban existe" — a decisão da
+  dívida 15 foi NÃO, e os três leitores continuam de pé (§19, 6-A)
+- ❌ Deixar uma regra ler o NOME da coluna do quadro: o nome é cadastro, a
+  etapa é código, e renomear não pode desligar nada (§19, 6-A)
+- ❌ Aceitar duas colunas na mesma etapa: o mesmo pedido apareceria em dois
+  lugares, e quem vê isso para de confiar na tela inteira (§19, 6-A)
+- ❌ Criar coluna de `entregue` antes de existir o que marque entrega: coluna
+  que nunca recebe cartão é paisagem, que é a dívida 18 (§19, 6-A)
+- ❌ Deixar o pedido sumir do quadro quando a coluna é desativada: ele vira
+  AVISO, com a etapa nomeada e a contagem (§19, 6-A)
+- ❌ Contar o kit ou a peça cancelada na barrinha do cartão, ou desenhar
+  barrinha antes da aprovação — a ficha só é explodida ali (§19, 6-A)
+- ❌ Escrever `R$ 0,00` no cartão sem valor lançado: ele não vale nada AINDA,
+  e o total da coluna vira PISO quando falta algum (§19, 6-A, e a regra 4)
+- ❌ Declarar o quadro como `pedido.ler`: ele é a fábrica toda com o valor de
+  cada carteira, e o vendedor tem essa chave (§19, 6-A)
+- ❌ Pôr selo de retido em cartão cancelado — ele não espera nada (§19, 6-A)
+- ❌ Filtrar o bipe suspeito em cada indicador de tempo por conta própria: a
+  régua é UMA e roda uma vez sobre a lista — três filtros divergem (§19, 6-B)
+- ❌ Escrever o limite do bipe no código: ele é cadastro, e nasce CHUTADO
+  porque ninguém mediu a bancada ainda (§19, 6-B)
+- ❌ Aceitar limite de bipe zero: com ele todo bipe vira suspeito e a tela diz
+  "ninguém bipou ainda" com a fábrica trabalhando (§19, 6-B)
+- ❌ Deixar a persiana com bipe descartado entrar na média: a soma dela é menor
+  do que foi, e puxa a média para baixo em silêncio (§19, 6-B)
+- ❌ Medir tempo por m² pelo m² COBRADO: ele carrega o mínimo faturado de
+  1,5 m², e a peça pequena pareceria mais rápida do que é (§19, 6-B)
+- ❌ Exigir persiana completa na PRODUTIVIDADE: o grão dela é o bipe, e cobrar
+  a persiana inteira mede uma pessoa pelo trabalho das outras quatro (§19, 6-B)
+- ❌ Juntar prazo prometido e negociado num número, ou escrever `0%` sem pedido
+  pronto — "cumpriu zero por cento" é uma afirmação falsa (§19, 6-B)
+- ❌ Contar a recusa em `recusado_de`: essa é a bancada que ACHOU o erro, e a
+  pergunta é de onde ele VEIO (§19, 6-B)
+- ❌ Apagar a diferença entre "ninguém bipou ainda" e "nada no período": são
+  conselhos opostos — esperar ou mudar o filtro (§19, 6-B)
+- ❌ Repetir a explicação do vazio nos sete blocos: vira um muro do mesmo
+  parágrafo, e texto que se repete ensina a não lê-lo (§19, 6-B)
+- ❌ Esticar com `flex:1` dois números que existem para serem lidos juntos —
+  os percentuais do prazo iam para pontas opostas de 1100 px (§19, 6-B)
+- ❌ Gerar boleto dentro do PCP: o título nasce no banco, e um número
+  inventado aqui é a segunda régua contra o extrato (§19, 6-C1)
+- ❌ Travar pedido por crédito estourado: mostra e não trava, e a decisão é do
+  dono desde 22/09/2026 — não se perde venda (§19, 6-C1)
+- ❌ Escrever zero no disponível de quem não tem limite lançado — é `null`, e
+  não se estoura um limite que não existe (§19, 6-C1)
+- ❌ Tirar o boleto VENCIDO da soma do em aberto: o limite de quem não paga
+  pareceria mais folgado que o de quem paga em dia (§19, 6-C1)
+- ❌ Aceitar número de boleto repetido na mesma revenda: é o mesmo título duas
+  vezes, e ele come o limite em dobro (§19, 6-C1)
+- ❌ Somar "aprovado sem boleto" no disponível: não é dívida, é compromisso
+  que ainda não virou título — "os dois, mostrados separados" (§19, 6-C1)
+- ❌ Deixar a baixa sem caminho de volta, ou desfazê-la sem motivo: sem ele o
+  jeito vira lançar o título de novo, e aí a conta dobra (§19, 6-C1)
+- ❌ Nomear campo de dinheiro do boleto sem o prefixo `valor_`, ou pôr
+  `valor_` em `estourado` — a marca tem que sobreviver à poda (§19, 6-C1)
+- ❌ Escrever a data do último movimento em toda revenda: o sinal é o dado
+  VELHO, e a linha repetida vira paisagem (§19, 6-C1)
+- ❌ Pôr dois selos no cartão do Quadro sem container: eles saem grudados, e
+  nenhum teste pega — o texto está certo, a distância é que não (§19, 6-C1)
+- ❌ Construir a coluna `entregue` ou o selo de NF antes de existir quem marque
+  a entrega: é a coluna-paisagem que a 6-A recusou (§19, 6-C2)
+- ❌ Guardar o pedido do boleto numa COLUNA: um título cobre vários pedidos, e
+  a coluna grava um e esquece o resto em silêncio (§19, 6-C1b)
+- ❌ Deixar `sm_boleto.pedido_id` de pé ao lado da tabela de vínculo: duas
+  afirmações sobre o mesmo fato divergem no primeiro título de dois (§19)
+- ❌ Adivinhar se um número é ID ou NÚMERO de pedido: os intervalos se cruzam,
+  e o título vai para a venda de outra pessoa sem erro nenhum (§19, 6-C1b)
+- ❌ Aceitar os pedidos certos e descartar o errado da lista: o título cobre
+  menos do que quem lançou acha, e ninguém confere o que "deu certo" (§19)
+- ❌ Apontar pedido CANCELADO num boleto — ele não é compromisso, e a conta
+  não se explica depois (§19, 6-C1b)
+- ❌ Exigir pedido em TODO boleto: acerto e frete existem, e a trava no caso
+  legítimo é a #6. Ele passa marcado como AVULSO (§19, 6-C1b)
+- ❌ Dar coluna ao `avulso` ou à conferência de valor: os dois são derivados,
+  como a `situacao` do próprio boleto (§19, 6-C1b)
+- ❌ TRAVAR o título que não bate com a soma dos pedidos: o parcelamento nunca
+  bate, e recusá-lo pararia o caso normal (§19, 6-C1b)
+- ❌ Deixar o aviso de valor BINÁRIO: ele acende por vinte centavos de
+  arredondamento, e marca que aparece no caso normal vira paisagem (§19)
+- ❌ Pôr `COALESCE(…,0)` na soma dos pedidos do título: o avulso passaria a
+  "exceder" qualquer valor — é a regra 4 do custo (§19, 6-C1b)
+- ❌ Escrever a lista de pedidos da tela com critério próprio: ela é a mesma
+  pergunta do "aprovado sem boleto", e duas réguas divergem (§19, 6-C1b)
+- ❌ Pedir `pedido.ler` na lista que a tela marca: quem lança boleto pode não
+  ter, e o seletor abriria vazio com 403 no console (§19, 6-C1b)
+- ❌ Deixar o lançamento resetar a revenda escolhida no formulário: quem lança
+  cinco da mesma revenda manda o quinto para a errada (§19, 6-C1b)
+- ❌ Dar um pedido por titulado só porque existe UM boleto apontando para ele:
+  a régua é o dinheiro — a soma dos títulos ativos contra o valor do pedido
+  (§19, 6-C1c)
+- ❌ Tirar da lista de marcar o pedido parcialmente titulado: sem ele a
+  parcela 2 não tem onde ser apontada, e o parcelamento deixa de ser
+  lançável pela tela (§19, 6-C1c)
+- ❌ Repartir por outro critério que não o proporcional quando um título
+  cobre vários pedidos, ou escrever uma segunda conta de "quanto já foi
+  titulado" fora do `TITULADO` (§19, 6-C1c)
+- ❌ Somar o que falta titular dentro do "em aberto": é compromisso, não
+  dívida, e o disponível mudaria de valor sem ninguém lançar nada (§19)
+- ❌ Somar o valor CHEIO do pedido parcial: o pedaço que já virou título já
+  está no em aberto, e o cheio o conta duas vezes (§19, 6-C1c)
+- ❌ Deixar o título PAGO parar de titular: o pedido voltaria à cobrança no
+  dia em que a revenda pagasse (§19, 6-C1c)
+- ❌ Chamar de "falta" o que a linha de UM título mostra: título menor é o
+  parcelamento, e quem sabe a falta é a lista, que olha todos (§19, 6-C1c)
+- ❌ Escrever dinheiro com formatador próprio de tela no sob medida: o dono
+  único é o `dinheiro` do `ui.js`, e a cópia local é a #12 em miniatura (§19)
+- ❌ Pré-preencher com o `dinheiro` um campo que volta pelo `paraCentavos`: o
+  ponto do milhar vira NaN, e a tela recusa o valor que ela mesma escreveu (§19)
+- ❌ Usar `toLocaleString('pt-BR')` no `nucleo/unidade.js`: Node com ICU pequeno
+  não dá erro, CAI em en-US, e a folha da revenda sai `R$ 4,785.50` (§19)
+- ❌ Consertar o dinheiro só na tela quando ele vem escrito do servidor: o
+  simulador mostra os dois na mesma linha, e um deles ficaria para trás (§19)
+- ❌ Conferir o `.rolaH` só pela classe: recipiente criado e VAZIO fica verde
+  com a tabela pendurada fora dele — é rodar o `rolaH` de verdade que prova (§19)
+- ❌ Montar o recipiente do `.rolaH` na tela, em dois passos: quem embrulha é o
+  `window.ui.rolaH(tabela)`, e ele não tem segundo passo para esquecer (§19)
+- ❌ Deixar de embrulhar a tabela que HOJE cabe: o recipiente é inerte sem
+  transbordo, e a lista de isentos envelhece antes da tela (§19)
+- ❌ Procurar só TABELA quando a página rola de lado: um `inline-flex` sem
+  `wrap` faz igual, e o `rolaH` não alcança (§19, a aba Endereços)
+- ❌ Medir tela com banco VAZIO e dar a conta por feita: sem rolo, sem sobra e
+  sem endereço a tela não desenha o que rola — mede-se o vazio (§19)
+- ❌ Escrever varredura que lê o comentário que a explica, ou que procura
+  `/100).toFixed` sem nomear o centavo: as duas acusam o inocente (§19)
+- ❌ Escrever uma segunda tabela de "o que vem antes" para a recusa: o `ANTES`
+  lido ao contrário já responde, e duas divergem no dia em que o fluxo mudar
+  (§19, 5-B2)
+- ❌ Fazer o motivo da recusa apontar o SETOR: a serralheria faz quatro peças,
+  e voltar "para a serralheria" refaz as quatro (§19, 5-B2)
+- ❌ Deixar o bandô recusado derrubar a montagem: ele não a segura, então não a
+  derruba (§19, 5-B1 e 5-B2)
+- ❌ Subir `refeitas` em tudo que foi reaberto: ela conta quantas vezes a PEÇA
+  FÍSICA foi feita, e quem conta recusa é a `sm_recusa` (§19, 5-B2)
+- ❌ Deixar de limpar o `kit_conferido_em` na reabertura: a persiana refeita
+  fecharia a caixa sem o terceiro bipe (§19, 5-B2)
+- ❌ Reimprimir o maço do pedido inteiro para refazer UMA peça: sobram
+  etiquetas repetidas na bancada, que é o que a 4-A impede (§19, 5-B2)
+- ❌ Oferecer à bancada o motivo que a rota vai recusar — o próprio trabalho e o
+  que vem depois. Escolha que só serve para dar erro é a #6 numa lista (§19)
+- ❌ Devolver lista de motivos vazia sem dizer por quê: são três razões e cada
+  uma manda para um lugar diferente (§19, 5-B2)
+- ❌ Reaproveitar a `motivo_recusa` do plano de corte para a recusa da produção:
+  os relatórios das duas ficariam errados (§19, 5-B2, e a §4.16 da spec)
+- ❌ Apagar motivo de recusa com história atrás, ou deixar o cadastro nascer
+  vazio: o vazio faz o botão "Recusar" abrir uma lista sem nada (§19, 5-B2)

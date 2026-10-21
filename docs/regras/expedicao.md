@@ -279,3 +279,145 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 R-PDF-05 (NF repetida), a parte de tela de R-VOL-05 (guard de 700 ms na
 Etiqueta de Venda), R-CONF-06 (cobertura das conferências) e R-CAR-03 (o
 segundo bipe cego do carregamento).
+
+## O que NÃO fazer
+
+> Vieram do CLAUDE.md §15 sem alteração, na ordem em que estavam. As
+> referências entre parênteses (§N) apontam para a seção do CLAUDE.md onde
+> a regra morava, hoje em cartão neste arquivo ou na história da área.
+
+- ❌ Escrever uma segunda régua de "isto é fantasma?": ela é o
+  `correcoes.classificarFantasmas`, e o `limpar_fantasmas.js` lê dela — duas
+  cópias são o botão e o terminal apagando linhas diferentes (§5, a Mesa)
+- ❌ Trocar a varredura do fantasma por um `SELECT` de `MIN(id)` "porque é igual":
+  não é — com #1 só-venda, #2 venda+pack e #3 só-pack as duas respondem
+  diferente, e a régua é **o irmão mais antigo** (§5, a Mesa)
+- ❌ Dar o "voltou" à caixa de várias persianas: o ML cancelou **um item** e o
+  sistema não sabe qual peça é — só o "registrar" existe (§5, a Mesa)
+- ❌ Deixar a prévia da Mesa gravar qualquer coisa: é ela que separa a Mesa de um
+  `UPDATE` na mão (§5, a Mesa)
+- ❌ Esconder a ação que não vale em vez de desabilitá-la com o motivo escrito —
+  botão que some não responde nada a quem foi procurar por ele (§5, a Mesa)
+- ❌ Devolver o volume do fantasma por cima de um id ocupado, ou sem as peças que
+  o `antes` guardou (§5, a Mesa)
+- ❌ Pôr na Mesa um contador sem a ação dele: acusar sem saber liberar é a trava
+  que a equipe aprende a contornar (§5, a Mesa, e Bloqueados → escolher)
+- ❌ Fazer um script de passivo escrever no `lote` ou na `fila` por conta própria:
+  ele chama a ação do `correcoes.js` e grava em `correcao` — terminal e botão com
+  a mesma régua (§5, a Mesa F3)
+- ❌ Pré-preencher a data de corte de "Fechar vencidos": ela é a prova de que
+  alguém conferiu o Mercado Livre (§5, a Mesa F2)
+- ❌ Reabrir como `embalado` a venda futura que nunca teve etiqueta: embalado sem
+  o −1 é a armadilha #27 (§5, a Mesa F2)
+- ❌ Desfazer metade de um bloco: um volume que andou trava o bloco inteiro
+  (§5, a Mesa F2)
+- ❌ Multiplicar volume por "quantidade" em qualquer lugar — uma venda é uma
+  etiqueta é uma persiana (§5); já foi tentado e revertido, e há teste travando
+- ❌ Fazer a leitura por pedaços (`split` em `Desenho do tecido`) voltar a rodar
+  antes do tokenizer no `parse.js` — manda a peça errada pro cliente (§5)
+- ❌ Criar N linhas em `lote` para uma etiqueta que leva N persianas — o grão de
+  `lote` é a ETIQUETA, o de `lote_item` é a PEÇA (§5, armadilha #23)
+- ❌ Deixar a caixa de pacote imprimir sem o bipe de todas as peças, ou baixar
+  só uma do estoque: saíram N da prateleira (§5, armadilha #23)
+- ❌ Fechar a linha do `lote_item` num bipe só quando ela tem 2 unidades — é um
+  bipe por PERSIANA, e a irmã fica na prateleira (§5, armadilha #23)
+- ❌ Tratar como irmão de pacote um item que traz `Venda:` ou comprador — esse é
+  o caso Abraão, e herdar ali manda a peça errada pro cliente (§5, #4 e #23)
+- ❌ Ler ausência como pacote quando o PDF **não fecha** (sobrou etiqueta sem
+  item na folha): ali é leitura quebrada, não peça a mais (§5, armadilha #23)
+- ❌ Chamar `irmaosDoPacote` sem a licença do `pdfFecha` — foi assim que o
+  `backfill_pacote.js` nasceu, e lá o erro **baixa estoque** (§5, #23)
+- ❌ Decidir "isto é caixa de várias persianas?" contando `itens.length` — uma
+  linha com `qtd:2` é UMA linha e DUAS persianas, e foi assim que a NF 6490 saiu
+  com uma de duas. Todo portão conta a soma das `qtd` (§5, #23) — **inclusive
+  os da TELA**: o `embalagem.html` ficou em `length` e a NF 7031 entrou em laço
+  no bipe; lá a conta é a `pecasDe()`, e há varredura recusando
+- ❌ Dar por consertada uma regra do servidor sem procurar a MESMA pergunta na
+  tela: a tela tem os portões dela, e nenhum teste de rota os enxerga (§5, #23)
+- ❌ Reter o PDF inteiro porque ele não fecha: a dúvida é do volume que **não
+  achou item** na folha. Um lote de 28 com 5 leituras quebradas retinha os 28,
+  e escondia da Etiqueta de Venda as caixas de várias peças (§5, #23)
+- ❌ Fazer o `reivindicarAcima` pegar identificador que **outro item já usou**:
+  é exatamente o caso Abraão, e ali o pack de cima é do vizinho (§5, #4)
+- ❌ Desempatar duas linhas livres acima do `SKU:` por proximidade ou por ordem
+  — ambiguidade sem resposta não vira palpite, fica como está (§5, #4)
+- ❌ Reter em Bloqueados a venda de N unidades do MESMO SKU: a folha escreveu a
+  quantidade, não há o que assinar, e travar o caso normal é a #6 (§5, #23)
+- ❌ Deixar a pessoa descobrir no BIPE que a caixa leva três — ali ela já montou;
+  o bloco da caixa na coluna existe para ela saber antes da prateleira (§5, #23)
+- ❌ Deixar o painel "Pra despachar depois" contar `COUNT(*)` e ler só o
+  `lote.codigo`: o número mente e o segundo SKU não aparece em tela nenhuma —
+  e aquele painel CONVIDA a adiantar, com o bipe que não filtra por prazo
+  (§5, #23)
+- ❌ Escrever uma segunda consulta de "quais caixas levam mais de uma persiana":
+  ela é do `caixasDeVarias`, e a cópia que fica para trás é sempre a do
+  "depois", que ninguém olha todo dia (§5, #23)
+- ❌ Trocar o `?quando=` por uma rota nova, ou fazer o parâmetro ausente
+  significar outra coisa: o tablet com a página em cache chama sem ele (§5, #23)
+- ❌ Escrever uma segunda consulta para a linha da lista de SKU: a do dia e a do
+  painel "depois" saem do mesmo `linhasDeSku`, e foi a cópia que ficou para trás
+  que deixou o painel sem medida, sem cor e **sem estoque** (§5, #23)
+- ❌ Escrever "✓ dá pra adiantar" no SKU com saldo: o saldo é o MESMO da fila de
+  hoje, e a promessa manda gastar peça de quem tem prazo curto (§5, #23)
+- ❌ Repetir a marca de modalidade numa lista que já é de uma modalidade só — a
+  marca só aparece quando ela separa alguma coisa (§5, #23)
+- ❌ Dividir o painel "depois" em colunas Agência e Coleta: em 23/09/2026 o
+  futuro era 22 de 22 coleta, e coluna vazia todo dia vira paisagem (§5, #23)
+- ❌ Perguntar "quais peças vão nesta caixa?" fora do `folha.js → pecasDaCaixa`:
+  são DUAS formas (2 SKUs órfão, e 1 SKU com `Quantidade: N`), e a cópia que
+  fica para trás é a do script que ninguém roda todo dia (§5, #23)
+- ❌ Fazer o `backfill_pacote.js` voltar a varrer só `irmaosDoPacote`: ele
+  deixava de fora a forma COMUM, e foi assim que a NF 6986 ficou invisível para
+  o único reparo que existe (§5, #23)
+- ❌ Descartar o PDF inteiro porque ele não fecha: a licença gateia os ÓRFÃOS,
+  não a `Quantidade: N` escrita no próprio item — é a retenção em massa por
+  outra porta (§5, #23)
+- ❌ Escrever "gravado" numa linha de `qtd 2` no relatório do backfill: o
+  sistema conhece UMA, e é por isso que o script existe (§5, #23)
+- ❌ Deixar o "Já impressos" sem a tarja `📦 N persianas`: é o ÚLTIMO lugar em
+  que a caixa aparece, e é dali que se reimprime (§5, #23)
+- ❌ Devolver a caixa de várias persianas à linha por SKU, ou recriar o quadro
+  do topo: ela aparece UMA vez, dentro da coluna da porta de saída — em dois
+  lugares o dono leu duas vendas (§5, #23, opção B de 25/09/2026)
+- ❌ Escrever uma segunda régua de "caixa de várias" para tirá-la das linhas:
+  é o `VARIAS()` do `exp_route.js`, o mesmo do `caixasDeVarias` — com duas, a
+  caixa some das duas listas ou aparece nas duas (§5, #23)
+- ❌ Escrever só o `lote.codigo` na caixa de várias persianas já impressa: ele
+  é o PRIMEIRO item, e dois SKUs diferentes se leem como um repetido — a lista
+  sai do `pecas_caixa.js` e da `pecasCaixa` da tela (§5, NF 7449)
+- ❌ Escrever a instrução de embalagem diferente em cada tela, ou sem o número:
+  é uma frase só, a `fita(n)` — *"Atenção: vão N persianas no mesmo pacote —
+  embalar junto"* (§5, #23)
+- ❌ Deixar cadastro de SKU soltar volume retido por `pacote:` — cadastro não
+  responde quantas persianas vão na caixa (§5, armadilha #23)
+- ❌ Declarar chave nova em `permissoes.js` sem a linha no `permDaRota()` **e**
+  sem o backfill de quem já devia tê-la: a rota fica em `@logado` ou a tela dá
+  403 para todo mundo, nos dois casos sem erro e sem log (§5, armadilha #23)
+- ❌ Deixar `POST /api/lote/conferir` cair no `pre('/api/lote')` → `pdf.subir`:
+  o bipe das peças é da bancada da etiqueta, e sem ele ela não imprime (§5, #23)
+- ❌ Tratar NF repetida como duplicidade: a nota é do **pedido**, e o cliente com
+  três persianas tem três vendas e uma nota só (§5, armadilha #22)
+- ❌ Deixar o mapa `danfeByNf` sem guarda: a última folha da nota vence e a
+  impressão sai com a continuação no lugar do documento (§5, armadilha #22)
+- ❌ Escrever uma segunda régua de "que página é esta" / "qual o número desta
+  nota" — as duas são do `folha.js`, e é por elas que a impressão gravou (§5)
+- ❌ Recortar a descrição do anúncio a partir de uma palavra ("Persiana"): o ML
+  escreve o título com ela no fim, e o recorte leva junto a medida que a
+  conferência 3 lê e a família que a 5 aprende (§5, armadilha #24)
+- ❌ Comparar nome de cliente fora do `nome.js`, ou com distância de edição:
+  `Marcelo`/`Marcela` estão a duas letras e são duas pessoas (§5, #10 e #22)
+- ❌ Deixar o carregamento aceitar volume que não está `embalado`: a peça sai da
+  fábrica sem o −1, o saldo fica alto para sempre e a venda some da conta de
+  urgência — sem sinal em tela nenhuma (§5, armadilha #27)
+- ❌ Voltar a imprimir a etiqueta de venda de um volume `pendente` pelo
+  `GET /api/print/:id`: é o segundo caminho que punha etiqueta na mão sem baixa,
+  e quem baixa a peça é o `POST /api/embalar` da bancada (§5, armadilha #27)
+- ❌ Recusar uma caixa no carregamento sem dizer por onde ela tem que passar — a
+  pessoa está na frente do carro com a caixa na mão (§5, armadilha #27)
+- ❌ Ler a marca das 15:00 do `conferir_carregados.js` como se valesse desde
+  sempre: ela só existe a partir de 26/08/2026, e antes disso o fechamento à
+  mão sai com hora de gente (§5, armadilha #27)
+- ❌ Baixar para **dois** o mínimo do bloco no mesmo segundo, ou contá-lo dentro
+  da janela: o primeiro esconde furo que ninguém vai procurar, o segundo faz o
+  volume mudar de classificação conforme o argumento da linha de comando
+  (§5, armadilha #27)
