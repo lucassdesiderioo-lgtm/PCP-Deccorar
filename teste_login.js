@@ -16,7 +16,11 @@
  *   - sem sessao, API responde 401 e tela manda para o login (302);
  *   - PIN de 4 digitos pede troca no USO, inclusive na sessao ja aberta, e a
  *     troca exige o PIN atual; o cadastro so aceita 6 digitos (ACESSOS-UNIFICADOS
- *     fase 5-A, 21/10/2026).
+ *     fase 5-A, 21/10/2026);
+ *   - esqueci meu PIN: quem tem `pessoas.gerenciar` autoriza com o proprio PIN,
+ *     nunca para si mesmo, e o PIN dele conta na trava dele (fase 5-A2);
+ *   - 1 hora sem uso encerra a sessao; leitura automatica nao renova; a TV e o
+ *     quadro do sob medida ficam de fora so para ler (fase 5-A3).
  *
  * Ate 20/10/2026 nenhum teste do projeto passava pelo POST /api/auth/login.
  *
@@ -57,6 +61,18 @@ app.use(express.json());
 require('./auth')(app, db);
 app.get('/api/coisa', (req,res) => res.json({ ok:true, quem: req.usuario && req.usuario.nome }));
 app.get('/painel', (req,res) => res.send('painel'));
+app.get('/api/painel', (req,res) => res.json({ ok:true }));
+app.get('/setor', (req,res) => res.send('tela de setor'));
+app.post('/api/acao', (req,res) => res.json({ ok:true }));
+/* O modelo de permissoes (acesso.js) nao sobe neste teste. Para o "Esqueci
+   meu PIN" (fase 5-A2) basta a pergunta que o auth.js faz a ele: quem tem
+   `pessoas.gerenciar`. O stub responde por id, e guarda o que foi auditado. */
+const GERENCIA = new Set();
+const AUDITADO = [];
+app.locals.acesso = {
+  permissoesDe: uid => new Set(GERENCIA.has(+uid) ? ['pessoas.gerenciar'] : []),
+  auditar: (req, cat, acao, alvo, det) => AUDITADO.push({ quem: req.usuario && req.usuario.nome, cat, acao, alvo, det })
+};
 
 /* Pessoas do teste. O auth.js semeia o Administrador (PIN 1234) no banco vazio;
    as outras entram com o MESMO formato que o auth.js grava (salt + scrypt). */
@@ -236,6 +252,135 @@ async function main(){
     eq('e quem ja estava la fica marcado para trocar',
        dbVelho.prepare("SELECT pin_curto FROM usuarios WHERE nome='Velho'").get().pin_curto, 1);
     dbVelho.close();
+
+    console.log('\n── 10. esqueci meu PIN: quem gerencia pessoas autoriza com o PROPRIO PIN (fase 5-A2) ──');
+    /* Sem senha de recuperacao: ela seria uma chave mestra dita em voz alta
+       perto de um tablet. Quem autoriza digita o proprio PIN, na hora, e nao
+       fica sabendo o PIN novo. */
+    const BETO = pessoa('Beto', '0', 'painel');
+    const salt = crypto.randomBytes(16).toString('hex');
+    db.prepare('UPDATE usuarios SET salt=?,pin_hash=?,pin_curto=0 WHERE id=?')
+      .run(salt, crypto.scryptSync('424242', salt, 32).toString('hex'), BETO);
+    GERENCIA.add(ADMIN); GERENCIA.add(BETO);
+    let lista = await (await fetch(base + '/api/auth/autorizadores')).json();
+    eq('a lista de quem pode autorizar tem os dois que gerenciam pessoas',
+       lista.map(x => x.nome).sort().join(','), 'Administrador,Beto');
+    eq('e so id e nome', Object.keys(lista[0]).sort().join(','), 'id,nome');
+    const recuperar = async body => {
+      const q = await fetch(base + '/api/auth/recuperar-pin', { method:'POST',
+        headers:{ 'content-type':'application/json' }, body: JSON.stringify(body) });
+      return { status: q.status, body: await q.json() };
+    };
+    r = await recuperar({ id:ANA, autorizador:CAIO, autorizador_pin:'123456' });
+    eq('quem nao gerencia pessoas nao autoriza (403)', r.status, 403);
+    r = await recuperar({ id:ANA, autorizador:BETO, autorizador_pin:'000000' });
+    eq('PIN errado de quem autoriza: 401', r.status, 401);
+    r = await recuperar({ id:BETO, autorizador:BETO, autorizador_pin:'424242', novo:'101010' });
+    eq('ninguem autoriza a troca do proprio PIN (403)', r.status, 403);
+    ok('e a frase diz que e outra pessoa', /outra pessoa/i.test(r.body.erro || ''), JSON.stringify(r.body));
+    eq('pessoa que nao existe: 404', (await recuperar({ id:9999, autorizador:BETO, autorizador_pin:'424242' })).status, 404);
+    eq('pessoa bloqueada no cadastro: 404', (await recuperar({ id:SAIU, autorizador:BETO, autorizador_pin:'424242' })).status, 404);
+    r = await recuperar({ id:ANA, autorizador:BETO, autorizador_pin:'424242' });
+    eq('sem o PIN novo, so confere quem autoriza (200)', r.status, 200);
+    eq('e responde que esta autorizado', r.body.autorizado, true);
+    eq('sem mexer no PIN da Ana', (await login(ANA, '135791')).status, 200);
+    eq('PIN novo de 5 digitos: recusado', (await recuperar({ id:ANA, autorizador:BETO, autorizador_pin:'424242', novo:'77788' })).status, 400);
+    const antes = AUDITADO.length;
+    r = await recuperar({ id:ANA, autorizador:BETO, autorizador_pin:'424242', novo:'777888' });
+    eq('autorizado e PIN novo de 6: trocado', r.status, 200);
+    eq('a Ana entra com o novo', (await login(ANA, '777888')).status, 200);
+    eq('e o antigo deixou de entrar', (await login(ANA, '135791')).status, 401);
+    const reg = AUDITADO.slice(antes).find(a => a.acao === 'recuperar_pin');
+    ok('a auditoria grava quem autorizou e para quem', !!reg && reg.quem === 'Beto' && reg.alvo === 'Ana', JSON.stringify(AUDITADO.slice(antes)));
+    ok('e nao grava o PIN', !JSON.stringify(AUDITADO).includes('777888'));
+    /* Quem tinha PIN de 4 sai da recuperacao com o de 6, sem cair na troca. */
+    const DORA = pessoa('Dora', '1212', 'painel');
+    eq('quem tinha 4 recupera direto para 6', (await recuperar({ id:DORA, autorizador:ADMIN, autorizador_pin:'975310', novo:'343434' })).status, 200);
+    eq('e entra sem cair na troca', (await login(DORA, '343434')).body.trocar_pin, false);
+    /* O PIN de quem autoriza conta na trava DELE: senao esta rota viraria a
+       porta para chutar o PIN do Admin Geral. */
+    for(let i=1;i<=5;i++) await recuperar({ id:ANA, autorizador:BETO, autorizador_pin:'999999' });
+    eq('5 PINs errados de quem autoriza seguram essa pessoa (429)',
+       (await recuperar({ id:ANA, autorizador:BETO, autorizador_pin:'424242' })).status, 429);
+    eq('e o login dela tambem', (await login(BETO, '424242')).status, 429);
+    desvio += 61 * 1000;
+    eq('passado o minuto, volta', (await login(BETO, '424242')).status, 200);
+    GERENCIA.clear();
+    eq('sem o modelo de permissoes respondendo, ninguem autoriza',
+       (await recuperar({ id:ANA, autorizador:BETO, autorizador_pin:'424242' })).status, 403);
+
+    console.log('\n── 11. 1 hora sem uso encerra a sessao (fase 5-A3) ──');
+    /* A sessao durava 1 ano: o tablet ficava com o nome da ultima pessoa ate
+       alguem tocar em Sair. Agora vale 1 hora desde o ultimo USO. A
+       atualizacao automatica das telas (o Carregamento pergunta a cada 4 s)
+       NAO conta como uso — senao o tablet nunca sairia. */
+    const MIN = 60 * 1000;
+    const get = (path, cookie, extra) => fetch(base + path, { redirect:'manual',
+      headers: Object.assign(cookie ? { cookie } : {}, extra || {}) });
+    const novoCookie = q => { const c = q.headers.get('set-cookie') || ''; return c ? c.split(';')[0] : null; };
+    let cCaio = sess((await login(CAIO, '123456')).cookie);
+    desvio += 59 * MIN;
+    eq('59 minutos depois do login, a sessao vale', (await get('/api/coisa', cCaio)).status, 200);
+    let q = await get('/api/coisa', cCaio);
+    eq('e a leitura automatica nao renova (sem cookie novo)', novoCookie(q), null);
+    desvio += 2 * MIN;
+    eq('61 minutos sem uso: a API responde 401', (await get('/api/coisa', cCaio)).status, 401);
+    q = await get('/setor', cCaio);
+    eq('a tela manda para o login', q.status, 302);
+    ok('levando a tela de volta', /^\/login\?r=/.test(q.headers.get('location') || ''), q.headers.get('location'));
+    eq('e o /api/auth/eu diz que nao esta logado', (await eu(cCaio)).logado, false);
+
+    cCaio = sess((await login(CAIO, '123456')).cookie);
+    desvio += 50 * MIN;
+    q = await fetch(base + '/api/auth/ativo', { method:'POST', headers:{ cookie: cCaio } });
+    eq('o aviso de uso da tela (toque, bipe) responde 200', q.status, 200);
+    let c2 = novoCookie(q);
+    ok('e renova a sessao', !!c2);
+    desvio += 50 * MIN;
+    eq('100 minutos depois do login, mas 50 do ultimo uso: vale', (await get('/api/coisa', c2)).status, 200);
+    q = await fetch(base + '/api/acao', { method:'POST', headers:{ cookie: c2 } });
+    eq('uma acao (POST) responde', q.status, 200);
+    const c3 = novoCookie(q);
+    ok('e tambem renova', !!c3);
+    desvio += 50 * MIN;
+    q = await get('/setor', c3);
+    eq('abrir uma tela 50 minutos depois: abre', q.status, 200);
+    const c4 = novoCookie(q);
+    ok('e renova', !!c4);
+    desvio += 50 * MIN;
+    eq('e a sessao renovada pela tela segue valendo', (await get('/api/coisa', c4)).status, 200);
+    eq('o cookie de antes da renovacao, sozinho, ja venceu', (await get('/api/coisa', c2)).status, 401);
+    desvio += 61 * MIN;
+    eq('sem uso de novo por 61 minutos: sai', (await get('/api/coisa', c4)).status, 401);
+    eq('o aviso de uso com a sessao vencida nao ressuscita ninguem',
+       (await fetch(base + '/api/auth/ativo', { method:'POST', headers:{ cookie: c4 } })).status, 401);
+
+    /* A sessao aberta antes desta fase nao tem a hora do ultimo uso: ela vence. */
+    const corpoVelho = Buffer.from(JSON.stringify({ id: CAIO })).toString('base64');
+    const assinaVelho = crypto.createHmac('sha256', fs.readFileSync(SEGREDO, 'utf8').trim()).update(corpoVelho).digest('hex').slice(0, 32);
+    const cVelho = 'sess=' + encodeURIComponent(corpoVelho + '.' + assinaVelho);
+    eq('cookie de antes da fase (sem hora de uso) nao vale', (await get('/api/coisa', cVelho)).status, 401);
+
+    console.log('\n── 12. a TV e o quadro do sob medida ficam de fora, so para LER (opcao A) ──');
+    const cTv = sess((await login(ANA, '777888')).cookie);   // a Ana tem a area do painel
+    desvio += 5 * 60 * MIN;
+    eq('5 horas depois, a TV (/painel) abre', (await get('/painel', cTv)).status, 200);
+    eq('e o numero dela (/api/painel) responde', (await get('/api/painel', cTv)).status, 200);
+    q = await get('/sobmedida/kanban', cTv);
+    ok('o quadro do sob medida nao vai para o login', q.status !== 302 && q.status !== 401, 'veio ' + q.status);
+    q = await get('/sobmedida/api/kanban', cTv);
+    ok('nem a leitura dele', q.status !== 401 && q.status !== 302, 'veio ' + q.status);
+    ok('nem o arquivo de apoio dele', ![302,401].includes((await get('/sobmedida/nav.js', cTv)).status));
+    eq('mas qualquer outra API recusa', (await get('/api/coisa', cTv)).status, 401);
+    eq('e qualquer outra tela vai para o login', (await get('/setor', cTv)).status, 302);
+    eq('mesmo vindo da TV (Referer /painel)', (await get('/setor', cTv, { referer: base + '/painel' })).status, 302);
+    eq('e escrever, nem pela API da TV (POST)',
+       (await fetch(base + '/api/painel', { method:'POST', headers:{ cookie: cTv } })).status, 401);
+    let euTv = await (await fetch(base + '/api/auth/eu?tela=%2Fpainel', { headers:{ cookie: cTv } })).json();
+    eq('o /api/auth/eu diz a tela que e de exibicao', euTv.exibicao, true);
+    euTv = await (await fetch(base + '/api/auth/eu?tela=%2Fsetor', { headers:{ cookie: cTv } })).json();
+    eq('e a que nao e', euTv.exibicao, false);
+    eq('e diz o tempo sem uso, em minutos', euTv.inativoMin, 60);
   } finally {
     srv.close();
   }

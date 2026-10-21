@@ -31,14 +31,17 @@
   <div id="etapa2" class="hide">
     <h1 id="oi"></h1>
     <div class="sub" id="pede">Digite seu PIN</div>
-    <div class="dots"><div class="d"></div><div class="d"></div><div class="d"></div><div class="d"></div><div class="d"></div><div class="d"></div></div>
-    <div class="pad">
+    <div class="nomes hide" id="autor"></div>
+    <div class="dots" id="dots"><div class="d"></div><div class="d"></div><div class="d"></div><div class="d"></div><div class="d"></div><div class="d"></div></div>
+    <div class="pad" id="pad">
       <div class="k">1</div><div class="k">2</div><div class="k">3</div>
       <div class="k">4</div><div class="k">5</div><div class="k">6</div>
       <div class="k">7</div><div class="k">8</div><div class="k">9</div>
       <div class="k" data-a="del">&#9003;</div><div class="k">0</div><div class="k" data-a="ok">OK</div>
     </div>
     <div class="err" id="err"></div>
+    <div class="volta" id="trocarMeu">Trocar meu PIN</div>
+    <div class="volta" id="esqueci">Esqueci meu PIN</div>
     <div class="volta" id="volta">Nao sou eu &mdash; trocar</div>
   </div>
 </div>
@@ -53,8 +56,17 @@
      pin   — o PIN de entrar
      atual — o PIN de hoje, para trocar (so quando chegou ja logado)
      novo  — o PIN novo de 6
-     conf  — o PIN novo de novo, para conferir */
-var alvo=null, pin='', etapa='pin', atual='', novoPin='';
+     conf  — o PIN novo de novo, para conferir
+
+   ESQUECI MEU PIN (fase 5-A2): quem tem a permissao de gerenciar pessoas
+   escolhe o proprio nome (autq) e digita o proprio PIN (autp), na hora; a
+   pessoa cria o novo nas etapas novo/conf. Quem autoriza nao ve o PIN novo.
+
+   TROCAR MEU PIN (por vontade propria) mora SO aqui, na tela do PIN — decisao
+   do dono, 21/10/2026: nada de botao nas barras das telas. O PIN de hoje entra
+   pelo proprio login (que confere e abre a sessao), e a troca segue pelo
+   /api/auth/trocar-pin, como a obrigatoria. */
+var alvo=null, pin='', etapa='pin', atual='', novoPin='', autor=null, autorPin='', recuperando=false, porVontade=false;
 var q=new URLSearchParams(location.search);
 var destino=q.get('r')||'';
 var MAX=6;
@@ -62,13 +74,21 @@ function $(s){return document.querySelector(s);}
 var TEXTO={
   pin:'Digite seu PIN. Se ele tem 4 números, toque OK.',
   atual:'O PIN agora tem 6 números. Para trocar, digite o seu PIN de hoje e toque OK.',
+  vontade:'Para trocar seu PIN, digite o PIN de hoje e toque OK.',
+  autq:'Chame quem cuida dos acessos. Essa pessoa toca no próprio nome:',
+  autp:'',
   novo:'Crie seu PIN novo, com 6 números.',
   conf:'Digite o PIN novo de novo, para conferir.'
 };
-function mostrar(e){
+function mostrar(e,texto){
   etapa=e; pin=''; pontos();
-  $('#pede').textContent=TEXTO[e];
-  $('#volta').textContent=(e==='pin')?'Nao sou eu \u2014 trocar':'Entrar com outro usuario';
+  $('#pede').textContent=texto||TEXTO[e];
+  var grade=(e==='autq');
+  $('#autor').classList.toggle('hide',!grade);
+  $('#dots').classList.toggle('hide',grade); $('#pad').classList.toggle('hide',grade);
+  $('#esqueci').classList.toggle('hide',e!=='pin');
+  $('#trocarMeu').classList.toggle('hide',e!=='pin');
+  $('#volta').textContent=(e==='pin')?'Nao sou eu \u2014 trocar':((recuperando||porVontade)?'Voltar':'Entrar com outro usuario');
   $('#etapa1').classList.add('hide'); $('#etapa2').classList.remove('hide');
 }
 fetch('/api/auth/pessoas').then(r=>r.json()).then(function(l){
@@ -81,10 +101,25 @@ fetch('/api/auth/eu').then(r=>r.json()).then(function(e){
   }
 }).catch(function(){});
 document.addEventListener('click',function(e){
-  var n=e.target.closest('.nome');
+  var n=e.target.closest('#nomes .nome');
   if(n){ alvo={id:+n.dataset.id,nome:n.textContent}; $('#err').textContent='';
          $('#oi').textContent='Ola, '+alvo.nome; mostrar('pin'); return; }
+  var au=e.target.closest('#autor .nome');
+  if(au){ autor={id:+au.dataset.id,nome:au.textContent}; $('#err').textContent='';
+          mostrar('autp',autor.nome+', digite o SEU PIN para autorizar a troca do PIN de '+alvo.nome+'.'); return; }
+  if(e.target.id==='trocarMeu'){ porVontade=true; $('#err').textContent=''; mostrar('atual',TEXTO.vontade); return; }
+  if(e.target.id==='esqueci'){
+    recuperando=true; $('#err').textContent='';
+    fetch('/api/auth/autorizadores').then(r=>r.json()).then(function(l){
+      l=l.filter(function(x){return x.id!==alvo.id;});
+      $('#autor').innerHTML=l.length?l.map(x=>'<div class="nome" data-id="'+x.id+'">'+x.nome+'</div>').join('')
+        :'<div class="sub">Ninguém pode autorizar agora. Peça a troca pela tela de Acessos.</div>';
+      mostrar('autq');
+    });
+    return;
+  }
   if(e.target.id==='volta'){
+    if(recuperando||porVontade){ recuperando=false; porVontade=false; autor=null; autorPin=''; $('#err').textContent=''; mostrar('pin'); return; }
     if(etapa==='pin'){ $('#etapa2').classList.add('hide'); $('#etapa1').classList.remove('hide'); return; }
     fetch('/api/auth/logout',{method:'POST'}).finally(function(){ location.href='/login'; });
     return;
@@ -128,7 +163,31 @@ function enviar(){
      });
     return;
   }
+  if(etapa==='atual'&&porVontade){
+    if(pin.length<4) return;
+    var hoje=pin;
+    fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:alvo.id,pin:hoje})})
+     .then(r=>r.json().then(j=>({ok:r.ok,j:j})))
+     .then(function(r){
+       if(!r.ok) return erro(r.j.erro||'Erro');
+       atual=hoje; mostrar('novo');
+     });
+    return;
+  }
   if(etapa==='atual'){ if(pin.length<4) return; atual=pin; return mostrar('novo'); }
+  if(etapa==='autp'){
+    if(pin.length<4) return;
+    var ap=pin;
+    fetch('/api/auth/recuperar-pin',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:alvo.id,autorizador:autor.id,autorizador_pin:ap})})
+     .then(r=>r.json().then(j=>({ok:r.ok,j:j})))
+     .then(function(r){
+       if(!r.ok) return erro(r.j.erro||'Erro');
+       autorPin=ap; mostrar('novo', alvo.nome+', crie seu PIN novo, com 6 números.');
+     });
+    return;
+  }
   if(etapa==='novo'){
     if(pin.length<MAX) return erro('O PIN novo tem que ter 6 números.');
     novoPin=pin; return mostrar('conf');
@@ -136,6 +195,18 @@ function enviar(){
   if(etapa==='conf'){
     if(pin.length<MAX) return;
     if(pin!==novoPin){ mostrar('novo'); return erro('Os dois PINs não batem. Crie de novo.'); }
+    if(recuperando){
+      var np=novoPin;
+      fetch('/api/auth/recuperar-pin',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:alvo.id,autorizador:autor.id,autorizador_pin:autorPin,novo:np})})
+       .then(r=>r.json().then(j=>({ok:r.ok,j:j})))
+       .then(function(r){
+         if(!r.ok){ recuperando=false; autorPin=''; mostrar('pin'); return erro(r.j.erro||'Erro'); }
+         /* Trocado: entra com o PIN novo, sem pedir de novo. */
+         recuperando=false; autorPin=''; etapa='pin'; pin=np; enviar();
+       });
+      return;
+    }
     fetch('/api/auth/trocar-pin',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({atual:atual,novo:novoPin})})
      .then(r=>r.json().then(j=>({ok:r.ok,status:r.status,j:j})))
@@ -143,7 +214,7 @@ function enviar(){
        if(r.ok) return seguir(r.j.destino);
        /* O PIN de hoje estava errado: volta a pedi-lo. Os outros erros
           (429, formato) voltam ao PIN novo, com a frase do servidor. */
-       if(r.status===401){ mostrar('atual'); return erro(r.j.erro||'PIN atual incorreto'); }
+       if(r.status===401){ mostrar('atual',porVontade?TEXTO.vontade:null); return erro(r.j.erro||'PIN atual incorreto'); }
        mostrar(r.status===429?'atual':'novo'); erro(r.j.erro||'Erro');
      });
   }

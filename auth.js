@@ -105,6 +105,37 @@ module.exports=function(app, db){
     console.log('[auth] usuario inicial: Administrador / PIN 1234 - TROQUE ASSIM QUE ENTRAR');
   }
 
+  /* 1 HORA SEM USO ENCERRA A SESSAO (ACESSOS-UNIFICADOS fase 5-A3, 21/10/2026).
+     O cookie leva a hora do ultimo USO (`u`), assinada como o resto. Ate aqui
+     a sessao valia 1 ano, e o tablet ficava com o nome da ultima pessoa ate
+     alguem tocar em Sair.
+
+     Renova a hora: abrir uma tela, toda acao (o que nao e GET) e o aviso de
+     uso que a barra da tela manda num toque ou bipe (POST /api/auth/ativo).
+     NAO renova: a leitura automatica das telas (GET de API) — o Carregamento
+     pergunta a cada 4 s, e se isso contasse o tablet nunca sairia.
+
+     A TV (/painel) e o quadro do sob medida ficam de fora (opcao A do dono):
+     eles so mostram numero e ficam ligados sem ninguem mexer. Ficam de fora so
+     para LER — a tela, o numero dela e os arquivos de apoio, por GET —, e pelo
+     CAMINHO, nunca pelo Referer: tocar num link da TV para outra tela cai no
+     PIN. O cookie antigo, sem `u`, vence (a sessao de antes desta fase). */
+  const INATIVO_MS=60*60*1000;
+  const EXIBICAO=['/painel','/painel.html',SOBMEDIDA+'/kanban'];
+  const EXIBICAO_LEITURA=['/api/painel',SOBMEDIDA+'/api/kanban',SOBMEDIDA+'/api/eu'];
+  const ehExibicao=p=>EXIBICAO.includes(p);
+  function livreDoRelogio(req){
+    if(req.method!=='GET') return false;
+    const p=req.path;
+    if(ehExibicao(p)||EXIBICAO_LEITURA.includes(p)) return true;
+    // arquivo de apoio do sob medida (.js, .css, imagem), que a tela do quadro carrega
+    return p.startsWith(SOBMEDIDA+'/')&&/\.[a-z0-9]+$/i.test(p)&&!/\.html$/i.test(p);
+  }
+  function cookieSessao(id){
+    const corpo=Buffer.from(JSON.stringify({id:id,u:Date.now()})).toString('base64');
+    return 'sess='+encodeURIComponent(corpo+'.'+assina(corpo))+'; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax';
+  }
+
   function lerSessao(req){
     const raw=req.headers.cookie||'';
     const par=raw.split(';').map(s=>s.trim()).find(s=>s.startsWith('sess='));
@@ -116,6 +147,7 @@ module.exports=function(app, db){
     if(assina(corpo)!==sig) return null;
     try{
       const o=JSON.parse(Buffer.from(corpo,'base64').toString('utf8'));
+      if(!(Date.now()-(+o.u||0)<INATIVO_MS) && !livreDoRelogio(req)) return null;
       const u=db.prepare('SELECT id,nome,areas,ativo,pin_curto FROM usuarios WHERE id=?').get(o.id);
       if(!u||!u.ativo) return null;
       return {id:u.id,nome:u.nome,areas:u.areas.split(',').filter(Boolean),trocarPin:!!u.pin_curto};
@@ -147,6 +179,13 @@ module.exports=function(app, db){
        Arquivo de apoio (.js, .css, imagem) segue o caminho normal: so tela
        e API sao barradas. A tela leva o `r`, para o tablet voltar a estacao
        dele depois da troca. */
+    /* Uso de verdade renova a hora (fase 5-A3): tela aberta ou acao. A
+       leitura automatica (GET de API) e o arquivo de apoio, nao. A TV e o
+       quadro nao renovam: eles nunca vencem, entao nao precisam. */
+    if(u&&!livreDoRelogio(req)){
+      const tela=!p.startsWith('/api/')&&!p.startsWith(SOBMEDIDA+'/api/')&&(!/\.[a-z0-9]+$/i.test(p)||/\.html$/i.test(p));
+      if(req.method!=='GET'||tela) res.setHeader('Set-Cookie',cookieSessao(u.id));
+    }
     if(u&&u.trocarPin){
       if(p.startsWith('/api/')||p.startsWith(SOBMEDIDA+'/api/'))
         return res.status(403).json({erro:'trocar_pin'});
@@ -206,11 +245,58 @@ module.exports=function(app, db){
       return res.status(401).json({erro:'PIN incorreto'});
     }
     delete falhas[id];
-    const corpo=Buffer.from(JSON.stringify({id:u.id})).toString('base64');
-    res.setHeader('Set-Cookie','sess='+encodeURIComponent(corpo+'.'+assina(corpo))+'; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax');
+    res.setHeader('Set-Cookie',cookieSessao(u.id));
     aud({usuario:{id:u.id,nome:u.nome},headers:req.headers,socket:req.socket},'acesso','login',u.nome,'');
     const areasU=u.areas.split(',').filter(Boolean);
     res.json({ok:true,nome:u.nome,areas:areasU,destino:destino(areasU),trocar_pin:!!u.pin_curto});
+  });
+
+  /* ESQUECI MEU PIN (fase 5-A2 da ACESSOS-UNIFICADOS, 21/10/2026).
+     Quem autoriza e quem tem `pessoas.gerenciar` — hoje so o Admin Geral —,
+     digitando o PROPRIO PIN no aparelho da pessoa, na hora. Nao ha senha de
+     recuperacao: ela seria uma chave mestra, dita em voz alta perto de um
+     tablet, e um dia alguem decora. Quem autoriza nao fica sabendo o PIN novo.
+
+     - ninguem autoriza a recuperacao do proprio PIN (a regra "quem pede nao
+       aprova"); o Admin Geral que esqueceu o dele precisa do outro;
+     - o PIN errado de quem autoriza conta na trava DELE (5 erros, 1 minuto),
+       senao esta rota viraria a porta para chutar o PIN do Admin Geral;
+     - sem o PIN novo, a rota so confere quem autoriza: a tela pede a
+       autorizacao antes de a pessoa digitar o PIN novo duas vezes;
+     - sem o modelo de permissoes respondendo, ninguem autoriza. */
+  function podeAutorizar(uid){
+    const ac=app.locals.acesso;
+    if(!ac||!ac.permissoesDe) return false;
+    try{ return ac.permissoesDe(+uid).has('pessoas.gerenciar'); }catch(e){ return false; }
+  }
+  app.get('/api/auth/autorizadores',(req,res)=>{
+    const l=db.prepare('SELECT id,nome FROM usuarios WHERE ativo=1 ORDER BY nome').all();
+    res.json(l.filter(u=>podeAutorizar(u.id)));
+  });
+  app.post('/api/auth/recuperar-pin',(req,res)=>{
+    const {id,autorizador,autorizador_pin,novo}=req.body||{};
+    const p=db.prepare('SELECT id,nome FROM usuarios WHERE id=? AND ativo=1').get(id);
+    if(!p) return res.status(404).json({erro:'Pessoa não encontrada.'});
+    const a=db.prepare('SELECT * FROM usuarios WHERE id=? AND ativo=1').get(autorizador);
+    if(!a||!podeAutorizar(a.id))
+      return res.status(403).json({erro:'Quem autoriza precisa ter a permissão de gerenciar pessoas.'});
+    if(a.id===p.id)
+      return res.status(403).json({erro:'O PIN esquecido é autorizado por outra pessoa, nunca por quem esqueceu.'});
+    const quem={usuario:{id:a.id,nome:a.nome},headers:req.headers,socket:req.socket};
+    if(bloqueado(a.id)) return res.status(429).json({erro:'Muitas tentativas. Aguarde 1 minuto.'});
+    if(hash(autorizador_pin,a.salt)!==a.pin_hash){
+      const f=falhas[a.id]||{n:0,t:0};
+      falhas[a.id]={n:(Date.now()-f.t<60000?f.n:0)+1,t:Date.now()};
+      aud(quem,'acesso','pin_errado',String(a.id),'autorizar PIN esquecido de '+p.nome);
+      return res.status(401).json({erro:'PIN de quem autoriza incorreto'});
+    }
+    delete falhas[a.id];
+    if(novo===undefined||novo===null||novo==='') return res.json({ok:true,autorizado:true});
+    if(!PIN_OK.test(String(novo))) return res.status(400).json({erro:ERRO_PIN});
+    gravarPin(p.id,String(novo));
+    delete falhas[p.id];
+    aud(quem,'acesso','recuperar_pin',p.nome,'PIN esquecido, autorizado por '+a.nome);
+    res.json({ok:true});
   });
 
   /* A pessoa troca o proprio PIN. Exige o PIN ATUAL: num tablet deixado
@@ -246,7 +332,20 @@ module.exports=function(app, db){
 
   app.get('/api/auth/eu',(req,res)=>{
     const u=lerSessao(req);
-    res.json(u?{logado:true,...u,destino:destino(u.areas)}:{logado:false});
+    // `exibicao` e `inativoMin` sao para a barra da tela: ela vai sozinha ao
+    // login passada a hora sem toque, menos na TV e no quadro.
+    const extra={inativoMin:INATIVO_MS/60000,exibicao:ehExibicao(String(req.query.tela||''))};
+    res.json(u?{logado:true,...u,destino:destino(u.areas),...extra}:{logado:false,...extra});
+  });
+
+  /* O aviso de uso: a barra da tela manda num toque, tecla ou bipe (no maximo
+     um a cada 2 minutos). E o que renova a sessao de quem so bipa numa tela
+     cujo bipe e uma leitura (GET). Sessao vencida nao renova. */
+  app.post('/api/auth/ativo',(req,res)=>{
+    const u=lerSessao(req);
+    if(!u) return res.status(401).json({erro:'nao_logado'});
+    res.setHeader('Set-Cookie',cookieSessao(u.id));
+    res.json({ok:true});
   });
 
   app.get('/api/auth/areas',(req,res)=>res.json(AREAS));

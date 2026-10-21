@@ -37,7 +37,7 @@ IMPLEMENTADO     → as regras vão para o CLAUDE.md / docs/
 | `ARQUITETURA-ALVO.md` | Parcial — só no módulo sob medida (`tecido/`) |
 | `PCP-CONTROLE-E-VISAO.md` | Parcial e divergente · decisão pendente |
 | `TABLETS-E-KIOSK.md` | **Em construção** · **camada 2 no ar (02/10, PR #183)**: cada estação vira app com ícone e manifest próprios, e o `ipad.css`; camada 1 é configuração do iPad (com o dono); camada 3 depende da arquitetura-alvo |
-| `ACESSOS-UNIFICADOS.md` | **Em construção** · `REGRA` · **fase 1 no ar (21/10)** · **fase 5-A em código (21/10): PIN de 6 dígitos e troca no próximo uso; falta subir** · 5-B (HTTPS) espera resposta · ordem 1 → 5 → 2 → 3 → 6 → 4 · uma lista só de permissões para as duas operações, os papéis do sob medida virando setores, e a fase 1 fechando a porta pela qual quem tem permissão de nível Admin (Comprador, Financeiro) vira diretor no sob medida · nada construído |
+| `ACESSOS-UNIFICADOS.md` | **Em construção** · `REGRA` · **fase 1 no ar (21/10)** · **fase 5-A mesclada (21/10): PIN de 6 dígitos** · **5-A2 em código (21/10): "Trocar meu PIN" e "Esqueci meu PIN" na tela do PIN; falta subir** · **5-A3 em código (21/10): 1 hora sem uso encerra a sessão; falta subir** · 5-B (HTTPS) espera resposta · ordem 1 → 5 → 2 → 3 → 6 → 4 · uma lista só de permissões para as duas operações, os papéis do sob medida virando setores, e a fase 1 fechando a porta pela qual quem tem permissão de nível Admin (Comprador, Financeiro) vira diretor no sob medida · nada construído |
 | `PRODUCAO-MAPA-E-MOTOR.md` | Planejado · não iniciado · depois da fila de consertos |
 | `PRODUCAO-MONTAGEM.md` | Planejado · não iniciado · depois da fila de consertos |
 

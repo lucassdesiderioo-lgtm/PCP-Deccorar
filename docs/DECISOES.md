@@ -283,3 +283,21 @@ o de 6 **na próxima vez que usar o sistema** — inclusive com a sessão já ab
 porque a sessão dura 1 ano e os tablets quase nunca passam pelo login. A troca
 pede o **PIN de hoje**, e o PIN de hoje errado conta na mesma trava de 5 erros do
 login. Detalhe no `CLAUDE.md` §10.
+
+## 21/10/2026 — a pessoa troca o próprio PIN, e o PIN esquecido é autorizado na hora, sem senha de recuperação
+Decisão do dono (fase 5-A2 da spec `ACESSOS-UNIFICADOS`), para não precisar trocar
+PIN pelo `/acessos`. **Antes:** só o cadastro trocava o PIN de alguém. **Depois:** o
+"Trocar meu PIN", **só na tela do PIN** (sem botão nas barras das telas, por decisão
+do dono), deixa a pessoa trocar o dela, pedindo o PIN de hoje; e ali mesmo,
+"Esqueci meu PIN" é autorizado por quem tem a permissão de gerenciar pessoas,
+digitando **o próprio PIN** no aparelho da pessoa — nunca para si mesmo. O dono propôs
+uma senha de recuperação dele; ficou de fora porque seria uma chave mestra, que um dia
+alguém decora. Detalhe no `CLAUDE.md` §10.
+
+## 21/10/2026 — 1 hora sem uso encerra a sessão; a TV e o quadro do sob medida ficam de fora
+Decisão do dono (fase 5-A3 da spec `ACESSOS-UNIFICADOS`, opção A). **Antes:** a sessão
+valia 1 ano, e o tablet ficava com o nome da última pessoa até alguém tocar em Sair.
+**Depois:** passada 1 hora sem uso — sem abrir tela, sem ação, sem toque nem bipe —, a
+pessoa digita o PIN de novo. A atualização automática das telas não conta como uso. A TV
+do painel e o quadro do sob medida ficam abertos, só para ler, porque mostram número e
+ficam ligados sem ninguém mexer. Detalhe no `CLAUDE.md` §10.
