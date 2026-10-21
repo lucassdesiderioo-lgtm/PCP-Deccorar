@@ -1,4 +1,4 @@
-> **STATUS · 21/10/2026 — EM CONSTRUÇÃO** · tipo `REGRA` · **fase 1 no ar e conferida (21/10, PR #212):** a área `admin` deixou de abrir o sob medida como diretor (`CLAUDE.md` §19, R-SMA-03); a lista de quem deixava de ser diretor saiu vazia · **fase 5 dividida em duas:** **5-A em código (21/10)** — PIN de 6 dígitos e troca no próximo uso (`CLAUDE.md` §10); falta subir · **5-B (HTTPS)** espera saber se o sistema é aberto por nome ou por IP · fases 2, 3, 6 e 4 não iniciadas.
+> **STATUS · 21/10/2026 — EM CONSTRUÇÃO** · tipo `REGRA` · **fase 1 no ar e conferida (21/10, PR #212):** a área `admin` deixou de abrir o sob medida como diretor (`CLAUDE.md` §19, R-SMA-03); a lista de quem deixava de ser diretor saiu vazia · **fase 5 dividida em duas:** **5-A mesclada (21/10, PR #213)** — PIN de 6 dígitos e troca no próximo uso (`CLAUDE.md` §10); falta o deploy · **5-A2 em código (21/10)** — "Trocar meu PIN" e "Esqueci meu PIN" na tela do PIN, o esquecido autorizado pelo PIN de quem gerencia pessoas; falta subir · **5-B (HTTPS)** espera saber se o sistema é aberto por nome ou por IP · fases 2, 3, 6 e 4 não iniciadas.
 > Nasceu da entrevista do guardião de 21/10/2026. O dono pediu: *"avalie se o
 > nosso controle de acesso é condizente com o que estamos criando … daqui a
 > alguns dias vamos estar com todo o time cadastrado, mais ou menos 20 logins"*.
@@ -131,6 +131,11 @@ sob medida trata a pessoa como dono.
     qualquer PIN de 4 ou mais. E "troca no próximo **login**" não pegaria a
     bancada — a sessão dura 1 ano —, então a troca é cobrada no **próximo
     uso**, com sessão aberta ou não, pedindo o PIN de hoje.
+  - **5-A2 — a pessoa cuida do próprio PIN** (nasceu de um pedido do dono no
+    mesmo dia): "Trocar meu PIN" e "Esqueci meu PIN" **só na tela do PIN**
+    (o dono pediu que não ficasse nas barras das telas), o esquecido autorizado por quem tem `pessoas.gerenciar` digitando **o próprio
+    PIN** no aparelho, nunca para si mesmo. O dono propôs uma senha de
+    recuperação dele; ficou de fora por ser uma chave mestra.
   - **5-B — o HTTPS.** Configuração do servidor (nginx + certificado) e a
     marca `Secure` no cookie. Espera a resposta: o sistema é aberto por nome
     ou por IP?

@@ -213,6 +213,54 @@ module.exports=function(app, db){
     res.json({ok:true,nome:u.nome,areas:areasU,destino:destino(areasU),trocar_pin:!!u.pin_curto});
   });
 
+  /* ESQUECI MEU PIN (fase 5-A2 da ACESSOS-UNIFICADOS, 21/10/2026).
+     Quem autoriza e quem tem `pessoas.gerenciar` — hoje so o Admin Geral —,
+     digitando o PROPRIO PIN no aparelho da pessoa, na hora. Nao ha senha de
+     recuperacao: ela seria uma chave mestra, dita em voz alta perto de um
+     tablet, e um dia alguem decora. Quem autoriza nao fica sabendo o PIN novo.
+
+     - ninguem autoriza a recuperacao do proprio PIN (a regra "quem pede nao
+       aprova"); o Admin Geral que esqueceu o dele precisa do outro;
+     - o PIN errado de quem autoriza conta na trava DELE (5 erros, 1 minuto),
+       senao esta rota viraria a porta para chutar o PIN do Admin Geral;
+     - sem o PIN novo, a rota so confere quem autoriza: a tela pede a
+       autorizacao antes de a pessoa digitar o PIN novo duas vezes;
+     - sem o modelo de permissoes respondendo, ninguem autoriza. */
+  function podeAutorizar(uid){
+    const ac=app.locals.acesso;
+    if(!ac||!ac.permissoesDe) return false;
+    try{ return ac.permissoesDe(+uid).has('pessoas.gerenciar'); }catch(e){ return false; }
+  }
+  app.get('/api/auth/autorizadores',(req,res)=>{
+    const l=db.prepare('SELECT id,nome FROM usuarios WHERE ativo=1 ORDER BY nome').all();
+    res.json(l.filter(u=>podeAutorizar(u.id)));
+  });
+  app.post('/api/auth/recuperar-pin',(req,res)=>{
+    const {id,autorizador,autorizador_pin,novo}=req.body||{};
+    const p=db.prepare('SELECT id,nome FROM usuarios WHERE id=? AND ativo=1').get(id);
+    if(!p) return res.status(404).json({erro:'Pessoa não encontrada.'});
+    const a=db.prepare('SELECT * FROM usuarios WHERE id=? AND ativo=1').get(autorizador);
+    if(!a||!podeAutorizar(a.id))
+      return res.status(403).json({erro:'Quem autoriza precisa ter a permissão de gerenciar pessoas.'});
+    if(a.id===p.id)
+      return res.status(403).json({erro:'O PIN esquecido é autorizado por outra pessoa, nunca por quem esqueceu.'});
+    const quem={usuario:{id:a.id,nome:a.nome},headers:req.headers,socket:req.socket};
+    if(bloqueado(a.id)) return res.status(429).json({erro:'Muitas tentativas. Aguarde 1 minuto.'});
+    if(hash(autorizador_pin,a.salt)!==a.pin_hash){
+      const f=falhas[a.id]||{n:0,t:0};
+      falhas[a.id]={n:(Date.now()-f.t<60000?f.n:0)+1,t:Date.now()};
+      aud(quem,'acesso','pin_errado',String(a.id),'autorizar PIN esquecido de '+p.nome);
+      return res.status(401).json({erro:'PIN de quem autoriza incorreto'});
+    }
+    delete falhas[a.id];
+    if(novo===undefined||novo===null||novo==='') return res.json({ok:true,autorizado:true});
+    if(!PIN_OK.test(String(novo))) return res.status(400).json({erro:ERRO_PIN});
+    gravarPin(p.id,String(novo));
+    delete falhas[p.id];
+    aud(quem,'acesso','recuperar_pin',p.nome,'PIN esquecido, autorizado por '+a.nome);
+    res.json({ok:true});
+  });
+
   /* A pessoa troca o proprio PIN. Exige o PIN ATUAL: num tablet deixado
      logado, qualquer um que passasse trocaria o PIN de quem esta na sessao.
      O PIN atual errado conta na MESMA trava do login (5 erros, 1 minuto),
