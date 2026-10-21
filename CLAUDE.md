@@ -1988,7 +1988,6 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Remover a trava de SKU não cadastrado
 - ❌ Usar `.rindex('</script>')` ao inserir JS em HTML
 - ❌ Commitar `.session_secret`, `dados.db`, `tecido.db`, `backups/` ou `lotes/`
-- ❌ Somar zero pelo rolo sem nota lançada: o total é PISO, com o `≥` na frente
 - ❌ Nomear o limite de crédito sem o prefixo do padrão de poda: um
   `limite_credito_centavos` viaja pelo fio em silêncio (§19, e §15 acima)
 - ❌ Dar código novo na reimpressão, ou pôr o aviso do já impresso DEPOIS do
@@ -2010,8 +2009,6 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   deixar a frase concordar só no começo (§19, 6-B, e o §2)
 - ❌ Cortar o disponível negativo em zero: dois mil estourados e um real
   estourado ficariam iguais na tela (§19, 6-C1, e o §2)
-- ❌ Cobrar "aprovado sem boleto" de quem paga em PIX ou cartão — a fábrica
-  recebe dos três jeitos (dono, 26/09/2026), e aviso no caso normal é a #6
 - ❌ Ordenar a tarefa semanal por nome: quem estourou tem que estar em cima
   (§19, 6-C1, e a §3)
 - ❌ Pedir dinheiro em centavos numa tela e em reais na outra (§19, 6-C1, §4)
@@ -2028,12 +2025,6 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   e dispensadas — o admin só se abre no computador (§12, decisão de 29/09/2026)
 - ❌ Dizer que levar o `.rolaH` ao `public/` da raiz é "uma linha": são duas
   base.css diferentes, 4 abas do admin e 3 telas (§12)
-- ❌ Reabrir mais que o culpado e o que depende dele — nem menos: a mais é
-  trabalho jogado fora, a menos é persiana montada sobre peça que foi pro lixo
-- ❌ Trocar o `marco` para desfazer o pronto numa recusa: quem desfaz é o
-  `pronto_em` — o marco é lido pela reimpressão e pelas duas contas da compra
-- ❌ Dar código novo à peça refeita, ou tirar a marca vermelha do papel: o
-  código é da peça, e sem a marca ficam duas etiquetas iguais na bancada
 - ❌ Criar tela interna sem o `nav.js` da operação: ela nasce sem "Trocar
   setor" e sem o atalho, e a pessoa só sai pelo login (§20, Regra A)
 - ❌ Escrever chefia, chefe, patrão, dono ou gestão em texto que aparece para
