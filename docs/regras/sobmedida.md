@@ -9,12 +9,11 @@
 > regra sem perceber.
 >
 > Formato: [`README.md`](README.md). O módulo tem regras próprias também no
-> [`tecido/README.md`](../../tecido/README.md). **Partes 1 a 3 de 4:** o
-> módulo, o acesso, o design e a estante de tecido (parte 1); o catálogo, a
-> revenda, o pedido e a etiqueta de produção (parte 2); o consumo, a compra, os
-> setores, o bipe, a recusa, o quadro e os indicadores (parte 3). O financeiro,
-> as telas e o corte em etapas continuam no `CLAUDE.md` §19 até serem passados
-> para cá.
+> [`tecido/README.md`](../../tecido/README.md). Passado para cá em quatro
+> partes (21/10/2026): o módulo, o acesso, o design e a estante de tecido; o
+> catálogo, a revenda, o pedido e a etiqueta de produção; o consumo, a compra,
+> os setores, o bipe, a recusa, o quadro e os indicadores; e o financeiro, as
+> telas e o corte em etapas.
 
 ---
 
@@ -609,11 +608,206 @@
 
 ---
 
-## O que ainda não tem teste nas partes 1 a 3
+## O financeiro (fases 6-C1, 6-C1b e 6-C1c)
+
+### R-SMF-01 · O disponível é limite menos boletos em aberto, e mostra sem travar
+- **Regra:** `disponível = limite − boletos em aberto`. Pedido de revenda estourada entra e é aprovado do mesmo jeito; o que muda é a cor e o selo **crédito estourado** no Quadro. Não há linha no domínio do pedido que leia crédito.
+- **Por quê:** decisão do dono, 22/09/2026 — não se perde venda. A trava antes de a baixa ser feita de verdade seria a armadilha #6.
+- **Exceções:** cartão cancelado e revenda sem limite não ganham selo.
+- **Teste que trava:** `tecido/teste/boleto.test.js`.
+- **Status:** no ar desde 26/09/2026 · a baixa de verdade pelo financeiro e o uso semanal pelo vendedor ainda não foram conferidos.
+- **História:** "A fase 6-C1".
+
+### R-SMF-02 · Negativo fica negativo, e sem limite o disponível é `null`
+- **Regra:** o estourado não é cortado em zero. Sem limite lançado o disponível é `null`, nunca zero.
+- **Por quê:** zerar apagaria o tamanho do buraco (o `MAX(0, …)` do §2 pela porta do crédito). Número indefinido não vira número certo (regra 4 do custo).
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/boleto.test.js`.
+- **Status:** no ar desde 26/09/2026.
+
+### R-SMF-03 · O título é lançado à mão, e o que conta é a situação derivada
+- **Regra:** o boleto nasce no banco e aqui só é lançado; o sistema nunca gera número. A `situacao` sai de `pago_em` e `cancelado_em`: pago e cancelado saem da conta; **vencido fica**, marcado, com o valor vencido à parte. Número repetido na mesma revenda é recusado; em outra revenda passa. Valor e data impossíveis são recusados dizendo o campo.
+- **Por quê:** número inventado aqui seria a segunda régua contra o extrato (#12). Tirar o vencido faria o limite de quem não paga parecer mais folgado. Número repetido come o limite em dobro.
+- **Exceções:** boleto de revenda inativa continua contando.
+- **Teste que trava:** `tecido/teste/boleto.test.js`.
+- **Status:** no ar desde 26/09/2026.
+
+### R-SMF-04 · A baixa e o cancelamento têm rastro e caminho de volta
+- **Regra:** a baixa grava quem e quando; baixar duas vezes é recusado; a baixa se desfaz com motivo. Cancelar exige motivo.
+- **Por quê:** sem caminho de volta o jeito vira lançar o título de novo, e a conta dobra. Trava que só acusa é trava que se contorna.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/boleto.test.js`.
+- **Status:** no ar desde 26/09/2026.
+
+### R-SMF-05 · "Aprovado sem boleto" é só de quem paga em boleto, e fica fora do disponível
+- **Regra:** a linha "aprovado sem boleto" conta à parte, só para revenda que paga em boleto; PIX e cartão não têm. Enviado, orçamento e cancelado não entram. Não soma no disponível.
+- **Por quê:** "nem todo pedido fazemos boleto" (dono, 26/09/2026); aviso no caso normal é a armadilha #6. É compromisso, não dívida — "os dois, mostrados separados".
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/boleto.test.js`.
+- **Status:** no ar desde 26/09/2026.
+
+### R-SMF-06 · O boleto aponta os pedidos que cobre, numa tabela de vínculo
+- **Regra:** um boleto cobre N pedidos da mesma revenda, e um pedido aceita N boletos (`sm_boleto_pedido`; a coluna `pedido_id` saiu). Sem pedido nenhum ele nasce **avulso**, derivado, nunca coluna. ID e número de pedido são campos separados (`pedido_ids`, `pedido_numeros`), nunca adivinhados. Um pedido errado, de outra revenda ou cancelado derruba a lista inteira e nada é gravado; o mesmo pedido citado duas vezes conta uma.
+- **Por quê:** a coluna única gravava um pedido e esquecia o resto. Números de pedido e ids se cruzam um dia, e o título iria para a venda de outra pessoa.
+- **Exceções:** o avulso existe (acerto, frete), e passa marcado.
+- **Teste que trava:** `tecido/teste/boleto.test.js` (casos 6-C1b).
+- **Status:** no ar desde 26/09/2026.
+- **História:** "A fase 6-C1b".
+
+### R-SMF-07 · O título que soma mais que os pedidos avisa quanto, e nunca trava
+- **Regra:** só o lado impossível acende: o título maior que os pedidos citados, com a tarja dizendo a diferença em reais. Parcela e avulso não avisam. A soma não usa `COALESCE(…,0)`.
+- **Por quê:** o parcelamento nunca "bate", e recusá-lo pararia o caso normal. Aviso binário acendia por vinte centavos de arredondamento.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/boleto.test.js`.
+- **Status:** no ar desde 26/09/2026.
+
+### R-SMF-08 · O pedido está titulado quando os títulos ativos alcançam o valor dele
+- **Regra:** a régua é o dinheiro (`TITULADO`, em `dados/boleto.js`, dono único): abaixo do valor o pedido continua cobrável e na lista de marcar, com o que falta. Título que cobre vários pedidos reparte **proporcionalmente**; título que fecha cobre todos sem centavo solto. Cancelado não titula; **pago continua titulando**. A falta é cortada em zero (o lado de cima já tem a tarja da R-SMF-07). O avulso não titula pedido nenhum.
+- **Por quê:** com o `NOT EXISTS (vínculo)` a parcela 1 tirava o pedido da lista, e a parcela 2 não tinha onde ser apontada.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/boleto.test.js` (casos 6-C1c).
+- **Status:** no ar e conferido em 26/09/2026 — o dono lançou a 2ª parcela do mesmo pedido e a falta caiu.
+- **História:** "A fase 6-C1c".
+
+### R-SMF-09 · O que falta titular aparece ao lado do em aberto, nunca dentro
+- **Regra:** "em aberto" continua sendo só título lançado. "Sem boleto" e "parcialmente titulado" são duas linhas; a do parcial mostra a **falta**, nunca o valor cheio, e as duas dizem "fora do disponível". A linha de um título escreve "cobre R$ X de R$ Y em pedidos", e não "falta".
+- **Por quê:** somar a falta mudaria o disponível sem ninguém lançar nada; somar o cheio contaria duas vezes o pedaço já titulado. Título menor é o parcelamento, e quem sabe a falta é a lista.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/boleto.test.js` (a mesma régua na lista e na contagem). ⚠ As frases das duas telas **não têm teste**.
+- **Status:** no ar desde 26/09/2026.
+
+### R-SMF-10 · A tela do financeiro lista o que marcar, e quem lê é `boleto.ler`
+- **Regra:** escolhida a revenda, a tela lista os pedidos com o que falta, pelo **mesmo** critério do crédito, para marcar — nunca para digitar. A rota da lista é `boleto.ler`, nunca `pedido.ler`. `boleto.editar` não está em papel nenhum (só o diretor, pelo `*`). A tarefa semanal vem por prioridade e só com revenda que tem boleto em aberto; a data do último movimento aparece só quando é velha. Todo campo de dinheiro começa com `valor_`, e a marca `estourado` não.
+- **Por quê:** digitar é onde nasce o vínculo errado; duas réguas divergem (#12). `pedido.ler` daria um seletor vazio com 403. A poda é por nome.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/boleto.test.js` (critério, prioridade, poda, chaves). ⚠ Manter a revenda escolhida depois de lançar e os selos separados no cartão do Quadro **não têm teste**.
+- **Status:** no ar desde 26/09/2026.
+
+### R-SMF-11 · NF e entrega não existem, por decisão
+- **Regra:** não há coluna `entregue`, selo de NF nem faturamento no sob medida.
+- **Por quê:** ninguém marca entrega, e o ERP é outro projeto; coluna que nunca recebe cartão é paisagem (dívida 18). Nasce quando o dono disser quem faz.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/kanban.test.js` ("não há etapa de ENTREGUE nem selo de NF").
+- **Status:** decisão de 26/09/2026.
+
+---
+
+## As telas do módulo (28 e 29/09/2026)
+
+### R-SML-01 · Dinheiro se escreve com o ponto do milhar, pelo dono único de cada lado
+- **Regra:** na tela, o `dinheiro` do `ui.js`; no servidor, o `emReais` do `nucleo/unidade.js`, escrito à mão, **sem `Intl` nem `toLocaleString`**. Os dois saem iguais e são conferidos contra literais em português. Dinheiro sem valor é traço, nunca `R$ 0,00`. Nenhuma tela nova monta `R$ ` à mão; os isentos são nomeados, e o isento zumbi reprova.
+- **Por quê:** a mesma revenda saía com o mesmo dinheiro de dois jeitos (#12). Node com ICU pequeno cai em en-US sem dar erro, e a folha da revenda sairia `R$ 4,785.50`.
+- **Exceções:** o `emPercentual` fica sem separador.
+- **Teste que trava:** `tecido/teste/dinheiro_tela.test.js`.
+- **Status:** no ar desde 28/09/2026.
+- **História:** "Os dois defeitos de tela do financeiro" e "o separador de milhar … era do servidor".
+
+### R-SML-02 · O que se lê e o que pré-preenche campo são duas funções
+- **Regra:** onde a tela mostra dinheiro **e** pré-preenche um campo que volta pelo `paraCentavos`, são duas funções: `reais` (lê, pelo `dinheiro`) e `paraCampo` (sem separador). Vale na ficha da revenda e no catálogo.
+- **Por quê:** `4.785,50` no campo vira NaN, e a tela recusaria o valor que ela mesma escreveu.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/dinheiro_tela.test.js`.
+- **Status:** no ar desde 28/09/2026 · conferido gravando o campo de verdade.
+
+### R-SML-03 · Toda tabela rola dentro do `window.ui.rolaH(tabela)`, e a página nunca rola de lado
+- **Regra:** o `rolaH` recebe a tabela e devolve o recipiente **com ela dentro**; a classe `.rolaH` mora no `base.css`, nunca na tela. Toda tabela do módulo passa por ele — inclusive a que hoje cabe —, sem lista de isentos e sem o padrão de dois passos.
+- **Por quê:** `table{width:100%}` não impede a página de andar de lado. O padrão de dois passos deixou um recipiente oco, verde num caso que só olhava a classe.
+- **Exceções:** página que rola por um `inline-flex` sem `wrap` (aba Endereços) não é tabela; o conserto é outro.
+- **Teste que trava:** `tecido/teste/rola_tela.test.js` (roda a função num DOM de mentira). ⚠ O `inline-flex` sem `wrap` **não tem teste**.
+- **Status:** no ar desde 29/09/2026 · medido nas dezesseis telas a 400 e 1440 px · o `/corte` no celular da bancada ainda não foi conferido.
+- **História:** "As sete telas que rolavam de lado".
+
+---
+
+## O corte em etapas (spec `CORTE-EM-ETAPAS`, 01/10/2026)
+
+### R-SMK-01 · O estoque só anda no Corte feito, e baixa o que está gravado
+- **Regra:** planejar → confirmar (grava e reserva) → cortando (relógio) → **corte feito (baixa tudo junto, atômico)** → guardar. A baixa é do `plano.proposta`, nunca de um plano recalculado. `plano.confirmado` continua querendo dizer "baixou" e só vira 1 no Corte feito; a etapa mora em `etapa`. `tecido/dominio/corte.js` é o dono único.
+- **Por quê:** em 01/10/2026 o Confirmar já baixava, e a sobra ficou "usada" com o rolo baixando a menos. Painel, comprometido e gerencial leem `confirmado` com o sentido de "baixou".
+- **Exceções:** os cortes de antes viraram `feito` na migração 27 (R28).
+- **Teste que trava:** `tecido/teste/corte_etapas.test.js`.
+- **Status:** no ar desde 01/10/2026 · conferido na bancada em 02/10/2026 (prova 1 de 4).
+- **História:** "O corte em etapas".
+
+### R-SMK-02 · A reserva é a faixa de um corte aberto, sem tabela própria
+- **Regra:** sobra de corte aberto não é oferecida a outro plano, que diz por quê (`reservada`); o rolo aparece com o saldo menos os metros reservados; o pedido num corte aberto conta como já cortado. Cancelar solta tudo e guarda o motivo; o cancelado não conta como cortado.
+- **Por quê:** uma tabela de reserva seria a segunda afirmação sobre o mesmo fato, e a que fica para trás prende a sobra para sempre.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/corte_etapas.test.js`.
+- **Status:** no ar desde 01/10/2026.
+
+### R-SMK-03 · Um corte aberto por operador, e mexe nele quem o abriu
+- **Regra:** um corte aberto por pessoa (a pendência de guardar não conta). Mexe quem abriu ou quem tem `corte.gerir`. "Voltar ao plano" apaga o corte do ②; do ③ em diante só se cancela, com motivo. O corte aberto se reencontra depois de recarregar a tela.
+- **Por quê:** um "cancelado" por cada vez que alguém conferiu o resumo encheria o histórico de cortes que nunca existiram.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/corte_etapas.test.js`.
+- **Status:** no ar desde 01/10/2026.
+
+### R-SMK-04 · A sobra nascida mora em `sobra_a_guardar` até ser guardada
+- **Regra:** a sobra nova não é linha de `sobra` e não entra em plano até ser guardada com medida, etiqueta e endereço juntos. A medida calculada vem escrita e a lista vem vazia. Quem tem `corte.gerir` vê as pendências de todos, com quem cortou.
+- **Por quê:** sem etiqueta ninguém acha a sobra na prateleira; morando à parte, nenhuma consulta precisa lembrar de filtrá-la. Medida pré-marcada é medida que se salva sem olhar.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/corte_etapas.test.js`.
+- **Status:** no ar desde 01/10/2026.
+
+### R-SMK-05 · Durante o corte o operador muda o plano sozinho, com motivo e pela mesma conta
+- **Regra:** no ③: não usar a fonte, o item saiu de outra fonte, rolo acabou e cortado errado (vira sobra marcada ou refugo medido, e o item volta). Toda edição exige motivo da lista de Motivos e vira linha em `plano_edicao`; vira restrição da entrada e o plano é recalculado pelo mesmo `plano.calcular`. Fonte onde o item não cabe é recusada, e nada muda. Só se edita o que está cortando.
+- **Por quê:** conta própria da edição seria a segunda régua do plano.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/corte_correcao.test.js`.
+- **Status:** no ar desde 01/10/2026.
+
+### R-SMK-06 · Depois do Corte feito corrige-se pedindo, e quem pediu não aprova
+- **Regra:** o operador pede (`corte.pedir_correcao`); pendente, nada no estoque muda. Outra pessoa aprova (`corte.aprovar_correcao`) e o sistema aplica a **diferença**: a sobra volta ao endereço, o rolo acerta como consumo, a sobra que não nasceu sai (a guardar é cancelada, a guardada vira `anulada`), o refugo é refeito. Na correção todo item tem fonte fixa. A verdade do que foi baixado é o `movimento_rolo`. Uma correção pendente por corte; bloqueada se a sobra "que não nasceu" já foi usada.
+- **Por quê:** a regra das duas pessoas do §18, por analogia — confirmada pelo dono em 02/10/2026 (`DECISOES.md`). Deixar o plano escolher fonte ali inventaria um corte que ninguém fez.
+- **Exceções:** os cortes de antes das etapas também se corrigem, pelo movimento (R28).
+- **Teste que trava:** `tecido/teste/corte_correcao.test.js`.
+- **Status:** no ar desde 01/10/2026 · a correção do corte de 01/10 foi conferida em 02/10/2026 (prova 2 de 4).
+
+### R-SMK-07 · O tom é pela origem, e o pedido dividido entre origens se confere
+- **Regra:** `tecido/dominio/tom.js` é o dono da origem de tom (o rolo; a sobra dele; a de sobra sobe até o rolo; a do mutirão é sozinha). O pedido inteiro numa fonte vence; senão divide entre fontes da mesma origem; senão entre origens diferentes, e cada fonte pede **"Conferi o tecido"** no Cortando — o Corte feito é recusado sem elas, dizendo quais, e mudar a fonte zera a conferência. Só divide se couber inteiro. O pedido já cortado só continua no **mesmo tecido**.
+- **Por quê:** uma peça na sobra e duas na bobina dá duas cores na mesma janela; o pedido de duas cores mandava a segunda cor para o rolo da primeira.
+- **Exceções:** peça sem pedido é livre.
+- **Teste que trava:** `tecido/teste/tom.test.js`.
+- **Status:** no ar desde 01/10/2026 · o caso da S-000091 foi conferido em 02/10/2026 (prova 4 de 4).
+
+### R-SMK-08 · Toda linha diz para quem é, e o tempo por m² é das peças
+- **Regra:** cada linha é **cliente final, revenda ou ML sob medida**; o Confirmar recusa linha sem tipo; a revenda vem da carteira por porta própria (`GET /api/planos/revendas`, só id e nome) e o nome fica como retrato. O relógio corre do CORTAR ao Corte feito menos as pausas; corte misturado divide o tempo pela área das peças; corte acima de `corteTempoMaxHoras` (nasce em 3 h, zero recusado) fica fora da média, e a tela diz quantos. Corte sem relógio fica fora, contado à parte.
+- **Por quê:** o m² puxado do rolo faria o corte com muito desperdício parecer mais rápido. Corte sem relógio não é corte rápido.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/tempo_corte.test.js`.
+- **Status:** no ar desde 01/10/2026.
+
+### R-SMK-09 · A etiqueta da sobra se lê pela foto, e só vale o que fecha o dígito
+- **Regra:** o botão 📷 dos campos de bipe de sobra lê a foto pelo `public/barras_ler.js` (mesma tabela do `barras.js`) e põe o código **no campo**, pelo caminho do bipe. Só vale o que fecha o dígito verificador; não há melhor palpite. Foto, não câmera ao vivo.
+- **Por quê:** código errado lido com confiança é sobra trocada na prateleira. Câmera ao vivo pede HTTPS (dívida 2).
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/barras_ler.test.js` (imagens sintéticas).
+- **Status:** no ar desde 01/10/2026 · conferido no iPad em 02/10/2026 (prova 3 de 4).
+
+### R-SMK-10 · Entre as sobras que servem vence a de menos refugo, e a que não entrou diz por quê
+- **Regra:** a ordem é condição (íntegra antes de defeito) → menor refugo → menor área. A sobra que servia e não entrou diz por quê também quando o plano usou outra (`outra_sobra`, nomeando a escolhida; a gêmea diz que é gêmea; a reservada aparece). Cada sobra usada mostra `usa · vira sobra · refugo`, somando 100, e o resumo mostra o refugo do corte ao lado da média dos últimos 30 dias (`painel.refugoMedio`), que é `null` sem corte, nunca zero. Não há limite de perda.
+- **Por quê:** a menor sobra pode virar só tira de refugo; a maior pode devolver sobra nova. O caso de 01/10 era o da sobra que servia e ficou de fora sem explicação.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/plano_claro.test.js` · `tecido/teste/tom.test.js` (R4).
+- **Status:** no ar desde 01/10/2026.
+
+### R-SMK-11 · O histórico do corte acha pela sobra e diz o que foi baixado
+- **Regra:** o botão **Histórico** lista os cortes (mais novo primeiro), filtra por pedido, operador e dia (dia fora do formato é recusado); a busca por sobra acha o corte que a usou e o de onde ela nasceu; o detalhe mostra a sobra marcada como usada com o status de hoje, os metros do rolo lidos do movimento, as sobras nascidas e o refugo. Não traz preço.
+- **Por quê:** é por ele que se pede a correção, e a verdade do que foi baixado é o movimento.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/historico_corte.test.js`.
+- **Status:** no ar desde 01/10/2026.
+
+---
+
+## O que ainda não tem teste no sob medida
 
 R-SMM-01 (o try/catch que protege a expedição), R-SMD-01 (a paleta igual à do
 PCP), R-SME-04 (sem ourela), a parte de tela da R-SMP-06 (o pedido sem peça não
 mostra `R$ 0,00`), a parte de tela da R-SMU-03 (o traço no lugar do `0 m²`),
 R-SMS-02 (setor é cadastro, chave é código), parte da R-SMX-05 (os oito motivos
-semeados, a exclusão recusada e os dois cadastros separados) e a parte de tela
-da R-SMI-07.
+semeados, a exclusão recusada e os dois cadastros separados), a parte de tela
+da R-SMI-07, as frases da R-SMF-09, as duas partes de tela da R-SMF-10 (a
+revenda que se mantém depois de lançar e os selos separados) e o `inline-flex`
+da R-SML-03.
