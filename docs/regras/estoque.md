@@ -293,7 +293,7 @@
 - **Status:** no ar desde 01/09/2026.
 
 ### R-EST-15 · O reservado é leitura, não conta
-- **Regra:** "reservado" é a soma das peças de volumes pendentes (vendidos, sem etiqueta) **e**, desde 22/10/2026, das caixas impressas que esperam a conferência (`baixa_dominio.reservados`). Aparece ao lado do saldo como "N sem etiqueta · N em caixa · N livres", e **não muda o `precisa`**: o comprometido da planilha já conta a venda impressa até ela sair, e descontar a reserva de novo contaria a mesma peça duas vezes. Quem usa o livre (saldo − caixa impressa) é a trava da impressão, a urgência, o inventário e o número da Etiqueta de Venda. Sob medida não tem reservado; bloqueado e cancelado não reservam; modo teste não reserva na coluna "sem etiqueta".
+- **Regra:** "reservado" é a soma das peças de volumes pendentes (vendidos, sem etiqueta) **e**, desde 22/10/2026, das caixas impressas que esperam a conferência (`baixa_dominio.reservados`). Aparece ao lado do saldo como "N sem etiqueta · N em caixa · N livres", e **não muda o `precisa`**: o comprometido da planilha já conta a venda impressa até ela sair, e descontar a reserva de novo contaria a mesma peça duas vezes. Quem usa o livre (saldo − caixa impressa) é a trava da impressão, a urgência, o inventário, o número da Etiqueta de Venda e a coluna **Livre** da TV (`/painel`, com "+N em caixa" embaixo, desde 22/10/2026; o `precisa` da TV não muda). Sob medida não tem reservado; bloqueado e cancelado não reservam; modo teste não reserva na coluna "sem etiqueta".
 - **Por quê:** informa o que já está prometido sem criar uma segunda conta de produção.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_acuracidade.js` (23).
