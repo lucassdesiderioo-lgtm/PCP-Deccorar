@@ -1,3 +1,10 @@
+> **ARQUIVADA EM 22/10/2026 — CONCLUÍDA.** As quatro entregas (fases 0, 1, 2-A e 2-B)
+> estão no ar, e as três provas com dado real foram relatadas pelo dono no mesmo dia:
+> a primeira sobra voltou à prateleira com o saldo subindo, a primeira caixa conferida
+> baixou o estoque, e as caixas antigas foram fechadas pela tela (Admin → Correções).
+> As regras moram no `CLAUDE.md` §2 e nos cartões R-EST-03, R-REC-01 a R-REC-05,
+> R-COR-03, R-COR-06 e R-COR-07. Histórico — não use como fonte de regra.
+
 > **STATUS · 22/10/2026 — EM CONSTRUÇÃO** · `REGRA` · risco 🔴 (estoque e dados de
 > produção) · aprovada pelo dono em 22/10/2026 ("pode seguir"), com a D8 confirmada
 > (§11).
@@ -117,10 +124,9 @@
 >
 > ✅ **A PRIMEIRA CAIXA CONFERIDA BAIXOU O ESTOQUE (22/10/2026)**: relato do dono.
 >
-> ⚠️ Falta relatar o **fechamento das caixas antigas pela tela**. A consulta só de
-> leitura do dia 22/10 já mostrava **nenhuma caixa impressa esperando conferência**
-> (só 281 de coleta no canto, depois fechadas pela saída do caminhão) — sinal de que
-> o passivo foi fechado, mas sem o relato de por onde. Prova que não foi feita se escreve
+> ✅ **AS CAIXAS ANTIGAS FORAM FECHADAS PELA TELA** (Admin → Correções → "Fechar
+> conferências antigas em bloco"), relato do dono em 22/10/2026. A consulta só de
+> leitura do mesmo dia confirmava: nenhuma caixa impressa esperando conferência. Prova que não foi feita se escreve
 > como não feita — e a spec só vai para `docs/arquivo/` depois delas.
 
 ---
