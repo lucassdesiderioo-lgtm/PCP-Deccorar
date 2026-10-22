@@ -384,21 +384,76 @@ const ACOES = {
     depoisReal(db, o, params, antes){
       return { ate:antes.ate, volumes:antes.volumes.map(a => instante(volumePorId(db, a.id))) };
     },
-    desfazer(db, c){
-      const a = JSON.parse(c.antes || '{}'), d = JSON.parse(c.depois || '{}');
-      /* TUDO OU NADA: um volume que andou depois trava o bloco inteiro, e a
-         recusa diz qual. Desfazer metade deixaria um bloco que ninguem sabe
-         descrever. */
-      for(const dv of (d.volumes || [])){
-        const v = db.prepare('SELECT * FROM lote WHERE id=?').get(dv.id);
-        if(!v) throw erro(409, 'o volume #' + dv.id + ' não existe mais. Não desfiz nada.');
-        const campo = andou(v, dv);
-        if(campo) throw erro(409, 'o volume #' + dv.id + ' andou depois desta correção: ' + campo + ' era ' +
-          (dv[campo] || 'vazio') + ' e agora é ' + (v[campo] || 'vazio') + '. Não desfiz nada.');
-      }
-      const up = db.prepare('UPDATE lote SET estagio=?, carregado_em=?, retirado_em=? WHERE id=?');
-      for(const av of (a.volumes || [])) up.run(av.estagio, av.carregado_em, av.retirado_em, av.id);
-    }
+    desfazer(db, c){ desfazerBloco(db, c); }
+  },
+
+  /* FECHAR CONFERENCIAS ANTIGAS — fase 0 da spec CONFERENCIA-E-BAIXA
+     (22/10/2026). A tela do Carregamento ficou um tempo com problema, e mais
+     de 500 caixas impressas e nunca conferidas se acumularam na linha ambar
+     (R-PIL-02). Quase todas sairam de verdade; a lista e a mesma da linha
+     ambar, e o dono escolhe ate que dia fechar.
+
+     ⚠️ NAO MEXE EM ESTOQUE: a baixa dessas caixas ja aconteceu na impressao
+     (regra de hoje, §2). Baixar de novo tiraria a mesma peca duas vezes.
+     ⚠️ A DATA DE CORTE NUNCA E HOJE: a caixa impressa hoje ainda e trabalho
+     da conferencia, e fecha-la aqui tiraria da pilha o que esta no chao.
+     ⚠️ A CONFERENCIA FICA VAZIA: ninguem conferiu, e escrever um nome ali
+     mentiria na pilha ("sem conferencia" e o que interessa olhar, §8-B). */
+  conferencias: {
+    id:'conferencias', alvo:'bloco',
+    rotulo:'Fechar conferências antigas',
+    explica:'Fecha em bloco as caixas com etiqueta impressa que nunca foram conferidas, até a data que você ' +
+            'escolher (nunca hoje). Cada uma sai na data de despacho dela. Não mexe em estoque: a baixa já ' +
+            'aconteceu na impressão.',
+    carregar(){ return { id:0 }; },
+    valePara(db, o, params){
+      const ate = ateConferencia(db, params);
+      if(!conferenciasAte(db, ate).length) return 'nenhuma caixa impressa e não conferida até ' + dataBR(ate);
+      return true;
+    },
+    previa(db, o, params){
+      const ate = ateConferencia(db, params);
+      const lista = conferenciasAte(db, ate);
+      const porDia = {};
+      lista.forEach(v => { const k = dataBR(String(v.embalado_em || v.data).slice(0, 10));
+        porDia[k] = (porDia[k] || 0) + 1; });
+      const coleta = lista.filter(ehColeta).length;
+      const futuras = db.prepare(`SELECT COUNT(*) n FROM lote WHERE ${SEM_CONFERENCIA}
+        AND COALESCE(date(embalado_em),data)<=? AND despachar_em IS NOT NULL AND despachar_em>?`).get(ate, hoje(db)).n;
+      const depois = db.prepare(`SELECT COUNT(*) n FROM lote WHERE ${SEM_CONFERENCIA}
+        AND COALESCE(date(embalado_em),data)>?`).get(ate).n;
+      const fora = [];
+      if(futuras) fora.push(futuras + (futuras === 1 ? ' que despacha no futuro' : ' que despacham no futuro') +
+        ' (a venda futura ainda não saiu)');
+      if(depois) fora.push(depois + (depois === 1 ? ' impressa' : ' impressas') + ' depois de ' + dataBR(ate));
+      return {
+        antes:  { ate, volumes: lista.map(v => instante(v)) },
+        depois: { ate, volumes: lista.map(v => Object.assign(instante(v), { estagio:'carregado',
+                  carregado_em:carimboImpressa(v), retirado_em:ehColeta(v) ? carimboImpressa(v) : v.retirado_em })) },
+        estoque: [],
+        lista: lista.map(v => ({ id:v.id, codigo:v.codigo, buyer:v.buyer, nf:v.nf, despachar_em:v.despachar_em,
+                                 embalado_em:v.embalado_em, data:v.data, coleta:ehColeta(v) })),
+        resumo: 'Fecha ' + lista.length + (lista.length === 1 ? ' caixa impressa e nunca conferida' : ' caixas impressas e nunca conferidas') +
+          ' até ' + dataBR(ate) + (coleta ? ' (' + coleta + ' de coleta)' : '') +
+          ' — por dia de impressão: ' + Object.keys(porDia).map(k => k + ': ' + porDia[k]).join(' · ') + '. ' +
+          'Cada uma sai na data de despacho dela às 15:00 (ou no dia da impressão, se foi impressa depois), nunca hoje, ' +
+          'e fica sem conferência. O estoque não se mexe: a baixa já aconteceu na impressão. ' +
+          (fora.length ? 'Ficam de fora ' + fora.join(' e ') + '. ' : '') +
+          'Antes de confirmar, passe na área e no canto: uma caixa de venda cancelada que ainda está na fábrica ' +
+          'não pode entrar no bloco.'
+      };
+    },
+    executar(db, o, params){
+      const up = db.prepare("UPDATE lote SET estagio='carregado', carregado_em=?, retirado_em=? WHERE id=?");
+      conferenciasAte(db, ateConferencia(db, params)).forEach(v => {
+        const q = carimboImpressa(v);
+        up.run(q, ehColeta(v) ? q : v.retirado_em, v.id);
+      });
+    },
+    depoisReal(db, o, params, antes){
+      return { ate:antes.ate, volumes:antes.volumes.map(a => instante(volumePorId(db, a.id))) };
+    },
+    desfazer(db, c){ desfazerBloco(db, c); }
   },
 
   /* REABRIR VENDA FUTURA — a regua do `reabrir_futuros.js`: so `carregado_em`
@@ -566,6 +621,53 @@ function vencidosAte(db, ate){
   return db.prepare(`SELECT * FROM lote WHERE estagio='pendente' AND COALESCE(teste,0)=0
     AND ((despachar_em IS NOT NULL AND despachar_em<=?) OR (despachar_em IS NULL AND data<=?))
     ORDER BY COALESCE(despachar_em,data), id`).all(ate, ate);
+}
+/* Desfazer de acao em bloco. TUDO OU NADA: um volume que andou depois trava o
+   bloco inteiro, e a recusa diz qual. Desfazer metade deixaria um bloco que
+   ninguem sabe descrever. */
+function desfazerBloco(db, c){
+  const a = JSON.parse(c.antes || '{}'), d = JSON.parse(c.depois || '{}');
+  for(const dv of (d.volumes || [])){
+    const v = db.prepare('SELECT * FROM lote WHERE id=?').get(dv.id);
+    if(!v) throw erro(409, 'o volume #' + dv.id + ' não existe mais. Não desfiz nada.');
+    const campo = andou(v, dv);
+    if(campo) throw erro(409, 'o volume #' + dv.id + ' andou depois desta correção: ' + campo + ' era ' +
+      (dv[campo] || 'vazio') + ' e agora é ' + (v[campo] || 'vazio') + '. Não desfiz nada.');
+  }
+  const up = db.prepare('UPDATE lote SET estagio=?, carregado_em=?, retirado_em=? WHERE id=?');
+  for(const av of (a.volumes || [])) up.run(av.estagio, av.carregado_em, av.retirado_em, av.id);
+}
+
+/* ─── apoio do "Fechar conferências antigas" (CONFERENCIA-E-BAIXA, fase 0) ──
+   A caixa impressa e nunca conferida e a da linha ambar do Carregamento
+   (`carga.pilhaDaArea → anteriores`), fora do modo teste. */
+const SEM_CONFERENCIA = "estagio='embalado' AND conferido_em IS NULL AND COALESCE(teste,0)=0";
+function ateConferencia(db, params){
+  /* A recusa da data vazia e propria: a do `ateDe` manda conferir o Mercado
+     Livre, e aqui quem confere e a area e o canto. */
+  if(!String((params && params.ate) || '').trim())
+    throw erro(400, 'escolha até que dia fechar — o dia até onde alguém passou na área e no canto');
+  const ate = ateDe(db, params);
+  if(ate >= hoje(db))
+    throw erro(400, 'a data de corte não pode ser hoje: a caixa impressa hoje ainda está esperando a conferência');
+  return ate;
+}
+/* Impressa ate o corte, e que nao despacha no futuro: venda futura nao saiu,
+   e carimbar a saida dela seria a armadilha da R-COR-04. A que esta no carro
+   ou numa saida ja tem dono, e fica. */
+function conferenciasAte(db, ate){
+  return db.prepare(`SELECT * FROM lote WHERE ${SEM_CONFERENCIA}
+      AND no_carro_em IS NULL AND saida_id IS NULL
+      AND COALESCE(date(embalado_em),data)<=?
+      AND (despachar_em IS NULL OR despachar_em<=?)
+    ORDER BY COALESCE(embalado_em,data), id`).all(ate, hoje(db));
+}
+/* A data de despacho, como no `carimbo` — mas a caixa nao sai antes de ter
+   etiqueta: a impressa depois do despacho sai no dia da impressao. */
+function carimboImpressa(v){
+  const despacho = v.despachar_em || v.data;
+  const impressa = v.embalado_em ? String(v.embalado_em).slice(0, 10) : '';
+  return (impressa > despacho ? impressa : despacho) + ' 15:00:00';
 }
 function skuPorCodigo(db, codigo){
   const s = db.prepare(`SELECT s.codigo, s.descricao, s.estoque, COALESCE(m.sob_medida,0) sob_medida
@@ -753,9 +855,15 @@ function contadores(db){
         AND date(COALESCE(revisado_em,data)) < date('now','localtime','-30 days')
       ORDER BY revisado_em, id`).all();
   }catch(e){}
+  /* A linha ambar do Carregamento (CONFERENCIA-E-BAIXA, fase 0): impressa num
+     dia anterior e nunca conferida. Chega junto com o botao que a zera. */
+  const conf = db.prepare(`SELECT id,data,codigo,buyer,nf,despachar_em,modalidade,embalado_em FROM lote
+    WHERE ${SEM_CONFERENCIA} AND (embalado_em IS NULL OR date(embalado_em)<date('now','localtime'))
+    ORDER BY COALESCE(embalado_em,data), id`).all();
   return { fantasmas:{ n:f.length, itens:f }, canceladas:{ n:canc.length, itens:canc },
            vencidos:{ n:venc.length, itens:venc }, futuras:{ n:fut.length, itens:fut },
-           fila:{ n:filaVelha.length, dias:30, itens:filaVelha } };
+           fila:{ n:filaVelha.length, dias:30, itens:filaVelha },
+           conferencias:{ n:conf.length, itens:conf } };
 }
 
 /* ─── O TERMINAL (fase 3) ─────────────────────────────────────────────────────

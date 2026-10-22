@@ -3397,6 +3397,13 @@ async function corPassivo(){
        +'<span class="sub">ou abra um volume para dar saída só nele</span></div>',
      linha:function(x){ return corFrase(x)+(x.despachar_em?' <span class="sub">despachava '+esc(x.despachar_em)+'</span>'
        :' <span class="sub">sem despacho lido</span>'); }},
+    {k:'conferencias', um:'caixa impressa sem conferência', muitos:'caixas impressas sem conferência',
+     lista:'as caixas sem conferência',
+     ajuda:'etiqueta impressa num dia anterior e nunca conferida — a linha âmbar do Carregamento',
+     extra:'<div style="margin:8px 0"><button class="btn" onclick="corConferencias()">Fechar conferências antigas em bloco…</button> '
+       +'<span class="sub">ou abra uma caixa para dar saída só nela</span></div>',
+     linha:function(x){ return corFrase(x)+' <span class="sub">impressa '+esc(String(x.embalado_em||x.data||'').slice(0,10))+'</span>'
+       +(String(x.modalidade||'').toLowerCase()==='coleta'?' <span class="sub">(coleta)</span>':''); }},
     {k:'futuras', um:'venda futura fechada', muitos:'vendas futuras fechadas', lista:'as futuras fechadas',
      ajuda:'fechadas com uma data de saída que ainda não chegou — somem do Carregamento no dia certo',
      linha:function(x){ return corFrase(x)+' <span class="sub">saída em '+esc(String(x.carregado_em||'').slice(0,10))+'</span>'; }},
@@ -3473,6 +3480,24 @@ function corVencidos(){
     +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
     +'<span>Fechar até</span><input id="corAte" type="date" style="width:auto">'
     +'<button class="btn" onclick="corPrevia(\'vencidos\',\'\')">Ver o que fecha</button></div>'
+    +'<div id="corPainel" style="margin-top:14px"></div></div>';
+}
+
+/* FECHAR CONFERENCIAS ANTIGAS (spec CONFERENCIA-E-BAIXA, fase 0): o bloco das
+   caixas impressas e nunca conferidas. A data nasce VAZIA pela mesma razao do
+   "Fechar vencidos", e o servidor recusa hoje: a caixa de hoje ainda espera a
+   conferencia. */
+function corConferencias(){
+  COR_PREVIA=null;
+  COR_OBJ={tipo:'bloco', id:0, acoes:[]};
+  $('#corObjeto').innerHTML='<div class="card"><h3 style="margin:0 0 8px">Fechar conferências antigas em bloco</h3>'
+    +'<div class="sub" style="margin-bottom:10px">Fecha as caixas com etiqueta impressa até a data escolhida e que nunca '
+    +'foram conferidas. Cada uma sai na data de despacho dela e fica sem conferência. <b>Não mexe em estoque</b>: a baixa já '
+    +'aconteceu na impressão. <b>Antes, passe na área e no canto</b>: a caixa de venda cancelada que ainda está na '
+    +'fábrica não pode entrar no bloco. A data não pode ser hoje, e a venda que despacha no futuro fica de fora.</div>'
+    +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+    +'<span>Fechar as impressas até</span><input id="corAte" type="date" style="width:auto">'
+    +'<button class="btn" onclick="corPrevia(\'conferencias\',\'\')">Ver o que fecha</button></div>'
     +'<div id="corPainel" style="margin-top:14px"></div></div>';
 }
 
@@ -3589,7 +3614,7 @@ async function corAbrir(tipo, id){
 async function corPrevia(acao, opcao){
   if(!COR_OBJ) return;
   var params=(opcao==='voltou')?{voltou:true}:(opcao==='registrar'?{voltou:false}:null);
-  if(acao==='vencidos') params={ate:(($('#corAte')||{}).value||'')};
+  if(acao==='vencidos' || acao==='conferencias') params={ate:(($('#corAte')||{}).value||'')};
   var r=await fetch('/api/correcao/previa',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({acao:acao,tipo:COR_OBJ.tipo,id:COR_OBJ.id,params:params})});
   var d={}; try{ d=await r.json(); }catch(e){}
