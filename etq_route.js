@@ -17,7 +17,10 @@ module.exports=function(app,db){
        lista, e nao a mais urgente do SKU em geral; sem filtro (Todas) e o
        comportamento de sempre. A regua de "isto e coleta?" e a do carga.js. */
     const modo=String((req.query&&req.query.modo)||'').toLowerCase();
-    const FM = modo==='coleta' ? ' AND '+COLETA() : (modo==='agencia' ? ' AND '+AGENCIA() : '');
+    /* Com o modo teste ligado o bipe so acha venda de TESTE: a de verdade nao
+       pode ser impressa nele (BAIXA.travaTeste). */
+    const FM = (modo==='coleta' ? ' AND '+COLETA() : (modo==='agencia' ? ' AND '+AGENCIA() : ''))
+      + (BAIXA.emTeste(db) ? ' AND COALESCE(teste,0)=1' : '');
     /* O QUE A PECA E, nao so o codigo dela. O leitor de codigo de barras le a
        ETIQUETA, nunca a persiana: se a peca dentro da caixa nao for o que a
        etiqueta diz, nenhum bipe no mundo percebe. Estas quatro informacoes sao
@@ -173,6 +176,8 @@ module.exports=function(app,db){
     if(!o) return res.status(404).json({erro:'venda nao encontrada'});
     if(o.estagio==='bloqueado') return res.json({erro:'Volume bloqueado: SKU fora do cadastro.'});
     if(o.estagio!=='pendente') return res.json({erro:'Esta venda ja foi processada ('+o.estagio+').'});
+    const tt=BAIXA.travaTeste(db,o);
+    if(tt) return res.json({erro:tt.aviso, motivo:tt.motivo});
 
     /* ── A CAIXA COM MAIS DE UMA PERSIANA (§5-B) ────────────────────────────
        Uma etiqueta, varias pecas. O que muda aqui e tudo o que depende de

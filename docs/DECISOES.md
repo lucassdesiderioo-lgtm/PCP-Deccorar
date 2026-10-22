@@ -305,3 +305,11 @@ Conferência — bipa a etiqueta, bipa o SKU de **cada** persiana, escolhe o mot
 tinha baixado (senão só solta a reserva). Quem conferiu a caixa não marca a
 sobra. A Mesa só registra a cancelada que não voltou, e nunca mexe em saldo.
 Detalhe no `CLAUDE.md` §2 e nos cartões R-REC-01 a R-REC-05.
+
+## 22/10/2026 — com o modo teste ligado, a caixa de verdade não é impressa nem conferida
+Pedido do dono (CONSERTO). **Antes:** dava para imprimir, conferir, marcar sobra
+ou "foi no caminhão" numa caixa de verdade com o modo teste ligado; o "apagar
+tudo" devolvia o saldo pela foto, mas a caixa ficava impressa ou baixada — a
+conferida nunca mais baixava, e o estoque ficava 1 acima para sempre.
+**Depois:** com o modo ligado, essas quatro portas só aceitam caixa de teste, e
+a tela diz por quê. Fora do modo teste nada muda. Detalhe no `CLAUDE.md` §11.

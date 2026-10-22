@@ -146,9 +146,11 @@ module.exports = function(app, db){
     const id = parseInt(req.body && req.body.id, 10);
     const levou = lista(s.levou);
     if(levou.includes(id)) return res.json(Object.assign({ ok:false, motivo:'ja_levou' }, retrato(s)));
-    const v = db.prepare(`SELECT id FROM lote WHERE id=? AND ${PODE_TER_IDO}`).get(id);
+    const v = db.prepare(`SELECT id, teste FROM lote WHERE id=? AND ${PODE_TER_IDO}`).get(id);
     if(!v) return res.json(Object.assign({ ok:false, motivo:'nao_pode',
       aviso:'Esta caixa não pode ter ido no caminhão: ou não tem etiqueta impressa, ou já saiu por outra saída.' }, retrato(s)));
+    const tt = BAIXA.travaTeste(db, v);
+    if(tt) return res.json(Object.assign(tt, retrato(s)));
     levou.push(id);
     db.prepare('UPDATE saida SET levou=? WHERE id=?').run(JSON.stringify(levou), s.id);
     res.json(Object.assign({ ok:true }, retrato(db.prepare('SELECT * FROM saida WHERE id=?').get(s.id))));

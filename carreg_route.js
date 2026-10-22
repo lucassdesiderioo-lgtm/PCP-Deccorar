@@ -127,6 +127,9 @@ module.exports=function(app,db){
      quem imprimiu no login, nao anda nem peca a peca. Devolve a resposta da
      recusa, ou null. */
   function barrar(req,alvo){
+    /* Modo teste ligado: so caixa de teste (BAIXA.travaTeste, 22/10/2026). */
+    const tt=BAIXA.travaTeste(db,alvo);
+    if(tt) return Object.assign({pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city}},tt);
     /* A VENDA CANCELADA NO ML NAO SOBE NO CARRO (VENDAS-E-MEDIA fase 2, D2).
        O import da planilha tirou a caixa das listas; se ela chegar aqui mesmo
        assim, a pessoa esta com ela na mao — a recusa diz o que fazer com ela. */
@@ -363,7 +366,7 @@ module.exports=function(app,db){
       alvo=batem.find(v=>!CANC.naoSobra(v))||batem[0]||null;
     }
     const pedido=v=>({id:v.id,buyer:v.buyer,nf:v.nf,codigo:v.codigo,city:v.city,modalidade:v.modalidade});
-    const nao=CANC.naoSobra(alvo);
+    const nao=CANC.naoSobra(alvo)||BAIXA.travaTeste(db,alvo);
     if(nao) return res.json(Object.assign({ok:false},nao,alvo?{pedido:pedido(alvo)}:{}));
     if(mesmaPessoa(alvo.conferido_por,quem.nome)){
       try{ const ac=app.locals.acesso;
