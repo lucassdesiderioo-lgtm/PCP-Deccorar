@@ -55,7 +55,7 @@ function digitoDoAtalho(e){
   //  botão dela sobrescrevia skus.alvo com esse número congelado — brigando com
   //  o Planejamento pela mesma coluna. Quem calcula alvo agora é um só.
   var MAP={ '1':'/painel','2':'/operador','3':'/montagem','5':'/embalagem','6':'/carregamento','7':'/','8':'/relatorios' };
-  var NAMES={ '/painel':'Painel','/operador':'Revisão','/montagem':'Embalagem','/embalagem':'Etiqueta Venda','/carregamento':'Carregamento','/':'Admin','/relatorios':'Relatórios' };
+  var NAMES={ '/painel':'Painel','/operador':'Revisão','/montagem':'Embalagem','/embalagem':'Etiqueta Venda','/carregamento':'Conferência','/':'Admin','/relatorios':'Relatórios' };
   var cur=location.pathname.replace(/\/$/,'')||'/';
   // barra de atalhos no rodapé
   var bar=document.createElement('div');

@@ -277,7 +277,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Por quê:** a tela do Carregamento ficou um tempo com problema e mais de 500 caixas impressas se acumularam sem conferência. A baixa delas já aconteceu na impressão; a caixa de hoje ainda é trabalho da conferência; e escrever um nome em `conferido_por` mentiria na pilha.
 - **Exceções:** a caixa de venda cancelada que ainda está na fábrica não entra: quem fecha passa antes na área e no canto, e escolhe a data de corte antes dela.
 - **Teste que trava:** `teste_conferencia_antiga.js` (64) · `teste_correcao.js` (a lista dos contadores).
-- **Status:** em código desde 22/10/2026 (fase 0 da spec `CONFERENCIA-E-BAIXA`) · falta subir e o dono fechar o passivo real.
+- **Status:** no ar desde 22/10/2026 (PR #216, fase 0 da spec `CONFERENCIA-E-BAIXA`) · o passivo real ainda não foi fechado pela tela.
 
 ---
 

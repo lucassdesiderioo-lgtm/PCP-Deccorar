@@ -318,7 +318,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
   <div style="font-weight:800;color:#b26a00;font-size:16px;margin-bottom:6px">CANCELADAS DEPOIS DA ETIQUETA</div>
   <div style="font-size:13px;color:#5a6472;margin-bottom:12px">
     Estas vendas foram canceladas <b>depois</b> que a etiqueta saiu — pelo relatório do Mercado Livre
-    ou pela recusa do motorista, marcada no Carregamento. A caixa não carrega mais (o bipe recusa), mas o
+    ou pela recusa do motorista, marcada na Conferência. A caixa não carrega mais (o bipe recusa), mas o
     estoque dela <b>já tinha baixado e não volta sozinho</b>: confira se a persiana voltou para a
     prateleira e decida na aba <i>Correções</i>.
   </div>
@@ -2847,9 +2847,9 @@ async function carregarCad(){
     h+='</div>';
   }
   var cnf=false; try{ cnf=!!(await (await fetch('/api/config/conferencia')).json()).ligada; }catch(e){}
-  h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:6px">Conferência dupla no carregamento</div>';
-  h+='<div class="sub" style="margin-bottom:12px">Com isso ligado, o carregamento pede <b>dois bipes</b>: a etiqueta de venda e, em seguida, o código de barras do produto <b>na mesma caixa</b>. Se a etiqueta estiver colada na caixa errada, os dois não batem e o volume <b>não carrega</b>. O operador não vê qual SKU esperar — a conferência é cega, senão vira só confirmação. Custa um bipe a mais por volume.</div>';
-  h+='<label style="display:flex;align-items:center;gap:10px;font-size:15px;cursor:pointer"><input type="checkbox" id="cdConf" '+(cnf?'checked':'')+' style="width:20px;height:20px"> <span>Exigir o bipe do SKU no carregamento</span></label>';
+  h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:6px">Segundo bipe na Conferência</div>';
+  h+='<div class="sub" style="margin-bottom:12px">Com isso ligado, a Conferência pede <b>dois bipes</b>: a etiqueta de venda e, em seguida, o código de barras do produto <b>na mesma caixa</b>. Se a etiqueta estiver colada na caixa errada, os dois não batem e o volume <b>não carrega</b>. O operador não vê qual SKU esperar — a conferência é cega, senão vira só confirmação. Custa um bipe a mais por volume.</div>';
+  h+='<label style="display:flex;align-items:center;gap:10px;font-size:15px;cursor:pointer"><input type="checkbox" id="cdConf" '+(cnf?'checked':'')+' style="width:20px;height:20px"> <span>Exigir o bipe do SKU na Conferência</span></label>';
   h+='<div id="cdConfMsg" style="margin-top:10px;font-size:14px"></div></div>';
   var kit=''; try{ kit=(await (await fetch('/api/config/kit')).json()).kit||''; }catch(e){}
   h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:6px">Código do kit (o que o operador bipa)</div>';
@@ -3089,8 +3089,8 @@ document.addEventListener('change',async function(e){
       body:JSON.stringify({ligada:c.checked})})).json();
     if(r.erro){ msg.innerHTML='<span style="color:#ff6b6b">'+r.erro+'</span>'; c.checked=!c.checked; return; }
     msg.innerHTML = r.ligada
-      ? '<span style="color:var(--green)">Ligado — o carregamento passa a exigir os dois bipes.</span>'
-      : '<span style="color:var(--muted)">Desligado — o carregamento volta a pedir só a etiqueta de venda.</span>';
+      ? '<span style="color:var(--green)">Ligado — a Conferência passa a exigir os dois bipes.</span>'
+      : '<span style="color:var(--muted)">Desligado — a Conferência volta a pedir só a etiqueta de venda.</span>';
   }catch(err){ msg.innerHTML='<span style="color:#ff6b6b">'+String(err)+'</span>'; c.checked=!c.checked; }
 });
 document.addEventListener('click',async function(e){
@@ -3399,13 +3399,13 @@ async function corPassivo(){
        :' <span class="sub">sem despacho lido</span>'); }},
     {k:'conferencias', um:'caixa impressa sem conferência', muitos:'caixas impressas sem conferência',
      lista:'as caixas sem conferência',
-     ajuda:'etiqueta impressa num dia anterior e nunca conferida — a linha âmbar do Carregamento',
+     ajuda:'etiqueta impressa num dia anterior e nunca conferida — a linha âmbar da Conferência',
      extra:'<div style="margin:8px 0"><button class="btn" onclick="corConferencias()">Fechar conferências antigas em bloco…</button> '
        +'<span class="sub">ou abra uma caixa para dar saída só nela</span></div>',
      linha:function(x){ return corFrase(x)+' <span class="sub">impressa '+esc(String(x.embalado_em||x.data||'').slice(0,10))+'</span>'
        +(String(x.modalidade||'').toLowerCase()==='coleta'?' <span class="sub">(coleta)</span>':''); }},
     {k:'futuras', um:'venda futura fechada', muitos:'vendas futuras fechadas', lista:'as futuras fechadas',
-     ajuda:'fechadas com uma data de saída que ainda não chegou — somem do Carregamento no dia certo',
+     ajuda:'fechadas com uma data de saída que ainda não chegou — somem da Conferência no dia certo',
      linha:function(x){ return corFrase(x)+' <span class="sub">saída em '+esc(String(x.carregado_em||'').slice(0,10))+'</span>'; }},
     {k:'fila', tipo:'fila', um:'linha velha na fila', muitos:'linhas velhas na fila', lista:'a fila velha',
      ajuda:'revisadas há mais de 30 dias e nunca embaladas — quase sempre sem peça atrás',

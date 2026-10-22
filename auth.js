@@ -16,7 +16,7 @@ const AREAS=[
   {id:'montagem',    nome:'Montagem'},
   {id:'embalagem',   nome:'Etiqueta de Venda'},
   {id:'expedicao',   nome:'Subir PDFs (ML)'},
-  {id:'carregamento',nome:'Carregamento'},
+  {id:'carregamento',nome:'Conferência'},
   // Compras fase 5. A area existe no modelo ANTIGO so para a tela ficar na
   // lista protegida abaixo — sem entrada em TELAS, um usuario deslogado cairia
   // no next() e a pagina seria servida do disco (armadilha #3 da secao 10 do
