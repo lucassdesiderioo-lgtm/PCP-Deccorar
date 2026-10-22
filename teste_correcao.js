@@ -410,10 +410,12 @@ ok('   e lista quem sao', (passivo.fantasmas.itens||[]).map(x=>x.id).indexOf(v2)
 eq('o passivo conta as canceladas que faltam decidir', passivo.canceladas && passivo.canceladas.n, 1);
 ok('   e e a que ninguem decidiu', (passivo.canceladas.itens||[]).map(x=>x.id).indexOf(c6)>=0);
 /* Decisao 3: cada contador chega JUNTO com a acao que o zera. Na fase 1 eram
-   dois; a fase 2 trouxe os outros tres com os botoes deles. Contador sem acao
-   nesta lista e a trava que acusa e nao sabe liberar. */
+   dois; a fase 2 trouxe os outros tres com os botoes deles, e a fase 0 da
+   CONFERENCIA-E-BAIXA (22/10/2026) as conferencias antigas, com o "Fechar
+   conferencias antigas". Contador sem acao nesta lista e a trava que acusa e
+   nao sabe liberar. */
 eq('e sao os contadores que tem botao, nada mais (decisao 3)', Object.keys(passivo).filter(k=>k!=='ok').sort().join(','),
-   'canceladas,fantasmas,fila,futuras,vencidos');
+   'canceladas,conferencias,fantasmas,fila,futuras,vencidos');
 
 const hist = (chamar('GET','/api/correcao/historico',null,LUCAS).body||{}).itens||[];
 ok('o historico lista as correcoes, a mais nova em cima', hist.length >= 4 && hist[0].id > hist[1].id);

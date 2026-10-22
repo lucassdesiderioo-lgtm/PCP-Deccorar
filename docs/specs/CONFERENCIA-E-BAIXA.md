@@ -1,8 +1,24 @@
-> **STATUS · 22/10/2026 — RASCUNHO, ESPERANDO O "PODE SEGUIR" DO DONO** · `REGRA` ·
-> risco 🔴 (estoque e dados de produção) · nada construído.
-> Nasceu da conversa de 22/10/2026 (sessão Claude Code). As perguntas da primeira
-> versão foram respondidas no mesmo dia (§2, D6 a D9). Resta confirmar a leitura da
-> D8 (§11).
+> **STATUS · 22/10/2026 — EM CONSTRUÇÃO** · `REGRA` · risco 🔴 (estoque e dados de
+> produção) · aprovada pelo dono em 22/10/2026 ("pode seguir"), com a D8 confirmada
+> (§11).
+>
+> **Fase 0 em código (22/10/2026):** "Fechar conferências antigas" na Mesa de
+> correções (`correcoes.js`, ação `conferencias`), o contador com o botão, o card na
+> aba Correções e o `fechar_conferencias_antigas.js`. `teste_conferencia_antiga.js`
+> (64 casos, escrito antes do código; quatro defeitos reintroduzidos um a um — data
+> de hoje aceita reprova 2, a futura entrando 3, o carimbo só pelo despacho 1, a
+> coleta sem `retirado_em` 1). Rodada na tela a 1440 e 400 px com banco semeado.
+> **Mudanças na construção:**
+> - **`saiu_por` NÃO é gravado** (a §7 dizia `'passivo'`): "Dar saída" e "Fechar
+>   vencidos" também não gravam, e um valor novo nessa coluna seria lido por quem
+>   hoje só conhece `coleta` e `agencia`. Quem fechou fica na `correcao`;
+> - **a caixa impressa DEPOIS do despacho sai no dia da impressão**, e não no
+>   despacho: a saída não pode vir antes de a caixa ter etiqueta;
+> - **ficam de fora também a caixa no carro e a que está numa saída** — elas já têm
+>   dono.
+>
+> Falta: subir, e o dono fechar o passivo real (mais de 500 caixas) pela tela.
+> Fases 1 e 2 não começaram.
 
 ---
 
@@ -184,7 +200,7 @@ vencidos" (R-COR-04):
   caixa de hoje continua esperando a conferência;
 - a prévia lista as caixas por dia, e quantas de coleta e de agência;
 - cada uma vira `carregado` na data de despacho dela às 15:00 (nunca hoje), sem
-  conferência (`conferido_em` vazio, `saiu_por='passivo'`);
+  conferência (`conferido_em` vazio; `saiu_por` não é gravado — ver o STATUS);
 - **não mexe em estoque** (já baixou na impressão, e D7);
 - grava em `correcao` e pode ser desfeita em bloco (tudo ou nada).
 
@@ -254,11 +270,11 @@ Acompanham: `teste_etiqueta`, `teste_carga`, `teste_area`, `teste_pecas_carga`,
 `teste_correcao*`, `teste_estoque`, `teste_acuracidade`, `teste_livro`,
 `teste_segunda_pessoa`.
 
-## 11. A confirmar com o dono
+## 11. Confirmado com o dono
 
-| # | Ponto | Leitura desta spec |
+| # | Ponto | Resposta |
 |---|---|---|
-| C1 | "A sobra deveria ser por outra pessoa" (D8): outra pessoa **de quem conferiu** a caixa? | Sim — quem conferiu 50 não confirma que sobraram 2 |
+| C1 | "A sobra deveria ser por outra pessoa" (D8): outra pessoa **de quem conferiu** a caixa? | **Sim** (22/10/2026): quem conferiu não marca a sobra |
 
 ## 12. Achado no caminho (não entra nesta spec)
 

@@ -272,6 +272,13 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Teste que trava:** `teste_correcao2.js`.
 - **Status:** no ar.
 
+### R-COR-07 · Conferências antigas fecham em bloco, até uma data que nunca é hoje, sem mexer em saldo
+- **Regra:** "Fechar conferências antigas" (Admin → Correções, contador "caixas impressas sem conferência") pega a caixa `embalado`, nunca conferida, fora do modo teste, impressa até a data de corte, que não está no carro nem numa saída e que não despacha no futuro. A data é **obrigatória** e **não pode ser hoje**. Cada caixa vira `carregado` na data de despacho às 15:00 — ou no dia da impressão, se foi impressa depois —, a coleta ganha `retirado_em`, e `conferido_em`/`conferido_por` ficam **vazios**. Não mexe em estoque. Uma linha em `correcao` para o bloco; desfazer é tudo ou nada. O contador é a mesma lista da linha âmbar do Carregamento (R-PIL-02). `fechar_conferencias_antigas.js --ate AAAA-MM-DD [--aplicar]` chama a mesma ação.
+- **Por quê:** a tela do Carregamento ficou um tempo com problema e mais de 500 caixas impressas se acumularam sem conferência. A baixa delas já aconteceu na impressão; a caixa de hoje ainda é trabalho da conferência; e escrever um nome em `conferido_por` mentiria na pilha.
+- **Exceções:** a caixa de venda cancelada que ainda está na fábrica não entra: quem fecha passa antes na área e no canto, e escolhe a data de corte antes dela.
+- **Teste que trava:** `teste_conferencia_antiga.js` (64) · `teste_correcao.js` (a lista dos contadores).
+- **Status:** em código desde 22/10/2026 (fase 0 da spec `CONFERENCIA-E-BAIXA`) · falta subir e o dono fechar o passivo real.
+
 ---
 
 ## O que ainda não tem teste nesta área
