@@ -291,8 +291,11 @@ const FOTO = 'data:image/jpeg;base64,' + Buffer.alloc(3000, 7).toString('base64'
   console.log('\n=== 10. O GRAFICO CONTA A SAIDA PELA BAIXA ===\n');
   const FLUXO = require('./fluxo_estoque');
   const saiuHoje = FLUXO.doDia(db).saiu;
-  const baixadosHoje = db.prepare("SELECT COUNT(*) n FROM lote WHERE date(baixado_em)=date('now','localtime')").get().n;
-  eq('"saiu" hoje = volumes que baixaram hoje (a impressa e nao conferida nao conta)', saiuHoje, baixadosHoje);
+  /* Conta PECA (22/10/2026): a caixa de varias soma o qtd dos itens; sem item, 1. */
+  const baixadosHoje = db.prepare(`SELECT COALESCE(SUM(COALESCE((SELECT SUM(MAX(1,COALESCE(li.qtd,1)))
+      FROM lote_item li WHERE li.lote_id=l.id),1)),0) n
+    FROM lote l WHERE date(l.baixado_em)=date('now','localtime') AND COALESCE(l.teste,0)=0`).get().n;
+  eq('"saiu" hoje = PECAS das caixas que baixaram hoje (a impressa e nao conferida nao conta)', saiuHoje, baixadosHoje);
   ok('a cinza impressa e nao conferida nao entrou em "saiu"', !vol(vB1).baixado_em);
 
   /* ═══════════════════════════════════════════════════════════════════════ */
