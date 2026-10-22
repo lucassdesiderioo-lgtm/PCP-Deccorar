@@ -17,8 +17,28 @@
 > - **ficam de fora também a caixa no carro e a que está numa saída** — elas já têm
 >   dono.
 >
-> Falta: subir, e o dono fechar o passivo real (mais de 500 caixas) pela tela.
-> Fases 1 e 2 não começaram.
+> **Fase 0 no ar (PR #216, 22/10/2026)**: o dono fez o deploy. **Ainda não foi
+> relatado o fechamento do passivo real** (as mais de 500 caixas) pela tela — prova
+> que não foi feita se escreve como não feita.
+>
+> **Fase 1 em código (22/10/2026):** a tela passou a se chamar **Conferência** — título
+> *Conferência da etiqueta de venda*, rodapé (`nav.js`), app do iPad (manifest e
+> `apple-mobile-web-app-title`), rótulo da área (`auth.js`) e da permissão
+> (`permissoes.js`), o painel, a `/setor`, a Etiqueta de Venda, o admin e as
+> mensagens do servidor que nomeiam a tela. **Mudanças na construção:**
+> - **o verbo da ação física fica** — *"não carregar"*, *"faltam carregar no carro"*,
+>   o estágio `carregado`: a caixa continua sendo carregada no carro;
+> - **a frase da auditoria fica** (*"bipado no carregamento"*): as linhas antigas
+>   estão gravadas com ela, e trocar só as novas partiria o histórico;
+> - **a recusa do motorista "no carregamento" fica**: é o momento físico em que ela
+>   acontece;
+> - **o tablet que já tem o app na Tela de Início continua mostrando o nome antigo**
+>   embaixo do ícone: o iPad guarda o nome na hora de adicionar. O app abre e
+>   funciona igual; para o nome novo, apagar o ícone e adicionar de novo.
+>
+> Testes: a suíte inteira (`teste_*.js`, como no CI) e o teste da §10. Tela aberta a
+> 1440, 1024, 768 e 400 px — o título cabe numa linha e nada rola de lado.
+> Fase 2 não começou.
 
 ---
 

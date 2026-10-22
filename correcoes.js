@@ -462,7 +462,7 @@ const ACOES = {
     id:'reabrir', alvo:'lote',
     rotulo:'Reabrir venda futura',
     explica:'O volume foi fechado com uma data de saída que ainda não chegou. Ele não saiu: volta para a fábrica, ' +
-            'e aparece no Carregamento no dia em que tiver que sair. Não mexe em estoque.',
+            'e aparece na Conferência no dia em que tiver que sair. Não mexe em estoque.',
     carregar: volumePorId,
     valePara(db, v){
       if(!v.carregado_em) return 'este volume não está fechado';
@@ -483,7 +483,7 @@ const ACOES = {
         estoque: [],
         resumo: 'Reabre o volume #' + v.id + ': a saída em ' + dataBR(v.carregado_em) + ' ainda não aconteceu. ' +
           (para === 'embalado'
-            ? 'Volta a embalado (a etiqueta já tinha saído) e aparece no Carregamento.'
+            ? 'Volta a embalado (a etiqueta já tinha saído) e aparece na Conferência.'
             : 'Volta a pendente: a etiqueta nunca foi impressa, então ele precisa passar pela Etiqueta de Venda.') +
           ' O estoque não se mexe.'
       };

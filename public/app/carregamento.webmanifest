@@ -1,6 +1,6 @@
 {
-  "name": "Deccorar — Carregamento",
-  "short_name": "Carregamento",
+  "name": "Deccorar — Conferência",
+  "short_name": "Conferência",
   "start_url": "/carregamento",
   "scope": "/",
   "display": "standalone",

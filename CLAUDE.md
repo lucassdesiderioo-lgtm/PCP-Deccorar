@@ -1176,6 +1176,18 @@ mostra contagem regressiva para o despacho, ficando **amarela** abaixo de 2 h e
 > duas da `CARREGAMENTO-SEGUNDA-PESSOA`, a recusa do motorista, o adiantado e os
 > dois passivos — está em [`docs/historia/carregamento.md`](docs/historia/carregamento.md).
 
+> ⚠️ **A TELA SE CHAMA "CONFERÊNCIA" DESDE 22/10/2026** (fase 1 da spec
+> `CONFERENCIA-E-BAIXA`): rodapé, título (*Conferência da etiqueta de venda*),
+> app do iPad, rótulo da área e da permissão, e os textos que nomeiam a tela.
+> **A URL `/carregamento`, o arquivo `carregamento.html`, o `carreg_route.js` e a
+> chave `carregamento.executar` NÃO mudaram**: a URL é o que os tablets salvaram
+> na Tela de Início, e trocar a chave tiraria a permissão de quem a tem, em
+> silêncio (#13). Também ficam o verbo da ação física (*"não carregar"*,
+> *"faltam carregar no carro"*, o estágio `carregado`) e a frase da auditoria
+> (*"bipado no carregamento"*): as linhas antigas já estão gravadas com ela, e
+> mudar só as novas partiria o histórico em dois. Nesta seção e nos cartões,
+> "Carregamento" ainda é a mesma tela.
+
 | | **Agência** | **Coleta** |
 |---|---|---|
 | Quem leva | a gente, no carro, até a agência | o caminhão do ML, na fábrica |

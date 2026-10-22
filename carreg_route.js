@@ -191,7 +191,7 @@ module.exports=function(app,db){
              'NF '+(alvo.nf||alvo.id), 'impressa por '+nomeLimpo(alvo.impresso_por)+' — bipada pela mesma pessoa'); }catch(e){}
       return ({ok:false,motivo:'mesma_pessoa',impresso_por:nomeLimpo(alvo.impresso_por),
         pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city,codigo:alvo.codigo},coleta:ehColeta(alvo),
-        aviso:'Você imprimiu esta etiqueta. O carregamento tem que ser feito por outra pessoa, com o login dela.'});
+        aviso:'Você imprimiu esta etiqueta. A conferência tem que ser feita por outra pessoa, com o login dela.'});
     }
     return null;
   }
@@ -458,7 +458,7 @@ module.exports=function(app,db){
      antigos continuam como historia, com a foto (rota logo abaixo). */
   app.post('/api/coleta/fechar',(req,res)=>{
     res.json({ok:false,motivo:'aposentado',
-      aviso:'O "Fechar coleta" virou a Saída do caminhão: no Carregamento, card da coleta, toque em '+
+      aviso:'O "Fechar coleta" virou a Saída do caminhão: na Conferência, card da coleta, toque em '+
             '"Saída do caminhão", bipe o que ficou e feche com a foto do motorista. '+
             'Se a tela não mostra esse botão, atualize a página.'});
   });

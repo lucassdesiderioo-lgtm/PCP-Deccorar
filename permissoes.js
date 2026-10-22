@@ -22,7 +22,7 @@ module.exports = [
   { chave:'etiqueta.emitir',      grupo:'Expedição',  nivel:'operacao',
     rotulo:'Emitir NF de venda',  desc:'Imprimir etiqueta e dar baixa no estoque' },
   { chave:'carregamento.executar',grupo:'Expedição',  nivel:'operacao',
-    rotulo:'Carregar veículo',    desc:'Conferir volumes por bipe' },
+    rotulo:'Conferência',         desc:'Conferir a etiqueta de venda por bipe e pôr no carro' },
   /* SAIDA DO CAMINHAO (spec SAIDA-E-DUPLA-CONFERENCIA, fase 3, 26/09/2026).
      Fechar a saida que BATEU e da bancada ('carregamento.executar'). Liberar o
      caminhao com numero DIFERENTE do motorista e a decisao que precisa ter

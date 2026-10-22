@@ -396,7 +396,7 @@ async function scanSku(sku){
       +'padding:8px 10px;margin-bottom:8px;font-weight:800;color:#4b2a91">'
       +'🚚 COLETA — o caminhão do Mercado Livre vem buscar'
       +'<div style="font-weight:400;font-size:13px;margin-top:2px">Depois de imprimir, leve pro <b>lugar reservado da coleta</b> '
-      +'e bipe no Carregamento. <b>Não vai no carro.</b></div></div>' : '';
+      +'e bipe na Conferência. <b>Não vai no carro.</b></div></div>' : '';
   /* HIERARQUIA: O CLIENTE PRIMEIRO.
      Aqui o bipe confere etiqueta contra etiqueta, nunca contra o produto (§4 do
      CLAUDE.md) — a caixa já está fechada num saco preto. Medida e cor são
@@ -440,7 +440,7 @@ async function imprimir(){
        mao da pessoa: e aqui que ela decide se vai pro carro ou pro canto. */
     var ondeVai = r.coleta
       ? '<div style="margin:6px 0 8px;padding:8px 10px;border-radius:8px;background:#efe9fb;border:2px solid #b9a3e6;color:#4b2a91;font-weight:800">'
-        +'🚚 COLETA — leve pro lugar reservado e bipe no Carregamento. Não vai no carro.</div>'
+        +'🚚 COLETA — leve pro lugar reservado e bipe na Conferência. Não vai no carro.</div>'
       : '';
     /* A caixa com várias persianas repete a conta DEPOIS de imprimir: é a
        última vez que alguém olha antes de fechar o saco preto, e a etiqueta
