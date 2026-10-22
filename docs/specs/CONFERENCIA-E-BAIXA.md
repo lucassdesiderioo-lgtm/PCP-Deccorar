@@ -115,8 +115,12 @@
 > ✅ **A PRIMEIRA SOBRA REAL FUNCIONOU (22/10/2026)**: o dono relatou *"a primeira
 > sobra funcionou, saldo subiu"*.
 >
-> ⚠️ Ainda não foram relatadas a **primeira caixa conferida baixando** e o
-> **fechamento das caixas antigas** pela tela. Prova que não foi feita se escreve
+> ✅ **A PRIMEIRA CAIXA CONFERIDA BAIXOU O ESTOQUE (22/10/2026)**: relato do dono.
+>
+> ⚠️ Falta relatar o **fechamento das caixas antigas pela tela**. A consulta só de
+> leitura do dia 22/10 já mostrava **nenhuma caixa impressa esperando conferência**
+> (só 281 de coleta no canto, depois fechadas pela saída do caminhão) — sinal de que
+> o passivo foi fechado, mas sem o relato de por onde. Prova que não foi feita se escreve
 > como não feita — e a spec só vai para `docs/arquivo/` depois delas.
 
 ---
