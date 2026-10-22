@@ -279,11 +279,11 @@
 - **História:** armadilha #12.
 
 ### R-EST-13 · O gráfico conta produção, venda e o que voltou
-- **Regra:** "entrou" é a embalagem e "saiu" é a **baixa** (`lote.baixado_em`, desde 22/10/2026; antes era a impressão) (`fluxo_estoque.js`, dono único). A virada deu `baixado_em = embalado_em` às caixas de antes, então os dias passados não mudam. Ajuste e contagem ficam fora do gráfico, com número próprio. A sobra (R-REC-01) aparece desde 22/10/2026 como uma terceira barra, **"voltou"** (azul, empilhada sobre o "entrou"), contando **peça** (`SUM(delta)` das linhas `sobra` do livro, sem as de teste) no dia da sobra. Ela não entra no "entrou" (não é produção) e **não reescreve o "saiu"**: a caixa que baixou na terça e sobrou na quarta é saída na terça e "voltou" na quarta. O quadro "Hoje" diz quantas voltaram. O fechamento diário do Planejamento continua gravando `variou = entrou − saiu`.
+- **Regra:** "entrou" é a embalagem e "saiu" é a **baixa** (`lote.baixado_em`, desde 22/10/2026; antes era a impressão) (`fluxo_estoque.js`, dono único). As três barras contam **peça**: o "saiu" soma o `qtd` do `lote_item` de cada caixa baixada (sem `lote_item`, 1), a mesma régua do `media_dominio` — até 22/10/2026 ele contava caixa, e a de 2 persianas saía como 1. O "Vendi" do fechamento diário segue a mesma conta desde então; os dias já gravados na tabela `fechamento` ficaram como foram contados. A virada deu `baixado_em = embalado_em` às caixas de antes, então os dias passados não mudam. Ajuste e contagem ficam fora do gráfico, com número próprio. A sobra (R-REC-01) aparece desde 22/10/2026 como uma terceira barra, **"voltou"** (azul, empilhada sobre o "entrou"), contando **peça** (`SUM(delta)` das linhas `sobra` do livro, sem as de teste) no dia da sobra. Ela não entra no "entrou" (não é produção) e **não reescreve o "saiu"**: a caixa que baixou na terça e sobrou na quarta é saída na terça e "voltou" na quarta. O quadro "Hoje" diz quantas voltaram. O fechamento diário do Planejamento continua gravando `variou = entrou − saiu`.
 - **Por quê:** o gráfico responde quanto a fábrica fez e quanto saiu, e não quanto a coluna variou.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_estoque.js`.
-- **Status:** no ar desde 01/09/2026; a barra "voltou" desde 22/10/2026.
+- **Status:** no ar desde 01/09/2026; a barra "voltou" e o "saiu" em peça desde 22/10/2026.
 
 ### R-EST-14 · O valor do estoque nunca esconde o que falta
 - **Regra:** o custo vem do `ficha_dominio`. SKU sem custo não vira zero: o total sai como **piso** (`≥`). SKU sem peça mostra traço. Quem não tem `custo.ver` não recebe os campos de valor no JSON nem no CSV.

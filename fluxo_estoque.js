@@ -7,7 +7,7 @@
  * respondem pela producao e pela venda:
  *
  *   ENTROU = pecas embaladas               (tabela `montagem`, o +1 do §4)
- *   SAIU   = caixas que baixaram do estoque (`lote.baixado_em`, o -1 do §2)
+ *   SAIU   = PECAS das caixas que baixaram (`lote.baixado_em`, o -1 do §2)
  *
  * A conta ja existia dentro do `/api/fechamento` (plan_route.js). Quando o
  * painel da aba Estoque passou a mostrar o MESMO movimento em serie de 30 dias,
@@ -36,12 +36,26 @@
    `embalado_em` (a hora da impressao). A virada deu a toda caixa impressa antes
    do deploy `baixado_em = embalado_em`, entao os dias de antes nao mudam. O
    try/catch cobre banco antigo sem a coluna, do mesmo jeito que o fechamento. */
-function saidasDoDia(db){
+/* E conta PECA, e nao caixa (22/10/2026): a baixa e -1 por peca (R-EST-03), e
+   a caixa de 2 persianas baixa 2. Ate ali era `COUNT(*)` e ela saia como 1,
+   enquanto o ENTROU e o VOLTOU ja contavam peca. A regua e a do `media_dominio`:
+   com `lote_item`, a soma do qtd; sem, 1. Banco sem `lote_item` conta 1 por
+   caixa, que e o que ele sabe. */
+function pecasBaixadas(db, onde, args){
+  const sql = (pecas) => "SELECT date(l.baixado_em) d, "+pecas+" q FROM lote l "+
+    "WHERE l.baixado_em IS NOT NULL AND "+onde+" AND COALESCE(l.teste,0)=0 "+
+    "GROUP BY date(l.baixado_em)";
   try{
-    return db.prepare("SELECT COUNT(*) n FROM lote "+
-      "WHERE baixado_em IS NOT NULL AND date(baixado_em)=date('now','localtime') "+
-      "AND COALESCE(teste,0)=0").get().n;
-  }catch(e){ return 0; }
+    return db.prepare(sql("SUM(COALESCE((SELECT SUM(MAX(1,COALESCE(li.qtd,1))) "+
+      "FROM lote_item li WHERE li.lote_id=l.id),1))")).all(...args);
+  }catch(e){
+    try{ return db.prepare(sql('COUNT(*)')).all(...args); }catch(e2){ return []; }
+  }
+}
+
+function saidasDoDia(db){
+  const r = pecasBaixadas(db, "date(l.baixado_em)=date('now','localtime')", []);
+  return r.length ? r[0].q : 0;
 }
 
 /* As pecas que voltaram pelo ↩ Sobrou, por dia: SOMA do delta (a caixa de
@@ -76,13 +90,8 @@ function serie(db, dias){
   db.prepare("SELECT data d, COUNT(*) q FROM montagem "+
     "WHERE data >= date('now','localtime','-'||?||' days') AND COALESCE(teste,0)=0 "+
     "GROUP BY data").all(n-1).forEach(r => ent[r.d] = r.q);
-  try{
-    db.prepare("SELECT date(baixado_em) d, COUNT(*) q FROM lote "+
-      "WHERE baixado_em IS NOT NULL "+
-      "AND date(baixado_em) >= date('now','localtime','-'||?||' days') "+
-      "AND COALESCE(teste,0)=0 GROUP BY date(baixado_em)").all(n-1)
-      .forEach(r => sai[r.d] = r.q);
-  }catch(e){}
+  pecasBaixadas(db, "date(l.baixado_em) >= date('now','localtime','-'||?||' days')", [n-1])
+    .forEach(r => sai[r.d] = r.q);
   const desde = db.prepare("SELECT date('now','localtime','-'||?||' days') d").get(n-1).d;
   sobrasPorDia(db, desde).forEach(r => vol[r.d] = r.q);
 

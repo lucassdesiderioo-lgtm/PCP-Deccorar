@@ -554,6 +554,42 @@ const ok = (n, c, extra) => { casos++;
        d.voltou === 1 && d.variou === d.entrou - d.saiu, JSON.stringify(d));
   }
 
+  // ── 18. O "SAIU" CONTA PEÇA, E NÃO CAIXA (22/10/2026) ────────────────────
+  /* A baixa e -1 por PECA (R-EST-03): a caixa de 2 persianas baixa 2. O grafico
+     contava `COUNT(*)` de lote e mostrava 1 — o "entrou" e o "voltou" ja contavam
+     peca, e as tres barras ficavam em unidades diferentes. A regua e a do
+     `media_dominio`: com `lote_item`, soma o qtd; sem, 1. */
+  {
+    const FLUXO = require('./fluxo_estoque');
+    db.exec(`CREATE TABLE IF NOT EXISTS lote_item (id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lote_id INTEGER, codigo TEXT, qtd INTEGER DEFAULT 1, conferidos INTEGER DEFAULT 0)`);
+    const antes = (await chamar('GET /api/estoque/painel')).serie;
+    const hojeAntes = FLUXO.doDia(db).saiu;
+    const novo = (dia, teste, baixado) => db.prepare(`INSERT INTO lote (codigo,estagio,embalado_em,data,teste,baixado_em)
+      VALUES ('BK140140BEGE','carregado',?,?,?,?)`).run(dia+' 10:00:00', dia, teste, baixado ? dia+' 10:30:00' : null).lastInsertRowid;
+    const item = db.prepare('INSERT INTO lote_item (lote_id,codigo,qtd) VALUES (?,?,?)');
+    const duas = novo(ontem, 0, true);                       // pacote de 2 SKUs: 2 pecas
+    item.run(duas, 'BK140140BEGE', 1); item.run(duas, 'BK160160CINZA', 1);
+    const tresUn = novo(ontem, 0, true);                     // 3 unidades do mesmo SKU
+    item.run(tresUn, 'BK140140BEGE', 3);
+    const deTeste = novo(ontem, 1, true);                    // teste: nao conta
+    item.run(deTeste, 'BK140140BEGE', 4);
+    const naoConf = novo(hoje, 0, false);                    // impressa, nao conferida
+    item.run(naoConf, 'BK140140BEGE', 2);
+    const umaHoje = novo(hoje, 0, true);                     // lote_item de 1: conta 1
+    item.run(umaHoje, 'BK140140BEGE', 1);
+    const s = await chamar('GET /api/estoque/painel');
+    ok('ontem: a caixa de 2 persianas e a de 3 unidades somam 5 peças no "saiu"',
+       s.serie[28].saiu === antes[28].saiu + 5, JSON.stringify([antes[28], s.serie[28]]));
+    ok('hoje: a caixa conferida de 1 peça soma 1; a impressa e não conferida não soma',
+       s.serie[29].saiu === antes[29].saiu + 1, JSON.stringify([antes[29], s.serie[29]]));
+    ok('o doDia (o "vendido" do fechamento) conta a mesma peça',
+       FLUXO.doDia(db).saiu === hojeAntes + 1 && s.resumo.saiu_hoje === hojeAntes + 1,
+       'doDia=' + FLUXO.doDia(db).saiu + ' resumo=' + s.resumo.saiu_hoje + ' antes=' + hojeAntes);
+    const fech = await chamar('GET /api/fechamento');
+    ok('e o fechamento grava o vendido em peça', fech.vendido === hojeAntes + 1, 'veio ' + fech.vendido);
+  }
+
   console.log('');
   console.log(falhas ? ('FALHARAM ' + falhas + ' de ' + casos)
                      : ('todos os ' + casos + ' casos passaram'));
