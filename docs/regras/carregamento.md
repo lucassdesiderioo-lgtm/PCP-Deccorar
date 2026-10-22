@@ -225,7 +225,7 @@ Etiqueta de Venda ────┤
 - **Por quê:** o bipe do SKU é o que prova que a persiana está na mão — sem ele, "voltou para o estoque" seria uma afirmação. A sobra é da caixa inteira: com uma peça só, o saldo subiria pela metade. "Já baixou", e não "foi conferida": a caixa impressa antes de 22/10 baixou na impressão.
 - **Exceções:** a venda que já estava cancelada (pelo relatório, ou pela recusa de antes da 2-B) também vai pela sobra e **mantém a origem** dela. O bipe normal da Conferência recusa a caixa cancelada e manda tocar em "Sobrou".
 - **Teste que trava:** `teste_sobra.js` (103) — seis defeitos reintroduzidos, um a um, e todos reprovam.
-- **Status:** em código desde 22/10/2026 · ainda não conferida na fábrica.
+- **Status:** no ar desde 22/10/2026 (PR #222) · a primeira sobra real ainda não foi relatada.
 - **História:** spec `CONFERENCIA-E-BAIXA` §4.
 
 ### R-REC-02 · Só a caixa com etiqueta e ainda na fábrica, e uma vez só
@@ -233,28 +233,28 @@ Etiqueta de Venda ────┤
 - **Por quê:** fora disso não há o que voltar à prateleira, e a mesma peça não volta duas vezes.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_sobra.js`.
-- **Status:** em código desde 22/10/2026.
+- **Status:** no ar desde 22/10/2026 (PR #222).
 
 ### R-REC-03 · A caixa de várias volta inteira; com um item cancelado não é sobra; o sob medida não mexe em saldo
 - **Regra:** a caixa de várias que sobrou inteira volta por peça. A que tem `cancelada_varias=1` (o ML cancelou só um item) é recusada: refaz-se na Etiqueta de Venda. O sob medida é registrado sem SKU a bipar e sem movimento, e o aviso não manda pôr na prateleira.
 - **Por quê:** no item cancelado o cliente ainda quer as outras persianas. O sob medida não tem estoque (§7).
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_sobra.js`.
-- **Status:** em código desde 22/10/2026.
+- **Status:** no ar desde 22/10/2026 (PR #222).
 
 ### R-REC-04 · Quem conferiu a caixa não marca a sobra dela (D8)
 - **Regra:** a recusa diz quem conferiu e oferece **Trocar de pessoa**. Sem liberação, nem para o Admin Geral. Caixa sem `conferido_por` passa (a régua do `carga.js → mesmaPessoa`).
 - **Por quê:** a sobra contradiz a contagem dele, e a mesma atenção conferiria a própria conta. Confirmado pelo dono em 22/10/2026.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_sobra.js`.
-- **Status:** em código desde 22/10/2026.
+- **Status:** no ar desde 22/10/2026 (PR #222).
 
 ### R-REC-05 · A lista "Sobras esperando decisão" zera
 - **Regra:** a Conferência mostra o que espera a sobra (`GET /api/carregamento/sobras`): a caixa que o caminhão deixou numa saída **já fechada** e continua no canto, e a venda cancelada que ainda está na fábrica sem decisão. Resolvida pelo "Sobrou", registrada na Mesa ou levada pelo caminhão seguinte, a caixa sai da lista.
 - **Por quê:** número que não zera vira paisagem.
 - **Exceções:** a caixa de várias com um item cancelado não entra (o lugar dela é a Etiqueta de Venda, e o card da Mesa a mostra).
 - **Teste que trava:** `teste_sobra.js`.
-- **Status:** em código desde 22/10/2026.
+- **Status:** no ar desde 22/10/2026 (PR #222).
 
 ---
 

@@ -109,9 +109,15 @@
 > - **o gráfico de estoque não mostra a sobra**: a caixa que baixou e voltou continua
 >   contando como saída no dia da baixa; o +1 está no livro (R-EST-13).
 >
-> Falta: subir **fora do horário de expedição**, com backup, e **a primeira sobra
-> real** — uma caixa que o caminhão deixou, ou uma venda cancelada ainda na fábrica,
-> voltando à prateleira pelo "Sobrou" com o saldo subindo.
+> ✅ **Fase 2-B no ar (PR #222, 22/10/2026)**: o dono fez o deploy e disse *"deu
+> certo"*.
+>
+> ⚠️ **ISSO PROVA QUE O SISTEMA SUBIU, E NÃO QUE A SOBRA FUNCIONA COM DADO REAL.**
+> Ainda não foram relatadas: a **primeira sobra real** (uma caixa que o caminhão
+> deixou, ou uma venda cancelada ainda na fábrica, voltando à prateleira com o saldo
+> subindo e a linha `sobra` no extrato), a **primeira caixa conferida baixando** e o
+> **fechamento das caixas antigas** pela tela. Prova que não foi feita se escreve
+> como não feita — e a spec só vai para `docs/arquivo/` depois delas.
 
 ---
 
