@@ -1833,13 +1833,18 @@ function renderEst(){
            como rotina. */
         ? '<b style="font-size:17px;color:#da3633" title="Saiu mais do que entrou. Confira a prateleira e veja o extrato — o saldo negativo é sinal de peça que saiu sem registro.">'+l.estoque+'</b>'
         : '<b style="font-size:17px" class="'+(l.precisa>0?'baixo':'ok')+'">'+l.estoque+'</b>')
-        /* físico − reservado = disponível, só quando há venda sem etiqueta. */
-        +(l.reservado?'<div class="estq" style="white-space:nowrap" title="Peças vendidas que ainda não têm etiqueta: '
-          +'estão prometidas da prateleira. Só leitura — a conta do que produzir continua a da tela azul.">'
+        /* físico − reservado = disponível, só quando há venda sem etiqueta ou
+           caixa impressa esperando a conferência (a peça continua no saldo
+           até a conferência, desde 22/10/2026). */
+        +((l.reservado||l.impresso)?'<div class="estq" style="white-space:nowrap" title="Sem etiqueta: peças vendidas que '
+          +'ainda não têm etiqueta. Em caixa: etiqueta impressa, a peça já está na caixa e sai do saldo na Conferência. '
+          +'Só leitura — a conta do que produzir continua a da tela azul.">'
           /* "sem etiqueta", e não "vendida": a coluna ao lado se chama
              "Vendido a despachar" (o comprometido da planilha), e as duas
              palavras iguais se leriam como o mesmo número. */
-          +l.reservado+' sem etiqueta · <span'+(l.disponivel<0?' style="color:#da3633"':'')+'>'
+          +(l.reservado?l.reservado+' sem etiqueta · ':'')
+          +(l.impresso?l.impresso+' em caixa · ':'')
+          +'<span'+(l.disponivel<0?' style="color:#da3633"':'')+'>'
           +l.disponivel+' livre'+(Math.abs(l.disponivel)===1?'':'s')+'</span></div>':'')
         +ujTxt+ct+'</td>'
       /* Sem peça na prateleira não há valor a mostrar: "R$ 0,00" se lê como
@@ -2017,7 +2022,7 @@ document.addEventListener("click",async e=>{
           +'<td>'+esc(m.usuario_nome||'—')+'</td>'
           +'<td class="sub">'+esc(m.criado_em||'')+'</td></tr>').join('')+'</tbody></table>')
         :'<div class="sub" style="margin-top:6px">Este SKU não tem movimento no livro. '
-         +'Ou ele nunca teve saldo, ou é sob medida — que não soma na embalagem nem baixa na etiqueta.</div>')
+         +'Ou ele nunca teve saldo, ou é sob medida — que não soma na embalagem nem baixa na conferência.</div>')
       +'</td>';
     tr.after(linha);
     return;

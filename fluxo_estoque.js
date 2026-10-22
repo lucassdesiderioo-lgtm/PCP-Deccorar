@@ -7,7 +7,7 @@
  * respondem pela producao e pela venda:
  *
  *   ENTROU = pecas embaladas               (tabela `montagem`, o +1 do §4)
- *   SAIU   = etiquetas de venda impressas  (`lote.embalado_em`, o -1 do §2)
+ *   SAIU   = caixas que baixaram do estoque (`lote.baixado_em`, o -1 do §2)
  *
  * A conta ja existia dentro do `/api/fechamento` (plan_route.js). Quando o
  * painel da aba Estoque passou a mostrar o MESMO movimento em serie de 30 dias,
@@ -25,13 +25,15 @@
  * `teste=0` em tudo: peca de teste nao e producao (§11).
  */
 
-/* A etiqueta de venda e o -1. A coluna se chama `embalado_em` por historia — e
-   o carimbo de quando a etiqueta saiu, nao de quando a peca foi embalada. O
+/* O -1 e a BAIXA, e desde 22/10/2026 ela e na conferencia (spec
+   CONFERENCIA-E-BAIXA, fase 2-A): conta `baixado_em`, e nao mais
+   `embalado_em` (a hora da impressao). A virada deu a toda caixa impressa antes
+   do deploy `baixado_em = embalado_em`, entao os dias de antes nao mudam. O
    try/catch cobre banco antigo sem a coluna, do mesmo jeito que o fechamento. */
 function saidasDoDia(db){
   try{
     return db.prepare("SELECT COUNT(*) n FROM lote "+
-      "WHERE embalado_em IS NOT NULL AND date(embalado_em)=date('now','localtime') "+
+      "WHERE baixado_em IS NOT NULL AND date(baixado_em)=date('now','localtime') "+
       "AND COALESCE(teste,0)=0").get().n;
   }catch(e){ return 0; }
 }
@@ -56,10 +58,10 @@ function serie(db, dias){
     "WHERE data >= date('now','localtime','-'||?||' days') AND COALESCE(teste,0)=0 "+
     "GROUP BY data").all(n-1).forEach(r => ent[r.d] = r.q);
   try{
-    db.prepare("SELECT date(embalado_em) d, COUNT(*) q FROM lote "+
-      "WHERE embalado_em IS NOT NULL "+
-      "AND date(embalado_em) >= date('now','localtime','-'||?||' days') "+
-      "AND COALESCE(teste,0)=0 GROUP BY date(embalado_em)").all(n-1)
+    db.prepare("SELECT date(baixado_em) d, COUNT(*) q FROM lote "+
+      "WHERE baixado_em IS NOT NULL "+
+      "AND date(baixado_em) >= date('now','localtime','-'||?||' days') "+
+      "AND COALESCE(teste,0)=0 GROUP BY date(baixado_em)").all(n-1)
       .forEach(r => sai[r.d] = r.q);
   }catch(e){}
 

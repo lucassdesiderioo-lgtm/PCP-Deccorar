@@ -36,9 +36,15 @@ const fs = require('fs'), path = require('path');
 const { acharVolumes, naSaida, podeTerIdo, PODE_TER_IDO, PRONTA_PRO_CARRO, nomeIgual, ehColeta } = require('./carga');
 const { decodificarFoto, tipoDaFoto } = require('./foto');
 const FOTOS_DIR = require('./caminhos').COLETAS;
+const BAIXA = require('./baixa_dominio');
 
 module.exports = function(app, db){
   require('./saida_schema').garantirSaida(db);
+  /* A coluna `baixado_em` (e a virada, uma vez so) e do baixa_dominio. O
+     exp_route ja chama no boot; chamar aqui tambem e o modulo nao depender da
+     ordem de `require` — carregado sozinho, num script ou num teste, a baixa
+     bateria numa coluna que nao existe (§10, o `config` do acesso.js). */
+  BAIXA.garantirSchema(db);
   try{ fs.mkdirSync(FOTOS_DIR, {recursive:true}); }catch(e){}
   const auditar = (req, acao, alvo, det) => {
     try{ const ac = app.locals.acesso; if(ac && ac.auditar) ac.auditar(req, 'expedicao', acao, alvo, det); }catch(e){}
@@ -203,6 +209,12 @@ module.exports = function(app, db){
           carregado_em=COALESCE(carregado_em, datetime('now','localtime'))
         WHERE id=? AND ${PODE_TER_IDO}`);
       for(const id of levouIds) saiu.run(id);
+      /* ⚠️ A CAIXA QUE SAI SEM CONFERENCIA BAIXA AQUI (spec CONFERENCIA-E-BAIXA,
+         fase 2-A, 22/10/2026). A baixa e na conferencia; a caixa que o motorista
+         levou sem ninguem bipar sairia da fabrica com a peca ainda no saldo.
+         A conferencia dela continua VAZIA — ninguem conferiu, e a pilha mostra
+         isso. As do canto ja baixaram no bipe: `baixar` nao baixa duas vezes. */
+      for(const id of ids) BAIXA.baixar(db, { id }, req.usuario);
       const up = db.prepare(`UPDATE lote SET saida_id=?, saiu_em=datetime('now','localtime'), saiu_por='coleta',
           retirado_em=COALESCE(retirado_em, datetime('now','localtime')) WHERE id=? AND saida_id IS NULL`);
       for(const id of ids) up.run(s.id, id);

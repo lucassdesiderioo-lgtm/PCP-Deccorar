@@ -5,10 +5,16 @@ const fs=require('fs'), path=require('path');
    junto com o PDF. Configuravel por ambiente so pro teste nao escrever em
    /opt. */
 const FOTOS_DIR=require('./caminhos').COLETAS;
+const BAIXA=require('./baixa_dominio');
 module.exports=function(app,db){
   /* A tabela das saidas (caminhao e agencia) tem dono proprio: o script do
      passivo tambem a cria, e duas copias do CREATE divergem. */
   require('./saida_schema').garantirSaida(db);
+  /* A coluna `baixado_em` (e a virada, uma vez so) e do baixa_dominio. O
+     exp_route ja chama no boot; chamar aqui tambem e o modulo nao depender da
+     ordem de `require` — carregado sozinho, num script ou num teste, a baixa
+     bateria numa coluna que nao existe (§10, o `config` do acesso.js). */
+  BAIXA.garantirSchema(db);
   const nomeLimpo=s=>{ const t=String(s||'').trim(); return t||null; };
   /* ── CONFERENCIA DUPLA (etiqueta de venda + SKU da caixa) ──────────────────
      A ultima rede antes do carro. Bipe 1 = a etiqueta de venda JA COLADA;
@@ -113,7 +119,7 @@ module.exports=function(app,db){
           pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city}});
       }
     }
-    res.json(concluir(req,alvo));
+    res.json(db.transaction(()=>concluir(req,alvo))());
   });
 
   /* As barreiras do bipe, na ordem de sempre — e as MESMAS no bipe de peca:
@@ -160,7 +166,7 @@ module.exports=function(app,db){
              'NF '+(alvo.nf||alvo.id), 'estagio '+alvo.estagio+' — bipado no carregamento'); }catch(e){}
       return ({ok:false,motivo:'nao_embalado',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
         aviso:'Esta caixa ainda nao passou pela ETIQUETA DE VENDA. Imprima a etiqueta por la '+
-              '(bipando o SKU) e depois carregue — e a impressao que baixa a peca do estoque.'});
+              '(bipando o SKU) e depois confira aqui — e a impressao que reserva a peca para esta venda.'});
     }
     /* A CAIXA DE AGENCIA JA CONFERIDA (fase 4): ela esta na area esperando o
        carro, e bipa-la de novo aqui nao a poe no carro — isso e o bipe da
@@ -200,6 +206,11 @@ module.exports=function(app,db){
      canto (coleta). Devolve a resposta. */
   function concluir(req,alvo){
     const quemBipou=(req.usuario&&req.usuario.nome)||null;
+    /* ⚠️ A BAIXA E AQUI (spec CONFERENCIA-E-BAIXA, fase 2-A, 22/10/2026): a
+       etiqueta so reservou a peca, e ela sai do estoque quando a conferencia
+       bate com a etiqueta — por peca, uma vez so (baixa_dominio.js). Quem chama
+       embrulha numa transacao: a baixa e a marca de conferida entram juntas. */
+    BAIXA.baixar(db,alvo,req.usuario);
     /* O BIPE DA AREA E A CONFERENCIA (bipe 2). Fase 4 da spec
        SAIDA-E-DUPLA-CONFERENCIA, decisao D1 do dono (26/09/2026): a caixa de
        AGENCIA ganhou um segundo bipe. Aqui ela e so CONFERIDA e fica na area;

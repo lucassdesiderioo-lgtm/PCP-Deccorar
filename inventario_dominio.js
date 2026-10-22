@@ -363,7 +363,12 @@ function terminar(db, { codigo, papel, quem }){
     if(!eu) throw erro(409, (item.rascunho_por || 'outra pessoa') + ' esta contando ' + cod + ' agora', { motivo:'outra_contando' });
   }
   const contado = item.rascunho || 0;
-  const saldo = ESTOQUE.saldo(db, cod) || 0;
+  /* ⚠️ O QUE DEVE ESTAR NA PRATELEIRA, e nao o saldo (CONFERENCIA-E-BAIXA,
+     fase 2-A, 22/10/2026). A peca da caixa impressa e nao conferida continua
+     no saldo ate a conferencia, mas esta dentro da caixa, e nao na prateleira:
+     comparar com o saldo acusaria falta onde nao ha. A diferenca aprovada
+     continua indo para o saldo (aprovar), e a conta fecha do mesmo jeito. */
+  const saldo = require('./baixa_dominio').disponivel(db, cod);
   const nome = quem.nome || '', uid = quem.id != null ? quem.id : null;
   const d1 = est === 1 ? contado - saldo : item.contado1 - item.saldo_na_contagem;
   let status, diferenca = null;

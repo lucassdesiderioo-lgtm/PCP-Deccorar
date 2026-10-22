@@ -171,7 +171,7 @@ function naoRecusa(v){
       '). Separe a caixa: ela está no card "Canceladas depois da etiqueta", e o admin decide a volta ao estoque.' };
   const lugar = onde(v);
   if(lugar === 'pendente' || lugar === 'bloqueado')
-    return { motivo:'sem_etiqueta', aviso:'Esta venda ainda não teve a etiqueta impressa: nada baixou do ' +
+    return { motivo:'sem_etiqueta', aviso:'Esta venda ainda não teve a etiqueta impressa: nada saiu do ' +
       'estoque, então não há o que voltar. Separe a caixa e avise o admin.' };
   if(lugar === 'carregado')
     return { motivo:'ja_saiu', aviso:'O sistema diz que esta caixa já saiu da fábrica. Se ela voltou, ' +

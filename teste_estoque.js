@@ -35,7 +35,7 @@ db.exec(`
     criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0);
   CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, estagio TEXT DEFAULT 'pendente',
     embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')),
-    teste INTEGER DEFAULT 0);
+    teste INTEGER DEFAULT 0, baixado_em TEXT);
   CREATE TABLE ajuste_estoque (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, antes INTEGER,
     depois INTEGER, delta INTEGER, motivo TEXT, obs TEXT, usuario_id INTEGER, usuario_nome TEXT,
     criado_em TEXT DEFAULT (datetime('now','localtime')), data TEXT DEFAULT (date('now','localtime')),
@@ -139,6 +139,9 @@ mont.run('BK140140BEGE', 55, hoje, 0);
 mont.run('BK140140BEGE', 50, hoje, 1);          // teste: nao conta como producao
 mont.run('BK160160CINZA', 70, ontem, 0);
 mont.run('BK160160CINZA', 65, ontem, 0);
+/* O "saiu" do grafico e a BAIXA (CONFERENCIA-E-BAIXA, fase 2-A, 22/10/2026),
+   e nao mais a impressao. Estas caixas sao as que baixaram — `baixado_em`
+   igual a hora da impressao, como a virada deixou as de antes do deploy. */
 const lote = db.prepare("INSERT INTO lote (codigo,estagio,embalado_em,data,teste) VALUES (?,?,?,?,?)");
 lote.run('BK140140BEGE','embalado', hoje +' 09:10:00', hoje, 0);
 lote.run('BK140140BEGE','carregado',hoje +' 11:20:00', hoje, 0);
@@ -149,6 +152,11 @@ lote.run('BK160160CINZA','carregado',ontem+' 16:40:00', ontem, 0);
    no grafico, mesmo com o estagio 'cancelado'. */
 const tres = db.prepare("SELECT date('now','localtime','-3 day') d").get().d;
 lote.run('BK160160CINZA','cancelado', tres+' 10:00:00', tres, 0);
+db.prepare("UPDATE lote SET baixado_em=embalado_em").run();
+/* E a caixa impressa HOJE e ainda nao conferida: a peca nao saiu do saldo, e o
+   grafico nao pode conta-la como saida. */
+db.prepare("INSERT INTO lote (codigo,estagio,embalado_em,data,teste,baixado_em) VALUES ('BK140140BEGE','embalado',?,?,0,NULL)")
+  .run(hoje+' 13:00:00', hoje);
 
 // --- dois ajustes manuais no mesmo SKU: vale o ultimo ---
 const aj = db.prepare(`INSERT INTO ajuste_estoque (codigo,antes,depois,delta,motivo,usuario_nome,criado_em)

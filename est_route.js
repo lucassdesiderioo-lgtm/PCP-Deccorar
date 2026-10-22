@@ -203,6 +203,11 @@ module.exports = function(app, db){
         GROUP BY UPPER(COALESCE(i.codigo, l.codigo))`).all()
         .forEach(r => reservado[r.c] = r.n);
     }catch(e){}
+    /* E A CAIXA IMPRESSA E NAO CONFERIDA (CONFERENCIA-E-BAIXA, fase 2-A,
+       22/10/2026): a impressao nao baixa mais, entao a peca continua no saldo
+       ate a conferencia, mas ja esta dentro da caixa. Dono: baixa_dominio. */
+    let impresso = {};
+    try{ impresso = require('./baixa_dominio').reservados(db); }catch(e){}
     let pecasReservadas = 0;
 
     let zerados=0, baixos=0, ok=0, excesso=0, parados=0, sobMedida=0, defasados=0, negativos=0;
@@ -274,7 +279,9 @@ module.exports = function(app, db){
       /* Sob medida nao tem reservado nem disponivel: o saldo dela e sempre
          zero (§7), e um "disponivel -3" ali seria falta que nao existe. */
       const resv = e.sob_medida ? null : (reservado[l.codigo] || 0);
+      const imp  = e.sob_medida ? null : (impresso[l.codigo] || 0);
       if(resv) pecasReservadas += resv;
+      if(imp) pecasReservadas += imp;
 
       /* Valor da linha. So conta quem TEM peca: SKU zerado sem custo nao e
          buraco na conta — nao ha o que valorizar ali. */
@@ -290,7 +297,7 @@ module.exports = function(app, db){
 
       return {
         codigo: l.codigo, descricao: l.descricao, cor: l.cor,
-        estoque, reservado: resv, disponivel: resv == null ? null : estoque - resv,
+        estoque, reservado: resv, impresso: imp, disponivel: resv == null ? null : estoque - resv - imp,
         alvo: l.alvo, alvo_salvo: alvoSalvo, alvo_defasado: defasado,
         alvo_aplicavel: aplicavel,
         contado_em: cont ? cont.em : null, contado_ha: cont ? cont.dias : null,

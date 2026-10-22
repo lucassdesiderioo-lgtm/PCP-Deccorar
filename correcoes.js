@@ -113,6 +113,17 @@ function devolucaoDeEstoque(db, v){
   return Object.keys(por).map(codigo => ({ codigo, delta: por[codigo] }));
 }
 
+/* JA BAIXOU DO ESTOQUE? Desde a fase 2-A da CONFERENCIA-E-BAIXA (22/10/2026)
+   a baixa e na conferencia, e `lote.baixado_em` diz se ela aconteceu. Banco
+   SEM a coluna e banco de antes da virada: ali a impressao baixava, entao a
+   caixa com etiqueta ja baixou. */
+function baixou(v){
+  if(!v) return false;
+  if(!Object.prototype.hasOwnProperty.call(v, 'baixado_em')) return !!v.embalado_em;
+  return !!v.baixado_em;
+}
+function pl(n, um, muitos){ return n === 1 ? um : muitos; }
+
 function volumePorId(db, id){
   const v = db.prepare('SELECT * FROM lote WHERE id=?').get(+id);
   if(!v) throw erro(404, 'volume #' + id + ' não existe (ou já foi corrigido)');
@@ -196,8 +207,8 @@ const ACOES = {
   cancelada: {
     id:'cancelada', alvo:'lote',
     rotulo:'Cancelada depois da etiqueta',
-    explica:'O cliente cancelou depois de a etiqueta sair, então a baixa do estoque já aconteceu. ' +
-            'Duas saídas: a persiana voltou para a prateleira (o saldo volta) ou não voltou (só registra).',
+    explica:'O cliente cancelou depois de a etiqueta sair. Duas saídas: a persiana voltou para a prateleira ' +
+            '(o saldo volta, se a caixa já tinha sido conferida) ou não voltou (só registra).',
     carregar: volumePorId,
     opcoes(db, v){
       const so = { id:'registrar', rotulo:'Não voltou — só registrar' };
@@ -238,27 +249,39 @@ const ACOES = {
       if(voltou && v.cancelada_varias)
         throw erro(409, 'a caixa de várias persianas não tem o "voltou": o sistema não sabe qual peça ' +
                         'o Mercado Livre cancelou');
-      const estoque = voltou ? devolucaoDeEstoque(db, v) : [];
+      /* ⚠️ SO DEVOLVE O QUE BAIXOU (CONFERENCIA-E-BAIXA, fase 2-A). A caixa
+         cancelada antes da conferencia nunca saiu do saldo: a reserva soltou
+         sozinha quando ela virou `cancelado`, e devolver +1 ali criaria uma
+         peca que nao existe. */
+      const jaBaixou = baixou(v);
+      const estoque = (voltou && jaBaixou) ? devolucaoDeEstoque(db, v) : [];
       const pecas = pecasDoVolume(db, v);
       const sem = pecas.filter(l => !l.cadastrado).map(l => l.codigo);
-      if(voltou && sem.length)
+      if(voltou && jaBaixou && sem.length)
         throw erro(409, 'SKU não cadastrado: ' + sem.join(', ') + ' — cadastre antes de devolver o saldo');
       const total = estoque.reduce((s, l) => s + l.delta, 0);
       /* ⚠️ "1 peça(s)" e meia concordancia, e ela se le pior que nenhuma numa
          tela de fabrica — a licao do "1 destes pedidos ja tiveram" (§19, 4-A).
          Só apareceu abrindo a tela. */
-      const pl = (n, um, muitos) => n === 1 ? um : muitos;
+      const npc = pecas.reduce((s, l) => s + l.qtd, 0);
       return {
         antes:  { lote:v },
         depois: { lote:Object.assign({}, v, { cancelada_resolvida_em:'(agora)', cancelada_voltou:voltou ? 1 : 0 }) },
         estoque,
-        resumo: voltou
+        resumo: !jaBaixou
+          ? (voltou
+            ? 'Esta caixa nunca foi conferida, então a peça não chegou a sair do estoque: a reserva soltou quando ' +
+              'a venda foi cancelada. Nada a devolver — é só pôr a persiana na prateleira. O volume sai do card de Bloqueados.'
+            : 'Registra que a persiana NÃO voltou. ⚠ Esta caixa nunca foi conferida, então a peça ainda está no ' +
+              'saldo: se ela não voltou, o estoque fica ' + npc + ' ' + pl(npc, 'peça', 'peças') + ' acima — peça um ' +
+              'ajuste. O volume sai do card de Bloqueados.')
+          : voltou
           ? 'Devolve ' + total + ' ' + pl(total, 'peça', 'peças') + ' ao estoque' +
             (estoque.length > 1 ? ' (' + estoque.map(l => l.codigo + ' +' + l.delta).join(', ') + ')' : '') +
             ', com movimento `cancelamento` no livro. O volume sai do card de Bloqueados.'
-          : 'Registra que a persiana NÃO voltou. O saldo não se mexe — a baixa da etiqueta continua valendo. ' +
+          : 'Registra que a persiana NÃO voltou. O saldo não se mexe — a baixa continua valendo. ' +
             'O volume sai do card de Bloqueados.' +
-            (pecas.length > 1 ? ' A caixa leva ' + pecas.reduce((s, l) => s + l.qtd, 0) + ' persianas.' : '')
+            (pecas.length > 1 ? ' A caixa leva ' + npc + ' persianas.' : '')
       };
     },
     executar(db, v, params, ctx){
@@ -331,7 +354,9 @@ const ACOES = {
           (v.despachar_em ? 'a data de despacho da etiqueta' : 'o dia em que ele entrou, porque a etiqueta não trazia despacho') +
           ', nunca hoje.' + (ehColeta(v) ? ' É de coleta: fica como retirado pelo caminhão no mesmo carimbo.' : '') +
           ' O estoque não se mexe: ' + (v.estagio === 'embalado'
-            ? 'a baixa já aconteceu na etiqueta.'
+            ? (baixou(v) ? 'a baixa já aconteceu.'
+              : 'a Mesa não mexe em saldo. ⚠ Esta caixa nunca foi conferida, então a peça ainda está no saldo: ' +
+                'se ela saiu mesmo, o estoque fica uma peça acima — peça um ajuste.')
             : 'a peça nunca somou +1 na embalagem, então não pode baixar agora.') +
           (copias.length ? ' Há ' + copias.length + (copias.length === 1 ? ' cópia pendente' : ' cópias pendentes') +
             ' deste volume (' + copias.map(c => '#' + c.id).join(', ') + '): depois da saída ' +
@@ -426,6 +451,9 @@ const ACOES = {
       if(futuras) fora.push(futuras + (futuras === 1 ? ' que despacha no futuro' : ' que despacham no futuro') +
         ' (a venda futura ainda não saiu)');
       if(depois) fora.push(depois + (depois === 1 ? ' impressa' : ' impressas') + ' depois de ' + dataBR(ate));
+      const semBaixa = conferenciasSemBaixa(db, ate);
+      if(semBaixa) fora.push(semBaixa + (semBaixa === 1 ? ' que nunca baixou' : ' que nunca baixaram') +
+        ' do estoque (impressa depois da virada e nunca conferida: confira na Conferência, ou dê saída uma a uma)');
       return {
         antes:  { ate, volumes: lista.map(v => instante(v)) },
         depois: { ate, volumes: lista.map(v => Object.assign(instante(v), { estagio:'carregado',
@@ -656,11 +684,24 @@ function ateConferencia(db, params){
    e carimbar a saida dela seria a armadilha da R-COR-04. A que esta no carro
    ou numa saida ja tem dono, e fica. */
 function conferenciasAte(db, ate){
+  /* ⚠️ SO A QUE JA BAIXOU (CONFERENCIA-E-BAIXA, fase 2-A). Depois da virada, a
+     caixa impressa e nao conferida ainda tem a peca no saldo: fecha-la aqui
+     tiraria a caixa da fabrica no papel e deixaria o estoque uma peca acima,
+     em silencio. Ela fica de fora, e a previa diz quantas. */
+  const soBaixada = temColuna(db, 'lote', 'baixado_em') ? ' AND baixado_em IS NOT NULL' : '';
   return db.prepare(`SELECT * FROM lote WHERE ${SEM_CONFERENCIA}
       AND no_carro_em IS NULL AND saida_id IS NULL
       AND COALESCE(date(embalado_em),data)<=?
-      AND (despachar_em IS NULL OR despachar_em<=?)
+      AND (despachar_em IS NULL OR despachar_em<=?)${soBaixada}
     ORDER BY COALESCE(embalado_em,data), id`).all(ate, hoje(db));
+}
+/* As que o corte pegaria, mas nunca baixaram — a conta do que fica de fora. */
+function conferenciasSemBaixa(db, ate){
+  if(!temColuna(db, 'lote', 'baixado_em')) return 0;
+  return db.prepare(`SELECT COUNT(*) n FROM lote WHERE ${SEM_CONFERENCIA}
+      AND no_carro_em IS NULL AND saida_id IS NULL AND baixado_em IS NULL
+      AND COALESCE(date(embalado_em),data)<=?
+      AND (despachar_em IS NULL OR despachar_em<=?)`).get(ate, hoje(db)).n;
 }
 /* A data de despacho, como no `carimbo` — mas a caixa nao sai antes de ter
    etiqueta: a impressa depois do despacho sai no dia da impressao. */

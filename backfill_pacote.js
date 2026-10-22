@@ -61,7 +61,12 @@ try{ db.exec("ALTER TABLE lote_item ADD COLUMN conferidos INTEGER DEFAULT 0"); }
 
 /* So quem ainda esta na fabrica, e so quem ainda nao tem pecas gravadas —
    rodar duas vezes nao duplica. */
-const alvo=db.prepare(`SELECT id,data,codigo,nf,buyer,packId,venda,srcfile,estagio,modalidade
+/* `baixado_em` (CONFERENCIA-E-BAIXA, fase 2-A): a caixa impressa depois da
+   virada so baixa na conferencia — e la ela baixa TODAS as pecas gravadas
+   aqui. Banco sem a coluna e de antes da virada: a impressao baixou. */
+const temBaixa=db.prepare("SELECT 1 FROM pragma_table_info('lote') WHERE name='baixado_em'").get();
+const alvo=db.prepare(`SELECT id,data,codigo,nf,buyer,packId,venda,srcfile,estagio,modalidade,
+    ${temBaixa?'baixado_em':'embalado_em AS baixado_em'}
   FROM lote
   WHERE estagio IN ('pendente','bloqueado','embalado')
     AND COALESCE(teste,0)=0
@@ -157,8 +162,11 @@ if(!pacotes.length){
   db.close(); return;
 }
 
-const naoImpressos=pacotes.filter(p=>p.v.estagio!=='embalado');
-const impressos   =pacotes.filter(p=>p.v.estagio==='embalado');
+/* ⚠️ "IMPRESSO" AQUI E "JA BAIXOU". A caixa impressa e nao conferida depois da
+   virada nao baixou nada ainda: a conferencia vai baixar as pecas gravadas
+   aqui, e acertar o saldo agora baixaria a mesma peca duas vezes. */
+const naoImpressos=pacotes.filter(p=>!(p.v.estagio==='embalado' && p.v.baixado_em));
+const impressos   =pacotes.filter(p=>p.v.estagio==='embalado' && p.v.baixado_em);
 const estoqueDe=db.prepare('SELECT estoque FROM skus WHERE codigo=?');
 const cadastrado=c=>!!estoqueDe.get(c);
 
@@ -182,8 +190,8 @@ function mostrar(p,extra){
 
 if(naoImpressos.length){
   console.log('');
-  console.log('── AINDA NAO IMPRESSOS: o estoque NAO baixou nada, nao ha saldo a acertar ──');
-  console.log('   Gravar as pecas basta: a bancada vai bipar cada uma e a impressao');
+  console.log('── AINDA SEM BAIXA: o estoque NAO baixou nada, nao ha saldo a acertar ──');
+  console.log('   Gravar as pecas basta: a bancada vai bipar cada uma e a conferencia');
   console.log('   baixa todas de uma vez.');
   console.log('');
   naoImpressos.forEach(p=>mostrar(p));

@@ -57,6 +57,16 @@ const rotas = {};
 const app = { get:(p,...h)=>{ rotas['GET '+p]=h[h.length-1]; }, post:(p,...h)=>{ rotas['POST '+p]=h[h.length-1]; },
   locals:{ acesso:{
     auditar(req, cat, acao, alvo, det){ auditoria.push({acao, alvo, det, quem:req.usuario&&req.usuario.nome}); } } } };
+/* A CONFERENCIA BAIXA DO ESTOQUE desde 22/10/2026 (spec CONFERENCIA-E-BAIXA,
+   fase 2-A): o bipe agora move saldo, e o banco de mentira precisa ter o que
+   o de verdade tem — o cadastro do SKU e o livro. */
+db.exec(`CREATE TABLE IF NOT EXISTS modelo (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, nome TEXT,
+    exige_medida INTEGER DEFAULT 1, sob_medida INTEGER DEFAULT 0);
+  CREATE TABLE IF NOT EXISTS skus (codigo TEXT PRIMARY KEY, descricao TEXT DEFAULT '', cor TEXT DEFAULT '',
+    estoque INTEGER DEFAULT 0, alvo INTEGER DEFAULT 0, modelo_id INTEGER);`);
+for(const c of ["BK100100BRANCO", "BK120120BEGE", "BK140140BEGE", "BK160160CINZA"])
+  db.prepare('INSERT OR IGNORE INTO skus (codigo,estoque) VALUES (?,100)').run(c);
+require('./estoque_dominio').garantirSchema(db);
 require('./carreg_route')(app, db);
 const chamar = (k, body, usuario) => new Promise(r => {
   if(!rotas[k]){ r({ _sem_rota:true }); return; }

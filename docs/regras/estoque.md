@@ -43,17 +43,17 @@
 - **Status:** no ar desde 17/09/2026.
 - **História:** armadilha #26.
 
-### R-EST-03 · A etiqueta de venda baixa uma por PEÇA
-- **Regra:** imprimir a etiqueta de venda baixa −1 de cada persiana da caixa. A caixa de várias persianas baixa N, uma linha por SKU. Sem saldo, não imprime.
-- **Por quê:** é quando a peça sai da prateleira para o cliente. Baixar uma numa caixa de três deixa duas peças fora do sistema.
-- **Exceções:** sob medida (R-EST-05).
-- **Teste que trava:** `teste_etiqueta.js` (68) · `teste_livro.js` (60).
-- **Status:** no ar.
-- **História:** CLAUDE.md §5, armadilha #23.
+### R-EST-03 · A etiqueta de venda RESERVA; a conferência baixa uma por PEÇA
+- **Regra:** imprimir a etiqueta de venda **não mexe no saldo**: a caixa fica `embalado` sem `baixado_em` e **reserva** as persianas dela. A baixa (−1 de cada persiana, uma linha `conferencia` por SKU, referência `lote:<id>`) acontece **uma vez só**, quando a caixa é conferida — no bipe da área ou do canto (`carreg_route.js`), ou, se ela saiu sem ninguém conferir, no "foi no caminhão" do fechamento da saída (`saida_route.js`). `baixa_dominio.js` é o dono único da baixa, da reserva e do **livre** (saldo − reservado). Sem peça **livre**, não imprime.
+- **Por quê:** decisão do dono (22/10/2026, spec `CONFERENCIA-E-BAIXA`, D1): a venda cancelada entre a impressão e o caminhão deixava o saldo baixo até alguém lembrar de devolver. Baixar uma numa caixa de três continua deixando duas peças fora do sistema — a conta segue por PEÇA (#23).
+- **Exceções:** sob medida (R-EST-05): não reserva e não baixa, mas a caixa fica marcada como baixada. As caixas impressas **antes** de 22/10/2026 baixaram na impressão: a **virada** (`config.virada_baixa_conferencia`, uma vez só) deu a elas `baixado_em = embalado_em`, e a conferência não baixa de novo.
+- **Teste que trava:** `teste_baixa_conferencia.js` (69) · `teste_etiqueta.js` (68) · `teste_livro.js` (65).
+- **Status:** em código desde 22/10/2026 (fase 2-A) · antes disso a etiqueta baixava.
+- **História:** CLAUDE.md §2 e §5, armadilha #23 · spec `CONFERENCIA-E-BAIXA`.
 
 ### R-EST-04 · Reimprimir não baixa
 - **Regra:** `POST /api/reimprimir` só grava `lote.reimpressoes` e `lote.reimpresso_em`. O saldo não anda.
-- **Por quê:** papel preso, etiqueta borrada e folha perdida são o mesmo volume para o mesmo cliente; a baixa já aconteceu na primeira impressão.
+- **Por quê:** papel preso, etiqueta borrada e folha perdida são o mesmo volume para o mesmo cliente; a reserva (e, depois da conferência, a baixa) já é do volume.
 - **Exceções:** nenhuma.
 - **Teste que trava:** ⚠ **sem teste** do saldo. `teste_saida.js` trava só que a reimpressão não troca quem imprimiu.
 - **Status:** no ar.
@@ -279,7 +279,7 @@
 - **História:** armadilha #12.
 
 ### R-EST-13 · O gráfico conta só produção e venda
-- **Regra:** "entrou" é a embalagem e "saiu" é a etiqueta de venda (`fluxo_estoque.js`, dono único). Ajuste e contagem ficam fora do gráfico, com número próprio.
+- **Regra:** "entrou" é a embalagem e "saiu" é a **baixa** (`lote.baixado_em`, desde 22/10/2026; antes era a impressão) (`fluxo_estoque.js`, dono único). A virada deu `baixado_em = embalado_em` às caixas de antes, então os dias passados não mudam. Ajuste e contagem ficam fora do gráfico, com número próprio.
 - **Por quê:** o gráfico responde quanto a fábrica fez e quanto saiu, e não quanto a coluna variou.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_estoque.js`.
@@ -293,7 +293,7 @@
 - **Status:** no ar desde 01/09/2026.
 
 ### R-EST-15 · O reservado é leitura, não conta
-- **Regra:** "reservado" é a soma das peças de volumes pendentes (vendidos, sem etiqueta). Aparece ao lado do saldo como "N sem etiqueta · N livres", e não muda o `precisa`. Sob medida não tem reservado; modo teste, bloqueado e cancelado não reservam.
+- **Regra:** "reservado" é a soma das peças de volumes pendentes (vendidos, sem etiqueta) **e**, desde 22/10/2026, das caixas impressas que esperam a conferência (`baixa_dominio.reservados`). Aparece ao lado do saldo como "N sem etiqueta · N em caixa · N livres", e **não muda o `precisa`**: o comprometido da planilha já conta a venda impressa até ela sair, e descontar a reserva de novo contaria a mesma peça duas vezes. Quem usa o livre (saldo − caixa impressa) é a trava da impressão, a urgência, o inventário e o número da Etiqueta de Venda. Sob medida não tem reservado; bloqueado e cancelado não reservam; modo teste não reserva na coluna "sem etiqueta".
 - **Por quê:** informa o que já está prometido sem criar uma segunda conta de produção.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_acuracidade.js` (23).

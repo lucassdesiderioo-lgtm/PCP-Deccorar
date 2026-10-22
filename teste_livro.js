@@ -244,9 +244,23 @@ chamar2('POST','/api/montagem',{codigo:'BK140140BEGE',segundos:30});
 eq('EMBALAR soma +1', saldo2('BK140140BEGE'), 3);
 bate('depois de embalar');
 
+/* A BAIXA SAIU DA ETIQUETA E FOI PARA A CONFERENCIA (spec CONFERENCIA-E-BAIXA,
+   fase 2-A, 22/10/2026). A etiqueta so reserva; quem move o saldo e o
+   `baixa_dominio.baixar`, que o bipe da conferencia chama. A rota da
+   conferencia arrasta o Carregamento inteiro; o que importa aqui e o livro,
+   entao o teste chama o dominio direto. */
+const BAIXA2 = require('./baixa_dominio');
 chamar2('POST','/api/embalar',{id:1});
-eq('a ETIQUETA baixa 1', saldo2('BK140140BEGE'), 2);
-bate('depois da etiqueta');
+eq('a ETIQUETA nao baixa — so reserva', saldo2('BK140140BEGE'), 3);
+eq('   e nao deixa linha no livro',
+   d2.prepare("SELECT COUNT(*) n FROM movimento_estoque WHERE referencia='lote:1'").get().n, 0);
+d2.transaction(() => BAIXA2.baixar(d2, {id:1}, {id:1, nome:'Bia'}))();
+eq('a CONFERENCIA baixa 1', saldo2('BK140140BEGE'), 2);
+eq('   com uma linha `conferencia` no livro',
+   d2.prepare("SELECT COUNT(*) n FROM movimento_estoque WHERE referencia='lote:1' AND tipo='conferencia'").get().n, 1);
+d2.transaction(() => BAIXA2.baixar(d2, {id:1}, {id:1, nome:'Bia'}))();
+eq('   e conferir de novo nao baixa de novo', saldo2('BK140140BEGE'), 2);
+bate('depois da conferencia');
 
 /* A REIMPRESSAO NAO BAIXA (armadilha #1-B). A rota dela mora no `exp_route`,
    que arrasta o leitor de PDF inteiro; o que importa aqui e a guarda que
@@ -261,7 +275,9 @@ eq('   e nao ha segunda linha de baixa para o volume 1',
 bate('depois da tentativa de segunda impressao');
 
 chamar2('POST','/api/embalar',{id:2});
-eq('a CAIXA DE PACOTE baixa por peca — 1 de BK120120BEGE', saldo2('BK120120BEGE'), 4);
+eq('a etiqueta da CAIXA DE PACOTE nao baixa', saldo2('BK120120BEGE'), 5);
+d2.transaction(() => BAIXA2.baixar(d2, {id:2}, {id:1, nome:'Bia'}))();
+eq('a conferencia da CAIXA DE PACOTE baixa por peca — 1 de BK120120BEGE', saldo2('BK120120BEGE'), 4);
 eq('   e 2 de BK140140BEGE', saldo2('BK140140BEGE'), 0);
 eq('   sao DUAS linhas de livro, uma por SKU, com a mesma referencia do volume',
    d2.prepare("SELECT COUNT(*) n FROM movimento_estoque WHERE referencia='lote:2'").get().n, 2);

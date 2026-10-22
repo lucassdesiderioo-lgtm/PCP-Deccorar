@@ -28,7 +28,10 @@
 /* Os tipos sao fechados, e a lista e a spec §3.1. Tipo livre viraria, em um
    mes, sete grafias da mesma coisa — e ai o extrato nao agrupa e a pergunta
    "quanto saiu por venda?" deixa de ter resposta. */
-const TIPOS = ['abertura','embalagem','etiqueta','inventario','ajuste','correcao','cancelamento'];
+/* `etiqueta` foi a baixa na impressao ate 22/10/2026; desde a fase 2-A da
+   CONFERENCIA-E-BAIXA a baixa e `conferencia` (baixa_dominio.js). O tipo
+   antigo fica: as linhas ja gravadas sao historia, e o livro le as duas. */
+const TIPOS = ['abertura','embalagem','etiqueta','inventario','ajuste','correcao','cancelamento','conferencia'];
 
 /* Peca e inteiro. Nao existe meia persiana, e um `delta` fracionario aqui seria
    erro de chamador — material e que se mede em metro, e tem o dominio dele. */

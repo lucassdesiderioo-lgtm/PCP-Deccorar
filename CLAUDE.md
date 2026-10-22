@@ -131,7 +131,7 @@ campos que aceitam bipe, mínimo de digitação, feedback sonoro.
 ## 2. O FLUXO — a regra mais importante
 
 ```
-Ordem de produção → REVISÃO → FILA → EMBALAGEM → ESTOQUE → ETIQUETA DE VENDA → CARREGAMENTO
+Ordem de produção → REVISÃO → FILA → EMBALAGEM → ESTOQUE → ETIQUETA DE VENDA → CONFERÊNCIA → CARREGAMENTO
 ```
 
 ### Onde o estoque entra e sai (LEIA COM ATENÇÃO)
@@ -140,7 +140,8 @@ Ordem de produção → REVISÃO → FILA → EMBALAGEM → ESTOQUE → ETIQUETA
 |---|---|---|
 | Peça **revisada** | **NENHUM.** Entra na tabela `fila` com `situacao='aguardando'` | nenhuma |
 | Peça **embalada** (com kit conferido) | **+1** — é aqui que vira estoque | `embalagem` · `montagem:<id>` |
-| **Etiqueta de venda** impressa | **−1** — é aqui que sai | `etiqueta` · `lote:<id>`, **uma por SKU** da caixa |
+| **Etiqueta de venda** impressa | **NENHUM** desde 22/10/2026 — a peça fica **reservada** (até ali era o −1) | nenhuma |
+| Caixa **conferida** (bipe da área ou do canto), ou que saiu sem conferência no "foi no caminhão" | **−1 por peça** — é aqui que sai, uma vez só | `conferencia` · `lote:<id>`, **uma por SKU** da caixa |
 | Etiqueta de venda **reimpressa** | **NENHUM** — mesmo volume, mesmo cliente | nenhuma |
 | Peça **sob medida** | **NENHUM** nos dois lados (§7) | nenhuma |
 
@@ -153,7 +154,7 @@ Ordem de produção → REVISÃO → FILA → EMBALAGEM → ESTOQUE → ETIQUETA
 |---|---|
 | R-EST-01 | Revisar não mexe no estoque — **está correto, não "conserte"** (#1) |
 | R-EST-02 | A embalagem é onde a peça vira estoque (+1) |
-| R-EST-03 | A etiqueta de venda baixa uma por PEÇA; a caixa de várias baixa N |
+| R-EST-03 | A etiqueta RESERVA; a conferência baixa uma por PEÇA, uma vez só (`baixa_dominio.js`) |
 | R-EST-04 | Reimprimir não baixa (#1-B) |
 | R-EST-05 | Sob medida não soma nem baixa |
 | R-EST-06 | O saldo só anda pelo livro: `estoque_dominio.js` é o dono único, e `SUM(delta) = skus.estoque` |
@@ -169,7 +170,28 @@ Ordem de produção → REVISÃO → FILA → EMBALAGEM → ESTOQUE → ETIQUETA
 
 **Ao mexer no `estoque_dominio.js` ou em qualquer coisa que mova saldo:**
 `node teste_livro.js` — ele exige `SUM(delta) = skus.estoque` depois de cada
-passo e recusa `UPDATE skus SET estoque` fora do domínio.
+passo e recusa `UPDATE skus SET estoque` fora do domínio. **No `baixa_dominio.js`,
+na impressão, no bipe da conferência ou no fechamento da saída:** `node
+teste_baixa_conferencia.js` também.
+
+> ⚠️ **A BAIXA É NA CONFERÊNCIA DESDE 22/10/2026** (fase 2-A da spec
+> `CONFERENCIA-E-BAIXA`, decisão do dono). A etiqueta só **reserva**; o −1 sai
+> quando a conferência bate com a etiqueta. `baixa_dominio.js` é o **dono único**
+> da baixa, da reserva e do **livre** (saldo − peça em caixa impressa).
+>
+> - **O livre manda onde a pergunta é "tem peça livre?"**: a trava da impressão,
+>   a urgência, o inventário (compara a contagem com o que deve estar na
+>   **prateleira**) e o número que a Etiqueta de Venda mostra.
+> - ⚠️ **O `precisa` da tela azul NÃO usa o livre**, e não é esquecimento: o
+>   comprometido da planilha já conta a venda impressa até ela sair, e descontar
+>   a reserva de novo contaria a mesma peça duas vezes.
+> - ⚠️ **A VIRADA RODOU UMA VEZ SÓ** (`config.virada_baixa_conferencia`): toda
+>   caixa com etiqueta no dia do deploy ganhou `baixado_em = embalado_em`, porque
+>   já tinha baixado na impressão. Rodá-la de novo marcaria como baixada uma caixa
+>   que nunca baixou.
+> - ⚠️ **A MESA NUNCA DÁ A BAIXA** (D7). "Dar saída" e "fechar conferências
+>   antigas" não movem saldo; a caixa que nunca baixou fica de fora do bloco, e a
+>   prévia avisa que o saldo fica alto.
 
 > ⚠️ **ARMADILHA #2:** `POST /api/revisao` ainda **retorna** os campos `estoque`,
 > `pedido` e `feito`. São resquício da versão antiga; não use como fonte de verdade.
@@ -341,7 +363,8 @@ relatório (`daPlanilha`) e marca os volumes (`marcar`); o import e o
 > (`motivo:'cancelada'`, com auditoria), na viagem à agência e nas sobras do
 > caminhão, e a reimpressão e o `GET /api/print/:id` também recusam — e diz o que fazer: *"Não carregar: separe a caixa e avise o
 > admin"*. A venda cancelada **continua** sendo saída no gráfico de estoque
-> (§18): o −1 aconteceu na impressão.
+> (§18) **se já tinha baixado** — até 22/10/2026 o −1 era na impressão; desde
+> então é na conferência (§2), e a cancelada antes de conferir nunca saiu.
 >
 > ⚠️ **E A VENDA TAMBÉM SE CANCELA PELA RECUSA DO MOTORISTA, desde 02/10/2026**
 > (bloco "O MOTORISTA RECUSOU" no §8-B). Só o relatório não bastava: quando o
@@ -445,7 +468,7 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 ```
 PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lote`
    → conferências (pode reter em Bloqueados) → cruzamento (urgência)
-   → Etiqueta de Venda (−1 por peça) → Carregamento
+   → Etiqueta de Venda (reserva) → Conferência (−1 por peça) → Carregamento
 ```
 
 | Cartão | Regra em uma linha |
@@ -481,7 +504,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 | R-COR-04 | Saída de passivo na data do volume; venda futura não se fecha |
 | R-COR-05 | O terminal e o botão usam a mesma régua (`correcoes.js`) |
 | R-COR-06 | A Mesa não mexe em saldo, exceto a cancelada que voltou |
-| R-COR-07 | Conferências antigas fecham em bloco, até uma data que nunca é hoje, sem mexer em saldo |
+| R-COR-07 | Conferências antigas fecham em bloco, até uma data que nunca é hoje, sem mexer em saldo, e só a caixa que já baixou |
 
 **Ao mexer em** `parse.js`, `folha.js` ou `nome.js`: `node teste_parse.js`. No
 upload (`exp_route.js`): `node teste_upload.js`. Nos textos de conflito, no
@@ -604,8 +627,8 @@ contador que nunca zera é um contador que a equipe aprende a ignorar.
 peça feita contra o pedido do cliente: ela não existe antes da venda e não sobra
 depois, então o saldo dela é sempre zero. Esses SKUs não passam pela trava de
 estoque da Etiqueta de Venda **nem pela baixa** — sem `+1` na embalagem não pode
-haver `−1` na impressão, senão cada venda sob medida abriria um buraco de uma
-peça no SKU.
+haver `−1` na conferência (até 22/10/2026, na impressão), senão cada venda sob
+medida abriria um buraco de uma peça no SKU.
 
 > ⚠️ **ARMADILHA #6 — a trava que a operação contorna não protege, só cega.**
 > Até 25/08/2026 o `POST /api/embalar` recusava todo SKU com estoque zero. Como
@@ -1879,7 +1902,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_recusa_motorista.js` (59), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (24), `teste_upload.js` (46), `teste_devolucao.js` (33), `teste_login.js` (74) e `teste_conferencia_antiga.js` (64); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_recusa_motorista.js` (59), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (24), `teste_upload.js` (46), `teste_devolucao.js` (33), `teste_login.js` (74), `teste_conferencia_antiga.js` (64) e `teste_baixa_conferencia.js` (69); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2157,9 +2180,9 @@ Compare com a §3 do `docs/ARQUITETURA.md`. Diferença ali é dívida nova.
 | Cartão | Regra em uma linha |
 |---|---|
 | R-EST-12 | A falta de estoque tem uma conta só (`demanda_dominio`): aba, tela azul, TV e gerencial (#12) |
-| R-EST-13 | O gráfico conta só embalagem e etiqueta; ajuste e contagem ficam fora (`fluxo_estoque`) |
+| R-EST-13 | O gráfico conta só embalagem e baixa (`baixado_em`); ajuste e contagem ficam fora (`fluxo_estoque`) |
 | R-EST-14 | Custo sem preço é piso, nunca zero; sem `custo.ver` o valor não viaja |
-| R-EST-15 | O reservado é leitura e não muda o `precisa` |
+| R-EST-15 | O reservado (sem etiqueta + em caixa) é leitura e não muda o `precisa` |
 | R-EST-16 | Toda correção aplica a DIFERENÇA sobre o saldo de agora (#32) |
 | R-EST-17 | Quem conta não vê o saldo, nem no JSON |
 | R-EST-18 | Ninguém aprova o próprio trabalho, nem o Admin Geral; o aprovador único espera |
