@@ -3486,6 +3486,20 @@ function corVencidos(){
     +'<span>Fechar até</span><input id="corAte" type="date" style="width:auto">'
     +'<button class="btn" onclick="corPrevia(\'vencidos\',\'\')">Ver o que fecha</button></div>'
     +'<div id="corPainel" style="margin-top:14px"></div></div>';
+  corMostrar();
+}
+
+/* ⚠️ O PAINEL MORA ABAIXO DA BUSCA, E A LISTA QUE O ABRE MORA ACIMA DELA. Com as
+   500 caixas da linha ambar abertas, o painel nascia 13 mil pixels abaixo do
+   clique: ele existia, e quem clicou via o botao "nao fazer nada" (22/10/2026).
+   Quem desenha no #corObjeto chama isto: recolhe as listas do passivo (elas so
+   serviam para chegar aqui) e leva a tela ate o painel, com o cursor no
+   primeiro campo. */
+function corMostrar(){
+  document.querySelectorAll('#corPassivo details[open]').forEach(function(d){ d.open=false; });
+  var box=$('#corObjeto'); if(!box) return;
+  box.scrollIntoView({block:'start'});
+  var campo=box.querySelector('input'); if(campo) campo.focus({preventScroll:true});
 }
 
 /* FECHAR CONFERENCIAS ANTIGAS (spec CONFERENCIA-E-BAIXA, fase 0): o bloco das
@@ -3504,6 +3518,7 @@ function corConferencias(){
     +'<span>Fechar as impressas até</span><input id="corAte" type="date" style="width:auto">'
     +'<button class="btn" onclick="corPrevia(\'conferencias\',\'\')">Ver o que fecha</button></div>'
     +'<div id="corPainel" style="margin-top:14px"></div></div>';
+  corMostrar();
 }
 
 /* O PEDIDO DE AJUSTE NAO PASSA PELA MESA: vai pela porta do ajuste em duas
@@ -3614,6 +3629,7 @@ async function corAbrir(tipo, id){
         +(c.desfeita_em?' — desfeita':''); }).join(' · ')+'</div>';
   h+='</div>';
   box.innerHTML=h;
+  corMostrar();
 }
 
 async function corPrevia(acao, opcao){
