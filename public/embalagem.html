@@ -293,8 +293,11 @@ function telaPacote(r,extras){
 /* A LINHA DE NUMEROS FALA, NAO SO CONTA.
    "15 PENDENTES" nao dizia o que fazer, e ainda contradizia a lista logo
    abaixo. Agora e uma frase: quanto falta hoje, quanto disso esta atrasado,
-   quanto da pra adiantar e quanto ja saiu. Um numero manda (o de hoje); o resto
-   e contexto, em cinza, sem competir. */
+   quanto da pra adiantar e quanto ja foi impresso. Um numero manda (o de hoje);
+   o resto e contexto, em cinza, sem competir.
+   ⚠️ "IMPRESSAS", E NAO "SAIRAM" (22/10/2026). Desde a fase 2-A da
+   CONFERENCIA-E-BAIXA a caixa impressa so reserva a peca: ela sai na
+   Conferencia. O numero e o placar da bancada (`embalado_em` de hoje). */
 async function stats(){
   var d=null;
   try{ d=await (await fetch('/api/fila/resumo')).json(); }catch(e){ return; }
@@ -312,7 +315,7 @@ async function stats(){
   var ctx=[];
   if(d.coleta_hoje>0) ctx.push('<span style="color:#4b2a91;font-weight:700">'+d.coleta_hoje+' pra coleta</span>');
   if(d.futuros>0) ctx.push(d.futuros+' pra adiantar');
-  if(d.impressas_hoje>0) ctx.push(d.impressas_hoje+' já saíram hoje');
+  if(d.impressas_hoje>0) ctx.push(d.impressas_hoje+(d.impressas_hoje===1?' impressa hoje':' impressas hoje'));
   if(ctx.length) h+='<div style="color:var(--muted);font-size:14px;margin-top:4px">'+ctx.join(' · ')+'</div>';
   el.innerHTML='<div style="text-align:center;margin:-6px 0 14px">'+h+'</div>';
 }
