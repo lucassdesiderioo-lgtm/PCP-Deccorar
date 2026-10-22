@@ -283,3 +283,15 @@ o de 6 **na próxima vez que usar o sistema** — inclusive com a sessão já ab
 porque a sessão dura 1 ano e os tablets quase nunca passam pelo login. A troca
 pede o **PIN de hoje**, e o PIN de hoje errado conta na mesma trava de 5 erros do
 login. Detalhe no `CLAUDE.md` §10.
+
+## 22/10/2026 — o estoque sai na conferência, e não mais na impressão da etiqueta
+Decisão do dono (spec `CONFERENCIA-E-BAIXA`, D1 e D7; fase 2-A). **Antes:** a
+etiqueta de venda impressa baixava −1 por peça, e a venda cancelada entre a
+impressão e o caminhão deixava o saldo baixo até alguém devolver pela Mesa.
+**Depois:** a etiqueta só **reserva** a peça; ela sai do estoque quando a
+conferência bate com a etiqueta (bipe da área ou do canto), ou, se a caixa saiu
+sem ninguém conferir, no "foi no caminhão" do fechamento da saída. A trava da
+impressão, a urgência e o inventário passam a olhar o **livre** (saldo − peça em
+caixa impressa); o `precisa` da tela azul não muda. A Mesa de correções nunca dá
+a baixa. As caixas impressas antes do deploy já tinham baixado e não baixam de
+novo (a virada, uma vez só). Detalhe no `CLAUDE.md` §2.

@@ -85,6 +85,10 @@ const chamar = (k, body, params) => new Promise(r => {
   rotas[k]({ body:body||{}, params:params||{}, query:{}, headers:{} }, res);
 });
 const estoqueDe = c => db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(c).estoque;
+/* O LIVRE (CONFERENCIA-E-BAIXA, fase 2-A, 22/10/2026): desde que a baixa foi
+   para a conferencia, imprimir nao mexe no saldo — reserva a peca. O que a
+   impressao muda e o livre: saldo menos as pecas em caixa impressa. */
+const livreDe = c => require('./baixa_dominio').disponivel(db, c);
 
 let falhas = 0, casos = 0;
 const ok = (n, c, extra) => { casos++;
@@ -92,21 +96,23 @@ const ok = (n, c, extra) => { casos++;
   else { falhas++; console.log('FALHOU  ' + n + (extra ? '   ' + extra : '')); } };
 
 (async () => {
-  // ── CADA ETIQUETA BAIXA UMA PECA ─────────────────────────────────────────
+  // ── CADA ETIQUETA RESERVA UMA PECA (a baixa e na conferencia) ────────────
   const r1 = await chamar('POST /api/embalar', {id:1});
-  ok('imprimir a etiqueta baixa UMA peça (2 → 1)',
-     r1.ok && estoqueDe('BK140140BEGE') === 1, 'veio ' + estoqueDe('BK140140BEGE'));
+  ok('imprimir a etiqueta NÃO baixa: o saldo fica 2 e o livre cai para 1',
+     r1.ok && estoqueDe('BK140140BEGE') === 2 && livreDe('BK140140BEGE') === 1,
+     'saldo ' + estoqueDe('BK140140BEGE') + ', livre ' + livreDe('BK140140BEGE'));
   const r2 = await chamar('POST /api/embalar', {id:2});
-  ok('a segunda venda do mesmo cliente baixa outra (1 → 0)',
-     r2.ok && estoqueDe('BK140140BEGE') === 0, 'veio ' + estoqueDe('BK140140BEGE'));
+  ok('a segunda venda do mesmo cliente reserva outra (livre 1 → 0)',
+     r2.ok && estoqueDe('BK140140BEGE') === 2 && livreDe('BK140140BEGE') === 0,
+     'saldo ' + estoqueDe('BK140140BEGE') + ', livre ' + livreDe('BK140140BEGE'));
   ok('o volume andou para embalado, com carimbo de hora',
      db.prepare("SELECT estagio,embalado_em FROM lote WHERE id=1").get().estagio === 'embalado' &&
      !!db.prepare("SELECT embalado_em FROM lote WHERE id=1").get().embalado_em);
 
   // ── A TRAVA DE ESTOQUE ───────────────────────────────────────────────────
   const r3 = await chamar('POST /api/embalar', {id:3});
-  ok('sem peça na prateleira não imprime — nem a venda futura',
-     !!r3.erro && estoqueDe('BK140140BEGE') === 0, JSON.stringify(r3));
+  ok('sem peça LIVRE não imprime — nem a venda futura (as duas do saldo já estão em caixa)',
+     !!r3.erro && livreDe('BK140140BEGE') === 0, JSON.stringify(r3));
   ok('e o volume recusado continua pendente',
      db.prepare("SELECT estagio FROM lote WHERE id=3").get().estagio === 'pendente');
   const r4 = await chamar('POST /api/embalar', {id:4});
@@ -162,13 +168,17 @@ const ok = (n, c, extra) => { casos++;
   ok('filtro sem venda nesta lista diz quantas há na outra', !pso.pedido && pso.na_outra_lista === 1, JSON.stringify({pedido:pso.pedido, outra:pso.na_outra_lista}));
 
   // ── COLETA: a tela avisa antes de imprimir, e de novo depois ─────────────
-  db.prepare("UPDATE lote SET estagio='embalado' WHERE id=4").run();   // tira o de agência da frente
+  /* tira o de agência da frente — como uma caixa ja conferida, para nao
+     reservar a unica peca cinza (a baixa e na conferencia desde 22/10/2026) */
+  db.prepare("UPDATE lote SET estagio='embalado', baixado_em=datetime('now','localtime') WHERE id=4").run();
+  const cinzaAntes = estoqueDe('BK160160CINZA');
   const pc = await chamar('GET /api/proximo/:sku', null, {sku:'BK160160CINZA'});
   ok('o bipe avisa que a venda é COLETA (o caminhão vem buscar)',
      pc.cadastrado && pc.pedido && pc.pedido.id === 7 && pc.coleta === true, JSON.stringify({coleta:pc.coleta, id:pc.pedido&&pc.pedido.id}));
   const ec = await chamar('POST /api/embalar', {id:7});
-  ok('imprimir a etiqueta de coleta baixa a peça igual e diz que é coleta',
-     ec.ok && ec.coleta === true && estoqueDe('BK160160CINZA') === 0, JSON.stringify(ec));
+  ok('imprimir a etiqueta de coleta reserva a peça igual (saldo parado, livre 0) e diz que é coleta',
+     ec.ok && ec.coleta === true && estoqueDe('BK160160CINZA') === cinzaAntes && livreDe('BK160160CINZA') === 0,
+     JSON.stringify(ec));
 
   /* ── A CAIXA COM MAIS DE UMA PERSIANA (§5-B, armadilha #23) ───────────────
      O caso real de 15/09/2026: NF 6585, Fabiano Pereira, pack 2000015040457349
@@ -238,14 +248,19 @@ const ok = (n, c, extra) => { casos++;
   const sobrando = await chamar('POST /api/lote/conferir', {id:PAC, codigo:'BK140140BEGE'});
   ok('e um bipe a mais depois de fechada é recusado', !!sobrando.erro, JSON.stringify(sobrando));
 
+  const resvAntes = require('./baixa_dominio').reservados(db);
   const imp = await chamar('POST /api/embalar', {id:PAC});
+  const resvDepois = require('./baixa_dominio').reservados(db);
+  const reservou = c => (resvDepois[c] || 0) - (resvAntes[c] || 0);
   ok('conferidas todas, a etiqueta sai — e é UMA etiqueta só', !!imp.ok, JSON.stringify(imp));
   /* ESTA É A LINHA QUE IMPORTA: 3 persianas saíram da fábrica, 3 saíram do
      saldo. Enquanto o sistema gravava só o item de cima, as 2 do irmão saíam
      da prateleira e o estoque não baixava — furo silencioso. */
-  ok('o estoque baixa POR PEÇA: 1 de um SKU e 2 do outro',
-     estoqueDe('BK120120BEGE') === 4 && estoqueDe('BK140140BEGE') === 2,
-     estoqueDe('BK120120BEGE')+'/'+estoqueDe('BK140140BEGE'));
+  ok('a etiqueta RESERVA POR PEÇA: 1 de um SKU e 2 do outro — e o saldo espera a conferência',
+     reservou('BK120120BEGE') === 1 && reservou('BK140140BEGE') === 2 &&
+     estoqueDe('BK120120BEGE') === 5 && estoqueDe('BK140140BEGE') === 4,
+     JSON.stringify({reservou:[reservou('BK120120BEGE'), reservou('BK140140BEGE')],
+                     saldo:[estoqueDe('BK120120BEGE'), estoqueDe('BK140140BEGE')]}));
   ok('a resposta diz quantas persianas fechar na caixa', imp.pecas === 3, JSON.stringify(imp.pecas));
   ok('e o volume andou UMA vez: um volume, um carregamento',
      db.prepare("SELECT estagio FROM lote WHERE id=?").get(PAC).estagio === 'embalado' &&
@@ -300,7 +315,12 @@ const ok = (n, c, extra) => { casos++;
     const DUP = db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data,modalidade)
       VALUES ('BK140140BEGE','Cliente 6490','6490','pk6490','vd6490','pendente',date('now','localtime'),'agencia')`).run().lastInsertRowid;
     db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK140140BEGE',2,'folha')").run(DUP);
+    /* As caixas impressas acima ainda nao foram conferidas, entao as pecas
+       delas continuam no saldo e reservadas: para esta caixa de 2 imprimir, a
+       prateleira precisa de 2 LIVRES (CONFERENCIA-E-BAIXA, fase 2-A). */
+    db.prepare("UPDATE skus SET estoque=estoque+2 WHERE codigo='BK140140BEGE'").run();
     const antes = estoqueDe('BK140140BEGE');
+    const livreAntes = livreDe('BK140140BEGE');
 
     const pp2 = await chamar('GET /api/proximo/:sku', null, {sku:'BK140140BEGE'});
     /* O bipe tem que ENTREGAR a lista mesmo com uma linha só — é ela que abre a
@@ -325,9 +345,9 @@ const ok = (n, c, extra) => { casos++;
 
     const imp2 = await chamar('POST /api/embalar', {id:DUP});
     /* A LINHA QUE IMPORTA: saíram DUAS da prateleira, o saldo baixou DUAS. */
-    ok('a etiqueta sai e o estoque baixa 2 — não 1',
-       !!imp2.ok && estoqueDe('BK140140BEGE') === antes - 2,
-       JSON.stringify({ok:imp2.ok, antes, agora:estoqueDe('BK140140BEGE')}));
+    ok('a etiqueta sai e reserva 2 — não 1 (o saldo espera a conferência)',
+       !!imp2.ok && estoqueDe('BK140140BEGE') === antes && livreDe('BK140140BEGE') === livreAntes - 2,
+       JSON.stringify({ok:imp2.ok, erro:imp2.erro, antes, agora:estoqueDe('BK140140BEGE'), livreAntes, livre:livreDe('BK140140BEGE')}));
     ok('e a resposta manda fechar a caixa com 2 persianas', imp2.pecas === 2, JSON.stringify(imp2.pecas));
     ok('continua sendo UM volume: nenhuma etiqueta foi inventada',
        db.prepare("SELECT COUNT(*) c FROM lote WHERE packId='pk6490'").get().c === 1);

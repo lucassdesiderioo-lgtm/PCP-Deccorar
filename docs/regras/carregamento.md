@@ -216,7 +216,7 @@ Etiqueta de Venda ────┤
 ## O motorista recusou
 
 ### R-REC-01 · A caixa recusada volta ao estoque em dois passos, e a marcação não mexe no saldo
-- **Regra:** a expedição marca pelo Carregamento (**🚫 Motorista recusou** → bipe → confere cliente, NF e peças → confirma; `POST /api/carregamento/recusa`, com `carregamento.executar`). A caixa vira `cancelado`, com `cancelada_origem='motorista'` e `cancelada_por`, e sai do canto, do carro e da saída. O aviso manda tirar a etiqueta e pôr a persiana na prateleira. **O saldo só volta** quando o admin diz "A persiana voltou" na Mesa de correções (R-COR-03). Sem `confirmar`, a rota só mostra a caixa. `cancelada_dominio.recusar` é a régua, a mesma do cancelamento pelo relatório.
+- **Regra:** a expedição marca pelo Carregamento (**🚫 Motorista recusou** → bipe → confere cliente, NF e peças → confirma; `POST /api/carregamento/recusa`, com `carregamento.executar`). A caixa vira `cancelado`, com `cancelada_origem='motorista'` e `cancelada_por`, e sai do canto, do carro e da saída. O aviso manda tirar a etiqueta e pôr a persiana na prateleira. **O saldo só volta** quando o admin diz "A persiana voltou" na Mesa de correções (R-COR-03). Sem `confirmar`, a rota só mostra a caixa. `cancelada_dominio.recusar` é a régua, a mesma do cancelamento pelo relatório. Desde 22/10/2026 (CONFERENCIA-E-BAIXA, fase 2-A) o "voltou" só devolve saldo se a caixa **já tinha baixado** (conferida); a recusada antes da conferência solta a reserva sozinha.
 - **Por quê:** o motorista recusa no bipe dele antes de o relatório do ML chegar. E quem diz que a persiana está na prateleira é uma pessoa, com motivo (D3).
 - **Exceções:** o relatório que chegar depois acha a venda já marcada (`ja_marcada`) e não mexe na origem. O bipe normal do Carregamento continua recusando a caixa, com o título **RECUSADA PELO MOTORISTA**.
 - **Teste que trava:** `teste_recusa_motorista.js` (59).
@@ -264,7 +264,7 @@ Etiqueta de Venda ────┤
 - **Status:** no ar desde 26/09/2026.
 
 ### R-SAI-04 · O bipe da saída só diz SOBROU; a troca de porta é por botão
-- **Regra:** a caixa impressa fora da conta que o motorista levou entra pelo botão **"foi no caminhão"** da lista de divergência: de agência na área (conferida ou não) e de coleta que foi direto da impressora — toda `embalado`. Ela sai com `saiu_por='coleta'` e vira `carregado`, e a `modalidade` não muda (R-MOD-04).
+- **Regra:** a caixa impressa fora da conta que o motorista levou entra pelo botão **"foi no caminhão"** da lista de divergência: de agência na área (conferida ou não) e de coleta que foi direto da impressora — toda `embalado`. Ela sai com `saiu_por='coleta'` e vira `carregado`, e a `modalidade` não muda (R-MOD-04). Desde 22/10/2026 (CONFERENCIA-E-BAIXA, fase 2-A) a caixa que sai assim **baixa do estoque no fechamento** — a baixa é na conferência, e ninguém a conferiu —, e a conferência dela **continua vazia** (R-PIL-04).
 - **Por quê:** o mesmo bipe querendo dizer duas coisas conforme o estado da caixa é como se erra de luva na mão.
 - **Exceções:** a caixa que está no carro não entra. `pendente` nunca entra: sem etiqueta, não baixou do estoque (R-CAR-02).
 - **Teste que trava:** `teste_saida_coleta.js`.

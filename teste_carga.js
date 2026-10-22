@@ -73,6 +73,16 @@ const app={ get:(p,h)=>{rotas['GET '+p]=h;}, post:(p,h)=>{rotas['POST '+p]=h;}, 
    senao ninguem descobre que a caixa chegou no carro sem passar pela etiqueta. */
 const auditoria=[];
 app.locals.acesso={ auditar(req,cat,acao,alvo,detalhe){ auditoria.push({cat,acao,alvo,detalhe}); } };
+/* A CONFERENCIA BAIXA DO ESTOQUE desde 22/10/2026 (spec CONFERENCIA-E-BAIXA,
+   fase 2-A): o bipe agora move saldo, e o banco de mentira precisa ter o que
+   o de verdade tem — o cadastro do SKU e o livro. */
+db.exec(`CREATE TABLE IF NOT EXISTS modelo (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, nome TEXT,
+    exige_medida INTEGER DEFAULT 1, sob_medida INTEGER DEFAULT 0);
+  CREATE TABLE IF NOT EXISTS skus (codigo TEXT PRIMARY KEY, descricao TEXT DEFAULT '', cor TEXT DEFAULT '',
+    estoque INTEGER DEFAULT 0, alvo INTEGER DEFAULT 0, modelo_id INTEGER);`);
+for(const c of ["BK100100BEGE", "BK120120BEGE", "BK120120CINZA", "BK140140BEGE", "BK140140CINZA", "BK150150BEGE", "BK150150BRANCO", "BK150150CINZA", "BK160140BEGE", "BK160160CINZA", "BK180150CINZA"])
+  db.prepare('INSERT OR IGNORE INTO skus (codigo,estoque) VALUES (?,100)').run(c);
+require('./estoque_dominio').garantirSchema(db);
 require('./carreg_route')(app,db);
 require('./saida_route')(app,db);
 const chamar=(k,body)=>new Promise(r=>{

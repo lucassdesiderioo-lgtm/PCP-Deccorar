@@ -25,9 +25,14 @@ function calcular(db, data){
       AND codigo IS NOT NULL AND estagio='pendente'
     GROUP BY codigo ORDER BY codigo`).all(data || null);
 
+  /* O LIVRE, e nao o saldo (CONFERENCIA-E-BAIXA, fase 2-A, 22/10/2026): a peca
+     que ja esta numa caixa impressa continua no saldo ate a conferencia, mas
+     tem dono. Contada aqui, a venda pendente parecia coberta por ela e nao
+     virava urgente. */
+  const resv = require('./baixa_dominio').reservados(db);
   const emap = {};
   db.prepare('SELECT codigo,estoque FROM skus').all()
-    .forEach(s => { emap[s.codigo] = s.estoque; });
+    .forEach(s => { emap[s.codigo] = (s.estoque || 0) - (resv[String(s.codigo).toUpperCase()] || 0); });
 
   return pend.map(v => {
     const estoque = emap[v.codigo] || 0;

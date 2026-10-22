@@ -362,7 +362,7 @@ async function scanSku(sku){
   // Sob medida nao tem estoque por definicao: a peca e feita contra o pedido.
   // Zero ali e o normal, e barrar aqui empurrava a bancada a imprimir a
   // etiqueta pelo PDF do ML e despachar por fora do sistema.
-  if(!r.sob_medida && r.estoque!==null && r.estoque<=0){ banner('err','SEM ESTOQUE — bloqueado', '<span class="sku">'+sku+'</span> não passou pela produção. Não dá pra imprimir a venda.'); beep(false); confirmar=null; return; }
+  if(!r.sob_medida && r.estoque!==null && r.estoque<=0){ banner('err','SEM ESTOQUE — bloqueado', '<span class="sku">'+sku+'</span> não tem peça livre: ou não passou pela produção, ou a peça que há já está numa caixa impressa, esperando a Conferência. Não dá pra imprimir a venda.'); beep(false); confirmar=null; return; }
   // Sem pedido agora significa mesmo NENHUM: a busca já inclui as vendas futuras.
   // Com filtro, "nenhum" pode ser "nenhum NESTA lista, mas tem na outra" — e
   // esse aviso tem que dizer isso, senão a pessoa conclui que o PDF não subiu.
@@ -416,7 +416,7 @@ async function scanSku(sku){
     +'<span class="sku" style="font-size:15px">'+esc(sku)+'</span>'
     +(pecaTxt(r.peca)?'<span style="font-weight:700;margin-left:8px">'+esc(pecaTxt(r.peca))+'</span>':'')
     +'<br>'+(r.sob_medida ? 'SOB MEDIDA — sem estoque, peça feita pro pedido'
-                          : 'Estoque: '+r.estoque)
+                          : 'Estoque livre: '+r.estoque)
     +' · pra hoje: '+r.pendentes+(r.futuros?' · pra depois: '+r.futuros:'')+'</div>'
     +'<div style="margin-top:8px"><b>Bipe de novo</b> ou clique pra imprimir a etiqueta de venda.</div>',
     '<button class="primary" onclick="imprimir()">Imprimir etiqueta de venda</button><button class="ghost" onclick="idle()">Cancelar</button>');
@@ -452,7 +452,7 @@ async function imprimir(){
         +'📦 FECHE A CAIXA COM '+r.pecas+' PERSIANAS — uma etiqueta, '+r.pecas+' peças.'
         +(lista?'<div style="font-weight:400;color:var(--txt);margin-top:4px">'+lista+'</div>':'')
         +'<div style="font-weight:700;font-size:13px;margin-top:6px">'+fita(r.pecas)+'</div></div>' : '';
-    banner(r.coleta?'col':'ok','Impresso ✓ — '+esc(o.buyer), quantas+ondeVai+'NF <b>'+esc(o.nf||'—')+'</b>'+(lista?'':' · <span class="sku">'+esc(o.codigo||'')+'</span>')+' · estoque agora: '+r.estoque+'<br>Saiu borrada ou o papel enroscou? Reimprima aqui — o estoque não muda.',
+    banner(r.coleta?'col':'ok','Impresso ✓ — '+esc(o.buyer), quantas+ondeVai+'NF <b>'+esc(o.nf||'—')+'</b>'+(lista?'':' · <span class="sku">'+esc(o.codigo||'')+'</span>')+' · livre agora: '+r.estoque+'<br>Saiu borrada ou o papel enroscou? Reimprima aqui — o estoque não muda.',
       '<button class="rebt" onclick="reimprimir('+o.id+',this)">🖨 Reimprimir esta</button>');
     beep(true); stats(); listaImp();
   }catch(e){ banner('err','Falha de conexão', String(e)); beep(false); }

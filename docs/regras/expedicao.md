@@ -245,7 +245,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Status:** no ar.
 
 ### R-COR-03 · A cancelada depois da etiqueta volta POR PEÇA, e só se alguém disser
-- **Regra:** "a persiana voltou" gera movimento `cancelamento` por peça; "não voltou" só registra. As duas tiram do card. Caixa de várias só tem o "registrar". Sob medida não volta saldo.
+- **Regra:** "a persiana voltou" gera movimento `cancelamento` por peça; "não voltou" só registra. As duas tiram do card. Caixa de várias só tem o "registrar". Sob medida não volta saldo. **Desde 22/10/2026** (CONFERENCIA-E-BAIXA, fase 2-A) o "voltou" só devolve o que **baixou** (`lote.baixado_em`): a caixa cancelada antes de ser conferida nunca saiu do saldo, a reserva soltou sozinha, e a prévia diz isso. O "não voltou" de caixa que nunca baixou avisa que o saldo fica alto e manda pedir ajuste.
 - **Por quê:** a caixa de pacote baixou N; e a Mesa não sabe qual peça de uma caixa de várias o ML cancelou.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_correcao.js`.
@@ -266,14 +266,14 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Status:** no ar.
 
 ### R-COR-06 · A Mesa não mexe em saldo, exceto a cancelada que voltou
-- **Regra:** dar saída, fechar vencidos, reabrir e tirar da fila não mexem em estoque. "Pedir ajuste" só abre o pedido de ajuste em duas pessoas.
+- **Regra:** dar saída, fechar vencidos, reabrir e tirar da fila não mexem em estoque. "Pedir ajuste" só abre o pedido de ajuste em duas pessoas. **A Mesa nunca dá a baixa** (CONFERENCIA-E-BAIXA, D7): "dar saída" numa caixa impressa que nunca foi conferida avisa na prévia que o saldo fica uma peça acima, e manda pedir ajuste.
 - **Por quê:** a peça que saiu sem etiqueta nunca somou +1, e a fila nunca somou.
 - **Exceções:** R-COR-03.
 - **Teste que trava:** `teste_correcao2.js`.
 - **Status:** no ar.
 
 ### R-COR-07 · Conferências antigas fecham em bloco, até uma data que nunca é hoje, sem mexer em saldo
-- **Regra:** "Fechar conferências antigas" (Admin → Correções, contador "caixas impressas sem conferência") pega a caixa `embalado`, nunca conferida, fora do modo teste, impressa até a data de corte, que não está no carro nem numa saída e que não despacha no futuro. A data é **obrigatória** e **não pode ser hoje**. Cada caixa vira `carregado` na data de despacho às 15:00 — ou no dia da impressão, se foi impressa depois —, a coleta ganha `retirado_em`, e `conferido_em`/`conferido_por` ficam **vazios**. Não mexe em estoque. Uma linha em `correcao` para o bloco; desfazer é tudo ou nada. O contador é a mesma lista da linha âmbar do Carregamento (R-PIL-02). `fechar_conferencias_antigas.js --ate AAAA-MM-DD [--aplicar]` chama a mesma ação.
+- **Regra:** "Fechar conferências antigas" (Admin → Correções, contador "caixas impressas sem conferência") pega a caixa `embalado`, nunca conferida, fora do modo teste, impressa até a data de corte, que não está no carro nem numa saída e que não despacha no futuro. A data é **obrigatória** e **não pode ser hoje**. Cada caixa vira `carregado` na data de despacho às 15:00 — ou no dia da impressão, se foi impressa depois —, a coleta ganha `retirado_em`, e `conferido_em`/`conferido_por` ficam **vazios**. Não mexe em estoque. **Só pega caixa que já baixou** (`baixado_em` cheio — as de antes da virada de 22/10/2026); a que nunca baixou fica de fora, e a prévia diz quantas — fechá-la deixaria o saldo alto em silêncio. Uma linha em `correcao` para o bloco; desfazer é tudo ou nada. O contador é a mesma lista da linha âmbar do Carregamento (R-PIL-02). `fechar_conferencias_antigas.js --ate AAAA-MM-DD [--aplicar]` chama a mesma ação.
 - **Por quê:** a tela do Carregamento ficou um tempo com problema e mais de 500 caixas impressas se acumularam sem conferência. A baixa delas já aconteceu na impressão; a caixa de hoje ainda é trabalho da conferência; e escrever um nome em `conferido_por` mentiria na pilha.
 - **Exceções:** a caixa de venda cancelada que ainda está na fábrica não entra: quem fecha passa antes na área e no canto, e escolhe a data de corte antes dela.
 - **Teste que trava:** `teste_conferencia_antiga.js` (64) · `teste_correcao.js` (a lista dos contadores).

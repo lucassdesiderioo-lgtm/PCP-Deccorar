@@ -2,7 +2,7 @@ const express=require('express'); const fs=require('fs');
 const {parsePdf}=require('./parse'); const {PDFDocument}=require('pdf-lib');
 const {futuro,COLETA,VARIAS}=require('./carga');
 module.exports=function(app,db){
-  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT, impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, no_carro_em TEXT, no_carro_por TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT, cancelada_em TEXT, cancelada_origem TEXT, cancelada_estagio TEXT, cancelada_motivo TEXT, cancelada_varias INTEGER DEFAULT 0, cancelada_aviso_em TEXT, cancelada_resolvida_em TEXT, cancelada_resolvida_por TEXT, cancelada_voltou INTEGER, cancelada_por TEXT);");
+  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT, impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, no_carro_em TEXT, no_carro_por TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT, cancelada_em TEXT, cancelada_origem TEXT, cancelada_estagio TEXT, cancelada_motivo TEXT, cancelada_varias INTEGER DEFAULT 0, cancelada_aviso_em TEXT, cancelada_resolvida_em TEXT, cancelada_resolvida_por TEXT, cancelada_voltou INTEGER, cancelada_por TEXT, baixado_em TEXT);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
   // sao so historia: quantas vezes o volume voltou pra impressora e quando foi a
   // ultima. O ALTER mora aqui, no dono da tabela (§17 do CLAUDE.md), com a
@@ -78,6 +78,11 @@ module.exports=function(app,db){
      cancela e uma pessoa da expedicao, e nao o relatorio do ML, o nome dela
      fica aqui — o relatorio nunca tem nome, e a marcacao a mao tem que ter. */
   try{ db.exec("ALTER TABLE lote ADD COLUMN cancelada_por TEXT"); }catch(e){}
+  /* A BAIXA NA CONFERENCIA (spec CONFERENCIA-E-BAIXA, fase 2-A, 22/10/2026):
+     `baixado_em` diz se a caixa ja saiu do estoque. A coluna e a VIRADA (que
+     marca como baixado o que foi impresso antes do deploy) moram no
+     baixa_dominio.js; chamados aqui porque este modulo e o dono do `lote`. */
+  require('./baixa_dominio').garantirSchema(db);
 
   /* ── AS PECAS DENTRO DA CAIXA (§5-B, desde 15/09/2026) ─────────────────────
      Ate aqui uma etiqueta era uma persiana, e por isso `lote.codigo` bastava.
@@ -613,7 +618,15 @@ module.exports=function(app,db){
     WHERE ${filtro} AND NOT COALESCE(${VARIAS('l')},0)
     GROUP BY ${porData?'l.despachar_em, ':''}l.codigo, CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END
     ORDER BY ${porData?'l.despachar_em, ':'atrasados DESC, '}qtd DESC`).all();
-  app.get('/api/pendentes',(req,res)=> res.json(linhasDeSku(filaDoDia('l'),false)));
+  /* O LIVRE, e nao o saldo (CONFERENCIA-E-BAIXA, fase 2-A, 22/10/2026): a peca
+     da caixa impressa e nao conferida continua no saldo, e a lista diria "tem"
+     de uma peca que a impressao vai recusar. Sob medida fica como esta. */
+  function livre(linhas){
+    const resv=require('./baixa_dominio').reservados(db);
+    linhas.forEach(l=>{ if(l.estoque!=null) l.estoque=l.estoque-(resv[String(l.codigo||'').toUpperCase()]||0); });
+    return linhas;
+  }
+  app.get('/api/pendentes',(req,res)=> res.json(livre(linhasDeSku(filaDoDia('l'),false))));
   /* ⚠️ AS CAIXAS DE VARIAS PERSIANAS TEM CARD PROPRIO, E POR UM MOTIVO FISICO.
      A coleta ganhou card proprio porque e um LUGAR diferente (§8-B); esta ganha
      porque e uma EMBALAGEM diferente — saco maior, as pecas juntas com fita, em
@@ -667,7 +680,7 @@ module.exports=function(app,db){
       LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
       LEFT JOIN modelo m ON m.id=s.modelo_id
       WHERE i.lote_id=? ORDER BY i.id`);
-    return vols.map(v=>Object.assign({},v,{itens:itens.all(v.id)}));
+    return vols.map(v=>Object.assign({},v,{itens:livre(itens.all(v.id))}));
   };
   /* ⚠️ `?quando=depois` EM VEZ DE UMA ROTA NOVA, e nao e economia de linha.
      A pergunta e a mesma ("quais caixas levam mais de uma persiana?"); o que
@@ -723,7 +736,7 @@ module.exports=function(app,db){
      caixa ja esta montada".
      `qtd` continua sendo CAIXA e `pecas` e PERSIANA — os dois nomes, nunca um
      so, e eles nao se somam (mesma regra do `faltaHoje` x `precisa`, §18). */
-  app.get('/api/pendentes/futuros',(req,res)=> res.json(linhasDeSku(DEPOIS('l'),true)));
+  app.get('/api/pendentes/futuros',(req,res)=> res.json(livre(linhasDeSku(DEPOIS('l'),true))));
   app.get('/api/lote',(req,res)=> res.json(db.prepare("SELECT id,codigo,cor,buyer,city,nf,estagio FROM lote WHERE data=date('now','localtime') ORDER BY id").all()));
 
   // ── Reimpressao ───────────────────────────────────────────────────────────
@@ -809,7 +822,7 @@ module.exports=function(app,db){
          sair errado sem ninguem saber que ele existia. */
       if(o.estagio==='pendente') return res.status(409).send(
         'AINDA NAO EMBALADO: imprima esta etiqueta pela tela ETIQUETA DE VENDA, bipando o SKU. '+
-        'E la que a peca baixa do estoque — imprimindo por aqui a caixa sairia da fabrica sem baixa.');
+        'E la que a peca fica reservada para esta venda — imprimindo por aqui a caixa sairia sem reserva e sem a conferencia.');
       if(!temPdf(o)) return res.status(410).send(PDF_SUMIU);
       const src=await PDFDocument.load(fs.readFileSync(o.srcfile));
       const out=await PDFDocument.create();

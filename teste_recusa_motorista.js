@@ -108,6 +108,11 @@ const H = volume({codigo:'BK140140BEGE', buyer:'Ja Cancelada', nf:'7018', venda:
   estagio:'cancelado', cancelada_estagio:'embalado', cancelada_em:HOJE+' 08:00:00', cancelada_origem:'planilha',
   cancelada_motivo:'Cancelada pelo comprador', modalidade:'agencia'});
 
+/* As caixas deste teste sao de ANTES da virada (CONFERENCIA-E-BAIXA, fase 2-A,
+   22/10/2026): elas baixaram na impressao, e e por isso que o "voltou" da Mesa
+   tem saldo a devolver. A caixa impressa depois da virada e nunca conferida nao
+   tem — esse caso mora no teste_baixa_conferencia.js. */
+db.prepare("UPDATE lote SET baixado_em=embalado_em WHERE embalado_em IS NOT NULL").run();
 const saldoAntes = { a:saldo('BK140140BEGE'), b:saldo('BK120120BEGE'), c:saldo('BK160160CINZA') };
 
 (async () => {

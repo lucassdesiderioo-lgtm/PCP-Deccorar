@@ -38,7 +38,47 @@
 >
 > Testes: a suíte inteira (`teste_*.js`, como no CI) e o teste da §10. Tela aberta a
 > 1440, 1024, 768 e 400 px — o título cabe numa linha e nada rola de lado.
-> Fase 2 não começou.
+> **Fase 1 no ar (PR #217, 22/10/2026).**
+>
+> **A fase 2 foi dividida em duas entregas** (aprovado pelo dono em 22/10/2026, com
+> os oito pontos do plano): **2-A** a baixa vai para a conferência; **2-B** o botão
+> "Sobrou" na tela da Conferência.
+>
+> **Fase 2-A em código (22/10/2026):** `baixa_dominio.js` (dono único da baixa, da
+> reserva e do livre), a coluna `lote.baixado_em` com a **virada** de uma vez só
+> (`config.virada_baixa_conferencia`), a impressão sem baixa e com a trava no livre,
+> a baixa no bipe da conferência (área, canto, peça a peça) e no "foi no caminhão",
+> o tipo `conferencia` no livro, e o livre na urgência, no inventário, no número da
+> Etiqueta de Venda e na aba Estoque ("N em caixa"). `teste_baixa_conferencia.js`
+> (69 casos, escrito antes do código; dez defeitos reintroduzidos um a um: a
+> impressão voltando a baixar reprova 22, a trava pelo saldo 8, a conferência sem
+> baixa 13, o "foi no caminhão" sem baixa 2, baixar duas vezes 7, a virada sem guarda
+> 1, a urgência pelo saldo 1, o inventário pelo saldo 2, o gráfico pela impressão 1 e
+> a Mesa devolvendo o que não baixou 1). Seis testes (`area`, `carga`, `pecas_carga`,
+> `saida_agencia`, `saida_coleta`, `segunda_pessoa`) ganharam SKU e livro no banco de
+> mentira; `etiqueta`, `livro`, `estoque` e `recusa_motorista` passaram a travar a
+> regra nova. Telas abertas com banco semeado.
+> **Mudanças na construção:**
+> - **o `precisa` da tela azul NÃO usa o livre** (a §5 dizia que usaria): o
+>   comprometido da planilha já conta a venda impressa até ela sair, e descontar a
+>   reserva contaria a peça duas vezes;
+> - **o "foi no caminhão" baixa, mas não grava quem conferiu** (a §3 dizia que
+>   gravaria): a pilha continua mostrando a caixa como "sem conferência";
+> - **"Fechar conferências antigas" só pega caixa que já baixou**, e a prévia diz
+>   quantas ficaram de fora;
+> - **o "voltou" da Mesa só devolve o que baixou** — a 2-A não tira o "voltou" (isso é
+>   da 2-B, junto com a Sobra);
+> - **banco sem a coluna `baixado_em` segue a regra antiga** (a caixa com etiqueta
+>   baixou): é o banco de antes da virada, e é o que mantém os testes antigos da Mesa
+>   descrevendo o que eles descreviam;
+> - **`carreg_route`, `saida_route` e `etq_route` garantem a coluna sozinhos**, além
+>   do `exp_route`: módulo carregado fora da ordem do `server.js` não pode bater numa
+>   coluna que não existe;
+> - **o `backfill_pacote.js` só acerta saldo de caixa que já baixou**: a impressa e
+>   não conferida baixa todas as peças na conferência.
+>
+> Falta: subir **fora do horário de expedição**, com backup, e a primeira caixa real
+> conferida baixando. **2-B não começou.**
 
 ---
 

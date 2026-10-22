@@ -62,7 +62,7 @@ async function lista(){
      imprimir em vez de oferecer um botão que não funciona mais. */
   $('#corpo').innerHTML=d.map(r=>'<tr><td>'+r.id+'</td><td class="c">'+(r.codigo||'<span style=color:#f85149>sem SKU</span>')+'</td><td>'+r.buyer+'</td><td>'+(r.nf||'—')+'</td><td>'+r.estagio+'</td><td>'
     +(r.estagio==='pendente'
-        ? '<span style="font-size:12px;color:#8b97a5">imprima pela <b>Etiqueta de Venda</b> (é lá que baixa a peça)</span>'
+        ? '<span style="font-size:12px;color:#8b97a5">imprima pela <b>Etiqueta de Venda</b> (é lá que a peça fica reservada)</span>'
         : '<button class="pr" onclick="imp('+r.id+')">imprimir</button>')
     +'</td></tr>').join('');
 }

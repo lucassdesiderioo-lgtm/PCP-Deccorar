@@ -1,7 +1,12 @@
 const {VENCE_HOJE,ORDEM_URGENCIA}=require('./fila_dia');
 const {ehColeta,COLETA,AGENCIA}=require('./carga');
-const ESTOQUE=require('./estoque_dominio');
+const BAIXA=require('./baixa_dominio');
 module.exports=function(app,db){
+  /* A coluna `baixado_em` (e a virada, uma vez so) e do baixa_dominio. O
+     exp_route ja chama no boot; chamar aqui tambem e o modulo nao depender da
+     ordem de `require` — carregado sozinho, num script ou num teste, a baixa
+     bateria numa coluna que nao existe (§10, o `config` do acesso.js). */
+  BAIXA.garantirSchema(db);
   const pecasDaCaixa=require('./pecas_caixa')(db);
   app.get('/api/proximo/:sku',(req,res)=>{
     const sku=(req.params.sku||'').trim().toUpperCase();
@@ -94,7 +99,10 @@ module.exports=function(app,db){
       LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
       LEFT JOIN modelo m ON m.id=s.modelo_id
       WHERE i.lote_id=? ORDER BY i.id`).all(p.id) : [];
-    res.json({cadastrado:true,estoque:s.estoque,total,pendentes:pend,futuros:fut,
+    /* O LIVRE, e nao o saldo (CONFERENCIA-E-BAIXA, fase 2-A): a peca que ja esta
+       numa caixa etiquetada continua no saldo ate a conferencia, e a tela que
+       mostrasse o saldo deixaria bipar o que o servidor vai recusar. */
+    res.json({cadastrado:true,estoque:s.sob_medida?s.estoque:BAIXA.disponivel(db,s.codigo),total,pendentes:pend,futuros:fut,
               pedido:p||null,peca,sob_medida:!!s.sob_medida,adiantado,coleta,
               /* ⚠️ O CRITERIO E PERSIANA, NAO LINHA. Uma caixa com 2 unidades do
                  MESMO SKU tem UMA linha em `lote_item` — com `itens.length>1`
@@ -217,12 +225,22 @@ module.exports=function(app,db){
        A baixa tambem sai: sem +1 na embalagem nao pode haver -1 aqui, senao
        cada venda sob medida abriria um buraco de uma peca no SKU. */
     /* A recusa nomeia O SKU que faltou: numa caixa de tres, "sem estoque" sem
-       dizer de que peca manda a bancada procurar no escuro. */
-    for(const l of linhas)
-      if(!l.sob_medida && l.estoque < l.qtd)
+       dizer de que peca manda a bancada procurar no escuro.
+       ⚠️ A TRAVA OLHA O LIVRE (CONFERENCIA-E-BAIXA, fase 2-A, 22/10/2026). A
+       impressao nao baixa mais: a peca da caixa impressa e nao conferida
+       continua no saldo. Comparar com o saldo deixaria a mesma persiana sair em
+       duas etiquetas. O pedido e somado por SKU: a caixa com duas linhas do
+       mesmo codigo precisa das duas pecas livres. */
+    const resv=BAIXA.reservados(db), precisa={};
+    for(const l of linhas) if(!l.sob_medida) precisa[l.codigo]=(precisa[l.codigo]||0)+l.qtd;
+    for(const c of Object.keys(precisa)){
+      const livre=(linhas.find(l=>l.codigo===c).estoque||0)-(resv[c]||0);
+      if(livre < precisa[c])
         return res.json({erro: linhas.length>1
-          ? ('Sem estoque de '+l.codigo+' (precisa de '+l.qtd+', tem '+l.estoque+').')
-          : 'Sem estoque desse SKU.'});
+          ? ('Sem estoque livre de '+c+' (precisa de '+precisa[c]+', livre '+livre+
+             (resv[c]?' — '+resv[c]+' já em caixa impressa':'')+').')
+          : ('Sem estoque desse SKU'+(resv[c]?' — a peça do saldo já está numa caixa impressa, esperando a conferência':'')+'.')});
+    }
     db.transaction(()=>{
       /* O BIPE 1 DA DUPLA CONFERENCIA: quem imprimiu (spec SAIDA-E-DUPLA-
          CONFERENCIA). So aqui, na primeira impressao — o /api/reimprimir nao
@@ -230,17 +248,16 @@ module.exports=function(app,db){
          ninguem logado fica vazio: nome inventado mentiria no fechamento. */
       db.prepare("UPDATE lote SET estagio='embalado', embalado_em=datetime('now','localtime'), impresso_por=? WHERE id=?")
         .run((req.usuario&&req.usuario.nome)||null, id);
-      /* UMA LINHA DE LIVRO POR SKU DA CAIXA, com a mesma referencia do volume
-         (spec §3.3.4). Numa caixa de pacote sao N baixas que valem como uma: a
-         transacao e de quem chama, e o `estoque_dominio` nao abre a dele.
-         O `MAX(0, ...)` SAIU (§3.3.1): o corte apagava o sinal de peca que saiu
-         sem registro. Quem impede o negativo aqui e a trava de estoque logo
-         acima, que ja recusou o que nao tem na prateleira. */
-      for(const l of linhas) if(!l.sob_medida)
-        ESTOQUE.movimentar(db,{codigo:l.codigo, delta:-l.qtd, tipo:'etiqueta',
-          referencia:'lote:'+id, usuario:req.usuario});
+      /* ⚠️ A IMPRESSAO NAO BAIXA MAIS (CONFERENCIA-E-BAIXA, fase 2-A,
+         22/10/2026). Ate aqui saia daqui uma linha de livro `etiqueta` por SKU
+         da caixa; hoje a caixa so RESERVA as pecas (`estagio='embalado'` sem
+         `baixado_em`), e o −1 acontece quando a conferencia bate com a
+         etiqueta (baixa_dominio.js). */
     })();
-    const e=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(o.codigo);
+    /* O numero que a tela escreve no "Impresso ✓" e o LIVRE depois desta
+       caixa — o saldo nao mudou, e escreve-lo faria a impressao parecer nao ter
+       acontecido. */
+    const e={estoque:BAIXA.disponivel(db,o.codigo)};
     /* Depois de imprimir, a tela diz pra onde a caixa vai. Sai daqui, e nao
        do que a tela guardou do bipe: e o volume gravado que manda. */
     res.json({ok:true,estoque:e?e.estoque:0,coleta:ehColeta(o),
