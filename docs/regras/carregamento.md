@@ -361,11 +361,11 @@ Etiqueta de Venda ────┤
 ## O passivo das saídas
 
 ### R-PAS-01 · O passivo da coleta bipada sai na data do bipe de cada caixa
-- **Regra:** `node fechar_saida_passivo.js` (simula) e `--aplicar` (com `await db.backup()` antes) fecham numa saída `tipo='passivo'` as caixas paradas em "esperando o caminhão" (a régua é o `AGUARDA_CAMINHAO`, sem o modo teste). Cada caixa sai em `carregado_em`, nunca hoje, e `retirado_em` recebe o mesmo carimbo. O script recusa banco sem as colunas novas, e é idempotente.
+- **Regra:** `node fechar_saida_passivo.js --ate AAAA-MM-DD` (simula) e `--aplicar` (com `await db.backup()` antes) fecham numa saída `tipo='passivo'` as caixas paradas em "esperando o caminhão" (a régua é o `AGUARDA_CAMINHAO`, sem o modo teste) **bipadas para o canto até a data**. A data é **obrigatória** desde 22/10/2026, no formato, e não pode ser futura: o canto também tem a caixa bipada hoje, que ainda espera o caminhão de hoje. Cada caixa sai em `carregado_em`, nunca hoje, e `retirado_em` recebe o mesmo carimbo. O motivo gravado diz o dia da rodada e a data de corte. O script recusa banco sem as colunas novas, e é idempotente.
 - **Por quê:** é o limite de baixo honesto — a caixa não saiu antes de ir pro canto, e a hora real da retirada não existe. É a regra de todo script de passivo (R-COR-04).
 - **Exceções:** essas caixas entram em "Peças adiantadas" nas datas do bipe.
 - **Teste que trava:** `teste_saida.js`.
-- **Status:** aplicado em produção em 26/09/2026 (saída #1, 399 caixas) · o canto foi conferido vazio pelo dono.
+- **Status:** aplicado em produção em 26/09/2026 (saída #1, 399 caixas) · o canto foi conferido vazio pelo dono. O canto voltou a encher (281 caixas de 05/10 a 22/10/2026, a saída do caminhão deixou de ser fechada) e o `--ate` entrou para a segunda rodada.
 
 ### R-PAS-02 · O passivo das caixas nunca bipadas exige data de corte de quem viu sair
 - **Regra:** `node fechar_saida_passivo.js --nao-bipadas --ate AAAA-MM-DD` (simula) e `--aplicar` gravam uma saída `tipo='passivo'` e, em cada caixa, `carregado`, `saida_id` e `saiu_por` pela modalidade. A data é **obrigatória**, no formato, e não pode ser futura. O carimbo é o dia do despacho às 15:00, nunca antes do dia da impressão nem do próprio `embalado_em`; sem despacho lido, vale o dia da impressão. `retirado_em` só na coleta; `conferido_em` fica vazio. Estoque e modalidade não se mexem.

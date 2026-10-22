@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /* Fecha, UMA vez, as caixas de coleta paradas em "esperando o caminhao".
  *
- *   node fechar_saida_passivo.js             so mostra
- *   node fechar_saida_passivo.js --aplicar   faz backup e grava
+ *   node fechar_saida_passivo.js --ate AAAA-MM-DD             so mostra
+ *   node fechar_saida_passivo.js --ate AAAA-MM-DD --aplicar   faz backup e grava
  *
  * DE ONDE VEM O PASSIVO
  * O "Fechar coleta" de 10/09/2026 (foto + numero do motorista) nao foi adotado
@@ -34,6 +34,12 @@
  *
  * E idempotente: depois de aplicado, as caixas ganham `retirado_em` e saem do
  * criterio — rodar de novo nao acha nada.
+ *
+ * A DATA DE CORTE E OBRIGATORIA (22/10/2026). A primeira rodada (25/09) fechou
+ * o canto inteiro, e podia: o canto estava parado. Na segunda (22/10, 281
+ * caixas de 05/10 em diante) o canto tinha tambem as caixas bipadas hoje, que
+ * ainda esperam o caminhao de hoje. Fecha-se so o que foi bipado ate a data, e
+ * quem diz a data e quem viu o caminhao levar — a mesma regra do --nao-bipadas.
  */
 const Database = require('better-sqlite3');
 const fs = require('fs'), path = require('path');
@@ -42,15 +48,29 @@ const { garantirSaida } = require('./saida_schema');
 
 const PRECISA = ['saida_id', 'saiu_em', 'saiu_por', 'retirado_em', 'carregado_em'];
 
+/* A data de corte das duas limpezas: obrigatoria, no formato do banco e nunca
+   depois de hoje. Devolve o hoje, que as duas usam. */
+function conferirCorte(db, ate){
+  if(!ate) throw new Error('falta a data de corte (--ate AAAA-MM-DD): ate que dia todas as caixas sairam?');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(ate)) throw new Error('data de corte "' + ate + '" fora do formato AAAA-MM-DD');
+  const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
+  if(ate > hoje) throw new Error('data de corte ' + ate + ' e depois de hoje (' + hoje + ')');
+  return hoje;
+}
+function dataBR(d){ return d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4); }
+
 function fecharPassivo(db, opcoes){
-  const aplicar = !!(opcoes && opcoes.aplicar);
+  const o = opcoes || {};
+  const aplicar = !!o.aplicar, ate = o.ate;
+  const hoje = conferirCorte(db, ate);
   const tem = db.prepare("SELECT name FROM pragma_table_info('lote')").all().map(c => c.name);
   const faltam = PRECISA.filter(c => !tem.includes(c));
   if(faltam.length) throw new Error('o banco ainda nao tem as colunas ' + faltam.join(', ') +
     ' — suba o servidor com o codigo novo (git pull + restart) antes de rodar este script');
   const caixas = db.prepare(`SELECT id, codigo, buyer, nf, despachar_em, carregado_em FROM lote
     WHERE ${AGUARDA_CAMINHAO} AND COALESCE(teste,0)=0 AND carregado_em IS NOT NULL
-    ORDER BY carregado_em, id`).all();
+      AND date(carregado_em) <= ?
+    ORDER BY carregado_em, id`).all(ate);
   if(!aplicar || !caixas.length) return { caixas, saida_id: null };
 
   garantirSaida(db);
@@ -59,7 +79,8 @@ function fecharPassivo(db, opcoes){
     saida_id = db.prepare(`INSERT INTO saida (tipo, fechada_em, fechado_por, qtd_sistema, ids, motivo)
       VALUES ('passivo', datetime('now','localtime'), 'fechar_saida_passivo.js', ?, ?, ?)`)
       .run(caixas.length, JSON.stringify(caixas.map(c => c.id)),
-           'limpeza de 25/09/2026: confirmado em 25/09/2026 que as caixas esperando o caminhao ja sairam')
+           'limpeza de ' + dataBR(hoje) + ': caixas da coleta bipadas para o canto até ' + dataBR(ate) +
+           ' e nunca fechadas com o motorista; confirmado que todas já saíram')
       .lastInsertRowid;
     /* `retirado_em IS NULL` na guarda: duas rodadas ao mesmo tempo nao fecham
        a mesma caixa duas vezes. */
@@ -114,10 +135,7 @@ function carimbo(c){
 function fecharNaoBipadas(db, opcoes){
   const o = opcoes || {};
   const aplicar = !!o.aplicar, ate = o.ate;
-  if(!ate) throw new Error('falta a data de corte (--ate AAAA-MM-DD): ate que dia todas as caixas sairam?');
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(ate)) throw new Error('data de corte "' + ate + '" fora do formato AAAA-MM-DD');
-  const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
-  if(ate > hoje) throw new Error('data de corte ' + ate + ' e depois de hoje (' + hoje + ')');
+  const hoje = conferirCorte(db, ate);
   const tem = db.prepare("SELECT name FROM pragma_table_info('lote')").all().map(c => c.name);
   const faltam = PRECISA.concat(['conferido_em', 'no_carro_em', 'embalado_em']).filter(c => !tem.includes(c));
   if(faltam.length) throw new Error('o banco ainda nao tem as colunas ' + faltam.join(', ') +
@@ -197,11 +215,13 @@ if(require.main === module && process.argv.includes('--nao-bipadas')){
   rodarNaoBipadas().catch(e => { console.error('erro:', e.message); process.exit(1); });
 }else if(require.main === module){
   const APLICAR = process.argv.includes('--aplicar');
+  const i = process.argv.indexOf('--ate');
+  const ate = i >= 0 ? process.argv[i + 1] : null;
   (async () => {
     const CAMINHOS = require('./caminhos');
     const db = new Database(CAMINHOS.BANCO);
-    const { caixas } = fecharPassivo(db, {aplicar:false});
-    console.log('Caixas de coleta esperando o caminhao (a regua da tela): ' + caixas.length);
+    const { caixas } = fecharPassivo(db, {aplicar:false, ate});
+    console.log('Caixas de coleta esperando o caminhao (a regua da tela), bipadas ate ' + ate + ': ' + caixas.length);
     const porDia = {};
     for(const c of caixas){ const d = String(c.carregado_em).slice(0,10); (porDia[d] = porDia[d] || []).push(c); }
     for(const d of Object.keys(porDia).sort()){
@@ -213,10 +233,14 @@ if(require.main === module && process.argv.includes('--nao-bipadas')){
     }
     const teste = db.prepare(`SELECT COUNT(*) n FROM lote WHERE ${AGUARDA_CAMINHAO} AND COALESCE(teste,0)=1`).get().n;
     if(teste) console.log('\n  (' + teste + ' caixa(s) do modo teste ficam de fora — o modo teste cuida delas)');
+    const depois = db.prepare(`SELECT COUNT(*) n FROM lote WHERE ${AGUARDA_CAMINHAO} AND COALESCE(teste,0)=0
+      AND date(carregado_em) > ?`).get(ate).n;
+    if(depois) console.log('  (' + depois + ' caixa(s) bipadas pro canto depois de ' + ate +
+      ' ficam de fora — ainda esperam o caminhao)');
     if(!caixas.length){ console.log('\nNada a fechar.'); db.close(); return; }
     if(!APLICAR){
       console.log('\nSIMULACAO — nada foi gravado. Cada caixa sairia com a data do bipe dela, nunca hoje.');
-      console.log('Para gravar: node fechar_saida_passivo.js --aplicar');
+      console.log('Para gravar: node fechar_saida_passivo.js --ate ' + ate + ' --aplicar');
       db.close(); return;
     }
     /* Backup ANTES de tocar em qualquer linha, pelo db.backup() — `cp dados.db`
@@ -226,7 +250,7 @@ if(require.main === module && process.argv.includes('--nao-bipadas')){
     const arq = path.join(CAMINHOS.BACKUPS, 'antes-saida-passivo-' + new Date().toISOString().replace(/[:.]/g,'-') + '.db');
     await db.backup(arq);
     console.log('\nbackup -> ' + arq);
-    const r = fecharPassivo(db,{aplicar:true});
+    const r = fecharPassivo(db,{aplicar:true, ate});
     console.log('saida #' + r.saida_id + ' (passivo): ' + r.caixas.length + ' caixa(s) fechada(s)');
     db.close();
   })().catch(e => { console.error('erro:', e.message); process.exit(1); });
