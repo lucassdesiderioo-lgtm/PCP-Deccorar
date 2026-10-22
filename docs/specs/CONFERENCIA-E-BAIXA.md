@@ -112,10 +112,10 @@
 > ✅ **Fase 2-B no ar (PR #222, 22/10/2026)**: o dono fez o deploy e disse *"deu
 > certo"*.
 >
-> ⚠️ **ISSO PROVA QUE O SISTEMA SUBIU, E NÃO QUE A SOBRA FUNCIONA COM DADO REAL.**
-> Ainda não foram relatadas: a **primeira sobra real** (uma caixa que o caminhão
-> deixou, ou uma venda cancelada ainda na fábrica, voltando à prateleira com o saldo
-> subindo e a linha `sobra` no extrato), a **primeira caixa conferida baixando** e o
+> ✅ **A PRIMEIRA SOBRA REAL FUNCIONOU (22/10/2026)**: o dono relatou *"a primeira
+> sobra funcionou, saldo subiu"*.
+>
+> ⚠️ Ainda não foram relatadas a **primeira caixa conferida baixando** e o
 > **fechamento das caixas antigas** pela tela. Prova que não foi feita se escreve
 > como não feita — e a spec só vai para `docs/arquivo/` depois delas.
 
