@@ -60,13 +60,21 @@ module.exports = function(app, db){
     const oMap={}; ORDEM_DIA.linhas(db).forEach(o=> oMap[o.codigo]=o);
 
     const dMap={}; demanda().forEach(l=> dMap[l.codigo]=l);
+    /* O LIVRE (22/10/2026): desde a fase 2-A da CONFERENCIA-E-BAIXA a caixa
+       impressa so reserva a peca, que continua no saldo ate a conferencia. A
+       coluna da TV responde "tem peca na prateleira?", e essa conta e do
+       baixa_dominio — a mesma da Etiqueta de Venda. O `precisa` NAO muda: o
+       comprometido da planilha ja conta a venda impressa (CLAUDE.md §2). */
+    let resv={}; try{ resv=require('./baixa_dominio').reservados(db); }catch(e){ resv={}; }
 
     const linhas = skus.map(s=>{
       const p = pMap[s.codigo] || {pedido:0, produzido:0};
       const o = oMap[s.codigo] || {a_produzir:0, atendidas:0, pendentes:0};
       const U=s.codigo.toUpperCase();
       const d = dMap[U] || {alvo:0, precisa:0, comprometido:0};
+      const emCaixa=resv[U]||0;
       return { codigo:s.codigo, cor:s.cor||'', estoque:s.estoque||0,
+        livre:(s.estoque||0)-emCaixa, em_caixa:emCaixa,
         /* O alvo mostrado e o CALCULADO, igual ao da aba Estoque. O gravado
            continua no banco e nao aparece aqui: numero velho com cara de numero
            de hoje e o que faz a conta "quebrar" sem ninguem notar. */

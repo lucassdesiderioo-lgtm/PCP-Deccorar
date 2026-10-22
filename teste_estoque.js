@@ -367,6 +367,21 @@ const ok = (n, c, extra) => { casos++;
      pPor.BK140140BEGE.alvo === 10, 'veio ' + pPor.BK140140BEGE.alvo);
   ok('sob medida não pede reposição na TV, como na aba',
      pPor.SOBMEDIDA.precisa === 0 && pPor.SOBMEDIDA.alvo === 0);
+  /* A TV MOSTRA O LIVRE (22/10/2026). Desde a fase 2-A da CONFERENCIA-E-BAIXA
+     a caixa impressa so RESERVA: a peca continua no saldo ate a conferencia. A
+     coluna da TV e a pergunta "tem peca na prateleira?", e essa e o livre do
+     baixa_dominio — a mesma conta da Etiqueta de Venda. O saldo vem ao lado. */
+  const resvTv = require('./baixa_dominio').reservados(db);
+  const saldoBege = db.prepare("SELECT estoque FROM skus WHERE codigo='BK140140BEGE'").get().estoque;
+  ok('a TV traz o livre: saldo − peça em caixa impressa e não conferida (BK140140BEGE tem 1 em caixa)',
+     resvTv.BK140140BEGE === 1 && pPor.BK140140BEGE.em_caixa === 1 && pPor.BK140140BEGE.livre === saldoBege - 1,
+     JSON.stringify({livre:pPor.BK140140BEGE.livre, em_caixa:pPor.BK140140BEGE.em_caixa, saldo:saldoBege, resv:resvTv.BK140140BEGE}));
+  ok('   e o saldo continua vindo ao lado, sem mexer',
+     pPor.BK140140BEGE.estoque === saldoBege, 'veio ' + pPor.BK140140BEGE.estoque);
+  ok('   SKU sem caixa impressa: livre = saldo, e em caixa 0',
+     Object.values(pPor).filter(l => !resvTv[l.codigo.toUpperCase()])
+       .every(l => l.em_caixa === 0 && l.livre === l.estoque),
+     JSON.stringify(Object.values(pPor).map(l => l.codigo+':'+l.livre+'/'+l.estoque+'/'+l.em_caixa)));
   /* "Falta hoje" e outra pergunta: o que sobrou das ordens do dia. Nao se soma
      com `precisa`, e por isso as duas colunas tem nomes proprios.
      Desde 08/09/2026 ela sai do ordem_dia.js — a MESMA regua da tela vermelha
