@@ -98,6 +98,16 @@
   .recusabox .btn{flex:1 1 200px}
   .btn.recusar{background:#fff;color:var(--red);border:2px solid var(--red)}
   .volta{margin-top:12px;font-size:22px;font-weight:800;color:var(--red);line-height:1.3}
+  /* O "SOBROU" (fase 2-B): a caixa volta para a prateleira. Os motivos sao
+     botoes grandes, o escolhido fica cheio; as persianas sao uma lista que se
+     marca a cada bipe do SKU. */
+  .motivos{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .motivos .btn{flex:1 1 160px;background:#fff;color:var(--txt);border:2px solid var(--line)}
+  .motivos .btn.esc{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .sobrouPecas{margin-top:10px;font-size:18px;line-height:1.5}
+  .sobrouPecas .ok{color:#2e7d32}
+  #sobrouTexto{width:100%;margin-top:8px;font-size:18px;padding:10px;border:2px solid var(--line);border-radius:10px;box-sizing:border-box}
+  .sobrasCard .row .c{white-space:normal}
   .tagok{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;margin-right:4px;
     background:#e7f5eb;color:var(--green);border:1px solid #a9d8b4;white-space:nowrap}
   .tagfalta{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;margin-right:4px;
@@ -157,7 +167,8 @@
   <div class="modobar area" id="modoBar">O bipe agora: CONFERIR NA ÁREA</div>
   <input id="scan" autocomplete="off">
   <button class="btn conf" onclick="conferir()" style="width:100%">✓ Conferir carga do carro</button>
-  <button class="btn recusar" id="btnRecusa" onclick="modoRecusa()" style="width:100%;margin-top:8px">🚫 Motorista recusou</button>
+  <button class="btn recusar" id="btnSobrou" onclick="modoSobrou()" style="width:100%;margin-top:8px">↩ Sobrou — a caixa volta para a prateleira</button>
+  <div class="card sobrasCard" id="sobrasCard"><h3 id="sobrasT">↩ Sobras esperando decisão</h3><div id="sobrasL"></div></div>
   <div class="card pilha" id="pilhaCard"><h3>📋 Conferência da pilha — etiquetas impressas hoje</h3>
     <div class="pconta" id="pConta"></div>
     <details id="pAntD"><summary id="pAntS"></summary><div id="pAnt"></div></details>
@@ -290,7 +301,7 @@ async function bip(code){
   /* O bipe vai para UM lugar de cada vez (modoAtual): a area (conferir), o
      carro (viagem aberta) ou as sobras do caminhao (saida aberta). A faixa
      #modoBar diz qual, na cor dele. */
-  if(recusa){ await bipRecusa(code); return; }
+  if(sobrou){ await bipSobrou(code); return; }
   var m=modoAtual();
   if(m==='sobra'){ await bipSobra(code); return; }
   if(m==='carro'){ await bipCarro(code); return; }
@@ -353,45 +364,98 @@ async function recomecarCaixa(){
    a etiqueta de venda) continua de onde parou. */
 function sairDaCaixa(){ caixaPecas=null; banner('','Pronto para bipar',''); }
 
-/* ── O MOTORISTA RECUSOU (RECUSA-DO-MOTORISTA, 02/10/2026) ──────────────────
-   O motorista bipa e o sistema dele diz "recusada": a venda foi cancelada
-   depois da etiqueta. Aqui a expedicao SO MARCA — o bipe mostra a caixa, a
-   pessoa confirma, e a tela manda voltar a peca a prateleira. Quem confirma a
-   volta ao estoque e o admin, pela Mesa de correcoes: o saldo nao anda aqui. */
-let recusa=false, recusaPend=null;
-function modoRecusa(){
-  recusa=!recusa; recusaPend=null; aguardando=null; caixaPecas=null; pintarModo();
-  if(recusa) banner('err','🚫 Motorista recusou','Bipe a etiqueta de VENDA da caixa que o motorista recusou.');
+/* ── O "SOBROU" (CONFERENCIA-E-BAIXA, fase 2-B, 22/10/2026) ──────────────────
+   A caixa que ficou na fabrica (venda cancelada, motorista recusou, outro)
+   volta para a prateleira AQUI, sem passar pela Mesa: bipa a etiqueta, bipa o
+   SKU de cada persiana, escolhe o motivo e confirma. Se a caixa ja tinha
+   baixado do estoque, o saldo volta +1 por peca; se nao, so solta a reserva.
+   O bipe do SKU e o que prova que a persiana esta na mao. Quem conferiu a
+   caixa nao marca a sobra dela (D8). O servidor confere tudo de novo no fim. */
+let sobrou=false, sobrouPend=null, sobrouSkus=[], sobrouMotivo=null, sobrouFaltam=0, sobrouErro='';
+function modoSobrou(){
+  sobrou=!sobrou; sobrouLimpar(); aguardando=null; caixaPecas=null; pintarModo();
+  if(sobrou) banner('err','↩ Sobrou','Bipe a etiqueta de VENDA da caixa que sobrou.');
   else banner('','Pronto para bipar','');
   $('#scan').focus();
 }
+function sobrouLimpar(){ sobrouPend=null; sobrouSkus=[]; sobrouMotivo=null; sobrouFaltam=0; sobrouErro=''; }
 function linhasPecas(l){
   return (l||[]).map(function(p){ return '<span class="c">'+(p.qtd>1?p.qtd+' × ':'')+esc0(p.codigo)+'</span>'; }).join(' · ');
 }
-async function bipRecusa(code){
-  var r=await postJ('/api/carregamento/recusa',{code:code});
-  if(!r.ok){ recusaPend=null;
-    banner('err','Não dá para marcar esta caixa',(r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); return; }
-  recusaPend=r;
-  var n=(r.pecas||[]).reduce(function(s,p){ return s+p.qtd; },0);
-  banner('warn','O motorista recusou esta caixa?',
-    '<b>'+esc0(r.pedido.buyer)+'</b> · NF <b>'+esc0(r.pedido.nf||'—')+'</b><br>'
-    +(n>1?'<b>'+n+' persianas</b>: ':'')+linhasPecas(r.pecas)
-    +(r.sob_medida?'<br><b>Sob medida</b>: não volta para a prateleira.':'')
-    +'<div class="recusabox"><button class="btn" style="background:var(--red);color:#fff" onclick="confirmarRecusa()">Sim, o motorista recusou</button>'
-    +'<button class="btn ghost" onclick="desistirRecusa()">Não — bipei a caixa errada</button></div>');
-  beep(true);
+function soCodigo0(c){ return String(c||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase(); }
+async function bipSobrou(code){
+  if(!sobrouPend){
+    var r=await postJ('/api/carregamento/sobra',{code:code});
+    if(!r.ok){
+      var quem=r.motivo==='mesma_pessoa'
+        ? '<br><b>Conferida por '+esc0(r.conferido_por||'')+'.</b><div class="recusabox"><button class="btn" onclick="trocarPessoa()">👤 Trocar de pessoa</button></div>'
+        : '';
+      banner('err','Não dá para marcar esta caixa como sobra',(r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')+quem);
+      beep(false); return;
+    }
+    sobrouLimpar(); sobrouPend=r; sobrouFaltam=r.faltam||0;
+    pintarModo(); desenharSobrou(); beep(true); return;
+  }
+  var lista=sobrouSkus.concat([code]);
+  var r2=await postJ('/api/carregamento/sobra',{id:sobrouPend.pedido.id,skus:lista});
+  if(!r2.ok){ sobrouErro=r2.aviso||'Este bipe não vale para esta caixa.'; desenharSobrou(); beep(false); return; }
+  sobrouSkus=lista; sobrouFaltam=r2.faltam||0; sobrouErro=''; desenharSobrou(); beep(true);
 }
-function desistirRecusa(){ recusaPend=null; banner('err','🚫 Motorista recusou','Bipe a etiqueta de VENDA da caixa que o motorista recusou.'); $('#scan').focus(); }
-async function confirmarRecusa(){
-  if(!recusaPend) return;
-  var r=await postJ('/api/carregamento/recusa',{id:recusaPend.pedido.id,confirmar:true});
-  recusaPend=null;
-  if(!r.ok){ banner('err','Não marquei',esc0(r.aviso||'Tente de novo.')); beep(false); return; }
-  recusa=false; pintarModo();
-  banner('err','🚫 Recusada — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · '+linhasPecas(r.pecas)
-    +'<div class="volta">'+esc0(r.aviso||'')+'</div>');
+function desenharSobrou(){
+  var r=sobrouPend; if(!r) return;
+  var bip={}; sobrouSkus.forEach(function(c){ var k=soCodigo0(c); bip[k]=(bip[k]||0)+1; });
+  var pecas=(r.pecas||[]).map(function(p){
+    if(p.sob_medida) return '<div>'+esc0(p.codigo)+' — <b>sob medida</b>, não tem SKU a bipar</div>';
+    var q=Math.max(1,p.qtd||1), b=Math.min(q,bip[soCodigo0(p.codigo)]||0);
+    return '<div class="'+(b>=q?'ok':'')+'">'+(b>=q?'✓ ':'○ ')+'<b>'+q+' ×</b> '+esc0(p.codigo)+(q>1?' — <b>'+b+' de '+q+'</b>':'')+'</div>';
+  }).join('');
+  var motivo=function(id,rot){ return '<button class="btn'+(sobrouMotivo===id?' esc':'')+'" onclick="escolherMotivo(\''+id+'\')">'+rot+'</button>'; };
+  var pronto=sobrouFaltam===0 && !!sobrouMotivo;
+  banner('warn','↩ Sobrou — '+esc0(r.pedido.buyer),
+    'NF <b>'+esc0(r.pedido.nf||'—')+'</b>'
+    +(r.cancelada_motivo?' · <span class="c">'+esc0(r.cancelada_motivo)+'</span>':'')
+    +'<div class="sobrouPecas">'+(sobrouFaltam?'<b>Bipe o SKU de cada persiana</b> (falta'+(sobrouFaltam===1?' 1':'m '+sobrouFaltam)+'):':'<b>Todas as persianas bipadas.</b>')+pecas+'</div>'
+    +(sobrouErro?'<div class="volta" style="font-size:18px">'+esc0(sobrouErro)+'</div>':'')
+    +'<div class="motivos">'+motivo('cancelada','Venda cancelada')+motivo('motorista','Motorista recusou')+motivo('outro','Outro')+'</div>'
+    +(sobrouMotivo==='outro'?'<input id="sobrouTexto" maxlength="160" placeholder="Escreva o motivo" value="'+esc0(sobrouTextoAtual())+'">':'')
+    +'<div style="margin-top:8px;font-size:14px;color:var(--muted)">'+(r.sob_medida?'Sob medida: o estoque não muda.':
+      (r.baixou?'Ao confirmar, o estoque volta +1 por persiana.':'Esta caixa ainda não foi conferida: a peça nunca saiu do saldo, e o estoque não muda.'))+'</div>'
+    +'<div class="recusabox"><button class="btn" style="background:var(--red);color:#fff"'+(pronto?'':' disabled')+' onclick="confirmarSobrou()">Confirmar a sobra</button>'
+    +'<button class="btn ghost" onclick="desistirSobrou()">Cancelar — bipei a caixa errada</button></div>');
+  var t=document.getElementById('sobrouTexto');
+  if(t){ t.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); confirmarSobrou(); } }); }
+}
+var sobrouTextoGuardado='';
+function sobrouTextoAtual(){ var t=document.getElementById('sobrouTexto'); return t?t.value:sobrouTextoGuardado; }
+function escolherMotivo(id){
+  sobrouTextoGuardado=sobrouTextoAtual(); sobrouMotivo=id; desenharSobrou();
+  var t=document.getElementById('sobrouTexto'); if(t) t.focus(); else $('#scan').focus();
+}
+function desistirSobrou(){ sobrouLimpar(); sobrouTextoGuardado=''; pintarModo(); banner('err','↩ Sobrou','Bipe a etiqueta de VENDA da caixa que sobrou.'); $('#scan').focus(); }
+async function confirmarSobrou(){
+  if(!sobrouPend) return;
+  var texto=sobrouTextoAtual();
+  var r=await postJ('/api/carregamento/sobra',{id:sobrouPend.pedido.id,skus:sobrouSkus,motivo:sobrouMotivo,texto:texto,confirmar:true});
+  if(!r.ok){ sobrouErro=r.aviso||'Não marquei. Tente de novo.'; sobrouTextoGuardado=texto; desenharSobrou(); beep(false); return; }
+  sobrouLimpar(); sobrouTextoGuardado=''; sobrou=false; pintarModo();
+  banner('ok','↩ Sobra registrada — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · '+linhasPecas(r.pecas)
+    +'<div class="volta" style="color:var(--green,#2e7d32)">'+esc0(r.aviso||'')+'</div>');
   beep(true); carregar(); $('#scan').focus();
+}
+/* AS SOBRAS ESPERANDO DECISAO: o que o caminhao deixou no canto numa saida ja
+   fechada, e as vendas canceladas que ainda estao na fabrica. Lista que zera:
+   resolvida (ou levada pelo caminhao seguinte), a caixa sai daqui. */
+async function desenharSobras(){
+  var d={caixas:[]}; try{ d=await (await fetch('/api/carregamento/sobras')).json(); }catch(e){ return; }
+  var l=d.caixas||[];
+  $('#sobrasT').textContent='↩ Sobras esperando decisão: '+l.length;
+  $('#sobrasL').innerHTML=l.length
+    ? '<div style="font-size:13px;color:var(--muted);padding:6px 14px">Para cada uma: toque em <b>↩ Sobrou</b> e bipe a etiqueta — ou ponha no próximo caminhão.</div>'
+      +l.map(function(v){ return '<div class="row"><span class="who">'+esc0(v.buyer)+' <span class="c">NF '+esc0(v.nf||'—')
+        +' · '+esc0(v.codigo||'')+(v.pecas>1?' · '+v.pecas+' persianas':'')+' · '
+        +(v.de==='caminhao'?'o caminhão deixou no canto':esc0(v.cancelada_origem==='motorista'?'motorista recusou':(v.cancelada_motivo||'venda cancelada')))
+        +'</span></span></div>'; }).join('')
+    : '<div class="empty" style="color:var(--muted)">Nenhuma sobra esperando.</div>';
 }
 
 function mostrar(r,code){
@@ -545,6 +609,7 @@ function desenharPilha(p){
 async function carregar(){
   const d=await (await fetch('/api/carregamento')).json();
   desenharPilha(d.pilha);
+  desenharSobras();
   const col=d.coleta||{faltam:[],aguardando:[],fechamentos:[],retiradas_hoje:0};
   $('#nCar').textContent=d.carregados; $('#nFal').textContent=d.faltam.length;
   $('#nCol').textContent=col.aguardando.length;
@@ -688,10 +753,10 @@ function pintarModo(){
   var m=modoAtual();
   document.body.classList.toggle('modo-saida',m==='sobra');
   document.body.classList.toggle('modo-viagem',m==='carro');
-  var bar=$('#modoBar'); bar.className='modobar '+(recusa?'recusa':m);
-  bar.textContent='O bipe agora: '+(recusa?'CAIXA RECUSADA PELO MOTORISTA':
+  var bar=$('#modoBar'); bar.className='modobar '+(sobrou?'recusa':m);
+  bar.textContent='O bipe agora: '+(sobrou?(sobrouPend?'SOBROU — BIPE O SKU DE CADA PERSIANA':'SOBROU — BIPE A ETIQUETA DA CAIXA'):
     ({area:'CONFERIR NA ÁREA',carro:'PÔR NO CARRO DA AGÊNCIA',sobra:'SOBRA DO CAMINHÃO (o que ficou no canto)'})[m]);
-  var bt=$('#btnRecusa'); if(bt) bt.textContent=recusa?'✕ Sair da recusa — voltar a conferir':'🚫 Motorista recusou';
+  var bt=$('#btnSobrou'); if(bt) bt.textContent=sobrou?'✕ Sair do Sobrou — voltar a conferir':'↩ Sobrou — a caixa volta para a prateleira';
 }
 const postJ=async function(url,corpo){
   const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo||{})});
@@ -902,7 +967,7 @@ const scan=$('#scan');
    BIPE cair no lugar certo, nao pra mexer no que a pessoa esta olhando.
    O campo do motorista e a excecao: enquanto a pessoa digita ali, o foco
    fica ali. */
-const keep=()=>{ const a=document.activeElement; if(a===scan) return; if(a && (a.id==='motQtd'||a.id==='fotoIn'||a.id==='motivoLib'||a.id==='atQtd'||a.id==='fotoInV'||a.id==='motivoLibV')) return; scan.focus({preventScroll:true}); };
+const keep=()=>{ const a=document.activeElement; if(a===scan) return; if(a && (a.id==='motQtd'||a.id==='fotoIn'||a.id==='motivoLib'||a.id==='atQtd'||a.id==='fotoInV'||a.id==='motivoLibV'||a.id==='sobrouTexto')) return; scan.focus({preventScroll:true}); };
 scan.addEventListener('blur',()=>setTimeout(keep,50));
 document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input,label')) keep(); });
 /* ⚠️ O BIPE QUE NAO CHEGA AVISA (20/10/2026). Sem rede, ou com o servidor
@@ -927,7 +992,7 @@ function beep(ok){ try{const a=new (window.AudioContext||window.webkitAudioConte
 /* A atualizacao de 4 s espera quem esta digitando: redesenhar por baixo de um
    campo com foco fecha o teclado do iPad. O campo do bipe nao conta — ele
    esta sempre com o foco, e a tela tem que andar com ele. */
-const DIGITACAO=['motQtd','motivoLib','atQtd','motivoLibV'];
+const DIGITACAO=['motQtd','motivoLib','atQtd','motivoLibV','sobrouTexto'];
 function digitando(){ var a=document.activeElement; return !!(a && DIGITACAO.indexOf(a.id)>=0); }
 carregar(); setInterval(function(){ if(!digitando()) carregar(); },4000);
 </script><script src="/nav.js"></script>

@@ -15,7 +15,7 @@
  *   - a VIRADA: o que foi impresso antes ja baixou, e nao baixa de novo;
  *   - urgencia e inventario olham o que esta na prateleira;
  *   - o grafico conta a saida pela data da baixa;
- *   - a Mesa: "a persiana voltou" so devolve o que baixou; "fechar
+ *   - a Mesa: nunca devolve saldo (desde a 2-B o "voltou" e o Sobrou); "fechar
  *     conferencias antigas" so fecha caixa que ja baixou;
  *   - o livro fecha (SUM(delta) = skus.estoque) depois de tudo.
  *
@@ -297,17 +297,19 @@ const FOTO = 'data:image/jpeg;base64,' + Buffer.alloc(3000, 7).toString('base64'
 
   /* ═══════════════════════════════════════════════════════════════════════ */
   console.log('\n=== 11. A MESA SE AJUSTA ===\n');
-  // cancelada antes da conferencia: a reserva some sozinha, e o "voltou" nao devolve nada
+  // cancelada antes da conferencia: a reserva some sozinha
   db.prepare("UPDATE lote SET estagio='cancelado', cancelada_estagio='embalado', cancelada_em=datetime('now','localtime') WHERE id=?").run(vB1);
   eq('cancelada antes de conferir: a reserva some', BAIXA.reservados(db)['BK160160CINZA'] || 0, 0);
+  /* Desde a fase 2-B a Mesa nunca devolve saldo (D7): a volta e o "Sobrou" da
+     Conferencia, que so devolve o que baixou (teste_sobra.js). */
+  r = await chamar('POST /api/correcao/previa', {acao:'cancelada', tipo:'lote', id:vB1, params:{voltou:false}}, ANA);
+  ok('o "registrar" de caixa que nunca baixou avisa que o saldo fica alto', r.status === 200 &&
+     (r.body.estoque || []).length === 0 && /nunca (foi )?conferid|acima/i.test(r.body.resumo || ''), JSON.stringify(r.body));
   r = await chamar('POST /api/correcao/previa', {acao:'cancelada', tipo:'lote', id:vB1, params:{voltou:true}}, ANA);
-  ok('"a persiana voltou" de caixa que nunca baixou NAO devolve saldo', r.status === 200 && (r.body.estoque || []).length === 0,
-     JSON.stringify(r.body));
-  ok('e a previa diz que a reserva ja soltou', /reserv/i.test(r.body.resumo || ''), r.body.resumo);
-  // cancelada depois da conferencia: devolve
+  ok('o "a persiana voltou" da Mesa e recusado (2-B, D7)', r.status === 409, JSON.stringify(r.body));
   db.prepare("UPDATE lote SET estagio='cancelado', cancelada_estagio='embalado', cancelada_em=datetime('now','localtime') WHERE id=?").run(vA);
-  r = await chamar('POST /api/correcao/previa', {acao:'cancelada', tipo:'lote', id:vA, params:{voltou:true}}, ANA);
-  ok('a que ja baixou devolve +1', r.status === 200 && (r.body.estoque || []).length === 1 && r.body.estoque[0].delta === 1,
+  r = await chamar('POST /api/correcao/previa', {acao:'cancelada', tipo:'lote', id:vA, params:{voltou:false}}, ANA);
+  ok('o "registrar" da que ja baixou nao traz movimento', r.status === 200 && (r.body.estoque || []).length === 0,
      JSON.stringify(r.body));
   // conferencias antigas: so a que ja baixou
   const vVelhaSem = volume({codigo:'BK140140BEGE', buyer:'Velha Sem Baixa', nf:'6601', venda:'9601', codes:'["P9601"]',

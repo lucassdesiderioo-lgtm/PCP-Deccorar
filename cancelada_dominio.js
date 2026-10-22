@@ -144,31 +144,42 @@ function marcar(db, lista, opts){
   return r;
 }
 
-/* ── A RECUSA DO MOTORISTA (spec RECUSA-DO-MOTORISTA, 02/10/2026) ─────────────
-   O motorista do ML bipa a caixa e o sistema dele diz "recusada": a venda foi
-   cancelada depois da etiqueta sair, e o relatorio ainda nao foi importado.
-   Quem esta com a caixa na mao e a expedicao, e ela MARCA aqui. Decisao do
-   dono: dois passos — a expedicao so diz "o motorista recusou", e o admin
-   aceita a volta ao estoque pela Mesa de correcoes.
+/* ── A SOBRA (CONFERENCIA-E-BAIXA, fase 2-B, 22/10/2026) ─────────────────────
+   A caixa que ficou na fabrica — o cliente cancelou, o motorista recusou, ou
+   outro motivo — e resolvida NA EXPEDICAO, pelo "Sobrou" da Conferencia: a
+   pessoa bipa a etiqueta, diz o motivo e bipa o SKU de cada persiana. O
+   "Motorista recusou" de 02/10/2026 virou um dos motivos, e o "a persiana
+   voltou" da Mesa saiu: a Mesa nunca mexe em saldo (D7). Quem devolve o saldo
+   e o `baixa_dominio.devolver`; aqui mora so o volume.
 
-   ⚠️ O SALDO NAO SE MEXE AQUI. Quem decide se a persiana voltou para a
-   prateleira e uma pessoa, pela Mesa, com motivo (D3). A marcacao so tira a
-   caixa das listas e a poe no card.
+   ⚠️ A ORIGEM E 'sobra', E NAO 'conferencia': esse valor ja e do
+   `conferir_canceladas.js`, e as duas origens se confundiriam. A venda que ja
+   estava cancelada (pelo relatorio, ou pela recusa de antes da 2-B) mantem a
+   origem dela — e historia — e so ganha a decisao.
 
-   ⚠️ A CAIXA DE VARIAS E CANCELADA INTEIRA, e isso nao contradiz a regra do
-   relatorio. La o ML cancela UM item e nao diz qual peca e; aqui o motorista
-   recusou a CAIXA, com tudo dentro. Por isso `cancelada_varias` fica 0, e a
-   Mesa oferece o "voltou" por peca.
+   ⚠️ A CAIXA DE VARIAS COM UM ITEM CANCELADO NAO E SOBRA. O ML cancelou um
+   item e o cliente ainda quer os outros: a caixa se refaz na Etiqueta de
+   Venda. Ja a caixa de varias que sobrou INTEIRA (o motorista recusou, o
+   pacote todo foi cancelado) e sobra, e volta por peca.
 
    Recusa (devolve {motivo, aviso}) ou null. A frase diz o que fazer: a pessoa
-   esta com a caixa na mao, na frente do motorista. */
+   esta com a caixa na mao. */
 const ORIGEM_MOTORISTA = 'motorista';
-function naoRecusa(v){
-  if(!v) return { motivo:'nao_encontrado', aviso:'Etiqueta não encontrada. Bipe a etiqueta de VENDA da caixa recusada.' };
-  if(v.estagio === ESTAGIO || v.cancelada_varias)
-    return { motivo:'ja_cancelada', aviso:'Esta venda já está cancelada no sistema (' +
-      (v.cancelada_origem === ORIGEM_MOTORISTA ? 'recusa do motorista' : 'relatório do Mercado Livre') +
-      '). Separe a caixa: ela está no card "Canceladas depois da etiqueta", e o admin decide a volta ao estoque.' };
+const ORIGEM_SOBRA = 'sobra';
+function naoSobra(v){
+  if(!v) return { motivo:'nao_encontrado', aviso:'Etiqueta não encontrada. Bipe a etiqueta de VENDA da caixa que sobrou.' };
+  if(v.estagio === ESTAGIO){
+    if(v.cancelada_resolvida_em)
+      return { motivo:'ja_decidida', aviso:'Esta caixa já foi resolvida' +
+        (v.cancelada_resolvida_por ? ' por ' + v.cancelada_resolvida_por : '') + '. Não há mais nada a fazer com ela.' };
+    if(v.cancelada_estagio !== 'embalado' && v.cancelada_estagio !== 'carregado')
+      return { motivo:'sem_etiqueta', aviso:'Esta venda foi cancelada antes de a etiqueta de venda sair: nada saiu ' +
+        'do estoque, então não há o que voltar. Separe a caixa e avise o admin.' };
+    return null;
+  }
+  if(v.cancelada_varias)
+    return { motivo:'varias_item', aviso:'O Mercado Livre cancelou só um item desta caixa de várias persianas, e o ' +
+      'cliente ainda quer as outras. Ela não é sobra: refaça a caixa na Etiqueta de Venda.' };
   const lugar = onde(v);
   if(lugar === 'pendente' || lugar === 'bloqueado')
     return { motivo:'sem_etiqueta', aviso:'Esta venda ainda não teve a etiqueta impressa: nada saiu do ' +
@@ -176,7 +187,7 @@ function naoRecusa(v){
   if(lugar === 'carregado')
     return { motivo:'ja_saiu', aviso:'O sistema diz que esta caixa já saiu da fábrica. Se ela voltou, ' +
       'é devolução: lance pela tela de Devoluções.' };
-  if(!lugar) return { motivo:'nao_cabe', aviso:'Esta caixa não está num lugar em que a recusa vale.' };
+  if(!lugar) return { motivo:'nao_cabe', aviso:'Esta caixa não está num lugar em que a sobra vale.' };
   return null;
 }
 
@@ -193,21 +204,42 @@ function pecasDaCaixa(db, v){
     return { codigo:p.codigo, qtd:p.qtd, sob_medida:s ? 1 : 0 }; });
 }
 
-/* Marca. NAO abre transacao (a regra do §2): a rota abre. Devolve o volume
-   como estava, para a auditoria dizer de onde ele saiu. */
-function recusar(db, id, quem){
+/* Marca a sobra. NAO abre transacao (a regra do §2): a rota abre, e devolve o
+   saldo na mesma. O volume sai do canto, do carro e da saida, e ja nasce
+   DECIDIDO — senao ia parar no card da Mesa, que pediria uma segunda decisao
+   sobre a mesma caixa. Devolve o volume como estava, para a auditoria. */
+function marcarSobra(db, id, o){
   const v = db.prepare('SELECT * FROM lote WHERE id=?').get(+id);
-  const nao = naoRecusa(v);
+  const nao = naoSobra(v);
   if(nao) return Object.assign({ ok:false }, nao);
-  const lugar = onde(v), tirar = lugar === 'no_carro' ? 1 : 0;
-  db.prepare(`UPDATE lote SET estagio='${ESTAGIO}', cancelada_estagio=estagio,
-      cancelada_em=datetime('now','localtime'), cancelada_origem=?, cancelada_motivo=?, cancelada_por=?,
-      saida_id=CASE WHEN ? THEN NULL ELSE saida_id END,
-      no_carro_em=CASE WHEN ? THEN NULL ELSE no_carro_em END,
-      no_carro_por=CASE WHEN ? THEN NULL ELSE no_carro_por END
-    WHERE id=?`).run(ORIGEM_MOTORISTA, 'Recusada pelo motorista do Mercado Livre no carregamento',
-      String((quem && quem.nome) || '').trim() || null, tirar, tirar, tirar, v.id);
+  const nome = String((o && o.quem && o.quem.nome) || '').trim() || null;
+  const lugar = v.estagio === ESTAGIO ? 'cancelada' : onde(v);
+  if(v.estagio !== ESTAGIO){
+    const tirar = lugar === 'no_carro' ? 1 : 0;
+    db.prepare(`UPDATE lote SET estagio='${ESTAGIO}', cancelada_estagio=estagio,
+        cancelada_em=datetime('now','localtime'), cancelada_origem=?, cancelada_motivo=?, cancelada_por=?,
+        saida_id=CASE WHEN ? THEN NULL ELSE saida_id END,
+        no_carro_em=CASE WHEN ? THEN NULL ELSE no_carro_em END,
+        no_carro_por=CASE WHEN ? THEN NULL ELSE no_carro_por END
+      WHERE id=?`).run(ORIGEM_SOBRA, String((o && o.motivo) || '').slice(0, 200), nome, tirar, tirar, tirar, v.id);
+  }
+  db.prepare(`UPDATE lote SET cancelada_resolvida_em=datetime('now','localtime'), cancelada_resolvida_por=?,
+      cancelada_voltou=1 WHERE id=?`).run(nome || '', v.id);
   return { ok:true, antes:v, lugar };
+}
+
+/* AS CANCELADAS QUE AINDA ESPERAM A SOBRA: a caixa com etiqueta, ainda na
+   fabrica, sem decisao. A caixa de varias com um item cancelado fica de fora —
+   o lugar dela e a Etiqueta de Venda, e o card da Mesa a mostra. */
+function aguardandoSobra(db){
+  const cols = colunas(db);
+  if(cols.indexOf('cancelada_resolvida_em') < 0) return [];
+  return db.prepare(`SELECT id, codigo, buyer, nf, modalidade, despachar_em, cancelada_motivo, cancelada_origem,
+      cancelada_em, conferido_por, (SELECT SUM(qtd) FROM lote_item i WHERE i.lote_id=lote.id) pecas
+    FROM lote
+    WHERE COALESCE(teste,0)=0 AND estagio='${ESTAGIO}' AND cancelada_estagio IN ('embalado','carregado')
+      AND cancelada_resolvida_em IS NULL AND COALESCE(cancelada_varias,0)=0
+    ORDER BY cancelada_em, id`).all();
 }
 
 /* O CARD (D3): o que ja tinha baixado do estoque, ou esta na fabrica, e a caixa
@@ -237,4 +269,4 @@ function listar(db){
 }
 
 module.exports = { ESTAGIO, ORIGEM_MOTORISTA, ehCancelamento, cabecalhoDePacote, daPlanilha, marcar, listar, onde,
-                   naoRecusa, pecasDaCaixa, recusar };
+                   ORIGEM_SOBRA, naoSobra, pecasDaCaixa, marcarSobra, aguardandoSobra };

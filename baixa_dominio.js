@@ -15,6 +15,10 @@
  * o "foi no caminhao" da saida (saida_route.js), que e a caixa que saiu sem
  * ninguem conferir. Mais ninguem. A Mesa de correcoes NAO baixa (D7).
  *
+ * QUEM CHAMA `devolver` (fase 2-B): so o "Sobrou" da Conferencia, depois de
+ * bipado o SKU de cada persiana. E o caminho de volta do mesmo −1, e por isso
+ * mora aqui: um dono so para a baixa e para o que ela devolve.
+ *
  * ⚠️ O SALDO CONTINUA SENDO `skus.estoque`, e o livro continua fechando: a
  * reserva e CONTA, nao movimento. Quem move saldo e o `estoque_dominio`.
  *
@@ -82,6 +86,30 @@ function baixar(db, v, usuario){
   return moveu;
 }
 
+/* A SOBRA (fase 2-B): a caixa que ficou na fabrica volta para a prateleira, e
+   a persiana volta ao saldo +1 POR PECA — mas SO SE A CAIXA JA TINHA BAIXADO.
+   A caixa impressa e nunca conferida nao saiu do saldo: a reserva some
+   sozinha quando ela vira `cancelado`, e devolver ali criaria uma peca que nao
+   existe. Sob medida nao tem saldo (§7).
+   ⚠️ UMA VEZ SO: a linha `sobra` do livro com a referencia da caixa e a
+   prova de que ela ja voltou. A rota tambem recusa a caixa ja decidida — esta
+   guarda e para o dia em que alguem chamar daqui sem passar por la. */
+function devolver(db, v, usuario){
+  const atual = db.prepare('SELECT * FROM lote WHERE id=?').get(v.id);
+  if(!atual || !atual.baixado_em) return [];
+  const ref = 'lote:' + atual.id;
+  if(db.prepare("SELECT 1 FROM movimento_estoque WHERE tipo='sobra' AND referencia=? LIMIT 1").get(ref)) return [];
+  const moveu = [];
+  for(const l of pecas(db, atual)){
+    if(l.sob_medida) continue;
+    ESTOQUE.movimentar(db, { codigo:l.codigo, delta:l.qtd, tipo:'sobra', referencia:ref,
+      motivo:'sobrou — ' + String(atual.cancelada_motivo || 'caixa de volta à prateleira').slice(0, 160),
+      usuario:usuario || null });
+    moveu.push({ codigo:l.codigo, delta:l.qtd });
+  }
+  return moveu;
+}
+
 /* O RESERVADO PELA ETIQUETA: pecas em caixa impressa (`embalado`) que ainda
    nao baixou. A caixa `carregado` sem baixa NAO reserva: ela saiu da fabrica
    (pela Mesa, por exemplo), e reservar para sempre travaria o SKU. Sob medida
@@ -105,4 +133,4 @@ function disponivel(db, codigo, mapa){
   return s - ((mapa || reservados(db))[c] || 0);
 }
 
-module.exports = { garantirSchema, pecas, baixar, reservados, disponivel };
+module.exports = { garantirSchema, pecas, baixar, devolver, reservados, disponivel };

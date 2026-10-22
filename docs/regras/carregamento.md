@@ -213,29 +213,48 @@ Etiqueta de Venda ────┤
 
 ---
 
-## O motorista recusou
+## A sobra (venda cancelada, motorista recusou, outro)
 
-### R-REC-01 · A caixa recusada volta ao estoque em dois passos, e a marcação não mexe no saldo
-- **Regra:** a expedição marca pelo Carregamento (**🚫 Motorista recusou** → bipe → confere cliente, NF e peças → confirma; `POST /api/carregamento/recusa`, com `carregamento.executar`). A caixa vira `cancelado`, com `cancelada_origem='motorista'` e `cancelada_por`, e sai do canto, do carro e da saída. O aviso manda tirar a etiqueta e pôr a persiana na prateleira. **O saldo só volta** quando o admin diz "A persiana voltou" na Mesa de correções (R-COR-03). Sem `confirmar`, a rota só mostra a caixa. `cancelada_dominio.recusar` é a régua, a mesma do cancelamento pelo relatório. Desde 22/10/2026 (CONFERENCIA-E-BAIXA, fase 2-A) o "voltou" só devolve saldo se a caixa **já tinha baixado** (conferida); a recusada antes da conferência solta a reserva sozinha.
-- **Por quê:** o motorista recusa no bipe dele antes de o relatório do ML chegar. E quem diz que a persiana está na prateleira é uma pessoa, com motivo (D3).
-- **Exceções:** o relatório que chegar depois acha a venda já marcada (`ja_marcada`) e não mexe na origem. O bipe normal do Carregamento continua recusando a caixa, com o título **RECUSADA PELO MOTORISTA**.
-- **Teste que trava:** `teste_recusa_motorista.js` (59).
-- **Status:** no ar desde 02/10/2026 · ainda não conferida na fábrica.
-- **História:** spec `RECUSA-DO-MOTORISTA`.
+> Desde 22/10/2026 (CONFERENCIA-E-BAIXA, fase 2-B). Até ali era o "🚫 Motorista
+> recusou" (02/10/2026, spec `RECUSA-DO-MOTORISTA`), que só marcava, e o saldo
+> voltava pela Mesa. O motorista virou um dos motivos da sobra, e a Mesa nunca
+> mexe em saldo (R-COR-06).
 
-### R-REC-02 · Só se marca a caixa com etiqueta e ainda na fábrica
-- **Regra:** área, canto ou carro de viagem aberta. Cada recusa diz o porquê: sem etiqueta (nada baixou), já saiu (é devolução, §9), já cancelada (está no card).
-- **Por quê:** fora disso não há o que voltar à prateleira.
+### R-REC-01 · A caixa que sobrou volta pelo "Sobrou", com o bipe do SKU de cada persiana
+- **Regra:** na Conferência, **↩ Sobrou** → bipa a etiqueta de venda (a tela mostra cliente, NF e persianas) → bipa o **SKU de cada persiana** → motivo (**Venda cancelada · Motorista recusou · Outro**, escrito) → **Confirmar a sobra** (`POST /api/carregamento/sobra`, `carregamento.executar`, sem chave nova — D3). A caixa vira `cancelado` com `cancelada_origem='sobra'`, o motivo e quem marcou, sai do canto, do carro e da saída, e **já nasce decidida** (`cancelada_resolvida_em`, `cancelada_voltou=1`). Se a caixa **já tinha baixado** (`baixado_em`), o saldo volta **+1 por peça** com o movimento `sobra` (`baixa_dominio.devolver`, dono único, referência `lote:<id>`); se não tinha, nenhum movimento — a reserva solta sozinha. SKU que não é da caixa, ou uma persiana a mais, é recusado; sem **todas** as persianas bipadas, sem motivo, ou com "Outro" em branco, não confirma.
+- **Por quê:** o bipe do SKU é o que prova que a persiana está na mão — sem ele, "voltou para o estoque" seria uma afirmação. A sobra é da caixa inteira: com uma peça só, o saldo subiria pela metade. "Já baixou", e não "foi conferida": a caixa impressa antes de 22/10 baixou na impressão.
+- **Exceções:** a venda que já estava cancelada (pelo relatório, ou pela recusa de antes da 2-B) também vai pela sobra e **mantém a origem** dela. O bipe normal da Conferência recusa a caixa cancelada e manda tocar em "Sobrou".
+- **Teste que trava:** `teste_sobra.js` (103) — seis defeitos reintroduzidos, um a um, e todos reprovam.
+- **Status:** em código desde 22/10/2026 · ainda não conferida na fábrica.
+- **História:** spec `CONFERENCIA-E-BAIXA` §4.
+
+### R-REC-02 · Só a caixa com etiqueta e ainda na fábrica, e uma vez só
+- **Regra:** área, canto, carro de viagem aberta, ou a cancelada ainda sem decisão. Cada recusa diz o porquê: sem etiqueta (nada saiu do estoque), já saiu (é devolução, §9), já decidida. A devolução tem guarda própria: com a linha `sobra` da caixa no livro, ela não devolve de novo.
+- **Por quê:** fora disso não há o que voltar à prateleira, e a mesma peça não volta duas vezes.
 - **Exceções:** nenhuma.
-- **Teste que trava:** `teste_recusa_motorista.js`.
-- **Status:** no ar desde 02/10/2026.
+- **Teste que trava:** `teste_sobra.js`.
+- **Status:** em código desde 22/10/2026.
 
-### R-REC-03 · A caixa de várias é recusada inteira, e o sob medida não manda pôr na prateleira
-- **Regra:** a caixa de várias vira `cancelado` com `cancelada_varias=0`, e a Mesa oferece o "voltou" por peça. A de sob medida é marcada, mas o aviso **não** manda pôr na prateleira.
-- **Por quê:** aqui o motorista recusou a caixa toda — diferente do relatório, em que o ML cancela UM item e não diz qual peça é. O sob medida não tem estoque (§7).
+### R-REC-03 · A caixa de várias volta inteira; com um item cancelado não é sobra; o sob medida não mexe em saldo
+- **Regra:** a caixa de várias que sobrou inteira volta por peça. A que tem `cancelada_varias=1` (o ML cancelou só um item) é recusada: refaz-se na Etiqueta de Venda. O sob medida é registrado sem SKU a bipar e sem movimento, e o aviso não manda pôr na prateleira.
+- **Por quê:** no item cancelado o cliente ainda quer as outras persianas. O sob medida não tem estoque (§7).
 - **Exceções:** nenhuma.
-- **Teste que trava:** `teste_recusa_motorista.js`.
-- **Status:** no ar desde 02/10/2026.
+- **Teste que trava:** `teste_sobra.js`.
+- **Status:** em código desde 22/10/2026.
+
+### R-REC-04 · Quem conferiu a caixa não marca a sobra dela (D8)
+- **Regra:** a recusa diz quem conferiu e oferece **Trocar de pessoa**. Sem liberação, nem para o Admin Geral. Caixa sem `conferido_por` passa (a régua do `carga.js → mesmaPessoa`).
+- **Por quê:** a sobra contradiz a contagem dele, e a mesma atenção conferiria a própria conta. Confirmado pelo dono em 22/10/2026.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `teste_sobra.js`.
+- **Status:** em código desde 22/10/2026.
+
+### R-REC-05 · A lista "Sobras esperando decisão" zera
+- **Regra:** a Conferência mostra o que espera a sobra (`GET /api/carregamento/sobras`): a caixa que o caminhão deixou numa saída **já fechada** e continua no canto, e a venda cancelada que ainda está na fábrica sem decisão. Resolvida pelo "Sobrou", registrada na Mesa ou levada pelo caminhão seguinte, a caixa sai da lista.
+- **Por quê:** número que não zera vira paisagem.
+- **Exceções:** a caixa de várias com um item cancelado não entra (o lugar dela é a Etiqueta de Venda, e o card da Mesa a mostra).
+- **Teste que trava:** `teste_sobra.js`.
+- **Status:** em código desde 22/10/2026.
 
 ---
 
@@ -388,10 +407,12 @@ nascem recolhidas), a exceção da R-SEG-01 (a viagem e as sobras não travam po
 > referências entre parênteses (§N) apontam para a seção do CLAUDE.md onde
 > a regra morava, hoje em cartão neste arquivo ou na história da área.
 
-- ❌ Fazer a marcação "Motorista recusou" mexer no saldo: a expedição só marca,
-  e o admin aceita a volta pela Mesa (§8-B, RECUSA-DO-MOTORISTA)
-- ❌ Marcar como `cancelada_varias` a caixa de várias que o motorista recusou: ele
-  recusou a caixa inteira, e o "voltou" tem que existir por peça (§8-B)
+- ❌ ~~Fazer a marcação "Motorista recusou" mexer no saldo~~ — desde 22/10/2026
+  quem devolve é o ↩ Sobrou, com o bipe do SKU de cada persiana (R-REC-01)
+- ❌ Devolver a sobra sem o bipe do SKU de TODAS as persianas, ou deixar quem
+  conferiu a caixa marcar a sobra dela (R-REC-01, R-REC-04)
+- ❌ Marcar como `cancelada_varias` a caixa de várias que sobrou inteira: ela
+  volta por peça (R-REC-03)
 - ❌ Fazer a reimpressão gravar `impresso_por`: o bipe 1 é a PRIMEIRA
   impressão, e papel repetido não é outra contagem (§8-B, fase 1 da saída)
 - ❌ Voltar a esconder os SKUs da caixa de várias no Carregamento, ou mostrar só

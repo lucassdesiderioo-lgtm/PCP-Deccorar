@@ -543,6 +543,10 @@ peça no cenário do adiantado.
 
 ### ⚠️ O MOTORISTA RECUSOU — a caixa volta ao estoque em dois passos (02/10/2026, spec `RECUSA-DO-MOTORISTA`)
 
+> ⚠️ **SUBSTITUÍDO EM 22/10/2026** pela fase 2-B da `CONFERENCIA-E-BAIXA`: o motorista
+> virou um dos motivos do **↩ Sobrou**, que marca e devolve o saldo na própria
+> Conferência, bipando o SKU (R-REC-01). O texto abaixo é a história dos dois passos.
+
 O motorista do ML bipa a caixa e o sistema dele diz **recusada**: a venda foi
 cancelada depois da etiqueta sair, e o relatório ainda não chegou. Até aqui a
 caixa ficava `embalado`/`carregado` e a Mesa recusava a volta ao estoque com
