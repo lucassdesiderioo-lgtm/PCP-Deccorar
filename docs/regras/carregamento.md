@@ -225,7 +225,7 @@ Etiqueta de Venda ────┤
 - **Por quê:** o bipe do SKU é o que prova que a persiana está na mão — sem ele, "voltou para o estoque" seria uma afirmação. A sobra é da caixa inteira: com uma peça só, o saldo subiria pela metade. "Já baixou", e não "foi conferida": a caixa impressa antes de 22/10 baixou na impressão.
 - **Exceções:** a venda que já estava cancelada (pelo relatório, ou pela recusa de antes da 2-B) também vai pela sobra e **mantém a origem** dela. O bipe normal da Conferência recusa a caixa cancelada e manda tocar em "Sobrou".
 - **Teste que trava:** `teste_sobra.js` (103) — seis defeitos reintroduzidos, um a um, e todos reprovam.
-- **Status:** no ar desde 22/10/2026 (PR #222) · a primeira sobra real ainda não foi relatada.
+- **Status:** no ar desde 22/10/2026 (PR #222) · ✅ a primeira sobra real funcionou no mesmo dia, com o saldo subindo (relato do dono).
 - **História:** spec `CONFERENCIA-E-BAIXA` §4.
 
 ### R-REC-02 · Só a caixa com etiqueta e ainda na fábrica, e uma vez só
