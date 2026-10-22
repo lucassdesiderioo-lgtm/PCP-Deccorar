@@ -153,15 +153,37 @@ function montar(db, modulos){
   const antesTudo = intocados.map(foto);
   const modAntes = db.prepare('SELECT id,modalidade FROM lote ORDER BY id').all();
 
-  let s = fecharPassivo(db, {aplicar:false});
+  /* A DATA DE CORTE (22/10/2026): "esperando o caminhão" também descreve a
+     caixa bipada hoje cedo, que está no canto esperando o caminhão de hoje.
+     Quem sabe até quando tudo saiu é quem viu sair. */
+  const recusaPassivo = o => { try{ fecharPassivo(db, o); return null; }catch(e){ return e.message; } };
+  let e1 = recusaPassivo({aplicar:true});
+  ok('sem --ate é recusado, e nada é gravado',
+     !!e1 && /data de corte/i.test(e1) && db.prepare('SELECT COUNT(*) n FROM saida').get().n === 0 && !l(c1).saiu_em,
+     e1 || 'não recusou');
+  e1 = recusaPassivo({aplicar:true, ate:'24/09/2026'});
+  ok('data fora do formato AAAA-MM-DD é recusada', !!e1 && /formato/i.test(e1), e1 || 'não recusou');
+  e1 = recusaPassivo({aplicar:true, ate:'2999-01-01'});
+  ok('data de corte depois de hoje é recusada', !!e1 && /depois de hoje/i.test(e1), e1 || 'não recusou');
+  let s = fecharPassivo(db, {aplicar:false, ate:'2026-09-23'});
+  ok('o corte é pelo dia do bipe pro canto: até 23/09 pega as duas de antes e deixa a de 24/09',
+     s.caixas.length === 2 && [c1,c2].every(i => s.caixas.some(c => c.id === i)),
+     JSON.stringify(s.caixas.map(c => c.id)));
+
+  s = fecharPassivo(db, {aplicar:false, ate:'2026-09-24'});
   ok('simulação acha exatamente as 3 caixas esperando o caminhão',
      s.caixas.length === 3 && [c1,c2,c3].every(i => s.caixas.some(c => c.id === i)),
      JSON.stringify(s.caixas.map(c => c.id)));
   ok('simulação NÃO grava nada — nem saída, nem caixa',
      !s.saida_id && db.prepare('SELECT COUNT(*) n FROM saida').get().n === 0 && !l(c1).saiu_em && !l(c1).retirado_em);
 
-  s = fecharPassivo(db, {aplicar:true});
+  s = fecharPassivo(db, {aplicar:true, ate:'2026-09-24'});
   const sd = db.prepare('SELECT * FROM saida WHERE id=?').get(s.saida_id);
+  const hojeBR = hoje.slice(8,10) + '/' + hoje.slice(5,7) + '/' + hoje.slice(0,4);
+  ok('o motivo gravado diz o dia da rodada e a data de corte (e não "25/09/2026" fixo)',
+     !!sd && sd.motivo.includes('limpeza de ' + hojeBR) && sd.motivo.includes('até 24/09/2026') &&
+     (hojeBR === '25/09/2026' || !sd.motivo.includes('25/09/2026')),
+     sd && sd.motivo);
   ok('aplicar cria UMA saída tipo passivo', !!sd && sd.tipo === 'passivo' &&
      db.prepare('SELECT COUNT(*) n FROM saida').get().n === 1, JSON.stringify(sd));
   ok('a saída guarda quantas e quais caixas',
@@ -183,7 +205,7 @@ function montar(db, modulos){
   ok('não mexe em lote.modalidade de ninguém',
      JSON.stringify(db.prepare('SELECT id,modalidade FROM lote ORDER BY id').all()) === JSON.stringify(modAntes));
 
-  const s2 = fecharPassivo(db, {aplicar:true});
+  const s2 = fecharPassivo(db, {aplicar:true, ate:hoje});
   ok('rodar de novo não acha nada e não cria outra saída (idempotente)',
      s2.caixas.length === 0 && !s2.saida_id && db.prepare('SELECT COUNT(*) n FROM saida').get().n === 1);
 
@@ -193,7 +215,7 @@ function montar(db, modulos){
     cru.exec(`CREATE TABLE lote (id INTEGER PRIMARY KEY, estagio TEXT, modalidade TEXT,
       carregado_em TEXT, retirado_em TEXT, teste INTEGER DEFAULT 0)`);
     let erro = null;
-    try{ fecharPassivo(cru, {aplicar:true}); }catch(e){ erro = e.message; }
+    try{ fecharPassivo(cru, {aplicar:true, ate:'2026-09-24'}); }catch(e){ erro = e.message; }
     ok('banco sem as colunas novas é recusado dizendo para subir o servidor antes',
        !!erro && /servidor/i.test(erro), erro || 'não recusou');
     cru.close();
@@ -204,8 +226,10 @@ function montar(db, modulos){
   ok('o script só grava com --aplicar', /process\.argv\.includes\(['"]--aplicar['"]\)/.test(texto));
   ok('e faz `await db.backup()` antes de gravar',
      /await\s+db\.backup\(/.test(texto) &&
-     texto.indexOf('await db.backup(') < texto.lastIndexOf('fecharPassivo(db,{aplicar:true})'),
+     texto.indexOf('await db.backup(') < texto.lastIndexOf('fecharPassivo(db,{aplicar:true'),
      'o backup tem que vir antes da chamada que grava');
+  ok('a linha de comando passa o --ate para as duas chamadas do passivo da coleta',
+     /fecharPassivo\(db, *\{aplicar:false, *ate\}\)/.test(texto) && /fecharPassivo\(db, *\{aplicar:true, *ate\}\)/.test(texto));
 
   // ── 7. O PASSIVO DAS CAIXAS NUNCA BIPADAS (01/10/2026) ───────────────────
   /* 460 caixas de coleta e 26 de agência com a etiqueta impressa e NUNCA
