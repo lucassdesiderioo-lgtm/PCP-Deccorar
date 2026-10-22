@@ -20,7 +20,8 @@
  *   - esqueci meu PIN: quem tem `pessoas.gerenciar` autoriza com o proprio PIN,
  *     nunca para si mesmo, e o PIN dele conta na trava dele (fase 5-A2);
  *   - 1 hora sem uso encerra a sessao; leitura automatica nao renova; a TV e o
- *     quadro do sob medida ficam de fora so para ler (fase 5-A3).
+ *     quadro do sob medida ficam de fora so para ler (fase 5-A3);
+ *   - pelo https (nginx), o cookie de sessao leva Secure (fase 5-B).
  *
  * Ate 20/10/2026 nenhum teste do projeto passava pelo POST /api/auth/login.
  *
@@ -57,6 +58,7 @@ let desvio = 0;
 Date.now = () => agoraReal() + desvio;
 
 const app = express();
+app.set('trust proxy', 'loopback');   // o mesmo do server.js (fase 5-B)
 app.use(express.json());
 require('./auth')(app, db);
 app.get('/api/coisa', (req,res) => res.json({ ok:true, quem: req.usuario && req.usuario.nome }));
@@ -381,6 +383,29 @@ async function main(){
     euTv = await (await fetch(base + '/api/auth/eu?tela=%2Fsetor', { headers:{ cookie: cTv } })).json();
     eq('e a que nao e', euTv.exibicao, false);
     eq('e diz o tempo sem uso, em minutos', euTv.inativoMin, 60);
+
+    console.log('\n── 13. com cadeado (HTTPS pelo nginx), o cookie so viaja protegido (fase 5-B) ──');
+    /* O nginx atende o https e repassa ao sistema na porta local, contando no
+       cabecalho X-Forwarded-Proto. O sistema so acredita nesse cabecalho
+       vindo da propria maquina (trust proxy 'loopback'). */
+    const loginCom = async (extra) => {
+      const q = await fetch(base + '/api/auth/login', { method:'POST',
+        headers: Object.assign({ 'content-type':'application/json' }, extra || {}),
+        body: JSON.stringify({ id: CAIO, pin: '123456' }) });
+      return q.headers.get('set-cookie') || '';
+    };
+    let ck = await loginCom({ 'x-forwarded-proto':'https' });
+    ok('login pelo https: o cookie leva Secure', /;\s*Secure/i.test(ck), ck);
+    ok('e continua HttpOnly', /HttpOnly/i.test(ck), ck);
+    ck = await loginCom();
+    ok('login sem cadeado (teste local, IP antigo): sem Secure, senao o navegador nem guardaria', !/;\s*Secure/i.test(ck), ck);
+    const cS = sess(await loginCom({ 'x-forwarded-proto':'https' }));
+    q = await fetch(base + '/api/acao', { method:'POST', headers:{ cookie: cS, 'x-forwarded-proto':'https' } });
+    ok('a renovacao pelo https tambem leva Secure', /;\s*Secure/i.test(q.headers.get('set-cookie') || ''), q.headers.get('set-cookie'));
+    q = await fetch(base + '/api/auth/ativo', { method:'POST', headers:{ cookie: cS, 'x-forwarded-proto':'https' } });
+    ok('e o aviso de uso tambem', /;\s*Secure/i.test(q.headers.get('set-cookie') || ''), q.headers.get('set-cookie'));
+    ok('o server.js confia so no nginx da propria maquina',
+       /app\.set\(\s*'trust proxy'\s*,\s*'loopback'\s*\)/.test(fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8')));
   } finally {
     srv.close();
   }

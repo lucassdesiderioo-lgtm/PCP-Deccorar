@@ -1311,6 +1311,14 @@ de 6 pela própria tela de login (`POST /api/auth/trocar-pin`).
 > ⚠️ **A TELA DE LOGIN NÃO SABE O TAMANHO DO PIN DE CADA PESSOA.** Quem tem 6
 > entra sozinho no sexto dígito; quem ainda tem 4 toca **OK**. Contar à tela o
 > tamanho do PIN de cada nome seria dizer a quem chuta quem ainda tem 4.
+>
+> ⚠️ **E O OK PARALISOU A FÁBRICA NO DIA DO DEPLOY (22/10/2026).** Com 6
+> bolinhas na tela, ninguém percebeu que o PIN antigo precisava do **OK**: o
+> dono concluiu que *"não dá para entrar com 4 números"*, e a fábrica ficou
+> parada até isso ser dito em palavras. O texto da tela dizia, e não bastou —
+> instrução de tela não substitui o recado à equipe no dia da troca. Fica a
+> proposta (não feita) de a tela mostrar 4 bolinhas a quem ainda tem o PIN
+> antigo.
 
 > ⚠️ **A PRÓPRIA PESSOA TROCA O PIN, E O ESQUECIDO NÃO PASSA PELO `/acessos`**
 > (fase 5-A2, 21/10/2026). Os dois ficam **só na tela do PIN**, depois de tocar
@@ -1340,6 +1348,19 @@ de 6 pela própria tela de login (`POST /api/auth/trocar-pin`).
 > link da TV para outra tela cai no PIN —, e sem sessão nenhuma eles continuam
 > trancados. O cookie de antes desta fase (sem a hora) vence: no deploy, todo
 > mundo entra de novo.
+
+> ⚠️ **O SISTEMA PASSA A ABRIR EM `https://pcp.sistemadeccorar.com.br`** (fase
+> 5-B, 22/10/2026). O nginx da própria máquina atende o https e repassa à porta
+> 3010; o `server.js` tem `app.set('trust proxy','loopback')` — só acredita no
+> `X-Forwarded-Proto` vindo da **própria máquina**, senão qualquer um de fora
+> mandaria "https" — e o cookie de sessão leva **`Secure`** quando o pedido chega
+> com cadeado. Sem cadeado (teste local, o IP antigo) vai sem a marca, senão o
+> navegador nem o guardaria. O passo a passo do servidor (nome na Hostinger,
+> nginx, certificado, tablets, fechar a porta 3010) está em `docs/HTTPS.md`.
+>
+> ⚠️ **O NGINX PRECISA DE `client_max_body_size 25m`.** Sem ele, o upload do PDF
+> do Mercado Livre acima de 1 MB é recusado antes de chegar ao sistema — a
+> armadilha do `express.json()` (§12) na frente do sistema.
 
 > ⚠️ **PIN fora do formato no `/acessos` é RECUSADO, e não ignorado.** Até aqui
 > um PIN de 3 dígitos na edição de uma pessoa era descartado em silêncio e a tela
@@ -1476,7 +1497,7 @@ Esperado: telas `302`, API `401`, `/login` `200`.
 
 Proteção contra força bruta: 5 PINs errados bloqueiam a pessoa por 1 minuto —
 **inclusive com o PIN certo**, senão a trava só atrasaria quem chuta —, e a trava é
-por pessoa. **Rode `node teste_login.js` (127 casos) ao mexer no `auth.js` ou no `login.html`**: ele
+por pessoa. **Rode `node teste_login.js` (133 casos) ao mexer no `auth.js` ou no `login.html`**: ele
 trava o PIN guardado como scrypt com salt próprio, o bloqueio e o minuto (o
 relógio do teste é trocado), o cookie assinado (trocar o id dentro dele não vira
 outra pessoa), a sessão que cai quando a pessoa é bloqueada no cadastro e a
@@ -1484,7 +1505,7 @@ troca do PIN de 4 (sessão aberta barrada, inclusive no sob medida; PIN de hoje
 exigido e contado na trava; cadastro só com 6; banco antigo ganhando a coluna) e o
 "Esqueci meu PIN" (só quem gerencia pessoas autoriza, nunca o próprio, e o PIN
 dele conta na trava dele) e a hora sem uso (59 minutos vale, 61 sai, leitura
-automática não renova, a TV só lê). Se o
+automática não renova, a TV só lê) e o cookie `Secure` pelo https. Se o
 `.session_secret` não existia, o teste o apaga no fim.
 
 ---
@@ -1889,7 +1910,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 1b | ~~`fila` não tem `CREATE TABLE` em lugar nenhum~~ **RESOLVIDO em 14/08/2026** — criada em `db.js` | — |
 | 1d | ~~`revisao.modo` e `producao.origem`/`urgente` sem migração~~ **RESOLVIDO em 14/08/2026** — auditoria completa, ver §17 | — |
 | 1c | ~~**Embalagem em teste consome linha real da `fila`**~~ **RESOLVIDO em 17/09/2026** — a fila é filtrada pelo mesmo `teste` do momento: em modo teste consome linha de teste, fora dele consome linha real (§4, armadilha #26) | — |
-| 2 | **Sem HTTPS.** PINs trafegam em texto aberto. O PIN passou a ter 6 dígitos em 21/10/2026 (fase 5-A da `ACESSOS-UNIFICADOS`); o HTTPS é a fase 5-B | Alto se exposto à internet |
+| 2 | **Sem HTTPS.** PINs trafegam em texto aberto. O PIN passou a ter 6 dígitos em 21/10/2026 (fase 5-A da `ACESSOS-UNIFICADOS`). **Código do HTTPS pronto em 22/10/2026 (fase 5-B)**: falta o servidor (`docs/HTTPS.md`) e, depois, fechar a porta 3010 de fora — só aí a dívida fecha | Alto se exposto à internet |
 | 3 | **Revisão perdida em falha de conexão** — sem fila local de reenvio | Médio — buraco silencioso no relatório |
 | 4 | `POST /api/producao` (manual) não aceita `data`, `origem` nem `urgente` | Médio — impede lançar adiantado pela tela |
 | 5 | Upload não permite escolher a data das vendas | Médio — vendas de amanhã entram como hoje |
@@ -1897,7 +1918,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_recusa_motorista.js` (59), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (24), `teste_upload.js` (46), `teste_devolucao.js` (33) e `teste_login.js` (127); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (47), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_recusa_motorista.js` (59), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (24), `teste_upload.js` (46), `teste_devolucao.js` (33) e `teste_login.js` (133); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |

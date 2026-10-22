@@ -4,6 +4,12 @@ const db = require('./db');
 const ESTOQUE = require('./estoque_dominio');
 const app = express();
 const PORT = 3010;
+/* HTTPS (ACESSOS-UNIFICADOS fase 5-B, 22/10/2026): o nginx da propria maquina
+   atende https://pcp.sistemadeccorar.com.br e repassa para esta porta, contando
+   no X-Forwarded-Proto. So se acredita nesse cabecalho vindo da propria maquina
+   ('loopback'): de fora, qualquer um poderia mandar "https" e o cookie sairia
+   marcado Secure sem cadeado nenhum. E o que faz o req.secure valer. */
+app.set('trust proxy', 'loopback');
 app.use(express.json({limit:'25mb'}));
 require('./auth')(app, db);
 app.use(express.static(path.join(__dirname, 'public')));

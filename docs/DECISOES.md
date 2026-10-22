@@ -301,3 +301,11 @@ valia 1 ano, e o tablet ficava com o nome da última pessoa até alguém tocar e
 pessoa digita o PIN de novo. A atualização automática das telas não conta como uso. A TV
 do painel e o quadro do sob medida ficam abertos, só para ler, porque mostram número e
 ficam ligados sem ninguém mexer. Detalhe no `CLAUDE.md` §10.
+
+## 22/10/2026 — o sistema passa a abrir em `https://pcp.sistemadeccorar.com.br`
+Decisão do dono (fase 5-B da spec `ACESSOS-UNIFICADOS`). **Antes:** `http://<IP>:3010`,
+sem cadeado, com o PIN viajando aberto. **Depois:** um nome por sistema, debaixo de
+`sistemadeccorar.com.br` (este é o `pcp.`; os outros sistemas da empresa seguem a
+mesma ideia), com certificado gratuito que se renova sozinho, e o cookie de sessão
+marcado para só viajar protegido. A porta antiga fecha quando todos os aparelhos
+tiverem mudado. Detalhe no `CLAUDE.md` §10 e em `docs/HTTPS.md`.

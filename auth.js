@@ -131,9 +131,12 @@ module.exports=function(app, db){
     // arquivo de apoio do sob medida (.js, .css, imagem), que a tela do quadro carrega
     return p.startsWith(SOBMEDIDA+'/')&&/\.[a-z0-9]+$/i.test(p)&&!/\.html$/i.test(p);
   }
-  function cookieSessao(id){
+  /* Pelo https (fase 5-B), o cookie leva Secure: o navegador nunca o manda
+     por uma conexao sem cadeado. Sem https (teste local, o IP antigo enquanto
+     ele existir) vai sem a marca — com ela o navegador nem guardaria. */
+  function cookieSessao(id,req){
     const corpo=Buffer.from(JSON.stringify({id:id,u:Date.now()})).toString('base64');
-    return 'sess='+encodeURIComponent(corpo+'.'+assina(corpo))+'; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax';
+    return 'sess='+encodeURIComponent(corpo+'.'+assina(corpo))+'; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax'+(req&&req.secure?'; Secure':'');
   }
 
   function lerSessao(req){
@@ -184,7 +187,7 @@ module.exports=function(app, db){
        quadro nao renovam: eles nunca vencem, entao nao precisam. */
     if(u&&!livreDoRelogio(req)){
       const tela=!p.startsWith('/api/')&&!p.startsWith(SOBMEDIDA+'/api/')&&(!/\.[a-z0-9]+$/i.test(p)||/\.html$/i.test(p));
-      if(req.method!=='GET'||tela) res.setHeader('Set-Cookie',cookieSessao(u.id));
+      if(req.method!=='GET'||tela) res.setHeader('Set-Cookie',cookieSessao(u.id,req));
     }
     if(u&&u.trocarPin){
       if(p.startsWith('/api/')||p.startsWith(SOBMEDIDA+'/api/'))
@@ -245,7 +248,7 @@ module.exports=function(app, db){
       return res.status(401).json({erro:'PIN incorreto'});
     }
     delete falhas[id];
-    res.setHeader('Set-Cookie',cookieSessao(u.id));
+    res.setHeader('Set-Cookie',cookieSessao(u.id,req));
     aud({usuario:{id:u.id,nome:u.nome},headers:req.headers,socket:req.socket},'acesso','login',u.nome,'');
     const areasU=u.areas.split(',').filter(Boolean);
     res.json({ok:true,nome:u.nome,areas:areasU,destino:destino(areasU),trocar_pin:!!u.pin_curto});
@@ -326,7 +329,7 @@ module.exports=function(app, db){
   app.post('/api/auth/logout',(req,res)=>{
     const u=lerSessao(req);
     if(u) aud({usuario:u,headers:req.headers,socket:req.socket},'acesso','logout',u.nome,'');
-    res.setHeader('Set-Cookie','sess=; Path=/; Max-Age=0');
+    res.setHeader('Set-Cookie','sess=; Path=/; Max-Age=0'+(req.secure?'; Secure':''));
     res.json({ok:true});
   });
 
@@ -344,7 +347,7 @@ module.exports=function(app, db){
   app.post('/api/auth/ativo',(req,res)=>{
     const u=lerSessao(req);
     if(!u) return res.status(401).json({erro:'nao_logado'});
-    res.setHeader('Set-Cookie',cookieSessao(u.id));
+    res.setHeader('Set-Cookie',cookieSessao(u.id,req));
     res.json({ok:true});
   });
 
