@@ -528,6 +528,12 @@ function mostrar(r,code){
   else if(r.motivo==='cancelada'){ aguardando=null;
     banner('err',r.origem==='motorista'?'🚫 RECUSADA PELO MOTORISTA — NÃO CARREGAR':'⛔ VENDA CANCELADA — NÃO CARREGAR',
       (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
+  /* MODO TESTE LIGADO E CAIXA DE VERDADE (22/10/2026): conferir aqui a deixaria
+     baixada, e o "apagar tudo" do modo teste devolveria o saldo pela foto — o
+     estoque ficaria 1 acima para sempre. A tela diz o porque, e o que fazer. */
+  else if(r.motivo==='modo_teste'){ aguardando=null;
+    banner('err','🧪 MODO TESTE LIGADO — ESTA CAIXA É DE VERDADE',
+      (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
   else if(r.motivo==='nao_embalado'){ aguardando=null;
     banner('err','⚠ FALTA A ETIQUETA DE VENDA',
       (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }

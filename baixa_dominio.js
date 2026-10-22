@@ -110,6 +110,24 @@ function devolver(db, v, usuario){
   return moveu;
 }
 
+/* O MODO TESTE E A CAIXA DE VERDADE (22/10/2026). O modo teste so marca o que
+   NASCE enquanto ele esta ligado (trigger de INSERT, teste_route.js). Imprimir
+   ou conferir uma caixa que ja existia deixava a caixa impressa ou baixada, e
+   o "apagar tudo" devolvia o saldo pela foto — a conferida ficava marcada como
+   baixada e nunca mais baixava: estoque 1 acima, para sempre e sem aviso.
+   Por isso, com o modo ligado, as portas que mexem em estoque (imprimir,
+   conferir, o Sobrou e o "foi no caminhao") so aceitam caixa de teste.
+   Devolve a recusa, ou null. */
+function emTeste(db){
+  try{ const r = db.prepare("SELECT valor FROM config WHERE chave='modo_teste'").get();
+       return !!(r && String(r.valor) === '1'); }catch(e){ return false; }
+}
+function travaTeste(db, v){
+  if(!v || v.teste || !emTeste(db)) return null;
+  return { ok:false, motivo:'modo_teste',
+    aviso:'Modo teste ligado: esta caixa é de verdade. Desligue o modo teste para trabalhar nela.' };
+}
+
 /* O RESERVADO PELA ETIQUETA: pecas em caixa impressa (`embalado`) que ainda
    nao baixou. A caixa `carregado` sem baixa NAO reserva: ela saiu da fabrica
    (pela Mesa, por exemplo), e reservar para sempre travaria o SKU. Sob medida
@@ -133,4 +151,4 @@ function disponivel(db, codigo, mapa){
   return s - ((mapa || reservados(db))[c] || 0);
 }
 
-module.exports = { garantirSchema, pecas, baixar, devolver, reservados, disponivel };
+module.exports = { garantirSchema, pecas, baixar, devolver, reservados, disponivel, emTeste, travaTeste };
