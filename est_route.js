@@ -394,6 +394,7 @@ module.exports = function(app, db){
         dias_cobertura_alvo: config.dias_cobertura,
         media_dia_total: cob.media_dia_total,
         entrou_hoje: hoje.entrou, saiu_hoje: hoje.saiu, variou_hoje: hoje.variou,
+        voltou_hoje: hoje.voltou,
         ajustes_30d: ajustes30, ajustes_delta_30d: ajustesDelta30,
         custo_visivel: verCusto,
         /* `sem_custo > 0` faz do total um PISO, e a tela escreve o "≥". A regra

@@ -519,6 +519,41 @@ const ok = (n, c, extra) => { casos++;
      comNeg.resumo.ok + comNeg.resumo.excesso === comNeg.resumo.skus,
      JSON.stringify(comNeg.resumo));
 
+  // ── 17. A SOBRA APARECE NO GRAFICO, COMO "VOLTOU" (22/10/2026) ───────────
+  /* A caixa que sobrou na fabrica volta pelo ↩ Sobrou e grava uma linha `sobra`
+     no livro, +1 por PECA (a caixa de 2 persianas devolve 2). O grafico passa a
+     mostra-la numa barra PROPRIA, separada do "entrou": nao e producao. E o
+     "saiu" do dia da baixa nao e reescrito — a caixa saiu naquele dia e voltou
+     neste. Linhas gravadas direto: o caso e a regua do grafico, nao o saldo. */
+  {
+    const FLUXO = require('./fluxo_estoque');
+    const antes = (await chamar('GET /api/estoque/painel')).serie;
+    const mov = db.prepare(`INSERT INTO movimento_estoque (codigo,delta,tipo,referencia,data,teste)
+      VALUES (?,?,?,?,?,?)`);
+    mov.run('BK140140BEGE', 2, 'sobra', 'lote:901', ontem, 0);   // caixa de 2 persianas
+    mov.run('BK140140BEGE', 1, 'sobra', 'lote:902', hoje,  0);
+    mov.run('BK140140BEGE', 1, 'sobra', 'lote:903', hoje,  1);   // teste: nao conta
+    mov.run('BK140140BEGE', 3, 'ajuste','ajuste:1', hoje,  0);   // ajuste: nao e sobra
+    const s = await chamar('GET /api/estoque/painel');
+    ok('a sobra de ontem aparece como "voltou", contando PEÇA (a caixa de 2 devolve 2)',
+       s.serie[28].voltou === 2, JSON.stringify(s.serie[28]));
+    ok('hoje: voltou 1 — a sobra de teste e o ajuste não contam',
+       s.serie[29].voltou === 1, JSON.stringify(s.serie[29]));
+    ok('a sobra não entra no "entrou": não é produção',
+       s.serie[29].entrou === antes[29].entrou && s.serie[28].entrou === antes[28].entrou,
+       JSON.stringify([antes[29], s.serie[29]]));
+    ok('e não reescreve o "saiu": a caixa saiu no dia da baixa',
+       s.serie[29].saiu === antes[29].saiu && s.serie[28].saiu === antes[28].saiu,
+       JSON.stringify([antes[28], s.serie[28]]));
+    ok('dia sem sobra tem "voltou" ZERO, não ausente',
+       s.serie[10].voltou === 0, JSON.stringify(s.serie[10]));
+    ok('o resumo traz quantas voltaram hoje', s.resumo.voltou_hoje === 1,
+       'veio ' + s.resumo.voltou_hoje);
+    const d = FLUXO.doDia(db);
+    ok('o doDia conta a sobra de hoje, e o "variou" do fechamento continua entrou − saiu',
+       d.voltou === 1 && d.variou === d.entrou - d.saiu, JSON.stringify(d));
+  }
+
   console.log('');
   console.log(falhas ? ('FALHARAM ' + falhas + ' de ' + casos)
                      : ('todos os ' + casos + ' casos passaram'));
