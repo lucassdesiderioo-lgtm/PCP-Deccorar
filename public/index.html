@@ -137,10 +137,11 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
         <div style="font-weight:700">Entrou &times; saiu — 30 dias</div>
         <div class="grafleg">
           <span><span class="dot" style="background:#2ea043"></span> entrou (embalagem)</span>
-          <span><span class="dot" style="background:#f85149"></span> saiu (etiqueta de venda)</span>
+          <span><span class="dot" style="background:#388bfd"></span> voltou (sobrou na conferência)</span>
+          <span><span class="dot" style="background:#f85149"></span> saiu (conferência)</span>
         </div>
       </div>
-      <div class="sub" style="margin-bottom:10px">Acima da linha o que a fábrica fez; abaixo, o que saiu pro cliente. Ajuste manual e contagem não entram aqui — eles mexem no saldo, mas não são produção nem venda.</div>
+      <div class="sub" style="margin-bottom:10px">Acima da linha o que a fábrica fez e, em azul, o que voltou à prateleira pelo ↩ Sobrou; abaixo, o que saiu pro cliente. A caixa que sobrou continua como saída no dia em que baixou. Ajuste manual e contagem não entram aqui — eles mexem no saldo, mas não são produção nem venda.</div>
       <div id="estGraf"></div>
     </div>
 
@@ -1604,15 +1605,19 @@ function estAuto(){
 function estGrafico(serie){
   const W=760, H=150, meio=H/2, n=serie.length||1, passo=W/n;
   const larg=Math.max(3, passo-6);
-  const max=Math.max(1, ...serie.map(d=>Math.max(d.entrou,d.saiu)));
+  /* A SOBRA ("voltou") vai EMPILHADA em cima do entrou, em azul: é peça que
+     voltou à prateleira, mas não é produção (fluxo_estoque.js). */
+  const vo=d=>d.voltou||0;
+  const max=Math.max(1, ...serie.map(d=>Math.max(d.entrou+vo(d),d.saiu)));
   const alt=v=> (v/max)*(meio-16);
   let b='';
   serie.forEach((d,i)=>{
-    const x=i*passo+(passo-larg)/2, he=alt(d.entrou), hs=alt(d.saiu);
+    const x=i*passo+(passo-larg)/2, he=alt(d.entrou), hv=alt(vo(d)), hs=alt(d.saiu);
     const dia=d.data.slice(8,10)+'/'+d.data.slice(5,7);
-    b+='<g><title>'+dia+' — entrou '+d.entrou+', saiu '+d.saiu+'</title>'
+    b+='<g><title>'+dia+' — entrou '+d.entrou+(vo(d)?', voltou '+vo(d):'')+', saiu '+d.saiu+'</title>'
       +'<rect x="'+(i*passo)+'" y="0" width="'+passo+'" height="'+H+'" fill="transparent"></rect>'
       +(d.entrou?'<rect x="'+x.toFixed(1)+'" y="'+(meio-he).toFixed(1)+'" width="'+larg.toFixed(1)+'" height="'+he.toFixed(1)+'" fill="#2ea043" rx="2"></rect>':'')
+      +(vo(d)   ?'<rect x="'+x.toFixed(1)+'" y="'+(meio-he-hv).toFixed(1)+'" width="'+larg.toFixed(1)+'" height="'+hv.toFixed(1)+'" fill="#388bfd" rx="2"></rect>':'')
       +(d.saiu  ?'<rect x="'+x.toFixed(1)+'" y="'+meio+'" width="'+larg.toFixed(1)+'" height="'+hs.toFixed(1)+'" fill="#f85149" rx="2"></rect>':'')
       +'</g>';
   });
@@ -1772,6 +1777,7 @@ function renderEst(){
     +'<div class="sumbox big"><div class="n" style="font-size:20px">'
        +'<span class="ok">+'+r.entrou_hoje+'</span> / <span class="baixo">−'+r.saiu_hoje+'</span></div>'
        +'<div class="l">Hoje: entrou / saiu</div>'
+       +(r.voltou_hoje?'<div class="d" style="color:#388bfd">+'+r.voltou_hoje+(r.voltou_hoje===1?' voltou':' voltaram')+' pelo ↩ Sobrou</div>':'')
        +'<div class="d">'+r.ajustes_30d+' ajuste(s) manual(is) em 30 dias</div></div>';
 
   $('#estGraf').innerHTML = estGrafico(PAINEL.serie||[]);

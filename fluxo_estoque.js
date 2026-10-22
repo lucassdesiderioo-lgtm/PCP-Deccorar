@@ -22,6 +22,12 @@
  * e passaria a responder "quanto a coluna variou", que ninguem perguntou. Eles
  * aparecem no painel com numero proprio (ajustes nos ultimos 30 dias).
  *
+ * A SOBRA E A TERCEIRA BARRA, "VOLTOU" (22/10/2026, decisao do dono). A caixa
+ * que sobrou na fabrica volta pelo ↩ Sobrou e grava `sobra` no livro, +1 por
+ * PECA. Ela fica separada do ENTROU (nao e producao) e NAO reescreve o SAIU: a
+ * caixa saiu no dia da baixa e voltou no dia da sobra. O fechamento diario
+ * continua gravando `variou = entrou - saiu`; a sobra so aparece ao lado.
+ *
  * `teste=0` em tudo: peca de teste nao e producao (§11).
  */
 
@@ -38,12 +44,25 @@ function saidasDoDia(db){
   }catch(e){ return 0; }
 }
 
-/* Os dois movimentos de hoje. E o que o fechamento diario grava. */
+/* As pecas que voltaram pelo ↩ Sobrou, por dia: SOMA do delta (a caixa de
+   duas persianas devolve 2), nunca contagem de linhas. Banco sem o livro
+   devolve vazio. */
+function sobrasPorDia(db, desde){
+  try{
+    return db.prepare("SELECT data d, COALESCE(SUM(delta),0) q FROM movimento_estoque "+
+      "WHERE tipo='sobra' AND data >= ? AND COALESCE(teste,0)=0 GROUP BY data").all(desde);
+  }catch(e){ return []; }
+}
+
+/* Os movimentos de hoje. O fechamento diario grava entrou, saiu e variou; o
+   `voltou` vai ao lado e nao entra no variou (ver o topo). */
 function doDia(db){
   const entrou = db.prepare("SELECT COUNT(*) n FROM montagem "+
     "WHERE data=date('now','localtime') AND COALESCE(teste,0)=0").get().n;
   const saiu = saidasDoDia(db);
-  return { entrou, saiu, variou: entrou - saiu };
+  const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
+  const v = sobrasPorDia(db, hoje).find(r => r.d === hoje);
+  return { entrou, saiu, variou: entrou - saiu, voltou: v ? v.q : 0 };
 }
 
 /* Os ultimos `dias` dias, um por linha, do mais antigo ao mais novo.
@@ -53,7 +72,7 @@ function doDia(db){
  * segunda e informacao. */
 function serie(db, dias){
   const n = Math.max(1, Math.min(365, Math.trunc(+dias) || 30));
-  const ent = {}, sai = {};
+  const ent = {}, sai = {}, vol = {};
   db.prepare("SELECT data d, COUNT(*) q FROM montagem "+
     "WHERE data >= date('now','localtime','-'||?||' days') AND COALESCE(teste,0)=0 "+
     "GROUP BY data").all(n-1).forEach(r => ent[r.d] = r.q);
@@ -64,6 +83,8 @@ function serie(db, dias){
       "AND COALESCE(teste,0)=0 GROUP BY date(baixado_em)").all(n-1)
       .forEach(r => sai[r.d] = r.q);
   }catch(e){}
+  const desde = db.prepare("SELECT date('now','localtime','-'||?||' days') d").get(n-1).d;
+  sobrasPorDia(db, desde).forEach(r => vol[r.d] = r.q);
 
   /* As datas saem do proprio SQLite ('now','localtime') e nao do relogio do
      Node: e o mesmo fuso que gravou as linhas, e nenhum dia se desloca. */
@@ -76,7 +97,7 @@ function serie(db, dias){
     const k = dt.getFullYear() + '-' +
       String(dt.getMonth()+1).padStart(2,'0') + '-' +
       String(dt.getDate()).padStart(2,'0');
-    out.push({ data:k, entrou: ent[k]||0, saiu: sai[k]||0 });
+    out.push({ data:k, entrou: ent[k]||0, saiu: sai[k]||0, voltou: vol[k]||0 });
   }
   return out;
 }

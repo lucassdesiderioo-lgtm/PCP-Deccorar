@@ -313,3 +313,12 @@ tudo" devolvia o saldo pela foto, mas a caixa ficava impressa ou baixada — a
 conferida nunca mais baixava, e o estoque ficava 1 acima para sempre.
 **Depois:** com o modo ligado, essas quatro portas só aceitam caixa de teste, e
 a tela diz por quê. Fora do modo teste nada muda. Detalhe no `CLAUDE.md` §11.
+
+## 22/10/2026 — o gráfico de estoque mostra a sobra, como "voltou"
+
+Pedido do dono (CONSERTO que muda o texto do R-EST-13). **Antes:** o gráfico "Entrou × saiu" da aba Estoque só mostrava a embalagem e a
+baixa; a peça que voltava pelo ↩ Sobrou subia o saldo e não aparecia nele.
+**Depois:** uma terceira barra, "voltou", em azul sobre o "entrou", conta as
+peças que sobraram no dia da sobra. O "saiu" do dia da baixa não muda, o
+"entrou" continua sendo só embalagem, e o fechamento diário segue gravando
+entrou − saiu. Cartão R-EST-13.
