@@ -142,6 +142,7 @@ Ordem de produção → REVISÃO → FILA → EMBALAGEM → ESTOQUE → ETIQUETA
 | Peça **embalada** (com kit conferido) | **+1** — é aqui que vira estoque | `embalagem` · `montagem:<id>` |
 | **Etiqueta de venda** impressa | **NENHUM** desde 22/10/2026 — a peça fica **reservada** (até ali era o −1) | nenhuma |
 | Caixa **conferida** (bipe da área ou do canto), ou que saiu sem conferência no "foi no caminhão" | **−1 por peça** — é aqui que sai, uma vez só | `conferencia` · `lote:<id>`, **uma por SKU** da caixa |
+| Caixa que **sobrou** (↩ Sobrou da Conferência, SKU de cada persiana bipado) | **+1 por peça**, se a caixa já tinha baixado; senão só solta a reserva | `sobra` · `lote:<id>`, **uma por SKU** |
 | Etiqueta de venda **reimpressa** | **NENHUM** — mesmo volume, mesmo cliente | nenhuma |
 | Peça **sob medida** | **NENHUM** nos dois lados (§7) | nenhuma |
 
@@ -172,7 +173,8 @@ Ordem de produção → REVISÃO → FILA → EMBALAGEM → ESTOQUE → ETIQUETA
 `node teste_livro.js` — ele exige `SUM(delta) = skus.estoque` depois de cada
 passo e recusa `UPDATE skus SET estoque` fora do domínio. **No `baixa_dominio.js`,
 na impressão, no bipe da conferência ou no fechamento da saída:** `node
-teste_baixa_conferencia.js` também.
+teste_baixa_conferencia.js` também. **No ↩ Sobrou ou na devolução:** `node
+teste_sobra.js`.
 
 > ⚠️ **A BAIXA É NA CONFERÊNCIA DESDE 22/10/2026** (fase 2-A da spec
 > `CONFERENCIA-E-BAIXA`, decisão do dono). A etiqueta só **reserva**; o −1 sai
@@ -192,6 +194,13 @@ teste_baixa_conferencia.js` também.
 > - ⚠️ **A MESA NUNCA DÁ A BAIXA** (D7). "Dar saída" e "fechar conferências
 >   antigas" não movem saldo; a caixa que nunca baixou fica de fora do bloco, e a
 >   prévia avisa que o saldo fica alto.
+> - ⚠️ **E A MESA TAMBÉM NUNCA DEVOLVE** (fase 2-B, 22/10/2026). A caixa que
+>   sobrou na fábrica volta pelo **↩ Sobrou** da Conferência: bipa a etiqueta e o
+>   SKU de **cada** persiana, escolhe o motivo, e o saldo volta +1 por peça **se
+>   já tinha baixado** (`baixa_dominio.devolver`, dono único). Quem conferiu a
+>   caixa não marca a sobra dela (D8). Cartões R-REC-01 a R-REC-05 em
+>   [`docs/regras/carregamento.md`](docs/regras/carregamento.md); `node
+>   teste_sobra.js` ao mexer nisso.
 
 > ⚠️ **ARMADILHA #2:** `POST /api/revisao` ainda **retorna** os campos `estoque`,
 > `pedido` e `feito`. São resquício da versão antiga; não use como fonte de verdade.
@@ -352,9 +361,10 @@ relatório (`daPlanilha`) e marca os volumes (`marcar`); o import e o
 > anterior a 15/09/2026 só conhece uma peça, e o arquivo diz que são várias.
 >
 > ⚠️ ~~**O CARD SÓ MOSTRA** (D3)~~ — **ELE DECIDE DESDE 02/10/2026**, pela
-> **Mesa de correções** (§5): *"a persiana voltou"* gera movimento
-> `cancelamento` **por peça** no livro, *"não voltou"* só registra, e nas duas o
-> volume **sai do card**. Ele continua fora do número da aba Bloqueados — nada
+> **Mesa de correções** (§5), e o volume decidido **sai do card**. ~~*"a
+> persiana voltou"* gera movimento `cancelamento` **por peça**~~ — **desde
+> 22/10/2026 a volta é o ↩ Sobrou da Conferência**, com o bipe do SKU (§2), e a
+> Mesa só registra a que *não voltou*. Ele continua fora do número da aba Bloqueados — nada
 > ali está retido —, e agora ele **zera**, que é o que faz alguém voltar a ler.
 > A caixa de várias persianas é a exceção: lá o sistema não sabe qual peça o ML
 > cancelou, então só o "registrar" existe.
@@ -368,8 +378,10 @@ relatório (`daPlanilha`) e marca os volumes (`marcar`); o import e o
 >
 > ⚠️ **E A VENDA TAMBÉM SE CANCELA PELA RECUSA DO MOTORISTA, desde 02/10/2026**
 > (bloco "O MOTORISTA RECUSOU" no §8-B). Só o relatório não bastava: quando o
-> motorista recusa no bipe dele, o relatório ainda não chegou. Esse volume
-> chega ao card e à Mesa com `cancelada_origem='motorista'` e quem marcou.
+> motorista recusa no bipe dele, o relatório ainda não chegou. ~~Esse volume
+> chega ao card e à Mesa com `cancelada_origem='motorista'`~~ — **desde
+> 22/10/2026 o motorista é um dos motivos do ↩ Sobrou** (origem `sobra`), e a
+> caixa já volta resolvida, sem passar pelo card.
 
 **Antes do primeiro import depois do deploy, rode
 `node conferir_canceladas.js <relatório.xlsx>`** — ele roda a mesma conta numa
@@ -500,10 +512,10 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 | R-CAR-03 | O segundo bipe do carregamento, quando ligado, é cego |
 | R-COR-01 | A Mesa de correções corrige pela ação, nunca pela linha |
 | R-COR-02 | Fantasma é o `pendente` cujo irmão MAIS ANTIGO já andou |
-| R-COR-03 | A cancelada depois da etiqueta volta POR PEÇA, e só se alguém disser |
+| R-COR-03 | A cancelada depois da etiqueta: a Mesa só registra a que não voltou; a volta é o ↩ Sobrou |
 | R-COR-04 | Saída de passivo na data do volume; venda futura não se fecha |
 | R-COR-05 | O terminal e o botão usam a mesma régua (`correcoes.js`) |
-| R-COR-06 | A Mesa não mexe em saldo, exceto a cancelada que voltou |
+| R-COR-06 | A Mesa nunca mexe em saldo |
 | R-COR-07 | Conferências antigas fecham em bloco, até uma data que nunca é hoje, sem mexer em saldo, e só a caixa que já baixou |
 
 **Ao mexer em** `parse.js`, `folha.js` ou `nome.js`: `node teste_parse.js`. No
@@ -1243,9 +1255,11 @@ mostra contagem regressiva para o despacho, ficando **amarela** abaixo de 2 h e
 | R-PEC-03 | O bipe de peça tem as mesmas barreiras do bipe da caixa |
 | R-PEC-04 | Guard de 700 ms; a divergência não apaga o que foi bipado |
 | R-PEC-05 | As etiquetas coladas por fora são as do saco de cada persiana |
-| R-REC-01 | O motorista recusou: a expedição marca, o saldo só volta pela Mesa |
-| R-REC-02 | Só a caixa com etiqueta e ainda na fábrica |
-| R-REC-03 | A caixa de várias é recusada inteira; o sob medida não vai à prateleira |
+| R-REC-01 | A caixa que sobrou volta pelo ↩ Sobrou: etiqueta + SKU de cada persiana; +1 por peça se já baixou |
+| R-REC-02 | Só a caixa com etiqueta e ainda na fábrica, e uma vez só |
+| R-REC-03 | A de várias volta inteira; com um item cancelado não é sobra; sob medida não mexe em saldo |
+| R-REC-04 | Quem conferiu a caixa não marca a sobra dela (D8) |
+| R-REC-05 | A lista "Sobras esperando decisão" zera |
 | R-SAI-01 | Uma saída por caminhão, e ela só olha o que saiu nela |
 | R-SAI-02 | As sobras são declaradas, nunca supostas |
 | R-SAI-03 | A conta do caminhão só olha o canto da coleta |
@@ -1270,7 +1284,7 @@ duas listas, o filtro): `node teste_etiqueta.js`. No `carreg_route.js` ou no
 `carga.js`: `node teste_carga.js`, `node teste_area.js`, `node
 teste_segunda_pessoa.js` e `node teste_pecas_carga.js`. No `saida_route.js`:
 `node teste_saida_coleta.js` e `node teste_saida_agencia.js`. Na recusa do
-motorista: `node teste_recusa_motorista.js`. No `POST /api/embalar`, no
+motorista ou no ↩ Sobrou: `node teste_sobra.js`. No `POST /api/embalar`, no
 `POST /api/reimprimir` ou no `fechar_saida_passivo.js`: `node teste_saida.js`.
 Em `saida.liberar` ou outra chave: `node teste_acesso.js` e `node
 teste_cobertura.js`. E **abra a tela**, a 1440 e a 400 px: a pilha, a tela
@@ -1903,7 +1917,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (115), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_recusa_motorista.js` (59), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (24), `teste_upload.js` (46), `teste_devolucao.js` (33), `teste_login.js` (74), `teste_conferencia_antiga.js` (64) e `teste_baixa_conferencia.js` (69); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (72), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (24), `teste_upload.js` (46), `teste_devolucao.js` (33), `teste_login.js` (74), `teste_conferencia_antiga.js` (64) e `teste_baixa_conferencia.js` (69); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -1948,10 +1962,15 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   `cancelado` (D1 A), ou uma segunda leitura das linhas canceladas fora do
   `cancelada_dominio.js` (§3, VENDAS F2)
 - ❌ Devolver ao estoque **sozinho** a venda cancelada depois da etiqueta: quem
-  decide é uma pessoa, pela Mesa, com motivo (§3 D3 · §5, a Mesa)
-- ❌ Fazer o "voltou" da cancelada devolver `+1` em vez de POR PEÇA, ou devolver
-  saldo de sob medida: a caixa de pacote baixou N, e o sob medida nunca
-  baixou (§5, a Mesa · §7)
+  devolve é uma pessoa, pelo ↩ Sobrou, bipando o SKU de cada persiana (§2, 2-B)
+- ❌ Fazer a sobra devolver `+1` em vez de POR PEÇA, devolver saldo de sob
+  medida, ou devolver a caixa que nunca baixou: a caixa de pacote baixou N, o
+  sob medida nunca baixou, e a não conferida nunca saiu do saldo (§2, §7)
+- ❌ Devolver a sobra fora do `baixa_dominio.devolver`, ou voltar a pôr o
+  "a persiana voltou" na Mesa: a Mesa nunca mexe em saldo (D7), e há varredura
+  no `teste_sobra.js` recusando movimento `sobra` em outro arquivo (§2)
+- ❌ Deixar quem conferiu a caixa marcar a sobra dela, ou confirmar a sobra sem
+  TODAS as persianas bipadas (§2, 2-B, D8)
 - ❌ Deixar o card de canceladas sem a marca de decidido: ele nunca zera, e
   número que não zera vira paisagem (§3 D3 · §5, a Mesa)
 - ❌ Dar backfill a `correcao.executar`: o Admin Geral passa por nível, e a chave

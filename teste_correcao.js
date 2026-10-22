@@ -303,8 +303,14 @@ const c5 = volume({codigo:'SOBMEDIDA', buyer:'Anderson Souza', nf:'6962', venda:
 
 r = objeto('lote', c1);
 eq('a acao vale no volume cancelado depois da etiqueta', acaoDe(r.body,'cancelada').vale, true);
-ok('   e ela tem as DUAS saidas', (acaoDe(r.body,'cancelada').opcoes||[]).length === 2,
+/* Desde a fase 2-B da CONFERENCIA-E-BAIXA (22/10/2026) a Mesa nunca mexe em
+   saldo (D7): a volta a prateleira e o "Sobrou" da Conferencia, com o bipe do
+   SKU (teste_sobra.js). Aqui so sobra o "registrar". */
+ok('   e ela tem UMA saida: registrar (o "voltou" e o Sobrou da Conferencia)',
+   (acaoDe(r.body,'cancelada').opcoes||[]).length === 1 && (acaoDe(r.body,'cancelada').opcoes||[])[0].id === 'registrar',
    'veio: '+JSON.stringify(acaoDe(r.body,'cancelada').opcoes));
+ok('   e a nota manda para o Sobrou', /sobrou/i.test(acaoDe(r.body,'cancelada').nota_voltou||''),
+   'veio: '+acaoDe(r.body,'cancelada').nota_voltou);
 r = objeto('lote', c3);
 eq('no cancelado ANTES da etiqueta a acao nao vale', acaoDe(r.body,'cancelada').vale, false);
 ok('   porque nada baixou', /n[aã]o baixou|antes da etiqueta|sem a etiqueta/i.test(acaoDe(r.body,'cancelada').por_que_nao||''),
@@ -321,39 +327,31 @@ r = executar('cancelada','lote',c4,{voltou:true},'A persiana voltou');
 eq('e o "voltou" na caixa de varias e RECUSADO pelo servidor', r.status, 409);
 eq('   sem gravar nada', db.prepare("SELECT COUNT(*) n FROM movimento_estoque WHERE tipo='cancelamento'").get().n, 0);
 
-console.log('\n=== 6. A CANCELADA — o estoque volta POR PECA ===\n');
+console.log('\n=== 6. A CANCELADA — a Mesa NAO devolve saldo (2-B, D7) ===\n');
 
+const s140 = saldo('BK140140BEGE'), s120b = saldo('BK120120BEGE');
 r = previa('cancelada','lote',c1,{voltou:true});
-eq('a previa do "voltou" diz o movimento', (r.body.estoque||[]).length, 1);
-eq('   com o SKU e o delta', (r.body.estoque||[])[0] &&
-   (r.body.estoque[0].codigo+':'+r.body.estoque[0].delta), 'BK140140BEGE:1');
-eq('   e nao grava', db.prepare("SELECT COUNT(*) n FROM movimento_estoque WHERE tipo='cancelamento'").get().n, 0);
-
-const s140 = saldo('BK140140BEGE');
+eq('a previa do "voltou" e recusada', r.status, 409);
+ok('   mandando para o "Sobrou" da Conferencia', /sobrou/i.test(String((r.body||{}).erro||'')) &&
+   /confer/i.test(String((r.body||{}).erro||'')), 'veio: '+(r.body||{}).erro);
 r = executar('cancelada','lote',c1,{voltou:true},'Cliente devolveu na agencia — peca conferida e na prateleira');
-eq('executar o "voltou" responde ok', r.body && r.body.ok, true);
-eq('o saldo subiu 1', saldo('BK140140BEGE'), s140 + 1);
-const mov1 = db.prepare("SELECT * FROM movimento_estoque WHERE tipo='cancelamento' ORDER BY id DESC").get();
-eq('o movimento e do tipo cancelamento', mov1.tipo, 'cancelamento');
-eq('   com a referencia da correcao', mov1.referencia, 'correcao:'+r.body.correcao_id);
-ok('   e o motivo escrito', /Cliente devolveu/.test(mov1.motivo||''), 'veio: '+mov1.motivo);
-eq('e o livro fecha', livroFecha().length, 0);
-
-const s120b = saldo('BK120120BEGE'), s140b = saldo('BK140140BEGE');
-r = previa('cancelada','lote',c2,{voltou:true});
-eq('na caixa de PACOTE a previa traz uma linha por SKU', (r.body.estoque||[]).length, 2);
+eq('executar o "voltou" tambem e recusado', r.status, 409);
 r = executar('cancelada','lote',c2,{voltou:true},'As tres persianas voltaram na caixa');
-eq('o SKU de 1 peca sobe 1', saldo('BK120120BEGE'), s120b + 1);
-eq('e o de 2 unidades sobe 2 — por PECA, nao por linha (decisao 2)', saldo('BK140140BEGE'), s140b + 2);
-eq('e o livro fecha', livroFecha().length, 0);
-
-const movsSob = db.prepare("SELECT COUNT(*) n FROM movimento_estoque WHERE codigo='SOBMEDIDA'").get().n;
-r = previa('cancelada','lote',c5,{voltou:true});
-eq('o sob medida nao tem o que devolver (§7)', (r.body.estoque||[]).length, 0);
+eq('   na caixa de pacote tambem', r.status, 409);
 r = executar('cancelada','lote',c5,{voltou:true},'Voltou — sob medida');
-eq('   e executar nao gera movimento nenhum nele',
-   db.prepare("SELECT COUNT(*) n FROM movimento_estoque WHERE codigo='SOBMEDIDA'").get().n, movsSob);
-eq('   e o saldo dele continua zero', saldo('SOBMEDIDA'), 0);
+eq('   e no sob medida', r.status, 409);
+eq('nenhum saldo andou', saldo('BK140140BEGE')+','+saldo('BK120120BEGE'), s140+','+s120b);
+eq('   e nenhuma linha `cancelamento` nasceu', db.prepare("SELECT COUNT(*) n FROM movimento_estoque WHERE tipo='cancelamento'").get().n, 0);
+r = previa('cancelada','lote',c1,{voltou:false});
+eq('o "registrar" da caixa que ja baixou nao traz movimento', (r.body.estoque||[]).length, 0);
+r = executar('cancelada','lote',c1,{voltou:false},'Nao voltou — a caixa foi junto com o motorista');
+eq('   e executa', r.body && r.body.ok, true);
+eq('   sem mexer no saldo', saldo('BK140140BEGE'), s140);
+r = executar('cancelada','lote',c2,{voltou:false},'Registrada — a caixa de pacote saiu com o motorista');
+eq('o "registrar" na caixa de pacote executa', r.body && r.body.ok, true);
+r = executar('cancelada','lote',c5,{voltou:false},'Registrada — sob medida separada');
+eq('   e no sob medida', r.body && r.body.ok, true);
+eq('e o livro fecha', livroFecha().length, 0);
 
 const movsAntes = conta('movimento_estoque');
 r = executar('cancelada','lote',c3,{voltou:false},'Nao voltou — perdida no transporte');
@@ -376,10 +374,8 @@ ok('a caixa de varias registrada tambem sai', noCard.indexOf(c4) < 0);
 const sAntes = saldo('BK140140BEGE');
 const cCanc = db.prepare("SELECT id FROM correcao WHERE acao='cancelada' AND alvo_id=? ORDER BY id DESC").get(c1).id;
 r = desfazer(cCanc);
-eq('desfazer o "voltou" responde ok', r.body && r.body.ok, true);
-eq('   e devolve o saldo', saldo('BK140140BEGE'), sAntes - 1);
-const movInv = db.prepare("SELECT * FROM movimento_estoque ORDER BY id DESC").get();
-eq('   com o movimento inverso, tambem referenciado na correcao', movInv.referencia, 'correcao:'+cCanc);
+eq('desfazer o "registrar" responde ok', r.body && r.body.ok, true);
+eq('   e nao mexe no saldo', saldo('BK140140BEGE'), sAntes);
 eq('e o livro fecha', livroFecha().length, 0);
 ok('o volume volta para o card', CANC.listar(db).map(v=>v.id).indexOf(c1) >= 0);
 

@@ -77,8 +77,41 @@
 > - **o `backfill_pacote.js` só acerta saldo de caixa que já baixou**: a impressa e
 >   não conferida baixa todas as peças na conferência.
 >
-> Falta: subir **fora do horário de expedição**, com backup, e a primeira caixa real
-> conferida baixando. **2-B não começou.**
+> **Fase 2-A mesclada (PR #218, 22/10/2026).** Falta a primeira caixa real conferida
+> baixando, relatada.
+>
+> **Fase 2-B em código (22/10/2026):** o **↩ Sobrou** na Conferência
+> (`POST /api/carregamento/sobra`: prévia → SKU a SKU → motivo → confirma), a
+> devolução no `baixa_dominio.devolver` (movimento `sobra`, +1 por peça, uma vez só,
+> só se a caixa já tinha baixado), `cancelada_dominio.marcarSobra`, a lista **"Sobras
+> esperando decisão"** (`GET /api/carregamento/sobras`), a Mesa sem o "voltou" (R-COR-03
+> e R-COR-06), e o bipe da caixa cancelada mandando para o "Sobrou". O "🚫 Motorista
+> recusou" saiu: virou um dos motivos, e a `RECUSA-DO-MOTORISTA` foi para
+> `docs/arquivo/`. `teste_sobra.js` (103 casos, escrito antes do código; seis defeitos
+> reintroduzidos um a um: devolver sem ter baixado reprova 3, quem conferiu marcando
+> 18, a sobra não ficando decidida 6, aceitar peça faltando 4, aceitar SKU de outra
+> caixa 4, a Mesa aceitando o "voltou" 2). `teste_correcao` e `teste_baixa_conferencia`
+> passaram a travar a Mesa sem saldo; o `teste_recusa_motorista.js` saiu (os casos que
+> valem moram no `teste_sobra.js`). Tela aberta a 1440 e 400 px com banco semeado: o
+> fluxo inteiro, o texto do "Outro" sobrevivendo ao refresh de 4 s, sem rolagem lateral.
+> **Os três pontos que a spec não dizia, decididos no plano (22/10/2026):**
+> - **a sobra só confirma com TODAS as persianas bipadas** — é da caixa inteira (§4);
+> - **o saldo volta se a caixa já tinha BAIXADO, e não "se foi conferida"** (a §3 dizia
+>   "conferida"): a caixa impressa antes da virada baixou na impressão;
+> - **quem conferiu a caixa não marca a sobra** (D8), sem liberação.
+> **Mudanças na construção:**
+> - **a venda que já estava cancelada mantém a origem** (planilha, motorista) e só ganha
+>   a decisão; a origem `sobra` é da caixa que vira cancelada pelo "Sobrou";
+> - **a sobra já nasce decidida** (`cancelada_resolvida_em`), senão iria parar no card
+>   da Mesa pedindo uma segunda decisão sobre a mesma caixa;
+> - **a lista olha as saídas de coleta fechadas** (as 60 mais recentes) e só mostra a
+>   caixa que continua no canto: levada pelo caminhão seguinte, ela some sozinha;
+> - **o gráfico de estoque não mostra a sobra**: a caixa que baixou e voltou continua
+>   contando como saída no dia da baixa; o +1 está no livro (R-EST-13).
+>
+> Falta: subir **fora do horário de expedição**, com backup, e **a primeira sobra
+> real** — uma caixa que o caminhão deixou, ou uma venda cancelada ainda na fábrica,
+> voltando à prateleira pelo "Sobrou" com o saldo subindo.
 
 ---
 

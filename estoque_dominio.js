@@ -30,8 +30,11 @@
    "quanto saiu por venda?" deixa de ter resposta. */
 /* `etiqueta` foi a baixa na impressao ate 22/10/2026; desde a fase 2-A da
    CONFERENCIA-E-BAIXA a baixa e `conferencia` (baixa_dominio.js). O tipo
-   antigo fica: as linhas ja gravadas sao historia, e o livro le as duas. */
-const TIPOS = ['abertura','embalagem','etiqueta','inventario','ajuste','correcao','cancelamento','conferencia'];
+   antigo fica: as linhas ja gravadas sao historia, e o livro le as duas.
+   `sobra` (fase 2-B) e a persiana que voltou para a prateleira pelo "Sobrou"
+   da Conferencia, bipada; `cancelamento` era a mesma volta pela Mesa, que
+   desde a 2-B nunca mexe em saldo (as linhas antigas ficam). */
+const TIPOS = ['abertura','embalagem','etiqueta','inventario','ajuste','correcao','cancelamento','conferencia','sobra'];
 
 /* Peca e inteiro. Nao existe meia persiana, e um `delta` fracionario aqui seria
    erro de chamador — material e que se mede em metro, e tem o dominio dele. */

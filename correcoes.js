@@ -101,18 +101,6 @@ function pecasDoVolume(db, v){
   return linhas;
 }
 
-/* O que a cancelada devolveria ao estoque: uma linha por SKU, com a soma das
-   `qtd`. SOB MEDIDA FICA DE FORA — ela nunca somou `+1` na embalagem e nao
-   baixou na etiqueta (§7), entao devolver abriria um buraco em vez de fechar. */
-function devolucaoDeEstoque(db, v){
-  const por = {};
-  for(const l of pecasDoVolume(db, v)){
-    if(l.sob_medida) continue;
-    por[l.codigo] = (por[l.codigo] || 0) + l.qtd;
-  }
-  return Object.keys(por).map(codigo => ({ codigo, delta: por[codigo] }));
-}
-
 /* JA BAIXOU DO ESTOQUE? Desde a fase 2-A da CONFERENCIA-E-BAIXA (22/10/2026)
    a baixa e na conferencia, e `lote.baixado_em` diz se ela aconteceu. Banco
    SEM a coluna e banco de antes da virada: ali a impressao baixava, entao a
@@ -207,13 +195,16 @@ const ACOES = {
   cancelada: {
     id:'cancelada', alvo:'lote',
     rotulo:'Cancelada depois da etiqueta',
-    explica:'O cliente cancelou depois de a etiqueta sair. Duas saídas: a persiana voltou para a prateleira ' +
-            '(o saldo volta, se a caixa já tinha sido conferida) ou não voltou (só registra).',
+    explica:'O cliente cancelou depois de a etiqueta sair. Se a persiana está na fábrica, ela volta para a ' +
+            'prateleira pelo "Sobrou" da Conferência, com o bipe do SKU. Aqui só se registra a que não voltou.',
     carregar: volumePorId,
+    /* ⚠️ O "A PERSIANA VOLTOU" SAIU DA MESA (CONFERENCIA-E-BAIXA, fase 2-B, D7):
+       a Mesa nunca mexe em saldo. A volta e o "Sobrou" da Conferencia, onde
+       a expedicao bipa o SKU de cada persiana — o bipe e a prova de que a peca
+       esta na mao, e a Mesa nao tem como prova-la. */
     opcoes(db, v){
-      const so = { id:'registrar', rotulo:'Não voltou — só registrar' };
-      if(v.cancelada_varias) return [so];
-      return [{ id:'voltou', rotulo:'A persiana voltou para a prateleira' }, so];
+      void db; void v;
+      return [{ id:'registrar', rotulo:'Não voltou — só registrar' }];
     },
     /* ⚠️ A CAIXA DE VARIAS NAO TEM O "VOLTOU", e e decisao do dono (02/10/2026).
        Ali o volume nem e cancelado — o cliente ainda quer as outras persianas —
@@ -224,10 +215,12 @@ const ACOES = {
       /* A RECUSA DO MOTORISTA (02/10/2026): quem marcou foi a expedicao, que
          recebeu o aviso de pôr a peca na prateleira. A Mesa so diz isso — quem
          confere que ela esta la e quem aceita. */
-      if(v.cancelada_origem === 'motorista' && !v.cancelada_varias)
-        return 'O motorista recusou esta caixa no carregamento' +
-          (v.cancelada_por ? ' (marcada por ' + v.cancelada_por + ')' : '') +
-          '. A expedição foi avisada para pôr a peça na prateleira: confira antes de dizer que voltou.';
+      if(!v.cancelada_varias)
+        return (v.cancelada_origem === 'motorista'
+          ? 'O motorista recusou esta caixa' + (v.cancelada_por ? ' (marcada por ' + v.cancelada_por + ')' : '') + '. '
+          : '') +
+          'Se a persiana está na fábrica, a volta ao estoque é pelo "Sobrou" da Conferência: bipe a etiqueta e o SKU ' +
+          'de cada persiana. Registre aqui só a que não voltou.';
       return v.cancelada_varias
         ? 'Esta caixa leva mais de uma persiana e o Mercado Livre cancelou só um item — o sistema não sabe ' +
           'qual peça é. Separe a caixa, confira na mão, e o saldo se corrige por Admin → Estoque, com motivo.'
@@ -245,60 +238,34 @@ const ACOES = {
       return true;
     },
     previa(db, v, params){
-      const voltou = !!(params && params.voltou);
-      if(voltou && v.cancelada_varias)
-        throw erro(409, 'a caixa de várias persianas não tem o "voltou": o sistema não sabe qual peça ' +
-                        'o Mercado Livre cancelou');
-      /* ⚠️ SO DEVOLVE O QUE BAIXOU (CONFERENCIA-E-BAIXA, fase 2-A). A caixa
-         cancelada antes da conferencia nunca saiu do saldo: a reserva soltou
-         sozinha quando ela virou `cancelado`, e devolver +1 ali criaria uma
-         peca que nao existe. */
+      if(params && params.voltou)
+        throw erro(409, 'a volta ao estoque é pelo "Sobrou" da Conferência: lá a expedição bipa a etiqueta e o ' +
+                        'SKU de cada persiana. A Mesa não mexe em saldo.');
       const jaBaixou = baixou(v);
-      const estoque = (voltou && jaBaixou) ? devolucaoDeEstoque(db, v) : [];
+      const estoque = [];
       const pecas = pecasDoVolume(db, v);
-      const sem = pecas.filter(l => !l.cadastrado).map(l => l.codigo);
-      if(voltou && jaBaixou && sem.length)
-        throw erro(409, 'SKU não cadastrado: ' + sem.join(', ') + ' — cadastre antes de devolver o saldo');
-      const total = estoque.reduce((s, l) => s + l.delta, 0);
       /* ⚠️ "1 peça(s)" e meia concordancia, e ela se le pior que nenhuma numa
          tela de fabrica — a licao do "1 destes pedidos ja tiveram" (§19, 4-A).
          Só apareceu abrindo a tela. */
       const npc = pecas.reduce((s, l) => s + l.qtd, 0);
       return {
         antes:  { lote:v },
-        depois: { lote:Object.assign({}, v, { cancelada_resolvida_em:'(agora)', cancelada_voltou:voltou ? 1 : 0 }) },
+        depois: { lote:Object.assign({}, v, { cancelada_resolvida_em:'(agora)', cancelada_voltou:0 }) },
         estoque,
         resumo: !jaBaixou
-          ? (voltou
-            ? 'Esta caixa nunca foi conferida, então a peça não chegou a sair do estoque: a reserva soltou quando ' +
-              'a venda foi cancelada. Nada a devolver — é só pôr a persiana na prateleira. O volume sai do card de Bloqueados.'
-            : 'Registra que a persiana NÃO voltou. ⚠ Esta caixa nunca foi conferida, então a peça ainda está no ' +
-              'saldo: se ela não voltou, o estoque fica ' + npc + ' ' + pl(npc, 'peça', 'peças') + ' acima — peça um ' +
-              'ajuste. O volume sai do card de Bloqueados.')
-          : voltou
-          ? 'Devolve ' + total + ' ' + pl(total, 'peça', 'peças') + ' ao estoque' +
-            (estoque.length > 1 ? ' (' + estoque.map(l => l.codigo + ' +' + l.delta).join(', ') + ')' : '') +
-            ', com movimento `cancelamento` no livro. O volume sai do card de Bloqueados.'
+          ? 'Registra que a persiana NÃO voltou. ⚠ Esta caixa nunca foi conferida, então a peça ainda está no ' +
+            'saldo: se ela não voltou, o estoque fica ' + npc + ' ' + pl(npc, 'peça', 'peças') + ' acima — peça um ' +
+            'ajuste. O volume sai do card de Bloqueados.'
           : 'Registra que a persiana NÃO voltou. O saldo não se mexe — a baixa continua valendo. ' +
             'O volume sai do card de Bloqueados.' +
             (pecas.length > 1 ? ' A caixa leva ' + npc + ' persianas.' : '')
       };
     },
     executar(db, v, params, ctx){
-      const voltou = !!(params && params.voltou);
-      const p = this.previa(db, v, params);
-      /* ⚠️ POR PECA, NUNCA +1 (decisao 2 do dono, 02/10/2026 — divergencia da
-         §4 da spec). A etiqueta de uma caixa de pacote baixou N (§5, #23):
-         devolver 1 de 2 deixaria o buraco pela metade, e ninguem procuraria. */
-      for(const l of p.estoque)
-        ESTOQUE.movimentar(db, { codigo:l.codigo, delta:l.delta, tipo:'cancelamento',
-          referencia:'correcao:' + ctx.correcao_id,
-          motivo:ctx.motivo + ' — volume #' + v.id + (v.buyer ? ', ' + v.buyer : '') +
-                 (v.nf ? ', NF ' + v.nf : ''),
-          usuario:ctx.quem });
+      this.previa(db, v, params);
       db.prepare(`UPDATE lote SET cancelada_resolvida_em=datetime('now','localtime'),
-          cancelada_resolvida_por=?, cancelada_voltou=? WHERE id=?`)
-        .run((ctx.quem && ctx.quem.nome) || '', voltou ? 1 : 0, v.id);
+          cancelada_resolvida_por=?, cancelada_voltou=0 WHERE id=?`)
+        .run((ctx.quem && ctx.quem.nome) || '', v.id);
     },
     desfazer(db, c, quem){
       const a = JSON.parse(c.antes || '{}'), d = JSON.parse(c.depois || '{}');
@@ -310,6 +277,8 @@ const ACOES = {
         if(String(v[campo] == null ? '' : v[campo]) !== String(a.lote && a.lote[campo] == null ? '' : a.lote[campo]))
           throw erro(409, 'o volume andou depois desta correção: ' + campo + ' era ' +
             ((a.lote && a.lote[campo]) || 'vazio') + ' e agora é ' + (v[campo] || 'vazio') + '. Não desfiz nada.');
+      /* A correcao "voltou" de antes da 2-B gravou o +1 no `depois`: desfaze-la
+         ainda devolve o −1. As de depois nao tem estoque, e o laco nao roda. */
       for(const l of (JSON.parse(c.depois || '{}').estoque || []))
         ESTOQUE.movimentar(db, { codigo:l.codigo, delta:-l.delta, tipo:'cancelamento',
           referencia:'correcao:' + c.id, motivo:'desfeita a correção #' + c.id +
@@ -921,5 +890,5 @@ function terminal(script, argv){
 }
 
 module.exports = { ACOES, garantirSchema, terminal, erro, classificarFantasmas, pecasDoVolume,
-                   devolucaoDeEstoque, buscar, objeto, previa, executar, desfazer,
+                   buscar, objeto, previa, executar, desfazer,
                    historico, contadores };

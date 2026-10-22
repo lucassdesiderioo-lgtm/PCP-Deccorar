@@ -134,15 +134,16 @@ module.exports=function(app,db){
       try{ const ac=app.locals.acesso;
            if(ac&&ac.auditar) ac.auditar(req,'expedicao','carregar_cancelada',
              'NF '+(alvo.nf||alvo.id), (alvo.cancelada_motivo||'cancelada')+' — bipada no carregamento'); }catch(e){}
-      /* A recusa do motorista ja foi marcada aqui por alguem: a frase repete o
-         que a pessoa tem que fazer com a caixa, e quem marcou. */
-      if(alvo.cancelada_origem==='motorista')
-        return ({ok:false,motivo:'cancelada',origem:'motorista',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
-          aviso:'O motorista recusou esta caixa'+(alvo.cancelada_por?' (marcada por '+alvo.cancelada_por+')':'')+
-                '. Não carregar: volte a peça ao estoque — o admin confirma a volta pela Mesa de correções.'});
-      return ({ok:false,motivo:'cancelada',pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
-        aviso:'Venda cancelada no Mercado Livre. Não carregar: separe a caixa e avise o admin — ela está no card '+
-              '"Canceladas depois da etiqueta".'+(alvo.cancelada_motivo?' ML: “'+alvo.cancelada_motivo+'”':'')});
+      /* A caixa ja resolvida pelo "Sobrou" (fase 2-B): a frase diz que ela ja
+         foi tratada, e quem tratou. A que ainda espera, manda para o "Sobrou". */
+      if(alvo.cancelada_resolvida_em)
+        return ({ok:false,motivo:'cancelada',origem:alvo.cancelada_origem||null,pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
+          aviso:'Esta caixa já foi resolvida como sobra'+(alvo.cancelada_resolvida_por?' por '+alvo.cancelada_resolvida_por:'')+
+                '. Não carregar: a persiana vai para a prateleira, sem a etiqueta de venda.'});
+      return ({ok:false,motivo:'cancelada',origem:alvo.cancelada_origem||null,pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city},
+        aviso:(alvo.cancelada_origem==='motorista'?'O motorista recusou esta caixa':'Venda cancelada no Mercado Livre')+
+              '. Não carregar: toque em "Sobrou", bipe a etiqueta e o SKU de cada persiana, e ponha na prateleira.'+
+              (alvo.cancelada_motivo&&alvo.cancelada_origem!=='motorista'?' ML: “'+alvo.cancelada_motivo+'”':'')});
     }
     if(alvo.estagio==='bloqueado') return ({ok:false,motivo:'bloqueado',pedido:alvo,
         aviso:'SKU "'+(alvo.codigo||'(vazio)')+'" nao esta no cadastro. Nao pode ser carregado.'});
@@ -331,49 +332,111 @@ module.exports=function(app,db){
     const pc=pecasCarga(alvo.id);
     res.json({ok:true,bipadas:pc.bipadas,pecas_total:pc.total,pecas:pecasVistas(alvo,pc)});
   });
-  /* ── O MOTORISTA RECUSOU (spec RECUSA-DO-MOTORISTA, 02/10/2026) ────────────
-     O motorista bipa a caixa e o sistema do ML diz "recusada": a venda foi
-     cancelada depois da etiqueta sair. Dois passos, decisao do dono:
-       1. aqui a EXPEDICAO marca — sem `confirmar`, so a previa (a caixa, o
-          cliente, as pecas); com `{id, confirmar:true}`, marca. O volume vira
-          cancelado (origem 'motorista'), sai do canto/do carro e da conta da
-          saida, e a tela manda voltar a peca a prateleira;
-       2. o ADMIN aceita a volta ao estoque pela Mesa de correcoes.
-     ⚠️ O SALDO NAO SE MEXE AQUI: quem decide que a persiana voltou e uma
-     pessoa, pela Mesa, com motivo — a regra do card D3. */
-  app.post('/api/carregamento/recusa',(req,res)=>{
-    const CANC=require('./cancelada_dominio');
+  /* ── O "SOBROU" (CONFERENCIA-E-BAIXA, fase 2-B, 22/10/2026) ────────────────
+     A caixa que ficou na fabrica — venda cancelada, motorista recusou, outro
+     motivo — e resolvida aqui, por quem tem a etiqueta de venda e a
+     conferencia (D3, sem chave nova). Tres passos, todos nesta rota:
+       {code} ou {id}          -> previa: a caixa, as pecas, se ja baixou
+       {id, skus}              -> confere os SKUs bipados ate agora
+       {id, skus, motivo, texto, confirmar:true}
+                               -> marca a sobra e devolve o saldo POR PECA
+     ⚠️ O BIPE DO SKU E O QUE PROVA QUE A PERSIANA ESTA NA MAO. Sem ele, "voltou
+     para o estoque" seria uma afirmacao, e o saldo subiria por uma peca que pode
+     ter ido embora. Por isso a confirmacao exige TODAS as persianas da caixa:
+     com uma so, o saldo subiria pela metade.
+     ⚠️ QUEM CONFERIU NAO MARCA A SOBRA (D8): a sobra contradiz a contagem dele.
+     Sem liberacao, nem para o Admin Geral; caixa sem `conferido_por` passa.
+     A lista de estado e da tela; o servidor confere tudo de novo no fim. */
+  const MOTIVO_SOBRA={cancelada:'Venda cancelada',motorista:'Motorista recusou'};
+  app.post('/api/carregamento/sobra',(req,res)=>{
+    const CANC=require('./cancelada_dominio'), BAIXA=require('./baixa_dominio');
     const quem=req.usuario||null;
-    if(!quem || (quem.id==null && !quem.nome)) return res.status(401).json({ok:false,motivo:'sem_login',aviso:'Entre com o seu login para marcar a recusa.'});
+    if(!quem || (quem.id==null && !quem.nome)) return res.status(401).json({ok:false,motivo:'sem_login',aviso:'Entre com o seu login para marcar a sobra.'});
     const b=req.body||{};
     let alvo=null;
     if(b.id!=null) alvo=db.prepare('SELECT * FROM lote WHERE id=?').get(+b.id)||null;
     else{
       const code=String(b.code||'').trim();
-      if(!code) return res.status(400).json({ok:false,motivo:'sem_codigo',aviso:'Bipe a etiqueta de venda da caixa recusada.'});
-      /* Entre irmaos duplicados (§5, os fantasmas), o que a recusa aceita manda. */
+      if(!code) return res.status(400).json({ok:false,motivo:'sem_codigo',aviso:'Bipe a etiqueta de venda da caixa que sobrou.'});
+      /* Entre irmaos duplicados (§5, os fantasmas), o que a sobra aceita manda. */
       const batem=acharVolumes(db,code);
-      alvo=batem.find(v=>!CANC.naoRecusa(v))||batem[0]||null;
+      alvo=batem.find(v=>!CANC.naoSobra(v))||batem[0]||null;
     }
     const pedido=v=>({id:v.id,buyer:v.buyer,nf:v.nf,codigo:v.codigo,city:v.city,modalidade:v.modalidade});
-    const nao=CANC.naoRecusa(alvo);
+    const nao=CANC.naoSobra(alvo);
     if(nao) return res.json(Object.assign({ok:false},nao,alvo?{pedido:pedido(alvo)}:{}));
+    if(mesmaPessoa(alvo.conferido_por,quem.nome)){
+      try{ const ac=app.locals.acesso;
+           if(ac&&ac.auditar) ac.auditar(req,'expedicao','sobra_mesma_pessoa','NF '+(alvo.nf||alvo.id),
+             'conferida por '+nomeLimpo(alvo.conferido_por)+' — sobra pedida pela mesma pessoa'); }catch(e){}
+      return res.json({ok:false,motivo:'mesma_pessoa',conferido_por:nomeLimpo(alvo.conferido_por),pedido:pedido(alvo),
+        aviso:'Você conferiu esta caixa. A sobra tem que ser marcada por outra pessoa, com o login dela.'});
+    }
     const pecas=CANC.pecasDaCaixa(db,alvo);
-    const sob=pecas.some(p=>p.sob_medida);
-    if(!b.confirmar) return res.json({ok:true,previa:true,pedido:pedido(alvo),pecas,sob_medida:sob,lugar:CANC.onde(alvo)});
-    const r=db.transaction(()=>CANC.recusar(db,alvo.id,quem))();
+    const sob=pecas.length>0 && pecas.every(p=>p.sob_medida);
+    const base={pedido:pedido(alvo),pecas,sob_medida:sob,baixou:!!alvo.baixado_em,
+      lugar:alvo.estagio==='cancelado'?'cancelada':CANC.onde(alvo),cancelada_motivo:alvo.cancelada_motivo||null};
+    /* O que falta bipar: so as pecas com saldo (o sob medida nao tem SKU a provar). */
+    const resta={};
+    pecas.filter(p=>!p.sob_medida).forEach(p=>{ const k=soCodigo(p.codigo); resta[k]=(resta[k]||0)+Math.max(1,p.qtd||1); });
+    const total=Object.keys(resta).reduce((n,k)=>n+resta[k],0);
+    if(!Array.isArray(b.skus) && !b.confirmar) return res.json(Object.assign({ok:true,previa:true,faltam:total},base));
+    for(const bip of (Array.isArray(b.skus)?b.skus:[])){
+      const k=soCodigo(bip);
+      if(!resta[k]){
+        const leva=listaPecas(pecas.map(p=>({codigo:p.codigo,n:Math.max(1,p.qtd||1)})));
+        const amais=pecas.some(p=>soCodigo(p.codigo)===k);
+        return res.json(Object.assign({ok:false,motivo:'sku_errado',sku:k,
+          aviso:(amais?'Persiana a mais: esta caixa leva só '+leva+'.':'O SKU '+(k||'(vazio)')+' não é desta caixa. Ela leva '+leva+'.')+
+                ' Confira a persiana na mão.'},base));
+      }
+      resta[k]--;
+    }
+    const faltam=Object.keys(resta).reduce((n,k)=>n+resta[k],0);
+    if(!b.confirmar) return res.json(Object.assign({ok:true,faltam},base));
+    if(faltam) return res.json(Object.assign({ok:false,motivo:'faltam_pecas',faltam,
+      aviso:'Falta'+(faltam===1?' 1 persiana':'m '+faltam+' persianas')+' para bipar. A sobra é da caixa inteira: bipe o SKU de cada uma.'},base));
+    const texto=String(b.texto||'').trim().slice(0,160);
+    const motivo=b.motivo==='outro'?(texto?'Outro: '+texto:''):(MOTIVO_SOBRA[b.motivo]||'');
+    if(!motivo) return res.json(Object.assign({ok:false,motivo:'sem_motivo',
+      aviso:b.motivo==='outro'?'Escreva o motivo da sobra.':'Escolha o motivo da sobra.'},base));
+    const r=db.transaction(()=>{
+      const m=CANC.marcarSobra(db,alvo.id,{motivo,quem});
+      if(!m.ok) return m;
+      return Object.assign(m,{moveu:BAIXA.devolver(db,alvo,quem)});
+    })();
     if(!r.ok) return res.json(Object.assign({ok:false},r,{pedido:pedido(alvo)}));
-    const n=pecas.reduce((s,p)=>s+p.qtd,0);
+    const n=r.moveu.reduce((s,l)=>s+l.delta,0);
     try{ const ac=app.locals.acesso;
-         if(ac&&ac.auditar) ac.auditar(req,'expedicao','recusa_motorista','NF '+(alvo.nf||alvo.id),
-           'volume #'+alvo.id+' ('+(r.lugar||'')+'): '+pecas.map(p=>p.qtd+'x '+p.codigo).join(', ')); }catch(e){}
-    /* O aviso e a regra inteira: sem ele a caixa fica no chao da area. O sob
-       medida nao tem estoque (§7) — mandar "por na prateleira" seria mentira. */
+         if(ac&&ac.auditar) ac.auditar(req,'expedicao','sobra','NF '+(alvo.nf||alvo.id),
+           'volume #'+alvo.id+' ('+(r.lugar||'')+') — '+motivo+': '+pecas.map(p=>p.qtd+'x '+p.codigo).join(', ')+
+           (n?' · estoque +'+n:' · estoque não mexeu')); }catch(e){}
+    const npc=pecas.reduce((s,p)=>s+Math.max(1,p.qtd||1),0);
     const aviso=sob
       ? 'Peça sob medida: ela não tem estoque. Separe a peça e avise o admin.'
-      : 'Volte a peça ao estoque: tire a etiqueta de venda e ponha '+(n===1?'a persiana':'as '+n+' persianas')+
-        ' na prateleira. O admin confirma a volta ao estoque pela Mesa de correções.';
-    res.json({ok:true,pedido:pedido(alvo),pecas,sob_medida:sob,aviso});
+      : 'Tire a etiqueta de venda e ponha '+(npc===1?'a persiana':'as '+npc+' persianas')+' na prateleira. '+
+        (n?'O estoque voltou +'+n+'.':'O estoque não muda: a caixa ainda não tinha sido conferida, então a peça nunca saiu do saldo.');
+    res.json(Object.assign({ok:true,aviso,estoque:r.moveu},base));
+  });
+
+  /* AS SOBRAS ESPERANDO DECISAO — lista que zera, para ser lida. Duas fontes:
+     a caixa que o caminhao deixou numa saida JA FECHADA e continua no canto
+     (se o caminhao de amanha a levar, ela sai daqui sozinha), e a venda
+     cancelada que ainda esta na fabrica sem decisao. */
+  app.get('/api/carregamento/sobras',(req,res)=>{
+    const CANC=require('./cancelada_dominio');
+    const ids=new Set();
+    try{ db.prepare(`SELECT sobras FROM saida WHERE tipo='coleta' AND fechada_em IS NOT NULL
+          AND sobras IS NOT NULL AND sobras<>'[]' ORDER BY id DESC LIMIT 60`).all()
+        .forEach(s=>{ try{ JSON.parse(s.sobras).forEach(i=>ids.add(+i)); }catch(e){} }); }catch(e){}
+    const lista=[...ids].filter(Number.isFinite);
+    const caminhao=lista.length?db.prepare(`SELECT id,codigo,buyer,nf,modalidade,despachar_em,conferido_por,
+        (SELECT SUM(qtd) FROM lote_item i WHERE i.lote_id=lote.id) pecas
+      FROM lote WHERE id IN (${lista.map(()=>'?').join(',')}) AND ${AGUARDA_CAMINHAO} AND COALESCE(teste,0)=0
+      ORDER BY carregado_em,id`).all(...lista):[];
+    const caixas=caminhao.map(v=>Object.assign(v,{de:'caminhao'}))
+      .concat(CANC.aguardandoSobra(db).map(v=>Object.assign(v,{de:'cancelada'})));
+    res.json({caixas});
   });
 
   /* O PROGRESSO DA CARGA — o mesmo numero pras duas rotas.

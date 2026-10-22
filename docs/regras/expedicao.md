@@ -244,12 +244,12 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Teste que trava:** `teste_correcao.js` · `teste_correcao3.js`.
 - **Status:** no ar.
 
-### R-COR-03 · A cancelada depois da etiqueta volta POR PEÇA, e só se alguém disser
-- **Regra:** "a persiana voltou" gera movimento `cancelamento` por peça; "não voltou" só registra. As duas tiram do card. Caixa de várias só tem o "registrar". Sob medida não volta saldo. **Desde 22/10/2026** (CONFERENCIA-E-BAIXA, fase 2-A) o "voltou" só devolve o que **baixou** (`lote.baixado_em`): a caixa cancelada antes de ser conferida nunca saiu do saldo, a reserva soltou sozinha, e a prévia diz isso. O "não voltou" de caixa que nunca baixou avisa que o saldo fica alto e manda pedir ajuste.
-- **Por quê:** a caixa de pacote baixou N; e a Mesa não sabe qual peça de uma caixa de várias o ML cancelou.
+### R-COR-03 · A cancelada depois da etiqueta: a Mesa só registra a que não voltou
+- **Regra:** desde 22/10/2026 (CONFERENCIA-E-BAIXA, fase 2-B) o card de canceladas tem uma saída só: **"Não voltou — só registrar"**, que tira do card sem mexer em saldo. A persiana que está na fábrica volta pelo **↩ Sobrou** da Conferência (R-REC-01), com o bipe do SKU. O "voltou" mandado à rota é recusado (409), mandando para lá. O "não voltou" de caixa que nunca baixou avisa que o saldo fica alto e manda pedir ajuste. Desfazer uma correção "voltou" de antes da 2-B ainda devolve o −1 que ela gravou.
+- **Por quê:** a Mesa não tem como provar que a persiana está na mão; o bipe do SKU tem.
 - **Exceções:** nenhuma.
-- **Teste que trava:** `teste_correcao.js`.
-- **Status:** no ar · a primeira cancelada real depois da etiqueta ainda não aconteceu.
+- **Teste que trava:** `teste_correcao.js`, `teste_sobra.js`.
+- **Status:** "voltou" pela Mesa no ar de 02/10 a 22/10/2026 · a regra nova está em código desde 22/10/2026.
 
 ### R-COR-04 · Saída de passivo é carimbada na data do volume, e venda futura não se fecha
 - **Regra:** dar saída e fechar vencidos carimbam `COALESCE(despachar_em, data)` às 15:00, nunca hoje. Volume com despacho no futuro é recusado. Reabrir venda futura volta a `embalado`, ou a `pendente` se nunca teve etiqueta. A data de corte de "Fechar vencidos" nasce vazia.
@@ -265,11 +265,11 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Teste que trava:** `teste_correcao3.js` (monta dois bancos e compara linha a linha).
 - **Status:** no ar.
 
-### R-COR-06 · A Mesa não mexe em saldo, exceto a cancelada que voltou
-- **Regra:** dar saída, fechar vencidos, reabrir e tirar da fila não mexem em estoque. "Pedir ajuste" só abre o pedido de ajuste em duas pessoas. **A Mesa nunca dá a baixa** (CONFERENCIA-E-BAIXA, D7): "dar saída" numa caixa impressa que nunca foi conferida avisa na prévia que o saldo fica uma peça acima, e manda pedir ajuste.
+### R-COR-06 · A Mesa nunca mexe em saldo
+- **Regra:** dar saída, fechar vencidos, reabrir, tirar da fila e registrar a cancelada não mexem em estoque (desde 22/10/2026 sem exceção: o "voltou" virou o Sobrou da Conferência, R-REC-01). "Pedir ajuste" só abre o pedido de ajuste em duas pessoas. **A Mesa nunca dá a baixa** (CONFERENCIA-E-BAIXA, D7): "dar saída" numa caixa impressa que nunca foi conferida avisa na prévia que o saldo fica uma peça acima, e manda pedir ajuste.
 - **Por quê:** a peça que saiu sem etiqueta nunca somou +1, e a fila nunca somou.
-- **Exceções:** R-COR-03.
-- **Teste que trava:** `teste_correcao2.js`.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `teste_correcao2.js`, `teste_sobra.js`.
 - **Status:** no ar.
 
 ### R-COR-07 · Conferências antigas fecham em bloco, até uma data que nunca é hoje, sem mexer em saldo

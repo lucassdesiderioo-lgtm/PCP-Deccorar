@@ -318,9 +318,9 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
   <div style="font-weight:800;color:#b26a00;font-size:16px;margin-bottom:6px">CANCELADAS DEPOIS DA ETIQUETA</div>
   <div style="font-size:13px;color:#5a6472;margin-bottom:12px">
     Estas vendas foram canceladas <b>depois</b> que a etiqueta saiu — pelo relatório do Mercado Livre
-    ou pela recusa do motorista, marcada na Conferência. A caixa não carrega mais (o bipe recusa), mas o
-    estoque dela <b>já tinha baixado e não volta sozinho</b>: confira se a persiana voltou para a
-    prateleira e decida na aba <i>Correções</i>.
+    ou pela recusa do motorista, marcada na Conferência. A caixa não carrega mais (o bipe recusa). Se a
+    persiana está na fábrica, ela volta para a prateleira pelo <b>↩ Sobrou</b> da Conferência, com o bipe
+    do SKU — é lá que o estoque volta. Se ela não voltou, registre na aba <i>Correções</i>.
   </div>
   <div id="cancLista"></div>
 </div>
@@ -1996,7 +1996,7 @@ document.addEventListener("click",async e=>{
     }
     const ROTULO={abertura:'abertura do livro', embalagem:'embalagem', etiqueta:'etiqueta de venda',
                   inventario:'contagem', ajuste:'ajuste manual', correcao:'correção',
-                  cancelamento:'cancelamento'};
+                  cancelamento:'cancelamento', conferencia:'conferência', sobra:'sobrou — voltou à prateleira'};
     /* ⚠️ A SOMA DO LIVRO VAI AO LADO DO SALDO, e nao e enfeite: e a mesma
        conferencia que o `teste_livro.js` faz, feita aqui com o dado real. Se um
        dia os dois divergirem, alguem voltou a escrever na coluna por fora — e e
@@ -3393,7 +3393,7 @@ async function corPassivo(){
      ajuda:'duplicatas do PDF reenviado cobrando etiqueta de peça que já saiu',
      linha:function(x){ return corFrase(x)+' <span class="sub">já era #'+x.ja_era+' de '+esc(x.ja_era_data||'')+' ('+esc(x.ja_era_estagio||'')+')</span>'; }},
     {k:'canceladas', um:'cancelada depois da etiqueta', muitos:'canceladas depois da etiqueta',
-     lista:'as canceladas', ajuda:'o cliente cancelou com a baixa do estoque já feita — falta dizer se a persiana voltou',
+     lista:'as canceladas', ajuda:'o cliente cancelou depois da etiqueta — a que está na fábrica volta pelo "Sobrou" da Conferência; aqui se registra a que não voltou',
      linha:function(x){ return corFrase(x)+(x.pecas>1?' <span class="tag">📦 '+x.pecas+' persianas</span>':'')
        +(x.cancelada_varias?' <span class="sub">(caixa de várias — só um item cancelado)</span>':''); }},
     {k:'vencidos', um:'pendente vencido', muitos:'pendentes vencidos', lista:'os vencidos',

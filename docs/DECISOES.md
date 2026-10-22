@@ -295,3 +295,13 @@ impressão, a urgência e o inventário passam a olhar o **livre** (saldo − pe
 caixa impressa); o `precisa` da tela azul não muda. A Mesa de correções nunca dá
 a baixa. As caixas impressas antes do deploy já tinham baixado e não baixam de
 novo (a virada, uma vez só). Detalhe no `CLAUDE.md` §2.
+
+## 22/10/2026 — a caixa que sobrou volta ao estoque na Conferência, e a Mesa nunca mexe em saldo
+Decisão do dono (spec `CONFERENCIA-E-BAIXA`, D2, D3, D7 e D8; fase 2-B). **Antes:**
+a expedição só marcava "Motorista recusou", e o saldo voltava quando alguém dizia
+"a persiana voltou" na Mesa de correções. **Depois:** o **↩ Sobrou** da
+Conferência — bipa a etiqueta, bipa o SKU de **cada** persiana, escolhe o motivo
+(venda cancelada, motorista recusou, outro) — devolve +1 por peça se a caixa já
+tinha baixado (senão só solta a reserva). Quem conferiu a caixa não marca a
+sobra. A Mesa só registra a cancelada que não voltou, e nunca mexe em saldo.
+Detalhe no `CLAUDE.md` §2 e nos cartões R-REC-01 a R-REC-05.

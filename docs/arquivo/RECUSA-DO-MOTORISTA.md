@@ -1,3 +1,9 @@
+> **ARQUIVADA EM 22/10/2026 — SUBSTITUÍDA** pela fase 2-B da spec `CONFERENCIA-E-BAIXA`:
+> o "Motorista recusou" virou um dos motivos do **↩ Sobrou** da Conferência, que marca
+> **e** devolve o saldo bipando o SKU; a rota `POST /api/carregamento/recusa` e o
+> `teste_recusa_motorista.js` saíram (os casos que valem moram no `teste_sobra.js`).
+> Histórico — não use como fonte de regra.
+>
 > **STATUS · 02/10/2026 — EM CÓDIGO** · tipo `REGRA` · risco 🔴 (estoque) · fase única.
 > Decidida pelo Lucas em 02/10/2026 (opção **B**, código novo). Em código no mesmo dia:
 > `POST /api/carregamento/recusa`, o botão **🚫 Motorista recusou** no Carregamento,
