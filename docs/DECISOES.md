@@ -362,11 +362,11 @@ com problema gravava quem revisou. **Depois:** toda revisão e toda embalagem
 gravam a pessoa que bipou. Nenhuma tela mostra isso ainda; o dado começa a se
 acumular para medir a produtividade por pessoa. Cartão R-EMB-08.
 
-## 26/10/2026 — o PCP passa a ser aberto por `https://pcp.deccorar.com.br`
+## 26/10/2026 — o PCP passa a ser aberto por `https://pcp.sistemadeccorar.com.br`
 
 Fase 5-B da spec `ACESSOS-UNIFICADOS` (R-ACE-07, dívida 2). **Antes:** o PCP era
 aberto por `http://…:3010`, e o PIN e a sessão viajavam abertos pela internet.
-**Depois:** o endereço é `https://pcp.deccorar.com.br`, com certificado do Let's
+**Depois:** o endereço é `https://pcp.sistemadeccorar.com.br`, com certificado do Let's
 Encrypt tirado pelo Traefik que já atende o n8n no servidor. Os dois endereços
 funcionam na transição; a porta 3010 é fechada para a internet quando todos os
 tablets estiverem no endereço novo. O cookie da sessão só ganha `Secure` quando a

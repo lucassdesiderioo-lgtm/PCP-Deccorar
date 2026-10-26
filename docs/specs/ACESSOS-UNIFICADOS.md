@@ -1,7 +1,7 @@
 > **STATUS · 26/10/2026 — FALTA SÓ SUBIR A 5-B** · **fases 1, 2, 3, 4 e 6 no ar e
 > conferidas na tela pelo dono (26/10, PR #231)**: a migração da fase 2 criou **0**
 > exceções. **Fase 5-B em código (26/10):** o sistema é aberto por nome
-> (`pcp.deccorar.com.br`) e de fora; o HTTPS entra pelo **Traefik que já existe**
+> (`pcp.sistemadeccorar.com.br`) e de fora; o HTTPS entra pelo **Traefik que já existe**
 > no servidor (portas 80/443, certificado Let's Encrypt do n8n), por um serviço
 > `pcp-https` que repassa à 3010, e o cookie ganha `Secure` só quando a pessoa entrou
 > por https — `teste_login.js` (83), passo a passo em `docs/HTTPS.md`. **Mudou na
