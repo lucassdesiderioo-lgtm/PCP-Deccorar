@@ -182,7 +182,13 @@ try{
      la e ainda nao foi produzido, e entra na lista de compras pelo mesmo
      gatilho 2 da medida padrao. O tubo e o MESMO material dos dois lados, e
      Compras e um so — decisao do dono, 24/09/2026. */
+  /* A PORTA DO ACESSO (fase 2 da ACESSOS-UNIFICADOS, 26/10/2026): o portao do
+     modulo pergunta aqui quais chaves a pessoa tem — o MESMO resolvedor que
+     decide as telas do PCP. Antes ele lia a sombra `usuarios.areas` e
+     traduzia em papel, e foi assim que o acesso sumiu em silencio (#13, #28,
+     #34). */
   const sm = require('./tecido/montar').montar(app, null, {
+    permissoes: uid => [...app.locals.acesso.permissoesDe(uid)],
     pessoas: () => db.prepare('SELECT id,nome FROM usuarios WHERE ativo=1 ORDER BY nome').all(),
     materiais: () => db.prepare('SELECT id,nome,unidade FROM componente WHERE ativo=1 ORDER BY nome').all()
   });

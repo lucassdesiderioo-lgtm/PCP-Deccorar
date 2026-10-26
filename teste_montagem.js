@@ -187,6 +187,16 @@ eq('gravou', db.prepare("SELECT valor FROM config WHERE chave='kit_codigo'").get
 r = chamar('POST','/api/config/kit',{kit:'OUTRO'});
 eq('e a trava do `confirmar` (R8) continua de pe', r.status, 409);
 
+console.log('\n── 6-B. QUEM EMBALOU fica gravado (fase 4 da ACESSOS-UNIFICADOS, divida 9) ──');
+{
+  const ult = db.prepare('SELECT * FROM montagem ORDER BY id DESC LIMIT 1').get();
+  ok('a ultima embalagem existe', !!ult);
+  if(ult){
+    eq('grava o id de quem embalou', ult.usuario_id, 1);
+    eq('e o nome, como retrato', ult.usuario_nome, 'Bancada');
+  }
+}
+
 console.log('\n── 7. o que ja valia continua valendo ──');
 r = chamar('POST','/api/montagem',{});
 eq('sem codigo → 400', r.status, 400);

@@ -34,7 +34,12 @@ module.exports=function(app,db){
   app.post('/api/devolucao/baixa',(req,res)=>{
     const b=req.body||{};
     if(!b.id) return res.status(400).json({erro:'sem id'});
-    db.prepare("UPDATE devolucao SET reputacao=?, motivo=?, baixado=1, baixado_em=datetime('now','localtime') WHERE id=?")
+    /* Responder ok para o que nao gravou e o pior silencio: o id que nao
+       existe passava, e a baixa repetida regravava a data de quem deu antes. */
+    const d=db.prepare("SELECT baixado, baixado_em FROM devolucao WHERE id=?").get(b.id);
+    if(!d) return res.status(404).json({erro:'Devolução não encontrada. Atualize a lista.'});
+    if(d.baixado) return res.status(409).json({erro:'Esta devolução já teve baixa'+(d.baixado_em?' em '+d.baixado_em.slice(8,10)+'/'+d.baixado_em.slice(5,7)+' às '+d.baixado_em.slice(11,16):'')+'.'});
+    db.prepare("UPDATE devolucao SET reputacao=?, motivo=?, baixado=1, baixado_em=datetime('now','localtime') WHERE id=? AND baixado=0")
       .run(b.reputacao||null,b.motivo||null,b.id);
     res.json({ok:true});
   });

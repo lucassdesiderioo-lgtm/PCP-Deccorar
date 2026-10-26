@@ -322,3 +322,42 @@ baixa; a peça que voltava pelo ↩ Sobrou subia o saldo e não aparecia nele.
 peças que sobraram no dia da sobra. O "saiu" do dia da baixa não muda, o
 "entrou" continua sendo só embalagem, e o fechamento diário segue gravando
 entrou − saiu. Cartão R-EST-13.
+
+## 26/10/2026 — as permissões do sob medida entram na tela de Acessos, uma a uma
+
+Fase 2 da spec `ACESSOS-UNIFICADOS`, aprovada pelo dono em 21/10/2026 e mandada
+construir em 26/10 ("pode seguir com todas essas pendências"). **Antes:** quem
+entrava no sob medida caía num de quatro papéis fixos (diretor, cortador,
+vendedor, produção), traduzidos da área do PCP; para lançar boleto a pessoa
+precisava ser diretor. **Depois:** as 41 permissões do módulo aparecem na tela de
+Acessos no grupo "Sob medida", os setores "Sob medida /" nascem com o pacote de
+antes, e cada permissão se marca ou desmarca sozinha. Ninguém ganhou nem perdeu
+nada na passagem (a migração confere pessoa a pessoa). Os setores mantiveram os
+nomes de hoje (Bancada, Cadastros, Venda). Cartões R-SMA-01 a R-SMA-03.
+
+## 26/10/2026 — o nível do setor vira etiqueta, e salvar um setor não apaga nada
+
+Fase 3 da spec `ACESSOS-UNIFICADOS` (R-ACE-03, dívidas 19 e 20). **Antes:** a
+caixinha acima do nível do setor saía travada e, no salvamento, a permissão
+sumia em silêncio; e `minimo.definir` aparecia na tela sem liberar nada.
+**Depois:** a caixinha aparece como está, com o aviso "acima do nível do setor",
+e só sai se alguém a desmarcar; a permissão sensível nova pede confirmação
+antes de entrar; as três intransferíveis continuam só no Admin Geral; e
+`minimo.definir` saiu (quem decide o card Materiais segue sendo
+`componente.cadastrar` e `compras.ver`).
+
+## 26/10/2026 — baixa de boleto e descarte de sobra passam a ser de duas pessoas
+
+Fase 6 da spec `ACESSOS-UNIFICADOS` (resposta P2 do dono, 21/10/2026).
+**Antes:** quem tinha a permissão dava a baixa no boleto ou descartava a sobra
+sozinho, na hora. **Depois:** a mesma pessoa **pede**, e outra **aprova** — quem
+pediu não aprova, nem o Admin Geral. Enquanto o pedido espera, o boleto continua
+em aberto e a sobra continua disponível. Quem já podia baixar ou descartar ganhou
+também a permissão de aprovar, para ninguém perder o que fazia. Cartão R-SMF-12.
+
+## 26/10/2026 — revisão e embalagem gravam quem fez
+
+Fase 4 da spec `ACESSOS-UNIFICADOS` (R-ACE-06, dívida 9). **Antes:** só a peça
+com problema gravava quem revisou. **Depois:** toda revisão e toda embalagem
+gravam a pessoa que bipou. Nenhuma tela mostra isso ainda; o dado começa a se
+acumular para medir a produtividade por pessoa. Cartão R-EMB-08.

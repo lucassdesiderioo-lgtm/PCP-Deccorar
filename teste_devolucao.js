@@ -120,6 +120,19 @@ eq('marca como baixada', d1b.baixado, 1);
 ok('com data da baixa', !!d1b.baixado_em);
 eq('sai da lista de pendentes', chamar('GET','/api/devolucao/pendentes').body.length, 3);
 eq('baixa sem id e recusada', chamar('POST','/api/devolucao/baixa',{}).status, 400);
+
+/* 26/10/2026: a baixa respondia ok para id que nao existe, e regravava a data
+   de quem ja tinha dado baixa. Resposta que diz que gravou sem ter gravado e o
+   pior tipo de silencio. */
+r = chamar('POST','/api/devolucao/baixa',{ id:99999, reputacao:'sim', motivo:'x' });
+eq('baixa de devolução que não existe é recusada (404)', r.status, 404);
+ok('   e diz que não achou', /não encontrada/i.test(r.body.erro || ''), JSON.stringify(r.body));
+db.prepare("UPDATE devolucao SET baixado_em='2026-01-01 10:00:00' WHERE id=?").run(d1.id);
+r = chamar('POST','/api/devolucao/baixa',{ id:d1.id, reputacao:'nao', motivo:'outro' });
+eq('baixa repetida é recusada (409)', r.status, 409);
+const d1c = db.prepare('SELECT * FROM devolucao WHERE id=?').get(d1.id);
+ok('   e não regrava data, reputação nem motivo',
+   d1c.baixado_em === '2026-01-01 10:00:00' && d1c.reputacao === 'sim' && d1c.motivo === 'envio errado', JSON.stringify(d1c));
 eq('o contador de hoje conta as quatro', chamar('GET','/api/devolucao/hoje').body.qtd, 4);
 
 db.close(); fs.rmSync(tmp, { recursive:true, force:true });

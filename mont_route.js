@@ -39,7 +39,13 @@ module.exports=function(app,db){
      deploy: o código parou de lê-los, e nada foi destruído. Limpar é `rm` na
      pasta `kit/`, com o gerador já rodando. */
   // teste vem por ultimo: e a coluna que o teste_route adicionava por ALTER
-  db.exec("CREATE TABLE IF NOT EXISTS montagem (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, inicio TEXT, fim TEXT, segundos INTEGER, kit_ok INTEGER DEFAULT 1, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0);");
+  db.exec("CREATE TABLE IF NOT EXISTS montagem (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, inicio TEXT, fim TEXT, segundos INTEGER, kit_ok INTEGER DEFAULT 1, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, usuario_id INTEGER, usuario_nome TEXT);");
+  /* QUEM EMBALOU (fase 4 da ACESSOS-UNIFICADOS, divida 9, 26/10/2026): o id e
+     o nome de quem fechou a embalagem — o nome como retrato. O ALTER guardado
+     e para o banco de producao, onde a tabela ja existe sem as colunas; elas
+     entram no FIM, onde o SQLite as poe (§17). */
+  for(const c of ['usuario_id INTEGER','usuario_nome TEXT'])
+    try{ db.exec('ALTER TABLE montagem ADD COLUMN '+c); }catch(e){}
   app.get('/api/config/kit',(req,res)=>{ const r=db.prepare("SELECT valor FROM config WHERE chave='kit_codigo'").get(); res.json({kit:r?r.valor:null}); });
   // Guarda o valor COMO VEIO (so trim) — o link do Drive e case-sensitive e
   // vira QR pro cliente. A conferencia na embalagem (kitBate/kitNorm) compara
@@ -255,8 +261,9 @@ module.exports=function(app,db){
     let naFila=false, modo='estoque', abatido=false;
     try{
       db.transaction(()=>{
-        const mid=db.prepare("INSERT INTO montagem (codigo,inicio,fim,segundos,kit_ok) VALUES (?,?,?,?,1)")
-          .run(cod,inicio,fim,Math.round(+segundos||0)).lastInsertRowid;
+        const u=req.usuario||{};
+        const mid=db.prepare("INSERT INTO montagem (codigo,inicio,fim,segundos,kit_ok,usuario_id,usuario_nome) VALUES (?,?,?,?,1,?,?)")
+          .run(cod,inicio,fim,Math.round(+segundos||0),u.id!=null?u.id:null,u.nome||null).lastInsertRowid;
         const f=db.prepare("SELECT id,modo FROM fila WHERE codigo=? AND situacao='aguardando' AND COALESCE(teste,0)=? ORDER BY id LIMIT 1").get(cod,emTeste);
         if(f){ db.prepare("UPDATE fila SET situacao='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(f.id); naFila=true; modo=f.modo; }
         /* A PORTA DE ENTRADA DO ESTOQUE, e ela passa pelo dono unico desde a

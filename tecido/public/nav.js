@@ -77,7 +77,7 @@ function sessao(eu,dest){
   b.appendChild(setor);
 
   var quem=document.createElement('span');
-  quem.innerHTML='<b>'+String(eu.nome||'').replace(/[<>&]/g,'')+'</b> · '+eu.papel;
+  quem.innerHTML='<b>'+String(eu.nome||'').replace(/[<>&]/g,'')+'</b>';
   b.appendChild(quem);
 
   b.appendChild(Object.assign(document.createElement('span'),{className:'espaco'}));

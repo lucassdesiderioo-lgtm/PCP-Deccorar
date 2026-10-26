@@ -16,6 +16,13 @@
  */
 const PERMISSOES = require('./permissoes');
 const path = require('path');
+/* O pacote com que cada setor do sob medida NASCE mora no proprio modulo
+   (fase 2 da ACESSOS-UNIFICADOS): e ele que sabe o que a bancada faz. */
+const SM = require('./tecido/nucleo/permissoes');
+const smPacote = nome => nome === 'diretor'
+  ? SM.CHAVES.map(c => 'sobmedida.' + c.chave)
+  : SM.PAPEIS[nome].map(c => 'sobmedida.' + c);
+const SM_SETORES = ['serralheria','colecao','montagem','revisao','embalagem'];
 
 // Modelo antigo (area) -> permissao equivalente no modelo novo, para comparar
 // a MESMA tela nos dois modelos. A area 'admin' fica de fora: e o hub do admin,
@@ -49,21 +56,24 @@ function setoresNativos(){
     // ninguem e migrado para ca. A operacao sob medida e outra equipe, e
     // herdar gente por engano daria acesso de corte a quem so revisa.
     { nome:'Sob medida / Bancada',           nivel:'operacao',
-      perms:['sobmedida.cortar','painel.ver','produtividade.propria'] },
+      perms:smPacote('cortador').concat(['painel.ver','produtividade.propria']) },
     /* ⚠️ NIVEL `supervisor`, e ele tem que CABER a chave que o setor carrega.
        A rota de salvar recusa permissao acima do nivel do setor, e a tela nem
        desenha a caixinha — entao o par declarado errado nao da erro: ele faz a
        chave sumir em silencio no primeiro salvamento do setor. Foi o que
        aconteceu em producao (19/09/2026), com o setor em `supervisor` e a
        chave em `admin`: editar o setor regravou a lista sem ela. */
+    /* E ELE CARREGA AS CINCO BANCADAS: era o `*` do diretor, que bipava
+       qualquer uma — recusar a chefia numa bancada seria trava disparando no
+       caso normal (#6). */
     { nome:'Sob medida / Cadastros',         nivel:'supervisor',
-      perms:['sobmedida.cortar','sobmedida.cadastrar'] },
+      perms:smPacote('diretor').concat(SM_SETORES.map(s => 'sobmedida.' + s)) },
     /* VENDA (fase 2 da SOBMEDIDA-PEDIDO-REVENDA). Nasce vazio como os dois
        de cima, e SO com a chave de vender: o vendedor nao corta. Ate esta
        fase ele entrava por 'Sob medida / Cadastros', que e da chefia — o
        setor existe justamente para ele parar de precisar daquela. */
     { nome:'Sob medida / Venda',             nivel:'operacao',
-      perms:['sobmedida.vender'] },
+      perms:smPacote('vendedor') },
     /* PRODUCAO SOB MEDIDA (fase 5-A, 24/09/2026). Cinco setores, um por
        bancada — o fluxo fisico da secao 4.15 da spec. Nascem VAZIOS como os
        tres de cima: ninguem e migrado, porque herdar gente por engano daria
@@ -96,7 +106,7 @@ function setoresNativos(){
     // Nascem VAZIOS: ninguem e migrado (mesma regra do setor de montagem).
     { nome:'Comprador',                      nivel:'admin',
       perms:['compras.ver','fornecedor.cadastrar','preco.lancar','pedido.criar','pedido.ver',
-             'custo.ver','minimo.definir','componente.cadastrar','modelo.cadastrar'] },
+             'custo.ver','componente.cadastrar','modelo.cadastrar'] },
     // Recebimento NAO VE PRECO em lugar nenhum — nem na conferencia, nem no
     // pedido, nem no PDF. Quem confere quantidade vendo valor tende a confirmar
     // o que esta escrito, e a separacao perde o sentido.
@@ -481,10 +491,41 @@ module.exports = function(app, db){
     const nivel = String(b.nivel || '').trim();
     if(!nome) return res.status(400).json({ erro:'nome obrigatório' });
     if(!NIVEIS[nivel]) return res.status(400).json({ erro:'nível inválido' });
-    // regra §5.2: o nível do setor limita as permissões marcaveis
+    /* ⚠️ O NIVEL DO SETOR VIROU ETIQUETA, E NAO TRAVA ESCONDIDA (fase 3 da
+       ACESSOS-UNIFICADOS, R-ACE-03, divida 20). Ate 26/10/2026 a rota recusava
+       chave acima do nivel e a tela desenhava a caixinha `disabled` — entao a
+       chave que ja estava no setor NUNCA voltava no corpo, e o DELETE + INSERT
+       abaixo a apagava em silencio no primeiro salvamento, por qualquer motivo.
+       Foi assim que `sobmedida.cadastrar` saiu do "Sob medida / Cadastros" em
+       19/09/2026. A tela nova manda a lista INTEIRA (`todas`), e o que vale e
+       o que a pessoa marcou.
+
+       ⚠️ E A TELA VELHA (a aba aberta antes do deploy) nao pode apagar nada:
+       sem `todas`, a chave acima do nivel que ja estava no setor FICA, e a
+       recusa de marcar uma nova acima do nivel continua como era. */
     const perms = (Array.isArray(b.permissoes) ? b.permissoes : []).filter(c => infoPerm[c]);
+    const telaNova = b.todas === true;
+    const anteriores = b.id ? db.prepare('SELECT chave FROM setor_permissao WHERE setor_id=?').all(b.id).map(r => r.chave) : [];
     const acima = perms.filter(c => NIVEIS[infoPerm[c].nivel] > NIVEIS[nivel]);
-    if(acima.length) return res.status(400).json({ erro:'permissões acima do nível do setor: '+acima.join(', ') });
+    if(!telaNova && acima.length) return res.status(400).json({ erro:'permissões acima do nível do setor: '+acima.join(', ') });
+    if(!telaNova) anteriores.forEach(c => { if(infoPerm[c] && NIVEIS[infoPerm[c].nivel] > NIVEIS[nivel] && perms.indexOf(c) < 0) perms.push(c); });
+    /* ⚠️ AS INTRANSFERIVEIS SO MORAM NO ADMIN GERAL. Com o nivel virando
+       etiqueta, era o nivel `admin_geral` que as segurava longe de setor
+       comum — e um setor com `pessoas.gerenciar` daria a quem estivesse nele o
+       poder de mandar nos acessos (armadilha #28). A trava passa a existir
+       por ela mesma. */
+    const intransf = perms.filter(c => infoPerm[c].intransferivel);
+    if(intransf.length) return res.status(400).json({ erro:'Estas permissões são só do setor Admin Geral e não entram em outro setor: '
+      + intransf.map(c => infoPerm[c].rotulo || c).join(', ') });
+    /* A SENSIVEL NOVA PEDE CONFIRMACAO: quem salva ve o que esta dando antes
+       de dar. So a que ENTRA agora — a que ja estava nao pergunta de novo,
+       senao o aviso viraria paisagem e passaria a ser confirmado sem ler. */
+    const novasSens = perms.filter(c => infoPerm[c].sensivel && anteriores.indexOf(c) < 0);
+    if(novasSens.length && b.confirmar !== true)
+      return res.status(409).json({ erro:'confirmar', motivo:'sensiveis',
+        mensagem:'Este setor vai passar a carregar permissões sensíveis. Confira antes de salvar.',
+        sensiveis: novasSens.map(c => ({ chave:c, rotulo:infoPerm[c].rotulo || c, nivel:infoPerm[c].nivel,
+          acima_do_nivel: NIVEIS[infoPerm[c].nivel] > NIVEIS[nivel] })) });
     try{
       db.transaction(() => {
         let id = b.id;
@@ -948,23 +989,18 @@ module.exports = function(app, db){
        para o fallback do modelo antigo; quem decide e a chave. Duas chaves
        levam a mesma area, e ela entra uma vez so. */
     ['contagem.contar','inventario'], ['contagem.recontar','inventario'],
-    /* SOB MEDIDA. Sem estas duas linhas a integracao NAO FUNCIONA, e falha em
-       silencio: o portao em tecido/montar.js le `usuarios.areas`, e no modo
-       novo esta coluna e recalculada aqui a cada mudanca de setor. Area que
-       nao esta neste mapa e apagada no primeiro salvamento — o acesso seria
-       concedido na tela e sumiria sozinho depois. */
-    ['sobmedida.cortar','sobmedida'], ['sobmedida.cadastrar','sobmedida_adm'],
-    ['sobmedida.vender','sobmedida_venda'],
-    /* Os cinco setores de producao (fase 5-A). Uma area por setor, e nao uma
-       area so: e ela que o modulo le para saber QUAIS bancadas a pessoa
-       bipa. Sem a linha aqui a caixinha e marcada na tela e a area some
-       sozinha no salvamento seguinte — o acesso seria concedido e perdido
-       sem erro, sem log e sem ninguem saber por que. */
-    ['sobmedida.serralheria','sobmedida_serralheria'],
-    ['sobmedida.colecao',    'sobmedida_colecao'],
-    ['sobmedida.montagem',   'sobmedida_montagem'],
-    ['sobmedida.revisao',    'sobmedida_revisao'],
-    ['sobmedida.embalagem',  'sobmedida_embalagem']
+    /* SOB MEDIDA — UMA AREA SO, e ela serve a uma pergunta so: "para onde a
+       pessoa vai depois do PIN?" (destino.js). Desde a fase 2 da
+       ACESSOS-UNIFICADOS (26/10/2026) o portao do modulo NAO le esta coluna:
+       ele pergunta ao `permissoesDe` quais chaves `sobmedida.*` a pessoa
+       tem. As areas `sobmedida_adm`, `_venda` e as cinco de setor sairam com
+       o tradutor de papel que as lia. Entra no sob medida quem tem a chave de
+       entrar OU uma bancada da producao — a mesma regra do modulo
+       (POR_SETOR em tecido/nucleo/permissoes.js). */
+    ['sobmedida.modulo.entrar','sobmedida'],
+    ['sobmedida.serralheria','sobmedida'], ['sobmedida.colecao','sobmedida'],
+    ['sobmedida.montagem','sobmedida'], ['sobmedida.revisao','sobmedida'],
+    ['sobmedida.embalagem','sobmedida']
   ];
   function sincronizarAreas(uid){
     try{
@@ -976,6 +1012,134 @@ module.exports = function(app, db){
       db.prepare("UPDATE usuarios SET areas=? WHERE id=?").run(areas.join(','), uid);
     }catch(e){}
   }
+
+  /* ── 3-G. `minimo.definir` SAI DO BANCO (fase 3 da ACESSOS-UNIFICADOS) ──
+     A chave saiu do registro (nenhuma rota a lia — divida 19), e o sync do
+     passo 2 ja a tira da tabela `permissoes`; as linhas de setor e de excecao
+     nao tem chave estrangeira e ficariam la, marcando na tela uma caixinha
+     que nao existe. Ninguem perde nada: o card Materiais e decidido por
+     `componente.cadastrar` e `compras.ver`. Uma vez so (marca em `config`). */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='acesso_minimo_definir'").get()){
+      db.transaction(() => {
+        db.prepare("DELETE FROM setor_permissao WHERE chave='minimo.definir'").run();
+        db.prepare("DELETE FROM usuario_excecao WHERE chave='minimo.definir'").run();
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('acesso_minimo_definir','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[acesso] limpeza do minimo.definir falhou: ' + e.message); }
+
+  /* ── 3-F. UMA LISTA SO (fase 2 da ACESSOS-UNIFICADOS, 26/10/2026) ──
+     As tres chaves velhas do sob medida (`sobmedida.cortar`, `.cadastrar`,
+     `.vender`) viram as chaves do modulo, uma a uma, e a regra e uma so:
+     NINGUEM GANHA NEM PERDE NADA NA PASSAGEM.
+
+       1. FOTO DE ANTES: o que cada pessoa podia no modulo, pela regua velha
+          (area -> papel -> pacote), congelada aqui embaixo;
+       2. setor que carregava uma chave velha passa a carregar o pacote dela;
+          excecao CONCEDIDA de chave velha vira excecao do pacote;
+       3. as chaves velhas saem de setor e de excecao (a revogada tambem: a
+          conferencia do passo 4 refaz o que ela fazia);
+       4. CONFERENCIA, pessoa a pessoa e chave a chave: o que ficou diferente
+          da foto vira excecao (concede ou revoga), com motivo — o que a regra
+          diz e garantido pela conta, e nao pela esperanca de que os pacotes
+          batam;
+       5. a sombra `areas` e recalculada para todo mundo.
+
+     Fica DEPOIS do PERM_AREA de proposito: o `sincronizarAreas` do passo 5 le
+     aquele `const`, e chamado antes ele estoura dentro do `try` dele e nao
+     grava nada — em silencio.
+
+     Roda UMA VEZ (marca em `config`): quem desmarcar uma caixinha depois nao
+     a ve voltar no proximo boot. */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='acesso_sobmedida_f2'").get()){
+      const VELHAS = ['sobmedida.cortar','sobmedida.cadastrar','sobmedida.vender'];
+      const PACOTE_DA = { 'sobmedida.cortar':smPacote('cortador'), 'sobmedida.vender':smPacote('vendedor'),
+        'sobmedida.cadastrar':smPacote('diretor').concat(SM_SETORES.map(x => 'sobmedida.' + x)) };
+      const CH = SM.CHAVES.map(c => c.chave);
+      // A regua velha, congelada como era ate 26/10/2026 (tecido/nucleo/acesso.js).
+      const regua = (perms, ag) => {
+        const tem = c => ag || perms.has(c);
+        const setores = SM_SETORES.filter(x => tem('sobmedida.cadastrar') || tem('sobmedida.' + x));
+        const papel = tem('sobmedida.cadastrar') ? 'diretor' : tem('sobmedida.cortar') ? 'cortador'
+          : tem('sobmedida.vender') ? 'vendedor' : SM_SETORES.some(x => tem('sobmedida.' + x)) ? 'producao' : null;
+        const pode = new Set();
+        if(papel) CH.forEach(k => { if(papel === 'diretor' || SM.PAPEIS[papel].includes(k)
+          || (k === 'producao.bipar' && setores.length)) pode.add(k); });
+        return { pode, setores:new Set(setores) };
+      };
+      // ...e a nova: a mesma conta do portao do modulo.
+      const SMA = require('./tecido/nucleo/acesso');
+      const novo = uid => {
+        const u = SMA.daSessaoDoPcp({ id:uid }, [...permissoesDe(uid)]);
+        return u ? { pode:new Set(CH.filter(k => SM.pode(u, k))), setores:new Set(u.setores) }
+                 : { pode:new Set(), setores:new Set() };
+      };
+      const gente = db.prepare('SELECT id FROM usuarios').all().map(r => r.id);
+      let excecoes = 0;
+      db.transaction(() => {
+        const antes = {};
+        gente.forEach(id => { antes[id] = ehAdminGeral(id) ? null : regua(permissoesDe(id), false); });
+        for(const v of VELHAS){
+          for(const c of PACOTE_DA[v]){
+            db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
+              SELECT setor_id, ? FROM setor_permissao WHERE chave=?`).run(c, v);
+            db.prepare(`INSERT OR IGNORE INTO usuario_excecao (usuario_id,chave,concede,motivo,criado_por)
+              SELECT usuario_id, ?, 1, 'fase 2: veio de ' || ?, 'sistema' FROM usuario_excecao e
+               WHERE chave=? AND concede=1`).run(c, v, v);
+          }
+          db.prepare('DELETE FROM setor_permissao WHERE chave=?').run(v);
+          db.prepare('DELETE FROM usuario_excecao WHERE chave=?').run(v);
+        }
+        const exc = db.prepare(`INSERT INTO usuario_excecao (usuario_id,chave,concede,motivo,criado_por)
+          VALUES (?,?,?,?, 'sistema') ON CONFLICT(usuario_id,chave) DO UPDATE SET concede=excluded.concede,
+          motivo=excluded.motivo, criado_por=excluded.criado_por`);
+        const MOT = 'fase 2 da lista unica: preserva o acesso que a pessoa ja tinha no sob medida';
+        gente.forEach(id => {
+          const a = antes[id];
+          if(!a) return;                                // Admin Geral: todas, antes e depois
+          const d = novo(id);
+          CH.forEach(k => {
+            if(a.pode.has(k) && !d.pode.has(k)){ exc.run(id, 'sobmedida.' + k, 1, MOT); excecoes++; }
+            else if(!a.pode.has(k) && d.pode.has(k)){ exc.run(id, 'sobmedida.' + k, 0, MOT); excecoes++; }
+          });
+          SM_SETORES.forEach(x => {
+            if(a.setores.has(x) && !d.setores.has(x)){ exc.run(id, 'sobmedida.' + x, 1, MOT); excecoes++; }
+            else if(!a.setores.has(x) && d.setores.has(x)){ exc.run(id, 'sobmedida.' + x, 0, MOT); excecoes++; }
+          });
+        });
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('acesso_sobmedida_f2','1')").run();
+      })();
+      gente.forEach(id => sincronizarAreas(id));
+      console.log('[acesso] fase 2 (lista unica do sob medida): migrada; ' + excecoes +
+        ' excecao(oes) criada(s) para preservar o acesso de antes');
+    }
+  }catch(e){ console.log('[acesso] fase 2 do sob medida falhou (nada gravado): ' + e.message); }
+
+  /* ── 3-H. DUAS PESSOAS NO BOLETO E NA SOBRA (fase 6 da ACESSOS-UNIFICADOS) ──
+     A baixa de boleto e o descarte de sobra viraram PEDIR e APROVAR, e
+     aprovar e chave nova. Quem ja tinha o poder de baixar ou descartar
+     ganha tambem o de aprovar — ninguem perde o que fazia; o que muda e que
+     agora sao precisas DUAS pessoas, e quem pediu nao aprova (isso e do
+     codigo, dominio/aprovacao.js, e nao da chave). Excecao concedida vai
+     junto. Uma vez so (marca em `config`). Fica DEPOIS do 3-F: num banco que
+     ainda tem as chaves velhas, e o 3-F que primeiro poe o pacote no setor. */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='acesso_sobmedida_f6'").get()){
+      db.transaction(() => {
+        for(const [de, para] of [['sobmedida.boleto.editar','sobmedida.boleto.aprovar_baixa'],
+                                 ['sobmedida.sobra.descartar','sobmedida.sobra.aprovar_descarte']]){
+          db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
+            SELECT setor_id, ? FROM setor_permissao WHERE chave=?`).run(para, de);
+          db.prepare(`INSERT OR IGNORE INTO usuario_excecao (usuario_id,chave,concede)
+            SELECT usuario_id, ?, 1 FROM usuario_excecao e WHERE chave=? AND concede=1
+              AND NOT EXISTS (SELECT 1 FROM usuario_excecao x WHERE x.usuario_id=e.usuario_id AND x.chave=?)`).run(para, de, para);
+        }
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('acesso_sobmedida_f6','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[acesso] seed da aprovacao em duas pessoas falhou: ' + e.message); }
 
   // pergunta pontual (usada por outras rotas, ex.: contagem em dois passos):
   // o usuario tem esta permissao? Admin Geral tem todas. Migra na primeira vez.

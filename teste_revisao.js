@@ -123,6 +123,16 @@ r = revisar({ codigo:'BK140140BEGE' });
    somar estoque. */
 eq('o estoque devolvido e o saldo atual, sem somar a peca revisada', r.body.estoque, 5);
 
+console.log('\n── 6. QUEM REVISOU fica gravado (fase 4 da ACESSOS-UNIFICADOS, divida 9) ──');
+/* A tabela deste teste nasce SEM as colunas — e o banco de producao de hoje. A
+   rota tem que garanti-las sozinha (o ALTER guardado), senao o INSERT estoura
+   no primeiro bipe depois do deploy. */
+r = revisar({ codigo:'BK160140CINZA' });
+eq('revisa normalmente', r.status, 200);
+const ultRev = db.prepare('SELECT * FROM revisao ORDER BY id DESC LIMIT 1').get();
+eq('grava o id de quem revisou', ultRev.usuario_id, 1);
+eq('e o nome, como retrato (a pessoa pode mudar de nome depois)', ultRev.usuario_nome, 'Ana');
+
 db.close(); fs.rmSync(tmp, { recursive:true, force:true });
 console.log('\n' + (n - falhas) + ' ok, ' + falhas + ' falha(s)\n');
 process.exit(falhas ? 1 : 0);

@@ -454,6 +454,7 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 | R-EMB-05 | A conferência da peça é no bipe 1 da embalagem (`pecaTexto`) |
 | R-EMB-06 | Em modo teste a embalagem consome fila de teste |
 | R-EMB-07 | Limpar a fila apaga só o que espera |
+| R-EMB-08 | A revisão e a embalagem gravam quem fez (`usuario_id`, `usuario_nome`) |
 | R-KIT-01 | Trocar o código do kit exige `confirmar` (servidor) |
 | R-KIT-02 | O código do kit não pode ser SKU de persiana |
 | R-KIT-03 | O código do kit é conferido quando vem, e não exigido |
@@ -1321,10 +1322,11 @@ normalmente — o vínculo é bônus, não requisito.
 fluxo normal de embalagem, com kit e cronômetro, e vira estoque como qualquer outra.
 Registrar a devolução **não** mexe no saldo: o `+1` é da embalagem.
 
-**Rode `node teste_devolucao.js` (33 casos) ao mexer no `dev_route.js`.** Ele trava o
+**Rode `node teste_devolucao.js` (37 casos) ao mexer no `dev_route.js`.** Ele trava o
 SKU físico cadastrado, o `sku_venda` gravado ao lado (nunca no lugar), a fila só no
-`reembalar` e a baixa. ⚠️ **Anotado, não consertado:** a baixa com um `id` que não
-existe responde `ok` sem gravar nada.
+`reembalar` e a baixa. Desde 26/10/2026 a baixa de um `id` que não existe é **404**
+(antes respondia `ok` sem gravar nada) e a baixa repetida é **409**, sem regravar a
+data, a reputação nem o motivo de quem deu antes; a aba Devoluções mostra a recusa.
 
 ---
 
@@ -1929,8 +1931,8 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 6 | `POST /api/revisao` retorna campos obsoletos (`estoque`, `pedido`, `feito`) | Baixo — confunde quem lê a API |
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
-| 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (24), `teste_upload.js` (46), `teste_devolucao.js` (33), `teste_login.js` (74), `teste_conferencia_antiga.js` (64) e `teste_baixa_conferencia.js` (69); o resto não tem | Médio a longo prazo |
+| 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (274), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (46), `teste_devolucao.js` (37), `teste_login.js` (74), `teste_conferencia_antiga.js` (64) e `teste_baixa_conferencia.js` (69); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -1938,8 +1940,8 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 15 | ~~**`POST /api/skus` zera o estoque** quando o corpo não traz `estoque`~~ **RESOLVIDO em 17/09/2026** — campo ausente preserva os quatro campos soltos, número impossível é recusado (400) em vez de clampado, e as duas escritas viraram uma transação com o `catch` vazio fora. A rota saiu para `sku_cad_route.js` e tem `teste_skus.js` (60 casos) atrás — ver §6, armadilha #25. ~~**Fica aberto**: a rota ainda muda saldo com `sku.cadastrar`~~ **FECHADO em 21/09/2026** na fase 1 do livro: o cadastro não mexe em saldo, nem com o campo presente, nem no SKU novo — e a rota diz que ignorou (§2, o livro) | — |
 | 16 | ~~**Acesso: default `@logado` e cobertura mantida à mão**~~ **RESOLVIDO em 17/09/2026** — o padrão passou a ser **negar**, a cobertura varre o Express (a lista `TODAS_ROTAS` saiu) e o boot grita o nome da rota não declarada; as 28 leituras sem dono foram declaradas e as telas `.html` gêmeas herdaram a permissão da tela. Ver §10, armadilha #29 · `teste_cobertura.js` | — |
 | 17 | ~~**Acesso: duas travas faltando**~~ **RESOLVIDO em 17/09/2026** — a exceção recusa conceder chave `intransferivel`, a troca de setores tem a trava do último Admin Geral (mesma conta do `auth.js`, agora no `acesso.js`), setor novo não nasce `admin_geral` e a migração de `areas` virou evento de uma vez só (a porta A, que promovia a Admin Geral em silêncio). Ver §10, armadilha #28 | — |
-| 19 | **`minimo.definir` é uma chave que nenhuma rota lê.** Ela está em `permissoes.js` e no setor de Compras do `acesso.js` desde a fase 0, dizendo *"Definir estoque mínimo — ponto de pedido e estoque ideal por componente"*. Quem manda de verdade no card Materiais é `componente.cadastrar` (escrita) e `compras.ver` (leitura). Então marcar a caixinha certa na tela de Acessos **não libera nada**, e a pessoa leva 403 numa tela que a permissão dela diz que ela pode — sem erro e sem log, que é a terceira ponta da armadilha #13 (§19). Juntar as duas ou apagar a chave muda **quem pode o quê**: é `REGRA`, não conserto | Baixo — hoje quem tem uma tem a outra, porque o seed de Compras dá as duas juntas |
-| 20 | **Editar um setor APAGA, sem avisar, as permissões que ele tem acima do próprio nível.** O `POST /api/acesso/setores` faz `DELETE` + `INSERT` da lista inteira, e a tela só manda as caixinhas **marcadas** — as que estão acima do nível do setor ela desenha `disabled`, então nunca são mandadas. Não há recusa: a chave simplesmente não volta. Foi assim que `sobmedida.cadastrar` saiu do `Sob medida / Cadastros` em 19/09/2026, num salvamento que era sobre outra coisa (§19, armadilha #34). O conserto de 24/09 igualou aquele par, mas o mecanismo continua valendo para qualquer setor. Consertar é decidir o que a tela faz com a chave que ela não pode mostrar — avisar, preservar ou recusar o salvamento —, e as três mudam quem pode o quê: é `REGRA` | Médio — o modo de falhar é silencioso, e quem salva não fez nada de errado |
+| 19 | ~~**`minimo.definir` é uma chave que nenhuma rota lê.**~~ **RESOLVIDO em 26/10/2026** (fase 3 da `ACESSOS-UNIFICADOS`) — a chave saiu do registro, do setor Comprador e das exceções (uma vez só, `config.acesso_minimo_definir`). Quem manda no card Materiais continua sendo `componente.cadastrar` e `compras.ver`; ninguém perdeu nada · `teste_setor_salvar.js` | — |
+| 20 | ~~**Editar um setor APAGA, sem avisar, as permissões que ele tem acima do próprio nível.**~~ **RESOLVIDO em 26/10/2026** (fase 3 da `ACESSOS-UNIFICADOS`, R-ACE-03) — o nível do setor virou **etiqueta**: a tela mostra a caixinha acima do nível como ela está (marcada, com o aviso "acima do nível do setor") e manda a lista inteira (`todas`); a tela antiga, sem a marca, não apaga nada. A permissão **sensível nova** pede confirmação (409 `sensiveis`) antes de entrar. As três **intransferíveis** continuam fora de qualquer setor que não seja o Admin Geral, agora por trava própria, e não mais pelo nível · `teste_setor_salvar.js` (22) | — |
 | 18 | **Nada acusa uma regra INERTE** — e ela tem pelo menos **três formas**: dado que ninguém preencheu, **rota que nenhuma tela chama** (o extrato do livro ficou um dia no ar sem botão, §2; o `POST /api/componentes` ficou **oito meses**, e no lugar dele se fazia `INSERT` à mão — §7-B, armadilha #33) e **chave de permissão que nenhuma rota lê** (a `minimo.definir` da linha abaixo). `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
 
 ---
@@ -2253,9 +2255,9 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 | R-SMM-01 | Módulo montado no mesmo servidor, dentro de um try/catch — sem segundo servidor |
 | R-SMM-02 | Sem cadastro de gente próprio: a liberação é uma área do PCP |
 | R-SMM-03 | O backup diário cobre o `tecido.db` |
-| R-SMA-01 | A área é SOMBRA: chave, setor e linha no `PERM_AREA` andam juntos (#13) |
-| R-SMA-02 | `sobmedida.cadastrar` é `supervisor`, nunca `admin` (#34) |
-| R-SMA-03 | A área `admin` do PCP não abre o sob medida; diretor é só o Admin Geral e o setor de cadastros |
+| R-SMA-01 | Uma lista só: as permissões do sob medida estão na tela de Acessos, e o portão pergunta ao PCP (#13) |
+| R-SMA-02 | Nenhuma chave do sob medida é `admin`; a chefia é `supervisor` (#34) |
+| R-SMA-03 | A área `admin` do PCP não abre o sob medida |
 | R-SMD-01 | O contexto é por tela, e a paleta é a mesma do PCP |
 | R-SME-01 | A bancada cria largura e endereço, e o cadastro nasce marcado para conferir (#14) |
 | R-SME-02 | Cada nível guarda um rolo só |
@@ -2273,7 +2275,7 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 | R-SMR-01 | Preço da revenda em cascata, arredondado uma vez; o subtotal Deccorar não se mexe |
 | R-SMR-02 | Tabela sem percentual é recusa nomeada, e nasce vazia, não zero |
 | R-SMR-03 | O prazo é conta do `prazo.js`, pela hora do ENVIO |
-| R-SMR-04 | O vendedor tem área própria; `sobmedida.vender` é `operacao` |
+| R-SMR-04 | O vendedor tem setor próprio, de chaves `operacao` |
 | R-SMR-05 | O vendedor é gente do PCP; a porta de pessoas só passa id e nome |
 | R-SMR-06 | Dinheiro se chama `preco_*` ou `valor_*` (a poda é por nome) |
 | R-SMP-01 | Congelado é congelado: preço no envio, ficha na aprovação |
@@ -2300,7 +2302,7 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 | R-SMU-08 | O que falta vira pendência, nunca zero, e a lista não cala |
 | R-SMS-01 | Cinco chaves de setor, `operacao`, e os setores nascem vazios |
 | R-SMS-02 | Setor é cadastro, chave é código |
-| R-SMS-03 | Papel e setores são duas contas; a bancada vem do setor |
+| R-SMS-03 | A bancada vem do setor, e não das outras permissões |
 | R-SMB-01 | As liberações são dado; só segura quem existe e gera etiqueta |
 | R-SMB-02 | O pronto é `pronto_em`, e o `marco` não muda |
 | R-SMB-03 | Um bipe inicia, o outro termina; o kit é o do tipo certo |
@@ -2334,6 +2336,7 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 | R-SMF-09 | O que falta titular aparece ao lado do em aberto, nunca dentro |
 | R-SMF-10 | A tela lista o que marcar pelo mesmo critério; quem lê é `boleto.ler` |
 | R-SMF-11 | NF e entrega não existem, por decisão |
+| R-SMF-12 | Baixa de boleto e descarte de sobra: uma pessoa pede, outra aprova, e nada muda enquanto espera |
 | R-SML-01 | Dinheiro com ponto do milhar, pelo dono único de cada lado do fio |
 | R-SML-02 | O que se lê e o que pré-preenche campo são duas funções |
 | R-SML-03 | Toda tabela rola dentro do `rolaH`; a página nunca rola de lado |
@@ -2361,7 +2364,7 @@ produção: `etiqueta_producao.test.js`. Em papel e chave do módulo:
 compra: `material_compra.test.js` e `node teste_compras_sobmedida.js`. Na bancada:
 `producao.test.js`. Na recusa: `recusa.test.js`. No quadro: `kanban.test.js`. Nos
 indicadores: `indicadores.test.js`. Nos setores: também `node teste_acesso.js`.
-No boleto e no crédito: `boleto.test.js`. No dinheiro de tela: `dinheiro_tela.test.js`.
+No boleto e no crédito: `boleto.test.js`. Na baixa pedida e no descarte pedido: `aprovacao.test.js`. No dinheiro de tela: `dinheiro_tela.test.js`.
 Em tabela de tela: `rola_tela.test.js`. No corte: `corte_etapas.test.js`,
 `corte_correcao.test.js`, `historico_corte.test.js`, `tom.test.js`,
 `tempo_corte.test.js`, `plano_claro.test.js` e `barras_ler.test.js`. Todos os
@@ -2370,7 +2373,7 @@ Em tabela de tela: `rola_tela.test.js`. No corte: `corte_etapas.test.js`,
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 742 casos
+cd tecido && npm test          # 750 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:

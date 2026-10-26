@@ -1,32 +1,23 @@
-// AREA DO PCP -> PAPEL DESTE MODULO.
+// QUEM ENTRA E O QUE PODE — a pergunta e feita ao PCP, chave a chave.
 //
-// Esta e a peca que faz a liberacao morar num lugar so. O PCP ja tem uma lista
-// de areas por pessoa (Admin -> Acessos); duas delas passam a valer aqui, e o
-// modulo nao guarda mais um cadastro proprio de quem entra.
+// ⚠️ ATE 26/10/2026 ESTE ARQUIVO TRADUZIA AREA EM PAPEL (`papelDe`), e essa
+// traducao falhou em silencio tres vezes: armadilhas #13, #28 e #34. A area
+// era SOMBRA das permissoes do PCP, o papel era uma segunda conta em cima da
+// sombra, e cada ponta podia sumir sem erro. Desde a fase 2 da spec
+// ACESSOS-UNIFICADOS as chaves deste modulo moram na tela de Acessos do PCP,
+// no grupo "Sob medida", como `sobmedida.<chave>` — e o portao so pergunta
+// ao PCP quais delas a pessoa tem. Nao ha mais papel nem area aqui dentro.
 //
-// Por que um tradutor em vez de usar a area direto: o dominio deste modulo
-// raciocina por CHAVE de permissao ('sobra.descartar'), nao por cargo. O papel
-// e o agrupador — e ele continua sendo o unico conceito que rotas e telas
-// conhecem. Trocar o modelo de acesso do PCP amanha mexe neste arquivo, e em
-// nenhum outro.
-//
-// ⚠️ A AREA 'admin' DO PCP NAO ABRE ESTE MODULO (fase 1 da spec
-// ACESSOS-UNIFICADOS, 21/10/2026). O PCP grava 'admin' em quem tem QUALQUER
-// chave de nivel admin — Comprador, Financeiro, uma excecao de "Ver custo" —, e
-// ler isso como diretor dava o modulo inteiro a quem foi posto la para comprar
-// material. Diretor e quem tem sobmedida_adm: o setor "Sob medida / Cadastros"
-// ou o Admin Geral, que recebe todas as areas pelo sincronizarAreas.
-// Quem tem so 'sobmedida' e bancada. Nenhuma area = NAO ENTRA — fechado por
-// padrao, que e a regra 4 do docs/CONTROLE-DE-ACESSO.md.
-
-const AREA_BANCADA = 'sobmedida';        // corta, bipa sobra, imprime etiqueta
-const AREA_CHEFIA  = 'sobmedida_adm';    // + cadastros, parametros, descarte
-const AREA_VENDA   = 'sobmedida_venda';  // simulador, catalogo e a carteira de revendas
+// ⚠️ E A AREA 'admin' DO PCP CONTINUA NAO ABRINDO O MODULO (fase 1): nenhuma
+// chave daqui e de nivel admin, entao o setor Admin e o Comprador nao carregam
+// nenhuma. Quem tem tudo e o Admin Geral (que tem todas as chaves do PCP) e o
+// setor "Sob medida / Cadastros".
+const {CHAVES,PREFIXO,pode}=require('./permissoes');
 
 /* ── OS CINCO SETORES DE PRODUCAO (fase 5-A, 24/09/2026) ──────────────────
    Decisao do dono: "tem que ser possivel criar cada setor no controle de
    acesso, e quem tem acesso pega o tablet de manha e ve o que tem para
-   fazer". Uma area do PCP por bancada.
+   fazer". Uma chave do PCP por bancada (`sobmedida.<setor>`).
 
    ⚠️ A ORDEM E A DA FABRICA, nao a alfabetica, e e ela que a fila usa para
    desempatar. Serralheria e colecao trabalham em paralelo; montagem espera
@@ -34,81 +25,33 @@ const AREA_VENDA   = 'sobmedida_venda';  // simulador, catalogo e a carteira de 
    spec). Ordenar por nome poria "colecao" antes de "serralheria" e a tela
    leria como se a ordem do trabalho fosse essa. */
 const SETORES = [
-  {chave:'serralheria', area:'sobmedida_serralheria', nome:'Serralheria'},
-  {chave:'colecao',     area:'sobmedida_colecao',     nome:'Coleção'},
-  {chave:'montagem',    area:'sobmedida_montagem',    nome:'Montagem'},
-  {chave:'revisao',     area:'sobmedida_revisao',     nome:'Revisão'},
-  {chave:'embalagem',   area:'sobmedida_embalagem',   nome:'Embalagem'}
+  {chave:'serralheria', nome:'Serralheria'},
+  {chave:'colecao',     nome:'Coleção'},
+  {chave:'montagem',    nome:'Montagem'},
+  {chave:'revisao',     nome:'Revisão'},
+  {chave:'embalagem',   nome:'Embalagem'}
 ];
 
-// As duas linhas que entram na lista de areas do PCP. O texto e o que o
-// diretor le na tela de acessos — por isso diz o que a pessoa passa a poder,
-// nao o nome tecnico da area.
-const AREAS_PCP = [
-  {id:AREA_BANCADA, nome:'Sob medida — bancada (corte, sobras, etiquetas)'},
-  {id:AREA_CHEFIA,  nome:'Sob medida — cadastros e parametros'},
-  {id:AREA_VENDA,   nome:'Sob medida — venda (simulador, catalogo e revendas)'}
-].concat(SETORES.map(s => (
-  {id:s.area, nome:'Sob medida — produção: '+s.nome}
-)));
+/* A SESSAO DESTE MODULO, montada das permissoes do PCP. `chavesPcp` e a
+   lista de chaves que o PCP diz que a pessoa tem (`permissoesDe`); daqui so
+   passam as que comecam por `sobmedida.`, sem o prefixo.
 
-/* ⚠️ A ORDEM E DO MAIS LARGO PARA O MAIS ESTREITO, e quem tem duas areas
-   fica com a maior. Nao ha soma de papeis: papel e agrupador de chaves, e
-   somar dois viraria um terceiro que ninguem declarou — e que nenhuma tela
-   saberia nomear.
+   ⚠️ O SETOR NAO SAI DAS PERMISSOES DE CORTE OU VENDA, e isso e o desenho que
+   ja era: quem vende e embala continua com a bancada. Os setores sao as
+   chaves `sobmedida.serralheria` etc. que a pessoa tem, na ordem da FABRICA —
+   a tela desenha a fila por esta lista, e a ordem em que alguem marcou as
+   caixinhas nao descreve nada. O setor "Sob medida / Cadastros" carrega as
+   cinco, e e assim que a chefia continua bipando todas (era o `*` do diretor).
 
-   ⚠️ E O VENDEDOR VEM DEPOIS DA BANCADA de proposito. Nao e ranking de
-   importancia: e que quem tem as duas areas corta, e quem corta precisa da
-   tela de corte. O vendedor com area de bancada e caso que nao existe hoje;
-   no dia em que existir, sera uma pessoa que corta E vende, e aí o papel
-   dela vai ter que ser desenhado — nao adivinhado aqui. */
-function papelDe(usuario){
+   Sem `modulo.entrar` — nem setor nenhum, que tambem entra (POR_SETOR) — a
+   pessoa NAO ENTRA: fechado por padrao. */
+function daSessaoDoPcp(usuario, chavesPcp){
   if(!usuario) return null;
-  const areas=usuario.areas||[];
-  if(areas.includes(AREA_CHEFIA)) return 'diretor';
-  if(areas.includes(AREA_BANCADA)) return 'cortador';
-  if(areas.includes(AREA_VENDA)) return 'vendedor';
-  /* PRODUCAO vem por ultimo, e isso nao e ranking: quem tem duas areas fica
-     com o papel mais largo, e os SETORES dele continuam valendo do mesmo
-     jeito — sao duas contas diferentes (ver setoresDe). O vendedor que
-     tambem embala nao perde a bancada ao ganhar a carteira. */
-  if(SETORES.some(s => areas.includes(s.area))) return 'producao';
-  return null;
+  const pcp=new Set(chavesPcp||usuario.permissoes||[]);
+  const permissoes=CHAVES.map(c=>c.chave).filter(k=>pcp.has(PREFIXO+k));
+  const setores=SETORES.filter(s=>pcp.has(PREFIXO+s.chave)).map(s=>s.chave);
+  const u={id:usuario.id, nome:usuario.nome, permissoes, setores, via:'pcp'};
+  return pode(u,'modulo.entrar') ? u : null;
 }
 
-/* ⚠️ O SETOR NAO SAI DO PAPEL, E ISSO E O DESENHO. O papel e a area MAIS
-   LARGA (uma so, sem soma — ver o bloco acima); os setores sao TODAS as
-   areas de bancada que a pessoa tem. Derivar um do outro faria quem ganha a
-   carteira perder a bancada, e a fabrica descobriria isso com o tablet na
-   mao numa segunda-feira.
-
-   O DIRETOR BIPA OS CINCO, por coerencia com o `*` das chaves dele: recusar
-   o dono numa bancada seria trava disparando no caso normal (armadilha #6 do
-   CLAUDE.md). O bipe grava o nome de quem fez de qualquer jeito, entao o
-   rastro nao se perde.
-
-   Devolve na ordem da FABRICA, nunca na de marcacao: a tela desenha a fila
-   por esta lista, e a ordem em que alguem marcou as caixinhas nao descreve
-   nada. */
-function setoresDe(usuario){
-  if(!usuario) return [];
-  const areas=usuario.areas||[];
-  const tudo = areas.includes(AREA_CHEFIA);
-  return SETORES.filter(s => tudo || areas.includes(s.area)).map(s => s.chave);
-}
-
-// O usuario como o dominio deste modulo espera ve-lo. O `id` continua sendo o
-// do PCP: a auditoria daqui grava o NOME, e o id so serve para nao confundir
-// dois homonimos.
-function daSessaoDoPcp(usuario){
-  const papel=papelDe(usuario);
-  if(!papel) return null;
-  /* `setores` viaja junto com o usuario porque e o dominio da producao que
-     decide "este bipe e seu?", e nao a rota: a rota tem UMA chave declarada e
-     o setor vem no corpo, entao conferir la seria conferir a pergunta errada. */
-  return {id:usuario.id, nome:usuario.nome, papel, setores:setoresDe(usuario), via:'pcp'};
-}
-
-const temAcesso = usuario => !!papelDe(usuario);
-
-module.exports={AREA_BANCADA, AREA_CHEFIA, AREA_VENDA, SETORES, AREAS_PCP, papelDe, setoresDe, daSessaoDoPcp, temAcesso};
+module.exports={SETORES, daSessaoDoPcp};

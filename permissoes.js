@@ -46,44 +46,30 @@ module.exports = [
     sensivel:true },
 
   // ─── SOB MEDIDA ─────────────────────────────────────────────
-  // A segunda operacao da fabrica: corte de tecido contra o pedido do cliente
-  // (modulo montado em /sobmedida). Duas chaves, e a divisao entre elas e o
-  // que se pode ESTRAGAR — a bancada corta e cadastra sobra; a chefia mexe no
-  // cadastro de tecido e nos parametros do calculo, que mudam o encaixe de
-  // todo mundo.
-  { chave:'sobmedida.cortar',     grupo:'Sob medida', nivel:'operacao',
-    rotulo:'Cortar tecido',       desc:'Plano de corte, rolos, sobras e etiquetas de prateleira' },
-  /* ⚠️ CADASTRAR E `supervisor`, E NAO `admin` — 24/09/2026, e e o espelho da
-     trava da `sobmedida.vender` logo abaixo. Declarada como admin, esta chave
-     dizia duas coisas que ninguem pediu: `sincronizarAreas` poe a area 'admin'
-     em quem tem QUALQUER chave de nivel admin, e as 24 rotas '@admin' do PCP
-     liberam por `temAdmin(perms)`. Entao a chave do CADASTRO DO SOB MEDIDA
-     valia como "e admin do PCP" — a fase 2 fechou o vazamento no sentido
-     venda→modulo, e este fecha no sentido modulo→PCP.
+  /* A segunda operacao da fabrica: corte de tecido contra o pedido do cliente
+     (modulo montado em /sobmedida).
 
-     ⚠️ DENTRO DO MODULO NAO MUDA NADA: `papelDe` devolve 'diretor' tanto para
-     'admin' quanto para AREA_CHEFIA ('sobmedida_adm'), e nunca houve papel
-     "chefia" separado. Quem tem esta chave continua entrando como diretor la
-     dentro — e o que a area sempre significou. O que sai e o PCP.
+     ⚠️ UMA LISTA SO DESDE 26/10/2026 (fase 2 da ACESSOS-UNIFICADOS). Ate ali
+     havia tres chaves aqui — `sobmedida.cortar`, `.cadastrar` e `.vender` —,
+     e o modulo traduzia a area que elas geravam num PAPEL fixo com o pacote
+     dele. A traducao falhou em silencio tres vezes (#13, #28, #34), e o
+     pacote fixo obrigava a dar o modulo inteiro a quem so lanca boleto.
 
-     ⚠️ E O SETOR NATIVO `Admin` DEIXOU DE CARREGA-LA, por consequencia: a
-     lista dele e calculada ("toda chave de nivel admin", acesso.js). Isso e
-     decisao — quem cadastra sob medida e o setor dedicado, nao o Admin do PCP
-     por tabela. Ha caso travando em teste_acesso.js (secao 6-D). */
-  { chave:'sobmedida.cadastrar',  grupo:'Sob medida', nivel:'supervisor',
-    rotulo:'Cadastrar sob medida',desc:'Tecidos, enderecos, motivos e os parametros do encaixe' },
-  /* ⚠️ VENDER E `operacao`, E NAO `admin` — e isto nao e classificacao, e
-     trava. `sincronizarAreas` poe a area 'admin' em quem tem QUALQUER chave
-     de nivel admin, e o portao do sob medida (tecido/nucleo/acesso.js) le
-     'admin' como DIRETOR. Declarada como admin, esta chave entregaria ao
-     vendedor o modulo inteiro — cadastro de tecido, parametros do encaixe e
-     descarte de sobra — sem ninguem ter pedido isso, e sem erro nenhum em
-     tela. E a porta A da armadilha #28 por uma porta nova.
+     Agora cada permissao do modulo aparece aqui, como `sobmedida.<chave>`, e
+     a tela de Acessos as mostra uma a uma. A LISTA MORA NO MODULO
+     (`tecido/nucleo/permissoes.js`), que e quem sabe o que cada uma faz; esta
+     linha so a traz para ca, sem copia — duas listas divergiriam no dia em
+     que uma chave nova nascesse de um lado so.
 
-     Vender tambem nao e administrar o sistema: e o trabalho da pessoa, como
-     cortar e revisar. O nivel diz isso, e a trava vem de graca junto. */
-  { chave:'sobmedida.vender',     grupo:'Sob medida', nivel:'operacao',
-    rotulo:'Vender sob medida',   desc:'Simulador, catalogo de venda e a carteira de revendas' },
+     ⚠️ NENHUMA E DE NIVEL ADMIN, e quem garante e o proprio modulo (a lista
+     dele so tem `operacao` e `supervisor`). `sincronizarAreas` poe a area
+     'admin' em quem tem qualquer chave admin, e as rotas '@admin' daqui
+     liberam por isso: uma chave do sob medida declarada admin daria um
+     pedaco do admin do PCP a quem so cuida do modulo. Ha caso travando em
+     teste_acessos_f2.js. */
+  ...require('./tecido/nucleo/permissoes').CHAVES.map(c => ({
+    chave:'sobmedida.' + c.chave, grupo:'Sob medida', nivel:c.nivel,
+    rotulo:c.nome, desc:'', sensivel:!!c.sensivel })),
 
   /* ── OS CINCO SETORES DE PRODUCAO (fase 5-A, 24/09/2026) ────────────────
      Decisao do dono: "tem que ser possivel criar cada setor no controle de
@@ -213,8 +199,11 @@ module.exports = [
     sensivel:true },
   { chave:'componente.cadastrar', grupo:'Compras', nivel:'admin',
     rotulo:'Cadastrar componente', desc:'Insumos e matérias-primas' },
-  { chave:'minimo.definir',       grupo:'Estoque', nivel:'admin',
-    rotulo:'Definir estoque mínimo', desc:'Ponto de pedido e estoque ideal por componente' },
+  /* `minimo.definir` SAIU em 26/10/2026 (fase 3 da ACESSOS-UNIFICADOS,
+     divida 19): nenhuma rota a lia. Quem manda no mínimo e no ideal do card
+     Materiais e `componente.cadastrar` (escrever) e `compras.ver` (ler), e a
+     caixinha marcada nao liberava nada — a pessoa levava 403 numa tela que a
+     permissao dela dizia que ela podia. */
   { chave:'bloqueio.liberar',     grupo:'Planejamento', nivel:'admin',
     rotulo:'Desbloquear volumes', desc:'Liberar volumes com SKU desconhecido' },
 

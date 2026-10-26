@@ -2,8 +2,9 @@
 //   sobra.criar      cortador tem  — e ele que cataloga a prateleira
 //   sobra.propor     cortador tem  — aponta o erro; nao muda nada sozinho
 //   sobra.corrigir   cortador NAO tem — a chefia corrige, e aceita ou recusa o apontado
-//   sobra.descartar  cortador NAO tem — baixa de sobra e da chefia
+//   sobra.descartar  cortador NAO tem — PEDE o descarte; outra pessoa aprova (sobra.aprovar_descarte)
 const sobra=require('../dominio/sobra');
+const aprovacao=require('../dominio/aprovacao');
 const etiqueta=require('../dominio/etiqueta');
 const pdf=require('../dominio/etiqueta_pdf');
 const custo=require('../dominio/custo');
@@ -71,9 +72,22 @@ module.exports={rotas:[
    manipulador:({params,corpo,usuario})=>sobra.recusar(params.id,corpo.motivo,usuario.nome),
    detalhe:(req,d)=>'recusou apontamento '+req.params.id+' da sobra '+(d&&d.sobra_codigo)+': '+(req.body.motivo||'')},
 
+  /* ⚠️ DESCARTAR VIROU PEDIR (fase 6 da ACESSOS-UNIFICADOS). A sobra continua
+     disponivel ate OUTRA pessoa aprovar — quem pediu nao aprova, nem o Admin
+     Geral (dominio/aprovacao.js). O efeito continua sendo o sobra.descartar
+     de sempre, chamado na aprovacao. */
   {metodo:'POST', caminho:'/api/sobras/:id/descartar', permissao:'sobra.descartar',
-   manipulador:({params,corpo,usuario})=>sobra.descartar(params.id,corpo.motivo,usuario.nome),
-   detalhe:(req)=>'descarte da sobra '+req.params.id+': '+(req.body.motivo||'')},
+   manipulador:({params,corpo,usuario})=>aprovacao.pedirDescarte(params.id,corpo.motivo,usuario),
+   detalhe:(req)=>'pediu o descarte da sobra '+req.params.id+': '+(req.body.motivo||'')},
+  {metodo:'GET', caminho:'/api/sobras/descartes', permissao:'sobra.ler',
+   manipulador:()=>aprovacao.pendentes('descarte_sobra').map(a=>({...a,
+     sobra:sobra.porId(a.alvo_id)}))},
+  {metodo:'POST', caminho:'/api/sobras/descartes/:aid/aprovar', permissao:'sobra.aprovar_descarte',
+   manipulador:({params,usuario})=>aprovacao.aprovar(params.aid,usuario),
+   detalhe:(req,d)=>'aprovou o descarte da sobra '+(d&&d.alvo_id)+' pedido por '+(d&&d.pedido_por)},
+  {metodo:'POST', caminho:'/api/sobras/descartes/:aid/recusar', permissao:'sobra.aprovar_descarte',
+   manipulador:({params,corpo,usuario})=>aprovacao.recusar(params.aid,corpo&&corpo.motivo,usuario),
+   detalhe:(req,d)=>'recusou o descarte da sobra '+(d&&d.alvo_id)+': '+(req.body&&req.body.motivo||'')},
 
   // ── Etiquetas ──────────────────────────────────────────────────────────
   {metodo:'GET', caminho:'/api/etiquetas/pendentes', permissao:'sobra.ler',

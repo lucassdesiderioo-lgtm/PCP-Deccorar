@@ -13,6 +13,7 @@
 // chegando a quem so ve a cor.
 const boleto=require('../dominio/boleto');
 const custo=require('../dominio/custo');
+const aprovacao=require('../dominio/aprovacao');
 
 const LER='boleto.ler', EDITAR='boleto.editar';
 const podar=(usuario,dados)=>custo.podar(usuario,dados);
@@ -52,9 +53,22 @@ module.exports={rotas:[
    detalhe:(req)=>'boleto '+(req.body&&req.body.numero)+
      ' · revenda '+(req.body&&req.body.revenda_id)},
 
+  /* ⚠️ A BAIXA VIROU PEDIDO (fase 6 da ACESSOS-UNIFICADOS, P2 do dono). O
+     boleto continua em aberto — e comendo o limite — ate OUTRA pessoa aprovar;
+     quem pediu nao aprova, nem o Admin Geral (dominio/aprovacao.js). O efeito
+     continua sendo o boleto.baixar de sempre, chamado na aprovacao. */
   {metodo:'POST', caminho:'/api/boletos/:id/baixa', permissao:EDITAR,
-   manipulador:({params,corpo,usuario})=>podar(usuario,boleto.baixar(Number(params.id),corpo,usuario)),
-   detalhe:(req)=>'baixa no boleto '+req.params.id},
+   manipulador:({params,corpo,usuario})=>aprovacao.pedirBaixa(Number(params.id),corpo,usuario),
+   detalhe:(req)=>'pediu a baixa do boleto '+req.params.id},
+  {metodo:'GET', caminho:'/api/boletos/baixas', permissao:LER,
+   manipulador:({usuario})=>podar(usuario,aprovacao.pendentes('baixa_boleto').map(a=>({...a,
+     boleto:boleto.porId(a.alvo_id)})))},
+  {metodo:'POST', caminho:'/api/boletos/baixas/:aid/aprovar', permissao:'boleto.aprovar_baixa',
+   manipulador:({params,usuario})=>aprovacao.aprovar(params.aid,usuario),
+   detalhe:(req,d)=>'aprovou a baixa do boleto '+(d&&d.alvo_id)+' pedida por '+(d&&d.pedido_por)},
+  {metodo:'POST', caminho:'/api/boletos/baixas/:aid/recusar', permissao:'boleto.aprovar_baixa',
+   manipulador:({params,corpo,usuario})=>aprovacao.recusar(params.aid,corpo&&corpo.motivo,usuario),
+   detalhe:(req,d)=>'recusou a baixa do boleto '+(d&&d.alvo_id)+': '+(req.body&&req.body.motivo||'')},
 
   {metodo:'POST', caminho:'/api/boletos/:id/reabrir', permissao:EDITAR,
    manipulador:({params,corpo,usuario})=>podar(usuario,

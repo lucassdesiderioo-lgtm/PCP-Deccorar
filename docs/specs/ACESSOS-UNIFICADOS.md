@@ -1,4 +1,38 @@
-> **STATUS · 21/10/2026 — EM CONSTRUÇÃO** · tipo `REGRA` · **fase 1 no ar e conferida (21/10, PR #212):** a área `admin` deixou de abrir o sob medida como diretor (`CLAUDE.md` §19, R-SMA-03); a lista de quem deixava de ser diretor saiu vazia · **fase 5 dividida em duas:** **5-A em código (21/10)** — PIN de 6 dígitos e troca no próximo uso (`CLAUDE.md` §10); falta subir · **5-B (HTTPS)** espera saber se o sistema é aberto por nome ou por IP · fases 2, 3, 6 e 4 não iniciadas.
+> **STATUS · 26/10/2026 — EM CONSTRUÇÃO** · **fase 4 em código (26/10):** revisão e
+> embalagem gravam quem fez (`usuario_id` e `usuario_nome` em `revisao` e `montagem`,
+> dívida 9) — `teste_revisao.js` e `teste_montagem.js`. Nenhuma tela mostra isso ainda: o
+> dado começa a se acumular. **Com isto as fases 1, 2, 3, 4 e 6 estão feitas; falta só a
+> 5-B (HTTPS), deixada por último por decisão do dono (26/10/2026)** ·
+> **fase 6 em código (26/10):** a baixa de
+> boleto e o descarte de sobra viraram pedir e aprovar (`sm_aprovacao`, migração 31,
+> `dominio/aprovacao.js`, chaves `boleto.aprovar_baixa` e `sobra.aprovar_descarte`); quem
+> pediu não aprova, nem o Admin Geral, e enquanto pendente nada muda — `tecido/teste/aprovacao.test.js`
+> (8). **Mudou na construção:** a regra é por **pessoa** (id do PCP), e não por nome como na
+> correção de corte; `pago_por` continua sendo quem viu o pagamento (quem pediu), e quem
+> aprovou fica no pedido; quem já baixava ou descartava ganhou o aprovar junto (seed
+> `acesso_sobmedida_f6`), então hoje quem pode é quem podia — só que agora são duas pessoas ·
+> **fase 3 em código (26/10):** salvar um
+> setor não apaga nada — o nível virou etiqueta (a caixinha acima do nível aparece como
+> está, com aviso), a tela manda a lista inteira e a tela antiga não apaga nada; a sensível
+> nova pede confirmação; as intransferíveis ficam fora de setor comum por trava própria; e
+> `minimo.definir` saiu (dívidas 19 e 20) — `teste_setor_salvar.js` (22). **Mudou na
+> construção:** a confirmação é só da sensível que ENTRA, e não de todas as que o setor
+> carrega a cada salvamento (aviso repetido vira paisagem) · **fase 2 em código (26/10):** as 41
+> chaves do sob medida aparecem na tela de Acessos como `sobmedida.<chave>`, no grupo
+> "Sob medida" (a lista mora em `tecido/nucleo/permissoes.js` e o `permissoes.js` do PCP
+> a traz sem cópia); o portão do módulo pergunta ao `permissoesDe` do PCP e saíram o
+> `papelDe`, as áreas `sobmedida_adm`/`_venda`/de setor e as chaves velhas `sobmedida.cortar`,
+> `.cadastrar` e `.vender`. A migração (`config.acesso_sobmedida_f2`, uma vez só) copia o
+> pacote para os setores e as exceções e confere pessoa a pessoa, criando exceção onde
+> precisar, para **ninguém ganhar nem perder nada** — `teste_acessos_f2.js` (73). **Mudou
+> na construção:** os setores **mantiveram os nomes** "Sob medida / Bancada", "/ Cadastros"
+> e "/ Venda" (a §5 dizia Corte e Direção): são os nomes que o dono já usa para liberar, e
+> trocar nome de setor não muda permissão nenhuma; **nenhuma chave do módulo é `admin`**
+> (as da chefia são `supervisor`, que cabe no setor Cadastros); e **a bancada da produção
+> também entra** sem `modulo.entrar` (POR_SETOR), como o papel `producao` sempre entrou.
+> Rodada sobre uma cópia de banco antigo: migrou sem exceção nenhuma, e cada pessoa abriu
+> no sob medida exatamente as telas de antes ·
+> **STATUS · 21/10/2026** · tipo `REGRA` · **fase 1 no ar e conferida (21/10, PR #212):** a área `admin` deixou de abrir o sob medida como diretor (`CLAUDE.md` §19, R-SMA-03); a lista de quem deixava de ser diretor saiu vazia · **fase 5 dividida em duas:** **5-A em código (21/10)** — PIN de 6 dígitos e troca no próximo uso (`CLAUDE.md` §10); falta subir · **5-B (HTTPS)** espera saber se o sistema é aberto por nome ou por IP · fases 2, 3, 6 e 4 não iniciadas.
 > Nasceu da entrevista do guardião de 21/10/2026. O dono pediu: *"avalie se o
 > nosso controle de acesso é condizente com o que estamos criando … daqui a
 > alguns dias vamos estar com todo o time cadastrado, mais ou menos 20 logins"*.

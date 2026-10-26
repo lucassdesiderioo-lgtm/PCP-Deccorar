@@ -29,7 +29,7 @@ db.exec(`
      grava 'hoje' ou 'estoque'), e st_route conta modo='hoje'. */
   CREATE TABLE IF NOT EXISTS revisao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, inicio TEXT, fim TEXT,
     segundos INTEGER, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')),
-    modo TEXT DEFAULT 'hoje', teste INTEGER DEFAULT 0);
+    modo TEXT DEFAULT 'hoje', teste INTEGER DEFAULT 0, usuario_id INTEGER, usuario_nome TEXT);
   /* fila: elo entre REVISAO e EMBALAGEM. Fica aqui, e nao num modulo de rota,
      porque nenhum modulo e dono dela: quem insere e o server.js (revisao) e o
      dev_route.js (devolucao com destinacao 'reembalar'); quem le e consome e o

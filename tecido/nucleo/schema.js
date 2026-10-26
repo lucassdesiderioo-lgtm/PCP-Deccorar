@@ -1768,6 +1768,36 @@ CREATE INDEX idx_plano_pausa ON plano_pausa(plano_id);
 INSERT INTO parametro(chave,valor,tipo,rotulo,ajuda,unidade,ordem) VALUES
  ('corteTempoMaxHoras','3','numero','Tempo maximo de um corte',
   'Corte com tempo liquido (do Cortar ao Corte feito, menos as pausas) acima disto aparece no historico, mas fica FORA do tempo por m² do painel. Serve para o corte esquecido aberto de um dia para o outro, que envenenaria a media. Nao e meta: e o teto acima do qual o numero deixa de ser acreditavel.','horas',22);
+`},
+
+/* ── DUAS PESSOAS NO BOLETO E NA SOBRA (fase 6 da ACESSOS-UNIFICADOS) ────
+   Dar baixa em boleto e descartar sobra passam a ser PEDIR e APROVAR, como o
+   ajuste de estoque do PCP: quem pede nao aprova, nem o Admin Geral. Uma
+   tabela so para os dois, porque a pergunta e a mesma ("quem pediu, quem
+   decidiu, e o que") e uma segunda tabela seria uma segunda regua.
+
+   ⚠️ ENQUANTO PENDENTE, NADA MUDA: o boleto continua em aberto (e comendo o
+   limite) e a sobra continua disponivel (e no plano de corte). O efeito so
+   acontece na aprovacao, pelas MESMAS funcoes de antes (boleto.baixar,
+   sobra.descartar) — o dono do efeito nao mudou.
+
+   ⚠️ UM PEDIDO PENDENTE POR ALVO, e quem segura isso e o banco (o indice
+   parcial), nao so o codigo: dois cliques no mesmo segundo nao viram dois
+   pedidos. */
+{n:31, nome:'duas pessoas na baixa de boleto e no descarte de sobra', sql:`
+CREATE TABLE sm_aprovacao(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tipo TEXT NOT NULL,                -- baixa_boleto | descarte_sobra
+  alvo_id INTEGER NOT NULL,          -- sm_boleto.id | sobra.id
+  dados TEXT,                        -- JSON do que vai ser feito (data do pagamento)
+  motivo TEXT,                       -- por que (o descarte exige)
+  pedido_por TEXT, pedido_por_id INTEGER,
+  pedido_em TEXT DEFAULT (datetime('now','localtime')),
+  status TEXT NOT NULL DEFAULT 'pendente',   -- pendente | aprovado | recusado
+  decidido_por TEXT, decidido_por_id INTEGER, decidido_em TEXT, decisao_motivo TEXT
+);
+CREATE UNIQUE INDEX idx_aprovacao_pendente ON sm_aprovacao(tipo,alvo_id) WHERE status='pendente';
+CREATE INDEX idx_aprovacao_status ON sm_aprovacao(status,tipo);
 `}
 ];
 

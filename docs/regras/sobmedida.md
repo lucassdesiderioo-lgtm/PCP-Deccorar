@@ -56,29 +56,29 @@
 
 ## O acesso
 
-### R-SMA-01 · A área do sob medida é SOMBRA: chave, setor e linha no `PERM_AREA` andam juntos
-- **Regra:** `usuarios.areas` é recalculada a partir das permissões pelo `PERM_AREA` do `acesso.js`. Toda área do sob medida precisa das três pontas: a chave em `permissoes.js`, o setor em `setoresNativos` e a linha em `PERM_AREA`. `areas` é **saída**: nada a lê para decidir alguma coisa.
-- **Por quê:** área fora do mapa é apagada no primeiro salvamento de acesso de qualquer pessoa — o acesso some sozinho, sem erro. E lida como entrada, ela promovia a Admin Geral (§10, armadilha #28).
+### R-SMA-01 · Uma lista só: as permissões do sob medida moram na tela de Acessos do PCP
+- **Regra:** desde 26/10/2026 (fase 2 da `ACESSOS-UNIFICADOS`) cada chave do módulo aparece no PCP como `sobmedida.<chave>`, no grupo "Sob medida". A lista **mora no módulo** (`tecido/nucleo/permissoes.js`, com nível e marca de sensível) e o `permissoes.js` do PCP a traz sem cópia. O portão do módulo pergunta ao resolvedor do PCP (`permissoesDe`, ligado no `server.js` como `opcoes.permissoes`) quais chaves a pessoa tem; **não há mais área virando papel** (`papelDe`, `sobmedida_adm`, `_venda` e as áreas de setor saíram). A sombra `usuarios.areas` guarda só `sobmedida`, para o destino depois do PIN.
+- **Por quê:** a tradução área → papel falhou em silêncio três vezes (#13, #28, #34), e o pacote fixo obrigava a dar o módulo inteiro a quem só lança boleto.
 - **Exceções:** nenhuma.
-- **Teste que trava:** `tecido/teste/acesso.test.js` (as duas pontas) · `teste_acesso.js`.
-- **Status:** no ar.
-- **História:** armadilha #13.
+- **Teste que trava:** `teste_acessos_f2.js` (73: ninguém ganha nem perde nada na migração, pessoa a pessoa e chave a chave) · `tecido/teste/acesso.test.js` · `teste_acesso.js` (6-B).
+- **Status:** em código em 26/10/2026; a migração rodou sobre um banco antigo de teste sem precisar de exceção nenhuma.
+- **História:** armadilha #13; spec `ACESSOS-UNIFICADOS` fase 2.
 
-### R-SMA-02 · A chave do cadastro do sob medida é `supervisor`, nunca `admin`
-- **Regra:** `sobmedida.cadastrar` é `nivel:'supervisor'`, e o setor `Sob medida / Cadastros` também. O setor nativo `Admin` **não** a carrega (a lista dele é calculada como "toda chave de nível admin").
-- **Por quê:** nível admin no PCP é "admin do PCP": `sincronizarAreas` dá a área `'admin'` e as 24 rotas `@admin` liberam. E o setor com nível menor que a chave que carrega a apaga em silêncio no próximo salvamento (a tela não desenha a caixinha). Dentro do módulo nada mudou: o `papelDe` devolve `diretor` para `sobmedida_adm`, como sempre.
-- **Exceções:** nenhuma. Até 21/10/2026 as outras chaves de nível admin do PCP entravam no sob medida como diretor; desde então não entram (R-SMA-03).
-- **Teste que trava:** `teste_acesso.js` (seção 6-D) · `tecido/teste/acesso.test.js`.
-- **Status:** no ar e conferida em produção em 24/09/2026 (uma pessoa saiu com `sobmedida_adm` e sem `admin`).
+### R-SMA-02 · Nenhuma chave do sob medida é `admin`; a chefia é `supervisor`
+- **Regra:** as chaves do módulo são `operacao` (bancada, venda, produção) ou `supervisor` (o que só a chefia fazia), nunca `admin`. O setor `Sob medida / Cadastros` é `supervisor` e carrega todas, mais as cinco bancadas. O setor nativo `Admin` não carrega nenhuma.
+- **Por quê:** nível admin no PCP é "admin do PCP": `sincronizarAreas` dá a área `'admin'` e as rotas `@admin` liberam. E o setor com nível menor que a chave que carrega a apaga em silêncio no próximo salvamento (a tela não desenha a caixinha).
+- **Exceções:** nenhuma.
+- **Teste que trava:** `teste_acessos_f2.js` · `teste_acesso.js` (seção 6-D) · `tecido/teste/acesso.test.js`.
+- **Status:** no ar desde 24/09/2026 (a chave da chefia); estendida às 41 chaves em 26/10/2026.
 - **História:** armadilha #34. O defeito de tela que apaga a chave continua aberto (dívida 20 do §14).
 
-### R-SMA-03 · A área `admin` do PCP não abre o sob medida; diretor é só o Admin Geral e o setor de cadastros
-- **Regra:** o papel `diretor` (e os cinco setores de produção junto) vem **só** da área `sobmedida_adm`, que é do setor "Sob medida / Cadastros" e do Admin Geral (que recebe todas as áreas). A área `admin` sozinha não entra no módulo, e a barra não oferece "Sob medida →" a quem só tem ela. Quem tem `admin` **e** outra área do sob medida fica com o papel daquela área (venda → vendedor, bancada → cortador).
-- **Por quê:** o PCP grava a área `admin` em quem tem **qualquer** chave de nível admin. Os setores Comprador e Financeiro são de nível admin, e uma exceção de "Ver custo" também. Ler isso como diretor dava a quem foi posto lá para comprar material o direito de lançar e baixar boleto, mexer em preço e parâmetro, descartar sobra e aprovar correção de corte — sem ninguém pedir e sem aviso.
-- **Exceções:** o "modo antigo" de acesso (reversão de emergência) não recalcula as áreas; quem já era Admin Geral continua com `sobmedida_adm` gravada.
-- **Teste que trava:** `teste_acesso.js` (seção 6-H: Comprador, Financeiro, Admin e a exceção "Ver custo" pelo `sincronizarAreas` de verdade) · `tecido/teste/acesso.test.js` (a conta e o portão pelo fio) · `teste_destino.js`.
-- **Status:** no ar e conferida em 21/10/2026 (fase 1 da spec `ACESSOS-UNIFICADOS`, PR #212).
-- **História:** decisão do dono P1 de 21/10/2026, em `docs/historia/sobmedida.md` e `docs/DECISOES.md`.
+### R-SMA-03 · A área `admin` do PCP não abre o sob medida
+- **Regra:** só entra quem tem `sobmedida.modulo.entrar` ou uma bancada da produção. Comprador, Financeiro, Admin e a exceção "Ver custo" do PCP não carregam chave nenhuma do módulo e não entram. Quem pode tudo é o Admin Geral (que tem todas as chaves) e quem está em `Sob medida / Cadastros`. Quem tem admin **e** outro setor do sob medida fica com o pacote daquele setor.
+- **Por quê:** o PCP grava a área `admin` em quem tem **qualquer** chave de nível admin, e lê-la como diretor dava a quem foi posto lá para comprar material o direito de lançar boleto, descartar sobra e aprovar correção de corte.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `teste_acesso.js` (seção 6-H) · `tecido/teste/acesso.test.js` · `teste_destino.js`.
+- **Status:** no ar e conferida em 21/10/2026 (fase 1, PR #212); desde 26/10/2026 garantida pela lista única, sem área.
+- **História:** decisão do dono P1 de 21/10/2026.
 
 ---
 
@@ -224,8 +224,8 @@
 - **Teste que trava:** `tecido/teste/prazo.test.js` (os casos saem das datas da §4.9 da spec).
 - **Status:** no ar desde 22/09/2026.
 
-### R-SMR-04 · O vendedor tem área própria, `sobmedida.vender` é `operacao`, e não edita revenda nem crédito
-- **Regra:** a área "Sob medida — venda" dá o papel `vendedor` (simulador, catálogo de leitura, a carteira dele). A chave é `nivel:'operacao'`. O papel tem `custo.ver` e `modulo.entrar`, e **não** tem `revenda.editar` nem `credito.editar`.
+### R-SMR-04 · O vendedor tem setor próprio, de chaves `operacao`, e não edita revenda nem crédito
+- **Regra:** o setor "Sob medida / Venda" nasce com o pacote do vendedor (simulador, catálogo de leitura, a carteira dele), todo de nível `operacao`: tem `custo.ver` e `modulo.entrar`, e **não** tem `revenda.editar` nem `credito.editar`. Desde 26/10/2026 cada uma se marca ou desmarca na tela de Acessos.
 - **Por quê:** declarada como admin, a área `'admin'` viraria **diretor** no portão e devolveria o módulo inteiro (porta A da #28). Sem `custo.ver` o simulador chegaria sem o preço; sem `modulo.entrar` o módulo abriria em branco. Tabela, desconto e limite são decisão de quem responde pelo dinheiro.
 - **Exceções:** nenhuma. Desde 21/10/2026 nenhuma chave de nível admin do PCP abre o sob medida como diretor (R-SMA-03).
 - **Teste que trava:** `teste_acesso.js` (seção 6-B, confere o nível declarado) · `tecido/teste/acesso_operador.test.js`.
@@ -433,8 +433,8 @@
 - **Teste que trava:** ⚠ **sem teste** — nada impede alguém de gerar chave a partir do cadastro.
 - **Status:** no ar desde 24/09/2026.
 
-### R-SMS-03 · Papel e setores são duas contas, e a bancada vem do setor
-- **Regra:** `papelDe()` dá um papel só (a área mais larga); `setoresDe()` dá todas as áreas de setor. `producao.bipar` vem do setor, e quem não tem setor não a tem. O diretor bipa os cinco.
+### R-SMS-03 · A bancada vem do setor, e não das outras permissões
+- **Regra:** as bancadas são as chaves `sobmedida.<setor>` que a pessoa tem, independentes das de corte e venda (`daSessaoDoPcp`). `producao.bipar` e `modulo.entrar` vêm do setor (POR_SETOR), e quem não tem setor não bipa. `Sob medida / Cadastros` carrega as cinco. Até 26/10/2026 era papel (`papelDe`) × setores (`setoresDe`), duas contas pela mesma razão.
 - **Por quê:** derivar uma conta da outra daria 403 na bancada ao vendedor que também embala, com a caixinha marcada. Recusar o dono na bancada seria a armadilha #6.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `tecido/teste/acesso.test.js` · `tecido/teste/producao.test.js` · `teste_acesso.js` (seção 6-C).
@@ -641,7 +641,7 @@
 - **Status:** no ar desde 26/09/2026.
 
 ### R-SMF-04 · A baixa e o cancelamento têm rastro e caminho de volta
-- **Regra:** a baixa grava quem e quando; baixar duas vezes é recusado; a baixa se desfaz com motivo. Cancelar exige motivo.
+- **Regra:** a baixa grava quem e quando; baixar duas vezes é recusado; a baixa se desfaz com motivo. Cancelar exige motivo. Desde 26/10/2026 a baixa é **pedida** por uma pessoa e **aprovada** por outra (R-SMF-12).
 - **Por quê:** sem caminho de volta o jeito vira lançar o título de novo, e a conta dobra. Trava que só acusa é trava que se contorna.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `tecido/teste/boleto.test.js`.
@@ -690,6 +690,13 @@
 - **Exceções:** nenhuma.
 - **Teste que trava:** `tecido/teste/boleto.test.js` (critério, prioridade, poda, chaves). ⚠ Manter a revenda escolhida depois de lançar e os selos separados no cartão do Quadro **não têm teste**.
 - **Status:** no ar desde 26/09/2026.
+
+### R-SMF-12 · Baixa de boleto e descarte de sobra são PEDIDOS por uma pessoa e APROVADOS por outra
+- **Regra:** quem tem `boleto.editar` **pede** a baixa e quem tem `sobra.descartar` **pede** o descarte; aprovar é `boleto.aprovar_baixa` / `sobra.aprovar_descarte` (as duas `supervisor` e sensíveis). **Quem pediu não aprova, nem o Admin Geral** — a regra é por pessoa (id do PCP), não por nome. Enquanto pendente **nada muda**: o boleto continua em aberto e comendo o limite, a sobra continua disponível e no plano de corte. Um pedido pendente por alvo (o banco segura, índice parcial). O impossível é recusado já no pedido. Na aprovação o efeito é feito pelo dono de sempre (`boleto.baixar`, `sobra.descartar`), refeito com as guardas dele — se a sobra foi usada no meio, a aprovação é recusada e o pedido espera quem recuse. Recusar exige motivo. `pago_por` é quem pediu (quem viu o pagamento); quem aprovou fica no pedido (`sm_aprovacao`, `dominio/aprovacao.js`). Na migração, quem tinha baixar ou descartar ganhou o aprovar junto.
+- **Por quê:** resposta P2 do dono (21/10/2026): "quem pede não aprova" vale também para dinheiro e para estoque de tecido, como no ajuste de estoque do PCP (R-EST-18) e na correção de corte (R-SMK-06).
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/aprovacao.test.js` (8) · `teste_acessos_f2.js` (seção 8, a semeadura).
+- **Status:** em código em 26/10/2026 (fase 6 da `ACESSOS-UNIFICADOS`); rodado na tela com duas pessoas.
 
 ### R-SMF-11 · NF e entrega não existem, por decisão
 - **Regra:** não há coluna `entregue`, selo de NF nem faturamento no sob medida.
