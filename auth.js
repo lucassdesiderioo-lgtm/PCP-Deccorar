@@ -194,6 +194,15 @@ module.exports=function(app, db){
   app.get('/api/auth/pessoas',(req,res)=>
     res.json(db.prepare('SELECT id,nome FROM usuarios WHERE ativo=1 ORDER BY nome').all()));
 
+  /* HTTPS (fase 5-B). O Traefik recebe o https e repassa ao PCP em http,
+     avisando pelo X-Forwarded-Proto; quando ele diz https, o cookie ganha
+     Secure e o navegador nunca mais o manda por http. Pelo endereco velho
+     (http://…:3010) o cookie sai SEM Secure: enquanto a porta estiver aberta
+     na transicao, um Secure ali faria ninguem conseguir logar.
+     O cabecalho pode ser forjado por quem chama a :3010 direto, mas o unico
+     efeito e o proprio cookie dele ficar mais restrito. */
+  const seguro=req=>String(req.headers['x-forwarded-proto']||'').split(',')[0].trim().toLowerCase()==='https'?'; Secure':'';
+
   app.post('/api/auth/login',(req,res)=>{
     const {id,pin}=req.body||{};
     const shim=n=>({usuario:{id:id||null,nome:n||''},headers:req.headers,socket:req.socket});
@@ -207,7 +216,7 @@ module.exports=function(app, db){
     }
     delete falhas[id];
     const corpo=Buffer.from(JSON.stringify({id:u.id})).toString('base64');
-    res.setHeader('Set-Cookie','sess='+encodeURIComponent(corpo+'.'+assina(corpo))+'; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax');
+    res.setHeader('Set-Cookie','sess='+encodeURIComponent(corpo+'.'+assina(corpo))+'; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax'+seguro(req));
     aud({usuario:{id:u.id,nome:u.nome},headers:req.headers,socket:req.socket},'acesso','login',u.nome,'');
     const areasU=u.areas.split(',').filter(Boolean);
     res.json({ok:true,nome:u.nome,areas:areasU,destino:destino(areasU),trocar_pin:!!u.pin_curto});
@@ -240,7 +249,7 @@ module.exports=function(app, db){
   app.post('/api/auth/logout',(req,res)=>{
     const u=lerSessao(req);
     if(u) aud({usuario:u,headers:req.headers,socket:req.socket},'acesso','logout',u.nome,'');
-    res.setHeader('Set-Cookie','sess=; Path=/; Max-Age=0');
+    res.setHeader('Set-Cookie','sess=; Path=/; Max-Age=0'+seguro(req));
     res.json({ok:true});
   });
 
