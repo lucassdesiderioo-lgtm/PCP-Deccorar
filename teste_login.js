@@ -236,6 +236,36 @@ async function main(){
     eq('e quem ja estava la fica marcado para trocar',
        dbVelho.prepare("SELECT pin_curto FROM usuarios WHERE nome='Velho'").get().pin_curto, 1);
     dbVelho.close();
+
+    console.log('\n── 10. pelo HTTPS o cookie ganha Secure; pelo http, nao (fase 5-B) ──');
+    /* O Traefik recebe o https e repassa ao PCP em http, avisando pelo
+       X-Forwarded-Proto. Com Secure o navegador nunca manda a sessao por
+       http — mas na transicao o http://…:3010 continua aberto, e um cookie
+       Secure ali faria ninguem conseguir logar pelo endereco velho. */
+    const HUGO = pessoa('Hugo', '246810', 'painel');
+    const loginVia = async proto => {
+      const r = await fetch(base + '/api/auth/login', { method:'POST',
+        headers: Object.assign({ 'content-type':'application/json' }, proto ? { 'x-forwarded-proto': proto } : {}),
+        body: JSON.stringify({ id: HUGO, pin: '246810' }) });
+      return r.headers.get('set-cookie') || '';
+    };
+    let ck = await loginVia('https');
+    ok('entrando por https, o cookie tem Secure', /;\s*Secure/i.test(ck), ck);
+    ok('e continua HttpOnly e SameSite=Lax', /HttpOnly/i.test(ck) && /SameSite=Lax/i.test(ck), ck);
+    eq('e a sessao vale', (await eu(sess(ck))).nome, 'Hugo');
+    ck = await loginVia(null);
+    ok('entrando por http (o endereco velho, :3010), sem Secure — senao ninguem loga na transicao', !/Secure/i.test(ck), ck);
+    ok('e continua HttpOnly', /HttpOnly/i.test(ck), ck);
+    ck = await loginVia('http');
+    ok('X-Forwarded-Proto http tambem fica sem Secure', !/Secure/i.test(ck), ck);
+    ck = await loginVia('https, http');
+    ok('a lista de proxies vale pelo primeiro (https)', /;\s*Secure/i.test(ck), ck);
+    const sair = async proto => (await fetch(base + '/api/auth/logout', { method:'POST',
+      headers: proto ? { 'x-forwarded-proto': proto } : {} })).headers.get('set-cookie') || '';
+    ck = await sair('https');
+    ok('sair por https apaga o cookie, com Secure', /^sess=;/.test(ck) && /Max-Age=0/.test(ck) && /Secure/i.test(ck), ck);
+    ck = await sair(null);
+    ok('sair por http apaga o cookie, sem Secure', /^sess=;/.test(ck) && /Max-Age=0/.test(ck) && !/Secure/i.test(ck), ck);
   } finally {
     srv.close();
   }
