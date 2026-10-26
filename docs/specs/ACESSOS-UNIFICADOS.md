@@ -1,4 +1,9 @@
-> **STATUS · 26/10/2026 — EM CONSTRUÇÃO** · **fase 6 em código (26/10):** a baixa de
+> **STATUS · 26/10/2026 — EM CONSTRUÇÃO** · **fase 4 em código (26/10):** revisão e
+> embalagem gravam quem fez (`usuario_id` e `usuario_nome` em `revisao` e `montagem`,
+> dívida 9) — `teste_revisao.js` e `teste_montagem.js`. Nenhuma tela mostra isso ainda: o
+> dado começa a se acumular. **Com isto as fases 1, 2, 3, 4 e 6 estão feitas; falta só a
+> 5-B (HTTPS), deixada por último por decisão do dono (26/10/2026)** ·
+> **fase 6 em código (26/10):** a baixa de
 > boleto e o descarte de sobra viraram pedir e aprovar (`sm_aprovacao`, migração 31,
 > `dominio/aprovacao.js`, chaves `boleto.aprovar_baixa` e `sobra.aprovar_descarte`); quem
 > pediu não aprova, nem o Admin Geral, e enquanto pendente nada muda — `tecido/teste/aprovacao.test.js`

@@ -212,6 +212,13 @@
 - **Teste que trava:** `teste_correcao2.js` · `teste_correcao3.js`.
 - **Status:** no ar.
 
+### R-EMB-08 · A revisão e a embalagem gravam quem fez
+- **Regra:** cada linha de `revisao` e de `montagem` grava `usuario_id` e `usuario_nome` de quem bipou. O nome vai como retrato: a revisão de ontem continua sendo de quem era, mesmo que a pessoa mude de nome no cadastro. O ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`).
+- **Por quê:** sem isso não há como medir a produtividade nem a autonomia de ninguém (dívida 9; R-ACE-06 da `ACESSOS-UNIFICADOS`).
+- **Exceções:** as linhas de antes de 26/10/2026 ficam com a pessoa vazia — não há de onde tirar.
+- **Teste que trava:** `teste_revisao.js` (seção 6, com a tabela de antes, sem a coluna) · `teste_montagem.js` (6-B).
+- **Status:** em código em 26/10/2026. Nenhuma tela mostra ainda: o dado começa a se acumular.
+
 ---
 
 ## O kit e a etiqueta dele

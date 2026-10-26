@@ -354,3 +354,10 @@ sozinho, na hora. **Depois:** a mesma pessoa **pede**, e outra **aprova** — qu
 pediu não aprova, nem o Admin Geral. Enquanto o pedido espera, o boleto continua
 em aberto e a sobra continua disponível. Quem já podia baixar ou descartar ganhou
 também a permissão de aprovar, para ninguém perder o que fazia. Cartão R-SMF-12.
+
+## 26/10/2026 — revisão e embalagem gravam quem fez
+
+Fase 4 da spec `ACESSOS-UNIFICADOS` (R-ACE-06, dívida 9). **Antes:** só a peça
+com problema gravava quem revisou. **Depois:** toda revisão e toda embalagem
+gravam a pessoa que bipou. Nenhuma tela mostra isso ainda; o dado começa a se
+acumular para medir a produtividade por pessoa. Cartão R-EMB-08.
