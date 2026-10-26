@@ -1374,7 +1374,7 @@ de 6 pela própria tela de login (`POST /api/auth/trocar-pin`).
 ### ⚠️ O HTTPS ENTRA PELO TRAEFIK QUE JÁ EXISTE NO SERVIDOR (26/10/2026)
 
 Fase 5-B da spec `ACESSOS-UNIFICADOS` (dívida 2). Endereço novo:
-**`https://pcp.deccorar.com.br`**. Passo a passo em [`docs/HTTPS.md`](docs/HTTPS.md).
+**`https://pcp.sistemadeccorar.com.br`**. Passo a passo em [`docs/HTTPS.md`](docs/HTTPS.md).
 
 > ⚠️ **AS PORTAS 80 E 443 SÃO DO TRAEFIK (Docker), E NÃO DO NGINX.** O Traefik já
 > tira certificado do Let's Encrypt para o n8n. Ligar o nginx na 443 brigaria pela
@@ -1951,7 +1951,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 1b | ~~`fila` não tem `CREATE TABLE` em lugar nenhum~~ **RESOLVIDO em 14/08/2026** — criada em `db.js` | — |
 | 1d | ~~`revisao.modo` e `producao.origem`/`urgente` sem migração~~ **RESOLVIDO em 14/08/2026** — auditoria completa, ver §17 | — |
 | 1c | ~~**Embalagem em teste consome linha real da `fila`**~~ **RESOLVIDO em 17/09/2026** — a fila é filtrada pelo mesmo `teste` do momento: em modo teste consome linha de teste, fora dele consome linha real (§4, armadilha #26) | — |
-| 2 | **Sem HTTPS.** PINs trafegam em texto aberto. O PIN passou a ter 6 dígitos em 21/10/2026 (fase 5-A da `ACESSOS-UNIFICADOS`). **Em código desde 26/10/2026 (fase 5-B):** `https://pcp.deccorar.com.br` pelo Traefik que já existe, cookie `Secure` por https (§10, `docs/HTTPS.md`). **Só se risca quando a porta 3010 fechar** (etapa 2): enquanto ela estiver aberta, o PIN ainda pode viajar aberto por quem usa o endereço velho | Alto se exposto à internet |
+| 2 | **Sem HTTPS.** PINs trafegam em texto aberto. O PIN passou a ter 6 dígitos em 21/10/2026 (fase 5-A da `ACESSOS-UNIFICADOS`). **Em código desde 26/10/2026 (fase 5-B):** `https://pcp.sistemadeccorar.com.br` pelo Traefik que já existe, cookie `Secure` por https (§10, `docs/HTTPS.md`). **Só se risca quando a porta 3010 fechar** (etapa 2): enquanto ela estiver aberta, o PIN ainda pode viajar aberto por quem usa o endereço velho | Alto se exposto à internet |
 | 3 | **Revisão perdida em falha de conexão** — sem fila local de reenvio | Médio — buraco silencioso no relatório |
 | 4 | `POST /api/producao` (manual) não aceita `data`, `origem` nem `urgente` | Médio — impede lançar adiantado pela tela |
 | 5 | Upload não permite escolher a data das vendas | Médio — vendas de amanhã entram como hoje |
