@@ -2834,7 +2834,10 @@ document.addEventListener('click',function(e){
     var v=DVESC[id3]||{};
     if(!v.rep||!v.mot){ alert('Responda a reputacao e o motivo antes de dar baixa.'); return; }
     fetch('/api/devolucao/baixa',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:id3,reputacao:v.rep,motivo:v.mot})}).then(function(){ carregarDev(); });
+      body:JSON.stringify({id:id3,reputacao:v.rep,motivo:v.mot})})
+      .then(function(r){ return r.json().catch(function(){ return {}; }); })
+      .then(function(d){ if(d && d.erro) alert(d.erro); carregarDev(); })
+      .catch(function(){ alert('Sem conexão: a baixa não foi confirmada. Tente de novo.'); });
   }
 });
 
