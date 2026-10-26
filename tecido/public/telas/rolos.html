@@ -42,7 +42,7 @@ const ocupanteDe=nivel_id=>(estado.ocupacao||[])
 // nenhuma bobina como escolhida.
 const dLargura={arred:v=>Math.round(Number(String(v).replace(',','.'))*1000)/1000};
 const ABAS=[{id:'estoque',nome:'Em estoque'},{id:'entrada',nome:'Entrada de rolo'}];
-const podeEntrar=()=>['diretor','cortador'].includes(eu.papel);
+const podeEntrar=()=>(eu.permissoes||[]).includes('rolo.entrada');
 /* QUEM VE PRECO E QUEM LANCA NOTA. A tela só decide o que DESENHAR — o
    servidor ja mandou o JSON sem os campos de preco para quem nao tem
    custo.ver, entao esconder aqui e conforto, nunca a trava. */
@@ -314,7 +314,7 @@ async function telaEstoque(pai){
         await telaEstoque($('#conteudo'));
       }}));
     }
-    if(r.status!=='encerrado'&&eu.papel==='diretor'){
+    if(r.status!=='encerrado'&&(eu.permissoes||[]).includes('rolo.ajustar')){
       acoes.push(el('button',{class:'bt pequeno',texto:'Ajustar',onclick:async()=>{
         const s=prompt('Saldo real do rolo '+r.codigo+', em metros:',String(r.saldo).replace('.',','));
         if(s===null) return;

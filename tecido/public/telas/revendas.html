@@ -125,7 +125,7 @@ function editor(campos, aoSalvar, aoCancelar){
 
 async function carregar(){
   eu=await api('/api/eu');
-  $('#quem').textContent=eu.nome+' · '+eu.papel;
+  $('#quem').textContent=eu.nome;
   const [revendas,carteiras,tabelas,formas,prazo,feriados]=await Promise.all([
     api('/api/revendas'), api('/api/revendas/carteiras'), api('/api/tabelas'),
     api('/api/formas-pagamento'), api('/api/prazo'), api('/api/feriados')

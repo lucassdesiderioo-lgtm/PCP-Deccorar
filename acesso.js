@@ -16,6 +16,13 @@
  */
 const PERMISSOES = require('./permissoes');
 const path = require('path');
+/* O pacote com que cada setor do sob medida NASCE mora no proprio modulo
+   (fase 2 da ACESSOS-UNIFICADOS): e ele que sabe o que a bancada faz. */
+const SM = require('./tecido/nucleo/permissoes');
+const smPacote = nome => nome === 'diretor'
+  ? SM.CHAVES.map(c => 'sobmedida.' + c.chave)
+  : SM.PAPEIS[nome].map(c => 'sobmedida.' + c);
+const SM_SETORES = ['serralheria','colecao','montagem','revisao','embalagem'];
 
 // Modelo antigo (area) -> permissao equivalente no modelo novo, para comparar
 // a MESMA tela nos dois modelos. A area 'admin' fica de fora: e o hub do admin,
@@ -49,21 +56,24 @@ function setoresNativos(){
     // ninguem e migrado para ca. A operacao sob medida e outra equipe, e
     // herdar gente por engano daria acesso de corte a quem so revisa.
     { nome:'Sob medida / Bancada',           nivel:'operacao',
-      perms:['sobmedida.cortar','painel.ver','produtividade.propria'] },
+      perms:smPacote('cortador').concat(['painel.ver','produtividade.propria']) },
     /* ⚠️ NIVEL `supervisor`, e ele tem que CABER a chave que o setor carrega.
        A rota de salvar recusa permissao acima do nivel do setor, e a tela nem
        desenha a caixinha — entao o par declarado errado nao da erro: ele faz a
        chave sumir em silencio no primeiro salvamento do setor. Foi o que
        aconteceu em producao (19/09/2026), com o setor em `supervisor` e a
        chave em `admin`: editar o setor regravou a lista sem ela. */
+    /* E ELE CARREGA AS CINCO BANCADAS: era o `*` do diretor, que bipava
+       qualquer uma — recusar a chefia numa bancada seria trava disparando no
+       caso normal (#6). */
     { nome:'Sob medida / Cadastros',         nivel:'supervisor',
-      perms:['sobmedida.cortar','sobmedida.cadastrar'] },
+      perms:smPacote('diretor').concat(SM_SETORES.map(s => 'sobmedida.' + s)) },
     /* VENDA (fase 2 da SOBMEDIDA-PEDIDO-REVENDA). Nasce vazio como os dois
        de cima, e SO com a chave de vender: o vendedor nao corta. Ate esta
        fase ele entrava por 'Sob medida / Cadastros', que e da chefia — o
        setor existe justamente para ele parar de precisar daquela. */
     { nome:'Sob medida / Venda',             nivel:'operacao',
-      perms:['sobmedida.vender'] },
+      perms:smPacote('vendedor') },
     /* PRODUCAO SOB MEDIDA (fase 5-A, 24/09/2026). Cinco setores, um por
        bancada — o fluxo fisico da secao 4.15 da spec. Nascem VAZIOS como os
        tres de cima: ninguem e migrado, porque herdar gente por engano daria
@@ -948,23 +958,18 @@ module.exports = function(app, db){
        para o fallback do modelo antigo; quem decide e a chave. Duas chaves
        levam a mesma area, e ela entra uma vez so. */
     ['contagem.contar','inventario'], ['contagem.recontar','inventario'],
-    /* SOB MEDIDA. Sem estas duas linhas a integracao NAO FUNCIONA, e falha em
-       silencio: o portao em tecido/montar.js le `usuarios.areas`, e no modo
-       novo esta coluna e recalculada aqui a cada mudanca de setor. Area que
-       nao esta neste mapa e apagada no primeiro salvamento — o acesso seria
-       concedido na tela e sumiria sozinho depois. */
-    ['sobmedida.cortar','sobmedida'], ['sobmedida.cadastrar','sobmedida_adm'],
-    ['sobmedida.vender','sobmedida_venda'],
-    /* Os cinco setores de producao (fase 5-A). Uma area por setor, e nao uma
-       area so: e ela que o modulo le para saber QUAIS bancadas a pessoa
-       bipa. Sem a linha aqui a caixinha e marcada na tela e a area some
-       sozinha no salvamento seguinte — o acesso seria concedido e perdido
-       sem erro, sem log e sem ninguem saber por que. */
-    ['sobmedida.serralheria','sobmedida_serralheria'],
-    ['sobmedida.colecao',    'sobmedida_colecao'],
-    ['sobmedida.montagem',   'sobmedida_montagem'],
-    ['sobmedida.revisao',    'sobmedida_revisao'],
-    ['sobmedida.embalagem',  'sobmedida_embalagem']
+    /* SOB MEDIDA — UMA AREA SO, e ela serve a uma pergunta so: "para onde a
+       pessoa vai depois do PIN?" (destino.js). Desde a fase 2 da
+       ACESSOS-UNIFICADOS (26/10/2026) o portao do modulo NAO le esta coluna:
+       ele pergunta ao `permissoesDe` quais chaves `sobmedida.*` a pessoa
+       tem. As areas `sobmedida_adm`, `_venda` e as cinco de setor sairam com
+       o tradutor de papel que as lia. Entra no sob medida quem tem a chave de
+       entrar OU uma bancada da producao — a mesma regra do modulo
+       (POR_SETOR em tecido/nucleo/permissoes.js). */
+    ['sobmedida.modulo.entrar','sobmedida'],
+    ['sobmedida.serralheria','sobmedida'], ['sobmedida.colecao','sobmedida'],
+    ['sobmedida.montagem','sobmedida'], ['sobmedida.revisao','sobmedida'],
+    ['sobmedida.embalagem','sobmedida']
   ];
   function sincronizarAreas(uid){
     try{
@@ -976,6 +981,94 @@ module.exports = function(app, db){
       db.prepare("UPDATE usuarios SET areas=? WHERE id=?").run(areas.join(','), uid);
     }catch(e){}
   }
+
+  /* ── 3-F. UMA LISTA SO (fase 2 da ACESSOS-UNIFICADOS, 26/10/2026) ──
+     As tres chaves velhas do sob medida (`sobmedida.cortar`, `.cadastrar`,
+     `.vender`) viram as chaves do modulo, uma a uma, e a regra e uma so:
+     NINGUEM GANHA NEM PERDE NADA NA PASSAGEM.
+
+       1. FOTO DE ANTES: o que cada pessoa podia no modulo, pela regua velha
+          (area -> papel -> pacote), congelada aqui embaixo;
+       2. setor que carregava uma chave velha passa a carregar o pacote dela;
+          excecao CONCEDIDA de chave velha vira excecao do pacote;
+       3. as chaves velhas saem de setor e de excecao (a revogada tambem: a
+          conferencia do passo 4 refaz o que ela fazia);
+       4. CONFERENCIA, pessoa a pessoa e chave a chave: o que ficou diferente
+          da foto vira excecao (concede ou revoga), com motivo — o que a regra
+          diz e garantido pela conta, e nao pela esperanca de que os pacotes
+          batam;
+       5. a sombra `areas` e recalculada para todo mundo.
+
+     Fica DEPOIS do PERM_AREA de proposito: o `sincronizarAreas` do passo 5 le
+     aquele `const`, e chamado antes ele estoura dentro do `try` dele e nao
+     grava nada — em silencio.
+
+     Roda UMA VEZ (marca em `config`): quem desmarcar uma caixinha depois nao
+     a ve voltar no proximo boot. */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='acesso_sobmedida_f2'").get()){
+      const VELHAS = ['sobmedida.cortar','sobmedida.cadastrar','sobmedida.vender'];
+      const PACOTE_DA = { 'sobmedida.cortar':smPacote('cortador'), 'sobmedida.vender':smPacote('vendedor'),
+        'sobmedida.cadastrar':smPacote('diretor').concat(SM_SETORES.map(x => 'sobmedida.' + x)) };
+      const CH = SM.CHAVES.map(c => c.chave);
+      // A regua velha, congelada como era ate 26/10/2026 (tecido/nucleo/acesso.js).
+      const regua = (perms, ag) => {
+        const tem = c => ag || perms.has(c);
+        const setores = SM_SETORES.filter(x => tem('sobmedida.cadastrar') || tem('sobmedida.' + x));
+        const papel = tem('sobmedida.cadastrar') ? 'diretor' : tem('sobmedida.cortar') ? 'cortador'
+          : tem('sobmedida.vender') ? 'vendedor' : SM_SETORES.some(x => tem('sobmedida.' + x)) ? 'producao' : null;
+        const pode = new Set();
+        if(papel) CH.forEach(k => { if(papel === 'diretor' || SM.PAPEIS[papel].includes(k)
+          || (k === 'producao.bipar' && setores.length)) pode.add(k); });
+        return { pode, setores:new Set(setores) };
+      };
+      // ...e a nova: a mesma conta do portao do modulo.
+      const SMA = require('./tecido/nucleo/acesso');
+      const novo = uid => {
+        const u = SMA.daSessaoDoPcp({ id:uid }, [...permissoesDe(uid)]);
+        return u ? { pode:new Set(CH.filter(k => SM.pode(u, k))), setores:new Set(u.setores) }
+                 : { pode:new Set(), setores:new Set() };
+      };
+      const gente = db.prepare('SELECT id FROM usuarios').all().map(r => r.id);
+      let excecoes = 0;
+      db.transaction(() => {
+        const antes = {};
+        gente.forEach(id => { antes[id] = ehAdminGeral(id) ? null : regua(permissoesDe(id), false); });
+        for(const v of VELHAS){
+          for(const c of PACOTE_DA[v]){
+            db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
+              SELECT setor_id, ? FROM setor_permissao WHERE chave=?`).run(c, v);
+            db.prepare(`INSERT OR IGNORE INTO usuario_excecao (usuario_id,chave,concede,motivo,criado_por)
+              SELECT usuario_id, ?, 1, 'fase 2: veio de ' || ?, 'sistema' FROM usuario_excecao e
+               WHERE chave=? AND concede=1`).run(c, v, v);
+          }
+          db.prepare('DELETE FROM setor_permissao WHERE chave=?').run(v);
+          db.prepare('DELETE FROM usuario_excecao WHERE chave=?').run(v);
+        }
+        const exc = db.prepare(`INSERT INTO usuario_excecao (usuario_id,chave,concede,motivo,criado_por)
+          VALUES (?,?,?,?, 'sistema') ON CONFLICT(usuario_id,chave) DO UPDATE SET concede=excluded.concede,
+          motivo=excluded.motivo, criado_por=excluded.criado_por`);
+        const MOT = 'fase 2 da lista unica: preserva o acesso que a pessoa ja tinha no sob medida';
+        gente.forEach(id => {
+          const a = antes[id];
+          if(!a) return;                                // Admin Geral: todas, antes e depois
+          const d = novo(id);
+          CH.forEach(k => {
+            if(a.pode.has(k) && !d.pode.has(k)){ exc.run(id, 'sobmedida.' + k, 1, MOT); excecoes++; }
+            else if(!a.pode.has(k) && d.pode.has(k)){ exc.run(id, 'sobmedida.' + k, 0, MOT); excecoes++; }
+          });
+          SM_SETORES.forEach(x => {
+            if(a.setores.has(x) && !d.setores.has(x)){ exc.run(id, 'sobmedida.' + x, 1, MOT); excecoes++; }
+            else if(!a.setores.has(x) && d.setores.has(x)){ exc.run(id, 'sobmedida.' + x, 0, MOT); excecoes++; }
+          });
+        });
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('acesso_sobmedida_f2','1')").run();
+      })();
+      gente.forEach(id => sincronizarAreas(id));
+      console.log('[acesso] fase 2 (lista unica do sob medida): migrada; ' + excecoes +
+        ' excecao(oes) criada(s) para preservar o acesso de antes');
+    }
+  }catch(e){ console.log('[acesso] fase 2 do sob medida falhou (nada gravado): ' + e.message); }
 
   // pergunta pontual (usada por outras rotas, ex.: contagem em dois passos):
   // o usuario tem esta permissao? Admin Geral tem todas. Migra na primeira vez.

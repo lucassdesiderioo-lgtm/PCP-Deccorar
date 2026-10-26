@@ -51,10 +51,10 @@ const MODULOS=[
 const semAcesso=(res,nome)=>res.status(403).send(
   '<body style="font-family:system-ui;background:#0e1217;color:#eef1f6;padding:40px;max-width:34em">'+
   '<h2 style="color:#ffb800">Sob medida — acesso nao liberado</h2>'+
-  '<p><b>'+String(nome||'').replace(/[<>&]/g,'')+'</b> esta logado, mas nao tem area de sob medida.</p>'+
-  '<p>Quem libera e o admin, em <b>Admin &rarr; Acessos</b>, marcando<br>'+
-  '<b>Sob medida — bancada</b> (corte e sobras), <b>Sob medida — cadastros</b><br>'+
-  'ou <b>Sob medida — venda</b> (simulador, catalogo e revendas).</p>'+
+  '<p><b>'+String(nome||'').replace(/[<>&]/g,'')+'</b> esta logado, mas nao tem acesso ao sob medida.</p>'+
+  '<p>Quem libera e quem tem permissao para gerenciar pessoas, em <b>Admin &rarr; Acessos</b>, pondo a pessoa num<br>'+
+  'setor <b>Sob medida /</b> (Bancada, Cadastros, Venda ou uma bancada da producao)<br>'+
+  'ou marcando as permissoes do grupo <b>Sob medida</b>.</p>'+
   '<p><a href="/" style="color:#ffb800">Voltar</a></p></body>');
 
 const negaTela=res=>res.status(403).send(
@@ -102,11 +102,23 @@ function montar(app, prefixo, opcoes){
      so. Ela entra para o cadastro poder apontar; o caminho de VOLTA e o
      `consumoDeMaterial` devolvido la embaixo. */
   materiais.ligar(opcoes&&opcoes.materiais);
+  /* `opcoes.permissoes(uid)` e a PORTA do acesso: devolve as chaves do PCP que
+     a pessoa tem (o mesmo `permissoesDe` que decide as telas de la). Sem ela
+     — num teste — vale a lista que vier em `req.usuario.permissoes`; sem as
+     duas, ninguem entra: fechado por padrao. */
+  const permissoesDoPcp=opcoes&&typeof opcoes.permissoes==='function' ? opcoes.permissoes : null;
   schema.aplicar(db);
 
   // ── O PORTAO ──────────────────────────────────────────────────────────
-  // Roda ANTES das rotas e do static deste modulo. Traduz o usuario do PCP
-  // (areas) no usuario deste dominio (papel), e barra quem nao tem area.
+  // Roda ANTES das rotas e do static deste modulo. Pergunta ao PCP quais
+  // chaves `sobmedida.*` a pessoa tem (fase 2 da ACESSOS-UNIFICADOS), monta
+  // o usuario deste dominio com elas, e barra quem nao tem nenhuma de entrar.
+  //
+  // ⚠️ A RESPOSTA VEM DO RESOLVEDOR DO PCP (`opcoes.permissoes`, ligado no
+  // server.js), e nao da coluna `usuarios.areas`. A coluna e sombra, so e
+  // recalculada quando alguem mexe em setor, e foi lendo ela que o acesso
+  // sumiu em silencio tres vezes (#13, #28, #34). Quem passa a lista pronta
+  // em `req.usuario.permissoes` sao os testes, que nao sobem o PCP.
   //
   // Ele NAO autentica: quem faz isso e o auth.js do PCP, que ja rodou. Aqui
   // so se decide o que a pessoa pode. Autenticacao la, autorizacao aqui —
@@ -118,10 +130,12 @@ function montar(app, prefixo, opcoes){
       ? res.status(401).json({ok:false,motivo:'nao_logado',mensagem:'Sessao expirada. Entre de novo.'})
       : res.redirect('/login?r='+encodeURIComponent(req.originalUrl));
 
-    const u=acesso.daSessaoDoPcp(doPcp);
+    const chaves=Array.isArray(doPcp.permissoes) ? doPcp.permissoes
+      : (permissoesDoPcp ? permissoesDoPcp(doPcp.id) : []);
+    const u=acesso.daSessaoDoPcp(doPcp, chaves);
     if(!u) return req.path.startsWith('/api/')
-      ? res.status(403).json({ok:false,motivo:'sem_area',
-          mensagem:'Voce nao tem area de sob medida. Peca ao admin em Admin -> Acessos.'})
+      ? res.status(403).json({ok:false,motivo:'sem_acesso',
+          mensagem:'Voce nao tem acesso ao sob medida. Ele se libera em Admin -> Acessos.'})
       : semAcesso(res,doPcp.nome);
 
     req.usuario=u;
@@ -164,4 +178,4 @@ function montar(app, prefixo, opcoes){
   return { consumoDeMaterial: ()=>require('./dominio/consumo').materialDeCompra() };
 }
 
-module.exports={montar, MODULOS, AREAS_PCP:acesso.AREAS_PCP, PREFIXO:'/sobmedida'};
+module.exports={montar, MODULOS, PREFIXO:'/sobmedida'};

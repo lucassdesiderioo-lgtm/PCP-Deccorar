@@ -227,249 +227,133 @@ ok('...mas o Admin Geral imprime desde o primeiro boot',
 ok('e quem so tem kit.editar NAO imprime',
   AC.decidir({ id:ua, nome:'Gestao' }, '/api/kit/etiqueta/imprimir', 'POST').ok === false);
 
-console.log('\n── 6-B. vender sob medida e uma area PROPRIA, e ela nao pode ser admin ──');
-/* Fase 2 da SOBMEDIDA-PEDIDO-REVENDA. Ate aqui o vendedor entrava pela area
-   "Sob medida / Cadastros" — a da CHEFIA, que abre cadastro de tecido,
-   parametros do encaixe e descarte de sobra. A area nova existe para ele
-   parar de precisar daquela.
+console.log('\n── 6-B. o sob medida: setores proprios, e NENHUMA chave admin ──');
+/* Desde a fase 2 da ACESSOS-UNIFICADOS (26/10/2026) as chaves do sob medida
+   moram nesta lista como `sobmedida.<chave>`, e os setores "Sob medida /"
+   nascem com o pacote de cada trabalho. A trava que importa continua a mesma
+   desde a fase 2 da SOBMEDIDA-PEDIDO-REVENDA: nenhuma delas e de nivel admin.
+   `sincronizarAreas` poe a area 'admin' em quem tem QUALQUER chave admin, e
+   as rotas '@admin' do PCP liberam por isso — uma chave do modulo declarada
+   admin daria um pedaco do admin do PCP a quem so vende ou corta (#34).
+   O "ninguem ganha nem perde nada" da passagem e o teste_acessos_f2.js. */
+const acessoSM = require('./tecido/nucleo/acesso');
+const SMP = require('./tecido/nucleo/permissoes');
+const ehAdm = c => { const i = P.find(x => x.chave === c); return !!i && (i.nivel === 'admin' || i.nivel === 'admin_geral'); };
+const doSetor = nome => db.prepare(`SELECT sp.chave FROM setores s
+  JOIN setor_permissao sp ON sp.setor_id=s.id WHERE s.nome=?`).all(nome).map(r => r.chave);
+eq('nenhuma chave do sob medida e de nivel admin',
+  P.filter(p => p.chave.indexOf('sobmedida.') === 0 && ehAdm(p.chave)).map(p => p.chave).join(','), '');
+for(const velha of ['sobmedida.cortar','sobmedida.cadastrar','sobmedida.vender'])
+  ok(velha + ' saiu da lista (era o tradutor de papel)', !P.find(p => p.chave === velha));
 
-   ⚠️ E O NIVEL DELA E `operacao`, NAO `admin`, e isso nao e classificacao —
-   e trava. `sincronizarAreas` poe a area 'admin' em quem tem QUALQUER chave
-   de nivel admin, e o portao do sob medida (tecido/nucleo/acesso.js) le
-   'admin' como DIRETOR. Declarada como admin, esta chave devolveria ao
-   vendedor exatamente o modulo inteiro que ela veio tirar dele — sem
-   ninguem pedir, e sem erro em tela nenhuma. */
-const chaveVender = P.find(p => p.chave === 'sobmedida.vender');
-ok('a chave sobmedida.vender esta declarada em permissoes.js', !!chaveVender);
-if(chaveVender)
-  eq('e o nivel dela e operacao — admin faria o vendedor virar diretor no sob medida',
-    chaveVender.nivel, 'operacao');
 ok('o setor "Sob medida / Venda" foi semeado',
   !!db.prepare("SELECT 1 FROM setores WHERE nome='Sob medida / Venda'").get());
-const permsVenda = db.prepare(`SELECT sp.chave FROM setores s
-  JOIN setor_permissao sp ON sp.setor_id=s.id WHERE s.nome='Sob medida / Venda'`)
-  .all().map(r => r.chave);
-eq('e ele nasce SO com a chave de vender — o vendedor nao corta',
-  permsVenda.sort().join(','), 'sobmedida.vender');
-/* A terceira ponta: a area tem que voltar para `usuarios.areas`, que e o que
-   o portao do modulo le. A linha do PERM_AREA e conferida por texto no teste
-   do proprio modulo (tecido/teste/acesso.test.js); aqui se confere o que
-   decide se a area 'admin' vem junto — que e o que faria o vendedor entrar
-   como DIRETOR. */
+const permsVenda = doSetor('Sob medida / Venda');
+ok('e ele nasce com o simulador e a carteira', permsVenda.includes('sobmedida.catalogo.ler') &&
+  permsVenda.includes('sobmedida.revenda.ler'));
+ok('e SEM o corte — o vendedor nao corta', !permsVenda.includes('sobmedida.plano.confirmar'));
 const uVend = db.prepare("INSERT INTO usuarios (nome,pin_hash,salt,areas,ativo) VALUES ('Vendedor teste','x','y','',1)")
   .run().lastInsertRowid;
-const sVenda = db.prepare("SELECT id FROM setores WHERE nome='Sob medida / Venda'").get().id;
-db.prepare('INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)').run(uVend, sVenda);
+db.prepare('INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)')
+  .run(uVend, db.prepare("SELECT id FROM setores WHERE nome='Sob medida / Venda'").get().id);
 const permsVend = AC.permissoesDe(uVend);
-ok('quem esta no setor de venda ganha sobmedida.vender', permsVend.has('sobmedida.vender'));
-const infoDe = c => P.find(x => x.chave === c);
-const admDoVendedor = [...permsVend].filter(c => { const i = infoDe(c); return i && (i.nivel === 'admin' || i.nivel === 'admin_geral'); });
-eq('e NENHUMA das permissoes dele e de nivel admin — e isso que mantem a area "admin" fora',
-  admDoVendedor.join(', '), '', 'admin-level: ' + (admDoVendedor.join(', ') || '(nenhuma)'));
-ok('ele nao corta nem cadastra tecido',
-  !permsVend.has('sobmedida.cortar') && !permsVend.has('sobmedida.cadastrar'));
-/* E o papel que sai disso, pelo tradutor do proprio modulo — a conta que o
-   portao faz de verdade, e nao uma releitura dela aqui. */
-const acessoSM = require('./tecido/nucleo/acesso');
-eq('o modulo traduz essa area em "vendedor"',
-  acessoSM.papelDe({ areas: ['sobmedida_venda'] }), 'vendedor');
-eq('...e "admin" sozinha NAO abre o sob medida (fase 1 da ACESSOS-UNIFICADOS)',
-  acessoSM.papelDe({ areas: ['admin'] }), null);
+eq('e NENHUMA das permissoes de quem esta nele e de nivel admin',
+  [...permsVend].filter(ehAdm).join(', '), '');
+/* E o que sai disso, pela conta do proprio modulo — a que o portao faz. */
+const vend = acessoSM.daSessaoDoPcp({ id:uVend, nome:'V' }, [...permsVend]);
+ok('o modulo deixa ele entrar e simular', !!vend && SMP.pode(vend, 'catalogo.ler'));
+ok('...e nao descartar sobra', !!vend && !SMP.pode(vend, 'sobra.descartar'));
+eq('...e uma pessoa com chaves so do PCP, nenhuma do modulo, NAO entra (fase 1)',
+  acessoSM.daSessaoDoPcp({ id:1, nome:'x' }, ['compras.ver','custo.ver']), null);
 
 console.log('\n── 6-C. os CINCO SETORES DE PRODUCAO do sob medida (fase 5-A) ──');
 /* Decisao do dono, 24/09/2026: "tem que ser possivel a gente criar cada setor
    no controle de acesso, e quem tem acesso pega o tablet de manha e ve o que
-   tem para fazer". Ate aqui o modulo traduzia area em UM papel, e "quais
-   setores esta pessoa bipa" nao era pergunta que o sistema soubesse responder.
-
-   ⚠️ SAO CINCO CHAVES, UMA POR SETOR, e nao uma chave so de "producao". Uma
-   chave unica deixaria o serralheiro bipar a embalagem, e o bipe e o que
-   grava QUEM fez a peca — na fase 5-B e por ele que a recusa acha a pessoa
-   certa. Uma regua que aponta a pessoa errada e pior que nenhuma. */
+   tem para fazer". Cinco chaves, UMA POR SETOR: o bipe grava QUEM fez a peca,
+   e na fase 5-B e por ele que a recusa acha a pessoa certa. */
 const SETORES_SM = [
-  ['serralheria','Sob medida / Serralheria','sobmedida_serralheria'],
-  ['colecao',    'Sob medida / Coleção',    'sobmedida_colecao'],
-  ['montagem',   'Sob medida / Montagem',   'sobmedida_montagem'],
-  ['revisao',    'Sob medida / Revisão',    'sobmedida_revisao'],
-  ['embalagem',  'Sob medida / Embalagem',  'sobmedida_embalagem']
+  ['serralheria','Sob medida / Serralheria'], ['colecao','Sob medida / Coleção'],
+  ['montagem','Sob medida / Montagem'], ['revisao','Sob medida / Revisão'],
+  ['embalagem','Sob medida / Embalagem']
 ];
-
 for(const [chaveCurta, nomeSetor] of SETORES_SM){
   const chave = 'sobmedida.' + chaveCurta;
   const info = P.find(p => p.chave === chave);
   ok('a chave ' + chave + ' esta declarada em permissoes.js', !!info);
-  /* ⚠️ O NIVEL E `operacao`, e pela MESMA razao da sobmedida.vender logo
-     acima: `sincronizarAreas` poe a area 'admin' em quem tem qualquer chave
-     de nivel admin, e o portao do modulo le 'admin' como DIRETOR. Um setor
-     declarado como admin entregaria o modulo inteiro a quem so embala. */
-  if(info) eq('  e o nivel dela e operacao — admin faria o operador virar diretor',
-    info.nivel, 'operacao');
+  if(info) eq('  e o nivel dela e operacao', info.nivel, 'operacao');
   ok('o setor "' + nomeSetor + '" foi semeado',
     !!db.prepare('SELECT 1 FROM setores WHERE nome=?').get(nomeSetor));
-  const perms = db.prepare(`SELECT sp.chave FROM setores s
-    JOIN setor_permissao sp ON sp.setor_id=s.id WHERE s.nome=?`).all(nomeSetor).map(r => r.chave);
-  /* Nasce SO com a chave do proprio setor. Quem embala nao corta tecido, nao
-     cadastra e nao vende — e a mesma regra dos tres setores de sob medida
-     que ja existiam, que nascem vazios de gente e estreitos de chave. */
-  eq('  e ele nasce SO com a chave do proprio setor',
-    perms.sort().join(','), chave);
+  eq('  e ele nasce SO com a chave do proprio setor', doSetor(nomeSetor).sort().join(','), chave);
   eq('  e NINGUEM foi migrado para ele — setor de sob medida nasce vazio',
     db.prepare(`SELECT COUNT(*) c FROM usuario_setor us
       JOIN setores s ON s.id=us.setor_id WHERE s.nome=?`).get(nomeSetor).c, 0);
 }
-
-/* A TERCEIRA PONTA: a area tem que voltar para `usuarios.areas`, que e o que
-   o portao do modulo le. Sem a linha no PERM_AREA o acesso e concedido na
-   tela e SOME SOZINHO no primeiro salvamento seguinte (armadilha #13). */
 const uEmb = db.prepare("INSERT INTO usuarios (nome,pin_hash,salt,areas,ativo) VALUES ('Embalador teste','x','y','',1)")
   .run().lastInsertRowid;
-const sEmb = db.prepare("SELECT id FROM setores WHERE nome='Sob medida / Embalagem'").get();
-if(sEmb){
-  db.prepare('INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)').run(uEmb, sEmb.id);
-  const permsEmb = AC.permissoesDe(uEmb);
-  ok('quem esta no setor de embalagem ganha sobmedida.embalagem',
-    permsEmb.has('sobmedida.embalagem'));
-  ok('e NAO ganha os outros quatro setores',
-    !permsEmb.has('sobmedida.serralheria') && !permsEmb.has('sobmedida.colecao') &&
-    !permsEmb.has('sobmedida.montagem') && !permsEmb.has('sobmedida.revisao'));
-  ok('nem corta tecido, nem cadastra, nem vende',
-    !permsEmb.has('sobmedida.cortar') && !permsEmb.has('sobmedida.cadastrar') &&
-    !permsEmb.has('sobmedida.vender'));
-  const admDoEmb = [...permsEmb].filter(c => { const i = P.find(x => x.chave === c); return i && (i.nivel === 'admin' || i.nivel === 'admin_geral'); });
-  eq('e NENHUMA permissao dele e de nivel admin — e isso que mantem a area "admin" fora',
-    admDoEmb.join(', '), '');
-  /* A area de verdade, depois do sincronizarAreas — este e o texto que o
-     portao do modulo vai ler. */
-  /* ⚠️ Pergunta ao codigo que GRAVA, em vez de refazer a conta aqui. Um teste
-     que remonta `usuarios.areas` pela propria leitura concordaria com o
-     defeito — e a licao do QR (§4): ele perguntaria a si mesmo. */
-  ok('o acesso.js expoe o sincronizarAreas para dar para conferir a 3a ponta',
-    typeof AC.sincronizarAreas === 'function');
-  if(typeof AC.sincronizarAreas === 'function') AC.sincronizarAreas(uEmb);
-  const areasEmb = (db.prepare('SELECT areas FROM usuarios WHERE id=?').get(uEmb).areas || '').split(',').filter(Boolean);
-  ok('a area sobmedida_embalagem chega em usuarios.areas (a linha do PERM_AREA)',
-    areasEmb.includes('sobmedida_embalagem'),
-    'areas: ' + (areasEmb.join(',') || '(vazio)'));
-  ok('e a area "admin" NAO vem junto', !areasEmb.includes('admin'));
-}
-
-/* E O QUE O MODULO FAZ COM ISSO — a conta de verdade, feita pelo tradutor
-   dele, e nao uma releitura dela aqui. */
-const acessoProd = require('./tecido/nucleo/acesso');
-eq('o modulo traduz area de setor em papel "producao"',
-  acessoProd.papelDe({ areas: ['sobmedida_embalagem'] }), 'producao');
-/* ⚠️ Funcao que ainda nao existe tem que dar VERMELHO, nunca derrubar a
-   rodada: suite que morre no meio faz o defeito aparecer como "travou" em vez
-   de falhar, e os casos de baixo nunca rodam. E a licao do teste_componentes
-   de hoje de manha, um andar acima. */
-ok('o modulo sabe responder QUAIS setores a pessoa bipa (setoresDe)',
-  typeof acessoProd.setoresDe === 'function');
-const setoresDe = a => { try{ return (acessoProd.setoresDe({areas:a})||[]); }catch(e){ return ['(estourou: '+e.message+')']; } };
-eq('quem so embala bipa UM setor',
-  setoresDe(['sobmedida_embalagem']).join(','), 'embalagem');
-eq('quem tem dois setores bipa os dois, na ordem da fabrica',
-  setoresDe(['sobmedida_embalagem','sobmedida_serralheria']).join(','),
+db.prepare('INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)')
+  .run(uEmb, db.prepare("SELECT id FROM setores WHERE nome='Sob medida / Embalagem'").get().id);
+const permsEmb = AC.permissoesDe(uEmb);
+ok('quem esta no setor de embalagem ganha sobmedida.embalagem', permsEmb.has('sobmedida.embalagem'));
+ok('e NAO ganha os outros quatro setores',
+  !permsEmb.has('sobmedida.serralheria') && !permsEmb.has('sobmedida.colecao') &&
+  !permsEmb.has('sobmedida.montagem') && !permsEmb.has('sobmedida.revisao'));
+eq('e NENHUMA permissao dele e de nivel admin', [...permsEmb].filter(ehAdm).join(', '), '');
+ok('o acesso.js expoe o sincronizarAreas para dar para conferir a sombra',
+  typeof AC.sincronizarAreas === 'function');
+if(typeof AC.sincronizarAreas === 'function') AC.sincronizarAreas(uEmb);
+const areasEmb = (db.prepare('SELECT areas FROM usuarios WHERE id=?').get(uEmb).areas || '').split(',').filter(Boolean);
+ok('a area "sobmedida" chega em usuarios.areas — e o destino depois do PIN',
+  areasEmb.includes('sobmedida'), 'areas: ' + (areasEmb.join(',') || '(vazio)'));
+ok('e a area "admin" NAO vem junto', !areasEmb.includes('admin'));
+/* E o que o modulo faz com isso — pela conta dele, e nao uma releitura aqui. */
+const emb = acessoSM.daSessaoDoPcp({ id:uEmb, nome:'E' }, [...permsEmb]);
+ok('o modulo deixa ele entrar e bipar', !!emb && SMP.pode(emb, 'producao.bipar'));
+eq('...so na embalagem', emb ? emb.setores.join(',') : '(nao entrou)', 'embalagem');
+eq('e quem tem dois setores bipa os dois, na ordem da fabrica',
+  acessoSM.daSessaoDoPcp({ id:1 }, ['sobmedida.embalagem','sobmedida.serralheria']).setores.join(','),
   'serralheria,embalagem');
-eq('quem nao tem setor nenhum nao bipa nada',
-  setoresDe(['sobmedida_venda']).length, 0);
-/* ⚠️ O SETOR NAO DEPENDE DO PAPEL, e e isso que faz o vendedor que tambem
-   embala continuar embalando. O papel sai da area MAIS LARGA (uma so), os
-   setores saem de TODAS as areas de setor — sao duas contas diferentes, e
-   juntar as duas faria a pessoa perder a bancada ao ganhar a carteira. */
-eq('quem vende E embala tem o papel mais largo...',
-  acessoProd.papelDe({ areas: ['sobmedida_venda','sobmedida_embalagem'] }), 'vendedor');
-eq('...e continua bipando a embalagem do mesmo jeito',
-  setoresDe(['sobmedida_venda','sobmedida_embalagem']).join(','), 'embalagem');
-/* O diretor bipa todos, por coerencia com o `*` das chaves dele: recusar o
-   dono numa bancada seria trava disparando no caso normal (armadilha #6). */
-eq('o diretor bipa os cinco',
-  setoresDe(['admin','sobmedida_adm']).length, 5);
 
-console.log('\n── 6-D. cadastrar sob medida e CHEFIA DO MODULO, nao admin do PCP ──');
-/* 24/09/2026. `sobmedida.cadastrar` era declarada `nivel:'admin'`, e isso
-   dizia duas coisas que ninguem pediu:
-
-     sincronizarAreas  -> area 'admin' em quem tem QUALQUER chave admin
-     temAdmin(perms)   -> as 24 rotas '@admin' do PCP liberam pela mesma regua
-
-   Entao a chave que devia dizer "mexe no cadastro do sob medida" dizia, de
-   fato, "e admin do PCP". E o espelho exato da trava que a fase 2 pos na
-   `sobmedida.vender` (secao 6-B) — la a chave de VENDER daria o modulo
-   inteiro; aqui a chave do modulo da um pedaco do PCP.
-
-   ⚠️ O QUE ISTO NAO MUDA: dentro do modulo a chefia JA E diretor — o
-   `papelDe` devolve 'diretor' para 'admin' e para AREA_CHEFIA, e nunca
-   houve papel "chefia" separado. O que sai e o PCP, e so ele. Esta escrito
-   porque e exatamente onde alguem le a intencao errada depois. */
-const chaveCad = P.find(p => p.chave === 'sobmedida.cadastrar');
-ok('a chave sobmedida.cadastrar esta declarada', !!chaveCad);
-if(chaveCad)
-  eq('e o nivel dela e supervisor — admin a faria valer como admin do PCP inteiro',
-    chaveCad.nivel, 'supervisor');
-
-/* A PROVA DE VERDADE nao e o rotulo: e o que chega em usuarios.areas depois
-   do sincronizarAreas, que e o texto que o portao do modulo le. Pergunto ao
-   codigo que GRAVA, nunca refazendo a conta aqui (a licao do QR, §4). */
+console.log('\n── 6-D. a chefia do sob medida e CHEFIA DO MODULO, nao admin do PCP ──');
+/* 24/09/2026: a chave da chefia era `nivel:'admin'`, e valia como "e admin do
+   PCP" — area 'admin' e as rotas '@admin'. Desde a fase 2 a chefia e o setor
+   "Sob medida / Cadastros" com todas as chaves do modulo, e nenhuma delas e
+   admin: a trava continua de pe pela mesma conta. */
 const uCad = db.prepare("INSERT INTO usuarios (nome,pin_hash,salt,areas,ativo) VALUES ('Chefia sob medida','x','y','',1)")
   .run().lastInsertRowid;
 const sCad = db.prepare("SELECT id,nivel FROM setores WHERE nome='Sob medida / Cadastros'").get();
 ok('o setor "Sob medida / Cadastros" existe', !!sCad);
 if(sCad){
-  /* ⚠️ O NIVEL DO SETOR TEM QUE CABER A CHAVE. A guarda da rota de salvar
-     recusa permissao acima do nivel do setor, e a TELA nem desenha a
-     caixinha — foi por isso que, em producao, a chave nao dava para marcar.
-     Declarar o setor como `admin` e a chave como `supervisor` deixaria a
-     declaracao mentindo sobre o proprio par. */
-  eq('  e o nivel dele e supervisor, igual ao da chave que ele carrega',
-    sCad.nivel, 'supervisor');
-  const permsCad = db.prepare(`SELECT sp.chave FROM setores s
-    JOIN setor_permissao sp ON sp.setor_id=s.id WHERE s.nome='Sob medida / Cadastros'`)
-    .all().map(r => r.chave).sort();
-  eq('  e ele carrega as duas chaves declaradas',
-    permsCad.join(','), 'sobmedida.cadastrar,sobmedida.cortar');
-
+  /* ⚠️ O NIVEL DO SETOR TEM QUE CABER AS CHAVES: a guarda da rota de salvar
+     recusa permissao acima do nivel do setor, e a tela nem desenha a caixinha
+     (foi assim que a chave sumiu em producao em 19/09/2026). */
+  eq('  e o nivel dele e supervisor', sCad.nivel, 'supervisor');
+  const permsCad = doSetor('Sob medida / Cadastros');
+  ok('  e ele carrega todas as chaves do modulo e as cinco bancadas',
+    SMP.CHAVES.every(c => permsCad.includes('sobmedida.' + c.chave)) &&
+    SETORES_SM.every(([c]) => permsCad.includes('sobmedida.' + c)));
+  const NV = { operacao:1, supervisor:2, admin:3, admin_geral:4 };
+  eq('  e nenhuma acima do nivel dele',
+    permsCad.filter(c => { const i = P.find(x => x.chave === c); return i && NV[i.nivel] > NV.supervisor; }).join(','), '');
   db.prepare('INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)').run(uCad, sCad.id);
   const pc = AC.permissoesDe(uCad);
-  ok('quem esta nele ganha sobmedida.cadastrar', pc.has('sobmedida.cadastrar'));
-  const admDoCad = [...pc].filter(c => { const i = P.find(x => x.chave === c); return i && (i.nivel === 'admin' || i.nivel === 'admin_geral'); });
-  eq('e NENHUMA das permissoes dele e de nivel admin — e isso que segura a area "admin" fora',
-    admDoCad.join(', '), '');
-
+  eq('e NENHUMA das permissoes de quem esta nele e de nivel admin', [...pc].filter(ehAdm).join(', '), '');
   if(typeof AC.sincronizarAreas === 'function') AC.sincronizarAreas(uCad);
   const areasCad = (db.prepare('SELECT areas FROM usuarios WHERE id=?').get(uCad).areas || '').split(',').filter(Boolean);
-  ok('a area sobmedida_adm chega em usuarios.areas (a linha do PERM_AREA continua de pe)',
-    areasCad.includes('sobmedida_adm'),
+  ok('a area "sobmedida" chega em usuarios.areas', areasCad.includes('sobmedida'),
     'areas: ' + (areasCad.join(',') || '(vazio)'));
-  ok('e a area "admin" do PCP NAO vem junto — e este e o caso que a mudanca existe para travar',
-    !areasCad.includes('admin'),
-    'areas: ' + (areasCad.join(',') || '(vazio)'));
-
-  /* As 24 rotas '@admin' liberam por temAdmin(perms). Sem chave admin, a
-     chefia do sob medida para de passar nelas — que e o ponto. */
+  ok('e a area "admin" do PCP NAO vem junto — e este e o caso que a trava existe para segurar',
+    !areasCad.includes('admin'), 'areas: ' + (areasCad.join(',') || '(vazio)'));
   ok('a chefia do sob medida NAO passa numa rota @admin do PCP',
     AC.decidir({ id:uCad, nome:'Chefia sob medida' }, '/api/divergencias', 'GET').ok === false);
+  const cad = acessoSM.daSessaoDoPcp({ id:uCad, nome:'C' }, [...pc]);
+  ok('e no modulo ela pode tudo, inclusive descartar sobra', !!cad && SMP.pode(cad, 'sobra.descartar'));
+  eq('...e bipa as cinco bancadas', cad ? cad.setores.length : 0, 5);
 }
-
-/* E O QUE O MODULO FAZ COM ISSO — pelo tradutor dele, nao por uma releitura
-   aqui. A chefia continua entrando como diretor: e o que a area sempre
-   significou, e nao e isso que esta sendo mexido. */
-eq('o modulo continua lendo sobmedida_adm como diretor',
-  acessoProd.papelDe({ areas: ['sobmedida_adm'] }), 'diretor');
-eq('e quem nao tem area nenhuma continua sem entrar',
-  acessoProd.papelDe({ areas: [] }), null);
-
-/* ⚠️ O SETOR NATIVO `Admin` DEIXA DE CARREGAR A CHAVE, e isso e DECISAO, nao
-   efeito colateral. A lista de permissoes dele e calculada — "toda chave de
-   nivel admin" (acesso.js, linha 38) —, entao baixar o nivel a tira de la na
-   instalacao limpa. Em producao nada muda (ninguem a tinha), e o lugar dela
-   passa a ser o setor dedicado. Esta afirmado aqui para nunca voltar por
-   acidente no dia em que alguem reler a lista calculada. */
-const permsAdmin = db.prepare(`SELECT sp.chave FROM setores s
-  JOIN setor_permissao sp ON sp.setor_id=s.id WHERE s.nome='Admin'`).all().map(r => r.chave);
+const permsAdmin = doSetor('Admin');
 ok('o setor nativo Admin existe', permsAdmin.length > 0);
-ok('e ele NAO carrega mais sobmedida.cadastrar — quem cadastra sob medida e o setor dedicado',
-  permsAdmin.indexOf('sobmedida.cadastrar') < 0,
-  'chaves admin: ' + permsAdmin.filter(c => c.indexOf('sobmedida') === 0).join(',' ));
+ok('e ele NAO carrega chave nenhuma do sob medida — quem cuida do modulo sao os setores dele',
+  !permsAdmin.some(c => c.indexOf('sobmedida.') === 0),
+  'chaves: ' + permsAdmin.filter(c => c.indexOf('sobmedida') === 0).join(','));
 
 /* ═══════════ AS TRAVAS DE ESCALONAMENTO (divida 17, 17/09/2026) ═══════════
    Tudo daqui pra baixo responde a mesma pergunta: DA PRA SUBIR DE NIVEL PELA
@@ -812,9 +696,13 @@ console.log('\n── 6-H. a area "admin" nao abre o sob medida (fase 1 da ACESS
    a LE (papelDe e destino), e nunca remonta a conta aqui. */
 {
   const SM = require('./tecido/nucleo/acesso');
+  const SMP = require('./tecido/nucleo/permissoes');
   const { destino } = require('./destino');
   const areasDe = id => { AC.sincronizarAreas(id);
     return (db.prepare('SELECT areas FROM usuarios WHERE id=?').get(id).areas || '').split(',').filter(Boolean); };
+  /* Desde a fase 2 o portao do modulo pergunta ao PCP as chaves da pessoa
+     (permissoesDe), e e essa a conta conferida aqui — a mesma do portao. */
+  const noModulo = id => SM.daSessaoDoPcp({ id, nome:'x' }, [...AC.permissoesDe(id)]);
   const noSetor = (nome, setor) => {
     const id = db.prepare("INSERT INTO usuarios (nome,pin_hash,salt,areas,ativo) VALUES (?,'x','y','',1)").run(nome).lastInsertRowid;
     if(setor) db.prepare("INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,(SELECT id FROM setores WHERE nome=?))").run(id, setor);
@@ -825,26 +713,28 @@ console.log('\n── 6-H. a area "admin" nao abre o sob medida (fase 1 da ACESS
     const areas = areasDe(id);
     ok('  ' + setor + ': o PCP ainda grava a area "admin" (ela abre o /admin)', areas.includes('admin'),
       'areas: ' + areas.join(','));
-    eq('  ' + setor + ': e o sob medida NAO o recebe como diretor', SM.papelDe({ areas }), null);
-    eq('  ' + setor + ': nem como bancada de setor nenhum', SM.setoresDe({ areas }).join(','), '');
+    eq('  ' + setor + ': e o sob medida NAO o deixa entrar', noModulo(id), null);
     eq('  ' + setor + ': e a barra nao oferece o "Sob medida"', destino(areas).sobmedida, null);
   }
   /* A excecao solta pela mesma porta: "Ver custo" e de nivel admin. */
   const uCusto = noSetor('So custo', null);
   db.prepare("INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,'custo.ver',1)").run(uCusto);
-  eq('  a excecao "Ver custo" tambem nao vira diretor', SM.papelDe({ areas: areasDe(uCusto) }), null);
-  /* Os que CONTINUAM diretor. */
+  eq('  a excecao "Ver custo" do PCP tambem nao abre o modulo', noModulo(uCusto), null);
+  /* Os que podem tudo no modulo. */
   const uAG = noSetor('Geral da fase 1', 'Admin Geral');
-  const aAG = areasDe(uAG);
-  eq('  o Admin Geral continua diretor (ele recebe sobmedida_adm)', SM.papelDe({ areas: aAG }), 'diretor');
-  eq('  e bipa os cinco setores', SM.setoresDe({ areas: aAG }).length, 5);
-  const uCadF1 = noSetor('Cadastros da fase 1', 'Sob medida / Cadastros');
-  eq('  o setor "Sob medida / Cadastros" continua diretor', SM.papelDe({ areas: areasDe(uCadF1) }), 'diretor');
-  /* Quem tem admin E uma area do sob medida fica com o papel DA AREA, e nao
-     com o de diretor por carona. */
+  const ag = noModulo(uAG);
+  ok('  o Admin Geral entra podendo tudo', !!ag && SMP.pode(ag, 'sobra.descartar') && SMP.pode(ag, 'boleto.editar'));
+  eq('  e bipa os cinco setores', ag ? ag.setores.length : 0, 5);
+  eq('  e a barra oferece o "Sob medida"', destino(areasDe(uAG)).sobmedida, '/sobmedida');
+  const cadF1 = noModulo(noSetor('Cadastros da fase 1', 'Sob medida / Cadastros'));
+  ok('  o setor "Sob medida / Cadastros" entra podendo tudo', !!cadF1 && SMP.pode(cadF1, 'sobra.descartar'));
+  /* Quem tem admin E um setor do sob medida fica com o pacote DO SETOR, e nao
+     com o de chefia por carona. */
   const uCompVend = noSetor('Comprador que vende', 'Comprador');
   db.prepare("INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,(SELECT id FROM setores WHERE nome='Sob medida / Venda'))").run(uCompVend);
-  eq('  Comprador + Venda vira vendedor, e nao diretor', SM.papelDe({ areas: areasDe(uCompVend) }), 'vendedor');
+  const cv = noModulo(uCompVend);
+  ok('  Comprador + Venda simula, e nao descarta sobra de carona',
+    !!cv && SMP.pode(cv, 'catalogo.ler') && !SMP.pode(cv, 'sobra.descartar'));
 }
 
 console.log('\n── 16. a cobertura passou a VARRER o app ──');

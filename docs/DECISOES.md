@@ -322,3 +322,15 @@ baixa; a peça que voltava pelo ↩ Sobrou subia o saldo e não aparecia nele.
 peças que sobraram no dia da sobra. O "saiu" do dia da baixa não muda, o
 "entrou" continua sendo só embalagem, e o fechamento diário segue gravando
 entrou − saiu. Cartão R-EST-13.
+
+## 26/10/2026 — as permissões do sob medida entram na tela de Acessos, uma a uma
+
+Fase 2 da spec `ACESSOS-UNIFICADOS`, aprovada pelo dono em 21/10/2026 e mandada
+construir em 26/10 ("pode seguir com todas essas pendências"). **Antes:** quem
+entrava no sob medida caía num de quatro papéis fixos (diretor, cortador,
+vendedor, produção), traduzidos da área do PCP; para lançar boleto a pessoa
+precisava ser diretor. **Depois:** as 41 permissões do módulo aparecem na tela de
+Acessos no grupo "Sob medida", os setores "Sob medida /" nascem com o pacote de
+antes, e cada permissão se marca ou desmarca sozinha. Ninguém ganhou nem perdeu
+nada na passagem (a migração confere pessoa a pessoa). Os setores mantiveram os
+nomes de hoje (Bancada, Cadastros, Venda). Cartões R-SMA-01 a R-SMA-03.

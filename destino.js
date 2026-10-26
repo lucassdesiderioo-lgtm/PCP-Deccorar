@@ -28,12 +28,12 @@ const PADRAO=[
 
 const SOBMEDIDA='/sobmedida';
 
-// 'admin' alcanca o sob medida: o portao do modulo le a area 'admin' como
-// diretor (tecido/nucleo/acesso.js). Toda area do modulo comeca com
-// 'sobmedida' — a de bancada, a de cadastros, a de venda e as cinco da producao.
-/* A area 'admin' sozinha NAO alcanca o sob medida (fase 1 da ACESSOS-UNIFICADOS):
-   o portao do modulo deixou de le-la como diretor, e o botao levaria a "sem
-   acesso". O Admin Geral alcanca, porque recebe sobmedida_adm. */
+/* Desde a fase 2 da ACESSOS-UNIFICADOS (26/10/2026) o PCP grava uma area so
+   para o modulo, 'sobmedida', em quem tem a chave de entrar ou uma bancada da
+   producao (PERM_AREA no acesso.js). O regex aceita tambem as areas antigas
+   (`sobmedida_adm` etc.): o boot da migracao recalcula a sombra de todo
+   mundo, mas uma sombra velha esquecida num banco restaurado nao pode mandar
+   a pessoa de volta ao login. A area 'admin' sozinha NAO alcanca (fase 1). */
 function alcancaSobMedida(areas){
   return (areas||[]).some(a=>/^sobmedida(_|$)/.test(a));
 }

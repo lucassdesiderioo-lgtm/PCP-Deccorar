@@ -34,7 +34,7 @@ const estado={linhas:[],aberturas:[],cores:[],tecidos:[],linhaSel:null,armazem:'
   linhaForm:null, aberturasForm:[],
   // Qual tecido esta com o cartao de preco do m² aberto (um de cada vez).
   precificando:null};
-const podeEditar=()=>eu.papel==='diretor';
+const podeEditar=()=>(eu.permissoes||[]).includes('cadastro.editar');
 
 const ABAS=[
   {id:'tecido',    nome:'Tecido'},
@@ -853,24 +853,20 @@ async function telaAcesso(pai){
   const papeis=await api('/api/papeis');
 
   const c=cartao(pai,'A liberacao mora no admin do PCP',
-    'Nao ha cadastro de pessoas aqui. Quem entra no sob medida e quem tem a area marcada em Admin -> Acessos.');
+    'Nao ha cadastro de pessoas aqui. Quem entra no sob medida e quem esta num setor "Sob medida /" em Admin -> Acessos, ou tem as permissoes do grupo Sob medida marcadas la.');
   const ir=el('a',{class:'bt primario',href:'/admin',target:'_top',
     style:'text-decoration:none;display:inline-flex;align-items:center',
     texto:'Abrir Admin -> Acessos'});
   c.appendChild(ir);
   c.appendChild(el('p',{class:'ajuda',texto:
-    'Duas áreas, e a diferença entre elas é o que se pode ESTRAGAR: a Operação corta e cadastra sobra; o nível administrativo cuida de tecido, endereço e dos parâmetros do cálculo.'}));
+    'Cada setor nasce com um pacote, e a diferença entre eles é o que se pode ESTRAGAR: a bancada corta e cadastra sobra; Cadastros cuida de tecido, endereço e dos parâmetros do cálculo. Depois, cada permissão se marca ou desmarca na tela de Acessos, uma a uma.'}));
 
   const t=el('table',{});
-  t.appendChild(el('tr',{},[el('th',{texto:'Area no PCP'}),el('th',{texto:'Vira'}),el('th',{texto:'Alcanca'})]));
-  [['Sob medida - bancada','cortador'],
-   ['Sob medida - cadastros','diretor'],
-   ['Admin (controle geral)','diretor']].forEach(([area,papel])=>{
-    const p=papeis.find(x=>x.papel===papel);
+  t.appendChild(el('tr',{},[el('th',{texto:'Setor no PCP'}),el('th',{texto:'Nasce podendo'})]));
+  papeis.forEach(p=>{
     t.appendChild(el('tr',{},[
-      el('td',{texto:area}),
-      el('td',{},[el('span',{class:'tag '+(papel==='diretor'?'bom':'rolo'),texto:papel})]),
-      el('td',{texto:p?p.permissoes.join(' · '):''})
+      el('td',{texto:p.setor}),
+      el('td',{texto:p.permissoes.join(' · ')})
     ]));
   });
   c.appendChild(rolaH(t));
@@ -878,7 +874,7 @@ async function telaAcesso(pai){
     'Repare que "Descartar sobra" nao esta no cortador: baixa de sobra sem trava e o furo classico de inventario.'}));
 
   c.appendChild(el('p',{class:'ajuda',texto:
-    'Tirar o acesso e desmarcar a area la — ou desligar a pessoa, o que fecha as duas operacoes de uma vez. Era isso que os dois cadastros separados nao davam.'}));
+    'Tirar o acesso e tirar a pessoa do setor la, ou desmarcar a permissao — ou desligar a pessoa, o que fecha as duas operacoes de uma vez. Era isso que os dois cadastros separados nao davam.'}));
 }
 
 // ── inicio ───────────────────────────────────────────────────────────────

@@ -499,7 +499,7 @@ async function telaLista(pai){
       onclick:()=>{ estado.corrigindo={id:s.id,modo:'corrigir'}; telaLista($('#conteudo')); }}));
     else if(podePropor&&!s.propostas_pendentes) acoes.push(el('button',{class:'bt pequeno',texto:'Apontar erro',
       onclick:()=>{ estado.corrigindo={id:s.id,modo:'propor'}; telaLista($('#conteudo')); }}));
-    if(eu.papel==='diretor') acoes.push(el('button',{class:'bt pequeno perigo',texto:'Descartar',onclick:async()=>{
+    if((eu.permissoes||[]).includes('sobra.descartar')) acoes.push(el('button',{class:'bt pequeno perigo',texto:'Descartar',onclick:async()=>{
       const motivo=prompt('Por que a sobra '+s.codigo+' esta sendo descartada?');
       if(!motivo) return;
       await api('/api/sobras/'+s.id+'/descartar',{metodo:'POST',corpo:{motivo}});

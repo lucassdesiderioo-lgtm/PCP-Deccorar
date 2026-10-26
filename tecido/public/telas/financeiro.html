@@ -427,7 +427,7 @@ async function carregar(){
 
 (async function(){
   EU=await api('/api/eu');
-  $('#quem').textContent=(EU.nome||'')+' · '+(EU.papel||'');
+  $('#quem').textContent=(EU.nome||'');
   await carregar();
 })();
 </script>

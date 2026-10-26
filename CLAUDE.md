@@ -1931,7 +1931,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (265), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (24), `teste_upload.js` (46), `teste_devolucao.js` (37), `teste_login.js` (74), `teste_conferencia_antiga.js` (64) e `teste_baixa_conferencia.js` (69); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (274), `teste_acessos_f2.js` (73), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (24), `teste_upload.js` (46), `teste_devolucao.js` (37), `teste_login.js` (74), `teste_conferencia_antiga.js` (64) e `teste_baixa_conferencia.js` (69); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2254,9 +2254,9 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 | R-SMM-01 | Módulo montado no mesmo servidor, dentro de um try/catch — sem segundo servidor |
 | R-SMM-02 | Sem cadastro de gente próprio: a liberação é uma área do PCP |
 | R-SMM-03 | O backup diário cobre o `tecido.db` |
-| R-SMA-01 | A área é SOMBRA: chave, setor e linha no `PERM_AREA` andam juntos (#13) |
-| R-SMA-02 | `sobmedida.cadastrar` é `supervisor`, nunca `admin` (#34) |
-| R-SMA-03 | A área `admin` do PCP não abre o sob medida; diretor é só o Admin Geral e o setor de cadastros |
+| R-SMA-01 | Uma lista só: as permissões do sob medida estão na tela de Acessos, e o portão pergunta ao PCP (#13) |
+| R-SMA-02 | Nenhuma chave do sob medida é `admin`; a chefia é `supervisor` (#34) |
+| R-SMA-03 | A área `admin` do PCP não abre o sob medida |
 | R-SMD-01 | O contexto é por tela, e a paleta é a mesma do PCP |
 | R-SME-01 | A bancada cria largura e endereço, e o cadastro nasce marcado para conferir (#14) |
 | R-SME-02 | Cada nível guarda um rolo só |
@@ -2274,7 +2274,7 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 | R-SMR-01 | Preço da revenda em cascata, arredondado uma vez; o subtotal Deccorar não se mexe |
 | R-SMR-02 | Tabela sem percentual é recusa nomeada, e nasce vazia, não zero |
 | R-SMR-03 | O prazo é conta do `prazo.js`, pela hora do ENVIO |
-| R-SMR-04 | O vendedor tem área própria; `sobmedida.vender` é `operacao` |
+| R-SMR-04 | O vendedor tem setor próprio, de chaves `operacao` |
 | R-SMR-05 | O vendedor é gente do PCP; a porta de pessoas só passa id e nome |
 | R-SMR-06 | Dinheiro se chama `preco_*` ou `valor_*` (a poda é por nome) |
 | R-SMP-01 | Congelado é congelado: preço no envio, ficha na aprovação |
@@ -2301,7 +2301,7 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 | R-SMU-08 | O que falta vira pendência, nunca zero, e a lista não cala |
 | R-SMS-01 | Cinco chaves de setor, `operacao`, e os setores nascem vazios |
 | R-SMS-02 | Setor é cadastro, chave é código |
-| R-SMS-03 | Papel e setores são duas contas; a bancada vem do setor |
+| R-SMS-03 | A bancada vem do setor, e não das outras permissões |
 | R-SMB-01 | As liberações são dado; só segura quem existe e gera etiqueta |
 | R-SMB-02 | O pronto é `pronto_em`, e o `marco` não muda |
 | R-SMB-03 | Um bipe inicia, o outro termina; o kit é o do tipo certo |

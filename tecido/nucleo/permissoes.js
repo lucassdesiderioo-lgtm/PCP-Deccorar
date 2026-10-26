@@ -20,7 +20,7 @@ const CHAVES=[
      se parece nem de longe com "mexeram na permissao". */
   {chave:'modulo.entrar',     nome:'Entrar no sob medida (tela inicial e menu)'},
   {chave:'cadastro.ler',      nome:'Ver cadastros'},
-  {chave:'cadastro.editar',   nome:'Editar cadastros (tecido, enderecos, motivos)'},
+  {chave:'cadastro.editar',   nome:'Editar cadastros (tecido, endereços, motivos)'},
   /* CRIAR ENDERECO E DA BANCADA TAMBEM, e nao e afrouxamento do cadastro.
      A prateleira ganha buraco novo no meio do dia, e quem esta com o tubo na
      mao e o operador. Sem esta chave ele nao espera a chefia — ele deixa o
@@ -28,18 +28,18 @@ const CHAVES=[
      fica na estante sem ninguem saber onde.
      Renomear e apagar continuam com a chefia (cadastro.editar): criar e
      necessidade fisica com pressa, arrumar nao e. */
-  {chave:'endereco.criar',    nome:'Criar haste, andar e nivel na estante'},
-  {chave:'parametro.ler',     nome:'Ver parametros'},
-  {chave:'parametro.editar',  nome:'Editar parametros do calculo'},
+  {chave:'endereco.criar',    nome:'Criar haste, andar e nível na estante'},
+  {chave:'parametro.ler',     nome:'Ver parâmetros'},
+  {chave:'parametro.editar',  nome:'Editar parâmetros do cálculo'},
   {chave:'sobra.ler',         nome:'Ver sobras'},
-  {chave:'sobra.criar',       nome:'Cadastrar sobra (mutirao e corte)'},
+  {chave:'sobra.criar',       nome:'Cadastrar sobra (mutirão e corte)'},
   /* CORRIGIR E DA CHEFIA, por decisao do dono (05/09/2026): e ela que aceita
      a correcao. A sobra lancada com o tecido errado muda de prateleira no
      sistema — o plano de corte passa a oferece-la para OUTRA cor —, e isso e
      o tipo de mexida que se quer com alguem olhando. Cada campo corrigido
      deixa linha de historico com quem e quando. A bancada ve a sobra marcada
      como "corrigida" e o historico, mas nao ve o botao. */
-  {chave:'sobra.corrigir',    nome:'Corrigir sobra lancada errada, e aceitar ou recusar o que a bancada apontou'},
+  {chave:'sobra.corrigir',    nome:'Corrigir sobra lançada errada, e aceitar ou recusar o que a bancada apontou'},
   /* APONTAR E DA BANCADA. Quem percebe o erro esta com o retalho na mao; se
      nao tem onde registrar, o erro fica na cabeca dela ate a chefia passar
      por ali — dado na memoria em vez de no sistema, a doenca de sempre. O
@@ -51,8 +51,8 @@ const CHAVES=[
      sai sem eles. Nao adianta esconder na tela e mandar pelo fio (regra 14 do
      CLAUDE.md §13). A bancada precisa saber onde o rolo esta e quanto ele
      tem; quanto ele custou e outra conversa. */
-  {chave:'custo.ver',         nome:'Ver preco e valor do estoque'},
-  {chave:'rolo.nota',         nome:'Lancar NF, fornecedor e preco do rolo'},
+  {chave:'custo.ver',         nome:'Ver preço e valor do estoque'},
+  {chave:'rolo.nota',         nome:'Lançar NF, fornecedor e preço do rolo'},
   {chave:'rolo.ler',          nome:'Ver rolos'},
   {chave:'rolo.entrada',      nome:'Entrada de rolo'},
   {chave:'rolo.encerrar',     nome:'Encerrar rolo (acerto de fim)'},
@@ -72,9 +72,9 @@ const CHAVES=[
      o erro com a peca na mao; quem aprova e a chefia. E quem pediu nao aprova
      o proprio pedido, nem o diretor: e a regra da casa para ajuste de saldo
      (CLAUDE.md §18, ajuste em duas pessoas). */
-  {chave:'corte.pedir_correcao',   nome:'Pedir correcao de um corte ja feito'},
-  {chave:'corte.aprovar_correcao', nome:'Aprovar ou recusar correcao de corte (mexe no saldo de rolo e sobra)'},
-  {chave:'painel.ler',        nome:'Painel e relatorios'},
+  {chave:'corte.pedir_correcao',   nome:'Pedir correção de um corte já feito'},
+  {chave:'corte.aprovar_correcao', nome:'Aprovar ou recusar correção de corte (mexe no saldo de rolo e sobra)'},
+  {chave:'painel.ler',        nome:'Painel e relatórios'},
 
   /* ── O CATALOGO DO SOB MEDIDA (spec SOBMEDIDA-PEDIDO-REVENDA, fase 1) ────
      Duas chaves, e a divisao e a mesma de sempre: ver o catalogo e o que o
@@ -87,8 +87,8 @@ const CHAVES=[
      O papel proprio do VENDEDOR e da fase 2 — ate la ele entra pela area
      "Sob medida - cadastros" do PCP, que e mais larga do que precisa. Isso
      esta escrito aqui para nao se descobrir por acidente. */
-  {chave:'catalogo.ler',      nome:'Ver o catalogo de venda e usar o simulador'},
-  {chave:'catalogo.editar',   nome:'Editar modelo, colecoes de venda, escada de tubos, ficha e precos'},
+  {chave:'catalogo.ler',      nome:'Ver o catálogo de venda e usar o simulador'},
+  {chave:'catalogo.editar',   nome:'Editar modelo, coleções de venda, escada de tubos, ficha e preços'},
 
   /* ── QUEM COMPRA (spec SOBMEDIDA-PEDIDO-REVENDA, fase 2) ────────────────
      Tres chaves, e a divisao e por quanto custa errar.
@@ -106,8 +106,8 @@ const CHAVES=[
      acidente: revenda nova, troca de tabela, endereco de entrega novo e
      limite passam pela chefia. Alargar e uma linha aqui; o contrario, nao. */
   {chave:'revenda.ler',       nome:'Ver as revendas e a carteira'},
-  {chave:'revenda.editar',    nome:'Cadastrar revenda, enderecos, contatos, tabela e desconto'},
-  {chave:'credito.editar',    nome:'Definir e revisar o limite de credito da revenda'},
+  {chave:'revenda.editar',    nome:'Cadastrar revenda, endereços, contatos, tabela e desconto'},
+  {chave:'credito.editar',    nome:'Definir e revisar o limite de crédito da revenda'},
 
   /* ── O BOLETO (fase 6-C1, 26/09/2026) ──────────────────────────────────
      ⚠️ LER E EDITAR SAO DUAS CHAVES, e os publicos sao diferentes de
@@ -123,8 +123,8 @@ const CHAVES=[
      as tres pontas da armadilha #13 — para uma caixinha que hoje ninguem
      marcaria. O dia em que houver financeiro com login proprio, a area nasce
      ali; ate la a chave tem dono, e nao nasce inerte. */
-  {chave:'boleto.ler',        nome:'Ver os boletos em aberto e o credito da revenda'},
-  {chave:'boleto.editar',     nome:'Lancar boleto, dar baixa e cancelar titulo'},
+  {chave:'boleto.ler',        nome:'Ver os boletos em aberto e o crédito da revenda'},
+  {chave:'boleto.editar',     nome:'Lançar boleto, dar baixa e cancelar título'},
 
   /* ── O PEDIDO (fase 3) ──────────────────────────────────────────────────
      Seis chaves, e a divisao e a de sempre: quanto custa errar.
@@ -141,12 +141,12 @@ const CHAVES=[
      um pedido aprovado e desfazer o que a fabrica ja viu; o vendedor negocia
      prazo (`pedido.prazo`) e lanca, mas desfazer e de quem responde pela
      casa. Alargar e uma linha aqui; o contrario, nao. */
-  {chave:'pedido.ler',            nome:'Ver pedidos e orcamentos'},
-  {chave:'pedido.lancar',         nome:'Lancar orcamento e pedido, editar e enviar'},
+  {chave:'pedido.ler',            nome:'Ver pedidos e orçamentos'},
+  {chave:'pedido.lancar',         nome:'Lançar orçamento e pedido, editar e enviar'},
   {chave:'pedido.aprovar',        nome:'Aprovar pedido da propria carteira'},
   {chave:'pedido.aprovar_qualquer', nome:'Aprovar pedido de qualquer carteira'},
   {chave:'pedido.prazo',          nome:'Negociar o prazo de um pedido (com motivo)'},
-  {chave:'pedido.cancelar',       nome:'Cancelar pedido ou peca de pedido'},
+  {chave:'pedido.cancelar',       nome:'Cancelar pedido ou peça de pedido'},
 
   /* ── A ETIQUETA DE PRODUCAO (fase 4-A) ──────────────────────────────────
      ⚠️ LER E IMPRIMIR SAO DUAS CHAVES, e a divisao e a do kit do PCP (§4):
@@ -158,16 +158,16 @@ const CHAVES=[
      Foi o contrario do pedido, que e escritorio inteiro — aqui quem precisa
      do papel e quem vai cortar, e mandar ele chamar alguem para imprimir e
      a trava que dispara no caso normal (armadilha #6). */
-  {chave:'etiqueta_producao.ler',      nome:'Ver as etiquetas de producao a imprimir'},
-  {chave:'etiqueta_producao.imprimir', nome:'Imprimir etiquetas de producao (gasta rolo e marca a peca)'},
+  {chave:'etiqueta_producao.ler',      nome:'Ver as etiquetas de produção a imprimir'},
+  {chave:'etiqueta_producao.imprimir', nome:'Imprimir etiquetas de produção (gasta rolo e marca a peça)'},
 
   /* ── A BANCADA (fase 5-A, 24/09/2026) ─────────────────────────────────
      UMA chave, e nao cinco. A rota tem uma permissao declarada e o setor vem
      no corpo do bipe — conferir cinco chaves na rota seria conferir a
      pergunta errada. Esta chave diz "esta tela e sua"; QUAL bancada a pessoa
      bipa e outra pergunta, e quem responde e a lista de setores dela
-     (nucleo/acesso.js → setoresDe), conferida no dominio. */
-  {chave:'producao.bipar',    nome:'Bipar inicio e fim na bancada da producao sob medida'},
+     (nucleo/acesso.js → daSessaoDoPcp), conferida no dominio. */
+  {chave:'producao.bipar',    nome:'Bipar início e fim na bancada da produção sob medida'},
   /* ⚠️ FECHAR PENDENCIA NAO E BIPAR, e por isso e chave separada (fase 5-B1).
      Bipar e dizer "eu fiz"; fechar pendencia e dizer "alguem fez e nao bipou"
      — e quem responde por uma peca dada como feita sem o bipe de quem fez e a
@@ -177,9 +177,44 @@ const CHAVES=[
      ⚠️ E ELA NAO TEM O PROBLEMA DA TERCEIRA PONTA (armadilha #13): esta lista
      e do MODULO, nao do PCP, e o diretor recebe qualquer chave nova pelo `*`.
      Nao ha caixinha para alguem marcar, entao ela nao nasce inerte. */
-  {chave:'producao.pendencia',nome:'Fechar pendencia de producao sob medida — a peca feita sem bipe'}
+  {chave:'producao.pendencia',nome:'Fechar pendência de produção sob medida — a peça feita sem bipe'}
 ];
 
+/* ── O NIVEL E A MARCA DE SENSIVEL (fase 2 da ACESSOS-UNIFICADOS, 26/10/2026) ──
+   Desde a fase 2 estas chaves aparecem na tela de Acessos do PCP, no grupo
+   "Sob medida", como `sobmedida.<chave>` — e la toda chave tem nivel. A
+   lista continua morando AQUI, porque e este modulo que sabe o que cada uma
+   faz; o `permissoes.js` do PCP le esta e nao tem copia.
+
+   ⚠️ NENHUMA E `admin`, E ISSO E TRAVA. O PCP poe a area 'admin' em quem tem
+   qualquer chave de nivel admin, e as rotas '@admin' de la liberam por isso:
+   uma chave deste modulo declarada admin daria um pedaco do admin do PCP a
+   quem so cuida do sob medida (armadilha #34). O que e da bancada e da venda
+   e `operacao`; o resto — o que so a chefia fazia — e `supervisor`, que e o
+   nivel do setor "Sob medida / Cadastros" e cabe nele. */
+const SUPERVISOR=new Set([
+  'cadastro.editar','parametro.editar','sobra.corrigir','sobra.descartar',
+  'rolo.nota','rolo.ajustar','corte.gerir','corte.aprovar_correcao','painel.ler',
+  'catalogo.editar','revenda.editar','credito.editar','boleto.editar',
+  'pedido.aprovar_qualquer','pedido.cancelar','producao.pendencia'
+]);
+const SENSIVEL=new Set([
+  'sobra.descartar','sobra.corrigir','rolo.ajustar','rolo.encerrar','rolo.nota','custo.ver',
+  'parametro.editar','catalogo.editar','revenda.editar','credito.editar','boleto.editar',
+  'pedido.aprovar_qualquer','pedido.cancelar','corte.aprovar_correcao','producao.pendencia'
+]);
+CHAVES.forEach(c=>{ c.nivel=SUPERVISOR.has(c.chave)?'supervisor':'operacao'; c.sensivel=SENSIVEL.has(c.chave); });
+
+// O prefixo das chaves deste modulo na lista do PCP.
+const PREFIXO='sobmedida.';
+
+/* ⚠️ ISTO DEIXOU DE SER PAPEL e virou PACOTE (fase 2, 26/10/2026). Ate ali o
+   portao traduzia a AREA da pessoa num papel, e o papel decidia as chaves.
+   Agora quem decide e a lista de permissoes do PCP; estes pacotes sao so o
+   conteudo com que os setores "Sob medida / Bancada", "/ Venda" e os cinco da
+   producao NASCEM (o seed do acesso.js le daqui), e a regua com que a
+   migracao confere que ninguem ganhou nem perdeu nada. O nome `papel` ficou
+   nos testes do modulo como atalho para "uma pessoa com o pacote X". */
 const PAPEIS={
   diretor:['*'],
   cortador:[
@@ -256,7 +291,7 @@ const PAPEIS={
 /* ⚠️ HA DUAS FONTES DE PERMISSAO DESDE A FASE 5-A, E A SEGUNDA E O SETOR.
    Nao e excecao no papel: e a definicao da chave. `producao.bipar` pergunta
    "esta pessoa esta em alguma bancada?", e isso nao sai do papel — sai das
-   areas de setor dela (nucleo/acesso.js → setoresDe).
+   chaves de setor dela (nucleo/acesso.js → daSessaoDoPcp).
 
    Sem esta linha, quem tem DUAS areas perderia a bancada: o papel e sempre a
    area mais larga (uma so, sem soma), entao o vendedor que tambem embala
@@ -266,15 +301,22 @@ const PAPEIS={
 
    Quem NAO tem setor nenhum continua sem a chave, entao a tela nao aparece
    no menu de quem nao bipa: a lista vazia nao vira tela inutil. */
-const POR_SETOR=['producao.bipar'];
+/* E ENTRAR TAMBEM VEM DO SETOR: quem esta numa bancada da producao entra no
+   modulo, como o papel `producao` sempre entrou. Sem isto, o setor marcado
+   sozinho (ou por excecao) daria uma bancada que a pessoa nao alcanca. */
+const POR_SETOR=['producao.bipar','modulo.entrar'];
 
+/* A PERGUNTA E UMA SO: "esta pessoa tem esta chave?". Quem responde e a lista
+   que o portao montou a partir das permissoes do PCP (`usuario.permissoes`).
+   O `papel` so existe nos testes, como atalho para um pacote — o portao nunca
+   o grava. */
 function pode(usuario,chave){
   if(!usuario) return false;
-  const lista=PAPEIS[usuario.papel]||[];
+  const lista=Array.isArray(usuario.permissoes) ? usuario.permissoes : (PAPEIS[usuario.papel]||[]);
   if(lista.includes('*')) return true;
   if(lista.includes(chave)) return true;
   if(POR_SETOR.includes(chave)) return ((usuario.setores||[]).length>0);
   return false;
 }
 
-module.exports={CHAVES,PAPEIS,POR_SETOR,pode};
+module.exports={CHAVES,PAPEIS,POR_SETOR,PREFIXO,pode};
