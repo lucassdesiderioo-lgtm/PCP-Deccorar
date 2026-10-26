@@ -345,3 +345,12 @@ e só sai se alguém a desmarcar; a permissão sensível nova pede confirmação
 antes de entrar; as três intransferíveis continuam só no Admin Geral; e
 `minimo.definir` saiu (quem decide o card Materiais segue sendo
 `componente.cadastrar` e `compras.ver`).
+
+## 26/10/2026 — baixa de boleto e descarte de sobra passam a ser de duas pessoas
+
+Fase 6 da spec `ACESSOS-UNIFICADOS` (resposta P2 do dono, 21/10/2026).
+**Antes:** quem tinha a permissão dava a baixa no boleto ou descartava a sobra
+sozinho, na hora. **Depois:** a mesma pessoa **pede**, e outra **aprova** — quem
+pediu não aprova, nem o Admin Geral. Enquanto o pedido espera, o boleto continua
+em aberto e a sobra continua disponível. Quem já podia baixar ou descartar ganhou
+também a permissão de aprovar, para ninguém perder o que fazia. Cartão R-SMF-12.

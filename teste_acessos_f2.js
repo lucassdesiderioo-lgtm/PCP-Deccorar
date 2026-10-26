@@ -239,6 +239,32 @@ ok('Venda nasce com o simulador', doSetor2('Sob medida / Venda').includes('sobme
 ok('e nenhum setor nasce com chave velha',
   !db2.prepare("SELECT 1 FROM setor_permissao WHERE chave IN ('sobmedida.cortar','sobmedida.cadastrar','sobmedida.vender')").get());
 
+console.log('\n── 8. a fase 6: quem baixava e descartava ganha tambem o aprovar ──');
+/* A baixa de boleto e o descarte de sobra viraram PEDIR e APROVAR. Quem ja
+   tinha o poder ganha a chave de aprovar — ninguem perde o que fazia; o que
+   muda e que sao precisas duas pessoas (isso e do codigo, nao da chave). */
+const db3 = new Database(path.join(dir, 'f6.db'));
+db3.exec(`CREATE TABLE usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT,
+    pin_hash TEXT, salt TEXT, areas TEXT, ativo INTEGER DEFAULT 1);
+  CREATE TABLE config (chave TEXT PRIMARY KEY, valor TEXT);`);
+db3.prepare("INSERT INTO config (chave,valor) VALUES ('acesso_sobmedida_f6','1')").run();
+require('./acesso')(appFalso(), db3);
+const fin = db3.prepare("INSERT INTO setores (nome,nivel,nativo) VALUES ('Financeiro SM','supervisor',0)").run().lastInsertRowid;
+db3.prepare("INSERT INTO setor_permissao (setor_id,chave) VALUES (?, 'sobmedida.boleto.editar')").run(fin);
+const u3 = db3.prepare("INSERT INTO usuarios (nome,pin_hash,salt,areas,ativo) VALUES ('Duda','x','y','',1)").run().lastInsertRowid;
+db3.prepare("INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?, 'sobmedida.sobra.descartar', 1)").run(u3);
+db3.prepare("DELETE FROM config WHERE chave='acesso_sobmedida_f6'").run();
+require('./acesso')(appFalso(), db3);
+ok('o setor que baixava boleto ganhou o aprovar da baixa',
+  !!db3.prepare("SELECT 1 FROM setor_permissao WHERE setor_id=? AND chave='sobmedida.boleto.aprovar_baixa'").get(fin));
+ok('a excecao de descartar ganhou o aprovar do descarte',
+  !!db3.prepare("SELECT 1 FROM usuario_excecao WHERE usuario_id=? AND chave='sobmedida.sobra.aprovar_descarte' AND concede=1").get(u3));
+ok('e quem nasce em Cadastros ja vem com os dois',
+  ['sobmedida.boleto.aprovar_baixa','sobmedida.sobra.aprovar_descarte'].every(c =>
+    db3.prepare(`SELECT 1 FROM setor_permissao sp JOIN setores s ON s.id=sp.setor_id
+      WHERE s.nome='Sob medida / Cadastros' AND sp.chave=?`).get(c)));
+db3.close();
+
 db.close(); db2.close();
 fs.rmSync(dir, { recursive:true, force:true });
 console.log('\n' + (n - falhas) + ' ok, ' + falhas + ' falha(s)\n');

@@ -17,7 +17,10 @@ const {SETORES}=require('./../nucleo/acesso');
 module.exports={rotas:[
   {metodo:'GET', caminho:'/api/eu', permissao:'modulo.entrar',
    manipulador:({usuario})=>({
-     nome:usuario.nome,
+     /* O id vai junto para a tela saber se um pedido de aprovacao e DELA
+        (quem pede nao aprova — dominio/aprovacao.js): o botao de aprovar nao
+        aparece para quem pediu. Quem recusa de verdade e o servidor. */
+     id:usuario.id, nome:usuario.nome,
      /* ⚠️ AS BANCADAS DESTA PESSOA VEM COM O NOME, e nao so a chave. A tela
         da bancada monta os botoes com isto — e escrever `serralheria` num
         botao e chave de banco em tela, que e o "— Correcao de contagem" do

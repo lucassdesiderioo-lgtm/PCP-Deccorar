@@ -1117,6 +1117,30 @@ module.exports = function(app, db){
     }
   }catch(e){ console.log('[acesso] fase 2 do sob medida falhou (nada gravado): ' + e.message); }
 
+  /* ── 3-H. DUAS PESSOAS NO BOLETO E NA SOBRA (fase 6 da ACESSOS-UNIFICADOS) ──
+     A baixa de boleto e o descarte de sobra viraram PEDIR e APROVAR, e
+     aprovar e chave nova. Quem ja tinha o poder de baixar ou descartar
+     ganha tambem o de aprovar — ninguem perde o que fazia; o que muda e que
+     agora sao precisas DUAS pessoas, e quem pediu nao aprova (isso e do
+     codigo, dominio/aprovacao.js, e nao da chave). Excecao concedida vai
+     junto. Uma vez so (marca em `config`). Fica DEPOIS do 3-F: num banco que
+     ainda tem as chaves velhas, e o 3-F que primeiro poe o pacote no setor. */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='acesso_sobmedida_f6'").get()){
+      db.transaction(() => {
+        for(const [de, para] of [['sobmedida.boleto.editar','sobmedida.boleto.aprovar_baixa'],
+                                 ['sobmedida.sobra.descartar','sobmedida.sobra.aprovar_descarte']]){
+          db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
+            SELECT setor_id, ? FROM setor_permissao WHERE chave=?`).run(para, de);
+          db.prepare(`INSERT OR IGNORE INTO usuario_excecao (usuario_id,chave,concede)
+            SELECT usuario_id, ?, 1 FROM usuario_excecao e WHERE chave=? AND concede=1
+              AND NOT EXISTS (SELECT 1 FROM usuario_excecao x WHERE x.usuario_id=e.usuario_id AND x.chave=?)`).run(para, de, para);
+        }
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('acesso_sobmedida_f6','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[acesso] seed da aprovacao em duas pessoas falhou: ' + e.message); }
+
   // pergunta pontual (usada por outras rotas, ex.: contagem em dois passos):
   // o usuario tem esta permissao? Admin Geral tem todas. Migra na primeira vez.
   function podePermissao(u, chave){

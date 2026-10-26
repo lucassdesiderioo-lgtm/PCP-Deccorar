@@ -1,4 +1,12 @@
-> **STATUS · 26/10/2026 — EM CONSTRUÇÃO** · **fase 3 em código (26/10):** salvar um
+> **STATUS · 26/10/2026 — EM CONSTRUÇÃO** · **fase 6 em código (26/10):** a baixa de
+> boleto e o descarte de sobra viraram pedir e aprovar (`sm_aprovacao`, migração 31,
+> `dominio/aprovacao.js`, chaves `boleto.aprovar_baixa` e `sobra.aprovar_descarte`); quem
+> pediu não aprova, nem o Admin Geral, e enquanto pendente nada muda — `tecido/teste/aprovacao.test.js`
+> (8). **Mudou na construção:** a regra é por **pessoa** (id do PCP), e não por nome como na
+> correção de corte; `pago_por` continua sendo quem viu o pagamento (quem pediu), e quem
+> aprovou fica no pedido; quem já baixava ou descartava ganhou o aprovar junto (seed
+> `acesso_sobmedida_f6`), então hoje quem pode é quem podia — só que agora são duas pessoas ·
+> **fase 3 em código (26/10):** salvar um
 > setor não apaga nada — o nível virou etiqueta (a caixinha acima do nível aparece como
 > está, com aviso), a tela manda a lista inteira e a tela antiga não apaga nada; a sensível
 > nova pede confirmação; as intransferíveis ficam fora de setor comum por trava própria; e

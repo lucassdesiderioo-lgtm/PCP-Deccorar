@@ -641,7 +641,7 @@
 - **Status:** no ar desde 26/09/2026.
 
 ### R-SMF-04 · A baixa e o cancelamento têm rastro e caminho de volta
-- **Regra:** a baixa grava quem e quando; baixar duas vezes é recusado; a baixa se desfaz com motivo. Cancelar exige motivo.
+- **Regra:** a baixa grava quem e quando; baixar duas vezes é recusado; a baixa se desfaz com motivo. Cancelar exige motivo. Desde 26/10/2026 a baixa é **pedida** por uma pessoa e **aprovada** por outra (R-SMF-12).
 - **Por quê:** sem caminho de volta o jeito vira lançar o título de novo, e a conta dobra. Trava que só acusa é trava que se contorna.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `tecido/teste/boleto.test.js`.
@@ -690,6 +690,13 @@
 - **Exceções:** nenhuma.
 - **Teste que trava:** `tecido/teste/boleto.test.js` (critério, prioridade, poda, chaves). ⚠ Manter a revenda escolhida depois de lançar e os selos separados no cartão do Quadro **não têm teste**.
 - **Status:** no ar desde 26/09/2026.
+
+### R-SMF-12 · Baixa de boleto e descarte de sobra são PEDIDOS por uma pessoa e APROVADOS por outra
+- **Regra:** quem tem `boleto.editar` **pede** a baixa e quem tem `sobra.descartar` **pede** o descarte; aprovar é `boleto.aprovar_baixa` / `sobra.aprovar_descarte` (as duas `supervisor` e sensíveis). **Quem pediu não aprova, nem o Admin Geral** — a regra é por pessoa (id do PCP), não por nome. Enquanto pendente **nada muda**: o boleto continua em aberto e comendo o limite, a sobra continua disponível e no plano de corte. Um pedido pendente por alvo (o banco segura, índice parcial). O impossível é recusado já no pedido. Na aprovação o efeito é feito pelo dono de sempre (`boleto.baixar`, `sobra.descartar`), refeito com as guardas dele — se a sobra foi usada no meio, a aprovação é recusada e o pedido espera quem recuse. Recusar exige motivo. `pago_por` é quem pediu (quem viu o pagamento); quem aprovou fica no pedido (`sm_aprovacao`, `dominio/aprovacao.js`). Na migração, quem tinha baixar ou descartar ganhou o aprovar junto.
+- **Por quê:** resposta P2 do dono (21/10/2026): "quem pede não aprova" vale também para dinheiro e para estoque de tecido, como no ajuste de estoque do PCP (R-EST-18) e na correção de corte (R-SMK-06).
+- **Exceções:** nenhuma.
+- **Teste que trava:** `tecido/teste/aprovacao.test.js` (8) · `teste_acessos_f2.js` (seção 8, a semeadura).
+- **Status:** em código em 26/10/2026 (fase 6 da `ACESSOS-UNIFICADOS`); rodado na tela com duas pessoas.
 
 ### R-SMF-11 · NF e entrega não existem, por decisão
 - **Regra:** não há coluna `entregue`, selo de NF nem faturamento no sob medida.

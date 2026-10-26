@@ -45,7 +45,9 @@ const CHAVES=[
      por ali — dado na memoria em vez de no sistema, a doenca de sempre. O
      apontamento nao muda a sobra: vira correcao so quando a chefia aceita. */
   {chave:'sobra.propor',      nome:'Propor correção de sobra'},
-  {chave:'sobra.descartar',   nome:'Descartar sobra'},
+  {chave:'sobra.descartar',   nome:'Pedir o descarte de sobra'},
+  // E aprovar o descarte e de outra pessoa (fase 6, mesma razao da baixa).
+  {chave:'sobra.aprovar_descarte', nome:'Aprovar o descarte de sobra pedido por outra pessoa'},
   {chave:'etiqueta.imprimir', nome:'Imprimir lote de etiquetas de sobra'},
   /* VER PRECO E CHAVE SEPARADA, e quem nao tem NAO RECEBE OS CAMPOS — o JSON
      sai sem eles. Nao adianta esconder na tela e mandar pelo fio (regra 14 do
@@ -124,7 +126,12 @@ const CHAVES=[
      marcaria. O dia em que houver financeiro com login proprio, a area nasce
      ali; ate la a chave tem dono, e nao nasce inerte. */
   {chave:'boleto.ler',        nome:'Ver os boletos em aberto e o crédito da revenda'},
-  {chave:'boleto.editar',     nome:'Lançar boleto, dar baixa e cancelar título'},
+  {chave:'boleto.editar',     nome:'Lançar boleto, pedir a baixa e cancelar título'},
+  /* ⚠️ APROVAR A BAIXA E OUTRA CHAVE, e outra PESSOA (fase 6 da
+     ACESSOS-UNIFICADOS, P2 do dono). Quem tem `boleto.editar` pede; quem
+     tem esta aprova — e quem pediu nao aprova o proprio pedido, nem o Admin
+     Geral (dominio/aprovacao.js). */
+  {chave:'boleto.aprovar_baixa', nome:'Aprovar a baixa de boleto pedida por outra pessoa'},
 
   /* ── O PEDIDO (fase 3) ──────────────────────────────────────────────────
      Seis chaves, e a divisao e a de sempre: quanto custa errar.
@@ -196,12 +203,14 @@ const SUPERVISOR=new Set([
   'cadastro.editar','parametro.editar','sobra.corrigir','sobra.descartar',
   'rolo.nota','rolo.ajustar','corte.gerir','corte.aprovar_correcao','painel.ler',
   'catalogo.editar','revenda.editar','credito.editar','boleto.editar',
-  'pedido.aprovar_qualquer','pedido.cancelar','producao.pendencia'
+  'pedido.aprovar_qualquer','pedido.cancelar','producao.pendencia',
+  'boleto.aprovar_baixa','sobra.aprovar_descarte'
 ]);
 const SENSIVEL=new Set([
   'sobra.descartar','sobra.corrigir','rolo.ajustar','rolo.encerrar','rolo.nota','custo.ver',
   'parametro.editar','catalogo.editar','revenda.editar','credito.editar','boleto.editar',
-  'pedido.aprovar_qualquer','pedido.cancelar','corte.aprovar_correcao','producao.pendencia'
+  'pedido.aprovar_qualquer','pedido.cancelar','corte.aprovar_correcao','producao.pendencia',
+  'boleto.aprovar_baixa','sobra.aprovar_descarte'
 ]);
 CHAVES.forEach(c=>{ c.nivel=SUPERVISOR.has(c.chave)?'supervisor':'operacao'; c.sensivel=SENSIVEL.has(c.chave); });
 

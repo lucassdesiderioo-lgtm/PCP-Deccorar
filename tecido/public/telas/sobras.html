@@ -446,6 +446,39 @@ async function telaLista(pai){
 
   const podeCorrigir=(eu.permissoes||[]).includes('sobra.corrigir');
   const podePropor=(eu.permissoes||[]).includes('sobra.propor');
+  /* O DESCARTE VIROU PEDIR E APROVAR (fase 6 da ACESSOS-UNIFICADOS): a sobra
+     continua disponível — e no plano de corte — até OUTRA pessoa aprovar.
+     Quem pediu não aprova, nem o Admin Geral; o servidor recusa, e a tela não
+     oferece o botão que levaria ao "não". */
+  const descartes=await api('/api/sobras/descartes');
+  const DESC={}; descartes.forEach(a=>{ DESC[a.alvo_id]=a; });
+  const podeAprovarDescarte=(eu.permissoes||[]).includes('sobra.aprovar_descarte');
+  const aprovaveis=descartes.filter(a=>Number(a.pedido_por_id)!==Number(eu.id));
+  if(podeAprovarDescarte && aprovaveis.length){
+    const cd=el('div',{class:'cartao'});
+    cd.appendChild(el('h2',{texto:'Descartes esperando aprovação ('+aprovaveis.length+')'}));
+    cd.appendChild(el('p',{class:'nota',texto:'Cada sobra continua disponível até alguém aprovar. Quem pediu não aprova o próprio pedido.'}));
+    aprovaveis.forEach(a=>{
+      const sb=a.sobra||{};
+      cd.appendChild(el('div',{class:'linha',style:'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0'},[
+        el('b',{texto:sb.codigo||('sobra '+a.alvo_id)}),
+        el('span',{texto:'pedido por '+(a.pedido_por||'alguém')+' — "'+(a.motivo||'')+'"'}),
+        el('button',{class:'bt pequeno perigo',texto:'Aprovar descarte',onclick:async()=>{
+          await api('/api/sobras/descartes/'+a.id+'/aprovar',{metodo:'POST',corpo:{}});
+          banner('Sobra descartada — a perda ficou medida no refugo.','alerta');
+          await telaLista($('#conteudo'));
+        }}),
+        el('button',{class:'bt pequeno',texto:'Recusar',onclick:async()=>{
+          const m=prompt('Por que o descarte está sendo recusado? Quem pediu vai ler.');
+          if(!m) return;
+          await api('/api/sobras/descartes/'+a.id+'/recusar',{metodo:'POST',corpo:{motivo:m}});
+          banner('Descarte recusado — a sobra continua no catálogo.','bom');
+          await telaLista($('#conteudo'));
+        }})
+      ]));
+    });
+    pai.appendChild(cd);
+  }
 
   // O QUE A BANCADA APONTOU, para a chefia decidir — em cima de tudo, porque
   // e trabalho esperando gente. Some inteiro quando nao ha nada: um cartao
@@ -499,11 +532,11 @@ async function telaLista(pai){
       onclick:()=>{ estado.corrigindo={id:s.id,modo:'corrigir'}; telaLista($('#conteudo')); }}));
     else if(podePropor&&!s.propostas_pendentes) acoes.push(el('button',{class:'bt pequeno',texto:'Apontar erro',
       onclick:()=>{ estado.corrigindo={id:s.id,modo:'propor'}; telaLista($('#conteudo')); }}));
-    if((eu.permissoes||[]).includes('sobra.descartar')) acoes.push(el('button',{class:'bt pequeno perigo',texto:'Descartar',onclick:async()=>{
+    if(!DESC[s.id] && (eu.permissoes||[]).includes('sobra.descartar')) acoes.push(el('button',{class:'bt pequeno perigo',texto:'Pedir descarte',onclick:async()=>{
       const motivo=prompt('Por que a sobra '+s.codigo+' esta sendo descartada?');
       if(!motivo) return;
       await api('/api/sobras/'+s.id+'/descartar',{metodo:'POST',corpo:{motivo}});
-      banner('Sobra descartada — a perda ficou medida no refugo.','alerta');
+      banner('Descarte pedido — a sobra continua disponível até outra pessoa aprovar.','bom');
       await telaLista($('#conteudo'));
     }}));
     const nomeTecido=[s.linha_nome,s.abertura_nome,s.cor_nome].join(' · ');
@@ -513,6 +546,9 @@ async function telaLista(pai){
     if(s.propostas_pendentes) celCod.appendChild(el('span',{class:'tag rolo',style:'margin-left:8px',
       title:'a bancada propôs uma correção nesta sobra; aguardando aprovação',
       texto:'Aguardando aprovação'}));
+    if(DESC[s.id]) celCod.appendChild(el('span',{class:'tag rolo',style:'margin-left:8px',
+      title:'descarte pedido por '+(DESC[s.id].pedido_por||'alguém')+'; a sobra continua disponível até outra pessoa aprovar',
+      texto:'Descarte pedido'}));
     if(s.correcoes) celCod.appendChild(el('span',{class:'tag sobra',style:'margin-left:8px',
       title:s.correcoes+' correcao(oes) — abra a sobra para ver o historico',
       texto:'corrigida'}));

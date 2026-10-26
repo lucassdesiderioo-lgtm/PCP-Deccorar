@@ -1931,7 +1931,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava) | Baixo — impede produtividade por pessoa |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (274), `teste_acessos_f2.js` (73), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (24), `teste_upload.js` (46), `teste_devolucao.js` (37), `teste_login.js` (74), `teste_conferencia_antiga.js` (64) e `teste_baixa_conferencia.js` (69); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (274), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (42), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (24), `teste_upload.js` (46), `teste_devolucao.js` (37), `teste_login.js` (74), `teste_conferencia_antiga.js` (64) e `teste_baixa_conferencia.js` (69); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2335,6 +2335,7 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 | R-SMF-09 | O que falta titular aparece ao lado do em aberto, nunca dentro |
 | R-SMF-10 | A tela lista o que marcar pelo mesmo critério; quem lê é `boleto.ler` |
 | R-SMF-11 | NF e entrega não existem, por decisão |
+| R-SMF-12 | Baixa de boleto e descarte de sobra: uma pessoa pede, outra aprova, e nada muda enquanto espera |
 | R-SML-01 | Dinheiro com ponto do milhar, pelo dono único de cada lado do fio |
 | R-SML-02 | O que se lê e o que pré-preenche campo são duas funções |
 | R-SML-03 | Toda tabela rola dentro do `rolaH`; a página nunca rola de lado |
@@ -2362,7 +2363,7 @@ produção: `etiqueta_producao.test.js`. Em papel e chave do módulo:
 compra: `material_compra.test.js` e `node teste_compras_sobmedida.js`. Na bancada:
 `producao.test.js`. Na recusa: `recusa.test.js`. No quadro: `kanban.test.js`. Nos
 indicadores: `indicadores.test.js`. Nos setores: também `node teste_acesso.js`.
-No boleto e no crédito: `boleto.test.js`. No dinheiro de tela: `dinheiro_tela.test.js`.
+No boleto e no crédito: `boleto.test.js`. Na baixa pedida e no descarte pedido: `aprovacao.test.js`. No dinheiro de tela: `dinheiro_tela.test.js`.
 Em tabela de tela: `rola_tela.test.js`. No corte: `corte_etapas.test.js`,
 `corte_correcao.test.js`, `historico_corte.test.js`, `tom.test.js`,
 `tempo_corte.test.js`, `plano_claro.test.js` e `barras_ler.test.js`. Todos os
@@ -2371,7 +2372,7 @@ Em tabela de tela: `rola_tela.test.js`. No corte: `corte_etapas.test.js`,
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 742 casos
+cd tecido && npm test          # 750 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:

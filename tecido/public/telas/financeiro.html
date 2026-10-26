@@ -88,6 +88,11 @@
 const {api,el,limpar,$,dinheiro,banner,rolaH}=window.ui;
 
 let EU={permissoes:[]}, REVENDAS=[];
+/* Os pedidos de baixa esperando aprovação, por boleto (fase 6 da
+   ACESSOS-UNIFICADOS): a baixa virou PEDIR e APROVAR, e quem pediu não
+   aprova. Enquanto pendente o boleto continua em aberto, e a linha diz quem
+   pediu — senão a próxima pessoa pediria de novo. */
+let BAIXAS={};
 const posso=k=>(EU.permissoes||[]).indexOf(k)>=0;
 
 const data=v=>{
@@ -211,7 +216,8 @@ async function carregarBoletos(revenda_id){
   if(!lista.length) return alvo.appendChild(el('p',{class:'vazio'},
     ['Nada em aberto nesta revenda.']));
   const colunas=[{nome:'Boleto'},{nome:'Pedido'},{nome:'Vencimento'},{nome:'Valor',num:true}];
-  if(posso('boleto.editar')) colunas.push({nome:''});
+  const acoes=posso('boleto.editar')||posso('boleto.aprovar_baixa');
+  if(acoes) colunas.push({nome:''});
   alvo.appendChild(tabela(colunas,lista,b=>{
     const cel=[
       /* ⚠️ O TÍTULO QUE EXCEDE OS PEDIDOS QUE CITA É MARCADO AQUI, e o aviso
@@ -227,20 +233,41 @@ async function carregarBoletos(revenda_id){
         : data(b.vencimento),
       reais(b.valor_centavos)||'—'
     ];
-    if(posso('boleto.editar')) cel.push(el('span',{},[
-      el('button',{class:'mini', type:'button',
-        onclick:()=>agir('/api/boletos/'+b.id+'/baixa',{},'Baixa dada.')},['Dar baixa']),
-      ' ',
-      el('button',{class:'mini secundario', type:'button', onclick:()=>{
-        /* Cancelar sem motivo é apagar — a regra de todo cancelamento do
-           módulo, e o servidor recusa de qualquer jeito. */
-        const m=prompt('Por que este título saiu?');
-        if(m===null) return;
-        agir('/api/boletos/'+b.id+'/cancelar',{motivo:m},'Título cancelado.');
-      }},['Cancelar'])
-    ]));
+    if(acoes) cel.push(el('span',{},acoesDoBoleto(b)));
     return cel;
   }));
+}
+
+/* A baixa pedida mostra QUEM pediu e QUANDO, no lugar do botão. Quem tem a
+   chave de aprovar e NÃO pediu vê Aprovar e Recusar; quem pediu vê só a
+   espera — o servidor recusaria de qualquer jeito, e botão que leva a "não"
+   ensina a não clicar. */
+function acoesDoBoleto(b){
+  const p=BAIXAS[b.id], out=[];
+  if(p){
+    out.push(el('span',{class:'nota'},['baixa pedida por '+(p.pedido_por||'alguém')+' em '+data(String(p.pedido_em).slice(0,10))+' ']));
+    if(posso('boleto.aprovar_baixa') && Number(p.pedido_por_id)!==Number(EU.id)){
+      out.push(el('button',{class:'mini', type:'button',
+        onclick:()=>agir('/api/boletos/baixas/'+p.id+'/aprovar',{},'Baixa aprovada.')},['Aprovar baixa']), ' ');
+      out.push(el('button',{class:'mini secundario', type:'button', onclick:()=>{
+        const m=prompt('Por que a baixa está sendo recusada? Quem pediu vai ler.');
+        if(m===null) return;
+        agir('/api/boletos/baixas/'+p.id+'/recusar',{motivo:m},'Baixa recusada.');
+      }},['Recusar']));
+    }
+    return out;
+  }
+  if(!posso('boleto.editar')) return out;
+  out.push(el('button',{class:'mini', type:'button',
+    onclick:()=>agir('/api/boletos/'+b.id+'/baixa',{},'Baixa pedida — outra pessoa aprova.')},['Pedir baixa']), ' ');
+  out.push(el('button',{class:'mini secundario', type:'button', onclick:()=>{
+    /* Cancelar sem motivo é apagar — a regra de todo cancelamento do
+       módulo, e o servidor recusa de qualquer jeito. */
+    const m=prompt('Por que este título saiu?');
+    if(m===null) return;
+    agir('/api/boletos/'+b.id+'/cancelar',{motivo:m},'Título cancelado.');
+  }},['Cancelar']));
+  return out;
 }
 
 /* ⚠️ A MARCA DIZ QUANTO PASSOU, E NÃO SÓ QUE PASSOU — e isso só apareceu com
@@ -396,6 +423,7 @@ async function lancar(){
 
 async function carregar(){
   const c=await api('/api/boletos/carteira');
+  BAIXAS={}; (await api('/api/boletos/baixas')).forEach(a=>{ BAIXAS[a.alvo_id]=a; });
   $('#titulo').textContent = c.carteira_inteira
     ? 'Boletos em aberto — a casa inteira'
     : 'Boletos em aberto — a sua carteira';
@@ -414,6 +442,8 @@ async function carregar(){
     if(reais(c.valor_em_aberto_centavos)) blocos.push(grande(reais(c.valor_em_aberto_centavos),'em aberto'));
     if(c.valor_vencido_centavos) blocos.push(grande(reais(c.valor_vencido_centavos),'vencido'));
     if(c.estouradas) blocos.push(grande(c.estouradas,'com limite estourado'));
+    const nb=Object.keys(BAIXAS).length;
+    if(nb) blocos.push(grande(nb,nb===1?'baixa esperando aprovação':'baixas esperando aprovação'));
     resumo.appendChild(el('div',{class:'numerao'},blocos));
     c.revendas.forEach(r=>alvo.appendChild(desenharRevenda(r)));
   }
