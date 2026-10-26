@@ -334,3 +334,14 @@ Acessos no grupo "Sob medida", os setores "Sob medida /" nascem com o pacote de
 antes, e cada permissão se marca ou desmarca sozinha. Ninguém ganhou nem perdeu
 nada na passagem (a migração confere pessoa a pessoa). Os setores mantiveram os
 nomes de hoje (Bancada, Cadastros, Venda). Cartões R-SMA-01 a R-SMA-03.
+
+## 26/10/2026 — o nível do setor vira etiqueta, e salvar um setor não apaga nada
+
+Fase 3 da spec `ACESSOS-UNIFICADOS` (R-ACE-03, dívidas 19 e 20). **Antes:** a
+caixinha acima do nível do setor saía travada e, no salvamento, a permissão
+sumia em silêncio; e `minimo.definir` aparecia na tela sem liberar nada.
+**Depois:** a caixinha aparece como está, com o aviso "acima do nível do setor",
+e só sai se alguém a desmarcar; a permissão sensível nova pede confirmação
+antes de entrar; as três intransferíveis continuam só no Admin Geral; e
+`minimo.definir` saiu (quem decide o card Materiais segue sendo
+`componente.cadastrar` e `compras.ver`).

@@ -328,13 +328,20 @@ function renderSetorPerms(){
   var h='';
   REG.grupos.forEach(function(g){
     h+='<div class="grp">'+g.grupo+'</div>';
+    /* ⚠️ O NIVEL E ETIQUETA, NAO TRAVA ESCONDIDA (fase 3 da ACESSOS-UNIFICADOS).
+       Ate 26/10/2026 a caixinha acima do nivel saia `disabled` e nunca voltava
+       no salvamento — e o servidor apagava a chave em silencio (divida 20).
+       Hoje ela aparece COMO ESTA, marcada se o setor a tem, com o aviso ao
+       lado; so as intransferiveis ficam travadas, porque so moram no Admin
+       Geral. */
     g.permissoes.forEach(function(pm){
-      var permitido=NIVEIS[pm.nivel]<=NIVEIS[nivel];
-      var on=marc.indexOf(pm.chave)>=0 && permitido;
-      h+='<label class="chk" style="'+(permitido?'':'opacity:.4')+'"><input type="checkbox" class="spermchk" data-c="'+pm.chave+'"'
-        +(on?' checked':'')+(permitido?'':' disabled')+'>'
+      var acima=NIVEIS[pm.nivel]>NIVEIS[nivel];
+      var trava=!!pm.intransferivel;
+      var on=marc.indexOf(pm.chave)>=0 && !trava;
+      h+='<label class="chk" style="'+(trava?'opacity:.4':'')+'"><input type="checkbox" class="spermchk" data-c="'+pm.chave+'"'
+        +(on?' checked':'')+(trava?' disabled':'')+'>'
         +'<span class="lb">'+pm.rotulo+(pm.sensivel?' <span class="sens">SENSÍVEL</span>':'')
-        +'<small>'+pm.nivel+(permitido?'':' — acima do nível do setor')+'</small></span></label>';
+        +'<small>'+pm.nivel+(trava?' — só o setor Admin Geral':(acima?' — <b style="color:#d29922">acima do nível do setor</b>':''))+'</small></span></label>';
     });
   });
   $('#setorPerms').innerHTML=h;
@@ -342,9 +349,20 @@ function renderSetorPerms(){
 document.addEventListener('change',function(e){ if(e.target.id==='sNivel') renderSetorPerms(); });
 async function salvarSetor(){
   var perms=[].slice.call(document.querySelectorAll('.spermchk:checked')).map(function(x){return x.getAttribute('data-c');});
-  var body={nome:$('#sNome').value.trim(),nivel:$('#sNivel').value,permissoes:perms};
+  /* `todas`: a lista vai INTEIRA, inclusive o que esta acima do nivel. Sem a
+     marca o servidor trata o corpo como o da tela antiga e nao apaga nada. */
+  var body={nome:$('#sNome').value.trim(),nivel:$('#sNivel').value,permissoes:perms,todas:true};
   if(SETOR_EDIT) body.id=SETOR_EDIT.id;
   var r=await jpost('/api/acesso/setores',body);
+  /* A sensivel NOVA pede confirmacao: quem salva le o que esta dando. */
+  if(r.motivo==='sensiveis'){
+    var lista=r.sensiveis.map(function(x){ return '• '+x.rotulo+(x.acima_do_nivel?'  (acima do nível do setor)':''); }).join('\n');
+    if(!confirm(r.mensagem+'\n\n'+lista+'\n\nSalvar mesmo assim?')){
+      $('#setorMsg').style.color='#d29922'; $('#setorMsg').textContent='não salvo'; return;
+    }
+    body.confirmar=true;
+    r=await jpost('/api/acesso/setores',body);
+  }
   if(r.erro){ $('#setorMsg').style.color='#f85149'; $('#setorMsg').textContent=r.erro; return; }
   $('#setorMsg').style.color='#2ea043'; $('#setorMsg').textContent='salvo';
   setTimeout(function(){$('#setorMsg').textContent='';},2000);

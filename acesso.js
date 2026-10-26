@@ -106,7 +106,7 @@ function setoresNativos(){
     // Nascem VAZIOS: ninguem e migrado (mesma regra do setor de montagem).
     { nome:'Comprador',                      nivel:'admin',
       perms:['compras.ver','fornecedor.cadastrar','preco.lancar','pedido.criar','pedido.ver',
-             'custo.ver','minimo.definir','componente.cadastrar','modelo.cadastrar'] },
+             'custo.ver','componente.cadastrar','modelo.cadastrar'] },
     // Recebimento NAO VE PRECO em lugar nenhum — nem na conferencia, nem no
     // pedido, nem no PDF. Quem confere quantidade vendo valor tende a confirmar
     // o que esta escrito, e a separacao perde o sentido.
@@ -491,10 +491,41 @@ module.exports = function(app, db){
     const nivel = String(b.nivel || '').trim();
     if(!nome) return res.status(400).json({ erro:'nome obrigatório' });
     if(!NIVEIS[nivel]) return res.status(400).json({ erro:'nível inválido' });
-    // regra §5.2: o nível do setor limita as permissões marcaveis
+    /* ⚠️ O NIVEL DO SETOR VIROU ETIQUETA, E NAO TRAVA ESCONDIDA (fase 3 da
+       ACESSOS-UNIFICADOS, R-ACE-03, divida 20). Ate 26/10/2026 a rota recusava
+       chave acima do nivel e a tela desenhava a caixinha `disabled` — entao a
+       chave que ja estava no setor NUNCA voltava no corpo, e o DELETE + INSERT
+       abaixo a apagava em silencio no primeiro salvamento, por qualquer motivo.
+       Foi assim que `sobmedida.cadastrar` saiu do "Sob medida / Cadastros" em
+       19/09/2026. A tela nova manda a lista INTEIRA (`todas`), e o que vale e
+       o que a pessoa marcou.
+
+       ⚠️ E A TELA VELHA (a aba aberta antes do deploy) nao pode apagar nada:
+       sem `todas`, a chave acima do nivel que ja estava no setor FICA, e a
+       recusa de marcar uma nova acima do nivel continua como era. */
     const perms = (Array.isArray(b.permissoes) ? b.permissoes : []).filter(c => infoPerm[c]);
+    const telaNova = b.todas === true;
+    const anteriores = b.id ? db.prepare('SELECT chave FROM setor_permissao WHERE setor_id=?').all(b.id).map(r => r.chave) : [];
     const acima = perms.filter(c => NIVEIS[infoPerm[c].nivel] > NIVEIS[nivel]);
-    if(acima.length) return res.status(400).json({ erro:'permissões acima do nível do setor: '+acima.join(', ') });
+    if(!telaNova && acima.length) return res.status(400).json({ erro:'permissões acima do nível do setor: '+acima.join(', ') });
+    if(!telaNova) anteriores.forEach(c => { if(infoPerm[c] && NIVEIS[infoPerm[c].nivel] > NIVEIS[nivel] && perms.indexOf(c) < 0) perms.push(c); });
+    /* ⚠️ AS INTRANSFERIVEIS SO MORAM NO ADMIN GERAL. Com o nivel virando
+       etiqueta, era o nivel `admin_geral` que as segurava longe de setor
+       comum — e um setor com `pessoas.gerenciar` daria a quem estivesse nele o
+       poder de mandar nos acessos (armadilha #28). A trava passa a existir
+       por ela mesma. */
+    const intransf = perms.filter(c => infoPerm[c].intransferivel);
+    if(intransf.length) return res.status(400).json({ erro:'Estas permissões são só do setor Admin Geral e não entram em outro setor: '
+      + intransf.map(c => infoPerm[c].rotulo || c).join(', ') });
+    /* A SENSIVEL NOVA PEDE CONFIRMACAO: quem salva ve o que esta dando antes
+       de dar. So a que ENTRA agora — a que ja estava nao pergunta de novo,
+       senao o aviso viraria paisagem e passaria a ser confirmado sem ler. */
+    const novasSens = perms.filter(c => infoPerm[c].sensivel && anteriores.indexOf(c) < 0);
+    if(novasSens.length && b.confirmar !== true)
+      return res.status(409).json({ erro:'confirmar', motivo:'sensiveis',
+        mensagem:'Este setor vai passar a carregar permissões sensíveis. Confira antes de salvar.',
+        sensiveis: novasSens.map(c => ({ chave:c, rotulo:infoPerm[c].rotulo || c, nivel:infoPerm[c].nivel,
+          acima_do_nivel: NIVEIS[infoPerm[c].nivel] > NIVEIS[nivel] })) });
     try{
       db.transaction(() => {
         let id = b.id;
@@ -981,6 +1012,22 @@ module.exports = function(app, db){
       db.prepare("UPDATE usuarios SET areas=? WHERE id=?").run(areas.join(','), uid);
     }catch(e){}
   }
+
+  /* ── 3-G. `minimo.definir` SAI DO BANCO (fase 3 da ACESSOS-UNIFICADOS) ──
+     A chave saiu do registro (nenhuma rota a lia — divida 19), e o sync do
+     passo 2 ja a tira da tabela `permissoes`; as linhas de setor e de excecao
+     nao tem chave estrangeira e ficariam la, marcando na tela uma caixinha
+     que nao existe. Ninguem perde nada: o card Materiais e decidido por
+     `componente.cadastrar` e `compras.ver`. Uma vez so (marca em `config`). */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='acesso_minimo_definir'").get()){
+      db.transaction(() => {
+        db.prepare("DELETE FROM setor_permissao WHERE chave='minimo.definir'").run();
+        db.prepare("DELETE FROM usuario_excecao WHERE chave='minimo.definir'").run();
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('acesso_minimo_definir','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[acesso] limpeza do minimo.definir falhou: ' + e.message); }
 
   /* ── 3-F. UMA LISTA SO (fase 2 da ACESSOS-UNIFICADOS, 26/10/2026) ──
      As tres chaves velhas do sob medida (`sobmedida.cortar`, `.cadastrar`,

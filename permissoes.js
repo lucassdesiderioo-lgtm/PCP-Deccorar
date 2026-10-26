@@ -199,8 +199,11 @@ module.exports = [
     sensivel:true },
   { chave:'componente.cadastrar', grupo:'Compras', nivel:'admin',
     rotulo:'Cadastrar componente', desc:'Insumos e matérias-primas' },
-  { chave:'minimo.definir',       grupo:'Estoque', nivel:'admin',
-    rotulo:'Definir estoque mínimo', desc:'Ponto de pedido e estoque ideal por componente' },
+  /* `minimo.definir` SAIU em 26/10/2026 (fase 3 da ACESSOS-UNIFICADOS,
+     divida 19): nenhuma rota a lia. Quem manda no mínimo e no ideal do card
+     Materiais e `componente.cadastrar` (escrever) e `compras.ver` (ler), e a
+     caixinha marcada nao liberava nada — a pessoa levava 403 numa tela que a
+     permissao dela dizia que ela podia. */
   { chave:'bloqueio.liberar',     grupo:'Planejamento', nivel:'admin',
     rotulo:'Desbloquear volumes', desc:'Liberar volumes com SKU desconhecido' },
 

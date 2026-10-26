@@ -1,4 +1,10 @@
-> **STATUS · 26/10/2026 — EM CONSTRUÇÃO** · **fase 2 em código (26/10):** as 41
+> **STATUS · 26/10/2026 — EM CONSTRUÇÃO** · **fase 3 em código (26/10):** salvar um
+> setor não apaga nada — o nível virou etiqueta (a caixinha acima do nível aparece como
+> está, com aviso), a tela manda a lista inteira e a tela antiga não apaga nada; a sensível
+> nova pede confirmação; as intransferíveis ficam fora de setor comum por trava própria; e
+> `minimo.definir` saiu (dívidas 19 e 20) — `teste_setor_salvar.js` (22). **Mudou na
+> construção:** a confirmação é só da sensível que ENTRA, e não de todas as que o setor
+> carrega a cada salvamento (aviso repetido vira paisagem) · **fase 2 em código (26/10):** as 41
 > chaves do sob medida aparecem na tela de Acessos como `sobmedida.<chave>`, no grupo
 > "Sob medida" (a lista mora em `tecido/nucleo/permissoes.js` e o `permissoes.js` do PCP
 > a traz sem cópia); o portão do módulo pergunta ao `permissoesDe` do PCP e saíram o

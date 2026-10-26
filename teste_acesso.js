@@ -405,7 +405,9 @@ console.log('\n── 9. setor NOVO nao nasce Admin Geral ──');
 let r9 = chamar('POST','/api/acesso/setores',{nome:'Quase Geral',nivel:'admin_geral',permissoes:[]},{},AG);
 eq('criar setor de nivel admin_geral → 400', r9.status, 400);
 eq('e ele nao foi criado', db.prepare("SELECT COUNT(*) c FROM setores WHERE nome='Quase Geral'").get().c, 0);
-r9 = chamar('POST','/api/acesso/setores',{nome:'Conferencia',nivel:'admin',permissoes:['custo.ver']},{},AG);
+/* custo.ver e SENSIVEL: desde a fase 3 da ACESSOS-UNIFICADOS a sensivel
+   nova pede confirmacao (teste_setor_salvar.js); aqui ela vem confirmada. */
+r9 = chamar('POST','/api/acesso/setores',{nome:'Conferencia',nivel:'admin',permissoes:['custo.ver'],confirmar:true},{},AG);
 eq('setor de nivel admin continua sendo criado normalmente', r9.status, 200);
 r9 = chamar('POST','/api/acesso/setores',{id:sgId,nome:'Admin Geral',nivel:'admin_geral',permissoes:[]},{},AG);
 eq('editar o setor Admin Geral continua recusado', r9.status, 400);
