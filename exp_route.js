@@ -343,6 +343,9 @@ module.exports=function(app,db){
          ficou fora de tela nenhuma, ATRASOU no Mercado Livre e saiu impressa
          por fora, sem conferencia e com o saldo 1 acima. */
       const se=gravarSemEtiqueta((orders.conta&&orders.conta.semEtiqueta)||[], fname);
+      /* E A CONTA QUE NAO FECHA SEM EXPLICACAO TAMBEM FICA (central de
+         pendencias, fase 2): o aviso do upload aparecia uma vez e sumia. */
+      const ca=gravarContaAberta(orders.conta, fname, orders);
       /* `coleta` vai na resposta pra quem subiu o PDF ver na hora quantos
          volumes o caminhao vai buscar — e estranhar se der zero num PDF de
          coleta, ou o lote inteiro num PDF de agencia (a marca e fraca).
@@ -354,6 +357,7 @@ module.exports=function(app,db){
       res.json({ok:true,total:orders.length,novos,repetidas:rep,religadas,
                 quantidade_duvida:qtdDuvida, conta_pdf:orders.conta||null,
                 sem_etiqueta_novas:se.novas, sem_etiqueta_resolvidas:se.resolvidas,
+                conta_aberta_nova:ca,
                 sem_sku:semsku,bloqueados:bloq,divergencias:divs,coleta,modalidade_duvida:modal,
                 pacotes, folha_nao_fecha:naoFecha, varias_pecas:variasPecas,
                 desconhecidos:Object.keys(desconhecidos).map(k=>({sku:k,qtd:desconhecidos[k]}))});
@@ -418,6 +422,72 @@ module.exports=function(app,db){
         CAST(julianday(date('now','localtime')) - julianday(date(visto_em)) AS INTEGER) dias
       FROM venda_sem_etiqueta WHERE resolvida_em IS NULL ORDER BY visto_em, id`).all());
   });
+  /* ── O PDF CUJA CONTA NAO FECHA (central de pendencias, fase 2, 27/10/2026)
+     A conta do PDF (leitura L4) compara as persianas da folha com as que o
+     sistema gravou. A diferenca que uma venda sem etiqueta explica ja tem o
+     card dela; o `resto` — o que nenhuma explicacao cobre, para mais ou para
+     menos — aparecia so no aviso do upload e sumia quando a tela fechava, o
+     mesmo modo de falhar da NF 8301. Agora ele fica gravado ate uma PESSOA
+     resolver: quem julga se o PDF veio estranho ou se faltou peca e o dono,
+     olhando o papel e o pedido no Mercado Livre (decisao de 27/10/2026). O
+     sistema nao decide nada sozinho.
+     Uma linha por PDF, e o que identifica o PDF sao as VENDAS dele (pack ou
+     venda de cada etiqueta) e a conta, e nao os bytes do arquivo: o mesmo PDF
+     baixado de novo do ML vem com outra data de criacao dentro, e abriria
+     outra linha. Assim, subir de novo nao abre outra, e o que ja foi
+     resolvido nao reabre. */
+  db.exec(`CREATE TABLE IF NOT EXISTS pdf_conta_aberta (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, hash TEXT, pdf TEXT, nfs TEXT, etiquetas INTEGER,
+    folha INTEGER, sistema INTEGER, resto INTEGER,
+    visto_em TEXT DEFAULT (datetime('now','localtime')), ultimo_visto_em TEXT,
+    resolvida_em TEXT, resolucao TEXT, resolvida_por TEXT, motivo TEXT,
+    teste INTEGER DEFAULT 0)`);
+  /* As NFs do PDF, em faixa: e por elas que se acha o papel. O nome do arquivo
+     gravado e um numero de relogio, que nao diz nada a quem procura. */
+  function faixaDeNfs(orders){
+    const n=[...new Set((orders||[]).map(o=>String(o.nf||'').trim()).filter(Boolean))]
+      .sort((a,b)=>(+a||0)-(+b||0)||a.localeCompare(b));
+    if(!n.length) return null;
+    return n.length===1 ? 'NF '+n[0] : 'NFs '+n[0]+' a '+n[n.length-1]+' ('+n.length+')';
+  }
+  function gravarContaAberta(conta, arquivo, orders){
+    if(!conta || conta.fecha || !conta.resto) return 0;
+    const vendas=(orders||[]).map(o=>String(o.packId||o.venda||o.nf||'?')).sort().join(',');
+    const hash=require('crypto').createHash('sha1')
+      .update(vendas+'|'+conta.folha+'|'+conta.sistema).digest('hex');
+    const ja=db.prepare('SELECT id, resolvida_em FROM pdf_conta_aberta WHERE hash=? ORDER BY id DESC LIMIT 1').get(hash);
+    if(ja){
+      if(!ja.resolvida_em) db.prepare("UPDATE pdf_conta_aberta SET ultimo_visto_em=datetime('now','localtime') WHERE id=?").run(ja.id);
+      return 0;
+    }
+    db.prepare(`INSERT INTO pdf_conta_aberta (hash,pdf,nfs,etiquetas,folha,sistema,resto) VALUES (?,?,?,?,?,?,?)`)
+      .run(hash, arquivo?require('path').basename(arquivo):null, faixaDeNfs(orders), (orders||[]).length,
+           conta.folha, conta.sistema, conta.resto);
+    return 1;
+  }
+  app.get('/api/contaaberta',(req,res)=>{
+    res.json(db.prepare(`SELECT id,pdf,nfs,etiquetas,folha,sistema,resto,visto_em,ultimo_visto_em,
+        CAST(julianday(date('now','localtime')) - julianday(date(visto_em)) AS INTEGER) dias
+      FROM pdf_conta_aberta WHERE resolvida_em IS NULL ORDER BY visto_em, id`).all());
+  });
+  const RESOLUCAO_CONTA={conferido:'conferi, o sistema está certo', corrigido:'corrigi o que faltava'};
+  app.post('/api/contaaberta/resolver',(req,res)=>{
+    const b=req.body||{};
+    const id=Number(b.id), resolucao=String(b.resolucao||''), motivo=String(b.motivo||'').trim();
+    if(!id) return res.status(400).json({erro:'informe o PDF'});
+    if(!RESOLUCAO_CONTA[resolucao]) return res.status(400).json({erro:'escolha: conferi, o sistema está certo — ou corrigi o que faltava'});
+    if(!motivo) return res.status(400).json({erro:'escreva o motivo — o que você conferiu, ou o que corrigiu e como'});
+    const c=db.prepare('SELECT * FROM pdf_conta_aberta WHERE id=?').get(id);
+    if(!c) return res.status(404).json({erro:'PDF não encontrado. Atualize a lista.'});
+    if(c.resolvida_em) return res.status(409).json({erro:'este PDF já foi resolvido em '+c.resolvida_em});
+    const quem=(req.usuario&&req.usuario.nome)||'';
+    db.prepare(`UPDATE pdf_conta_aberta SET resolvida_em=datetime('now','localtime'), resolucao=?,
+      resolvida_por=?, motivo=? WHERE id=?`).run(resolucao, quem, motivo, id);
+    try{ app.locals.acesso.auditar(req,'expedicao','resolver_conta_aberta',id,
+      (c.nfs||c.pdf||'')+': folha '+c.folha+' × sistema '+c.sistema+' — '+RESOLUCAO_CONTA[resolucao]+' — '+motivo); }catch(e){}
+    res.json({ok:true});
+  });
+
   const RESOLUCAO={cancelada:'cancelada no Mercado Livre', por_fora:'saiu por fora do sistema'};
   app.post('/api/semetiqueta/resolver',(req,res)=>{
     const b=req.body||{};

@@ -41,7 +41,7 @@ function maisAntiga(datas){
 }
 
 const LINHAS = [
-  { chave:'correcoes', nome:'Correções', perm:['correcao.executar'], onde:{ aba:'cor' },
+  { chave:'correcoes', nome:'Correções', perm:['correcao.executar'], onde:{ aba:'blq', ancora:'corCard' },
     ajuda:'fantasmas, vencidos, caixas sem conferência, canceladas depois da etiqueta e fila velha',
     contar(db){
       const c = require('./correcoes').contadores(db);

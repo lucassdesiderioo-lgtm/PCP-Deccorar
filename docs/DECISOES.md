@@ -417,3 +417,16 @@ pendência só se via abrindo a tela dele. **Depois:** o topo da aba Pendências
 dá o número de cada um, há quantos dias, quem resolve e o caminho. Quem decide
 cada coisa **não mudou**. A aba "Pendências de SKU" passou a se chamar "SKU
 incompleto".
+
+## 27/10/2026 — o PDF cuja conta não fecha fica em Pendências, e quem julga é uma pessoa
+
+Spec `CENTRAL-DE-PENDENCIAS`, fase 2 (cartão R-PDF-10). **Antes:** quando a folha
+do ML declarava um número de persianas e o sistema gravava outro, sem venda sem
+etiqueta que explicasse, o aviso aparecia só no upload e sumia. **Depois:** o
+PDF fica gravado num card da aba Pendências até uma pessoa resolver, com uma de
+duas opções — *conferi, o sistema está certo* ou *corrigi o que faltava* — e o
+motivo. O dono: *"não tem como o sistema julgar se foi ou não cancelada, ou um
+próprio erro no PDF; quem decide sou eu, buscando cada venda no Mercado Livre"*.
+E o passivo da Mesa de correções passou a aparecer na aba Pendências, com a
+decisão na aba Correções.
+

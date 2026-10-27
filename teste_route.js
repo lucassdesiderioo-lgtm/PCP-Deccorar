@@ -54,7 +54,8 @@ module.exports=function(app, db){
     /* A venda da folha sem etiqueta (fase 1-B, 27/10/2026): o upload de teste
        grava aqui. Sem cobertura, "apagar tudo" deixaria em Bloqueados uma
        venda que so existiu no teste. */
-    {nome:'venda_sem_etiqueta',   pk:'id', rotulo:'vendas sem etiqueta'}
+    {nome:'venda_sem_etiqueta',   pk:'id', rotulo:'vendas sem etiqueta'},
+    {nome:'pdf_conta_aberta',     pk:'id', rotulo:'PDFs com a conta aberta'}
   ];
 
   // Fase 3: foto_estoque saiu da cobertura; limpa o trigger antigo em bancos
