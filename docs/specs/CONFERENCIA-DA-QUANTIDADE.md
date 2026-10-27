@@ -197,10 +197,55 @@ confere todos a cada mudança de código, para sempre.**
 | Fase | O quê | Precisa de |
 |---|---|---|
 | **1** | O caderno (§4) e o primeiro caso, a NF 8196 (a folha que o dono mandou) · **o irmão que o PDF sem fechar descartava passa a RETER o volume, com as peças pré-preenchidas** · L2, L3 (contando também os SKUs irmãos) e L4 · a trava (§3.2) · a cobertura na auditoria | — |
+| **1-B** | **A venda da folha sem etiqueta fica na tela até alguém resolver** (§5-B) — PROPOSTA, aguarda aprovação | as respostas P6 a P9 |
 | **2** | L5 (o relatório) e a lista "o ML diz N, o sistema gravou M" | um relatório com a coluna Unidades |
 
 Cada fase com teste escrito antes, backup e deploy fora do horário de
 expedição (🔴).
+
+## 5-B. Fase 1-B — a venda da folha sem etiqueta não pode sumir (PROPOSTA, 27/10/2026)
+
+**O problema, nas palavras do dono:** *"Pelo fato de ficar pendente e não estar
+no primeiro PDF, a venda ficou como atrasada. É um erro que vem acontecendo, e
+por esse motivo não vemos a venda, e daí ela fica atrasada no Mercado Livre."*
+
+O caminho, com o caso real (NF 8301, venda 2000018960012186, BK180150BEGE):
+
+```
+o ML põe a venda na FOLHA, mas a ETIQUETA dela não vem no PDF
+   → o sistema nunca cria a caixa (sem etiqueta não há o que ler)
+   → ela não aparece em "Faltam imprimir" nem em tela nenhuma
+   → no ML ela fica pendente até ATRASAR
+   → alguém vê pelo ML e imprime a etiqueta POR FORA
+   → a caixa sai sem conferência, e o saldo fica 1 acima
+```
+
+É a armadilha #6 (§7 do CLAUDE.md) por outra porta: o desvio acontece fora da
+vista do sistema. Desde o PR #236 o upload mostra a venda em vermelho pelo
+número — mas **uma vez só**, para quem subiu o PDF. Ninguém leu, a venda volta
+a sumir.
+
+**O que esta fase faria:**
+
+1. **O upload GRAVA a venda sem etiqueta** numa lista própria (venda, pack, SKU,
+   quantidade, o PDF e quando foi vista pela primeira vez). Venda repetida em
+   outro PDF não duplica.
+2. **A lista aparece na Etiqueta de Venda, em cima, em vermelho**, com quantos
+   dias ela tem: *"Venda 2000018960012186 · BK180150BEGE · está na folha do ML
+   desde 21/10 e ainda não tem etiqueta no sistema — baixe a etiqueta no ML e
+   suba o PDF"*. Ela não some sozinha por tempo.
+3. **Ela sai da lista sozinha** quando um PDF trouxer a etiqueta (o volume
+   entra em `lote` com aquela venda ou aquele pack) — o caminho normal.
+4. **Ou uma pessoa resolve, com motivo**: *cancelada no ML* ou *saiu por fora
+   do sistema*. No segundo caso a tela lembra que o saldo ficou 1 acima e manda
+   para Admin → Estoque (o ajuste continua sendo de duas pessoas, R-EST-20).
+5. **Nada é retido nem impresso** por esta lista: ela só não deixa a venda
+   ficar invisível.
+
+**Risco 🔴** (tabela nova no banco). Teste escrito antes; o caso da NF 8301 vira
+o caso do caderno que trava a regra.
+
+**Perguntas ao dono (P6 a P9 no §7).**
 
 ## 6. Fica de fora
 
@@ -218,4 +263,8 @@ expedição (🔴).
 | P2 | Quem libera a quantidade retida? | ✅ **Quem assina o pacote** (`pacote.assinar`) (dono, 27/10/2026) |
 | P3 | O caderno guarda o texto do PDF no repositório, com **nomes e endereços trocados**. Está bem assim? | ✅ **Sim, trocados** (dono, 27/10/2026) |
 | P4 | Você tem o PDF com a NF 8196? | O dono vai mandar. O primeiro enviado (NF 8152 e 8268 a 8303) não a tem |
-| P5 | Você consegue o relatório de vendas do ML com a coluna **Unidades**, cobrindo o período das reclamações? | Para a fase 3 |
+| P5 | Você consegue o relatório de vendas do ML com a coluna **Unidades**, cobrindo o período das reclamações? | Para a fase 2 |
+| P6 | A fase 1-B (a venda sem etiqueta fica na tela até resolver) pode ser construída? | Sim, antes da fase 2: é o que está atrasando venda hoje |
+| P7 | Onde a lista aparece? | Na Etiqueta de Venda, em cima (é onde se imprime) · e um número em Admin → Bloqueados |
+| P8 | Quem pode marcar "cancelada no ML" ou "saiu por fora"? | Quem já imprime a etiqueta (`etiqueta.emitir`) · com motivo e registro de quem marcou |
+| P9 | A venda vista há mais de 1 dia muda de cor? | Sim: âmbar no dia em que aparece, vermelho a partir do dia seguinte |
