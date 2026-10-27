@@ -295,6 +295,24 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 
 ---
 
+## Quando o cliente reclama — a investigação
+
+### R-INV-01 · Todo problema de expedição chega com três coisas, e vira caso gravado
+- **Regra:** quem traz um problema de expedição (peça faltando, SKU trocado, caixa errada) traz **três coisas**:
+  1. **O que aconteceu**, numa frase: *"o cliente X recebeu 1 de 2"*.
+  2. **A NF ou o nome do cliente.**
+  3. **O pedaço da folha de controle daquela venda**: um print, ou o PDF reduzido às páginas que importam (a folha de controle e a etiqueta da venda). O PDF inteiro não é preciso.
+
+  Com isso, quem investiga **grava o caso** no caderno de casos reais, com nomes e endereços trocados e o que deveria ter saído. Mostra o caso **reprovando** antes do conserto e **passando** depois. Caso gravado nunca se apaga, e toda mudança de código roda todos os casos.
+- **Por quê:** a NF 8196 (Roberto, 19/10/2026) parecia "Quantidade: 2" pela descrição, e só o print da folha mostrou que era um pacote de dois SKUs, que é outro caminho no código. Sem o papel do ML se conserta o defeito errado. E problema que não vira caso gravado volta no próximo conserto de outra coisa.
+- **Como reduzir o PDF no Mac:** abrir na Pré-Visualização → Visualizar → Miniaturas → marcar com ⌘ a folha de controle (as últimas páginas, *"Identificação Produtos"*) e a etiqueta da venda → Arquivo → Imprimir → Páginas: *"Selecionadas na barra lateral"* → PDF → Salvar como PDF.
+- **Exceções:** se o PDF ainda está no servidor (menos de 7 dias), a NF basta: o PDF se lê lá.
+- **Teste que trava:** o caderno (`teste_casos_reais.js`) chega na fase 1 da spec `CONFERENCIA-DA-QUANTIDADE`. Até lá a regra vale para trazer o problema, e o caso é guardado na spec.
+- **Status:** regra desde 27/10/2026 (decisão do dono). O caderno ainda não foi construído.
+- **História:** spec `docs/specs/CONFERENCIA-DA-QUANTIDADE.md`, §2 e §4.
+
+---
+
 ## O que ainda não tem teste nesta área
 
 R-PDF-05 (NF repetida), a parte de tela de R-VOL-05 (guard de 700 ms na

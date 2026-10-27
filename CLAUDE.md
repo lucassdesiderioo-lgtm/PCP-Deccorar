@@ -474,7 +474,7 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 ## 5. O cruzamento com o PDF do Mercado Livre
 
 > **As regras desta seção estão em [`docs/regras/expedicao.md`](docs/regras/expedicao.md)**
-> (cartões R-PDF, R-VOL, R-CONF, R-URG, R-CAR e R-COR), cada uma com o teste que
+> (cartões R-PDF, R-VOL, R-CONF, R-URG, R-CAR, R-COR e R-INV), cada uma com o teste que
 > a trava. O porquê longo — armadilhas **#4, #5, #8, #9, #10, #22, #23, #24 e
 > #27**, a caixa de várias persianas, as conferências e a Mesa de correções —
 > está em [`docs/historia/expedicao.md`](docs/historia/expedicao.md).
@@ -521,6 +521,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 | R-COR-05 | O terminal e o botão usam a mesma régua (`correcoes.js`) |
 | R-COR-06 | A Mesa nunca mexe em saldo |
 | R-COR-07 | Conferências antigas fecham em bloco, até uma data que nunca é hoje, sem mexer em saldo, e só a caixa que já baixou |
+| R-INV-01 | Problema de expedição chega com três coisas (o que houve, NF ou cliente, o pedaço da folha) e vira caso gravado |
 
 **Ao mexer em** `parse.js`, `folha.js` ou `nome.js`: `node teste_parse.js`. No
 upload (`exp_route.js`): `node teste_upload.js`. Na lista "Já impressos"
