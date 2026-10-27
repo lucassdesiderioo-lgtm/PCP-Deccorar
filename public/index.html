@@ -2642,11 +2642,16 @@ document.addEventListener("click",async function(e){
   if(inp) inp.value="";
   carregarBloq();
 });
+/* Com o motivo digitado, o card NAO se redesenha: a aba se atualiza a cada
+   30 s e o campo nascia de novo, vazio, no meio da frase (§12). */
+var SEM_N=0;
 async function carregarSemEtq(){
-  var l=[]; try{ l=await (await fetch("/api/semetiqueta")).json(); }catch(e){}
   var card=document.getElementById("semEtqCard"), lis=document.getElementById("semEtqLista");
   if(!card||!lis) return 0;
-  if(!Array.isArray(l)||!l.length){ card.style.display="none"; lis.innerHTML=""; return 0; }
+  var digitado=[].some.call(lis.querySelectorAll("input"),function(i){ return i.value.trim()||i===document.activeElement; });
+  if(digitado) return SEM_N;
+  var l=[]; try{ l=await (await fetch("/api/semetiqueta")).json(); }catch(e){}
+  if(!Array.isArray(l)||!l.length){ card.style.display="none"; lis.innerHTML=""; SEM_N=0; return 0; }
   card.style.display="";
   var h="";
   for(var i=0;i<l.length;i++){
@@ -2664,6 +2669,7 @@ async function carregarSemEtq(){
       +'</div><div data-semmsg="'+v.id+'" style="font-size:12px;margin-top:4px"></div></div>';
   }
   lis.innerHTML=h;
+  SEM_N=l.length;
   return l.length;
 }
 document.addEventListener("click",async function(e){
@@ -2674,6 +2680,7 @@ document.addEventListener("click",async function(e){
   if(!motivo){ if(msg){ msg.style.color="#c62828"; msg.textContent="Escreva o motivo antes — é o registro de por que esta venda saiu da lista."; } if(inp) inp.focus(); return; }
   var r={}; try{ r=await (await fetch("/api/semetiqueta/resolver",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id,resolucao:res,motivo:motivo})})).json(); }catch(err){ r={erro:"sem conexão — tente de novo"}; }
   if(r.erro){ if(msg){ msg.style.color="#c62828"; msg.textContent=r.erro; } return; }
+  if(inp) inp.value="";
   if(r.aviso) alert(r.aviso);
   carregarBloq();
 });

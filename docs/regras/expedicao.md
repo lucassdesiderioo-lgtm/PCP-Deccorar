@@ -145,8 +145,8 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 ### R-PDF-09 · A venda da folha sem etiqueta fica em Bloqueados até alguém resolver
 - **Regra:** a venda (ou pack) que está na folha de controle e **não tem etiqueta no PDF** é gravada pelo upload em `venda_sem_etiqueta`, uma vez só por venda, e aparece em **Admin → Pendências** com há quantos dias espera (âmbar no dia, vermelho depois). Sai **sozinha** quando um PDF traz a etiqueta dela (a caixa entra em `lote` com a venda ou o pack), ou por uma **pessoa**, com motivo obrigatório: *cancelada no ML* ou *saiu por fora do sistema* — esta lembra que o estoque ficou acima e manda para Admin → Estoque. A Etiqueta de Venda mostra **só uma linha** de aviso, sem botão. A venda cuja etiqueta já entrou por outro PDF não é gravada. Nada é retido nem impresso por esta lista.
 - **Por quê:** a NF 8301 (venda 2000018960012186) estava na folha e a etiqueta não veio em PDF nenhum: o sistema nunca criou a caixa, a venda ficou fora de tela nenhuma, **atrasou no Mercado Livre** e saiu impressa por fora — sem conferência e com o saldo 1 acima. O aviso do upload aparece uma vez só.
-- **Exceções:** resolver é `@admin`, como as outras decisões da aba; ler é também de `etiqueta.emitir` (a linha da bancada). Coberta pelo modo teste (`TABELAS`).
-- **Teste que trava:** `teste_sem_etiqueta.js` (35) · `teste_casos_reais.js` (o caso da NF 8301).
+- **Exceções:** resolver é `@admin`, como as outras decisões da aba; ler é também de `etiqueta.emitir` (a linha da bancada). Coberta pelo modo teste (`TABELAS`). O card não se redesenha enquanto há motivo digitado (desde 27/10/2026: a atualização de 30 s apagava o campo).
+- **Teste que trava:** `teste_sem_etiqueta.js` (36) · `teste_casos_reais.js` (o caso da NF 8301).
 - **Status:** no ar desde 27/10/2026 (PR #237). Ainda não conferida com dado real: a prova é a primeira venda sem etiqueta aparecer no card e sair sozinha quando o PDF dela subir.
 - **História:** spec `docs/specs/CONFERENCIA-DA-QUANTIDADE.md` §5-B · o lugar único das pendências é a spec `CENTRAL-DE-PENDENCIAS.md`.
 

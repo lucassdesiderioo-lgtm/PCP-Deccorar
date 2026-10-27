@@ -1,4 +1,4 @@
-> **STATUS · 27/10/2026 — APROVADA, FASE 1 NO AR E CONFERIDA, FASE 2 EM CÓDIGO** ·
+> **STATUS · 27/10/2026 — APROVADA, FASES 1 E 2 NO AR E CONFERIDAS** ·
 > `NOVIDADE` · a fase 1 é risco 🟡 (só lê; não muda quem decide); a fase 2 é 🔴
 > (tabela nova, mexe no upload).
 >
@@ -10,7 +10,9 @@
 > da aba, até uma pessoa resolver com *conferi, o sistema está certo* ou
 > *corrigi o que faltava* e o motivo (R-PDF-10); (B) o passivo da Mesa de
 > correções é desenhado na aba Pendências, e a decisão continua na aba
-> Correções. `teste_conta_aberta.js` (42). Aguarda deploy.
+> Correções. `teste_conta_aberta.js` (42). ✅ **No ar e conferida em
+> 27/10/2026** (PR #239): o dono conferiu a Mesa na aba e o clique. O card do
+> PDF cuja conta não fecha ainda não apareceu com dado real.
 >
 > **Mudou na construção da fase 2:** as **sobras não vieram** — o ↩ Sobrou se
 > decide com a caixa na mão, bipando a etiqueta e cada SKU, e não pelo Admin.
