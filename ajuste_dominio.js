@@ -96,8 +96,15 @@ function pedir(db, { codigo, delta, estoque, motivo, obs, quem }){
   return { id, codigo:cod, delta:d, saldo_no_pedido:agora };
 }
 
+/* O pedido que espera a segunda pessoa. A aba Estoque e a central de
+   pendencias perguntam pela mesma frase. */
+const PENDENTE = "status='pendente'";
+function contarPendentes(db){
+  return db.prepare('SELECT COUNT(*) n, MIN(pedido_em) desde FROM ajuste_pedido WHERE ' + PENDENTE).get();
+}
+
 function pendentes(db, { quem }){
-  const linhas = db.prepare("SELECT * FROM ajuste_pedido WHERE status='pendente' ORDER BY pedido_em, id").all();
+  const linhas = db.prepare('SELECT * FROM ajuste_pedido WHERE ' + PENDENTE + ' ORDER BY pedido_em, id').all();
   return linhas.map(p => {
     const pode = ESTOQUE.outraPessoa(quem, quemPediu(p));
     const agora = ESTOQUE.saldo(db, p.codigo);
@@ -157,4 +164,4 @@ function recusar(db, { id, resposta, quem, podeAprovar }){
   return { id:p.id, codigo:p.codigo, status };
 }
 
-module.exports = { garantirSchema, pedir, pendentes, aprovar, recusar, erro };
+module.exports = { garantirSchema, pedir, pendentes, contarPendentes, aprovar, recusar, erro };

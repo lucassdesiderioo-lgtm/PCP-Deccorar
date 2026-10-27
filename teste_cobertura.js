@@ -46,7 +46,7 @@ const db = require('./db.js');
 const MODULOS = ['sku_cad_route','revisao_route','painel_route','exp_route','mont_route','carreg_route','saida_route',
   'backup_route','rel_route','alvo_route','est_route','plan_route','modo_route','cruz_route',
   'cont_route','inventario_route','ajuste_route','correcao_route','etq_route','dev_route','cad_route','sku_route','compras_route','ficha_route',
-  'pedido_route','receb_route','ger_route','st_route','teste_route'];
+  'pedido_route','receb_route','ger_route','st_route','pendencias_route','teste_route'];
 
 require('./auth')(app, db);
 const quebrados = [];

@@ -1,3 +1,8 @@
+/* A devolucao esperando a baixa do admin, numa funcao: a aba Devolucoes e a
+   central de pendencias contam pela mesma conta. */
+function devolucoesPendentes(db){
+  return db.prepare("SELECT * FROM devolucao WHERE baixado=0 ORDER BY id DESC").all();
+}
 module.exports=function(app,db){
   db.exec("CREATE TABLE IF NOT EXISTS devolucao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo_ml TEXT, sku_fisico TEXT, sku_venda TEXT, venda_id INTEGER, buyer TEXT, embalagem TEXT, tecido TEXT, tubo TEXT, base TEXT, comando TEXT, kit TEXT, destinacao TEXT, obs TEXT, reputacao TEXT, motivo TEXT, baixado INTEGER DEFAULT 0, baixado_em TEXT, recebido_em TEXT DEFAULT (datetime('now','localtime')), data TEXT DEFAULT (date('now','localtime')), teste INTEGER DEFAULT 0)");
 
@@ -23,9 +28,7 @@ module.exports=function(app,db){
     res.json({ok:true,id:info.lastInsertRowid,naFila});
   });
 
-  app.get('/api/devolucao/pendentes',(req,res)=>{
-    res.json(db.prepare("SELECT * FROM devolucao WHERE baixado=0 ORDER BY id DESC").all());
-  });
+  app.get('/api/devolucao/pendentes',(req,res)=> res.json(devolucoesPendentes(db)));
 
   app.get('/api/devolucao/hoje',(req,res)=>{
     res.json(db.prepare("SELECT COUNT(*) qtd FROM devolucao WHERE data=date('now','localtime')").get());
@@ -44,3 +47,4 @@ module.exports=function(app,db){
     res.json({ok:true});
   });
 };
+module.exports.pendentes = devolucoesPendentes;

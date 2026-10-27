@@ -97,7 +97,7 @@ function skuInfo(c){ return SKUS.find(s=>s.codigo===c); }
 // Le das COLUNAS do SKU, nao mais da regex ^BK(\d{3})(\d{3}): o codigo virou
 // etiqueta livre e nao carrega mais significado. Um SKU sem medida cadastrada
 // cai no mesmo fallback de antes — mostra so o codigo — e aparece na aba
-// "Pendencias de SKU" do admin para alguem completar.
+// "SKU incompleto" do admin para alguem completar.
 function medidaDe(cod){
   var s=skuInfo(cod);
   if(!s||s.largura_cm==null||s.altura_cm==null) return null;

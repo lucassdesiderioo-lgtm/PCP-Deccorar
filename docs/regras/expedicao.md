@@ -115,7 +115,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **História:** spec `docs/specs/CONFERENCIA-DA-QUANTIDADE.md` §2.
 
 ### R-VOL-04 · Só o pacote de vários SKUs fica retido; a caixa de N unidades não
-- **Regra:** 2 SKUs na mesma etiqueta: retém com `pacote:` e alguém assina as peças em Admin → Bloqueados (`pacote.assinar`). 1 SKU com `Quantidade: N`: não retém — a folha escreveu o número.
+- **Regra:** 2 SKUs na mesma etiqueta: retém com `pacote:` e alguém assina as peças em Admin → Pendências (`pacote.assinar`). 1 SKU com `Quantidade: N`: não retém — a folha escreveu o número.
 - **Por quê:** reter venda de 2 unidades pararia a rotina, e trava que dispara no caso normal vira desvio.
 - **Exceções:** cadastrar SKU não solta volume retido por `pacote:`.
 - **Teste que trava:** `teste_upload.js` · `teste_divergencia.js` · `teste_acesso.js` (a chave e o backfill).
@@ -143,7 +143,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Status:** no ar desde 25/09/2026.
 
 ### R-PDF-09 · A venda da folha sem etiqueta fica em Bloqueados até alguém resolver
-- **Regra:** a venda (ou pack) que está na folha de controle e **não tem etiqueta no PDF** é gravada pelo upload em `venda_sem_etiqueta`, uma vez só por venda, e aparece em **Admin → Bloqueados** com há quantos dias espera (âmbar no dia, vermelho depois). Sai **sozinha** quando um PDF traz a etiqueta dela (a caixa entra em `lote` com a venda ou o pack), ou por uma **pessoa**, com motivo obrigatório: *cancelada no ML* ou *saiu por fora do sistema* — esta lembra que o estoque ficou acima e manda para Admin → Estoque. A Etiqueta de Venda mostra **só uma linha** de aviso, sem botão. A venda cuja etiqueta já entrou por outro PDF não é gravada. Nada é retido nem impresso por esta lista.
+- **Regra:** a venda (ou pack) que está na folha de controle e **não tem etiqueta no PDF** é gravada pelo upload em `venda_sem_etiqueta`, uma vez só por venda, e aparece em **Admin → Pendências** com há quantos dias espera (âmbar no dia, vermelho depois). Sai **sozinha** quando um PDF traz a etiqueta dela (a caixa entra em `lote` com a venda ou o pack), ou por uma **pessoa**, com motivo obrigatório: *cancelada no ML* ou *saiu por fora do sistema* — esta lembra que o estoque ficou acima e manda para Admin → Estoque. A Etiqueta de Venda mostra **só uma linha** de aviso, sem botão. A venda cuja etiqueta já entrou por outro PDF não é gravada. Nada é retido nem impresso por esta lista.
 - **Por quê:** a NF 8301 (venda 2000018960012186) estava na folha e a etiqueta não veio em PDF nenhum: o sistema nunca criou a caixa, a venda ficou fora de tela nenhuma, **atrasou no Mercado Livre** e saiu impressa por fora — sem conferência e com o saldo 1 acima. O aviso do upload aparece uma vez só.
 - **Exceções:** resolver é `@admin`, como as outras decisões da aba; ler é também de `etiqueta.emitir` (a linha da bancada). Coberta pelo modo teste (`TABELAS`).
 - **Teste que trava:** `teste_sem_etiqueta.js` (35) · `teste_casos_reais.js` (o caso da NF 8301).
@@ -199,7 +199,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Status:** no ar.
 
 ### R-CONF-05 · Quem retém sabe liberar
-- **Regra:** Admin → Bloqueados mostra o motivo, o anúncio como o ML escreveu e as opções tiradas do cadastro de SKU (o código gravado vem primeiro), com campo que aceita bipe. Resolver grava `bloqueio_resolvido`, quem e quando, e vai para a auditoria. SKU fora do cadastro não solta.
+- **Regra:** Admin → Pendências mostra o motivo, o anúncio como o ML escreveu e as opções tiradas do cadastro de SKU (o código gravado vem primeiro), com campo que aceita bipe. Resolver grava `bloqueio_resolvido`, quem e quando, e vai para a auditoria. SKU fora do cadastro não solta.
 - **Por quê:** até 01/09/2026, quatro dos cinco motivos prendiam o volume para sempre.
 - **Exceções:** cadastrar SKU solta só o volume retido por `sku_nao_cadastrado` — nunca divergência, pacote ou modalidade.
 - **Teste que trava:** `teste_divergencia.js` (os motivos com o texto exato do `parse.js`).

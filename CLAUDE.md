@@ -339,7 +339,7 @@ relatório (`daPlanilha`) e marca os volumes (`marcar`); o import e o
 | Onde o volume estava | O que acontece |
 |---|---|
 | `pendente`, `bloqueado` | `estagio='cancelado'` — sai de "Faltam imprimir", da fila, da urgência, dos Bloqueados e da média. **Estoque não mexe** |
-| `embalado` (etiqueta impressa) | `cancelado` e vai para o card **Canceladas depois da etiqueta** (Admin → Bloqueados). **O estoque não volta sozinho** |
+| `embalado` (etiqueta impressa) | `cancelado` e vai para o card **Canceladas depois da etiqueta** (Admin → Pendências). **O estoque não volta sozinho** |
 | no canto da coleta (`carregado`, sem caminhão) | idem — a caixa ainda está na fábrica |
 | no carro de uma viagem aberta | idem, e sai da viagem (`saida_id` limpo) |
 | `carregado` que já saiu | ignorado — se voltar, é devolução (§9) |
@@ -495,7 +495,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 | R-PDF-06 | O upload recusa Pack ID ou Venda que já existe no histórico inteiro (#5) |
 | R-PDF-07 | A venda repetida cujo PDF sumiu volta a ter PDF — e só isso (27/10/2026) |
 | R-PDF-08 | A busca do "Já impressos" olha o histórico inteiro; a lista não corta calada (27/10/2026) |
-| R-PDF-09 | A venda da folha sem etiqueta fica em Admin → Bloqueados até o PDF dela chegar ou alguém resolver (NF 8301) |
+| R-PDF-09 | A venda da folha sem etiqueta fica em Admin → Pendências até o PDF dela chegar ou alguém resolver (NF 8301) |
 | R-VOL-01 | Uma venda = uma etiqueta = uma persiana; o volume nunca se multiplica (#8) |
 | R-VOL-02 | O que vai na caixa é `lote_item`, e conta-se PERSIANA — no servidor e na tela (#23) |
 | R-VOL-03 | O irmão do pacote se lê por ausência; sem o PDF fechar, ele RETÉM a caixa em vez de sumir (NF 8196) |
@@ -509,7 +509,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 | R-CONF-02 | A trava não acusa o inocente; nome se compara pelo `nome.js` (#10) |
 | R-CONF-03 | Retém o volume com dúvida, nunca o PDF inteiro |
 | R-CONF-04 | A ordem das travas: divergência > pacote > folha > modalidade > SKU |
-| R-CONF-05 | Quem retém sabe liberar (Admin → Bloqueados) |
+| R-CONF-05 | Quem retém sabe liberar (Admin → Pendências) |
 | R-CONF-06 | A cobertura das conferências é medida na auditoria |
 | R-URG-01 | O PDF gera só urgência |
 | R-URG-02 | O recálculo é idempotente e não apaga o manual |
@@ -540,6 +540,44 @@ teste_correcao.js`, `teste_correcao2.js`, `teste_correcao3.js` e
 `teste_conferencia_antiga.js`. Em permissão:
 `node teste_acesso.js` e `node teste_cobertura.js`. E **abra a tela**: a caixa
 de várias, o painel "depois" e a Mesa são texto montado.
+
+### ⚠️ A ABA BLOQUEADOS VIROU "PENDÊNCIAS" — a central, fase 1 (27/10/2026)
+
+Spec `docs/specs/CENTRAL-DE-PENDENCIAS.md`. O dono: *"essas pendências devemos
+concentrar em apenas uma única tela, para não ficar o problema espalhado"*. No
+topo da aba (antiga Bloqueados) fica o **número** de cada lugar onde uma pessoa
+tem algo a decidir — Bloqueados, Correções, ajuste de saldo, inventário
+(aprovar e recontar), contagem de material, SKU incompleto, sobras da
+Conferência e devoluções —, há quantos dias espera e quem resolve, com o
+caminho para a tela dona. A aba "Pendências de SKU" passou a se chamar **"SKU
+incompleto"**, para não haver duas "Pendências".
+
+> ⚠️ **A CENTRAL NÃO TEM CONTA PRÓPRIA.** `pendencias_dominio.js` pergunta à
+> função da tela dona (`correcoes.contadores`, `ajuste_dominio.contarPendentes`,
+> `inventario_dominio.pendencias`, `cont_route.pendentes`,
+> `sku_route.pendencias`, `carreg_route.sobrasEsperando`, `dev_route.pendentes`),
+> a mesma que a tela usa. Uma conta copiada diverge no primeiro ajuste (#12), e
+> o teste recusa SQL no domínio da central.
+>
+> ⚠️ **SÓ NÚMERO, PARA TODO MUNDO QUE ABRE A ABA.** Quem não pode resolver uma
+> linha vê o número e o nome da permissão de quem pode; nenhum SKU, cliente ou
+> saldo viaja (`GET /api/pendencias/resumo`, `@admin`). Linha zerada fica à
+> vista, em cinza. Linha que não conseguiu contar diz isso, e não vira zero.
+>
+> ⚠️ **A CANCELADA NA FÁBRICA ESTÁ EM DUAS LINHAS, e é certo**: volta pelo ↩
+> Sobrou da Conferência, ou a Mesa registra a que não voltou. O total a conta
+> uma vez, e a tela diz quantas estão nas duas.
+>
+> ⚠️ **O PRIMEIRO PAINEL NASCEU COM UM ID QUE JÁ ERA DA ABA DE SKU**
+> (`pendResumo`): a central escrevia por cima do resumo de lá e ficava em
+> "carregando…". Só apareceu abrindo a tela; o teste agora recusa id repetido
+> na marcação do admin.
+
+**Rode `node teste_pendencias.js` (46 casos) ao mexer no `pendencias_dominio.js`
+ou em qualquer função de tela dona que ele chama.** Cinco defeitos foram
+reintroduzidos um a um: a conta copiada (reprova 6), sem descontar a repetida
+(1), o ponteiro interno viajando (1), o erro virando zero (3) e a recontagem de
+ciclo fechado contando (2).
 
 Ferramentas que só leem: `node rastrear.js --lote` (os sete degraus do PDF até a
 tela), `node rastrear.js --auditar [dias]`, `node conferir_nf.js --pdf` e `node
@@ -1970,7 +2008,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (274), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (35), `teste_sem_etiqueta.js` (35), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64) e `teste_baixa_conferencia.js` (69); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (274), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (35), `teste_sem_etiqueta.js` (35), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69) e `teste_pendencias.js` (46); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2176,6 +2214,11 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   dele no rodapé (§20)
 - ❌ Escrever uma segunda lista de "para onde a pessoa vai": é o `destino.js`,
   e foi a cópia do login que mandava o vendedor de volta ao PIN (§20)
+- ❌ Contar uma pendência dentro do `pendencias_dominio.js`: a central pergunta
+  à função da tela dona, senão diz 3 onde a aba diz 5 (§5, a central, #12)
+- ❌ Esconder da central a linha que a pessoa não pode resolver, ou mandar nela
+  SKU, cliente ou saldo: o número aparece para todos, o detalhe fica na tela
+  dona (§5, a central)
 
 ---
 

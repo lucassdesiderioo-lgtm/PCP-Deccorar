@@ -406,3 +406,14 @@ fora). A Etiqueta de Venda mostra só uma linha apontando para lá. **E a regra
 geral do dono:** *"essas pendências e esses tipos de problemas devemos
 concentrar em apenas uma única tela, para não ficar o problema espalhado"* —
 o desenho dessa tela é a spec `CENTRAL-DE-PENDENCIAS.md` (rascunho).
+
+## 27/10/2026 — a central de pendências: a aba Bloqueados vira "Pendências"
+
+Spec `CENTRAL-DE-PENDENCIAS`, fase 1. Respostas do dono às perguntas C1 a C5
+(seguiu as propostas): a central é a aba **Bloqueados renomeada**; na fase 1
+quem a vê é quem abre o Admin, vendo todas as linhas; sob medida, TV e aviso
+por fora ficam para depois (a TV na fase 3). **Antes:** cada lugar de
+pendência só se via abrindo a tela dele. **Depois:** o topo da aba Pendências
+dá o número de cada um, há quantos dias, quem resolve e o caminho. Quem decide
+cada coisa **não mudou**. A aba "Pendências de SKU" passou a se chamar "SKU
+incompleto".

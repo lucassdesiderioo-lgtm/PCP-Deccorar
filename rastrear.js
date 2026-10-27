@@ -462,9 +462,9 @@ async function verLote(){
   const bMod=vols.filter(v=>v.estagio==='bloqueado'&&/^modalidade/.test(String(v.bloqueio||''))).length;
   const todosPend=vols.filter(v=>v.estagio==='pendente'&&v.codigo);
   const andando=vols.filter(v=>v.estagio!=='pendente'&&v.estagio!=='bloqueado').length;
-  T('  - retidos: SKU sem cadastro : '+bSku+(bSku?'   (Admin > Bloqueados)':''));
-  T('  - retidos: divergencia      : '+bDiv+(bDiv?'   (Admin > Bloqueados, em vermelho)':''));
-  if(bMod) T('  - retidos: etiqueta em formato desconhecido (agencia ou coleta?) : '+bMod+'   (definir em Admin > Bloqueados, card violeta)');
+  T('  - retidos: SKU sem cadastro : '+bSku+(bSku?'   (Admin > Pendencias)':''));
+  T('  - retidos: divergencia      : '+bDiv+(bDiv?'   (Admin > Pendencias, em vermelho)':''));
+  if(bMod) T('  - retidos: etiqueta em formato desconhecido (agencia ou coleta?) : '+bMod+'   (definir em Admin > Pendencias, card violeta)');
   if(andando) T('  - ja embalados/carregados   : '+andando);
   T('  = PENDENTES                 : '+todosPend.length);
 

@@ -32,6 +32,18 @@
 const COMPONENTE = require('./componente_dominio');
 const ESTOQUE    = require('./estoque_dominio');
 
+/* A contagem esperando aprovacao, numa funcao: a aba Contagem e a central
+   de pendencias contam pela mesma conta. */
+function contagemPendentes(db){
+  return db.prepare(`SELECT p.id,p.sessao,p.codigo,p.contado,p.sistema_era,p.operacao,
+      p.contado_por,p.criado_em, COALESCE(p.tipo,'sku') tipo, p.componente_id,
+      CASE WHEN COALESCE(p.tipo,'sku')='componente' THEN c.estoque ELSE s.estoque END AS estoque_atual,
+      CASE WHEN COALESCE(p.tipo,'sku')='componente' THEN COALESCE(c.unidade,'un') ELSE s.cor END AS cor
+    FROM contagem_pendente p
+    LEFT JOIN skus s ON COALESCE(p.tipo,'sku')='sku' AND s.codigo=p.codigo
+    LEFT JOIN componente c ON p.tipo='componente' AND c.id=p.componente_id
+    WHERE p.aprovado=0 ORDER BY p.criado_em, p.codigo`).all();
+}
 module.exports=function(app,db){
   db.exec("CREATE TABLE IF NOT EXISTS contagem (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, contado_em TEXT DEFAULT (datetime('now','localtime')), sessao TEXT, teste INTEGER DEFAULT 0)");
   // contagem_pendente (secao 10) e criada em acesso.js; garantimos aqui tambem,
@@ -256,14 +268,7 @@ module.exports=function(app,db){
 
   // ── contagem pendente (registra ANTES do /:sessao para nao cair no param) ──
   app.get('/api/contagem/pendentes',(req,res)=>{
-    const linhas=db.prepare(`SELECT p.id,p.sessao,p.codigo,p.contado,p.sistema_era,p.operacao,
-        p.contado_por,p.criado_em, COALESCE(p.tipo,'sku') tipo, p.componente_id,
-        CASE WHEN COALESCE(p.tipo,'sku')='componente' THEN c.estoque ELSE s.estoque END AS estoque_atual,
-        CASE WHEN COALESCE(p.tipo,'sku')='componente' THEN COALESCE(c.unidade,'un') ELSE s.cor END AS cor
-      FROM contagem_pendente p
-      LEFT JOIN skus s ON COALESCE(p.tipo,'sku')='sku' AND s.codigo=p.codigo
-      LEFT JOIN componente c ON p.tipo='componente' AND c.id=p.componente_id
-      WHERE p.aprovado=0 ORDER BY p.criado_em, p.codigo`).all();
+    const linhas=contagemPendentes(db);
     res.json({linhas, total:linhas.length});
   });
 
@@ -416,3 +421,4 @@ module.exports=function(app,db){
     res.json({ok:true,apagados:n});
   });
 };
+module.exports.pendentes = contagemPendentes;

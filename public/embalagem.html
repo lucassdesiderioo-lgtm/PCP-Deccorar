@@ -824,7 +824,7 @@ setInterval(listaFut,30000);
 
 /* A venda que esta na folha do ML e nao tem etiqueta no sistema nao aparece em
    "Faltam imprimir" — e a NF 8301 atrasou no ML por isso. Uma linha so,
-   apontando para Admin → Bloqueados; âmbar no dia, vermelho depois. */
+   apontando para Admin → Pendências; âmbar no dia, vermelho depois. */
 async function avisoSemEtq(){
   var el=document.getElementById('semEtqAviso'); if(!el) return;
   var l=[]; try{ l=await (await fetch('/api/semetiqueta')).json(); }catch(e){ return; }
@@ -835,7 +835,7 @@ async function avisoSemEtq(){
   el.innerHTML='<div style="margin:0 0 12px;padding:10px 12px;border-radius:10px;border:2px solid '+cor+';background:'+fundo+';color:'+cor+';font-weight:700">'
     +'⚠ '+l.length+' venda(s) da folha do ML sem etiqueta no sistema'
     +(d.length===3?' — a mais antiga desde '+d[2]+'/'+d[1]:'')
-    +'. Ela(s) não aparecem em "Faltam imprimir": veja em Admin → Bloqueados.</div>';
+    +'. Ela(s) não aparecem em "Faltam imprimir": veja em Admin → Pendências.</div>';
 }
 setInterval(avisoSemEtq,60000);
 avisoSemEtq();
@@ -1024,7 +1024,7 @@ function avisoQuantidade(qtd,contas){
   var e=function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
   var caixa=function(t){ return '<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#fdecea;border:2px solid #c62828;color:#8e1b1b;font-weight:700">⚠ '+t+'</div>'; };
   var h='';
-  if(qtd) h+=caixa(qtd+' caixa(s) retida(s) por QUANTIDADE EM DÚVIDA — a folha foi lida de jeitos diferentes e eles não bateram. Confira o pedido no Mercado Livre e libere em Admin → Bloqueados (pacote).');
+  if(qtd) h+=caixa(qtd+' caixa(s) retida(s) por QUANTIDADE EM DÚVIDA — a folha foi lida de jeitos diferentes e eles não bateram. Confira o pedido no Mercado Livre e libere em Admin → Pendências (pacote).');
   (contas||[]).forEach(function(c){
     var sem=c.semEtiqueta||[];
     sem.forEach(function(v){
@@ -1057,7 +1057,7 @@ async function upMany(fileList){
        sobe de novo — e quem subiu precisa saber que funcionou. */
     +(totRel?' · <b>'+totRel+' antiga(s) voltaram a ter PDF</b> (já dá pra reimprimir)':'')
     +(totCol?' · <span class="tagC" style="margin-left:0">🚚 '+totCol+' pra coleta</span>':'')
-    +(totMod?'<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#efe9fb;border:2px solid #6f42c1;color:#4b2a91;font-weight:700">⚠ '+totMod+' etiqueta(s) num formato que o sistema não conhece — retidas. Defina agência ou coleta em Admin → Bloqueados.</div>':'')
+    +(totMod?'<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#efe9fb;border:2px solid #6f42c1;color:#4b2a91;font-weight:700">⚠ '+totMod+' etiqueta(s) num formato que o sistema não conhece — retidas. Defina agência ou coleta em Admin → Pendências.</div>':'')
     +avisoQuantidade(totQtd,contas);
   stats(); listaPend();
 }
