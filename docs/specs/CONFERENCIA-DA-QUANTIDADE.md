@@ -1,5 +1,5 @@
-> **STATUS · 27/10/2026 — RASCUNHO, COM TRÊS RESPOSTAS DO DONO** (§7: reter já,
-> nomes trocados ok, o PDF vem) · `NOVIDADE` + `REGRA`
+> **STATUS · 27/10/2026 — RASCUNHO, COM QUATRO RESPOSTAS DO DONO** (§7: reter já,
+> quem assina o pacote libera, nomes trocados ok, o PDF vem) · `NOVIDADE` + `REGRA`
 > · risco 🔴 (etiqueta, estoque). Nasceu da NF 8196 (Roberto, 19/10/2026): o ML
 > vendeu **2** persianas numa etiqueta, o sistema gravou **1**, e o cliente
 > recebeu uma. Outros clientes relataram o mesmo. **Nada construído** (§0:
@@ -163,7 +163,7 @@ expedição (🔴).
 | # | Pergunta | Proposta |
 |---|---|---|
 | P1 | A trava retém já na fase 1, ou passa uma semana só **avisando**? | ✅ **Reter já** (dono, 27/10/2026) |
-| P2 | Quem libera a quantidade retida? | Quem já assina o pacote (`pacote.assinar`) |
+| P2 | Quem libera a quantidade retida? | ✅ **Quem assina o pacote** (`pacote.assinar`) (dono, 27/10/2026) |
 | P3 | O caderno guarda o texto do PDF no repositório, com **nomes e endereços trocados**. Está bem assim? | ✅ **Sim, trocados** (dono, 27/10/2026) |
 | P4 | Você tem o PDF com a NF 8196? | O dono vai mandar. O primeiro enviado (NF 8152 e 8268 a 8303) não a tem |
 | P5 | Você consegue o relatório de vendas do ML com a coluna **Unidades**, cobrindo o período das reclamações? | Para a fase 3 |
