@@ -111,7 +111,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Por quê:** até 27/10/2026, sem o PDF fechar, o irmão era descartado de **todas** as caixas, e a caixa que casou passava com 1 peça, calada. Foi assim que o Roberto (NF 8196) recebeu uma de duas persianas. O papel não diz de quem é o item: juntar duas vendas é erro, perder a peça calado é erro maior, porque só aparece na casa do cliente.
 - **Exceções:** a etiqueta que não achou item continua retida como `divergencia:` (R-CONF-03). O custo da regra: **uma caixa a mais retida por leitura quebrada** (a vizinha de cima do item sem identificação), nunca o lote inteiro.
 - **Teste que trava:** `teste_parse.js` (casos 2, 17, 19, 20, 21) · `teste_quantidade.js` (caso 1) · `teste_casos_reais.js` (NF 8196).
-- **Status:** no ar desde 15/09/2026 · a dúvida sem o PDF fechar em código desde 27/10/2026, aguardando deploy.
+- **Status:** no ar desde 15/09/2026 · a dúvida sem o PDF fechar no ar desde 27/10/2026 (PR #235) · ✅ **a causa da NF 8196 confirmada no banco** em 27/10/2026: o PDF do Roberto tinha uma etiqueta sem item na folha.
 - **História:** spec `docs/specs/CONFERENCIA-DA-QUANTIDADE.md` §2.
 
 ### R-VOL-04 · Só o pacote de vários SKUs fica retido; a caixa de N unidades não
@@ -143,11 +143,11 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Status:** no ar desde 25/09/2026.
 
 ### R-VOL-09 · A quantidade é lida por três caminhos, e a conta do PDF inteiro é conferida
-- **Regra:** cada caixa tem as peças lidas pela **folha por bloco** (a de sempre), pela **folha item a item** (a testemunha, que também lê o `Quantidade:`) e pela **folha inteira** (sem o limite de 4 linhas, contando todo `SKU:` entre uma venda e a próxima, e só pack ou venda abrem uma venda). Qualquer uma dizendo **mais** do que a leitura por bloco retém a caixa no card do pacote, com o **maior** número já escrito; quem assina o pacote libera (`pacote.assinar`). Leitura que não conseguiu ler não vota. A **conta do PDF** (persianas da folha × persianas gravadas) vai na resposta do upload (`conta_pdf`) e em vermelho nas três telas de upload; ela não retém, porque não diz qual caixa.
+- **Regra:** cada caixa tem as peças lidas pela **folha por bloco** (a de sempre), pela **folha item a item** (a testemunha, que também lê o `Quantidade:`) e pela **folha inteira** (sem o limite de 4 linhas, contando todo `SKU:` entre uma venda e a próxima, e só pack ou venda abrem uma venda). Qualquer uma dizendo **mais** do que a leitura por bloco retém a caixa no card do pacote, com o **maior** número já escrito; quem assina o pacote libera (`pacote.assinar`). Leitura que não conseguiu ler não vota. A **conta do PDF** (persianas da folha × persianas gravadas) vai na resposta do upload (`conta_pdf`) e em vermelho nas três telas de upload; ela não retém, porque não diz qual caixa. Desde 27/10/2026 ela separa a **venda da folha sem etiqueta no PDF**, que sai **pelo número** (`semEtiqueta`) com o que fazer — conferir no ML e, se não foi cancelada, subir o PDF dela —, e só o que sobra sem explicação (`resto`) fica no aviso genérico.
 - **Por quê:** até 27/10/2026 a quantidade era lida uma vez só, e havia dois caminhos em que ela sumia calada: o irmão sem o PDF fechar (R-VOL-03) e a testemunha casando o item sem ler a quantidade. Com o defeito do Roberto recolocado no código, a folha inteira ainda retém a caixa dele com as duas peças.
 - **Exceções:** a caixa que todas as leituras leem igual não é retida, inclusive a de N unidades do mesmo SKU (R-VOL-04). ⚠ As três leem o **mesmo papel**: o ML omitindo o número passa pelas três. A fonte de fora do PDF é o relatório do ML (fase 2 da spec).
-- **Teste que trava:** `teste_quantidade.js` (35) · `teste_casos_reais.js` · `rastrear.js --auditar` mede a cobertura de cada leitura e lista caixa gravada com menos peças do que a folha diz.
-- **Status:** em código desde 27/10/2026, aguardando deploy · o PDF real de 16–19/10 (33 etiquetas) passou sem nenhuma caixa retida à toa.
+- **Teste que trava:** `teste_quantidade.js` (44) · `teste_casos_reais.js` · `rastrear.js --auditar` mede a cobertura de cada leitura, lista caixa gravada com menos peças do que a folha diz e a venda da folha sem etiqueta.
+- **Status:** no ar desde 27/10/2026 (PR #235) · o PDF real de 16–19/10 (33 etiquetas) passou sem nenhuma caixa retida à toa · ✅ a primeira auditoria em produção (414 caixas, 17 PDFs) deu cobertura de 99–100% nas três leituras e **zero** caixa com menos peças · ✅ **o primeiro aviso real** da conta achou uma venda da folha (2000018960012186) que nunca entrou no sistema e **não estava cancelada** — o aviso passou a dizer a venda pelo número no mesmo dia.
 - **História:** spec `docs/specs/CONFERENCIA-DA-QUANTIDADE.md`.
 
 ### R-VOL-08 · O backfill do pacote relê o PDF, e só tem 7 dias
@@ -318,7 +318,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Exceções:** se o PDF ainda está no servidor (menos de 7 dias), a NF basta: o PDF se lê lá.
 - **Como gravar:** `node registrar_caso.js <pdf> <venda-ou-pack> --pecas "1xSKU,1xSKU" [--estagio bloqueado|pendente] [--card pacote] --nota "..."` grava `casos/<data>-nf-<nf>.json` com o texto de **todas** as páginas (a conta do PDF inteiro decide, por exemplo, se o irmão entra), trocando nome e endereço de todo cliente. Quando só há o print, o caso é montado à mão no mesmo formato, dizendo isso no campo `origem`.
 - **Teste que trava:** `teste_casos_reais.js` — passa cada caso pelo upload de verdade. Roda no CI com os outros.
-- **Status:** regra desde 27/10/2026 (decisão do dono) · o caderno em código desde 27/10/2026, com três casos: NF 8196 com o PDF sem fechar e fechando (Roberto) e NF 8152 (José, 2 unidades).
+- **Status:** regra desde 27/10/2026 (decisão do dono) · o caderno no ar desde 27/10/2026, com quatro casos: NF 8196 com o PDF sem fechar e fechando (Roberto), NF 8152 (José, 2 unidades) e a venda 2000018960012186 na folha sem etiqueta (o caso pode trazer `conta`, que confere as vendas sem etiqueta e o que sobra).
 - **História:** spec `docs/specs/CONFERENCIA-DA-QUANTIDADE.md`, §2 e §4.
 
 ---

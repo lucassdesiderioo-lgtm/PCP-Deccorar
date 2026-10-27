@@ -229,7 +229,33 @@ async function main(){
     eq('e diz que não fecha', r.body.conta_pdf && r.body.conta_pdf.fecha, false);
     eq('2 peças na folha', r.body.conta_pdf && r.body.conta_pdf.folha, 2);
     eq('1 no sistema', r.body.conta_pdf && r.body.conta_pdf.sistema, 1);
+    /* ⚠️ O CASO REAL (27/10/2026, PDF 1792590414811): a folha listou uma venda
+       cuja etiqueta não veio no PDF e nunca entrou no sistema — e a venda NÃO
+       estava cancelada. O aviso genérico ("alguma caixa pode estar com peça a
+       menos") mandava procurar a caixa errada. A conta diz QUAL venda. */
+    const se=(r.body.conta_pdf&&r.body.conta_pdf.semEtiqueta)||[];
+    eq('a conta diz qual venda está na folha sem etiqueta', se.map(x=>x.venda).join(','), '2000019000000601');
+    eq('com o SKU dela', se[0]&&se[0].sku, 'BK160160BEGE');
+    eq('e nada sobra sem explicação', r.body.conta_pdf && r.body.conta_pdf.resto, 0);
     limpar();
+
+    console.log('\n── 6-B. a diferença que NÃO é venda sem etiqueta ──');
+    /* Um item sem pack, sem venda e sem nome ANTES de qualquer venda: não é
+       irmão de ninguém e não tem etiqueta. A folha conta, o sistema não, e
+       não há número de venda para mostrar — aí o aviso genérico continua. */
+    r=await subir(await pdf([ETQ_JULIANE], [
+      'Cortina Rolo Blackout 1,60x1,60 Persiana Bege','SKU: BK160160BEGE','Quantidade: 1','Cor: Bege','Desenho do tecido: Liso'
+    ].concat(JULIANE)));
+    eq('a conta não fecha', r.body.conta_pdf && r.body.conta_pdf.fecha, false);
+    eq('nenhuma venda sem etiqueta para mostrar', ((r.body.conta_pdf&&r.body.conta_pdf.semEtiqueta)||[]).length, 0);
+    eq('e 1 persiana sobra sem explicação', r.body.conta_pdf && r.body.conta_pdf.resto, 1);
+    limpar();
+
+    console.log('\n── 6-C. as telas de upload dizem a venda ──');
+    for(const tela of ['embalagem','expedicao','index']){
+      const html=fs.readFileSync(path.join(__dirname,'public',tela+'.html'),'utf8');
+      ok(tela+'.html mostra a venda sem etiqueta pelo número', /semEtiqueta/.test(html) && /sem etiqueta neste PDF/.test(html));
+    }
 
     console.log('\n── 7. quem assina o pacote libera ──');
     await subir(await pdf([{venda:'2000019000000301', nf:'9301', nome:'Cliente Toquio Teste'}],[
