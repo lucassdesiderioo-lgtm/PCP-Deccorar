@@ -124,8 +124,13 @@ module.exports = [
   { chave:'contagem.aprovar',     grupo:'Estoque',    nivel:'admin',
     rotulo:'Aprovar conferência', desc:'Aprovar ou rejeitar a diferença achada (nunca a que a própria pessoa contou)',
     sensivel:true },
+  /* O ROTULO MUDOU EM 27/10/2026, A CHAVE NAO (§20: trocar o texto de uma
+     permissao e so o nome). Ele era "Aprovar ajuste de estoque", igual ao do
+     `estoque.aprovar_ajuste` logo abaixo, e na tela de Acessos as duas
+     caixinhas tinham o mesmo nome. Esta e a contagem de MATERIAL da aba
+     Contagem (peca se conta pelo Inventario, R-EST-21). */
   { chave:'contagem.ajustar',     grupo:'Estoque',    nivel:'admin',
-    rotulo:'Aprovar ajuste de estoque', desc:'Aplicar a contagem ao estoque',
+    rotulo:'Aprovar contagem de material', desc:'Aplicar ao estoque de material a contagem da aba Contagem',
     sensivel:true },
   /* O AJUSTE MANUAL EM DUAS PESSOAS (fase 3 da ESTOQUE-LIVRO-E-CONFERENCIA,
      28/09/2026). Substituem `estoque.editar`, que aplicava sozinho. Pedir nao
