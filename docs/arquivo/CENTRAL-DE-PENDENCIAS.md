@@ -1,4 +1,4 @@
-> **STATUS · 27/10/2026 — APROVADA, FASES 1 E 2 NO AR E CONFERIDAS, FASE 3 EM CÓDIGO** ·
+> **STATUS · 27/10/2026 — CONCLUÍDA E ARQUIVADA: AS TRÊS FASES NO AR E CONFERIDAS PELO DONO** · as regras que parecem bug estão no CLAUDE.md §5 e no cartão R-PDF-10 · o sob medida (C3) e o aviso por fora (C5) ficaram para depois, por decisão do dono, e nascem como spec nova se um dia forem feitos ·
 > `NOVIDADE` · a fase 1 é risco 🟡 (só lê; não muda quem decide); a fase 2 é 🔴
 > (tabela nova, mexe no upload).
 >
@@ -18,7 +18,9 @@
 > telas da bancada (Etiqueta de Venda e Conferência) e o quadro Pendências na
 > TV, pelo `GET /api/pendencias/total` (três números). A linha Bloqueados foi
 > para o servidor (`exp_route.bloqueados`). `teste_pendencias.js` (65).
-> Aguarda deploy. O sob medida e o aviso por fora ficam para depois (C3, C5).
+> ✅ **No ar e conferida em 27/10/2026** (PR #240): a linha na Etiqueta de
+> Venda e na Conferência, o quadro na TV com o mesmo número, a linha num tablet
+> de quem não é admin, e o motivo que não some do card. O sob medida e o aviso por fora ficam para depois (C3, C5).
 >
 > **Mudou na construção da fase 2:** as **sobras não vieram** — o ↩ Sobrou se
 > decide com a caixa na mão, bipando a etiqueta e cada SKU, e não pelo Admin.

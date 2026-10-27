@@ -1,5 +1,5 @@
 /* pendencias_route.js — a central de pendências, fase 1 (spec
- * docs/specs/CENTRAL-DE-PENDENCIAS.md). Só leitura: os números de cada lugar
+ * docs/arquivo/CENTRAL-DE-PENDENCIAS.md). Só leitura: os números de cada lugar
  * onde uma pessoa tem algo a decidir, para o topo da aba Pendências do admin.
  *
  *   GET /api/pendencias/resumo  -> @admin (só números, nunca detalhe)

@@ -156,7 +156,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Exceções:** uma linha por PDF, e o PDF se reconhece pelas **vendas** dele e pela conta, e não pelos bytes: o mesmo PDF baixado de novo do ML traz outra data de criação dentro. Subir de novo não abre outra linha, e o PDF resolvido não reabre. Ler e resolver são `@admin`. Coberta pelo modo teste (`TABELAS`). O card não se redesenha enquanto há motivo digitado.
 - **Teste que trava:** `teste_conta_aberta.js` (42).
 - **Status:** em código desde 27/10/2026 (fase 2 da central de pendências).
-- **História:** spec `docs/specs/CENTRAL-DE-PENDENCIAS.md`.
+- **História:** spec `docs/arquivo/CENTRAL-DE-PENDENCIAS.md`.
 
 ### R-VOL-09 · A quantidade é lida por três caminhos, e a conta do PDF inteiro é conferida
 - **Regra:** cada caixa tem as peças lidas pela **folha por bloco** (a de sempre), pela **folha item a item** (a testemunha, que também lê o `Quantidade:`) e pela **folha inteira** (sem o limite de 4 linhas, contando todo `SKU:` entre uma venda e a próxima, e só pack ou venda abrem uma venda). Qualquer uma dizendo **mais** do que a leitura por bloco retém a caixa no card do pacote, com o **maior** número já escrito; quem assina o pacote libera (`pacote.assinar`). Leitura que não conseguiu ler não vota. A **conta do PDF** (persianas da folha × persianas gravadas) vai na resposta do upload (`conta_pdf`) e em vermelho nas três telas de upload; ela não retém, porque não diz qual caixa. Desde 27/10/2026 ela separa a **venda da folha sem etiqueta no PDF**, que sai **pelo número** (`semEtiqueta`) com o que fazer — conferir no ML e, se não foi cancelada, subir o PDF dela —, e só o que sobra sem explicação (`resto`) fica no aviso genérico.

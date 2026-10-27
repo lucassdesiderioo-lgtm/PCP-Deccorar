@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* teste_pendencias.js — a central de pendências, fase 1 (spec
- * docs/specs/CENTRAL-DE-PENDENCIAS.md, 27/10/2026).
+ * docs/arquivo/CENTRAL-DE-PENDENCIAS.md, 27/10/2026).
  *
  *   node teste_pendencias.js
  *
