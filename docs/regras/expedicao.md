@@ -106,12 +106,13 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Status:** no ar · tela da NF 7031 conferida pelo dono em 25/09/2026.
 - **História:** armadilha #23.
 
-### R-VOL-03 · O irmão do pacote se reconhece por ausência — e só quando o PDF fecha
-- **Regra:** um item é peça a mais (irmão) quando não tem pack, nem venda, nem comprador, **e** nenhuma etiqueta do PDF ficou sem item (`pdfFecha`). Item com venda ou comprador nunca é irmão. A licença gateia só os órfãos: a `Quantidade: N` escrita no item vale sempre.
-- **Por quê:** sem a conta do documento, um item com campos ilegíveis viraria peça a mais e juntaria duas vendas numa caixa que não existe.
-- **Exceções:** sobrou etiqueta sem item: retém só **aquele** volume, como `divergencia:` (R-CONF-03).
-- **Teste que trava:** `teste_parse.js` (casos 2, 17, 19, 20, 21).
-- **Status:** no ar · o padrão nasceu de **um** PDF (NF 6585): acompanhe `pacotes` e `folha_nao_fecha` na resposta do upload.
+### R-VOL-03 · O irmão do pacote se reconhece por ausência — e, sem o PDF fechar, ele RETÉM em vez de sumir
+- **Regra:** um item é peça a mais (irmão) quando não tem pack, nem venda, nem comprador. Item com venda ou comprador nunca é irmão. Quando **nenhuma** etiqueta do PDF ficou sem item (`pdfFecha`), o irmão entra na caixa de cima sem dúvida. **Quando o PDF não fecha, o irmão entra como DÚVIDA:** a caixa de cima fica retida no card do pacote, com as peças escritas e o motivo dizendo que o item pode ser de outra caixa. A `Quantidade: N` escrita no item vale sempre.
+- **Por quê:** até 27/10/2026, sem o PDF fechar, o irmão era descartado de **todas** as caixas, e a caixa que casou passava com 1 peça, calada. Foi assim que o Roberto (NF 8196) recebeu uma de duas persianas. O papel não diz de quem é o item: juntar duas vendas é erro, perder a peça calado é erro maior, porque só aparece na casa do cliente.
+- **Exceções:** a etiqueta que não achou item continua retida como `divergencia:` (R-CONF-03). O custo da regra: **uma caixa a mais retida por leitura quebrada** (a vizinha de cima do item sem identificação), nunca o lote inteiro.
+- **Teste que trava:** `teste_parse.js` (casos 2, 17, 19, 20, 21) · `teste_quantidade.js` (caso 1) · `teste_casos_reais.js` (NF 8196).
+- **Status:** no ar desde 15/09/2026 · a dúvida sem o PDF fechar em código desde 27/10/2026, aguardando deploy.
+- **História:** spec `docs/specs/CONFERENCIA-DA-QUANTIDADE.md` §2.
 
 ### R-VOL-04 · Só o pacote de vários SKUs fica retido; a caixa de N unidades não
 - **Regra:** 2 SKUs na mesma etiqueta: retém com `pacote:` e alguém assina as peças em Admin → Bloqueados (`pacote.assinar`). 1 SKU com `Quantidade: N`: não retém — a folha escreveu o número.
@@ -140,6 +141,14 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_etiqueta.js` (recusa a frase antiga do "saco maior").
 - **Status:** no ar desde 25/09/2026.
+
+### R-VOL-09 · A quantidade é lida por três caminhos, e a conta do PDF inteiro é conferida
+- **Regra:** cada caixa tem as peças lidas pela **folha por bloco** (a de sempre), pela **folha item a item** (a testemunha, que também lê o `Quantidade:`) e pela **folha inteira** (sem o limite de 4 linhas, contando todo `SKU:` entre uma venda e a próxima, e só pack ou venda abrem uma venda). Qualquer uma dizendo **mais** do que a leitura por bloco retém a caixa no card do pacote, com o **maior** número já escrito; quem assina o pacote libera (`pacote.assinar`). Leitura que não conseguiu ler não vota. A **conta do PDF** (persianas da folha × persianas gravadas) vai na resposta do upload (`conta_pdf`) e em vermelho nas três telas de upload; ela não retém, porque não diz qual caixa.
+- **Por quê:** até 27/10/2026 a quantidade era lida uma vez só, e havia dois caminhos em que ela sumia calada: o irmão sem o PDF fechar (R-VOL-03) e a testemunha casando o item sem ler a quantidade. Com o defeito do Roberto recolocado no código, a folha inteira ainda retém a caixa dele com as duas peças.
+- **Exceções:** a caixa que todas as leituras leem igual não é retida, inclusive a de N unidades do mesmo SKU (R-VOL-04). ⚠ As três leem o **mesmo papel**: o ML omitindo o número passa pelas três. A fonte de fora do PDF é o relatório do ML (fase 2 da spec).
+- **Teste que trava:** `teste_quantidade.js` (35) · `teste_casos_reais.js` · `rastrear.js --auditar` mede a cobertura de cada leitura e lista caixa gravada com menos peças do que a folha diz.
+- **Status:** em código desde 27/10/2026, aguardando deploy · o PDF real de 16–19/10 (33 etiquetas) passou sem nenhuma caixa retida à toa.
+- **História:** spec `docs/specs/CONFERENCIA-DA-QUANTIDADE.md`.
 
 ### R-VOL-08 · O backfill do pacote relê o PDF, e só tem 7 dias
 - **Regra:** `backfill_pacote.js` grava as peças dos volumes de antes de 15/09, pelas duas formas (`pecasDaCaixa`). Acertar o saldo dos já impressos só com `--baixar`, depois de conferir a caixa. Faz backup e é idempotente.
@@ -295,6 +304,25 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 
 ---
 
+## Quando o cliente reclama — a investigação
+
+### R-INV-01 · Todo problema de expedição chega com três coisas, e vira caso gravado
+- **Regra:** quem traz um problema de expedição (peça faltando, SKU trocado, caixa errada) traz **três coisas**:
+  1. **O que aconteceu**, numa frase: *"o cliente X recebeu 1 de 2"*.
+  2. **A NF ou o nome do cliente.**
+  3. **O pedaço da folha de controle daquela venda**: um print, ou o PDF reduzido às páginas que importam (a folha de controle e a etiqueta da venda). O PDF inteiro não é preciso.
+
+  Com isso, quem investiga **grava o caso** no caderno de casos reais, com nomes e endereços trocados e o que deveria ter saído. Mostra o caso **reprovando** antes do conserto e **passando** depois. Caso gravado nunca se apaga, e toda mudança de código roda todos os casos.
+- **Por quê:** a NF 8196 (Roberto, 19/10/2026) parecia "Quantidade: 2" pela descrição, e só o print da folha mostrou que era um pacote de dois SKUs, que é outro caminho no código. Sem o papel do ML se conserta o defeito errado. E problema que não vira caso gravado volta no próximo conserto de outra coisa.
+- **Como reduzir o PDF no Mac:** abrir na Pré-Visualização → Visualizar → Miniaturas → marcar com ⌘ a folha de controle (as últimas páginas, *"Identificação Produtos"*) e a etiqueta da venda → Arquivo → Imprimir → Páginas: *"Selecionadas na barra lateral"* → PDF → Salvar como PDF.
+- **Exceções:** se o PDF ainda está no servidor (menos de 7 dias), a NF basta: o PDF se lê lá.
+- **Como gravar:** `node registrar_caso.js <pdf> <venda-ou-pack> --pecas "1xSKU,1xSKU" [--estagio bloqueado|pendente] [--card pacote] --nota "..."` grava `casos/<data>-nf-<nf>.json` com o texto de **todas** as páginas (a conta do PDF inteiro decide, por exemplo, se o irmão entra), trocando nome e endereço de todo cliente. Quando só há o print, o caso é montado à mão no mesmo formato, dizendo isso no campo `origem`.
+- **Teste que trava:** `teste_casos_reais.js` — passa cada caso pelo upload de verdade. Roda no CI com os outros.
+- **Status:** regra desde 27/10/2026 (decisão do dono) · o caderno em código desde 27/10/2026, com três casos: NF 8196 com o PDF sem fechar e fechando (Roberto) e NF 8152 (José, 2 unidades).
+- **História:** spec `docs/specs/CONFERENCIA-DA-QUANTIDADE.md`, §2 e §4.
+
+---
+
 ## O que ainda não tem teste nesta área
 
 R-PDF-05 (NF repetida), a parte de tela de R-VOL-05 (guard de 700 ms na
@@ -400,6 +428,13 @@ segundo bipe cego do carregamento).
   que a caixa aparece, e é dali que se reimprime (§5, #23)
 - ❌ Voltar a buscar o "Já impressos" só dentro da lista que já veio, ou deixar
   a lista bater no teto sem dizer: o "30 dias" virava 7, calado (R-PDF-08)
+- ❌ Voltar a descartar o irmão do pacote quando o PDF não fecha: a caixa que
+  casou passa com 1 peça, calada — o Roberto recebeu uma de duas (R-VOL-03)
+- ❌ Fazer a folha crua reconhecer venda pelo nome do comprador: ela erraria
+  junto com a leitura por bloco, que é justamente o que ela confere (R-VOL-09)
+- ❌ Escolher o MENOR número quando as leituras da quantidade discordam, ou
+  deixar a caixa passar "porque a leitura principal disse 1" (R-VOL-09)
+- ❌ Apagar ou sobrescrever caso do caderno: caso velho ganha nota, não some (R-INV-01)
 - ❌ Fazer o upload religar PDF de venda que ainda tem o dela, ou mexer em
   qualquer outra coluna da venda repetida: ela continua repetida (R-PDF-07)
 - ❌ Devolver a caixa de várias persianas à linha por SKU, ou recriar o quadro

@@ -371,3 +371,26 @@ Encrypt tirado pelo Traefik que já atende o n8n no servidor. Os dois endereços
 funcionam na transição; a porta 3010 é fechada para a internet quando todos os
 tablets estiverem no endereço novo. O cookie da sessão só ganha `Secure` quando a
 pessoa entrou por https.
+
+## 27/10/2026 — todo problema de expedição chega com três coisas, e vira caso gravado
+
+Cartão R-INV-01. **Antes:** o problema chegava como relato ("o cliente recebeu
+1 de 2"), e quem investigava adivinhava o caminho pelo código. **Depois:** quem
+traz o problema traz **o que aconteceu**, **a NF ou o cliente** e **o pedaço
+da folha de controle** daquela venda (print ou PDF reduzido). O caso é gravado
+com nomes trocados, reprova antes do conserto, passa depois, e nunca se apaga.
+Nasceu da NF 8196: pela descrição parecia "Quantidade: 2", e o print da folha
+mostrou que era um pacote de dois SKUs, outro caminho no código.
+
+## 27/10/2026 — a quantidade de cada caixa é conferida por três leituras, e o irmão do pacote não some mais
+
+Fase 1 da spec `CONFERENCIA-DA-QUANTIDADE` (cartões R-VOL-03 e R-VOL-09).
+**Antes:** a quantidade era lida uma vez só; e, quando uma etiqueta qualquer do
+PDF não achava item na folha, a segunda persiana do pacote (o "irmão") era
+descartada de todas as caixas, e a caixa passava com 1 peça, calada — o
+Roberto (NF 8196) recebeu uma de duas. **Depois:** a folha é lida por bloco,
+item a item e inteira; qualquer leitura dizendo mais peças retém a caixa no
+card do pacote, com o maior número já escrito, e **quem assina o pacote
+libera** (decisão do dono, "reter já"). O irmão com o PDF sem fechar entra como
+dúvida: a caixa fica retida, e não perde a peça. A conta do PDF inteiro
+(persianas da folha × gravadas) aparece em vermelho no upload quando não fecha.

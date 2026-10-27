@@ -309,7 +309,10 @@ function itensDaFolha(linhas){
          campo — ele existe pra `rastrear.js --lote` conseguir explicar a
          diferenca em vez de deixar o operador achando que sumiu peca. */
       qtd: Math.max(1, parseInt(pega(/Quantidade:\s*(\d+)/)||'1',10)||1),
-      larg: med?med.larg:null, alt: med?med.alt:null
+      larg: med?med.larg:null, alt: med?med.alt:null,
+      /* A linha do `SKU:` deste item na folha. So a folha crua (pecasCruas)
+         usa: e por ela que o item sabe onde comeca o pedaco da folha dele. */
+      linha: i
     });
     janelas.push({de:antes, ate:i});
   });
@@ -364,6 +367,68 @@ function irmaosDoPacote(blocos){
 function irmaosDe(blocos, pai){
   const g=irmaosDoPacote(blocos).find(x=>x.pai===pai);
   return g?g.irmaos:[];
+}
+
+/* ── A FOLHA CRUA: A TERCEIRA LEITURA DA QUANTIDADE (27/10/2026) ───────────
+ *
+ * Spec CONFERENCIA-DA-QUANTIDADE, leitura L3. Nasceu da NF 8196 (Roberto): um
+ * pacote de dois SKUs em que a segunda persiana sumiu sem aviso, e o cliente
+ * recebeu uma de duas.
+ *
+ * A leitura por bloco (itensDaFolha) olha o `Quantidade:` so nas 4 linhas
+ * abaixo do `SKU:`, e o irmao do pacote so entra com a licenca do pdfFecha.
+ * Esta leitura nao tem nenhuma das duas regras: conta TODA persiana escrita
+ * entre um item identificado por PACK ou VENDA e o proximo — cada
+ * `SKU:` do pedaco, com o primeiro `Quantidade:` que vier ate o SKU seguinte,
+ * sem limite de linhas. Ela nao decide nada: existe para DISCORDAR. Quando
+ * conta mais pecas do que o volume gravou, o upload retem a caixa.
+ *
+ * O que ela NAO pega: o ML omitindo o numero. Ela le o mesmo papel que as
+ * outras duas; a fonte de fora do PDF e o relatorio do ML (fase 2).
+ *
+ * ⚠️ SO PACK OU VENDA ABREM UMA VENDA AQUI, E NAO O NOME. A leitura por bloco
+ * reconhece o comprador tambem pela linha solta de letras abaixo do SKU — e
+ * uma linha solta de texto do anuncio debaixo do SKU de um irmao ("Bege Claro
+ * Acabamento Branco") vira "comprador", e o irmao deixa de ser irmao. Se esta
+ * leitura usasse a mesma regra, erraria junto. Toda venda do ML traz pack ou
+ * venda na folha (o item que vem sem os dois e o irmao, ou leitura quebrada —
+ * e nos dois casos a duvida e o que se quer).
+ *
+ * Devolve Map(item -> {total, pecas:[{sku,qtd}]}) so dos itens com pack ou venda.
+ */
+function quantidadeDoSku(linhas, idxSku, k){
+  const j=idxSku.indexOf(k);
+  const ate=(j>=0 && j<idxSku.length-1)?idxSku[j+1]:linhas.length;
+  for(let m=k;m<ate;m++){
+    const mm=String(linhas[m]||'').match(/Quantidade:\s*(\d+)/);
+    if(mm) return Math.max(1, parseInt(mm[1],10)||1);
+  }
+  return 1;
+}
+function indicesDoSku(linhas){
+  const idx=[]; (linhas||[]).forEach((l,k)=>{ if(/SKU:\s*\S/.test(l)) idx.push(k); });
+  return idx;
+}
+function pecasCruas(linhas, itens){
+  linhas=linhas||[];
+  const idx=indicesDoSku(linhas);
+  const ancoras=(itens||[]).filter(b=>(b.packId||b.venda) && b.linha!=null);
+  const mapa=new Map();
+  ancoras.forEach((a,n)=>{
+    const ate=ancoras[n+1]?ancoras[n+1].linha:linhas.length;
+    const pecas=idx.filter(k=>k>=a.linha && k<ate).map(k=>({
+      sku:(String(linhas[k]).match(/SKU:\s*(\S+)/)||[])[1]||null,
+      qtd:quantidadeDoSku(linhas, idx, k)}));
+    mapa.set(a,{total:pecas.reduce((s,p)=>s+p.qtd,0), pecas});
+  });
+  return mapa;
+}
+/* A CONTA DO PDF (leitura L4): quantas persianas a folha inteira declara —
+   cada `SKU:` com a sua quantidade. O upload compara com o que gravou. */
+function pecasDaFolhaInteira(linhas){
+  linhas=linhas||[];
+  const idx=indicesDoSku(linhas);
+  return idx.reduce((s,k)=>s+quantidadeDoSku(linhas, idx, k),0);
 }
 
 /* Mapas pack->sku e venda->sku, primeira ocorrencia manda (igual ao parse). */
@@ -476,5 +541,6 @@ function travasAtivas(volume, item, coresConhecidas){
 }
 
 module.exports={lerFolha,mapasDaFolha,skuDaFolha,itemDaFolha,itensDaFolha,travasAtivas,pageLines,
+                pecasCruas,pecasDaFolhaInteira,
                 tipoDaPagina,nfDaNota,irmaosDoPacote,irmaosDe,tituloDoAnuncio,medidaDoTitulo,
                 etiquetasSemItem,pdfFecha,pecasDaCaixa};

@@ -212,6 +212,7 @@ module.exports=function(app,db){
         }
         return n;
       }
+      let qtdDuvida=0;
       let novos=0,rep=0,religadas=0,semsku=0,bloq=0,divs=0,coleta=0,modal=0,pacotes=0,naoFecha=0,variasPecas=0; const desconhecidos={};
       db.transaction(()=>{ for(const o of orders){
         if((o.packId&&seen.has('p:'+o.packId))||(o.venda&&seen.has('v:'+o.venda))){ rep++; if(religar(o)) religadas++; continue; }
@@ -268,7 +269,23 @@ module.exports=function(app,db){
           est='bloqueado'; bloq++; pacotes++;
           const pecas=o.itens.reduce((s,i)=>s+(i.qtd||1),0);
           motivo='pacote: esta etiqueta leva '+pecas+' pecas de '+o.itens.length+' SKUs — '
-            +o.itens.map(i=>i.qtd+'x '+i.sku).join(' + ');
+            +o.itens.map(i=>i.qtd+'x '+i.sku).join(' + ')
+            /* O irmao que entrou sem a licenca do pdfFecha (NF 8196): a mesma
+               caixa, com a duvida escrita para quem assina. */
+            +(o.duvidaQuantidade?' · '+o.duvidaQuantidade:'');
+          if(o.duvidaQuantidade) qtdDuvida++;
+        }
+        /* A QUANTIDADE EM DUVIDA (27/10/2026, spec CONFERENCIA-DA-QUANTIDADE).
+           As leituras da folha discordam sobre quantas persianas vao nesta
+           caixa. Vai para o MESMO card do pacote, e nao para um prefixo novo:
+           a pergunta e a mesma ("o que vai nesta caixa?"), quem responde e a
+           mesma pessoa (`pacote.assinar`, decisao do dono) e o card ja sabe
+           mostrar e corrigir as pecas — que vao pre-preenchidas com o MAIOR
+           numero lido. */
+        else if(o.duvidaQuantidade){
+          est='bloqueado'; bloq++; qtdDuvida++;
+          motivo='pacote: quantidade em duvida — '+o.duvidaQuantidade
+            +' — confira o pedido no Mercado Livre';
         }
         /* A FOLHA TEM ITEM SEM DONO E O PDF NAO FECHA (§5-B).
            Aqui o sistema NAO SABE se aquele item e peca a mais nesta caixa ou
@@ -324,7 +341,13 @@ module.exports=function(app,db){
          volumes o caminhao vai buscar — e estranhar se der zero num PDF de
          coleta, ou o lote inteiro num PDF de agencia (a marca e fraca).
          `modalidade_duvida` e o que ficou retido por formato desconhecido. */
-      res.json({ok:true,total:orders.length,novos,repetidas:rep,religadas,sem_sku:semsku,bloqueados:bloq,divergencias:divs,coleta,modalidade_duvida:modal,
+      /* `conta_pdf`: as persianas que a folha declara contra as que o sistema
+         gravou para este PDF (leitura L4). Nao retem ninguem — quando nao
+         fecha, nao da para dizer qual caixa ficou com menos —, mas a tela
+         mostra em vermelho, para alguem olhar antes de imprimir. */
+      res.json({ok:true,total:orders.length,novos,repetidas:rep,religadas,
+                quantidade_duvida:qtdDuvida, conta_pdf:orders.conta||null,
+                sem_sku:semsku,bloqueados:bloq,divergencias:divs,coleta,modalidade_duvida:modal,
                 pacotes, folha_nao_fecha:naoFecha, varias_pecas:variasPecas,
                 desconhecidos:Object.keys(desconhecidos).map(k=>({sku:k,qtd:desconhecidos[k]}))});
     }catch(e){ console.error(e); res.status(500).json({erro:String(e.message||e)}); }

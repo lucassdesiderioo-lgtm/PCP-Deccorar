@@ -536,11 +536,20 @@ function conferir(nome, orders, esperado){
     const os_=await parsePdf(new Uint8Array(fs.readFileSync(arq)));
     const erros=[];
     if(os_.length!==2) erros.push('esperava 2 volumes (2 etiquetas), veio '+os_.length);
-    /* Nenhum dos dois pode virar pacote: o PDF não fecha, e ali ausência é
-       leitura quebrada, não peça a mais. */
-    os_.forEach(v=>{
-      if(v.itens) erros.push(v.packId+' virou PACOTE sendo leitura quebrada: '+JSON.stringify(v.itens));
-    });
+    /* ⚠️ MUDOU EM 27/10/2026 (NF 8196, spec CONFERENCIA-DA-QUANTIDADE).
+       Até aqui este caso exigia que o 111 NÃO ganhasse o item de baixo e
+       passasse limpo: a ausência, com o PDF sem fechar, era lida como leitura
+       quebrada da OUTRA etiqueta. Foi exatamente esse caminho que deixou o
+       Roberto com uma de duas persianas — o item de baixo ERA dele.
+       O papel não diz de quem é o item. Então nenhum dos dois passa: o 111
+       fica com o item de baixo como DÚVIDA (retido no card do pacote, dizendo
+       que pode ser de outra caixa), e o 222 continua retido por não achar
+       item. Quem assina abre os dois pedidos no ML e decide. */
+    const a111=os_.find(v=>v.packId==='111')||{};
+    if(!a111.itens || a111.itens.length!==2)
+      erros.push('111 perdeu o item de baixo calado — é o caminho do Roberto: '+JSON.stringify(a111.itens));
+    if(!/nao fecha/.test(a111.duvidaQuantidade||''))
+      erros.push('111 não diz que o item de baixo é dúvida: '+JSON.stringify(a111.duvidaQuantidade));
     /* ⚠️ A RETENÇÃO É DO VOLUME COM DÚVIDA, NÃO DO PDF INTEIRO (23/09/2026).
        A primeira versão retinha todo volume do arquivo, porque a condição era
        global. Num PDF real de 28 etiquetas com 5 leituras quebradas isso
@@ -669,11 +678,19 @@ function conferir(nome, orders, esperado){
     if(!dois.itens || dois.itens.length!==1 || dois.itens[0].qtd!==2)
       erros.push('a venda de 2 unidades iguais nao sobreviveu: '+JSON.stringify(dois.itens));
     if(dois.folhaNaoFecha) erros.push('a caixa de 2 persianas foi retida a toa — nao chegaria na etiqueta');
-    /* E nenhum dos tres bons pode ter virado pacote por causa do orfao. */
-    ['111','333'].forEach(pk=>{
-      const v=os_.find(x=>x.packId===pk)||{};
-      if(v.itens) erros.push(pk+' virou pacote por causa do item orfao: '+JSON.stringify(v.itens));
-    });
+    /* O 111 nao tem orfao embaixo: segue limpo. */
+    const v111=os_.find(x=>x.packId==='111')||{};
+    if(v111.itens) erros.push('111 virou pacote sem orfao embaixo: '+JSON.stringify(v111.itens));
+    if(v111.duvidaQuantidade) erros.push('111 ficou em duvida sem motivo: '+v111.duvidaQuantidade);
+    /* ⚠️ O 333 TEM O ORFAO LOGO ABAIXO, e desde 27/10/2026 (NF 8196) ele fica
+       em DUVIDA em vez de passar: o papel nao diz se o item e dele (como foi
+       com o Roberto) ou do 444, que perdeu os identificadores. Uma caixa a
+       mais retida por leitura quebrada, e nunca o lote inteiro: o 111 e o
+       222 seguem. */
+    const v333=os_.find(x=>x.packId==='333')||{};
+    if(!/nao fecha/.test(v333.duvidaQuantidade||''))
+      erros.push('333 passou calado com o orfao embaixo — o caminho do Roberto: '+JSON.stringify(v333.itens));
+    if(dois.duvidaQuantidade) erros.push('a caixa de 2 persianas ficou em duvida a toa: '+dois.duvidaQuantidade);
     if(erros.length){ falhas++; console.log('FALHOU  o lote grande nao para por 1 leitura quebrada');
       erros.forEach(e=>console.log('        '+e)); }
     else console.log('ok      o lote grande nao para por 1 leitura quebrada');

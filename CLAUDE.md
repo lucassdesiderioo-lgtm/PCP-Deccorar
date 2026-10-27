@@ -474,7 +474,7 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 ## 5. O cruzamento com o PDF do Mercado Livre
 
 > **As regras desta seção estão em [`docs/regras/expedicao.md`](docs/regras/expedicao.md)**
-> (cartões R-PDF, R-VOL, R-CONF, R-URG, R-CAR e R-COR), cada uma com o teste que
+> (cartões R-PDF, R-VOL, R-CONF, R-URG, R-CAR, R-COR e R-INV), cada uma com o teste que
 > a trava. O porquê longo — armadilhas **#4, #5, #8, #9, #10, #22, #23, #24 e
 > #27**, a caixa de várias persianas, as conferências e a Mesa de correções —
 > está em [`docs/historia/expedicao.md`](docs/historia/expedicao.md).
@@ -497,12 +497,13 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 | R-PDF-08 | A busca do "Já impressos" olha o histórico inteiro; a lista não corta calada (27/10/2026) |
 | R-VOL-01 | Uma venda = uma etiqueta = uma persiana; o volume nunca se multiplica (#8) |
 | R-VOL-02 | O que vai na caixa é `lote_item`, e conta-se PERSIANA — no servidor e na tela (#23) |
-| R-VOL-03 | O irmão do pacote se lê por ausência, e só quando o PDF fecha |
+| R-VOL-03 | O irmão do pacote se lê por ausência; sem o PDF fechar, ele RETÉM a caixa em vez de sumir (NF 8196) |
 | R-VOL-04 | Só o pacote de vários SKUs fica retido; a caixa de N unidades não |
 | R-VOL-05 | Sem o bipe de cada persiana, a caixa de várias não imprime; baixa por peça |
 | R-VOL-06 | A caixa de várias aparece antes do bipe, e uma vez só |
 | R-VOL-07 | A frase da caixa é uma só (`fita(n)`) |
 | R-VOL-08 | O backfill do pacote relê o PDF, e só tem 7 dias |
+| R-VOL-09 | A quantidade é lida por três caminhos e a conta do PDF é conferida; qualquer leitura dizendo mais retém |
 | R-CONF-01 | Cinco conferências; qualquer uma retém — e só com os dois lados lidos |
 | R-CONF-02 | A trava não acusa o inocente; nome se compara pelo `nome.js` (#10) |
 | R-CONF-03 | Retém o volume com dúvida, nunca o PDF inteiro |
@@ -521,10 +522,14 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 | R-COR-05 | O terminal e o botão usam a mesma régua (`correcoes.js`) |
 | R-COR-06 | A Mesa nunca mexe em saldo |
 | R-COR-07 | Conferências antigas fecham em bloco, até uma data que nunca é hoje, sem mexer em saldo, e só a caixa que já baixou |
+| R-INV-01 | Problema de expedição chega com três coisas (o que houve, NF ou cliente, o pedaço da folha) e vira caso gravado |
 
 **Ao mexer em** `parse.js`, `folha.js` ou `nome.js`: `node teste_parse.js`. No
 upload (`exp_route.js`): `node teste_upload.js`. Na lista "Já impressos"
-(`GET /api/impressos`, a busca e a reimpressão): `node teste_impressos.js`. Nos textos de conflito, no
+(`GET /api/impressos`, a busca e a reimpressão): `node teste_impressos.js`. Na
+quantidade (`parse.js`, `folha.js`, a retenção do pacote): `node teste_quantidade.js`
+e `node teste_casos_reais.js` — o caderno de casos reais, que **todo** problema
+de expedição alimenta (R-INV-01, `registrar_caso.js`). Nos textos de conflito, no
 destravamento ou nas listas da caixa de várias: `node teste_divergencia.js`. Na
 Etiqueta de Venda (`etq_route.js`, `embalagem.html`): `node teste_etiqueta.js`.
 No cruzamento: `node teste_cruzamento.js`. No `carreg_route.js`: `node
@@ -1962,7 +1967,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (274), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64) e `teste_baixa_conferencia.js` (69); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (274), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (35), `teste_casos_reais.js` (27), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64) e `teste_baixa_conferencia.js` (69); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |

@@ -1,0 +1,178 @@
+{
+  "data": "2026-10-19",
+  "registrado_em": "2026-10-27",
+  "o_que_aconteceu": "NF 8196: pacote de 2 SKUs numa etiqueta, BK120120BEGE + BK140140BEGE. O sistema gravou 1 persiana e o cliente recebeu 1.",
+  "id": "2026-10-19-nf-8196-pdf-nao-fecha",
+  "origem": "Folha de controle copiada do print enviado pelo dono (27/10/2026), cinco itens, nomes trocados. As etiquetas e notas foram reconstruídas no formato real do ML (o PDF passou de 7 dias e não chegou inteiro). A etiqueta da NF 8200, SEM item na folha, é o caminho reproduzido: com ela o PDF não fecha e o irmão sumia. Falta confirmar no banco que o PDF real tinha uma etiqueta assim.",
+  "paginas": [
+    [
+      "lucas desiderio lucas des #136721278",
+      "Rua Jussara 1250 Tamboré",
+      "Barueri BR-SP 06465070",
+      "Pack ID: 20000 15591586323",
+      "Despachar: segunda 19/out",
+      "SEG 20/10/2026 NF: 8195",
+      "Cliente A (APELIDO)",
+      "Endereço: (removido)",
+      "Cidade de destino : (removida)"
+    ],
+    [
+      "1 - Saida Chave de acesso",
+      "Número 8,195/Serie 2",
+      "Emissão 19/10/2026",
+      "Remetente: LUCAS DA SILVA DESIDERIO",
+      "DESTINATARIO: Cliente A",
+      "DANFE SIMPLIFICADO"
+    ],
+    [
+      "lucas desiderio lucas des #136721278",
+      "Rua Jussara 1250 Tamboré",
+      "Barueri BR-SP 06465070",
+      "Pack ID: 20000 15590336287",
+      "Despachar: segunda 19/out",
+      "SEG 20/10/2026 NF: 8196",
+      "Cliente B (APELIDO)",
+      "Endereço: (removido)",
+      "Cidade de destino : (removida)"
+    ],
+    [
+      "1 - Saida Chave de acesso",
+      "Número 8,196/Serie 2",
+      "Emissão 19/10/2026",
+      "Remetente: LUCAS DA SILVA DESIDERIO",
+      "DESTINATARIO: Cliente B",
+      "DANFE SIMPLIFICADO"
+    ],
+    [
+      "lucas desiderio lucas des #136721278",
+      "Rua Jussara 1250 Tamboré",
+      "Barueri BR-SP 06465070",
+      "Venda: 2000019048761546",
+      "Despachar: segunda 19/out",
+      "SEG 20/10/2026 NF: 8197",
+      "Cliente C (APELIDO)",
+      "Endereço: (removido)",
+      "Cidade de destino : (removida)"
+    ],
+    [
+      "1 - Saida Chave de acesso",
+      "Número 8,197/Serie 2",
+      "Emissão 19/10/2026",
+      "Remetente: LUCAS DA SILVA DESIDERIO",
+      "DESTINATARIO: Cliente C",
+      "DANFE SIMPLIFICADO"
+    ],
+    [
+      "lucas desiderio lucas des #136721278",
+      "Rua Jussara 1250 Tamboré",
+      "Barueri BR-SP 06465070",
+      "Venda: 2000019048592812",
+      "Despachar: segunda 19/out",
+      "SEG 20/10/2026 NF: 8198",
+      "Cliente D (APELIDO)",
+      "Endereço: (removido)",
+      "Cidade de destino : (removida)"
+    ],
+    [
+      "1 - Saida Chave de acesso",
+      "Número 8,198/Serie 2",
+      "Emissão 19/10/2026",
+      "Remetente: LUCAS DA SILVA DESIDERIO",
+      "DESTINATARIO: Cliente D",
+      "DANFE SIMPLIFICADO"
+    ],
+    [
+      "lucas desiderio lucas des #136721278",
+      "Rua Jussara 1250 Tamboré",
+      "Barueri BR-SP 06465070",
+      "Venda: 2000019046484212",
+      "Despachar: segunda 19/out",
+      "SEG 20/10/2026 NF: 8199",
+      "Cliente E (APELIDO)",
+      "Endereço: (removido)",
+      "Cidade de destino : (removida)"
+    ],
+    [
+      "1 - Saida Chave de acesso",
+      "Número 8,199/Serie 2",
+      "Emissão 19/10/2026",
+      "Remetente: LUCAS DA SILVA DESIDERIO",
+      "DESTINATARIO: Cliente E",
+      "DANFE SIMPLIFICADO"
+    ],
+    [
+      "lucas desiderio lucas des #136721278",
+      "Rua Jussara 1250 Tamboré",
+      "Barueri BR-SP 06465070",
+      "Pack ID: 20000 15599999999",
+      "Despachar: segunda 19/out",
+      "SEG 20/10/2026 NF: 8200",
+      "Cliente F (APELIDO)",
+      "Endereço: (removido)",
+      "Cidade de destino : (removida)"
+    ],
+    [
+      "1 - Saida Chave de acesso",
+      "Número 8,200/Serie 2",
+      "Emissão 19/10/2026",
+      "Remetente: LUCAS DA SILVA DESIDERIO",
+      "DESTINATARIO: Cliente F",
+      "DANFE SIMPLIFICADO"
+    ],
+    [
+      "Despachem as suas vendas o quanto antes. Não demore, o seu comprador está esperando.",
+      "Identifiicação Produtos",
+      "DLKPCFZRJZI3PJYMGDPZNTKSZM Cortina Rolô Blackout 1,60x1,60 Quarto Bege",
+      "Pack ID: 2000015591586323 SKU: BK160160BEGE",
+      "Venda: 2000019050907086 Quantidade: 1",
+      "Cliente A Cor: Bege",
+      "Desenho do tecido: Liso",
+      "LESLWOUN55IWDHI3GZ6UYKB4FA Cortina Rolo Blackout 1,20x1,20 Blecaute Persiana Bege",
+      "Pack ID: 2000015590336287 SKU: BK120120BEGE",
+      "Venda: 2000019049592564 Quantidade: 1",
+      "Cliente B Cor: Bege",
+      "Desenho do tecido: Liso",
+      "Cortina Rolo Blackout 1,40x1,40 Persiana Blecaute Bege",
+      "SKU: BK140140BEGE",
+      "Quantidade: 1",
+      "Cor: Bege",
+      "Desenho do tecido: Liso",
+      "434MYMXU3VN4NGY5XLEX4XKMPU Cortina Rolo Blackout 1,60x1,60 Persiana Home Office Cinza",
+      "Venda: 2000019048761546 SKU: BK160160CINZA",
+      "Cliente C Quantidade: 1",
+      "Cor: Cinza",
+      "Desenho do tecido: Liso",
+      "5CVYGSQLQFJLXMW2ZEQ2IA2UTY Cortina Rolo Blackout 1,40x1,40 Persiana Blecaute Cinza",
+      "Venda: 2000019048592812 SKU: BK140140CINZA",
+      "Cliente D Quantidade: 1",
+      "Cor: Cinza",
+      "Desenho do tecido: Liso",
+      "H22DLOYJAJP4HHDX7BHOMY42FM Cortina Rolo Blackout 1,60x1,60 Persiana Home Office Bege",
+      "Venda: 2000019046484212 SKU: BK160160BEGE",
+      "Cliente E Quantidade: 1",
+      "Cor: Bege",
+      "Desenho do tecido: Liso"
+    ]
+  ],
+  "esperado": [
+    {
+      "chave": "2000015590336287",
+      "cliente": "Cliente B",
+      "pecas": [
+        "1xBK120120BEGE",
+        "1xBK140140BEGE"
+      ],
+      "estagio": "bloqueado",
+      "card": "pacote"
+    },
+    {
+      "chave": "2000019048761546",
+      "cliente": "Cliente C",
+      "pecas": [
+        "1xBK160160CINZA"
+      ],
+      "estagio": "pendente",
+      "card": null
+    }
+  ]
+}

@@ -3,7 +3,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.js';
 /* A leitura crua do PDF mora toda no folha.js — inclusive "que pagina e esta" e
    "qual o numero desta nota". Aqui elas gravam; na auditoria elas conferem. */
 const {tipoDaPagina,nfDaNota,itensDaFolha,irmaosDe,irmaosDoPacote,etiquetasSemItem,
-       pecasDaCaixa} = require('./folha');
+       pecasDaCaixa,pecasCruas,pecasDaFolhaInteira} = require('./folha');
 /* "Estes dois nomes sao a mesma pessoa?" e do nome.js, dono unico: a conferencia
    de NF faz a MESMA pergunta, e duas reguas discordariam sobre o mesmo cliente. */
 const {mesmoCliente} = require('./nome');
@@ -199,12 +199,19 @@ async function parsePdf(uint8){
      nada — existe para discordar. Le por um caminho diferente do bloco, entao
      quando os dois chegam ao mesmo SKU para o mesmo volume, a chance de ambos
      errarem igual e pequena; quando discordam, o volume e retido. */
-  { const tok=/(Pack ID:\s*([\d ]+))|(Venda:\s*([\d ]+))|(SKU:\s*(\S+))|(Cor:\s*([^\n]+))/g; let m,pk=null,vd=null,last=null;
+  /* ⚠️ A TESTEMUNHA TAMBEM LE A QUANTIDADE (27/10/2026, spec
+     CONFERENCIA-DA-QUANTIDADE, leitura L2). Ate aqui ela so lia o SKU: quando a
+     leitura por bloco nao casava o item com a etiqueta e a testemunha casava,
+     o volume entrava com o SKU dela e a quantidade ia embora, calada. O
+     `Quantidade:` vem DEPOIS do `SKU:` no layout do ML, entao ele e do ultimo
+     SKU lido — e so do primeiro `Quantidade:` que aparecer. */
+  { const tok=/(Pack ID:\s*([\d ]+))|(Venda:\s*([\d ]+))|(SKU:\s*(\S+))|(Cor:\s*([^\n]+))|(Quantidade:\s*(\d+))/g; let m,pk=null,vd=null,last=null;
     while((m=tok.exec(controlText))){
       if(m[2])pk=m[2].replace(/\s+/g,'');
       else if(m[4])vd=m[4].replace(/\s+/g,'');
-      else if(m[6]){ last={packId:pk,venda:vd,sku:m[6].trim(),cor:null}; guardar(leitura2,last); pk=null;vd=null; }
+      else if(m[6]){ last={packId:pk,venda:vd,sku:m[6].trim(),cor:null,qtd:null}; guardar(leitura2,last); pk=null;vd=null; }
       else if(m[8]&&last&&!last.cor) last.cor=m[8].trim();
+      else if(m[10]&&last&&last.qtd==null) last.qtd=Math.max(1,parseInt(m[10],10)||1);
     } }
   /* A NOTA DE CADA NF, E A PRIMEIRA PAGINA DELA.
      Uma nota com muitos itens estoura para uma pagina de continuacao, e as duas
@@ -247,6 +254,10 @@ async function parsePdf(uint8){
      copias significaria o backfill gravar peca que o upload teria retido. */
   const semItem = etiquetasSemItem(etiquetasDoPdf, itensFolha);
   const pdfFecha = semItem.length===0;
+  /* A folha crua (L3) e a conta do PDF (L4) — spec CONFERENCIA-DA-QUANTIDADE.
+     Calculadas uma vez: as duas olham a folha inteira. */
+  const cruas = pecasCruas(controlLines, itensFolha);
+  const pecasNaFolha = controlLines.length ? pecasDaFolhaInteira(controlLines) : null;
 
   const orders=[], seen=new Set();
   for(let p=1;p<=N;p++){
@@ -281,7 +292,21 @@ async function parsePdf(uint8){
        A LISTA COMECA PELO PAI porque ele tambem e peca da caixa: a conta de
        "quantas persianas vao aqui" e a soma dos dois lados, e uma lista que
        comecasse nos irmaos leria como "1 + 2" em vez de "3". */
-    const irmaos = (r1 && pdfFecha) ? irmaosDe(itensFolha, r1) : [];
+    /* ⚠️ O IRMAO NAO SOME MAIS QUANDO O PDF NAO FECHA (27/10/2026, NF 8196).
+       Ate aqui era `(r1 && pdfFecha) ? irmaosDe(...) : []`: bastava UMA
+       etiqueta de outro cliente sem item na folha para o irmao ser descartado
+       de TODAS as caixas do PDF — e a caixa que casou certinho passava com 1
+       peca, sem reter e sem aviso, porque a retencao do "nao fecha" (logo
+       abaixo) so pega a etiqueta que nao achou item (`!r1`). Foi assim que o
+       Roberto recebeu uma de duas persianas.
+       A licenca do pdfFecha continua valendo para o que ela protege — ler
+       ausencia como peca a mais SEM duvida. Sem ela, o irmao entra na caixa
+       como DUVIDA: a caixa e retida com as pecas escritas, e quem assina o
+       pacote decide com o pedido do ML aberto. Juntar duas vendas numa caixa
+       que nao existe e erro; perder a peca calado e erro maior, porque so
+       aparece na casa do cliente. */
+    const irmaos = r1 ? irmaosDe(itensFolha, r1) : [];
+    const irmaoSemLicenca = !pdfFecha && irmaos.length>0;
     /* ⚠️ A CAIXA DE VARIAS PECAS TEM DUAS FORMAS, E A SEGUNDA E A MAIS COMUM.
        Ate 15/09/2026 so a primeira era vista:
 
@@ -303,7 +328,36 @@ async function parsePdf(uint8){
        no bloco daquele item. Exigir o documento fechar para acreditar num numero
        que o documento afirma seria recusar a evidencia mais forte que existe. */
     const pecasDoPai = r1 ? Math.max(1, r1.qtd||1) : 1;
-    const itensDoVolume = pecasDaCaixa(r1, irmaos);
+    let itensDoVolume = pecasDaCaixa(r1, irmaos);
+    /* ── AS LEITURAS DA QUANTIDADE SE CONFEREM (spec CONFERENCIA-DA-QUANTIDADE)
+       L1 e a leitura por bloco (o `itensDoVolume` acima). L2 e a testemunha,
+       L3 a folha crua. Qualquer uma dizendo MAIS do que L1 retem a caixa — o
+       sistema nunca escolhe o numero menor para deixar passar — e a caixa vai
+       com o MAIOR numero ja escrito, para quem assina so conferir. Leitura que
+       nao conseguiu ler nao vota (armadilha #10). */
+    const lido = itensDoVolume ? itensDoVolume.reduce((s,i)=>s+(i.qtd||1),0) : 1;
+    const crua = r1 ? cruas.get(r1) : null;
+    const l2 = (r2 && rec && r2.sku===rec.sku && r2.qtd) ? r2.qtd : null;
+    const duvidas=[];
+    if(irmaoSemLicenca)
+      duvidas.push('o PDF nao fecha ('+semItem.length+' etiqueta(s) sem item na folha) e esta etiqueta tem '
+        +irmaos.length+' peca(s) logo abaixo sem identificacao — confira se vao nesta caixa ou em outra');
+    if(crua && crua.total>lido)
+      duvidas.push('a folha lida por bloco diz '+lido+' peca(s) e a folha inteira diz '+crua.total);
+    if(l2 && l2>pecasDoPai)
+      duvidas.push('a folha lida item a item diz '+l2+' peca(s) e a leitura por bloco '
+        +(r1?'diz '+pecasDoPai:'nao achou o item'));
+    const duvidaQuantidade = duvidas.length ? duvidas.join(' · ') : null;
+    if(duvidaQuantidade && !irmaoSemLicenca){
+      /* A caixa vai com o MAIOR numero lido ja escrito. */
+      const opcoes=[];
+      if(itensDoVolume) opcoes.push(itensDoVolume);
+      if(crua && crua.pecas.length) opcoes.push(crua.pecas.map((p,n)=>({sku:p.sku, qtd:p.qtd,
+        cor:n===0&&r1?(r1.cor||null):null, descricao:n===0&&r1?(r1.desc||null):null})));
+      if(l2) opcoes.push([{sku:rec.sku, qtd:l2, cor:rec.cor||null, descricao:rec.desc||null}]);
+      const soma=l=>l.reduce((s,i)=>s+(i.qtd||1),0);
+      itensDoVolume = opcoes.sort((a,b)=>soma(b)-soma(a))[0] || itensDoVolume;
+    }
     /* O PDF NAO FECHOU E AINDA HA ITEM SEM DONO: nao da pra dizer se e peca a
        mais ou item que perdeu os identificadores na leitura. As duas respostas
        levam a caixas diferentes, entao o sistema nao escolhe — retem e conta o
@@ -409,7 +463,22 @@ async function parsePdf(uint8){
       /* Preenchido só quando a folha traz item sem dono E o PDF não fecha — o
          upload retém por ele, e a mensagem diz a conta que não bateu. */
       folhaNaoFecha,
+      /* A quantidade em duvida: as leituras discordam (ou o irmao entrou sem a
+         licenca do pdfFecha). O upload retem a caixa no card do pacote. */
+      duvidaQuantidade,
+      /* O que cada leitura achou (null = nao conseguiu ler). A auditoria usa
+         a MESMA conta para medir a cobertura de cada uma e para achar caixa ja
+         gravada com menos pecas do que a folha diz (rastrear.js --auditar). */
+      leituras:{ bloco: r1?lido:null, item: (r2&&r2.qtd)?r2.qtd:null, crua: crua?crua.total:null },
       buyer:buyer||'(sem nome)',city,nf,packId,venda,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
+  }
+  /* A CONTA DO PDF (leitura L4): quantas persianas a folha declara contra
+     quantas o sistema decidiu gravar. Etiqueta sem item conta 1 — e o que ela
+     vira. Vai pendurada no array para o upload mostrar; nao retem ninguem,
+     porque quando ela nao fecha nao da para dizer QUAL caixa ficou com menos. */
+  if(pecasNaFolha!=null){
+    const sistema=orders.reduce((s,o)=>s+(o.itens?o.itens.reduce((a,i)=>a+(i.qtd||1),0):1),0);
+    orders.conta={folha:pecasNaFolha, sistema, fecha:pecasNaFolha===sistema};
   }
   return orders;
 }
