@@ -1,5 +1,24 @@
-> **STATUS · 02/10/2026 — EM CONSTRUÇÃO** · **fase 1 no ar (PR #174)** · **fases 2 e 3 no ar
-> (PR #183, 02/10/2026)**: as cinco ações da §4 que faltavam, os três contadores que faltavam e os cinco
+> **STATUS · 27/10/2026 — AS TRÊS FASES NO AR** · fase 1 (PR #174, 02/10/2026) · fases 2 e 3
+> (PR #183, 02/10/2026). **Para arquivar faltam as duas provas de fábrica** do fim deste bloco.
+>
+> ⚠️ **DUAS REGRAS DESTA SPEC MUDARAM EM 22/10/2026, E ELA FICOU CINCO DIAS DIZENDO O
+> CONTRÁRIO DO CÓDIGO.** Quem fez a mudança atualizou os **cartões**
+> (`docs/regras/expedicao.md`, R-COR-01 a R-COR-07) e o `DECISOES.md`, e não voltou
+> aqui — então a §4 abaixo continuou oferecendo um botão que a rota recusa com **409**,
+> e a coluna "Estoque" continuou dizendo **sim** numa tela que não mexe em saldo.
+> Corrigido em 27/10/2026. O texto antigo fica **riscado** em vez de apagado: ele foi
+> verdade entre 02/10 e 22/10, e é dele que vêm as correções já gravadas no banco.
+>
+> | O que mudou em 22/10/2026 | Onde |
+> |---|---|
+> | **O "a persiana voltou" SAIU da Mesa.** A volta ao estoque é o **↩ Sobrou** da Conferência, com o bipe do SKU de cada persiana — o bipe é a prova de que a peça está na mão, e a Mesa não tem como provar isso. A Mesa **nunca** mexe em saldo, sem exceção | spec `CONFERENCIA-E-BAIXA` (hoje em `docs/arquivo/`), fase 2-B, D7 · cartões **R-COR-03** e **R-COR-06** · `DECISOES.md` 22/10/2026 |
+> | **Ação nova: "Fechar conferências antigas"** — a **oitava** porta da aba Correções, que nasceu noutra spec e por isso não está na §4 original | fase 0 da `CONFERENCIA-E-BAIXA` (PR #216) · cartão **R-COR-07** · `teste_conferencia_antiga.js` (64) |
+>
+> **Onde esta spec e os cartões divergirem, valem os cartões** (`CLAUDE.md` §13).
+>
+> ---
+>
+> **Fases 2 e 3 (PR #183, 02/10/2026)**: as cinco ações da §4 que faltavam, os três contadores que faltavam e os cinco
 > scripts chamando o `correcoes.js` e gravando em `correcao`. `teste_correcao2.js` (98) e
 > `teste_correcao3.js` (23, o mesmo cenário pelo botão e pelo terminal, os dois iguais linha a
 > linha). **Mudanças na construção:** a venda futura reaberta sem etiqueta volta a `pendente`
@@ -7,8 +26,10 @@
 > que entrou até ela; a coleta fechada ganha `retirado_em`; a fila velha é a de mais de 30 dias;
 > "Dar saída" não apaga as cópias (elas viram fantasmas, e saem pelo contador); "Pedir ajuste"
 > abre o pedido pela porta do ajuste (não grava em `correcao`). Quatro delas foram
-> confirmadas pelo dono em 02/10/2026 (`docs/DECISOES.md`). No ar (PR #183). Falta: o dono
-> fechar um passivo de verdade pela tela.
+> confirmadas pelo dono em 02/10/2026 (`docs/DECISOES.md`). No ar (PR #183).
+> ~~Falta: o dono fechar um passivo de verdade pela tela.~~ — **feito em 22/10/2026**,
+> pelo bloco: mais de 500 caixas impressas sem conferência fechadas pela aba Correções
+> (R-COR-07). O que **falta** é por objeto — ver o fim deste bloco.
 >
 > **Fase 1** entrou em 02/10/2026: `correcoes.js` (dono único de cada ação),
 > `correcao_route.js` (7 rotas), a tabela `correcao`, a aba **Correções** no admin, a
@@ -25,8 +46,10 @@
 >   seriam o botão e o terminal apagando linhas diferentes. **O efeito ainda diverge
 >   num ponto** — a Mesa apaga o `lote_item` do volume e o script não —, e isso só se
 >   unifica na fase 3;
-> - **o "voltou" devolve POR PEÇA, e não `+1`** (§4): a etiqueta de uma caixa de
->   pacote baixou N. **Sob medida fica de fora**, porque nunca baixou;
+> - ~~**o "voltou" devolve POR PEÇA, e não `+1`** (§4): a etiqueta de uma caixa de
+>   pacote baixou N. **Sob medida fica de fora**, porque nunca baixou~~ — **o "voltou"
+>   saiu da Mesa em 22/10/2026** (bloco acima). Valeu de 02/10 a 22/10, e é assim que
+>   estão gravadas as correções daquela janela: desfazer uma delas ainda devolve o −1;
 > - **a caixa de várias persianas não tem o "voltou"**: o ML cancela um item e o
 >   sistema não sabe qual peça é. Sobra o "registrar", com a frase que manda separar a
 >   caixa e corrigir por Admin → Estoque;
@@ -41,10 +64,15 @@
 >
 > ✅ **NO AR**, confirmado pelo dono em 02/10/2026.
 >
-> ⚠️ **AINDA NÃO FOI CONFERIDA NA FÁBRICA.** A rodada foi num navegador, a 1440 px,
-> com banco semeado. A prova que fecha a fase é o dono corrigindo um passivo de
-> verdade pela tela — e a **primeira cancelada real depois da etiqueta**, que é a prova
-> que a VENDAS F2 deixou pendente.
+> **O QUE JÁ FOI PROVADO COM DADO REAL, E O QUE NÃO** (27/10/2026) — e a diferença
+> importa, porque prova que não foi feita se escreve como não feita, e prova que foi
+> escrita como pendente faz alguém refazê-la:
+>
+> | | |
+> |---|---|
+> | ✅ **o mecanismo da Mesa**, com dado real | 22/10/2026: mais de 500 caixas fechadas pela aba Correções (R-COR-07) — a prévia, o motivo, o bloco e o `correcao` gravado passaram pela operação |
+> | ⚠️ **nenhuma ação POR OBJETO** | descartar um fantasma, dar saída num volume, tirar uma linha da fila, reabrir uma futura: todas rodaram só em navegador, a 1440 px, com banco semeado |
+> | ⚠️ **a primeira cancelada real depois da etiqueta** | pendente desde 26/09/2026 — é a prova que a `VENDAS-E-MEDIA` F2 deixou em aberto, e a fase 1 herdou |
 
 ---
 
@@ -106,19 +134,42 @@ BUSCAR ──▶ VER O OBJETO ──▶ PRÉVIA ──▶ EXECUTAR (motivo) ─�
 | **Fechar vencidos** | `pendente` vencido, em bloco, por período conferido | a do `fechar_vencidos.js` | não |
 | **Reabrir venda futura** | volume com `carregado_em > hoje` | a do `reabrir_futuros.js` | não |
 | **Tirar da fila** | linha de `fila` `aguardando` | nunca toca `embalado`; mostra a idade da linha | não |
-| **Cancelada depois da etiqueta** | volume `embalado` com `cancelada_em` | duas saídas: **"a persiana voltou"** → movimento `cancelamento` ~~+1~~ **por peça** (ver abaixo); **"não voltou"** → só registra | **sim**, no "voltou" |
+| **Cancelada depois da etiqueta** | volume `embalado` com `cancelada_em` | ~~duas saídas: **"a persiana voltou"** → movimento `cancelamento` por peça; **"não voltou"** → só registra~~ → **desde 22/10/2026 há UMA saída: "Não voltou — só registrar"** (ver abaixo) | ~~sim, no "voltou"~~ **não** |
 | **Pedir ajuste de saldo** | SKU | abre um pedido em `estoque.ajustar` — **outra pessoa aprova** | só depois da aprovação |
+| **Fechar conferências antigas** *(não é desta spec)* | bloco de caixas `embalado` nunca conferidas, até uma data de corte que **não pode ser hoje** | fase 0 da `CONFERENCIA-E-BAIXA` · cartão **R-COR-07** | não |
 
 > **A Mesa não tem ação de estoque direto.** Mexer em saldo sem venda na frente é o
-> que as duas pessoas existem para vigiar. A única exceção é a cancelada que voltou:
-> ali o movimento desfaz uma baixa conhecida, com volume e cliente na referência.
+> que as duas pessoas existem para vigiar. ~~A única exceção é a cancelada que voltou:
+> ali o movimento desfaz uma baixa conhecida, com volume e cliente na referência.~~
+> **Desde 22/10/2026 não há exceção nenhuma** (cartão **R-COR-06**).
 
-> ⚠️ **DIVERGÊNCIA RESOLVIDA EM 02/10/2026 (fase 1):** o "voltou" devolve **a soma
-> das `qtd` do `lote_item`, SKU por SKU**, e não `+1` — a etiqueta de uma caixa de
-> pacote baixou N (`CLAUDE.md` §5, #23). **Sob medida não recebe devolução** (§7). E a
-> **caixa de várias persianas** (`cancelada_varias=1`) **não tem a saída "voltou"**: o
-> ML cancela um item e o sistema não sabe qual peça da caixa é. Lá só existe o
-> "registrar", com a frase que manda separar a caixa.
+> ⚠️ **O "A PERSIANA VOLTOU" SAIU DA MESA EM 22/10/2026** (`CONFERENCIA-E-BAIXA`, fase
+> 2-B, D7 — decisão do dono). A volta ao estoque é o **↩ Sobrou** da Conferência:
+> bipa-se a etiqueta e **o SKU de cada persiana**, escolhe-se o motivo (venda
+> cancelada, motorista recusou, outro), e aí sim o saldo anda. **O bipe é a prova de
+> que a peça está na mão, e a Mesa não tem como prová-la** — era isso que faltava.
+> Quem conferiu a caixa não marca a sobra.
+>
+> Na Mesa sobrou **"Não voltou — só registrar"**, que tira o volume do card de
+> Bloqueados sem tocar em saldo. O `voltou:true` mandado à rota é **recusado com 409**,
+> dizendo onde é agora. E o "não voltou" de uma caixa que **nunca baixou** avisa que o
+> saldo fica uma peça alto, e manda pedir ajuste.
+>
+> ⚠️ **DESFAZER UMA CORREÇÃO "VOLTOU" DE ANTES DE 22/10 AINDA DEVOLVE O −1 QUE ELA
+> GRAVOU**, e isso é de propósito: o movimento existe no livro, e o desfazer tem que
+> fechar a conta que a correção abriu.
+
+> ⚠️ **DIVERGÊNCIA RESOLVIDA EM 02/10/2026 (fase 1), E SUPERADA EM 22/10:** enquanto o
+> "voltou" existiu, ele devolvia **a soma das `qtd` do `lote_item`, SKU por SKU**, e
+> não `+1` — a etiqueta de uma caixa de pacote baixou N (`CLAUDE.md` §5, #23), e
+> devolver 1 de 2 deixaria o buraco pela metade. **Sob medida não recebia devolução**
+> (§7), porque nunca baixou. **Essa conta não morreu com o botão:** é a mesma que o
+> ↩ Sobrou da Conferência faz hoje, por peça.
+
+> ⚠️ **A CAIXA DE VÁRIAS PERSIANAS (`cancelada_varias=1`) CONTINUA SENDO O CASO À
+> PARTE**, e essa regra é de 02/10/2026 e não mudou: o ML cancela **um item** e o
+> sistema não sabe qual peça da caixa é. Lá só existe o "registrar", com a frase que
+> manda separar a caixa e corrigir por Admin → Estoque, com motivo.
 
 Ações que ficam **de fora** desta versão: editar SKU de volume (é a tela de
 Bloqueados que resolve), apagar volume, mexer em `revisao`/`montagem`.
@@ -196,9 +247,10 @@ Aba nova **"Correções"** no admin, fundo escuro (DESIGN.md §1):
 - `correcoes.js`, tabela, rotas, tela, permissão.
 - Ações: **Cancelada depois da etiqueta** e **Descartar fantasma**.
 - **Testes:** `teste_correcao.js` — ação que não vale é recusada com motivo; prévia
-  não grava; executar grava antes/depois e auditoria; "voltou" gera exatamente um
-  movimento +1 e a soma do livro bate; desfazer recusa objeto que andou; fantasma
-  mantém o mais antigo.
+  não grava; executar grava antes/depois e auditoria; ~~"voltou" gera exatamente um
+  movimento +1 e a soma do livro bate~~ **desde 22/10/2026 o caso é o contrário: a
+  prévia e o executar do `voltou:true` têm que ser RECUSADOS com 409** (casos das
+  linhas 326 e 333); desfazer recusa objeto que andou; fantasma mantém o mais antigo.
 
 ### Fase 2 ☑ — as outras ações 🔴 (em código em 02/10/2026)
 
@@ -219,3 +271,19 @@ Aba nova **"Correções"** no admin, fundo escuro (DESIGN.md §1):
 
 `CLAUDE.md` §5 ("Os três scripts que fecham passivo") passa a apontar para a Mesa como
 caminho normal; esta spec vai para `docs/arquivo/`.
+
+> **Onde isso está em 27/10/2026.** O `CLAUDE.md` foi reescrito em cartões em
+> 20–21/10, e a Mesa já é o caminho normal ali: **R-COR-01 a R-COR-07** em
+> `docs/regras/expedicao.md`, e **R-COR-05** diz que o terminal chama a mesma régua.
+> **O que segura o arquivamento são as duas provas de fábrica**, e só elas:
+>
+> 1. **uma ação por objeto** corrigida pelo dono na tela — descartar um fantasma, dar
+>    saída num volume, tirar uma linha da fila. O bloco já foi provado em 22/10 (mais
+>    de 500 caixas), e ele exercita a prévia, o motivo e o `correcao`; o que não foi
+>    exercitado é o caminho buscar → abrir o objeto → ação que vale;
+> 2. **a primeira cancelada real depois da etiqueta** — pendente desde 26/09/2026, e
+>    hoje ela prova as duas pontas de uma vez: o registro na Mesa **e** o ↩ Sobrou da
+>    Conferência, que é para onde o "voltou" foi.
+>
+> Feitas as duas, esta spec vai para `docs/arquivo/` e os cartões passam a ser a
+> única fonte.
