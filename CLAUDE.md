@@ -544,7 +544,7 @@ de várias, o painel "depois" e a Mesa são texto montado.
 
 ### ⚠️ A ABA BLOQUEADOS VIROU "PENDÊNCIAS" — a central, fase 1 (27/10/2026)
 
-Spec `docs/specs/CENTRAL-DE-PENDENCIAS.md`. O dono: *"essas pendências devemos
+Spec `docs/arquivo/CENTRAL-DE-PENDENCIAS.md`. O dono: *"essas pendências devemos
 concentrar em apenas uma única tela, para não ficar o problema espalhado"*. No
 topo da aba (antiga Bloqueados) fica o **número** de cada lugar onde uma pessoa
 tem algo a decidir — Bloqueados, Correções, ajuste de saldo, inventário
@@ -638,6 +638,13 @@ Etiqueta de Venda e a Conferência não abre o admin. Agora:
 > ⚠️ **A LINHA DA CONFERÊNCIA FICA FORA DO REDESENHO DE 4 s.** Ela se atualiza
 > sozinha a cada 60 s; dentro do `carregar()` ela pediria a central inteira 15
 > vezes por minuto por tablet, e o redesenho é o que apaga campo digitado (§12).
+>
+> ✅ **A FASE 3 ESTÁ NO AR E CONFERIDA EM 27/10/2026** (PR #240): o dono
+> conferiu a linha nas duas telas da bancada, o quadro da TV com o mesmo número
+> da aba, a linha num tablet de quem **não** é admin (a permissão nova pegando)
+> e o motivo que não some do card da venda sem etiqueta. A spec foi para
+> `docs/arquivo/`; o sob medida e o aviso por WhatsApp ou e-mail ficaram para
+> depois, por decisão do dono.
 
 **Rode `node teste_pendencias.js` (65) ao mexer na fase 3.** Quatro defeitos
 reintroduzidos: Bloqueados sem a venda sem etiqueta (reprova 2), sem o PDF

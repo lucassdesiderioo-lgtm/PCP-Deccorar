@@ -1,5 +1,5 @@
 /* pendencias_dominio.js — a central de pendências, fase 1 (spec
- * docs/specs/CENTRAL-DE-PENDENCIAS.md, 27/10/2026).
+ * docs/arquivo/CENTRAL-DE-PENDENCIAS.md, 27/10/2026).
  *
  * O que espera uma pessoa decidir mora em sete lugares (Correções, ajuste de
  * saldo, inventário, contagem de material, SKU incompleto, sobras da
