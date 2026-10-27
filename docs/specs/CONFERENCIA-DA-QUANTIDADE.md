@@ -32,8 +32,14 @@
 > etiqueta e a nota dos casos do Roberto são reconstruídas, porque o PDF não
 > chegou inteiro — a folha é a do print.
 >
-> **Falta:** a fase 2 (o relatório do ML) · o destino da venda 2000018960012186
-> (com o dono).
+> ⚠️ **A venda 2000018960012186 é a NF 8301, e FOI ENVIADA por fora do sistema**
+> (dono, 27/10/2026): não está no banco nem em PDF subido, e falta também no PDF
+> de 16–19/10 (NFs 8268 a 8303, sem a 8301). A caixa nunca foi conferida e o
+> saldo de BK180150BEGE ficou 1 acima — a correção é Admin → Estoque, com
+> motivo, ou a próxima contagem. **Etiqueta impressa por fora é a armadilha #6**
+> (§7 do CLAUDE.md): vale descobrir qual trava empurrou a impressão para fora.
+>
+> **Falta:** a fase 2 (o relatório do ML) · o motivo de a NF 8301 ter saído por fora.
 
 # A conferência da quantidade — o sistema confere o próprio trabalho
 
