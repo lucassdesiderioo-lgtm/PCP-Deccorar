@@ -478,7 +478,19 @@ async function parsePdf(uint8){
      porque quando ela nao fecha nao da para dizer QUAL caixa ficou com menos. */
   if(pecasNaFolha!=null){
     const sistema=orders.reduce((s,o)=>s+(o.itens?o.itens.reduce((a,i)=>a+(i.qtd||1),0):1),0);
-    orders.conta={folha:pecasNaFolha, sistema, fecha:pecasNaFolha===sistema};
+    /* ⚠️ A CONTA DIZ QUAL VENDA SOBROU (27/10/2026). O primeiro PDF real que
+       nao fechou (1792590414811: 50 na folha, 49 gravadas) era uma venda da
+       folha cuja etiqueta nao veio no PDF e nunca entrou no sistema — e a
+       venda NAO estava cancelada. O aviso generico mandava procurar uma caixa
+       com peca a menos, que nao existia. Agora a venda com pack ou venda na
+       folha e SEM etiqueta neste PDF sai pelo numero; `resto` e so o que
+       nenhuma explicacao cobre, e so ele fica no aviso generico. */
+    const temEtiqueta=i=>etiquetasDoPdf.some(e=>(i.packId&&e.packId===i.packId)||(i.venda&&e.venda===i.venda));
+    const semEtiqueta=itensFolha.filter(i=>(i.packId||i.venda) && !temEtiqueta(i))
+      .map(i=>({venda:i.venda||null, packId:i.packId||null, sku:i.sku, qtd:Math.max(1,i.qtd||1)}));
+    const explicadas=semEtiqueta.reduce((a,i)=>a+i.qtd,0);
+    orders.conta={folha:pecasNaFolha, sistema, fecha:pecasNaFolha===sistema,
+      semEtiqueta, resto:pecasNaFolha-sistema-explicadas};
   }
   return orders;
 }

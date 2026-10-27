@@ -995,11 +995,23 @@ function avisoQuantidade(qtd,contas){
   /* A conferencia da quantidade (spec CONFERENCIA-DA-QUANTIDADE): caixa retida
      porque as leituras da folha discordam, e PDF cuja conta de persianas nao
      fecha. Os dois em vermelho: o segundo nao retem ninguem, e por isso mesmo
-     precisa gritar antes de alguem imprimir. */
+     precisa gritar antes de alguem imprimir.
+     A venda da folha SEM etiqueta no PDF sai pelo numero (27/10/2026): o
+     primeiro caso real era uma venda que nunca entrou no sistema, e o aviso
+     generico mandava procurar uma caixa errada que nao existia. */
+  var e=function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  var caixa=function(t){ return '<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#fdecea;border:2px solid #c62828;color:#8e1b1b;font-weight:700">⚠ '+t+'</div>'; };
   var h='';
-  if(qtd) h+='<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#fdecea;border:2px solid #c62828;color:#8e1b1b;font-weight:700">⚠ '+qtd+' caixa(s) retida(s) por QUANTIDADE EM DÚVIDA — a folha foi lida de jeitos diferentes e eles não bateram. Confira o pedido no Mercado Livre e libere em Admin → Bloqueados (pacote).</div>';
+  if(qtd) h+=caixa(qtd+' caixa(s) retida(s) por QUANTIDADE EM DÚVIDA — a folha foi lida de jeitos diferentes e eles não bateram. Confira o pedido no Mercado Livre e libere em Admin → Bloqueados (pacote).');
   (contas||[]).forEach(function(c){
-    h+='<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#fdecea;border:2px solid #c62828;color:#8e1b1b;font-weight:700">⚠ '+c.nome+': a folha do ML tem '+c.folha+' persiana(s) e o sistema gravou '+c.sistema+'. Alguma caixa pode estar com peça a menos (ou a mais) — confira antes de imprimir.</div>';
+    var sem=c.semEtiqueta||[];
+    sem.forEach(function(v){
+      h+=caixa(e(c.nome)+': a venda <b>'+e(v.venda||v.packId)+'</b> ('+e(v.sku)+(v.qtd>1?', '+v.qtd+' peças':'')+') está na folha do ML e <b>sem etiqueta neste PDF</b> — ela não entrou no sistema. Confira no Mercado Livre: se não foi cancelada, falta subir o PDF com a etiqueta dela.');
+    });
+    var resto=(c.resto!=null)?c.resto:(c.folha-c.sistema);
+    if(resto) h+=caixa(e(c.nome)+': a folha do ML tem '+c.folha+' persiana(s) e o sistema gravou '+c.sistema
+      +(sem.length?' — '+(c.folha-c.sistema-resto)+' explicada(s) acima, e '+resto+' sem explicação':'')
+      +'. Alguma caixa pode estar com peça a menos (ou a mais) — confira antes de imprimir.');
   });
   return h;
 }
@@ -1012,7 +1024,7 @@ async function upMany(fileList){
     try{
       var j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
       if(j.erro){ continue; }
-      totNov+=j.novos||0; totRep+=j.repetidas||0; totRel+=j.religadas||0; totQtd+=j.quantidade_duvida||0; if(j.conta_pdf&&!j.conta_pdf.fecha) contas.push({nome:files[i].name,folha:j.conta_pdf.folha,sistema:j.conta_pdf.sistema}); totSem+=j.sem_sku||0; totPdf+=j.total||0; totCol+=j.coleta||0; totMod+=j.modalidade_duvida||0; ok++;
+      totNov+=j.novos||0; totRep+=j.repetidas||0; totRel+=j.religadas||0; totQtd+=j.quantidade_duvida||0; if(j.conta_pdf&&!j.conta_pdf.fecha) contas.push(Object.assign({nome:files[i].name},j.conta_pdf)); totSem+=j.sem_sku||0; totPdf+=j.total||0; totCol+=j.coleta||0; totMod+=j.modalidade_duvida||0; ok++;
     }catch(e){}
   }
   // Quantas o caminhão vem buscar sai aqui, na hora: é o momento de estranhar

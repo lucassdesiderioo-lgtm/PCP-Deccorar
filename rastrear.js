@@ -198,7 +198,14 @@ async function auditar(){
   T('  (abaixo de 90% numa delas: o ML pode ter mudado a folha — avise antes de subir o proximo PDF)');
   if(contas.length){
     T(''); T('PDFs CUJA CONTA DE PERSIANAS NAO FECHA:');
-    contas.forEach(c=>T('  '+c.arq+': a folha tem '+c.folha+', o sistema gravou '+c.sistema));
+    contas.forEach(c=>{
+      T('  '+c.arq+': a folha tem '+c.folha+', o sistema gravou '+c.sistema);
+      /* A venda da folha sem etiqueta no PDF sai pelo numero: o primeiro caso
+         real foi uma venda que nunca entrou no sistema, nao uma caixa errada. */
+      (c.semEtiqueta||[]).forEach(v=>T('     venda '+(v.venda||v.packId)+' ('+v.sku+') esta na folha e SEM etiqueta neste PDF'
+        +' — confira no ML: se nao foi cancelada, falta subir o PDF dela'));
+      if(c.resto) T('     '+c.resto+' persiana(s) sem explicacao — alguma caixa pode estar com peca a menos');
+    });
   }
   T('');
   T('CAIXAS GRAVADAS COM MENOS PERSIANAS DO QUE A FOLHA DIZ: '+menos.length);

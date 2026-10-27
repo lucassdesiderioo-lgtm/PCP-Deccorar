@@ -1,4 +1,13 @@
-> **STATUS · 27/10/2026 — APROVADA, FASE 1 EM CÓDIGO** (aguardando deploy) ·
+> **STATUS · 27/10/2026 — APROVADA, FASE 1 NO AR** (PR #235, deploy do dono no
+> mesmo dia: `/login` 200, telas 302, API 401) · ✅ **a causa da NF 8196 confirmada
+> no banco**: o PDF do Roberto tinha 1 etiqueta sem item na folha · ✅ a primeira
+> auditoria em produção (414 caixas, 17 PDFs): cobertura de 99–100% nas três
+> leituras e **zero** caixa gravada com menos peças · ✅ **o primeiro aviso real**
+> da conta do PDF (folha 50, sistema 49) era uma venda da folha **sem etiqueta**
+> (2000018960012186, BK180150BEGE) que nunca entrou no sistema e **não estava
+> cancelada** — o aviso genérico mandava procurar uma caixa errada; no mesmo dia
+> ele passou a dizer a venda pelo número (`semEtiqueta`, `resto`) e virou o 4º
+> caso do caderno ·
 > `NOVIDADE` + `REGRA` · risco 🔴. Nasceu da NF 8196 (Roberto, 19/10/2026): um
 > pacote de **dois SKUs** numa etiqueta, o sistema gravou **1** e o cliente
 > recebeu uma. Respostas do dono no §7: reter já, quem assina o pacote libera,
@@ -23,8 +32,8 @@
 > etiqueta e a nota dos casos do Roberto são reconstruídas, porque o PDF não
 > chegou inteiro — a folha é a do print.
 >
-> **Falta:** confirmar no banco que o PDF real do Roberto tinha uma etiqueta sem
-> item (a consulta está no fechamento) · a fase 2 (o relatório do ML).
+> **Falta:** a fase 2 (o relatório do ML) · o destino da venda 2000018960012186
+> (com o dono).
 
 # A conferência da quantidade — o sistema confere o próprio trabalho
 

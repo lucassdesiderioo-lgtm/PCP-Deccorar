@@ -71,6 +71,15 @@ async function rodar(caso){
       body:JSON.stringify({pdf:'data:application/pdf;base64,'+buf.toString('base64')})});
     const corpo=await r.json();
     ok(caso.id+': o upload aceitou o PDF', r.status===200 && corpo.ok, JSON.stringify(corpo));
+    /* A conta do PDF inteiro (opcional no caso): quais vendas a folha traz SEM
+       etiqueta no PDF, e quantas persianas sobram sem explicação. */
+    if(caso.conta){
+      const c=corpo.conta_pdf||{};
+      const vendas=(c.semEtiqueta||[]).map(v=>v.venda||v.packId).sort();
+      ok(caso.id+': a conta aponta as vendas sem etiqueta '+(caso.conta.semEtiqueta||[]).join(', '),
+         JSON.stringify(vendas)===JSON.stringify((caso.conta.semEtiqueta||[]).slice().sort()), 'veio '+JSON.stringify(vendas));
+      if(caso.conta.resto!=null) ok(caso.id+': sobram '+caso.conta.resto+' persiana(s) sem explicação', c.resto===caso.conta.resto, 'veio '+c.resto);
+    }
     for(const e of caso.esperado){
       const v=db.prepare('SELECT * FROM lote WHERE packId=? OR venda=?').get(e.chave,e.chave);
       ok(caso.id+': a venda '+e.chave+' entrou', !!v);
