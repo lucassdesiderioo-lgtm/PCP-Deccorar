@@ -277,12 +277,15 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
      persianas numa etiqueta so. Fica ACIMA de tudo porque e a unica retencao em
      que o problema e PECA FALTANDO: as outras sao volume mal classificado. -->
 <div class="card" id="pacCard" style="display:none;border:2px solid #e0a63f">
-  <div style="font-weight:800;color:#8a5a00;font-size:16px;margin-bottom:6px">📦 ETIQUETA COM MAIS DE UM PRODUTO — assine as peças</div>
+  <div style="font-weight:800;color:#8a5a00;font-size:16px;margin-bottom:6px">📦 O QUE VAI NESTA CAIXA — mais de um produto, ou quantidade em dúvida: assine as peças</div>
   <div style="font-size:13px;color:#5a6472;margin-bottom:12px">
     O Mercado Livre juntou mais de uma persiana na <b>mesma etiqueta</b> ("Pacote de N produtos", no painel dele).
     A etiqueta de venda continua sendo <b>uma só</b> — o que muda é o que vai <b>dentro da caixa</b>.
     Abra o pedido no ML, confira peça por peça e <b>assine</b>: é essa lista que a bancada vai bipar
     antes de imprimir, e é por ela que o estoque baixa. Enquanto isso o volume não imprime e não carrega.
+    <br><b>Também param aqui as caixas com a QUANTIDADE EM DÚVIDA</b>: a folha do ML foi lida de jeitos
+    diferentes e eles não bateram (o motivo diz o que cada leitura achou). As peças já vêm com o
+    <b>maior</b> número lido — confira no pedido e corrija antes de assinar.
   </div>
   <div id="pacLista"></div>
 </div>
@@ -2588,22 +2591,34 @@ document.getElementById('upTit').onclick=function(){
 document.getElementById('drop').onclick=function(){ document.getElementById('file').click(); };
 document.getElementById('file').onchange=function(e){ upMany(e.target.files); e.target.value=''; };
 function b64(f){ return new Promise(function(r){ var fr=new FileReader(); fr.onload=function(){r(fr.result);}; fr.readAsDataURL(f); }); }
+function avisoQuantidade(qtd,contas){
+  /* A conferencia da quantidade (spec CONFERENCIA-DA-QUANTIDADE): caixa retida
+     porque as leituras da folha discordam, e PDF cuja conta de persianas nao
+     fecha. Os dois em vermelho: o segundo nao retem ninguem, e por isso mesmo
+     precisa gritar antes de alguem imprimir. */
+  var h='';
+  if(qtd) h+='<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#fdecea;border:2px solid #c62828;color:#8e1b1b;font-weight:700">⚠ '+qtd+' caixa(s) retida(s) por QUANTIDADE EM DÚVIDA — a folha foi lida de jeitos diferentes e eles não bateram. Confira o pedido no Mercado Livre e libere em Admin → Bloqueados (pacote).</div>';
+  (contas||[]).forEach(function(c){
+    h+='<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#fdecea;border:2px solid #c62828;color:#8e1b1b;font-weight:700">⚠ '+c.nome+': a folha do ML tem '+c.folha+' persiana(s) e o sistema gravou '+c.sistema+'. Alguma caixa pode estar com peça a menos (ou a mais) — confira antes de imprimir.</div>';
+  });
+  return h;
+}
 async function upMany(fl){
   var files=[].slice.call(fl).filter(function(f){ return /pdf/i.test(f.type)||/\.pdf$/i.test(f.name); });
   if(!files.length) return;
-  var nov=0,rep=0,rel=0,bloq=0,ok=0;
+  var nov=0,rep=0,rel=0,bloq=0,ok=0,totQtd=0,contas=[];
   for(var i=0;i<files.length;i++){
     document.getElementById('res').innerHTML='Lendo '+(i+1)+' de '+files.length+'...';
     try{
       var j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
       if(j.erro) continue;
-      nov+=j.novos; rep+=j.repetidas; rel+=(j.religadas||0); bloq+=(j.bloqueados||0); ok++;
+      nov+=j.novos; rep+=j.repetidas; rel+=(j.religadas||0); bloq+=(j.bloqueados||0); totQtd+=j.quantidade_duvida||0; if(j.conta_pdf&&!j.conta_pdf.fecha) contas.push({nome:files[i].name,folha:j.conta_pdf.folha,sistema:j.conta_pdf.sistema}); ok++;
     }catch(e){}
   }
   var msg='<b>'+ok+' PDF(s)</b> - '+nov+' vendas novas, '+rep+' repetidas';
   if(rel>0) msg+=', '+rel+' antiga(s) voltaram a ter PDF (já dá pra reimprimir)';
   if(bloq>0) msg+=', <b style="color:#ff6b6b">'+bloq+' BLOQUEADAS</b> (SKU fora do cadastro)';
-  document.getElementById('res').innerHTML=msg;
+  document.getElementById('res').innerHTML=msg+avisoQuantidade(totQtd,contas);
   verCruz();
 }
 async function verCruz(){

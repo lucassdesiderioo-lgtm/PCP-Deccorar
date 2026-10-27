@@ -165,6 +165,49 @@ async function auditar(){
         div.push({v,esperado,arq:path.basename(arq)});
     }
   }
+  /* ── A QUANTIDADE (spec CONFERENCIA-DA-QUANTIDADE) ──────────────────────
+     Relê cada PDF pelo MESMO parse.js do upload e mede duas coisas:
+       - a COBERTURA de cada leitura da quantidade: em quantos volumes ela
+         conseguiu ler. Leitura que deixa de ler — o ML mudou o layout — cai
+         aqui antes de virar reclamação (o mesmo desenho do R-CONF-06);
+       - a caixa GRAVADA com menos persianas do que alguma leitura diz hoje:
+         é a lista de quem pode ter recebido a menos (o caso do Roberto). */
+  const {parsePdf}=require('./parse');
+  const cob={total:0,bloco:0,item:0,crua:0}; const menos=[]; const contas=[];
+  for(const arq of arqs){
+    let os_; try{ os_=await parsePdf(new Uint8Array(fs.readFileSync(arq))); }catch(e){ continue; }
+    if(os_.conta && !os_.conta.fecha) contas.push({arq:path.basename(arq),...os_.conta});
+    const gravadas=db.prepare(`SELECT l.*, COALESCE((SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id),1) pecas
+      FROM lote l WHERE srcfile=?`).all(arq);
+    for(const o of os_){
+      cob.total++;
+      if(o.leituras){ if(o.leituras.bloco!=null) cob.bloco++; if(o.leituras.item!=null) cob.item++; if(o.leituras.crua!=null) cob.crua++; }
+      const v=gravadas.find(g=>(o.packId&&g.packId===o.packId)||(o.venda&&g.venda===o.venda));
+      if(!v) continue;
+      const l=o.leituras||{};
+      const maior=Math.max(l.bloco||0,l.item||0,l.crua||0,(o.itens||[]).reduce((s,i)=>s+(i.qtd||1),0));
+      if(maior>v.pecas) menos.push({v,maior,l});
+    }
+  }
+  const pct=n=>cob.total?' ('+Math.round(100*n/cob.total)+'%)':'';
+  T('');
+  T('QUANTIDADE — em quantos volumes cada leitura conseguiu ler:');
+  T('  folha por bloco     : '+cob.bloco+' de '+cob.total+pct(cob.bloco));
+  T('  folha item a item   : '+cob.item+' de '+cob.total+pct(cob.item));
+  T('  folha inteira (crua): '+cob.crua+' de '+cob.total+pct(cob.crua));
+  T('  (abaixo de 90% numa delas: o ML pode ter mudado a folha — avise antes de subir o proximo PDF)');
+  if(contas.length){
+    T(''); T('PDFs CUJA CONTA DE PERSIANAS NAO FECHA:');
+    contas.forEach(c=>T('  '+c.arq+': a folha tem '+c.folha+', o sistema gravou '+c.sistema));
+  }
+  T('');
+  T('CAIXAS GRAVADAS COM MENOS PERSIANAS DO QUE A FOLHA DIZ: '+menos.length);
+  menos.forEach(m=>{
+    T('  #'+m.v.id+'  '+(m.v.buyer||'—')+'   NF '+(m.v.nf||'—')+'   '+m.v.data+'   ('+m.v.estagio+')');
+    T('     gravado '+m.v.pecas+' · a folha diz '+m.maior+'   (bloco '+(m.l.bloco??'—')+' · item a item '+(m.l.item??'—')+' · crua '+(m.l.crua??'—')+')');
+  });
+  if(menos.length) T('  ← confira o pedido no ML: se a caixa ja saiu, o cliente pode ter recebido a menos');
+
   T('');
   T('PDFs lidos          : '+arqs.length);
   T('Volumes conferidos  : '+conferidos);

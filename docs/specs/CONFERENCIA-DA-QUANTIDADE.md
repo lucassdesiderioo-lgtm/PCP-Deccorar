@@ -1,10 +1,30 @@
-> **STATUS · 27/10/2026 — RASCUNHO, COM QUATRO RESPOSTAS DO DONO** (§7: reter já,
-> quem assina o pacote libera, nomes trocados ok, o PDF vem) · `NOVIDADE` + `REGRA`
-> · risco 🔴 (etiqueta, estoque). Nasceu da NF 8196 (Roberto, 19/10/2026): o ML
-> vendeu **2** persianas numa etiqueta, o sistema gravou **1**, e o cliente
-> recebeu uma. Outros clientes relataram o mesmo. **Nada construído** (§0:
-> `REGRA`/`NOVIDADE` sem spec aprovada não se constrói). As perguntas do §7 são
-> do dono.
+> **STATUS · 27/10/2026 — APROVADA, FASE 1 EM CÓDIGO** (aguardando deploy) ·
+> `NOVIDADE` + `REGRA` · risco 🔴. Nasceu da NF 8196 (Roberto, 19/10/2026): um
+> pacote de **dois SKUs** numa etiqueta, o sistema gravou **1** e o cliente
+> recebeu uma. Respostas do dono no §7: reter já, quem assina o pacote libera,
+> nomes trocados no caderno.
+>
+> **Fase 1 em código (27/10/2026):** o irmão do pacote com o PDF sem fechar
+> **retém** a caixa em vez de sumir (R-VOL-03); a testemunha lê a quantidade
+> (L2); a folha inteira (L3) conta toda persiana entre uma venda e a próxima,
+> abrindo venda **só por pack ou venda**; a conta do PDF (L4) vai na resposta do
+> upload e em vermelho nas três telas; a caixa em dúvida vai ao card do pacote
+> com o maior número já escrito (R-VOL-09). O caderno de casos (`casos/`,
+> `registrar_caso.js`, `teste_casos_reais.js`) nasceu com três casos: NF 8196
+> com o PDF sem fechar e fechando, e NF 8152. `rastrear.js --auditar` mede a
+> cobertura de cada leitura e lista caixa gravada com menos peças do que a
+> folha diz. **Testes:** `teste_quantidade.js` 35 (escrito antes; cada leitura
+> desligada reprova o caso dela) · `teste_casos_reais.js` 27 · o PDF real de
+> 16–19/10 sem nenhuma caixa retida à toa.
+>
+> **Divergências da construção:** (1) a nota saiu das leituras — o DANFE
+> simplificado não traz produto (§3.1); (2) a folha crua não reconhece venda
+> pelo nome do comprador, para não errar junto com a leitura por bloco; (3) a
+> etiqueta e a nota dos casos do Roberto são reconstruídas, porque o PDF não
+> chegou inteiro — a folha é a do print.
+>
+> **Falta:** confirmar no banco que o PDF real do Roberto tinha uma etiqueta sem
+> item (a consulta está no fechamento) · a fase 2 (o relatório do ML).
 
 # A conferência da quantidade — o sistema confere o próprio trabalho
 
