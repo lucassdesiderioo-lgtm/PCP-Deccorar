@@ -823,44 +823,78 @@ listaFut();
 // Existe pra UM momento: a impressora enroscou e ninguém lembra qual era a
 // venda. Por isso vem do mais recente pro mais antigo, e a busca aceita
 // cliente, NF ou SKU — que é o que o operador tem na mão nessa hora.
-var impCache=[];
+var impCache=[], impCorte=null;
+/* A BUSCA VAI AO SERVIDOR, NO HISTÓRICO INTEIRO (27/10/2026). Até aqui ela
+   filtrava no navegador só a lista do período — e a lista para em 400 vendas,
+   uns 7 dias no ritmo da fábrica: o "30 dias" não trazia 30 dias, e a NF de
+   uma semana e meia atrás dava "Nada com esse termo". `seq` descarta a
+   resposta que chega depois de uma busca mais nova. */
+var busca={q:'', lista:null, corte:null, erro:false, seq:0, timer:null};
 function horaDe(s){
   if(!s) return '—';
   var p=String(s).split(' '), hm=(p[1]||'').slice(0,5);
   var hoje=new Date().toLocaleDateString('sv-SE');   // AAAA-MM-DD, igual ao banco
   if(p[0]===hoje) return hm;
   var d=(p[0]||'').split('-');
-  return (d[2]||'')+'/'+(d[1]||'')+' '+hm;
+  // A busca acha venda de qualquer data: de outro ano, o ano vai junto.
+  var ano=(d[0]&&d[0]!==hoje.slice(0,4))?'/'+d[0].slice(2):'';
+  return (d[2]||'')+'/'+(d[1]||'')+ano+' '+hm;
 }
+function termoImp(){ return ((document.getElementById('impBusca')||{}).value||'').trim(); }
 async function listaImp(){
   var dias=(document.getElementById('impDias')||{}).value||'1';
-  try{ var l=await (await fetch('/api/impressos?dias='+dias)).json(); impCache=Array.isArray(l)?l:[]; }catch(e){ return; }
+  try{
+    var r=await fetch('/api/impressos?dias='+dias), l=await r.json();
+    impCache=Array.isArray(l)?l:[]; impCorte=r.headers.get('X-Cortado');
+  }catch(e){ return; }
   renderImp();
   // A tela parada precisa aprender qual é a última: no primeiro idle() a lista
   // ainda não tinha chegado, e depois de cada impressão a última muda.
   if(emIdle) idle();
+  // Reimprimiu ou subiu PDF com uma busca aberta: o resultado dela muda junto.
+  if(termoImp()) buscaImp();
+}
+async function buscaImp(){
+  var q=termoImp(), meu=++busca.seq;
+  if(!q){ busca.q=''; busca.lista=null; busca.corte=null; busca.erro=false; renderImp(); return; }
+  try{
+    var r=await fetch('/api/impressos?q='+encodeURIComponent(q)), l=await r.json();
+    if(meu!==busca.seq) return;
+    busca.q=q; busca.lista=Array.isArray(l)?l:[]; busca.corte=r.headers.get('X-Cortado'); busca.erro=false;
+  }catch(e){
+    if(meu!==busca.seq) return;
+    busca.q=q; busca.lista=null; busca.erro=true;
+  }
+  renderImp();
 }
 function renderImp(){
   var el=document.getElementById('impLista'); if(!el) return;
-  var q=((document.getElementById('impBusca')||{}).value||'').trim().toLowerCase();
-  var qs=q.replace(/[^a-z0-9]/g,'');
-  var l=impCache.filter(function(r){
-    if(!q) return true;
-    // Os SKUs da caixa de várias entram na busca: quem tem na mão a etiqueta
-    // da SEGUNDA persiana tem que achar a venda por ela também.
-    var alvo=[r.buyer,r.nf,r.codigo,r.city,r.packId,r.venda]
-      .concat((r.itens||[]).map(function(i){ return i.codigo; })).join(' ').toLowerCase();
-    if(alvo.indexOf(q)>=0) return true;
-    return !!qs && alvo.replace(/[^a-z0-9]/g,'').indexOf(qs)>=0;
-  });
-  var cnt=document.getElementById('impQtd');
-  if(cnt) cnt.textContent=l.length+(q?' de '+impCache.length:'')+' impressa'+(l.length===1?'':'s');
-  if(!l.length){ el.innerHTML='<span class="vazio">'+(impCache.length?'Nada com esse termo.':'Nenhuma etiqueta impressa no período.')+'</span>'; return; }
+  var q=termoImp(), cnt=document.getElementById('impQtd'), l, h='';
+  if(q){
+    if(busca.q!==q || !busca.lista){
+      if(cnt) cnt.textContent='';
+      el.innerHTML='<span class="vazio">'+(busca.q===q && busca.erro
+        ? 'Sem conexão — a busca não chegou ao servidor. Tente de novo.'
+        : 'Buscando em todas as datas…')+'</span>';
+      return;
+    }
+    l=busca.lista;
+    if(cnt) cnt.textContent=l.length+(busca.corte?'+':'')+' encontrada'+(l.length===1?'':'s')+' · todas as datas';
+    if(!l.length){ el.innerHTML='<span class="vazio">Nenhuma venda impressa com esse termo, em nenhuma data.</span>'; return; }
+    if(busca.corte) h+='<div class="vazio" style="padding-bottom:8px">Mais de '+busca.corte+' vendas com esse termo — aqui estão as mais recentes. Escreva mais (a NF inteira, o nome todo) pra achar a venda.</div>';
+  } else {
+    l=impCache;
+    if(cnt) cnt.textContent=l.length+' impressa'+(l.length===1?'':'s');
+    if(!l.length){ el.innerHTML='<span class="vazio">Nenhuma etiqueta impressa no período.</span>'; return; }
+    /* O teto da lista não corta calado: quem escolheu "30 dias" tem que saber
+       que não está vendo 30 dias, e por onde achar o resto. */
+    if(impCorte) h+='<div class="vazio" style="padding-bottom:8px;color:#8a5a00;font-weight:700">O período tem mais de '+impCorte+' vendas: aqui estão as '+impCorte+' mais recentes. Pra uma mais antiga, busque pela NF, cliente ou SKU — a busca olha todas as datas.</div>';
+  }
   // A ÚLTIMA é sempre a mesma venda, esteja a lista filtrada ou não — por isso
   // marcada por id, e não pela posição na tela. "Última" = última que saiu pela
   // PRIMEIRA vez; reimprimir uma venda velha não a promove a última.
   var ultimoId=(impCache[0]||{}).id;
-  var mostra=l.slice(0,60), h='';
+  var mostra=l.slice(0,60);
   for(var i=0;i<mostra.length;i++){
     var r=mostra[i], eh=(r.id===ultimoId);
     h+='<div class="imp'+(eh?' ultima':'')+'"><div class="who"><div class="nome">'+esc(r.buyer||'—')
@@ -883,16 +917,24 @@ function renderImp(){
          ele é o PRIMEIRO item, e sozinho fazia dois SKUs parecerem um. */
       +'<div class="meta">NF <b>'+esc(r.nf||'—')+'</b>'+(pecasDe(r.itens)>1?'':' · <b>'+esc(r.codigo||'—')+'</b>')+' · '+horaDe(r.embalado_em)
       +(r.city?' · '+esc(r.city):'')
-      +(r.estagio==='carregado'?' · <span style="color:#2e7d32">carregado</span>':'')+'</div>'
+      +(r.estagio==='carregado'?' · <span style="color:#2e7d32">carregado</span>':'')
+      /* O PDF de origem sai do servidor em 7 dias (cron). A tela diz ANTES do
+         clique; o que fazer vem no clique (subir o PDF de novo religa). Curto,
+         porque no "30 dias" quase toda linha é assim — frase longa repetida
+         em cada uma é a lista que se aprende a não ler. */
+      +(r.tem_pdf===0?' · <span style="color:#8a5a00;font-weight:700;white-space:nowrap">PDF saiu do servidor</span>':'')+'</div>'
       +pecasCaixa(r.itens,true)+'</div>'
-      +'<button class="rebt'+(eh?' forte':'')+'" onclick="reimprimir('+r.id+',this)">🖨 Reimprimir'+(eh?' a última':'')+'</button></div>';
+      +'<button class="rebt'+(eh?' forte':'')+'" onclick="reimprimir('+r.id+',this)">'+(r.tem_pdf===0?'📄 Reimprimir (sem PDF)':'🖨 Reimprimir'+(eh?' a última':''))+'</button></div>';
   }
   if(l.length>mostra.length) h+='<div class="vazio" style="padding-top:10px">Mostrando '+mostra.length+' de '+l.length+' — use a busca pra achar a venda.</div>';
   el.innerHTML=h;
 }
 (function(){
   var b=document.getElementById('impBusca'), d=document.getElementById('impDias');
-  if(b) b.addEventListener('input',renderImp);
+  if(b) b.addEventListener('input',function(){
+    clearTimeout(busca.timer); renderImp();
+    busca.timer=setTimeout(buscaImp,300);
+  });
   if(d) d.addEventListener('change',listaImp);
 })();
 setInterval(listaImp,15000);
@@ -952,19 +994,22 @@ function b64(f){ return new Promise(function(r){var fr=new FileReader();fr.onloa
 async function upMany(fileList){
   var files=[].slice.call(fileList).filter(function(f){ return /pdf/i.test(f.type)||/\.pdf$/i.test(f.name); });
   if(!files.length) return;
-  var totNov=0,totRep=0,totSem=0,totPdf=0,totCol=0,totMod=0,ok=0;
+  var totNov=0,totRep=0,totRel=0,totSem=0,totPdf=0,totCol=0,totMod=0,ok=0;
   for(var i=0;i<files.length;i++){
     document.getElementById('upRes').innerHTML='Lendo '+(i+1)+' de '+files.length+': <b>'+files[i].name+'</b>…';
     try{
       var j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
       if(j.erro){ continue; }
-      totNov+=j.novos||0; totRep+=j.repetidas||0; totSem+=j.sem_sku||0; totPdf+=j.total||0; totCol+=j.coleta||0; totMod+=j.modalidade_duvida||0; ok++;
+      totNov+=j.novos||0; totRep+=j.repetidas||0; totRel+=j.religadas||0; totSem+=j.sem_sku||0; totPdf+=j.total||0; totCol+=j.coleta||0; totMod+=j.modalidade_duvida||0; ok++;
     }catch(e){}
   }
   // Quantas o caminhão vem buscar sai aqui, na hora: é o momento de estranhar
   // um PDF de coleta que deu zero, ou um de agência que virou coleta inteiro.
   // E se a etiqueta mudou de formato, o aviso é aqui — a gestão decide em Bloqueados.
   document.getElementById('upRes').innerHTML='<b>'+ok+' PDF(s)</b> · '+totNov+' vendas adicionadas · '+totPdf+' no total · '+totRep+' repetidas · '+totSem+' sem SKU'
+    /* A venda antiga cujo PDF o cron apagou volta a reimprimir quando o PDF
+       sobe de novo — e quem subiu precisa saber que funcionou. */
+    +(totRel?' · <b>'+totRel+' antiga(s) voltaram a ter PDF</b> (já dá pra reimprimir)':'')
     +(totCol?' · <span class="tagC" style="margin-left:0">🚚 '+totCol+' pra coleta</span>':'')
     +(totMod?'<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#efe9fb;border:2px solid #6f42c1;color:#4b2a91;font-weight:700">⚠ '+totMod+' etiqueta(s) num formato que o sistema não conhece — retidas. Defina agência ou coleta em Admin → Bloqueados.</div>':'');
   stats(); listaPend();
