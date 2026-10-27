@@ -2384,7 +2384,10 @@ function pacPeca(i){
 }
 function pacLinha(vid,i,k){
   var txt=pacPeca(i);
-  return '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px" data-pacrow="'+vid+'">'
+  /* flex-wrap: a descricao da peca (flex-basis:100%) vai para a linha de baixo.
+     Sem ele, ela ficava na MESMA linha e espremia o campo do SKU a 24 px —
+     quem assinava nao conseguia ler nem corrigir o codigo (27/10/2026). */
+  return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;margin-bottom:6px" data-pacrow="'+vid+'">'
     +'<input value="'+esc(i.codigo||'')+'" data-paccod="1" placeholder="bipe ou digite o SKU" '
       +'autocapitalize="characters" autocorrect="off" spellcheck="false" '
       +'style="flex:1;min-width:0;font-family:ui-monospace,monospace;text-transform:uppercase">'
