@@ -153,7 +153,7 @@ module.exports = [
   { chave:'contagem.contar',      grupo:'Estoque',    nivel:'operacao',
     rotulo:'Contar estoque',      desc:'Bipar peças na conferência' },
   { chave:'contagem.ajustar',     grupo:'Estoque',    nivel:'admin',
-    rotulo:'Aprovar ajuste de estoque', desc:'Aplicar a contagem ao estoque',
+    rotulo:'Aprovar contagem de material', desc:'Aplicar ao estoque de material a contagem da aba Contagem',
     sensivel:true },
   { chave:'estoque.editar',       grupo:'Estoque',    nivel:'admin',
     rotulo:'Editar estoque direto', desc:'Alterar quantidade manualmente',

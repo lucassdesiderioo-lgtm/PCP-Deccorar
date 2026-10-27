@@ -753,6 +753,20 @@ if(cob){
     cob.linhas.some(l => l.rota.indexOf('/api/') === 0), 'nenhuma rota /api/ na varredura');
 }
 
+/* DUAS PERMISSOES COM O MESMO NOME NA TELA (27/10/2026). `contagem.ajustar`
+   (a contagem de MATERIAL da aba Contagem) e `estoque.aprovar_ajuste` (o
+   ajuste de saldo em duas pessoas) se chamavam as duas "Aprovar ajuste de
+   estoque": na tela de Acessos e na central de pendencias nao dava para saber
+   qual caixinha dar a quem. O nome e o que a pessoa le; a chave continua. */
+{
+  const PERMS = require('./permissoes');
+  const porNome = {};
+  PERMS.forEach(p => { (porNome[p.rotulo] = porNome[p.rotulo] || []).push(p.chave); });
+  const repetidos = Object.keys(porNome).filter(k => porNome[k].length > 1);
+  ok('nenhuma permissao tem o mesmo nome de outra na tela', repetidos.length === 0,
+    repetidos.map(k => '"' + k + '": ' + porNome[k].join(', ')).join(' · '));
+}
+
 db.close();
 try{ fs.rmSync(dir, { recursive:true, force:true }); }catch(e){}
 console.log('');
