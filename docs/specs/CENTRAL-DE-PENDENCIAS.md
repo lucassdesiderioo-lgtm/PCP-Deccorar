@@ -1,9 +1,23 @@
-> **STATUS · 27/10/2026 — RASCUNHO, AGUARDANDO O DONO** · `NOVIDADE` + `REGRA`
-> · risco 🔴 (permissões, telas de decisão). Nasceu de uma frase do dono ao
+> **STATUS · 27/10/2026 — APROVADA, FASE 1 EM CÓDIGO** · `NOVIDADE` · a fase 1
+> é risco 🟡 (só lê; não muda quem decide). Nasceu de uma frase do dono ao
 > decidir onde fica a venda da folha sem etiqueta: *"Essas pendências e esses
 > tipos de problemas devemos concentrar em apenas uma única tela, para não
-> ficar o problema espalhado."* **Nada construído.** As perguntas do §6 são do
-> dono.
+> ficar o problema espalhado."* O dono mandou seguir com as propostas do §6 e
+> aprovou o plano da fase 1 no mesmo dia.
+>
+> **Fase 1 em código (27/10/2026):** a aba Bloqueados virou **"Pendências"**, com
+> um painel no topo que dá o número de cada um dos lugares do §1 — oito linhas
+> mais a de Bloqueados —, há quantos dias espera a mais antiga, quem resolve
+> (pelo nome da permissão) e o caminho para a tela dona. `pendencias_dominio.js`
+> não conta nada: pergunta à função da tela dona. A aba "Pendências de SKU"
+> virou **"SKU incompleto"**. `teste_pendencias.js` (46). Aguarda deploy.
+>
+> **Mudou na construção:** o levantamento achou um **sétimo** lugar — as
+> **devoluções** esperando a baixa do admin — e o inventário são **duas**
+> linhas (aprovar e recontar), porque são permissões diferentes. A cancelada
+> na fábrica aparece em Correções **e** em Sobras (as duas portas a resolvem);
+> o total a conta uma vez. O aviso do upload (`resto`) virar linha gravada
+> ficou para a fase 2: precisa de tabela.
 
 # A central de pendências — um lugar só para o que espera uma pessoa
 
@@ -76,8 +90,8 @@ não muda quem decide — cada card continua com a permissão que tem hoje.
 
 | # | Pergunta | Proposta |
 |---|---|---|
-| C1 | A central é a aba **Bloqueados renomeada** ("Pendências"), ou uma tela nova fora do Admin? | Bloqueados renomeada: já é onde a fábrica olha |
-| C2 | Quem vê a central? Ela fica dentro do Admin, e quem opera a bancada pode não ter Admin | Todo mundo que tem alguma pendência para decidir; cada um vê os cards dele e o total dos outros |
-| C3 | O sob medida entra na mesma central? | Numa fase 3, depois de a do PCP estar em uso |
-| C4 | Quer uma linha no **Painel da TV** com o número de pendências? | Sim, só o número, para ninguém dizer que não viu |
-| C5 | Alguma pendência deve **avisar fora do sistema** (WhatsApp, e-mail) quando passar de N dias? | Fica para depois — primeiro ver o volume real |
+| C1 | A central é a aba **Bloqueados renomeada** ("Pendências"), ou uma tela nova fora do Admin? | ✅ **Bloqueados renomeada** (dono, 27/10/2026) |
+| C2 | Quem vê a central? Ela fica dentro do Admin, e quem opera a bancada pode não ter Admin | ✅ Na fase 1, **quem abre o Admin**, vendo todas as linhas; quem não tem Admin, na fase 3 (dono, 27/10/2026) |
+| C3 | O sob medida entra na mesma central? | ✅ **Depois** (dono, 27/10/2026) |
+| C4 | Quer uma linha no **Painel da TV** com o número de pendências? | ✅ **Sim, na fase 3**, junto com a linha da bancada (dono, 27/10/2026) |
+| C5 | Alguma pendência deve **avisar fora do sistema** (WhatsApp, e-mail) quando passar de N dias? | ✅ **Depois**, quando o volume real for conhecido (dono, 27/10/2026) |

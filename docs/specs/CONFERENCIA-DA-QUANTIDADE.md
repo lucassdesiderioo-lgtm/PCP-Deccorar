@@ -42,10 +42,19 @@
 > **Fase 1-B em código (27/10/2026, aprovada pelo dono no mesmo dia):** a venda
 > da folha sem etiqueta é gravada e fica em **Admin → Bloqueados** até o PDF
 > dela chegar ou alguém resolver com motivo; a Etiqueta de Venda mostra só uma
-> linha (§5-B, R-PDF-09). Aguarda deploy.
+> linha (§5-B, R-PDF-09). ✅ **No ar em 27/10/2026** (PR #237, deploy do dono:
+> `/login` 200).
 >
-> **Falta:** o deploy da fase 1-B · a fase 2 (o relatório do ML) · o motivo de a
-> NF 8301 ter saído por fora.
+> ⚠️ **NO AR NÃO É CONFERIDA.** A prova é o primeiro PDF cuja folha traga uma
+> venda sem etiqueta: ela tem que aparecer no card de Admin → Bloqueados e na
+> linha da Etiqueta de Venda, e sair sozinha quando o PDF dela subir. Se nesse
+> dia o aviso do upload aparecer e o card ficar vazio, é defeito. A NF 8301 não
+> serve de prova: saiu antes da regra existir.
+>
+> **Falta:** a conferência da fase 1-B com dado real · a fase 2 (o relatório do
+> ML com a coluna Unidades) · o motivo de a NF 8301 ter saído por fora · corrigir
+> o saldo do BK180150BEGE (1 acima), que o dono fará depois da correção de
+> estoque.
 
 # A conferência da quantidade — o sistema confere o próprio trabalho
 
@@ -203,7 +212,7 @@ confere todos a cada mudança de código, para sempre.**
 | Fase | O quê | Precisa de |
 |---|---|---|
 | **1** | O caderno (§4) e o primeiro caso, a NF 8196 (a folha que o dono mandou) · **o irmão que o PDF sem fechar descartava passa a RETER o volume, com as peças pré-preenchidas** · L2, L3 (contando também os SKUs irmãos) e L4 · a trava (§3.2) · a cobertura na auditoria | — |
-| **1-B** | **A venda da folha sem etiqueta fica na tela até alguém resolver** (§5-B) — **em código desde 27/10/2026** | — |
+| **1-B** | **A venda da folha sem etiqueta fica na tela até alguém resolver** (§5-B) — **no ar desde 27/10/2026** (PR #237), falta conferir com dado real | — |
 | **2** | L5 (o relatório) e a lista "o ML diz N, o sistema gravou M" | um relatório com a coluna Unidades |
 
 Cada fase com teste escrito antes, backup e deploy fora do horário de

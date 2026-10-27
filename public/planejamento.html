@@ -293,7 +293,7 @@ async function importar(confirmar){
     const fab=(c.embalado||0)+(c.no_canto||0)+(c.no_carro||0);
     if(fab) l.push('<b>'+q(fab,'caixa cancelada já tinha etiqueta','caixas canceladas já tinham etiqueta')+'</b>'
       +(c.no_carro?' ('+c.no_carro+' dentro do carro — tire)':'')
-      +': separe e confira em Admin → Bloqueados → <i>Canceladas depois da etiqueta</i>. O estoque delas <b>não volta sozinho</b>.');
+      +': separe e confira em Admin → Pendências → <i>Canceladas depois da etiqueta</i>. O estoque delas <b>não volta sozinho</b>.');
     if(c.varias) l.push('<b>'+q(c.varias,'caixa de várias persianas tem','caixas de várias persianas têm')+' um item cancelado</b> — '
       +(c.varias===1?'ela não foi cancelada':'elas não foram canceladas')+', porque o cliente ainda quer o resto; confira no mesmo card.');
     if(l.length){ rec.style.display='block'; rec.innerHTML=l.join('<br>'); }

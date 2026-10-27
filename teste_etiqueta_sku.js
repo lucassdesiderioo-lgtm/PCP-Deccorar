@@ -113,7 +113,7 @@ function lerBarras(rs){
   ok('...e SEM M² (area de acessorio nao existe)', !/M²/.test(ta), ta);
   let v = ETQ.conferir(SEM_MEDIDA, 1);
   ok('persiana sem medida e RECUSADA', !v.pronta);
-  ok('...dizendo o caminho (Pendencias de SKU)', /medida/i.test(v.problemas.join(' ')) && /Pend[eê]ncias de SKU/.test(v.problemas.join(' ')), v.problemas.join(' '));
+  ok('...dizendo o caminho (aba SKU incompleto)', /medida/i.test(v.problemas.join(' ')) && /SKU incompleto/.test(v.problemas.join(' ')), v.problemas.join(' '));
   let erro = null; try{ await ETQ.gerar(SEM_MEDIDA, 1); }catch(e){ erro = e; }
   ok('...e o gerar tambem recusa (nao sai PDF sem medida)', !!erro);
 
@@ -198,7 +198,7 @@ function lerBarras(rs){
   eq('SKU que nao existe e 404', r.status, 404);
   r = await chamar('/api/skus/etiqueta', { codigo:'BK999', quantidade:1 });
   eq('persiana sem medida e 409 (falta CADASTRO, nao e pedido errado)', r.status, 409);
-  ok('...com a frase que manda a Pendencias de SKU', r.body && /Pend[eê]ncias de SKU/.test(r.body.erro), r.body && r.body.erro);
+  ok('...com a frase que manda a aba SKU incompleto', r.body && /SKU incompleto/.test(r.body.erro), r.body && r.body.erro);
   r = await chamar('/api/skus/etiqueta', { codigo:'BK180150BRANCO', quantidade:0 });
   eq('quantidade invalida e 400', r.status, 400);
   eq('imprimir NAO mexe no saldo', db.prepare("SELECT estoque FROM skus WHERE codigo='BK180150BRANCO'").get().estoque, 7);

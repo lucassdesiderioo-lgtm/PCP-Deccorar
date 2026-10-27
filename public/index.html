@@ -98,10 +98,10 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
   <div class="tab" data-t="plan">Planejamento</div>
   <div class="tab" data-t="rel">Relatórios</div>
   <div class="tab" data-t="acs">Acessos &amp; Permissões</div>
-  <div class="tab" data-t="pend" id="tabPend">Pendências de SKU</div>
+  <div class="tab" data-t="pend" id="tabPend">SKU incompleto</div>
   <div class="tab" data-t="ficha">Ficha técnica</div>
   <div class="tab" data-t="compras">Compras</div>
-  <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="cor" id="tabCor">Correções</div><div class="tab" data-t="blq" id="tabBlq">Bloqueados</div><div class="tab" data-t="tst">Modo teste</div>
+  <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="cor" id="tabCor">Correções</div><div class="tab" data-t="blq" id="tabBlq">Pendências</div><div class="tab" data-t="tst">Modo teste</div>
 </div>
 <div class="wrap">
   <!-- PRODUÇÃO -->
@@ -268,6 +268,17 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
 </div>
 
 <div id="v-blq" class="hide">
+<!-- A CENTRAL DE PENDENCIAS, fase 1 (spec CENTRAL-DE-PENDENCIAS, 27/10/2026).
+     O dono: "essas pendencias devemos concentrar em apenas uma unica tela".
+     Aqui so os NUMEROS de cada lugar onde uma pessoa tem algo a decidir, com
+     o caminho de onde se resolve; a decisao continua na tela dona, com a
+     permissao dela. Linha zerada fica a vista: o zero que aparece e a prova de
+     que ninguem esqueceu de olhar. -->
+<div class="card" id="pendCentral">
+  <div style="font-weight:800;font-size:16px;margin-bottom:4px">O que espera uma pessoa decidir</div>
+  <div class="sub" style="margin-bottom:10px">Cada linha leva para onde se resolve. A decisão continua com quem tem a permissão de cada uma.</div>
+  <div id="centralResumo" class="sub">carregando…</div>
+</div>
 <!-- A ETIQUETA MUDOU DE FORMATO (§8-B, armadilha #21). O sistema le se a caixa
      e do carro (agencia) ou do caminhao (coleta) pela linha "Despachar:" da
      etiqueta, e so os dois formatos conhecidos decidem. Linha diferente e o
@@ -676,7 +687,7 @@ async function carregarPend(){
     +grupo('Cor pendente','Cor em branco, ou apontando para um código que não está na lista de cores.',d.cor);
 
   const tab=$('#tabPend');
-  if(tab) tab.textContent='Pendências de SKU'+(d.total?' ('+d.total+')':'');
+  if(tab) tab.textContent='SKU incompleto'+(d.total?' ('+d.total+')':'');
 }
 
 /* ---- Ficha técnica por fórmula (COMPRAS.md §3) -------------------------
@@ -2601,6 +2612,44 @@ document.addEventListener("click",async function(e){
   if(r.aviso) alert(r.aviso);
   carregarBloq();
 });
+/* O resumo da central (fase 1). Devolve o total das outras telas, que a aba
+   soma ao dos cards daqui. A linha que nao conseguiu contar diz isso e NAO
+   entra como zero — zero e "nada esperando". */
+function pendDias(desde){
+  if(!desde) return null;
+  var d=new Date(String(desde).slice(0,10)+'T00:00:00'), h=new Date(); h.setHours(0,0,0,0);
+  return Math.max(0,Math.round((h-d)/86400000));
+}
+async function carregarResumo(nBloq){
+  var box=document.getElementById("centralResumo"); if(!box) return 0;
+  var r=null; try{ var x=await fetch("/api/pendencias/resumo"); if(x.ok) r=await x.json(); }catch(e){}
+  if(!r||!r.linhas){ box.innerHTML='<span style="color:var(--red);font-weight:700">Não consegui carregar o resumo das outras telas.</span>'; return 0; }
+  var linhas=[{nome:'Bloqueados',n:nBloq,ajuda:'SKU fora do cadastro, dúvida na leitura, pacote, formato novo e venda sem etiqueta',quem:'os cards logo abaixo dizem quem',aqui:true}].concat(r.linhas);
+  var h='<table class="pendTab"><thead><tr><th>Onde</th><th>Esperando</th><th>Desde</th><th>Quem resolve</th></tr></thead><tbody>';
+  linhas.forEach(function(l){
+    var dias=pendDias(l.desde), cor, num;
+    if(l.n==null){ cor='var(--red)'; num='não consegui contar'; }
+    else if(!l.n){ cor='var(--muted)'; num='0'; }
+    else { cor=(dias!=null&&dias>=1)?'var(--red)':'var(--amber)'; num=String(l.n); }
+    var desde=(l.n&&dias!=null)?(dias===0?'hoje':(dias===1?'há 1 dia':'há '+dias+' dias')):'—';
+    var alvo=l.aqui?'':(l.onde&&l.onde.aba?' data-pendaba="'+l.onde.aba+'"':(l.onde&&l.onde.url?' data-pendurl="'+l.onde.url+'"':''));
+    h+='<tr style="color:'+(l.n?'inherit':'var(--muted)')+'"><td><b>'+(alvo?'<a href="#" style="color:var(--blue);text-decoration:none"'+alvo+'>'+l.nome+' →</a>':l.nome+' <span class="sub">(abaixo)</span>')+'</b>'
+      +'<div class="sub">'+l.ajuda+'</div></td>'
+      +'<td style="font-weight:800;font-size:18px;color:'+cor+'">'+num+'</td>'
+      +'<td style="color:'+cor+'">'+desde+'</td>'
+      +'<td class="sub">'+(l.aqui?l.quem:'quem tem <i>'+l.quem+'</i>')+'</td></tr>';
+  });
+  h+='</tbody></table>';
+  if(r.em_duas_linhas) h+='<div class="sub" style="margin-top:6px">'+r.em_duas_linhas+' caixa(s) cancelada(s) aparecem em Correções e em Sobras: volta pelo ↩ Sobrou, ou se registra na Mesa que não voltou. No total contam uma vez.</div>';
+  box.innerHTML=h;
+  return r.total||0;
+}
+document.addEventListener("click",function(e){
+  var a=e.target.closest("[data-pendaba],[data-pendurl]"); if(!a) return;
+  e.preventDefault();
+  var u=a.getAttribute("data-pendurl"); if(u){ location.href=u; return; }
+  var t=document.querySelector('.tab[data-t="'+a.getAttribute("data-pendaba")+'"]'); if(t){ t.click(); window.scrollTo(0,0); }
+});
 async function carregarBloq(){
 carregarCanc();
 var l=[]; try{ l=await (await fetch("/api/bloqueados")).json(); }catch(e){}
@@ -2609,8 +2658,9 @@ var nd=await carregarDiv();
 var nm=await carregarMod();
 var np=await carregarPac();
 var ns=await carregarSemEtq();
-var tb=document.getElementById("tabBlq");
-if(tb) tb.textContent = (n+nd+nm+np+ns) ? ("Bloqueados ("+(n+nd+nm+np+ns)+")") : "Bloqueados";
+var nr=await carregarResumo(n+nd+nm+np+ns);
+var tb=document.getElementById("tabBlq"), tot=n+nd+nm+np+ns+nr;
+if(tb) tb.textContent = tot ? ("Pendências ("+tot+")") : "Pendências";
 var est=document.getElementById("blqEstado"), lis=document.getElementById("blqLista");
 if(!est||!lis) return;
 if(!l.length){ est.innerHTML="<b>Nenhum volume bloqueado.</b>"; lis.innerHTML=""; return; }
@@ -2659,7 +2709,7 @@ function avisoQuantidade(qtd,contas){
   var e=function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
   var caixa=function(t){ return '<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#fdecea;border:2px solid #c62828;color:#8e1b1b;font-weight:700">⚠ '+t+'</div>'; };
   var h='';
-  if(qtd) h+=caixa(qtd+' caixa(s) retida(s) por QUANTIDADE EM DÚVIDA — a folha foi lida de jeitos diferentes e eles não bateram. Confira o pedido no Mercado Livre e libere em Admin → Bloqueados (pacote).');
+  if(qtd) h+=caixa(qtd+' caixa(s) retida(s) por QUANTIDADE EM DÚVIDA — a folha foi lida de jeitos diferentes e eles não bateram. Confira o pedido no Mercado Livre e libere em Admin → Pendências (pacote).');
   (contas||[]).forEach(function(c){
     var sem=c.semEtiqueta||[];
     sem.forEach(function(v){

@@ -157,7 +157,7 @@ async function main(){
     ok('e o card entra na conta da aba', /carregarSemEtq\(\)/.test(idx) && /n\+nd\+nm\+np\+ns/.test(idx));
     const emb=fs.readFileSync(path.join(__dirname,'public','embalagem.html'),'utf8');
     ok('a Etiqueta de Venda lê a lista', /\/api\/semetiqueta/.test(emb));
-    ok('e manda para Admin → Bloqueados, sem botão de resolver', /Admin → Bloqueados/.test(emb) && !/semetiqueta\/resolver/.test(emb));
+    ok('e manda para Admin → Pendências, sem botão de resolver', /Admin → Pendências/.test(emb) && !/semetiqueta\/resolver/.test(emb));
 
     console.log('\n── 7. o modo teste cobre a lista ──');
     const tr=fs.readFileSync(path.join(__dirname,'teste_route.js'),'utf8');

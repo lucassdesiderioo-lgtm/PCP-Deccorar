@@ -15,6 +15,43 @@
  *   GET /api/cores, GET /api/modelos -> @logado, igual a GET /api/skus e
  *     GET /api/listas/:tipo: sao listas de apoio de tela, sem dado sensivel.
  */
+/* A CONTA DO CADASTRO INCOMPLETO mora aqui, e nao dentro da rota: a central
+   de pendencias (Admin → Pendências) mostra o mesmo numero que a aba
+   "SKU incompleto", e duas contas para o mesmo numero divergem (#12). */
+function pendenciasSku(db){
+  const cols=`s.codigo, s.descricao, s.largura_cm, s.altura_cm, s.modelo_id, s.cor_codigo,
+              s.tecido_codigo, m.codigo modelo_codigo, m.nome modelo_nome`;
+  const q=(where)=>db.prepare('SELECT '+cols+' FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id'
+    +' WHERE '+where+' ORDER BY s.codigo').all();
+
+  /* Acessorio nao tem medida e nunca vai ter — cobrar dele e ruido que ensina
+     a equipe a ignorar o contador. Modelo ainda NULO conta como pendente de
+     medida: sem saber o que a peca e, nao da para dizer que ela nao tem. */
+  /* COMPRAS.md §2: so cobra medida e modelo de quem TEM ficha tecnica. SKU de
+     revenda (tem_ficha=0) e comprado pronto — nao tem modelo de fabricacao nem
+     precisa de medida; o que falta nele e custo. */
+  const FABRICADO='COALESCE(s.tem_ficha,1)=1';
+  const SEM_MEDIDA='(s.modelo_id IS NULL OR COALESCE(m.exige_medida,1)=1)';
+  const medida=q(FABRICADO+' AND '+SEM_MEDIDA+' AND (s.largura_cm IS NULL OR s.altura_cm IS NULL)');
+  const modelo=q(FABRICADO+' AND s.modelo_id IS NULL');
+  const cor   =q('s.cor_codigo IS NULL OR s.cor_codigo NOT IN (SELECT codigo FROM cor)');
+  /* §2: revenda sem preco nenhum — nem digitado, nem cotado — e "custo
+     pendente". Regra 4 do §13: custo indefinido nunca vira zero. */
+  const custo=q(`COALESCE(s.tem_ficha,1)=0 AND s.custo_direto IS NULL
+    AND NOT EXISTS (SELECT 1 FROM oferta o JOIN fornecedor f ON f.id=o.fornecedor_id
+                    WHERE o.sku=s.codigo AND o.ativo=1 AND f.ativo=1)`);
+  const todas =q('('+FABRICADO+' AND '+SEM_MEDIDA+' AND (s.largura_cm IS NULL OR s.altura_cm IS NULL))'
+    +' OR ('+FABRICADO+' AND s.modelo_id IS NULL)'
+    +' OR s.cor_codigo IS NULL OR s.cor_codigo NOT IN (SELECT codigo FROM cor)'
+    +` OR (COALESCE(s.tem_ficha,1)=0 AND s.custo_direto IS NULL
+           AND NOT EXISTS (SELECT 1 FROM oferta o JOIN fornecedor f ON f.id=o.fornecedor_id
+                           WHERE o.sku=s.codigo AND o.ativo=1 AND f.ativo=1))`);
+  return {
+    total: todas.length, skus: db.prepare('SELECT COUNT(*) c FROM skus').get().c,
+    medida, modelo, cor, custo
+  };
+}
+
 module.exports = function(app, db){
 
   /* ── CORES ────────────────────────────────────────────────────────────────
@@ -101,37 +138,6 @@ module.exports = function(app, db){
      `cor_codigo` apontando para uma cor DESATIVADA nao e pendencia: ela continua
      na lista, so nao e mais oferecida para cadastro novo. Pendencia e cor nula
      ou que nao existe na tabela. */
-  app.get('/api/skus/pendencias',(req,res)=>{
-    const cols=`s.codigo, s.descricao, s.largura_cm, s.altura_cm, s.modelo_id, s.cor_codigo,
-                s.tecido_codigo, m.codigo modelo_codigo, m.nome modelo_nome`;
-    const q=(where)=>db.prepare('SELECT '+cols+' FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id'
-      +' WHERE '+where+' ORDER BY s.codigo').all();
-
-    /* Acessorio nao tem medida e nunca vai ter — cobrar dele e ruido que ensina
-       a equipe a ignorar o contador. Modelo ainda NULO conta como pendente de
-       medida: sem saber o que a peca e, nao da para dizer que ela nao tem. */
-    /* COMPRAS.md §2: so cobra medida e modelo de quem TEM ficha tecnica. SKU de
-       revenda (tem_ficha=0) e comprado pronto — nao tem modelo de fabricacao nem
-       precisa de medida; o que falta nele e custo. */
-    const FABRICADO='COALESCE(s.tem_ficha,1)=1';
-    const SEM_MEDIDA='(s.modelo_id IS NULL OR COALESCE(m.exige_medida,1)=1)';
-    const medida=q(FABRICADO+' AND '+SEM_MEDIDA+' AND (s.largura_cm IS NULL OR s.altura_cm IS NULL)');
-    const modelo=q(FABRICADO+' AND s.modelo_id IS NULL');
-    const cor   =q('s.cor_codigo IS NULL OR s.cor_codigo NOT IN (SELECT codigo FROM cor)');
-    /* §2: revenda sem preco nenhum — nem digitado, nem cotado — e "custo
-       pendente". Regra 4 do §13: custo indefinido nunca vira zero. */
-    const custo=q(`COALESCE(s.tem_ficha,1)=0 AND s.custo_direto IS NULL
-      AND NOT EXISTS (SELECT 1 FROM oferta o JOIN fornecedor f ON f.id=o.fornecedor_id
-                      WHERE o.sku=s.codigo AND o.ativo=1 AND f.ativo=1)`);
-    const todas =q('('+FABRICADO+' AND '+SEM_MEDIDA+' AND (s.largura_cm IS NULL OR s.altura_cm IS NULL))'
-      +' OR ('+FABRICADO+' AND s.modelo_id IS NULL)'
-      +' OR s.cor_codigo IS NULL OR s.cor_codigo NOT IN (SELECT codigo FROM cor)'
-      +` OR (COALESCE(s.tem_ficha,1)=0 AND s.custo_direto IS NULL
-             AND NOT EXISTS (SELECT 1 FROM oferta o JOIN fornecedor f ON f.id=o.fornecedor_id
-                             WHERE o.sku=s.codigo AND o.ativo=1 AND f.ativo=1))`);
-    res.json({
-      total: todas.length, skus: db.prepare('SELECT COUNT(*) c FROM skus').get().c,
-      medida, modelo, cor, custo
-    });
-  });
+  app.get('/api/skus/pendencias',(req,res)=> res.json(pendenciasSku(db)));
 };
+module.exports.pendencias = pendenciasSku;

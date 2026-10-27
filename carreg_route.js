@@ -6,6 +6,23 @@ const fs=require('fs'), path=require('path');
    /opt. */
 const FOTOS_DIR=require('./caminhos').COLETAS;
 const BAIXA=require('./baixa_dominio');
+/* AS SOBRAS ESPERANDO DECISAO, numa funcao: a lista da Conferencia e a
+   central de pendencias (Admin → Pendências) contam pela mesma conta. */
+function sobrasEsperando(db){
+  const CANC=require('./cancelada_dominio');
+  const ids=new Set();
+  try{ db.prepare(`SELECT sobras FROM saida WHERE tipo='coleta' AND fechada_em IS NOT NULL
+        AND sobras IS NOT NULL AND sobras<>'[]' ORDER BY id DESC LIMIT 60`).all()
+      .forEach(s=>{ try{ JSON.parse(s.sobras).forEach(i=>ids.add(+i)); }catch(e){} }); }catch(e){}
+  const lista=[...ids].filter(Number.isFinite);
+  const caminhao=lista.length?db.prepare(`SELECT id,codigo,buyer,nf,modalidade,despachar_em,conferido_por,
+      (SELECT SUM(qtd) FROM lote_item i WHERE i.lote_id=lote.id) pecas
+    FROM lote WHERE id IN (${lista.map(()=>'?').join(',')}) AND ${AGUARDA_CAMINHAO} AND COALESCE(teste,0)=0
+    ORDER BY carregado_em,id`).all(...lista):[];
+  const caixas=caminhao.map(v=>Object.assign(v,{de:'caminhao'}))
+    .concat(CANC.aguardandoSobra(db).map(v=>Object.assign(v,{de:'cancelada'})));
+  return caixas;
+}
 module.exports=function(app,db){
   /* A tabela das saidas (caminhao e agencia) tem dono proprio: o script do
      passivo tambem a cria, e duas copias do CREATE divergem. */
@@ -426,21 +443,7 @@ module.exports=function(app,db){
      a caixa que o caminhao deixou numa saida JA FECHADA e continua no canto
      (se o caminhao de amanha a levar, ela sai daqui sozinha), e a venda
      cancelada que ainda esta na fabrica sem decisao. */
-  app.get('/api/carregamento/sobras',(req,res)=>{
-    const CANC=require('./cancelada_dominio');
-    const ids=new Set();
-    try{ db.prepare(`SELECT sobras FROM saida WHERE tipo='coleta' AND fechada_em IS NOT NULL
-          AND sobras IS NOT NULL AND sobras<>'[]' ORDER BY id DESC LIMIT 60`).all()
-        .forEach(s=>{ try{ JSON.parse(s.sobras).forEach(i=>ids.add(+i)); }catch(e){} }); }catch(e){}
-    const lista=[...ids].filter(Number.isFinite);
-    const caminhao=lista.length?db.prepare(`SELECT id,codigo,buyer,nf,modalidade,despachar_em,conferido_por,
-        (SELECT SUM(qtd) FROM lote_item i WHERE i.lote_id=lote.id) pecas
-      FROM lote WHERE id IN (${lista.map(()=>'?').join(',')}) AND ${AGUARDA_CAMINHAO} AND COALESCE(teste,0)=0
-      ORDER BY carregado_em,id`).all(...lista):[];
-    const caixas=caminhao.map(v=>Object.assign(v,{de:'caminhao'}))
-      .concat(CANC.aguardandoSobra(db).map(v=>Object.assign(v,{de:'cancelada'})));
-    res.json({caixas});
-  });
+  app.get('/api/carregamento/sobras',(req,res)=> res.json({caixas:sobrasEsperando(db)}));
 
   /* O PROGRESSO DA CARGA — o mesmo numero pras duas rotas.
      "Carregados X de Y" e a lista tem que falar do mesmo universo, senao o
@@ -550,3 +553,4 @@ module.exports=function(app,db){
     res.send(fs.readFileSync(r.foto));
   });
 };
+module.exports.sobrasEsperando = sobrasEsperando;

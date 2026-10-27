@@ -54,7 +54,7 @@ function conteudo(sku){
   const exigeMedida = (s.exige_medida === undefined || s.exige_medida === null) ? 1 : s.exige_medida;
   const temMedida = (s.largura_cm != null && s.altura_cm != null);
   if(exigeMedida && !temMedida)
-    return { erro:'Este SKU não tem medida cadastrada. Abra a aba "Pendências de SKU" ou edite o produto '+
+    return { erro:'Este SKU não tem medida cadastrada. Abra a aba "SKU incompleto" ou edite o produto '+
                    'e preencha largura e altura antes de imprimir.' };
   const cor = s.cor_codigo || '';
   const desc = String(s.descricao || '').trim();

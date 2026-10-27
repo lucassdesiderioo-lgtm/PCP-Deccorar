@@ -136,6 +136,9 @@ require('./receb_route')(app, db);
 app.get('/recebimento',(req,res)=>res.sendFile(path.join(__dirname,'public','recebimento.html')));
 require('./ger_route')(app, db);
 require('./st_route')(app, db);
+// A central de pendencias (fase 1): so le, e pergunta a funcao de cada tela
+// dona — por isso depois de todas elas.
+require('./pendencias_route')(app, db);
 // Controle de Acesso — Fase 1 (roda em paralelo; NAO decide acesso ainda).
 // Depois do auth (precisa da tabela usuarios) e antes do teste_route.
 require('./acesso')(app, db);

@@ -407,11 +407,23 @@ function terminar(db, { codigo, papel, quem }){
 /* O que a pessoa tem para contar (papel 'contar') ou recontar ('recontar').
    SEM saldo e SEM contagem anterior — o JSON nao traz os campos. Na
    recontagem, some o que a pessoa ja contou. */
+/* AS FRASES DAS DUAS FILAS QUE ESPERAM UMA PESSOA, usadas pelas telas e pela
+   central de pendencias (Admin → Pendências). A central conta a recontagem de
+   TODOS, e a tela so mostra a quem nao contou antes: o numero da central e o
+   que existe, a tela e o que cabe a quem esta olhando. */
+const NA_LISTA  = status => `c.status='aberto' AND i.status IN (${status.map(() => '?').join(',')})`;
+const RECONTAR  = ['recontar','terceira'];
+const A_APROVAR = "i.status='aprovar'";
+function pendencias(db){
+  const um = (where, args) => db.prepare(`SELECT COUNT(*) n, MIN(i.em1) desde FROM inventario_item i
+    JOIN inventario_ciclo c ON c.id=i.ciclo_id WHERE ${where}`).get(...(args || []));
+  return { aprovar: um(A_APROVAR), recontar: um(NA_LISTA(RECONTAR), RECONTAR) };
+}
+
 function lista(db, { papel, quem }){
-  const status = papel === 'recontar' ? ['recontar','terceira'] : ['a_contar'];
+  const status = papel === 'recontar' ? RECONTAR : ['a_contar'];
   const linhas = db.prepare(`SELECT i.* FROM inventario_item i JOIN inventario_ciclo c ON c.id=i.ciclo_id
-    WHERE c.status='aberto' AND i.status IN (${status.map(() => '?').join(',')})
-    ORDER BY i.codigo`).all(...status)
+    WHERE ${NA_LISTA(status)} ORDER BY i.codigo`).all(...status)
     .filter(i => papel !== 'recontar' || ESTOQUE.outraPessoa(quem, quemJaContou(i)));
   const desc = descreverSkus(db, linhas.map(l => l.codigo));
   const eu = i => (quem && quem.id != null && i.rascunho_por_id != null)
@@ -437,7 +449,7 @@ function lista(db, { papel, quem }){
 function aprovacao(db, { quem }){
   const linhas = db.prepare(`SELECT i.*, c.tipo ciclo_tipo FROM inventario_item i
     JOIN inventario_ciclo c ON c.id=i.ciclo_id
-    WHERE i.status='aprovar' ORDER BY i.em1, i.id`).all();
+    WHERE ${A_APROVAR} ORDER BY i.em1, i.id`).all();
   const desc = descreverSkus(db, linhas.map(l => l.codigo));
   return linhas.map(i => {
     const pode = ESTOQUE.outraPessoa(quem, quemJaContou(i));
@@ -573,5 +585,5 @@ function diferencaPorMotivo(db, opcoes){
       AND decidido_em >= ? AND COALESCE(teste,0)=0`).all(desde);
 }
 
-module.exports = { ABERTOS, CONFERIU, MOTIVOS, garantirSchema, acuracidade, diferencaPorMotivo, conferencias, sugestao, abrir, encerrar,
+module.exports = { ABERTOS, CONFERIU, MOTIVOS, garantirSchema, pendencias, acuracidade, diferencaPorMotivo, conferencias, sugestao, abrir, encerrar,
   contar, terminar, lista, aprovacao, aprovar, rejeitar, andamento, itemAberto, erro };

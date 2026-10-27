@@ -43,7 +43,7 @@ Etiqueta de Venda ────┤
 - **História:** armadilha #21.
 
 ### R-MOD-02 · Formato desconhecido vai para Bloqueados, e uma pessoa decide
-- **Regra:** o volume retido por modalidade aparece em Admin → Bloqueados, num card violeta, e alguém com acesso de admin escolhe **Agência** ou **Coleta** (`POST /api/modalidade/resolver`), por volume ou pelo lote inteiro. A decisão grava `modalidade`, o motivo em `bloqueio_resolvido` com quem e quando, e vai para a auditoria. Cadastrar SKU **não** solta volume retido por modalidade, e a decisão **não** passa por cima da trava de SKU (§6).
+- **Regra:** o volume retido por modalidade aparece em Admin → Pendências, num card violeta, e alguém com acesso de admin escolhe **Agência** ou **Coleta** (`POST /api/modalidade/resolver`), por volume ou pelo lote inteiro. A decisão grava `modalidade`, o motivo em `bloqueio_resolvido` com quem e quando, e vai para a auditoria. Cadastrar SKU **não** solta volume retido por modalidade, e a decisão **não** passa por cima da trava de SKU (§6).
 - **Por quê:** regra do dono (09/09/2026): *qualquer modificação na etiqueta vai para Bloqueados*. O sistema não adivinha por onde a caixa sai, e cadastro de SKU não responde isso.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_divergencia.js` (os dois últimos casos).
