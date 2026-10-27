@@ -32,8 +32,20 @@
 > etiqueta e a nota dos casos do Roberto são reconstruídas, porque o PDF não
 > chegou inteiro — a folha é a do print.
 >
-> **Falta:** a fase 2 (o relatório do ML) · o destino da venda 2000018960012186
-> (com o dono).
+> ⚠️ **A venda 2000018960012186 é a NF 8301, e FOI ENVIADA por fora do sistema**
+> (dono, 27/10/2026): não está no banco nem em PDF subido, e falta também no PDF
+> de 16–19/10 (NFs 8268 a 8303, sem a 8301). A caixa nunca foi conferida e o
+> saldo de BK180150BEGE ficou 1 acima — a correção é Admin → Estoque, com
+> motivo, ou a próxima contagem. **Etiqueta impressa por fora é a armadilha #6**
+> (§7 do CLAUDE.md): vale descobrir qual trava empurrou a impressão para fora.
+>
+> **Fase 1-B em código (27/10/2026, aprovada pelo dono no mesmo dia):** a venda
+> da folha sem etiqueta é gravada e fica em **Admin → Bloqueados** até o PDF
+> dela chegar ou alguém resolver com motivo; a Etiqueta de Venda mostra só uma
+> linha (§5-B, R-PDF-09). Aguarda deploy.
+>
+> **Falta:** o deploy da fase 1-B · a fase 2 (o relatório do ML) · o motivo de a
+> NF 8301 ter saído por fora.
 
 # A conferência da quantidade — o sistema confere o próprio trabalho
 
@@ -191,10 +203,68 @@ confere todos a cada mudança de código, para sempre.**
 | Fase | O quê | Precisa de |
 |---|---|---|
 | **1** | O caderno (§4) e o primeiro caso, a NF 8196 (a folha que o dono mandou) · **o irmão que o PDF sem fechar descartava passa a RETER o volume, com as peças pré-preenchidas** · L2, L3 (contando também os SKUs irmãos) e L4 · a trava (§3.2) · a cobertura na auditoria | — |
+| **1-B** | **A venda da folha sem etiqueta fica na tela até alguém resolver** (§5-B) — **em código desde 27/10/2026** | — |
 | **2** | L5 (o relatório) e a lista "o ML diz N, o sistema gravou M" | um relatório com a coluna Unidades |
 
 Cada fase com teste escrito antes, backup e deploy fora do horário de
 expedição (🔴).
+
+## 5-B. Fase 1-B — a venda da folha sem etiqueta não pode sumir (APROVADA e em código, 27/10/2026)
+
+> **Como foi construída:** tabela `venda_sem_etiqueta` (dona: `exp_route.js`),
+> gravada pelo upload a partir da `conta_pdf.semEtiqueta`; a venda cuja caixa
+> já existe em `lote` não entra; a etiqueta chegando resolve sozinha
+> (`resolucao='etiqueta'`); uma pessoa resolve com motivo obrigatório
+> (`cancelada` ou `por_fora`, 400 sem motivo, 409 se já resolvida, auditoria).
+> **Mudou na construção, por decisão do dono:** a lista fica em **Admin →
+> Bloqueados** (o lugar único das pendências), e não na Etiqueta de Venda —
+> lá aparece só **uma linha de aviso, sem botão**. Por isso **resolver é
+> `@admin`**, como as outras decisões da aba (P8); ler é também de quem tem
+> `etiqueta.emitir`, para a linha aparecer na bancada. Entra no número da aba
+> e na cobertura do modo teste. `teste_sem_etiqueta.js` (35, escrito antes).
+
+
+**O problema, nas palavras do dono:** *"Pelo fato de ficar pendente e não estar
+no primeiro PDF, a venda ficou como atrasada. É um erro que vem acontecendo, e
+por esse motivo não vemos a venda, e daí ela fica atrasada no Mercado Livre."*
+
+O caminho, com o caso real (NF 8301, venda 2000018960012186, BK180150BEGE):
+
+```
+o ML põe a venda na FOLHA, mas a ETIQUETA dela não vem no PDF
+   → o sistema nunca cria a caixa (sem etiqueta não há o que ler)
+   → ela não aparece em "Faltam imprimir" nem em tela nenhuma
+   → no ML ela fica pendente até ATRASAR
+   → alguém vê pelo ML e imprime a etiqueta POR FORA
+   → a caixa sai sem conferência, e o saldo fica 1 acima
+```
+
+É a armadilha #6 (§7 do CLAUDE.md) por outra porta: o desvio acontece fora da
+vista do sistema. Desde o PR #236 o upload mostra a venda em vermelho pelo
+número — mas **uma vez só**, para quem subiu o PDF. Ninguém leu, a venda volta
+a sumir.
+
+**O que esta fase faria:**
+
+1. **O upload GRAVA a venda sem etiqueta** numa lista própria (venda, pack, SKU,
+   quantidade, o PDF e quando foi vista pela primeira vez). Venda repetida em
+   outro PDF não duplica.
+2. **A lista aparece na Etiqueta de Venda, em cima, em vermelho**, com quantos
+   dias ela tem: *"Venda 2000018960012186 · BK180150BEGE · está na folha do ML
+   desde 21/10 e ainda não tem etiqueta no sistema — baixe a etiqueta no ML e
+   suba o PDF"*. Ela não some sozinha por tempo.
+3. **Ela sai da lista sozinha** quando um PDF trouxer a etiqueta (o volume
+   entra em `lote` com aquela venda ou aquele pack) — o caminho normal.
+4. **Ou uma pessoa resolve, com motivo**: *cancelada no ML* ou *saiu por fora
+   do sistema*. No segundo caso a tela lembra que o saldo ficou 1 acima e manda
+   para Admin → Estoque (o ajuste continua sendo de duas pessoas, R-EST-20).
+5. **Nada é retido nem impresso** por esta lista: ela só não deixa a venda
+   ficar invisível.
+
+**Risco 🔴** (tabela nova no banco). Teste escrito antes; o caso da NF 8301 vira
+o caso do caderno que trava a regra.
+
+**Perguntas ao dono (P6 a P9 no §7).**
 
 ## 6. Fica de fora
 
@@ -212,4 +282,8 @@ expedição (🔴).
 | P2 | Quem libera a quantidade retida? | ✅ **Quem assina o pacote** (`pacote.assinar`) (dono, 27/10/2026) |
 | P3 | O caderno guarda o texto do PDF no repositório, com **nomes e endereços trocados**. Está bem assim? | ✅ **Sim, trocados** (dono, 27/10/2026) |
 | P4 | Você tem o PDF com a NF 8196? | O dono vai mandar. O primeiro enviado (NF 8152 e 8268 a 8303) não a tem |
-| P5 | Você consegue o relatório de vendas do ML com a coluna **Unidades**, cobrindo o período das reclamações? | Para a fase 3 |
+| P5 | Você consegue o relatório de vendas do ML com a coluna **Unidades**, cobrindo o período das reclamações? | Para a fase 2 |
+| P6 | A fase 1-B pode ser construída? | ✅ **Sim, antes da fase 2** (dono, 27/10/2026) |
+| P7 | Onde a lista aparece? | ✅ **Em Admin → Bloqueados**, junto com o que espera decisão; na Etiqueta de Venda **só uma linha** apontando para lá (dono, 27/10/2026: *"essas pendências devemos concentrar em uma única tela"*) |
+| P8 | Quem pode marcar "cancelada no ML" ou "saiu por fora"? | Quem decide na aba Bloqueados (`@admin`), com motivo e registro — consequência da P7 |
+| P9 | A venda vista há mais de 1 dia muda de cor? | Âmbar no dia em que aparece, vermelho a partir do dia seguinte (como proposto) |

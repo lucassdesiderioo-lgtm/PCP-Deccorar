@@ -337,6 +337,12 @@ module.exports=function(app,db){
           variasPecas++;
         }
       }})();
+      /* A VENDA DA FOLHA SEM ETIQUETA FICA GRAVADA (fase 1-B da spec
+         CONFERENCIA-DA-QUANTIDADE, 27/10/2026). Ela nao vira caixa — sem
+         etiqueta nao ha o que imprimir —, mas tambem nao pode sumir: a NF 8301
+         ficou fora de tela nenhuma, ATRASOU no Mercado Livre e saiu impressa
+         por fora, sem conferencia e com o saldo 1 acima. */
+      const se=gravarSemEtiqueta((orders.conta&&orders.conta.semEtiqueta)||[], fname);
       /* `coleta` vai na resposta pra quem subiu o PDF ver na hora quantos
          volumes o caminhao vai buscar — e estranhar se der zero num PDF de
          coleta, ou o lote inteiro num PDF de agencia (a marca e fraca).
@@ -347,6 +353,7 @@ module.exports=function(app,db){
          mostra em vermelho, para alguem olhar antes de imprimir. */
       res.json({ok:true,total:orders.length,novos,repetidas:rep,religadas,
                 quantidade_duvida:qtdDuvida, conta_pdf:orders.conta||null,
+                sem_etiqueta_novas:se.novas, sem_etiqueta_resolvidas:se.resolvidas,
                 sem_sku:semsku,bloqueados:bloq,divergencias:divs,coleta,modalidade_duvida:modal,
                 pacotes, folha_nao_fecha:naoFecha, varias_pecas:variasPecas,
                 desconhecidos:Object.keys(desconhecidos).map(k=>({sku:k,qtd:desconhecidos[k]}))});
@@ -362,6 +369,75 @@ module.exports=function(app,db){
         AND COALESCE(bloqueio,'') NOT LIKE 'modalidade%'
         AND COALESCE(bloqueio,'') NOT LIKE 'pacote%'
       GROUP BY codigo ORDER BY qtd DESC`).all());
+  });
+
+  /* ── A VENDA DA FOLHA SEM ETIQUETA (fase 1-B, 27/10/2026) ────────────────
+     O ML pos a venda na folha e a etiqueta dela nao veio no PDF. O sistema
+     nunca cria a caixa, a venda fica fora de tela nenhuma e atrasa no ML —
+     ate alguem imprimir por fora (a NF 8301). A lista fica em Admin →
+     Bloqueados, o lugar unico das pendencias (decisao do dono), e a Etiqueta
+     de Venda mostra so uma linha apontando para la.
+     Sai da lista de dois jeitos: SOZINHA, quando um PDF traz a etiqueta (a
+     caixa entra em `lote` com a venda ou o pack), ou por uma PESSOA, com
+     motivo: cancelada no ML, ou saiu por fora do sistema. */
+  db.exec(`CREATE TABLE IF NOT EXISTS venda_sem_etiqueta (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, venda TEXT, packId TEXT, sku TEXT,
+    qtd INTEGER DEFAULT 1, pdf TEXT,
+    visto_em TEXT DEFAULT (datetime('now','localtime')), ultimo_visto_em TEXT,
+    resolvida_em TEXT, resolucao TEXT, resolvida_por TEXT, motivo TEXT,
+    teste INTEGER DEFAULT 0)`);
+  function gravarSemEtiqueta(lista, arquivo){
+    let novas=0, resolvidas=0;
+    /* Preparadas AQUI, e nao no carregamento do modulo: os testes de outras
+       rotas montam um `lote` reduzido (sem `venda`), e uma consulta preparada
+       no `require` derrubaria o modulo inteiro antes de existir rota. */
+    const temCaixa=db.prepare(`SELECT 1 FROM lote WHERE (? IS NOT NULL AND venda=?) OR (? IS NOT NULL AND packId=?) LIMIT 1`);
+    const abertaDe=db.prepare(`SELECT id FROM venda_sem_etiqueta WHERE resolvida_em IS NULL
+      AND ((? IS NOT NULL AND venda=?) OR (? IS NOT NULL AND packId=?))`);
+    db.transaction(()=>{
+      for(const v of lista){
+        const ve=v.venda||null, pk=v.packId||null;
+        if(temCaixa.get(ve,ve,pk,pk)) continue;      // a etiqueta ja entrou por outro PDF
+        const a=abertaDe.get(ve,ve,pk,pk);
+        if(a){ db.prepare("UPDATE venda_sem_etiqueta SET ultimo_visto_em=datetime('now','localtime') WHERE id=?").run(a.id); continue; }
+        db.prepare('INSERT INTO venda_sem_etiqueta (venda,packId,sku,qtd,pdf) VALUES (?,?,?,?,?)')
+          .run(ve, pk, v.sku||null, Math.max(1,v.qtd||1), arquivo?require('path').basename(arquivo):null);
+        novas++;
+      }
+      /* A etiqueta chegou: a caixa existe em `lote` com a venda ou o pack. */
+      resolvidas=db.prepare(`UPDATE venda_sem_etiqueta SET resolvida_em=datetime('now','localtime'),
+          resolucao='etiqueta', resolvida_por='sistema'
+        WHERE resolvida_em IS NULL AND EXISTS (SELECT 1 FROM lote l WHERE
+          (venda_sem_etiqueta.venda IS NOT NULL AND l.venda=venda_sem_etiqueta.venda)
+          OR (venda_sem_etiqueta.packId IS NOT NULL AND l.packId=venda_sem_etiqueta.packId))`).run().changes;
+    })();
+    return {novas, resolvidas};
+  }
+  app.get('/api/semetiqueta',(req,res)=>{
+    res.json(db.prepare(`SELECT id,venda,packId,sku,qtd,pdf,visto_em,ultimo_visto_em,
+        CAST(julianday(date('now','localtime')) - julianday(date(visto_em)) AS INTEGER) dias
+      FROM venda_sem_etiqueta WHERE resolvida_em IS NULL ORDER BY visto_em, id`).all());
+  });
+  const RESOLUCAO={cancelada:'cancelada no Mercado Livre', por_fora:'saiu por fora do sistema'};
+  app.post('/api/semetiqueta/resolver',(req,res)=>{
+    const b=req.body||{};
+    const id=Number(b.id), resolucao=String(b.resolucao||''), motivo=String(b.motivo||'').trim();
+    if(!id) return res.status(400).json({erro:'informe a venda'});
+    if(!RESOLUCAO[resolucao]) return res.status(400).json({erro:'escolha: cancelada no Mercado Livre, ou saiu por fora do sistema'});
+    if(!motivo) return res.status(400).json({erro:'escreva o motivo — é o registro de por que esta venda saiu da lista'});
+    const v=db.prepare('SELECT * FROM venda_sem_etiqueta WHERE id=?').get(id);
+    if(!v) return res.status(404).json({erro:'venda nao encontrada'});
+    if(v.resolvida_em) return res.status(409).json({erro:'esta venda ja foi resolvida em '+v.resolvida_em});
+    const quem=(req.usuario&&req.usuario.nome)||'';
+    db.prepare(`UPDATE venda_sem_etiqueta SET resolvida_em=datetime('now','localtime'), resolucao=?,
+      resolvida_por=?, motivo=? WHERE id=?`).run(resolucao, quem, motivo, id);
+    try{ app.locals.acesso.auditar(req,'expedicao','resolver_sem_etiqueta',id,
+      'venda '+(v.venda||v.packId)+' ('+v.sku+'): '+RESOLUCAO[resolucao]+' — '+motivo); }catch(e){}
+    /* A caixa que saiu por fora nunca foi conferida, entao nunca baixou: o
+       saldo ficou alto. Quem corrige e o ajuste em duas pessoas (R-EST-20). */
+    res.json({ok:true, aviso: resolucao==='por_fora'
+      ? 'A caixa saiu sem conferência: o estoque de '+(v.sku||'')+' ficou '+(v.qtd||1)+' acima. Peça o ajuste em Admin → Estoque, com este motivo.'
+      : null});
   });
 
   /* ── A ETIQUETA COM MAIS DE UM PRODUTO: A GESTAO ASSINA OS SKUs (§5-B) ────

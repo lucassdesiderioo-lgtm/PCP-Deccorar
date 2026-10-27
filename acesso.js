@@ -741,6 +741,12 @@ module.exports = function(app, db){
        (sku.cadastrar) e por onde a caixa sai ('@admin'); esta decide QUANTAS
        persianas vao dentro e, com isso, quantas baixam do estoque na impressao.
        VER continua '@admin', como o resto da aba. */
+    /* A venda da folha sem etiqueta (fase 1-B, 27/10/2026): LER e de quem
+       imprime etiqueta (a Etiqueta de Venda mostra a linha do aviso) e do
+       admin; RESOLVER fica com a aba Bloqueados, o lugar unico das pendencias
+       (decisao do dono), como a modalidade logo acima. */
+    if(M !== 'GET' && pre('/api/semetiqueta')) return '@admin';
+    if(eq('/api/semetiqueta')) return ['etiqueta.emitir','@admin'];
     if(M !== 'GET' && pre('/api/pacote')) return 'pacote.assinar';
     if(pre('/api/pacote')) return '@admin';
     if(eq('/api/auditoria/skus')) return '@admin';

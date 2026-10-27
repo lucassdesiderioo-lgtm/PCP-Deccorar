@@ -2,7 +2,7 @@
   "id": "2026-10-21-venda-sem-etiqueta-2000018960012186",
   "data": "2026-10-21",
   "registrado_em": "2026-10-27",
-  "o_que_aconteceu": "A folha do PDF 1792590414811 listou a venda 2000018960012186 (BK180150BEGE), mas a etiqueta dela não veio no PDF e nunca entrou no sistema. A venda NÃO estava cancelada (conferido no ML pelo dono). Primeiro aviso real da conta do PDF: folha 50, sistema 49.",
+  "o_que_aconteceu": "A folha do PDF 1792590414811 listou a venda 2000018960012186 (BK180150BEGE, NF 8301), mas a etiqueta dela não veio no PDF e nunca entrou no sistema. A venda NÃO estava cancelada e FOI ENVIADA (conferido pelo dono em 27/10/2026): a etiqueta saiu POR FORA do sistema. A NF 8301 também falta no PDF de 16–19/10 (NFs 8268 a 8303, sem a 8301). Consequência: a caixa nunca foi conferida e o saldo de BK180150BEGE ficou 1 acima. Primeiro aviso real da conta do PDF: folha 50, sistema 49. Como a venda não estava em PDF nenhum, ela ficou invisível no sistema e ATRASOU no Mercado Livre antes de alguém imprimir por fora (dono, 27/10/2026) — origem da fase 1-B da spec.",
   "origem": "Venda, SKU e a conta (50 × 49, 49 etiquetas e 50 itens, nenhum item sem pack/venda) vêm da saída do servidor em 27/10/2026. A folha e as etiquetas são reconstruídas no formato real do ML, com um vizinho só: o PDF não foi enviado.",
   "paginas": [
     [

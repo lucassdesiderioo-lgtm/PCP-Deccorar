@@ -143,6 +143,10 @@
     <button type="button" data-modo="coleta">🚚 Coleta — o caminhão busca</button>
     <span id="modoDica" style="color:var(--muted);font-size:13px"></span>
   </div>
+  <!-- A venda da folha do ML sem etiqueta (fase 1-B, 27/10/2026): SO A LINHA,
+       sem botao. Quem resolve e a aba Bloqueados, o lugar unico das pendencias
+       (decisao do dono); aqui e o sinal para quem esta na bancada. -->
+  <div id="semEtqAviso"></div>
   <div class="colunas">
     <div>
       <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="bipe aqui">
@@ -817,6 +821,24 @@ function renderFut(){
   el.innerHTML=h;
 }
 setInterval(listaFut,30000);
+
+/* A venda que esta na folha do ML e nao tem etiqueta no sistema nao aparece em
+   "Faltam imprimir" — e a NF 8301 atrasou no ML por isso. Uma linha so,
+   apontando para Admin → Bloqueados; âmbar no dia, vermelho depois. */
+async function avisoSemEtq(){
+  var el=document.getElementById('semEtqAviso'); if(!el) return;
+  var l=[]; try{ l=await (await fetch('/api/semetiqueta')).json(); }catch(e){ return; }
+  if(!Array.isArray(l)||!l.length){ el.innerHTML=''; return; }
+  var velha=l.reduce(function(m,v){ return Math.max(m,v.dias||0); },0);
+  var d=String(l[0].visto_em||'').slice(0,10).split('-');
+  var cor=velha>=1?'#c62828':'#b26a00', fundo=velha>=1?'#fdecea':'#fff4e5';
+  el.innerHTML='<div style="margin:0 0 12px;padding:10px 12px;border-radius:10px;border:2px solid '+cor+';background:'+fundo+';color:'+cor+';font-weight:700">'
+    +'⚠ '+l.length+' venda(s) da folha do ML sem etiqueta no sistema'
+    +(d.length===3?' — a mais antiga desde '+d[2]+'/'+d[1]:'')
+    +'. Ela(s) não aparecem em "Faltam imprimir": veja em Admin → Bloqueados.</div>';
+}
+setInterval(avisoSemEtq,60000);
+avisoSemEtq();
 listaFut();
 
 // ── Já impressos: as notas e clientes que a impressora já cuspiu hoje ────────

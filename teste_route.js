@@ -50,7 +50,11 @@ module.exports=function(app, db){
        pior, a cancelada que "voltou" devolveria saldo pela foto E a correcao
        continuaria dizendo que foi ela quem devolveu. Mesma razao do
        `movimento_estoque` (§2). */
-    {nome:'correcao',             pk:'id', rotulo:'correcoes'}
+    {nome:'correcao',             pk:'id', rotulo:'correcoes'},
+    /* A venda da folha sem etiqueta (fase 1-B, 27/10/2026): o upload de teste
+       grava aqui. Sem cobertura, "apagar tudo" deixaria em Bloqueados uma
+       venda que so existiu no teste. */
+    {nome:'venda_sem_etiqueta',   pk:'id', rotulo:'vendas sem etiqueta'}
   ];
 
   // Fase 3: foto_estoque saiu da cobertura; limpa o trigger antigo em bancos
