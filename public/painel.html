@@ -40,6 +40,10 @@
     <div class="kpi prod"><div class="n" id="kProd">0</div><div class="l">Produzido</div></div>
     <div class="kpi emb"><div class="n" id="kEmb">0</div><div class="l">Embalado</div></div>
     <div class="kpi car"><div class="n" id="kCar">0</div><div class="l">Carregado</div></div>
+    <!-- A central de pendencias na TV (fase 3, 27/10/2026): so o numero, para
+         ninguem dizer que nao viu. Vermelho quando alguma espera ha mais de um
+         dia. Decidir e na aba Admin -> Pendencias. -->
+    <div class="kpi" id="kPendBox"><div class="n" id="kPend">—</div><div class="l" id="kPendL">Pendências</div></div>
   </div>
   <div class="sub" style="margin:2px 0 8px;font-weight:700;color:var(--txt);font-size:13px">Produtividade do dia</div>
   <div class="cards">
@@ -99,5 +103,16 @@ async function load(){
   $('#upd').textContent='Atualizado '+new Date().toLocaleTimeString('pt-BR');
 }
 load(); setInterval(load,3000);
+/* As pendencias andam devagar e a conta passa por varias telas: a cada 60 s,
+   fora do load() de 3 s. */
+async function pendTV(){
+  var t=null; try{ var r=await fetch('/api/pendencias/total'); if(r.ok) t=await r.json(); }catch(e){}
+  var n=document.getElementById('kPend'), l=document.getElementById('kPendL'); if(!n) return;
+  if(!t){ n.textContent='—'; return; }
+  n.textContent=t.total;
+  n.style.color=!t.total?'':(t.dias>=1?'#f85149':'#ffb800');
+  l.textContent=!t.total?'Pendências':('Pendências — a mais antiga '+(t.dias?'há '+t.dias+(t.dias===1?' dia':' dias'):'é de hoje'));
+}
+pendTV(); setInterval(pendTV,60000);
 </script><script src="/nav.js"></script>
 </body></html>

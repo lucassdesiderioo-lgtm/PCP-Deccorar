@@ -155,8 +155,15 @@ async function main(){
     const idx=fs.readFileSync(path.join(__dirname,'public','index.html'),'utf8');
     ok('a aba Bloqueados tem o card da venda sem etiqueta', /id="semEtqCard"/.test(idx));
     ok('e o card entra na conta da aba', /carregarSemEtq\(\)/.test(idx) && /n\+nd\+nm\+np\+ns/.test(idx));
+    /* A aba se redesenha a cada 30 s. Com o motivo digitado no meio, o
+       redesenho trocava o card e o campo nascia de novo, VAZIO (§12, o
+       redesenho periódico). A função tem que olhar os campos ANTES de buscar
+       e redesenhar, e devolver o número de antes. */
+    const fn=(idx.match(/async function carregarSemEtq\(\)\{[\s\S]*?\n\}/)||[''])[0];
+    const guarda=fn.search(/querySelectorAll\("input"\)/), busca=fn.indexOf('fetch("/api/semetiqueta")');
+    ok('o card não se redesenha com o motivo digitado', guarda>0 && busca>guarda && /activeElement/.test(fn) && /return SEM_N/.test(fn));
     const emb=fs.readFileSync(path.join(__dirname,'public','embalagem.html'),'utf8');
-    ok('a Etiqueta de Venda lê a lista', /\/api\/semetiqueta/.test(emb));
+    ok('a Etiqueta de Venda mostra a linha (pela central, fase 3)', /\/pendencias_aviso\.js/.test(emb) && /id="pendAviso"/.test(emb));
     ok('e manda para Admin → Pendências, sem botão de resolver', /Admin → Pendências/.test(emb) && !/semetiqueta\/resolver/.test(emb));
 
     console.log('\n── 7. o modo teste cobre a lista ──');

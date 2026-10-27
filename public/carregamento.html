@@ -163,6 +163,9 @@
     <div class="stat col"><div class="n" id="nCol">0</div><div class="l">Coleta esperando</div></div>
     <div class="stat adi"><div class="n" id="nAdi">0</div><div class="l">Peças adiantadas hoje</div><div class="s" id="sAdi"></div></div>
   </div>
+  <!-- A central de pendencias na bancada (fase 3, 27/10/2026): so a linha,
+       fora do redesenho de 4 s (pendencias_aviso.js, 60 s). -->
+  <div id="pendAviso"></div>
   <div class="banner" id="banner"><div class="bt">Pronto</div><div class="bs">Bipe o QR ou código de barras da etiqueta de venda.</div></div>
   <div class="modobar area" id="modoBar">O bipe agora: CONFERIR NA ÁREA</div>
   <input id="scan" autocomplete="off">
@@ -243,6 +246,7 @@
   </div>
 </div>
 <script src="/sku.js"></script>
+<script src="/pendencias_aviso.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 let last={c:null,t:0};
@@ -1001,5 +1005,6 @@ function beep(ok){ try{const a=new (window.AudioContext||window.webkitAudioConte
 const DIGITACAO=['motQtd','motivoLib','atQtd','motivoLibV','sobrouTexto'];
 function digitando(){ var a=document.activeElement; return !!(a && DIGITACAO.indexOf(a.id)>=0); }
 carregar(); setInterval(function(){ if(!digitando()) carregar(); },4000);
+window.avisoPendencias && window.avisoPendencias('pendAviso');
 </script><script src="/nav.js"></script>
 </body></html>

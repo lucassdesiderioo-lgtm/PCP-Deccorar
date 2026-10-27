@@ -1,4 +1,4 @@
-> **STATUS · 27/10/2026 — APROVADA, FASE 1 NO AR E CONFERIDA, FASE 2 EM CÓDIGO** ·
+> **STATUS · 27/10/2026 — APROVADA, FASES 1 E 2 NO AR E CONFERIDAS, FASE 3 EM CÓDIGO** ·
 > `NOVIDADE` · a fase 1 é risco 🟡 (só lê; não muda quem decide); a fase 2 é 🔴
 > (tabela nova, mexe no upload).
 >
@@ -10,7 +10,15 @@
 > da aba, até uma pessoa resolver com *conferi, o sistema está certo* ou
 > *corrigi o que faltava* e o motivo (R-PDF-10); (B) o passivo da Mesa de
 > correções é desenhado na aba Pendências, e a decisão continua na aba
-> Correções. `teste_conta_aberta.js` (42). Aguarda deploy.
+> Correções. `teste_conta_aberta.js` (42). ✅ **No ar e conferida em
+> 27/10/2026** (PR #239): o dono conferiu a Mesa na aba e o clique. O card do
+> PDF cuja conta não fecha ainda não apareceu com dado real.
+>
+> **Fase 3 em código (27/10/2026, plano aprovado pelo dono):** uma linha nas
+> telas da bancada (Etiqueta de Venda e Conferência) e o quadro Pendências na
+> TV, pelo `GET /api/pendencias/total` (três números). A linha Bloqueados foi
+> para o servidor (`exp_route.bloqueados`). `teste_pendencias.js` (65).
+> Aguarda deploy. O sob medida e o aviso por fora ficam para depois (C3, C5).
 >
 > **Mudou na construção da fase 2:** as **sobras não vieram** — o ↩ Sobrou se
 > decide com a caixa na mão, bipando a etiqueta e cada SKU, e não pelo Admin.
@@ -96,7 +104,7 @@ não muda quem decide — cada card continua com a permissão que tem hoje.
 |---|---|
 | **1** | A tela "Pendências" (a aba Bloqueados renomeada e ampliada) com um **painel de contadores** de todos os lugares do §1, cada um com o link para onde se resolve hoje. Nada se move ainda: é ver tudo num lugar só. O aviso do upload (`resto`) vira linha |
 | **2** | ✅ em código (27/10): o PDF cuja conta não fecha vira pendência gravada; o passivo da Mesa é desenhado na central, com a decisão na aba Correções. ~~Sobras da Conferência~~ ficam na Conferência (decisão física) |
-| **3** | As telas de bancada ganham a linha de aviso; o sob medida entra, se o dono quiser |
+| **3** | ✅ em código (27/10): a linha nas telas da bancada e o número na TV. O sob medida fica para depois (C3) |
 
 ## 5. Fica de fora
 

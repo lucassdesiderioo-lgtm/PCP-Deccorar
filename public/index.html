@@ -2642,11 +2642,16 @@ document.addEventListener("click",async function(e){
   if(inp) inp.value="";
   carregarBloq();
 });
+/* Com o motivo digitado, o card NAO se redesenha: a aba se atualiza a cada
+   30 s e o campo nascia de novo, vazio, no meio da frase (§12). */
+var SEM_N=0;
 async function carregarSemEtq(){
-  var l=[]; try{ l=await (await fetch("/api/semetiqueta")).json(); }catch(e){}
   var card=document.getElementById("semEtqCard"), lis=document.getElementById("semEtqLista");
   if(!card||!lis) return 0;
-  if(!Array.isArray(l)||!l.length){ card.style.display="none"; lis.innerHTML=""; return 0; }
+  var digitado=[].some.call(lis.querySelectorAll("input"),function(i){ return i.value.trim()||i===document.activeElement; });
+  if(digitado) return SEM_N;
+  var l=[]; try{ l=await (await fetch("/api/semetiqueta")).json(); }catch(e){}
+  if(!Array.isArray(l)||!l.length){ card.style.display="none"; lis.innerHTML=""; SEM_N=0; return 0; }
   card.style.display="";
   var h="";
   for(var i=0;i<l.length;i++){
@@ -2664,6 +2669,7 @@ async function carregarSemEtq(){
       +'</div><div data-semmsg="'+v.id+'" style="font-size:12px;margin-top:4px"></div></div>';
   }
   lis.innerHTML=h;
+  SEM_N=l.length;
   return l.length;
 }
 document.addEventListener("click",async function(e){
@@ -2674,6 +2680,7 @@ document.addEventListener("click",async function(e){
   if(!motivo){ if(msg){ msg.style.color="#c62828"; msg.textContent="Escreva o motivo antes — é o registro de por que esta venda saiu da lista."; } if(inp) inp.focus(); return; }
   var r={}; try{ r=await (await fetch("/api/semetiqueta/resolver",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id,resolucao:res,motivo:motivo})})).json(); }catch(err){ r={erro:"sem conexão — tente de novo"}; }
   if(r.erro){ if(msg){ msg.style.color="#c62828"; msg.textContent=r.erro; } return; }
+  if(inp) inp.value="";
   if(r.aviso) alert(r.aviso);
   carregarBloq();
 });
@@ -2685,11 +2692,13 @@ function pendDias(desde){
   var d=new Date(String(desde).slice(0,10)+'T00:00:00'), h=new Date(); h.setHours(0,0,0,0);
   return Math.max(0,Math.round((h-d)/86400000));
 }
-async function carregarResumo(nBloq){
-  var box=document.getElementById("centralResumo"); if(!box) return 0;
+async function carregarResumo(){
+  var box=document.getElementById("centralResumo"); if(!box) return null;
   var r=null; try{ var x=await fetch("/api/pendencias/resumo"); if(x.ok) r=await x.json(); }catch(e){}
-  if(!r||!r.linhas){ box.innerHTML='<span style="color:var(--red);font-weight:700">Não consegui carregar o resumo das outras telas.</span>'; return 0; }
-  var linhas=[{nome:'Bloqueados',n:nBloq,ajuda:'SKU fora do cadastro, dúvida na leitura, pacote, formato novo, venda sem etiqueta e PDF cuja conta não fechou',quem:'os cards logo abaixo dizem quem',aqui:true}].concat(r.linhas);
+  if(!r||!r.linhas){ box.innerHTML='<span style="color:var(--red);font-weight:700">Não consegui carregar o resumo das pendências.</span>'; return null; }
+  /* A linha Bloqueados vem do servidor desde a fase 3: a bancada e a TV leem o
+     mesmo total, e uma soma feita aqui seria uma segunda regua (#12). */
+  var linhas=r.linhas;
   var h='<table class="pendTab"><thead><tr><th>Onde</th><th>Esperando</th><th>Desde</th><th>Quem resolve</th></tr></thead><tbody>';
   linhas.forEach(function(l){
     var dias=pendDias(l.desde), cor, num;
@@ -2707,7 +2716,7 @@ async function carregarResumo(nBloq){
   h+='</tbody></table>';
   if(r.em_duas_linhas) h+='<div class="sub" style="margin-top:6px">'+r.em_duas_linhas+' caixa(s) cancelada(s) aparecem em Correções e em Sobras: volta pelo ↩ Sobrou, ou se registra na Mesa que não voltou. No total contam uma vez.</div>';
   box.innerHTML=h;
-  return r.total||0;
+  return r.total;
 }
 document.addEventListener("click",function(e){
   var a=e.target.closest("[data-pendaba],[data-pendurl]"); if(!a) return;
@@ -2726,8 +2735,10 @@ var nm=await carregarMod();
 var np=await carregarPac();
 var ns=await carregarSemEtq();
 var nc=await carregarContaAberta();
-var nr=await carregarResumo(n+nd+nm+np+ns+nc);
-var tb=document.getElementById("tabBlq"), tot=n+nd+nm+np+ns+nc+nr;
+var nr=await carregarResumo();
+/* O total da aba e o do servidor (o mesmo da bancada e da TV). Sem resposta,
+   cai na soma dos cards daqui, para o numero nao sumir. */
+var tb=document.getElementById("tabBlq"), tot=(nr!=null)?nr:(n+nd+nm+np+ns+nc);
 if(tb) tb.textContent = tot ? ("Pendências ("+tot+")") : "Pendências";
 var est=document.getElementById("blqEstado"), lis=document.getElementById("blqLista");
 if(!est||!lis) return;
