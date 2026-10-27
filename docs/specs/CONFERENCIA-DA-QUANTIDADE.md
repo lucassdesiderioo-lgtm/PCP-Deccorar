@@ -47,10 +47,27 @@ testemunha não a leu. Nada retém, nada avisa. A NF 8196 tinha só o Pack ID na
 etiqueta (sem número de venda), que é o tipo de etiqueta em que esse casamento
 é mais frágil.
 
-> ⚠️ **A causa exata da NF 8196 ainda não está provada.** Ela pode ter sido o
-> caminho acima, o `Quantidade:` caído fora das 4 linhas (título comprido, como
-> nos Tóquio), ou o ML ter mudado o jeito de escrever. Só o PDF de 19/10 diz —
-> e ele é o **primeiro caso** do caderno (§4).
+> ⚠️ **A NF 8196 NÃO ERA "QUANTIDADE: 2" — ERA UM PACOTE DE DOIS SKUs**
+> (27/10/2026, folha enviada pelo dono). Na folha: `BK120120BEGE` (Quantidade 1)
+> com pack, venda e o nome do Roberto, e logo abaixo `BK140140BEGE` (Quantidade
+> 1) sem pack, sem venda e sem nome — o **irmão** do pacote (§5-B).
+>
+> **O caminho, reproduzido com a folha dele no leitor do sistema:** a folha
+> sozinha dá as duas peças. Mas o irmão só é aceito quando **todas as etiquetas
+> do PDF** acham item na folha (`pdfFecha`). Basta UMA etiqueta de outro
+> cliente ficar sem item para o irmão ser descartado em **todos** os volumes do
+> PDF — e o volume que casou certinho, como o do Roberto, **passa com 1 peça,
+> sem reter e sem aviso**, porque a retenção do "PDF não fecha" só pega a
+> etiqueta que não achou item (`!r1`, R-CONF-03). É a licença do R-VOL-03
+> ("o irmão se lê por ausência, e só quando o PDF fecha") virando silêncio do
+> lado do volume que tem o irmão.
+>
+> Falta só a confirmação do banco: se outro volume do mesmo PDF ficou retido
+> por "não achou item na folha", é este caminho.
+>
+> **Há um segundo furo no mesmo lugar, achado no código:** quando a leitura
+> por bloco não acha o item e a testemunha acha, a quantidade é jogada fora —
+> a testemunha não a lê.
 
 ## 3. Parte A — as leituras da quantidade
 
@@ -144,7 +161,7 @@ confere todos a cada mudança de código, para sempre.**
 
 | Fase | O quê | Precisa de |
 |---|---|---|
-| **1** | O caderno (§4) e o primeiro caso, a NF 8196 · L2, L3 e L4 · a trava (§3.2) · a cobertura na auditoria | o PDF que tem a NF 8196 |
+| **1** | O caderno (§4) e o primeiro caso, a NF 8196 (a folha que o dono mandou) · **o irmão que o PDF sem fechar descartava passa a RETER o volume, com as peças pré-preenchidas** · L2, L3 (contando também os SKUs irmãos) e L4 · a trava (§3.2) · a cobertura na auditoria | — |
 | **2** | L5 (o relatório) e a lista "o ML diz N, o sistema gravou M" | um relatório com a coluna Unidades |
 
 Cada fase com teste escrito antes, backup e deploy fora do horário de
