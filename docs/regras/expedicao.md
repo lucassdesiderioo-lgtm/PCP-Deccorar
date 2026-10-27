@@ -147,7 +147,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Por quê:** a NF 8301 (venda 2000018960012186) estava na folha e a etiqueta não veio em PDF nenhum: o sistema nunca criou a caixa, a venda ficou fora de tela nenhuma, **atrasou no Mercado Livre** e saiu impressa por fora — sem conferência e com o saldo 1 acima. O aviso do upload aparece uma vez só.
 - **Exceções:** resolver é `@admin`, como as outras decisões da aba; ler é também de `etiqueta.emitir` (a linha da bancada). Coberta pelo modo teste (`TABELAS`).
 - **Teste que trava:** `teste_sem_etiqueta.js` (35) · `teste_casos_reais.js` (o caso da NF 8301).
-- **Status:** em código desde 27/10/2026, aguardando deploy.
+- **Status:** no ar desde 27/10/2026 (PR #237). Ainda não conferida com dado real: a prova é a primeira venda sem etiqueta aparecer no card e sair sozinha quando o PDF dela subir.
 - **História:** spec `docs/specs/CONFERENCIA-DA-QUANTIDADE.md` §5-B · o lugar único das pendências é a spec `CENTRAL-DE-PENDENCIAS.md` (rascunho).
 
 ### R-VOL-09 · A quantidade é lida por três caminhos, e a conta do PDF inteiro é conferida
