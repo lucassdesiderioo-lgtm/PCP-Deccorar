@@ -1,4 +1,5 @@
-> **STATUS · 27/10/2026 — RASCUNHO, AGUARDANDO O DONO** · `NOVIDADE` + `REGRA`
+> **STATUS · 27/10/2026 — RASCUNHO, COM TRÊS RESPOSTAS DO DONO** (§7: reter já,
+> nomes trocados ok, o PDF vem) · `NOVIDADE` + `REGRA`
 > · risco 🔴 (etiqueta, estoque). Nasceu da NF 8196 (Roberto, 19/10/2026): o ML
 > vendeu **2** persianas numa etiqueta, o sistema gravou **1**, e o cliente
 > recebeu uma. Outros clientes relataram o mesmo. **Nada construído** (§0:
@@ -35,7 +36,7 @@ conferências no upload (R-CONF-01): leituras, comprador, medida, cor e família
 |---|---|
 | leitura por bloco (`folha.js`, `itensDaFolha`) | lê o `Quantidade: N` — mas só nas **4 linhas** abaixo do `SKU:` |
 | leitura item a item (`parse.js`, a "testemunha") | **não lê** a quantidade |
-| a nota fiscal (DANFE), que está no mesmo PDF | **não é usada** para isso |
+| a nota fiscal (DANFE) e a etiqueta | não trazem a quantidade (ver o aviso no §3.1) |
 | a conta do PDF inteiro (peças da folha × peças gravadas) | existe só no `rastrear.js --lote`, como relatório; **o upload não faz** |
 | o relatório do ML (coluna **Unidades**) | **não é importado** |
 
@@ -63,17 +64,31 @@ régua. Uma leitura que falha não arrasta as outras.
 | L1 | folha por bloco | o `Quantidade:` do bloco do item (o que existe hoje) | no upload |
 | L2 | folha item a item | a testemunha passa a ler o `Quantidade:` também | no upload |
 | L3 | folha crua, sem janela | todo número de quantidade escrito entre o item e o próximo (`Quantidade: N`, `N unidades`), sem o limite de 4 linhas | no upload |
-| L4 | a nota fiscal | soma das quantidades dos produtos da NF **contra** a soma das peças de todos os volumes daquela NF (a nota é do pedido, R-PDF-05) | no upload |
-| L5 | a conta do PDF | soma de todas as quantidades da folha **contra** a soma das peças gravadas no upload inteiro | no fim do upload |
-| L6 | o relatório do ML | coluna **Unidades** de cada venda **contra** as peças do volume | no import de Admin → Planejamento |
+| L4 | a conta do PDF | soma de todas as quantidades da folha **contra** a soma das peças gravadas no upload inteiro | no fim do upload |
+| L5 | o relatório do ML | coluna **Unidades** de cada venda **contra** as peças do volume | no import de Admin → Planejamento |
 
-> **A etiqueta de envio também pode dizer a quantidade**, mas isso não está
-> confirmado. Se o PDF real de 19/10 mostrar, ela entra como mais uma leitura.
+> ⚠️ **A ETIQUETA E A NOTA NÃO DIZEM A QUANTIDADE — conferido no PDF real de
+> 16 e 19/10/2026 (33 etiquetas, NF 8152 a 8303).** A etiqueta de envio traz
+> pack, despacho, rota e destinatário, sem produto. A nota que vem no PDF é o
+> **DANFE simplificado**: remetente, destinatário e chave, com o quadro de
+> produtos **em branco**. O caso conferido foi o José Maria Martins (NF 8152,
+> `SCREEN1-120120BEGE`, *Quantidade: 2* na folha): etiqueta e nota sem número
+> nenhum. A primeira versão deste rascunho tinha a nota como leitura; ela saiu.
+>
+> **Consequência: dentro do PDF, a quantidade só existe na folha de controle.**
+> L1, L2 e L3 são três réguas sobre o MESMO texto: pegam erro de LEITURA (janela
+> curta, casamento errado, layout quebrado), mas não pegam o ML omitindo o
+> número. A L4 confere a conta inteira. A **única fonte de fora do PDF é a L5**,
+> o relatório do ML — e por isso ela não é opcional.
+>
+> **O mesmo PDF mostrou que a leitura funciona no caso simples:** o José entrou
+> com as duas peças gravadas. O defeito da NF 8196 está em um caminho que esse
+> PDF não exercita, e só o PDF dela diz qual.
 
 ### 3.2 A regra de decisão
 
 1. **A peça só passa quando todas as leituras que conseguiram ler concordam.**
-2. **Leitura que não conseguiu ler não vota.** Sem nota legível, a L4 fica de
+2. **Leitura que não conseguiu ler não vota.** Sem relatório importado, a L5 fica de
    fora daquele volume — nunca vira acusação. É a regra dos dois lados
    (armadilha #10): trava que acusa o inocente para de proteger.
 3. **Qualquer leitura dizendo MAIS do que foi gravado retém o volume.** O
@@ -81,11 +96,11 @@ régua. Uma leitura que falha não arrasta as outras.
 4. **Retém o volume, nunca o PDF inteiro** (R-CONF-03). As outras etiquetas
    seguem.
 5. **O motivo diz cada leitura**, para quem libera conferir em segundos:
-   *"quantidade: folha diz 2, nota diz 2, gravado 1"*.
+   *"quantidade: bloco diz 2, folha crua diz 2, gravado 1"*.
 6. **Quem libera** é uma pessoa em Admin → Bloqueados, com o pedido do ML
    aberto: confirma quantas persianas e de quais SKUs. É o card que já existe
    para o pacote de vários SKUs (§5-B, `pacote.assinar`).
-7. **Na L6** (o relatório chega depois, às vezes depois de a caixa sair), a
+7. **Na L5** (o relatório chega depois, às vezes depois de a caixa sair), a
    divergência não tem como reter a caixa que já foi. Ela vai para uma lista
    **"o ML diz N, o sistema gravou M"**, com cliente, NF e estágio: é a lista
    de quem pode ter recebido menos.
@@ -129,9 +144,8 @@ confere todos a cada mudança de código, para sempre.**
 
 | Fase | O quê | Precisa de |
 |---|---|---|
-| **1** | O caderno (§4) e o primeiro caso, a NF 8196 · L2 e L3 · a trava (§3.2) com as três leituras da folha · a cobertura na auditoria | o PDF de 19/10 |
-| **2** | L4 (a nota) e L5 (a conta do PDF) | — |
-| **3** | L6 (o relatório) e a lista "o ML diz N, o sistema gravou M" | um relatório com a coluna Unidades |
+| **1** | O caderno (§4) e o primeiro caso, a NF 8196 · L2, L3 e L4 · a trava (§3.2) · a cobertura na auditoria | o PDF que tem a NF 8196 |
+| **2** | L5 (o relatório) e a lista "o ML diz N, o sistema gravou M" | um relatório com a coluna Unidades |
 
 Cada fase com teste escrito antes, backup e deploy fora do horário de
 expedição (🔴).
@@ -148,8 +162,8 @@ expedição (🔴).
 
 | # | Pergunta | Proposta |
 |---|---|---|
-| P1 | A trava retém já na fase 1, ou passa uma semana só **avisando** (tarja na tela, sem reter) para medir o falso alarme? | Avisar por uma semana, depois reter |
+| P1 | A trava retém já na fase 1, ou passa uma semana só **avisando**? | ✅ **Reter já** (dono, 27/10/2026) |
 | P2 | Quem libera a quantidade retida? | Quem já assina o pacote (`pacote.assinar`) |
-| P3 | O caderno guarda o texto do PDF no repositório, com **nomes e endereços trocados**. Está bem assim? | Sim, trocados |
-| P4 | Você tem o PDF de 19/10 com a NF 8196? | É o primeiro caso, e diz a causa |
+| P3 | O caderno guarda o texto do PDF no repositório, com **nomes e endereços trocados**. Está bem assim? | ✅ **Sim, trocados** (dono, 27/10/2026) |
+| P4 | Você tem o PDF com a NF 8196? | O dono vai mandar. O primeiro enviado (NF 8152 e 8268 a 8303) não a tem |
 | P5 | Você consegue o relatório de vendas do ML com a coluna **Unidades**, cobrindo o período das reclamações? | Para a fase 3 |
