@@ -314,6 +314,21 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
   <div id="divLista"></div>
 </div>
 <div class="card"><div id="blqEstado"></div><table><thead><tr><th>SKU</th><th>Volumes</th><th></th></tr></thead><tbody id="blqLista"></tbody></table></div>
+<div class="card" id="semEtqCard" style="display:none;border:2px solid #c62828">
+  <!-- Fase 1-B da spec CONFERENCIA-DA-QUANTIDADE (27/10/2026). A venda esta na
+       folha do ML e a etiqueta dela nao veio em PDF nenhum: o sistema nunca
+       criou a caixa. A NF 8301 ficou assim, invisivel, ATRASOU no ML e saiu
+       impressa por fora. Fica aqui ate o PDF dela chegar (sai sozinha) ou ate
+       alguem resolver com motivo. Entra no numero da aba: e pendencia. -->
+  <div style="font-weight:800;color:#c62828;font-size:16px;margin-bottom:6px">🧾 VENDA NA FOLHA DO ML SEM ETIQUETA NO SISTEMA</div>
+  <div style="font-size:13px;color:#5a6472;margin-bottom:12px">
+    O Mercado Livre pôs estas vendas na folha de controle, mas a <b>etiqueta</b> delas não veio em nenhum PDF
+    subido — então elas não aparecem em "Faltam imprimir" e podem <b>atrasar no ML</b>. Baixe a etiqueta no
+    Mercado Livre e suba o PDF pela Etiqueta de Venda: a venda sai daqui sozinha. Se ela foi cancelada, ou se
+    a etiqueta já saiu por fora do sistema, marque abaixo com o motivo.
+  </div>
+  <div id="semEtqLista"></div>
+</div>
 <div class="card" id="cancCard" style="display:none;border:2px solid #b26a00">
   <!-- VENDAS-E-MEDIA fase 2 (D3 do dono, 26/09/2026). SO MOSTRA: decidir o que
        fazer com a persiana e da Mesa de correcoes, que ainda nao existe. Fica
@@ -2548,6 +2563,44 @@ async function carregarCanc(){
   }
   lis.innerHTML=h;
 }
+/* A venda da folha sem etiqueta (fase 1-B). Âmbar no dia em que aparece,
+   vermelho a partir do dia seguinte: no ML ela ja esta contando prazo. */
+function dataBRsem(s){ var d=String(s||'').slice(0,10).split('-'); return d.length===3?(d[2]+'/'+d[1]):''; }
+async function carregarSemEtq(){
+  var l=[]; try{ l=await (await fetch("/api/semetiqueta")).json(); }catch(e){}
+  var card=document.getElementById("semEtqCard"), lis=document.getElementById("semEtqLista");
+  if(!card||!lis) return 0;
+  if(!Array.isArray(l)||!l.length){ card.style.display="none"; lis.innerHTML=""; return 0; }
+  card.style.display="";
+  var h="";
+  for(var i=0;i<l.length;i++){
+    var v=l[i], cor=v.dias>=1?"#c62828":"#b26a00";
+    h+='<div style="border-top:1px solid #d8dee6;padding:12px 0" data-semrow="'+v.id+'">'
+      +'<div style="font-weight:700">Venda '+esc(v.venda||v.packId||"—")+' · <span style="font-family:monospace">'+esc(v.sku||"—")+'</span>'
+      +(v.qtd>1?' · '+v.qtd+' peças':'')+'</div>'
+      +'<div style="font-size:13px;margin-top:3px;color:'+cor+';font-weight:700">na folha desde '+esc(dataBRsem(v.visto_em))
+      +(v.dias>=1?' — há '+v.dias+' dia(s), pode estar atrasando no ML':' — vista hoje')+'</div>'
+      +'<div style="font-size:12px;color:#5a6472;margin-top:3px">'+(v.packId?'pack '+esc(v.packId)+' · ':'')+'PDF '+esc(v.pdf||"—")+'</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">'
+      +'<input data-semmot="'+v.id+'" placeholder="motivo (obrigatório)" style="flex:1;min-width:200px">'
+      +'<button class="ghost" data-semres="cancelada" data-semid="'+v.id+'">Cancelada no ML</button>'
+      +'<button class="ghost" data-semres="por_fora" data-semid="'+v.id+'">Saiu por fora do sistema</button>'
+      +'</div><div data-semmsg="'+v.id+'" style="font-size:12px;margin-top:4px"></div></div>';
+  }
+  lis.innerHTML=h;
+  return l.length;
+}
+document.addEventListener("click",async function(e){
+  var b=e.target.closest("[data-semres]"); if(!b) return;
+  var id=Number(b.getAttribute("data-semid")), res=b.getAttribute("data-semres");
+  var inp=document.querySelector('[data-semmot="'+id+'"]'), msg=document.querySelector('[data-semmsg="'+id+'"]');
+  var motivo=(inp&&inp.value||"").trim();
+  if(!motivo){ if(msg){ msg.style.color="#c62828"; msg.textContent="Escreva o motivo antes — é o registro de por que esta venda saiu da lista."; } if(inp) inp.focus(); return; }
+  var r={}; try{ r=await (await fetch("/api/semetiqueta/resolver",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id,resolucao:res,motivo:motivo})})).json(); }catch(err){ r={erro:"sem conexão — tente de novo"}; }
+  if(r.erro){ if(msg){ msg.style.color="#c62828"; msg.textContent=r.erro; } return; }
+  if(r.aviso) alert(r.aviso);
+  carregarBloq();
+});
 async function carregarBloq(){
 carregarCanc();
 var l=[]; try{ l=await (await fetch("/api/bloqueados")).json(); }catch(e){}
@@ -2555,8 +2608,9 @@ var n=0; for(var i=0;i<l.length;i++) n+=l[i].qtd;
 var nd=await carregarDiv();
 var nm=await carregarMod();
 var np=await carregarPac();
+var ns=await carregarSemEtq();
 var tb=document.getElementById("tabBlq");
-if(tb) tb.textContent = (n+nd+nm+np) ? ("Bloqueados ("+(n+nd+nm+np)+")") : "Bloqueados";
+if(tb) tb.textContent = (n+nd+nm+np+ns) ? ("Bloqueados ("+(n+nd+nm+np+ns)+")") : "Bloqueados";
 var est=document.getElementById("blqEstado"), lis=document.getElementById("blqLista");
 if(!est||!lis) return;
 if(!l.length){ est.innerHTML="<b>Nenhum volume bloqueado.</b>"; lis.innerHTML=""; return; }

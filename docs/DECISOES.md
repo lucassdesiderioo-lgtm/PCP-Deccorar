@@ -394,3 +394,15 @@ card do pacote, com o maior número já escrito, e **quem assina o pacote
 libera** (decisão do dono, "reter já"). O irmão com o PDF sem fechar entra como
 dúvida: a caixa fica retida, e não perde a peça. A conta do PDF inteiro
 (persianas da folha × gravadas) aparece em vermelho no upload quando não fecha.
+
+## 27/10/2026 — a venda da folha sem etiqueta fica em Bloqueados, e as pendências vão para um lugar só
+
+Fase 1-B da spec `CONFERENCIA-DA-QUANTIDADE` (cartão R-PDF-09). **Antes:** a
+venda que o ML punha na folha sem mandar a etiqueta no PDF não aparecia em tela
+nenhuma — a NF 8301 atrasou no Mercado Livre e saiu impressa por fora.
+**Depois:** o upload a grava numa lista que fica em **Admin → Bloqueados** até o
+PDF dela chegar ou alguém resolver com motivo (cancelada no ML, ou saiu por
+fora). A Etiqueta de Venda mostra só uma linha apontando para lá. **E a regra
+geral do dono:** *"essas pendências e esses tipos de problemas devemos
+concentrar em apenas uma única tela, para não ficar o problema espalhado"* —
+o desenho dessa tela é a spec `CENTRAL-DE-PENDENCIAS.md` (rascunho).

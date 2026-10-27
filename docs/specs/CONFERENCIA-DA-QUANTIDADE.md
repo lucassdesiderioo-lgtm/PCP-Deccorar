@@ -39,7 +39,13 @@
 > motivo, ou a próxima contagem. **Etiqueta impressa por fora é a armadilha #6**
 > (§7 do CLAUDE.md): vale descobrir qual trava empurrou a impressão para fora.
 >
-> **Falta:** a fase 2 (o relatório do ML) · o motivo de a NF 8301 ter saído por fora.
+> **Fase 1-B em código (27/10/2026, aprovada pelo dono no mesmo dia):** a venda
+> da folha sem etiqueta é gravada e fica em **Admin → Bloqueados** até o PDF
+> dela chegar ou alguém resolver com motivo; a Etiqueta de Venda mostra só uma
+> linha (§5-B, R-PDF-09). Aguarda deploy.
+>
+> **Falta:** o deploy da fase 1-B · a fase 2 (o relatório do ML) · o motivo de a
+> NF 8301 ter saído por fora.
 
 # A conferência da quantidade — o sistema confere o próprio trabalho
 
@@ -197,13 +203,26 @@ confere todos a cada mudança de código, para sempre.**
 | Fase | O quê | Precisa de |
 |---|---|---|
 | **1** | O caderno (§4) e o primeiro caso, a NF 8196 (a folha que o dono mandou) · **o irmão que o PDF sem fechar descartava passa a RETER o volume, com as peças pré-preenchidas** · L2, L3 (contando também os SKUs irmãos) e L4 · a trava (§3.2) · a cobertura na auditoria | — |
-| **1-B** | **A venda da folha sem etiqueta fica na tela até alguém resolver** (§5-B) — PROPOSTA, aguarda aprovação | as respostas P6 a P9 |
+| **1-B** | **A venda da folha sem etiqueta fica na tela até alguém resolver** (§5-B) — **em código desde 27/10/2026** | — |
 | **2** | L5 (o relatório) e a lista "o ML diz N, o sistema gravou M" | um relatório com a coluna Unidades |
 
 Cada fase com teste escrito antes, backup e deploy fora do horário de
 expedição (🔴).
 
-## 5-B. Fase 1-B — a venda da folha sem etiqueta não pode sumir (PROPOSTA, 27/10/2026)
+## 5-B. Fase 1-B — a venda da folha sem etiqueta não pode sumir (APROVADA e em código, 27/10/2026)
+
+> **Como foi construída:** tabela `venda_sem_etiqueta` (dona: `exp_route.js`),
+> gravada pelo upload a partir da `conta_pdf.semEtiqueta`; a venda cuja caixa
+> já existe em `lote` não entra; a etiqueta chegando resolve sozinha
+> (`resolucao='etiqueta'`); uma pessoa resolve com motivo obrigatório
+> (`cancelada` ou `por_fora`, 400 sem motivo, 409 se já resolvida, auditoria).
+> **Mudou na construção, por decisão do dono:** a lista fica em **Admin →
+> Bloqueados** (o lugar único das pendências), e não na Etiqueta de Venda —
+> lá aparece só **uma linha de aviso, sem botão**. Por isso **resolver é
+> `@admin`**, como as outras decisões da aba (P8); ler é também de quem tem
+> `etiqueta.emitir`, para a linha aparecer na bancada. Entra no número da aba
+> e na cobertura do modo teste. `teste_sem_etiqueta.js` (35, escrito antes).
+
 
 **O problema, nas palavras do dono:** *"Pelo fato de ficar pendente e não estar
 no primeiro PDF, a venda ficou como atrasada. É um erro que vem acontecendo, e
@@ -264,7 +283,7 @@ o caso do caderno que trava a regra.
 | P3 | O caderno guarda o texto do PDF no repositório, com **nomes e endereços trocados**. Está bem assim? | ✅ **Sim, trocados** (dono, 27/10/2026) |
 | P4 | Você tem o PDF com a NF 8196? | O dono vai mandar. O primeiro enviado (NF 8152 e 8268 a 8303) não a tem |
 | P5 | Você consegue o relatório de vendas do ML com a coluna **Unidades**, cobrindo o período das reclamações? | Para a fase 2 |
-| P6 | A fase 1-B (a venda sem etiqueta fica na tela até resolver) pode ser construída? | Sim, antes da fase 2: é o que está atrasando venda hoje |
-| P7 | Onde a lista aparece? | Na Etiqueta de Venda, em cima (é onde se imprime) · e um número em Admin → Bloqueados |
-| P8 | Quem pode marcar "cancelada no ML" ou "saiu por fora"? | Quem já imprime a etiqueta (`etiqueta.emitir`) · com motivo e registro de quem marcou |
-| P9 | A venda vista há mais de 1 dia muda de cor? | Sim: âmbar no dia em que aparece, vermelho a partir do dia seguinte |
+| P6 | A fase 1-B pode ser construída? | ✅ **Sim, antes da fase 2** (dono, 27/10/2026) |
+| P7 | Onde a lista aparece? | ✅ **Em Admin → Bloqueados**, junto com o que espera decisão; na Etiqueta de Venda **só uma linha** apontando para lá (dono, 27/10/2026: *"essas pendências devemos concentrar em uma única tela"*) |
+| P8 | Quem pode marcar "cancelada no ML" ou "saiu por fora"? | Quem decide na aba Bloqueados (`@admin`), com motivo e registro — consequência da P7 |
+| P9 | A venda vista há mais de 1 dia muda de cor? | Âmbar no dia em que aparece, vermelho a partir do dia seguinte (como proposto) |
