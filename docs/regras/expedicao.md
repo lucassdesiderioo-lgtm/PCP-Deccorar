@@ -274,7 +274,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Por quê:** apagar linha à mão quebra saldo e fila em silêncio.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_correcao.js` (115) · `teste_correcao2.js` (98).
-- **Status:** no ar desde 02/10/2026 · conferida na fábrica: **ainda não**.
+- **Status:** no ar desde 02/10/2026 · na fábrica, **pela metade**: o caminho do **bloco** (prévia → motivo → executar → `correcao`) foi exercitado com dado real em 22/10/2026, com mais de 500 caixas (R-COR-07); **nenhuma ação por objeto** — fantasma, dar saída, tirar da fila, reabrir — foi usada em produção ainda.
 
 ### R-COR-02 · Fantasma é o volume `pendente` cujo irmão MAIS ANTIGO já andou
 - **Regra:** `correcoes.classificarFantasmas` é a única régua; o `limpar_fantasmas.js` lê dela. Varre o `lote` por id. Descartar apaga o volume **e** as peças; desfazer volta com o mesmo id e recusa id ocupado.

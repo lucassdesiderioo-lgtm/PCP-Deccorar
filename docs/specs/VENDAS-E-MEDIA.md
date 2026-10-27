@@ -215,7 +215,7 @@ cruzar essas linhas com os volumes:
 | Estágio do volume | O que acontece |
 |---|---|
 | `pendente` ou `bloqueado` | sai de "Faltam imprimir", da fila do dia, dos Bloqueados, da urgência e da média. **Estoque não mexe** — nada baixou |
-| `embalado` (etiqueta impressa) | o estoque já baixou. Vai para **"Canceladas depois da etiqueta"**, na Mesa de correções (`MESA-DE-CORRECOES.md`): alguém confere se a persiana voltou e decide |
+| `embalado` (etiqueta impressa) | o estoque já baixou. Vai para **"Canceladas depois da etiqueta"**, na Mesa de correções (`MESA-DE-CORRECOES.md`). ⚠️ **Desde 22/10/2026 a Mesa só registra a que NÃO voltou** — ela nunca mexe em saldo (R-COR-06). A persiana que está na fábrica volta ao estoque pelo **↩ Sobrou** da Conferência, com o bipe do SKU de cada peça (R-REC-01) |
 | `carregado` | ignora — saiu. Se voltar, é devolução (§9 do CLAUDE.md) |
 
 4. O resumo do import diz quantas canceladas achou, em cada estágio.
