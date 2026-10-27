@@ -1,6 +1,21 @@
 const express=require('express'); const fs=require('fs');
 const {parsePdf}=require('./parse'); const {PDFDocument}=require('pdf-lib');
 const {futuro,COLETA,VARIAS}=require('./carga');
+/* O QUE ESPERA DECISAO NA ABA PENDENCIAS, contado no servidor (central de
+   pendencias, fase 3). Sao os seis cards da aba: os quatro motivos de volume
+   retido (SKU, divergencia, pacote, modalidade — as quatro rotas abaixo
+   repartem o `estagio='bloqueado'` inteiro entre si), a venda da folha sem
+   etiqueta e o PDF cuja conta nao fecha. A bancada e a TV leem este numero
+   pela central; a aba do admin, tambem — a soma que a tela fazia sozinha
+   deixou de ser a regua (#12). */
+function bloqueadosPendentes(db){
+  const um = sql => db.prepare(sql).get();
+  const v = um("SELECT COUNT(*) n, MIN(data) desde FROM lote WHERE estagio='bloqueado'");
+  const s = um('SELECT COUNT(*) n, MIN(visto_em) desde FROM venda_sem_etiqueta WHERE resolvida_em IS NULL');
+  const c = um('SELECT COUNT(*) n, MIN(visto_em) desde FROM pdf_conta_aberta WHERE resolvida_em IS NULL');
+  const datas = [v.desde, s.desde, c.desde].filter(Boolean).map(String).sort();
+  return { n: v.n + s.n + c.n, desde: datas[0] || null, sem_etiqueta: s.n };
+}
 module.exports=function(app,db){
   db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT, impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, no_carro_em TEXT, no_carro_por TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT, cancelada_em TEXT, cancelada_origem TEXT, cancelada_estagio TEXT, cancelada_motivo TEXT, cancelada_varias INTEGER DEFAULT 0, cancelada_aviso_em TEXT, cancelada_resolvida_em TEXT, cancelada_resolvida_por TEXT, cancelada_voltou INTEGER, cancelada_por TEXT, baixado_em TEXT);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
@@ -1056,3 +1071,4 @@ module.exports=function(app,db){
     }catch(e){ console.error(e); res.status(500).send(String(e.message||e)); }
   });
 };
+module.exports.bloqueados = bloqueadosPendentes;

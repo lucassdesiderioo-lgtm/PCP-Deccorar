@@ -163,7 +163,7 @@ async function main(){
     const guarda=fn.search(/querySelectorAll\("input"\)/), busca=fn.indexOf('fetch("/api/semetiqueta")');
     ok('o card não se redesenha com o motivo digitado', guarda>0 && busca>guarda && /activeElement/.test(fn) && /return SEM_N/.test(fn));
     const emb=fs.readFileSync(path.join(__dirname,'public','embalagem.html'),'utf8');
-    ok('a Etiqueta de Venda lê a lista', /\/api\/semetiqueta/.test(emb));
+    ok('a Etiqueta de Venda mostra a linha (pela central, fase 3)', /\/pendencias_aviso\.js/.test(emb) && /id="pendAviso"/.test(emb));
     ok('e manda para Admin → Pendências, sem botão de resolver', /Admin → Pendências/.test(emb) && !/semetiqueta\/resolver/.test(emb));
 
     console.log('\n── 7. o modo teste cobre a lista ──');

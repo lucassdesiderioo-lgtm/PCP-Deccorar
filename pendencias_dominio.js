@@ -41,6 +41,10 @@ function maisAntiga(datas){
 }
 
 const LINHAS = [
+  { chave:'bloqueados', nome:'Bloqueados', perm:[], onde:{ aba:'blq' }, aqui:true,
+    quemTexto:'os cards logo abaixo dizem quem',
+    ajuda:'SKU fora do cadastro, dúvida na leitura, pacote, formato novo, venda sem etiqueta e PDF cuja conta não fechou',
+    contar(db){ const r = require('./exp_route').bloqueados(db); return { n:r.n, desde:r.desde, sem_etiqueta:r.sem_etiqueta }; } },
   { chave:'correcoes', nome:'Correções', perm:['correcao.executar'], onde:{ aba:'blq', ancora:'corCard' },
     ajuda:'fantasmas, vencidos, caixas sem conferência, canceladas depois da etiqueta e fila velha',
     contar(db){
@@ -94,9 +98,11 @@ const LINHAS = [
 function resumo(db){
   const linhas = LINHAS.map(L => {
     const base = { chave:L.chave, nome:L.nome, ajuda:L.ajuda, onde:L.onde,
-                   quem:L.perm.map(rotulo).join(' ou ') };
+                   quem:L.quemTexto || L.perm.map(rotulo).join(' ou ') };
+    if(L.aqui) base.aqui = true;
     try{
       const r = L.contar(db);
+      if(r.sem_etiqueta != null) base._sem = r.sem_etiqueta;
       return Object.assign(base, { n:r.n, desde:r.desde, _canc:r.canceladas || [] });
     }catch(e){
       console.log('[pendencias] ' + L.chave + ': ' + (e && e.message));
@@ -110,8 +116,28 @@ function resumo(db){
   const a = new Set((linhas.find(l => l.chave === 'correcoes') || {})._canc || []);
   const duas = ((linhas.find(l => l.chave === 'sobras') || {})._canc || []).filter(id => a.has(id)).length;
   const total = linhas.reduce((s, l) => s + (l.n || 0), 0) - duas;
-  linhas.forEach(l => { delete l._canc; });
-  return { total, em_duas_linhas:duas, sem_conta:linhas.filter(l => l.n == null).length, linhas };
+  const sem = (linhas.find(l => l.chave === 'bloqueados') || {})._sem || 0;
+  linhas.forEach(l => { delete l._canc; delete l._sem; });
+  return { total, em_duas_linhas:duas, sem_conta:linhas.filter(l => l.n == null).length,
+           sem_etiqueta:sem, linhas };
 }
 
-module.exports = { LINHAS, resumo };
+/* O QUE A BANCADA E A TV RECEBEM (fase 3): tres numeros e nada mais — o total
+   (o mesmo do resumo), ha quantos dias espera a mais antiga e quantas vendas
+   da folha estao sem etiqueta (a que pode atrasar no ML). Quem opera a
+   Etiqueta de Venda ou a Conferencia nao abre o admin, e sem isto a central
+   so existia para quem ja estava la. */
+function total(db){
+  const r = resumo(db);
+  const t = new Date(), z = n => String(n).padStart(2, '0');
+  const hoje = Date.parse(t.getFullYear() + '-' + z(t.getMonth() + 1) + '-' + z(t.getDate()) + 'T00:00:00');
+  let dias = null;
+  r.linhas.forEach(l => {
+    if(!l.n || !l.desde) return;
+    const d = Math.round((hoje - Date.parse(String(l.desde).slice(0, 10) + 'T00:00:00')) / 86400000);
+    if(isFinite(d) && (dias == null || d > dias)) dias = Math.max(0, d);
+  });
+  return { total:r.total, dias, sem_etiqueta:r.sem_etiqueta };
+}
+
+module.exports = { LINHAS, resumo, total };

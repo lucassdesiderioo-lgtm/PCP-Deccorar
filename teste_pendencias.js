@@ -92,6 +92,15 @@ function semear(){
     VALUES ('2026-10-01','BKCENTRAL999','Cliente Secreto','9001','pendente','2026-10-02',0)`).run();
   db.prepare(`INSERT INTO lote (data, codigo, buyer, nf, estagio, cancelada_estagio, cancelada_em, embalado_em, teste)
     VALUES ('2026-10-10','BKCENTRAL999','Cliente Secreto','9002','cancelado','embalado','2026-10-12 10:00:00','2026-10-11 10:00:00',0)`).run();
+  /* Fase 3: os retidos de Bloqueados, um de cada motivo, a venda sem etiqueta
+     e o PDF cuja conta não fecha — os seis cards da aba. */
+  const bl = db.prepare(`INSERT INTO lote (data, codigo, buyer, nf, estagio, bloqueio, teste) VALUES (?,?,?,?,'bloqueado',?,0)`);
+  bl.run('2026-10-21', 'SKUNOVO', 'Cliente Secreto', '9101', null);
+  bl.run('2026-10-22', 'BKCENTRAL999', 'Cliente Secreto', '9102', 'divergencia: o comprador não bate');
+  bl.run('2026-10-23', 'BKCENTRAL999', 'Cliente Secreto', '9103', 'pacote: 2 SKUs na etiqueta');
+  bl.run('2026-10-24', 'BKCENTRAL999', 'Cliente Secreto', '9104', 'modalidade: formato novo');
+  db.prepare("INSERT INTO venda_sem_etiqueta (venda, sku, qtd, visto_em) VALUES ('2000018960012186','BKCENTRAL999',1,'2026-10-19 08:00:00')").run();
+  db.prepare("INSERT INTO pdf_conta_aberta (hash, nfs, etiquetas, folha, sistema, resto) VALUES ('h','NFs 1 a 2 (2)',2,3,2,1)").run();
 }
 
 (async () => {
@@ -173,6 +182,39 @@ function semear(){
   ok('nenhum id repetido na marcação da tela do admin', rep.length === 0, rep.join(', '));
   ok('a aba Bloqueados virou Pendências', /data-t="blq" id="tabBlq">Pendências</.test(tela));
   ok('a aba Pendências de SKU virou SKU incompleto', /data-t="pend" id="tabPend">SKU incompleto</.test(tela) && tela.indexOf("'Pendências de SKU'") < 0);
+
+  console.log('\n── 8. fase 3: Bloqueados no servidor, e o número para a bancada e a TV ──');
+  const rb = await get('/api/pendencias/resumo');
+  const somaCards = (await get('/api/bloqueados')).reduce((s, x) => s + x.qtd, 0)
+    + (await get('/api/divergencias')).length + (await get('/api/modalidade/pendentes')).length
+    + (await get('/api/pacote/pendentes')).length + (await get('/api/semetiqueta')).length
+    + (await get('/api/contaaberta')).length;
+  eq('a linha Bloqueados é a soma dos seis cards da aba', linha(rb, 'bloqueados').n, somaCards);
+  eq('e conta os quatro retidos, a venda sem etiqueta e o PDF', linha(rb, 'bloqueados').n, 6);
+  eq('a mais antiga é a venda sem etiqueta de 19/10', String(linha(rb, 'bloqueados').desde || '').slice(0, 10), '2026-10-19');
+  ok('a linha Bloqueados é a primeira', (rb.linhas || [])[0] && rb.linhas[0].chave === 'bloqueados');
+  ok('e o total do resumo a inclui', rb.total === (rb.linhas || []).reduce((s, l) => s + (l.n || 0), 0) - rb.em_duas_linhas);
+  const tt = await get('/api/pendencias/total');
+  eq('o total da bancada é o mesmo do resumo', tt.total, rb.total);
+  eq('diz quantas vendas sem etiqueta', tt.sem_etiqueta, 1);
+  const dias = Math.round((new Date(new Date().toDateString()) - new Date('2026-10-01T00:00:00')) / 86400000);
+  ok('diz há quantos dias espera a mais antiga', tt.dias >= dias - 1 && tt.dias <= dias + 1, 'veio ' + tt.dias + ', esperado ~' + dias);
+  eq('e só isso: três números, nenhum detalhe', JSON.stringify(Object.keys(tt).sort()), JSON.stringify(['dias','sem_etiqueta','total']));
+  ok('nenhum SKU nem cliente vai para a bancada', JSON.stringify(tt).indexOf('BKCENTRAL') < 0 && JSON.stringify(tt).indexOf('Cliente') < 0);
+  eq('a bancada, a Conferência, a TV e o admin leem o total', JSON.stringify(AC.permDaRota('/api/pendencias/total', 'GET')),
+     JSON.stringify(['etiqueta.emitir','carregamento.executar','painel.ver','@admin']));
+  ok('a aba não monta mais a linha Bloqueados sozinha', !/nome:'Bloqueados',n:nBloq/.test(tela));
+  const emb = fs.readFileSync(path.join(__dirname, 'public', 'embalagem.html'), 'utf8');
+  const car = fs.readFileSync(path.join(__dirname, 'public', 'carregamento.html'), 'utf8');
+  const tv = fs.readFileSync(path.join(__dirname, 'public', 'painel.html'), 'utf8');
+  const aviso = fs.readFileSync(path.join(__dirname, 'public', 'pendencias_aviso.js'), 'utf8');
+  ok('a frase da bancada lê o total', /\/api\/pendencias\/total/.test(aviso));
+  ok('a Etiqueta de Venda mostra a linha das pendências', /id="pendAviso"/.test(emb) && /avisoPendencias\('pendAviso'\)/.test(emb));
+  ok('e não tem botão de resolver', !/semetiqueta\/resolver|contaaberta\/resolver/.test(emb));
+  ok('a Conferência mostra a linha das pendências', /id="pendAviso"/.test(car) && /avisoPendencias\('pendAviso'\)/.test(car));
+  ok('a linha da Conferência não entra no redesenho de 4 s', !/function carregar\(\)[\s\S]{0,400}avisoPend/.test(car));
+  ok('a TV mostra o número', /\/api\/pendencias\/total/.test(tv) && /id="kPend"/.test(tv));
+  ok('as três telas usam a mesma frase (pendencias_aviso.js)', [emb, car].every(t => /\/pendencias_aviso\.js/.test(t)));
 
   console.log('\n── 5. a linha que não conta diz isso ──');
   db.exec('DROP TABLE devolucao');

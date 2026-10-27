@@ -430,3 +430,11 @@ próprio erro no PDF; quem decide sou eu, buscando cada venda no Mercado Livre"*
 E o passivo da Mesa de correções passou a aparecer na aba Pendências, com a
 decisão na aba Correções.
 
+## 27/10/2026 — a bancada e a TV veem quantas pendências esperam
+
+Spec `CENTRAL-DE-PENDENCIAS`, fase 3 (respostas C2 e C4). **Antes:** só quem
+abria o admin via a aba Pendências. **Depois:** a Etiqueta de Venda e a
+Conferência mostram uma linha com o número e a idade da mais antiga, e a TV um
+quadro com o número. Só o número: decidir continua na aba, com a permissão de
+cada pendência.
+
