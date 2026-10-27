@@ -191,6 +191,61 @@ async function main(){
     eq('corpo sem pdf e recusado (400)', r.status, 400);
     eq('e nada foi gravado', contar(), total);
     ok('o PDF enviado foi guardado na pasta de lotes (a do teste)', fs.readdirSync(process.env.PCP_LOTES).length > 0);
+
+    console.log('\n── 8. a venda antiga cujo PDF sumiu volta a ter PDF (e só isso) ──');
+    /* O cron apaga os PDFs em 7 dias, e a reimpressão manda "suba o PDF de
+       novo". Até 27/10/2026 a dedup pulava a venda repetida SEM religar o
+       arquivo novo: subir de novo não destravava nada. A venda continua
+       repetida — não volta pra fila, não ganha segunda linha, não mexe em
+       estoque —, só aponta para o PDF que existe. */
+    const sumiu = path.join(tmp, 'apagado-pelo-cron.pdf');           // nunca existiu no disco
+    const existe = path.join(tmp, 'ainda-aqui.pdf'); fs.writeFileSync(existe, '%PDF-velho');
+    const insVelha = db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data,srcfile,labelPage,danfePage,
+        embalado_em,baixado_em,reimpressoes,impresso_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+    const velha = insVelha.run('BK160140BEGE','Cliente Antigo','6100','2000014610005001','2000018016005001','carregado',
+      '2026-08-01', sumiu, 7, 8, '2026-08-01 10:00:00', '2026-08-01 10:00:00', 2, 'Bruno').lastInsertRowid;
+    const viva = insVelha.run('BK160140BEGE','Cliente Recente','6101','2000014610005002','2000018016005002','embalado',
+      '2026-10-20', existe, 3, 4, '2026-10-20 10:00:00', null, 0, 'Bruno').lastInsertRowid;
+    const outra = insVelha.run('BK160140BEGE','Cliente Pacote','6102','2000014610005003','2000018016005003','carregado',
+      '2026-08-02', sumiu, 1, 2, '2026-08-02 10:00:00', '2026-08-02 10:00:00', 0, 'Bruno').lastInsertRowid;
+    const pend = insVelha.run('BK160140BEGE','Cliente Pendente','6103','2000014610005004','2000018016005004','pendente',
+      '2026-10-10', sumiu, 1, 2, null, null, 0, null).lastInsertRowid;
+    const linha = id => db.prepare('SELECT * FROM lote WHERE id=?').get(id);
+    const antesVelha = linha(velha), antesViva = linha(viva), antesOutra = linha(outra);
+    const totalAntes = contar(), saldo8 = saldos();
+    r = await subir([
+      vol('BK160140BEGE', { packId:'2000014610005001', venda:'2000018016005001', labelPage:2, danfePage:3 }),
+      vol('BK160140BEGE', { packId:'2000014610005002', venda:'2000018016005002', labelPage:5, danfePage:6 }),
+      /* a mesma VENDA com OUTRO pack: é outra etiqueta, e religar trocaria o papel de caixa */
+      vol('BK160140BEGE', { packId:'2000014610009999', venda:'2000018016005003', labelPage:9, danfePage:10 }),
+      vol('BK160140BEGE', { packId:'2000014610005004', venda:'2000018016005004', labelPage:4, danfePage:5 }),
+      vol('BK160140BEGE'),
+    ]);
+    eq('a rota responde ok', r.status, 200);
+    eq('só a venda nova entrou', r.body.novos, 1);
+    eq('as quatro antigas contam como repetidas', r.body.repetidas, 4);
+    eq('e a resposta diz quantas voltaram a ter PDF', r.body.religadas, 2);
+    eq('nenhuma linha a mais além da nova', contar(), totalAntes + 1);
+    const depoisVelha = linha(velha);
+    ok('a venda de agosto aponta para um PDF que existe', !!depoisVelha.srcfile && fs.existsSync(depoisVelha.srcfile), depoisVelha.srcfile);
+    eq('com a página da etiqueta do PDF novo', depoisVelha.labelPage, 2);
+    eq('e a da nota', depoisVelha.danfePage, 3);
+    for(const c of ['estagio','buyer','nf','codigo','embalado_em','baixado_em','reimpressoes','impresso_por','data'])
+      eq('o '+c+' da venda antiga não mudou', depoisVelha[c], antesVelha[c]);
+    const depoisViva = linha(viva);
+    eq('venda com PDF ainda no disco NÃO troca de arquivo', depoisViva.srcfile, antesViva.srcfile);
+    eq('nem de página', depoisViva.labelPage, antesViva.labelPage);
+    eq('a venda igual com pack diferente NÃO é religada', linha(outra).srcfile, antesOutra.srcfile);
+    eq('a pendente repetida continua pendente (não vira fantasma nem impressa)', linha(pend).estagio, 'pendente');
+    ok('e também volta a ter PDF — sem ele nem a primeira impressão sai', fs.existsSync(linha(pend).srcfile));
+    eq('subir o PDF de novo não mexe no estoque', saldos(), saldo8);
+    let rr = await fetch(base + '/api/reimprimir', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: velha }) });
+    rr = await rr.json();
+    eq('e agora a venda de agosto reimprime', rr.ok, true);
+    eq('contando a reimpressão', rr.vezes, 3);
+    r = await subir([ vol('BK160140BEGE', { packId:'2000014610005001', venda:'2000018016005001', labelPage:0, danfePage:1 }) ]);
+    eq('subir uma terceira vez não religa o que já tem PDF', r.body.religadas, 0);
+    eq('e a página continua a do segundo upload', linha(velha).labelPage, 2);
   } finally { srv.close(); }
 }
 

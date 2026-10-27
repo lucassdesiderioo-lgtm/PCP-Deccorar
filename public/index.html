@@ -2591,16 +2591,17 @@ function b64(f){ return new Promise(function(r){ var fr=new FileReader(); fr.onl
 async function upMany(fl){
   var files=[].slice.call(fl).filter(function(f){ return /pdf/i.test(f.type)||/\.pdf$/i.test(f.name); });
   if(!files.length) return;
-  var nov=0,rep=0,bloq=0,ok=0;
+  var nov=0,rep=0,rel=0,bloq=0,ok=0;
   for(var i=0;i<files.length;i++){
     document.getElementById('res').innerHTML='Lendo '+(i+1)+' de '+files.length+'...';
     try{
       var j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
       if(j.erro) continue;
-      nov+=j.novos; rep+=j.repetidas; bloq+=(j.bloqueados||0); ok++;
+      nov+=j.novos; rep+=j.repetidas; rel+=(j.religadas||0); bloq+=(j.bloqueados||0); ok++;
     }catch(e){}
   }
   var msg='<b>'+ok+' PDF(s)</b> - '+nov+' vendas novas, '+rep+' repetidas';
+  if(rel>0) msg+=', '+rel+' antiga(s) voltaram a ter PDF (já dá pra reimprimir)';
   if(bloq>0) msg+=', <b style="color:#ff6b6b">'+bloq+' BLOQUEADAS</b> (SKU fora do cadastro)';
   document.getElementById('res').innerHTML=msg;
   verCruz();

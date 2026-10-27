@@ -188,9 +188,33 @@ module.exports=function(app,db){
         ON CONFLICT(familia,prefixo) DO UPDATE SET vezes=vezes+1, visto_em=datetime('now','localtime')`);
       const insItem=db.prepare(`INSERT INTO lote_item (lote_id,codigo,qtd,cor,descricao,origem)
         VALUES (?,?,?,?,?,'folha')`);
-      let novos=0,rep=0,semsku=0,bloq=0,divs=0,coleta=0,modal=0,pacotes=0,naoFecha=0,variasPecas=0; const desconhecidos={};
+      /* A VENDA REPETIDA CUJO PDF SUMIU VOLTA A TER PDF (27/10/2026). O cron
+         apaga os PDFs em 7 dias, e a reimpressao manda "suba o PDF de novo" —
+         mas a dedup pulava a venda sem religar o arquivo, e subir de novo nao
+         destravava nada. Religar e SO apontar o arquivo e as paginas: a venda
+         continua repetida (nao volta pra fila, nao ganha linha, nao mexe em
+         estoque), e quem ja tem PDF no disco nao troca de papel.
+         Pack e venda tem que bater os dois, quando os dois existem: a mesma
+         venda com outro pack e outra etiqueta, e religar trocaria o papel da
+         caixa. */
+      const achaRepetida=db.prepare(`SELECT id,packId,venda,srcfile FROM lote
+        WHERE (? IS NOT NULL AND packId=?) OR (? IS NOT NULL AND venda=?)`);
+      const religa=db.prepare('UPDATE lote SET srcfile=?, labelPage=?, danfePage=? WHERE id=?');
+      const pdfNoDisco=a=>{ try{ return !!a && fs.existsSync(a); }catch(e){ return false; } };
+      function religar(o){
+        if(o.labelPage==null) return 0;
+        let n=0;
+        for(const v of achaRepetida.all(o.packId||null,o.packId||null,o.venda||null,o.venda||null)){
+          if(pdfNoDisco(v.srcfile)) continue;
+          if(o.packId && v.packId && o.packId!==v.packId) continue;
+          if(o.venda && v.venda && o.venda!==v.venda) continue;
+          religa.run(fname,o.labelPage,o.danfePage==null?null:o.danfePage,v.id); n++;
+        }
+        return n;
+      }
+      let novos=0,rep=0,religadas=0,semsku=0,bloq=0,divs=0,coleta=0,modal=0,pacotes=0,naoFecha=0,variasPecas=0; const desconhecidos={};
       db.transaction(()=>{ for(const o of orders){
-        if((o.packId&&seen.has('p:'+o.packId))||(o.venda&&seen.has('v:'+o.venda))){ rep++; continue; }
+        if((o.packId&&seen.has('p:'+o.packId))||(o.venda&&seen.has('v:'+o.venda))){ rep++; if(religar(o)) religadas++; continue; }
         if(o.packId)seen.add('p:'+o.packId); if(o.venda)seen.add('v:'+o.venda);
         const sku=(o.sku||'').trim().toUpperCase();
         const ok = sku && existe.get(sku);
@@ -300,7 +324,7 @@ module.exports=function(app,db){
          volumes o caminhao vai buscar — e estranhar se der zero num PDF de
          coleta, ou o lote inteiro num PDF de agencia (a marca e fraca).
          `modalidade_duvida` e o que ficou retido por formato desconhecido. */
-      res.json({ok:true,total:orders.length,novos,repetidas:rep,sem_sku:semsku,bloqueados:bloq,divergencias:divs,coleta,modalidade_duvida:modal,
+      res.json({ok:true,total:orders.length,novos,repetidas:rep,religadas,sem_sku:semsku,bloqueados:bloq,divergencias:divs,coleta,modalidade_duvida:modal,
                 pacotes, folha_nao_fecha:naoFecha, varias_pecas:variasPecas,
                 desconhecidos:Object.keys(desconhecidos).map(k=>({sku:k,qtd:desconhecidos[k]}))});
     }catch(e){ console.error(e); res.status(500).json({erro:String(e.message||e)}); }
@@ -743,15 +767,29 @@ module.exports=function(app,db){
   // O PDF de origem some de lotes/ depois de 7 dias (limpeza por cron). Sem essa
   // guarda o reimprimir estoura 500 com "ENOENT" na cara do operador, que nao
   // tem como saber que a saida e subir o PDF de novo.
-  const PDF_SUMIU='O PDF de origem nao esta mais no servidor (os arquivos saem depois de 7 dias). Suba o PDF do Mercado Livre de novo pra reimprimir.';
+  const PDF_SUMIU='O PDF de origem nao esta mais no servidor (os arquivos saem depois de 7 dias). Suba de novo o PDF do Mercado Livre que tem esta venda: ela nao entra duplicada, so volta a ter o papel, e ai reimprime.';
   const pecasDaCaixa=require('./pecas_caixa')(db);
   const temPdf=o=>{ try{ return !!o.srcfile && fs.existsSync(o.srcfile); }catch(e){ return false; } };
 
   // Notas e clientes ja impressos. Serve a UMA pergunta: "a impressora enroscou,
   // qual era mesmo aquela venda?" — por isso vem do mais recente pro mais
   // antigo, que e a ordem em que o operador procura.
+  /* ⚠️ COM BUSCA, O HISTORICO INTEIRO (27/10/2026). Sem busca a lista e a do
+     periodo, com teto de 400 — e saindo ~57 caixas por dia, as 400 eram uns 7
+     dias. A busca era feita no NAVEGADOR, so dentro delas: "30 dias" nao
+     trazia 30 dias, e a NF de uma semana e meia atras dava "Nada com esse
+     termo", calado. Hoje a busca e no banco, sem periodo; e quando qualquer
+     das duas bate no teto, o cabecalho `X-Cortado` diz, e a tela avisa. */
+  const TETO_LISTA=400, TETO_BUSCA=60;
+  const sem=s=>"REPLACE(REPLACE(REPLACE(REPLACE(REPLACE("+s+",' ',''),'-',''),'.',''),'/',''),'_','')";
+  const alvoBusca="(COALESCE(buyer,'')||' '||COALESCE(nf,'')||' '||COALESCE(codigo,'')||' '||COALESCE(city,'')||' '||COALESCE(packId,'')||' '||COALESCE(venda,''))";
+  const comoLike=s=>'%'+s.replace(/[\\%_]/g,c=>'\\'+c)+'%';
   app.get('/api/impressos',(req,res)=>{
     let dias=parseInt(req.query.dias,10); if(!(dias>=1)) dias=1; if(dias>30) dias=30;
+    const q=String(req.query.q||'').trim().slice(0,60);
+    /* O mesmo "tira o que nao e letra nem numero" da tela, pra "BK 160" achar
+       "BK160" e a NF com ponto achar a sem. */
+    const qs=q.toLowerCase().replace(/[^a-z0-9]/g,'');
     const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
     /* `adiantada` = a etiqueta saiu antes do prazo de despacho dela. Vem
        marcada daqui, pela MESMA funcao que a tela de carregamento usa
@@ -766,19 +804,36 @@ module.exports=function(app,db){
        alguém voltar e conferir, e para REIMPRIMIR: tirar de novo a etiqueta de
        uma caixa de duas sem saber que são duas é a descoberta tardia um passo
        adiante. Soma das `qtd`, nunca `COUNT(*)` (§5, #23). */
-    res.json(db.prepare(`SELECT id,codigo,cor,buyer,city,nf,packId,venda,estagio,data,despachar_em,
-        embalado_em,carregado_em,COALESCE(reimpressoes,0) reimpressoes,reimpresso_em,
+    const cols=`SELECT id,codigo,cor,buyer,city,nf,packId,venda,estagio,data,despachar_em,
+        embalado_em,carregado_em,COALESCE(reimpressoes,0) reimpressoes,reimpresso_em,srcfile,
         COALESCE((SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=lote.id),1) pecas,
         CASE WHEN ${COLETA()} THEN 1 ELSE 0 END coleta
       FROM lote
-      WHERE estagio IN ('embalado','carregado')
-        AND data >= date('now','localtime','-'||?||' day')
-      ORDER BY COALESCE(embalado_em,criado_em) DESC, id DESC LIMIT 400`).all(dias-1)
+      WHERE estagio IN ('embalado','carregado')`;
+    const ordem=` ORDER BY COALESCE(embalado_em,criado_em) DESC, id DESC LIMIT ?`;
+    let linhas, teto;
+    if(q){
+      teto=TETO_BUSCA;
+      linhas=db.prepare(cols+`
+        AND ( ${alvoBusca} LIKE ? ESCAPE '\\'
+           OR (? <> '' AND ${sem('LOWER('+alvoBusca+')')} LIKE ? ESCAPE '\\')
+           OR EXISTS (SELECT 1 FROM lote_item i WHERE i.lote_id=lote.id
+                AND (i.codigo LIKE ? ESCAPE '\\' OR (? <> '' AND ${sem('LOWER(i.codigo)')} LIKE ? ESCAPE '\\'))) )`+ordem)
+        .all(comoLike(q), qs, comoLike(qs), comoLike(q), qs, comoLike(qs), teto);
+    } else {
+      teto=TETO_LISTA;
+      linhas=db.prepare(cols+` AND data >= date('now','localtime','-'||?||' day')`+ordem).all(dias-1, teto);
+    }
+    if(linhas.length>=teto) res.set('X-Cortado', String(teto));
+    res.json(linhas
       /* E AS PECAS, NAO SO A CONTA (05/10/2026, NF 7449). A tarja dizia "2
          persianas" ao lado de UM codigo — o `lote.codigo`, que e o primeiro
          item —, e numa caixa de dois SKUs diferentes quem voltou pra conferir
-         leu uma persiana repetida. So a caixa de varias leva a lista. */
-      .map(v=>Object.assign({},v,{adiantada: futuro(v,hoje)?1:0,
+         leu uma persiana repetida. So a caixa de varias leva a lista.
+         `tem_pdf`: a tela diz ANTES do clique que o PDF saiu do servidor. O
+         caminho do arquivo fica aqui — e do disco do servidor, nao da tela. */
+      .map(({srcfile,...v})=>Object.assign(v,{adiantada: futuro(v,hoje)?1:0,
+        tem_pdf: temPdf({srcfile})?1:0,
         itens: v.pecas>1 ? pecasDaCaixa(v.id) : []})));
   });
 

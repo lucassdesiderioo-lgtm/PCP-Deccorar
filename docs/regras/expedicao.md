@@ -67,10 +67,24 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 ### R-PDF-06 · O upload recusa volume que já existe no histórico inteiro
 - **Regra:** Pack ID ou Venda que já existem em `lote`, em qualquer dia, não entram de novo.
 - **Por quê:** com a dedup só do dia, resubir um PDF gerou 94 volumes fantasmas em 25/08/2026, cobrando etiqueta de peça que estava no caminhão.
-- **Exceções:** nenhuma. O passivo antigo sai pela Mesa (R-COR-02).
-- **Teste que trava:** `teste_upload.js` (46).
+- **Exceções:** nenhuma. O passivo antigo sai pela Mesa (R-COR-02). A venda repetida cujo PDF sumiu **não entra de novo** — só volta a ter PDF (R-PDF-07).
+- **Teste que trava:** `teste_upload.js` (73).
 - **Status:** no ar desde 25/08/2026.
 - **História:** armadilha #5.
+
+### R-PDF-07 · A venda repetida cujo PDF sumiu volta a ter PDF
+- **Regra:** no upload, a venda que já existe e cujo PDF não está mais no disco ganha o arquivo novo (`srcfile`, `labelPage`, `danfePage`). Só isso: estágio, cliente, NF, estoque, reimpressões e quem imprimiu ficam como estavam, e ela continua contando como **repetida**. A resposta diz quantas em `religadas`, e as três telas de upload mostram.
+- **Por quê:** o cron apaga os PDFs em 7 dias, e a reimpressão mandava "suba o PDF de novo" — mas até 27/10/2026 a dedup pulava a venda sem religar nada, e subir de novo não destravava a reimpressão. A tela prometia o que o sistema não fazia.
+- **Exceções:** venda com PDF ainda no disco **não troca** de arquivo. Quando pack e venda existem dos dois lados, os dois têm que bater: a mesma venda com outro pack é outra etiqueta, e religar trocaria o papel da caixa.
+- **Teste que trava:** `teste_upload.js` (bloco 8, escrito antes do conserto).
+- **Status:** no código desde 27/10/2026, aguardando deploy. ⚠ Não foi provado com um PDF real do ML: o teste troca o `parsePdf`.
+
+### R-PDF-08 · A busca do "Já impressos" olha o histórico inteiro, e a lista não corta calada
+- **Regra:** `GET /api/impressos?q=` busca no **banco**, em todas as datas, por cliente, NF, SKU (inclusive os da caixa de várias), cidade, pack e venda — até 60 resultados. Sem `q`, a lista é a do período (até 30 dias), com teto de 400. Quando qualquer das duas bate no teto, o cabeçalho `X-Cortado` diz, e a tela avisa. Só aparece o que foi impresso (`embalado`/`carregado`). `tem_pdf` diz antes do clique se o PDF ainda está no servidor; o caminho do arquivo não viaja.
+- **Por quê:** até 27/10/2026 a busca filtrava **no navegador** só as 400 da lista, e saindo ~57 caixas por dia as 400 eram uns 7 dias. O "30 dias" não trazia 30 dias, e a NF de uma semana e meia atrás dava "Nada com esse termo", calado.
+- **Exceções:** nenhuma. A permissão é a mesma de antes (`etiqueta.emitir`).
+- **Teste que trava:** `teste_impressos.js` (33).
+- **Status:** no código desde 27/10/2026, aguardando deploy. Aberta a 1440 e a 400 px num banco semeado.
 
 ---
 
@@ -384,6 +398,10 @@ segundo bipe cego do carregamento).
   sistema conhece UMA, e é por isso que o script existe (§5, #23)
 - ❌ Deixar o "Já impressos" sem a tarja `📦 N persianas`: é o ÚLTIMO lugar em
   que a caixa aparece, e é dali que se reimprime (§5, #23)
+- ❌ Voltar a buscar o "Já impressos" só dentro da lista que já veio, ou deixar
+  a lista bater no teto sem dizer: o "30 dias" virava 7, calado (R-PDF-08)
+- ❌ Fazer o upload religar PDF de venda que ainda tem o dela, ou mexer em
+  qualquer outra coluna da venda repetida: ela continua repetida (R-PDF-07)
 - ❌ Devolver a caixa de várias persianas à linha por SKU, ou recriar o quadro
   do topo: ela aparece UMA vez, dentro da coluna da porta de saída — em dois
   lugares o dono leu duas vendas (§5, #23, opção B de 25/09/2026)
