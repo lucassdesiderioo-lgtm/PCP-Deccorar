@@ -340,6 +340,19 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
   </div>
   <div id="semEtqLista"></div>
 </div>
+<div class="card" id="contaCard" style="display:none;border:2px solid #c62828">
+  <!-- Fase 2 da central de pendencias (27/10/2026). A conta do PDF (persianas
+       da folha x gravadas) nao fechou, e nenhuma venda sem etiqueta explica a
+       diferenca. O aviso do upload aparecia uma vez e sumia; agora fica aqui
+       ate uma pessoa olhar o PDF e o pedido no ML e resolver com motivo. -->
+  <div style="font-weight:800;color:#c62828;font-size:16px;margin-bottom:6px">🧮 PDF CUJA CONTA NÃO FECHOU</div>
+  <div style="font-size:13px;color:#5a6472;margin-bottom:12px">
+    A folha de controle declara um número de persianas e o sistema gravou outro, e nenhuma venda sem etiqueta
+    explica a diferença. Abra o PDF dessas NFs e o pedido no Mercado Livre e confira caixa a caixa.
+    O sistema não decide sozinho: marque o que você achou, com o motivo.
+  </div>
+  <div id="contaLista"></div>
+</div>
 <div class="card" id="cancCard" style="display:none;border:2px solid #b26a00">
   <!-- VENDAS-E-MEDIA fase 2 (D3 do dono, 26/09/2026). SO MOSTRA: decidir o que
        fazer com a persiana e da Mesa de correcoes, que ainda nao existe. Fica
@@ -353,6 +366,12 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
     do SKU — é lá que o estoque volta. Se ela não voltou, registre na aba <i>Correções</i>.
   </div>
   <div id="cancLista"></div>
+</div>
+<div class="card" id="corCard">
+  <h3 style="margin:0 0 4px">Correções da operação (Mesa de correções)</h3>
+  <div class="sub" style="margin-bottom:12px">Abrir um volume leva à aba Correções, onde fica a prévia, o motivo
+    obrigatório e o desfazer.</div>
+  <div id="corPassivo" class="sub">carregando…</div>
 </div>
 <div class="card" style="margin-top:14px">
   <div style="font-weight:700;font-size:15px;margin-bottom:6px">Conferir o que já foi impresso</div>
@@ -374,12 +393,16 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
      valem para o estado dele, e a que nao vale aparece DESABILITADA com o
      motivo escrito — trava que some nao ensina nada a quem procurava por ela. -->
 <div id="v-cor" class="hide">
+  <!-- O PASSIVO DA MESA MORA NA ABA PENDENCIAS desde a fase 2 da central
+       (27/10/2026): e la que se ve o que espera decisao. Aqui ficam a busca, o
+       painel onde se decide (prev/motivo/desfazer) e o historico — uma porta
+       so para decidir. -->
   <div class="card">
     <h3 style="margin:0 0 4px">Mesa de correções</h3>
-    <div class="sub" style="margin-bottom:12px">Corrige o passivo da operação item por item: a prévia
+    <div class="sub">Corrige o passivo da operação item por item: a prévia
       mostra o que vai mudar antes de gravar, o motivo é obrigatório, e dá para desfazer enquanto
-      nada andar depois da correção.</div>
-    <div id="corPassivo" class="sub">carregando…</div>
+      nada andar depois da correção. <b>O que está esperando correção aparece em Admin → Pendências</b>;
+      aqui se busca qualquer volume e se decide.</div>
   </div>
   <div class="card">
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -458,7 +481,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   var vt=$("#v-tst"); if(vt) vt.classList.toggle("hide",t.dataset.t!=="tst");
   if(t.dataset.t==="tst") carregarTeste();
   var vb=$("#v-blq"); if(vb) vb.classList.toggle("hide",t.dataset.t!=="blq");
-  if(t.dataset.t==="blq") carregarBloq();
+  if(t.dataset.t==="blq"){ carregarBloq(); corPassivo(); }
   var vco=$("#v-cor"); if(vco) vco.classList.toggle("hide",t.dataset.t!=="cor");
   if(t.dataset.t==="cor") corCarregar();
   var vc=$("#v-ct"); if(vc) vc.classList.toggle("hide",t.dataset.t!=="ct");
@@ -2577,6 +2600,48 @@ async function carregarCanc(){
 /* A venda da folha sem etiqueta (fase 1-B). Âmbar no dia em que aparece,
    vermelho a partir do dia seguinte: no ML ela ja esta contando prazo. */
 function dataBRsem(s){ var d=String(s||'').slice(0,10).split('-'); return d.length===3?(d[2]+'/'+d[1]):''; }
+/* O PDF CUJA CONTA NAO FECHOU (central, fase 2). O card tem campo de motivo, e
+   a aba se redesenha a cada 30 s: com algo digitado, ele NAO se redesenha —
+   senao o motivo sumiria no meio da frase (§12, o redesenho periodico). */
+var CONTA_N=0;
+async function carregarContaAberta(){
+  var card=document.getElementById("contaCard"), lis=document.getElementById("contaLista");
+  if(!card||!lis) return 0;
+  var digitado=[].some.call(lis.querySelectorAll("input"),function(i){ return i.value.trim()||i===document.activeElement; });
+  if(digitado) return CONTA_N;
+  var l=[]; try{ l=await (await fetch("/api/contaaberta")).json(); }catch(e){}
+  if(!Array.isArray(l)||!l.length){ card.style.display="none"; lis.innerHTML=""; CONTA_N=0; return 0; }
+  card.style.display="";
+  var h="";
+  l.forEach(function(c){
+    var cor=c.dias>=1?"#c62828":"#b26a00";
+    var dif=c.resto>0?(c.resto+' persiana(s) a MENOS no sistema'):((-c.resto)+' persiana(s) a MAIS no sistema');
+    h+='<div style="border-top:1px solid #d8dee6;padding:12px 0">'
+      +'<div style="font-weight:700">'+esc(c.nfs||'PDF '+(c.pdf||''))+' · '+c.etiquetas+' etiqueta(s)</div>'
+      +'<div style="font-size:13px;margin-top:3px">a folha declara <b>'+c.folha+'</b> persiana(s), o sistema gravou <b>'+c.sistema+'</b> — '+dif+'</div>'
+      +'<div style="font-size:13px;margin-top:3px;color:'+cor+';font-weight:700">subido em '+esc(dataBRsem(c.visto_em))
+      +(c.dias>=1?' — há '+c.dias+' dia(s)':' — hoje')+'</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">'
+      +'<input data-contamot="'+c.id+'" placeholder="motivo (obrigatório): o que você conferiu, ou o que corrigiu e como" style="flex:1;min-width:220px">'
+      +'<button class="ghost" data-contares="conferido" data-contaid="'+c.id+'">Conferi, o sistema está certo</button>'
+      +'<button class="ghost" data-contares="corrigido" data-contaid="'+c.id+'">Corrigi o que faltava</button>'
+      +'</div><div data-contamsg="'+c.id+'" style="font-size:12px;margin-top:4px"></div></div>';
+  });
+  lis.innerHTML=h;
+  CONTA_N=l.length;
+  return l.length;
+}
+document.addEventListener("click",async function(e){
+  var b=e.target.closest("[data-contares]"); if(!b) return;
+  var id=Number(b.getAttribute("data-contaid")), res=b.getAttribute("data-contares");
+  var inp=document.querySelector('[data-contamot="'+id+'"]'), msg=document.querySelector('[data-contamsg="'+id+'"]');
+  var motivo=(inp&&inp.value||"").trim();
+  if(!motivo){ if(msg){ msg.style.color="#c62828"; msg.textContent="Escreva o motivo antes — o que você conferiu, ou o que corrigiu e como."; } if(inp) inp.focus(); return; }
+  var r={}; try{ r=await (await fetch("/api/contaaberta/resolver",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id,resolucao:res,motivo:motivo})})).json(); }catch(err){ r={erro:"sem conexão — tente de novo"}; }
+  if(r.erro){ if(msg){ msg.style.color="#c62828"; msg.textContent=r.erro; } return; }
+  if(inp) inp.value="";
+  carregarBloq();
+});
 async function carregarSemEtq(){
   var l=[]; try{ l=await (await fetch("/api/semetiqueta")).json(); }catch(e){}
   var card=document.getElementById("semEtqCard"), lis=document.getElementById("semEtqLista");
@@ -2624,7 +2689,7 @@ async function carregarResumo(nBloq){
   var box=document.getElementById("centralResumo"); if(!box) return 0;
   var r=null; try{ var x=await fetch("/api/pendencias/resumo"); if(x.ok) r=await x.json(); }catch(e){}
   if(!r||!r.linhas){ box.innerHTML='<span style="color:var(--red);font-weight:700">Não consegui carregar o resumo das outras telas.</span>'; return 0; }
-  var linhas=[{nome:'Bloqueados',n:nBloq,ajuda:'SKU fora do cadastro, dúvida na leitura, pacote, formato novo e venda sem etiqueta',quem:'os cards logo abaixo dizem quem',aqui:true}].concat(r.linhas);
+  var linhas=[{nome:'Bloqueados',n:nBloq,ajuda:'SKU fora do cadastro, dúvida na leitura, pacote, formato novo, venda sem etiqueta e PDF cuja conta não fechou',quem:'os cards logo abaixo dizem quem',aqui:true}].concat(r.linhas);
   var h='<table class="pendTab"><thead><tr><th>Onde</th><th>Esperando</th><th>Desde</th><th>Quem resolve</th></tr></thead><tbody>';
   linhas.forEach(function(l){
     var dias=pendDias(l.desde), cor, num;
@@ -2632,7 +2697,7 @@ async function carregarResumo(nBloq){
     else if(!l.n){ cor='var(--muted)'; num='0'; }
     else { cor=(dias!=null&&dias>=1)?'var(--red)':'var(--amber)'; num=String(l.n); }
     var desde=(l.n&&dias!=null)?(dias===0?'hoje':(dias===1?'há 1 dia':'há '+dias+' dias')):'—';
-    var alvo=l.aqui?'':(l.onde&&l.onde.aba?' data-pendaba="'+l.onde.aba+'"':(l.onde&&l.onde.url?' data-pendurl="'+l.onde.url+'"':''));
+    var alvo=l.aqui?'':(l.onde&&l.onde.aba?' data-pendaba="'+l.onde.aba+'"'+(l.onde.ancora?' data-pendancora="'+l.onde.ancora+'"':''):(l.onde&&l.onde.url?' data-pendurl="'+l.onde.url+'"':''));
     h+='<tr style="color:'+(l.n?'inherit':'var(--muted)')+'"><td><b>'+(alvo?'<a href="#" style="color:var(--blue);text-decoration:none"'+alvo+'>'+l.nome+' →</a>':l.nome+' <span class="sub">(abaixo)</span>')+'</b>'
       +'<div class="sub">'+l.ajuda+'</div></td>'
       +'<td style="font-weight:800;font-size:18px;color:'+cor+'">'+num+'</td>'
@@ -2648,6 +2713,8 @@ document.addEventListener("click",function(e){
   var a=e.target.closest("[data-pendaba],[data-pendurl]"); if(!a) return;
   e.preventDefault();
   var u=a.getAttribute("data-pendurl"); if(u){ location.href=u; return; }
+  var anc=a.getAttribute("data-pendancora"), el=anc&&document.getElementById(anc);
+  if(el){ el.scrollIntoView({block:'start'}); return; }
   var t=document.querySelector('.tab[data-t="'+a.getAttribute("data-pendaba")+'"]'); if(t){ t.click(); window.scrollTo(0,0); }
 });
 async function carregarBloq(){
@@ -2658,8 +2725,9 @@ var nd=await carregarDiv();
 var nm=await carregarMod();
 var np=await carregarPac();
 var ns=await carregarSemEtq();
-var nr=await carregarResumo(n+nd+nm+np+ns);
-var tb=document.getElementById("tabBlq"), tot=n+nd+nm+np+ns+nr;
+var nc=await carregarContaAberta();
+var nr=await carregarResumo(n+nd+nm+np+ns+nc);
+var tb=document.getElementById("tabBlq"), tot=n+nd+nm+np+ns+nc+nr;
 if(tb) tb.textContent = tot ? ("Pendências ("+tot+")") : "Pendências";
 var est=document.getElementById("blqEstado"), lis=document.getElementById("blqLista");
 if(!est||!lis) return;
@@ -3522,6 +3590,13 @@ function corFrase(v){
     +(v.nf?' · NF '+esc(v.nf):'')+' · '+esc(v.estagio||'')+' · '+esc(v.data||'');
 }
 async function corCarregar(){ corPassivo(); corHistorico(); }
+/* O passivo e desenhado na aba Pendencias, e a decisao mora na aba Correções
+   (central, fase 2): o clique numa linha ou num "em bloco" vai para la antes
+   de abrir o painel. */
+function corIrMesa(){
+  var t=document.querySelector('.tab[data-t="cor"]');
+  if(t && !t.classList.contains('active')) t.click();
+}
 
 async function corPassivo(){
   var box=$('#corPassivo'); if(!box) return;
@@ -3542,14 +3617,14 @@ async function corPassivo(){
        +(x.cancelada_varias?' <span class="sub">(caixa de várias — só um item cancelado)</span>':''); }},
     {k:'vencidos', um:'pendente vencido', muitos:'pendentes vencidos', lista:'os vencidos',
      ajuda:'despacho já passou e a etiqueta nunca saiu — ou saiu por fora, ou é venda atrasada',
-     extra:'<div style="margin:8px 0"><button class="btn" onclick="corVencidos()">Fechar vencidos em bloco…</button> '
+     extra:'<div style="margin:8px 0"><button class="btn" onclick="corIrMesa();corVencidos()">Fechar vencidos em bloco…</button> '
        +'<span class="sub">ou abra um volume para dar saída só nele</span></div>',
      linha:function(x){ return corFrase(x)+(x.despachar_em?' <span class="sub">despachava '+esc(x.despachar_em)+'</span>'
        :' <span class="sub">sem despacho lido</span>'); }},
     {k:'conferencias', um:'caixa impressa sem conferência', muitos:'caixas impressas sem conferência',
      lista:'as caixas sem conferência',
      ajuda:'etiqueta impressa num dia anterior e nunca conferida — a linha âmbar da Conferência',
-     extra:'<div style="margin:8px 0"><button class="btn" onclick="corConferencias()">Fechar conferências antigas em bloco…</button> '
+     extra:'<div style="margin:8px 0"><button class="btn" onclick="corIrMesa();corConferencias()">Fechar conferências antigas em bloco…</button> '
        +'<span class="sub">ou abra uma caixa para dar saída só nela</span></div>',
      linha:function(x){ return corFrase(x)+' <span class="sub">impressa '+esc(String(x.embalado_em||x.data||'').slice(0,10))+'</span>'
        +(String(x.modalidade||'').toLowerCase()==='coleta'?' <span class="sub">(coleta)</span>':''); }},
@@ -3582,7 +3657,7 @@ async function corPassivo(){
       +esc(b.lista)+'</summary>'+(b.extra||'')
       +'<div style="margin-top:8px">'+it.map(function(x){
           return '<div style="padding:5px 0;border-bottom:1px solid var(--bd)">'
-            +'<a href="#" class="corLink" onclick="corAbrir(\''+(b.tipo||'lote')+'\','+x.id+');return false">'+b.linha(x)+'</a></div>'; }).join('')
+            +'<a href="#" class="corLink" onclick="corIrMesa();corAbrir(\''+(b.tipo||'lote')+'\','+x.id+');return false">'+b.linha(x)+'</a></div>'; }).join('')
       +'</div></details>';
   });
   if(!blocos.some(function(b){ return ((d[b.k]||{}).n||0)>0; }))

@@ -1,5 +1,22 @@
-> **STATUS · 27/10/2026 — APROVADA, FASE 1 EM CÓDIGO** · `NOVIDADE` · a fase 1
-> é risco 🟡 (só lê; não muda quem decide). Nasceu de uma frase do dono ao
+> **STATUS · 27/10/2026 — APROVADA, FASE 1 NO AR E CONFERIDA, FASE 2 EM CÓDIGO** ·
+> `NOVIDADE` · a fase 1 é risco 🟡 (só lê; não muda quem decide); a fase 2 é 🔴
+> (tabela nova, mexe no upload).
+>
+> **Fase 1 no ar e conferida (27/10/2026, PR #238):** o dono fez o deploy e disse
+> que os números batem com os de cada tela.
+>
+> **Fase 2 em código (27/10/2026, plano aprovado pelo dono):** (A) o PDF cuja
+> conta não fecha sem explicação fica gravado em `pdf_conta_aberta` e num card
+> da aba, até uma pessoa resolver com *conferi, o sistema está certo* ou
+> *corrigi o que faltava* e o motivo (R-PDF-10); (B) o passivo da Mesa de
+> correções é desenhado na aba Pendências, e a decisão continua na aba
+> Correções. `teste_conta_aberta.js` (42). Aguarda deploy.
+>
+> **Mudou na construção da fase 2:** as **sobras não vieram** — o ↩ Sobrou se
+> decide com a caixa na mão, bipando a etiqueta e cada SKU, e não pelo Admin.
+> Devoluções, ajuste e contagem continuam com o link da fase 1. O PDF se
+> reconhece pelas vendas, não pelos bytes (o mesmo PDF baixado de novo muda de
+> bytes). Nasceu de uma frase do dono ao
 > decidir onde fica a venda da folha sem etiqueta: *"Essas pendências e esses
 > tipos de problemas devemos concentrar em apenas uma única tela, para não
 > ficar o problema espalhado."* O dono mandou seguir com as propostas do §6 e
@@ -78,7 +95,7 @@ não muda quem decide — cada card continua com a permissão que tem hoje.
 | Fase | O quê |
 |---|---|
 | **1** | A tela "Pendências" (a aba Bloqueados renomeada e ampliada) com um **painel de contadores** de todos os lugares do §1, cada um com o link para onde se resolve hoje. Nada se move ainda: é ver tudo num lugar só. O aviso do upload (`resto`) vira linha |
-| **2** | Os cards de decisão curta passam para dentro da central (Correções, sobras da Conferência); os de decisão longa (contagem, ajuste) ficam com link |
+| **2** | ✅ em código (27/10): o PDF cuja conta não fecha vira pendência gravada; o passivo da Mesa é desenhado na central, com a decisão na aba Correções. ~~Sobras da Conferência~~ ficam na Conferência (decisão física) |
 | **3** | As telas de bancada ganham a linha de aviso; o sob medida entra, se o dono quiser |
 
 ## 5. Fica de fora

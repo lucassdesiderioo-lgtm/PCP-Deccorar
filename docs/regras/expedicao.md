@@ -148,7 +148,15 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Exceções:** resolver é `@admin`, como as outras decisões da aba; ler é também de `etiqueta.emitir` (a linha da bancada). Coberta pelo modo teste (`TABELAS`).
 - **Teste que trava:** `teste_sem_etiqueta.js` (35) · `teste_casos_reais.js` (o caso da NF 8301).
 - **Status:** no ar desde 27/10/2026 (PR #237). Ainda não conferida com dado real: a prova é a primeira venda sem etiqueta aparecer no card e sair sozinha quando o PDF dela subir.
-- **História:** spec `docs/specs/CONFERENCIA-DA-QUANTIDADE.md` §5-B · o lugar único das pendências é a spec `CENTRAL-DE-PENDENCIAS.md` (rascunho).
+- **História:** spec `docs/specs/CONFERENCIA-DA-QUANTIDADE.md` §5-B · o lugar único das pendências é a spec `CENTRAL-DE-PENDENCIAS.md`.
+
+### R-PDF-10 · O PDF cuja conta não fecha fica em Pendências até uma pessoa resolver
+- **Regra:** quando a conta do PDF (persianas da folha × gravadas pelo sistema) não fecha e **nenhuma venda sem etiqueta explica a diferença** (`conta.resto` ≠ 0, para mais ou para menos), o upload grava o PDF em `pdf_conta_aberta`, com a faixa de NFs, as etiquetas, a folha, o sistema e a diferença. Ele aparece num card de **Admin → Pendências** e entra no número da aba. **Só uma pessoa resolve**, com uma de duas opções — *conferi, o sistema está certo* ou *corrigi o que faltava* — e o motivo obrigatório; fica quem e quando, e vai para a auditoria. O sistema não decide sozinho.
+- **Por quê:** o aviso do upload aparecia uma vez e sumia quando a tela fechava — o modo de falhar da NF 8301. E quem julga se o PDF veio estranho ou se faltou peça é o dono, olhando o papel e o pedido no Mercado Livre (decisão de 27/10/2026).
+- **Exceções:** uma linha por PDF, e o PDF se reconhece pelas **vendas** dele e pela conta, e não pelos bytes: o mesmo PDF baixado de novo do ML traz outra data de criação dentro. Subir de novo não abre outra linha, e o PDF resolvido não reabre. Ler e resolver são `@admin`. Coberta pelo modo teste (`TABELAS`). O card não se redesenha enquanto há motivo digitado.
+- **Teste que trava:** `teste_conta_aberta.js` (42).
+- **Status:** em código desde 27/10/2026 (fase 2 da central de pendências).
+- **História:** spec `docs/specs/CENTRAL-DE-PENDENCIAS.md`.
 
 ### R-VOL-09 · A quantidade é lida por três caminhos, e a conta do PDF inteiro é conferida
 - **Regra:** cada caixa tem as peças lidas pela **folha por bloco** (a de sempre), pela **folha item a item** (a testemunha, que também lê o `Quantidade:`) e pela **folha inteira** (sem o limite de 4 linhas, contando todo `SKU:` entre uma venda e a próxima, e só pack ou venda abrem uma venda). Qualquer uma dizendo **mais** do que a leitura por bloco retém a caixa no card do pacote, com o **maior** número já escrito; quem assina o pacote libera (`pacote.assinar`). Leitura que não conseguiu ler não vota. A **conta do PDF** (persianas da folha × persianas gravadas) vai na resposta do upload (`conta_pdf`) e em vermelho nas três telas de upload; ela não retém, porque não diz qual caixa. Desde 27/10/2026 ela separa a **venda da folha sem etiqueta no PDF**, que sai **pelo número** (`semEtiqueta`) com o que fazer — conferir no ML e, se não foi cancelada, subir o PDF dela —, e só o que sobra sem explicação (`resto`) fica no aviso genérico.

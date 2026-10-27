@@ -745,6 +745,7 @@ module.exports = function(app, db){
        imprime etiqueta (a Etiqueta de Venda mostra a linha do aviso) e do
        admin; RESOLVER fica com a aba Bloqueados, o lugar unico das pendencias
        (decisao do dono), como a modalidade logo acima. */
+    if(pre('/api/contaaberta')) return '@admin';   // o PDF cuja conta nao fecha (central, fase 2)
     if(M !== 'GET' && pre('/api/semetiqueta')) return '@admin';
     if(eq('/api/semetiqueta')) return ['etiqueta.emitir','@admin'];
     if(M !== 'GET' && pre('/api/pacote')) return 'pacote.assinar';
