@@ -40,7 +40,8 @@ const ENTREGAS=['entrega','retira'];
    campo que o acrescentar conhece e o editar esquece — foi assim que o
    `estoque` sumiu do POST /api/skus do PCP (armadilha #25). */
 const ESCOLHAS=['modelo_id','abertura_id','cor_tecido_id','cor_acessorio_id',
-  'largura_mm','altura_mm','comando','rolamento','adicional','reducao'];
+  'largura_mm','altura_mm','comando','rolamento','adicional','reducao',
+  'acionamento','sentido','lado_corrente','folhas'];
 
 const nome=usuario=>(usuario&&usuario.nome)||null;
 const ativo=i=>!i.cancelado_em;
@@ -159,6 +160,14 @@ function gravarEscolhas(escolha,r){
   fora.adicional=r.adicional;
   fora.reducao=r.reducao.aplicada?'pedida':'nao';
   fora.tecido_id=r.tecido_id;
+  /* ⚠️ O QUE O PRODUTO NAO LIGA SAI DO CALCULO, e nao do corpo: comando e
+     rolamento sao NOT NULL e gravam '' ("nao se aplica", migracao 33); as
+     escolhas novas gravam NULL. Gravar o que veio no corpo poria no pedido
+     uma escolha que o calculo recusaria no envio. */
+  fora.comando=r.comando||'';
+  fora.rolamento=r.rolamento||'';
+  fora.acionamento=r.acionamento; fora.sentido=r.sentido;
+  fora.lado_corrente=r.lado_corrente; fora.folhas=r.folhas;
   return fora;
 }
 

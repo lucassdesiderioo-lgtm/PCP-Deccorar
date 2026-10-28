@@ -75,7 +75,8 @@ const reais=c=>c==null?'—':dinheiro(c/100);
 
 const estado={modelo:null, abertura_id:null, cor_acessorio_id:null,
   largura:'1,000', altura:'1,000', comando:'direito', rolamento:'frente',
-  adicional:'nenhum', reducao:'nao', opcoes:null, recado:null,
+  adicional:'nenhum', reducao:'nao', acionamento:'com_comando', sentido:'esquerda',
+  lado_corrente:'direito', folhas:'2', opcoes:null, recado:null,
   revendas:[], revenda_id:null};
 
 function fileira(rotulo, itens, valorAtual, aoEscolher, desabilitados){
@@ -143,13 +144,32 @@ function desenharEscolhas(){
   c.appendChild(medidas);
 
   const op=estado.opcoes||{};
+  /* ⚠️ OS CAMPOS SAEM DAS ESCOLHAS LIGADAS NO PRODUTO (secao 4 da spec
+     SOBMEDIDA-CADASTRO-DE-PRODUTO). Escolha desligada nao aparece, e a que
+     depende de outra (o lado da corrente, so com comando) some quando nao se
+     aplica. O servidor recusa o que vier fora disso — esconder aqui e so nao
+     oferecer o que da erro. */
+  const liga=k=>(m.escolhas||[]).some(x=>x.chave===k&&x.ligada);
+  const esc=k=>(m.escolhas||[]).find(x=>x.chave===k)||{opcoes:[]};
   const linha3=el('div',{class:'campos'});
-  linha3.appendChild(fileira('Comando',
+  if(liga('comando')) linha3.appendChild(fileira('Comando',
     [{valor:'direito',nome:'Direito'},{valor:'esquerdo',nome:'Esquerdo'}],
     estado.comando, v=>{ estado.comando=v; simular(); }));
-  linha3.appendChild(fileira('Rolamento',
+  if(liga('rolamento')) linha3.appendChild(fileira('Rolamento',
     [{valor:'frente',nome:'Desce pela frente'},{valor:'tras',nome:'Desce por trás'}],
     estado.rolamento, v=>{ estado.rolamento=v; simular(); }));
+  ['sentido','acionamento'].forEach(k=>{ if(liga(k)) linha3.appendChild(fileira(esc(k).nome,
+    esc(k).opcoes.map(o=>({valor:o.valor,nome:o.nome})), estado[k], v=>{ estado[k]=v; simular(); })); });
+  if(liga('lado_corrente')&&(!liga('acionamento')||estado.acionamento==='com_comando'))
+    linha3.appendChild(fileira(esc('lado_corrente').nome,
+      esc('lado_corrente').opcoes.map(o=>({valor:o.valor,nome:o.nome})),
+      estado.lado_corrente, v=>{ estado.lado_corrente=v; simular(); }));
+  if(liga('folhas')){
+    const box=el('div',{class:'campo'},[el('label',{},['Folhas'])]);
+    const i=el('input',{type:'text',inputmode:'numeric',value:estado.folhas,'aria-label':'Folhas'});
+    i.addEventListener('input',()=>{ estado.folhas=i.value; simular(); });
+    box.appendChild(i); linha3.appendChild(box);
+  }
   c.appendChild(linha3);
 
   /* ⚠️ BANDO E BARRA NA MESMA FILEIRA, e nao duas caixinhas. Elas nunca
@@ -159,25 +179,54 @@ function desenharEscolhas(){
      embaixo — sumir calado vira desconfianca da tela. */
   const linha4=el('div',{class:'campos'});
   const bloq={};
+  if(liga('adicional')){
   if(op.bando&&!op.bando.disponivel) bloq.bando=op.bando.motivo;
   if(op.barra&&!op.barra.disponivel) bloq.barra=op.barra.motivo;
   linha4.appendChild(fileira('Bandô ou barra',
     [{valor:'nenhum',nome:'Nenhum'},{valor:'bando',nome:'Bandô'},{valor:'barra',nome:'Barra niveladora'}],
     estado.adicional, v=>{ estado.adicional=v; simular(); }, bloq));
+  }
 
   const podePedir=op.reducao&&op.reducao.pode_pedir;
   const auto=op.reducao&&op.reducao.automatica;
-  linha4.appendChild(fileira('Redução de peso',
+  if(liga('reducao')) linha4.appendChild(fileira('Redução de peso',
     [{valor:'nao',nome:auto?'Incluída pela regra':'Não'},{valor:'pedida',nome:'Pedida'}],
     auto?'nao':estado.reducao, v=>{ estado.reducao=v; simular(); },
     (podePedir&&!auto)?{}:{pedida:true}));
   c.appendChild(linha4);
 
   Object.keys(bloq).forEach(k=>c.appendChild(el('p',{class:'motivo'},[bloq[k]])));
-  if(auto) c.appendChild(el('p',{class:'motivo'},
-    ['A redução entra sozinha nesta medida e é cobrada do mesmo jeito.']));
-  else if(!podePedir) c.appendChild(el('p',{class:'motivo'},
-    ['A redução de peso existe a partir do Tubo 38.']));
+  if(liga('reducao')){
+    if(auto) c.appendChild(el('p',{class:'motivo'},
+      ['A redução entra sozinha nesta medida e é cobrada do mesmo jeito.']));
+    else if(!podePedir) c.appendChild(el('p',{class:'motivo'},
+      ['A redução de peso existe a partir do Tubo 38.']));
+  }
+}
+
+/* O corpo leva SO o que o produto liga — mandar o comando do Rolo para um
+   Painel seria recusado pelo servidor, com razao. */
+function escolhasDoCorpo(m){
+  const liga=k=>(m.escolhas||[]).some(x=>x.chave===k&&x.ligada);
+  const corpo={};
+  ['comando','rolamento','adicional','reducao','acionamento','sentido'].forEach(k=>{
+    if(liga(k)) corpo[k]=estado[k]; });
+  if(liga('lado_corrente')&&(!liga('acionamento')||estado.acionamento==='com_comando'))
+    corpo.lado_corrente=estado.lado_corrente;
+  if(liga('folhas')) corpo.folhas=String(estado.folhas||'').trim()===''?null:Number(estado.folhas);
+  return corpo;
+}
+
+/* O NUMERO GRANDE E O QUE O CALCULO DECIDIU: o tubo no Rolo, os gomos na
+   Romana, a folha no Painel. E o que quem esta ao telefone com a revenda
+   responde primeiro. */
+function cabecaDoCalculo(r){
+  if(r.degrau) return el('div',{class:'degrau'},[r.degrau.nome,
+    el('small',{},['desconto de '+r.degrau.desconto_mm+' mm no tubo · tecido + '+
+      r.degrau.acrescimo_altura_tecido_mm+' mm de altura'])]);
+  if(r.calculo&&r.calculo.titulo) return el('div',{class:'degrau'},[r.calculo.titulo,
+    el('small',{},[r.calculo.detalhe||''])]);
+  return el('div',{class:'degrau'},[r.modelo.nome]);
 }
 
 function desenhar(r){
@@ -185,12 +234,7 @@ function desenhar(r){
   const grade=el('div',{class:'grade'});
 
   // ── O que a peca e ───────────────────────────────────────────────────────
-  const esq=el('div',{class:'cartao'},[
-    el('div',{class:'degrau'},[r.degrau.nome,
-      el('small',{},['desconto de '+r.degrau.desconto_mm+' mm no tubo · tecido + '+
-        r.degrau.acrescimo_altura_tecido_mm+' mm de altura'])]),
-    el('p',{class:'resumo'},[r.resumo])
-  ]);
+  const esq=el('div',{class:'cartao'},[cabecaDoCalculo(r), el('p',{class:'resumo'},[r.resumo])]);
   const t=el('table',{class:'lista'});
   t.appendChild(el('thead',{},[el('tr',{},[
     el('th',{},['Componente']),el('th',{},['Corta a']),el('th',{},['Consome'])])]));
@@ -296,10 +340,8 @@ async function rodar(){
     return s.appendChild(el('div',{class:'aviso'},
       ['Escolha a coleção e a cor dos acessórios.']));
 
-  const corpo={modelo_id:estado.modelo.id, abertura_id:estado.abertura_id,
-    cor_acessorio_id:estado.cor_acessorio_id, largura_mm, altura_mm,
-    comando:estado.comando, rolamento:estado.rolamento,
-    adicional:estado.adicional, reducao:estado.reducao};
+  const corpo=Object.assign({modelo_id:estado.modelo.id, abertura_id:estado.abertura_id,
+    cor_acessorio_id:estado.cor_acessorio_id, largura_mm, altura_mm},escolhasDoCorpo(estado.modelo));
   if(estado.revenda_id) corpo.revenda_id=estado.revenda_id;
   try{
     const r=await api('/api/sm/simular',{metodo:'POST',corpo,silencioso:true});

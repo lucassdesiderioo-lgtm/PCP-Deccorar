@@ -20,6 +20,7 @@ const u=require('../nucleo/unidade');
 const catalogo=require('./catalogo_sm');
 const dRevenda=require('../dados/revenda');
 const dTecido=require('../dados/tecido');
+const ESC=require('./escolhas');
 
 const COMANDOS={direito:'direito', esquerdo:'esquerdo'};
 const ROLAMENTOS={frente:'pela frente', tras:'por trás'};
@@ -131,12 +132,60 @@ function calcular(escolha,opcoes){
     tecido_id=item.id;
   }
 
-  // ── 2. As escolhas obrigatorias ─────────────────────────────────────────
-  exigir(e.comando&&COMANDOS[e.comando],'comando_obrigatorio',
+  // ── 2. As escolhas do cliente ───────────────────────────────────────────
+  /* ⚠️ SO O QUE O PRODUTO LIGA (secao 4 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO).
+     Ligada e obrigatoria; desligada e RECUSADA se vier mesmo assim — a tela
+     esconder o campo nao e a regra (armadilha #26). O Rolo liga as quatro de
+     sempre (migracao 33), e por isso as frases e as recusas dele sao as
+     mesmas de antes, letra por letra. */
+  const ligadas=new Set((modelo.escolhas||[]).filter(x=>x.ligada).map(x=>x.chave));
+  const liga=chave=>ligadas.has(chave);
+  const desligadaVeio=chave=>{
+    const esc=ESC.porChave(chave);
+    if(!liga(chave)&&ESC.veio(esc,e[chave]))
+      throw new ErroDeRegra('escolha_desligada','O produto '+modelo.nome+' não tem "'+esc.nome+
+        '". Tire essa escolha da peça.');
+  };
+  ['comando','rolamento','adicional','reducao','acionamento','sentido','lado_corrente','folhas']
+    .forEach(desligadaVeio);
+  const opcaoDe=(chave,valor)=>(ESC.porChave(chave).opcoes||[]).find(o=>o.valor===valor)||null;
+
+  if(liga('comando')) exigir(e.comando&&COMANDOS[e.comando],'comando_obrigatorio',
     'Escolha o lado do comando: direito ou esquerdo.');
-  exigir(e.rolamento&&ROLAMENTOS[e.rolamento],'rolamento_obrigatorio',
+  if(liga('rolamento')) exigir(e.rolamento&&ROLAMENTOS[e.rolamento],'rolamento_obrigatorio',
     'Escolha o rolamento: desce pela frente ou por trás.');
-  const adicional=normalizarAdicional(e.adicional);
+  const adicional=liga('adicional')?normalizarAdicional(e.adicional):'nenhum';
+
+  let acionamento=null, lado_corrente=null, sentido=null, folhas=null;
+  if(liga('acionamento')){
+    exigir(e.acionamento,'acionamento_obrigatorio','Escolha o acionamento: com comando ou sem comando.');
+    exigir(opcaoDe('acionamento',e.acionamento),'acionamento_invalido',
+      'O acionamento é "com comando" ou "sem comando".');
+    acionamento=e.acionamento;
+  }
+  if(liga('lado_corrente')){
+    if(acionamento==='com_comando'){
+      exigir(e.lado_corrente,'lado_corrente_obrigatorio','Escolha o lado da corrente: direito ou esquerdo.');
+      exigir(opcaoDe('lado_corrente',e.lado_corrente),'lado_corrente_invalido',
+        'O lado da corrente é direito ou esquerdo.');
+      lado_corrente=e.lado_corrente;
+    }else if(ESC.veio(ESC.porChave('lado_corrente'),e.lado_corrente))
+      throw new ErroDeRegra('escolha_nao_se_aplica',
+        'Sem comando não há corrente: tire o lado da corrente desta peça.');
+  }
+  if(liga('sentido')){
+    exigir(e.sentido,'sentido_obrigatorio','Escolha a abertura: para a esquerda, para a direita ou central.');
+    exigir(opcaoDe('sentido',e.sentido),'sentido_invalido',
+      'A abertura é: tudo para a esquerda, tudo para a direita, ou central.');
+    sentido=e.sentido;
+  }
+  if(liga('folhas')){
+    exigir(e.folhas!==undefined&&e.folhas!==null&&e.folhas!=='','folhas_obrigatorio',
+      'Diga quantas folhas.');
+    const n=Number(e.folhas);
+    exigir(Number.isInteger(n)&&n>0,'folhas_invalido','O número de folhas é inteiro e maior que zero.');
+    folhas=n;
+  }
 
   // ── 3. A medida ─────────────────────────────────────────────────────────
   const largura_mm=u.mm(e.largura_mm,'a largura acabada');
@@ -184,7 +233,10 @@ function calcular(escolha,opcoes){
   if(adicional==='barra') exigir(podeBarra.disponivel,'barra_indisponivel',podeBarra.motivo);
 
   // ── 6. A reducao de peso ────────────────────────────────────────────────
-  const regra=modelo.reducao||{};
+  /* Desligada, a reducao nao entra nem pela regra de garantia: a automatica
+     e parte da MESMA escolha (secao 4.1), e um produto sem ela nao tem a
+     peca para pendurar. */
+  const regra=liga('reducao')?(modelo.reducao||{}):{};
   const automatica=(regra.m2_acima_mm2!=null&&area_mm2>regra.m2_acima_mm2)
                  ||(regra.largura_acima_mm!=null&&largura_mm>regra.largura_acima_mm);
   const pedida=e.reducao==='pedida'||e.reducao===true;
@@ -197,7 +249,7 @@ function calcular(escolha,opcoes){
     automatica:!!automatica,
     pedida:!!pedida&&!automatica,
     aplicada:!!(automatica||pedida),
-    pode_pedir:!!degrau.aceita_reducao
+    pode_pedir:liga('reducao')&&!!degrau.aceita_reducao
   };
 
   // ── 7. A ficha vira componentes ─────────────────────────────────────────
@@ -206,7 +258,11 @@ function calcular(escolha,opcoes){
   || (quando==='bando'&&adicional==='bando')
   || (quando==='barra'&&adicional==='barra')
   || (quando==='sem_adicional'&&adicional==='nenhum')
-  || (quando==='reducao'&&reducao.aplicada);
+  || (quando==='reducao'&&reducao.aplicada)
+  || (quando==='com_comando'&&acionamento==='com_comando')
+  || (quando==='sem_comando'&&acionamento==='sem_comando')
+  || (quando==='abertura_lateral'&&(sentido==='esquerda'||sentido==='direita'))
+  || (quando==='abertura_central'&&sentido==='central');
 
   const calculados={};
   const componentes=[];
@@ -420,13 +476,18 @@ function calcular(escolha,opcoes){
     avisos.push('Sem preço lançado para: '+semPreco.join(', ')+'. O total sai como piso (≥).');
 
   const nomeAdicional={bando:'Bandô',barra:'Barra niveladora'}[adicional];
+  const frase=(chave,valor)=>{ const o=valor==null?null:opcaoDe(chave,valor); return o&&o.frase?[o.frase]:[]; };
   const resumo=[
     u.emMetros(largura_mm)+' × '+u.emMetros(altura_mm),
     colecao.colecao_nome+(corTecido?' '+corTecido:''),
-    'Acessórios '+cor.cor_nome,
-    'Comando '+COMANDOS[e.comando],
-    'Rolamento '+ROLAMENTOS[e.rolamento]
-  ].concat(nomeAdicional?[nomeAdicional]:[])
+    'Acessórios '+cor.cor_nome]
+   .concat(liga('comando')?['Comando '+COMANDOS[e.comando]]:[])
+   .concat(liga('rolamento')?['Rolamento '+ROLAMENTOS[e.rolamento]]:[])
+   .concat(frase('sentido',sentido))
+   .concat(folhas!=null?[folhas+' folhas']:[])
+   .concat(frase('acionamento',acionamento))
+   .concat(frase('lado_corrente',lado_corrente))
+   .concat(nomeAdicional?[nomeAdicional]:[])
    .concat(reducao.aplicada?['Redução de peso']:[]).join(' · ');
 
   return {
@@ -437,7 +498,9 @@ function calcular(escolha,opcoes){
     cor_tecido:corTecido, tecido_id,
     medida:{largura_mm, altura_mm, area_mm2,
             largura:u.emMetros(largura_mm), altura:u.emMetros(altura_mm), area:u.emM2(area_mm2)},
-    comando:e.comando, rolamento:e.rolamento, adicional,
+    comando:liga('comando')?e.comando:'', rolamento:liga('rolamento')?e.rolamento:'', adicional,
+    acionamento, lado_corrente, sentido, folhas,
+    escolhas_ligadas:[...ligadas],
     degrau:{id:degrau.id, nome:degrau.nome, desconto_mm:degrau.desconto_mm,
             acrescimo_altura_tecido_mm:degrau.acrescimo_altura_tecido_mm},
     /* O que esta medida ACEITA, para a tela oferecer so o possivel — e dizer

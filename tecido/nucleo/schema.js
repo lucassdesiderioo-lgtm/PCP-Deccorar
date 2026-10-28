@@ -1815,6 +1815,45 @@ CREATE INDEX idx_aprovacao_status ON sm_aprovacao(status,tipo);
    a verdade: elas foram digitadas. */
 ALTER TABLE sm_preco_historico ADD COLUMN detalhe TEXT;
 `}
+,
+
+{n:33, nome:'as escolhas do cliente viram peca pronta que o produto liga', sql:`
+/* === AS ESCOLHAS LIGAVEIS =================================================
+   Fase 2 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO (secao 4). As escolhas sao
+   uma LISTA DO SISTEMA (dominio/escolhas.js); aqui se grava so quais delas
+   cada produto liga. Escolha ligada e obrigatoria no pedido, desligada e
+   recusada pela rota.
+
+   ⚠️ TODO MODELO QUE JA EXISTE GANHA AS QUATRO DO ROLO, e nao so o Rolo por
+   nome. Ate esta migracao o codigo exigia comando, rolamento, adicional e
+   reducao de QUALQUER modelo — ligar as quatro em todos e descrever o que ja
+   acontecia. Procurar pelo nome 'Rolô' quebraria no dia em que alguem o
+   tivesse renomeado, e o Rolo passaria a aceitar persiana sem comando. */
+CREATE TABLE sm_modelo_escolha (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  modelo_id INTEGER NOT NULL REFERENCES sm_modelo(id),
+  escolha TEXT NOT NULL,
+  ordem INTEGER DEFAULT 0,
+  UNIQUE(modelo_id, escolha)
+);
+INSERT INTO sm_modelo_escolha(modelo_id,escolha,ordem)
+SELECT m.id, v.escolha, v.ordem FROM sm_modelo m, (
+  SELECT 'comando' escolha, 1 ordem UNION ALL SELECT 'rolamento',2
+  UNION ALL SELECT 'adicional',3 UNION ALL SELECT 'reducao',4) v;
+
+/* As escolhas novas no item do pedido. Coluna propria para cada uma, e nao
+   um JSON: elas sao lidas pela etiqueta, pelo PDF e pela bancada.
+
+   ⚠️ comando E rolamento CONTINUAM NOT NULL, e o produto que nao as liga
+   grava ''. Tirar o NOT NULL pediria recriar a tabela, e com foreign_keys
+   ligado (nucleo/db.js) recriar sm_pedido_item com pedido aprovado em cima e
+   o tipo de mexida que perde dado de producao. '' quer dizer "nao se aplica",
+   e toda leitura ja trata assim (COMANDO[c.comando]||''). */
+ALTER TABLE sm_pedido_item ADD COLUMN acionamento TEXT;
+ALTER TABLE sm_pedido_item ADD COLUMN sentido TEXT;
+ALTER TABLE sm_pedido_item ADD COLUMN lado_corrente TEXT;
+ALTER TABLE sm_pedido_item ADD COLUMN folhas INTEGER;
+`}
 ];
 
 // ─────────────────────────────────────────────────────────────────────────

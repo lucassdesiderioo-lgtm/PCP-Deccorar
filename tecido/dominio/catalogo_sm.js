@@ -22,12 +22,17 @@ const materiais=require('../nucleo/materiais');
 const dTecido=require('../dados/tecido');
 const dSetor=require('../dados/etiqueta_producao');
 const db=require('../nucleo/db');
+const ESC=require('./escolhas');
 
 /* As duas palavras que uma referencia de ficha pode ter alem de uma chave de
    componente. Elas sao reservadas: um componente chamado 'final' faria a
    ficha dizer duas coisas com a mesma palavra. */
 const REF_RESERVADAS=['final','degrau'];
-const QUANDOS=['sempre','bando','barra','sem_adicional','reducao'];
+/* Os `quando` das escolhas novas (secao 4.2): a linha entra pelo acionamento
+   ou pela abertura escolhida. A corda do Painel e `com_comando`, e no painel
+   sem comando ela nao entra — nao baixa estoque nem custa. */
+const QUANDOS=['sempre','bando','barra','sem_adicional','reducao',
+  'com_comando','sem_comando','abertura_lateral','abertura_central'];
 
 const modeloOuErro=id=>{
   const m=dCat.modelo(id);
@@ -63,6 +68,7 @@ function modelo(id){
     /* O que a tela precisa para OFERECER so o que o servidor aceita: os
        `quando` e as referencias validas, e os setores do cadastro. Uma lista
        copiada no navegador divergiria na primeira fase que acrescentasse um. */
+    escolhas: ESC.doModelo(dCat.escolhas(id)),
     quandos: QUANDOS.slice(), refs_reservadas: REF_RESERVADAS.slice(),
     setores: dSetor.setores().map(s=>({chave:s.chave,nome:s.nome}))
   });
@@ -147,7 +153,7 @@ function ativarModelo(id,ativo,usuario){
    produto: o preco do bandô por metro e um so, e o setor e o codigo do kit
    tambem. A copia aponta para o MESMO componente pela ficha. */
 const FILHAS=['sm_modelo_colecao','sm_modelo_cor_acessorio','sm_degrau_tubo',
-  'sm_ficha_linha','sm_faixa_suporte','sm_reducao_regra'];
+  'sm_ficha_linha','sm_faixa_suporte','sm_reducao_regra','sm_modelo_escolha'];
 /* Acrescentada pela fase que cria a tabela — um nome a mais aqui, e o duplicar
    leva junto. */
 const filhas=()=>FILHAS.concat(FILHAS_EXTRAS);
@@ -182,6 +188,32 @@ function duplicarModelo(id,d,usuario){
 /* O que uma fase seguinte precisa fazer depois da copia (o preco por cor
    aponta para a colecao copiada, e nao para o modelo). */
 const DEPOIS_DE_COPIAR=[];
+
+// ── As escolhas do cliente (secao 4 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO) ─
+/* Ligar e desligar. ⚠️ A DEPENDENCIA E CONFERIDA NOS DOIS SENTIDOS: o lado da
+   corrente nao liga sem o acionamento (ele so aparece "com comando"), e o
+   acionamento nao desliga com o lado da corrente ligado — senao sobraria uma
+   escolha obrigatoria que nunca aparece, e o pedido seria recusado sem
+   ninguem entender por que. */
+function ligarEscolha(modelo_id,escolha,ligada){
+  const m=modeloOuErro(modelo_id);
+  const e=ESC.porChave(escolha);
+  exigir(e,'escolha_inexistente','A escolha "'+escolha+'" não existe. As escolhas são: '+
+    ESC.ESCOLHAS.map(x=>x.chave).join(', ')+'.');
+  const atuais=dCat.escolhas(m.id);
+  if(ligada){
+    for(const dep of Object.keys(e.depende||{}))
+      exigir(atuais.includes(dep),'depende_de','"'+e.nome+'" só existe com "'+ESC.porChave(dep).nome+
+        '" ligado. Ligue "'+ESC.porChave(dep).nome+'" antes.');
+    dCat.ligarEscolha(m.id,e.chave,ESC.ESCOLHAS.indexOf(e)+1);
+  }else{
+    const orfa=ESC.ESCOLHAS.find(x=>atuais.includes(x.chave)&&x.depende&&x.depende[e.chave]!==undefined);
+    exigir(!orfa,'tem_dependente','"'+(orfa&&orfa.nome)+'" depende de "'+e.nome+'". Desligue "'+
+      (orfa&&orfa.nome)+'" antes.');
+    dCat.desligarEscolha(m.id,e.chave);
+  }
+  return modelo(m.id).escolhas;
+}
 
 // ── Colecao de venda ──────────────────────────────────────────────────────
 const colecoesDe=modelo_id=>dCat.colecoes(modelo_id);
@@ -584,7 +616,7 @@ const historicoPreco=(alvo,alvo_id)=>dCat.historicoPreco(alvo,alvo_id);
 module.exports={
   coresDaColecao,
   listarModelos, modelo, modeloParaVer, modeloPorNome, criarModelo, editarModelo, ativarModelo,
-  duplicarModelo, FILHAS_EXTRAS, DEPOIS_DE_COPIAR,
+  duplicarModelo, FILHAS_EXTRAS, DEPOIS_DE_COPIAR, ligarEscolha,
   colecoesDe, colecaoDe, ligarColecao, editarColecao, definirPrecoColecao,
   ligarCorAcessorio,
   listarComponentes, criarComponente, definirPrecoComponente, COBRANCAS,

@@ -92,7 +92,7 @@ const paraCampo=v=>v==null?'':(v/100).toFixed(2).replace('.',',');
 let modelo=null, aba='produto', editando=null, erro=null, novoAberto=false, erroNovo=null;
 let modelos=[];
 
-const ABAS=[['produto','Produto'],['colecoes','Coleções de venda'],['escada','Escada de tubos'],
+const ABAS=[['produto','Produto'],['escolhas','Escolhas do cliente'],['colecoes','Coleções de venda'],['escada','Escada de tubos'],
             ['ficha','Ficha técnica'],['kit','Kit e suportes'],
             ['componentes','Componentes e preços']];
 
@@ -220,6 +220,42 @@ function desenharNovo(){
     el('div',{class:'campo'},[criar]),el('div',{class:'campo'},[cancelar])]));
   if(erroNovo) ed.appendChild(el('p',{class:'erro-linha'},[erroNovo]));
   box.appendChild(ed);
+}
+
+// ── As escolhas do cliente ─────────────────────────────────────────────────
+/* A LISTA E DO SISTEMA, e aqui so se liga ou desliga. Escolha ligada e
+   obrigatoria no pedido; desligada some do simulador e do pedido, e o
+   servidor recusa se ela vier mesmo assim. */
+function abaEscolhas(){
+  const c=el('div',{class:'cartao'},[
+    el('h2',{},['Escolhas do cliente']),
+    el('p',{class:'nota'},['O que a revenda escolhe no pedido. A lista é do sistema — cada '+
+      'escolha tem a regra dela escrita no código. Produto que precisa de uma escolha que não '+
+      'está aqui entra por especificação, nunca como campo digitado.'])
+  ]);
+  const t=el('table',{class:'lista'});
+  t.appendChild(el('thead',{},[el('tr',{},[el('th',{},['Escolha']),el('th',{},['Opções']),
+    el('th',{},['Ligada']),el('th',{},[''])])]));
+  const tb=el('tbody');
+  (modelo.escolhas||[]).forEach(x=>{
+    const ops=x.numero?'número':(x.opcoes||[]).map(o=>o.nome).join(' · ');
+    const dep=x.depende?Object.keys(x.depende).map(k=>{
+      const pai=(modelo.escolhas||[]).find(y=>y.chave===k);
+      const op=pai&&(pai.opcoes||[]).find(o=>o.valor===x.depende[k]);
+      return 'só com '+(op?op.nome.toLowerCase():x.depende[k]);
+    }).join(', '):'';
+    tb.appendChild(el('tr',{class:x.ligada?'':'inativa'},[
+      el('td',{},[x.nome, dep?el('div',{class:'setor'},[dep]):'']),
+      el('td',{class:'nota'},[ops]),
+      el('td',{},[x.ligada?'sim':'não']),
+      el('td',{},[botao(x.ligada?'Desligar':'Ligar',()=>tentar(()=>api('/api/sm/modelos/'+modelo.id+
+        '/escolhas/'+x.chave,{metodo:'PUT',silencioso:true,corpo:{ligada:!x.ligada}})))])
+    ]));
+  });
+  t.appendChild(tb);
+  c.appendChild(rolaH(t));
+  if(erro) c.appendChild(el('p',{class:'erro-linha'},[erro]));
+  return c;
 }
 
 // ── Coleções de venda ──────────────────────────────────────────────────────
@@ -694,7 +730,7 @@ function desenhar(){
   raiz.appendChild(barra);
   if(!modelo.ativo) raiz.appendChild(el('div',{class:'tarja'},
     ['INATIVO — a revenda não vê "'+modelo.nome+'". O simulador aceita, para conferir.']));
-  raiz.appendChild({produto:abaProduto, colecoes:abaColecoes, escada:abaEscada, ficha:abaFicha,
+  raiz.appendChild({produto:abaProduto, escolhas:abaEscolhas, colecoes:abaColecoes, escada:abaEscada, ficha:abaFicha,
                     kit:abaKit, componentes:abaComponentes}[aba]());
 
   $('#sobreModelo').textContent='Mínimo faturado de '+emM2(modelo.m2_min_faturado_mm2)+

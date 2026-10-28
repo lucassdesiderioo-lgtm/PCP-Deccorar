@@ -45,6 +45,13 @@ module.exports={rotas:[
    manipulador:({params,corpo,usuario})=>catalogo.ativarModelo(params.id,!!(corpo&&corpo.ativo),usuario),
    detalhe:(req,d)=>d?((d.ativo?'ativou':'desativou')+' o modelo '+d.nome):null},
 
+  /* AS ESCOLHAS DO CLIENTE (secao 4 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO):
+     o produto liga as que usa, da lista do sistema. */
+  {metodo:'PUT', caminho:'/api/sm/modelos/:id/escolhas/:escolha', permissao:EDITAR,
+   manipulador:({params,corpo})=>catalogo.ligarEscolha(params.id,params.escolha,!!(corpo&&corpo.ligada)),
+   detalhe:(req)=>(req.body&&req.body.ligada?'ligou':'desligou')+' a escolha '+req.params.escolha+
+     ' no modelo '+req.params.id},
+
   // ── Colecoes de venda ───────────────────────────────────────────────────
   {metodo:'POST', caminho:'/api/sm/modelos/:id/colecoes', permissao:EDITAR,
    manipulador:({params,corpo,usuario})=>custo.podar(usuario,

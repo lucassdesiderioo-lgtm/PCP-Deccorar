@@ -194,6 +194,14 @@ module.exports={
     return this.fichaLinha(id);
   },
 
+  // ── As escolhas que o modelo liga (fase 2 do cadastro de produto) ────────
+  escolhas:modelo_id=>varios('SELECT escolha FROM sm_modelo_escolha WHERE modelo_id=? ORDER BY ordem, id',
+    modelo_id).map(x=>x.escolha),
+  ligarEscolha:(modelo_id,escolha,ordem)=>db.prepare(
+    'INSERT OR IGNORE INTO sm_modelo_escolha(modelo_id,escolha,ordem) VALUES(?,?,?)').run(modelo_id,escolha,ordem||0),
+  desligarEscolha:(modelo_id,escolha)=>db.prepare(
+    'DELETE FROM sm_modelo_escolha WHERE modelo_id=? AND escolha=?').run(modelo_id,escolha),
+
   // ── Faixas de suporte e regra da reducao ────────────────────────────────
   faixas:modelo_id=>varios('SELECT * FROM sm_faixa_suporte WHERE modelo_id=? ORDER BY largura_max_mm',modelo_id),
   criarFaixa(d){
