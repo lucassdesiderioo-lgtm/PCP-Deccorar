@@ -151,6 +151,20 @@ const sCanc = acaoDe(objeto('lote', vCanc).body,'saida');
 eq('venda cancelada: a saída não vale', sCanc.vale, false);
 ok('e diz que foi cancelada', /cancel/i.test(sCanc.por_que_nao||''), sCanc.por_que_nao);
 
+/* E O "DAR SAÍDA" UM A UM PELA MESMA PORTA (28/10/2026): a venda que vence
+   hoje ainda está na fila do dia. Com ou sem despacho lido. */
+const vHojeS = volume({codigo:'BK140140BEGE', buyer:'Vence Hoje', nf:'7107', venda:'9007',
+  estagio:'pendente', data:D(-1), despachar_em:HOJE});
+const vHojeSemData = volume({codigo:'BK140140BEGE', buyer:'Entrou Hoje', nf:'7108', venda:'9008',
+  estagio:'pendente', data:HOJE});
+const sHoje = acaoDe(objeto('lote', vHojeS).body,'saida');
+eq('VENCE HOJE: a saída não vale', sHoje.vale, false);
+ok('e o motivo manda para a Etiqueta de Venda', /hoje/i.test(sHoje.por_que_nao||'') && /Etiqueta de Venda/.test(sHoje.por_que_nao||''), sHoje.por_que_nao);
+eq('entrou hoje sem despacho lido: a saída também não vale', acaoDe(objeto('lote', vHojeSemData).body,'saida').vale, false);
+eq('executar a saída da que vence hoje é recusado (409)', executar('saida','lote',vHojeS,{},'saiu').status, 409);
+eq('e ela continua pendente', vol(vHojeS).estagio, 'pendente');
+db.prepare('DELETE FROM lote WHERE id IN (?,?)').run(vHojeS, vHojeSemData);
+
 let r = executar('saida','lote',vFutura,{},'saiu');
 eq('executar a saída da venda futura é recusado (409)', r.status, 409);
 eq('e o volume futuro continua embalado', vol(vFutura).estagio, 'embalado');
@@ -243,13 +257,26 @@ ok('a prévia diz o que fica de fora (futuros e bloqueados)', /bloquead/i.test(r
 ok('e manda conferir o Mercado Livre antes', /Mercado Livre/i.test(r.body.resumo||''), r.body.resumo);
 eq('a prévia não grava', vol(v1).estagio, 'pendente');
 
+/* ⚠️ HOJE NÃO É CORTE (28/10/2026). O corte em hoje fechou como "saiu" as 50
+   vendas da fila do dia, que ainda não tinham sido impressas: a lista da
+   Etiqueta de Venda sumiu inteira. O contador já dizia "o que vence hoje é
+   trabalho de hoje"; o bloco agora diz o mesmo. */
+const snapHoje = [v1,v2,v3,vHoje].map(id => vol(id).estagio).join();
+r = previa('vencidos','bloco',0,{ate:HOJE});
+eq('A PRÉVIA ATÉ HOJE É RECUSADA (400) — o que vence hoje ainda é trabalho de hoje', r.status, 400);
+ok('e a recusa diz por quê', /hoje/i.test((r.body||{}).erro||'') && /Etiqueta de Venda/i.test((r.body||{}).erro||''), (r.body||{}).erro);
 r = executar('vencidos','bloco',0,{ate:HOJE},'conferido no ML: tudo entregue');
-eq('fechar até hoje responde 200', r.status, 200);
+eq('EXECUTAR ATÉ HOJE É RECUSADO (400)', r.status, 400);
+eq('e nada andou', [v1,v2,v3,vHoje].map(id => vol(id).estagio).join(), snapHoje);
+eq('nem gravou correção', db.prepare("SELECT COUNT(*) n FROM correcao WHERE acao='vencidos'").get().n, 0);
+
+r = executar('vencidos','bloco',0,{ate:D(-1)},'conferido no ML: tudo entregue');
+eq('fechar até ontem responde 200', r.status, 200);
 const cVenc = r.body.correcao_id;
 eq('o vencido virou carregado na data dele', vol(v1).carregado_em, D(-10)+' 15:00:00');
 eq('o de coleta também, com retirado_em', vol(v2).retirado_em, D(-6)+' 15:00:00');
 eq('o sem data, no dia em que entrou', vol(v3).carregado_em, D(-11)+' 15:00:00');
-eq('o que vence hoje entrou (o corte é até hoje)', vol(vHoje).estagio, 'carregado');
+eq('O QUE VENCE HOJE FICA NA FILA — o corte é no máximo ontem', vol(vHoje).estagio, 'pendente');
 eq('O FUTURO FICA — venda futura não foi despachada', vol(vFut2).estagio, 'pendente');
 eq('o bloqueado fica', vol(vBloq).estagio, 'bloqueado');
 eq('o teste fica', vol(vTst).estagio, 'pendente');
@@ -263,7 +290,7 @@ eq('e nenhum foi reaberto (tudo ou nada)', vol(v1).estagio, 'carregado');
 db.prepare("UPDATE lote SET estagio='carregado' WHERE id=?").run(v2);
 r = desfazer(cVenc);
 eq('com o bloco intacto, desfaz', r.status, 200);
-ok('todos voltam a pendente, sem carimbo', [v1,v2,v3,vHoje].every(id => vol(id).estagio==='pendente' && !vol(id).carregado_em));
+ok('todos voltam a pendente, sem carimbo', [v1,v2,v3].every(id => vol(id).estagio==='pendente' && !vol(id).carregado_em));
 eq('e o retirado_em da coleta volta a vazio', vol(v2).retirado_em, null);
 
 /* ═════════════════════════════════════════════════════════════════════════ */

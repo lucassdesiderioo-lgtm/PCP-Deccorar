@@ -438,3 +438,12 @@ Conferência mostram uma linha com o número e a idade da mais antiga, e a TV um
 quadro com o número. Só o número: decidir continua na aba, com a permissão de
 cada pendência.
 
+## 28/10/2026 — o "Fechar vencidos" corta no máximo em ontem
+
+Cartão R-COR-04, decisão do dono depois do incidente da manhã. **Antes:** a data
+de corte do "Fechar vencidos" podia ser hoje, e o "Dar saída" valia para a venda
+que despacha hoje. A correção #4 (07:13, corte em hoje) fechou como "saiu" as 50
+vendas da fila do dia, nunca impressas, e a lista da Etiqueta de Venda sumiu —
+voltou pelo Desfazer da Mesa. **Depois:** corte em hoje é recusado (400), a venda
+que vence hoje não aceita "Dar saída", e o `fechar_vencidos.js` sem `--ate` corta
+em ontem. O que vence hoje é trabalho da Etiqueta de Venda.
