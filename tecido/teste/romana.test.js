@@ -134,6 +134,10 @@ module.exports=[
 {nome:'§5 — o PEDIDO congela os gomos: a etiqueta e a bancada leem o que foi aprovado',
  executar({igual}){
   const b=cena();
+  // Todo produto leva kit de instalacao, senao nao ativa (secao 8.5).
+  const kit=catalogo.criarComponente({chave:'kit_romana',nome:'Kit romana',setor:'embalagem',
+    gera_etiqueta:0,eh_kit:1,codigo_barras:'KIT-ROMANA'},DIRETOR);
+  catalogo.criarFichaLinha({modelo_id:b.m.id,componente_id:kit.id});
   catalogo.ativarModelo(b.m.id,true,DIRETOR);
   config.gravar('pedidoNumeroInicial','5000','teste');
   const t=revendas.tabelas()[0];

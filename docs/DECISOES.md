@@ -458,18 +458,10 @@ revenda ganha cliente final opcional. Romana e Painel usam os cinco setores de
 hoje. O dono: *"isso que estamos fazendo é algo para facilitar na criação de um
 produto novo"*.
 
-## 28/10/2026 — sob medida: a recusa de uma unidade e as duas fontes da etiqueta
-
-Spec `SOBMEDIDA-CADASTRO-DE-PRODUTO`, respostas do dono ao plano. **Recusa:**
-quando o insumo tem mais de uma unidade, quem recusa escolhe o motivo **e a
-unidade** (ex.: 2/4), e só ela volta, junto com o que depende dela pela regra
-de liberação da 5-B2; as outras seguem. A refeita reimprime a mesma etiqueta
-(mesmo código, mesmo k/n, mesma data de fabricação), marcada como refeita.
-**Etiqueta:** o cadastro de material (Compras) dá o que o componente é — nome,
-marca, modelo; a ficha técnica dá quanto e a quanto cortar. A etiqueta nunca
-tira medida do material, nem nome da ficha quando há material ligado; o tubo
-segue com o nome do degrau. Falta de material ou campo vazio **nunca trava**
-etiqueta, pedido nem aprovação: sai o nome do componente, o campo vazio não
-sai, e a ficha mostra em âmbar o que falta. O motor sem marca ou modelo avisa
-também no simulador — avisa, não trava.
-
+Em 28/10/2026, na construção: todo produto tem kit de instalação na ficha, e
+no sob medida os suportes (do bandô, do trilho, da Romana) variam com a
+largura, por faixa, para cada kit — sem kit o produto não ativa. A recusa de
+um insumo com várias unidades devolve só a unidade recusada. Nome, marca e
+modelo do insumo vêm do cadastro de material; medida e quantidade, da ficha
+técnica — e cadastro de material incompleto avisa, nunca trava. Nada na
+etiqueta de produção termina em "…".

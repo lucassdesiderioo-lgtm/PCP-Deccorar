@@ -83,9 +83,10 @@ function tarefaDe(c){
 function extraDe(c,doItem){
   const partes=[];
   if(c.setor==='embalagem'){
-    const kit=doItem.find(x=>x.eh_kit);
-    if(kit) partes.push(kit.nome.toUpperCase()+
-      (kit.suportes!=null?' · '+kit.suportes+' suportes':''));
+    /* Todos os kits da persiana, cada um com os suportes da faixa dele
+       (secao 8.5): o Painel com bandô leva o do trilho E o do bandô. */
+    doItem.filter(x=>x.eh_kit).forEach(kit=>partes.push(kit.nome.toUpperCase()+
+      (kit.suportes!=null?' · '+kit.suportes+' suportes':'')));
   }
   if(c.setor==='montagem'&&doItem.some(x=>x.chave==='reducao'))
     partes.push('REDUÇÃO DE PESO');
@@ -100,12 +101,24 @@ function extraDe(c,doItem){
 }
 
 /* As escolhas que a bancada confere na peca: o comando do Rolo, ou a abertura,
-   as folhas e o acionamento do Painel. */
-const SENTIDO={esquerda:'ABRE PARA A ESQUERDA', direita:'ABRE PARA A DIREITA', central:'ABERTURA CENTRAL'};
-const CORRENTE={direito:'CORRENTE À DIREITA', esquerdo:'CORRENTE À ESQUERDA'};
+   as folhas e o acionamento do Painel.
+
+   ⚠️ AS ABREVIACOES SAO FIXAS E MORAM AQUI, E SO AQUI (secao 8.2 da spec
+   SOBMEDIDA-CADASTRO-DE-PRODUTO). Nada na etiqueta de producao termina em
+   "…": o Painel central de 6 folhas com comando, escrito por extenso, nao
+   cabia, e o papel cortava justamente o que a bancada precisa ler. A forma
+   curta e uma so, para a bancada aprender a le-la uma vez —
+   `CENTRAL · 6 FOLHAS · C/ COMANDO · CORRENTE ESQ`. Ha teste recusando uma
+   segunda tabela em outro arquivo. O comando do Rolo continua por extenso:
+   sempre coube, e a etiqueta dele nao muda. */
+const ABREV={
+  sentido:{esquerda:'P/ ESQUERDA', direita:'P/ DIREITA', central:'CENTRAL'},
+  acionamento:{com_comando:'C/ COMANDO', sem_comando:'S/ COMANDO'},
+  lado_corrente:{direito:'CORRENTE DIR', esquerdo:'CORRENTE ESQ'}
+};
 function escolhasDe(c){
-  return [COMANDO[c.comando], SENTIDO[c.sentido], c.folhas?c.folhas+' FOLHAS':null,
-    c.acionamento==='sem_comando'?'SEM COMANDO':null, CORRENTE[c.lado_corrente]]
+  return [COMANDO[c.comando], ABREV.sentido[c.sentido], c.folhas?c.folhas+' FOLHAS':null,
+    ABREV.acionamento[c.acionamento], ABREV.lado_corrente[c.lado_corrente]]
     .filter(Boolean).join(' · ');
 }
 
@@ -187,8 +200,12 @@ function paraImprimir(filtro){
   const deQuem=daLista.length?daLista:pedidos;
   if(deQuem.length) d.pecasDoPedido(deQuem).forEach(x=>{ totais[x.pedido_id]=x.total; });
 
+  /* Os IRMAOS saem do pedido inteiro, e nao so do recorte: pedida por codigo
+     (a refeita), a embalagem chegava sozinha, e a etiqueta dela saia sem a
+     linha do kit — justamente na caixa que ja deu problema uma vez. */
+  const irmaos=codigos.length&&daLista.length?d.componentes(daLista,null):todos;
   const porItem=new Map();
-  todos.forEach(c=>{
+  irmaos.forEach(c=>{
     if(!porItem.has(c.item_id)) porItem.set(c.item_id,[]);
     porItem.get(c.item_id).push(c);
   });
@@ -292,4 +309,4 @@ function paraCortar(filtro){
 const impressoes=limite=>d.impressoes(limite);
 
 module.exports={setores,atribuirCodigos,atribuirPendentes,
-  paraImprimir,imprimir,aImprimir,paraCortar,impressoes,tarefaDe};
+  paraImprimir,imprimir,aImprimir,paraCortar,impressoes,tarefaDe,escolhasDe,ABREV};

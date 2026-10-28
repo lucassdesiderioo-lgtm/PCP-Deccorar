@@ -2521,14 +2521,17 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 | R-SMN-10 | A data de fabricação é a da PRIMEIRA impressão |
 | R-SMN-11 | A liberação é regra por setor mais `libera` (montagem ou só a embalagem) |
 | R-SMN-12 | Com várias unidades, a recusa volta SÓ a unidade escolhida |
-| R-SMN-13 | O kit só é cobrado na embalagem de quem leva kit (a confirmar com o dono) |
+| R-SMN-13 | O kit só é cobrado na embalagem de quem leva kit — e de cada kit (aceita com a R-SMN-16) |
 | R-SMN-14 | O preço por cor existe sem tela; com linha vence a coleção, vazio não muda nada |
 | R-SMN-15 | O cliente final é opcional, e sai ao lado da revenda |
+| R-SMN-16 | Todo produto tem kit de instalação na ficha; sem kit, não ativa |
+| R-SMN-17 | A faixa de suporte serve a cada kit da ficha (o trilho e o bandô, cada um pela sua) |
+| R-SMN-18 | Nada na etiqueta de produção termina em "…": encolhe ou quebra; abreviações num lugar só |
 
 ### ⚠️ O CADASTRO DE PRODUTO — o que parece bug e não é (28/10/2026)
 
 Spec `docs/specs/SOBMEDIDA-CADASTRO-DE-PRODUTO.md`, as seis fases numa entrega
-só (§14 dela), cartões R-SMN-01 a R-SMN-15.
+só (§14 dela), cartões R-SMN-01 a R-SMN-18.
 
 > ⚠️ **O PRODUTO NOVO NÃO APARECE NO PEDIDO, E É ASSIM.** Ele nasce inativo, e
 > só o simulador o calcula — para quem tem `catalogo.editar`, com a tarja
@@ -2545,9 +2548,20 @@ só (§14 dela), cartões R-SMN-01 a R-SMN-15.
 > ⚠️ **O PREÇO POR COR NÃO TEM TELA NEM ROTA, DE PROPÓSITO.** A tabela e a conta
 > estão prontas (decisão do dono), e vazia ela não muda preço nenhum.
 >
-> ⚠️ **O FIM DA EMBALAGEM SEM KIT PASSA QUANDO A PERSIANA NÃO LEVA KIT** — é
-> decisão de construção, **a confirmar com o dono** (R-SMN-13). Todo Rolô leva
-> kit, e nada mudou para ele.
+> ⚠️ **TODO PRODUTO LEVA KIT, E SEM KIT NA FICHA ELE NÃO ATIVA** (R-SMN-16,
+> dono, 28/10/2026). Não existe "não leva kit". É essa trava que deixa a
+> embalagem cobrar o kit só de quem tem kit na ficha (R-SMN-13) sem abrir
+> buraco: a ficha que esqueceu o kit não chega à venda.
+>
+> ⚠️ **A FAIXA DE SUPORTE É DE CADA KIT** (R-SMN-17, migração 38). O Painel com
+> bandô leva os suportes do trilho e os do bandô, cada um pela sua faixa, e a
+> embalagem cobra os dois. A faixa sem kit apontado é a "de todos os kits" —
+> a do Rolô, que por isso não mudou.
+>
+> ⚠️ **NADA NA ETIQUETA DE PRODUÇÃO TERMINA EM "…"** (R-SMN-18). A linha que
+> não cabe encolhe e, se preciso, quebra em duas; a que cabe sai onde sempre
+> saiu. As abreviações das escolhas moram só no `ABREV` do
+> `etiqueta_producao.js`.
 >
 > ⚠️ **A CONFERÊNCIA ACHOU DOIS DEFEITOS DE TELA QUE JÁ ESTAVAM NO AR**, e os
 > dois só apareciam abrindo a tela: o Catálogo e o simulador liam a recusa em
@@ -2574,7 +2588,8 @@ Em tabela de tela: `rola_tela.test.js`. No corte: `corte_etapas.test.js`,
 de produto (criar, duplicar, escolhas, Romana, Painel, etiqueta por unidade,
 liberação por produto, preço por cor): `produto.test.js`, `escolhas.test.js`,
 `romana.test.js`, `painel.test.js`, `etiqueta_unidade.test.js`,
-`produto_producao.test.js` e `telas_produto.test.js` — e o `persiana.test.js`,
+`produto_producao.test.js`, `telas_produto.test.js`, `kit_produto.test.js` e
+`etiqueta_sem_corte.test.js` — e o `persiana.test.js`,
 o `etiqueta_producao.test.js`, o `producao.test.js` e o `recusa.test.js` têm que
 passar **sem mudar o esperado**: é a prova de que o Rolô não mudou. No cadastro
 de material do PCP (marca e modelo): `node teste_componentes.js`. Todos os
@@ -2583,7 +2598,7 @@ de material do PCP (marca e modelo): `node teste_componentes.js`. Todos os
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 828 casos
+cd tecido && npm test          # 855 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:

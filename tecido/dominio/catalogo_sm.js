@@ -100,6 +100,7 @@ function modeloParaVer(id,podeVerInativo){
      pintar em ambar o que falta (secao 8.2). Ela nunca derruba a leitura: o
      cadastro de material incompleto e o caso normal de hoje. */
   try{ m.avisos_material=avisosDeMaterial(m.id); }catch(x){ m.avisos_material=[]; }
+  m.sem_kit=!temKit(m.id);
   return m;
 }
 
@@ -168,11 +169,23 @@ function editarModelo(id,d,usuario){
    produto que sai para a revenda chamado "Cópia de Rolô" e o sinal de que
    ninguem conferiu — e o nome que ela le no orcamento. */
 const NOME_DE_COPIA=/^\s*c[óo]pia\s+de\b/i;
+/* ⚠️ TODO PRODUTO LEVA KIT DE INSTALACAO (secao 8.5, dono, 28/10/2026). Nao
+   existe "nao leva kit": a ficha sem kit e ficha que ESQUECEU o kit, e e por
+   isso que ela nao ativa. Sem esta trava a embalagem — que so cobra o kit de
+   quem tem kit na ficha (R-SMN-13) — deixaria passar sem cobrar nada
+   justamente o esquecimento que a trava do kit existe para pegar. Conta so a
+   linha ATIVA de um kit ATIVO: kit desativado no cadastro nao entra na
+   persiana (persiana.js), e contar com ele seria ativar sem kit. */
+const temKit=modelo_id=>dCat.ficha(modelo_id).some(l=>l.eh_kit&&l.ativo!==0&&l.componente_ativo!==0);
+
 function ativarModelo(id,ativo,usuario){
   const m=modeloOuErro(id);
   if(ativo) exigir(!NOME_DE_COPIA.test(m.nome),'nome_de_copia',
     'O nome "'+m.nome+'" ainda é o da cópia. Dê ao produto o nome que a revenda vai ler '+
     'antes de ativar.');
+  if(ativo) exigir(temKit(m.id),'sem_kit',
+    'O produto '+m.nome+' não tem kit de instalação na ficha técnica. Todo produto leva kit: '+
+    'acrescente a linha do kit (aba Ficha técnica) antes de ativar.');
   return dCat.atualizarModelo(m.id,{ativo:ativo?1:0});
 }
 
@@ -630,14 +643,26 @@ function criarFichaLinha(d){
 }
 
 // ── Faixas de suporte ─────────────────────────────────────────────────────
+/* ⚠️ A FAIXA E DE CADA KIT (secao 8.5). `componente_id` vazio e a faixa DO
+   PRODUTO, que vale para todo kit que conta suporte e nao tem faixa propria —
+   e assim que o Rolo sempre funcionou, e continua. Apontada, ela tem que ser
+   de um kit que conta suporte e esta na ficha deste produto: faixa de um tubo
+   ou de um kit de outro produto e numero que nao pega em ninguem (divida 18). */
 function criarFaixaSuporte(d){
   const m=modeloOuErro(d.modelo_id);
   const largura=u.mm(d.largura_max_mm,'a largura da faixa');
   const q=Number(d.quantidade);
   exigir(Number.isInteger(q)&&q>0,'quantidade_invalida','A quantidade de suportes tem que ser inteira e maior que zero.');
-  if(dCat.faixas(m.id).some(f=>f.largura_max_mm===largura))
-    throw new ErroDeRegra('faixa_repetida','Ja existe faixa ate '+u.emMetros(largura)+' neste modelo.');
-  return dCat.criarFaixa({modelo_id:m.id,largura_max_mm:largura,quantidade:q});
+  const kitId=(d.componente_id==null||d.componente_id==='')?null:Number(d.componente_id);
+  let kit=null;
+  if(kitId!=null){
+    kit=dCat.ficha(m.id).find(l=>l.componente_id===kitId&&l.eh_kit&&l.usa_faixa_suporte);
+    exigir(kit,'faixa_sem_kit','A faixa só pode ser de um kit que conta suportes pela largura e está na ficha deste produto.');
+  }
+  if(dCat.faixas(m.id).some(f=>f.largura_max_mm===largura&&(f.componente_id==null?null:f.componente_id)===kitId))
+    throw new ErroDeRegra('faixa_repetida','Ja existe faixa ate '+u.emMetros(largura)+
+      (kit?' para o '+kit.componente_nome:' neste modelo')+'.');
+  return dCat.criarFaixa({modelo_id:m.id,largura_max_mm:largura,quantidade:q,componente_id:kitId});
 }
 const apagarFaixaSuporte=id=>{ dCat.apagarFaixa(id); return {apagada:true}; };
 

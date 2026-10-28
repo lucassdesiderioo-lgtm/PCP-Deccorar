@@ -119,7 +119,15 @@ function achar(codigo){
    regra de uma valer para a outra no dia em que uma delas mudasse. */
 const limpo=s=>String(s||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
 
-function kitDoItem(irmaos){ return irmaos.find(x=>x.eh_kit)||null; }
+/* ⚠️ A PERSIANA PODE LEVAR MAIS DE UM KIT (secao 8.5): o Painel com bandô
+   leva o do trilho e o do bandô, cada um com os seus suportes. Cada kit e
+   conferido na PROPRIA linha (`kit_conferido_em` do kit), e a embalagem so
+   ganha o seu quando todos entraram — e a marca da embalagem que o fim le,
+   como sempre, entao o Rolo (um kit so) anda exatamente como antes, e a caixa
+   aberta antes desta mudanca, com o kit ja bipado, fecha sem bipar de novo. */
+const kitsDoItem=irmaos=>irmaos.filter(x=>x.eh_kit);
+const kitsQueFaltam=irmaos=>kitsDoItem(irmaos).filter(k=>!k.kit_conferido_em);
+const descreveKits=ks=>ks.map(descreveKit).join(' + ');
 
 /* ⚠️ SEM SUPORTES NAO E FALTA DE DADO: o kit tradicional nao usa faixa de
    suporte (secao 4.7 — ele leva o padrao do kit), e so o kit bandô e o kit
@@ -144,20 +152,30 @@ function biparKit(codigo,codigoKit,usuario){
   exigir(c.iniciado_em,'nao_iniciado','Bipe a etiqueta da peça primeiro, e depois o kit.');
 
   const irmaos=d.doItem(c.item_id);
-  const kit=kitDoItem(irmaos);
-  /* ⚠️ KIT SEM CODIGO CADASTRADO E RECUSA, NUNCA "PASSOU". Deixar passar
-     faria a conferencia existir no papel e nao pegar em ninguem — a divida
-     18 do CLAUDE.md pela porta da bancada, e justamente na peca que ja esta
-     dentro do plastico. */
-  exigir(kit&&kit.codigo_barras,'kit_sem_codigo',
-    'Esta peça leva '+descreveKit(kit)+', e esse kit está sem código de barras no cadastro. '+
-    'Sem ele não dá para conferir — avise quem cuida do catálogo antes de fechar a caixa.');
+  const kits=kitsDoItem(irmaos);
+  exigir(kits.length,'kit_sem_codigo','Esta peça não tem kit de instalação na ficha — avise quem cuida do catálogo.');
+  const kit=kits.find(k=>k.codigo_barras&&limpo(codigoKit)===limpo(k.codigo_barras));
+  if(!kit){
+    /* ⚠️ KIT SEM CODIGO CADASTRADO E RECUSA, NUNCA "PASSOU". Deixar passar
+       faria a conferencia existir no papel e nao pegar em ninguem — a divida
+       18 do CLAUDE.md pela porta da bancada, e justamente na peca que ja esta
+       dentro do plastico. */
+    const semCodigo=kits.find(k=>!k.codigo_barras);
+    exigir(!semCodigo,'kit_sem_codigo',
+      'Esta peça leva '+descreveKit(semCodigo)+', e esse kit está sem código de barras no cadastro. '+
+      'Sem ele não dá para conferir — avise quem cuida do catálogo antes de fechar a caixa.');
+    throw new ErroDeRegra('kit_errado','Kit errado. Esta persiana leva '+descreveKits(kits)+'.');
+  }
 
-  exigir(limpo(codigoKit)===limpo(kit.codigo_barras),'kit_errado',
-    'Kit errado. Esta persiana leva '+descreveKit(kit)+'.');
-
-  d.marcar(c.id,{kit_conferido_em:dia.agora()});
-  return {ok:true, kit:descreveKit(kit)};
+  const faltam=db.transaction(()=>{
+    d.marcar(kit.id,{kit_conferido_em:dia.agora()});
+    const f=kitsQueFaltam(d.doItem(c.item_id));
+    if(!f.length) d.marcar(c.id,{kit_conferido_em:dia.agora()});
+    return f;
+  })();
+  /* `faltam` diz a bancada que ainda ha kit para bipar, e ela continua
+     esperando kit em vez de pedir o fechamento. Vazio no Rolo, sempre. */
+  return {ok:true, kit:descreveKit(kit), faltam:faltam.map(descreveKit)};
 }
 
 /* ── O BIPE ───────────────────────────────────────────────────────────────
@@ -194,9 +212,9 @@ function bipar(codigo,usuario){
      cadastrado sem kit na ficha ficaria PRESO na embalagem para sempre, sem
      ter o que bipar — e trava que nunca solta e a armadilha #6. O aviso de
      produto sem kit continua no simulador, onde alguem pode cadastra-lo. */
-  if(c.setor==='embalagem'&&!c.kit_conferido_em&&kitDoItem(irmaos))
+  if(c.setor==='embalagem'&&!c.kit_conferido_em&&kitsQueFaltam(irmaos).length)
     throw new ErroDeRegra('faltou_kit','⚠ FALTOU O KIT. Bipe o kit desta peça antes de fechar: '+
-      descreveKit(kitDoItem(irmaos))+'.');
+      descreveKits(kitsQueFaltam(irmaos))+'.');
 
   return db.transaction(()=>{
     d.marcar(c.id,{terminado_em:dia.agora(), terminado_por:nome(usuario)});

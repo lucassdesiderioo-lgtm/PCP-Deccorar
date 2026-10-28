@@ -646,17 +646,25 @@ function novaLinhaFicha(){
 
 // ── Kit e suportes ─────────────────────────────────────────────────────────
 function abaKit(){
+  /* ⚠️ A FAIXA E DE CADA KIT (secao 8.5): um Painel com bandô leva os suportes
+     do trilho e os do bandô, cada um pela sua faixa. "Todos os kits" e a faixa
+     do produto, que vale para o kit que conta suporte e nao tem faixa propria
+     — e e assim que o Rolo sempre contou. */
+  const kitsComFaixa=modelo.ficha.filter(f=>f.eh_kit&&f.usa_faixa_suporte&&f.ativo)
+    .filter((f,i,a)=>a.findIndex(x=>x.componente_id===f.componente_id)===i);
   const c=el('div',{class:'cartao'},[
     el('h2',{},['Faixas de suporte']),
-    el('p',{class:'nota'},['Quantos suportes o kit leva, pela largura. A medida exata '+
-      'fica no degrau de baixo: 1,000 → 2 suportes, 1,001 → 3. O kit tradicional usa '+
+    el('p',{class:'nota'},['Quantos suportes cada kit leva, pela largura. A medida exata '+
+      'fica no degrau de baixo: 1,000 → 2 suportes, 1,001 → 3. O kit que tem faixa própria '+
+      'conta por ela; o que não tem conta pela faixa de "todos os kits". O kit tradicional usa '+
       'os suportes padrão dele e não passa por aqui.'])
   ]);
   const t=el('table',{class:'lista'});
   t.appendChild(el('thead',{},[el('tr',{},[
-    el('th',{class:'n'},['Largura até']),el('th',{class:'n'},['Suportes']),el('th',{},[''])])]));
+    el('th',{},['Kit']),el('th',{class:'n'},['Largura até']),el('th',{class:'n'},['Suportes']),el('th',{},[''])])]));
   const tb=el('tbody');
   modelo.faixas_suporte.forEach(f=>tb.appendChild(el('tr',{},[
+    el('td',{},[f.kit_nome||'todos os kits']),
     el('td',{class:'n medida'},[emMetros(f.largura_max_mm)]),
     el('td',{class:'n'},[String(f.quantidade)]),
     el('td',{},[botao('Apagar',()=>tentar(()=>api('/api/sm/faixas/'+f.id,{metodo:'DELETE',silencioso:true})),'perigo')])
@@ -665,12 +673,16 @@ function abaKit(){
   c.appendChild(rolaH(t));
 
   const nova=el('div',{class:'editor'});
+  const k=el('select',{'aria-label':'Kit da faixa'},[el('option',{value:''},['todos os kits'])]
+    .concat(kitsComFaixa.map(f=>el('option',{value:String(f.componente_id)},[f.componente_nome]))));
   const l=el('input',{type:'text',placeholder:'3,000','aria-label':'Largura até'});
   const q=el('input',{type:'text',placeholder:'5','aria-label':'Suportes'});
   const bt=el('button',{class:'bt primario',type:'button'},['Acrescentar faixa']);
   bt.addEventListener('click',()=>tentar(()=>api('/api/sm/modelos/'+modelo.id+'/faixas',
-    {metodo:'POST',silencioso:true,corpo:{largura_max_mm:paraMm(l.value),quantidade:Number(q.value)}})));
+    {metodo:'POST',silencioso:true,corpo:{largura_max_mm:paraMm(l.value),quantidade:Number(q.value),
+      componente_id:k.value?Number(k.value):null}})));
   nova.appendChild(el('div',{class:'campos'},[
+    el('div',{class:'campo'},[el('label',{},['Kit']),k]),
     el('div',{class:'campo'},[el('label',{},['Largura até (m)']),l]),
     el('div',{class:'campo'},[el('label',{},['Suportes']),q]),
     el('div',{class:'campo'},[bt])]));
@@ -794,6 +806,11 @@ function desenhar(){
   raiz.appendChild(barra);
   if(!modelo.ativo) raiz.appendChild(el('div',{class:'tarja'},
     ['INATIVO — a revenda não vê "'+modelo.nome+'". O simulador aceita, para conferir.']));
+  /* Todo produto leva kit de instalacao, e sem ele o produto nao ativa
+     (secao 8.5). A tarja diz isso antes de a pessoa clicar em Ativar. */
+  if(modelo.sem_kit) raiz.appendChild(el('div',{class:'tarja'},
+    ['SEM KIT — a ficha técnica não tem kit de instalação. Todo produto leva kit: '+
+     'sem ele o produto não ativa.']));
   raiz.appendChild({produto:abaProduto, escolhas:abaEscolhas, colecoes:abaColecoes, escada:abaEscada, ficha:abaFicha,
                     kit:abaKit, componentes:abaComponentes}[aba]());
 

@@ -897,9 +897,28 @@
 - **Status:** em código (28/10/2026).
 
 ### R-SMN-13 · O kit só é cobrado na embalagem de quem leva kit
-- **Regra:** o fim da embalagem exige o bipe do kit **quando a persiana tem kit na ficha**. Sem kit, o fim passa (o simulador já avisa *"Este modelo não tem kit de instalação na ficha"*).
-- **Por quê:** produto cadastrado sem kit ficaria preso na embalagem para sempre. Todo Rolô leva um dos três kits, e para ele nada muda.
-- **Status:** em código (28/10/2026) — **decisão de construção, a confirmar com o dono**.
+- **Regra:** o fim da embalagem exige o bipe do kit **quando a persiana tem kit na ficha** — e de **cada** kit, quando há mais de um (R-SMN-17). Sem kit, o fim passa.
+- **Por quê:** produto sem kit ficaria preso na embalagem para sempre. O buraco ("a ficha esqueceu o kit e a caixa fecha sem cobrar") é fechado pela R-SMN-16: produto sem kit não ativa.
+- **Teste que trava:** `kit_produto.test.js`, `producao.test.js`.
+- **Status:** em código (28/10/2026) — **aceita pelo dono em 28/10/2026, com a trava da R-SMN-16**.
+
+### R-SMN-16 · Todo produto tem kit de instalação na ficha; sem kit, não ativa
+- **Regra:** `ativarModelo` recusa (`sem_kit`) a ficha sem linha ativa de um kit ativo, dizendo o porquê. A tela do Catálogo mostra a tarja âmbar *"SEM KIT"* enquanto faltar. Não existe a marcação "não leva kit". Desativar nunca pede kit.
+- **Por quê:** *"Rolô, Romana e Painel levam kit de instalação, e todo produto tem o kit cadastrado na ficha técnica"* (dono, 28/10/2026, §8.5).
+- **Teste que trava:** `kit_produto.test.js`.
+- **Status:** em código (28/10/2026).
+
+### R-SMN-17 · A faixa de suporte serve a CADA kit da ficha
+- **Regra:** `sm_faixa_suporte.componente_id` diz de qual kit é a faixa (migração 38). O kit que conta suporte usa a faixa dele; sem faixa própria, a "de todos os kits" (sem kit apontado) — que é a do Rolô, e por isso ele não muda. A persiana devolve `kits` (todos, cada um com os seus suportes); cada kit é conferido na própria linha, e a embalagem só fecha com todos. A faixa só aponta kit que conta suporte e está na ficha (`faixa_sem_kit`); a repetida é recusada no mesmo kit, e a mesma divisa em outro kit passa.
+- **Por quê:** um Painel com bandô leva os suportes do trilho **e** os do bandô, cada um pela sua faixa (§8.5).
+- **Teste que trava:** `kit_produto.test.js`.
+- **Status:** em código (28/10/2026).
+
+### R-SMN-18 · Nada na etiqueta de produção termina em "…"
+- **Regra:** a linha que não cabe encolhe até um piso e, se ainda não couber, quebra em duas pelo " · " (depois pelo espaço; só a palavra maior que a linha parte no meio), e a etiqueta se reacomoda de cima para baixo sem descer sobre o código de barras. A que cabe sai no mesmo lugar e tamanho de sempre. As escolhas saem com abreviações fixas, escritas só no `ABREV` do `etiqueta_producao.js` (`CENTRAL · 6 FOLHAS · C/ COMANDO · CORRENTE ESQ`); o comando do Rolô continua por extenso.
+- **Por quê:** as escolhas são o que a bancada precisa ler; texto cortado manda conferir na tela (§8.2).
+- **Teste que trava:** `etiqueta_sem_corte.test.js` (o pior caso, o nome absurdo, a palavra sem espaço e o Rolô no lugar de sempre).
+- **Status:** em código (28/10/2026).
 
 ### R-SMN-14 · O preço por cor existe sem tela, e vazio não muda nada
 - **Regra:** `sm_preco_cor` (coleção de venda + cor). Com linha, ela vence o preço da coleção, e a conta diz *"(preço da cor X)"*; sem linha, vale a coleção. Toda mudança deixa linha no histórico (`alvo='colecao_cor'`). Não há rota nem tela: lança-se por script, no domínio (`catalogo.definirPrecoCor`).
@@ -1324,4 +1343,7 @@ da R-SML-03.
 - ❌ Voltar a liberar a montagem por uma lista de chaves: a vareta da Romana
   não seguraria nada (R-SMN-11)
 - ❌ Devolver as quatro varetas porque uma veio torta (R-SMN-12)
+- ❌ Criar a marcação "não leva kit", ou ativar produto sem kit na ficha (R-SMN-16)
+- ❌ Contar os suportes de todos os kits por uma faixa só: o do trilho e o do bandô andam separados (R-SMN-17)
+- ❌ Cortar texto da etiqueta de produção com "…", ou escrever uma segunda tabela de abreviações (R-SMN-18)
 

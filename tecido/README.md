@@ -8,7 +8,7 @@ Este módulo **não sobe sozinho**. Ele é montado dentro do PCP, em `/sobmedida
 pelo `server.js` da raiz. Uma porta, um processo, um PIN.
 
 ```bash
-npm test          # daqui: 828 casos, banco temporário, sem servidor
+npm test          # daqui: 855 casos, banco temporário, sem servidor
 node server.js    # da RAIZ: sobe o PCP inteiro, com o sob medida junto
 ```
 
@@ -334,7 +334,7 @@ redução — os números das seções 4.4 a 4.8 da spec.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 828 casos
+cd tecido && npm test          # 855 casos
 ```
 
 **Rode ao mexer em `dominio/persiana.js`, `dominio/catalogo_sm.js`,
@@ -859,7 +859,9 @@ ativar. Todo produto é montado com quatro peças — as **escolhas** do cliente
 escada de tubos, gomos, folhas), a **ficha** (referência + ajuste, com
 quantidade por referência) e o **preço** (m² por produto e coleção, mais
 acessório por metro; pronto para preço por cor). Os cartões R-SMN-01 a
-R-SMN-15 estão em `docs/regras/sobmedida.md`.
+R-SMN-18 estão em `docs/regras/sobmedida.md`. Todo produto leva kit (sem kit
+na ficha não ativa), a faixa de suporte é de cada kit, e nada na etiqueta de
+produção termina em "…".
 
 ```
 Romana   gomos ímpares, mínimo 3, o menor com cada gomo ≤ 0,350 · varetas = gomos − 1

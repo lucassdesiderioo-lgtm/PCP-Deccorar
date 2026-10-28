@@ -448,20 +448,29 @@ function calcular(escolha,opcoes){
   }
 
   // ── 8. O kit ────────────────────────────────────────────────────────────
+  /* ⚠️ CADA KIT DA FICHA, CADA UM PELA SUA FAIXA (secao 8.5 da spec
+     SOBMEDIDA-CADASTRO-DE-PRODUTO). Um Painel com bandô leva os suportes do
+     trilho E os do bandô. A faixa apontada para o kit vence; sem ela vale a
+     faixa do produto (componente_id vazio), que e como o Rolo conta desde
+     sempre — e por isso ele nao muda. `kit` continua sendo o primeiro, para
+     quem so conhece um; `kits` e a lista inteira, e e ela que a embalagem
+     cobra. */
   const avisos=[];
-  const doKit=componentes.find(c=>c.eh_kit);
-  let kit=null;
-  if(doKit){
+  const kits=componentes.filter(c=>c.eh_kit).map(doKit=>{
     const linha=linhaDe.get(doKit);
     let suportes=null;
     if(linha.usa_faixa_suporte){
-      const faixa=modelo.faixas_suporte.find(f=>largura_mm<=f.largura_max_mm);
+      const proprias=modelo.faixas_suporte.filter(f=>f.componente_id===linha.componente_id);
+      const faixas=proprias.length?proprias:modelo.faixas_suporte.filter(f=>f.componente_id==null);
+      const faixa=faixas.find(f=>largura_mm<=f.largura_max_mm);
       if(faixa) suportes=faixa.quantidade;
       else avisos.push('Não há faixa de suporte cadastrada para '+u.emMetros(largura_mm)+
-        ' de largura — o kit sai sem a quantidade de suportes.');
+        ' de largura'+(proprias.length?' no '+doKit.nome:'')+' — o kit sai sem a quantidade de suportes.');
     }
-    kit={chave:doKit.chave, nome:doKit.nome, codigo_barras:doKit.codigo_barras, suportes};
-  } else avisos.push('Este modelo não tem kit de instalação na ficha.');
+    return {chave:doKit.chave, nome:doKit.nome, codigo_barras:doKit.codigo_barras, suportes};
+  });
+  const kit=kits[0]||null;
+  if(!kits.length) avisos.push('Este modelo não tem kit de instalação na ficha.');
 
   // ── 9. O preco ──────────────────────────────────────────────────────────
   const minimo=colecao.m2_min_faturado_mm2!=null
@@ -649,7 +658,7 @@ function calcular(escolha,opcoes){
        POR QUE, em vez de esconder o botao calado (secao 4.6). */
     opcoes:{bando:podeBando, barra:podeBarra,
             reducao:{pode_pedir:reducao.pode_pedir, automatica:reducao.automatica}},
-    componentes, kit, reducao, preco, avisos, resumo
+    componentes, kit, kits, reducao, preco, avisos, resumo
   };
 }
 

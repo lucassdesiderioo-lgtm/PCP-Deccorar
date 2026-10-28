@@ -1989,6 +1989,32 @@ CREATE TABLE sm_preco_cor (
   preco_m2_centavos INTEGER NOT NULL,
   UNIQUE(colecao_id, cor_id)
 );
+`},
+{n:38, nome:'a faixa de suporte serve a cada kit da ficha', sql:`
+/* === A FAIXA DE SUPORTE E DE CADA KIT ======================================
+   Secao 8.5 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO (dono, 28/10/2026). Ate aqui
+   a faixa era do MODELO: "ate 1,000 -> 2 suportes" valia para qualquer kit. Um
+   Painel com bandô leva os suportes do TRILHO e os do BANDÔ, cada um pela sua
+   faixa — e com uma faixa so por modelo os dois sairiam com o mesmo numero.
+
+   componente_id NULL quer dizer "a faixa do produto", que vale para todo kit
+   que conta suporte e nao tem faixa propria. ⚠️ O ROLO NAO MUDA: as faixas
+   dele ficam com NULL, e o kit bandô e o kit barra continuam contando por elas.
+
+   A tabela e refeita porque o UNIQUE(modelo_id, largura_max_mm) proibiria dois
+   kits com a mesma divisa — e o SQLite nao tira restricao com ALTER. */
+CREATE TABLE sm_faixa_suporte_nova (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  modelo_id INTEGER NOT NULL REFERENCES sm_modelo(id),
+  largura_max_mm INTEGER NOT NULL,
+  quantidade INTEGER NOT NULL,
+  componente_id INTEGER REFERENCES sm_componente(id),
+  UNIQUE(modelo_id, componente_id, largura_max_mm)
+);
+INSERT INTO sm_faixa_suporte_nova(id,modelo_id,largura_max_mm,quantidade,componente_id)
+  SELECT id,modelo_id,largura_max_mm,quantidade,NULL FROM sm_faixa_suporte;
+DROP TABLE sm_faixa_suporte;
+ALTER TABLE sm_faixa_suporte_nova RENAME TO sm_faixa_suporte;
 `}
 ];
 

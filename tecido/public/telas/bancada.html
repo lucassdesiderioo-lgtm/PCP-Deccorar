@@ -126,8 +126,14 @@ async function bipou(codigo){
   const r=$('#resposta'); limpar(r);
   try{
     if(EMBALANDO){
-      await api('/api/producao/kit',{metodo:'POST',corpo:{codigo:EMBALANDO,kit:limpoCod}});
+      const k=await api('/api/producao/kit',{metodo:'POST',corpo:{codigo:EMBALANDO,kit:limpoCod}});
       beep(); r.appendChild(el('div',{class:'grande'},['KIT CONFERIDO ✓']));
+      /* A persiana com DOIS kits (o Painel com bandô: o do trilho e o do
+         bandô) continua esperando kit — e a tela diz qual falta. */
+      if(k&&k.faltam&&k.faltam.length){
+        r.appendChild(el('div',{class:'segura'},['Falta bipar: '+k.faltam.join(' + ')+'.']));
+        return;
+      }
       r.appendChild(el('div',{class:'de'},['Agora bipe a etiqueta da peça de novo para fechar.']));
       EMBALANDO=null; return;
     }

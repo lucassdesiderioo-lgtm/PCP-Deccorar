@@ -66,6 +66,10 @@ function cena(){
   catalogo.criarFichaLinha({modelo_id:m.id,componente_id:ponteira.id,quantidade:2});
   catalogo.ligarMaterialDoComponente(vareta.id,50,DIRETOR);
   catalogo.ligarMaterialDoComponente(motor.id,51,DIRETOR);
+  // Todo produto leva kit de instalacao, senao nao ativa (secao 8.5).
+  const kit=catalogo.criarComponente({chave:'kit_romana',nome:'Kit romana',setor:'embalagem',
+    gera_etiqueta:0,eh_kit:1,codigo_barras:'KIT-ROMANA'},DIRETOR);
+  catalogo.criarFichaLinha({modelo_id:m.id,componente_id:kit.id});
   catalogo.ativarModelo(m.id,true,DIRETOR);
 
   // O Rolo, com o Tubo 32 apontado para o material do PCP (como em producao).

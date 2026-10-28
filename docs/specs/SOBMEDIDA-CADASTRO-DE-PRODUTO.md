@@ -4,7 +4,7 @@
 STATUS
 Situação: em código — as seis fases, conferidas num servidor local; falta subir
 Criada em: 27/10/2026
-Última atualização: 28/10/2026 (seis fases em código e conferência local, PR aberto)
+Última atualização: 28/10/2026 (spec final do dono; kit em todo produto §8.5 e etiqueta sem "…" §8.2 em código; conferência dos 21 itens da §15)
 Fase atual: as seis em código; espera o "pode subir" (§14)
 Fases: 1 ☑ em código  2 ☑ em código  3 ☑ em código  4 ☑ em código  5 ☑ em código  6 ☑ em código
 Risco: 🔴 (schema do catálogo, preço, etiqueta de produção, ficha congelada)
@@ -23,9 +23,6 @@ Conferência (§15), 28/10/2026, num servidor local com banco IMITANDO a
   A conferência achou e consertou dois defeitos de tela que JÁ estavam no ar
   (a frase da recusa lida em e.mensagem; o foco perdido ao digitar no
   simulador) — telas_produto.test.js.
-  ⚠️ O arquivo com a §15 completa não chegou a esta sessão: a tabela do
-  FECHAMENTO segue a lista da mensagem do dono e precisa ser reconciliada
-  item a item com a §15 antes do deploy.
   ⚠️ O QUE NÃO FOI PROVADO: o pedido REAL de Romana e de Painel com o leitor
   na mão (prova da fase 6) — os bipes foram pela rota, com as sessões das
   pessoas de cada bancada, e um pela tela da bancada; e a conferência só de
@@ -71,6 +68,24 @@ Mudanças no caminho:
        frase da recusa (liam e.mensagem), o simulador devolve o foco a quem
        digita, mostra a quantidade (4 × Vareta), o editor da ficha não repete
        rótulo, e a etiqueta não repete o nome do produto na linha 3.
+  §8.5 (28/10/2026, depois do 1º FECHAMENTO) — a faixa de suporte ganhou
+        o KIT a que serve (migração 38, sm_faixa_suporte.componente_id; a
+        tabela foi refeita porque o UNIQUE antigo proibia dois kits com a
+        mesma divisa). Faixa sem kit apontado é a "do produto" — a do Rolô,
+        que não mudou. A persiana devolve `kits` (todos) além de `kit` (o
+        primeiro); cada kit é conferido na própria linha, e a embalagem só
+        fecha com todos. Ativar recusa (`sem_kit`) se a ficha não tem linha
+        ativa de kit ativo; desativar nunca pede kit.
+  §8.2 (28/10/2026, depois do 1º FECHAMENTO) — a etiqueta deixou de cortar
+        com "…": a linha que não cabe encolhe até um piso e, se precisar,
+        quebra em duas pelo " · ", e a etiqueta se reacomoda de cima para
+        baixo (o `diagramar` do etiqueta_producao_pdf.js). A que cabe sai no
+        mesmo lugar e tamanho de sempre — o Rolô não mudou. As abreviações
+        fixas moram no ABREV do etiqueta_producao.js (CENTRAL · 6 FOLHAS ·
+        C/ COMANDO · CORRENTE ESQ); o comando do Rolô continua por extenso.
+        No caminho: a etiqueta pedida POR CÓDIGO (a refeita) saía sem a
+        linha do kit, porque os irmãos vinham só do recorte — consertado.
+
 ```
 
 > **Onde mora:** dentro do `/sobmedida`, no `tecido.db`, com migrações
@@ -161,6 +176,8 @@ modelo, com duas opções:
   — e conferir depois de ativar é conferir com a revenda já vendendo.
 - **O nome é obrigatório e único.** Duplicar propõe "Cópia de Rolô", e não
   deixa ativar enquanto o nome começar com "Cópia de".
+- **Sem kit de instalação na ficha, o produto não ativa** (§8.5). O botão
+  Ativar recusa dizendo o porquê, e a ficha mostra em âmbar "sem kit".
 - **Os preços copiados vão para o histórico de preço** (`sm_preco_historico`)
   com a marca "copiado de Rolô". Preço que aparece sem rastro é a metade do
   registro que falta quando alguém pergunta "de onde veio esse número?".
@@ -375,9 +392,24 @@ A **ficha** (com os descontos) responde outra pergunta: **quanto custa** e
 | **Do insumo** | nome · medida de **corte** · unidade (`2/4`) | **o cadastro de matéria-prima** (o material do Compras do PCP ligado ao componente) e a ficha congelada |
 | **Extras** — marcados por insumo | ex.: no **motor**, marca + modelo + **data de fabricação** | o cadastro de matéria-prima |
 
-- **Os dados do insumo nunca são digitados de novo** — vêm do cadastro de
-  matéria-prima. Componente sem material ligado sai com o nome do componente,
-  e a ficha mostra um aviso âmbar "sem matéria-prima ligada".
+- **Duas fontes, que não se misturam** (dono, 28/10/2026):
+
+  | Fonte | Responde | Dados |
+  |---|---|---|
+  | **Cadastro de material** (Compras do PCP) | o que o componente **é** | nome, marca, modelo |
+  | **Ficha técnica** do produto | **quanto** e **a quanto cortar** | medida de corte, medida de produção, quantidade de unidades |
+
+  A etiqueta nunca tira medida do cadastro de material, e nunca tira nome da
+  ficha quando há material ligado. O tubo continua com o nome do degrau
+  (`TUBO 32`), como hoje.
+- **O cadastro de material ainda não está refinado** — vai ser arrumado aos
+  poucos. Por isso **falta de material ligado, ou campo vazio nele, nunca trava
+  etiqueta, pedido nem aprovação**: sem material ligado sai o nome do
+  componente; campo vazio não sai no papel. A ficha de cada produto mostra em
+  âmbar o que falta ("sem material ligado", "material sem marca/modelo") — é a
+  lista de trabalho para arrumar o cadastro. O **motor** avisa mais alto: sem
+  marca/modelo aparece em âmbar também no simulador, porque é o dado da
+  garantia. Avisa, não trava.
 - **O motor e a garantia** (decidido pelo dono, 27/10/2026): fica gravado
   **qual motor** (marca e modelo, do cadastro) e a **data de fabricação**. Não
   há número de série. Marca e modelo passam a existir como campos opcionais do
@@ -389,25 +421,12 @@ A **ficha** (com os descontos) responde outra pergunta: **quanto custa** e
   **opcional**. Preenchido, sai na etiqueta ao lado da revenda; vazio, a
   etiqueta sai só com a revenda. Hoje o pedido não guarda cliente final.
 - A medida da etiqueta é a de **corte**, nunca a de consumo (armadilha #18).
-
-> **As duas fontes, sem misturar** (dono, 28/10/2026):
->
-> | Fonte | Dá | Nunca dá |
-> |---|---|---|
-> | **Cadastro de material** (Compras do PCP) | o que o componente **É**: nome, marca, modelo | medida |
-> | **Ficha técnica** do produto | **quanto** e **a quanto cortar**: medida de corte, medida de produção, quantidade de unidades | o nome, quando há material ligado |
->
-> O tubo continua com o nome do **degrau** (`TUBO 32`).
->
-> ⚠️ **O CADASTRO DE MATERIAL AINDA NÃO ESTÁ REFINADO, E POR ISSO NADA TRAVA**
-> (dono, 28/10/2026). Falta de material ligado, ou campo vazio nele (marca,
-> modelo), **nunca** trava etiqueta, pedido nem aprovação. Sem material ligado
-> sai o nome do componente; campo vazio simplesmente não sai no papel. A ficha
-> de cada produto mostra em âmbar o que falta — *"sem material ligado"* ou
-> *"material sem marca/modelo"* —, e essa é a lista de trabalho para arrumar o
-> cadastro. **O motor é a exceção que avisa mais alto:** motor sem marca ou
-> modelo aparece em âmbar também no simulador, porque é o dado da garantia.
-> Avisa, não trava.
+- **Nada na etiqueta de produção termina em "…".** As escolhas (abertura,
+  folhas, comando, lado da corrente) são o que a bancada precisa ler; texto
+  cortado manda conferir na tela. Linha comprida **quebra em duas** ou usa
+  **abreviações fixas** (ex.: `CENTRAL · 6 FOLHAS · C/ COMANDO · CORRENTE
+  ESQ`), escritas no código num lugar só. Prova: o pior caso impresso — Painel
+  central, 6 folhas, com comando, bandô e cliente final de nome comprido.
 
 ### 8.3 O que já existe e não muda
 
@@ -421,13 +440,33 @@ A **ficha** (com os descontos) responde outra pergunta: **quanto custa** e
 - O Rolô de hoje tem quantidade 1 em todas as linhas com etiqueta, então a
   etiqueta dele **não muda** — só ganha o "1/1" e os campos da base.
 
-- **A recusa de um insumo com várias unidades volta SÓ A UNIDADE** (dono,
-  28/10/2026). Quando o insumo tem mais de uma unidade, quem recusa escolhe o
-  motivo **e a unidade** (ex.: `2/4`), e só ela volta — junto com o que
-  depende dela, pela mesma regra de liberação da 5-B2. As outras (`1/4`,
-  `3/4`, `4/4`) seguem. A unidade refeita reimprime a **mesma** etiqueta:
-  mesmo código, mesmo `k/n`, mesma data de fabricação, marcada como refeita.
-  Insumo de unidade única (todo o Rolô) continua com uma escolha só, o motivo.
+### 8.4 Recusa de uma unidade (dono, 28/10/2026)
+
+Quando o insumo tem mais de uma unidade, quem recusa escolhe **o motivo e a
+unidade** (ex.: `2/4`), e **só ela volta** — junto com o que depende dela, pela
+mesma regra de liberação da fase 5-B2 da spec do sob medida. As outras
+unidades seguem. A unidade refeita reimprime a **mesma** etiqueta (mesmo
+código, mesmo `k/n`, mesma data de fabricação), marcada como refeita. Voltar
+as quatro varetas por uma torta seria refugo sem motivo. O Rolô não muda: lá
+tudo tem uma unidade só.
+
+### 8.5 O kit de instalação — todo produto tem (dono, 28/10/2026)
+
+- **Rolô, Romana e Painel levam kit de instalação.** O kit de cada produto é
+  cadastrado **na ficha técnica dele**, sempre.
+- **No sob medida a quantidade do kit varia com a largura**: são os
+  **suportes** — do bandô, do trilho (Painel) ou da Romana. É a faixa de
+  suporte que já existe (`sm_faixa_suporte`, "até X de largura → N
+  suportes"), e ela tem que servir a **cada kit** da ficha: um Painel com
+  bandô leva os suportes do trilho **e** os do bandô, cada um pela sua faixa.
+  O Rolô continua contando como hoje.
+- **Produto sem kit na ficha não ativa** (§3.2). Não há marcação "não leva
+  kit": todo produto leva. É isso que fecha o buraco da regra R-SMN-13 ("o
+  fim da embalagem só cobra o kit de quem leva kit"): sem a trava na ativação,
+  um produto cuja ficha **esqueceu** o kit passaria pela embalagem sem cobrar
+  nada — exatamente o esquecimento que a trava do kit existe para pegar.
+- A embalagem confere o kit **certo**, com a quantidade de suportes que a
+  faixa deu, como já faz no Rolô.
 
 ---
 
@@ -546,6 +585,15 @@ com o leitor na mão.
 - 27/10/2026 · Romana e Painel usam os **cinco setores de hoje**, sem costura.
 - 27/10/2026 · O pedido da revenda ganha **cliente final opcional**, que sai
   na etiqueta.
+- 28/10/2026 · **Todo produto tem kit de instalação** na ficha; no sob medida
+  os suportes variam com a largura, por faixa, para cada kit. Sem kit, o
+  produto não ativa.
+- 28/10/2026 · Recusa de insumo com várias unidades devolve **só a unidade**
+  recusada (e o que depende dela).
+- 28/10/2026 · Nome, marca e modelo do insumo vêm do **cadastro de material**;
+  medida e quantidade, da **ficha técnica**. Cadastro incompleto avisa, nunca
+  trava.
+- 28/10/2026 · Nada na etiqueta de produção termina em "…".
 
 ---
 
@@ -573,6 +621,14 @@ leva marca, modelo e a data da primeira impressão da etiqueta. O pedido da
 revenda ganha cliente final opcional. Romana e Painel usam os cinco setores de
 hoje. O dono: *"isso que estamos fazendo é algo para facilitar na criação de um
 produto novo"*.
+
+Em 28/10/2026, na construção: todo produto tem kit de instalação na ficha, e
+no sob medida os suportes (do bandô, do trilho, da Romana) variam com a
+largura, por faixa, para cada kit — sem kit o produto não ativa. A recusa de
+um insumo com várias unidades devolve só a unidade recusada. Nome, marca e
+modelo do insumo vêm do cadastro de material; medida e quantidade, da ficha
+técnica — e cadastro de material incompleto avisa, nunca trava. Nada na
+etiqueta de produção termina em "…".
 ```
 
 ---
@@ -603,3 +659,66 @@ Teste antigo que precisar mudar de resultado é regra mudando — para e pergunt
 **Ordem dentro das fases de risco 🔴 (1, 2, 5 e 6):** teste escrito **antes**
 do código, como manda o semáforo do §0.
 
+
+---
+
+## 15. A conferência completa — feita pelo próprio Claude, antes do FECHAMENTO
+
+Decisão do dono, 28/10/2026: **o Claude confere tudo dentro do sistema**, de
+ponta a ponta, antes de entregar o FECHAMENTO. Teste unitário passando não
+basta: a conferência é o sistema rodando de verdade, pela tela e pelas rotas,
+como a fábrica e a revenda vão usar.
+
+**Onde:** num servidor local, com uma **cópia** do banco (do backup de
+produção, se houver acesso; senão, um banco montado com o Rolô igual ao de
+produção). **Nunca no banco de produção** — a conferência cria produto, pedido
+e etiqueta de mentira.
+
+**O que conferir — todos os itens, um a um:**
+
+| # | Conferência | Esperado |
+|---|---|---|
+| 1 | Criar produto do zero pela tela | nasce inativo, abas vazias |
+| 2 | Duplicar o Rolô pela tela | cópia de tudo da §3.1, inativa, "Cópia de Rolô" não ativa, preços no histórico com "copiado de" |
+| 3 | Simular na cópia do Rolô as três conferências da §4.5 da spec do sob medida | **idênticas** ao Rolô original, número por número |
+| 4 | O Rolô original antes e depois da entrega | os mesmos resultados em corte, consumo, preço e etiqueta |
+| 5 | Revenda olhando a lista de produtos | não vê o inativo; pedido com produto inativo é recusado pela rota |
+| 6 | Escolhas do cliente | escolha desligada não aparece e é recusada pela rota; lado da corrente some "sem comando" |
+| 7 | Romana: cadastrar e simular os seis casos da §5.3 | gomos, gomo (uma casa), varetas exatamente como na tabela |
+| 8 | Painel: cadastrar e simular os nove casos da §6.4 | folha, vias, trilho em uma peça, recusas com o motivo certo |
+| 9 | Preço de Romana e Painel | m² × preço da coleção **do produto**, mínimo faturado, bandô por metro linear — conta refeita à mão ao lado |
+| 10 | Preço por cor (sem tela, direto no banco) | com linha, vence o da coleção; sem linha, nada muda |
+| 11 | Pedido de teste de Romana e de Painel, do lançamento à aprovação | ficha e preço congelados; mudar o desconto depois não muda o pedido |
+| 12 | Etiquetas desses pedidos | uma por unidade, `1/4…4/4`, códigos diferentes; base, insumo do cadastro de matéria-prima, cliente final quando houver; motor com marca, modelo e data da impressão |
+| 13 | Reimpressão | mesmos códigos e mesma data de fabricação |
+| 14 | Consumo no Compras do PCP | 4 varetas contam 4, não 16 |
+| 15 | Bipe dos setores | Romana e Painel atravessando os cinco setores de hoje |
+| 16 | Segurança (§10 e §19 do `CLAUDE.md`) | telas 302, API 401, `/login` 200, `corte.html` 403 |
+| 17 | Recusa de uma unidade: Romana com 4 varetas, recusar a `2/4` | só ela volta (e o que depende dela); `1/4`, `3/4` e `4/4` seguem; a refeita sai com o mesmo código, marcada |
+| 18 | Insumo sem material ligado / material sem marca e modelo | imprime com o nome do componente, sem travar; âmbar na ficha; motor sem marca/modelo em âmbar também no simulador |
+| 19 | Kit: produto sem kit na ficha | Ativar recusa dizendo o porquê |
+| 20 | Kit por largura: Painel com bandô em duas larguras de faixas diferentes | suportes do trilho e do bandô, cada um pela sua faixa; a embalagem cobra o kit certo com essa quantidade |
+| 21 | Etiqueta no pior caso (Painel central, 6 folhas, com comando, bandô, cliente final comprido) | nenhuma linha termina em "…"; PDF impresso e print no FECHAMENTO |
+
+**Como entregar:** uma tabela no FECHAMENTO com **caso · esperado · obtido ·
+✓/✗**, mais os prints das telas principais (produto criado, duplicado, Romana
+e Painel no simulador, uma etiqueta). Qualquer ✗ é consertado e conferido de
+novo antes do FECHAMENTO — ou, se for regra, vira pergunta ao dono.
+
+**Depois do deploy:** conferência **só de leitura** em produção — o
+simulador com os **itens 3, 7 e 8 desta tabela** (a cópia do Rolô idêntica ao
+Rolô, os seis casos da Romana e os nove do Painel), sem criar pedido nem
+imprimir etiqueta — e o teste de segurança.
+
+**O Rolô real, sem cópia do banco de produção** (decisão do dono, 28/10/2026 —
+opção B): a conferência roda num banco que imita a produção. Para a prova do
+Rolô valer no Rolô **real**, antes do deploy o dono roda no simulador de
+produção as três conferências da §4.5 da spec do sob medida (só leitura) e
+entrega os números; depois do deploy, a conferência só de leitura repete as
+mesmas três e compara número por número — degrau, cada medida de corte,
+consumo e preço. Diferença em qualquer um = não está pronto.
+
+**Pendente para depois do deploy:** um pedido real de Romana e um de Painel
+com o leitor na mão, atravessando os cinco setores (prova da fase 6). Fica
+escrito no STATUS até acontecer, e vem **antes** de vender Romana ou Painel
+para revenda.

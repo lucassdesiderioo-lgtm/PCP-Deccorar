@@ -211,10 +211,12 @@ module.exports={
     'DELETE FROM sm_modelo_escolha WHERE modelo_id=? AND escolha=?').run(modelo_id,escolha),
 
   // ── Faixas de suporte e regra da reducao ────────────────────────────────
-  faixas:modelo_id=>varios('SELECT * FROM sm_faixa_suporte WHERE modelo_id=? ORDER BY largura_max_mm',modelo_id),
+  faixas:modelo_id=>varios(`SELECT f.*, c.nome AS kit_nome FROM sm_faixa_suporte f
+      LEFT JOIN sm_componente c ON c.id=f.componente_id
+    WHERE f.modelo_id=? ORDER BY f.componente_id IS NOT NULL, f.componente_id, f.largura_max_mm`,modelo_id),
   criarFaixa(d){
-    const r=db.prepare('INSERT INTO sm_faixa_suporte(modelo_id,largura_max_mm,quantidade) VALUES(?,?,?)')
-      .run(d.modelo_id,d.largura_max_mm,d.quantidade);
+    const r=db.prepare('INSERT INTO sm_faixa_suporte(modelo_id,largura_max_mm,quantidade,componente_id) VALUES(?,?,?,?)')
+      .run(d.modelo_id,d.largura_max_mm,d.quantidade,d.componente_id==null?null:d.componente_id);
     return um('SELECT * FROM sm_faixa_suporte WHERE id=?',r.lastInsertRowid);
   },
   apagarFaixa:id=>db.prepare('DELETE FROM sm_faixa_suporte WHERE id=?').run(id),

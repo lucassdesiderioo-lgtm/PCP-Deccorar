@@ -434,7 +434,8 @@ function aprovar(id,usuario){
           chave:c.chave, nome:c.nome, setor:c.setor,
           gera_etiqueta:c.gera_etiqueta?1:0, eh_kit:c.eh_kit?1:0,
           codigo_barras:c.codigo_barras,
-          suportes:(r.kit&&r.kit.chave===c.chave)?r.kit.suportes:null,
+          /* Os suportes de CADA kit, pela faixa dele (secao 8.5). */
+          suportes:c.eh_kit?(((r.kits||[]).find(k=>k.chave===c.chave)||{}).suportes??null):null,
           largura_corte_mm:c.largura_corte_mm, altura_corte_mm:c.altura_corte_mm,
           consumo_largura_mm:c.consumo_largura_mm, consumo_altura_mm:c.consumo_altura_mm,
           etiqueta_extras:c.etiqueta_extras||null, libera:c.libera||null};

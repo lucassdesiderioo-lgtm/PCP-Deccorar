@@ -56,14 +56,137 @@ const txt = v => String(v==null?'':v)
     '“':'"','”':'"','‘':"'",'’':"'"}[c]))
   .replace(/[^\x20-\x7E\xA0-\xFF]/g,'?');
 
-/* Corta o texto que nao cabe na largura, em vez de deixar vazar por cima do
-   codigo de barras. Quem sobra escrito e o comeco, que e o que identifica. */
-function cortar(s, fonte, tam, larguraMM){
-  let t = txt(s);
-  const limite = larguraMM*MM;
-  if(fonte.widthOfTextAtSize(t,tam) <= limite) return t;
-  while(t.length>1 && fonte.widthOfTextAtSize(t+'…',tam) > limite) t=t.slice(0,-1);
-  return t+'…';
+/* ⚠️ NADA AQUI TERMINA EM "…" (secao 8.2 da spec SOBMEDIDA-CADASTRO-DE-
+   PRODUTO, dono, 28/10/2026). Ate aqui a linha que nao cabia era cortada, e o
+   Painel central de 6 folhas com comando perdia justamente as escolhas que a
+   bancada precisa ler — texto cortado manda conferir na tela, e conferir na
+   tela e o que a etiqueta existe para dispensar.
+
+   A ordem e: (1) a linha cabe → sai como sempre, no mesmo lugar e no mesmo
+   tamanho (o Rolo nao muda); (2) nao cabe → ENCOLHE ate um piso legivel, no
+   mesmo lugar; (3) nem assim → QUEBRA EM DUAS (ou mais) linhas, pelo " · "
+   primeiro, depois pelo espaco, e so no limite no meio da palavra; e as linhas
+   da etiqueta se reacomodam de cima para baixo. Se ainda faltar altura, tudo
+   encolhe junto, a tarefa por ultimo. Nunca some palavra. */
+const PISO_TEXTO_MM = 10.0;         // abaixo disto mora o codigo de barras
+const TOPO_MM = ETQ.altura - ETQ.margem;
+
+const largura = (fonte, tam, t) => fonte.widthOfTextAtSize(t, tam) * PT_MM;
+
+/* Quebra o texto em linhas que cabem em `limite` mm. Corta pelo separador da
+   etiqueta (" · ") primeiro, que e onde a frase ja se divide; depois pelo
+   espaco; e so a palavra sozinha maior que a linha e partida no meio. */
+function quebrar(texto, fonte, tam, limite){
+  const pedacos = [];
+  txt(texto).split('  ·  ').forEach((p,i,a)=>pedacos.push(p + (i<a.length-1?'  ·':'')));
+  const linhas = [];
+  let atual = '';
+  const caber = t => largura(fonte, tam, t) <= limite;
+  const empurrar = parte => {
+    const tentativa = atual ? atual + ' ' + parte : parte;
+    if(caber(tentativa)){ atual = tentativa; return; }
+    if(atual){ linhas.push(atual); atual = ''; }
+    if(caber(parte)){ atual = parte; return; }
+    // Maior que a linha sozinha: pela palavra, e no limite pela letra.
+    const palavras = parte.split(' ');
+    if(palavras.length > 1){ palavras.forEach(empurrar); return; }
+    let resto = parte;
+    while(resto){
+      let n = resto.length;
+      while(n > 1 && !caber(resto.slice(0,n))) n--;
+      if(n < resto.length){ linhas.push(resto.slice(0,n)); resto = resto.slice(n); }
+      else { atual = resto; resto = ''; }
+    }
+  };
+  pedacos.forEach(empurrar);
+  if(atual) linhas.push(atual);
+  // O separador que sobrou no fim da linha quebrada sai: a quebra ja separa.
+  return linhas.length ? linhas.map(l => l.replace(/\s+·$/,'')) : [''];
+}
+
+/* Os blocos, de cima para baixo, na ordem em que a bancada procura: de quem
+   e (pedido e peca), para quem e quando, o que a peca e, o trabalho, e os
+   extras. `y` e onde cada um sempre saiu; `min` e o menor tamanho em que ele
+   ainda sai numa linha so antes de quebrar. */
+function blocosDe(e, reservado){
+  const L = ETQ.largura - 2*ETQ.margem;
+  /* A linha do tecido costuma ter o NOME DO PRODUTO (Romana, Painel), e
+     escrever os dois gastava a linha que as escolhas precisam. Quando a
+     colecao comeca pelo produto, o produto fica e a palavra repetida sai —
+     so no papel; o dado continua inteiro. */
+  const col = (e.produto && String(e.colecao||'').indexOf(e.produto+' ')===0)
+    ? String(e.colecao).slice(e.produto.length+1) : e.colecao;
+  const baixo = [e.extra].concat(e.extras||[]).filter(Boolean).join('  ·  ');
+  return [
+    {bloco:'cabeca', texto:(e.pedido_item||e.pedido_numero)+'  ·  '+e.peca, y:27.5, tam:11, min:8,
+      fonte:'forte', largura:L-reservado},
+    {bloco:'base', texto:[e.revenda, e.cliente_final, e.prazo].filter(Boolean).join('  ·  '),
+      y:23.5, tam:7.5, min:6, fonte:'normal', cinza:true, largura:L},
+    {bloco:'produto', texto:[e.produto, e.medida, col, e.escolhas||e.comando].filter(Boolean).join('  ·  '),
+      y:19.8, tam:7.5, min:6, fonte:'normal', largura:L},
+    /* ⚠️ A TAREFA E A MAIOR LETRA DO CORPO, e e de proposito. Tudo o mais
+       identifica a peca; esta linha e o trabalho — `TUBO 32 · CORTAR 0,970`.
+       O serralheiro le isso de relance, com a peca na mao, e e o unico numero
+       que ele nao pode conferir depois: o tubo cortado nao volta. */
+    {bloco:'tarefa', texto:e.tarefa, y:14.6, tam:10, min:8, fonte:'forte', largura:L},
+    /* O que muda com o setor (o kit, a reducao, os gomos, as vias) e os
+       EXTRAS do insumo (marca, modelo, fabricacao). Campo vazio nao sai — o
+       extrasDe ja o tirou da lista. */
+    {bloco:'extras', texto:baixo, y:10.8, tam:7, min:5.5, fonte:'normal', cinza:true, largura:L}
+  ].filter(b => String(b.texto||'').trim());
+}
+
+/* O DIAGRAMA: onde cada linha de texto fica. Separado do desenho para o teste
+   conferir, linha a linha, que nada sai da etiqueta, nada encosta no codigo e
+   nenhuma palavra some. */
+function diagramar(e, f, reservado){
+  const m = ETQ.margem;
+  const blocos = blocosDe(e, reservado||0);
+  const fonte = b => f[b.fonte];
+
+  // (1) e (2): cabe numa linha, no tamanho de sempre ou encolhendo ate o piso.
+  const umaLinha = blocos.map(b => {
+    for(let t=b.tam; t>=b.min-1e-9; t=Math.round((t-0.25)*100)/100)
+      if(largura(fonte(b), t, txt(b.texto)) <= b.largura) return t;
+    return null;
+  });
+  if(umaLinha.every(t => t!=null))
+    return {linhas: blocos.map((b,i) => ({bloco:b.bloco, texto:txt(b.texto), x:m, y:b.y,
+      tam:umaLinha[i], fonte:fonte(b), cinza:!!b.cinza}))};
+
+  // (3): quem nao coube quebra; a etiqueta se reacomoda de cima para baixo, e
+  // se faltar altura tudo encolhe junto — a tarefa e a ultima a perder letra.
+  // A CABECA fica onde sempre esteve quando cabe numa linha: a unidade (2/4)
+  // e a marca de refeita moram ao lado dela, na mesma altura.
+  const cabecaFixa = blocos[0] && blocos[0].bloco==='cabeca' && umaLinha[0]!=null;
+  const fluem = cabecaFixa ? blocos.slice(1) : blocos;
+  const tamUma = cabecaFixa ? umaLinha.slice(1) : umaLinha;
+  const topoFluxo = cabecaFixa ? blocos[0].y - umaLinha[0]*PT_MM*0.30 - 0.6 : TOPO_MM;
+  const ASC=0.78, DESC=0.30;
+  for(let escala=1; ; escala=Math.round((escala-0.04)*100)/100){
+    const linhas = [];
+    fluem.forEach((b,i) => {
+      const alvo = b.bloco==='tarefa' ? Math.max(b.min*0.8, b.tam*Math.sqrt(escala)) : b.tam*escala;
+      const tam = tamUma[i]!=null ? Math.min(tamUma[i], b.bloco==='tarefa'?tamUma[i]:alvo) : Math.min(alvo, b.min);
+      const t = txt(b.texto);
+      const partes = largura(fonte(b), tam, t) <= b.largura ? [t] : quebrar(b.texto, fonte(b), tam, b.largura);
+      partes.forEach(x => linhas.push({bloco:b.bloco, texto:x, x:m, tam, fonte:fonte(b), cinza:!!b.cinza}));
+    });
+    const altura = linhas.reduce((s,l) => s + l.tam*PT_MM*(ASC+DESC), 0);
+    const cabe = altura <= topoFluxo - PISO_TEXTO_MM;
+    if(cabe || escala<=0.3){
+      // Cada linha desce o quanto ela mesma mede; a folga que sobra se reparte.
+      const folga = Math.max(0, (topoFluxo - PISO_TEXTO_MM) - altura) / Math.max(1, linhas.length);
+      let topo = topoFluxo;
+      linhas.forEach(l => {
+        l.y = topo - l.tam*PT_MM*ASC;
+        topo = l.y - l.tam*PT_MM*DESC - folga;
+      });
+      if(cabecaFixa) linhas.unshift({bloco:'cabeca', texto:txt(blocos[0].texto), x:m, y:blocos[0].y,
+        tam:umaLinha[0], fonte:fonte(blocos[0]), cinza:false});
+      return {linhas};
+    }
+  }
 }
 
 async function gerar(etiquetas){
@@ -86,13 +209,16 @@ async function gerar(etiquetas){
 
 function desenhar(pagina, e, f){
   const m = ETQ.margem;
-  const escreve = (t, {x, y, tam, fonte, cor, largura}) => {
-    const s = largura ? cortar(t, fonte, tam, largura) : txt(t);
-    pagina.drawText(s, {x:x*MM, y:y*MM, size:tam, font:fonte,
-      color: cor || rgb(0,0,0)});
+  /* O que fica fora do diagrama — a unidade, a marca de refeita e o codigo
+     escrito — e curto e tem lugar proprio. Se um dia nao couber, encolhe:
+     nunca corta. */
+  const escreve = (t, {x, y, tam, fonte, cor, largura:lim}) => {
+    const s = txt(t);
+    let size = tam;
+    while(lim && size>4 && largura(fonte, size, s) > lim) size = Math.round((size-0.25)*100)/100;
+    pagina.drawText(s, {x:x*MM, y:y*MM, size, font:fonte, color: cor || rgb(0,0,0)});
   };
   const cinza = rgb(.35,.35,.35);
-  const L = ETQ.largura - 2*m;          // largura util
 
   /* ── DE CIMA PARA BAIXO, na ordem em que a bancada procura ──────────────
      de quem e (pedido e peca), para quem e quando, o que a peca e, e so
@@ -123,30 +249,9 @@ function desenhar(pagina, e, f){
   }
   /* A BASE, igual em todas (secao 8.2): pedido e item (1027/02), a peca do
      pedido, revenda e CLIENTE FINAL quando houver, a entrega; e o produto, a
-     medida, a cor e as escolhas. */
-  escreve((e.pedido_item||e.pedido_numero)+'  ·  '+e.peca,
-    {x:m, y:27.5, tam:11, fonte:f.forte, largura:L-reservado});
-  escreve([e.revenda, e.cliente_final, e.prazo].filter(Boolean).join('  ·  '),
-    {x:m, y:23.5, tam:7.5, fonte:f.normal, cor:cinza, largura:L});
-  /* A linha do tecido costuma ter o NOME DO PRODUTO (Romana, Painel), e
-     escrever os dois gastava a linha que as escolhas precisam. Quando a
-     colecao comeca pelo produto, o produto fica e a palavra repetida sai —
-     so no papel; o dado continua inteiro. */
-  const col = (e.produto && String(e.colecao||'').indexOf(e.produto+' ')===0)
-    ? String(e.colecao).slice(e.produto.length+1) : e.colecao;
-  escreve([e.produto, e.medida, col, e.escolhas||e.comando].filter(Boolean).join('  ·  '),
-    {x:m, y:19.8, tam:7.5, fonte:f.normal, largura:L});
-
-  /* ⚠️ A TAREFA E A MAIOR LETRA DA ETIQUETA, e e de proposito. Tudo o mais
-     identifica a peca; esta linha e o trabalho — `TUBO 32 · CORTAR 0,970`. O
-     serralheiro le isso de relance, com a peca na mao, e e o unico numero
-     que ele nao pode conferir depois: o tubo cortado nao volta. */
-  escreve(e.tarefa, {x:m, y:14.6, tam:10, fonte:f.forte, largura:L});
-  /* O que muda com o setor (o kit, a reducao, os gomos, as vias) e os EXTRAS
-     do insumo (marca, modelo, fabricacao), na mesma linha. Campo vazio nao
-     sai — o extrasDe ja o tirou da lista. */
-  const baixo = [e.extra].concat(e.extras||[]).filter(Boolean).join('  ·  ');
-  if(baixo) escreve(baixo, {x:m, y:10.8, tam:7, fonte:f.normal, cor:cinza, largura:L});
+     medida, a cor e as escolhas. Onde cada linha fica e o `diagramar`. */
+  diagramar(e, f, reservado).linhas.forEach(l => pagina.drawText(l.texto,
+    {x:l.x*MM, y:l.y*MM, size:l.tam, font:l.fonte, color:l.cinza?cinza:rgb(0,0,0)}));
 
   /* ── A FAIXA DE BAIXO: o codigo ─────────────────────────────────────── */
   const {mm, cabe} = moduloDe(e.codigo);
@@ -172,4 +277,4 @@ function desenhar(pagina, e, f){
     {x:fimBarras, y:m+7, tam:6, fonte:f.normal, cor:rgb(.6,0,0)});
 }
 
-module.exports={gerar, moduloDe, ETQ, MODULO_MIN_MM, MODULO_MAX_MM};
+module.exports={gerar, moduloDe, diagramar, txt, ETQ, PISO_TEXTO_MM, MODULO_MIN_MM, MODULO_MAX_MM};
