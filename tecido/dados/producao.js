@@ -85,6 +85,11 @@ const listaDe=n=>Array.from({length:n},()=>'?').join(',');
 
 const reabrir=ids=>{
   if(!ids.length) return 0;
+  /* E OS KITS da persiana cuja embalagem reabre: com dois kits (secao 8.5)
+     cada um e conferido na propria linha, e reabrir so a embalagem deixaria os
+     dois marcados — a caixa refeita fecharia sem bipar kit nenhum. */
+  db.prepare('UPDATE sm_pedido_componente SET kit_conferido_em=NULL WHERE eh_kit=1 AND item_id IN '+
+    '(SELECT item_id FROM sm_pedido_componente WHERE setor=\'embalagem\' AND id IN ('+listaDe(ids.length)+'))').run(...ids);
   return db.prepare(
     'UPDATE sm_pedido_componente SET iniciado_em=NULL, iniciado_por=NULL, '+
     'terminado_em=NULL, terminado_por=NULL, kit_conferido_em=NULL '+

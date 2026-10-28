@@ -25,6 +25,14 @@ table.lista tr.inativa td{opacity:.55}
 .setor{font-size:12px; color:var(--tinta-fraca); text-transform:uppercase; letter-spacing:.05em}
 .hist{font-size:14px; color:var(--tinta-fraca); margin-top:8px}
 .hist div{padding:3px 0; border-bottom:1px solid var(--linha)}
+/* A TARJA DO INATIVO e o primeiro aviso da tela: o produto que a revenda nao
+   ve tem que parecer diferente do que ela ve, antes de qualquer outro numero. */
+.tarja{background:var(--alerta-fraca); color:var(--alerta); border:1px solid var(--alerta);
+  border-radius:var(--raio); padding:8px 12px; font-weight:700; margin-top:10px}
+.selo{display:inline-block; font-size:12px; font-weight:700; padding:2px 8px; border-radius:999px;
+  border:1px solid var(--linha-forte); margin-left:6px}
+.selo.ativo{color:var(--bom); border-color:var(--bom)}
+.selo.inativo{color:var(--alerta); border-color:var(--alerta)}
 </style>
 </head>
 <body>
@@ -41,9 +49,11 @@ table.lista tr.inativa td{opacity:.55}
         <label for="modelo">Modelo</label>
         <select id="modelo"></select>
       </div>
-      <a class="bt" href="/sobmedida/simulador">Abrir o simulador →</a>
+      <button class="bt primario" type="button" id="btNovo">+ Novo produto</button>
+      <a class="bt" href="/sobmedida/simulador" id="lnSimular">Abrir o simulador →</a>
     </div>
     <p class="nota" id="sobreModelo"></p>
+    <div id="novoProduto"></div>
   </div>
   <div id="abas"></div>
 </div>
@@ -79,9 +89,10 @@ const emM2=v=>v==null?'':(v/1000000).toFixed(3).replace('.',',');
 const reais=c=>(c===null||c===undefined)?null:dinheiro(c/100);
 const paraCampo=v=>v==null?'':(v/100).toFixed(2).replace('.',',');
 
-let modelo=null, aba='colecoes', editando=null, erro=null;
+let modelo=null, aba='produto', editando=null, erro=null, novoAberto=false, erroNovo=null;
+let modelos=[];
 
-const ABAS=[['colecoes','Coleções de venda'],['escada','Escada de tubos'],
+const ABAS=[['produto','Produto'],['escolhas','Escolhas do cliente'],['colecoes','Coleções de venda'],['escada','Escada de tubos'],
             ['ficha','Ficha técnica'],['kit','Kit e suportes'],
             ['componentes','Componentes e preços']];
 
@@ -131,7 +142,149 @@ const botao=(texto,clique,classe)=>{
 
 async function tentar(fn){
   try{ erro=null; await fn(); editando=null; await recarregar(); }
-  catch(e){ erro=e.mensagem||'Não deu para salvar.'; desenhar(); }
+  /* ⚠️ A FRASE DO SERVIDOR MORA EM `message`: e assim que o ui.js monta o
+     erro. Ate 28/10/2026 esta linha lia `e.mensagem`, que nao existe, e toda
+     recusa do Catalogo virava "Não deu para salvar." — o porque da recusa
+     (a escada que nao sobe, o nome da copia) nunca chegava a quem editava. */
+  catch(e){ erro=e.message||e.mensagem||'Não deu para salvar.'; desenhar(); }
+}
+
+// ── O produto: nome, limites e se a revenda o vê ──────────────────────────
+function abaProduto(){
+  const c=el('div',{class:'cartao'},[
+    el('h2',{},['Produto',el('span',{class:'selo '+(modelo.ativo?'ativo':'inativo')},
+      [modelo.ativo?'ATIVO':'INATIVO'])]),
+    el('p',{class:'nota'},[modelo.ativo
+      ? 'A revenda vê este produto e o pedido o aceita.'
+      : 'INATIVO — a revenda não vê e o pedido não aceita. Confira no simulador (ele aceita o '+
+        'produto inativo, com a tarja) e ative quando estiver certo.'])
+  ]);
+  const ehCopia=/^\s*c[óo]pia\s+de\b/i.test(modelo.nome);
+  if(!modelo.ativo&&ehCopia) c.appendChild(el('p',{class:'falta'},
+    ['O nome ainda é o da cópia. Dê ao produto o nome que a revenda vai ler — com "Cópia de…" ele não ativa.']));
+  c.appendChild(editor([
+    {chave:'nome',rotulo:'Nome do produto',valor:modelo.nome},
+    {chave:'largura_max_mm',rotulo:'Largura máx (m)',valor:emMetros(modelo.largura_max_mm),dica:'sem teto'},
+    {chave:'altura_max_mm',rotulo:'Altura máx (m)',valor:emMetros(modelo.altura_max_mm),dica:'sem teto'},
+    {chave:'m2_max_mm2',rotulo:'m² máx',valor:emM2(modelo.m2_max_mm2),dica:'sem teto'},
+    {chave:'m2_min_faturado_mm2',rotulo:'Mín. faturado (m²)',valor:emM2(modelo.m2_min_faturado_mm2)}
+  ],v=>tentar(()=>api('/api/sm/modelos/'+modelo.id,{metodo:'PUT',silencioso:true,corpo:{
+      nome:v.nome,
+      largura_max_mm:v.largura_max_mm.trim()?paraMm(v.largura_max_mm):null,
+      altura_max_mm:v.altura_max_mm.trim()?paraMm(v.altura_max_mm):null,
+      m2_max_mm2:v.m2_max_mm2.trim()?paraInteiro(v.m2_max_mm2,6):null,
+      m2_min_faturado_mm2:paraInteiro(v.m2_min_faturado_mm2,6)}})),
+    ()=>{ erro=null; desenhar(); }));
+  c.appendChild(calculoDoProduto());
+  const linha=el('div',{class:'campos'});
+  linha.appendChild(botao(modelo.ativo?'Desativar — tirar da venda':'Ativar — a revenda passa a ver',
+    ()=>tentar(()=>api('/api/sm/modelos/'+modelo.id+'/ativo',
+      {metodo:'PUT',silencioso:true,corpo:{ativo:modelo.ativo?0:1}})),modelo.ativo?'perigo':'primario'));
+  c.appendChild(linha);
+  return c;
+}
+
+/* O CALCULO e uma peca pronta do sistema: o produto escolhe qual, e preenche
+   os numeros dela. A conta nao se digita aqui (secao 2 da spec). */
+function calculoDoProduto(){
+  const box=el('div',{class:'editor'},[el('h2',{},['Cálculo']),
+    el('p',{class:'nota'},['O que o sistema decide sozinho. A escada escolhe o tubo; os gomos '+
+      'da Romana são sempre ímpares, no mínimo 3, o menor número que deixa cada gomo até o '+
+      'limite abaixo; as folhas do Painel se transpassam a cada encontro, lateral de 2 a 5 e '+
+      'central em 2, 4 ou 6, sem transpasse no meio.'])]);
+  const campos=[{chave:'calculo',rotulo:'Peça pronta de cálculo',valor:modelo.calculo,
+    opcoes:(modelo.calculos||[]).map(x=>({valor:x.chave,rotulo:x.nome}))}];
+  if(modelo.calculo==='gomos') campos.push({chave:'gomo_max_mm',rotulo:'Gomo até (m)',
+    valor:emMetros(modelo.gomo_max_mm),dica:'0,350'});
+  if(modelo.calculo==='folhas') campos.push({chave:'transpasse_mm',rotulo:'Transpasse por encontro (m)',
+    valor:emMetros(modelo.transpasse_mm),dica:'0,100'});
+  box.appendChild(editor(campos,v=>{
+    const corpo={calculo:v.calculo};
+    if(v.gomo_max_mm!==undefined) corpo.gomo_max_mm=paraMm(v.gomo_max_mm);
+    if(v.transpasse_mm!==undefined) corpo.transpasse_mm=paraMm(v.transpasse_mm);
+    return tentar(()=>api('/api/sm/modelos/'+modelo.id,{metodo:'PUT',silencioso:true,corpo}));
+  },()=>{ erro=null; desenhar(); }));
+  return box;
+}
+
+/* ── + NOVO PRODUTO (secao 3.1 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO) ──────
+   Dois caminhos: do zero (so o nome e os limites, as abas vazias) ou
+   duplicando um que existe (copia de tudo). Os dois nascem INATIVOS. */
+function desenharNovo(){
+  const box=limpar($('#novoProduto'));
+  if(!novoAberto) return;
+  const ed=el('div',{class:'editor'},[el('h2',{},['Novo produto'])]);
+  const modo=el('select',{'aria-label':'Como nasce'},[
+    el('option',{value:'duplicar'},['Duplicar um produto que existe (copia tudo)']),
+    el('option',{value:'zero'},['Do zero (só o nome e os limites)'])]);
+  const origem=el('select',{'aria-label':'Duplicar qual'},
+    modelos.map(m=>el('option',{value:String(m.id),selected:m.id===modelo.id?'selected':null},
+      [m.nome+(m.ativo?'':' (inativo)')])));
+  const nome=el('input',{type:'text','aria-label':'Nome do produto novo',
+    placeholder:'Cópia de '+modelo.nome});
+  const campoOrigem=el('div',{class:'campo cresce'},[el('label',{},['Duplicar']),origem]);
+  modo.addEventListener('change',()=>{
+    campoOrigem.style.display=modo.value==='duplicar'?'':'none';
+    nome.placeholder=modo.value==='duplicar'?'Cópia de '+origem.selectedOptions[0].textContent:'Romana';
+  });
+  origem.addEventListener('change',()=>{ nome.placeholder='Cópia de '+origem.selectedOptions[0].textContent; });
+  const criar=el('button',{class:'bt primario',type:'button'},['Criar — nasce inativo']);
+  criar.addEventListener('click',async()=>{
+    try{
+      erroNovo=null;
+      const novo=modo.value==='duplicar'
+        ? await api('/api/sm/modelos/'+origem.value+'/duplicar',{metodo:'POST',silencioso:true,
+            corpo:nome.value.trim()?{nome:nome.value.trim()}:{}})
+        : await api('/api/sm/modelos',{metodo:'POST',silencioso:true,corpo:{nome:nome.value}});
+      novoAberto=false; aba='produto';
+      desenharNovo();
+      await carregarModelos(novo.id);
+      banner('"'+novo.nome+'" criado, INATIVO. Confira no simulador antes de ativar.','bom',8);
+    }catch(e){ erroNovo=e.message||e.mensagem||'Não deu para criar.'; desenharNovo(); }
+  });
+  const cancelar=botao('Cancelar',()=>{ novoAberto=false; erroNovo=null; desenharNovo(); });
+  ed.appendChild(el('div',{class:'campos'},[
+    el('div',{class:'campo cresce'},[el('label',{},['Como nasce']),modo]),campoOrigem,
+    el('div',{class:'campo cresce'},[el('label',{},['Nome (vazio = "Cópia de …")']),nome]),
+    el('div',{class:'campo'},[criar]),el('div',{class:'campo'},[cancelar])]));
+  if(erroNovo) ed.appendChild(el('p',{class:'erro-linha'},[erroNovo]));
+  box.appendChild(ed);
+}
+
+// ── As escolhas do cliente ─────────────────────────────────────────────────
+/* A LISTA E DO SISTEMA, e aqui so se liga ou desliga. Escolha ligada e
+   obrigatoria no pedido; desligada some do simulador e do pedido, e o
+   servidor recusa se ela vier mesmo assim. */
+function abaEscolhas(){
+  const c=el('div',{class:'cartao'},[
+    el('h2',{},['Escolhas do cliente']),
+    el('p',{class:'nota'},['O que a revenda escolhe no pedido. A lista é do sistema — cada '+
+      'escolha tem a regra dela escrita no código. Produto que precisa de uma escolha que não '+
+      'está aqui entra por especificação, nunca como campo digitado.'])
+  ]);
+  const t=el('table',{class:'lista'});
+  t.appendChild(el('thead',{},[el('tr',{},[el('th',{},['Escolha']),el('th',{},['Opções']),
+    el('th',{},['Ligada']),el('th',{},[''])])]));
+  const tb=el('tbody');
+  (modelo.escolhas||[]).forEach(x=>{
+    const ops=x.numero?'número':(x.opcoes||[]).map(o=>o.nome).join(' · ');
+    const dep=x.depende?Object.keys(x.depende).map(k=>{
+      const pai=(modelo.escolhas||[]).find(y=>y.chave===k);
+      const op=pai&&(pai.opcoes||[]).find(o=>o.valor===x.depende[k]);
+      return 'só com '+(op?op.nome.toLowerCase():x.depende[k]);
+    }).join(', '):'';
+    tb.appendChild(el('tr',{class:x.ligada?'':'inativa'},[
+      el('td',{},[x.nome, dep?el('div',{class:'setor'},[dep]):'']),
+      el('td',{class:'nota'},[ops]),
+      el('td',{},[x.ligada?'sim':'não']),
+      el('td',{},[botao(x.ligada?'Desligar':'Ligar',()=>tentar(()=>api('/api/sm/modelos/'+modelo.id+
+        '/escolhas/'+x.chave,{metodo:'PUT',silencioso:true,corpo:{ligada:!x.ligada}})))])
+    ]));
+  });
+  t.appendChild(tb);
+  c.appendChild(rolaH(t));
+  if(erro) c.appendChild(el('p',{class:'erro-linha'},[erro]));
+  return c;
 }
 
 // ── Coleções de venda ──────────────────────────────────────────────────────
@@ -381,34 +534,50 @@ function abaFicha(){
   ]);
   const t=el('table',{class:'lista'});
   t.appendChild(el('thead',{},[el('tr',{},[
-    el('th',{},['#']),el('th',{},['Componente']),el('th',{},['Quando']),
-    el('th',{},['Corta a']),el('th',{},['Consome']),el('th',{},[''])])]));
+    el('th',{},['#']),el('th',{},['Componente']),el('th',{},['Quando']),el('th',{class:'n'},['Qtd.']),
+    el('th',{},['Corta a']),el('th',{},['Consome']),el('th',{},['Etiqueta']),el('th',{},[''])])]));
   const tb=el('tbody');
   const refTexto=(r,a)=>!r?'—':(r+(a?(a>0?' + '+a:' − '+Math.abs(a)):'')+' mm');
   modelo.ficha.slice().sort((x,y)=>x.ordem-y.ordem).forEach(f=>{
     tb.appendChild(el('tr',{class:f.ativo?'':'inativa'},[
       el('td',{class:'n'},[String(f.ordem)]),
       el('td',{},[f.componente_nome, el('div',{class:'setor'},[f.setor+' · '+f.chave])]),
-      el('td',{},[f.quando]),
+      el('td',{},[f.quando, f.libera==='embalagem'?el('div',{class:'setor'},['só na caixa']):'']),
+      el('td',{class:'n'},[f.quantidade_ref?('= '+f.quantidade_ref):String(f.quantidade)]),
       el('td',{class:'medida'},[refTexto(f.ref_largura,f.ajuste_largura_mm)+
         (f.ref_altura?(' × '+refTexto(f.ref_altura,f.ajuste_altura_mm)):'')]),
       el('td',{class:'medida'},[refTexto(f.consumo_ref_largura,f.consumo_ajuste_largura_mm)+
         (f.consumo_ref_altura?(' × '+refTexto(f.consumo_ref_altura,f.consumo_ajuste_altura_mm)):'')]),
+      celulaEtiqueta(f),
       el('td',{},[botao('Editar',()=>{ editando='fic-'+f.id; erro=null; desenhar(); })])
     ]));
-    if(editando==='fic-'+f.id) tb.appendChild(el('tr',{},[el('td',{colspan:'6'},[editor([
-      {chave:'ref_largura',rotulo:'Corte: ref largura',valor:f.ref_largura,dica:'final | degrau | tubo'},
-      {chave:'ajuste_largura_mm',rotulo:'Corte: ajuste (mm)',valor:f.ajuste_largura_mm,dica:'-5'},
+    if(editando==='fic-'+f.id) tb.appendChild(el('tr',{},[el('td',{colspan:'8'},[editor([
+      {chave:'gera_etiqueta',rotulo:'Gera etiqueta',
+       valor:f.ficha_gera_etiqueta==null?'':String(f.ficha_gera_etiqueta),
+       opcoes:[{valor:'',rotulo:'como o componente ('+(f.componente_gera_etiqueta?'sim':'não')+')'},
+               {valor:'1',rotulo:'sim, uma por unidade'},{valor:'0',rotulo:'não'}]},
+      {chave:'etiqueta_extras',rotulo:'Extras na etiqueta',valor:f.etiqueta_extras||'',
+       opcoes:[{valor:'',rotulo:'nenhum'},{valor:'marca,modelo,fabricacao',rotulo:'marca, modelo e fabricação'},
+               {valor:'marca,modelo',rotulo:'marca e modelo'},{valor:'fabricacao',rotulo:'só a fabricação'}]},
+      {chave:'libera',rotulo:'Na bancada, segura',valor:f.libera||'',
+       opcoes:[{valor:'',rotulo:'a montagem (padrão)'},{valor:'embalagem',rotulo:'só a embalagem (vai só na caixa)'}]},
+      {chave:'quantidade',rotulo:'Quantidade fixa',valor:f.quantidade},
+      {chave:'quantidade_ref',rotulo:'ou pela referência',valor:f.quantidade_ref||'',
+       opcoes:[{valor:'',rotulo:'— fixa —'}].concat((modelo.quantidades_ref||[]).map(q=>({valor:q,rotulo:q})))},
+      {chave:'ref_largura',rotulo:'Corte: ref largura',valor:f.ref_largura,dica:'final | degrau | folha | tubo'},
+      {chave:'ajuste_largura_mm',rotulo:'Corte: ajuste da largura (mm)',valor:f.ajuste_largura_mm,dica:'-5'},
       {chave:'ref_altura',rotulo:'Corte: ref altura',valor:f.ref_altura},
-      {chave:'ajuste_altura_mm',rotulo:'Corte: ajuste (mm)',valor:f.ajuste_altura_mm},
+      {chave:'ajuste_altura_mm',rotulo:'Corte: ajuste da altura (mm)',valor:f.ajuste_altura_mm},
       {chave:'consumo_ref_largura',rotulo:'Consumo: ref largura',valor:f.consumo_ref_largura},
-      {chave:'consumo_ajuste_largura_mm',rotulo:'Consumo: ajuste (mm)',valor:f.consumo_ajuste_largura_mm},
+      {chave:'consumo_ajuste_largura_mm',rotulo:'Consumo: ajuste da largura (mm)',valor:f.consumo_ajuste_largura_mm},
       {chave:'consumo_ref_altura',rotulo:'Consumo: ref altura',valor:f.consumo_ref_altura},
-      {chave:'consumo_ajuste_altura_mm',rotulo:'Consumo: ajuste (mm)',valor:f.consumo_ajuste_altura_mm}
+      {chave:'consumo_ajuste_altura_mm',rotulo:'Consumo: ajuste da altura (mm)',valor:f.consumo_ajuste_altura_mm}
     ],v=>{
       const corpo={};
       Object.keys(v).forEach(k=>{
         const t=v[k].trim();
+        if(k==='quantidade'){ if(t!=='') corpo.quantidade=Number(t); return; }
+        if(k==='gera_etiqueta'){ corpo.gera_etiqueta=t===''?null:Number(t); return; }
         corpo[k]=/ajuste/.test(k) ? (t===''?null:Number(t.replace(',','.'))) : (t===''?null:t);
       });
       return tentar(()=>api('/api/sm/ficha/'+f.id,{metodo:'PUT',corpo,silencioso:true}));
@@ -416,22 +585,86 @@ function abaFicha(){
   });
   t.appendChild(tb);
   c.appendChild(rolaH(t));
+  c.appendChild(novaLinhaFicha());
   return c;
+}
+
+/* A ETIQUETA DA LINHA, e o que falta no cadastro de material em AMBAR
+   (secao 8.2). "Sem material ligado" e a lista de trabalho para arrumar o
+   cadastro aos poucos — nada trava por isso: a etiqueta sai com o nome do
+   componente. */
+function celulaEtiqueta(f){
+  const td=el('td',{},[f.gera_etiqueta?('sim'+(f.ficha_gera_etiqueta==null?'':' (desta ficha)')):
+    ('não'+(f.ficha_gera_etiqueta==null?'':' (desta ficha)'))]);
+  if(f.etiqueta_extras) td.appendChild(el('div',{class:'setor'},['+ '+f.etiqueta_extras.replace(/,/g,', ')]));
+  const av=(modelo.avisos_material||[]).find(x=>x.chave===f.chave);
+  if(av&&av.aviso) td.appendChild(el('div',{class:'falta'},[av.aviso]));
+  else if(av&&av.material) td.appendChild(el('div',{class:'setor'},[av.material.nome+
+    (av.material.marca?' · '+av.material.marca:'')+(av.material.modelo?' · '+av.material.modelo:'')]));
+  return td;
+}
+
+/* ⚠️ A LINHA NOVA DA FICHA E O QUE DEIXA O DONO MONTAR UM PRODUTO SOZINHO
+   (secao 2 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO). Ela entra no FIM da ficha
+   por padrao: a referencia so pode olhar para tras, e no fim ela enxerga
+   todas as que ja existem. */
+function novaLinhaFicha(){
+  const comps=(window.__componentes||[]).filter(x=>x.ativo);
+  const opComp=comps.map(x=>({valor:x.id, rotulo:x.nome+' · '+x.chave+' · '+x.setor}));
+  const opQuando=(modelo.quandos||['sempre']).map(q=>({valor:q,rotulo:q}));
+  const box=el('div',{class:'editor'},[el('h2',{},['Acrescentar linha à ficha'])]);
+  if(editando==='fic-nova'){
+    box.appendChild(editor([
+      {chave:'componente_id',rotulo:'Componente',valor:'',opcoes:opComp},
+      {chave:'quando',rotulo:'Quando entra',valor:'sempre',opcoes:opQuando},
+      {chave:'libera',rotulo:'Na bancada, segura',valor:'',
+       opcoes:[{valor:'',rotulo:'a montagem (padrão)'},{valor:'embalagem',rotulo:'só a embalagem (vai só na caixa)'}]},
+      {chave:'quantidade',rotulo:'Quantidade',valor:'1'},
+      {chave:'quantidade_ref',rotulo:'ou pela referência',valor:'',
+       opcoes:[{valor:'',rotulo:'— fixa —'}].concat((modelo.quantidades_ref||[]).map(q=>({valor:q,rotulo:q})))},
+      {chave:'ref_largura',rotulo:'Corte: ref largura',dica:'final | tubo'},
+      {chave:'ajuste_largura_mm',rotulo:'Corte: ajuste da largura (mm)',dica:'-5'},
+      {chave:'ref_altura',rotulo:'Corte: ref altura',dica:'final'},
+      {chave:'ajuste_altura_mm',rotulo:'Corte: ajuste da altura (mm)'},
+      {chave:'consumo_ref_largura',rotulo:'Consumo: ref largura'},
+      {chave:'consumo_ajuste_largura_mm',rotulo:'Consumo: ajuste da largura (mm)'},
+      {chave:'consumo_ref_altura',rotulo:'Consumo: ref altura'},
+      {chave:'consumo_ajuste_altura_mm',rotulo:'Consumo: ajuste da altura (mm)'}
+    ],v=>{
+      const corpo={componente_id:Number(v.componente_id),quando:v.quando};
+      Object.keys(v).forEach(k=>{
+        if(k==='componente_id'||k==='quando') return;
+        const t=String(v[k]).trim();
+        if(t==='') return;
+        corpo[k]=/ajuste|^quantidade$/.test(k)?Number(t.replace(',','.')):t;
+      });
+      return tentar(()=>api('/api/sm/modelos/'+modelo.id+'/ficha',{metodo:'POST',corpo,silencioso:true}));
+    },()=>{ editando=null; erro=null; desenhar(); }));
+  }else box.appendChild(botao('+ Acrescentar linha',()=>{ editando='fic-nova'; erro=null; desenhar(); }));
+  return box;
 }
 
 // ── Kit e suportes ─────────────────────────────────────────────────────────
 function abaKit(){
+  /* ⚠️ A FAIXA E DE CADA KIT (secao 8.5): um Painel com bandô leva os suportes
+     do trilho e os do bandô, cada um pela sua faixa. "Todos os kits" e a faixa
+     do produto, que vale para o kit que conta suporte e nao tem faixa propria
+     — e e assim que o Rolo sempre contou. */
+  const kitsComFaixa=modelo.ficha.filter(f=>f.eh_kit&&f.usa_faixa_suporte&&f.ativo)
+    .filter((f,i,a)=>a.findIndex(x=>x.componente_id===f.componente_id)===i);
   const c=el('div',{class:'cartao'},[
     el('h2',{},['Faixas de suporte']),
-    el('p',{class:'nota'},['Quantos suportes o kit leva, pela largura. A medida exata '+
-      'fica no degrau de baixo: 1,000 → 2 suportes, 1,001 → 3. O kit tradicional usa '+
+    el('p',{class:'nota'},['Quantos suportes cada kit leva, pela largura. A medida exata '+
+      'fica no degrau de baixo: 1,000 → 2 suportes, 1,001 → 3. O kit que tem faixa própria '+
+      'conta por ela; o que não tem conta pela faixa de "todos os kits". O kit tradicional usa '+
       'os suportes padrão dele e não passa por aqui.'])
   ]);
   const t=el('table',{class:'lista'});
   t.appendChild(el('thead',{},[el('tr',{},[
-    el('th',{class:'n'},['Largura até']),el('th',{class:'n'},['Suportes']),el('th',{},[''])])]));
+    el('th',{},['Kit']),el('th',{class:'n'},['Largura até']),el('th',{class:'n'},['Suportes']),el('th',{},[''])])]));
   const tb=el('tbody');
   modelo.faixas_suporte.forEach(f=>tb.appendChild(el('tr',{},[
+    el('td',{},[f.kit_nome||'todos os kits']),
     el('td',{class:'n medida'},[emMetros(f.largura_max_mm)]),
     el('td',{class:'n'},[String(f.quantidade)]),
     el('td',{},[botao('Apagar',()=>tentar(()=>api('/api/sm/faixas/'+f.id,{metodo:'DELETE',silencioso:true})),'perigo')])
@@ -440,12 +673,16 @@ function abaKit(){
   c.appendChild(rolaH(t));
 
   const nova=el('div',{class:'editor'});
+  const k=el('select',{'aria-label':'Kit da faixa'},[el('option',{value:''},['todos os kits'])]
+    .concat(kitsComFaixa.map(f=>el('option',{value:String(f.componente_id)},[f.componente_nome]))));
   const l=el('input',{type:'text',placeholder:'3,000','aria-label':'Largura até'});
   const q=el('input',{type:'text',placeholder:'5','aria-label':'Suportes'});
   const bt=el('button',{class:'bt primario',type:'button'},['Acrescentar faixa']);
   bt.addEventListener('click',()=>tentar(()=>api('/api/sm/modelos/'+modelo.id+'/faixas',
-    {metodo:'POST',silencioso:true,corpo:{largura_max_mm:paraMm(l.value),quantidade:Number(q.value)}})));
+    {metodo:'POST',silencioso:true,corpo:{largura_max_mm:paraMm(l.value),quantidade:Number(q.value),
+      componente_id:k.value?Number(k.value):null}})));
   nova.appendChild(el('div',{class:'campos'},[
+    el('div',{class:'campo'},[el('label',{},['Kit']),k]),
     el('div',{class:'campo'},[el('label',{},['Largura até (m)']),l]),
     el('div',{class:'campo'},[el('label',{},['Suportes']),q]),
     el('div',{class:'campo'},[bt])]));
@@ -521,7 +758,46 @@ function abaComponentes(){
   });
   t.appendChild(tb);
   c.appendChild(rolaH(t));
+  c.appendChild(novoComponente());
   return c;
+}
+
+/* O COMPONENTE NOVO — vareta, trilho, corda, motor. Ele e do sistema, e nao
+   do produto: o mesmo componente pode estar na ficha de varios produtos, e o
+   preco por metro dele e um so. */
+function novoComponente(){
+  const box=el('div',{class:'editor'},[el('h2',{},['Novo componente'])]);
+  if(editando!=='comp-novo'){
+    box.appendChild(botao('+ Novo componente',()=>{ editando='comp-novo'; erro=null; desenhar(); }));
+    return box;
+  }
+  box.appendChild(editor([
+    {chave:'chave',rotulo:'Chave (uma palavra)',dica:'vareta'},
+    {chave:'nome',rotulo:'Nome',dica:'Vareta'},
+    {chave:'setor',rotulo:'Setor',valor:'serralheria',
+     opcoes:(modelo.setores||[]).map(x=>({valor:x.chave,rotulo:x.nome}))},
+    {chave:'gera_etiqueta',rotulo:'Gera etiqueta',valor:'1',
+     opcoes:[{valor:'1',rotulo:'sim'},{valor:'0',rotulo:'não'}]},
+    {chave:'unidade_cobranca',rotulo:'Cobrança',valor:'',
+     opcoes:[{valor:'',rotulo:'não cobra'},{valor:'metro',rotulo:'por metro linear'},
+             {valor:'peca',rotulo:'por peça'},{valor:'m2_colecao',rotulo:'m² da coleção (tecido)'}]},
+    {chave:'preco',rotulo:'Preço (R$)',dica:'55,00'},
+    {chave:'eh_kit',rotulo:'É kit',valor:'0',opcoes:[{valor:'0',rotulo:'não'},{valor:'1',rotulo:'sim'}]},
+    {chave:'codigo_barras',rotulo:'Código de barras (kit)',dica:'KIT-PAINEL'},
+    /* O kit cujos suportes variam com a largura — o do trilho, o do bandô, o
+       da Romana (secao 8.5). Sem este campo o kit novo nasceria contando os
+       suportes padrao, e a faixa de suporte dele nunca pegaria. */
+    {chave:'usa_faixa_suporte',rotulo:'Kit: conta suportes pela largura',valor:'0',
+     opcoes:[{valor:'0',rotulo:'não (suportes padrão do kit)'},{valor:'1',rotulo:'sim (pela faixa de suporte)'}]}
+  ],v=>{
+    const corpo={chave:v.chave,nome:v.nome,setor:v.setor,gera_etiqueta:v.gera_etiqueta==='1',
+      unidade_cobranca:v.unidade_cobranca||null,eh_kit:v.eh_kit==='1',
+      usa_faixa_suporte:v.eh_kit==='1'&&v.usa_faixa_suporte==='1',
+      codigo_barras:v.codigo_barras.trim()||null};
+    if(v.preco.trim()) corpo.preco_centavos=paraCentavos(v.preco);
+    return tentar(()=>api('/api/sm/componentes',{metodo:'POST',corpo,silencioso:true}));
+  },()=>{ editando=null; erro=null; desenhar(); }));
+  return box;
 }
 
 // ── Moldura ────────────────────────────────────────────────────────────────
@@ -534,7 +810,14 @@ function desenhar(){
     barra.appendChild(b);
   });
   raiz.appendChild(barra);
-  raiz.appendChild({colecoes:abaColecoes, escada:abaEscada, ficha:abaFicha,
+  if(!modelo.ativo) raiz.appendChild(el('div',{class:'tarja'},
+    ['INATIVO — a revenda não vê "'+modelo.nome+'". O simulador aceita, para conferir.']));
+  /* Todo produto leva kit de instalacao, e sem ele o produto nao ativa
+     (secao 8.5). A tarja diz isso antes de a pessoa clicar em Ativar. */
+  if(modelo.sem_kit) raiz.appendChild(el('div',{class:'tarja'},
+    ['SEM KIT — a ficha técnica não tem kit de instalação. Todo produto leva kit: '+
+     'sem ele o produto não ativa.']));
+  raiz.appendChild({produto:abaProduto, escolhas:abaEscolhas, colecoes:abaColecoes, escada:abaEscada, ficha:abaFicha,
                     kit:abaKit, componentes:abaComponentes}[aba]());
 
   $('#sobreModelo').textContent='Mínimo faturado de '+emM2(modelo.m2_min_faturado_mm2)+
@@ -544,21 +827,42 @@ function desenhar(){
 
 async function recarregar(){
   modelo=await api('/api/sm/modelos/'+modelo.id);
+  /* O simulador abre JA no produto daqui: conferir a copia e o caminho
+     normal, e escolher de novo la e a chance de conferir o Rolo achando que
+     e a copia. */
+  $('#lnSimular').setAttribute('href','/sobmedida/simulador?modelo='+modelo.id);
+  const i=modelos.findIndex(m=>m.id===modelo.id);
+  if(i>=0&&(modelos[i].nome!==modelo.nome||modelos[i].ativo!==modelo.ativo)){
+    modelos[i]=Object.assign({},modelos[i],{nome:modelo.nome,ativo:modelo.ativo});
+    const o=$('#modelo').options[i];
+    if(o) o.textContent=modelo.nome+(modelo.ativo?'':' (inativo)');
+  }
   window.__componentes=await api('/api/sm/componentes');
   window.__materiais=await api('/api/sm/materiais');
   desenhar();
 }
 
+/* O seletor diz QUAL esta inativo, no proprio nome: escolher o modelo errado
+   para editar e o primeiro jeito de mexer no Rolo achando que e a copia. */
+async function carregarModelos(escolher){
+  modelos=await api('/api/sm/modelos');
+  const sel=limpar($('#modelo'));
+  modelos.forEach(m=>sel.appendChild(el('option',{value:String(m.id),
+    selected:m.id===escolher?'selected':null},[m.nome+(m.ativo?'':' (inativo)')])));
+  if(!modelos.length) return banner('Nenhum modelo cadastrado.','alerta');
+  modelo={id:escolher||modelos[0].id};
+  sel.value=String(modelo.id);
+  editando=null; erro=null;
+  await recarregar();
+}
+
 (async function(){
   const eu=await api('/api/eu');
   $('#quem').textContent=eu.nome;
-  const modelos=await api('/api/sm/modelos');
-  const sel=$('#modelo');
-  modelos.forEach(m=>sel.appendChild(el('option',{value:String(m.id)},[m.nome])));
-  if(!modelos.length) return banner('Nenhum modelo cadastrado.','alerta');
-  modelo={id:modelos[0].id};
-  sel.addEventListener('change',()=>{ modelo={id:Number(sel.value)}; editando=null; recarregar(); });
-  await recarregar();
+  $('#modelo').addEventListener('change',()=>{
+    modelo={id:Number($('#modelo').value)}; editando=null; erro=null; recarregar(); });
+  $('#btNovo').addEventListener('click',()=>{ novoAberto=!novoAberto; erroNovo=null; desenharNovo(); });
+  await carregarModelos();
 })();
 </script>
 </body>

@@ -1330,6 +1330,11 @@ async function verMinimos(){
       +(c.ativo?'':'<div class="sub" style="color:var(--amber)">inativo</div>')+'</td>'
       +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="codigo" value="'+esc(c.codigo||'')+'" style="width:175px"></td>'
       +'<td><select class="lcCampo" data-id="'+c.id+'" data-campo="unidade" style="width:100px">'+opts(c.unidade)+'</select></td>'
+      /* MARCA E MODELO saem na etiqueta de produção do sob medida quando a ficha
+         do produto pede (o motor: o dado da garantia). Opcionais — vazio não
+         trava nada, só não sai no papel. */
+      +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="marca" value="'+esc(c.marca||'')+'" placeholder="—" style="width:110px"></td>'
+      +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="modelo" value="'+esc(c.modelo||'')+'" placeholder="—" style="width:110px"></td>'
       +'<td class="sub">'+qtd(c.estoque)+'</td>'
       +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="estoque_minimo" type="number" step="0.01" min="0" value="'+(c.estoque_minimo||0)+'" style="width:100px"></td>'
       +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="estoque_ideal" type="number" step="0.01" min="0" value="'+(c.estoque_ideal||0)+'" style="width:100px"></td>'
@@ -1338,7 +1343,7 @@ async function verMinimos(){
          "inativo" e ninguém acha como reativar. Aqui o botão troca de nome. */
       +'<td><button class="ghost" data-comp-ativo="'+(c.ativo?0:1)+'" data-id="'+c.id+'">'
       +(c.ativo?'Desativar':'Reativar')+'</button></td></tr>';
-  box.innerHTML='<table><thead><tr><th>Material</th><th>Código</th><th>Un</th>'
+  box.innerHTML='<table><thead><tr><th>Material</th><th>Código</th><th>Un</th><th>Marca</th><th>Modelo</th>'
     +'<th>Estoque</th><th>Mínimo</th><th>Ideal</th><th></th></tr></thead><tbody>'
     +COMPS.map(linha).join('')
     +'</tbody></table>'

@@ -20,6 +20,8 @@ const u=require('../nucleo/unidade');
 const catalogo=require('./catalogo_sm');
 const dRevenda=require('../dados/revenda');
 const dTecido=require('../dados/tecido');
+const ESC=require('./escolhas');
+const materiais=require('../nucleo/materiais');
 
 const COMANDOS={direito:'direito', esquerdo:'esquerdo'};
 const ROLAMENTOS={frente:'pela frente', tras:'por trás'};
@@ -83,12 +85,92 @@ function conferirTeto(onde, nome, motivo, limites, largura_mm, altura_mm, area_m
       u.emM2(limites.m2_max_mm2)+' m² que '+onde+' '+nome+' aceita.');
 }
 
-function calcular(escolha){
+/* `opcoes.aceitaInativo` e o SIMULADOR INTERNO, e mais ninguem (secao 3.2 da
+   spec SOBMEDIDA-CADASTRO-DE-PRODUTO). O produto novo nasce inativo para o
+   dono conferir antes de a revenda ver — e sem calcular o inativo nao ha
+   como conferir. O pedido chama sem a opcao, e por isso o inativo continua
+   recusado ali: a tela esconder o modelo nao e a regra (armadilha #26). */
+/* ── A PECA PRONTA DOS GOMOS (secao 5 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO) ─
+   ⚠️ SAO REGRA DO DONO, E NAO PREFERENCIA (27/10/2026): o numero de gomos e
+   IMPAR, nunca menos de 3, e o MENOR que deixa cada gomo ate o limite do
+   produto (35 cm). Quem decide e o sistema — ninguem escolhe. A medida exata
+   do limite cabe, como na escada de tubos (1,050 ÷ 3 = 350,0 fica em 3).
+
+   O gomo e a divisao EXATA, com uma casa (333,3), e nenhum gomo absorve
+   diferenca. Ele nao e medida de corte de nenhuma peca — e a marcacao que a
+   montagem segue —, e por isso pode ter a casa decimal sem ferir o mm
+   inteiro: guarda-se em DECIMO de mm, inteiro. */
+const GOMOS_MIN=3;
+function gomosDe(modelo,altura_mm){
+  const limite=modelo.gomo_max_mm;
+  exigir(limite>0,'gomo_sem_limite','O produto '+modelo.nome+' não tem o limite do gomo cadastrado.');
+  let n=Math.max(GOMOS_MIN,Math.ceil(altura_mm/limite));
+  if(n%2===0) n++;
+  const decimo=Math.round(altura_mm*10/n);
+  const gomo=Math.floor(decimo/10)+','+(decimo%10);
+  return {tipo:'gomos', gomos:n, varetas:n-1, gomo_decimo_mm:decimo, gomo,
+    titulo:n+' gomos de '+gomo+' mm',
+    detalhe:(n-1)+' varetas · cada gomo até '+u.emMetros(limite)+' m',
+    frase:n+' gomos de '+gomo+' mm'};
+}
+
+/* ── A PECA PRONTA DAS FOLHAS (secao 6 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO) ─
+   As folhas sao sempre transpassadas, T por encontro de folhas (numero do
+   produto, nasce 100 mm):
+
+     lateral   folha = (largura + (folhas − 1) × T) ÷ folhas
+     central   lado = largura ÷ 2, e a mesma conta com as folhas DO LADO
+
+   ⚠️ NO MEIO DA CENTRAL AS DUAS METADES SO SE ENCOSTAM — nao ha transpasse
+   no meio (dono, 27/10/2026). Por isso a central de 2 folhas da duas folhas
+   de meia largura, sem transpasse nenhum.
+
+   ⚠️ A CONTA E FEITA NUM NUMERADOR INTEIRO e so divide no fim, para o
+   arredondamento ao milimetro ser um so: largura impar na central daria meio
+   milimetro no lado, e arredondar duas vezes erraria um milimetro sem regra.
+   (largura + 2·(k−1)·T) ÷ 2k e a mesma conta, sem o meio milimetro.
+
+   Os limites sao regra do dono (secao 6.2): lateral de 2 a 5, central sempre
+   par, 2, 4 ou 6. Fora disso RECUSA dizendo o porque. */
+const FOLHAS_LATERAL={min:2,max:5}, FOLHAS_CENTRAL={min:2,max:6};
+function folhasDe(modelo,largura_mm,sentido,folhas){
+  exigir(sentido&&folhas!=null,'escolha_necessaria','O produto '+modelo.nome+' calcula folhas, e para '+
+    'isso precisa das escolhas Abertura e Folhas ligadas — ligue as duas em Catálogo → Escolhas do cliente.');
+  const T=modelo.transpasse_mm==null?100:modelo.transpasse_mm;
+  const central=sentido==='central';
+  const lim=central?FOLHAS_CENTRAL:FOLHAS_LATERAL;
+  if(folhas<lim.min) throw new ErroDeRegra('folhas_abaixo','No mínimo '+lim.min+' folhas.');
+  if(central){
+    if(folhas%2) throw new ErroDeRegra('folhas_central_par',
+      'A abertura central pede número par de folhas (2, 4 ou 6): metade corre para cada lado.');
+    if(folhas>lim.max) throw new ErroDeRegra('folhas_acima_central',
+      'No máximo 6 folhas na abertura central — 3 correndo para cada lado.');
+  }else if(folhas>lim.max) throw new ErroDeRegra('folhas_acima_lateral',
+    'No máximo 5 folhas correndo para um lado. Para mais folhas, use a abertura central.');
+
+  const lados=central?2:1;
+  const k=folhas/lados;                       // folhas de cada lado
+  const folha_mm=Math.round((largura_mm+lados*(k-1)*T)/(lados*k));
+  exigir(folha_mm>0,'medida_de_corte_invalida','A folha deu '+folha_mm+' mm. Confira a largura.');
+  const folha=u.emMetros(folha_mm);
+  const vias=k;
+  return {tipo:'folhas', folhas, folhas_por_lado:k, lados, vias,
+    lado_mm:central?largura_mm/2:largura_mm,
+    transpasses:k-1, transpasse_mm:T, folha_mm, folha,
+    titulo:folhas+' folhas de '+folha,
+    detalhe:(central?'abertura central · '+k+' de cada lado · ':'')+
+      (k-1)+' transpasse'+(k-1===1?'':'s')+(central?' de cada lado':'')+' de '+T+' mm · '+
+      vias+' via'+(vias===1?'':'s')+(central?' de cada lado':''),
+    frase:'Folha '+folha};
+}
+
+function calcular(escolha,opcoes){
   const e=escolha||{};
+  const op=opcoes||{};
 
   // ── 1. O catalogo ───────────────────────────────────────────────────────
   const modelo=catalogo.modelo(e.modelo_id);
-  exigir(modelo.ativo,'modelo_indisponivel','O modelo '+modelo.nome+' está desativado.');
+  exigir(modelo.ativo||op.aceitaInativo,'modelo_indisponivel','O modelo '+modelo.nome+' está desativado.');
 
   const colecao=catalogo.colecaoDe(modelo.id,e.abertura_id);
   exigir(colecao,'colecao_fora_do_modelo',
@@ -125,12 +207,60 @@ function calcular(escolha){
     tecido_id=item.id;
   }
 
-  // ── 2. As escolhas obrigatorias ─────────────────────────────────────────
-  exigir(e.comando&&COMANDOS[e.comando],'comando_obrigatorio',
+  // ── 2. As escolhas do cliente ───────────────────────────────────────────
+  /* ⚠️ SO O QUE O PRODUTO LIGA (secao 4 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO).
+     Ligada e obrigatoria; desligada e RECUSADA se vier mesmo assim — a tela
+     esconder o campo nao e a regra (armadilha #26). O Rolo liga as quatro de
+     sempre (migracao 33), e por isso as frases e as recusas dele sao as
+     mesmas de antes, letra por letra. */
+  const ligadas=new Set((modelo.escolhas||[]).filter(x=>x.ligada).map(x=>x.chave));
+  const liga=chave=>ligadas.has(chave);
+  const desligadaVeio=chave=>{
+    const esc=ESC.porChave(chave);
+    if(!liga(chave)&&ESC.veio(esc,e[chave]))
+      throw new ErroDeRegra('escolha_desligada','O produto '+modelo.nome+' não tem "'+esc.nome+
+        '". Tire essa escolha da peça.');
+  };
+  ['comando','rolamento','adicional','reducao','acionamento','sentido','lado_corrente','folhas']
+    .forEach(desligadaVeio);
+  const opcaoDe=(chave,valor)=>(ESC.porChave(chave).opcoes||[]).find(o=>o.valor===valor)||null;
+
+  if(liga('comando')) exigir(e.comando&&COMANDOS[e.comando],'comando_obrigatorio',
     'Escolha o lado do comando: direito ou esquerdo.');
-  exigir(e.rolamento&&ROLAMENTOS[e.rolamento],'rolamento_obrigatorio',
+  if(liga('rolamento')) exigir(e.rolamento&&ROLAMENTOS[e.rolamento],'rolamento_obrigatorio',
     'Escolha o rolamento: desce pela frente ou por trás.');
-  const adicional=normalizarAdicional(e.adicional);
+  const adicional=liga('adicional')?normalizarAdicional(e.adicional):'nenhum';
+
+  let acionamento=null, lado_corrente=null, sentido=null, folhas=null;
+  if(liga('acionamento')){
+    exigir(e.acionamento,'acionamento_obrigatorio','Escolha o acionamento: com comando ou sem comando.');
+    exigir(opcaoDe('acionamento',e.acionamento),'acionamento_invalido',
+      'O acionamento é "com comando" ou "sem comando".');
+    acionamento=e.acionamento;
+  }
+  if(liga('lado_corrente')){
+    if(acionamento==='com_comando'){
+      exigir(e.lado_corrente,'lado_corrente_obrigatorio','Escolha o lado da corrente: direito ou esquerdo.');
+      exigir(opcaoDe('lado_corrente',e.lado_corrente),'lado_corrente_invalido',
+        'O lado da corrente é direito ou esquerdo.');
+      lado_corrente=e.lado_corrente;
+    }else if(ESC.veio(ESC.porChave('lado_corrente'),e.lado_corrente))
+      throw new ErroDeRegra('escolha_nao_se_aplica',
+        'Sem comando não há corrente: tire o lado da corrente desta peça.');
+  }
+  if(liga('sentido')){
+    exigir(e.sentido,'sentido_obrigatorio','Escolha a abertura: para a esquerda, para a direita ou central.');
+    exigir(opcaoDe('sentido',e.sentido),'sentido_invalido',
+      'A abertura é: tudo para a esquerda, tudo para a direita, ou central.');
+    sentido=e.sentido;
+  }
+  if(liga('folhas')){
+    exigir(e.folhas!==undefined&&e.folhas!==null&&e.folhas!=='','folhas_obrigatorio',
+      'Diga quantas folhas.');
+    const n=Number(e.folhas);
+    exigir(Number.isInteger(n)&&n>0,'folhas_invalido','O número de folhas é inteiro e maior que zero.');
+    folhas=n;
+  }
 
   // ── 3. A medida ─────────────────────────────────────────────────────────
   const largura_mm=u.mm(e.largura_mm,'a largura acabada');
@@ -142,11 +272,23 @@ function calcular(escolha){
   conferirTeto('o modelo',modelo.nome,'medida_acima_do_modelo',
     modelo,largura_mm,altura_mm,area_mm2);
 
-  // ── 4. A escada de tubos ────────────────────────────────────────────────
-  const degraus=modelo.degraus.filter(d=>d.ativo);
-  exigir(degraus.length,'escada_vazia',
-    'O modelo '+modelo.nome+' não tem escada de tubos cadastrada.');
-  const degrau=escolherDegrau(degraus,largura_mm,area_mm2);
+  // ── 4. O calculo do produto ─────────────────────────────────────────────
+  /* ⚠️ CADA PRODUTO LIGA UMA PECA PRONTA (secao 2 da spec
+     SOBMEDIDA-CADASTRO-DE-PRODUTO): a escada de tubos do Rolo, os gomos da
+     Romana, as folhas do Painel. A conta e codigo testado; o produto guarda os
+     numeros dela. O Rolo e 'escada' desde a migracao 34, e por isso o caminho
+     dele e exatamente o de antes. */
+  const tipoCalculo=modelo.calculo||'escada';
+  let degrau=null;
+  if(tipoCalculo==='escada'){
+    const degraus=modelo.degraus.filter(d=>d.ativo);
+    exigir(degraus.length,'escada_vazia',
+      'O modelo '+modelo.nome+' não tem escada de tubos cadastrada.');
+    degrau=escolherDegrau(degraus,largura_mm,area_mm2);
+  }
+  const calculo=tipoCalculo==='gomos'?gomosDe(modelo,altura_mm)
+              :tipoCalculo==='folhas'?folhasDe(modelo,largura_mm,sentido,folhas)
+              :{tipo:tipoCalculo};
 
   /* ── 5. O adicional cabe? ───────────────────────────────────────────────
      ⚠️ A DISPONIBILIDADE E CALCULADA SEMPRE, e nao so quando alguem pede.
@@ -156,11 +298,17 @@ function calcular(escolha){
      revenda leria "deu erro" em vez de "nesta medida nao tem bando".
      Quem escolhe o indisponivel continua sendo RECUSADO logo abaixo: a tela
      esconder o botao nao e a regra, e a regra que existe fora do navegador. */
-  const componenteDe=chave=>modelo.ficha.find(l=>l.chave===chave);
+  /* ⚠️ O ADICIONAL E A LINHA `quando = bando` (ou barra), e nao so o
+     componente do Rolo (secoes 4.1 e 6.3 da spec SOBMEDIDA-CADASTRO-DE-
+     PRODUTO): o bandô do Painel e o bandô CONCAVO, outro componente. O Rolo
+     continua achando o `bando` dele primeiro, pela chave — e por isso nada
+     muda para ele. */
+  const componenteDe=chave=>modelo.ficha.find(l=>l.chave===chave)||
+    modelo.ficha.find(l=>l.quando===chave&&l.ativo&&l.componente_ativo&&!l.eh_kit);
   function cabe(chave, frase, semFicha){
     const c=componenteDe(chave);
     if(!c) return {disponivel:false, motivo:semFicha};
-    if(chave==='bando'&&!degrau.aceita_bando)
+    if(chave==='bando'&&degrau&&!degrau.aceita_bando)
       return {disponivel:false, motivo:frase+' ('+degrau.nome+' não aceita bandô.)'};
     if(c.componente_altura_max_mm!=null&&altura_mm>c.componente_altura_max_mm)
       return {disponivel:false, motivo:frase+' (a altura vai até '+
@@ -178,20 +326,24 @@ function calcular(escolha){
   if(adicional==='barra') exigir(podeBarra.disponivel,'barra_indisponivel',podeBarra.motivo);
 
   // ── 6. A reducao de peso ────────────────────────────────────────────────
-  const regra=modelo.reducao||{};
+  /* Desligada, a reducao nao entra nem pela regra de garantia: a automatica
+     e parte da MESMA escolha (secao 4.1), e um produto sem ela nao tem a
+     peca para pendurar. */
+  const regra=liga('reducao')?(modelo.reducao||{}):{};
   const automatica=(regra.m2_acima_mm2!=null&&area_mm2>regra.m2_acima_mm2)
                  ||(regra.largura_acima_mm!=null&&largura_mm>regra.largura_acima_mm);
   const pedida=e.reducao==='pedida'||e.reducao===true;
   if(e.reducao!=null&&e.reducao!==''&&e.reducao!=='nao'&&e.reducao!=='pedida'&&e.reducao!==true&&e.reducao!==false)
     throw new ErroDeRegra('reducao_invalida','A redução de peso só pode ser "nao" ou "pedida".');
-  if(pedida&&!automatica&&!degrau.aceita_reducao)
-    throw new ErroDeRegra('reducao_indisponivel',
-      'O '+degrau.nome+' não tem redução de peso. Ela existe a partir do Tubo 38.');
+  if(pedida&&!automatica&&!(degrau&&degrau.aceita_reducao))
+    throw new ErroDeRegra('reducao_indisponivel', degrau
+      ? 'O '+degrau.nome+' não tem redução de peso. Ela existe a partir do Tubo 38.'
+      : 'O produto '+modelo.nome+' não tem redução de peso pedida: ela depende do tubo.');
   const reducao={
     automatica:!!automatica,
     pedida:!!pedida&&!automatica,
     aplicada:!!(automatica||pedida),
-    pode_pedir:!!degrau.aceita_reducao
+    pode_pedir:liga('reducao')&&!!(degrau&&degrau.aceita_reducao)
   };
 
   // ── 7. A ficha vira componentes ─────────────────────────────────────────
@@ -200,7 +352,11 @@ function calcular(escolha){
   || (quando==='bando'&&adicional==='bando')
   || (quando==='barra'&&adicional==='barra')
   || (quando==='sem_adicional'&&adicional==='nenhum')
-  || (quando==='reducao'&&reducao.aplicada);
+  || (quando==='reducao'&&reducao.aplicada)
+  || (quando==='com_comando'&&acionamento==='com_comando')
+  || (quando==='sem_comando'&&acionamento==='sem_comando')
+  || (quando==='abertura_lateral'&&(sentido==='esquerda'||sentido==='direita'))
+  || (quando==='abertura_central'&&sentido==='central');
 
   const calculados={};
   const componentes=[];
@@ -218,11 +374,20 @@ function calcular(escolha){
   for(const linha of modelo.ficha.slice().sort((a,b)=>a.ordem-b.ordem)){
     if(!linha.ativo||!linha.componente_ativo||!entra(linha.quando)) continue;
 
+    const semEscada=()=>{ throw new ErroDeRegra('referencia_sem_escada','A ficha manda medir "'+linha.chave+
+      '" pelo degrau, e o produto '+modelo.nome+' não tem escada de tubos. Use "final" ou um componente.'); };
     const medirLargura=(ref,ajuste)=>{
       if(!ref) return null;
       let base;
       if(ref==='final') base=largura_mm;
-      else if(ref==='degrau') base=largura_mm-degrau.desconto_mm;
+      else if(ref==='degrau') base=degrau?largura_mm-degrau.desconto_mm:semEscada();
+      /* A largura de CADA FOLHA do Painel (secao 6.3). So existe no calculo
+         das folhas; em outro produto a ficha que a pede e recusada dizendo. */
+      else if(ref==='folha'){
+        exigir(calculo.folha_mm!=null,'referencia_sem_folha','A ficha manda medir "'+linha.chave+
+          '" pela folha, e o produto '+modelo.nome+' não calcula folhas.');
+        base=calculo.folha_mm;
+      }
       else{
         const ja=calculados[ref];
         exigir(ja&&ja.largura_corte_mm!=null,'referencia_adiantada',
@@ -235,7 +400,9 @@ function calcular(escolha){
       if(!ref) return null;
       let base;
       if(ref==='final') base=altura_mm;
-      else if(ref==='degrau') base=altura_mm+degrau.acrescimo_altura_tecido_mm;
+      else if(ref==='degrau') base=degrau?altura_mm+degrau.acrescimo_altura_tecido_mm:semEscada();
+      else if(ref==='folha') throw new ErroDeRegra('referencia_sem_folha',
+        'A folha é uma LARGURA: a altura de "'+linha.chave+'" se mede pelo final.');
       else{
         const ja=calculados[ref];
         exigir(ja&&ja.altura_corte_mm!=null,'referencia_adiantada',
@@ -245,11 +412,30 @@ function calcular(escolha){
       return base+(ajuste||0);
     };
 
+    /* A QUANTIDADE POR REFERENCIA (secao 5.2): as varetas da Romana, as
+       folhas do Painel. ⚠️ Referencia que a peca pronta deste produto nao
+       calcula e RECUSA, e nao zero: a linha sairia da ficha sem ninguem ver,
+       e ela e uma peca que a bancada teria que fazer. */
+    let quantidade=linha.quantidade;
+    if(linha.quantidade_ref){
+      exigir(calculo[linha.quantidade_ref]!=null,'quantidade_sem_calculo',
+        'A ficha conta "'+linha.chave+'" por '+linha.quantidade_ref+', e o cálculo do produto '+
+        modelo.nome+' não devolve '+linha.quantidade_ref+'.');
+      quantidade=calculo[linha.quantidade_ref];
+    }
     const c={
       chave:linha.chave, nome:linha.componente_nome, setor:linha.setor,
-      quantidade:linha.quantidade, quando:linha.quando,
+      quantidade, quando:linha.quando,
       gera_etiqueta:!!linha.gera_etiqueta, eh_kit:!!linha.eh_kit,
       codigo_barras:linha.codigo_barras||null,
+      /* O material de compra do PCP que diz o que a peca E (nome, marca,
+         modelo — secao 8.2). O tubo aponta no DEGRAU, porque o material muda
+         com ele (fase 4-C); o resto, no componente. */
+      material_id:linha.chave==='tubo'?(degrau?degrau.componente_id:null):
+        (linha.material_id==null?null:linha.material_id),
+      etiqueta_extras:linha.etiqueta_extras||null,
+      // O que a peca segura na bancada: a montagem (NULL) ou so a embalagem.
+      libera:linha.libera||null,
       // ⚠️ CORTE e CONSUMO, lado a lado e nunca somados — armadilha #18.
       largura_corte_mm: medirLargura(linha.ref_largura,linha.ajuste_largura_mm),
       altura_corte_mm:  medirAltura(linha.ref_altura,linha.ajuste_altura_mm),
@@ -268,20 +454,29 @@ function calcular(escolha){
   }
 
   // ── 8. O kit ────────────────────────────────────────────────────────────
+  /* ⚠️ CADA KIT DA FICHA, CADA UM PELA SUA FAIXA (secao 8.5 da spec
+     SOBMEDIDA-CADASTRO-DE-PRODUTO). Um Painel com bandô leva os suportes do
+     trilho E os do bandô. A faixa apontada para o kit vence; sem ela vale a
+     faixa do produto (componente_id vazio), que e como o Rolo conta desde
+     sempre — e por isso ele nao muda. `kit` continua sendo o primeiro, para
+     quem so conhece um; `kits` e a lista inteira, e e ela que a embalagem
+     cobra. */
   const avisos=[];
-  const doKit=componentes.find(c=>c.eh_kit);
-  let kit=null;
-  if(doKit){
+  const kits=componentes.filter(c=>c.eh_kit).map(doKit=>{
     const linha=linhaDe.get(doKit);
     let suportes=null;
     if(linha.usa_faixa_suporte){
-      const faixa=modelo.faixas_suporte.find(f=>largura_mm<=f.largura_max_mm);
+      const proprias=modelo.faixas_suporte.filter(f=>f.componente_id===linha.componente_id);
+      const faixas=proprias.length?proprias:modelo.faixas_suporte.filter(f=>f.componente_id==null);
+      const faixa=faixas.find(f=>largura_mm<=f.largura_max_mm);
       if(faixa) suportes=faixa.quantidade;
       else avisos.push('Não há faixa de suporte cadastrada para '+u.emMetros(largura_mm)+
-        ' de largura — o kit sai sem a quantidade de suportes.');
+        ' de largura'+(proprias.length?' no '+doKit.nome:'')+' — o kit sai sem a quantidade de suportes.');
     }
-    kit={chave:doKit.chave, nome:doKit.nome, codigo_barras:doKit.codigo_barras, suportes};
-  } else avisos.push('Este modelo não tem kit de instalação na ficha.');
+    return {chave:doKit.chave, nome:doKit.nome, codigo_barras:doKit.codigo_barras, suportes};
+  });
+  const kit=kits[0]||null;
+  if(!kits.length) avisos.push('Este modelo não tem kit de instalação na ficha.');
 
   // ── 9. O preco ──────────────────────────────────────────────────────────
   const minimo=colecao.m2_min_faturado_mm2!=null
@@ -294,8 +489,14 @@ function calcular(escolha){
     if(!f.unidade_cobranca) continue;
     let unitario=null, base=null, valor=null;
     if(f.unidade_cobranca==='m2_colecao'){
-      unitario=colecao.preco_m2_centavos;
-      base=u.emM2(m2_cobrado_mm2)+' m² × R$ '+u.emReais(unitario)+'/m²';
+      /* ⚠️ O PRECO POR COR VENCE O DA COLECAO quando tem linha (secao 7 da
+         spec SOBMEDIDA-CADASTRO-DE-PRODUTO); sem linha, e o da colecao, como
+         sempre. A conta diz qual dos dois cobrou — preco que muda sem dizer
+         por que e o numero que a revenda liga para perguntar. */
+      const daCor=catalogo.precoCorDe(colecao.id,e.cor_tecido_id);
+      unitario=daCor?daCor.preco_m2_centavos:colecao.preco_m2_centavos;
+      base=u.emM2(m2_cobrado_mm2)+' m² × R$ '+u.emReais(unitario)+'/m²'+
+        (daCor?' (preço da cor '+(corTecido||'escolhida')+')':'');
       if(unitario!=null) valor=Math.round(m2_cobrado_mm2*unitario/u.M2);
     }else if(f.unidade_cobranca==='metro'){
       /* ⚠️ POR METRO LINEAR **REAL**, nunca pela medida de corte. A barra e
@@ -401,6 +602,9 @@ function calcular(escolha){
   preco.revenda=precoRevenda;
 
   // ── 10. O que a tela e a bancada leem ───────────────────────────────────
+  /* A TARJA VEM PRIMEIRO: e a coisa mais importante que o dono le quando
+     confere um produto que ainda nao foi ativado. */
+  if(!modelo.ativo) avisos.unshift('INATIVO — a revenda não vê este produto. Confira e ative no Catálogo.');
   if(reducao.automatica)
     avisos.push('Redução de peso incluída pela regra de garantia — acima de '+
       u.emM2(regra.m2_acima_mm2)+' m² ou de '+u.emMetros(regra.largura_acima_mm)+' de largura.');
@@ -409,33 +613,58 @@ function calcular(escolha){
       u.emM2(area_mm2)+' m².');
   if(semPreco.length)
     avisos.push('Sem preço lançado para: '+semPreco.join(', ')+'. O total sai como piso (≥).');
+  /* ⚠️ O INSUMO QUE LEVA MARCA OU MODELO NA ETIQUETA (o motor) AVISA AQUI
+     TAMBEM, porque e o dado da garantia (dono, 28/10/2026). AVISA, NAO TRAVA:
+     o cadastro de material ainda esta sendo arrumado, e a persiana sai do
+     mesmo jeito, com o campo vazio de fora do papel. */
+  for(const c of componentes){
+    const pede=String(c.etiqueta_extras||'').split(',').filter(x=>x==='marca'||x==='modelo');
+    if(!pede.length) continue;
+    let mat=null;
+    try{ mat=c.material_id!=null&&materiais.ligada()?materiais.porId(c.material_id):null; }catch(x){ mat=null; }
+    if(c.material_id==null)
+      avisos.push(c.nome+' sem material ligado: a etiqueta sai sem marca e modelo — é o dado da garantia. '+
+        'Ligue o material em Catálogo → Componentes e preços.');
+    else if(mat&&pede.some(x=>!mat[x]))
+      avisos.push(c.nome+' sem marca ou modelo no cadastro de material ("'+mat.nome+'"): a etiqueta sai '+
+        'sem o dado da garantia. Complete em Compras → Materiais.');
+  }
 
   const nomeAdicional={bando:'Bandô',barra:'Barra niveladora'}[adicional];
+  const frase=(chave,valor)=>{ const o=valor==null?null:opcaoDe(chave,valor); return o&&o.frase?[o.frase]:[]; };
   const resumo=[
     u.emMetros(largura_mm)+' × '+u.emMetros(altura_mm),
     colecao.colecao_nome+(corTecido?' '+corTecido:''),
-    'Acessórios '+cor.cor_nome,
-    'Comando '+COMANDOS[e.comando],
-    'Rolamento '+ROLAMENTOS[e.rolamento]
-  ].concat(nomeAdicional?[nomeAdicional]:[])
+    'Acessórios '+cor.cor_nome]
+   .concat(liga('comando')?['Comando '+COMANDOS[e.comando]]:[])
+   .concat(liga('rolamento')?['Rolamento '+ROLAMENTOS[e.rolamento]]:[])
+   .concat(calculo.frase?[calculo.frase]:[])
+   .concat(frase('sentido',sentido))
+   .concat(folhas!=null?[folhas+' folhas']:[])
+   .concat(frase('acionamento',acionamento))
+   .concat(frase('lado_corrente',lado_corrente))
+   .concat(nomeAdicional?[nomeAdicional]:[])
    .concat(reducao.aplicada?['Redução de peso']:[]).join(' · ');
 
   return {
-    modelo:{id:modelo.id, nome:modelo.nome},
+    modelo:{id:modelo.id, nome:modelo.nome, ativo:!!modelo.ativo},
     colecao:{id:colecao.id, abertura_id:colecao.abertura_id, nome:colecao.colecao_nome,
              linha_nome:colecao.linha_nome},
     cor_acessorio:{id:cor.cor_id, nome:cor.cor_nome},
     cor_tecido:corTecido, tecido_id,
     medida:{largura_mm, altura_mm, area_mm2,
             largura:u.emMetros(largura_mm), altura:u.emMetros(altura_mm), area:u.emM2(area_mm2)},
-    comando:e.comando, rolamento:e.rolamento, adicional,
-    degrau:{id:degrau.id, nome:degrau.nome, desconto_mm:degrau.desconto_mm,
-            acrescimo_altura_tecido_mm:degrau.acrescimo_altura_tecido_mm},
+    comando:liga('comando')?e.comando:'', rolamento:liga('rolamento')?e.rolamento:'', adicional,
+    acionamento, lado_corrente, sentido, folhas,
+    escolhas_ligadas:[...ligadas],
+    degrau:degrau?{id:degrau.id, nome:degrau.nome, desconto_mm:degrau.desconto_mm,
+            acrescimo_altura_tecido_mm:degrau.acrescimo_altura_tecido_mm}:null,
+    calculo,
     /* O que esta medida ACEITA, para a tela oferecer so o possivel — e dizer
        POR QUE, em vez de esconder o botao calado (secao 4.6). */
     opcoes:{bando:podeBando, barra:podeBarra,
             reducao:{pode_pedir:reducao.pode_pedir, automatica:reducao.automatica}},
-    componentes, kit, reducao, preco, avisos, resumo
+    componentes, kit, kits, reducao, preco, avisos, resumo
   };
 }
 

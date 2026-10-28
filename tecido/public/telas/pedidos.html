@@ -80,7 +80,7 @@ const emMetros=mm=>mm==null?'':(mm/1000).toFixed(3).replace('.',',');
    nesta tela: arrumar so aqui deixaria o total certo e o PDF errado. */
 const reais=t=>t==null?'—':'R$ '+t;
 
-let eu={permissoes:[]}, fila=[], lista=[], revendas=[], modelo=null, cores=[];
+let eu={permissoes:[]}, fila=[], lista=[], revendas=[], modelo=null, modelos=[], cores=[];
 let risco=[];
 let aberto=null, erro=null, novaPeca=null;
 const posso=k=>(eu.permissoes||[]).indexOf(k)>=0;
@@ -169,10 +169,15 @@ async function abrir(id){
   $('#cAberto').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-async function carregarCatalogo(){
-  const modelos=await api('/api/sm/modelos');
+/* ⚠️ O PEDIDO SO OFERECE PRODUTO ATIVO, mesmo para quem edita o catalogo e
+   recebe o inativo na lista (secao 3.2 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO).
+   O inativo e para conferir no simulador; aqui ele so daria a recusa do
+   servidor depois de a peca inteira digitada. */
+async function carregarCatalogo(id){
+  modelos=(await api('/api/sm/modelos')).filter(m=>m.ativo);
   if(!modelos.length) return;
-  modelo=await api('/api/sm/modelos/'+modelos[0].id);
+  const alvo=modelos.find(m=>m.id===Number(id))||modelos[0];
+  modelo=await api('/api/sm/modelos/'+alvo.id);
 }
 
 async function carregarCores(abertura_id){
@@ -195,6 +200,24 @@ function desenharAberto(){
 
   if(p.marco==='cancelado')
     c.appendChild(el('div',{class:'aviso'},['Cancelado por '+p.cancelado_por+': '+p.cancelado_motivo]));
+
+  /* ⚠️ O CLIENTE FINAL E OPCIONAL (secao 8.2 da spec SOBMEDIDA-CADASTRO-DE-
+     PRODUTO): preenchido, sai na etiqueta de producao ao lado da revenda;
+     vazio, a etiqueta sai so com a revenda. Edita-se no rascunho, como o
+     resto do pedido. */
+  if(!p.congelado&&p.marco!=='cancelado'&&posso('pedido.lancar')){
+    const i=el('input',{type:'text',value:p.cliente_final||'','aria-label':'Cliente final (opcional)',
+      placeholder:'quem vai receber a persiana, se a revenda disser'});
+    const ok=el('button',{class:'bt',type:'button'},['Salvar']);
+    ok.onclick=async()=>{
+      try{ await api('/api/pedidos/'+p.id,{metodo:'PUT',silencioso:true,corpo:{cliente_final:i.value}});
+        erro=null; abrir(p.id); }
+      catch(x){ erro=x.message; desenharAberto(); }
+    };
+    c.appendChild(el('div',{class:'campos'},[
+      el('div',{class:'campo cresce'},[el('label',{},['Cliente final (opcional)']),i]),
+      el('div',{class:'campo'},[ok])]));
+  }else if(p.cliente_final) c.appendChild(el('p',{},['Cliente final: ',el('b',{},[p.cliente_final])]));
 
   if(p.prazo){
     const t=['Pronto em '+p.prazo.atual_extenso];
@@ -265,7 +288,8 @@ function desenharAberto(){
 
 function desenharPeca(p,item){
   const box=el('div',{class:'peca'+(item.cancelado_em?' cancelada':'')});
-  box.appendChild(el('h3',{},['Peça '+item.n+(item.degrau_nome?' · '+item.degrau_nome:'')]));
+  box.appendChild(el('h3',{},['Peça '+item.n+(item.modelo_nome?' · '+item.modelo_nome:'')+
+    (item.degrau_nome?' · '+item.degrau_nome:'')]));
   box.appendChild(el('div',{class:'frase'},[item.resumo||
     (emMetros(item.largura_mm)+' × '+emMetros(item.altura_mm))]));
   if(item.erro) box.appendChild(el('div',{class:'aviso'},[item.erro]));
@@ -305,7 +329,7 @@ function desenharPeca(p,item){
     const f=el('div',{class:'linhas'});
     f.appendChild(el('div',{},[el('span',{},['Ficha congelada na aprovação']),el('span',{},[''])]));
     item.componentes.forEach(x=>f.appendChild(el('div',{},[
-      el('span',{},[x.nome+(x.setor?' · '+x.setor:'')]),
+      el('span',{},[x.nome+(x.unidade_n>1?' '+x.unidade_k+'/'+x.unidade_n:'')+(x.setor?' · '+x.setor:'')]),
       el('span',{},[x.largura_corte_mm==null?'—':
         (emMetros(x.largura_corte_mm)+(x.altura_corte_mm!=null?' × '+emMetros(x.altura_corte_mm):''))])])));
     box.appendChild(f);
@@ -319,11 +343,27 @@ function desenharPeca(p,item){
 function abrirNovaPeca(){
   const e={abertura_id:null, cor_tecido_id:null, cor_acessorio_id:null,
     largura:'1,000', altura:'1,000', comando:'direito', rolamento:'frente',
-    adicional:'nenhum', reducao:'nao'};
+    adicional:'nenhum', reducao:'nao', acionamento:'', sentido:'', lado_corrente:'', folhas:''};
   const box=el('div',{class:'editor'});
 
   const redesenhar=async()=>{
     limpar(box);
+    /* O PRODUTO VEM PRIMEIRO: ele decide que colecoes, cores e escolhas
+       existem. Trocar de produto recomeca a peca — a colecao de um nao e
+       vendida no outro. */
+    if(modelos.length>1){
+      const l0=el('div',{class:'campos'});
+      const selMod=el('select',{'aria-label':'Produto'});
+      modelos.forEach(m=>selMod.appendChild(el('option',{value:String(m.id),
+        selected:m.id===modelo.id?'selected':null},[m.nome])));
+      selMod.onchange=async()=>{
+        await carregarCatalogo(selMod.value);
+        e.abertura_id=null; e.cor_tecido_id=null; e.cor_acessorio_id=null;
+        redesenhar();
+      };
+      l0.appendChild(el('div',{class:'campo cresce'},[el('label',{},['Produto']),selMod]));
+      box.appendChild(l0);
+    }
     const l1=el('div',{class:'campos'});
     const selCol=el('select',{'aria-label':'Coleção'});
     (modelo.colecoes||[]).filter(x=>x.disponivel).forEach(x=>{
@@ -370,24 +410,37 @@ function abrirNovaPeca(){
       i.oninput=()=>{ e[k]=i.value; };
       l2.appendChild(el('div',{class:'campo'},[el('label',{},[rot]),i]));
     });
-    const selCmd=el('select',{'aria-label':'Comando'});
-    [['direito','Direito'],['esquerdo','Esquerdo']].forEach(([v,t])=>{
-      const o=el('option',{value:v},[t]); if(v===e.comando) o.selected=true; selCmd.appendChild(o); });
-    selCmd.onchange=()=>{ e.comando=selCmd.value; };
-    l2.appendChild(el('div',{class:'campo'},[el('label',{},['Comando']),selCmd]));
-    const selRol=el('select',{'aria-label':'Rolamento'});
-    [['frente','Desce pela frente'],['tras','Desce por trás']].forEach(([v,t])=>{
-      const o=el('option',{value:v},[t]); if(v===e.rolamento) o.selected=true; selRol.appendChild(o); });
-    selRol.onchange=()=>{ e.rolamento=selRol.value; };
-    l2.appendChild(el('div',{class:'campo'},[el('label',{},['Rolamento']),selRol]));
+    /* ⚠️ OS CAMPOS SAEM DAS ESCOLHAS QUE O PRODUTO LIGA (secao 4 da spec
+       SOBMEDIDA-CADASTRO-DE-PRODUTO). O Rolo continua com os mesmos tres de
+       sempre; a Painel mostra acionamento, abertura e folhas, e o lado da
+       corrente so com comando. O servidor recusa o que vier fora disso. */
+    const liga=k=>(modelo.escolhas||[]).some(x=>x.chave===k&&x.ligada);
+    const seletor=(chave,rotulo,opcoes,aoMudar)=>{
+      const sel=el('select',{'aria-label':rotulo});
+      opcoes.forEach(([v,t])=>{ const o=el('option',{value:v},[t]); if(v===e[chave]) o.selected=true; sel.appendChild(o); });
+      sel.onchange=()=>{ e[chave]=sel.value; if(aoMudar) aoMudar(); };
+      l2.appendChild(el('div',{class:'campo'},[el('label',{},[rotulo]),sel]));
+    };
+    const opcoesDe=k=>((modelo.escolhas||[]).find(x=>x.chave===k)||{opcoes:[]}).opcoes.map(o=>[o.valor,o.nome]);
+    if(liga('comando')) seletor('comando','Comando',[['direito','Direito'],['esquerdo','Esquerdo']]);
+    if(liga('rolamento')) seletor('rolamento','Rolamento',[['frente','Desce pela frente'],['tras','Desce por trás']]);
     /* ⚠️ O `aria-label` E O TEXTO DO `<label>` DIZEM A MESMA COISA. Eram
        "Bandô ou barra" e "Bandô / barra": quem enxerga le um nome e quem usa
        leitor de tela ouve outro, e os dois conferem o mesmo campo. */
-    const selAd=el('select',{'aria-label':'Bandô / barra'});
-    [['nenhum','Sem bandô nem barra'],['bando','Bandô'],['barra','Barra niveladora']]
-      .forEach(([v,t])=>{ const o=el('option',{value:v},[t]); if(v===e.adicional) o.selected=true; selAd.appendChild(o); });
-    selAd.onchange=()=>{ e.adicional=selAd.value; };
-    l2.appendChild(el('div',{class:'campo'},[el('label',{},['Bandô / barra']),selAd]));
+    if(liga('adicional')) seletor('adicional','Bandô / barra',
+      [['nenhum','Sem bandô nem barra'],['bando','Bandô'],['barra','Barra niveladora']]);
+    /* As escolhas sem padrao comecam em branco: a revenda escolhe, e o
+       servidor recusa a que ficou sem resposta dizendo qual e. */
+    ['sentido','acionamento'].forEach(k=>{ if(liga(k)) seletor(k,
+      (modelo.escolhas.find(x=>x.chave===k)||{}).nome,[['','— escolha —']].concat(opcoesDe(k)),
+      k==='acionamento'?redesenhar:null); });
+    if(liga('lado_corrente')&&e.acionamento==='com_comando')
+      seletor('lado_corrente','Lado da corrente',[['','— escolha —']].concat(opcoesDe('lado_corrente')));
+    if(liga('folhas')){
+      const i=el('input',{type:'text',inputmode:'numeric',value:e.folhas||'','aria-label':'Folhas'});
+      i.oninput=()=>{ e.folhas=i.value; };
+      l2.appendChild(el('div',{class:'campo'},[el('label',{},['Folhas']),i]));
+    }
     box.appendChild(l2);
 
     const salvar=el('button',{class:'bt primario',type:'button'},['Acrescentar']);
@@ -397,12 +450,10 @@ function abrirNovaPeca(){
         erro='Medida em metros, com até três casas: 1,450.'; desenharAberto(); return;
       }
       try{
-        await api('/api/pedidos/'+aberto.id+'/itens',{metodo:'POST',silencioso:true,corpo:{
+        await api('/api/pedidos/'+aberto.id+'/itens',{metodo:'POST',silencioso:true,corpo:Object.assign({
           modelo_id:modelo.id, abertura_id:e.abertura_id,
           cor_tecido_id:e.cor_tecido_id, cor_acessorio_id:e.cor_acessorio_id,
-          largura_mm:largura, altura_mm:altura,
-          comando:e.comando, rolamento:e.rolamento,
-          adicional:e.adicional, reducao:e.reducao}});
+          largura_mm:largura, altura_mm:altura},corpoDasEscolhas(e))});
         erro=null; novaPeca=null;
         await abrir(aberto.id);
       }catch(x){ erro=x.message; desenharAberto(); }
@@ -414,6 +465,18 @@ function abrirNovaPeca(){
 
   novaPeca=box;
   redesenhar().then(desenharAberto);
+}
+
+/* So o que o produto liga vai no corpo — o comando do Rolo numa Painel seria
+   recusado pelo servidor, com razao. */
+function corpoDasEscolhas(e){
+  const liga=k=>(modelo.escolhas||[]).some(x=>x.chave===k&&x.ligada);
+  const corpo={};
+  ['comando','rolamento','adicional','reducao','acionamento','sentido'].forEach(k=>{
+    if(liga(k)&&e[k]!=null&&e[k]!=='') corpo[k]=e[k]; });
+  if(liga('lado_corrente')&&e.acionamento==='com_comando'&&e.lado_corrente) corpo.lado_corrente=e.lado_corrente;
+  if(liga('folhas')&&String(e.folhas||'').trim()!=='') corpo.folhas=Number(e.folhas);
+  return corpo;
 }
 
 /* ⚠️ MOTIVO E CAMPO, NAO `prompt()` OPCIONAL. Cancelar, reabrir e mudar

@@ -20,12 +20,35 @@ const dAbertura=require('../dados/abertura');
 const dCor=require('../dados/cor');
 const materiais=require('../nucleo/materiais');
 const dTecido=require('../dados/tecido');
+const dSetor=require('../dados/etiqueta_producao');
+const db=require('../nucleo/db');
+const ESC=require('./escolhas');
 
 /* As duas palavras que uma referencia de ficha pode ter alem de uma chave de
    componente. Elas sao reservadas: um componente chamado 'final' faria a
    ficha dizer duas coisas com a mesma palavra. */
-const REF_RESERVADAS=['final','degrau'];
-const QUANDOS=['sempre','bando','barra','sem_adicional','reducao'];
+const REF_RESERVADAS=['final','degrau','folha'];
+
+/* AS PECAS PRONTAS DE CALCULO (secao 2 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO).
+   O produto liga uma; a conta mora no persiana.js, e cada uma diz o que
+   devolve para a ficha medir e contar. Conta nova entra por spec, como peca
+   pronta nova — nunca digitada na tela. */
+const CALCULOS=[
+  {chave:'escada', nome:'Escada de tubos', quantidades:[]},
+  {chave:'gomos',  nome:'Gomos e varetas (Romana)', quantidades:['gomos','varetas']},
+  {chave:'folhas', nome:'Folhas, transpasse e vias (Painel)', quantidades:['folhas','vias','lados']},
+  {chave:'nenhum', nome:'Nenhum', quantidades:[]}
+];
+const QUANTIDADES_REF=['gomos','varetas','folhas','vias','lados'];
+/* Os campos EXTRAS da etiqueta, marcados por insumo (secao 8.2). Os valores
+   vem do cadastro de material; a data de fabricacao e a da primeira
+   impressao. */
+const EXTRAS=['marca','modelo','fabricacao'];
+/* Os `quando` das escolhas novas (secao 4.2): a linha entra pelo acionamento
+   ou pela abertura escolhida. A corda do Painel e `com_comando`, e no painel
+   sem comando ela nao entra — nao baixa estoque nem custa. */
+const QUANDOS=['sempre','bando','barra','sem_adicional','reducao',
+  'com_comando','sem_comando','abertura_lateral','abertura_central'];
 
 const modeloOuErro=id=>{
   const m=dCat.modelo(id);
@@ -34,7 +57,16 @@ const modeloOuErro=id=>{
 };
 
 // ── Modelo ────────────────────────────────────────────────────────────────
-const listarModelos=()=>dCat.modelos();
+/* ⚠️ O PRODUTO INATIVO NAO APARECE PARA QUEM VENDE (secao 3.2 da spec
+   SOBMEDIDA-CADASTRO-DE-PRODUTO). Ele nasce inativo para o dono conferir no
+   simulador antes de a revenda ver — e a lista do pedido e a primeira porta
+   por onde a revenda o veria. Sem filtro (a chamada antiga, sem argumento) a
+   lista continua inteira: e o que o cadastro usa. */
+function listarModelos(f){
+  const todos=dCat.modelos();
+  if(f&&f.inativos===false) return todos.filter(m=>m.ativo);
+  return todos;
+}
 const modeloPorNome=nome=>dCat.modeloPorNome(nome);
 
 /* O modelo INTEIRO, numa leitura so: e assim que a tela de catalogo e o
@@ -48,23 +80,185 @@ function modelo(id){
     degraus: dCat.degraus(id),
     ficha: dCat.ficha(id),
     faixas_suporte: dCat.faixas(id),
-    reducao: dCat.reducaoRegra(id)||{modelo_id:id,m2_acima_mm2:null,largura_acima_mm:null}
+    reducao: dCat.reducaoRegra(id)||{modelo_id:id,m2_acima_mm2:null,largura_acima_mm:null},
+    /* O que a tela precisa para OFERECER so o que o servidor aceita: os
+       `quando` e as referencias validas, e os setores do cadastro. Uma lista
+       copiada no navegador divergiria na primeira fase que acrescentasse um. */
+    escolhas: ESC.doModelo(dCat.escolhas(id)),
+    quandos: QUANDOS.slice(), refs_reservadas: REF_RESERVADAS.slice(),
+    calculos: CALCULOS, quantidades_ref: QUANTIDADES_REF.slice(),
+    setores: dSetor.setores().map(s=>({chave:s.chave,nome:s.nome}))
   });
 }
 
-function criarModelo(d,usuario){
-  const nome=String(d.nome||'').trim();
+/* Quem pode ver o modelo inteiro. O inativo so para quem edita o catalogo —
+   para o resto, a mesma recusa do calculo, com o nome dele. */
+function modeloParaVer(id,podeVerInativo){
+  const m=modelo(id);
+  exigir(m.ativo||podeVerInativo,'modelo_indisponivel','O modelo '+m.nome+' está desativado.');
+  /* A lista de trabalho do cadastro de material vai junto, para a ficha
+     pintar em ambar o que falta (secao 8.2). Ela nunca derruba a leitura: o
+     cadastro de material incompleto e o caso normal de hoje. */
+  try{ m.avisos_material=avisosDeMaterial(m.id); }catch(x){ m.avisos_material=[]; }
+  m.sem_kit=!temKit(m.id);
+  return m;
+}
+
+function nomeNovo(bruto,id){
+  const nome=String(bruto==null?'':bruto).trim();
   exigir(nome,'nome_vazio','Informe o nome do modelo.');
-  if(dCat.modeloPorNome(nome))
+  const ja=dCat.modeloPorNome(nome);
+  if(ja&&ja.id!==id)
     throw new ErroDeRegra('modelo_repetido','O modelo "'+nome+'" ja existe.');
-  return dCat.criarModelo({
-    nome,
-    largura_max_mm: d.largura_max_mm==null?null:u.mm(d.largura_max_mm,'a largura maxima'),
-    altura_max_mm:  d.altura_max_mm==null?null:u.mm(d.altura_max_mm,'a altura maxima'),
-    m2_max_mm2:     d.m2_max_mm2==null?null:u.mm(d.m2_max_mm2,'o m² maximo'),
-    m2_min_faturado_mm2: d.m2_min_faturado_mm2==null?1500000:u.mm(d.m2_min_faturado_mm2,'o minimo faturado'),
-    ordem:d.ordem, criado_por: usuario&&usuario.nome
+  return nome;
+}
+
+/* Os limites do modelo, validados juntos e antes de gravar. Vazio de
+   proposito (null) apaga o limite — e decisao de quem editou; ausente nao
+   mexe. O minimo faturado e o unico que nao pode ficar vazio: a coluna e NOT
+   NULL desde a migracao 16, porque o preco sem minimo cobraria 0,10 m². */
+function limitesModelo(d){
+  const fora={};
+  [['largura_max_mm','a largura maxima'],['altura_max_mm','a altura maxima'],
+   ['m2_max_mm2','o m² maximo']].forEach(([c,oque])=>{
+    if(d[c]!==undefined) fora[c]=d[c]==null||d[c]===''?null:u.mm(d[c],oque);
   });
+  if(d.m2_min_faturado_mm2!==undefined){
+    exigir(d.m2_min_faturado_mm2!=null&&d.m2_min_faturado_mm2!=='','minimo_obrigatorio',
+      'O mínimo faturado não fica vazio. Para não cobrar mínimo, lance 0,000.');
+    fora.m2_min_faturado_mm2=u.mm(d.m2_min_faturado_mm2,'o minimo faturado');
+  }
+  if(d.ordem!==undefined) fora.ordem=d.ordem;
+  if(d.calculo!==undefined){
+    exigir(CALCULOS.some(c=>c.chave===d.calculo),'calculo_invalido',
+      'O cálculo é um dos do sistema: '+CALCULOS.map(c=>c.nome).join(', ')+'.');
+    fora.calculo=d.calculo;
+  }
+  [['gomo_max_mm','o limite do gomo'],['transpasse_mm','o transpasse']].forEach(([c,oque])=>{
+    if(d[c]===undefined) return;
+    const v=u.mm(d[c],oque);
+    exigir(v>0||c==='transpasse_mm','numero_invalido',oque.charAt(0).toUpperCase()+oque.slice(1)+
+      ' tem que ser maior que zero.');
+    fora[c]=v;
+  });
+  return fora;
+}
+
+/* ⚠️ O PRODUTO NOVO NASCE INATIVO — decisao do dono em 27/10/2026. A revenda
+   nao ve e o pedido nao aceita ate o dono conferir no simulador e ativar.
+   Conferir depois de ativar seria conferir com a revenda ja vendendo. */
+function criarModelo(d,usuario){
+  const nome=nomeNovo(d.nome);
+  const lim=limitesModelo(d);
+  return dCat.criarModelo(Object.assign({nome, m2_min_faturado_mm2:1500000},lim,{
+    ordem:d.ordem, criado_por: usuario&&usuario.nome, ativo:0}));
+}
+
+function editarModelo(id,d,usuario){
+  const m=modeloOuErro(id);
+  /* O ativo tem porta propria, com a regra do "Copia de". Deixa-lo entrar por
+     aqui seria o segundo caminho para ativar — e o que pula a regra. */
+  if(d.ativo!==undefined) throw new ErroDeRegra('ativo_por_outra_porta',
+    'Ativar e desativar é no botão Ativar, que confere o nome antes.');
+  const campos=limitesModelo(d);
+  if(d.nome!==undefined) campos.nome=nomeNovo(d.nome,m.id);
+  return dCat.atualizarModelo(m.id,campos);
+}
+
+/* ⚠️ "COPIA DE…" NAO ATIVA (secao 3.2). O duplicar propoe esse nome, e um
+   produto que sai para a revenda chamado "Cópia de Rolô" e o sinal de que
+   ninguem conferiu — e o nome que ela le no orcamento. */
+const NOME_DE_COPIA=/^\s*c[óo]pia\s+de\b/i;
+/* ⚠️ TODO PRODUTO LEVA KIT DE INSTALACAO (secao 8.5, dono, 28/10/2026). Nao
+   existe "nao leva kit": a ficha sem kit e ficha que ESQUECEU o kit, e e por
+   isso que ela nao ativa. Sem esta trava a embalagem — que so cobra o kit de
+   quem tem kit na ficha (R-SMN-13) — deixaria passar sem cobrar nada
+   justamente o esquecimento que a trava do kit existe para pegar. Conta so a
+   linha ATIVA de um kit ATIVO: kit desativado no cadastro nao entra na
+   persiana (persiana.js), e contar com ele seria ativar sem kit. */
+const temKit=modelo_id=>dCat.ficha(modelo_id).some(l=>l.eh_kit&&l.ativo!==0&&l.componente_ativo!==0);
+
+function ativarModelo(id,ativo,usuario){
+  const m=modeloOuErro(id);
+  if(ativo) exigir(!NOME_DE_COPIA.test(m.nome),'nome_de_copia',
+    'O nome "'+m.nome+'" ainda é o da cópia. Dê ao produto o nome que a revenda vai ler '+
+    'antes de ativar.');
+  if(ativo) exigir(temKit(m.id),'sem_kit',
+    'O produto '+m.nome+' não tem kit de instalação na ficha técnica. Todo produto leva kit: '+
+    'acrescente a linha do kit (aba Ficha técnica) antes de ativar.');
+  return dCat.atualizarModelo(m.id,{ativo:ativo?1:0});
+}
+
+/* ── DUPLICAR (secao 3.1) ─────────────────────────────────────────────────
+   COPIA DE TUDO, NUMA TRANSACAO SO: colecoes com preco, cores de acessorio,
+   escada de tubos, ficha, faixas de suporte, regra da reducao — e, nas fases
+   seguintes, as escolhas ligadas e o calculo, que moram nas mesmas tabelas e
+   por isso vem junto sem linha nova aqui (as colunas saem do pragma).
+
+   ⚠️ O COMPONENTE NAO SE COPIA, e e de proposito. Ele e do sistema, nao do
+   produto: o preco do bandô por metro e um so, e o setor e o codigo do kit
+   tambem. A copia aponta para o MESMO componente pela ficha. */
+const FILHAS=['sm_modelo_colecao','sm_modelo_cor_acessorio','sm_degrau_tubo',
+  'sm_ficha_linha','sm_faixa_suporte','sm_reducao_regra','sm_modelo_escolha'];
+/* Acrescentada pela fase que cria a tabela — um nome a mais aqui, e o duplicar
+   leva junto. */
+const filhas=()=>FILHAS.concat(FILHAS_EXTRAS);
+const FILHAS_EXTRAS=[];
+
+function nomeDeCopia(original){
+  const raiz='Cópia de '+original;
+  if(!dCat.modeloPorNome(raiz)) return raiz;
+  for(let n=2;;n++) if(!dCat.modeloPorNome(raiz+' '+n)) return raiz+' '+n;
+}
+
+function duplicarModelo(id,d,usuario){
+  const m=modeloOuErro(id);
+  const nome=(d&&d.nome!=null&&String(d.nome).trim())?nomeNovo(d.nome):nomeDeCopia(m.nome);
+  const quem=usuario&&usuario.nome;
+  return db.transaction(()=>{
+    const novo=dCat.copiarModelo(m.id,nome,quem);
+    const mapas={};
+    for(const t of filhas()) mapas[t]=dCat.copiarFilhas(t,m.id,novo);
+    /* ⚠️ O PRECO COPIADO DEIXA LINHA, com a marca de onde veio. Preco que
+       aparece sem rastro e a metade do registro que falta quando alguem
+       pergunta "de onde veio esse numero?" (secao 3.2). */
+    for(const [antigo,nova] of mapas.sm_modelo_colecao){
+      const c=dCat.colecao(nova);
+      if(c&&c.preco_m2_centavos!=null) dCat.registrarPreco({alvo:'colecao',alvo_id:nova,de:null,
+        para:c.preco_m2_centavos,usuario_nome:quem,detalhe:'copiado de '+m.nome});
+    }
+    for(const f of DEPOIS_DE_COPIAR) f(mapas,m,novo,quem);
+    return dCat.modelo(novo);
+  })();
+}
+/* O que uma fase seguinte precisa fazer depois da copia (o preco por cor
+   aponta para a colecao copiada, e nao para o modelo). */
+const DEPOIS_DE_COPIAR=[];
+
+// ── As escolhas do cliente (secao 4 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO) ─
+/* Ligar e desligar. ⚠️ A DEPENDENCIA E CONFERIDA NOS DOIS SENTIDOS: o lado da
+   corrente nao liga sem o acionamento (ele so aparece "com comando"), e o
+   acionamento nao desliga com o lado da corrente ligado — senao sobraria uma
+   escolha obrigatoria que nunca aparece, e o pedido seria recusado sem
+   ninguem entender por que. */
+function ligarEscolha(modelo_id,escolha,ligada){
+  const m=modeloOuErro(modelo_id);
+  const e=ESC.porChave(escolha);
+  exigir(e,'escolha_inexistente','A escolha "'+escolha+'" não existe. As escolhas são: '+
+    ESC.ESCOLHAS.map(x=>x.chave).join(', ')+'.');
+  const atuais=dCat.escolhas(m.id);
+  if(ligada){
+    for(const dep of Object.keys(e.depende||{}))
+      exigir(atuais.includes(dep),'depende_de','"'+e.nome+'" só existe com "'+ESC.porChave(dep).nome+
+        '" ligado. Ligue "'+ESC.porChave(dep).nome+'" antes.');
+    dCat.ligarEscolha(m.id,e.chave,ESC.ESCOLHAS.indexOf(e)+1);
+  }else{
+    const orfa=ESC.ESCOLHAS.find(x=>atuais.includes(x.chave)&&x.depende&&x.depende[e.chave]!==undefined);
+    exigir(!orfa,'tem_dependente','"'+(orfa&&orfa.nome)+'" depende de "'+e.nome+'". Desligue "'+
+      (orfa&&orfa.nome)+'" antes.');
+    dCat.desligarEscolha(m.id,e.chave);
+  }
+  return modelo(m.id).escolhas;
 }
 
 // ── Colecao de venda ──────────────────────────────────────────────────────
@@ -141,6 +335,52 @@ function ligarCorAcessorio(d){
 
 // ── Componente ────────────────────────────────────────────────────────────
 const listarComponentes=()=>dCat.componentes();
+
+const COBRANCAS=['m2_colecao','metro','peca'];
+
+/* ⚠️ O COMPONENTE NOVO E O QUE DEIXA O DONO MONTAR A ROMANA SOZINHO (secao 2
+   da spec SOBMEDIDA-CADASTRO-DE-PRODUTO). Ate aqui os doze da semente eram
+   os unicos, e vareta, trilho e corda so entrariam por INSERT a mao — que e o
+   desvio da armadilha #6 pela porta do cadastro (a #33 do CLAUDE.md).
+
+   A chave e o nome por que a FICHA se refere a ele, e por isso ela segue as
+   regras de uma referencia: minuscula, sem espaco, e nunca uma das palavras
+   reservadas — um componente chamado "final" faria a ficha dizer duas coisas
+   com a mesma palavra. */
+function criarComponente(d,usuario){
+  const chave=String(d.chave||'').trim().toLowerCase();
+  exigir(/^[a-z][a-z0-9_]*$/.test(chave),'chave_invalida',
+    'A chave do componente é uma palavra só, minúscula, sem espaço e sem acento (ex.: vareta, base_conica).');
+  exigir(REF_RESERVADAS.indexOf(chave)<0,'chave_reservada',
+    '"'+chave+'" é palavra reservada da ficha ('+REF_RESERVADAS.join(', ')+'). Escolha outra chave.');
+  if(dCat.componentePorChave(chave))
+    throw new ErroDeRegra('componente_repetido','Já existe o componente "'+chave+'".');
+  const nome=String(d.nome||'').trim();
+  exigir(nome,'nome_vazio','Informe o nome do componente.');
+  const setor=String(d.setor||'').trim();
+  exigir(dSetor.setor(setor),'setor_inexistente','O setor "'+setor+'" não está no cadastro de setores. '+
+    'Os setores são: '+dSetor.setores().map(s=>s.nome).join(', ')+'.');
+  const cobra=d.unidade_cobranca==null||d.unidade_cobranca===''?null:String(d.unidade_cobranca);
+  exigir(cobra==null||COBRANCAS.indexOf(cobra)>=0,'cobranca_invalida',
+    'A cobrança é: m2_colecao, metro, peca — ou vazia, para quem não cobra.');
+  const codigo=d.codigo_barras==null||String(d.codigo_barras).trim()===''?null:String(d.codigo_barras).trim();
+  if(codigo&&dCat.componentePorCodigo(codigo))
+    throw new ErroDeRegra('codigo_repetido','O código de barras "'+codigo+'" já é de outro componente.');
+  const preco=d.preco_centavos==null||d.preco_centavos===''?null:u.centavos(d.preco_centavos,'o preço');
+  const lim={};
+  ['largura_max_mm','altura_max_mm'].forEach(c=>{
+    lim[c]=d[c]==null||d[c]===''?null:u.mm(d[c],'o limite do componente'); });
+  return db.transaction(()=>{
+    const c=dCat.criarComponente(Object.assign({chave,nome,setor,
+      gera_etiqueta:d.gera_etiqueta===undefined?1:(d.gera_etiqueta?1:0),
+      eh_kit:d.eh_kit?1:0, usa_faixa_suporte:d.usa_faixa_suporte?1:0,
+      codigo_barras:codigo, preco_centavos:preco, unidade_cobranca:cobra,
+      ordem:dCat.componentes().length+1},lim));
+    if(preco!=null) dCat.registrarPreco({alvo:'componente',alvo_id:c.id,de:null,para:preco,
+      usuario_nome:usuario&&usuario.nome});
+    return c;
+  })();
+}
 
 function definirPrecoComponente(id,valor,usuario){
   const c=dCat.componente(id);
@@ -341,6 +581,30 @@ function camposFicha(d){
     fora.quando=d.quando;
   }
   if(d.ordem!==undefined) fora.ordem=d.ordem;
+  /* "Gera etiqueta" na linha: null herda do componente, 0/1 decide aqui. */
+  if(d.gera_etiqueta!==undefined)
+    fora.gera_etiqueta=d.gera_etiqueta==null||d.gera_etiqueta===''?null:(d.gera_etiqueta?1:0);
+  if(d.etiqueta_extras!==undefined){
+    const lista=(Array.isArray(d.etiqueta_extras)?d.etiqueta_extras:String(d.etiqueta_extras||'').split(','))
+      .map(x=>String(x).trim()).filter(Boolean);
+    lista.forEach(x=>exigir(EXTRAS.indexOf(x)>=0,'extra_invalido',
+      'O campo extra da etiqueta é um de: '+EXTRAS.join(', ')+'.'));
+    fora.etiqueta_extras=lista.length?[...new Set(lista)].join(','):null;
+  }
+  /* O QUE A PECA SEGURA NA BANCADA (fase 6): a montagem, como quase tudo, ou
+     so a embalagem — a peca que vai SO NA CAIXA (o bandô e a barra do Rolo). */
+  if(d.libera!==undefined){
+    const v=d.libera==null||d.libera===''||d.libera==='montagem'?null:String(d.libera);
+    exigir(v==null||v==='embalagem','libera_invalido',
+      'A peça segura a montagem (o padrão) ou só a embalagem, quando vai só na caixa.');
+    fora.libera=v;
+  }
+  if(d.quantidade_ref!==undefined){
+    const q=d.quantidade_ref==null||d.quantidade_ref===''?null:String(d.quantidade_ref).trim();
+    exigir(q==null||QUANTIDADES_REF.indexOf(q)>=0,'quantidade_ref_invalida',
+      'A quantidade por referência é uma de: '+QUANTIDADES_REF.join(', ')+' — ou vazia, para a quantidade fixa.');
+    fora.quantidade_ref=q;
+  }
   if(d.quantidade!==undefined){
     const q=Number(d.quantidade);
     exigir(Number.isInteger(q)&&q>0,'quantidade_invalida','A quantidade tem que ser inteira e maior que zero.');
@@ -379,14 +643,26 @@ function criarFichaLinha(d){
 }
 
 // ── Faixas de suporte ─────────────────────────────────────────────────────
+/* ⚠️ A FAIXA E DE CADA KIT (secao 8.5). `componente_id` vazio e a faixa DO
+   PRODUTO, que vale para todo kit que conta suporte e nao tem faixa propria —
+   e assim que o Rolo sempre funcionou, e continua. Apontada, ela tem que ser
+   de um kit que conta suporte e esta na ficha deste produto: faixa de um tubo
+   ou de um kit de outro produto e numero que nao pega em ninguem (divida 18). */
 function criarFaixaSuporte(d){
   const m=modeloOuErro(d.modelo_id);
   const largura=u.mm(d.largura_max_mm,'a largura da faixa');
   const q=Number(d.quantidade);
   exigir(Number.isInteger(q)&&q>0,'quantidade_invalida','A quantidade de suportes tem que ser inteira e maior que zero.');
-  if(dCat.faixas(m.id).some(f=>f.largura_max_mm===largura))
-    throw new ErroDeRegra('faixa_repetida','Ja existe faixa ate '+u.emMetros(largura)+' neste modelo.');
-  return dCat.criarFaixa({modelo_id:m.id,largura_max_mm:largura,quantidade:q});
+  const kitId=(d.componente_id==null||d.componente_id==='')?null:Number(d.componente_id);
+  let kit=null;
+  if(kitId!=null){
+    kit=dCat.ficha(m.id).find(l=>l.componente_id===kitId&&l.eh_kit&&l.usa_faixa_suporte);
+    exigir(kit,'faixa_sem_kit','A faixa só pode ser de um kit que conta suportes pela largura e está na ficha deste produto.');
+  }
+  if(dCat.faixas(m.id).some(f=>f.largura_max_mm===largura&&(f.componente_id==null?null:f.componente_id)===kitId))
+    throw new ErroDeRegra('faixa_repetida','Ja existe faixa ate '+u.emMetros(largura)+
+      (kit?' para o '+kit.componente_nome:' neste modelo')+'.');
+  return dCat.criarFaixa({modelo_id:m.id,largura_max_mm:largura,quantidade:q,componente_id:kitId});
 }
 const apagarFaixaSuporte=id=>{ dCat.apagarFaixa(id); return {apagada:true}; };
 
@@ -417,17 +693,89 @@ function coresDaColecao(id){
     .map(t=>({cor_id:t.cor_id, cor_nome:t.cor_nome, tecido_id:t.id, codigo:t.codigo}));
 }
 
+/* ── O PRECO POR COR (secao 7 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO) ──────
+   SEM TELA, por decisao do dono: a estrutura e o calculo ficam prontos, e a
+   tela entra quando o preco passar a mudar por cor. A linha da cor VENCE a
+   da colecao; `null` tira a linha, e volta a valer a colecao. Toda mudanca
+   deixa linha no historico, como o preco da colecao. */
+function definirPrecoCor(colecao_id,cor_id,valor,usuario){
+  const c=dCat.colecao(colecao_id);
+  exigir(c,'colecao_inexistente','Colecao de venda nao encontrada.');
+  const cor=dCor.porId(cor_id);
+  exigir(cor,'cor_inexistente','Esta cor nao existe no cadastro.');
+  const antes=dCat.precoCor(c.id,cor.id);
+  const novo=valor==null||valor===''?null:u.centavos(valor,'o preco do m² da cor');
+  if((antes?antes.preco_m2_centavos:null)===novo) return {mudou:false};
+  if(novo==null) dCat.apagarPrecoCor(c.id,cor.id); else dCat.gravarPrecoCor(c.id,cor.id,novo);
+  dCat.registrarPreco({alvo:'colecao_cor',alvo_id:c.id,de:antes?antes.preco_m2_centavos:null,
+    para:novo,usuario_nome:usuario&&usuario.nome,detalhe:'cor '+cor.nome});
+  return {mudou:true};
+}
+const precosPorCor=colecao_id=>dCat.precosPorCor(colecao_id);
+const precoCorDe=(colecao_id,cor_id)=>cor_id?dCat.precoCor(colecao_id,Number(cor_id)):null;
+
+/* A copia leva o preco por cor, apontando para a colecao COPIADA. */
+DEPOIS_DE_COPIAR.push((mapas)=>{
+  for(const [antiga,nova] of mapas.sm_modelo_colecao)
+    for(const pc of dCat.precosPorCor(antiga)) dCat.gravarPrecoCor(nova,pc.cor_id,pc.preco_m2_centavos);
+});
+
+/* ── O QUE FALTA NO CADASTRO DE MATERIAL (secao 8.2, dono 28/10/2026) ──────
+   O cadastro de material ainda NAO esta refinado, e por isso nada trava: a
+   etiqueta sai com o nome do componente, e o campo vazio nao sai. O que esta
+   lista faz e mostrar em ambar, na ficha de cada produto, o que falta ligar
+   — e a lista de trabalho para arrumar o cadastro aos poucos.
+
+   ⚠️ SO ENTRA O QUE E INSUMO. Ficam de fora: o TECIDO (o estoque dele mora
+   aqui, e por decisao do dono nem vai ao Compras do PCP — fase 4-C), os KITS
+   (o codigo deles e o bipe da embalagem, e nao uma compra) e o TRABALHO DE
+   SETOR (montagem, revisao, embalagem: o componente cuja chave e o proprio
+   setor e a mao de obra, e nao uma peca). Cobrar material deles seria
+   ruido permanente, e ruido permanente e a lista que a equipe aprende a nao
+   ler (armadilha #6). O TUBO se aponta no degrau: o aviso diz qual degrau.
+
+   E "material sem marca/modelo" so aparece onde a etiqueta PEDE marca ou
+   modelo — a vareta nao tem o que avisar por nao ter marca. */
+function avisosDeMaterial(modelo_id){
+  const m=modelo(modelo_id);
+  const porta=materiais.ligada();
+  const doPcp=porta?new Map(materiais.listar().map(x=>[x.id,x])):null;
+  const fora=[];
+  const vistas=new Set();
+  for(const l of m.ficha.filter(x=>x.ativo&&x.componente_ativo)){
+    if(l.chave==='tecido'||l.eh_kit||l.chave===l.setor) continue;
+    if(!l.gera_etiqueta) continue;
+    if(vistas.has(l.chave)) continue;
+    vistas.add(l.chave);
+    let aviso='';
+    if(l.chave==='tubo'){
+      const sem=m.degraus.filter(d=>d.ativo&&d.componente_id==null).map(d=>d.nome);
+      if(sem.length) aviso='sem material ligado ('+sem.join(', ')+')';
+    }else if(l.material_id==null) aviso='sem material ligado';
+    else if(doPcp&&!doPcp.has(l.material_id)) aviso='o material apontado não está mais em Compras';
+    else{
+      const pede=String(l.etiqueta_extras||'').split(',').filter(x=>x==='marca'||x==='modelo');
+      const mat=doPcp&&doPcp.get(l.material_id);
+      if(pede.length&&mat&&pede.some(x=>!mat[x])) aviso='material sem marca/modelo';
+    }
+    fora.push({chave:l.chave, nome:l.componente_nome, aviso,
+      material:(l.material_id!=null&&doPcp&&doPcp.get(l.material_id))||null});
+  }
+  return fora;
+}
+
 const historicoPreco=(alvo,alvo_id)=>dCat.historicoPreco(alvo,alvo_id);
 
 module.exports={
   coresDaColecao,
-  listarModelos, modelo, modeloPorNome, criarModelo,
+  listarModelos, modelo, modeloParaVer, modeloPorNome, criarModelo, editarModelo, ativarModelo,
+  duplicarModelo, FILHAS_EXTRAS, DEPOIS_DE_COPIAR, ligarEscolha,
   colecoesDe, colecaoDe, ligarColecao, editarColecao, definirPrecoColecao,
   ligarCorAcessorio,
-  listarComponentes, definirPrecoComponente,
+  listarComponentes, criarComponente, definirPrecoComponente, COBRANCAS,
   criarDegrau, editarDegrau,
   ligarMaterialDoDegrau, ligarMaterialDoComponente,
   fichaDe, fichaLinhaDe, criarFichaLinha, editarFichaLinha,
   criarFaixaSuporte, apagarFaixaSuporte, definirReducaoRegra,
-  historicoPreco, QUANDOS, REF_RESERVADAS
+  historicoPreco, avisosDeMaterial, definirPrecoCor, precosPorCor, precoCorDe, QUANDOS, REF_RESERVADAS, CALCULOS, QUANTIDADES_REF, EXTRAS
 };

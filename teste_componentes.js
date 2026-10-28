@@ -48,7 +48,8 @@ db.exec(`
     criado_em TEXT DEFAULT (datetime('now','localtime')),
     estoque_minimo REAL DEFAULT 0, estoque_ideal REAL DEFAULT 0,
     perda_pct REAL DEFAULT 0, sobra_aproveitavel INTEGER DEFAULT 1,
-    familia TEXT, cor TEXT, largura_bobina_cm REAL, custo_medio REAL);
+    familia TEXT, cor TEXT, largura_bobina_cm REAL, custo_medio REAL,
+    marca TEXT, modelo TEXT);
   CREATE UNIQUE INDEX idx_comp_variante
     ON componente(familia, cor, largura_bobina_cm) WHERE familia IS NOT NULL;
   CREATE TABLE fornecedor (id INTEGER PRIMARY KEY, nome TEXT, ativo INTEGER DEFAULT 1);
@@ -225,6 +226,28 @@ console.log('\n── desativar e o caminho de VOLTA '+'─'.repeat(27));
   chamar('POST','/api/componentes',{id, nome:'Fica inativo', estoque_minimo:3});
   ok('editar sem citar `ativo` NAO reativa sozinho', ler(id).ativo===0,
      ()=>JSON.stringify(ler(id)));
+}
+
+console.log('\n── marca e modelo (sob medida, cadastro de produto, fase 5) '+'─'.repeat(4));
+{
+  /* MARCA E MODELO sao o que a etiqueta de producao do sob medida escreve do
+     motor — o dado da garantia (spec SOBMEDIDA-CADASTRO-DE-PRODUTO, secao
+     8.2). Sao opcionais: o cadastro de material ainda esta sendo arrumado, e
+     falta deles nunca trava nada. A regra do campo ausente vale inteira. */
+  const t=criar({nome:'Motor tubular', unidade:'un', marca:'Somfy', modelo:'Sonesse 30'});
+  const id=t.corpo.id;
+  ok('marca e modelo gravam no nascimento', ler(id).marca==='Somfy'&&ler(id).modelo==='Sonesse 30',
+     ()=>JSON.stringify(ler(id)));
+  chamar('POST','/api/componentes',{id, estoque_minimo:2});
+  ok('⚠ editar o minimo NAO apaga marca nem modelo (campo ausente nao e vazio)',
+     ler(id).marca==='Somfy'&&ler(id).modelo==='Sonesse 30', ()=>JSON.stringify(ler(id)));
+  chamar('POST','/api/componentes',{id, modelo:'Sonesse 40'});
+  ok('o campo citado muda, e so ele', ler(id).modelo==='Sonesse 40'&&ler(id).marca==='Somfy');
+  chamar('POST','/api/componentes',{id, marca:''});
+  ok('vazio de proposito apaga — e decisao de quem editou', ler(id).marca===null,
+     ()=>JSON.stringify(ler(id).marca));
+  const sem=criar({nome:'Vareta 8 mm', unidade:'un'});
+  ok('material sem marca nasce normalmente — nao e obrigatorio', sem.status===200&&ler(sem.corpo.id).marca==null);
 }
 
 console.log('\n── a lista que a tela le '+'─'.repeat(36));

@@ -193,7 +193,7 @@ try{
   const sm = require('./tecido/montar').montar(app, null, {
     permissoes: uid => [...app.locals.acesso.permissoesDe(uid)],
     pessoas: () => db.prepare('SELECT id,nome FROM usuarios WHERE ativo=1 ORDER BY nome').all(),
-    materiais: () => db.prepare('SELECT id,nome,unidade FROM componente WHERE ativo=1 ORDER BY nome').all()
+    materiais: () => db.prepare('SELECT id,nome,unidade,marca,modelo FROM componente WHERE ativo=1 ORDER BY nome').all()
   });
   require('./sobmedida_material').ligar(sm && sm.consumoDeMaterial);
 }catch(e){

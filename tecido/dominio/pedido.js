@@ -32,6 +32,7 @@ const {pode}=require('../nucleo/permissoes');
    sequencial e o `etiqueta_producao.js`; se ele morasse aqui, a numeracao
    teria dois donos no dia em que o backfill precisasse dela. */
 const etiquetas=require('./etiqueta_producao');
+const materiais=require('../nucleo/materiais');
 
 const TIPOS=['orcamento','pedido'];
 const ENTREGAS=['entrega','retira'];
@@ -40,7 +41,8 @@ const ENTREGAS=['entrega','retira'];
    campo que o acrescentar conhece e o editar esquece — foi assim que o
    `estoque` sumiu do POST /api/skus do PCP (armadilha #25). */
 const ESCOLHAS=['modelo_id','abertura_id','cor_tecido_id','cor_acessorio_id',
-  'largura_mm','altura_mm','comando','rolamento','adicional','reducao'];
+  'largura_mm','altura_mm','comando','rolamento','adicional','reducao',
+  'acionamento','sentido','lado_corrente','folhas'];
 
 const nome=usuario=>(usuario&&usuario.nome)||null;
 const ativo=i=>!i.cancelado_em;
@@ -79,6 +81,13 @@ function camposCabecalho(dados,revenda){
     fora.entrega=dados.entrega;
   }
   if(dados.observacao!==undefined) fora.observacao=dados.observacao==null?null:String(dados.observacao).trim();
+  /* O CLIENTE FINAL e opcional (secao 8.2 da spec SOBMEDIDA-CADASTRO-DE-
+     PRODUTO): preenchido, sai na etiqueta ao lado da revenda. Vazio e NULL —
+     e a etiqueta sai so com a revenda. */
+  if(dados.cliente_final!==undefined){
+    const t=dados.cliente_final==null?'':String(dados.cliente_final).trim();
+    fora.cliente_final=t||null;
+  }
   if(dados.endereco_entrega_id!==undefined){
     if(dados.endereco_entrega_id===null||dados.endereco_entrega_id==='') fora.endereco_entrega_id=null;
     else{
@@ -159,6 +168,21 @@ function gravarEscolhas(escolha,r){
   fora.adicional=r.adicional;
   fora.reducao=r.reducao.aplicada?'pedida':'nao';
   fora.tecido_id=r.tecido_id;
+  /* ⚠️ O QUE O PRODUTO NAO LIGA SAI DO CALCULO, e nao do corpo: comando e
+     rolamento sao NOT NULL e gravam '' ("nao se aplica", migracao 33); as
+     escolhas novas gravam NULL. Gravar o que veio no corpo poria no pedido
+     uma escolha que o calculo recusaria no envio. */
+  fora.comando=r.comando||'';
+  fora.rolamento=r.rolamento||'';
+  fora.acionamento=r.acionamento; fora.sentido=r.sentido;
+  fora.lado_corrente=r.lado_corrente; fora.folhas=r.folhas;
+  // O que o calculo disse vai junto, como o degrau: a etiqueta le daqui.
+  fora.gomos=r.calculo&&r.calculo.gomos!=null?r.calculo.gomos:null;
+  fora.gomo_decimo_mm=r.calculo&&r.calculo.gomo_decimo_mm!=null?r.calculo.gomo_decimo_mm:null;
+  const cal=r.calculo||{};
+  fora.folha_mm=cal.folha_mm!=null?cal.folha_mm:null;
+  fora.vias=cal.vias!=null?cal.vias:null;
+  fora.lados=cal.lados!=null?cal.lados:null;
   return fora;
 }
 
@@ -301,7 +325,7 @@ function enviar(id,usuario,quando){
     let semTecido=0;
     for(const {item,r,tecido} of calculados){
       d.atualizarItem(item.id,Object.assign(gravarEscolhas(item,r),{
-        degrau_nome:r.degrau.nome,
+        degrau_nome:r.degrau?r.degrau.nome:null,
         m2_real_mm2:r.preco.m2_real_mm2, m2_cobrado_mm2:r.preco.m2_cobrado_mm2,
         valor_subtotal_centavos:r.preco.valor_subtotal_centavos,
         valor_final_centavos:r.preco.revenda?r.preco.revenda.valor_final_centavos:null,
@@ -381,6 +405,13 @@ function aprovar(id,usuario){
 
   // Calcula tudo antes de gravar — recusa nao deixa meia ficha explodida.
   const explodidos=itens.map(item=>({item, r:calcularItem(item,p.revenda_id)}));
+  /* O CADASTRO DE MATERIAL DO PCP, lido UMA vez. ⚠️ Porta desligada ou
+     material sumido NAO travam a aprovacao (dono, 28/10/2026): o cadastro de
+     material ainda nao esta refinado, e a etiqueta sai com o nome do
+     componente. Travar aqui seria a armadilha #6 — o pedido parado por um
+     campo que ninguem preencheu ainda. */
+  let doPcp=null;
+  try{ doPcp=materiais.ligada()?new Map(materiais.listar().map(m=>[m.id,m])):null; }catch(x){ doPcp=null; }
 
   return db.transaction(()=>{
     for(const {item,r} of explodidos){
@@ -390,20 +421,36 @@ function aprovar(id,usuario){
          meio, a fabrica vai cortar um tubo diferente do que foi vendido. E
          evento raro e caro — o tipo de coisa que ninguem procura depois se
          nao estiver escrito. */
-      if(item.degrau_nome&&item.degrau_nome!==r.degrau.nome)
+      const degrauAgora=r.degrau?r.degrau.nome:null;
+      if(item.degrau_nome&&item.degrau_nome!==degrauAgora)
         d.criarAlteracao({pedido_id:p.id, item_id:item.id, o_que:'degrau',
-          antes:item.degrau_nome, depois:r.degrau.nome,
+          antes:item.degrau_nome, depois:degrauAgora,
           motivo:'a escada de tubos mudou entre o envio e a aprovacao',
           usuario_nome:nome(usuario)});
 
       d.apagarComponentes(item.id);
-      r.componentes.forEach((c,i)=>d.criarComponente({item_id:item.id, ordem:i+1,
-        chave:c.chave, nome:c.nome, setor:c.setor, quantidade:c.quantidade,
-        gera_etiqueta:c.gera_etiqueta?1:0, eh_kit:c.eh_kit?1:0,
-        codigo_barras:c.codigo_barras,
-        suportes:(r.kit&&r.kit.chave===c.chave)?r.kit.suportes:null,
-        largura_corte_mm:c.largura_corte_mm, altura_corte_mm:c.altura_corte_mm,
-        consumo_largura_mm:c.consumo_largura_mm, consumo_altura_mm:c.consumo_altura_mm}));
+      r.componentes.forEach((c,i)=>{
+        const comum={item_id:item.id, ordem:i+1,
+          chave:c.chave, nome:c.nome, setor:c.setor,
+          gera_etiqueta:c.gera_etiqueta?1:0, eh_kit:c.eh_kit?1:0,
+          codigo_barras:c.codigo_barras,
+          /* Os suportes de CADA kit, pela faixa dele (secao 8.5). */
+          suportes:c.eh_kit?(((r.kits||[]).find(k=>k.chave===c.chave)||{}).suportes??null):null,
+          largura_corte_mm:c.largura_corte_mm, altura_corte_mm:c.altura_corte_mm,
+          consumo_largura_mm:c.consumo_largura_mm, consumo_altura_mm:c.consumo_altura_mm,
+          etiqueta_extras:c.etiqueta_extras||null, libera:c.libera||null};
+        Object.assign(comum,materialDe(c,doPcp));
+        /* ⚠️ UMA LINHA POR UNIDADE, QUANDO A PECA TEM ETIQUETA (secao 8.1 da
+           spec SOBMEDIDA-CADASTRO-DE-PRODUTO). Quatro varetas sao quatro
+           etiquetas, 1/4 a 4/4, cada uma com o seu codigo e o seu bipe. Cada
+           linha tem quantidade 1, e e por isso que o consumo nao multiplica:
+           o Compras soma linha x quantidade, e as quatro linhas sao as mesmas
+           quatro varetas de antes. A peca sem etiqueta (o kit, a reducao)
+           continua numa linha so, com a quantidade dela. */
+        const n=c.gera_etiqueta?c.quantidade:1;
+        for(let k=1;k<=n;k++) d.criarComponente(Object.assign({},comum,{
+          quantidade:c.gera_etiqueta?1:c.quantidade, unidade_k:k, unidade_n:n}));
+      });
     }
     /* ⚠️ O CODIGO DA ETIQUETA NASCE AQUI, e nao na impressao (secao 4.14).
        Junto com a ficha, na MESMA transacao: codigo gravado com a ficha
@@ -417,6 +464,14 @@ function aprovar(id,usuario){
     d.criarMarco({pedido_id:p.id, marco:'aprovado', detalhe:null, usuario_nome:nome(usuario)});
     return porId(p.id);
   })();
+}
+
+/* O QUE O MATERIAL E, congelado com a ficha: nome, marca, modelo. A medida
+   NUNCA sai daqui — ela e da ficha (as duas fontes, secao 8.2). */
+function materialDe(c,doPcp){
+  const m=c.material_id!=null&&doPcp?doPcp.get(Number(c.material_id)):null;
+  return {material_id:c.material_id==null?null:c.material_id,
+    material_nome:m?m.nome:null, material_marca:m?m.marca:null, material_modelo:m?m.modelo:null};
 }
 
 function cancelar(id,motivo,usuario){
@@ -464,6 +519,9 @@ function lerItem(p,item){
     cancelado_por:item.cancelado_por, cancelado_motivo:item.cancelado_motivo,
     tecido_id:item.tecido_id, sem_tecido:item.sem_tecido, sem_tecido_motivo:item.sem_tecido_motivo};
   for(const c of ESCOLHAS) comum[c]=item[c];
+  // O que o calculo congelou (os gomos da Romana, a folha do Painel).
+  for(const c of ['gomos','gomo_decimo_mm','folha_mm','vias','lados']) comum[c]=item[c]==null?null:item[c];
+  comum.modelo_nome=item.modelo_nome||null;
 
   if(congelado(p)) return Object.assign(comum,{
     degrau_nome:item.degrau_nome,
@@ -483,7 +541,7 @@ function lerItem(p,item){
   if(!r) return Object.assign(comum,{erro, linhas:[], componentes:[], sem_preco:['a peca nao calcula']});
   const pr=r.preco.revenda;
   return Object.assign(comum,{
-    degrau_nome:r.degrau.nome,
+    degrau_nome:r.degrau?r.degrau.nome:null,
     m2_real_mm2:r.preco.m2_real_mm2, m2_cobrado_mm2:r.preco.m2_cobrado_mm2,
     m2_real:r.preco.m2_real, m2_cobrado:r.preco.m2_cobrado,
     valor_subtotal_centavos:r.preco.valor_subtotal_centavos,
@@ -525,6 +583,7 @@ function porId(id){
     revenda:{id:p.revenda_id, nome_fantasia:p.revenda_nome,
              vendedor_usuario_id:p.vendedor_usuario_id, vendedor_nome:p.vendedor_nome},
     entrega:p.entrega, endereco_entrega_id:p.endereco_entrega_id, observacao:p.observacao,
+    cliente_final:p.cliente_final||null,
     sem_tecido:p.sem_tecido,
     enviado_em:p.enviado_em, enviado_por:p.enviado_por,
     aprovado_em:p.aprovado_em, aprovado_por:p.aprovado_por,

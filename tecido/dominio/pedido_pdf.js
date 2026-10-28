@@ -62,6 +62,8 @@ function gerar(pedido){
     const titulo=(pedido.tipo==='pedido'?'Pedido ':'Orcamento ')+(pedido.numero||('#'+pedido.id));
     linha(titulo,{tam:16,fonte:forte,dy:6.5*MM});
     linha(pedido.revenda.nome_fantasia,{tam:11,fonte:forte});
+    // O cliente final, opcional (secao 8.2 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO).
+    if(pedido.cliente_final) linha('Cliente final: '+pedido.cliente_final,{fonte:forte});
     linha('Vendedor: '+(pedido.revenda.vendedor_nome||'— sem vendedor —')+
           '   ·   Enviado em '+(pedido.enviado_em||'—')+
           '   ·   '+(pedido.entrega==='retira'?'Retira na fabrica':'Entrega'),{cor:cinza});
@@ -77,6 +79,7 @@ function gerar(pedido){
     for(const item of pedido.itens){
       espaco(30*MM);
       const cabeca=(item.cancelado_em?'CANCELADA · ':'')+'Peca '+item.n+
+        (item.modelo_nome?'   ·   '+item.modelo_nome:'')+
         (item.degrau_nome?'   ·   '+item.degrau_nome:'');
       linha(cabeca,{tam:10,fonte:forte});
       linha(item.resumo||'',{cor:cinza});

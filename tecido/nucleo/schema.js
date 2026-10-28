@@ -1799,6 +1799,223 @@ CREATE TABLE sm_aprovacao(
 CREATE UNIQUE INDEX idx_aprovacao_pendente ON sm_aprovacao(tipo,alvo_id) WHERE status='pendente';
 CREATE INDEX idx_aprovacao_status ON sm_aprovacao(status,tipo);
 `}
+,
+
+{n:32, nome:'o produto se cria e se duplica — o preco copiado diz de onde veio', sql:`
+/* === O CADASTRO DE PRODUTO ================================================
+   Fase 1 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO. O sm_modelo ja tinha 'ativo'
+   desde a migracao 16, e a rota de criar tambem; faltava a tela, o duplicar e
+   o produto novo nascer INATIVO — nada disso pede coluna.
+
+   ⚠️ O QUE PEDE COLUNA E O RASTRO DO PRECO COPIADO. Duplicar o Rolo leva os
+   precos do m² de cada colecao para o produto novo, e preco que aparece sem
+   rastro e a metade do registro que falta quando alguem pergunta "de onde
+   veio esse numero?" (secao 3.2 da spec). A linha do historico ganha o
+   'detalhe' — "copiado de Rolô" —, e as linhas de antes ficam com NULL, que e
+   a verdade: elas foram digitadas. */
+ALTER TABLE sm_preco_historico ADD COLUMN detalhe TEXT;
+`}
+,
+
+{n:33, nome:'as escolhas do cliente viram peca pronta que o produto liga', sql:`
+/* === AS ESCOLHAS LIGAVEIS =================================================
+   Fase 2 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO (secao 4). As escolhas sao
+   uma LISTA DO SISTEMA (dominio/escolhas.js); aqui se grava so quais delas
+   cada produto liga. Escolha ligada e obrigatoria no pedido, desligada e
+   recusada pela rota.
+
+   ⚠️ TODO MODELO QUE JA EXISTE GANHA AS QUATRO DO ROLO, e nao so o Rolo por
+   nome. Ate esta migracao o codigo exigia comando, rolamento, adicional e
+   reducao de QUALQUER modelo — ligar as quatro em todos e descrever o que ja
+   acontecia. Procurar pelo nome 'Rolô' quebraria no dia em que alguem o
+   tivesse renomeado, e o Rolo passaria a aceitar persiana sem comando. */
+CREATE TABLE sm_modelo_escolha (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  modelo_id INTEGER NOT NULL REFERENCES sm_modelo(id),
+  escolha TEXT NOT NULL,
+  ordem INTEGER DEFAULT 0,
+  UNIQUE(modelo_id, escolha)
+);
+INSERT INTO sm_modelo_escolha(modelo_id,escolha,ordem)
+SELECT m.id, v.escolha, v.ordem FROM sm_modelo m, (
+  SELECT 'comando' escolha, 1 ordem UNION ALL SELECT 'rolamento',2
+  UNION ALL SELECT 'adicional',3 UNION ALL SELECT 'reducao',4) v;
+
+/* As escolhas novas no item do pedido. Coluna propria para cada uma, e nao
+   um JSON: elas sao lidas pela etiqueta, pelo PDF e pela bancada.
+
+   ⚠️ comando E rolamento CONTINUAM NOT NULL, e o produto que nao as liga
+   grava ''. Tirar o NOT NULL pediria recriar a tabela, e com foreign_keys
+   ligado (nucleo/db.js) recriar sm_pedido_item com pedido aprovado em cima e
+   o tipo de mexida que perde dado de producao. '' quer dizer "nao se aplica",
+   e toda leitura ja trata assim (COMANDO[c.comando]||''). */
+ALTER TABLE sm_pedido_item ADD COLUMN acionamento TEXT;
+ALTER TABLE sm_pedido_item ADD COLUMN sentido TEXT;
+ALTER TABLE sm_pedido_item ADD COLUMN lado_corrente TEXT;
+ALTER TABLE sm_pedido_item ADD COLUMN folhas INTEGER;
+`}
+,
+
+{n:34, nome:'o calculo vira peca pronta do produto — a escada do Rolo e os gomos da Romana', sql:`
+/* === O CALCULO DO PRODUTO =================================================
+   Fase 3 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO (secoes 2 e 5). Cada produto
+   liga UMA peca pronta de calculo: 'escada' (os tubos do Rolo), 'gomos' (a
+   Romana), 'folhas' (o Painel, fase 4) ou 'nenhum'. A conta e codigo
+   testado; o que o produto guarda sao os NUMEROS dela.
+
+   ⚠️ TODO MODELO QUE TEM ESCADA PASSA A SER 'escada', e nao o Rolo pelo nome
+   — a mesma razao da migracao 33: ate aqui o codigo exigia a escada de
+   qualquer modelo. O que nasce depois desta migracao comeca em 'nenhum', e o
+   dono escolhe. */
+ALTER TABLE sm_modelo ADD COLUMN calculo TEXT NOT NULL DEFAULT 'nenhum';
+UPDATE sm_modelo SET calculo='escada' WHERE id IN (SELECT modelo_id FROM sm_degrau_tubo);
+
+/* O limite do gomo e NUMERO DO PRODUTO (nasce 35 cm), como a escada guarda os
+   dela — e nao um 350 escrito no codigo. O minimo de 3 gomos e o impar SAO
+   regra (do dono, 27/10/2026) e moram no codigo. */
+ALTER TABLE sm_modelo ADD COLUMN gomo_max_mm INTEGER NOT NULL DEFAULT 350;
+
+/* A quantidade da linha por REFERENCIA (secao 5.2): 'varetas' na vareta da
+   Romana, 'folhas' no tecido do Painel. NULL = a quantidade fixa de sempre,
+   e e o que o Rolo inteiro continua usando. */
+ALTER TABLE sm_ficha_linha ADD COLUMN quantidade_ref TEXT;
+
+/* O que o calculo disse, congelado no item no envio e na aprovacao, como o
+   degrau_nome: a etiqueta da montagem e a bancada leem daqui, e nunca
+   refazem a conta. O gomo vai em DECIMO de milimetro inteiro — ele e a
+   divisao exata, com uma casa (333,3), e nao e medida de corte de nenhuma
+   peca: e a marcacao que a montagem segue. */
+ALTER TABLE sm_pedido_item ADD COLUMN gomos INTEGER;
+ALTER TABLE sm_pedido_item ADD COLUMN gomo_decimo_mm INTEGER;
+`}
+,
+
+{n:35, nome:'o Painel — o transpasse das folhas e numero do produto', sql:`
+/* === AS FOLHAS DO PAINEL ==================================================
+   Fase 4 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO (secao 6). As folhas sao
+   sempre transpassadas, e o transpasse por encontro de folhas e NUMERO DO
+   PRODUTO (nasce 10 cm), como o limite do gomo da Romana. Os limites de folhas
+   (lateral 2 a 5, central par ate 6) sao regra do dono e moram no codigo.
+
+   O que o calculo disse vai para o item, congelado no envio: a largura de
+   cada folha, as vias (por lado, na central) e quantos lados. A etiqueta do
+   trilho diz quantas vias — ele e uma peca so, tambem na central. */
+ALTER TABLE sm_modelo ADD COLUMN transpasse_mm INTEGER NOT NULL DEFAULT 100;
+ALTER TABLE sm_pedido_item ADD COLUMN folha_mm INTEGER;
+ALTER TABLE sm_pedido_item ADD COLUMN vias INTEGER;
+ALTER TABLE sm_pedido_item ADD COLUMN lados INTEGER;
+`}
+,
+
+{n:36, nome:'a etiqueta por unidade, com o que o cadastro de material diz da peca', sql:`
+/* === A ETIQUETA POR UNIDADE ===============================================
+   Fase 5 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO (secao 8).
+
+   ⚠️ "GERA ETIQUETA" PASSA A SER DA FICHA DE CADA PRODUTO, e NULL quer dizer
+   "o que o componente diz" — que e o que o Rolo inteiro continua usando. O
+   componente e do sistema (o mesmo em varios produtos); se a marca morasse
+   so nele, desligar a etiqueta da ponteira na Romana desligaria tambem no
+   Painel, sem ninguem ver. */
+ALTER TABLE sm_ficha_linha ADD COLUMN gera_etiqueta INTEGER;
+/* Os campos EXTRAS da etiqueta, marcados por insumo: 'marca,modelo,fabricacao'
+   no motor (o dado da garantia). Os valores vem do cadastro de material; aqui
+   se marca so O QUE sai no papel. */
+ALTER TABLE sm_ficha_linha ADD COLUMN etiqueta_extras TEXT;
+
+/* ⚠️ UMA LINHA POR UNIDADE, e nao uma linha com quantidade 4. Quatro varetas
+   sao quatro etiquetas e quatro codigos, uma colada em cada (1/4 a 4/4), e o
+   bipe, a recusa e o tempo de cada uma sao da UNIDADE. Cada linha tem
+   quantidade 1, e por isso o consumo continua sendo linha x quantidade: as
+   quatro etiquetas sao as mesmas 4 unidades que o Compras ja contava.
+   A peca sem etiqueta continua numa linha so, com a quantidade dela. */
+ALTER TABLE sm_pedido_componente ADD COLUMN unidade_k INTEGER;
+ALTER TABLE sm_pedido_componente ADD COLUMN unidade_n INTEGER;
+UPDATE sm_pedido_componente SET unidade_k=1, unidade_n=1;
+
+/* O QUE O CADASTRO DE MATERIAL DIZ, CONGELADO NA APROVACAO, como a ficha.
+   Nome, marca e modelo do material ligado (o motor: qual motor foi, para a
+   garantia). Sem material ligado, NULL — e a etiqueta sai com o nome do
+   componente: o cadastro de material ainda nao esta refinado, e falta dele
+   nunca trava etiqueta, pedido nem aprovacao (dono, 28/10/2026). */
+ALTER TABLE sm_pedido_componente ADD COLUMN material_id INTEGER;
+ALTER TABLE sm_pedido_componente ADD COLUMN material_nome TEXT;
+ALTER TABLE sm_pedido_componente ADD COLUMN material_marca TEXT;
+ALTER TABLE sm_pedido_componente ADD COLUMN material_modelo TEXT;
+ALTER TABLE sm_pedido_componente ADD COLUMN etiqueta_extras TEXT;
+
+/* ⚠️ A DATA DE FABRICACAO E A DA PRIMEIRA IMPRESSAO, e a reimpressao nao a
+   muda — ela e da peca, como o codigo (secao 8.2). O impresso_em nao serve:
+   ele e regravado a cada reimpressao, para o "falta de total" da tela. */
+ALTER TABLE sm_pedido_componente ADD COLUMN fabricado_em TEXT;
+UPDATE sm_pedido_componente SET fabricado_em=impresso_em WHERE impresso_em IS NOT NULL;
+
+/* O cliente final, opcional (secao 8.2): preenchido, sai na etiqueta ao lado
+   da revenda. */
+ALTER TABLE sm_pedido ADD COLUMN cliente_final TEXT;
+`}
+,
+
+{n:37, nome:'as liberacoes da bancada sao de cada produto, e o preco nasce pronto para a cor', sql:`
+/* === AS LIBERACOES POR PRODUTO ============================================
+   Fase 6 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO. Ate aqui a montagem esperava
+   tres pecas pelo NOME (tubo, base, tecido) e a embalagem esperava o bandô e
+   a barra pelo nome — a regra do Rolo escrita no codigo. A vareta da Romana
+   nao seguraria nada, e a montagem sairia sem ela.
+
+   Agora a regra e uma so, e o produto so diz uma coisa por peca: a peca da
+   serralheria ou da colecao segura a MONTAGEM, a menos que va SO NA CAIXA
+   ('embalagem' — o bandô e a barra, que nao fazem parte do conjunto montado).
+   Montagem, revisao e embalagem continuam em fila, como sempre.
+
+   ⚠️ O ROLO NAO MUDA: a migracao marca 'embalagem' exatamente no bandô e na
+   barra, de toda ficha e de todo pedido ja aprovado — que e o que o codigo
+   fazia. O resto fica NULL, que quer dizer "segura a montagem". */
+ALTER TABLE sm_ficha_linha ADD COLUMN libera TEXT;
+UPDATE sm_ficha_linha SET libera='embalagem'
+ WHERE componente_id IN (SELECT id FROM sm_componente WHERE chave IN ('bando','barra'));
+ALTER TABLE sm_pedido_componente ADD COLUMN libera TEXT;
+UPDATE sm_pedido_componente SET libera='embalagem' WHERE chave IN ('bando','barra');
+
+/* === O PRECO POR COR, SEM TELA (secao 7) ==================================
+   "Ainda nao muda por cor, mas podemos ja deixar certo" (dono, 27/10/2026).
+   Uma linha aqui VENCE o preco da colecao para aquela cor; sem linha, vale o
+   da colecao. Vazia — e e assim que ela nasce —, nada muda em preco nenhum.
+   Aponta para a COLECAO DE VENDA (o produto + a colecao), porque o 1% do Rolo
+   e o 1% da Romana tem precos diferentes. */
+CREATE TABLE sm_preco_cor (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  colecao_id INTEGER NOT NULL REFERENCES sm_modelo_colecao(id),
+  cor_id INTEGER NOT NULL REFERENCES cor(id),
+  preco_m2_centavos INTEGER NOT NULL,
+  UNIQUE(colecao_id, cor_id)
+);
+`},
+{n:38, nome:'a faixa de suporte serve a cada kit da ficha', sql:`
+/* === A FAIXA DE SUPORTE E DE CADA KIT ======================================
+   Secao 8.5 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO (dono, 28/10/2026). Ate aqui
+   a faixa era do MODELO: "ate 1,000 -> 2 suportes" valia para qualquer kit. Um
+   Painel com bandô leva os suportes do TRILHO e os do BANDÔ, cada um pela sua
+   faixa — e com uma faixa so por modelo os dois sairiam com o mesmo numero.
+
+   componente_id NULL quer dizer "a faixa do produto", que vale para todo kit
+   que conta suporte e nao tem faixa propria. ⚠️ O ROLO NAO MUDA: as faixas
+   dele ficam com NULL, e o kit bandô e o kit barra continuam contando por elas.
+
+   A tabela e refeita porque o UNIQUE(modelo_id, largura_max_mm) proibiria dois
+   kits com a mesma divisa — e o SQLite nao tira restricao com ALTER. */
+CREATE TABLE sm_faixa_suporte_nova (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  modelo_id INTEGER NOT NULL REFERENCES sm_modelo(id),
+  largura_max_mm INTEGER NOT NULL,
+  quantidade INTEGER NOT NULL,
+  componente_id INTEGER REFERENCES sm_componente(id),
+  UNIQUE(modelo_id, componente_id, largura_max_mm)
+);
+INSERT INTO sm_faixa_suporte_nova(id,modelo_id,largura_max_mm,quantidade,componente_id)
+  SELECT id,modelo_id,largura_max_mm,quantidade,NULL FROM sm_faixa_suporte;
+DROP TABLE sm_faixa_suporte;
+ALTER TABLE sm_faixa_suporte_nova RENAME TO sm_faixa_suporte;
+`}
 ];
 
 // ─────────────────────────────────────────────────────────────────────────

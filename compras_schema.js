@@ -40,7 +40,14 @@ const COLUNAS_COMPONENTE = [
      branco e bege sao itens diferentes; bobina 2,50 e 1,40 tambem. */
   ['familia',            'TEXT'],
   ['cor',                'TEXT'],
-  ['largura_bobina_cm',  'INTEGER']
+  ['largura_bobina_cm',  'INTEGER'],
+  /* MARCA E MODELO, opcionais (spec SOBMEDIDA-CADASTRO-DE-PRODUTO, secao 8.2):
+     o que a etiqueta de producao do sob medida escreve do insumo — no motor,
+     o dado da garantia. Atravessam a porta de materiais do /sobmedida junto
+     com id, nome e unidade. Vazio nunca trava nada: o campo so nao sai no
+     papel. */
+  ['marca',              'TEXT'],
+  ['modelo',             'TEXT']
 ];
 
 const COLUNAS_SKU = [
