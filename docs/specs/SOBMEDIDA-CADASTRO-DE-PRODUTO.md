@@ -6,7 +6,7 @@ Situação: em construção
 Criada em: 27/10/2026
 Última atualização: 28/10/2026 (documento único: decisões e modo de construção nas §13 e §14)
 Fase atual: construindo as seis em sequência (§14)
-Fases: 1 ☑ em código  2 ☑ em código  3 ☑ em código  4 ☐  5 ☐  6 ☐
+Fases: 1 ☑ em código  2 ☑ em código  3 ☑ em código  4 ☑ em código  5 ☐  6 ☐
 Risco: 🔴 (schema do catálogo, preço, etiqueta de produção, ficha congelada)
 Módulo: sob medida (tecido/) — ler tecido/README.md e a spec
         SOBMEDIDA-PEDIDO-REVENDA.md (§4.2 a §4.14) antes de mexer
@@ -24,6 +24,9 @@ Mudanças no caminho:
        todo modelo com escada virou 'escada' na migração 34. O gomo mora em
        DÉCIMO de mm inteiro (333,3 → 3333). Quantidade por referência que o
        cálculo do produto não devolve é RECUSADA, nunca zero.
+  F4 — a folha sai de UM numerador inteiro, (largura + 2·(k−1)·T) ÷ 2k na
+       central, para o arredondamento ao mm ser um só. A referência de
+       medida `folha` virou palavra reservada da ficha, como final e degrau.
 ```
 
 > **Onde mora:** dentro do `/sobmedida`, no `tecido.db`, com migrações

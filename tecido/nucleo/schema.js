@@ -1888,6 +1888,23 @@ ALTER TABLE sm_ficha_linha ADD COLUMN quantidade_ref TEXT;
 ALTER TABLE sm_pedido_item ADD COLUMN gomos INTEGER;
 ALTER TABLE sm_pedido_item ADD COLUMN gomo_decimo_mm INTEGER;
 `}
+,
+
+{n:35, nome:'o Painel — o transpasse das folhas e numero do produto', sql:`
+/* === AS FOLHAS DO PAINEL ==================================================
+   Fase 4 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO (secao 6). As folhas sao
+   sempre transpassadas, e o transpasse por encontro de folhas e NUMERO DO
+   PRODUTO (nasce 10 cm), como o limite do gomo da Romana. Os limites de folhas
+   (lateral 2 a 5, central par ate 6) sao regra do dono e moram no codigo.
+
+   O que o calculo disse vai para o item, congelado no envio: a largura de
+   cada folha, as vias (por lado, na central) e quantos lados. A etiqueta do
+   trilho diz quantas vias — ele e uma peca so, tambem na central. */
+ALTER TABLE sm_modelo ADD COLUMN transpasse_mm INTEGER NOT NULL DEFAULT 100;
+ALTER TABLE sm_pedido_item ADD COLUMN folha_mm INTEGER;
+ALTER TABLE sm_pedido_item ADD COLUMN vias INTEGER;
+ALTER TABLE sm_pedido_item ADD COLUMN lados INTEGER;
+`}
 ];
 
 // ─────────────────────────────────────────────────────────────────────────

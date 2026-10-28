@@ -186,14 +186,18 @@ function calculoDoProduto(){
   const box=el('div',{class:'editor'},[el('h2',{},['Cálculo']),
     el('p',{class:'nota'},['O que o sistema decide sozinho. A escada escolhe o tubo; os gomos '+
       'da Romana são sempre ímpares, no mínimo 3, o menor número que deixa cada gomo até o '+
-      'limite abaixo.'])]);
+      'limite abaixo; as folhas do Painel se transpassam a cada encontro, lateral de 2 a 5 e '+
+      'central em 2, 4 ou 6, sem transpasse no meio.'])]);
   const campos=[{chave:'calculo',rotulo:'Peça pronta de cálculo',valor:modelo.calculo,
     opcoes:(modelo.calculos||[]).map(x=>({valor:x.chave,rotulo:x.nome}))}];
   if(modelo.calculo==='gomos') campos.push({chave:'gomo_max_mm',rotulo:'Gomo até (m)',
     valor:emMetros(modelo.gomo_max_mm),dica:'0,350'});
+  if(modelo.calculo==='folhas') campos.push({chave:'transpasse_mm',rotulo:'Transpasse por encontro (m)',
+    valor:emMetros(modelo.transpasse_mm),dica:'0,100'});
   box.appendChild(editor(campos,v=>{
     const corpo={calculo:v.calculo};
     if(v.gomo_max_mm!==undefined) corpo.gomo_max_mm=paraMm(v.gomo_max_mm);
+    if(v.transpasse_mm!==undefined) corpo.transpasse_mm=paraMm(v.transpasse_mm);
     return tentar(()=>api('/api/sm/modelos/'+modelo.id,{metodo:'PUT',silencioso:true,corpo}));
   },()=>{ erro=null; desenhar(); }));
   return box;

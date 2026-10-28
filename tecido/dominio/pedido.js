@@ -171,6 +171,10 @@ function gravarEscolhas(escolha,r){
   // O que o calculo disse vai junto, como o degrau: a etiqueta le daqui.
   fora.gomos=r.calculo&&r.calculo.gomos!=null?r.calculo.gomos:null;
   fora.gomo_decimo_mm=r.calculo&&r.calculo.gomo_decimo_mm!=null?r.calculo.gomo_decimo_mm:null;
+  const cal=r.calculo||{};
+  fora.folha_mm=cal.folha_mm!=null?cal.folha_mm:null;
+  fora.vias=cal.vias!=null?cal.vias:null;
+  fora.lados=cal.lados!=null?cal.lados:null;
   return fora;
 }
 

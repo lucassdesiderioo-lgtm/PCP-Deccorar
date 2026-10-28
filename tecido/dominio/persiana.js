@@ -113,9 +113,54 @@ function gomosDe(modelo,altura_mm){
     frase:n+' gomos de '+gomo+' mm'};
 }
 
-/* ── A PECA PRONTA DAS FOLHAS (secao 6) — preenchida na fase 4 ────────────── */
+/* ── A PECA PRONTA DAS FOLHAS (secao 6 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO) ─
+   As folhas sao sempre transpassadas, T por encontro de folhas (numero do
+   produto, nasce 100 mm):
+
+     lateral   folha = (largura + (folhas − 1) × T) ÷ folhas
+     central   lado = largura ÷ 2, e a mesma conta com as folhas DO LADO
+
+   ⚠️ NO MEIO DA CENTRAL AS DUAS METADES SO SE ENCOSTAM — nao ha transpasse
+   no meio (dono, 27/10/2026). Por isso a central de 2 folhas da duas folhas
+   de meia largura, sem transpasse nenhum.
+
+   ⚠️ A CONTA E FEITA NUM NUMERADOR INTEIRO e so divide no fim, para o
+   arredondamento ao milimetro ser um so: largura impar na central daria meio
+   milimetro no lado, e arredondar duas vezes erraria um milimetro sem regra.
+   (largura + 2·(k−1)·T) ÷ 2k e a mesma conta, sem o meio milimetro.
+
+   Os limites sao regra do dono (secao 6.2): lateral de 2 a 5, central sempre
+   par, 2, 4 ou 6. Fora disso RECUSA dizendo o porque. */
+const FOLHAS_LATERAL={min:2,max:5}, FOLHAS_CENTRAL={min:2,max:6};
 function folhasDe(modelo,largura_mm,sentido,folhas){
-  return {tipo:'folhas'};
+  exigir(sentido&&folhas!=null,'escolha_necessaria','O produto '+modelo.nome+' calcula folhas, e para '+
+    'isso precisa das escolhas Abertura e Folhas ligadas — ligue as duas em Catálogo → Escolhas do cliente.');
+  const T=modelo.transpasse_mm==null?100:modelo.transpasse_mm;
+  const central=sentido==='central';
+  const lim=central?FOLHAS_CENTRAL:FOLHAS_LATERAL;
+  if(folhas<lim.min) throw new ErroDeRegra('folhas_abaixo','No mínimo '+lim.min+' folhas.');
+  if(central){
+    if(folhas%2) throw new ErroDeRegra('folhas_central_par',
+      'A abertura central pede número par de folhas (2, 4 ou 6): metade corre para cada lado.');
+    if(folhas>lim.max) throw new ErroDeRegra('folhas_acima_central',
+      'No máximo 6 folhas na abertura central — 3 correndo para cada lado.');
+  }else if(folhas>lim.max) throw new ErroDeRegra('folhas_acima_lateral',
+    'No máximo 5 folhas correndo para um lado. Para mais folhas, use a abertura central.');
+
+  const lados=central?2:1;
+  const k=folhas/lados;                       // folhas de cada lado
+  const folha_mm=Math.round((largura_mm+lados*(k-1)*T)/(lados*k));
+  exigir(folha_mm>0,'medida_de_corte_invalida','A folha deu '+folha_mm+' mm. Confira a largura.');
+  const folha=u.emMetros(folha_mm);
+  const vias=k;
+  return {tipo:'folhas', folhas, folhas_por_lado:k, lados, vias,
+    lado_mm:central?largura_mm/2:largura_mm,
+    transpasses:k-1, transpasse_mm:T, folha_mm, folha,
+    titulo:folhas+' folhas de '+folha,
+    detalhe:(central?'abertura central · '+k+' de cada lado · ':'')+
+      (k-1)+' transpasse'+(k-1===1?'':'s')+(central?' de cada lado':'')+' de '+T+' mm · '+
+      vias+' via'+(vias===1?'':'s')+(central?' de cada lado':''),
+    frase:'Folha '+folha};
 }
 
 function calcular(escolha,opcoes){
