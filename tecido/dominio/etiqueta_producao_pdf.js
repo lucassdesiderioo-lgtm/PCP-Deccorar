@@ -106,16 +106,29 @@ function desenhar(pagina, e, f){
      codigo, ele disputaria espaco com o "CONFERIR LEITURA". */
   const marca = e.refeitas>0 ? ('REFAZER '+(e.refeitas+1)+'\u00AA VEZ') : '';
   let reservado = 0;
-  if(marca){
-    const larg = f.forte.widthOfTextAtSize(txt(marca), 9) * PT_MM;
-    escreve(marca, {x:ETQ.largura-m-larg, y:28, tam:9, fonte:f.forte, cor:rgb(.72,0,0)});
+  /* ⚠️ A UNIDADE E O CANTO DE CIMA, EM LETRA GRANDE (secao 8.1 da spec
+     SOBMEDIDA-CADASTRO-DE-PRODUTO): "2/4" e o que a bancada conta para ver se
+     alguma vareta ficou para tras, e e o primeiro lugar onde o olho cai. A
+     marca de refeita fica logo a esquerda dela, em vermelho. */
+  const unidade = e.unidade || '';
+  if(unidade){
+    const larg = f.forte.widthOfTextAtSize(txt(unidade), 11) * PT_MM;
+    escreve(unidade, {x:ETQ.largura-m-larg, y:27.5, tam:11, fonte:f.forte});
     reservado = larg + 3;
   }
-  escreve(e.pedido_numero+'  ·  '+e.peca,
+  if(marca){
+    const larg = f.forte.widthOfTextAtSize(txt(marca), 9) * PT_MM;
+    escreve(marca, {x:ETQ.largura-m-reservado-larg, y:28, tam:9, fonte:f.forte, cor:rgb(.72,0,0)});
+    reservado += larg + 3;
+  }
+  /* A BASE, igual em todas (secao 8.2): pedido e item (1027/02), a peca do
+     pedido, revenda e CLIENTE FINAL quando houver, a entrega; e o produto, a
+     medida, a cor e as escolhas. */
+  escreve((e.pedido_item||e.pedido_numero)+'  ·  '+e.peca,
     {x:m, y:27.5, tam:11, fonte:f.forte, largura:L-reservado});
-  escreve([e.revenda, e.prazo].filter(Boolean).join('  ·  '),
+  escreve([e.revenda, e.cliente_final, e.prazo].filter(Boolean).join('  ·  '),
     {x:m, y:23.5, tam:7.5, fonte:f.normal, cor:cinza, largura:L});
-  escreve([e.medida, e.colecao, e.comando].filter(Boolean).join('  ·  '),
+  escreve([e.produto, e.medida, e.colecao, e.escolhas||e.comando].filter(Boolean).join('  ·  '),
     {x:m, y:19.8, tam:7.5, fonte:f.normal, largura:L});
 
   /* ⚠️ A TAREFA E A MAIOR LETRA DA ETIQUETA, e e de proposito. Tudo o mais
@@ -123,7 +136,11 @@ function desenhar(pagina, e, f){
      serralheiro le isso de relance, com a peca na mao, e e o unico numero
      que ele nao pode conferir depois: o tubo cortado nao volta. */
   escreve(e.tarefa, {x:m, y:14.6, tam:10, fonte:f.forte, largura:L});
-  if(e.extra) escreve(e.extra, {x:m, y:10.8, tam:7, fonte:f.normal, cor:cinza, largura:L});
+  /* O que muda com o setor (o kit, a reducao, os gomos, as vias) e os EXTRAS
+     do insumo (marca, modelo, fabricacao), na mesma linha. Campo vazio nao
+     sai — o extrasDe ja o tirou da lista. */
+  const baixo = [e.extra].concat(e.extras||[]).filter(Boolean).join('  ·  ');
+  if(baixo) escreve(baixo, {x:m, y:10.8, tam:7, fonte:f.normal, cor:cinza, largura:L});
 
   /* ── A FAIXA DE BAIXO: o codigo ─────────────────────────────────────── */
   const {mm, cabe} = moduloDe(e.codigo);

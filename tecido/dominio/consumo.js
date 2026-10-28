@@ -38,7 +38,8 @@ const PECAS=`
          p.id AS pedido_id, p.numero AS pedido_numero,
          r.nome_fantasia AS revenda_nome,
          c.consumo_largura_mm AS cl, c.consumo_altura_mm AS ca,
-         c.largura_corte_mm AS corte_l, c.altura_corte_mm AS corte_a
+         c.largura_corte_mm AS corte_l, c.altura_corte_mm AS corte_a,
+         c.quantidade AS qtd
     FROM sm_pedido_item i
     JOIN sm_pedido p ON p.id=i.pedido_id
     LEFT JOIN sm_revenda r ON r.id=p.revenda_id
@@ -95,7 +96,13 @@ function comprometido(){
   for(const n of db.prepare(NOMES).all()) nomes.set(n.tecido_id,n);
 
   const porTecido=new Map();
-  for(const p of db.prepare(PECAS).all()){
+  /* ⚠️ UMA PECA POR UNIDADE (fase 5 do cadastro de produto). O tecido com
+     etiqueta ja vem numa linha por folha; o que nao gera etiqueta vem numa
+     linha com a quantidade — e conta-la como uma esconderia o resto das
+     folhas do comprometido. O Rolo tem quantidade 1, e nada muda nele. */
+  const pecas=[];
+  for(const p of db.prepare(PECAS).all()) for(let k=0;k<Math.max(1,p.qtd||1);k++) pecas.push(p);
+  for(const p of pecas){
     /* Cada peca gasta a "cota" de uma cortada igual a ela, se houver. Gastar
        em vez de so comparar e o que faz duas persianas identicas com UMA
        cortada deixarem uma de pe — comparar diria que as duas ja sairam. */

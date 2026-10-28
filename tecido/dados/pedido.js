@@ -37,7 +37,7 @@ const maiorNumero=()=>db.prepare('SELECT MAX(numero) v FROM sm_pedido').get().v|
 const COLUNAS=['revenda_id','tipo','marco','numero','enviado_em','enviado_por',
   'tabela_id','tabela_nome','tabela_desconto_centesimos','desconto_centesimos',
   'valor_total_centavos','prazo_prometido','prazo_atual',
-  'aprovado_em','aprovado_por','endereco_entrega_id','entrega','observacao','sem_tecido',
+  'aprovado_em','aprovado_por','endereco_entrega_id','entrega','observacao','sem_tecido','cliente_final',
   'cancelado_em','cancelado_por','cancelado_motivo'];
 
 function criar(d){
@@ -56,7 +56,11 @@ function atualizar(id,d){
 }
 
 // ── Os itens ──────────────────────────────────────────────────────────────
-const itens=pedido_id=>db.prepare('SELECT * FROM sm_pedido_item WHERE pedido_id=? ORDER BY n').all(pedido_id);
+/* O nome do produto vem junto (Rolô, Romana, Painel): com mais de um produto
+   no catalogo, a folha e a tela precisam dizer QUAL — o degrau so dizia isso
+   enquanto so havia o Rolo. */
+const itens=pedido_id=>db.prepare('SELECT i.*, m.nome AS modelo_nome FROM sm_pedido_item i '+
+  'LEFT JOIN sm_modelo m ON m.id=i.modelo_id WHERE i.pedido_id=? ORDER BY i.n').all(pedido_id);
 const item=(pedido_id,id)=>db.prepare('SELECT * FROM sm_pedido_item WHERE pedido_id=? AND id=?').get(pedido_id,id);
 const proximoN=pedido_id=>(db.prepare('SELECT MAX(n) v FROM sm_pedido_item WHERE pedido_id=?').get(pedido_id).v||0)+1;
 
@@ -99,9 +103,13 @@ const componentes=item_id=>db.prepare(
 const apagarComponentes=item_id=>db.prepare('DELETE FROM sm_pedido_componente WHERE item_id=?').run(item_id);
 const criarComponente=d=>db.prepare(`INSERT INTO sm_pedido_componente
   (item_id,ordem,chave,nome,setor,quantidade,gera_etiqueta,eh_kit,codigo_barras,suportes,
-   largura_corte_mm,altura_corte_mm,consumo_largura_mm,consumo_altura_mm)
+   largura_corte_mm,altura_corte_mm,consumo_largura_mm,consumo_altura_mm,
+   unidade_k,unidade_n,material_id,material_nome,material_marca,material_modelo,etiqueta_extras)
   VALUES(@item_id,@ordem,@chave,@nome,@setor,@quantidade,@gera_etiqueta,@eh_kit,@codigo_barras,
-   @suportes,@largura_corte_mm,@altura_corte_mm,@consumo_largura_mm,@consumo_altura_mm)`).run(d);
+   @suportes,@largura_corte_mm,@altura_corte_mm,@consumo_largura_mm,@consumo_altura_mm,
+   @unidade_k,@unidade_n,@material_id,@material_nome,@material_marca,@material_modelo,@etiqueta_extras)`)
+  .run(Object.assign({unidade_k:1,unidade_n:1,material_id:null,material_nome:null,
+    material_marca:null,material_modelo:null,etiqueta_extras:null},d));
 
 // ── Os tres registros ─────────────────────────────────────────────────────
 const marcos=pedido_id=>db.prepare(

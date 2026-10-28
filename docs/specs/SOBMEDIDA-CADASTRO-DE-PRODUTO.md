@@ -6,7 +6,7 @@ Situação: em construção
 Criada em: 27/10/2026
 Última atualização: 28/10/2026 (documento único: decisões e modo de construção nas §13 e §14)
 Fase atual: construindo as seis em sequência (§14)
-Fases: 1 ☑ em código  2 ☑ em código  3 ☑ em código  4 ☑ em código  5 ☐  6 ☐
+Fases: 1 ☑ em código  2 ☑ em código  3 ☑ em código  4 ☑ em código  5 ☑ em código  6 ☐
 Risco: 🔴 (schema do catálogo, preço, etiqueta de produção, ficha congelada)
 Módulo: sob medida (tecido/) — ler tecido/README.md e a spec
         SOBMEDIDA-PEDIDO-REVENDA.md (§4.2 a §4.14) antes de mexer
@@ -27,6 +27,15 @@ Mudanças no caminho:
   F4 — a folha sai de UM numerador inteiro, (largura + 2·(k−1)·T) ÷ 2k na
        central, para o arredondamento ao mm ser um só. A referência de
        medida `folha` virou palavra reservada da ficha, como final e degrau.
+  F5 — a unidade é uma LINHA por unidade em sm_pedido_componente (quantidade
+       1 cada), e não uma tabela nova: o bipe, a recusa e o consumo já
+       trabalhavam por linha. A data de fabricação é coluna própria
+       (fabricado_em) porque o impresso_em é regravado na reimpressão. O nome,
+       a marca e o modelo do material são CONGELADOS na aprovação, como a
+       ficha. A lista de trabalho do material (âmbar) deixa de fora o tecido,
+       os kits e o trabalho de setor (montagem, revisão, embalagem). O teste
+       material_compra.test.js teve o esperado da porta ampliado para
+       marca e modelo, que a §8.2 manda atravessar.
 ```
 
 > **Onde mora:** dentro do `/sobmedida`, no `tecido.db`, com migrações

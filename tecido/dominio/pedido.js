@@ -32,6 +32,7 @@ const {pode}=require('../nucleo/permissoes');
    sequencial e o `etiqueta_producao.js`; se ele morasse aqui, a numeracao
    teria dois donos no dia em que o backfill precisasse dela. */
 const etiquetas=require('./etiqueta_producao');
+const materiais=require('../nucleo/materiais');
 
 const TIPOS=['orcamento','pedido'];
 const ENTREGAS=['entrega','retira'];
@@ -80,6 +81,13 @@ function camposCabecalho(dados,revenda){
     fora.entrega=dados.entrega;
   }
   if(dados.observacao!==undefined) fora.observacao=dados.observacao==null?null:String(dados.observacao).trim();
+  /* O CLIENTE FINAL e opcional (secao 8.2 da spec SOBMEDIDA-CADASTRO-DE-
+     PRODUTO): preenchido, sai na etiqueta ao lado da revenda. Vazio e NULL —
+     e a etiqueta sai so com a revenda. */
+  if(dados.cliente_final!==undefined){
+    const t=dados.cliente_final==null?'':String(dados.cliente_final).trim();
+    fora.cliente_final=t||null;
+  }
   if(dados.endereco_entrega_id!==undefined){
     if(dados.endereco_entrega_id===null||dados.endereco_entrega_id==='') fora.endereco_entrega_id=null;
     else{
@@ -397,6 +405,13 @@ function aprovar(id,usuario){
 
   // Calcula tudo antes de gravar — recusa nao deixa meia ficha explodida.
   const explodidos=itens.map(item=>({item, r:calcularItem(item,p.revenda_id)}));
+  /* O CADASTRO DE MATERIAL DO PCP, lido UMA vez. ⚠️ Porta desligada ou
+     material sumido NAO travam a aprovacao (dono, 28/10/2026): o cadastro de
+     material ainda nao esta refinado, e a etiqueta sai com o nome do
+     componente. Travar aqui seria a armadilha #6 — o pedido parado por um
+     campo que ninguem preencheu ainda. */
+  let doPcp=null;
+  try{ doPcp=materiais.ligada()?new Map(materiais.listar().map(m=>[m.id,m])):null; }catch(x){ doPcp=null; }
 
   return db.transaction(()=>{
     for(const {item,r} of explodidos){
@@ -414,13 +429,27 @@ function aprovar(id,usuario){
           usuario_nome:nome(usuario)});
 
       d.apagarComponentes(item.id);
-      r.componentes.forEach((c,i)=>d.criarComponente({item_id:item.id, ordem:i+1,
-        chave:c.chave, nome:c.nome, setor:c.setor, quantidade:c.quantidade,
-        gera_etiqueta:c.gera_etiqueta?1:0, eh_kit:c.eh_kit?1:0,
-        codigo_barras:c.codigo_barras,
-        suportes:(r.kit&&r.kit.chave===c.chave)?r.kit.suportes:null,
-        largura_corte_mm:c.largura_corte_mm, altura_corte_mm:c.altura_corte_mm,
-        consumo_largura_mm:c.consumo_largura_mm, consumo_altura_mm:c.consumo_altura_mm}));
+      r.componentes.forEach((c,i)=>{
+        const comum={item_id:item.id, ordem:i+1,
+          chave:c.chave, nome:c.nome, setor:c.setor,
+          gera_etiqueta:c.gera_etiqueta?1:0, eh_kit:c.eh_kit?1:0,
+          codigo_barras:c.codigo_barras,
+          suportes:(r.kit&&r.kit.chave===c.chave)?r.kit.suportes:null,
+          largura_corte_mm:c.largura_corte_mm, altura_corte_mm:c.altura_corte_mm,
+          consumo_largura_mm:c.consumo_largura_mm, consumo_altura_mm:c.consumo_altura_mm,
+          etiqueta_extras:c.etiqueta_extras||null};
+        Object.assign(comum,materialDe(c,doPcp));
+        /* ⚠️ UMA LINHA POR UNIDADE, QUANDO A PECA TEM ETIQUETA (secao 8.1 da
+           spec SOBMEDIDA-CADASTRO-DE-PRODUTO). Quatro varetas sao quatro
+           etiquetas, 1/4 a 4/4, cada uma com o seu codigo e o seu bipe. Cada
+           linha tem quantidade 1, e e por isso que o consumo nao multiplica:
+           o Compras soma linha x quantidade, e as quatro linhas sao as mesmas
+           quatro varetas de antes. A peca sem etiqueta (o kit, a reducao)
+           continua numa linha so, com a quantidade dela. */
+        const n=c.gera_etiqueta?c.quantidade:1;
+        for(let k=1;k<=n;k++) d.criarComponente(Object.assign({},comum,{
+          quantidade:c.gera_etiqueta?1:c.quantidade, unidade_k:k, unidade_n:n}));
+      });
     }
     /* ⚠️ O CODIGO DA ETIQUETA NASCE AQUI, e nao na impressao (secao 4.14).
        Junto com a ficha, na MESMA transacao: codigo gravado com a ficha
@@ -434,6 +463,14 @@ function aprovar(id,usuario){
     d.criarMarco({pedido_id:p.id, marco:'aprovado', detalhe:null, usuario_nome:nome(usuario)});
     return porId(p.id);
   })();
+}
+
+/* O QUE O MATERIAL E, congelado com a ficha: nome, marca, modelo. A medida
+   NUNCA sai daqui — ela e da ficha (as duas fontes, secao 8.2). */
+function materialDe(c,doPcp){
+  const m=c.material_id!=null&&doPcp?doPcp.get(Number(c.material_id)):null;
+  return {material_id:c.material_id==null?null:c.material_id,
+    material_nome:m?m.nome:null, material_marca:m?m.marca:null, material_modelo:m?m.modelo:null};
 }
 
 function cancelar(id,motivo,usuario){
@@ -483,6 +520,7 @@ function lerItem(p,item){
   for(const c of ESCOLHAS) comum[c]=item[c];
   // O que o calculo congelou (os gomos da Romana, a folha do Painel).
   for(const c of ['gomos','gomo_decimo_mm','folha_mm','vias','lados']) comum[c]=item[c]==null?null:item[c];
+  comum.modelo_nome=item.modelo_nome||null;
 
   if(congelado(p)) return Object.assign(comum,{
     degrau_nome:item.degrau_nome,
@@ -544,6 +582,7 @@ function porId(id){
     revenda:{id:p.revenda_id, nome_fantasia:p.revenda_nome,
              vendedor_usuario_id:p.vendedor_usuario_id, vendedor_nome:p.vendedor_nome},
     entrega:p.entrega, endereco_entrega_id:p.endereco_entrega_id, observacao:p.observacao,
+    cliente_final:p.cliente_final||null,
     sem_tecido:p.sem_tecido,
     enviado_em:p.enviado_em, enviado_por:p.enviado_por,
     aprovado_em:p.aprovado_em, aprovado_por:p.aprovado_por,

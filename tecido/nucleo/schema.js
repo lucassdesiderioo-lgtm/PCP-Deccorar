@@ -1905,6 +1905,54 @@ ALTER TABLE sm_pedido_item ADD COLUMN folha_mm INTEGER;
 ALTER TABLE sm_pedido_item ADD COLUMN vias INTEGER;
 ALTER TABLE sm_pedido_item ADD COLUMN lados INTEGER;
 `}
+,
+
+{n:36, nome:'a etiqueta por unidade, com o que o cadastro de material diz da peca', sql:`
+/* === A ETIQUETA POR UNIDADE ===============================================
+   Fase 5 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO (secao 8).
+
+   ⚠️ "GERA ETIQUETA" PASSA A SER DA FICHA DE CADA PRODUTO, e NULL quer dizer
+   "o que o componente diz" — que e o que o Rolo inteiro continua usando. O
+   componente e do sistema (o mesmo em varios produtos); se a marca morasse
+   so nele, desligar a etiqueta da ponteira na Romana desligaria tambem no
+   Painel, sem ninguem ver. */
+ALTER TABLE sm_ficha_linha ADD COLUMN gera_etiqueta INTEGER;
+/* Os campos EXTRAS da etiqueta, marcados por insumo: 'marca,modelo,fabricacao'
+   no motor (o dado da garantia). Os valores vem do cadastro de material; aqui
+   se marca so O QUE sai no papel. */
+ALTER TABLE sm_ficha_linha ADD COLUMN etiqueta_extras TEXT;
+
+/* ⚠️ UMA LINHA POR UNIDADE, e nao uma linha com quantidade 4. Quatro varetas
+   sao quatro etiquetas e quatro codigos, uma colada em cada (1/4 a 4/4), e o
+   bipe, a recusa e o tempo de cada uma sao da UNIDADE. Cada linha tem
+   quantidade 1, e por isso o consumo continua sendo linha x quantidade: as
+   quatro etiquetas sao as mesmas 4 unidades que o Compras ja contava.
+   A peca sem etiqueta continua numa linha so, com a quantidade dela. */
+ALTER TABLE sm_pedido_componente ADD COLUMN unidade_k INTEGER;
+ALTER TABLE sm_pedido_componente ADD COLUMN unidade_n INTEGER;
+UPDATE sm_pedido_componente SET unidade_k=1, unidade_n=1;
+
+/* O QUE O CADASTRO DE MATERIAL DIZ, CONGELADO NA APROVACAO, como a ficha.
+   Nome, marca e modelo do material ligado (o motor: qual motor foi, para a
+   garantia). Sem material ligado, NULL — e a etiqueta sai com o nome do
+   componente: o cadastro de material ainda nao esta refinado, e falta dele
+   nunca trava etiqueta, pedido nem aprovacao (dono, 28/10/2026). */
+ALTER TABLE sm_pedido_componente ADD COLUMN material_id INTEGER;
+ALTER TABLE sm_pedido_componente ADD COLUMN material_nome TEXT;
+ALTER TABLE sm_pedido_componente ADD COLUMN material_marca TEXT;
+ALTER TABLE sm_pedido_componente ADD COLUMN material_modelo TEXT;
+ALTER TABLE sm_pedido_componente ADD COLUMN etiqueta_extras TEXT;
+
+/* ⚠️ A DATA DE FABRICACAO E A DA PRIMEIRA IMPRESSAO, e a reimpressao nao a
+   muda — ela e da peca, como o codigo (secao 8.2). O impresso_em nao serve:
+   ele e regravado a cada reimpressao, para o "falta de total" da tela. */
+ALTER TABLE sm_pedido_componente ADD COLUMN fabricado_em TEXT;
+UPDATE sm_pedido_componente SET fabricado_em=impresso_em WHERE impresso_em IS NOT NULL;
+
+/* O cliente final, opcional (secao 8.2): preenchido, sai na etiqueta ao lado
+   da revenda. */
+ALTER TABLE sm_pedido ADD COLUMN cliente_final TEXT;
+`}
 ];
 
 // ─────────────────────────────────────────────────────────────────────────

@@ -201,6 +201,24 @@ function desenharAberto(){
   if(p.marco==='cancelado')
     c.appendChild(el('div',{class:'aviso'},['Cancelado por '+p.cancelado_por+': '+p.cancelado_motivo]));
 
+  /* ⚠️ O CLIENTE FINAL E OPCIONAL (secao 8.2 da spec SOBMEDIDA-CADASTRO-DE-
+     PRODUTO): preenchido, sai na etiqueta de producao ao lado da revenda;
+     vazio, a etiqueta sai so com a revenda. Edita-se no rascunho, como o
+     resto do pedido. */
+  if(!p.congelado&&p.marco!=='cancelado'&&posso('pedido.lancar')){
+    const i=el('input',{type:'text',value:p.cliente_final||'','aria-label':'Cliente final (opcional)',
+      placeholder:'quem vai receber a persiana, se a revenda disser'});
+    const ok=el('button',{class:'bt',type:'button'},['Salvar']);
+    ok.onclick=async()=>{
+      try{ await api('/api/pedidos/'+p.id,{metodo:'PUT',silencioso:true,corpo:{cliente_final:i.value}});
+        erro=null; abrir(p.id); }
+      catch(x){ erro=x.message; desenharAberto(); }
+    };
+    c.appendChild(el('div',{class:'campos'},[
+      el('div',{class:'campo cresce'},[el('label',{},['Cliente final (opcional)']),i]),
+      el('div',{class:'campo'},[ok])]));
+  }else if(p.cliente_final) c.appendChild(el('p',{},['Cliente final: ',el('b',{},[p.cliente_final])]));
+
   if(p.prazo){
     const t=['Pronto em '+p.prazo.atual_extenso];
     if(p.prazo.negociado) t.push(' (prometido no envio: '+p.prazo.prometido_extenso+')');
@@ -270,7 +288,8 @@ function desenharAberto(){
 
 function desenharPeca(p,item){
   const box=el('div',{class:'peca'+(item.cancelado_em?' cancelada':'')});
-  box.appendChild(el('h3',{},['Peça '+item.n+(item.degrau_nome?' · '+item.degrau_nome:'')]));
+  box.appendChild(el('h3',{},['Peça '+item.n+(item.modelo_nome?' · '+item.modelo_nome:'')+
+    (item.degrau_nome?' · '+item.degrau_nome:'')]));
   box.appendChild(el('div',{class:'frase'},[item.resumo||
     (emMetros(item.largura_mm)+' × '+emMetros(item.altura_mm))]));
   if(item.erro) box.appendChild(el('div',{class:'aviso'},[item.erro]));
@@ -310,7 +329,7 @@ function desenharPeca(p,item){
     const f=el('div',{class:'linhas'});
     f.appendChild(el('div',{},[el('span',{},['Ficha congelada na aprovação']),el('span',{},[''])]));
     item.componentes.forEach(x=>f.appendChild(el('div',{},[
-      el('span',{},[x.nome+(x.setor?' · '+x.setor:'')]),
+      el('span',{},[x.nome+(x.unidade_n>1?' '+x.unidade_k+'/'+x.unidade_n:'')+(x.setor?' · '+x.setor:'')]),
       el('span',{},[x.largura_corte_mm==null?'—':
         (emMetros(x.largura_corte_mm)+(x.altura_corte_mm!=null?' × '+emMetros(x.altura_corte_mm):''))])])));
     box.appendChild(f);

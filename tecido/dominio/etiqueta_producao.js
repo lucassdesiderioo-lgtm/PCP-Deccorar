@@ -67,7 +67,10 @@ function tarefaDe(c){
      e guardados em lugares diferentes. Escrever so "TUBO" mandaria o
      serralheiro conferir na tela qual e, e a etiqueta existe justamente para
      ele nao precisar. */
-  const quem=(c.chave==='tubo'&&c.degrau_nome?c.degrau_nome:c.nome).toUpperCase();
+  /* ⚠️ AS DUAS FONTES (dono, 28/10/2026): o NOME sai do cadastro de material
+     quando ha material ligado, e a MEDIDA sai sempre da ficha. Sem material,
+     o nome do componente — falta de cadastro nunca trava a etiqueta. */
+  const quem=(c.chave==='tubo'&&c.degrau_nome?c.degrau_nome:(c.material_nome||c.nome)).toUpperCase();
   const l=c.largura_corte_mm, a=c.altura_corte_mm;
   if(l!=null&&a!=null) return quem+' · CORTAR '+u.emMetros(l)+' × '+u.emMetros(a);
   if(l!=null) return quem+' · CORTAR '+u.emMetros(l);
@@ -86,7 +89,40 @@ function extraDe(c,doItem){
   }
   if(c.setor==='montagem'&&doItem.some(x=>x.chave==='reducao'))
     partes.push('REDUÇÃO DE PESO');
+  /* O que o calculo congelou e a montagem precisa ler: os gomos da Romana (a
+     marcacao que ela segue) e as vias do Painel. O trilho e uma peca so, e e
+     a etiqueta dele que diz quantas vias (secao 6.3). */
+  if(c.setor==='montagem'&&c.gomos)
+    partes.push(c.gomos+' GOMOS DE '+Math.floor(c.gomo_decimo_mm/10)+','+(c.gomo_decimo_mm%10)+' MM');
+  if(c.vias!=null&&(c.chave==='trilho'||c.setor==='montagem'))
+    partes.push(c.vias+' VIA'+(c.vias===1?'':'S')+(c.lados===2?' DE CADA LADO':''));
   return partes.join(' · ');
+}
+
+/* As escolhas que a bancada confere na peca: o comando do Rolo, ou a abertura,
+   as folhas e o acionamento do Painel. */
+const SENTIDO={esquerda:'ABRE PARA A ESQUERDA', direita:'ABRE PARA A DIREITA', central:'ABERTURA CENTRAL'};
+const CORRENTE={direito:'CORRENTE À DIREITA', esquerdo:'CORRENTE À ESQUERDA'};
+function escolhasDe(c){
+  return [COMANDO[c.comando], SENTIDO[c.sentido], c.folhas?c.folhas+' FOLHAS':null,
+    c.acionamento==='sem_comando'?'SEM COMANDO':null, CORRENTE[c.lado_corrente]]
+    .filter(Boolean).join(' · ');
+}
+
+/* OS EXTRAS DO INSUMO, marcados na ficha (o motor: marca, modelo e a data de
+   fabricacao). ⚠️ CAMPO VAZIO NAO SAI — nao vira "MARCA: —", que na garantia
+   se le como "nao tem marca". A data e a da primeira impressao, e a
+   reimpressao a mantem. */
+function extrasDe(c){
+  const quais=String(c.etiqueta_extras||'').split(',').filter(Boolean);
+  const fora=[];
+  if(quais.includes('marca')&&c.material_marca) fora.push(String(c.material_marca).toUpperCase());
+  if(quais.includes('modelo')&&c.material_modelo) fora.push(String(c.material_modelo).toUpperCase());
+  if(quais.includes('fabricacao')&&c.fabricado_em){
+    const [a,m,d]=String(c.fabricado_em).slice(0,10).split('-');
+    fora.push('FAB. '+d+'/'+m+'/'+a);
+  }
+  return fora;
 }
 
 const COMANDO={direito:'COMANDO DIREITO', esquerdo:'COMANDO ESQUERDO'};
@@ -104,6 +140,16 @@ function montar(c,totalDoPedido,doItem){
     comando:COMANDO[c.comando]||'',
     tarefa:tarefaDe(c),
     extra:extraDe(c,doItem),
+    /* ── A BASE NOVA e o INSUMO (secao 8.2 da spec SOBMEDIDA-CADASTRO-DE-
+       PRODUTO). O Rolo ganha so isto — o resto da etiqueta dele e o de antes. */
+    unidade:(c.unidade_k||1)+'/'+(c.unidade_n||1),
+    pedido_item:(c.pedido_numero||c.pedido_id)+'/'+String(c.item_n).padStart(2,'0'),
+    produto:c.modelo_nome||'',
+    cliente_final:c.cliente_final||null,
+    escolhas:escolhasDe(c),
+    marca:c.material_marca||null, modelo_material:c.material_modelo||null,
+    extras:extrasDe(c),
+    fabricado_em:c.fabricado_em||null,
     impresso_em:c.impresso_em, reimpressoes:c.reimpressoes,
     /* ⚠️ A PECA REFEITA SAI MARCADA NO PAPEL (fase 5-B2, secao 4.16). O
        CODIGO e o mesmo de sempre — ele e da peca, nao do papel —, e e
@@ -171,9 +217,12 @@ function imprimir(filtro,usuario){
     d.registrar({setor:setor||'todos', quantidade:lista.length,
       pedidos:[...new Set(lista.map(e=>e.pedido_numero))].join(', '),
       reimpressao:reimpressao?1:0, usuario_nome:nome(usuario)});
-    /* A lista devolvida e a de ANTES da marcacao, e e a certa: o PDF mostra o
-       codigo, que nao mudou. O que mudou foi so o carimbo de impresso. */
-    return {etiquetas:lista, reimpressao, quando};
+    /* A lista e RELIDA depois da marcacao, e so por um motivo: a data de
+       fabricacao da primeira impressao nasce agora, e o papel tem que sai-la.
+       Os codigos sao os mesmos — eles nao mudam com a marcacao. */
+    const ids=new Set(lista.map(e=>e.id));
+    const depois=paraImprimir(filtro).filter(e=>ids.has(e.id));
+    return {etiquetas:depois, reimpressao, quando};
   })();
 }
 
@@ -220,11 +269,14 @@ function paraCortar(filtro){
     if(c.chave!=='tecido') continue;
     if(c.largura_corte_mm==null||c.altura_corte_mm==null) continue;
     const k=c.tecido_id||0;
+    /* A folha do Painel vem uma linha por unidade; o tecido sem etiqueta, numa
+       linha so com a quantidade. Cada unidade e UMA peca no plano de corte. */
+    const vezes=c.codigo_etiqueta?1:Math.max(1,c.quantidade||1);
     if(!grupos.has(k)) grupos.set(k,{
       tecido_id:c.tecido_id,
       tecido_nome:[c.linha_nome,c.colecao_nome,c.cor_nome].filter(Boolean).join(' · '),
       pecas:[]});
-    grupos.get(k).pecas.push({
+    for(let v=0;v<vezes;v++) grupos.get(k).pecas.push({
       largura:c.largura_corte_mm/1000,
       altura:c.altura_corte_mm/1000,
       /* O PEDIDO e o que agrupa o tom unico (§19), e o CLIENTE aqui e a

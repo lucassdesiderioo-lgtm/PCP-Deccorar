@@ -40,6 +40,10 @@ const CALCULOS=[
   {chave:'nenhum', nome:'Nenhum', quantidades:[]}
 ];
 const QUANTIDADES_REF=['gomos','varetas','folhas','vias','lados'];
+/* Os campos EXTRAS da etiqueta, marcados por insumo (secao 8.2). Os valores
+   vem do cadastro de material; a data de fabricacao e a da primeira
+   impressao. */
+const EXTRAS=['marca','modelo','fabricacao'];
 /* Os `quando` das escolhas novas (secao 4.2): a linha entra pelo acionamento
    ou pela abertura escolhida. A corda do Painel e `com_comando`, e no painel
    sem comando ela nao entra — nao baixa estoque nem custa. */
@@ -92,6 +96,10 @@ function modelo(id){
 function modeloParaVer(id,podeVerInativo){
   const m=modelo(id);
   exigir(m.ativo||podeVerInativo,'modelo_indisponivel','O modelo '+m.nome+' está desativado.');
+  /* A lista de trabalho do cadastro de material vai junto, para a ficha
+     pintar em ambar o que falta (secao 8.2). Ela nunca derruba a leitura: o
+     cadastro de material incompleto e o caso normal de hoje. */
+  try{ m.avisos_material=avisosDeMaterial(m.id); }catch(x){ m.avisos_material=[]; }
   return m;
 }
 
@@ -560,6 +568,16 @@ function camposFicha(d){
     fora.quando=d.quando;
   }
   if(d.ordem!==undefined) fora.ordem=d.ordem;
+  /* "Gera etiqueta" na linha: null herda do componente, 0/1 decide aqui. */
+  if(d.gera_etiqueta!==undefined)
+    fora.gera_etiqueta=d.gera_etiqueta==null||d.gera_etiqueta===''?null:(d.gera_etiqueta?1:0);
+  if(d.etiqueta_extras!==undefined){
+    const lista=(Array.isArray(d.etiqueta_extras)?d.etiqueta_extras:String(d.etiqueta_extras||'').split(','))
+      .map(x=>String(x).trim()).filter(Boolean);
+    lista.forEach(x=>exigir(EXTRAS.indexOf(x)>=0,'extra_invalido',
+      'O campo extra da etiqueta é um de: '+EXTRAS.join(', ')+'.'));
+    fora.etiqueta_extras=lista.length?[...new Set(lista)].join(','):null;
+  }
   if(d.quantidade_ref!==undefined){
     const q=d.quantidade_ref==null||d.quantidade_ref===''?null:String(d.quantidade_ref).trim();
     exigir(q==null||QUANTIDADES_REF.indexOf(q)>=0,'quantidade_ref_invalida',
@@ -642,6 +660,50 @@ function coresDaColecao(id){
     .map(t=>({cor_id:t.cor_id, cor_nome:t.cor_nome, tecido_id:t.id, codigo:t.codigo}));
 }
 
+/* ── O QUE FALTA NO CADASTRO DE MATERIAL (secao 8.2, dono 28/10/2026) ──────
+   O cadastro de material ainda NAO esta refinado, e por isso nada trava: a
+   etiqueta sai com o nome do componente, e o campo vazio nao sai. O que esta
+   lista faz e mostrar em ambar, na ficha de cada produto, o que falta ligar
+   — e a lista de trabalho para arrumar o cadastro aos poucos.
+
+   ⚠️ SO ENTRA O QUE E INSUMO. Ficam de fora: o TECIDO (o estoque dele mora
+   aqui, e por decisao do dono nem vai ao Compras do PCP — fase 4-C), os KITS
+   (o codigo deles e o bipe da embalagem, e nao uma compra) e o TRABALHO DE
+   SETOR (montagem, revisao, embalagem: o componente cuja chave e o proprio
+   setor e a mao de obra, e nao uma peca). Cobrar material deles seria
+   ruido permanente, e ruido permanente e a lista que a equipe aprende a nao
+   ler (armadilha #6). O TUBO se aponta no degrau: o aviso diz qual degrau.
+
+   E "material sem marca/modelo" so aparece onde a etiqueta PEDE marca ou
+   modelo — a vareta nao tem o que avisar por nao ter marca. */
+function avisosDeMaterial(modelo_id){
+  const m=modelo(modelo_id);
+  const porta=materiais.ligada();
+  const doPcp=porta?new Map(materiais.listar().map(x=>[x.id,x])):null;
+  const fora=[];
+  const vistas=new Set();
+  for(const l of m.ficha.filter(x=>x.ativo&&x.componente_ativo)){
+    if(l.chave==='tecido'||l.eh_kit||l.chave===l.setor) continue;
+    if(!l.gera_etiqueta) continue;
+    if(vistas.has(l.chave)) continue;
+    vistas.add(l.chave);
+    let aviso='';
+    if(l.chave==='tubo'){
+      const sem=m.degraus.filter(d=>d.ativo&&d.componente_id==null).map(d=>d.nome);
+      if(sem.length) aviso='sem material ligado ('+sem.join(', ')+')';
+    }else if(l.material_id==null) aviso='sem material ligado';
+    else if(doPcp&&!doPcp.has(l.material_id)) aviso='o material apontado não está mais em Compras';
+    else{
+      const pede=String(l.etiqueta_extras||'').split(',').filter(x=>x==='marca'||x==='modelo');
+      const mat=doPcp&&doPcp.get(l.material_id);
+      if(pede.length&&mat&&pede.some(x=>!mat[x])) aviso='material sem marca/modelo';
+    }
+    fora.push({chave:l.chave, nome:l.componente_nome, aviso,
+      material:(l.material_id!=null&&doPcp&&doPcp.get(l.material_id))||null});
+  }
+  return fora;
+}
+
 const historicoPreco=(alvo,alvo_id)=>dCat.historicoPreco(alvo,alvo_id);
 
 module.exports={
@@ -655,5 +717,5 @@ module.exports={
   ligarMaterialDoDegrau, ligarMaterialDoComponente,
   fichaDe, fichaLinhaDe, criarFichaLinha, editarFichaLinha,
   criarFaixaSuporte, apagarFaixaSuporte, definirReducaoRegra,
-  historicoPreco, QUANDOS, REF_RESERVADAS, CALCULOS, QUANTIDADES_REF
+  historicoPreco, avisosDeMaterial, QUANDOS, REF_RESERVADAS, CALCULOS, QUANTIDADES_REF, EXTRAS
 };

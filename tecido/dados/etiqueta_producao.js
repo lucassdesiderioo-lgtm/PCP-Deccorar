@@ -29,13 +29,17 @@ const CAMPOS=`c.*,
   i.n AS item_n, i.largura_mm, i.altura_mm, i.comando, i.rolamento,
   i.adicional, i.reducao, i.degrau_nome, i.cor_tecido_id, i.tecido_id,
   i.cancelado_em AS item_cancelado,
+  i.acionamento, i.sentido, i.lado_corrente, i.folhas, i.gomos, i.gomo_decimo_mm,
+  i.folha_mm, i.vias, i.lados,
   a.nome AS colecao_nome, l.nome AS linha_nome, cor.nome AS cor_nome,
-  p.id AS pedido_id, p.numero AS pedido_numero, p.marco, p.prazo_atual,
+  m.nome AS modelo_nome,
+  p.id AS pedido_id, p.numero AS pedido_numero, p.marco, p.prazo_atual, p.cliente_final,
   r.nome_fantasia AS revenda_nome`;
 const DE=`FROM sm_pedido_componente c
   JOIN sm_pedido_item i ON i.id=c.item_id
   JOIN sm_pedido p ON p.id=i.pedido_id
   JOIN sm_revenda r ON r.id=p.revenda_id
+  LEFT JOIN sm_modelo m ON m.id=i.modelo_id
   LEFT JOIN abertura a ON a.id=i.abertura_id
   LEFT JOIN linha l ON l.id=a.linha_id
   LEFT JOIN cor ON cor.id=i.cor_tecido_id`;
@@ -51,7 +55,7 @@ const componentes=(pedidos,filtroSetor)=>db.prepare(
   'SELECT '+CAMPOS+' '+DE+' WHERE '+VIVOS+
   ' AND p.id IN ('+listaDe(pedidos.length)+')'+
   (filtroSetor?' AND c.setor=?':'')+
-  ' ORDER BY p.numero, i.n, c.ordem')
+  ' ORDER BY p.numero, i.n, c.ordem, c.unidade_k, c.id')
   .all(...pedidos, ...(filtroSetor?[filtroSetor]:[]));
 
 /* ⚠️ A REIMPRESSAO DA PECA REFEITA E POR CODIGO (fase 5-B2). Reimprimir o
@@ -61,7 +65,7 @@ const componentes=(pedidos,filtroSetor)=>db.prepare(
 const porCodigos=codigos=>db.prepare(
   'SELECT '+CAMPOS+' '+DE+' WHERE '+VIVOS+
   ' AND c.codigo_etiqueta COLLATE NOCASE IN ('+listaDe(codigos.length)+')'+
-  ' ORDER BY p.numero, i.n, c.ordem').all(...codigos);
+  ' ORDER BY p.numero, i.n, c.ordem, c.unidade_k, c.id').all(...codigos);
 
 // Quantas pecas VIVAS o pedido tem — o "3 de 10" da etiqueta.
 const pecasDoPedido=pedidos=>db.prepare(
@@ -88,10 +92,15 @@ const semCodigo=()=>db.prepare(
 const gravarCodigo=(id,codigo)=>db.prepare(
   'UPDATE sm_pedido_componente SET codigo_etiqueta=? WHERE id=?').run(codigo,id);
 
+/* ⚠️ A DATA DE FABRICACAO SO NASCE NA PRIMEIRA IMPRESSAO (secao 8.2 da spec
+   SOBMEDIDA-CADASTRO-DE-PRODUTO): o COALESCE e a regra inteira. A
+   reimpressao regrava o impresso_em e nao toca nela — a data e da peca, como
+   o codigo. */
 const marcarImpresso=(ids,quando,quem)=>db.prepare(
   'UPDATE sm_pedido_componente SET impresso_em=?, impresso_por=?, '+
+  'fabricado_em=COALESCE(fabricado_em,?), '+
   'reimpressoes=reimpressoes+(CASE WHEN impresso_em IS NULL THEN 0 ELSE 1 END) '+
-  'WHERE id IN ('+listaDe(ids.length)+')').run(quando,quem,...ids);
+  'WHERE id IN ('+listaDe(ids.length)+')').run(quando,quem,quando,...ids);
 
 const registrar=d=>db.prepare(
   'INSERT INTO sm_etiqueta_impressao(setor,quantidade,pedidos,reimpressao,usuario_nome) '+

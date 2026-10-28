@@ -123,13 +123,18 @@ module.exports=[
   materiais.ligar(()=>DO_COMPRAS);
 }},
 
-{nome:'a porta entrega id, nome e unidade — e nada mais',
+/* ⚠️ MARCA E MODELO ATRAVESSAM DESDE A FASE 5 DA SPEC SOBMEDIDA-CADASTRO-DE-
+   PRODUTO (secao 8.2): sao o que a etiqueta escreve do motor, o dado da
+   garantia. O que este caso existe para travar continua de pe — preco,
+   fornecedor e estoque sao assunto do Compras e NAO atravessam. */
+{nome:'a porta entrega id, nome, unidade, marca e modelo — e nada mais',
  executar({db,igual}){
   limpar(db);
   materiais.ligar(()=>[{id:101,nome:'Tubo 32 mm',unidade:'m',
     preco:66.13, fornecedor:'JP', estoque:1200}]);
   const m=materiais.listar()[0];
-  igual(Object.keys(m).sort().join(','),'id,nome,unidade','campos que atravessam');
+  igual(Object.keys(m).sort().join(','),'id,marca,modelo,nome,unidade','campos que atravessam');
+  igual(m.marca,null,'marca ausente vira null — e nao sai no papel');
   materiais.ligar(()=>DO_COMPRAS);
 }},
 

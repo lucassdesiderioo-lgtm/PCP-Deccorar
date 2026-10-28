@@ -11,7 +11,7 @@
 // Mesmo desenho do `pessoas.js`, e de proposito — um segundo jeito de
 // atravessar seria um segundo lugar para consertar.
 //
-// ⚠️ A PORTA ENTREGA id, nome E unidade, E SO. O mapeamento e explicito:
+// ⚠️ A PORTA ENTREGA id, nome, unidade, marca E modelo, E SO. O mapeamento e explicito:
 // preco, estoque, minimo e fornecedor sao assunto do Compras, e nao tem o
 // que fazer deste lado. O que nao atravessa nao vaza — e a poda do
 // `custo.js` nem chega a ser perguntada.
@@ -38,8 +38,13 @@ function listar(){
   if(!porta) throw new ErroDeRegra('porta_de_materiais_nao_ligada',
     'A lista de materiais do PCP nao esta ligada neste servidor. Quem a liga e o server.js, '+
     'na chamada de montar() do /sobmedida.');
+  /* Marca e modelo atravessam desde a fase 5 do cadastro de produto: e o que
+     a etiqueta escreve do motor (o dado da garantia). Vazio vira null — e o
+     campo vazio simplesmente nao sai no papel. */
+  const t=v=>v==null||String(v).trim()===''?null:String(v).trim();
   return (porta()||[]).map(m=>({
-    id:Number(m.id), nome:String(m.nome||''), unidade:String(m.unidade||'')
+    id:Number(m.id), nome:String(m.nome||''), unidade:String(m.unidade||''),
+    marca:t(m.marca), modelo:t(m.modelo)
   }));
 }
 

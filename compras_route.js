@@ -119,7 +119,7 @@ module.exports = function(app, db){
         erro:rotulo+' tem que ser um número maior ou igual a zero — veio "'+b[k]+'"'});
       campos[k]=n;
     }
-    for(const k of ['nome','codigo','unidade','familia']) if(tem(k)) campos[k]=txt(b[k]);
+    for(const k of ['nome','codigo','unidade','familia','marca','modelo']) if(tem(k)) campos[k]=txt(b[k]);
     if(tem('cor')) campos.cor = txt(b.cor) && String(b.cor).toUpperCase();
     if(tem('sobra_aproveitavel')) campos.sobra_aproveitavel = b.sobra_aproveitavel?1:0;
     if(tem('ativo')) campos.ativo = b.ativo?1:0;

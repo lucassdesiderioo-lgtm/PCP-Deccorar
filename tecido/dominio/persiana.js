@@ -21,6 +21,7 @@ const catalogo=require('./catalogo_sm');
 const dRevenda=require('../dados/revenda');
 const dTecido=require('../dados/tecido');
 const ESC=require('./escolhas');
+const materiais=require('../nucleo/materiais');
 
 const COMANDOS={direito:'direito', esquerdo:'esquerdo'};
 const ROLAMENTOS={frente:'pela frente', tras:'por trás'};
@@ -421,6 +422,12 @@ function calcular(escolha,opcoes){
       quantidade, quando:linha.quando,
       gera_etiqueta:!!linha.gera_etiqueta, eh_kit:!!linha.eh_kit,
       codigo_barras:linha.codigo_barras||null,
+      /* O material de compra do PCP que diz o que a peca E (nome, marca,
+         modelo — secao 8.2). O tubo aponta no DEGRAU, porque o material muda
+         com ele (fase 4-C); o resto, no componente. */
+      material_id:linha.chave==='tubo'?(degrau?degrau.componente_id:null):
+        (linha.material_id==null?null:linha.material_id),
+      etiqueta_extras:linha.etiqueta_extras||null,
       // ⚠️ CORTE e CONSUMO, lado a lado e nunca somados — armadilha #18.
       largura_corte_mm: medirLargura(linha.ref_largura,linha.ajuste_largura_mm),
       altura_corte_mm:  medirAltura(linha.ref_altura,linha.ajuste_altura_mm),
@@ -583,6 +590,22 @@ function calcular(escolha,opcoes){
       u.emM2(area_mm2)+' m².');
   if(semPreco.length)
     avisos.push('Sem preço lançado para: '+semPreco.join(', ')+'. O total sai como piso (≥).');
+  /* ⚠️ O INSUMO QUE LEVA MARCA OU MODELO NA ETIQUETA (o motor) AVISA AQUI
+     TAMBEM, porque e o dado da garantia (dono, 28/10/2026). AVISA, NAO TRAVA:
+     o cadastro de material ainda esta sendo arrumado, e a persiana sai do
+     mesmo jeito, com o campo vazio de fora do papel. */
+  for(const c of componentes){
+    const pede=String(c.etiqueta_extras||'').split(',').filter(x=>x==='marca'||x==='modelo');
+    if(!pede.length) continue;
+    let mat=null;
+    try{ mat=c.material_id!=null&&materiais.ligada()?materiais.porId(c.material_id):null; }catch(x){ mat=null; }
+    if(c.material_id==null)
+      avisos.push(c.nome+' sem material ligado: a etiqueta sai sem marca e modelo — é o dado da garantia. '+
+        'Ligue o material em Catálogo → Componentes e preços.');
+    else if(mat&&pede.some(x=>!mat[x]))
+      avisos.push(c.nome+' sem marca ou modelo no cadastro de material ("'+mat.nome+'"): a etiqueta sai '+
+        'sem o dado da garantia. Complete em Compras → Materiais.');
+  }
 
   const nomeAdicional={bando:'Bandô',barra:'Barra niveladora'}[adicional];
   const frase=(chave,valor)=>{ const o=valor==null?null:opcaoDe(chave,valor); return o&&o.frase?[o.frase]:[]; };

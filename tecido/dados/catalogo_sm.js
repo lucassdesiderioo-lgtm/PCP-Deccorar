@@ -154,8 +154,14 @@ module.exports={
   },
 
   // ── Ficha ───────────────────────────────────────────────────────────────
+  /* ⚠️ O "GERA ETIQUETA" DA LINHA VENCE O DO COMPONENTE, e NULL herda (fase 5
+     do cadastro de produto). `ficha_gera_etiqueta` e o que a linha diz por si,
+     para a tela saber se e herdado. */
   ficha:modelo_id=>varios(`SELECT f.*, c.chave, c.nome AS componente_nome, c.setor,
-      c.gera_etiqueta, c.eh_kit, c.usa_faixa_suporte, c.codigo_barras,
+      COALESCE(f.gera_etiqueta,c.gera_etiqueta) AS gera_etiqueta,
+      f.gera_etiqueta AS ficha_gera_etiqueta, c.gera_etiqueta AS componente_gera_etiqueta,
+      c.componente_id AS material_id,
+      c.eh_kit, c.usa_faixa_suporte, c.codigo_barras,
       c.preco_centavos, c.unidade_cobranca,
       c.largura_max_mm AS componente_largura_max_mm,
       c.altura_max_mm AS componente_altura_max_mm, c.ativo AS componente_ativo
@@ -174,10 +180,11 @@ module.exports={
     'SELECT * FROM sm_ficha_linha WHERE componente_id=?',componente_id),
   criarFichaLinha(d){
     const r=db.prepare(`INSERT INTO sm_ficha_linha(modelo_id,componente_id,ordem,quando,quantidade,
-      quantidade_ref,ref_largura,ajuste_largura_mm,ref_altura,ajuste_altura_mm,
+      quantidade_ref,gera_etiqueta,etiqueta_extras,ref_largura,ajuste_largura_mm,ref_altura,ajuste_altura_mm,
       consumo_ref_largura,consumo_ajuste_largura_mm,consumo_ref_altura,consumo_ajuste_altura_mm)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(d.modelo_id,d.componente_id,d.ordem,
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(d.modelo_id,d.componente_id,d.ordem,
       d.quando||'sempre',d.quantidade||1,d.quantidade_ref||null,
+      d.gera_etiqueta==null?null:d.gera_etiqueta,d.etiqueta_extras||null,
       d.ref_largura||null,d.ajuste_largura_mm==null?null:d.ajuste_largura_mm,
       d.ref_altura||null,d.ajuste_altura_mm==null?null:d.ajuste_altura_mm,
       d.consumo_ref_largura||null,d.consumo_ajuste_largura_mm==null?null:d.consumo_ajuste_largura_mm,
@@ -185,7 +192,8 @@ module.exports={
     return this.fichaLinha(r.lastInsertRowid);
   },
   atualizarFichaLinha(id,d){
-    const cols=['ordem','quando','quantidade','quantidade_ref','ref_largura','ajuste_largura_mm',
+    const cols=['ordem','quando','quantidade','quantidade_ref','gera_etiqueta','etiqueta_extras',
+                'ref_largura','ajuste_largura_mm',
                 'ref_altura','ajuste_altura_mm','consumo_ref_largura','consumo_ajuste_largura_mm',
                 'consumo_ref_altura','consumo_ajuste_altura_mm','ativo'];
     const campos=[],vals=[];
