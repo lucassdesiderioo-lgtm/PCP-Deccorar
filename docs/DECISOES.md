@@ -438,3 +438,22 @@ Conferência mostram uma linha com o número e a idade da mais antiga, e a TV um
 quadro com o número. Só o número: decidir continua na aba, com a permissão de
 cada pendência.
 
+## 27/10/2026 — o sob medida ganha cadastro de produto: criar, duplicar, Romana e Painel
+
+Spec `SOBMEDIDA-CADASTRO-DE-PRODUTO`. **Antes:** a tela Catálogo só editava o
+Rolô; não havia onde criar produto, e o cálculo conhecia uma regra só, a escada
+de tubos. **Depois:** produto se cria do zero ou duplicando, e nasce inativo até
+o dono conferir no simulador e ativar. Escolhas do cliente e cálculos são peças
+prontas do sistema; o produto liga as que usa e o dono preenche os números —
+conta nova entra por spec, nunca como fórmula digitada na tela. Romana: gomos
+ímpares, o menor número que deixa cada gomo até 35 cm, mínimo de 3, gomo pela
+divisão exata, varetas = gomos − 1. Painel: 10 cm de transpasse por encontro de
+folhas; abertura lateral de 2 a 5 folhas, central par até 6, dividindo a largura
+ao meio sem transpasse no meio; uma via por folha; trilho de uma peça só; com ou
+sem comando. O preço continua m² por produto e coleção, mais acessório por metro
+linear, com a estrutura pronta para preço por cor. Etiqueta de produção por
+UNIDADE de insumo, marcada k/n, com dados do cadastro de matéria-prima; o motor
+leva marca, modelo e a data da primeira impressão da etiqueta. O pedido da
+revenda ganha cliente final opcional. Romana e Painel usam os cinco setores de
+hoje. O dono: *"isso que estamos fazendo é algo para facilitar na criação de um
+produto novo"*.
