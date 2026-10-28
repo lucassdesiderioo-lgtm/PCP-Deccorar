@@ -330,6 +330,25 @@ A **ficha** (com os descontos) responde outra pergunta: **quanto custa** e
   etiqueta sai só com a revenda. Hoje o pedido não guarda cliente final.
 - A medida da etiqueta é a de **corte**, nunca a de consumo (armadilha #18).
 
+> **As duas fontes, sem misturar** (dono, 28/10/2026):
+>
+> | Fonte | Dá | Nunca dá |
+> |---|---|---|
+> | **Cadastro de material** (Compras do PCP) | o que o componente **É**: nome, marca, modelo | medida |
+> | **Ficha técnica** do produto | **quanto** e **a quanto cortar**: medida de corte, medida de produção, quantidade de unidades | o nome, quando há material ligado |
+>
+> O tubo continua com o nome do **degrau** (`TUBO 32`).
+>
+> ⚠️ **O CADASTRO DE MATERIAL AINDA NÃO ESTÁ REFINADO, E POR ISSO NADA TRAVA**
+> (dono, 28/10/2026). Falta de material ligado, ou campo vazio nele (marca,
+> modelo), **nunca** trava etiqueta, pedido nem aprovação. Sem material ligado
+> sai o nome do componente; campo vazio simplesmente não sai no papel. A ficha
+> de cada produto mostra em âmbar o que falta — *"sem material ligado"* ou
+> *"material sem marca/modelo"* —, e essa é a lista de trabalho para arrumar o
+> cadastro. **O motor é a exceção que avisa mais alto:** motor sem marca ou
+> modelo aparece em âmbar também no simulador, porque é o dado da garantia.
+> Avisa, não trava.
+
 ### 8.3 O que já existe e não muda
 
 - O **código da etiqueta é da peça**, nasce na aprovação e sobrevive à
@@ -341,6 +360,14 @@ A **ficha** (com os descontos) responde outra pergunta: **quanto custa** e
   teste travando isso (fase 5).
 - O Rolô de hoje tem quantidade 1 em todas as linhas com etiqueta, então a
   etiqueta dele **não muda** — só ganha o "1/1" e os campos da base.
+
+- **A recusa de um insumo com várias unidades volta SÓ A UNIDADE** (dono,
+  28/10/2026). Quando o insumo tem mais de uma unidade, quem recusa escolhe o
+  motivo **e a unidade** (ex.: `2/4`), e só ela volta — junto com o que
+  depende dela, pela mesma regra de liberação da 5-B2. As outras (`1/4`,
+  `3/4`, `4/4`) seguem. A unidade refeita reimprime a **mesma** etiqueta:
+  mesmo código, mesmo `k/n`, mesma data de fabricação, marcada como refeita.
+  Insumo de unidade única (todo o Rolô) continua com uma escolha só, o motivo.
 
 ---
 
