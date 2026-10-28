@@ -12,19 +12,38 @@ const persiana=require('../dominio/persiana');
    `total_centavos` NAO casaria com o padrao e vazaria em silencio. */
 const custo=require('../dominio/custo');
 const materiais=require('../nucleo/materiais');
+const {pode}=require('../nucleo/permissoes');
 
 const LER='catalogo.ler', EDITAR='catalogo.editar';
 
 module.exports={rotas:[
 
   // ── Catalogo ────────────────────────────────────────────────────────────
+  /* ⚠️ O INATIVO SO CHEGA A QUEM EDITA O CATALOGO (secao 3.2 da spec
+     SOBMEDIDA-CADASTRO-DE-PRODUTO). O produto novo nasce inativo para o dono
+     conferir; o vendedor que lanca pedido nao o ve na lista, e o detalhe dele
+     e recusado com o mesmo motivo do calculo. */
   {metodo:'GET', caminho:'/api/sm/modelos', permissao:LER,
-   manipulador:({usuario})=>custo.podar(usuario,catalogo.listarModelos())},
+   manipulador:({usuario})=>custo.podar(usuario,
+     catalogo.listarModelos({inativos:pode(usuario,EDITAR)}))},
   {metodo:'GET', caminho:'/api/sm/modelos/:id', permissao:LER,
-   manipulador:({params,usuario})=>custo.podar(usuario,catalogo.modelo(params.id))},
+   manipulador:({params,usuario})=>custo.podar(usuario,
+     catalogo.modeloParaVer(params.id,pode(usuario,EDITAR)))},
   {metodo:'POST', caminho:'/api/sm/modelos', permissao:EDITAR,
    manipulador:({corpo,usuario})=>catalogo.criarModelo(corpo,usuario),
    detalhe:(req)=>'modelo '+req.body.nome},
+  {metodo:'PUT', caminho:'/api/sm/modelos/:id', permissao:EDITAR,
+   manipulador:({params,corpo,usuario})=>catalogo.editarModelo(params.id,corpo,usuario),
+   detalhe:(req,d)=>'modelo '+(d&&d.nome)},
+  /* DUPLICAR E ATIVAR TEM PORTA PROPRIA. O duplicar grava sete tabelas numa
+     transacao so; o ativar confere o nome da copia antes. Nenhum dos dois
+     cabe no PUT do modelo sem virar um `if` escondido dentro dele. */
+  {metodo:'POST', caminho:'/api/sm/modelos/:id/duplicar', permissao:EDITAR,
+   manipulador:({params,corpo,usuario})=>catalogo.duplicarModelo(params.id,corpo||{},usuario),
+   detalhe:(req,d)=>d?('duplicou o modelo '+req.params.id+' em "'+d.nome+'"'):null},
+  {metodo:'PUT', caminho:'/api/sm/modelos/:id/ativo', permissao:EDITAR,
+   manipulador:({params,corpo,usuario})=>catalogo.ativarModelo(params.id,!!(corpo&&corpo.ativo),usuario),
+   detalhe:(req,d)=>d?((d.ativo?'ativou':'desativou')+' o modelo '+d.nome):null},
 
   // ── Colecoes de venda ───────────────────────────────────────────────────
   {metodo:'POST', caminho:'/api/sm/modelos/:id/colecoes', permissao:EDITAR,
@@ -54,6 +73,9 @@ module.exports={rotas:[
   // ── Componentes ─────────────────────────────────────────────────────────
   {metodo:'GET', caminho:'/api/sm/componentes', permissao:LER,
    manipulador:({usuario})=>custo.podar(usuario,catalogo.listarComponentes())},
+  {metodo:'POST', caminho:'/api/sm/componentes', permissao:EDITAR,
+   manipulador:({corpo,usuario})=>custo.podar(usuario,catalogo.criarComponente(corpo||{},usuario)),
+   detalhe:(req,d)=>d?('componente '+d.chave+' · '+d.nome):null},
   {metodo:'PUT', caminho:'/api/sm/componentes/:id/preco', permissao:EDITAR,
    manipulador:({params,corpo,usuario})=>custo.podar(usuario,
      catalogo.definirPrecoComponente(params.id,corpo.preco_centavos,usuario)),
@@ -121,7 +143,8 @@ module.exports={rotas:[
      o mesmo caminho que a fase 3 vai usar para montar o item do pedido.
      Ele NAO grava nada: simular e perguntar. */
   {metodo:'POST', caminho:'/api/sm/simular', permissao:LER,
-   manipulador:({corpo,usuario})=>custo.podar(usuario,persiana.calcular(corpo))},
+   manipulador:({corpo,usuario})=>custo.podar(usuario,
+     persiana.calcular(corpo,{aceitaInativo:pode(usuario,EDITAR)}))},
 
   /* ⚠️ AS CORES DE UMA COLECAO TEM PORTA PROPRIA, e nao e duplicacao do
      cadastro de tecido. O pedido (fase 3) EXIGE a cor do tecido — e ela que

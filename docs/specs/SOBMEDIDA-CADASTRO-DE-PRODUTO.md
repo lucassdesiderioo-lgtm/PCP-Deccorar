@@ -2,15 +2,19 @@
 
 ```
 STATUS
-Situação: planejado
+Situação: em construção
 Criada em: 27/10/2026
 Última atualização: 28/10/2026 (documento único: decisões e modo de construção nas §13 e §14)
-Fase atual: nenhuma — spec aprovada pelo dono em 27/10/2026; próxima é a fase 1
-Fases: 1 ☐  2 ☐  3 ☐  4 ☐  5 ☐  6 ☐
+Fase atual: construindo as seis em sequência (§14)
+Fases: 1 ☑ em código  2 ☐  3 ☐  4 ☐  5 ☐  6 ☐
 Risco: 🔴 (schema do catálogo, preço, etiqueta de produção, ficha congelada)
 Módulo: sob medida (tecido/) — ler tecido/README.md e a spec
         SOBMEDIDA-PEDIDO-REVENDA.md (§4.2 a §4.14) antes de mexer
-Mudanças no caminho: —
+Mudanças no caminho:
+  F1 — o pedido e o simulador ganharam o SELETOR de produto (abriam sempre o
+       primeiro modelo); criar componente e acrescentar linha de ficha pela
+       tela entraram aqui, porque sem eles o dono não monta a Romana sozinho.
+       O simulador aceita o inativo só para quem tem catalogo.editar.
 ```
 
 > **Onde mora:** dentro do `/sobmedida`, no `tecido.db`, com migrações

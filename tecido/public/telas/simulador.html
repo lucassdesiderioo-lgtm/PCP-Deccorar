@@ -29,6 +29,8 @@ table.lista td.n{text-align:right; font-variant-numeric:tabular-nums}
   border-radius:var(--raio); padding:10px 12px; font-size:15px; margin-top:8px}
 .piso{color:var(--alerta)}
 .motivo{font-size:13px; color:var(--tinta-fraca); margin:4px 0 0}
+.tarja{background:var(--alerta-fraca); color:var(--alerta); border:1px solid var(--alerta);
+  border-radius:var(--raio); padding:8px 12px; font-weight:700; margin:10px 0}
 </style>
 </head>
 <body>
@@ -95,6 +97,17 @@ function desenharEscolhas(){
   const m=estado.modelo;
   if(!m) return;
 
+  /* O PRODUTO, e o inativo marcado no nome: quem confere a copia tem que
+     saber, antes de qualquer numero, que esta olhando para a copia. */
+  if((estado.modelos||[]).length>1){
+    const l0=el('div',{class:'campos'});
+    l0.appendChild(fileira('Produto',
+      estado.modelos.map(x=>({valor:x.id,nome:x.nome+(x.ativo?'':' (inativo)')})),
+      m.id, v=>{ trocarModelo(v); }));
+    c.appendChild(l0);
+  }
+  if(!m.ativo) c.appendChild(el('div',{class:'tarja'},
+    ['INATIVO — a revenda não vê "'+m.nome+'". Você está conferindo; ative no Catálogo quando estiver certo.']));
   const linha1=el('div',{class:'campos'});
   linha1.appendChild(fileira('Coleção',
     m.colecoes.filter(x=>x.disponivel).map(x=>({valor:x.abertura_id,nome:x.colecao_nome+' · '+x.linha_nome})),
@@ -260,7 +273,9 @@ function desenhar(r){
   }
 
   s.appendChild(grade);
-  (r.avisos||[]).forEach(a=>s.appendChild(el('div',{class:'aviso'},[a])));
+  // A tarja do inativo ja esta no topo das escolhas; repeti-la aqui embaixo
+  // faria o aviso mais importante virar o mais repetido.
+  (r.avisos||[]).filter(a=>!/^INATIVO/.test(a)).forEach(a=>s.appendChild(el('div',{class:'aviso'},[a])));
 }
 
 let pendente=null;
@@ -322,17 +337,25 @@ async function rodar(){
      simulando — so nao ve o seletor; por isso o catch devolve lista vazia em
      vez de derrubar a tela. */
   estado.revendas=await api('/api/revendas?ativo=1',{silencioso:true}).catch(()=>[]);
-  const modelos=await api('/api/sm/modelos');
-  if(!modelos.length) return banner('Nenhum modelo cadastrado ainda.','alerta');
-  estado.modelo=await api('/api/sm/modelos/'+modelos[0].id);
+  estado.modelos=await api('/api/sm/modelos');
+  if(!estado.modelos.length) return banner('Nenhum modelo cadastrado ainda.','alerta');
+  /* O Catalogo abre o simulador JA no produto que esta sendo conferido
+     (?modelo=). Sem isso, conferir a copia comecaria pelo Rolo. */
+  const pedido=Number(new URLSearchParams(location.search).get('modelo'));
+  await trocarModelo((estado.modelos.find(m=>m.id===pedido)||estado.modelos[0]).id);
+})();
+
+async function trocarModelo(id){
+  estado.modelo=await api('/api/sm/modelos/'+id);
   const c=estado.modelo.colecoes.filter(x=>x.disponivel)[0];
   const cor=estado.modelo.cores_acessorio.filter(x=>x.ativo&&x.cor_ativa)[0];
   estado.abertura_id=c?c.abertura_id:null;
   estado.cor_acessorio_id=cor?cor.cor_id:null;
+  estado.opcoes=null;
   simular();
   if(!c) banner('O modelo '+estado.modelo.nome+' ainda não tem coleção de venda ligada. '+
     'Ligue em Catálogo.','alerta',8);
-})();
+}
 </script>
 </body>
 </html>

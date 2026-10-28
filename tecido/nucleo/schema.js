@@ -1799,6 +1799,22 @@ CREATE TABLE sm_aprovacao(
 CREATE UNIQUE INDEX idx_aprovacao_pendente ON sm_aprovacao(tipo,alvo_id) WHERE status='pendente';
 CREATE INDEX idx_aprovacao_status ON sm_aprovacao(status,tipo);
 `}
+,
+
+{n:32, nome:'o produto se cria e se duplica — o preco copiado diz de onde veio', sql:`
+/* === O CADASTRO DE PRODUTO ================================================
+   Fase 1 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO. O sm_modelo ja tinha 'ativo'
+   desde a migracao 16, e a rota de criar tambem; faltava a tela, o duplicar e
+   o produto novo nascer INATIVO — nada disso pede coluna.
+
+   ⚠️ O QUE PEDE COLUNA E O RASTRO DO PRECO COPIADO. Duplicar o Rolo leva os
+   precos do m² de cada colecao para o produto novo, e preco que aparece sem
+   rastro e a metade do registro que falta quando alguem pergunta "de onde
+   veio esse numero?" (secao 3.2 da spec). A linha do historico ganha o
+   'detalhe' — "copiado de Rolô" —, e as linhas de antes ficam com NULL, que e
+   a verdade: elas foram digitadas. */
+ALTER TABLE sm_preco_historico ADD COLUMN detalhe TEXT;
+`}
 ];
 
 // ─────────────────────────────────────────────────────────────────────────

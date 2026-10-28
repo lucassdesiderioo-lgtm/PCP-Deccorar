@@ -80,7 +80,7 @@ const emMetros=mm=>mm==null?'':(mm/1000).toFixed(3).replace('.',',');
    nesta tela: arrumar so aqui deixaria o total certo e o PDF errado. */
 const reais=t=>t==null?'—':'R$ '+t;
 
-let eu={permissoes:[]}, fila=[], lista=[], revendas=[], modelo=null, cores=[];
+let eu={permissoes:[]}, fila=[], lista=[], revendas=[], modelo=null, modelos=[], cores=[];
 let risco=[];
 let aberto=null, erro=null, novaPeca=null;
 const posso=k=>(eu.permissoes||[]).indexOf(k)>=0;
@@ -169,10 +169,15 @@ async function abrir(id){
   $('#cAberto').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-async function carregarCatalogo(){
-  const modelos=await api('/api/sm/modelos');
+/* ⚠️ O PEDIDO SO OFERECE PRODUTO ATIVO, mesmo para quem edita o catalogo e
+   recebe o inativo na lista (secao 3.2 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO).
+   O inativo e para conferir no simulador; aqui ele so daria a recusa do
+   servidor depois de a peca inteira digitada. */
+async function carregarCatalogo(id){
+  modelos=(await api('/api/sm/modelos')).filter(m=>m.ativo);
   if(!modelos.length) return;
-  modelo=await api('/api/sm/modelos/'+modelos[0].id);
+  const alvo=modelos.find(m=>m.id===Number(id))||modelos[0];
+  modelo=await api('/api/sm/modelos/'+alvo.id);
 }
 
 async function carregarCores(abertura_id){
@@ -324,6 +329,22 @@ function abrirNovaPeca(){
 
   const redesenhar=async()=>{
     limpar(box);
+    /* O PRODUTO VEM PRIMEIRO: ele decide que colecoes, cores e escolhas
+       existem. Trocar de produto recomeca a peca — a colecao de um nao e
+       vendida no outro. */
+    if(modelos.length>1){
+      const l0=el('div',{class:'campos'});
+      const selMod=el('select',{'aria-label':'Produto'});
+      modelos.forEach(m=>selMod.appendChild(el('option',{value:String(m.id),
+        selected:m.id===modelo.id?'selected':null},[m.nome])));
+      selMod.onchange=async()=>{
+        await carregarCatalogo(selMod.value);
+        e.abertura_id=null; e.cor_tecido_id=null; e.cor_acessorio_id=null;
+        redesenhar();
+      };
+      l0.appendChild(el('div',{class:'campo cresce'},[el('label',{},['Produto']),selMod]));
+      box.appendChild(l0);
+    }
     const l1=el('div',{class:'campos'});
     const selCol=el('select',{'aria-label':'Coleção'});
     (modelo.colecoes||[]).filter(x=>x.disponivel).forEach(x=>{

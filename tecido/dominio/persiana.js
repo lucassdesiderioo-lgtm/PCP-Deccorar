@@ -83,12 +83,18 @@ function conferirTeto(onde, nome, motivo, limites, largura_mm, altura_mm, area_m
       u.emM2(limites.m2_max_mm2)+' m² que '+onde+' '+nome+' aceita.');
 }
 
-function calcular(escolha){
+/* `opcoes.aceitaInativo` e o SIMULADOR INTERNO, e mais ninguem (secao 3.2 da
+   spec SOBMEDIDA-CADASTRO-DE-PRODUTO). O produto novo nasce inativo para o
+   dono conferir antes de a revenda ver — e sem calcular o inativo nao ha
+   como conferir. O pedido chama sem a opcao, e por isso o inativo continua
+   recusado ali: a tela esconder o modelo nao e a regra (armadilha #26). */
+function calcular(escolha,opcoes){
   const e=escolha||{};
+  const op=opcoes||{};
 
   // ── 1. O catalogo ───────────────────────────────────────────────────────
   const modelo=catalogo.modelo(e.modelo_id);
-  exigir(modelo.ativo,'modelo_indisponivel','O modelo '+modelo.nome+' está desativado.');
+  exigir(modelo.ativo||op.aceitaInativo,'modelo_indisponivel','O modelo '+modelo.nome+' está desativado.');
 
   const colecao=catalogo.colecaoDe(modelo.id,e.abertura_id);
   exigir(colecao,'colecao_fora_do_modelo',
@@ -401,6 +407,9 @@ function calcular(escolha){
   preco.revenda=precoRevenda;
 
   // ── 10. O que a tela e a bancada leem ───────────────────────────────────
+  /* A TARJA VEM PRIMEIRO: e a coisa mais importante que o dono le quando
+     confere um produto que ainda nao foi ativado. */
+  if(!modelo.ativo) avisos.unshift('INATIVO — a revenda não vê este produto. Confira e ative no Catálogo.');
   if(reducao.automatica)
     avisos.push('Redução de peso incluída pela regra de garantia — acima de '+
       u.emM2(regra.m2_acima_mm2)+' m² ou de '+u.emMetros(regra.largura_acima_mm)+' de largura.');
@@ -421,7 +430,7 @@ function calcular(escolha){
    .concat(reducao.aplicada?['Redução de peso']:[]).join(' · ');
 
   return {
-    modelo:{id:modelo.id, nome:modelo.nome},
+    modelo:{id:modelo.id, nome:modelo.nome, ativo:!!modelo.ativo},
     colecao:{id:colecao.id, abertura_id:colecao.abertura_id, nome:colecao.colecao_nome,
              linha_nome:colecao.linha_nome},
     cor_acessorio:{id:cor.cor_id, nome:cor.cor_nome},
