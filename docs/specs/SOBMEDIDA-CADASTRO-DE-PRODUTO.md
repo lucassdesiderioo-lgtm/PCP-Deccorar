@@ -2,14 +2,34 @@
 
 ```
 STATUS
-Situação: em construção
+Situação: em código — as seis fases, conferidas num servidor local; falta subir
 Criada em: 27/10/2026
-Última atualização: 28/10/2026 (documento único: decisões e modo de construção nas §13 e §14)
-Fase atual: construindo as seis em sequência (§14)
+Última atualização: 28/10/2026 (seis fases em código e conferência local, PR aberto)
+Fase atual: as seis em código; espera o "pode subir" (§14)
 Fases: 1 ☑ em código  2 ☑ em código  3 ☑ em código  4 ☑ em código  5 ☑ em código  6 ☑ em código
 Risco: 🔴 (schema do catálogo, preço, etiqueta de produção, ficha congelada)
 Módulo: sob medida (tecido/) — ler tecido/README.md e a spec
         SOBMEDIDA-PEDIDO-REVENDA.md (§4.2 a §4.14) antes de mexer
+Conferência (§15), 28/10/2026, num servidor local com banco IMITANDO a
+  produção (opção B do dono), tudo pelas rotas e pela tela como a equipe usa:
+  o Rolô com oito coleções e os tubos apontados, a Romana e o Painel montados
+  DO ZERO pela tela do Catálogo, um pedido com Romana + Painel + Rolô
+  enviado, aprovado pelo vendedor da carteira e atravessando os cinco setores
+  com uma pessoa em cada bancada até o pronto, e a recusa da vareta 2/4.
+  Toda conta escrita à mão ao lado do número; as etiquetas renderizadas a
+  203 dpi e LIDAS de volta pelo public/barras_ler.js. O Rolô calculado pelo
+  código da main e por este deu o mesmo resultado byte a byte nas três
+  conferências da §4.5, e a etiqueta dele manteve todos os campos de antes.
+  A conferência achou e consertou dois defeitos de tela que JÁ estavam no ar
+  (a frase da recusa lida em e.mensagem; o foco perdido ao digitar no
+  simulador) — telas_produto.test.js.
+  ⚠️ O arquivo com a §15 completa não chegou a esta sessão: a tabela do
+  FECHAMENTO segue a lista da mensagem do dono e precisa ser reconciliada
+  item a item com a §15 antes do deploy.
+  ⚠️ O QUE NÃO FOI PROVADO: o pedido REAL de Romana e de Painel com o leitor
+  na mão (prova da fase 6) — os bipes foram pela rota, com as sessões das
+  pessoas de cada bancada, e um pela tela da bancada; e a conferência só de
+  leitura em produção (passo 5).
 Mudanças no caminho:
   F1 — o pedido e o simulador ganharam o SELETOR de produto (abriam sempre o
        primeiro modelo); criar componente e acrescentar linha de ficha pela
@@ -47,6 +67,10 @@ Mudanças no caminho:
        kit na ficha ficaria preso na embalagem para sempre. O preço por cor
        tem a tabela, o cálculo e a função de domínio, e nenhuma rota (§10:
        sem tela).
+  Conferência — consertado no caminho: o Catálogo e o simulador mostram a
+       frase da recusa (liam e.mensagem), o simulador devolve o foco a quem
+       digita, mostra a quantidade (4 × Vareta), o editor da ficha não repete
+       rótulo, e a etiqueta não repete o nome do produto na linha 3.
 ```
 
 > **Onde mora:** dentro do `/sobmedida`, no `tecido.db`, com migrações

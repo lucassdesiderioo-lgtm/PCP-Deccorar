@@ -8,7 +8,7 @@ Este módulo **não sobe sozinho**. Ele é montado dentro do PCP, em `/sobmedida
 pelo `server.js` da raiz. Uma porta, um processo, um PIN.
 
 ```bash
-npm test          # daqui: 419 casos, banco temporário, sem servidor
+npm test          # daqui: 828 casos, banco temporário, sem servidor
 node server.js    # da RAIZ: sobe o PCP inteiro, com o sob medida junto
 ```
 
@@ -57,6 +57,12 @@ E, da spec `SOBMEDIDA-PEDIDO-REVENDA` (o segundo assunto do módulo — a venda)
 | 1 | Catálogo de venda, ficha técnica e simulador | **pronta e conferida na fábrica** (22/09/2026) |
 | 2 | Revendas, carteiras, tabelas A/B/C, feriados e prazo | **em código** (22/09/2026) — falta cadastrar as revendas de hoje |
 | 3 | Pedido interno: orçamento, envio que congela, fila do vendedor, aprovação, PDF | **em código e conferida no deploy** (23/09/2026) — falta a semana em paralelo ao Decorsoft |
+
+E da spec `SOBMEDIDA-CADASTRO-DE-PRODUTO` (o terceiro assunto — criar produto):
+**as seis fases em código e conferidas num servidor local em 28/10/2026** —
+criar e duplicar produto, escolhas e cálculos como peças prontas, Romana,
+Painel, etiqueta por unidade e Romana e Painel nos cinco setores. Seção
+**O CADASTRO DE PRODUTO**, logo abaixo da etiqueta de produção.
 
 ---
 
@@ -328,7 +334,7 @@ redução — os números das seções 4.4 a 4.8 da spec.
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 419 casos
+cd tecido && npm test          # 828 casos
 ```
 
 **Rode ao mexer em `dominio/persiana.js`, `dominio/catalogo_sm.js`,
@@ -841,6 +847,58 @@ apontado"*, que é o certo e é o sinal de que falta cadastro — nunca um zero.
 unidade que decide a conta (`m` lê a medida de **consumo** da ficha, nunca a de
 corte; `un` contaria peças). Cadastrar em `un` faz o tubo entrar errado na
 lista de compras sem nada acusar.
+
+---
+
+## O CADASTRO DE PRODUTO (spec `SOBMEDIDA-CADASTRO-DE-PRODUTO`, 28/10/2026)
+
+O Catálogo deixou de editar só o Rolô: **+ Novo produto** cria do zero ou
+duplicando, e o produto nasce **inativo** até o dono conferir no simulador e
+ativar. Todo produto é montado com quatro peças — as **escolhas** do cliente
+(lista do sistema, o produto liga as que usa), o **cálculo** (peça pronta:
+escada de tubos, gomos, folhas), a **ficha** (referência + ajuste, com
+quantidade por referência) e o **preço** (m² por produto e coleção, mais
+acessório por metro; pronto para preço por cor). Os cartões R-SMN-01 a
+R-SMN-15 estão em `docs/regras/sobmedida.md`.
+
+```
+Romana   gomos ímpares, mínimo 3, o menor com cada gomo ≤ 0,350 · varetas = gomos − 1
+         1,051 → 5 gomos de 210,2 mm → 4 varetas
+Painel   folha = (largura + (folhas − 1) × 0,100) ÷ folhas · central: cada lado é metade
+         3,000 · 6 central → lado 1,500 · 3 folhas → 0,567 · 3 vias de cada lado
+```
+
+### As regras que parecem bug e não são
+
+- **O produto novo não aparece no pedido** — nasce inativo. O simulador o
+  calcula, com a tarja, só para quem edita o catálogo.
+- **"Cópia de…" não ativa.** É o nome que a revenda leria no orçamento.
+- **O duplicar não copia o componente.** Ele é do sistema: o preço do bandô
+  por metro é um só.
+- **O `comando` vazio no item da Painel é "não se aplica"**: a coluna é NOT
+  NULL, e a escolha dela é o lado da corrente.
+- **Quatro linhas de vareta no pedido aprovado são quatro unidades**, uma
+  etiqueta e um código cada (1/4 a 4/4). O Compras continua contando 4.
+- **O nome na etiqueta vem do material de Compras, e a medida da ficha.** O
+  tubo segue com o nome do degrau; sem material ligado, sai o nome do
+  componente — nada trava, e a ficha mostra em âmbar o que falta.
+- **A data de fabricação é a da primeira impressão** (`fabricado_em`); a
+  reimpressão não a muda.
+- **A montagem espera toda peça da serralheria e da coleção**, a menos que a
+  linha da ficha diga que ela vai só na caixa (`libera='embalagem'`, o bandô
+  e a barra do Rolô).
+- **Com várias unidades, a recusa pede qual** (2/4), e só ela volta.
+- **O kit só é cobrado de quem leva kit** — decisão de construção, a
+  confirmar com o dono.
+- **O preço por cor não tem tela nem rota**: lança-se por script
+  (`catalogo.definirPrecoCor`). Vazio, nada muda.
+
+### Teste obrigatório
+
+`produto`, `escolhas`, `romana`, `painel`, `etiqueta_unidade`,
+`produto_producao` e `telas_produto` — e o `persiana.test.js`,
+`etiqueta_producao.test.js`, `producao.test.js` e `recusa.test.js` passando
+**sem mudar o esperado**, que é a prova de que o Rolô não mudou.
 
 ---
 

@@ -816,6 +816,102 @@
 
 ---
 
+## O cadastro de produto (spec `SOBMEDIDA-CADASTRO-DE-PRODUTO`, 28/10/2026)
+
+> Criar e duplicar produto, escolhas e cálculos como peças prontas, a Romana, o
+> Painel, a etiqueta por unidade, a liberação por produto e o preço por cor.
+> O porquê longo está na própria spec, no bloco STATUS e nas §5 a §8.
+
+### R-SMN-01 · O produto novo nasce INATIVO, e só o simulador interno o calcula
+- **Regra:** do zero ou duplicado, `sm_modelo.ativo=0`. O `persiana.calcular` recusa o inativo (`modelo_indisponivel`) a menos que venha `aceitaInativo`, que só a rota do simulador passa, e só para quem tem `catalogo.editar` — com a tarja *"INATIVO — a revenda não vê"* em primeiro nos avisos. A lista de modelos e o detalhe de um modelo não mostram o inativo a quem não edita o catálogo; o formulário do pedido só oferece produto ativo.
+- **Por quê:** o dono confere no simulador antes de a revenda ver. Conferir depois de ativar seria conferir com a revenda já vendendo.
+- **Exceções:** nenhuma — o pedido recusa o inativo mesmo vindo de quem edita o catálogo.
+- **Teste que trava:** `tecido/teste/produto.test.js` (casos "nasce INATIVO", "a lista de quem VENDE", "o PEDIDO nao aceita").
+- **Status:** em código (28/10/2026).
+
+### R-SMN-02 · Duplicar copia tudo numa transação, e as colunas saem do banco
+- **Regra:** `catalogo.duplicarModelo` copia, numa transação só, o modelo e as tabelas filhas (`sm_modelo_colecao`, `sm_modelo_cor_acessorio`, `sm_degrau_tubo`, `sm_ficha_linha`, `sm_faixa_suporte`, `sm_reducao_regra`, `sm_modelo_escolha`) e o preço por cor. As colunas vêm do `pragma_table_info`, nunca de uma lista escrita à mão. Cada preço de coleção copiado deixa linha em `sm_preco_historico` com `detalhe='copiado de <origem>'`. O nome proposto é *"Cópia de X"* (e *"Cópia de X 2"* se já existir).
+- **Por quê:** cada fase desta spec acrescentou coluna a essas tabelas; uma lista à mão esqueceria a próxima, e a cópia sairia faltando justamente o número novo, com cara de cópia perfeita (a #25 pela porta do duplicar).
+- **Exceções:** o **componente** (`sm_componente`) não se copia: ele é do sistema, e o preço do bandô por metro é um só.
+- **Teste que trava:** `produto.test.js` (a cópia campo a campo, e as três conferências da §4.5 iguais no Rolô e na cópia); `produto_producao.test.js` (o preço por cor vai junto).
+- **Status:** em código (28/10/2026).
+
+### R-SMN-03 · "Cópia de…" não ativa, e ativar tem porta própria
+- **Regra:** `PUT /api/sm/modelos/:id/ativo` recusa ativar nome que começa com *"Cópia de"* (`nome_de_copia`, sem olhar maiúscula). O `PUT /api/sm/modelos/:id` recusa o campo `ativo` (`ativo_por_outra_porta`). Desativar continua existindo, e é como se tira um produto de venda — nunca apagando.
+- **Por quê:** um produto que sai para a revenda chamado "Cópia de Rolô" é o sinal de que ninguém conferiu, e é o nome que ela lê no orçamento.
+- **Teste que trava:** `produto.test.js` ("Cópia de… NAO ativa").
+- **Status:** em código (28/10/2026).
+
+### R-SMN-04 · As escolhas são uma lista do SISTEMA, e o produto só liga
+- **Regra:** `dominio/escolhas.js` tem as oito (comando, rolamento, adicional, redução, acionamento, abertura — chave `sentido` —, lado da corrente, folhas). O produto liga as que usa (`sm_modelo_escolha`). Ligada é obrigatória no pedido; desligada é **recusada pela rota** (`escolha_desligada`). O lado da corrente só existe com comando: some da tela e é recusado (`escolha_nao_se_aplica`); não liga sem o acionamento (`depende_de`), e o acionamento não desliga com ele ligado (`tem_dependente`). A migração 33 ligou as quatro do Rolô em **todo** modelo que já existia, e não pelo nome.
+- **Por quê:** a tela esconder não é a regra (#26). E o Rolô não podia mudar: até a migração o código exigia as quatro de qualquer modelo.
+- **Exceções:** `comando` e `rolamento` são `NOT NULL` em `sm_pedido_item`; o produto que não os liga grava `''`, que quer dizer "não se aplica" (recriar a tabela com `foreign_keys` ligado arriscaria pedido aprovado).
+- **Teste que trava:** `escolhas.test.js` (11) e o `persiana.test.js` sem mudar o esperado.
+- **Status:** em código (28/10/2026).
+
+### R-SMN-05 · O cálculo é peça pronta do sistema; conta nova entra por spec
+- **Regra:** `sm_modelo.calculo` é `escada` (os tubos do Rolô), `gomos` (Romana), `folhas` (Painel) ou `nenhum`. A conta mora no `persiana.js`; o produto guarda os números dela (`gomo_max_mm`, nasce 350; `transpasse_mm`, nasce 100). A referência `degrau` num produto sem escada é recusada (`referencia_sem_escada`); `folha` é palavra reservada da ficha, como `final` e `degrau`. A quantidade por referência (`quantidade_ref` = gomos, varetas, folhas, vias, lados) que o cálculo do produto não devolve é **recusada** (`quantidade_sem_calculo`), nunca zero.
+- **Por quê:** a regra dos gomos é uma busca com condição, e a do painel muda de forma com a abertura — fórmula digitada na tela seria linguagem de programação no cadastro, e erro de fórmula vira persiana cortada errado (§2 da spec).
+- **Teste que trava:** `romana.test.js`, `painel.test.js`.
+- **Status:** em código (28/10/2026).
+
+### R-SMN-06 · Romana: gomos ímpares, no mínimo 3, o menor que cabe no limite
+- **Regra:** `n = max(3, ⌈altura ÷ limite⌉)`, e se `n` for par, `n+1`. O gomo é a divisão exata com uma casa, guardado em décimo de mm inteiro (`gomo_decimo_mm`: 333,3 → 3333). Varetas = gomos − 1. A medida exata do limite cabe (1,050 ÷ 3 = 350,0 fica em 3).
+- **Por quê:** são regras do dono (27/10/2026), e não preferência. O gomo não é medida de corte de peça nenhuma — é a marcação que a montagem segue — e por isso pode ter a casa decimal.
+- **Teste que trava:** `romana.test.js` (os seis casos da §5.3, escritos à mão).
+- **Status:** em código (28/10/2026).
+
+### R-SMN-07 · Painel: transpasse por encontro, e a central não transpassa no meio
+- **Regra:** lateral `folha = (largura + (folhas−1)×T) ÷ folhas`; central, cada lado leva metade e faz a mesma conta com as folhas do lado. A conta é um numerador inteiro dividido uma vez — `(largura + 2·(k−1)·T) ÷ 2k` — para o arredondamento ao mm ser um só (566,67 → 567). Lateral de 2 a 5; central par, 2, 4 ou 6, recusando dizendo o porquê (`folhas_central_par`, `folhas_acima_lateral`, `folhas_acima_central`, `folhas_abaixo`). Uma via por folha (de cada lado, na central). O trilho é **uma peça só**, também na central.
+- **Teste que trava:** `painel.test.js` (os nove casos da §6.4).
+- **Status:** em código (28/10/2026).
+
+### R-SMN-08 · A etiqueta é por UNIDADE, e o consumo não multiplica
+- **Regra:** na aprovação, a peça que gera etiqueta vira **uma linha por unidade** em `sm_pedido_componente`, cada uma com `quantidade=1`, `unidade_k`/`unidade_n` e o seu código. A peça sem etiqueta (kit, redução) continua numa linha só, com a quantidade dela. "Gera etiqueta" é da **ficha** de cada produto (`sm_ficha_linha.gera_etiqueta`, `NULL` herda do componente).
+- **Por quê:** quatro varetas são quatro etiquetas, 1/4 a 4/4, para a bancada ver se alguma ficou para trás. O Compras soma linha × quantidade, e as quatro linhas são as mesmas 4 varetas de antes — **4, e não 16**.
+- **Teste que trava:** `etiqueta_unidade.test.js` ("PROVA: o consumo de vareta no Compras continua 4").
+- **Status:** em código (28/10/2026).
+
+### R-SMN-09 · As duas fontes da etiqueta, e falta de cadastro nunca trava
+- **Regra:** o **cadastro de material** (Compras do PCP) dá o que a peça É — nome, marca, modelo —, congelado na aprovação (`material_nome`, `material_marca`, `material_modelo`). A **ficha** dá quanto e a quanto cortar. O tubo continua com o nome do **degrau**. Sem material ligado sai o nome do componente; campo vazio não sai no papel. A ficha mostra em âmbar o que falta (*"sem material ligado"*, *"material sem marca/modelo"*), deixando de fora o tecido, os kits e o trabalho de setor (montagem, revisão, embalagem). O insumo que pede marca ou modelo na etiqueta (o motor) avisa também no simulador.
+- **Por quê:** o cadastro de material ainda está sendo arrumado aos poucos (dono, 28/10/2026); travar etiqueta, pedido ou aprovação por isso seria a #6.
+- **Teste que trava:** `etiqueta_unidade.test.js`.
+- **Status:** em código (28/10/2026).
+
+### R-SMN-10 · A data de fabricação é a da PRIMEIRA impressão
+- **Regra:** `sm_pedido_componente.fabricado_em` nasce no primeiro `imprimir` (`COALESCE`), e a reimpressão não o toca — ela regrava só o `impresso_em`. Os extras da etiqueta se marcam por linha da ficha (`etiqueta_extras` = `marca,modelo,fabricacao`).
+- **Por quê:** a data é da peça, como o código (garantia do motor).
+- **Teste que trava:** `etiqueta_unidade.test.js` e `produto_producao.test.js` (a refeita mantém a data).
+- **Status:** em código (28/10/2026).
+
+### R-SMN-11 · A liberação é uma regra por setor mais uma marca da linha
+- **Regra:** a peça da serralheria ou da coleção segura a **montagem**, a menos que vá só na caixa (`libera='embalagem'`), e aí segura só a embalagem. Revisão espera a montagem; embalagem espera a revisão e o que vai só na caixa. A migração 37 marcou o bandô e a barra de toda ficha e todo pedido aprovado. A recusa anda pela mesma regra, peça a peça.
+- **Por quê:** o mapa por chave (montagem esperava tubo, base e tecido) era a ficha do Rolô escrita no código, e a vareta da Romana não seguraria nada.
+- **Teste que trava:** `produto_producao.test.js`, e o `producao.test.js` e o `recusa.test.js` passando sem mudar o esperado.
+- **Status:** em código (28/10/2026).
+
+### R-SMN-12 · A recusa de um insumo com várias unidades volta SÓ a unidade escolhida
+- **Regra:** com mais de uma unidade, `recusar` exige `unidade` (`unidade_obrigatoria`, `unidade_inexistente`); volta ela e o que depende dela, e as outras seguem. A bancada mostra as unidades prontas para escolher; com uma unidade (todo o Rolô), a escolha continua sendo só o motivo. A refeita reimprime a mesma etiqueta — código, k/n e data —, marcada.
+- **Por quê:** decisão do dono (28/10/2026): refazer quatro varetas porque uma veio torta é trabalho jogado fora.
+- **Teste que trava:** `produto_producao.test.js`.
+- **Status:** em código (28/10/2026).
+
+### R-SMN-13 · O kit só é cobrado na embalagem de quem leva kit
+- **Regra:** o fim da embalagem exige o bipe do kit **quando a persiana tem kit na ficha**. Sem kit, o fim passa (o simulador já avisa *"Este modelo não tem kit de instalação na ficha"*).
+- **Por quê:** produto cadastrado sem kit ficaria preso na embalagem para sempre. Todo Rolô leva um dos três kits, e para ele nada muda.
+- **Status:** em código (28/10/2026) — **decisão de construção, a confirmar com o dono**.
+
+### R-SMN-14 · O preço por cor existe sem tela, e vazio não muda nada
+- **Regra:** `sm_preco_cor` (coleção de venda + cor). Com linha, ela vence o preço da coleção, e a conta diz *"(preço da cor X)"*; sem linha, vale a coleção. Toda mudança deixa linha no histórico (`alvo='colecao_cor'`). Não há rota nem tela: lança-se por script, no domínio (`catalogo.definirPrecoCor`).
+- **Por quê:** *"ainda não muda por cor, mas podemos já deixar certo"* (dono, 27/10/2026).
+- **Teste que trava:** `produto_producao.test.js`.
+- **Status:** em código (28/10/2026).
+
+### R-SMN-15 · O cliente final é opcional, e sai ao lado da revenda
+- **Regra:** `sm_pedido.cliente_final`, editado no rascunho. Preenchido, sai na etiqueta e no PDF do pedido; vazio, a etiqueta sai só com a revenda.
+- **Teste que trava:** `etiqueta_unidade.test.js`.
+- **Status:** em código (28/10/2026).
+
 ## O que ainda não tem teste no sob medida
 
 R-SMM-01 (o try/catch que protege a expedição), R-SMD-01 (a paleta igual à do
@@ -1209,3 +1305,23 @@ da R-SML-03.
 - ❌ Dar código novo à peça refeita, ou tirar a marca vermelha do papel: o
   código é da peça, e sem a marca ficam duas etiquetas iguais na bancada
   (§19, 5-B2)
+- ❌ Ativar produto que ainda se chama "Cópia de…", ou abrir o `ativo` pelo
+  PUT do modelo: a porta própria é o que confere o nome (R-SMN-03)
+- ❌ Escrever à mão a lista de colunas do duplicar: a próxima fase acrescenta
+  uma e a cópia sai faltando ela, com cara de perfeita (R-SMN-02)
+- ❌ Tirar o NOT NULL de `comando`/`rolamento` recriando `sm_pedido_item`: o
+  produto que não liga a escolha grava '' (R-SMN-04)
+- ❌ Aceitar fórmula digitada na tela para um produto novo: conta nova entra
+  por spec, como peça pronta (R-SMN-05)
+- ❌ Fazer a quantidade por referência que o cálculo não devolve virar zero: a
+  peça sumiria da ficha calada (R-SMN-05)
+- ❌ Gravar uma linha com quantidade 4 para peça com etiqueta: são quatro
+  etiquetas, e o bipe, a recusa e o tempo são da unidade (R-SMN-08)
+- ❌ Tirar medida do cadastro de material, ou nome da ficha quando há material
+  ligado — e travar qualquer coisa por material incompleto (R-SMN-09)
+- ❌ Usar o `impresso_em` como data de fabricação: a reimpressão o regrava
+  (R-SMN-10)
+- ❌ Voltar a liberar a montagem por uma lista de chaves: a vareta da Romana
+  não seguraria nada (R-SMN-11)
+- ❌ Devolver as quatro varetas porque uma veio torta (R-SMN-12)
+

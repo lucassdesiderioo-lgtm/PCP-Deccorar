@@ -2085,7 +2085,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (275), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (38), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (35), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65) e `teste_conta_aberta.js` (42); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (24 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (275), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (6), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (35), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65) e `teste_conta_aberta.js` (42); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2509,6 +2509,51 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 | R-SMK-09 | A etiqueta da sobra se lê pela foto; só vale o que fecha o dígito |
 | R-SMK-10 | Vence a sobra de menos refugo, e a que não entrou diz por quê |
 | R-SMK-11 | O histórico do corte acha pela sobra e diz o que foi baixado |
+| R-SMN-01 | O produto novo nasce INATIVO, e só o simulador interno o calcula, com a tarja |
+| R-SMN-02 | Duplicar copia tudo numa transação, e as colunas saem do banco (pragma) |
+| R-SMN-03 | "Cópia de…" não ativa, e ativar tem porta própria |
+| R-SMN-04 | As escolhas são lista do SISTEMA; ligada é obrigatória, desligada é recusada pela rota |
+| R-SMN-05 | O cálculo é peça pronta (escada, gomos, folhas); conta nova entra por spec |
+| R-SMN-06 | Romana: gomos ímpares, mínimo 3, o menor que cabe no limite; varetas = gomos − 1 |
+| R-SMN-07 | Painel: transpasse por encontro, central sem transpasse no meio, trilho uma peça só |
+| R-SMN-08 | A etiqueta é por UNIDADE (uma linha por unidade), e o consumo não multiplica |
+| R-SMN-09 | O nome vem do material, a medida da ficha; falta de cadastro nunca trava |
+| R-SMN-10 | A data de fabricação é a da PRIMEIRA impressão |
+| R-SMN-11 | A liberação é regra por setor mais `libera` (montagem ou só a embalagem) |
+| R-SMN-12 | Com várias unidades, a recusa volta SÓ a unidade escolhida |
+| R-SMN-13 | O kit só é cobrado na embalagem de quem leva kit (a confirmar com o dono) |
+| R-SMN-14 | O preço por cor existe sem tela; com linha vence a coleção, vazio não muda nada |
+| R-SMN-15 | O cliente final é opcional, e sai ao lado da revenda |
+
+### ⚠️ O CADASTRO DE PRODUTO — o que parece bug e não é (28/10/2026)
+
+Spec `docs/specs/SOBMEDIDA-CADASTRO-DE-PRODUTO.md`, as seis fases numa entrega
+só (§14 dela), cartões R-SMN-01 a R-SMN-15.
+
+> ⚠️ **O PRODUTO NOVO NÃO APARECE NO PEDIDO, E É ASSIM.** Ele nasce inativo, e
+> só o simulador o calcula — para quem tem `catalogo.editar`, com a tarja
+> âmbar. "Cópia de…" não ativa: dê o nome que a revenda vai ler.
+>
+> ⚠️ **O `comando` VAZIO NO PEDIDO DA PAINEL NÃO É DADO FALTANDO.** A coluna é
+> `NOT NULL`, e `''` quer dizer "este produto não tem lado do comando". O lado
+> da corrente é outra escolha, e só existe com comando.
+>
+> ⚠️ **QUATRO LINHAS DE VARETA NO PEDIDO APROVADO NÃO SÃO DUPLICAÇÃO.** É uma
+> linha por unidade (1/4 a 4/4), cada uma com o seu código; o Compras soma
+> linha × quantidade e dá 4, não 16.
+>
+> ⚠️ **O PREÇO POR COR NÃO TEM TELA NEM ROTA, DE PROPÓSITO.** A tabela e a conta
+> estão prontas (decisão do dono), e vazia ela não muda preço nenhum.
+>
+> ⚠️ **O FIM DA EMBALAGEM SEM KIT PASSA QUANDO A PERSIANA NÃO LEVA KIT** — é
+> decisão de construção, **a confirmar com o dono** (R-SMN-13). Todo Rolô leva
+> kit, e nada mudou para ele.
+>
+> ⚠️ **A CONFERÊNCIA ACHOU DOIS DEFEITOS DE TELA QUE JÁ ESTAVAM NO AR**, e os
+> dois só apareciam abrindo a tela: o Catálogo e o simulador liam a recusa em
+> `e.mensagem` (o `ui.js` a põe em `e.message`), e toda recusa virava "Não deu
+> para salvar."; e o simulador perdia o foco no primeiro número digitado.
+> Consertados e travados no `telas_produto.test.js`.
 
 **Ao mexer em** acesso, área ou nível de chave: `node teste_acesso.js`, `node
 teste_cobertura.js` e `cd tecido && npm test` (`acesso.test.js`). Em endereço,
@@ -2525,13 +2570,20 @@ indicadores: `indicadores.test.js`. Nos setores: também `node teste_acesso.js`.
 No boleto e no crédito: `boleto.test.js`. Na baixa pedida e no descarte pedido: `aprovacao.test.js`. No dinheiro de tela: `dinheiro_tela.test.js`.
 Em tabela de tela: `rola_tela.test.js`. No corte: `corte_etapas.test.js`,
 `corte_correcao.test.js`, `historico_corte.test.js`, `tom.test.js`,
-`tempo_corte.test.js`, `plano_claro.test.js` e `barras_ler.test.js`. Todos os
+`tempo_corte.test.js`, `plano_claro.test.js` e `barras_ler.test.js`. No cadastro
+de produto (criar, duplicar, escolhas, Romana, Painel, etiqueta por unidade,
+liberação por produto, preço por cor): `produto.test.js`, `escolhas.test.js`,
+`romana.test.js`, `painel.test.js`, `etiqueta_unidade.test.js`,
+`produto_producao.test.js` e `telas_produto.test.js` — e o `persiana.test.js`,
+o `etiqueta_producao.test.js`, o `producao.test.js` e o `recusa.test.js` têm que
+passar **sem mudar o esperado**: é a prova de que o Rolô não mudou. No cadastro
+de material do PCP (marca e modelo): `node teste_componentes.js`. Todos os
 `*.test.js` rodam pelo `cd tecido && npm test`.
 
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 750 casos
+cd tecido && npm test          # 828 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
