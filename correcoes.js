@@ -309,6 +309,11 @@ const ACOES = {
          sair — a guarda que o `regularizar_saida.js` perdeu em 26/08/2026. */
       if(v.despachar_em && v.despachar_em > hoje(db))
         return 'só despacha em ' + dataBR(v.despachar_em) + ' — venda futura não foi despachada, a peça ainda está na fábrica';
+      /* ⚠️ E A QUE VENCE HOJE AINDA E TRABALHO DE HOJE (28/10/2026): ela esta
+         na fila da Etiqueta de Venda. Saida em bloco ate hoje fechou 50 dessas
+         como "saiu" sem etiqueta, e a lista do dia sumiu. */
+      if((v.despachar_em || v.data || '').slice(0, 10) >= hoje(db))
+        return HOJE_NAO;
       return true;
     },
     previa(db, v){
@@ -348,12 +353,12 @@ const ACOES = {
             'Cada um sai na data de despacho dele. Não mexe em estoque.',
     carregar(){ return { id:0 }; },
     valePara(db, o, params){
-      const ate = ateDe(db, params);
+      const ate = ateVencidos(db, params);
       if(!vencidosAte(db, ate).length) return 'nada pendente vencido até ' + dataBR(ate);
       return true;
     },
     previa(db, o, params){
-      const ate = ateDe(db, params);
+      const ate = ateVencidos(db, params);
       const lista = vencidosAte(db, ate);
       const porDia = {};
       lista.forEach(v => { const k = v.despachar_em ? dataBR(v.despachar_em) : 'sem despacho lido';
@@ -374,7 +379,7 @@ const ACOES = {
           'uma venda atrasada de verdade sumiria da fila junto.'
       };
     },
-    executar(db, o, params){ vencidosAte(db, ateDe(db, params)).forEach(v => fecharComoSaido(db, v)); },
+    executar(db, o, params){ vencidosAte(db, ateVencidos(db, params)).forEach(v => fecharComoSaido(db, v)); },
     depoisReal(db, o, params, antes){
       return { ate:antes.ate, volumes:antes.volumes.map(a => instante(volumePorId(db, a.id))) };
     },
@@ -639,6 +644,21 @@ function desfazerBloco(db, c){
    A caixa impressa e nunca conferida e a da linha ambar do Carregamento
    (`carga.pilhaDaArea → anteriores`), fora do modo teste. */
 const SEM_CONFERENCIA = "estagio='embalado' AND conferido_em IS NULL AND COALESCE(teste,0)=0";
+/* ⚠️ O CORTE DO "FECHAR VENCIDOS" E NO MAXIMO ONTEM (28/10/2026). Ate hoje ele
+   aceitava hoje, e a correcao #4 da producao fechou como "saiu" as 50 vendas
+   da fila do dia, que nunca tinham sido impressas: a lista da Etiqueta de
+   Venda sumiu inteira, sem erro. O contador do passivo ja dizia que o que
+   vence hoje e trabalho de hoje; o bloco passou a dizer o mesmo. E a regra do
+   "Fechar conferencias antigas", logo abaixo. */
+const HOJE_NAO = 'vence hoje: a venda ainda está na fila do dia — imprima pela Etiqueta de Venda. ' +
+  'Se ela saiu por fora, a saída se registra a partir de amanhã';
+function ateVencidos(db, params){
+  const ate = ateDe(db, params);
+  if(ate >= hoje(db))
+    throw erro(400, 'a data de corte não pode ser hoje: as vendas que despacham hoje ainda estão na fila da ' +
+      'Etiqueta de Venda. Feche no máximo até ontem');
+  return ate;
+}
 function ateConferencia(db, params){
   /* A recusa da data vazia e propria: a do `ateDe` manda conferir o Mercado
      Livre, e aqui quem confere e a area e o canto. */

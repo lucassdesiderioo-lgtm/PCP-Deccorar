@@ -520,7 +520,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 | R-COR-01 | A Mesa de correções corrige pela ação, nunca pela linha |
 | R-COR-02 | Fantasma é o `pendente` cujo irmão MAIS ANTIGO já andou |
 | R-COR-03 | A cancelada depois da etiqueta: a Mesa só registra a que não voltou; a volta é o ↩ Sobrou |
-| R-COR-04 | Saída de passivo na data do volume; venda futura não se fecha |
+| R-COR-04 | Saída de passivo na data do volume; venda futura **e a que vence hoje** não se fecham (corte no máximo ontem, 28/10/2026) |
 | R-COR-05 | O terminal e o botão usam a mesma régua (`correcoes.js`) |
 | R-COR-06 | A Mesa nunca mexe em saldo |
 | R-COR-07 | Conferências antigas fecham em bloco, até uma data que nunca é hoje, sem mexer em saldo, e só a caixa que já baixou |
@@ -2291,6 +2291,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   dele no rodapé (§20)
 - ❌ Escrever uma segunda lista de "para onde a pessoa vai": é o `destino.js`,
   e foi a cópia do login que mandava o vendedor de volta ao PIN (§20)
+- ❌ Deixar o "Fechar vencidos" aceitar HOJE como corte, ou o "Dar saída" valer para a venda que vence hoje: em 28/10/2026 isso fechou como "saiu" as 50 vendas da fila do dia, e a lista da Etiqueta de Venda sumiu sem erro (§5, R-COR-04)
 - ❌ Contar uma pendência dentro do `pendencias_dominio.js`: a central pergunta
   à função da tela dona, senão diz 3 onde a aba diz 5 (§5, a central, #12)
 - ❌ Esconder da central a linha que a pessoa não pode resolver, ou mandar nela

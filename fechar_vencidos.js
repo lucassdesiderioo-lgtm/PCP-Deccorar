@@ -32,7 +32,8 @@
  * somou +1 (nao passou pela embalagem), entao nao pode baixar -1 agora.
  * NAO TOCA EM `bloqueado`: aquilo e outro problema (SKU fora do cadastro ou
  * divergencia de leitura) e se resolve por outro caminho.
- * NAO TOCA NO QUE VENCE DEPOIS DE HOJE: venda futura nao foi despachada.
+ * NAO TOCA NO QUE VENCE HOJE NEM DEPOIS: o de hoje ainda esta na fila do dia, e
+ * venda futura nao foi despachada. Sem --ate, o corte e ontem.
  */
 const Database=require('better-sqlite3');
 const path=require('path'); const fs=require('fs');
@@ -46,7 +47,11 @@ const ATE=(iAte>=0 && args[iAte+1] && /^\d{4}-\d{2}-\d{2}$/.test(args[iAte+1])) 
 (async()=>{
 const db=new Database(DB);
 const hoje=db.prepare("SELECT date('now','localtime') d").get().d;
-const limite=ATE||hoje;
+/* Sem --ate o corte e ONTEM, e --ate hoje e recusado pela Mesa (28/10/2026):
+   o que vence hoje ainda esta na fila da Etiqueta de Venda. */
+const ontem=db.prepare("SELECT date('now','localtime','-1 day') d").get().d;
+const limite=ATE||ontem;
+if(limite>=hoje){ console.error('a data de corte nao pode ser hoje: o que vence hoje ainda esta na fila da Etiqueta de Venda. Use no maximo --ate '+ontem); process.exit(1); }
 
 /* A LISTA E A DA MESA DE CORRECOES (fase 3, 02/10/2026): pendente, fora do
    modo teste, com despacho ate o corte — e o sem despacho lido entra se ENTROU
@@ -59,7 +64,7 @@ try{ alvo=COR.previa(db,{acao:'vencidos',tipo:'bloco',id:0,params:{ate:limite}})
 catch(e){ if(e.status!==409) throw e; alvo=[]; }
 
 console.log('banco:',DB);
-console.log('fechando o que vence ate:',limite,(ATE?'(--ate)':'(hoje)'));
+console.log('fechando o que vence ate:',limite,(ATE?'(--ate)':'(ontem)'));
 console.log('');
 if(!alvo.length){ console.log('Nada a fechar.'); db.close(); return; }
 
