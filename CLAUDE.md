@@ -2564,6 +2564,15 @@ só (§14 dela), cartões R-SMN-01 a R-SMN-18.
 > saiu. As abreviações das escolhas moram só no `ABREV` do
 > `etiqueta_producao.js`.
 >
+> ✅ **NO AR EM 28/10/2026** (PR #244): o dono fez o deploy, as migrações 32 a
+> 38 estão no banco, a segurança passou, e as três conferências da §4.5 no
+> simulador de produção deram o Rolô **igual à conta, número por número**.
+>
+> ⚠️ **O QUE NÃO ESTÁ PROVADO EM PRODUÇÃO:** a Romana e o Painel (não existem
+> ainda — a prova é conferi-los no simulador, inativos, quando cadastrados) e
+> o pedido real com o leitor na mão, que vem **antes** de vender para a
+> revenda. Prova que não foi feita se escreve como não feita (§4).
+>
 > ⚠️ **A CONFERÊNCIA ACHOU DOIS DEFEITOS DE TELA QUE JÁ ESTAVAM NO AR**, e os
 > dois só apareciam abrindo a tela: o Catálogo e o simulador liam a recusa em
 > `e.mensagem` (o `ui.js` a põe em `e.message`), e toda recusa virava "Não deu
