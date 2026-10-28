@@ -104,12 +104,12 @@ const apagarComponentes=item_id=>db.prepare('DELETE FROM sm_pedido_componente WH
 const criarComponente=d=>db.prepare(`INSERT INTO sm_pedido_componente
   (item_id,ordem,chave,nome,setor,quantidade,gera_etiqueta,eh_kit,codigo_barras,suportes,
    largura_corte_mm,altura_corte_mm,consumo_largura_mm,consumo_altura_mm,
-   unidade_k,unidade_n,material_id,material_nome,material_marca,material_modelo,etiqueta_extras)
+   unidade_k,unidade_n,material_id,material_nome,material_marca,material_modelo,etiqueta_extras,libera)
   VALUES(@item_id,@ordem,@chave,@nome,@setor,@quantidade,@gera_etiqueta,@eh_kit,@codigo_barras,
    @suportes,@largura_corte_mm,@altura_corte_mm,@consumo_largura_mm,@consumo_altura_mm,
-   @unidade_k,@unidade_n,@material_id,@material_nome,@material_marca,@material_modelo,@etiqueta_extras)`)
+   @unidade_k,@unidade_n,@material_id,@material_nome,@material_marca,@material_modelo,@etiqueta_extras,@libera)`)
   .run(Object.assign({unidade_k:1,unidade_n:1,material_id:null,material_nome:null,
-    material_marca:null,material_modelo:null,etiqueta_extras:null},d));
+    material_marca:null,material_modelo:null,etiqueta_extras:null,libera:null},d));
 
 // ── Os tres registros ─────────────────────────────────────────────────────
 const marcos=pedido_id=>db.prepare(

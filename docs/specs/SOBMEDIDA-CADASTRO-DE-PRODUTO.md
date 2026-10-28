@@ -6,7 +6,7 @@ Situação: em construção
 Criada em: 27/10/2026
 Última atualização: 28/10/2026 (documento único: decisões e modo de construção nas §13 e §14)
 Fase atual: construindo as seis em sequência (§14)
-Fases: 1 ☑ em código  2 ☑ em código  3 ☑ em código  4 ☑ em código  5 ☑ em código  6 ☐
+Fases: 1 ☑ em código  2 ☑ em código  3 ☑ em código  4 ☑ em código  5 ☑ em código  6 ☑ em código
 Risco: 🔴 (schema do catálogo, preço, etiqueta de produção, ficha congelada)
 Módulo: sob medida (tecido/) — ler tecido/README.md e a spec
         SOBMEDIDA-PEDIDO-REVENDA.md (§4.2 a §4.14) antes de mexer
@@ -36,6 +36,17 @@ Mudanças no caminho:
        os kits e o trabalho de setor (montagem, revisão, embalagem). O teste
        material_compra.test.js teve o esperado da porta ampliado para
        marca e modelo, que a §8.2 manda atravessar.
+  F6 — a liberação deixou de ser um mapa por CHAVE (montagem esperava
+       tubo/base/tecido) e virou uma regra por SETOR mais uma marca da linha
+       da ficha, `libera`: a peça da serralheria/coleção segura a montagem,
+       ou só a embalagem quando vai só na caixa. A migração 37 marcou o
+       bandô e a barra de toda ficha e todo pedido aprovado — o Rolô não
+       mudou. A recusa anda pela mesma regra, por PEÇA (linha) e não por
+       chave. Decisão de construção a confirmar com o dono: o bipe do kit
+       na embalagem só é exigido quando a persiana LEVA kit; um produto sem
+       kit na ficha ficaria preso na embalagem para sempre. O preço por cor
+       tem a tabela, o cálculo e a função de domínio, e nenhuma rota (§10:
+       sem tela).
 ```
 
 > **Onde mora:** dentro do `/sobmedida`, no `tecido.db`, com migrações

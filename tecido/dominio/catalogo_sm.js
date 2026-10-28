@@ -578,6 +578,14 @@ function camposFicha(d){
       'O campo extra da etiqueta é um de: '+EXTRAS.join(', ')+'.'));
     fora.etiqueta_extras=lista.length?[...new Set(lista)].join(','):null;
   }
+  /* O QUE A PECA SEGURA NA BANCADA (fase 6): a montagem, como quase tudo, ou
+     so a embalagem — a peca que vai SO NA CAIXA (o bandô e a barra do Rolo). */
+  if(d.libera!==undefined){
+    const v=d.libera==null||d.libera===''||d.libera==='montagem'?null:String(d.libera);
+    exigir(v==null||v==='embalagem','libera_invalido',
+      'A peça segura a montagem (o padrão) ou só a embalagem, quando vai só na caixa.');
+    fora.libera=v;
+  }
   if(d.quantidade_ref!==undefined){
     const q=d.quantidade_ref==null||d.quantidade_ref===''?null:String(d.quantidade_ref).trim();
     exigir(q==null||QUANTIDADES_REF.indexOf(q)>=0,'quantidade_ref_invalida',
@@ -660,6 +668,33 @@ function coresDaColecao(id){
     .map(t=>({cor_id:t.cor_id, cor_nome:t.cor_nome, tecido_id:t.id, codigo:t.codigo}));
 }
 
+/* ── O PRECO POR COR (secao 7 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO) ──────
+   SEM TELA, por decisao do dono: a estrutura e o calculo ficam prontos, e a
+   tela entra quando o preco passar a mudar por cor. A linha da cor VENCE a
+   da colecao; `null` tira a linha, e volta a valer a colecao. Toda mudanca
+   deixa linha no historico, como o preco da colecao. */
+function definirPrecoCor(colecao_id,cor_id,valor,usuario){
+  const c=dCat.colecao(colecao_id);
+  exigir(c,'colecao_inexistente','Colecao de venda nao encontrada.');
+  const cor=dCor.porId(cor_id);
+  exigir(cor,'cor_inexistente','Esta cor nao existe no cadastro.');
+  const antes=dCat.precoCor(c.id,cor.id);
+  const novo=valor==null||valor===''?null:u.centavos(valor,'o preco do m² da cor');
+  if((antes?antes.preco_m2_centavos:null)===novo) return {mudou:false};
+  if(novo==null) dCat.apagarPrecoCor(c.id,cor.id); else dCat.gravarPrecoCor(c.id,cor.id,novo);
+  dCat.registrarPreco({alvo:'colecao_cor',alvo_id:c.id,de:antes?antes.preco_m2_centavos:null,
+    para:novo,usuario_nome:usuario&&usuario.nome,detalhe:'cor '+cor.nome});
+  return {mudou:true};
+}
+const precosPorCor=colecao_id=>dCat.precosPorCor(colecao_id);
+const precoCorDe=(colecao_id,cor_id)=>cor_id?dCat.precoCor(colecao_id,Number(cor_id)):null;
+
+/* A copia leva o preco por cor, apontando para a colecao COPIADA. */
+DEPOIS_DE_COPIAR.push((mapas)=>{
+  for(const [antiga,nova] of mapas.sm_modelo_colecao)
+    for(const pc of dCat.precosPorCor(antiga)) dCat.gravarPrecoCor(nova,pc.cor_id,pc.preco_m2_centavos);
+});
+
 /* ── O QUE FALTA NO CADASTRO DE MATERIAL (secao 8.2, dono 28/10/2026) ──────
    O cadastro de material ainda NAO esta refinado, e por isso nada trava: a
    etiqueta sai com o nome do componente, e o campo vazio nao sai. O que esta
@@ -717,5 +752,5 @@ module.exports={
   ligarMaterialDoDegrau, ligarMaterialDoComponente,
   fichaDe, fichaLinhaDe, criarFichaLinha, editarFichaLinha,
   criarFaixaSuporte, apagarFaixaSuporte, definirReducaoRegra,
-  historicoPreco, avisosDeMaterial, QUANDOS, REF_RESERVADAS, CALCULOS, QUANTIDADES_REF, EXTRAS
+  historicoPreco, avisosDeMaterial, definirPrecoCor, precosPorCor, precoCorDe, QUANDOS, REF_RESERVADAS, CALCULOS, QUANTIDADES_REF, EXTRAS
 };

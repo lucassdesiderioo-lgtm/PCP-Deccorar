@@ -202,7 +202,7 @@ async function abrirMotivos(){
       el('div',{},[m.nome]),
       el('div',{class:'destino'},['volta para '+(m.setor_nome||m.setor)+' · '+m.componente_nome])
     ]);
-    bt.onclick=()=>confirmar(m);
+    bt.onclick=()=>m.unidades?escolherUnidade(m):confirmar(m);
     g.appendChild(bt);
   });
   caixa.appendChild(g);
@@ -212,12 +212,37 @@ async function abrirMotivos(){
   alvo.appendChild(caixa);
 }
 
-function confirmar(m){
+/* ⚠️ COM MAIS DE UMA UNIDADE, A BANCADA DIZ QUAL (dono, 28/10/2026). Quatro
+   varetas e uma torta: so ela volta — a etiqueta colada nela diz 2/4. A
+   escolha a mais SO aparece quando ha mais de uma; no Rolo, tudo tem uma
+   unidade, e a recusa continua sendo so o motivo. */
+function escolherUnidade(m){
   const alvo=limpar($('#recusar'));
   const caixa=el('div',{class:'caixa'});
-  caixa.appendChild(el('h3',{},[m.nome]));
+  caixa.appendChild(el('h3',{},[m.nome+' — qual delas?']));
   caixa.appendChild(el('div',{class:'de'},
-    [(m.componente_nome||'')+' volta para '+(m.setor_nome||m.setor)+
+    ['Olhe a etiqueta colada na peça (1/4, 2/4…). Só ela volta; as outras seguem.']));
+  const g=el('div',{class:'motivos'});
+  m.unidades.forEach(u=>{
+    const bt=el('button',{class:'bt',type:'button'},[
+      el('div',{},[(m.componente_nome||'')+' '+u.unidade]),
+      el('div',{class:'destino'},[u.codigo||''])]);
+    bt.onclick=()=>confirmar(m,u);
+    g.appendChild(bt);
+  });
+  caixa.appendChild(g);
+  const nao=el('button',{class:'bt',type:'button'},['Voltar']);
+  nao.onclick=abrirMotivos;
+  caixa.appendChild(nao);
+  alvo.appendChild(caixa);
+}
+
+function confirmar(m,unidade){
+  const alvo=limpar($('#recusar'));
+  const caixa=el('div',{class:'caixa'});
+  caixa.appendChild(el('h3',{},[m.nome+(unidade?' · '+unidade.unidade:'')]));
+  caixa.appendChild(el('div',{class:'de'},
+    [(m.componente_nome||'')+(unidade?' '+unidade.unidade:'')+' volta para '+(m.setor_nome||m.setor)+
      '. O que foi feito em cima dela é refeito.']));
   const obs=el('input',{type:'text',placeholder:'o que houve (opcional)',
     autocomplete:'off',autocorrect:'off',spellcheck:'false'});
@@ -226,18 +251,19 @@ function confirmar(m){
      o que foi feito em cima dela e refeito. Botao de desfazer com cara de
      botao de seguir e o que faz alguem tocar sem ler. */
   const ok=el('button',{class:'bt perigo',type:'button'},['Confirmar a recusa']);
-  ok.onclick=()=>enviar(m,obs.value);
+  ok.onclick=()=>enviar(m,obs.value,unidade);
   const nao=el('button',{class:'bt',type:'button'},['Voltar']);
   nao.onclick=abrirMotivos;
   caixa.appendChild(ok); caixa.appendChild(nao);
   alvo.appendChild(caixa);
 }
 
-async function enviar(m,observacao){
+async function enviar(m,observacao,unidade){
   const r=limpar($('#resposta'));
   try{
-    const d=await api('/api/producao/recusa',{metodo:'POST',silencioso:true,
-      corpo:{codigo:NA_MAO.codigo, motivo_id:m.id, observacao:observacao||''}});
+    const corpo={codigo:NA_MAO.codigo, motivo_id:m.id, observacao:observacao||''};
+    if(unidade) corpo.unidade=unidade.k;
+    const d=await api('/api/producao/recusa',{metodo:'POST',silencioso:true,corpo});
     beep();
     r.appendChild(el('div',{class:'grande'},['RECUSADA']));
     r.appendChild(el('div',{class:'segura'},[

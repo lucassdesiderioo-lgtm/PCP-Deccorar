@@ -1953,6 +1953,43 @@ UPDATE sm_pedido_componente SET fabricado_em=impresso_em WHERE impresso_em IS NO
    da revenda. */
 ALTER TABLE sm_pedido ADD COLUMN cliente_final TEXT;
 `}
+,
+
+{n:37, nome:'as liberacoes da bancada sao de cada produto, e o preco nasce pronto para a cor', sql:`
+/* === AS LIBERACOES POR PRODUTO ============================================
+   Fase 6 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO. Ate aqui a montagem esperava
+   tres pecas pelo NOME (tubo, base, tecido) e a embalagem esperava o bandô e
+   a barra pelo nome — a regra do Rolo escrita no codigo. A vareta da Romana
+   nao seguraria nada, e a montagem sairia sem ela.
+
+   Agora a regra e uma so, e o produto so diz uma coisa por peca: a peca da
+   serralheria ou da colecao segura a MONTAGEM, a menos que va SO NA CAIXA
+   ('embalagem' — o bandô e a barra, que nao fazem parte do conjunto montado).
+   Montagem, revisao e embalagem continuam em fila, como sempre.
+
+   ⚠️ O ROLO NAO MUDA: a migracao marca 'embalagem' exatamente no bandô e na
+   barra, de toda ficha e de todo pedido ja aprovado — que e o que o codigo
+   fazia. O resto fica NULL, que quer dizer "segura a montagem". */
+ALTER TABLE sm_ficha_linha ADD COLUMN libera TEXT;
+UPDATE sm_ficha_linha SET libera='embalagem'
+ WHERE componente_id IN (SELECT id FROM sm_componente WHERE chave IN ('bando','barra'));
+ALTER TABLE sm_pedido_componente ADD COLUMN libera TEXT;
+UPDATE sm_pedido_componente SET libera='embalagem' WHERE chave IN ('bando','barra');
+
+/* === O PRECO POR COR, SEM TELA (secao 7) ==================================
+   "Ainda nao muda por cor, mas podemos ja deixar certo" (dono, 27/10/2026).
+   Uma linha aqui VENCE o preco da colecao para aquela cor; sem linha, vale o
+   da colecao. Vazia — e e assim que ela nasce —, nada muda em preco nenhum.
+   Aponta para a COLECAO DE VENDA (o produto + a colecao), porque o 1% do Rolo
+   e o 1% da Romana tem precos diferentes. */
+CREATE TABLE sm_preco_cor (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  colecao_id INTEGER NOT NULL REFERENCES sm_modelo_colecao(id),
+  cor_id INTEGER NOT NULL REFERENCES cor(id),
+  preco_m2_centavos INTEGER NOT NULL,
+  UNIQUE(colecao_id, cor_id)
+);
+`}
 ];
 
 // ─────────────────────────────────────────────────────────────────────────

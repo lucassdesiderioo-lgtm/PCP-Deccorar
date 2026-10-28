@@ -180,11 +180,11 @@ module.exports={
     'SELECT * FROM sm_ficha_linha WHERE componente_id=?',componente_id),
   criarFichaLinha(d){
     const r=db.prepare(`INSERT INTO sm_ficha_linha(modelo_id,componente_id,ordem,quando,quantidade,
-      quantidade_ref,gera_etiqueta,etiqueta_extras,ref_largura,ajuste_largura_mm,ref_altura,ajuste_altura_mm,
+      quantidade_ref,gera_etiqueta,etiqueta_extras,libera,ref_largura,ajuste_largura_mm,ref_altura,ajuste_altura_mm,
       consumo_ref_largura,consumo_ajuste_largura_mm,consumo_ref_altura,consumo_ajuste_altura_mm)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(d.modelo_id,d.componente_id,d.ordem,
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(d.modelo_id,d.componente_id,d.ordem,
       d.quando||'sempre',d.quantidade||1,d.quantidade_ref||null,
-      d.gera_etiqueta==null?null:d.gera_etiqueta,d.etiqueta_extras||null,
+      d.gera_etiqueta==null?null:d.gera_etiqueta,d.etiqueta_extras||null,d.libera||null,
       d.ref_largura||null,d.ajuste_largura_mm==null?null:d.ajuste_largura_mm,
       d.ref_altura||null,d.ajuste_altura_mm==null?null:d.ajuste_altura_mm,
       d.consumo_ref_largura||null,d.consumo_ajuste_largura_mm==null?null:d.consumo_ajuste_largura_mm,
@@ -192,7 +192,7 @@ module.exports={
     return this.fichaLinha(r.lastInsertRowid);
   },
   atualizarFichaLinha(id,d){
-    const cols=['ordem','quando','quantidade','quantidade_ref','gera_etiqueta','etiqueta_extras',
+    const cols=['ordem','quando','quantidade','quantidade_ref','gera_etiqueta','etiqueta_extras','libera',
                 'ref_largura','ajuste_largura_mm',
                 'ref_altura','ajuste_altura_mm','consumo_ref_largura','consumo_ajuste_largura_mm',
                 'consumo_ref_altura','consumo_ajuste_altura_mm','ativo'];
@@ -228,6 +228,16 @@ module.exports={
            d.largura_acima_mm==null?null:d.largura_acima_mm);
     return this.reducaoRegra(d.modelo_id);
   },
+
+  // ── O preco por cor (fase 6 do cadastro de produto, sem tela) ─────────────
+  precoCor:(colecao_id,cor_id)=>um('SELECT * FROM sm_preco_cor WHERE colecao_id=? AND cor_id=?',colecao_id,cor_id),
+  precosPorCor:colecao_id=>varios(`SELECT pc.*, c.nome AS cor_nome FROM sm_preco_cor pc
+    JOIN cor c ON c.id=pc.cor_id WHERE pc.colecao_id=? ORDER BY c.nome`,colecao_id),
+  gravarPrecoCor:(colecao_id,cor_id,valor)=>db.prepare(`INSERT INTO sm_preco_cor(colecao_id,cor_id,preco_m2_centavos)
+    VALUES(?,?,?) ON CONFLICT(colecao_id,cor_id) DO UPDATE SET preco_m2_centavos=excluded.preco_m2_centavos`)
+    .run(colecao_id,cor_id,valor),
+  apagarPrecoCor:(colecao_id,cor_id)=>db.prepare('DELETE FROM sm_preco_cor WHERE colecao_id=? AND cor_id=?')
+    .run(colecao_id,cor_id),
 
   // ── Historico de preco ──────────────────────────────────────────────────
   registrarPreco:p=>db.prepare(

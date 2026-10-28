@@ -428,6 +428,8 @@ function calcular(escolha,opcoes){
       material_id:linha.chave==='tubo'?(degrau?degrau.componente_id:null):
         (linha.material_id==null?null:linha.material_id),
       etiqueta_extras:linha.etiqueta_extras||null,
+      // O que a peca segura na bancada: a montagem (NULL) ou so a embalagem.
+      libera:linha.libera||null,
       // ⚠️ CORTE e CONSUMO, lado a lado e nunca somados — armadilha #18.
       largura_corte_mm: medirLargura(linha.ref_largura,linha.ajuste_largura_mm),
       altura_corte_mm:  medirAltura(linha.ref_altura,linha.ajuste_altura_mm),
@@ -472,8 +474,14 @@ function calcular(escolha,opcoes){
     if(!f.unidade_cobranca) continue;
     let unitario=null, base=null, valor=null;
     if(f.unidade_cobranca==='m2_colecao'){
-      unitario=colecao.preco_m2_centavos;
-      base=u.emM2(m2_cobrado_mm2)+' m² × R$ '+u.emReais(unitario)+'/m²';
+      /* ⚠️ O PRECO POR COR VENCE O DA COLECAO quando tem linha (secao 7 da
+         spec SOBMEDIDA-CADASTRO-DE-PRODUTO); sem linha, e o da colecao, como
+         sempre. A conta diz qual dos dois cobrou — preco que muda sem dizer
+         por que e o numero que a revenda liga para perguntar. */
+      const daCor=catalogo.precoCorDe(colecao.id,e.cor_tecido_id);
+      unitario=daCor?daCor.preco_m2_centavos:colecao.preco_m2_centavos;
+      base=u.emM2(m2_cobrado_mm2)+' m² × R$ '+u.emReais(unitario)+'/m²'+
+        (daCor?' (preço da cor '+(corTecido||'escolhida')+')':'');
       if(unitario!=null) valor=Math.round(m2_cobrado_mm2*unitario/u.M2);
     }else if(f.unidade_cobranca==='metro'){
       /* ⚠️ POR METRO LINEAR **REAL**, nunca pela medida de corte. A barra e

@@ -26,34 +26,37 @@ const dia=require('../nucleo/dia');
 const nome=usuario=>(usuario&&usuario.nome)||null;
 
 /* ── AS LIBERACOES ────────────────────────────────────────────────────────
-   Uma linha por setor, e cada uma diz o que TEM QUE ESTAR PRONTO antes. E a
-   tabela da secao 4.15 escrita como dado, e nao como uma cadeia de `if`: a
-   cadeia esconde a regra dentro do codigo e a proxima mudanca de fluxo vira
-   um remendo no meio dela.
+   O que cada setor espera, escrito como uma regra so, e nao como uma lista de
+   nomes. Ate a fase 6 do cadastro de produto ela era um mapa por CHAVE
+   (montagem esperava tubo, base e tecido) — a ficha do Rolo escrita no
+   codigo, e a vareta da Romana nao seguraria nada.
 
-   ⚠️ BANDO E BARRA APARECEM SO NA EMBALAGEM, e isso e a decisao que a spec
-   faz questao de separar. Eles sao da serralheria, como o tubo — mas nao
-   seguram a MONTAGEM: entram na hora de fechar a caixa. Poe-los tambem na
-   montagem pararia a linha inteira por uma peca que so e necessaria no fim. */
-const ANTES={
-  serralheria:[],
-  colecao:[],
-  montagem:['tubo','base','tecido'],
-  revisao:['montagem'],
-  embalagem:['revisao','bando','barra']
-};
+     serralheria, colecao   ninguem
+     montagem               toda peca da serralheria e da colecao que segura a
+                            MONTAGEM (o padrao)
+     revisao                o que e da montagem
+     embalagem              o que e da revisao, MAIS a peca que vai so na
+                            caixa (libera='embalagem')
 
-/* ⚠️ SO CONTA QUEM EXISTE NAQUELA PERSIANA. A peca sem adicional nao tem
-   bandô nem barra, e exigi-los a deixaria esperando para sempre por uma peca
-   que nunca foi feita — o silencio que este arquivo existe para impedir.
+   ⚠️ BANDO E BARRA SEGURAM SO A EMBALAGEM, e isso e a decisao que a spec do
+   pedido faz questao de separar: eles sao da serralheria, como o tubo — mas
+   entram na hora de fechar a caixa. Hoje isso e DADO da ficha (a migracao 37
+   os marcou), e por isso o Rolo continua exatamente como era; o bandô
+   concavo do Painel e a mesma coisa, marcada pelo dono. */
+const PRIMEIROS=['serralheria','colecao'];
+function espera(componente,x){
+  const s=componente.setor;
+  if(s==='montagem') return PRIMEIROS.includes(x.setor)&&x.libera!=='embalagem';
+  if(s==='revisao') return x.setor==='montagem';
+  if(s==='embalagem') return x.setor==='revisao'||(PRIMEIROS.includes(x.setor)&&x.libera==='embalagem');
+  return false;
+}
 
-   ⚠️ E SO QUEM GERA ETIQUETA. A reducao de peso e componente da montagem e
-   NAO tem codigo (fase 4-A): sem bipe ela nunca termina, e se pudesse
-   segurar alguem a montagem esperaria a vida toda. */
+/* ⚠️ SO CONTA QUEM EXISTE NAQUELA PERSIANA, e so quem gera etiqueta. A peca
+   sem adicional nao tem bandô; a reducao de peso nao tem codigo e nunca
+   termina — se pudesse segurar alguem, a montagem esperaria a vida toda. */
 function seguram(componente, irmaos){
-  const espera=ANTES[componente.setor]||[];
-  return irmaos.filter(x=>
-    espera.includes(x.chave) && x.gera_etiqueta && !x.terminado_em);
+  return irmaos.filter(x=>x.id!==componente.id&&x.gera_etiqueta&&!x.terminado_em&&espera(componente,x));
 }
 
 const liberado=(componente,irmaos)=>seguram(componente,irmaos).length===0;
@@ -186,7 +189,12 @@ function bipar(codigo,usuario){
      passado — a trava mora no servidor e nao na tela, que e a licao do
      `kit_ok` da armadilha #26 do PCP: aviso que so existe no navegador nao
      protege quem chama a rota por fora. */
-  if(c.setor==='embalagem'&&!c.kit_conferido_em)
+  /* ⚠️ SO COBRA O KIT DA PERSIANA QUE LEVA KIT (fase 6 do cadastro de
+     produto). Todo Rolo leva um dos tres, e para ele nada muda; um produto
+     cadastrado sem kit na ficha ficaria PRESO na embalagem para sempre, sem
+     ter o que bipar — e trava que nunca solta e a armadilha #6. O aviso de
+     produto sem kit continua no simulador, onde alguem pode cadastra-lo. */
+  if(c.setor==='embalagem'&&!c.kit_conferido_em&&kitDoItem(irmaos))
     throw new ErroDeRegra('faltou_kit','⚠ FALTOU O KIT. Bipe o kit desta peça antes de fechar: '+
       descreveKit(kitDoItem(irmaos))+'.');
 
@@ -285,45 +293,47 @@ function oQueSegura(codigo){
    Qualquer bancada recusa a peca por defeito do trabalho ANTERIOR, e quem
    recusa escolhe SO O MOTIVO — o motivo ja diz qual peca volta.
 
-   ⚠️ ELA ANDA PARA TRAS PELA MESMA TABELA QUE LIBERA PARA A FRENTE. O
-   `ANTES` diz o que libera o que; lido de tras para a frente diz o que e
+   ⚠️ ELA ANDA PARA TRAS PELA MESMA REGRA QUE LIBERA PARA A FRENTE. O
+   `espera` diz o que libera o que; lido de tras para a frente diz o que e
    "trabalho anterior", e lido no sentido normal diz o que tem que voltar
    para "aguardando". Uma segunda tabela divergiria no dia em que o fluxo
    mudasse, e as duas estariam "certas" — armadilha #12 do CLAUDE.md. */
 
-/* O QUE VEM ANTES DESTA BANCADA, direta ou indiretamente. A embalagem
+/* O QUE VEM ANTES DESTA PECA, direta ou indiretamente — PECA, e nao chave:
+   a vareta 2/4 e a 3/4 tem a mesma chave e sao duas pecas. A embalagem
    alcanca a revisao, a montagem e, por ela, o tubo, a base e o tecido. A
    serralheria e a colecao nao alcancam nada: elas sao as primeiras. */
-function anteriores(setor,irmaos){
-  const setorDe={}; irmaos.forEach(x=>{ setorDe[x.chave]=x.setor; });
-  const vistos=new Set(), pilha=[setor];
+function anteriores(componente,irmaos){
+  const vistos=new Map(), pilha=[componente];
   while(pilha.length){
-    const s=pilha.pop();
-    for(const k of (ANTES[s]||[])){
-      if(vistos.has(k)) continue;
-      vistos.add(k);
-      if(setorDe[k]) pilha.push(setorDe[k]);
+    const c=pilha.pop();
+    for(const x of irmaos){
+      if(vistos.has(x.id)||x.id===componente.id||!espera(c,x)) continue;
+      vistos.set(x.id,x); pilha.push(x);
     }
   }
-  return vistos;
+  return [...vistos.values()];
 }
 
 /* O QUE FOI FEITO EM CIMA DESTA PECA — o culpado mais tudo que depende dele.
    ⚠️ NEM MAIS, NEM MENOS. A mais, a serralheria refaz a base porque o tubo
-   veio errado: trabalho jogado fora todo dia, que e a armadilha #6. A menos,
+   veio errado — ou as quatro varetas porque UMA veio torta (dono,
+   28/10/2026): trabalho jogado fora todo dia, que e a armadilha #6. A menos,
    a persiana continua montada em cima de um tubo que ja foi para o lixo. */
-function posteriores(chave,irmaos){
-  const alcanca=new Set([chave]);
+function posteriores(culpado,irmaos){
+  const alcanca=new Map([[culpado.id,culpado]]);
   let mudou=true;
   while(mudou){
     mudou=false;
     for(const x of irmaos){
-      if(alcanca.has(x.chave)) continue;
-      if((ANTES[x.setor]||[]).some(k=>alcanca.has(k))){ alcanca.add(x.chave); mudou=true; }
+      if(alcanca.has(x.id)) continue;
+      if([...alcanca.values()].some(a=>espera(x,a))){ alcanca.set(x.id,x); mudou=true; }
     }
   }
-  return irmaos.filter(x=>alcanca.has(x.chave));
+  return irmaos.filter(x=>alcanca.has(x.id));
 }
+
+const unidadeDe=x=>(x.unidade_k||1)+'/'+(x.unidade_n||1);
 
 function recusar(codigo,dados,usuario){
   const c=achar(codigo);
@@ -339,29 +349,46 @@ function recusar(codigo,dados,usuario){
   exigir(m.ativo,'motivo_inativo','O motivo "'+m.nome+'" foi desativado. Escolha outro.');
 
   const irmaos=d.doItem(c.item_id);
-  const culpado=irmaos.find(x=>x.chave===m.componente_chave);
-  exigir(culpado,'peca_sem_esse_componente',
+  const daChave=irmaos.filter(x=>x.chave===m.componente_chave);
+  exigir(daChave.length,'peca_sem_esse_componente',
     'Esta persiana não leva '+(m.componente_nome||m.componente_chave)+', então não há o que refazer. '+
     'Confira se o motivo é o certo.');
 
   /* ⚠️ NAO SE RECUSA O PROPRIO TRABALHO. Refazer o que acabei de fazer nao e
      recusa — e so refazer. Aceitar aqui daria a quem errou o caminho de
      apagar o proprio bipe, e o bipe e o rastro de quem fez. */
-  exigir(culpado.id!==c.id,'recusa_do_proprio',
+  exigir(c.chave!==m.componente_chave,'recusa_do_proprio',
     'Refazer o próprio trabalho não é recusa. A recusa é para o defeito que veio do setor de trás.');
 
   /* ⚠️ E SO DO QUE VEM ANTES. A colecao recusando o tubo seria uma bancada
      mandando refazer uma peca que ela nunca viu. */
-  exigir(anteriores(c.setor,irmaos).has(culpado.chave),'nao_e_anterior',
-    (culpado.nome||culpado.chave)+' não é trabalho anterior à '+nomeDoSetor(c.setor)+
+  const antes=new Set(anteriores(c,irmaos).map(x=>x.id));
+  const candidatos=daChave.filter(x=>antes.has(x.id));
+  exigir(candidatos.length,'nao_e_anterior',
+    (daChave[0].nome||daChave[0].chave)+' não é trabalho anterior à '+nomeDoSetor(c.setor)+
     ' — a peça não passa por aqui depois dele. A recusa é para o defeito que veio do setor de trás.');
+
+  /* ⚠️ COM MAIS DE UMA UNIDADE, QUEM RECUSA DIZ QUAL (dono, 28/10/2026). Quatro
+     varetas e uma torta: so a torta volta, e as outras tres seguem. A escolha
+     a mais so existe quando ha mais de uma — no Rolo, tudo tem uma unidade, e
+     continua sendo so o motivo. */
+  let culpado=candidatos[0];
+  if(candidatos.length>1){
+    const k=Number((dados&&dados.unidade)||0);
+    exigir(k,'unidade_obrigatoria','Esta persiana leva '+candidatos.length+' '+
+      (candidatos[0].nome||candidatos[0].chave).toLowerCase()+'s. Diga qual delas: '+
+      candidatos.map(unidadeDe).join(', ')+'.');
+    culpado=candidatos.find(x=>(x.unidade_k||1)===k);
+    exigir(culpado,'unidade_inexistente','Não há a unidade '+k+' de '+candidatos.length+
+      ' nesta persiana. As unidades são: '+candidatos.map(unidadeDe).join(', ')+'.');
+  }
 
   exigir(culpado.terminado_em,'culpado_nao_terminado',
     (culpado.nome||culpado.chave)+' ainda não foi terminado, então não há trabalho para refazer. '+
     (culpado.iniciado_em?'Ele está em andamento na '+nomeDoSetor(culpado.setor)+'.'
                         :'Ele nem começou na '+nomeDoSetor(culpado.setor)+'.'));
 
-  const volta=posteriores(culpado.chave,irmaos);
+  const volta=posteriores(culpado,irmaos);
   return db.transaction(()=>{
     d.reabrir(volta.map(x=>x.id));
     d.contarRefeita(culpado.id);
@@ -417,17 +444,21 @@ function recusar(codigo,dados,usuario){
 function listarMotivos(codigo){
   const c=achar(codigo);
   const irmaos=d.doItem(c.item_id);
-  const antes=anteriores(c.setor,irmaos);
-  const porChave={}; irmaos.forEach(x=>{ porChave[x.chave]=x; });
+  const antes=anteriores(c,irmaos);
 
-  const lista=motivos.ativos().filter(m=>{
-    const irmao=porChave[m.componente_chave];
-    return antes.has(m.componente_chave) && irmao && irmao.terminado_em;
-  }).map(m=>({
-    id:m.id, nome:m.nome,
-    componente_chave:m.componente_chave, componente_nome:m.componente_nome,
-    setor:m.setor, setor_nome:m.setor_nome||nomeDoSetor(m.setor)
-  }));
+  const lista=motivos.ativos().map(m=>{
+    const prontos=antes.filter(x=>x.chave===m.componente_chave&&x.terminado_em);
+    if(!prontos.length) return null;
+    const fora={id:m.id, nome:m.nome,
+      componente_chave:m.componente_chave, componente_nome:m.componente_nome,
+      setor:m.setor, setor_nome:m.setor_nome||nomeDoSetor(m.setor)};
+    /* Com mais de uma unidade, a lista diz quais estao prontas para a bancada
+       escolher a que veio errada (dono, 28/10/2026). */
+    const todas=antes.filter(x=>x.chave===m.componente_chave);
+    if(todas.length>1) fora.unidades=prontos.map(x=>({unidade:unidadeDe(x), k:x.unidade_k||1,
+      codigo:x.codigo_etiqueta}));
+    return fora;
+  }).filter(Boolean);
 
   /* ⚠️ LISTA VAZIA DIZ POR QUE. "Nada aqui" se parece com tela quebrada, e
      quem esta com a peca na mao nao tem como saber a diferenca entre "nao ha
@@ -435,7 +466,7 @@ function listarMotivos(codigo){
      diferentes, e cada uma manda para um lugar diferente. */
   let sem_motivo=null;
   if(!lista.length){
-    if(!antes.size)
+    if(!antes.length)
       sem_motivo='A '+nomeDoSetor(c.setor)+' é a primeira bancada desta persiana — '+
         'não há trabalho anterior para recusar.';
     else if(!motivos.ativos().length)
@@ -463,4 +494,4 @@ function aRefazer(){
 
 module.exports={fila,bipar,biparKit,oQueSegura,fecharPendencia,
   recusar,motivos:listarMotivos,aRefazer,
-  ANTES,anteriores,posteriores};
+  espera,anteriores,posteriores};

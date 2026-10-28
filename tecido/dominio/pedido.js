@@ -437,7 +437,7 @@ function aprovar(id,usuario){
           suportes:(r.kit&&r.kit.chave===c.chave)?r.kit.suportes:null,
           largura_corte_mm:c.largura_corte_mm, altura_corte_mm:c.altura_corte_mm,
           consumo_largura_mm:c.consumo_largura_mm, consumo_altura_mm:c.consumo_altura_mm,
-          etiqueta_extras:c.etiqueta_extras||null};
+          etiqueta_extras:c.etiqueta_extras||null, libera:c.libera||null};
         Object.assign(comum,materialDe(c,doPcp));
         /* ⚠️ UMA LINHA POR UNIDADE, QUANDO A PECA TEM ETIQUETA (secao 8.1 da
            spec SOBMEDIDA-CADASTRO-DE-PRODUTO). Quatro varetas sao quatro

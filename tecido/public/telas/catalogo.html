@@ -537,7 +537,7 @@ function abaFicha(){
     tb.appendChild(el('tr',{class:f.ativo?'':'inativa'},[
       el('td',{class:'n'},[String(f.ordem)]),
       el('td',{},[f.componente_nome, el('div',{class:'setor'},[f.setor+' · '+f.chave])]),
-      el('td',{},[f.quando]),
+      el('td',{},[f.quando, f.libera==='embalagem'?el('div',{class:'setor'},['só na caixa']):'']),
       el('td',{class:'n'},[f.quantidade_ref?('= '+f.quantidade_ref):String(f.quantidade)]),
       el('td',{class:'medida'},[refTexto(f.ref_largura,f.ajuste_largura_mm)+
         (f.ref_altura?(' × '+refTexto(f.ref_altura,f.ajuste_altura_mm)):'')]),
@@ -554,6 +554,8 @@ function abaFicha(){
       {chave:'etiqueta_extras',rotulo:'Extras na etiqueta',valor:f.etiqueta_extras||'',
        opcoes:[{valor:'',rotulo:'nenhum'},{valor:'marca,modelo,fabricacao',rotulo:'marca, modelo e fabricação'},
                {valor:'marca,modelo',rotulo:'marca e modelo'},{valor:'fabricacao',rotulo:'só a fabricação'}]},
+      {chave:'libera',rotulo:'Na bancada, segura',valor:f.libera||'',
+       opcoes:[{valor:'',rotulo:'a montagem (padrão)'},{valor:'embalagem',rotulo:'só a embalagem (vai só na caixa)'}]},
       {chave:'quantidade',rotulo:'Quantidade fixa',valor:f.quantidade},
       {chave:'quantidade_ref',rotulo:'ou pela referência',valor:f.quantidade_ref||'',
        opcoes:[{valor:'',rotulo:'— fixa —'}].concat((modelo.quantidades_ref||[]).map(q=>({valor:q,rotulo:q})))},
@@ -610,6 +612,8 @@ function novaLinhaFicha(){
     box.appendChild(editor([
       {chave:'componente_id',rotulo:'Componente',valor:'',opcoes:opComp},
       {chave:'quando',rotulo:'Quando entra',valor:'sempre',opcoes:opQuando},
+      {chave:'libera',rotulo:'Na bancada, segura',valor:'',
+       opcoes:[{valor:'',rotulo:'a montagem (padrão)'},{valor:'embalagem',rotulo:'só a embalagem (vai só na caixa)'}]},
       {chave:'quantidade',rotulo:'Quantidade',valor:'1'},
       {chave:'quantidade_ref',rotulo:'ou pela referência',valor:'',
        opcoes:[{valor:'',rotulo:'— fixa —'}].concat((modelo.quantidades_ref||[]).map(q=>({valor:q,rotulo:q})))},
