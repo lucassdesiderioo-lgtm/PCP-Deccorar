@@ -172,5 +172,33 @@ module.exports=[
   try{ recusa(()=>painel(1500,undefined,'esquerda'),'escolha_necessaria'); }
   finally{ catalogo.ligarEscolha(b.m.id,'folhas',true); }
 }}
+,
+
+{nome:'§6.3 — o BANDÔ CÔNCAVO do Painel e o adicional dele, pela linha quando=bando: opcional e por metro',
+ executar({igual,recusa}){
+  /* §4.1: o Adicional serve ao Rolo E ao Painel (bandô côncavo); §6.3: o
+     bandô côncavo e opcional, vendido por metro linear, `quando = bando`. Ate
+     aqui o calculo so reconhecia o componente `bando` do Rolo, e o Painel que
+     pedia bandô era recusado com "este modelo nao tem bandô na ficha". */
+  const b=cena();
+  const concavo=catalogo.criarComponente({chave:'bando_concavo_t',nome:'Bandô côncavo',setor:'serralheria',
+    unidade_cobranca:'metro',preco_centavos:6000},DIRETOR);
+  const l=catalogo.criarFichaLinha({modelo_id:b.m.id,componente_id:concavo.id,quando:'bando',libera:'embalagem',
+    ref_largura:'final',ajuste_largura_mm:-5,consumo_ref_largura:'final',consumo_ajuste_largura_mm:-5});
+  catalogo.ligarEscolha(b.m.id,'adicional',true);
+  try{
+    const sem=painel(2000,4,'central');
+    igual(!!peca(sem,'bando_concavo_t'),false,'sem pedir, o bandô não entra');
+    igual(sem.opcoes.bando.disponivel,true,'e a opção está disponível');
+    const com=painel(2000,4,'central',{adicional:'bando'});
+    igual(peca(com,'bando_concavo_t').largura_corte_mm,1995,'pedindo, entra: 2000 − 5');
+    // 2,000 m × R$ 60,00 = R$ 120,00
+    igual(com.preco.linhas.find(x=>x.chave==='bando_concavo_t').valor_centavos,12000,'e cobra por metro linear');
+    recusa(()=>painel(2000,4,'central',{adicional:'barra'}),'barra_indisponivel','barra o Painel não tem');
+  }finally{
+    catalogo.editarFichaLinha(l.id,{ativo:0});
+    catalogo.ligarEscolha(b.m.id,'adicional',false);
+  }
+}}
 
 ];

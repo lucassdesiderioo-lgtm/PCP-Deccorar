@@ -298,7 +298,13 @@ function calcular(escolha,opcoes){
      revenda leria "deu erro" em vez de "nesta medida nao tem bando".
      Quem escolhe o indisponivel continua sendo RECUSADO logo abaixo: a tela
      esconder o botao nao e a regra, e a regra que existe fora do navegador. */
-  const componenteDe=chave=>modelo.ficha.find(l=>l.chave===chave);
+  /* ⚠️ O ADICIONAL E A LINHA `quando = bando` (ou barra), e nao so o
+     componente do Rolo (secoes 4.1 e 6.3 da spec SOBMEDIDA-CADASTRO-DE-
+     PRODUTO): o bandô do Painel e o bandô CONCAVO, outro componente. O Rolo
+     continua achando o `bando` dele primeiro, pela chave — e por isso nada
+     muda para ele. */
+  const componenteDe=chave=>modelo.ficha.find(l=>l.chave===chave)||
+    modelo.ficha.find(l=>l.quando===chave&&l.ativo&&l.componente_ativo&&!l.eh_kit);
   function cabe(chave, frase, semFicha){
     const c=componenteDe(chave);
     if(!c) return {disponivel:false, motivo:semFicha};

@@ -783,10 +783,16 @@ function novoComponente(){
              {valor:'peca',rotulo:'por peça'},{valor:'m2_colecao',rotulo:'m² da coleção (tecido)'}]},
     {chave:'preco',rotulo:'Preço (R$)',dica:'55,00'},
     {chave:'eh_kit',rotulo:'É kit',valor:'0',opcoes:[{valor:'0',rotulo:'não'},{valor:'1',rotulo:'sim'}]},
-    {chave:'codigo_barras',rotulo:'Código de barras (kit)',dica:'KIT-PAINEL'}
+    {chave:'codigo_barras',rotulo:'Código de barras (kit)',dica:'KIT-PAINEL'},
+    /* O kit cujos suportes variam com a largura — o do trilho, o do bandô, o
+       da Romana (secao 8.5). Sem este campo o kit novo nasceria contando os
+       suportes padrao, e a faixa de suporte dele nunca pegaria. */
+    {chave:'usa_faixa_suporte',rotulo:'Kit: conta suportes pela largura',valor:'0',
+     opcoes:[{valor:'0',rotulo:'não (suportes padrão do kit)'},{valor:'1',rotulo:'sim (pela faixa de suporte)'}]}
   ],v=>{
     const corpo={chave:v.chave,nome:v.nome,setor:v.setor,gera_etiqueta:v.gera_etiqueta==='1',
       unidade_cobranca:v.unidade_cobranca||null,eh_kit:v.eh_kit==='1',
+      usa_faixa_suporte:v.eh_kit==='1'&&v.usa_faixa_suporte==='1',
       codigo_barras:v.codigo_barras.trim()||null};
     if(v.preco.trim()) corpo.preco_centavos=paraCentavos(v.preco);
     return tentar(()=>api('/api/sm/componentes',{metodo:'POST',corpo,silencioso:true}));

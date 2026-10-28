@@ -85,6 +85,14 @@ Mudanças no caminho:
         C/ COMANDO · CORRENTE ESQ); o comando do Rolô continua por extenso.
         No caminho: a etiqueta pedida POR CÓDIGO (a refeita) saía sem a
         linha do kit, porque os irmãos vinham só do recorte — consertado.
+  Conferência dos 21 itens — achou e consertou dois defeitos de construção:
+        o Painel que pedia BANDÔ era recusado ("este modelo não tem bandô na
+        ficha"), porque o cálculo só reconhecia o componente `bando` do Rolô;
+        o adicional passou a ser também a linha `quando = bando` (o bandô
+        côncavo, §4.1 e §6.3), e o Rolô acha o dele primeiro, pela chave. E o
+        formulário de componente novo não tinha o campo "Kit: conta suportes
+        pela largura": sem ele o kit da Romana ou do Painel não pegaria a
+        faixa (§8.5).
 
 ```
 
