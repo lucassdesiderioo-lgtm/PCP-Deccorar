@@ -6,7 +6,7 @@ Situação: em construção
 Criada em: 27/10/2026
 Última atualização: 28/10/2026 (documento único: decisões e modo de construção nas §13 e §14)
 Fase atual: construindo as seis em sequência (§14)
-Fases: 1 ☑ em código  2 ☑ em código  3 ☐  4 ☐  5 ☐  6 ☐
+Fases: 1 ☑ em código  2 ☑ em código  3 ☑ em código  4 ☐  5 ☐  6 ☐
 Risco: 🔴 (schema do catálogo, preço, etiqueta de produção, ficha congelada)
 Módulo: sob medida (tecido/) — ler tecido/README.md e a spec
         SOBMEDIDA-PEDIDO-REVENDA.md (§4.2 a §4.14) antes de mexer
@@ -20,6 +20,10 @@ Mudanças no caminho:
        NULL e o produto que não os liga grava '' (recriar sm_pedido_item com
        foreign_keys ligado arriscaria pedido aprovado). A migração liga as
        quatro do Rolô em TODO modelo existente, e não pelo nome.
+  F3 — o cálculo virou coluna do produto (escada | gomos | folhas | nenhum);
+       todo modelo com escada virou 'escada' na migração 34. O gomo mora em
+       DÉCIMO de mm inteiro (333,3 → 3333). Quantidade por referência que o
+       cálculo do produto não devolve é RECUSADA, nunca zero.
 ```
 
 > **Onde mora:** dentro do `/sobmedida`, no `tecido.db`, com migrações

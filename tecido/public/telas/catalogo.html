@@ -171,12 +171,32 @@ function abaProduto(){
       m2_max_mm2:v.m2_max_mm2.trim()?paraInteiro(v.m2_max_mm2,6):null,
       m2_min_faturado_mm2:paraInteiro(v.m2_min_faturado_mm2,6)}})),
     ()=>{ erro=null; desenhar(); }));
+  c.appendChild(calculoDoProduto());
   const linha=el('div',{class:'campos'});
   linha.appendChild(botao(modelo.ativo?'Desativar — tirar da venda':'Ativar — a revenda passa a ver',
     ()=>tentar(()=>api('/api/sm/modelos/'+modelo.id+'/ativo',
       {metodo:'PUT',silencioso:true,corpo:{ativo:modelo.ativo?0:1}})),modelo.ativo?'perigo':'primario'));
   c.appendChild(linha);
   return c;
+}
+
+/* O CALCULO e uma peca pronta do sistema: o produto escolhe qual, e preenche
+   os numeros dela. A conta nao se digita aqui (secao 2 da spec). */
+function calculoDoProduto(){
+  const box=el('div',{class:'editor'},[el('h2',{},['Cálculo']),
+    el('p',{class:'nota'},['O que o sistema decide sozinho. A escada escolhe o tubo; os gomos '+
+      'da Romana são sempre ímpares, no mínimo 3, o menor número que deixa cada gomo até o '+
+      'limite abaixo.'])]);
+  const campos=[{chave:'calculo',rotulo:'Peça pronta de cálculo',valor:modelo.calculo,
+    opcoes:(modelo.calculos||[]).map(x=>({valor:x.chave,rotulo:x.nome}))}];
+  if(modelo.calculo==='gomos') campos.push({chave:'gomo_max_mm',rotulo:'Gomo até (m)',
+    valor:emMetros(modelo.gomo_max_mm),dica:'0,350'});
+  box.appendChild(editor(campos,v=>{
+    const corpo={calculo:v.calculo};
+    if(v.gomo_max_mm!==undefined) corpo.gomo_max_mm=paraMm(v.gomo_max_mm);
+    return tentar(()=>api('/api/sm/modelos/'+modelo.id,{metodo:'PUT',silencioso:true,corpo}));
+  },()=>{ erro=null; desenhar(); }));
+  return box;
 }
 
 /* ── + NOVO PRODUTO (secao 3.1 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO) ──────
@@ -505,7 +525,7 @@ function abaFicha(){
   ]);
   const t=el('table',{class:'lista'});
   t.appendChild(el('thead',{},[el('tr',{},[
-    el('th',{},['#']),el('th',{},['Componente']),el('th',{},['Quando']),
+    el('th',{},['#']),el('th',{},['Componente']),el('th',{},['Quando']),el('th',{class:'n'},['Qtd.']),
     el('th',{},['Corta a']),el('th',{},['Consome']),el('th',{},[''])])]));
   const tb=el('tbody');
   const refTexto=(r,a)=>!r?'—':(r+(a?(a>0?' + '+a:' − '+Math.abs(a)):'')+' mm');
@@ -514,14 +534,18 @@ function abaFicha(){
       el('td',{class:'n'},[String(f.ordem)]),
       el('td',{},[f.componente_nome, el('div',{class:'setor'},[f.setor+' · '+f.chave])]),
       el('td',{},[f.quando]),
+      el('td',{class:'n'},[f.quantidade_ref?('= '+f.quantidade_ref):String(f.quantidade)]),
       el('td',{class:'medida'},[refTexto(f.ref_largura,f.ajuste_largura_mm)+
         (f.ref_altura?(' × '+refTexto(f.ref_altura,f.ajuste_altura_mm)):'')]),
       el('td',{class:'medida'},[refTexto(f.consumo_ref_largura,f.consumo_ajuste_largura_mm)+
         (f.consumo_ref_altura?(' × '+refTexto(f.consumo_ref_altura,f.consumo_ajuste_altura_mm)):'')]),
       el('td',{},[botao('Editar',()=>{ editando='fic-'+f.id; erro=null; desenhar(); })])
     ]));
-    if(editando==='fic-'+f.id) tb.appendChild(el('tr',{},[el('td',{colspan:'6'},[editor([
-      {chave:'ref_largura',rotulo:'Corte: ref largura',valor:f.ref_largura,dica:'final | degrau | tubo'},
+    if(editando==='fic-'+f.id) tb.appendChild(el('tr',{},[el('td',{colspan:'7'},[editor([
+      {chave:'quantidade',rotulo:'Quantidade fixa',valor:f.quantidade},
+      {chave:'quantidade_ref',rotulo:'ou pela referência',valor:f.quantidade_ref||'',
+       opcoes:[{valor:'',rotulo:'— fixa —'}].concat((modelo.quantidades_ref||[]).map(q=>({valor:q,rotulo:q})))},
+      {chave:'ref_largura',rotulo:'Corte: ref largura',valor:f.ref_largura,dica:'final | degrau | folha | tubo'},
       {chave:'ajuste_largura_mm',rotulo:'Corte: ajuste (mm)',valor:f.ajuste_largura_mm,dica:'-5'},
       {chave:'ref_altura',rotulo:'Corte: ref altura',valor:f.ref_altura},
       {chave:'ajuste_altura_mm',rotulo:'Corte: ajuste (mm)',valor:f.ajuste_altura_mm},
@@ -533,6 +557,7 @@ function abaFicha(){
       const corpo={};
       Object.keys(v).forEach(k=>{
         const t=v[k].trim();
+        if(k==='quantidade'){ if(t!=='') corpo.quantidade=Number(t); return; }
         corpo[k]=/ajuste/.test(k) ? (t===''?null:Number(t.replace(',','.'))) : (t===''?null:t);
       });
       return tentar(()=>api('/api/sm/ficha/'+f.id,{metodo:'PUT',corpo,silencioso:true}));
@@ -558,6 +583,8 @@ function novaLinhaFicha(){
       {chave:'componente_id',rotulo:'Componente',valor:'',opcoes:opComp},
       {chave:'quando',rotulo:'Quando entra',valor:'sempre',opcoes:opQuando},
       {chave:'quantidade',rotulo:'Quantidade',valor:'1'},
+      {chave:'quantidade_ref',rotulo:'ou pela referência',valor:'',
+       opcoes:[{valor:'',rotulo:'— fixa —'}].concat((modelo.quantidades_ref||[]).map(q=>({valor:q,rotulo:q})))},
       {chave:'ref_largura',rotulo:'Corte: ref largura',dica:'final | tubo'},
       {chave:'ajuste_largura_mm',rotulo:'Corte: ajuste (mm)',dica:'-5'},
       {chave:'ref_altura',rotulo:'Corte: ref altura',dica:'final'},
@@ -572,7 +599,7 @@ function novaLinhaFicha(){
         if(k==='componente_id'||k==='quando') return;
         const t=String(v[k]).trim();
         if(t==='') return;
-        corpo[k]=/ajuste|quantidade/.test(k)?Number(t.replace(',','.')):t;
+        corpo[k]=/ajuste|^quantidade$/.test(k)?Number(t.replace(',','.')):t;
       });
       return tentar(()=>api('/api/sm/modelos/'+modelo.id+'/ficha',{metodo:'POST',corpo,silencioso:true}));
     },()=>{ editando=null; erro=null; desenhar(); }));

@@ -30,7 +30,7 @@ module.exports={
   /* ⚠️ CAMPO AUSENTE NAO E CAMPO VAZIO, como em toda tabela daqui. */
   atualizarModelo(id,d){
     const cols=['nome','largura_max_mm','altura_max_mm','m2_max_mm2','m2_min_faturado_mm2',
-                'ordem','ativo'];
+                'ordem','ativo','calculo','gomo_max_mm','transpasse_mm'];
     const campos=[],vals=[];
     cols.forEach(c=>{ if(d[c]!==undefined){ campos.push(c+'=?'); vals.push(d[c]); } });
     if(campos.length) db.prepare('UPDATE sm_modelo SET '+campos.join(', ')+' WHERE id=?').run(...vals,id);
@@ -174,10 +174,10 @@ module.exports={
     'SELECT * FROM sm_ficha_linha WHERE componente_id=?',componente_id),
   criarFichaLinha(d){
     const r=db.prepare(`INSERT INTO sm_ficha_linha(modelo_id,componente_id,ordem,quando,quantidade,
-      ref_largura,ajuste_largura_mm,ref_altura,ajuste_altura_mm,
+      quantidade_ref,ref_largura,ajuste_largura_mm,ref_altura,ajuste_altura_mm,
       consumo_ref_largura,consumo_ajuste_largura_mm,consumo_ref_altura,consumo_ajuste_altura_mm)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(d.modelo_id,d.componente_id,d.ordem,
-      d.quando||'sempre',d.quantidade||1,
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(d.modelo_id,d.componente_id,d.ordem,
+      d.quando||'sempre',d.quantidade||1,d.quantidade_ref||null,
       d.ref_largura||null,d.ajuste_largura_mm==null?null:d.ajuste_largura_mm,
       d.ref_altura||null,d.ajuste_altura_mm==null?null:d.ajuste_altura_mm,
       d.consumo_ref_largura||null,d.consumo_ajuste_largura_mm==null?null:d.consumo_ajuste_largura_mm,
@@ -185,7 +185,7 @@ module.exports={
     return this.fichaLinha(r.lastInsertRowid);
   },
   atualizarFichaLinha(id,d){
-    const cols=['ordem','quando','quantidade','ref_largura','ajuste_largura_mm',
+    const cols=['ordem','quando','quantidade','quantidade_ref','ref_largura','ajuste_largura_mm',
                 'ref_altura','ajuste_altura_mm','consumo_ref_largura','consumo_ajuste_largura_mm',
                 'consumo_ref_altura','consumo_ajuste_altura_mm','ativo'];
     const campos=[],vals=[];

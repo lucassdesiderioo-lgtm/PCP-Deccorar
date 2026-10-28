@@ -1854,6 +1854,40 @@ ALTER TABLE sm_pedido_item ADD COLUMN sentido TEXT;
 ALTER TABLE sm_pedido_item ADD COLUMN lado_corrente TEXT;
 ALTER TABLE sm_pedido_item ADD COLUMN folhas INTEGER;
 `}
+,
+
+{n:34, nome:'o calculo vira peca pronta do produto — a escada do Rolo e os gomos da Romana', sql:`
+/* === O CALCULO DO PRODUTO =================================================
+   Fase 3 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO (secoes 2 e 5). Cada produto
+   liga UMA peca pronta de calculo: 'escada' (os tubos do Rolo), 'gomos' (a
+   Romana), 'folhas' (o Painel, fase 4) ou 'nenhum'. A conta e codigo
+   testado; o que o produto guarda sao os NUMEROS dela.
+
+   ⚠️ TODO MODELO QUE TEM ESCADA PASSA A SER 'escada', e nao o Rolo pelo nome
+   — a mesma razao da migracao 33: ate aqui o codigo exigia a escada de
+   qualquer modelo. O que nasce depois desta migracao comeca em 'nenhum', e o
+   dono escolhe. */
+ALTER TABLE sm_modelo ADD COLUMN calculo TEXT NOT NULL DEFAULT 'nenhum';
+UPDATE sm_modelo SET calculo='escada' WHERE id IN (SELECT modelo_id FROM sm_degrau_tubo);
+
+/* O limite do gomo e NUMERO DO PRODUTO (nasce 35 cm), como a escada guarda os
+   dela — e nao um 350 escrito no codigo. O minimo de 3 gomos e o impar SAO
+   regra (do dono, 27/10/2026) e moram no codigo. */
+ALTER TABLE sm_modelo ADD COLUMN gomo_max_mm INTEGER NOT NULL DEFAULT 350;
+
+/* A quantidade da linha por REFERENCIA (secao 5.2): 'varetas' na vareta da
+   Romana, 'folhas' no tecido do Painel. NULL = a quantidade fixa de sempre,
+   e e o que o Rolo inteiro continua usando. */
+ALTER TABLE sm_ficha_linha ADD COLUMN quantidade_ref TEXT;
+
+/* O que o calculo disse, congelado no item no envio e na aprovacao, como o
+   degrau_nome: a etiqueta da montagem e a bancada leem daqui, e nunca
+   refazem a conta. O gomo vai em DECIMO de milimetro inteiro — ele e a
+   divisao exata, com uma casa (333,3), e nao e medida de corte de nenhuma
+   peca: e a marcacao que a montagem segue. */
+ALTER TABLE sm_pedido_item ADD COLUMN gomos INTEGER;
+ALTER TABLE sm_pedido_item ADD COLUMN gomo_decimo_mm INTEGER;
+`}
 ];
 
 // ─────────────────────────────────────────────────────────────────────────

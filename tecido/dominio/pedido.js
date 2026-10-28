@@ -168,6 +168,9 @@ function gravarEscolhas(escolha,r){
   fora.rolamento=r.rolamento||'';
   fora.acionamento=r.acionamento; fora.sentido=r.sentido;
   fora.lado_corrente=r.lado_corrente; fora.folhas=r.folhas;
+  // O que o calculo disse vai junto, como o degrau: a etiqueta le daqui.
+  fora.gomos=r.calculo&&r.calculo.gomos!=null?r.calculo.gomos:null;
+  fora.gomo_decimo_mm=r.calculo&&r.calculo.gomo_decimo_mm!=null?r.calculo.gomo_decimo_mm:null;
   return fora;
 }
 
@@ -310,7 +313,7 @@ function enviar(id,usuario,quando){
     let semTecido=0;
     for(const {item,r,tecido} of calculados){
       d.atualizarItem(item.id,Object.assign(gravarEscolhas(item,r),{
-        degrau_nome:r.degrau.nome,
+        degrau_nome:r.degrau?r.degrau.nome:null,
         m2_real_mm2:r.preco.m2_real_mm2, m2_cobrado_mm2:r.preco.m2_cobrado_mm2,
         valor_subtotal_centavos:r.preco.valor_subtotal_centavos,
         valor_final_centavos:r.preco.revenda?r.preco.revenda.valor_final_centavos:null,
@@ -399,9 +402,10 @@ function aprovar(id,usuario){
          meio, a fabrica vai cortar um tubo diferente do que foi vendido. E
          evento raro e caro — o tipo de coisa que ninguem procura depois se
          nao estiver escrito. */
-      if(item.degrau_nome&&item.degrau_nome!==r.degrau.nome)
+      const degrauAgora=r.degrau?r.degrau.nome:null;
+      if(item.degrau_nome&&item.degrau_nome!==degrauAgora)
         d.criarAlteracao({pedido_id:p.id, item_id:item.id, o_que:'degrau',
-          antes:item.degrau_nome, depois:r.degrau.nome,
+          antes:item.degrau_nome, depois:degrauAgora,
           motivo:'a escada de tubos mudou entre o envio e a aprovacao',
           usuario_nome:nome(usuario)});
 
@@ -473,6 +477,8 @@ function lerItem(p,item){
     cancelado_por:item.cancelado_por, cancelado_motivo:item.cancelado_motivo,
     tecido_id:item.tecido_id, sem_tecido:item.sem_tecido, sem_tecido_motivo:item.sem_tecido_motivo};
   for(const c of ESCOLHAS) comum[c]=item[c];
+  // O que o calculo congelou (os gomos da Romana, a folha do Painel).
+  for(const c of ['gomos','gomo_decimo_mm','folha_mm','vias','lados']) comum[c]=item[c]==null?null:item[c];
 
   if(congelado(p)) return Object.assign(comum,{
     degrau_nome:item.degrau_nome,
@@ -492,7 +498,7 @@ function lerItem(p,item){
   if(!r) return Object.assign(comum,{erro, linhas:[], componentes:[], sem_preco:['a peca nao calcula']});
   const pr=r.preco.revenda;
   return Object.assign(comum,{
-    degrau_nome:r.degrau.nome,
+    degrau_nome:r.degrau?r.degrau.nome:null,
     m2_real_mm2:r.preco.m2_real_mm2, m2_cobrado_mm2:r.preco.m2_cobrado_mm2,
     m2_real:r.preco.m2_real, m2_cobrado:r.preco.m2_cobrado,
     valor_subtotal_centavos:r.preco.valor_subtotal_centavos,

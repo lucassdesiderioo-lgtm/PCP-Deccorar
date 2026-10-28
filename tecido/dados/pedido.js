@@ -62,7 +62,7 @@ const proximoN=pedido_id=>(db.prepare('SELECT MAX(n) v FROM sm_pedido_item WHERE
 
 const COL_ITEM=['pedido_id','n','modelo_id','abertura_id','cor_tecido_id','tecido_id',
   'cor_acessorio_id','largura_mm','altura_mm','comando','rolamento','adicional','reducao',
-  'acionamento','sentido','lado_corrente','folhas',
+  'acionamento','sentido','lado_corrente','folhas','gomos','gomo_decimo_mm','folha_mm','vias','lados',
   'degrau_nome','m2_real_mm2','m2_cobrado_mm2','valor_subtotal_centavos','valor_final_centavos',
   'resumo','sem_tecido','sem_tecido_motivo','cancelado_em','cancelado_por','cancelado_motivo'];
 

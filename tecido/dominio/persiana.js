@@ -89,6 +89,35 @@ function conferirTeto(onde, nome, motivo, limites, largura_mm, altura_mm, area_m
    dono conferir antes de a revenda ver — e sem calcular o inativo nao ha
    como conferir. O pedido chama sem a opcao, e por isso o inativo continua
    recusado ali: a tela esconder o modelo nao e a regra (armadilha #26). */
+/* ── A PECA PRONTA DOS GOMOS (secao 5 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO) ─
+   ⚠️ SAO REGRA DO DONO, E NAO PREFERENCIA (27/10/2026): o numero de gomos e
+   IMPAR, nunca menos de 3, e o MENOR que deixa cada gomo ate o limite do
+   produto (35 cm). Quem decide e o sistema — ninguem escolhe. A medida exata
+   do limite cabe, como na escada de tubos (1,050 ÷ 3 = 350,0 fica em 3).
+
+   O gomo e a divisao EXATA, com uma casa (333,3), e nenhum gomo absorve
+   diferenca. Ele nao e medida de corte de nenhuma peca — e a marcacao que a
+   montagem segue —, e por isso pode ter a casa decimal sem ferir o mm
+   inteiro: guarda-se em DECIMO de mm, inteiro. */
+const GOMOS_MIN=3;
+function gomosDe(modelo,altura_mm){
+  const limite=modelo.gomo_max_mm;
+  exigir(limite>0,'gomo_sem_limite','O produto '+modelo.nome+' não tem o limite do gomo cadastrado.');
+  let n=Math.max(GOMOS_MIN,Math.ceil(altura_mm/limite));
+  if(n%2===0) n++;
+  const decimo=Math.round(altura_mm*10/n);
+  const gomo=Math.floor(decimo/10)+','+(decimo%10);
+  return {tipo:'gomos', gomos:n, varetas:n-1, gomo_decimo_mm:decimo, gomo,
+    titulo:n+' gomos de '+gomo+' mm',
+    detalhe:(n-1)+' varetas · cada gomo até '+u.emMetros(limite)+' m',
+    frase:n+' gomos de '+gomo+' mm'};
+}
+
+/* ── A PECA PRONTA DAS FOLHAS (secao 6) — preenchida na fase 4 ────────────── */
+function folhasDe(modelo,largura_mm,sentido,folhas){
+  return {tipo:'folhas'};
+}
+
 function calcular(escolha,opcoes){
   const e=escolha||{};
   const op=opcoes||{};
@@ -197,11 +226,23 @@ function calcular(escolha,opcoes){
   conferirTeto('o modelo',modelo.nome,'medida_acima_do_modelo',
     modelo,largura_mm,altura_mm,area_mm2);
 
-  // ── 4. A escada de tubos ────────────────────────────────────────────────
-  const degraus=modelo.degraus.filter(d=>d.ativo);
-  exigir(degraus.length,'escada_vazia',
-    'O modelo '+modelo.nome+' não tem escada de tubos cadastrada.');
-  const degrau=escolherDegrau(degraus,largura_mm,area_mm2);
+  // ── 4. O calculo do produto ─────────────────────────────────────────────
+  /* ⚠️ CADA PRODUTO LIGA UMA PECA PRONTA (secao 2 da spec
+     SOBMEDIDA-CADASTRO-DE-PRODUTO): a escada de tubos do Rolo, os gomos da
+     Romana, as folhas do Painel. A conta e codigo testado; o produto guarda os
+     numeros dela. O Rolo e 'escada' desde a migracao 34, e por isso o caminho
+     dele e exatamente o de antes. */
+  const tipoCalculo=modelo.calculo||'escada';
+  let degrau=null;
+  if(tipoCalculo==='escada'){
+    const degraus=modelo.degraus.filter(d=>d.ativo);
+    exigir(degraus.length,'escada_vazia',
+      'O modelo '+modelo.nome+' não tem escada de tubos cadastrada.');
+    degrau=escolherDegrau(degraus,largura_mm,area_mm2);
+  }
+  const calculo=tipoCalculo==='gomos'?gomosDe(modelo,altura_mm)
+              :tipoCalculo==='folhas'?folhasDe(modelo,largura_mm,sentido,folhas)
+              :{tipo:tipoCalculo};
 
   /* ── 5. O adicional cabe? ───────────────────────────────────────────────
      ⚠️ A DISPONIBILIDADE E CALCULADA SEMPRE, e nao so quando alguem pede.
@@ -215,7 +256,7 @@ function calcular(escolha,opcoes){
   function cabe(chave, frase, semFicha){
     const c=componenteDe(chave);
     if(!c) return {disponivel:false, motivo:semFicha};
-    if(chave==='bando'&&!degrau.aceita_bando)
+    if(chave==='bando'&&degrau&&!degrau.aceita_bando)
       return {disponivel:false, motivo:frase+' ('+degrau.nome+' não aceita bandô.)'};
     if(c.componente_altura_max_mm!=null&&altura_mm>c.componente_altura_max_mm)
       return {disponivel:false, motivo:frase+' (a altura vai até '+
@@ -242,14 +283,15 @@ function calcular(escolha,opcoes){
   const pedida=e.reducao==='pedida'||e.reducao===true;
   if(e.reducao!=null&&e.reducao!==''&&e.reducao!=='nao'&&e.reducao!=='pedida'&&e.reducao!==true&&e.reducao!==false)
     throw new ErroDeRegra('reducao_invalida','A redução de peso só pode ser "nao" ou "pedida".');
-  if(pedida&&!automatica&&!degrau.aceita_reducao)
-    throw new ErroDeRegra('reducao_indisponivel',
-      'O '+degrau.nome+' não tem redução de peso. Ela existe a partir do Tubo 38.');
+  if(pedida&&!automatica&&!(degrau&&degrau.aceita_reducao))
+    throw new ErroDeRegra('reducao_indisponivel', degrau
+      ? 'O '+degrau.nome+' não tem redução de peso. Ela existe a partir do Tubo 38.'
+      : 'O produto '+modelo.nome+' não tem redução de peso pedida: ela depende do tubo.');
   const reducao={
     automatica:!!automatica,
     pedida:!!pedida&&!automatica,
     aplicada:!!(automatica||pedida),
-    pode_pedir:liga('reducao')&&!!degrau.aceita_reducao
+    pode_pedir:liga('reducao')&&!!(degrau&&degrau.aceita_reducao)
   };
 
   // ── 7. A ficha vira componentes ─────────────────────────────────────────
@@ -280,11 +322,20 @@ function calcular(escolha,opcoes){
   for(const linha of modelo.ficha.slice().sort((a,b)=>a.ordem-b.ordem)){
     if(!linha.ativo||!linha.componente_ativo||!entra(linha.quando)) continue;
 
+    const semEscada=()=>{ throw new ErroDeRegra('referencia_sem_escada','A ficha manda medir "'+linha.chave+
+      '" pelo degrau, e o produto '+modelo.nome+' não tem escada de tubos. Use "final" ou um componente.'); };
     const medirLargura=(ref,ajuste)=>{
       if(!ref) return null;
       let base;
       if(ref==='final') base=largura_mm;
-      else if(ref==='degrau') base=largura_mm-degrau.desconto_mm;
+      else if(ref==='degrau') base=degrau?largura_mm-degrau.desconto_mm:semEscada();
+      /* A largura de CADA FOLHA do Painel (secao 6.3). So existe no calculo
+         das folhas; em outro produto a ficha que a pede e recusada dizendo. */
+      else if(ref==='folha'){
+        exigir(calculo.folha_mm!=null,'referencia_sem_folha','A ficha manda medir "'+linha.chave+
+          '" pela folha, e o produto '+modelo.nome+' não calcula folhas.');
+        base=calculo.folha_mm;
+      }
       else{
         const ja=calculados[ref];
         exigir(ja&&ja.largura_corte_mm!=null,'referencia_adiantada',
@@ -297,7 +348,9 @@ function calcular(escolha,opcoes){
       if(!ref) return null;
       let base;
       if(ref==='final') base=altura_mm;
-      else if(ref==='degrau') base=altura_mm+degrau.acrescimo_altura_tecido_mm;
+      else if(ref==='degrau') base=degrau?altura_mm+degrau.acrescimo_altura_tecido_mm:semEscada();
+      else if(ref==='folha') throw new ErroDeRegra('referencia_sem_folha',
+        'A folha é uma LARGURA: a altura de "'+linha.chave+'" se mede pelo final.');
       else{
         const ja=calculados[ref];
         exigir(ja&&ja.altura_corte_mm!=null,'referencia_adiantada',
@@ -307,9 +360,20 @@ function calcular(escolha,opcoes){
       return base+(ajuste||0);
     };
 
+    /* A QUANTIDADE POR REFERENCIA (secao 5.2): as varetas da Romana, as
+       folhas do Painel. ⚠️ Referencia que a peca pronta deste produto nao
+       calcula e RECUSA, e nao zero: a linha sairia da ficha sem ninguem ver,
+       e ela e uma peca que a bancada teria que fazer. */
+    let quantidade=linha.quantidade;
+    if(linha.quantidade_ref){
+      exigir(calculo[linha.quantidade_ref]!=null,'quantidade_sem_calculo',
+        'A ficha conta "'+linha.chave+'" por '+linha.quantidade_ref+', e o cálculo do produto '+
+        modelo.nome+' não devolve '+linha.quantidade_ref+'.');
+      quantidade=calculo[linha.quantidade_ref];
+    }
     const c={
       chave:linha.chave, nome:linha.componente_nome, setor:linha.setor,
-      quantidade:linha.quantidade, quando:linha.quando,
+      quantidade, quando:linha.quando,
       gera_etiqueta:!!linha.gera_etiqueta, eh_kit:!!linha.eh_kit,
       codigo_barras:linha.codigo_barras||null,
       // ⚠️ CORTE e CONSUMO, lado a lado e nunca somados — armadilha #18.
@@ -483,6 +547,7 @@ function calcular(escolha,opcoes){
     'Acessórios '+cor.cor_nome]
    .concat(liga('comando')?['Comando '+COMANDOS[e.comando]]:[])
    .concat(liga('rolamento')?['Rolamento '+ROLAMENTOS[e.rolamento]]:[])
+   .concat(calculo.frase?[calculo.frase]:[])
    .concat(frase('sentido',sentido))
    .concat(folhas!=null?[folhas+' folhas']:[])
    .concat(frase('acionamento',acionamento))
@@ -501,8 +566,9 @@ function calcular(escolha,opcoes){
     comando:liga('comando')?e.comando:'', rolamento:liga('rolamento')?e.rolamento:'', adicional,
     acionamento, lado_corrente, sentido, folhas,
     escolhas_ligadas:[...ligadas],
-    degrau:{id:degrau.id, nome:degrau.nome, desconto_mm:degrau.desconto_mm,
-            acrescimo_altura_tecido_mm:degrau.acrescimo_altura_tecido_mm},
+    degrau:degrau?{id:degrau.id, nome:degrau.nome, desconto_mm:degrau.desconto_mm,
+            acrescimo_altura_tecido_mm:degrau.acrescimo_altura_tecido_mm}:null,
+    calculo,
     /* O que esta medida ACEITA, para a tela oferecer so o possivel — e dizer
        POR QUE, em vez de esconder o botao calado (secao 4.6). */
     opcoes:{bando:podeBando, barra:podeBarra,

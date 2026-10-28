@@ -27,7 +27,19 @@ const ESC=require('./escolhas');
 /* As duas palavras que uma referencia de ficha pode ter alem de uma chave de
    componente. Elas sao reservadas: um componente chamado 'final' faria a
    ficha dizer duas coisas com a mesma palavra. */
-const REF_RESERVADAS=['final','degrau'];
+const REF_RESERVADAS=['final','degrau','folha'];
+
+/* AS PECAS PRONTAS DE CALCULO (secao 2 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO).
+   O produto liga uma; a conta mora no persiana.js, e cada uma diz o que
+   devolve para a ficha medir e contar. Conta nova entra por spec, como peca
+   pronta nova — nunca digitada na tela. */
+const CALCULOS=[
+  {chave:'escada', nome:'Escada de tubos', quantidades:[]},
+  {chave:'gomos',  nome:'Gomos e varetas (Romana)', quantidades:['gomos','varetas']},
+  {chave:'folhas', nome:'Folhas, transpasse e vias (Painel)', quantidades:['folhas','vias','lados']},
+  {chave:'nenhum', nome:'Nenhum', quantidades:[]}
+];
+const QUANTIDADES_REF=['gomos','varetas','folhas','vias','lados'];
 /* Os `quando` das escolhas novas (secao 4.2): a linha entra pelo acionamento
    ou pela abertura escolhida. A corda do Painel e `com_comando`, e no painel
    sem comando ela nao entra — nao baixa estoque nem custa. */
@@ -70,6 +82,7 @@ function modelo(id){
        copiada no navegador divergiria na primeira fase que acrescentasse um. */
     escolhas: ESC.doModelo(dCat.escolhas(id)),
     quandos: QUANDOS.slice(), refs_reservadas: REF_RESERVADAS.slice(),
+    calculos: CALCULOS, quantidades_ref: QUANTIDADES_REF.slice(),
     setores: dSetor.setores().map(s=>({chave:s.chave,nome:s.nome}))
   });
 }
@@ -107,6 +120,18 @@ function limitesModelo(d){
     fora.m2_min_faturado_mm2=u.mm(d.m2_min_faturado_mm2,'o minimo faturado');
   }
   if(d.ordem!==undefined) fora.ordem=d.ordem;
+  if(d.calculo!==undefined){
+    exigir(CALCULOS.some(c=>c.chave===d.calculo),'calculo_invalido',
+      'O cálculo é um dos do sistema: '+CALCULOS.map(c=>c.nome).join(', ')+'.');
+    fora.calculo=d.calculo;
+  }
+  [['gomo_max_mm','o limite do gomo'],['transpasse_mm','o transpasse']].forEach(([c,oque])=>{
+    if(d[c]===undefined) return;
+    const v=u.mm(d[c],oque);
+    exigir(v>0||c==='transpasse_mm','numero_invalido',oque.charAt(0).toUpperCase()+oque.slice(1)+
+      ' tem que ser maior que zero.');
+    fora[c]=v;
+  });
   return fora;
 }
 
@@ -535,6 +560,12 @@ function camposFicha(d){
     fora.quando=d.quando;
   }
   if(d.ordem!==undefined) fora.ordem=d.ordem;
+  if(d.quantidade_ref!==undefined){
+    const q=d.quantidade_ref==null||d.quantidade_ref===''?null:String(d.quantidade_ref).trim();
+    exigir(q==null||QUANTIDADES_REF.indexOf(q)>=0,'quantidade_ref_invalida',
+      'A quantidade por referência é uma de: '+QUANTIDADES_REF.join(', ')+' — ou vazia, para a quantidade fixa.');
+    fora.quantidade_ref=q;
+  }
   if(d.quantidade!==undefined){
     const q=Number(d.quantidade);
     exigir(Number.isInteger(q)&&q>0,'quantidade_invalida','A quantidade tem que ser inteira e maior que zero.');
@@ -624,5 +655,5 @@ module.exports={
   ligarMaterialDoDegrau, ligarMaterialDoComponente,
   fichaDe, fichaLinhaDe, criarFichaLinha, editarFichaLinha,
   criarFaixaSuporte, apagarFaixaSuporte, definirReducaoRegra,
-  historicoPreco, QUANDOS, REF_RESERVADAS
+  historicoPreco, QUANDOS, REF_RESERVADAS, CALCULOS, QUANTIDADES_REF
 };
