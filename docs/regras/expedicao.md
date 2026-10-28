@@ -291,11 +291,12 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Status:** "voltou" pela Mesa no ar de 02/10 a 22/10/2026 · a regra nova está em código desde 22/10/2026.
 
 ### R-COR-04 · Saída de passivo é carimbada na data do volume, e venda futura não se fecha
-- **Regra:** dar saída e fechar vencidos carimbam `COALESCE(despachar_em, data)` às 15:00, nunca hoje. Volume com despacho no futuro é recusado. Reabrir venda futura volta a `embalado`, ou a `pendente` se nunca teve etiqueta. A data de corte de "Fechar vencidos" nasce vazia.
-- **Por quê:** carimbar hoje cria pico falso e some com o volume da tela no dia em que ele sair de verdade.
+- **Regra:** dar saída e fechar vencidos carimbam `COALESCE(despachar_em, data)` às 15:00, nunca hoje. Volume com despacho no futuro é recusado. **Desde 28/10/2026 o que vence hoje também é recusado:** a data de corte de "Fechar vencidos" é no máximo **ontem** (400), e "Dar saída" não vale para a venda que despacha hoje (ou que entrou hoje sem despacho lido) — ela ainda está na fila da Etiqueta de Venda. O `fechar_vencidos.js` sem `--ate` corta em ontem. Reabrir venda futura volta a `embalado`, ou a `pendente` se nunca teve etiqueta. A data de corte de "Fechar vencidos" nasce vazia.
+- **O que aconteceu:** em 28/10/2026, às 07:13, um "Fechar vencidos" com corte em hoje (correção #4) fechou como "saiu" as 50 vendas da fila do dia, nunca impressas. "Faltam imprimir" ficou vazio, elas apareceram em "Já impressos" sem horário, e a tela não deu erro nenhum. O Desfazer da Mesa trouxe as 58 de volta.
+- **Por quê:** carimbar hoje cria pico falso e some com o volume da tela no dia em que ele sair de verdade. E fechar o que vence hoje apaga a fila do dia: o contador do passivo já não contava essas vendas, e o bloco passou a concordar com ele.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_correcao2.js`.
-- **Status:** no ar desde 02/10/2026.
+- **Status:** no ar desde 02/10/2026; o corte em ontem, em 28/10/2026 (aguarda deploy).
 
 ### R-COR-05 · O terminal e o botão usam a mesma régua
 - **Regra:** os scripts de passivo (`limpar_fantasmas`, `fechar_vencidos`, `regularizar_saida`, `reabrir_futuros`, `limpar_fila`) chamam as ações do `correcoes.js` e gravam em `correcao`, com `terminal: <script>` como autor.

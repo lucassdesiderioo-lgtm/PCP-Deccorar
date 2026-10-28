@@ -465,3 +465,13 @@ um insumo com várias unidades devolve só a unidade recusada. Nome, marca e
 modelo do insumo vêm do cadastro de material; medida e quantidade, da ficha
 técnica — e cadastro de material incompleto avisa, nunca trava. Nada na
 etiqueta de produção termina em "…".
+
+## 28/10/2026 — o "Fechar vencidos" corta no máximo em ontem
+
+Cartão R-COR-04, decisão do dono depois do incidente da manhã. **Antes:** a data
+de corte do "Fechar vencidos" podia ser hoje, e o "Dar saída" valia para a venda
+que despacha hoje. A correção #4 (07:13, corte em hoje) fechou como "saiu" as 50
+vendas da fila do dia, nunca impressas, e a lista da Etiqueta de Venda sumiu —
+voltou pelo Desfazer da Mesa. **Depois:** corte em hoje é recusado (400), a venda
+que vence hoje não aceita "Dar saída", e o `fechar_vencidos.js` sem `--ate` corta
+em ontem. O que vence hoje é trabalho da Etiqueta de Venda.
