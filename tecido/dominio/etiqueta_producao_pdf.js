@@ -128,7 +128,13 @@ function desenhar(pagina, e, f){
     {x:m, y:27.5, tam:11, fonte:f.forte, largura:L-reservado});
   escreve([e.revenda, e.cliente_final, e.prazo].filter(Boolean).join('  ·  '),
     {x:m, y:23.5, tam:7.5, fonte:f.normal, cor:cinza, largura:L});
-  escreve([e.produto, e.medida, e.colecao, e.escolhas||e.comando].filter(Boolean).join('  ·  '),
+  /* A linha do tecido costuma ter o NOME DO PRODUTO (Romana, Painel), e
+     escrever os dois gastava a linha que as escolhas precisam. Quando a
+     colecao comeca pelo produto, o produto fica e a palavra repetida sai —
+     so no papel; o dado continua inteiro. */
+  const col = (e.produto && String(e.colecao||'').indexOf(e.produto+' ')===0)
+    ? String(e.colecao).slice(e.produto.length+1) : e.colecao;
+  escreve([e.produto, e.medida, col, e.escolhas||e.comando].filter(Boolean).join('  ·  '),
     {x:m, y:19.8, tam:7.5, fonte:f.normal, largura:L});
 
   /* ⚠️ A TAREFA E A MAIOR LETRA DA ETIQUETA, e e de proposito. Tudo o mais

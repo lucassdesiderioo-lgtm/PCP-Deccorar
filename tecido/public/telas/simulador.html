@@ -93,7 +93,25 @@ function fileira(rotulo, itens, valorAtual, aoEscolher, desabilitados){
   return campo;
 }
 
+/* ⚠️ O REDESENHO DEVOLVE O FOCO E O CURSOR A QUEM ESTAVA DIGITANDO. As
+   escolhas se redesenham a cada tecla (a opcao de bandô some quando a medida
+   muda), e o campo de medida nasce de novo — sem esta guarda o foco caia no
+   PRIMEIRO numero digitado, e "1,051" virava "1" com o resto das teclas indo
+   para lugar nenhum. E a armadilha do redesenho do §12 do CLAUDE.md (o
+   motivo que sumia no Carregamento), pela porta do simulador; so apareceu
+   conferindo a Romana pela tela, em 28/10/2026. */
 function desenharEscolhas(){
+  const ativo=document.activeElement;
+  const foco=ativo&&ativo.closest&&ativo.closest('#escolhas')&&ativo.getAttribute('aria-label');
+  const cursor=foco&&typeof ativo.selectionStart==='number'?[ativo.selectionStart,ativo.selectionEnd]:null;
+  desenharEscolhasDentro();
+  if(foco){
+    const novo=document.querySelector('#escolhas [aria-label="'+foco+'"]');
+    if(novo){ novo.focus(); if(cursor) try{ novo.setSelectionRange(cursor[0],cursor[1]); }catch(e){} }
+  }
+}
+
+function desenharEscolhasDentro(){
   const c=limpar($('#escolhas'));
   const m=estado.modelo;
   if(!m) return;
@@ -245,8 +263,10 @@ function desenhar(r){
     const consumo=c.consumo_largura_mm==null?'—'
       :(c.consumo_altura_mm==null?emMetros(c.consumo_largura_mm)
         :emMetros(c.consumo_largura_mm)+' × '+emMetros(c.consumo_altura_mm));
+    /* A QUANTIDADE aparece quando passa de uma: as 4 varetas da Romana, as 6
+       folhas do Painel. Sem ela a tabela diria "uma vareta de 1,185". */
     tb.appendChild(el('tr',{},[
-      el('td',{},[c.nome, el('div',{class:'setor'},[c.setor])]),
+      el('td',{},[(c.quantidade>1?c.quantidade+' × ':'')+c.nome, el('div',{class:'setor'},[c.setor])]),
       el('td',{class:'medida'},[corte]),
       el('td',{class:'medida'},[consumo])
     ]));
@@ -359,7 +379,11 @@ async function rodar(){
        calado faria o orcamento mudar de preco sem ninguem entender por que. */
     const voltou=(e.motivo==='bando_indisponivel'||e.motivo==='barra_indisponivel')
       &&estado.adicional!=='nenhum';
-    limpar($('#saida')).appendChild(el('div',{class:'recusa'},[e.mensagem||'Não foi possível calcular.']));
+    /* A frase do servidor mora em `message` (o ui.js monta o erro assim). Ler
+       `e.mensagem` fazia toda recusa virar "Não foi possível calcular." — e a
+       recusa que DIZ o porquê ("a abertura central pede número par") e a
+       regra, nao um detalhe (secao 6.2 da spec SOBMEDIDA-CADASTRO-DE-PRODUTO). */
+    limpar($('#saida')).appendChild(el('div',{class:'recusa'},[e.message||e.mensagem||'Não foi possível calcular.']));
     if(voltou){
       estado.adicional='nenhum';
       /* O recado sobrevive ao proximo desenho DE PROPOSITO: a re-simulacao

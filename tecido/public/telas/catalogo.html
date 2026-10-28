@@ -142,7 +142,11 @@ const botao=(texto,clique,classe)=>{
 
 async function tentar(fn){
   try{ erro=null; await fn(); editando=null; await recarregar(); }
-  catch(e){ erro=e.mensagem||'Não deu para salvar.'; desenhar(); }
+  /* ⚠️ A FRASE DO SERVIDOR MORA EM `message`: e assim que o ui.js monta o
+     erro. Ate 28/10/2026 esta linha lia `e.mensagem`, que nao existe, e toda
+     recusa do Catalogo virava "Não deu para salvar." — o porque da recusa
+     (a escada que nao sobe, o nome da copia) nunca chegava a quem editava. */
+  catch(e){ erro=e.message||e.mensagem||'Não deu para salvar.'; desenhar(); }
 }
 
 // ── O produto: nome, limites e se a revenda o vê ──────────────────────────
@@ -233,9 +237,10 @@ function desenharNovo(){
             corpo:nome.value.trim()?{nome:nome.value.trim()}:{}})
         : await api('/api/sm/modelos',{metodo:'POST',silencioso:true,corpo:{nome:nome.value}});
       novoAberto=false; aba='produto';
+      desenharNovo();
       await carregarModelos(novo.id);
       banner('"'+novo.nome+'" criado, INATIVO. Confira no simulador antes de ativar.','bom',8);
-    }catch(e){ erroNovo=e.mensagem||'Não deu para criar.'; desenharNovo(); }
+    }catch(e){ erroNovo=e.message||e.mensagem||'Não deu para criar.'; desenharNovo(); }
   });
   const cancelar=botao('Cancelar',()=>{ novoAberto=false; erroNovo=null; desenharNovo(); });
   ed.appendChild(el('div',{class:'campos'},[
@@ -560,13 +565,13 @@ function abaFicha(){
       {chave:'quantidade_ref',rotulo:'ou pela referência',valor:f.quantidade_ref||'',
        opcoes:[{valor:'',rotulo:'— fixa —'}].concat((modelo.quantidades_ref||[]).map(q=>({valor:q,rotulo:q})))},
       {chave:'ref_largura',rotulo:'Corte: ref largura',valor:f.ref_largura,dica:'final | degrau | folha | tubo'},
-      {chave:'ajuste_largura_mm',rotulo:'Corte: ajuste (mm)',valor:f.ajuste_largura_mm,dica:'-5'},
+      {chave:'ajuste_largura_mm',rotulo:'Corte: ajuste da largura (mm)',valor:f.ajuste_largura_mm,dica:'-5'},
       {chave:'ref_altura',rotulo:'Corte: ref altura',valor:f.ref_altura},
-      {chave:'ajuste_altura_mm',rotulo:'Corte: ajuste (mm)',valor:f.ajuste_altura_mm},
+      {chave:'ajuste_altura_mm',rotulo:'Corte: ajuste da altura (mm)',valor:f.ajuste_altura_mm},
       {chave:'consumo_ref_largura',rotulo:'Consumo: ref largura',valor:f.consumo_ref_largura},
-      {chave:'consumo_ajuste_largura_mm',rotulo:'Consumo: ajuste (mm)',valor:f.consumo_ajuste_largura_mm},
+      {chave:'consumo_ajuste_largura_mm',rotulo:'Consumo: ajuste da largura (mm)',valor:f.consumo_ajuste_largura_mm},
       {chave:'consumo_ref_altura',rotulo:'Consumo: ref altura',valor:f.consumo_ref_altura},
-      {chave:'consumo_ajuste_altura_mm',rotulo:'Consumo: ajuste (mm)',valor:f.consumo_ajuste_altura_mm}
+      {chave:'consumo_ajuste_altura_mm',rotulo:'Consumo: ajuste da altura (mm)',valor:f.consumo_ajuste_altura_mm}
     ],v=>{
       const corpo={};
       Object.keys(v).forEach(k=>{
@@ -618,13 +623,13 @@ function novaLinhaFicha(){
       {chave:'quantidade_ref',rotulo:'ou pela referência',valor:'',
        opcoes:[{valor:'',rotulo:'— fixa —'}].concat((modelo.quantidades_ref||[]).map(q=>({valor:q,rotulo:q})))},
       {chave:'ref_largura',rotulo:'Corte: ref largura',dica:'final | tubo'},
-      {chave:'ajuste_largura_mm',rotulo:'Corte: ajuste (mm)',dica:'-5'},
+      {chave:'ajuste_largura_mm',rotulo:'Corte: ajuste da largura (mm)',dica:'-5'},
       {chave:'ref_altura',rotulo:'Corte: ref altura',dica:'final'},
-      {chave:'ajuste_altura_mm',rotulo:'Corte: ajuste (mm)'},
+      {chave:'ajuste_altura_mm',rotulo:'Corte: ajuste da altura (mm)'},
       {chave:'consumo_ref_largura',rotulo:'Consumo: ref largura'},
-      {chave:'consumo_ajuste_largura_mm',rotulo:'Consumo: ajuste (mm)'},
+      {chave:'consumo_ajuste_largura_mm',rotulo:'Consumo: ajuste da largura (mm)'},
       {chave:'consumo_ref_altura',rotulo:'Consumo: ref altura'},
-      {chave:'consumo_ajuste_altura_mm',rotulo:'Consumo: ajuste (mm)'}
+      {chave:'consumo_ajuste_altura_mm',rotulo:'Consumo: ajuste da altura (mm)'}
     ],v=>{
       const corpo={componente_id:Number(v.componente_id),quando:v.quando};
       Object.keys(v).forEach(k=>{
