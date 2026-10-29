@@ -162,13 +162,41 @@ function tituloDoAnuncio(linha){
  * nenhum, entao nao ha o que reivindicar e ele segue sendo peca a mais.
  * Validado contra os dois PDFs reais — resolve os 5 Tóquio e nao toca no
  * irmao `BK130130BRANCO`. Casos 22 e 23 do `teste_parse.js`.
+ *
+ * ⚠️ E O PACK QUE SOBE COM A VENDA EMBAIXO (29/10/2026). Outro titulo longo
+ * ("Tóquio 004 - Cinza Com Acabamento Branco") desfez o pareamento do outro
+ * jeito:
+ *
+ *     ...Blecaute Roller Cor Tóquio 004 - Cinza
+ *     Com Acabamento Branco
+ *     Pack ID: 2000015735133241               <- o pack sobe, sozinho
+ *     SKU: BK180150CINZA
+ *     Venda: 2000019201782254                 <- a venda fica embaixo
+ *
+ * O item tinha a VENDA e por isso era dado como identificado — so que a
+ * etiqueta da venda com pack traz SO O PACK. Folha e etiqueta ficavam sem
+ * numero em comum, e as NF 8827 e 8828 cairam em "venda na folha sem
+ * etiqueta" com as duas etiquetas dentro do PDF. Por isso o item que tem a
+ * venda e nao tem o pack tambem passa aqui, mas SO para o pack: a venda dele
+ * ja esta lida, e a mesma palavra REIVINDICADO segura o caso Abraao (o pack
+ * do vizinho esta na linha do SKU dele, fora desta janela e ja pego). Caso 26
+ * do `teste_parse.js` e casos/2026-10-29-nf-8828.json.
  */
 function reivindicarAcima(linhas, itens, janelas){
   const usadas=new Set(), packs=new Set();
   itens.forEach(it=>{ if(it.venda) usadas.add(it.venda); if(it.packId) packs.add(it.packId); });
   itens.forEach((it,n)=>{
-    if(it.venda || it.packId) return;                 // ja se identifica sozinho
+    if(it.packId) return;                             // o pack identifica sozinho
     const j=janelas[n]; if(!j) return;
+    if(it.venda){                                     // tem a venda: falta so o pack
+      const livres=[];
+      for(let k=j.de; k<j.ate; k++){
+        const p=(String(linhas[k]||'').match(/Pack ID:\s*([\d ]+)/)||[])[1];
+        if(p){ const x=p.replace(/\s+/g,''); if(x && !packs.has(x)) livres.push(x); }
+      }
+      if(livres.length===1){ it.packId=livres[0]; packs.add(it.packId); }
+      return;
+    }
     const livres=[];
     for(let k=j.de; k<j.ate; k++){
       const linha=String(linhas[k]||'');

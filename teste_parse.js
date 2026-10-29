@@ -929,6 +929,61 @@ function conferir(nome, orders, esperado){
     else console.log('ok      as pecas da caixa tem dono unico, nas DUAS formas');
   }
 
+  /* ── caso 26: O PACK QUE FICOU ACIMA DO SKU, COM A VENDA EMBAIXO (29/10/2026)
+        Copiado linha a linha do PDF real de 29/10/2026 (NF 8827 e 8828). O
+        titulo "Tóquio 004 - Cinza Com Acabamento Branco" quebra em duas, e o
+        Pack ID fica numa linha SO DELE, acima do `SKU:`. A venda vem embaixo,
+        entao o item se identificava "sozinho" pela venda — e a segunda passada
+        nem olhava. Mas a ETIQUETA desse tipo de venda traz so o pack: sem ele
+        a folha e a etiqueta nao tinham numero em comum, e as duas vendas
+        cairam em "venda na folha sem etiqueta" com a etiqueta dentro do PDF.
+        Caderno: casos/2026-10-29-nf-8828.json. */
+  casos++;
+  {
+    const {itensDaFolha}=require('./folha');
+    const erros=[];
+    const its=itensDaFolha([
+      'Despachem as suas vendas o quanto antes.','Identifiicação Produtos',
+      'JF6EK6AUTNOSHJQNXPPFT2UVOY Cortina Rolô Blackout 1,60x1,60 Quarto Bege',
+      'Pack ID: 2000015739279681 SKU: BK160160BEGE',
+      'Venda: 2000019206213048 Quantidade: 1',
+      'Daniela Souza Siqueira Cor: Bege','Desenho do tecido: Liso',
+      'VJ64D2VYLVPJFFDWBCHEGWYMW4 Cortina Rolo Blackout Medida L 1,80 X A 1,50 Blecaute Roller Cor Tóquio 004 - Cinza',
+      'Com Acabamento Branco',
+      'Pack ID: 2000015735133241',
+      'SKU: BK180150CINZA',
+      'Venda: 2000019201782254',
+      'Quantidade: 1','Fabiana Taborda','Cor: Tóquio 004 - Cinza com acabamento branco','Desenho do tecido: Liso',
+      'RIGBPY2O4FO77FYOWMYOJAWPQU Cortina Rolô Blackout 1,30x1,30 Quarto 0% Luz Persiana Cinza',
+      'Venda: 2000019185354834 SKU: BK130130CINZA',
+      'Maria Eduarda Costa Quantidade: 1','Cor: Cinza','Desenho do tecido: Liso']);
+    const t=its.find(x=>x.sku==='BK180150CINZA')||{};
+    const viz=its.find(x=>x.sku==='BK160160BEGE')||{};
+    const sem=its.find(x=>x.sku==='BK130130CINZA')||{};
+    if(its.length!==3) erros.push('esperava 3 itens, veio '+its.length);
+    if(t.packId!=='2000015735133241') erros.push('nao recuperou o pack de cima: '+JSON.stringify(t.packId));
+    if(t.venda!=='2000019201782254') erros.push('perdeu a venda de baixo: '+JSON.stringify(t.venda));
+    if(viz.packId!=='2000015739279681') erros.push('o vizinho de cima mudou de pack: '+viz.packId);
+    /* A venda sem pack de verdade (o ML nao deu pack) continua sem pack: o
+       pack do item de cima esta FORA da janela dela, e alem disso reivindicado. */
+    if(sem.packId) erros.push('a venda sem pack ganhou um: '+sem.packId);
+    /* As guardas de sempre: dois packs livres na janela nao desempatam, e o
+       pack que o vizinho ja pegou nao e oferecido. */
+    const dois=itensDaFolha([
+      'A descricao que transborda Cor Tóquio 004 - Cinza','Pack ID: 111','Pack ID: 222',
+      'SKU: BK180150CINZA','Venda: 999','Quantidade: 1']);
+    if((dois[0]||{}).packId) erros.push('escolheu um entre dois packs livres: '+dois[0].packId);
+    const dono=itensDaFolha([
+      'X Cortina Rolo Blackout 1,60x1,40 Persiana Bege',
+      'Pack ID: 333 SKU: BK160140BEGE','Venda: 444 Quantidade: 1',
+      'Pack ID: 333',
+      'SKU: BK180150CINZA','Venda: 555','Quantidade: 1']);
+    if((dono[1]||{}).packId) erros.push('pegou o pack que o vizinho ja tinha: '+dono[1].packId);
+    if(erros.length){ falhas++; console.log('FALHOU  o pack acima do SKU volta pro item que ja tinha a venda');
+      erros.forEach(e=>console.log('        '+e)); }
+    else console.log('ok      o pack acima do SKU volta pro item que ja tinha a venda');
+  }
+
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));
