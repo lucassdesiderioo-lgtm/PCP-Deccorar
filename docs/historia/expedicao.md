@@ -113,6 +113,41 @@ Ao subir o PDF (aba "Lançar produção" do admin), o sistema:
 > travam a recuperação e as três guardas — **o caso 2 (Abraão) tem que passar
 > junto**, que é exatamente o ponto.
 >
+> ⚠️ **E O PACK TAMBÉM SOBE, COM A VENDA EMBAIXO (29/10/2026).** Outro título
+> longo — *"Tóquio 004 - Cinza **Com Acabamento Branco**"* — desfez o pareamento
+> do outro jeito:
+>
+> ```
+> ...Blecaute Roller Cor Tóquio 004 - Cinza
+> Com Acabamento Branco
+> Pack ID: 2000015735133241               ← o pack sobe, sozinho
+> SKU: BK180150CINZA
+> Venda: 2000019201782254                 ← a venda fica embaixo
+> ```
+>
+> O item tinha a **venda**, então a segunda passada o dava por identificado e
+> nem olhava. Só que a etiqueta de venda com pack traz **só o pack**: folha e
+> etiqueta ficaram sem número em comum. As caixas entraram pelo pack, mas a
+> folha concluiu que as vendas 2000019201782254 e 2000019201782272 (NF 8828 e
+> 8827, a mesma cliente) estavam **sem etiqueta** — com as duas etiquetas dentro
+> do PDF de 78 páginas. O card vermelho mandava baixar no ML uma etiqueta que já
+> tinha subido.
+>
+> Hoje o item que tem a venda e não tem o pack também passa pela segunda
+> passada, mas **só para o pack**, com a mesma palavra REIVINDICADO. O pack do
+> vizinho está na linha do SKU dele, fora desta janela e já pego — o caso Abraão
+> continua fechado. O PDF real foi para o caderno (R-INV-01), com a conta
+> exigindo **zero** vendas sem etiqueta: é ele que impede este defeito de voltar.
+>
+> O `registrar_caso.js` tropeçou no mesmo defeito: ele liga etiqueta e folha
+> pelo mesmo leitor, e deu à cliente um apelido na etiqueta e outro na folha.
+> O caso foi corrigido à mão, e o campo `origem` dele diz isso.
+>
+> Os dois cards já gravados não fecham sozinhos (o card guardou a venda, a caixa
+> guardou o pack, e o upload recusa o PDF repetido), e nenhum botão da tela
+> serve. `node religar_sem_etiqueta.js` relê o PDF do card com o leitor de hoje
+> e só fecha quando a caixa do pack está no sistema com o mesmo SKU.
+>
 > **O ganho não é só destravar:** com o comprador lido, a conferência 2 do §5 —
 > a única que não depende do Pack ID — **volta a proteger** esses volumes, que
 > até aqui passavam sem ela por falta de dado dos dois lados.

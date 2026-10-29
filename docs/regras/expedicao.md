@@ -35,11 +35,11 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **História:** armadilha #4.
 
 ### R-PDF-02 · A venda que subiu de linha só é aproveitada se ninguém mais a pegou
-- **Regra:** quando a descrição longa desfaz o pareamento das colunas, `reivindicarAcima()` aproveita o número da linha de cima — só para item sem pack **e** sem venda, e só se houver **exatamente uma** linha livre que nenhum outro item já pegou. Duas livres: nada é escolhido.
-- **Por quê:** os produtos "Tóquio" ficavam retidos sem dúvida nenhuma. A guarda do "nenhum outro pegou" é o que mantém o caso Abraão fechado.
+- **Regra:** quando a descrição longa desfaz o pareamento das colunas, `reivindicarAcima()` aproveita o número da linha de cima — para item sem pack **e** sem venda (pega a venda ou o pack), e, desde 29/10/2026, também para item que **tem a venda e não tem o pack** (pega só o pack). Nos dois casos, só se houver **exatamente uma** linha livre que nenhum outro item já pegou. Duas livres: nada é escolhido.
+- **Por quê:** os produtos "Tóquio" ficavam retidos sem dúvida nenhuma (23/09). E em 29/10 o título "Tóquio 004 - Cinza Com Acabamento Branco" deixou o **Pack ID acima** do `SKU:` e a **Venda embaixo**: a folha lia só a venda, a etiqueta traz só o pack, e as NF 8827 e 8828 caíram em "venda na folha sem etiqueta" com as duas etiquetas dentro do PDF. A guarda do "nenhum outro pegou" é o que mantém o caso Abraão fechado.
 - **Exceções:** nenhuma.
-- **Teste que trava:** `teste_parse.js` (casos 22 e 23, junto com o caso 2).
-- **Status:** no ar desde 23/09/2026.
+- **Teste que trava:** `teste_parse.js` (casos 22, 23 e 26, junto com o caso 2) e o caderno (`casos/2026-10-29-nf-8828.json`, R-INV-01).
+- **Status:** no ar desde 23/09/2026 · a parte do pack escrita em 29/10/2026. Card já gravado por este defeito se fecha com `node religar_sem_etiqueta.js` (simula; `--aplicar` faz backup e fecha), `teste_religar_sem_etiqueta.js`.
 
 ### R-PDF-03 · O título do anúncio sai da estrutura da folha, não de uma palavra
 - **Regra:** a descrição é a linha acima do `SKU:` que não é linha de campo; o identificador do envio sai. A medida do anúncio (inclusive `L 1,80 X A 1,50`) tem dono único: `MEDIDA_TITULO` / `medidaDoTitulo()`. Título em três linhas é emendado.
@@ -335,7 +335,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Exceções:** se o PDF ainda está no servidor (menos de 7 dias), a NF basta: o PDF se lê lá.
 - **Como gravar:** `node registrar_caso.js <pdf> <venda-ou-pack> --pecas "1xSKU,1xSKU" [--estagio bloqueado|pendente] [--card pacote] --nota "..."` grava `casos/<data>-nf-<nf>.json` com o texto de **todas** as páginas (a conta do PDF inteiro decide, por exemplo, se o irmão entra), trocando nome e endereço de todo cliente. Quando só há o print, o caso é montado à mão no mesmo formato, dizendo isso no campo `origem`.
 - **Teste que trava:** `teste_casos_reais.js` — passa cada caso pelo upload de verdade. Roda no CI com os outros.
-- **Status:** regra desde 27/10/2026 (decisão do dono) · o caderno no ar desde 27/10/2026, com quatro casos: NF 8196 com o PDF sem fechar e fechando (Roberto), NF 8152 (José, 2 unidades) e a venda 2000018960012186 na folha sem etiqueta (o caso pode trazer `conta`, que confere as vendas sem etiqueta e o que sobra).
+- **Status:** regra desde 27/10/2026 (decisão do dono) · o caderno no ar desde 27/10/2026, com cinco casos: NF 8196 com o PDF sem fechar e fechando (Roberto), NF 8152 (José, 2 unidades), a venda 2000018960012186 na folha sem etiqueta (o caso pode trazer `conta`, que confere as vendas sem etiqueta e o que sobra) e, desde 29/10/2026, as NF 8827 e 8828 (o pack acima do SKU, R-PDF-02), com o PDF inteiro de 78 páginas e `conta` exigindo **zero** vendas sem etiqueta.
 - **História:** spec `docs/specs/CONFERENCIA-DA-QUANTIDADE.md`, §2 e §4.
 
 ---
