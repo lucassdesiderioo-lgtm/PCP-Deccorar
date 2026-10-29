@@ -39,7 +39,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Por quê:** os produtos "Tóquio" ficavam retidos sem dúvida nenhuma (23/09). E em 29/10 o título "Tóquio 004 - Cinza Com Acabamento Branco" deixou o **Pack ID acima** do `SKU:` e a **Venda embaixo**: a folha lia só a venda, a etiqueta traz só o pack, e as NF 8827 e 8828 caíram em "venda na folha sem etiqueta" com as duas etiquetas dentro do PDF. A guarda do "nenhum outro pegou" é o que mantém o caso Abraão fechado.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_parse.js` (casos 22, 23 e 26, junto com o caso 2) e o caderno (`casos/2026-10-29-nf-8828.json`, R-INV-01).
-- **Status:** no ar desde 23/09/2026 · a parte do pack escrita em 29/10/2026. Card já gravado por este defeito se fecha com `node religar_sem_etiqueta.js` (simula; `--aplicar` faz backup e fecha), `teste_religar_sem_etiqueta.js`.
+- **Status:** no ar desde 23/09/2026 · a parte do pack no ar em 29/10/2026 (PR #248), e os 2 cards antigos (NF 8827 e 8828) fechados pelo script no mesmo dia. Falta a prova com dado novo: o próximo PDF com título longo assim não pode abrir card. Card já gravado por este defeito se fecha com `node religar_sem_etiqueta.js` (simula; `--aplicar` faz backup e fecha), `teste_religar_sem_etiqueta.js`.
 
 ### R-PDF-03 · O título do anúncio sai da estrutura da folha, não de uma palavra
 - **Regra:** a descrição é a linha acima do `SKU:` que não é linha de campo; o identificador do envio sai. A medida do anúncio (inclusive `L 1,80 X A 1,50`) tem dono único: `MEDIDA_TITULO` / `medidaDoTitulo()`. Título em três linhas é emendado.

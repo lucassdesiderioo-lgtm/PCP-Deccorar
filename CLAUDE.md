@@ -544,6 +544,29 @@ teste_correcao.js`, `teste_correcao2.js`, `teste_correcao3.js` e
 `node teste_acesso.js` e `node teste_cobertura.js`. E **abra a tela**: a caixa
 de várias, o painel "depois" e a Mesa são texto montado.
 
+### ⚠️ O PACK ACIMA DO SKU — a venda com etiqueta que caía em "sem etiqueta" (29/10/2026)
+
+O título longo *"…Tóquio 004 - Cinza **Com Acabamento Branco**"* deixa o
+**Pack ID** numa linha acima do `SKU:` e a **Venda** embaixo. A folha lia só
+a venda, a etiqueta traz só o pack, e as NF 8827 e 8828 (vendas
+2000019201782254 e 2000019201782272) viraram card de "venda na folha sem
+etiqueta" com as duas etiquetas dentro do PDF. Regra em R-PDF-02, história em
+`docs/historia/expedicao.md`, e o PDF real no caderno
+(`casos/2026-10-29-nf-8828.json`), com a conta exigindo **zero** vendas sem
+etiqueta — é ele que impede o defeito de voltar.
+
+> ✅ **NO AR EM 29/10/2026** (PR #248). O dono fez o deploy (`/login` 200) e
+> rodou `node religar_sem_etiqueta.js`: a simulação e o `--aplicar` acharam os
+> **mesmos 2 cards** — #1 → caixa #3815 (NF 8828) e #2 → caixa #3816 (NF 8827)
+> —, nenhum ficou aberto, e o backup saiu antes
+> (`backups/dados-antes-religar-2026-10-29T11-51-58-639Z.db`).
+>
+> ⚠️ **ISSO PROVA QUE OS DOIS CARDS ANTIGOS FECHARAM, E NÃO QUE A LEITURA NOVA
+> PEGOU COM DADO REAL.** A prova é o **próximo PDF** com um anúncio de título
+> longo assim: ele não pode abrir card de venda sem etiqueta. Se abrir, é
+> defeito, não silêncio normal — e o PDF vira caso no caderno (R-INV-01).
+> Prova que não foi feita se escreve como não feita (§4).
+
 ### ⚠️ A ABA BLOQUEADOS VIROU "PENDÊNCIAS" — a central, fase 1 (27/10/2026)
 
 Spec `docs/arquivo/CENTRAL-DE-PENDENCIAS.md`. O dono: *"essas pendências devemos
