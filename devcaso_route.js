@@ -197,6 +197,13 @@ module.exports = function(app, db){
     responder(res, () => { const b = req.body || {}; D.ligarManual(db, req.params.id, b.devolucao_id, req.usuario, !!b.confirmar); return { ok:true }; });
   });
 
+  /* Desligar a revisão errada (AJUSTE de 03/11/2026): com motivo, e a baixa
+     daquela peça é desfeita junto (decisão do dono). Quem acompanha. */
+  app.post('/api/devolucao-casos/:id/desligar-revisao', (req,res) => {
+    if(!pode(req).acompanhar) return res.status(403).json({ erro:'Desligar a revisão é de quem acompanha as devoluções.', chave:'devolucao.acompanhar' });
+    responder(res, () => { D.desligarRevisao(db, req.params.id, (req.body || {}).motivo, req.usuario); return { ok:true }; });
+  });
+
   /* A caixa chegou e ainda não foi revisada (fase 2). */
   app.post('/api/devolucao-casos/:id/chegou', (req,res) => responder(res, () => {
     D.chegou(db, req.params.id, req.usuario, req.body);

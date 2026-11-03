@@ -234,6 +234,22 @@ function linkDevolucaoML(c){
   var d=String(c.etiqueta_devolucao||'').replace(/\D/g,''); if(!d) return '';
   return '<a class="bt sec" style="text-decoration:none" href="https://vendedores.mercadolivre.com.br/post-purchase/post-sales?main.filter=returns&search.value='+d+'" target="_blank" rel="noopener noreferrer">Abrir esta devolução no ML ↗</a>';
 }
+/* O CARTÃO DE UMA REVISÃO (AJUSTE de 03/11/2026, dono: "temos mais de 3
+   persianas de 150x150 cinza"): a etiqueta bipada com o "Conferir no ML ↗" —
+   digitada na busca do ML, ela mostra de qual venda a peça é —, a hora e a
+   triagem. É o que separa uma peça da outra do mesmo SKU. */
+var TRIAGEM=[['embalagem','embalagem'],['tecido','tecido'],['tubo','tubo'],['base','base'],['comando','comando'],['kit','kit'],['destinacao','destino']];
+function conferirNoML(cod){
+  var d=String(cod||'').replace(/\D/g,''); if(d.length<5) return '';
+  return '<a class="bt sec" style="text-decoration:none" href="https://vendedores.mercadolivre.com.br/post-purchase/post-sales?main.filter=returns&search.value='+d+'" target="_blank" rel="noopener noreferrer">Conferir no ML ↗</a>';
+}
+function cartaoRevisao(x){
+  var tri=TRIAGEM.filter(function(t){ return x[t[0]]; }).map(function(t){ return t[1]+': <b style="color:var(--txt)">'+esc(x[t[0]])+'</b>'; }).join(' · ');
+  return '<div><b>Revisão #'+x.id+'</b> · '+esc(x.sku_fisico||'—')+' · '+horaBR(x.recebido_em)+'</div>'+
+    '<div class="sub">Etiqueta bipada: <b style="color:var(--txt)">'+esc(x.codigo_ml||'—')+'</b></div>'+
+    (tri?'<div class="sub">'+tri+'</div>':'')+
+    (x.obs?'<div class="sub">Observação: <b style="color:var(--txt)">'+esc(x.obs)+'</b></div>':'');
+}
 function textoDias(n){ return n<0 ? 'VENCIDO há '+plural(-n,'dia','dias') : n===0 ? 'vence HOJE' : (n===1 ? 'falta 1 dia' : 'faltam '+n+' dias'); }
 function chipPrazo(c){
   if(c.dias_prazo===null || c.dias_prazo===undefined) return '';
@@ -923,6 +939,32 @@ GANCHOS.push({
   }
 });
 
+/* A REVISÃO LIGADA, E O CAMINHO DE VOLTA (AJUSTE de 03/11/2026, decisão do
+   dono "a"): ligou-se a peça de outro cliente? Desliga-se com motivo; a baixa
+   dada naquela peça é desfeita junto, e o caso volta a "Chegou" — reaberto se
+   tinha encerrado por ela. Quem decide o que pode é o servidor. */
+GANCHOS.push({
+  html:function(d, c, P, aberto){
+    if(!c.devolucao_id || !d.revisao) return '';
+    var pode=P.acompanhar && (aberto || c.saida==='revisado_ml');
+    return '<div class="bloco"><h3>A peça revisada</h3>'+cartaoRevisao(d.revisao)+
+      '<div class="sub" style="margin:4px 0 6px">Para conferir se é a peça deste caso (venda '+esc(c.venda||'—')+(c.nf?' · NF '+esc(c.nf):'')+'), procure a etiqueta bipada no ML.</div>'+
+      '<div class="acoes">'+conferirNoML(d.revisao.codigo_ml)+'</div>'+
+      (pode?'<div class="acoes"><label for="dsMotivo" style="margin:0;align-self:center">Não é esta?</label><input id="dsMotivo" placeholder="por quê (ex.: a etiqueta é da venda de outro cliente)" style="max-width:420px">'+
+        '<button class="bt sec" id="btDesligar">↩ Esta não é a peça certa — desligar</button></div>':'')+'</div>';
+  },
+  ligar:function(d, c, base){
+    var b=document.getElementById('btDesligar'); if(!b) return;
+    b.onclick=function(){
+      var m=document.getElementById('dsMotivo').value.trim();
+      if(!m){ document.getElementById('cMsg').innerHTML='<div class="erro">Diga por que esta não é a peça certa antes de desligar.</div>'; return; }
+      if(!confirm('Desligar a revisão #'+c.devolucao_id+' deste caso?'+(c.dev_baixado?'\n\nA baixa dada nesta peça será desfeita: ela volta para a Baixa, sem caso.':'')+(c.encerrado_em?'\n\nO caso será reaberto.':''))) return;
+      ESTADO.origem=b;
+      acao(base+'/desligar-revisao', { motivo:m });
+    };
+  }
+});
+
 /* A BAIXA DENTRO DO CASO (03/11/2026, dono: "não faz sentido ir dentro da aba
    Baixa sendo que já temos o caso para solucionar do início até o fim"). É a
    mesma baixa da aba Baixa — mesma rota, mesma chave (devolucao.baixar) — com o
@@ -965,9 +1007,12 @@ GANCHOS.push({
     api('GET', base+'/revisoes-soltas').then(function(r){
       var l=(r.revisoes||[]).filter(function(x){ return x.mesmo_sku; }), outras=(r.revisoes||[]).length-l.length;
       if(!l.length){ box.innerHTML='Nenhuma revisão sem caso com o SKU '+esc(c.sku||'—')+' nos últimos 30 dias'+(outras?' ('+outras+' de outros SKUs).':'.'); return; }
-      box.innerHTML='<div class="acoes">'+l.map(function(x){
-        return '<button class="bt sec" data-ligar="'+x.id+'">Ligar a revisão #'+x.id+' · '+esc(x.sku_fisico)+' · '+horaBR(x.recebido_em)+(x.codigo_ml?' · etiqueta '+esc(x.codigo_ml):'')+'</button>';
-      }).join('')+'</div>';
+      box.innerHTML='<div class="sub" style="margin-bottom:6px">Este caso: venda <b style="color:var(--txt)">'+esc(c.venda||'—')+'</b>'+(c.nf?' · NF '+esc(c.nf):'')+(c.comprador?' · '+esc(c.comprador):'')+
+        (l.length>1?' — há '+l.length+' peças deste SKU: confira a etiqueta de cada uma no ML antes de ligar.':'')+'</div>'+
+        l.map(function(x){
+        return '<div class="bloco" style="margin:6px 0">'+cartaoRevisao(x)+'<div class="acoes">'+conferirNoML(x.codigo_ml)+
+          '<button class="bt sec" data-ligar="'+x.id+'">Ligar a revisão #'+x.id+'</button></div></div>';
+      }).join('');
       box.querySelectorAll('[data-ligar]').forEach(function(b){ b.onclick=function(){
         var id=+b.getAttribute('data-ligar'), g=guardarSujos();  // o que está digitado no caso volta depois
         api('POST', base+'/ligar', { devolucao_id:id }).then(function(){ carregar(); abrir(c.id, g); })

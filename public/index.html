@@ -3054,8 +3054,12 @@ async function dvEsperadasBaixa(l){
     var box=document.getElementById('dvEsp'+d.id); if(!box) continue;
     var r={}; try{ r=await (await fetch('/api/devolucao/esperadas?sku='+encodeURIComponent(d.sku_fisico||''))).json(); }catch(e){}
     var cs=r.casos||[]; if(!cs.length || !document.getElementById('dvEsp'+d.id)) continue;
-    box.innerHTML='<div style="color:var(--amber);font-weight:700;margin-bottom:6px">Há devolução esperada com este SKU — é alguma destas?</div><div style="display:flex;gap:8px;flex-wrap:wrap">'+
-      cs.map(function(c){ return '<button class="ghost dvLigar" data-dev="'+d.id+'" data-caso="'+c.id+'">Ligar ao caso #'+c.id+' · '+String(c.comprador||'sem nome').replace(/[<>&"]/g,'')+' · NF '+String(c.nf||'—').replace(/[<>&"]/g,'')+'</button>'; }).join('')+'</div>';
+    /* "Conferir no ML ↗" (AJUSTE de 03/11/2026): com várias peças do mesmo
+       SKU, a etiqueta bipada digitada na busca do ML diz de qual venda ela é. */
+    var dgt=String(d.codigo_ml||'').replace(/\D/g,'');
+    var conf=dgt.length>=5?'<a class="ghost" style="text-decoration:none;display:inline-block;margin-bottom:6px" href="https://vendedores.mercadolivre.com.br/post-purchase/post-sales?main.filter=returns&search.value='+dgt+'" target="_blank" rel="noopener noreferrer">Conferir a etiqueta '+dgt+' no ML ↗</a>':'';
+    box.innerHTML='<div style="color:var(--amber);font-weight:700;margin-bottom:6px">Há devolução esperada com este SKU — é alguma destas?'+(cs.length>1?' Confira a etiqueta no ML antes de ligar.':'')+'</div>'+conf+'<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      cs.map(function(c){ return '<button class="ghost dvLigar" data-dev="'+d.id+'" data-caso="'+c.id+'">Ligar ao caso #'+c.id+' · '+String(c.comprador||'sem nome').replace(/[<>&"]/g,'')+' · NF '+String(c.nf||'—').replace(/[<>&"]/g,'')+(c.venda?' · venda …'+String(c.venda).slice(-5).replace(/[<>&"]/g,''):'')+'</button>'; }).join('')+'</div>';
   }
 }
 var DVESC={};

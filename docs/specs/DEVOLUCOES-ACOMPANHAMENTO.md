@@ -8,6 +8,9 @@ Conferido: os 6 casos iniciais gravados (#1 a #6, a 2ª rodada não duplicou), a
   prazo, a porta "Devoluções" com as abas e a aba Baixa levando ao Admin.
 Falta: um caso "nós coletamos" levado até o fim pelo Renato, e a tarja no primeiro bipe do
   Edvaldo. Com os dois, a spec vai para docs/arquivo/.
+Em código (03/11/2026, AJUSTE, decisão do dono "a"): desligar a revisão ligada à peça errada,
+  com motivo — o caso volta a "Chegou" (reabre se encerrou por ela) e a baixa daquela peça é
+  desfeita; o cartão de cada revisão com a etiqueta bipada e o "Conferir no ML ↗".
 Criada em: 03/11/2026
 Última atualização: 03/11/2026
 Fase atual: todas em código; falta o deploy e a prova de fábrica

@@ -386,6 +386,44 @@ const srv = app.listen(0, async () => {
     await pa2.click('.dvLigar[data-dev="'+solta3.id+'"][data-caso="'+e3.id+'"]'); await pa2.waitForTimeout(1200);
     eq('   "Ligar" pela Baixa liga', caso(e3.id).devolucao_id, solta3.id);
 
+    secao('três peças do mesmo SKU: o cartão de cada uma e o "Conferir no ML"');
+    const e4 = await api(p, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000015571700777', nf:'8401', sku:'BK140140BEGE', comprador:'Cliente Certo', publicidade:false });
+    const pA = await api(p, 'POST', '/api/devolucao', { codigo_ml:'48323600011', sku_fisico:'BK140140BEGE', destinacao:'estoque', tecido:'rasgado', obs:'veio sem kit' });
+    const pB = await api(p, 'POST', '/api/devolucao', { codigo_ml:'48323600022', sku_fisico:'BK140140BEGE', destinacao:'reembalar', tecido:'intacto' });
+    await p.goto(B + '/devolucao-casos'); await p.waitForTimeout(900);
+    await p.locator('#listaMl .linha', { hasText:'#'+e4.id }).locator('.t1').click(); await p.waitForTimeout(1200);
+    const sb4 = await p.textContent('#soltasBox');
+    ok('a lista mostra a venda do caso e avisa que há mais de uma peça', sb4.includes('2000015571700777') && /há 2 peças deste SKU/.test(sb4), sb4);
+    ok('   cada peça com a etiqueta bipada, a triagem e a observação', sb4.includes('48323600011') && sb4.includes('rasgado') && sb4.includes('veio sem kit') && sb4.includes('48323600022'), sb4);
+    eq('   e o "Conferir no ML" de cada uma procura a etiqueta dela', await p.getAttribute('#soltasBox a:has-text("Conferir no ML")', 'href'),
+       'https://vendedores.mercadolivre.com.br/post-purchase/post-sales?main.filter=returns&search.value=48323600022');
+    await p.click('[data-ligar="'+pA.id+'"]'); await p.waitForTimeout(1300);
+    eq('ligou a primeira (a errada)', caso(e4.id).devolucao_id, pA.id);
+    await p.selectOption('#bxRep', 'sim'); await p.selectOption('#bxMot', 'Falta de kit');
+    await p.click('#btBaixa'); await p.waitForTimeout(1300);
+    await p.click('#btAvisoML'); await p.waitForTimeout(1300);
+    eq('   baixa e "Já revisei": encerrou', caso(e4.id).saida, 'revisado_ml');
+
+    secao('desligar a peça errada pela tela do caso');
+    const pq = await p.textContent('#painel');
+    ok('o caso encerrado mostra a peça revisada, com a etiqueta e o desligar', pq.includes('A peça revisada') && pq.includes('48323600011') && pq.includes('veio sem kit') && /não é a peça certa/.test(pq), pq.slice(0, 600));
+    await p.click('#btDesligar'); await p.waitForTimeout(400);
+    ok('sem o motivo, a tela pede antes de gravar', /por que/.test(await p.textContent('#cMsg')));
+    eq('   e nada mudou', caso(e4.id).devolucao_id, pA.id);
+    await p.fill('#dsMotivo', 'a etiqueta 48323600011 é de outra venda');
+    let dlg = '';
+    p.removeAllListeners('dialog'); p.once('dialog', d => { dlg = d.message(); d.accept(); });
+    await p.click('#btDesligar'); await p.waitForTimeout(1500);
+    ok('a confirmação avisa que a baixa é desfeita e o caso reabre', /baixa dada nesta peça será desfeita/.test(dlg) && /reaberto/.test(dlg), dlg);
+    eq('desligou: sem revisão, em "Chegou", reaberto', caso(e4.id).devolucao_id + '/' + caso(e4.id).etapa + '/' + caso(e4.id).encerrado_em, 'null/chegou/null');
+    eq('   a baixa da peça errada foi desfeita', db.prepare('SELECT baixado FROM devolucao WHERE id=?').get(pA.id).baixado, 0);
+    const sb5 = await p.textContent('#soltasBox');
+    ok('   e o caso volta a listar as duas peças para ligar a certa', sb5.includes('Ligar a revisão #'+pA.id) && sb5.includes('Ligar a revisão #'+pB.id), sb5);
+    await p.click('[data-ligar="'+pB.id+'"]'); await p.waitForTimeout(1300);
+    eq('ligou a certa', caso(e4.id).devolucao_id, pB.id);
+    ok('   e a história diz o que foi desligado e por quê', /desligada/.test(await p.textContent('#painel')) && /outra venda/.test(await p.textContent('#painel')));
+    await p.click('#painel button:has-text("Fechar")'); await p.waitForTimeout(300);
+
     /* ═════════ 5. o celular ═════════ */
     secao('a 400 px — a página não rola de lado, e o caso abre');
     const p4 = await pg(400);
