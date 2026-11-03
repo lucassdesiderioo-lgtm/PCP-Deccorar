@@ -33,6 +33,20 @@ module.exports = function(app, db){
       return res.status(500).json({ erro:'Não deu para gravar. Nada foi alterado. Tente de novo.' });
     }
   }
+  /* VER valores entra na auditoria AMORTECIDA (como o valor do estoque, §18):
+     a lista se recarrega a cada 30 s, e uma linha por leitura enterraria a
+     auditoria de verdade. No máximo uma por pessoa a cada 30 min. Cada
+     DECISÃO grava sempre. */
+  const vistoEm = new Map();
+  function comDinheiro(req){
+    if(!podeDinheiro(req)) return false;
+    const u = req.usuario || {}, agora = Date.now();
+    if((agora - (vistoEm.get(u.id) || 0)) >= 30*60*1000){
+      vistoEm.set(u.id, agora);
+      auditar(req, 'viu_valores', '(devoluções)', 'viu os valores das devoluções em andamento');
+    }
+    return true;
+  }
   const semDinheiro = (req, res) => res.status(403).json({ erro:'Só quem tem a permissão de ver o dinheiro das devoluções faz isto.', chave:'devolucao.dinheiro' });
 
   /* ── leituras ── */
@@ -43,8 +57,14 @@ module.exports = function(app, db){
   /* A lista diz também O QUE a pessoa pode fazer, para a tela não mostrar
      botão que dá "sem permissão". Esconder não é segurança: quem tranca é o
      portão e o handler. */
-  app.get('/api/devolucao-casos', (req,res) => responder(res, () => Object.assign(D.listar(db, {}), { pode:pode(req) })));
-  app.get('/api/devolucao-casos/encerrados', (req,res) => responder(res, () => ({ casos: D.encerrados(db, {}) })));
+  app.get('/api/devolucao-casos', (req,res) => responder(res, () => Object.assign(D.listar(db, { comDinheiro: comDinheiro(req) }), { pode:pode(req) })));
+  app.get('/api/devolucao-casos/encerrados', (req,res) => responder(res, () => ({ casos: D.encerrados(db, { comDinheiro: comDinheiro(req) }) })));
+  /* O relatório do mês por motivo (R22). Antes do `/:id`. */
+  app.get('/api/devolucao-casos/relatorio', (req,res) => responder(res, () => {
+    const q = req.query || {};
+    const mes = q.mes || D.hoje(db).slice(0,7);
+    return D.relatorio(db, mes, comDinheiro(req));
+  }));
   /* A tela de lançar acha a venda antes de gravar, para preencher SKU,
      comprador e NF (R2). A NF também acha. */
   app.get('/api/devolucao-casos/venda/:cod', (req,res) => responder(res, () => {
@@ -76,7 +96,7 @@ module.exports = function(app, db){
     res.sendFile(arq);
   });
 
-  app.get('/api/devolucao-casos/:id', (req,res) => responder(res, () => D.detalhe(db, req.params.id, { comDinheiro: podeDinheiro(req) })));
+  app.get('/api/devolucao-casos/:id', (req,res) => responder(res, () => D.detalhe(db, req.params.id, { comDinheiro: comDinheiro(req) })));
 
   /* ── lançar e editar (devolucao.lancar) ── */
   app.post('/api/devolucao-casos', (req,res) => responder(res, () => {
@@ -130,7 +150,29 @@ module.exports = function(app, db){
   app.post('/api/devolucao-casos/:id/anexo', (req,res) => responder(res, () =>
     ({ ok:true, id: D.anexar(db, req.params.id, req.body, req.usuario, CAMINHOS.DEVOLUCOES) })));
 
+  /* A situação do valor do ML (R18) é de quem acompanha; o número, não. */
+  app.post('/api/devolucao-casos/:id/situacao-valor', (req,res) => responder(res, () => {
+    D.situacaoValor(db, req.params.id, (req.body||{}).situacao, req.usuario);
+    return { ok:true };
+  }));
+
   /* ── decisões do admin geral (devolucao.dinheiro) ── */
+  app.post('/api/devolucao-casos/:id/valor', (req,res) => {
+    if(!podeDinheiro(req)) return semDinheiro(req, res);
+    responder(res, () => {
+      const mud = D.lancarValor(db, req.params.id, req.body, req.usuario);
+      if(mud.length) auditar(req, 'valor', req.params.id, 'lançou '+mud.join(', ')+': '+JSON.stringify(req.body||{}));
+      return { ok:true, mudou:mud };
+    });
+  });
+  app.post('/api/devolucao-casos/:id/reembolso', (req,res) => {
+    if(!podeDinheiro(req)) return semDinheiro(req, res);
+    responder(res, () => {
+      const c = D.baixaReembolso(db, req.params.id, (req.body||{}).resultado, req.usuario);
+      auditar(req, c.saida, c.id, 'baixa do reembolso: '+(c.saida === 'reembolso_recebido' ? 'recebido' : 'não recebido'));
+      return { ok:true };
+    });
+  });
   app.post('/api/devolucao-casos/:id/devolver-comprador', (req,res) => {
     if(!podeDinheiro(req)) return semDinheiro(req, res);
     responder(res, () => {

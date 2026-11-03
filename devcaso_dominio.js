@@ -70,7 +70,7 @@ function garantir(db){
     prazo TEXT, prazo_original TEXT,
     responsavel TEXT, passado_em TEXT,
     cep TEXT,
-    valor_ml REAL, valor_ml_situacao TEXT,
+    valor_ml REAL, valor_ml_situacao TEXT, valor_ml_desde TEXT,
     valor_devolvido REAL, valor_perdido REAL,
     saida TEXT,
     devolucao_id INTEGER,
@@ -78,6 +78,10 @@ function garantir(db){
     obs TEXT, criado_por TEXT,
     criado_em TEXT DEFAULT (datetime('now','localtime')),
     teste INTEGER DEFAULT 0)`);
+  /* FASE 5 — desde quando o valor do ML está nesta situação (R18: "pedir" há
+     ≥ 2 dias entra no parado). O ALTER fica ao lado do CREATE, no fim da
+     tabela, para o banco que nasceu antes desta fase (§17). */
+  try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN valor_ml_desde TEXT"); }catch(e){}
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_venda ON devolucao_caso(venda)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_aberto ON devolucao_caso(encerrado_em)");
   db.exec(`CREATE TABLE IF NOT EXISTS devolucao_evento (
@@ -133,7 +137,7 @@ function limites(db){
    Lê só a linha; não grava nada — a leitura nunca encerra um caso (R7). */
 function situacao(c, h, lim){
   const aberto = !c.encerrado_em;
-  const o = { dias_prazo:null, cor:'', dias_parado:null, parado:false, dias_esperando:null };
+  const o = { dias_prazo:null, cor:'', dias_parado:null, parado:false, parado_valor:false, dias_esperando:null };
   o.dias_parado = dias(c.etapa_desde || c.criado_em, h);
   if(c.tipo === 'coleta'){
     if(c.prazo){
@@ -145,6 +149,12 @@ function situacao(c, h, lim){
       }
     }
     o.parado = aberto && o.dias_parado !== null && o.dias_parado >= lim.parado;
+    /* R18: "precisamos pedir o valor ao ML" parado há N dias também grita —
+       mesmo com a etapa andando, o dinheiro da coleta não vem sozinho. */
+    if(aberto && c.valor_ml_situacao === 'pedir'){
+      const dv = dias(c.valor_ml_desde || c.criado_em, h);
+      if(dv !== null && dv >= lim.parado){ o.parado = true; o.parado_valor = true; o.dias_valor = dv; }
+    }
   } else {
     // R5: só a espera. Sem cor e sem trava — a regra de cobrar o ML vem depois.
     o.dias_esperando = dias(c.criado_em, c.chegou_em || h);
@@ -152,15 +162,31 @@ function situacao(c, h, lim){
   return o;
 }
 
-/* O caso como vai pelo fio. Sem os reais, a menos que a rota peça (R15). */
-function publico(c, h, lim, comDinheiro){
+/* O caso como vai pelo fio. Sem os reais, a menos que a rota peça (R15).
+   Com eles, vai também o SALDO (R9): valor do ML menos os custos das
+   tentativas — nulo e "incompleto" quando falta o valor ou algum custo. Custo
+   indefinido nunca vira zero (§7-B, regra 4). */
+function publico(c, h, lim, comDinheiro, custos){
   const o = {};
   for(const k of Object.keys(c)) if(comDinheiro || DINHEIRO.indexOf(k) < 0) o[k] = c[k];
   delete o.teste;
   o.teste = c.teste;
   o.etapa_nome = NOME_ETAPA[c.etapa] || c.etapa;
   o.saida_nome = c.saida ? (NOME_SAIDA[c.saida] || c.saida) : null;
+  if(comDinheiro && c.tipo === 'coleta'){
+    const k = (custos && custos.get(c.id)) || { soma:0, faltam:0, n:0 };
+    o.custos = Math.round(k.soma * 100) / 100;
+    o.incompleto = c.valor_ml == null || k.faltam > 0;
+    o.saldo = o.incompleto ? null : Math.round((c.valor_ml - k.soma) * 100) / 100;
+  }
   return Object.assign(o, situacao(c, h, lim));
+}
+/* Os custos das tentativas, por caso: a soma e quantos estão vazios. */
+function custosPorCaso(db){
+  const m = new Map();
+  for(const r of db.prepare('SELECT caso_id, COALESCE(SUM(custo),0) soma, SUM(CASE WHEN custo IS NULL THEN 1 ELSE 0 END) faltam, COUNT(*) n FROM devolucao_coleta GROUP BY caso_id').all())
+    m.set(r.caso_id, { soma:r.soma, faltam:r.faltam, n:r.n });
+  return m;
 }
 
 function evento(db, caso_id, tipo, de, para, texto, usuario){
@@ -189,8 +215,9 @@ function abertoDaVenda(db, venda){
 function listar(db, opt){
   const o = opt || {};
   const h = hoje(db), lim = limites(db);
+  const cu = o.comDinheiro ? custosPorCaso(db) : null;
   const linhas = db.prepare('SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL ORDER BY id').all()
-    .map(c => publico(c, h, lim, o.comDinheiro));
+    .map(c => publico(c, h, lim, o.comDinheiro, cu));
   /* R3: o "nós coletamos" vai pelo PRAZO — o vencido mais antigo em cima —,
      nunca pela data de lançamento. Sem prazo (não deveria existir) vai ao fim. */
   const coleta = linhas.filter(c => c.tipo === 'coleta').sort((a,b) => {
@@ -203,14 +230,15 @@ function listar(db, opt){
 }
 function encerrados(db, opt){
   const o = opt || {}, h = hoje(db), lim = limites(db);
+  const cu = o.comDinheiro ? custosPorCaso(db) : null;
   return db.prepare('SELECT * FROM devolucao_caso WHERE encerrado_em IS NOT NULL ORDER BY encerrado_em DESC, id DESC LIMIT ?')
-    .all(o.limite || 200).map(c => publico(c, h, lim, o.comDinheiro));
+    .all(o.limite || 200).map(c => publico(c, h, lim, o.comDinheiro, cu));
 }
 function detalhe(db, id, opt){
   const c = ler(db, id);
   if(!c) throw new Recusa(404, 'Caso não encontrado. Atualize a lista.');
   const o = opt || {};
-  return { caso: publico(c, hoje(db), limites(db), o.comDinheiro),
+  return { caso: publico(c, hoje(db), limites(db), o.comDinheiro, o.comDinheiro ? custosPorCaso(db) : null),
            tentativas: tentativas(db, c.id, o.comDinheiro),
            anexos: listarAnexos(db, c.id),
            docs: c.tipo === 'coleta' ? situacaoDocs(db, c.id) : [],
@@ -285,7 +313,8 @@ function lancar(db, b, usuario){
         txt(b.responsavel), dataValida(b.passado_em), txt(b.cep),
         b._valor_ml === undefined ? null : b._valor_ml, b._valor_ml_situacao || null,
         txt(b.obs), nomeDe(usuario)).lastInsertRowid;
-    evento(db, id, 'lancado', null, etapa, (tipo === 'coleta' ? 'Nós coletamos' : 'ML devolve') + (prazo ? ' · prazo '+prazo : ''), nomeDe(usuario));
+    if(b._valor_ml_situacao) db.prepare("UPDATE devolucao_caso SET valor_ml_desde=datetime('now','localtime') WHERE id=?").run(id);
+    evento(db, id, 'lancado', null, etapa, (tipo === 'coleta' ? 'Nós coletamos' : 'ML devolve') + (prazo ? ' · prazo '+prazo.split('-').reverse().join('/') : ''), nomeDe(usuario));
   })();
   return ler(db, id);
 }
@@ -654,7 +683,130 @@ function devolverComprador(db, id, b, usuario){
   return ler(db, c.id);
 }
 
+/* ═══ FASE 5 — o dinheiro e o relatório ═══ */
+
+const SITUACOES_VALOR = { ja_veio:'já veio', pedir:'precisamos pedir ao ML', pedido:'pedimos, esperando o ML' };
+
+/* R18: a SITUAÇÃO do valor do ML não é dinheiro — quem acompanha marca
+   "precisamos pedir" e "pedimos". O NÚMERO é do admin geral. */
+function situacaoValor(db, id, sit, usuario){
+  const c = aberto(db, id);
+  if(c.tipo !== 'coleta') throw new Recusa(400, 'No "ML devolve" não há valor de coleta.');
+  if(!SITUACOES_VALOR[sit]) throw new Recusa(400, 'A situação do valor é: já veio, precisamos pedir, ou pedimos.');
+  if(sit === c.valor_ml_situacao) throw new Recusa(400, 'O valor já está nessa situação.');
+  db.transaction(() => {
+    db.prepare("UPDATE devolucao_caso SET valor_ml_situacao=?, valor_ml_desde=datetime('now','localtime') WHERE id=?").run(sit, c.id);
+    evento(db, c.id, 'valor_situacao', c.valor_ml_situacao, sit, 'valor do ML: '+SITUACOES_VALOR[sit], nomeDe(usuario));
+  })();
+  return ler(db, c.id);
+}
+
+/* Os valores em reais (devolucao.dinheiro, conferida na rota). CAMPO AUSENTE
+   NÃO É CAMPO VAZIO; vazio de propósito apaga (vira nulo, e o total do mês
+   vira piso). Vale também no caso encerrado: o valor perdido costuma chegar
+   depois. A história diz O QUE mudou, nunca o número — quem acompanha lê a
+   história e não pode ler os reais (R15). Devolve a lista do que mudou. */
+function lancarValor(db, id, b, usuario){
+  const c = ler(db, id);
+  if(!c) throw new Recusa(404, 'Caso não encontrado. Atualize a lista.');
+  b = b || {};
+  const sets = [], vals = [], mud = [];
+  const ROT = { valor_ml:'valor do ML', valor_perdido:'valor perdido', valor_devolvido:'valor devolvido' };
+  for(const k of Object.keys(ROT)){
+    if(!(k in b)) continue;
+    const v = reais(b[k], ROT[k]);
+    if(v === c[k]) continue;
+    sets.push(k+'=?'); vals.push(v); mud.push(ROT[k]);
+  }
+  if('valor_ml' in b && b.valor_ml !== '' && b.valor_ml != null && !('valor_ml_situacao' in b) && c.valor_ml_situacao !== 'ja_veio'){
+    sets.push("valor_ml_situacao='ja_veio'", "valor_ml_desde=datetime('now','localtime')");
+  }
+  if('valor_ml_situacao' in b){
+    if(!SITUACOES_VALOR[b.valor_ml_situacao]) throw new Recusa(400, 'A situação do valor é: já veio, precisamos pedir, ou pedimos.');
+    if(b.valor_ml_situacao !== c.valor_ml_situacao){ sets.push('valor_ml_situacao=?', "valor_ml_desde=datetime('now','localtime')"); vals.push(b.valor_ml_situacao); mud.push('situação do valor do ML'); }
+  }
+  let tent = null, custo;
+  if('tentativa_id' in b){
+    tent = db.prepare('SELECT * FROM devolucao_coleta WHERE id=? AND caso_id=?').get(+b.tentativa_id || 0, c.id);
+    if(!tent) throw new Recusa(404, 'Tentativa não encontrada neste caso.');
+    custo = reais(b.custo, 'o custo da coleta');
+    const num = db.prepare('SELECT COUNT(*) n FROM devolucao_coleta WHERE caso_id=? AND id<=?').get(c.id, tent.id).n;
+    if(custo !== tent.custo) mud.push('custo da '+num+'ª tentativa');
+  }
+  if(!mud.length) return mud;
+  db.transaction(() => {
+    if(sets.length) db.prepare('UPDATE devolucao_caso SET '+sets.join(',')+' WHERE id=?').run(...vals, c.id);
+    if(tent && custo !== tent.custo) db.prepare('UPDATE devolucao_coleta SET custo=? WHERE id=?').run(custo, tent.id);
+    evento(db, c.id, 'valor', null, null, 'lançado: '+mud.join(', '), nomeDe(usuario));
+  })();
+  return mud;
+}
+
+/* R16, R19: a baixa do reembolso, conferida no Mercado Pago. Só encerra o
+   "nós coletamos" que já foi REVISADO (a peça voltou e o Edvaldo a viu). */
+function baixaReembolso(db, id, resultado, usuario){
+  const c = aberto(db, id);
+  if(c.tipo !== 'coleta') throw new Recusa(400, 'O "ML devolve" encerra na baixa da devolução, sem reembolso de coleta.');
+  const saida = { recebido:'reembolso_recebido', nao_recebido:'reembolso_nao_recebido' }[resultado];
+  if(!saida) throw new Recusa(400, 'O reembolso foi "recebido" ou "não recebido".');
+  if(!c.devolucao_id) throw new Recusa(400, 'A peça ainda não foi revisada na tela de Devoluções: o caso só encerra depois da revisão.');
+  db.transaction(() => encerrar(db, c, saida, usuario, 'conferido no Mercado Pago'))();
+  return ler(db, c.id);
+}
+
+/* R22: O MÊS POR MOTIVO, NUMA RÉGUA SÓ. Conta os casos lançados no mês E as
+   devoluções recebidas no mês que NÃO estão ligadas a caso nenhum (pelo motivo
+   da baixa) — a devolução ligada a um caso conta uma vez, pelo caso. O
+   dinheiro (só com a chave) separa a perda por prazo do devolvido ao
+   comprador, e sai como PISO quando falta algum valor (R9). */
+function relatorio(db, mes, comDinheiro){
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(mes||''))) throw new Recusa(400, 'Mês impossível. Use AAAA-MM.');
+  const casos = db.prepare("SELECT * FROM devolucao_caso WHERE teste=0 AND substr(criado_em,1,7)=?").all(mes);
+  let semCaso = [];
+  try{
+    semCaso = db.prepare(`SELECT motivo FROM devolucao d WHERE COALESCE(d.teste,0)=0 AND substr(d.data,1,7)=?
+      AND NOT EXISTS (SELECT 1 FROM devolucao_caso c WHERE c.devolucao_id=d.id)`).all(mes);
+  }catch(e){}
+  const SEM = 'sem motivo';
+  const por = new Map();
+  const linha = (m) => { const k = m || SEM; if(!por.has(k)) por.set(k, { motivo:k, qtd:0, casos:0, sem_caso:0, perda_prazo:0, devolvido_comprador:0 }); return por.get(k); };
+  for(const c of casos){
+    const l = linha(c.motivo); l.qtd++; l.casos++;
+    if(c.saida === 'perda_prazo' && c.valor_perdido != null) l.perda_prazo += c.valor_perdido;
+    if(c.saida === 'devolvido_comprador' && c.valor_devolvido != null) l.devolvido_comprador += c.valor_devolvido;
+  }
+  for(const d of semCaso){ const l = linha(d.motivo); l.qtd++; l.sem_caso++; }
+  const r2 = (v) => Math.round(v * 100) / 100;
+  const por_motivo = Array.from(por.values()).sort((a,b) => b.qtd - a.qtd || a.motivo.localeCompare(b.motivo))
+    .map(l => comDinheiro ? Object.assign(l, { perda_prazo:r2(l.perda_prazo), devolvido_comprador:r2(l.devolvido_comprador) })
+                          : { motivo:l.motivo, qtd:l.qtd, casos:l.casos, sem_caso:l.sem_caso });
+  const out = { mes, total: casos.length + semCaso.length, casos: casos.length, sem_caso: semCaso.length, por_motivo,
+                por_saida: casos.reduce((a,c) => { if(c.saida) a[c.saida] = (a[c.saida]||0) + 1; return a; }, {}) };
+  if(comDinheiro){
+    const coleta = casos.filter(c => c.tipo === 'coleta');
+    const ids = coleta.map(c => c.id);
+    const tent = ids.length ? db.prepare('SELECT custo FROM devolucao_coleta WHERE caso_id IN ('+ids.map(()=>'?').join(',')+')').all(...ids) : [];
+    const faltam = [];
+    const semValor = coleta.filter(c => c.valor_ml == null && !['devolvido_comprador'].includes(c.saida)).length;
+    const semCusto = tent.filter(t => t.custo == null).length;
+    const perdaSem = casos.filter(c => c.saida === 'perda_prazo' && c.valor_perdido == null).length;
+    const devSem = casos.filter(c => c.saida === 'devolvido_comprador' && c.valor_devolvido == null).length;
+    if(semValor) faltam.push(semValor+' caso(s) sem o valor do ML');
+    if(semCusto) faltam.push(semCusto+' tentativa(s) de coleta sem custo');
+    if(perdaSem) faltam.push(perdaSem+' perda(s) por prazo sem o valor perdido');
+    if(devSem) faltam.push(devSem+' devolução(ões) ao comprador sem o valor devolvido');
+    const valor_ml = r2(coleta.reduce((a,c) => a + (c.valor_ml || 0), 0));
+    const custos = r2(tent.reduce((a,t) => a + (t.custo || 0), 0));
+    out.dinheiro = { valor_ml, custos, saldo: r2(valor_ml - custos),
+      perda_prazo: r2(casos.filter(c => c.saida === 'perda_prazo').reduce((a,c) => a + (c.valor_perdido || 0), 0)),
+      devolvido_comprador: r2(casos.filter(c => c.saida === 'devolvido_comprador').reduce((a,c) => a + (c.valor_devolvido || 0), 0)),
+      piso: faltam.length > 0, faltam };
+  }
+  return out;
+}
+
 module.exports = {
+  SITUACOES_VALOR, situacaoValor, lancarValor, baixaReembolso, relatorio, custosPorCaso,
   docsExigidos, situacaoDocs, listarAnexos, anexar, arquivoDoAnexo, devolverComprador,
   RESULTADOS, listarTransportadoras, salvarTransportadora, tentativas, pedirColeta, resultadoColeta, sugerirTransportadoras,
   abertoPorCodigo, chegou, avisarML, ligarRevisao, baixaDaDevolucao,

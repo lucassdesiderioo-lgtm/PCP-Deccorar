@@ -670,6 +670,135 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   ok('o modo teste cobre os anexos e as tentativas', ['devolucao_anexo','devolucao_coleta'].every(t =>
      new RegExp("nome:'" + t + "'").test(fs.readFileSync(path.join(__dirname,'teste_route.js'),'utf8'))));
 
+  /* ═════════════════════ FASE 5 — o dinheiro e o relatório ═════════════════════ */
+  const DINHEIRO_CHAVES = ['valor_ml','custo','valor_devolvido','valor_perdido','saldo'];
+  function chavesDe(o, acc){
+    acc = acc || new Set();
+    if(Array.isArray(o)) o.forEach(x => chavesDe(x, acc));
+    else if(o && typeof o === 'object') for(const k of Object.keys(o)){ acc.add(k); chavesDe(o[k], acc); }
+    return acc;
+  }
+  const mes = dia(0).slice(0,7);
+  const valor = (id, corpo, quem) => chamar('POST','/api/devolucao-casos/:id/valor', corpo, quem || 1, {id});
+
+  /* Um caso de coleta com valor e duas tentativas com custo, para a conta. */
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'7770045', motivo:'Comando quebrado', prazo:dia(7) }, 3);
+  const k45 = r.body.id;
+  eq('lançar valor do ML sem a chave do dinheiro: 403', valor(k45, { valor_ml:'150,00' }, 2).status, 403);
+  eq('lançar valor do ML com a chave', valor(k45, { valor_ml:'150,00' }).status, 200);
+  eq('   o valor gravado', caso(k45).valor_ml, 150);
+  eq('   e a situação vira "já veio"', caso(k45).valor_ml_situacao, 'ja_veio');
+  chamar('POST','/api/devolucao-casos/:id/coleta',{ transportadora_id:tA, cep:'80010-000', custo:'40' }, 2, {id:k45});
+  let tt = db.prepare("SELECT id FROM devolucao_coleta WHERE caso_id=? AND resultado='aguardando'").get(k45);
+  chamar('POST','/api/devolucao-casos/:id/coleta-resultado',{ tentativa_id:tt.id, resultado:'nao_encontrou' }, 2, {id:k45});
+  tt = db.prepare("SELECT id FROM devolucao_coleta WHERE caso_id=? AND resultado='aguardando'").get(k45);
+
+  secao('45. quem NÃO tem devolucao.dinheiro não recebe nenhum valor pelo fio');
+  const fios = {
+    lista: chamar('GET','/api/devolucao-casos',null,2).body,
+    caso: chamar('GET','/api/devolucao-casos/:id',null,2,{id:k45}).body,
+    encerrados: chamar('GET','/api/devolucao-casos/encerrados',null,2).body,
+    relatorio: chamar('GET','/api/devolucao-casos/relatorio',null,2,{},{ mes }).body
+  };
+  for(const [nome, corpo] of Object.entries(fios)){
+    const ks = chavesDe(corpo);
+    const vazou = DINHEIRO_CHAVES.filter(k => ks.has(k));
+    ok(nome + ': nenhuma chave de dinheiro', vazou.length === 0, 'vazou: ' + vazou.join(', '));
+  }
+  ok('o relatório para quem não tem a chave ainda conta os casos por motivo', (fios.relatorio.por_motivo || []).length > 0, JSON.stringify(fios.relatorio).slice(0,300));
+  const comD = chamar('GET','/api/devolucao-casos/:id',null,1,{id:k45}).body;
+  ok('o admin geral recebe os valores', comD.caso.valor_ml === 150 && 'saldo' in comD.caso, JSON.stringify(comD.caso).slice(0,300));
+  ok('   e os custos das tentativas', comD.tentativas.every(t => 'custo' in t));
+
+  secao('46. o saldo do caso: valor do ML menos os custos; custo vazio → incompleto');
+  eq('com a 2ª tentativa sem custo: saldo nulo', comD.caso.saldo, null);
+  eq('   e incompleto', comD.caso.incompleto, true);
+  valor(k45, { tentativa_id:tt.id, custo:'35,50' });
+  let cd = chamar('GET','/api/devolucao-casos/:id',null,1,{id:k45}).body.caso;
+  eq('com todos os custos: 150 − 40 − 35,50 = 74,50', cd.saldo, 74.5);
+  eq('   e não é mais incompleto', cd.incompleto, false);
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'7770046', prazo:dia(7) }, 3);
+  cd = chamar('GET','/api/devolucao-casos/:id',null,1,{id:r.body.id}).body.caso;
+  eq('sem valor do ML lançado: saldo nulo, incompleto', cd.saldo + '/' + cd.incompleto, 'null/true');
+  ok('a mudança de valor virou história sem o número (quem acompanha vê a história)',
+     eventos(k45).some(e => e.tipo === 'valor') && !eventos(k45).some(e => /150|35[,.]5/.test((e.texto||'') + (e.de||'') + (e.para||''))));
+  eq('custo impossível é recusado', valor(k45, { tentativa_id:tt.id, custo:'-3' }).status, 400);
+
+  secao('47. o total do mês com algum valor faltando sai como piso');
+  let rel = chamar('GET','/api/devolucao-casos/relatorio',null,1,{},{ mes }).body;
+  eq('há caso sem valor do ML e tentativa sem custo no mês: piso', rel.dinheiro && rel.dinheiro.piso, true);
+  ok('   e diz o que falta', rel.dinheiro && (rel.dinheiro.faltam || []).length > 0, JSON.stringify(rel.dinheiro));
+  ok('os totais existem em reais', rel.dinheiro && typeof rel.dinheiro.valor_ml === 'number' && typeof rel.dinheiro.custos === 'number', JSON.stringify(rel.dinheiro));
+
+  secao('48. a baixa do reembolso: só admin geral, e encerra o "nós coletamos" já revisado');
+  eq('sem a chave: 403', chamar('POST','/api/devolucao-casos/:id/reembolso',{ resultado:'recebido' }, 3, {id:k29}).status, 403);
+  eq('caso ainda não revisado: recusado', chamar('POST','/api/devolucao-casos/:id/reembolso',{ resultado:'recebido' }, 1, {id:k45}).status, 400);
+  eq('resultado desconhecido: recusado', chamar('POST','/api/devolucao-casos/:id/reembolso',{ resultado:'talvez' }, 1, {id:k29}).status, 400);
+  r = chamar('POST','/api/devolucao-casos/:id/reembolso',{ resultado:'recebido' }, 1, {id:k29});
+  eq('com a chave, no caso revisado: encerra', r.status, 200);
+  eq('   saida = reembolso_recebido', caso(k29).saida, 'reembolso_recebido');
+  eq('   com quem', caso(k29).encerrado_por, 'Lucas');
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'2000000000009103', prazo:dia(7) }, 3);
+  const k48 = r.body.id;
+  chamar('POST','/api/devolucao',{ codigo_ml:'2000000000009103', caso_id:k48, sku_fisico:'BK160160BRANCO', destinacao:'estoque' }, 4);
+  eq('"não recebido" também encerra', chamar('POST','/api/devolucao-casos/:id/reembolso',{ resultado:'nao_recebido' }, 1, {id:k48}).status, 200);
+  eq('   saida = reembolso_nao_recebido', caso(k48).saida, 'reembolso_nao_recebido');
+  eq('no "ML devolve" não há reembolso de coleta', chamar('POST','/api/devolucao-casos/:id/reembolso',{ resultado:'recebido' }, 1, {id:c5}).status, 400);
+
+  secao('49. valor do ML a pedir há 2 dias entra no parado');
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'7770049', prazo:dia(9) }, 3);
+  const k49 = r.body.id;
+  r = chamar('POST','/api/devolucao-casos/:id/situacao-valor',{ situacao:'pedir' }, 2, {id:k49});
+  eq('quem acompanha marca "precisamos pedir"', r.status, 200);
+  eq('   situação gravada', caso(k49).valor_ml_situacao, 'pedir');
+  eq('situação desconhecida é recusada', chamar('POST','/api/devolucao-casos/:id/situacao-valor',{ situacao:'xyz' }, 2, {id:k49}).status, 400);
+  eq('com 0 dias, não está parado', daLista(lista(2).coleta, k49).parado, false);
+  db.prepare("UPDATE devolucao_caso SET valor_ml_desde=datetime('now','localtime','-2 days') WHERE id=?").run(k49);
+  const l49 = daLista(lista(2).coleta, k49);
+  eq('pedir há 2 dias: parado, mesmo com a etapa recém mexida', l49.parado, true);
+  eq('   e diz que é o valor', l49.parado_valor, true);
+  eq('   sem mandar o valor junto', 'valor_ml' in l49, false);
+  db.prepare("UPDATE devolucao_caso SET valor_ml_situacao='pedido' WHERE id=?").run(k49);
+  eq('já pedido (esperando o ML): não grita pelo valor', daLista(lista(2).coleta, k49).parado_valor, false);
+
+  secao('50. o relatório por motivo conta a devolução ligada UMA vez');
+  db.exec("UPDATE devolucao_caso SET criado_em = datetime('now','localtime') WHERE id IN (SELECT id FROM devolucao_caso)");
+  db.exec("UPDATE devolucao SET data = date('now','localtime')");
+  rel = chamar('GET','/api/devolucao-casos/relatorio',null,1,{},{ mes }).body;
+  const pm = (m) => (rel.por_motivo || []).find(x => x.motivo === m) || { qtd:0 };
+  const esperadoFalta = db.prepare("SELECT COUNT(*) n FROM devolucao_caso WHERE motivo='Falta de kit' AND teste=0").get().n
+    + db.prepare("SELECT COUNT(*) n FROM devolucao d WHERE motivo='Falta de kit' AND NOT EXISTS (SELECT 1 FROM devolucao_caso c WHERE c.devolucao_id=d.id)").get().n;
+  eq('"Falta de kit": caso + baixa ligada contam uma vez', pm('Falta de kit').qtd, esperadoFalta);
+  const semCaso = db.prepare("SELECT COUNT(*) n FROM devolucao d WHERE motivo='Avaria no transporte' AND NOT EXISTS (SELECT 1 FROM devolucao_caso c WHERE c.devolucao_id=d.id)").get().n;
+  const casosAvaria = db.prepare("SELECT COUNT(*) n FROM devolucao_caso WHERE motivo='Avaria no transporte'").get().n;
+  eq('a devolução antiga sem caso conta pelo motivo da baixa', pm('Avaria no transporte').qtd, semCaso + casosAvaria);
+  const r50 = chamar('POST','/api/devolucao',{ codigo_ml:'NOVA50', sku_fisico:'BK140140BEGE', destinacao:'estoque' }, 4);
+  chamar('POST','/api/devolucao/baixa',{ id:r50.body.id, reputacao:'nao', motivo:'Defeito de fabricacao' }, 3);
+  const antes50 = pm('Defeito de fabricacao').qtd;
+  rel = chamar('GET','/api/devolucao-casos/relatorio',null,1,{},{ mes }).body;
+  eq('uma baixa nova sem caso soma 1 no motivo dela', pm('Defeito de fabricacao').qtd, antes50 + 1);
+  ok('o total bate com a soma das linhas', rel.total === (rel.por_motivo || []).reduce((a,x) => a + x.qtd, 0), JSON.stringify(rel).slice(0,200));
+
+  secao('51. o relatório separa perda por prazo de devolvido ao comprador');
+  ok('perda por prazo em reais, à parte', rel.dinheiro && rel.dinheiro.perda_prazo === 164.04, JSON.stringify(rel.dinheiro));
+  ok('devolvido ao comprador em reais, à parte', rel.dinheiro && rel.dinheiro.devolvido_comprador === 189.9, JSON.stringify(rel.dinheiro));
+  ok('e por motivo, cada uma no seu', (rel.por_motivo || []).some(x => x.motivo === 'Chegou amassada' && x.devolvido_comprador === 189.9), JSON.stringify(rel.por_motivo));
+  eq('quem não tem a chave não recebe o bloco do dinheiro', 'dinheiro' in chamar('GET','/api/devolucao-casos/relatorio',null,2,{},{ mes }).body, false);
+  eq('mês impossível é recusado', chamar('GET','/api/devolucao-casos/relatorio',null,1,{},{ mes:'2026-13' }).status, 400);
+
+  secao('52. a auditoria: ver valores no máximo 1 vez a cada 30 min; cada decisão, sempre');
+  PERMS[5] = new Set(['devolucao.acompanhar','devolucao.dinheiro']); NOMES[5] = 'Outra';
+  const vistas = (uid) => AUDIT.filter(a => a.acao === 'viu_valores' && a.uid === uid).length;
+  const v0 = vistas(5);
+  for(let i = 0; i < 4; i++){ chamar('GET','/api/devolucao-casos',null,5); chamar('GET','/api/devolucao-casos/:id',null,5,{id:k45}); chamar('GET','/api/devolucao-casos/relatorio',null,5,{},{mes}); }
+  eq('doze leituras com valores: uma linha só', vistas(5) - v0, 1);
+  const vQuem = vistas(2);
+  chamar('GET','/api/devolucao-casos',null,2);
+  eq('quem não vê valores não gera linha de "viu valores"', vistas(2), vQuem);
+  const dec0 = AUDIT.filter(a => a.acao === 'valor').length;
+  valor(k45, { valor_ml:'151' }, 5); valor(k45, { valor_ml:'152' }, 5);
+  eq('duas decisões de valor: duas linhas', AUDIT.filter(a => a.acao === 'valor').length - dec0, 2);
+
   fim();
 })().catch(e => { console.log('ESTOUROU: ' + e.stack); falhas++; fim(); });
 

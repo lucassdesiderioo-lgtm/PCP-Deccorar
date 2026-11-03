@@ -74,6 +74,7 @@
   <div class="tabs" id="tabs">
     <button class="tab on" data-t="and">Em andamento</button>
     <button class="tab" data-t="enc">Encerrados</button>
+    <button class="tab" data-t="rel">Relatório do mês</button>
     <button class="tab" data-t="tra" id="tabTra">Transportadoras</button>
   </div>
 
@@ -106,6 +107,10 @@
   </div>
 
   <div id="secEnc" style="display:none"><div class="card"><h2>Encerrados</h2><div id="listaEnc"></div></div></div>
+  <div id="secRel" style="display:none"><div class="card"><h2>Relatório do mês, por motivo</h2>
+    <div class="sub" style="margin-bottom:10px">Conta os casos lançados no mês e as devoluções recebidas no mês sem caso (pelo motivo da baixa). A devolução ligada a um caso conta uma vez.</div>
+    <div class="acoes"><label for="rMes" style="margin:0;align-self:center">Mês</label><input id="rMes" type="month" style="max-width:180px"></div>
+    <div id="relBox"></div></div></div>
   <div id="secTra" style="display:none"><div class="card"><h2>Transportadoras</h2>
     <div class="sub" style="margin-bottom:10px">Quem já coletou numa região aparece sozinho como sugestão ao pedir a coleta, pelo CEP — não há lista de cobertura para manter.</div>
     <div id="listaTra"></div>
@@ -126,6 +131,7 @@ var ESTADO={pode:{}, coleta:[], ml:[], skus:{}, motivos:[], tipo:'coleta', abert
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 function dataBR(s){ if(!s) return '—'; var d=String(s).slice(0,10).split('-'); return d.length===3?d[2]+'/'+d[1]+'/'+d[0]:s; }
 function horaBR(s){ if(!s) return ''; return dataBR(s)+(String(s).length>10?' '+String(s).slice(11,16):''); }
+function virg(v){ return Number(v).toFixed(2).replace('.',','); }
 function reais(v){ if(v===null||v===undefined) return '—'; return 'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function api(metodo, url, corpo){
   return fetch(url,{method:metodo,headers:corpo?{'Content-Type':'application/json'}:{},body:corpo?JSON.stringify(corpo):undefined})
@@ -145,7 +151,10 @@ function chipPrazo(c){
 function linhaCaso(c){
   var peca=pecaDe(c.sku);
   var chips=chipPrazo(c);
-  if(c.tipo==='coleta' && c.parado) chips+='<span class="chip parado">parado há '+plural(c.dias_parado,'dia','dias')+'</span>';
+  if(c.tipo==='coleta' && c.parado && !c.parado_valor) chips+='<span class="chip parado">parado há '+plural(c.dias_parado,'dia','dias')+'</span>';
+  if(c.parado_valor) chips+='<span class="chip parado">valor do ML a pedir há '+plural(c.dias_valor||0,'dia','dias')+'</span>';
+  if(c.valor_ml_situacao==='pedido') chips+='<span class="chip">valor do ML pedido</span>';
+  if('saldo' in c) chips+= c.incompleto ? '<span class="chip falta">saldo incompleto</span>' : '<span class="chip dinheiro">saldo '+reais(c.saldo)+'</span>';
   if(c.tipo==='ml') chips+='<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>';
   if(c.responsavel) chips+='<span class="chip">'+esc(c.responsavel)+'</span>';
   if(c.prazo_original) chips+='<span class="chip">prorrogado (era '+dataBR(c.prazo_original)+')</span>';
@@ -310,6 +319,8 @@ function nomeEvento(e, nomes){
     case 'chegou': return 'A caixa chegou';
     case 'aviso_ml': return 'Avisamos o ML que recebemos';
     case 'anexo': return 'Anexo';
+    case 'valor': return 'Valores';
+    case 'valor_situacao': return 'Situação do valor do ML';
     case 'coleta': return 'Coleta'+(e.para?': '+n(e.de)+' → '+n(e.para):'');
     default: return e.tipo+(e.para?' → '+n(e.para):'');
   }
@@ -522,6 +533,88 @@ GANCHOS.push({
     };
   }
 });
+
+/* ── FASE 5: o dinheiro (só Admin Geral) e o relatório ── */
+var NOME_SIT={ja_veio:'já veio', pedir:'precisamos pedir ao ML', pedido:'pedimos, esperando o ML'};
+GANCHOS.push({
+  html:function(d, c, P, aberto){
+    var h='';
+    if(c.tipo==='coleta' && aberto && P.acompanhar){
+      h+='<div class="bloco"><h3>Valor do ML pela coleta</h3><div class="sub" style="margin-bottom:6px">Situação: <b style="color:var(--txt)">'+esc(NOME_SIT[c.valor_ml_situacao]||'não informada')+'</b>'+
+        (c.parado_valor?' · <span style="color:var(--amber)">a pedir há '+plural(c.dias_valor,'dia','dias')+'</span>':'')+'</div><div class="acoes">'+
+        ['pedir','pedido','ja_veio'].filter(function(x){return x!==c.valor_ml_situacao;}).map(function(x){ return '<button class="bt sec" data-sit="'+x+'">'+esc(NOME_SIT[x])+'</button>'; }).join('')+'</div></div>';
+    }
+    if(!P.dinheiro) return h;
+    h+='<div class="bloco"><h3>Dinheiro (Admin Geral)</h3>';
+    if(c.tipo==='coleta'){
+      h+='<div class="dados"><div><b>Valor do ML</b>'+reais(c.valor_ml)+'</div><div><b>Custos das tentativas</b>'+reais(c.custos)+'</div>'+
+        '<div><b>Saldo</b>'+(c.incompleto?'<span style="color:var(--amber)">incompleto</span>':'<span style="color:'+(c.saldo<0?'var(--red)':'var(--green)')+'">'+reais(c.saldo)+'</span>')+'</div>'+
+        (c.valor_perdido!=null?'<div><b>Valor perdido</b>'+reais(c.valor_perdido)+'</div>':'')+
+        (c.valor_devolvido!=null?'<div><b>Valor devolvido</b>'+reais(c.valor_devolvido)+'</div>':'')+'</div>';
+      if(c.incompleto) h+='<div class="aviso">Falta '+(c.valor_ml==null?'o valor do ML':'')+(c.valor_ml==null&&(d.tentativas||[]).some(function(t){return t.custo==null;})?' e ':'')+
+        ((d.tentativas||[]).some(function(t){return t.custo==null;})?'o custo de alguma tentativa':'')+': o saldo não é zero, é desconhecido.</div>';
+      h+='<div class="grade" style="margin-top:8px"><div><label>Valor do ML (R$)</label><input id="dValor" value="'+(c.valor_ml!=null?virg(c.valor_ml):'')+'"></div>'+
+        (c.saida==='perda_prazo'?'<div><label>Valor perdido (R$)</label><input id="dPerdido" value="'+(c.valor_perdido!=null?virg(c.valor_perdido):'')+'"></div>':'')+
+        (c.saida==='devolvido_comprador'?'<div><label>Valor devolvido (R$)</label><input id="dDevolvido" value="'+(c.valor_devolvido!=null?virg(c.valor_devolvido):'')+'"></div>':'')+
+        (d.tentativas||[]).map(function(t){ return '<div><label>Custo da '+t.numero+'ª tentativa (R$)</label><input data-custot="'+t.id+'" value="'+(t.custo!=null?virg(t.custo):'')+'"></div>'; }).join('')+
+        '</div><div class="acoes"><button class="bt sec" id="btValor">Salvar valores</button></div>';
+      if(aberto){
+        h+= c.devolucao_id
+          ? '<div class="sub" style="margin:8px 0 6px">Baixa do reembolso — conferido no Mercado Pago:</div><div class="acoes"><button class="bt" data-reemb="recebido">Reembolso recebido</button><button class="bt perigo" data-reemb="nao_recebido">Reembolso não recebido</button></div>'
+          : '<div class="sub" style="margin-top:8px">A baixa do reembolso aparece depois de a peça ser revisada na tela de Devoluções.</div>';
+      }
+    } else {
+      h+='<div class="sub">O "ML devolve" não tem valor de coleta; ele encerra na baixa da devolução.</div>';
+    }
+    return h+'</div>';
+  },
+  ligar:function(d, c, base){
+    document.querySelectorAll('#painel [data-sit]').forEach(function(b){ b.onclick=function(){ acao(base+'/situacao-valor',{situacao:b.getAttribute('data-sit')}); }; });
+    document.querySelectorAll('#painel [data-reemb]').forEach(function(b){ b.onclick=function(){
+      var r=b.getAttribute('data-reemb');
+      if(!confirm('Dar baixa no reembolso como "'+(r==='recebido'?'recebido':'não recebido')+'" e encerrar o caso #'+c.id+'?')) return;
+      acao(base+'/reembolso',{resultado:r});
+    }; });
+    var x=document.getElementById('btValor');
+    if(x) x.onclick=function(){
+      var m=document.getElementById('cMsg'); m.innerHTML='';
+      var corpo={}, v=document.getElementById('dValor');
+      if(v && v.value!==(c.valor_ml!=null?virg(c.valor_ml):'')) corpo.valor_ml=v.value;
+      var p=document.getElementById('dPerdido'); if(p) corpo.valor_perdido=p.value;
+      var dv=document.getElementById('dDevolvido'); if(dv) corpo.valor_devolvido=dv.value;
+      var pedidos=[api('POST',base+'/valor',corpo)];
+      document.querySelectorAll('#painel [data-custot]').forEach(function(inp){
+        var t=(d.tentativas||[]).find(function(k){return String(k.id)===inp.getAttribute('data-custot');});
+        if(t && inp.value!==(t.custo!=null?virg(t.custo):'')) pedidos.push(api('POST',base+'/valor',{tentativa_id:t.id, custo:inp.value}));
+      });
+      Promise.all(pedidos).then(function(){ carregar(); abrir(c.id); })
+        .catch(function(e){ m.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; m.scrollIntoView({block:'nearest'}); });
+    };
+  }
+});
+
+ABAS_EXTRA.push('rel');
+function carregarRel(){
+  var el=document.getElementById('relBox'), mes=document.getElementById('rMes').value;
+  api('GET','/api/devolucao-casos/relatorio?mes='+encodeURIComponent(mes)).then(function(r){
+    var din=!!r.dinheiro;
+    var h='<div class="dados" style="margin:10px 0"><div><b>Total no mês</b>'+r.total+'</div><div><b>Casos lançados</b>'+r.casos+'</div><div><b>Devoluções sem caso</b>'+r.sem_caso+'</div></div>';
+    h+= r.por_motivo.length ? '<div class="rolaH"><table><thead><tr><th>Motivo</th><th class="num">Qtd</th><th class="num">Casos</th><th class="num">Sem caso</th>'+
+      (din?'<th class="num">Perda por prazo</th><th class="num">Devolvido ao comprador</th>':'')+'</tr></thead><tbody>'+
+      r.por_motivo.map(function(l){ return '<tr><td>'+esc(l.motivo)+'</td><td class="num"><b>'+l.qtd+'</b></td><td class="num">'+l.casos+'</td><td class="num">'+l.sem_caso+'</td>'+
+        (din?'<td class="num">'+reais(l.perda_prazo)+'</td><td class="num">'+reais(l.devolvido_comprador)+'</td>':'')+'</tr>'; }).join('')+
+      '</tbody></table></div>' : '<div class="vazio">Nenhuma devolução neste mês.</div>';
+    if(din){
+      var D=r.dinheiro, ge=D.piso?'≥ ':'';
+      h+='<div class="bloco"><h3>Dinheiro do mês (Admin Geral)</h3>'+(D.piso?'<div class="aviso">Total incompleto — falta: '+esc(D.faltam.join(' · '))+'. Os números são o mínimo (≥), não o total.</div>':'')+
+        '<div class="dados"><div><b>Valor do ML pelas coletas</b>'+ge+reais(D.valor_ml)+'</div><div><b>Custos das tentativas</b>'+ge+reais(D.custos)+'</div>'+
+        '<div><b>Perda por prazo</b>'+ge+reais(D.perda_prazo)+'</div><div><b>Devolvido ao comprador</b>'+ge+reais(D.devolvido_comprador)+'</div></div></div>';
+    }
+    el.innerHTML=h;
+  }).catch(function(e){ el.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; });
+}
+ABAS_GANCHO.push({ aba:'rel', abrir:function(){ var m=document.getElementById('rMes'); if(!m.value){ var d=new Date(); m.value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); } carregarRel(); } });
+document.getElementById('rMes').addEventListener('change', carregarRel);
 
 /* ── início ── */
 setTipo('coleta');

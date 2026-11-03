@@ -2,11 +2,14 @@
 
 ```
 STATUS
-Situação: em construção
+Situação: em código — as cinco fases (03/11/2026), falta subir
 Criada em: 03/11/2026
 Última atualização: 03/11/2026
-Fase atual: 4 em código (falta subir)
-Fases: 1 ✅ em código  2 ✅ em código  3 ✅ em código  4 ✅ em código  5 ☐
+Fase atual: todas em código; falta o deploy e a prova de fábrica
+Fases: 1 ✅  2 ✅  3 ✅  4 ✅  5 ✅  (em código, não no ar)
+Testes: teste_devolucao_casos.js (307 casos, os 52 da §10 e mais), teste_acesso.js (+40),
+        teste_caminhos.js (+1); os 62 arquivos da raiz e os 856 do sob medida passando
+Regras que parecem bug: CLAUDE.md §9-B
 Risco: 🔴 (acesso/permissão, dinheiro, schema, toca na devolução que já existe)
 Mudanças no caminho:
   · Fase 1 (03/11): `devcaso_dominio.js` é o dono único do caso, do prazo e do parado;
@@ -38,6 +41,15 @@ Mudanças no caminho:
   · Anexo não se apaga por rota (é prova). No modo teste, "apagar tudo" apaga a linha e o arquivo
     fica na pasta, sem nada apontando para ele.
   · A lista `doc_devolucao` é editável em Admin → Cadastros, ao lado dos motivos.
+  · Fase 5 (03/11): a situação do valor do ML (pedir / pedido / já veio) é de quem acompanha; o
+    NÚMERO é do admin geral. Lançar o valor marca "já veio". `valor_ml_desde` (coluna nova,
+    com ALTER guardado) mede o "pedir há N dias". O valor pode ser lançado no caso encerrado
+    (o perdido costuma chegar depois).
+  · O saldo é do "nós coletamos": valor do ML − custos; sem tentativa, os custos são zero (não há
+    custo faltando) e o saldo é o próprio valor. O relatório conta os casos pelo mês de
+    LANÇAMENTO e as devoluções sem caso pelo mês de RECEBIMENTO, sem as de modo teste.
+  · A baixa do reembolso só encerra o caso já revisado (a peça voltou e foi vista).
+  · Fica de fora: a linha das devoluções em andamento na central de Pendências (a spec não pede).
 ```
 
 > Desenhada no Projeto do Claude entre 29/10 e 03/11/2026, com o Lucas.
