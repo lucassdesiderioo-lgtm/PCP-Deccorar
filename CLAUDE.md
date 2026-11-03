@@ -1604,13 +1604,22 @@ os 6 casos da tabela de 29/10/2026, com backup antes e sem duplicar. O SKU
 da tabela não tem o `BK`: o script usa o do `lote` e, sem a venda no sistema,
 grava o texto como veio com *"conferir"* na observação.
 
-> ✅ **NO AR EM 03/11/2026** (PR #250): o dono fez o deploy (`/devolucao-casos`
-> 302) e a simulação do `lancar_casos_iniciais.js` achou **as 6 vendas no
-> sistema**, todas com o SKU do cadastro (nenhuma para conferir).
+> ✅ **NO AR E CONFERIDO EM 03/11/2026** (PRs #250 e #251): o dono fez o
+> deploy (telas 302, API 401, `/login` 200, inclusive `/devolucoes` e
+> `/api/devolucao/abas`) e conferiu na tela:
+> - a simulação do `lancar_casos_iniciais.js` achou **as 6 vendas no sistema**,
+>   todas com o SKU do cadastro (nenhuma para conferir), e os casos #1 a #6
+>   estão gravados; a rodada seguinte do `--aplicar` **pulou os seis** — não
+>   duplicar está provado com dado real;
+> - as **cores do prazo** bateram nos seis (7336 vence hoje em vermelho, 8040 e
+>   7451 com 1 dia em vermelho, 7245 em âmbar, 8271 e 7675 sem cor);
+> - o "Devoluções" do rodapé leva a Em andamento com a faixa de abas, e a aba
+>   **Baixa** abre o Admin na aba Devoluções.
 >
-> ⚠️ **AINDA NÃO PROVADO:** o `--aplicar` dos 6 casos e as cores na tela, o
-> Renato acompanhando um caso até o fim, e a primeira caixa bipada pelo
-> Edvaldo mostrando a tarja. Prova que não foi feita se escreve como não feita.
+> ⚠️ **AINDA NÃO PROVADO:** o Renato acompanhando um caso até o fim (coleta,
+> documentos, chegada, reembolso), e a primeira caixa bipada pelo Edvaldo
+> mostrando a tarja e ligando o caso. Prova que não foi feita se escreve como
+> não feita.
 
 ---
 
