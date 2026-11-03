@@ -805,7 +805,23 @@ function relatorio(db, mes, comDinheiro){
   return out;
 }
 
+/* A BUSCA (AJUSTE de 03/11/2026): "esta reclamação já foi lançada?". Pelo
+   número da NF, da venda ou do pack — inteiro ou um pedaço, a partir de 3
+   dígitos —, nos casos ABERTOS e nos ENCERRADOS: o encerrado também responde
+   "já foi". Os espaços que o leitor manda saem. Os abertos vêm primeiro. */
+function buscar(db, q, opt){
+  const d = String(q || '').replace(/\D/g, '');
+  if(d.length < 3) throw new Recusa(400, 'Digite pelo menos 3 números da NF, da venda ou do pack.');
+  const o = opt || {}, h = hoje(db), lim = limites(db);
+  const cu = o.comDinheiro ? custosPorCaso(db) : null;
+  const like = '%' + d + '%';
+  return db.prepare(`SELECT * FROM devolucao_caso WHERE venda LIKE ? OR pack_id LIKE ? OR nf LIKE ?
+      ORDER BY (encerrado_em IS NOT NULL), id DESC LIMIT 30`).all(like, like, like)
+    .map(c => publico(c, h, lim, o.comDinheiro, cu));
+}
+
 module.exports = {
+  buscar,
   SITUACOES_VALOR, situacaoValor, lancarValor, baixaReembolso, relatorio, custosPorCaso,
   docsExigidos, situacaoDocs, listarAnexos, anexar, arquivoDoAnexo, devolverComprador,
   RESULTADOS, listarTransportadoras, salvarTransportadora, tentativas, pedirColeta, resultadoColeta, sugerirTransportadoras,

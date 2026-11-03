@@ -59,6 +59,8 @@ Mudanças no caminho:
     (Receber peça · Em andamento · Baixa), cada uma pela permissão. A §8 da spec dizia "entra
     no menu do nav.js para quem tem devolucao.acompanhar"; o link próprio não apareceu para
     ninguém (ele lia a coluna `areas`, que o backfill não recalculou), e o dono preferiu juntar.
+  · AJUSTE de 03/11 (pedido do dono): campo "Buscar devolução" em Em andamento, pela NF, venda
+    ou pack (inteiro ou pedaço, a partir de 3 dígitos), nos casos abertos e encerrados.
 ```
 
 > Desenhada no Projeto do Claude entre 29/10 e 03/11/2026, com o Lucas.

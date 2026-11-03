@@ -84,6 +84,11 @@
   </div>
 
   <div id="secAnd">
+    <div class="card" id="cardBusca">
+      <label for="bBusca">Buscar devolução — já foi lançada?</label>
+      <input id="bBusca" placeholder="NF, venda ou pack (bipe ou digite)" autocomplete="off" autocorrect="off" inputmode="numeric">
+      <div id="bResultado"></div>
+    </div>
     <div class="card" id="cardLancar" style="display:none">
       <h2>Lançar devolução</h2>
       <div class="tipos" style="margin-bottom:10px">
@@ -640,6 +645,28 @@ function carregarRel(){
 }
 ABAS_GANCHO.push({ aba:'rel', abrir:function(){ var m=document.getElementById('rMes'); if(!m.value){ var d=new Date(); m.value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); } carregarRel(); } });
 document.getElementById('rMes').addEventListener('change', carregarRel);
+
+/* ── A BUSCA (AJUSTE de 03/11/2026): "esta reclamação já foi lançada?" ──
+   Pela NF, venda ou pack, nos abertos E nos encerrados. Quem decide o que casa
+   é o servidor (devcaso_dominio.buscar); a tela só desenha. */
+var tBusca=null;
+function buscar(){
+  var q=document.getElementById('bBusca').value.trim(), box=document.getElementById('bResultado');
+  if(q.replace(/\D/g,'').length<3){ box.innerHTML=''; return; }
+  api('GET','/api/devolucao-casos/buscar?q='+encodeURIComponent(q)).then(function(d){
+    var c=d.casos||[];
+    if(!c.length){ box.innerHTML='<div class="vazio">Nenhum caso com esse número — ainda não foi lançado.</div>'; return; }
+    box.innerHTML='<div class="sub" style="margin:8px 0 6px">'+plural(c.length,'caso encontrado','casos encontrados')+'</div>'+c.map(function(x){
+      var situ = x.encerrado_em ? '<span class="chip">encerrado · '+esc(x.saida_nome||'')+' · '+dataBR(x.encerrado_em)+'</span>'
+                                : '<span class="chip ambar">aberto · '+esc(x.etapa_nome)+'</span>';
+      return '<div class="linha" data-id="'+x.id+'"><div class="t1"><span>#'+x.id+'</span><span>Venda '+esc(x.venda||'—')+'</span><span>NF '+esc(x.nf||'—')+'</span></div>'+
+        '<div class="t2">'+(x.tipo==='coleta'?'Nós coletamos':'ML devolve')+' · '+esc(x.sku||'sem SKU')+(x.comprador?' · '+esc(x.comprador):'')+' · '+esc(x.motivo||'sem motivo')+'</div>'+
+        '<div class="chips">'+situ+'</div></div>';
+    }).join('');
+  }).catch(function(e){ box.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; });
+}
+document.getElementById('bBusca').addEventListener('input',function(){ clearTimeout(tBusca); tBusca=setTimeout(buscar,400); });
+document.getElementById('bBusca').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); clearTimeout(tBusca); buscar(); } });
 
 /* ── início ── */
 setTipo('coleta');

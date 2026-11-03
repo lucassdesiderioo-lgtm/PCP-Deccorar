@@ -96,6 +96,10 @@ module.exports = function(app, db){
     res.sendFile(arq);
   });
 
+  /* A busca por NF, venda ou pack (AJUSTE de 03/11/2026). Antes do `/:id`. */
+  app.get('/api/devolucao-casos/buscar', (req,res) => responder(res, () =>
+    ({ casos: D.buscar(db, (req.query||{}).q, { comDinheiro: comDinheiro(req) }) })));
+
   app.get('/api/devolucao-casos/:id', (req,res) => responder(res, () => D.detalhe(db, req.params.id, { comDinheiro: comDinheiro(req) })));
 
   /* ── lançar e editar (devolucao.lancar) ── */
