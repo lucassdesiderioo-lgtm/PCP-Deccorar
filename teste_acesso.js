@@ -775,6 +775,11 @@ console.log('\n── 6-I. as devoluções em andamento (spec DEVOLUCOES-ACOMPAN
        && ['"@logado"','"@negado"'].indexOf(J(AC.permDaRota(r,'GET'))) < 0));
   eq('a tela do Edvaldo continua com a chave de sempre', AC.permDaRota('/devolucao','GET'), 'devolucao.registrar');
   eq('   e o bipe dele também', AC.permDaRota('/api/devolucao','POST'), 'devolucao.registrar');
+  eq('os casos esperados de um SKU: o Edvaldo, a Baixa e quem acompanha ou lança', J(AC.permDaRota('/api/devolucao/esperadas','GET')),
+     J(['devolucao.registrar','devolucao.baixar','devolucao.acompanhar','devolucao.lancar']));
+  eq('ligar pela Baixa pede devolucao.baixar', AC.permDaRota('/api/devolucao/ligar-caso','POST'), 'devolucao.baixar');
+  eq('ligar pela tela do caso pede devolucao.acompanhar', AC.permDaRota('/api/devolucao-casos/12/ligar','POST'), 'devolucao.acompanhar');
+  eq('as revisões soltas: quem lê o caso', J(AC.permDaRota('/api/devolucao-casos/12/revisoes-soltas','GET')), LER);
 
   /* O BACKFILL, num banco que já existia: quem dá baixa passa a lançar e a acompanhar. */
   const sB = db.prepare("INSERT INTO setores (nome,nivel,nativo) VALUES ('Pós-venda','admin',0)").run().lastInsertRowid;

@@ -12,11 +12,15 @@ Criada em: 03/11/2026
 Última atualização: 03/11/2026
 Fase atual: todas em código; falta o deploy e a prova de fábrica
 Fases: 1 ✅  2 ✅  3 ✅  4 ✅  5 ✅  (em código, não no ar)
-Testes: teste_devolucao_casos.js (605 casos, e a tela em teste_devolucao_casos_tela.js, 93, os 52 da §10 e mais), teste_acesso.js (+42),
+Testes: teste_devolucao_casos.js (668 casos, e a tela em teste_devolucao_casos_tela.js, 107, os 52 da §10 e mais), teste_acesso.js (+46),
         teste_caminhos.js (+1); os 62 arquivos da raiz e os 856 do sob medida passando
 Regras que parecem bug: CLAUDE.md §9-B
 Risco: 🔴 (acesso/permissão, dinheiro, schema, toca na devolução que já existe)
 Mudanças no caminho:
+  · CONSERTO de 03/11 (NF 8207) — a etiqueta de devolução do ML não acha o caso: a revisão solta
+    se liga pelo SKU (Edvaldo, caso, Baixa). DIVERGE da R19: o "ML devolve" não encerra mais só na
+    baixa — precisa do "Já revisei" no ML e da resposta da revisão, se pedida; a revisão pede valor,
+    reputação ou os dois (vale o CLAUDE.md §9-B).
   · AJUSTE (6) de 03/11 — DOIS PRAZOS e OS VALORES (decisões do dono): no "nós coletamos" o
     prazo de antes virou o do comprovante, e a coleta tem o seu (abertura da reclamação +
     20 dias corridos, `devol_coleta_dias`); a lista mostra o próximo aberto; data agendada

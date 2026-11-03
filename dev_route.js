@@ -33,6 +33,22 @@ module.exports=function(app,db){
       etapa_nome:CASO.NOME_ETAPA[caso.etapa]||caso.etapa,sku:caso.sku,venda:caso.venda,nf:caso.nf}});
   });
 
+  /* OS CASOS ESPERADOS DE UM SKU (CONSERTO de 03/11/2026, NF 8207): a
+     etiqueta de devolucao do ML nao e venda, pack nem NF, e o bipe nao acha o
+     caso. Depois do SKU, a tela pergunta "e esta?". A Baixa usa a mesma lista. */
+  app.get('/api/devolucao/esperadas',(req,res)=>{
+    try{ res.json({casos:CASO.esperadas(db,(req.query||{}).sku)}); }
+    catch(e){ res.status(e.status||500).json({erro:e.message}); }
+  });
+  /* Ligar pela Baixa a revisao que ficou sem caso (quem da baixa). */
+  app.post('/api/devolucao/ligar-caso',(req,res)=>{
+    let ok=false; try{ ok=!!app.locals.acesso.podePermissao(req.usuario,'devolucao.baixar'); }catch(e){}
+    if(!ok) return res.status(403).json({erro:'Ligar a revisão pela Baixa é de quem dá baixa nas devoluções.',chave:'devolucao.baixar'});
+    const b=req.body||{};
+    try{ CASO.ligarManual(db,b.caso_id,b.devolucao_id,req.usuario,!!b.confirmar); res.json({ok:true}); }
+    catch(e){ if(e instanceof CASO.Recusa) return res.status(e.status).json(Object.assign({erro:e.message},e.extra)); console.log('[devolucao] '+(e&&e.stack||e)); res.status(500).json({erro:'Não deu para gravar. Nada foi alterado.'}); }
+  });
+
   app.post('/api/devolucao',(req,res)=>{
     const b=req.body||{};
     const sku=(b.sku_fisico||'').trim().toUpperCase();

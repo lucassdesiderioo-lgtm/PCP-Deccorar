@@ -116,6 +116,9 @@ module.exports = function(app, db){
   app.get('/api/devolucao-casos/buscar', (req,res) => responder(res, () =>
     ({ casos: D.buscar(db, (req.query||{}).q, { comDinheiro: comValores(req) }) })));
 
+  /* As revisões recebidas sem caso, para ligar à mão (CONSERTO de 03/11/2026). */
+  app.get('/api/devolucao-casos/:id/revisoes-soltas', (req,res) => responder(res, () => ({ revisoes: D.revisoesSoltas(db, req.params.id) })));
+
   app.get('/api/devolucao-casos/:id', (req,res) => responder(res, () => D.detalhe(db, req.params.id, { comDinheiro: comValores(req), usuario: req.usuario })));
 
   /* ── lançar e editar (devolucao.lancar) ── */
@@ -186,9 +189,15 @@ module.exports = function(app, db){
     return { ok:true };
   }));
 
+  /* Ligar à mão uma revisão solta a este caso (quem acompanha). */
+  app.post('/api/devolucao-casos/:id/ligar', (req,res) => {
+    if(!pode(req).acompanhar) return res.status(403).json({ erro:'Ligar a revisão é de quem acompanha as devoluções.', chave:'devolucao.acompanhar' });
+    responder(res, () => { const b = req.body || {}; D.ligarManual(db, req.params.id, b.devolucao_id, req.usuario, !!b.confirmar); return { ok:true }; });
+  });
+
   /* A caixa chegou e ainda não foi revisada (fase 2). */
   app.post('/api/devolucao-casos/:id/chegou', (req,res) => responder(res, () => {
-    D.chegou(db, req.params.id, req.usuario);
+    D.chegou(db, req.params.id, req.usuario, req.body);
     return { ok:true };
   }));
   app.post('/api/devolucao-casos/:id/aviso-ml', (req,res) => responder(res, () => {
