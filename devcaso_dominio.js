@@ -46,7 +46,7 @@ const NOME_SAIDA = {
   revisado_ml:'Revisado (ML devolve)', devolvido_comprador:'Devolvido ao comprador', perda_prazo:'Perda por prazo'
 };
 /* Os campos em reais. Ficam fora de tudo que vai para quem não tem a chave. */
-const DINHEIRO = ['valor_ml','valor_devolvido','valor_perdido','custo_etiqueta'];
+const DINHEIRO = ['valor_ml','valor_devolvido','valor_perdido','custo_etiqueta','valor_revisao'];
 
 const PADROES = { devol_prazo_ambar:'3', devol_prazo_vermelho:'1', devol_parado_dias:'2' };
 
@@ -79,7 +79,8 @@ function garantir(db){
     criado_em TEXT DEFAULT (datetime('now','localtime')),
     teste INTEGER DEFAULT 0,
     publicidade INTEGER, mensagem_ml TEXT, link_ml TEXT,
-    custo_etiqueta REAL)`);
+    custo_etiqueta REAL,
+    revisao_pedida_em TEXT, revisao_numero TEXT, revisao_resultado TEXT, revisao_resp_em TEXT, valor_revisao REAL)`);
   /* FASE 5 — desde quando o valor do ML está nesta situação (R18: "pedir" há
      ≥ 2 dias entra no parado). O ALTER fica ao lado do CREATE, no fim da
      tabela, para o banco que nasceu antes desta fase (§17). */
@@ -95,6 +96,11 @@ function garantir(db){
      03/11/2026, dono): no "ML devolve" também há custo quando o ML entende que
      o problema é nosso. Dinheiro — só com devolucao.dinheiro (R15). */
   try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN custo_etiqueta REAL"); }catch(e){}
+  /* A REVISÃO DO FRETE (AJUSTE de 03/11/2026, dono): no "ML devolve", quando o
+     ML cobra o frete e a culpa não é nossa, depois de a peça chegar pede-se
+     revisão; o ML devolve o frete ou nega. valor_revisao é dinheiro (R15). */
+  for(const col of ['revisao_pedida_em TEXT','revisao_numero TEXT','revisao_resultado TEXT','revisao_resp_em TEXT','valor_revisao REAL'])
+    try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN "+col); }catch(e){}
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_venda ON devolucao_caso(venda)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_aberto ON devolucao_caso(encerrado_em)");
   db.exec(`CREATE TABLE IF NOT EXISTS devolucao_evento (
@@ -177,6 +183,11 @@ function situacao(c, h, lim){
   } else {
     // R5: só a espera. Sem cor e sem trava — a regra de cobrar o ML vem depois.
     o.dias_esperando = dias(c.criado_em, c.chegou_em || h);
+    /* A revisão do frete pedida e sem resposta grita como o "parado": a
+       resposta do ML não vem sozinha, e o caso fica aberto esperando por ela. */
+    o.revisao_pendente = !!(c.revisao_pedida_em && !c.revisao_resultado);
+    o.dias_revisao = o.revisao_pendente ? dias(String(c.revisao_pedida_em).slice(0,10), h) : null;
+    o.revisao_parada = o.revisao_pendente && o.dias_revisao !== null && o.dias_revisao >= lim.parado;
   }
   return o;
 }
@@ -470,6 +481,43 @@ function trocarTipo(db, id, b, usuario){
   return ler(db, c.id);
 }
 
+/* A REVISÃO DO FRETE — pedir (quem acompanha). Só no "ML devolve", só
+   depois de a caixa chegar (o pedido ao ML precisa da peça vista), uma vez. */
+function pedirRevisaoFrete(db, id, b, usuario){
+  const c = aberto(db, id);
+  if(c.tipo !== 'ml') throw new Recusa(400, 'A revisão do frete é do "ML devolve": no "Nós coletamos" quem cobra é a transportadora.');
+  if(!c.chegou_em) throw new Recusa(409, 'A revisão do frete se pede depois de a caixa chegar. Marque "A caixa chegou" antes.');
+  if(c.revisao_pedida_em) throw new Recusa(409, 'A revisão do frete já foi pedida em '+String(c.revisao_pedida_em).slice(0,10).split('-').reverse().join('/')+'.');
+  const numero = String((b||{}).numero == null ? '' : b.numero).trim().slice(0,100) || null;
+  db.transaction(() => {
+    db.prepare("UPDATE devolucao_caso SET revisao_pedida_em=datetime('now','localtime'), revisao_numero=? WHERE id=?").run(numero, c.id);
+    evento(db, c.id, 'revisao_frete', null, 'pedida', 'pedi revisão do frete ao ML'+(numero ? ' · nº '+numero : ''), nomeDe(usuario));
+  })();
+  return ler(db, c.id);
+}
+/* A resposta do ML (quem acompanha). O VALOR devolvido é dinheiro: vem pela
+   rota só com devolucao.dinheiro (conferido lá), e também pelo "Salvar
+   valores", depois. Com o caso já baixado, a resposta o encerra. */
+function respostaRevisaoFrete(db, id, b, usuario){
+  const c = aberto(db, id);
+  b = b || {};
+  const resultado = String(b.resultado || '').trim();
+  if(['devolveu','negou'].indexOf(resultado) < 0) throw new Recusa(400, 'A resposta do ML é "devolveu o frete" ou "negou".');
+  if(!c.revisao_pedida_em) throw new Recusa(409, 'A revisão do frete ainda não foi pedida.');
+  if(c.revisao_resultado) throw new Recusa(409, 'A resposta da revisão já foi lançada ('+(c.revisao_resultado === 'devolveu' ? 'devolveu o frete' : 'negou')+').');
+  let mud = [];
+  db.transaction(() => {
+    db.prepare("UPDATE devolucao_caso SET revisao_resultado=?, revisao_resp_em=datetime('now','localtime') WHERE id=?").run(resultado, c.id);
+    evento(db, c.id, 'revisao_frete', 'pedida', resultado, resultado === 'devolveu' ? 'o ML devolveu o frete' : 'o ML negou a revisão do frete', nomeDe(usuario));
+    if(resultado === 'devolveu' && b.valor_revisao !== undefined && String(b.valor_revisao).trim() !== '')
+      mud = lancarValor(db, c.id, { valor_revisao: b.valor_revisao }, usuario);
+    // Já baixado (revisado, e a devolução ligada com baixa): encerra agora.
+    const d = c.devolucao_id ? db.prepare('SELECT baixado FROM devolucao WHERE id=?').get(c.devolucao_id) : null;
+    if(c.etapa === 'revisado' && d && d.baixado) encerrar(db, ler(db, c.id), 'revisado_ml', usuario, 'resposta da revisão do frete');
+  })();
+  return { caso: ler(db, c.id), valorMudou: mud };
+}
+
 /* Editar o que foi lançado. CAMPO AUSENTE NÃO É CAMPO VAZIO (§6, #25): só o
    que veio no corpo muda, e o resto fica como está. */
 const EDITAVEIS = ['motivo','nf','sku','comprador','responsavel','passado_em','cep','obs','publicidade','mensagem_ml','link_ml'];
@@ -692,7 +740,14 @@ function baixaDaDevolucao(db, devolucao_id, motivoEscolhido, usuario){
     db.prepare('UPDATE devolucao_caso SET motivo=? WHERE id=?').run(motivoEscolhido, c.id);
     evento(db, c.id, 'editado', null, null, 'motivo: — → '+motivoEscolhido+' (na baixa)', nomeDe(usuario));
   }
-  if(c.tipo === 'ml') encerrar(db, c, 'revisado_ml', usuario, 'baixa da devolução #'+devolucao_id);
+  if(c.tipo === 'ml'){
+    /* Com a revisão do frete pedida e sem resposta, a baixa NÃO encerra
+       (decisão do dono, 03/11/2026): o caso fica aberto até o ML responder,
+       senão a cobrança some da lista de abertos. */
+    if(c.revisao_pedida_em && !c.revisao_resultado)
+      evento(db, c.id, 'baixa', null, null, 'baixa da devolução #'+devolucao_id+' — o caso fica aberto esperando a resposta da revisão do frete', nomeDe(usuario));
+    else encerrar(db, c, 'revisado_ml', usuario, 'baixa da devolução #'+devolucao_id);
+  }
   return { motivo, caso:c.id };
 }
 
@@ -919,7 +974,7 @@ function lancarValor(db, id, b, usuario){
   if(!c) throw new Recusa(404, 'Caso não encontrado. Atualize a lista.');
   b = b || {};
   const sets = [], vals = [], mud = [];
-  const ROT = { valor_ml:'valor do ML', valor_perdido:'valor perdido', valor_devolvido:'valor devolvido', custo_etiqueta:'custo da etiqueta de devolução' };
+  const ROT = { valor_ml:'valor do ML', valor_perdido:'valor perdido', valor_devolvido:'valor devolvido', custo_etiqueta:'custo da etiqueta de devolução', valor_revisao:'frete devolvido na revisão' };
   for(const k of Object.keys(ROT)){
     if(!(k in b)) continue;
     const v = reais(b[k], ROT[k]);
@@ -1017,6 +1072,9 @@ function relatorio(db, mes, comDinheiro){
          (o "ML devolve" também tem). Fora do saldo da coleta: não é custo de
          coleta, e o saldo do "nós coletamos" não muda. */
       custo_etiqueta: r2(casos.reduce((a,c) => a + (c.custo_etiqueta || 0), 0)),
+      // O que a revisão trouxe de volta, e o que ficou de prejuízo no frete.
+      frete_devolvido: r2(casos.reduce((a,c) => a + (c.valor_revisao || 0), 0)),
+      frete_prejuizo: r2(casos.reduce((a,c) => a + (c.custo_etiqueta || 0), 0) - casos.reduce((a,c) => a + (c.valor_revisao || 0), 0)),
       piso: faltam.length > 0, faltam };
   }
   return out;
@@ -1038,7 +1096,7 @@ function buscar(db, q, opt){
 }
 
 module.exports = {
-  buscar, lancarCompleto, trocarTipo, desfazerEtapa, podeDesfazer, mesmoComprador,
+  buscar, lancarCompleto, trocarTipo, pedirRevisaoFrete, respostaRevisaoFrete, desfazerEtapa, podeDesfazer, mesmoComprador,
   SITUACOES_VALOR, situacaoValor, lancarValor, baixaReembolso, relatorio, custosPorCaso,
   docsExigidos, situacaoDocs, listarAnexos, anexar, arquivoDoAnexo, devolverComprador,
   RESULTADOS, listarTransportadoras, salvarTransportadora, tentativas, pedirColeta, resultadoColeta, sugerirTransportadoras,

@@ -678,7 +678,7 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
      new RegExp("nome:'" + t + "'").test(fs.readFileSync(path.join(__dirname,'teste_route.js'),'utf8'))));
 
   /* ═════════════════════ FASE 5 — o dinheiro e o relatório ═════════════════════ */
-  const DINHEIRO_CHAVES = ['valor_ml','custo','valor_devolvido','valor_perdido','saldo','custo_etiqueta'];
+  const DINHEIRO_CHAVES = ['valor_ml','custo','valor_devolvido','valor_perdido','saldo','custo_etiqueta','valor_revisao'];
   function chavesDe(o, acc){
     acc = acc || new Set();
     if(Array.isArray(o)) o.forEach(x => chavesDe(x, acc));
@@ -1146,6 +1146,74 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   eq('o relatório soma as etiquetas', relCE.dinheiro.custo_etiqueta,
      Math.round(db.prepare("SELECT SUM(custo_etiqueta) s FROM devolucao_caso WHERE teste=0 AND substr(criado_em,1,7)=?").get(dia(0).slice(0,7)).s * 100) / 100);
   ok('   e quem não tem a chave não vê', !chavesDe(chamar('GET','/api/devolucao-casos/relatorio',null,2,{},{ mes:dia(0).slice(0,7) }).body).has('custo_etiqueta'));
+
+  /* ── AJUSTE de 03/11/2026 (5): a revisão do frete no "ML devolve" ── */
+  secao('revisão do frete — só no ML devolve, e só depois de a caixa chegar');
+  const pedeRev = (id, corpo, quem) => chamar('POST','/api/devolucao-casos/:id/revisao-frete', corpo || {}, quem || 2, { id });
+  const respRev = (id, corpo, quem) => chamar('POST','/api/devolucao-casos/:id/revisao-frete-resposta', corpo || {}, quem || 2, { id });
+  const rv = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000000000009301', publicidade:true, custo_etiqueta:'48,70' }, 1).body.id;
+  eq('antes de a caixa chegar: recusado', pedeRev(rv).status, 409);
+  chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, { id:rv });
+  eq('quem não acompanha não pede', pedeRev(rv, {}, 4).status, 403);
+  rp = pedeRev(rv, { numero:'  REV-5603716835 ' });
+  eq('depois de chegar: pede', rp.status, 200);
+  ok('   grava a data do pedido', !!caso(rv).revisao_pedida_em);
+  eq('   e o número, sem os espaços', caso(rv).revisao_numero, 'REV-5603716835');
+  ok('   e a história', eventos(rv).some(e => e.tipo === 'revisao_frete'));
+  eq('pedir de novo: recusado', pedeRev(rv).status, 409);
+  const rvc = lanC({ venda:'8800100' }, 3).body.id;
+  chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, { id:rvc });
+  eq('no Nós coletamos: recusado', pedeRev(rvc).status, 400);
+
+  secao('revisão do frete — pendente aparece, e grita depois de 2 dias');
+  let lr = daLista(chamar('GET','/api/devolucao-casos',null,2).body.ml, rv);
+  eq('a lista diz que a revisão está pendente', lr.revisao_pendente, true);
+  eq('   há 0 dias', lr.dias_revisao, 0);
+  eq('   e ainda não é parada', lr.revisao_parada, false);
+  db.prepare("UPDATE devolucao_caso SET revisao_pedida_em=datetime('now','localtime','-3 days') WHERE id=?").run(rv);
+  lr = daLista(chamar('GET','/api/devolucao-casos',null,2).body.ml, rv);
+  eq('com 3 dias: parada', lr.dias_revisao + '/' + lr.revisao_parada, '3/true');
+
+  secao('revisão do frete — com revisão pendente, a baixa NÃO encerra o ML devolve (decisão do dono)');
+  r = chamar('POST','/api/devolucao',{ codigo_ml:'2000000000009301', caso_id:rv, sku_fisico:'BK140140BEGE', destinacao:'estoque' }, 4);
+  eq('a peça é revisada', caso(rv).etapa, 'revisado');
+  r = chamar('POST','/api/devolucao/baixa',{ id:caso(rv).devolucao_id, reputacao:'nao' }, 3);
+  eq('a baixa passa', r.status, 200);
+  eq('   e o caso continua aberto', caso(rv).encerrado_em, null);
+  ok('   e a história diz que espera a revisão', eventos(rv).some(e => /revis[ãa]o do frete/i.test(e.texto || '') && /baixa/i.test(e.texto || '')), JSON.stringify(eventos(rv).map(e=>e.texto)));
+
+  secao('revisão do frete — a resposta do ML');
+  eq('resposta impossível: recusada', respRev(rv, { resultado:'talvez' }).status, 400);
+  eq('quem não tem o dinheiro não lança o valor devolvido', respRev(rv, { resultado:'devolveu', valor_revisao:'48,70' }).status, 403);
+  eq('   e nada mudou', caso(rv).revisao_resultado, null);
+  rp = respRev(rv, { resultado:'devolveu', valor_revisao:'48,70' }, 1);
+  eq('"ML devolveu", com o valor (Admin Geral)', rp.status, 200);
+  eq('   o resultado', caso(rv).revisao_resultado, 'devolveu');
+  eq('   o valor', caso(rv).valor_revisao, 48.7);
+  ok('   e a data da resposta', !!caso(rv).revisao_resp_em);
+  eq('   e o caso já baixado encerra agora', caso(rv).saida, 'revisado_ml');
+  ok('   a história diz o que mudou, sem o número', eventos(rv).some(e => e.tipo === 'revisao_frete' && /devolveu/.test(e.texto) && !/48/.test(e.texto)), JSON.stringify(eventos(rv).map(e=>e.texto)));
+  ok('   e a auditoria grava o valor', AUDIT.some(a => a.acao === 'valor' && a.alvo === String(rv)));
+  ok('o valor devolvido não viaja a quem não tem a chave', !chavesDe(det(rv, 2)).has('valor_revisao'));
+  const rv2 = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000000000009302', publicidade:false }, 3).body.id;
+  eq('resposta sem pedido: recusada', respRev(rv2, { resultado:'negou' }).status, 409);
+  chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, { id:rv2 });
+  pedeRev(rv2);
+  eq('"ML negou" (quem acompanha)', respRev(rv2, { resultado:'negou' }).status, 200);
+  eq('   resposta duas vezes: recusada', respRev(rv2, { resultado:'devolveu' }).status, 409);
+  eq('   e o caso ainda não baixado continua aberto', caso(rv2).encerrado_em, null);
+  r = chamar('POST','/api/devolucao',{ codigo_ml:'2000000000009302', caso_id:rv2, sku_fisico:'BK140140BEGE', destinacao:'estoque' }, 4);
+  chamar('POST','/api/devolucao/baixa',{ id:caso(rv2).devolucao_id, reputacao:'nao' }, 3);
+  eq('com a revisão respondida, a baixa encerra como sempre', caso(rv2).saida, 'revisado_ml');
+  rp = respRev(rv2, { resultado:'devolveu' });
+  eq('o valor devolvido depois, pelo "Salvar valores"', chamar('POST','/api/devolucao-casos/:id/valor',{ valor_revisao:'10' }, 1, { id:rv2 }).status, 200);
+  eq('   gravado mesmo com o caso encerrado', caso(rv2).valor_revisao, 10);
+
+  secao('revisão do frete — o relatório do mês');
+  const relRv = chamar('GET','/api/devolucao-casos/relatorio',null,1,{},{ mes:dia(0).slice(0,7) }).body.dinheiro;
+  const somaRv = db.prepare("SELECT SUM(valor_revisao) s FROM devolucao_caso WHERE teste=0 AND substr(criado_em,1,7)=?").get(dia(0).slice(0,7)).s;
+  eq('soma o frete devolvido na revisão', relRv.frete_devolvido, Math.round(somaRv * 100) / 100);
+  eq('e o prejuízo é o cobrado menos o devolvido', relRv.frete_prejuizo, Math.round((relRv.custo_etiqueta - relRv.frete_devolvido) * 100) / 100);
 
   secao('motivo removido da lista — o caso que já usa ele não perde');
   db.prepare("INSERT INTO listas (tipo,valor,ordem,ativo) VALUES ('motivo_devolucao','Motivo que vai sair',99,1)").run();

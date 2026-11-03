@@ -156,6 +156,24 @@ module.exports = function(app, db){
     responder(res, () => { D.trocarTipo(db, req.params.id, req.body, req.usuario); return { ok:true }; });
   });
 
+  /* A revisão do frete do "ML devolve" (de quem acompanha). O valor devolvido
+     é dinheiro: com ele no corpo, só com devolucao.dinheiro (R15). */
+  const semAcompanhar = (res) => res.status(403).json({ erro:'A revisão do frete é de quem acompanha as devoluções.', chave:'devolucao.acompanhar' });
+  app.post('/api/devolucao-casos/:id/revisao-frete', (req,res) => {
+    if(!pode(req).acompanhar) return semAcompanhar(res);
+    responder(res, () => { D.pedirRevisaoFrete(db, req.params.id, req.body, req.usuario); return { ok:true }; });
+  });
+  app.post('/api/devolucao-casos/:id/revisao-frete-resposta', (req,res) => {
+    if(!pode(req).acompanhar) return semAcompanhar(res);
+    const b = req.body || {};
+    if(b.valor_revisao !== undefined && String(b.valor_revisao).trim() !== '' && !podeDinheiro(req)) return semDinheiro(req, res);
+    responder(res, () => {
+      const r = D.respostaRevisaoFrete(db, req.params.id, b, req.usuario);
+      if(r.valorMudou && r.valorMudou.length) auditar(req, 'valor', req.params.id, 'lançou '+r.valorMudou.join(', ')+': '+JSON.stringify({ valor_revisao: b.valor_revisao }));
+      return { ok:true };
+    });
+  });
+
   /* Desfazer a última mudança de etapa feita à mão — só quem a fez. */
   app.post('/api/devolucao-casos/:id/desfazer-etapa', (req,res) => responder(res, () => {
     D.desfazerEtapa(db, req.params.id, req.usuario);

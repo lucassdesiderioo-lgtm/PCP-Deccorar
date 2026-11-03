@@ -757,6 +757,8 @@ console.log('\n── 6-I. as devoluções em andamento (spec DEVOLUCOES-ACOMPAN
   eq('ler o relatório', J(AC.permDaRota('/api/devolucao-casos/relatorio','GET')), LER);
   eq('lançar pede devolucao.lancar', AC.permDaRota('/api/devolucao-casos','POST'), 'devolucao.lancar');
   eq('editar pede devolucao.lancar', AC.permDaRota('/api/devolucao-casos/12/editar','POST'), 'devolucao.lancar');
+  eq('pedir a revisão do frete pede devolucao.acompanhar', AC.permDaRota('/api/devolucao-casos/12/revisao-frete','POST'), 'devolucao.acompanhar');
+  eq('a resposta da revisão pede devolucao.acompanhar', AC.permDaRota('/api/devolucao-casos/12/revisao-frete-resposta','POST'), 'devolucao.acompanhar');
   eq('trocar o tipo pede devolucao.lancar', AC.permDaRota('/api/devolucao-casos/12/tipo','POST'), 'devolucao.lancar');
   eq('desfazer a etapa pede devolucao.acompanhar', AC.permDaRota('/api/devolucao-casos/12/desfazer-etapa','POST'), 'devolucao.acompanhar');
   for(const a of ['etapa','prorrogacao','prazo','chegou','coleta','anexo'])

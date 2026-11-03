@@ -53,6 +53,12 @@
   .simnao button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
   .msgml{white-space:pre-wrap;word-break:break-word;max-height:280px;overflow:auto;background:#0b0f14;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:13px;line-height:1.45}
   .larga{grid-column:1/-1}
+  /* campo mudado e ainda não salvo (CONSERTO de 03/11/2026) */
+  .naosalvo{border-color:var(--amber)!important;box-shadow:0 0 0 1px var(--amber)}
+  .barraSujo{position:sticky;bottom:0;margin:12px -18px -18px;padding:10px 18px;background:var(--ambg);border-top:1px solid var(--amber);
+    border-radius:0 0 14px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;z-index:2}
+  .barraSujo .txt{flex:1;min-width:200px;color:var(--amber);font-size:13px}
+  @media (max-width:600px){ .barraSujo{margin:12px -12px -12px;padding:10px 12px} }
   /* o caso aberto */
   #fundo{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:10001;overflow:auto;padding:24px 12px}
   #painel{max-width:860px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
@@ -221,7 +227,7 @@ function linhaCaso(c){
   if(c.parado_valor) chips+='<span class="chip parado">valor do ML a pedir há '+plural(c.dias_valor||0,'dia','dias')+'</span>';
   if(c.valor_ml_situacao==='pedido') chips+='<span class="chip">valor do ML pedido</span>';
   if('saldo' in c) chips+= c.incompleto ? '<span class="chip falta">saldo incompleto</span>' : '<span class="chip dinheiro">saldo '+reais(c.saldo)+'</span>';
-  if(c.tipo==='ml') chips+='<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>';
+  if(c.tipo==='ml') chips+='<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>'+chipRevisao(c);
   if(c.responsavel) chips+='<span class="chip">'+esc(c.responsavel)+'</span>';
   if(c.prazo_original) chips+='<span class="chip">prorrogado (era '+dataBR(c.prazo_original)+')</span>';
   chips+=chipPub(c)+chipLink(c);
@@ -338,13 +344,80 @@ document.getElementById('btLancar').onclick=function(){
 };
 
 /* ── o caso aberto ── */
-function fechar(){ ESTADO.aberto=null; document.getElementById('fundo').style.display='none'; }
+/* ── NADA DIGITADO SOME CALADO (CONSERTO de 03/11/2026) ──
+   O caso tinha dois "Salvar" (o do lançamento e o dos valores), e qualquer
+   ação redesenhava o caso inteiro: o que estava digitado no OUTRO bloco
+   sumia sem aviso — o dono digitou o responsável e o valor, salvou um, e o
+   outro voltou ao que era. Agora:
+   · todo campo mudado e não salvo fica marcado, e a barra embaixo diz quais;
+   · "Salvar alterações" grava TUDO o que mudou (lançamento e valores);
+   · uma ação (etapa, prazo, coleta…) consome só os campos do bloco dela; os
+     outros campos digitados VOLTAM depois do redesenho, ainda marcados;
+   · Fechar, ou abrir outro caso, com campo não salvo pergunta antes. */
+function chaveCampo(el){
+  if(el.id) return el.id;
+  var a=el.getAttribute('data-custot'); if(a) return 'custot:'+a;
+  a=el.getAttribute('data-custo'); if(a) return 'custo:'+a;
+  return null;
+}
+function acharCampo(k){
+  if(k.indexOf('custot:')===0) return document.querySelector('#painel [data-custot="'+k.slice(7)+'"]');
+  if(k.indexOf('custo:')===0) return document.querySelector('#painel [data-custo="'+k.slice(6)+'"]');
+  var el=document.getElementById(k); return el && document.getElementById('painel').contains(el) ? el : null;
+}
+function camposDoCaso(){
+  return Array.prototype.slice.call(document.querySelectorAll('#painel input, #painel select, #painel textarea'))
+    .filter(function(el){ return el.type!=='file' && el.id!=='qMotivo' && chaveCampo(el); });
+}
+function marcarOriginais(){ camposDoCaso().forEach(function(el){ el.setAttribute('data-orig', el.value); }); }
+function estaSujo(el){ return el.value !== el.getAttribute('data-orig'); }
+function sujos(){ return camposDoCaso().filter(estaSujo); }
+function rotuloDe(el){
+  var d=el.closest('div'), l=d && d.querySelector('label');
+  var t=(l && l.textContent.trim()) || el.getAttribute('placeholder') || chaveCampo(el);
+  return t.replace(/\s*\(.*?\)\s*$/,'');
+}
+function atualizarBarra(){
+  var s=sujos(), bar=document.getElementById('barraSujo');
+  camposDoCaso().forEach(function(el){ el.classList.toggle('naosalvo', estaSujo(el)); });
+  if(!bar) return;
+  bar.style.display = s.length ? '' : 'none';
+  bar.querySelector('.qual').textContent = s.map(rotuloDe).join(' · ');
+}
+function guardarSujos(fora){
+  var g={}; sujos().forEach(function(el){ if(!fora || fora.indexOf(el)<0) g[chaveCampo(el)]=el.value; }); return g;
+}
+function restaurarSujos(g){
+  var perdidos=[];
+  Object.keys(g||{}).forEach(function(k){ var el=acharCampo(k); if(el) el.value=g[k]; else perdidos.push(k); });
+  atualizarBarra();
+  return perdidos;
+}
+function podeSair(){
+  var s=sujos(); if(!s.length) return true;
+  return confirm('Há alterações NÃO salvas neste caso: '+s.map(rotuloDe).join(', ')+'.\n\nSair e perder o que foi digitado?');
+}
+function fechar(){ if(!podeSair()) return; ESTADO.aberto=null; document.getElementById('fundo').style.display='none'; }
 document.getElementById('fundo').addEventListener('click',function(e){ if(e.target.id==='fundo') fechar(); });
 document.addEventListener('keydown',function(e){ if(e.key==='Escape' && ESTADO.aberto) fechar(); });
-function abrir(id){
+function abrir(id, guardar, depois){
+  if(ESTADO.aberto && id!==ESTADO.aberto && !guardar && !podeSair()) return;
   ESTADO.aberto=id;
-  api('GET','/api/devolucao-casos/'+id).then(desenharCaso).catch(function(e){ alert(e.message); });
+  api('GET','/api/devolucao-casos/'+id).then(function(d){
+    desenharCaso(d);
+    var perdidos=restaurarSujos(guardar);
+    if(depois) depois(perdidos);
+    else if(perdidos.length) document.getElementById('cMsg').innerHTML='<div class="erro">Não deu para manter o que estava digitado em: '+esc(perdidos.join(', '))+'.</div>';
+  }).catch(function(e){ alert(e.message); });
 }
+/* De onde veio a ação: o botão (ou campo) clicado. Os campos do MESMO bloco
+   são dela; os dos outros blocos ficam guardados. */
+ESTADO.origem=null;
+['click','change'].forEach(function(t){
+  document.getElementById('painel').addEventListener(t,function(e){ if(e.target.closest('button,select,input,label')) ESTADO.origem=e.target; }, true);
+});
+document.getElementById('painel').addEventListener('input', atualizarBarra);
+document.getElementById('painel').addEventListener('change', atualizarBarra);
 var GANCHOS=[];   // as fases seguintes acrescentam blocos ao caso aberto
 function desenharCaso(d){
   var c=d.caso, P=ESTADO.pode, aberto=!c.encerrado_em;
@@ -354,7 +427,7 @@ function desenharCaso(d){
     (c.link_ml?'<a class="bt" style="margin-left:auto;text-decoration:none" href="'+esc(c.link_ml)+'" target="_blank" rel="noopener noreferrer">Abrir conversa no ML ↗</a>':'')+
     '<button class="bt sec" style="'+(c.link_ml?'':'margin-left:auto')+'" onclick="fechar()">Fechar</button></div>';
   h+='<div class="chips">'+chipPrazo(c)+(c.tipo==='coleta'&&c.parado?'<span class="chip parado">parado há '+plural(c.dias_parado,'dia','dias')+'</span>':'')+
-     (c.tipo==='ml'?'<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>':'')+
+     (c.tipo==='ml'?'<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>'+chipRevisao(c):'')+
      (c.saida_nome?'<span class="chip">'+esc(c.saida_nome)+'</span>':'')+chipPub(c)+'</div>';
   h+='<div class="trilha">'+trilha+'</div>';
   h+='<div class="dados">'+
@@ -362,8 +435,9 @@ function desenharCaso(d){
     '<div><b>SKU</b>'+esc(c.sku||'—')+(pecaDe(c.sku)?'<br><small>'+esc(pecaDe(c.sku))+'</small>':'')+'</div>'+
     '<div><b>Comprador</b>'+esc(c.comprador||'—')+'</div>'+celulaMotivo(c, P, aberto)+
     '<div><b>Via publicidade</b>'+simNao(c.publicidade)+'</div>'+
-    (c.tipo==='coleta'?'<div><b>Resolver até</b>'+dataBR(c.prazo)+(c.prazo_original?'<br><small>original: '+dataBR(c.prazo_original)+'</small>':'')+'</div>'+
-      '<div><b>Responsável</b>'+esc(c.responsavel||'—')+'</div><div><b>Passado em</b>'+dataBR(c.passado_em)+'</div>':'')+
+    (c.tipo==='coleta'?'<div><b>Resolver até</b>'+dataBR(c.prazo)+(c.prazo_original?'<br><small>original: '+dataBR(c.prazo_original)+'</small>':'')+'</div>':'')+
+    // Responsável e Passado em nos DOIS tipos: no "ML devolve" eles eram gravados e não apareciam.
+    '<div><b>Responsável</b>'+esc(c.responsavel||'—')+'</div><div><b>Passado em</b>'+dataBR(c.passado_em)+'</div>'+
     '<div><b>Na etapa desde</b>'+horaBR(c.etapa_desde)+'</div>'+
     (c.chegou_em?'<div><b>Chegou em</b>'+horaBR(c.chegou_em)+'</div>':'')+
     (c.devolucao_id?'<div><b>Revisão</b>#'+c.devolucao_id+'</div>':'')+
@@ -404,7 +478,7 @@ function desenharCaso(d){
         '<option value="1"'+(c.publicidade===1?' selected':'')+'>Sim</option><option value="0"'+(c.publicidade===0?' selected':'')+'>Não</option></select></div>'+
       '<div class="larga"><label>Link da conversa no ML</label><input id="eLink" value="'+esc(c.link_ml||'')+'" autocomplete="off" autocapitalize="off" inputmode="url"></div>'+
       '<div class="larga"><label>Mensagem do ML</label><textarea id="eMsgMl" rows="6">'+esc(c.mensagem_ml||'')+'</textarea></div>'+
-      '</div><div class="acoes"><button class="bt sec" id="btEditar">Salvar</button></div></div>';
+      '</div><div class="acoes"><button class="bt" id="btEditar">Salvar alterações</button></div></div>';
   }
   /* Trocar o tipo (AJUSTE de 03/11/2026): o caso nasce como o ML disse no
      dia, e muda se o ML mudar. Quem decide se pode é o servidor (recusa com
@@ -423,9 +497,12 @@ function desenharCaso(d){
   h+='<div class="bloco"><h3>História</h3><div class="hist">'+d.eventos.slice().reverse().map(function(e){
     return '<div><small>'+horaBR(e.criado_em)+' · '+esc(e.usuario||'—')+'</small><br>'+esc(nomeEvento(e, d.nomes))+(e.texto?' — '+esc(e.texto):'')+'</div>';
   }).join('')+'</div></div>';
+  h+='<div id="barraSujo" class="barraSujo" style="display:none"><span class="txt">Alterações NÃO salvas: <b class="qual"></b></span>'+
+     '<button class="bt" id="btSalvarTudo">Salvar alterações</button><button class="bt sec" id="btDescartar">Descartar</button></div>';
   document.getElementById('painel').innerHTML=h;
   document.getElementById('fundo').style.display='block';
   ligarCaso(d, c);
+  marcarOriginais();
 }
 /* O MOTIVO SE ESCOLHE NO ALTO DO CASO (AJUSTE de 03/11/2026, dono: "uma vez
    lançado não conseguimos mais colocar o motivo"). Ele já se editava, mas só
@@ -448,6 +525,8 @@ function nomeEvento(e, nomes){
     case 'editado': return 'Lançamento editado';
     case 'desfeito': return 'Clique de etapa desfeito';
     case 'tipo': return 'Tipo trocado';
+    case 'revisao_frete': return 'Revisão do frete';
+    case 'baixa': return 'Baixa da devolução';
     case 'encerrado': return 'Encerrado';
     case 'revisado': return 'Revisado na tela de Devoluções';
     case 'chegou': return 'A caixa chegou';
@@ -461,8 +540,64 @@ function nomeEvento(e, nomes){
 }
 function acao(url, corpo){
   var m=document.getElementById('cMsg'); m.innerHTML='';
-  return api('POST', url, corpo).then(function(){ carregar(); abrir(ESTADO.aberto); })
-    .catch(function(e){ m.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; m.scrollIntoView({block:'nearest'}); });
+  /* Os campos da AÇÃO são os da linha do botão (o prazo ao lado de "Lançar
+     prazo novo", o custo ao lado de "Coletou"…). Todo o resto que está
+     digitado fica guardado e volta depois do redesenho. Um campo do bloco da
+     ação que sumiu com ela (o formulário de pedir coleta, depois de pedida)
+     não é perda: foi usado. */
+  var o=ESTADO.origem, linha=o && (o.closest('.acoes') || o), bloco=o && o.closest('.bloco');
+  var daAcao = linha ? camposDoCaso().filter(function(el){ return linha.contains(el); }) : [];
+  var doBloco = bloco ? camposDoCaso().filter(function(el){ return bloco.contains(el); }).map(chaveCampo) : [];
+  var guardar=guardarSujos(daAcao);
+  return api('POST', url, corpo).then(function(){
+    carregar();
+    abrir(ESTADO.aberto, guardar, function(perdidos){
+      perdidos=perdidos.filter(function(k){ return doBloco.indexOf(k)<0; });
+      if(perdidos.length) document.getElementById('cMsg').innerHTML='<div class="erro">Não deu para manter o que estava digitado em: '+esc(perdidos.join(', '))+'.</div>';
+    });
+  }).catch(function(e){ m.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; m.scrollIntoView({block:'nearest'}); });
+}
+/* "Salvar alterações": grava TUDO o que mudou no caso, cada parte pela rota
+   de sempre (o lançamento pelo editar; o dinheiro pelo valor, que o servidor
+   só aceita de quem tem a permissão). O que for recusado volta ao campo,
+   marcado, com o motivo. */
+var CAMPOS_EDITAR={eMotivo:'motivo', eNf:'nf', eSku:'sku', eResp:'responsavel', eObs:'obs', ePub:'publicidade', eLink:'link_ml', eMsgMl:'mensagem_ml'};
+var CAMPOS_VALOR={dValor:'valor_ml', dPerdido:'valor_perdido', dDevolvido:'valor_devolvido', dEtiqueta:'custo_etiqueta', dRevisao:'valor_revisao'};
+function salvarTudo(){
+  var id=ESTADO.aberto, base='/api/devolucao-casos/'+id, m=document.getElementById('cMsg');
+  var s=sujos(), corpoE={}, corpoV={}, tent=[], usados=[], nomesE=[], nomesV=[];
+  s.forEach(function(el){
+    var k=chaveCampo(el);
+    if(CAMPOS_EDITAR[k]){
+      if(k==='ePub'){ if(el.value==='') return; corpoE.publicidade = el.value==='1'; }
+      else corpoE[CAMPOS_EDITAR[k]]=el.value;
+      usados.push(el); nomesE.push(rotuloDe(el));
+    } else if(CAMPOS_VALOR[k]){ corpoV[CAMPOS_VALOR[k]]=el.value; usados.push(el); nomesV.push(rotuloDe(el)); }
+    else if(k.indexOf('custot:')===0){ tent.push({ el:el, corpo:{ tentativa_id:+k.slice(7), custo:el.value } }); usados.push(el); nomesV.push(rotuloDe(el)); }
+  });
+  if(!usados.length){ m.innerHTML='<div class="sub">Nada para salvar: os campos marcados são de ações com botão próprio.</div>'; return; }
+  var ok=[], erros=[], falhou=[];
+  function passo(url, corpo, els, nomes){
+    return api('POST', url, corpo).then(function(){ ok=ok.concat(nomes); })
+      .catch(function(e){ erros.push(nomes.join(', ')+': '+e.message); falhou=falhou.concat(els); });
+  }
+  var cad=Promise.resolve();
+  var elsE=usados.filter(function(el){ return CAMPOS_EDITAR[chaveCampo(el)]; });
+  var elsV=usados.filter(function(el){ return CAMPOS_VALOR[chaveCampo(el)]; });
+  if(Object.keys(corpoE).length) cad=cad.then(function(){ return passo(base+'/editar', corpoE, elsE, nomesE); });
+  if(Object.keys(corpoV).length) cad=cad.then(function(){ return passo(base+'/valor', corpoV, elsV, elsV.map(rotuloDe)); });
+  tent.forEach(function(t){ cad=cad.then(function(){ return passo(base+'/valor', t.corpo, [t.el], [rotuloDe(t.el)]); }); });
+  cad.then(function(){
+    // Fica digitado: o que falhou e o que é de outra ação; sai o que foi gravado.
+    var guardar=guardarSujos(usados.filter(function(el){ return falhou.indexOf(el)<0; }));
+    carregar();
+    abrir(id, guardar, function(){
+      var msg=document.getElementById('cMsg');
+      msg.innerHTML=(ok.length?'<div class="okmsg">✓ Salvo: '+esc(ok.join(', '))+'</div>':'')+
+        (erros.length?'<div class="erro">NÃO salvo — '+esc(erros.join(' · '))+'</div>':'');
+      if(erros.length) msg.scrollIntoView({block:'nearest'});
+    });
+  });
 }
 function ligarCaso(d, c){
   var base='/api/devolucao-casos/'+c.id;
@@ -480,14 +615,10 @@ function ligarCaso(d, c){
   document.querySelectorAll('#painel [data-irmao]').forEach(function(b){ b.onclick=function(){ abrir(+b.getAttribute('data-irmao')); }; });
   if((x=document.getElementById('btAvisoML'))) x.onclick=function(){ acao(base+'/aviso-ml',{}); };
   if((x=document.getElementById('btPrazo'))) x.onclick=function(){ acao(base+'/prazo',{prazo:document.getElementById('novoPrazo').value}); };
-  if((x=document.getElementById('btEditar'))) x.onclick=function(){
-    var corpo={ motivo:document.getElementById('eMotivo').value, nf:document.getElementById('eNf').value,
-      sku:document.getElementById('eSku').value, responsavel:document.getElementById('eResp').value, obs:document.getElementById('eObs').value,
-      link_ml:document.getElementById('eLink').value, mensagem_ml:document.getElementById('eMsgMl').value };
-    // Sem resposta escolhida, a publicidade não vai: campo ausente não apaga.
-    var pv=document.getElementById('ePub').value; if(pv!=='') corpo.publicidade = pv==='1';
-    acao(base+'/editar', corpo);
-  };
+  // Os dois "Salvar" do caso gravam TUDO o que mudou (o lançamento e os valores).
+  if((x=document.getElementById('btEditar'))) x.onclick=salvarTudo;
+  if((x=document.getElementById('btSalvarTudo'))) x.onclick=salvarTudo;
+  if((x=document.getElementById('btDescartar'))) x.onclick=function(){ sujos().forEach(function(el){ el.value=el.getAttribute('data-orig'); }); atualizarBarra(); };
   if((x=document.getElementById('btPerda'))) x.onclick=function(){
     if(!confirm('Encerrar o caso #'+c.id+' como PERDA por prazo? A decisão fica registrada com seu nome.')) return;
     acao(base+'/perda',{ valor_perdido:document.getElementById('vPerdido').value });
@@ -495,7 +626,7 @@ function ligarCaso(d, c){
   GANCHOS.forEach(function(g){ if(g.ligar) g.ligar(d, c, base); });
 }
 document.addEventListener('click',function(e){
-  var l=e.target.closest('.linha'); if(l && l.getAttribute('data-id')) abrir(+l.getAttribute('data-id'));
+  var l=e.target.closest('.linha'); if(l && l.getAttribute('data-id')) abrir(+l.getAttribute('data-id'));  // abrir() pergunta se há campo não salvo
 });
 
 /* ── abas ── */
@@ -680,6 +811,49 @@ GANCHOS.push({
   }
 });
 
+/* ── A REVISÃO DO FRETE (AJUSTE de 03/11/2026) — só no "ML devolve" ──
+   Quando o ML cobra o frete e a culpa não é nossa, depois de a peça chegar
+   pede-se revisão. Pedir e lançar a resposta é de quem acompanha; o VALOR
+   devolvido é só do Admin Geral. Com a revisão pendente o caso não encerra
+   na baixa: fica aberto até o ML responder. */
+function chipRevisao(c){
+  if(!c.revisao_pendente) return '';
+  return '<span class="chip '+(c.revisao_parada?'parado':'')+'">revisão do frete pedida há '+plural(c.dias_revisao||0,'dia','dias')+'</span>';
+}
+GANCHOS.push({
+  html:function(d, c, P, aberto){
+    if(c.tipo!=='ml') return '';
+    var h='<div class="bloco"><h3>Revisão do frete (ML)</h3>';
+    if(!c.revisao_pedida_em){
+      if(aberto && P.acompanhar && c.chegou_em)
+        h+='<div class="sub" style="margin-bottom:6px">Se o ML cobrou o frete e a culpa não foi nossa, peça a revisão mostrando que o anúncio não prometia o que o comprador pediu.</div>'+
+          '<div class="acoes"><input id="rvNumero" placeholder="nº da solicitação (opcional)" autocomplete="off" style="max-width:260px"><button class="bt sec" id="btRevisao">Pedi revisão do frete ao ML</button></div>';
+      else h+='<div class="sub">'+(c.chegou_em?'Nenhuma revisão pedida.':'A revisão do frete se pede depois de a caixa chegar.')+'</div>';
+    } else {
+      h+='<div class="dados"><div><b>Pedida em</b>'+horaBR(c.revisao_pedida_em)+'</div>'+(c.revisao_numero?'<div><b>Nº da solicitação</b>'+esc(c.revisao_numero)+'</div>':'')+
+        '<div><b>Resposta do ML</b>'+(c.revisao_resultado==='devolveu'?'devolveu o frete':c.revisao_resultado==='negou'?'negou':'<span style="color:var(--amber)">esperando há '+plural(c.dias_revisao||0,'dia','dias')+'</span>')+
+        (c.revisao_resp_em?'<br><small>'+horaBR(c.revisao_resp_em)+'</small>':'')+'</div></div>';
+      if(!c.revisao_resultado && aberto && P.acompanhar)
+        h+='<div class="acoes" style="margin-top:8px">'+(P.dinheiro?'<input id="rvValor" placeholder="valor devolvido (R$)" style="max-width:200px">':'')+
+          '<button class="bt" id="btRevDevolveu">ML devolveu o frete</button><button class="bt sec" id="btRevNegou">ML negou</button></div>';
+    }
+    return h+'</div>';
+  },
+  ligar:function(d, c, base){
+    var x;
+    if((x=document.getElementById('btRevisao'))) x.onclick=function(){ acao(base+'/revisao-frete',{ numero:document.getElementById('rvNumero').value }); };
+    if((x=document.getElementById('btRevDevolveu'))) x.onclick=function(){
+      var v=document.getElementById('rvValor'), corpo={ resultado:'devolveu' };
+      if(v && v.value.trim()) corpo.valor_revisao=v.value;
+      acao(base+'/revisao-frete-resposta', corpo);
+    };
+    if((x=document.getElementById('btRevNegou'))) x.onclick=function(){
+      if(!confirm('Lançar que o ML NEGOU a revisão do frete do caso #'+c.id+'?')) return;
+      acao(base+'/revisao-frete-resposta',{ resultado:'negou' });
+    };
+  }
+});
+
 /* ── FASE 5: o dinheiro (só Admin Geral) e o relatório ── */
 var NOME_SIT={ja_veio:'já veio', pedir:'precisamos pedir ao ML', pedido:'pedimos, esperando o ML'};
 /* O custo da etiqueta de devolução que o ML cobra (AJUSTE de 03/11/2026):
@@ -709,15 +883,17 @@ GANCHOS.push({
         (c.saida==='devolvido_comprador'?'<div><label>Valor devolvido (R$)</label><input id="dDevolvido" value="'+(c.valor_devolvido!=null?virg(c.valor_devolvido):'')+'"></div>':'')+
         (d.tentativas||[]).map(function(t){ return '<div><label>Custo da '+t.numero+'ª tentativa (R$)</label><input data-custot="'+t.id+'" value="'+(t.custo!=null?virg(t.custo):'')+'"></div>'; }).join('')+
         campoEtiqueta(c)+
-        '</div><div class="acoes"><button class="bt sec" id="btValor">Salvar valores</button></div>';
+        '</div><div class="acoes"><button class="bt" id="btValor">Salvar alterações</button></div>';
       if(aberto){
         h+= c.devolucao_id
           ? '<div class="sub" style="margin:8px 0 6px">Baixa do reembolso — conferido no Mercado Pago:</div><div class="acoes"><button class="bt" data-reemb="recebido">Reembolso recebido</button><button class="bt perigo" data-reemb="nao_recebido">Reembolso não recebido</button></div>'
           : '<div class="sub" style="margin-top:8px">A baixa do reembolso aparece depois de a peça ser revisada na tela de Devoluções.</div>';
       }
     } else {
-      h+='<div class="sub">O "ML devolve" não tem valor de coleta; ele encerra na baixa da devolução. Quando o ML cobra a etiqueta de devolução da Deccorar, o custo entra aqui.</div>'+
-        '<div class="grade" style="margin-top:8px">'+campoEtiqueta(c)+'</div><div class="acoes"><button class="bt sec" id="btValor">Salvar valores</button></div>';
+      h+='<div class="sub">O "ML devolve" não tem valor de coleta. Quando o ML cobra o frete (a etiqueta de devolução) da Deccorar, o custo entra aqui; se a revisão do frete devolver, o valor devolvido também.</div>'+
+        '<div class="grade" style="margin-top:8px">'+campoEtiqueta(c)+
+        '<div><label>Frete devolvido pelo ML na revisão (R$)</label><input id="dRevisao" value="'+(c.valor_revisao!=null?virg(c.valor_revisao):'')+'" placeholder="se o ML devolveu"></div>'+
+        '</div><div class="acoes"><button class="bt" id="btValor">Salvar alterações</button></div>';
     }
     return h+'</div>';
   },
@@ -728,22 +904,9 @@ GANCHOS.push({
       if(!confirm('Dar baixa no reembolso como "'+(r==='recebido'?'recebido':'não recebido')+'" e encerrar o caso #'+c.id+'?')) return;
       acao(base+'/reembolso',{resultado:r});
     }; });
+    // O "Salvar alterações" do dinheiro é o mesmo do caso: grava TUDO o que mudou.
     var x=document.getElementById('btValor');
-    if(x) x.onclick=function(){
-      var m=document.getElementById('cMsg'); m.innerHTML='';
-      var corpo={}, v=document.getElementById('dValor');
-      if(v && v.value!==(c.valor_ml!=null?virg(c.valor_ml):'')) corpo.valor_ml=v.value;
-      var p=document.getElementById('dPerdido'); if(p) corpo.valor_perdido=p.value;
-      var dv=document.getElementById('dDevolvido'); if(dv) corpo.valor_devolvido=dv.value;
-      var de=document.getElementById('dEtiqueta'); if(de && de.value!==(c.custo_etiqueta!=null?virg(c.custo_etiqueta):'')) corpo.custo_etiqueta=de.value;
-      var pedidos=[api('POST',base+'/valor',corpo)];
-      document.querySelectorAll('#painel [data-custot]').forEach(function(inp){
-        var t=(d.tentativas||[]).find(function(k){return String(k.id)===inp.getAttribute('data-custot');});
-        if(t && inp.value!==(t.custo!=null?virg(t.custo):'')) pedidos.push(api('POST',base+'/valor',{tentativa_id:t.id, custo:inp.value}));
-      });
-      Promise.all(pedidos).then(function(){ carregar(); abrir(c.id); })
-        .catch(function(e){ m.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; m.scrollIntoView({block:'nearest'}); });
-    };
+    if(x) x.onclick=salvarTudo;
   }
 });
 
@@ -765,7 +928,8 @@ function carregarRel(){
       h+='<div class="bloco"><h3>Dinheiro do mês (Admin Geral)</h3>'+(D.piso?'<div class="aviso">Total incompleto — falta: '+esc(D.faltam.join(' · '))+'. Os números são o mínimo (≥), não o total.</div>':'')+
         '<div class="dados"><div><b>Valor do ML pelas coletas</b>'+ge+reais(D.valor_ml)+'</div><div><b>Custos das tentativas</b>'+ge+reais(D.custos)+'</div>'+
         '<div><b>Perda por prazo</b>'+ge+reais(D.perda_prazo)+'</div><div><b>Devolvido ao comprador</b>'+ge+reais(D.devolvido_comprador)+'</div>'+
-        '<div><b>Etiquetas de devolução cobradas pelo ML</b>'+reais(D.custo_etiqueta||0)+'</div></div></div>';
+        '<div><b>Fretes cobrados pelo ML</b>'+reais(D.custo_etiqueta||0)+'</div><div><b>Devolvidos na revisão</b>'+reais(D.frete_devolvido||0)+'</div>'+
+        '<div><b>Ficou de prejuízo no frete</b>'+reais(D.frete_prejuizo||0)+'</div></div></div>';
     }
     el.innerHTML=h;
   }).catch(function(e){ el.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; });
