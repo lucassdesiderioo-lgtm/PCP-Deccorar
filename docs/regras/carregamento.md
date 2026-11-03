@@ -82,12 +82,12 @@ Etiqueta de Venda ────┤
 - **Teste que trava:** ⚠ **sem teste**.
 - **Status:** no ar desde 10/09/2026.
 
-### R-COL-03 · A caixa de coleta não entra no carro, nem na lista nem no contador
-- **Regra:** a coleta não aparece em "Faltam carregar no carro" e não conta no "No carro X de Y". Ela tem card próprio (violeta), ao lado do carro, sempre visível; abaixo de 900 px empilha, carro primeiro. O bipe pro canto é o mesmo `POST /api/carregar`, que responde `coleta:true` e "Está indo N peças".
+### R-COL-03 · A caixa de coleta não entra na conta do carro; na tela, lista única com a marcação
+- **Regra:** a caixa de coleta nunca entra na conta do carro (`faltam` e `carregados` da rota são só agência). **Desde 03/11/2026 a tela mostra agência e coleta numa lista única** (`listaUnica`, CONFERENCIA-EXPEDICAO fase 1), cada caixa com a marcação 🟣 Coleta / 🚗 Agência, em duas partes: **Esperando conferência** (agência não conferida + coleta fora do canto, a de dia anterior em cima) e **Conferidas, esperando sair** (agência conferida na área + coleta no canto). A tela só junta as listas que a rota já manda: quem diz o que é coleta continua sendo o `carga.js`. O bipe pro canto é o mesmo `POST /api/carregar`, que responde `coleta:true` e "Está indo N peças". Os cards da viagem (agência) e da saída do caminhão (coleta) ficam embaixo, lado a lado; abaixo de 900 px empilham.
 - **Por quê:** são dois lugares físicos. `carregado_em` na coleta é a hora em que a caixa foi pro canto; a hora em que o caminhão levou é `retirado_em`.
 - **Exceções:** nenhuma.
-- **Teste que trava:** `teste_carga.js`.
-- **Status:** no ar desde 10/09/2026.
+- **Teste que trava:** `teste_carga.js` (a lista única com as duas modalidades misturadas, executada).
+- **Status:** no ar desde 10/09/2026 · lista única em código em 03/11/2026, falta subir.
 
 ### R-COL-04 · O caminhão leva antes da data, e o canto cheio de caixa futura é normal
 - **Regra:** `AGUARDA_CAMINHAO` **não filtra pela data de despacho**: a caixa de coleta impressa e bipada pro canto vai no próximo caminhão, mesmo com despacho semanas à frente. Por isso ela sai da faixa azul do Carregamento (que só conta o `embalado` futuro na prateleira) e o painel "Pra despachar depois" (que só lista o `pendente`) some quando as etiquetas futuras já foram impressas.
@@ -143,7 +143,7 @@ Etiqueta de Venda ────┤
 - **Status:** no ar desde 02/10/2026.
 
 ### R-PIL-05 · As listas da pilha nascem recolhidas
-- **Regra:** o número fica sempre à vista; a lista abre com um toque e continua aberta nos refreshes de 4 s (o `<details>` não é redesenhado).
+- **Regra:** o número fica sempre à vista; a lista das impressas em dia anterior abre com um toque e continua aberta nos refreshes de 4 s (o `<details>` não é redesenhado). **Desde 03/11/2026 a lista "Ver as que faltam" saiu** (decisão do dono): as mesmas caixas estão na lista única, em "Esperando conferência", e a pilha diz isso numa linha.
 - **Por quê:** aberta, a pilha repete as listas do carro e da coleta logo abaixo — o que o dono leu como "duas vendas" na caixa de várias.
 - **Exceções:** nenhuma.
 - **Teste que trava:** ⚠ **sem teste**.
@@ -358,6 +358,7 @@ Etiqueta de Venda ────┤
 - **Status:** no ar desde 26/09/2026.
 
 ### R-VIA-06 · O "No carro" do topo e a viagem dizem o mesmo número
+- ⚠️ **O quadro "No carro" saiu da tela em 03/11/2026** (CONFERENCIA-EXPEDICAO fase 1). A regra continua valendo para o `carregados` da rota, que ficou.
 - **Regra:** o topo conta também a caixa de coleta que entrou no carro, pela hora em que entrou (`no_carro_em`); a de agência que o caminhão levou continua fora (R-SAI-07).
 - **Por quê:** o topo dizia 2 e a viagem dizia 3 — a mesma tela com duas réguas.
 - **Exceções:** nenhuma.
@@ -369,7 +370,8 @@ Etiqueta de Venda ────┤
 ## O que sai adiantado
 
 ### R-ADI-01 · Adiantado é o que sai da fábrica antes do despacho da etiqueta, contado em PEÇAS
-- **Regra:** o 4º quadro do Carregamento mostra **Peças adiantadas hoje** (carro × coleta, as caixas quando não batem com as peças) e os **últimos 30 dias**; o `GET /api/carregamento` devolve `saiu_adiantado`, e o `POST /api/carregar` devolve `adiantado`. No carro a saída é o bipe; **na coleta é o caminhão levando (`retirado_em`)**, não o bipe pro canto. A caixa de várias conta N. `carga.js → saidasAdiantadas(db, dias)` e `SAIDA()` são o dono único. O banner `⏩ ADIANTADO — despacha dd/mm` aparece no bipe, no carro e na coleta. O bipe continua aceitando.
+- ⚠️ **O quadro "Peças adiantadas hoje" saiu da tela de Conferência em 03/11/2026** (CONFERENCIA-EXPEDICAO fase 1: não serve à conferência). A conta continua na rota, e nenhuma outra tela a mostra hoje.
+- **Regra:** até 03/11/2026 o 4º quadro do Carregamento mostrava **Peças adiantadas hoje** (carro × coleta, as caixas quando não batem com as peças) e os **últimos 30 dias**; o `GET /api/carregamento` devolve `saiu_adiantado`, e o `POST /api/carregar` devolve `adiantado`. No carro a saída é o bipe; **na coleta é o caminhão levando (`retirado_em`)**, não o bipe pro canto. A caixa de várias conta N. `carga.js → saidasAdiantadas(db, dias)` e `SAIDA()` são o dono único. O banner `⏩ ADIANTADO — despacha dd/mm` aparece no bipe, no carro e na coleta. O bipe continua aceitando.
 - **Por quê:** pedido do dono (25/09/2026), para medir quanto se envia adiantado. Contada pelo bipe, a caixa de coleta seria "adiantada" sem ter saído da fábrica.
 - **Exceções:** o fechamento à mão dos scripts de passivo nunca entra (eles carimbam a saída na data do despacho); volume sem `despachar_em` lido fica fora. Não confundir com `adiantadas`, que é o que **pode** sair adiantado e ainda está na fábrica.
 - **Teste que trava:** `teste_carga.js` (11 casos).
