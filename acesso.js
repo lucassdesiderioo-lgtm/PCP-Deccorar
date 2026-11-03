@@ -42,7 +42,12 @@ const AREA_CHAVE = {
 // Setores nativos (secao 5). Admin Geral tem TODAS por definicao (o resolvedor
 // forca isso), entao a lista dele aqui e so o seed inicial.
 function setoresNativos(){
-  const admin = PERMISSOES.filter(p => p.nivel === 'admin').map(p => p.chave);
+  /* O dinheiro das devolucoes e de nivel admin desde 03/11/2026, mas NAO
+     nasce no setor Admin: em producao o setor ja existe e nao a recebe, e o
+     dono a da pela tela de Acessos a quem decide (o Financeiro). Banco novo
+     igual a producao (§17). */
+  const SO_PELA_TELA = ['devolucao.dinheiro'];
+  const admin = PERMISSOES.filter(p => p.nivel === 'admin' && SO_PELA_TELA.indexOf(p.chave) < 0).map(p => p.chave);
   return [
     { nome:'Operador / Revisão',             nivel:'operacao',
       perms:['revisao.executar','revisao.rejeitar','devolucao.registrar','painel.ver','produtividade.propria'] },
@@ -689,8 +694,9 @@ module.exports = function(app, db){
     if(eq('/carregamento')) return 'carregamento.executar';
     if(eq('/expedicao')) return 'pdf.subir';
     if(eq('/devolucao')) return 'devolucao.registrar';
-    // As devolucoes EM ANDAMENTO (escritorio): quem acompanha ou quem lanca.
-    if(eq('/devolucao-casos')) return ['devolucao.acompanhar','devolucao.lancar'];
+    /* As devolucoes EM ANDAMENTO (escritorio): quem acompanha, quem lanca, e
+       quem tem o dinheiro (o Financeiro, que da a baixa do reembolso). */
+    if(eq('/devolucao-casos')) return ['devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro'];
     // A porta unica do rodape (so redireciona, pela permissao, no dev_route).
     if(eq('/devolucoes')) return '@logado';
     if(eq('/painel')) return 'painel.ver';
@@ -787,11 +793,14 @@ module.exports = function(app, db){
     if(pre('/api/devolucao-casos')){
       const m = p.match(/^\/api\/devolucao-casos\/[^/]+\/([a-z_-]+)$/);
       const acao = m ? m[1] : '';
-      if(M !== 'GET' && ['perda','devolver-comprador','reembolso','valor'].indexOf(acao) >= 0) return 'devolucao.dinheiro';
-      if(M === 'GET' && eq('/api/devolucao-casos/relatorio')) return ['devolucao.acompanhar','devolucao.lancar'];
-      if(M !== 'GET' && (eq('/api/devolucao-casos') || acao === 'editar')) return 'devolucao.lancar';
+      if(M !== 'GET' && ['perda','devolver-comprador','reembolso'].indexOf(acao) >= 0) return 'devolucao.dinheiro';
+      /* Os valores do caso sao de quem lanca e de quem acompanha (AJUSTE de
+         03/11/2026, dono); o valor perdido e o devolvido, o handler confere
+         o dinheiro. */
+      if(M !== 'GET' && acao === 'valor') return ['devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro'];
+      if(M !== 'GET' && (eq('/api/devolucao-casos') || acao === 'editar' || acao === 'tipo')) return 'devolucao.lancar';
       if(M !== 'GET') return 'devolucao.acompanhar';
-      return ['devolucao.acompanhar','devolucao.lancar'];
+      return ['devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro'];
     }
     /* O AJUSTE EM DUAS PESSOAS (fase 3 da ESTOQUE-LIVRO-E-CONFERENCIA). Pedir e
        estoque.ajustar; aprovar e estoque.aprovar_ajuste; recusar e das duas —
@@ -957,7 +966,7 @@ module.exports = function(app, db){
     if(pre('/api/contagem')) return ['contagem.contar','@admin'];
     if(eq('/api/devolucao/pendentes')) return ['devolucao.baixar','@admin'];
     // Quais abas das devolucoes a pessoa ve: de quem tem QUALQUER uma das quatro.
-    if(eq('/api/devolucao/abas')) return ['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.baixar'];
+    if(eq('/api/devolucao/abas')) return ['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.baixar','devolucao.dinheiro'];
     if(pre('/api/devolucao')) return ['devolucao.registrar','@admin'];
 
     /* ═══ LISTAS DE APOIO DE TELA: continuam abertas a quem entrou ═════════
@@ -1035,7 +1044,7 @@ module.exports = function(app, db){
     ['etiqueta.emitir','embalagem'], ['carregamento.executar','carregamento'],
     ['pdf.subir','expedicao'], ['devolucao.registrar','devolucao'],
     // A tela das devolucoes em andamento (a area existe para a TELAS do auth.js).
-    ['devolucao.acompanhar','devolucao_casos'], ['devolucao.lancar','devolucao_casos'],
+    ['devolucao.acompanhar','devolucao_casos'], ['devolucao.lancar','devolucao_casos'], ['devolucao.dinheiro','devolucao_casos'],
     ['painel.ver','painel'], ['relatorios.ver','relatorios'], ['necessidade.ver','necessidade'],
     ['pedido.receber','recebimento'],
     /* A tela de conferencia (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA). A area

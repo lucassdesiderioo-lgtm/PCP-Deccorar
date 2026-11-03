@@ -11,11 +11,17 @@ Criada em: 03/11/2026
 Última atualização: 03/11/2026
 Fase atual: todas em código; falta o deploy e a prova de fábrica
 Fases: 1 ✅  2 ✅  3 ✅  4 ✅  5 ✅  (em código, não no ar)
-Testes: teste_devolucao_casos.js (307 casos, os 52 da §10 e mais), teste_acesso.js (+40),
+Testes: teste_devolucao_casos.js (605 casos, e a tela em teste_devolucao_casos_tela.js, 93, os 52 da §10 e mais), teste_acesso.js (+42),
         teste_caminhos.js (+1); os 62 arquivos da raiz e os 856 do sob medida passando
 Regras que parecem bug: CLAUDE.md §9-B
 Risco: 🔴 (acesso/permissão, dinheiro, schema, toca na devolução que já existe)
 Mudanças no caminho:
+  · AJUSTE (6) de 03/11 — DOIS PRAZOS e OS VALORES (decisões do dono): no "nós coletamos" o
+    prazo de antes virou o do comprovante, e a coleta tem o seu (abertura da reclamação +
+    20 dias corridos, `devol_coleta_dias`); a lista mostra o próximo aberto; data agendada
+    e limite do frete só avisam. DIVERGE da §7/R15: os valores passaram a ser de quem lança e
+    acompanha, e `devolucao.dinheiro` ficou só com reembolso, perda, devolver ao comprador e
+    os totais do relatório — e deixou de ser intransferível (vale o CLAUDE.md §9-B).
   · Fase 1 (03/11): `devcaso_dominio.js` é o dono único do caso, do prazo e do parado;
     `devcaso_route.js` traduz HTTP. As colunas de dinheiro já nascem na tabela (o script
     dos 6 casos grava o valor do ML), mas nenhuma rota as manda até a fase 5.
@@ -67,6 +73,25 @@ Mudanças no caminho:
     a mensagem do ML colada inteira; o link da conversa da reclamação (botão "Abrir conversa
     no ML"); "Passado em" nasce com o dia do lançamento; e a aba Motivos, que edita a mesma
     lista da baixa para quem tem listas.editar.
+  · AJUSTE de 03/11 (2): o lançamento do "Nós coletamos" já adianta CEP, transportadora (nasce
+    em Coleta pedida), custo, situação e valor do ML (valor e custo só com devolucao.dinheiro);
+    "↩ Desfazer" a última mudança de etapa, só por quem a fez, voltando com a data de antes;
+    e o aviso "mesmo comprador" (só avisa, os casos continuam separados). O CEP pela NF não
+    entrou: o PCP não grava o CEP da venda (fica para plano à parte, no parse).
+  · AJUSTE de 03/11 (3): o motivo se escolhe no alto do caso, e o motivo removido da lista
+    continua no caso que já o usa.
+  · Revisão em dupla (03/11): custo sem transportadora recusado; coleta e situação do valor no
+    lançamento exigem devolucao.acompanhar; o desfazer passa pela trava dos documentos; o aviso
+    de mesmo comprador compara palavra inteira (nome.js mesmaPessoaPorPalavras); colunas novas
+    também no CREATE (§17).
+  · AJUSTE de 03/11 (4): trocar o tipo do caso aberto (ML devolve ↔ Nós coletamos; para ML
+    devolve recusado com coleta pedida ou valor lançado) e o custo da etiqueta de devolução
+    cobrada pelo ML, nos dois tipos, só com devolucao.dinheiro e somado à parte no relatório.
+  · AJUSTE de 03/11 (5): a revisão do frete no ML devolve (pedir depois de chegar, resposta
+    devolveu/negou, valor devolvido só com devolucao.dinheiro); com ela pendente o caso não
+    encerra na baixa. CONSERTO: o caso tinha dois "Salvar" que apagavam o digitado no outro
+    bloco, e o responsável do ML devolve não aparecia — hoje um "Salvar alterações" só, campo
+    não salvo marcado, e teste de tela em navegador.
 ```
 
 > Desenhada no Projeto do Claude entre 29/10 e 03/11/2026, com o Lucas.

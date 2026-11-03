@@ -112,16 +112,19 @@ module.exports = [
      o caso nasce quando o ML abre a reclamacao, antes de a peca chegar.
      Lancar e de quem olha o pos-venda (o mesmo publico da baixa); acompanhar
      e de quem cuida da coleta (supervisor, para caber em quem nao e admin).
-     O DINHEIRO e do Admin Geral e de mais ninguem: o reembolso se confere no
-     Mercado Pago, que so ele acessa (decisao do dono) — por isso
-     `intransferivel`, e a rota nem manda os valores a quem nao a tem (R15). */
+     OS VALORES do caso (valor do ML, custos, etiqueta, limite do frete) sao
+     de quem lanca e de quem acompanha (AJUSTE de 03/11/2026, dono: "quem
+     estiver lancando e quem estiver a frente do problema"). O DINHEIRO ficou
+     com as DECISOES — baixa do reembolso, perda, devolver ao comprador — e com
+     os totais em reais do relatorio. Deixou de ser `intransferivel`: o dono
+     pode da-la a um setor (o Financeiro). Continua sensivel. */
   { chave:'devolucao.lancar',     grupo:'Devoluções', nivel:'admin',
     rotulo:'Lançar devolução em andamento', desc:'Lançar e editar o caso antes de a peça chegar (venda, NF, motivo, prazo)' },
   { chave:'devolucao.acompanhar', grupo:'Devoluções', nivel:'supervisor',
     rotulo:'Acompanhar devoluções em andamento', desc:'Ver a lista, mover etapas, coleta, transportadora, documentos e prorrogação' },
-  { chave:'devolucao.dinheiro',   grupo:'Devoluções', nivel:'admin_geral',
-    rotulo:'Dinheiro das devoluções', desc:'Ver valores, devolver ao comprador, encerrar como perda e dar baixa no reembolso',
-    sensivel:true, intransferivel:true },
+  { chave:'devolucao.dinheiro',   grupo:'Devoluções', nivel:'admin',
+    rotulo:'Dinheiro das devoluções', desc:'Dar baixa no reembolso, devolver ao comprador, encerrar como perda e ver os totais em reais do relatório',
+    sensivel:true },
 
   // ─── ESTOQUE ────────────────────────────────────────────────
   { chave:'contagem.contar',      grupo:'Estoque',    nivel:'operacao',

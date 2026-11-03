@@ -678,7 +678,7 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
      new RegExp("nome:'" + t + "'").test(fs.readFileSync(path.join(__dirname,'teste_route.js'),'utf8'))));
 
   /* ═════════════════════ FASE 5 — o dinheiro e o relatório ═════════════════════ */
-  const DINHEIRO_CHAVES = ['valor_ml','custo','valor_devolvido','valor_perdido','saldo'];
+  const DINHEIRO_CHAVES = ['valor_ml','custo','valor_devolvido','valor_perdido','saldo','custo_etiqueta','valor_revisao'];
   function chavesDe(o, acc){
     acc = acc || new Set();
     if(Array.isArray(o)) o.forEach(x => chavesDe(x, acc));
@@ -691,8 +691,13 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   /* Um caso de coleta com valor e duas tentativas com custo, para a conta. */
   r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'7770045', motivo:'Comando quebrado', prazo:dia(7) }, 3);
   const k45 = r.body.id;
-  eq('lançar valor do ML sem a chave do dinheiro: 403', valor(k45, { valor_ml:'150,00' }, 2).status, 403);
-  eq('lançar valor do ML com a chave', valor(k45, { valor_ml:'150,00' }).status, 200);
+  /* Desde 03/11/2026 (decisão do dono): quem lança e quem acompanha vê e
+     lança os valores do caso; a chave do dinheiro fica com as decisões. */
+  eq('quem não lança nem acompanha não lança valor: 403', valor(k45, { valor_ml:'150,00' }, 4).status, 403);
+  eq('quem acompanha lança o valor do ML', valor(k45, { valor_ml:'150,00' }, 2).status, 200);
+  eq('o valor perdido e o devolvido continuam da chave do dinheiro', valor(k45, { valor_perdido:'10' }, 2).status, 403);
+  eq('   e o devolvido também', valor(k45, { valor_devolvido:'10' }, 3).status, 403);
+  eq('com a chave, de novo: nada muda e passa', valor(k45, { valor_ml:'150,00' }).status, 200);
   eq('   o valor gravado', caso(k45).valor_ml, 150);
   eq('   e a situação vira "já veio"', caso(k45).valor_ml_situacao, 'ja_veio');
   chamar('POST','/api/devolucao-casos/:id/coleta',{ transportadora_id:tA, cep:'80010-000', custo:'40' }, 2, {id:k45});
@@ -700,12 +705,14 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   chamar('POST','/api/devolucao-casos/:id/coleta-resultado',{ tentativa_id:tt.id, resultado:'nao_encontrou' }, 2, {id:k45});
   tt = db.prepare("SELECT id FROM devolucao_coleta WHERE caso_id=? AND resultado='aguardando'").get(k45);
 
-  secao('45. quem NÃO tem devolucao.dinheiro não recebe nenhum valor pelo fio');
+  secao('45. quem não lança nem acompanha não recebe valor; o total do mês é só da chave do dinheiro');
   const fios = {
-    lista: chamar('GET','/api/devolucao-casos',null,2).body,
-    caso: chamar('GET','/api/devolucao-casos/:id',null,2,{id:k45}).body,
-    encerrados: chamar('GET','/api/devolucao-casos/encerrados',null,2).body,
-    relatorio: chamar('GET','/api/devolucao-casos/relatorio',null,2,{},{ mes }).body
+    lista: chamar('GET','/api/devolucao-casos',null,4).body,
+    caso: chamar('GET','/api/devolucao-casos/:id',null,4,{id:k45}).body,
+    encerrados: chamar('GET','/api/devolucao-casos/encerrados',null,4).body,
+    relatorio: chamar('GET','/api/devolucao-casos/relatorio',null,4,{},{ mes }).body,
+    'relatório de quem acompanha': chamar('GET','/api/devolucao-casos/relatorio',null,2,{},{ mes }).body,
+    'relatório de quem lança': chamar('GET','/api/devolucao-casos/relatorio',null,3,{},{ mes }).body
   };
   for(const [nome, corpo] of Object.entries(fios)){
     const ks = chavesDe(corpo);
@@ -713,6 +720,10 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
     ok(nome + ': nenhuma chave de dinheiro', vazou.length === 0, 'vazou: ' + vazou.join(', '));
   }
   ok('o relatório para quem não tem a chave ainda conta os casos por motivo', (fios.relatorio.por_motivo || []).length > 0, JSON.stringify(fios.relatorio).slice(0,300));
+  const comA = chamar('GET','/api/devolucao-casos/:id',null,2,{id:k45}).body;
+  ok('quem acompanha recebe os valores do caso', comA.caso.valor_ml === 150 && 'saldo' in comA.caso && comA.tentativas.every(t => 'custo' in t), JSON.stringify(comA.caso).slice(0,300));
+  ok('   e na lista também', (daLista(chamar('GET','/api/devolucao-casos',null,3).body.coleta, k45) || {}).valor_ml === 150);
+  eq('   e o "pode" diz que vê valores, sem dizer que tem o dinheiro', JSON.stringify([lista(2).pode.valores, lista(2).pode.dinheiro]), '[true,false]');
   const comD = chamar('GET','/api/devolucao-casos/:id',null,1,{id:k45}).body;
   ok('o admin geral recebe os valores', comD.caso.valor_ml === 150 && 'saldo' in comD.caso, JSON.stringify(comD.caso).slice(0,300));
   ok('   e os custos das tentativas', comD.tentativas.every(t => 'custo' in t));
@@ -764,7 +775,7 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   const l49 = daLista(lista(2).coleta, k49);
   eq('pedir há 2 dias: parado, mesmo com a etapa recém mexida', l49.parado, true);
   eq('   e diz que é o valor', l49.parado_valor, true);
-  eq('   sem mandar o valor junto', 'valor_ml' in l49, false);
+  eq('   e a quem não lança nem acompanha, sem mandar o valor junto', 'valor_ml' in daLista(lista(4).coleta, k49), false);
   db.prepare("UPDATE devolucao_caso SET valor_ml_situacao='pedido' WHERE id=?").run(k49);
   eq('já pedido (esperando o ML): não grita pelo valor', daLista(lista(2).coleta, k49).parado_valor, false);
 
@@ -876,10 +887,10 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   rb = busca('987654321987');
   eq('número que não existe: lista vazia, sem erro', rb.status + '/' + (rb.body.casos || []).length, '200/0');
 
-  secao('busca — o dinheiro não viaja a quem não tem a chave');
-  const ks = chavesDe(busca('55123', 2).body);
-  ok('sem a chave: nenhum valor', !DINHEIRO_CHAVES.some(k => ks.has(k)), [...ks].join(','));
-  ok('com a chave: o valor vem', (busca('55123', 1).body.casos || []).some(c => c.valor_ml === 99));
+  secao('busca — o valor não viaja a quem não lança nem acompanha');
+  const ks = chavesDe(busca('55123', 4).body);
+  ok('sem lançar nem acompanhar: nenhum valor', !DINHEIRO_CHAVES.some(k => ks.has(k)), [...ks].join(','));
+  ok('quem acompanha: o valor vem', (busca('55123', 2).body.casos || []).some(c => c.valor_ml === 99));
 
   /* ── AJUSTE de 03/11/2026: publicidade, mensagem do ML, link da conversa ── */
   secao('publicidade — obrigatória no lançamento, Sim ou Não');
@@ -967,9 +978,408 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   rp = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8800023', publicidade:false }, 3);
   eq('no "ML devolve" não há a quem passar: fica vazio', caso(rp.body.id).passado_em, null);
 
+  /* ── AJUSTE de 03/11/2026 (2): desfazer, lançar completo, mesmo comprador ── */
+  secao('desfazer — o clique errado na etapa volta, com a data de antes');
+  const lanC = (corpo, quem) => chamar('POST','/api/devolucao-casos', Object.assign({ tipo:'coleta', prazo:dia(6), publicidade:false }, corpo), quem || 3);
+  const det = (id, quem) => chamar('GET','/api/devolucao-casos/:id',null,quem || 3,{ id }).body;
+  const desf = (id, quem) => chamar('POST','/api/devolucao-casos/:id/desfazer-etapa',{}, quem || 3, { id });
+  let dz = lanC({ venda:'8800030' }).body.id;
+  db.prepare("UPDATE devolucao_caso SET etapa_desde='2026-10-20 08:00:00' WHERE id=?").run(dz);
+  eq('antes de mudar não há o que desfazer', det(dz).desfazer, null);
+  chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'coleta_pedida' }, 3, { id:dz });
+  eq('mudou para Coleta pedida', caso(dz).etapa, 'coleta_pedida');
+  ok('quem mudou vê o desfazer, voltando para Lançado', det(dz, 3).desfazer && det(dz, 3).desfazer.para === 'lancado', JSON.stringify(det(dz,3).desfazer));
+  eq('outra pessoa não vê o desfazer', det(dz, 2).desfazer, null);
+  eq('   e se tentar, é recusada', desf(dz, 2).status, 403);
+  eq('   e a etapa não mexe', caso(dz).etapa, 'coleta_pedida');
+  eq('quem mudou desfaz', desf(dz, 3).status, 200);
+  eq('   a etapa volta', caso(dz).etapa, 'lancado');
+  eq('   e a data da etapa volta a de antes (o "parado" não zera)', caso(dz).etapa_desde, '2026-10-20 08:00:00');
+  ok('   e a história guarda o clique e o desfeito', eventos(dz).some(e => e.tipo === 'etapa' && e.para === 'coleta_pedida') && eventos(dz).some(e => e.tipo === 'desfeito' && e.de === 'coleta_pedida' && e.para === 'lancado'), JSON.stringify(eventos(dz).map(e => e.tipo)));
+  eq('desfazer duas vezes não volta mais uma', desf(dz, 3).status, 409);
+  eq('   e o desfazer some do caso', det(dz, 3).desfazer, null);
+  chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'coleta_pedida' }, 3, { id:dz });
+  chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'a_caminho' }, 3, { id:dz });
+  eq('com duas mudanças, desfaz só a última', (desf(dz, 3), caso(dz).etapa), 'coleta_pedida');
+  chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'a_caminho' }, 3, { id:dz });
+  chamar('POST','/api/devolucao-casos/:id/chegou',{}, 3, { id:dz });
+  eq('depois da chegada não desfaz a etapa de antes', desf(dz, 3).status, 409);
+  eq('   e a chegada fica', caso(dz).etapa, 'chegou');
+  dz = lanC({ venda:'8800031' }).body.id;
+  chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'coleta_pedida' }, 3, { id:dz });
+  chamar('POST','/api/devolucao-casos/:id/editar',{ obs:'anotei' }, 3, { id:dz });
+  eq('editar o lançamento depois não impede o desfazer', desf(dz, 3).status, 200);
+  dz = lanC({ venda:'8800032' }).body.id;
+  chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'coleta_pedida' }, 3, { id:dz });
+  chamar('POST','/api/devolucao-casos/:id/perda',{}, 1, { id:dz });
+  eq('caso encerrado não desfaz', desf(dz, 3).status, 409);
+
+  secao('lançar completo — coleta e valor já no lançamento');
+  const tL = chamar('POST','/api/devolucao-casos/transportadoras',{ nome:'Rápido Lançar' }, 2).body.id;
+  rp = lanC({ venda:'8800040', comprador:'Fulano Completo', cep:'01310-100', coleta:{ transportadora_id:tL, custo:'45,90' }, valor_ml:'120,00', valor_ml_situacao:'pedir' }, 1);
+  eq('lança com tudo', rp.status, 200);
+  const cL = rp.body.id;
+  eq('   o caso já nasce em Coleta pedida', caso(cL).etapa, 'coleta_pedida');
+  eq('   o CEP só com os números', caso(cL).cep, '01310100');
+  const tentL = db.prepare('SELECT * FROM devolucao_coleta WHERE caso_id=?').all(cL);
+  eq('   a 1ª tentativa registrada', tentL.length + '/' + (tentL[0] && tentL[0].transportadora_id) + '/' + (tentL[0] && tentL[0].custo), '1/' + tL + '/45.9');
+  eq('   o valor do ML gravado', caso(cL).valor_ml, 120);
+  eq('   e a situação do valor', caso(cL).valor_ml_situacao, 'pedir');
+  ok('   e o valor entra na auditoria', AUDIT.some(a => a.acao === 'valor' && a.alvo === String(cL)));
+  rp = lanC({ venda:'8800047', valor_ml:'80' }, 1);
+  eq('valor sem situação escolhida: "já veio", como na tela do caso', caso(rp.body.id).valor_ml_situacao, 'ja_veio');
+  const antesL = contar('devolucao_caso');
+  /* Quem lança, lança os valores (decisão do dono, 03/11/2026). */
+  rp = lanC({ venda:'8800041', valor_ml:'50', coleta:{ transportadora_id:tL, custo:'10' } }, 3);
+  eq('quem lança e acompanha, sem a chave do dinheiro, lança valor e custo', rp.status, 200);
+  eq('   o valor gravado', caso(rp.body.id).valor_ml, 50);
+  eq('   e o custo da tentativa', db.prepare('SELECT custo FROM devolucao_coleta WHERE caso_id=?').get(rp.body.id).custo, 10);
+  eq('   (um caso a mais)', contar('devolucao_caso'), antesL + 1);
+  rp = lanC({ venda:'8800042', coleta:{ transportadora_id:tL }, valor_ml_situacao:'ja_veio' }, 3);
+  eq('coleta sem custo e a situação do valor passam', rp.status, 200);
+  eq('   a tentativa fica com o custo vazio, não zero', db.prepare('SELECT custo FROM devolucao_coleta WHERE caso_id=?').get(rp.body.id).custo, null);
+  eq('transportadora que não existe: recusado', lanC({ venda:'8800043', coleta:{ transportadora_id:99999 } }, 1).status, 400);
+  eq('   e o caso não nasce pela metade', contar('devolucao_caso',"venda='8800043'"), 0);
+  eq('situação do valor impossível: recusado e nada gravado', lanC({ venda:'8800044', valor_ml_situacao:'xyz' }, 1).status + '/' + contar('devolucao_caso',"venda='8800044'"), '400/0');
+  eq('no "ML devolve" não se pede coleta', chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8800045', publicidade:false, coleta:{ transportadora_id:tL } }, 1).status, 400);
+  eq('   e nada foi gravado', contar('devolucao_caso',"venda='8800045'"), 0);
+  rp = lanC({ venda:'8800046', coleta:{ transportadora_id:'' }, valor_ml:'', valor_ml_situacao:'' }, 3);
+  eq('bloco vazio é como não ter vindo', rp.status + '/' + caso(rp.body.id).etapa, '200/lancado');
+
+  secao('mesmo comprador — a coleta sabe que são várias da mesma pessoa');
+  const m1 = lanC({ venda:'8800050', comprador:'Rosangela da Paz Arruda' }).body.id;
+  const m2 = lanC({ venda:'8800051', comprador:'ROSANGELA DA PAZ ARRUDA' }).body.id;
+  const m3 = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8800052', comprador:'Rosângela da Paz Arruda', publicidade:false }, 3).body.id;
+  const mOutra = lanC({ venda:'8800053', comprador:'José Pereira Lima' }).body.id;
+  const mFechado = lanC({ venda:'8800054', comprador:'Rosangela da Paz Arruda' }).body.id;
+  chamar('POST','/api/devolucao-casos/:id/perda',{}, 1, { id:mFechado });
+  const lstM = chamar('GET','/api/devolucao-casos',null,2).body;
+  const todosM = lstM.coleta.concat(lstM.ml);
+  const irm = (id) => (daLista(todosM, id) || {}).mesmo_comprador;
+  eq('o caso diz quais outros abertos são da mesma pessoa', JSON.stringify(irm(m1)), JSON.stringify([m2, m3]));
+  eq('   nos dois sentidos, e nos dois tipos', JSON.stringify(irm(m3)), JSON.stringify([m1, m2]));
+  eq('   outra pessoa não entra', JSON.stringify(irm(mOutra)), '[]');
+  ok('   o encerrado não conta', !irm(m1).includes(mFechado));
+  eq('o detalhe do caso traz os mesmos', JSON.stringify((det(m2, 2).mesmo_comprador || []).map(x => x.id)), JSON.stringify([m1, m3]));
+  ok('   com a venda e a etapa de cada um', (det(m2, 2).mesmo_comprador || []).every(x => x.venda && x.etapa_nome));
+  db.exec("INSERT INTO lote (codigo,buyer,nf,venda,packId) VALUES ('BK100100BEGE','Rosangela da Paz Arruda','7777','8800059',NULL)");
+  const vm = chamar('GET','/api/devolucao-casos/venda/:cod',null,3,{ cod:'8800059' }).body;
+  eq('ao lançar, a venda achada avisa os casos abertos do comprador', JSON.stringify((vm.comprador_casos || []).map(x => x.id)), JSON.stringify([m1, m2, m3]));
+
+  secao('revisão (dupla checagem) — o que a revisão independente achou');
+  const antesR = contar('devolucao_caso');
+  rp = lanC({ venda:'8800070', coleta:{ transportadora_id:'', custo:'50' } }, 1);
+  eq('custo sem transportadora é recusado, e não some calado', rp.status, 400);
+  ok('   e a recusa diz o que fazer', /transportadora/i.test(rp.body.erro || ''), rp.body.erro);
+  eq('   e nada foi gravado', contar('devolucao_caso'), antesR);
+  PERMS[6] = new Set(['devolucao.lancar']); NOMES[6] = 'Só lança';
+  eq('quem só lança não pede a coleta no lançamento', lanC({ venda:'8800071', coleta:{ transportadora_id:tL } }, 6).status, 403);
+  eq('   nem marca a situação do valor', lanC({ venda:'8800071', valor_ml_situacao:'pedir' }, 6).status, 403);
+  eq('   mas lança o caso simples', lanC({ venda:'8800071' }, 6).status, 200);
+  const NM = require('./nome');
+  eq('"Ana" não é a mesma pessoa que "Luciana Souza"', NM.mesmaPessoaPorPalavras('Ana', 'Luciana Souza'), false);
+  eq('"Maria Silva" não é "Rosemaria Silva Santos"', NM.mesmaPessoaPorPalavras('Maria Silva', 'Rosemaria Silva Santos'), false);
+  eq('um nome só não junta ninguém', NM.mesmaPessoaPorPalavras('Maria', 'Maria Silva'), false);
+  eq('"Maria Silva" é "Maria da Silva" (palavras inteiras)', NM.mesmaPessoaPorPalavras('Maria Silva', 'Maria da Silva'), true);
+  eq('"Maria Souza" × "Maria da Silva Souza": avisa (o ML abrevia o meio)', NM.mesmaPessoaPorPalavras('Maria Souza', 'Maria da Silva Souza'), true);
+  eq('sobrenome do fim diferente não junta', NM.mesmaPessoaPorPalavras('Maria Silva', 'Maria Silva Santos'), false);
+  eq('acento e maiúscula não separam', NM.mesmaPessoaPorPalavras('JOSÉ PEREIRA', 'José Pereira'), true);
+  eq('a letra dobrada do ML continua juntando', NM.mesmaPessoaPorPalavras('Ryta Rufiino', 'Ryta Rufino'), true);
+  eq('nome vazio: sem resposta (null)', NM.mesmaPessoaPorPalavras('', 'Ana Souza'), null);
+  const a1 = lanC({ venda:'8800072', comprador:'Ana' }).body.id;
+  lanC({ venda:'8800073', comprador:'Luciana Souza' });
+  const lstR = chamar('GET','/api/devolucao-casos',null,2).body;
+  eq('na lista, "Ana" não ganha irmão falso', JSON.stringify((daLista(lstR.coleta.concat(lstR.ml), a1) || {}).mesmo_comprador), '[]');
+  dz = lanC({ venda:'8800074' }).body.id;
+  db.prepare("UPDATE devolucao_caso SET etapa='docs_enviados' WHERE id=?").run(dz);
+  chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'a_caminho' }, 3, { id:dz });
+  eq('desfazer para "Documentos ao ML" sem os documentos é recusado', desf(dz, 3).status, 400);
+  eq('   e o caso fica onde estava', caso(dz).etapa, 'a_caminho');
+  const colsC = db.prepare("SELECT sql FROM sqlite_master WHERE name='devolucao_caso'").get().sql;
+  const colsE = db.prepare("SELECT sql FROM sqlite_master WHERE name='devolucao_evento'").get().sql;
+  ok('§17: as colunas novas estão no CREATE do código', ['publicidade','mensagem_ml','link_ml'].every(k => new RegExp('\\b'+k+'\\b').test(require('fs').readFileSync(require('path').join(__dirname,'devcaso_dominio.js'),'utf8').split('CREATE TABLE IF NOT EXISTS devolucao_caso')[1].split(')`);')[0])));
+  ok('§17: e as do evento também', ['usuario_id','etapa_desde_antes'].every(k => new RegExp('\\b'+k+'\\b').test(require('fs').readFileSync(require('path').join(__dirname,'devcaso_dominio.js'),'utf8').split('CREATE TABLE IF NOT EXISTS devolucao_evento')[1].split(')`);')[0])));
+
+  /* ── AJUSTE de 03/11/2026 (4): trocar o tipo do caso, e o custo da etiqueta ── */
+  secao('trocar o tipo — ML devolve → Nós coletamos');
+  const troca = (id, corpo, quem) => chamar('POST','/api/devolucao-casos/:id/tipo', corpo, quem || 3, { id });
+  let tp = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8800080', publicidade:false }, 3).body.id;
+  db.prepare("UPDATE devolucao_caso SET etapa_desde='2026-10-25 09:00:00' WHERE id=?").run(tp);
+  eq('sem o prazo do ML: recusado', troca(tp, { para:'coleta' }).status, 400);
+  eq('   e o caso continua ML devolve', caso(tp).tipo, 'ml');
+  eq('quem só acompanha não troca', troca(tp, { para:'coleta', prazo:dia(5) }, 2).status, 403);
+  eq('com o prazo: troca', troca(tp, { para:'coleta', prazo:dia(5) }).status, 200);
+  eq('   vira Nós coletamos', caso(tp).tipo, 'coleta');
+  eq('   Aguardando vira Lançado', caso(tp).etapa, 'lancado');
+  eq('   com o prazo gravado', caso(tp).prazo, dia(5));
+  eq('   e o "passado em" vazio ganha o dia do lançamento', caso(tp).passado_em, caso(tp).criado_em.slice(0,10));
+  eq('   e a data da etapa não zera', caso(tp).etapa_desde, '2026-10-25 09:00:00');
+  ok('   e a história diz a troca', eventos(tp).some(e => e.tipo === 'tipo' && e.de === 'ml' && e.para === 'coleta'), JSON.stringify(eventos(tp).map(e => e.tipo)));
+  eq('trocar para o mesmo tipo é recusado', troca(tp, { para:'coleta', prazo:dia(5) }).status, 400);
+  eq('tipo que não existe é recusado', troca(tp, { para:'outro' }).status, 400);
+
+  secao('trocar o tipo — Nós coletamos → ML devolve');
+  chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'coleta_pedida' }, 3, { id:tp });
+  eq('sem coleta nem valor: troca', troca(tp, { para:'ml' }).status, 200);
+  eq('   Coleta pedida (à mão) vira Aguardando', caso(tp).etapa, 'aguardando');
+  eq('   e o prazo fica guardado', caso(tp).prazo, dia(5));
+  eq('   e o desfazer do clique de antes não volta para o outro tipo', det(tp, 3).desfazer, null);
+  rp = lanC({ venda:'8800081', coleta:{ transportadora_id:tL } }, 3);
+  eq('com coleta pedida: recusado', troca(rp.body.id, { para:'ml' }).status, 409);
+  ok('   e a recusa diz por quê', /coleta/i.test(troca(rp.body.id, { para:'ml' }).body.erro || ''));
+  eq('   e o caso fica', caso(rp.body.id).tipo, 'coleta');
+  rp = lanC({ venda:'8800082', valor_ml:'90' }, 1);
+  eq('com valor do ML lançado: recusado', troca(rp.body.id, { para:'ml' }).status, 409);
+  rp = lanC({ venda:'8800083' }, 3);
+  db.prepare("UPDATE devolucao_caso SET etapa='ml_avisado', chegou_em=datetime('now','localtime') WHERE id=?").run(rp.body.id);
+  troca(rp.body.id, { para:'ml' });
+  eq('ML avisado vira Chegou', caso(rp.body.id).etapa, 'chegou');
+  rp = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8800084', publicidade:false }, 3);
+  db.prepare("UPDATE devolucao_caso SET etapa='revisado' WHERE id=?").run(rp.body.id);
+  troca(rp.body.id, { para:'coleta', prazo:dia(3) });
+  eq('Revisado fica Revisado', caso(rp.body.id).etapa, 'revisado');
+  eq('caso encerrado não troca', troca(mFechado, { para:'ml' }).status, 409);
+
+  secao('custo da etiqueta de devolução — no ML devolve também há custo');
+  rp = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8800090', publicidade:false, custo_etiqueta:'48,70' }, 1);
+  eq('lançar com o custo da etiqueta (com a chave do dinheiro)', rp.status, 200);
+  const ce = rp.body.id;
+  eq('   gravado', caso(ce).custo_etiqueta, 48.7);
+  eq('quem lança, sem a chave do dinheiro, também lança a etiqueta', chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8800091', publicidade:false, custo_etiqueta:'48,70' }, 3).status, 200);
+  eq('   gravado', (db.prepare("SELECT custo_etiqueta v FROM devolucao_caso WHERE venda='8800091'").get() || {}).v, 48.7);
+  eq('custo impossível: recusado', chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8800092', publicidade:false, custo_etiqueta:'abc' }, 1).status, 400);
+  eq('corrigir pelo "Salvar valores"', chamar('POST','/api/devolucao-casos/:id/valor',{ custo_etiqueta:'50' }, 1, { id:ce }).status, 200);
+  eq('   corrigido', caso(ce).custo_etiqueta, 50);
+  ok('   a história diz o que mudou, sem o número', eventos(ce).some(e => e.tipo === 'valor' && /etiqueta/.test(e.texto) && !/50/.test(e.texto)), JSON.stringify(eventos(ce).map(e=>e.texto)));
+  eq('   e vai para a auditoria', AUDIT.some(a => a.acao === 'valor' && a.alvo === String(ce)), true);
+  eq('quem não lança nem acompanha: o "Salvar valores" é recusado', chamar('POST','/api/devolucao-casos/:id/valor',{ custo_etiqueta:'1' }, 4, { id:ce }).status, 403);
+  eq('quem acompanha salva a etiqueta', chamar('POST','/api/devolucao-casos/:id/valor',{ custo_etiqueta:'50' }, 2, { id:ce }).status, 200);
+  ok('o custo não viaja a quem não lança nem acompanha (caso)', !chavesDe(det(ce, 4)).has('custo_etiqueta'));
+  ok('   nem na lista', !chavesDe(chamar('GET','/api/devolucao-casos',null,4).body).has('custo_etiqueta'));
+  eq('   e viaja a quem acompanha', det(ce, 2).caso.custo_etiqueta, 50);
+  const relCE = chamar('GET','/api/devolucao-casos/relatorio',null,1,{},{ mes:dia(0).slice(0,7) }).body;
+  eq('o relatório soma as etiquetas', relCE.dinheiro.custo_etiqueta,
+     Math.round(db.prepare("SELECT SUM(custo_etiqueta) s FROM devolucao_caso WHERE teste=0 AND substr(criado_em,1,7)=?").get(dia(0).slice(0,7)).s * 100) / 100);
+  ok('   e quem não tem a chave não vê', !chavesDe(chamar('GET','/api/devolucao-casos/relatorio',null,2,{},{ mes:dia(0).slice(0,7) }).body).has('custo_etiqueta'));
+
+  /* ── AJUSTE de 03/11/2026 (5): a revisão do frete no "ML devolve" ── */
+  secao('revisão do frete — só no ML devolve, e só depois de a caixa chegar');
+  const pedeRev = (id, corpo, quem) => chamar('POST','/api/devolucao-casos/:id/revisao-frete', corpo || {}, quem || 2, { id });
+  const respRev = (id, corpo, quem) => chamar('POST','/api/devolucao-casos/:id/revisao-frete-resposta', corpo || {}, quem || 2, { id });
+  const rv = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000000000009301', publicidade:true, custo_etiqueta:'48,70' }, 1).body.id;
+  eq('antes de a caixa chegar: recusado', pedeRev(rv).status, 409);
+  chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, { id:rv });
+  eq('quem não acompanha não pede', pedeRev(rv, {}, 4).status, 403);
+  rp = pedeRev(rv, { numero:'  REV-5603716835 ' });
+  eq('depois de chegar: pede', rp.status, 200);
+  ok('   grava a data do pedido', !!caso(rv).revisao_pedida_em);
+  eq('   e o número, sem os espaços', caso(rv).revisao_numero, 'REV-5603716835');
+  ok('   e a história', eventos(rv).some(e => e.tipo === 'revisao_frete'));
+  eq('pedir de novo: recusado', pedeRev(rv).status, 409);
+  const rvc = lanC({ venda:'8800100' }, 3).body.id;
+  chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, { id:rvc });
+  eq('no Nós coletamos: recusado', pedeRev(rvc).status, 400);
+
+  secao('revisão do frete — pendente aparece, e grita depois de 2 dias');
+  let lr = daLista(chamar('GET','/api/devolucao-casos',null,2).body.ml, rv);
+  eq('a lista diz que a revisão está pendente', lr.revisao_pendente, true);
+  eq('   há 0 dias', lr.dias_revisao, 0);
+  eq('   e ainda não é parada', lr.revisao_parada, false);
+  db.prepare("UPDATE devolucao_caso SET revisao_pedida_em=datetime('now','localtime','-3 days') WHERE id=?").run(rv);
+  lr = daLista(chamar('GET','/api/devolucao-casos',null,2).body.ml, rv);
+  eq('com 3 dias: parada', lr.dias_revisao + '/' + lr.revisao_parada, '3/true');
+
+  secao('revisão do frete — com revisão pendente, a baixa NÃO encerra o ML devolve (decisão do dono)');
+  r = chamar('POST','/api/devolucao',{ codigo_ml:'2000000000009301', caso_id:rv, sku_fisico:'BK140140BEGE', destinacao:'estoque' }, 4);
+  eq('a peça é revisada', caso(rv).etapa, 'revisado');
+  r = chamar('POST','/api/devolucao/baixa',{ id:caso(rv).devolucao_id, reputacao:'nao' }, 3);
+  eq('a baixa passa', r.status, 200);
+  eq('   e o caso continua aberto', caso(rv).encerrado_em, null);
+  ok('   e a história diz que espera a revisão', eventos(rv).some(e => /revis[ãa]o do frete/i.test(e.texto || '') && /baixa/i.test(e.texto || '')), JSON.stringify(eventos(rv).map(e=>e.texto)));
+
+  secao('revisão do frete — a resposta do ML');
+  eq('resposta impossível: recusada', respRev(rv, { resultado:'talvez' }).status, 400);
+  eq('quem não acompanha não lança a resposta', respRev(rv, { resultado:'devolveu', valor_revisao:'48,70' }, 4).status, 403);
+  eq('   e nada mudou', caso(rv).revisao_resultado, null);
+  rp = respRev(rv, { resultado:'devolveu', valor_revisao:'48,70' }, 1);
+  eq('"ML devolveu", com o valor (Admin Geral)', rp.status, 200);
+  eq('   o resultado', caso(rv).revisao_resultado, 'devolveu');
+  eq('   o valor', caso(rv).valor_revisao, 48.7);
+  ok('   e a data da resposta', !!caso(rv).revisao_resp_em);
+  eq('   e o caso já baixado encerra agora', caso(rv).saida, 'revisado_ml');
+  ok('   a história diz o que mudou, sem o número', eventos(rv).some(e => e.tipo === 'revisao_frete' && /devolveu/.test(e.texto) && !/48/.test(e.texto)), JSON.stringify(eventos(rv).map(e=>e.texto)));
+  ok('   e a auditoria grava o valor', AUDIT.some(a => a.acao === 'valor' && a.alvo === String(rv)));
+  ok('o valor devolvido não viaja a quem não lança nem acompanha', !chavesDe(det(rv, 4)).has('valor_revisao'));
+  ok('   e viaja a quem acompanha', chavesDe(det(rv, 2)).has('valor_revisao'));
+  const rv2 = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000000000009302', publicidade:false }, 3).body.id;
+  eq('resposta sem pedido: recusada', respRev(rv2, { resultado:'negou' }).status, 409);
+  chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, { id:rv2 });
+  pedeRev(rv2);
+  eq('"ML negou" (quem acompanha)', respRev(rv2, { resultado:'negou' }).status, 200);
+  eq('   resposta duas vezes: recusada', respRev(rv2, { resultado:'devolveu' }).status, 409);
+  eq('   e o caso ainda não baixado continua aberto', caso(rv2).encerrado_em, null);
+  r = chamar('POST','/api/devolucao',{ codigo_ml:'2000000000009302', caso_id:rv2, sku_fisico:'BK140140BEGE', destinacao:'estoque' }, 4);
+  chamar('POST','/api/devolucao/baixa',{ id:caso(rv2).devolucao_id, reputacao:'nao' }, 3);
+  eq('com a revisão respondida, a baixa encerra como sempre', caso(rv2).saida, 'revisado_ml');
+  rp = respRev(rv2, { resultado:'devolveu' });
+  eq('o valor devolvido depois, pelo "Salvar valores"', chamar('POST','/api/devolucao-casos/:id/valor',{ valor_revisao:'10' }, 1, { id:rv2 }).status, 200);
+  eq('   gravado mesmo com o caso encerrado', caso(rv2).valor_revisao, 10);
+
+  secao('revisão do frete — o relatório do mês');
+  const relRv = chamar('GET','/api/devolucao-casos/relatorio',null,1,{},{ mes:dia(0).slice(0,7) }).body.dinheiro;
+  const somaRv = db.prepare("SELECT SUM(valor_revisao) s FROM devolucao_caso WHERE teste=0 AND substr(criado_em,1,7)=?").get(dia(0).slice(0,7)).s;
+  eq('soma o frete devolvido na revisão', relRv.frete_devolvido, Math.round(somaRv * 100) / 100);
+  eq('e o prejuízo é o cobrado menos o devolvido', relRv.frete_prejuizo, Math.round((relRv.custo_etiqueta - relRv.frete_devolvido) * 100) / 100);
+
+  secao('motivo removido da lista — o caso que já usa ele não perde');
+  db.prepare("INSERT INTO listas (tipo,valor,ordem,ativo) VALUES ('motivo_devolucao','Motivo que vai sair',99,1)").run();
+  const mr = lanC({ venda:'8800060', motivo:'Motivo que vai sair' }).body.id;
+  db.prepare("UPDATE listas SET ativo=0 WHERE tipo='motivo_devolucao' AND valor='Motivo que vai sair'").run();
+  rp = chamar('POST','/api/devolucao-casos/:id/editar',{ motivo:'Motivo que vai sair', obs:'mudei só a observação' }, 3, { id:mr });
+  eq('editar outro campo mandando o mesmo motivo passa', rp.status, 200);
+  eq('   e o motivo fica', caso(mr).motivo, 'Motivo que vai sair');
+  eq('trocar PARA um motivo removido é recusado', chamar('POST','/api/devolucao-casos/:id/editar',{ motivo:'Motivo que vai sair' }, 3, { id:m1 }).status, 400);
+
   secao('motivos — o cadastro aparece para quem tem listas.editar');
   eq('quem tem a chave vê o cadastro', chamar('GET','/api/devolucao-casos',null,1).body.pode.listas, true);
   eq('quem não tem não vê', chamar('GET','/api/devolucao-casos',null,2).body.pode.listas, false);
+
+  /* ═══════ OS DOIS PRAZOS DO ML (AJUSTE de 03/11/2026, dono) ═══════
+     No "nós coletamos" o ML dá dois prazos: mandar o comprovante do
+     agendamento (o prazo que já existia) e coletar até 20 dias corridos
+     depois da abertura da reclamação. A lista mostra o PRÓXIMO aberto. */
+  const lanP = (corpo, quem) => chamar('POST','/api/devolucao-casos', Object.assign({ tipo:'coleta', prazo:dia(6), publicidade:false }, corpo), quem || 3);
+  const detP = (id, quem) => chamar('GET','/api/devolucao-casos/:id',null,quem || 3,{ id }).body;
+
+  secao('dois prazos — o da coleta nasce da abertura da reclamação');
+  rp = lanP({ venda:'8810001' });
+  eq('sem a data da abertura: lança', rp.status, 200);
+  let pz = caso(rp.body.id);
+  eq('   a reclamação foi aberta hoje', pz.aberta_em, dia(0));
+  eq('   e o prazo da coleta é 20 dias corridos depois', pz.prazo_coleta, dia(20));
+  eq('   o prazo do comprovante é o informado', pz.prazo, dia(6));
+  rp = lanP({ venda:'8810002', aberta_em:dia(-5) });
+  eq('com a abertura informada, o prazo da coleta conta dela', caso(rp.body.id).prazo_coleta, dia(15));
+  eq('abertura impossível: recusada', lanP({ venda:'8810003', aberta_em:'2026-02-31' }).status, 400);
+  eq('abertura no futuro: recusada', lanP({ venda:'8810003', aberta_em:dia(2) }).status, 400);
+  db.prepare("UPDATE config SET valor='10' WHERE chave='devol_coleta_dias'").run();
+  rp = lanP({ venda:'8810004' });
+  eq('os 20 dias são do config (devol_coleta_dias)', caso(rp.body.id).prazo_coleta, dia(10));
+  db.prepare("UPDATE config SET valor='20' WHERE chave='devol_coleta_dias'").run();
+  eq('   e o padrão gravado é 20', db.prepare("SELECT valor FROM config WHERE chave='devol_coleta_dias'").get().valor, '20');
+  rp = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8810005', publicidade:false }, 3);
+  eq('o "ML devolve" não tem prazo da coleta', String(caso(rp.body.id).prazo_coleta), 'null');
+
+  secao('dois prazos — a cor e a lista vão pelo próximo prazo aberto');
+  const pzA = lanP({ venda:'8810010', prazo:dia(3), aberta_em:dia(-19) }).body.id;   // coleta vence amanhã
+  let sp = detP(pzA).caso;
+  eq('o próximo prazo é o mais perto dos abertos: o da coleta', sp.prazo_qual, 'coleta');
+  eq('   faltando 1 dia', sp.dias_prazo, 1);
+  eq('   e a cor vem dele', sp.cor, 'vermelho');
+  eq('   o caso mostra os dois prazos', (sp.prazos || []).map(x => x.qual).join(','), 'comprovante,coleta');
+  const pzB = lanP({ venda:'8810011', prazo:dia(2) }).body.id;
+  sp = detP(pzB).caso;
+  eq('com o comprovante mais perto, o próximo é o do comprovante', sp.prazo_qual + '/' + sp.dias_prazo, 'comprovante/2');
+  ok('   e o nome do prazo vai junto', /comprovante/i.test(sp.prazo_nome || ''), sp.prazo_nome);
+  db.prepare("UPDATE devolucao_caso SET etapa='docs_enviados' WHERE id=?").run(pzB);
+  sp = detP(pzB).caso;
+  ok('com os documentos ao ML, o do comprovante está cumprido', (sp.prazos || []).find(x => x.qual === 'comprovante').feito === true, JSON.stringify(sp.prazos));
+  eq('   e o próximo passa a ser o da coleta', sp.prazo_qual + '/' + sp.dias_prazo, 'coleta/20');
+  db.prepare("UPDATE devolucao_caso SET etapa='a_caminho' WHERE id=?").run(pzB);
+  sp = detP(pzB).caso;
+  ok('coletado: os dois cumpridos', (sp.prazos || []).every(x => x.feito), JSON.stringify(sp.prazos));
+  eq('   e não há prazo correndo, nem cor', JSON.stringify([sp.prazo_qual, sp.dias_prazo, sp.cor]), '[null,null,""]');
+  const pzC = lanP({ venda:'8810013', prazo:dia(2) }).body.id;
+  const ord2 = lista(3).coleta.map(c => c.id);
+  ok('na lista, a coleta que vence amanhã vem antes do comprovante em 2 dias', ord2.indexOf(pzA) < ord2.indexOf(pzC), JSON.stringify(ord2));
+  ok('   e o coletado vai ao fim', ord2.indexOf(pzB) > ord2.indexOf(pzC));
+  const pzV = lanP({ venda:'8810014', prazo:dia(5), aberta_em:dia(-25) }).body.id;
+  sp = detP(pzV).caso;
+  eq('coleta vencida: vencido', sp.cor + '/' + sp.prazo_qual, 'vencido/coleta');
+  lista(3); detP(pzV);
+  eq('   e não encerra sozinho (R7)', caso(pzV).encerrado_em, null);
+
+  secao('dois prazos — o caso antigo, sem a abertura, só tem o do comprovante');
+  db.prepare('UPDATE devolucao_caso SET aberta_em=NULL, prazo_coleta=NULL WHERE id=?').run(pzC);
+  sp = detP(pzC).caso;
+  eq('um prazo só', (sp.prazos || []).length, 1);
+  eq('   o do comprovante', sp.prazo_qual + '/' + sp.dias_prazo, 'comprovante/2');
+
+  secao('dois prazos — o prazo novo e a prorrogação valem para o prazo aberto');
+  rp = chamar('POST','/api/devolucao-casos/:id/prorrogacao',{}, 2, { id:pzA });
+  eq('pedir prorrogação', rp.status, 200);
+  let evp = eventos(pzA).filter(e => e.tipo === 'prorrogacao_pedida').pop();
+  ok('   a história diz qual prazo', /coleta/.test(evp.texto) && evp.de === dia(1), JSON.stringify(evp));
+  rp = chamar('POST','/api/devolucao-casos/:id/prazo',{ prazo:dia(8) }, 2, { id:pzA });
+  eq('o prazo novo (o ML aceitou)', rp.status, 200);
+  pz = caso(pzA);
+  eq('   mudou o prazo da coleta', pz.prazo_coleta, dia(8));
+  eq('   guardou o original', pz.prazo_coleta_original, dia(1));
+  eq('   e não mexeu no do comprovante', pz.prazo, dia(3));
+  chamar('POST','/api/devolucao-casos/:id/prazo',{ prazo:dia(9) }, 2, { id:pzA });
+  eq('o segundo prazo novo não sobrescreve o original (R6)', caso(pzA).prazo_coleta_original, dia(1));
+  rp = chamar('POST','/api/devolucao-casos/:id/prazo',{ prazo:dia(4), qual:'comprovante' }, 2, { id:pzA });
+  eq('dá para dizer qual prazo mudou', rp.status + '/' + caso(pzA).prazo, '200/' + dia(4));
+  eq('   e o original do comprovante fica guardado', caso(pzA).prazo_original, dia(3));
+  eq('prazo desconhecido: recusado', chamar('POST','/api/devolucao-casos/:id/prazo',{ prazo:dia(4), qual:'outro' }, 2, { id:pzA }).status, 400);
+  ok('a história do prazo novo diz qual', eventos(pzA).filter(e => e.tipo === 'prazo').some(e => /coleta/.test(e.texto)) &&
+     eventos(pzA).filter(e => e.tipo === 'prazo').some(e => /comprovante/.test(e.texto)));
+
+  secao('dois prazos — corrigir a data da abertura');
+  const pzE = lanP({ venda:'8810020' }).body.id;
+  rp = chamar('POST','/api/devolucao-casos/:id/editar',{ aberta_em:dia(-4) }, 3, { id:pzE });
+  eq('editar a abertura', rp.status, 200);
+  eq('   recalcula o prazo da coleta', caso(pzE).prazo_coleta, dia(16));
+  ok('   e vai para a história', eventos(pzE).some(e => e.tipo === 'editado' && /aberta em/.test(e.texto)), JSON.stringify(eventos(pzE).map(e=>e.texto)));
+  eq('abertura impossível na edição: recusada', chamar('POST','/api/devolucao-casos/:id/editar',{ aberta_em:'31/02' }, 3, { id:pzE }).status, 400);
+  chamar('POST','/api/devolucao-casos/:id/prazo',{ prazo:dia(30), qual:'coleta' }, 2, { id:pzE });
+  chamar('POST','/api/devolucao-casos/:id/editar',{ aberta_em:dia(-6) }, 3, { id:pzE });
+  eq('com prazo novo do ML lançado, corrigir a abertura não o desfaz', caso(pzE).prazo_coleta, dia(30));
+
+  secao('dois prazos — trocar para "nós coletamos" ganha o prazo da coleta');
+  const pzT = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8810030', publicidade:false }, 3).body.id;
+  rp = chamar('POST','/api/devolucao-casos/:id/tipo',{ para:'coleta', prazo:dia(5), aberta_em:dia(-2) }, 3, { id:pzT });
+  eq('troca', rp.status, 200);
+  eq('   com a abertura informada', caso(pzT).aberta_em + '/' + caso(pzT).prazo_coleta, dia(-2) + '/' + dia(18));
+  const pzT2 = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8810031', publicidade:false }, 3).body.id;
+  chamar('POST','/api/devolucao-casos/:id/tipo',{ para:'coleta', prazo:dia(5) }, 3, { id:pzT2 });
+  eq('   sem ela, a abertura é o dia do lançamento', caso(pzT2).aberta_em, String(caso(pzT2).criado_em).slice(0,10));
+
+  secao('a data agendada da coleta — avisa, não trava');
+  const tP = chamar('POST','/api/devolucao-casos/transportadoras',{ nome:'Prazo Teste' }, 2).body.id;
+  const pzG = lanP({ venda:'8810040' }).body.id;                 // coleta até dia(20)
+  rp = chamar('POST','/api/devolucao-casos/:id/coleta',{ transportadora_id:tP, agendada_para:dia(25) }, 2, { id:pzG });
+  eq('agendada depois do prazo da coleta: passa', rp.status, 200);
+  let tg = detP(pzG).tentativas[0];
+  eq('   a data gravada', tg.agendada_para, dia(25));
+  ok('   e a tentativa avisa', /depois do prazo da coleta/.test(tg.aviso_agenda || ''), JSON.stringify(tg));
+  rp = chamar('POST','/api/devolucao-casos/:id/coleta-agenda',{ tentativa_id:tg.id, agendada_para:dia(12) }, 2, { id:pzG });
+  eq('remarcar a data agendada', rp.status, 200);
+  tg = detP(pzG).tentativas[0];
+  ok('   dentro do prazo: sem aviso', tg.agendada_para === dia(12) && !tg.aviso_agenda, JSON.stringify(tg));
+  ok('   e vai para a história', eventos(pzG).some(e => /agendada/.test(e.texto || '')));
+  eq('data impossível: recusada', chamar('POST','/api/devolucao-casos/:id/coleta-agenda',{ tentativa_id:tg.id, agendada_para:'2026-13-01' }, 2, { id:pzG }).status, 400);
+  eq('tentativa de outro caso: 404', chamar('POST','/api/devolucao-casos/:id/coleta-agenda',{ tentativa_id:tg.id, agendada_para:dia(3) }, 2, { id:pzA }).status, 404);
+  eq('no lançamento também', lanP({ venda:'8810041', coleta:{ transportadora_id:tP, agendada_para:dia(4) } }).status, 200);
+  eq('   gravada na 1ª tentativa', db.prepare("SELECT k.agendada_para d FROM devolucao_coleta k JOIN devolucao_caso c ON c.id=k.caso_id WHERE c.venda='8810041'").get().d, dia(4));
+
+  secao('o limite do frete do ML — avisa, não trava');
+  rp = lanP({ venda:'8810050', limite_frete:'174,87', coleta:{ transportadora_id:tP, custo:'200' } });
+  eq('lança com o limite e um custo acima dele', rp.status, 200);
+  const pzL = rp.body.id;
+  eq('   o limite gravado', caso(pzL).limite_frete, 174.87);
+  tg = detP(pzL).tentativas[0];
+  ok('   a tentativa avisa que passou do limite', /limite do frete/.test(tg.aviso_limite || ''), JSON.stringify(tg));
+  const tgId = tg.id;
+  eq('baixar o custo pelo "Salvar valores" (quem acompanha)', valor(pzL, { tentativa_id:tgId, custo:'150' }, 2).status, 200);
+  ok('   sem aviso', !detP(pzL).tentativas[0].aviso_limite);
+  eq('   o custo igual ao limite não avisa', valor(pzL, { tentativa_id:tgId, custo:'174,87' }, 2).status + '/' + !!detP(pzL).tentativas[0].aviso_limite, '200/false');
+  eq('corrigir o limite (quem acompanha)', valor(pzL, { limite_frete:'100' }, 2).status, 200);
+  ok('   e o aviso volta', /limite do frete/.test(detP(pzL).tentativas[0].aviso_limite || ''));
+  eq('limite impossível: recusado', valor(pzL, { limite_frete:'-1' }, 2).status, 400);
+  ok('o limite não viaja a quem não lança nem acompanha', !chavesDe(detP(pzL, 4)).has('limite_frete') && !chavesDe(detP(pzL, 4)).has('aviso_limite'));
+  ok('a história diz que o limite mudou, sem o número', eventos(pzL).some(e => /limite do frete/.test(e.texto || '')) && !eventos(pzL).some(e => /174|100[,.]/.test(e.texto || '')));
+  eq('no "ML devolve" não há limite de frete', chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8810051', publicidade:false, limite_frete:'50' }, 3).status, 400);
 
   fim();
 })().catch(e => { console.log('ESTOUROU: ' + e.stack); falhas++; fim(); });

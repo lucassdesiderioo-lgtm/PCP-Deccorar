@@ -1491,13 +1491,15 @@ quando ela chega, e não mudou.
 | Tipo | Quem busca | O que manda na tela |
 |---|---|---|
 | **ML devolve** | a logística do ML | há quantos dias espera — sem cor, sem trava (R5) |
-| **Nós coletamos** | a Deccorar, com transportadora | o **prazo do ML** ("resolver até") e o parado |
+| **Nós coletamos** | a Deccorar, com transportadora | o **próximo prazo do ML** (comprovante ou coleta) e o parado |
 
 `devcaso_dominio.js` é o **dono único** do caso: etapas, cor do prazo, parado,
 saldo e relatório. A tela só desenha. Chaves: `devolucao.lancar` (admin),
-`devolucao.acompanhar` (supervisor) e `devolucao.dinheiro` (**admin geral,
-sensível, intransferível**). Backfill de uma vez só (`seed_devolucao_caso`):
-quem dá baixa em devolução lança e acompanha; o dinheiro não vem junto.
+`devolucao.acompanhar` (supervisor) e `devolucao.dinheiro` (admin,
+**sensível**; desde 03/11/2026 **não** é mais intransferível — ver "OS VALORES
+SÃO DE QUEM LANÇA E ACOMPANHA" abaixo). Backfill de uma vez só
+(`seed_devolucao_caso`): quem dá baixa em devolução lança e acompanha; o
+dinheiro não vem junto.
 
 > ⚠️ **O VENCIDO NÃO ENCERRA SOZINHO** (R7). Pode ter havido prorrogação não
 > lançada. Ele fica vermelho no topo até o admin geral lançar o prazo novo ou
@@ -1543,10 +1545,13 @@ quem dá baixa em devolução lança e acompanha; o dinheiro não vem junto.
 > tentativas com `coletou` (5 dígitos antes de 3). Não existe tabela de
 > cobertura escrita à mão, que envelheceria calada.
 >
-> ⚠️ **O DINHEIRO NEM VIAJA** para quem não tem `devolucao.dinheiro` (R15):
-> lista, caso, encerrados e relatório saem sem `valor_ml`, `custo`,
-> `valor_devolvido`, `valor_perdido` e `saldo` (o teste varre as chaves do
-> JSON). A **história** diz o que mudou, nunca o número, porque quem acompanha
+> ⚠️ ~~**O DINHEIRO NEM VIAJA** para quem não tem `devolucao.dinheiro`~~ —
+> **desde 03/11/2026 os valores viajam a quem lança ou acompanha** (bloco
+> abaixo). Continuam fora do fio para quem não tem nenhuma das três chaves
+> (R15): lista, caso, encerrados e busca saem sem `valor_ml`, `custo`,
+> `valor_devolvido`, `valor_perdido`, `limite_frete` e `saldo` (o teste varre
+> as chaves do JSON), e os **totais em reais do relatório** só com
+> `devolucao.dinheiro`. A **história** diz o que mudou, nunca o número, porque quem acompanha
 > lê a história. A **situação** do valor do ML (pedir / pedido / já veio) não é
 > dinheiro e é de quem acompanha. Ver valores entra na auditoria amortecida
 > (uma linha por pessoa a cada 30 min); cada decisão grava sempre.
@@ -1627,7 +1632,155 @@ quem dá baixa em devolução lança e acompanha; o dinheiro não vem junto.
 > texto. A tela recusa o repetido (sem diferença de maiúscula); a rota
 > `/api/listas` em si **não** recusa, e isso ficou como está.
 
-**Rode `node teste_devolucao_casos.js` (387 casos) ao mexer no
+> ⚠️ **O LANÇAMENTO JÁ ADIANTA A COLETA E O VALOR** (AJUSTE de 03/11/2026,
+> dono: *"no lançar devolução é onde devemos já lançar o maior número de
+> informações"*). No "Nós coletamos", o lançamento aceita o CEP, a
+> transportadora (o caso nasce em "Coleta pedida", com a 1ª tentativa), o
+> custo, a situação do valor e o valor do ML — pelas **mesmas** funções da
+> tela do caso (`devcaso_dominio.lancarCompleto`), numa transação só: parte
+> recusada, caso não nasce pela metade. Valor, custo, etiqueta e limite do
+> frete no lançamento são de **quem lança** (desde 03/11/2026). Valor sem
+> situação escolhida vira "já veio", a regra que já valia no caso.
+>
+> ⚠️ **O CEP NÃO VEM DA NF, e não é esquecimento.** O PCP não grava o CEP da
+> venda (da etiqueta só lê a cidade), e o PDF é apagado em 7 dias — a
+> devolução chega semanas depois. Puxar o CEP pede gravá-lo no upload, o que
+> mexe no `parse.js` e só vale para as vendas novas: fica para um plano à parte.
+>
+> ⚠️ **O DESFAZER DA ETAPA É SÓ DE QUEM CLICOU, E SÓ DO ÚLTIMO CLIQUE**
+> (decisão do dono). Um clique errado em "→ Coleta pedida" volta pelo botão
+> "↩ Desfazer", e o caso volta **com a data de antes** (`etapa_desde_antes` no
+> evento), para o "parado" não zerar. Vale só para etapa marcada à mão
+> (`MANUAIS`), e só enquanto o caso não andou por outra porta (coleta, chegada,
+> revisão, aviso, encerrar); editar, anexar, prazo e valor não contam. A
+> história guarda o clique e o desfeito. Quem clicou é gravado pelo **id**
+> (`devolucao_evento.usuario_id`): o evento anterior a isto não tem o id e não
+> se desfaz — volta pelos botões de etapa.
+>
+> ⚠️ **O MOTIVO SE ESCOLHE NO ALTO DO CASO** (AJUSTE de 03/11/2026, dono: *"uma
+> vez lançado não conseguimos mais colocar o motivo"*). Ele já se editava, mas
+> só em "Editar o lançamento", lá embaixo; no alto era texto. Hoje é um campo
+> que salva ao escolher (mesma rota e chave do editar, `devolucao.lancar`), em
+> âmbar quando vazio. **O motivo que o caso já tem passa mesmo se saiu da
+> lista**: sem isso, salvar a NF de um caso cujo motivo foi removido na aba
+> Motivos apagava o motivo calado (achado na revisão, travado no teste).
+>
+> ⚠️ **"MESMO COMPRADOR" SÓ AVISA, NÃO JUNTA OS CASOS.** Cada venda tem o seu
+> prazo, o seu valor e o seu reembolso no ML, então os casos continuam
+> separados; a lista, o caso e o lançamento dizem quais outros casos **abertos**
+> são da mesma pessoa, para quem pede a coleta combinar uma ida só. Quem diz se
+> dois nomes são a mesma pessoa é o `nome.js`, e **não** pelo `mesmoCliente`:
+> aquele aceita letra contida em letra (feito para o nome abreviado dentro de
+> UM pacote), e contra todos os casos abertos juntava "Ana" com "Luciana
+> Souza". Aqui é o `mesmaPessoaPorPalavras`: igualdade, a letra dobrada do ML,
+> ou as palavras inteiras do nome menor (duas ou mais) dentro do maior, com o
+> mesmo primeiro nome e o mesmo último sobrenome. Nome vazio ou de uma palavra
+> não junta ninguém.
+>
+> ⚠️ **O TIPO DO CASO SE TROCA ENQUANTO ELE ESTÁ ABERTO** (decisão do dono,
+> 03/11/2026: *"ainda não sei se o ML vai me entregar a persiana ou se eu vou
+> ter que coletar"*). Botão "Trocar para …" no caso, de quem lança
+> (`devolucao.lancar`, conferida também na rota). A etapa vai para a
+> equivalente (Aguardando ↔ Lançado; Chegou e Revisado ficam; Coleta pedida,
+> Documentos e A caminho voltam a Aguardando; ML avisado vira Chegou) e a
+> **data da etapa não muda** — trocar o tipo não é o caso andar. Para "Nós
+> coletamos" o prazo do ML é obrigatório, e o "passado em" vazio ganha o dia
+> do lançamento. **Para "ML devolve" é RECUSADO com coleta pedida ou valor do
+> ML lançado** (decisão do dono): o relatório só soma o dinheiro da coleta no
+> "nós coletamos", e o custo e o valor sairiam da conta calados. A troca
+> entra na história e bloqueia o desfazer do clique de antes.
+>
+> ⚠️ **O "ML DEVOLVE" TAMBÉM TEM CUSTO: A ETIQUETA DE DEVOLUÇÃO** (decisão do
+> dono). Quando o ML entende que o problema é nosso, ele cobra a etiqueta
+> (R$ 48,70 no caso que originou isto). `devolucao_caso.custo_etiqueta`, nos
+> dois tipos, é um **valor do caso**: de quem lança ou acompanha, no lançamento
+> ou no "Salvar alterações". O relatório soma as
+> etiquetas **à parte** — não entram no saldo da coleta. Vazio não é zero, mas
+> também não é "falta": o ML nem sempre cobra.
+>
+> ⚠️ **A REVISÃO DO FRETE: COM ELA PENDENTE, O "ML DEVOLVE" NÃO ENCERRA NA
+> BAIXA** (decisão do dono, 03/11/2026). Quando o ML cobra o frete e a culpa
+> não é nossa, **depois de a caixa chegar** pede-se revisão ("Pedi revisão do
+> frete ao ML", com o número da solicitação se houver); a resposta é "devolveu"
+> ou "negou". Pedir e responder são de `devolucao.acompanhar` (conferida também
+> na rota), e o **valor devolvido** (`valor_revisao`) também, como os outros
+> valores do caso. Só no "ML devolve" — no "Nós coletamos"
+> quem cobra é a transportadora. Pedida e sem resposta, o caso mostra "revisão
+> do frete pedida há N dias", âmbar a partir do `devol_parado_dias`. **Antes o
+> "ML devolve" encerrava sempre na baixa; agora, com a revisão pendente, a
+> baixa só fica na história e o caso espera a resposta** — que o encerra se a
+> devolução já teve baixa. O relatório do mês mostra fretes cobrados,
+> devolvidos na revisão e o prejuízo.
+>
+> ⚠️ **NADA DIGITADO SOME CALADO NO CASO** (CONSERTO de 03/11/2026, o dono:
+> *"coloco o nome do responsável e não está salvando"*). O servidor gravava;
+> era a tela. O caso tinha **dois "Salvar"** (lançamento e valores), cada um
+> gravava só o seu bloco, e o caso inteiro era redesenhado por cima do que
+> estava digitado no outro bloco. E no "ML devolve" o responsável era gravado
+> e **não aparecia** (o quadro só o mostrava no "nós coletamos"). Hoje: os dois
+> botões e a barra embaixo são o mesmo **"Salvar alterações"**, que grava todo
+> campo mudado; campo não salvo fica marcado e a barra diz quais; uma ação usa
+> só os campos da **linha do botão** dela e o resto volta depois do redesenho;
+> o recusado fica no campo com o motivo; Fechar ou abrir outro caso pergunta.
+> **Campo novo no caso entra no `CAMPOS_EDITAR` ou no `CAMPOS_VALOR`** da tela,
+> senão o "Salvar alterações" não o grava.
+>
+> ⚠️ **A TELA TEM TESTE PRÓPRIO, NUM NAVEGADOR DE VERDADE:
+> `node teste_devolucao_casos_tela.js`** (93 casos). Ele **não** sobe o
+> `server.js` (a porta 3010 é fixa, e no servidor bateria na produção): monta um
+> Express só com as rotas das devoluções, num banco temporário e numa porta
+> livre. **Sem Playwright/Chromium ele diz "PULADO" e sai sem falhar — e o CI
+> do GitHub não tem navegador**, então lá esta tela não é conferida. Quatro
+> defeitos foram reintroduzidos um a um: sem devolver o digitado depois de uma
+> ação (reprova 5), o "Salvar" do dinheiro gravando só valores — o defeito
+> original (16), o responsável só no "nós coletamos" (1) e o Fechar sem
+> perguntar (3).
+>
+> ⚠️ **A REVISÃO EM DUPLA (03/11/2026) ACHOU, E FICOU TRAVADO NO TESTE:** custo
+> digitado sem transportadora sumia calado (hoje 400); pelo lançamento, quem
+> só lança pedia coleta e marcava a situação do valor, que nas rotas próprias
+> são de `devolucao.acompanhar` (hoje 403); o desfazer podia voltar a
+> "Documentos ao ML" sem os documentos (hoje passa pela trava R11); e as
+> colunas novas estavam só no `ALTER` — agora estão também no `CREATE` (§17).
+
+> ⚠️ **O "NÓS COLETAMOS" TEM DOIS PRAZOS DO ML** (AJUSTE de 03/11/2026, dono,
+> com a conversa do ML na mão). O `prazo` de sempre virou **"Mandar o
+> comprovante ao ML até"** (o comprovante do agendamento); e a coleta tem o
+> dela, **20 dias corridos da abertura da reclamação**:
+> `prazo_coleta = aberta_em + devol_coleta_dias` (`config`, padrão 20). A
+> **abertura** nasce hoje no lançamento (editável, nunca no futuro), e corrigi-la
+> recalcula o prazo da coleta — **menos** se o ML já deu prazo novo para ela.
+> - **A cor, o número e a ordem da lista vêm do PRÓXIMO prazo aberto** (o mais
+>   perto dos não cumpridos), e o chip diz qual: *"comprovante: faltam 3 dias"*,
+>   *"coleta: falta 1 dia"*. O do comprovante se cumpre quando o caso chega a
+>   "Documentos ao ML"; o da coleta, em "A caminho". **Coletado, não há prazo
+>   correndo** — o caso vai ao fim da lista, sem cor. Não existe terceiro prazo.
+> - **Prorrogação e prazo novo valem para o prazo escolhido** (o próximo, de
+>   início); cada prazo guarda o **seu** original (`prazo_original`,
+>   `prazo_coleta_original`), e o segundo prazo novo não o sobrescreve (R6).
+> - O **caso de antes disto**, sem a abertura, só tem o do comprovante.
+> - **Dois avisos que nunca travam:** a tentativa **agendada para** depois do
+>   prazo da coleta (`devolucao_coleta.agendada_para`, remarcável pelo "Salvar
+>   alterações") e o **custo acima do limite do frete** que o ML paga
+>   (`limite_frete`; igual ao limite não avisa). Travar faria a pessoa lançar
+>   por fora (#6); o ML às vezes prorroga e às vezes aceita.
+> - No "ML devolve" não há abertura, prazo da coleta nem limite de frete — o
+>   limite é **recusado** (400).
+>
+> ⚠️ **OS VALORES SÃO DE QUEM LANÇA E ACOMPANHA; O DINHEIRO FICOU COM AS
+> DECISÕES** (decisão do dono, 03/11/2026: *"quem estiver lançando e quem
+> estiver à frente do problema"*). Valor do ML, custo das tentativas, etiqueta,
+> limite do frete e frete devolvido: **vê e lança** quem tem
+> `devolucao.lancar` ou `devolucao.acompanhar`. Com `devolucao.dinheiro` ficam
+> só a **baixa do reembolso**, **encerrar como perda**, **devolver ao
+> comprador**, o valor perdido e o devolvido, e os **totais em reais do
+> relatório**. A chave deixou de ser intransferível e virou nível `admin`, para
+> o dono a dar a um setor (o Financeiro) pela tela de Acessos — e quem tem só
+> ela também abre a tela e as abas. **Ela NÃO nasce no setor Admin**
+> (`SO_PELA_TELA` no `acesso.js`): em produção o setor já existe e não a
+> recebe, e o banco novo tem de ser igual (§17).
+
+**Rode `node teste_devolucao_casos.js` (605 casos) — e, na tela, `node teste_devolucao_casos_tela.js` (93) — ao mexer no
 `devcaso_dominio.js`, no `devcaso_route.js`, no bipe ou na baixa do
 `dev_route.js`, ou nas listas de motivos e documentos do `cad_route.js`** —
 e `node teste_devolucao.js` (37), que tem que passar sem mudar o esperado. Os
@@ -2294,7 +2447,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (322), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (387); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (328), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (605) e `teste_devolucao_casos_tela.js` (93, precisa de navegador); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2505,8 +2658,14 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   pode ter havido prorrogação não lançada, e quem decide é o admin geral (§9-B, R7)
 - ❌ Gravar custo, valor do ML ou valor perdido vazio como zero: o saldo e o
   total do mês ficam incompletos e saem como piso (§9-B, R9)
-- ❌ Mandar `valor_ml`, `custo`, `saldo` ou os valores pelo fio a quem não tem
-  `devolucao.dinheiro`, ou escrever o número na história do caso (§9-B, R15)
+- ❌ Mandar `valor_ml`, `custo`, `saldo` ou os valores pelo fio a quem não lança
+  nem acompanha, mandar os totais do relatório sem `devolucao.dinheiro`, ou
+  escrever o número na história do caso (§9-B, R15)
+- ❌ Pôr a cor ou a ordem do "nós coletamos" num prazo só, ou travar a coleta
+  agendada depois do prazo ou o custo acima do limite: são dois prazos e dois
+  avisos, e quem decide é quem acompanha (§9-B)
+- ❌ Dar `devolucao.dinheiro` ao setor Admin pelo seed: ela vai pela tela de
+  Acessos, e o banco novo tem de ser igual à produção (§9-B, §17)
 - ❌ Criar uma segunda lista de motivos para os casos em andamento, ou pôr motivo
   novo no `seed()` do `cad_route.js` — ele só grava em lista vazia; motivo novo
   entra por acréscimo de uma vez só (§9-B, R12)
@@ -2515,6 +2674,13 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   para ninguém por isso (§9-B)
 - ❌ Gravar anexo de devolução em `lotes/` (o cron apaga em 7 dias) ou fora da
   transação da linha (§9-B, R21)
+- ❌ Voltar a ter mais de um "Salvar" no caso gravando só o próprio bloco, ou
+  redesenhar o caso sem devolver o que estava digitado: o dono digitou o
+  responsável e o valor, salvou um, e o outro sumiu calado (§9-B)
+- ❌ Encerrar o "ML devolve" na baixa com a revisão do frete pedida e sem
+  resposta: a cobrança some da lista de abertos (§9-B)
+- ❌ Deixar trocar um caso para "ML devolve" com coleta pedida ou valor do ML
+  lançado: o dinheiro da coleta sai do relatório calado (§9-B)
 - ❌ Contar a publicidade vazia como "não", ou deixar o link da conversa aceitar
   algo que não comece com `http(s)://` — ele vira botão que abre na sessão de
   quem clica (§9-B, AJUSTE de 03/11/2026)

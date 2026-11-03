@@ -63,7 +63,7 @@ module.exports=function(app,db){
      seguranca: quem tranca e a chave de cada tela e de cada rota. */
   function abasDe(u){
     const p=(c)=>{ try{ return !!app.locals.acesso.podePermissao(u,c); }catch(e){ return false; } };
-    return { receber:p('devolucao.registrar'), andamento:p('devolucao.acompanhar')||p('devolucao.lancar'), baixa:p('devolucao.baixar') };
+    return { receber:p('devolucao.registrar'), andamento:p('devolucao.acompanhar')||p('devolucao.lancar')||p('devolucao.dinheiro'), baixa:p('devolucao.baixar') };
   }
   app.get('/api/devolucao/abas',(req,res)=> res.json(abasDe(req.usuario)));
   /* A porta unica do rodape: leva a primeira aba que a pessoa alcanca. Em
