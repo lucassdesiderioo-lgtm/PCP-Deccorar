@@ -205,18 +205,26 @@ document.addEventListener('click',function(e){
   if(m){ DVMED=m.getAttribute('data-med'); DVSKU=null; dvSkus(); return; }
 });
 
+var DVCASO=null;
+function escDv(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 async function dvBuscar(cod){
   var r={achou:false};
   try{ r=await (await fetch('/api/devolucao/buscar/'+encodeURIComponent(cod))).json(); }catch(e){}
   var el=document.getElementById('dvVenda');
+  /* A DEVOLUCAO ESPERADA (spec DEVOLUCOES-ACOMPANHAMENTO, R14): se a etiqueta
+     aponta um caso em andamento, a tarja diz qual e o motivo, e o salvar liga
+     o caso. Sem caso, tudo como sempre. */
+  DVCASO=r.caso||null;
+  var tarja=DVCASO?'<div style="background:#fff4e0;border:2px solid #b26a00;color:#7a4a00;border-radius:10px;padding:10px 12px;margin-bottom:8px;font-weight:800;font-size:15px">'+
+    'Devolução esperada — caso #'+DVCASO.id+' · '+escDv(DVCASO.motivo||'sem motivo lançado')+'</div>':'';
   if(r.achou){
     DVVENDA=r.venda;
-    el.innerHTML='Venda encontrada: <b>'+(r.venda.buyer||'')+'</b> - enviado <b style="color:#b26a00">'+(r.venda.codigo||'?')+'</b> em '+(r.venda.data||'');
+    el.innerHTML=tarja+'Venda encontrada: <b>'+(r.venda.buyer||'')+'</b> - enviado <b style="color:#b26a00">'+(r.venda.codigo||'?')+'</b> em '+(r.venda.data||'');
     var sel=document.getElementById('dvSku');
     if(sel) sel.value='';
   } else {
     DVVENDA=null;
-    el.innerHTML='<span style="color:#5a6472">Sem registro dessa venda - tudo bem, siga normalmente.</span>';
+    el.innerHTML=tarja+'<span style="color:#5a6472">Sem registro dessa venda - tudo bem, siga normalmente.</span>';
   }
 }
 async function dvSalvar(){
@@ -226,12 +234,12 @@ async function dvSalvar(){
   if(!DVSEL.destinacao){ msg.innerHTML='<span style="color:#c62828">Escolha a destinacao</span>'; return; }
   var body={codigo_ml:document.getElementById('dvCod').value.trim(),sku_fisico:sku,
     sku_venda:DVVENDA?DVVENDA.codigo:null, venda_id:DVVENDA?DVVENDA.id:null, buyer:DVVENDA?DVVENDA.buyer:null,
-    obs:document.getElementById('dvObs').value.trim()};
+    obs:document.getElementById('dvObs').value.trim(), caso_id:DVCASO?DVCASO.id:null};
   for(var k in DVSEL) body[k]=DVSEL[k];
   var r=await (await fetch('/api/devolucao',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
   if(r.erro){ msg.innerHTML='<span style="color:#c62828">'+r.erro+'</span>'; return; }
-  msg.innerHTML='<span style="color:#2e7d32">Salvo'+(r.naFila?' - foi pra fila de embalagem':'')+'</span>';
-  DVSEL={}; DVVENDA=null;
+  msg.innerHTML='<span style="color:#2e7d32">Salvo'+(r.naFila?' - foi pra fila de embalagem':'')+(r.caso_id?' - caso #'+r.caso_id+' revisado':'')+'</span>';
+  DVSEL={}; DVVENDA=null; DVCASO=null;
   document.getElementById('dvCod').value=''; document.getElementById('dvObs').value='';
   DVCOR=null; DVMED=null; dvSkus(); document.getElementById('dvVenda').innerHTML='';
   dvMontar();

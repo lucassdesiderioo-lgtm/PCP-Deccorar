@@ -475,3 +475,15 @@ vendas da fila do dia, nunca impressas, e a lista da Etiqueta de Venda sumiu —
 voltou pelo Desfazer da Mesa. **Depois:** corte em hoje é recusado (400), a venda
 que vence hoje não aceita "Dar saída", e o `fechar_vencidos.js` sem `--ate` corta
 em ontem. O que vence hoje é trabalho da Etiqueta de Venda.
+
+## 03/11/2026 — devoluções em andamento: do aviso do ML até o reembolso
+
+Spec `docs/specs/DEVOLUCOES-ACOMPANHAMENTO.md`, desenhada com o dono entre 29/10 e 03/11/2026.
+
+| Data | O que mudou | Por quê | Decidido por | Onde está |
+|---|---|---|---|---|
+| 03/11/2026 | Toda devolução do ML é lançada no sistema antes de a peça chegar, com tipo "ML devolve" ou "Nós coletamos" | Peças perdidas por prazo vencido e devolução que nunca chega sem ninguém ver | Lucas | docs/specs/DEVOLUCOES-ACOMPANHAMENTO.md |
+| 03/11/2026 | No "Nós coletamos", o prazo do ML fica âmbar a 3 dias, vermelho a 1 dia, e caso parado há 2 dias fica âmbar; vencido não encerra sozinho | Prazo de 7 a 10 dias; em out/2026 caso parado fez perder peça | Lucas | idem, R3, R4, R7 |
+| 03/11/2026 | Uma lista de motivos só (a da baixa de devolução) para todas as devoluções, com Falta de kit, Comando quebrado e Chegou amassada | Relatório do que mais dá problema numa régua só | Lucas | idem, R12 |
+| 03/11/2026 | Valores, devolver ao comprador sem coletar, perda por prazo e baixa do reembolso são só do admin geral | Reembolso é conferido no Mercado Pago, que só o admin geral acessa | Lucas | idem, R15, R16 |
+| 03/11/2026 | Chegou amassada: devolvemos o dinheiro ao comprador em vez de coletar, com a foto dele anexada | A peça não se reaproveita e o frete de volta só aumentaria a perda | Lucas | idem, R17 |

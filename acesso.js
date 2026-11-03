@@ -312,6 +312,28 @@ module.exports = function(app, db){
     }
   }catch(e){ console.log('[acesso] seed do ajuste em duas pessoas falhou: '+e.message); }
 
+  /* ── 3-E2. AS DEVOLUCOES EM ANDAMENTO (spec DEVOLUCOES-ACOMPANHAMENTO,
+     03/11/2026) ──
+     Quem ja da baixa em devolucao (`devolucao.baixar`) passa a LANCAR e a
+     ACOMPANHAR o caso: e quem olha o pos-venda do ML hoje. O dinheiro NAO vem
+     junto — e do Admin Geral, que passa por nivel. O Renato recebe
+     `acompanhar` pela tela de Acessos depois do deploy. Excecao concedida vai
+     junto. Uma vez so (marca em `config`): desmarcar depois nao volta. */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='seed_devolucao_caso'").get()){
+      db.transaction(() => {
+        for(const para of ['devolucao.lancar','devolucao.acompanhar']){
+          db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
+            SELECT setor_id, ? FROM setor_permissao WHERE chave='devolucao.baixar'`).run(para);
+          db.prepare(`INSERT OR IGNORE INTO usuario_excecao (usuario_id,chave,concede)
+            SELECT usuario_id, ?, 1 FROM usuario_excecao e WHERE chave='devolucao.baixar' AND concede=1
+              AND NOT EXISTS (SELECT 1 FROM usuario_excecao x WHERE x.usuario_id=e.usuario_id AND x.chave=?)`).run(para, para);
+        }
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('seed_devolucao_caso','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[acesso] seed das devolucoes em andamento falhou: '+e.message); }
+
   // ── resolvedor do modelo NOVO: permissoes efetivas de um usuario (secao 2) ──
   function permissoesDe(uid){
     const setores = db.prepare(`SELECT s.nivel FROM usuario_setor us
@@ -667,6 +689,8 @@ module.exports = function(app, db){
     if(eq('/carregamento')) return 'carregamento.executar';
     if(eq('/expedicao')) return 'pdf.subir';
     if(eq('/devolucao')) return 'devolucao.registrar';
+    // As devolucoes EM ANDAMENTO (escritorio): quem acompanha ou quem lanca.
+    if(eq('/devolucao-casos')) return ['devolucao.acompanhar','devolucao.lancar'];
     if(eq('/painel')) return 'painel.ver';
     if(eq('/relatorios')) return 'relatorios.ver';
     if(eq('/planejamento')) return 'planilha.importar';
@@ -753,6 +777,20 @@ module.exports = function(app, db){
     if(eq('/api/auditoria/skus')) return '@admin';
     if(M !== 'GET' && eq('/api/devolucao')) return 'devolucao.registrar';
     if(M !== 'GET' && eq('/api/devolucao/baixa')) return 'devolucao.baixar';
+    /* AS DEVOLUCOES EM ANDAMENTO. `/api/devolucao-casos` NAO cai no
+       `pre('/api/devolucao')` (o pre exige a barra), e por isso cada porta e
+       declarada aqui, com a chave dela. As decisoes de dinheiro tem a chave
+       PROPRIA antes do resto: atras de uma regra mais larga ela seria engolida
+       e nao mandaria em nada. O handler confere `devolucao.dinheiro` de novo. */
+    if(pre('/api/devolucao-casos')){
+      const m = p.match(/^\/api\/devolucao-casos\/[^/]+\/([a-z_-]+)$/);
+      const acao = m ? m[1] : '';
+      if(M !== 'GET' && ['perda','devolver-comprador','reembolso','valor'].indexOf(acao) >= 0) return 'devolucao.dinheiro';
+      if(M === 'GET' && eq('/api/devolucao-casos/relatorio')) return ['devolucao.acompanhar','devolucao.lancar'];
+      if(M !== 'GET' && (eq('/api/devolucao-casos') || acao === 'editar')) return 'devolucao.lancar';
+      if(M !== 'GET') return 'devolucao.acompanhar';
+      return ['devolucao.acompanhar','devolucao.lancar'];
+    }
     /* O AJUSTE EM DUAS PESSOAS (fase 3 da ESTOQUE-LIVRO-E-CONFERENCIA). Pedir e
        estoque.ajustar; aprovar e estoque.aprovar_ajuste; recusar e das duas —
        quem pediu desiste do proprio, e o handler exige a de aprovar para o
@@ -992,6 +1030,8 @@ module.exports = function(app, db){
     ['revisao.executar','operador'], ['embalagem.executar','montagem'],
     ['etiqueta.emitir','embalagem'], ['carregamento.executar','carregamento'],
     ['pdf.subir','expedicao'], ['devolucao.registrar','devolucao'],
+    // A tela das devolucoes em andamento (a area existe para a TELAS do auth.js).
+    ['devolucao.acompanhar','devolucao_casos'], ['devolucao.lancar','devolucao_casos'],
     ['painel.ver','painel'], ['relatorios.ver','relatorios'], ['necessidade.ver','necessidade'],
     ['pedido.receber','recebimento'],
     /* A tela de conferencia (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA). A area

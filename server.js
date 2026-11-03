@@ -125,6 +125,11 @@ require('./etq_route')(app, db);
 require('./correcao_route')(app, db);
 require('./dev_route')(app, db);
 app.get('/devolucao',(req,res)=> res.sendFile(path.join(__dirname,'public','devolucao.html')));
+/* As devolucoes EM ANDAMENTO (spec DEVOLUCOES-ACOMPANHAMENTO): o caso nasce
+   antes de a peca chegar. Depois do dev_route, que e o dono da `devolucao`, e
+   antes do teste_route, que poe o trigger em cima das tabelas novas. */
+require('./devcaso_route')(app, db);
+app.get('/devolucao-casos',(req,res)=> res.sendFile(path.join(__dirname,'public','devolucao-casos.html')));
 require('./cad_route')(app, db);
 // Antes do acesso.js: as rotas de cor/modelo/pendencias precisam existir quando
 // a cobertura de permissoes for montada.

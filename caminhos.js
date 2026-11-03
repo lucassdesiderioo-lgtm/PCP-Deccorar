@@ -40,5 +40,9 @@ module.exports = {
   BANCO:   de('PCP_DB',          'dados.db'),
   LOTES:   de('PCP_LOTES',       'lotes'),
   COLETAS: de('PCP_COLETAS_DIR', 'coletas'),
-  BACKUPS: de('PCP_BACKUPS',     'backups')
+  BACKUPS: de('PCP_BACKUPS',     'backups'),
+  /* Os anexos das devolucoes em andamento (spec DEVOLUCOES-ACOMPANHAMENTO,
+     R21): etiqueta de coleta, comprovante, a foto do comprador. FORA de
+     lotes/, que o cron apaga em 7 dias — o anexo e prova, e prova nao expira. */
+  DEVOLUCOES: de('PCP_DEVOLUCOES_DIR', 'devolucoes')
 };

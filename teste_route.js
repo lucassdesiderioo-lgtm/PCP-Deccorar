@@ -55,7 +55,18 @@ module.exports=function(app, db){
        grava aqui. Sem cobertura, "apagar tudo" deixaria em Bloqueados uma
        venda que so existiu no teste. */
     {nome:'venda_sem_etiqueta',   pk:'id', rotulo:'vendas sem etiqueta'},
-    {nome:'pdf_conta_aberta',     pk:'id', rotulo:'PDFs com a conta aberta'}
+    {nome:'pdf_conta_aberta',     pk:'id', rotulo:'PDFs com a conta aberta'},
+    /* As devolucoes EM ANDAMENTO (spec DEVOLUCOES-ACOMPANHAMENTO, 03/11/2026).
+       O caso e a historia dele andam juntos: apagar o caso de teste e deixar os
+       eventos de pe criaria historia orfa, que o proximo caso com o mesmo id
+       herdaria. */
+    {nome:'devolucao_caso',       pk:'id', rotulo:'devolucoes em andamento'},
+    {nome:'devolucao_evento',     pk:'id', rotulo:'devolucoes (historia)'},
+    // As tentativas de coleta (fase 3). A transportadora e cadastro e fica fora.
+    {nome:'devolucao_coleta',     pk:'id', rotulo:'devolucoes (tentativas de coleta)'},
+    /* Os anexos (fase 4). "Apagar tudo" apaga a LINHA; o arquivo fica na pasta
+       das devolucoes, sem nada apontando para ele — e lixo, nao prova. */
+    {nome:'devolucao_anexo',      pk:'id', rotulo:'devolucoes (documentos e fotos)'}
   ];
 
   // Fase 3: foto_estoque saiu da cobertura; limpa o trigger antigo em bancos

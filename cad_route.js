@@ -15,6 +15,30 @@ module.exports=function(app,db){
      pessoa escolhe qualquer um — que e o mesmo que nao ter motivo. */
   seed('ajuste_estoque',['Peca quebrada','Peca perdida','Peca encontrada','Correcao de contagem','Correcao de erro do sistema','Outro']);
 
+  /* ⚠️ O `seed()` ACIMA SO GRAVA QUANDO A LISTA ESTA VAZIA — num banco que ja
+     existe, valor novo nunca chegaria. O acrescimo e um EVENTO de uma vez so
+     (marca em `config`), e so insere o valor que nao existe: quem apagar ou
+     desativar um motivo depois nao o ve voltar no boot seguinte. Mesma licao
+     do backfill de chave (armadilha #23). Spec DEVOLUCOES-ACOMPANHAMENTO, R12:
+     a lista de motivos da baixa e a MESMA dos casos em andamento — duas
+     listas partiriam o relatorio em dois. */
+  const acrescentar=(marca,tipo,vals)=>{
+    try{
+      db.exec("CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT)");
+      if(db.prepare('SELECT 1 FROM config WHERE chave=?').get(marca)) return;
+      db.transaction(()=>{
+        const tem=db.prepare('SELECT 1 FROM listas WHERE tipo=? AND valor=?');
+        const ins=db.prepare('INSERT INTO listas (tipo,valor,ordem) VALUES (?,?,(SELECT COALESCE(MAX(ordem),-1)+1 FROM listas WHERE tipo=?))');
+        vals.forEach(v=>{ if(!tem.get(tipo,v)) ins.run(tipo,v,tipo); });
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES (?, '1')").run(marca);
+      })();
+    }catch(e){ console.log('[listas] acrescimo '+marca+' falhou: '+e.message); }
+  };
+  acrescentar('seed_motivos_devolucao_2','motivo_devolucao',['Falta de kit','Comando quebrado','Chegou amassada']);
+  /* Os documentos que a coleta exige antes de "Documentos ao ML" (R11). Lista
+     cadastravel, nasce com os dois de hoje, pelo mesmo acrescimo de uma vez so. */
+  acrescentar('seed_doc_devolucao_1','doc_devolucao',['Etiqueta de coleta','Comprovante de pagamento da transportadora']);
+
   app.get('/api/listas/:tipo',(req,res)=>
     res.json(db.prepare('SELECT id,valor FROM listas WHERE tipo=? AND ativo=1 ORDER BY ordem,id').all(req.params.tipo)));
 

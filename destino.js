@@ -23,7 +23,8 @@ const PADRAO=[
   ['admin','/admin'], ['painel','/painel'], ['operador','/operador'],
   ['montagem','/montagem'], ['embalagem','/embalagem'], ['carregamento','/carregamento'],
   ['expedicao','/expedicao'], ['relatorios','/relatorios'], ['necessidade','/planejamento'],
-  ['recebimento','/recebimento'], ['inventario','/inventario'], ['devolucao','/devolucao']
+  ['recebimento','/recebimento'], ['inventario','/inventario'], ['devolucao','/devolucao'],
+  ['devolucao_casos','/devolucao-casos']
 ];
 
 const SOBMEDIDA='/sobmedida';

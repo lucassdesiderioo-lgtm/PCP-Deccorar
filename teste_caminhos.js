@@ -22,7 +22,7 @@ const igual=(veio,esperado,oque)=>{ if(veio!==esperado)
    com o cache do require, o segundo caso leria a resposta do primeiro. */
 function comAmbiente(vars){
   const antes={};
-  for(const k of ['PCP_DIR','PCP_DB','PCP_LOTES','PCP_COLETAS_DIR','PCP_BACKUPS']){
+  for(const k of ['PCP_DIR','PCP_DB','PCP_LOTES','PCP_COLETAS_DIR','PCP_BACKUPS','PCP_DEVOLUCOES_DIR']){
     antes[k]=process.env[k];
     if(vars[k]===undefined) delete process.env[k]; else process.env[k]=vars[k];
   }
@@ -74,6 +74,15 @@ caso('os nomes que treze scripts JA liam continuam valendo', ()=>{
   igual(comAmbiente({PCP_COLETAS_DIR:'/x/c'}).COLETAS,'/x/c','PCP_COLETAS_DIR');
   /* Nomes novos aqui criariam DUAS reguas para a mesma pergunta — as duas
      "certas", cada uma na sua (armadilha #12). */
+});
+
+caso('a pasta dos anexos das devolucoes (spec DEVOLUCOES-ACOMPANHAMENTO, R21)', ()=>{
+  igual(comAmbiente({}).DEVOLUCOES,'/opt/expedicao/devolucoes','o padrao, ao lado das coletas');
+  igual(comAmbiente({PCP_DIR:'/tmp/pcp-teste'}).DEVOLUCOES,'/tmp/pcp-teste/devolucoes','o PCP_DIR a move');
+  igual(comAmbiente({PCP_DIR:'/tmp/pcp-teste', PCP_DEVOLUCOES_DIR:'/x/dv'}).DEVOLUCOES,'/x/dv','e a especifica ganha');
+  /* FORA de lotes/, que o cron apaga em 7 dias: o anexo e prova, e prova nao
+     expira (mesma razao das fotos da coleta). */
+  if(comAmbiente({}).DEVOLUCOES.indexOf(comAmbiente({}).LOTES) === 0) throw new Error('a pasta das devolucoes caiu dentro de lotes/');
 });
 
 console.log('\n── a regra que impede o literal de voltar ───────────────────────────\n');
