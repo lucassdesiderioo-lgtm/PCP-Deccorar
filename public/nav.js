@@ -80,6 +80,11 @@ function digitoDoAtalho(e){
   // voltou do ML existia so por URL — quem nao a decorou nao chegava nela.
   var onDev=(cur==='/devolucao');
   html+='<a href="/devolucao" style="text-decoration:none;font-size:12px;padding:6px 12px;border-radius:7px;color:'+(onDev?CH.planTx:CH.off)+';background:'+(onDev?CH.planBg:'transparent')+';font-weight:'+(onDev?'700':'500')+'">Devoluções</a>';
+  // As devolucoes EM ANDAMENTO (spec DEVOLUCOES-ACOMPANHAMENTO): nasce
+  // escondida e aparece so para quem tem a area (bloco da sessao, abaixo).
+  // Esconder nao e seguranca — so evita mostrar um caminho que da "nao".
+  var onDevC=(cur==='/devolucao-casos');
+  html+='<a href="/devolucao-casos" id="navDevCasos" style="display:none;text-decoration:none;font-size:12px;padding:6px 12px;border-radius:7px;color:'+(onDevC?CH.planTx:CH.off)+';background:'+(onDevC?CH.planBg:'transparent')+';font-weight:'+(onDevC?'700':'500')+'">Devoluções em andamento</a>';
   bar.innerHTML=html;
   document.body.appendChild(bar);
   document.body.style.paddingBottom='52px';
@@ -132,6 +137,8 @@ function digitoDoAtalho(e){
 
   fetch('/api/auth/eu').then(function(r){return r.json();}).then(function(u){
     if(!u.logado) return;
+    var nDC=document.getElementById('navDevCasos');
+    if(nDC && (u.areas||[]).indexOf('devolucao_casos')>=0) nDC.style.display='';
     var d=document.createElement('div');
     d.id='sessBar';
     var fadj = CH.light ? '<div id="fadj"><button class="fbtn" data-fd="-1" aria-label="Diminuir a fonte">A−</button>'+

@@ -26,6 +26,10 @@ const AREAS=[
      26/09/2026). Mesma razao do recebimento: sem a area, /inventario ficaria
      fora de TELAS e o express.static a serviria sem sessao. */
   {id:'inventario',  nome:'Conferencia de estoque (contar e recontar)'},
+  /* As devolucoes EM ANDAMENTO (spec DEVOLUCOES-ACOMPANHAMENTO, 03/11/2026).
+     Mesma razao do inventario: sem a area, /devolucao-casos ficaria fora de
+     TELAS e o pedido sem sessao cairia no next(). Quem decide e a chave. */
+  {id:'devolucao_casos', nome:'Devolucoes em andamento'},
   /* SOB MEDIDA (02/09/2026). A fabrica tem duas operacoes: a de medida padrao,
      que vende pelo Mercado Livre, e a sob medida, que corta tecido contra o
      pedido do cliente. Ate aqui a segunda vivia num segundo servidor, com um
@@ -56,6 +60,7 @@ const TELAS={
   '/carregamento':'carregamento','/carregamento.html':'carregamento',
   '/recebimento':'recebimento','/recebimento.html':'recebimento',
   '/inventario':'inventario','/inventario.html':'inventario',
+  '/devolucao-casos':'devolucao_casos','/devolucao-casos.html':'devolucao_casos',
   /* A escolha de setor. O '*' quer dizer QUALQUER SESSAO: nao ha area para
      escolher onde trabalhar. Ela precisa estar nesta lista de todo jeito —
      fora dela, o pedido cairia no next() e o express.static entregaria o

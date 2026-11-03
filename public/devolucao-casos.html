@@ -1,0 +1,342 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Devoluções em andamento</title>
+<!-- Tela de ESCRITÓRIO (contexto escuro do docs/DESIGN.md). Spec
+     docs/specs/DEVOLUCOES-ACOMPANHAMENTO.md §8. Quem decide cor, prazo e
+     ordem é o servidor (devcaso_dominio.js): esta tela só desenha o que vem. -->
+<style>
+  :root{--bg:#0e1217;--panel:#161b22;--panel2:#1c232c;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;
+    --amber:#ffb800;--red:#f85149;--redbg:#3a1416;--ambg:#3a2c05;--green:#2ea043;--blue:#4493f8}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif;font-size:14px}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
+  h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
+  .wrap{max-width:1400px;margin:0 auto;padding:16px}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+  .tab{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px}
+  .tab.on{background:var(--amber);color:#1a1300;border-color:var(--amber);font-weight:700}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+  .card h2{font-size:15px;margin:0 0 10px}
+  .cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+  @media (max-width:900px){ .cols{grid-template-columns:minmax(0,1fr)} }
+  label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;margin:0 0 4px}
+  input,select,textarea{width:100%;padding:9px;border-radius:8px;border:1px solid var(--line);background:#0b0f14;color:var(--txt);font-size:14px;font-family:inherit}
+  .grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+  .bt{background:var(--amber);color:#1a1300;border:0;border-radius:8px;font-weight:700;padding:10px 16px;cursor:pointer;font-size:14px}
+  .bt.sec{background:transparent;color:var(--txt);border:1px solid var(--line);font-weight:600}
+  .bt.perigo{background:var(--red);color:#fff}
+  .bt:disabled{opacity:.5;cursor:default}
+  .tipos{display:flex;gap:8px;flex-wrap:wrap}
+  .tipos button{flex:1;min-width:140px}
+  .erro{color:var(--red);font-size:13px;margin-top:8px;white-space:pre-wrap}
+  .okmsg{color:var(--green);font-size:13px;margin-top:8px}
+  .vazio{color:var(--muted);font-size:13px;padding:10px 0}
+  .linha{border:1px solid var(--line);border-left:4px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;background:var(--panel2)}
+  .linha:hover{border-color:#3a4450}
+  .linha.vencido{border-left-color:var(--red);background:var(--redbg)}
+  .linha.vermelho{border-left-color:var(--red)}
+  .linha.ambar{border-left-color:var(--amber)}
+  .linha .t1{font-weight:700;display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
+  .linha .t2,.linha .t3{font-size:13px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .chip{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+  .chip.vencido,.chip.vermelho{background:var(--red);color:#fff;border-color:var(--red);font-weight:700}
+  .chip.ambar{background:var(--amber);color:#1a1300;border-color:var(--amber);font-weight:700}
+  .chip.parado{background:var(--ambg);color:var(--amber);border-color:var(--amber)}
+  .chip.dinheiro{color:var(--green);border-color:#1f5e2c}
+  .chip.falta{color:var(--amber);border-color:#6b5310}
+  /* o caso aberto */
+  #fundo{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:10001;overflow:auto;padding:24px 12px}
+  #painel{max-width:860px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .trilha{display:flex;flex-wrap:wrap;gap:4px;margin:10px 0}
+  .trilha span{font-size:12px;padding:4px 9px;border-radius:6px;background:#0b0f14;color:var(--muted);border:1px solid var(--line)}
+  .trilha span.feito{color:var(--txt)}
+  .trilha span.agora{background:var(--amber);color:#1a1300;border-color:var(--amber);font-weight:700}
+  .acoes{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .bloco{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}
+  .bloco h3{font-size:13px;margin:0 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .hist div{font-size:13px;padding:5px 0;border-bottom:1px dashed var(--line);overflow-wrap:anywhere}
+  .hist small{color:var(--muted)}
+  .dados{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px 14px;font-size:13px}
+  .dados b{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600}
+  .rolaH{overflow-x:auto;max-width:100%}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase}
+  .num{text-align:right;white-space:nowrap}
+  .aviso{background:var(--ambg);border:1px solid #6b5310;color:var(--amber);border-radius:8px;padding:8px 10px;font-size:13px;margin:8px 0}
+  @media (max-width:600px){ .wrap{padding:10px} #painel{padding:12px} }
+</style></head><body>
+<header><div class="mark">D</div><div><h1>Devoluções em andamento</h1>
+  <div class="sub">Do aviso do Mercado Livre até o reembolso — o caso nasce antes de a peça chegar</div></div></header>
+<div class="wrap">
+  <div class="tabs" id="tabs">
+    <button class="tab on" data-t="and">Em andamento</button>
+    <button class="tab" data-t="enc">Encerrados</button>
+  </div>
+
+  <div id="secAnd">
+    <div class="card" id="cardLancar" style="display:none">
+      <h2>Lançar devolução</h2>
+      <div class="tipos" style="margin-bottom:10px">
+        <button class="bt sec" data-tipo="coleta" id="tpColeta">Nós coletamos</button>
+        <button class="bt sec" data-tipo="ml" id="tpMl">ML devolve</button>
+      </div>
+      <div class="grade">
+        <div><label for="lVenda">Venda ou NF (bipe ou digite)</label><input id="lVenda" autocomplete="off" autocorrect="off"></div>
+        <div><label for="lNf">NF</label><input id="lNf" autocomplete="off"></div>
+        <div><label for="lSku">SKU</label><input id="lSku" autocomplete="off"></div>
+        <div><label for="lComprador">Comprador</label><input id="lComprador" autocomplete="off"></div>
+        <div><label for="lMotivo">Motivo</label><select id="lMotivo"></select></div>
+        <div id="boxPrazo"><label for="lPrazo">Resolver até (prazo do ML)</label><input id="lPrazo" type="date"></div>
+        <div id="boxResp"><label for="lResp">Responsável</label><input id="lResp" autocomplete="off"></div>
+        <div id="boxPassado"><label for="lPassado">Passado em</label><input id="lPassado" type="date"></div>
+        <div><label for="lObs">Observação</label><input id="lObs" autocomplete="off"></div>
+      </div>
+      <div id="lAchou" class="sub" style="margin-top:8px"></div>
+      <div style="margin-top:10px"><button class="bt" id="btLancar">Lançar</button></div>
+      <div id="lMsg"></div>
+    </div>
+    <div class="cols">
+      <div class="card"><h2>Nós coletamos <span class="sub" id="nColeta"></span></h2><div class="sub" style="margin:-4px 0 10px">Pelo prazo do ML — vencido em cima</div><div id="listaColeta"></div></div>
+      <div class="card"><h2>ML devolve <span class="sub" id="nMl"></span></h2><div class="sub" style="margin:-4px 0 10px">Pelos dias esperando a peça chegar</div><div id="listaMl"></div></div>
+    </div>
+  </div>
+
+  <div id="secEnc" style="display:none"><div class="card"><h2>Encerrados</h2><div id="listaEnc"></div></div></div>
+</div>
+
+<div id="fundo"><div id="painel"></div></div>
+
+<script src="/sku.js"></script>
+<script>
+var ESTADO={pode:{}, coleta:[], ml:[], skus:{}, motivos:[], tipo:'coleta', aberto:null, aba:'and', limites:{}};
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function dataBR(s){ if(!s) return '—'; var d=String(s).slice(0,10).split('-'); return d.length===3?d[2]+'/'+d[1]+'/'+d[0]:s; }
+function horaBR(s){ if(!s) return ''; return dataBR(s)+(String(s).length>10?' '+String(s).slice(11,16):''); }
+function reais(v){ if(v===null||v===undefined) return '—'; return 'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function api(metodo, url, corpo){
+  return fetch(url,{method:metodo,headers:corpo?{'Content-Type':'application/json'}:{},body:corpo?JSON.stringify(corpo):undefined})
+    .then(function(r){ return r.json().catch(function(){return {};}).then(function(b){ if(!r.ok){ var e=new Error(b.erro||('Erro '+r.status)); e.status=r.status; throw e; } return b; }); });
+}
+function pecaDe(sku){
+  var s=ESTADO.skus[String(sku||'').toUpperCase()];
+  try{ return s ? pecaTexto(pecaDeSku(s)) : ''; }catch(e){ return ''; }
+}
+function plural(n, um, varios){ return n+' '+(Math.abs(n)===1?um:varios); }
+function chipPrazo(c){
+  if(c.tipo!=='coleta' || c.dias_prazo===null) return '';
+  var t = c.cor==='vencido' ? 'VENCIDO há '+plural(-c.dias_prazo,'dia','dias')
+        : c.dias_prazo===0 ? 'vence HOJE' : (c.dias_prazo===1 ? 'falta 1 dia' : 'faltam '+c.dias_prazo+' dias');
+  return '<span class="chip '+esc(c.cor)+'">'+t+' · até '+dataBR(c.prazo)+'</span>';
+}
+function linhaCaso(c){
+  var peca=pecaDe(c.sku);
+  var chips=chipPrazo(c);
+  if(c.tipo==='coleta' && c.parado) chips+='<span class="chip parado">parado há '+plural(c.dias_parado,'dia','dias')+'</span>';
+  if(c.tipo==='ml') chips+='<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>';
+  if(c.responsavel) chips+='<span class="chip">'+esc(c.responsavel)+'</span>';
+  if(c.prazo_original) chips+='<span class="chip">prorrogado (era '+dataBR(c.prazo_original)+')</span>';
+  return '<div class="linha '+esc(c.cor||'')+'" data-id="'+c.id+'">'+
+    '<div class="t1"><span>#'+c.id+'</span><span>Venda '+esc(c.venda||'—')+'</span><span>NF '+esc(c.nf||'—')+'</span></div>'+
+    '<div class="t2">'+esc(c.sku||'sem SKU')+(peca?' · '+esc(peca):'')+(c.comprador?' · '+esc(c.comprador):'')+'</div>'+
+    '<div class="t3">'+esc(c.motivo||'sem motivo')+' · <b style="color:var(--txt)">'+esc(c.etapa_nome)+'</b></div>'+
+    '<div class="chips">'+chips+'</div></div>';
+}
+function desenharListas(){
+  var lc=document.getElementById('listaColeta'), lm=document.getElementById('listaMl');
+  lc.innerHTML = ESTADO.coleta.length ? ESTADO.coleta.map(linhaCaso).join('') : '<div class="vazio">Nenhuma coleta em andamento.</div>';
+  lm.innerHTML = ESTADO.ml.length ? ESTADO.ml.map(linhaCaso).join('') : '<div class="vazio">Nenhuma devolução do ML esperando chegar.</div>';
+  document.getElementById('nColeta').textContent='('+ESTADO.coleta.length+')';
+  document.getElementById('nMl').textContent='('+ESTADO.ml.length+')';
+}
+/* O redesenho de 30 s não apaga o que a pessoa está digitando (§12): ele
+   espera enquanto há um campo com foco, e não mexe no caso aberto. */
+function digitando(){ var a=document.activeElement; return a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName); }
+function carregar(){
+  return api('GET','/api/devolucao-casos').then(function(d){
+    ESTADO.coleta=d.coleta||[]; ESTADO.ml=d.ml||[]; ESTADO.pode=d.pode||{}; ESTADO.limites=d.limites||{};
+    document.getElementById('cardLancar').style.display = ESTADO.pode.lancar ? '' : 'none';
+    desenharListas();
+  }).catch(function(e){
+    document.getElementById('listaColeta').innerHTML='<div class="erro">Não deu para carregar a lista: '+esc(e.message)+'</div>';
+  });
+}
+function carregarEnc(){
+  api('GET','/api/devolucao-casos/encerrados').then(function(d){
+    var c=d.casos||[];
+    document.getElementById('listaEnc').innerHTML = c.length ? c.map(function(x){
+      return '<div class="linha" data-id="'+x.id+'"><div class="t1"><span>#'+x.id+'</span><span>Venda '+esc(x.venda||'—')+'</span><span>NF '+esc(x.nf||'—')+'</span></div>'+
+        '<div class="t2">'+esc(x.sku||'')+' · '+esc(x.motivo||'sem motivo')+' · '+(x.tipo==='coleta'?'Nós coletamos':'ML devolve')+'</div>'+
+        '<div class="chips"><span class="chip">'+esc(x.saida_nome||'')+'</span><span class="chip">'+horaBR(x.encerrado_em)+(x.encerrado_por?' · '+esc(x.encerrado_por):'')+'</span></div></div>';
+    }).join('') : '<div class="vazio">Nenhum caso encerrado ainda.</div>';
+  }).catch(function(e){ document.getElementById('listaEnc').innerHTML='<div class="erro">'+esc(e.message)+'</div>'; });
+}
+
+/* ── lançar ── */
+function setTipo(t){
+  ESTADO.tipo=t;
+  document.getElementById('tpColeta').className='bt '+(t==='coleta'?'':'sec');
+  document.getElementById('tpMl').className='bt '+(t==='ml'?'':'sec');
+  ['boxPrazo','boxResp','boxPassado'].forEach(function(id){ document.getElementById(id).style.display = t==='coleta' ? '' : 'none'; });
+}
+document.getElementById('tpColeta').onclick=function(){ setTipo('coleta'); };
+document.getElementById('tpMl').onclick=function(){ setTipo('ml'); };
+function acharVenda(){
+  var v=document.getElementById('lVenda').value.trim();
+  var box=document.getElementById('lAchou');
+  if(!v){ box.textContent=''; return; }
+  api('GET','/api/devolucao-casos/venda/'+encodeURIComponent(v)).then(function(d){
+    if(d.caso_aberto){ box.innerHTML='<span style="color:var(--red)">Já existe o caso #'+d.caso_aberto+' aberto para esta venda.</span>'; return; }
+    if(!d.achou){ box.textContent='Venda não está no sistema — preencha à mão (devolução antiga).'; return; }
+    var x=d.venda, nf=document.getElementById('lNf'), sku=document.getElementById('lSku'), cp=document.getElementById('lComprador');
+    if(!nf.value && x.nf) nf.value=x.nf;
+    if(!sku.value && x.codigo) sku.value=x.codigo;
+    if(!cp.value && x.buyer) cp.value=x.buyer;
+    var peca=pecaDe(x.codigo);
+    box.textContent='Achei a venda '+(x.venda||'')+' · '+(x.codigo||'')+(peca?' · '+peca:'')+' · '+(x.buyer||'')+' · NF '+(x.nf||'—');
+  }).catch(function(){ box.textContent=''; });
+}
+var tVenda=null;
+document.getElementById('lVenda').addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key==='Tab'){ if(e.key==='Enter') e.preventDefault(); acharVenda(); } });
+document.getElementById('lVenda').addEventListener('input',function(){ clearTimeout(tVenda); tVenda=setTimeout(acharVenda,500); });
+document.getElementById('btLancar').onclick=function(){
+  var msg=document.getElementById('lMsg'); msg.innerHTML='';
+  var v=document.getElementById('lVenda').value.trim().replace(/\s+/g,'');
+  var corpo={ tipo:ESTADO.tipo, nf:document.getElementById('lNf').value, sku:document.getElementById('lSku').value,
+    comprador:document.getElementById('lComprador').value, motivo:document.getElementById('lMotivo').value,
+    obs:document.getElementById('lObs').value };
+  // O campo de cima aceita venda OU NF: número curto é NF.
+  if(v && v.length<=7 && !corpo.nf) corpo.nf=v; else corpo.venda=v;
+  if(ESTADO.tipo==='coleta'){ corpo.prazo=document.getElementById('lPrazo').value; corpo.responsavel=document.getElementById('lResp').value; corpo.passado_em=document.getElementById('lPassado').value; }
+  var b=this; b.disabled=true;
+  api('POST','/api/devolucao-casos',corpo).then(function(r){
+    msg.innerHTML='<div class="okmsg">Caso #'+r.id+' lançado.</div>';
+    ['lVenda','lNf','lSku','lComprador','lObs','lPrazo','lResp','lPassado'].forEach(function(id){ document.getElementById(id).value=''; });
+    document.getElementById('lMotivo').value=''; document.getElementById('lAchou').textContent='';
+    carregar();
+  }).catch(function(e){ msg.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; })
+    .then(function(){ b.disabled=false; });
+};
+
+/* ── o caso aberto ── */
+function fechar(){ ESTADO.aberto=null; document.getElementById('fundo').style.display='none'; }
+document.getElementById('fundo').addEventListener('click',function(e){ if(e.target.id==='fundo') fechar(); });
+document.addEventListener('keydown',function(e){ if(e.key==='Escape' && ESTADO.aberto) fechar(); });
+function abrir(id){
+  ESTADO.aberto=id;
+  api('GET','/api/devolucao-casos/'+id).then(desenharCaso).catch(function(e){ alert(e.message); });
+}
+var GANCHOS=[];   // as fases seguintes acrescentam blocos ao caso aberto
+function desenharCaso(d){
+  var c=d.caso, P=ESTADO.pode, aberto=!c.encerrado_em;
+  var i=d.etapas.indexOf(c.etapa);
+  var trilha=d.etapas.map(function(e,k){ return '<span class="'+(k<i?'feito':k===i?'agora':'')+'">'+esc(d.nomes[e]||e)+'</span>'; }).join('');
+  var h='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0;font-size:17px">Caso #'+c.id+' · '+(c.tipo==='coleta'?'Nós coletamos':'ML devolve')+'</h2>'+
+    '<button class="bt sec" style="margin-left:auto" onclick="fechar()">Fechar</button></div>';
+  h+='<div class="chips">'+chipPrazo(c)+(c.tipo==='coleta'&&c.parado?'<span class="chip parado">parado há '+plural(c.dias_parado,'dia','dias')+'</span>':'')+
+     (c.tipo==='ml'?'<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>':'')+
+     (c.saida_nome?'<span class="chip">'+esc(c.saida_nome)+'</span>':'')+'</div>';
+  h+='<div class="trilha">'+trilha+'</div>';
+  h+='<div class="dados">'+
+    '<div><b>Venda</b>'+esc(c.venda||'—')+'</div><div><b>Pack</b>'+esc(c.pack_id||'—')+'</div><div><b>NF</b>'+esc(c.nf||'—')+'</div>'+
+    '<div><b>SKU</b>'+esc(c.sku||'—')+(pecaDe(c.sku)?'<br><small>'+esc(pecaDe(c.sku))+'</small>':'')+'</div>'+
+    '<div><b>Comprador</b>'+esc(c.comprador||'—')+'</div><div><b>Motivo</b>'+esc(c.motivo||'—')+'</div>'+
+    (c.tipo==='coleta'?'<div><b>Resolver até</b>'+dataBR(c.prazo)+(c.prazo_original?'<br><small>original: '+dataBR(c.prazo_original)+'</small>':'')+'</div>'+
+      '<div><b>Responsável</b>'+esc(c.responsavel||'—')+'</div><div><b>Passado em</b>'+dataBR(c.passado_em)+'</div>':'')+
+    '<div><b>Na etapa desde</b>'+horaBR(c.etapa_desde)+'</div>'+
+    (c.chegou_em?'<div><b>Chegou em</b>'+horaBR(c.chegou_em)+'</div>':'')+
+    (c.obs?'<div style="grid-column:1/-1"><b>Observação</b>'+esc(c.obs)+'</div>':'')+'</div>';
+  h+='<div id="cMsg"></div>';
+  if(aberto && P.acompanhar){
+    var botoes=(d.manuais||[]).filter(function(e){ return e!==c.etapa && !(e==='ml_avisado' && !c.chegou_em); })
+      .map(function(e){ return '<button class="bt sec" data-etapa="'+e+'">→ '+esc(d.nomes[e]||e)+'</button>'; }).join('');
+    h+='<div class="bloco"><h3>Etapa</h3><div class="acoes">'+(botoes||'<span class="sub">Sem etapa para marcar à mão agora.</span>')+'</div></div>';
+    if(c.tipo==='coleta'){
+      h+='<div class="bloco"><h3>Prazo do ML</h3><div class="acoes"><button class="bt sec" id="btProrr">Pedi prorrogação ao ML</button>'+
+        '<input type="date" id="novoPrazo" style="max-width:180px"><button class="bt sec" id="btPrazo">Lançar prazo novo</button></div></div>';
+    }
+  }
+  if(aberto && P.lancar){
+    var ops=['<option value="">— sem motivo —</option>'].concat(ESTADO.motivos.map(function(m){ return '<option'+(m===c.motivo?' selected':'')+'>'+esc(m)+'</option>'; })).join('');
+    h+='<div class="bloco"><h3>Editar o lançamento</h3><div class="grade">'+
+      '<div><label>Motivo</label><select id="eMotivo">'+ops+'</select></div>'+
+      '<div><label>NF</label><input id="eNf" value="'+esc(c.nf||'')+'"></div>'+
+      '<div><label>SKU</label><input id="eSku" value="'+esc(c.sku||'')+'"></div>'+
+      '<div><label>Responsável</label><input id="eResp" value="'+esc(c.responsavel||'')+'"></div>'+
+      '<div><label>Observação</label><input id="eObs" value="'+esc(c.obs||'')+'"></div>'+
+      '</div><div class="acoes"><button class="bt sec" id="btEditar">Salvar</button></div></div>';
+  }
+  GANCHOS.forEach(function(g){ h+=g.html(d, c, P, aberto)||''; });
+  if(aberto && P.dinheiro && c.tipo==='coleta'){
+    h+='<div class="bloco"><h3>Encerrar como perda (Admin Geral)</h3><div class="sub" style="margin-bottom:6px">O caso vencido não encerra sozinho: pode ter havido prorrogação não lançada.</div>'+
+      '<div class="acoes"><input id="vPerdido" placeholder="valor perdido (R$)" style="max-width:200px"><button class="bt perigo" id="btPerda">Encerrar como perda por prazo</button></div></div>';
+  }
+  h+='<div class="bloco"><h3>História</h3><div class="hist">'+d.eventos.slice().reverse().map(function(e){
+    return '<div><small>'+horaBR(e.criado_em)+' · '+esc(e.usuario||'—')+'</small><br>'+esc(nomeEvento(e, d.nomes))+(e.texto?' — '+esc(e.texto):'')+'</div>';
+  }).join('')+'</div></div>';
+  document.getElementById('painel').innerHTML=h;
+  document.getElementById('fundo').style.display='block';
+  ligarCaso(d, c);
+}
+function nomeEvento(e, nomes){
+  var n=function(x){ return nomes[x]||x||'—'; };
+  switch(e.tipo){
+    case 'lancado': return 'Lançado';
+    case 'etapa': return n(e.de)+' → '+n(e.para);
+    case 'prazo': return 'Prazo novo: '+dataBR(e.de)+' → '+dataBR(e.para);
+    case 'prorrogacao_pedida': return 'Pediu prorrogação ao ML';
+    case 'editado': return 'Lançamento editado';
+    case 'encerrado': return 'Encerrado';
+    default: return e.tipo+(e.para?' → '+n(e.para):'');
+  }
+}
+function acao(url, corpo){
+  var m=document.getElementById('cMsg'); m.innerHTML='';
+  return api('POST', url, corpo).then(function(){ carregar(); abrir(ESTADO.aberto); })
+    .catch(function(e){ m.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; m.scrollIntoView({block:'nearest'}); });
+}
+function ligarCaso(d, c){
+  var base='/api/devolucao-casos/'+c.id;
+  document.querySelectorAll('#painel [data-etapa]').forEach(function(b){ b.onclick=function(){ acao(base+'/etapa',{para:b.getAttribute('data-etapa')}); }; });
+  var x;
+  if((x=document.getElementById('btProrr'))) x.onclick=function(){ acao(base+'/prorrogacao',{}); };
+  if((x=document.getElementById('btPrazo'))) x.onclick=function(){ acao(base+'/prazo',{prazo:document.getElementById('novoPrazo').value}); };
+  if((x=document.getElementById('btEditar'))) x.onclick=function(){
+    acao(base+'/editar',{ motivo:document.getElementById('eMotivo').value, nf:document.getElementById('eNf').value,
+      sku:document.getElementById('eSku').value, responsavel:document.getElementById('eResp').value, obs:document.getElementById('eObs').value });
+  };
+  if((x=document.getElementById('btPerda'))) x.onclick=function(){
+    if(!confirm('Encerrar o caso #'+c.id+' como PERDA por prazo? A decisão fica registrada com seu nome.')) return;
+    acao(base+'/perda',{ valor_perdido:document.getElementById('vPerdido').value });
+  };
+  GANCHOS.forEach(function(g){ if(g.ligar) g.ligar(d, c, base); });
+}
+document.addEventListener('click',function(e){
+  var l=e.target.closest('.linha'); if(l && l.getAttribute('data-id')) abrir(+l.getAttribute('data-id'));
+});
+
+/* ── abas ── */
+document.getElementById('tabs').addEventListener('click',function(e){
+  var t=e.target.closest('.tab'); if(!t) return;
+  ESTADO.aba=t.getAttribute('data-t');
+  document.querySelectorAll('.tab').forEach(function(x){ x.classList.toggle('on', x===t); });
+  ['and','enc'].concat(ABAS_EXTRA).forEach(function(a){ var s=document.getElementById('sec'+a.charAt(0).toUpperCase()+a.slice(1)); if(s) s.style.display = a===ESTADO.aba ? '' : 'none'; });
+  if(ESTADO.aba==='enc') carregarEnc();
+  ABAS_GANCHO.forEach(function(g){ if(g.aba===ESTADO.aba) g.abrir(); });
+});
+var ABAS_EXTRA=[], ABAS_GANCHO=[];
+
+/* ── início ── */
+setTipo('coleta');
+api('GET','/api/listas/motivo_devolucao').then(function(l){
+  ESTADO.motivos=(l||[]).map(function(x){return x.valor;});
+  document.getElementById('lMotivo').innerHTML='<option value="">— escolher depois —</option>'+ESTADO.motivos.map(function(m){ return '<option>'+esc(m)+'</option>'; }).join('');
+}).catch(function(){});
+api('GET','/api/skus').then(function(l){ (l||[]).forEach(function(s){ ESTADO.skus[String(s.codigo).toUpperCase()]=s; }); desenharListas(); }).catch(function(){});
+carregar();
+setInterval(function(){ if(!digitando() && !ESTADO.aberto && ESTADO.aba==='and') carregar(); }, 30000);
+</script>
+<script src="/nav.js"></script>
+</body></html>

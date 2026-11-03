@@ -55,7 +55,13 @@ module.exports=function(app, db){
        grava aqui. Sem cobertura, "apagar tudo" deixaria em Bloqueados uma
        venda que so existiu no teste. */
     {nome:'venda_sem_etiqueta',   pk:'id', rotulo:'vendas sem etiqueta'},
-    {nome:'pdf_conta_aberta',     pk:'id', rotulo:'PDFs com a conta aberta'}
+    {nome:'pdf_conta_aberta',     pk:'id', rotulo:'PDFs com a conta aberta'},
+    /* As devolucoes EM ANDAMENTO (spec DEVOLUCOES-ACOMPANHAMENTO, 03/11/2026).
+       O caso e a historia dele andam juntos: apagar o caso de teste e deixar os
+       eventos de pe criaria historia orfa, que o proximo caso com o mesmo id
+       herdaria. */
+    {nome:'devolucao_caso',       pk:'id', rotulo:'devolucoes em andamento'},
+    {nome:'devolucao_evento',     pk:'id', rotulo:'devolucoes (historia)'}
   ];
 
   // Fase 3: foto_estoque saiu da cobertura; limpa o trigger antigo em bancos

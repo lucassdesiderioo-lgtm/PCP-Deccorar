@@ -739,6 +739,74 @@ console.log('\n── 6-H. a area "admin" nao abre o sob medida (fase 1 da ACESS
     !!cv && SMP.pode(cv, 'catalogo.ler') && !SMP.pode(cv, 'sobra.descartar'));
 }
 
+console.log('\n── 6-I. as devoluções em andamento (spec DEVOLUCOES-ACOMPANHAMENTO) ──');
+{
+  const P = (c) => PERMISSOES.find(p => p.chave === c);
+  eq('devolucao.lancar é nível admin', (P('devolucao.lancar')||{}).nivel, 'admin');
+  eq('devolucao.acompanhar é nível supervisor', (P('devolucao.acompanhar')||{}).nivel, 'supervisor');
+  eq('devolucao.dinheiro é nível admin_geral', (P('devolucao.dinheiro')||{}).nivel, 'admin_geral');
+  ok('devolucao.dinheiro é sensível E intransferível', (P('devolucao.dinheiro')||{}).sensivel === true && (P('devolucao.dinheiro')||{}).intransferivel === true);
+  ok('as três têm rótulo e descrição', ['devolucao.lancar','devolucao.acompanhar','devolucao.dinheiro'].every(c => P(c) && P(c).rotulo && P(c).desc));
+
+  const J = (x) => JSON.stringify(x);
+  const LER = J(['devolucao.acompanhar','devolucao.lancar']);
+  eq('a tela /devolucao-casos: quem acompanha ou quem lança', J(AC.permDaRota('/devolucao-casos','GET')), LER);
+  eq('a gêmea .html herda a tela', J(AC.permDaRota('/devolucao-casos.html','GET')), LER);
+  eq('ler a lista', J(AC.permDaRota('/api/devolucao-casos','GET')), LER);
+  eq('ler um caso', J(AC.permDaRota('/api/devolucao-casos/12','GET')), LER);
+  eq('ler o relatório', J(AC.permDaRota('/api/devolucao-casos/relatorio','GET')), LER);
+  eq('lançar pede devolucao.lancar', AC.permDaRota('/api/devolucao-casos','POST'), 'devolucao.lancar');
+  eq('editar pede devolucao.lancar', AC.permDaRota('/api/devolucao-casos/12/editar','POST'), 'devolucao.lancar');
+  for(const a of ['etapa','prorrogacao','prazo','chegou','coleta','anexo'])
+    eq('"' + a + '" pede devolucao.acompanhar', AC.permDaRota('/api/devolucao-casos/12/' + a,'POST'), 'devolucao.acompanhar');
+  eq('a transportadora pede devolucao.acompanhar', AC.permDaRota('/api/devolucao-casos/transportadoras','POST'), 'devolucao.acompanhar');
+  for(const a of ['perda','devolver-comprador','reembolso','valor'])
+    eq('"' + a + '" pede devolucao.dinheiro', AC.permDaRota('/api/devolucao-casos/12/' + a,'POST'), 'devolucao.dinheiro');
+  ok('NENHUMA rota nova cai em @logado ou @negado', ['/api/devolucao-casos','/api/devolucao-casos/1','/api/devolucao-casos/1/etapa',
+     '/api/devolucao-casos/1/perda','/devolucao-casos'].every(r => ['@logado','@negado'].indexOf(J(AC.permDaRota(r,'POST'))) < 0
+       && ['"@logado"','"@negado"'].indexOf(J(AC.permDaRota(r,'GET'))) < 0));
+  eq('a tela do Edvaldo continua com a chave de sempre', AC.permDaRota('/devolucao','GET'), 'devolucao.registrar');
+  eq('   e o bipe dele também', AC.permDaRota('/api/devolucao','POST'), 'devolucao.registrar');
+
+  /* O BACKFILL, num banco que já existia: quem dá baixa passa a lançar e a acompanhar. */
+  const sB = db.prepare("INSERT INTO setores (nome,nivel,nativo) VALUES ('Pós-venda','admin',0)").run().lastInsertRowid;
+  db.prepare("INSERT INTO setor_permissao (setor_id,chave) VALUES (?, 'devolucao.baixar')").run(sB);
+  const uB = db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('ExcecaoBaixa','')").run().lastInsertRowid;
+  db.prepare("INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,'devolucao.baixar',1)").run(uB);
+  db.prepare("DELETE FROM config WHERE chave='seed_devolucao_caso'").run();
+  require('./acesso')({ locals:{}, router:{ stack:[] }, get(){}, post(){}, delete(){} }, db);
+  const tem = (sid, c) => !!db.prepare('SELECT 1 FROM setor_permissao WHERE setor_id=? AND chave=?').get(sid, c);
+  ok('backfill: quem dá baixa passa a LANÇAR', tem(sB, 'devolucao.lancar'));
+  ok('backfill: e a ACOMPANHAR', tem(sB, 'devolucao.acompanhar'));
+  ok('backfill: o DINHEIRO não vem junto', !tem(sB, 'devolucao.dinheiro'));
+  ok('backfill: a exceção vai junto',
+     !!db.prepare("SELECT 1 FROM usuario_excecao WHERE usuario_id=? AND chave='devolucao.acompanhar' AND concede=1").get(uB));
+  ok('marcado para rodar uma vez só', !!db.prepare("SELECT 1 FROM config WHERE chave='seed_devolucao_caso'").get());
+  db.prepare("DELETE FROM setor_permissao WHERE setor_id=? AND chave='devolucao.acompanhar'").run(sB);
+  require('./acesso')({ locals:{}, router:{ stack:[] }, get(){}, post(){}, delete(){} }, db);
+  ok('desmarcada, a chave não volta no boot seguinte', !tem(sB, 'devolucao.acompanhar'));
+  const idAdm = db.prepare("SELECT id FROM setores WHERE nome='Admin'").get().id;
+  ok('o setor Admin nativo lança e acompanha (pelo backfill do primeiro boot)', tem(idAdm,'devolucao.lancar') && tem(idAdm,'devolucao.acompanhar'));
+  ok('   e NÃO tem o dinheiro', !tem(idAdm,'devolucao.dinheiro'));
+
+  /* O dinheiro é intransferível: a exceção não o concede. */
+  const uX = db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('QuerDinheiro','')").run().lastInsertRowid;
+  const ag = db.prepare("SELECT u.id FROM usuarios u JOIN usuario_setor us ON us.usuario_id=u.id JOIN setores s ON s.id=us.setor_id WHERE s.nivel='admin_geral' LIMIT 1").get();
+  const rotaExc = Object.keys(rotas).find(k => /^POST .*excecao/.test(k));
+  if(rotaExc && ag){
+    const r = chamar('POST', rotaExc.slice(5), { chave:'devolucao.dinheiro', concede:1, usuario_id:uX }, { id:uX }, { id:ag.id, nome:'AG' });
+    ok('a exceção recusa CONCEDER devolucao.dinheiro, por ser intransferível', r.status === 400 && /intransfer/i.test((r.body||{}).erro||''), JSON.stringify(r));
+    ok('   e nada foi gravado', !db.prepare("SELECT 1 FROM usuario_excecao WHERE usuario_id=? AND chave='devolucao.dinheiro'").get(uX));
+  } else ok('rota de exceção e Admin Geral achados para o caso', false, rotaExc + ' / ' + JSON.stringify(ag));
+
+  const sup = { id: db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('Renato','')").run().lastInsertRowid };
+  db.prepare("INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,'devolucao.acompanhar',1)").run(sup.id);
+  ok('decidir(): quem acompanha move a etapa', AC.decidir(sup,'/api/devolucao-casos/3/etapa','POST').ok === true);
+  ok('decidir(): quem acompanha NÃO encerra como perda', AC.decidir(sup,'/api/devolucao-casos/3/perda','POST').ok === false);
+  ok('decidir(): quem acompanha NÃO lança', AC.decidir(sup,'/api/devolucao-casos','POST').ok === false);
+  ok('decidir(): quem acompanha abre a tela', AC.decidir(sup,'/devolucao-casos','GET').ok === true);
+}
+
 console.log('\n── 16. a cobertura passou a VARRER o app ──');
 const cob = AC.coberturaDeRotas ? AC.coberturaDeRotas() : null;
 ok('existe a varredura das rotas registradas', !!cob, 'coberturaDeRotas() nao existe');

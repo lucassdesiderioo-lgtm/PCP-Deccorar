@@ -108,6 +108,20 @@ module.exports = [
     rotulo:'Registrar devolução', desc:'Receber e fazer a triagem física' },
   { chave:'devolucao.baixar',     grupo:'Devoluções', nivel:'admin',
     rotulo:'Dar baixa em devolução', desc:'Informar reputação e motivo' },
+  /* AS DEVOLUCOES EM ANDAMENTO (spec DEVOLUCOES-ACOMPANHAMENTO, 03/11/2026):
+     o caso nasce quando o ML abre a reclamacao, antes de a peca chegar.
+     Lancar e de quem olha o pos-venda (o mesmo publico da baixa); acompanhar
+     e de quem cuida da coleta (supervisor, para caber em quem nao e admin).
+     O DINHEIRO e do Admin Geral e de mais ninguem: o reembolso se confere no
+     Mercado Pago, que so ele acessa (decisao do dono) — por isso
+     `intransferivel`, e a rota nem manda os valores a quem nao a tem (R15). */
+  { chave:'devolucao.lancar',     grupo:'Devoluções', nivel:'admin',
+    rotulo:'Lançar devolução em andamento', desc:'Lançar e editar o caso antes de a peça chegar (venda, NF, motivo, prazo)' },
+  { chave:'devolucao.acompanhar', grupo:'Devoluções', nivel:'supervisor',
+    rotulo:'Acompanhar devoluções em andamento', desc:'Ver a lista, mover etapas, coleta, transportadora, documentos e prorrogação' },
+  { chave:'devolucao.dinheiro',   grupo:'Devoluções', nivel:'admin_geral',
+    rotulo:'Dinheiro das devoluções', desc:'Ver valores, devolver ao comprador, encerrar como perda e dar baixa no reembolso',
+    sensivel:true, intransferivel:true },
 
   // ─── ESTOQUE ────────────────────────────────────────────────
   { chave:'contagem.contar',      grupo:'Estoque',    nivel:'operacao',
