@@ -63,7 +63,9 @@ module.exports = function(app, db){
     const p = (c) => { try{ return !!app.locals.acesso.podePermissao(req.usuario, c); }catch(e){ return false; } };
     /* `listas` é a chave do cadastro de motivos (Admin → Cadastros): a mesma
        lista aparece aqui para quem já pode editá-la, e só para ele. */
-    return { lancar:p('devolucao.lancar'), acompanhar:p('devolucao.acompanhar'), dinheiro:podeDinheiro(req), valores:podeValores(req), listas:p('listas.editar') };
+    return { lancar:p('devolucao.lancar'), acompanhar:p('devolucao.acompanhar'), dinheiro:podeDinheiro(req), valores:podeValores(req), listas:p('listas.editar'),
+      /* A baixa dentro do caso (03/11/2026) usa a rota da aba Baixa, com a chave dela. */
+      baixar:p('devolucao.baixar') };
   }
   /* A lista diz também O QUE a pessoa pode fazer, para a tela não mostrar
      botão que dá "sem permissão". Esconder não é segurança: quem tranca é o

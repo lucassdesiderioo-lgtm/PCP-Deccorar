@@ -1516,6 +1516,65 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
     db.prepare("UPDATE devolucao_caso SET revisao_pedida_em=datetime('now','localtime') WHERE id=?").run(v);
     return respRev(v, { resultado:'negou' }).status; })(), 200);
 
+  /* ═══════ O CASO #20 DE NOVO (03/11/2026): parado em "Já revisei" sem dizer
+     que faltava a BAIXA; e a etiqueta de devolução só traz o Pack ID impresso. ═══════ */
+  secao('o caso diz o que falta para encerrar');
+  const f1 = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571700001', sku:'BK150150BRANCO', publicidade:false }, 3).body.id;
+  eq('antes da revisão: não falta nada para encerrar (espera a peça)', JSON.stringify((daLista(lista(2).ml, f1) || {}).falta), '[]');
+  const rf1 = chamar('POST','/api/devolucao',{ codigo_ml:'2000015571700001', sku_fisico:'BK150150BRANCO', destinacao:'estoque' }, 4).body.id;
+  let lf = daLista(lista(2).ml, f1);
+  ok('revisada: falta a baixa e o "Já revisei"', JSON.stringify(lf.falta) === JSON.stringify(['dar a baixa','marcar "Já revisei" no ML']), JSON.stringify(lf.falta));
+  chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 2, { id:f1 });
+  lf = daLista(lista(2).ml, f1);
+  eq('com o "Já revisei": falta só a baixa (o caso #20)', JSON.stringify(lf.falta), JSON.stringify(['dar a baixa']));
+  eq('   e o caso mostra o mesmo', JSON.stringify(chamar('GET','/api/devolucao-casos/:id',null,2,{ id:f1 }).body.caso.falta), JSON.stringify(['dar a baixa']));
+  pedeRev(f1, { pede:'valor' });
+  eq('com revisão no ML pedida: falta também a resposta', JSON.stringify(daLista(lista(2).ml, f1).falta), JSON.stringify(['dar a baixa','resposta da revisão no ML']));
+  respRev(f1, { resultado:'negou' });
+
+  secao('a baixa dentro do caso');
+  eq('o caso diz se a pessoa dá baixa', lista(3).pode.baixar + '/' + lista(2).pode.baixar, 'true/false');
+  eq('o caso traz a revisão ligada sem baixa', chamar('GET','/api/devolucao-casos/:id',null,3,{ id:f1 }).body.caso.dev_baixado, 0);
+  r = chamar('POST','/api/devolucao/baixa',{ id:rf1, reputacao:'nao' }, 3);
+  eq('a baixa (a mesma rota da aba Baixa), sem motivo escolhido', r.status, 200);
+  eq('   encerra o ML devolve que só esperava por ela', caso(f1).saida, 'revisado_ml');
+  eq('   e a devolução ficou com baixa', db.prepare('SELECT baixado FROM devolucao WHERE id=?').get(rf1).baixado, 1);
+
+  secao('o número bipado da etiqueta de devolução fica no caso');
+  const g1 = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571711111', sku:'BK150150BRANCO', publicidade:false }, 3).body.id;
+  chamar('POST','/api/devolucao',{ codigo_ml:'48323699991', sku_fisico:'BK150150BRANCO', destinacao:'estoque', caso_id:g1 }, 4);
+  eq('ligado pelo toque: o número bipado vai para o caso', caso(g1).etiqueta_devolucao, '48323699991');
+  const g2 = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571722222', sku:'BK150150BRANCO', publicidade:false }, 3).body.id;
+  const sg2 = chamar('POST','/api/devolucao',{ codigo_ml:'48323699992', sku_fisico:'BK150150BRANCO', destinacao:'estoque' }, 4).body.id;
+  chamar('POST','/api/devolucao-casos/:id/ligar',{ devolucao_id:sg2 }, 2, { id:g2 });
+  eq('ligado pelo "Ligar": também', caso(g2).etiqueta_devolucao, '48323699992');
+  const g3 = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571733333', sku:'BK150150BRANCO', publicidade:false }, 3).body.id;
+  chamar('POST','/api/devolucao',{ codigo_ml:'2000015571733333', sku_fisico:'BK150150BRANCO', destinacao:'estoque' }, 4);
+  eq('bipada a própria venda: não vira "etiqueta de devolução"', caso(g3).etiqueta_devolucao, null);
+  ok('a busca acha pelo número da etiqueta de devolução', (chamar('GET','/api/devolucao-casos/buscar',null,2,{},{ q:'48323699992' }).body.casos || []).some(c => c.id === g2));
+  ok('   e a história conta qual etiqueta foi bipada', eventos(g1).some(e => /48323699991/.test(e.texto || '')), JSON.stringify(eventos(g1).map(e=>e.texto)));
+  const g4 = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571744444', sku:'BK140140BEGE', publicidade:false }, 3).body.id;
+  db.prepare("UPDATE devolucao_caso SET etiqueta_devolucao='48323699994' WHERE id=?").run(g4);
+  let bz = chamar('GET','/api/devolucao/buscar/:cod',null,4,{ cod:'48323699994' }).body;
+  eq('o bipe acha o caso pelo número já gravado', (bz.caso || {}).id, g4);
+
+  secao('o Edvaldo acha pelos últimos números do Pack ID impresso');
+  const p1 = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571798765', pack_id:'2000099999912345', sku:'BK140140BEGE', publicidade:false }, 3).body.id;
+  bz = chamar('GET','/api/devolucao/buscar/:cod',null,4,{ cod:'98765' }).body;
+  eq('os 5 últimos da venda acham o caso', (bz.caso || {}).id, p1);
+  eq('os últimos do pack também', ((chamar('GET','/api/devolucao/buscar/:cod',null,4,{ cod:'912345' }).body).caso || {}).id, p1);
+  eq('4 números não bastam (podem ser NF)', ((chamar('GET','/api/devolucao/buscar/:cod',null,4,{ cod:'8765' }).body).caso || {}).id, undefined);
+  const p2 = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571898765', sku:'BK140140BEGE', publicidade:false }, 3).body.id;
+  bz = chamar('GET','/api/devolucao/buscar/:cod',null,4,{ cod:'98765' }).body;
+  eq('dois casos com os mesmos finais: nenhum é escolhido sozinho', bz.caso, undefined);
+  ok('   e os dois vêm para ele tocar no certo', (bz.casos || []).map(c => c.id).sort().join(',') === [p1, p2].sort().join(','), JSON.stringify(bz));
+  eq('   a resposta sem caso continua com as duas chaves de sempre quando nada bate', Object.keys(chamar('GET','/api/devolucao/buscar/:cod',null,4,{ cod:'9087601' }).body).sort().join(','), 'achou,venda');
+  eq('o código de 11 números da etiqueta não vira "últimos números"', ((chamar('GET','/api/devolucao/buscar/:cod',null,4,{ cod:'15571798765' }).body).caso || {}).id, undefined);
+  r = chamar('POST','/api/devolucao',{ codigo_ml:'98765', sku_fisico:'BK140140BEGE', destinacao:'estoque', caso_id:p1 }, 4);
+  eq('salvar com o caso tocado liga', caso(p1).devolucao_id, r.body.id);
+  eq('   e os finais digitados não viram "etiqueta de devolução"', caso(p1).etiqueta_devolucao, null);
+  ok('a lista de esperadas traz venda e pack, para comparar com a etiqueta', (chamar('GET','/api/devolucao/esperadas',null,4,{},{ sku:'BK140140BEGE' }).body.casos || []).some(c => c.id === p2 && c.venda === '2000015571898765' && 'pack_id' in c));
+
   fim();
 })().catch(e => { console.log('ESTOUROU: ' + e.stack); falhas++; fim(); });
 

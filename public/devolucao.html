@@ -226,7 +226,15 @@ function dvResultado(){
    8207): ela e um numero de envio que o PCP nao conhece. Sem caso pelo bipe,
    depois do SKU a tela mostra os casos esperados daquele SKU, e um toque liga.
    Ignorar segue como sempre. O caso achado pelo bipe vale sobre a lista. */
-var DVESP={sku:null,casos:[]}, DVCASOBIPE=false;
+var DVESP={sku:null,casos:[]}, DVCASOBIPE=false, DVSUF=[];
+/* A venda e o pack com os ÚLTIMOS números em destaque: é o que o Edvaldo
+   compara com o "Pack ID" impresso no alto da etiqueta de devolução. */
+function dvFinais(c){
+  var vs=[], h='';
+  [c.venda,c.pack_id].forEach(function(v){ v=String(v||''); if(v && vs.indexOf(v)<0) vs.push(v); });
+  vs.forEach(function(v){ h+='<br><span style="font-family:ui-monospace,monospace;font-size:14px">'+escDv(v.slice(0,-5))+'<b style="font-size:19px;color:#b26a00">'+escDv(v.slice(-5))+'</b></span>'; });
+  return h;
+}
 async function dvEsperadas(sku){
   var box=document.getElementById('dvEsp'); if(!box) return;
   if(DVCASOBIPE){ box.innerHTML=''; return; }
@@ -240,12 +248,16 @@ async function dvEsperadas(sku){
     '<div style="font-weight:800;font-size:15px;margin-bottom:8px">Devolução esperada com este SKU? Toque se for esta:</div><div class="ops">';
   for(var i=0;i<DVESP.casos.length;i++){
     var c=DVESP.casos[i], on=DVCASO&&DVCASO.id===c.id;
-    h+='<button type="button" class="op'+(on?' on':'')+'" data-dvcaso="'+c.id+'" style="font-size:15px;padding:12px 16px">#'+c.id+' · '+escDv(c.comprador||'sem nome')+' · NF '+escDv(c.nf||'—')+'</button>';
+    h+='<button type="button" class="op'+(on?' on':'')+'" data-dvcaso="'+c.id+'" style="font-size:15px;padding:12px 16px">#'+c.id+' · '+escDv(c.comprador||'sem nome')+' · NF '+escDv(c.nf||'—')+dvFinais(c)+'</button>';
   }
   h+='</div>'+(DVCASO?'<div style="margin-top:8px;font-size:14px">Ao salvar, o caso #'+DVCASO.id+' fica revisado. Tocar de novo desmarca.</div>':'<div style="margin-top:8px;font-size:13px">Não é nenhuma destas? Siga normalmente.</div>')+'</div>';
   box.innerHTML=h;
 }
 document.addEventListener('click',function(e){
+  var s2=e.target.closest('[data-dvsuf]');
+  if(s2){ var id2=+s2.getAttribute('data-dvsuf');
+    for(var j=0;j<DVSUF.length;j++) if(DVSUF[j].id===id2){ DVCASO=DVSUF[j]; DVCASOBIPE=true; }
+    dvTarja(); return; }
   var b=e.target.closest('[data-dvcaso]'); if(!b) return;
   var id=+b.getAttribute('data-dvcaso');
   if(DVCASO&&DVCASO.id===id) DVCASO=null;
@@ -270,9 +282,8 @@ async function dvBuscar(cod){
   /* A DEVOLUCAO ESPERADA (spec DEVOLUCOES-ACOMPANHAMENTO, R14): se a etiqueta
      aponta um caso em andamento, a tarja diz qual e o motivo, e o salvar liga
      o caso. Sem caso, tudo como sempre. */
-  DVCASO=r.caso||null; DVCASOBIPE=!!r.caso; DVESP={sku:null,casos:[]};
-  var tarja=DVCASO?'<div style="background:#fff4e0;border:2px solid #b26a00;color:#7a4a00;border-radius:10px;padding:10px 12px;margin-bottom:8px;font-weight:800;font-size:15px">'+
-    'Devolução esperada — caso #'+DVCASO.id+' · '+escDv(DVCASO.motivo||'sem motivo lançado')+'</div>':'';
+  DVCASO=r.caso||null; DVCASOBIPE=!!r.caso; DVESP={sku:null,casos:[]}; DVSUF=r.casos||[]; DVULT=r;
+  var tarja=dvTarjaHtml(r);
   if(r.achou){
     DVVENDA=r.venda;
     el.innerHTML=tarja+'Venda encontrada: <b>'+(r.venda.buyer||'')+'</b> - enviado <b style="color:#b26a00">'+(r.venda.codigo||'?')+'</b> em '+(r.venda.data||'');
@@ -280,8 +291,25 @@ async function dvBuscar(cod){
     if(sel) sel.value='';
   } else {
     DVVENDA=null;
-    el.innerHTML=tarja+'<span style="color:#5a6472">Sem registro dessa venda - tudo bem, siga normalmente.</span>';
+    el.innerHTML=tarja+'<span style="color:#5a6472">Sem registro dessa venda - tudo bem, siga normalmente.</span>'+
+      (!DVCASO&&!DVSUF.length?'<div style="margin-top:6px;color:#7a4a00">Não achou o caso? Digite os <b>últimos números do Pack ID</b> impresso no alto da etiqueta (ex.: 73263).</div>':'');
   }
+}
+/* A tarja do caso esperado, e os vários casos quando os finais batem em mais
+   de um (03/11/2026): ele toca no certo, comparando com o Pack ID impresso. */
+var DVULT=null;
+function dvTarjaHtml(r){
+  if(DVCASO) return '<div style="background:#fff4e0;border:2px solid #b26a00;color:#7a4a00;border-radius:10px;padding:10px 12px;margin-bottom:8px;font-weight:800;font-size:15px">'+
+    'Devolução esperada — caso #'+DVCASO.id+' · '+escDv(DVCASO.motivo||'sem motivo lançado')+'</div>';
+  if(!DVSUF.length) return '';
+  return '<div style="background:#fff4e0;border:2px solid #b26a00;color:#7a4a00;border-radius:10px;padding:10px 12px;margin-bottom:8px">'+
+    '<div style="font-weight:800;font-size:15px;margin-bottom:8px">Mais de um caso termina com esses números — toque no da etiqueta:</div><div class="ops">'+
+    DVSUF.map(function(c){ return '<button type="button" class="op" data-dvsuf="'+c.id+'" style="font-size:15px;padding:12px 16px">#'+c.id+' · '+escDv(c.comprador||'sem nome')+' · NF '+escDv(c.nf||'—')+dvFinais(c)+'</button>'; }).join('')+'</div></div>';
+}
+function dvTarja(){
+  var el=document.getElementById('dvVenda');
+  el.innerHTML=dvTarjaHtml(DVULT||{})+(DVULT&&DVULT.achou?'Venda encontrada: <b>'+escDv(DVULT.venda.buyer||'')+'</b>':'');
+  dvEsperadas(DVESP.sku);
 }
 async function dvSalvar(){
   var sku=dvSkuAtual();
@@ -295,7 +323,7 @@ async function dvSalvar(){
   var r=await (await fetch('/api/devolucao',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
   if(r.erro){ msg.innerHTML='<span style="color:#c62828">'+r.erro+'</span>'; return; }
   msg.innerHTML='<span style="color:#2e7d32">Salvo'+(r.naFila?' - foi pra fila de embalagem':'')+(r.caso_id?' - caso #'+r.caso_id+' revisado':'')+'</span>';
-  DVSEL={}; DVVENDA=null; DVCASO=null; DVCASOBIPE=false; DVESP={sku:null,casos:[]};
+  DVSEL={}; DVVENDA=null; DVCASO=null; DVCASOBIPE=false; DVESP={sku:null,casos:[]}; DVSUF=[]; DVULT=null;
   document.getElementById('dvCod').value=''; document.getElementById('dvObs').value='';
   DVCOR=null; DVMED=null; dvSkus(); document.getElementById('dvVenda').innerHTML='';
   dvMontar();
@@ -305,7 +333,7 @@ document.addEventListener('DOMContentLoaded',function(){
   var c=document.getElementById('dvCod');
   if(!c) return;
   var t=null;
-  c.addEventListener('input',function(){ clearTimeout(t); t=setTimeout(function(){ var v=c.value.trim(); if(v.length>=6) dvBuscar(v); },400); });
+  c.addEventListener('input',function(){ clearTimeout(t); t=setTimeout(function(){ var v=c.value.trim(); if(v.length>=5) dvBuscar(v); },400); });
 });
 
 
