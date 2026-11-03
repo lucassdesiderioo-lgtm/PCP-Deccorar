@@ -1593,6 +1593,10 @@ quem dá baixa em devolução lança e acompanha; o dinheiro não vem junto.
 > leitor — nos casos **abertos e encerrados** (`devcaso_dominio.buscar`), com
 > os abertos em cima. O encerrado também responde "já foi lançada": o aviso do
 > lançamento, que só olha o caso aberto, não basta para essa pergunta.
+>
+> ✅ **NO AR E CONFERIDA EM 03/11/2026** (PR #253): o dono fez o deploy (telas
+> 302, API 401, `/login` 200, inclusive `/api/devolucao-casos/buscar`) e
+> conferiu a busca na tela, pela NF e por pedaço da venda.
 
 **Rode `node teste_devolucao_casos.js` (338 casos) ao mexer no
 `devcaso_dominio.js`, no `devcaso_route.js`, no bipe ou na baixa do

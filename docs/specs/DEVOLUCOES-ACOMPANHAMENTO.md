@@ -61,6 +61,7 @@ Mudanças no caminho:
     ninguém (ele lia a coluna `areas`, que o backfill não recalculou), e o dono preferiu juntar.
   · AJUSTE de 03/11 (pedido do dono): campo "Buscar devolução" em Em andamento, pela NF, venda
     ou pack (inteiro ou pedaço, a partir de 3 dígitos), nos casos abertos e encerrados.
+    No ar e conferida pelo dono em 03/11/2026 (PR #253).
 ```
 
 > Desenhada no Projeto do Claude entre 29/10 e 03/11/2026, com o Lucas.
