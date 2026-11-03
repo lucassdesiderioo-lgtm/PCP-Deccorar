@@ -1742,7 +1742,7 @@ dinheiro não vem junto.
 > senão o "Salvar alterações" não o grava.
 >
 > ⚠️ **A TELA TEM TESTE PRÓPRIO, NUM NAVEGADOR DE VERDADE:
-> `node teste_devolucao_casos_tela.js`** (119 casos). Ele **não** sobe o
+> `node teste_devolucao_casos_tela.js`** (133 casos). Ele **não** sobe o
 > `server.js` (a porta 3010 é fixa, e no servidor bateria na produção): monta um
 > Express só com as rotas das devoluções, num banco temporário e numa porta
 > livre. **Sem Playwright/Chromium ele diz "PULADO" e sai sem falhar — e o CI
@@ -1856,7 +1856,25 @@ dinheiro não vem junto.
 > leva à busca do ML com ele. Os finais digitados e a venda bipada **não**
 > viram etiqueta de devolução.
 
-**Rode `node teste_devolucao_casos.js` (694 casos) — e, na tela, `node teste_devolucao_casos_tela.js` (119) — ao mexer no
+> ⚠️ **A REVISÃO LIGADA À PEÇA ERRADA SE DESLIGA, E A BAIXA DELA SAI JUNTO**
+> (AJUSTE de 03/11/2026, decisão do dono "a": *"temos mais de 3 persianas de
+> 150x150 cinza"*). No caso, o bloco **"A peça revisada"** mostra a etiqueta
+> bipada, a hora, a triagem e a observação, com o **"Conferir no ML ↗"** — a
+> etiqueta digitada na busca do ML diz de qual venda a peça é. **"↩ Esta não é
+> a peça certa — desligar"** pede motivo (400 sem ele) e é de
+> `devolucao.acompanhar` (`desligarRevisao`): o caso fica sem revisão, volta a
+> **"Chegou"** (a chegada continua), **reabre** se tinha encerrado por ela
+> (`revisado_ml`) e perde a etiqueta de devolução que veio daquela peça. **A
+> baixa dada naquela peça é desfeita** (`baixado=0`, sem reputação nem
+> motivo): eles vieram do caso errado; ela volta para a Baixa sem caso e
+> recebe a baixa certa quando for ligada ao caso dela. A história guarda o
+> que tinha. **O "Já revisei" não se desfaz no ML**: o caso volta a pedi-lo, e
+> a história diz para marcar de novo depois de ligar a peça certa. Encerrado
+> por decisão de dinheiro (perda, comprador, reembolso) **não** se desliga
+> por aqui (409). A lista de revisões soltas mostra cada peça em cartão, com a
+> venda do caso em cima para comparar, e a Baixa tem o mesmo "Conferir no ML".
+
+**Rode `node teste_devolucao_casos.js` (729 casos) — e, na tela, `node teste_devolucao_casos_tela.js` (133) — ao mexer no
 `devcaso_dominio.js`, no `devcaso_route.js`, no bipe ou na baixa do
 `dev_route.js`, ou nas listas de motivos e documentos do `cad_route.js`** —
 e `node teste_devolucao.js` (37), que tem que passar sem mudar o esperado. Os
@@ -2533,7 +2551,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (332), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (694) e `teste_devolucao_casos_tela.js` (119, precisa de navegador); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (332), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (729) e `teste_devolucao_casos_tela.js` (133, precisa de navegador); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2752,6 +2770,8 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   cobrança ou a reputação somem da lista (§9-B)
 - ❌ Deixar caso parado sem dizer o que falta para encerrar, ou escolher sozinho
   o caso quando os finais do Pack ID batem em mais de um (§9-B)
+- ❌ Desligar a revisão do caso e deixar a baixa dela de pé, ou desligar sem
+  motivo: a reputação e o motivo daquela baixa vieram do caso errado (§9-B)
 - ❌ Procurar o caso só pela venda, pack ou NF e deixar a revisão solta calada:
   a etiqueta de devolução do ML é outro número, e o caso se acha pelo SKU (§9-B)
 - ❌ Pôr a cor ou a ordem do "nós coletamos" num prazo só, ou travar a coleta
