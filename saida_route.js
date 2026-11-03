@@ -287,13 +287,50 @@ module.exports = function(app, db){
     };
   }
   app.get('/api/viagem/aberta', (req, res) => res.json(retratoViagem(viagemAberta())));
+  /* O banco de producao tem `lote.teste` (§11); um banco de teste montado a mao
+     pode nao ter, e o filtro do modo teste nao pode derrubar a abertura. */
+  const temTeste = () => { try{ return db.prepare('PRAGMA table_info(lote)').all().some(c => c.name === 'teste'); }catch(e){ return false; } };
+  /* ⚠️ ABRIR POE NO CARRO TODAS AS CONFERIDAS (CONFERENCIA-EXPEDICAO fase 2,
+     03/11/2026). O carro deixou de ser uma etapa: a caixa ja foi conferida na
+     area, e um segundo bipe por caixa so dizia de novo o que ela ja disse. A
+     viagem nasce com a conta FECHADA na hora em que o carro sai — o que for
+     conferido depois nao entra sozinho (pode entrar pelo "Bipar no carro") —
+     e o bipe agora diz o que FICOU, como na saida do caminhao. A conta tem
+     que estar congelada porque a viagem fecha horas depois, na volta, com a
+     foto do atendente. Em modo teste so a caixa de teste entra (§11).
+     ⚠️ A VENDA FUTURA NAO ENTRA SOZINHA (carga.js → futuro, #9): ela nao e da
+     carga de hoje. Se for mandada adiantada, entra pelo "Bipar no carro". */
   app.post('/api/viagem/abrir', (req, res) => {
     let v = viagemAberta();
     if(!v){
-      const id = db.prepare("INSERT INTO saida (tipo, aberta_por) VALUES ('agencia', ?)").run(quem(req)).lastInsertRowid;
-      v = db.prepare('SELECT * FROM saida WHERE id=?').get(id);
+      db.transaction(() => {
+        const id = db.prepare("INSERT INTO saida (tipo, aberta_por) VALUES ('agencia', ?)").run(quem(req)).lastInsertRowid;
+        db.prepare(`UPDATE lote SET estagio='carregado', carregado_em=COALESCE(carregado_em, datetime('now','localtime')),
+            no_carro_em=datetime('now','localtime'), no_carro_por=?, saida_id=?
+          WHERE ${PRONTA_PRO_CARRO} AND (despachar_em IS NULL OR despachar_em <= date('now','localtime'))${temTeste() ? ' AND COALESCE(teste,0)=' + (BAIXA.emTeste(db) ? 1 : 0) : ''}`)
+          .run(quem(req) || null, id);
+        v = db.prepare('SELECT * FROM saida WHERE id=?').get(id);
+      })();
     }
     res.json(Object.assign({ ok:true }, retratoViagem(v)));
+  });
+
+  /* O BIPE "FICOU NA FABRICA": tira do carro a caixa que nao foi. E o mesmo
+     "tirar do carro", pelo codigo da etiqueta — o bipe so quer dizer "ficou". */
+  app.post('/api/viagem/ficou', (req, res) => {
+    const v = viagemAberta(); if(!v) return semViagem(res);
+    const code = String((req.body && req.body.code) || '').trim();
+    if(!code) return res.status(400).json({ erro:'sem codigo' });
+    const batem = acharVolumes(db, code);
+    if(!batem.length) return res.json(Object.assign({ ok:false, motivo:'nao_encontrado', lido:code }, retratoViagem(v)));
+    const x = batem.find(b => b.saida_id === v.id && !b.saiu_em);
+    const ped = b => ({ id:b.id, buyer:b.buyer, nf:b.nf, codigo:b.codigo });
+    if(!x) return res.json(Object.assign({ ok:false, motivo:'fora_do_carro', pedido:ped(batem[0]),
+      aviso:'Esta caixa não está no carro desta viagem.' }, retratoViagem(v)));
+    if(ehColeta(x)) db.prepare('UPDATE lote SET no_carro_em=NULL, no_carro_por=NULL, saida_id=NULL WHERE id=?').run(x.id);
+    else db.prepare(`UPDATE lote SET estagio='embalado', carregado_em=NULL, no_carro_em=NULL, no_carro_por=NULL,
+        saida_id=NULL WHERE id=?`).run(x.id);
+    res.json(Object.assign({ ok:true, pedido:ped(x) }, retratoViagem(v)));
   });
 
   /* O BIPE NO CARRO. A ordem das recusas é a da caixa na mão: não existe,
@@ -359,6 +396,13 @@ module.exports = function(app, db){
     const at = parseInt(b.atendente, 10);
     if(!(at >= 0)) return res.status(400).json({ erro:'informe quantas caixas o atendente bipou' });
     const r = retratoViagem(v);
+    /* QUEM LEVOU (fase 2): pessoa ATIVA do cadastro, obrigatoria. Quem fecha e
+       o login (`fechado_por`); os dois podem ser pessoas diferentes — a foto
+       pode chegar pelo WhatsApp e ser lancada por quem ficou na fabrica. */
+    let levou = null;
+    try{ levou = db.prepare('SELECT id, nome FROM usuarios WHERE id=? AND ativo=1').get(parseInt(b.quem_levou_id, 10)) || null; }catch(e){}
+    if(!levou) return res.json(Object.assign({ ok:false, motivo:'sem_quem_levou', atendente:at,
+      aviso:'Escolha quem levou as caixas à agência.' }, r));
     if(!r.sistema && !at) return res.json(Object.assign({ ok:false, motivo:'vazia',
       aviso:'Esta viagem não tem caixa nenhuma. Cancele a viagem em vez de fechar.' }, r));
     const foto = decodificarFoto(b.foto);
@@ -386,14 +430,15 @@ module.exports = function(app, db){
       const arq = path.join(FOTOS_DIR, 'saida-' + v.id + '.' + foto.ext);
       fs.writeFileSync(arq, foto.buf);
       db.prepare(`UPDATE saida SET fechada_em=datetime('now','localtime'), fechado_por=?, qtd_sistema=?, qtd_externa=?,
-          divergente=?, liberado_por=?, motivo=?, foto=?, ids=?, sem_segunda_pessoa=? WHERE id=?`)
+          divergente=?, liberado_por=?, motivo=?, foto=?, ids=?, sem_segunda_pessoa=?, quem_levou_id=?, quem_levou=? WHERE id=?`)
         .run(autor, r.sistema, at, divergente?1:0, divergente ? autor : null, motivo || null, arq,
-             JSON.stringify(ids), sem2, v.id);
+             JSON.stringify(ids), sem2, levou.id, levou.nome, v.id);
     })();
     if(divergente) auditar(req, 'viagem_liberada_divergente', 'saida '+v.id, 'carro '+r.sistema+' / atendente '+at+' — '+motivo);
     const troca = r.lista.filter(x => x.troca_de_porta).length;
     if(troca) auditar(req, 'viagem_troca_de_porta', 'saida '+v.id, troca+' caixa(s) de coleta foram pela agência');
-    res.json({ ok:true, id:v.id, sistema:r.sistema, atendente:at, divergente, troca_de_porta:troca,
+    auditar(req, 'viagem_fechada', 'saida '+v.id, r.sistema+' caixa(s) · levou: '+levou.nome+' · fechou: '+(autor||'?'));
+    res.json({ ok:true, id:v.id, sistema:r.sistema, atendente:at, divergente, troca_de_porta:troca, quem_levou:levou.nome,
       foto:'/api/saida/foto/'+v.id });
   }
   app.post('/api/viagem/fechar', (req, res) => fecharViagem(req, res, false));

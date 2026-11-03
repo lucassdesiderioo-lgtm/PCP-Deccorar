@@ -215,6 +215,12 @@ Etiqueta de Venda ────┤
 
 ## A sobra (venda cancelada, motorista recusou, outro)
 
+> ⚠️ **DESDE 03/11/2026 SÃO DUAS PESSOAS** (CONFERENCIA-EXPEDICAO fase 4). O
+> botão virou **"✕ Venda cancelada — separar a caixa"**, no card **Fim do dia**,
+> e o mesmo bipe da etiqueta e do SKU agora só **separa**; o saldo volta na
+> **confirmação** (R-REC-06). Onde os cartões abaixo dizem "Sobrou", leia "Venda
+> cancelada"; onde dizem que a caixa já nasce decidida, leia R-REC-06.
+
 > Desde 22/10/2026 (CONFERENCIA-E-BAIXA, fase 2-B). Até ali era o "🚫 Motorista
 > recusou" (02/10/2026, spec `RECUSA-DO-MOTORISTA`), que só marcava, e o saldo
 > voltava pela Mesa. O motorista virou um dos motivos da sobra, e a Mesa nunca
@@ -224,7 +230,8 @@ Etiqueta de Venda ────┤
 - **Regra:** na Conferência, **↩ Sobrou** → bipa a etiqueta de venda (a tela mostra cliente, NF e persianas) → bipa o **SKU de cada persiana** → motivo (**Venda cancelada · Motorista recusou · Outro**, escrito) → **Confirmar a sobra** (`POST /api/carregamento/sobra`, `carregamento.executar`, sem chave nova — D3). A caixa vira `cancelado` com `cancelada_origem='sobra'`, o motivo e quem marcou, sai do canto, do carro e da saída, e **já nasce decidida** (`cancelada_resolvida_em`, `cancelada_voltou=1`). Se a caixa **já tinha baixado** (`baixado_em`), o saldo volta **+1 por peça** com o movimento `sobra` (`baixa_dominio.devolver`, dono único, referência `lote:<id>`); se não tinha, nenhum movimento — a reserva solta sozinha. SKU que não é da caixa, ou uma persiana a mais, é recusado; sem **todas** as persianas bipadas, sem motivo, ou com "Outro" em branco, não confirma.
 - **Por quê:** o bipe do SKU é o que prova que a persiana está na mão — sem ele, "voltou para o estoque" seria uma afirmação. A sobra é da caixa inteira: com uma peça só, o saldo subiria pela metade. "Já baixou", e não "foi conferida": a caixa impressa antes de 22/10 baixou na impressão.
 - **Exceções:** a venda que já estava cancelada (pelo relatório, ou pela recusa de antes da 2-B) também vai pela sobra e **mantém a origem** dela. O bipe normal da Conferência recusa a caixa cancelada e manda tocar em "Sobrou".
-- **Teste que trava:** `teste_sobra.js` (103) — seis defeitos reintroduzidos, um a um, e todos reprovam.
+- ⚠️ **Mudou em 03/11/2026:** "Confirmar a sobra" virou **"Separar como venda cancelada"**, e ela NÃO decide nem devolve o saldo — a caixa fica `cancelado`, fora das listas, esperando a confirmação (R-REC-06).
+- **Teste que trava:** `teste_sobra.js` (102) — seis defeitos reintroduzidos, um a um, e todos reprovam · `teste_conferencia_expedicao.js`.
 - **Status:** no ar desde 22/10/2026 (PR #222) · ✅ a primeira sobra real funcionou no mesmo dia, com o saldo subindo (relato do dono).
 - **História:** spec `CONFERENCIA-E-BAIXA` §4.
 
@@ -249,12 +256,38 @@ Etiqueta de Venda ────┤
 - **Teste que trava:** `teste_sobra.js`.
 - **Status:** no ar desde 22/10/2026 (PR #222).
 
-### R-REC-05 · A lista "Sobras esperando decisão" zera
-- **Regra:** a Conferência mostra o que espera a sobra (`GET /api/carregamento/sobras`): a caixa que o caminhão deixou numa saída **já fechada** e continua no canto, e a venda cancelada que ainda está na fábrica sem decisão. Resolvida pelo "Sobrou", registrada na Mesa ou levada pelo caminhão seguinte, a caixa sai da lista.
+### R-REC-05 · A lista das canceladas zera
+- **Regra:** desde 03/11/2026 o card se chama **Canceladas** e tem duas partes (`GET /api/carregamento/sobras` → `caixas` e `aguardando`): **a separar** (a venda que o ML cancelou e cuja caixa ainda está na fábrica) e **aguardando confirmação** (já separada). Separada, confirmada, recusada ou registrada na Mesa, a caixa sai da parte dela. ~~A caixa que o caminhão deixou numa saída já fechada~~ **saiu do card**: é atraso, não decisão — está na lista única, e o "a coleta não passou" lhe dá nome (R-FIM-01).
 - **Por quê:** número que não zera vira paisagem.
 - **Exceções:** a caixa de várias com um item cancelado não entra (o lugar dela é a Etiqueta de Venda, e o card da Mesa a mostra).
 - **Teste que trava:** `teste_sobra.js`.
-- **Status:** no ar desde 22/10/2026 (PR #222).
+- **Status:** no ar desde 22/10/2026 (PR #222) · duas partes em código desde 03/11/2026, falta subir.
+
+### R-REC-06 · A venda cancelada só volta ao estoque na confirmação, de outra pessoa
+- **Regra:** a caixa separada vira um pedido em `cancelamento_caixa` (`cancel_conf.js`, dono único: quem marcou, o volume como estava, as peças). Quem tem **`cancelamento.confirmar`** (sensível, nível `supervisor`; backfill de uma vez para os setores Supervisor e Admin) **confirma** (`POST /api/carregamento/cancelada/confirmar`): a caixa fica decidida por ele, e o saldo volta **+1 por peça** se já tinha baixado (`baixa_dominio.devolver`), numa transação — confirmar duas vezes não soma duas. Ou **recusa** (`…/recusar`, motivo obrigatório): a caixa volta para onde estava, e a de agência que estava no carro volta à **área, conferida**. A cancelada pelo relatório do ML, recusada, continua cancelada e volta a esperar a separação.
+- **Por quê:** decisão do dono (03/11/2026). Confirmar devolve peça sem venda na frente — a natureza do `estoque.editar`.
+- **Exceções:** **quem separou não confirma nem recusa**, nem o Admin Geral (R-EST-18). Sob medida é confirmado e não mexe em saldo. A chave é conferida no portão e na rota (403).
+- **Teste que trava:** `teste_conferencia_expedicao.js` (92) · `teste_conferencia_tela.js` (38, navegador) · `teste_sobra.js`.
+- **Status:** em código em 03/11/2026, falta subir.
+- **História:** spec `CONFERENCIA-EXPEDICAO` fase 4.
+
+### R-REC-07 · "+1 por peça" só se a caixa já baixou
+- **Regra:** a confirmação da caixa impressa e **nunca conferida** não gera movimento: a peça nunca saiu do saldo (estava só reservada), e a reserva solta quando a caixa vira cancelada.
+- **Por quê:** a spec dizia "cada persiana volta ao estoque"; o `CLAUDE.md` §2 manda o contrário para a caixa que não baixou, e vale o `CLAUDE.md`.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `teste_conferencia_expedicao.js`.
+- **Status:** em código em 03/11/2026.
+
+---
+
+## O fim do dia
+
+### R-FIM-01 · "A coleta não passou" dá nome à caixa que ficou, e não mexe em nada
+- **Regra:** no card **Fim do dia**, **🚚 A coleta não passou hoje** (`POST /api/carregamento/fimdia`, `carregamento.executar`) grava quem, quando e **quais caixas** — as da lista única de agora (esperando conferência e conferidas, de hoje e atrasadas; a futura não) — em `fim_dia` (`fim_dia.js`, uma linha por dia; registrar de novo junta e atualiza quem). No dia seguinte (`ficou_de`, até 30 dias), a caixa vem **em cima** da lista, com o selo **"🌙 de ontem — a coleta não passou"**.
+- **Por quê:** decisão do dono (03/11/2026): ninguém sabia se a caixa que ficou era atraso ou cancelamento.
+- **Exceções:** **registrar não muda estágio, saída nem estoque.** Caixa **sem** marcação continua na lista, sem selo — "não saiu", **nunca** "cancelada". Cancelar é a outra porta (R-REC-06).
+- **Teste que trava:** `teste_conferencia_expedicao.js` · `teste_conferencia_tela.js`.
+- **Status:** em código em 03/11/2026, falta subir.
 
 ---
 
@@ -322,14 +355,16 @@ Etiqueta de Venda ────┤
 ## A viagem à agência
 
 ### R-VIA-01 · A caixa de agência tem dois bipes: a área confere, a viagem põe no carro
-- **Regra:** o bipe normal do Carregamento **só confere** (a caixa fica na área, "✓ na área"). Com **🚗 Viagem à agência** aberta, o bipe põe **no carro**, e só aceita caixa conferida; a recusa diz o que fazer (*"Toque em 'Conferir na área', bipe ela, e depois ponha no carro"*). O botão **Conferir na área** devolve o bipe à área sem fechar a viagem, e a faixa **"O bipe agora: …"** diz para onde vai cada bipe, na cor dele. Com as duas saídas abertas, vale a última escolhida. O `PRONTA_PRO_CARRO` do `carga.js` é a régua.
+- ⚠️ **Mudou em 03/11/2026** (CONFERENCIA-EXPEDICAO fase 2): **abrir a viagem põe no carro toda caixa de agência conferida e de hoje**, e o bipe padrão da viagem passa a dizer o que **FICOU** (`POST /api/viagem/ficou`, tira do carro e devolve à área, conferida). O bipe "no carro" virou o botão **"Pôr mais uma no carro"**: para a venda futura mandada adiantada (ela **não entra sozinha**, #9), a conferida depois de abrir e a troca de porta. A conta congela ao abrir, porque a viagem fecha horas depois. O texto abaixo é o de antes.
+- **Regra (até 03/11/2026):** o bipe normal do Carregamento **só confere** (a caixa fica na área, "✓ na área"). Com **🚗 Viagem à agência** aberta, o bipe põe **no carro**, e só aceita caixa conferida; a recusa diz o que fazer (*"Toque em 'Conferir na área', bipe ela, e depois ponha no carro"*). O botão **Conferir na área** devolve o bipe à área sem fechar a viagem, e a faixa **"O bipe agora: …"** diz para onde vai cada bipe, na cor dele. Com as duas saídas abertas, vale a última escolhida. O `PRONTA_PRO_CARRO` do `carga.js` é a régua.
 - **Por quê:** decisão do dono (D1, 26/09/2026). Recusar sem caminho, com a caixa na mão, ensina a empurrar do jeito que der.
 - **Exceções:** nenhuma.
-- **Teste que trava:** `teste_saida_agencia.js` (43).
+- **Teste que trava:** `teste_saida_agencia.js` (45) · `teste_conferencia_expedicao.js`.
 - **Status:** no ar desde 26/09/2026 (PR #142) · a primeira viagem de verdade ainda não foi fechada.
 - **História:** fase 4 da spec `SAIDA-E-DUPLA-CONFERENCIA`.
 
 ### R-VIA-02 · A viagem fecha com foto e número, como o caminhão
+- ⚠️ **E com QUEM LEVOU desde 03/11/2026** (fase 2): fechar exige a pessoa **ativa** do cadastro que levou as caixas (`quem_levou_id`; lista do `/api/auth/pessoas`), gravada em `saida.quem_levou_id` e `saida.quem_levou`, além de quem fechou (`fechado_por`, o login) — podem ser pessoas diferentes, porque a foto pode chegar pelo WhatsApp. Sem ela, `sem_quem_levou`. O histórico do dia mostra "levou: … · fechou: …".
 - **Regra:** `saíram = bipadas no carro NESTA viagem`. **Bateu:** cada caixa grava `saiu_em` e `saiu_por='agencia'`, numa saída `tipo='agencia'` (o `saida_id` já vem do bipe no carro). **Não bateu:** nada anda, e liberar exige `saida.liberar` e motivo.
 - **Por quê:** a mesma razão da R-SAI-06.
 - **Exceções:** as caixas de agência carregadas antes do deploy da fase 4 não têm viagem e ficam como estão; bipadas de novo, respondem "essa caixa já saiu".

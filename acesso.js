@@ -267,6 +267,21 @@ module.exports = function(app, db){
     }
   }catch(e){ console.log('[acesso] seed de saida.liberar falhou: '+e.message); }
 
+  /* ── 3-C2. 'cancelamento.confirmar' (CONFERENCIA-EXPEDICAO fase 4, 03/11/2026) ──
+     A mesma razao do 3-C: chave nova em banco que ja existe nao chega a
+     ninguem. Quem recebe: os setores nativos 'Supervisor' e 'Admin' — a
+     "gestao" da decisao do dono, os mesmos do `saida.liberar`. Admin Geral
+     passa por nivel. Uma vez so: quem desmarcar nao a ve voltar no boot. */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='seed_cancelamento_confirmar'").get()){
+      db.transaction(() => {
+        db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
+          SELECT id,'cancelamento.confirmar' FROM setores WHERE nome IN ('Supervisor','Admin')`).run();
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('seed_cancelamento_confirmar','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[acesso] seed de cancelamento.confirmar falhou: '+e.message); }
+
   /* ── 3-D. A CONFERENCIA EM TRES PAPEIS (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA,
      26/09/2026) ──
      Mesma razao do 3-B: chave nova em banco que ja existe nao chega a ninguem,
@@ -725,7 +740,13 @@ module.exports = function(app, db){
        a conferencia marca a sobra E devolve o saldo, bipando o SKU (D3, sem
        chave nova). Substitui o "Motorista recusou", que virou um dos motivos. */
     if(M !== 'GET' && eq('/api/carregamento/sobra')) return 'carregamento.executar';
-    if(M === 'GET' && eq('/api/carregamento/sobras')) return ['carregamento.executar','@admin'];
+    /* A VENDA CANCELADA EM DUAS PESSOAS (CONFERENCIA-EXPEDICAO fase 4): marcar e
+       a sobra acima, da bancada; confirmar e recusar sao da chave nova. A
+       lista e lida pela bancada, por quem confirma e pelo admin. O fim do dia
+       ("a coleta nao passou", fase 3) e da bancada. */
+    if(M !== 'GET' && (eq('/api/carregamento/cancelada/confirmar') || eq('/api/carregamento/cancelada/recusar'))) return 'cancelamento.confirmar';
+    if(M !== 'GET' && eq('/api/carregamento/fimdia')) return 'carregamento.executar';
+    if(M === 'GET' && eq('/api/carregamento/sobras')) return ['carregamento.executar','cancelamento.confirmar','@admin'];
     /* A SAIDA DO CAMINHAO (fase 3 da SAIDA-E-DUPLA-CONFERENCIA): abrir, bipar
        as sobras e fechar a que BATEU sao da bancada que bipa a caixa. Liberar
        com numero diferente do motorista tem chave propria, e vem ANTES do

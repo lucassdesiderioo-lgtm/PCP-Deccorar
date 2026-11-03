@@ -251,8 +251,9 @@ const vol = (buyer, estagio, campos) => {
   const ag = vol('AgViagem', 'embalado', { venda:'2000018100000020', embalado_em: hoje+' 09:00:00' });
   db.prepare("UPDATE lote SET conferido_em=datetime('now','localtime'), conferido_por='Ana' WHERE id=?").run(ag);
   r = await chamar('POST /api/viagem/abrir', {}, ANA);
-  r = await chamar('POST /api/viagem/carro', { code:'2000018100000020' }, ANA);
-  ok('a caixa conferida entra no carro da viagem', r.ok === true && lote(ag).estagio === 'carregado', r);
+  /* Desde 03/11/2026 (CONFERENCIA-EXPEDICAO fase 2) abrir a viagem ja poe no
+     carro toda caixa de agencia conferida — o bipe no carro saiu do caminho. */
+  ok('a caixa conferida entra no carro da viagem (ao abrir)', r.ok === true && lote(ag).estagio === 'carregado' && !!lote(ag).saida_id, r);
   r = await importar([ futura, linha('2000018100000020', 1, 'Cancelada pelo comprador', 'BK140140BEGE') ]);
   l = lote(ag);
   ok('cancelada DENTRO do carro de uma viagem aberta: sai da viagem', r.ok && l.estagio === 'cancelado'

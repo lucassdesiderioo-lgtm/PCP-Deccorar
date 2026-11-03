@@ -80,8 +80,8 @@ const LINHAS = [
   { chave:'sku', nome:'SKU incompleto', perm:['sku.cadastrar'], onde:{ aba:'pend' },
     ajuda:'cadastro sem medida, modelo, cor ou custo',
     contar(db){ return { n:require('./sku_route').pendencias(db).total, desde:null }; } },
-  { chave:'sobras', nome:'Sobras da Conferência', perm:['carregamento.executar'], onde:{ url:'/carregamento' },
-    ajuda:'caixas que o caminhão deixou e canceladas na fábrica, esperando o ↩ Sobrou',
+  { chave:'sobras', nome:'Canceladas da Conferência', perm:['cancelamento.confirmar','carregamento.executar'], onde:{ url:'/carregamento' },
+    ajuda:'caixas separadas como venda cancelada esperando confirmação no ML, e canceladas no ML ainda na fábrica esperando ser separadas',
     contar(db){
       const l = require('./carreg_route').sobrasEsperando(db);
       return { n:l.length, desde:maisAntiga(l.map(x => x.cancelada_em)),

@@ -47,7 +47,12 @@ const app = { get:(p,...h)=>{ rotas['GET '+p]=h[h.length-1]; },
 db.exec(`CREATE TABLE IF NOT EXISTS modelo (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, nome TEXT,
     exige_medida INTEGER DEFAULT 1, sob_medida INTEGER DEFAULT 0);
   CREATE TABLE IF NOT EXISTS skus (codigo TEXT PRIMARY KEY, descricao TEXT DEFAULT '', cor TEXT DEFAULT '',
-    estoque INTEGER DEFAULT 0, alvo INTEGER DEFAULT 0, modelo_id INTEGER);`);
+    estoque INTEGER DEFAULT 0, alvo INTEGER DEFAULT 0, modelo_id INTEGER);
+  CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY, nome TEXT, ativo INTEGER DEFAULT 1);
+  INSERT OR IGNORE INTO usuarios (id,nome) VALUES (1,'Ana'),(2,'Beto');`);
+/* QUEM LEVOU (CONFERENCIA-EXPEDICAO fase 2, 03/11/2026): a viagem so fecha com
+   a pessoa do cadastro que levou as caixas — o Beto (2) na primeira, a Ana (1)
+   na segunda. */
 for(const c of ["BK140140BEGE"])
   db.prepare('INSERT OR IGNORE INTO skus (codigo,estoque) VALUES (?,100)').run(c);
 require('./estoque_dominio').garantirSchema(db);
@@ -106,7 +111,12 @@ const vol = (buyer, estagio, modalidade, extra) => {
   r = await chamar('POST /api/viagem/carro', {code:'PAgUm'}, BETO);
   ok('sem viagem aberta, o bipe no carro diz para abrir antes', r.ok === false && r.motivo === 'sem_viagem', JSON.stringify(r));
   r = await chamar('POST /api/viagem/abrir', {}, BETO);
-  ok('abrir cria a viagem', r.ok && r.viagem && r.viagem.tipo === 'agencia' && r.sistema === 0, JSON.stringify(r));
+  /* Desde 03/11/2026 (CONFERENCIA-EXPEDICAO fase 2) abrir a viagem poe no carro
+     TODAS as de agencia conferidas e de hoje: AgUm, AgDois e AgTres. A futura
+     (AgFutura) nao entra sozinha; a nao conferida tambem nao. */
+  ok('abrir cria a viagem com as tres conferidas de hoje no carro', r.ok && r.viagem && r.viagem.tipo === 'agencia' && r.sistema === 3
+     && [a1,a2,a3].every(id => r.lista.some(v => v.id === id)), JSON.stringify(r));
+  ok('...e a futura e a nao conferida ficam de fora', !r.lista.some(v => v.id === aFut || v.id === aSem));
   const v1 = r.viagem.id;
   r = await chamar('POST /api/viagem/abrir', {}, ANA);
   ok('abrir de novo devolve a MESMA viagem', r.ok && r.viagem.id === v1);
@@ -120,14 +130,16 @@ const vol = (buyer, estagio, modalidade, extra) => {
   r = await chamar('POST /api/viagem/carro', {code:'NADA'}, BETO);
   ok('código que não existe dá nao_encontrado', r.ok === false && r.motivo === 'nao_encontrado');
 
-  r = await chamar('POST /api/viagem/carro', {code:'PAgUm'}, BETO);
-  ok('caixa conferida entra no carro', r.ok && r.sistema === 1, JSON.stringify(r));
+  r = await chamar('POST /api/viagem/ficou', {code:'PAgTres'}, BETO);
+  ok('o bipe "ficou" tira a AgTres do carro (ela fica na area)', r.ok && r.sistema === 2 && lote(a3).estagio === 'embalado', JSON.stringify(r));
+  r = await chamar('GET /api/viagem/aberta');
+  ok('caixa conferida esta no carro', r.sistema === 2 && r.lista.some(v => v.id === a1), JSON.stringify(r));
   l = lote(a1);
-  ok('...e grava quem pôs, quando, e a viagem', l.estagio === 'carregado' && l.no_carro_por === 'Beto'
+  ok('...e grava quem abriu a viagem, quando, e a viagem', l.estagio === 'carregado' && l.no_carro_por === 'Beto'
      && !!l.no_carro_em && !!l.carregado_em && l.saida_id === v1 && !l.saiu_em, JSON.stringify(l));
   r = await chamar('POST /api/viagem/carro', {code:'PAgUm'}, BETO);
   ok('bipar a mesma no carro não conta duas vezes', r.ok === false && r.motivo === 'ja_no_carro', JSON.stringify(r));
-  for(const c of ['PAgDois','PAgFutura']) await chamar('POST /api/viagem/carro', {code:c}, BETO);
+  await chamar('POST /api/viagem/carro', {code:'PAgFutura'}, BETO);   // a adiantada entra pelo bipe no carro
 
   // ── coleta indo pela agência ──
   r = await chamar('POST /api/viagem/carro', {code:'PColUm'}, BETO);
@@ -156,15 +168,15 @@ const vol = (buyer, estagio, modalidade, extra) => {
   ok('cancelar com caixa no carro é recusado', r.ok === false && r.motivo === 'carro_cheio', JSON.stringify(r));
 
   // ── fechar ──
-  r = await chamar('POST /api/viagem/fechar', {atendente:3}, BETO);
+  r = await chamar('POST /api/viagem/fechar', {atendente:3, quem_levou_id:2}, BETO);
   ok('sem foto não fecha', r.ok === false && r.motivo === 'sem_foto', JSON.stringify(r));
-  r = await chamar('POST /api/viagem/fechar', {atendente:4, foto:FOTO}, BETO);
+  r = await chamar('POST /api/viagem/fechar', {atendente:4, foto:FOTO, quem_levou_id:2}, BETO);
   ok('o atendente bipou 4, o carro tem 3: não fecha', r.ok === false && r.motivo === 'divergente'
      && r.sistema === 3 && r.atendente === 4 && r.lista.length === 3, JSON.stringify(r));
   ok('...e nada anda', !lote(a1).saiu_em && lote(a1).saida_id === v1);
-  r = await chamar('POST /api/viagem/liberar', {atendente:4, foto:FOTO}, BETO);
+  r = await chamar('POST /api/viagem/liberar', {atendente:4, foto:FOTO, quem_levou_id:2}, BETO);
   ok('liberar sem motivo é recusado', r.ok === false && r.motivo === 'sem_motivo', JSON.stringify(r));
-  r = await chamar('POST /api/viagem/fechar', {atendente:3, foto:FOTO}, BETO);
+  r = await chamar('POST /api/viagem/fechar', {atendente:3, foto:FOTO, quem_levou_id:2}, BETO);
   ok('bateu: fecha', r.ok && r.id === v1 && r.divergente === false && r.troca_de_porta === 1, JSON.stringify(r));
   const sd = db.prepare('SELECT * FROM saida WHERE id=?').get(v1);
   ok('a saída é da agência, com os dois números, quem fechou e a foto',
@@ -190,12 +202,13 @@ const vol = (buyer, estagio, modalidade, extra) => {
   ok('o caminhão fecha só com o que a agência deixou no canto', r.ok && r.sistema === 1, JSON.stringify(r));
   r = await chamar('POST /api/viagem/abrir', {}, ANA);
   const v2 = r.viagem.id;
-  ok('a segunda viagem do dia começa vazia', v2 !== v1 && r.sistema === 0, JSON.stringify(r));
+  ok('a segunda viagem do dia comeca com as que ficaram na area (AgDois, tirada do carro, e AgTres)',
+     v2 !== v1 && r.sistema === 2 && [a2,a3].every(id => r.lista.some(v => v.id === id)), JSON.stringify(r));
   r = await chamar('POST /api/viagem/carro', {code:'PAgUm'}, ANA);
   ok('caixa que já saiu não entra na segunda viagem', r.ok === false && r.motivo === 'duplicado', JSON.stringify(r));
-  r = await chamar('POST /api/viagem/carro', {code:'PAgDois'}, ANA);
-  ok('a que ficou na área entra na segunda', r.ok && r.sistema === 1, JSON.stringify(r));
-  r = await chamar('POST /api/viagem/liberar', {atendente:0, foto:FOTO, motivo:'atendente não achou a caixa'}, ANA);
+  r = await chamar('POST /api/viagem/carro', {code:'PAgTres'}, ANA);
+  ok('bipar no carro a que ja esta nele nao conta duas vezes', r.ok === false && r.motivo === 'ja_no_carro', JSON.stringify(r));
+  r = await chamar('POST /api/viagem/liberar', {atendente:0, foto:FOTO, motivo:'atendente não achou a caixa', quem_levou_id:1}, ANA);
   ok('liberar com motivo fecha como divergente', r.ok && r.divergente === true, JSON.stringify(r));
   const sd2 = db.prepare('SELECT * FROM saida WHERE id=?').get(v2);
   ok('...com quem liberou e o motivo, e vai para a auditoria', sd2.divergente === 1 && sd2.liberado_por === 'Ana'

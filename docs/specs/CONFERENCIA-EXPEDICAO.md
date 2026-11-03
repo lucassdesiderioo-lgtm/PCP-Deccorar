@@ -1,6 +1,6 @@
 # Conferência da expedição — tela enxuta, fechamento com prova e o que sobrou no fim do dia
 
-> **STATUS: em construção · 03/11/2026 — fase 1 em código, falta subir**
+> **STATUS: em construção · 03/11/2026 — fase 1 no ar (PR #261); fases 2, 3 e 4 em código, falta subir**
 > Desenhada no Projeto do Claude com o Lucas em 03/11/2026. Nada construído.
 > Spec aprovada e salva no repositório em 03/11/2026; decisões em `docs/DECISOES.md`.
 >
@@ -21,10 +21,10 @@
 >
 > | Fase | O quê | Risco | Situação |
 > |---|---|---|---|
-> | 1 | Enxugar a tela: lista única com marcação Coleta / Agência | 🟡 | **em código (03/11/2026), falta subir** |
-> | 2 | Fechamento da agência com foto e "quem levou" | 🔴 | planejado |
-> | 3 | Fim do dia: "a coleta não passou" e o selo "de ontem" | 🟡 | planejado |
-> | 4 | Venda cancelada: operador marca, gestão confirma, peça volta ao estoque | 🔴 | planejado |
+> | 1 | Enxugar a tela: lista única com marcação Coleta / Agência | 🟡 | **no ar (03/11/2026, PR #261)**; falta a conferência num dia real |
+> | 2 | Fechamento da agência com foto e "quem levou" | 🔴 | **em código (03/11/2026), falta subir** |
+> | 3 | Fim do dia: "a coleta não passou" e o selo "de ontem" | 🟡 | **em código (03/11/2026), falta subir** |
+> | 4 | Venda cancelada: operador marca, gestão confirma, peça volta ao estoque | 🔴 | **em código (03/11/2026), falta subir** |
 >
 > **Fase 1 em código (03/11/2026):** saíram da tela os quadros do topo (No
 > carro, Faltam no carro, Coleta esperando, Peças adiantadas), o "Conferir carga
@@ -37,6 +37,47 @@
 > parte da lista. `teste_carga.js` (67) ganhou a lista única executada.
 > Conferida no navegador a 1440 e a 400 px com dado semeado, sem rolar de lado.
 > Falta: subir e o dono conferir num dia real.
+>
+> **Fases 2, 3 e 4 em código (03/11/2026)**, com o "pode seguir com todas as
+> fases" do dono. As escolhas que a spec deixava para o PLANO, e como ficaram:
+>
+> - **Fase 2 — sem tabela nova:** a `saida` ganhou `quem_levou_id` e
+>   `quem_levou` (CREATE e ALTER, §17). **Abrir a viagem põe no carro as
+>   conferidas de agência de hoje**; o bipe passa a dizer o que **ficou**
+>   (`POST /api/viagem/ficou`); o bipe "no carro" virou o botão "Pôr mais uma no
+>   carro" (a venda futura mandada adiantada não entra sozinha, #9). A conta
+>   congela ao abrir porque a viagem fecha na volta. Quem levou é pessoa
+>   **ativa** do cadastro, obrigatória. O fechamento grava `saiu_em`/`saiu_por`
+>   como antes — **não** `retirado_em`, que pelo `CLAUDE.md` é só da coleta.
+> - **Fase 3 — tabela `fim_dia`** (`fim_dia.js`), uma linha por dia com as
+>   caixas da lista; registrar de novo junta. O selo vale do dia seguinte até
+>   30 dias. O botão marca **todas** as caixas da lista de agora (agência e
+>   coleta), e não uma a uma.
+> - **Fase 4 — tabela `cancelamento_caixa`** (`cancel_conf.js`) e a rota do
+>   ↩ Sobrou reaproveitada (`POST /api/carregamento/sobra`, agora só separa,
+>   com o bipe do SKU de cada persiana mantido). A caixa separada vira o estágio
+>   `cancelado` já existente (D1 A da VENDAS-E-MEDIA) e sai das listas; a
+>   recusa a devolve. **Chave `cancelamento.confirmar`** (e não
+>   `expedicao.cancelamento.confirmar`: as chaves do PCP têm duas partes),
+>   sensível, nível `supervisor`, **backfill para os setores Supervisor e Admin**
+>   — os mesmos do `saida.liberar`. Quem separou não confirma nem recusa. A
+>   confirmação e a recusa aparecem **na própria Conferência** (para quem tem a
+>   chave) e são contadas na central de Pendências ("Canceladas da
+>   Conferência"). Os motivos (venda cancelada · motorista recusou · outro)
+>   continuam, como subtipo da venda cancelada.
+> - ⚠️ **"+1 por peça" só se a caixa já baixou** — a R6 diz "cada persiana
+>   volta"; vale o `CLAUDE.md` §2 (a caixa não conferida nunca saiu do saldo).
+> - A caixa que o caminhão deixou saiu da lista de sobras: é atraso, e a fase 3
+>   lhe dá nome.
+>
+> Testes: `teste_conferencia_expedicao.js` (92, escrito antes das rotas; cinco
+> defeitos reintroduzidos, cada um reprovando) e `teste_conferencia_tela.js`
+> (38, num Chromium de verdade, o fluxo inteiro de clique). `teste_sobra.js`,
+> `teste_saida_agencia.js`, `teste_cancelada.js`, `teste_pendencias.js` e
+> `teste_correcao.js` foram ajustados ao comportamento novo. Falta: subir, e a
+> prova de fábrica — a primeira viagem fechada com quem levou, o primeiro "a
+> coleta não passou" com o selo no dia seguinte, e a primeira venda cancelada
+> confirmada por outra pessoa.
 
 ---
 

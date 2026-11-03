@@ -33,6 +33,15 @@ module.exports = [
     rotulo:'Liberar caminhão com divergência',
     desc:'Fechar a saída da coleta quando o número do motorista não bate, com motivo',
     sensivel:true },
+  /* A VENDA CANCELADA EM DUAS PESSOAS (CONFERENCIA-EXPEDICAO fase 4,
+     03/11/2026): a Conferencia separa a caixa, e quem tem esta chave confere
+     no Mercado Livre e confirma — so a confirmacao devolve a peca ao estoque.
+     SENSIVEL pela mesma razao do `estoque.editar`: e saldo voltando sem venda
+     na frente. Nivel `supervisor`, como o `saida.liberar` (§19, #34). */
+  { chave:'cancelamento.confirmar', grupo:'Expedição', nivel:'supervisor',
+    rotulo:'Confirmar venda cancelada',
+    desc:'Confirmar no Mercado Livre a venda cancelada que a Conferência separou — devolve as peças ao estoque — ou recusar',
+    sensivel:true },
   /* Pacote (§5, armadilha #23). Quem ASSINA nao esta destravando um volume: esta
      dizendo QUANTAS persianas e QUAIS vao dentro da caixa — e e essa lista que
      a Etiqueta de Venda cobra no bipe e que baixa do estoque, peca por peca.

@@ -6,22 +6,21 @@ const fs=require('fs'), path=require('path');
    /opt. */
 const FOTOS_DIR=require('./caminhos').COLETAS;
 const BAIXA=require('./baixa_dominio');
-/* AS SOBRAS ESPERANDO DECISAO, numa funcao: a lista da Conferencia e a
-   central de pendencias (Admin → Pendências) contam pela mesma conta. */
+/* AS CANCELADAS DA CONFERENCIA, numa funcao: a lista da tela e a central de
+   pendencias (Admin → Pendências) contam pela mesma conta.
+   Desde 03/11/2026 (CONFERENCIA-EXPEDICAO fase 4) sao duas coisas:
+     - `cancelada`  a venda que o ML cancelou (pelo relatorio) e ainda esta na
+                    fabrica: falta a Conferencia SEPARAR (bipe + SKU);
+     - `aguardando` a caixa ja separada como venda cancelada, esperando quem
+                    tem `cancelamento.confirmar` (cancel_conf.js).
+   A caixa que o caminhao deixou no canto SAIU desta lista: ela nao e decisao
+   de ninguem, so atraso — esta na lista unica, e o "a coleta nao passou" do
+   fim do dia lhe da nome (fase 3). */
 function sobrasEsperando(db){
-  const CANC=require('./cancelada_dominio');
-  const ids=new Set();
-  try{ db.prepare(`SELECT sobras FROM saida WHERE tipo='coleta' AND fechada_em IS NOT NULL
-        AND sobras IS NOT NULL AND sobras<>'[]' ORDER BY id DESC LIMIT 60`).all()
-      .forEach(s=>{ try{ JSON.parse(s.sobras).forEach(i=>ids.add(+i)); }catch(e){} }); }catch(e){}
-  const lista=[...ids].filter(Number.isFinite);
-  const caminhao=lista.length?db.prepare(`SELECT id,codigo,buyer,nf,modalidade,despachar_em,conferido_por,
-      (SELECT SUM(qtd) FROM lote_item i WHERE i.lote_id=lote.id) pecas
-    FROM lote WHERE id IN (${lista.map(()=>'?').join(',')}) AND ${AGUARDA_CAMINHAO} AND COALESCE(teste,0)=0
-    ORDER BY carregado_em,id`).all(...lista):[];
-  const caixas=caminhao.map(v=>Object.assign(v,{de:'caminhao'}))
-    .concat(CANC.aguardandoSobra(db).map(v=>Object.assign(v,{de:'cancelada'})));
-  return caixas;
+  const CANC=require('./cancelada_dominio'), CONF=require('./cancel_conf');
+  const a_separar=CANC.aguardandoSobra(db).map(v=>Object.assign(v,{de:'cancelada'}));
+  const aguardando=CONF.aguardando(db).map(p=>Object.assign({},p,{de:'aguardando',cancelada_em:p.marcado_em}));
+  return a_separar.concat(aguardando);
 }
 module.exports=function(app,db){
   /* A tabela das saidas (caminhao e agencia) tem dono proprio: o script do
@@ -32,6 +31,10 @@ module.exports=function(app,db){
      ordem de `require` — carregado sozinho, num script ou num teste, a baixa
      bateria numa coluna que nao existe (§10, o `config` do acesso.js). */
   BAIXA.garantirSchema(db);
+  /* As duas tabelas novas da CONFERENCIA-EXPEDICAO (fases 3 e 4): os donos as
+     criam; chamar aqui e o modulo nao depender da ordem de `require`. */
+  require('./fim_dia').garantir(db);
+  require('./cancel_conf').garantir(db);
   const nomeLimpo=s=>{ const t=String(s||'').trim(); return t||null; };
   /* ── CONFERENCIA DUPLA (etiqueta de venda + SKU da caixa) ──────────────────
      A ultima rede antes do carro. Bipe 1 = a etiqueta de venda JA COLADA;
@@ -420,30 +423,71 @@ module.exports=function(app,db){
     const motivo=b.motivo==='outro'?(texto?'Outro: '+texto:''):(MOTIVO_SOBRA[b.motivo]||'');
     if(!motivo) return res.json(Object.assign({ok:false,motivo:'sem_motivo',
       aviso:b.motivo==='outro'?'Escreva o motivo da sobra.':'Escolha o motivo da sobra.'},base));
-    const r=db.transaction(()=>{
-      const m=CANC.marcarSobra(db,alvo.id,{motivo,quem});
-      if(!m.ok) return m;
-      return Object.assign(m,{moveu:BAIXA.devolver(db,alvo,quem)});
-    })();
+    /* ⚠️ DESDE 03/11/2026 (CONFERENCIA-EXPEDICAO fase 4) ISTO SO MARCA. A caixa
+       sai das listas e fica separada; o saldo NAO mexe. Quem devolve ao
+       estoque e a confirmacao, de outra pessoa, com `cancelamento.confirmar`
+       (rota logo abaixo). Ate aqui um clique so decidia e devolvia. */
+    const CONF=require('./cancel_conf');
+    const r=db.transaction(()=>CONF.marcar(db,alvo,{motivo,quem,pecas}))();
     if(!r.ok) return res.json(Object.assign({ok:false},r,{pedido:pedido(alvo)}));
-    const n=r.moveu.reduce((s,l)=>s+l.delta,0);
     try{ const ac=app.locals.acesso;
-         if(ac&&ac.auditar) ac.auditar(req,'expedicao','sobra','NF '+(alvo.nf||alvo.id),
+         if(ac&&ac.auditar) ac.auditar(req,'expedicao','cancelamento_marcado','NF '+(alvo.nf||alvo.id),
            'volume #'+alvo.id+' ('+(r.lugar||'')+') — '+motivo+': '+pecas.map(p=>p.qtd+'x '+p.codigo).join(', ')+
-           (n?' · estoque +'+n:' · estoque não mexeu')); }catch(e){}
+           ' · esperando confirmação, estoque não mexeu'); }catch(e){}
     const npc=pecas.reduce((s,p)=>s+Math.max(1,p.qtd||1),0);
-    const aviso=sob
-      ? 'Peça sob medida: ela não tem estoque. Separe a peça e avise o admin.'
-      : 'Tire a etiqueta de venda e ponha '+(npc===1?'a persiana':'as '+npc+' persianas')+' na prateleira. '+
-        (n?'O estoque voltou +'+n+'.':'O estoque não muda: a caixa ainda não tinha sido conferida, então a peça nunca saiu do saldo.');
-    res.json(Object.assign({ok:true,aviso,estoque:r.moveu},base));
+    const aviso='Separe a caixa'+(npc>1?' ('+npc+' persianas)':'')+' e deixe-a fora da expedição. '+
+      'Ela espera a confirmação no Mercado Livre por quem confirma cancelamentos'+
+      (sob?'.':'; o estoque só volta depois dela.');
+    res.json(Object.assign({ok:true,aguardando:true,pedido_cancelamento:r.pedido,aviso},base));
   });
 
   /* AS SOBRAS ESPERANDO DECISAO — lista que zera, para ser lida. Duas fontes:
      a caixa que o caminhao deixou numa saida JA FECHADA e continua no canto
      (se o caminhao de amanha a levar, ela sai daqui sozinha), e a venda
      cancelada que ainda esta na fabrica sem decisao. */
-  app.get('/api/carregamento/sobras',(req,res)=> res.json({caixas:sobrasEsperando(db)}));
+  const podeConfirmar=req=>{ try{ return !!app.locals.acesso.podePermissao(req.usuario,'cancelamento.confirmar'); }catch(e){ return false; } };
+  app.get('/api/carregamento/sobras',(req,res)=>{
+    const l=sobrasEsperando(db);
+    res.json({caixas:l.filter(x=>x.de==='cancelada'), aguardando:l.filter(x=>x.de==='aguardando'),
+              pode_confirmar:podeConfirmar(req)});
+  });
+  /* CONFIRMAR / RECUSAR a venda cancelada (fase 4). A chave e conferida no
+     portao (permDaRota) E aqui: esconder o botao nao e seguranca. */
+  function decidir(req,res,acao){
+    if(!podeConfirmar(req)) return res.status(403).json({ok:false,motivo:'sem_permissao',chave:'cancelamento.confirmar',
+      aviso:'Confirmar ou recusar venda cancelada é de quem tem a permissão "Confirmar venda cancelada".'});
+    const CONF=require('./cancel_conf'), b=req.body||{};
+    const r=db.transaction(()=> acao==='confirmar' ? CONF.confirmar(db,b.id,req.usuario) : CONF.recusar(db,b.id,req.usuario,b.motivo))();
+    if(!r.ok) return res.json(r);
+    const p=CONF.pegar(db,b.id)||{};
+    const n=(r.estoque||[]).reduce((s,l)=>s+l.delta,0);
+    try{ const ac=app.locals.acesso;
+         if(ac&&ac.auditar) ac.auditar(req,'expedicao', acao==='confirmar'?'cancelamento_confirmado':'cancelamento_recusado',
+           'NF '+(p.nf||p.lote_id), 'volume #'+p.lote_id+' — marcado por '+(p.marcado_por||'?')+
+           (acao==='confirmar' ? (n?' · estoque +'+n:' · estoque não mexeu') : ' · '+(p.decisao_motivo||'')+' · voltou: '+r.volta)); }catch(e){}
+    const aviso = acao==='confirmar'
+      ? (n ? 'Confirmado. O estoque voltou +'+n+': tire a etiqueta de venda e ponha a peça na prateleira.'
+           : 'Confirmado. O estoque não muda'+(r.sob_medida?' (sob medida não tem estoque).':': a caixa ainda não tinha baixado.'))
+      : (r.volta==='continua_cancelada' ? 'Recusado. A venda continua cancelada no ML, e a caixa volta a esperar a separação.'
+                                        : 'Recusado. A caixa volta para a lista de saída.');
+    res.json(Object.assign({ok:true,aviso},r));
+  }
+  app.post('/api/carregamento/cancelada/confirmar',(req,res)=>decidir(req,res,'confirmar'));
+  app.post('/api/carregamento/cancelada/recusar',(req,res)=>decidir(req,res,'recusar'));
+
+  /* O FIM DO DIA (CONFERENCIA-EXPEDICAO fase 3): "a coleta nao passou hoje".
+     Registra quem, quando e QUAIS caixas ficaram — as da lista unica de agora:
+     esperando conferencia e conferidas esperando sair, de hoje e atrasadas
+     (a venda futura nao "ficou", ela nem era de hoje). Nao mexe em nada. */
+  app.post('/api/carregamento/fimdia',(req,res)=>{
+    const p=progresso();
+    const ids=[].concat(p.faltam,p.coleta.faltam,p.coleta.aguardando).map(v=>v.id);
+    const FIM=require('./fim_dia');
+    const r=FIM.registrar(db,ids,req.usuario);
+    try{ const ac=app.locals.acesso;
+         if(ac&&ac.auditar) ac.auditar(req,'expedicao','coleta_nao_passou','fim do dia '+r.dia, ids.length+' caixa(s) ficaram'); }catch(e){}
+    res.json({ok:true,fim_dia:r,caixas:ids.length});
+  });
 
   /* O PROGRESSO DA CARGA — o mesmo numero pras duas rotas.
      "Carregados X de Y" e a lista tem que falar do mesmo universo, senao o
@@ -504,13 +548,19 @@ module.exports=function(app,db){
     /* A VIAGEM A AGENCIA (fase 4): quantas estao prontas na area (conferidas,
        fora do carro), a viagem aberta e as fechadas hoje. */
     const prontas=db.prepare(`SELECT COUNT(*) n FROM lote WHERE ${PRONTA_PRO_CARRO}`).get().n;
-    const viagensHoje=db.prepare(`SELECT id,fechada_em,fechado_por,qtd_sistema,qtd_externa,divergente,liberado_por,motivo,
+    const viagensHoje=db.prepare(`SELECT id,fechada_em,fechado_por,qtd_sistema,qtd_externa,divergente,liberado_por,motivo,quem_levou,
         CASE WHEN foto IS NOT NULL THEN 1 ELSE 0 END tem_foto
       FROM saida WHERE tipo='agencia' AND fechada_em IS NOT NULL AND date(fechada_em)=date('now','localtime')
       ORDER BY id DESC`).all();
     const viagem=db.prepare(`SELECT id,aberta_em,aberta_por FROM saida WHERE tipo='agencia' AND fechada_em IS NULL
       ORDER BY id DESC`).get()||null;
-    return {total:car+faltam.length, carregados:car, faltam,
+    /* A marca do fim do dia (fase 3): a caixa que ficou num dia anterior traz
+       o dia, e a tela a poe em cima com o selo. */
+    const marcas=require('./fim_dia').marcas(db);
+    const marca=l=>l.forEach(v=>{ if(marcas.has(v.id)) v.ficou_de=marcas.get(v.id); });
+    marca(faltam); marca(coletaFaltam); marca(aguardando);
+    return {hoje, fim_dia:{hoje:require('./fim_dia').doDia(db)},
+            total:car+faltam.length, carregados:car, faltam,
             atrasados:faltam.filter(f=>f.atrasado).length,
             depois, adiantadas:depois.length,
             /* O que JA SAIU adiantado (hoje e nos ultimos 30 dias), em pecas.

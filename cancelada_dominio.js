@@ -204,11 +204,22 @@ function pecasDaCaixa(db, v){
     return { codigo:p.codigo, qtd:p.qtd, sob_medida:s ? 1 : 0 }; });
 }
 
-/* Marca a sobra. NAO abre transacao (a regra do §2): a rota abre, e devolve o
-   saldo na mesma. O volume sai do canto, do carro e da saida, e ja nasce
-   DECIDIDO — senao ia parar no card da Mesa, que pediria uma segunda decisao
-   sobre a mesma caixa. Devolve o volume como estava, para a auditoria. */
-function marcarSobra(db, id, o){
+/* A VENDA CANCELADA NA CONFERENCIA EM DUAS PESSOAS (CONFERENCIA-EXPEDICAO
+   fase 4, 03/11/2026). O que ate 03/11 era UM passo (o ↩ Sobrou marcava, e
+   ja decidia e devolvia o saldo) virou dois, e este dominio da os pedacos;
+   quem guarda o pedido e decide quem pode o que e o cancel_conf.js:
+
+     separar()   o operador marcou: a caixa vira `cancelado` e SAI das listas
+                 (fila, canto, carro, saida), mas NAO e decidida — e o saldo
+                 nao mexe. Ela fica separada, esperando a confirmacao.
+     resolver()  a confirmacao: a caixa fica decidida e "voltou". O saldo e do
+                 baixa_dominio.devolver, na mesma transacao de quem chama.
+     desfazer()  a recusa: a caixa que ESTA porta cancelou volta para onde
+                 estava, para a lista de saida (R7). A que o ML ja tinha
+                 cancelado pelo relatorio continua cancelada.
+
+   Nenhum abre transacao (a regra do §2): a rota abre. */
+function separar(db, id, o){
   const v = db.prepare('SELECT * FROM lote WHERE id=?').get(+id);
   const nao = naoSobra(v);
   if(nao) return Object.assign({ ok:false }, nao);
@@ -223,9 +234,45 @@ function marcarSobra(db, id, o){
         no_carro_por=CASE WHEN ? THEN NULL ELSE no_carro_por END
       WHERE id=?`).run(ORIGEM_SOBRA, String((o && o.motivo) || '').slice(0, 200), nome, tirar, tirar, tirar, v.id);
   }
-  db.prepare(`UPDATE lote SET cancelada_resolvida_em=datetime('now','localtime'), cancelada_resolvida_por=?,
-      cancelada_voltou=1 WHERE id=?`).run(nome || '', v.id);
   return { ok:true, antes:v, lugar };
+}
+function resolver(db, id, nome){
+  db.prepare(`UPDATE lote SET cancelada_resolvida_em=datetime('now','localtime'), cancelada_resolvida_por=?,
+      cancelada_voltou=1 WHERE id=?`).run(String(nome || '').trim(), +id);
+}
+/* A recusa. `antes` e o volume como estava NA HORA DE SEPARAR (o pedido o
+   guarda): so ele diz se foi esta porta que cancelou. A caixa de agencia que
+   estava no carro volta a AREA, conferida — a viagem ja seguiu sem ela. */
+function desfazer(db, id, antes){
+  if(!antes || antes.estagio === ESTAGIO) return 'continua_cancelada';
+  const v = db.prepare('SELECT * FROM lote WHERE id=?').get(+id);
+  if(!v || v.estagio !== ESTAGIO || v.cancelada_resolvida_em) return 'nao_mexeu';
+  const coleta = String(antes.modalidade || '') === 'coleta';
+  const volta = antes.estagio === 'carregado' && !coleta ? 'embalado' : antes.estagio;
+  db.prepare(`UPDATE lote SET estagio=?, carregado_em=CASE WHEN ?='embalado' THEN NULL ELSE carregado_em END,
+      cancelada_estagio=NULL, cancelada_em=NULL, cancelada_origem=NULL, cancelada_motivo=NULL, cancelada_por=NULL
+    WHERE id=?`).run(volta, volta, +id);
+  return volta;
+}
+
+/* O ↩ Sobrou de antes, num passo so — separar e resolver. Fica para quem o
+   chama direto (scripts e testes antigos); a Conferencia usa o cancel_conf.js. */
+function marcarSobra(db, id, o){
+  const r = separar(db, id, o);
+  if(!r.ok) return r;
+  resolver(db, id, String((o && o.quem && o.quem.nome) || '').trim());
+  return r;
+}
+
+/* A caixa com pedido de cancelamento ESPERANDO a confirmacao nao entra no card
+   da Mesa nem na lista de "canceladas a separar": ela ja foi separada, e a
+   decisao dela e da confirmacao (cancel_conf.js). Sem a tabela (banco que nao
+   passou pelo boot), nao filtra nada. */
+function semPedidoAberto(db){
+  try{
+    if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='cancelamento_caixa'").get()) return '';
+  }catch(e){ return ''; }
+  return " AND id NOT IN (SELECT lote_id FROM cancelamento_caixa WHERE situacao='aguardando')";
 }
 
 /* AS CANCELADAS QUE AINDA ESPERAM A SOBRA: a caixa com etiqueta, ainda na
@@ -238,7 +285,7 @@ function aguardandoSobra(db){
       cancelada_em, conferido_por, (SELECT SUM(qtd) FROM lote_item i WHERE i.lote_id=lote.id) pecas
     FROM lote
     WHERE COALESCE(teste,0)=0 AND estagio='${ESTAGIO}' AND cancelada_estagio IN ('embalado','carregado')
-      AND cancelada_resolvida_em IS NULL AND COALESCE(cancelada_varias,0)=0
+      AND cancelada_resolvida_em IS NULL AND COALESCE(cancelada_varias,0)=0${semPedidoAberto(db)}
     ORDER BY cancelada_em, id`).all();
 }
 
@@ -264,9 +311,10 @@ function listar(db){
     FROM lote
     WHERE COALESCE(teste,0)=0 ${decidida} AND (
       (estagio='${ESTAGIO}' AND cancelada_estagio IN ('embalado','carregado'))
-      OR (cancelada_varias=1 AND estagio<>'carregado'))
+      OR (cancelada_varias=1 AND estagio<>'carregado'))${semPedidoAberto(db)}
     ORDER BY COALESCE(cancelada_em, cancelada_aviso_em) DESC, id DESC`).all();
 }
 
 module.exports = { ESTAGIO, ORIGEM_MOTORISTA, ehCancelamento, cabecalhoDePacote, daPlanilha, marcar, listar, onde,
-                   ORIGEM_SOBRA, naoSobra, pecasDaCaixa, marcarSobra, aguardandoSobra };
+                   ORIGEM_SOBRA, naoSobra, pecasDaCaixa, marcarSobra, aguardandoSobra,
+                   separar, resolver, desfazer };

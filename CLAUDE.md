@@ -142,7 +142,8 @@ Ordem de produção → REVISÃO → FILA → EMBALAGEM → ESTOQUE → ETIQUETA
 | Peça **embalada** (com kit conferido) | **+1** — é aqui que vira estoque | `embalagem` · `montagem:<id>` |
 | **Etiqueta de venda** impressa | **NENHUM** desde 22/10/2026 — a peça fica **reservada** (até ali era o −1) | nenhuma |
 | Caixa **conferida** (bipe da área ou do canto), ou que saiu sem conferência no "foi no caminhão" | **−1 por peça** — é aqui que sai, uma vez só | `conferencia` · `lote:<id>`, **uma por SKU** da caixa |
-| Caixa que **sobrou** (↩ Sobrou da Conferência, SKU de cada persiana bipado) | **+1 por peça**, se a caixa já tinha baixado; senão só solta a reserva | `sobra` · `lote:<id>`, **uma por SKU** |
+| Caixa **separada como venda cancelada** na Conferência (etiqueta + SKU de cada persiana) | **NENHUM** desde 03/11/2026 — a caixa só fica separada | nenhuma |
+| Venda cancelada **confirmada** por outra pessoa (`cancelamento.confirmar`) | **+1 por peça**, se a caixa já tinha baixado; senão só solta a reserva | `sobra` · `lote:<id>`, **uma por SKU** |
 | Etiqueta de venda **reimpressa** | **NENHUM** — mesmo volume, mesmo cliente | nenhuma |
 | Peça **sob medida** | **NENHUM** nos dois lados (§7) | nenhuma |
 
@@ -173,8 +174,8 @@ Ordem de produção → REVISÃO → FILA → EMBALAGEM → ESTOQUE → ETIQUETA
 `node teste_livro.js` — ele exige `SUM(delta) = skus.estoque` depois de cada
 passo e recusa `UPDATE skus SET estoque` fora do domínio. **No `baixa_dominio.js`,
 na impressão, no bipe da conferência ou no fechamento da saída:** `node
-teste_baixa_conferencia.js` também. **No ↩ Sobrou ou na devolução:** `node
-teste_sobra.js`.
+teste_baixa_conferencia.js` também. **Na venda cancelada da Conferência ou na
+devolução:** `node teste_sobra.js` e `node teste_conferencia_expedicao.js`.
 
 > ⚠️ **A BAIXA É NA CONFERÊNCIA DESDE 22/10/2026** (fase 2-A da spec
 > `CONFERENCIA-E-BAIXA`, decisão do dono). A etiqueta só **reserva**; o −1 sai
@@ -196,10 +197,13 @@ teste_sobra.js`.
 >   antigas" não movem saldo; a caixa que nunca baixou fica de fora do bloco, e a
 >   prévia avisa que o saldo fica alto.
 > - ⚠️ **E A MESA TAMBÉM NUNCA DEVOLVE** (fase 2-B, 22/10/2026). A caixa que
->   sobrou na fábrica volta pelo **↩ Sobrou** da Conferência: bipa a etiqueta e o
->   SKU de **cada** persiana, escolhe o motivo, e o saldo volta +1 por peça **se
->   já tinha baixado** (`baixa_dominio.devolver`, dono único). Quem conferiu a
->   caixa não marca a sobra dela (D8). Cartões R-REC-01 a R-REC-05 em
+>   sobrou na fábrica volta pelo **✕ Venda cancelada** da Conferência (até
+>   03/11/2026, "↩ Sobrou"): bipa a etiqueta e o SKU de **cada** persiana,
+>   escolhe o motivo, e a caixa fica **separada**. **Desde 03/11/2026 são duas
+>   pessoas** (CONFERENCIA-EXPEDICAO fase 4): o saldo só volta +1 por peça
+>   **quando outra pessoa, com `cancelamento.confirmar`, confirma no ML** — e só
+>   **se já tinha baixado** (`baixa_dominio.devolver`, dono único). Quem conferiu a
+>   caixa não a separa (D8); quem separou não confirma nem recusa. Cartões R-REC-01 a R-REC-07 em
 >   [`docs/regras/carregamento.md`](docs/regras/carregamento.md); `node
 >   teste_sobra.js` ao mexer nisso.
 
@@ -1393,10 +1397,46 @@ mostra contagem regressiva para o despacho, ficando **amarela** abaixo de 2 h e
 > (`listaUnica`, R-COL-03). **Nenhuma rota mudou**: a tela só junta o que o
 > `GET /api/carregamento` já manda, e a modalidade continua vindo do `carga.js`.
 >
-> ⚠️ **A VIAGEM À AGÊNCIA E O ↩ SOBROU FICARAM DE PROPÓSITO.** A viagem é o
-> único caminho de fechar a agência até a fase 2 (que acrescenta o "quem
-> levou"); as sobras, até a fase 4. E a faixa "SOBRA DO CAMINHÃO" é da saída
-> do caminhão (R-SAI-02), não do ↩ Sobrou — ela fica.
+> ⚠️ **A AGÊNCIA FECHA COMO A COLETA, E COM QUEM LEVOU (fase 2, 03/11/2026).**
+> Abrir a viagem **põe no carro toda caixa de agência conferida e de hoje**; o
+> bipe passa a dizer o que **FICOU** (`POST /api/viagem/ficou`), como na saída
+> do caminhão. O "Pôr mais uma no carro" (o bipe antigo) fica para a venda
+> futura mandada adiantada — **ela não entra sozinha** (#9) — e para a troca de
+> porta. Fechar exige foto, número e **quem levou** (pessoa ativa do cadastro,
+> `saida.quem_levou_id`/`quem_levou`), além de quem fechou (o login). A conta
+> congela ao abrir porque a viagem fecha horas depois, na volta (R-VIA-01/02).
+>
+> ⚠️ **O FIM DO DIA DÁ NOME À CAIXA QUE FICOU (fase 3).** "🚚 A coleta não
+> passou hoje" grava quem, quando e quais caixas (`fim_dia.js`, tabela
+> `fim_dia`, uma linha por dia) e **não mexe em nada** — nem estágio, nem
+> estoque. No dia seguinte a caixa vem **em cima** da lista, com o selo **de
+> ontem**. **Caixa sem marcação nunca é cancelada**: continua na lista, como
+> "não saiu" (R-FIM-01).
+>
+> ⚠️ **A VENDA CANCELADA PASSA POR DUAS PESSOAS (fase 4).** O "✕ Venda
+> cancelada" (ex-↩ Sobrou, mesma rota `POST /api/carregamento/sobra`) agora só
+> **separa**: a caixa vira `cancelado` e sai das listas, **sem mexer no saldo**.
+> Quem tem `cancelamento.confirmar` (nova, sensível, nível `supervisor`,
+> backfill de uma vez para Supervisor e Admin) **confirma** — o saldo volta +1
+> por peça se já tinha baixado — ou **recusa** com motivo, e a caixa volta para
+> onde estava (a de agência que estava no carro volta à área, conferida). A
+> cancelada pelo relatório do ML recusada continua cancelada. `cancel_conf.js` é
+> o dono do pedido (tabela `cancelamento_caixa`, com quem marcou, quem decidiu e
+> o que moveu). O card "Sobras esperando decisão" virou **Canceladas** (a
+> separar · aguardando confirmação); a caixa que o caminhão deixou saiu dele —
+> é atraso, e o fim do dia lhe dá nome. A faixa "SOBRA DO CAMINHÃO" é da saída
+> do caminhão (R-SAI-02) e **ficou**.
+>
+> ⚠️ **"+1 POR PEÇA" SÓ SE A CAIXA JÁ BAIXOU, e a spec dizia "cada persiana
+> volta".** A impressa e não conferida nunca saiu do saldo (§2); devolver a ela
+> seria saldo a mais. Vale este arquivo.
+>
+> ⚠️ **A TELA ACHOU DOIS DEFEITOS QUE OS TESTES DE ROTA NÃO PEGAM**: o texto do
+> fim do dia saía grande (a regra `.sub3` valia só dentro da lista), e o
+> cabeçalho "Conferidas" nasceu **âmbar** — a classe `conf` já era do botão
+> "Conferir carga do carro", que saiu. **`node teste_conferencia_tela.js`** (38,
+> num Chromium de verdade; sem navegador diz PULADO e o CI não o roda) trava a
+> cor do cabeçalho.
 
 | Cartão | Regra em uma linha |
 |---|---|
@@ -1423,11 +1463,14 @@ mostra contagem regressiva para o despacho, ficando **amarela** abaixo de 2 h e
 | R-PEC-03 | O bipe de peça tem as mesmas barreiras do bipe da caixa |
 | R-PEC-04 | Guard de 700 ms; a divergência não apaga o que foi bipado |
 | R-PEC-05 | As etiquetas coladas por fora são as do saco de cada persiana |
-| R-REC-01 | A caixa que sobrou volta pelo ↩ Sobrou: etiqueta + SKU de cada persiana; +1 por peça se já baixou |
+| R-REC-01 | A venda cancelada se separa na Conferência: etiqueta + SKU de cada persiana; separar não mexe em saldo (03/11/2026) |
 | R-REC-02 | Só a caixa com etiqueta e ainda na fábrica, e uma vez só |
 | R-REC-03 | A de várias volta inteira; com um item cancelado não é sobra; sob medida não mexe em saldo |
 | R-REC-04 | Quem conferiu a caixa não marca a sobra dela (D8) |
-| R-REC-05 | A lista "Sobras esperando decisão" zera |
+| R-REC-05 | A lista das canceladas (a separar · aguardando confirmação) zera |
+| R-REC-06 | Só a confirmação, de outra pessoa com `cancelamento.confirmar`, devolve ao estoque; recusar devolve a caixa à lista |
+| R-REC-07 | "+1 por peça" só se a caixa já baixou |
+| R-FIM-01 | "A coleta não passou" dá nome à caixa que ficou e não mexe em nada; sem marcação nunca é cancelada |
 | R-SAI-01 | Uma saída por caminhão, e ela só olha o que saiu nela |
 | R-SAI-02 | As sobras são declaradas, nunca supostas |
 | R-SAI-03 | A conta do caminhão só olha o canto da coleta |
@@ -1436,8 +1479,8 @@ mostra contagem regressiva para o despacho, ficando **amarela** abaixo de 2 h e
 | R-SAI-06 | Sem a foto não fecha; com divergência, só com `saida.liberar` e motivo |
 | R-SAI-07 | A caixa de agência que o caminhão levou não conta no "No carro" |
 | R-SAI-08 | O "Fechar coleta" antigo está aposentado |
-| R-VIA-01 | A agência tem dois bipes: a área confere, a viagem põe no carro |
-| R-VIA-02 | A viagem fecha com foto e número, como o caminhão |
+| R-VIA-01 | A área confere; abrir a viagem põe no carro as conferidas de hoje, e o bipe diz o que ficou (03/11/2026) |
+| R-VIA-02 | A viagem fecha com foto, número e quem levou, como o caminhão |
 | R-VIA-03 | A caixa de coleta pode ir pelo carro, e sai do canto |
 | R-VIA-04 | Tirar do carro desfaz o bipe; cancelar com caixa no carro é recusado |
 | R-VIA-05 | A foto da viagem vem da galeria, e fecha de qualquer aparelho |
@@ -1452,7 +1495,10 @@ duas listas, o filtro): `node teste_etiqueta.js`. No `carreg_route.js` ou no
 `carga.js`: `node teste_carga.js`, `node teste_area.js`, `node
 teste_segunda_pessoa.js` e `node teste_pecas_carga.js`. No `saida_route.js`:
 `node teste_saida_coleta.js` e `node teste_saida_agencia.js`. Na recusa do
-motorista ou no ↩ Sobrou: `node teste_sobra.js`. No `POST /api/embalar`, no
+motorista ou na venda cancelada: `node teste_sobra.js`. Nas fases 2 a 4 da
+`CONFERENCIA-EXPEDICAO` (viagem com quem levou, fim do dia, cancelamento em
+duas pessoas): `node teste_conferencia_expedicao.js` (92) e, na tela, `node
+teste_conferencia_tela.js` (38). No `POST /api/embalar`, no
 `POST /api/reimprimir` ou no `fechar_saida_passivo.js`: `node teste_saida.js`.
 Em `saida.liberar` ou outra chave: `node teste_acesso.js` e `node
 teste_cobertura.js`. E **abra a tela**, a 1440 e a 400 px: a pilha, a tela
@@ -2157,7 +2203,8 @@ guarda o saldo é a coluna, o movimento é só a história dela.
 `movimento_componente` — e depois `movimento_estoque` (fase 1 do livro) e
 `inventario_ciclo`/`inventario_item` (fase 2, 26/09/2026), `ajuste_pedido` (fase 3,
 28/09/2026), `correcao` (Mesa de correções fase 1, 02/10/2026),
-`venda_sem_etiqueta` e `pdf_conta_aberta` (27/10/2026).
+`venda_sem_etiqueta` e `pdf_conta_aberta` (27/10/2026), `fim_dia` e
+`cancelamento_caixa` (03/11/2026).
 (`foto_estoque` saiu na Fase 3.)
 
 A lista fica em `TABELAS`, no topo do `teste_route.js`. Cada entrada traz a coluna
@@ -2559,7 +2606,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (332), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (729) e `teste_devolucao_casos_tela.js` (133, precisa de navegador); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (332), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (729) e `teste_devolucao_casos_tela.js` (133, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2605,6 +2652,11 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   `cancelada_dominio.js` (§3, VENDAS F2)
 - ❌ Devolver ao estoque **sozinho** a venda cancelada depois da etiqueta: quem
   devolve é uma pessoa, pelo ↩ Sobrou, bipando o SKU de cada persiana (§2, 2-B)
+- ❌ Devolver ao estoque a venda cancelada no passo de SEPARAR, deixar quem
+  separou confirmar, ou tratar caixa sem marcação do fim do dia como cancelada:
+  só a confirmação de outra pessoa devolve, e "não saiu" não é "cancelada" (§8-B)
+- ❌ Voltar a exigir o bipe "no carro" de cada caixa de agência, ou deixar a
+  venda futura entrar sozinha no carro ao abrir a viagem (§8-B, #9)
 - ❌ Fazer a sobra devolver `+1` em vez de POR PEÇA, devolver saldo de sob
   medida, ou devolver a caixa que nunca baixou: a caixa de pacote baixou N, o
   sob medida nunca baixou, e a não conferida nunca saiu do saldo (§2, §7)
