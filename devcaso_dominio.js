@@ -97,6 +97,12 @@ function garantir(db){
     resultado TEXT DEFAULT 'aguardando', obs TEXT, usuario TEXT,
     criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0)`);
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcoleta_caso ON devolucao_coleta(caso_id)");
+  // FASE 4 — os anexos: documentos da coleta e a foto do comprador.
+  db.exec(`CREATE TABLE IF NOT EXISTS devolucao_anexo (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, caso_id INTEGER NOT NULL, tipo TEXT NOT NULL,
+    doc_tipo TEXT, arquivo TEXT, usuario TEXT,
+    criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0)`);
+  db.exec("CREATE INDEX IF NOT EXISTS idx_devanexo_caso ON devolucao_anexo(caso_id)");
   const ins = db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES (?,?)");
   for(const [k,v] of Object.entries(PADROES)) ins.run(k, v);
 }
@@ -206,6 +212,8 @@ function detalhe(db, id, opt){
   const o = opt || {};
   return { caso: publico(c, hoje(db), limites(db), o.comDinheiro),
            tentativas: tentativas(db, c.id, o.comDinheiro),
+           anexos: listarAnexos(db, c.id),
+           docs: c.tipo === 'coleta' ? situacaoDocs(db, c.id) : [],
            eventos: db.prepare('SELECT id,tipo,de,para,texto,usuario,criado_em FROM devolucao_evento WHERE caso_id=? ORDER BY id').all(c.id),
            etapas: ETAPAS[c.tipo], manuais: MANUAIS[c.tipo], nomes: NOME_ETAPA };
 }
@@ -322,6 +330,11 @@ function etapa(db, id, para, usuario, texto, travas){
     (para === 'revisado' ? 'é o bipe da tela de Devoluções.' : para === 'chegou' ? 'use o botão "chegou".' : 'é uma decisão com botão próprio.'));
   if(para === c.etapa) throw new Recusa(400, 'O caso já está em "'+(NOME_ETAPA[para]||para)+'".');
   if(para === 'ml_avisado' && !c.chegou_em) throw new Recusa(400, 'Só se avisa o ML que recebemos depois de a peça chegar.');
+  // R11: "Documentos ao ML" só com TODOS os documentos ativos da lista anexados.
+  if(para === 'docs_enviados'){
+    const falta = situacaoDocs(db, c.id).filter(d => !d.ok).map(d => d.doc);
+    if(falta.length) throw new Recusa(400, 'Faltam documentos para ir a "Documentos ao ML": '+falta.join(' · ')+'.', { faltam: falta });
+  }
   if(travas) for(const t of travas) t(db, c, para);
   db.transaction(() => moverEtapa(db, c, para, usuario, texto))();
   return ler(db, c.id);
@@ -558,7 +571,91 @@ function sugerirTransportadoras(db, cep){
   return cinco.concat(tres);
 }
 
+/* ═══ FASE 4 — documentos e a foto do comprador ═══ */
+
+function docsExigidos(db){
+  try{ return db.prepare("SELECT valor FROM listas WHERE tipo='doc_devolucao' AND ativo=1 ORDER BY ordem,id").all().map(x => x.valor); }
+  catch(e){ return []; }
+}
+function situacaoDocs(db, caso_id){
+  const tem = new Set(db.prepare("SELECT DISTINCT doc_tipo FROM devolucao_anexo WHERE caso_id=? AND tipo='doc'").all(caso_id).map(x => x.doc_tipo));
+  return docsExigidos(db).map(d => ({ doc:d, ok: tem.has(d) }));
+}
+function listarAnexos(db, caso_id){
+  return db.prepare('SELECT id,tipo,doc_tipo,usuario,criado_em, arquivo FROM devolucao_anexo WHERE caso_id=? ORDER BY id').all(caso_id)
+    .map(a => ({ id:a.id, tipo:a.tipo, doc_tipo:a.doc_tipo, usuario:a.usuario, criado_em:a.criado_em,
+                 formato: /\.pdf$/i.test(a.arquivo||'') ? 'pdf' : 'imagem' }));
+}
+
+/* O arquivo como chega da tela (data URL). Foto pela régua ÚNICA do `foto.js`
+   (foto vazia não é prova); PDF tem que começar com %PDF. Devolve null quando
+   não serve. */
+function decodificarAnexo(s, soImagem){
+  const F = require('./foto');
+  const img = F.decodificarFoto(s);
+  if(img) return { ext: img.ext === 'jpeg' ? 'jpg' : img.ext, buf: img.buf };
+  if(soImagem) return null;
+  const m = String(s||'').match(/^data:application\/pdf;base64,([A-Za-z0-9+/=\s]+)$/i);
+  if(!m) return null;
+  const buf = Buffer.from(m[1].replace(/\s+/g,''), 'base64');
+  if(buf.length < 1000 || buf.slice(0,4).toString() !== '%PDF') return null;
+  return { ext:'pdf', buf };
+}
+
+/* Anexar (R11, R17, R21). A linha e o arquivo nascem JUNTOS: o arquivo é
+   gravado DENTRO da transação, e se o disco recusar a linha não existe.
+   `dir` é a pasta das devoluções (caminhos.js, chave DEVOLUCOES). */
+function anexar(db, caso_id, b, usuario, dir){
+  const c = aberto(db, caso_id);
+  b = b || {};
+  const tipo = String(b.tipo||'');
+  if(['doc','foto_comprador'].indexOf(tipo) < 0) throw new Recusa(400, 'O anexo é um documento da coleta ou a foto do comprador.');
+  let doc = null;
+  if(tipo === 'doc'){
+    doc = String(b.doc_tipo||'').trim();
+    if(docsExigidos(db).indexOf(doc) < 0) throw new Recusa(400, 'Documento fora da lista de documentos da devolução: "'+doc+'".');
+  }
+  const arq = decodificarAnexo(b.arquivo, tipo === 'foto_comprador');
+  if(!arq) throw new Recusa(400, tipo === 'foto_comprador'
+    ? 'A foto do comprador tem que ser uma imagem com conteúdo (JPEG, PNG ou WebP). Foto vazia não é prova.'
+    : 'O documento tem que ser uma imagem ou um PDF com conteúdo.');
+  const fs = require('fs'), path = require('path');
+  let id, caminho;
+  try{
+    db.transaction(() => {
+      id = db.prepare('INSERT INTO devolucao_anexo (caso_id,tipo,doc_tipo,usuario) VALUES (?,?,?,?)').run(c.id, tipo, doc, nomeDe(usuario)).lastInsertRowid;
+      fs.mkdirSync(dir, { recursive:true });
+      caminho = path.join(dir, 'caso-'+c.id+'-anexo-'+id+'-'+tipo+'.'+arq.ext);
+      fs.writeFileSync(caminho, arq.buf);
+      db.prepare('UPDATE devolucao_anexo SET arquivo=? WHERE id=?').run(caminho, id);
+      evento(db, c.id, 'anexo', null, null, tipo === 'doc' ? doc : 'foto do comprador', nomeDe(usuario));
+    })();
+  }catch(e){
+    if(e instanceof Recusa) throw e;
+    try{ if(caminho) fs.unlinkSync(caminho); }catch(x){}
+    throw new Recusa(500, 'O disco recusou o arquivo: nada foi anexado. Tente de novo; se repetir, avise quem cuida do servidor.');
+  }
+  return id;
+}
+function arquivoDoAnexo(db, aid){
+  const a = db.prepare('SELECT arquivo FROM devolucao_anexo WHERE id=?').get(+aid);
+  if(!a || !a.arquivo) throw new Recusa(404, 'Anexo não encontrado.');
+  return a.arquivo;
+}
+
+/* R17: devolver ao comprador em vez de coletar (chegou amassada). Só com a foto
+   que o comprador mandou ao ML anexada. A chave é conferida na rota (R16). */
+function devolverComprador(db, id, b, usuario){
+  const c = aberto(db, id);
+  const foto = db.prepare("SELECT 1 FROM devolucao_anexo WHERE caso_id=? AND tipo='foto_comprador' AND arquivo IS NOT NULL").get(c.id);
+  if(!foto) throw new Recusa(400, 'Anexe antes a foto que o comprador mandou ao ML: sem ela o caso não encerra por este caminho.');
+  const v = reais((b||{}).valor_devolvido, 'o valor devolvido');
+  db.transaction(() => encerrar(db, c, 'devolvido_comprador', usuario, (b||{}).texto, { valor_devolvido: v }))();
+  return ler(db, c.id);
+}
+
 module.exports = {
+  docsExigidos, situacaoDocs, listarAnexos, anexar, arquivoDoAnexo, devolverComprador,
   RESULTADOS, listarTransportadoras, salvarTransportadora, tentativas, pedirColeta, resultadoColeta, sugerirTransportadoras,
   abertoPorCodigo, chegou, avisarML, ligarRevisao, baixaDaDevolucao,
   ETAPAS, MANUAIS, NOME_ETAPA, NOME_SAIDA, DINHEIRO, Recusa,

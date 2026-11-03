@@ -35,6 +35,9 @@ module.exports=function(app,db){
     }catch(e){ console.log('[listas] acrescimo '+marca+' falhou: '+e.message); }
   };
   acrescentar('seed_motivos_devolucao_2','motivo_devolucao',['Falta de kit','Comando quebrado','Chegou amassada']);
+  /* Os documentos que a coleta exige antes de "Documentos ao ML" (R11). Lista
+     cadastravel, nasce com os dois de hoje, pelo mesmo acrescimo de uma vez so. */
+  acrescentar('seed_doc_devolucao_1','doc_devolucao',['Etiqueta de coleta','Comprovante de pagamento da transportadora']);
 
   app.get('/api/listas/:tipo',(req,res)=>
     res.json(db.prepare('SELECT id,valor FROM listas WHERE tipo=? AND ativo=1 ORDER BY ordem,id').all(req.params.tipo)));

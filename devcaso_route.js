@@ -10,6 +10,7 @@
  *                        handler que o teste consegue exercitar.
  */
 const D = require('./devcaso_dominio');
+const CAMINHOS = require('./caminhos');
 
 module.exports = function(app, db){
   D.garantir(db);
@@ -64,6 +65,17 @@ module.exports = function(app, db){
   app.post('/api/devolucao-casos/transportadoras/:tid', (req,res) => responder(res, () =>
     ({ ok:true, id: D.salvarTransportadora(db, req.params.tid, req.body) })));
 
+  /* O anexo, de volta (fase 4). Só leitura: prova não se edita nem se apaga
+     por rota. */
+  app.get('/api/devolucao-casos/anexo/:aid', (req,res) => {
+    let arq;
+    try{ arq = D.arquivoDoAnexo(db, req.params.aid); }
+    catch(e){ return res.status(e.status || 500).json({ erro:e.message }); }
+    let ok = false; try{ ok = require('fs').existsSync(arq); }catch(e){}
+    if(!ok) return res.status(410).json({ erro:'O arquivo não está mais no disco.' });
+    res.sendFile(arq);
+  });
+
   app.get('/api/devolucao-casos/:id', (req,res) => responder(res, () => D.detalhe(db, req.params.id, { comDinheiro: podeDinheiro(req) })));
 
   /* ── lançar e editar (devolucao.lancar) ── */
@@ -114,7 +126,19 @@ module.exports = function(app, db){
     return { ok:true };
   }));
 
+  /* Os anexos (fase 4, R11, R21). */
+  app.post('/api/devolucao-casos/:id/anexo', (req,res) => responder(res, () =>
+    ({ ok:true, id: D.anexar(db, req.params.id, req.body, req.usuario, CAMINHOS.DEVOLUCOES) })));
+
   /* ── decisões do admin geral (devolucao.dinheiro) ── */
+  app.post('/api/devolucao-casos/:id/devolver-comprador', (req,res) => {
+    if(!podeDinheiro(req)) return semDinheiro(req, res);
+    responder(res, () => {
+      const c = D.devolverComprador(db, req.params.id, req.body, req.usuario);
+      auditar(req, 'devolvido_comprador', c.id, 'devolveu o dinheiro ao comprador sem coletar'+(c.valor_devolvido != null ? ' · R$ '+c.valor_devolvido.toFixed(2) : ' · sem valor lançado'));
+      return { ok:true };
+    });
+  });
   app.post('/api/devolucao-casos/:id/perda', (req,res) => {
     if(!podeDinheiro(req)) return semDinheiro(req, res);
     responder(res, () => {

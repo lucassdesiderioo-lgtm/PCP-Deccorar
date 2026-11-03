@@ -569,6 +569,107 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   ok('"Só Falhou" fica fora', !sug36.some(x => x.nome === 'Só Falhou'), JSON.stringify(sug36));
   ok('nem a tentativa aguardando conta como "coletou"', !sug36.some(x => x.nome === 'Leva e Traz'));
 
+  /* ═══════════════ FASE 4 — documentos e a foto do comprador ═══════════════ */
+  const FOTO = 'data:image/jpeg;base64,' + Buffer.alloc(4000, 7).toString('base64');
+  const PDF  = 'data:application/pdf;base64,' + Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(3000, 32)]).toString('base64');
+  const DIR_DV = process.env.PCP_DEVOLUCOES_DIR;
+  const anexar = (id, corpo, quem) => chamar('POST','/api/devolucao-casos/:id/anexo', corpo, quem || 2, {id});
+  const anexos = (id) => db.prepare('SELECT * FROM devolucao_anexo WHERE caso_id=? ORDER BY id').all(id);
+
+  secao('37. a lista doc_devolucao nasce com os 2 documentos, por acréscimo de uma vez só');
+  const docs = (d) => d.prepare("SELECT valor FROM listas WHERE tipo='doc_devolucao' AND ativo=1 ORDER BY ordem,id").all().map(x => x.valor);
+  eq('no banco do teste, os dois', docs(db).join(' | '), 'Etiqueta de coleta | Comprovante de pagamento da transportadora');
+  let d37 = bootListas();
+  eq('banco vazio recebe os 2', docs(d37).length, 2);
+  d37.prepare("DELETE FROM listas WHERE valor='Etiqueta de coleta'").run();
+  require('./cad_route')({ get(){}, post(){}, delete(){} }, d37);
+  ok('o documento apagado depois não volta no boot seguinte', !docs(d37).includes('Etiqueta de coleta'), JSON.stringify(docs(d37)));
+  d37.close();
+
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'7770037', prazo:dia(7) }, 3);
+  const k37 = r.body.id;
+
+  secao('38. ir para "Documentos ao ML" faltando um documento: recusado, nomeando o que falta');
+  r = chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'docs_enviados' }, 2, {id:k37});
+  eq('recusado', r.status, 400);
+  ok('   nomeando os dois que faltam', /Etiqueta de coleta/.test(r.body.erro || '') && /Comprovante de pagamento/.test(r.body.erro || ''), JSON.stringify(r.body));
+  eq('   e a etapa não mudou', caso(k37).etapa, 'lancado');
+  r = anexar(k37, { tipo:'doc', doc_tipo:'Etiqueta de coleta', arquivo:PDF });
+  eq('anexa a etiqueta (PDF)', r.status, 200);
+  r = chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'docs_enviados' }, 2, {id:k37});
+  eq('com um só, ainda recusa', r.status, 400);
+  ok('   nomeando só o que falta', !/Etiqueta de coleta/.test(r.body.erro || '') && /Comprovante de pagamento/.test(r.body.erro || ''), JSON.stringify(r.body));
+
+  secao('39. com todos anexados, avança');
+  eq('anexa o comprovante (foto)', anexar(k37, { tipo:'doc', doc_tipo:'Comprovante de pagamento da transportadora', arquivo:FOTO }).status, 200);
+  r = chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'docs_enviados' }, 2, {id:k37});
+  eq('avança', r.status, 200);
+  eq('   para Documentos ao ML', caso(k37).etapa, 'docs_enviados');
+  ok('cada anexo virou história', eventos(k37).filter(e => e.tipo === 'anexo').length === 2);
+  r = chamar('GET','/api/devolucao-casos/:id',null,2,{id:k37});
+  eq('o caso lista os anexos', (r.body.anexos || []).length, 2);
+  ok('   e diz quais documentos a lista pede, e se estão', (r.body.docs || []).every(x => x.ok === true), JSON.stringify(r.body.docs));
+
+  secao('40. documento desativado na lista deixa de ser exigido');
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'7770040', prazo:dia(7) }, 3);
+  const k40 = r.body.id;
+  anexar(k40, { tipo:'doc', doc_tipo:'Etiqueta de coleta', arquivo:PDF });
+  db.prepare("UPDATE listas SET ativo=0 WHERE tipo='doc_devolucao' AND valor='Comprovante de pagamento da transportadora'").run();
+  eq('com o comprovante desativado, a etiqueta basta', chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'docs_enviados' }, 2, {id:k40}).status, 200);
+  eq('anexar um tipo desativado é recusado', anexar(k40, { tipo:'doc', doc_tipo:'Comprovante de pagamento da transportadora', arquivo:PDF }).status, 400);
+  db.prepare("UPDATE listas SET ativo=1 WHERE tipo='doc_devolucao'").run();
+
+  secao('41. anexo vazio ou que não é imagem nem PDF: recusado');
+  const n41 = anexos(k40).length;
+  eq('sem arquivo', anexar(k40, { tipo:'doc', doc_tipo:'Etiqueta de coleta' }).status, 400);
+  eq('foto vazia (não é prova)', anexar(k40, { tipo:'doc', doc_tipo:'Etiqueta de coleta', arquivo:'data:image/jpeg;base64,AAAA' }).status, 400);
+  eq('texto qualquer', anexar(k40, { tipo:'doc', doc_tipo:'Etiqueta de coleta', arquivo:'data:text/plain;base64,' + Buffer.alloc(5000,65).toString('base64') }).status, 400);
+  eq('"PDF" que não começa com %PDF', anexar(k40, { tipo:'doc', doc_tipo:'Etiqueta de coleta', arquivo:'data:application/pdf;base64,' + Buffer.alloc(5000,65).toString('base64') }).status, 400);
+  eq('tipo de documento fora da lista', anexar(k40, { tipo:'doc', doc_tipo:'Inventado', arquivo:PDF }).status, 400);
+  eq('tipo de anexo desconhecido', anexar(k40, { tipo:'outro', arquivo:PDF }).status, 400);
+  eq('nada foi gravado', anexos(k40).length, n41);
+
+  secao('42. o arquivo vai para PCP_DEVOLUCOES_DIR, nunca para lotes/');
+  const a42 = anexos(k37)[0];
+  ok('o caminho está dentro da pasta das devoluções', a42.arquivo.indexOf(DIR_DV) === 0, a42.arquivo);
+  ok('   e o arquivo existe, com o conteúdo', fs.existsSync(a42.arquivo) && fs.readFileSync(a42.arquivo).slice(0,4).toString() === '%PDF');
+  ok('   e não está em lotes/', !/\/lotes\//.test(a42.arquivo));
+  r = chamar('GET','/api/devolucao-casos/anexo/:aid',null,2,{aid:a42.id});
+  eq('a rota devolve o arquivo', r.arquivo, a42.arquivo);
+
+  secao('43. o disco recusa: o anexo não existe no banco');
+  const nAntes = contar('devolucao_anexo');
+  fs.renameSync(DIR_DV, DIR_DV + '.bak');
+  fs.writeFileSync(DIR_DV, 'sou um arquivo no lugar da pasta');
+  r = anexar(k40, { tipo:'doc', doc_tipo:'Etiqueta de coleta', arquivo:PDF });
+  fs.unlinkSync(DIR_DV); fs.renameSync(DIR_DV + '.bak', DIR_DV);
+  ok('a gravação falha com erro', r.status >= 500, JSON.stringify(r));
+  eq('nenhuma linha nova no banco', contar('devolucao_anexo'), nAntes);
+  eq('nem evento de anexo', eventos(k40).filter(e => e.tipo === 'anexo').length, 1);
+
+  secao('44. devolver ao comprador: foto obrigatória, e só o admin geral');
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'7770044', motivo:'Chegou amassada', prazo:dia(7) }, 3);
+  const k44 = r.body.id;
+  r = chamar('POST','/api/devolucao-casos/:id/devolver-comprador',{ valor_devolvido:'189,90' }, 1, {id:k44});
+  eq('sem a foto do comprador: recusado', r.status, 400);
+  ok('   dizendo que falta a foto', /foto/i.test(r.body.erro || ''), JSON.stringify(r.body));
+  eq('   e continua aberto', caso(k44).encerrado_em, null);
+  eq('a foto do comprador tem que ser imagem (PDF não serve)', anexar(k44, { tipo:'foto_comprador', arquivo:PDF }).status, 400);
+  eq('anexa a foto do comprador', anexar(k44, { tipo:'foto_comprador', arquivo:FOTO }).status, 200);
+  r = chamar('POST','/api/devolucao-casos/:id/devolver-comprador',{ valor_devolvido:'189,90' }, 3, {id:k44});
+  eq('sem devolucao.dinheiro: 403', r.status, 403);
+  eq('   e nada mudou', caso(k44).encerrado_em, null);
+  r = chamar('POST','/api/devolucao-casos/:id/devolver-comprador',{ valor_devolvido:'189,90' }, 1, {id:k44});
+  eq('com as duas coisas: encerra', r.status, 200);
+  k = caso(k44);
+  eq('saida = devolvido_comprador', k.saida, 'devolvido_comprador');
+  eq('   com quem', k.encerrado_por, 'Lucas');
+  ok('   e quando', !!k.encerrado_em);
+  eq('   e o valor devolvido', k.valor_devolvido, 189.9);
+  ok('a decisão foi para a auditoria', AUDIT.some(a => a.acao === 'devolvido_comprador' && a.uid === 1));
+  ok('o modo teste cobre os anexos e as tentativas', ['devolucao_anexo','devolucao_coleta'].every(t =>
+     new RegExp("nome:'" + t + "'").test(fs.readFileSync(path.join(__dirname,'teste_route.js'),'utf8'))));
+
   fim();
 })().catch(e => { console.log('ESTOUROU: ' + e.stack); falhas++; fim(); });
 

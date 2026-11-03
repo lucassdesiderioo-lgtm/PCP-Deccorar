@@ -5,8 +5,8 @@ STATUS
 Situação: em construção
 Criada em: 03/11/2026
 Última atualização: 03/11/2026
-Fase atual: 3 em código (falta subir)
-Fases: 1 ✅ em código  2 ✅ em código  3 ✅ em código  4 ☐  5 ☐
+Fase atual: 4 em código (falta subir)
+Fases: 1 ✅ em código  2 ✅ em código  3 ✅ em código  4 ✅ em código  5 ☐
 Risco: 🔴 (acesso/permissão, dinheiro, schema, toca na devolução que já existe)
 Mudanças no caminho:
   · Fase 1 (03/11): `devcaso_dominio.js` é o dono único do caso, do prazo e do parado;
@@ -32,6 +32,12 @@ Mudanças no caminho:
     vazio; "coletou" leva o caso a caminho. O custo pode ser escrito por quem acompanha, mas só
     volta pelo fio para quem tem `devolucao.dinheiro` (R15) — a poda já nasce nesta fase.
   · A transportadora é cadastro (fora do modo teste); a tentativa é movimento (dentro).
+  · Fase 4 (03/11): a foto passa pela régua única do `foto.js`; o documento pode ser foto ou PDF
+    (que tem que começar com %PDF); a foto do comprador só imagem. O arquivo é gravado DENTRO da
+    transação: disco recusou, a linha não existe (e o arquivo meio escrito é apagado).
+  · Anexo não se apaga por rota (é prova). No modo teste, "apagar tudo" apaga a linha e o arquivo
+    fica na pasta, sem nada apontando para ele.
+  · A lista `doc_devolucao` é editável em Admin → Cadastros, ao lado dos motivos.
 ```
 
 > Desenhada no Projeto do Claude entre 29/10 e 03/11/2026, com o Lucas.

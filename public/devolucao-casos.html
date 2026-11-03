@@ -309,6 +309,7 @@ function nomeEvento(e, nomes){
     case 'revisado': return 'Revisado na tela de Devoluções';
     case 'chegou': return 'A caixa chegou';
     case 'aviso_ml': return 'Avisamos o ML que recebemos';
+    case 'anexo': return 'Anexo';
     case 'coleta': return 'Coleta'+(e.para?': '+n(e.de)+' → '+n(e.para):'');
     default: return e.tipo+(e.para?' → '+n(e.para):'');
   }
@@ -450,6 +451,74 @@ GANCHOS.push({
     document.getElementById('btColeta').onclick=function(){
       acao(base+'/coleta',{ transportadora_id:+sel.value||null, cep:document.getElementById('kCep').value,
         custo:document.getElementById('kCusto').value, obs:document.getElementById('kObs').value });
+    };
+  }
+});
+
+/* ── FASE 4: documentos da coleta e a foto do comprador ── */
+/* A foto é reduzida aqui (1600 px, JPEG), como a da coleta, para não pesar no
+   fio. PDF vai como está. Quem decide se serve é o servidor (foto vazia não é
+   prova). */
+function lerArquivo(file){
+  return new Promise(function(res,rej){
+    var fr=new FileReader();
+    fr.onerror=rej;
+    if(/pdf$/i.test(file.type)){ fr.onload=function(){ res(fr.result); }; fr.readAsDataURL(file); return; }
+    fr.onload=function(){
+      var img=new Image();
+      img.onload=function(){
+        var max=1600, w=img.width, h=img.height, k=Math.min(1, max/Math.max(w,h));
+        var cv=document.createElement('canvas'); cv.width=Math.round(w*k); cv.height=Math.round(h*k);
+        cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+        res(cv.toDataURL('image/jpeg',0.85));
+      };
+      img.onerror=rej; img.src=fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+GANCHOS.push({
+  html:function(d, c, P, aberto){
+    var h='<div class="bloco"><h3>Documentos e fotos</h3>';
+    if(c.tipo==='coleta' && (d.docs||[]).length){
+      h+='<div class="sub" style="margin-bottom:6px">Para ir a "Documentos ao ML", todos os documentos da lista precisam estar anexados.</div>';
+      h+=(d.docs||[]).map(function(x){
+        return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0">'+
+          '<span class="chip '+(x.ok?'':'falta')+'">'+(x.ok?'✓ ':'falta: ')+esc(x.doc)+'</span>'+
+          (aberto && P.acompanhar ? '<label class="bt sec" style="text-transform:none;font-size:13px;margin:0;color:var(--txt)">Anexar<input type="file" accept="image/*,application/pdf" data-doc="'+esc(x.doc)+'" style="display:none"></label>' : '')+
+          '</div>';
+      }).join('');
+    }
+    var fotoOk=(d.anexos||[]).some(function(a){return a.tipo==='foto_comprador';});
+    if(aberto && P.acompanhar)
+      h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0"><span class="chip">'+(fotoOk?'✓ ':'')+'Foto que o comprador mandou ao ML</span>'+
+        '<label class="bt sec" style="text-transform:none;font-size:13px;margin:0;color:var(--txt)">Anexar foto<input type="file" accept="image/*" data-foto="1" style="display:none"></label></div>';
+    var an=d.anexos||[];
+    h+= an.length ? '<div class="hist" style="margin-top:6px">'+an.map(function(a){
+      return '<div><a href="/api/devolucao-casos/anexo/'+a.id+'" target="_blank" style="color:var(--amber)">'+(a.tipo==='doc'?esc(a.doc_tipo):'Foto do comprador')+'</a> <small>· '+a.formato+' · '+horaBR(a.criado_em)+' · '+esc(a.usuario||'')+'</small></div>';
+    }).join('')+'</div>' : '<div class="sub">Nenhum anexo ainda.</div>';
+    h+='<div id="anxMsg"></div></div>';
+    if(aberto && P.dinheiro){
+      h+='<div class="bloco"><h3>Devolver ao comprador sem coletar (Admin Geral)</h3>'+
+        '<div class="sub" style="margin-bottom:6px">Chegou amassada: devolvemos o dinheiro em vez de coletar. Exige a foto do comprador anexada.</div>'+
+        '<div class="acoes"><input id="vDevolvido" placeholder="valor devolvido (R$)" style="max-width:200px">'+
+        '<button class="bt perigo" id="btDevComp"'+(fotoOk?'':' disabled title="Anexe a foto do comprador antes"')+'>Devolver ao comprador e encerrar</button></div></div>';
+    }
+    return h;
+  },
+  ligar:function(d, c, base){
+    function subir(inp, corpo){
+      var f=inp.files&&inp.files[0]; if(!f) return;
+      var m=document.getElementById('anxMsg'); m.innerHTML='<div class="sub">Enviando…</div>';
+      lerArquivo(f).then(function(url){ corpo.arquivo=url; return acao(base+'/anexo', corpo); })
+        .catch(function(){ m.innerHTML='<div class="erro">Não deu para ler o arquivo. Tente de novo.</div>'; });
+    }
+    document.querySelectorAll('#painel input[data-doc]').forEach(function(inp){ inp.onchange=function(){ subir(inp,{tipo:'doc', doc_tipo:inp.getAttribute('data-doc')}); }; });
+    document.querySelectorAll('#painel input[data-foto]').forEach(function(inp){ inp.onchange=function(){ subir(inp,{tipo:'foto_comprador'}); }; });
+    var x=document.getElementById('btDevComp');
+    if(x) x.onclick=function(){
+      if(!confirm('Devolver o dinheiro ao comprador e encerrar o caso #'+c.id+' sem coletar? A decisão fica registrada com seu nome.')) return;
+      acao(base+'/devolver-comprador',{ valor_devolvido:document.getElementById('vDevolvido').value });
     };
   }
 });
