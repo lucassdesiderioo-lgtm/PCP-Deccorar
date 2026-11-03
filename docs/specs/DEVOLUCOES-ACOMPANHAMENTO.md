@@ -2,7 +2,11 @@
 
 ```
 STATUS
-Situação: no ar desde 03/11/2026 (PR #250) — falta a prova de fábrica
+Situação: no ar e conferida na tela em 03/11/2026 (PRs #250 e #251) — falta a prova de uso
+Conferido: os 6 casos iniciais gravados (#1 a #6, a 2ª rodada não duplicou), as cores do
+  prazo, a porta "Devoluções" com as abas e a aba Baixa levando ao Admin.
+Falta: um caso "nós coletamos" levado até o fim pelo Renato, e a tarja no primeiro bipe do
+  Edvaldo. Com os dois, a spec vai para docs/arquivo/.
 Criada em: 03/11/2026
 Última atualização: 03/11/2026
 Fase atual: todas em código; falta o deploy e a prova de fábrica
