@@ -56,6 +56,26 @@ module.exports=function(app,db){
     res.json(resp);
   });
 
+  /* AS ABAS DAS DEVOLUCOES (AJUSTE de 03/11/2026, a pedido do dono: "concentrar
+     em um unico lugar"). Tres telas, uma entrada no rodape: cada aba aparece
+     pela PERMISSAO de verdade — e nao pela coluna `areas`, que e sombra e ficou
+     desatualizada no deploy das devolucoes em andamento. Esconder a aba nao e
+     seguranca: quem tranca e a chave de cada tela e de cada rota. */
+  function abasDe(u){
+    const p=(c)=>{ try{ return !!app.locals.acesso.podePermissao(u,c); }catch(e){ return false; } };
+    return { receber:p('devolucao.registrar'), andamento:p('devolucao.acompanhar')||p('devolucao.lancar'), baixa:p('devolucao.baixar') };
+  }
+  app.get('/api/devolucao/abas',(req,res)=> res.json(abasDe(req.usuario)));
+  /* A porta unica do rodape: leva a primeira aba que a pessoa alcanca. Em
+     andamento primeiro (e o trabalho de escritorio do dia); quem so registra
+     cai na tela de sempre; quem nao tem nada tambem, e o portao responde la
+     como sempre respondeu. */
+  app.get('/devolucoes',(req,res)=>{
+    if(!req.usuario) return res.redirect('/login?r='+encodeURIComponent('/devolucoes'));
+    const a=abasDe(req.usuario);
+    res.redirect(a.andamento?'/devolucao-casos':a.receber?'/devolucao':a.baixa?'/admin#dv':'/devolucao');
+  });
+
   app.get('/api/devolucao/pendentes',(req,res)=> res.json(devolucoesPendentes(db)));
 
   app.get('/api/devolucao/hoje',(req,res)=>{

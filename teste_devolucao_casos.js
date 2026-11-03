@@ -85,9 +85,10 @@ function chamar(metodo, rota, corpo, quem, params, query){
   if(!h) throw new Error('rota nao registrada: '+metodo+' '+rota);
   const out = { status:200, body:null };
   const res = { status(c){ out.status=c; return res; }, json(b){ out.body=b; return res; },
-                sendFile(f){ out.arquivo=f; return res; }, type(){ return res; }, send(b){ out.body=b; return res; } };
+                sendFile(f){ out.arquivo=f; return res; }, type(){ return res; }, send(b){ out.body=b; return res; },
+                redirect(u){ out.status=302; out.para=u; return res; } };
   const uid = quem || 1;
-  h({ body: corpo||{}, params: params||{}, query: query||{}, headers:{}, usuario:{id:uid, nome:NOMES[uid]} }, res);
+  h({ body: corpo||{}, params: params||{}, query: query||{}, headers:{}, usuario: quem === 'ninguem' ? null : {id:uid, nome:NOMES[uid]} }, res);
   return out;
 }
 const dia = (k) => db.prepare("SELECT date('now','localtime',?) d").get((k>=0?'+':'')+k+' days').d;
@@ -798,6 +799,43 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   const dec0 = AUDIT.filter(a => a.acao === 'valor').length;
   valor(k45, { valor_ml:'151' }, 5); valor(k45, { valor_ml:'152' }, 5);
   eq('duas decisões de valor: duas linhas', AUDIT.filter(a => a.acao === 'valor').length - dec0, 2);
+
+  /* ═══════ AS ABAS: uma entrada só, "Devoluções" (AJUSTE de 03/11/2026) ═══════
+     O dono: "concentramos em um único lugar as devoluções". Juntar é na
+     NAVEGAÇÃO: cada aba aparece pela permissão de verdade, e quem tranca
+     continua sendo a chave de cada tela e de cada rota. */
+  secao('abas — cada pessoa vê só as abas que a permissão dela alcança');
+  const abas = (quem) => chamar('GET','/api/devolucao/abas',null,quem).body;
+  eq('Edvaldo (só registrar): só Receber peça', JSON.stringify(abas(4)), JSON.stringify({ receber:true, andamento:false, baixa:false }));
+  eq('Renato (só acompanhar): só Em andamento', JSON.stringify(abas(2)), JSON.stringify({ receber:false, andamento:true, baixa:false }));
+  eq('Ana (lança, acompanha e dá baixa): Em andamento e Baixa', JSON.stringify(abas(3)), JSON.stringify({ receber:false, andamento:true, baixa:true }));
+  eq('o admin geral: as três', JSON.stringify(abas(1)), JSON.stringify({ receber:true, andamento:true, baixa:true }));
+  PERMS[6] = new Set(['devolucao.lancar']); NOMES[6] = 'SoLanca';
+  eq('quem só lança também vê Em andamento', abas(6).andamento, true);
+
+  secao('abas — a porta única "Devoluções" leva à primeira aba que a pessoa alcança');
+  const porta = (quem) => chamar('GET','/devolucoes',null,quem);
+  eq('Edvaldo vai à tela de sempre', porta(4).para, '/devolucao');
+  eq('Renato vai a Em andamento', porta(2).para, '/devolucao-casos');
+  eq('o admin geral vai a Em andamento', porta(1).para, '/devolucao-casos');
+  PERMS[7] = new Set(['devolucao.baixar']); NOMES[7] = 'SoBaixa';
+  eq('quem só dá baixa vai ao Admin, na aba Devoluções', porta(7).para, '/admin#dv');
+  PERMS[8] = new Set([]); NOMES[8] = 'Nada';
+  eq('quem não tem nada vai à tela de sempre (e o portão responde como hoje)', porta(8).para, '/devolucao');
+  eq('sem sessão vai ao login, e volta à porta depois', porta('ninguem').para, '/login?r=%2Fdevolucoes');
+
+  secao('abas — o rodapé tem uma entrada só, e as duas telas têm a faixa');
+  const NAV = fs.readFileSync(path.join(__dirname,'public','nav.js'),'utf8');
+  ok('o rodapé não tem mais o link "Devoluções em andamento"', !/Devoluções em andamento/.test(NAV) && !/navDevCasos/.test(NAV));
+  ok('o "Devoluções" do rodapé aponta para a porta única', /href="\/devolucoes"/.test(NAV));
+  ok('   e fica aceso nas duas telas', /\/devolucao-casos/.test(NAV));
+  for(const tela of ['devolucao.html','devolucao-casos.html']){
+    const H = fs.readFileSync(path.join(__dirname,'public',tela),'utf8');
+    ok(tela + ' pede as abas ao servidor (/api/devolucao/abas)', /\/api\/devolucao\/abas/.test(H));
+    ok(tela + ' liga as três abas às três telas', /'\/devolucao'/.test(H) && /'\/devolucao-casos'/.test(H) && /'\/admin#dv'/.test(H));
+  }
+  const ADM = fs.readFileSync(path.join(__dirname,'public','index.html'),'utf8');
+  ok('o admin abre direto na aba pelo endereço (#dv)', /location\.hash/.test(ADM) && /data-t="dv"/.test(ADM));
 
   fim();
 })().catch(e => { console.log('ESTOUROU: ' + e.stack); falhas++; fim(); });

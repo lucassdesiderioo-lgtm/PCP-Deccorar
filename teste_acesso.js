@@ -805,6 +805,27 @@ console.log('\n── 6-I. as devoluções em andamento (spec DEVOLUCOES-ACOMPAN
   ok('decidir(): quem acompanha NÃO encerra como perda', AC.decidir(sup,'/api/devolucao-casos/3/perda','POST').ok === false);
   ok('decidir(): quem acompanha NÃO lança', AC.decidir(sup,'/api/devolucao-casos','POST').ok === false);
   ok('decidir(): quem acompanha abre a tela', AC.decidir(sup,'/devolucao-casos','GET').ok === true);
+
+  /* AS ABAS (AJUSTE de 03/11/2026): a porta única e a pergunta "quais abas eu
+     vejo?" são de quem tem QUALQUER uma das quatro chaves de devolução. */
+  eq('a porta única /devolucoes é de quem está logado (ela só redireciona)', AC.permDaRota('/devolucoes','GET'), '@logado');
+  eq('as abas: qualquer uma das quatro chaves', J(AC.permDaRota('/api/devolucao/abas','GET')),
+     J(['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.baixar']));
+  ok('decidir(): quem só acompanha pergunta as abas', AC.decidir(sup,'/api/devolucao/abas','GET').ok === true);
+  eq('a tela do Edvaldo continua só de quem registra', AC.permDaRota('/devolucao','GET'), 'devolucao.registrar');
+
+  /* O RECÁLCULO DAS ÁREAS: o backfill do dia 03/11 deu as chaves sem recalcular
+     a coluna `areas`, e o destino depois do PIN lê dela. Uma vez só. */
+  const uR = db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('PosVendaAntigo','')").run().lastInsertRowid;
+  db.prepare("INSERT OR IGNORE INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)").run(uR, sB);
+  db.prepare("INSERT OR IGNORE INTO setor_permissao (setor_id,chave) VALUES (?, 'devolucao.acompanhar')").run(sB);
+  db.prepare("UPDATE usuarios SET areas='' WHERE id=?").run(uR);
+  db.prepare("DELETE FROM config WHERE chave='areas_devolucao_casos'").run();
+  require('./acesso')({ locals:{}, router:{ stack:[] }, get(){}, post(){}, delete(){} }, db);
+  const areasDe = (id) => (db.prepare('SELECT areas FROM usuarios WHERE id=?').get(id).areas || '').split(',');
+  ok('o boot recalcula: quem ganhou a chave pelo setor passa a ter a área', areasDe(uR).includes('devolucao_casos'), areasDe(uR).join(','));
+  ok('   e quem não tem chave nenhuma de devolução não ganha', !areasDe(uX).includes('devolucao_casos'), areasDe(uX).join(','));
+  ok('marcado para rodar uma vez só', !!db.prepare("SELECT 1 FROM config WHERE chave='areas_devolucao_casos'").get());
 }
 
 console.log('\n── 16. a cobertura passou a VARRER o app ──');
