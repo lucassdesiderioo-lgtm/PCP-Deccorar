@@ -27,7 +27,13 @@ module.exports=function(app,db){
        SEMPRE, com as mesmas duas chaves — o tablet antigo nao percebe nada. */
     let caso=null;
     try{ caso=CASO.abertoPorCodigo(db,c,{semRevisao:true}); }catch(e){}
-    if(!caso) return res.json({achou:!!r,venda:r||null});
+    if(!caso){
+      /* Os finais do Pack ID batendo em MAIS de um caso aberto: vêm todos, para
+         o Edvaldo tocar no certo (03/11/2026). Sem isso, a resposta de sempre. */
+      let cs=[]; try{ cs=CASO.candidatosPorFinais(db,c); }catch(e){}
+      if(cs.length) return res.json({achou:!!r,venda:r||null,casos:cs});
+      return res.json({achou:!!r,venda:r||null});
+    }
     if(!r && caso.lote_id) r=db.prepare("SELECT id,codigo,cor,buyer,city,nf,venda,packId,data FROM lote WHERE id=?").get(caso.lote_id);
     res.json({achou:!!r,venda:r||null,caso:{id:caso.id,tipo:caso.tipo,motivo:caso.motivo,etapa:caso.etapa,
       etapa_nome:CASO.NOME_ETAPA[caso.etapa]||caso.etapa,sku:caso.sku,venda:caso.venda,nf:caso.nf}});

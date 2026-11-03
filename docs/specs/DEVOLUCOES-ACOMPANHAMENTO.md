@@ -12,11 +12,14 @@ Criada em: 03/11/2026
 Última atualização: 03/11/2026
 Fase atual: todas em código; falta o deploy e a prova de fábrica
 Fases: 1 ✅  2 ✅  3 ✅  4 ✅  5 ✅  (em código, não no ar)
-Testes: teste_devolucao_casos.js (668 casos, e a tela em teste_devolucao_casos_tela.js, 107, os 52 da §10 e mais), teste_acesso.js (+46),
+Testes: teste_devolucao_casos.js (694 casos, e a tela em teste_devolucao_casos_tela.js, 119, os 52 da §10 e mais), teste_acesso.js (+46),
         teste_caminhos.js (+1); os 62 arquivos da raiz e os 856 do sob medida passando
 Regras que parecem bug: CLAUDE.md §9-B
 Risco: 🔴 (acesso/permissão, dinheiro, schema, toca na devolução que já existe)
 Mudanças no caminho:
+  · AJUSTE de 03/11 (caso #20 de novo) — a baixa dentro do caso e o "para encerrar falta: …"; o Edvaldo
+    acha pelos últimos números do Pack ID impresso; o número da etiqueta de devolução fica no caso e
+    abre a devolução no ML (vale o CLAUDE.md §9-B).
   · CONSERTO de 03/11 (NF 8207) — a etiqueta de devolução do ML não acha o caso: a revisão solta
     se liga pelo SKU (Edvaldo, caso, Baixa). DIVERGE da R19: o "ML devolve" não encerra mais só na
     baixa — precisa do "Já revisei" no ML e da resposta da revisão, se pedida; a revisão pede valor,

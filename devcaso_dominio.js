@@ -87,7 +87,7 @@ function garantir(db){
     custo_etiqueta REAL,
     revisao_pedida_em TEXT, revisao_numero TEXT, revisao_resultado TEXT, revisao_resp_em TEXT, valor_revisao REAL,
     aberta_em TEXT, prazo_coleta TEXT, prazo_coleta_original TEXT, limite_frete REAL,
-    revisar_ate TEXT, revisao_pede TEXT)`);
+    revisar_ate TEXT, revisao_pede TEXT, etiqueta_devolucao TEXT)`);
   /* FASE 5 — desde quando o valor do ML está nesta situação (R18: "pedir" há
      ≥ 2 dias entra no parado). O ALTER fica ao lado do CREATE, no fim da
      tabela, para o banco que nasceu antes desta fase (§17). */
@@ -119,6 +119,10 @@ function garantir(db){
      ML pede: o valor cobrado, a reputação, ou os dois (03/11/2026). (§17) */
   for(const col of ['revisar_ate TEXT','revisao_pede TEXT'])
     try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN "+col); }catch(e){}
+  /* O número da ETIQUETA DE DEVOLUÇÃO do ML (o envio de volta, que o PCP não
+     conhece), gravado quando a revisão é ligada: bipar de novo acha o caso, e
+     a busca do ML acha a devolução por ele (03/11/2026, caso #20). (§17) */
+  try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN etiqueta_devolucao TEXT"); }catch(e){}
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_venda ON devolucao_caso(venda)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_aberto ON devolucao_caso(encerrado_em)");
   db.exec(`CREATE TABLE IF NOT EXISTS devolucao_evento (
@@ -245,6 +249,15 @@ function situacao(c, h, lim){
        marcar no ML; e o "revisar no ML até", quando lançado, dá a cor. */
     const avisado = c.etapa === 'ml_revisei' || c.etapa === 'encerrado';
     o.falta_revisei = aberto && !!c.devolucao_id && !avisado;
+    /* O QUE FALTA PARA ENCERRAR (03/11/2026: o caso #20 ficou parado em "Já
+       revisei" sem dizer que faltava a baixa). Só depois da revisão ligada;
+       antes, o caso espera a peça. `dev_baixado` vem de quem lê a lista. */
+    o.falta = [];
+    if(aberto && c.devolucao_id){
+      if(!c.dev_baixado) o.falta.push('dar a baixa');
+      if(!avisado) o.falta.push('marcar "Já revisei" no ML');
+      if(c.revisao_pedida_em && !c.revisao_resultado) o.falta.push('resposta da revisão no ML');
+    }
     o.prazo_qual = null; o.prazo_nome = null; o.prazo_data = null;
     if(c.revisar_ate && !avisado){
       o.prazo_qual = 'revisar'; o.prazo_nome = 'Revisar no ML'; o.prazo_data = c.revisar_ate;
@@ -283,6 +296,16 @@ function publico(c, h, lim, comDinheiro, custos){
   }
   return Object.assign(o, situacao(c, h, lim));
 }
+/* A baixa da revisão ligada, junto do caso: é ela que diz "falta dar a
+   baixa" e que mostra o bloco da baixa dentro do caso. */
+function comBaixa(db, linhas){
+  const q = db.prepare('SELECT baixado, reputacao, motivo FROM devolucao WHERE id=?');
+  return linhas.map(c => {
+    if(!c.devolucao_id) return c;
+    const d = q.get(c.devolucao_id) || {};
+    return Object.assign({}, c, { dev_baixado: d.baixado ? 1 : 0, dev_reputacao: d.reputacao || null, dev_motivo: d.motivo || null });
+  });
+}
 /* Os custos das tentativas, por caso: a soma e quantos estão vazios. */
 function custosPorCaso(db){
   const m = new Map();
@@ -318,7 +341,7 @@ function listar(db, opt){
   const o = opt || {};
   const h = hoje(db), lim = limites(db);
   const cu = o.comDinheiro ? custosPorCaso(db) : null;
-  const abertos = db.prepare('SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL ORDER BY id').all();
+  const abertos = comBaixa(db, db.prepare('SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL ORDER BY id').all());
   const linhas = abertos.map(c => Object.assign(publico(c, h, lim, o.comDinheiro, cu),
     { mesmo_comprador: irmaos(abertos, c.comprador, c.id).map(x => x.id) }));
   /* R3: o "nós coletamos" vai pelo PRAZO — o vencido mais antigo em cima —,
@@ -360,7 +383,7 @@ function detalhe(db, id, opt){
   const c = ler(db, id);
   if(!c) throw new Recusa(404, 'Caso não encontrado. Atualize a lista.');
   const o = opt || {};
-  return { caso: publico(c, hoje(db), limites(db), o.comDinheiro, o.comDinheiro ? custosPorCaso(db) : null),
+  return { caso: publico(comBaixa(db, [c])[0], hoje(db), limites(db), o.comDinheiro, o.comDinheiro ? custosPorCaso(db) : null),
            tentativas: tentativas(db, c.id, o.comDinheiro),
            anexos: listarAnexos(db, c.id),
            docs: c.tipo === 'coleta' ? situacaoDocs(db, c.id) : [],
@@ -802,9 +825,37 @@ function abertoPorCodigo(db, cod, opt){
   const c = String(cod||'').trim(), dig = c.replace(/\D/g,'');
   if(!c) return null;
   const semRevisao = (opt && opt.semRevisao) ? ' AND devolucao_id IS NULL' : '';
-  return db.prepare(`SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL`+semRevisao+`
-    AND (venda=? OR venda=? OR pack_id=? OR pack_id=? OR nf=? OR nf=?) ORDER BY id DESC LIMIT 1`)
-    .get(c, dig, c, dig, c, dig) || null;
+  const exato = db.prepare(`SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL`+semRevisao+`
+    AND (venda=? OR venda=? OR pack_id=? OR pack_id=? OR nf=? OR nf=? OR etiqueta_devolucao=? OR etiqueta_devolucao=?) ORDER BY id DESC LIMIT 1`)
+    .get(c, dig, c, dig, c, dig, c, dig);
+  if(exato) return exato;
+  /* OS ÚLTIMOS NÚMEROS DO PACK ID IMPRESSO (03/11/2026): a etiqueta de
+     devolução traz a venda/pack só em texto, e o Edvaldo digita os finais.
+     De 5 a 10 números (4 é NF; 11 é o código da etiqueta de devolução). Só
+     acha se UM caso aberto bate — com dois, ninguém é escolhido sozinho. */
+  const l = porFinais(db, dig, semRevisao);
+  return l.length === 1 ? l[0] : null;
+}
+function porFinais(db, dig, semRevisao){
+  if(!/^\d{5,10}$/.test(dig || '')) return [];
+  const like = '%' + dig;
+  return db.prepare(`SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL`+(semRevisao || '')+`
+    AND (venda LIKE ? OR pack_id LIKE ?) ORDER BY id`).all(like, like);
+}
+/* Os casos abertos sem revisão cujos finais batem, quando são MAIS de um: a
+   tela do Edvaldo mostra todos para ele tocar no certo. */
+function candidatosPorFinais(db, cod){
+  const dig = String(cod||'').replace(/\D/g,'');
+  const l = porFinais(db, dig, ' AND devolucao_id IS NULL');
+  return l.length > 1 ? l.map(c => ({ id:c.id, tipo:c.tipo, venda:c.venda, pack_id:c.pack_id, nf:c.nf, comprador:c.comprador, motivo:c.motivo, sku:c.sku })) : [];
+}
+/* O número bipado é a etiqueta de devolução do ML quando não é a venda, o
+   pack, a NF nem os finais deles. É ele que se grava no caso. */
+function etiquetaDeDevolucao(c, cod){
+  const s = String(cod || '').trim(), dig = s.replace(/\D/g, '');
+  if(!s || !dig || dig.length < 11) return null;
+  for(const v of [c.venda, c.pack_id, c.nf]) if(v && (String(v) === s || String(v) === dig || String(v).endsWith(dig))) return null;
+  return dig;
 }
 
 /* O botão "chegou": a caixa chegou e ainda não foi revisada. A chegada é UMA
@@ -867,9 +918,10 @@ function ligarRevisao(db, ref, devolucao_id, usuario){
   }
   if(!c) c = abertoPorCodigo(db, ref.codigo, { semRevisao:true });
   if(!c) return null;
+  const etq = etiquetaDeDevolucao(c, ref.codigo);
   db.prepare(`UPDATE devolucao_caso SET devolucao_id=?, chegou_em=COALESCE(chegou_em, datetime('now','localtime')),
-    etapa='revisado', etapa_desde=datetime('now','localtime') WHERE id=?`).run(devolucao_id, c.id);
-  evento(db, c.id, 'revisado', c.etapa, 'revisado', 'revisão #'+devolucao_id+' na tela de Devoluções', nomeDe(usuario));
+    etapa='revisado', etapa_desde=datetime('now','localtime'), etiqueta_devolucao=COALESCE(?, etiqueta_devolucao) WHERE id=?`).run(devolucao_id, etq, c.id);
+  evento(db, c.id, 'revisado', c.etapa, 'revisado', 'revisão #'+devolucao_id+' na tela de Devoluções'+(etq ? ' · etiqueta de devolução '+etq : ''), nomeDe(usuario));
   return c.id;
 }
 
@@ -895,7 +947,7 @@ function talvezEncerrarML(db, id, usuario, baixadaAgora, texto){
 function esperadas(db, sku){
   const s = String(sku || '').trim().toUpperCase();
   if(!s) throw new Recusa(400, 'Informe o SKU.');
-  return db.prepare(`SELECT id,tipo,venda,nf,comprador,motivo,etapa,sku FROM devolucao_caso
+  return db.prepare(`SELECT id,tipo,venda,pack_id,nf,comprador,motivo,etapa,sku FROM devolucao_caso
       WHERE encerrado_em IS NULL AND devolucao_id IS NULL AND UPPER(sku)=? ORDER BY id`).all(s)
     .map(c => Object.assign(c, { etapa_nome: NOME_ETAPA[c.etapa] || c.etapa }));
 }
@@ -929,7 +981,8 @@ function ligarManual(db, caso_id, devolucao_id, usuario, confirmar){
   if(diferente && !confirmar) throw new Recusa(409, 'O SKU recebido ('+skuD+') é diferente do vendido ('+skuC+'). Confirme para ligar: isso fica registrado como envio diferente.', { sku_diferente:true });
   db.transaction(() => {
     db.prepare(`UPDATE devolucao_caso SET devolucao_id=?, chegou_em=COALESCE(chegou_em, ?),
-      etapa='revisado', etapa_desde=datetime('now','localtime') WHERE id=?`).run(d.id, d.recebido_em || null, c.id);
+      etapa='revisado', etapa_desde=datetime('now','localtime'), etiqueta_devolucao=COALESCE(?, etiqueta_devolucao) WHERE id=?`)
+      .run(d.id, d.recebido_em || null, etiquetaDeDevolucao(c, d.codigo_ml), c.id);
     if(!c.chegou_em && !d.recebido_em) db.prepare("UPDATE devolucao_caso SET chegou_em=datetime('now','localtime') WHERE id=?").run(c.id);
     evento(db, c.id, 'revisado', c.etapa, 'revisado', 'revisão #'+d.id+' ligada à mão (etiqueta bipada: '+(d.codigo_ml || '—')+')'+
       (diferente ? ' · SKU recebido '+skuD+' diferente do vendido '+skuC : ''), nomeDe(usuario));
@@ -1342,8 +1395,8 @@ function buscar(db, q, opt){
   const o = opt || {}, h = hoje(db), lim = limites(db);
   const cu = o.comDinheiro ? custosPorCaso(db) : null;
   const like = '%' + d + '%';
-  return db.prepare(`SELECT * FROM devolucao_caso WHERE venda LIKE ? OR pack_id LIKE ? OR nf LIKE ?
-      ORDER BY (encerrado_em IS NOT NULL), id DESC LIMIT 30`).all(like, like, like)
+  return comBaixa(db, db.prepare(`SELECT * FROM devolucao_caso WHERE venda LIKE ? OR pack_id LIKE ? OR nf LIKE ? OR etiqueta_devolucao LIKE ?
+      ORDER BY (encerrado_em IS NOT NULL), id DESC LIMIT 30`).all(like, like, like, like))
     .map(c => publico(c, h, lim, o.comDinheiro, cu));
 }
 
@@ -1357,6 +1410,6 @@ module.exports = {
   garantir, hoje, dataValida, dias, limites, situacao, publico, evento,
   buscarLote, buscarLotePorNF, ler, abertoDaVenda, listar, encerrados, detalhe,
   motivoValido, reais, aberto, lancar, editar, etapa, moverEtapa, pedirProrrogacao, novoPrazo, prazosDoCaso, agendarColeta,
-  talvezEncerrarML, esperadas, revisoesSoltas, ligarManual,
+  talvezEncerrarML, esperadas, revisoesSoltas, ligarManual, candidatosPorFinais,
   encerrar, encerrarPerda
 };

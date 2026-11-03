@@ -308,12 +308,49 @@ const srv = app.listen(0, async () => {
     secao('o "Já revisei no ML" do ML devolve, pela tela do caso');
     QUEM = 1;
     await p.goto(B + '/devolucao-casos'); await p.waitForTimeout(900);
-    ok('a lista diz que falta marcar o "Já revisei"', /falta marcar "Já revisei" no ML/.test(await p.locator('#listaMl .linha', { hasText:'#'+e1.id }).textContent()));
+    const lin1 = await p.locator('#listaMl .linha', { hasText:'#'+e1.id }).textContent();
+    ok('a lista diz o que falta para encerrar: a baixa e o "Já revisei"', /para encerrar falta: dar a baixa · marcar "Já revisei" no ML/.test(lin1), lin1);
     await p.locator('#listaMl .linha', { hasText:'#'+e1.id }).locator('.t1').click(); await p.waitForTimeout(800);
     await p.click('#btAvisoML'); await p.waitForTimeout(1000);
     eq('marcado: a etapa vai a "Já revisei no ML"', caso(e1.id).etapa, 'ml_revisei');
     eq('   e sem a baixa o caso continua aberto', caso(e1.id).encerrado_em, null);
+    ok('   e diz que falta só a baixa (o caso #20)', /para encerrar falta: dar a baixa/.test(await p.textContent('#painel .chips')) && !/Já revisei" no ML/.test(await p.textContent('#painel .chips')), await p.textContent('#painel .chips'));
+    ok('o número bipado da etiqueta de devolução aparece no caso', /Etiqueta de devolução\s*48323653161/.test(await p.locator('#painel .dados').first().textContent()));
+    eq('   e o botão abre a devolução no ML pela busca', await p.getAttribute('#painel a:has-text("Abrir esta devolução no ML")', 'href'),
+       'https://vendedores.mercadolivre.com.br/post-purchase/post-sales?main.filter=returns&search.value=48323653161');
+
+    secao('a baixa dentro do caso');
+    await p.click('#btBaixa'); await p.waitForTimeout(400);
+    ok('sem a reputação, a tela pede antes de gravar', /reputação/.test(await p.textContent('#cMsg')));
+    eq('   e nada foi gravado', caso(e1.id).encerrado_em, null);
+    await p.selectOption('#bxRep', 'nao'); await p.selectOption('#bxMot', 'Falta de kit');
+    await p.click('#btBaixa'); await p.waitForTimeout(1300);
+    eq('"Dar baixa" no caso: o ML devolve encerra', caso(e1.id).saida, 'revisado_ml');
+    eq('   a devolução ficou com a baixa, a reputação e o motivo', JSON.stringify(db.prepare('SELECT baixado, reputacao, motivo FROM devolucao WHERE id=?').get(caso(e1.id).devolucao_id)),
+       JSON.stringify({ baixado:1, reputacao:'nao', motivo:'Falta de kit' }));
+    ok('   e o caso mostra a baixa dada', /Baixa dada/.test(await p.textContent('#painel')));
     await p.click('#painel button:has-text("Fechar")'); await p.waitForTimeout(300);
+
+    secao('o Edvaldo digita os últimos números do Pack ID impresso');
+    const s1 = await api(p, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000015571798765', nf:'8301', sku:'BK150150BRANCO', comprador:'Pack Um', publicidade:false });
+    const s2 = await api(p, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000015571898765', nf:'8302', sku:'BK150150BRANCO', comprador:'Pack Dois', publicidade:false });
+    QUEM = 3;
+    const pe2 = await pg();
+    await pe2.goto(B + '/devolucao'); await pe2.waitForTimeout(900);
+    await pe2.fill('#dvCod', '48323600000'); await pe2.waitForTimeout(1200);
+    ok('o bipe que não acha diz para digitar os últimos números do Pack ID', /últimos números do Pack ID/.test(await pe2.textContent('#dvVenda')), await pe2.textContent('#dvVenda'));
+    await pe2.fill('#dvCod', '98765'); await pe2.waitForTimeout(1200);
+    const vz = await pe2.textContent('#dvVenda');
+    ok('dois casos terminam igual: aparecem os dois para tocar', vz.includes('#'+s1.id+' ') && vz.includes('#'+s2.id+' ') && /Mais de um caso/.test(vz), vz);
+    await pe2.click('[data-dvsuf="'+s2.id+'"]'); await pe2.waitForTimeout(300);
+    ok('   tocado, vira a devolução esperada', (await pe2.textContent('#dvVenda')).includes('Devolução esperada — caso #'+s2.id));
+    await pe2.click('[data-cor="BRANCO"]'); await pe2.waitForTimeout(200);
+    await pe2.click('[data-med="150x150"]'); await pe2.waitForTimeout(600);
+    for(const [k, v] of [['embalagem','intacta'],['tecido','intacto'],['tubo','ok'],['base','ok'],['comando','perfeito'],['kit','com kit'],['destinacao','reembalar']])
+      await pe2.click('.dvOp[data-p="'+k+'"][data-v="'+v+'"]');
+    await pe2.click('#dvSalvar'); await pe2.waitForTimeout(1200);
+    eq('   salvou e ligou o caso certo', caso(s2.id).etapa + '/' + caso(s1.id).etapa, 'revisado/aguardando');
+    QUEM = 1;
 
     secao('a revisão que ficou solta: "Ligar" pela tela do caso');
     const e2 = await api(p, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000015571779999', nf:'8208', sku:'BK150150BRANCO', publicidade:false });

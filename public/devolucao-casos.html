@@ -225,7 +225,15 @@ function plural(n, um, varios){ return n+' '+(Math.abs(n)===1?um:varios); }
    prazo aberto, com o nome dele. Quem escolhe qual é o servidor. */
 var CURTO_PRAZO={ comprovante:'comprovante', coleta:'coleta', revisar:'revisar no ML' };
 /* "Já revisei no ML" (03/11/2026): no ML devolve revisado, falta marcar no ML. */
-function chipRevisei(c){ return c.falta_revisei ? '<span class="chip ambar">falta marcar "Já revisei" no ML</span>' : ''; }
+/* O QUE FALTA PARA ENCERRAR (03/11/2026, o caso #20 parado sem dizer que
+   faltava a baixa): uma tarja só, com tudo o que falta. Quem diz é o servidor. */
+function chipRevisei(c){ return (c.falta && c.falta.length) ? '<span class="chip ambar">para encerrar falta: '+esc(c.falta.join(' · '))+'</span>' : ''; }
+/* A devolução no ML pela etiqueta de devolução gravada no caso: a busca do ML
+   acha a venda por esse número. */
+function linkDevolucaoML(c){
+  var d=String(c.etiqueta_devolucao||'').replace(/\D/g,''); if(!d) return '';
+  return '<a class="bt sec" style="text-decoration:none" href="https://vendedores.mercadolivre.com.br/post-purchase/post-sales?main.filter=returns&search.value='+d+'" target="_blank" rel="noopener noreferrer">Abrir esta devolução no ML ↗</a>';
+}
 function textoDias(n){ return n<0 ? 'VENCIDO há '+plural(-n,'dia','dias') : n===0 ? 'vence HOJE' : (n===1 ? 'falta 1 dia' : 'faltam '+n+' dias'); }
 function chipPrazo(c){
   if(c.dias_prazo===null || c.dias_prazo===undefined) return '';
@@ -460,8 +468,9 @@ function desenharCaso(d){
   var i=d.etapas.indexOf(c.etapa);
   var trilha=d.etapas.map(function(e,k){ return '<span class="'+(k<i?'feito':k===i?'agora':'')+'">'+esc(d.nomes[e]||e)+'</span>'; }).join('');
   var h='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0;font-size:17px">Caso #'+c.id+' · '+(c.tipo==='coleta'?'Nós coletamos':'ML devolve')+'</h2>'+
-    (c.link_ml?'<a class="bt" style="margin-left:auto;text-decoration:none" href="'+esc(c.link_ml)+'" target="_blank" rel="noopener noreferrer">Abrir conversa no ML ↗</a>':'')+
-    '<button class="bt sec" style="'+(c.link_ml?'':'margin-left:auto')+'" onclick="fechar()">Fechar</button></div>';
+    '<span style="margin-left:auto"></span>'+linkDevolucaoML(c)+
+    (c.link_ml?'<a class="bt" style="text-decoration:none" href="'+esc(c.link_ml)+'" target="_blank" rel="noopener noreferrer">Abrir conversa no ML ↗</a>':'')+
+    '<button class="bt sec" onclick="fechar()">Fechar</button></div>';
   h+='<div class="chips">'+chipPrazo(c)+(c.tipo==='coleta'&&c.parado?'<span class="chip parado">parado há '+plural(c.dias_parado,'dia','dias')+'</span>':'')+
      (c.tipo==='ml'?'<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>'+chipRevisei(c)+chipRevisao(c):'')+
      (c.saida_nome?'<span class="chip">'+esc(c.saida_nome)+'</span>':'')+chipPub(c)+'</div>';
@@ -472,6 +481,7 @@ function desenharCaso(d){
     '<div><b>Comprador</b>'+esc(c.comprador||'—')+'</div>'+celulaMotivo(c, P, aberto)+
     '<div><b>Via publicidade</b>'+simNao(c.publicidade)+'</div>'+
     (c.tipo==='coleta'?celulasPrazos(c):'<div><b>Revisar no ML até</b>'+(c.revisar_ate?dataBR(c.revisar_ate):'—')+'</div>')+
+    (c.etiqueta_devolucao?'<div><b>Etiqueta de devolução</b>'+esc(c.etiqueta_devolucao)+'</div>':'')+
     // Responsável e Passado em nos DOIS tipos: no "ML devolve" eles eram gravados e não apareciam.
     '<div><b>Responsável</b>'+esc(c.responsavel||'—')+'</div><div><b>Passado em</b>'+dataBR(c.passado_em)+'</div>'+
     '<div><b>Na etapa desde</b>'+horaBR(c.etapa_desde)+'</div>'+
@@ -909,6 +919,33 @@ GANCHOS.push({
     if((x=document.getElementById('btRevNegou'))) x.onclick=function(){
       if(!confirm('Lançar que o ML NEGOU a revisão do caso #'+c.id+'?')) return;
       acao(base+'/revisao-frete-resposta',{ resultado:'negou' });
+    };
+  }
+});
+
+/* A BAIXA DENTRO DO CASO (03/11/2026, dono: "não faz sentido ir dentro da aba
+   Baixa sendo que já temos o caso para solucionar do início até o fim"). É a
+   mesma baixa da aba Baixa — mesma rota, mesma chave (devolucao.baixar) — com o
+   motivo do caso já marcado. No ML devolve, com o resto feito, ela encerra. */
+GANCHOS.push({
+  html:function(d, c, P, aberto){
+    if(!c.devolucao_id) return '';
+    if(c.dev_baixado) return '<div class="bloco"><h3>Baixa da devolução</h3><div class="sub">Baixa dada · afetou a reputação: <b style="color:var(--txt)">'+esc(c.dev_reputacao||'—')+'</b> · motivo: <b style="color:var(--txt)">'+esc(c.dev_motivo||'—')+'</b></div></div>';
+    if(!aberto || !P.baixar) return '<div class="bloco"><h3>Baixa da devolução</h3><div class="sub">A revisão #'+c.devolucao_id+' ainda não teve baixa'+(P.baixar?'':' (é de quem dá baixa nas devoluções)')+'.</div></div>';
+    var ops=['<option value="">— motivo —</option>'].concat(ESTADO.motivos.map(function(m){ return '<option'+(m===c.motivo?' selected':'')+'>'+esc(m)+'</option>'; })).join('')+
+      (c.motivo && ESTADO.motivos.indexOf(c.motivo)<0 ? '<option selected>'+esc(c.motivo)+'</option>' : '');
+    return '<div class="bloco"><h3>Baixa da devolução</h3><div class="sub" style="margin-bottom:6px">A peça foi revisada (revisão #'+c.devolucao_id+'). Responda e dê a baixa aqui mesmo.</div>'+
+      '<div class="acoes"><label for="bxRep" style="margin:0;align-self:center">Afetou a reputação?</label><select id="bxRep" style="max-width:140px"><option value="">—</option><option value="sim">Sim</option><option value="nao">Não</option></select>'+
+      '<label for="bxMot" style="margin:0;align-self:center">Motivo</label><select id="bxMot" style="max-width:260px">'+ops+'</select>'+
+      '<button class="bt" id="btBaixa">Dar baixa</button></div></div>';
+  },
+  ligar:function(d, c, base){
+    var x=document.getElementById('btBaixa'); if(!x) return;
+    x.onclick=function(){
+      var rep=document.getElementById('bxRep').value, mot=document.getElementById('bxMot').value;
+      if(!rep){ document.getElementById('cMsg').innerHTML='<div class="erro">Diga se afetou a reputação antes de dar a baixa.</div>'; return; }
+      if(!mot){ document.getElementById('cMsg').innerHTML='<div class="erro">Escolha o motivo antes de dar a baixa.</div>'; return; }
+      acao('/api/devolucao/baixa', { id:c.devolucao_id, reputacao:rep, motivo:mot });
     };
   }
 });
