@@ -388,6 +388,7 @@ function detalhe(db, id, opt){
            anexos: listarAnexos(db, c.id),
            docs: c.tipo === 'coleta' ? situacaoDocs(db, c.id) : [],
            eventos: db.prepare('SELECT id,tipo,de,para,texto,usuario,criado_em FROM devolucao_evento WHERE caso_id=? ORDER BY id').all(c.id),
+           revisao: revisaoLigada(db, c.devolucao_id),
            etapas: ETAPAS[c.tipo], manuais: MANUAIS[c.tipo], nomes: NOME_ETAPA,
            desfazer: podeDesfazer(db, c, o.usuario),
            mesmo_comprador: mesmoComprador(db, c.comprador, c.id).map(x => ({ id:x.id, venda:x.venda, nf:x.nf, tipo:x.tipo, etapa_nome: NOME_ETAPA[x.etapa] || x.etapa })) };
@@ -704,7 +705,7 @@ function moverEtapa(db, c, para, usuario, texto, tipoEvento){
    COM a data de antes. A história guarda o clique e o desfeito: nada se apaga.
    Andar no caso é o que muda a etapa por outra porta (lançar, coleta, chegada,
    revisão, aviso, encerrar, desfazer); editar, anexar, prazo e valor não. */
-const ANDAM = ['lancado','etapa','desfeito','coleta','chegou','aviso_ml','revisado','encerrado','tipo'];
+const ANDAM = ['lancado','etapa','desfeito','coleta','chegou','aviso_ml','revisado','encerrado','tipo','desligado'];
 function ultimoAndar(db, caso_id){
   return db.prepare('SELECT * FROM devolucao_evento WHERE caso_id=? AND tipo IN ('+ANDAM.map(()=>'?').join(',')+') ORDER BY id DESC LIMIT 1')
     .get(caso_id, ...ANDAM) || null;
@@ -958,7 +959,7 @@ function revisoesSoltas(db, caso_id){
   const c = ler(db, caso_id);
   if(!c) throw new Recusa(404, 'Caso não encontrado. Atualize a lista.');
   const sku = String(c.sku || '').toUpperCase();
-  return db.prepare(`SELECT d.id,d.codigo_ml,d.sku_fisico,d.destinacao,d.recebido_em,d.baixado FROM devolucao d
+  return db.prepare(`SELECT ${CAMPOS_REVISAO.map(k => 'd.'+k).join(',')},d.baixado FROM devolucao d
       WHERE NOT EXISTS (SELECT 1 FROM devolucao_caso x WHERE x.devolucao_id=d.id)
         AND d.recebido_em >= datetime('now','localtime','-30 days')
       ORDER BY (UPPER(d.sku_fisico)=?) DESC, d.id DESC`).all(sku)
@@ -987,6 +988,53 @@ function ligarManual(db, caso_id, devolucao_id, usuario, confirmar){
     evento(db, c.id, 'revisado', c.etapa, 'revisado', 'revisão #'+d.id+' ligada à mão (etiqueta bipada: '+(d.codigo_ml || '—')+')'+
       (diferente ? ' · SKU recebido '+skuD+' diferente do vendido '+skuC : ''), nomeDe(usuario));
     if(d.baixado && c.tipo === 'ml') evento(db, c.id, 'baixa', null, null, 'a revisão #'+d.id+' já tinha baixa — falta marcar "Já revisei" no ML', nomeDe(usuario));
+  })();
+  return ler(db, c.id);
+}
+
+/* O que a revisão do Edvaldo diz da peça: a etiqueta bipada, a hora e a
+   triagem. É com isso que se separam três 150×150 cinza (AJUSTE de
+   03/11/2026, dono). Sem nenhum valor em reais. */
+const CAMPOS_REVISAO = ['id','codigo_ml','sku_fisico','destinacao','recebido_em','embalagem','tecido','tubo','base','comando','kit','obs'];
+function revisaoLigada(db, devolucao_id){
+  if(!devolucao_id) return null;
+  return db.prepare('SELECT '+CAMPOS_REVISAO.join(',')+' FROM devolucao WHERE id=?').get(devolucao_id) || null;
+}
+
+/* DESLIGAR A REVISÃO ERRADA (AJUSTE de 03/11/2026, decisão do dono "a"):
+   ligou-se a peça de outro cliente. Com motivo, o caso fica sem revisão, volta
+   a "Chegou" (a chegada continua) e REABRE se encerrou por causa dela (o ML
+   devolve). A BAIXA dada naquela peça é desfeita junto: a reputação e o motivo
+   vieram do caso errado — ela volta solta e pendente na Baixa, e recebe a
+   baixa certa quando for ligada ao caso dela. O "Já revisei" não se desfaz no
+   ML; a história avisa para marcar de novo depois de ligar a peça certa.
+   Encerrado por decisão de dinheiro (perda, comprador, reembolso) não volta
+   por aqui. */
+function desligarRevisao(db, caso_id, motivo, usuario){
+  const c = ler(db, caso_id);
+  if(!c) throw new Recusa(404, 'Caso não encontrado. Atualize a lista.');
+  if(!c.devolucao_id) throw new Recusa(409, 'O caso #'+c.id+' não tem revisão ligada.');
+  if(c.encerrado_em && c.saida !== 'revisado_ml')
+    throw new Recusa(409, 'O caso #'+c.id+' foi encerrado como "'+(NOME_SAIDA[c.saida]||c.saida||'')+'": a revisão dele não se desliga por aqui.');
+  const m = String(motivo || '').trim();
+  if(!m) throw new Recusa(400, 'Diga por que esta não é a peça certa (por exemplo: a etiqueta é da venda de outro cliente).');
+  const d = db.prepare('SELECT * FROM devolucao WHERE id=?').get(c.devolucao_id) || { id:c.devolucao_id };
+  const etq = etiquetaDeDevolucao(c, d.codigo_ml);
+  const quem = nomeDe(usuario);
+  db.transaction(() => {
+    if(d.baixado){
+      db.prepare('UPDATE devolucao SET baixado=0, baixado_em=NULL, reputacao=NULL, motivo=NULL WHERE id=?').run(d.id);
+      evento(db, c.id, 'baixa', null, null, 'baixa da revisão #'+d.id+' desfeita (era: afetou a reputação '+(d.reputacao||'—')+' · motivo '+(d.motivo||'—')+
+        (d.baixado_em ? ' · de '+d.baixado_em.slice(8,10)+'/'+d.baixado_em.slice(5,7) : '')+') — ela volta para a Baixa sem caso', quem);
+    }
+    db.prepare(`UPDATE devolucao_caso SET devolucao_id=NULL, etapa='chegou', etapa_desde=datetime('now','localtime'),
+      chegou_em=COALESCE(chegou_em, datetime('now','localtime')), encerrado_em=NULL, encerrado_por=NULL, saida=NULL,
+      etiqueta_devolucao=CASE WHEN etiqueta_devolucao=? THEN NULL ELSE etiqueta_devolucao END WHERE id=?`).run(etq, c.id);
+    const avisos = [];
+    if(c.encerrado_em) avisos.push('caso reaberto');
+    if(c.etapa === 'ml_revisei' || (c.encerrado_em && c.tipo === 'ml')) avisos.push('o "Já revisei" tinha sido marcado com esta peça — marque de novo depois de ligar a certa');
+    evento(db, c.id, 'desligado', c.etapa, 'chegou', 'revisão #'+d.id+' desligada (etiqueta bipada: '+(d.codigo_ml || '—')+') · motivo: '+m+
+      (avisos.length ? ' · '+avisos.join(' · ') : ''), quem);
   })();
   return ler(db, c.id);
 }
@@ -1410,6 +1458,6 @@ module.exports = {
   garantir, hoje, dataValida, dias, limites, situacao, publico, evento,
   buscarLote, buscarLotePorNF, ler, abertoDaVenda, listar, encerrados, detalhe,
   motivoValido, reais, aberto, lancar, editar, etapa, moverEtapa, pedirProrrogacao, novoPrazo, prazosDoCaso, agendarColeta,
-  talvezEncerrarML, esperadas, revisoesSoltas, ligarManual, candidatosPorFinais,
+  talvezEncerrarML, esperadas, revisoesSoltas, ligarManual, desligarRevisao, candidatosPorFinais,
   encerrar, encerrarPerda
 };
