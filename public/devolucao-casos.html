@@ -124,6 +124,7 @@
           <div id="lSug" class="sub" style="margin-top:6px"></div>
           <div class="sub" style="margin-top:4px">Escolhendo a transportadora, o caso já nasce em "Coleta pedida", com a 1ª tentativa.</div>
         </div></div>
+        <div class="soDin"><label for="lEtiqueta">Custo da etiqueta de devolução</label><input id="lEtiqueta" placeholder="R$ — se o ML cobrou" autocomplete="off"></div>
         <div class="larga"><label>Venda via publicidade? (obrigatório)</label>
           <div class="simnao" id="lPub"><button class="bt sec" data-pub="1">Sim</button><button class="bt sec" data-pub="0">Não</button></div></div>
         <div class="larga"><label for="lLink">Link da conversa da reclamação (cole o endereço do ML)</label>
@@ -314,6 +315,7 @@ document.getElementById('btLancar').onclick=function(){
     obs:document.getElementById('lObs').value,
     publicidade: ESTADO.pub===null ? '' : ESTADO.pub===1,
     link_ml:document.getElementById('lLink').value, mensagem_ml:document.getElementById('lMsgMl').value };
+  if(ESTADO.pode.dinheiro) corpo.custo_etiqueta=document.getElementById('lEtiqueta').value;
   if(ESTADO.tipo==='coleta'){
     corpo.cep=document.getElementById('lCep').value;
     corpo.coleta={ transportadora_id:document.getElementById('lTransp').value, custo:ESTADO.pode.dinheiro?document.getElementById('lCusto').value:'' };
@@ -326,7 +328,7 @@ document.getElementById('btLancar').onclick=function(){
   var b=this; b.disabled=true;
   api('POST','/api/devolucao-casos',corpo).then(function(r){
     msg.innerHTML='<div class="okmsg">Caso #'+r.id+' lançado.</div>';
-    ['lVenda','lNf','lSku','lComprador','lObs','lPrazo','lResp','lPassado','lLink','lMsgMl','lCep','lTransp','lCusto','lSit','lValor'].forEach(function(id){ document.getElementById(id).value=''; });
+    ['lVenda','lNf','lSku','lComprador','lObs','lPrazo','lResp','lPassado','lLink','lMsgMl','lCep','lTransp','lCusto','lSit','lValor','lEtiqueta'].forEach(function(id){ document.getElementById(id).value=''; });
     document.getElementById('lSug').textContent='';
     setPub(null); passadoHoje();
     document.getElementById('lMotivo').value=''; document.getElementById('lAchou').textContent='';
@@ -404,6 +406,15 @@ function desenharCaso(d){
       '<div class="larga"><label>Mensagem do ML</label><textarea id="eMsgMl" rows="6">'+esc(c.mensagem_ml||'')+'</textarea></div>'+
       '</div><div class="acoes"><button class="bt sec" id="btEditar">Salvar</button></div></div>';
   }
+  /* Trocar o tipo (AJUSTE de 03/11/2026): o caso nasce como o ML disse no
+     dia, e muda se o ML mudar. Quem decide se pode é o servidor (recusa com
+     coleta pedida ou valor lançado). */
+  if(aberto && P.lancar){
+    h+='<div class="bloco"><h3>Tipo do caso</h3><div class="sub" style="margin-bottom:6px">Hoje é <b style="color:var(--txt)">'+(c.tipo==='coleta'?'Nós coletamos':'ML devolve')+'</b>. Se o ML mudar quem busca a peça, troque aqui: a etapa vai para a equivalente e a história guarda a troca.</div>'+
+      '<div class="acoes">'+(c.tipo==='ml'
+        ? '<label for="tPrazo" style="margin:0;align-self:center">Prazo do ML (resolver até)</label><input type="date" id="tPrazo" style="max-width:180px"><button class="bt sec" id="btTipo" data-para="coleta">Trocar para Nós coletamos</button>'
+        : '<button class="bt sec" id="btTipo" data-para="ml">Trocar para ML devolve</button>')+'</div></div>';
+  }
   GANCHOS.forEach(function(g){ h+=g.html(d, c, P, aberto)||''; });
   if(aberto && P.dinheiro && c.tipo==='coleta'){
     h+='<div class="bloco"><h3>Encerrar como perda (Admin Geral)</h3><div class="sub" style="margin-bottom:6px">O caso vencido não encerra sozinho: pode ter havido prorrogação não lançada.</div>'+
@@ -436,6 +447,7 @@ function nomeEvento(e, nomes){
     case 'prorrogacao_pedida': return 'Pediu prorrogação ao ML';
     case 'editado': return 'Lançamento editado';
     case 'desfeito': return 'Clique de etapa desfeito';
+    case 'tipo': return 'Tipo trocado';
     case 'encerrado': return 'Encerrado';
     case 'revisado': return 'Revisado na tela de Devoluções';
     case 'chegou': return 'A caixa chegou';
@@ -460,6 +472,11 @@ function ligarCaso(d, c){
   if((x=document.getElementById('btChegou'))) x.onclick=function(){ acao(base+'/chegou',{}); };
   if((x=document.getElementById('btDesfazer'))) x.onclick=function(){ acao(base+'/desfazer-etapa',{}); };
   if((x=document.getElementById('qMotivo'))) x.onchange=function(){ acao(base+'/editar',{ motivo:this.value }); };
+  if((x=document.getElementById('btTipo'))) x.onclick=function(){
+    var para=this.getAttribute('data-para'), pz=document.getElementById('tPrazo');
+    if(!confirm('Trocar o caso #'+c.id+' para "'+(para==='coleta'?'Nós coletamos':'ML devolve')+'"?')) return;
+    acao(base+'/tipo',{ para:para, prazo:pz?pz.value:undefined });
+  };
   document.querySelectorAll('#painel [data-irmao]').forEach(function(b){ b.onclick=function(){ abrir(+b.getAttribute('data-irmao')); }; });
   if((x=document.getElementById('btAvisoML'))) x.onclick=function(){ acao(base+'/aviso-ml',{}); };
   if((x=document.getElementById('btPrazo'))) x.onclick=function(){ acao(base+'/prazo',{prazo:document.getElementById('novoPrazo').value}); };
@@ -665,6 +682,11 @@ GANCHOS.push({
 
 /* ── FASE 5: o dinheiro (só Admin Geral) e o relatório ── */
 var NOME_SIT={ja_veio:'já veio', pedir:'precisamos pedir ao ML', pedido:'pedimos, esperando o ML'};
+/* O custo da etiqueta de devolução que o ML cobra (AJUSTE de 03/11/2026):
+   existe nos dois tipos, e só aparece a quem vê o dinheiro. */
+function campoEtiqueta(c){
+  return '<div><label>Custo da etiqueta de devolução (R$)</label><input id="dEtiqueta" value="'+(c.custo_etiqueta!=null?virg(c.custo_etiqueta):'')+'" placeholder="se o ML cobrou"></div>';
+}
 GANCHOS.push({
   html:function(d, c, P, aberto){
     var h='';
@@ -686,6 +708,7 @@ GANCHOS.push({
         (c.saida==='perda_prazo'?'<div><label>Valor perdido (R$)</label><input id="dPerdido" value="'+(c.valor_perdido!=null?virg(c.valor_perdido):'')+'"></div>':'')+
         (c.saida==='devolvido_comprador'?'<div><label>Valor devolvido (R$)</label><input id="dDevolvido" value="'+(c.valor_devolvido!=null?virg(c.valor_devolvido):'')+'"></div>':'')+
         (d.tentativas||[]).map(function(t){ return '<div><label>Custo da '+t.numero+'ª tentativa (R$)</label><input data-custot="'+t.id+'" value="'+(t.custo!=null?virg(t.custo):'')+'"></div>'; }).join('')+
+        campoEtiqueta(c)+
         '</div><div class="acoes"><button class="bt sec" id="btValor">Salvar valores</button></div>';
       if(aberto){
         h+= c.devolucao_id
@@ -693,7 +716,8 @@ GANCHOS.push({
           : '<div class="sub" style="margin-top:8px">A baixa do reembolso aparece depois de a peça ser revisada na tela de Devoluções.</div>';
       }
     } else {
-      h+='<div class="sub">O "ML devolve" não tem valor de coleta; ele encerra na baixa da devolução.</div>';
+      h+='<div class="sub">O "ML devolve" não tem valor de coleta; ele encerra na baixa da devolução. Quando o ML cobra a etiqueta de devolução da Deccorar, o custo entra aqui.</div>'+
+        '<div class="grade" style="margin-top:8px">'+campoEtiqueta(c)+'</div><div class="acoes"><button class="bt sec" id="btValor">Salvar valores</button></div>';
     }
     return h+'</div>';
   },
@@ -711,6 +735,7 @@ GANCHOS.push({
       if(v && v.value!==(c.valor_ml!=null?virg(c.valor_ml):'')) corpo.valor_ml=v.value;
       var p=document.getElementById('dPerdido'); if(p) corpo.valor_perdido=p.value;
       var dv=document.getElementById('dDevolvido'); if(dv) corpo.valor_devolvido=dv.value;
+      var de=document.getElementById('dEtiqueta'); if(de && de.value!==(c.custo_etiqueta!=null?virg(c.custo_etiqueta):'')) corpo.custo_etiqueta=de.value;
       var pedidos=[api('POST',base+'/valor',corpo)];
       document.querySelectorAll('#painel [data-custot]').forEach(function(inp){
         var t=(d.tentativas||[]).find(function(k){return String(k.id)===inp.getAttribute('data-custot');});
@@ -739,7 +764,8 @@ function carregarRel(){
       var D=r.dinheiro, ge=D.piso?'≥ ':'';
       h+='<div class="bloco"><h3>Dinheiro do mês (Admin Geral)</h3>'+(D.piso?'<div class="aviso">Total incompleto — falta: '+esc(D.faltam.join(' · '))+'. Os números são o mínimo (≥), não o total.</div>':'')+
         '<div class="dados"><div><b>Valor do ML pelas coletas</b>'+ge+reais(D.valor_ml)+'</div><div><b>Custos das tentativas</b>'+ge+reais(D.custos)+'</div>'+
-        '<div><b>Perda por prazo</b>'+ge+reais(D.perda_prazo)+'</div><div><b>Devolvido ao comprador</b>'+ge+reais(D.devolvido_comprador)+'</div></div></div>';
+        '<div><b>Perda por prazo</b>'+ge+reais(D.perda_prazo)+'</div><div><b>Devolvido ao comprador</b>'+ge+reais(D.devolvido_comprador)+'</div>'+
+        '<div><b>Etiquetas de devolução cobradas pelo ML</b>'+reais(D.custo_etiqueta||0)+'</div></div></div>';
     }
     el.innerHTML=h;
   }).catch(function(e){ el.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; });

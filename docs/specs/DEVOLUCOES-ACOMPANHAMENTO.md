@@ -11,7 +11,7 @@ Criada em: 03/11/2026
 Última atualização: 03/11/2026
 Fase atual: todas em código; falta o deploy e a prova de fábrica
 Fases: 1 ✅  2 ✅  3 ✅  4 ✅  5 ✅  (em código, não no ar)
-Testes: teste_devolucao_casos.js (453 casos, os 52 da §10 e mais), teste_acesso.js (+40),
+Testes: teste_devolucao_casos.js (491 casos, os 52 da §10 e mais), teste_acesso.js (+40),
         teste_caminhos.js (+1); os 62 arquivos da raiz e os 856 do sob medida passando
 Regras que parecem bug: CLAUDE.md §9-B
 Risco: 🔴 (acesso/permissão, dinheiro, schema, toca na devolução que já existe)
@@ -78,6 +78,9 @@ Mudanças no caminho:
     lançamento exigem devolucao.acompanhar; o desfazer passa pela trava dos documentos; o aviso
     de mesmo comprador compara palavra inteira (nome.js mesmaPessoaPorPalavras); colunas novas
     também no CREATE (§17).
+  · AJUSTE de 03/11 (4): trocar o tipo do caso aberto (ML devolve ↔ Nós coletamos; para ML
+    devolve recusado com coleta pedida ou valor lançado) e o custo da etiqueta de devolução
+    cobrada pelo ML, nos dois tipos, só com devolucao.dinheiro e somado à parte no relatório.
 ```
 
 > Desenhada no Projeto do Claude entre 29/10 e 03/11/2026, com o Lucas.

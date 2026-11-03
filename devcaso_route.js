@@ -116,7 +116,7 @@ module.exports = function(app, db){
     /* Valor do ML e custo da coleta no lançamento: só com a chave do dinheiro
        (R15). Sem ela, RECUSA — ignorar calado faria a pessoa achar que gravou. */
     const cheio = (v) => v !== undefined && v !== null && String(v).trim() !== '';
-    if((cheio(b.valor_ml) || (b.coleta && cheio(b.coleta.custo))) && !podeDinheiro(req))
+    if((cheio(b.valor_ml) || cheio(b.custo_etiqueta) || (b.coleta && cheio(b.coleta.custo))) && !podeDinheiro(req))
       return res.status(403).json({ erro:'Valor do ML e custo da coleta só com a permissão de ver o dinheiro das devoluções. Lance sem eles.', chave:'devolucao.dinheiro' });
     /* Pedir a coleta e marcar a situação do valor são de quem acompanha, nas
        rotas próprias; pelo lançamento, também (achado na revisão). */
@@ -148,6 +148,13 @@ module.exports = function(app, db){
     D.novoPrazo(db, req.params.id, (req.body||{}).prazo, req.usuario);
     return { ok:true };
   }));
+
+  /* Trocar o tipo (ML devolve ↔ Nós coletamos) — de quem lança, como o
+     editar. A chave é conferida aqui também: o portão é a primeira trava. */
+  app.post('/api/devolucao-casos/:id/tipo', (req,res) => {
+    if(!pode(req).lancar) return res.status(403).json({ erro:'Trocar o tipo do caso é de quem lança as devoluções.', chave:'devolucao.lancar' });
+    responder(res, () => { D.trocarTipo(db, req.params.id, req.body, req.usuario); return { ok:true }; });
+  });
 
   /* Desfazer a última mudança de etapa feita à mão — só quem a fez. */
   app.post('/api/devolucao-casos/:id/desfazer-etapa', (req,res) => responder(res, () => {

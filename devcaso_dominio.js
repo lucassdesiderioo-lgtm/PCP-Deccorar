@@ -46,7 +46,7 @@ const NOME_SAIDA = {
   revisado_ml:'Revisado (ML devolve)', devolvido_comprador:'Devolvido ao comprador', perda_prazo:'Perda por prazo'
 };
 /* Os campos em reais. Ficam fora de tudo que vai para quem não tem a chave. */
-const DINHEIRO = ['valor_ml','valor_devolvido','valor_perdido'];
+const DINHEIRO = ['valor_ml','valor_devolvido','valor_perdido','custo_etiqueta'];
 
 const PADROES = { devol_prazo_ambar:'3', devol_prazo_vermelho:'1', devol_parado_dias:'2' };
 
@@ -78,7 +78,8 @@ function garantir(db){
     obs TEXT, criado_por TEXT,
     criado_em TEXT DEFAULT (datetime('now','localtime')),
     teste INTEGER DEFAULT 0,
-    publicidade INTEGER, mensagem_ml TEXT, link_ml TEXT)`);
+    publicidade INTEGER, mensagem_ml TEXT, link_ml TEXT,
+    custo_etiqueta REAL)`);
   /* FASE 5 — desde quando o valor do ML está nesta situação (R18: "pedir" há
      ≥ 2 dias entra no parado). O ALTER fica ao lado do CREATE, no fim da
      tabela, para o banco que nasceu antes desta fase (§17). */
@@ -90,6 +91,10 @@ function garantir(db){
   try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN publicidade INTEGER"); }catch(e){}
   try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN mensagem_ml TEXT"); }catch(e){}
   try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN link_ml TEXT"); }catch(e){}
+  /* O custo da etiqueta de devolução que o ML cobra da Deccorar (AJUSTE de
+     03/11/2026, dono): no "ML devolve" também há custo quando o ML entende que
+     o problema é nosso. Dinheiro — só com devolucao.dinheiro (R15). */
+  try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN custo_etiqueta REAL"); }catch(e){}
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_venda ON devolucao_caso(venda)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_aberto ON devolucao_caso(encerrado_em)");
   db.exec(`CREATE TABLE IF NOT EXISTS devolucao_evento (
@@ -419,8 +424,50 @@ function lancarCompleto(db, b, usuario, opt){
     /* Valor sem situação escolhida é "já veio" (a regra do lancarValor);
        com a situação escolhida no lançamento, vale a escolhida. */
     if(valor !== null) valorMudou = lancarValor(db, c.id, sit ? { valor_ml: valor, valor_ml_situacao: sit } : { valor_ml: valor }, usuario);
+    if(preenchido(b.custo_etiqueta)) valorMudou = valorMudou.concat(lancarValor(db, c.id, { custo_etiqueta: b.custo_etiqueta }, usuario));
   })();
   return { caso: ler(db, c.id), valorMudou };
+}
+
+/* TROCAR O TIPO (AJUSTE de 03/11/2026, dono: "ainda não sei se o ML vai me
+   entregar a persiana ou se eu vou ter que coletar"). O tipo deixa de ser
+   fixo enquanto o caso está aberto. A etapa vai para a equivalente do outro
+   tipo, e a DATA da etapa não muda — trocar o tipo não é o caso andar, e o
+   "parado" não zera.
+   · → Nós coletamos: o prazo do ML é obrigatório, como no lançamento.
+   · → ML devolve: RECUSADO com coleta pedida ou valor do ML lançado (decisão
+     do dono). O relatório só soma o dinheiro da coleta no "nós coletamos", e
+     o custo e o valor sairiam da conta calados. O prazo fica guardado. */
+const PARA_ML = { lancado:'aguardando', coleta_pedida:'aguardando', docs_enviados:'aguardando', a_caminho:'aguardando',
+                  chegou:'chegou', ml_avisado:'chegou', revisado:'revisado' };
+const PARA_COLETA = { aguardando:'lancado', chegou:'chegou', revisado:'revisado' };
+function trocarTipo(db, id, b, usuario){
+  const c = aberto(db, id);
+  b = b || {};
+  const para = String(b.para || '').trim();
+  if(!ETAPAS[para]) throw new Recusa(400, 'O tipo é "ML devolve" ou "Nós coletamos".');
+  if(para === c.tipo) throw new Recusa(400, 'O caso já é '+(para === 'coleta' ? '"Nós coletamos"' : '"ML devolve"')+'.');
+  let prazo = c.prazo, etapa;
+  if(para === 'coleta'){
+    prazo = dataValida(b.prazo);
+    if(!prazo) throw new Recusa(400, 'Para passar a "Nós coletamos", informe o prazo do ML (resolver até).');
+    etapa = PARA_COLETA[c.etapa];
+  } else {
+    const tent = db.prepare('SELECT COUNT(*) n FROM devolucao_coleta WHERE caso_id=?').get(c.id).n;
+    if(tent) throw new Recusa(409, 'Este caso já tem coleta pedida com transportadora. Não dá para trocar para "ML devolve": a coleta e o custo dela sairiam da conta.');
+    if(c.valor_ml != null) throw new Recusa(409, 'Este caso já tem o valor do ML pela coleta lançado. Não dá para trocar para "ML devolve": o valor sairia da conta.');
+    etapa = PARA_ML[c.etapa];
+  }
+  if(!etapa) throw new Recusa(409, 'A etapa "'+(NOME_ETAPA[c.etapa]||c.etapa)+'" não tem equivalente no outro tipo.');
+  db.transaction(() => {
+    db.prepare('UPDATE devolucao_caso SET tipo=?, etapa=?, prazo=? WHERE id=?').run(para, etapa, prazo, c.id);
+    // "Passado em" é o dia do lançamento (dono): o "ML devolve" não tem, e quem vira coleta ganha.
+    if(para === 'coleta' && !c.passado_em) db.prepare('UPDATE devolucao_caso SET passado_em=? WHERE id=?').run(String(c.criado_em||'').slice(0,10) || hoje(db), c.id);
+    evento(db, c.id, 'tipo', c.tipo, para, (c.tipo === 'coleta' ? 'Nós coletamos' : 'ML devolve')+' → '+(para === 'coleta' ? 'Nós coletamos' : 'ML devolve')+
+      (para === 'coleta' ? ' · prazo '+prazo.split('-').reverse().join('/') : '')+
+      (etapa !== c.etapa ? ' · etapa '+(NOME_ETAPA[c.etapa]||c.etapa)+' → '+(NOME_ETAPA[etapa]||etapa) : ''), nomeDe(usuario));
+  })();
+  return ler(db, c.id);
 }
 
 /* Editar o que foi lançado. CAMPO AUSENTE NÃO É CAMPO VAZIO (§6, #25): só o
@@ -471,7 +518,7 @@ function moverEtapa(db, c, para, usuario, texto, tipoEvento){
    COM a data de antes. A história guarda o clique e o desfeito: nada se apaga.
    Andar no caso é o que muda a etapa por outra porta (lançar, coleta, chegada,
    revisão, aviso, encerrar, desfazer); editar, anexar, prazo e valor não. */
-const ANDAM = ['lancado','etapa','desfeito','coleta','chegou','aviso_ml','revisado','encerrado'];
+const ANDAM = ['lancado','etapa','desfeito','coleta','chegou','aviso_ml','revisado','encerrado','tipo'];
 function ultimoAndar(db, caso_id){
   return db.prepare('SELECT * FROM devolucao_evento WHERE caso_id=? AND tipo IN ('+ANDAM.map(()=>'?').join(',')+') ORDER BY id DESC LIMIT 1')
     .get(caso_id, ...ANDAM) || null;
@@ -872,7 +919,7 @@ function lancarValor(db, id, b, usuario){
   if(!c) throw new Recusa(404, 'Caso não encontrado. Atualize a lista.');
   b = b || {};
   const sets = [], vals = [], mud = [];
-  const ROT = { valor_ml:'valor do ML', valor_perdido:'valor perdido', valor_devolvido:'valor devolvido' };
+  const ROT = { valor_ml:'valor do ML', valor_perdido:'valor perdido', valor_devolvido:'valor devolvido', custo_etiqueta:'custo da etiqueta de devolução' };
   for(const k of Object.keys(ROT)){
     if(!(k in b)) continue;
     const v = reais(b[k], ROT[k]);
@@ -966,6 +1013,10 @@ function relatorio(db, mes, comDinheiro){
     out.dinheiro = { valor_ml, custos, saldo: r2(valor_ml - custos),
       perda_prazo: r2(casos.filter(c => c.saida === 'perda_prazo').reduce((a,c) => a + (c.valor_perdido || 0), 0)),
       devolvido_comprador: r2(casos.filter(c => c.saida === 'devolvido_comprador').reduce((a,c) => a + (c.valor_devolvido || 0), 0)),
+      /* As etiquetas de devolução que o ML cobrou, de todos os casos do mês
+         (o "ML devolve" também tem). Fora do saldo da coleta: não é custo de
+         coleta, e o saldo do "nós coletamos" não muda. */
+      custo_etiqueta: r2(casos.reduce((a,c) => a + (c.custo_etiqueta || 0), 0)),
       piso: faltam.length > 0, faltam };
   }
   return out;
@@ -987,7 +1038,7 @@ function buscar(db, q, opt){
 }
 
 module.exports = {
-  buscar, lancarCompleto, desfazerEtapa, podeDesfazer, mesmoComprador,
+  buscar, lancarCompleto, trocarTipo, desfazerEtapa, podeDesfazer, mesmoComprador,
   SITUACOES_VALOR, situacaoValor, lancarValor, baixaReembolso, relatorio, custosPorCaso,
   docsExigidos, situacaoDocs, listarAnexos, anexar, arquivoDoAnexo, devolverComprador,
   RESULTADOS, listarTransportadoras, salvarTransportadora, tentativas, pedirColeta, resultadoColeta, sugerirTransportadoras,

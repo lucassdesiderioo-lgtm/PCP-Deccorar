@@ -789,7 +789,7 @@ module.exports = function(app, db){
       const acao = m ? m[1] : '';
       if(M !== 'GET' && ['perda','devolver-comprador','reembolso','valor'].indexOf(acao) >= 0) return 'devolucao.dinheiro';
       if(M === 'GET' && eq('/api/devolucao-casos/relatorio')) return ['devolucao.acompanhar','devolucao.lancar'];
-      if(M !== 'GET' && (eq('/api/devolucao-casos') || acao === 'editar')) return 'devolucao.lancar';
+      if(M !== 'GET' && (eq('/api/devolucao-casos') || acao === 'editar' || acao === 'tipo')) return 'devolucao.lancar';
       if(M !== 'GET') return 'devolucao.acompanhar';
       return ['devolucao.acompanhar','devolucao.lancar'];
     }

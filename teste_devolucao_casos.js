@@ -678,7 +678,7 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
      new RegExp("nome:'" + t + "'").test(fs.readFileSync(path.join(__dirname,'teste_route.js'),'utf8'))));
 
   /* ═════════════════════ FASE 5 — o dinheiro e o relatório ═════════════════════ */
-  const DINHEIRO_CHAVES = ['valor_ml','custo','valor_devolvido','valor_perdido','saldo'];
+  const DINHEIRO_CHAVES = ['valor_ml','custo','valor_devolvido','valor_perdido','saldo','custo_etiqueta'];
   function chavesDe(o, acc){
     acc = acc || new Set();
     if(Array.isArray(o)) o.forEach(x => chavesDe(x, acc));
@@ -1085,6 +1085,67 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   const colsE = db.prepare("SELECT sql FROM sqlite_master WHERE name='devolucao_evento'").get().sql;
   ok('§17: as colunas novas estão no CREATE do código', ['publicidade','mensagem_ml','link_ml'].every(k => new RegExp('\\b'+k+'\\b').test(require('fs').readFileSync(require('path').join(__dirname,'devcaso_dominio.js'),'utf8').split('CREATE TABLE IF NOT EXISTS devolucao_caso')[1].split(')`);')[0])));
   ok('§17: e as do evento também', ['usuario_id','etapa_desde_antes'].every(k => new RegExp('\\b'+k+'\\b').test(require('fs').readFileSync(require('path').join(__dirname,'devcaso_dominio.js'),'utf8').split('CREATE TABLE IF NOT EXISTS devolucao_evento')[1].split(')`);')[0])));
+
+  /* ── AJUSTE de 03/11/2026 (4): trocar o tipo do caso, e o custo da etiqueta ── */
+  secao('trocar o tipo — ML devolve → Nós coletamos');
+  const troca = (id, corpo, quem) => chamar('POST','/api/devolucao-casos/:id/tipo', corpo, quem || 3, { id });
+  let tp = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8800080', publicidade:false }, 3).body.id;
+  db.prepare("UPDATE devolucao_caso SET etapa_desde='2026-10-25 09:00:00' WHERE id=?").run(tp);
+  eq('sem o prazo do ML: recusado', troca(tp, { para:'coleta' }).status, 400);
+  eq('   e o caso continua ML devolve', caso(tp).tipo, 'ml');
+  eq('quem só acompanha não troca', troca(tp, { para:'coleta', prazo:dia(5) }, 2).status, 403);
+  eq('com o prazo: troca', troca(tp, { para:'coleta', prazo:dia(5) }).status, 200);
+  eq('   vira Nós coletamos', caso(tp).tipo, 'coleta');
+  eq('   Aguardando vira Lançado', caso(tp).etapa, 'lancado');
+  eq('   com o prazo gravado', caso(tp).prazo, dia(5));
+  eq('   e o "passado em" vazio ganha o dia do lançamento', caso(tp).passado_em, caso(tp).criado_em.slice(0,10));
+  eq('   e a data da etapa não zera', caso(tp).etapa_desde, '2026-10-25 09:00:00');
+  ok('   e a história diz a troca', eventos(tp).some(e => e.tipo === 'tipo' && e.de === 'ml' && e.para === 'coleta'), JSON.stringify(eventos(tp).map(e => e.tipo)));
+  eq('trocar para o mesmo tipo é recusado', troca(tp, { para:'coleta', prazo:dia(5) }).status, 400);
+  eq('tipo que não existe é recusado', troca(tp, { para:'outro' }).status, 400);
+
+  secao('trocar o tipo — Nós coletamos → ML devolve');
+  chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'coleta_pedida' }, 3, { id:tp });
+  eq('sem coleta nem valor: troca', troca(tp, { para:'ml' }).status, 200);
+  eq('   Coleta pedida (à mão) vira Aguardando', caso(tp).etapa, 'aguardando');
+  eq('   e o prazo fica guardado', caso(tp).prazo, dia(5));
+  eq('   e o desfazer do clique de antes não volta para o outro tipo', det(tp, 3).desfazer, null);
+  rp = lanC({ venda:'8800081', coleta:{ transportadora_id:tL } }, 3);
+  eq('com coleta pedida: recusado', troca(rp.body.id, { para:'ml' }).status, 409);
+  ok('   e a recusa diz por quê', /coleta/i.test(troca(rp.body.id, { para:'ml' }).body.erro || ''));
+  eq('   e o caso fica', caso(rp.body.id).tipo, 'coleta');
+  rp = lanC({ venda:'8800082', valor_ml:'90' }, 1);
+  eq('com valor do ML lançado: recusado', troca(rp.body.id, { para:'ml' }).status, 409);
+  rp = lanC({ venda:'8800083' }, 3);
+  db.prepare("UPDATE devolucao_caso SET etapa='ml_avisado', chegou_em=datetime('now','localtime') WHERE id=?").run(rp.body.id);
+  troca(rp.body.id, { para:'ml' });
+  eq('ML avisado vira Chegou', caso(rp.body.id).etapa, 'chegou');
+  rp = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8800084', publicidade:false }, 3);
+  db.prepare("UPDATE devolucao_caso SET etapa='revisado' WHERE id=?").run(rp.body.id);
+  troca(rp.body.id, { para:'coleta', prazo:dia(3) });
+  eq('Revisado fica Revisado', caso(rp.body.id).etapa, 'revisado');
+  eq('caso encerrado não troca', troca(mFechado, { para:'ml' }).status, 409);
+
+  secao('custo da etiqueta de devolução — no ML devolve também há custo');
+  rp = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8800090', publicidade:false, custo_etiqueta:'48,70' }, 1);
+  eq('lançar com o custo da etiqueta (com a chave do dinheiro)', rp.status, 200);
+  const ce = rp.body.id;
+  eq('   gravado', caso(ce).custo_etiqueta, 48.7);
+  eq('sem a chave do dinheiro: 403', chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8800091', publicidade:false, custo_etiqueta:'48,70' }, 3).status, 403);
+  eq('   e nada gravado', contar('devolucao_caso',"venda='8800091'"), 0);
+  eq('custo impossível: recusado', chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8800092', publicidade:false, custo_etiqueta:'abc' }, 1).status, 400);
+  eq('corrigir pelo "Salvar valores"', chamar('POST','/api/devolucao-casos/:id/valor',{ custo_etiqueta:'50' }, 1, { id:ce }).status, 200);
+  eq('   corrigido', caso(ce).custo_etiqueta, 50);
+  ok('   a história diz o que mudou, sem o número', eventos(ce).some(e => e.tipo === 'valor' && /etiqueta/.test(e.texto) && !/50/.test(e.texto)), JSON.stringify(eventos(ce).map(e=>e.texto)));
+  eq('   e vai para a auditoria', AUDIT.some(a => a.acao === 'valor' && a.alvo === String(ce)), true);
+  eq('sem a chave, o "Salvar valores" é recusado', chamar('POST','/api/devolucao-casos/:id/valor',{ custo_etiqueta:'1' }, 2, { id:ce }).status, 403);
+  ok('o custo não viaja a quem não tem a chave (caso)', !chavesDe(det(ce, 2)).has('custo_etiqueta'));
+  ok('   nem na lista', !chavesDe(chamar('GET','/api/devolucao-casos',null,2).body).has('custo_etiqueta'));
+  eq('   e viaja a quem tem', det(ce, 1).caso.custo_etiqueta, 50);
+  const relCE = chamar('GET','/api/devolucao-casos/relatorio',null,1,{},{ mes:dia(0).slice(0,7) }).body;
+  eq('o relatório soma as etiquetas', relCE.dinheiro.custo_etiqueta,
+     Math.round(db.prepare("SELECT SUM(custo_etiqueta) s FROM devolucao_caso WHERE teste=0 AND substr(criado_em,1,7)=?").get(dia(0).slice(0,7)).s * 100) / 100);
+  ok('   e quem não tem a chave não vê', !chavesDe(chamar('GET','/api/devolucao-casos/relatorio',null,2,{},{ mes:dia(0).slice(0,7) }).body).has('custo_etiqueta'));
 
   secao('motivo removido da lista — o caso que já usa ele não perde');
   db.prepare("INSERT INTO listas (tipo,valor,ordem,ativo) VALUES ('motivo_devolucao','Motivo que vai sair',99,1)").run();
