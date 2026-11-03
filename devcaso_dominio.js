@@ -31,11 +31,14 @@ const NOME_ETAPA = {
 };
 /* As que se movem À MÃO pela tela. As outras têm porta própria:
    - `chegou` é o botão "chegou" (ou o bipe do Edvaldo);
-   - `ml_avisado` só depois de chegar;
+   - `ml_avisado` é o botão "avisamos o ML", e só depois de chegar. Ele é
+     botão, e não etapa à mão, porque o aviso pode vir DEPOIS da revisão do
+     Edvaldo — e aí ele é só história: voltar o caso de "revisado" para "ML
+     avisado" apagaria da trilha que a peça já foi revisada;
    - `revisado` é o bipe do Edvaldo, na tela de sempre (R14);
    - `encerrado` é decisão (R19). */
 const MANUAIS = {
-  coleta: ['lancado','coleta_pedida','docs_enviados','a_caminho','ml_avisado'],
+  coleta: ['lancado','coleta_pedida','docs_enviados','a_caminho'],
   ml:     ['aguardando']
 };
 const NOME_SAIDA = {
@@ -352,7 +355,87 @@ function encerrarPerda(db, id, b, usuario){
   return ler(db, c.id);
 }
 
+/* ═══ FASE 2 — a chegada ═══ */
+
+/* O caso ABERTO que a etiqueta bipada aponta: venda, pack ou NF (R2). A caixa
+   que vem por transportadora pode chegar só com a NF. */
+function abertoPorCodigo(db, cod, opt){
+  const c = String(cod||'').trim(), dig = c.replace(/\D/g,'');
+  if(!c) return null;
+  const semRevisao = (opt && opt.semRevisao) ? ' AND devolucao_id IS NULL' : '';
+  return db.prepare(`SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL`+semRevisao+`
+    AND (venda=? OR venda=? OR pack_id=? OR pack_id=? OR nf=? OR nf=?) ORDER BY id DESC LIMIT 1`)
+    .get(c, dig, c, dig, c, dig) || null;
+}
+
+/* O botão "chegou": a caixa chegou e ainda não foi revisada. A chegada é UMA
+   — revisar depois não regrava a data (teste 27). */
+function chegou(db, id, usuario){
+  const c = aberto(db, id);
+  if(c.chegou_em) throw new Recusa(409, 'A chegada do caso #'+c.id+' já foi marcada em '+c.chegou_em.slice(8,10)+'/'+c.chegou_em.slice(5,7)+'.');
+  const etapas = ETAPAS[c.tipo];
+  db.transaction(() => {
+    db.prepare("UPDATE devolucao_caso SET chegou_em=datetime('now','localtime') WHERE id=?").run(c.id);
+    if(etapas.indexOf(c.etapa) < etapas.indexOf('chegou')) moverEtapa(db, c, 'chegou', usuario, 'a caixa chegou');
+    else evento(db, c.id, 'chegou', null, null, 'a caixa chegou', nomeDe(usuario));
+  })();
+  return ler(db, c.id);
+}
+
+/* "Avisamos o ML que recebemos" (⑥). Antes da revisão vira a etapa; depois,
+   só história — a trilha não volta de "revisado". */
+function avisarML(db, id, usuario){
+  const c = aberto(db, id);
+  if(c.tipo !== 'coleta') throw new Recusa(400, 'No "ML devolve" não há aviso de recebimento a fazer.');
+  if(!c.chegou_em) throw new Recusa(400, 'Só se avisa o ML que recebemos depois de a peça chegar.');
+  const ja = c.etapa === 'ml_avisado' || db.prepare("SELECT 1 FROM devolucao_evento WHERE caso_id=? AND tipo='aviso_ml'").get(c.id);
+  if(ja) throw new Recusa(409, 'O aviso ao ML do caso #'+c.id+' já foi registrado.');
+  db.transaction(() => {
+    if(c.etapa === 'chegou') moverEtapa(db, c, 'ml_avisado', usuario, 'avisamos o ML que recebemos', 'aviso_ml');
+    else evento(db, c.id, 'aviso_ml', null, null, 'avisamos o ML que recebemos', nomeDe(usuario));
+  })();
+  return ler(db, c.id);
+}
+
+/* A revisão do Edvaldo LIGA o caso (R14). Sem caso, devolve null e nada é
+   tocado — o vínculo é bônus, não requisito (§9). Quem chama abre a transação
+   (a mesma da gravação da devolução): revisão sem o caso ligado, ou caso
+   ligado a revisão que não gravou, é a história mentindo. */
+function ligarRevisao(db, ref, devolucao_id, usuario){
+  ref = ref || {};
+  let c = null;
+  if(ref.caso_id){
+    const x = ler(db, ref.caso_id);
+    if(x && !x.encerrado_em && !x.devolucao_id) c = x;
+  }
+  if(!c) c = abertoPorCodigo(db, ref.codigo, { semRevisao:true });
+  if(!c) return null;
+  db.prepare(`UPDATE devolucao_caso SET devolucao_id=?, chegou_em=COALESCE(chegou_em, datetime('now','localtime')),
+    etapa='revisado', etapa_desde=datetime('now','localtime') WHERE id=?`).run(devolucao_id, c.id);
+  evento(db, c.id, 'revisado', c.etapa, 'revisado', 'revisão #'+devolucao_id+' na tela de Devoluções', nomeDe(usuario));
+  return c.id;
+}
+
+/* A BAIXA de uma devolução ligada a um caso (a baixa que já existe, na aba
+   Devoluções do admin). O motivo vem do caso quando ninguém escolheu (R12);
+   o "ML devolve" encerra aqui, porque é o fim dele (R19). O "nós coletamos"
+   NÃO: ele ainda espera o reembolso, que é do admin geral. Quem chama abre a
+   transação. Devolve o motivo a gravar na devolução. */
+function baixaDaDevolucao(db, devolucao_id, motivoEscolhido, usuario){
+  const c = db.prepare('SELECT * FROM devolucao_caso WHERE devolucao_id=? AND encerrado_em IS NULL').get(devolucao_id);
+  if(!c) return { motivo: motivoEscolhido || null, caso:null };
+  const motivo = motivoEscolhido || c.motivo || null;
+  if(!c.motivo && motivoEscolhido){
+    // Um motivo por caso: o caso sem motivo ganha o da baixa, e isso é história.
+    db.prepare('UPDATE devolucao_caso SET motivo=? WHERE id=?').run(motivoEscolhido, c.id);
+    evento(db, c.id, 'editado', null, null, 'motivo: — → '+motivoEscolhido+' (na baixa)', nomeDe(usuario));
+  }
+  if(c.tipo === 'ml') encerrar(db, c, 'revisado_ml', usuario, 'baixa da devolução #'+devolucao_id);
+  return { motivo, caso:c.id };
+}
+
 module.exports = {
+  abertoPorCodigo, chegou, avisarML, ligarRevisao, baixaDaDevolucao,
   ETAPAS, MANUAIS, NOME_ETAPA, NOME_SAIDA, DINHEIRO, Recusa,
   garantir, hoje, dataValida, dias, limites, situacao, publico, evento,
   buscarLote, buscarLotePorNF, ler, abertoDaVenda, listar, encerrados, detalhe,

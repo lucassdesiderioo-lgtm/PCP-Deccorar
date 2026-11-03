@@ -351,6 +351,121 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   ok('todo caso inicial nasceu com o evento de lançamento', db.prepare(
     "SELECT COUNT(*) n FROM devolucao_caso c WHERE responsavel='Renato' AND NOT EXISTS (SELECT 1 FROM devolucao_evento e WHERE e.caso_id=c.id)").get().n === 0);
 
+  /* ═══════════════════════ FASE 2 — a chegada ═══════════════════════ */
+  db.exec(`INSERT INTO lote (codigo,buyer,nf,venda,packId) VALUES
+    ('BK140140BEGE','Rita Melo','9101','2000000000009101','2000099900009101'),
+    ('BK160140BEGE','Ivo Reis','9102','2000000000009102',NULL),
+    ('BK160160BRANCO','Lia Paz','9103','2000000000009103',NULL)`);
+  const B = (cod) => chamar('GET','/api/devolucao/buscar/:cod',null,4,{cod});
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000000000009101', motivo:'Falta de kit' }, 3);
+  const k21 = r.body.id;
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'2000000000009102', motivo:'Chegou amassada', prazo:dia(6) }, 3);
+  const k29 = r.body.id;
+
+  secao('21. o bipe do Edvaldo acha o caso aberto pela venda');
+  r = B('2000000000009101');
+  ok('devolve o caso', r.body.caso && r.body.caso.id === k21, JSON.stringify(r.body));
+  eq('   com o motivo do caso (a tarja)', r.body.caso && r.body.caso.motivo, 'Falta de kit');
+  eq('   e continua devolvendo a venda do lote, como hoje', r.body.venda && r.body.venda.codigo, 'BK140140BEGE');
+
+  secao('22. acha também pelo pack e pela NF');
+  r = B('2000 0999 0000 9101');
+  ok('pelo pack, mesmo com espaços', r.body.caso && r.body.caso.id === k21, JSON.stringify(r.body));
+  r = B('9102');
+  ok('pela NF (a caixa que veio por transportadora)', r.body.caso && r.body.caso.id === k29, JSON.stringify(r.body));
+  eq('   e pela NF o volume vem do caso', r.body.venda && r.body.venda.codigo, 'BK160140BEGE');
+
+  secao('23. sem caso, o bipe responde IGUAL a hoje');
+  r = B('2000000000009103');
+  eq('as mesmas duas chaves de sempre', Object.keys(r.body).sort().join(','), 'achou,venda');
+  eq('achou a venda do lote', r.body.achou, true);
+  r = B('5555555555');
+  eq('sem venda e sem caso: as duas chaves', Object.keys(r.body).sort().join(','), 'achou,venda');
+  eq('   achou:false', r.body.achou, false);
+
+  secao('24. salvar a revisão com caso liga o caso');
+  r = chamar('POST','/api/devolucao',{ codigo_ml:'2000000000009101', caso_id:k21, sku_fisico:'BK140140BEGE', destinacao:'estoque', kit:'faltando' }, 4);
+  eq('salva', r.status, 200);
+  let k = caso(k21);
+  eq('devolucao_id ligado à revisão', k.devolucao_id, r.body.id);
+  ok('chegou_em gravado', !!k.chegou_em);
+  eq('etapa revisado', k.etapa, 'revisado');
+  ok('com evento do Edvaldo', eventos(k21).some(e => e.para === 'revisado' && e.usuario === 'Edvaldo'));
+  eq('a resposta diz qual caso ligou', r.body.caso_id, k21);
+  const dv24 = db.prepare('SELECT * FROM devolucao WHERE id=?').get(r.body.id);
+  eq('a triagem continua igual (R13)', dv24.kit, 'faltando');
+  eq('nenhum caso ganhou motivo da triagem', caso(k21).motivo, 'Falta de kit');
+
+  secao('25. salvar SEM caso grava igual a hoje, e não toca em caso nenhum');
+  const ligados = contar('devolucao_caso','devolucao_id IS NOT NULL');
+  const evAntes = contar('devolucao_evento');
+  r = chamar('POST','/api/devolucao',{ codigo_ml:'2000000000009103', sku_fisico:'BK160160BRANCO', destinacao:'estoque' }, 4);
+  eq('salva', r.status, 200);
+  eq('nenhum caso novo ligado', contar('devolucao_caso','devolucao_id IS NOT NULL'), ligados);
+  eq('nenhum evento novo', contar('devolucao_evento'), evAntes);
+  eq('a resposta não fala de caso', r.body.caso_id, undefined);
+
+  secao('26. reembalar com caso continua indo para a fila');
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'7770026', sku:'BK160140BEGE' }, 3);
+  const k26 = r.body.id;
+  const filaAntes = contar('fila',"modo='devolucao'");
+  r = chamar('POST','/api/devolucao',{ codigo_ml:'7770026', caso_id:k26, sku_fisico:'BK160140BEGE', destinacao:'reembalar' }, 4);
+  eq('responde naFila', r.body.naFila, true);
+  eq('entrou na fila com modo devolucao', contar('fila',"modo='devolucao'"), filaAntes + 1);
+  eq('e o caso foi ligado', caso(k26).devolucao_id, r.body.id);
+
+  secao('27. o botão "chegou", e revisar depois não regrava a chegada');
+  r = chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, {id:k29});
+  eq('marca a chegada', r.status, 200);
+  k = caso(k29);
+  eq('etapa chegou', k.etapa, 'chegou');
+  ok('chegou_em gravado', !!k.chegou_em);
+  db.prepare("UPDATE devolucao_caso SET chegou_em='2026-11-01 08:00:00' WHERE id=?").run(k29);
+  eq('"chegou" de novo é recusado (409)', chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, {id:k29}).status, 409);
+  r = chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 2, {id:k29});
+  eq('avisar o ML que recebemos', r.status, 200);
+  eq('   leva a ML avisado', caso(k29).etapa, 'ml_avisado');
+  eq('   e não se avisa duas vezes', chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 2, {id:k29}).status, 409);
+  /* O tablet sem o refresh não manda o caso_id: o servidor acha sozinho pela etiqueta. */
+  r = chamar('POST','/api/devolucao',{ codigo_ml:'9102', sku_fisico:'BK160140BEGE', destinacao:'descarte' }, 4);
+  eq('a revisão sem caso_id liga pelo código bipado', caso(k29).devolucao_id, r.body.id);
+  eq('revisar depois não regrava chegou_em', caso(k29).chegou_em, '2026-11-01 08:00:00');
+  eq('e marca revisado', caso(k29).etapa, 'revisado');
+  eq('"chegou" no caso que não chegou pelo ML devolve sem prazo também funciona',
+     chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, {id:c2b.id}).status, 200);
+
+  secao('28. a baixa da devolução ligada: o motivo vem do caso, e o "ML devolve" encerra');
+  const pend = chamar('GET','/api/devolucao/pendentes',null,3).body;
+  const p28 = pend.find(d => d.id === caso(k21).devolucao_id);
+  eq('a lista de pendentes traz o motivo do caso', p28 && p28.caso_motivo, 'Falta de kit');
+  eq('   e o número do caso', p28 && p28.caso_id, k21);
+  r = chamar('POST','/api/devolucao/baixa',{ id:caso(k21).devolucao_id, reputacao:'nao' }, 3);
+  eq('a baixa sem motivo escolhido passa', r.status, 200);
+  eq('   e grava o motivo do caso', db.prepare('SELECT motivo FROM devolucao WHERE id=?').get(caso(k21).devolucao_id).motivo, 'Falta de kit');
+  k = caso(k21);
+  eq('o caso "ML devolve" encerra', k.saida, 'revisado_ml');
+  ok('   com quem e quando', k.encerrado_por === 'Ana' && !!k.encerrado_em, JSON.stringify(k));
+  r = chamar('POST','/api/devolucao/baixa',{ id: (function(){ const x = chamar('POST','/api/devolucao',{ codigo_ml:'9999000', sku_fisico:'BK140140BEGE', destinacao:'estoque' }, 4); return x.body.id; })(), reputacao:'nao' }, 3);
+  eq('a baixa SEM caso e sem motivo continua aceita (como hoje)', r.status, 200);
+
+  secao('29. o "nós coletamos" revisado NÃO encerra com a baixa da devolução');
+  r = chamar('POST','/api/devolucao/baixa',{ id:caso(k29).devolucao_id, reputacao:'sim', motivo:'Avaria no transporte' }, 3);
+  eq('a baixa passa', r.status, 200);
+  eq('o caso continua aberto (espera a baixa do reembolso)', caso(k29).encerrado_em, null);
+  eq('   revisado', caso(k29).etapa, 'revisado');
+  eq('a baixa grava o motivo que a pessoa escolheu', db.prepare('SELECT motivo FROM devolucao WHERE id=?').get(caso(k29).devolucao_id).motivo, 'Avaria no transporte');
+  eq('   e o motivo do caso não muda por isso (um motivo por caso)', caso(k29).motivo, 'Chegou amassada');
+
+  secao('30. SKU não cadastrado continua recusado, com caso ou sem');
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'7770030' }, 3);
+  const k30 = r.body.id;
+  r = chamar('POST','/api/devolucao',{ codigo_ml:'7770030', caso_id:k30, sku_fisico:'NAOEXISTE1', destinacao:'estoque' }, 4);
+  eq('recusado (400)', r.status, 400);
+  ok('   nomeando o SKU', /NAOEXISTE1/.test(r.body.erro || ''));
+  eq('   e o caso não foi tocado', caso(k30).devolucao_id, null);
+  eq('   nem a etapa', caso(k30).etapa, 'aguardando');
+  eq('   nem a chegada', caso(k30).chegou_em, null);
+
   fim();
 })().catch(e => { console.log('ESTOUROU: ' + e.stack); falhas++; fim(); });
 

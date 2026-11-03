@@ -3024,6 +3024,9 @@ async function carregarDev(){
     h+='<div class="sub" style="margin-top:10px;line-height:1.7">Embalagem: <b>'+(d.embalagem||'-')+'</b> &middot; Tecido: <b>'+(d.tecido||'-')+'</b> &middot; Tubo: <b>'+(d.tubo||'-')+'</b> &middot; Base: <b>'+(d.base||'-')+'</b> &middot; Comando: <b>'+(d.comando||'-')+'</b> &middot; Kit: <b>'+(d.kit||'-')+'</b><br>Destinacao: <b style="color:var(--amber)">'+(d.destinacao||'-')+'</b>';
     if(d.obs) h+='<br>Obs: '+d.obs;
     if(d.codigo_ml) h+='<br>Etiqueta ML: '+d.codigo_ml;
+    /* Ligada a um caso em andamento (spec DEVOLUCOES-ACOMPANHAMENTO, R12): o
+       motivo ja foi escolhido no caso e vem marcado. Trocar continua possivel. */
+    if(d.caso_id) h+='<br>Caso em andamento <b>#'+d.caso_id+'</b> ('+(d.caso_tipo==='coleta'?'nós coletamos':'ML devolve')+')'+(d.caso_motivo?' · motivo do caso: <b>'+d.caso_motivo+'</b>':'');
     h+='</div>';
     h+='<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">';
     h+='<div class="sub" style="margin-bottom:6px">Afetou a reputacao?</div><div style="display:flex;gap:8px;margin-bottom:12px">';
@@ -3033,7 +3036,8 @@ async function carregarDev(){
     for(var j=0;j<DVMOTIVOS.length;j++){
       h+='<button class="ghost dvMot" data-id="'+d.id+'" data-v="'+DVMOTIVOS[j].valor+'">'+DVMOTIVOS[j].valor+'</button>';
     }
-    h+='<span id="mot'+d.id+'" style="align-self:center;color:var(--amber);font-weight:700"></span></div>';
+    if(d.caso_motivo && !(DVESC[d.id]&&DVESC[d.id].mot)){ DVESC[d.id]=DVESC[d.id]||{}; DVESC[d.id].mot=d.caso_motivo; }
+    h+='<span id="mot'+d.id+'" style="align-self:center;color:var(--amber);font-weight:700">'+((DVESC[d.id]&&DVESC[d.id].mot)||'')+'</span></div>';
     h+='<button class="primary dvBaixa" data-id="'+d.id+'" style="margin-top:14px">Dar baixa</button>';
     h+='</div></div>';
   }

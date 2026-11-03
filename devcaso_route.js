@@ -83,6 +83,16 @@ module.exports = function(app, db){
     return { ok:true };
   }));
 
+  /* A caixa chegou e ainda não foi revisada (fase 2). */
+  app.post('/api/devolucao-casos/:id/chegou', (req,res) => responder(res, () => {
+    D.chegou(db, req.params.id, req.usuario);
+    return { ok:true };
+  }));
+  app.post('/api/devolucao-casos/:id/aviso-ml', (req,res) => responder(res, () => {
+    D.avisarML(db, req.params.id, req.usuario);
+    return { ok:true };
+  }));
+
   /* ── decisões do admin geral (devolucao.dinheiro) ── */
   app.post('/api/devolucao-casos/:id/perda', (req,res) => {
     if(!podeDinheiro(req)) return semDinheiro(req, res);

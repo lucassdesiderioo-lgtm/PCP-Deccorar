@@ -5,8 +5,8 @@ STATUS
 Situação: em construção
 Criada em: 03/11/2026
 Última atualização: 03/11/2026
-Fase atual: 1 em código (falta subir)
-Fases: 1 ✅ em código  2 ☐  3 ☐  4 ☐  5 ☐
+Fase atual: 2 em código (falta subir)
+Fases: 1 ✅ em código  2 ✅ em código  3 ☐  4 ☐  5 ☐
 Risco: 🔴 (acesso/permissão, dinheiro, schema, toca na devolução que já existe)
 Mudanças no caminho:
   · Fase 1 (03/11): `devcaso_dominio.js` é o dono único do caso, do prazo e do parado;
@@ -20,6 +20,13 @@ Mudanças no caminho:
     só depois de chegar, `revisado` é o bipe do Edvaldo e `encerrado` é decisão.
   · Perda por prazo não exige o caso vencido: travar no "ainda não venceu" seria trava
     disparando no caso normal (armadilha #6); quem decide é o admin geral.
+  · Fase 2 (03/11): o bipe acha o caso pela venda, pelo pack ou pela NF; sem caso, a resposta
+    é a de sempre (as mesmas duas chaves). O salvar liga pelo `caso_id` da tarja OU, no
+    tablet sem o refresh, pela etiqueta bipada — na mesma transação da revisão.
+  · "ML avisado" virou botão ("Avisamos o ML que recebemos"), e não etapa à mão: o aviso
+    pode vir depois da revisão, e aí é só história — a trilha não volta de "revisado".
+  · Na baixa ligada a um caso sem motivo, o motivo escolhido na baixa vira o do caso
+    (um motivo por caso); o caso que já tem motivo não muda.
 ```
 
 > Desenhada no Projeto do Claude entre 29/10 e 03/11/2026, com o Lucas.
