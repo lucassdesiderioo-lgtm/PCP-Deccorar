@@ -96,6 +96,11 @@ function garantir(db){
     tipo TEXT, de TEXT, para TEXT, texto TEXT, usuario TEXT,
     criado_em TEXT DEFAULT (datetime('now','localtime')),
     teste INTEGER DEFAULT 0)`);
+  /* AJUSTE de 03/11/2026 (o desfazer): quem moveu a etapa, pelo id e não só
+     pelo nome, e a data em que o caso estava na etapa de antes — é ela que
+     volta, para o "parado" não zerar por causa de um clique errado. */
+  try{ db.exec("ALTER TABLE devolucao_evento ADD COLUMN usuario_id INTEGER"); }catch(e){}
+  try{ db.exec("ALTER TABLE devolucao_evento ADD COLUMN etapa_desde_antes TEXT"); }catch(e){}
   db.exec("CREATE INDEX IF NOT EXISTS idx_devevento_caso ON devolucao_evento(caso_id)");
   /* FASE 3 — a transportadora é CADASTRO (não entra no modo teste); a
      tentativa de coleta é movimento (entra). */
@@ -197,8 +202,8 @@ function custosPorCaso(db){
 }
 
 function evento(db, caso_id, tipo, de, para, texto, usuario){
-  db.prepare('INSERT INTO devolucao_evento (caso_id,tipo,de,para,texto,usuario) VALUES (?,?,?,?,?,?)')
-    .run(caso_id, tipo, de == null ? null : String(de), para == null ? null : String(para), texto || null, usuario || null);
+  return db.prepare('INSERT INTO devolucao_evento (caso_id,tipo,de,para,texto,usuario) VALUES (?,?,?,?,?,?)')
+    .run(caso_id, tipo, de == null ? null : String(de), para == null ? null : String(para), texto || null, usuario || null).lastInsertRowid;
 }
 
 /* ── leituras ── */
@@ -223,8 +228,9 @@ function listar(db, opt){
   const o = opt || {};
   const h = hoje(db), lim = limites(db);
   const cu = o.comDinheiro ? custosPorCaso(db) : null;
-  const linhas = db.prepare('SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL ORDER BY id').all()
-    .map(c => publico(c, h, lim, o.comDinheiro, cu));
+  const abertos = db.prepare('SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL ORDER BY id').all();
+  const linhas = abertos.map(c => Object.assign(publico(c, h, lim, o.comDinheiro, cu),
+    { mesmo_comprador: irmaos(abertos, c.comprador, c.id).map(x => x.id) }));
   /* R3: o "nós coletamos" vai pelo PRAZO — o vencido mais antigo em cima —,
      nunca pela data de lançamento. Sem prazo (não deveria existir) vai ao fim. */
   const coleta = linhas.filter(c => c.tipo === 'coleta').sort((a,b) => {
@@ -241,6 +247,19 @@ function encerrados(db, opt){
   return db.prepare('SELECT * FROM devolucao_caso WHERE encerrado_em IS NOT NULL ORDER BY encerrado_em DESC, id DESC LIMIT ?')
     .all(o.limite || 200).map(c => publico(c, h, lim, o.comDinheiro, cu));
 }
+/* A MESMA PESSOA COM VÁRIOS CASOS ABERTOS (AJUSTE de 03/11/2026, dono:
+   "ela sabe que tem 3 unidades da mesma pessoa"). Só AVISA: cada venda tem o
+   seu prazo, o seu valor e o seu reembolso no ML, então os casos continuam
+   separados. Quem diz se dois nomes são a mesma pessoa é o nome.js (a régua
+   única da expedição); nome vazio não junta ninguém. */
+function irmaos(abertos, comprador, menos){
+  const N = require('./nome');
+  if(!N.nomeChave(comprador)) return [];
+  return abertos.filter(x => x.id !== menos && N.mesmoCliente(x.comprador, comprador) === true);
+}
+function mesmoComprador(db, comprador, menos){
+  return irmaos(db.prepare('SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL ORDER BY id').all(), comprador, menos);
+}
 function detalhe(db, id, opt){
   const c = ler(db, id);
   if(!c) throw new Recusa(404, 'Caso não encontrado. Atualize a lista.');
@@ -250,7 +269,9 @@ function detalhe(db, id, opt){
            anexos: listarAnexos(db, c.id),
            docs: c.tipo === 'coleta' ? situacaoDocs(db, c.id) : [],
            eventos: db.prepare('SELECT id,tipo,de,para,texto,usuario,criado_em FROM devolucao_evento WHERE caso_id=? ORDER BY id').all(c.id),
-           etapas: ETAPAS[c.tipo], manuais: MANUAIS[c.tipo], nomes: NOME_ETAPA };
+           etapas: ETAPAS[c.tipo], manuais: MANUAIS[c.tipo], nomes: NOME_ETAPA,
+           desfazer: podeDesfazer(db, c, o.usuario),
+           mesmo_comprador: mesmoComprador(db, c.comprador, c.id).map(x => ({ id:x.id, venda:x.venda, nf:x.nf, tipo:x.tipo, etapa_nome: NOME_ETAPA[x.etapa] || x.etapa })) };
 }
 
 /* ── validações ── */
@@ -358,7 +379,7 @@ function lancar(db, b, usuario, opt){
         tipo, venda || null, pack || null, nf || null,
         txt(b.sku) || (lt ? lt.codigo : null), txt(b.comprador) || (lt ? lt.buyer : null), lt ? lt.id : null,
         motivo, etapa, prazo,
-        txt(b.responsavel), passado_em, txt(b.cep),
+        txt(b.responsavel), passado_em, cepDe(b.cep),
         b._valor_ml === undefined ? null : b._valor_ml, b._valor_ml_situacao || null,
         txt(b.obs), nomeDe(usuario), publicidade, mensagem_ml, link_ml).lastInsertRowid;
     if(b._valor_ml_situacao) db.prepare("UPDATE devolucao_caso SET valor_ml_desde=datetime('now','localtime') WHERE id=?").run(id);
@@ -366,6 +387,33 @@ function lancar(db, b, usuario, opt){
       (publicidade == null ? '' : ' · via publicidade: '+simNao(publicidade)), nomeDe(usuario));
   })();
   return ler(db, id);
+}
+
+/* O LANÇAMENTO COMPLETO (AJUSTE de 03/11/2026, dono: "no lançar devolução é
+   onde devemos já lançar o maior número de informações"). Lança e, no mesmo
+   passo, pede a coleta, marca a situação do valor do ML e lança o valor —
+   pelas MESMAS funções da tela do caso, nunca uma segunda conta. É uma
+   transação só: se uma parte for recusada, o caso não nasce pela metade.
+   Bloco vazio é como não ter vindo. Quem pode mandar valor e custo é a rota
+   que decide (a chave do dinheiro, R15). */
+const preenchido = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+function lancarCompleto(db, b, usuario, opt){
+  b = b || {};
+  const co = (b.coleta && preenchido(b.coleta.transportadora_id)) ? b.coleta : null;
+  const sit = preenchido(b.valor_ml_situacao) ? String(b.valor_ml_situacao).trim() : null;
+  const valor = preenchido(b.valor_ml) ? b.valor_ml : null;
+  if((co || sit || valor !== null) && String(b.tipo||'').trim() === 'ml')
+    throw new Recusa(400, 'No "ML devolve" a coleta e o valor são do Mercado Livre: lance sem eles.');
+  let c, valorMudou = [];
+  db.transaction(() => {
+    c = lancar(db, b, usuario, opt);
+    if(co) pedirColeta(db, c.id, { transportadora_id: co.transportadora_id, custo: co.custo, cep: b.cep, obs: co.obs }, usuario);
+    if(sit) situacaoValor(db, c.id, sit, usuario);
+    /* Valor sem situação escolhida é "já veio" (a regra do lancarValor);
+       com a situação escolhida no lançamento, vale a escolhida. */
+    if(valor !== null) valorMudou = lancarValor(db, c.id, sit ? { valor_ml: valor, valor_ml_situacao: sit } : { valor_ml: valor }, usuario);
+  })();
+  return { caso: ler(db, c.id), valorMudou };
 }
 
 /* Editar o que foi lançado. CAMPO AUSENTE NÃO É CAMPO VAZIO (§6, #25): só o
@@ -404,7 +452,48 @@ function editar(db, id, b, usuario){
 
 function moverEtapa(db, c, para, usuario, texto, tipoEvento){
   db.prepare("UPDATE devolucao_caso SET etapa=?, etapa_desde=datetime('now','localtime') WHERE id=?").run(para, c.id);
-  evento(db, c.id, tipoEvento || 'etapa', c.etapa, para, texto, nomeDe(usuario));
+  const ev = evento(db, c.id, tipoEvento || 'etapa', c.etapa, para, texto, nomeDe(usuario));
+  db.prepare('UPDATE devolucao_evento SET usuario_id=?, etapa_desde_antes=? WHERE id=?').run((usuario && usuario.id) || null, c.etapa_desde || null, ev);
+}
+
+/* O DESFAZER (AJUSTE de 03/11/2026, dono: "um clique acidental vai me trazer
+   problema"). Volta SÓ a última mudança de etapa feita à mão, SÓ por quem a
+   fez, e só enquanto nada mais andou no caso. O caso volta à etapa de antes
+   COM a data de antes. A história guarda o clique e o desfeito: nada se apaga.
+   Andar no caso é o que muda a etapa por outra porta (lançar, coleta, chegada,
+   revisão, aviso, encerrar, desfazer); editar, anexar, prazo e valor não. */
+const ANDAM = ['lancado','etapa','desfeito','coleta','chegou','aviso_ml','revisado','encerrado'];
+function ultimoAndar(db, caso_id){
+  return db.prepare('SELECT * FROM devolucao_evento WHERE caso_id=? AND tipo IN ('+ANDAM.map(()=>'?').join(',')+') ORDER BY id DESC LIMIT 1')
+    .get(caso_id, ...ANDAM) || null;
+}
+/* O que esta pessoa pode desfazer neste caso, ou null. */
+function podeDesfazer(db, c, usuario){
+  if(!c || c.encerrado_em || !usuario || !usuario.id) return null;
+  const e = ultimoAndar(db, c.id);
+  /* A chegada também grava um evento "etapa" (pelo moverEtapa): só conta como
+     mudança à mão a etapa que se marca à mão (MANUAIS). */
+  if(!e || e.tipo !== 'etapa' || e.para !== c.etapa || !e.de || !e.etapa_desde_antes) return null;
+  if(MANUAIS[c.tipo].indexOf(e.para) < 0) return null;
+  if(e.usuario_id !== usuario.id) return null;
+  return { evento_id: e.id, de: e.para, para: e.de, nome: NOME_ETAPA[e.de] || e.de };
+}
+function desfazerEtapa(db, id, usuario){
+  const c = aberto(db, id);
+  const d = podeDesfazer(db, c, usuario);
+  if(!d){
+    const e = ultimoAndar(db, c.id);
+    if(e && e.tipo === 'etapa' && e.para === c.etapa && MANUAIS[c.tipo].indexOf(e.para) >= 0 && e.usuario_id && usuario && e.usuario_id !== usuario.id)
+      throw new Recusa(403, 'Só quem mudou a etapa ('+(e.usuario||'outra pessoa')+') pode desfazer. Para voltar, use os botões de etapa.');
+    throw new Recusa(409, 'Não há mudança de etapa para desfazer: o caso já andou depois dela, ou ela já foi desfeita.');
+  }
+  const e = db.prepare('SELECT * FROM devolucao_evento WHERE id=?').get(d.evento_id);
+  db.transaction(() => {
+    db.prepare('UPDATE devolucao_caso SET etapa=?, etapa_desde=? WHERE id=?').run(e.de, e.etapa_desde_antes, c.id);
+    const ev = evento(db, c.id, 'desfeito', e.para, e.de, 'desfeito: '+(NOME_ETAPA[e.para]||e.para)+' → '+(NOME_ETAPA[e.de]||e.de), nomeDe(usuario));
+    db.prepare('UPDATE devolucao_evento SET usuario_id=? WHERE id=?').run(usuario.id, ev);
+  })();
+  return ler(db, c.id);
 }
 
 /* Mover a etapa à mão (R20). Só as etapas manuais do tipo; o resto tem porta
@@ -884,7 +973,7 @@ function buscar(db, q, opt){
 }
 
 module.exports = {
-  buscar,
+  buscar, lancarCompleto, desfazerEtapa, podeDesfazer, mesmoComprador,
   SITUACOES_VALOR, situacaoValor, lancarValor, baixaReembolso, relatorio, custosPorCaso,
   docsExigidos, situacaoDocs, listarAnexos, anexar, arquivoDoAnexo, devolverComprador,
   RESULTADOS, listarTransportadoras, salvarTransportadora, tentativas, pedirColeta, resultadoColeta, sugerirTransportadoras,

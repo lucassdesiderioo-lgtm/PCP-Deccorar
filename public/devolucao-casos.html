@@ -113,6 +113,17 @@
         <div id="boxResp"><label for="lResp">Responsável</label><input id="lResp" autocomplete="off"></div>
         <div id="boxPassado"><label for="lPassado">Passado em</label><input id="lPassado" type="date"></div>
         <div><label for="lObs">Observação</label><input id="lObs" autocomplete="off"></div>
+        <div class="larga" id="boxJa"><div class="bloco" style="margin:4px 0 0"><h3>Já adiantar a coleta e o valor (opcional)</h3>
+          <div class="grade">
+            <div><label for="lCep">CEP do comprador</label><input id="lCep" inputmode="numeric" autocomplete="off" placeholder="só os números"></div>
+            <div><label for="lTransp">Pedir coleta com</label><select id="lTransp"><option value="">— ainda não pedi —</option></select></div>
+            <div class="soDin"><label for="lCusto">Custo da coleta</label><input id="lCusto" placeholder="R$ (pode ficar vazio)" autocomplete="off"></div>
+            <div><label for="lSit">Situação do valor do ML</label><select id="lSit"><option value="">— não sei ainda —</option><option value="ja_veio">já veio</option><option value="pedir">precisamos pedir</option><option value="pedido">pedimos, esperando</option></select></div>
+            <div class="soDin"><label for="lValor">Valor do ML</label><input id="lValor" placeholder="R$" autocomplete="off"></div>
+          </div>
+          <div id="lSug" class="sub" style="margin-top:6px"></div>
+          <div class="sub" style="margin-top:4px">Escolhendo a transportadora, o caso já nasce em "Coleta pedida", com a 1ª tentativa.</div>
+        </div></div>
         <div class="larga"><label>Venda via publicidade? (obrigatório)</label>
           <div class="simnao" id="lPub"><button class="bt sec" data-pub="1">Sim</button><button class="bt sec" data-pub="0">Não</button></div></div>
         <div class="larga"><label for="lLink">Link da conversa da reclamação (cole o endereço do ML)</label>
@@ -213,6 +224,7 @@ function linhaCaso(c){
   if(c.responsavel) chips+='<span class="chip">'+esc(c.responsavel)+'</span>';
   if(c.prazo_original) chips+='<span class="chip">prorrogado (era '+dataBR(c.prazo_original)+')</span>';
   chips+=chipPub(c)+chipLink(c);
+  if(c.mesmo_comprador && c.mesmo_comprador.length) chips+='<span class="chip pub">👥 mesmo comprador: '+c.mesmo_comprador.map(function(i){return '#'+i;}).join(', ')+'</span>';
   return '<div class="linha '+esc(c.cor||'')+'" data-id="'+c.id+'">'+
     '<div class="t1"><span>#'+c.id+'</span><span>Venda '+esc(c.venda||'—')+'</span><span>NF '+esc(c.nf||'—')+'</span></div>'+
     '<div class="t2">'+esc(c.sku||'sem SKU')+(peca?' · '+esc(peca):'')+(c.comprador?' · '+esc(c.comprador):'')+'</div>'+
@@ -234,6 +246,7 @@ function carregar(){
     ESTADO.coleta=d.coleta||[]; ESTADO.ml=d.ml||[]; ESTADO.pode=d.pode||{}; ESTADO.limites=d.limites||{};
     document.getElementById('cardLancar').style.display = ESTADO.pode.lancar ? '' : 'none';
     document.getElementById('tabMot').style.display = ESTADO.pode.listas ? '' : 'none';
+    document.querySelectorAll('.soDin').forEach(function(x){ x.style.display = ESTADO.pode.dinheiro ? '' : 'none'; });
     document.getElementById('lNovoMotivo').style.display = ESTADO.pode.listas ? 'block' : 'none';
     desenharListas();
   }).catch(function(e){
@@ -256,7 +269,7 @@ function setTipo(t){
   ESTADO.tipo=t;
   document.getElementById('tpColeta').className='bt '+(t==='coleta'?'':'sec');
   document.getElementById('tpMl').className='bt '+(t==='ml'?'':'sec');
-  ['boxPrazo','boxResp','boxPassado'].forEach(function(id){ document.getElementById(id).style.display = t==='coleta' ? '' : 'none'; });
+  ['boxPrazo','boxResp','boxPassado','boxJa'].forEach(function(id){ document.getElementById(id).style.display = t==='coleta' ? '' : 'none'; });
 }
 document.getElementById('tpColeta').onclick=function(){ setTipo('coleta'); };
 /* "Via publicidade?" começa sem resposta de propósito: quem decide se falta é o
@@ -285,6 +298,9 @@ function acharVenda(){
     if(!cp.value && x.buyer) cp.value=x.buyer;
     var peca=pecaDe(x.codigo);
     box.textContent='Achei a venda '+(x.venda||'')+' · '+(x.codigo||'')+(peca?' · '+peca:'')+' · '+(x.buyer||'')+' · NF '+(x.nf||'—');
+    var irm=d.comprador_casos||[];
+    if(irm.length) box.innerHTML+= '<div style="color:var(--blue);margin-top:4px;font-weight:700">👥 Este comprador já tem '+plural(irm.length,'outro caso aberto','outros casos abertos')+': '+
+      irm.map(function(k){ return '#'+k.id+' (venda '+esc(k.venda||'—')+', '+esc(k.etapa_nome)+')'; }).join(' · ')+'. Dá para combinar uma coleta só.</div>';
   }).catch(function(){ box.textContent=''; });
 }
 var tVenda=null;
@@ -298,13 +314,20 @@ document.getElementById('btLancar').onclick=function(){
     obs:document.getElementById('lObs').value,
     publicidade: ESTADO.pub===null ? '' : ESTADO.pub===1,
     link_ml:document.getElementById('lLink').value, mensagem_ml:document.getElementById('lMsgMl').value };
+  if(ESTADO.tipo==='coleta'){
+    corpo.cep=document.getElementById('lCep').value;
+    corpo.coleta={ transportadora_id:document.getElementById('lTransp').value, custo:ESTADO.pode.dinheiro?document.getElementById('lCusto').value:'' };
+    corpo.valor_ml_situacao=document.getElementById('lSit').value;
+    if(ESTADO.pode.dinheiro) corpo.valor_ml=document.getElementById('lValor').value;
+  }
   // O campo de cima aceita venda OU NF: número curto é NF.
   if(v && v.length<=7 && !corpo.nf) corpo.nf=v; else corpo.venda=v;
   if(ESTADO.tipo==='coleta'){ corpo.prazo=document.getElementById('lPrazo').value; corpo.responsavel=document.getElementById('lResp').value; corpo.passado_em=document.getElementById('lPassado').value; }
   var b=this; b.disabled=true;
   api('POST','/api/devolucao-casos',corpo).then(function(r){
     msg.innerHTML='<div class="okmsg">Caso #'+r.id+' lançado.</div>';
-    ['lVenda','lNf','lSku','lComprador','lObs','lPrazo','lResp','lPassado','lLink','lMsgMl'].forEach(function(id){ document.getElementById(id).value=''; });
+    ['lVenda','lNf','lSku','lComprador','lObs','lPrazo','lResp','lPassado','lLink','lMsgMl','lCep','lTransp','lCusto','lSit','lValor'].forEach(function(id){ document.getElementById(id).value=''; });
+    document.getElementById('lSug').textContent='';
     setPub(null); passadoHoje();
     document.getElementById('lMotivo').value=''; document.getElementById('lAchou').textContent='';
     carregar();
@@ -343,6 +366,9 @@ function desenharCaso(d){
     (c.chegou_em?'<div><b>Chegou em</b>'+horaBR(c.chegou_em)+'</div>':'')+
     (c.devolucao_id?'<div><b>Revisão</b>#'+c.devolucao_id+'</div>':'')+
     (c.obs?'<div style="grid-column:1/-1"><b>Observação</b>'+esc(c.obs)+'</div>':'')+'</div>';
+  if(d.mesmo_comprador && d.mesmo_comprador.length) h+='<div class="bloco"><h3>👥 O mesmo comprador tem '+plural(d.mesmo_comprador.length,'outro caso aberto','outros casos abertos')+'</h3><div class="acoes">'+
+    d.mesmo_comprador.map(function(k){ return '<button class="bt sec" data-irmao="'+k.id+'">#'+k.id+' · venda '+esc(k.venda||'—')+' · '+esc(k.etapa_nome)+'</button>'; }).join('')+
+    '</div><div class="sub">Dá para combinar uma coleta só; cada caso continua com o seu prazo e o seu valor no ML.</div></div>';
   if(c.mensagem_ml) h+='<div class="bloco"><h3>Mensagem do ML</h3><div class="msgml">'+esc(c.mensagem_ml)+'</div></div>';
   h+='<div id="cMsg"></div>';
   if(aberto && P.acompanhar){
@@ -352,7 +378,10 @@ function desenharCaso(d){
     if(!c.chegou_em) botoes+='<button class="bt" id="btChegou">A caixa chegou</button>';
     if(c.tipo==='coleta' && c.chegou_em && c.etapa!=='ml_avisado' && !d.eventos.some(function(e){return e.tipo==='aviso_ml';}))
       botoes+='<button class="bt sec" id="btAvisoML">Avisamos o ML que recebemos</button>';
-    h+='<div class="bloco"><h3>Etapa</h3><div class="acoes">'+(botoes||'<span class="sub">Sem etapa para marcar à mão agora.</span>')+'</div>'+
+    /* O desfazer (AJUSTE de 03/11/2026): só aparece a quem fez a última mudança
+       de etapa à mão, e volta com a data de antes. Quem decide é o servidor. */
+    var desf = d.desfazer ? '<div class="acoes"><button class="bt" id="btDesfazer" style="background:var(--blue);color:#fff">↩ Desfazer: voltar para '+esc(d.desfazer.nome)+'</button></div>' : '';
+    h+='<div class="bloco"><h3>Etapa</h3>'+desf+'<div class="acoes">'+(botoes||'<span class="sub">Sem etapa para marcar à mão agora.</span>')+'</div>'+
       (c.chegou_em && !c.devolucao_id ? '<div class="sub">A revisão é feita na tela de Devoluções, bipando a etiqueta: o caso é ligado sozinho.</div>' : '')+'</div>';
     if(c.tipo==='coleta'){
       h+='<div class="bloco"><h3>Prazo do ML</h3><div class="acoes"><button class="bt sec" id="btProrr">Pedi prorrogação ao ML</button>'+
@@ -393,6 +422,7 @@ function nomeEvento(e, nomes){
     case 'prazo': return 'Prazo novo: '+dataBR(e.de)+' → '+dataBR(e.para);
     case 'prorrogacao_pedida': return 'Pediu prorrogação ao ML';
     case 'editado': return 'Lançamento editado';
+    case 'desfeito': return 'Clique de etapa desfeito';
     case 'encerrado': return 'Encerrado';
     case 'revisado': return 'Revisado na tela de Devoluções';
     case 'chegou': return 'A caixa chegou';
@@ -415,6 +445,8 @@ function ligarCaso(d, c){
   var x;
   if((x=document.getElementById('btProrr'))) x.onclick=function(){ acao(base+'/prorrogacao',{}); };
   if((x=document.getElementById('btChegou'))) x.onclick=function(){ acao(base+'/chegou',{}); };
+  if((x=document.getElementById('btDesfazer'))) x.onclick=function(){ acao(base+'/desfazer-etapa',{}); };
+  document.querySelectorAll('#painel [data-irmao]').forEach(function(b){ b.onclick=function(){ abrir(+b.getAttribute('data-irmao')); }; });
   if((x=document.getElementById('btAvisoML'))) x.onclick=function(){ acao(base+'/aviso-ml',{}); };
   if((x=document.getElementById('btPrazo'))) x.onclick=function(){ acao(base+'/prazo',{prazo:document.getElementById('novoPrazo').value}); };
   if((x=document.getElementById('btEditar'))) x.onclick=function(){
@@ -760,8 +792,31 @@ document.getElementById('mNovo').addEventListener('keydown',function(e){ if(e.ke
 ABAS_GANCHO.push({ aba:'mot', abrir:function(){ carregarMotivos(); } });
 document.getElementById('lNovoMotivo').onclick=function(e){ e.preventDefault(); document.getElementById('tabMot').click(); document.getElementById('mNovo').focus(); };
 
+/* O CEP no lançamento já sugere a transportadora (a mesma régua da tela do
+   caso: quem coletou na região). */
+function encherTranspLancar(){
+  carregarTransp().then(function(l){
+    var sel=document.getElementById('lTransp'), v=sel.value;
+    sel.innerHTML='<option value="">— ainda não pedi —</option>'+l.filter(function(t){return t.ativo;}).map(function(t){ return '<option value="'+t.id+'"'+(String(t.id)===v?' selected':'')+'>'+esc(t.nome)+'</option>'; }).join('');
+  }).catch(function(){});
+}
+function sugerirLancar(){
+  var cep=document.getElementById('lCep').value, box=document.getElementById('lSug');
+  if(cep.replace(/\D/g,'').length<3){ box.textContent=''; return; }
+  api('GET','/api/devolucao-casos/transportadoras/sugestao?cep='+encodeURIComponent(cep)).then(function(r){
+    var s=r.sugestoes||[];
+    box.innerHTML = s.length ? 'Já coletaram nesta região: '+s.map(function(x){
+      return '<a href="#" data-lsug="'+x.id+'" style="color:var(--amber)">'+esc(x.nome)+'</a> ('+plural(x.vezes,'vez','vezes')+')';
+    }).join(' · ') : 'Ninguém coletou nesta região ainda.';
+  }).catch(function(){ box.textContent=''; });
+}
+var tCep=null;
+document.getElementById('lCep').addEventListener('input',function(){ clearTimeout(tCep); tCep=setTimeout(sugerirLancar,500); });
+document.getElementById('lSug').addEventListener('click',function(e){ var a=e.target.closest('[data-lsug]'); if(!a) return; e.preventDefault(); document.getElementById('lTransp').value=a.getAttribute('data-lsug'); });
+
 /* ── início ── */
 setTipo('coleta');
+encherTranspLancar();
 passadoHoje();
 carregarMotivos();
 api('GET','/api/skus').then(function(l){ (l||[]).forEach(function(s){ ESTADO.skus[String(s.codigo).toUpperCase()]=s; }); desenharListas(); }).catch(function(){});

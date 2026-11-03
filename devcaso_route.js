@@ -74,7 +74,11 @@ module.exports = function(app, db){
     const v = D.buscarLote(db, cod) || D.buscarLotePorNF(db, cod);
     const venda = v ? v.venda : String(cod||'').replace(/\s+/g,'');
     const ja = D.abertoDaVenda(db, venda);
-    return { achou: !!v, venda: v, caso_aberto: ja ? ja.id : null };
+    /* Os outros casos abertos do mesmo comprador: quem pede a coleta fica
+       sabendo, antes de lançar, que há mais peça da mesma pessoa. */
+    const irm = v && v.buyer ? D.mesmoComprador(db, v.buyer, ja ? ja.id : null)
+      .map(x => ({ id:x.id, venda:x.venda, nf:x.nf, etapa_nome: D.NOME_ETAPA[x.etapa] || x.etapa })) : [];
+    return { achou: !!v, venda: v, caso_aberto: ja ? ja.id : null, comprador_casos: irm };
   }));
   /* ── transportadoras (fase 3). ANTES do `/:id`: no Express, a rota com
      parâmetro registrada primeiro engoliria "transportadoras" como um id. ── */
@@ -102,16 +106,24 @@ module.exports = function(app, db){
   app.get('/api/devolucao-casos/buscar', (req,res) => responder(res, () =>
     ({ casos: D.buscar(db, (req.query||{}).q, { comDinheiro: comDinheiro(req) }) })));
 
-  app.get('/api/devolucao-casos/:id', (req,res) => responder(res, () => D.detalhe(db, req.params.id, { comDinheiro: comDinheiro(req) })));
+  app.get('/api/devolucao-casos/:id', (req,res) => responder(res, () => D.detalhe(db, req.params.id, { comDinheiro: comDinheiro(req), usuario: req.usuario })));
 
   /* ── lançar e editar (devolucao.lancar) ── */
-  app.post('/api/devolucao-casos', (req,res) => responder(res, () => {
+  app.post('/api/devolucao-casos', (req,res) => {
     const b = Object.assign({}, req.body || {});
-    // Os campos de dinheiro não entram pelo lançamento comum (R15).
+    // Os campos internos do script dos casos iniciais não entram pela rota.
     delete b._valor_ml; delete b._valor_ml_situacao;
-    const c = D.lancar(db, b, req.usuario);
-    return { ok:true, id:c.id };
-  }));
+    /* Valor do ML e custo da coleta no lançamento: só com a chave do dinheiro
+       (R15). Sem ela, RECUSA — ignorar calado faria a pessoa achar que gravou. */
+    const cheio = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+    if((cheio(b.valor_ml) || (b.coleta && cheio(b.coleta.custo))) && !podeDinheiro(req))
+      return res.status(403).json({ erro:'Valor do ML e custo da coleta só com a permissão de ver o dinheiro das devoluções. Lance sem eles.', chave:'devolucao.dinheiro' });
+    responder(res, () => {
+      const r = D.lancarCompleto(db, b, req.usuario);
+      if(r.valorMudou && r.valorMudou.length) auditar(req, 'valor', r.caso.id, 'lançou no lançamento '+r.valorMudou.join(', ')+': '+JSON.stringify({ valor_ml: b.valor_ml }));
+      return { ok:true, id:r.caso.id };
+    });
+  });
   app.post('/api/devolucao-casos/:id/editar', (req,res) => responder(res, () => {
     D.editar(db, req.params.id, req.body, req.usuario);
     return { ok:true };
@@ -129,6 +141,12 @@ module.exports = function(app, db){
   }));
   app.post('/api/devolucao-casos/:id/prazo', (req,res) => responder(res, () => {
     D.novoPrazo(db, req.params.id, (req.body||{}).prazo, req.usuario);
+    return { ok:true };
+  }));
+
+  /* Desfazer a última mudança de etapa feita à mão — só quem a fez. */
+  app.post('/api/devolucao-casos/:id/desfazer-etapa', (req,res) => responder(res, () => {
+    D.desfazerEtapa(db, req.params.id, req.usuario);
     return { ok:true };
   }));
 

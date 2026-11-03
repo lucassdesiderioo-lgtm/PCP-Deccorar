@@ -67,6 +67,11 @@ Mudanças no caminho:
     a mensagem do ML colada inteira; o link da conversa da reclamação (botão "Abrir conversa
     no ML"); "Passado em" nasce com o dia do lançamento; e a aba Motivos, que edita a mesma
     lista da baixa para quem tem listas.editar.
+  · AJUSTE de 03/11 (2): o lançamento do "Nós coletamos" já adianta CEP, transportadora (nasce
+    em Coleta pedida), custo, situação e valor do ML (valor e custo só com devolucao.dinheiro);
+    "↩ Desfazer" a última mudança de etapa, só por quem a fez, voltando com a data de antes;
+    e o aviso "mesmo comprador" (só avisa, os casos continuam separados). O CEP pela NF não
+    entrou: o PCP não grava o CEP da venda (fica para plano à parte, no parse).
 ```
 
 > Desenhada no Projeto do Claude entre 29/10 e 03/11/2026, com o Lucas.

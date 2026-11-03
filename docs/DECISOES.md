@@ -488,4 +488,5 @@ Spec `docs/specs/DEVOLUCOES-ACOMPANHAMENTO.md`, desenhada com o dono entre 29/10
 | 03/11/2026 | Valores, devolver ao comprador sem coletar, perda por prazo e baixa do reembolso são só do admin geral | Reembolso é conferido no Mercado Pago, que só o admin geral acessa | Lucas | idem, R15, R16 |
 | 03/11/2026 | Chegou amassada: devolvemos o dinheiro ao comprador em vez de coletar, com a foto dele anexada | A peça não se reaproveita e o frete de volta só aumentaria a perda | Lucas | idem, R17 |
 | 03/11/2026 | O lançamento pergunta se a venda foi via publicidade (Sim ou Não, obrigatório), e o relatório do mês conta quantas foram | Saber quanto da devolução vem de venda paga com anúncio | Lucas | CLAUDE.md §9-B (AJUSTE) |
+| 03/11/2026 | Só quem mudou a etapa de um caso de devolução pode desfazer, e só a última mudança; o caso volta com a data de antes | Um clique errado não pode virar problema, nem zerar o "parado" | Lucas | CLAUDE.md §9-B (AJUSTE) |
 | 03/11/2026 | "Passado em" é o dia do lançamento: no "Nós coletamos" nasce com a data de hoje, e a data informada vale | É o dia em que o caso é passado ao responsável | Lucas | CLAUDE.md §9-B (AJUSTE) |
