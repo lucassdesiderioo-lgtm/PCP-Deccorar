@@ -66,7 +66,13 @@ module.exports=function(app, db){
     {nome:'devolucao_coleta',     pk:'id', rotulo:'devolucoes (tentativas de coleta)'},
     /* Os anexos (fase 4). "Apagar tudo" apaga a LINHA; o arquivo fica na pasta
        das devolucoes, sem nada apontando para ele — e lixo, nao prova. */
-    {nome:'devolucao_anexo',      pk:'id', rotulo:'devolucoes (documentos e fotos)'}
+    {nome:'devolucao_anexo',      pk:'id', rotulo:'devolucoes (documentos e fotos)'},
+    // CONFERENCIA-EXPEDICAO (03/11/2026): o fim do dia ("a coleta nao passou")
+    // e o pedido de venda cancelada. O pedido confirmado devolve saldo, que a
+    // foto restaura; sem esta cobertura, "apagar tudo" deixaria o pedido de pe
+    // descrevendo uma devolucao que nao existe mais. As duas ja tem `teste`.
+    {nome:'fim_dia',              pk:'id', rotulo:'fim do dia da Conferencia'},
+    {nome:'cancelamento_caixa',   pk:'id', rotulo:'vendas canceladas na Conferencia'}
   ];
 
   // Fase 3: foto_estoque saiu da cobertura; limpa o trigger antigo em bancos

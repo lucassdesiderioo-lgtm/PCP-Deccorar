@@ -309,7 +309,7 @@ eq('a acao vale no volume cancelado depois da etiqueta', acaoDe(r.body,'cancelad
 ok('   e ela tem UMA saida: registrar (o "voltou" e o Sobrou da Conferencia)',
    (acaoDe(r.body,'cancelada').opcoes||[]).length === 1 && (acaoDe(r.body,'cancelada').opcoes||[])[0].id === 'registrar',
    'veio: '+JSON.stringify(acaoDe(r.body,'cancelada').opcoes));
-ok('   e a nota manda para o Sobrou', /sobrou/i.test(acaoDe(r.body,'cancelada').nota_voltou||''),
+ok('   e a nota manda para o "Venda cancelada" da Conferencia (03/11/2026)', /venda cancelada/i.test(acaoDe(r.body,'cancelada').nota_voltou||''),
    'veio: '+acaoDe(r.body,'cancelada').nota_voltou);
 r = objeto('lote', c3);
 eq('no cancelado ANTES da etiqueta a acao nao vale', acaoDe(r.body,'cancelada').vale, false);
@@ -332,7 +332,7 @@ console.log('\n=== 6. A CANCELADA — a Mesa NAO devolve saldo (2-B, D7) ===\n')
 const s140 = saldo('BK140140BEGE'), s120b = saldo('BK120120BEGE');
 r = previa('cancelada','lote',c1,{voltou:true});
 eq('a previa do "voltou" e recusada', r.status, 409);
-ok('   mandando para o "Sobrou" da Conferencia', /sobrou/i.test(String((r.body||{}).erro||'')) &&
+ok('   mandando para o "Venda cancelada" da Conferencia (03/11/2026)', /venda cancelada/i.test(String((r.body||{}).erro||'')) &&
    /confer/i.test(String((r.body||{}).erro||'')), 'veio: '+(r.body||{}).erro);
 r = executar('cancelada','lote',c1,{voltou:true},'Cliente devolveu na agencia — peca conferida e na prateleira');
 eq('executar o "voltou" tambem e recusado', r.status, 409);

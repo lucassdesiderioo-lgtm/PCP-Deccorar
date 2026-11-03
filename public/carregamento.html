@@ -34,10 +34,16 @@
      de pendencias: a conta esta no cabecalho de cada parte da lista unica. */
   .tag.age{background:#e6f0fb;color:#1f4f8f;border:1px solid #b8cfee}
   .lista1{margin-top:14px}
-  .lista1 .sub3{padding:10px 14px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--line);line-height:1.9}
-  .lista1 .sec{padding:10px 14px;font-size:14px;border-top:1px solid var(--line);background:#fafbfd}
-  .lista1 .sec.esp b{color:var(--amber)} .lista1 .sec.conf b{color:var(--green)}
-  .lista1 .sec .por{color:var(--muted);font-weight:400;margin-left:6px}
+  .fimdia{margin-top:14px}
+  .fimdia .fechbox{flex-wrap:wrap}
+  .tag.ontem{background:#fde8e6;color:#9b2c22;border:1px solid #efb1ad}
+  .cancPend .row{flex-wrap:wrap}
+  .cancPend .acoes{display:flex;gap:8px;flex-wrap:wrap}
+  #quemLevou{font-size:18px;padding:10px;border:2px solid #c9d8ee;border-radius:10px;max-width:100%}
+  .sub3{padding:10px 14px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--line);line-height:1.9}
+  .parte{padding:10px 14px;font-size:14px;border-top:1px solid var(--line);background:#fafbfd}
+  .parte.p-esp b{color:var(--amber)} .parte.p-conf b{color:var(--green)}
+  .parte .por{color:var(--muted);font-weight:400;margin-left:6px}
   .adiant{margin-top:10px;font-size:18px;font-weight:800;color:var(--blue)}
   .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:26px;text-align:center;margin-bottom:14px}
   .banner.ok{background:#e7f5eb;border-color:#a9d8b4}.banner.err{background:#fbe9e8;border-color:#efb1ad}.banner.warn{background:#fbf1db;border-color:#e7cb8c}
@@ -52,7 +58,6 @@
   .row .c{font-family:ui-monospace,monospace;color:var(--muted);font-size:12px}
   .row .who{flex:1}
   .btn{border:0;border-radius:9px;font-weight:700;padding:11px 16px;cursor:pointer}
-  .conf{background:var(--amber);color:#1a1300;margin-top:12px}
   .fech{background:var(--violet);color:#fff}
   .ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
   .empty{padding:22px;text-align:center;color:var(--green)}
@@ -102,7 +107,7 @@
   .sobrouPecas{margin-top:10px;font-size:18px;line-height:1.5}
   .sobrouPecas .ok{color:#2e7d32}
   #sobrouTexto{width:100%;margin-top:8px;font-size:18px;padding:10px;border:2px solid var(--line);border-radius:10px;box-sizing:border-box}
-  .sobrasCard .row .c{white-space:normal}
+  .cancPend .row .c{white-space:normal}
   .saidahead{background:var(--violet);color:#fff;font-weight:800;padding:12px 14px;font-size:15px}
   .saidaconta{padding:12px 14px;font-size:15px;border-bottom:1px solid #e3d9f5}
   .saidaconta .big{font-size:34px;font-weight:900;color:var(--violet);line-height:1.1}
@@ -151,8 +156,6 @@
   <div class="banner" id="banner"><div class="bt">Pronto</div><div class="bs">Bipe o QR ou código de barras da etiqueta de venda.</div></div>
   <div class="modobar area" id="modoBar">O bipe agora: CONFERIR NA ÁREA</div>
   <input id="scan" autocomplete="off">
-  <button class="btn recusar" id="btnSobrou" onclick="modoSobrou()" style="width:100%;margin-top:8px">↩ Sobrou — a caixa volta para a prateleira</button>
-  <div class="card sobrasCard" id="sobrasCard"><h3 id="sobrasT">↩ Sobras esperando decisão</h3><div id="sobrasL"></div></div>
   <div class="card pilha" id="pilhaCard"><h3>📋 Conferência da pilha — etiquetas impressas hoje</h3>
     <div class="pconta" id="pConta"></div>
     <details id="pAntD"><summary id="pAntS"></summary><div id="pAnt"></div></details>
@@ -162,23 +165,39 @@
        (carga.js); a tela so junta o que a rota ja manda (listaUnica). -->
   <div class="card lista1" id="listaCard"><h3>📦 Caixas com etiqueta de venda</h3>
     <div class="sub3">Bipe cada caixa para conferir. <span class="tag col">🟣 Coleta</span> o caminhão do Mercado Livre vem buscar — a caixa vai pro canto reservado. <span class="tag age">🚗 Agência</span> a gente leva no carro.</div>
-    <div class="sec esp" id="espT"></div><div id="espL"></div>
-    <div class="sec conf" id="confT"></div><div id="confL"></div>
+    <div class="parte p-esp" id="espT"></div><div id="espL"></div>
+    <div class="parte p-conf" id="confT"></div><div id="confL"></div>
     <div id="depois"></div>
+  </div>
+  <!-- O FIM DO DIA (CONFERENCIA-EXPEDICAO fases 3 e 4, 03/11/2026): a caixa
+       que ficou tem dois destinos, e so dois. Sem marcacao ela continua na
+       lista, como "nao saiu" — nunca como cancelada. -->
+  <div class="card fimdia" id="fimCard"><h3>🌙 Fim do dia — a caixa que ficou na fábrica</h3>
+    <div class="sub3">A caixa da lista acima que não saiu hoje tem <b>dois destinos</b>. Sem marcação ela continua na lista — o sistema entende "não saiu", nunca "cancelada".</div>
+    <div class="fechbox">
+      <button class="btn fech" id="btnNaoPassou" onclick="coletaNaoPassou()">🚚 A coleta não passou hoje</button>
+      <span style="font-size:13px;color:var(--muted)" id="fimInfo">As caixas da lista ficam esperando e amanhã aparecem <b>em cima</b>, com o selo <b>de ontem</b>. Nada muda no estoque.</span>
+    </div>
+    <div class="fechbox">
+      <button class="btn recusar" id="btnSobrou" onclick="modoSobrou()">✕ Venda cancelada — separar a caixa</button>
+      <span style="font-size:13px;color:var(--muted)">Bipe a etiqueta e o SKU de cada persiana. A caixa fica separada, e o estoque <b>só volta</b> quando outra pessoa confirmar o cancelamento no Mercado Livre.</span>
+    </div>
+    <div class="cancPend" id="cancCard"><div class="parte" id="cancT"></div><div id="cancL"></div></div>
   </div>
   <div class="duas">
   <div class="card"><h3>🚗 Agência — a viagem até a agência</h3>
     <!-- A VIAGEM A AGENCIA (fase 4): fechada, so o botao; aberta, o bipe poe no carro. -->
     <div class="fechbox" id="viagemBtnBox" style="border-top:0;border-bottom:1px solid var(--line)">
       <button class="btn" style="background:var(--blue);color:#fff" onclick="abrirViagem()">🚗 Viagem à agência</button>
-      <span style="font-size:13px;color:var(--muted)">Confira as caixas na área; na hora de sair, abra a viagem e bipe o que <b>entra no carro</b>.</span>
+      <span style="font-size:13px;color:var(--muted)">Na hora de sair, abra a viagem: <b>todas as conferidas de agência</b> entram no carro. Depois bipe só o que <b>ficou</b>.</span>
     </div>
     <div id="viagemBox" style="display:none">
-      <div class="viagemhead" id="viagemHead">🚗 VIAGEM À AGÊNCIA ABERTA — BIPE O QUE ENTRA NO CARRO</div>
+      <div class="viagemhead" id="viagemHead">🚗 VIAGEM À AGÊNCIA ABERTA — BIPE O QUE FICOU NA FÁBRICA</div>
       <div class="saidaconta viagemconta" id="viagemConta"></div>
       <div id="viagemLista"></div>
       <div class="fechbox">
-        <button class="btn ghost" id="btnModoCarro" onclick="escolherModo('carro')">Bipar no carro</button>
+        <button class="btn ghost" id="btnModoFicou" onclick="escolherModo('ficou')">Bipar o que ficou</button>
+        <button class="btn ghost" id="btnModoCarro" onclick="escolherModo('carro')">Pôr mais uma no carro</button>
         <button class="btn ghost" id="btnModoArea" onclick="escolherModo('area')">Conferir na área</button>
         <button class="btn ghost" onclick="cancelarViagem()">Cancelar viagem</button>
       </div>
@@ -189,6 +208,8 @@
         <label class="fotobtn" id="fotoBtnV" style="border-color:var(--blue);color:var(--blue)">📷 <span id="fotoTxtV">Foto da tela do atendente</span>
           <input type="file" id="fotoInV" accept="image/*"></label>
         <img class="fotoprev" id="fotoPrevV" alt="">
+        <label style="font-weight:700">Quem levou
+          <select id="quemLevou"><option value="">— escolha —</option></select></label>
         <span style="font-weight:700">Atendente bipou</span>
         <input id="atQtd" type="number" min="0" inputmode="numeric" placeholder="0" style="font-size:24px;font-weight:800;width:110px;padding:10px;text-align:center;border:2px solid #c9d8ee;border-radius:10px">
         <span style="font-weight:700">caixas</span>
@@ -294,6 +315,7 @@ async function bip(code){
   var m=modoAtual();
   if(m==='sobra'){ await bipSobra(code); return; }
   if(m==='carro'){ await bipCarro(code); return; }
+  if(m==='ficou'){ await bipFicou(code); return; }
   if(caixaPecas){ await bipPeca(code); return; }
   const corpo = aguardando ? {code:aguardando.code, sku:code} : {code:code};
   const r=await (await fetch('/api/carregar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)})).json();
@@ -363,7 +385,7 @@ function sairDaCaixa(){ caixaPecas=null; banner('','Pronto para bipar',''); }
 let sobrou=false, sobrouPend=null, sobrouSkus=[], sobrouMotivo=null, sobrouFaltam=0, sobrouErro='';
 function modoSobrou(){
   sobrou=!sobrou; sobrouLimpar(); aguardando=null; caixaPecas=null; pintarModo();
-  if(sobrou) banner('err','↩ Sobrou','Bipe a etiqueta de VENDA da caixa que sobrou.');
+  if(sobrou) banner('err','✕ Venda cancelada','Bipe a etiqueta de VENDA da caixa cancelada.');
   else banner('','Pronto para bipar','');
   $('#scan').focus();
 }
@@ -400,16 +422,16 @@ function desenharSobrou(){
   }).join('');
   var motivo=function(id,rot){ return '<button class="btn'+(sobrouMotivo===id?' esc':'')+'" onclick="escolherMotivo(\''+id+'\')">'+rot+'</button>'; };
   var pronto=sobrouFaltam===0 && !!sobrouMotivo;
-  banner('warn','↩ Sobrou — '+esc0(r.pedido.buyer),
+  banner('warn','✕ Venda cancelada — '+esc0(r.pedido.buyer),
     'NF <b>'+esc0(r.pedido.nf||'—')+'</b>'
     +(r.cancelada_motivo?' · <span class="c">'+esc0(r.cancelada_motivo)+'</span>':'')
     +'<div class="sobrouPecas">'+(sobrouFaltam?'<b>Bipe o SKU de cada persiana</b> (falta'+(sobrouFaltam===1?' 1':'m '+sobrouFaltam)+'):':'<b>Todas as persianas bipadas.</b>')+pecas+'</div>'
     +(sobrouErro?'<div class="volta" style="font-size:18px">'+esc0(sobrouErro)+'</div>':'')
     +'<div class="motivos">'+motivo('cancelada','Venda cancelada')+motivo('motorista','Motorista recusou')+motivo('outro','Outro')+'</div>'
     +(sobrouMotivo==='outro'?'<input id="sobrouTexto" maxlength="160" placeholder="Escreva o motivo" value="'+esc0(sobrouTextoAtual())+'">':'')
-    +'<div style="margin-top:8px;font-size:14px;color:var(--muted)">'+(r.sob_medida?'Sob medida: o estoque não muda.':
-      (r.baixou?'Ao confirmar, o estoque volta +1 por persiana.':'Esta caixa ainda não foi conferida: a peça nunca saiu do saldo, e o estoque não muda.'))+'</div>'
-    +'<div class="recusabox"><button class="btn" style="background:var(--red);color:#fff"'+(pronto?'':' disabled')+' onclick="confirmarSobrou()">Confirmar a sobra</button>'
+    +'<div style="margin-top:8px;font-size:14px;color:var(--muted)">Separar <b>não mexe no estoque</b>. '+(r.sob_medida?'Sob medida não tem estoque.':
+      (r.baixou?'Quando outra pessoa confirmar no Mercado Livre, o estoque volta +1 por persiana.':'Esta caixa ainda não foi conferida: a peça nunca saiu do saldo.'))+'</div>'
+    +'<div class="recusabox"><button class="btn" style="background:var(--red);color:#fff"'+(pronto?'':' disabled')+' onclick="confirmarSobrou()">Separar como venda cancelada</button>'
     +'<button class="btn ghost" onclick="desistirSobrou()">Cancelar — bipei a caixa errada</button></div>');
   var t=document.getElementById('sobrouTexto');
   if(t){ t.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); confirmarSobrou(); } }); }
@@ -420,31 +442,61 @@ function escolherMotivo(id){
   sobrouTextoGuardado=sobrouTextoAtual(); sobrouMotivo=id; desenharSobrou();
   var t=document.getElementById('sobrouTexto'); if(t) t.focus(); else $('#scan').focus();
 }
-function desistirSobrou(){ sobrouLimpar(); sobrouTextoGuardado=''; pintarModo(); banner('err','↩ Sobrou','Bipe a etiqueta de VENDA da caixa que sobrou.'); $('#scan').focus(); }
+function desistirSobrou(){ sobrouLimpar(); sobrouTextoGuardado=''; pintarModo(); banner('err','✕ Venda cancelada','Bipe a etiqueta de VENDA da caixa cancelada.'); $('#scan').focus(); }
 async function confirmarSobrou(){
   if(!sobrouPend) return;
   var texto=sobrouTextoAtual();
   var r=await postJ('/api/carregamento/sobra',{id:sobrouPend.pedido.id,skus:sobrouSkus,motivo:sobrouMotivo,texto:texto,confirmar:true});
   if(!r.ok){ sobrouErro=r.aviso||'Não marquei. Tente de novo.'; sobrouTextoGuardado=texto; desenharSobrou(); beep(false); return; }
   sobrouLimpar(); sobrouTextoGuardado=''; sobrou=false; pintarModo();
-  banner('ok','↩ Sobra registrada — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · '+linhasPecas(r.pecas)
-    +'<div class="volta" style="color:var(--green,#2e7d32)">'+esc0(r.aviso||'')+'</div>');
+  banner('warn','✕ Separada como venda cancelada — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · '+linhasPecas(r.pecas)
+    +'<div class="volta">'+esc0(r.aviso||'')+'</div>');
   beep(true); carregar(); $('#scan').focus();
 }
-/* AS SOBRAS ESPERANDO DECISAO: o que o caminhao deixou no canto numa saida ja
-   fechada, e as vendas canceladas que ainda estao na fabrica. Lista que zera:
-   resolvida (ou levada pelo caminhao seguinte), a caixa sai daqui. */
+/* AS CANCELADAS (CONFERENCIA-EXPEDICAO fase 4). Duas partes:
+   - a separar: a venda que o ML ja cancelou e cuja caixa ainda esta na fabrica
+     (falta bipar no "✕ Venda cancelada");
+   - aguardando confirmacao: separada pelo operador; quem tem a permissao
+     confirma (o estoque volta) ou recusa (a caixa volta para a lista).
+   Os botoes so aparecem a quem pode (pode_confirmar); o servidor confere de
+   novo. A recusa pede o motivo num prompt, e nao num campo do card: o card e
+   redesenhado a cada 4 s, e o campo apagaria no meio da frase (§12). */
+var canceladas={caixas:[],aguardando:[]};
 async function desenharSobras(){
-  var d={caixas:[]}; try{ d=await (await fetch('/api/carregamento/sobras')).json(); }catch(e){ return; }
-  var l=d.caixas||[];
-  $('#sobrasT').textContent='↩ Sobras esperando decisão: '+l.length;
-  $('#sobrasL').innerHTML=l.length
-    ? '<div style="font-size:13px;color:var(--muted);padding:6px 14px">Para cada uma: toque em <b>↩ Sobrou</b> e bipe a etiqueta — ou ponha no próximo caminhão.</div>'
-      +l.map(function(v){ return '<div class="row"><span class="who">'+esc0(v.buyer)+' <span class="c">NF '+esc0(v.nf||'—')
-        +' · '+esc0(v.codigo||'')+(v.pecas>1?' · '+v.pecas+' persianas':'')+' · '
-        +(v.de==='caminhao'?'o caminhão deixou no canto':esc0(v.cancelada_origem==='motorista'?'motorista recusou':(v.cancelada_motivo||'venda cancelada')))
-        +'</span></span></div>'; }).join('')
-    : '<div class="empty" style="color:var(--muted)">Nenhuma sobra esperando.</div>';
+  var d={caixas:[],aguardando:[]}; try{ d=await (await fetch('/api/carregamento/sobras')).json(); }catch(e){ return; }
+  canceladas=d;
+  var sep=d.caixas||[], ag=d.aguardando||[];
+  $('#cancT').innerHTML='<b>Canceladas: '+(sep.length+ag.length)+'</b><span class="por">a separar '+sep.length+' · aguardando confirmação '+ag.length+'</span>';
+  var h='';
+  if(sep.length) h+='<div style="font-size:13px;color:var(--muted);padding:6px 14px">O Mercado Livre cancelou — a caixa ainda está na fábrica. Toque em <b>✕ Venda cancelada</b> e bipe a etiqueta:</div>'
+    +sep.map(function(v){ return '<div class="row"><span class="who">'+esc0(v.buyer)+' <span class="c">NF '+esc0(v.nf||'—')
+      +' · '+esc0(v.codigo||'')+(v.pecas>1?' · '+v.pecas+' persianas':'')+' · '+esc0(v.cancelada_motivo||'venda cancelada')+'</span></span></div>'; }).join('');
+  if(ag.length) h+='<div style="font-size:13px;color:var(--muted);padding:6px 14px">Separadas, <b>aguardando confirmação no Mercado Livre</b>'
+      +(d.pode_confirmar?'':' — quem confirma é quem tem a permissão "Confirmar venda cancelada"')+':</div>'
+    +ag.map(function(p){ var n=(p.pecas||[]).reduce(function(s,x){ return s+Math.max(1,x.qtd||1); },0);
+      return '<div class="row"><span class="who">'+esc0(p.buyer||'')+' <span class="c">NF '+esc0(p.nf||'—')
+        +' · '+(n>1?n+' persianas':esc0(((p.pecas||[])[0]||{}).codigo||p.codigo||''))+' · '+esc0(p.motivo||'')
+        +' · separada por '+esc0(p.marcado_por||'?')+' em '+dataBR(String(p.marcado_em||'').slice(0,10))+' '+horaDe(p.marcado_em)
+        +' · '+(p.baixou?'ao confirmar, o estoque volta':'o estoque não muda')+'</span></span>'
+        +(d.pode_confirmar?'<span class="acoes"><button class="btn" style="background:var(--green);color:#fff" onclick="decidirCancelada('+p.id+',\'confirmar\')">Confirmar no ML</button>'
+          +'<button class="btn ghost" onclick="decidirCancelada('+p.id+',\'recusar\')">Recusar</button></span>':'')+'</div>'; }).join('');
+  $('#cancL').innerHTML=h||'<div class="empty" style="color:var(--muted)">Nenhuma venda cancelada esperando.</div>';
+}
+async function decidirCancelada(id, acao){
+  var corpo={id:id};
+  if(acao==='confirmar'){
+    if(!confirm('Confirmar que a venda está CANCELADA no Mercado Livre? Se a caixa já tinha baixado, as peças voltam ao estoque.')) return;
+  } else {
+    var m=prompt('Por que o cancelamento foi recusado? A caixa volta para a lista de saída.');
+    if(m===null) return;
+    if(!String(m).trim()){ banner('warn','Escreva o motivo da recusa',''); beep(false); return; }
+    corpo.motivo=m;
+  }
+  const r=await postJ('/api/carregamento/cancelada/'+acao,corpo);
+  if(r.__status===403){ banner('err','Sem permissão','Confirmar ou recusar venda cancelada é de quem tem a permissão "Confirmar venda cancelada".'); beep(false); return; }
+  if(r.ok){ banner(acao==='confirmar'?'ok':'warn',acao==='confirmar'?'✓ Cancelamento confirmado':'Cancelamento recusado', esc0(r.aviso||'')); beep(true); }
+  else { banner('err','Não deu', esc0(r.aviso||r.erro||'')); beep(false); }
+  carregar();
 }
 
 function mostrar(r,code){
@@ -558,26 +610,49 @@ function horaDe(s){ var p=String(s||'').split(' '); return (p[1]||'').slice(0,5)
 function listaUnica(d){
   var col=(d&&d.coleta)||{}, age=((d&&d.faltam)||[]);
   function marca(m){ return function(f){ return Object.assign({},f,{modal:m}); }; }
-  function ordem(a,b){ return ((b.atrasado||0)-(a.atrasado||0))
+  /* A caixa que FICOU num dia anterior (o "a coleta nao passou", fase 3) vem
+     em cima de tudo, com o selo; depois o atraso. */
+  function ordem(a,b){ return ((b.ficou_de?1:0)-(a.ficou_de?1:0)) || ((b.atrasado||0)-(a.atrasado||0))
     || String(a.data||'').localeCompare(String(b.data||'')) || ((a.id||0)-(b.id||0)); }
   var esperando=age.filter(function(f){ return f.conferida!==1; }).map(marca('agencia'))
     .concat((col.faltam||[]).map(marca('coleta'))).sort(ordem);
   var conferidas=age.filter(function(f){ return f.conferida===1; }).map(marca('agencia'))
-    .concat((col.aguardando||[]).map(marca('coleta')));
+    .concat((col.aguardando||[]).map(marca('coleta'))).sort(function(a,b){ return (b.ficou_de?1:0)-(a.ficou_de?1:0); });
   return {esperando:esperando, conferidas:conferidas};
 }
 function tagModal(f){ return f.modal==='coleta' ? '<span class="tag col">🟣 Coleta</span>' : '<span class="tag age">🚗 Agência</span>'; }
+/* O selo do fim do dia: "de ontem" quando ficou ontem; senao, o dia. */
+var hojeSrv='';
+function ontemDe(h){ var m=String(h||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m) return '';
+  var d=new Date(+m[1],+m[2]-1,+m[3]-1); var z=function(n){ return (n<10?'0':'')+n; };
+  return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()); }
+function seloFicou(f){ if(!f.ficou_de) return '';
+  return '<span class="tag ontem">🌙 '+(f.ficou_de===ontemDe(hojeSrv)?'de ontem':'ficou '+dataBR(f.ficou_de))+' — a coleta não passou</span>'; }
 function linha(f){
-  return '<div class="row"><span class="who">'
+  return '<div class="row"><span class="who">'+seloFicou(f)
     +(f.atrasado?'<span class="tag ant">⏳ de '+dataBR(f.data)+'</span>':'')
     +tagModal(f)+esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+skuDaLinha(f)
     +(f.modal==='coleta'&&f.carregado_em?' · no canto desde '+horaDe(f.carregado_em):'')
     +'</span>'+pecasLinhas(f.itens)+'</span></div>';
 }
+/* A COLETA NAO PASSOU (fase 3): registra quem, quando e quais caixas — as da
+   lista de agora. Nao mexe em estagio nem em estoque. */
+async function coletaNaoPassou(){
+  if(!confirm('Registrar que a coleta não passou hoje? As caixas da lista continuam esperando e amanhã aparecem em cima. Nada muda no estoque.')) return;
+  const r=await postJ('/api/carregamento/fimdia',{});
+  if(r.ok){ banner('ok','🚚 Registrado: a coleta não passou hoje', '<b>'+r.caixas+'</b> caixa'+(r.caixas===1?'':'s')+' ficam esperando. Amanhã elas aparecem no topo da lista, com o selo <b>de ontem</b>.'); beep(true); }
+  else { banner('err','Não registrei', esc0(r.aviso||r.erro||'')); beep(false); }
+  carregar();
+}
 function porModal(l){ var c=l.filter(function(f){ return f.modal==='coleta'; }).length, a=l.length-c;
   return l.length ? '<span class="por">🟣 coleta '+c+' · 🚗 agência '+a+'</span>' : ''; }
 function desenharLista(d){
+  hojeSrv=d.hoje||hojeSrv;
   var u=listaUnica(d), col=d.coleta||{};
+  var fh=d.fim_dia&&d.fim_dia.hoje;
+  $('#fimInfo').innerHTML = fh
+    ? '✓ Registrado hoje por <b>'+esc0(fh.por||'?')+'</b> às '+horaDe(fh.em)+' ('+fh.n+' caixa'+(fh.n===1?'':'s')+'). Amanhã elas aparecem em cima, com o selo <b>de ontem</b>. Pode registrar de novo.'
+    : 'As caixas da lista ficam esperando e amanhã aparecem <b>em cima</b>, com o selo <b>de ontem</b>. Nada muda no estoque.';
   $('#espT').innerHTML='<b>Esperando conferência: '+u.esperando.length+'</b>'+porModal(u.esperando);
   $('#espL').innerHTML=u.esperando.length ? u.esperando.map(linha).join('')
     : '<div class="empty">✅ Nenhuma caixa esperando conferência.</div>';
@@ -667,7 +742,7 @@ async function carregar(){
     return '<div class="hist">🚗 '+horaDe(f.fechada_em)+' — '
       +(f.divergente ? '<b class="div">⛔ LIBERADA COM DIVERGÊNCIA</b>: carro '+f.qtd_sistema+', atendente '+f.qtd_externa
                      : '<b class="ok">✓ bateu</b>: '+f.qtd_sistema+' caixa'+(f.qtd_sistema===1?'':'s'))
-      +(f.fechado_por?' · '+esc0(f.fechado_por):'')+(f.motivo?' · '+esc0(f.motivo):'')
+      +(f.quem_levou?' · levou: <b>'+esc0(f.quem_levou)+'</b>':'')+(f.fechado_por?' · fechou: '+esc0(f.fechado_por):'')+(f.motivo?' · '+esc0(f.motivo):'')
       +(f.tem_foto?' · <a href="/api/saida/foto/'+f.id+'" target="_blank" style="color:var(--blue);font-weight:700">📷 ver a foto</a>':'')+'</div>';
   }).join('');
   $('#colHist').innerHTML = (col.saidas_hoje||[]).map(function(f){
@@ -731,19 +806,23 @@ function modoAtual(){
   var sa=!!(saidaAtual&&saidaAtual.saida), vi=!!(viagemAtual&&viagemAtual.viagem);
   if(modoEscolhido==='sobra'&&sa) return 'sobra';
   if(modoEscolhido==='carro'&&vi) return 'carro';
+  if(modoEscolhido==='ficou'&&vi) return 'ficou';
   if(modoEscolhido==='area') return 'area';
-  return sa?'sobra':(vi?'carro':'area');
+  /* Viagem aberta: o bipe diz o que FICOU (CONFERENCIA-EXPEDICAO fase 2) —
+     abrir ja pos no carro todas as conferidas de agencia de hoje. */
+  return sa?'sobra':(vi?'ficou':'area');
 }
 function escolherModo(m){ modoEscolhido=m; pintarModo(); desenharViagem();
-  banner('',({area:'Bipe para CONFERIR na área',carro:'Bipe para PÔR NO CARRO',sobra:'Bipe o que FICOU no canto'})[m],''); }
+  banner('',({area:'Bipe para CONFERIR na área',carro:'Bipe para PÔR NO CARRO',ficou:'Bipe a caixa de agência que FICOU na fábrica',sobra:'Bipe o que FICOU no canto'})[m],''); }
 function pintarModo(){
   var m=modoAtual();
   document.body.classList.toggle('modo-saida',m==='sobra');
-  document.body.classList.toggle('modo-viagem',m==='carro');
-  var bar=$('#modoBar'); bar.className='modobar '+(sobrou?'recusa':m);
-  bar.textContent='O bipe agora: '+(sobrou?(sobrouPend?'SOBROU — BIPE O SKU DE CADA PERSIANA':'SOBROU — BIPE A ETIQUETA DA CAIXA'):
-    ({area:'CONFERIR NA ÁREA',carro:'PÔR NO CARRO DA AGÊNCIA',sobra:'SOBRA DO CAMINHÃO (o que ficou no canto)'})[m]);
-  var bt=$('#btnSobrou'); if(bt) bt.textContent=sobrou?'✕ Sair do Sobrou — voltar a conferir':'↩ Sobrou — a caixa volta para a prateleira';
+  document.body.classList.toggle('modo-viagem',m==='carro'||m==='ficou');
+  var bar=$('#modoBar');
+  bar.className='modobar '+(sobrou?'recusa':(m==='ficou'?'carro':m));
+  bar.textContent='O bipe agora: '+(sobrou?(sobrouPend?'VENDA CANCELADA — BIPE O SKU DE CADA PERSIANA':'VENDA CANCELADA — BIPE A ETIQUETA DA CAIXA'):
+    ({area:'CONFERIR NA ÁREA',carro:'PÔR NO CARRO DA AGÊNCIA',ficou:'FICOU NA FÁBRICA (tira do carro da agência)',sobra:'SOBRA DO CAMINHÃO (o que ficou no canto)'})[m]);
+  var bt=$('#btnSobrou'); if(bt) bt.textContent=sobrou?'✕ Sair — voltar a conferir':'✕ Venda cancelada — separar a caixa';
 }
 const postJ=async function(url,corpo){
   const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo||{})});
@@ -844,12 +923,14 @@ function desenharViagem(){
   pintarModo();
   if(!ab){ $('#viagemDiv').innerHTML=''; return; }
   var vi=viagemAtual, m=modoAtual();
+  $('#btnModoFicou').style.display=m==='ficou'?'none':'';
   $('#btnModoCarro').style.display=m==='carro'?'none':'';
-  $('#btnModoArea').style.display=m==='carro'?'':'none';
-  $('#viagemHead').textContent=m==='carro'?'🚗 VIAGEM À AGÊNCIA ABERTA — BIPE O QUE ENTRA NO CARRO'
-                                          :'🚗 VIAGEM À AGÊNCIA ABERTA — o bipe agora está conferindo na área';
+  $('#btnModoArea').style.display=m==='area'?'none':'';
+  $('#viagemHead').textContent=({ficou:'🚗 VIAGEM À AGÊNCIA ABERTA — BIPE O QUE FICOU NA FÁBRICA',
+    carro:'🚗 VIAGEM À AGÊNCIA ABERTA — BIPE O QUE ENTRA NO CARRO'})[m]||'🚗 VIAGEM À AGÊNCIA ABERTA — o bipe agora está conferindo na área';
+  carregarPessoas();
   $('#viagemConta').innerHTML='No carro:<div class="big">'+vi.sistema+' caixa'+(vi.sistema===1?'':'s')+'</div>'
-    +'<b>'+vi.prontas.length+'</b> pronta'+(vi.prontas.length===1?'':'s')+' na área'
+    +'<b>'+vi.prontas.length+'</b> conferida'+(vi.prontas.length===1?'':'s')+' na área, fora do carro'+(vi.prontas.length?' (foi? toque em "Pôr mais uma no carro" e bipe)':'')
     +(vi.viagem.antiga?' · <b style="color:var(--red)">⚠ viagem aberta desde '+dataBR(String(vi.viagem.aberta_em).slice(0,10))+' — feche com a foto do atendente</b>':'');
   $('#viagemLista').innerHTML=vi.lista.map(function(f){
     return '<div class="row"><span class="who">'+(f.troca_de_porta?'<span class="tagtroca">troca de porta · era coleta</span>':'')
@@ -868,8 +949,8 @@ function desenharViagem(){
 }
 async function abrirViagem(){
   const r=await postJ('/api/viagem/abrir',{});
-  if(r.ok){ divergV=null; limparFotoV(); modoEscolhido='carro';
-    banner('ok','🚗 VIAGEM À AGÊNCIA ABERTA','Prontas na área: <b>'+r.prontas.length+'</b>. Agora <b>bipe cada caixa que entra no carro</b>. Na agência, fotografe a tela do atendente.');
+  if(r.ok){ divergV=null; limparFotoV(); modoEscolhido='ficou';
+    banner('ok','🚗 VIAGEM À AGÊNCIA ABERTA — '+r.sistema+' no carro','Todas as conferidas de agência entraram no carro. Se alguma <b>ficou</b>, bipe ela agora. Na agência, peça a foto da tela do atendente; feche na volta, com quem levou.');
     beep(true); }
   else banner('err','Não deu pra abrir a viagem', esc0(r.erro||r.aviso||''));
   carregar();
@@ -885,6 +966,15 @@ async function bipCarro(code){
     (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
   carregar();
 }
+/* O BIPE "FICOU" (fase 2): tira do carro da viagem a caixa que nao foi. */
+async function bipFicou(code){
+  const r=await postJ('/api/viagem/ficou',{code:code});
+  if(r.ok){ banner('ok','Ficou na fábrica ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> saiu do carro · no carro agora <b>'+r.sistema+'</b>'); beep(true); }
+  else if(r.motivo==='fora_do_carro'){ banner('warn','Essa não está no carro', (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
+  else if(r.motivo==='nao_encontrado'){ banner('err','Etiqueta não reconhecida','Lido: '+esc0(code)+'. Bipe a etiqueta de VENDA.'); beep(false); }
+  else { banner('err','Não deu', esc0(r.aviso||r.erro||'')); beep(false); }
+  carregar();
+}
 async function tirarDoCarro(id){ await postJ('/api/viagem/tirar',{id:id}); carregar(); }
 async function cancelarViagem(){
   if(!confirm('Cancelar esta viagem?')) return;
@@ -896,19 +986,30 @@ async function fecharViagem(liberar){
   if(!fotoV){ banner('warn','Falta a foto da tela do atendente','Toque em <b>📷 Foto da tela do atendente</b> e escolha a foto (da câmera ou da galeria). Sem a foto a viagem não fecha.'); beep(false); return; }
   var q=$('#atQtd').value;
   if(q==='' || !(parseInt(q,10)>=0)){ banner('warn','Quantas caixas o atendente bipou?','Digite o número que está na foto antes de fechar.'); return; }
-  var corpo={atendente:parseInt(q,10),foto:fotoV};
+  var ql=$('#quemLevou').value;
+  if(!ql){ banner('warn','Quem levou as caixas à agência?','Escolha a pessoa em <b>Quem levou</b> antes de fechar.'); beep(false); return; }
+  var corpo={atendente:parseInt(q,10),foto:fotoV,quem_levou_id:parseInt(ql,10)};
   if(liberar){ var m=document.getElementById('motivoLibV'); corpo.motivo=m?m.value:''; }
   const r=await postJ(liberar?'/api/viagem/liberar':'/api/viagem/fechar',corpo);
   if(r.__status===403){ banner('err','Só supervisor ou admin libera com divergência','Chame quem pode liberar — ou confira as caixas até o número bater.'); beep(false); return; }
-  if(r.ok){ divergV=null; $('#atQtd').value=''; limparFotoV(); modoEscolhido=null;
+  if(r.ok){ divergV=null; $('#atQtd').value=''; $('#quemLevou').value=''; limparFotoV(); modoEscolhido=null;
     if(r.divergente){ banner('err','Viagem liberada COM DIVERGÊNCIA','Carro <b>'+r.sistema+'</b> · atendente <b>'+r.atendente+'</b>. Ficou registrado com o seu nome, o motivo e a foto.'); beep(false); }
     else { banner('ok','Viagem conferida ✓ — '+r.sistema+' = '+r.atendente,'O número do atendente bateu e a foto ficou guardada.'
       +(r.troca_de_porta?' <b>'+r.troca_de_porta+'</b> caixa'+(r.troca_de_porta===1?'':'s')+' de coleta foi pela agência.':'')); beep(true); } }
   else if(r.motivo==='divergente'){ divergV=r;
     banner('err','⛔ NÃO BATEU — carro '+r.sistema+', atendente '+r.atendente,'Confira as caixas logo abaixo, no card do carro.'); beep(false); }
-  else { banner('warn',({sem_foto:'Falta a foto',sem_motivo:'Escreva o motivo',vazia:'Viagem vazia',sem_viagem:'Nenhuma viagem aberta'})[r.motivo]||'Não deu pra fechar',
+  else { banner('warn',({sem_foto:'Falta a foto',sem_motivo:'Escreva o motivo',vazia:'Viagem vazia',sem_viagem:'Nenhuma viagem aberta',sem_quem_levou:'Falta quem levou'})[r.motivo]||'Não deu pra fechar',
     esc0(r.aviso||r.erro||'')); beep(false); }
   carregar();
+}
+/* QUEM LEVOU: as pessoas ativas do cadastro (a mesma lista da tela de login).
+   Busca uma vez, e so com a viagem aberta. */
+var pessoasCarregadas=false;
+async function carregarPessoas(){
+  if(pessoasCarregadas) return; pessoasCarregadas=true;
+  var l=[]; try{ l=await (await fetch('/api/auth/pessoas')).json(); }catch(e){ pessoasCarregadas=false; return; }
+  var sel=$('#quemLevou'); if(!sel) return;
+  sel.innerHTML='<option value="">— escolha —</option>'+(l||[]).map(function(p){ return '<option value="'+p.id+'">'+esc0(p.nome)+'</option>'; }).join('');
 }
 function limparFotoV(){
   fotoV=null; $('#fotoInV').value=''; $('#fotoPrevV').className='fotoprev'; $('#fotoPrevV').src='';

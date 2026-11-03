@@ -141,7 +141,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
           <span><span class="dot" style="background:#f85149"></span> saiu (conferência)</span>
         </div>
       </div>
-      <div class="sub" style="margin-bottom:10px">Acima da linha o que a fábrica fez e, em azul, o que voltou à prateleira pelo ↩ Sobrou; abaixo, o que saiu pro cliente. A caixa que sobrou continua como saída no dia em que baixou. Ajuste manual e contagem não entram aqui — eles mexem no saldo, mas não são produção nem venda.</div>
+      <div class="sub" style="margin-bottom:10px">Acima da linha o que a fábrica fez e, em azul, o que voltou à prateleira pela venda cancelada confirmada na Conferência; abaixo, o que saiu pro cliente. A caixa que sobrou continua como saída no dia em que baixou. Ajuste manual e contagem não entram aqui — eles mexem no saldo, mas não são produção nem venda.</div>
       <div id="estGraf"></div>
     </div>
 
@@ -362,8 +362,8 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
   <div style="font-size:13px;color:#5a6472;margin-bottom:12px">
     Estas vendas foram canceladas <b>depois</b> que a etiqueta saiu — pelo relatório do Mercado Livre
     ou pela recusa do motorista, marcada na Conferência. A caixa não carrega mais (o bipe recusa). Se a
-    persiana está na fábrica, ela volta para a prateleira pelo <b>↩ Sobrou</b> da Conferência, com o bipe
-    do SKU — é lá que o estoque volta. Se ela não voltou, registre na aba <i>Correções</i>.
+    persiana está na fábrica, ela volta para a prateleira pelo <b>✕ Venda cancelada</b> da Conferência, com o bipe
+    do SKU e a confirmação de outra pessoa — é lá que o estoque volta. Se ela não voltou, registre na aba <i>Correções</i>.
   </div>
   <div id="cancLista"></div>
 </div>
@@ -1834,7 +1834,7 @@ function renderEst(){
     +'<div class="sumbox big"><div class="n" style="font-size:20px">'
        +'<span class="ok">+'+r.entrou_hoje+'</span> / <span class="baixo">−'+r.saiu_hoje+'</span></div>'
        +'<div class="l">Hoje: entrou / saiu</div>'
-       +(r.voltou_hoje?'<div class="d" style="color:#388bfd">+'+r.voltou_hoje+(r.voltou_hoje===1?' voltou':' voltaram')+' pelo ↩ Sobrou</div>':'')
+       +(r.voltou_hoje?'<div class="d" style="color:#388bfd">+'+r.voltou_hoje+(r.voltou_hoje===1?' voltou':' voltaram')+' (venda cancelada confirmada)</div>':'')
        +'<div class="d">'+r.ajustes_30d+' ajuste(s) manual(is) em 30 dias</div></div>';
 
   $('#estGraf').innerHTML = estGrafico(PAINEL.serie||[]);
@@ -2719,7 +2719,7 @@ async function carregarResumo(){
       +'<td class="sub">'+(l.aqui?l.quem:'quem tem <i>'+l.quem+'</i>')+'</td></tr>';
   });
   h+='</tbody></table>';
-  if(r.em_duas_linhas) h+='<div class="sub" style="margin-top:6px">'+r.em_duas_linhas+' caixa(s) cancelada(s) aparecem em Correções e em Sobras: volta pelo ↩ Sobrou, ou se registra na Mesa que não voltou. No total contam uma vez.</div>';
+  if(r.em_duas_linhas) h+='<div class="sub" style="margin-top:6px">'+r.em_duas_linhas+' caixa(s) cancelada(s) aparecem em Correções e em Canceladas da Conferência: volta pelo ✕ Venda cancelada da Conferência, ou se registra na Mesa que não voltou. No total contam uma vez.</div>';
   box.innerHTML=h;
   return r.total;
 }
@@ -3674,7 +3674,7 @@ async function corPassivo(){
      ajuda:'duplicatas do PDF reenviado cobrando etiqueta de peça que já saiu',
      linha:function(x){ return corFrase(x)+' <span class="sub">já era #'+x.ja_era+' de '+esc(x.ja_era_data||'')+' ('+esc(x.ja_era_estagio||'')+')</span>'; }},
     {k:'canceladas', um:'cancelada depois da etiqueta', muitos:'canceladas depois da etiqueta',
-     lista:'as canceladas', ajuda:'o cliente cancelou depois da etiqueta — a que está na fábrica volta pelo "Sobrou" da Conferência; aqui se registra a que não voltou',
+     lista:'as canceladas', ajuda:'o cliente cancelou depois da etiqueta — a que está na fábrica volta pelo "✕ Venda cancelada" da Conferência; aqui se registra a que não voltou',
      linha:function(x){ return corFrase(x)+(x.pecas>1?' <span class="tag">📦 '+x.pecas+' persianas</span>':'')
        +(x.cancelada_varias?' <span class="sub">(caixa de várias — só um item cancelado)</span>':''); }},
     {k:'vencidos', um:'pendente vencido', muitos:'pendentes vencidos', lista:'os vencidos',

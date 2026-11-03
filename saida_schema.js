@@ -32,12 +32,18 @@ function garantirSaida(db){
     sem_segunda_pessoa INTEGER DEFAULT 0,
     aberta_por TEXT DEFAULT '',
     levou TEXT DEFAULT '[]',
-    nada_ficou INTEGER DEFAULT 0);`);
+    nada_ficou INTEGER DEFAULT 0,
+    quem_levou_id INTEGER,
+    quem_levou TEXT);`);
   /* Fase 3 (26/09/2026): quem abriu, as caixas de fora que "foram no
      caminhao" (troca de porta) e o "nao ficou nada" — o passo das sobras
      precisa ser DECLARADO, senao pular o bipe das sobras passaria calado.
      No fim, pelo ALTER, como manda o §17: o banco de producao ja tem a tabela. */
-  for(const c of ["aberta_por TEXT DEFAULT ''", "levou TEXT DEFAULT '[]'", "nada_ficou INTEGER DEFAULT 0"]){
+  /* CONFERENCIA-EXPEDICAO fase 2 (03/11/2026): QUEM LEVOU as caixas a agencia
+     (pessoa do cadastro), alem de quem fechou (`fechado_por`, o login). Quem
+     leva nem sempre e quem fecha: a foto pode chegar pelo WhatsApp. */
+  for(const c of ["aberta_por TEXT DEFAULT ''", "levou TEXT DEFAULT '[]'", "nada_ficou INTEGER DEFAULT 0",
+                  "quem_levou_id INTEGER", "quem_levou TEXT"]){
     try{ db.exec('ALTER TABLE saida ADD COLUMN ' + c); }catch(e){}
   }
 }

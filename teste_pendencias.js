@@ -165,7 +165,7 @@ function semear(){
   ok('a aba Devoluções lê pela mesma função', dono('dev_route.js', "'/api/devolucao/pendentes',\\(req,res\\)=> res\\.json\\(devolucoesPendentes\\(db\\)\\)"));
   ok('a aba Contagem lê pela mesma função', dono('cont_route.js', 'const linhas=contagemPendentes\\(db\\)'));
   ok('a aba SKU incompleto lê pela mesma função', dono('sku_route.js', "'/api/skus/pendencias',\\(req,res\\)=> res\\.json\\(pendenciasSku\\(db\\)\\)"));
-  ok('a Conferência lê pela mesma função', dono('carreg_route.js', "'/api/carregamento/sobras',\\(req,res\\)=> res\\.json\\(\\{caixas:sobrasEsperando\\(db\\)\\}\\)"));
+  ok('a Conferência lê pela mesma função', dono('carreg_route.js', "'/api/carregamento/sobras',\\(req,res\\)=>\\{\\s*const l=sobrasEsperando\\(db\\);"));
   ok('o ajuste e a central usam a mesma frase', dono('ajuste_dominio.js', "WHERE ' \\+ PENDENTE \\+ ' ORDER BY") && dono('ajuste_dominio.js', "FROM ajuste_pedido WHERE ' \\+ PENDENTE"));
   ok('o inventário e a central usam as mesmas frases', dono('inventario_dominio.js', 'WHERE \\$\\{A_APROVAR\\} ORDER BY') && dono('inventario_dominio.js', 'WHERE \\$\\{NA_LISTA\\(status\\)\\}'));
 

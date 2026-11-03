@@ -45,7 +45,8 @@ const auditado = [];
 const rotas = {};
 const app = { get:(p,...h)=>{ rotas['GET '+p]=h[h.length-1]; },
               post:(p,...h)=>{ rotas['POST '+p]=h[h.length-1]; },
-              use:()=>{}, locals:{ acesso:{ auditar(req,a,b,c,d){ auditado.push([b,c,d]); } } } };
+              use:()=>{}, locals:{ acesso:{ auditar(req,a,b,c,d){ auditado.push([b,c,d]); },
+                podePermissao(u,c){ return !!(u && u.id === 9 && c === 'cancelamento.confirmar'); } } } };
 require('./exp_route')(app, db);
 require('./carreg_route')(app, db);
 require('./saida_route')(app, db);
@@ -68,6 +69,21 @@ const chamar = (k, body, usuario) => new Promise(r => {
   catch(e){ r({ __st:500, __erro:String(e.message||e) }); }
 });
 const SOBRA = 'POST /api/carregamento/sobra';
+/* DESDE 03/11/2026 (CONFERENCIA-EXPEDICAO fase 4) A SOBRA SO MARCA: a caixa sai
+   das listas e fica separada, e quem tem `cancelamento.confirmar` (a GESTORA,
+   aqui) confirma — so entao o saldo volta. `sobraOk` faz os dois passos, para
+   os casos de baixo continuarem medindo o que medem: a conta por peca. */
+const GESTORA = {id:9, nome:'Gestora'};
+async function sobraOk(body, usuario){
+  const m = await chamar(SOBRA, body, usuario);
+  if(!m.ok || m.previa) return m;
+  const lid = m.pedido && m.pedido.id;
+  const lis = await chamar('GET /api/carregamento/sobras', {}, GESTORA);
+  const p = (lis.aguardando || []).find(x => x.lote_id === lid);
+  if(!p) return Object.assign({}, m, { ok:false, motivo:'sem_pedido_aberto' });
+  const c = await chamar('POST /api/carregamento/cancelada/confirmar', {id:p.id}, GESTORA);
+  return Object.assign({}, m, { confirmado:c, aviso:c.aviso, ok:!!c.ok });
+}
 const lote = id => db.prepare('SELECT * FROM lote WHERE id=?').get(id);
 const saldo = c => db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(c).estoque;
 const movSobra = id => db.prepare("SELECT codigo, delta FROM movimento_estoque WHERE tipo='sobra' AND referencia=? ORDER BY codigo")
@@ -152,11 +168,9 @@ const antes = { a:saldo('BK140140BEGE'), b:saldo('BK120120BEGE'), c:saldo('BK160
   console.log('\n=== 2. A LISTA "ESPERANDO DECISAO" ===\n');
   r = await chamar('GET /api/carregamento/sobras');
   const ids0 = (r.caixas || []).map(c => c.id);
-  ok('a lista traz a caixa que o caminhao deixou numa saida fechada', ids0.includes(S), r);
+  ok('a caixa que o caminhao deixou NAO esta mais aqui (e atraso, nao decisao: lista unica e fim do dia)', !ids0.includes(S), r);
   ok('   e as canceladas ainda na fabrica, sem decisao', ids0.includes(H) && ids0.includes(K), ids0);
   ok('   e nao traz caixa normal, que ja saiu, pendente, nem a de varias com um item', ![A,G,F,V].some(id => ids0.includes(id)), ids0);
-  const linS = (r.caixas || []).find(c => c.id === S) || {};
-  eq('   a sobra do caminhao diz de onde veio', linS.de, 'caminhao');
   eq('   a cancelada tambem', ((r.caixas || []).find(c => c.id === H) || {}).de, 'cancelada');
 
   console.log('\n=== 3. A PREVIA: mostra a caixa, nao grava nada ===\n');
@@ -209,7 +223,7 @@ const antes = { a:saldo('BK140140BEGE'), b:saldo('BK120120BEGE'), c:saldo('BK160
   eq('   e o saldo continua o mesmo', saldo('BK140140BEGE'), antes.a);
 
   console.log('\n=== 6. CONFIRMAR: a caixa sai das listas e a peca volta POR PECA ===\n');
-  r = await chamar(SOBRA, {id:A, skus:['BK140140BEGE'], motivo:'cancelada', confirmar:true});
+  r = await sobraOk( {id:A, skus:['BK140140BEGE'], motivo:'cancelada', confirmar:true});
   ok('a sobra de A responde ok', r.ok === true && !r.previa, r);
   const a = lote(A);
   eq('   o volume vira cancelado', a.estagio, 'cancelado');
@@ -217,12 +231,13 @@ const antes = { a:saldo('BK140140BEGE'), b:saldo('BK120120BEGE'), c:saldo('BK160
   eq('   a origem e `sobra` (nao `conferencia`, que e do conferir_canceladas.js)', a.cancelada_origem, 'sobra');
   ok('   o motivo e o escolhido', /venda cancelada/i.test(a.cancelada_motivo||''), a.cancelada_motivo);
   eq('   quem marcou', a.cancelada_por, 'Lucas');
-  ok('   e ja sai decidida (nao vai parar no card da Mesa)', !!a.cancelada_resolvida_em && a.cancelada_resolvida_por === 'Lucas', a);
+  ok('   e sai decidida por quem CONFIRMOU (nao vai parar no card da Mesa)', !!a.cancelada_resolvida_em && a.cancelada_resolvida_por === 'Gestora', a);
   eq('   voltou para a prateleira', a.cancelada_voltou, 1);
   eq('   +1 no saldo', saldo('BK140140BEGE'), antes.a + 1);
   eq('   com uma linha `sobra` no livro, referencia lote:<id>', JSON.stringify(movSobra(A)), JSON.stringify([{codigo:'BK140140BEGE', delta:1}]));
   ok('   o livro fecha', livroFecha());
-  ok('   e vai para a auditoria', auditado.some(x => x[0] === 'sobra' && /7011/.test(x[1])), auditado.slice(-3));
+  ok('   e vai para a auditoria (marcada e confirmada)', auditado.some(x => x[0] === 'cancelamento_marcado' && /7011/.test(x[1]))
+     && auditado.some(x => x[0] === 'cancelamento_confirmado' && /7011/.test(x[1])), auditado.slice(-3));
   ok('   a tela recebe o aviso de por na prateleira', /prateleira/i.test(r.aviso||''), r.aviso);
 
   r = await chamar(SOBRA, {id:A, skus:['BK140140BEGE'], motivo:'cancelada', confirmar:true});
@@ -231,38 +246,38 @@ const antes = { a:saldo('BK140140BEGE'), b:saldo('BK120120BEGE'), c:saldo('BK160
   eq('   a devolucao do dominio tambem nao repete', typeof BAIXA.devolver === 'function' ? BAIXA.devolver(db, lote(A), 'x').length : -1, 0);
   eq('   e continua uma linha so no livro', movSobra(A).length, 1);
 
-  r = await chamar(SOBRA, {id:B, skus:['BK140140BEGE'], motivo:'motorista', confirmar:true}, ANA);
+  r = await sobraOk( {id:B, skus:['BK140140BEGE'], motivo:'motorista', confirmar:true}, ANA);
   ok('a coleta no canto, motivo "motorista recusou"', r.ok === true, r);
   ok('   o motivo diz motorista', /motorista/i.test(lote(B).cancelada_motivo||''), lote(B).cancelada_motivo);
   ok('   e saiu do canto do caminhao', !db.prepare('SELECT 1 FROM lote WHERE id=? AND ' + AGUARDA_CAMINHAO).get(B));
   eq('   +1 de novo', saldo('BK140140BEGE'), antes.a + 2);
 
-  r = await chamar(SOBRA, {id:C, skus:['BK160160CINZA'], motivo:'outro', texto:'Caixa amassada, cliente desistiu', confirmar:true});
+  r = await sobraOk( {id:C, skus:['BK160160CINZA'], motivo:'outro', texto:'Caixa amassada, cliente desistiu', confirmar:true});
   ok('a caixa no carro da viagem, motivo escrito', r.ok === true, r);
   ok('   sai da viagem (saida_id e no_carro limpos)', lote(C).saida_id == null && lote(C).no_carro_em == null, lote(C));
   ok('   o motivo escrito fica gravado', /amassada/.test(lote(C).cancelada_motivo||''), lote(C).cancelada_motivo);
   eq('   +1 de BK160', saldo('BK160160CINZA'), antes.c + 1);
 
-  r = await chamar(SOBRA, {id:D, skus:['BK160160CINZA','BK120120BEGE','BK120120BEGE'], motivo:'cancelada', confirmar:true});
+  r = await sobraOk( {id:D, skus:['BK160160CINZA','BK120120BEGE','BK120120BEGE'], motivo:'cancelada', confirmar:true});
   ok('a caixa de varias, com as 3 bipadas em qualquer ordem', r.ok === true, r);
   eq('   devolve 2 de BK120', saldo('BK120120BEGE'), antes.b + 2);
   eq('   e 1 de BK160', saldo('BK160160CINZA'), antes.c + 2);
   eq('   uma linha por SKU no livro', movSobra(D).length, 2);
 
-  r = await chamar(SOBRA, {id:E, skus:[], motivo:'cancelada', confirmar:true});
+  r = await sobraOk( {id:E, skus:[], motivo:'cancelada', confirmar:true});
   ok('o sob medida e registrado sem SKU a bipar', r.ok === true && lote(E).estagio === 'cancelado', r);
   eq('   e nao gera movimento', db.prepare("SELECT COUNT(*) n FROM movimento_estoque WHERE codigo='SOBMEDIDA'").get().n, 0);
   ok('   e o aviso nao manda por na prateleira', !/prateleira/i.test(r.aviso||'') && /sob medida/i.test(r.aviso||''), r.aviso);
 
   const resvAntes = (BAIXA.reservados(db)['BK160160CINZA'] || 0);
   const cAntes = saldo('BK160160CINZA');
-  r = await chamar(SOBRA, {id:N, skus:['BK160160CINZA'], motivo:'cancelada', confirmar:true});
+  r = await sobraOk( {id:N, skus:['BK160160CINZA'], motivo:'cancelada', confirmar:true});
   ok('a caixa que nunca baixou e registrada', r.ok === true && lote(N).estagio === 'cancelado', r);
   eq('   o saldo NAO sobe (a peca nunca saiu)', saldo('BK160160CINZA'), cAntes);
   eq('   nenhuma linha no livro', movSobra(N).length, 0);
   eq('   e a reserva solta', (BAIXA.reservados(db)['BK160160CINZA'] || 0), resvAntes - 1);
 
-  r = await chamar(SOBRA, {code:'2000018000000008', skus:['BK140140BEGE'], motivo:'cancelada', confirmar:true});
+  r = await sobraOk( {code:'2000018000000008', skus:['BK140140BEGE'], motivo:'cancelada', confirmar:true});
   ok('a cancelada pelo ML ainda na area tambem vai pela sobra', r.ok === true, r);
   eq('   a origem dela continua planilha (e historia)', lote(H).cancelada_origem, 'planilha');
   ok('   e fica decidida', !!lote(H).cancelada_resolvida_em && lote(H).cancelada_voltou === 1);
@@ -270,7 +285,7 @@ const antes = { a:saldo('BK140140BEGE'), b:saldo('BK120120BEGE'), c:saldo('BK160
 
   r = await chamar(SOBRA, {id:S, skus:['BK120120BEGE'], motivo:'cancelada', confirmar:true}, ANA);
   ok('a Ana conferiu a S: a sobra do caminhao tambem e recusada a ela', r.ok === false && r.motivo === 'mesma_pessoa', r);
-  r = await chamar(SOBRA, {id:S, skus:['BK120120BEGE'], motivo:'cancelada', confirmar:true});
+  r = await sobraOk( {id:S, skus:['BK120120BEGE'], motivo:'cancelada', confirmar:true});
   ok('com outra pessoa, a sobra do caminhao volta', r.ok === true, r);
   eq('   +1 de BK120', saldo('BK120120BEGE'), antes.b + 3);
   ok('o livro fecha depois de tudo', livroFecha());
@@ -305,7 +320,7 @@ const antes = { a:saldo('BK140140BEGE'), b:saldo('BK120120BEGE'), c:saldo('BK160
   const prev = (id, params) => { try{ return COR.previa(db,{acao:'cancelada',tipo:'lote',id,params}); }catch(e){ return { erro:e.message, status:e.status }; } };
   r = prev(K, {voltou:true});
   ok('o "a persiana voltou" da Mesa e recusado', !!r.erro, r);
-  ok('   e manda para o "Sobrou" da Conferencia', /sobrou/i.test(r.erro||'') && /confer/i.test(r.erro||''), r.erro);
+  ok('   e manda para o "Venda cancelada" da Conferencia (desde 03/11/2026)', /venda cancelada/i.test(r.erro||'') && /confer/i.test(r.erro||''), r.erro);
   const v = db.prepare('SELECT * FROM lote WHERE id=?').get(K);
   const opc = COR.ACOES.cancelada.opcoes(db, v).map(o => o.id);
   eq('a Mesa oferece so o "registrar"', opc.join(','), 'registrar');

@@ -196,10 +196,12 @@ const ACOES = {
     id:'cancelada', alvo:'lote',
     rotulo:'Cancelada depois da etiqueta',
     explica:'O cliente cancelou depois de a etiqueta sair. Se a persiana está na fábrica, ela volta para a ' +
-            'prateleira pelo "Sobrou" da Conferência, com o bipe do SKU. Aqui só se registra a que não voltou.',
+            'prateleira pelo "✕ Venda cancelada" da Conferência, com o bipe do SKU e a confirmação de outra pessoa. ' +
+            'Aqui só se registra a que não voltou.',
     carregar: volumePorId,
     /* ⚠️ O "A PERSIANA VOLTOU" SAIU DA MESA (CONFERENCIA-E-BAIXA, fase 2-B, D7):
-       a Mesa nunca mexe em saldo. A volta e o "Sobrou" da Conferencia, onde
+       a Mesa nunca mexe em saldo. A volta e o "Venda cancelada" da Conferencia (desde
+       03/11/2026 em duas pessoas: separa e confirma), onde
        a expedicao bipa o SKU de cada persiana — o bipe e a prova de que a peca
        esta na mao, e a Mesa nao tem como prova-la. */
     opcoes(db, v){
@@ -219,8 +221,8 @@ const ACOES = {
         return (v.cancelada_origem === 'motorista'
           ? 'O motorista recusou esta caixa' + (v.cancelada_por ? ' (marcada por ' + v.cancelada_por + ')' : '') + '. '
           : '') +
-          'Se a persiana está na fábrica, a volta ao estoque é pelo "Sobrou" da Conferência: bipe a etiqueta e o SKU ' +
-          'de cada persiana. Registre aqui só a que não voltou.';
+          'Se a persiana está na fábrica, a volta ao estoque é pelo "✕ Venda cancelada" da Conferência: bipe a etiqueta ' +
+          'e o SKU de cada persiana, e outra pessoa confirma. Registre aqui só a que não voltou.';
       return v.cancelada_varias
         ? 'Esta caixa leva mais de uma persiana e o Mercado Livre cancelou só um item — o sistema não sabe ' +
           'qual peça é. Separe a caixa, confira na mão, e o saldo se corrige por Admin → Estoque, com motivo.'
@@ -239,8 +241,8 @@ const ACOES = {
     },
     previa(db, v, params){
       if(params && params.voltou)
-        throw erro(409, 'a volta ao estoque é pelo "Sobrou" da Conferência: lá a expedição bipa a etiqueta e o ' +
-                        'SKU de cada persiana. A Mesa não mexe em saldo.');
+        throw erro(409, 'a volta ao estoque é pelo "✕ Venda cancelada" da Conferência: lá a expedição bipa a etiqueta e o ' +
+                        'SKU de cada persiana, e outra pessoa confirma. A Mesa não mexe em saldo.');
       const jaBaixou = baixou(v);
       const estoque = [];
       const pecas = pecasDoVolume(db, v);
