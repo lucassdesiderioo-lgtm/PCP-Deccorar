@@ -3028,6 +3028,10 @@ async function carregarDev(){
        motivo ja foi escolhido no caso e vem marcado. Trocar continua possivel. */
     if(d.caso_id) h+='<br>Caso em andamento <b>#'+d.caso_id+'</b> ('+(d.caso_tipo==='coleta'?'nós coletamos':'ML devolve')+')'+(d.caso_motivo?' · motivo do caso: <b>'+d.caso_motivo+'</b>':'');
     h+='</div>';
+    /* SEM CASO (CONSERTO de 03/11/2026, NF 8207): a etiqueta bipada pode ser a
+       de devolução do ML, que não acha o caso. Os casos esperados do mesmo SKU
+       aparecem aqui, e "Ligar" junta os dois antes da baixa. */
+    if(!d.caso_id) h+='<div id="dvEsp'+d.id+'" data-sku="'+String(d.sku_fisico||'').replace(/"/g,'')+'" class="sub" style="margin-top:10px"></div>';
     h+='<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">';
     h+='<div class="sub" style="margin-bottom:6px">Afetou a reputacao?</div><div style="display:flex;gap:8px;margin-bottom:12px">';
     h+='<button class="ghost dvRep" data-id="'+d.id+'" data-v="sim">Sim</button><button class="ghost dvRep" data-id="'+d.id+'" data-v="nao">Nao</button>';
@@ -3042,6 +3046,17 @@ async function carregarDev(){
     h+='</div></div>';
   }
   el.innerHTML=h;
+  dvEsperadasBaixa(l);
+}
+async function dvEsperadasBaixa(l){
+  for(var i=0;i<l.length;i++){
+    var d=l[i]; if(d.caso_id) continue;
+    var box=document.getElementById('dvEsp'+d.id); if(!box) continue;
+    var r={}; try{ r=await (await fetch('/api/devolucao/esperadas?sku='+encodeURIComponent(d.sku_fisico||''))).json(); }catch(e){}
+    var cs=r.casos||[]; if(!cs.length || !document.getElementById('dvEsp'+d.id)) continue;
+    box.innerHTML='<div style="color:var(--amber);font-weight:700;margin-bottom:6px">Há devolução esperada com este SKU — é alguma destas?</div><div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      cs.map(function(c){ return '<button class="ghost dvLigar" data-dev="'+d.id+'" data-caso="'+c.id+'">Ligar ao caso #'+c.id+' · '+String(c.comprador||'sem nome').replace(/[<>&"]/g,'')+' · NF '+String(c.nf||'—').replace(/[<>&"]/g,'')+'</button>'; }).join('')+'</div>';
+  }
 }
 var DVESC={};
 document.addEventListener('click',function(e){
@@ -3051,6 +3066,15 @@ document.addEventListener('click',function(e){
   var m=e.target.closest('.dvMot');
   if(m){ var id2=m.getAttribute('data-id'); DVESC[id2]=DVESC[id2]||{}; DVESC[id2].mot=m.getAttribute('data-v');
     document.getElementById('mot'+id2).textContent=m.getAttribute('data-v'); return; }
+  var lg=e.target.closest('.dvLigar');
+  if(lg){
+    fetch('/api/devolucao/ligar-caso',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({devolucao_id:+lg.getAttribute('data-dev'),caso_id:+lg.getAttribute('data-caso')})})
+      .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.erro||('Erro '+r.status)); }); })
+      .then(function(){ carregarDev(); })
+      .catch(function(x){ alert(x.message); });
+    return;
+  }
   var b=e.target.closest('.dvBaixa');
   if(b){
     var id3=b.getAttribute('data-id');

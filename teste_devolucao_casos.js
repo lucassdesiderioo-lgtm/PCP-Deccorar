@@ -441,7 +441,7 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   eq('"chegou" no caso que não chegou pelo ML devolve sem prazo também funciona',
      chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, {id:c2b.id}).status, 200);
 
-  secao('28. a baixa da devolução ligada: o motivo vem do caso, e o "ML devolve" encerra');
+  secao('28. a baixa da devolução ligada: o motivo vem do caso; o "ML devolve" encerra com a baixa E o "Já revisei"');
   const pend = chamar('GET','/api/devolucao/pendentes',null,3).body;
   const p28 = pend.find(d => d.id === caso(k21).devolucao_id);
   eq('a lista de pendentes traz o motivo do caso', p28 && p28.caso_motivo, 'Falta de kit');
@@ -449,6 +449,13 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   r = chamar('POST','/api/devolucao/baixa',{ id:caso(k21).devolucao_id, reputacao:'nao' }, 3);
   eq('a baixa sem motivo escolhido passa', r.status, 200);
   eq('   e grava o motivo do caso', db.prepare('SELECT motivo FROM devolucao WHERE id=?').get(caso(k21).devolucao_id).motivo, 'Falta de kit');
+  /* Desde 03/11/2026 (decisão do dono): o "ML devolve" só encerra depois de
+     alguém marcar "Já revisei" no ML — sem isso o ML entende que a peça chegou
+     como esperado e o prazo de contestar passa. */
+  eq('a baixa sozinha NÃO encerra o "ML devolve"', caso(k21).encerrado_em, null);
+  eq('   e a lista diz que falta o "Já revisei"', (daLista(lista(2).ml, k21) || {}).falta_revisei, true);
+  r = chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 3, {id:k21});
+  eq('"Já revisei no ML" marcado', r.status, 200);
   k = caso(k21);
   eq('o caso "ML devolve" encerra', k.saida, 'revisado_ml');
   ok('   com quem e quando', k.encerrado_por === 'Ana' && !!k.encerrado_em, JSON.stringify(k));
@@ -1206,8 +1213,10 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   eq('   o resultado', caso(rv).revisao_resultado, 'devolveu');
   eq('   o valor', caso(rv).valor_revisao, 48.7);
   ok('   e a data da resposta', !!caso(rv).revisao_resp_em);
-  eq('   e o caso já baixado encerra agora', caso(rv).saida, 'revisado_ml');
-  ok('   a história diz o que mudou, sem o número', eventos(rv).some(e => e.tipo === 'revisao_frete' && /devolveu/.test(e.texto) && !/48/.test(e.texto)), JSON.stringify(eventos(rv).map(e=>e.texto)));
+  eq('   o caso já baixado, sem o "Já revisei", continua aberto', caso(rv).encerrado_em, null);
+  chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 2, { id:rv });
+  eq('   e com o "Já revisei" encerra', caso(rv).saida, 'revisado_ml');
+  ok('   a história diz o que mudou, sem o número', eventos(rv).some(e => e.tipo === 'revisao_frete' && /atendeu/.test(e.texto) && !/48/.test(e.texto)), JSON.stringify(eventos(rv).map(e=>e.texto)));
   ok('   e a auditoria grava o valor', AUDIT.some(a => a.acao === 'valor' && a.alvo === String(rv)));
   ok('o valor devolvido não viaja a quem não lança nem acompanha', !chavesDe(det(rv, 4)).has('valor_revisao'));
   ok('   e viaja a quem acompanha', chavesDe(det(rv, 2)).has('valor_revisao'));
@@ -1219,8 +1228,10 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   eq('   resposta duas vezes: recusada', respRev(rv2, { resultado:'devolveu' }).status, 409);
   eq('   e o caso ainda não baixado continua aberto', caso(rv2).encerrado_em, null);
   r = chamar('POST','/api/devolucao',{ codigo_ml:'2000000000009302', caso_id:rv2, sku_fisico:'BK140140BEGE', destinacao:'estoque' }, 4);
+  chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 2, { id:rv2 });
+  eq('com a revisão respondida e o "Já revisei", ainda espera a baixa', caso(rv2).encerrado_em, null);
   chamar('POST','/api/devolucao/baixa',{ id:caso(rv2).devolucao_id, reputacao:'nao' }, 3);
-  eq('com a revisão respondida, a baixa encerra como sempre', caso(rv2).saida, 'revisado_ml');
+  eq('   e a baixa encerra', caso(rv2).saida, 'revisado_ml');
   rp = respRev(rv2, { resultado:'devolveu' });
   eq('o valor devolvido depois, pelo "Salvar valores"', chamar('POST','/api/devolucao-casos/:id/valor',{ valor_revisao:'10' }, 1, { id:rv2 }).status, 200);
   eq('   gravado mesmo com o caso encerrado', caso(rv2).valor_revisao, 10);
@@ -1380,6 +1391,130 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   ok('o limite não viaja a quem não lança nem acompanha', !chavesDe(detP(pzL, 4)).has('limite_frete') && !chavesDe(detP(pzL, 4)).has('aviso_limite'));
   ok('a história diz que o limite mudou, sem o número', eventos(pzL).some(e => /limite do frete/.test(e.texto || '')) && !eventos(pzL).some(e => /174|100[,.]/.test(e.texto || '')));
   eq('no "ML devolve" não há limite de frete', chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8810051', publicidade:false, limite_frete:'50' }, 3).status, 400);
+
+  /* ═══════ A REVISÃO QUE NÃO ACHOU O CASO (CONSERTO de 03/11/2026, NF 8207) ═══════
+     O Edvaldo bipou a etiqueta de DEVOLUÇÃO do ML (48323653161): ela não é venda,
+     pack nem NF, e o caso ficou solto. Agora o caso se acha pelo SKU, e a revisão
+     solta se liga pela tela do caso ou pela Baixa. */
+  secao('revisão solta — as devoluções esperadas pelo SKU');
+  db.prepare("INSERT OR IGNORE INTO skus (codigo,estoque) VALUES ('BK150150BRANCO',0)").run();
+  const sx = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571773263', nf:'8207', sku:'BK150150BRANCO', comprador:'Maria Consuelo Bermudez', publicidade:true }, 3).body.id;
+  chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, { id:sx });
+  let esp = chamar('GET','/api/devolucao/esperadas',null,4,{},{ sku:'BK150150BRANCO' });
+  eq('quem registra a peça vê os casos esperados do SKU', esp.status, 200);
+  ok('   o caso #' + sx + ' está lá', (esp.body.casos || []).some(c => c.id === sx), JSON.stringify(esp.body));
+  ok('   com NF e comprador, para o Edvaldo reconhecer', (esp.body.casos || []).some(c => c.id === sx && c.nf === '8207' && /Consuelo/.test(c.comprador)));
+  ok('   e sem nenhum valor em reais', !DINHEIRO_CHAVES.some(k => chavesDe(esp.body).has(k)));
+  eq('SKU de outro produto não traz o caso', (chamar('GET','/api/devolucao/esperadas',null,4,{},{ sku:'BK140140BEGE' }).body.casos || []).some(c => c.id === sx), false);
+  eq('sem SKU: recusado', chamar('GET','/api/devolucao/esperadas',null,4,{},{}).status, 400);
+
+  secao('revisão solta — o bipe da etiqueta de devolução não acha, e o toque na lista liga');
+  r = chamar('POST','/api/devolucao',{ codigo_ml:'48323653161', sku_fisico:'BK150150BRANCO', destinacao:'reembalar', caso_id:sx }, 4);
+  eq('salvando com o caso escolhido na lista, liga', r.body.caso_id, sx);
+  eq('   e o caso fica revisado', caso(sx).etapa, 'revisado');
+  eq('o caso revisado sai da lista de esperados', (chamar('GET','/api/devolucao/esperadas',null,4,{},{ sku:'BK150150BRANCO' }).body.casos || []).some(c => c.id === sx), false);
+
+  secao('revisão solta — ligar depois, pela tela do caso');
+  const sy = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571779999', nf:'8208', sku:'BK150150BRANCO', publicidade:false }, 3).body.id;
+  const solta = chamar('POST','/api/devolucao',{ codigo_ml:'48323650000', sku_fisico:'BK150150BRANCO', destinacao:'reembalar' }, 4).body.id;
+  eq('a revisão pela etiqueta de devolução fica solta', caso(sy).devolucao_id, null);
+  let rs = chamar('GET','/api/devolucao-casos/:id/revisoes-soltas',null,2,{ id:sy });
+  eq('o caso lista as revisões sem caso', rs.status, 200);
+  ok('   a do mesmo SKU vem, marcada', (rs.body.revisoes || []).some(d => d.id === solta && d.mesmo_sku === true), JSON.stringify(rs.body));
+  ok('   e a que já tem caso não vem', !(rs.body.revisoes || []).some(d => d.id === caso(sx).devolucao_id));
+  r = chamar('POST','/api/devolucao-casos/:id/ligar',{ devolucao_id:solta }, 2, { id:sy });
+  eq('"Ligar a este caso"', r.status, 200);
+  eq('   ligou', caso(sy).devolucao_id, solta);
+  eq('   revisado', caso(sy).etapa, 'revisado');
+  ok('   com chegada', !!caso(sy).chegou_em);
+  ok('   e a história diz que foi ligada à mão', eventos(sy).some(e => e.tipo === 'revisado' && /ligad/.test(e.texto || '')), JSON.stringify(eventos(sy).map(e=>e.texto)));
+  eq('ligar de novo: recusado', chamar('POST','/api/devolucao-casos/:id/ligar',{ devolucao_id:solta }, 2, { id:sy }).status, 409);
+  eq('a mesma revisão em outro caso: recusado', chamar('POST','/api/devolucao-casos/:id/ligar',{ devolucao_id:solta }, 2, { id:lanP({ venda:'8810090' }).body.id }).status, 409);
+  eq('revisão que não existe: 404', chamar('POST','/api/devolucao-casos/:id/ligar',{ devolucao_id:999999 }, 2, { id:lanP({ venda:'8810091' }).body.id }).status, 404);
+
+  secao('revisão solta — SKU diferente pede confirmação, e a confirmação vira evidência');
+  const sz = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571778888', sku:'BK160160BRANCO', publicidade:false }, 3).body.id;
+  const outra = chamar('POST','/api/devolucao',{ codigo_ml:'48323651111', sku_fisico:'BK140140BEGE', destinacao:'estoque' }, 4).body.id;
+  r = chamar('POST','/api/devolucao-casos/:id/ligar',{ devolucao_id:outra }, 2, { id:sz });
+  eq('SKU recebido diferente do vendido: pede confirmação (409)', r.status + '/' + (r.body.sku_diferente === true), '409/true');
+  eq('   e nada foi ligado', caso(sz).devolucao_id, null);
+  r = chamar('POST','/api/devolucao-casos/:id/ligar',{ devolucao_id:outra, confirmar:true }, 2, { id:sz });
+  eq('confirmando, liga', r.status + '/' + caso(sz).devolucao_id, '200/' + outra);
+  ok('   e a história registra a divergência', eventos(sz).some(e => /diferente/.test(e.texto || '') && /BK140140BEGE/.test(e.texto || '')), JSON.stringify(eventos(sz).map(e=>e.texto)));
+
+  secao('revisão solta — ligar pela Baixa');
+  const sb = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571777777', sku:'BK160140BEGE', publicidade:false }, 3).body.id;
+  const soltaB = chamar('POST','/api/devolucao',{ codigo_ml:'48323652222', sku_fisico:'BK160140BEGE', destinacao:'estoque' }, 4).body.id;
+  const pendB = chamar('GET','/api/devolucao/pendentes',null,3).body.find(d => d.id === soltaB);
+  ok('a Baixa sabe que a revisão está sem caso', pendB && !pendB.caso_id, JSON.stringify(pendB));
+  r = chamar('POST','/api/devolucao/ligar-caso',{ devolucao_id:soltaB, caso_id:sb }, 3);
+  eq('ligar pela Baixa (quem dá baixa)', r.status, 200);
+  eq('   ligou', caso(sb).devolucao_id, soltaB);
+  eq('   e a Baixa passa a mostrar o caso', (chamar('GET','/api/devolucao/pendentes',null,3).body.find(d => d.id === soltaB) || {}).caso_id, sb);
+  eq('quem só registra não liga pela Baixa', chamar('POST','/api/devolucao/ligar-caso',{ devolucao_id:soltaB, caso_id:sb }, 4).status, 403);
+
+  secao('revisão solta — ligada depois da baixa, o "ML devolve" segue a regra');
+  const sl = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571776666', sku:'BK140140BEGE', publicidade:false }, 3).body.id;
+  const soltaL = chamar('POST','/api/devolucao',{ codigo_ml:'48323653333', sku_fisico:'BK140140BEGE', destinacao:'estoque' }, 4).body.id;
+  chamar('POST','/api/devolucao/baixa',{ id:soltaL, reputacao:'nao', motivo:'Comprador se arrependeu' }, 3);
+  chamar('POST','/api/devolucao-casos/:id/ligar',{ devolucao_id:soltaL }, 2, { id:sl });
+  eq('ligada já baixada: falta só o "Já revisei"', caso(sl).encerrado_em + '/' + (daLista(lista(2).ml, sl) || {}).falta_revisei, 'null/true');
+  chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 2, { id:sl });
+  eq('   e com ele encerra', caso(sl).saida, 'revisado_ml');
+
+  secao('"Já revisei no ML" — só depois da revisão, e uma vez');
+  const ja = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571775555', sku:'BK140140BEGE', publicidade:false }, 3).body.id;
+  chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, { id:ja });
+  eq('antes da revisão do Edvaldo: recusado', chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 2, { id:ja }).status, 400);
+  chamar('POST','/api/devolucao',{ codigo_ml:'2000015571775555', sku_fisico:'BK140140BEGE', destinacao:'estoque' }, 4);
+  eq('revisado: a lista diz que falta o "Já revisei"', (daLista(lista(2).ml, ja) || {}).falta_revisei, true);
+  eq('marcar', chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 2, { id:ja }).status, 200);
+  eq('   a etapa vai a "Já revisei no ML"', caso(ja).etapa, 'ml_revisei');
+  eq('   e não falta mais', (daLista(lista(2).ml, ja) || {}).falta_revisei, false);
+  eq('marcar de novo: recusado', chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 2, { id:ja }).status, 409);
+  eq('   ainda aberto, esperando a baixa', caso(ja).encerrado_em, null);
+
+  secao('"revisar no ML até" — o prazo do ML devolve');
+  const pr = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571774444', sku:'BK140140BEGE', publicidade:false }, 3).body.id;
+  r = chamar('POST','/api/devolucao-casos/:id/chegou',{ revisar_ate:dia(1) }, 2, { id:pr });
+  eq('a chegada já pode trazer o prazo', r.status + '/' + caso(pr).revisar_ate, '200/' + dia(1));
+  let lp = daLista(lista(2).ml, pr);
+  eq('o prazo dá a cor (falta 1 dia: vermelho)', lp.cor + '/' + lp.dias_prazo, 'vermelho/1');
+  eq('   e diz qual prazo', lp.prazo_qual, 'revisar');
+  eq('editar o prazo', chamar('POST','/api/devolucao-casos/:id/editar',{ revisar_ate:dia(5) }, 3, { id:pr }).status + '/' + caso(pr).revisar_ate, '200/' + dia(5));
+  eq('data impossível: recusada', chamar('POST','/api/devolucao-casos/:id/editar',{ revisar_ate:'2026-02-30' }, 3, { id:pr }).status, 400);
+  const prs = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571773333', publicidade:false }, 3).body.id;
+  eq('ML devolve sem o prazo: sem cor, como antes', (daLista(lista(2).ml, prs) || {}).cor, '');
+  const ordML = lista(2).ml.map(c => c.id);
+  ok('na lista, o ML devolve com prazo vem antes do sem prazo', ordML.indexOf(pr) < ordML.indexOf(prs), JSON.stringify(ordML));
+  chamar('POST','/api/devolucao',{ codigo_ml:'2000015571774444', sku_fisico:'BK140140BEGE', destinacao:'estoque' }, 4);
+  chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 2, { id:pr });
+  lp = daLista(lista(2).ml, pr);
+  eq('com o "Já revisei", o prazo está cumprido: sem cor', lp.cor + '/' + lp.dias_prazo, '/null');
+
+  secao('a revisão no ML pede o valor E/OU a reputação, e não fecha sem resposta');
+  const rq = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571772222', sku:'BK140140BEGE', publicidade:false }, 3).body.id;
+  chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, { id:rq });
+  eq('pedido sem dizer o que se pede: recusado', pedeRev(rq, { pede:'' }).status, 400);
+  eq('pedido impossível: recusado', pedeRev(rq, { pede:'tudo' }).status, 400);
+  eq('pedir o valor e a reputação', pedeRev(rq, { pede:'ambos', numero:'SR-1' }).status, 200);
+  eq('   gravado', caso(rq).revisao_pede, 'ambos');
+  ok('   e a história diz o que se pediu', eventos(rq).some(e => /valor/.test(e.texto || '') && /reputa/.test(e.texto || '')), JSON.stringify(eventos(rq).map(e=>e.texto)));
+  chamar('POST','/api/devolucao',{ codigo_ml:'2000015571772222', sku_fisico:'BK140140BEGE', destinacao:'estoque' }, 4);
+  chamar('POST','/api/devolucao/baixa',{ id:caso(rq).devolucao_id, reputacao:'sim' }, 3);
+  chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 2, { id:rq });
+  eq('baixa e "Já revisei" feitos, revisão sem resposta: NÃO fecha', caso(rq).encerrado_em, null);
+  eq('a resposta "atendeu"', respRev(rq, { resultado:'devolveu' }).status, 200);
+  eq('   e aí fecha', caso(rq).saida, 'revisado_ml');
+  const rq2 = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571771111', sku:'BK140140BEGE', publicidade:false }, 3).body.id;
+  chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, { id:rq2 });
+  eq('pedir só a reputação', pedeRev(rq2, { pede:'reputacao' }).status, 200);
+  eq('   sem pedido de valor, o valor devolvido é recusado', respRev(rq2, { resultado:'devolveu', valor_revisao:'10' }).status, 400);
+  eq('o pedido antigo, sem dizer o que pede, ainda responde (casos de antes)', (function(){
+    const v = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571770000', publicidade:false }, 3).body.id;
+    chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, { id:v });
+    db.prepare("UPDATE devolucao_caso SET revisao_pedida_em=datetime('now','localtime') WHERE id=?").run(v);
+    return respRev(v, { resultado:'negou' }).status; })(), 200);
 
   fim();
 })().catch(e => { console.log('ESTOUROU: ' + e.stack); falhas++; fim(); });

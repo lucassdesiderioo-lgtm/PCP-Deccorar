@@ -223,10 +223,12 @@ function celulasPrazos(c){
 function plural(n, um, varios){ return n+' '+(Math.abs(n)===1?um:varios); }
 /* OS DOIS PRAZOS DO ML (AJUSTE de 03/11/2026): o chip mostra só o PRÓXIMO
    prazo aberto, com o nome dele. Quem escolhe qual é o servidor. */
-var CURTO_PRAZO={ comprovante:'comprovante', coleta:'coleta' };
+var CURTO_PRAZO={ comprovante:'comprovante', coleta:'coleta', revisar:'revisar no ML' };
+/* "Já revisei no ML" (03/11/2026): no ML devolve revisado, falta marcar no ML. */
+function chipRevisei(c){ return c.falta_revisei ? '<span class="chip ambar">falta marcar "Já revisei" no ML</span>' : ''; }
 function textoDias(n){ return n<0 ? 'VENCIDO há '+plural(-n,'dia','dias') : n===0 ? 'vence HOJE' : (n===1 ? 'falta 1 dia' : 'faltam '+n+' dias'); }
 function chipPrazo(c){
-  if(c.tipo!=='coleta' || c.dias_prazo===null || c.dias_prazo===undefined) return '';
+  if(c.dias_prazo===null || c.dias_prazo===undefined) return '';
   var q=CURTO_PRAZO[c.prazo_qual] ? CURTO_PRAZO[c.prazo_qual]+': ' : '';
   return '<span class="chip '+esc(c.cor)+'">'+q+textoDias(c.dias_prazo)+' · até '+dataBR(c.prazo_data||c.prazo)+'</span>';
 }
@@ -242,7 +244,7 @@ function linhaCaso(c){
   if(c.parado_valor) chips+='<span class="chip parado">valor do ML a pedir há '+plural(c.dias_valor||0,'dia','dias')+'</span>';
   if(c.valor_ml_situacao==='pedido') chips+='<span class="chip">valor do ML pedido</span>';
   if('saldo' in c) chips+= c.incompleto ? '<span class="chip falta">saldo incompleto</span>' : '<span class="chip dinheiro">saldo '+reais(c.saldo)+'</span>';
-  if(c.tipo==='ml') chips+='<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>'+chipRevisao(c);
+  if(c.tipo==='ml') chips+='<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>'+chipRevisei(c)+chipRevisao(c);
   if(c.responsavel) chips+='<span class="chip">'+esc(c.responsavel)+'</span>';
   if(c.prazo_original) chips+='<span class="chip">comprovante prorrogado (era '+dataBR(c.prazo_original)+')</span>';
   if(c.prazo_coleta_original) chips+='<span class="chip">coleta prorrogada (era '+dataBR(c.prazo_coleta_original)+')</span>';
@@ -461,7 +463,7 @@ function desenharCaso(d){
     (c.link_ml?'<a class="bt" style="margin-left:auto;text-decoration:none" href="'+esc(c.link_ml)+'" target="_blank" rel="noopener noreferrer">Abrir conversa no ML ↗</a>':'')+
     '<button class="bt sec" style="'+(c.link_ml?'':'margin-left:auto')+'" onclick="fechar()">Fechar</button></div>';
   h+='<div class="chips">'+chipPrazo(c)+(c.tipo==='coleta'&&c.parado?'<span class="chip parado">parado há '+plural(c.dias_parado,'dia','dias')+'</span>':'')+
-     (c.tipo==='ml'?'<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>'+chipRevisao(c):'')+
+     (c.tipo==='ml'?'<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>'+chipRevisei(c)+chipRevisao(c):'')+
      (c.saida_nome?'<span class="chip">'+esc(c.saida_nome)+'</span>':'')+chipPub(c)+'</div>';
   h+='<div class="trilha">'+trilha+'</div>';
   h+='<div class="dados">'+
@@ -469,7 +471,7 @@ function desenharCaso(d){
     '<div><b>SKU</b>'+esc(c.sku||'—')+(pecaDe(c.sku)?'<br><small>'+esc(pecaDe(c.sku))+'</small>':'')+'</div>'+
     '<div><b>Comprador</b>'+esc(c.comprador||'—')+'</div>'+celulaMotivo(c, P, aberto)+
     '<div><b>Via publicidade</b>'+simNao(c.publicidade)+'</div>'+
-    (c.tipo==='coleta'?celulasPrazos(c):'')+
+    (c.tipo==='coleta'?celulasPrazos(c):'<div><b>Revisar no ML até</b>'+(c.revisar_ate?dataBR(c.revisar_ate):'—')+'</div>')+
     // Responsável e Passado em nos DOIS tipos: no "ML devolve" eles eram gravados e não apareciam.
     '<div><b>Responsável</b>'+esc(c.responsavel||'—')+'</div><div><b>Passado em</b>'+dataBR(c.passado_em)+'</div>'+
     '<div><b>Na etapa desde</b>'+horaBR(c.etapa_desde)+'</div>'+
@@ -485,7 +487,11 @@ function desenharCaso(d){
     var botoes=(d.manuais||[]).filter(function(e){ return e!==c.etapa && !(e==='ml_avisado' && !c.chegou_em); })
       .map(function(e){ return '<button class="bt sec" data-etapa="'+e+'">→ '+esc(d.nomes[e]||e)+'</button>'; }).join('');
     // A chegada (fase 2): a caixa chegou e ainda não foi revisada; e o aviso ao ML.
-    if(!c.chegou_em) botoes+='<button class="bt" id="btChegou">A caixa chegou</button>';
+    if(!c.chegou_em) botoes+=(c.tipo==='ml'?'<label for="rvAte" style="margin:0;align-self:center">Revisar no ML até</label><input type="date" id="rvAte" style="max-width:170px">':'')+'<button class="bt" id="btChegou">A caixa chegou</button>';
+    /* O "Já revisei" do ML devolve: depois da revisão do Edvaldo. Com ele e a
+       baixa (e a resposta da revisão, se pedida), o caso encerra. */
+    if(c.tipo==='ml' && c.devolucao_id && c.etapa!=='ml_revisei')
+      botoes+='<button class="bt" id="btAvisoML">Marquei "Já revisei" no ML</button>';
     if(c.tipo==='coleta' && c.chegou_em && c.etapa!=='ml_avisado' && !d.eventos.some(function(e){return e.tipo==='aviso_ml';}))
       botoes+='<button class="bt sec" id="btAvisoML">Avisamos o ML que recebemos</button>';
     /* O desfazer (AJUSTE de 03/11/2026): só aparece a quem fez a última mudança
@@ -511,7 +517,8 @@ function desenharCaso(d){
       '<div><label>SKU</label><input id="eSku" value="'+esc(c.sku||'')+'"></div>'+
       '<div><label>Responsável</label><input id="eResp" value="'+esc(c.responsavel||'')+'"></div>'+
       '<div><label>Observação</label><input id="eObs" value="'+esc(c.obs||'')+'"></div>'+
-      (c.tipo==='coleta'?'<div><label>Reclamação aberta em</label><input type="date" id="eAberta" value="'+esc(c.aberta_em||'')+'"></div>':'')+
+      (c.tipo==='coleta'?'<div><label>Reclamação aberta em</label><input type="date" id="eAberta" value="'+esc(c.aberta_em||'')+'"></div>'
+        :'<div><label>Revisar no ML até</label><input type="date" id="eRevisarAte" value="'+esc(c.revisar_ate||'')+'"></div>')+
       '<div><label>Via publicidade</label><select id="ePub">'+(c.publicidade==null?'<option value="" selected>— não informado —</option>':'')+
         '<option value="1"'+(c.publicidade===1?' selected':'')+'>Sim</option><option value="0"'+(c.publicidade===0?' selected':'')+'>Não</option></select></div>'+
       '<div class="larga"><label>Link da conversa no ML</label><input id="eLink" value="'+esc(c.link_ml||'')+'" autocomplete="off" autocapitalize="off" inputmode="url"></div>'+
@@ -565,7 +572,7 @@ function nomeEvento(e, nomes){
     case 'editado': return 'Lançamento editado';
     case 'desfeito': return 'Clique de etapa desfeito';
     case 'tipo': return 'Tipo trocado';
-    case 'revisao_frete': return 'Revisão do frete';
+    case 'revisao_frete': return 'Revisão no ML';
     case 'baixa': return 'Baixa da devolução';
     case 'encerrado': return 'Encerrado';
     case 'revisado': return 'Revisado na tela de Devoluções';
@@ -601,7 +608,7 @@ function acao(url, corpo){
    de sempre (o lançamento pelo editar; o dinheiro pelo valor, que o servidor
    só aceita de quem tem a permissão). O que for recusado volta ao campo,
    marcado, com o motivo. */
-var CAMPOS_EDITAR={eMotivo:'motivo', eNf:'nf', eSku:'sku', eResp:'responsavel', eObs:'obs', ePub:'publicidade', eLink:'link_ml', eMsgMl:'mensagem_ml', eAberta:'aberta_em'};
+var CAMPOS_EDITAR={eMotivo:'motivo', eNf:'nf', eSku:'sku', eResp:'responsavel', eObs:'obs', ePub:'publicidade', eLink:'link_ml', eMsgMl:'mensagem_ml', eAberta:'aberta_em', eRevisarAte:'revisar_ate'};
 var CAMPOS_VALOR={dValor:'valor_ml', dPerdido:'valor_perdido', dDevolvido:'valor_devolvido', dEtiqueta:'custo_etiqueta', dRevisao:'valor_revisao', dLimite:'limite_frete'};
 function salvarTudo(){
   var id=ESTADO.aberto, base='/api/devolucao-casos/'+id, m=document.getElementById('cMsg');
@@ -646,7 +653,7 @@ function ligarCaso(d, c){
   document.querySelectorAll('#painel [data-etapa]').forEach(function(b){ b.onclick=function(){ acao(base+'/etapa',{para:b.getAttribute('data-etapa')}); }; });
   var x;
   if((x=document.getElementById('btProrr'))) x.onclick=function(){ var q=document.getElementById('novoPrazoQual'); acao(base+'/prorrogacao',{ qual:q?q.value:undefined }); };
-  if((x=document.getElementById('btChegou'))) x.onclick=function(){ acao(base+'/chegou',{}); };
+  if((x=document.getElementById('btChegou'))) x.onclick=function(){ var a=document.getElementById('rvAte'); acao(base+'/chegou',{ revisar_ate:a?a.value:undefined }); };
   if((x=document.getElementById('btDesfazer'))) x.onclick=function(){ acao(base+'/desfazer-etapa',{}); };
   if((x=document.getElementById('qMotivo'))) x.onchange=function(){ acao(base+'/editar',{ motivo:this.value }); };
   if((x=document.getElementById('btTipo'))) x.onclick=function(){
@@ -865,39 +872,75 @@ GANCHOS.push({
    na baixa: fica aberto até o ML responder. */
 function chipRevisao(c){
   if(!c.revisao_pendente) return '';
-  return '<span class="chip '+(c.revisao_parada?'parado':'')+'">revisão do frete pedida há '+plural(c.dias_revisao||0,'dia','dias')+'</span>';
+  return '<span class="chip '+(c.revisao_parada?'parado':'')+'">revisão no ML pedida há '+plural(c.dias_revisao||0,'dia','dias')+'</span>';
 }
 GANCHOS.push({
   html:function(d, c, P, aberto){
     if(c.tipo!=='ml') return '';
-    var h='<div class="bloco"><h3>Revisão do frete (ML)</h3>';
+    /* A revisão no ML pede o valor cobrado, tirar o impacto na reputação, ou
+       os dois (03/11/2026). Pedida e sem resposta, o caso NÃO fecha. */
+    var PEDE={ valor:'devolver o valor cobrado', reputacao:'tirar o impacto na reputação', ambos:'o valor e a reputação' };
+    var h='<div class="bloco"><h3>Revisão no ML (valor cobrado / reputação)</h3>';
     if(!c.revisao_pedida_em){
       if(aberto && P.acompanhar && c.chegou_em)
-        h+='<div class="sub" style="margin-bottom:6px">Se o ML cobrou o frete e a culpa não foi nossa, peça a revisão mostrando que o anúncio não prometia o que o comprador pediu.</div>'+
-          '<div class="acoes"><input id="rvNumero" placeholder="nº da solicitação (opcional)" autocomplete="off" style="max-width:260px"><button class="bt sec" id="btRevisao">Pedi revisão do frete ao ML</button></div>';
-      else h+='<div class="sub">'+(c.chegou_em?'Nenhuma revisão pedida.':'A revisão do frete se pede depois de a caixa chegar.')+'</div>';
+        h+='<div class="sub" style="margin-bottom:6px">Se o ML cobrou o frete ou afetou a reputação e a culpa não foi nossa, peça a revisão. O caso só fecha depois da resposta do ML.</div>'+
+          '<div class="acoes"><label for="rvPede" style="margin:0;align-self:center">Pedimos</label><select id="rvPede" style="max-width:240px"><option value="valor">devolver o valor cobrado</option><option value="reputacao">tirar o impacto na reputação</option><option value="ambos">os dois</option></select>'+
+          '<input id="rvNumero" placeholder="nº da solicitação (opcional)" autocomplete="off" style="max-width:240px"><button class="bt sec" id="btRevisao">Pedi revisão ao ML</button></div>';
+      else h+='<div class="sub">'+(c.chegou_em?'Nenhuma revisão pedida.':'A revisão se pede depois de a caixa chegar.')+'</div>';
     } else {
-      h+='<div class="dados"><div><b>Pedida em</b>'+horaBR(c.revisao_pedida_em)+'</div>'+(c.revisao_numero?'<div><b>Nº da solicitação</b>'+esc(c.revisao_numero)+'</div>':'')+
-        '<div><b>Resposta do ML</b>'+(c.revisao_resultado==='devolveu'?'devolveu o frete':c.revisao_resultado==='negou'?'negou':'<span style="color:var(--amber)">esperando há '+plural(c.dias_revisao||0,'dia','dias')+'</span>')+
+      h+='<div class="dados"><div><b>Pedida em</b>'+horaBR(c.revisao_pedida_em)+'</div>'+
+        '<div><b>Pedimos</b>'+esc(PEDE[c.revisao_pede||'valor'])+'</div>'+(c.revisao_numero?'<div><b>Nº da solicitação</b>'+esc(c.revisao_numero)+'</div>':'')+
+        '<div><b>Resposta do ML</b>'+(c.revisao_resultado==='devolveu'?'atendeu':c.revisao_resultado==='negou'?'negou':'<span style="color:var(--amber)">esperando há '+plural(c.dias_revisao||0,'dia','dias')+'</span>')+
         (c.revisao_resp_em?'<br><small>'+horaBR(c.revisao_resp_em)+'</small>':'')+'</div></div>';
       if(!c.revisao_resultado && aberto && P.acompanhar)
-        h+='<div class="acoes" style="margin-top:8px">'+(P.valores?'<input id="rvValor" placeholder="valor devolvido (R$)" style="max-width:200px">':'')+
-          '<button class="bt" id="btRevDevolveu">ML devolveu o frete</button><button class="bt sec" id="btRevNegou">ML negou</button></div>';
+        h+='<div class="acoes" style="margin-top:8px">'+(P.valores && c.revisao_pede!=='reputacao'?'<input id="rvValor" placeholder="valor devolvido (R$)" style="max-width:200px">':'')+
+          '<button class="bt" id="btRevDevolveu">ML atendeu</button><button class="bt sec" id="btRevNegou">ML negou</button></div>';
     }
     return h+'</div>';
   },
   ligar:function(d, c, base){
     var x;
-    if((x=document.getElementById('btRevisao'))) x.onclick=function(){ acao(base+'/revisao-frete',{ numero:document.getElementById('rvNumero').value }); };
+    if((x=document.getElementById('btRevisao'))) x.onclick=function(){ acao(base+'/revisao-frete',{ numero:document.getElementById('rvNumero').value, pede:document.getElementById('rvPede').value }); };
     if((x=document.getElementById('btRevDevolveu'))) x.onclick=function(){
       var v=document.getElementById('rvValor'), corpo={ resultado:'devolveu' };
       if(v && v.value.trim()) corpo.valor_revisao=v.value;
       acao(base+'/revisao-frete-resposta', corpo);
     };
     if((x=document.getElementById('btRevNegou'))) x.onclick=function(){
-      if(!confirm('Lançar que o ML NEGOU a revisão do frete do caso #'+c.id+'?')) return;
+      if(!confirm('Lançar que o ML NEGOU a revisão do caso #'+c.id+'?')) return;
       acao(base+'/revisao-frete-resposta',{ resultado:'negou' });
     };
+  }
+});
+
+/* A REVISÃO QUE FICOU SEM CASO (CONSERTO de 03/11/2026, NF 8207): a etiqueta
+   de devolução do ML não é venda, pack nem NF, e o bipe do Edvaldo não acha o
+   caso. Aqui o caso aberto ainda sem revisão lista as revisões recebidas sem
+   caso (as do mesmo SKU em cima) e liga com um clique. SKU diferente pede
+   confirmação, e a confirmação fica na história como envio diferente. */
+GANCHOS.push({
+  html:function(d, c, P, aberto){
+    if(!aberto || c.devolucao_id || !P.acompanhar) return '';
+    return '<div class="bloco"><h3>A peça já foi revisada?</h3><div class="sub" style="margin-bottom:6px">Se o Edvaldo revisou bipando a etiqueta de devolução do ML, a revisão pode ter ficado sem caso. Ligue aqui.</div><div id="soltasBox" class="sub">carregando…</div></div>';
+  },
+  ligar:function(d, c, base){
+    var box=document.getElementById('soltasBox'); if(!box) return;
+    api('GET', base+'/revisoes-soltas').then(function(r){
+      var l=(r.revisoes||[]).filter(function(x){ return x.mesmo_sku; }), outras=(r.revisoes||[]).length-l.length;
+      if(!l.length){ box.innerHTML='Nenhuma revisão sem caso com o SKU '+esc(c.sku||'—')+' nos últimos 30 dias'+(outras?' ('+outras+' de outros SKUs).':'.'); return; }
+      box.innerHTML='<div class="acoes">'+l.map(function(x){
+        return '<button class="bt sec" data-ligar="'+x.id+'">Ligar a revisão #'+x.id+' · '+esc(x.sku_fisico)+' · '+horaBR(x.recebido_em)+(x.codigo_ml?' · etiqueta '+esc(x.codigo_ml):'')+'</button>';
+      }).join('')+'</div>';
+      box.querySelectorAll('[data-ligar]').forEach(function(b){ b.onclick=function(){
+        var id=+b.getAttribute('data-ligar'), g=guardarSujos();  // o que está digitado no caso volta depois
+        api('POST', base+'/ligar', { devolucao_id:id }).then(function(){ carregar(); abrir(c.id, g); })
+          .catch(function(e){
+            if(e.status===409 && /diferente/.test(e.message) && confirm(e.message)) api('POST', base+'/ligar', { devolucao_id:id, confirmar:true }).then(function(){ carregar(); abrir(c.id, g); })
+              .catch(function(e2){ box.insertAdjacentHTML('beforeend','<div class="erro">'+esc(e2.message)+'</div>'); });
+            else box.insertAdjacentHTML('beforeend','<div class="erro">'+esc(e.message)+'</div>');
+          });
+      }; });
+    }).catch(function(e){ box.innerHTML='<span class="erro">Não deu para carregar: '+esc(e.message)+'</span>'; });
   }
 });
 

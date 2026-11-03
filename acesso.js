@@ -785,6 +785,11 @@ module.exports = function(app, db){
     if(eq('/api/auditoria/skus')) return '@admin';
     if(M !== 'GET' && eq('/api/devolucao')) return 'devolucao.registrar';
     if(M !== 'GET' && eq('/api/devolucao/baixa')) return 'devolucao.baixar';
+    /* A revisao que ficou sem caso (CONSERTO de 03/11/2026): a lista dos casos
+       esperados de um SKU e lida pelo Edvaldo, pela Baixa e por quem acompanha;
+       ligar pela Baixa e de quem da baixa. */
+    if(M === 'GET' && eq('/api/devolucao/esperadas')) return ['devolucao.registrar','devolucao.baixar','devolucao.acompanhar','devolucao.lancar'];
+    if(M !== 'GET' && eq('/api/devolucao/ligar-caso')) return 'devolucao.baixar';
     /* AS DEVOLUCOES EM ANDAMENTO. `/api/devolucao-casos` NAO cai no
        `pre('/api/devolucao')` (o pre exige a barra), e por isso cada porta e
        declarada aqui, com a chave dela. As decisoes de dinheiro tem a chave

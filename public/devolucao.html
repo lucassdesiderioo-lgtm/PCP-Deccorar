@@ -219,8 +219,39 @@ function dvResultado(){
   }
   var s=dvSkuAtual();
   if(!s){ el.innerHTML='<b style="color:#b26a00">Mais de um SKU com essa cor e medida — escolha acima</b>'; return; }
-  el.innerHTML='SKU: <b style="color:#b26a00;font-family:ui-monospace,monospace;font-size:19px">'+s+'</b>';
+  el.innerHTML='SKU: <b style="color:#b26a00;font-family:ui-monospace,monospace;font-size:19px">'+s+'</b><div id="dvEsp"></div>';
+  dvEsperadas(s);
 }
+/* A ETIQUETA DE DEVOLUCAO DO ML NAO ACHA O CASO (CONSERTO de 03/11/2026, NF
+   8207): ela e um numero de envio que o PCP nao conhece. Sem caso pelo bipe,
+   depois do SKU a tela mostra os casos esperados daquele SKU, e um toque liga.
+   Ignorar segue como sempre. O caso achado pelo bipe vale sobre a lista. */
+var DVESP={sku:null,casos:[]}, DVCASOBIPE=false;
+async function dvEsperadas(sku){
+  var box=document.getElementById('dvEsp'); if(!box) return;
+  if(DVCASOBIPE){ box.innerHTML=''; return; }
+  if(DVESP.sku!==sku){
+    DVESP={sku:sku,casos:[]}; DVCASO=null;  // trocou o SKU: o caso tocado era de outro
+    try{ var r=await (await fetch('/api/devolucao/esperadas?sku='+encodeURIComponent(sku))).json(); if(DVESP.sku===sku) DVESP.casos=r.casos||[]; }catch(e){}
+    box=document.getElementById('dvEsp'); if(!box) return;
+  }
+  if(!DVESP.casos.length){ box.innerHTML=''; return; }
+  var h='<div style="background:#fff4e0;border:2px solid #b26a00;color:#7a4a00;border-radius:10px;padding:10px 12px;margin-top:12px">'+
+    '<div style="font-weight:800;font-size:15px;margin-bottom:8px">Devolução esperada com este SKU? Toque se for esta:</div><div class="ops">';
+  for(var i=0;i<DVESP.casos.length;i++){
+    var c=DVESP.casos[i], on=DVCASO&&DVCASO.id===c.id;
+    h+='<button type="button" class="op'+(on?' on':'')+'" data-dvcaso="'+c.id+'" style="font-size:15px;padding:12px 16px">#'+c.id+' · '+escDv(c.comprador||'sem nome')+' · NF '+escDv(c.nf||'—')+'</button>';
+  }
+  h+='</div>'+(DVCASO?'<div style="margin-top:8px;font-size:14px">Ao salvar, o caso #'+DVCASO.id+' fica revisado. Tocar de novo desmarca.</div>':'<div style="margin-top:8px;font-size:13px">Não é nenhuma destas? Siga normalmente.</div>')+'</div>';
+  box.innerHTML=h;
+}
+document.addEventListener('click',function(e){
+  var b=e.target.closest('[data-dvcaso]'); if(!b) return;
+  var id=+b.getAttribute('data-dvcaso');
+  if(DVCASO&&DVCASO.id===id) DVCASO=null;
+  else { for(var i=0;i<DVESP.casos.length;i++) if(DVESP.casos[i].id===id) DVCASO=DVESP.casos[i]; }
+  dvEsperadas(DVESP.sku);
+});
 document.addEventListener('click',function(e){
   var k=e.target.closest('[data-dvsku]');
   if(k){ DVSKU=k.getAttribute('data-dvsku'); dvSkus(); return; }
@@ -239,7 +270,7 @@ async function dvBuscar(cod){
   /* A DEVOLUCAO ESPERADA (spec DEVOLUCOES-ACOMPANHAMENTO, R14): se a etiqueta
      aponta um caso em andamento, a tarja diz qual e o motivo, e o salvar liga
      o caso. Sem caso, tudo como sempre. */
-  DVCASO=r.caso||null;
+  DVCASO=r.caso||null; DVCASOBIPE=!!r.caso; DVESP={sku:null,casos:[]};
   var tarja=DVCASO?'<div style="background:#fff4e0;border:2px solid #b26a00;color:#7a4a00;border-radius:10px;padding:10px 12px;margin-bottom:8px;font-weight:800;font-size:15px">'+
     'Devolução esperada — caso #'+DVCASO.id+' · '+escDv(DVCASO.motivo||'sem motivo lançado')+'</div>':'';
   if(r.achou){
@@ -264,7 +295,7 @@ async function dvSalvar(){
   var r=await (await fetch('/api/devolucao',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
   if(r.erro){ msg.innerHTML='<span style="color:#c62828">'+r.erro+'</span>'; return; }
   msg.innerHTML='<span style="color:#2e7d32">Salvo'+(r.naFila?' - foi pra fila de embalagem':'')+(r.caso_id?' - caso #'+r.caso_id+' revisado':'')+'</span>';
-  DVSEL={}; DVVENDA=null; DVCASO=null;
+  DVSEL={}; DVVENDA=null; DVCASO=null; DVCASOBIPE=false; DVESP={sku:null,casos:[]};
   document.getElementById('dvCod').value=''; document.getElementById('dvObs').value='';
   DVCOR=null; DVMED=null; dvSkus(); document.getElementById('dvVenda').innerHTML='';
   dvMontar();

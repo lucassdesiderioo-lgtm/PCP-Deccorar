@@ -22,12 +22,15 @@
 /* As etapas de cada tipo, na ordem da fábrica (§3 da spec). */
 const ETAPAS = {
   coleta: ['lancado','coleta_pedida','docs_enviados','a_caminho','chegou','ml_avisado','revisado','encerrado'],
-  ml:     ['aguardando','chegou','revisado','encerrado']
+  /* `ml_revisei` (03/11/2026, decisão do dono): depois da revisão do Edvaldo,
+     alguém marca "Já revisei" no ML — sem isso o ML entende que a peça chegou
+     como esperado e o prazo de contestar passa. */
+  ml:     ['aguardando','chegou','revisado','ml_revisei','encerrado']
 };
 const NOME_ETAPA = {
   lancado:'Lançado', coleta_pedida:'Coleta pedida', docs_enviados:'Documentos ao ML',
   a_caminho:'A caminho', chegou:'Chegou', ml_avisado:'ML avisado', revisado:'Revisado',
-  encerrado:'Encerrado', aguardando:'Aguardando chegar'
+  encerrado:'Encerrado', aguardando:'Aguardando chegar', ml_revisei:'Já revisei no ML'
 };
 /* As que se movem À MÃO pela tela. As outras têm porta própria:
    - `chegou` é o botão "chegou" (ou o bipe do Edvaldo);
@@ -83,7 +86,8 @@ function garantir(db){
     publicidade INTEGER, mensagem_ml TEXT, link_ml TEXT,
     custo_etiqueta REAL,
     revisao_pedida_em TEXT, revisao_numero TEXT, revisao_resultado TEXT, revisao_resp_em TEXT, valor_revisao REAL,
-    aberta_em TEXT, prazo_coleta TEXT, prazo_coleta_original TEXT, limite_frete REAL)`);
+    aberta_em TEXT, prazo_coleta TEXT, prazo_coleta_original TEXT, limite_frete REAL,
+    revisar_ate TEXT, revisao_pede TEXT)`);
   /* FASE 5 — desde quando o valor do ML está nesta situação (R18: "pedir" há
      ≥ 2 dias entra no parado). O ALTER fica ao lado do CREATE, no fim da
      tabela, para o banco que nasceu antes desta fase (§17). */
@@ -110,6 +114,10 @@ function garantir(db){
      guardado como o do comprovante (R6). E o limite do frete que o ML paga
      (dinheiro, mas de quem lança e acompanha). No fim da tabela (§17). */
   for(const col of ['aberta_em TEXT','prazo_coleta TEXT','prazo_coleta_original TEXT','limite_frete REAL'])
+    try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN "+col); }catch(e){}
+  /* O prazo do ML para marcar "Já revisei" no ML devolve, e o que a revisão no
+     ML pede: o valor cobrado, a reputação, ou os dois (03/11/2026). (§17) */
+  for(const col of ['revisar_ate TEXT','revisao_pede TEXT'])
     try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN "+col); }catch(e){}
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_venda ON devolucao_caso(venda)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_aberto ON devolucao_caso(encerrado_em)");
@@ -233,6 +241,20 @@ function situacao(c, h, lim){
   } else {
     // R5: só a espera. Sem cor e sem trava — a regra de cobrar o ML vem depois.
     o.dias_esperando = dias(c.criado_em, c.chegou_em || h);
+    /* "Já revisei no ML" (03/11/2026): depois da revisão do Edvaldo, falta
+       marcar no ML; e o "revisar no ML até", quando lançado, dá a cor. */
+    const avisado = c.etapa === 'ml_revisei' || c.etapa === 'encerrado';
+    o.falta_revisei = aberto && !!c.devolucao_id && !avisado;
+    o.prazo_qual = null; o.prazo_nome = null; o.prazo_data = null;
+    if(c.revisar_ate && !avisado){
+      o.prazo_qual = 'revisar'; o.prazo_nome = 'Revisar no ML'; o.prazo_data = c.revisar_ate;
+      o.dias_prazo = dias(h, c.revisar_ate);
+      if(aberto && o.dias_prazo !== null){
+        if(o.dias_prazo < 0) o.cor = 'vencido';
+        else if(o.dias_prazo <= lim.vermelho) o.cor = 'vermelho';
+        else if(o.dias_prazo <= lim.ambar) o.cor = 'ambar';
+      }
+    }
     /* A revisão do frete pedida e sem resposta grita como o "parado": a
        resposta do ML não vem sozinha, e o caso fica aberto esperando por ela. */
     o.revisao_pendente = !!(c.revisao_pedida_em && !c.revisao_resultado);
@@ -306,7 +328,12 @@ function listar(db, opt){
     return x - y || a.id - b.id;
   });
   // R5: o "ML devolve" vai pela espera, quem espera há mais tempo em cima.
-  const ml = linhas.filter(c => c.tipo === 'ml').sort((a,b) => (b.dias_esperando||0) - (a.dias_esperando||0) || a.id - b.id);
+  /* Com o "revisar no ML até" lançado, o prazo manda (o mais perto em cima);
+     sem ele, a espera, como antes. */
+  const ml = linhas.filter(c => c.tipo === 'ml').sort((a,b) => {
+    const x = a.dias_prazo === null || a.dias_prazo === undefined ? 1e9 : a.dias_prazo, y = b.dias_prazo === null || b.dias_prazo === undefined ? 1e9 : b.dias_prazo;
+    return x - y || (b.dias_esperando||0) - (a.dias_esperando||0) || a.id - b.id;
+  });
   return { hoje:h, limites:lim, coleta, ml };
 }
 function encerrados(db, opt){
@@ -507,7 +534,7 @@ function lancarCompleto(db, b, usuario, opt){
      o custo e o valor sairiam da conta calados. O prazo fica guardado. */
 const PARA_ML = { lancado:'aguardando', coleta_pedida:'aguardando', docs_enviados:'aguardando', a_caminho:'aguardando',
                   chegou:'chegou', ml_avisado:'chegou', revisado:'revisado' };
-const PARA_COLETA = { aguardando:'lancado', chegou:'chegou', revisado:'revisado' };
+const PARA_COLETA = { aguardando:'lancado', chegou:'chegou', revisado:'revisado', ml_revisei:'revisado' };
 function trocarTipo(db, id, b, usuario){
   const c = aberto(db, id);
   b = b || {};
@@ -544,15 +571,21 @@ function trocarTipo(db, id, b, usuario){
 
 /* A REVISÃO DO FRETE — pedir (quem acompanha). Só no "ML devolve", só
    depois de a caixa chegar (o pedido ao ML precisa da peça vista), uma vez. */
+const PEDE = { valor:'devolver o valor cobrado', reputacao:'tirar o impacto na reputação', ambos:'devolver o valor cobrado e tirar o impacto na reputação' };
 function pedirRevisaoFrete(db, id, b, usuario){
   const c = aberto(db, id);
   if(c.tipo !== 'ml') throw new Recusa(400, 'A revisão do frete é do "ML devolve": no "Nós coletamos" quem cobra é a transportadora.');
   if(!c.chegou_em) throw new Recusa(409, 'A revisão do frete se pede depois de a caixa chegar. Marque "A caixa chegou" antes.');
   if(c.revisao_pedida_em) throw new Recusa(409, 'A revisão do frete já foi pedida em '+String(c.revisao_pedida_em).slice(0,10).split('-').reverse().join('/')+'.');
   const numero = String((b||{}).numero == null ? '' : b.numero).trim().slice(0,100) || null;
+  /* O QUE SE PEDE (03/11/2026, dono): o valor cobrado, tirar o impacto na
+     reputação, ou os dois. Ausente é o pedido de antes (o valor); vazio de
+     propósito é recusado. */
+  const pede = (b && 'pede' in b) ? String(b.pede == null ? '' : b.pede).trim() : 'valor';
+  if(!PEDE[pede]) throw new Recusa(400, 'Diga o que se pede ao ML: o valor cobrado, a reputação, ou os dois.');
   db.transaction(() => {
-    db.prepare("UPDATE devolucao_caso SET revisao_pedida_em=datetime('now','localtime'), revisao_numero=? WHERE id=?").run(numero, c.id);
-    evento(db, c.id, 'revisao_frete', null, 'pedida', 'pedi revisão do frete ao ML'+(numero ? ' · nº '+numero : ''), nomeDe(usuario));
+    db.prepare("UPDATE devolucao_caso SET revisao_pedida_em=datetime('now','localtime'), revisao_numero=?, revisao_pede=? WHERE id=?").run(numero, pede, c.id);
+    evento(db, c.id, 'revisao_frete', null, 'pedida', 'pedi revisão ao ML: '+PEDE[pede]+(numero ? ' · nº '+numero : ''), nomeDe(usuario));
   })();
   return ler(db, c.id);
 }
@@ -565,23 +598,24 @@ function respostaRevisaoFrete(db, id, b, usuario){
   const resultado = String(b.resultado || '').trim();
   if(['devolveu','negou'].indexOf(resultado) < 0) throw new Recusa(400, 'A resposta do ML é "devolveu o frete" ou "negou".');
   if(!c.revisao_pedida_em) throw new Recusa(409, 'A revisão do frete ainda não foi pedida.');
-  if(c.revisao_resultado) throw new Recusa(409, 'A resposta da revisão já foi lançada ('+(c.revisao_resultado === 'devolveu' ? 'devolveu o frete' : 'negou')+').');
+  if(c.revisao_resultado) throw new Recusa(409, 'A resposta da revisão já foi lançada ('+(c.revisao_resultado === 'devolveu' ? 'atendeu' : 'negou')+').');
+  if(c.revisao_pede === 'reputacao' && b.valor_revisao !== undefined && String(b.valor_revisao).trim() !== '')
+    throw new Recusa(400, 'Esta revisão pediu só a reputação: não há valor devolvido a lançar.');
   let mud = [];
   db.transaction(() => {
     db.prepare("UPDATE devolucao_caso SET revisao_resultado=?, revisao_resp_em=datetime('now','localtime') WHERE id=?").run(resultado, c.id);
-    evento(db, c.id, 'revisao_frete', 'pedida', resultado, resultado === 'devolveu' ? 'o ML devolveu o frete' : 'o ML negou a revisão do frete', nomeDe(usuario));
+    evento(db, c.id, 'revisao_frete', 'pedida', resultado, resultado === 'devolveu' ? 'o ML atendeu a revisão' : 'o ML negou a revisão', nomeDe(usuario));
     if(resultado === 'devolveu' && b.valor_revisao !== undefined && String(b.valor_revisao).trim() !== '')
       mud = lancarValor(db, c.id, { valor_revisao: b.valor_revisao }, usuario);
-    // Já baixado (revisado, e a devolução ligada com baixa): encerra agora.
-    const d = c.devolucao_id ? db.prepare('SELECT baixado FROM devolucao WHERE id=?').get(c.devolucao_id) : null;
-    if(c.etapa === 'revisado' && d && d.baixado) encerrar(db, ler(db, c.id), 'revisado_ml', usuario, 'resposta da revisão do frete');
+    // Com a baixa e o "Já revisei" já feitos, a resposta encerra.
+    talvezEncerrarML(db, c.id, usuario, false);
   })();
   return { caso: ler(db, c.id), valorMudou: mud };
 }
 
 /* Editar o que foi lançado. CAMPO AUSENTE NÃO É CAMPO VAZIO (§6, #25): só o
    que veio no corpo muda, e o resto fica como está. */
-const EDITAVEIS = ['motivo','nf','sku','comprador','responsavel','passado_em','cep','obs','publicidade','mensagem_ml','link_ml','aberta_em'];
+const EDITAVEIS = ['motivo','nf','sku','comprador','responsavel','passado_em','cep','obs','publicidade','mensagem_ml','link_ml','aberta_em','revisar_ate'];
 function editar(db, id, b, usuario){
   const c = aberto(db, id);
   b = b || {};
@@ -597,6 +631,11 @@ function editar(db, id, b, usuario){
     else if(k === 'publicidade') v = publicidadeValida(v);
     else if(k === 'mensagem_ml') v = mensagemValida(v);
     else if(k === 'link_ml') v = linkValido(v);
+    else if(k === 'revisar_ate'){
+      if(c.tipo !== 'ml') continue;
+      v = (v === '' || v == null) ? null : dataValida(v);
+      if(b[k] && !v) throw new Recusa(400, 'Data impossível em "revisar no ML até".');
+    }
     else if(k === 'aberta_em'){
       if(c.tipo !== 'coleta') continue;
       /* Vazio não apaga a abertura: sem ela não há prazo da coleta. */
@@ -770,12 +809,20 @@ function abertoPorCodigo(db, cod, opt){
 
 /* O botão "chegou": a caixa chegou e ainda não foi revisada. A chegada é UMA
    — revisar depois não regrava a data (teste 27). */
-function chegou(db, id, usuario){
+function chegou(db, id, usuario, b){
   const c = aberto(db, id);
   if(c.chegou_em) throw new Recusa(409, 'A chegada do caso #'+c.id+' já foi marcada em '+c.chegou_em.slice(8,10)+'/'+c.chegou_em.slice(5,7)+'.');
   const etapas = ETAPAS[c.tipo];
+  /* No ML devolve, a chegada já pode trazer o "revisar no ML até" (o prazo
+     que o ML mostra na devolução). Vazio fica sem prazo. */
+  let revisar = null;
+  if(c.tipo === 'ml' && b && String(b.revisar_ate == null ? '' : b.revisar_ate).trim()){
+    revisar = dataValida(b.revisar_ate);
+    if(!revisar) throw new Recusa(400, 'Data impossível em "revisar no ML até".');
+  }
   db.transaction(() => {
     db.prepare("UPDATE devolucao_caso SET chegou_em=datetime('now','localtime') WHERE id=?").run(c.id);
+    if(revisar) db.prepare('UPDATE devolucao_caso SET revisar_ate=? WHERE id=?').run(revisar, c.id);
     if(etapas.indexOf(c.etapa) < etapas.indexOf('chegou')) moverEtapa(db, c, 'chegou', usuario, 'a caixa chegou');
     else evento(db, c.id, 'chegou', null, null, 'a caixa chegou', nomeDe(usuario));
   })();
@@ -786,7 +833,17 @@ function chegou(db, id, usuario){
    só história — a trilha não volta de "revisado". */
 function avisarML(db, id, usuario){
   const c = aberto(db, id);
-  if(c.tipo !== 'coleta') throw new Recusa(400, 'No "ML devolve" não há aviso de recebimento a fazer.');
+  if(c.tipo === 'ml'){
+    /* "Já revisei no ML" (03/11/2026): só depois da revisão do Edvaldo, uma
+       vez; e é ele que, junto com a baixa, encerra o ML devolve. */
+    if(!c.devolucao_id) throw new Recusa(400, 'O "Já revisei" se marca no ML depois de a peça ser revisada na tela de Devoluções.');
+    if(c.etapa === 'ml_revisei') throw new Recusa(409, 'O "Já revisei" do caso #'+c.id+' já foi marcado.');
+    db.transaction(() => {
+      moverEtapa(db, c, 'ml_revisei', usuario, 'marcamos "Já revisei" no ML', 'aviso_ml');
+      talvezEncerrarML(db, c.id, usuario, false);
+    })();
+    return ler(db, c.id);
+  }
   if(!c.chegou_em) throw new Recusa(400, 'Só se avisa o ML que recebemos depois de a peça chegar.');
   const ja = c.etapa === 'ml_avisado' || db.prepare("SELECT 1 FROM devolucao_evento WHERE caso_id=? AND tipo='aviso_ml'").get(c.id);
   if(ja) throw new Recusa(409, 'O aviso ao ML do caso #'+c.id+' já foi registrado.');
@@ -816,6 +873,71 @@ function ligarRevisao(db, ref, devolucao_id, usuario){
   return c.id;
 }
 
+/* O ML devolve ENCERRA quando as três coisas estão feitas: a baixa da
+   devolução, o "Já revisei" no ML e — se pedida — a resposta da revisão
+   (decisões do dono, 03/11/2026). Chamada por quem pode completar a última:
+   a baixa, o "Já revisei" e a resposta. Quem chama abre a transação. */
+function talvezEncerrarML(db, id, usuario, baixadaAgora, texto){
+  const c = ler(db, id);
+  if(!c || c.tipo !== 'ml' || c.encerrado_em || !c.devolucao_id) return false;
+  if(c.etapa !== 'ml_revisei') return false;
+  if(c.revisao_pedida_em && !c.revisao_resultado) return false;
+  const d = db.prepare('SELECT baixado FROM devolucao WHERE id=?').get(c.devolucao_id);
+  if(!baixadaAgora && !(d && d.baixado)) return false;
+  encerrar(db, c, 'revisado_ml', usuario, texto || 'baixa, "Já revisei" e revisão resolvidos');
+  return true;
+}
+
+/* OS CASOS ESPERADOS DE UM SKU (CONSERTO de 03/11/2026, NF 8207). A etiqueta
+   de DEVOLUÇÃO do ML é um número de envio que o PCP não conhece: o bipe não
+   acha o caso. Depois de escolher o SKU, o Edvaldo vê os casos abertos ainda
+   sem revisão daquele SKU e toca no certo. Sem nenhum valor em reais. */
+function esperadas(db, sku){
+  const s = String(sku || '').trim().toUpperCase();
+  if(!s) throw new Recusa(400, 'Informe o SKU.');
+  return db.prepare(`SELECT id,tipo,venda,nf,comprador,motivo,etapa,sku FROM devolucao_caso
+      WHERE encerrado_em IS NULL AND devolucao_id IS NULL AND UPPER(sku)=? ORDER BY id`).all(s)
+    .map(c => Object.assign(c, { etapa_nome: NOME_ETAPA[c.etapa] || c.etapa }));
+}
+
+/* As revisões recebidas SEM caso (últimos 30 dias), as do mesmo SKU em cima:
+   é daqui que o caso aberto se liga à mão. */
+function revisoesSoltas(db, caso_id){
+  const c = ler(db, caso_id);
+  if(!c) throw new Recusa(404, 'Caso não encontrado. Atualize a lista.');
+  const sku = String(c.sku || '').toUpperCase();
+  return db.prepare(`SELECT d.id,d.codigo_ml,d.sku_fisico,d.destinacao,d.recebido_em,d.baixado FROM devolucao d
+      WHERE NOT EXISTS (SELECT 1 FROM devolucao_caso x WHERE x.devolucao_id=d.id)
+        AND d.recebido_em >= datetime('now','localtime','-30 days')
+      ORDER BY (UPPER(d.sku_fisico)=?) DESC, d.id DESC`).all(sku)
+    .map(d => Object.assign(d, { mesmo_sku: !!sku && String(d.sku_fisico || '').toUpperCase() === sku }));
+}
+
+/* LIGAR À MÃO uma revisão solta a um caso aberto — pela tela do caso ou pela
+   Baixa. SKU recebido diferente do vendido pede confirmação, e a confirmação
+   fica na história: é a evidência de envio errado (§9, DIVERGÊNCIA). Ligada
+   depois da baixa, o ML devolve segue a regra de encerrar. */
+function ligarManual(db, caso_id, devolucao_id, usuario, confirmar){
+  const c = aberto(db, caso_id);
+  if(c.devolucao_id) throw new Recusa(409, 'O caso #'+c.id+' já tem a revisão #'+c.devolucao_id+' ligada.');
+  const d = db.prepare('SELECT * FROM devolucao WHERE id=?').get(+devolucao_id || 0);
+  if(!d) throw new Recusa(404, 'Revisão não encontrada. Atualize a lista.');
+  const outro = db.prepare('SELECT id FROM devolucao_caso WHERE devolucao_id=?').get(d.id);
+  if(outro) throw new Recusa(409, 'A revisão #'+d.id+' já está ligada ao caso #'+outro.id+'.');
+  const skuC = String(c.sku || '').toUpperCase(), skuD = String(d.sku_fisico || '').toUpperCase();
+  const diferente = !!skuC && !!skuD && skuC !== skuD;
+  if(diferente && !confirmar) throw new Recusa(409, 'O SKU recebido ('+skuD+') é diferente do vendido ('+skuC+'). Confirme para ligar: isso fica registrado como envio diferente.', { sku_diferente:true });
+  db.transaction(() => {
+    db.prepare(`UPDATE devolucao_caso SET devolucao_id=?, chegou_em=COALESCE(chegou_em, ?),
+      etapa='revisado', etapa_desde=datetime('now','localtime') WHERE id=?`).run(d.id, d.recebido_em || null, c.id);
+    if(!c.chegou_em && !d.recebido_em) db.prepare("UPDATE devolucao_caso SET chegou_em=datetime('now','localtime') WHERE id=?").run(c.id);
+    evento(db, c.id, 'revisado', c.etapa, 'revisado', 'revisão #'+d.id+' ligada à mão (etiqueta bipada: '+(d.codigo_ml || '—')+')'+
+      (diferente ? ' · SKU recebido '+skuD+' diferente do vendido '+skuC : ''), nomeDe(usuario));
+    if(d.baixado && c.tipo === 'ml') evento(db, c.id, 'baixa', null, null, 'a revisão #'+d.id+' já tinha baixa — falta marcar "Já revisei" no ML', nomeDe(usuario));
+  })();
+  return ler(db, c.id);
+}
+
 /* A BAIXA de uma devolução ligada a um caso (a baixa que já existe, na aba
    Devoluções do admin). O motivo vem do caso quando ninguém escolheu (R12);
    o "ML devolve" encerra aqui, porque é o fim dele (R19). O "nós coletamos"
@@ -831,12 +953,14 @@ function baixaDaDevolucao(db, devolucao_id, motivoEscolhido, usuario){
     evento(db, c.id, 'editado', null, null, 'motivo: — → '+motivoEscolhido+' (na baixa)', nomeDe(usuario));
   }
   if(c.tipo === 'ml'){
-    /* Com a revisão do frete pedida e sem resposta, a baixa NÃO encerra
-       (decisão do dono, 03/11/2026): o caso fica aberto até o ML responder,
-       senão a cobrança some da lista de abertos. */
-    if(c.revisao_pedida_em && !c.revisao_resultado)
-      evento(db, c.id, 'baixa', null, null, 'baixa da devolução #'+devolucao_id+' — o caso fica aberto esperando a resposta da revisão do frete', nomeDe(usuario));
-    else encerrar(db, c, 'revisado_ml', usuario, 'baixa da devolução #'+devolucao_id);
+    /* A baixa encerra o ML devolve só com o "Já revisei" marcado e sem
+       revisão pedida esperando resposta (decisões do dono, 03/11/2026): o caso
+       não some da lista antes de alguém avisar o ML ou de o ML responder. */
+    const falta = [];
+    if(c.etapa !== 'ml_revisei') falta.push('marcar "Já revisei" no ML');
+    if(c.revisao_pedida_em && !c.revisao_resultado) falta.push('a resposta da revisão do frete');
+    if(falta.length) evento(db, c.id, 'baixa', null, null, 'baixa da devolução #'+devolucao_id+' — o caso fica aberto: falta '+falta.join(' e '), nomeDe(usuario));
+    else talvezEncerrarML(db, c.id, usuario, true, 'baixa da devolução #'+devolucao_id);
   }
   return { motivo, caso:c.id };
 }
@@ -1233,5 +1357,6 @@ module.exports = {
   garantir, hoje, dataValida, dias, limites, situacao, publico, evento,
   buscarLote, buscarLotePorNF, ler, abertoDaVenda, listar, encerrados, detalhe,
   motivoValido, reais, aberto, lancar, editar, etapa, moverEtapa, pedirProrrogacao, novoPrazo, prazosDoCaso, agendarColeta,
+  talvezEncerrarML, esperadas, revisoesSoltas, ligarManual,
   encerrar, encerrarPerda
 };

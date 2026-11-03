@@ -38,10 +38,14 @@ process.env.PCP_DEVOLUCOES_DIR = path.join(tmp, 'devolucoes');
 const Database = require('better-sqlite3');
 const express = require('express');
 const db = new Database(path.join(tmp, 'dados.db'));
-db.exec(`CREATE TABLE skus (codigo TEXT PRIMARY KEY, estoque INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1);
+db.exec(`CREATE TABLE fila (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, modo TEXT, situacao TEXT DEFAULT 'aguardando', teste INTEGER DEFAULT 0);
+  CREATE TABLE skus (codigo TEXT PRIMARY KEY, estoque INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1);
   CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT, buyer TEXT,
     city TEXT, nf TEXT, venda TEXT, packId TEXT, data TEXT DEFAULT (date('now','localtime')), teste INTEGER DEFAULT 0);
   INSERT INTO skus (codigo) VALUES ('BK140140BEGE');
+  ALTER TABLE skus ADD COLUMN largura_cm INTEGER; ALTER TABLE skus ADD COLUMN altura_cm INTEGER;
+  ALTER TABLE skus ADD COLUMN cor_codigo TEXT; ALTER TABLE skus ADD COLUMN descricao TEXT; ALTER TABLE skus ADD COLUMN tecido_codigo TEXT;
+  INSERT INTO skus (codigo,largura_cm,altura_cm,cor_codigo) VALUES ('BK150150BRANCO',150,150,'BRANCO');
   INSERT INTO lote (codigo,buyer,nf,venda) VALUES ('BK140140BEGE','Compradora Tela','9001','2000000000090001');`);
 
 let n = 0, falhas = 0;
@@ -57,7 +61,9 @@ function secao(t){ console.log('\n── ' + t + ' ──'); }
 /* 2 só acompanha: desde 03/11/2026 vê e lança os valores do caso, sem a
    baixa do reembolso. QUEM troca a pessoa da sessão no meio do teste. */
 const PERMS = { 1: new Set(['devolucao.lancar','devolucao.acompanhar','devolucao.dinheiro','devolucao.registrar','devolucao.baixar','listas.editar']),
-                2: new Set(['devolucao.acompanhar']) };
+                2: new Set(['devolucao.acompanhar']),
+                /* 3 só registra a peça (o Edvaldo). */
+                3: new Set(['devolucao.registrar']) };
 let QUEM = 1;
 const app = express();
 app.use(express.json({ limit:'25mb' }));
@@ -65,7 +71,7 @@ app.locals.acesso = {
   podePermissao(u, chave){ return !!(u && PERMS[u.id] && PERMS[u.id].has(chave)); },
   auditar(){}
 };
-app.use((req, res, next) => { req.usuario = QUEM === 1 ? { id:1, nome:'Lucas Tela' } : { id:2, nome:'Renato Tela' }; next(); });
+app.use((req, res, next) => { req.usuario = QUEM === 1 ? { id:1, nome:'Lucas Tela' } : QUEM === 2 ? { id:2, nome:'Renato Tela' } : { id:3, nome:'Edvaldo Tela' }; next(); });
 app.get('/api/auth/eu', (req, res) => res.json({ logado:true, nome:'Lucas Tela', destino:{} }));
 app.get('/api/teste', (req, res) => res.json({ ativo:false }));
 app.get('/api/skus', (req, res) => res.json(db.prepare('SELECT * FROM skus').all()));
@@ -73,6 +79,7 @@ require('./cad_route')(app, db);
 require('./dev_route')(app, db);
 require('./devcaso_route')(app, db);
 app.get('/devolucao-casos', (req, res) => res.sendFile(path.join(__dirname, 'public', 'devolucao-casos.html')));
+app.get('/devolucao', (req, res) => res.sendFile(path.join(__dirname, 'public', 'devolucao.html')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 const caso = (id) => db.prepare('SELECT * FROM devolucao_caso WHERE id=?').get(id);
@@ -277,6 +284,70 @@ const srv = app.listen(0, async () => {
     eq('não vê a baixa do reembolso', await pa.$('[data-reemb]'), null);
     eq('   nem o encerrar como perda', await pa.$('#btPerda'), null);
     QUEM = 1;
+
+    /* ═════════ 4-C. a etiqueta de devolução do ML (NF 8207) ═════════ */
+    secao('a etiqueta de devolução não acha o caso: o Edvaldo toca no caso esperado do SKU');
+    const e1 = await api(p, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000015571773263', nf:'8207', sku:'BK150150BRANCO', comprador:'Maria Consuelo Bermudez', publicidade:true });
+    QUEM = 3;
+    const pe = await pg();
+    await pe.goto(B + '/devolucao'); await pe.waitForTimeout(900);
+    await pe.fill('#dvCod', '48323653161'); await pe.waitForTimeout(1200);
+    ok('o bipe da etiqueta de devolução não acha o caso (sem tarja)', !/Devolução esperada — caso/.test(await pe.textContent('#dvVenda')));
+    await pe.click('[data-cor="BRANCO"]'); await pe.waitForTimeout(200);
+    await pe.click('[data-med="150x150"]'); await pe.waitForTimeout(900);
+    const esp = await pe.textContent('#dvEsp');
+    ok('escolhido o SKU, aparece a devolução esperada', /Devolução esperada com este SKU/.test(esp) && esp.includes('#'+e1.id+' ') && /NF 8207/.test(esp), esp);
+    await pe.click('[data-dvcaso="'+e1.id+'"]'); await pe.waitForTimeout(300);
+    ok('   tocada, ela fica marcada e diz o que vai acontecer', /fica revisado/.test(await pe.textContent('#dvEsp')));
+    for(const [k, v] of [['embalagem','intacta'],['tecido','intacto'],['tubo','ok'],['base','ok'],['comando','quebrado'],['kit','com kit'],['destinacao','reembalar']])
+      await pe.click('.dvOp[data-p="'+k+'"][data-v="'+v+'"]');
+    await pe.click('#dvSalvar'); await pe.waitForTimeout(1200);
+    eq('salvou e ligou: o caso fica revisado', caso(e1.id).etapa, 'revisado');
+    ok('   e a tela diz', (await pe.textContent('#dvMsg')).includes('caso #'+e1.id+' revisado'), await pe.textContent('#dvMsg'));
+
+    secao('o "Já revisei no ML" do ML devolve, pela tela do caso');
+    QUEM = 1;
+    await p.goto(B + '/devolucao-casos'); await p.waitForTimeout(900);
+    ok('a lista diz que falta marcar o "Já revisei"', /falta marcar "Já revisei" no ML/.test(await p.locator('#listaMl .linha', { hasText:'#'+e1.id }).textContent()));
+    await p.locator('#listaMl .linha', { hasText:'#'+e1.id }).locator('.t1').click(); await p.waitForTimeout(800);
+    await p.click('#btAvisoML'); await p.waitForTimeout(1000);
+    eq('marcado: a etapa vai a "Já revisei no ML"', caso(e1.id).etapa, 'ml_revisei');
+    eq('   e sem a baixa o caso continua aberto', caso(e1.id).encerrado_em, null);
+    await p.click('#painel button:has-text("Fechar")'); await p.waitForTimeout(300);
+
+    secao('a revisão que ficou solta: "Ligar" pela tela do caso');
+    const e2 = await api(p, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000015571779999', nf:'8208', sku:'BK150150BRANCO', publicidade:false });
+    const solta = await api(p, 'POST', '/api/devolucao', { codigo_ml:'48323650000', sku_fisico:'BK150150BRANCO', destinacao:'reembalar' });
+    await p.goto(B + '/devolucao-casos'); await p.waitForTimeout(900);
+    await p.locator('#listaMl .linha', { hasText:'#'+e2.id }).locator('.t1').click(); await p.waitForTimeout(1200);
+    ok('o caso mostra a revisão sem caso do mesmo SKU', (await p.textContent('#soltasBox')).includes('Ligar a revisão #'+solta.id), await p.textContent('#soltasBox'));
+    await p.fill('#eObs', 'digitado antes de ligar');
+    await p.click('[data-ligar="'+solta.id+'"]'); await p.waitForTimeout(1300);
+    eq('ligou', caso(e2.id).devolucao_id, solta.id);
+    eq('   o caso fica revisado', caso(e2.id).etapa, 'revisado');
+    eq('   e o que estava digitado no caso continua no campo', await p.inputValue('#eObs'), 'digitado antes de ligar');
+    await p.fill('#eObs', ''); await p.click('#btEditar'); await p.waitForTimeout(600);
+    await p.click('#painel button:has-text("Fechar")'); await p.waitForTimeout(300);
+
+    secao('a revisão que ficou solta: "Ligar" pela Baixa, no Admin');
+    const e3 = await api(p, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000015571778888', nf:'8209', sku:'BK150150BRANCO', comprador:'Fulana Baixa', publicidade:false });
+    const solta3 = await api(p, 'POST', '/api/devolucao', { codigo_ml:'48323651111', sku_fisico:'BK150150BRANCO', destinacao:'reembalar' });
+    const pa2 = await pg();
+    /* O Admin inteiro não sobe aqui (dezenas de rotas): o card da Baixa é
+       o pedaço do index.html que desenha a lista e o "Ligar", tirado do
+       próprio arquivo — o que roda é o código de verdade. */
+    const idx = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+    const fns = idx.slice(idx.indexOf('var DVMOTIVOS=[];'), idx.indexOf('var DVESC={};'));
+    const iLg = idx.indexOf('var lg=e.target.closest');
+    const lgBloco = idx.slice(iLg, idx.indexOf('var b=e.target.closest(\'.dvBaixa\');', iLg));
+    await pa2.goto(B + '/devolucao-casos'); await pa2.waitForTimeout(400);
+    await pa2.evaluate((codigo) => { document.body.innerHTML = '<div id="dvAdmLista"></div>'; const sc = document.createElement('script'); sc.textContent = codigo; document.body.appendChild(sc); },
+      fns + '\nvar DVESC={};\ndocument.addEventListener("click",function(e){ ' + lgBloco + ' });\ncarregarDev();');
+    await pa2.waitForTimeout(1500);
+    const cardB = await pa2.textContent('#dvEsp'+solta3.id);
+    ok('o card sem caso mostra o caso esperado do SKU', cardB.includes('Ligar ao caso #'+e3.id), cardB);
+    await pa2.click('.dvLigar[data-dev="'+solta3.id+'"][data-caso="'+e3.id+'"]'); await pa2.waitForTimeout(1200);
+    eq('   "Ligar" pela Baixa liga', caso(e3.id).devolucao_id, solta3.id);
 
     /* ═════════ 5. o celular ═════════ */
     secao('a 400 px — a página não rola de lado, e o caso abre');
