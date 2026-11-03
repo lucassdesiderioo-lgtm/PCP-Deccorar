@@ -118,6 +118,11 @@ module.exports = function(app, db){
     const cheio = (v) => v !== undefined && v !== null && String(v).trim() !== '';
     if((cheio(b.valor_ml) || (b.coleta && cheio(b.coleta.custo))) && !podeDinheiro(req))
       return res.status(403).json({ erro:'Valor do ML e custo da coleta só com a permissão de ver o dinheiro das devoluções. Lance sem eles.', chave:'devolucao.dinheiro' });
+    /* Pedir a coleta e marcar a situação do valor são de quem acompanha, nas
+       rotas próprias; pelo lançamento, também (achado na revisão). */
+    const pode2 = pode(req);
+    if((b.coleta && cheio(b.coleta.transportadora_id) || cheio(b.valor_ml_situacao)) && !pode2.acompanhar)
+      return res.status(403).json({ erro:'Pedir a coleta e marcar a situação do valor são de quem acompanha as devoluções. Lance sem eles.', chave:'devolucao.acompanhar' });
     responder(res, () => {
       const r = D.lancarCompleto(db, b, req.usuario);
       if(r.valorMudou && r.valorMudou.length) auditar(req, 'valor', r.caso.id, 'lançou no lançamento '+r.valorMudou.join(', ')+': '+JSON.stringify({ valor_ml: b.valor_ml }));

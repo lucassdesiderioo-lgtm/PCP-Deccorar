@@ -77,7 +77,8 @@ function garantir(db){
     chegou_em TEXT, encerrado_em TEXT, encerrado_por TEXT,
     obs TEXT, criado_por TEXT,
     criado_em TEXT DEFAULT (datetime('now','localtime')),
-    teste INTEGER DEFAULT 0)`);
+    teste INTEGER DEFAULT 0,
+    publicidade INTEGER, mensagem_ml TEXT, link_ml TEXT)`);
   /* FASE 5 — desde quando o valor do ML está nesta situação (R18: "pedir" há
      ≥ 2 dias entra no parado). O ALTER fica ao lado do CREATE, no fim da
      tabela, para o banco que nasceu antes desta fase (§17). */
@@ -95,7 +96,8 @@ function garantir(db){
     id INTEGER PRIMARY KEY AUTOINCREMENT, caso_id INTEGER NOT NULL,
     tipo TEXT, de TEXT, para TEXT, texto TEXT, usuario TEXT,
     criado_em TEXT DEFAULT (datetime('now','localtime')),
-    teste INTEGER DEFAULT 0)`);
+    teste INTEGER DEFAULT 0,
+    usuario_id INTEGER, etapa_desde_antes TEXT)`);
   /* AJUSTE de 03/11/2026 (o desfazer): quem moveu a etapa, pelo id e não só
      pelo nome, e a data em que o caso estava na etapa de antes — é ela que
      volta, para o "parado" não zerar por causa de um clique errado. */
@@ -250,12 +252,13 @@ function encerrados(db, opt){
 /* A MESMA PESSOA COM VÁRIOS CASOS ABERTOS (AJUSTE de 03/11/2026, dono:
    "ela sabe que tem 3 unidades da mesma pessoa"). Só AVISA: cada venda tem o
    seu prazo, o seu valor e o seu reembolso no ML, então os casos continuam
-   separados. Quem diz se dois nomes são a mesma pessoa é o nome.js (a régua
-   única da expedição); nome vazio não junta ninguém. */
+   separados. Quem diz se dois nomes são a mesma pessoa é o nome.js
+   (mesmaPessoaPorPalavras: palavra inteira, nunca pedaço — a revisão achou
+   "Ana" juntando com "Luciana"); nome vazio não junta ninguém. */
 function irmaos(abertos, comprador, menos){
   const N = require('./nome');
   if(!N.nomeChave(comprador)) return [];
-  return abertos.filter(x => x.id !== menos && N.mesmoCliente(x.comprador, comprador) === true);
+  return abertos.filter(x => x.id !== menos && N.mesmaPessoaPorPalavras(x.comprador, comprador) === true);
 }
 function mesmoComprador(db, comprador, menos){
   return irmaos(db.prepare('SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL ORDER BY id').all(), comprador, menos);
@@ -399,6 +402,10 @@ function lancar(db, b, usuario, opt){
 const preenchido = (v) => v !== undefined && v !== null && String(v).trim() !== '';
 function lancarCompleto(db, b, usuario, opt){
   b = b || {};
+  /* Custo sem transportadora não tem onde morar: recusa, em vez de sumir
+     calado (achado na revisão). */
+  if(b.coleta && !preenchido(b.coleta.transportadora_id) && preenchido(b.coleta.custo))
+    throw new Recusa(400, 'Escolha a transportadora para lançar o custo da coleta — ou apague o custo.');
   const co = (b.coleta && preenchido(b.coleta.transportadora_id)) ? b.coleta : null;
   const sit = preenchido(b.valor_ml_situacao) ? String(b.valor_ml_situacao).trim() : null;
   const valor = preenchido(b.valor_ml) ? b.valor_ml : null;
@@ -490,6 +497,11 @@ function desfazerEtapa(db, id, usuario){
     throw new Recusa(409, 'Não há mudança de etapa para desfazer: o caso já andou depois dela, ou ela já foi desfeita.');
   }
   const e = db.prepare('SELECT * FROM devolucao_evento WHERE id=?').get(d.evento_id);
+  // A volta passa pela mesma trava da ida (R11): sem os documentos, não volta a "Documentos ao ML".
+  if(e.de === 'docs_enviados'){
+    const falta = situacaoDocs(db, c.id).filter(x => !x.ok).map(x => x.doc);
+    if(falta.length) throw new Recusa(400, 'Não dá para voltar a "Documentos ao ML": faltam '+falta.join(' · ')+'. Use os botões de etapa.', { faltam: falta });
+  }
   db.transaction(() => {
     db.prepare('UPDATE devolucao_caso SET etapa=?, etapa_desde=? WHERE id=?').run(e.de, e.etapa_desde_antes, c.id);
     const ev = evento(db, c.id, 'desfeito', e.para, e.de, 'desfeito: '+(NOME_ETAPA[e.para]||e.para)+' → '+(NOME_ETAPA[e.de]||e.de), nomeDe(usuario));

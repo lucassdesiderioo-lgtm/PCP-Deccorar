@@ -57,4 +57,25 @@ function mesmoCliente(a,b){
   return x===y || x.indexOf(y)>=0 || y.indexOf(x)>=0 || mesmoNomeComRepeticao(x,y);
 }
 
-module.exports={nomeChave,mesmoNomeComRepeticao,mesmoCliente};
+/* "Este caso aberto é da mesma pessoa?" — para o aviso de MESMO COMPRADOR das
+   devoluções (devcaso_dominio). O mesmoCliente compara dentro de UM pacote,
+   onde "um contido no outro" é o nome abreviado da mesma etiqueta. Aqui a
+   comparação roda contra TODOS os casos abertos, e o comprador é texto livre:
+   letra contida em letra junta "Ana" com "Luciana Souza". Então: igualdade,
+   a letra dobrada do ML, ou TODAS as palavras do nome menor (com duas ou mais)
+   como palavras inteiras do maior, com o mesmo primeiro nome e o mesmo último
+   sobrenome ("Maria Silva" × "Maria da Silva"). Um nome só nunca junta ninguém. NULL quando falta um dos lados, como o mesmoCliente. */
+function mesmaPessoaPorPalavras(a,b){
+  const x=nomeChave(a), y=nomeChave(b);
+  if(!x||!y) return null;
+  if(x===y || mesmoNomeComRepeticao(x,y)) return true;
+  const px=x.split(' '), py=y.split(' ');
+  const [menor,maior]=px.length<=py.length?[px,py]:[py,px];
+  if(menor.length<2) return false;
+  // o mesmo primeiro nome e o mesmo último sobrenome, e o resto como palavras inteiras
+  if(menor[0]!==maior[0] || menor[menor.length-1]!==maior[maior.length-1]) return false;
+  const tem=new Set(maior);
+  return menor.every(w=>tem.has(w));
+}
+
+module.exports={nomeChave,mesmoNomeComRepeticao,mesmoCliente,mesmaPessoaPorPalavras};
