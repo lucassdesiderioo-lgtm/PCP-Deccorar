@@ -52,7 +52,9 @@ module.exports = function(app, db){
   /* ── leituras ── */
   function pode(req){
     const p = (c) => { try{ return !!app.locals.acesso.podePermissao(req.usuario, c); }catch(e){ return false; } };
-    return { lancar:p('devolucao.lancar'), acompanhar:p('devolucao.acompanhar'), dinheiro:podeDinheiro(req) };
+    /* `listas` é a chave do cadastro de motivos (Admin → Cadastros): a mesma
+       lista aparece aqui para quem já pode editá-la, e só para ele. */
+    return { lancar:p('devolucao.lancar'), acompanhar:p('devolucao.acompanhar'), dinheiro:podeDinheiro(req), listas:p('listas.editar') };
   }
   /* A lista diz também O QUE a pessoa pode fazer, para a tela não mostrar
      botão que dá "sem permissão". Esconder não é segurança: quem tranca é o

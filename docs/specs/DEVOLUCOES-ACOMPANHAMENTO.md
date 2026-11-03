@@ -62,6 +62,11 @@ Mudanças no caminho:
   · AJUSTE de 03/11 (pedido do dono): campo "Buscar devolução" em Em andamento, pela NF, venda
     ou pack (inteiro ou pedaço, a partir de 3 dígitos), nos casos abertos e encerrados.
     No ar e conferida pelo dono em 03/11/2026 (PR #253).
+  · AJUSTE de 03/11 (pedido do dono), no lançamento: "Venda via publicidade?" (Sim ou Não,
+    obrigatório; os casos de antes ficam "não informado") e a contagem no relatório do mês;
+    a mensagem do ML colada inteira; o link da conversa da reclamação (botão "Abrir conversa
+    no ML"); "Passado em" nasce com o dia do lançamento; e a aba Motivos, que edita a mesma
+    lista da baixa para quem tem listas.editar.
 ```
 
 > Desenhada no Projeto do Claude entre 29/10 e 03/11/2026, com o Lucas.

@@ -46,6 +46,13 @@
   .chip.parado{background:var(--ambg);color:var(--amber);border-color:var(--amber)}
   .chip.dinheiro{color:var(--green);border-color:#1f5e2c}
   .chip.falta{color:var(--amber);border-color:#6b5310}
+  .chip.pub{background:#13233a;color:var(--blue);border-color:var(--blue);font-weight:700}
+  a.chip{text-decoration:none;color:var(--blue);border-color:#22406b}
+  .simnao{display:flex;gap:8px;flex-wrap:wrap}
+  .simnao button{flex:1;min-width:110px;max-width:220px}
+  .simnao button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .msgml{white-space:pre-wrap;word-break:break-word;max-height:280px;overflow:auto;background:#0b0f14;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:13px;line-height:1.45}
+  .larga{grid-column:1/-1}
   /* o caso aberto */
   #fundo{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:10001;overflow:auto;padding:24px 12px}
   #painel{max-width:860px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
@@ -81,6 +88,7 @@
     <button class="tab" data-t="enc">Encerrados</button>
     <button class="tab" data-t="rel">Relatório do mês</button>
     <button class="tab" data-t="tra" id="tabTra">Transportadoras</button>
+    <button class="tab" data-t="mot" id="tabMot" style="display:none">Motivos</button>
   </div>
 
   <div id="secAnd">
@@ -100,11 +108,17 @@
         <div><label for="lNf">NF</label><input id="lNf" autocomplete="off"></div>
         <div><label for="lSku">SKU</label><input id="lSku" autocomplete="off"></div>
         <div><label for="lComprador">Comprador</label><input id="lComprador" autocomplete="off"></div>
-        <div><label for="lMotivo">Motivo</label><select id="lMotivo"></select></div>
+        <div><label for="lMotivo">Motivo</label><select id="lMotivo"></select><a href="#" id="lNovoMotivo" class="sub" style="display:none;margin-top:4px">+ cadastrar motivo</a></div>
         <div id="boxPrazo"><label for="lPrazo">Resolver até (prazo do ML)</label><input id="lPrazo" type="date"></div>
         <div id="boxResp"><label for="lResp">Responsável</label><input id="lResp" autocomplete="off"></div>
         <div id="boxPassado"><label for="lPassado">Passado em</label><input id="lPassado" type="date"></div>
         <div><label for="lObs">Observação</label><input id="lObs" autocomplete="off"></div>
+        <div class="larga"><label>Venda via publicidade? (obrigatório)</label>
+          <div class="simnao" id="lPub"><button class="bt sec" data-pub="1">Sim</button><button class="bt sec" data-pub="0">Não</button></div></div>
+        <div class="larga"><label for="lLink">Link da conversa da reclamação (cole o endereço do ML)</label>
+          <input id="lLink" placeholder="https://www.mercadolivre.com.br/…" autocomplete="off" autocorrect="off" autocapitalize="off" inputmode="url"></div>
+        <div class="larga"><label for="lMsgMl">Mensagem do Mercado Livre (cole aqui)</label>
+          <textarea id="lMsgMl" rows="6" placeholder="Cole a mensagem que o ML mandou sobre a reclamação"></textarea></div>
       </div>
       <div id="lAchou" class="sub" style="margin-top:8px"></div>
       <div style="margin-top:10px"><button class="bt" id="btLancar">Lançar</button></div>
@@ -121,6 +135,11 @@
     <div class="sub" style="margin-bottom:10px">Conta os casos lançados no mês e as devoluções recebidas no mês sem caso (pelo motivo da baixa). A devolução ligada a um caso conta uma vez.</div>
     <div class="acoes"><label for="rMes" style="margin:0;align-self:center">Mês</label><input id="rMes" type="month" style="max-width:180px"></div>
     <div id="relBox"></div></div></div>
+  <div id="secMot" style="display:none"><div class="card"><h2>Motivos de devolução</h2>
+    <div class="sub" style="margin-bottom:10px">A mesma lista da baixa (Admin → Cadastros). Remover tira o motivo das opções; os casos que já usam ele continuam com o texto.</div>
+    <div id="listaMot"></div>
+    <div class="acoes" style="margin-top:12px"><input id="mNovo" placeholder="novo motivo" autocomplete="off" style="max-width:360px"><button class="bt" id="btMot">Adicionar</button></div>
+    <div id="mMsg"></div></div></div>
   <div id="secTra" style="display:none"><div class="card"><h2>Transportadoras</h2>
     <div class="sub" style="margin-bottom:10px">Quem já coletou numa região aparece sozinho como sugestão ao pedir a coleta, pelo CEP — não há lista de cobertura para manter.</div>
     <div id="listaTra"></div>
@@ -178,6 +197,11 @@ function chipPrazo(c){
         : c.dias_prazo===0 ? 'vence HOJE' : (c.dias_prazo===1 ? 'falta 1 dia' : 'faltam '+c.dias_prazo+' dias');
   return '<span class="chip '+esc(c.cor)+'">'+t+' · até '+dataBR(c.prazo)+'</span>';
 }
+/* A venda via publicidade e o link da conversa (AJUSTE de 03/11/2026). O
+   link só abre noutra aba, e o clique nele não abre o caso por baixo. */
+function chipPub(c){ return c.publicidade===1 ? '<span class="chip pub">📣 Publicidade</span>' : ''; }
+function chipLink(c){ return c.link_ml ? '<a class="chip" href="'+esc(c.link_ml)+'" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">conversa no ML ↗</a>' : ''; }
+function simNao(v){ return v===1 ? 'Sim' : v===0 ? 'Não' : 'não informado'; }
 function linhaCaso(c){
   var peca=pecaDe(c.sku);
   var chips=chipPrazo(c);
@@ -188,6 +212,7 @@ function linhaCaso(c){
   if(c.tipo==='ml') chips+='<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>';
   if(c.responsavel) chips+='<span class="chip">'+esc(c.responsavel)+'</span>';
   if(c.prazo_original) chips+='<span class="chip">prorrogado (era '+dataBR(c.prazo_original)+')</span>';
+  chips+=chipPub(c)+chipLink(c);
   return '<div class="linha '+esc(c.cor||'')+'" data-id="'+c.id+'">'+
     '<div class="t1"><span>#'+c.id+'</span><span>Venda '+esc(c.venda||'—')+'</span><span>NF '+esc(c.nf||'—')+'</span></div>'+
     '<div class="t2">'+esc(c.sku||'sem SKU')+(peca?' · '+esc(peca):'')+(c.comprador?' · '+esc(c.comprador):'')+'</div>'+
@@ -208,6 +233,8 @@ function carregar(){
   return api('GET','/api/devolucao-casos').then(function(d){
     ESTADO.coleta=d.coleta||[]; ESTADO.ml=d.ml||[]; ESTADO.pode=d.pode||{}; ESTADO.limites=d.limites||{};
     document.getElementById('cardLancar').style.display = ESTADO.pode.lancar ? '' : 'none';
+    document.getElementById('tabMot').style.display = ESTADO.pode.listas ? '' : 'none';
+    document.getElementById('lNovoMotivo').style.display = ESTADO.pode.listas ? 'block' : 'none';
     desenharListas();
   }).catch(function(e){
     document.getElementById('listaColeta').innerHTML='<div class="erro">Não deu para carregar a lista: '+esc(e.message)+'</div>';
@@ -219,7 +246,7 @@ function carregarEnc(){
     document.getElementById('listaEnc').innerHTML = c.length ? c.map(function(x){
       return '<div class="linha" data-id="'+x.id+'"><div class="t1"><span>#'+x.id+'</span><span>Venda '+esc(x.venda||'—')+'</span><span>NF '+esc(x.nf||'—')+'</span></div>'+
         '<div class="t2">'+esc(x.sku||'')+' · '+esc(x.motivo||'sem motivo')+' · '+(x.tipo==='coleta'?'Nós coletamos':'ML devolve')+'</div>'+
-        '<div class="chips"><span class="chip">'+esc(x.saida_nome||'')+'</span><span class="chip">'+horaBR(x.encerrado_em)+(x.encerrado_por?' · '+esc(x.encerrado_por):'')+'</span></div></div>';
+        '<div class="chips"><span class="chip">'+esc(x.saida_nome||'')+'</span><span class="chip">'+horaBR(x.encerrado_em)+(x.encerrado_por?' · '+esc(x.encerrado_por):'')+'</span>'+chipPub(x)+chipLink(x)+'</div></div>';
     }).join('') : '<div class="vazio">Nenhum caso encerrado ainda.</div>';
   }).catch(function(e){ document.getElementById('listaEnc').innerHTML='<div class="erro">'+esc(e.message)+'</div>'; });
 }
@@ -232,6 +259,18 @@ function setTipo(t){
   ['boxPrazo','boxResp','boxPassado'].forEach(function(id){ document.getElementById(id).style.display = t==='coleta' ? '' : 'none'; });
 }
 document.getElementById('tpColeta').onclick=function(){ setTipo('coleta'); };
+/* "Via publicidade?" começa sem resposta de propósito: quem decide se falta é o
+   servidor, e a recusa dele aparece aqui. */
+ESTADO.pub=null;
+function setPub(v){
+  ESTADO.pub=v;
+  document.querySelectorAll('#lPub [data-pub]').forEach(function(b){ b.className='bt sec'+(String(v)===b.getAttribute('data-pub')?' on':''); });
+}
+document.querySelectorAll('#lPub [data-pub]').forEach(function(b){ b.onclick=function(){ setPub(+b.getAttribute('data-pub')); }; });
+/* "Passado em" é o dia do lançamento (dono, 03/11/2026): nasce com hoje, e
+   continua editável. */
+function hojeISO(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function passadoHoje(){ document.getElementById('lPassado').value=hojeISO(); }
 document.getElementById('tpMl').onclick=function(){ setTipo('ml'); };
 function acharVenda(){
   var v=document.getElementById('lVenda').value.trim();
@@ -256,14 +295,17 @@ document.getElementById('btLancar').onclick=function(){
   var v=document.getElementById('lVenda').value.trim().replace(/\s+/g,'');
   var corpo={ tipo:ESTADO.tipo, nf:document.getElementById('lNf').value, sku:document.getElementById('lSku').value,
     comprador:document.getElementById('lComprador').value, motivo:document.getElementById('lMotivo').value,
-    obs:document.getElementById('lObs').value };
+    obs:document.getElementById('lObs').value,
+    publicidade: ESTADO.pub===null ? '' : ESTADO.pub===1,
+    link_ml:document.getElementById('lLink').value, mensagem_ml:document.getElementById('lMsgMl').value };
   // O campo de cima aceita venda OU NF: número curto é NF.
   if(v && v.length<=7 && !corpo.nf) corpo.nf=v; else corpo.venda=v;
   if(ESTADO.tipo==='coleta'){ corpo.prazo=document.getElementById('lPrazo').value; corpo.responsavel=document.getElementById('lResp').value; corpo.passado_em=document.getElementById('lPassado').value; }
   var b=this; b.disabled=true;
   api('POST','/api/devolucao-casos',corpo).then(function(r){
     msg.innerHTML='<div class="okmsg">Caso #'+r.id+' lançado.</div>';
-    ['lVenda','lNf','lSku','lComprador','lObs','lPrazo','lResp','lPassado'].forEach(function(id){ document.getElementById(id).value=''; });
+    ['lVenda','lNf','lSku','lComprador','lObs','lPrazo','lResp','lPassado','lLink','lMsgMl'].forEach(function(id){ document.getElementById(id).value=''; });
+    setPub(null); passadoHoje();
     document.getElementById('lMotivo').value=''; document.getElementById('lAchou').textContent='';
     carregar();
   }).catch(function(e){ msg.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; })
@@ -284,21 +326,24 @@ function desenharCaso(d){
   var i=d.etapas.indexOf(c.etapa);
   var trilha=d.etapas.map(function(e,k){ return '<span class="'+(k<i?'feito':k===i?'agora':'')+'">'+esc(d.nomes[e]||e)+'</span>'; }).join('');
   var h='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0;font-size:17px">Caso #'+c.id+' · '+(c.tipo==='coleta'?'Nós coletamos':'ML devolve')+'</h2>'+
-    '<button class="bt sec" style="margin-left:auto" onclick="fechar()">Fechar</button></div>';
+    (c.link_ml?'<a class="bt" style="margin-left:auto;text-decoration:none" href="'+esc(c.link_ml)+'" target="_blank" rel="noopener noreferrer">Abrir conversa no ML ↗</a>':'')+
+    '<button class="bt sec" style="'+(c.link_ml?'':'margin-left:auto')+'" onclick="fechar()">Fechar</button></div>';
   h+='<div class="chips">'+chipPrazo(c)+(c.tipo==='coleta'&&c.parado?'<span class="chip parado">parado há '+plural(c.dias_parado,'dia','dias')+'</span>':'')+
      (c.tipo==='ml'?'<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>':'')+
-     (c.saida_nome?'<span class="chip">'+esc(c.saida_nome)+'</span>':'')+'</div>';
+     (c.saida_nome?'<span class="chip">'+esc(c.saida_nome)+'</span>':'')+chipPub(c)+'</div>';
   h+='<div class="trilha">'+trilha+'</div>';
   h+='<div class="dados">'+
     '<div><b>Venda</b>'+esc(c.venda||'—')+'</div><div><b>Pack</b>'+esc(c.pack_id||'—')+'</div><div><b>NF</b>'+esc(c.nf||'—')+'</div>'+
     '<div><b>SKU</b>'+esc(c.sku||'—')+(pecaDe(c.sku)?'<br><small>'+esc(pecaDe(c.sku))+'</small>':'')+'</div>'+
     '<div><b>Comprador</b>'+esc(c.comprador||'—')+'</div><div><b>Motivo</b>'+esc(c.motivo||'—')+'</div>'+
+    '<div><b>Via publicidade</b>'+simNao(c.publicidade)+'</div>'+
     (c.tipo==='coleta'?'<div><b>Resolver até</b>'+dataBR(c.prazo)+(c.prazo_original?'<br><small>original: '+dataBR(c.prazo_original)+'</small>':'')+'</div>'+
       '<div><b>Responsável</b>'+esc(c.responsavel||'—')+'</div><div><b>Passado em</b>'+dataBR(c.passado_em)+'</div>':'')+
     '<div><b>Na etapa desde</b>'+horaBR(c.etapa_desde)+'</div>'+
     (c.chegou_em?'<div><b>Chegou em</b>'+horaBR(c.chegou_em)+'</div>':'')+
     (c.devolucao_id?'<div><b>Revisão</b>#'+c.devolucao_id+'</div>':'')+
     (c.obs?'<div style="grid-column:1/-1"><b>Observação</b>'+esc(c.obs)+'</div>':'')+'</div>';
+  if(c.mensagem_ml) h+='<div class="bloco"><h3>Mensagem do ML</h3><div class="msgml">'+esc(c.mensagem_ml)+'</div></div>';
   h+='<div id="cMsg"></div>';
   if(aberto && P.acompanhar){
     var botoes=(d.manuais||[]).filter(function(e){ return e!==c.etapa && !(e==='ml_avisado' && !c.chegou_em); })
@@ -322,6 +367,10 @@ function desenharCaso(d){
       '<div><label>SKU</label><input id="eSku" value="'+esc(c.sku||'')+'"></div>'+
       '<div><label>Responsável</label><input id="eResp" value="'+esc(c.responsavel||'')+'"></div>'+
       '<div><label>Observação</label><input id="eObs" value="'+esc(c.obs||'')+'"></div>'+
+      '<div><label>Via publicidade</label><select id="ePub">'+(c.publicidade==null?'<option value="" selected>— não informado —</option>':'')+
+        '<option value="1"'+(c.publicidade===1?' selected':'')+'>Sim</option><option value="0"'+(c.publicidade===0?' selected':'')+'>Não</option></select></div>'+
+      '<div class="larga"><label>Link da conversa no ML</label><input id="eLink" value="'+esc(c.link_ml||'')+'" autocomplete="off" autocapitalize="off" inputmode="url"></div>'+
+      '<div class="larga"><label>Mensagem do ML</label><textarea id="eMsgMl" rows="6">'+esc(c.mensagem_ml||'')+'</textarea></div>'+
       '</div><div class="acoes"><button class="bt sec" id="btEditar">Salvar</button></div></div>';
   }
   GANCHOS.forEach(function(g){ h+=g.html(d, c, P, aberto)||''; });
@@ -369,8 +418,12 @@ function ligarCaso(d, c){
   if((x=document.getElementById('btAvisoML'))) x.onclick=function(){ acao(base+'/aviso-ml',{}); };
   if((x=document.getElementById('btPrazo'))) x.onclick=function(){ acao(base+'/prazo',{prazo:document.getElementById('novoPrazo').value}); };
   if((x=document.getElementById('btEditar'))) x.onclick=function(){
-    acao(base+'/editar',{ motivo:document.getElementById('eMotivo').value, nf:document.getElementById('eNf').value,
-      sku:document.getElementById('eSku').value, responsavel:document.getElementById('eResp').value, obs:document.getElementById('eObs').value });
+    var corpo={ motivo:document.getElementById('eMotivo').value, nf:document.getElementById('eNf').value,
+      sku:document.getElementById('eSku').value, responsavel:document.getElementById('eResp').value, obs:document.getElementById('eObs').value,
+      link_ml:document.getElementById('eLink').value, mensagem_ml:document.getElementById('eMsgMl').value };
+    // Sem resposta escolhida, a publicidade não vai: campo ausente não apaga.
+    var pv=document.getElementById('ePub').value; if(pv!=='') corpo.publicidade = pv==='1';
+    acao(base+'/editar', corpo);
   };
   if((x=document.getElementById('btPerda'))) x.onclick=function(){
     if(!confirm('Encerrar o caso #'+c.id+' como PERDA por prazo? A decisão fica registrada com seu nome.')) return;
@@ -628,10 +681,12 @@ function carregarRel(){
   var el=document.getElementById('relBox'), mes=document.getElementById('rMes').value;
   api('GET','/api/devolucao-casos/relatorio?mes='+encodeURIComponent(mes)).then(function(r){
     var din=!!r.dinheiro;
-    var h='<div class="dados" style="margin:10px 0"><div><b>Total no mês</b>'+r.total+'</div><div><b>Casos lançados</b>'+r.casos+'</div><div><b>Devoluções sem caso</b>'+r.sem_caso+'</div></div>';
-    h+= r.por_motivo.length ? '<div class="rolaH"><table><thead><tr><th>Motivo</th><th class="num">Qtd</th><th class="num">Casos</th><th class="num">Sem caso</th>'+
+    var P=r.publicidade||{sim:0,nao:0,nao_informado:0};
+    var h='<div class="dados" style="margin:10px 0"><div><b>Total no mês</b>'+r.total+'</div><div><b>Casos lançados</b>'+r.casos+'</div><div><b>Devoluções sem caso</b>'+r.sem_caso+'</div>'+
+      '<div><b>Via publicidade</b>'+P.sim+' sim · '+P.nao+' não'+(P.nao_informado?' · '+P.nao_informado+' não informado':'')+'<br><small>só os casos lançados</small></div></div>';
+    h+= r.por_motivo.length ? '<div class="rolaH"><table><thead><tr><th>Motivo</th><th class="num">Qtd</th><th class="num">Casos</th><th class="num">Sem caso</th><th class="num">Via publicidade</th>'+
       (din?'<th class="num">Perda por prazo</th><th class="num">Devolvido ao comprador</th>':'')+'</tr></thead><tbody>'+
-      r.por_motivo.map(function(l){ return '<tr><td>'+esc(l.motivo)+'</td><td class="num"><b>'+l.qtd+'</b></td><td class="num">'+l.casos+'</td><td class="num">'+l.sem_caso+'</td>'+
+      r.por_motivo.map(function(l){ return '<tr><td>'+esc(l.motivo)+'</td><td class="num"><b>'+l.qtd+'</b></td><td class="num">'+l.casos+'</td><td class="num">'+l.sem_caso+'</td><td class="num">'+(l.publicidade||0)+'</td>'+
         (din?'<td class="num">'+reais(l.perda_prazo)+'</td><td class="num">'+reais(l.devolvido_comprador)+'</td>':'')+'</tr>'; }).join('')+
       '</tbody></table></div>' : '<div class="vazio">Nenhuma devolução neste mês.</div>';
     if(din){
@@ -661,19 +716,54 @@ function buscar(){
                                 : '<span class="chip ambar">aberto · '+esc(x.etapa_nome)+'</span>';
       return '<div class="linha" data-id="'+x.id+'"><div class="t1"><span>#'+x.id+'</span><span>Venda '+esc(x.venda||'—')+'</span><span>NF '+esc(x.nf||'—')+'</span></div>'+
         '<div class="t2">'+(x.tipo==='coleta'?'Nós coletamos':'ML devolve')+' · '+esc(x.sku||'sem SKU')+(x.comprador?' · '+esc(x.comprador):'')+' · '+esc(x.motivo||'sem motivo')+'</div>'+
-        '<div class="chips">'+situ+'</div></div>';
+        '<div class="chips">'+situ+chipPub(x)+chipLink(x)+'</div></div>';
     }).join('');
   }).catch(function(e){ box.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; });
 }
 document.getElementById('bBusca').addEventListener('input',function(){ clearTimeout(tBusca); tBusca=setTimeout(buscar,400); });
 document.getElementById('bBusca').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); clearTimeout(tBusca); buscar(); } });
 
+/* ── OS MOTIVOS (AJUSTE de 03/11/2026): a lista é a MESMA da baixa (R12), e a
+   chave é a do Admin → Cadastros (listas.editar). Aqui é só uma porta a mais
+   para ela, perto de quem lança. ── */
+ABAS_EXTRA.push('mot');
+var MOTIVOS_LINHAS=[];
+function carregarMotivos(){
+  return api('GET','/api/listas/motivo_devolucao').then(function(l){
+    MOTIVOS_LINHAS=l||[];
+    ESTADO.motivos=MOTIVOS_LINHAS.map(function(x){return x.valor;});
+    var sel=document.getElementById('lMotivo'), atual=sel.value;
+    sel.innerHTML='<option value="">— escolher depois —</option>'+ESTADO.motivos.map(function(m){ return '<option'+(m===atual?' selected':'')+'>'+esc(m)+'</option>'; }).join('');
+    desenharMotivos();
+  }).catch(function(){});
+}
+function desenharMotivos(){
+  var el=document.getElementById('listaMot');
+  el.innerHTML = MOTIVOS_LINHAS.length ? MOTIVOS_LINHAS.map(function(m){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)"><span>'+esc(m.valor)+'</span>'+
+      '<button class="bt sec" data-motdel="'+m.id+'" data-nome="'+esc(m.valor)+'">remover</button></div>';
+  }).join('') : '<div class="vazio">Nenhum motivo cadastrado.</div>';
+  el.querySelectorAll('[data-motdel]').forEach(function(b){ b.onclick=function(){
+    if(!confirm('Remover o motivo "'+b.getAttribute('data-nome')+'" das opções? Os casos que já usam ele não mudam.')) return;
+    api('DELETE','/api/listas/'+b.getAttribute('data-motdel')).then(carregarMotivos)
+      .catch(function(e){ document.getElementById('mMsg').innerHTML='<div class="erro">'+esc(e.message)+'</div>'; });
+  }; });
+}
+document.getElementById('btMot').onclick=function(){
+  var inp=document.getElementById('mNovo'), v=inp.value.trim(), m=document.getElementById('mMsg'); m.innerHTML='';
+  if(!v){ m.innerHTML='<div class="erro">Escreva o motivo.</div>'; return; }
+  if(ESTADO.motivos.some(function(x){ return x.toLowerCase()===v.toLowerCase(); })){ m.innerHTML='<div class="erro">Esse motivo já está na lista.</div>'; return; }
+  api('POST','/api/listas',{tipo:'motivo_devolucao', valor:v}).then(function(){ inp.value=''; m.innerHTML='<div class="okmsg">Motivo "'+esc(v)+'" cadastrado.</div>'; return carregarMotivos(); })
+    .catch(function(e){ m.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; });
+};
+document.getElementById('mNovo').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('btMot').click(); } });
+ABAS_GANCHO.push({ aba:'mot', abrir:function(){ carregarMotivos(); } });
+document.getElementById('lNovoMotivo').onclick=function(e){ e.preventDefault(); document.getElementById('tabMot').click(); document.getElementById('mNovo').focus(); };
+
 /* ── início ── */
 setTipo('coleta');
-api('GET','/api/listas/motivo_devolucao').then(function(l){
-  ESTADO.motivos=(l||[]).map(function(x){return x.valor;});
-  document.getElementById('lMotivo').innerHTML='<option value="">— escolher depois —</option>'+ESTADO.motivos.map(function(m){ return '<option>'+esc(m)+'</option>'; }).join('');
-}).catch(function(){});
+passadoHoje();
+carregarMotivos();
 api('GET','/api/skus').then(function(l){ (l||[]).forEach(function(s){ ESTADO.skus[String(s.codigo).toUpperCase()]=s; }); desenharListas(); }).catch(function(){});
 carregar();
 setInterval(function(){ if(!digitando() && !ESTADO.aberto && ESTADO.aba==='and') carregar(); }, 30000);

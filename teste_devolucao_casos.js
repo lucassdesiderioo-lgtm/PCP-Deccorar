@@ -61,7 +61,7 @@ db.exec(`
    Renato acompanha; a Ana lança. A régua de permissão é a do acesso.js de
    verdade: aqui ela é de mentira, mas a pergunta é a mesma (podePermissao). */
 const PERMS = {
-  1: new Set(['devolucao.lancar','devolucao.acompanhar','devolucao.dinheiro','devolucao.registrar','devolucao.baixar']),
+  1: new Set(['devolucao.lancar','devolucao.acompanhar','devolucao.dinheiro','devolucao.registrar','devolucao.baixar','listas.editar']),
   2: new Set(['devolucao.acompanhar']),
   3: new Set(['devolucao.lancar','devolucao.acompanhar','devolucao.baixar']),
   4: new Set(['devolucao.registrar'])
@@ -87,6 +87,12 @@ function chamar(metodo, rota, corpo, quem, params, query){
   const res = { status(c){ out.status=c; return res; }, json(b){ out.body=b; return res; },
                 sendFile(f){ out.arquivo=f; return res; }, type(){ return res; }, send(b){ out.body=b; return res; },
                 redirect(u){ out.status=302; out.para=u; return res; } };
+  /* O "via publicidade?" é obrigatório no lançamento (AJUSTE de 03/11/2026).
+     Os casos de antes dele não falam de publicidade, e mudar cada um mudaria
+     a entrada de 338 casos que não são sobre isso: quem não diz nada lança
+     com "não". Quem testa a obrigação manda a chave, mesmo vazia. */
+  if(metodo === 'POST' && rota === '/api/devolucao-casos' && corpo && !('publicidade' in corpo))
+    corpo = Object.assign({ publicidade:false }, corpo);
   const uid = quem || 1;
   h({ body: corpo||{}, params: params||{}, query: query||{}, headers:{}, usuario: quem === 'ninguem' ? null : {id:uid, nome:NOMES[uid]} }, res);
   return out;
@@ -874,6 +880,96 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   const ks = chavesDe(busca('55123', 2).body);
   ok('sem a chave: nenhum valor', !DINHEIRO_CHAVES.some(k => ks.has(k)), [...ks].join(','));
   ok('com a chave: o valor vem', (busca('55123', 1).body.casos || []).some(c => c.valor_ml === 99));
+
+  /* ── AJUSTE de 03/11/2026: publicidade, mensagem do ML, link da conversa ── */
+  secao('publicidade — obrigatória no lançamento, Sim ou Não');
+  const lan = (corpo, quem) => chamar('POST','/api/devolucao-casos', Object.assign({ tipo:'ml' }, corpo), quem || 3);
+  let rp = lan({ venda:'8800001', publicidade:undefined });
+  eq('sem a resposta: recusado', rp.status, 400);
+  ok('   e a recusa diz o que falta', /publicidade/i.test(rp.body.erro || ''), rp.body.erro);
+  eq('   e nada foi gravado', contar('devolucao_caso',"venda='8800001'"), 0);
+  eq('valor impossível: recusado', lan({ venda:'8800001', publicidade:'talvez' }).status, 400);
+  eq('vazio de propósito: recusado', lan({ venda:'8800001', publicidade:'' }).status, 400);
+  rp = lan({ venda:'8800001', publicidade:true });
+  eq('Sim lança', rp.status, 200);
+  const pSim = rp.body.id;
+  eq('   e grava 1', caso(pSim).publicidade, 1);
+  rp = lan({ venda:'8800002', publicidade:'nao' });
+  const pNao = rp.body.id;
+  eq('Não lança e grava 0', caso(pNao).publicidade, 0);
+  eq('"sim" em texto também vale', caso(lan({ venda:'8800003', publicidade:'sim' }).body.id).publicidade, 1);
+  ok('a lista leva a publicidade', daLista(chamar('GET','/api/devolucao-casos',null,2).body.ml, pSim).publicidade === 1);
+  ok('   e a busca também', (chamar('GET','/api/devolucao-casos/buscar',null,2,{},{ q:'8800001' }).body.casos || []).some(c => c.id === pSim && c.publicidade === 1));
+  ok('o lançamento conta na história', /publicidade/i.test(eventos(pSim)[0].texto || ''), eventos(pSim)[0].texto);
+
+  secao('publicidade — editar corrige, e campo ausente não apaga');
+  rp = chamar('POST','/api/devolucao-casos/:id/editar',{ obs:'outra coisa' }, 3, { id:pSim });
+  eq('editar outro campo não mexe na publicidade', caso(pSim).publicidade, 1);
+  rp = chamar('POST','/api/devolucao-casos/:id/editar',{ publicidade:false }, 3, { id:pSim });
+  eq('editar corrige para Não', caso(pSim).publicidade, 0);
+  ok('   e a história diz o que mudou', eventos(pSim).some(e => e.tipo === 'editado' && /publicidade: sim → não/.test(e.texto || '')), JSON.stringify(eventos(pSim).map(e=>e.texto)));
+  eq('editar para vazio é recusado', chamar('POST','/api/devolucao-casos/:id/editar',{ publicidade:'' }, 3, { id:pSim }).status, 400);
+  eq('   e o valor fica', caso(pSim).publicidade, 0);
+  chamar('POST','/api/devolucao-casos/:id/editar',{ publicidade:true }, 3, { id:pSim });
+
+  secao('publicidade — os casos de antes ficam "não informado"');
+  const LCp = require('./lancar_casos_iniciais');
+  ok('o script dos casos iniciais não manda publicidade, e não é recusado', typeof LCp.rodar === 'function');
+  db.prepare("INSERT INTO devolucao_caso (tipo,venda,etapa) VALUES ('ml','8800009','aguardando')").run();
+  const pVelho = db.prepare("SELECT id FROM devolucao_caso WHERE venda='8800009'").get().id;
+  eq('caso antigo: publicidade vazia, não zero', caso(pVelho).publicidade, null);
+
+  secao('publicidade — entra no relatório do mês');
+  const mesP = dia(0).slice(0,7);
+  const relP = chamar('GET','/api/devolucao-casos/relatorio',null,2,{},{ mes:mesP }).body;
+  ok('o relatório traz os três números', relP.publicidade && 'sim' in relP.publicidade && 'nao' in relP.publicidade && 'nao_informado' in relP.publicidade, JSON.stringify(relP.publicidade));
+  const casosMes = db.prepare("SELECT publicidade FROM devolucao_caso WHERE teste=0 AND substr(criado_em,1,7)=?").all(mesP);
+  eq('   o "sim" bate com o banco', relP.publicidade.sim, casosMes.filter(c => c.publicidade === 1).length);
+  eq('   o "não" bate com o banco', relP.publicidade.nao, casosMes.filter(c => c.publicidade === 0).length);
+  eq('   o "não informado" bate com o banco', relP.publicidade.nao_informado, casosMes.filter(c => c.publicidade == null).length);
+  eq('   e os três somam os casos', relP.publicidade.sim + relP.publicidade.nao + relP.publicidade.nao_informado, relP.casos);
+  ok('cada motivo diz quantos foram via publicidade', relP.por_motivo.every(l => typeof l.publicidade === 'number'), JSON.stringify(relP.por_motivo[0]));
+  eq('   e a soma por motivo é o "sim"', relP.por_motivo.reduce((a,l) => a + l.publicidade, 0), relP.publicidade.sim);
+
+  secao('mensagem do ML — texto longo, com quebra de linha');
+  const msgML = 'Olá, o comprador abriu uma reclamação.\n\nMotivo: chegou com defeito.\n' + 'x'.repeat(3000);
+  rp = lan({ venda:'8800010', publicidade:false, mensagem_ml:msgML });
+  const pMsg = rp.body.id;
+  eq('a mensagem é gravada inteira, com as quebras', caso(pMsg).mensagem_ml, msgML);
+  ok('   e a história não copia o texto', eventos(pMsg).every(e => (e.texto || '').length < 500));
+  chamar('POST','/api/devolucao-casos/:id/editar',{ mensagem_ml:'nova mensagem' }, 3, { id:pMsg });
+  eq('editar troca a mensagem', caso(pMsg).mensagem_ml, 'nova mensagem');
+  ok('   e a história diz só que mudou', eventos(pMsg).some(e => e.tipo === 'editado' && /mensagem do ML/.test(e.texto) && !/nova mensagem/.test(e.texto)), JSON.stringify(eventos(pMsg).map(e=>e.texto)));
+  chamar('POST','/api/devolucao-casos/:id/editar',{ obs:'x' }, 3, { id:pMsg });
+  eq('editar outro campo não apaga a mensagem', caso(pMsg).mensagem_ml, 'nova mensagem');
+  eq('mensagem grande demais é recusada', lan({ venda:'8800011', publicidade:false, mensagem_ml:'y'.repeat(20001) }).status, 400);
+
+  secao('link da conversa — só http(s), e abre direto');
+  const LINK = 'https://www.mercadolivre.com.br/vendas/reclamacoes/123456/detalhe';
+  rp = lan({ venda:'8800012', publicidade:false, link_ml:'  ' + LINK + '  ' });
+  const pLink = rp.body.id;
+  eq('o link é gravado sem os espaços', caso(pLink).link_ml, LINK);
+  ok('   e vem no detalhe do caso', chamar('GET','/api/devolucao-casos/:id',null,2,{ id:pLink }).body.caso.link_ml === LINK);
+  ['javascript:alert(1)', 'mercadolivre.com.br/x', 'ftp://a.b/c', 'https://a b.com', 'data:text/html,oi']
+    .forEach(l => eq('link "'+l+'" é recusado', lan({ venda:'8800013', publicidade:false, link_ml:l }).status, 400));
+  eq('link comprido demais é recusado', lan({ venda:'8800013', publicidade:false, link_ml:'https://a.com/'+'z'.repeat(2100) }).status, 400);
+  eq('editar com link impossível é recusado', chamar('POST','/api/devolucao-casos/:id/editar',{ link_ml:'javascript:x' }, 3, { id:pLink }).status, 400);
+  eq('   e o link fica', caso(pLink).link_ml, LINK);
+  chamar('POST','/api/devolucao-casos/:id/editar',{ link_ml:'' }, 3, { id:pLink });
+  eq('vazio de propósito apaga o link', caso(pLink).link_ml, null);
+
+  secao('passado em — nasce no dia do lançamento (AJUSTE de 03/11/2026)');
+  rp = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'8800020', prazo:dia(5), publicidade:false }, 3);
+  eq('coleta sem "passado em": grava o dia do lançamento', caso(rp.body.id).passado_em, dia(0));
+  rp = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'8800021', prazo:dia(5), passado_em:dia(-2), publicidade:false }, 3);
+  eq('com a data informada, vale a informada', caso(rp.body.id).passado_em, dia(-2));
+  eq('data impossível é recusada, e não vira hoje', chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'8800022', prazo:dia(5), passado_em:'2026-02-31', publicidade:false }, 3).status, 400);
+  rp = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8800023', publicidade:false }, 3);
+  eq('no "ML devolve" não há a quem passar: fica vazio', caso(rp.body.id).passado_em, null);
+
+  secao('motivos — o cadastro aparece para quem tem listas.editar');
+  eq('quem tem a chave vê o cadastro', chamar('GET','/api/devolucao-casos',null,1).body.pode.listas, true);
+  eq('quem não tem não vê', chamar('GET','/api/devolucao-casos',null,2).body.pode.listas, false);
 
   fim();
 })().catch(e => { console.log('ESTOUROU: ' + e.stack); falhas++; fim(); });
