@@ -1919,6 +1919,14 @@ dinheiro não vem junto.
 > por decisão de dinheiro (perda, comprador, reembolso) **não** se desliga
 > por aqui (409). A lista de revisões soltas mostra cada peça em cartão, com a
 > venda do caso em cima para comparar, e a Baixa tem o mesmo "Conferir no ML".
+>
+> ✅ **NO AR E CONFERIDO EM 03/11/2026** (PRs #259 e #260): o dono fez o
+> deploy e percorreu o roteiro na tela — a baixa dentro do caso encerrando o
+> "ML devolve", o "falta para encerrar", a peça revisada com o "Conferir no
+> ML ↗", o desligar com motivo (a baixa desfeita, o caso reaberto em
+> "Chegou"), a peça certa ligada nos cartões, a baixa e o "Já revisei" de novo
+> encerrando, e a peça errada de volta na Baixa sem caso — e disse *"bateu
+> tudo"*.
 
 **Rode `node teste_devolucao_casos.js` (729 casos) — e, na tela, `node teste_devolucao_casos_tela.js` (133) — ao mexer no
 `devcaso_dominio.js`, no `devcaso_route.js`, no bipe ou na baixa do
