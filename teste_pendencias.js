@@ -211,10 +211,12 @@ function semear(){
   ok('a frase da bancada lê o total', /\/api\/pendencias\/total/.test(aviso));
   ok('a Etiqueta de Venda mostra a linha das pendências', /id="pendAviso"/.test(emb) && /avisoPendencias\('pendAviso'\)/.test(emb));
   ok('e não tem botão de resolver', !/semetiqueta\/resolver|contaaberta\/resolver/.test(emb));
-  ok('a Conferência mostra a linha das pendências', /id="pendAviso"/.test(car) && /avisoPendencias\('pendAviso'\)/.test(car));
-  ok('a linha da Conferência não entra no redesenho de 4 s', !/function carregar\(\)[\s\S]{0,400}avisoPend/.test(car));
+  /* A LINHA SAIU DA CONFERÊNCIA em 03/11/2026 (CONFERENCIA-EXPEDICAO fase 1,
+     decisão do dono): ela é do Admin, não da bancada que confere. Fica na
+     Etiqueta de Venda e na TV. */
+  ok('a Conferência NÃO mostra mais a linha das pendências', !/pendAviso|avisoPendencias|pendencias_aviso/.test(car));
   ok('a TV mostra o número', /\/api\/pendencias\/total/.test(tv) && /id="kPend"/.test(tv));
-  ok('as três telas usam a mesma frase (pendencias_aviso.js)', [emb, car].every(t => /\/pendencias_aviso\.js/.test(t)));
+  ok('a Etiqueta de Venda usa a frase do pendencias_aviso.js', /\/pendencias_aviso\.js/.test(emb));
 
   console.log('\n── 5. a linha que não conta diz isso ──');
   db.exec('DROP TABLE devolucao');

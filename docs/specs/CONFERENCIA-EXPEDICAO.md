@@ -1,6 +1,6 @@
 # Conferência da expedição — tela enxuta, fechamento com prova e o que sobrou no fim do dia
 
-> **STATUS: planejado · 03/11/2026**
+> **STATUS: em construção · 03/11/2026 — fase 1 em código, falta subir**
 > Desenhada no Projeto do Claude com o Lucas em 03/11/2026. Nada construído.
 > Spec aprovada e salva no repositório em 03/11/2026; decisões em `docs/DECISOES.md`.
 >
@@ -21,10 +21,22 @@
 >
 > | Fase | O quê | Risco | Situação |
 > |---|---|---|---|
-> | 1 | Enxugar a tela: lista única com marcação Coleta / Agência | 🟡 | planejado |
+> | 1 | Enxugar a tela: lista única com marcação Coleta / Agência | 🟡 | **em código (03/11/2026), falta subir** |
 > | 2 | Fechamento da agência com foto e "quem levou" | 🔴 | planejado |
 > | 3 | Fim do dia: "a coleta não passou" e o selo "de ontem" | 🟡 | planejado |
 > | 4 | Venda cancelada: operador marca, gestão confirma, peça volta ao estoque | 🔴 | planejado |
+>
+> **Fase 1 em código (03/11/2026):** saíram da tela os quadros do topo (No
+> carro, Faltam no carro, Coleta esperando, Peças adiantadas), o "Conferir carga
+> do carro", a linha da central de pendências e — decisão do dono no "pode
+> seguir" — o "Ver as que faltam" da pilha, cujas caixas já estão na lista
+> única. A lista única (`listaUnica` no `carregamento.html`) junta as listas que
+> a rota já manda; **nenhuma rota mudou** (o `saiu_adiantado` e o `carregados`
+> ficam na rota, sem tela). Ficaram a viagem à agência e o ↩ Sobrou (ver
+> acima). O "Coleta esperando" também saiu: a conta está no cabeçalho de cada
+> parte da lista. `teste_carga.js` (67) ganhou a lista única executada.
+> Conferida no navegador a 1440 e a 400 px com dado semeado, sem rolar de lado.
+> Falta: subir e o dono conferir num dia real.
 
 ---
 

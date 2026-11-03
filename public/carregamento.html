@@ -26,23 +26,18 @@
      (abaixo de 900 px) empilha, o carro primeiro. */
   .duas{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;align-items:start}
   @media(max-width:900px){ .duas{grid-template-columns:1fr} }
-  .stats{display:flex;gap:12px;margin-bottom:14px}
-  /* No CELULAR (a viagem fecha por ele, decisao D3 da fase 4) os quatro
-     quadros nao cabem numa linha: sem quebrar, a pagina inteira rolava de
-     lado (481 px num celular de 400). */
-  @media(max-width:600px){ .stats{flex-wrap:wrap} .stat{flex:1 1 40%} }
-  .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
-  .stat .n{font-size:34px;font-weight:800}.stat .l{font-size:12px;color:var(--muted);text-transform:uppercase}
-  .stat.car .n{color:var(--green)}.stat.fal .n{color:var(--amber)}
   /* COLETA tem cor propria (violeta) nas duas telas — Etiqueta de Venda e aqui.
-     E a segunda porta de saida da fabrica, e a caixa dela NAO vai no carro:
-     uma cor que nao se confunde com "carregado" (verde) nem "falta" (ambar). */
-  .stat.col{border-color:#b9a3e6;background:#f6f2fd}.stat.col .n{color:var(--violet)}
-  /* ADIANTADO em azul: e a mesma cor do quadro "so despacham depois" logo
-     abaixo — os dois falam da venda de prazo futuro, um do que pode sair e o
-     outro do que ja saiu. O detalhe vem numa linha menor, sem caixa-alta. */
-  .stat.adi{border-color:#c9d8ee;background:#eef3fb}.stat.adi .n{color:var(--blue)}
-  .stat .s{font-size:12px;color:var(--muted);margin-top:4px}
+     E a segunda porta de saida da fabrica: uma cor que nao se confunde com
+     "conferida" (verde) nem "falta" (ambar). Os quatro quadros do topo (No
+     carro, Faltam no carro, Coleta esperando, Pecas adiantadas) SAIRAM em
+     03/11/2026 (CONFERENCIA-EXPEDICAO fase 1), junto com a linha da central
+     de pendencias: a conta esta no cabecalho de cada parte da lista unica. */
+  .tag.age{background:#e6f0fb;color:#1f4f8f;border:1px solid #b8cfee}
+  .lista1{margin-top:14px}
+  .lista1 .sub3{padding:10px 14px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--line);line-height:1.9}
+  .lista1 .sec{padding:10px 14px;font-size:14px;border-top:1px solid var(--line);background:#fafbfd}
+  .lista1 .sec.esp b{color:var(--amber)} .lista1 .sec.conf b{color:var(--green)}
+  .lista1 .sec .por{color:var(--muted);font-weight:400;margin-left:6px}
   .adiant{margin-top:10px;font-size:18px;font-weight:800;color:var(--blue)}
   .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:26px;text-align:center;margin-bottom:14px}
   .banner.ok{background:#e7f5eb;border-color:#a9d8b4}.banner.err{background:#fbe9e8;border-color:#efb1ad}.banner.warn{background:#fbf1db;border-color:#e7cb8c}
@@ -108,10 +103,6 @@
   .sobrouPecas .ok{color:#2e7d32}
   #sobrouTexto{width:100%;margin-top:8px;font-size:18px;padding:10px;border:2px solid var(--line);border-radius:10px;box-sizing:border-box}
   .sobrasCard .row .c{white-space:normal}
-  .tagok{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;margin-right:4px;
-    background:#e7f5eb;color:var(--green);border:1px solid #a9d8b4;white-space:nowrap}
-  .tagfalta{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;margin-right:4px;
-    background:#fbf1db;color:var(--amber);border:1px solid #e7cb8c;white-space:nowrap}
   .saidahead{background:var(--violet);color:#fff;font-weight:800;padding:12px 14px;font-size:15px}
   .saidaconta{padding:12px 14px;font-size:15px;border-bottom:1px solid #e3d9f5}
   .saidaconta .big{font-size:34px;font-weight:900;color:var(--violet);line-height:1.1}
@@ -157,28 +148,26 @@
 <header><div class="mark">C</div><div><h1>Conferência da etiqueta de venda</h1><div class="sub">Bipe a etiqueta de venda ao conferir a caixa — antes do carro ou do caminhão</div></div>
 <div class="links"><button class="link" style="background:none;cursor:pointer" onclick="trocarPessoa()">👤 Trocar de pessoa</button><a class="link" href="/embalagem">Expedição</a><a class="link" href="/painel">Painel</a></div></header>
 <div class="wrap">
-  <div class="stats">
-    <div class="stat car"><div class="n" id="nCar">0</div><div class="l">No carro</div></div>
-    <div class="stat fal"><div class="n" id="nFal">0</div><div class="l">Faltam no carro</div></div>
-    <div class="stat col"><div class="n" id="nCol">0</div><div class="l">Coleta esperando</div></div>
-    <div class="stat adi"><div class="n" id="nAdi">0</div><div class="l">Peças adiantadas hoje</div><div class="s" id="sAdi"></div></div>
-  </div>
-  <!-- A central de pendencias na bancada (fase 3, 27/10/2026): so a linha,
-       fora do redesenho de 4 s (pendencias_aviso.js, 60 s). -->
-  <div id="pendAviso"></div>
   <div class="banner" id="banner"><div class="bt">Pronto</div><div class="bs">Bipe o QR ou código de barras da etiqueta de venda.</div></div>
   <div class="modobar area" id="modoBar">O bipe agora: CONFERIR NA ÁREA</div>
   <input id="scan" autocomplete="off">
-  <button class="btn conf" onclick="conferir()" style="width:100%">✓ Conferir carga do carro</button>
   <button class="btn recusar" id="btnSobrou" onclick="modoSobrou()" style="width:100%;margin-top:8px">↩ Sobrou — a caixa volta para a prateleira</button>
   <div class="card sobrasCard" id="sobrasCard"><h3 id="sobrasT">↩ Sobras esperando decisão</h3><div id="sobrasL"></div></div>
   <div class="card pilha" id="pilhaCard"><h3>📋 Conferência da pilha — etiquetas impressas hoje</h3>
     <div class="pconta" id="pConta"></div>
     <details id="pAntD"><summary id="pAntS"></summary><div id="pAnt"></div></details>
-    <details id="pFalD"><summary id="pFalS"></summary><div id="pFaltam"></div></details>
     <div id="pVazio"></div><div id="pSeg"></div></div>
+  <!-- A LISTA UNICA (CONFERENCIA-EXPEDICAO fase 1, 03/11/2026): agencia e
+       coleta juntas, cada caixa com a marcacao. A modalidade vem do servidor
+       (carga.js); a tela so junta o que a rota ja manda (listaUnica). -->
+  <div class="card lista1" id="listaCard"><h3>📦 Caixas com etiqueta de venda</h3>
+    <div class="sub3">Bipe cada caixa para conferir. <span class="tag col">🟣 Coleta</span> o caminhão do Mercado Livre vem buscar — a caixa vai pro canto reservado. <span class="tag age">🚗 Agência</span> a gente leva no carro.</div>
+    <div class="sec esp" id="espT"></div><div id="espL"></div>
+    <div class="sec conf" id="confT"></div><div id="confL"></div>
+    <div id="depois"></div>
+  </div>
   <div class="duas">
-  <div class="card"><h3>🚗 Faltam carregar no carro (agência)</h3>
+  <div class="card"><h3>🚗 Agência — a viagem até a agência</h3>
     <!-- A VIAGEM A AGENCIA (fase 4): fechada, so o botao; aberta, o bipe poe no carro. -->
     <div class="fechbox" id="viagemBtnBox" style="border-top:0;border-bottom:1px solid var(--line)">
       <button class="btn" style="background:var(--blue);color:#fff" onclick="abrirViagem()">🚗 Viagem à agência</button>
@@ -207,16 +196,13 @@
       </div>
       <div id="viagemDiv"></div>
     </div>
-    <div id="lista"></div><div id="depois"></div><div id="viagemHist"></div></div>
+    <div id="viagemHist"></div></div>
 
   <!-- A COLETA: a segunda porta de saida. O caminhao do Mercado Livre vem
        buscar; a caixa vai pro lugar reservado, nunca pro carro. Bipa-se igual —
        o bipe e o que poe a caixa na conta que o motorista tem que bater. -->
   <div class="card col" id="colCard">
-    <h3>🚚 Coleta — o caminhão do Mercado Livre vem buscar</h3>
-    <div class="sub2">Essas caixas <b>não vão no carro</b>. Bipe cada uma ao levar pro lugar reservado. Quando o caminhão chegar, abra a <b>Saída do caminhão</b>: bipe o que ficou, tire a foto da tela do celular do motorista e digite o número.</div>
-    <div id="colFaltam"></div>
-    <div id="colAguard"></div>
+    <h3>🚚 Coleta — a saída do caminhão do Mercado Livre</h3>
     <!-- A SAIDA DO CAMINHAO: fechada, so o botao; aberta, o bipe vira SOBRA. -->
     <div class="fechbox" id="saidaBtnBox">
       <button class="btn fech" onclick="abrirSaida()">🚚 Saída do caminhão</button>
@@ -246,7 +232,6 @@
   </div>
 </div>
 <script src="/sku.js"></script>
-<script src="/pendencias_aviso.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 let last={c:null,t:0};
@@ -560,12 +545,46 @@ function mostrar(r,code){
    lista que nunca zera — e lista que nunca zera ninguem le ate o fim. */
 function dataBR(s){ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?(m[3]+'/'+m[2]):''; }
 function horaDe(s){ var p=String(s||'').split(' '); return (p[1]||'').slice(0,5); }
+/* A LISTA UNICA (CONFERENCIA-EXPEDICAO fase 1, 03/11/2026). Agencia e coleta
+   numa lista so, cada caixa com a marcacao. A tela NAO decide o que e coleta:
+   junta as tres listas que a rota ja manda, e a modalidade de cada uma vem do
+   carga.js (dono unico de "isto e coleta?").
+     esperando  = agencia ainda nao conferida (`faltam`, conferida=0)
+                + coleta com etiqueta ainda fora do canto (`coleta.faltam`)
+     conferidas = agencia conferida na area, esperando o carro (conferida=1)
+                + coleta no canto, esperando o caminhao (`coleta.aguardando`)
+   A de dia anterior vem em cima (armadilha #9: atraso tem que gritar). A
+   venda futura continua fora da conta, na linha "so despacham depois". */
+function listaUnica(d){
+  var col=(d&&d.coleta)||{}, age=((d&&d.faltam)||[]);
+  function marca(m){ return function(f){ return Object.assign({},f,{modal:m}); }; }
+  function ordem(a,b){ return ((b.atrasado||0)-(a.atrasado||0))
+    || String(a.data||'').localeCompare(String(b.data||'')) || ((a.id||0)-(b.id||0)); }
+  var esperando=age.filter(function(f){ return f.conferida!==1; }).map(marca('agencia'))
+    .concat((col.faltam||[]).map(marca('coleta'))).sort(ordem);
+  var conferidas=age.filter(function(f){ return f.conferida===1; }).map(marca('agencia'))
+    .concat((col.aguardando||[]).map(marca('coleta')));
+  return {esperando:esperando, conferidas:conferidas};
+}
+function tagModal(f){ return f.modal==='coleta' ? '<span class="tag col">🟣 Coleta</span>' : '<span class="tag age">🚗 Agência</span>'; }
 function linha(f){
   return '<div class="row"><span class="who">'
-    +(f.atrasado?'<b style="color:var(--amber)">⏳ de '+dataBR(f.data)+'</b> · ':'')
-    +(f.modalidade!=='coleta' && f.conferida===1?'<span class="tagok">✓ na área</span>':'')
-    +(f.modalidade!=='coleta' && f.conferida===0?'<span class="tagfalta">falta conferir</span>':'')
-    +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+skuDaLinha(f)+'</span>'+pecasLinhas(f.itens)+'</span></div>';
+    +(f.atrasado?'<span class="tag ant">⏳ de '+dataBR(f.data)+'</span>':'')
+    +tagModal(f)+esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+skuDaLinha(f)
+    +(f.modal==='coleta'&&f.carregado_em?' · no canto desde '+horaDe(f.carregado_em):'')
+    +'</span>'+pecasLinhas(f.itens)+'</span></div>';
+}
+function porModal(l){ var c=l.filter(function(f){ return f.modal==='coleta'; }).length, a=l.length-c;
+  return l.length ? '<span class="por">🟣 coleta '+c+' · 🚗 agência '+a+'</span>' : ''; }
+function desenharLista(d){
+  var u=listaUnica(d), col=d.coleta||{};
+  $('#espT').innerHTML='<b>Esperando conferência: '+u.esperando.length+'</b>'+porModal(u.esperando);
+  $('#espL').innerHTML=u.esperando.length ? u.esperando.map(linha).join('')
+    : '<div class="empty">✅ Nenhuma caixa esperando conferência.</div>';
+  $('#confT').innerHTML='<b>Conferidas, esperando sair: '+u.conferidas.length+'</b>'+porModal(u.conferidas);
+  $('#confL').innerHTML=u.conferidas.length ? u.conferidas.map(linha).join('')
+    : '<div class="empty" style="color:var(--muted)">Nenhuma caixa conferida esperando sair'
+      +(col.retiradas_hoje?' — '+col.retiradas_hoje+' já retirada'+(col.retiradas_hoje===1?'':'s')+' pelo caminhão hoje':'')+'.</div>';
 }
 /* A PILHA (carga.js → pilhaDaArea). A caixa conferida e a que foi bipada aqui
    — no carro ou no canto da coleta. "Sem segunda pessoa" e HISTORIA: a caixa
@@ -594,11 +613,9 @@ function desenharPilha(p){
   $('#pAntS').textContent='⏳ '+na+(na===1?' caixa impressa em dia anterior e ainda não conferida'
                                         :' caixas impressas em dias anteriores e ainda não conferidas');
   $('#pAnt').innerHTML=p.anteriores.map(function(f){ return linhaPilha(f,true); }).join('');
-  var fd=$('#pFalD'); fd.style.display=h.faltam?'':'none';
-  $('#pFalS').textContent='Ver as '+h.faltam+' que faltam conferir';
-  if(h.faltam===1) $('#pFalS').textContent='Ver a que falta conferir';
-  $('#pFaltam').innerHTML=p.faltam.map(function(f){ return linhaPilha(f,false); }).join('');
-  $('#pVazio').innerHTML = h.faltam ? ''
+  /* "Ver as que faltam" SAIU (03/11/2026, decisao do dono): as mesmas caixas
+     estao na lista unica, em "Esperando conferencia". */
+  $('#pVazio').innerHTML = h.faltam ? '<div class="pnota">As que faltam estão na lista <b>Esperando conferência</b>, logo abaixo.</div>'
     : (h.impressas ? '<div class="empty">✅ Todas as impressas hoje foram conferidas.</div>'
                    : '<div class="empty" style="color:var(--muted)">Nenhuma etiqueta impressa hoje ainda.</div>');
   var notas=[];
@@ -621,24 +638,10 @@ async function carregar(){
   desenharPilha(d.pilha);
   desenharSobras();
   const col=d.coleta||{faltam:[],aguardando:[],fechamentos:[],retiradas_hoje:0};
-  $('#nCar').textContent=d.carregados; $('#nFal').textContent=d.faltam.length;
-  $('#nCol').textContent=col.aguardando.length;
-  /* PECAS QUE SAIRAM ADIANTADAS (carga.js): agencia pelo bipe no carro,
-     coleta quando o caminhao leva. A linha de baixo diz de qual porta vieram
-     e os 30 dias; as caixas so aparecem quando nao batem com as pecas. */
-  var ad=d.saiu_adiantado||{hoje:{pecas:0,caixas:0,agencia:0,coleta:0},periodo:{dias:30,pecas:0,caixas:0}};
-  $('#nAdi').textContent=ad.hoje.pecas;
-  /* Duas linhas, e cada pedaco inteiro: no card estreito do tablet a quebra
-     caia no meio ("coleta / 1", "5 / pecas") e o numero se separava do que
-     ele conta. */
-  var pedaco=function(t){ return '<span style="white-space:nowrap">'+t+'</span>'; };
-  var partes=[];
-  if(ad.hoje.pecas && ad.hoje.caixas!==ad.hoje.pecas) partes.push(pedaco(ad.hoje.caixas+' caixa'+(ad.hoje.caixas===1?'':'s')));
-  if(ad.hoje.agencia && ad.hoje.coleta) partes.push(pedaco('carro '+ad.hoje.agencia)+' · '+pedaco('coleta '+ad.hoje.coleta));
-  else if(ad.hoje.coleta) partes.push(pedaco('todas pela coleta'));
-  $('#sAdi').innerHTML=(partes.length?'<div>'+partes.join(' · ')+'</div>':'')
-    +'<div>'+pedaco('últimos '+ad.periodo.dias+' dias: '+ad.periodo.pecas+' peça'+(ad.periodo.pecas===1?'':'s'))+'</div>';
-  $('#lista').innerHTML = d.faltam.length ? d.faltam.map(linha).join('') : '<div class="empty">✅ Nada faltando — carro completo!</div>';
+  /* Os quadros do topo e as duas colunas (carro e canto) sairam em 03/11/2026:
+     tudo o que se confere esta na lista unica. `saiu_adiantado` e `carregados`
+     continuam na rota, para quem ler; a tela nao os mostra mais. */
+  desenharLista(d);
   /* A venda futura aparece, mas fora da cobranca: ela existe e esta na
      fabrica (nao pode sumir, foi esse o buraco), so nao e carga de hoje. */
   var dp=document.getElementById('depois');
@@ -649,23 +652,7 @@ async function carregar(){
       +d.depois.slice(0,6).map(function(f){ return esc0(f.buyer)+' ('+dataBR(f.despachar_em)+')'; }).join(', ')
       +(d.depois.length>6?'…':'')+'</div>'
     : '';
-  /* O CANTO DA COLETA, em duas partes: o que ainda falta bipar (etiqueta
-     impressa, caixa ainda na bancada) e o que ja esta la esperando o
-     caminhao. O card so some quando nao ha nada de coleta em lugar nenhum —
-     hoje e o primeiro dia dessa modalidade e a equipe precisa VER onde ela
-     mora na tela. */
-  /* O card da coleta fica SEMPRE visível: ele é a coluna da direita, e sumir
-     com ele deslocaria o carro pro meio da tela. Sem nada de coleta, escreve
-     que não há nada — que também é resposta. */
   $('#colCard').style.display = '';
-  $('#colFaltam').innerHTML = col.faltam.length
-    ? '<div class="hist" style="border-top:0"><b>Faltam bipar pra coleta: '+col.faltam.length+'</b></div>'+col.faltam.map(linha).join('')
-    : '';
-  $('#colAguard').innerHTML = col.aguardando.length
-    ? '<div class="hist"><b style="color:#4b2a91">No lugar reservado, esperando o caminhão: '+col.aguardando.length+'</b></div>'
-      +col.aguardando.map(function(f){ return '<div class="row"><span class="who">'+esc0(f.buyer)
-        +' <span class="c">NF '+esc0(f.nf||'—')+skuDaLinha(f)+' · '+horaDe(f.carregado_em)+'</span>'+pecasLinhas(f.itens)+'</span></div>'; }).join('')
-    : '<div class="empty" style="color:var(--muted)">Nenhuma caixa esperando o caminhão'+(col.retiradas_hoje?' — '+col.retiradas_hoje+' já retirada'+(col.retiradas_hoje===1?'':'s')+' hoje':'')+'.</div>';
   /* A saida do caminhao: aberta no banco, a tela entra no modo e busca o
      retrato (a conta, as sobras e o que pode ter ido fora da conta). */
   if(col.saida_aberta){
@@ -696,16 +683,6 @@ async function carregar(){
       +(f.fechado_por?' · '+esc0(f.fechado_por):'')+(f.obs?' · '+esc0(f.obs):'')
       +(f.tem_foto?' · <a href="/api/coleta/foto/'+f.id+'" target="_blank" style="color:#4b2a91;font-weight:700">📷 ver a foto</a>':'')+'</div>';
   }).join('');
-}
-async function conferir(){
-  const d=await (await fetch('/api/carregamento')).json();
-  /* "Sem lote" olha o que FALTA, nao o dia: com volume atrasado esperando, o
-     aviso de dia vazio mandaria fechar o carro por cima dele. */
-  if(d.total===0){ banner('warn','Nada pra carregar no carro','Nenhum volume de agência embalado esperando.'); return; }
-  if(d.faltam.length===0){ banner('ok','Carga do carro completa ✓','Pode fechar o carro. '+d.carregados+' pacotes conferidos.'); beep(true); }
-  else{ banner('err','Faltam '+d.faltam.length+' no carro',
-    (d.atrasados?'<b>'+d.atrasados+' de dias anteriores.</b> ':'')
-    +'NÃO feche ainda: '+d.faltam.slice(0,6).map(f=>esc0(f.buyer)).join(', ')+(d.faltam.length>6?'…':'')); beep(false); }
 }
 /* FECHAR A COLETA: o motorista diz quantas bipou, o sistema compara com as
    que estao no canto. Bateu, as caixas saem do canto e fica registrado. Nao
@@ -795,11 +772,10 @@ function desenharSaida(){
   var ab=!!(saidaAtual&&saidaAtual.saida);
   pintarModo();
   $('#saidaBtnBox').style.display=ab?'none':'';
-  /* Aberta, as listas do canto somem: elas repetiam as mesmas caixas da conta
-     e empurravam o painel da saida para fora da tela (1440 x 900). A conta e
-     as sobras sao o que importa agora; a lista volta quando a saida fecha. */
-  $('#colFaltam').style.display=ab?'none':'';
-  $('#colAguard').style.display=ab?'none':'';
+  /* Aberta, a lista unica some: ela repetia as mesmas caixas da conta e
+     empurrava o painel da saida para fora da tela (1440 x 900). A conta e as
+     sobras sao o que importa agora; a lista volta quando a saida fecha. */
+  $('#listaCard').style.display=ab?'none':'';
   $('#saidaBox').style.display=ab?'':'none';
   if(!ab){ $('#saidaDiv').innerHTML=''; return; }
   var sa=saidaAtual, nS=(sa.sobras||[]).length;
@@ -1005,6 +981,5 @@ function beep(ok){ try{const a=new (window.AudioContext||window.webkitAudioConte
 const DIGITACAO=['motQtd','motivoLib','atQtd','motivoLibV','sobrouTexto'];
 function digitando(){ var a=document.activeElement; return !!(a && DIGITACAO.indexOf(a.id)>=0); }
 carregar(); setInterval(function(){ if(!digitando()) carregar(); },4000);
-window.avisoPendencias && window.avisoPendencias('pendAviso');
 </script><script src="/nav.js"></script>
 </body></html>
