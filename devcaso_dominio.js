@@ -82,6 +82,13 @@ function garantir(db){
      ≥ 2 dias entra no parado). O ALTER fica ao lado do CREATE, no fim da
      tabela, para o banco que nasceu antes desta fase (§17). */
   try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN valor_ml_desde TEXT"); }catch(e){}
+  /* AJUSTE de 03/11/2026 (pedido do dono): a venda veio de publicidade (1),
+     não veio (0) ou o caso é de antes da pergunta (NULL, "não informado");
+     a mensagem que o ML mandou, colada inteira; e o link da conversa da
+     reclamação, para o caso abrir direto nela. No fim da tabela (§17). */
+  try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN publicidade INTEGER"); }catch(e){}
+  try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN mensagem_ml TEXT"); }catch(e){}
+  try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN link_ml TEXT"); }catch(e){}
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_venda ON devolucao_caso(venda)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_aberto ON devolucao_caso(encerrado_em)");
   db.exec(`CREATE TABLE IF NOT EXISTS devolucao_evento (
@@ -274,8 +281,37 @@ function aberto(db, id){
 }
 const nomeDe = (u) => (u && u.nome) || null;
 
+/* "Via publicidade?" — Sim ou Não, e nada mais. Vazio não é "não": seria o
+   esquecimento contando como resposta (o custo vazio do R9 pela outra porta). */
+function publicidadeValida(v){
+  if(v === true || v === 1 || v === '1') return 1;
+  if(v === false || v === 0 || v === '0') return 0;
+  const t = String(v == null ? '' : v).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(t === 'sim') return 1;
+  if(t === 'nao') return 0;
+  throw new Recusa(400, 'Diga se a venda foi via publicidade: Sim ou Não.');
+}
+/* O link da conversa vira um botão que abre noutra aba: só http(s), sem
+   espaço, e de tamanho de link. "javascript:" ali seria código rodando na
+   sessão de quem clica. Vazio de propósito apaga. */
+const LINK_MAX = 2000, MENSAGEM_MAX = 20000;
+function linkValido(v){
+  const s = String(v == null ? '' : v).trim();
+  if(!s) return null;
+  if(s.length > LINK_MAX || !/^https?:\/\/[^\s<>"']+$/i.test(s))
+    throw new Recusa(400, 'O link da conversa tem que ser o endereço inteiro, começando com https://');
+  return s;
+}
+function mensagemValida(v){
+  const s = String(v == null ? '' : v).replace(/\r\n/g, '\n').trim();
+  if(!s) return null;
+  if(s.length > MENSAGEM_MAX) throw new Recusa(400, 'A mensagem do ML passou de '+MENSAGEM_MAX.toLocaleString('pt-BR')+' letras. Cole só a parte que importa.');
+  return s;
+}
+const simNao = (v) => v === 1 ? 'sim' : v === 0 ? 'não' : '—';
+
 /* ── escritas ── */
-function lancar(db, b, usuario){
+function lancar(db, b, usuario, opt){
   b = b || {};
   const tipo = String(b.tipo||'').trim();
   if(!ETAPAS[tipo]) throw new Recusa(400, 'Escolha o tipo: "ML devolve" ou "Nós coletamos".');
@@ -289,6 +325,18 @@ function lancar(db, b, usuario){
     if(!prazo) throw new Recusa(400, 'No "Nós coletamos" o prazo do ML (resolver até) é obrigatório.');
   }
   const motivo = motivoValido(db, b.motivo);
+  /* Obrigatória no lançamento (decisão do dono, 03/11/2026). Só o script dos
+     casos iniciais, que é de antes da pergunta, lança sem ela. */
+  const publicidade = (opt && opt.semPublicidade && b.publicidade === undefined) ? null : publicidadeValida(b.publicidade);
+  const mensagem_ml = mensagemValida(b.mensagem_ml), link_ml = linkValido(b.link_ml);
+  /* "Passado em" é o dia do lançamento (dono, 03/11/2026): no "nós coletamos"
+     ele nasce hoje quando não vem, e a data informada vale. Data impossível é
+     recusada — virar hoje em silêncio esconderia o erro de quem digitou. */
+  let passado_em = null;
+  if(String(b.passado_em == null ? '' : b.passado_em).trim()){
+    passado_em = dataValida(b.passado_em);
+    if(!passado_em) throw new Recusa(400, 'Data impossível em "passado em".');
+  } else if(tipo === 'coleta') passado_em = hoje(db);
 
   // R2: achar o volume pela venda (ou pelo pack bipado no lugar), ou pela NF.
   const lt = buscarLote(db, venda || pack) || buscarLotePorNF(db, nf);
@@ -305,23 +353,24 @@ function lancar(db, b, usuario){
   let id;
   db.transaction(() => {
     id = db.prepare(`INSERT INTO devolucao_caso (tipo,venda,pack_id,nf,sku,comprador,lote_id,motivo,etapa,prazo,
-        responsavel,passado_em,cep,valor_ml,valor_ml_situacao,obs,criado_por)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+        responsavel,passado_em,cep,valor_ml,valor_ml_situacao,obs,criado_por,publicidade,mensagem_ml,link_ml)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
         tipo, venda || null, pack || null, nf || null,
         txt(b.sku) || (lt ? lt.codigo : null), txt(b.comprador) || (lt ? lt.buyer : null), lt ? lt.id : null,
         motivo, etapa, prazo,
-        txt(b.responsavel), dataValida(b.passado_em), txt(b.cep),
+        txt(b.responsavel), passado_em, txt(b.cep),
         b._valor_ml === undefined ? null : b._valor_ml, b._valor_ml_situacao || null,
-        txt(b.obs), nomeDe(usuario)).lastInsertRowid;
+        txt(b.obs), nomeDe(usuario), publicidade, mensagem_ml, link_ml).lastInsertRowid;
     if(b._valor_ml_situacao) db.prepare("UPDATE devolucao_caso SET valor_ml_desde=datetime('now','localtime') WHERE id=?").run(id);
-    evento(db, id, 'lancado', null, etapa, (tipo === 'coleta' ? 'Nós coletamos' : 'ML devolve') + (prazo ? ' · prazo '+prazo.split('-').reverse().join('/') : ''), nomeDe(usuario));
+    evento(db, id, 'lancado', null, etapa, (tipo === 'coleta' ? 'Nós coletamos' : 'ML devolve') + (prazo ? ' · prazo '+prazo.split('-').reverse().join('/') : '') +
+      (publicidade == null ? '' : ' · via publicidade: '+simNao(publicidade)), nomeDe(usuario));
   })();
   return ler(db, id);
 }
 
 /* Editar o que foi lançado. CAMPO AUSENTE NÃO É CAMPO VAZIO (§6, #25): só o
    que veio no corpo muda, e o resto fica como está. */
-const EDITAVEIS = ['motivo','nf','sku','comprador','responsavel','passado_em','cep','obs'];
+const EDITAVEIS = ['motivo','nf','sku','comprador','responsavel','passado_em','cep','obs','publicidade','mensagem_ml','link_ml'];
 function editar(db, id, b, usuario){
   const c = aberto(db, id);
   b = b || {};
@@ -332,9 +381,18 @@ function editar(db, id, b, usuario){
     let v = b[k];
     if(k === 'motivo') v = motivoValido(db, v);
     else if(k === 'passado_em'){ v = (v === '' || v == null) ? null : dataValida(v); if(b[k] && !v) throw new Recusa(400, 'Data impossível em "passado em".'); }
+    else if(k === 'publicidade') v = publicidadeValida(v);
+    else if(k === 'mensagem_ml') v = mensagemValida(v);
+    else if(k === 'link_ml') v = linkValido(v);
     else { v = String(v == null ? '' : v).trim() || null; }
     if((c[k] == null ? null : c[k]) === v) continue;
-    sets.push(k+'=?'); vals.push(v); mud.push(k+': '+(c[k]==null?'—':c[k])+' → '+(v==null?'—':v));
+    sets.push(k+'=?'); vals.push(v);
+    /* A mensagem e o link não vão para a história: a mensagem é longa, e quem
+       lê a história quer saber que mudou, não reler o texto. */
+    if(k === 'publicidade') mud.push('publicidade: '+simNao(c[k])+' → '+simNao(v));
+    else if(k === 'mensagem_ml') mud.push('mensagem do ML '+(v == null ? 'apagada' : c[k] == null ? 'colada' : 'trocada'));
+    else if(k === 'link_ml') mud.push('link da conversa '+(v == null ? 'apagado' : c[k] == null ? 'colado' : 'trocado'));
+    else mud.push(k+': '+(c[k]==null?'—':c[k])+' → '+(v==null?'—':v));
   }
   if(!sets.length) return c;
   db.transaction(() => {
@@ -769,9 +827,10 @@ function relatorio(db, mes, comDinheiro){
   }catch(e){}
   const SEM = 'sem motivo';
   const por = new Map();
-  const linha = (m) => { const k = m || SEM; if(!por.has(k)) por.set(k, { motivo:k, qtd:0, casos:0, sem_caso:0, perda_prazo:0, devolvido_comprador:0 }); return por.get(k); };
+  const linha = (m) => { const k = m || SEM; if(!por.has(k)) por.set(k, { motivo:k, qtd:0, casos:0, sem_caso:0, publicidade:0, perda_prazo:0, devolvido_comprador:0 }); return por.get(k); };
   for(const c of casos){
     const l = linha(c.motivo); l.qtd++; l.casos++;
+    if(c.publicidade === 1) l.publicidade++;
     if(c.saida === 'perda_prazo' && c.valor_perdido != null) l.perda_prazo += c.valor_perdido;
     if(c.saida === 'devolvido_comprador' && c.valor_devolvido != null) l.devolvido_comprador += c.valor_devolvido;
   }
@@ -779,9 +838,13 @@ function relatorio(db, mes, comDinheiro){
   const r2 = (v) => Math.round(v * 100) / 100;
   const por_motivo = Array.from(por.values()).sort((a,b) => b.qtd - a.qtd || a.motivo.localeCompare(b.motivo))
     .map(l => comDinheiro ? Object.assign(l, { perda_prazo:r2(l.perda_prazo), devolvido_comprador:r2(l.devolvido_comprador) })
-                          : { motivo:l.motivo, qtd:l.qtd, casos:l.casos, sem_caso:l.sem_caso });
+                          : { motivo:l.motivo, qtd:l.qtd, casos:l.casos, sem_caso:l.sem_caso, publicidade:l.publicidade });
   const out = { mes, total: casos.length + semCaso.length, casos: casos.length, sem_caso: semCaso.length, por_motivo,
-                por_saida: casos.reduce((a,c) => { if(c.saida) a[c.saida] = (a[c.saida]||0) + 1; return a; }, {}) };
+                por_saida: casos.reduce((a,c) => { if(c.saida) a[c.saida] = (a[c.saida]||0) + 1; return a; }, {}),
+                /* Só os casos: a devolução recebida sem caso não tem a pergunta. */
+                publicidade: { sim: casos.filter(c => c.publicidade === 1).length,
+                               nao: casos.filter(c => c.publicidade === 0).length,
+                               nao_informado: casos.filter(c => c.publicidade == null).length } };
   if(comDinheiro){
     const coleta = casos.filter(c => c.tipo === 'coleta');
     const ids = coleta.map(c => c.id);

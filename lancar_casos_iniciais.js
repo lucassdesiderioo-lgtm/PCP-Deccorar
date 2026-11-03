@@ -59,7 +59,7 @@ async function rodar(db, opt){
         tipo:'coleta', venda:x.c.venda, nf:x.c.nf, sku: x.lt ? null : x.c.sku, prazo:x.c.prazo,
         responsavel:'Renato', passado_em:'2026-10-29', obs:x.obs || null,
         _valor_ml:x.c.valor, _valor_ml_situacao:x.c.situacao
-      }, AUTOR);
+      }, AUTOR, { semPublicidade:true });   // os 6 são de antes da pergunta: "não informado"
       r.lancados.push(caso.id);
     }
   })();
