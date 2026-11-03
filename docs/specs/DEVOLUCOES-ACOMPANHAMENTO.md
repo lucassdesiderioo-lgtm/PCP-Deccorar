@@ -72,6 +72,8 @@ Mudanças no caminho:
     "↩ Desfazer" a última mudança de etapa, só por quem a fez, voltando com a data de antes;
     e o aviso "mesmo comprador" (só avisa, os casos continuam separados). O CEP pela NF não
     entrou: o PCP não grava o CEP da venda (fica para plano à parte, no parse).
+  · AJUSTE de 03/11 (3): o motivo se escolhe no alto do caso, e o motivo removido da lista
+    continua no caso que já o usa.
 ```
 
 > Desenhada no Projeto do Claude entre 29/10 e 03/11/2026, com o Lucas.

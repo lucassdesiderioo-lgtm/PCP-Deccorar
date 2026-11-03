@@ -358,7 +358,7 @@ function desenharCaso(d){
   h+='<div class="dados">'+
     '<div><b>Venda</b>'+esc(c.venda||'—')+'</div><div><b>Pack</b>'+esc(c.pack_id||'—')+'</div><div><b>NF</b>'+esc(c.nf||'—')+'</div>'+
     '<div><b>SKU</b>'+esc(c.sku||'—')+(pecaDe(c.sku)?'<br><small>'+esc(pecaDe(c.sku))+'</small>':'')+'</div>'+
-    '<div><b>Comprador</b>'+esc(c.comprador||'—')+'</div><div><b>Motivo</b>'+esc(c.motivo||'—')+'</div>'+
+    '<div><b>Comprador</b>'+esc(c.comprador||'—')+'</div>'+celulaMotivo(c, P, aberto)+
     '<div><b>Via publicidade</b>'+simNao(c.publicidade)+'</div>'+
     (c.tipo==='coleta'?'<div><b>Resolver até</b>'+dataBR(c.prazo)+(c.prazo_original?'<br><small>original: '+dataBR(c.prazo_original)+'</small>':'')+'</div>'+
       '<div><b>Responsável</b>'+esc(c.responsavel||'—')+'</div><div><b>Passado em</b>'+dataBR(c.passado_em)+'</div>':'')+
@@ -389,7 +389,9 @@ function desenharCaso(d){
     }
   }
   if(aberto && P.lancar){
-    var ops=['<option value="">— sem motivo —</option>'].concat(ESTADO.motivos.map(function(m){ return '<option'+(m===c.motivo?' selected':'')+'>'+esc(m)+'</option>'; })).join('');
+    var ops=['<option value="">— sem motivo —</option>'].concat(ESTADO.motivos.map(function(m){ return '<option'+(m===c.motivo?' selected':'')+'>'+esc(m)+'</option>'; })).join('')+
+      // o motivo que saiu da lista continua no caso, e não pode sumir ao salvar outro campo
+      (c.motivo && ESTADO.motivos.indexOf(c.motivo)<0 ? '<option selected>'+esc(c.motivo)+'</option>' : '');
     h+='<div class="bloco"><h3>Editar o lançamento</h3><div class="grade">'+
       '<div><label>Motivo</label><select id="eMotivo">'+ops+'</select></div>'+
       '<div><label>NF</label><input id="eNf" value="'+esc(c.nf||'')+'"></div>'+
@@ -413,6 +415,17 @@ function desenharCaso(d){
   document.getElementById('painel').innerHTML=h;
   document.getElementById('fundo').style.display='block';
   ligarCaso(d, c);
+}
+/* O MOTIVO SE ESCOLHE NO ALTO DO CASO (AJUSTE de 03/11/2026, dono: "uma vez
+   lançado não conseguimos mais colocar o motivo"). Ele já se editava, mas só
+   lá embaixo, no "Editar o lançamento", e no alto aparecia como texto. Aqui
+   ele salva ao escolher, pela mesma rota e chave do editar (devolucao.lancar);
+   vazio fica âmbar, porque caso sem motivo some do relatório por motivo. */
+function celulaMotivo(c, P, aberto){
+  if(!(aberto && P.lancar)) return '<div><b>Motivo</b>'+esc(c.motivo||'—')+'</div>';
+  var ops=['<option value="">'+(c.motivo?'— tirar o motivo —':'— escolha o motivo —')+'</option>'].concat(ESTADO.motivos.map(function(m){ return '<option'+(m===c.motivo?' selected':'')+'>'+esc(m)+'</option>'; }));
+  if(c.motivo && ESTADO.motivos.indexOf(c.motivo)<0) ops.push('<option selected>'+esc(c.motivo)+'</option>');
+  return '<div><b>Motivo</b><select id="qMotivo" style="margin-top:2px'+(c.motivo?'':';border-color:var(--amber);color:var(--amber)')+'">'+ops.join('')+'</select></div>';
 }
 function nomeEvento(e, nomes){
   var n=function(x){ return nomes[x]||x||'—'; };
@@ -446,6 +459,7 @@ function ligarCaso(d, c){
   if((x=document.getElementById('btProrr'))) x.onclick=function(){ acao(base+'/prorrogacao',{}); };
   if((x=document.getElementById('btChegou'))) x.onclick=function(){ acao(base+'/chegou',{}); };
   if((x=document.getElementById('btDesfazer'))) x.onclick=function(){ acao(base+'/desfazer-etapa',{}); };
+  if((x=document.getElementById('qMotivo'))) x.onchange=function(){ acao(base+'/editar',{ motivo:this.value }); };
   document.querySelectorAll('#painel [data-irmao]').forEach(function(b){ b.onclick=function(){ abrir(+b.getAttribute('data-irmao')); }; });
   if((x=document.getElementById('btAvisoML'))) x.onclick=function(){ acao(base+'/aviso-ml',{}); };
   if((x=document.getElementById('btPrazo'))) x.onclick=function(){ acao(base+'/prazo',{prazo:document.getElementById('novoPrazo').value}); };

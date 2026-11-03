@@ -1052,6 +1052,15 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   const vm = chamar('GET','/api/devolucao-casos/venda/:cod',null,3,{ cod:'8800059' }).body;
   eq('ao lançar, a venda achada avisa os casos abertos do comprador', JSON.stringify((vm.comprador_casos || []).map(x => x.id)), JSON.stringify([m1, m2, m3]));
 
+  secao('motivo removido da lista — o caso que já usa ele não perde');
+  db.prepare("INSERT INTO listas (tipo,valor,ordem,ativo) VALUES ('motivo_devolucao','Motivo que vai sair',99,1)").run();
+  const mr = lanC({ venda:'8800060', motivo:'Motivo que vai sair' }).body.id;
+  db.prepare("UPDATE listas SET ativo=0 WHERE tipo='motivo_devolucao' AND valor='Motivo que vai sair'").run();
+  rp = chamar('POST','/api/devolucao-casos/:id/editar',{ motivo:'Motivo que vai sair', obs:'mudei só a observação' }, 3, { id:mr });
+  eq('editar outro campo mandando o mesmo motivo passa', rp.status, 200);
+  eq('   e o motivo fica', caso(mr).motivo, 'Motivo que vai sair');
+  eq('trocar PARA um motivo removido é recusado', chamar('POST','/api/devolucao-casos/:id/editar',{ motivo:'Motivo que vai sair' }, 3, { id:m1 }).status, 400);
+
   secao('motivos — o cadastro aparece para quem tem listas.editar');
   eq('quem tem a chave vê o cadastro', chamar('GET','/api/devolucao-casos',null,1).body.pode.listas, true);
   eq('quem não tem não vê', chamar('GET','/api/devolucao-casos',null,2).body.pode.listas, false);

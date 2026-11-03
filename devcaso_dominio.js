@@ -427,7 +427,9 @@ function editar(db, id, b, usuario){
   for(const k of EDITAVEIS){
     if(!(k in b)) continue;
     let v = b[k];
-    if(k === 'motivo') v = motivoValido(db, v);
+    /* O motivo que o caso JÁ tem passa mesmo se saiu da lista: removido não é
+       apagado (a aba Motivos só desativa), e editar a NF não pode levá-lo. */
+    if(k === 'motivo') v = (c.motivo && String(v == null ? '' : v).trim() === c.motivo) ? c.motivo : motivoValido(db, v);
     else if(k === 'passado_em'){ v = (v === '' || v == null) ? null : dataValida(v); if(b[k] && !v) throw new Recusa(400, 'Data impossível em "passado em".'); }
     else if(k === 'publicidade') v = publicidadeValida(v);
     else if(k === 'mensagem_ml') v = mensagemValida(v);
