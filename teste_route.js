@@ -61,7 +61,9 @@ module.exports=function(app, db){
        eventos de pe criaria historia orfa, que o proximo caso com o mesmo id
        herdaria. */
     {nome:'devolucao_caso',       pk:'id', rotulo:'devolucoes em andamento'},
-    {nome:'devolucao_evento',     pk:'id', rotulo:'devolucoes (historia)'}
+    {nome:'devolucao_evento',     pk:'id', rotulo:'devolucoes (historia)'},
+    // As tentativas de coleta (fase 3). A transportadora e cadastro e fica fora.
+    {nome:'devolucao_coleta',     pk:'id', rotulo:'devolucoes (tentativas de coleta)'}
   ];
 
   // Fase 3: foto_estoque saiu da cobertura; limpa o trigger antigo em bancos

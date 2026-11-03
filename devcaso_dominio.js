@@ -86,6 +86,17 @@ function garantir(db){
     criado_em TEXT DEFAULT (datetime('now','localtime')),
     teste INTEGER DEFAULT 0)`);
   db.exec("CREATE INDEX IF NOT EXISTS idx_devevento_caso ON devolucao_evento(caso_id)");
+  /* FASE 3 — a transportadora é CADASTRO (não entra no modo teste); a
+     tentativa de coleta é movimento (entra). */
+  db.exec(`CREATE TABLE IF NOT EXISTS transportadora (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, contato TEXT, canal TEXT, obs TEXT,
+    ativo INTEGER DEFAULT 1, criado_em TEXT DEFAULT (datetime('now','localtime')))`);
+  db.exec(`CREATE TABLE IF NOT EXISTS devolucao_coleta (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, caso_id INTEGER NOT NULL, transportadora_id INTEGER,
+    cep TEXT, pedida_em TEXT DEFAULT (datetime('now','localtime')), custo REAL,
+    resultado TEXT DEFAULT 'aguardando', obs TEXT, usuario TEXT,
+    criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0)`);
+  db.exec("CREATE INDEX IF NOT EXISTS idx_devcoleta_caso ON devolucao_coleta(caso_id)");
   const ins = db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES (?,?)");
   for(const [k,v] of Object.entries(PADROES)) ins.run(k, v);
 }
@@ -194,6 +205,7 @@ function detalhe(db, id, opt){
   if(!c) throw new Recusa(404, 'Caso não encontrado. Atualize a lista.');
   const o = opt || {};
   return { caso: publico(c, hoje(db), limites(db), o.comDinheiro),
+           tentativas: tentativas(db, c.id, o.comDinheiro),
            eventos: db.prepare('SELECT id,tipo,de,para,texto,usuario,criado_em FROM devolucao_evento WHERE caso_id=? ORDER BY id').all(c.id),
            etapas: ETAPAS[c.tipo], manuais: MANUAIS[c.tipo], nomes: NOME_ETAPA };
 }
@@ -434,7 +446,120 @@ function baixaDaDevolucao(db, devolucao_id, motivoEscolhido, usuario){
   return { motivo, caso:c.id };
 }
 
+/* ═══ FASE 3 — transportadora e tentativas ═══ */
+
+const RESULTADOS = ['aguardando','coletou','nao_encontrou'];
+const cepDe = (v) => { const d = String(v||'').replace(/\D/g,''); return d || null; };
+
+function listarTransportadoras(db, todas){
+  return db.prepare('SELECT id,nome,contato,canal,obs,ativo FROM transportadora'+(todas ? '' : ' WHERE ativo=1')+' ORDER BY ativo DESC, nome').all();
+}
+/* Cadastrar ou editar. CAMPO AUSENTE NÃO É CAMPO VAZIO (§6, #25); `nome` é
+   obrigatório só para nascer (§7-B, #33). Desativar não apaga: há tentativa
+   apontando para a linha, e o caminho de volta é o mesmo campo. */
+function salvarTransportadora(db, id, b){
+  b = b || {};
+  const txt = (v) => String(v == null ? '' : v).trim() || null;
+  if(!id){
+    const nome = txt(b.nome);
+    if(!nome) throw new Recusa(400, 'Dê um nome à transportadora.');
+    return db.prepare('INSERT INTO transportadora (nome,contato,canal,obs) VALUES (?,?,?,?)').run(nome, txt(b.contato), txt(b.canal), txt(b.obs)).lastInsertRowid;
+  }
+  const t = db.prepare('SELECT * FROM transportadora WHERE id=?').get(+id);
+  if(!t) throw new Recusa(404, 'Transportadora não encontrada.');
+  const sets = [], vals = [];
+  for(const k of ['nome','contato','canal','obs']){
+    if(!(k in b)) continue;
+    const v = txt(b[k]);
+    if(k === 'nome' && !v) throw new Recusa(400, 'O nome não pode ficar vazio.');
+    sets.push(k+'=?'); vals.push(v);
+  }
+  if('ativo' in b){ sets.push('ativo=?'); vals.push(+b.ativo ? 1 : 0); }
+  if(sets.length) db.prepare('UPDATE transportadora SET '+sets.join(',')+' WHERE id=?').run(...vals, t.id);
+  return t.id;
+}
+
+/* As tentativas de um caso, numeradas (1ª, 2ª…). O custo é DINHEIRO (R15):
+   só vai pelo fio a quem tem a chave. */
+function tentativas(db, caso_id, comDinheiro){
+  return db.prepare(`SELECT k.id,k.transportadora_id,t.nome transportadora,k.cep,k.pedida_em,k.custo,k.resultado,k.obs,k.usuario
+      FROM devolucao_coleta k LEFT JOIN transportadora t ON t.id=k.transportadora_id
+      WHERE k.caso_id=? ORDER BY k.id`).all(caso_id)
+    .map((k, i) => { const o = Object.assign({ numero:i+1 }, k); if(!comDinheiro) delete o.custo; return o; });
+}
+
+/* R8: pedir a coleta abre uma tentativa. Uma de cada vez: duas aguardando ao
+   mesmo tempo seriam dois caminhões para a mesma caixa. */
+function pedirColeta(db, caso_id, b, usuario){
+  const c = aberto(db, caso_id);
+  b = b || {};
+  if(c.tipo !== 'coleta') throw new Recusa(400, 'No "ML devolve" a coleta é do Mercado Livre.');
+  const t = db.prepare('SELECT * FROM transportadora WHERE id=?').get(+b.transportadora_id || 0);
+  if(!t) throw new Recusa(400, 'Escolha a transportadora.');
+  if(!t.ativo) throw new Recusa(400, 'A transportadora "'+t.nome+'" está desativada.');
+  const custo = reais(b.custo, 'o custo da coleta');
+  const cep = cepDe(b.cep) || c.cep;
+  const ja = db.prepare("SELECT id FROM devolucao_coleta WHERE caso_id=? AND resultado='aguardando'").get(c.id);
+  if(ja) throw new Recusa(409, 'Já há uma tentativa de coleta aguardando neste caso. Registre o resultado dela antes.');
+  const n = db.prepare('SELECT COUNT(*) n FROM devolucao_coleta WHERE caso_id=?').get(c.id).n + 1;
+  db.transaction(() => {
+    db.prepare('INSERT INTO devolucao_coleta (caso_id,transportadora_id,cep,custo,obs,usuario) VALUES (?,?,?,?,?,?)')
+      .run(c.id, t.id, cep, custo, String(b.obs||'').trim() || null, nomeDe(usuario));
+    if(cep && !c.cep) db.prepare('UPDATE devolucao_caso SET cep=? WHERE id=?').run(cep, c.id);
+    if(c.etapa !== 'coleta_pedida') moverEtapa(db, c, 'coleta_pedida', usuario, n+'ª tentativa · '+t.nome, 'coleta');
+    else evento(db, c.id, 'coleta', null, null, n+'ª tentativa · '+t.nome, nomeDe(usuario));
+  })();
+  return ler(db, c.id);
+}
+
+/* O resultado de uma tentativa. "Não achou o cliente" abre a PRÓXIMA (mesma
+   transportadora, mesmo CEP, custo vazio — ainda não se sabe se a segunda ida
+   cobra) e volta a etapa para coleta pedida. "Coletou" leva a caminho. */
+function resultadoColeta(db, caso_id, b, usuario){
+  const c = aberto(db, caso_id);
+  b = b || {};
+  const k = db.prepare('SELECT * FROM devolucao_coleta WHERE id=? AND caso_id=?').get(+b.tentativa_id || 0, c.id);
+  if(!k) throw new Recusa(404, 'Tentativa não encontrada neste caso.');
+  if(k.resultado !== 'aguardando') throw new Recusa(409, 'Esta tentativa já tem resultado.');
+  const res = String(b.resultado||'');
+  if(['coletou','nao_encontrou'].indexOf(res) < 0) throw new Recusa(400, 'O resultado é "coletou" ou "não achou o cliente".');
+  const custo = ('custo' in b) ? reais(b.custo, 'o custo da coleta') : undefined;
+  const t = db.prepare('SELECT nome FROM transportadora WHERE id=?').get(k.transportadora_id) || {};
+  db.transaction(() => {
+    db.prepare('UPDATE devolucao_coleta SET resultado=?'+(custo !== undefined && custo !== null ? ', custo=?' : '')+' WHERE id=?')
+      .run(...[res].concat(custo !== undefined && custo !== null ? [custo] : []).concat([k.id]));
+    if(res === 'coletou'){
+      if(ETAPAS.coleta.indexOf(c.etapa) < ETAPAS.coleta.indexOf('a_caminho')) moverEtapa(db, c, 'a_caminho', usuario, 'coletou · '+(t.nome||''), 'coleta');
+      else evento(db, c.id, 'coleta', null, null, 'coletou · '+(t.nome||''), nomeDe(usuario));
+    } else {
+      db.prepare('INSERT INTO devolucao_coleta (caso_id,transportadora_id,cep,custo,usuario) VALUES (?,?,?,NULL,?)')
+        .run(c.id, k.transportadora_id, k.cep, nomeDe(usuario));
+      const txt = 'não achou o cliente · '+(t.nome||'')+' · nova tentativa aberta';
+      if(c.etapa !== 'coleta_pedida') moverEtapa(db, c, 'coleta_pedida', usuario, txt, 'coleta');
+      else evento(db, c.id, 'coleta', null, null, txt, nomeDe(usuario));
+    }
+  })();
+  return ler(db, c.id);
+}
+
+/* R10: quem JÁ COLETOU naquela região — 5 primeiros dígitos do CEP, depois os
+   3. Sai das tentativas com resultado `coletou`: não há tabela de cobertura
+   escrita à mão, que envelheceria calada. */
+function sugerirTransportadoras(db, cep){
+  const d = cepDe(cep);
+  if(!d || d.length < 3) return [];
+  const q = (n) => db.prepare(`SELECT t.id, t.nome, COUNT(*) vezes, MAX(k.criado_em) ultima
+      FROM devolucao_coleta k JOIN transportadora t ON t.id=k.transportadora_id
+      WHERE k.resultado='coletou' AND t.ativo=1 AND substr(k.cep,1,?)=?
+      GROUP BY t.id ORDER BY vezes DESC, ultima DESC`).all(n, d.slice(0, n));
+  const cinco = d.length >= 5 ? q(5).map(x => Object.assign(x, { casa:5 })) : [];
+  const ids = new Set(cinco.map(x => x.id));
+  const tres = q(3).filter(x => !ids.has(x.id)).map(x => Object.assign(x, { casa:3 }));
+  return cinco.concat(tres);
+}
+
 module.exports = {
+  RESULTADOS, listarTransportadoras, salvarTransportadora, tentativas, pedirColeta, resultadoColeta, sugerirTransportadoras,
   abertoPorCodigo, chegou, avisarML, ligarRevisao, baixaDaDevolucao,
   ETAPAS, MANUAIS, NOME_ETAPA, NOME_SAIDA, DINHEIRO, Recusa,
   garantir, hoje, dataValida, dias, limites, situacao, publico, evento,

@@ -5,8 +5,8 @@ STATUS
 Situação: em construção
 Criada em: 03/11/2026
 Última atualização: 03/11/2026
-Fase atual: 2 em código (falta subir)
-Fases: 1 ✅ em código  2 ✅ em código  3 ☐  4 ☐  5 ☐
+Fase atual: 3 em código (falta subir)
+Fases: 1 ✅ em código  2 ✅ em código  3 ✅ em código  4 ☐  5 ☐
 Risco: 🔴 (acesso/permissão, dinheiro, schema, toca na devolução que já existe)
 Mudanças no caminho:
   · Fase 1 (03/11): `devcaso_dominio.js` é o dono único do caso, do prazo e do parado;
@@ -27,6 +27,11 @@ Mudanças no caminho:
     pode vir depois da revisão, e aí é só história — a trilha não volta de "revisado".
   · Na baixa ligada a um caso sem motivo, o motivo escolhido na baixa vira o do caso
     (um motivo por caso); o caso que já tem motivo não muda.
+  · Fase 3 (03/11): uma tentativa aguardando por vez (duas seriam dois caminhões para a mesma
+    caixa). "Não achou o cliente" abre a próxima com a mesma transportadora e o mesmo CEP, custo
+    vazio; "coletou" leva o caso a caminho. O custo pode ser escrito por quem acompanha, mas só
+    volta pelo fio para quem tem `devolucao.dinheiro` (R15) — a poda já nasce nesta fase.
+  · A transportadora é cadastro (fora do modo teste); a tentativa é movimento (dentro).
 ```
 
 > Desenhada no Projeto do Claude entre 29/10 e 03/11/2026, com o Lucas.

@@ -74,6 +74,7 @@
   <div class="tabs" id="tabs">
     <button class="tab on" data-t="and">Em andamento</button>
     <button class="tab" data-t="enc">Encerrados</button>
+    <button class="tab" data-t="tra" id="tabTra">Transportadoras</button>
   </div>
 
   <div id="secAnd">
@@ -105,6 +106,16 @@
   </div>
 
   <div id="secEnc" style="display:none"><div class="card"><h2>Encerrados</h2><div id="listaEnc"></div></div></div>
+  <div id="secTra" style="display:none"><div class="card"><h2>Transportadoras</h2>
+    <div class="sub" style="margin-bottom:10px">Quem já coletou numa região aparece sozinho como sugestão ao pedir a coleta, pelo CEP — não há lista de cobertura para manter.</div>
+    <div id="listaTra"></div>
+    <div class="bloco"><h3>Nova transportadora</h3><div class="grade">
+      <div><label for="tNome">Nome</label><input id="tNome" autocomplete="off"></div>
+      <div><label for="tContato">Contato</label><input id="tContato" autocomplete="off"></div>
+      <div><label for="tCanal">Canal (WhatsApp, e-mail…)</label><input id="tCanal" autocomplete="off"></div>
+      <div><label for="tObs">Observação</label><input id="tObs" autocomplete="off"></div>
+    </div><div class="acoes"><button class="bt" id="btTra">Cadastrar</button></div><div id="tMsg"></div></div>
+  </div></div>
 </div>
 
 <div id="fundo"><div id="painel"></div></div>
@@ -298,6 +309,7 @@ function nomeEvento(e, nomes){
     case 'revisado': return 'Revisado na tela de Devoluções';
     case 'chegou': return 'A caixa chegou';
     case 'aviso_ml': return 'Avisamos o ML que recebemos';
+    case 'coleta': return 'Coleta'+(e.para?': '+n(e.de)+' → '+n(e.para):'');
     default: return e.tipo+(e.para?' → '+n(e.para):'');
   }
 }
@@ -338,6 +350,109 @@ document.getElementById('tabs').addEventListener('click',function(e){
   ABAS_GANCHO.forEach(function(g){ if(g.aba===ESTADO.aba) g.abrir(); });
 });
 var ABAS_EXTRA=[], ABAS_GANCHO=[];
+
+/* ── FASE 3: transportadoras e tentativas de coleta ── */
+ABAS_EXTRA.push('tra');
+var TRANSP=[];
+function carregarTransp(){
+  return api('GET','/api/devolucao-casos/transportadoras?todas=1').then(function(d){ TRANSP=d.transportadoras||[]; return TRANSP; });
+}
+function desenharTransp(){
+  var el=document.getElementById('listaTra');
+  if(!TRANSP.length){ el.innerHTML='<div class="vazio">Nenhuma transportadora cadastrada.</div>'; return; }
+  el.innerHTML='<div class="rolaH"><table><thead><tr><th>Nome</th><th>Contato</th><th>Canal</th><th>Observação</th><th></th></tr></thead><tbody>'+
+    TRANSP.map(function(t){
+      return '<tr data-tid="'+t.id+'" style="'+(t.ativo?'':'opacity:.55')+'">'+
+        '<td><input data-campo="nome" value="'+esc(t.nome)+'"></td><td><input data-campo="contato" value="'+esc(t.contato||'')+'"></td>'+
+        '<td><input data-campo="canal" value="'+esc(t.canal||'')+'"></td><td><input data-campo="obs" value="'+esc(t.obs||'')+'"></td>'+
+        '<td><button class="bt sec" data-ativo="'+(t.ativo?0:1)+'">'+(t.ativo?'Desativar':'Reativar')+'</button><div class="erro" data-erro></div></td></tr>';
+    }).join('')+'</tbody></table></div>';
+}
+/* Cada campo salva sozinho ao sair dele, e manda SÓ o campo editado (campo
+   ausente não é vazio). A recusa aparece na própria linha, e o digitado fica. */
+document.getElementById('listaTra').addEventListener('change',function(e){
+  var inp=e.target.closest('input[data-campo]'); if(!inp) return;
+  var tr=inp.closest('tr'), corpo={}; corpo[inp.getAttribute('data-campo')]=inp.value;
+  var er=tr.querySelector('[data-erro]'); er.textContent='';
+  api('POST','/api/devolucao-casos/transportadoras/'+tr.getAttribute('data-tid'),corpo)
+    .then(function(){ inp.style.borderColor='var(--green)'; })
+    .catch(function(x){ inp.style.borderColor='var(--red)'; er.textContent=x.message; });
+});
+document.getElementById('listaTra').addEventListener('click',function(e){
+  var b=e.target.closest('[data-ativo]'); if(!b) return;
+  var tr=b.closest('tr');
+  api('POST','/api/devolucao-casos/transportadoras/'+tr.getAttribute('data-tid'),{ativo:+b.getAttribute('data-ativo')})
+    .then(function(){ carregarTransp().then(desenharTransp); });
+});
+document.getElementById('btTra').onclick=function(){
+  var m=document.getElementById('tMsg'); m.innerHTML='';
+  api('POST','/api/devolucao-casos/transportadoras',{ nome:document.getElementById('tNome').value, contato:document.getElementById('tContato').value,
+    canal:document.getElementById('tCanal').value, obs:document.getElementById('tObs').value })
+    .then(function(){ ['tNome','tContato','tCanal','tObs'].forEach(function(id){ document.getElementById(id).value=''; });
+      m.innerHTML='<div class="okmsg">Cadastrada.</div>'; carregarTransp().then(desenharTransp); })
+    .catch(function(x){ m.innerHTML='<div class="erro">'+esc(x.message)+'</div>'; });
+};
+ABAS_GANCHO.push({ aba:'tra', abrir:function(){ carregarTransp().then(desenharTransp).catch(function(x){ document.getElementById('listaTra').innerHTML='<div class="erro">'+esc(x.message)+'</div>'; }); } });
+
+var NOME_RES={aguardando:'aguardando', coletou:'coletou', nao_encontrou:'não achou o cliente'};
+GANCHOS.push({
+  html:function(d, c, P, aberto){
+    if(c.tipo!=='coleta') return '';
+    var t=d.tentativas||[];
+    var h='<div class="bloco"><h3>Coleta — tentativas</h3>';
+    h+= t.length ? '<div class="rolaH"><table><thead><tr><th>#</th><th>Transportadora</th><th>CEP</th><th>Pedida em</th>'+(P.dinheiro?'<th class="num">Custo</th>':'')+'<th>Resultado</th><th></th></tr></thead><tbody>'+
+      t.map(function(k){
+        return '<tr><td>'+k.numero+'ª</td><td>'+esc(k.transportadora||'—')+'</td><td>'+esc(k.cep||'—')+'</td><td>'+horaBR(k.pedida_em)+'</td>'+
+          (P.dinheiro?'<td class="num">'+(k.custo===null||k.custo===undefined?'<span style="color:var(--amber)">sem custo</span>':reais(k.custo))+'</td>':'')+
+          '<td>'+esc(NOME_RES[k.resultado]||k.resultado)+'</td><td>'+
+          (aberto && P.acompanhar && k.resultado==='aguardando' ?
+            '<div class="acoes" style="margin:0"><input data-custo="'+k.id+'" placeholder="custo (opcional)" style="max-width:140px">'+
+            '<button class="bt sec" data-res="coletou" data-tent="'+k.id+'">Coletou</button>'+
+            '<button class="bt sec" data-res="nao_encontrou" data-tent="'+k.id+'">Não achou o cliente</button></div>' : '')+
+          '</td></tr>';
+      }).join('')+'</tbody></table></div>' : '<div class="sub">Nenhuma tentativa ainda.</div>';
+    var aguardando=t.some(function(k){return k.resultado==='aguardando';});
+    if(aberto && P.acompanhar && !aguardando){
+      h+='<div class="grade" style="margin-top:10px">'+
+        '<div><label>CEP da coleta</label><input id="kCep" value="'+esc(c.cep||'')+'" inputmode="numeric"></div>'+
+        '<div><label>Transportadora</label><select id="kTransp"><option value="">— escolher —</option></select></div>'+
+        '<div><label>Custo (pode ficar vazio)</label><input id="kCusto" placeholder="R$"></div>'+
+        '<div><label>Observação</label><input id="kObs"></div></div>'+
+        '<div id="kSug" class="sub" style="margin-top:6px"></div>'+
+        '<div class="acoes"><button class="bt" id="btColeta">Pedir coleta</button></div>';
+    }
+    return h+'</div>';
+  },
+  ligar:function(d, c, base){
+    document.querySelectorAll('#painel [data-res]').forEach(function(b){ b.onclick=function(){
+      var id=b.getAttribute('data-tent'), cu=document.querySelector('#painel [data-custo="'+id+'"]');
+      var corpo={ tentativa_id:+id, resultado:b.getAttribute('data-res') };
+      if(cu && cu.value.trim()) corpo.custo=cu.value;
+      acao(base+'/coleta-resultado', corpo);
+    }; });
+    var sel=document.getElementById('kTransp'); if(!sel) return;
+    carregarTransp().then(function(l){
+      sel.innerHTML='<option value="">— escolher —</option>'+l.filter(function(t){return t.ativo;}).map(function(t){ return '<option value="'+t.id+'">'+esc(t.nome)+'</option>'; }).join('');
+    }).catch(function(){});
+    function sugerir(){
+      var cep=document.getElementById('kCep').value, box=document.getElementById('kSug');
+      if(cep.replace(/\D/g,'').length<3){ box.textContent=''; return; }
+      api('GET','/api/devolucao-casos/transportadoras/sugestao?cep='+encodeURIComponent(cep)).then(function(r){
+        var s=r.sugestoes||[];
+        box.innerHTML = s.length ? 'Já coletaram nesta região: '+s.map(function(x){
+          return '<a href="#" data-sug="'+x.id+'" style="color:var(--amber)">'+esc(x.nome)+'</a> ('+plural(x.vezes,'vez','vezes')+', última '+dataBR(x.ultima)+(x.casa===3?', mesma região ampla':'')+')';
+        }).join(' · ') : 'Ninguém coletou nesta região ainda.';
+      }).catch(function(){ box.textContent=''; });
+    }
+    document.getElementById('kCep').addEventListener('change', sugerir);
+    sugerir();
+    document.getElementById('kSug').addEventListener('click',function(e){ var a=e.target.closest('[data-sug]'); if(!a) return; e.preventDefault(); sel.value=a.getAttribute('data-sug'); });
+    document.getElementById('btColeta').onclick=function(){
+      acao(base+'/coleta',{ transportadora_id:+sel.value||null, cep:document.getElementById('kCep').value,
+        custo:document.getElementById('kCusto').value, obs:document.getElementById('kObs').value });
+    };
+  }
+});
 
 /* ── início ── */
 setTipo('coleta');

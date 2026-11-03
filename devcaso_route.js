@@ -53,7 +53,18 @@ module.exports = function(app, db){
     const ja = D.abertoDaVenda(db, venda);
     return { achou: !!v, venda: v, caso_aberto: ja ? ja.id : null };
   }));
-  app.get('/api/devolucao-casos/:id', (req,res) => responder(res, () => D.detalhe(db, req.params.id, {})));
+  /* ── transportadoras (fase 3). ANTES do `/:id`: no Express, a rota com
+     parâmetro registrada primeiro engoliria "transportadoras" como um id. ── */
+  app.get('/api/devolucao-casos/transportadoras', (req,res) => responder(res, () =>
+    ({ transportadoras: D.listarTransportadoras(db, (req.query||{}).todas === '1') })));
+  app.get('/api/devolucao-casos/transportadoras/sugestao', (req,res) => responder(res, () =>
+    ({ sugestoes: D.sugerirTransportadoras(db, (req.query||{}).cep) })));
+  app.post('/api/devolucao-casos/transportadoras', (req,res) => responder(res, () =>
+    ({ ok:true, id: D.salvarTransportadora(db, null, req.body) })));
+  app.post('/api/devolucao-casos/transportadoras/:tid', (req,res) => responder(res, () =>
+    ({ ok:true, id: D.salvarTransportadora(db, req.params.tid, req.body) })));
+
+  app.get('/api/devolucao-casos/:id', (req,res) => responder(res, () => D.detalhe(db, req.params.id, { comDinheiro: podeDinheiro(req) })));
 
   /* ── lançar e editar (devolucao.lancar) ── */
   app.post('/api/devolucao-casos', (req,res) => responder(res, () => {
@@ -90,6 +101,16 @@ module.exports = function(app, db){
   }));
   app.post('/api/devolucao-casos/:id/aviso-ml', (req,res) => responder(res, () => {
     D.avisarML(db, req.params.id, req.usuario);
+    return { ok:true };
+  }));
+
+  /* As tentativas de coleta (fase 3, R8). */
+  app.post('/api/devolucao-casos/:id/coleta', (req,res) => responder(res, () => {
+    D.pedirColeta(db, req.params.id, req.body, req.usuario);
+    return { ok:true };
+  }));
+  app.post('/api/devolucao-casos/:id/coleta-resultado', (req,res) => responder(res, () => {
+    D.resultadoColeta(db, req.params.id, req.body, req.usuario);
     return { ok:true };
   }));
 

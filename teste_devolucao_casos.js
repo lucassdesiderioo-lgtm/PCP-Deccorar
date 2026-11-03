@@ -466,6 +466,109 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   eq('   nem a etapa', caso(k30).etapa, 'aguardando');
   eq('   nem a chegada', caso(k30).chegou_em, null);
 
+  /* ═════════════════ FASE 3 — transportadora e tentativas ═════════════════ */
+  const T = (corpo, quem) => chamar('POST','/api/devolucao-casos/transportadoras', corpo, quem || 2);
+  const transp = (quem) => chamar('GET','/api/devolucao-casos/transportadoras', null, quem || 2).body;
+
+  secao('31. cadastro de transportadora: cadastrar, editar, desativar');
+  r = T({ nome:'Rapidão Sul', contato:'Marta', canal:'WhatsApp 41 9999-0000' });
+  eq('cadastra', r.status, 200);
+  const tA = r.body.id;
+  const tB = T({ nome:'Leva e Traz' }).body.id;
+  const tC = T({ nome:'Expressa Norte' }).body.id;
+  eq('sem nome é recusado', T({ contato:'x' }).status, 400);
+  r = chamar('POST','/api/devolucao-casos/transportadoras/:tid', { canal:'e-mail' }, 2, { tid:tA });
+  eq('edita', r.status, 200);
+  let tx = transp().transportadoras.find(t => t.id === tA);
+  eq('   o campo editado muda', tx.canal, 'e-mail');
+  eq('   e o que não veio fica (campo ausente não é vazio)', tx.contato, 'Marta');
+  chamar('POST','/api/devolucao-casos/transportadoras/:tid', { ativo:0 }, 2, { tid:tC });
+  ok('desativada não aparece para escolher', !transp().transportadoras.some(t => t.id === tC));
+  ok('   mas aparece na lista completa do cadastro, para reativar',
+     chamar('GET','/api/devolucao-casos/transportadoras', null, 2, {}, { todas:'1' }).body.transportadoras.some(t => t.id === tC && t.ativo === 0));
+
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'7770031', prazo:dia(7) }, 3);
+  const k31 = r.body.id;
+  eq('pedir coleta com transportadora desativada é recusado',
+     chamar('POST','/api/devolucao-casos/:id/coleta',{ transportadora_id:tC, cep:'80010-000' }, 2, {id:k31}).status, 400);
+
+  secao('32. tentativa com custo vazio: aceita, e o custo fica NULO (nunca zero)');
+  r = chamar('POST','/api/devolucao-casos/:id/coleta',{ transportadora_id:tA, cep:'80010-000', custo:'' }, 2, {id:k31});
+  eq('pede a coleta', r.status, 200);
+  const t32 = db.prepare('SELECT * FROM devolucao_coleta WHERE caso_id=?').get(k31);
+  eq('custo NULL', t32.custo, null);
+  eq('resultado aguardando', t32.resultado, 'aguardando');
+  eq('o CEP gravado só com os dígitos', t32.cep, '80010000');
+  eq('o caso foi para coleta pedida', caso(k31).etapa, 'coleta_pedida');
+  eq('e o CEP do caso ficou gravado', caso(k31).cep, '80010000');
+  eq('custo impossível é recusado', chamar('POST','/api/devolucao-casos/:id/coleta',{ transportadora_id:tA, custo:'abc' }, 2, {id:k31}).status, 400);
+  eq('segunda tentativa com uma aguardando é recusada (409)',
+     chamar('POST','/api/devolucao-casos/:id/coleta',{ transportadora_id:tB }, 2, {id:k31}).status, 409);
+  eq('no "ML devolve" não há coleta nossa', chamar('POST','/api/devolucao-casos/:id/coleta',{ transportadora_id:tA }, 2, {id:c5}).status, 400);
+
+  secao('33. "não achou o cliente" abre a próxima tentativa e volta a coleta pedida');
+  chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'a_caminho' }, 2, {id:k31});
+  r = chamar('POST','/api/devolucao-casos/:id/coleta-resultado',{ tentativa_id:t32.id, resultado:'nao_encontrou', custo:'45,00' }, 2, {id:k31});
+  eq('registra', r.status, 200);
+  const tents = db.prepare('SELECT * FROM devolucao_coleta WHERE caso_id=? ORDER BY id').all(k31);
+  eq('a primeira ficou nao_encontrou', tents[0].resultado, 'nao_encontrou');
+  eq('   com o custo que veio', tents[0].custo, 45);
+  eq('abriu a segunda tentativa', tents.length, 2);
+  eq('   aguardando', tents[1].resultado, 'aguardando');
+  eq('   com o custo vazio (ainda não se sabe se a segunda ida cobra)', tents[1].custo, null);
+  eq('   mesma transportadora e mesmo CEP', tents[1].transportadora_id + '/' + tents[1].cep, tA + '/80010000');
+  eq('a etapa voltou para coleta pedida', caso(k31).etapa, 'coleta_pedida');
+  ok('e virou história', eventos(k31).some(e => e.tipo === 'coleta' && /não achou/i.test(e.texto || '')));
+  eq('o resultado de uma tentativa já fechada é recusado (409)',
+     chamar('POST','/api/devolucao-casos/:id/coleta-resultado',{ tentativa_id:t32.id, resultado:'coletou' }, 2, {id:k31}).status, 409);
+  eq('resultado desconhecido é recusado',
+     chamar('POST','/api/devolucao-casos/:id/coleta-resultado',{ tentativa_id:tents[1].id, resultado:'sumiu' }, 2, {id:k31}).status, 400);
+  r = chamar('POST','/api/devolucao-casos/:id/coleta-resultado',{ tentativa_id:tents[1].id, resultado:'coletou' }, 2, {id:k31});
+  eq('"coletou" fecha a tentativa', r.status, 200);
+  eq('   e leva o caso a caminho', caso(k31).etapa, 'a_caminho');
+
+  secao('34. as tentativas são numeradas por caso');
+  r = chamar('GET','/api/devolucao-casos/:id',null,2,{id:k31});
+  eq('o caso traz as tentativas numeradas', (r.body.tentativas || []).map(t => t.numero).join(','), '1,2');
+  eq('   com o nome da transportadora', r.body.tentativas[0].transportadora, 'Rapidão Sul');
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'7770034', prazo:dia(7) }, 3);
+  const k34 = r.body.id;
+  chamar('POST','/api/devolucao-casos/:id/coleta',{ transportadora_id:tB, cep:'80020-100' }, 2, {id:k34});
+  eq('outro caso começa na 1ª de novo', chamar('GET','/api/devolucao-casos/:id',null,2,{id:k34}).body.tentativas[0].numero, 1);
+
+  secao('35. a sugestão pelo CEP: quem já coletou, 5 dígitos antes de 3');
+  const tD = T({ nome:'Cinco Dígitos' }).body.id;
+  const tE = T({ nome:'Três Dígitos' }).body.id;
+  function coletaFeita(transp, cep){
+    const rr = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'S'+Math.random().toString().slice(2,12), prazo:dia(7) }, 3);
+    chamar('POST','/api/devolucao-casos/:id/coleta',{ transportadora_id:transp, cep }, 2, {id:rr.body.id});
+    const tt = db.prepare('SELECT id FROM devolucao_coleta WHERE caso_id=?').get(rr.body.id);
+    chamar('POST','/api/devolucao-casos/:id/coleta-resultado',{ tentativa_id:tt.id, resultado:'coletou' }, 2, {id:rr.body.id});
+  }
+  coletaFeita(tD, '80010-500'); coletaFeita(tE, '80099-000'); coletaFeita(tE, '80098-000'); coletaFeita(tE, '80097-000');
+  r = chamar('GET','/api/devolucao-casos/transportadoras/sugestao',null,2,{},{ cep:'80010-999' });
+  const sug = r.body.sugestoes || [];
+  ok('sugere quem coletou na região', sug.length >= 2, JSON.stringify(r.body));
+  const iUlt5 = sug.map(x => x.casa).lastIndexOf(5), iPri3 = sug.map(x => x.casa).indexOf(3);
+  ok('quem casa pelos 5 dígitos vem antes de quem casa pelos 3, mesmo com menos vezes', iUlt5 >= 0 && iPri3 > iUlt5, JSON.stringify(sug));
+  ok('   e a "Cinco Dígitos" (1 vez, em 80010) está entre as de 5', sug.some(x => x.nome === 'Cinco Dígitos' && x.casa === 5), JSON.stringify(sug));
+  const s3 = sug.find(x => x.nome === 'Três Dígitos');
+  ok('quem casa só pelos 3 vem depois, com as vezes e a última', s3 && s3.casa === 3 && s3.vezes === 3 && !!s3.ultima, JSON.stringify(s3));
+  ok('a Rapidão Sul (coletou em 80010) também casa pelos 5', sug.some(x => x.nome === 'Rapidão Sul' && x.casa === 5));
+  const i5 = sug.filter(x => x.casa === 5).map(x => x.vezes);
+  ok('   entre as de 5, ordenadas por vezes', i5.every((v,i) => i === 0 || i5[i-1] >= v), JSON.stringify(sug));
+  eq('CEP de outra região não sugere ninguém', (chamar('GET','/api/devolucao-casos/transportadoras/sugestao',null,2,{},{ cep:'01000-000' }).body.sugestoes || []).length, 0);
+
+  secao('36. quem só teve "não achou" naquele CEP não é sugerido');
+  const tF = T({ nome:'Só Falhou' }).body.id;
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'7770036', prazo:dia(7) }, 3);
+  chamar('POST','/api/devolucao-casos/:id/coleta',{ transportadora_id:tF, cep:'80010-111' }, 2, {id:r.body.id});
+  const t36 = db.prepare('SELECT id FROM devolucao_coleta WHERE caso_id=?').get(r.body.id);
+  chamar('POST','/api/devolucao-casos/:id/coleta-resultado',{ tentativa_id:t36.id, resultado:'nao_encontrou' }, 2, {id:r.body.id});
+  const sug36 = chamar('GET','/api/devolucao-casos/transportadoras/sugestao',null,2,{},{ cep:'80010-999' }).body.sugestoes || [];
+  ok('"Só Falhou" fica fora', !sug36.some(x => x.nome === 'Só Falhou'), JSON.stringify(sug36));
+  ok('nem a tentativa aguardando conta como "coletou"', !sug36.some(x => x.nome === 'Leva e Traz'));
+
   fim();
 })().catch(e => { console.log('ESTOUROU: ' + e.stack); falhas++; fim(); });
 
