@@ -3614,6 +3614,19 @@ async function corCarregar(){ corPassivo(); corHistorico(); }
 /* O passivo e desenhado na aba Pendencias, e a decisao mora na aba Correções
    (central, fase 2): o clique numa linha ou num "em bloco" vai para la antes
    de abrir o painel. */
+/* Abrir direto numa aba pelo endereço (#dv): a aba "Baixa" das devoluções
+   leva aqui. Só clica na aba que existe; endereço sem # fica como sempre. */
+(function(){
+  function irPeloHash(){
+    var h=(location.hash||'').replace('#','');
+    if(!h) return;
+    var t=document.querySelector('.tab[data-t="'+h+'"]');
+    if(t && !t.classList.contains('active')) t.click();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(irPeloHash,0); });
+  else setTimeout(irPeloHash,0);
+  window.addEventListener('hashchange',irPeloHash);
+})();
 function corIrMesa(){
   var t=document.querySelector('.tab[data-t="cor"]');
   if(t && !t.classList.contains('active')) t.click();

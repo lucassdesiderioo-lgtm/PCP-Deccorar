@@ -47,8 +47,13 @@
   .dvopt.sel{background:var(--amber);color:#1a1300;border-color:#8a6300;border-width:3px;font-weight:800}
   .dvopt .ck{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;
     background:#1a1300;color:var(--amber);font-size:15px;font-weight:900;flex:0 0 auto}
+  /* as abas das devoluções: botões grandes, como o resto da estação */
+  .dvAbas{display:flex;gap:8px;flex-wrap:wrap;padding:10px 20px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .dvAba{padding:10px 16px;border-radius:9px;font-size:15px;font-weight:600;text-decoration:none;color:var(--muted);border:1px solid var(--line);background:#fff}
+  .dvAba.on{background:var(--amber);color:#fff;border-color:var(--amber);font-weight:800}
 </style></head><body>
 <header><div class="mark">D</div><div><h1>Devolucoes</h1><div class="sub">Recebimento e triagem de peças devolvidas</div></div><button onclick="(function(){try{localStorage.removeItem('rev_modo');}catch(e){} location.href='/operador';})()" style="margin-left:auto;background:transparent;border:1px solid #d8dee6;color:#5a6472;border-radius:9px;padding:11px 18px;font-size:14px;cursor:pointer">Trocar</button></header>
+<nav id="dvAbas" class="dvAbas" style="display:none" aria-label="Devoluções"></nav>
 <div class="wrap">
   <div class="card">
     <div class="lb">Codigo da etiqueta do Mercado Livre</div>
@@ -70,6 +75,26 @@
   <div class="card"><div class="lb">Recebidas hoje</div><div id="dvHoje" style="font-size:26px;font-weight:800">0</div></div>
 </div>
 <script>
+/* AS ABAS DAS DEVOLUÇÕES (AJUSTE de 03/11/2026): uma entrada só, e cada pessoa
+   vê as abas que a permissão dela alcança — quem decide é o servidor
+   (/api/devolucao/abas). Com uma aba só, a faixa não aparece: a tela fica
+   igual à de sempre. Esconder não é segurança; quem tranca é a chave da tela. */
+(function(){
+  var ABAS=[['receber','Receber peça','/devolucao'],['andamento','Em andamento','/devolucao-casos'],['baixa','Baixa','/admin#dv']];
+  var aqui=location.pathname.replace(/\/$/,'');
+  fetch('/api/devolucao/abas').then(function(r){ return r.ok ? r.json() : null; }).then(function(p){
+    if(!p) return;
+    var vis=ABAS.filter(function(a){ return p[a[0]]; });
+    var el=document.getElementById('dvAbas');
+    if(!el || vis.length<2) return;
+    el.innerHTML=vis.map(function(a){
+      var on=(a[2]===aqui);
+      return '<a href="'+a[2]+'" class="dvAba'+(on?' on':'')+'"'+(on?' aria-current="page"':'')+'>'+a[1]+'</a>';
+    }).join('');
+    el.style.display='';
+  }).catch(function(){});
+})();
+
 var SKUS=[];
 var DVPERG=[
   {id:'embalagem',t:'Embalagem',o:['intacta','amassada','violada']},

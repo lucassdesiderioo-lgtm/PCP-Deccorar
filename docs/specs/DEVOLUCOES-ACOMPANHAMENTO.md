@@ -2,7 +2,7 @@
 
 ```
 STATUS
-Situação: em código — as cinco fases (03/11/2026), falta subir
+Situação: no ar desde 03/11/2026 (PR #250) — falta a prova de fábrica
 Criada em: 03/11/2026
 Última atualização: 03/11/2026
 Fase atual: todas em código; falta o deploy e a prova de fábrica
@@ -50,6 +50,11 @@ Mudanças no caminho:
     LANÇAMENTO e as devoluções sem caso pelo mês de RECEBIMENTO, sem as de modo teste.
   · A baixa do reembolso só encerra o caso já revisado (a peça voltou e foi vista).
   · Fica de fora: a linha das devoluções em andamento na central de Pendências (a spec não pede).
+  · Depois do deploy (03/11, AJUSTE pedido pelo dono): a tela de casos deixou de ter link próprio
+    no rodapé. As devoluções têm UMA entrada ("Devoluções" → /devolucoes) e abas no topo
+    (Receber peça · Em andamento · Baixa), cada uma pela permissão. A §8 da spec dizia "entra
+    no menu do nav.js para quem tem devolucao.acompanhar"; o link próprio não apareceu para
+    ninguém (ele lia a coluna `areas`, que o backfill não recalculou), e o dono preferiu juntar.
 ```
 
 > Desenhada no Projeto do Claude entre 29/10 e 03/11/2026, com o Lucas.

@@ -67,9 +67,14 @@
   .num{text-align:right;white-space:nowrap}
   .aviso{background:var(--ambg);border:1px solid #6b5310;color:var(--amber);border-radius:8px;padding:8px 10px;font-size:13px;margin:8px 0}
   @media (max-width:600px){ .wrap{padding:10px} #painel{padding:12px} }
+  /* as abas das devoluções (Receber peça · Em andamento · Baixa) */
+  .dvAbas{display:flex;gap:6px;flex-wrap:wrap;padding:10px 20px;border-bottom:1px solid var(--line);background:#0b0f14}
+  .dvAba{padding:8px 14px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;color:var(--muted);border:1px solid var(--line)}
+  .dvAba.on{background:var(--amber);color:#1a1300;border-color:var(--amber);font-weight:800}
 </style></head><body>
 <header><div class="mark">D</div><div><h1>Devoluções em andamento</h1>
   <div class="sub">Do aviso do Mercado Livre até o reembolso — o caso nasce antes de a peça chegar</div></div></header>
+<nav id="dvAbas" class="dvAbas" style="display:none" aria-label="Devoluções"></nav>
 <div class="wrap">
   <div class="tabs" id="tabs">
     <button class="tab on" data-t="and">Em andamento</button>
@@ -127,6 +132,26 @@
 
 <script src="/sku.js"></script>
 <script>
+/* AS ABAS DAS DEVOLUÇÕES (AJUSTE de 03/11/2026): uma entrada só, e cada pessoa
+   vê as abas que a permissão dela alcança — quem decide é o servidor
+   (/api/devolucao/abas). Com uma aba só, a faixa não aparece: a tela fica
+   igual à de sempre. Esconder não é segurança; quem tranca é a chave da tela. */
+(function(){
+  var ABAS=[['receber','Receber peça','/devolucao'],['andamento','Em andamento','/devolucao-casos'],['baixa','Baixa','/admin#dv']];
+  var aqui=location.pathname.replace(/\/$/,'');
+  fetch('/api/devolucao/abas').then(function(r){ return r.ok ? r.json() : null; }).then(function(p){
+    if(!p) return;
+    var vis=ABAS.filter(function(a){ return p[a[0]]; });
+    var el=document.getElementById('dvAbas');
+    if(!el || vis.length<2) return;
+    el.innerHTML=vis.map(function(a){
+      var on=(a[2]===aqui);
+      return '<a href="'+a[2]+'" class="dvAba'+(on?' on':'')+'"'+(on?' aria-current="page"':'')+'>'+a[1]+'</a>';
+    }).join('');
+    el.style.display='';
+  }).catch(function(){});
+})();
+
 var ESTADO={pode:{}, coleta:[], ml:[], skus:{}, motivos:[], tipo:'coleta', aberto:null, aba:'and', limites:{}};
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 function dataBR(s){ if(!s) return '—'; var d=String(s).slice(0,10).split('-'); return d.length===3?d[2]+'/'+d[1]+'/'+d[0]:s; }

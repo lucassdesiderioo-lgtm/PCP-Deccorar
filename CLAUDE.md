@@ -1565,7 +1565,28 @@ quem dá baixa em devolução lança e acompanha; o dinheiro não vem junto.
 > um caso conta uma vez, pelo caso. Perda por prazo e devolvido ao comprador
 > ficam separados.
 
-**Rode `node teste_devolucao_casos.js` (307 casos) ao mexer no
+> ⚠️ **AS DEVOLUÇÕES TÊM UMA ENTRADA SÓ, COM ABAS** (AJUSTE de 03/11/2026,
+> pedido do dono: *"concentrar em um único lugar"*). O rodapé tem **um**
+> "Devoluções", que aponta para a porta `/devolucoes`; ela leva cada pessoa à
+> primeira aba que alcança (Em andamento → Receber peça → Baixa). No topo das
+> duas telas fica a faixa **Receber peça** (`/devolucao`, `devolucao.registrar`)
+> · **Em andamento** (`/devolucao-casos`) · **Baixa** (Admin → Devoluções,
+> `/admin#dv`, `devolucao.baixar`). Quem vê uma aba só não vê a faixa: a tela do
+> Edvaldo continua igual. **Juntar é só na navegação**: cada tela e cada rota
+> continuam com a sua chave.
+>
+> ⚠️ **A FAIXA PERGUNTA A PERMISSÃO (`/api/devolucao/abas`), E NÃO A COLUNA
+> `areas`.** O primeiro deploy pôs um link próprio "Devoluções em andamento" que
+> lia a `areas`, e ele **não apareceu para ninguém**: o backfill
+> `seed_devolucao_caso` gravou as chaves nos setores sem recalcular a coluna,
+> que é sombra. No banco de teste o defeito não aparecia, porque o
+> Administrador de banco novo nasce com todas as áreas. O boot recalcula a
+> sombra de todos uma vez (`config.areas_devolucao_casos`), **depois** do
+> `PERM_AREA` — chamado antes, o `sincronizarAreas` estouraria no TDZ dentro
+> do `try` e não gravaria nada, calado. **Backfill de chave nova que dá tela
+> tem que recalcular a `areas`**, senão o destino depois do PIN fica errado.
+
+**Rode `node teste_devolucao_casos.js` (326 casos) ao mexer no
 `devcaso_dominio.js`, no `devcaso_route.js`, no bipe ou na baixa do
 `dev_route.js`, ou nas listas de motivos e documentos do `cad_route.js`** —
 e `node teste_devolucao.js` (37), que tem que passar sem mudar o esperado. Os
@@ -1583,9 +1604,13 @@ os 6 casos da tabela de 29/10/2026, com backup antes e sem duplicar. O SKU
 da tabela não tem o `BK`: o script usa o do `lote` e, sem a venda no sistema,
 grava o texto como veio com *"conferir"* na observação.
 
-> ⚠️ **NÃO ESTÁ NO AR.** O deploy é do dono, e a prova de fábrica é: os 6
-> casos aparecendo com a cor certa, o Renato acompanhando um caso até o fim, e
-> a primeira caixa bipada pelo Edvaldo mostrando a tarja.
+> ✅ **NO AR EM 03/11/2026** (PR #250): o dono fez o deploy (`/devolucao-casos`
+> 302) e a simulação do `lancar_casos_iniciais.js` achou **as 6 vendas no
+> sistema**, todas com o SKU do cadastro (nenhuma para conferir).
+>
+> ⚠️ **AINDA NÃO PROVADO:** o `--aplicar` dos 6 casos e as cores na tela, o
+> Renato acompanhando um caso até o fim, e a primeira caixa bipada pelo
+> Edvaldo mostrando a tarja. Prova que não foi feita se escreve como não feita.
 
 ---
 
@@ -2219,7 +2244,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (315), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (307); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (60), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (322), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (43), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (103), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (326); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2435,6 +2460,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Criar uma segunda lista de motivos para os casos em andamento, ou pôr motivo
   novo no `seed()` do `cad_route.js` — ele só grava em lista vazia; motivo novo
   entra por acréscimo de uma vez só (§9-B, R12)
+- ❌ Pôr de novo um segundo "Devoluções" no rodapé, ou mostrar a faixa de abas
+  pela coluna `areas`: ela é sombra, e o link do primeiro deploy não apareceu
+  para ninguém por isso (§9-B)
 - ❌ Gravar anexo de devolução em `lotes/` (o cron apaga em 7 dias) ou fora da
   transação da linha (§9-B, R21)
 - ❌ Contar uma pendência dentro do `pendencias_dominio.js`: a central pergunta

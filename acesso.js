@@ -691,6 +691,8 @@ module.exports = function(app, db){
     if(eq('/devolucao')) return 'devolucao.registrar';
     // As devolucoes EM ANDAMENTO (escritorio): quem acompanha ou quem lanca.
     if(eq('/devolucao-casos')) return ['devolucao.acompanhar','devolucao.lancar'];
+    // A porta unica do rodape (so redireciona, pela permissao, no dev_route).
+    if(eq('/devolucoes')) return '@logado';
     if(eq('/painel')) return 'painel.ver';
     if(eq('/relatorios')) return 'relatorios.ver';
     if(eq('/planejamento')) return 'planilha.importar';
@@ -954,6 +956,8 @@ module.exports = function(app, db){
     if(eq('/api/producao')) return ['revisao.executar','@admin'];
     if(pre('/api/contagem')) return ['contagem.contar','@admin'];
     if(eq('/api/devolucao/pendentes')) return ['devolucao.baixar','@admin'];
+    // Quais abas das devolucoes a pessoa ve: de quem tem QUALQUER uma das quatro.
+    if(eq('/api/devolucao/abas')) return ['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.baixar'];
     if(pre('/api/devolucao')) return ['devolucao.registrar','@admin'];
 
     /* ═══ LISTAS DE APOIO DE TELA: continuam abertas a quem entrou ═════════
@@ -1166,6 +1170,21 @@ module.exports = function(app, db){
         ' excecao(oes) criada(s) para preservar o acesso de antes');
     }
   }catch(e){ console.log('[acesso] fase 2 do sob medida falhou (nada gravado): ' + e.message); }
+
+  /* ── 3-G2. A SOMBRA `areas` DEPOIS DAS DEVOLUCOES EM ANDAMENTO (03/11/2026) ──
+     O backfill `seed_devolucao_caso` deu as chaves novas direto nos setores, e
+     nao recalculou a coluna `areas` de ninguem: a area `devolucao_casos` nao
+     chegou a quem ja tinha a chave, e o destino depois do PIN le dela. Fica
+     AQUI, depois do PERM_AREA (um `const`): chamado antes, o sincronizarAreas
+     estouraria no TDZ dentro do try e nao gravaria nada, calado. Ninguem ganha
+     nem perde permissao — a coluna so passa a dizer o que a pessoa ja pode.
+     Uma vez so (marca em `config`). */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='areas_devolucao_casos'").get()){
+      db.prepare('SELECT id FROM usuarios WHERE ativo=1').all().forEach(u => sincronizarAreas(u.id));
+      db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('areas_devolucao_casos','1')").run();
+    }
+  }catch(e){ console.log('[acesso] recalculo das areas (devolucoes) falhou: ' + e.message); }
 
   /* ── 3-H. DUAS PESSOAS NO BOLETO E NA SOBRA (fase 6 da ACESSOS-UNIFICADOS) ──
      A baixa de boleto e o descarte de sobra viraram PEDIR e APROVAR, e
