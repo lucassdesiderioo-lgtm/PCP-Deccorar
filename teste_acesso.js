@@ -744,13 +744,15 @@ console.log('\n── 6-I. as devoluções em andamento (spec DEVOLUCOES-ACOMPAN
   const P = (c) => PERMISSOES.find(p => p.chave === c);
   eq('devolucao.lancar é nível admin', (P('devolucao.lancar')||{}).nivel, 'admin');
   eq('devolucao.acompanhar é nível supervisor', (P('devolucao.acompanhar')||{}).nivel, 'supervisor');
-  eq('devolucao.dinheiro é nível admin_geral', (P('devolucao.dinheiro')||{}).nivel, 'admin_geral');
-  ok('devolucao.dinheiro é sensível E intransferível', (P('devolucao.dinheiro')||{}).sensivel === true && (P('devolucao.dinheiro')||{}).intransferivel === true);
+  /* Desde 03/11/2026 (dono): o dinheiro ficou com as decisões, e pode ir a um
+     setor (o Financeiro). Continua sensível; deixou de ser intransferível. */
+  eq('devolucao.dinheiro é nível admin', (P('devolucao.dinheiro')||{}).nivel, 'admin');
+  ok('devolucao.dinheiro é sensível e NÃO é intransferível', (P('devolucao.dinheiro')||{}).sensivel === true && !(P('devolucao.dinheiro')||{}).intransferivel);
   ok('as três têm rótulo e descrição', ['devolucao.lancar','devolucao.acompanhar','devolucao.dinheiro'].every(c => P(c) && P(c).rotulo && P(c).desc));
 
   const J = (x) => JSON.stringify(x);
-  const LER = J(['devolucao.acompanhar','devolucao.lancar']);
-  eq('a tela /devolucao-casos: quem acompanha ou quem lança', J(AC.permDaRota('/devolucao-casos','GET')), LER);
+  const LER = J(['devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro']);
+  eq('a tela /devolucao-casos: quem acompanha, quem lança ou quem tem o dinheiro', J(AC.permDaRota('/devolucao-casos','GET')), LER);
   eq('a gêmea .html herda a tela', J(AC.permDaRota('/devolucao-casos.html','GET')), LER);
   eq('ler a lista', J(AC.permDaRota('/api/devolucao-casos','GET')), LER);
   eq('ler um caso', J(AC.permDaRota('/api/devolucao-casos/12','GET')), LER);
@@ -764,8 +766,10 @@ console.log('\n── 6-I. as devoluções em andamento (spec DEVOLUCOES-ACOMPAN
   for(const a of ['etapa','prorrogacao','prazo','chegou','coleta','anexo'])
     eq('"' + a + '" pede devolucao.acompanhar', AC.permDaRota('/api/devolucao-casos/12/' + a,'POST'), 'devolucao.acompanhar');
   eq('a transportadora pede devolucao.acompanhar', AC.permDaRota('/api/devolucao-casos/transportadoras','POST'), 'devolucao.acompanhar');
-  for(const a of ['perda','devolver-comprador','reembolso','valor'])
+  for(const a of ['perda','devolver-comprador','reembolso'])
     eq('"' + a + '" pede devolucao.dinheiro', AC.permDaRota('/api/devolucao-casos/12/' + a,'POST'), 'devolucao.dinheiro');
+  eq('"valor" é de quem lança, acompanha ou tem o dinheiro', J(AC.permDaRota('/api/devolucao-casos/12/valor','POST')), LER);
+  eq('a data agendada da coleta pede devolucao.acompanhar', AC.permDaRota('/api/devolucao-casos/12/coleta-agenda','POST'), 'devolucao.acompanhar');
   ok('NENHUMA rota nova cai em @logado ou @negado', ['/api/devolucao-casos','/api/devolucao-casos/1','/api/devolucao-casos/1/etapa',
      '/api/devolucao-casos/1/perda','/devolucao-casos'].every(r => ['@logado','@negado'].indexOf(J(AC.permDaRota(r,'POST'))) < 0
        && ['"@logado"','"@negado"'].indexOf(J(AC.permDaRota(r,'GET'))) < 0));
@@ -791,16 +795,19 @@ console.log('\n── 6-I. as devoluções em andamento (spec DEVOLUCOES-ACOMPAN
   ok('desmarcada, a chave não volta no boot seguinte', !tem(sB, 'devolucao.acompanhar'));
   const idAdm = db.prepare("SELECT id FROM setores WHERE nome='Admin'").get().id;
   ok('o setor Admin nativo lança e acompanha (pelo backfill do primeiro boot)', tem(idAdm,'devolucao.lancar') && tem(idAdm,'devolucao.acompanhar'));
-  ok('   e NÃO tem o dinheiro', !tem(idAdm,'devolucao.dinheiro'));
+  ok('   e NÃO tem o dinheiro (ele vai pela tela de Acessos)', !tem(idAdm,'devolucao.dinheiro'));
 
-  /* O dinheiro é intransferível: a exceção não o concede. */
+  /* O dinheiro deixou de ser intransferível (03/11/2026): a exceção o concede. */
   const uX = db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('QuerDinheiro','')").run().lastInsertRowid;
   const ag = db.prepare("SELECT u.id FROM usuarios u JOIN usuario_setor us ON us.usuario_id=u.id JOIN setores s ON s.id=us.setor_id WHERE s.nivel='admin_geral' LIMIT 1").get();
   const rotaExc = Object.keys(rotas).find(k => /^POST .*excecao/.test(k));
   if(rotaExc && ag){
     const r = chamar('POST', rotaExc.slice(5), { chave:'devolucao.dinheiro', concede:1, usuario_id:uX }, { id:uX }, { id:ag.id, nome:'AG' });
-    ok('a exceção recusa CONCEDER devolucao.dinheiro, por ser intransferível', r.status === 400 && /intransfer/i.test((r.body||{}).erro||''), JSON.stringify(r));
-    ok('   e nada foi gravado', !db.prepare("SELECT 1 FROM usuario_excecao WHERE usuario_id=? AND chave='devolucao.dinheiro'").get(uX));
+    ok('a exceção CONCEDE devolucao.dinheiro (deixou de ser intransferível)', r.status === 200, JSON.stringify(r));
+    ok('   e foi gravada', !!db.prepare("SELECT 1 FROM usuario_excecao WHERE usuario_id=? AND chave='devolucao.dinheiro' AND concede=1").get(uX));
+    const qd = { id:uX };
+    ok('decidir(): quem tem só o dinheiro abre a tela e dá a baixa', AC.decidir(qd,'/devolucao-casos','GET').ok === true && AC.decidir(qd,'/api/devolucao-casos/3/reembolso','POST').ok === true);
+    db.prepare("DELETE FROM usuario_excecao WHERE usuario_id=? AND chave='devolucao.dinheiro'").run(uX);
   } else ok('rota de exceção e Admin Geral achados para o caso', false, rotaExc + ' / ' + JSON.stringify(ag));
 
   const sup = { id: db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('Renato','')").run().lastInsertRowid };
@@ -813,8 +820,8 @@ console.log('\n── 6-I. as devoluções em andamento (spec DEVOLUCOES-ACOMPAN
   /* AS ABAS (AJUSTE de 03/11/2026): a porta única e a pergunta "quais abas eu
      vejo?" são de quem tem QUALQUER uma das quatro chaves de devolução. */
   eq('a porta única /devolucoes é de quem está logado (ela só redireciona)', AC.permDaRota('/devolucoes','GET'), '@logado');
-  eq('as abas: qualquer uma das quatro chaves', J(AC.permDaRota('/api/devolucao/abas','GET')),
-     J(['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.baixar']));
+  eq('as abas: qualquer uma das chaves de devolução', J(AC.permDaRota('/api/devolucao/abas','GET')),
+     J(['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.baixar','devolucao.dinheiro']));
   ok('decidir(): quem só acompanha pergunta as abas', AC.decidir(sup,'/api/devolucao/abas','GET').ok === true);
   eq('a tela do Edvaldo continua só de quem registra', AC.permDaRota('/devolucao','GET'), 'devolucao.registrar');
 

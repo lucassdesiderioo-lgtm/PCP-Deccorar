@@ -5,9 +5,14 @@
  * As chaves de cada rota estão no permDaRota() do acesso.js:
  *   ler e acompanhar   → devolucao.acompanhar (ou devolucao.lancar)
  *   lançar e editar    → devolucao.lancar
- *   dinheiro e decisão → devolucao.dinheiro, conferida AQUI TAMBÉM: o portão
- *                        é a primeira trava, o handler é a segunda, e é a do
- *                        handler que o teste consegue exercitar.
+ *   os valores do caso → quem lança ou acompanha (AJUSTE de 03/11/2026, dono:
+ *                        "quem estiver lançando e quem estiver à frente do
+ *                        problema")
+ *   decisões e totais  → devolucao.dinheiro: baixa do reembolso, perda,
+ *                        devolver ao comprador, o valor perdido e o devolvido,
+ *                        e os totais em reais do relatório. Conferida AQUI
+ *                        TAMBÉM: o portão é a primeira trava, o handler é a
+ *                        segunda, e é a do handler que o teste exercita.
  */
 const D = require('./devcaso_dominio');
 const CAMINHOS = require('./caminhos');
@@ -15,13 +20,17 @@ const CAMINHOS = require('./caminhos');
 module.exports = function(app, db){
   D.garantir(db);
 
-  function podeDinheiro(req){
+  function podeChave(req, chave){
     /* Sem o acesso.js carregado não há quem responda — e a resposta é NÃO.
-       O dinheiro é intransferível (§7 da spec): o "é admin" do modelo antigo
-       não serve de escape aqui. */
-    try{ return !!app.locals.acesso.podePermissao(req.usuario, 'devolucao.dinheiro'); }
+       O "é admin" do modelo antigo não serve de escape aqui. */
+    try{ return !!app.locals.acesso.podePermissao(req.usuario, chave); }
     catch(e){ return false; }
   }
+  const podeDinheiro = (req) => podeChave(req, 'devolucao.dinheiro');
+  /* Os VALORES do caso (valor do ML, custos, etiqueta, limite do frete, frete
+     devolvido) são de quem lança e de quem acompanha — e de quem tem o
+     dinheiro, que decide sobre eles. */
+  const podeValores = (req) => podeChave(req, 'devolucao.lancar') || podeChave(req, 'devolucao.acompanhar') || podeDinheiro(req);
   function auditar(req, acao, alvo, detalhe){
     try{ app.locals.acesso.auditar(req, 'devolucao', acao, String(alvo), detalhe || ''); }catch(e){}
   }
@@ -38,8 +47,8 @@ module.exports = function(app, db){
      auditoria de verdade. No máximo uma por pessoa a cada 30 min. Cada
      DECISÃO grava sempre. */
   const vistoEm = new Map();
-  function comDinheiro(req){
-    if(!podeDinheiro(req)) return false;
+  function comValores(req, so){
+    if(!(so || podeValores)(req)) return false;
     const u = req.usuario || {}, agora = Date.now();
     if((agora - (vistoEm.get(u.id) || 0)) >= 30*60*1000){
       vistoEm.set(u.id, agora);
@@ -47,25 +56,26 @@ module.exports = function(app, db){
     }
     return true;
   }
-  const semDinheiro = (req, res) => res.status(403).json({ erro:'Só quem tem a permissão de ver o dinheiro das devoluções faz isto.', chave:'devolucao.dinheiro' });
+  const semDinheiro = (req, res) => res.status(403).json({ erro:'Só quem tem a permissão do dinheiro das devoluções faz isto.', chave:'devolucao.dinheiro' });
 
   /* ── leituras ── */
   function pode(req){
     const p = (c) => { try{ return !!app.locals.acesso.podePermissao(req.usuario, c); }catch(e){ return false; } };
     /* `listas` é a chave do cadastro de motivos (Admin → Cadastros): a mesma
        lista aparece aqui para quem já pode editá-la, e só para ele. */
-    return { lancar:p('devolucao.lancar'), acompanhar:p('devolucao.acompanhar'), dinheiro:podeDinheiro(req), listas:p('listas.editar') };
+    return { lancar:p('devolucao.lancar'), acompanhar:p('devolucao.acompanhar'), dinheiro:podeDinheiro(req), valores:podeValores(req), listas:p('listas.editar') };
   }
   /* A lista diz também O QUE a pessoa pode fazer, para a tela não mostrar
      botão que dá "sem permissão". Esconder não é segurança: quem tranca é o
      portão e o handler. */
-  app.get('/api/devolucao-casos', (req,res) => responder(res, () => Object.assign(D.listar(db, { comDinheiro: comDinheiro(req) }), { pode:pode(req) })));
-  app.get('/api/devolucao-casos/encerrados', (req,res) => responder(res, () => ({ casos: D.encerrados(db, { comDinheiro: comDinheiro(req) }) })));
+  app.get('/api/devolucao-casos', (req,res) => responder(res, () => Object.assign(D.listar(db, { comDinheiro: comValores(req) }), { pode:pode(req) })));
+  app.get('/api/devolucao-casos/encerrados', (req,res) => responder(res, () => ({ casos: D.encerrados(db, { comDinheiro: comValores(req) }) })));
   /* O relatório do mês por motivo (R22). Antes do `/:id`. */
   app.get('/api/devolucao-casos/relatorio', (req,res) => responder(res, () => {
     const q = req.query || {};
     const mes = q.mes || D.hoje(db).slice(0,7);
-    return D.relatorio(db, mes, comDinheiro(req));
+    // Os TOTAIS em reais do mês são só da chave do dinheiro.
+    return D.relatorio(db, mes, comValores(req, podeDinheiro));
   }));
   /* A tela de lançar acha a venda antes de gravar, para preencher SKU,
      comprador e NF (R2). A NF também acha. */
@@ -104,20 +114,17 @@ module.exports = function(app, db){
 
   /* A busca por NF, venda ou pack (AJUSTE de 03/11/2026). Antes do `/:id`. */
   app.get('/api/devolucao-casos/buscar', (req,res) => responder(res, () =>
-    ({ casos: D.buscar(db, (req.query||{}).q, { comDinheiro: comDinheiro(req) }) })));
+    ({ casos: D.buscar(db, (req.query||{}).q, { comDinheiro: comValores(req) }) })));
 
-  app.get('/api/devolucao-casos/:id', (req,res) => responder(res, () => D.detalhe(db, req.params.id, { comDinheiro: comDinheiro(req), usuario: req.usuario })));
+  app.get('/api/devolucao-casos/:id', (req,res) => responder(res, () => D.detalhe(db, req.params.id, { comDinheiro: comValores(req), usuario: req.usuario })));
 
   /* ── lançar e editar (devolucao.lancar) ── */
   app.post('/api/devolucao-casos', (req,res) => {
     const b = Object.assign({}, req.body || {});
     // Os campos internos do script dos casos iniciais não entram pela rota.
     delete b._valor_ml; delete b._valor_ml_situacao;
-    /* Valor do ML e custo da coleta no lançamento: só com a chave do dinheiro
-       (R15). Sem ela, RECUSA — ignorar calado faria a pessoa achar que gravou. */
+    /* Os valores no lançamento são de quem lança (AJUSTE de 03/11/2026). */
     const cheio = (v) => v !== undefined && v !== null && String(v).trim() !== '';
-    if((cheio(b.valor_ml) || cheio(b.custo_etiqueta) || (b.coleta && cheio(b.coleta.custo))) && !podeDinheiro(req))
-      return res.status(403).json({ erro:'Valor do ML e custo da coleta só com a permissão de ver o dinheiro das devoluções. Lance sem eles.', chave:'devolucao.dinheiro' });
     /* Pedir a coleta e marcar a situação do valor são de quem acompanha, nas
        rotas próprias; pelo lançamento, também (achado na revisão). */
     const pode2 = pode(req);
@@ -125,7 +132,7 @@ module.exports = function(app, db){
       return res.status(403).json({ erro:'Pedir a coleta e marcar a situação do valor são de quem acompanha as devoluções. Lance sem eles.', chave:'devolucao.acompanhar' });
     responder(res, () => {
       const r = D.lancarCompleto(db, b, req.usuario);
-      if(r.valorMudou && r.valorMudou.length) auditar(req, 'valor', r.caso.id, 'lançou no lançamento '+r.valorMudou.join(', ')+': '+JSON.stringify({ valor_ml: b.valor_ml }));
+      if(r.valorMudou && r.valorMudou.length) auditar(req, 'valor', r.caso.id, 'lançou no lançamento '+r.valorMudou.join(', ')+': '+JSON.stringify({ valor_ml: b.valor_ml, custo_etiqueta: b.custo_etiqueta, limite_frete: b.limite_frete, custo: b.coleta && b.coleta.custo }));
       return { ok:true, id:r.caso.id };
     });
   });
@@ -141,11 +148,11 @@ module.exports = function(app, db){
     return { ok:true };
   }));
   app.post('/api/devolucao-casos/:id/prorrogacao', (req,res) => responder(res, () => {
-    D.pedirProrrogacao(db, req.params.id, req.usuario, (req.body||{}).texto);
+    D.pedirProrrogacao(db, req.params.id, req.usuario, (req.body||{}).texto, (req.body||{}).qual);
     return { ok:true };
   }));
   app.post('/api/devolucao-casos/:id/prazo', (req,res) => responder(res, () => {
-    D.novoPrazo(db, req.params.id, (req.body||{}).prazo, req.usuario);
+    D.novoPrazo(db, req.params.id, (req.body||{}).prazo, req.usuario, (req.body||{}).qual);
     return { ok:true };
   }));
 
@@ -156,8 +163,8 @@ module.exports = function(app, db){
     responder(res, () => { D.trocarTipo(db, req.params.id, req.body, req.usuario); return { ok:true }; });
   });
 
-  /* A revisão do frete do "ML devolve" (de quem acompanha). O valor devolvido
-     é dinheiro: com ele no corpo, só com devolucao.dinheiro (R15). */
+  /* A revisão do frete do "ML devolve" (de quem acompanha, com o valor
+     devolvido junto — os valores do caso são de quem acompanha). */
   const semAcompanhar = (res) => res.status(403).json({ erro:'A revisão do frete é de quem acompanha as devoluções.', chave:'devolucao.acompanhar' });
   app.post('/api/devolucao-casos/:id/revisao-frete', (req,res) => {
     if(!pode(req).acompanhar) return semAcompanhar(res);
@@ -166,7 +173,6 @@ module.exports = function(app, db){
   app.post('/api/devolucao-casos/:id/revisao-frete-resposta', (req,res) => {
     if(!pode(req).acompanhar) return semAcompanhar(res);
     const b = req.body || {};
-    if(b.valor_revisao !== undefined && String(b.valor_revisao).trim() !== '' && !podeDinheiro(req)) return semDinheiro(req, res);
     responder(res, () => {
       const r = D.respostaRevisaoFrete(db, req.params.id, b, req.usuario);
       if(r.valorMudou && r.valorMudou.length) auditar(req, 'valor', req.params.id, 'lançou '+r.valorMudou.join(', ')+': '+JSON.stringify({ valor_revisao: b.valor_revisao }));
@@ -195,6 +201,10 @@ module.exports = function(app, db){
     D.pedirColeta(db, req.params.id, req.body, req.usuario);
     return { ok:true };
   }));
+  app.post('/api/devolucao-casos/:id/coleta-agenda', (req,res) => responder(res, () => {
+    D.agendarColeta(db, req.params.id, req.body, req.usuario);
+    return { ok:true };
+  }));
   app.post('/api/devolucao-casos/:id/coleta-resultado', (req,res) => responder(res, () => {
     D.resultadoColeta(db, req.params.id, req.body, req.usuario);
     return { ok:true };
@@ -210,15 +220,19 @@ module.exports = function(app, db){
     return { ok:true };
   }));
 
-  /* ── decisões do admin geral (devolucao.dinheiro) ── */
+  /* Os valores do caso — de quem lança ou acompanha. O valor perdido e o
+     devolvido ao comprador acompanham as DECISÕES, e ficam com o dinheiro. */
   app.post('/api/devolucao-casos/:id/valor', (req,res) => {
-    if(!podeDinheiro(req)) return semDinheiro(req, res);
+    const b = req.body || {};
+    if(!podeValores(req)) return res.status(403).json({ erro:'Os valores do caso são de quem lança ou acompanha as devoluções.', chave:'devolucao.acompanhar' });
+    if(('valor_perdido' in b || 'valor_devolvido' in b) && !podeDinheiro(req)) return semDinheiro(req, res);
     responder(res, () => {
       const mud = D.lancarValor(db, req.params.id, req.body, req.usuario);
       if(mud.length) auditar(req, 'valor', req.params.id, 'lançou '+mud.join(', ')+': '+JSON.stringify(req.body||{}));
       return { ok:true, mudou:mud };
     });
   });
+  /* ── decisões (devolucao.dinheiro) ── */
   app.post('/api/devolucao-casos/:id/reembolso', (req,res) => {
     if(!podeDinheiro(req)) return semDinheiro(req, res);
     responder(res, () => {

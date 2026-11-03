@@ -46,9 +46,11 @@ const NOME_SAIDA = {
   revisado_ml:'Revisado (ML devolve)', devolvido_comprador:'Devolvido ao comprador', perda_prazo:'Perda por prazo'
 };
 /* Os campos em reais. Ficam fora de tudo que vai para quem não tem a chave. */
-const DINHEIRO = ['valor_ml','valor_devolvido','valor_perdido','custo_etiqueta','valor_revisao'];
+const DINHEIRO = ['valor_ml','valor_devolvido','valor_perdido','custo_etiqueta','valor_revisao','limite_frete'];
 
-const PADROES = { devol_prazo_ambar:'3', devol_prazo_vermelho:'1', devol_parado_dias:'2' };
+/* devol_coleta_dias: o ML dá 20 dias CORRIDOS, contados da abertura da
+   reclamação, para a coleta no comprador (AJUSTE de 03/11/2026, dono). */
+const PADROES = { devol_prazo_ambar:'3', devol_prazo_vermelho:'1', devol_parado_dias:'2', devol_coleta_dias:'20' };
 
 class Recusa extends Error {
   constructor(status, msg, extra){ super(msg); this.status = status; this.extra = extra || {}; }
@@ -80,7 +82,8 @@ function garantir(db){
     teste INTEGER DEFAULT 0,
     publicidade INTEGER, mensagem_ml TEXT, link_ml TEXT,
     custo_etiqueta REAL,
-    revisao_pedida_em TEXT, revisao_numero TEXT, revisao_resultado TEXT, revisao_resp_em TEXT, valor_revisao REAL)`);
+    revisao_pedida_em TEXT, revisao_numero TEXT, revisao_resultado TEXT, revisao_resp_em TEXT, valor_revisao REAL,
+    aberta_em TEXT, prazo_coleta TEXT, prazo_coleta_original TEXT, limite_frete REAL)`);
   /* FASE 5 — desde quando o valor do ML está nesta situação (R18: "pedir" há
      ≥ 2 dias entra no parado). O ALTER fica ao lado do CREATE, no fim da
      tabela, para o banco que nasceu antes desta fase (§17). */
@@ -100,6 +103,13 @@ function garantir(db){
      ML cobra o frete e a culpa não é nossa, depois de a peça chegar pede-se
      revisão; o ML devolve o frete ou nega. valor_revisao é dinheiro (R15). */
   for(const col of ['revisao_pedida_em TEXT','revisao_numero TEXT','revisao_resultado TEXT','revisao_resp_em TEXT','valor_revisao REAL'])
+    try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN "+col); }catch(e){}
+  /* OS DOIS PRAZOS DO ML (AJUSTE de 03/11/2026, dono): no "nós coletamos" o
+     `prazo` é o de mandar o comprovante do agendamento; a coleta tem o seu,
+     20 dias corridos da abertura da reclamação (`aberta_em`), com o original
+     guardado como o do comprovante (R6). E o limite do frete que o ML paga
+     (dinheiro, mas de quem lança e acompanha). No fim da tabela (§17). */
+  for(const col of ['aberta_em TEXT','prazo_coleta TEXT','prazo_coleta_original TEXT','limite_frete REAL'])
     try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN "+col); }catch(e){}
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_venda ON devolucao_caso(venda)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_aberto ON devolucao_caso(encerrado_em)");
@@ -124,7 +134,10 @@ function garantir(db){
     id INTEGER PRIMARY KEY AUTOINCREMENT, caso_id INTEGER NOT NULL, transportadora_id INTEGER,
     cep TEXT, pedida_em TEXT DEFAULT (datetime('now','localtime')), custo REAL,
     resultado TEXT DEFAULT 'aguardando', obs TEXT, usuario TEXT,
-    criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0)`);
+    criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0,
+    agendada_para TEXT)`);
+  // O dia em que a transportadora vai buscar (AJUSTE de 03/11/2026). No fim (§17).
+  try{ db.exec("ALTER TABLE devolucao_coleta ADD COLUMN agendada_para TEXT"); }catch(e){}
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcoleta_caso ON devolucao_coleta(caso_id)");
   // FASE 4 — os anexos: documentos da coleta e a foto do comprador.
   db.exec(`CREATE TABLE IF NOT EXISTS devolucao_anexo (
@@ -155,7 +168,36 @@ function dias(de, ate){
 function limites(db){
   const ler = (k) => { const r = db.prepare('SELECT valor FROM config WHERE chave=?').get(k);
     const v = parseInt(r ? r.valor : PADROES[k], 10); return isFinite(v) ? v : parseInt(PADROES[k], 10); };
-  return { ambar: ler('devol_prazo_ambar'), vermelho: ler('devol_prazo_vermelho'), parado: ler('devol_parado_dias') };
+  return { ambar: ler('devol_prazo_ambar'), vermelho: ler('devol_prazo_vermelho'), parado: ler('devol_parado_dias'), coleta: ler('devol_coleta_dias') };
+}
+
+/* Os prazos do ML de um caso "nós coletamos", em ordem: mandar o comprovante
+   do agendamento (`prazo`) e coletar (`prazo_coleta`). Cumprido é pela etapa:
+   o comprovante, quando o caso chegou a "Documentos ao ML"; a coleta, quando
+   chegou a "A caminho" (a transportadora coletou). O caso de antes dos dois
+   prazos, sem a abertura, só tem o do comprovante. */
+const NOME_PRAZO = { comprovante:'Mandar o comprovante ao ML', coleta:'Coletar' };
+function prazosDoCaso(c, h){
+  const i = ETAPAS.coleta.indexOf(c.etapa);
+  const fim = c.etapa === 'encerrado';
+  const out = [];
+  if(c.prazo) out.push({ qual:'comprovante', nome:NOME_PRAZO.comprovante, data:c.prazo, original:c.prazo_original || null,
+    dias: dias(h, c.prazo), feito: fim || i >= ETAPAS.coleta.indexOf('docs_enviados') });
+  if(c.prazo_coleta) out.push({ qual:'coleta', nome:NOME_PRAZO.coleta, data:c.prazo_coleta, original:c.prazo_coleta_original || null,
+    dias: dias(h, c.prazo_coleta), feito: fim || i >= ETAPAS.coleta.indexOf('a_caminho') });
+  return out;
+}
+function somarDias(d, n){
+  const t = Date.parse(String(d).slice(0,10)+'T00:00:00Z');
+  return isFinite(t) ? new Date(t + n*86400000).toISOString().slice(0,10) : null;
+}
+/* A abertura da reclamação: vazia é hoje; impossível ou no futuro, recusada. */
+function abertaValida(db, v){
+  if(!String(v == null ? '' : v).trim()) return hoje(db);
+  const d = dataValida(v);
+  if(!d) throw new Recusa(400, 'Data impossível em "reclamação aberta em".');
+  if(d > hoje(db)) throw new Recusa(400, 'A reclamação não pode ter sido aberta depois de hoje.');
+  return d;
 }
 
 /* O que o caso É agora: a conta da cor, do parado e da espera (R3, R4, R5).
@@ -165,8 +207,16 @@ function situacao(c, h, lim){
   const o = { dias_prazo:null, cor:'', dias_parado:null, parado:false, parado_valor:false, dias_esperando:null };
   o.dias_parado = dias(c.etapa_desde || c.criado_em, h);
   if(c.tipo === 'coleta'){
-    if(c.prazo){
-      o.dias_prazo = dias(h, c.prazo);
+    /* OS DOIS PRAZOS (AJUSTE de 03/11/2026): a cor, o número e a ordem vêm do
+       PRÓXIMO prazo aberto — o mais perto dos que ainda não foram cumpridos.
+       Cumpridos os dois (a peça foi coletada), não há prazo correndo. */
+    o.prazos = prazosDoCaso(c, h);
+    const vig = o.prazos.filter(x => !x.feito && x.dias !== null).sort((a,b) => a.dias - b.dias)[0] || null;
+    o.prazo_qual = vig ? vig.qual : null;
+    o.prazo_nome = vig ? vig.nome : null;
+    o.prazo_data = vig ? vig.data : null;
+    if(vig){
+      o.dias_prazo = vig.dias;
       if(aberto){
         if(o.dias_prazo < 0) o.cor = 'vencido';
         else if(o.dias_prazo <= lim.vermelho) o.cor = 'vermelho';
@@ -349,6 +399,7 @@ function mensagemValida(v){
   return s;
 }
 const simNao = (v) => v === 1 ? 'sim' : v === 0 ? 'não' : '—';
+const br = (d) => d ? String(d).slice(0,10).split('-').reverse().join('/') : '—';
 
 /* ── escritas ── */
 function lancar(db, b, usuario, opt){
@@ -359,10 +410,12 @@ function lancar(db, b, usuario, opt){
   let nf = String(b.nf||'').trim();
   let pack = String(b.pack_id||'').replace(/\s+/g,'');
   if(!venda && !nf && !pack) throw new Recusa(400, 'Informe a venda, o pack ou a NF.');
-  let prazo = null;
+  let prazo = null, aberta_em = null, prazo_coleta = null;
   if(tipo === 'coleta'){
     prazo = dataValida(b.prazo);
-    if(!prazo) throw new Recusa(400, 'No "Nós coletamos" o prazo do ML (resolver até) é obrigatório.');
+    if(!prazo) throw new Recusa(400, 'No "Nós coletamos" o prazo do ML para mandar o comprovante é obrigatório.');
+    aberta_em = abertaValida(db, b.aberta_em);
+    prazo_coleta = somarDias(aberta_em, limites(db).coleta);
   }
   const motivo = motivoValido(db, b.motivo);
   /* Obrigatória no lançamento (decisão do dono, 03/11/2026). Só o script dos
@@ -393,16 +446,17 @@ function lancar(db, b, usuario, opt){
   let id;
   db.transaction(() => {
     id = db.prepare(`INSERT INTO devolucao_caso (tipo,venda,pack_id,nf,sku,comprador,lote_id,motivo,etapa,prazo,
-        responsavel,passado_em,cep,valor_ml,valor_ml_situacao,obs,criado_por,publicidade,mensagem_ml,link_ml)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+        responsavel,passado_em,cep,valor_ml,valor_ml_situacao,obs,criado_por,publicidade,mensagem_ml,link_ml,aberta_em,prazo_coleta)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
         tipo, venda || null, pack || null, nf || null,
         txt(b.sku) || (lt ? lt.codigo : null), txt(b.comprador) || (lt ? lt.buyer : null), lt ? lt.id : null,
         motivo, etapa, prazo,
         txt(b.responsavel), passado_em, cepDe(b.cep),
         b._valor_ml === undefined ? null : b._valor_ml, b._valor_ml_situacao || null,
-        txt(b.obs), nomeDe(usuario), publicidade, mensagem_ml, link_ml).lastInsertRowid;
+        txt(b.obs), nomeDe(usuario), publicidade, mensagem_ml, link_ml, aberta_em, prazo_coleta).lastInsertRowid;
     if(b._valor_ml_situacao) db.prepare("UPDATE devolucao_caso SET valor_ml_desde=datetime('now','localtime') WHERE id=?").run(id);
-    evento(db, id, 'lancado', null, etapa, (tipo === 'coleta' ? 'Nós coletamos' : 'ML devolve') + (prazo ? ' · prazo '+prazo.split('-').reverse().join('/') : '') +
+    evento(db, id, 'lancado', null, etapa, (tipo === 'coleta' ? 'Nós coletamos' : 'ML devolve') +
+      (prazo ? ' · comprovante até '+br(prazo)+' · coletar até '+br(prazo_coleta) : '') +
       (publicidade == null ? '' : ' · via publicidade: '+simNao(publicidade)), nomeDe(usuario));
   })();
   return ler(db, id);
@@ -425,12 +479,14 @@ function lancarCompleto(db, b, usuario, opt){
   const co = (b.coleta && preenchido(b.coleta.transportadora_id)) ? b.coleta : null;
   const sit = preenchido(b.valor_ml_situacao) ? String(b.valor_ml_situacao).trim() : null;
   const valor = preenchido(b.valor_ml) ? b.valor_ml : null;
-  if((co || sit || valor !== null) && String(b.tipo||'').trim() === 'ml')
-    throw new Recusa(400, 'No "ML devolve" a coleta e o valor são do Mercado Livre: lance sem eles.');
+  const limite = preenchido(b.limite_frete) ? b.limite_frete : null;
+  if((co || sit || valor !== null || limite !== null) && String(b.tipo||'').trim() === 'ml')
+    throw new Recusa(400, 'No "ML devolve" a coleta, o limite do frete e o valor são do Mercado Livre: lance sem eles.');
   let c, valorMudou = [];
   db.transaction(() => {
     c = lancar(db, b, usuario, opt);
-    if(co) pedirColeta(db, c.id, { transportadora_id: co.transportadora_id, custo: co.custo, cep: b.cep, obs: co.obs }, usuario);
+    if(co) pedirColeta(db, c.id, { transportadora_id: co.transportadora_id, custo: co.custo, cep: b.cep, obs: co.obs, agendada_para: co.agendada_para }, usuario);
+    if(limite !== null) valorMudou = valorMudou.concat(lancarValor(db, c.id, { limite_frete: limite }, usuario));
     if(sit) situacaoValor(db, c.id, sit, usuario);
     /* Valor sem situação escolhida é "já veio" (a regra do lancarValor);
        com a situação escolhida no lançamento, vale a escolhida. */
@@ -458,10 +514,15 @@ function trocarTipo(db, id, b, usuario){
   const para = String(b.para || '').trim();
   if(!ETAPAS[para]) throw new Recusa(400, 'O tipo é "ML devolve" ou "Nós coletamos".');
   if(para === c.tipo) throw new Recusa(400, 'O caso já é '+(para === 'coleta' ? '"Nós coletamos"' : '"ML devolve"')+'.');
-  let prazo = c.prazo, etapa;
+  let prazo = c.prazo, etapa, aberta_em = c.aberta_em, prazo_coleta = c.prazo_coleta;
   if(para === 'coleta'){
     prazo = dataValida(b.prazo);
-    if(!prazo) throw new Recusa(400, 'Para passar a "Nós coletamos", informe o prazo do ML (resolver até).');
+    if(!prazo) throw new Recusa(400, 'Para passar a "Nós coletamos", informe o prazo do ML para mandar o comprovante.');
+    /* A abertura da reclamação: a informada, ou a que o caso já tem, ou o dia
+       do lançamento. O prazo da coleta sai dela, se ainda não houver um. */
+    aberta_em = String(b.aberta_em == null ? '' : b.aberta_em).trim() ? abertaValida(db, b.aberta_em)
+      : (c.aberta_em || String(c.criado_em||'').slice(0,10) || hoje(db));
+    if(!c.prazo_coleta_original || !prazo_coleta) prazo_coleta = somarDias(aberta_em, limites(db).coleta);
     etapa = PARA_COLETA[c.etapa];
   } else {
     const tent = db.prepare('SELECT COUNT(*) n FROM devolucao_coleta WHERE caso_id=?').get(c.id).n;
@@ -471,11 +532,11 @@ function trocarTipo(db, id, b, usuario){
   }
   if(!etapa) throw new Recusa(409, 'A etapa "'+(NOME_ETAPA[c.etapa]||c.etapa)+'" não tem equivalente no outro tipo.');
   db.transaction(() => {
-    db.prepare('UPDATE devolucao_caso SET tipo=?, etapa=?, prazo=? WHERE id=?').run(para, etapa, prazo, c.id);
+    db.prepare('UPDATE devolucao_caso SET tipo=?, etapa=?, prazo=?, aberta_em=?, prazo_coleta=? WHERE id=?').run(para, etapa, prazo, aberta_em, prazo_coleta, c.id);
     // "Passado em" é o dia do lançamento (dono): o "ML devolve" não tem, e quem vira coleta ganha.
     if(para === 'coleta' && !c.passado_em) db.prepare('UPDATE devolucao_caso SET passado_em=? WHERE id=?').run(String(c.criado_em||'').slice(0,10) || hoje(db), c.id);
     evento(db, c.id, 'tipo', c.tipo, para, (c.tipo === 'coleta' ? 'Nós coletamos' : 'ML devolve')+' → '+(para === 'coleta' ? 'Nós coletamos' : 'ML devolve')+
-      (para === 'coleta' ? ' · prazo '+prazo.split('-').reverse().join('/') : '')+
+      (para === 'coleta' ? ' · comprovante até '+br(prazo)+' · coletar até '+br(prazo_coleta) : '')+
       (etapa !== c.etapa ? ' · etapa '+(NOME_ETAPA[c.etapa]||c.etapa)+' → '+(NOME_ETAPA[etapa]||etapa) : ''), nomeDe(usuario));
   })();
   return ler(db, c.id);
@@ -520,7 +581,7 @@ function respostaRevisaoFrete(db, id, b, usuario){
 
 /* Editar o que foi lançado. CAMPO AUSENTE NÃO É CAMPO VAZIO (§6, #25): só o
    que veio no corpo muda, e o resto fica como está. */
-const EDITAVEIS = ['motivo','nf','sku','comprador','responsavel','passado_em','cep','obs','publicidade','mensagem_ml','link_ml'];
+const EDITAVEIS = ['motivo','nf','sku','comprador','responsavel','passado_em','cep','obs','publicidade','mensagem_ml','link_ml','aberta_em'];
 function editar(db, id, b, usuario){
   const c = aberto(db, id);
   b = b || {};
@@ -536,9 +597,24 @@ function editar(db, id, b, usuario){
     else if(k === 'publicidade') v = publicidadeValida(v);
     else if(k === 'mensagem_ml') v = mensagemValida(v);
     else if(k === 'link_ml') v = linkValido(v);
+    else if(k === 'aberta_em'){
+      if(c.tipo !== 'coleta') continue;
+      /* Vazio não apaga a abertura: sem ela não há prazo da coleta. */
+      if(!String(v == null ? '' : v).trim()) continue;
+      v = abertaValida(db, v);
+    }
     else { v = String(v == null ? '' : v).trim() || null; }
     if((c[k] == null ? null : c[k]) === v) continue;
     sets.push(k+'=?'); vals.push(v);
+    /* Corrigir a abertura recalcula o prazo da coleta — a menos que o ML já
+       tenha dado um prazo novo: aí vale o que o ML deu (R6). */
+    if(k === 'aberta_em' && !c.prazo_coleta_original){
+      const pc = somarDias(v, limites(db).coleta);
+      sets.push('prazo_coleta=?'); vals.push(pc);
+      mud.push('reclamação aberta em: '+br(c.aberta_em)+' → '+br(v)+' (coletar até '+br(pc)+')');
+      continue;
+    }
+    if(k === 'aberta_em'){ mud.push('reclamação aberta em: '+br(c.aberta_em)+' → '+br(v)+' (o prazo da coleta dado pelo ML fica)'); continue; }
     /* A mensagem e o link não vão para a história: a mensagem é longa, e quem
        lê a história quer saber que mudou, não reler o texto. */
     if(k === 'publicidade') mud.push('publicidade: '+simNao(c[k])+' → '+simNao(v));
@@ -626,23 +702,37 @@ function etapa(db, id, para, usuario, texto, travas){
 }
 
 /* R6: prorrogar é PEDIDO, e o prazo não muda. */
-function pedirProrrogacao(db, id, usuario, texto){
+/* Qual prazo: o que veio (comprovante ou coleta), ou o PRÓXIMO aberto — é o
+   que a tela mostra. Sem nenhum aberto, o do comprovante. */
+function qualPrazo(db, c, qual){
+  if(qual !== undefined && qual !== null && String(qual).trim() !== ''){
+    if(!NOME_PRAZO[qual]) throw new Recusa(400, 'O prazo é o do comprovante ou o da coleta.');
+    if(qual === 'coleta' && !c.prazo_coleta) throw new Recusa(400, 'Este caso não tem o prazo da coleta: informe quando a reclamação foi aberta.');
+    return qual;
+  }
+  return situacao(c, hoje(db), limites(db)).prazo_qual || 'comprovante';
+}
+function pedirProrrogacao(db, id, usuario, texto, qual){
   const c = aberto(db, id);
   if(c.tipo !== 'coleta') throw new Recusa(400, 'No "ML devolve" não há prazo do ML para prorrogar.');
-  evento(db, c.id, 'prorrogacao_pedida', c.prazo, null, texto || 'pedi prorrogação ao ML', nomeDe(usuario));
+  const q = qualPrazo(db, c, qual);
+  evento(db, c.id, 'prorrogacao_pedida', q === 'coleta' ? c.prazo_coleta : c.prazo, null,
+    (texto || 'pedi prorrogação ao ML')+' · prazo '+(q === 'coleta' ? 'da coleta' : 'do comprovante'), nomeDe(usuario));
   return ler(db, c.id);
 }
 /* R6: o ML aceitou — lança o prazo novo, e o ORIGINAL fica guardado. O
    segundo prazo novo não sobrescreve o original: ele é o primeiro, sempre. */
-function novoPrazo(db, id, prazo, usuario){
+function novoPrazo(db, id, prazo, usuario, qual){
   const c = aberto(db, id);
   if(c.tipo !== 'coleta') throw new Recusa(400, 'No "ML devolve" não há prazo do ML.');
+  const q = qualPrazo(db, c, qual);
   const p = dataValida(prazo);
   if(!p) throw new Recusa(400, 'Data impossível para o prazo novo.');
-  if(p === c.prazo) throw new Recusa(400, 'Esse já é o prazo do caso.');
+  const col = q === 'coleta' ? 'prazo_coleta' : 'prazo', orig = col + '_original';
+  if(p === c[col]) throw new Recusa(400, 'Esse já é o prazo '+(q === 'coleta' ? 'da coleta' : 'do comprovante')+'.');
   db.transaction(() => {
-    db.prepare('UPDATE devolucao_caso SET prazo=?, prazo_original=COALESCE(prazo_original, ?) WHERE id=?').run(p, c.prazo, c.id);
-    evento(db, c.id, 'prazo', c.prazo, p, 'prazo novo do ML', nomeDe(usuario));
+    db.prepare('UPDATE devolucao_caso SET '+col+'=?, '+orig+'=COALESCE('+orig+', ?) WHERE id=?').run(p, c[col], c.id);
+    evento(db, c.id, 'prazo', c[col], p, 'prazo novo do ML · '+(q === 'coleta' ? 'coleta' : 'comprovante'), nomeDe(usuario));
   })();
   return ler(db, c.id);
 }
@@ -787,10 +877,45 @@ function salvarTransportadora(db, id, b){
 /* As tentativas de um caso, numeradas (1ª, 2ª…). O custo é DINHEIRO (R15):
    só vai pelo fio a quem tem a chave. */
 function tentativas(db, caso_id, comDinheiro){
-  return db.prepare(`SELECT k.id,k.transportadora_id,t.nome transportadora,k.cep,k.pedida_em,k.custo,k.resultado,k.obs,k.usuario
+  /* Os dois AVISOS (AJUSTE de 03/11/2026) — avisam, nunca travam: a coleta
+     agendada depois do prazo da coleta, e o custo acima do limite do frete
+     que o ML paga. O do limite fala de reais: só vai com os valores. */
+  const c = ler(db, caso_id) || {};
+  return db.prepare(`SELECT k.id,k.transportadora_id,t.nome transportadora,k.cep,k.pedida_em,k.agendada_para,k.custo,k.resultado,k.obs,k.usuario
       FROM devolucao_coleta k LEFT JOIN transportadora t ON t.id=k.transportadora_id
       WHERE k.caso_id=? ORDER BY k.id`).all(caso_id)
-    .map((k, i) => { const o = Object.assign({ numero:i+1 }, k); if(!comDinheiro) delete o.custo; return o; });
+    .map((k, i) => {
+      const o = Object.assign({ numero:i+1 }, k);
+      if(k.agendada_para && c.prazo_coleta && k.agendada_para > c.prazo_coleta)
+        o.aviso_agenda = 'Agendada para '+br(k.agendada_para)+', depois do prazo da coleta ('+br(c.prazo_coleta)+'). Peça prorrogação ao ML ou remarque.';
+      if(comDinheiro && k.custo != null && c.limite_frete != null && k.custo > c.limite_frete)
+        o.aviso_limite = 'O custo passa do limite do frete que o ML paga.';
+      if(!comDinheiro) delete o.custo;
+      return o;
+    });
+}
+
+/* A data agendada da coleta, lançada ou remarcada depois do pedido (quem
+   acompanha). Vazio apaga. Só avisa se passar do prazo — nunca trava. */
+function agendarColeta(db, caso_id, b, usuario){
+  const c = aberto(db, caso_id);
+  b = b || {};
+  const k = db.prepare('SELECT * FROM devolucao_coleta WHERE id=? AND caso_id=?').get(+b.tentativa_id || 0, c.id);
+  if(!k) throw new Recusa(404, 'Tentativa não encontrada neste caso.');
+  const d = agendaValida(b.agendada_para);
+  if(d === (k.agendada_para || null)) return ler(db, c.id);
+  const num = db.prepare('SELECT COUNT(*) n FROM devolucao_coleta WHERE caso_id=? AND id<=?').get(c.id, k.id).n;
+  db.transaction(() => {
+    db.prepare('UPDATE devolucao_coleta SET agendada_para=? WHERE id=?').run(d, k.id);
+    evento(db, c.id, 'coleta', k.agendada_para, d, num+'ª tentativa · '+(d ? 'agendada para '+br(d) : 'data agendada apagada'), nomeDe(usuario));
+  })();
+  return ler(db, c.id);
+}
+function agendaValida(v){
+  if(!String(v == null ? '' : v).trim()) return null;
+  const d = dataValida(v);
+  if(!d) throw new Recusa(400, 'Data impossível em "coleta agendada para".');
+  return d;
 }
 
 /* R8: pedir a coleta abre uma tentativa. Uma de cada vez: duas aguardando ao
@@ -803,16 +928,18 @@ function pedirColeta(db, caso_id, b, usuario){
   if(!t) throw new Recusa(400, 'Escolha a transportadora.');
   if(!t.ativo) throw new Recusa(400, 'A transportadora "'+t.nome+'" está desativada.');
   const custo = reais(b.custo, 'o custo da coleta');
+  const agendada = agendaValida(b.agendada_para);
   const cep = cepDe(b.cep) || c.cep;
   const ja = db.prepare("SELECT id FROM devolucao_coleta WHERE caso_id=? AND resultado='aguardando'").get(c.id);
   if(ja) throw new Recusa(409, 'Já há uma tentativa de coleta aguardando neste caso. Registre o resultado dela antes.');
   const n = db.prepare('SELECT COUNT(*) n FROM devolucao_coleta WHERE caso_id=?').get(c.id).n + 1;
   db.transaction(() => {
-    db.prepare('INSERT INTO devolucao_coleta (caso_id,transportadora_id,cep,custo,obs,usuario) VALUES (?,?,?,?,?,?)')
-      .run(c.id, t.id, cep, custo, String(b.obs||'').trim() || null, nomeDe(usuario));
+    db.prepare('INSERT INTO devolucao_coleta (caso_id,transportadora_id,cep,custo,obs,usuario,agendada_para) VALUES (?,?,?,?,?,?,?)')
+      .run(c.id, t.id, cep, custo, String(b.obs||'').trim() || null, nomeDe(usuario), agendada);
     if(cep && !c.cep) db.prepare('UPDATE devolucao_caso SET cep=? WHERE id=?').run(cep, c.id);
-    if(c.etapa !== 'coleta_pedida') moverEtapa(db, c, 'coleta_pedida', usuario, n+'ª tentativa · '+t.nome, 'coleta');
-    else evento(db, c.id, 'coleta', null, null, n+'ª tentativa · '+t.nome, nomeDe(usuario));
+    const tx = n+'ª tentativa · '+t.nome + (agendada ? ' · agendada para '+br(agendada) : '');
+    if(c.etapa !== 'coleta_pedida') moverEtapa(db, c, 'coleta_pedida', usuario, tx, 'coleta');
+    else evento(db, c.id, 'coleta', null, null, tx, nomeDe(usuario));
   })();
   return ler(db, c.id);
 }
@@ -974,7 +1101,8 @@ function lancarValor(db, id, b, usuario){
   if(!c) throw new Recusa(404, 'Caso não encontrado. Atualize a lista.');
   b = b || {};
   const sets = [], vals = [], mud = [];
-  const ROT = { valor_ml:'valor do ML', valor_perdido:'valor perdido', valor_devolvido:'valor devolvido', custo_etiqueta:'custo da etiqueta de devolução', valor_revisao:'frete devolvido na revisão' };
+  const ROT = { valor_ml:'valor do ML', valor_perdido:'valor perdido', valor_devolvido:'valor devolvido', custo_etiqueta:'custo da etiqueta de devolução', valor_revisao:'frete devolvido na revisão', limite_frete:'limite do frete do ML' };
+  if('limite_frete' in b && c.tipo !== 'coleta') throw new Recusa(400, 'O limite do frete é do "Nós coletamos": no "ML devolve" quem paga a coleta é o ML.');
   for(const k of Object.keys(ROT)){
     if(!(k in b)) continue;
     const v = reais(b[k], ROT[k]);
@@ -1104,6 +1232,6 @@ module.exports = {
   ETAPAS, MANUAIS, NOME_ETAPA, NOME_SAIDA, DINHEIRO, Recusa,
   garantir, hoje, dataValida, dias, limites, situacao, publico, evento,
   buscarLote, buscarLotePorNF, ler, abertoDaVenda, listar, encerrados, detalhe,
-  motivoValido, reais, aberto, lancar, editar, etapa, moverEtapa, pedirProrrogacao, novoPrazo,
+  motivoValido, reais, aberto, lancar, editar, etapa, moverEtapa, pedirProrrogacao, novoPrazo, prazosDoCaso, agendarColeta,
   encerrar, encerrarPerda
 };

@@ -11,11 +11,17 @@ Criada em: 03/11/2026
 Última atualização: 03/11/2026
 Fase atual: todas em código; falta o deploy e a prova de fábrica
 Fases: 1 ✅  2 ✅  3 ✅  4 ✅  5 ✅  (em código, não no ar)
-Testes: teste_devolucao_casos.js (527 casos, e a tela em teste_devolucao_casos_tela.js, 68, os 52 da §10 e mais), teste_acesso.js (+40),
+Testes: teste_devolucao_casos.js (605 casos, e a tela em teste_devolucao_casos_tela.js, 93, os 52 da §10 e mais), teste_acesso.js (+42),
         teste_caminhos.js (+1); os 62 arquivos da raiz e os 856 do sob medida passando
 Regras que parecem bug: CLAUDE.md §9-B
 Risco: 🔴 (acesso/permissão, dinheiro, schema, toca na devolução que já existe)
 Mudanças no caminho:
+  · AJUSTE (6) de 03/11 — DOIS PRAZOS e OS VALORES (decisões do dono): no "nós coletamos" o
+    prazo de antes virou o do comprovante, e a coleta tem o seu (abertura da reclamação +
+    20 dias corridos, `devol_coleta_dias`); a lista mostra o próximo aberto; data agendada
+    e limite do frete só avisam. DIVERGE da §7/R15: os valores passaram a ser de quem lança e
+    acompanha, e `devolucao.dinheiro` ficou só com reembolso, perda, devolver ao comprador e
+    os totais do relatório — e deixou de ser intransferível (vale o CLAUDE.md §9-B).
   · Fase 1 (03/11): `devcaso_dominio.js` é o dono único do caso, do prazo e do parado;
     `devcaso_route.js` traduz HTTP. As colunas de dinheiro já nascem na tabela (o script
     dos 6 casos grava o valor do ML), mas nenhuma rota as manda até a fase 5.

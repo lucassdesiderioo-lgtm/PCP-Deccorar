@@ -54,14 +54,18 @@ function eq(desc, achado, esperado){ ok(desc, achado === esperado, 'esperado ' +
 function secao(t){ console.log('\n── ' + t + ' ──'); }
 
 /* Quem é quem: 1 é o Admin Geral (tudo, inclusive o dinheiro). */
-const PERMS = { 1: new Set(['devolucao.lancar','devolucao.acompanhar','devolucao.dinheiro','devolucao.registrar','devolucao.baixar','listas.editar']) };
+/* 2 só acompanha: desde 03/11/2026 vê e lança os valores do caso, sem a
+   baixa do reembolso. QUEM troca a pessoa da sessão no meio do teste. */
+const PERMS = { 1: new Set(['devolucao.lancar','devolucao.acompanhar','devolucao.dinheiro','devolucao.registrar','devolucao.baixar','listas.editar']),
+                2: new Set(['devolucao.acompanhar']) };
+let QUEM = 1;
 const app = express();
 app.use(express.json({ limit:'25mb' }));
 app.locals.acesso = {
   podePermissao(u, chave){ return !!(u && PERMS[u.id] && PERMS[u.id].has(chave)); },
   auditar(){}
 };
-app.use((req, res, next) => { req.usuario = { id:1, nome:'Lucas Tela' }; next(); });
+app.use((req, res, next) => { req.usuario = QUEM === 1 ? { id:1, nome:'Lucas Tela' } : { id:2, nome:'Renato Tela' }; next(); });
 app.get('/api/auth/eu', (req, res) => res.json({ logado:true, nome:'Lucas Tela', destino:{} }));
 app.get('/api/teste', (req, res) => res.json({ ativo:false }));
 app.get('/api/skus', (req, res) => res.json(db.prepare('SELECT * FROM skus').all()));
@@ -122,6 +126,47 @@ const srv = app.listen(0, async () => {
     eq('   publicidade', c1.publicidade, 1);
     eq('   link', c1.link_ml, 'https://www.mercadolivre.com.br/reclamacao/1');
     eq('   mensagem, com a quebra de linha', c1.mensagem_ml, 'linha 1\nlinha 2');
+    eq('   a reclamação aberta hoje (o campo já vinha com hoje)', c1.aberta_em, dia(0));
+    eq('   e o prazo da coleta, 20 dias depois', c1.prazo_coleta, dia(20));
+
+    /* ═════════ 1-B. os dois prazos e os campos novos do lançamento ═════════ */
+    secao('o lançamento — os dois prazos, a data agendada e o limite do frete');
+    await p.fill('#lVenda', '2000000000090055'); await p.waitForTimeout(700);
+    await p.fill('#lPrazo', dia(3));
+    await p.fill('#lAberta', dia(-2));
+    ok('a tela mostra até quando coletar', /Coletar até .*20 dias corridos/.test(await p.textContent('#lColetaAte')), await p.textContent('#lColetaAte'));
+    await p.selectOption('#lTransp', String(tr.id));
+    await p.fill('#lAgenda', dia(25));
+    ok('agendada depois do prazo da coleta: a tela avisa antes de gravar', /Depois do prazo da coleta/.test(await p.textContent('#lAgendaAviso')));
+    await p.fill('#lLimite', '174,87'); await p.fill('#lCusto', '200');
+    await p.click('#lPub [data-pub="0"]');
+    await p.click('#btLancar'); await p.waitForTimeout(1000);
+    const cid2 = +((await p.textContent('#lMsg')).match(/#(\d+)/) || [])[1];
+    const c2 = caso(cid2) || {};
+    eq('lançou mesmo com o aviso (avisa, não trava)', !!cid2, true);
+    eq('   a abertura', c2.aberta_em, dia(-2));
+    eq('   o prazo da coleta', c2.prazo_coleta, dia(18));
+    eq('   o limite do frete', c2.limite_frete, 174.87);
+    eq('   a data agendada na 1ª tentativa', (db.prepare('SELECT agendada_para d FROM devolucao_coleta WHERE caso_id=?').get(cid2) || {}).d, dia(25));
+    eq('   e a abertura volta a hoje para o próximo lançamento', await p.inputValue('#lAberta'), dia(0));
+    const linha2 = await p.locator('#listaColeta .linha', { hasText:'#'+cid2 }).textContent();
+    ok('na lista, o chip diz qual prazo: o do comprovante, que vence antes', /comprovante: faltam 3 dias/.test(linha2), linha2);
+    await p.locator('#listaColeta .linha', { hasText:'#'+cid2 }).locator('.t1').click(); await p.waitForTimeout(800);
+    const dados2 = await p.locator('#painel .dados').first().textContent();
+    ok('o caso mostra os dois prazos', /Mandar o comprovante até/.test(dados2) && /Coletar até/.test(dados2) && /Reclamação aberta em/.test(dados2), dados2);
+    ok('a tentativa avisa a data depois do prazo', /depois do prazo da coleta/.test(await p.textContent('#painel')));
+    ok('   e o custo acima do limite', /passa do limite do frete/.test(await p.textContent('#painel')));
+    await p.fill('[data-agenda]', dia(10)); await p.fill('#dLimite', '250'); await p.fill('#eAberta', dia(-1));
+    await p.click('#btSalvarTudo'); await p.waitForTimeout(1500);
+    eq('um "Salvar alterações": a data agendada', (db.prepare('SELECT agendada_para d FROM devolucao_coleta WHERE caso_id=?').get(cid2) || {}).d, dia(10));
+    eq('   o limite do frete', caso(cid2).limite_frete, 250);
+    eq('   e a abertura, com o prazo da coleta recalculado', caso(cid2).aberta_em + '/' + caso(cid2).prazo_coleta, dia(-1) + '/' + dia(19));
+    ok('   e os avisos somem', !/depois do prazo da coleta|passa do limite/.test(await p.textContent('#painel')));
+    await p.fill('#novoPrazo', dia(5)); await p.click('#btPrazo'); await p.waitForTimeout(1000);
+    eq('o prazo novo vai para o prazo escolhido (o próximo: comprovante)', caso(cid2).prazo + '/' + caso(cid2).prazo_original, dia(5) + '/' + dia(3));
+    await p.selectOption('#novoPrazoQual', 'coleta'); await p.fill('#novoPrazo', dia(25)); await p.click('#btPrazo'); await p.waitForTimeout(1000);
+    eq('   e escolhendo o da coleta, vai para ele', caso(cid2).prazo_coleta + '/' + caso(cid2).prazo_coleta_original, dia(25) + '/' + dia(19));
+    await p.click('#painel button:has-text("Fechar")'); await p.waitForTimeout(300);
 
     /* ═════════ 2. o defeito que o dono pegou ═════════ */
     secao('o caso — dois campos de blocos diferentes, UM clique (o defeito de 03/11)');
@@ -218,6 +263,20 @@ const srv = app.listen(0, async () => {
     await p.fill('#dEtiqueta', '48,70'); await p.click('#btValor'); await p.waitForTimeout(1000);
     eq('o frete cobrado pelo "Salvar alterações" do dinheiro', caso(ml.id).custo_etiqueta, 48.7);
     eq('   e a observação foi junto', caso(ml.id).obs, 'digitado antes de pedir revisão');
+
+    /* ═════════ 4-B. quem só acompanha: vê e lança os valores, sem a baixa ═════════ */
+    secao('quem só acompanha — os valores do caso, sem a baixa do reembolso');
+    QUEM = 2;
+    const pa = await pg();
+    await pa.goto(B + '/devolucao-casos'); await pa.waitForTimeout(800);
+    await pa.locator('#listaColeta .linha', { hasText:'#'+cid2 }).locator('.t1').click(); await pa.waitForTimeout(800);
+    ok('vê o bloco Valores do caso', /Valores do caso/.test(await pa.textContent('#painel')));
+    ok('   com o custo das tentativas', /Custo/.test(await pa.locator('#painel table').first().textContent()));
+    await pa.fill('#dValor', '99,90'); await pa.click('#btSalvarTudo'); await pa.waitForTimeout(1200);
+    eq('   e salva o valor do ML', caso(cid2).valor_ml, 99.9);
+    eq('não vê a baixa do reembolso', await pa.$('[data-reemb]'), null);
+    eq('   nem o encerrar como perda', await pa.$('#btPerda'), null);
+    QUEM = 1;
 
     /* ═════════ 5. o celular ═════════ */
     secao('a 400 px — a página não rola de lado, e o caso abre');
