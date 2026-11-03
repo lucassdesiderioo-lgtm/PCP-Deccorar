@@ -837,6 +837,44 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   const ADM = fs.readFileSync(path.join(__dirname,'public','index.html'),'utf8');
   ok('o admin abre direto na aba pelo endereço (#dv)', /location\.hash/.test(ADM) && /data-t="dv"/.test(ADM));
 
+  /* ═══════ A BUSCA (AJUSTE de 03/11/2026): "já foi lançada?" ═══════
+     O dono lança muitas reclamações e precisa saber se a de agora já existe.
+     A busca acha pelo número da NF, da venda ou do pack — aberto OU encerrado. */
+  const busca = (q, quem) => chamar('GET','/api/devolucao-casos/buscar',null,quem || 2,{},{ q });
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'2000077700001234', nf:'55123', prazo:dia(7) }, 3);
+  const kB = r.body.id;
+  valor(kB, { valor_ml:'99,00' });
+
+  secao('busca — acha pela NF, pela venda e pelo pack');
+  let rb = busca('55123');
+  eq('pela NF', (rb.body.casos || []).some(c => c.id === kB), true);
+  rb = busca('2000 0777 0000 1234');
+  eq('pela venda, com os espaços do bipe', (rb.body.casos || []).some(c => c.id === kB), true);
+  rb = busca('2000099900009101');
+  eq('pelo pack', (rb.body.casos || []).some(c => c.id === k21), true);
+
+  secao('busca — acha o aberto E o encerrado, dizendo qual é');
+  rb = busca('7770044');
+  const enc = (rb.body.casos || []).find(c => c.id === k44);
+  ok('o caso encerrado aparece', !!enc, JSON.stringify(rb.body));
+  ok('   dizendo como encerrou', enc && !!enc.encerrado_em && /comprador/i.test(enc.saida_nome || ''), JSON.stringify(enc));
+  rb = busca('55123');
+  const abr = (rb.body.casos || []).find(c => c.id === kB);
+  ok('o aberto aparece com a etapa', abr && !abr.encerrado_em && abr.etapa_nome === 'Lançado', JSON.stringify(abr));
+
+  secao('busca — pedaço do número, e o mínimo de 3 dígitos');
+  rb = busca('0001234');
+  eq('o final da venda acha', (rb.body.casos || []).some(c => c.id === kB), true);
+  eq('menos de 3 dígitos é recusado', busca('55').status, 400);
+  eq('vazio é recusado', busca('').status, 400);
+  rb = busca('987654321987');
+  eq('número que não existe: lista vazia, sem erro', rb.status + '/' + (rb.body.casos || []).length, '200/0');
+
+  secao('busca — o dinheiro não viaja a quem não tem a chave');
+  const ks = chavesDe(busca('55123', 2).body);
+  ok('sem a chave: nenhum valor', !DINHEIRO_CHAVES.some(k => ks.has(k)), [...ks].join(','));
+  ok('com a chave: o valor vem', (busca('55123', 1).body.casos || []).some(c => c.valor_ml === 99));
+
   fim();
 })().catch(e => { console.log('ESTOUROU: ' + e.stack); falhas++; fim(); });
 
