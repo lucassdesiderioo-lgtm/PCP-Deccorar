@@ -2,7 +2,8 @@
 
 ```
 STATUS
-Situação: no ar e conferida na tela em 03/11/2026 (PRs #250 e #251) — falta a prova de uso
+Situação: no ar e conferida na tela em 03/11/2026 (PRs #250 e #251; ajustes #253 a #256 também no ar e
+  conferidos) — falta a prova de uso
 Conferido: os 6 casos iniciais gravados (#1 a #6, a 2ª rodada não duplicou), as cores do
   prazo, a porta "Devoluções" com as abas e a aba Baixa levando ao Admin.
 Falta: um caso "nós coletamos" levado até o fim pelo Renato, e a tarja no primeiro bipe do

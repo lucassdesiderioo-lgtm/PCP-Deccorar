@@ -1810,10 +1810,20 @@ grava o texto como veio com *"conferir"* na observação.
 > - o "Devoluções" do rodapé leva a Em andamento com a faixa de abas, e a aba
 >   **Baixa** abre o Admin na aba Devoluções.
 >
+> ✅ **OS AJUSTES DE 03/11/2026 ESTÃO NO AR E CONFERIDOS** (PRs #254, #255 e
+> #256, num deploy só): o dono fez o backup, o deploy e o teste de segurança
+> (telas 302, API 401, `/login` 200) e percorreu o roteiro na tela — o
+> lançamento com "Reclamação aberta em" e "Coletar até", o chip dizendo qual
+> prazo corre, a abertura preenchida nos 6 casos antigos, quem só acompanha
+> vendo e salvando os valores sem os botões da baixa, e a permissão do
+> dinheiro dada pela tela de Acessos — e disse *"bateu tudo"*.
+>
 > ⚠️ **AINDA NÃO PROVADO:** o Renato acompanhando um caso até o fim (coleta,
-> documentos, chegada, reembolso), e a primeira caixa bipada pelo Edvaldo
-> mostrando a tarja e ligando o caso. Prova que não foi feita se escreve como
-> não feita.
+> documentos, chegada, reembolso); a primeira caixa bipada pelo Edvaldo
+> mostrando a tarja e ligando o caso; o aviso da coleta agendada depois do
+> prazo e o do custo acima do limite do frete com um caso de verdade; e a
+> revisão do frete do "ML devolve" respondida pelo ML. Prova que não foi feita
+> se escreve como não feita.
 
 ---
 
