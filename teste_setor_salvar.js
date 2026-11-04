@@ -95,18 +95,30 @@ r = chamar('POST', '/api/acesso/setores', { id:s, nome:'Supervisor', nivel:'supe
 eq('salva', r.status, 200);
 ok('o que foi desmarcado saiu, os dois', !chaves(s).includes('custo.ver') && !chaves(s).includes('compras.ver'));
 
-console.log('\n── 4. o NIVEL e etiqueta, e a SENSIVEL nova pede confirmacao ──');
+console.log('\n── 4. o NIVEL do setor TRAVA (desde 04/11/2026), e a SENSIVEL nova pede confirmacao ──');
+/* Ate 04/11/2026 o nivel do setor era so etiqueta (R-ACE-03) e este bloco
+   provava que dava para marcar `custo.ver` (Admin) no Supervisor confirmando.
+   A spec ACESSO-POR-TELA-E-NIVEL (fase 4, R-ALC-04, linha em DECISOES.md)
+   mudou a regra: a chave NOVA acima do nivel do setor e recusada na hora,
+   dizendo por que — e a que ja estava la continua la (o bloco 1 prova). */
 const semCusto = chaves(s);
 r = chamar('POST', '/api/acesso/setores', { id:s, nome:'Supervisor', nivel:'supervisor',
-  permissoes:semCusto.concat(['custo.ver']), todas:true });
-eq('marcar uma sensivel nova sem confirmar e recusado (409)', r.status, 409);
-ok('e a resposta diz QUAL, com o nome da tela', Array.isArray(r.body && r.body.sensiveis) &&
-  r.body.sensiveis.some(x => x.chave === 'custo.ver' && !!x.rotulo), JSON.stringify(r.body));
-ok('e nada foi gravado', !chaves(s).includes('custo.ver'));
-r = chamar('POST', '/api/acesso/setores', { id:s, nome:'Supervisor', nivel:'supervisor',
   permissoes:semCusto.concat(['custo.ver']), todas:true, confirmar:true });
-eq('confirmando, salva — o nivel do setor nao e mais trava escondida', r.status, 200, JSON.stringify(r.body));
-ok('e a chave entrou', chaves(s).includes('custo.ver'));
+eq('marcar no Supervisor uma chave de nivel Admin e recusado na hora (400), mesmo confirmando', r.status, 400);
+ok('e diz por que: "exige nível Admin — o setor é nível Supervisor"', /exige nível Admin — o setor é nível Supervisor/.test((r.body||{}).erro||''), JSON.stringify(r.body));
+ok('e nada foi gravado', !chaves(s).includes('custo.ver'));
+const sensSup = PERMISSOES.find(p => p.sensivel && p.nivel === 'supervisor' && !semCusto.includes(p.chave) && !p.intransferivel);
+ok('(existe uma sensivel de nivel Supervisor que o setor ainda nao tem)', !!sensSup);
+r = chamar('POST', '/api/acesso/setores', { id:s, nome:'Supervisor', nivel:'supervisor',
+  permissoes:semCusto.concat([sensSup.chave]), todas:true });
+eq('marcar uma sensivel nova DO NIVEL sem confirmar e recusado (409)', r.status, 409);
+ok('e a resposta diz QUAL, com o nome da tela', Array.isArray(r.body && r.body.sensiveis) &&
+  r.body.sensiveis.some(x => x.chave === sensSup.chave && !!x.rotulo), JSON.stringify(r.body));
+ok('e nada foi gravado', !chaves(s).includes(sensSup.chave));
+r = chamar('POST', '/api/acesso/setores', { id:s, nome:'Supervisor', nivel:'supervisor',
+  permissoes:semCusto.concat([sensSup.chave]), todas:true, confirmar:true });
+eq('confirmando, salva', r.status, 200, JSON.stringify(r.body));
+ok('e a chave entrou', chaves(s).includes(sensSup.chave));
 r = chamar('POST', '/api/acesso/setores', { id:s, nome:'Supervisor', nivel:'supervisor', permissoes:chaves(s), todas:true });
 eq('salvar de novo sem mexer nao pede confirmacao (a sensivel ja estava la)', r.status, 200, JSON.stringify(r.body));
 

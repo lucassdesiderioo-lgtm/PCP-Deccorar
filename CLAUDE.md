@@ -69,7 +69,18 @@ O que vou mudar: (arquivos, em 1 linha cada)
 Regra de negócio muda? NÃO  |  SIM → antes: … / depois: …
 Como vou testar: …
 Fica de fora: …
+
+🔐 ALÇADA
+Telas novas: nº · nome · módulo · nível        (ou "nenhuma")
+Ações novas: chave · nível · tela · sensível?   (ou "nenhuma")
+Setores novos: nome · nível                     (ou "nenhum")
+Quem recebe: só o Admin Geral, até o dono marcar
 ```
+
+> ⚠️ **O BLOCO 🔐 ALÇADA NUNCA SOME** (R-ALC-07, spec `ACESSO-POR-TELA-E-NIVEL`,
+> decisão do dono em 04/11/2026: *"tudo que for novo no sistema, a partir de
+> hoje, tem que ser revisado e entrar no controle de alçadas"*). Tarefa sem nada
+> novo escreve "nenhuma / nenhum" — o bloco vazio é a prova de que alguém olhou.
 
 4. **✋ Espere o "pode seguir".**
 
@@ -105,6 +116,7 @@ Testes: quais rodaram · resultado
 Papel em dia: CLAUDE.md §… · DECISOES.md · spec … · README das specs
 Commit/PR: …   Falta mesclar? …
 Deploy: não precisa  |  precisa → comandos · melhor horário
+Alçada conferida: telas, ações e setores novos com nível e lugar · só o Admin Geral recebe  |  nada novo
 Achei no caminho (não mexi): …
 ```
 
@@ -1590,11 +1602,19 @@ normalmente — o vínculo é bônus, não requisito.
 fluxo normal de embalagem, com kit e cronômetro, e vira estoque como qualquer outra.
 Registrar a devolução **não** mexe no saldo: o `+1` é da embalagem.
 
-**Rode `node teste_devolucao.js` (37 casos) ao mexer no `dev_route.js`.** Ele trava o
+**Rode `node teste_devolucao.js` (48 casos) ao mexer no `dev_route.js`.** Ele trava o
 SKU físico cadastrado, o `sku_venda` gravado ao lado (nunca no lugar), a fila só no
 `reembalar` e a baixa. Desde 26/10/2026 a baixa de um `id` que não existe é **404**
 (antes respondia `ok` sem gravar nada) e a baixa repetida é **409**, sem regravar a
 data, a reputação nem o motivo de quem deu antes; a aba Devoluções mostra a recusa.
+
+> ⚠️ **A BAIXA GRAVA QUEM DEU, DESDE 04/11/2026** (fase 1 da spec
+> `ACESSO-POR-TELA-E-NIVEL`, linha em `docs/DECISOES.md`): `devolucao.baixado_por_id`
+> e `baixado_por` (o nome como retrato, como o `revisao.usuario_nome`), no `CREATE`
+> e no `ALTER` guardado do `dev_route.js` (§17), na mesma transação da baixa —
+> a da aba e a de dentro do caso, que é a mesma rota. A baixa repetida (409) diz
+> quem deu e não regrava; desligar a revisão do caso (§9-B) limpa o nome junto.
+> **A baixa anterior fica sem nome** — não se inventa de memória.
 
 
 ---
@@ -1697,8 +1717,10 @@ dinheiro não vem junto.
 > ficam separados.
 
 > ⚠️ **AS DEVOLUÇÕES TÊM UMA ENTRADA SÓ, COM ABAS** (AJUSTE de 03/11/2026,
-> pedido do dono: *"concentrar em um único lugar"*). O rodapé tem **um**
-> "Devoluções", que aponta para a porta `/devolucoes`; ela leva cada pessoa à
+> pedido do dono: *"concentrar em um único lugar"*). ~~O rodapé tem **um**
+> "Devoluções"~~ — **desde 04/11/2026 o rodapé saiu e as devoluções são o bloco
+> 250 do menu por pessoa (§20)**; a porta `/devolucoes` continua, e abre para quem
+> tem alguma chave das devoluções —, que aponta para a porta `/devolucoes`; ela leva cada pessoa à
 > primeira aba que alcança (Em andamento → Receber peça → Baixa). No topo das
 > duas telas fica a faixa **Receber peça** (`/devolucao`, `devolucao.registrar`)
 > · **Em andamento** (`/devolucao-casos`) · **Baixa** (Admin → Devoluções,
@@ -1996,6 +2018,9 @@ dinheiro não vem junto.
 > por aqui (409). A lista de revisões soltas mostra cada peça em cartão, com a
 > venda do caso em cima para comparar, e a Baixa tem o mesmo "Conferir no ML".
 >
+> **O bloco "Baixa da devolução" do caso diz quando e por quem** (*"Baixa dada
+> em 04/11 às 15:20, por Renato"*, fase 1 da `ACESSO-POR-TELA-E-NIVEL`).
+>
 > ✅ **NO AR E CONFERIDO EM 03/11/2026** (PRs #259 e #260): o dono fez o
 > deploy e percorreu o roteiro na tela — a baixa dentro do caso encerrando o
 > "ML devolve", o "falta para encerrar", a peça revisada com o "Conferir no
@@ -2132,10 +2157,10 @@ dinheiro não vem junto.
 > e um caso parado entrando em "vezes parado". Prova que não foi feita se
 > escreve como não feita.
 
-**Rode `node teste_devolucao_casos.js` (908 casos) — e, na tela, `node teste_devolucao_casos_tela.js` (202) — ao mexer no
+**Rode `node teste_devolucao_casos.js` (910 casos) — e, na tela, `node teste_devolucao_casos_tela.js` (202) — ao mexer no
 `devcaso_dominio.js`, no `devcaso_route.js`, no bipe ou na baixa do
 `dev_route.js`, ou nas listas de motivos e documentos do `cad_route.js`** —
-e `node teste_devolucao.js` (37), que tem que passar sem mudar o esperado. Os
+e `node teste_devolucao.js` (48), que tem que passar sem mudar o esperado. Os
 defeitos reintroduzidos um a um (cada um reprova pelo menos um caso): a lista
 pela data de lançamento, o original sobrescrito, o acréscimo sem a marca, o
 vencido sem cor, o "nós coletamos" encerrando na baixa, a resposta sem caso
@@ -2351,6 +2376,177 @@ hoje nasce negada**. O `teste_cobertura.js` sobe os módulos de verdade e varre
 o `server.js` por texto, porque as rotas dele não são carregáveis — foi assim
 que `GET /api/producao` apareceu, no boot, depois de o outro teste dizer zero.
 
+### A alçada — tudo que é novo entra no controle de acesso (04/11/2026)
+
+Spec `docs/specs/ACESSO-POR-TELA-E-NIVEL.md` §3, regra do dono: *"tudo que for
+novo no sistema, a partir de hoje, tem que ser revisado e entrar no controle de
+alçadas — nível, tela, acesso."* Linha em `docs/DECISOES.md`.
+
+| # | Regra | Quem garante |
+|---|---|---|
+| R-ALC-01 | Nada nasce fora do controle de acesso: tela, ação (permissão), setor, módulo e rota novos só existem declarados | os testes abaixo |
+| R-ALC-02 | Tela nova: linha no mapa (`telas.js`) com número, módulo, nível e permissão | `teste_mapa.js` |
+| R-ALC-03 | Ação nova: permissão em `permissoes.js` com nível, rótulo e **a tela onde é usada** (`tela: 301`); `sensivel` quando mexe em estoque, dinheiro, acesso ou dado de pessoa | `teste_mapa.js` |
+| R-ALC-04 | Setor novo: nasce com nível e vazio de pessoas; só recebe telas e ações do nível dele ou abaixo | `teste_acesso.js` |
+| R-ALC-05 | Rota nova: linha no `permDaRota` (#29, desde 17/09/2026) | `teste_cobertura.js` |
+| R-ALC-06 | Tudo novo nasce só para o Admin Geral; quem recebe é decisão do dono, na tela de Acessos, depois da entrega | R-TEL-03 |
+| R-ALC-07 | O PLANO de toda tarefa traz o bloco 🔐 ALÇADA, e o FECHAMENTO a linha "Alçada conferida" | §0 |
+| R-ALC-08 | Spec nova traz a seção "Alçada": para cada tela e ação nova, o número, o nível e o setor sugerido | `docs/specs/README.md` |
+
+> Até o mapa e os testes existirem (fases 2 e 7 da spec), a regra vale pelo
+> PLANO, e o `teste_cobertura.js` já cobre a rota.
+
+### ⚠️ O MAPA DE TELAS — uma tela, uma linha, um número (fase 2, 04/11/2026)
+
+`telas.js` (raiz) é o **dono único** de "que telas a medida padrão tem": número,
+nome, endereço, nível, onde se trabalha, as permissões que a abrem, a área de
+chegada e a aba antiga do Admin. O sob medida põe **número 6xx e nível** no
+próprio `tecido/nucleo/telas.js` (o `/inicio` é apelido do `/`, uma linha só).
+Quem lê o mapa: as linhas de **tela** do `permDaRota` (as de API não mudaram) e
+o `destino.js`. Toda permissão de `permissoes.js` tem `tela` (R-ALC-03); as do
+sob medida tiram a dela do `TELA_DA_CHAVE` do módulo.
+
+> ⚠️ **O NÚMERO NUNCA MUDA E NUNCA SE REAPROVEITA** (R-TEL-02). A centena é o
+> módulo onde a tela nasceu; tela que muda de módulo fica com o número, e tela
+> que sai deixa o número vago. É o que permite falar *"libera a 204"*.
+>
+> ⚠️ **OS NÍVEIS DO MAPA SÃO OS DE HOJE, E NÃO OS DA PROPOSTA DA SPEC** onde os
+> dois divergiram: 104 Problemas e 204 Pendências ficaram **Admin** (a proposta
+> era Supervisor, que daria a tela a quem hoje não abre o Admin), e o 401
+> Planejamento ficou Admin abrindo com `planilha.importar` (decisão D1 (b) do
+> dono). Para mudar, é decisão dele, e muda a linha do mapa.
+>
+> ⚠️ **A ORDEM DE CHEGADA É UMA LISTA PRÓPRIA** (`CHEGADA`), e não a ordem do
+> mapa: ela decide para onde cada pessoa vai de manhã, e é a do `PADRAO` antigo.
+>
+> ⚠️ **A FASE 2 NÃO DEU NEM TIROU NADA DE NINGUÉM, e isso está provado pessoa a
+> pessoa.** `perfis_acesso.js` monta um banco de exemplo (uma pessoa por setor
+> nativo, exceção que concede e que revoga, dois setores, setor feito à mão com
+> chave acima do nível, ninguém em setor nenhum), e o `teste_mapa_antes.json`
+> é o retrato de ANTES do mapa: o que cada uma abre, as permissões e o destino.
+> O `teste_mapa.js` compara. **Não regrave esse arquivo para o teste passar** —
+> ele é a prova; regravar é apagar a prova.
+
+**Rode `node teste_mapa.js` ao criar tela, permissão, mexer no `telas.js`, no
+`permDaRota` ou no `destino.js`.** Ele reprova `.html` em `public/` ou `views/`
+sem linha no mapa (fora o login, a `/setor` e o Admin), número repetido, tela
+sem nível ou sem permissão, permissão sem `tela`, tela do sob medida sem número
+e a tela escrita à mão de novo no `acesso.js`. Oito defeitos foram
+reintroduzidos um a um, e cada um reprova.
+
+### ⚠️ O NÍVEL É DA PESSOA (fase 3 da `ACESSO-POR-TELA-E-NIVEL`, 04/11/2026)
+
+`usuarios.nivel` — `operacao`, `supervisor`, `admin` ou `admin_geral` —, no
+`CREATE` e no `ALTER` guardado do `auth.js` (o dono da tabela) e repetido no
+`acesso.js`, que sobe sozinho nos testes. Um nível só por pessoa, e ele é o
+**teto** (R-NIV-02; quem o faz valer é a fase 4, abaixo).
+
+> ⚠️ **A MIGRAÇÃO RODOU UMA VEZ SÓ** (`config.nivel_pessoa_1`), e deu a cada
+> pessoa o **maior nível que ela já alcançava** (R-NIV-05): o nível da permissão
+> mais alta que ela tem de fato, por setor ou exceção — **e não o nível do
+> setor**. Quem estava num setor marcado Admin com só chaves de Operação
+> ganharia o Admin na trava. Quem está no setor Admin Geral é Admin Geral. Rodar
+> de novo apagaria o ajuste que o dono faz pessoa a pessoa depois.
+>
+> ⚠️ **SÓ O ADMIN GERAL MUDA O NÍVEL** (R-NIV-04), por `POST
+> /api/acesso/usuario/:id/nivel`, com o de antes e o de depois na auditoria
+> (`usuario_nivel`). Na tela de Acessos é um botão próprio, e não salva junto
+> com o nome: subir de nível é promoção, não caixinha. Quem está no setor Admin
+> Geral não desce por ali — tira-se do setor antes. **Pessoa nova nasce
+> Operação.**
+
+### ⚠️ O NÍVEL É O TETO — a trava (fase 4, 04/11/2026)
+
+**Muda a R-ACE-03** (o nível do setor era só etiqueta; linha em `docs/DECISOES.md`).
+
+| Onde | O que a trava faz |
+|---|---|
+| `permissoesDe` | a permissão efetiva é só a do nível da pessoa ou abaixo — venha do setor ou da exceção. **O que passa do teto não é apagado**: só não vale, e aparece no `cortadasPeloNivel` (e no `nivel_relatorio.js`) |
+| exceção (`.../excecao`) | conceder acima do nível da pessoa: **400**, *"exige nível Admin — a pessoa é nível Operação"*. Revogar e limpar continuam livres |
+| setores da pessoa | pôr num setor de nível maior que o dela, ou que **carrega** chave acima do nível dela: **400**, com a frase. O setor que ela **já tinha** não trava a edição |
+| salvar um setor | a chave **nova** acima do nível do setor: **400**, *"exige nível X — o setor é nível Y"*, mesmo confirmando. A que **já estava** fica, e entra na lista `setoresAcimaDoNivel` para o dono decidir (R-ALC-04) |
+| `@admin` e a área `admin` | é o **nível da pessoa** ≥ Admin (`ehNivelAdmin`), e não mais "tem alguma permissão de nível Admin" |
+
+> ⚠️ **O RELATÓRIO DE QUEM PERDERIA SAIU VAZIO, E TEM QUE SAIR VAZIO EM
+> PRODUÇÃO** — por construção: a migração deu a cada pessoa o nível da
+> permissão mais alta que ela tinha, e o corte só tira o que passa desse nível.
+> A prova com dado real é rodar `node nivel_relatorio.js` no servidor depois do
+> deploy: a seção 2 tem que dizer *"ninguém"*. Se não disser, é defeito.
+>
+> ⚠️ **NÍVEL VAZIO NÃO CORTA NADA.** Ele só existe em linha criada por SQL
+> direto (um teste, um script); a pessoa criada pela tela nasce `operacao`, e o
+> deploy grava todo mundo. Não é furo: quem escreve SQL no banco já passou por
+> qualquer trava.
+>
+> ⚠️ **O ADMIN GERAL (PELO SETOR) NÃO TEM TETO**, e continua passando antes da
+> chave (#29). **Baixar o nível de alguém não apaga nada**: subindo de volta, ele
+> tem tudo de novo.
+
+### ⚠️ O ADMIN VIROU TELAS (fase 5, 04/11/2026)
+
+O Admin de 16 abas acabou (R-TEL-05): cada aba é uma tela do mapa com endereço,
+número e permissão próprios — `/admin/producao` (103), `/admin/problemas`
+(104), `/admin/pendencias` (204), `/admin/correcoes` (205),
+`/admin/devolucoes` (253), `/admin/estoque` (301), `/admin/contagem` (302),
+`/admin/skus` (402), `/admin/sku-incompleto` (403), `/admin/ficha` (404),
+`/admin/compras` (501), `/admin/cadastros` (902) e `/admin/teste` (903). A aba
+de Planejamento, Relatórios e Acessos era um iframe: **saiu**, e o caminho leva
+à tela deles (401, 904, 901).
+
+> ⚠️ **CADA TELA ABRE COM AS CHAVES DAS AÇÕES DELA** (decisão D2 (A) do dono):
+> quem via uma aba sem ter nenhuma chave dela **deixa de ver** — a seção 4 do
+> `nivel_relatorio.js` lista, pessoa a pessoa, para o dono marcar o que faltar.
+> **Estoque (301), Pendências (204) e Problemas (104)** continuam abrindo para
+> todo nível Admin (`@admin` no mapa). E a tela também tem **nível**: o
+> Supervisor com `compras.ver` não abre a 501, que é de nível Admin.
+>
+> ⚠️ **É O MESMO `index.html`, SERVIDO COM `window.TELA_ADMIN`** (`admin_telas.js`):
+> a faixa de abas some, só a carga daquela tela roda (`naTela`), e o caminho para
+> outra aba — um card da central, o "Cadastrar" de um bloqueado — vira o endereço
+> da tela dela, que o portão julga. Não foram escritos 16 arquivos novos.
+>
+> ⚠️ **A PORTA (`/`, `/admin`, `/index.html`) SÓ REDIRECIONA** (`views/admin_porta.html`):
+> à tela do link antigo (`/admin#dv` → `/admin/devolucoes`; a âncora não chega ao
+> servidor, quem lê é a página) ou à primeira tela do Admin que a pessoa alcança.
+> O `admin_telas.js` fica **entre o `auth` e o `express.static`**, e o static sobe
+> com `index:false` — sem isso o `/` entregaria as 16 abas direto do disco
+> (armadilha #3). As telas `/admin/...` entram na lista protegida do `auth.js`
+> a partir do mapa. `GET /api/telas/minhas` (`@logado`) diz as telas que a
+> pessoa abre, pela mesma conta do portão.
+
+**Rode `node teste_admin_telas.js` ao mexer no `admin_telas.js`, na porta, na
+ordem do `server.js` ou no modo de tela do `index.html`.** Seis defeitos foram
+reintroduzidos um a um, e cada um reprova. E o teste de segurança da §10 com as
+telas novas (está no CI).
+
+### ⚠️ A TELA DE ACESSOS PELO MAPA (fase 7, 04/11/2026)
+
+As caixinhas da pessoa e do setor saem do mapa: **módulo → tela (número e
+nível) → as ações penduradas nela** (`GET /api/acesso/registro` traz o `mapa`;
+o campo `tela` de cada permissão diz onde ela pendura). A caixinha **acima do
+nível** da pessoa ou do setor aparece **cinza, com a frase** (*"exige nível
+Admin (a pessoa é Operação)"*) — o servidor recusaria, e a frase diz antes do
+clique (R-NIV-03). A que o setor **já tem** acima do nível continua marcada e
+mexível, com o aviso: sai quando alguém a desmarca. A grade **telas × setores**
+(`GET /api/acesso/grade`) mostra o que cada setor recebe.
+
+> ⚠️ **TELA E AÇÃO NOVAS APARECEM SOZINHAS, SEM SETOR NENHUM, E SÓ O ADMIN GERAL
+> AS ALCANÇA** (R-TEL-03, R-ALC-06). O seed dos setores nativos só grava quando
+> o setor **nasce**; num banco que já existe, a chave nova não entra em setor
+> nenhum — o `teste_acesso.js` simula o deploy de uma tela nova e exige isso.
+> Quem recebe é decisão do dono, na tela de Acessos, depois da entrega.
+
+**Rode `node teste_acesso.js` ao mexer na tela de Acessos, no mapa ou nas
+permissões.** Cinco defeitos foram reintroduzidos (o registro sem o mapa, ação
+sumindo da tela, a grade sem o nível, setor sem nível aceito, chave nova
+entrando sozinha num setor), e cada um reprova.
+
+**`node nivel_relatorio.js` (só lê)** copia o banco com `db.backup()` e sobe o
+`acesso.js` em cima da cópia: lista cada pessoa com o nível, quem perderia
+alguma permissão com a trava (tem que sair vazio) e os setores com chave acima
+do nível deles. **Rode `node teste_nivel.js` ao mexer no nível, na migração ou
+na trava.**
+
 ### ⚠️ ARMADILHA #3 — a ordem no `server.js` é arquitetura, não estilo
 
 ```js
@@ -2373,7 +2569,11 @@ curl -s -o /dev/null -w "/login  %{http_code}\n" http://localhost:3010/login
 ```
 
 Esperado: telas `302`, API `401`, `/login` `200`.
-**Qualquer `200` numa tela é furo de segurança.**
+**Qualquer `200` numa tela é furo de segurança.** Desde a fase 5 da
+`ACESSO-POR-TELA-E-NIVEL` a lista inclui as telas do Admin: `/admin/producao`,
+`/admin/problemas`, `/admin/pendencias`, `/admin/correcoes`, `/admin/devolucoes`,
+`/admin/estoque`, `/admin/contagem`, `/admin/skus`, `/admin/sku-incompleto`,
+`/admin/ficha`, `/admin/compras`, `/admin/cadastros` e `/admin/teste`.
 
 Proteção contra força bruta: 5 PINs errados bloqueiam a pessoa por 1 minuto —
 **inclusive com o PIN certo**, senão a trava só atrasaria quem chuta —, e a trava é
@@ -2458,7 +2658,7 @@ aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não sil
 | **`express.json()` 100 kb** | Bloqueia upload de PDF | Já elevado para 25 mb — não reduzir |
 | **pdf.js quebra números** | Pack IDs vêm com espaços no meio | Regex que rejunta dígitos (já em `parse.js`) |
 | **Campo invisível no iPad** | Leitor bipa e nada acontece — iOS tira o foco de campos fora da tela | Campos de bipe devem ser **visíveis**, com `autocorrect="off"` |
-| **Leitor no modo "Alt + teclado numérico" troca de tela** | Em PC com teclado ABNT2 o leitor costuma mandar cada caractere pelo código do Windows: Alt segurado + dígitos do teclado **numérico** (o "5" chega como Alt+5-3). O `nav.js` aceitava qualquer dígito com Alt, e o primeiro dígito do código virava atalho: bipar jogava a pessoa na Etiqueta de Venda, no Carregamento, no Admin ou no "Sair do sistema?" (20/10/2026) | Atalho só pelo número da **fileira de cima** (`code` = `Digit1`…); teclado numérico com Alt nunca é atalho — `digitoDoAtalho()` no `nav.js`, travado pelo `teste_atalho.js`. ⚠️ O Playwright aperta o teclado numérico com NumLock **desligado** (`key` = "Clear"), e por isso não reproduz o defeito: para ver no navegador de verdade, mande a tecla pelo CDP com `key` = "5" e `code` = "Numpad5" |
+| **Leitor no modo "Alt + teclado numérico" troca de tela** (o Alt+1..8 saiu com o rodapé em 04/11/2026; a regra vale para o Alt+0) | Em PC com teclado ABNT2 o leitor costuma mandar cada caractere pelo código do Windows: Alt segurado + dígitos do teclado **numérico** (o "5" chega como Alt+5-3). O `nav.js` aceitava qualquer dígito com Alt, e o primeiro dígito do código virava atalho: bipar jogava a pessoa na Etiqueta de Venda, no Carregamento, no Admin ou no "Sair do sistema?" (20/10/2026) | Atalho só pelo número da **fileira de cima** (`code` = `Digit1`…); teclado numérico com Alt nunca é atalho — `digitoDoAtalho()` no `nav.js`, travado pelo `teste_atalho.js`. ⚠️ O Playwright aperta o teclado numérico com NumLock **desligado** (`key` = "Clear"), e por isso não reproduz o defeito: para ver no navegador de verdade, mande a tecla pelo CDP com `key` = "5" e `code` = "Numpad5" |
 | **Redesenho periódico apaga o campo que mora dentro do card** | A tela que se atualiza sozinha (o Carregamento, a cada 4 s) troca o `innerHTML` do card, e o campo de dentro nasce de novo, **vazio**. O motivo do "Liberar com divergência" sumia no meio da frase e, no iPad, o teclado fechava. Corrigido em 20/10/2026 | Quem redesenha guarda o digitado e devolve com o foco (`digitado`/`devolverDigitado` no `carregamento.html`), e a atualização **espera** enquanto a pessoa digita (`digitando()`) — o campo do bipe não conta, ele tem o foco o tempo todo. Campo novo dentro de card redesenhado entra nas duas listas. Travado pelo `teste_carregamento_tela.js` |
 | **`fetch` que falha some calado** | Sem rede, ou com o servidor devolvendo página de erro, o `await fetch(...).json()` lança e a promessa morre sem ninguém ver: nada na tela, nenhum som. No Carregamento a pessoa concluía que o leitor tinha falhado (20/10/2026) | O bipe passa por um `.catch` que **avisa** (`semConexao()`). A frase não promete que nada foi gravado — a resposta pode se perder depois da gravação —: manda bipar de novo, e na caixa de várias recomeçar a caixa |
 | **Leitor manda Tab ou espaço** | Código chega picado ou o Enter cai no vazio | Aceitar Enter **e** Tab; limpar com `replace(/[^A-Za-z0-9]/g,'')`; processar por timeout após a última tecla |
@@ -2811,7 +3011,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (360), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (51), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (908) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (51), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (910) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (40), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (20); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -2820,7 +3020,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 16 | ~~**Acesso: default `@logado` e cobertura mantida à mão**~~ **RESOLVIDO em 17/09/2026** — o padrão passou a ser **negar**, a cobertura varre o Express (a lista `TODAS_ROTAS` saiu) e o boot grita o nome da rota não declarada; as 28 leituras sem dono foram declaradas e as telas `.html` gêmeas herdaram a permissão da tela. Ver §10, armadilha #29 · `teste_cobertura.js` | — |
 | 17 | ~~**Acesso: duas travas faltando**~~ **RESOLVIDO em 17/09/2026** — a exceção recusa conceder chave `intransferivel`, a troca de setores tem a trava do último Admin Geral (mesma conta do `auth.js`, agora no `acesso.js`), setor novo não nasce `admin_geral` e a migração de `areas` virou evento de uma vez só (a porta A, que promovia a Admin Geral em silêncio). Ver §10, armadilha #28 | — |
 | 19 | ~~**`minimo.definir` é uma chave que nenhuma rota lê.**~~ **RESOLVIDO em 26/10/2026** (fase 3 da `ACESSOS-UNIFICADOS`) — a chave saiu do registro, do setor Comprador e das exceções (uma vez só, `config.acesso_minimo_definir`). Quem manda no card Materiais continua sendo `componente.cadastrar` e `compras.ver`; ninguém perdeu nada · `teste_setor_salvar.js` | — |
-| 20 | ~~**Editar um setor APAGA, sem avisar, as permissões que ele tem acima do próprio nível.**~~ **RESOLVIDO em 26/10/2026** (fase 3 da `ACESSOS-UNIFICADOS`, R-ACE-03) — o nível do setor virou **etiqueta**: a tela mostra a caixinha acima do nível como ela está (marcada, com o aviso "acima do nível do setor") e manda a lista inteira (`todas`); a tela antiga, sem a marca, não apaga nada. A permissão **sensível nova** pede confirmação (409 `sensiveis`) antes de entrar. As três **intransferíveis** continuam fora de qualquer setor que não seja o Admin Geral, agora por trava própria, e não mais pelo nível · `teste_setor_salvar.js` (22) | — |
+| 20 | ~~**Editar um setor APAGA, sem avisar, as permissões que ele tem acima do próprio nível.**~~ **RESOLVIDO em 26/10/2026** (fase 3 da `ACESSOS-UNIFICADOS`, R-ACE-03) — o nível do setor virou **etiqueta**: a tela mostra a caixinha acima do nível como ela está (marcada, com o aviso "acima do nível do setor") e manda a lista inteira (`todas`); a tela antiga, sem a marca, não apaga nada. A permissão **sensível nova** pede confirmação (409 `sensiveis`) antes de entrar. As três **intransferíveis** continuam fora de qualquer setor que não seja o Admin Geral, agora por trava própria, e não mais pelo nível · `teste_setor_salvar.js` (26). **Desde 04/11/2026 o nível volta a travar** (fase 4 da `ACESSO-POR-TELA-E-NIVEL`), mas recusando a chave **nova** na hora, dizendo por quê — a que já estava fica, nunca se apaga (§10) | — |
 | 18 | **Nada acusa uma regra INERTE** — e ela tem pelo menos **três formas**: dado que ninguém preencheu, **rota que nenhuma tela chama** (o extrato do livro ficou um dia no ar sem botão, §2; o `POST /api/componentes` ficou **oito meses**, e no lugar dele se fazia `INSERT` à mão — §7-B, armadilha #33) e **chave de permissão que nenhuma rota lê** (a `minimo.definir` da linha abaixo). `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
 
 ---
@@ -2969,7 +3169,25 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Declarar leitura de tela por uma chave só quando ela tem mais de um público:
   o setor Admin não tem chave de operação, e a leitura da própria tela dele
   sumiria — a declaração aceita uma LISTA (§10, armadilha #29)
-- ❌ Mover `express.static` para antes do `auth`
+- ❌ Criar tela sem linha no mapa (`telas.js`), reaproveitar um número de tela,
+  ou criar permissão sem nível ou sem `tela` (§10, O MAPA DE TELAS)
+- ❌ Fazer a trava do nível APAGAR permissão (de setor ou de exceção), ou
+  aceitar em silêncio uma chave acima do nível — ela recusa na hora, dizendo
+  "exige nível X" (§10, R-NIV-03)
+- ❌ Dar a pessoa de Operação permissão de escritório por exceção (§10)
+- ❌ Voltar a abrir a porta `@admin` por "ter alguma permissão de nível Admin":
+  é o NÍVEL da pessoa (§10, fase 4)
+- ❌ Rodar de novo a migração do nível (`config.nivel_pessoa_1`), dar o nível
+  pelo nível do SETOR, ou deixar alguém que não é Admin Geral mudar nível (§10)
+- ❌ Regravar o `teste_mapa_antes.json` para um teste passar: ele é a prova de
+  que ninguém ganhou nem perdeu acesso (§10)
+- ❌ Criar tela, ação (permissão), setor ou rota sem a declaração de alçada —
+  nível e lugar —, ou entregar o PLANO sem o bloco 🔐 ALÇADA (§0, §10, R-ALC)
+- ❌ Mover `express.static` para antes do `auth`, tirar o `index:false` dele, ou
+  registrar o `admin_telas.js` depois do static: o `/` voltaria a entregar as 16
+  abas direto do disco (§10, fase 5)
+- ❌ Voltar a pôr tela do Admin em iframe, ou a mostrar as 16 abas a quem
+  entra: cada aba é uma tela, com a permissão dela (§10, R-TEL-05)
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor
 - ❌ Criar tabela de equivalências de SKU (decisão explícita do dono)
@@ -3013,6 +3231,12 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   e dispensadas — o admin só se abre no computador (§12, decisão de 29/09/2026)
 - ❌ Dizer que levar o `.rolaH` ao `public/` da raiz é "uma linha": são duas
   base.css diferentes, 4 abas do admin e 3 telas (§12)
+- ❌ Dar uma tela ou ação nova a um setor por seed ou backfill sem o dono pedir:
+  nasce só para o Admin Geral (§10, R-TEL-03)
+- ❌ Pôr de volta o rodapé de atalhos ou o Alt+número de troca de tela, ou
+  escrever uma lista de telas no `nav.js`: o menu sai do mapa, por pessoa (§20)
+- ❌ Criar botão de ação sem `data-perm`, ou achar que esconder o botão protege
+  a ação: quem tranca é a rota (§20, R-TEL-04)
 - ❌ Criar tela interna sem o `nav.js` da operação: ela nasce sem "Trocar
   setor" e sem o atalho, e a pessoa só sai pelo login (§20, Regra A)
 - ❌ Escrever chefia, chefe, patrão, dono ou gestão em texto que aparece para
@@ -3498,6 +3722,38 @@ módulo furou o portão, que é a armadilha #3 por outra porta.
 Spec `docs/arquivo/NAVEGACAO-E-LINGUAGEM.md` (arquivada), decidida pelo Lucas em 02/10/2026,
 com as duas linhas em `docs/DECISOES.md`.
 
+### O MENU POR PESSOA NO LUGAR DO RODAPÉ (fase 6 da `ACESSO-POR-TELA-E-NIVEL`, 04/11/2026)
+
+**O rodapé de atalhos saiu** (R-TEL-06), e o **Alt+1..8** de troca de tela
+junto: ele mostrava os mesmos atalhos a todo mundo, ninguém usava, e aparecia
+duplicado no Admin. No lugar dele, o botão **☰ Menu** da barra de sessão abre
+as telas que **a pessoa** alcança, por módulo, com o número ao lado do nome
+(*"253 Devoluções — baixa"*). Módulo sem tela dela não aparece; a tela aberta
+vem marcada. Ficam **"Trocar setor"**, o atalho para a outra operação (Regra A
+abaixo) e o **Alt+0** do "Sair".
+
+> ⚠️ **O MENU SAI DO MAPA, PELA CONTA DO PORTÃO** (`GET /api/telas/minhas`,
+> `admin_telas.js`): as telas do `telas.js` que o `decidir` deixa abrir, mais as
+> do sob medida pela chave `sobmedida.<permissão>` delas. Não há lista de telas
+> no `nav.js`. As devoluções são o **bloco 250** (251, 252, 253), e a porta
+> `/devolucoes` deixou de ser `@logado`: abre para quem tem alguma chave delas.
+>
+> ⚠️ **O BOTÃO DE AÇÃO QUE A PESSOA NÃO TEM SOME** (R-TEL-04): `data-perm="chave
+> outra.chave"` no botão, e o `nav.js` o esconde de quem não tem nenhuma delas
+> (o `/api/telas/minhas` manda as permissões **da própria pessoa**). Ele nasce
+> escondido, para não piscar. **Esconder é conforto, não segurança**: a rota
+> continua recusando. Hoje estão marcados 21 botões das telas do Admin (lançar
+> produção, salvar SKU, ficha, pedir ajuste, aplicar alvo, compras, assinar a
+> caixa, cadastrar bloqueado, dar baixa, etiqueta do kit, aprovar contagem,
+> planejar a conferência). **Botão novo de ação nasce com `data-perm`.**
+>
+> ⚠️ **A APARÊNCIA DO MENU NÃO É DESTA SPEC** — é da conversa de design. Aqui
+> ele é funcional, no visual da barra de sessão.
+
+**Rode `node teste_menu.js` e `node teste_atalho.js` ao mexer no `nav.js`, no
+`/api/telas/minhas` ou num `data-perm`.** Cinco defeitos foram reintroduzidos um
+a um, e cada um reprova.
+
 ### Regra A — toda tela interna tem a troca de operação
 
 No **canto superior direito** de toda tela interna das duas operações, com o
@@ -3523,8 +3779,10 @@ existir). **Tela nova usa o `nav.js` da sua operação** (`/nav.js` no PCP,
 > dali. **A lista existia em duas cópias e elas já tinham divergido**: a do
 > `login.html` só reconhecia `sobmedida` e `sobmedida_adm` como sob medida, e
 > quem tinha só a área de **vendedor** ou de um dos **cinco setores da
-> produção** voltava ao login depois de digitar o PIN. Tela nova da medida
-> padrão entra na lista `PADRAO` de lá.
+> produção** voltava ao login depois de digitar o PIN. ~~Tela nova da medida
+> padrão entra na lista `PADRAO` de lá.~~ **Desde 04/11/2026 o `PADRAO` sai do
+> mapa de telas** (`telas.js`, a `area` e a `CHEGADA` de lá): tela nova entra
+> no mapa (§10, "O MAPA DE TELAS").
 
 > ⚠️ **O "← Medida padrão" DO RODAPÉ DO SOB MEDIDA SAIU.** Ele apontava para
 > `/`, que é o admin, e quem não tinha admin caía em "sem permissão".

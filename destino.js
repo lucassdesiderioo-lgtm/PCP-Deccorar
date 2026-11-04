@@ -18,14 +18,11 @@
    portao do `tecido/montar.js`. Isto so evita mostrar um caminho que da "nao". */
 
 // A ordem e a da prioridade de chegada: a primeira area que a pessoa tem
-// decide a tela. Tela nova da medida padrao entra aqui.
-const PADRAO=[
-  ['admin','/admin'], ['painel','/painel'], ['operador','/operador'],
-  ['montagem','/montagem'], ['embalagem','/embalagem'], ['carregamento','/carregamento'],
-  ['expedicao','/expedicao'], ['relatorios','/relatorios'], ['necessidade','/planejamento'],
-  ['recebimento','/recebimento'], ['inventario','/inventario'], ['devolucao','/devolucao'],
-  ['devolucao_casos','/devolucao-casos']
-];
+// decide a tela. DESDE 04/11/2026 A LISTA SAI DO MAPA (`telas.js`, fase 2 da
+// ACESSO-POR-TELA-E-NIVEL): a area e o endereco de cada tela moram la, e a
+// ordem de chegada e a `CHEGADA` de la. Tela nova entra no mapa, e nao aqui.
+const MAPA=require('./telas');
+const PADRAO=[['admin','/admin']].concat(MAPA.CHEGADA.map(n=>{ const t=MAPA.porNumero(n); return [t.area,t.rota]; }));
 
 const SOBMEDIDA='/sobmedida';
 

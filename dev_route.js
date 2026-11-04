@@ -14,7 +14,16 @@ function devolucoesPendentes(db){
 }
 const CASO=require('./devcaso_dominio');
 module.exports=function(app,db){
-  db.exec("CREATE TABLE IF NOT EXISTS devolucao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo_ml TEXT, sku_fisico TEXT, sku_venda TEXT, venda_id INTEGER, buyer TEXT, embalagem TEXT, tecido TEXT, tubo TEXT, base TEXT, comando TEXT, kit TEXT, destinacao TEXT, obs TEXT, reputacao TEXT, motivo TEXT, baixado INTEGER DEFAULT 0, baixado_em TEXT, recebido_em TEXT DEFAULT (datetime('now','localtime')), data TEXT DEFAULT (date('now','localtime')), teste INTEGER DEFAULT 0)");
+  db.exec("CREATE TABLE IF NOT EXISTS devolucao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo_ml TEXT, sku_fisico TEXT, sku_venda TEXT, venda_id INTEGER, buyer TEXT, embalagem TEXT, tecido TEXT, tubo TEXT, base TEXT, comando TEXT, kit TEXT, destinacao TEXT, obs TEXT, reputacao TEXT, motivo TEXT, baixado INTEGER DEFAULT 0, baixado_em TEXT, recebido_em TEXT DEFAULT (datetime('now','localtime')), data TEXT DEFAULT (date('now','localtime')), teste INTEGER DEFAULT 0, baixado_por_id INTEGER, baixado_por TEXT)");
+  /* QUEM DEU A BAIXA (spec ACESSO-POR-TELA-E-NIVEL, fase 1, 04/11/2026): o id
+     e o nome como retrato, como `revisao.usuario_nome`. Ate aqui a baixa
+     guardava so a hora. O ALTER guardado mora aqui, no dono da tabela (§17);
+     a baixa anterior fica sem nome — nao se inventa de memoria. */
+  try{
+    const cols=db.prepare("SELECT name FROM pragma_table_info('devolucao')").all().map(c=>c.name);
+    if(cols.indexOf('baixado_por_id')<0) db.exec('ALTER TABLE devolucao ADD COLUMN baixado_por_id INTEGER');
+    if(cols.indexOf('baixado_por')<0) db.exec('ALTER TABLE devolucao ADD COLUMN baixado_por TEXT');
+  }catch(e){ console.log('[devolucao] coluna de quem deu a baixa falhou: '+e.message); }
   // As tabelas do caso em andamento: o bipe e a baixa daqui leem e ligam o caso.
   CASO.garantir(db);
 
@@ -95,7 +104,7 @@ module.exports=function(app,db){
   app.get('/devolucoes',(req,res)=>{
     if(!req.usuario) return res.redirect('/login?r='+encodeURIComponent('/devolucoes'));
     const a=abasDe(req.usuario);
-    res.redirect(a.andamento?'/devolucao-casos':a.receber?'/devolucao':a.baixa?'/admin#dv':'/devolucao');
+    res.redirect(a.andamento?'/devolucao-casos':a.receber?'/devolucao':a.baixa?'/admin/devolucoes':'/devolucao');
   });
 
   app.get('/api/devolucao/pendentes',(req,res)=> res.json(devolucoesPendentes(db)));
@@ -109,17 +118,19 @@ module.exports=function(app,db){
     if(!b.id) return res.status(400).json({erro:'sem id'});
     /* Responder ok para o que nao gravou e o pior silencio: o id que nao
        existe passava, e a baixa repetida regravava a data de quem deu antes. */
-    const d=db.prepare("SELECT baixado, baixado_em FROM devolucao WHERE id=?").get(b.id);
+    const d=db.prepare("SELECT baixado, baixado_em, baixado_por FROM devolucao WHERE id=?").get(b.id);
     if(!d) return res.status(404).json({erro:'Devolução não encontrada. Atualize a lista.'});
-    if(d.baixado) return res.status(409).json({erro:'Esta devolução já teve baixa'+(d.baixado_em?' em '+d.baixado_em.slice(8,10)+'/'+d.baixado_em.slice(5,7)+' às '+d.baixado_em.slice(11,16):'')+'.'});
+    if(d.baixado) return res.status(409).json({erro:'Esta devolução já teve baixa'+(d.baixado_em?' em '+d.baixado_em.slice(8,10)+'/'+d.baixado_em.slice(5,7)+' às '+d.baixado_em.slice(11,16):'')+(d.baixado_por?', por '+d.baixado_por:'')+'.'});
     /* Ligada a um caso em andamento, o motivo vem do caso quando ninguem
        escolheu (R12), e o "ML devolve" encerra aqui (R19). Uma transacao. */
     db.transaction(()=>{
       const bx=CASO.baixaDaDevolucao(db,b.id,b.motivo||null,req.usuario);
-      db.prepare("UPDATE devolucao SET reputacao=?, motivo=?, baixado=1, baixado_em=datetime('now','localtime') WHERE id=? AND baixado=0")
-        .run(b.reputacao||null,bx.motivo,b.id);
+      const u=req.usuario||{};
+      db.prepare("UPDATE devolucao SET reputacao=?, motivo=?, baixado=1, baixado_em=datetime('now','localtime'), baixado_por_id=?, baixado_por=? WHERE id=? AND baixado=0")
+        .run(b.reputacao||null,bx.motivo,u.id||null,u.nome||null,b.id);
     })();
-    res.json({ok:true});
+    const g=db.prepare("SELECT baixado_em, baixado_por FROM devolucao WHERE id=?").get(b.id)||{};
+    res.json({ok:true, baixado_em:g.baixado_em||null, baixado_por:g.baixado_por||null});
   });
 };
 module.exports.pendentes = devolucoesPendentes;
