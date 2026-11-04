@@ -11,7 +11,7 @@
 > | Fase | O quê | Risco | Situação |
 > |---|---|---|---|
 > | 0 | A regra das alçadas no papel (`CLAUDE.md`, `DECISOES.md`) | 🟢 | feito (04/11) |
-> | 1 | A baixa de devolução grava quem deu | 🔴 | planejado |
+> | 1 | A baixa de devolução grava quem deu | 🔴 | feito (04/11) — 6 defeitos reintroduzidos, todos reprovam |
 > | 2 | O mapa de telas: uma linha por tela, um dono só | 🔴 | planejado |
 > | 3 | O nível na pessoa (sem trava ainda) | 🔴 | planejado |
 > | 4 | A trava do nível | 🔴 | planejado |

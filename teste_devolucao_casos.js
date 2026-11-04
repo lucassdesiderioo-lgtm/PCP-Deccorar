@@ -1605,6 +1605,10 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   ok('a lista de revisões soltas traz a triagem e a observação, para separar as iguais', rsE.tecido === 'ok' && rsE.obs === 'risco no tecido' && 'embalagem' in rsE && 'kit' in rsE, JSON.stringify(rsE));
   chamar('POST','/api/devolucao-casos/:id/ligar',{ devolucao_id:pecaErrada }, 2, { id:dw });
   chamar('POST','/api/devolucao/baixa',{ id:pecaErrada, reputacao:'sim', motivo:'Comprador se arrependeu' }, 3);
+  /* quem deu a baixa (fase 1 da ACESSO-POR-TELA-E-NIVEL): o caso mostra o nome */
+  const detBx = chamar("GET","/api/devolucao-casos/:id",null,2,{ id:dw }).body;
+  const cBx = detBx.caso || detBx;
+  ok('o caso mostra quem deu a baixa e quando', !!cBx.dev_baixado_em && !!cBx.dev_baixado_por, JSON.stringify({ em:cBx.dev_baixado_em, por:cBx.dev_baixado_por }));
   chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 2, { id:dw });
   eq('ligada, baixada e "Já revisei": o caso encerrou', caso(dw).saida, 'revisado_ml');
   eq('   e a etiqueta da peça errada foi gravada no caso', caso(dw).etiqueta_devolucao, '48323600001');
@@ -1626,6 +1630,7 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   eq('   a etiqueta da peça errada sai do caso', dwc.etiqueta_devolucao, null);
   const dErr = db.prepare('SELECT * FROM devolucao WHERE id=?').get(pecaErrada);
   eq('a baixa da peça errada é DESFEITA (decisão do dono)', dErr.baixado + '/' + dErr.baixado_em + '/' + dErr.reputacao + '/' + dErr.motivo, '0/null/null/null');
+  eq('   e quem deu a baixa sai junto (fase 1 da ACESSO-POR-TELA-E-NIVEL)', dErr.baixado_por_id + '/' + dErr.baixado_por, 'null/null');
   eq('   e ela volta a ser revisão solta, pendente na Baixa', (chamar('GET','/api/devolucao/pendentes',null,3).body.find(d => d.id === pecaErrada) || {}).caso_id || null, null);
   ok('   ...e aparece na Baixa', chamar('GET','/api/devolucao/pendentes',null,3).body.some(d => d.id === pecaErrada));
   const evD = eventos(dw);

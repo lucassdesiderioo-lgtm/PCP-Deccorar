@@ -234,7 +234,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
       <div id="lcMin"></div></div>
   </div>
 
-  <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide">
+  <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="sub" id="dvUltima" style="margin:0 0 10px 4px"></div><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide">
   <!-- A CONFERENCIA DE PECA (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA, 26/09/2026).
        Contar e no tablet, as cegas, em /inventario; aqui fica o que e de quem
        planeja e de quem aprova. A contagem de MATERIAL continua logo abaixo,
@@ -3005,6 +3005,7 @@ async function carregarProb(){
 }
 
 var DVMOTIVOS=[];
+function quandoBaixa(t){ t=String(t||''); return t.length>=16 ? 'em '+t.slice(8,10)+'/'+t.slice(5,7)+' às '+t.slice(11,16) : ''; }
 async function carregarDev(){
   if(!DVMOTIVOS.length){ try{ DVMOTIVOS=await (await fetch('/api/listas/motivo_devolucao')).json(); }catch(e){} }
   var l=[]; try{ l=await (await fetch('/api/devolucao/pendentes')).json(); }catch(e){}
@@ -3088,7 +3089,11 @@ document.addEventListener('click',function(e){
     fetch('/api/devolucao/baixa',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({id:id3,reputacao:v.rep,motivo:v.mot})})
       .then(function(r){ return r.json().catch(function(){ return {}; }); })
-      .then(function(d){ if(d && d.erro) alert(d.erro); carregarDev(); })
+      .then(function(d){ if(d && d.erro) alert(d.erro);
+        /* quem deu a baixa (fase 1 da ACESSO-POR-TELA-E-NIVEL): o card sai da
+           lista, e a linha diz o que acabou de ser gravado, com o nome */
+        else if(d && d.ok){ var u=document.getElementById('dvUltima'); if(u) u.textContent='Baixa da devolução #'+id3+' dada '+quandoBaixa(d.baixado_em)+(d.baixado_por?', por '+d.baixado_por:'')+'.'; }
+        carregarDev(); })
       .catch(function(){ alert('Sem conexão: a baixa não foi confirmada. Tente de novo.'); });
   }
 });

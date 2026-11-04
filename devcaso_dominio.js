@@ -307,11 +307,15 @@ function publico(c, h, lim, comDinheiro, custos){
 /* A baixa da revisão ligada, junto do caso: é ela que diz "falta dar a
    baixa" e que mostra o bloco da baixa dentro do caso. */
 function comBaixa(db, linhas){
-  const q = db.prepare('SELECT baixado, reputacao, motivo FROM devolucao WHERE id=?');
+  /* `SELECT *`, e nao as colunas: o banco que ainda nao subiu com o
+     `dev_route` novo nao tem `baixado_por` (fase 1 da ACESSO-POR-TELA-E-NIVEL),
+     e nomear a coluna derrubaria a lista inteira. */
+  const q = db.prepare('SELECT * FROM devolucao WHERE id=?');
   return linhas.map(c => {
     if(!c.devolucao_id) return c;
     const d = q.get(c.devolucao_id) || {};
-    return Object.assign({}, c, { dev_baixado: d.baixado ? 1 : 0, dev_reputacao: d.reputacao || null, dev_motivo: d.motivo || null });
+    return Object.assign({}, c, { dev_baixado: d.baixado ? 1 : 0, dev_reputacao: d.reputacao || null, dev_motivo: d.motivo || null,
+      dev_baixado_em: d.baixado_em || null, dev_baixado_por: d.baixado_por || null });
   });
 }
 /* Os custos das tentativas, por caso: a soma e quantos estão vazios. */
@@ -1116,8 +1120,11 @@ function desligarRevisao(db, caso_id, motivo, usuario){
   db.transaction(() => {
     if(d.baixado){
       db.prepare('UPDATE devolucao SET baixado=0, baixado_em=NULL, reputacao=NULL, motivo=NULL WHERE id=?').run(d.id);
+      /* quem deu sai junto (fase 1 da ACESSO-POR-TELA-E-NIVEL); a coluna pode
+         nao existir num banco que ainda nao subiu com o dev_route novo */
+      try{ db.prepare('UPDATE devolucao SET baixado_por_id=NULL, baixado_por=NULL WHERE id=?').run(d.id); }catch(e){}
       evento(db, c.id, 'baixa', null, null, 'baixa da revisão #'+d.id+' desfeita (era: afetou a reputação '+(d.reputacao||'—')+' · motivo '+(d.motivo||'—')+
-        (d.baixado_em ? ' · de '+d.baixado_em.slice(8,10)+'/'+d.baixado_em.slice(5,7) : '')+') — ela volta para a Baixa sem caso', quem);
+        (d.baixado_em ? ' · de '+d.baixado_em.slice(8,10)+'/'+d.baixado_em.slice(5,7) : '')+(d.baixado_por ? ' · por '+d.baixado_por : '')+') — ela volta para a Baixa sem caso', quem);
     }
     db.prepare(`UPDATE devolucao_caso SET devolucao_id=NULL, etapa='chegou', etapa_desde=datetime('now','localtime'),
       chegou_em=COALESCE(chegou_em, datetime('now','localtime')), encerrado_em=NULL, encerrado_por=NULL, saida=NULL,

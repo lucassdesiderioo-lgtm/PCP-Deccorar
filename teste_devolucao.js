@@ -135,6 +135,53 @@ ok('   e não regrava data, reputação nem motivo',
    d1c.baixado_em === '2026-01-01 10:00:00' && d1c.reputacao === 'sim' && d1c.motivo === 'envio errado', JSON.stringify(d1c));
 eq('o contador de hoje conta as quatro', chamar('GET','/api/devolucao/hoje').body.qtd, 4);
 
+console.log('\n── 7. a baixa grava QUEM deu (spec ACESSO-POR-TELA-E-NIVEL, fase 1) ──');
+/* Ate 04/11/2026 a baixa guardava so a hora: quem deu ficava fora do banco, e
+   so a devolucao ligada a um caso ganhava um evento com o nome. */
+const cols = db.prepare("SELECT name FROM pragma_table_info('devolucao')").all().map(c => c.name);
+ok('a tabela tem baixado_por_id e baixado_por', cols.includes('baixado_por_id') && cols.includes('baixado_por'), cols.join(','));
+eq('a baixado_por_id vem DEPOIS da teste (o ALTER acrescenta no fim, §17)', cols.indexOf('baixado_por_id') > cols.indexOf('teste'), true);
+eq('d1, baixada pela Ana, guarda o id dela', d1c.baixado_por_id, 1);
+eq('   e o nome como retrato', d1c.baixado_por, 'Ana');
+/* a 409 não regrava quem: outra pessoa tenta de novo e o nome fica */
+rotas['POST /api/devolucao/baixa']({ body:{ id:d1.id, reputacao:'nao', motivo:'x' }, params:{}, query:{}, headers:{}, usuario:{id:7,nome:'Renato'} },
+  { status(){ return this; }, json(){ return this; } });
+const d1d = db.prepare('SELECT * FROM devolucao WHERE id=?').get(d1.id);
+ok('a baixa repetida por outra pessoa não regrava quem deu', d1d.baixado_por_id === 1 && d1d.baixado_por === 'Ana', JSON.stringify(d1d));
+const pend = chamar('GET','/api/devolucao/pendentes').body;
+const d2 = pend[0];
+const out = {};
+rotas['POST /api/devolucao/baixa']({ body:{ id:d2.id, reputacao:'nao', motivo:'arrependimento' }, params:{}, query:{}, headers:{}, usuario:{id:7,nome:'Renato'} },
+  { status(c){ out.s=c; return this; }, json(b){ out.b=b; return this; } });
+const d2b = db.prepare('SELECT * FROM devolucao WHERE id=?').get(d2.id);
+ok('outra pessoa dá a baixa e o nome é o dela', d2b.baixado_por_id === 7 && d2b.baixado_por === 'Renato', JSON.stringify(d2b));
+r = chamar('POST','/api/devolucao/baixa',{ id:d2.id, reputacao:'sim', motivo:'y' });
+ok('a recusa da baixa repetida diz quem deu', /por Renato/.test(r.body.erro || ''), JSON.stringify(r.body));
+/* baixa antiga, sem o nome: nao se inventa de memoria */
+db.prepare("UPDATE devolucao SET baixado=1, baixado_em='2026-10-01 09:00:00', baixado_por_id=NULL, baixado_por=NULL WHERE id=?").run(pend[1].id);
+r = chamar('POST','/api/devolucao/baixa',{ id:pend[1].id, reputacao:'sim', motivo:'y' });
+ok('a baixa antiga continua sem nome, e a recusa não inventa um', r.status === 409 && !/ por /.test(r.body.erro || ''), JSON.stringify(r.body));
+/* sem sessao (script) a baixa nao grava nome falso */
+const pend2 = chamar('GET','/api/devolucao/pendentes').body;
+rotas['POST /api/devolucao/baixa']({ body:{ id:pend2[0].id, reputacao:'nao', motivo:'z' }, params:{}, query:{}, headers:{} },
+  { status(){ return this; }, json(){ return this; } });
+const d4 = db.prepare('SELECT * FROM devolucao WHERE id=?').get(pend2[0].id);
+ok('sem pessoa na sessão, quem deu fica vazio (nunca um nome inventado)', d4.baixado === 1 && d4.baixado_por_id == null && d4.baixado_por == null, JSON.stringify(d4));
+
+/* banco de PRODUCAO: a tabela ja existe sem as colunas, e o boot as acrescenta */
+const db2 = new Database(path.join(tmp, 'antigo.db'));
+db2.exec(`CREATE TABLE devolucao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo_ml TEXT, sku_fisico TEXT, sku_venda TEXT, venda_id INTEGER, buyer TEXT, embalagem TEXT, tecido TEXT, tubo TEXT, base TEXT, comando TEXT, kit TEXT, destinacao TEXT, obs TEXT, reputacao TEXT, motivo TEXT, baixado INTEGER DEFAULT 0, baixado_em TEXT, recebido_em TEXT, data TEXT, teste INTEGER DEFAULT 0);
+  INSERT INTO devolucao (sku_fisico,baixado,baixado_em) VALUES ('X',1,'2026-10-01 09:00:00');
+  CREATE TABLE skus (codigo TEXT PRIMARY KEY, estoque INTEGER DEFAULT 0);
+  CREATE TABLE fila (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, modo TEXT, situacao TEXT, revisado_em TEXT, embalado_em TEXT, data TEXT, teste INTEGER DEFAULT 0);
+  CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT, buyer TEXT, city TEXT, nf TEXT, venda TEXT, packId TEXT, data TEXT);`);
+require('./dev_route')({ locals:{}, get(){}, post(){} }, db2);
+const cols2 = db2.prepare("SELECT name FROM pragma_table_info('devolucao')").all().map(c => c.name);
+ok('banco que já existia ganha as duas colunas no boot (ALTER guardado)', cols2.includes('baixado_por_id') && cols2.includes('baixado_por'), cols2.join(','));
+const velha = db2.prepare('SELECT * FROM devolucao').get();
+ok('   e a baixa antiga fica sem nome (não se inventa)', velha.baixado_por == null && velha.baixado_por_id == null && velha.baixado_em === '2026-10-01 09:00:00');
+db2.close();
+
 db.close(); fs.rmSync(tmp, { recursive:true, force:true });
 console.log('\n' + (n - falhas) + ' ok, ' + falhas + ' falha(s)\n');
 process.exit(falhas ? 1 : 0);

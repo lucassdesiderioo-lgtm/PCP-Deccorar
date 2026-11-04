@@ -1143,7 +1143,7 @@ GANCHOS.push({
 GANCHOS.push({
   html:function(d, c, P, aberto){
     if(!c.devolucao_id) return '';
-    if(c.dev_baixado) return '<div class="bloco"><h3>Baixa da devolução</h3><div class="sub">Baixa dada · afetou a reputação: <b style="color:var(--txt)">'+esc(c.dev_reputacao||'—')+'</b> · motivo: <b style="color:var(--txt)">'+esc(c.dev_motivo||'—')+'</b></div></div>';
+    if(c.dev_baixado) return '<div class="bloco"><h3>Baixa da devolução</h3><div class="sub">Baixa dada'+(c.dev_baixado_em&&String(c.dev_baixado_em).length>=16?' em '+String(c.dev_baixado_em).slice(8,10)+'/'+String(c.dev_baixado_em).slice(5,7)+' às '+String(c.dev_baixado_em).slice(11,16):'')+(c.dev_baixado_por?', por <b style="color:var(--txt)">'+esc(c.dev_baixado_por)+'</b>':'')+' · afetou a reputação: <b style="color:var(--txt)">'+esc(c.dev_reputacao||'—')+'</b> · motivo: <b style="color:var(--txt)">'+esc(c.dev_motivo||'—')+'</b></div></div>';
     if(!aberto || !P.baixar) return '<div class="bloco"><h3>Baixa da devolução</h3><div class="sub">A revisão #'+c.devolucao_id+' ainda não teve baixa'+(P.baixar?'':' (é de quem dá baixa nas devoluções)')+'.</div></div>';
     var ops=['<option value="">— motivo —</option>'].concat(ESTADO.motivos.map(function(m){ return '<option'+(m===c.motivo?' selected':'')+'>'+esc(m)+'</option>'; })).join('')+
       (c.motivo && ESTADO.motivos.indexOf(c.motivo)<0 ? '<option selected>'+esc(c.motivo)+'</option>' : '');
