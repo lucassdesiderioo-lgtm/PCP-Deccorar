@@ -1,6 +1,6 @@
 # Conferência da expedição — tela enxuta, fechamento com prova e o que sobrou no fim do dia
 
-> **STATUS: em construção · 03/11/2026 — fase 1 no ar (PR #261); fases 2, 3 e 4 em código, falta subir**
+> **STATUS: no ar · 04/11/2026 — as quatro fases no ar (PRs #261 e #263); falta a prova de fábrica das fases 2 a 4**
 > Desenhada no Projeto do Claude com o Lucas em 03/11/2026. Nada construído.
 > Spec aprovada e salva no repositório em 03/11/2026; decisões em `docs/DECISOES.md`.
 >
