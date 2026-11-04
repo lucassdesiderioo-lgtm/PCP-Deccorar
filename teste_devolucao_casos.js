@@ -868,8 +868,12 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   secao('abas — o rodapé tem uma entrada só, e as duas telas têm a faixa');
   const NAV = fs.readFileSync(path.join(__dirname,'public','nav.js'),'utf8');
   ok('o rodapé não tem mais o link "Devoluções em andamento"', !/Devoluções em andamento/.test(NAV) && !/navDevCasos/.test(NAV));
-  ok('o "Devoluções" do rodapé aponta para a porta única', /href="\/devolucoes"/.test(NAV));
-  ok('   e fica aceso nas duas telas', /\/devolucao-casos/.test(NAV));
+  /* O RODAPE SAIU (fase 6 da ACESSO-POR-TELA-E-NIVEL): as devolucoes viraram o
+     bloco 250 do MENU POR PESSOA, montado do mapa — 251 receber, 252 em
+     andamento, 253 baixa. */
+  const MAPA = require('./telas');
+  ok('as três telas das devoluções são o bloco 250 do mapa (o menu por pessoa)', [251,252,253].every(n => MAPA.porNumero(n) && MAPA.moduloDe(n) === 250) && MAPA.MODULOS[250] === 'Devoluções');
+  ok('   e o menu sai do mapa (/api/telas/minhas), não de uma lista no nav.js', /\/api\/telas\/minhas/.test(NAV) && !/href="\/devolucoes"/.test(NAV));
   for(const tela of ['devolucao.html','devolucao-casos.html']){
     const H = fs.readFileSync(path.join(__dirname,'public',tela),'utf8');
     ok(tela + ' pede as abas ao servidor (/api/devolucao/abas)', /\/api\/devolucao\/abas/.test(H));

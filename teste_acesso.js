@@ -866,7 +866,11 @@ console.log('\n── 6-I. as devoluções em andamento (spec DEVOLUCOES-ACOMPAN
 
   /* AS ABAS (AJUSTE de 03/11/2026): a porta única e a pergunta "quais abas eu
      vejo?" são de quem tem QUALQUER uma das quatro chaves de devolução. */
-  eq('a porta única /devolucoes é de quem está logado (ela só redireciona)', AC.permDaRota('/devolucoes','GET'), '@logado');
+  /* Desde 04/11/2026 (fase 6 da ACESSO-POR-TELA-E-NIVEL) a porta deixou de ser
+     @logado: ela e a entrada do bloco 250 no menu, e abre para quem alcanca
+     alguma das tres telas das devolucoes. Continua so redirecionando. */
+  ok('a porta única /devolucoes abre para quem tem alguma chave das devoluções (ela só redireciona)',
+     JSON.stringify(AC.permDaRota('/devolucoes','GET')) === JSON.stringify(['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro','devolucao.baixar']));
   eq('as abas: qualquer uma das chaves de devolução', J(AC.permDaRota('/api/devolucao/abas','GET')),
      J(['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.baixar','devolucao.dinheiro']));
   ok('decidir(): quem só acompanha pergunta as abas', AC.decidir(sup,'/api/devolucao/abas','GET').ok === true);

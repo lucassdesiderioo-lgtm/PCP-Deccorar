@@ -99,4 +99,24 @@ function retrato(B, p, rotas){
   return { abre, perms, destino: destino.inicial };
 }
 
-module.exports = { montar, retrato, PERFIS, ROTAS, SETORES_EXTRAS };
+/* COMPARA O RETRATO DE ANTES COM O DE AGORA. Uma diferença é esperada, e só
+   uma, e vem nomeada: a porta `/devolucoes` (que só redireciona) deixou de ser
+   de qualquer pessoa logada na fase 6 — ela é a entrada do bloco 250 do menu e
+   abre para quem tem alguma chave das devoluções. Quem não tinha nenhuma caía,
+   depois do redirecionamento, em "Sem permissão": não perdeu tela nenhuma.
+   Devolve '' quando bate, ou o que mudou. */
+const CHAVES_DEV = ['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro','devolucao.baixar'];
+function comparar(antes, agora){
+  if(!antes) return 'sem retrato de antes';
+  const tira = l => (l || []).filter(r => r !== '/devolucoes');
+  const dif = [];
+  if(JSON.stringify(tira(antes.abre)) !== JSON.stringify(tira(agora.abre))) dif.push('telas ' + JSON.stringify(tira(antes.abre)) + ' → ' + JSON.stringify(tira(agora.abre)));
+  if(JSON.stringify(antes.perms) !== JSON.stringify(agora.perms)) dif.push('permissões mudaram');
+  if(antes.destino !== agora.destino) dif.push('destino ' + antes.destino + ' → ' + agora.destino);
+  const temDev = (agora.perms || []).some(c => CHAVES_DEV.indexOf(c) >= 0);
+  if((agora.abre || []).indexOf('/devolucoes') >= 0 && !temDev && agora.abre.indexOf('/') < 0 || ((agora.abre || []).indexOf('/devolucoes') < 0 && temDev))
+    dif.push('a porta /devolucoes não segue as chaves das devoluções');
+  return dif.join(' · ');
+}
+
+module.exports = { montar, retrato, comparar, PERFIS, ROTAS, SETORES_EXTRAS };

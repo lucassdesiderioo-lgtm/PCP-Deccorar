@@ -1717,8 +1717,10 @@ dinheiro não vem junto.
 > ficam separados.
 
 > ⚠️ **AS DEVOLUÇÕES TÊM UMA ENTRADA SÓ, COM ABAS** (AJUSTE de 03/11/2026,
-> pedido do dono: *"concentrar em um único lugar"*). O rodapé tem **um**
-> "Devoluções", que aponta para a porta `/devolucoes`; ela leva cada pessoa à
+> pedido do dono: *"concentrar em um único lugar"*). ~~O rodapé tem **um**
+> "Devoluções"~~ — **desde 04/11/2026 o rodapé saiu e as devoluções são o bloco
+> 250 do menu por pessoa (§20)**; a porta `/devolucoes` continua, e abre para quem
+> tem alguma chave das devoluções —, que aponta para a porta `/devolucoes`; ela leva cada pessoa à
 > primeira aba que alcança (Em andamento → Receber peça → Baixa). No topo das
 > duas telas fica a faixa **Receber peça** (`/devolucao`, `devolucao.registrar`)
 > · **Em andamento** (`/devolucao-casos`) · **Baixa** (Admin → Devoluções,
@@ -2634,7 +2636,7 @@ aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não sil
 | **`express.json()` 100 kb** | Bloqueia upload de PDF | Já elevado para 25 mb — não reduzir |
 | **pdf.js quebra números** | Pack IDs vêm com espaços no meio | Regex que rejunta dígitos (já em `parse.js`) |
 | **Campo invisível no iPad** | Leitor bipa e nada acontece — iOS tira o foco de campos fora da tela | Campos de bipe devem ser **visíveis**, com `autocorrect="off"` |
-| **Leitor no modo "Alt + teclado numérico" troca de tela** | Em PC com teclado ABNT2 o leitor costuma mandar cada caractere pelo código do Windows: Alt segurado + dígitos do teclado **numérico** (o "5" chega como Alt+5-3). O `nav.js` aceitava qualquer dígito com Alt, e o primeiro dígito do código virava atalho: bipar jogava a pessoa na Etiqueta de Venda, no Carregamento, no Admin ou no "Sair do sistema?" (20/10/2026) | Atalho só pelo número da **fileira de cima** (`code` = `Digit1`…); teclado numérico com Alt nunca é atalho — `digitoDoAtalho()` no `nav.js`, travado pelo `teste_atalho.js`. ⚠️ O Playwright aperta o teclado numérico com NumLock **desligado** (`key` = "Clear"), e por isso não reproduz o defeito: para ver no navegador de verdade, mande a tecla pelo CDP com `key` = "5" e `code` = "Numpad5" |
+| **Leitor no modo "Alt + teclado numérico" troca de tela** (o Alt+1..8 saiu com o rodapé em 04/11/2026; a regra vale para o Alt+0) | Em PC com teclado ABNT2 o leitor costuma mandar cada caractere pelo código do Windows: Alt segurado + dígitos do teclado **numérico** (o "5" chega como Alt+5-3). O `nav.js` aceitava qualquer dígito com Alt, e o primeiro dígito do código virava atalho: bipar jogava a pessoa na Etiqueta de Venda, no Carregamento, no Admin ou no "Sair do sistema?" (20/10/2026) | Atalho só pelo número da **fileira de cima** (`code` = `Digit1`…); teclado numérico com Alt nunca é atalho — `digitoDoAtalho()` no `nav.js`, travado pelo `teste_atalho.js`. ⚠️ O Playwright aperta o teclado numérico com NumLock **desligado** (`key` = "Clear"), e por isso não reproduz o defeito: para ver no navegador de verdade, mande a tecla pelo CDP com `key` = "5" e `code` = "Numpad5" |
 | **Redesenho periódico apaga o campo que mora dentro do card** | A tela que se atualiza sozinha (o Carregamento, a cada 4 s) troca o `innerHTML` do card, e o campo de dentro nasce de novo, **vazio**. O motivo do "Liberar com divergência" sumia no meio da frase e, no iPad, o teclado fechava. Corrigido em 20/10/2026 | Quem redesenha guarda o digitado e devolve com o foco (`digitado`/`devolverDigitado` no `carregamento.html`), e a atualização **espera** enquanto a pessoa digita (`digitando()`) — o campo do bipe não conta, ele tem o foco o tempo todo. Campo novo dentro de card redesenhado entra nas duas listas. Travado pelo `teste_carregamento_tela.js` |
 | **`fetch` que falha some calado** | Sem rede, ou com o servidor devolvendo página de erro, o `await fetch(...).json()` lança e a promessa morre sem ninguém ver: nada na tela, nenhum som. No Carregamento a pessoa concluía que o leitor tinha falhado (20/10/2026) | O bipe passa por um `.catch` que **avisa** (`semConexao()`). A frase não promete que nada foi gravado — a resposta pode se perder depois da gravação —: manda bipar de novo, e na caixa de várias recomeçar a caixa |
 | **Leitor manda Tab ou espaço** | Código chega picado ou o Enter cai no vazio | Aceitar Enter **e** Tab; limpar com `replace(/[^A-Za-z0-9]/g,'')`; processar por timeout após a última tecla |
@@ -2987,7 +2989,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (360), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (51), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (910) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (60), `teste_nivel.js` (98), `teste_admin_telas.js` (54); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (360), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (51), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (910) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (40), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (20); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3207,6 +3209,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   e dispensadas — o admin só se abre no computador (§12, decisão de 29/09/2026)
 - ❌ Dizer que levar o `.rolaH` ao `public/` da raiz é "uma linha": são duas
   base.css diferentes, 4 abas do admin e 3 telas (§12)
+- ❌ Pôr de volta o rodapé de atalhos ou o Alt+número de troca de tela, ou
+  escrever uma lista de telas no `nav.js`: o menu sai do mapa, por pessoa (§20)
+- ❌ Criar botão de ação sem `data-perm`, ou achar que esconder o botão protege
+  a ação: quem tranca é a rota (§20, R-TEL-04)
 - ❌ Criar tela interna sem o `nav.js` da operação: ela nasce sem "Trocar
   setor" e sem o atalho, e a pessoa só sai pelo login (§20, Regra A)
 - ❌ Escrever chefia, chefe, patrão, dono ou gestão em texto que aparece para
@@ -3691,6 +3697,38 @@ módulo furou o portão, que é a armadilha #3 por outra porta.
 
 Spec `docs/arquivo/NAVEGACAO-E-LINGUAGEM.md` (arquivada), decidida pelo Lucas em 02/10/2026,
 com as duas linhas em `docs/DECISOES.md`.
+
+### O MENU POR PESSOA NO LUGAR DO RODAPÉ (fase 6 da `ACESSO-POR-TELA-E-NIVEL`, 04/11/2026)
+
+**O rodapé de atalhos saiu** (R-TEL-06), e o **Alt+1..8** de troca de tela
+junto: ele mostrava os mesmos atalhos a todo mundo, ninguém usava, e aparecia
+duplicado no Admin. No lugar dele, o botão **☰ Menu** da barra de sessão abre
+as telas que **a pessoa** alcança, por módulo, com o número ao lado do nome
+(*"253 Devoluções — baixa"*). Módulo sem tela dela não aparece; a tela aberta
+vem marcada. Ficam **"Trocar setor"**, o atalho para a outra operação (Regra A
+abaixo) e o **Alt+0** do "Sair".
+
+> ⚠️ **O MENU SAI DO MAPA, PELA CONTA DO PORTÃO** (`GET /api/telas/minhas`,
+> `admin_telas.js`): as telas do `telas.js` que o `decidir` deixa abrir, mais as
+> do sob medida pela chave `sobmedida.<permissão>` delas. Não há lista de telas
+> no `nav.js`. As devoluções são o **bloco 250** (251, 252, 253), e a porta
+> `/devolucoes` deixou de ser `@logado`: abre para quem tem alguma chave delas.
+>
+> ⚠️ **O BOTÃO DE AÇÃO QUE A PESSOA NÃO TEM SOME** (R-TEL-04): `data-perm="chave
+> outra.chave"` no botão, e o `nav.js` o esconde de quem não tem nenhuma delas
+> (o `/api/telas/minhas` manda as permissões **da própria pessoa**). Ele nasce
+> escondido, para não piscar. **Esconder é conforto, não segurança**: a rota
+> continua recusando. Hoje estão marcados 21 botões das telas do Admin (lançar
+> produção, salvar SKU, ficha, pedir ajuste, aplicar alvo, compras, assinar a
+> caixa, cadastrar bloqueado, dar baixa, etiqueta do kit, aprovar contagem,
+> planejar a conferência). **Botão novo de ação nasce com `data-perm`.**
+>
+> ⚠️ **A APARÊNCIA DO MENU NÃO É DESTA SPEC** — é da conversa de design. Aqui
+> ele é funcional, no visual da barra de sessão.
+
+**Rode `node teste_menu.js` e `node teste_atalho.js` ao mexer no `nav.js`, no
+`/api/telas/minhas` ou num `data-perm`.** Cinco defeitos foram reintroduzidos um
+a um, e cada um reprova.
 
 ### Regra A — toda tela interna tem a troca de operação
 

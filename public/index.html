@@ -118,7 +118,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
 
     <div class="card"><div style="font-weight:700;margin-bottom:10px">Selecione os SKUs e as quantidades a produzir</div>
       <div id="sellist"></div>
-      <div class="row-actions"><button class="primary" onclick="lancar()">Lançar para produção</button>
+      <div class="row-actions"><button class="primary" data-perm="producao.lancar" onclick="lancar()">Lançar para produção</button>
         <button class="ghost" onclick="limparSel()">Limpar quantidades</button><span class="msg" id="msgProd"></span></div>
     </div>
     <div class="card"><div style="font-weight:700;margin-bottom:10px">Lançamentos de hoje</div>
@@ -197,8 +197,8 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
     <div class="card">
       <div id="fxLinhas"></div>
       <div class="row-actions">
-        <button class="primary" id="fxNovo">+ acrescentar material</button>
-        <button class="ghost" id="fxMat">Gravar na ficha da montagem</button>
+        <button class="primary" data-perm="modelo.cadastrar" id="fxNovo">+ acrescentar material</button>
+        <button class="ghost" data-perm="modelo.cadastrar" id="fxMat">Gravar na ficha da montagem</button>
         <span class="msg" id="fxMatMsg"></span>
       </div>
     </div>
@@ -449,7 +449,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
       </div>
       <div class="sub" style="margin-top:10px"><b>O código do SKU não precisa seguir formato nenhum</b> — pode ser o que você quiser. O que vale é o que está nestes campos. Se o código por acaso for do tipo antigo (<code>BK180150BRANCO</code>), largura, altura e cor se preenchem sozinhos como atalho de digitação, e seguem editáveis. Modelo e tecido nunca são deduzidos do código: <code>BK</code> é o tecido blackout, não o modelo.</div>
       <div id="cadDica" style="margin-top:8px;font-size:13px"></div>
-      <div class="row-actions"><button class="primary" onclick="salvar()">Salvar produto</button>
+      <div class="row-actions"><button class="primary" data-perm="sku.cadastrar" onclick="salvar()">Salvar produto</button>
         <span class="sub">O saldo se corrige na aba "Estoque"; o alvo vem do Planejamento.</span><span class="msg" id="msg"></span></div></div>
 
     <div class="card"><div style="font-weight:700;margin-bottom:4px">Modelos, cores e tecidos</div>
@@ -476,6 +476,9 @@ const $=s=>document.querySelector(s);
    Pendências, o "Cadastrar" de um bloqueado — vira o endereço da tela dela,
    que o portão julga como qualquer tela. */
 var TELA=window.TELA_ADMIN||null, ROTA_DA_ABA=window.ROTA_DA_ABA||{};
+/* BOTÃO QUE A PESSOA NÃO TEM SOME (fase 6, R-TEL-04): `data-perm="chave outra"`
+   no botão de ação, e o nav.js o esconde de quem não tem nenhuma delas. O
+   servidor continua recusando — esconder é conforto, não segurança. */
 function naTela(){ return !TELA || Array.prototype.indexOf.call(arguments, TELA.aba) >= 0; }
 if(TELA){
   document.querySelector('.tabs').style.display='none';
@@ -1260,7 +1263,7 @@ async function verLista(){
     +'<span class="sub">'+d.itens+' item(ns) · por fornecedor: '
     +Object.keys(d.por_fornecedor).map(f=>esc(f)+' ('+d.por_fornecedor[f].itens+')').join(' · ')+'</span>'
     +'<span style="font-size:17px"><span class="sub">previsto: </span><b style="color:var(--amber);font-size:21px">'+brl(d.total)+'</b></span></div>'
-    +'<div class="row-actions"><button class="primary" id="lcGerar">Gerar pedidos por fornecedor</button>'
+    +'<div class="row-actions"><button class="primary" data-perm="pedido.criar" id="lcGerar">Gerar pedidos por fornecedor</button>'
     +'<span class="sub">Um pedido por fornecedor — 6 itens do mesmo fornecedor é um pedido, não seis.</span>'
     +'<span class="msg" id="lcGerMsg"></span></div>';
   h+='<div class="sub" style="margin-top:10px">A necessidade é o <b>maior</b> dos dois gatilhos, nunca a soma. O mínimo existe para cobrir a venda que ainda não apareceu; quando ela aparece, substitui o mínimo em vez de somar a ele.</div>';
@@ -1369,7 +1372,7 @@ async function verMinimos(){
     +'<div><label class="sub">Material novo</label><br><input id="cnNome" placeholder="Tubo 38 mm" style="width:220px"></div>'
     +'<div><label class="sub">Código</label><br><input id="cnCod" placeholder="(opcional)" style="width:100px"></div>'
     +'<div><label class="sub">Unidade</label><br><select id="cnUn" style="width:100px">'+opts('un')+'</select></div>'
-    +'<button class="primary" id="cnAdd">Adicionar</button>'
+    +'<button class="primary" data-perm="componente.cadastrar" id="cnAdd">Adicionar</button>'
     +'<span class="msg" id="lcMsg"></span></div>'
     +'<div class="sub" style="margin-top:8px">A <b>unidade</b> é como a ficha gasta o material — metro para tubo, '
     +'fita e tecido; unidade para comando, tampa e parafuso. Ela decide a conta, então trocar depois muda o que a lista de compras pede.</div>';
@@ -1390,8 +1393,8 @@ async function verPedidos(){
       +'<td class="sub">'+esc(String(p.criado_em||'').slice(0,16))+'</td>'
       +'<td><button class="ghost small pdWa" data-id="'+p.id+'">WhatsApp</button> '
       +'<button class="ghost small pdImp" data-id="'+p.id+'">imprimir</button>'
-      +(p.status==='rascunho'?' <button class="primary small pdEnv" data-id="'+p.id+'">enviar</button>':'')
-      +(p.status!=='cancelado'&&p.status!=='recebido'?' <button class="del pdCanc" data-id="'+p.id+'">cancelar</button>':'')
+      +(p.status==='rascunho'?' <button class="primary small pdEnv" data-perm="pedido.criar" data-id="'+p.id+'">enviar</button>':'')
+      +(p.status!=='cancelado'&&p.status!=='recebido'?' <button class="del pdCanc" data-perm="pedido.criar" data-id="'+p.id+'">cancelar</button>':'')
       +'</td></tr>').join('')+'</tbody></table>';
 }
 /* Impressao no navegador, como a etiqueta ja faz — sem biblioteca de PDF no
@@ -1943,7 +1946,7 @@ function renderEst(){
       +'<td class="n">'+(l.cobertura_dias==null?'<span class="zero">—</span>':(l.cobertura_dias+'d'))+'</td>'
       +'<td>'+(pct==null?'<span class="zero">—</span>'
         :'<span class="barmini"><i style="width:'+pct+'%;background:'+corBarra+'"></i></span>')+'</td>'
-      +'<td style="white-space:nowrap"><button class="ghost small" data-ajustar="'+esc(l.codigo)+'">pedir ajuste</button> '
+      +'<td style="white-space:nowrap"><button class="ghost small" data-perm="estoque.ajustar" data-ajustar="'+esc(l.codigo)+'">pedir ajuste</button> '
       +'<button class="ghost small" data-hist="'+esc(l.codigo)+'">histórico</button> '
       +'<button class="ghost small" data-extrato="'+esc(l.codigo)+'">extrato</button></td>'
     +'</tr>';
@@ -1966,7 +1969,7 @@ function renderEst(){
   $('#estRodape').innerHTML=
      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'
     +'<button class="ghost small" onclick="estCSV()">exportar CSV</button>'
-    +(r.alvo_aplicaveis?'<button class="ghost small" id="estAplicar" onclick="estAplicarAlvo()">aplicar alvo</button>':'')
+    +(r.alvo_aplicaveis?'<button class="ghost small" data-perm="alvo.editar" id="estAplicar" onclick="estAplicarAlvo()">aplicar alvo</button>':'')
     +(r.nunca_contados?('<span class="sub">'+r.nunca_contados+' SKU(s) nunca passaram por contagem.</span>'):'')
     +'</div>'
     +'Mostrando '+linhas.length+' de '+(PAINEL.linhas||[]).length+' SKUs. '+esc(alvoEm)+avisoAlvo;
@@ -2486,7 +2489,7 @@ async function carregarPac(){
       +'<div data-paclinhas="'+r.id+'">'+(r.itens||[]).map(function(x,k){ return pacLinha(r.id,x,k); }).join('')+'</div>'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
       +'<button class="ghost" data-pacadd="'+r.id+'">+ outra peça</button>'
-      +'<button class="primary" data-pacok="'+r.id+'">✓ Assinar — '+pecas+' peça(s) nesta caixa</button>'
+      +'<button class="primary" data-perm="pacote.assinar" data-pacok="'+r.id+'">✓ Assinar — '+pecas+' peça(s) nesta caixa</button>'
       +'</div></div>';
   }
   lis.innerHTML=h;
@@ -2768,7 +2771,7 @@ var h="";
 for(var j=0;j<l.length;j++){
 var cod=String(l[j].codigo||"");
 h+="<tr><td><b>"+(cod||"(sem SKU)")+"</b></td><td>"+l[j].qtd+"</td><td>";
-h+= cod ? ("<button class=ghost data-cadbloq="+cod+">Cadastrar</button>") : "corrigir no ML";
+h+= cod ? ("<button class=ghost data-perm=sku.cadastrar data-cadbloq="+cod+">Cadastrar</button>") : "corrigir no ML";
 h+="</td></tr>";
 }
 lis.innerHTML=h;
@@ -3057,7 +3060,7 @@ async function carregarDev(){
     }
     if(d.caso_motivo && !(DVESC[d.id]&&DVESC[d.id].mot)){ DVESC[d.id]=DVESC[d.id]||{}; DVESC[d.id].mot=d.caso_motivo; }
     h+='<span id="mot'+d.id+'" style="align-self:center;color:var(--amber);font-weight:700">'+((DVESC[d.id]&&DVESC[d.id].mot)||'')+'</span></div>';
-    h+='<button class="primary dvBaixa" data-id="'+d.id+'" style="margin-top:14px">Dar baixa</button>';
+    h+='<button class="primary dvBaixa" data-perm="devolucao.baixar" data-id="'+d.id+'" style="margin-top:14px">Dar baixa</button>';
     h+='</div></div>';
   }
   el.innerHTML=h;
@@ -3173,7 +3176,7 @@ async function carregarCad(){
   h+='</div>';
   h+='<div class="sub" id="cdEtqInfo" style="flex:1;min-width:200px"></div>';
   h+='</div>';
-  h+='<div style="margin-top:10px"><button class="primary" id="cdEtqBt">Salvar etiqueta</button></div>';
+  h+='<div style="margin-top:10px"><button class="primary" data-perm="kit.editar" id="cdEtqBt">Salvar etiqueta</button></div>';
   /* O que ainda falta para a etiqueta poder ser impressa aparece ANTES de
      alguem tentar imprimir (R7) — trava que so fala na hora do clique manda a
      pessoa descobrir o problema com a impressora ligada. */
@@ -3189,9 +3192,9 @@ async function carregarCad(){
     +'Na janela de impressão: impressora <b>Zebra ZD220</b>, margens <b>Nenhuma</b>, escala <b>100%</b>. '
     +'<b>Comece por uma de teste</b> — é com a etiqueta na mão que se vê se o QR abre e se o leitor bipa o código.</div>';
   h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
-  h+='<button class="ghost" id="cdEtqPr1">Imprimir 1 de teste</button>';
+  h+='<button class="ghost" data-perm="kit.imprimir" id="cdEtqPr1">Imprimir 1 de teste</button>';
   h+='<span class="sub">ou</span><input id="cdEtqQtd" type="number" min="1" max="500" value="50" style="width:90px">';
-  h+='<button class="primary" id="cdEtqPrN">Imprimir o lote</button></div>';
+  h+='<button class="primary" data-perm="kit.imprimir" id="cdEtqPrN">Imprimir o lote</button></div>';
   h+='<div id="cdEtqPrMsg" style="margin-top:10px;font-size:14px"></div>';
   h+='</div>';
   h+='</div>';
@@ -3518,7 +3521,7 @@ async function ctPendentes(){
       +'<td><button class="primary" style="padding:6px 10px" onclick="ctAprovar(['+l.id+'])">Aprovar</button> <button class="ghost" style="padding:6px 10px" onclick="ctRejeitar(['+l.id+'])">Rejeitar</button></td></tr>';
   }
   h+='</tbody></table>';
-  h+='<div style="margin-top:10px"><button class="primary" onclick="ctAprovarTodos()">Aprovar todos</button></div>';
+  h+='<div style="margin-top:10px"><button class="primary" data-perm="contagem.ajustar" onclick="ctAprovarTodos()">Aprovar todos</button></div>';
   box.innerHTML=h;
   ctPendIds=d.linhas.map(function(l){return l.id;});
 }
@@ -3624,9 +3627,9 @@ async function invAndamento(){
         ' <span class="sub">'+(p.fora?'fora do rodízio':(p.ultima?'escalada '+invDia(p.ultima):'nunca escalada'))+'</span></span>'; }).join('')
         : '<span style="color:#d29922">Ninguém tem a permissão de contar. Ponha as pessoas no setor "Operador / Controle de Estoque" em Admin → Acessos.</span>')+'</div>';
     h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'+
-      '<button class="ghost" onclick="invQuinzenal()">Antecipar a quinzenal</button>'+
-      '<button class="ghost" onclick="invGeral()">Contagem geral (expedição parada)</button>'+
-      '<button class="ghost" onclick="invAbrir(\'ciclico\')">Conferência avulsa</button></div>';
+      '<button class="ghost" data-perm="contagem.planejar" onclick="invQuinzenal()">Antecipar a quinzenal</button>'+
+      '<button class="ghost" data-perm="contagem.planejar" onclick="invGeral()">Contagem geral (expedição parada)</button>'+
+      '<button class="ghost" data-perm="contagem.planejar" onclick="invAbrir(\'ciclico\')">Conferência avulsa</button></div>';
   }
   if(!d.ciclos.length) h+='<div class="sub">Nenhuma conferência aberta.</div>';
   d.ciclos.forEach(function(c){

@@ -69,7 +69,15 @@ module.exports = function(app, db){
   };
   app.get('/', porta); app.get('/admin', porta); app.get('/index.html', porta);
 
-  app.get('/api/telas/minhas', (req, res) => res.json({ telas: telasDe(req.usuario), rota_da_aba: ROTA_DA_ABA }));
+  /* O menu por pessoa (fase 6) le daqui: as telas, o nome de cada modulo e
+     as PERMISSOES DA PROPRIA PESSOA — com elas o nav.js esconde o botao de
+     acao que ela nao tem (R-TEL-04). Sao as dela, e so as dela. */
+  app.get('/api/telas/minhas', (req, res) => {
+    const u = req.usuario, ac = app.locals.acesso;
+    let perms = [], ag = false;
+    try{ if(u && ac){ ag = !!ac.ehAdminGeral(u.id); perms = Array.from(ac.permissoesDe(u.id)).sort(); } }catch(e){}
+    res.json({ telas: telasDe(u), rota_da_aba: ROTA_DA_ABA, modulos: M.MODULOS, perms: ag ? [] : perms, admin_geral: ag });
+  });
 
   app.locals.telasDe = telasDe;
 };

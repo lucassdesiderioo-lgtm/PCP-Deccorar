@@ -838,8 +838,10 @@ module.exports = function(app, db){
        Desde a fase 5 as telas do Admin (`/admin/...`) tambem saem daqui. */
     const tela = TELA_DA_ROTA[p];
     if(tela) return tela.perms.length === 1 ? tela.perms[0] : tela.perms.slice();
-    // A porta unica do rodape (so redireciona, pela permissao, no dev_route).
-    if(eq('/devolucoes')) return '@logado';
+    /* A ENTRADA DO BLOCO 250 NO MENU (fase 6 da ACESSO-POR-TELA-E-NIVEL): a
+       porta so redireciona (dev_route), e deixa de ser @logado — abre para
+       quem alcanca alguma das tres telas das devolucoes. */
+    if(eq('/devolucoes')) return ['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro','devolucao.baixar'];
     // As telas que a pessoa abre (fase 5): cada um ve as proprias, so nome e endereco.
     if(eq('/api/telas/minhas')) return '@logado';
     if(eq('/baixar-backup')) return '@ag';

@@ -1,4 +1,4 @@
-/* Chrome (rodape de atalhos + barra de sessao) ciente do tema.
+/* Chrome (barra de sessao + menu por pessoa) ciente do tema.
    Operacao usa fundo CLARO (DESIGN secao 2); admin/dashboards seguem escuros.
    Detecta pela luminancia do fundo real da pagina, entao adapta sozinho. */
 var CH=(function(){
@@ -47,54 +47,54 @@ function digitoDoAtalho(e){
   return /^[0-9]$/.test(e.key||'') ? e.key : null;
 }
 
-(function(){
-  // Saíram do menu (rotas seguem vivas por URL):
-  //  '/expedicao' (Subir PDFs) -> upload agora fica na Etiqueta de Venda.
-  //  '/necessidade' (ABC) -> REMOVIDA em 01/09/2026, não só do menu: a tabela
-  //  `demanda` que ela lia era semeada uma vez no código e nunca atualizada, e o
-  //  botão dela sobrescrevia skus.alvo com esse número congelado — brigando com
-  //  o Planejamento pela mesma coluna. Quem calcula alvo agora é um só.
-  var MAP={ '1':'/painel','2':'/operador','3':'/montagem','5':'/embalagem','6':'/carregamento','7':'/','8':'/relatorios' };
-  var NAMES={ '/painel':'Painel','/operador':'Revisão','/montagem':'Embalagem','/embalagem':'Etiqueta Venda','/carregamento':'Conferência','/':'Admin','/relatorios':'Relatórios' };
-  var cur=location.pathname.replace(/\/$/,'')||'/';
-  // barra de atalhos no rodapé
-  var bar=document.createElement('div');
-  bar.style.cssText='position:fixed;left:0;right:0;bottom:0;background:'+CH.barBg+';border-top:1px solid '+CH.barLine+';display:flex;gap:2px;justify-content:center;padding:6px;z-index:9999;flex-wrap:wrap;font-family:system-ui,sans-serif';
-  var html='';
-  for(var k in MAP){ var p=MAP[k]; var on=(p===cur||(p==='/'&&cur==='/'));
-    html+='<a href="'+p+'" style="text-decoration:none;font-size:12px;padding:6px 12px;border-radius:7px;color:'+(on?CH.actTx:CH.off)+';background:'+(on?CH.actBg:'transparent')+';font-weight:'+(on?'700':'500')+'"><b>Alt+'+k+'</b> '+NAMES[p]+'</a>';
-  }
-  // Planejamento (Fase 1/2/4) — sem atalho Alt porque 1..9 ja estao ocupados
-  var onPlan=(cur==='/planejamento');
-  html+='<a href="/planejamento" style="text-decoration:none;font-size:12px;padding:6px 12px;border-radius:7px;color:'+(onPlan?CH.planTx:CH.off)+';background:'+(onPlan?CH.planBg:'transparent')+';font-weight:'+(onPlan?'700':'500')+'">Planejamento</a>';
-  // Recebimento (Compras fase 5) — idem, sem atalho Alt. Quem confere entrega
-  // precisa achar a tela sem decorar URL.
-  var onRec=(cur==='/recebimento');
-  html+='<a href="/recebimento" style="text-decoration:none;font-size:12px;padding:6px 12px;border-radius:7px;color:'+(onRec?CH.planTx:CH.off)+';background:'+(onRec?CH.planBg:'transparent')+';font-weight:'+(onRec?'700':'500')+'">Recebimento</a>';
-  // Inventario (a conferencia de estoque as cegas, fase 2 da
-  // ESTOQUE-LIVRO-E-CONFERENCIA) — idem: o tablet do estoque precisa achar a
-  // tela sem decorar URL. Sem ele a rota existiria e ninguem chegaria nela (§2).
-  var onInv=(cur==='/inventario');
-  html+='<a href="/inventario" style="text-decoration:none;font-size:12px;padding:6px 12px;border-radius:7px;color:'+(onInv?CH.planTx:CH.off)+';background:'+(onInv?CH.planBg:'transparent')+';font-weight:'+(onInv?'700':'500')+'">Inventário</a>';
-  // Devolucoes (divida 8 do §14, 02/10/2026): a tela de quem recebe a peca que
-  // voltou do ML existia so por URL — quem nao a decorou nao chegava nela.
-  // UMA entrada so para as devolucoes (AJUSTE de 03/11/2026): a porta
-  // /devolucoes leva cada pessoa a primeira aba que ela alcanca, e as abas
-  // ficam no topo das telas. Acesa nas duas telas.
-  var onDev=(cur==='/devolucao'||cur==='/devolucao-casos');
-  html+='<a href="/devolucoes" style="text-decoration:none;font-size:12px;padding:6px 12px;border-radius:7px;color:'+(onDev?CH.planTx:CH.off)+';background:'+(onDev?CH.planBg:'transparent')+';font-weight:'+(onDev?'700':'500')+'">Devoluções</a>';
-  bar.innerHTML=html;
-  document.body.appendChild(bar);
-  document.body.style.paddingBottom='52px';
-  // atalhos de teclado
-  document.addEventListener('keydown',function(e){
-    var n=digitoDoAtalho(e);
-    if(n!==null && MAP[n]){
-      e.preventDefault();
-      if((MAP[n]===cur)||(MAP[n]==='/'&&cur==='/')) return;
-      location.href=MAP[n];
-    }
+/* ⚠️ O RODAPÉ DE ATALHOS SAIU (spec ACESSO-POR-TELA-E-NIVEL, fase 6, R-TEL-06,
+   04/11/2026), e o Alt+1..8 de troca de tela junto. Ele mostrava os mesmos
+   atalhos a todo mundo — o embalador clicava em "Admin" e caía em "Sem
+   permissão" —, a equipe não o usava, e ele aparecia duplicado nas abas que o
+   Admin abria em iframe. No lugar dele fica o MENU POR PESSOA (abaixo, na
+   barra de sessão), montado do mapa de telas. O Alt+0 do "Sair" continua. */
+
+/* ---- o menu por pessoa e os botões que a pessoa não tem ----
+   `/api/telas/minhas` diz as telas do mapa (`telas.js`) que ESTA pessoa abre,
+   pela mesma conta do portão, com o número e o módulo, e as permissões dela.
+   O menu mostra só os módulos e as telas que ela alcança; o botão de ação
+   marcado com `data-perm="chave outra.chave"` some para quem não tem nenhuma
+   delas (R-TEL-04). ESCONDER NÃO É SEGURANÇA: o servidor continua travando
+   por baixo (§20, Regra A). A aparência do menu é da conversa de design; aqui
+   ele é funcional, no visual atual. */
+var MENU={ telas:null };
+function menuHtml(d, atual){
+  var mods=d.modulos||{}, grupos={}, ordem=[];
+  (d.telas||[]).forEach(function(t){
+    var m=String(t.modulo); if(!grupos[m]){ grupos[m]=[]; ordem.push(m); } grupos[m].push(t);
   });
+  ordem.sort(function(a,b){ return (+a)-(+b); });
+  if(!ordem.length) return '<div class="mnVazio">Seu acesso não alcança nenhuma tela.</div>';
+  return ordem.map(function(m){
+    return '<div class="mnMod"><div class="mnTit">'+(mods[m]||m)+'</div>'+grupos[m].map(function(t){
+      var on=(t.rota===atual);
+      return '<a class="mnTela'+(on?' on':'')+'" href="'+t.rota+'"'+(on?' aria-current="page"':'')+'><b>'+t.n+'</b> '+t.nome+'</a>';
+    }).join('')+'</div>';
+  }).join('');
+}
+function estiloDasPermissoes(d){
+  if(d.admin_geral) return '[data-perm]{display:revert !important}';
+  return '[data-perm]{display:none !important}'+(d.perms||[]).map(function(c){
+    return '[data-perm~="'+String(c).replace(/[^a-z0-9_.]/gi,'')+'"]{display:revert !important}';
+  }).join('');
+}
+(function(){
+  if(location.pathname.indexOf('/login')===0) return;
+  /* Nasce escondido: o botão que a pessoa não tem não pisca antes da resposta. */
+  var st=document.createElement('style'); st.id='permCss';
+  st.textContent='[data-perm]{display:none !important}';
+  document.head.appendChild(st);
+  fetch('/api/telas/minhas',{credentials:'same-origin'}).then(function(r){ return r.json(); }).then(function(d){
+    MENU.telas=d||{};
+    st.textContent=estiloDasPermissoes(MENU.telas);
+    var m=document.getElementById('menuTelas');
+    if(m) m.innerHTML=menuHtml(MENU.telas, location.pathname.replace(/\/$/,'')||'/');
+  }).catch(function(){});
 })();
 
 /* ---- sessao: quem esta logado + sair (botao e Alt+0) ---- */
@@ -110,7 +110,7 @@ function digitoDoAtalho(e){
     '#sessSair{background:transparent;color:'+CH.sBtn+';border:1px solid '+CH.sBtn+';border-radius:8px;'+
     'padding:6px 14px;font:700 13px system-ui;cursor:pointer;min-height:34px}'+
     '#sessSair:active{opacity:.75}'+
-    '#fadj{margin-right:auto;display:flex;gap:8px;align-items:center}'+
+    '#fadj{display:flex;gap:8px;align-items:center}'+
     '#fadj .fbtn{min-width:46px;min-height:34px;border:1px solid '+CH.sBtn+';color:'+CH.sBtn+';'+
     'background:transparent;border-radius:8px;font:800 15px system-ui;cursor:pointer}'+
     '#fadj .fbtn:active{opacity:.7}'+
@@ -124,8 +124,18 @@ function digitoDoAtalho(e){
     'font:700 14px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;text-decoration:none;white-space:nowrap}'+
     '#sessBar .sessOp.atalho{background:'+CH.planBg+';color:'+CH.planTx+'}'+
     '#sessBar .sessOp:active{opacity:.75}'+
+    '#sessMenu{margin-right:auto}'+
+    '#menuTelas{position:sticky;top:48px;z-index:9998;background:'+CH.sBg+';border-bottom:1px solid '+CH.sLine+';'+
+    'padding:10px 14px;display:flex;flex-wrap:wrap;gap:18px;font:500 14px system-ui,-apple-system,Segoe UI,Roboto,sans-serif}'+
+    '#menuTelas .mnMod{display:inline-block;vertical-align:top;margin:0 22px 10px 0;min-width:180px}'+
+    '#menuTelas .mnTit{color:'+CH.sTx+';font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}'+
+    '#menuTelas .mnTela{display:block;min-height:34px;line-height:34px;padding:0 10px;border-radius:8px;text-decoration:none;color:'+CH.sName+'}'+
+    '#menuTelas .mnTela b{color:'+CH.sTx+';margin-right:6px}'+
+    '#menuTelas .mnTela.on{background:'+CH.planBg+';color:'+CH.planTx+'}'+
+    '#menuTelas .mnTela.on b{color:'+CH.planTx+'}'+
+    '#menuTelas .mnVazio{color:'+CH.sTx+'}'+
     '@media (max-width:600px){#sessBar{flex-wrap:wrap}}'+
-    '@media print{#sessBar{display:none}}';
+    '@media print{#sessBar,#menuTelas{display:none}}';
   document.head.appendChild(css);
 
   function sair(){
@@ -144,9 +154,18 @@ function digitoDoAtalho(e){
     // seguranca, so evita mostrar um caminho que da "sem permissao".
     var dest=u.destino||{};
     var atalho=(dest.duas&&dest.sobmedida) ? '<a class="sessOp atalho" href="'+dest.sobmedida+'">Sob medida →</a>' : '';
-    d.innerHTML=fadj+'<span><b style="color:'+CH.sName+'">'+u.nome+'</b></span>'+
+    d.innerHTML=fadj+'<button class="sessOp" id="sessMenu" aria-expanded="false" aria-controls="menuTelas">☰ Menu</button>'+
+      '<span><b style="color:'+CH.sName+'">'+u.nome+'</b></span>'+
       atalho+'<a class="sessOp" id="sessSetor" href="/setor">Trocar setor</a><button id="sessSair">Sair</button>';
     document.body.insertBefore(d, document.body.firstChild);
+    /* O MENU (fase 6): a lista sai do /api/telas/minhas (acima). Abre e fecha
+       no botão; quem tem uma tela só vê só ela. */
+    var pn=document.createElement('nav'); pn.id='menuTelas'; pn.setAttribute('aria-label','Telas');
+    pn.style.display='none';
+    pn.innerHTML=MENU.telas?menuHtml(MENU.telas, location.pathname.replace(/\/$/,'')||'/'):'<div class="mnVazio">carregando…</div>';
+    document.body.insertBefore(pn, d.nextSibling||null);
+    var bm=document.getElementById('sessMenu');
+    if(bm) bm.onclick=function(){ var ab=pn.style.display==='none'; pn.style.display=ab?'block':'none'; bm.setAttribute('aria-expanded',ab?'true':'false'); };
     document.getElementById('sessSair').onclick=sair;
     var fa=document.getElementById('fadj');
     if(fa){ fa.addEventListener('click',function(e){ var btn=e.target.closest('[data-fd]'); if(!btn) return;

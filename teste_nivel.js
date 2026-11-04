@@ -79,8 +79,8 @@ chamar(B, 'POST', R, { nivel:'operacao' }, { id:pessoa('Edvaldo').id }, sessao(p
 console.log('\n── 3. a fase 3 não trava nada: o retrato pessoa a pessoa não mudou ──');
 const antes = JSON.parse(require('fs').readFileSync(__dirname + '/teste_mapa_antes.json', 'utf8'));
 for(const p of B.pessoas){
-  const a = P.retrato(B, p), e = antes[p.nome];
-  ok(p.nome + ': o mesmo de antes', JSON.stringify(a) === JSON.stringify(e), JSON.stringify(e) + '\n         ' + JSON.stringify(a));
+  const d = P.comparar(antes[p.nome], P.retrato(B, p));
+  ok(p.nome + ': o mesmo de antes', d === '', d);
 }
 
 console.log('\n── 5. FASE 4: antes de ligar, quem perderia alguma coisa? ──');

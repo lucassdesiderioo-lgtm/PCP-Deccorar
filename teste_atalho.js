@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-/* Testes dos atalhos de teclado do nav.js (Alt+1..8 troca de tela, Alt+0 sai).
+/* Testes dos atalhos de teclado do nav.js (Alt+0 sai; desde 04/11/2026 o Alt+1..8
+ * de troca de tela saiu com o rodape).
  *
  *   node teste_atalho.js
  *
@@ -99,17 +100,12 @@ caso('nenhum caractere imprimivel, em nenhuma das duas formas, troca de tela', (
 
 console.log('\n── a pessoa continua usando os atalhos ───────────────────────────────\n');
 
-caso('Alt+1 a Alt+8 pela fileira de cima vao para as mesmas telas de sempre', ()=>{
-  const MAPA={1:'/painel',2:'/operador',3:'/montagem',5:'/embalagem',6:'/carregamento',7:'/',8:'/relatorios'};
-  for(const n in MAPA){ const t=abrir('/inventario'); atalho(t,n); igual(t.foi(),MAPA[n],'Alt+'+n); }
-});
-
-caso('Alt+4 e Alt+9 continuam sem tela', ()=>{
-  for(const n of [4,9]){ const t=abrir('/inventario'); atalho(t,n); igual(t.foi(),'/inventario','Alt+'+n); }
-});
-
-caso('o atalho da propria tela nao recarrega', ()=>{
-  const t=abrir('/carregamento'); atalho(t,6); igual(t.foi(),'/carregamento','Alt+6 no Carregamento');
+/* O RODAPE DE ATALHOS SAIU EM 04/11/2026 (spec ACESSO-POR-TELA-E-NIVEL, fase
+   6, R-TEL-06), e o Alt+1..9 de troca de tela junto: o menu por pessoa ficou
+   no lugar. Ate ali estes casos provavam que Alt+1..8 iam para as telas de
+   sempre; agora provam que nenhum numero com Alt troca de tela. */
+caso('Alt+1 a Alt+9 pela fileira de cima nao trocam mais de tela (o rodape saiu)', ()=>{
+  for(let n=1;n<=9;n++){ const t=abrir('/inventario'); atalho(t,n); igual(t.foi(),'/inventario','Alt+'+n); }
 });
 
 caso('Alt+0 pela fileira de cima continua perguntando "Sair do sistema?"', ()=>{

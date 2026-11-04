@@ -100,10 +100,8 @@ const antes = JSON.parse(fs.readFileSync(path.join(__dirname, 'teste_mapa_antes.
 ok('o retrato de antes tem as ' + P.PERFIS.length + ' pessoas', Object.keys(antes).length === P.PERFIS.length);
 for(const p of B.pessoas){
   const agora = P.retrato(B, p), era = antes[p.nome] || {};
-  ok(p.nome + ': abre as mesmas telas', JSON.stringify(agora.abre) === JSON.stringify(era.abre),
-     'antes ' + JSON.stringify(era.abre) + '\n         agora ' + JSON.stringify(agora.abre));
-  ok(p.nome + ': as mesmas permissões e o mesmo destino', JSON.stringify(agora.perms) === JSON.stringify(era.perms) && agora.destino === era.destino,
-     'destino ' + era.destino + ' → ' + agora.destino);
+  const d = P.comparar(era, agora);
+  ok(p.nome + ': abre as mesmas telas, com as mesmas permissões e o mesmo destino', d === '', d);
 }
 B.fechar();
 
