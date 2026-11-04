@@ -1910,6 +1910,82 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
     eq('o encerrado não cobra o que falta', JSON.stringify(chamar('GET','/api/devolucao-casos/encerrados',null,1).body.casos.find(c => c.id === sem2.id).falta_lancamento), '[]');
   }
 
+  /* ═══ OS CASOS DE CADA RESPONSÁVEL E O HISTÓRICO DE DESEMPENHO (04/11/2026) ═══
+     Spec docs/specs/DEVOLUCOES-DESEMPENHO.md. Escritos antes do código. */
+  secao('por responsável — o quadro dos casos abertos');
+  {
+    const L = lista(1);
+    const todos = L.coleta.concat(L.ml);
+    const pr = L.por_responsavel || [];
+    eq('a soma do quadro é o total de abertos', pr.reduce((s, x) => s + x.casos, 0), todos.length);
+    const ren = pr.find(x => x.id === 2) || {};
+    const deRen = todos.filter(c => c.responsavel_id === 2);
+    eq('a linha do Renato conta os casos dele', ren.casos, deRen.length);
+    eq('   os que esperam a gente', ren.esperando, deRen.filter(c => !c.proximo || c.proximo.nossa).length);
+    eq('   os vencidos', ren.vencidos, deRen.filter(c => c.cor === 'vencido').length);
+    eq('   os que vencem hoje ou amanhã', ren.vermelhos, deRen.filter(c => c.cor === 'vermelho').length);
+    eq('   os parados', ren.parados, deRen.filter(c => c.parado || c.revisao_parada).length);
+    const sem = pr.find(x => x.id === null);
+    eq('o texto livre conta como "Sem responsável"', sem && sem.casos, todos.filter(c => !c.responsavel_id).length);
+    ok('   e a linha diz o nome', sem && sem.nome === 'Sem responsável');
+    ok('o quadro não leva valor em reais', pr.every(x => !Object.keys(x).some(k => /valor|custo|saldo|limite/.test(k))));
+  }
+
+  secao('desempenho — o histórico por responsável, mês a mês');
+  {
+    const ins = db.prepare(`INSERT INTO devolucao_caso (tipo,venda,etapa,etapa_desde,prazo,prazo_original,prazo_coleta,revisar_ate,
+        aberta_em,criado_em,encerrado_em,saida,responsavel,responsavel_id,responsavel_nome,teste)
+      VALUES (@tipo,@venda,@etapa,@ed,@prazo,@po,@pc,@ra,@ab,@cr,@enc,@saida,@rt,@rid,@rnome,0)`);
+    const ev = db.prepare('INSERT INTO devolucao_evento (caso_id,tipo,de,para,texto,usuario,criado_em) VALUES (?,?,?,?,?,?,?)');
+    const caso0 = { tipo:'coleta', venda:null, etapa:'encerrado', ed:null, prazo:null, po:null, pc:null, ra:null, ab:null, cr:null, enc:null, saida:null, rt:null, rid:null, rnome:null };
+    const novo = (x, evs) => {
+      const id = ins.run(Object.assign({}, caso0, x)).lastInsertRowid;
+      for(const [tipo, para, data] of evs) ev.run(id, tipo, null, para, null, 'Teste', data);
+      return id;
+    };
+    // A: Renato, comprovante cumprido, coleta vencida, reembolso; 19 dias; três vezes parado (3, 8 e 6 dias).
+    const A = novo({ venda:'DSP-A', prazo:'2026-07-05', pc:'2026-07-10', ab:'2026-07-01', cr:'2026-07-01 09:00:00', enc:'2026-07-20 10:00:00', saida:'reembolso_recebido', rid:2, rnome:'Renato' },
+      [['lancado','lancado','2026-07-01 09:00:00'],['etapa','docs_enviados','2026-07-04 10:00:00'],['coleta','a_caminho','2026-07-12 10:00:00'],
+       ['chegou','chegou','2026-07-13 10:00:00'],['revisado','revisado','2026-07-14 10:00:00'],['encerrado','encerrado','2026-07-20 10:00:00']]);
+    // B: Renato (com um intervalo de exatamente 2 dias, o limite do parado), comprovante prorrogado de 03/07 para 08/07 e cumprido em 06/07 (pelo original seria vencido); perda; 7 dias.
+    const B = novo({ venda:'DSP-B', prazo:'2026-07-08', po:'2026-07-03', ab:'2026-07-02', cr:'2026-07-02 09:00:00', enc:'2026-07-09 10:00:00', saida:'perda_prazo', rid:2, rnome:'Renato' },
+      [['lancado','lancado','2026-07-02 09:00:00'],['etapa','docs_enviados','2026-07-06 10:00:00'],['chegou','chegou','2026-07-08 10:00:00'],['encerrado','encerrado','2026-07-09 10:00:00']]);
+    // C: Renato, ML devolve, "Já revisei" depois do "revisar até": vencido; 10 dias.
+    const C = novo({ tipo:'ml', venda:'DSP-C', ra:'2026-07-10', cr:'2026-07-01 09:00:00', enc:'2026-07-11 10:00:00', saida:'revisado_ml', rid:2, rnome:'Renato' },
+      [['lancado','aguardando','2026-07-01 09:00:00'],['chegou','chegou','2026-07-02 10:00:00'],['revisado','revisado','2026-07-03 10:00:00'],
+       ['aviso_ml','ml_revisei','2026-07-11 09:00:00'],['encerrado','encerrado','2026-07-11 10:00:00']]);
+    // D: só o texto livre: "Sem responsável".
+    const D = novo({ venda:'DSP-D', ab:'2026-07-01', cr:'2026-07-01 09:00:00', enc:'2026-07-15 10:00:00', saida:'devolvido_comprador', rt:'Fulano à mão' },
+      [['lancado','lancado','2026-07-01 09:00:00'],['encerrado','encerrado','2026-07-15 10:00:00']]);
+    // E: aberto (não conta); F: encerrado em junho (não conta).
+    novo({ venda:'DSP-E', etapa:'lancado', cr:'2026-07-01 09:00:00', rid:2, rnome:'Renato' }, [['lancado','lancado','2026-07-01 09:00:00']]);
+    novo({ venda:'DSP-F', cr:'2026-06-01 09:00:00', enc:'2026-06-20 10:00:00', saida:'reembolso_recebido', rid:2, rnome:'Renato' },
+      [['lancado','lancado','2026-06-01 09:00:00'],['encerrado','encerrado','2026-06-20 10:00:00']]);
+
+    r = chamar('GET','/api/devolucao-casos/desempenho',null,2,{},{ mes:'2026-07' });
+    eq('a rota responde para quem acompanha', r.status, 200);
+    const pess = r.body.pessoas || [];
+    const ren = pess.find(x => x.id === 2) || {};
+    eq('o Renato tem os três casos encerrados no mês (o aberto e o de junho ficam fora)', ren.casos, 3);
+    eq('   prazos cumpridos: o comprovante de A e o de B (pelo prazo final)', ren.prazos && ren.prazos.cumpridos, 2);
+    eq('   prazos vencidos: a coleta de A e o "revisar até" de C', ren.prazos && ren.prazos.vencidos, 2);
+    eq('   e diz quantos foram prorrogados', ren.prazos && ren.prazos.prorrogados, 1);
+    eq('   como encerraram', JSON.stringify(ren.saidas), JSON.stringify({ reembolso_recebido:1, perda_prazo:1, revisado_ml:1 }));
+    eq('   o tempo até encerrar é a MEDIANA (7, 10, 19 → 10), não a média', ren.dias_mediana, 10);
+    eq('   com o maior ao lado', ren.dias_maior, 19);
+    eq('   as vezes parado (gaps de 3, 8 e 6 dias em A; 4 e 2 — o limite exato — em B; 8 em C)', ren.vezes_parado, 6);
+    eq('   e o maior intervalo parado', ren.maior_parado, 8);
+    eq('   a lista dos casos dele, para abrir', (ren.lista || []).map(x => x.id).sort((a,b) => a-b).join(','), [A,B,C].sort((a,b) => a-b).join(','));
+    const semR = pess.find(x => x.id === null) || {};
+    eq('o caso com só o texto livre vai para "Sem responsável"', (semR.lista || []).map(x => x.id).join(), String(D));
+    eq('   e sem prazo decidido não vira "0 de 0"', semR.prazos && semR.prazos.decididos, 0);
+    ok('nenhum valor em reais no histórico', JSON.stringify(r.body).search(/valor_|custo|saldo|limite_frete/) < 0);
+    r = chamar('GET','/api/devolucao-casos/desempenho',null,2,{},{ mes:'2026-13' });
+    eq('mês impossível: 400', r.status, 400);
+    r = chamar('GET','/api/devolucao-casos/desempenho',null,2,{},{ mes:'2026-05' });
+    eq('mês sem caso encerrado: lista vazia', (r.body.pessoas || []).length, 0);
+  }
+
   fim();
 })().catch(e => { console.log('ESTOUROU: ' + e.stack); falhas++; fim(); });
 

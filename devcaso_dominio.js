@@ -369,7 +369,7 @@ function listar(db, opt){
     const x = a.dias_prazo === null || a.dias_prazo === undefined ? 1e9 : a.dias_prazo, y = b.dias_prazo === null || b.dias_prazo === undefined ? 1e9 : b.dias_prazo;
     return x - y || (b.dias_esperando||0) - (a.dias_esperando||0) || a.id - b.id;
   });
-  return { hoje:h, limites:lim, coleta, ml };
+  return { hoje:h, limites:lim, coleta, ml, por_responsavel: resumoPorResponsavel(linhas) };
 }
 function encerrados(db, opt){
   const o = opt || {}, h = hoje(db), lim = limites(db);
@@ -1644,7 +1644,98 @@ function comProximo(db, linhas, h, lim){
   });
 }
 
+/* ═══ OS CASOS DE CADA RESPONSÁVEL E O HISTÓRICO DE DESEMPENHO (04/11/2026) ═══
+   Spec docs/specs/DEVOLUCOES-DESEMPENHO.md. Dono único das duas contas: a
+   tela só desenha. O caso conta para o RESPONSÁVEL (a pessoa escolhida no
+   sistema, `responsavel_id`); o nome escrito à mão de antes não é pessoa e
+   vai para "Sem responsável" — sem chute (decisões do dono, 04/11/2026).
+   Nenhum valor em reais em nenhuma das duas. */
+const SEM_RESP = 'Sem responsável';
+/* O quadro dos casos ABERTOS, sobre as mesmas linhas da lista (já com o
+   `proximo`, a cor e o parado): uma régua só. */
+function resumoPorResponsavel(linhas){
+  const m = new Map();
+  for(const c of linhas){
+    const id = c.responsavel_id || null;
+    if(!m.has(id)) m.set(id, { id, nome: id ? (c.responsavel_nome || ('#'+id)) : SEM_RESP, casos:0, esperando:0, vencidos:0, vermelhos:0, parados:0 });
+    const x = m.get(id);
+    x.casos++;
+    if(!c.proximo || c.proximo.nossa) x.esperando++;
+    if(c.cor === 'vencido') x.vencidos++;
+    if(c.cor === 'vermelho') x.vermelhos++;
+    if(c.parado || c.revisao_parada) x.parados++;
+  }
+  return [...m.values()].sort((a,b) => (a.id === null) - (b.id === null) || b.vencidos - a.vencidos ||
+    b.vermelhos - a.vermelhos || b.esperando - a.esperando || String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+}
+/* Mediana: o caso de 60 dias não esconde os outros (a régua do R-SMI-06). */
+function mediana(ns){
+  if(!ns.length) return null;
+  const s = ns.slice().sort((a,b) => a-b), k = Math.floor(s.length/2);
+  return s.length % 2 ? s[k] : Math.round((s[k-1] + s[k]) / 2 * 10) / 10;
+}
+/* O HISTÓRICO: os casos ENCERRADOS no mês, por responsável.
+   - prazo do ML cumprido: o caso chegou à etapa que cumpre o prazo até o fim
+     do dia do prazo FINAL (o prorrogado conta pelo prazo novo, e é contado à
+     parte); chegou depois, ou fechou como perda sem chegar, é vencido; fechou
+     por outro caminho sem chegar (devolvido ao comprador) não decide nada;
+   - o tempo até encerrar é a mediana em dias corridos, com o maior ao lado;
+   - parado é cada intervalo entre dois "andar" (ANDAM) que passou do
+     `devol_parado_dias`. */
+function desempenho(db, mes){
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(mes||''))) throw new Recusa(400, 'Mês impossível. Use AAAA-MM.');
+  const lim = limites(db);
+  const casos = db.prepare("SELECT * FROM devolucao_caso WHERE teste=0 AND encerrado_em IS NOT NULL AND substr(encerrado_em,1,7)=? ORDER BY id").all(mes);
+  const qEv = db.prepare('SELECT tipo,para,criado_em FROM devolucao_evento WHERE caso_id=? ORDER BY criado_em, id');
+  const IDX = (e) => ETAPAS.coleta.indexOf(e);
+  const pessoas = new Map();
+  for(const c of casos){
+    const evs = qEv.all(c.id);
+    const dia = (t) => String(t || '').slice(0,10);
+    /* O dia em que o caso chegou à etapa (ou adiante), ou null. */
+    const chegouEm = (etapaMin) => { const e = evs.find(x => IDX(x.para) >= IDX(etapaMin) && x.para !== 'encerrado'); return e ? dia(e.criado_em) : null; };
+    const prazos = [];
+    const decide = (prazo, quando, prorrogado) => {
+      if(!prazo) return;
+      if(quando) prazos.push({ ok: quando <= prazo, prorrogado });
+      else if(c.saida === 'perda_prazo') prazos.push({ ok:false, prorrogado });
+    };
+    if(c.tipo === 'coleta'){
+      decide(c.prazo, chegouEm('docs_enviados'), !!c.prazo_original);
+      decide(c.prazo_coleta, chegouEm('a_caminho'), !!c.prazo_coleta_original);
+    } else if(c.revisar_ate){
+      const e = evs.find(x => x.para === 'ml_revisei');
+      decide(c.revisar_ate, e ? dia(e.criado_em) : null, false);
+    }
+    const andares = evs.filter(x => ANDAM.indexOf(x.tipo) >= 0).map(x => dia(x.criado_em));
+    let vezes = 0, maior = 0;
+    for(let i = 1; i < andares.length; i++){
+      const g = dias(andares[i-1], andares[i]);
+      if(g !== null && g >= lim.parado){ vezes++; if(g > maior) maior = g; }
+    }
+    const d = dias(c.aberta_em || c.criado_em, c.encerrado_em);
+    const id = c.responsavel_id || null;
+    if(!pessoas.has(id)) pessoas.set(id, { id, nome: id ? (c.responsavel_nome || ('#'+id)) : SEM_RESP, casos:0,
+      prazos:{ cumpridos:0, vencidos:0, decididos:0, prorrogados:0 }, saidas:{}, _dias:[], vezes_parado:0, maior_parado:0, lista:[] });
+    const p = pessoas.get(id);
+    p.casos++;
+    for(const x of prazos){ p.prazos.decididos++; if(x.ok) p.prazos.cumpridos++; else p.prazos.vencidos++; if(x.prorrogado) p.prazos.prorrogados++; }
+    p.saidas[c.saida] = (p.saidas[c.saida] || 0) + 1;
+    if(d !== null) p._dias.push(d);
+    p.vezes_parado += vezes; if(maior > p.maior_parado) p.maior_parado = maior;
+    p.lista.push({ id:c.id, tipo:c.tipo, venda:c.venda, nf:c.nf, comprador:c.comprador, saida:c.saida, saida_nome: NOME_SAIDA[c.saida] || c.saida,
+      encerrado_em:c.encerrado_em, dias:d, prazos_cumpridos: prazos.filter(x => x.ok).length, prazos_vencidos: prazos.filter(x => !x.ok).length, vezes_parado:vezes });
+  }
+  const out = [...pessoas.values()].map(p => {
+    const o = Object.assign({}, p, { dias_mediana: mediana(p._dias), dias_maior: p._dias.length ? Math.max(...p._dias) : null });
+    delete o._dias;
+    return o;
+  }).sort((a,b) => (a.id === null) - (b.id === null) || String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+  return { mes, parado_dias: lim.parado, nomes_saida: NOME_SAIDA, pessoas: out };
+}
+
 module.exports = {
+  resumoPorResponsavel, desempenho,
   faltaLancamento, OBRIGATORIOS,
   responsaveis, responsavelValido,
   proximoPasso, comProximo, VEZ_NOSSA,
