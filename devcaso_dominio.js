@@ -787,17 +787,26 @@ function podeDesfazer(db, c, usuario){
   /* A chegada também grava um evento "etapa" (pelo moverEtapa): só conta como
      mudança à mão a etapa que se marca à mão (MANUAIS). */
   if(!e || e.tipo !== 'etapa' || e.para !== c.etapa || !e.de || !e.etapa_desde_antes) return null;
-  if(MANUAIS[c.tipo].indexOf(e.para) < 0) return null;
+  /* AJUSTE de 04/11/2026: o "A caixa chegou" clicado por engano também se
+     desfaz — só pelo botão (a chegada do bipe do Edvaldo liga a revisão) e só
+     enquanto a peça não foi revisada. */
+  const chegada = desfazChegada(c, e);
+  if(MANUAIS[c.tipo].indexOf(e.para) < 0 && !chegada) return null;
   if(e.usuario_id !== usuario.id) return null;
-  return { evento_id: e.id, de: e.para, para: e.de, nome: NOME_ETAPA[e.de] || e.de };
+  return { evento_id: e.id, de: e.para, para: e.de, nome: NOME_ETAPA[e.de] || e.de, chegada };
+}
+function desfazChegada(c, e){
+  return e.para === 'chegou' && !!c.chegou_em && !c.devolucao_id;
 }
 function desfazerEtapa(db, id, usuario){
   const c = aberto(db, id);
   const d = podeDesfazer(db, c, usuario);
   if(!d){
     const e = ultimoAndar(db, c.id);
-    if(e && e.tipo === 'etapa' && e.para === c.etapa && MANUAIS[c.tipo].indexOf(e.para) >= 0 && e.usuario_id && usuario && e.usuario_id !== usuario.id)
-      throw new Recusa(403, 'Só quem mudou a etapa ('+(e.usuario||'outra pessoa')+') pode desfazer. Para voltar, use os botões de etapa.');
+    if(e && e.tipo === 'etapa' && e.para === c.etapa && (MANUAIS[c.tipo].indexOf(e.para) >= 0 || desfazChegada(c, e)) && e.usuario_id && usuario && e.usuario_id !== usuario.id)
+      throw new Recusa(403, e.para === 'chegou'
+        ? 'Só quem marcou a chegada ('+(e.usuario||'outra pessoa')+') pode desfazer.'
+        : 'Só quem mudou a etapa ('+(e.usuario||'outra pessoa')+') pode desfazer. Para voltar, use os botões de etapa.');
     throw new Recusa(409, 'Não há mudança de etapa para desfazer: o caso já andou depois dela, ou ela já foi desfeita.');
   }
   const e = db.prepare('SELECT * FROM devolucao_evento WHERE id=?').get(d.evento_id);
@@ -808,6 +817,7 @@ function desfazerEtapa(db, id, usuario){
   }
   db.transaction(() => {
     db.prepare('UPDATE devolucao_caso SET etapa=?, etapa_desde=? WHERE id=?').run(e.de, e.etapa_desde_antes, c.id);
+    if(d.chegada) db.prepare('UPDATE devolucao_caso SET chegou_em=NULL WHERE id=?').run(c.id);
     const ev = evento(db, c.id, 'desfeito', e.para, e.de, 'desfeito: '+(NOME_ETAPA[e.para]||e.para)+' → '+(NOME_ETAPA[e.de]||e.de), nomeDe(usuario));
     db.prepare('UPDATE devolucao_evento SET usuario_id=? WHERE id=?').run(usuario.id, ev);
   })();

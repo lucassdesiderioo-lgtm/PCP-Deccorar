@@ -660,6 +660,22 @@ const srv = app.listen(0, async () => {
     ok('   e a porta própria de depois da chegada continua (avisar o ML)', !!(await pch.$('#btAvisoML')));
     await pch.close();
 
+    /* AJUSTE de 04/11/2026: o "A caixa chegou" clicado por engano se desfaz. */
+    secao('desfazer o "A caixa chegou" pela tela');
+    const pdc = await pg();
+    const cdc = await api(pdc, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000000000099701', publicidade:false });
+    await pdc.goto(B + '/devolucao-casos'); await pdc.waitForTimeout(900);
+    await abreFora(pdc); await pdc.locator('#listaMl .linha', { hasText:'#'+cdc.id }).locator('.t1').click(); await pdc.waitForTimeout(800);
+    eq('antes da chegada não há desfazer', await pdc.$('#btDesfazer'), null);
+    await pdc.click('#btChegou'); await pdc.waitForTimeout(1000);
+    ok('depois de "A caixa chegou", aparece o desfazer voltando para "Aguardando chegar"', /Aguardando chegar/.test(await pdc.textContent('#btDesfazer').catch(() => '')));
+    await pdc.click('#btDesfazer'); await pdc.waitForTimeout(1000);
+    eq('   desfeito, o caso volta a "Aguardando chegar"', caso(cdc.id).etapa, 'aguardando');
+    eq('   sem a chegada', caso(cdc.id).chegou_em, null);
+    ok('   e o "A caixa chegou" volta à tela', !!(await pdc.$('#btChegou')));
+    eq('   e o desfazer some', await pdc.$('#btDesfazer'), null);
+    await pdc.close();
+
     /* ═════════ 5. o celular ═════════ */
     secao('a 400 px — a página não rola de lado, e o caso abre');
     const p4 = await pg(400);
