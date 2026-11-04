@@ -42,6 +42,12 @@ module.exports=function(app, db){
        da conferencia contaria um inventario que o saldo ja nao tem. */
     {nome:'inventario_ciclo',     pk:'id', rotulo:'conferencia (ciclos)'},
     {nome:'inventario_item',      pk:'id', rotulo:'conferencia (SKUs)'},
+    /* A CONFERENCIA v2 (04/11/2026): a recusa "sem estoque" da Etiqueta de
+       Venda (que poe o SKU na lista de amanha) e a escala do rodizio. Sem
+       elas, a recusa de teste empurraria SKU para a lista de verdade, e a
+       escala de teste contaria como "escalada ha pouco" no rodizio real. */
+    {nome:'recusa_estoque',       pk:'id', rotulo:'recusas sem estoque'},
+    {nome:'inventario_escala',    pk:'id', rotulo:'rodizio da contagem'},
     /* O PEDIDO DE AJUSTE (fase 3, 28/09/2026), pela mesma razao: aprovar gera
        movimento no livro, e o livro de teste e apagado ali em cima. */
     {nome:'ajuste_pedido',        pk:'id', rotulo:'pedidos de ajuste'},

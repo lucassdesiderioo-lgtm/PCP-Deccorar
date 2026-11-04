@@ -122,7 +122,7 @@ function semear(){
   eq('Ajuste de saldo conta só o pendente', linha(r, 'ajuste').n, 1);
   eq('Inventário — aprovar = a fila de aprovação', linha(r, 'inventario_aprovar').n, (await get('/api/inventario/aprovacao')).itens.length);
   eq('Inventário — aprovar conta 1', linha(r, 'inventario_aprovar').n, 1);
-  eq('Inventário — recontar = a recontagem de quem não contou', linha(r, 'inventario_recontar').n, (await get('/api/inventario/recontagem')).itens.length);
+  eq('Inventário — 2ª e 3ª = as rodadas 2 e 3 da lista de quem não contou', linha(r, 'inventario_recontar').n, (await get('/api/inventario/hoje')).itens.filter(i => i.rodada > 1).length);
   eq('Inventário — recontar conta recontar e terceira do ciclo aberto, e não o fechado', linha(r, 'inventario_recontar').n, 2);
   eq('Contagem de material = a aba Contagem', linha(r, 'contagem').n, (await get('/api/contagem/pendentes')).total);
   eq('Contagem de material conta só a não aprovada', linha(r, 'contagem').n, 1);
@@ -167,7 +167,7 @@ function semear(){
   ok('a aba SKU incompleto lê pela mesma função', dono('sku_route.js', "'/api/skus/pendencias',\\(req,res\\)=> res\\.json\\(pendenciasSku\\(db\\)\\)"));
   ok('a Conferência lê pela mesma função', dono('carreg_route.js', "'/api/carregamento/sobras',\\(req,res\\)=>\\{\\s*const l=sobrasEsperando\\(db\\);"));
   ok('o ajuste e a central usam a mesma frase', dono('ajuste_dominio.js', "WHERE ' \\+ PENDENTE \\+ ' ORDER BY") && dono('ajuste_dominio.js', "FROM ajuste_pedido WHERE ' \\+ PENDENTE"));
-  ok('o inventário e a central usam as mesmas frases', dono('inventario_dominio.js', 'WHERE \\$\\{A_APROVAR\\} ORDER BY') && dono('inventario_dominio.js', 'WHERE \\$\\{NA_LISTA\\(status\\)\\}'));
+  ok('o inventário e a central usam as mesmas frases', dono('inventario_dominio.js', 'WHERE \\$\\{A_APROVAR\\} ORDER BY') && dono('inventario_dominio.js', 'WHERE \\$\\{NA_LISTA\\('));
 
   console.log('\n── 7. a permissão e a tela ──');
   eq('GET /api/pendencias/resumo é @admin', AC.permDaRota('/api/pendencias/resumo', 'GET'), '@admin');

@@ -56,7 +56,7 @@ function setoresNativos(){
     { nome:'Operador / Expedição',           nivel:'operacao',
       perms:['pdf.subir','etiqueta.emitir','carregamento.executar','painel.ver','produtividade.propria'] },
     { nome:'Operador / Controle de Estoque', nivel:'operacao',
-      perms:['contagem.contar','contagem.recontar','painel.ver','produtividade.propria'] },
+      perms:['contagem.contar','contagem.recontar','contagem.desempatar','painel.ver','produtividade.propria'] },
     // SOB MEDIDA — nascem VAZIOS, como o de montagem e os de compras:
     // ninguem e migrado para ca. A operacao sob medida e outra equipe, e
     // herdar gente por engano daria acesso de corte a quem so revisa.
@@ -308,6 +308,30 @@ module.exports = function(app, db){
       })();
     }
   }catch(e){ console.log('[acesso] seed da conferencia falhou: '+e.message); }
+
+  /* ── 3-D2. A CONFERENCIA VERSAO 2 (04/11/2026) ──
+     Chave nova em banco que ja existe nao chega a ninguem (#13). Ninguem perde
+     nada e ninguem ganha trabalho que nao fazia (decisao do dono, 04/11/2026):
+       contagem.recontar -> contagem.desempatar   (quem recontava faz a 3ª)
+       contagem.contar   -> contagem.desempatar   (spec §8.2: a outraPessoa
+                                                   impede a mesma pessoa no SKU)
+       contagem.aprovar  -> contagem.resolver + contagem.relatorio
+     As antigas ficam como estao. Excecao CONCEDIDA vai junto. Uma vez so. */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='seed_inventario_v2'").get()){
+      db.transaction(() => {
+        for(const [de, para] of [['contagem.recontar','contagem.desempatar'], ['contagem.contar','contagem.desempatar'],
+                                 ['contagem.aprovar','contagem.resolver'], ['contagem.aprovar','contagem.relatorio']]){
+          db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
+            SELECT setor_id, ? FROM setor_permissao WHERE chave=?`).run(para, de);
+          db.prepare(`INSERT OR IGNORE INTO usuario_excecao (usuario_id,chave,concede)
+            SELECT usuario_id, ?, 1 FROM usuario_excecao e WHERE chave=? AND concede=1
+              AND NOT EXISTS (SELECT 1 FROM usuario_excecao x WHERE x.usuario_id=e.usuario_id AND x.chave=?)`).run(para, de, para);
+        }
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('seed_inventario_v2','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[acesso] seed da conferencia v2 falhou: '+e.message); }
 
   /* ── 3-E. O AJUSTE EM DUAS PESSOAS (fase 3 da ESTOQUE-LIVRO-E-CONFERENCIA,
      28/09/2026) ──
@@ -718,7 +742,7 @@ module.exports = function(app, db){
     if(eq('/relatorios')) return 'relatorios.ver';
     if(eq('/planejamento')) return 'planilha.importar';
     // A conferencia de estoque no tablet: quem conta OU quem reconta.
-    if(eq('/inventario')) return ['contagem.contar','contagem.recontar'];
+    if(eq('/inventario')) return ['contagem.contar','contagem.desempatar'];
     if(eq('/baixar-backup')) return '@ag';
     // ── acoes/admin por API ──
     if(pre('/api/teste')) return 'teste.operar';
@@ -921,12 +945,19 @@ module.exports = function(app, db){
        chave: o `passivo` e a lista de tudo que esta errado na operacao, e o
        `/:tipo/:id` devolve a historia do volume. */
     if(pre('/api/correcao')) return 'correcao.executar';
-    if(eq('/api/inventario/sugestao') || eq('/api/inventario/abrir') || eq('/api/inventario/encerrar')) return 'contagem.planejar';
-    if(eq('/api/inventario/andamento')) return ['contagem.planejar','contagem.aprovar'];
-    if(eq('/api/inventario/minha-lista') || eq('/api/inventario/contar')) return 'contagem.contar';
-    if(eq('/api/inventario/recontagem') || eq('/api/inventario/recontar')) return 'contagem.recontar';
-    if(eq('/api/inventario/terminar-sku')) return ['contagem.contar','contagem.recontar'];
-    if(eq('/api/inventario/aprovacao') || eq('/api/inventario/aprovar') || eq('/api/inventario/rejeitar')) return 'contagem.aprovar';
+    /* A VERSAO 2 (04/11/2026): as tres rodadas pelas mesmas tres rotas (`hoje`,
+       `bipe`, `terminar`), com contar OU desempatar — e o dominio que diz qual
+       rodada a pessoa pode contar, item a item. A tarja e de qualquer pessoa
+       logada: quem nao tem a chave recebe nada. */
+    if(eq('/api/inventario/tarja')) return '@logado';
+    if(eq('/api/inventario/hoje') || eq('/api/inventario/bipe') || eq('/api/inventario/terminar')) return ['contagem.contar','contagem.desempatar'];
+    if(eq('/api/inventario/geral/terminar-prateleira')) return 'contagem.contar';
+    if(eq('/api/inventario/sugestao') || eq('/api/inventario/abrir') || eq('/api/inventario/encerrar') ||
+       eq('/api/inventario/geral/abrir') || eq('/api/inventario/quinzenal/abrir') || eq('/api/inventario/rodizio')) return 'contagem.planejar';
+    if(eq('/api/inventario/andamento')) return ['contagem.planejar','contagem.resolver','contagem.relatorio'];
+    if(eq('/api/inventario/aprovacao') || eq('/api/inventario/aprovar') || eq('/api/inventario/rejeitar') ||
+       eq('/api/inventario/resolver')) return 'contagem.resolver';
+    if(eq('/api/inventario/relatorio')) return 'contagem.relatorio';
     // contagem em dois passos (secao 9): aprovar/rejeitar o pendente exige
     // contagem.ajustar; contar e ENVIAR (que pode virar pendente) exige so
     // contagem.contar — o handler decide aplicar direto ou enfileirar.
@@ -1077,7 +1108,7 @@ module.exports = function(app, db){
        existe para a tela ficar na lista protegida do auth.js (armadilha #3) e
        para o fallback do modelo antigo; quem decide e a chave. Duas chaves
        levam a mesma area, e ela entra uma vez so. */
-    ['contagem.contar','inventario'], ['contagem.recontar','inventario'],
+    ['contagem.contar','inventario'], ['contagem.recontar','inventario'], ['contagem.desempatar','inventario'],
     /* SOB MEDIDA — UMA AREA SO, e ela serve a uma pergunta so: "para onde a
        pessoa vai depois do PIN?" (destino.js). Desde a fase 2 da
        ACESSOS-UNIFICADOS (26/10/2026) o portao do modulo NAO le esta coluna:

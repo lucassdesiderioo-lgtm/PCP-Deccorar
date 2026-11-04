@@ -143,13 +143,27 @@ module.exports = [
      proprio trabalho" e regra de CODIGO (outraPessoa, no estoque_dominio), que
      vale ate para o Admin Geral: a chave diz o que a pessoa pode fazer, e a
      regra diz em QUAL item. */
+  /* A VERSAO 2 DA CONFERENCIA (04/11/2026): a 2ª contagem passou a ser de quem
+     CONTA (as duas escaladas do dia sao o A e o B), a 3ª e de quem DESEMPATA, e
+     a aprovacao saiu — quando duas contagens batem, aplica sozinho; o que nem a
+     3ª resolve vai para quem RESOLVE. `contagem.recontar` e `contagem.aprovar`
+     ficam no registro, SEM rota de peca: trocar o nome de uma chave tiraria a
+     permissao de quem a tem, em silencio (#13). O backfill (acesso.js, 3-D2)
+     levou quem as tinha para as novas. */
   { chave:'contagem.recontar',    grupo:'Estoque',    nivel:'operacao',
-    rotulo:'Recontar divergência', desc:'Recontar às cegas o SKU que não bateu (nunca o que a própria pessoa contou)' },
+    rotulo:'Recontar divergência (antiga)', desc:'Sem uso desde 04/11/2026: a 2ª contagem é de quem conta, e a 3ª de quem desempata' },
+  { chave:'contagem.desempatar',  grupo:'Estoque',    nivel:'operacao',
+    rotulo:'Fazer a 3ª contagem', desc:'Contar às cegas o SKU em que as duas primeiras contagens não bateram (nunca o que a própria pessoa contou)' },
   { chave:'contagem.planejar',    grupo:'Estoque',    nivel:'admin',
-    rotulo:'Planejar conferência', desc:'Abrir a conferência do dia ou o inventário geral' },
+    rotulo:'Planejar conferência', desc:'Abrir a contagem geral, antecipar a quinzenal e tirar ou pôr pessoas no rodízio da contagem' },
   { chave:'contagem.aprovar',     grupo:'Estoque',    nivel:'admin',
-    rotulo:'Aprovar conferência', desc:'Aprovar ou rejeitar a diferença achada (nunca a que a própria pessoa contou)',
+    rotulo:'Aprovar conferência (antiga)', desc:'Sem uso desde 04/11/2026: duas contagens que batem aplicam sozinhas, e o resto é de quem resolve',
     sensivel:true },
+  { chave:'contagem.resolver',    grupo:'Estoque',    nivel:'admin',
+    rotulo:'Resolver contagem sem acordo', desc:'Decidir o SKU em que nem a 3ª contagem bateu: aplicar um valor com motivo, ou mandar contar de novo (nunca o que a própria pessoa contou)',
+    sensivel:true },
+  { chave:'contagem.relatorio',   grupo:'Estoque',    nivel:'admin',
+    rotulo:'Ver o relatório de furos', desc:'Ler os furos da conferência: quanto, de qual SKU, quem contou e o extrato' },
   /* O ROTULO MUDOU EM 27/10/2026, A CHAVE NAO (§20: trocar o texto de uma
      permissao e so o nome). Ele era "Aprovar ajuste de estoque", igual ao do
      `estoque.aprovar_ajuste` logo abaixo, e na tela de Acessos as duas

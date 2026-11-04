@@ -329,8 +329,8 @@ const ok = (n, c, extra) => { casos++;
   const meioPor = {}; meio.linhas.forEach(l => meioPor[l.codigo] = l);
   ok('conferencia aberta e ainda nao contada nao conta como conferencia',
      meioPor.BK160160CINZA.contado_em === null, 'veio ' + meioPor.BK160160CINZA.contado_em);
-  for(let i=0;i<7;i++) await chamar('POST /api/inventario/contar', {codigo:'BK160160CINZA'}, usuario);
-  await chamar('POST /api/inventario/terminar-sku', {codigo:'BK160160CINZA'}, usuario);
+  for(let i=0;i<7;i++) await chamar('POST /api/inventario/bipe', {codigo:'BK160160CINZA'}, usuario);
+  await chamar('POST /api/inventario/terminar', {codigo:'BK160160CINZA'}, usuario);
   ok('o fluxo real deixou o item confirmado (7 com 7)',
      db.prepare("SELECT status FROM inventario_item WHERE codigo='BK160160CINZA'").get().status === 'confirmado');
 

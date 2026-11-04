@@ -240,11 +240,19 @@ module.exports=function(app,db){
     for(const l of linhas) if(!l.sob_medida) precisa[l.codigo]=(precisa[l.codigo]||0)+l.qtd;
     for(const c of Object.keys(precisa)){
       const livre=(linhas.find(l=>l.codigo===c).estoque||0)-(resv[c]||0);
-      if(livre < precisa[c])
+      if(livre < precisa[c]){
+        /* A RECUSA FICA GRAVADA (ESTOQUE-LIVRO-E-CONFERENCIA v2, §6.1): o SKU
+           que travou aqui entra no topo da lista de contagem do dia seguinte
+           (degrau 1). Ate 04/11/2026 ela so respondia para a tela. Falhar em
+           gravar nao muda a recusa: a bancada continua sabendo que faltou. */
+        try{ require('./inventario_dominio').registrarRecusa(db, { codigo:c,
+          usuario_nome:(req.usuario&&req.usuario.nome)||null, lote_id:id }); }
+        catch(e){ console.log('[etiqueta] recusa sem estoque nao gravada: '+e.message); }
         return res.json({erro: linhas.length>1
           ? ('Sem estoque livre de '+c+' (precisa de '+precisa[c]+', livre '+livre+
              (resv[c]?' — '+resv[c]+' já em caixa impressa':'')+').')
           : ('Sem estoque desse SKU'+(resv[c]?' — a peça do saldo já está numa caixa impressa, esperando a conferência':'')+'.')});
+      }
     }
     db.transaction(()=>{
       /* O BIPE 1 DA DUPLA CONFERENCIA: quem imprimiu (spec SAIDA-E-DUPLA-

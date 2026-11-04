@@ -63,8 +63,8 @@
 - **Regra:** SKU de modelo com `sob_medida=1` não ganha +1 na embalagem nem −1 na etiqueta, e não passa pela trava de estoque. O saldo dele é sempre zero.
 - **Por quê:** a peça é feita contra o pedido; não existe antes da venda nem sobra depois. Baixar de um lado só abriria um buraco por venda.
 - **Exceções:** nenhuma. ⚠ **Não marque `sob_medida` no modelo `ROLO`**: são 29 dos 30 SKUs.
-- **Teste que trava:** `teste_livro.js` (fluxo real com sob medida).
-- **Status:** no ar · a flag só pega quando o modelo está marcado no banco (armadilha #30, CLAUDE.md §7).
+- **Teste que trava:** `teste_livro.js` (impressão e conferência) · `teste_montagem.js` §8 (a embalagem) · `teste_regras_estoque.js` (regra 16, com o servidor de verdade).
+- **Status:** no ar · a flag só pega quando o modelo está marcado no banco (armadilha #30, CLAUDE.md §7) · ⚠️ **até 04/11/2026 a EMBALAGEM somava +1 para sob medida** — o teste do livro não chamava a embalagem; achado pelo `teste_regras_estoque.js` e consertado (CONSERTO, decisão do dono). O saldo que o SOBMEDIDA já acumulou em produção **não foi mexido**: confira em Admin → Estoque e zere por ajuste, com motivo.
 - **História:** CLAUDE.md §7, armadilhas #6 e #30.
 
 ### R-EST-06 · O saldo só anda pelo livro
@@ -319,25 +319,32 @@
 - **História:** armadilha #32.
 
 ### R-EST-17 · Quem conta não vê o saldo
-- **Regra:** as rotas de contar e recontar não devolvem saldo, contagem anterior nem "bateu/não bateu" — nem no JSON. Conta-se só a peça embalada, com etiqueta de SKU e sem etiqueta de venda.
+- **Regra:** as rotas de quem conta (`/api/inventario/hoje`, `bipe`, `terminar`) não devolvem saldo, contagem anterior nem "bateu/não bateu" — nem no JSON. Conta-se **toda caixa embalada SEM etiqueta de venda, na prateleira e na bancada** (v2, 04/11/2026); a comparação é contra o **livre** (saldo − peça em caixa impressa e não conferida).
 - **Por quê:** quem sabe a resposta conta até chegar nela.
-- **Exceções:** quem planeja e aprova vê os números.
-- **Teste que trava:** `teste_inventario.js` (varre o JSON) · ⚠ **sem teste** da frase "só peça embalada" na tela.
-- **Status:** no ar desde 26/09/2026 · conferida na fábrica: **ainda não**.
+- **Exceções:** quem resolve e quem lê o relatório veem os números.
+- **Teste que trava:** `teste_inventario.js` (varre o JSON) · `teste_regras_estoque.js` (regra 7, com o servidor de verdade).
+- **Status:** no ar desde 26/09/2026; rotas da v2 em código (04/11/2026) · conferida na fábrica: **ainda não**.
 
-### R-EST-18 · Ninguém aprova o próprio trabalho
-- **Regra:** quem contou não reconta nem aprova aquele item; quem pediu um ajuste não o aprova. Vale para o Admin Geral. Sem uma segunda pessoa, a correção **espera**. A comparação é por pessoa (`outraPessoa`), e vazio nunca é igual a vazio.
-- **Por quê:** é a única forma de a correção de saldo ter duas pessoas atrás. Decisão do dono (26/09/2026): o aprovador único espera, sem exceção com motivo.
+### R-EST-18 · Ninguém conta duas vezes o mesmo SKU, e ninguém resolve o que contou
+- **Regra:** quem contou A não conta B nem C do mesmo SKU; quem contou não resolve o item na fila do admin; quem pediu um ajuste não o aprova. Vale para o Admin Geral. A comparação é por pessoa (`outraPessoa`), e vazio nunca é igual a vazio. A recontagem **na hora** por "mexeram durante a contagem" não é outra contagem (é a mesma, refeita).
+- **Por quê:** duas pessoas às cegas que acham a mesma diferença são a prova. Decisão do dono (26/09/2026, mantida na v2): o aprovador único do **ajuste** espera.
 - **Exceções:** nenhuma.
-- **Teste que trava:** `teste_inventario.js` · `teste_ajuste.js`.
-- **Status:** no ar · conferida na fábrica: **ainda não**.
+- **Teste que trava:** `teste_inventario.js` · `teste_ajuste.js` · `teste_regras_estoque.js` (regra 4).
+- **Status:** no ar · v2 em código (04/11/2026) · conferida na fábrica: **ainda não**.
 
-### R-EST-19 · O caminho da contagem
-- **Regra:** bateu na 1ª contagem → confirma sozinho, sem movimento. Diferente → outra pessoa reconta. As duas acharam a mesma diferença → vai para aprovação. Não acharam → uma 3ª pessoa conta e vale o acordo de duas; acordo em zero confirma sem movimento. Rejeitar não apaga: nasce um item novo a contar do zero. Uma pessoa por vez no mesmo SKU. Terminar sem bipe é contagem zero. Aprovar exige motivo.
-- **Por quê:** compara-se a diferença, e não o número, porque a bancada continua trabalhando entre uma contagem e outra.
-- **Exceções:** SKU fora do plano entra marcado; sob medida é recusado.
-- **Teste que trava:** `teste_inventario.js`.
-- **Status:** no ar desde 26/09/2026 · conferida na fábrica: **ainda não**.
+### R-EST-19 · O caminho da contagem (v2, 04/11/2026)
+- **Regra:** bateu na 1ª → confirma, sem movimento. Diferente → a 2ª é de **outra pessoa que conta** (as duas escaladas do dia são o A e o B). As duas acharam a **mesma diferença** → **aplica sozinho**, sem aprovação: uma linha `inventario` com a diferença, em nome de quem fechou, sem motivo, e o furo vai para o relatório. Não acharam → a **3ª**, de quem tem `contagem.desempatar` e não contou; C bate com A ou com B → aplica sozinho; acordo em zero → confirma; ninguém bate → **fila do admin** (`contagem.resolver`): aplicar uma diferença com motivo, ou mandar contar de novo (na diária, volta **amanhã**, do zero). **Mexeram no SKU durante a contagem** (o livre mudou, ou linha no livro que não seja a baixa da Conferência, entre o primeiro bipe e o "terminei") → a contagem não vale e a tela pede recontar na hora. Uma pessoa por vez no mesmo SKU. "Não tem nenhuma" é contagem zero.
+- **Por quê:** compara-se a diferença, e não o número, porque a bancada continua trabalhando entre uma contagem e outra; e o que anda durante a contagem não aparece na diferença. Decisão do dono (04/11/2026): o admin só recebe o que nem a 3ª resolveu.
+- **Exceções:** os itens que já esperavam aprovação no dia do deploy da v2 continuam na fila, pela regra velha. SKU fora da lista do dia é recusado; na quinzenal, na geral e na avulsa entra marcado. Sob medida é recusado.
+- **Teste que trava:** `teste_inventario.js` (98) · `teste_regras_estoque.js` (97).
+- **Status:** v1 no ar desde 26/09/2026; v2 em código (04/11/2026) · conferida na fábrica: **ainda não**.
+
+### R-EST-24 · A lista do dia, o rodízio e a tarja (v2, 04/11/2026)
+- **Regra:** de segunda a sexta (`config.ciclo_dias`), no primeiro pedido depois das 7h (`ciclo_hora`), nasce a lista do dia de 8 SKUs (`ciclo_qtd`) e **não muda no dia**: sobrou de ontem → travou na etiqueta (`recusa_estoque`, ignora a folga) → menor cobertura (livre ÷ média do `demanda_dominio`) → nunca conferido → mais tempo sem conferir; folga de 7 dias (`ciclo_folga`); sob medida fora. Na mesma hora o sistema escala **duas pessoas** (`ciclo_pessoas`): quem tem `contagem.contar` **pelo setor ou por exceção** (o Admin Geral não entra só pelo nível), ativa e fora do "fora do rodízio", há mais tempo sem escala (empate: nome). Até as 10h (`ciclo_abre_todos`) a 1ª e a 2ª contagem são delas; às 10h, se uma não começou, abre para todo o setor e o relatório diz "escalada, não contou". Menos de duas pessoas: não há escala, a lista nasce aberta e o aviso vai para quem planeja. A **tarja** (`nav.js`) aparece para as escaladas (e para o setor depois das 10h, e para quem desempata quando há 3ª), **não fecha e não bloqueia**. A quinzenal (`quinzenal_dias`=15, prazo `quinzenal_prazo`=3 dias úteis) suspende a diária; no fim do prazo o não contado vira `nao_conferido` e a divergência vai para a diária seguinte. A geral abre só com a expedição parada confirmada, e o "terminei a prateleira" grava zero da pessoa nos SKUs que ela não bipou.
+- **Por quê:** decisões do dono (04/11/2026, `docs/DECISOES.md`): fechar o furo aos poucos sem parar a expedição, e contagem livre num time pequeno acaba em sempre a mesma pessoa, ou ninguém.
+- **Exceções:** a primeira quinzenal é 15 dias depois do deploy. A conferência avulsa da v1 continua.
+- **Teste que trava:** `teste_inventario.js` · `teste_regras_estoque.js` (regras 8 a 14).
+- **Status:** em código (04/11/2026) · conferida na fábrica: **ainda não**.
 
 ### R-EST-20 · O ajuste manual é pedido por uma pessoa e aprovado por outra
 - **Regra:** pedir (`estoque.ajustar`) não mexe no saldo; o pedido é em delta e guarda o saldo da hora. Outra pessoa aprova (`estoque.aprovar_ajuste`) ou recusa com motivo; quem pediu pode desistir. Um pedido pendente por SKU. O `POST /api/estoque` antigo só recusa (410). Pedidos moram em `ajuste_pedido`; o aplicado vai para `ajuste_estoque`.

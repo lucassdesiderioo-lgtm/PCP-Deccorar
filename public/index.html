@@ -241,6 +241,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
        como era. -->
   <div class="card" id="invAprov" style="display:none"></div>
   <div class="card" id="invConf" style="display:none"></div>
+  <div class="card" id="invRel" style="display:none"></div>
   <div class="card">
     <div style="font-weight:700;margin-bottom:4px">Material</div>
     <div class="sub" style="margin-bottom:12px">Pe&ccedil;a n&atilde;o se conta mais aqui: ela se conta &agrave;s cegas na tela
@@ -3527,36 +3528,46 @@ function invEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ r
 function invSinal(n){ return n>0 ? '+'+n : String(n); }
 function invData(s){ if(!s) return ''; var m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/); return m ? m[3]+'/'+m[2]+' '+m[4]+':'+m[5] : s; }
 function invPeca(i){ return (typeof pecaTexto==='function'&&typeof pecaDeSku==='function') ? pecaTexto(pecaDeSku(i)) : (i.descricao||''); }
-var INV_STATUS={a_contar:'a contar',recontar:'recontagem',terceira:'3ª contagem',aprovar:'esperando aprovação',
-  confirmado:'bateu',aprovado:'aprovado',rejeitado:'rejeitado',nao_contado:'não contado'};
+var INV_STATUS={a_contar:'a contar',recontar:'2ª contagem',terceira:'3ª contagem',aprovar:'sem acordo — decidir',
+  confirmado:'bateu',aprovado:'decidido',aplicado:'aplicou sozinho',rejeitado:'contar de novo',nao_contado:'não contado',nao_conferido:'não conferido'};
+function invDia(s){ if(!s) return ''; var m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3]+'/'+m[2] : s; }
 async function invCarregar(){
   if(!INV_MOT.length){ try{ INV_MOT=await (await fetch('/api/listas/motivo_estoque')).json(); }catch(e){ INV_MOT=[]; } }
-  await Promise.all([invAprovacao(), invAndamento()]);
+  await Promise.all([invAprovacao(), invAndamento(), invRelatorio()]);
 }
+/* A FILA DO ADMIN (versão 2, 04/11/2026): só o que nem a 3ª contagem resolveu
+   — quando duas contagens batem, o saldo muda sozinho e o furo vai para o
+   relatório. Os itens que já esperavam aprovação no dia do deploy continuam
+   aqui, pela regra velha. */
 async function invAprovacao(){
   var box=document.getElementById('invAprov'); if(!box) return;
   var r; try{ r=await fetch('/api/inventario/aprovacao'); }catch(e){ return; }
   if(r.status!==200){ box.style.display='none'; return; }
   var d=await r.json(); var it=d.itens||[];
   box.style.display='block';
-  var h='<div style="font-weight:700;margin-bottom:4px">Conferência — diferenças esperando aprovação ('+it.length+')</div>'+
-    '<div class="sub" style="margin-bottom:10px">Cada uma foi achada por duas contagens às cegas, de pessoas diferentes. Aprovar grava no livro a <b>diferença</b> que elas acharam, sobre o saldo de agora — o que foi embalado ou impresso depois da contagem continua valendo. Quem contou não aprova.</div>';
-  if(!it.length){ box.innerHTML=h+'<div class="sub">Nenhuma diferença esperando.</div>'; return; }
+  var h='<div style="font-weight:700;margin-bottom:4px">Conferência — sem acordo, para decidir ('+it.length+')</div>'+
+    '<div class="sub" style="margin-bottom:10px">Quando duas contagens às cegas acham a mesma diferença, o saldo muda <b>sozinho</b> e o furo vai para o relatório abaixo. Aqui ficam só os SKUs em que nem a 3ª contagem bateu: escolha a diferença que vale, com motivo, ou mande contar de novo. Quem contou não decide.</div>';
+  if(!it.length){ box.innerHTML=h+'<div class="sub">Nenhum SKU esperando decisão.</div>'; return; }
   var opts='<option value="">motivo…</option>'+INV_MOT.map(function(m){ return '<option>'+invEsc(m.valor)+'</option>'; }).join('');
   it.forEach(function(i){
+    var difs=[]; i.contagens.forEach(function(c){ if(difs.indexOf(c.diferenca)<0) difs.push(c.diferenca); });
     h+='<div style="border-top:1px solid var(--line);padding:12px 0">'+
       '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b style="font-family:ui-monospace,monospace">'+invEsc(i.codigo)+'</b> <span class="sub">'+invEsc(invPeca(i))+'</span></div>'+
-      '<div><b style="font-size:18px;color:'+(i.diferenca<0?'#ff6b6b':'#4493f8')+'">'+invSinal(i.diferenca)+'</b> <span class="sub">saldo '+i.saldo_agora+' → '+i.saldo_depois+
+      '<div><span class="sub">saldo agora '+i.saldo_agora+
       (i.valor_diferenca!=null&&i.valor_diferenca!==undefined ? ' · R$ '+Number(i.valor_diferenca).toFixed(2).replace('.',',') : '')+'</span></div></div>'+
       '<table style="margin-top:6px"><thead><tr><th>Contagem</th><th>Contou</th><th>Sistema dizia</th><th>Diferença</th><th>Quem</th><th>Quando</th></tr></thead><tbody>'+
       i.contagens.map(function(c){ return '<tr><td>'+c.rodada+'ª</td><td align=center><b>'+c.contado+'</b></td><td align=center>'+c.saldo+'</td><td align=center>'+invSinal(c.diferenca)+'</td><td>'+invEsc(c.por||'—')+'</td><td class="sub">'+invData(c.em)+'</td></tr>'; }).join('')+
       '</tbody></table>'+
-      (i.sem_acordo ? '<div style="color:#d29922;margin-top:6px">⚠ As três contagens não concordam: vale a da 3ª. Na dúvida, rejeite — o SKU volta a ser contado do zero.</div>' : '')+
+      (i.regra_velha ? '<div style="color:#d29922;margin-top:6px">Contado antes de 04/11/2026: as duas contagens bateram e ele esperava aprovação pela regra de antes.</div>'
+        : (i.sem_acordo ? '<div style="color:#d29922;margin-top:6px">⚠ As três contagens não concordam. Na dúvida, mande contar de novo — na lista do dia ele volta amanhã, do zero.</div>' : ''))+
       (function(){ var mx=(i.extrato||[]).filter(function(m){ return m.tipo!=='abertura'; });
-        return mx.length ? '<div class="sub" style="margin-top:6px">Mexeu no saldo desde a 1ª contagem (e continua valendo): '+mx.map(function(m){ return invSinal(m.delta)+' '+m.tipo; }).join(' · ')+'</div>' : ''; })()+
+        return mx.length ? '<div class="sub" style="margin-top:6px">Extrato desde a última conferência: '+mx.map(function(m){ return invSinal(m.delta)+' '+m.tipo+' '+invData(m.criado_em); }).join(' · ')+'</div>' : ''; })()+
       (i.pode_aprovar
-        ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><select id="invMot'+i.id+'">'+opts+'</select><input id="invObs'+i.id+'" placeholder="observação (obrigatória em Outro)" style="flex:1;min-width:200px">'+
-          '<button class="primary" onclick="invDecidir('+i.id+',\'aprovar\')">Aprovar</button><button class="ghost" onclick="invDecidir('+i.id+',\'rejeitar\')">Rejeitar e recontar</button></div>'
+        ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
+          '<select id="invDif'+i.id+'">'+difs.map(function(x){ return '<option value="'+x+'"'+(x===i.diferenca?' selected':'')+'>vale '+invSinal(x)+'</option>'; }).join('')+'<option value="outro">outra diferença…</option></select>'+
+          '<input id="invDifO'+i.id+'" type="number" step="1" placeholder="diferença" style="width:110px">'+
+          '<select id="invMot'+i.id+'">'+opts+'</select><input id="invObs'+i.id+'" placeholder="observação (obrigatória em Outro)" style="flex:1;min-width:200px">'+
+          '<button class="primary" onclick="invDecidir('+i.id+',\'aprovar\')">Aplicar</button><button class="ghost" onclick="invDecidir('+i.id+',\'rejeitar\')">Mandar contar de novo</button></div>'
         : '<div class="sub" style="margin-top:8px;color:#d29922">Você não pode decidir esta: '+invEsc(i.por_que_nao)+'. Ela espera outra pessoa com a permissão.</div>')+
       '<div id="invErr'+i.id+'" style="color:#ff6b6b;margin-top:6px"></div></div>';
   });
@@ -3564,8 +3575,11 @@ async function invAprovacao(){
 }
 async function invDecidir(id, acao){
   var m=(document.getElementById('invMot'+id)||{}).value||'', o=(document.getElementById('invObs'+id)||{}).value||'';
+  var sel=(document.getElementById('invDif'+id)||{}).value, outro=(document.getElementById('invDifO'+id)||{}).value;
+  var dif = sel==='outro' ? outro : sel;
   var err=document.getElementById('invErr'+id);
-  var r=await fetch('/api/inventario/'+acao,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,motivo:m,obs:o})});
+  if(acao==='aprovar' && (dif===''||dif==null)){ if(err) err.textContent='Digite a diferença que vale.'; return; }
+  var r=await fetch('/api/inventario/'+acao,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,motivo:m,obs:o,diferenca:acao==='aprovar'?Number(dif):undefined})});
   var d={}; try{ d=await r.json(); }catch(e){}
   if(!r.ok||d.ok===false){ if(err) err.textContent=d.erro||('falhou ('+r.status+')'); return; }
   invCarregar(); carregar();
@@ -3575,38 +3589,65 @@ async function invAndamento(){
   var r; try{ r=await fetch('/api/inventario/andamento'); }catch(e){ return; }
   if(r.status!==200){ box.style.display='none'; return; }
   var d=await r.json(); box.style.display='block';
-  var sug=null; try{ var rs=await fetch('/api/inventario/sugestao'); if(rs.status===200) sug=(await rs.json()).sugestao; }catch(e){}
+  var pl=await fetch('/api/inventario/rodizio').then(function(x){ return x.status===200?x.json():null; }).catch(function(){ return null; });
   var h='<div style="font-weight:700;margin-bottom:4px">Conferência de peças</div>'+
-    '<div class="sub" style="margin-bottom:10px">Contar é no tablet, às cegas, na tela <a href="/inventario" style="color:#4493f8">Inventário</a>. O que bateu confirma sozinho; o que não bateu é recontado por outra pessoa e só então vem para aprovação.</div>';
-  if(sug){
+    '<div class="sub" style="margin-bottom:10px">Contar é no tablet, às cegas, na tela <a href="/inventario" style="color:#4493f8">Inventário</a>. Todo dia de trabalho, às 7h, nasce a lista do dia ('+d.ciclo_qtd+' SKUs) e o sistema escala duas pessoas do rodízio; às 10h, o que elas não começaram abre para todo o setor. A cada 15 dias, a quinzenal passa por todos.</div>';
+  var dd=d.do_dia;
+  if(dd){
+    h+='<div style="margin-bottom:8px"><b>Hoje:</b> '+(dd.tipo==='quinzenal'?'conferência quinzenal (prazo '+invDia(dd.prazo)+')':'lista do dia')+
+      ' · escala: '+(d.escala&&d.escala.length ? d.escala.map(function(e){ return invEsc(e.usuario_nome)+(e.abriu_para_todos_em?' <span style="color:#d29922">(não começou — abriu para todos)</span>':''); }).join(' e ') : '<span style="color:#d29922">sem escala (menos de duas pessoas no rodízio)</span>')+'</div>';
+  } else h+='<div class="sub" style="margin-bottom:8px">Hoje ainda não há lista (antes das 7h, ou fora dos dias de trabalho).</div>';
+  h+='<div class="sub" style="margin-bottom:10px">Próxima quinzenal: '+invDia(d.quinzenal_proxima)+'</div>';
+  if(pl){
+    h+='<div style="margin-bottom:10px"><div class="sub" style="margin-bottom:6px">Rodízio — quem tem a permissão de contar (pelo setor ou por exceção). Fora do rodízio: folga, férias, afastamento.</div>'+
+      (pl.pessoas.length ? pl.pessoas.map(function(p){ /* span, e não label: o admin pinta todo label como rótulo de campo (caixa alta, em bloco) */
+        return '<span style="display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin:0 6px 6px 0;font-size:14px;cursor:pointer" onclick="if(event.target.tagName!==\'INPUT\'){var c=this.querySelector(\'input\');c.checked=!c.checked;c.onchange();}">'+
+        '<input type="checkbox" style="width:auto;margin:0" '+(p.fora?'':'checked')+' onchange="invRodizio('+p.id+',!this.checked)">'+'<b>'+invEsc(p.nome)+'</b>'+(p.ativo?'':' (bloqueado)')+
+        ' <span class="sub">'+(p.fora?'fora do rodízio':(p.ultima?'escalada '+invDia(p.ultima):'nunca escalada'))+'</span></span>'; }).join('')
+        : '<span style="color:#d29922">Ninguém tem a permissão de contar. Ponha as pessoas no setor "Operador / Controle de Estoque" em Admin → Acessos.</span>')+'</div>';
     h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'+
-      (sug.length ? '<button class="primary" onclick="invAbrir(\'ciclico\')">Abrir a conferência do dia ('+sug.length+(sug.length===1?' SKU':' SKUs')+')</button>' : '<span class="sub">Nenhum SKU para sugerir hoje.</span>')+
-      '<button class="ghost" onclick="invAbrir(\'geral\')">Inventário geral</button></div>';
-    if(sug.length) h+='<div class="sub" style="margin-bottom:10px">Sugestão de hoje: '+sug.map(function(x){ return invEsc(x.codigo)+(x.nunca?' <span style="color:#d29922">(nunca conferido)</span>':(x.dias===0?' (conferido hoje)':' (há '+x.dias+(x.dias===1?' dia':' dias')+')')); }).join(', ')+'</div>';
+      '<button class="ghost" onclick="invQuinzenal()">Antecipar a quinzenal</button>'+
+      '<button class="ghost" onclick="invGeral()">Contagem geral (expedição parada)</button>'+
+      '<button class="ghost" onclick="invAbrir(\'ciclico\')">Conferência avulsa</button></div>';
   }
   if(!d.ciclos.length) h+='<div class="sub">Nenhuma conferência aberta.</div>';
   d.ciclos.forEach(function(c){
     var its=d.itens.filter(function(i){ return i.ciclo_id===c.id; });
+    var nome = c.tipo==='geral'?'contagem geral':(c.tipo==='quinzenal'?'quinzenal':(c.tipo==='diario'?'lista do dia '+invDia(c.data):'avulsa'));
     h+='<div style="border-top:1px solid var(--line);padding:10px 0"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">'+
-      '<b>Conferência #'+c.id+' · '+(c.tipo==='geral'?'inventário geral':'do dia')+'</b><span class="sub">aberta por '+invEsc(c.aberto_por||'—')+' em '+invData(c.aberto_em)+'</span></div>'+
+      '<b>Conferência #'+c.id+' · '+nome+'</b><span class="sub">aberta por '+invEsc(c.aberto_por||'—')+' em '+invData(c.aberto_em)+'</span></div>'+
       '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">'+its.map(function(i){
-        var cor = i.status==='confirmado'||i.status==='aprovado' ? '#2ea043' : (i.status==='aprovar'||i.status==='recontar'||i.status==='terceira' ? '#d29922' : '#8b97a5');
+        var cor = i.status==='confirmado'||i.status==='aprovado'||i.status==='aplicado' ? '#2ea043' : (i.status==='aprovar'||i.status==='recontar'||i.status==='terceira' ? '#d29922' : '#8b97a5');
         var quem = i.contando ? ' · '+invEsc(i.rascunho_por)+' contando' : '';
-        return '<span style="border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:13px"><b style="font-family:ui-monospace,monospace">'+invEsc(i.codigo)+'</b> <span style="color:'+cor+'">'+(INV_STATUS[i.status]||i.status)+'</span>'+quem+(i.fora_do_plano?' <span class="sub">(fora do plano)</span>':'')+'</span>';
+        return '<span style="border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:13px"><b style="font-family:ui-monospace,monospace">'+invEsc(i.codigo)+'</b> <span style="color:'+cor+'">'+(INV_STATUS[i.status]||i.status)+'</span>'+quem+
+          (i.degrau!=null&&d.degraus?' <span class="sub">('+invEsc(d.degraus[i.degrau])+')</span>':'')+(i.fora_do_plano?' <span class="sub">(fora do plano)</span>':'')+'</span>';
       }).join('')+'</div>'+
-      (its.some(function(i){ return i.status==='a_contar'; }) ? '<div style="margin-top:8px"><button class="ghost small" onclick="invEncerrar('+c.id+')">Encerrar: o que ninguém contou sai como não contado</button></div>' : '')+
+      (c.tipo!=='diario' && its.some(function(i){ return i.status==='a_contar'; }) ? '<div style="margin-top:8px"><button class="ghost small" onclick="invEncerrar('+c.id+')">Encerrar: o que ninguém contou sai como não contado</button></div>' : '')+
       '</div>';
   });
-  if(d.recentes && d.recentes.length){
-    h+='<div style="border-top:1px solid var(--line);padding-top:10px;margin-top:4px"><div class="sub" style="margin-bottom:6px">Últimas decisões</div>'+
-      d.recentes.slice(0,10).map(function(x){ return '<div style="font-size:13px;padding:3px 0"><b style="font-family:ui-monospace,monospace">'+invEsc(x.codigo)+'</b> — '+(INV_STATUS[x.status]||x.status)+
-        (x.status==='aprovado' ? ' ('+invSinal(x.diferenca)+', '+invEsc(x.motivo||'')+')' : x.status==='rejeitado' ? ' ('+invEsc(x.motivo||'')+')' : '')+
-        ' <span class="sub">'+(x.decidido_por ? invEsc(x.decidido_por)+' · ' : '')+invData(x.decidido_em||x.em1)+'</span></div>'; }).join('')+'</div>';
-  }
   box.innerHTML=h;
 }
+async function invRodizio(id, fora){
+  var r=await fetch('/api/inventario/rodizio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({usuario_id:id,fora:fora})});
+  var d={}; try{ d=await r.json(); }catch(e){}
+  if(!r.ok||d.ok===false){ alert(d.erro||('falhou ('+r.status+')')); }
+  invAndamento();
+}
+async function invQuinzenal(){
+  if(!confirm('Antecipar a conferência quinzenal? Ela passa por todos os SKUs, com prazo de 3 dias úteis, e suspende a lista do dia enquanto estiver aberta.')) return;
+  var r=await fetch('/api/inventario/quinzenal/abrir',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+  var d={}; try{ d=await r.json(); }catch(e){}
+  if(!r.ok||d.ok===false){ alert(d.erro||('falhou ('+r.status+')')); return; }
+  invAndamento();
+}
+async function invGeral(){
+  if(!confirm('CONTAGEM GERAL — com a EXPEDIÇÃO PARADA.\n\nEnquanto ela roda, ninguém embala nem imprime etiqueta de venda. Entra todo SKU com saldo ou com movimento nos últimos 30 dias, e cada SKU é contado por duas pessoas.\n\nAbrir agora?')) return;
+  var r=await fetch('/api/inventario/geral/abrir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmar:true})});
+  var d={}; try{ d=await r.json(); }catch(e){}
+  if(!r.ok||d.ok===false){ alert(d.erro||('falhou ('+r.status+')')); return; }
+  invAndamento();
+}
 async function invAbrir(tipo){
-  if(tipo==='geral' && !confirm('Abrir um inventário GERAL? Entra todo SKU com saldo ou com movimento nos últimos 30 dias.')) return;
   var r=await fetch('/api/inventario/abrir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo:tipo})});
   var d={}; try{ d=await r.json(); }catch(e){}
   if(!r.ok||d.ok===false){ alert(d.erro||('falhou ('+r.status+')')); return; }
@@ -3618,6 +3659,46 @@ async function invEncerrar(id){
   var d={}; try{ d=await r.json(); }catch(e){}
   if(!r.ok||d.ok===false){ alert(d.erro||('falhou ('+r.status+')')); return; }
   invAndamento();
+}
+/* O RELATÓRIO DE FUROS (§7.3): só leitura. É o que substitui o "aprovar" — o
+   dono lê para onde a peça foi. R$ só viaja para quem tem custo.ver. */
+var INV_REL_ABERTO={};
+async function invRelatorio(){
+  var box=document.getElementById('invRel'); if(!box) return;
+  var r; try{ r=await fetch('/api/inventario/relatorio'); }catch(e){ return; }
+  if(r.status!==200){ box.style.display='none'; return; }
+  var d=await r.json(); box.style.display='block';
+  var rs=function(v){ return 'R$ '+Number(v).toFixed(2).replace('.',','); };
+  var resumo=function(t,x){ return '<div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:150px"><div class="sub">'+t+'</div><b style="font-size:18px">'+invSinal(x.pecas)+'</b> <span class="sub">peças · faltou '+x.faltou+' · sobrou '+x.sobrou+' · '+x.itens+' SKU(s)</span></div>'; };
+  var h='<div style="font-weight:700;margin-bottom:4px">Relatório de furos</div>'+
+    '<div class="sub" style="margin-bottom:10px">O que a conferência achou desde '+invDia(d.desde)+'. Cada furo traz quem contou e o extrato do SKU desde a conferência anterior — é ali que se vê por onde a peça foi.</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+resumo('Últimos 7 dias',d.semana)+resumo('Este mês',d.mes)+
+    '<div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px"><div class="sub">Acuracidade do mês (1ª contagem certa)</div><b style="font-size:18px">'+(d.acuracidade.pct==null?'—':String(d.acuracidade.pct).replace('.',',')+'%')+'</b> <span class="sub">'+d.acuracidade.certos+' de '+d.acuracidade.contados+'</span></div>'+
+    '<div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px"><div class="sub">Sem acordo, para decidir</div><b style="font-size:18px">'+d.fila_admin+'</b></div>'+
+    /* Custo indefinido nunca vira zero (§7-B): sem custo nenhum é "sem custo"; com parte sem custo, o valor é piso (≥). */
+    (d.valor_periodo ? '<div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px"><div class="sub">Valor do período</div>'+
+      (d.valor_periodo.sem_custo && d.valor_periodo.sem_custo>=d.furos.length ? '<b style="font-size:16px;color:#d29922">sem custo cadastrado</b>'
+        : '<b style="font-size:18px">'+(d.valor_periodo.sem_custo?'≥ ':'')+rs(d.valor_periodo.valor)+'</b>'+(d.valor_periodo.sem_custo?' <span class="sub" style="color:#d29922">'+d.valor_periodo.sem_custo+' furo(s) sem custo</span>':''))+'</div>' : '')+
+    '</div>';
+  if(d.mais_furam.length) h+='<div class="sub" style="margin-bottom:8px">SKUs que mais furam: '+d.mais_furam.map(function(m){ return '<b style="font-family:ui-monospace,monospace">'+invEsc(m.codigo)+'</b> '+invSinal(m.pecas)+(m.vezes>1?' ('+m.vezes+'×)':''); }).join(' · ')+'</div>';
+  if(!d.furos.length) h+='<div class="sub">Nenhum furo no período.</div>';
+  d.furos.forEach(function(f){
+    var ab=INV_REL_ABERTO[f.id];
+    h+='<div style="border-top:1px solid var(--line);padding:8px 0"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;cursor:pointer" onclick="INV_REL_ABERTO['+f.id+']=!INV_REL_ABERTO['+f.id+'];invRelatorio()">'+
+      '<div><b style="font-family:ui-monospace,monospace">'+invEsc(f.codigo)+'</b> <b style="color:'+(f.diferenca<0?'#ff6b6b':'#4493f8')+'">'+invSinal(f.diferenca)+'</b>'+
+      (f.valor_diferenca!=null&&f.valor_diferenca!==undefined?' <span class="sub">'+rs(f.valor_diferenca)+'</span>':'')+
+      ' <span class="sub">'+(f.sozinho?'as contagens bateram':'decidido por '+invEsc(f.decidido_por||'—')+' · '+invEsc(f.motivo||''))+'</span></div>'+
+      '<span class="sub">'+f.contagens.map(function(c){ return c.rodada+'ª '+invEsc(c.por||'—')+' ('+c.contado+')'; }).join(' · ')+' · '+invData(f.quando)+' '+(ab?'▲':'▼')+'</span></div>'+
+      (ab ? '<div style="margin-top:6px;font-size:13px">'+(f.extrato.length ? f.extrato.map(function(m){ return '<div>'+invData(m.criado_em)+' · '+invSinal(m.delta)+' '+invEsc(m.tipo)+(m.usuario_nome?' · '+invEsc(m.usuario_nome):'')+' → saldo '+m.saldo_depois+'</div>'; }).join('') : '<div class="sub">Sem movimento no livro desde a conferência anterior.</div>')+'</div>' : '')+
+      '</div>';
+  });
+  var nc=d.nao_conferidos.length, pm=d.listas_pela_metade.length, nao=d.escala.filter(function(e){ return e.nao_contou; });
+  h+='<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:4px;font-size:13px">'+
+    '<div><b>Não conferidos:</b> '+(nc ? d.nao_conferidos.map(function(x){ return invEsc(x.codigo)+' <span class="sub">('+(x.tipo==='quinzenal'?'quinzenal vencida':x.tipo)+')</span>'; }).join(', ') : '<span class="sub">nenhum</span>')+'</div>'+
+    '<div><b>Listas do dia que ficaram pela metade:</b> '+(pm ? d.listas_pela_metade.map(function(x){ return invDia(x.data)+' ('+x.sobraram+' para o dia seguinte)'; }).join(', ') : '<span class="sub">nenhuma</span>')+'</div>'+
+    '<div><b>Escalada, não contou:</b> '+(nao.length ? nao.map(function(e){ return invEsc(e.nome)+' '+invDia(e.data); }).join(', ') : '<span class="sub">ninguém</span>')+'</div>'+
+    '<div class="sub" style="margin-top:4px">Escala do período: '+(d.escala.length ? d.escala.map(function(e){ return invDia(e.data)+' '+invEsc(e.nome); }).join(' · ') : '—')+'</div></div>';
+  box.innerHTML=h;
 }
 
 

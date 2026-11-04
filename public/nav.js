@@ -179,3 +179,32 @@ function digitoDoAtalho(e){
   }
   pinta(); setInterval(pinta,10000);
 })();
+
+/* ---- tarja da contagem de estoque (ESTOQUE-LIVRO-E-CONFERENCIA v2, §7.1) ----
+   Aparece no topo de todas as telas para as duas escaladas do dia (e para o
+   setor depois das 10h, se uma nao comecou). NAO FECHA E NAO BLOQUEIA:
+   incomoda, nao trava — uma trava que para a bancada perto do despacho vira
+   desvio (armadilha #6). Quem decide se ela aparece e o servidor
+   (/api/inventario/tarja); quem nao tem a chave recebe nada. Toque abre a
+   tela de contagem. Fora do fluxo do bipe: um elemento no topo, sem foco. */
+(function(){
+  if(location.pathname.indexOf('/login')===0) return;
+  function pinta(){
+    fetch('/api/inventario/tarja').then(function(r){ return r.ok ? r.json() : {}; }).then(function(d){
+      var t=d&&d.tarja, el=document.getElementById('invBar');
+      if(!t||!t.texto){ if(el) el.remove(); return; }
+      if(!el){
+        el=document.createElement('a'); el.id='invBar';
+        el.style.cssText='display:block;position:relative;z-index:9999;text-decoration:none;text-align:center;'+
+          'font:800 15px system-ui;padding:9px 12px;letter-spacing:.2px;line-height:1.3';
+        document.body.insertBefore(el, document.body.firstChild);
+      }
+      var aviso=t.tipo==='aviso';
+      el.style.background=aviso?'#fbf1db':'#1565c0'; el.style.color=aviso?'#7a4a00':'#fff';
+      el.href=t.link||'/inventario';
+      el.textContent=(aviso?'⚠ ':'▣ ')+t.texto+(aviso?'':'  →');
+    }).catch(function(){});
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',pinta); else pinta();
+  setInterval(pinta,60000);
+})();
