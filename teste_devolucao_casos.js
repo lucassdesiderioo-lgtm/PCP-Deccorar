@@ -1027,8 +1027,11 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   eq('com duas mudanças, desfaz só a última', (desf(dz, 3), caso(dz).etapa), 'coleta_pedida');
   chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'a_caminho' }, 3, { id:dz });
   chamar('POST','/api/devolucao-casos/:id/chegou',{}, 3, { id:dz });
-  eq('depois da chegada não desfaz a etapa de antes', desf(dz, 3).status, 409);
-  eq('   e a chegada fica', caso(dz).etapa, 'chegou');
+  /* AJUSTE de 04/11/2026: o desfazer depois da chegada desfaz a CHEGADA (o
+     último clique), e não a etapa de antes dela. */
+  eq('depois da chegada, o desfazer volta a chegada', desf(dz, 3).status, 200);
+  eq('   e o caso volta a "A caminho"', caso(dz).etapa, 'a_caminho');
+  eq('   e a etapa de antes da chegada não se desfaz em seguida', desf(dz, 3).status, 409);
   dz = lanC({ venda:'8800031' }).body.id;
   chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'coleta_pedida' }, 3, { id:dz });
   chamar('POST','/api/devolucao-casos/:id/editar',{ obs:'anotei' }, 3, { id:dz });
@@ -2021,7 +2024,66 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
     for(const para of ['lancado','coleta_pedida','docs_enviados','a_caminho'])
       eq('   e a rota recusa voltar a "'+para+'" (400)', chamar('POST','/api/devolucao-casos/:id/etapa',{ para }, 2, {id:co}).status, 400);
     eq('   e o caso fica em "Chegou"', caso(co).etapa, 'chegou');
-    eq('   e não há desfazer de volta para antes da chegada', r.body.desfazer, null);
+    /* Desde 04/11/2026 o desfazer existe aqui, mas é o da CHEGADA (o último
+       clique), e não uma etapa à mão de antes dela. */
+    ok('   e o único desfazer é o da própria chegada', r.body.desfazer && r.body.desfazer.de === 'chegou' && r.body.desfazer.chegada === true, JSON.stringify(r.body.desfazer));
+  }
+
+  /* AJUSTE de 04/11/2026: o "A caixa chegou" clicado por engano se desfaz
+     pelo mesmo "↩ Desfazer", nas mesmas condições — e só sem revisão ligada. */
+  secao('DESFAZER A CHEGADA');
+  {
+    const det2 = (id, quem) => chamar('GET','/api/devolucao-casos/:id',null,quem || 3,{ id }).body;
+    const desf2 = (id, quem) => chamar('POST','/api/devolucao-casos/:id/desfazer-etapa',{}, quem || 3, { id });
+    let r = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'7770901', sku:'BK160140BEGE' }, 3);
+    const m1 = r.body.id;
+    db.prepare("UPDATE devolucao_caso SET etapa_desde='2026-10-21 09:00:00' WHERE id=?").run(m1);
+    chamar('POST','/api/devolucao-casos/:id/chegou',{}, 3, {id:m1});
+    ok('ML devolve: quem marcou a chegada vê o desfazer, voltando para "Aguardando chegar"',
+       det2(m1,3).desfazer && det2(m1,3).desfazer.para === 'aguardando' && /Aguardando chegar/.test(det2(m1,3).desfazer.nome), JSON.stringify(det2(m1,3).desfazer));
+    eq('   outra pessoa não vê', det2(m1,2).desfazer, null);
+    eq('   e se tentar, é recusada (403)', desf2(m1,2).status, 403);
+    eq('   e a chegada fica', caso(m1).etapa, 'chegou');
+    eq('quem marcou desfaz (200)', desf2(m1,3).status, 200);
+    eq('   o caso volta a "Aguardando chegar"', caso(m1).etapa, 'aguardando');
+    eq('   com a data da etapa de antes', caso(m1).etapa_desde, '2026-10-21 09:00:00');
+    eq('   e a chegada sai (chegou_em vazio)', caso(m1).chegou_em, null);
+    ok('   e a história guarda a chegada e o desfeito', eventos(m1).some(e => e.tipo === 'desfeito' && e.de === 'chegou' && e.para === 'aguardando'), JSON.stringify(eventos(m1).map(e => e.tipo)));
+    eq('   e a caixa pode ser marcada de novo', chamar('POST','/api/devolucao-casos/:id/chegou',{}, 3, {id:m1}).status, 200);
+
+    r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'7770902', sku:'BK160140BEGE', prazo:dia(6) }, 3);
+    const c1 = r.body.id;
+    chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'coleta_pedida' }, 3, {id:c1});
+    chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'a_caminho' }, 3, {id:c1});
+    chamar('POST','/api/devolucao-casos/:id/chegou',{}, 3, {id:c1});
+    eq('nós coletamos: desfazer a chegada (200)', desf2(c1,3).status, 200);
+    eq('   volta a "A caminho"', caso(c1).etapa, 'a_caminho');
+    eq('   sem a chegada', caso(c1).chegou_em, null);
+    ok('   e os botões de etapa voltam', (det2(c1,3).manuais || []).length > 0, JSON.stringify(det2(c1,3).manuais));
+
+    r = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'7770903', sku:'BK160140BEGE' }, 3);
+    const m2 = r.body.id;
+    chamar('POST','/api/devolucao-casos/:id/chegou',{}, 3, {id:m2});
+    chamar('POST','/api/devolucao',{ codigo_ml:'7770903', caso_id:m2, sku_fisico:'BK160140BEGE', destinacao:'estoque' }, 4);
+    eq('com a peça já revisada, não há desfazer da chegada', det2(m2,3).desfazer, null);
+    eq('   e se tentar, é recusado (409)', desf2(m2,3).status, 409);
+    ok('   e a chegada fica', !!caso(m2).chegou_em);
+
+    /* A revisão ligada também trava mesmo se o último andar ainda fosse a chegada. */
+    r = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'7770905', sku:'BK160140BEGE' }, 3);
+    const m3 = r.body.id;
+    chamar('POST','/api/devolucao-casos/:id/chegou',{}, 3, {id:m3});
+    const dv = db.prepare('SELECT id FROM devolucao ORDER BY id DESC LIMIT 1').get().id;
+    db.prepare('UPDATE devolucao_caso SET devolucao_id=? WHERE id=?').run(dv, m3);
+    eq('com revisão ligada (sem evento novo), também não desfaz', desf2(m3,3).status, 409);
+
+    r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'7770904', sku:'BK160140BEGE', prazo:dia(6) }, 3);
+    const c2 = r.body.id;
+    chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'a_caminho' }, 3, {id:c2});
+    chamar('POST','/api/devolucao-casos/:id/chegou',{}, 3, {id:c2});
+    chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 3, {id:c2});
+    eq('depois do "Avisamos o ML", a chegada não se desfaz (409)', desf2(c2,3).status, 409);
+    ok('   e a chegada fica', !!caso(c2).chegou_em);
   }
 
   fim();
