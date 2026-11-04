@@ -2,8 +2,21 @@
 
 ```
 STATUS
-Situação: RASCUNHO para aprovação do dono (04/11/2026) — nada construído
+Situação: FASES 1, 2 e 3 EM CÓDIGO (04/11/2026), num PR só — falta o deploy
+  e a conferência do dono na tela
 Tipo: NOVIDADE · risco 🟡 nas fases 1 e 2, 🔴 na fase 3 (schema)
+Aprovada pelo dono em 04/11/2026 ("pode mesclar e seguir com a fase 1, 2, 3")
+O que mudou na construção (vale o CLAUDE.md §9-B):
+  - "quem pode lançar caso novo" ficou como estava: `devolucao.lancar`, que já
+    é separada e se dá pela tela de Acessos (decisão do dono, 04/11/2026);
+  - a lista de responsável mostra só pessoa ativa com `devolucao.lancar` ou
+    `devolucao.acompanhar` (decisão do dono, 04/11/2026);
+  - os dois tipos continuam em dois cards; os grupos ficam dentro de cada um
+    (§4, fase 2: "a decidir com a tela aberta");
+  - C8 (a caminho) também devolve a vez para nós quando parado, como C12 e M5;
+  - M1 sem a peça revisada pede a revisão hoje (vez de quem recebe a peça);
+  - o "Meus casos" lembra a escolha por aparelho (localStorage).
+Testes: teste_devolucao_casos.js 732 → 820 · teste_devolucao_casos_tela.js 141 → 170
 Depende de: DEVOLUCOES-ACOMPANHAMENTO.md (no ar) e CLAUDE.md §9-B
 Decisões do dono já tomadas (04/11/2026):
   - o responsável vira pessoa do sistema, com o filtro "Meus casos";

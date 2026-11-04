@@ -46,7 +46,9 @@ db.exec(`CREATE TABLE fila (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, m
   ALTER TABLE skus ADD COLUMN largura_cm INTEGER; ALTER TABLE skus ADD COLUMN altura_cm INTEGER;
   ALTER TABLE skus ADD COLUMN cor_codigo TEXT; ALTER TABLE skus ADD COLUMN descricao TEXT; ALTER TABLE skus ADD COLUMN tecido_codigo TEXT;
   INSERT INTO skus (codigo,largura_cm,altura_cm,cor_codigo) VALUES ('BK150150BRANCO',150,150,'BRANCO');
-  INSERT INTO lote (codigo,buyer,nf,venda) VALUES ('BK140140BEGE','Compradora Tela','9001','2000000000090001');`);
+  INSERT INTO lote (codigo,buyer,nf,venda) VALUES ('BK140140BEGE','Compradora Tela','9001','2000000000090001');
+  CREATE TABLE usuarios (id INTEGER PRIMARY KEY, nome TEXT, ativo INTEGER DEFAULT 1);
+  INSERT INTO usuarios (id,nome,ativo) VALUES (1,'Lucas Tela',1),(2,'Renato Tela',1),(3,'Edvaldo Tela',1),(4,'Saiu Tela',0);`);
 
 let n = 0, falhas = 0;
 function ok(desc, cond, detalhe){
@@ -111,7 +113,7 @@ const srv = app.listen(0, async () => {
     await p.fill('#lVenda', '2000000000090001'); await p.waitForTimeout(900);
     eq('achar a venda preenche a NF', await p.inputValue('#lNf'), '9001');
     await p.selectOption('#lMotivo', 'Falta de kit');
-    await p.fill('#lPrazo', dia(6)); await p.fill('#lResp', 'Renato Tela'); await p.fill('#lObs', 'obs do lançamento');
+    await p.fill('#lPrazo', dia(6)); await p.selectOption('#lResp', '2'); await p.fill('#lObs', 'obs do lançamento');
     await p.fill('#lCep', '80010-000'); await p.selectOption('#lTransp', String(tr.id));
     await p.fill('#lCusto', '35,50'); await p.selectOption('#lSit', 'pedir'); await p.fill('#lValor', '120,00');
     await p.fill('#lEtiqueta', '10,00');
@@ -124,7 +126,7 @@ const srv = app.listen(0, async () => {
     eq('lançou', !!cid, true);
     eq('   motivo', c1.motivo, 'Falta de kit');
     eq('   prazo', c1.prazo, dia(6));
-    eq('   responsável', c1.responsavel, 'Renato Tela');
+    eq('   responsável: a pessoa escolhida, pelo id', c1.responsavel_id + '/' + c1.responsavel_nome, '2/Renato Tela');
     eq('   observação', c1.obs, 'obs do lançamento');
     eq('   passado em', c1.passado_em, dia(0));
     eq('   CEP', c1.cep, '80010000');
@@ -181,41 +183,43 @@ const srv = app.listen(0, async () => {
     /* ═════════ 2. o defeito que o dono pegou ═════════ */
     secao('o caso — dois campos de blocos diferentes, UM clique (o defeito de 03/11)');
     await abreFora(p); await p.locator('#listaColeta .linha', { hasText:'#'+cid }).locator('.t1').click(); await p.waitForTimeout(800);
-    await p.fill('#eResp', 'Fulano Novo'); await p.fill('#dValor', '77,70');
-    ok('os dois ficam marcados como não salvos', await p.$eval('#eResp', e => e.classList.contains('naosalvo')) && await p.$eval('#dValor', e => e.classList.contains('naosalvo')));
-    ok('   e a barra diz quais', /Responsável/.test(await p.textContent('#barraSujo')) && /Valor do ML/.test(await p.textContent('#barraSujo')));
+    /* Desde a fase 3 (DEVOLUCOES-PROXIMO-PASSO) o responsável é uma escolha;
+       o campo de texto que prova o "nada some calado" é a observação. */
+    await p.fill('#eObs', 'Fulano Novo'); await p.fill('#dValor', '77,70');
+    ok('os dois ficam marcados como não salvos', await p.$eval('#eObs', e => e.classList.contains('naosalvo')) && await p.$eval('#dValor', e => e.classList.contains('naosalvo')));
+    ok('   e a barra diz quais', /Observação/.test(await p.textContent('#barraSujo')) && /Valor do ML/.test(await p.textContent('#barraSujo')));
     await p.click('#btValor'); await p.waitForTimeout(1200);
-    eq('clicando o "Salvar" do dinheiro: o responsável é gravado', caso(cid).responsavel, 'Fulano Novo');
+    eq('clicando o "Salvar" do dinheiro: a observação é gravada', caso(cid).obs, 'Fulano Novo');
     eq('   e o valor também', caso(cid).valor_ml, 77.7);
     ok('   a tela diz o que salvou', /Salvo/.test(await p.textContent('#cMsg')));
     eq('   e a barra some', await p.isVisible('#barraSujo'), false);
-    await p.fill('#dValor', '88,80'); await p.fill('#eObs', 'outra obs');
+    await p.fill('#dValor', '88,80'); await p.selectOption('#eResp', '2');
     await p.click('#btEditar'); await p.waitForTimeout(1200);
     eq('clicando o "Salvar" do lançamento: o valor é gravado', caso(cid).valor_ml, 88.8);
-    eq('   e a observação também', caso(cid).obs, 'outra obs');
+    eq('   e o responsável escolhido também', caso(cid).responsavel_id, 2);
 
     secao('o caso — uma ação não apaga o que está digitado em outro bloco');
-    await p.fill('#eResp', 'Digitado Antes'); await p.fill('#dEtiqueta', '12,00');
+    await p.fill('#eObs', 'Digitado Antes'); await p.fill('#dEtiqueta', '12,00');
     await p.click('#painel [data-etapa="docs_enviados"]').catch(() => {});
     await p.waitForTimeout(400);
     await p.click('#painel [data-etapa="lancado"]'); await p.waitForTimeout(1200);
     eq('a etapa andou', caso(cid).etapa, 'lancado');
-    eq('o responsável digitado continua no campo', await p.inputValue('#eResp'), 'Digitado Antes');
+    eq('a observação digitada continua no campo', await p.inputValue('#eObs'), 'Digitado Antes');
     eq('   o custo da etiqueta também', await p.inputValue('#dEtiqueta'), '12,00');
-    ok('   os dois continuam marcados', await p.$eval('#eResp', e => e.classList.contains('naosalvo')));
-    eq('   e nada foi gravado sem pedir', caso(cid).responsavel, 'Fulano Novo');
+    ok('   os dois continuam marcados', await p.$eval('#eObs', e => e.classList.contains('naosalvo')));
+    eq('   e nada foi gravado sem pedir', caso(cid).obs, 'Fulano Novo');
     await p.fill('#novoPrazo', dia(9)); await p.click('#btPrazo'); await p.waitForTimeout(1200);
     eq('o prazo novo foi lançado', caso(cid).prazo, dia(9));
-    eq('   e o responsável digitado continua', await p.inputValue('#eResp'), 'Digitado Antes');
+    eq('   e a observação digitada continua', await p.inputValue('#eObs'), 'Digitado Antes');
     eq('   e o campo do prazo, que era da ação, não volta', await p.inputValue('#novoPrazo'), '');
     await p.click('#btSalvarTudo'); await p.waitForTimeout(1200);
-    eq('"Salvar alterações" da barra grava o responsável', caso(cid).responsavel, 'Digitado Antes');
+    eq('"Salvar alterações" da barra grava a observação', caso(cid).obs, 'Digitado Antes');
     eq('   e o custo da etiqueta', caso(cid).custo_etiqueta, 12);
 
     secao('o caso — o recusado fica no campo, e o resto é gravado');
-    await p.fill('#eResp', 'Grava Este'); await p.fill('#dValor', 'abc');
+    await p.fill('#eObs', 'Grava Este'); await p.fill('#dValor', 'abc');
     await p.click('#btSalvarTudo'); await p.waitForTimeout(1200);
-    eq('o responsável foi gravado', caso(cid).responsavel, 'Grava Este');
+    eq('a observação foi gravada', caso(cid).obs, 'Grava Este');
     eq('o valor impossível não', caso(cid).valor_ml, 88.8);
     eq('   e continua no campo', await p.inputValue('#dValor'), 'abc');
     ok('   marcado', await p.$eval('#dValor', e => e.classList.contains('naosalvo')));
@@ -237,14 +241,14 @@ const srv = app.listen(0, async () => {
     /* ═════════ 3. a varredura dos campos do caso ═════════ */
     secao('o caso — varredura: cada campo do "Editar" e do dinheiro chega ao banco');
     await abreFora(p); await p.locator('#listaColeta .linha', { hasText:'#'+cid }).locator('.t1').click(); await p.waitForTimeout(800);
-    const novos = { eNf:'9999', eSku:'BK140140BEGE', eResp:'Varredura', eObs:'obs varredura', eLink:'https://www.mercadolivre.com.br/x/2', eMsgMl:'msg varredura' };
+    const novos = { eNf:'9999', eSku:'BK140140BEGE', eObs:'obs varredura', eLink:'https://www.mercadolivre.com.br/x/2', eMsgMl:'msg varredura' };
     for(const k of Object.keys(novos)) await p.fill('#'+k, novos[k]);
-    await p.selectOption('#eMotivo', 'Comando quebrado'); await p.selectOption('#ePub', '0');
+    await p.selectOption('#eMotivo', 'Comando quebrado'); await p.selectOption('#ePub', '0'); await p.selectOption('#eResp', '1');
     await p.fill('#dValor', '99,90'); await p.fill('#dEtiqueta', '5,00');
     await p.fill('#painel [data-custot]', '41,00');
     await p.click('#btSalvarTudo'); await p.waitForTimeout(1500);
     const cv = caso(cid);
-    eq('   NF', cv.nf, '9999'); eq('   SKU', cv.sku, 'BK140140BEGE'); eq('   responsável', cv.responsavel, 'Varredura');
+    eq('   NF', cv.nf, '9999'); eq('   SKU', cv.sku, 'BK140140BEGE'); eq('   responsável', cv.responsavel_id + '/' + cv.responsavel_nome, '1/Lucas Tela');
     eq('   observação', cv.obs, 'obs varredura'); eq('   link', cv.link_ml, 'https://www.mercadolivre.com.br/x/2');
     eq('   mensagem', cv.mensagem_ml, 'msg varredura'); eq('   motivo', cv.motivo, 'Comando quebrado');
     eq('   publicidade', cv.publicidade, 0); eq('   valor do ML', cv.valor_ml, 99.9); eq('   custo da etiqueta', cv.custo_etiqueta, 5);
@@ -259,8 +263,8 @@ const srv = app.listen(0, async () => {
     const ml = await api(p, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000000000090077', publicidade:false });
     await p.goto(B + '/devolucao-casos'); await p.waitForTimeout(800);
     await abreFora(p); await p.locator('#listaMl .linha', { hasText:'#'+ml.id }).locator('.t1').click(); await p.waitForTimeout(800);
-    await p.fill('#eResp', 'Resp do ML'); await p.click('#btEditar'); await p.waitForTimeout(1000);
-    ok('o responsável aparece no caso do ML devolve', /Resp do ML/.test(await p.locator('#painel .dados').first().textContent()));
+    await p.selectOption('#eResp', '2'); await p.click('#btEditar'); await p.waitForTimeout(1000);
+    ok('o responsável aparece no caso do ML devolve', /Renato Tela/.test(await p.locator('#painel .dados').first().textContent()));
     eq('antes de chegar não há o botão da revisão', await p.$('#btRevisao'), null);
     await p.click('#btChegou'); await p.waitForTimeout(1000);
     await p.fill('#eObs', 'digitado antes de pedir revisão');
@@ -510,6 +514,46 @@ const srv = app.listen(0, async () => {
     }
     await pp.close();
 
+    /* ═════════ O RESPONSÁVEL COMO PESSOA e "Meus casos" (fase 3) ═════════ */
+    secao('o responsável — a escolha entre as pessoas, e o "Meus casos"');
+    QUEM = 1;
+    const pr = await pg();
+    await pr.goto(B + '/devolucao-casos'); await pr.waitForTimeout(900);
+    const opts = await pr.$$eval('#lResp option', os => os.map(o => o.textContent));
+    eq('o lançamento oferece só quem lança ou acompanha, ativo', opts.join('|'), '— escolher —|Lucas Tela|Renato Tela');
+    const velho = await api(pr, 'POST', '/api/devolucao-casos', { tipo:'coleta', venda:'2000000000098001', sku:'BK140140BEGE', prazo:dia(7), responsavel:'Escrito à mão', publicidade:false });
+    await pr.evaluate(() => carregar()); await pr.waitForTimeout(700);
+    ok('o caso de antes mostra o texto livre na lista', /Escrito à mão/.test(await pr.locator('#listaColeta .linha', { hasText:'#'+velho.id+' ' }).first().textContent()));
+    await pr.locator('#listaColeta .linha', { hasText:'#'+velho.id+' ' }).first().locator('.t1').click(); await pr.waitForTimeout(900);
+    ok('   e no caso, ao lado da escolha vazia', /antes, escrito à mão: “Escrito à mão”/.test(await pr.textContent('#painel')) && await pr.inputValue('#eResp') === '');
+    await pr.selectOption('#eResp', '2'); await pr.click('#btSalvarTudo'); await pr.waitForTimeout(1200);
+    eq('escolher a pessoa pelo "Salvar alterações" grava o id', caso(velho.id).responsavel_id + '/' + caso(velho.id).responsavel, '2/Escrito à mão');
+    ok('   e o caso passa a mostrar a pessoa', /Renato Tela/.test(await pr.locator('#painel .dados').first().textContent()));
+    await pr.evaluate(() => fechar()); await pr.close();
+    QUEM = 2;
+    const pm = await pg();
+    await pm.goto(B + '/devolucao-casos'); await pm.waitForTimeout(1000);
+    const meus = db.prepare('SELECT id FROM devolucao_caso WHERE encerrado_em IS NULL AND responsavel_id=2').all().map(x => x.id).sort((a,b) => a-b);
+    ok('o botão diz quantos casos são da pessoa', (await pm.textContent('#btMeus')).includes('('+meus.length+')'), await pm.textContent('#btMeus'));
+    await pm.click('#btMeus'); await pm.waitForTimeout(300); await abreFora(pm);
+    const vistos = await pm.$$eval('#listaColeta .linha, #listaMl .linha', ls => ls.map(l => +l.getAttribute('data-id')).sort((a,b) => a-b));
+    eq('"Meus casos" deixa só os casos em que o Renato é o responsável', vistos.join(','), meus.join(','));
+    ok('   e a tela diz que está filtrando', /só os casos em que você é o responsável/.test(await pm.textContent('#meusAviso')));
+    await pm.evaluate(() => carregar()); await pm.waitForTimeout(700);
+    eq('   o filtro continua depois do redesenho', (await pm.$$eval('#listaColeta .linha, #listaMl .linha', ls => ls.length)), meus.length);
+    await pm.click('#btMeus'); await pm.waitForTimeout(300);
+    ok('desligado, volta a lista inteira', (await pm.$$eval('#listaColeta .linha, #listaMl .linha', ls => ls.length)) > meus.length);
+    await pm.close();
+    db.prepare('UPDATE devolucao_caso SET responsavel_id=NULL, responsavel_nome=NULL WHERE responsavel_id=1').run();
+    QUEM = 1;
+    const pz = await pg();
+    await pz.goto(B + '/devolucao-casos'); await pz.waitForTimeout(1000);
+    const total = await pz.$$eval('#listaColeta .linha, #listaMl .linha', ls => ls.length);
+    await pz.click('#btMeus'); await pz.waitForTimeout(300);
+    eq('quem não tem caso nenhum vê a lista inteira', await pz.$$eval('#listaColeta .linha, #listaMl .linha', ls => ls.length), total);
+    ok('   e a tela diz isso', /nenhum caso aberto: mostrando todos/.test(await pz.textContent('#meusAviso')), await pz.textContent('#meusAviso'));
+    await pz.close();
+
     /* ═════════ 5. o celular ═════════ */
     secao('a 400 px — a página não rola de lado, e o caso abre');
     const p4 = await pg(400);
@@ -517,7 +561,7 @@ const srv = app.listen(0, async () => {
     let m = await p4.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
     eq('a lista', m[0] <= m[1], true);
     await abreFora(p4); await p4.locator('#listaMl .linha', { hasText:'#'+ml.id }).locator('.t1').click(); await p4.waitForTimeout(800);
-    await p4.fill('#eResp', 'x');
+    await p4.fill('#eObs', 'x');
     m = await p4.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
     eq('o caso aberto, com a barra de não salvo', m[0] <= m[1], true);
 

@@ -1659,9 +1659,12 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   {
     const DD = require('./devcaso_dominio');
     const H = dia(0), LIM = { ambar:3, vermelho:1, parado:2, coleta:20 };
+    /* Os casos de mentira têm os valores em reais preenchidos: se alguém um
+       dia puser o número na frase, a varredura lá embaixo pega. */
     const base = (x) => Object.assign({ id:900, tipo:'coleta', etapa:'lancado', criado_em:H, etapa_desde:H,
-      prazo:dia(5), prazo_coleta:dia(15), cep:'88000000' }, x);
-    const P = (c, ctx) => DD.proximoPasso(c, Object.assign({ h:H, lim:LIM, tentativas:[], docs:[], avisado:false }, ctx));
+      prazo:dia(5), prazo_coleta:dia(15), cep:'88000000', valor_ml:164.04, limite_frete:99.9, custo_etiqueta:48.7 }, x);
+    const PASSOS = [];
+    const P = (c, ctx) => { const r = DD.proximoPasso(c, Object.assign({ h:H, lim:LIM, tentativas:[], docs:[], avisado:false }, ctx)); if(r) PASSOS.push(r); return r; };
     const T = (resultado, agendada_para) => ({ id:1, resultado, agendada_para: agendada_para || null });
     const DOCS = [{ doc:'Etiqueta de coleta', ok:false }, { doc:'Comprovante de pagamento da transportadora', ok:true }];
     let p;
@@ -1725,7 +1728,7 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
     ok('o prazo do comprovante cumprido (a caminho) não grita vencido', p.acao !== 'prazo', p.texto);
 
     secao('próximo passo — o mapa do "ML devolve" (M1 a M5)');
-    const mb = (x) => Object.assign({ id:901, tipo:'ml', etapa:'aguardando', criado_em:dia(-4), etapa_desde:dia(-4) }, x);
+    const mb = (x) => Object.assign({ id:901, tipo:'ml', etapa:'aguardando', criado_em:dia(-4), etapa_desde:dia(-4), custo_etiqueta:48.7, valor_revisao:48.7 }, x);
     p = P(mb({ etapa:'revisado', chegou_em:H, devolucao_id:7, dev_baixado:1, revisar_ate:dia(-1) }));
     eq('M1 "revisar no ML até" vencido: marcar "Já revisei" hoje', p.vez+'/'+p.acao, 'nos/revisei');
     ok('   a frase diz que o prazo venceu', /venceu em/.test(p.texto), p.texto);
@@ -1760,7 +1763,10 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
     for(const c of L.coleta.concat(L.ml)) if(c.proximo) todos.push(c.proximo);
     for(const c of lista(1).coleta.concat(lista(1).ml)) if(c.proximo) todos.push(c.proximo);
     ok('vários casos abertos têm passo', todos.length >= 4, String(todos.length));
-    ok('nenhum passo fala em reais (R$, valor em número com vírgula)', todos.every(p => !/R\$|\d+,\d{2}\b/.test(p.texto)), JSON.stringify(todos.find(p => /R\$|\d+,\d{2}\b/.test(p.texto))));
+    const linhasMapa = PASSOS.length;
+    for(const x of PASSOS) todos.push(x);
+    ok('   e a varredura inclui as frases de todas as linhas do mapa', linhasMapa >= 25, String(linhasMapa));
+    ok('nenhum passo fala em reais (R$, valor em número com vírgula ou ponto)', todos.every(p => !/R\$|\d+[,.]\d{1,2}\b|reais/i.test(p.texto)), JSON.stringify(todos.find(p => /R\$|\d+,\d{2}\b/.test(p.texto))));
     ok('e o passo só tem as chaves de passo', todos.every(p => Object.keys(p).every(k => ['texto','vez','ate','acao','quem','nossa'].indexOf(k) >= 0)), JSON.stringify(todos[0]));
     ok('encerrado não leva passo', chamar('GET','/api/devolucao-casos/encerrados',null,1).body.casos.every(c => !c.proximo));
     // o passo anda com o caso, pelas rotas de verdade
@@ -1774,6 +1780,70 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
     const pr = daLista(lista(2).coleta, pc).proximo;
     ok('não achou o cliente: o passo vira "remarcar"', pr.acao === 'agendar' && /Remarcar/.test(pr.texto), pr.texto);
   }
+
+  /* ═══ FASE 3 — o responsável como pessoa e "Meus casos" (🔴, teste antes) ═══ */
+  secao('responsável — as colunas novas, num banco novo e num antigo');
+  {
+    const DD = require('./devcaso_dominio');
+    const cols = (d) => d.prepare("SELECT name FROM pragma_table_info('devolucao_caso')").all().map(x => x.name);
+    ok('banco novo: responsavel_id e responsavel_nome no CREATE', cols(db).indexOf('responsavel_id') >= 0 && cols(db).indexOf('responsavel_nome') >= 0, cols(db).join(','));
+    const novo = new Database(':memory:');
+    novo.exec("CREATE TABLE devolucao_caso (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT NOT NULL, etapa TEXT NOT NULL, venda TEXT, encerrado_em TEXT)");
+    DD.garantir(novo);
+    const cn = cols(novo);
+    ok('banco antigo: o ALTER acrescenta as duas no fim', cn.slice(-2).join(',') === 'responsavel_id,responsavel_nome', cn.slice(-4).join(','));
+    const zero = new Database(':memory:'); DD.garantir(zero);
+    const cz = cols(zero);
+    ok('   e a ordem do banco novo é a mesma do antigo depois do ALTER (§17)', cz.slice(-2).join(',') === 'responsavel_id,responsavel_nome', cz.slice(-4).join(','));
+    const antigo = new Database(':memory:');
+    antigo.exec("CREATE TABLE devolucao_caso (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT NOT NULL, etapa TEXT NOT NULL, venda TEXT, encerrado_em TEXT, responsavel TEXT)");
+    antigo.prepare("INSERT INTO devolucao_caso (tipo,etapa,responsavel) VALUES ('coleta','lancado','Renato do texto')").run();
+    DD.garantir(antigo);
+    const ra = antigo.prepare('SELECT responsavel, responsavel_id, responsavel_nome FROM devolucao_caso').get();
+    eq('   o texto livre antigo fica como estava, sem conversão', ra.responsavel + '/' + ra.responsavel_id + '/' + ra.responsavel_nome, 'Renato do texto/null/null');
+    novo.close(); zero.close(); antigo.close();
+  }
+
+  secao('responsável — quem pode ser escolhido');
+  db.exec("CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY, nome TEXT, ativo INTEGER DEFAULT 1)");
+  db.exec("DELETE FROM usuarios");
+  db.prepare("INSERT INTO usuarios (id,nome,ativo) VALUES (1,'Lucas',1),(2,'Renato',1),(3,'Ana',1),(4,'Edvaldo',1),(6,'Só lança',1),(7,'SoBaixa',1),(8,'Nada',1),(9,'Ex-acompanha',0)").run();
+  PERMS[9] = new Set(['devolucao.acompanhar']); NOMES[9] = 'Ex-acompanha';
+  r = chamar('GET','/api/devolucao-casos/responsaveis',null,2);
+  eq('a lista responde (quem acompanha)', r.status, 200);
+  const rIds = (r.body.pessoas || []).map(x => x.id).sort((a,b) => a-b).join(',');
+  eq('só pessoa ativa que lança ou acompanha: Lucas, Renato, Ana, Só lança', rIds, '1,2,3,6');
+  ok('   e só viajam id e nome', (r.body.pessoas || []).every(x => Object.keys(x).sort().join(',') === 'id,nome'), JSON.stringify(r.body.pessoas));
+  eq('   e diz quem é a pessoa logada (para o "Meus casos")', r.body.eu, 2);
+  ok('   em ordem de nome', (r.body.pessoas || []).map(x => x.nome).join('|') === (r.body.pessoas || []).map(x => x.nome).sort((a,b) => a.localeCompare(b,'pt-BR')).join('|'));
+
+  secao('responsável — escolher a pessoa no caso');
+  const rc = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'2000015571709301', sku:'BK140140BEGE', prazo:dia(5), responsavel:'Texto de antes', publicidade:false }, 3).body.id;
+  eq('o lançamento de antes, com texto livre, continua aceito', caso(rc).responsavel, 'Texto de antes');
+  r = chamar('POST','/api/devolucao-casos/:id/editar',{ responsavel_id:2 }, 3, { id:rc });
+  eq('escolher o Renato (200)', r.status, 200);
+  eq('   grava o id', caso(rc).responsavel_id, 2);
+  eq('   e o nome como retrato', caso(rc).responsavel_nome, 'Renato');
+  eq('   e o texto livre de antes não é apagado', caso(rc).responsavel, 'Texto de antes');
+  ok('   e vai para a história', eventos(rc).some(e => e.tipo === 'editado' && /responsável: Texto de antes → Renato/.test(e.texto || '')), JSON.stringify(eventos(rc).slice(-1)));
+  r = chamar('POST','/api/devolucao-casos/:id/editar',{ responsavel_id:2 }, 3, { id:rc });
+  eq('escolher a mesma pessoa de novo não grava outra linha na história', eventos(rc).filter(e => e.tipo === 'editado').length, 1);
+  for(const [uid, rot] of [[4,'quem só recebe a peça'],[7,'quem só dá baixa'],[9,'pessoa inativa'],[999,'pessoa que não existe'],['abc','id impossível']]){
+    r = chamar('POST','/api/devolucao-casos/:id/editar',{ responsavel_id:uid }, 3, { id:rc });
+    eq('recusa '+rot+' (400)', r.status, 400);
+  }
+  eq('   e nada mudou', caso(rc).responsavel_id + '/' + caso(rc).responsavel_nome, '2/Renato');
+  r = chamar('POST','/api/devolucao-casos/:id/editar',{ responsavel_id:'' }, 3, { id:rc });
+  eq('vazio de propósito tira a pessoa', caso(rc).responsavel_id + '/' + caso(rc).responsavel_nome, 'null/null');
+  eq('   e o texto antigo continua lá', caso(rc).responsavel, 'Texto de antes');
+  r = chamar('POST','/api/devolucao-casos/:id/editar',{ obs:'só a observação' }, 3, { id:rc });
+  eq('editar outro campo não mexe no responsável (campo ausente não é vazio)', caso(rc).responsavel_id, null);
+  const rc2 = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571709302', sku:'BK140140BEGE', responsavel_id:6, publicidade:false }, 3);
+  eq('o lançamento já escolhe a pessoa', rc2.status + '/' + caso(rc2.body.id).responsavel_id + '/' + caso(rc2.body.id).responsavel_nome, '200/6/Só lança');
+  r = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571709303', sku:'BK140140BEGE', responsavel_id:4, publicidade:false }, 3);
+  eq('   e recusa quem não pode (400), sem nascer o caso', r.status + '/' + contar('devolucao_caso', "venda='2000015571709303'"), '400/0');
+  const nl = daLista(lista(2).ml, rc2.body.id);
+  eq('a lista leva o id e o nome da pessoa (o "Meus casos" filtra por ele)', nl && (nl.responsavel_id + '/' + nl.responsavel_nome), '6/Só lança');
 
   fim();
 })().catch(e => { console.log('ESTOUROU: ' + e.stack); falhas++; fim(); });
