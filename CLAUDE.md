@@ -69,7 +69,18 @@ O que vou mudar: (arquivos, em 1 linha cada)
 Regra de negócio muda? NÃO  |  SIM → antes: … / depois: …
 Como vou testar: …
 Fica de fora: …
+
+🔐 ALÇADA
+Telas novas: nº · nome · módulo · nível        (ou "nenhuma")
+Ações novas: chave · nível · tela · sensível?   (ou "nenhuma")
+Setores novos: nome · nível                     (ou "nenhum")
+Quem recebe: só o Admin Geral, até o dono marcar
 ```
+
+> ⚠️ **O BLOCO 🔐 ALÇADA NUNCA SOME** (R-ALC-07, spec `ACESSO-POR-TELA-E-NIVEL`,
+> decisão do dono em 04/11/2026: *"tudo que for novo no sistema, a partir de
+> hoje, tem que ser revisado e entrar no controle de alçadas"*). Tarefa sem nada
+> novo escreve "nenhuma / nenhum" — o bloco vazio é a prova de que alguém olhou.
 
 4. **✋ Espere o "pode seguir".**
 
@@ -105,6 +116,7 @@ Testes: quais rodaram · resultado
 Papel em dia: CLAUDE.md §… · DECISOES.md · spec … · README das specs
 Commit/PR: …   Falta mesclar? …
 Deploy: não precisa  |  precisa → comandos · melhor horário
+Alçada conferida: telas, ações e setores novos com nível e lugar · só o Admin Geral recebe  |  nada novo
 Achei no caminho (não mexi): …
 ```
 
@@ -2351,6 +2363,26 @@ hoje nasce negada**. O `teste_cobertura.js` sobe os módulos de verdade e varre
 o `server.js` por texto, porque as rotas dele não são carregáveis — foi assim
 que `GET /api/producao` apareceu, no boot, depois de o outro teste dizer zero.
 
+### A alçada — tudo que é novo entra no controle de acesso (04/11/2026)
+
+Spec `docs/specs/ACESSO-POR-TELA-E-NIVEL.md` §3, regra do dono: *"tudo que for
+novo no sistema, a partir de hoje, tem que ser revisado e entrar no controle de
+alçadas — nível, tela, acesso."* Linha em `docs/DECISOES.md`.
+
+| # | Regra | Quem garante |
+|---|---|---|
+| R-ALC-01 | Nada nasce fora do controle de acesso: tela, ação (permissão), setor, módulo e rota novos só existem declarados | os testes abaixo |
+| R-ALC-02 | Tela nova: linha no mapa (`telas.js`) com número, módulo, nível e permissão | `teste_mapa.js` |
+| R-ALC-03 | Ação nova: permissão em `permissoes.js` com nível, rótulo e **a tela onde é usada** (`tela: 301`); `sensivel` quando mexe em estoque, dinheiro, acesso ou dado de pessoa | `teste_mapa.js` |
+| R-ALC-04 | Setor novo: nasce com nível e vazio de pessoas; só recebe telas e ações do nível dele ou abaixo | `teste_acesso.js` |
+| R-ALC-05 | Rota nova: linha no `permDaRota` (#29, desde 17/09/2026) | `teste_cobertura.js` |
+| R-ALC-06 | Tudo novo nasce só para o Admin Geral; quem recebe é decisão do dono, na tela de Acessos, depois da entrega | R-TEL-03 |
+| R-ALC-07 | O PLANO de toda tarefa traz o bloco 🔐 ALÇADA, e o FECHAMENTO a linha "Alçada conferida" | §0 |
+| R-ALC-08 | Spec nova traz a seção "Alçada": para cada tela e ação nova, o número, o nível e o setor sugerido | `docs/specs/README.md` |
+
+> Até o mapa e os testes existirem (fases 2 e 7 da spec), a regra vale pelo
+> PLANO, e o `teste_cobertura.js` já cobre a rota.
+
 ### ⚠️ ARMADILHA #3 — a ordem no `server.js` é arquitetura, não estilo
 
 ```js
@@ -2969,6 +3001,8 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Declarar leitura de tela por uma chave só quando ela tem mais de um público:
   o setor Admin não tem chave de operação, e a leitura da própria tela dele
   sumiria — a declaração aceita uma LISTA (§10, armadilha #29)
+- ❌ Criar tela, ação (permissão), setor ou rota sem a declaração de alçada —
+  nível e lugar —, ou entregar o PLANO sem o bloco 🔐 ALÇADA (§0, §10, R-ALC)
 - ❌ Mover `express.static` para antes do `auth`
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor

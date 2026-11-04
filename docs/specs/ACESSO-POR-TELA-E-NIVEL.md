@@ -1,6 +1,8 @@
 # Acesso por tela e por nível — quem não pode, não vê
 
-> **STATUS: planejado · 04/11/2026** — nada construído.
+> **STATUS: em construção · 04/11/2026** — decisões do dono no "pode seguir":
+> **D1 (b)** — o Planejamento (401) continua abrindo com `planilha.importar`;
+> **D2 (A)** — cada tela do Admin abre com as chaves das ações dela.
 > Tipo: `REGRA` + `NOVIDADE` · Risco 🔴 (acesso/permissão e schema).
 > Desenhada no Projeto do Claude com o Lucas, de 28/10 a 04/11/2026. Referência: o
 > Decorsoft (o ERP da empresa), onde o que a pessoa não pode usar não aparece.
@@ -8,7 +10,7 @@
 >
 > | Fase | O quê | Risco | Situação |
 > |---|---|---|---|
-> | 0 | A regra das alçadas no papel (`CLAUDE.md`, `DECISOES.md`) | 🟢 | planejado |
+> | 0 | A regra das alçadas no papel (`CLAUDE.md`, `DECISOES.md`) | 🟢 | feito (04/11) |
 > | 1 | A baixa de devolução grava quem deu | 🔴 | planejado |
 > | 2 | O mapa de telas: uma linha por tela, um dono só | 🔴 | planejado |
 > | 3 | O nível na pessoa (sem trava ainda) | 🔴 | planejado |
