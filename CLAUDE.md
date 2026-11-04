@@ -602,6 +602,12 @@ escrita **"Nota fiscal #9124"** (o pdf.js lê **"fiiscal"**) e o comprador
   aponta outro item e **contar as peças** (leitura L5 do R-VOL-09). Nunca solta
   caixa que outra leitura reteve. Na folha antiga ela não vota.
 
+> ✅ **NO AR EM 04/11/2026** (PR #273): o dono fez o deploy e disse *"deu
+> tudo certo"*. ⚠️ **AINDA NÃO PROVADO COM DADO REAL:** a próxima etiqueta
+> deste formato entrando sozinha como 🟣 Coleta, com NF e comprador, e saindo
+> no bipe do SKU. A caixa da NF 9124 subiu antes do conserto e se resolve como
+> Coleta em Pendências. Prova que não foi feita se escreve como não feita.
+>
 > ⚠️ **A FORMA 6 COM DOIS SKUs SÓ FOI PROVADA COM PDF MONTADO À MÃO.** Não
 > houve ainda pacote de vários produtos neste formato. A prova é o primeiro:
 > ele tem que sair com as N persianas, ou retido dizendo o número. Se sair com
