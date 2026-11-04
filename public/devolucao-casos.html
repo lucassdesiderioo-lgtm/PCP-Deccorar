@@ -97,6 +97,8 @@
   .linha .passo{font-size:13px;margin-top:5px;color:var(--txt);overflow-wrap:anywhere}
   .linha .passo.fora{color:var(--muted)}
   .foraGrupo{margin-top:8px}
+  .meusBar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px}
+  .meusBar .sub{overflow-wrap:anywhere}
   .foraGrupo summary{cursor:pointer;color:var(--muted);font-size:13px;font-weight:700;padding:8px 0}
 </style></head><body>
 <header><div class="mark">D</div><div><h1>Devoluções em andamento</h1>
@@ -131,7 +133,7 @@
         <div><label for="lMotivo">Motivo</label><select id="lMotivo"></select><a href="#" id="lNovoMotivo" class="sub" style="display:none;margin-top:4px">+ cadastrar motivo</a></div>
         <div id="boxPrazo"><label for="lPrazo">Mandar o comprovante ao ML até</label><input id="lPrazo" type="date"></div>
         <div id="boxAberta"><label for="lAberta">Reclamação aberta em</label><input id="lAberta" type="date"><div class="sub" id="lColetaAte" style="margin-top:4px"></div></div>
-        <div id="boxResp"><label for="lResp">Responsável</label><input id="lResp" autocomplete="off"></div>
+        <div id="boxResp"><label for="lResp">Responsável</label><select id="lResp"><option value="">— escolher —</option></select></div>
         <div id="boxPassado"><label for="lPassado">Passado em</label><input id="lPassado" type="date"></div>
         <div><label for="lObs">Observação</label><input id="lObs" autocomplete="off"></div>
         <div class="larga" id="boxJa"><div class="bloco" style="margin:4px 0 0"><h3>Já adiantar a coleta e o valor (opcional)</h3>
@@ -159,6 +161,7 @@
       <div style="margin-top:10px"><button class="bt" id="btLancar">Lançar</button></div>
       <div id="lMsg"></div>
     </div>
+    <div class="meusBar"><button class="bt sec" id="btMeus" aria-pressed="false">Meus casos</button><span class="sub" id="meusAviso"></span></div>
     <div class="cols">
       <div class="card"><h2>Nós coletamos <span class="sub" id="nColeta"></span></h2><div class="sub" style="margin:-4px 0 10px">Pelo prazo do ML — vencido em cima</div><div id="listaColeta"></div></div>
       <div class="card"><h2>ML devolve <span class="sub" id="nMl"></span></h2><div class="sub" style="margin:-4px 0 10px">Pelos dias esperando a peça chegar</div><div id="listaMl"></div></div>
@@ -211,7 +214,26 @@
   }).catch(function(){});
 })();
 
-var ESTADO={pode:{}, coleta:[], ml:[], skus:{}, motivos:[], tipo:'coleta', aberto:null, aba:'and', limites:{}};
+var ESTADO={pode:{}, coleta:[], ml:[], skus:{}, motivos:[], tipo:'coleta', aberto:null, aba:'and', limites:{}, pessoas:[], eu:null, meus:false};
+/* O RESPONSÁVEL COMO PESSOA (fase 3 da spec DEVOLUCOES-PROXIMO-PASSO): a
+   lista vem do servidor — pessoa ativa que lança ou acompanha — e diz quem
+   está logado, para o "Meus casos". O texto livre de antes continua
+   aparecendo até alguém escolher a pessoa. */
+try{ ESTADO.meus = localStorage.getItem('devcasos_meus')==='1'; }catch(e){}
+function nomeResp(c){ return c.responsavel_nome || c.responsavel || ''; }
+function opcoesResp(atual){
+  var lista=ESTADO.pessoas.slice(), h='<option value="">— escolher —</option>';
+  if(atual && atual.id && !lista.some(function(x){ return x.id===atual.id; })) lista.push({ id:atual.id, nome:(atual.nome||'')+' (sem a permissão hoje)' });
+  lista.forEach(function(x){ h+='<option value="'+x.id+'"'+(atual && atual.id===x.id?' selected':'')+'>'+esc(x.nome)+'</option>'; });
+  return h;
+}
+function carregarPessoas(){
+  return api('GET','/api/devolucao-casos/responsaveis').then(function(d){
+    ESTADO.pessoas=d.pessoas||[]; ESTADO.eu=d.eu||null;
+    var sel=document.getElementById('lResp'), v=sel.value; sel.innerHTML=opcoesResp(null); sel.value=v;
+    desenharListas();
+  }).catch(function(){});
+}
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 function dataBR(s){ if(!s) return '—'; var d=String(s).slice(0,10).split('-'); return d.length===3?d[2]+'/'+d[1]+'/'+d[0]:s; }
 function horaBR(s){ if(!s) return ''; return dataBR(s)+(String(s).length>10?' '+String(s).slice(11,16):''); }
@@ -283,7 +305,7 @@ function linhaCaso(c){
   if(c.valor_ml_situacao==='pedido') chips+='<span class="chip">valor do ML pedido</span>';
   if('saldo' in c) chips+= c.incompleto ? '<span class="chip falta">saldo incompleto</span>' : '<span class="chip dinheiro">saldo '+reais(c.saldo)+'</span>';
   if(c.tipo==='ml') chips+='<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>'+chipRevisei(c)+chipRevisao(c);
-  if(c.responsavel) chips+='<span class="chip">'+esc(c.responsavel)+'</span>';
+  if(nomeResp(c)) chips+='<span class="chip">'+(c.responsavel_id && c.responsavel_id===ESTADO.eu?'👤 ':'')+esc(nomeResp(c))+'</span>';
   if(c.prazo_original) chips+='<span class="chip">comprovante prorrogado (era '+dataBR(c.prazo_original)+')</span>';
   if(c.prazo_coleta_original) chips+='<span class="chip">coleta prorrogada (era '+dataBR(c.prazo_coleta_original)+')</span>';
   chips+=chipPub(c)+chipLink(c);
@@ -300,7 +322,24 @@ function linhaCaso(c){
    prazo); embaixo, recolhido, o que espera outros (transportadora, ML). Quem
    diz de quem é a vez é o servidor (proximo.nossa). O aberto/fechado do grupo
    de fora sobrevive ao redesenho de 30 s. */
-function filtrarMeus(l){ return l; }
+function meusTotal(){ var eu=ESTADO.eu; return eu ? ESTADO.coleta.concat(ESTADO.ml).filter(function(c){ return c.responsavel_id===eu; }).length : 0; }
+/* "Meus casos": os casos em que a pessoa logada é a responsável. Quem não
+   tem caso nenhum vê a lista inteira, e a tela diz isso. */
+function filtrarMeus(l){
+  if(!ESTADO.meus || !meusTotal()) return l;
+  return l.filter(function(c){ return c.responsavel_id===ESTADO.eu; });
+}
+function desenharMeus(){
+  var b=document.getElementById('btMeus'), a=document.getElementById('meusAviso'), n=meusTotal();
+  b.className = ESTADO.meus ? 'bt' : 'bt sec'; b.setAttribute('aria-pressed', ESTADO.meus ? 'true' : 'false');
+  b.textContent = 'Meus casos' + (ESTADO.eu ? ' ('+n+')' : '');
+  a.textContent = ESTADO.meus ? (n ? 'Mostrando só os casos em que você é o responsável.' : 'Você não é responsável por nenhum caso aberto: mostrando todos.') : '';
+}
+document.getElementById('btMeus').onclick=function(){
+  ESTADO.meus=!ESTADO.meus;
+  try{ localStorage.setItem('devcasos_meus', ESTADO.meus?'1':'0'); }catch(e){}
+  desenharListas();
+};
 function ehNossa(c){ return !c.proximo || c.proximo.nossa; }
 function grupoLista(id, casos, vazio){
   var nos=casos.filter(ehNossa), fora=casos.filter(function(c){ return !ehNossa(c); });
@@ -311,6 +350,7 @@ function grupoLista(id, casos, vazio){
 }
 function desenharListas(){
   var lc=document.getElementById('listaColeta'), lm=document.getElementById('listaMl');
+  desenharMeus();
   var col=filtrarMeus(ESTADO.coleta), ml=filtrarMeus(ESTADO.ml);
   lc.innerHTML = grupoLista('coleta', col, 'Nenhuma coleta em andamento.');
   lm.innerHTML = grupoLista('ml', ml, 'Nenhuma devolução do ML esperando chegar.');
@@ -421,7 +461,7 @@ document.getElementById('btLancar').onclick=function(){
   }
   // O campo de cima aceita venda OU NF: número curto é NF.
   if(v && v.length<=7 && !corpo.nf) corpo.nf=v; else corpo.venda=v;
-  if(ESTADO.tipo==='coleta'){ corpo.prazo=document.getElementById('lPrazo').value; corpo.responsavel=document.getElementById('lResp').value; corpo.passado_em=document.getElementById('lPassado').value; }
+  if(ESTADO.tipo==='coleta'){ corpo.prazo=document.getElementById('lPrazo').value; if(document.getElementById('lResp').value) corpo.responsavel_id=+document.getElementById('lResp').value; corpo.passado_em=document.getElementById('lPassado').value; }
   var b=this; b.disabled=true;
   api('POST','/api/devolucao-casos',corpo).then(function(r){
     msg.innerHTML='<div class="okmsg">Caso #'+r.id+' lançado.</div>';
@@ -564,7 +604,7 @@ function desenharCaso(d){
     (c.tipo==='coleta'?celulasPrazos(c):'<div><b>Revisar no ML até</b>'+(c.revisar_ate?dataBR(c.revisar_ate):'—')+'</div>')+
     (c.etiqueta_devolucao?'<div><b>Etiqueta de devolução</b>'+esc(c.etiqueta_devolucao)+'</div>':'')+
     // Responsável e Passado em nos DOIS tipos: no "ML devolve" eles eram gravados e não apareciam.
-    '<div><b>Responsável</b>'+esc(c.responsavel||'—')+'</div><div><b>Passado em</b>'+dataBR(c.passado_em)+'</div>'+
+    '<div><b>Responsável</b>'+esc(nomeResp(c)||'—')+'</div><div><b>Passado em</b>'+dataBR(c.passado_em)+'</div>'+
     '<div><b>Na etapa desde</b>'+horaBR(c.etapa_desde)+'</div>'+
     (c.chegou_em?'<div><b>Chegou em</b>'+horaBR(c.chegou_em)+'</div>':'')+
     (c.devolucao_id?'<div><b>Revisão</b>#'+c.devolucao_id+'</div>':'')+
@@ -606,7 +646,8 @@ function desenharCaso(d){
       '<div><label>Motivo</label><select id="eMotivo">'+ops+'</select></div>'+
       '<div><label>NF</label><input id="eNf" value="'+esc(c.nf||'')+'"></div>'+
       '<div><label>SKU</label><input id="eSku" value="'+esc(c.sku||'')+'"></div>'+
-      '<div><label>Responsável</label><input id="eResp" value="'+esc(c.responsavel||'')+'"></div>'+
+      '<div><label for="eResp">Responsável</label><select id="eResp">'+opcoesResp(c.responsavel_id?{ id:c.responsavel_id, nome:c.responsavel_nome }:null)+'</select>'+
+        (c.responsavel && !c.responsavel_id?'<div class="sub">antes, escrito à mão: “'+esc(c.responsavel)+'”</div>':'')+'</div>'+
       '<div><label>Observação</label><input id="eObs" value="'+esc(c.obs||'')+'"></div>'+
       (c.tipo==='coleta'?'<div><label>Reclamação aberta em</label><input type="date" id="eAberta" value="'+esc(c.aberta_em||'')+'"></div>'
         :'<div><label>Revisar no ML até</label><input type="date" id="eRevisarAte" value="'+esc(c.revisar_ate||'')+'"></div>')+
@@ -699,7 +740,7 @@ function acao(url, corpo){
    de sempre (o lançamento pelo editar; o dinheiro pelo valor, que o servidor
    só aceita de quem tem a permissão). O que for recusado volta ao campo,
    marcado, com o motivo. */
-var CAMPOS_EDITAR={eMotivo:'motivo', eNf:'nf', eSku:'sku', eResp:'responsavel', eObs:'obs', ePub:'publicidade', eLink:'link_ml', eMsgMl:'mensagem_ml', eAberta:'aberta_em', eRevisarAte:'revisar_ate'};
+var CAMPOS_EDITAR={eMotivo:'motivo', eNf:'nf', eSku:'sku', eResp:'responsavel_id', eObs:'obs', ePub:'publicidade', eLink:'link_ml', eMsgMl:'mensagem_ml', eAberta:'aberta_em', eRevisarAte:'revisar_ate'};
 var CAMPOS_VALOR={dValor:'valor_ml', dPerdido:'valor_perdido', dDevolvido:'valor_devolvido', dEtiqueta:'custo_etiqueta', dRevisao:'valor_revisao', dLimite:'limite_frete'};
 function salvarTudo(){
   var id=ESTADO.aberto, base='/api/devolucao-casos/'+id, m=document.getElementById('cMsg');
@@ -1266,7 +1307,7 @@ encherTranspLancar();
 passadoHoje();
 carregarMotivos();
 api('GET','/api/skus').then(function(l){ (l||[]).forEach(function(s){ ESTADO.skus[String(s.codigo).toUpperCase()]=s; }); desenharListas(); }).catch(function(){});
-carregar();
+carregar(); carregarPessoas();
 setInterval(function(){ if(!digitando() && !ESTADO.aberto && ESTADO.aba==='and') carregar(); }, 30000);
 </script>
 <script src="/nav.js"></script>
