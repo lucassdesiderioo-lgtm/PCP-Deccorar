@@ -1642,6 +1642,16 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   chamar('POST','/api/devolucao-casos/:id/desligar-revisao',{ motivo:'trocada' }, 2, { id:dzD });
   eq('depois de desligar, o desfazer de etapa não volta a etapa de antes', chamar('GET','/api/devolucao-casos/:id',null,2,{ id:dzD }).body.desfazer, null);
 
+  secao('esperadas: a cidade do comprador, para comparar com o remetente da etiqueta');
+  db.prepare("INSERT OR IGNORE INTO skus (codigo,estoque) VALUES ('BK150150CINZA',0)").run();
+  db.prepare("INSERT INTO lote (codigo,buyer,nf,venda,packId,city) VALUES ('BK150150CINZA','Maria Consuelo Bermudez','8901','2000015571700901',NULL,'Governador Celso Ramos, Santa Catarina')").run();
+  const ec1 = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571700901', publicidade:false }, 3).body.id;
+  const ec2 = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'2000015571700902', sku:'BK150150CINZA', comprador:'Fulano Sem Venda', publicidade:false }, 3).body.id;
+  const espC = chamar('GET','/api/devolucao/esperadas',null,4,{},{ sku:'BK150150CINZA' }).body.casos || [];
+  eq('o caso com venda no sistema traz a cidade da venda', (espC.find(c => c.id === ec1) || {}).cidade, 'Governador Celso Ramos, Santa Catarina');
+  eq('   o caso sem venda no sistema vem sem cidade', (espC.find(c => c.id === ec2) || {}).cidade, null);
+  ok('   e nenhum valor em reais viaja na lista', espC.every(c => !Object.keys(c).some(k => /valor|custo|saldo|limite/.test(k))), JSON.stringify(espC[0]));
+
   fim();
 })().catch(e => { console.log('ESTOUROU: ' + e.stack); falhas++; fim(); });
 

@@ -244,14 +244,37 @@ async function dvEsperadas(sku){
     box=document.getElementById('dvEsp'); if(!box) return;
   }
   if(!DVESP.casos.length){ box.innerHTML=''; return; }
+  /* O NOME E A CIDADE DO REMETENTE (AJUSTE de 03/11/2026): a etiqueta de
+     devolução nem sempre traz o Pack ID, mas sempre traz quem mandou — o
+     comprador — e a cidade. Com várias peças do mesmo SKU, ele filtra pelo
+     que lê no remetente e toca no certo. Quem escolhe é ele. */
+  var filtro=document.getElementById('dvEspFiltro'), ft=filtro?filtro.value:'', foco=filtro&&document.activeElement===filtro;
   var h='<div style="background:#fff4e0;border:2px solid #b26a00;color:#7a4a00;border-radius:10px;padding:10px 12px;margin-top:12px">'+
-    '<div style="font-weight:800;font-size:15px;margin-bottom:8px">Devolução esperada com este SKU? Toque se for esta:</div><div class="ops">';
+    '<div style="font-weight:800;font-size:15px;margin-bottom:8px">Devolução esperada com este SKU? Compare com o remetente da etiqueta e toque se for esta:</div>'+
+    (DVESP.casos.length>1?'<input id="dvEspFiltro" placeholder="Filtrar pelo nome ou cidade do remetente" autocomplete="off" autocorrect="off" autocapitalize="off" style="width:100%;max-width:420px;font-size:16px;padding:10px 12px;margin-bottom:8px;border:2px solid #b26a00;border-radius:8px">':'')+
+    '<div class="ops">';
   for(var i=0;i<DVESP.casos.length;i++){
     var c=DVESP.casos[i], on=DVCASO&&DVCASO.id===c.id;
-    h+='<button type="button" class="op'+(on?' on':'')+'" data-dvcaso="'+c.id+'" style="font-size:15px;padding:12px 16px">#'+c.id+' · '+escDv(c.comprador||'sem nome')+' · NF '+escDv(c.nf||'—')+dvFinais(c)+'</button>';
+    h+='<button type="button" class="op'+(on?' on':'')+'" data-dvcaso="'+c.id+'" data-dvbusca="'+escDv(dvSemAcento((c.comprador||'')+' '+(c.cidade||'')))+'" style="font-size:15px;padding:12px 16px;text-align:left">'+
+      '<b style="font-size:19px">'+escDv(c.comprador||'sem nome')+'</b>'+
+      '<br><span style="font-size:17px">📍 '+escDv(c.cidade||'cidade não registrada')+'</span>'+
+      '<br><span style="font-size:13px">#'+c.id+' · NF '+escDv(c.nf||'—')+'</span>'+dvFinais(c)+'</button>';
   }
-  h+='</div>'+(DVCASO?'<div style="margin-top:8px;font-size:14px">Ao salvar, o caso #'+DVCASO.id+' fica revisado. Tocar de novo desmarca.</div>':'<div style="margin-top:8px;font-size:13px">Não é nenhuma destas? Siga normalmente.</div>')+'</div>';
+  h+='</div><div id="dvEspNada" style="display:none;margin-top:6px;font-size:14px">Nenhum caso com esse nome ou cidade.</div>'+
+    (DVCASO?'<div style="margin-top:8px;font-size:14px">Ao salvar, o caso #'+DVCASO.id+' fica revisado. Tocar de novo desmarca.</div>':'<div style="margin-top:8px;font-size:13px">Não é nenhuma destas? Siga normalmente.</div>')+'</div>';
   box.innerHTML=h;
+  var f2=document.getElementById('dvEspFiltro');
+  if(f2){ f2.value=ft; f2.oninput=dvFiltrarEsp; dvFiltrarEsp(); if(foco) f2.focus(); }
+}
+function dvSemAcento(t){ return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
+function dvFiltrarEsp(){
+  var f=document.getElementById('dvEspFiltro'); if(!f) return;
+  var q=dvSemAcento(f.value).trim(), vistos=0;
+  document.querySelectorAll('#dvEsp [data-dvcaso]').forEach(function(b){
+    var mostra=!q || q.split(/\s+/).every(function(p){ return b.getAttribute('data-dvbusca').indexOf(p)>=0; });
+    b.style.display=mostra?'':'none'; if(mostra) vistos++;
+  });
+  var n=document.getElementById('dvEspNada'); if(n) n.style.display=vistos?'none':'';
 }
 document.addEventListener('click',function(e){
   var s2=e.target.closest('[data-dvsuf]');
