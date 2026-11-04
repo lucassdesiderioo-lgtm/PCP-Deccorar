@@ -860,7 +860,7 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   eq('Renato vai a Em andamento', porta(2).para, '/devolucao-casos');
   eq('o admin geral vai a Em andamento', porta(1).para, '/devolucao-casos');
   PERMS[7] = new Set(['devolucao.baixar']); NOMES[7] = 'SoBaixa';
-  eq('quem só dá baixa vai ao Admin, na aba Devoluções', porta(7).para, '/admin#dv');
+  eq('quem só dá baixa vai à tela 253 (Admin → Devoluções, desde a fase 5 da ACESSO-POR-TELA-E-NIVEL)', porta(7).para, '/admin/devolucoes');
   PERMS[8] = new Set([]); NOMES[8] = 'Nada';
   eq('quem não tem nada vai à tela de sempre (e o portão responde como hoje)', porta(8).para, '/devolucao');
   eq('sem sessão vai ao login, e volta à porta depois', porta('ninguem').para, '/login?r=%2Fdevolucoes');
@@ -868,12 +868,16 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   secao('abas — o rodapé tem uma entrada só, e as duas telas têm a faixa');
   const NAV = fs.readFileSync(path.join(__dirname,'public','nav.js'),'utf8');
   ok('o rodapé não tem mais o link "Devoluções em andamento"', !/Devoluções em andamento/.test(NAV) && !/navDevCasos/.test(NAV));
-  ok('o "Devoluções" do rodapé aponta para a porta única', /href="\/devolucoes"/.test(NAV));
-  ok('   e fica aceso nas duas telas', /\/devolucao-casos/.test(NAV));
+  /* O RODAPE SAIU (fase 6 da ACESSO-POR-TELA-E-NIVEL): as devolucoes viraram o
+     bloco 250 do MENU POR PESSOA, montado do mapa — 251 receber, 252 em
+     andamento, 253 baixa. */
+  const MAPA = require('./telas');
+  ok('as três telas das devoluções são o bloco 250 do mapa (o menu por pessoa)', [251,252,253].every(n => MAPA.porNumero(n) && MAPA.moduloDe(n) === 250) && MAPA.MODULOS[250] === 'Devoluções');
+  ok('   e o menu sai do mapa (/api/telas/minhas), não de uma lista no nav.js', /\/api\/telas\/minhas/.test(NAV) && !/href="\/devolucoes"/.test(NAV));
   for(const tela of ['devolucao.html','devolucao-casos.html']){
     const H = fs.readFileSync(path.join(__dirname,'public',tela),'utf8');
     ok(tela + ' pede as abas ao servidor (/api/devolucao/abas)', /\/api\/devolucao\/abas/.test(H));
-    ok(tela + ' liga as três abas às três telas', /'\/devolucao'/.test(H) && /'\/devolucao-casos'/.test(H) && /'\/admin#dv'/.test(H));
+    ok(tela + ' liga as três abas às três telas', /'\/devolucao'/.test(H) && /'\/devolucao-casos'/.test(H) && /'\/admin\/devolucoes'/.test(H));
   }
   const ADM = fs.readFileSync(path.join(__dirname,'public','index.html'),'utf8');
   ok('o admin abre direto na aba pelo endereço (#dv)', /location\.hash/.test(ADM) && /data-t="dv"/.test(ADM));
@@ -1605,6 +1609,10 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   ok('a lista de revisões soltas traz a triagem e a observação, para separar as iguais', rsE.tecido === 'ok' && rsE.obs === 'risco no tecido' && 'embalagem' in rsE && 'kit' in rsE, JSON.stringify(rsE));
   chamar('POST','/api/devolucao-casos/:id/ligar',{ devolucao_id:pecaErrada }, 2, { id:dw });
   chamar('POST','/api/devolucao/baixa',{ id:pecaErrada, reputacao:'sim', motivo:'Comprador se arrependeu' }, 3);
+  /* quem deu a baixa (fase 1 da ACESSO-POR-TELA-E-NIVEL): o caso mostra o nome */
+  const detBx = chamar("GET","/api/devolucao-casos/:id",null,2,{ id:dw }).body;
+  const cBx = detBx.caso || detBx;
+  ok('o caso mostra quem deu a baixa e quando', !!cBx.dev_baixado_em && !!cBx.dev_baixado_por, JSON.stringify({ em:cBx.dev_baixado_em, por:cBx.dev_baixado_por }));
   chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 2, { id:dw });
   eq('ligada, baixada e "Já revisei": o caso encerrou', caso(dw).saida, 'revisado_ml');
   eq('   e a etiqueta da peça errada foi gravada no caso', caso(dw).etiqueta_devolucao, '48323600001');
@@ -1626,6 +1634,7 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   eq('   a etiqueta da peça errada sai do caso', dwc.etiqueta_devolucao, null);
   const dErr = db.prepare('SELECT * FROM devolucao WHERE id=?').get(pecaErrada);
   eq('a baixa da peça errada é DESFEITA (decisão do dono)', dErr.baixado + '/' + dErr.baixado_em + '/' + dErr.reputacao + '/' + dErr.motivo, '0/null/null/null');
+  eq('   e quem deu a baixa sai junto (fase 1 da ACESSO-POR-TELA-E-NIVEL)', dErr.baixado_por_id + '/' + dErr.baixado_por, 'null/null');
   eq('   e ela volta a ser revisão solta, pendente na Baixa', (chamar('GET','/api/devolucao/pendentes',null,3).body.find(d => d.id === pecaErrada) || {}).caso_id || null, null);
   ok('   ...e aparece na Baixa', chamar('GET','/api/devolucao/pendentes',null,3).body.some(d => d.id === pecaErrada));
   const evD = eventos(dw);

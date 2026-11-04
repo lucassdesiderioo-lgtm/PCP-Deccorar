@@ -6,22 +6,25 @@
  * niveis: operacao | supervisor | admin | admin_geral
  * sensivel: exige aviso visual e fica registrada na auditoria
  * intransferivel: nunca delegavel (so Admin Geral) — anula o modelo se sair dele
+ * tela: o NUMERO da tela onde a acao e usada (telas.js) — R-ALC-03 da spec
+ *       ACESSO-POR-TELA-E-NIVEL. Permissao nova sem `tela` reprova o teste_mapa.js;
+ *       e e por ela que a tela de Acessos pendura cada acao na tela dela.
  */
 module.exports = [
   // ─── PRODUÇÃO ───────────────────────────────────────────────
-  { chave:'revisao.executar',     grupo:'Produção',   nivel:'operacao',
+  { chave:'revisao.executar',     grupo:'Produção',   tela:101, nivel:'operacao',
     rotulo:'Revisar peças',       desc:'Bipar início e fim da revisão' },
-  { chave:'revisao.rejeitar',     grupo:'Produção',   nivel:'operacao',
+  { chave:'revisao.rejeitar',     grupo:'Produção',   tela:101, nivel:'operacao',
     rotulo:'Devolver peça à produção', desc:'Registrar peça com problema' },
-  { chave:'embalagem.executar',   grupo:'Produção',   nivel:'operacao',
+  { chave:'embalagem.executar',   grupo:'Produção',   tela:102, nivel:'operacao',
     rotulo:'Embalar peças',       desc:'Bipar SKU, kit e finalizar' },
 
   // ─── EXPEDIÇÃO ──────────────────────────────────────────────
-  { chave:'pdf.subir',            grupo:'Expedição',  nivel:'operacao',
+  { chave:'pdf.subir',            grupo:'Expedição',  tela:203, nivel:'operacao',
     rotulo:'Lançar NF de venda',  desc:'Subir o PDF do Mercado Livre' },
-  { chave:'etiqueta.emitir',      grupo:'Expedição',  nivel:'operacao',
+  { chave:'etiqueta.emitir',      grupo:'Expedição',  tela:201, nivel:'operacao',
     rotulo:'Emitir NF de venda',  desc:'Imprimir etiqueta e dar baixa no estoque' },
-  { chave:'carregamento.executar',grupo:'Expedição',  nivel:'operacao',
+  { chave:'carregamento.executar',grupo:'Expedição',  tela:202, nivel:'operacao',
     rotulo:'Conferência',         desc:'Conferir a etiqueta de venda por bipe e pôr no carro' },
   /* SAIDA DO CAMINHAO (spec SAIDA-E-DUPLA-CONFERENCIA, fase 3, 26/09/2026).
      Fechar a saida que BATEU e da bancada ('carregamento.executar'). Liberar o
@@ -29,7 +32,7 @@ module.exports = [
      nome — decisao 7 do dono: so supervisor e admin, com motivo, na auditoria.
      ⚠️ NIVEL `supervisor`, e nao `admin`: nivel admin no PCP vale como "e admin
      do PCP" (as rotas '@admin' e a area 'admin', §19 armadilha #34). */
-  { chave:'saida.liberar',        grupo:'Expedição',  nivel:'supervisor',
+  { chave:'saida.liberar',        grupo:'Expedição',  tela:202, nivel:'supervisor',
     rotulo:'Liberar caminhão com divergência',
     desc:'Fechar a saída da coleta quando o número do motorista não bate, com motivo',
     sensivel:true },
@@ -38,7 +41,7 @@ module.exports = [
      no Mercado Livre e confirma — so a confirmacao devolve a peca ao estoque.
      SENSIVEL pela mesma razao do `estoque.editar`: e saldo voltando sem venda
      na frente. Nivel `supervisor`, como o `saida.liberar` (§19, #34). */
-  { chave:'cancelamento.confirmar', grupo:'Expedição', nivel:'supervisor',
+  { chave:'cancelamento.confirmar', grupo:'Expedição', tela:202, nivel:'supervisor',
     rotulo:'Confirmar venda cancelada',
     desc:'Confirmar no Mercado Livre a venda cancelada que a Conferência separou — devolve as peças ao estoque — ou recusar',
     sensivel:true },
@@ -49,7 +52,7 @@ module.exports = [
      (hoje 'estoque.aprovar_ajuste'):
      a assinatura mexe no saldo sem venda na frente, e o unico rastro do porque e
      quem assinou. Ver a caixa retida continua sendo '@admin' (a aba Bloqueados). */
-  { chave:'pacote.assinar',       grupo:'Expedição',  nivel:'admin',
+  { chave:'pacote.assinar',       grupo:'Expedição',  tela:204, nivel:'admin',
     rotulo:'Assinar peças de caixa com várias persianas',
     desc:'Confirmar quais SKUs vão dentro do volume retido por pacote',
     sensivel:true },
@@ -78,6 +81,7 @@ module.exports = [
      teste_acessos_f2.js. */
   ...require('./tecido/nucleo/permissoes').CHAVES.map(c => ({
     chave:'sobmedida.' + c.chave, grupo:'Sob medida', nivel:c.nivel,
+    tela:require('./tecido/nucleo/telas').TELA_DA_CHAVE[c.chave],
     rotulo:c.nome, desc:'', sensivel:!!c.sensivel })),
 
   /* ── OS CINCO SETORES DE PRODUCAO (fase 5-A, 24/09/2026) ────────────────
@@ -101,21 +105,21 @@ module.exports = [
      nivel admin, e o portao do modulo le 'admin' como DIRETOR. Um setor
      declarado admin entregaria o modulo inteiro — catalogo, parametros do
      encaixe, descarte de sobra — a quem so embala. */
-  { chave:'sobmedida.serralheria', grupo:'Sob medida', nivel:'operacao',
+  { chave:'sobmedida.serralheria', grupo:'Sob medida', tela:613, nivel:'operacao',
     rotulo:'Sob medida — serralheria', desc:'Bipar tubo, base, bandô e barra na produção sob medida' },
-  { chave:'sobmedida.colecao',     grupo:'Sob medida', nivel:'operacao',
+  { chave:'sobmedida.colecao',     grupo:'Sob medida', tela:613, nivel:'operacao',
     rotulo:'Sob medida — coleção',     desc:'Bipar o corte do tecido na produção sob medida' },
-  { chave:'sobmedida.montagem',    grupo:'Sob medida', nivel:'operacao',
+  { chave:'sobmedida.montagem',    grupo:'Sob medida', tela:613, nivel:'operacao',
     rotulo:'Sob medida — montagem',    desc:'Bipar a montagem da persiana sob medida' },
-  { chave:'sobmedida.revisao',     grupo:'Sob medida', nivel:'operacao',
+  { chave:'sobmedida.revisao',     grupo:'Sob medida', tela:613, nivel:'operacao',
     rotulo:'Sob medida — revisão',     desc:'Bipar a revisão da persiana sob medida' },
-  { chave:'sobmedida.embalagem',   grupo:'Sob medida', nivel:'operacao',
+  { chave:'sobmedida.embalagem',   grupo:'Sob medida', tela:613, nivel:'operacao',
     rotulo:'Sob medida — embalagem',   desc:'Bipar a embalagem da persiana sob medida (com o kit)' },
 
   // ─── DEVOLUÇÕES ─────────────────────────────────────────────
-  { chave:'devolucao.registrar',  grupo:'Devoluções', nivel:'operacao',
+  { chave:'devolucao.registrar',  grupo:'Devoluções', tela:251, nivel:'operacao',
     rotulo:'Registrar devolução', desc:'Receber e fazer a triagem física' },
-  { chave:'devolucao.baixar',     grupo:'Devoluções', nivel:'admin',
+  { chave:'devolucao.baixar',     grupo:'Devoluções', tela:253, nivel:'admin',
     rotulo:'Dar baixa em devolução', desc:'Informar reputação e motivo' },
   /* AS DEVOLUCOES EM ANDAMENTO (spec DEVOLUCOES-ACOMPANHAMENTO, 03/11/2026):
      o caso nasce quando o ML abre a reclamacao, antes de a peca chegar.
@@ -127,16 +131,16 @@ module.exports = [
      com as DECISOES — baixa do reembolso, perda, devolver ao comprador — e com
      os totais em reais do relatorio. Deixou de ser `intransferivel`: o dono
      pode da-la a um setor (o Financeiro). Continua sensivel. */
-  { chave:'devolucao.lancar',     grupo:'Devoluções', nivel:'admin',
+  { chave:'devolucao.lancar',     grupo:'Devoluções', tela:252, nivel:'admin',
     rotulo:'Lançar devolução em andamento', desc:'Lançar e editar o caso antes de a peça chegar (venda, NF, motivo, prazo)' },
-  { chave:'devolucao.acompanhar', grupo:'Devoluções', nivel:'supervisor',
+  { chave:'devolucao.acompanhar', grupo:'Devoluções', tela:252, nivel:'supervisor',
     rotulo:'Acompanhar devoluções em andamento', desc:'Ver a lista, mover etapas, coleta, transportadora, documentos e prorrogação' },
-  { chave:'devolucao.dinheiro',   grupo:'Devoluções', nivel:'admin',
+  { chave:'devolucao.dinheiro',   grupo:'Devoluções', tela:252, nivel:'admin',
     rotulo:'Dinheiro das devoluções', desc:'Dar baixa no reembolso, devolver ao comprador, encerrar como perda e ver os totais em reais do relatório',
     sensivel:true },
 
   // ─── ESTOQUE ────────────────────────────────────────────────
-  { chave:'contagem.contar',      grupo:'Estoque',    nivel:'operacao',
+  { chave:'contagem.contar',      grupo:'Estoque',    tela:303, nivel:'operacao',
     rotulo:'Contar estoque',      desc:'Contar às cegas a prateleira na conferência (e contar material)' },
   /* A CONFERENCIA EM TRES PAPEIS (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA,
      26/09/2026). Tres chaves porque sao tres trabalhos, e "ninguem aprova o
@@ -150,35 +154,35 @@ module.exports = [
      ficam no registro, SEM rota de peca: trocar o nome de uma chave tiraria a
      permissao de quem a tem, em silencio (#13). O backfill (acesso.js, 3-D2)
      levou quem as tinha para as novas. */
-  { chave:'contagem.recontar',    grupo:'Estoque',    nivel:'operacao',
+  { chave:'contagem.recontar',    grupo:'Estoque',    tela:303, nivel:'operacao',
     rotulo:'Recontar divergência (antiga)', desc:'Sem uso desde 04/11/2026: a 2ª contagem é de quem conta, e a 3ª de quem desempata' },
-  { chave:'contagem.desempatar',  grupo:'Estoque',    nivel:'operacao',
+  { chave:'contagem.desempatar',  grupo:'Estoque',    tela:303, nivel:'operacao',
     rotulo:'Fazer a 3ª contagem', desc:'Contar às cegas o SKU em que as duas primeiras contagens não bateram (nunca o que a própria pessoa contou)' },
-  { chave:'contagem.planejar',    grupo:'Estoque',    nivel:'admin',
+  { chave:'contagem.planejar',    grupo:'Estoque',    tela:302, nivel:'admin',
     rotulo:'Planejar conferência', desc:'Abrir a contagem geral, antecipar a quinzenal e tirar ou pôr pessoas no rodízio da contagem' },
-  { chave:'contagem.aprovar',     grupo:'Estoque',    nivel:'admin',
+  { chave:'contagem.aprovar',     grupo:'Estoque',    tela:302, nivel:'admin',
     rotulo:'Aprovar conferência (antiga)', desc:'Sem uso desde 04/11/2026: duas contagens que batem aplicam sozinhas, e o resto é de quem resolve',
     sensivel:true },
-  { chave:'contagem.resolver',    grupo:'Estoque',    nivel:'admin',
+  { chave:'contagem.resolver',    grupo:'Estoque',    tela:302, nivel:'admin',
     rotulo:'Resolver contagem sem acordo', desc:'Decidir o SKU em que nem a 3ª contagem bateu: aplicar um valor com motivo, ou mandar contar de novo (nunca o que a própria pessoa contou)',
     sensivel:true },
-  { chave:'contagem.relatorio',   grupo:'Estoque',    nivel:'admin',
+  { chave:'contagem.relatorio',   grupo:'Estoque',    tela:302, nivel:'admin',
     rotulo:'Ver o relatório de furos', desc:'Ler os furos da conferência: quanto, de qual SKU, quem contou e o extrato' },
   /* O ROTULO MUDOU EM 27/10/2026, A CHAVE NAO (§20: trocar o texto de uma
      permissao e so o nome). Ele era "Aprovar ajuste de estoque", igual ao do
      `estoque.aprovar_ajuste` logo abaixo, e na tela de Acessos as duas
      caixinhas tinham o mesmo nome. Esta e a contagem de MATERIAL da aba
      Contagem (peca se conta pelo Inventario, R-EST-21). */
-  { chave:'contagem.ajustar',     grupo:'Estoque',    nivel:'admin',
+  { chave:'contagem.ajustar',     grupo:'Estoque',    tela:302, nivel:'admin',
     rotulo:'Aprovar contagem de material', desc:'Aplicar ao estoque de material a contagem da aba Contagem',
     sensivel:true },
   /* O AJUSTE MANUAL EM DUAS PESSOAS (fase 3 da ESTOQUE-LIVRO-E-CONFERENCIA,
      28/09/2026). Substituem `estoque.editar`, que aplicava sozinho. Pedir nao
      mexe no saldo; aprovar e de outra pessoa (outraPessoa, no estoque_dominio),
      e isso vale ate para o Admin Geral. */
-  { chave:'estoque.ajustar',      grupo:'Estoque',    nivel:'admin',
+  { chave:'estoque.ajustar',      grupo:'Estoque',    tela:301, nivel:'admin',
     rotulo:'Pedir ajuste de estoque', desc:'Pedir um ajuste manual do saldo (quantas peças a mais ou a menos, com motivo) — não muda o saldo sozinho' },
-  { chave:'estoque.aprovar_ajuste', grupo:'Estoque',  nivel:'admin',
+  { chave:'estoque.aprovar_ajuste', grupo:'Estoque',  tela:301, nivel:'admin',
     rotulo:'Aprovar ajuste de estoque', desc:'Aprovar ou recusar o ajuste pedido por outra pessoa (nunca o próprio)',
     sensivel:true },
   /* A MESA DE CORRECOES (fase 1, 02/10/2026). Uma chave para a mesa inteira, e
@@ -188,26 +192,26 @@ module.exports = [
      mexe em saldo sem venda na frente, e o motivo e o unico rastro de por que.
      NAO HA BACKFILL: o Admin Geral recebe toda chave por nivel (§10), entao ela
      chega ao dono no primeiro boot — a mesma decisao do `kit.imprimir` (§4). */
-  { chave:'correcao.executar',    grupo:'Estoque',    nivel:'admin',
+  { chave:'correcao.executar',    grupo:'Estoque',    tela:205, nivel:'admin',
     rotulo:'Mesa de correções',   desc:'Corrigir passivo da operação item por item — fantasma, cancelada depois da etiqueta, saída, vencidos, venda futura fechada e fila velha — com motivo e desfazer',
     sensivel:true },
-  { chave:'alvo.editar',          grupo:'Estoque',    nivel:'admin',
+  { chave:'alvo.editar',          grupo:'Estoque',    tela:301, nivel:'admin',
     rotulo:'Definir alvo',        desc:'Travar o alvo de um SKU' },
 
   // ─── PLANEJAMENTO ───────────────────────────────────────────
-  { chave:'producao.lancar',      grupo:'Planejamento', nivel:'admin',
+  { chave:'producao.lancar',      grupo:'Planejamento', tela:103, nivel:'admin',
     rotulo:'Lançar produção',     desc:'Criar ordens manualmente' },
-  { chave:'planilha.importar',    grupo:'Planejamento', nivel:'admin',
+  { chave:'planilha.importar',    grupo:'Planejamento', tela:401, nivel:'admin',
     rotulo:'Importar planilha do ML', desc:'Atualizar a demanda futura' },
-  { chave:'sku.cadastrar',        grupo:'Planejamento', nivel:'admin',
+  { chave:'sku.cadastrar',        grupo:'Planejamento', tela:402, nivel:'admin',
     rotulo:'Cadastrar SKU',       desc:'Criar e editar produtos' },
-  { chave:'sku.excluir',          grupo:'Planejamento', nivel:'admin',
+  { chave:'sku.excluir',          grupo:'Planejamento', tela:402, nivel:'admin',
     rotulo:'Excluir SKU',         desc:'Remover produto do cadastro',
     sensivel:true },
   // O cadastro de COR fica sob sku.cadastrar — e a mesma tela e a mesma pessoa.
   // Modelo e permissao propria: na Fase 2 e ele que carrega as formulas da
   // ficha tecnica, e quem mexe numa formula mexe no consumo de material.
-  { chave:'modelo.cadastrar',     grupo:'Planejamento', nivel:'admin',
+  { chave:'modelo.cadastrar',     grupo:'Planejamento', tela:402, nivel:'admin',
     rotulo:'Cadastrar modelo de produto', desc:'Linhas de produto e suas fórmulas' },
 
   // ─── COMPRAS ────────────────────────────────────────────────
@@ -219,60 +223,60 @@ module.exports = [
   // controle de acesso: setor de nivel operacao nao aceita permissao acima do
   // seu nivel. Quem recebe precisa saber o que esta chegando; nao precisa da
   // lista de compras nem dos precos comparados.
-  { chave:'compras.ver',          grupo:'Compras', nivel:'supervisor',
+  { chave:'compras.ver',          grupo:'Compras', tela:501, nivel:'supervisor',
     rotulo:'Ver lista de compras', desc:'O que precisa ser comprado' },
-  { chave:'fornecedor.cadastrar', grupo:'Compras', nivel:'admin',
+  { chave:'fornecedor.cadastrar', grupo:'Compras', tela:501, nivel:'admin',
     rotulo:'Cadastrar fornecedor', desc:'Criar e editar fornecedores' },
-  { chave:'preco.lancar',         grupo:'Compras', nivel:'admin',
+  { chave:'preco.lancar',         grupo:'Compras', tela:501, nivel:'admin',
     rotulo:'Lançar preço',        desc:'Cadastrar e atualizar preço de fornecedor' },
-  { chave:'pedido.criar',         grupo:'Compras', nivel:'admin',
+  { chave:'pedido.criar',         grupo:'Compras', tela:501, nivel:'admin',
     rotulo:'Criar e enviar pedido', desc:'Gerar pedido de compra ao fornecedor',
     sensivel:true },
-  { chave:'pedido.ver',           grupo:'Compras', nivel:'operacao',
+  { chave:'pedido.ver',           grupo:'Compras', tela:502, nivel:'operacao',
     rotulo:'Ver pedidos em aberto', desc:'O que está a caminho, sem preço' },
-  { chave:'pedido.receber',       grupo:'Compras', nivel:'operacao',
+  { chave:'pedido.receber',       grupo:'Compras', tela:502, nivel:'operacao',
     rotulo:'Registrar recebimento', desc:'Conferir a entrega e dar entrada no estoque' },
-  { chave:'pedido.devolver',      grupo:'Compras', nivel:'operacao',
+  { chave:'pedido.devolver',      grupo:'Compras', tela:502, nivel:'operacao',
     rotulo:'Devolver ao fornecedor', desc:'Recusar item na conferência, com motivo' },
-  { chave:'pedido.pagar',         grupo:'Compras', nivel:'admin',
+  { chave:'pedido.pagar',         grupo:'Compras', tela:501, nivel:'admin',
     rotulo:'Marcar pedido como pago', desc:'Fecha o ciclo — não é contas a pagar',
     sensivel:true },
   // Custo do produto e a informacao mais estrategica do sistema — mais que
   // produtividade nominal. Nao vaza por padrao e todo acesso vai para a auditoria.
-  { chave:'custo.ver',            grupo:'Compras', nivel:'admin',
+  { chave:'custo.ver',            grupo:'Compras', tela:404, nivel:'admin',
     rotulo:'Ver custo do produto', desc:'Custo por SKU e evolução',
     sensivel:true },
-  { chave:'componente.cadastrar', grupo:'Compras', nivel:'admin',
+  { chave:'componente.cadastrar', grupo:'Compras', tela:501, nivel:'admin',
     rotulo:'Cadastrar componente', desc:'Insumos e matérias-primas' },
   /* `minimo.definir` SAIU em 26/10/2026 (fase 3 da ACESSOS-UNIFICADOS,
      divida 19): nenhuma rota a lia. Quem manda no mínimo e no ideal do card
      Materiais e `componente.cadastrar` (escrever) e `compras.ver` (ler), e a
      caixinha marcada nao liberava nada — a pessoa levava 403 numa tela que a
      permissao dela dizia que ela podia. */
-  { chave:'bloqueio.liberar',     grupo:'Planejamento', nivel:'admin',
+  { chave:'bloqueio.liberar',     grupo:'Planejamento', tela:204, nivel:'admin',
     rotulo:'Desbloquear volumes', desc:'Liberar volumes com SKU desconhecido' },
 
   // ─── VISÃO ──────────────────────────────────────────────────
-  { chave:'painel.ver',           grupo:'Visão',      nivel:'operacao',
+  { chave:'painel.ver',           grupo:'Visão',      tela:105, nivel:'operacao',
     rotulo:'Ver painel do dia',   desc:'Andamento geral da operação' },
-  { chave:'produtividade.propria',grupo:'Visão',      nivel:'operacao',
+  { chave:'produtividade.propria',grupo:'Visão',      tela:105, nivel:'operacao',
     rotulo:'Ver a própria produção', desc:'Quanto a pessoa produziu' },
-  { chave:'produtividade.equipe', grupo:'Visão',      nivel:'supervisor',
+  { chave:'produtividade.equipe', grupo:'Visão',      tela:904, nivel:'supervisor',
     rotulo:'Ver produção da equipe', desc:'Distribuição sem identificar quem' },
-  { chave:'produtividade.nominal',grupo:'Visão',      nivel:'admin',
+  { chave:'produtividade.nominal',grupo:'Visão',      tela:104, nivel:'admin',
     rotulo:'Ver produção com nome', desc:'Identifica cada operador',
     sensivel:true },
-  { chave:'relatorios.ver',       grupo:'Visão',      nivel:'supervisor',
+  { chave:'relatorios.ver',       grupo:'Visão',      tela:904, nivel:'supervisor',
     rotulo:'Ver relatórios',      desc:'Relatórios e painel gerencial' },
   /* A chave segue 'necessidade.ver' porque ja esta gravada nos perfis; o que
      ela libera hoje e a tela de Planejamento (a ABC saiu em 01/09/2026). */
-  { chave:'necessidade.ver',      grupo:'Visão',      nivel:'supervisor',
+  { chave:'necessidade.ver',      grupo:'Visão',      tela:401, nivel:'supervisor',
     rotulo:'Ver planejamento',    desc:'Estoque alvo, cobertura e necessidade de produção' },
 
   // ─── CONFIGURAÇÃO ───────────────────────────────────────────
-  { chave:'listas.editar',        grupo:'Configuração', nivel:'admin',
+  { chave:'listas.editar',        grupo:'Configuração', tela:902, nivel:'admin',
     rotulo:'Editar listas',       desc:'Motivos de rejeição e devolução' },
-  { chave:'kit.editar',           grupo:'Configuração', nivel:'admin',
+  { chave:'kit.editar',           grupo:'Configuração', tela:902, nivel:'admin',
     rotulo:'Definir código do kit', desc:'QR conferido na embalagem' },
   /* IMPRIMIR NAO E EDITAR, e por isso sao duas chaves. Editar decide o que a
      etiqueta diz (e o que a Embalagem passa a bipar); imprimir so tira copia
@@ -283,23 +287,23 @@ module.exports = [
      assinalar o nome na tela de Acessos. E o contrario do caso `pacote.assinar`
      (§5, armadilha #23), onde a chave nova tinha que alcancar sozinha quem ja
      fazia aquilo — aqui ninguem fazia, porque a impressao nao existia. */
-  { chave:'kit.imprimir',         grupo:'Configuração', nivel:'supervisor',
+  { chave:'kit.imprimir',         grupo:'Configuração', tela:902, nivel:'supervisor',
     rotulo:'Imprimir etiqueta do kit', desc:'Gerar o PDF do rolo de etiquetas' },
-  { chave:'horarios.editar',      grupo:'Configuração', nivel:'admin',
+  { chave:'horarios.editar',      grupo:'Configuração', tela:902, nivel:'admin',
     rotulo:'Editar horários',     desc:'Corte e despacho por dia',
     sensivel:true },
 
   // ─── SISTEMA ────────────────────────────────────────────────
-  { chave:'pessoas.gerenciar',    grupo:'Sistema',    nivel:'admin_geral',
+  { chave:'pessoas.gerenciar',    grupo:'Sistema',    tela:901, nivel:'admin_geral',
     rotulo:'Gerenciar pessoas e acessos', desc:'Cadastrar e definir permissões',
     sensivel:true, intransferivel:true },
-  { chave:'setores.gerenciar',    grupo:'Sistema',    nivel:'admin_geral',
+  { chave:'setores.gerenciar',    grupo:'Sistema',    tela:901, nivel:'admin_geral',
     rotulo:'Criar e editar setores', desc:'Estrutura de cargos da empresa',
     sensivel:true, intransferivel:true },
-  { chave:'teste.operar',         grupo:'Sistema',    nivel:'admin',
+  { chave:'teste.operar',         grupo:'Sistema',    tela:903, nivel:'admin',
     rotulo:'Operar modo teste',   desc:'Ligar, desligar e apagar testes',
     sensivel:true },
-  { chave:'auditoria.ver',        grupo:'Sistema',    nivel:'admin_geral',
+  { chave:'auditoria.ver',        grupo:'Sistema',    tela:901, nivel:'admin_geral',
     rotulo:'Ver auditoria',       desc:'Histórico de ações e cobertura',
     sensivel:true, intransferivel:true },
 ];

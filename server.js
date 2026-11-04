@@ -10,7 +10,11 @@ const app = express();
 const PORT = +process.env.PCP_PORTA || 3010;
 app.use(express.json({limit:'25mb'}));
 require('./auth')(app, db);
-app.use(express.static(path.join(__dirname, 'public')));
+/* O Admin virou telas (spec ACESSO-POR-TELA-E-NIVEL, fase 5): a porta `/` e
+   as telas `/admin/...` ficam ENTRE o auth e o static (armadilha #3), e o
+   static nao entrega mais o index.html no `/` (`index:false`). */
+require('./admin_telas')(app, db);
+app.use(express.static(path.join(__dirname, 'public'), { index:false }));
 
 /* O cadastro de SKU (GET, POST e DELETE /api/skus) mora no
    sku_cad_route.js desde 17/09/2026, e o require fica EXATAMENTE onde as
@@ -110,7 +114,7 @@ require('./plan_route')(app, db);
 app.get('/planejamento',(req,res)=>res.sendFile(path.join(__dirname,'public','planejamento.html')));
 app.get('/setor',(req,res)=> res.sendFile(path.join(__dirname,'public','setor.html')));
 app.get('/status',(req,res)=> res.json({ok:true,hora:new Date().toISOString()}));
-app.get('/admin',(req,res)=> res.sendFile(path.join(__dirname,'public','index.html')));
+// '/admin' e a porta do Admin desde a fase 5 da ACESSO-POR-TELA-E-NIVEL (admin_telas.js).
 require('./modo_route')(app, db);
 require('./cruz_route')(app, db);
 require('./cont_route')(app, db);

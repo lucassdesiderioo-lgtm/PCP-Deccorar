@@ -33,6 +33,12 @@
   .sens{font-size:10px;font-weight:800;color:#ffb4ae;background:#3a1513;border-radius:5px;padding:1px 6px;margin-left:6px}
   .intr{font-size:10px;font-weight:800;color:#8b97a5;border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin-left:6px}
   .grp{font-size:13px;font-weight:800;color:var(--amber);margin:14px 0 4px;letter-spacing:.03em}
+  .tela{font-size:13px;font-weight:700;margin:10px 0 2px 2px;color:var(--txt,#eef1f6)}
+  .tela .nivelpill{margin-left:6px}
+  .chk.acima{opacity:.5}
+  .chk.acima input{cursor:not-allowed}
+  #gradeTab th,#gradeTab td{border-bottom:1px solid var(--line);padding:4px 8px;text-align:center;white-space:nowrap}
+  #gradeTab th:first-child,#gradeTab td:first-child{text-align:left}
   button{cursor:pointer;border:0;border-radius:9px;font-weight:700;font-size:14px;padding:10px 16px}
   .primary{background:var(--amber);color:#1a1300}.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
   .del{color:var(--red);background:transparent;border:1px solid var(--line);font-size:12px;padding:6px 11px}
@@ -78,8 +84,16 @@
         <button class="ghost" onclick="novoSetor()">Limpar</button>
         <span class="msg" id="setorMsg"></span>
       </div>
-      <div class="sub" style="margin-bottom:6px">Permissões (só até o nível do setor):</div>
+      <div class="sub" style="margin-bottom:6px">Permissões, por tela (só até o nível do setor):</div>
       <div id="setorPerms"></div>
+    </div>
+    <!-- A GRADE TELAS × SETORES (fase 7 da ACESSO-POR-TELA-E-NIVEL): bate o olho
+         e vê o que cada setor recebe. Tela nova aparece aqui sozinha, sem
+         setor nenhum marcado — até o dono marcar (R-TEL-03). -->
+    <div class="card">
+      <h2>Telas × setores</h2>
+      <div class="sub" style="margin-bottom:8px">● o setor recebe a tela (tem uma permissão que a abre, e o nível dele cabe).</div>
+      <div style="overflow:auto"><table id="gradeTab" style="border-collapse:collapse;font-size:12px"></table></div>
     </div>
   </div>
 
@@ -117,9 +131,19 @@ function $(s){return document.querySelector(s);}
 async function jget(u){ return (await fetch(u)).json(); }
 async function jpost(u,b){ return (await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})})).json(); }
 
+async function carregarGrade(){
+  var g; try{ g=await jget('/api/acesso/grade'); }catch(e){ return; }
+  if(!g||!g.setores) return;
+  var h='<tr><th>Tela</th>'+g.setores.map(function(s){ return '<th title="'+s.nivel+'">'+s.nome+'</th>'; }).join('')+'</tr>';
+  h+=g.telas.map(function(t){
+    return '<tr><td><b>'+t.n+'</b> '+t.nome+'</td>'+t.setores.map(function(x){ return '<td>'+(x?'●':'')+'</td>'; }).join('')+'</tr>';
+  }).join('');
+  var el=document.getElementById('gradeTab'); if(el) el.innerHTML=h;
+}
 async function init(){
   REG=await jget('/api/acesso/registro');
   await carregarSetores();
+  carregarGrade();
   PESSOAS=await jget('/api/usuarios');
   renderPessoas();
   renderSetorPerms();
@@ -224,6 +248,16 @@ async function selPessoa(id){
   EST=await jget('/api/acesso/usuario/'+id);   // {setores:[{nome,nivel}], permissoes:[...]}
   renderDetalhe();
 }
+async function salvarNivel(){
+  var nv=$('#pNivel').value, ant=EST.nivel;
+  if(nv===ant) return;
+  var nomes={operacao:'Operação',supervisor:'Supervisor',admin:'Admin',admin_geral:'Admin Geral'};
+  if(!confirm('Mudar o nível de '+((PESSOAS.find(function(x){return x.id===SEL;})||{}).nome||'')+' de '+nomes[ant]+' para '+nomes[nv]+'?')){ $('#pNivel').value=ant; return; }
+  var r=await jpost('/api/acesso/usuario/'+SEL+'/nivel',{nivel:nv});
+  if(r.erro){ $('#nvMsg').style.color='#f85149'; $('#nvMsg').textContent=r.erro; $('#pNivel').value=ant; return; }
+  EST=await jget('/api/acesso/usuario/'+SEL); renderDetalhe();
+  $('#nvMsg').style.color='#2ea043'; $('#nvMsg').textContent='nível salvo';
+}
 function meusSetorIds(){
   // reconstroi os ids a partir dos nomes (EST.setores traz nome/nivel)
   var nomes={}; EST.setores.forEach(function(s){nomes[s.nome]=1;});
@@ -247,6 +281,17 @@ function renderDetalhe(){
     +'<div class="sub" style="margin-bottom:8px">Saiu do time? <b>Desativar</b> bloqueia o login na hora e mantém o histórico (recomendado). <b>Excluir</b> remove a pessoa da lista de vez.</div>'
     +(p.ativo?'':'<div class="warn">Esta pessoa está <b>inativa</b> — não consegue entrar até ser reativada.</div>')
     +(isAG?'<div class="orig exc" style="display:inline-block;margin-bottom:4px">Admin Geral · todas as permissões</div>':'');
+  /* O NÍVEL DA PESSOA (spec ACESSO-POR-TELA-E-NIVEL, fase 3): um só, e é o
+     teto do que ela alcança. Mudar é ato separado, só do Admin Geral, e vai
+     para a auditoria (R-NIV-04) — por isso tem o botão dele, e não salva junto
+     com o nome. */
+  var NV=[['operacao','Operação'],['supervisor','Supervisor'],['admin','Admin'],['admin_geral','Admin Geral']];
+  h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0 4px">'
+    +'<b>Nível:</b> <select class="tin" id="pNivel"'+(isAG?' disabled title="quem está no setor Admin Geral é nível Admin Geral"':'')+'>'
+    +NV.map(function(x){ return '<option value="'+x[0]+'"'+(EST.nivel===x[0]?' selected':'')+'>'+x[1]+'</option>'; }).join('')
+    +'</select>'+(isAG?'':'<button class="ghost" onclick="salvarNivel()">Mudar nível</button>')
+    +'<span class="msg" id="nvMsg"></span></div>'
+    +'<div class="sub" style="margin-bottom:8px">O nível é o teto: a pessoa só alcança tela e ação do nível dela ou abaixo, venha do setor ou de exceção.</div>';
   // SETORES
   h+='<h2 style="margin-top:16px">Setores</h2>';
   h+=SETORES.filter(function(s){return s.ativo;}).map(function(s){
@@ -257,37 +302,50 @@ function renderDetalhe(){
   h+='<div style="margin-top:10px"><button class="primary" onclick="salvarSetoresPessoa()">Salvar setores</button><span class="msg" id="msgSet"></span></div>';
   // PERMISSOES
   h+='<h2 style="margin-top:20px">Permissões '+(isAG?'(Admin Geral tem todas)':'')+'</h2>';
-  REG.grupos.forEach(function(g){
-    h+='<div class="grp">'+g.grupo+'</div>';
-    g.permissoes.forEach(function(pm){
-      var temSetor=viaSetor.has(pm.chave);
-      var tem=isAG||perms.has(pm.chave);
-      var origem = isAG?'<span class="orig exc">Admin Geral</span>'
-                 : (tem&&temSetor)?'<span class="orig setor">via setor</span>'
-                 : (tem&&!temSetor)?'<span class="orig exc">exceção</span>'
-                 : (!tem&&temSetor)?'<span class="orig exc">revogada</span>'
-                 : '<span class="orig no">—</span>';
-      /* A CAIXINHA DA INTRANSFERÍVEL NÃO SE MARCA (dívida 17, 17/09/2026).
-         Ela decide quem tem acesso a quê, e por isso só vem por nível, no setor
-         Admin Geral. O rótulo já aparecia aqui; a caixinha, não. Quem
-         desmarcava numa pessoa que a tinha continua podendo — quem NÃO a tem
-         não pode ganhá-la por exceção. A guarda que vale é a do servidor (a
-         tela sozinha não protege quem chama a rota por fora); esta linha existe
-         para a recusa não chegar como surpresa depois do clique. */
-      var trancada = pm.intransferivel && !tem;
-      h+='<label class="chk'+(trancada?' trancada':'')+'"'
-        +(trancada?' title="Intransferível: só o Admin Geral tem, por nível"':'')
-        +'><input type="checkbox" class="permchk" data-c="'+pm.chave+'" data-setor="'+(temSetor?1:0)+'"'
-        +(tem?' checked':'')+((isAG||trancada)?' disabled':'')+'>'
-        +'<span class="lb">'+pm.rotulo+(pm.sensivel?' <span class="sens">SENSÍVEL</span>':'')+(pm.intransferivel?' <span class="intr">intransferível</span>':'')
-        +'<small>'+(pm.desc||'')+'</small></span>'+origem+'</label>';
+  /* AS PERMISSÕES PELO MAPA (fase 7 da ACESSO-POR-TELA-E-NIVEL): módulo →
+     tela (número e nível) → as ações penduradas nela. A caixinha ACIMA DO
+     NÍVEL DA PESSOA aparece cinza, com a frase (R-NIV-03): o servidor recusaria
+     na hora, e a frase diz antes do clique. Tela e ação novas aparecem aqui
+     sozinhas. */
+  var NOMEN={operacao:'Operação',supervisor:'Supervisor',admin:'Admin',admin_geral:'Admin Geral'};
+  var nvPessoa=EST.nivel||'operacao';
+  (REG.mapa||[]).forEach(function(m){
+    var bloco='';
+    m.telas.forEach(function(t){
+      if(!t.acoes.length) return;
+      bloco+='<div class="tela">'+t.n+' · '+t.nome+' <span class="nivelpill">'+NOMEN[t.nivel]+'</span></div>';
+      t.acoes.forEach(function(pm){
+        var temSetor=viaSetor.has(pm.chave);
+        var tem=isAG||perms.has(pm.chave);
+        var acima=!isAG && NIVEIS[pm.nivel]>NIVEIS[nvPessoa];
+        var origem = isAG?'<span class="orig exc">Admin Geral</span>'
+                   : acima&&temSetor?'<span class="orig no">cortada pelo nível</span>'
+                   : (tem&&temSetor)?'<span class="orig setor">via setor</span>'
+                   : (tem&&!temSetor)?'<span class="orig exc">exceção</span>'
+                   : (!tem&&temSetor)?'<span class="orig exc">revogada</span>'
+                   : '<span class="orig no">—</span>';
+        /* A CAIXINHA DA INTRANSFERÍVEL NÃO SE MARCA (dívida 17): só vem por nível,
+           no setor Admin Geral. Quem a tem pode desmarcar. */
+        var trancada = pm.intransferivel && !tem;
+        var trava = trancada || (acima && !tem);
+        bloco+='<label class="chk'+(trancada?' trancada':'')+(acima&&!tem?' acima':'')+'"'
+          +(trancada?' title="Intransferível: só o Admin Geral tem, por nível"':'')
+          +'><input type="checkbox" class="permchk" data-c="'+pm.chave+'" data-setor="'+(temSetor?1:0)+'"'
+          +(tem?' checked':'')+((isAG||trava)?' disabled':'')+'>'
+          +'<span class="lb">'+pm.rotulo+(pm.sensivel?' <span class="sens">SENSÍVEL</span>':'')+(pm.intransferivel?' <span class="intr">intransferível</span>':'')
+          +'<small>'+(pm.desc||'')+(acima?' — <b>exige nível '+NOMEN[pm.nivel]+'</b> (a pessoa é '+NOMEN[nvPessoa]+')':'')+'</small></span>'+origem+'</label>';
+      });
     });
+    if(bloco) h+='<div class="grp">'+m.modulo+' · '+m.nome+'</div>'+bloco;
   });
   $('#detalhe').innerHTML=h;
 }
 async function salvarSetoresPessoa(){
   var ids=[].slice.call(document.querySelectorAll('.setchk:checked')).map(function(x){return +x.value;});
   var r=await jpost('/api/acesso/usuario/'+SEL+'/setores',{setores:ids});
+  /* A trava do nível (fase 4) recusa na hora e diz por quê; nada é salvo, e a
+     ficha volta ao que estava gravado. */
+  if(r.erro){ alert(r.erro); await selPessoa(SEL); return; }
   $('#msgSet').textContent='setores salvos'; setTimeout(function(){$('#msgSet').textContent='';},2000);
   EST.permissoes=r.permissoes; await carregarSetores(); await selPessoa(SEL);
 }
@@ -301,6 +359,7 @@ document.addEventListener('change',async function(e){
   else if(!marcado && temSetor) body={chave:chave,concede:0};       // revoga o herdado
   else body={chave:chave,limpar:true};                             // nada a fazer
   var r=await jpost('/api/acesso/usuario/'+SEL+'/excecao',body);
+  if(r.erro){ alert(r.erro); renderDetalhe(); return; }
   EST.permissoes=r.permissoes; renderDetalhe();
 });
 
@@ -326,23 +385,31 @@ function renderSetorPerms(){
   if(!REG) return;
   var nivel=$('#sNivel').value, marc=(SETOR_EDIT?SETOR_EDIT.permissoes:[]);
   var h='';
-  REG.grupos.forEach(function(g){
-    h+='<div class="grp">'+g.grupo+'</div>';
-    /* ⚠️ O NIVEL E ETIQUETA, NAO TRAVA ESCONDIDA (fase 3 da ACESSOS-UNIFICADOS).
-       Ate 26/10/2026 a caixinha acima do nivel saia `disabled` e nunca voltava
-       no salvamento — e o servidor apagava a chave em silencio (divida 20).
-       Hoje ela aparece COMO ESTA, marcada se o setor a tem, com o aviso ao
-       lado; so as intransferiveis ficam travadas, porque so moram no Admin
-       Geral. */
-    g.permissoes.forEach(function(pm){
-      var acima=NIVEIS[pm.nivel]>NIVEIS[nivel];
-      var trava=!!pm.intransferivel;
-      var on=marc.indexOf(pm.chave)>=0 && !trava;
-      h+='<label class="chk" style="'+(trava?'opacity:.4':'')+'"><input type="checkbox" class="spermchk" data-c="'+pm.chave+'"'
-        +(on?' checked':'')+(trava?' disabled':'')+'>'
-        +'<span class="lb">'+pm.rotulo+(pm.sensivel?' <span class="sens">SENSÍVEL</span>':'')
-        +'<small>'+pm.nivel+(trava?' — só o setor Admin Geral':(acima?' — <b style="color:#d29922">acima do nível do setor</b>':''))+'</small></span></label>';
+  /* PELO MAPA, E O NÍVEL DO SETOR TRAVA (fase 4/7 da ACESSO-POR-TELA-E-NIVEL,
+     R-ALC-04): a caixinha nova acima do nível aparece cinza, com a frase
+     ("exige nível Admin"). A que o setor JÁ TEM acima do nível continua
+     marcada e mexível, com o aviso — ela nunca se apaga sozinha; sai quando
+     alguém a desmarca. As intransferíveis só moram no Admin Geral. */
+  var NOMEN={operacao:'Operação',supervisor:'Supervisor',admin:'Admin',admin_geral:'Admin Geral'};
+  (REG.mapa||[]).forEach(function(m){
+    var bloco='';
+    m.telas.forEach(function(t){
+      if(!t.acoes.length) return;
+      bloco+='<div class="tela">'+t.n+' · '+t.nome+' <span class="nivelpill">'+NOMEN[t.nivel]+'</span></div>';
+      t.acoes.forEach(function(pm){
+        var acima=NIVEIS[pm.nivel]>NIVEIS[nivel];
+        var trava=!!pm.intransferivel;
+        var jaTem=marc.indexOf(pm.chave)>=0 && !trava;
+        var cinza=trava||(acima&&!jaTem);
+        bloco+='<label class="chk'+(cinza?' acima':'')+'"><input type="checkbox" class="spermchk" data-c="'+pm.chave+'"'
+          +(jaTem?' checked':'')+(cinza?' disabled':'')+'>'
+          +'<span class="lb">'+pm.rotulo+(pm.sensivel?' <span class="sens">SENSÍVEL</span>':'')
+          +'<small>'+NOMEN[pm.nivel]+(trava?' — só o setor Admin Geral'
+            :(acima&&jaTem?' — <b style="color:#d29922">acima do nível do setor: fica até alguém desmarcar</b>'
+            :(acima?' — <b>exige nível '+NOMEN[pm.nivel]+'</b> (o setor é '+NOMEN[nivel]+')':'')))+'</small></span></label>';
+      });
     });
+    if(bloco) h+='<div class="grp">'+m.modulo+' · '+m.nome+'</div>'+bloco;
   });
   $('#setorPerms').innerHTML=h;
 }
@@ -364,7 +431,7 @@ async function salvarSetor(){
     r=await jpost('/api/acesso/setores',body);
   }
   if(r.erro){ $('#setorMsg').style.color='#f85149'; $('#setorMsg').textContent=r.erro; return; }
-  $('#setorMsg').style.color='#2ea043'; $('#setorMsg').textContent='salvo';
+  $('#setorMsg').style.color='#2ea043'; $('#setorMsg').textContent='salvo'; carregarGrade();
   setTimeout(function(){$('#setorMsg').textContent='';},2000);
   novoSetor(); await carregarSetores();
 }

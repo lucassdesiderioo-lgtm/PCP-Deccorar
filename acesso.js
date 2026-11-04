@@ -39,6 +39,13 @@ const AREA_CHAVE = {
   necessidade:  'necessidade.ver'
 };
 
+/* O nivel de cada chave, no escopo do modulo: o `permissoesDe` corta pelo
+   nivel da pessoa (fase 4 da ACESSO-POR-TELA-E-NIVEL) e e chamado no boot,
+   antes de o `infoPerm` de dentro da funcao existir. */
+const ORDEM_NIVEL = { operacao:1, supervisor:2, admin:3, admin_geral:4 };
+const NIVEL_DA_CHAVE = {}; PERMISSOES.forEach(p => NIVEL_DA_CHAVE[p.chave] = p.nivel || 'admin');
+const NOME_NIVEL = { operacao:'Operação', supervisor:'Supervisor', admin:'Admin', admin_geral:'Admin Geral' };
+
 // Setores nativos (secao 5). Admin Geral tem TODAS por definicao (o resolvedor
 // forca isso), entao a lista dele aqui e so o seed inicial.
 function setoresNativos(){
@@ -180,6 +187,15 @@ module.exports = function(app, db){
       aprovado INTEGER DEFAULT 0, aprovado_por TEXT, aprovado_em TEXT
     );
   `);
+
+  /* usuarios.nivel (fase 3 da ACESSO-POR-TELA-E-NIVEL). O dono da tabela e o
+     auth.js (CREATE e ALTER la); o ALTER guardado repete aqui porque este
+     modulo sobe sozinho nos testes e nos scripts, e a migracao do nivel mora
+     aqui — sem a coluna ela estouraria calada no try (a familia do §17). */
+  try{
+    const cu = db.prepare("SELECT name FROM pragma_table_info('usuarios')").all().map(c => c.name);
+    if(cu.length && cu.indexOf('nivel') < 0) db.exec("ALTER TABLE usuarios ADD COLUMN nivel TEXT");
+  }catch(e){ console.log('[acesso] coluna usuarios.nivel falhou: '+e.message); }
 
   // Auditoria (Fase 4): registra o que MUDA coisas. Nunca lanca (log nao pode
   // derrubar a acao). IP e nome ficam junto do id (sobrevive a desativacao).
@@ -379,7 +395,8 @@ module.exports = function(app, db){
   }catch(e){ console.log('[acesso] seed das devolucoes em andamento falhou: '+e.message); }
 
   // ── resolvedor do modelo NOVO: permissoes efetivas de um usuario (secao 2) ──
-  function permissoesDe(uid){
+  /* AS PERMISSOES QUE A PESSOA TEM, ANTES DO TETO: setores + excecoes. */
+  function permissoesBrutas(uid){
     const setores = db.prepare(`SELECT s.nivel FROM usuario_setor us
       JOIN setores s ON s.id=us.setor_id WHERE us.usuario_id=? AND s.ativo=1`).all(uid);
     // Admin Geral => TODAS, sempre (secao 14, regra 1)
@@ -394,6 +411,50 @@ module.exports = function(app, db){
     exc.forEach(e => { if(e.concede) efetivas.add(e.chave); });
     exc.forEach(e => { if(!e.concede) efetivas.delete(e.chave); });
     return efetivas;
+  }
+  /* O NIVEL GRAVADO DA PESSOA, ou null. Vazio quer dizer "sem nivel gravado"
+     (a linha nasceu por SQL direto) e nao corta nada; a pessoa criada pela
+     tela nasce `operacao`, e a migracao da fase 3 gravou todo mundo. */
+  function nivelDaPessoa(uid){
+    try{ const r = db.prepare('SELECT nivel FROM usuarios WHERE id=?').get(uid); return (r && ORDEM_NIVEL[r.nivel]) ? r.nivel : null; }
+    catch(e){ return null; }
+  }
+  /* ══ O NIVEL E O TETO (fase 4 da ACESSO-POR-TELA-E-NIVEL, R-NIV-02) ══
+     A permissao efetiva e so a do nivel da pessoa ou abaixo — venha do setor
+     ou da excecao. O que passa do teto NAO E APAGADO de lugar nenhum: so nao
+     vale, e aparece no relatorio (`cortadasPeloNivel`, nivel_relatorio.js).
+     A trava antiga apagava permissao em silencio ao salvar setor (divida 20);
+     esta nunca apaga. O Admin Geral (pelo setor) nao tem teto. */
+  function permissoesDe(uid){
+    const brutas = permissoesBrutas(uid);
+    if(ehAdminGeral(uid)) return brutas;
+    const nv = nivelDaPessoa(uid);
+    if(!nv) return brutas;
+    const teto = ORDEM_NIVEL[nv];
+    for(const c of Array.from(brutas)) if(ORDEM_NIVEL[NIVEL_DA_CHAVE[c] || 'admin'] > teto) brutas.delete(c);
+    return brutas;
+  }
+  function cortadasPeloNivel(uid){
+    const efet = permissoesDe(uid);
+    return Array.from(permissoesBrutas(uid)).filter(c => !efet.has(c)).sort();
+  }
+  /* Os setores que carregam chave acima do nivel deles. Nada e apagado
+     (R-ALC-04): e a lista para o dono decidir. */
+  function setoresAcimaDoNivel(){
+    return db.prepare("SELECT id,nome,nivel FROM setores WHERE ativo=1 AND nivel!='admin_geral' ORDER BY nome").all().map(s => ({
+      nome:s.nome, nivel:s.nivel,
+      acima: db.prepare('SELECT chave FROM setor_permissao WHERE setor_id=? ORDER BY chave').all(s.id).map(r => r.chave)
+        .filter(c => NIVEL_DA_CHAVE[c] && ORDEM_NIVEL[NIVEL_DA_CHAVE[c]] > ORDEM_NIVEL[s.nivel])
+    })).filter(s => s.acima.length);
+  }
+  /* "ESTA PESSOA E DE NIVEL ADMIN?" — a porta '@admin' e a area 'admin'. Ate a
+     fase 4 era "tem alguma permissao de nivel admin"; agora e o nivel da
+     pessoa. Sem nivel gravado, a regra antiga. */
+  function ehNivelAdmin(uid, perms){
+    if(ehAdminGeral(uid)) return true;
+    const nv = nivelDaPessoa(uid);
+    if(nv) return ORDEM_NIVEL[nv] >= ORDEM_NIVEL.admin;
+    return temAdmin(perms || permissoesDe(uid));
   }
 
   // ── 4. MIGRACAO dos usuarios atuais (secao 12), transacional e a prova de falha ──
@@ -501,7 +562,7 @@ module.exports = function(app, db){
   function soAdmin(req, res){
     const u = req.usuario;
     let ok = false;
-    try{ ok = !!u && (ehAdminGeral(u.id) || temAdmin(permissoesDe(u.id))); }catch(e){}
+    try{ ok = !!u && (ehAdminGeral(u.id) || ehNivelAdmin(u.id)); }catch(e){}
     if(!ok && u && (u.areas||[]).includes('admin')) ok = true;   // fallback do modelo antigo
     if(!ok){ res.status(403).json({erro:'sem_permissao'}); return false; }
     return true;
@@ -519,7 +580,8 @@ module.exports = function(app, db){
     const uid = +req.params.id;
     const setores = db.prepare(`SELECT s.nome, s.nivel FROM usuario_setor us
       JOIN setores s ON s.id=us.setor_id WHERE us.usuario_id=? ORDER BY s.nome`).all(uid);
-    res.json({ usuario_id:uid, setores, permissoes:[...permissoesDe(uid)].sort() });
+    const nv = db.prepare('SELECT nivel FROM usuarios WHERE id=?').get(uid);
+    res.json({ usuario_id:uid, setores, permissoes:[...permissoesDe(uid)].sort(), nivel:(nv && nv.nivel) || 'operacao' });
   });
 
   // ══════════════ FASE 2 — tela de cadastro (le o registro) ══════════════
@@ -535,7 +597,43 @@ module.exports = function(app, db){
       g.permissoes.push({ chave:p.chave, rotulo:p.rotulo, desc:p.desc, nivel:p.nivel,
         sensivel:!!p.sensivel, intransferivel:!!p.intransferivel });
     });
-    res.json({ grupos, niveis:NIVEIS });
+    res.json({ grupos, niveis:NIVEIS, mapa:mapaDeAcessos() });
+  });
+
+  /* ══ A TELA DE ACESSOS PELO MAPA (fase 7 da ACESSO-POR-TELA-E-NIVEL) ══
+     Os módulos, as telas de cada um (número, nível) e as AÇÕES penduradas na
+     tela onde são usadas (o campo `tela` de cada permissão, R-ALC-03). Tela e
+     ação novas aparecem aqui sozinhas, sem setor nenhum marcado (R-TEL-03). */
+  function todasAsTelas(){
+    const MP = require('./telas');
+    return MP.TELAS.map(t => Object.assign({ modulo:MP.moduloDe(t.n) }, t))
+      .concat(MP.telasSobMedida().map(t => Object.assign({ modulo:600 }, t)));
+  }
+  function mapaDeAcessos(){
+    const MP = require('./telas');
+    const telas = todasAsTelas(), mods = {};
+    telas.forEach(t => {
+      const m = mods[t.modulo] = mods[t.modulo] || { modulo:t.modulo, nome:MP.MODULOS[t.modulo] || String(t.modulo), telas:[] };
+      m.telas.push({ n:t.n, nome:t.nome, rota:t.rota, nivel:t.nivel, onde:t.onde || '', abrem:t.perms.slice(),
+        acoes: PERMISSOES.filter(p => +p.tela === t.n).map(p => ({ chave:p.chave, rotulo:p.rotulo, desc:p.desc || '', nivel:p.nivel,
+          sensivel:!!p.sensivel, intransferivel:!!p.intransferivel })) });
+    });
+    return Object.keys(mods).map(Number).sort((a, b) => a - b).map(k => { mods[k].telas.sort((a, b) => a.n - b.n); return mods[k]; });
+  }
+  /* A GRADE TELAS × SETORES: bate o olho e vê o que cada setor recebe. O setor
+     "recebe" a tela quando carrega uma das permissões que a abrem e o nível
+     dele cabe a tela ('@admin' = setor de nível Admin). */
+  app.get('/api/acesso/grade', (req, res) => {
+    if(!soAdmin(req, res)) return;
+    const setores = db.prepare("SELECT id,nome,nivel FROM setores WHERE ativo=1 ORDER BY nivel DESC, nome").all()
+      .map(st => Object.assign(st, { perms:new Set(db.prepare('SELECT chave FROM setor_permissao WHERE setor_id=?').all(st.id).map(r => r.chave)) }));
+    const recebe = (st, t) => {
+      if(st.nivel === 'admin_geral') return true;
+      if(NIVEIS[st.nivel] < NIVEIS[t.nivel]) return false;
+      return t.perms.some(c => c === '@admin' ? NIVEIS[st.nivel] >= NIVEIS.admin : st.perms.has(c));
+    };
+    res.json({ setores: setores.map(st => ({ id:st.id, nome:st.nome, nivel:st.nivel })),
+      telas: todasAsTelas().map(t => ({ n:t.n, nome:t.nome, nivel:t.nivel, modulo:t.modulo, setores: setores.map(st => recebe(st, t)) })) });
   });
 
   app.get('/api/acesso/setores', (req, res) => {
@@ -574,6 +672,17 @@ module.exports = function(app, db){
     const anteriores = b.id ? db.prepare('SELECT chave FROM setor_permissao WHERE setor_id=?').all(b.id).map(r => r.chave) : [];
     const acima = perms.filter(c => NIVEIS[infoPerm[c].nivel] > NIVEIS[nivel]);
     if(!telaNova && acima.length) return res.status(400).json({ erro:'permissões acima do nível do setor: '+acima.join(', ') });
+    /* ⚠️ O SETOR SO ACEITA O QUE CABE NO NIVEL DELE (fase 4 da
+       ACESSO-POR-TELA-E-NIVEL, R-ALC-04) — e muda a R-ACE-03 (o nivel do setor
+       era so etiqueta). A chave NOVA acima do nivel e recusada na hora, dizendo
+       por que; a que JA ESTAVA no setor fica (nunca se apaga em silencio, que
+       era a divida 20) e entra na lista do dono (setoresAcimaDoNivel). */
+    const novasAcima = acima.filter(c => anteriores.indexOf(c) < 0);
+    if(telaNova && novasAcima.length){
+      const pior = novasAcima.reduce((a, c) => NIVEIS[infoPerm[c].nivel] > NIVEIS[infoPerm[a].nivel] ? c : a, novasAcima[0]);
+      return res.status(400).json({ erro:'"'+novasAcima.map(c => infoPerm[c].rotulo || c).join('", "')+'" exige nível '+NOME_NIVEL[infoPerm[pior].nivel]
+        + ' — o setor é nível '+NOME_NIVEL[nivel]+'. Nada foi salvo.', motivo:'nivel', acima:novasAcima });
+    }
     if(!telaNova) anteriores.forEach(c => { if(infoPerm[c] && NIVEIS[infoPerm[c].nivel] > NIVEIS[nivel] && perms.indexOf(c) < 0) perms.push(c); });
     /* ⚠️ AS INTRANSFERIVEIS SO MORAM NO ADMIN GERAL. Com o nivel virando
        etiqueta, era o nivel `admin_geral` que as segurava longe de setor
@@ -658,6 +767,25 @@ module.exports = function(app, db){
       if(!temAG) return res.status(400).json({ erro:'Esta é a única pessoa com acesso total (Admin Geral). '+
         'Dê o setor Admin Geral a outra pessoa antes de tirar o dela — senão ninguém mais administra o sistema.' });
     }
+    /* ⚠️ POR NUM SETOR ALGO ACIMA DO NIVEL DA PESSOA E RECUSADO (fase 4): o
+       setor de nivel maior que o dela, ou que carrega chave acima do nivel
+       dela. So o setor que ENTRA agora: o que ela ja tinha nao trava a edicao. */
+    const nvP = nivelDaPessoa(uid);
+    if(nvP && !ehAdminGeral(uid) && ids.length){
+      const ja = new Set(db.prepare('SELECT setor_id FROM usuario_setor WHERE usuario_id=?').all(uid).map(r => r.setor_id));
+      for(const sid of ids){
+        if(ja.has(sid)) continue;
+        const st = db.prepare('SELECT id,nome,nivel FROM setores WHERE id=?').get(sid);
+        if(!st) continue;
+        let exige = NIVEIS[st.nivel] > NIVEIS[nvP] ? st.nivel : null;
+        db.prepare('SELECT chave FROM setor_permissao WHERE setor_id=?').all(sid).forEach(r => {
+          const nc = (infoPerm[r.chave] || {}).nivel;
+          if(nc && NIVEIS[nc] > NIVEIS[nvP] && (!exige || NIVEIS[nc] > NIVEIS[exige])) exige = nc;
+        });
+        if(exige) return res.status(400).json({ erro:'O setor "'+st.nome+'" exige nível '+NOME_NIVEL[exige]+' — a pessoa é nível '+NOME_NIVEL[nvP]+'. '
+          + 'Para pôr a pessoa nele, o Admin Geral sobe o nível dela antes.', motivo:'nivel', exige, nivel_pessoa:nvP });
+      }
+    }
     db.transaction(() => {
       db.prepare("DELETE FROM usuario_setor WHERE usuario_id=?").run(uid);
       const ins = db.prepare("INSERT OR IGNORE INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)");
@@ -690,6 +818,15 @@ module.exports = function(app, db){
       return res.status(400).json({ erro:'"'+infoPerm[chave].rotulo+'" é intransferível: '+
         'ela decide quem tem acesso a quê, então só o Admin Geral a tem, por nível. '+
         'Para dar esse poder a alguém, ponha a pessoa no setor Admin Geral.' });
+    /* ⚠️ CONCEDER ACIMA DO NIVEL DA PESSOA E RECUSADO NA HORA, DIZENDO POR QUE
+       (fase 4 da ACESSO-POR-TELA-E-NIVEL, R-NIV-02 e 03): "Operação nunca
+       alcança o Admin, nem por exceção". Revogar e limpar continuam livres. */
+    if(!b.limpar && b.concede){
+      const nvP = nivelDaPessoa(uid);
+      if(nvP && !ehAdminGeral(uid) && NIVEIS[infoPerm[chave].nivel] > NIVEIS[nvP])
+        return res.status(400).json({ erro:'"'+(infoPerm[chave].rotulo||chave)+'" exige nível '+NOME_NIVEL[infoPerm[chave].nivel]+' — a pessoa é nível '+NOME_NIVEL[nvP]+'. '
+          + 'Para dar, o Admin Geral sobe o nível dela antes.', motivo:'nivel', exige:infoPerm[chave].nivel, nivel_pessoa:nvP });
+    }
     if(b.limpar){
       db.prepare("DELETE FROM usuario_excecao WHERE usuario_id=? AND chave=?").run(uid, chave);
     } else {
@@ -719,6 +856,11 @@ module.exports = function(app, db){
   // permissao; leituras gerais de operacao ficam '@logado' (qualquer logado),
   // como hoje. '@admin' = tem alguma permissao de nivel admin+; '@ag' = Admin
   // Geral. Rota nao listada cai no default '@logado' e aparece na cobertura.
+  /* O mapa de telas (fase 2 da ACESSO-POR-TELA-E-NIVEL): as linhas de TELA do
+     permDaRota leem daqui. As de API nao mudam. */
+  const MAPA = require('./telas');
+  const TELA_DA_ROTA = {};
+  MAPA.TELAS.forEach(t => { TELA_DA_ROTA[t.rota] = t; });
   function permDaRota(pathRaw, method){
     const p = (pathRaw || '').replace(/\/+$/,'') || '/';
     const M = (method || 'GET').toUpperCase();
@@ -726,23 +868,18 @@ module.exports = function(app, db){
     const pre = (x) => p === x || p.indexOf(x + '/') === 0;
     // ── telas ──
     if(eq('/') || eq('/admin') || eq('/index.html')) return '@admin';
-    if(eq('/acessos')) return 'pessoas.gerenciar';
-    if(eq('/operador')) return 'revisao.executar';
-    if(eq('/montagem')) return 'embalagem.executar';
-    if(eq('/embalagem')) return 'etiqueta.emitir';
-    if(eq('/carregamento')) return 'carregamento.executar';
-    if(eq('/expedicao')) return 'pdf.subir';
-    if(eq('/devolucao')) return 'devolucao.registrar';
-    /* As devolucoes EM ANDAMENTO (escritorio): quem acompanha, quem lanca, e
-       quem tem o dinheiro (o Financeiro, que da a baixa do reembolso). */
-    if(eq('/devolucao-casos')) return ['devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro'];
-    // A porta unica do rodape (so redireciona, pela permissao, no dev_route).
-    if(eq('/devolucoes')) return '@logado';
-    if(eq('/painel')) return 'painel.ver';
-    if(eq('/relatorios')) return 'relatorios.ver';
-    if(eq('/planejamento')) return 'planilha.importar';
-    // A conferencia de estoque no tablet: quem conta OU quem reconta.
-    if(eq('/inventario')) return ['contagem.contar','contagem.desempatar'];
+    /* AS TELAS SAEM DO MAPA (spec ACESSO-POR-TELA-E-NIVEL, fase 2): uma linha
+       por tela em `telas.js`, com as permissoes que a abrem. Tela nova entra
+       la, e nao aqui — e tela fora do mapa continua nascendo negada (#29).
+       Desde a fase 5 as telas do Admin (`/admin/...`) tambem saem daqui. */
+    const tela = TELA_DA_ROTA[p];
+    if(tela) return tela.perms.length === 1 ? tela.perms[0] : tela.perms.slice();
+    /* A ENTRADA DO BLOCO 250 NO MENU (fase 6 da ACESSO-POR-TELA-E-NIVEL): a
+       porta so redireciona (dev_route), e deixa de ser @logado — abre para
+       quem alcanca alguma das tres telas das devolucoes. */
+    if(eq('/devolucoes')) return ['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro','devolucao.baixar'];
+    // As telas que a pessoa abre (fase 5): cada um ve as proprias, so nome e endereco.
+    if(eq('/api/telas/minhas')) return '@logado';
     if(eq('/baixar-backup')) return '@ag';
     // ── acoes/admin por API ──
     if(pre('/api/teste')) return 'teste.operar';
@@ -1127,12 +1264,66 @@ module.exports = function(app, db){
     ['sobmedida.montagem','sobmedida'], ['sobmedida.revisao','sobmedida'],
     ['sobmedida.embalagem','sobmedida']
   ];
+  /* ══ O NÍVEL DA PESSOA (spec ACESSO-POR-TELA-E-NIVEL, fase 3, 04/11/2026) ══
+     O nível passa a ser da PESSOA, e é um só: Operação, Supervisor, Admin ou
+     Admin Geral (R-NIV-02). Na fase 3 ele só existe e aparece; quem o faz
+     valer como teto é a fase 4.
+
+     ⚠️ A MIGRAÇÃO DÁ A CADA UM O MAIOR NÍVEL QUE ELE JÁ ALCANÇA HOJE (R-NIV-05,
+     decisão do dono: "depois que estiver pronto vou editar o nível de cada
+     um"), e roda UMA VEZ só (`config.nivel_pessoa_1`). "Alcança" é o nível da
+     permissão mais alta que a pessoa TEM de fato, por setor ou exceção — e
+     não o nível do setor: quem está num setor marcado Admin com só chaves de
+     Operação ganharia o Admin na fase 4, que é exatamente o que a trava
+     existe para impedir. Quem está no setor Admin Geral é Admin Geral.
+     Rodar de novo apagaria o ajuste que o dono fez pessoa a pessoa. */
+  function nivelAlcancado(uid){
+    if(ehAdminGeral(uid)) return 'admin_geral';
+    let melhor = 'operacao';
+    for(const c of permissoesBrutas(uid)){
+      const i = infoPerm[c];
+      if(i && NIVEIS[i.nivel] > NIVEIS[melhor]) melhor = i.nivel;
+    }
+    return melhor;
+  }
+  function migrarNiveis(){
+    if(db.prepare("SELECT 1 FROM config WHERE chave='nivel_pessoa_1'").get()) return 0;
+    const pessoas = db.prepare('SELECT id FROM usuarios').all();
+    const up = db.prepare('UPDATE usuarios SET nivel=? WHERE id=?');
+    db.transaction(() => {
+      pessoas.forEach(u => up.run(nivelAlcancado(u.id), u.id));
+      db.prepare("INSERT OR REPLACE INTO config (chave,valor) VALUES ('nivel_pessoa_1', datetime('now','localtime'))").run();
+    })();
+    return pessoas.length;
+  }
+  try{ const q = migrarNiveis(); if(q) console.log('[acesso] nível da pessoa: '+q+' pessoa(s) receberam o maior nível que já alcançam (uma vez só)'); }
+  catch(e){ console.log('[acesso] migração do nível da pessoa falhou: '+e.message); }
+
+  app.post('/api/acesso/usuario/:id/nivel', (req, res) => {
+    if(!soAdmin(req, res)) return;
+    /* SÓ O ADMIN GERAL MUDA O NÍVEL (R-NIV-04): subir de nível é promoção, não
+       caixinha. A rota já é de `pessoas.gerenciar` (intransferível); a guarda
+       aqui é defesa em profundidade. */
+    if(!req.usuario || !ehAdminGeral(req.usuario.id)) return res.status(403).json({ erro:'Só o Admin Geral muda o nível de uma pessoa.' });
+    const uid = +req.params.id;
+    const u = db.prepare('SELECT id,nome,nivel FROM usuarios WHERE id=?').get(uid);
+    if(!u) return res.status(404).json({ erro:'pessoa não encontrada' });
+    const nivel = String((req.body || {}).nivel || '');
+    if(!NIVEIS[nivel]) return res.status(400).json({ erro:'Nível inválido: escolha Operação, Supervisor, Admin ou Admin Geral.' });
+    if(ehAdminGeral(uid) && nivel !== 'admin_geral')
+      return res.status(400).json({ erro:'Esta pessoa está no setor Admin Geral, e quem está lá é nível Admin Geral. Tire-a do setor antes de baixar o nível.' });
+    db.prepare('UPDATE usuarios SET nivel=? WHERE id=?').run(nivel, uid);
+    sincronizarAreas(uid);
+    auditar(req, 'sistema', 'usuario_nivel', String(uid), (u.nivel || '—') + ' → ' + nivel + ' (' + u.nome + ')');
+    res.json({ ok:true, nivel });
+  });
+
   function sincronizarAreas(uid){
     try{
       const ag = ehAdminGeral(uid);
       const perms = permissoesDe(uid);
       const areas = [];
-      if(ag || temAdmin(perms)) areas.push('admin');   // landing /admin + fallback
+      if(ag || ehNivelAdmin(uid, perms)) areas.push('admin');   // landing /admin + fallback (o NIVEL, desde a fase 4)
       PERM_AREA.forEach(([chave,area]) => { if((ag || perms.has(chave)) && areas.indexOf(area) < 0) areas.push(area); });
       db.prepare("UPDATE usuarios SET areas=? WHERE id=?").run(areas.join(','), uid);
     }catch(e){}
@@ -1316,9 +1507,17 @@ module.exports = function(app, db){
        no permDaRota). */
     const exigidas = Array.isArray(req) ? req : [req];
     const passa = (c) => c === '@logado' ? true
-                       : c === '@admin'  ? temAdmin(perms)
+                       : c === '@admin'  ? ehNivelAdmin(u.id, perms)
                        : c === '@ag'     ? false
                        : perms.has(c);
+    /* A TELA TEM NIVEL (fase 4/5 da ACESSO-POR-TELA-E-NIVEL, R-NIV-01): alem
+       da permissao, a pessoa tem que ser do nivel da tela ou acima. Sem isso
+       um Supervisor com `compras.ver` (nivel Supervisor) abriria a 501, que e
+       de nivel Admin. Sem nivel gravado, so a permissao, como antes. */
+    const telaR = TELA_DA_ROTA[(pathRaw || '').replace(/\/+$/,'').replace(/\.html$/,'') || '/'];
+    const nvP = telaR ? nivelDaPessoa(u.id) : null;
+    if(telaR && nvP && ORDEM_NIVEL[nvP] < ORDEM_NIVEL[telaR.nivel])
+      return { ok:false, chave:exigidas[0], motivo:'nivel' };
     const atendida = exigidas.find(passa);
     return { ok: !!atendida, chave: atendida || exigidas[0],
              motivo: exigidas.length > 1 ? 'permissao_lista'
@@ -1433,5 +1632,5 @@ module.exports = function(app, db){
    que remonta a coluna pela propria leitura concorda com o defeito — e a
    licao do QR (§4 do CLAUDE.md): ele pergunta a si mesmo. Nenhuma rota usa
    este campo; ele e leitura para teste e diagnostico. */
-  app.locals.acesso = { permissoesDe, compararDivergencias, AREA_CHAVE, decidir, modoAcesso, permDaRota, auditar, podePermissao, ehAdminGeral, ehUltimoAdminGeral, coberturaDeRotas, sincronizarAreas };
+  app.locals.acesso = { permissoesDe, compararDivergencias, AREA_CHAVE, decidir, modoAcesso, permDaRota, auditar, podePermissao, ehAdminGeral, ehUltimoAdminGeral, coberturaDeRotas, sincronizarAreas, migrarNiveis, nivelAlcancado, cortadasPeloNivel, setoresAcimaDoNivel, nivelDaPessoa, permissoesBrutas };
 };
