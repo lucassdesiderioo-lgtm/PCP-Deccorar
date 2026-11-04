@@ -3,7 +3,11 @@ const path = require('path');
 const db = require('./db');
 const ESTOQUE = require('./estoque_dominio');
 const app = express();
-const PORT = 3010;
+/* A PORTA E 3010, E CONTINUA SENDO. `PCP_PORTA` existe para o teste que sobe o
+   servidor de verdade (teste_regras_estoque.js) numa porta livre: rodado no
+   servidor, um teste na 3010 falharia ao abrir a porta e conversaria com a
+   PRODUCAO. Ninguem configura isto no servidor (§13). */
+const PORT = +process.env.PCP_PORTA || 3010;
 app.use(express.json({limit:'25mb'}));
 require('./auth')(app, db);
 app.use(express.static(path.join(__dirname, 'public')));

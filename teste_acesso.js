@@ -587,23 +587,41 @@ console.log('\n── 6-F. a conferência em três papéis (fase 2 da ESTOQUE-LI
   ok('aprovar é sensível: mexe no saldo, e a decisão precisa ter nome',
      (PERMISSOES.find(p => p.chave === 'contagem.aprovar') || {}).sensivel === true);
 
-  eq('a tela /inventario: quem conta OU quem reconta',
-     JSON.stringify(AC.permDaRota('/inventario','GET')), JSON.stringify(['contagem.contar','contagem.recontar']));
+  /* A VERSAO 2 (04/11/2026): as tres rodadas pelas mesmas rotas, com contar OU
+     desempatar; resolver e relatorio sao chaves proprias; a tarja e de quem
+     estiver logado. As rotas antigas (minha-lista, recontagem, contar,
+     recontar, terminar-sku) sairam: rota sem declaracao nasce negada. */
+  eq('a tela /inventario: quem conta OU quem desempata',
+     JSON.stringify(AC.permDaRota('/inventario','GET')), JSON.stringify(['contagem.contar','contagem.desempatar']));
   eq('a gêmea .html herda a tela',
-     JSON.stringify(AC.permDaRota('/inventario.html','GET')), JSON.stringify(['contagem.contar','contagem.recontar']));
+     JSON.stringify(AC.permDaRota('/inventario.html','GET')), JSON.stringify(['contagem.contar','contagem.desempatar']));
   for(const [r,m,c] of [['/api/inventario/sugestao','GET','contagem.planejar'], ['/api/inventario/abrir','POST','contagem.planejar'],
-                        ['/api/inventario/encerrar','POST','contagem.planejar'],
-                        ['/api/inventario/minha-lista','GET','contagem.contar'], ['/api/inventario/contar','POST','contagem.contar'],
-                        ['/api/inventario/recontagem','GET','contagem.recontar'], ['/api/inventario/recontar','POST','contagem.recontar'],
-                        ['/api/inventario/aprovacao','GET','contagem.aprovar'], ['/api/inventario/aprovar','POST','contagem.aprovar'],
-                        ['/api/inventario/rejeitar','POST','contagem.aprovar']])
+                        ['/api/inventario/encerrar','POST','contagem.planejar'], ['/api/inventario/geral/abrir','POST','contagem.planejar'],
+                        ['/api/inventario/quinzenal/abrir','POST','contagem.planejar'], ['/api/inventario/rodizio','POST','contagem.planejar'],
+                        ['/api/inventario/rodizio','GET','contagem.planejar'],
+                        ['/api/inventario/geral/terminar-prateleira','POST','contagem.contar'],
+                        ['/api/inventario/aprovacao','GET','contagem.resolver'], ['/api/inventario/aprovar','POST','contagem.resolver'],
+                        ['/api/inventario/rejeitar','POST','contagem.resolver'], ['/api/inventario/resolver','POST','contagem.resolver'],
+                        ['/api/inventario/relatorio','GET','contagem.relatorio'], ['/api/inventario/tarja','GET','@logado'],
+                        ['/api/inventario/minha-lista','GET','@negado'], ['/api/inventario/recontar','POST','@negado']])
     eq(m + ' ' + r + ' pede ' + c, AC.permDaRota(r, m), c);
-  eq('terminar serve as duas rodadas',
-     JSON.stringify(AC.permDaRota('/api/inventario/terminar-sku','POST')), JSON.stringify(['contagem.contar','contagem.recontar']));
+  for(const r of ['/api/inventario/hoje','/api/inventario/bipe','/api/inventario/terminar'])
+    eq(r + ' serve as três rodadas', JSON.stringify(AC.permDaRota(r, r === '/api/inventario/hoje' ? 'GET' : 'POST')),
+       JSON.stringify(['contagem.contar','contagem.desempatar']));
+  eq('o andamento é de quem planeja, resolve ou lê o relatório',
+     JSON.stringify(AC.permDaRota('/api/inventario/andamento','GET')), JSON.stringify(['contagem.planejar','contagem.resolver','contagem.relatorio']));
+  for(const [c, nv, sens] of [['contagem.desempatar','operacao',false], ['contagem.resolver','admin',true], ['contagem.relatorio','admin',false]]){
+    const ch = PERMISSOES.find(p => p.chave === c) || {};
+    eq(c + ' existe com nível ' + nv, ch.nivel, nv);
+    eq(c + (sens ? ' é sensível' : ' não é sensível'), !!ch.sensivel, sens);
+  }
 
   const perm = nome => db.prepare(`SELECT sp.chave FROM setor_permissao sp JOIN setores s ON s.id=sp.setor_id
     WHERE s.nome=?`).all(nome).map(r => r.chave);
   ok('o setor Operador / Controle de Estoque nasce recontando', perm('Operador / Controle de Estoque').includes('contagem.recontar'));
+  ok('   e desempatando (v2)', perm('Operador / Controle de Estoque').includes('contagem.desempatar'));
+  ok('   e não resolve nem lê o relatório',
+     !perm('Operador / Controle de Estoque').includes('contagem.resolver') && !perm('Operador / Controle de Estoque').includes('contagem.relatorio'));
   ok('   e NÃO aprova nem planeja',
      !perm('Operador / Controle de Estoque').includes('contagem.aprovar') && !perm('Operador / Controle de Estoque').includes('contagem.planejar'));
 
@@ -627,6 +645,28 @@ console.log('\n── 6-F. a conferência em três papéis (fase 2 da ESTOQUE-LI
   ok('backfill: a exceção que concedia contagem.ajustar concede aprovar',
      !!db.prepare("SELECT 1 FROM usuario_excecao WHERE usuario_id=? AND chave='contagem.aprovar' AND concede=1").get(uX));
   ok('o backfill ficou marcado para rodar uma vez só', !!db.prepare("SELECT 1 FROM config WHERE chave='seed_inventario'").get());
+  /* O BACKFILL DA V2: quem recontava ou contava desempata; quem aprovava
+     resolve e lê o relatório. Ninguém perde nada. */
+  const sV = db.prepare("INSERT INTO setores (nome,nivel,nativo) VALUES ('Aprova v1','admin',0)").run().lastInsertRowid;
+  const sR = db.prepare("INSERT INTO setores (nome,nivel,nativo) VALUES ('Reconta v1','operacao',0)").run().lastInsertRowid;
+  db.prepare("INSERT INTO setor_permissao (setor_id,chave) VALUES (?, 'contagem.aprovar')").run(sV);
+  db.prepare("INSERT INTO setor_permissao (setor_id,chave) VALUES (?, 'contagem.recontar')").run(sR);
+  const uV = db.prepare("INSERT INTO usuarios (nome,areas) VALUES ('ExcecaoV2','')").run().lastInsertRowid;
+  db.prepare("INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,'contagem.aprovar',1)").run(uV);
+  db.prepare("DELETE FROM config WHERE chave='seed_inventario_v2'").run();
+  require('./acesso')({ locals:{}, router:{ stack:[] }, get(){}, post(){}, delete(){} }, db);
+  ok('backfill v2: quem aprovava passa a resolver', tem(sV, 'contagem.resolver'));
+  ok('backfill v2: e a ler o relatório', tem(sV, 'contagem.relatorio'));
+  ok('backfill v2: e continua com a chave antiga', tem(sV, 'contagem.aprovar'));
+  ok('backfill v2: quem recontava passa a desempatar', tem(sR, 'contagem.desempatar'));
+  ok('backfill v2: quem só contava também desempata', tem(sC, 'contagem.desempatar'));
+  ok('backfill v2: quem só conta NÃO resolve nem lê o relatório', !tem(sC, 'contagem.resolver') && !tem(sC, 'contagem.relatorio'));
+  ok('backfill v2: a exceção que concedia aprovar concede resolver',
+     !!db.prepare("SELECT 1 FROM usuario_excecao WHERE usuario_id=? AND chave='contagem.resolver' AND concede=1").get(uV));
+  ok('backfill v2 marcado para rodar uma vez só', !!db.prepare("SELECT 1 FROM config WHERE chave='seed_inventario_v2'").get());
+  db.prepare("DELETE FROM setor_permissao WHERE setor_id=? AND chave='contagem.desempatar'").run(sR);
+  require('./acesso')({ locals:{}, router:{ stack:[] }, get(){}, post(){}, delete(){} }, db);
+  ok('backfill v2 desmarcado não volta no boot seguinte', !tem(sR, 'contagem.desempatar'));
   db.prepare("DELETE FROM setor_permissao WHERE setor_id=? AND chave='contagem.recontar'").run(sC);
   require('./acesso')({ locals:{}, router:{ stack:[] }, get(){}, post(){}, delete(){} }, db);
   ok('desmarcada, a chave não volta no boot seguinte', !tem(sC, 'contagem.recontar'));
@@ -642,7 +682,9 @@ console.log('\n── 6-F. a conferência em três papéis (fase 2 da ESTOQUE-LI
   eq('   uma vez só, mesmo com duas chaves levando a ela', areasC.filter(a => a === 'inventario').length, 1);
   ok('   e NÃO a área admin', !areasC.includes('admin'), areasC.join(','));
   ok('decidir(): quem conta abre a tela', AC.decidir({id:uC, nome:'Conta'}, '/inventario', 'GET').ok === true);
-  ok('decidir(): quem conta NÃO aprova', AC.decidir({id:uC, nome:'Conta'}, '/api/inventario/aprovar', 'POST').ok === false);
+  ok('decidir(): quem conta NÃO resolve', AC.decidir({id:uC, nome:'Conta'}, '/api/inventario/aprovar', 'POST').ok === false);
+  ok('decidir(): quem conta NÃO lê o relatório', AC.decidir({id:uC, nome:'Conta'}, '/api/inventario/relatorio', 'GET').ok === false);
+  ok('decidir(): quem conta abre a lista dele', AC.decidir({id:uC, nome:'Conta'}, '/api/inventario/hoje', 'GET').ok === true);
   ok('decidir(): quem conta NÃO abre a conferência', AC.decidir({id:uC, nome:'Conta'}, '/api/inventario/abrir', 'POST').ok === false);
 }
 

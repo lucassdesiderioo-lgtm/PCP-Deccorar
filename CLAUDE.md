@@ -2408,7 +2408,8 @@ guarda o saldo é a coluna, o movimento é só a história dela.
 `inventario_ciclo`/`inventario_item` (fase 2, 26/09/2026), `ajuste_pedido` (fase 3,
 28/09/2026), `correcao` (Mesa de correções fase 1, 02/10/2026),
 `venda_sem_etiqueta` e `pdf_conta_aberta` (27/10/2026), `fim_dia` e
-`cancelamento_caixa` (03/11/2026).
+`cancelamento_caixa` (03/11/2026), `recusa_estoque` e `inventario_escala`
+(04/11/2026, conferência v2).
 (`foto_estoque` saiu na Fase 3.)
 
 A lista fica em `TABELAS`, no topo do `teste_route.js`. Cada entrada traz a coluna
@@ -2810,7 +2811,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (80), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (332), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (45), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (908) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (360), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (51), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (37), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (908) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3077,6 +3078,13 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Contar o quadro "Por responsável" ou o desempenho na tela, usar a média
   no lugar da mediana, contar o prazo pelo original, ou dar a um caso antigo
   um responsável pelo nome escrito à mão (§9-B, 04/11/2026)
+- ❌ Voltar a pedir aprovação quando duas contagens cegas batem, ou olhar só o
+  livro para saber se mexeram no SKU durante a contagem: a etiqueta só reserva
+  (§18, conferência v2)
+- ❌ Pôr o Admin Geral no rodízio pelo nível, ou rodar o `teste_regras_estoque.js`
+  na porta 3010 — no servidor ele conversaria com a produção (§18)
+- ❌ Somar +1 na embalagem de SKU sob medida: a Conferência não o baixa, e o
+  saldo sobe para sempre (R-EST-05, CONSERTO de 04/11/2026)
 - ❌ Contar uma pendência dentro do `pendencias_dominio.js`: a central pergunta
   à função da tela dona, senão diz 3 onde a aba diz 5 (§5, a central, #12)
 - ❌ Esconder da central a linha que a pessoa não pode resolver, ou mandar nela
@@ -3163,9 +3171,10 @@ Compare com a §3 do `docs/ARQUITETURA.md`. Diferença ali é dívida nova.
 | R-EST-14 | Custo sem preço é piso, nunca zero; sem `custo.ver` o valor não viaja |
 | R-EST-15 | O reservado (sem etiqueta + em caixa) é leitura e não muda o `precisa` |
 | R-EST-16 | Toda correção aplica a DIFERENÇA sobre o saldo de agora (#32) |
-| R-EST-17 | Quem conta não vê o saldo, nem no JSON |
-| R-EST-18 | Ninguém aprova o próprio trabalho, nem o Admin Geral; o aprovador único espera |
-| R-EST-19 | O caminho da contagem: bateu confirma; diferente reconta; a 3ª decide pelo acordo |
+| R-EST-17 | Quem conta não vê o saldo, nem no JSON; conta-se toda caixa embalada SEM etiqueta de venda, contra o LIVRE |
+| R-EST-18 | Ninguém conta duas vezes o mesmo SKU nem resolve o que contou, nem o Admin Geral; o aprovador único do ajuste espera |
+| R-EST-19 | O caminho da contagem (v2): duas que batem APLICAM SOZINHAS; a 3ª desempata; o admin só recebe o que nem a 3ª resolveu; mexeram durante a contagem → reconta na hora |
+| R-EST-24 | A lista do dia (8, às 7h, seg a sex), o rodízio de duas pessoas, as 10h, a tarja que não bloqueia, a quinzenal e a geral |
 | R-EST-20 | Ajuste manual: pedir não mexe no saldo; outra pessoa aprova |
 | R-EST-21 | Peça se conta só pelo Inventário; a aba Contagem é de material |
 | R-EST-22 | A idade da conferência sai do `inventario_dominio.conferencias()` |
@@ -3177,6 +3186,64 @@ Compare com a §3 do `docs/ARQUITETURA.md`. Diferença ali é dívida nova.
 `cont_route.js`: `node teste_contagem.js`. No `ajuste_*.js`: `node
 teste_ajuste.js`. No reservado ou na acuracidade: `node teste_acuracidade.js`.
 Nas chaves: `node teste_acesso.js` e `node teste_cobertura.js`.
+
+### ⚠️ A CONFERÊNCIA EM DUAS PESSOAS — versão 2 (04/11/2026)
+
+Spec `docs/specs/ESTOQUE-LIVRO-E-CONFERENCIA.md` v2, construída **como mudança
+sobre o que já estava no ar** (decisão do dono): a v1 (livro, três papéis, ajuste
+em duas pessoas, reservado e acuracidade) não foi refeita. Cartões R-EST-17 a
+R-EST-19 e **R-EST-24**. O que parece bug e não é:
+
+> ⚠️ **DUAS CONTAGENS QUE BATEM MUDAM O SALDO SEM NINGUÉM APROVAR.** Não é a fila
+> de aprovação quebrada: é a regra (`DECISOES.md`). O furo vai para o **relatório
+> de furos** (aba Contagem do admin, `contagem.relatorio`), com quem contou e o
+> extrato do SKU desde a conferência anterior. O admin (`contagem.resolver`) só
+> recebe o que nem a 3ª contagem resolveu — e os itens que já esperavam aprovação
+> no dia do deploy, pela regra velha.
+>
+> ⚠️ **A ETIQUETA IMPRESSA NO MEIO DA CONTAGEM INVALIDA A CONTAGEM, E A CONFERÊNCIA
+> NÃO.** "Mexeram no SKU" é o **livre** (saldo − caixa impressa) que mudou entre o
+> primeiro bipe (ou o toque no SKU) e o "terminei", ou linha do livro que não seja
+> a baixa da Conferência (`inventario_dominio.mexeram`). A etiqueta não gera linha
+> no livro desde 22/10/2026 — olhar só o livro, como a spec escrevia, deixaria a
+> etiqueta passar. A baixa da Conferência é de caixa que já estava fora da
+> prateleira. Decisão do dono, 04/11/2026.
+>
+> ⚠️ **A LISTA NASCE NO PRIMEIRO PEDIDO DEPOIS DAS 7h, e não por cron.** Quem
+> pergunta (a lista, a tarja, o andamento) chama `garantirDia`. O relógio é o
+> `relogio.js`: em produção é só o relógio do servidor; `relogio.fixar` e
+> `PCP_RELOGIO_ARQUIVO` existem para os testes simularem dias, e ninguém os
+> configura no servidor.
+>
+> ⚠️ **O ADMIN GERAL NÃO ENTRA NO RODÍZIO SÓ PELO NÍVEL.** Ele passa em toda chave
+> por nível (§10); o rodízio lê `contagem.contar` **pelo setor ou pela exceção**
+> (`inventario_route.temChaveRodizio`). Quem tem a chave por outro setor ou por
+> exceção entra. Para pôr o dono no rodízio, ponha-o no setor de contagem.
+>
+> ⚠️ **SEM ESCALA, A LISTA NASCE ABERTA.** Com menos de duas pessoas no rodízio
+> não há escala, o aviso vai para quem planeja, e qualquer um com
+> `contagem.contar` conta — senão ninguém contaria.
+>
+> ⚠️ **AS CHAVES ANTIGAS FICARAM.** `contagem.recontar` e `contagem.aprovar` estão no
+> registro, sem rota de peça: trocar nome de chave tira a permissão em silêncio
+> (#13). O backfill (`config.seed_inventario_v2`, uma vez só) levou quem as tinha
+> para `contagem.desempatar`, `contagem.resolver` e `contagem.relatorio`. As rotas
+> antigas (`minha-lista`, `contar`, `recontagem`, `recontar`, `terminar-sku`)
+> saíram e nascem negadas.
+>
+> ⚠️ **A QUINZENAL FICA ABERTA ATÉ O PRAZO, MESMO TERMINADA**, porque é ela que
+> suspende a diária "nesses dias". A primeira é **15 dias depois do deploy**
+> (`config.quinzenal_base`). No fim do prazo, o não contado vira `nao_conferido` e
+> a divergência em andamento vai para o topo da diária seguinte.
+>
+> ⚠️ **A TARJA É UM GET QUE PODE CRIAR A LISTA DO DIA.** Toda tela do PCP pergunta
+> `/api/inventario/tarja` a cada minuto (`nav.js`); quem não tem chave de contagem
+> volta antes de qualquer conta.
+
+**Rode `node teste_inventario.js` (98) e `node teste_regras_estoque.js` (97, sobe
+o servidor de verdade numa porta livre — `PCP_PORTA` —, NUNCA na 3010) ao mexer
+no `inventario_*.js`, no `relogio.js`, na tarja do `nav.js`, na gravação da
+recusa do `etq_route.js` ou nas chaves de contagem.**
 
 **Ferramenta (só lê): `node conferir_contagem_persianas.js`** — a folha de
 contagem de 04/11/2026 contra o sistema, SKU a SKU: saldo, em caixa, livre,

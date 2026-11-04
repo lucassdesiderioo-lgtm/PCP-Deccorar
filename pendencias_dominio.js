@@ -65,11 +65,11 @@ const LINHAS = [
       const r = require('./ajuste_dominio').contarPendentes(db);
       return { n:r.n, desde:r.desde };
     } },
-  { chave:'inventario_aprovar', nome:'Inventário — aprovar', perm:['contagem.aprovar'], onde:{ url:'/inventario' },
-    ajuda:'contagens com diferença esperando aprovação',
+  { chave:'inventario_aprovar', nome:'Inventário — sem acordo', perm:['contagem.resolver'], onde:{ url:'/inventario' },
+    ajuda:'SKUs em que nem a 3ª contagem bateu (e os que já esperavam aprovação antes de 04/11/2026)',
     contar(db){ const r = require('./inventario_dominio').pendencias(db).aprovar; return { n:r.n, desde:r.desde }; } },
-  { chave:'inventario_recontar', nome:'Inventário — recontar', perm:['contagem.recontar'], onde:{ url:'/inventario' },
-    ajuda:'SKUs que não bateram e esperam a recontagem de outra pessoa',
+  { chave:'inventario_recontar', nome:'Inventário — 2ª e 3ª contagem', perm:['contagem.contar','contagem.desempatar'], onde:{ url:'/inventario' },
+    ajuda:'SKUs que esperam a contagem de outra pessoa (a 2ª, ou a 3ª porque as duas não bateram)',
     contar(db){ const r = require('./inventario_dominio').pendencias(db).recontar; return { n:r.n, desde:r.desde }; } },
   { chave:'contagem', nome:'Contagem de material', perm:['contagem.ajustar'], onde:{ aba:'ct' },
     ajuda:'contagens esperando aprovação para ir ao estoque',

@@ -72,7 +72,7 @@ const API_ADMIN=['/api/teste','/api/usuarios','/api/estoque','/api/alvo','/api/b
 const LIVRE=['/login','/login.html','/nav.js','/favicon.ico'];
 
 module.exports=function(app, db){
-  db.exec("CREATE TABLE IF NOT EXISTS usuarios(id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, salt TEXT NOT NULL, pin_hash TEXT NOT NULL, areas TEXT NOT NULL DEFAULT '', ativo INTEGER NOT NULL DEFAULT 1, criado_em TEXT DEFAULT (datetime('now','localtime')), pin_curto INTEGER NOT NULL DEFAULT 1)");
+  db.exec("CREATE TABLE IF NOT EXISTS usuarios(id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, salt TEXT NOT NULL, pin_hash TEXT NOT NULL, areas TEXT NOT NULL DEFAULT '', ativo INTEGER NOT NULL DEFAULT 1, criado_em TEXT DEFAULT (datetime('now','localtime')), pin_curto INTEGER NOT NULL DEFAULT 1, fora_rodizio INTEGER DEFAULT 0)");
   /* PIN DE 6 DIGITOS (ACESSOS-UNIFICADOS fase 5-A, 21/10/2026). `pin_curto=1`
      quer dizer "esta pessoa ainda entra com o PIN de 4 e tem que trocar". O
      hash nao diz o tamanho do PIN, entao a marca e uma coluna: quem ja estava
@@ -82,6 +82,10 @@ module.exports=function(app, db){
      A troca e cobrada no USO, nao so no login: a sessao dura 1 ano e os
      tablets quase nunca passam pela tela de PIN. */
   try{ db.exec('ALTER TABLE usuarios ADD COLUMN pin_curto INTEGER NOT NULL DEFAULT 1'); }catch(e){ /* ja existe */ }
+  /* FORA DO RODIZIO DA CONTAGEM (ESTOQUE-LIVRO-E-CONFERENCIA v2, §6.5,
+     04/11/2026): folga, ferias, afastamento. Quem liga e desliga e quem tem
+     contagem.planejar (inventario_route). No fim, por ALTER (§17). */
+  try{ db.exec('ALTER TABLE usuarios ADD COLUMN fora_rodizio INTEGER DEFAULT 0'); }catch(e){ /* ja existe */ }
   const PIN_OK=/^[0-9]{6}$/;
   const ERRO_PIN='O PIN tem que ter 6 números.';
 

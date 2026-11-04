@@ -1,20 +1,22 @@
-/* A CONFERENCIA DE ESTOQUE — as rotas. Fase 2 da spec
- * ESTOQUE-LIVRO-E-CONFERENCIA (26/09/2026). A regra mora no
+/* A CONFERENCIA DE ESTOQUE — as rotas. Spec ESTOQUE-LIVRO-E-CONFERENCIA
+ * (fase 2 em 26/09/2026, versao 2 em 04/11/2026). A regra mora no
  * inventario_dominio.js; aqui e so a porta: quem pode, a transacao e a
  * auditoria.
  *
- * ⚠️ AS ROTAS DE QUEM CONTA NAO DEVOLVEM SALDO — nem por engano: elas so
- * repassam o que o dominio monta, e o dominio nao poe o campo (regra 14 do
- * §13). Ha caso no teste_inventario.js varrendo o JSON atras de `estoque` e
- * `saldo`.
+ * ⚠️ AS ROTAS DE QUEM CONTA NAO DEVOLVEM SALDO NEM CONTAGEM DE NINGUEM — elas
+ * so repassam o que o dominio monta, e o dominio nao poe o campo (regra 14 do
+ * §13). O teste varre o JSON atras de `saldo`, `estoque` e `contado1..3`.
  *
- * ⚠️ `terminar-sku` serve as duas rodadas, e por isso a rota aceita
- * contagem.contar OU contagem.recontar no `permDaRota()`; e o handler que
- * confere a chave CERTA para a rodada em que o item esta. Declarar so uma
- * trancaria a outra metade da bancada.
+ * ⚠️ `hoje`, `bipe` e `terminar` servem as tres rodadas, e por isso a rota
+ * aceita contagem.contar OU contagem.desempatar no `permDaRota()`. Quem decide
+ * QUAL rodada a pessoa pode contar e o dominio (`pode`), item a item.
+ *
+ * ⚠️ O RODIZIO LE A CHAVE PELO SETOR OU PELA EXCECAO, E NAO PELO NIVEL. O Admin
+ * Geral passa em toda chave por nivel (§10); pelo nivel ele entraria no
+ * rodizio sem nunca ter sido posto no setor de contagem. Quem tem a chave por
+ * outro setor ou por excecao entra (spec §8.1).
  */
 const INV = require('./inventario_dominio');
-const ESTOQUE = require('./estoque_dominio');
 
 module.exports = function(app, db){
   INV.garantirSchema(db);
@@ -27,31 +29,97 @@ module.exports = function(app, db){
     try{ return !!app.locals.acesso.podePermissao(req.usuario, chave); }
     catch(e){ return (((req.usuario||{}).areas)||[]).indexOf('admin') >= 0; }
   }
+  const podeDe = req => chave => pode(req, chave);
+  /* A chave contagem.contar pelo setor ou pela excecao (ver o cabecalho). */
+  function temChaveRodizio(uid){
+    const ac = app.locals.acesso;
+    if(!ac || !ac.permissoesDe) return false;
+    try{
+      if(ac.ehAdminGeral && ac.ehAdminGeral(uid)){
+        const porSetor = db.prepare(`SELECT 1 FROM usuario_setor us JOIN setor_permissao sp ON sp.setor_id=us.setor_id
+          JOIN setores s ON s.id=us.setor_id WHERE us.usuario_id=? AND s.ativo=1 AND s.nivel<>'admin_geral'
+            AND sp.chave='contagem.contar' LIMIT 1`).get(uid);
+        const porExc = db.prepare("SELECT 1 FROM usuario_excecao WHERE usuario_id=? AND chave='contagem.contar' AND concede=1").get(uid);
+        const revoga = db.prepare("SELECT 1 FROM usuario_excecao WHERE usuario_id=? AND chave='contagem.contar' AND concede=0").get(uid);
+        return !!(porSetor || porExc) && !revoga;
+      }
+      return ac.permissoesDe(uid).has('contagem.contar');
+    }catch(e){ return false; }
+  }
   function auditar(req, acao, alvo, detalhe){
     try{ app.locals.acesso.auditar(req, 'estoque', acao, alvo, detalhe); }catch(e){}
   }
   /* Erro do dominio vira status + mensagem; erro de verdade vira 500 dizendo o
      que foi, e a transacao ja desfez tudo. */
   function responder(res, fn){
-    try{ return res.json(Object.assign({ ok:true }, fn())); }
-    catch(e){
+    try{
+      const r = fn();
+      if(r && r.__status){ const st = r.__status; delete r.__status; return res.status(st).json(Object.assign({ ok:false }, r)); }
+      return res.json(Object.assign({ ok:true }, r));
+    }catch(e){
       if(e && e.status) return res.status(e.status).json(Object.assign({ ok:false, erro:e.message }, e.extra || {}));
       console.log('[inventario] ' + (e && e.stack || e));
       return res.status(500).json({ ok:false, erro:'falhou: ' + (e && e.message) });
     }
   }
   const tx = fn => db.transaction(fn)();
+  const ctx = { temChave: temChaveRodizio };
+
+  // ── quem conta (as tres rodadas) ──────────────────────────────────────────
+  app.get('/api/inventario/hoje', (req,res) => responder(res, () =>
+    tx(() => INV.hoje(db, { quem:quem(req), pode:podeDe(req), temChave:temChaveRodizio }))));
+
+  /* A tarja (§7.1): qualquer pessoa logada pergunta; quem nao tem a chave
+     recebe nada. */
+  app.get('/api/inventario/tarja', (req,res) => responder(res, () =>
+    ({ tarja: tx(() => INV.tarja(db, { quem:quem(req), pode:podeDe(req), temChave:temChaveRodizio })) })));
+
+  app.post('/api/inventario/bipe', (req,res) => responder(res, () => {
+    const b = req.body || {};
+    return tx(() => INV.contar(db, { codigo:b.codigo, quantidade:b.quantidade, zerar:!!b.zerar, abrir:!!b.abrir,
+      quem:quem(req), pode:podeDe(req) }));
+  }));
+
+  app.post('/api/inventario/terminar', (req,res) => responder(res, () => {
+    const b = req.body || {};
+    const r = tx(() => INV.terminar(db, { codigo:b.codigo, nenhuma:!!b.nenhuma, quem:quem(req), pode:podeDe(req) }));
+    if(r.invalidada){
+      auditar(req, 'inventario_recontar_na_hora', r.codigo, 'mexeram no SKU durante a contagem');
+      return Object.assign({ __status:409, erro:r.mensagem }, r);
+    }
+    auditar(req, 'inventario_contado', r.codigo, b.nenhuma ? 'nao tem nenhuma' : '');
+    return r;
+  }));
+
+  app.post('/api/inventario/geral/terminar-prateleira', (req,res) => responder(res, () => {
+    const b = req.body || {};
+    const r = tx(() => INV.terminarPrateleira(db, { quem:quem(req), pode:podeDe(req), confirmar:!!b.confirmar }));
+    if(r.zerados != null) auditar(req, 'inventario_prateleira_zero', 'geral', r.zerados + ' SKU(s) sem nenhuma peça');
+    return r;
+  }));
 
   // ── quem planeja ──────────────────────────────────────────────────────────
   app.get('/api/inventario/sugestao', (req,res) => responder(res, () =>
     ({ sugestao: INV.sugestao(db, req.query && req.query.qtd) })));
 
-  app.get('/api/inventario/andamento', (req,res) => responder(res, () => INV.andamento(db)));
+  app.get('/api/inventario/andamento', (req,res) => responder(res, () =>
+    tx(() => { INV.garantirDia(db, ctx); return INV.andamento(db, ctx); })));
 
   app.post('/api/inventario/abrir', (req,res) => responder(res, () => {
     const b = req.body || {};
-    const r = tx(() => INV.abrir(db, { tipo:b.tipo, codigos:b.codigos, quem:quem(req) }));
+    const r = tx(() => INV.abrir(db, { tipo:b.tipo, codigos:b.codigos, quem:quem(req), confirmar:!!b.confirmar }));
     auditar(req, 'inventario_aberto', 'conferencia #' + r.ciclo_id, r.tipo + ' · ' + r.itens + ' SKU(s)');
+    return r;
+  }));
+  app.post('/api/inventario/geral/abrir', (req,res) => responder(res, () => {
+    const b = req.body || {};
+    const r = tx(() => INV.abrir(db, { tipo:'geral', quem:quem(req), confirmar:!!b.confirmar }));
+    auditar(req, 'inventario_aberto', 'conferencia #' + r.ciclo_id, 'geral · ' + r.itens + ' SKU(s) · expedição parada');
+    return r;
+  }));
+  app.post('/api/inventario/quinzenal/abrir', (req,res) => responder(res, () => {
+    const r = tx(() => INV.abrirQuinzenal(db, { quem:quem(req) }));
+    auditar(req, 'inventario_aberto', 'conferencia #' + r.ciclo_id, 'quinzenal antecipada · ' + r.itens + ' SKU(s) · prazo ' + r.prazo);
     return r;
   }));
 
@@ -62,64 +130,63 @@ module.exports = function(app, db){
     return r;
   }));
 
-  // ── quem conta (1ª rodada) ────────────────────────────────────────────────
-  app.get('/api/inventario/minha-lista', (req,res) => responder(res, () =>
-    ({ itens: INV.lista(db, { papel:'contar', quem:quem(req) }) })));
-
-  app.post('/api/inventario/contar', (req,res) => responder(res, () => {
+  app.get('/api/inventario/rodizio', (req,res) => responder(res, () =>
+    ({ pessoas: INV.rodizio(db, temChaveRodizio) })));
+  app.post('/api/inventario/rodizio', (req,res) => responder(res, () => {
     const b = req.body || {};
-    return tx(() => INV.contar(db, { codigo:b.codigo, quantidade:b.quantidade, zerar:!!b.zerar,
-      papel:'contar', quem:quem(req) }));
-  }));
-
-  // ── quem reconta (2ª e 3ª rodadas) ────────────────────────────────────────
-  app.get('/api/inventario/recontagem', (req,res) => responder(res, () =>
-    ({ itens: INV.lista(db, { papel:'recontar', quem:quem(req) }) })));
-
-  app.post('/api/inventario/recontar', (req,res) => responder(res, () => {
-    const b = req.body || {};
-    return tx(() => INV.contar(db, { codigo:b.codigo, quantidade:b.quantidade, zerar:!!b.zerar,
-      papel:'recontar', quem:quem(req) }));
-  }));
-
-  app.post('/api/inventario/terminar-sku', (req,res) => responder(res, () => {
-    const b = req.body || {};
-    const papel = b.papel === 'recontar' ? 'recontar' : 'contar';
-    const chave = papel === 'recontar' ? 'contagem.recontar' : 'contagem.contar';
-    if(!pode(req, chave)){ const e = INV.erro(403, 'sem permissao para ' + (papel === 'recontar' ? 'recontar' : 'contar')); throw e; }
-    const r = tx(() => INV.terminar(db, { codigo:b.codigo, papel, quem:quem(req) }));
-    auditar(req, papel === 'recontar' ? 'inventario_recontado' : 'inventario_contado', r.codigo, '');
+    const r = tx(() => INV.marcarRodizio(db, { usuario_id:b.usuario_id, fora:!!b.fora }));
+    auditar(req, 'rodizio_' + (r.fora ? 'fora' : 'dentro'), r.nome, r.fora ? 'fora do rodízio da contagem' : 'de volta ao rodízio');
     return r;
   }));
 
-  // ── quem aprova ───────────────────────────────────────────────────────────
-  app.get('/api/inventario/aprovacao', (req,res) => responder(res, () => {
-    const itens = INV.aprovacao(db, { quem:quem(req) });
-    /* O R$ da diferenca so vai para quem tem custo.ver — o campo nem viaja
-       para os outros (regra 14 do §13). O custo e o do ficha_dominio, o mesmo
-       da aba Estoque. */
-    if(pode(req, 'custo.ver')){
-      let FICHA = null; try{ FICHA = require('./ficha_dominio'); }catch(e){}
-      itens.forEach(i => {
+  // ── quem resolve (a fila do admin) ────────────────────────────────────────
+  function comValor(req, itens){
+    /* O R$ so vai para quem tem custo.ver — o campo nem viaja para os outros
+       (regra 14 do §13). O custo e o do ficha_dominio, o mesmo da aba Estoque. */
+    if(!pode(req, 'custo.ver')) return itens;
+    let FICHA = null; try{ FICHA = require('./ficha_dominio'); }catch(e){}
+    const custo = {};
+    itens.forEach(i => {
+      if(!(i.codigo in custo)){
         let c = null;
         try{ const f = FICHA && FICHA.calcularFicha(db, i.codigo); if(f && f.custo_material != null && isFinite(f.custo_material)) c = +f.custo_material; }catch(e){}
-        i.valor_diferenca = c == null ? null : Math.round(c * (i.diferenca || 0) * 100) / 100;
-      });
-    }
-    return { itens };
-  }));
+        custo[i.codigo] = c;
+      }
+      const c = custo[i.codigo];
+      i.valor_diferenca = c == null ? null : Math.round(c * (i.diferenca || 0) * 100) / 100;
+    });
+    return itens;
+  }
+  app.get('/api/inventario/aprovacao', (req,res) => responder(res, () =>
+    ({ itens: comValor(req, INV.aprovacao(db, { quem:quem(req) })) })));
 
-  app.post('/api/inventario/aprovar', (req,res) => responder(res, () => {
+  function aplicar(req){
     const b = req.body || {};
-    const r = tx(() => INV.aprovar(db, { id:b.id, motivo:b.motivo, obs:b.obs, quem:quem(req) }));
-    auditar(req, 'inventario_aprovado', r.codigo, 'delta ' + r.delta + ' (' + r.antes + ' -> ' + r.depois + ') · ' + (b.motivo || ''));
+    const r = tx(() => INV.aprovar(db, { id:b.id, motivo:b.motivo, obs:b.obs, diferenca:b.diferenca, quem:quem(req) }));
+    auditar(req, 'inventario_resolvido', r.codigo, 'delta ' + r.delta + ' (' + r.antes + ' -> ' + r.depois + ') · ' + (b.motivo || ''));
     return r;
-  }));
-
-  app.post('/api/inventario/rejeitar', (req,res) => responder(res, () => {
+  }
+  function recontar(req){
     const b = req.body || {};
     const r = tx(() => INV.rejeitar(db, { id:b.id, motivo:b.motivo, obs:b.obs, quem:quem(req) }));
-    auditar(req, 'inventario_rejeitado', r.codigo, (b.motivo || '') + ' · volta a contar do zero');
+    auditar(req, 'inventario_contar_de_novo', r.codigo, (b.motivo || '') + (r.amanha ? ' · volta na lista de amanhã' : ' · volta a contar do zero'));
+    return r;
+  }
+  app.post('/api/inventario/aprovar', (req,res) => responder(res, () => aplicar(req)));
+  app.post('/api/inventario/rejeitar', (req,res) => responder(res, () => recontar(req)));
+  app.post('/api/inventario/resolver', (req,res) => responder(res, () =>
+    (((req.body || {}).acao) === 'recontar') ? recontar(req) : aplicar(req)));
+
+  // ── o relatorio de furos (§7.3) ───────────────────────────────────────────
+  app.get('/api/inventario/relatorio', (req,res) => responder(res, () => {
+    const r = INV.relatorio(db, { desde: req.query && req.query.desde });
+    if(pode(req, 'custo.ver')){
+      comValor(req, r.furos);
+      const custo = {}; r.furos.forEach(f => custo[f.codigo] = f.valor_diferenca == null ? null : f.valor_diferenca / f.diferenca);
+      const valor = lista => { let v = 0, falta = 0; lista.forEach(f => { const c = custo[f.codigo]; if(c == null) falta++; else v += c * f.diferenca; });
+        return { valor: Math.round(v * 100) / 100, sem_custo: falta }; };
+      r.valor_periodo = valor(r.furos);
+    }
     return r;
   }));
 };
