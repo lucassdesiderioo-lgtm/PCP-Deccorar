@@ -1656,7 +1656,10 @@ dinheiro não vem junto.
 > nenhuma etapa à mão se marca** (CONSERTO de 04/11/2026): as `MANUAIS` são
 > todas de antes dela, a tela não as oferece e a rota recusa (400) — o
 > "→ Aguardando chegar" num caso já revisado deixava a chegada e a revisão
-> gravadas num caso que dizia "aguardando".
+> gravadas num caso que dizia "aguardando". ✅ **No ar e conferido em
+> 04/11/2026** (PR #277): o dono fez o deploy e viu o caso revisado sem o
+> botão, e o "nós coletamos" chegado só com o "Avisamos o ML". Desfazer um
+> "A caixa chegou" clicado por engano continua sem caminho — é ajuste à parte.
 >
 > ⚠️ **CUSTO VAZIO NÃO É ZERO** (R9). Tentativa de coleta sem custo deixa o
 > saldo **nulo e "incompleto"**, e o total do mês sai como **piso** (≥, aviso
