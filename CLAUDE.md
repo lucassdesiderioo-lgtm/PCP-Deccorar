@@ -3812,6 +3812,13 @@ abaixo) e o **Alt+0** do "Sair".
 > decisão da contagem de peça (`pode_aprovar`). Ali quem decide é a rota, que
 > também diz por que não.
 >
+> ✅ **NO AR E CONFERIDO EM 04/11/2026** (PR #285): o dono fez o backup, o
+> deploy e o teste de segurança (telas 302, API 401, `/login` 200) e conferiu
+> na tela o "Liberar com divergência" escondido do operador e visível para ele,
+> o "Adicionar" de modelo escondido de quem não cadastra modelo e o "Peça com
+> problema" escondido de quem não registra peça com problema — e disse *"bateu
+> tudo"*.
+>
 > ⚠️ **A APARÊNCIA DO MENU NÃO É DESTA SPEC** — é da conversa de design. Aqui
 > ele é funcional, no visual da barra de sessão.
 
