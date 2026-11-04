@@ -404,7 +404,9 @@ function detalhe(db, id, opt){
            docs: c.tipo === 'coleta' ? situacaoDocs(db, c.id) : [],
            eventos: db.prepare('SELECT id,tipo,de,para,texto,usuario,criado_em FROM devolucao_evento WHERE caso_id=? ORDER BY id').all(c.id),
            revisao: revisaoLigada(db, c.devolucao_id),
-           etapas: ETAPAS[c.tipo], manuais: MANUAIS[c.tipo], nomes: NOME_ETAPA,
+           /* As etapas à mão são todas de antes da chegada: com a caixa na fábrica,
+              nenhuma se oferece (CONSERTO de 04/11/2026). */
+           etapas: ETAPAS[c.tipo], manuais: c.chegou_em ? [] : MANUAIS[c.tipo], nomes: NOME_ETAPA,
            desfazer: podeDesfazer(db, c, o.usuario),
            mesmo_comprador: mesmoComprador(db, c.comprador, c.id).map(x => ({ id:x.id, venda:x.venda, nf:x.nf, tipo:x.tipo, etapa_nome: NOME_ETAPA[x.etapa] || x.etapa })) };
 }
@@ -821,6 +823,10 @@ function etapa(db, id, para, usuario, texto, travas){
   if(MANUAIS[c.tipo].indexOf(para) < 0) throw new Recusa(400, '"'+(NOME_ETAPA[para]||para)+'" não se marca à mão: '+
     (para === 'revisado' ? 'é o bipe da tela de Devoluções.' : para === 'chegou' ? 'use o botão "chegou".' : 'é uma decisão com botão próprio.'));
   if(para === c.etapa) throw new Recusa(400, 'O caso já está em "'+(NOME_ETAPA[para]||para)+'".');
+  /* CONSERTO de 04/11/2026: as etapas à mão são todas de antes da chegada.
+     Voltar a uma delas com a caixa na fábrica deixava a chegada e a revisão
+     gravadas num caso que dizia "aguardando" — a trilha mentindo. */
+  if(c.chegou_em) throw new Recusa(400, 'A caixa já chegou: o caso não volta para antes da chegada.');
   if(para === 'ml_avisado' && !c.chegou_em) throw new Recusa(400, 'Só se avisa o ML que recebemos depois de a peça chegar.');
   // R11: "Documentos ao ML" só com TODOS os documentos ativos da lista anexados.
   if(para === 'docs_enviados'){

@@ -1986,6 +1986,44 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
     eq('mês sem caso encerrado: lista vazia', (r.body.pessoas || []).length, 0);
   }
 
+  /* CONSERTO de 04/11/2026: o caso que já chegou não volta para antes da
+     chegada. As etapas à mão (MANUAIS) são todas de antes dela; com a caixa
+     na fábrica, a tela não as oferece e a rota recusa. */
+  secao('CHEGOU: o caso não volta para antes da chegada');
+  {
+    let r = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'7770801', sku:'BK160140BEGE' }, 3);
+    const mlA = r.body.id;
+    r = chamar('GET','/api/devolucao-casos/:id',null,2,{id:mlA});
+    eq('ML devolve aguardando: a tela recebe as etapas à mão de sempre', JSON.stringify(r.body.manuais), JSON.stringify(['aguardando']));
+    chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, {id:mlA});
+    r = chamar('GET','/api/devolucao-casos/:id',null,2,{id:mlA});
+    eq('ML devolve chegado: nenhuma etapa à mão para a tela', JSON.stringify(r.body.manuais), '[]');
+    r = chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'aguardando' }, 2, {id:mlA});
+    eq('   e a rota recusa voltar a "Aguardando chegar" (400)', r.status, 400);
+    ok('   dizendo por quê', /já chegou/.test(r.body && (r.body.erro || r.body.mensagem || JSON.stringify(r.body))));
+    eq('   e o caso fica em "Chegou"', caso(mlA).etapa, 'chegou');
+
+    r = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'7770802', sku:'BK160140BEGE' }, 3);
+    const mlR = r.body.id;
+    r = chamar('POST','/api/devolucao',{ codigo_ml:'7770802', caso_id:mlR, sku_fisico:'BK160140BEGE', destinacao:'estoque' }, 4);
+    eq('ML devolve revisado pelo bipe', caso(mlR).etapa, 'revisado');
+    r = chamar('GET','/api/devolucao-casos/:id',null,2,{id:mlR});
+    eq('   nenhuma etapa à mão para a tela', JSON.stringify(r.body.manuais), '[]');
+    eq('   e a rota recusa voltar a "Aguardando chegar" (400)', chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'aguardando' }, 2, {id:mlR}).status, 400);
+    eq('   e o caso continua revisado', caso(mlR).etapa, 'revisado');
+
+    r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'7770803', sku:'BK160140BEGE', prazo:dia(6) }, 3);
+    const co = r.body.id;
+    eq('nós coletamos não chegado: a etapa à mão continua (200)', chamar('POST','/api/devolucao-casos/:id/etapa',{ para:'coleta_pedida' }, 2, {id:co}).status, 200);
+    chamar('POST','/api/devolucao-casos/:id/chegou',{}, 2, {id:co});
+    r = chamar('GET','/api/devolucao-casos/:id',null,2,{id:co});
+    eq('nós coletamos chegado: nenhuma etapa à mão para a tela', JSON.stringify(r.body.manuais), '[]');
+    for(const para of ['lancado','coleta_pedida','docs_enviados','a_caminho'])
+      eq('   e a rota recusa voltar a "'+para+'" (400)', chamar('POST','/api/devolucao-casos/:id/etapa',{ para }, 2, {id:co}).status, 400);
+    eq('   e o caso fica em "Chegou"', caso(co).etapa, 'chegou');
+    eq('   e não há desfazer de volta para antes da chegada', r.body.desfazer, null);
+  }
+
   fim();
 })().catch(e => { console.log('ESTOUROU: ' + e.stack); falhas++; fim(); });
 

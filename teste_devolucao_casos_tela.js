@@ -648,6 +648,18 @@ const srv = app.listen(0, async () => {
     }
     await pcd.close();
 
+    /* CONSERTO de 04/11/2026: chegou, os botões de etapa de antes da chegada somem. */
+    secao('o caso que chegou não oferece voltar para antes da chegada');
+    const pch = await pg();
+    const cch = await api(pch, 'POST', '/api/devolucao-casos', { tipo:'coleta', venda:'2000000000099601', prazo:dia(6), publicidade:false });
+    await pch.goto(B + '/devolucao-casos'); await pch.waitForTimeout(900);
+    await abreFora(pch); await pch.locator('#listaColeta .linha', { hasText:'#'+cch.id }).locator('.t1').click(); await pch.waitForTimeout(800);
+    ok('antes de chegar, os botões de etapa à mão aparecem', (await pch.$$('#painel [data-etapa]')).length > 0);
+    await pch.click('#btChegou'); await pch.waitForTimeout(1000);
+    eq('depois de chegar, nenhum botão de etapa à mão', (await pch.$$('#painel [data-etapa]')).length, 0);
+    ok('   e a porta própria de depois da chegada continua (avisar o ML)', !!(await pch.$('#btAvisoML')));
+    await pch.close();
+
     /* ═════════ 5. o celular ═════════ */
     secao('a 400 px — a página não rola de lado, e o caso abre');
     const p4 = await pg(400);
