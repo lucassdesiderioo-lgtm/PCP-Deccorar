@@ -237,8 +237,8 @@
 - **Regra:** cada linha de `revisao` e de `montagem` grava `usuario_id` e `usuario_nome` de quem bipou. O nome vai como retrato: a revisão de ontem continua sendo de quem era, mesmo que a pessoa mude de nome no cadastro. O ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`).
 - **Por quê:** sem isso não há como medir a produtividade nem a autonomia de ninguém (dívida 9; R-ACE-06 da `ACESSOS-UNIFICADOS`).
 - **Exceções:** as linhas de antes de 26/10/2026 ficam com a pessoa vazia — não há de onde tirar.
-- **Teste que trava:** `teste_revisao.js` (seção 6, com a tabela de antes, sem a coluna; seção 8, sem login é 401) · `teste_montagem.js` (6-B).
-- **Status:** em código em 26/10/2026. Desde 04/11/2026 a revisão lê quem fez pelo `quem.js` (dono único, spec `QUEM-FEZ-E-REVISAO`) e recusa sem login (401); a embalagem ainda lê `req.usuario` direto (fase 2). Nenhuma tela mostra ainda: o dado começa a se acumular.
+- **Teste que trava:** `teste_revisao.js` (seção 6, com a tabela de antes, sem a coluna; seção 8, sem login é 401) · `teste_montagem.js` (6-B; 6-C, sem login é 401 e nada muda — nem o saldo, nem o livro, nem a ordem do dia).
+- **Status:** em código em 26/10/2026. Desde 04/11/2026 a revisão (fase 1) e a embalagem (fase 2) leem quem fez pelo `quem.js` (dono único, spec `QUEM-FEZ-E-REVISAO`) e recusam sem login (401), antes de olhar SKU e kit; a linha do livro do +1 (`movimento_estoque`) grava o mesmo quem. Nenhuma tela mostra ainda: o dado começa a se acumular.
 
 ---
 

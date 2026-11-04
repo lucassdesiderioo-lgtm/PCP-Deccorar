@@ -5,6 +5,7 @@
    `public/kit_etiqueta.js`. */
 const KIT_BIPE = require('./public/kit_bipe.js');
 const ESTOQUE  = require('./estoque_dominio');
+const QUEM     = require('./quem');
 module.exports=function(app,db){
   db.exec("CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT);");
   // Le uma chave do `config`. null = a chave NAO EXISTE (diferente de gravada
@@ -243,6 +244,12 @@ module.exports=function(app,db){
      embalar (§4) — é isso que torna o `limpar_fila.js` seguro, e quem
      "consertar" isso trava a bancada. Há caso travando. */
   app.post('/api/montagem',(req,res)=>{
+    /* QUEM EMBALOU vem do `quem.js` (QUEM-FEZ-E-REVISAO fase 2, 04/11/2026),
+       o mesmo dono da revisao, e sem login NADA grava: antes, sem
+       `req.usuario`, a embalagem e o +1 do livro entravam com a pessoa vazia.
+       O 401 vem antes de olhar SKU e kit: quem nao esta logado nao descobre
+       o que existe no cadastro. */
+    const q=QUEM.exigir(req,res); if(!q) return;
     const {codigo,segundos=0,kit_ok=1,inicio=null,fim=null}=req.body||{};
     if(!codigo) return res.status(400).json({erro:'codigo'});
     const cod=codigo.trim().toUpperCase();
@@ -261,9 +268,8 @@ module.exports=function(app,db){
     let naFila=false, modo='estoque', abatido=false;
     try{
       db.transaction(()=>{
-        const u=req.usuario||{};
         const mid=db.prepare("INSERT INTO montagem (codigo,inicio,fim,segundos,kit_ok,usuario_id,usuario_nome) VALUES (?,?,?,?,1,?,?)")
-          .run(cod,inicio,fim,Math.round(+segundos||0),u.id!=null?u.id:null,u.nome||null).lastInsertRowid;
+          .run(cod,inicio,fim,Math.round(+segundos||0),q.usuario_id,q.usuario_nome).lastInsertRowid;
         const f=db.prepare("SELECT id,modo FROM fila WHERE codigo=? AND situacao='aguardando' AND COALESCE(teste,0)=? ORDER BY id LIMIT 1").get(cod,emTeste);
         if(f){ db.prepare("UPDATE fila SET situacao='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(f.id); naFila=true; modo=f.modo; }
         /* A PORTA DE ENTRADA DO ESTOQUE, e ela passa pelo dono unico desde a
@@ -280,7 +286,7 @@ module.exports=function(app,db){
         try{ const m=db.prepare('SELECT COALESCE(m.sob_medida,0) s FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id WHERE s.codigo=?').get(cod);
              sobMedida=!!(m&&m.s); }catch(e){ sobMedida=false; }
         if(!sobMedida) ESTOQUE.movimentar(db,{codigo:cod, delta:+1, tipo:'embalagem',
-          referencia:'montagem:'+mid, usuario:req.usuario});
+          referencia:'montagem:'+mid, usuario_id:q.usuario_id, usuario_nome:q.usuario_nome});
         if(modo==='hoje'){
           const r=db.prepare("SELECT id FROM producao WHERE codigo=? AND data=date('now','localtime') AND produzido<qtd ORDER BY id LIMIT 1").get(cod);
           if(r){ db.prepare('UPDATE producao SET produzido=produzido+1 WHERE id=?').run(r.id); abatido=true; }

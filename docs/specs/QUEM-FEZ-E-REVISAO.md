@@ -1,6 +1,14 @@
-> **STATUS · 04/11/2026 — EM CONSTRUÇÃO · fase 1 em código, falta subir**
+> **STATUS · 04/11/2026 — EM CONSTRUÇÃO · fase 1 no ar · fase 2 em código, falta subir**
 > - Desenhado no Projeto do Claude com o Lucas em 04/11/2026.
-> - **Fase 1 (Revisão) em código em 04/11/2026**: `quem.js`, barreira de 15 s
+> - **Fase 2 (Embalagem) em código em 04/11/2026**: o `POST /api/montagem` lê quem
+>   fez pelo `quem.js` e, sem login, responde 401 antes de olhar SKU e kit — nada
+>   grava, nem a embalagem nem o +1 do livro. A linha do `movimento_estoque` do +1
+>   grava o mesmo quem. As colunas já existiam (26/10/2026): não houve schema.
+>   `teste_montagem.js` (64). As rotas do kit no `mont_route.js` (cadastro e
+>   impressão da etiqueta) ficam para a fase 7.
+> - **Fase 1 (Revisão) no ar desde 04/11/2026** (PR #284; o dono fez o deploy e
+>   conferiu): ⚠️ a prova de fábrica ainda é o primeiro bipe duplo recusado na
+>   bancada e um desfazer de verdade. Em código em 04/11/2026: `quem.js`, barreira de 15 s
 >   (`config.rev_minimo_seg`), "Cancelar revisão", "Desfazer última",
 >   `revisao_evento`, `fila.revisao_id`, `rejeicao.usuario_id`. Cartões R-REV-07 a
 >   R-REV-09 em `docs/regras/estoque.md`; `teste_revisao.js` (120). Falta o deploy e

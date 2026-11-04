@@ -80,13 +80,13 @@ app.locals.acesso = { auditar(req,cat,acao,alvo,detalhe){ auditoria.push({cat,ac
 require('./estoque_dominio').garantirSchema(db);
 require('./mont_route')(app, db);
 
-function chamar(metodo, rota, corpo){
+function chamar(metodo, rota, corpo, usuario){
   const h = rotas[metodo+' '+rota];
   if(!h) throw new Error('rota nao registrada: '+metodo+' '+rota);
   const out = { status:200, body:null };
   const res = { status(c){ out.status=c; return res; }, json(b){ out.body=b; return res; },
                 send(b){ out.body=b; return res; } };
-  h({ body: corpo||{}, params:{}, headers:{}, usuario:{id:1,nome:'Bancada'} }, res);
+  h({ body: corpo||{}, params:{}, headers:{}, usuario: usuario===undefined ? {id:1,nome:'Bancada'} : usuario }, res);
   return out;
 }
 const estoqueDe = c => db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(c).estoque;
@@ -195,6 +195,46 @@ console.log('\n── 6-B. QUEM EMBALOU fica gravado (fase 4 da ACESSOS-UNIFICAD
     eq('grava o id de quem embalou', ult.usuario_id, 1);
     eq('e o nome, como retrato', ult.usuario_nome, 'Bancada');
   }
+}
+
+console.log('\n── 6-C. sem login nao embala (QUEM-FEZ-E-REVISAO fase 2, 04/11/2026) ──');
+/* A regra-mae da spec (§2.3): acao de operacao sem login nao grava. A
+   embalagem ja gravava quem fez, mas lia `req.usuario` direto e, sem ele,
+   gravava a linha e o +1 do livro com a pessoa vazia. Quem responde agora e o
+   `quem.js` — o mesmo da revisao. */
+{
+  const cod = 'BK160160CINZA';
+  const fid = novaFila(cod,'hoje');
+  db.prepare("INSERT INTO producao (codigo,qtd,produzido) VALUES (?,1,0)").run(cod);
+  const foto = () => JSON.stringify({
+    montagem: nMontagem(), est: estoqueDe(cod), fila: filaSit(fid),
+    livro: db.prepare('SELECT COUNT(*) n FROM movimento_estoque').get().n,
+    prod: db.prepare("SELECT SUM(produzido) p FROM producao WHERE codigo=?").get(cod).p });
+  const antes = foto();
+  const kitAgora = db.prepare("SELECT valor FROM config WHERE chave='kit_codigo'").get().valor;
+  const corpo = { codigo:cod, segundos:40, kit_ok:1, kit_codigo:kitAgora };
+  let r = chamar('POST','/api/montagem',corpo,null);
+  eq('sem login leva 401', r.status, 401);
+  ok('e a recusa diz para entrar com o PIN', /PIN/.test(r.body && r.body.erro || ''), JSON.stringify(r.body));
+  eq('nada mudou: embalagem, saldo, fila, livro e ordem do dia', foto(), antes);
+  eq('usuario sem id tambem leva 401', chamar('POST','/api/montagem',corpo,{nome:'Fulano'}).status, 401);
+  eq('e continua sem mudar nada', foto(), antes);
+  /* O 401 vem antes de olhar o cadastro: quem nao esta logado nao descobre
+     se um SKU existe, nem se o kit bate. */
+  eq('SKU que nao existe, sem login, e 401 e nao 404',
+     chamar('POST','/api/montagem',{codigo:'NAOEXISTE', segundos:40, kit_ok:1},null).status, 401);
+  eq('kit faltando, sem login, e 401 e nao 400',
+     chamar('POST','/api/montagem',{codigo:cod, segundos:40, kit_ok:0},null).status, 401);
+
+  r = chamar('POST','/api/montagem',corpo,{id:7,nome:'Carla'});
+  eq('logada, a Carla embala', r.status, 200);
+  const m = db.prepare('SELECT * FROM montagem ORDER BY id DESC LIMIT 1').get();
+  eq('a embalagem e da Carla (id)', m.usuario_id, 7);
+  eq('e o nome dela, como retrato', m.usuario_nome, 'Carla');
+  const mv = db.prepare("SELECT * FROM movimento_estoque WHERE referencia=?").get('montagem:'+m.id);
+  ok('o +1 entrou no livro', !!mv && mv.delta === 1, JSON.stringify(mv));
+  eq('e a linha do livro diz que foi a Carla (id)', mv && mv.usuario_id, 7);
+  eq('e o nome dela', mv && mv.usuario_nome, 'Carla');
 }
 
 console.log('\n── 7. o que ja valia continua valendo ──');
