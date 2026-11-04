@@ -84,6 +84,20 @@
   .dvAbas{display:flex;gap:6px;flex-wrap:wrap;padding:10px 20px;border-bottom:1px solid var(--line);background:#0b0f14}
   .dvAba{padding:8px 14px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;color:var(--muted);border:1px solid var(--line)}
   .dvAba.on{background:var(--amber);color:#1a1300;border-color:var(--amber);font-weight:800}
+  /* O PRÓXIMO PASSO (spec DEVOLUCOES-PROXIMO-PASSO): a frase vem do servidor
+     (devcaso_dominio.proximoPasso); a tela só desenha. A vez de fora é cinza. */
+  .proximo{border:2px solid var(--amber);background:var(--ambg);border-radius:10px;padding:12px 14px;margin:12px 0}
+  .proximo .pTit{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--amber);font-weight:700}
+  .proximo .pTxt{font-size:19px;font-weight:700;margin:4px 0 6px;overflow-wrap:anywhere;line-height:1.3}
+  .proximo .pSub{font-size:13px;color:var(--muted);display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center}
+  .proximo.fora{border-color:var(--line);background:var(--panel2)}
+  .proximo.fora .pTit{color:var(--muted)}
+  .proximo.fora .pTxt{color:var(--muted);font-size:16px}
+  .destaque{outline:2px solid var(--amber);outline-offset:4px;border-radius:6px}
+  .linha .passo{font-size:13px;margin-top:5px;color:var(--txt);overflow-wrap:anywhere}
+  .linha .passo.fora{color:var(--muted)}
+  .foraGrupo{margin-top:8px}
+  .foraGrupo summary{cursor:pointer;color:var(--muted);font-size:13px;font-weight:700;padding:8px 0}
 </style></head><body>
 <header><div class="mark">D</div><div><h1>Devoluções em andamento</h1>
   <div class="sub">Do aviso do Mercado Livre até o reembolso — o caso nasce antes de a peça chegar</div></div></header>
@@ -278,14 +292,33 @@ function linhaCaso(c){
     '<div class="t1"><span>#'+c.id+'</span><span>Venda '+esc(c.venda||'—')+'</span><span>NF '+esc(c.nf||'—')+'</span></div>'+
     '<div class="t2">'+esc(c.sku||'sem SKU')+(peca?' · '+esc(peca):'')+(c.comprador?' · '+esc(c.comprador):'')+'</div>'+
     '<div class="t3">'+esc(c.motivo||'sem motivo')+' · <b style="color:var(--txt)">'+esc(c.etapa_nome)+'</b></div>'+
+    (c.proximo?'<div class="passo'+(c.proximo.nossa?'':' fora')+'">→ '+esc(c.proximo.texto)+(c.proximo.ate?' · até '+dataBR(c.proximo.ate):'')+'</div>':'')+
     '<div class="chips">'+chips+'</div></div>';
+}
+/* A LISTA EM DOIS GRUPOS (fase 2 da spec DEVOLUCOES-PROXIMO-PASSO): dentro
+   de cada card, em cima o que espera A GENTE (na ordem de sempre, a do
+   prazo); embaixo, recolhido, o que espera outros (transportadora, ML). Quem
+   diz de quem é a vez é o servidor (proximo.nossa). O aberto/fechado do grupo
+   de fora sobrevive ao redesenho de 30 s. */
+function filtrarMeus(l){ return l; }
+function ehNossa(c){ return !c.proximo || c.proximo.nossa; }
+function grupoLista(id, casos, vazio){
+  var nos=casos.filter(ehNossa), fora=casos.filter(function(c){ return !ehNossa(c); });
+  if(!casos.length) return '<div class="vazio">'+vazio+'</div>';
+  var h=nos.length ? nos.map(linhaCaso).join('') : '<div class="vazio">Nada esperando a gente aqui.</div>';
+  if(fora.length) h+='<details class="foraGrupo" data-grupo="'+id+'"'+(ESTADO.foraAberto&&ESTADO.foraAberto[id]?' open':'')+'><summary>Esperando outros ('+fora.length+')</summary>'+fora.map(linhaCaso).join('')+'</details>';
+  return h;
 }
 function desenharListas(){
   var lc=document.getElementById('listaColeta'), lm=document.getElementById('listaMl');
-  lc.innerHTML = ESTADO.coleta.length ? ESTADO.coleta.map(linhaCaso).join('') : '<div class="vazio">Nenhuma coleta em andamento.</div>';
-  lm.innerHTML = ESTADO.ml.length ? ESTADO.ml.map(linhaCaso).join('') : '<div class="vazio">Nenhuma devolução do ML esperando chegar.</div>';
-  document.getElementById('nColeta').textContent='('+ESTADO.coleta.length+')';
-  document.getElementById('nMl').textContent='('+ESTADO.ml.length+')';
+  var col=filtrarMeus(ESTADO.coleta), ml=filtrarMeus(ESTADO.ml);
+  lc.innerHTML = grupoLista('coleta', col, 'Nenhuma coleta em andamento.');
+  lm.innerHTML = grupoLista('ml', ml, 'Nenhuma devolução do ML esperando chegar.');
+  document.getElementById('nColeta').textContent='('+col.length+' · '+col.filter(ehNossa).length+' esperando a gente)';
+  document.getElementById('nMl').textContent='('+ml.length+' · '+ml.filter(ehNossa).length+' esperando a gente)';
+  document.querySelectorAll('details.foraGrupo').forEach(function(d){
+    d.addEventListener('toggle', function(){ ESTADO.foraAberto=ESTADO.foraAberto||{}; ESTADO.foraAberto[d.getAttribute('data-grupo')]=d.open; });
+  });
 }
 /* O redesenho de 30 s não apaga o que a pessoa está digitando (§12): ele
    espera enquanto há um campo com foco, e não mexe no caso aberto. */
@@ -479,6 +512,37 @@ ESTADO.origem=null;
 document.getElementById('painel').addEventListener('input', atualizarBarra);
 document.getElementById('painel').addEventListener('change', atualizarBarra);
 var GANCHOS=[];   // as fases seguintes acrescentam blocos ao caso aberto
+/* O cartão "Próximo passo" (fase 1 da spec DEVOLUCOES-PROXIMO-PASSO). O
+   botão rola até o bloco do caso que resolve o passo — pelo título dele. */
+var ALVO_PASSO={ pedir_coleta:'Coleta — tentativas', agendar:'Coleta — tentativas', resultado_coleta:'Coleta — tentativas',
+  docs:'Documentos e fotos', chegou:'Etapa', aviso_ml:'Etapa', revisei:'Etapa', prazo:'Prazos do ML',
+  valor:'Valor do ML pela coleta', reembolso:'Valores do caso', baixa:'Baixa da devolução',
+  revisao_frete:'Revisão no ML', revisar:'A peça já foi revisada?' };
+var VEZ_NOME={ nos:'a gente', dinheiro:'a gente (o dinheiro)', receber_peca:'quem recebe a peça', transportadora:'a transportadora', ml:'o Mercado Livre' };
+function cartaoProximo(c){
+  var p=c.proximo; if(!p) return '';
+  var ate=p.ate?'<span>até <b>'+dataBR(p.ate)+'</b></span>':'';
+  if(!p.nossa) return '<div class="proximo fora" id="cxProximo"><div class="pTit">Esperando '+esc(VEZ_NOME[p.vez]||p.vez)+'</div>'+
+    '<div class="pTxt">'+esc(p.texto)+'</div><div class="pSub">'+ate+'<span>nada a fazer por enquanto</span>'+
+    (p.acao?'<button class="bt sec" data-irpasso="'+esc(p.acao)+'">Ver no caso ↓</button>':'')+'</div></div>';
+  return '<div class="proximo" id="cxProximo"><div class="pTit">Próximo passo</div><div class="pTxt">'+esc(p.texto)+'</div>'+
+    '<div class="pSub">'+ate+'<span>vez de: <b>'+esc(VEZ_NOME[p.vez]||p.vez)+'</b></span><span>quem pode: '+esc(p.quem||'')+'</span>'+
+    (p.acao?'<button class="bt" data-irpasso="'+esc(p.acao)+'">Ir para a ação ↓</button>':'')+'</div></div>';
+}
+function blocoDoPasso(acao){
+  var t=ALVO_PASSO[acao]; if(!t) return null;
+  var hs=document.querySelectorAll('#painel .bloco > h3');
+  for(var i=0;i<hs.length;i++) if(hs[i].textContent.indexOf(t)===0) return hs[i].parentNode;
+  return null;
+}
+function ligarPasso(){
+  document.querySelectorAll('#painel [data-irpasso]').forEach(function(b){
+    var alvo=blocoDoPasso(b.getAttribute('data-irpasso'));
+    if(!alvo){ b.style.display='none'; return; }
+    b.onclick=function(){ alvo.scrollIntoView({behavior:'smooth', block:'start'}); alvo.classList.add('destaque');
+      setTimeout(function(){ alvo.classList.remove('destaque'); }, 2500); };
+  });
+}
 function desenharCaso(d){
   var c=d.caso, P=ESTADO.pode, aberto=!c.encerrado_em;
   var i=d.etapas.indexOf(c.etapa);
@@ -490,6 +554,7 @@ function desenharCaso(d){
   h+='<div class="chips">'+chipPrazo(c)+(c.tipo==='coleta'&&c.parado?'<span class="chip parado">parado há '+plural(c.dias_parado,'dia','dias')+'</span>':'')+
      (c.tipo==='ml'?'<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>'+chipRevisei(c)+chipRevisao(c):'')+
      (c.saida_nome?'<span class="chip">'+esc(c.saida_nome)+'</span>':'')+chipPub(c)+'</div>';
+  if(aberto) h+=cartaoProximo(c);
   h+='<div class="trilha">'+trilha+'</div>';
   h+='<div class="dados">'+
     '<div><b>Venda</b>'+esc(c.venda||'—')+'</div><div><b>Pack</b>'+esc(c.pack_id||'—')+'</div><div><b>NF</b>'+esc(c.nf||'—')+'</div>'+
@@ -687,6 +752,7 @@ function ligarCaso(d, c){
     if(!confirm('Trocar o caso #'+c.id+' para "'+(para==='coleta'?'Nós coletamos':'ML devolve')+'"?')) return;
     acao(base+'/tipo',{ para:para, prazo:pz?pz.value:undefined, aberta_em:ab?ab.value:undefined });
   };
+  ligarPasso();
   document.querySelectorAll('#painel [data-irmao]').forEach(function(b){ b.onclick=function(){ abrir(+b.getAttribute('data-irmao')); }; });
   if((x=document.getElementById('btAvisoML'))) x.onclick=function(){ acao(base+'/aviso-ml',{}); };
   if((x=document.getElementById('btPrazo'))) x.onclick=function(){ var q=document.getElementById('novoPrazoQual'); acao(base+'/prazo',{prazo:document.getElementById('novoPrazo').value, qual:q?q.value:undefined}); };

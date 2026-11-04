@@ -55,7 +55,10 @@ function ok(desc, cond, detalhe){
   else { falhas++; console.log('  FALHOU ' + n + ' — ' + desc + (detalhe ? '\n         ' + detalhe : '')); }
 }
 function eq(desc, achado, esperado){ ok(desc, achado === esperado, 'esperado ' + JSON.stringify(esperado) + ', veio ' + JSON.stringify(achado)); }
-function secao(t){ console.log('\n── ' + t + ' ──'); }
+let SEC=''; function secao(t){ SEC=t; console.log('\n── ' + t + ' ──'); }
+/* A lista em dois grupos (fase 2): o "Esperando outros" nasce recolhido;
+   para clicar num caso de lá, o teste abre o grupo, como a pessoa faria. */
+const abreFora = (pg) => pg.evaluate(() => document.querySelectorAll("details.foraGrupo").forEach(d => { d.open = true; }));
 
 /* Quem é quem: 1 é o Admin Geral (tudo, inclusive o dinheiro). */
 /* 2 só acompanha: desde 03/11/2026 vê e lança os valores do caso, sem a
@@ -94,7 +97,7 @@ const srv = app.listen(0, async () => {
   try {
     const pg = async (w) => {
       const p = await (await b.newContext({ viewport:{ width:w||1440, height:1000 } })).newPage();
-      p.on('pageerror', e => erros.push(e.message));
+      p.on('pageerror', e => erros.push(SEC+' · '+e.message));
       return p;
     };
     const api = async (p, metodo, url, corpo) => (await p.request[metodo.toLowerCase()](B + url, corpo ? { data:corpo } : undefined)).json();
@@ -158,7 +161,7 @@ const srv = app.listen(0, async () => {
     eq('   e a abertura volta a hoje para o próximo lançamento', await p.inputValue('#lAberta'), dia(0));
     const linha2 = await p.locator('#listaColeta .linha', { hasText:'#'+cid2 }).textContent();
     ok('na lista, o chip diz qual prazo: o do comprovante, que vence antes', /comprovante: faltam 3 dias/.test(linha2), linha2);
-    await p.locator('#listaColeta .linha', { hasText:'#'+cid2 }).locator('.t1').click(); await p.waitForTimeout(800);
+    await abreFora(p); await p.locator('#listaColeta .linha', { hasText:'#'+cid2 }).locator('.t1').click(); await p.waitForTimeout(800);
     const dados2 = await p.locator('#painel .dados').first().textContent();
     ok('o caso mostra os dois prazos', /Mandar o comprovante até/.test(dados2) && /Coletar até/.test(dados2) && /Reclamação aberta em/.test(dados2), dados2);
     ok('a tentativa avisa a data depois do prazo', /depois do prazo da coleta/.test(await p.textContent('#painel')));
@@ -177,7 +180,7 @@ const srv = app.listen(0, async () => {
 
     /* ═════════ 2. o defeito que o dono pegou ═════════ */
     secao('o caso — dois campos de blocos diferentes, UM clique (o defeito de 03/11)');
-    await p.locator('#listaColeta .linha', { hasText:'#'+cid }).locator('.t1').click(); await p.waitForTimeout(800);
+    await abreFora(p); await p.locator('#listaColeta .linha', { hasText:'#'+cid }).locator('.t1').click(); await p.waitForTimeout(800);
     await p.fill('#eResp', 'Fulano Novo'); await p.fill('#dValor', '77,70');
     ok('os dois ficam marcados como não salvos', await p.$eval('#eResp', e => e.classList.contains('naosalvo')) && await p.$eval('#dValor', e => e.classList.contains('naosalvo')));
     ok('   e a barra diz quais', /Responsável/.test(await p.textContent('#barraSujo')) && /Valor do ML/.test(await p.textContent('#barraSujo')));
@@ -233,7 +236,7 @@ const srv = app.listen(0, async () => {
 
     /* ═════════ 3. a varredura dos campos do caso ═════════ */
     secao('o caso — varredura: cada campo do "Editar" e do dinheiro chega ao banco');
-    await p.locator('#listaColeta .linha', { hasText:'#'+cid }).locator('.t1').click(); await p.waitForTimeout(800);
+    await abreFora(p); await p.locator('#listaColeta .linha', { hasText:'#'+cid }).locator('.t1').click(); await p.waitForTimeout(800);
     const novos = { eNf:'9999', eSku:'BK140140BEGE', eResp:'Varredura', eObs:'obs varredura', eLink:'https://www.mercadolivre.com.br/x/2', eMsgMl:'msg varredura' };
     for(const k of Object.keys(novos)) await p.fill('#'+k, novos[k]);
     await p.selectOption('#eMotivo', 'Comando quebrado'); await p.selectOption('#ePub', '0');
@@ -255,7 +258,7 @@ const srv = app.listen(0, async () => {
     secao('o ML devolve — o responsável aparece, e a revisão do frete pela tela');
     const ml = await api(p, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000000000090077', publicidade:false });
     await p.goto(B + '/devolucao-casos'); await p.waitForTimeout(800);
-    await p.locator('#listaMl .linha', { hasText:'#'+ml.id }).locator('.t1').click(); await p.waitForTimeout(800);
+    await abreFora(p); await p.locator('#listaMl .linha', { hasText:'#'+ml.id }).locator('.t1').click(); await p.waitForTimeout(800);
     await p.fill('#eResp', 'Resp do ML'); await p.click('#btEditar'); await p.waitForTimeout(1000);
     ok('o responsável aparece no caso do ML devolve', /Resp do ML/.test(await p.locator('#painel .dados').first().textContent()));
     eq('antes de chegar não há o botão da revisão', await p.$('#btRevisao'), null);
@@ -276,7 +279,7 @@ const srv = app.listen(0, async () => {
     QUEM = 2;
     const pa = await pg();
     await pa.goto(B + '/devolucao-casos'); await pa.waitForTimeout(800);
-    await pa.locator('#listaColeta .linha', { hasText:'#'+cid2 }).locator('.t1').click(); await pa.waitForTimeout(800);
+    await abreFora(pa); await pa.locator('#listaColeta .linha', { hasText:'#'+cid2 }).locator('.t1').click(); await pa.waitForTimeout(800);
     ok('vê o bloco Valores do caso', /Valores do caso/.test(await pa.textContent('#painel')));
     ok('   com o custo das tentativas', /Custo/.test(await pa.locator('#painel table').first().textContent()));
     await pa.fill('#dValor', '99,90'); await pa.click('#btSalvarTudo'); await pa.waitForTimeout(1200);
@@ -310,7 +313,7 @@ const srv = app.listen(0, async () => {
     await p.goto(B + '/devolucao-casos'); await p.waitForTimeout(900);
     const lin1 = await p.locator('#listaMl .linha', { hasText:'#'+e1.id }).textContent();
     ok('a lista diz o que falta para encerrar: a baixa e o "Já revisei"', /para encerrar falta: dar a baixa · marcar "Já revisei" no ML/.test(lin1), lin1);
-    await p.locator('#listaMl .linha', { hasText:'#'+e1.id }).locator('.t1').click(); await p.waitForTimeout(800);
+    await abreFora(p); await p.locator('#listaMl .linha', { hasText:'#'+e1.id }).locator('.t1').click(); await p.waitForTimeout(800);
     await p.click('#btAvisoML'); await p.waitForTimeout(1000);
     eq('marcado: a etapa vai a "Já revisei no ML"', caso(e1.id).etapa, 'ml_revisei');
     eq('   e sem a baixa o caso continua aberto', caso(e1.id).encerrado_em, null);
@@ -356,7 +359,7 @@ const srv = app.listen(0, async () => {
     const e2 = await api(p, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000015571779999', nf:'8208', sku:'BK150150BRANCO', publicidade:false });
     const solta = await api(p, 'POST', '/api/devolucao', { codigo_ml:'48323650000', sku_fisico:'BK150150BRANCO', destinacao:'reembalar' });
     await p.goto(B + '/devolucao-casos'); await p.waitForTimeout(900);
-    await p.locator('#listaMl .linha', { hasText:'#'+e2.id }).locator('.t1').click(); await p.waitForTimeout(1200);
+    await abreFora(p); await p.locator('#listaMl .linha', { hasText:'#'+e2.id }).locator('.t1').click(); await p.waitForTimeout(1200);
     ok('o caso mostra a revisão sem caso do mesmo SKU', (await p.textContent('#soltasBox')).includes('Ligar a revisão #'+solta.id), await p.textContent('#soltasBox'));
     await p.fill('#eObs', 'digitado antes de ligar');
     await p.click('[data-ligar="'+solta.id+'"]'); await p.waitForTimeout(1300);
@@ -385,13 +388,16 @@ const srv = app.listen(0, async () => {
     ok('o card sem caso mostra o caso esperado do SKU', cardB.includes('Ligar ao caso #'+e3.id), cardB);
     await pa2.click('.dvLigar[data-dev="'+solta3.id+'"][data-caso="'+e3.id+'"]'); await pa2.waitForTimeout(1200);
     eq('   "Ligar" pela Baixa liga', caso(e3.id).devolucao_id, solta3.id);
+    /* A página emprestada para a Baixa fica sem a lista, e o relógio de 30 s
+       da tela de casos continuaria chamando carregar() nela: fecha. */
+    await pa2.close();
 
     secao('três peças do mesmo SKU: o cartão de cada uma e o "Conferir no ML"');
     const e4 = await api(p, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000015571700777', nf:'8401', sku:'BK140140BEGE', comprador:'Cliente Certo', publicidade:false });
     const pA = await api(p, 'POST', '/api/devolucao', { codigo_ml:'48323600011', sku_fisico:'BK140140BEGE', destinacao:'estoque', tecido:'rasgado', obs:'veio sem kit' });
     const pB = await api(p, 'POST', '/api/devolucao', { codigo_ml:'48323600022', sku_fisico:'BK140140BEGE', destinacao:'reembalar', tecido:'intacto' });
     await p.goto(B + '/devolucao-casos'); await p.waitForTimeout(900);
-    await p.locator('#listaMl .linha', { hasText:'#'+e4.id }).locator('.t1').click(); await p.waitForTimeout(1200);
+    await abreFora(p); await p.locator('#listaMl .linha', { hasText:'#'+e4.id }).locator('.t1').click(); await p.waitForTimeout(1200);
     const sb4 = await p.textContent('#soltasBox');
     ok('a lista mostra a venda do caso e avisa que há mais de uma peça', sb4.includes('2000015571700777') && /há 2 peças deste SKU/.test(sb4), sb4);
     ok('   cada peça com a etiqueta bipada, a triagem e a observação', sb4.includes('48323600011') && sb4.includes('rasgado') && sb4.includes('veio sem kit') && sb4.includes('48323600022'), sb4);
@@ -464,13 +470,53 @@ const srv = app.listen(0, async () => {
     }
     QUEM = 1;
 
+    /* ═════════ O PRÓXIMO PASSO e os dois grupos (spec DEVOLUCOES-PROXIMO-PASSO) ═════════ */
+    secao('o próximo passo — o cartão no alto do caso e a lista em dois grupos');
+    QUEM = 1;
+    const ppC = await api(p, 'POST', '/api/devolucao-casos', { tipo:'coleta', venda:'2000000000097001', sku:'BK140140BEGE', prazo:dia(5), publicidade:false });
+    const ppM = await api(p, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000000000097002', sku:'BK140140BEGE', publicidade:false });
+    const pp = await pg();
+    await pp.goto(B + '/devolucao-casos'); await pp.waitForTimeout(900);
+    const linC = await pp.locator('#listaColeta .linha', { hasText:'#'+ppC.id+' ' }).first();
+    ok('a linha do caso diz o próximo passo', /→ Pedir a coleta/.test(await linC.textContent()), await linC.textContent());
+    ok('   e o caso nosso fica no grupo de cima (fora do "Esperando outros")', await linC.evaluate(e => !e.closest('details')));
+    const linM = pp.locator('#listaMl details.foraGrupo .linha', { hasText:'#'+ppM.id+' ' });
+    eq('o ML devolve aguardando fica em "Esperando outros"', await linM.count(), 1);
+    eq('   que nasce recolhido', await pp.$eval('#listaMl details.foraGrupo', d => d.open), false);
+    ok('   e o título diz quantos', /Esperando outros \(\d+\)/.test(await pp.textContent('#listaMl details.foraGrupo summary')));
+    ok('o título do card diz quantos esperam a gente', /esperando a gente/.test(await pp.textContent('#nColeta')), await pp.textContent('#nColeta'));
+    await pp.click('#listaMl details.foraGrupo summary'); await pp.waitForTimeout(200);
+    await pp.evaluate(() => carregar()); await pp.waitForTimeout(600);
+    eq('aberto à mão, o grupo continua aberto depois do redesenho', await pp.$eval('#listaMl details.foraGrupo', d => d.open), true);
+    await linC.locator('.t1').click(); await pp.waitForTimeout(900);
+    ok('o caso abre com o cartão "Próximo passo"', /Próximo passo/.test(await pp.textContent('#cxProximo')) && /Pedir a coleta/.test(await pp.textContent('#cxProximo')));
+    ok('   antes de qualquer bloco do caso', await pp.evaluate(() => { const c = document.getElementById('cxProximo'), b = document.querySelector('#painel .bloco'); return !!(c && b && (c.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)); }));
+    ok('   com o "até" e de quem é a vez', /até/.test(await pp.textContent('#cxProximo')) && /vez de: a gente/.test(await pp.textContent('#cxProximo')), await pp.textContent('#cxProximo'));
+    await pp.click('#cxProximo [data-irpasso]'); await pp.waitForTimeout(400);
+    ok('"Ir para a ação" leva ao bloco da coleta e o destaca', await pp.evaluate(() => { const d = document.querySelector('#painel .bloco.destaque h3'); return !!d && d.textContent.indexOf('Coleta — tentativas') === 0; }));
+    await pp.evaluate(() => fechar()); await pp.waitForTimeout(300);
+    await abreFora(pp); await pp.locator('#listaMl .linha', { hasText:'#'+ppM.id+' ' }).locator('.t1').click(); await pp.waitForTimeout(900);
+    ok('o ML devolve aguardando: o cartão é cinza, "esperando o Mercado Livre"', await pp.$eval('#cxProximo', e => e.classList.contains('fora')) && /Esperando o Mercado Livre/.test(await pp.textContent('#cxProximo')), await pp.textContent('#cxProximo'));
+    ok('   e não pede ação', /nada a fazer/.test(await pp.textContent('#cxProximo')));
+    for(const w of [400, 768]){
+      const pw = await pg(w);
+      await pw.goto(B + '/devolucao-casos'); await pw.waitForTimeout(900);
+      let mw = await pw.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+      ok('a ' + w + ' px a lista em dois grupos não rola de lado', mw[0] <= mw[1], JSON.stringify(mw));
+      await pw.locator('#listaColeta .linha', { hasText:'#'+ppC.id+' ' }).first().locator('.t1').click(); await pw.waitForTimeout(900);
+      mw = await pw.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth, !!document.getElementById('cxProximo')]);
+      ok('   e o caso com o cartão do passo também não', mw[2] && mw[0] <= mw[1], JSON.stringify(mw));
+      await pw.close();
+    }
+    await pp.close();
+
     /* ═════════ 5. o celular ═════════ */
     secao('a 400 px — a página não rola de lado, e o caso abre');
     const p4 = await pg(400);
     await p4.goto(B + '/devolucao-casos'); await p4.waitForTimeout(800);
     let m = await p4.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
     eq('a lista', m[0] <= m[1], true);
-    await p4.locator('#listaMl .linha', { hasText:'#'+ml.id }).locator('.t1').click(); await p4.waitForTimeout(800);
+    await abreFora(p4); await p4.locator('#listaMl .linha', { hasText:'#'+ml.id }).locator('.t1').click(); await p4.waitForTimeout(800);
     await p4.fill('#eResp', 'x');
     m = await p4.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
     eq('o caso aberto, com a barra de não salvo', m[0] <= m[1], true);
