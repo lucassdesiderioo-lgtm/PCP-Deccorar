@@ -424,6 +424,46 @@ const srv = app.listen(0, async () => {
     ok('   e a história diz o que foi desligado e por quê', /desligada/.test(await p.textContent('#painel')) && /outra venda/.test(await p.textContent('#painel')));
     await p.click('#painel button:has-text("Fechar")'); await p.waitForTimeout(300);
 
+    secao('três peças do mesmo SKU sem Pack ID: o nome e a cidade do remetente acham o caso');
+    db.prepare("INSERT OR IGNORE INTO skus (codigo,largura_cm,altura_cm,cor_codigo) VALUES ('BK150150CINZA',150,150,'CINZA')").run();
+    db.prepare("INSERT INTO lote (codigo,buyer,nf,venda,city) VALUES ('BK150150CINZA','Maria Consuelo Bermudez','8901','2000015571700901','Governador Celso Ramos, Santa Catarina')").run();
+    db.prepare("INSERT INTO lote (codigo,buyer,nf,venda,city) VALUES ('BK150150CINZA','José Ávila Santos','8902','2000015571700902','Jundiaí, São Paulo')").run();
+    const f1 = await api(p, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000015571700901', publicidade:false });
+    const f2 = await api(p, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000015571700902', publicidade:false });
+    const f3 = await api(p, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000015571700903', sku:'BK150150CINZA', comprador:'Sem Venda Silva', publicidade:false });
+    QUEM = 3;
+    const pf = await pg();
+    await pf.goto(B + '/devolucao'); await pf.waitForTimeout(900);
+    await pf.fill('#dvCod', '48323699999'); await pf.waitForTimeout(1200);
+    await pf.click('[data-cor="CINZA"]'); await pf.waitForTimeout(200);
+    await pf.click('[data-med="150x150"]'); await pf.waitForTimeout(900);
+    let espF = await pf.textContent('#dvEsp');
+    ok('os três casos aparecem, com o nome e a cidade do comprador', espF.includes('#'+f1.id+' ') && espF.includes('#'+f2.id+' ') && espF.includes('#'+f3.id+' ') && /Governador Celso Ramos/.test(espF) && /Jundiaí/.test(espF), espF);
+    ok('   e o campo de filtrar pelo remetente aparece', await pf.isVisible('#dvEspFiltro'));
+    await pf.fill('#dvEspFiltro', 'celso'); await pf.waitForTimeout(300);
+    let vis = await pf.$$eval('#dvEsp [data-dvcaso]', bs => bs.filter(b => b.offsetParent !== null).map(b => +b.getAttribute('data-dvcaso')));
+    eq('"celso" deixa só o caso de Governador Celso Ramos', vis.join(','), String(f1.id));
+    await pf.fill('#dvEspFiltro', 'AVILA'); await pf.waitForTimeout(300);
+    vis = await pf.$$eval('#dvEsp [data-dvcaso]', bs => bs.filter(b => b.offsetParent !== null).map(b => +b.getAttribute('data-dvcaso')));
+    eq('   sem acento e sem diferença de maiúscula: "AVILA" acha José Ávila', vis.join(','), String(f2.id));
+    await pf.fill('#dvEspFiltro', 'bermudez'); await pf.waitForTimeout(300);
+    await pf.click('[data-dvcaso="'+f1.id+'"]'); await pf.waitForTimeout(400);
+    eq('   tocado, o filtro continua escrito', await pf.inputValue('#dvEspFiltro'), 'bermudez');
+    for(const [k, v] of [['embalagem','intacta'],['tecido','intacto'],['tubo','ok'],['base','ok'],['comando','perfeito'],['kit','com kit'],['destinacao','reembalar']])
+      await pf.click('.dvOp[data-p="'+k+'"][data-v="'+v+'"]');
+    await pf.click('#dvSalvar'); await pf.waitForTimeout(1200);
+    eq('salvou e ligou o caso certo', caso(f1.id).etapa + '/' + caso(f2.id).etapa + '/' + caso(f3.id).etapa, 'revisado/aguardando/aguardando');
+    for(const w of [400, 768]){
+      const pw = await pg(w);
+      await pw.goto(B + '/devolucao'); await pw.waitForTimeout(900);
+      await pw.fill('#dvCod', '48323699998'); await pw.waitForTimeout(1200);
+      await pw.click('[data-cor="CINZA"]'); await pw.waitForTimeout(200);
+      await pw.click('[data-med="150x150"]'); await pw.waitForTimeout(900);
+      const mw = await pw.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth, !!document.getElementById('dvEspFiltro')]);
+      ok('a ' + w + ' px a lista com o filtro não rola de lado', mw[2] && mw[0] <= mw[1], JSON.stringify(mw));
+    }
+    QUEM = 1;
+
     /* ═════════ 5. o celular ═════════ */
     secao('a 400 px — a página não rola de lado, e o caso abre');
     const p4 = await pg(400);

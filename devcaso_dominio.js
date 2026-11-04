@@ -948,8 +948,16 @@ function talvezEncerrarML(db, id, usuario, baixadaAgora, texto){
 function esperadas(db, sku){
   const s = String(sku || '').trim().toUpperCase();
   if(!s) throw new Recusa(400, 'Informe o SKU.');
-  return db.prepare(`SELECT id,tipo,venda,pack_id,nf,comprador,motivo,etapa,sku FROM devolucao_caso
-      WHERE encerrado_em IS NULL AND devolucao_id IS NULL AND UPPER(sku)=? ORDER BY id`).all(s)
+  /* A CIDADE do comprador (AJUSTE de 03/11/2026): a etiqueta de devolução
+     traz o remetente — o comprador, às vezes pelo apelido — e a cidade dele,
+     e nem sempre o Pack ID. Ela vem da venda ligada ao caso; sem venda no
+     sistema, vem vazia. */
+  let comCidade = true;
+  try{ db.prepare('SELECT city FROM lote LIMIT 0').all(); }catch(e){ comCidade = false; }
+  return db.prepare(`SELECT c.id,c.tipo,c.venda,c.pack_id,c.nf,c.comprador,c.motivo,c.etapa,c.sku,
+        ${comCidade ? "NULLIF(TRIM(l.city),'')" : 'NULL'} cidade
+      FROM devolucao_caso c ${comCidade ? 'LEFT JOIN lote l ON l.id=c.lote_id' : ''}
+      WHERE c.encerrado_em IS NULL AND c.devolucao_id IS NULL AND UPPER(c.sku)=? ORDER BY c.id`).all(s)
     .map(c => Object.assign(c, { etapa_nome: NOME_ETAPA[c.etapa] || c.etapa }));
 }
 
