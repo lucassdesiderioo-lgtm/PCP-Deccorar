@@ -55,6 +55,8 @@ db.exec(`
     ('BK160140BEGE','Carla Dias','7451','2000018750385396','2000099900000003'),
     ('BK160160BRANCO','Maria Souza','6001','2000000000006001','2000099900006001'),
     ('BK160140BEGE','Carla Dias','6003','2000000000006003','2000099900006003');
+  CREATE TABLE usuarios (id INTEGER PRIMARY KEY, nome TEXT, ativo INTEGER DEFAULT 1);
+  INSERT INTO usuarios (id,nome) VALUES (1,'Lucas'),(2,'Renato'),(3,'Ana'),(4,'Edvaldo');
 `);
 
 /* Quem é quem. O Lucas é o admin geral (tem tudo, inclusive o dinheiro); o
@@ -93,6 +95,21 @@ function chamar(metodo, rota, corpo, quem, params, query){
      com "não". Quem testa a obrigação manda a chave, mesmo vazia. */
   if(metodo === 'POST' && rota === '/api/devolucao-casos' && corpo && !('publicidade' in corpo))
     corpo = Object.assign({ publicidade:false }, corpo);
+  /* O QUE O LANÇAMENTO EXIGE (04/11/2026): motivo, SKU, comprador,
+     responsável e link. Os casos de antes da regra não falam disso; quem não
+     manda a chave ganha um valor de teste — o SKU e o comprador só quando a
+     venda não está no lote (lá eles vêm da venda, como no servidor). Quem
+     testa a obrigação manda a chave, mesmo vazia. */
+  if(metodo === 'POST' && rota === '/api/devolucao-casos' && corpo && !corpo._cru){
+    const DD = require('./devcaso_dominio');
+    const lt = DD.buscarLote(db, String(corpo.venda||corpo.pack_id||'').replace(/\s+/g,'')) || DD.buscarLotePorNF(db, corpo.nf);
+    const pad = { motivo:'Avaria no transporte', responsavel_id:1, link_ml:'https://www.mercadolivre.com.br/reclamacao/teste' };
+    if(!(lt && lt.codigo)) pad.sku = 'BK140140BEGE';
+    if(!(lt && lt.buyer)) pad.comprador = 'Comprador Teste';
+    for(const k of Object.keys(pad)) if(k in corpo) delete pad[k];
+    corpo = Object.assign(pad, corpo);
+  }
+  if(corpo && corpo._cru){ corpo = Object.assign({}, corpo); delete corpo._cru; }
   const uid = quem || 1;
   h({ body: corpo||{}, params: params||{}, query: query||{}, headers:{}, usuario: quem === 'ninguem' ? null : {id:uid, nome:NOMES[uid]} }, res);
   return out;
@@ -1819,7 +1836,10 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
 
   secao('responsável — escolher a pessoa no caso');
   const rc = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'2000015571709301', sku:'BK140140BEGE', prazo:dia(5), responsavel:'Texto de antes', publicidade:false }, 3).body.id;
-  eq('o lançamento de antes, com texto livre, continua aceito', caso(rc).responsavel, 'Texto de antes');
+  /* O caso de antes da regra (04/11/2026): só o texto livre, sem a pessoa. */
+  db.prepare('UPDATE devolucao_caso SET responsavel_id=NULL, responsavel_nome=NULL WHERE id=?').run(rc);
+  eq('o caso de antes, com texto livre, fica como estava', caso(rc).responsavel, 'Texto de antes');
+  eq('   e o texto livre não conta como responsável: o caso diz que falta', chamar('GET','/api/devolucao-casos/:id',null,2,{ id:rc }).body.caso.falta_lancamento.join(), 'responsável');
   r = chamar('POST','/api/devolucao-casos/:id/editar',{ responsavel_id:2 }, 3, { id:rc });
   eq('escolher o Renato (200)', r.status, 200);
   eq('   grava o id', caso(rc).responsavel_id, 2);
@@ -1844,6 +1864,51 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   eq('   e recusa quem não pode (400), sem nascer o caso', r.status + '/' + contar('devolucao_caso', "venda='2000015571709303'"), '400/0');
   const nl = daLista(lista(2).ml, rc2.body.id);
   eq('a lista leva o id e o nome da pessoa (o "Meus casos" filtra por ele)', nl && (nl.responsavel_id + '/' + nl.responsavel_nome), '6/Só lança');
+
+  /* ═══ O QUE O LANÇAMENTO EXIGE (decisão do dono, 04/11/2026) ═══
+     Motivo, SKU, comprador, responsável e link da conversa, nos dois tipos.
+     `_cru` desliga o completar do helper: aqui o corpo é exatamente este. */
+  secao('lançamento — os cinco campos obrigatórios');
+  {
+    const DD = require('./devcaso_dominio');
+    const cheio = (x) => Object.assign({ _cru:true, tipo:'coleta', venda:'2000015571709401', prazo:dia(5), publicidade:false,
+      motivo:'Avaria no transporte', sku:'BK140140BEGE', comprador:'Maria Teste', responsavel_id:2,
+      link_ml:'https://www.mercadolivre.com.br/reclamacao/9401' }, x);
+    const n0 = contar('devolucao_caso');
+    for(const [k, nome] of [['motivo','motivo'],['sku','SKU'],['comprador','comprador'],['responsavel_id','responsável'],['link_ml','link da conversa']]){
+      for(const tipo of ['coleta','ml']){
+        const r1 = chamar('POST','/api/devolucao-casos', cheio({ tipo, [k]:'' }), 3);
+        ok('sem '+nome+' ('+tipo+'): 400 nomeando o campo', r1.status === 400 && r1.body.erro.indexOf(nome) >= 0 && (r1.body.faltam||[]).join() === k, JSON.stringify(r1.body));
+      }
+    }
+    eq('   e nenhum caso nasceu', contar('devolucao_caso'), n0);
+    r = chamar('POST','/api/devolucao-casos', { _cru:true, tipo:'ml', venda:'2000015571709402', publicidade:false }, 3);
+    eq('faltando os cinco: uma recusa só, com os cinco', r.status + ' ' + (r.body.faltam||[]).join(','), '400 motivo,sku,comprador,responsavel_id,link_ml');
+    ok('   e a frase diz todos', /Para lançar, falta: motivo · SKU · comprador · responsável · link da conversa\./.test(r.body.erro), r.body.erro);
+    r = chamar('POST','/api/devolucao-casos', cheio({ responsavel_id:undefined, responsavel:'Escrito à mão' }), 3);
+    eq('o texto livre de responsável não basta', r.status + ' ' + (r.body.faltam||[]).join(), '400 responsavel_id');
+    db.prepare("INSERT INTO lote (codigo,buyer,nf,venda) VALUES ('BK160140BEGE','Joao Lima','9410','2000015571709410')").run();
+    r = chamar('POST','/api/devolucao-casos', cheio({ venda:'2000015571709410', sku:'', comprador:'' }), 3);
+    eq('a venda achada no sistema preenche SKU e comprador, e lança', r.status, 200);
+    const cs = caso(r.body.id);
+    eq('   com os da venda', cs.sku + '/' + cs.comprador, 'BK160140BEGE/Joao Lima');
+    r = chamar('POST','/api/devolucao-casos', cheio({}), 3);
+    eq('com os cinco, lança', r.status, 200);
+    const cc = r.body.id;
+    eq('   e o caso completo não tem "falta"', JSON.stringify(chamar('GET','/api/devolucao-casos/:id',null,2,{ id:cc }).body.caso.falta_lancamento), '[]');
+    const semReg = DD.lancar(db, { tipo:'ml', venda:'2000015571709403', publicidade:false }, { nome:'Script' }, { semObrigatorios:true });
+    ok('o script dos casos iniciais (semObrigatorios) lança sem eles', !!(semReg && semReg.id));
+    const fl = chamar('GET','/api/devolucao-casos/:id',null,2,{ id:semReg.id }).body.caso.falta_lancamento;
+    eq('o caso incompleto diz o que falta', fl.join(' · '), 'motivo · SKU · comprador · responsável · link da conversa');
+    const nl = daLista(lista(2).ml, semReg.id);
+    eq('   a lista também', (nl.falta_lancamento||[]).length, 5);
+    ok('   sem valor em reais', fl.every(x => !/R\$|\d/.test(x)));
+    chamar('POST','/api/devolucao-casos/:id/editar',{ motivo:'Avaria no transporte', sku:'BK140140BEGE', comprador:'Fulano', responsavel_id:3, link_ml:'https://www.mercadolivre.com.br/x/9403' }, 1, { id:semReg.id });
+    eq('completado pelo editar, o "falta" some', chamar('GET','/api/devolucao-casos/:id',null,2,{ id:semReg.id }).body.caso.falta_lancamento.length, 0);
+    const sem2 = DD.lancar(db, { tipo:'coleta', venda:'2000015571709404', prazo:dia(3), publicidade:false }, { nome:'Script' }, { semObrigatorios:true });
+    chamar('POST','/api/devolucao-casos/:id/perda',{ valor_perdido:'1' }, 1, { id:sem2.id });
+    eq('o encerrado não cobra o que falta', JSON.stringify(chamar('GET','/api/devolucao-casos/encerrados',null,1).body.casos.find(c => c.id === sem2.id).falta_lancamento), '[]');
+  }
 
   fim();
 })().catch(e => { console.log('ESTOUROU: ' + e.stack); falhas++; fim(); });

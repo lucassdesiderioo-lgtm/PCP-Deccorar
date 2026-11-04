@@ -294,6 +294,7 @@ function publico(c, h, lim, comDinheiro, custos){
   delete o.teste;
   o.teste = c.teste;
   o.etapa_nome = NOME_ETAPA[c.etapa] || c.etapa;
+  o.falta_lancamento = c.encerrado_em ? [] : faltaLancamento(c);
   o.saida_nome = c.saida ? (NOME_SAIDA[c.saida] || c.saida) : null;
   if(comDinheiro && c.tipo === 'coleta'){
     const k = (custos && custos.get(c.id)) || { soma:0, faltam:0, n:0 };
@@ -506,6 +507,16 @@ function lancar(db, b, usuario, opt){
   }
   const ja = abertoDaVenda(db, venda);
   if(ja) throw new Recusa(409, 'Já existe o caso #'+ja.id+' aberto para a venda '+venda+'.', { caso_id: ja.id });
+  /* O QUE NÃO PODE FALTAR NO LANÇAMENTO (decisão do dono, 04/11/2026): sem
+     isso alguém abre o caso depois para completar. O SKU e o comprador que
+     vieram da venda no sistema contam. A recusa é UMA, dizendo todos. Só o
+     script dos casos iniciais, de antes da regra, lança sem eles. */
+  if(!(opt && opt.semObrigatorios)){
+    const t = (v) => { const x = String(v == null ? '' : v).trim(); return x || null; };
+    const faltam = faltaLancamento({ motivo, sku: t(b.sku) || (lt ? lt.codigo : null),
+      comprador: t(b.comprador) || (lt ? lt.buyer : null), responsavel_id: resp ? resp.id : null, link_ml }, true);
+    if(faltam.length) throw new Recusa(400, 'Para lançar, falta: '+faltam.map(x => x.nome).join(' · ')+'.', { faltam: faltam.map(x => x.campo) });
+  }
 
   const etapa = ETAPAS[tipo][0];
   const txt = (v) => { const s = String(v == null ? '' : v).trim(); return s || null; };
@@ -675,6 +686,15 @@ function responsavelValido(db, v, temChave){
   try{ u = db.prepare('SELECT id, nome FROM usuarios WHERE id=? AND ativo=1').get(id); }catch(e){}
   if(!u || (temChave && !temChave(u.id))) throw recusa();
   return u;
+}
+/* O que o lançamento exige e o caso ainda não tem (dono único de "o que
+   falta neste caso"). O responsável conta pela PESSOA: o texto escrito à mão
+   de antes não alimenta o "Meus casos". `comCampo` devolve também a chave. */
+const OBRIGATORIOS = [['motivo','motivo'],['sku','SKU'],['comprador','comprador'],['responsavel_id','responsável'],['link_ml','link da conversa']];
+function faltaLancamento(c, comCampo){
+  const vazio = (v) => v === null || v === undefined || String(v).trim() === '';
+  const f = OBRIGATORIOS.filter(([k]) => vazio(c[k]));
+  return comCampo ? f.map(([campo, nome]) => ({ campo, nome })) : f.map(([, nome]) => nome);
 }
 const nomeResp = (c) => (c && (c.responsavel_nome || c.responsavel)) || '—';
 
@@ -1625,6 +1645,7 @@ function comProximo(db, linhas, h, lim){
 }
 
 module.exports = {
+  faltaLancamento, OBRIGATORIOS,
   responsaveis, responsavelValido,
   proximoPasso, comProximo, VEZ_NOSSA,
   buscar, lancarCompleto, trocarTipo, pedirRevisaoFrete, respostaRevisaoFrete, desfazerEtapa, podeDesfazer, mesmoComprador,

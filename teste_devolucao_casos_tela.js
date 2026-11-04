@@ -102,7 +102,22 @@ const srv = app.listen(0, async () => {
       p.on('pageerror', e => erros.push(SEC+' · '+e.message));
       return p;
     };
-    const api = async (p, metodo, url, corpo) => (await p.request[metodo.toLowerCase()](B + url, corpo ? { data:corpo } : undefined)).json();
+    /* O lançamento exige motivo, SKU, comprador, responsável e link (04/11/2026):
+       os casos de antes não falam disso e ganham valores de teste; quem testa
+       a obrigação manda a chave (o SKU e o comprador só se a venda não está no lote). */
+    const PAD_LANCAR = (c) => {
+      const lt = db.prepare('SELECT codigo,buyer FROM lote WHERE venda=? OR packId=?').get(c.venda||'', c.venda||'') || {};
+      const pad = { motivo:'Falta de kit', responsavel_id:1, link_ml:'https://www.mercadolivre.com.br/reclamacao/tela' };
+      if(!lt.codigo) pad.sku = 'BK140140BEGE';
+      /* Um nome por caso: o mesmo nome em todos juntaria os casos no "mesmo comprador". */
+      if(!lt.buyer) pad.comprador = 'Cliente ' + String(c.venda||c.nf||'x').replace(/\D/g,'').slice(-6).replace(/\d/g, d => 'abcdefghij'[d]);
+      for(const k of Object.keys(pad)) if(k in c) delete pad[k];
+      return Object.assign(pad, c);
+    };
+    const api = async (p, metodo, url, corpo) => {
+      if(metodo === 'POST' && url === '/api/devolucao-casos' && corpo) corpo = PAD_LANCAR(corpo);
+      return (await p.request[metodo.toLowerCase()](B + url, corpo ? { data:corpo } : undefined)).json();
+    };
     let p = await pg();
     const tr = await api(p, 'POST', '/api/devolucao-casos/transportadoras', { nome:'Transp Tela' });
 
@@ -145,6 +160,8 @@ const srv = app.listen(0, async () => {
     secao('o lançamento — os dois prazos, a data agendada e o limite do frete');
     await p.fill('#lVenda', '2000000000090055'); await p.waitForTimeout(700);
     await p.fill('#lPrazo', dia(3));
+    await p.selectOption('#lMotivo', 'Falta de kit'); await p.fill('#lSku', 'BK140140BEGE'); await p.fill('#lComprador', 'Cliente Sem Venda');
+    await p.selectOption('#lResp', '2'); await p.fill('#lLink', 'https://www.mercadolivre.com.br/reclamacao/2');
     await p.fill('#lAberta', dia(-2));
     ok('a tela mostra até quando coletar', /Coletar até .*20 dias corridos/.test(await p.textContent('#lColetaAte')), await p.textContent('#lColetaAte'));
     await p.selectOption('#lTransp', String(tr.id));
@@ -522,6 +539,7 @@ const srv = app.listen(0, async () => {
     const opts = await pr.$$eval('#lResp option', os => os.map(o => o.textContent));
     eq('o lançamento oferece só quem lança ou acompanha, ativo', opts.join('|'), '— escolher —|Lucas Tela|Renato Tela');
     const velho = await api(pr, 'POST', '/api/devolucao-casos', { tipo:'coleta', venda:'2000000000098001', sku:'BK140140BEGE', prazo:dia(7), responsavel:'Escrito à mão', publicidade:false });
+    db.prepare('UPDATE devolucao_caso SET responsavel_id=NULL, responsavel_nome=NULL WHERE id=?').run(velho.id);   // o caso de antes da regra
     await pr.evaluate(() => carregar()); await pr.waitForTimeout(700);
     ok('o caso de antes mostra o texto livre na lista', /Escrito à mão/.test(await pr.locator('#listaColeta .linha', { hasText:'#'+velho.id+' ' }).first().textContent()));
     await pr.locator('#listaColeta .linha', { hasText:'#'+velho.id+' ' }).first().locator('.t1').click(); await pr.waitForTimeout(900);
@@ -553,6 +571,37 @@ const srv = app.listen(0, async () => {
     eq('quem não tem caso nenhum vê a lista inteira', await pz.$$eval('#listaColeta .linha, #listaMl .linha', ls => ls.length), total);
     ok('   e a tela diz isso', /nenhum caso aberto: mostrando todos/.test(await pz.textContent('#meusAviso')), await pz.textContent('#meusAviso'));
     await pz.close();
+
+    /* ═════════ O QUE O LANÇAMENTO EXIGE (04/11/2026) ═════════ */
+    secao('o lançamento — os campos obrigatórios marcados, e o "falta" dos casos antigos');
+    QUEM = 1;
+    const po = await pg();
+    await po.goto(B + '/devolucao-casos'); await po.waitForTimeout(900);
+    await po.click('#tpMl'); await po.waitForTimeout(200);
+    ok('o responsável aparece também no ML devolve', await po.isVisible('#lResp'));
+    ok('   e os obrigatórios têm a marca *', (await po.$$eval('#cardLancar .obrig', e => e.length)) >= 5);
+    await po.fill('#lVenda', '2000000000096001'); await po.waitForTimeout(700);
+    await po.fill('#lObs', 'obs que não pode sumir'); await po.click('#lPub [data-pub="0"]');
+    await po.click('#btLancar'); await po.waitForTimeout(900);
+    ok('lançar sem eles: a recusa diz todos de uma vez', /Para lançar, falta: motivo · SKU · comprador · responsável · link da conversa/.test(await po.textContent('#lMsg')), await po.textContent('#lMsg'));
+    const marcados = await po.$$eval('#cardLancar .campoFalta', es => es.map(e => e.id).sort().join(','));
+    eq('   e marca os cinco campos', marcados, 'lComprador,lLink,lMotivo,lResp,lSku');
+    eq('   sem apagar o digitado', await po.inputValue('#lObs') + '|' + await po.inputValue('#lVenda'), 'obs que não pode sumir|2000000000096001');
+    eq('   e nenhum caso nasceu', db.prepare("SELECT COUNT(*) n FROM devolucao_caso WHERE venda='2000000000096001'").get().n, 0);
+    await po.fill('#lLink', 'https://www.mercadolivre.com.br/reclamacao/96001'); await po.waitForTimeout(100);
+    eq('digitar no campo tira a marca dele', await po.$eval('#lLink', e => e.classList.contains('campoFalta')), false);
+    await po.selectOption('#lMotivo', 'Falta de kit'); await po.fill('#lSku', 'BK140140BEGE'); await po.fill('#lComprador', 'Fulana Obrigatoria');
+    await po.selectOption('#lResp', '2'); await po.click('#btLancar'); await po.waitForTimeout(1000);
+    const nob = db.prepare("SELECT * FROM devolucao_caso WHERE venda='2000000000096001'").get() || {};
+    eq('completo, lança o ML devolve com o responsável', nob.tipo + '/' + nob.responsavel_id, 'ml/2');
+    const DDt = require('./devcaso_dominio');
+    const antigo = DDt.lancar(db, { tipo:'ml', venda:'2000000000096002', publicidade:false }, { nome:'Script' }, { semObrigatorios:true });
+    await po.evaluate(() => carregar()); await po.waitForTimeout(700); await abreFora(po);
+    const linA = await po.locator('#listaMl .linha', { hasText:'#'+antigo.id+' ' }).first().textContent();
+    ok('o caso antigo incompleto mostra "falta: …" na lista', /falta: motivo · SKU · comprador · responsável · link da conversa/.test(linA), linA);
+    await po.locator('#listaMl .linha', { hasText:'#'+antigo.id+' ' }).first().locator('.t1').click(); await po.waitForTimeout(900);
+    ok('   e no caso aberto', /falta: motivo/.test(await po.locator('#painel .chips').first().textContent()));
+    await po.close();
 
     /* ═════════ 5. o celular ═════════ */
     secao('a 400 px — a página não rola de lado, e o caso abre');
