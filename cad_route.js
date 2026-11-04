@@ -1,6 +1,9 @@
 module.exports=function(app,db){
   db.exec("CREATE TABLE IF NOT EXISTS listas (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, valor TEXT, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1)");
-  db.exec("CREATE TABLE IF NOT EXISTS rejeicao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, motivo TEXT, obs TEXT, segundos INTEGER, modo TEXT, usuario TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0)");
+  db.exec("CREATE TABLE IF NOT EXISTS rejeicao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, motivo TEXT, obs TEXT, segundos INTEGER, modo TEXT, usuario TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, usuario_id INTEGER)");
+  /* QUEM-FEZ-E-REVISAO (04/11/2026): a "Peca com problema" ja gravava o NOME
+     em `usuario` (fica, e historia e ha tela lendo); o id entra ao lado. */
+  try{ db.exec('ALTER TABLE rejeicao ADD COLUMN usuario_id INTEGER'); }catch(e){}
 
   const seed=(tipo,vals)=>{
     const n=db.prepare('SELECT COUNT(*) c FROM listas WHERE tipo=?').get(tipo).c;
@@ -56,11 +59,12 @@ module.exports=function(app,db){
   });
 
   app.post('/api/rejeicao',(req,res)=>{
+    const q=require('./quem').exigir(req,res); if(!q) return;
     const b=req.body||{};
     const cod=(b.codigo||'').trim().toUpperCase();
     if(!cod||!b.motivo) return res.status(400).json({erro:'faltam dados'});
-    db.prepare('INSERT INTO rejeicao (codigo,motivo,obs,segundos,modo,usuario) VALUES (?,?,?,?,?,?)')
-      .run(cod,b.motivo,b.obs||null,Math.round(+b.segundos||0),b.modo||null,(req.usuario&&req.usuario.nome)||null);
+    db.prepare('INSERT INTO rejeicao (codigo,motivo,obs,segundos,modo,usuario,usuario_id) VALUES (?,?,?,?,?,?,?)')
+      .run(cod,b.motivo,b.obs||null,Math.round(+b.segundos||0),b.modo||null,q.usuario_nome,q.usuario_id);
     res.json({ok:true});
   });
 

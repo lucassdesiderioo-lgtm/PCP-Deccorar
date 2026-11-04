@@ -1,5 +1,27 @@
-> **STATUS · 04/11/2026 — PLANEJADO**
-> - Desenhado no Projeto do Claude com o Lucas em 04/11/2026. Nada implementado.
+> **STATUS · 04/11/2026 — EM CONSTRUÇÃO · fase 1 em código, falta subir**
+> - Desenhado no Projeto do Claude com o Lucas em 04/11/2026.
+> - **Fase 1 (Revisão) em código em 04/11/2026**: `quem.js`, barreira de 15 s
+>   (`config.rev_minimo_seg`), "Cancelar revisão", "Desfazer última",
+>   `revisao_evento`, `fila.revisao_id`, `rejeicao.usuario_id`. Cartões R-REV-07 a
+>   R-REV-09 em `docs/regras/estoque.md`; `teste_revisao.js` (120). Falta o deploy e
+>   a prova de fábrica: o primeiro bipe duplo recusado na bancada, e um desfazer de
+>   verdade tirando a peça da lista da Embalagem.
+> - **O que divergiu na construção (vale o `CLAUDE.md`):**
+>   - §4, linha "Revisão — não (dívida 9)": **estava atrasada.** A revisão e a
+>     embalagem já gravavam `usuario_id` + `usuario_nome` desde 26/10/2026 (fase 4
+>     da `ACESSOS-UNIFICADOS`, R-EMB-08). A fase 1 não criou essas colunas: passou a
+>     ler pelo `quem.js` e a recusar sem login. A fase 2 (embalagem) fica menor —
+>     é trocar a leitura para o `quem(req)` e o 401.
+>   - §3.4, aviso do `permDaRota()`: as rotas novas **não** cairiam no `@logado`,
+>     e sim no `pre('/api/revisao')` das leituras, que aceita `@admin`. A linha
+>     própria com `revisao.executar` entrou do mesmo jeito.
+>   - `revisao_evento` ganhou `revisao_id` (a revisão desfeita) e `data`: é pela
+>     `revisao_id` que o desfazer sabe que já desfez e não volta a anterior.
+>   - Em **modo teste** só se desfaz revisão de teste, e fora dele só a de verdade
+>     (§11 do `CLAUDE.md`: o modo teste só marca o que nasce; desfazer em teste uma
+>     revisão real a apagaria para sempre). Não estava na spec.
+>   - O `GET /api/revisao/hoje` saiu do `server.js` para o `revisao_route.js`, sem
+>     mudar o SQL, para o caso 10 alcançá-lo.
 > - Fases 1 a 7 abaixo. A fase 1 resolve o problema que originou esta spec (bipe
 >   acidental na Revisão); as demais aplicam a regra "quem fez" ao resto do sistema.
 > - Os **relatórios** de produtividade NÃO são desta spec: moram em

@@ -77,9 +77,7 @@ app.get('/api/producao',(req,res)=> res.json(db.prepare(`SELECT p.*, s.estoque, 
    sku_cad_route: a ordem de registro no Express nao muda. Saiu daqui so para
    ter teste atras (teste_revisao.js) — e a rota da armadilha #1 do CLAUDE.md:
    revisar NAO mexe no estoque. */
-require('./revisao_route')(app, db);
-app.get('/api/revisao/hoje',(req,res)=> res.json(db.prepare(`SELECT codigo, COUNT(*) qtd, ROUND(AVG(segundos)) tmedio
-  FROM revisao WHERE data=date('now','localtime') GROUP BY codigo ORDER BY qtd DESC`).all()));
+require('./revisao_route')(app, db);   // e o GET /api/revisao/hoje, que saiu daqui em 04/11/2026 (QUEM-FEZ-E-REVISAO)
 
 app.get('/operador',(req,res)=> res.sendFile(path.join(__dirname,'public','operador.html')));
 require('./painel_route')(app, db);

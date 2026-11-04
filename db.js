@@ -41,8 +41,22 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS fila (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT,
     modo TEXT DEFAULT 'hoje', situacao TEXT DEFAULT 'aguardando',
     revisado_em TEXT DEFAULT (datetime('now','localtime')), embalado_em TEXT,
-    data TEXT DEFAULT (date('now','localtime')), teste INTEGER DEFAULT 0);
+    data TEXT DEFAULT (date('now','localtime')), teste INTEGER DEFAULT 0,
+    revisao_id INTEGER);
+  /* O que aconteceu na bancada de revisao e NAO virou revisao (spec
+     QUEM-FEZ-E-REVISAO, fase 1, 04/11/2026): o bipe de fim recusado por ser
+     rapido demais, a revisao cancelada e a desfeita (com a copia inteira da
+     linha apagada). Acao desfeita tambem e acao, e grava quem fez. */
+  CREATE TABLE IF NOT EXISTS revisao_evento (id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tipo TEXT NOT NULL, revisao_id INTEGER, codigo TEXT, segundos INTEGER, modo TEXT,
+    inicio TEXT, fim TEXT, usuario_id INTEGER, usuario_nome TEXT,
+    data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')),
+    teste INTEGER DEFAULT 0);
 `);
+
+/* fila.revisao_id no banco que ja existe (o CREATE acima cobre o banco novo).
+   No fim, onde o SQLite poe a coluna — a mesma ordem do CREATE (§17). */
+require('./revisao_route').garantirSchema(db);
 
 /* A fila nasceu criada a mao direto no banco de producao, entao la o CREATE
    acima e no-op e uma eventual diferenca de colunas passaria despercebida.
