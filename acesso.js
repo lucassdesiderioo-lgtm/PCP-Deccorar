@@ -719,6 +719,11 @@ module.exports = function(app, db){
   // permissao; leituras gerais de operacao ficam '@logado' (qualquer logado),
   // como hoje. '@admin' = tem alguma permissao de nivel admin+; '@ag' = Admin
   // Geral. Rota nao listada cai no default '@logado' e aparece na cobertura.
+  /* O mapa de telas (fase 2 da ACESSO-POR-TELA-E-NIVEL): as linhas de TELA do
+     permDaRota leem daqui. As de API nao mudam. */
+  const MAPA = require('./telas');
+  const TELA_DA_ROTA = {};
+  MAPA.TELAS.forEach(t => { if(t.rota.indexOf('/admin/') !== 0) TELA_DA_ROTA[t.rota] = t; });
   function permDaRota(pathRaw, method){
     const p = (pathRaw || '').replace(/\/+$/,'') || '/';
     const M = (method || 'GET').toUpperCase();
@@ -726,23 +731,14 @@ module.exports = function(app, db){
     const pre = (x) => p === x || p.indexOf(x + '/') === 0;
     // ── telas ──
     if(eq('/') || eq('/admin') || eq('/index.html')) return '@admin';
-    if(eq('/acessos')) return 'pessoas.gerenciar';
-    if(eq('/operador')) return 'revisao.executar';
-    if(eq('/montagem')) return 'embalagem.executar';
-    if(eq('/embalagem')) return 'etiqueta.emitir';
-    if(eq('/carregamento')) return 'carregamento.executar';
-    if(eq('/expedicao')) return 'pdf.subir';
-    if(eq('/devolucao')) return 'devolucao.registrar';
-    /* As devolucoes EM ANDAMENTO (escritorio): quem acompanha, quem lanca, e
-       quem tem o dinheiro (o Financeiro, que da a baixa do reembolso). */
-    if(eq('/devolucao-casos')) return ['devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro'];
+    /* AS TELAS SAEM DO MAPA (spec ACESSO-POR-TELA-E-NIVEL, fase 2): uma linha
+       por tela em `telas.js`, com as permissoes que a abrem. Tela nova entra
+       la, e nao aqui — e tela fora do mapa continua nascendo negada (#29).
+       As telas do Admin (`/admin/...`) so passam a responder na fase 5. */
+    const tela = TELA_DA_ROTA[p];
+    if(tela) return tela.perms.length === 1 ? tela.perms[0] : tela.perms.slice();
     // A porta unica do rodape (so redireciona, pela permissao, no dev_route).
     if(eq('/devolucoes')) return '@logado';
-    if(eq('/painel')) return 'painel.ver';
-    if(eq('/relatorios')) return 'relatorios.ver';
-    if(eq('/planejamento')) return 'planilha.importar';
-    // A conferencia de estoque no tablet: quem conta OU quem reconta.
-    if(eq('/inventario')) return ['contagem.contar','contagem.desempatar'];
     if(eq('/baixar-backup')) return '@ag';
     // ── acoes/admin por API ──
     if(pre('/api/teste')) return 'teste.operar';

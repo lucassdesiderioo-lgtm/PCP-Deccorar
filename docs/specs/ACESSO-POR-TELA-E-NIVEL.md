@@ -2,7 +2,13 @@
 
 > **STATUS: em construção · 04/11/2026** — decisões do dono no "pode seguir":
 > **D1 (b)** — o Planejamento (401) continua abrindo com `planilha.importar`;
-> **D2 (A)** — cada tela do Admin abre com as chaves das ações dela.
+> **D2 (A)** — cada tela do Admin abre com as chaves das ações dela; Estoque
+> (301), Pendências (204) e Problemas (104) continuam abrindo para todo nível Admin.
+>
+> **Divergências do mapa (fase 2):** 104 e 204 ficaram Admin (a proposta era
+> Supervisor); 401 ficou Admin com `planilha.importar` (D1 b). Telas do sob
+> medida: 601 a 616, na ordem de `tecido/nucleo/telas.js`. **O rodapé foi para
+> a fase 6:** ele morre lá, e reescrevê-lo duas vezes não muda nada para ninguém.
 > Tipo: `REGRA` + `NOVIDADE` · Risco 🔴 (acesso/permissão e schema).
 > Desenhada no Projeto do Claude com o Lucas, de 28/10 a 04/11/2026. Referência: o
 > Decorsoft (o ERP da empresa), onde o que a pessoa não pode usar não aparece.
@@ -12,7 +18,7 @@
 > |---|---|---|---|
 > | 0 | A regra das alçadas no papel (`CLAUDE.md`, `DECISOES.md`) | 🟢 | feito (04/11) |
 > | 1 | A baixa de devolução grava quem deu | 🔴 | feito (04/11) — 6 defeitos reintroduzidos, todos reprovam |
-> | 2 | O mapa de telas: uma linha por tela, um dono só | 🔴 | planejado |
+> | 2 | O mapa de telas: uma linha por tela, um dono só | 🔴 | feito (04/11) — `telas.js`, 8 defeitos reintroduzidos; o rodapé (`nav.js`) passa a ler do mapa na fase 6, quando vira o menu |
 > | 3 | O nível na pessoa (sem trava ainda) | 🔴 | planejado |
 > | 4 | A trava do nível | 🔴 | planejado |
 > | 5 | O Admin de 16 abas vira telas | 🔴 | planejado |

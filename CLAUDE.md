@@ -2394,6 +2394,44 @@ alçadas — nível, tela, acesso."* Linha em `docs/DECISOES.md`.
 > Até o mapa e os testes existirem (fases 2 e 7 da spec), a regra vale pelo
 > PLANO, e o `teste_cobertura.js` já cobre a rota.
 
+### ⚠️ O MAPA DE TELAS — uma tela, uma linha, um número (fase 2, 04/11/2026)
+
+`telas.js` (raiz) é o **dono único** de "que telas a medida padrão tem": número,
+nome, endereço, nível, onde se trabalha, as permissões que a abrem, a área de
+chegada e a aba antiga do Admin. O sob medida põe **número 6xx e nível** no
+próprio `tecido/nucleo/telas.js` (o `/inicio` é apelido do `/`, uma linha só).
+Quem lê o mapa: as linhas de **tela** do `permDaRota` (as de API não mudaram) e
+o `destino.js`. Toda permissão de `permissoes.js` tem `tela` (R-ALC-03); as do
+sob medida tiram a dela do `TELA_DA_CHAVE` do módulo.
+
+> ⚠️ **O NÚMERO NUNCA MUDA E NUNCA SE REAPROVEITA** (R-TEL-02). A centena é o
+> módulo onde a tela nasceu; tela que muda de módulo fica com o número, e tela
+> que sai deixa o número vago. É o que permite falar *"libera a 204"*.
+>
+> ⚠️ **OS NÍVEIS DO MAPA SÃO OS DE HOJE, E NÃO OS DA PROPOSTA DA SPEC** onde os
+> dois divergiram: 104 Problemas e 204 Pendências ficaram **Admin** (a proposta
+> era Supervisor, que daria a tela a quem hoje não abre o Admin), e o 401
+> Planejamento ficou Admin abrindo com `planilha.importar` (decisão D1 (b) do
+> dono). Para mudar, é decisão dele, e muda a linha do mapa.
+>
+> ⚠️ **A ORDEM DE CHEGADA É UMA LISTA PRÓPRIA** (`CHEGADA`), e não a ordem do
+> mapa: ela decide para onde cada pessoa vai de manhã, e é a do `PADRAO` antigo.
+>
+> ⚠️ **A FASE 2 NÃO DEU NEM TIROU NADA DE NINGUÉM, e isso está provado pessoa a
+> pessoa.** `perfis_acesso.js` monta um banco de exemplo (uma pessoa por setor
+> nativo, exceção que concede e que revoga, dois setores, setor feito à mão com
+> chave acima do nível, ninguém em setor nenhum), e o `teste_mapa_antes.json`
+> é o retrato de ANTES do mapa: o que cada uma abre, as permissões e o destino.
+> O `teste_mapa.js` compara. **Não regrave esse arquivo para o teste passar** —
+> ele é a prova; regravar é apagar a prova.
+
+**Rode `node teste_mapa.js` ao criar tela, permissão, mexer no `telas.js`, no
+`permDaRota` ou no `destino.js`.** Ele reprova `.html` em `public/` ou `views/`
+sem linha no mapa (fora o login, a `/setor` e o Admin), número repetido, tela
+sem nível ou sem permissão, permissão sem `tela`, tela do sob medida sem número
+e a tela escrita à mão de novo no `acesso.js`. Oito defeitos foram
+reintroduzidos um a um, e cada um reprova.
+
 ### ⚠️ ARMADILHA #3 — a ordem no `server.js` é arquitetura, não estilo
 
 ```js
@@ -2854,7 +2892,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (360), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (51), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (910) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (360), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (22), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (51), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (910) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (60); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3012,6 +3050,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Declarar leitura de tela por uma chave só quando ela tem mais de um público:
   o setor Admin não tem chave de operação, e a leitura da própria tela dele
   sumiria — a declaração aceita uma LISTA (§10, armadilha #29)
+- ❌ Criar tela sem linha no mapa (`telas.js`), reaproveitar um número de tela,
+  ou criar permissão sem nível ou sem `tela` (§10, O MAPA DE TELAS)
+- ❌ Regravar o `teste_mapa_antes.json` para um teste passar: ele é a prova de
+  que ninguém ganhou nem perdeu acesso (§10)
 - ❌ Criar tela, ação (permissão), setor ou rota sem a declaração de alçada —
   nível e lugar —, ou entregar o PLANO sem o bloco 🔐 ALÇADA (§0, §10, R-ALC)
 - ❌ Mover `express.static` para antes do `auth`
@@ -3568,8 +3610,10 @@ existir). **Tela nova usa o `nav.js` da sua operação** (`/nav.js` no PCP,
 > dali. **A lista existia em duas cópias e elas já tinham divergido**: a do
 > `login.html` só reconhecia `sobmedida` e `sobmedida_adm` como sob medida, e
 > quem tinha só a área de **vendedor** ou de um dos **cinco setores da
-> produção** voltava ao login depois de digitar o PIN. Tela nova da medida
-> padrão entra na lista `PADRAO` de lá.
+> produção** voltava ao login depois de digitar o PIN. ~~Tela nova da medida
+> padrão entra na lista `PADRAO` de lá.~~ **Desde 04/11/2026 o `PADRAO` sai do
+> mapa de telas** (`telas.js`, a `area` e a `CHEGADA` de lá): tela nova entra
+> no mapa (§10, "O MAPA DE TELAS").
 
 > ⚠️ **O "← Medida padrão" DO RODAPÉ DO SOB MEDIDA SAIU.** Ele apontava para
 > `/`, que é o admin, e quem não tinha admin caía em "sem permissão".

@@ -1,0 +1,538 @@
+{
+ "Lucas (Admin Geral)": {
+  "abre": [
+   "/",
+   "/admin",
+   "/index.html",
+   "/acessos",
+   "/operador",
+   "/operador.html",
+   "/montagem",
+   "/embalagem",
+   "/carregamento",
+   "/expedicao",
+   "/devolucao",
+   "/devolucao-casos",
+   "/devolucoes",
+   "/painel",
+   "/relatorios",
+   "/planejamento",
+   "/inventario",
+   "/recebimento",
+   "/setor",
+   "/baixar-backup"
+  ],
+  "perms": [
+   "alvo.editar",
+   "auditoria.ver",
+   "bloqueio.liberar",
+   "cancelamento.confirmar",
+   "carregamento.executar",
+   "componente.cadastrar",
+   "compras.ver",
+   "contagem.ajustar",
+   "contagem.aprovar",
+   "contagem.contar",
+   "contagem.desempatar",
+   "contagem.planejar",
+   "contagem.recontar",
+   "contagem.relatorio",
+   "contagem.resolver",
+   "correcao.executar",
+   "custo.ver",
+   "devolucao.acompanhar",
+   "devolucao.baixar",
+   "devolucao.dinheiro",
+   "devolucao.lancar",
+   "devolucao.registrar",
+   "embalagem.executar",
+   "estoque.ajustar",
+   "estoque.aprovar_ajuste",
+   "etiqueta.emitir",
+   "fornecedor.cadastrar",
+   "horarios.editar",
+   "kit.editar",
+   "kit.imprimir",
+   "listas.editar",
+   "modelo.cadastrar",
+   "necessidade.ver",
+   "pacote.assinar",
+   "painel.ver",
+   "pdf.subir",
+   "pedido.criar",
+   "pedido.devolver",
+   "pedido.pagar",
+   "pedido.receber",
+   "pedido.ver",
+   "pessoas.gerenciar",
+   "planilha.importar",
+   "preco.lancar",
+   "producao.lancar",
+   "produtividade.equipe",
+   "produtividade.nominal",
+   "produtividade.propria",
+   "relatorios.ver",
+   "revisao.executar",
+   "revisao.rejeitar",
+   "saida.liberar",
+   "setores.gerenciar",
+   "sku.cadastrar",
+   "sku.excluir",
+   "sobmedida.boleto.aprovar_baixa",
+   "sobmedida.boleto.editar",
+   "sobmedida.boleto.ler",
+   "sobmedida.cadastro.editar",
+   "sobmedida.cadastro.ler",
+   "sobmedida.catalogo.editar",
+   "sobmedida.catalogo.ler",
+   "sobmedida.colecao",
+   "sobmedida.corte.aprovar_correcao",
+   "sobmedida.corte.gerir",
+   "sobmedida.corte.pedir_correcao",
+   "sobmedida.credito.editar",
+   "sobmedida.custo.ver",
+   "sobmedida.embalagem",
+   "sobmedida.endereco.criar",
+   "sobmedida.etiqueta.imprimir",
+   "sobmedida.etiqueta_producao.imprimir",
+   "sobmedida.etiqueta_producao.ler",
+   "sobmedida.modulo.entrar",
+   "sobmedida.montagem",
+   "sobmedida.painel.ler",
+   "sobmedida.parametro.editar",
+   "sobmedida.parametro.ler",
+   "sobmedida.pedido.aprovar",
+   "sobmedida.pedido.aprovar_qualquer",
+   "sobmedida.pedido.cancelar",
+   "sobmedida.pedido.lancar",
+   "sobmedida.pedido.ler",
+   "sobmedida.pedido.prazo",
+   "sobmedida.plano.calcular",
+   "sobmedida.plano.confirmar",
+   "sobmedida.producao.bipar",
+   "sobmedida.producao.pendencia",
+   "sobmedida.revenda.editar",
+   "sobmedida.revenda.ler",
+   "sobmedida.revisao",
+   "sobmedida.rolo.ajustar",
+   "sobmedida.rolo.encerrar",
+   "sobmedida.rolo.entrada",
+   "sobmedida.rolo.ler",
+   "sobmedida.rolo.nota",
+   "sobmedida.serralheria",
+   "sobmedida.sobra.aprovar_descarte",
+   "sobmedida.sobra.corrigir",
+   "sobmedida.sobra.criar",
+   "sobmedida.sobra.descartar",
+   "sobmedida.sobra.ler",
+   "sobmedida.sobra.propor",
+   "teste.operar"
+  ],
+  "destino": "/setor"
+ },
+ "Ana (Admin)": {
+  "abre": [
+   "/",
+   "/admin",
+   "/index.html",
+   "/devolucao-casos",
+   "/devolucoes",
+   "/planejamento",
+   "/setor"
+  ],
+  "perms": [
+   "alvo.editar",
+   "bloqueio.liberar",
+   "cancelamento.confirmar",
+   "componente.cadastrar",
+   "contagem.ajustar",
+   "contagem.aprovar",
+   "contagem.planejar",
+   "contagem.relatorio",
+   "contagem.resolver",
+   "correcao.executar",
+   "custo.ver",
+   "devolucao.acompanhar",
+   "devolucao.baixar",
+   "devolucao.lancar",
+   "estoque.ajustar",
+   "estoque.aprovar_ajuste",
+   "fornecedor.cadastrar",
+   "horarios.editar",
+   "kit.editar",
+   "listas.editar",
+   "modelo.cadastrar",
+   "pacote.assinar",
+   "pedido.criar",
+   "pedido.pagar",
+   "planilha.importar",
+   "preco.lancar",
+   "producao.lancar",
+   "produtividade.nominal",
+   "saida.liberar",
+   "sku.cadastrar",
+   "sku.excluir",
+   "teste.operar"
+  ],
+  "destino": "/admin"
+ },
+ "Sergio (Supervisor)": {
+  "abre": [
+   "/devolucoes",
+   "/painel",
+   "/relatorios",
+   "/setor"
+  ],
+  "perms": [
+   "cancelamento.confirmar",
+   "necessidade.ver",
+   "painel.ver",
+   "produtividade.equipe",
+   "produtividade.propria",
+   "relatorios.ver",
+   "saida.liberar"
+  ],
+  "destino": "/painel"
+ },
+ "Carla (Comprador)": {
+  "abre": [
+   "/",
+   "/admin",
+   "/index.html",
+   "/devolucoes",
+   "/setor"
+  ],
+  "perms": [
+   "componente.cadastrar",
+   "compras.ver",
+   "custo.ver",
+   "fornecedor.cadastrar",
+   "modelo.cadastrar",
+   "pedido.criar",
+   "pedido.ver",
+   "preco.lancar"
+  ],
+  "destino": "/admin"
+ },
+ "Fabio (Financeiro)": {
+  "abre": [
+   "/",
+   "/admin",
+   "/index.html",
+   "/devolucoes",
+   "/setor"
+  ],
+  "perms": [
+   "pedido.pagar",
+   "pedido.ver"
+  ],
+  "destino": "/admin"
+ },
+ "Rui (Recebimento)": {
+  "abre": [
+   "/devolucoes",
+   "/recebimento",
+   "/setor"
+  ],
+  "perms": [
+   "pedido.devolver",
+   "pedido.receber",
+   "pedido.ver"
+  ],
+  "destino": "/recebimento"
+ },
+ "Edvaldo (Revisão)": {
+  "abre": [
+   "/operador",
+   "/operador.html",
+   "/devolucao",
+   "/devolucoes",
+   "/painel",
+   "/setor"
+  ],
+  "perms": [
+   "devolucao.registrar",
+   "painel.ver",
+   "produtividade.propria",
+   "revisao.executar",
+   "revisao.rejeitar"
+  ],
+  "destino": "/painel"
+ },
+ "Bia (Embalagem)": {
+  "abre": [
+   "/montagem",
+   "/devolucoes",
+   "/painel",
+   "/setor"
+  ],
+  "perms": [
+   "embalagem.executar",
+   "painel.ver",
+   "produtividade.propria"
+  ],
+  "destino": "/painel"
+ },
+ "Davi (Expedição)": {
+  "abre": [
+   "/embalagem",
+   "/carregamento",
+   "/expedicao",
+   "/devolucoes",
+   "/painel",
+   "/setor"
+  ],
+  "perms": [
+   "carregamento.executar",
+   "etiqueta.emitir",
+   "painel.ver",
+   "pdf.subir",
+   "produtividade.propria"
+  ],
+  "destino": "/painel"
+ },
+ "Elis (Estoque)": {
+  "abre": [
+   "/devolucoes",
+   "/painel",
+   "/inventario",
+   "/setor"
+  ],
+  "perms": [
+   "contagem.contar",
+   "contagem.desempatar",
+   "contagem.recontar",
+   "painel.ver",
+   "produtividade.propria"
+  ],
+  "destino": "/painel"
+ },
+ "Tom (SM Bancada)": {
+  "abre": [
+   "/devolucoes",
+   "/painel",
+   "/setor"
+  ],
+  "perms": [
+   "painel.ver",
+   "produtividade.propria",
+   "sobmedida.cadastro.ler",
+   "sobmedida.corte.pedir_correcao",
+   "sobmedida.endereco.criar",
+   "sobmedida.etiqueta.imprimir",
+   "sobmedida.etiqueta_producao.imprimir",
+   "sobmedida.etiqueta_producao.ler",
+   "sobmedida.modulo.entrar",
+   "sobmedida.parametro.ler",
+   "sobmedida.plano.calcular",
+   "sobmedida.plano.confirmar",
+   "sobmedida.rolo.encerrar",
+   "sobmedida.rolo.entrada",
+   "sobmedida.rolo.ler",
+   "sobmedida.sobra.criar",
+   "sobmedida.sobra.ler",
+   "sobmedida.sobra.propor"
+  ],
+  "destino": "/setor"
+ },
+ "Gil (SM Cadastros)": {
+  "abre": [
+   "/devolucoes",
+   "/setor"
+  ],
+  "perms": [
+   "sobmedida.boleto.aprovar_baixa",
+   "sobmedida.boleto.editar",
+   "sobmedida.boleto.ler",
+   "sobmedida.cadastro.editar",
+   "sobmedida.cadastro.ler",
+   "sobmedida.catalogo.editar",
+   "sobmedida.catalogo.ler",
+   "sobmedida.colecao",
+   "sobmedida.corte.aprovar_correcao",
+   "sobmedida.corte.gerir",
+   "sobmedida.corte.pedir_correcao",
+   "sobmedida.credito.editar",
+   "sobmedida.custo.ver",
+   "sobmedida.embalagem",
+   "sobmedida.endereco.criar",
+   "sobmedida.etiqueta.imprimir",
+   "sobmedida.etiqueta_producao.imprimir",
+   "sobmedida.etiqueta_producao.ler",
+   "sobmedida.modulo.entrar",
+   "sobmedida.montagem",
+   "sobmedida.painel.ler",
+   "sobmedida.parametro.editar",
+   "sobmedida.parametro.ler",
+   "sobmedida.pedido.aprovar",
+   "sobmedida.pedido.aprovar_qualquer",
+   "sobmedida.pedido.cancelar",
+   "sobmedida.pedido.lancar",
+   "sobmedida.pedido.ler",
+   "sobmedida.pedido.prazo",
+   "sobmedida.plano.calcular",
+   "sobmedida.plano.confirmar",
+   "sobmedida.producao.bipar",
+   "sobmedida.producao.pendencia",
+   "sobmedida.revenda.editar",
+   "sobmedida.revenda.ler",
+   "sobmedida.revisao",
+   "sobmedida.rolo.ajustar",
+   "sobmedida.rolo.encerrar",
+   "sobmedida.rolo.entrada",
+   "sobmedida.rolo.ler",
+   "sobmedida.rolo.nota",
+   "sobmedida.serralheria",
+   "sobmedida.sobra.aprovar_descarte",
+   "sobmedida.sobra.corrigir",
+   "sobmedida.sobra.criar",
+   "sobmedida.sobra.descartar",
+   "sobmedida.sobra.ler",
+   "sobmedida.sobra.propor"
+  ],
+  "destino": "/sobmedida"
+ },
+ "Vera (SM Venda)": {
+  "abre": [
+   "/devolucoes",
+   "/setor"
+  ],
+  "perms": [
+   "sobmedida.boleto.ler",
+   "sobmedida.catalogo.ler",
+   "sobmedida.custo.ver",
+   "sobmedida.etiqueta_producao.ler",
+   "sobmedida.modulo.entrar",
+   "sobmedida.pedido.aprovar",
+   "sobmedida.pedido.lancar",
+   "sobmedida.pedido.ler",
+   "sobmedida.pedido.prazo",
+   "sobmedida.revenda.ler"
+  ],
+  "destino": "/sobmedida"
+ },
+ "Otto (Revisão + custo)": {
+  "abre": [
+   "/",
+   "/admin",
+   "/index.html",
+   "/operador",
+   "/operador.html",
+   "/devolucao",
+   "/devolucoes",
+   "/painel",
+   "/setor"
+  ],
+  "perms": [
+   "custo.ver",
+   "devolucao.registrar",
+   "painel.ver",
+   "produtividade.propria",
+   "revisao.executar",
+   "revisao.rejeitar"
+  ],
+  "destino": "/admin"
+ },
+ "Sara (Supervisor − rel.)": {
+  "abre": [
+   "/devolucoes",
+   "/painel",
+   "/setor"
+  ],
+  "perms": [
+   "cancelamento.confirmar",
+   "necessidade.ver",
+   "painel.ver",
+   "produtividade.equipe",
+   "produtividade.propria",
+   "saida.liberar"
+  ],
+  "destino": "/painel"
+ },
+ "Nina (sem setor)": {
+  "abre": [
+   "/devolucoes",
+   "/setor"
+  ],
+  "perms": [],
+  "destino": "/login"
+ },
+ "Paulo (Expedição + Sup.)": {
+  "abre": [
+   "/embalagem",
+   "/carregamento",
+   "/expedicao",
+   "/devolucoes",
+   "/painel",
+   "/relatorios",
+   "/setor"
+  ],
+  "perms": [
+   "cancelamento.confirmar",
+   "carregamento.executar",
+   "etiqueta.emitir",
+   "necessidade.ver",
+   "painel.ver",
+   "pdf.subir",
+   "produtividade.equipe",
+   "produtividade.propria",
+   "relatorios.ver",
+   "saida.liberar"
+  ],
+  "destino": "/painel"
+ },
+ "Renato (Pós-venda)": {
+  "abre": [
+   "/",
+   "/admin",
+   "/index.html",
+   "/devolucao",
+   "/devolucao-casos",
+   "/devolucoes",
+   "/setor"
+  ],
+  "perms": [
+   "devolucao.acompanhar",
+   "devolucao.baixar",
+   "devolucao.lancar",
+   "devolucao.registrar"
+  ],
+  "destino": "/admin"
+ },
+ "Lia (só dinheiro)": {
+  "abre": [
+   "/",
+   "/admin",
+   "/index.html",
+   "/devolucao-casos",
+   "/devolucoes",
+   "/setor"
+  ],
+  "perms": [
+   "devolucao.dinheiro"
+  ],
+  "destino": "/admin"
+ },
+ "Igor (Sup. + baixa)": {
+  "abre": [
+   "/",
+   "/admin",
+   "/index.html",
+   "/devolucoes",
+   "/painel",
+   "/relatorios",
+   "/setor"
+  ],
+  "perms": [
+   "cancelamento.confirmar",
+   "devolucao.baixar",
+   "necessidade.ver",
+   "painel.ver",
+   "produtividade.equipe",
+   "produtividade.propria",
+   "relatorios.ver",
+   "saida.liberar"
+  ],
+  "destino": "/admin"
+ }
+}
