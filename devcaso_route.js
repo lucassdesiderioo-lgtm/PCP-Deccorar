@@ -119,6 +119,12 @@ module.exports = function(app, db){
     ({ casos: D.buscar(db, (req.query||{}).q, { comDinheiro: comValores(req) }) })));
 
   /* As revisões recebidas sem caso, para ligar à mão (CONSERTO de 03/11/2026). */
+  /* Quem pode ser o responsável (fase 3 da spec DEVOLUCOES-PROXIMO-PASSO):
+     pessoa ativa que lança ou acompanha. Só id e nome; e quem está logado,
+     para o filtro "Meus casos". */
+  const temChaveResp = (uid) => podeChave({ usuario:{ id:uid } }, 'devolucao.lancar') || podeChave({ usuario:{ id:uid } }, 'devolucao.acompanhar');
+  app.get('/api/devolucao-casos/responsaveis', (req,res) => responder(res, () =>
+    ({ pessoas: D.responsaveis(db, temChaveResp), eu: (req.usuario && req.usuario.id) || null })));
   app.get('/api/devolucao-casos/:id/revisoes-soltas', (req,res) => responder(res, () => ({ revisoes: D.revisoesSoltas(db, req.params.id) })));
 
   app.get('/api/devolucao-casos/:id', (req,res) => responder(res, () => D.detalhe(db, req.params.id, { comDinheiro: comValores(req), usuario: req.usuario })));
@@ -136,13 +142,13 @@ module.exports = function(app, db){
     if((b.coleta && cheio(b.coleta.transportadora_id) || cheio(b.valor_ml_situacao)) && !pode2.acompanhar)
       return res.status(403).json({ erro:'Pedir a coleta e marcar a situação do valor são de quem acompanha as devoluções. Lance sem eles.', chave:'devolucao.acompanhar' });
     responder(res, () => {
-      const r = D.lancarCompleto(db, b, req.usuario);
+      const r = D.lancarCompleto(db, b, req.usuario, { temChave: temChaveResp });
       if(r.valorMudou && r.valorMudou.length) auditar(req, 'valor', r.caso.id, 'lançou no lançamento '+r.valorMudou.join(', ')+': '+JSON.stringify({ valor_ml: b.valor_ml, custo_etiqueta: b.custo_etiqueta, limite_frete: b.limite_frete, custo: b.coleta && b.coleta.custo }));
       return { ok:true, id:r.caso.id };
     });
   });
   app.post('/api/devolucao-casos/:id/editar', (req,res) => responder(res, () => {
-    D.editar(db, req.params.id, req.body, req.usuario);
+    D.editar(db, req.params.id, req.body, req.usuario, { temChave: temChaveResp });
     return { ok:true };
   }));
 

@@ -87,7 +87,8 @@ function garantir(db){
     custo_etiqueta REAL,
     revisao_pedida_em TEXT, revisao_numero TEXT, revisao_resultado TEXT, revisao_resp_em TEXT, valor_revisao REAL,
     aberta_em TEXT, prazo_coleta TEXT, prazo_coleta_original TEXT, limite_frete REAL,
-    revisar_ate TEXT, revisao_pede TEXT, etiqueta_devolucao TEXT)`);
+    revisar_ate TEXT, revisao_pede TEXT, etiqueta_devolucao TEXT,
+    responsavel_id INTEGER, responsavel_nome TEXT)`);
   /* FASE 5 — desde quando o valor do ML está nesta situação (R18: "pedir" há
      ≥ 2 dias entra no parado). O ALTER fica ao lado do CREATE, no fim da
      tabela, para o banco que nasceu antes desta fase (§17). */
@@ -123,6 +124,12 @@ function garantir(db){
      conhece), gravado quando a revisão é ligada: bipar de novo acha o caso, e
      a busca do ML acha a devolução por ele (03/11/2026, caso #20). (§17) */
   try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN etiqueta_devolucao TEXT"); }catch(e){}
+  /* O RESPONSÁVEL COMO PESSOA (spec DEVOLUCOES-PROXIMO-PASSO, fase 3,
+     04/11/2026): o id da pessoa do PCP e o nome como retrato (como o
+     revisao.usuario_nome). O texto livre `responsavel` fica como está — não é
+     apagado nem convertido — e aparece até alguém escolher a pessoa. (§17) */
+  for(const col of ['responsavel_id INTEGER','responsavel_nome TEXT'])
+    try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN "+col); }catch(e){}
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_venda ON devolucao_caso(venda)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_aberto ON devolucao_caso(encerrado_em)");
   db.exec(`CREATE TABLE IF NOT EXISTS devolucao_evento (
@@ -342,8 +349,12 @@ function listar(db, opt){
   const h = hoje(db), lim = limites(db);
   const cu = o.comDinheiro ? custosPorCaso(db) : null;
   const abertos = comBaixa(db, db.prepare('SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL ORDER BY id').all());
-  const linhas = abertos.map(c => Object.assign(publico(c, h, lim, o.comDinheiro, cu),
-    { mesmo_comprador: irmaos(abertos, c.comprador, c.id).map(x => x.id) }));
+  /* O próximo passo lê a linha CRUA (com os campos que não vão pelo fio) e a
+     situação já calculada; só o passo, sem reais, viaja. */
+  const crus = new Map(abertos.map(c => [c.id, c]));
+  const linhas = comProximo(db, abertos.map(c => Object.assign({}, c, situacao(c, h, lim))), h, lim)
+    .map(x => Object.assign(publico(crus.get(x.id), h, lim, o.comDinheiro, cu),
+      { proximo: x.proximo, mesmo_comprador: irmaos(abertos, x.comprador, x.id).map(y => y.id) }));
   /* R3: o "nós coletamos" vai pelo PRAZO — o vencido mais antigo em cima —,
      nunca pela data de lançamento. Sem prazo (não deveria existir) vai ao fim. */
   const coleta = linhas.filter(c => c.tipo === 'coleta').sort((a,b) => {
@@ -383,7 +394,10 @@ function detalhe(db, id, opt){
   const c = ler(db, id);
   if(!c) throw new Recusa(404, 'Caso não encontrado. Atualize a lista.');
   const o = opt || {};
-  return { caso: publico(comBaixa(db, [c])[0], hoje(db), limites(db), o.comDinheiro, o.comDinheiro ? custosPorCaso(db) : null),
+  const h = hoje(db), lim = limites(db), cb = comBaixa(db, [c])[0];
+  const caso = publico(cb, h, lim, o.comDinheiro, o.comDinheiro ? custosPorCaso(db) : null);
+  caso.proximo = comProximo(db, [Object.assign({}, cb, situacao(cb, h, lim))], h, lim)[0].proximo || null;
+  return { caso,
            tentativas: tentativas(db, c.id, o.comDinheiro),
            anexos: listarAnexos(db, c.id),
            docs: c.tipo === 'coleta' ? situacaoDocs(db, c.id) : [],
@@ -473,6 +487,7 @@ function lancar(db, b, usuario, opt){
      casos iniciais, que é de antes da pergunta, lança sem ela. */
   const publicidade = (opt && opt.semPublicidade && b.publicidade === undefined) ? null : publicidadeValida(b.publicidade);
   const mensagem_ml = mensagemValida(b.mensagem_ml), link_ml = linkValido(b.link_ml);
+  const resp = ('responsavel_id' in b) ? responsavelValido(db, b.responsavel_id, opt && opt.temChave) : null;
   /* "Passado em" é o dia do lançamento (dono, 03/11/2026): no "nós coletamos"
      ele nasce hoje quando não vem, e a data informada vale. Data impossível é
      recusada — virar hoje em silêncio esconderia o erro de quem digitou. */
@@ -506,6 +521,7 @@ function lancar(db, b, usuario, opt){
         b._valor_ml === undefined ? null : b._valor_ml, b._valor_ml_situacao || null,
         txt(b.obs), nomeDe(usuario), publicidade, mensagem_ml, link_ml, aberta_em, prazo_coleta).lastInsertRowid;
     if(b._valor_ml_situacao) db.prepare("UPDATE devolucao_caso SET valor_ml_desde=datetime('now','localtime') WHERE id=?").run(id);
+    if(resp) db.prepare('UPDATE devolucao_caso SET responsavel_id=?, responsavel_nome=? WHERE id=?').run(resp.id, resp.nome, id);
     evento(db, id, 'lancado', null, etapa, (tipo === 'coleta' ? 'Nós coletamos' : 'ML devolve') +
       (prazo ? ' · comprovante até '+br(prazo)+' · coletar até '+br(prazo_coleta) : '') +
       (publicidade == null ? '' : ' · via publicidade: '+simNao(publicidade)), nomeDe(usuario));
@@ -637,14 +653,46 @@ function respostaRevisaoFrete(db, id, b, usuario){
   return { caso: ler(db, c.id), valorMudou: mud };
 }
 
+/* QUEM PODE SER O RESPONSÁVEL (fase 3, decisão do dono 04/11/2026): pessoa
+   ATIVA do PCP com `devolucao.lancar` ou `devolucao.acompanhar`. Quem
+   responde se a pessoa tem a chave é o acesso.js, pela rota (`temChave`);
+   daqui só saem id e nome (a regra do R-SMR-05). */
+function responsaveis(db, temChave){
+  let gente = [];
+  try{ gente = db.prepare('SELECT id, nome FROM usuarios WHERE ativo=1').all(); }catch(e){ return []; }
+  return gente.filter(u => !temChave || temChave(u.id))
+    .map(u => ({ id:u.id, nome:u.nome }))
+    .sort((a,b) => String(a.nome||'').localeCompare(String(b.nome||''), 'pt-BR'));
+}
+/* O id escolhido: vazio de propósito tira a pessoa (null); fora da lista é
+   recusado dizendo por quê, nunca gravado calado. */
+function responsavelValido(db, v, temChave){
+  if(v === null || v === undefined || String(v).trim() === '') return null;
+  const id = Number(v);
+  const recusa = () => new Recusa(400, 'Escolha como responsável uma pessoa ativa que lança ou acompanha as devoluções.');
+  if(!Number.isInteger(id) || id <= 0) throw recusa();
+  let u = null;
+  try{ u = db.prepare('SELECT id, nome FROM usuarios WHERE id=? AND ativo=1').get(id); }catch(e){}
+  if(!u || (temChave && !temChave(u.id))) throw recusa();
+  return u;
+}
+const nomeResp = (c) => (c && (c.responsavel_nome || c.responsavel)) || '—';
+
 /* Editar o que foi lançado. CAMPO AUSENTE NÃO É CAMPO VAZIO (§6, #25): só o
    que veio no corpo muda, e o resto fica como está. */
 const EDITAVEIS = ['motivo','nf','sku','comprador','responsavel','passado_em','cep','obs','publicidade','mensagem_ml','link_ml','aberta_em','revisar_ate'];
-function editar(db, id, b, usuario){
+function editar(db, id, b, usuario, opt){
   const c = aberto(db, id);
   b = b || {};
   const mud = [];
   const sets = [], vals = [];
+  if('responsavel_id' in b){
+    const u = responsavelValido(db, b.responsavel_id, opt && opt.temChave);
+    if((u ? u.id : null) !== (c.responsavel_id == null ? null : c.responsavel_id)){
+      sets.push('responsavel_id=?', 'responsavel_nome=?'); vals.push(u ? u.id : null, u ? u.nome : null);
+      mud.push('responsável: '+nomeResp(c)+' → '+(u ? u.nome : (c.responsavel || '—')));
+    }
+  }
   for(const k of EDITAVEIS){
     if(!(k in b)) continue;
     let v = b[k];
@@ -1456,7 +1504,129 @@ function buscar(db, q, opt){
     .map(c => publico(c, h, lim, o.comDinheiro, cu));
 }
 
+/* ═══ O PRÓXIMO PASSO (spec DEVOLUCOES-PROXIMO-PASSO, fase 1, 04/11/2026) ═══
+   Todo caso aberto diz, numa frase, o próximo passo, de quem é a vez e até
+   quando. O passo é CALCULADO do que já está gravado — nunca gravado, nunca
+   digitado — e não muda regra nenhuma: só lê. A primeira linha do mapa (§3 da
+   spec) que bate é o passo. Dono único: a lista e o caso leem daqui; uma
+   segunda régua na tela divergiria no primeiro ajuste (#12).
+   ⚠️ NENHUM NÚMERO EM REAIS NO PASSO: ele vai a quem acompanha e a quem só
+   lança, e a varredura do teste recusa. Só datas e dias.
+   `vez`: nos · dinheiro · receber_peca (a gente) · transportadora · ml (outros). */
+const VEZ_NOSSA = ['nos','dinheiro','receber_peca'];
+const QUEM = { nos:'quem acompanha', dinheiro:'quem tem a permissão do dinheiro das devoluções',
+  receber_peca:'quem recebe a peça (tela Receber peça)', transportadora:'a transportadora', ml:'o Mercado Livre' };
+function passo(texto, vez, ate, acao, quem){
+  return { texto, vez, ate: ate || null, acao: acao || null, quem: quem || QUEM[vez], nossa: VEZ_NOSSA.indexOf(vez) >= 0 };
+}
+const diasTxt = (n) => n === 1 ? '1 dia' : (n || 0)+' dias';
+/* ctx: { tentativas (as do caso, em ordem), docs (situacaoDocs), avisado, h, lim, sit } */
+function proximoPasso(c, ctx){
+  if(!c || c.encerrado_em) return null;
+  ctx = ctx || {};
+  const h = ctx.h, lim = ctx.lim || { parado: parseInt(PADROES.devol_parado_dias, 10) };
+  const sit = ctx.sit || situacao(c, h, lim);
+  if(c.tipo === 'coleta'){
+    // C1 — algum prazo vencido: pode ter havido prorrogação não lançada (R7).
+    if(sit.cor === 'vencido')
+      return passo('O prazo de "'+String(sit.prazo_nome||'').toLowerCase()+'" venceu em '+br(sit.prazo_data)+': lançar o prazo novo do ML ou encerrar como perda', 'dinheiro', sit.prazo_data, 'prazo');
+    const i = ETAPAS.coleta.indexOf(c.etapa);
+    const prazoCom = c.prazo || null, prazoCol = c.prazo_coleta || null;
+    if(!c.chegou_em && !c.devolucao_id && i < ETAPAS.coleta.indexOf('a_caminho')){
+      const ts = ctx.tentativas || [];
+      const ult = ts.length ? ts[ts.length-1] : null;
+      const ant = ts.length > 1 ? ts[ts.length-2] : null;
+      // C2 — ainda sem transportadora (ou a última já coletou e a etapa ficou para trás).
+      if(!ult || ult.resultado !== 'aguardando')
+        return passo('Pedir a coleta à transportadora'+(c.cep ? ' (a sugestão sai pelo CEP)' : ''), 'nos', prazoCol || prazoCom, 'pedir_coleta');
+      if(!ult.agendada_para){
+        // C4 — a última ida não achou o cliente: remarcar dentro do prazo da coleta.
+        if(ant && ant.resultado === 'nao_encontrou')
+          return passo('Remarcar a coleta: a transportadora não achou o cliente'+(prazoCol ? ' — antes de '+br(prazoCol)+' (prazo da coleta)' : ''), 'nos', prazoCol, 'agendar');
+        // C3 — coleta pedida sem a data.
+        return passo('Confirmar com a transportadora a data da coleta e lançar', 'nos', prazoCol || prazoCom, 'agendar');
+      }
+      // C5 — coleta agendada, o comprovante ainda não foi ao ML.
+      if(i < ETAPAS.coleta.indexOf('docs_enviados')){
+        const faltam = (ctx.docs || []).filter(d => !d.ok).map(d => d.doc);
+        return passo(faltam.length
+            ? 'Mandar o comprovante do agendamento ao ML — anexar: '+faltam.join(', ')
+            : 'Mandar o comprovante do agendamento ao ML e marcar "Documentos ao ML"', 'nos', prazoCom, 'docs');
+      }
+      // C6 — documentos no ML, a data ainda não chegou.
+      if(ult.agendada_para >= h)
+        return passo('Aguardar a coleta de '+br(ult.agendada_para), 'transportadora', ult.agendada_para, 'resultado_coleta');
+      // C7 — a data passou e ninguém lançou que coletou.
+      return passo('Ligar para a transportadora: a coleta de '+br(ult.agendada_para)+' não foi confirmada — lançar o resultado', 'nos', prazoCol, 'resultado_coleta');
+    }
+    // C8 — a caminho; parado há N dias devolve a vez para nós.
+    if(!c.chegou_em && !c.devolucao_id){
+      if(sit.dias_parado !== null && sit.dias_parado >= lim.parado)
+        return passo('Cobrar a transportadora: a caixa foi coletada há '+diasTxt(sit.dias_parado)+' e não chegou', 'nos', null, 'chegou');
+      return passo('Acompanhar a entrega; quando chegar, marcar "A caixa chegou"', 'transportadora', null, 'chegou');
+    }
+    // C9 — chegou e não foi revisada.
+    if(!c.devolucao_id) return passo('Revisar a peça na tela Receber peça', 'receber_peca', null, 'revisar');
+    // C10 — revisada, o ML não sabe que recebemos.
+    if(!ctx.avisado && c.etapa !== 'ml_avisado') return passo('Avisar o ML que recebemos a peça', 'nos', null, 'aviso_ml');
+    // C11 a C13 — o valor da coleta e o reembolso.
+    const sv = c.valor_ml_situacao;
+    if(!sv || sv === 'pedir') return passo('Pedir ao ML o valor da coleta (ou marcar que já veio)', 'nos', null, 'valor');
+    if(sv === 'pedido'){
+      const dv = dias(c.valor_ml_desde || c.criado_em, h);
+      if(dv !== null && dv >= lim.parado)
+        return passo('Cobrar o ML: o valor da coleta foi pedido há '+diasTxt(dv)+' e não veio', 'nos', null, 'valor');
+      return passo('Aguardar o ML pagar o valor da coleta (pedido há '+diasTxt(dv)+')', 'ml', null, 'valor');
+    }
+    return passo('Conferir no Mercado Pago e dar a baixa do reembolso', 'dinheiro', null, 'reembolso');
+  }
+  // ── ML devolve ──
+  const avisado = c.etapa === 'ml_revisei';
+  // M1 — o "revisar no ML até" venceu: o prazo de contestar passou.
+  if(sit.cor === 'vencido' && sit.prazo_qual === 'revisar'){
+    if(!c.devolucao_id) return passo('Revisar a peça hoje na tela Receber peça: o prazo do ML para revisar venceu em '+br(c.revisar_ate), 'receber_peca', c.revisar_ate, 'revisar');
+    return passo('Marcar "Já revisei" no ML hoje: o prazo de contestar venceu em '+br(c.revisar_ate), 'nos', c.revisar_ate, 'revisei');
+  }
+  // M2 — a peça ainda não chegou.
+  if(!c.chegou_em && !c.devolucao_id)
+    return passo('Nada a fazer: o ML traz a peça (há '+diasTxt(sit.dias_esperando)+'); quando chegar, marcar "A caixa chegou"', 'ml', null, 'chegou');
+  // M3 — chegou e não foi revisada.
+  if(!c.devolucao_id) return passo('Revisar a peça na tela Receber peça', 'receber_peca', c.revisar_ate, 'revisar');
+  // M4 — o `falta` que já existe, em ordem.
+  if(!c.dev_baixado) return passo('Dar a baixa da devolução (reputação e motivo)', 'nos', c.revisar_ate, 'baixa', 'quem dá baixa em devolução');
+  if(!avisado) return passo('Marcar "Já revisei" no ML — e, se o problema não foi nosso, pedir a revisão do valor ou da reputação', 'nos', c.revisar_ate, 'revisei');
+  // M5 — a revisão pedida espera o ML; parada, a vez volta para nós.
+  if(c.revisao_pedida_em && !c.revisao_resultado){
+    if(sit.revisao_parada) return passo('Cobrar o ML: a revisão foi pedida há '+diasTxt(sit.dias_revisao)+' e não teve resposta', 'nos', null, 'revisao_frete');
+    return passo('Aguardar a resposta do ML à revisão (pedida há '+diasTxt(sit.dias_revisao)+')', 'ml', null, 'revisao_frete');
+  }
+  return passo('Conferir o caso: a baixa, o "Já revisei" e a revisão estão feitos e ele não encerrou', 'nos', null, null);
+}
+/* O passo de uma porção de casos abertos de uma vez — a lista não faz uma
+   consulta por caso. Devolve as linhas com `proximo`. */
+function comProximo(db, linhas, h, lim){
+  const abertos = linhas.filter(c => !c.encerrado_em);
+  if(!abertos.length) return linhas;
+  const ids = new Set(abertos.map(c => c.id));
+  const tent = new Map(), docs = new Map(), avisados = new Set();
+  for(const k of db.prepare('SELECT caso_id,id,resultado,agendada_para FROM devolucao_coleta ORDER BY id').all())
+    if(ids.has(k.caso_id)){ if(!tent.has(k.caso_id)) tent.set(k.caso_id, []); tent.get(k.caso_id).push(k); }
+  const exig = docsExigidos(db);
+  for(const a of db.prepare("SELECT DISTINCT caso_id,doc_tipo FROM devolucao_anexo WHERE tipo='doc'").all())
+    if(ids.has(a.caso_id)){ if(!docs.has(a.caso_id)) docs.set(a.caso_id, new Set()); docs.get(a.caso_id).add(a.doc_tipo); }
+  for(const e of db.prepare("SELECT DISTINCT caso_id FROM devolucao_evento WHERE tipo='aviso_ml'").all()) avisados.add(e.caso_id);
+  return linhas.map(c => {
+    if(c.encerrado_em) return c;
+    const tem = docs.get(c.id) || new Set();
+    c.proximo = proximoPasso(c, { h, lim, sit:c, tentativas: tent.get(c.id) || [],
+      docs: exig.map(d => ({ doc:d, ok: tem.has(d) })), avisado: avisados.has(c.id) });
+    return c;
+  });
+}
+
 module.exports = {
+  responsaveis, responsavelValido,
+  proximoPasso, comProximo, VEZ_NOSSA,
   buscar, lancarCompleto, trocarTipo, pedirRevisaoFrete, respostaRevisaoFrete, desfazerEtapa, podeDesfazer, mesmoComprador,
   SITUACOES_VALOR, situacaoValor, lancarValor, baixaReembolso, relatorio, custosPorCaso,
   docsExigidos, situacaoDocs, listarAnexos, anexar, arquivoDoAnexo, devolverComprador,
