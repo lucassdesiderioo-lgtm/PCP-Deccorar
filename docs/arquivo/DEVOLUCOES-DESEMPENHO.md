@@ -2,8 +2,9 @@
 
 ```
 STATUS
-Situação: EM CÓDIGO (04/11/2026), num PR só — falta o deploy e a conferência
-  do dono na tela
+Situação: NO AR E CONFERIDA (04/11/2026, PR #275) — o dono fez o deploy e
+  conferiu na tela o "Casos de:", o quadro "Por responsável" e a aba
+  Desempenho ("bateu tudo"). Concluída e arquivada
 Tipo: AJUSTE (parte A) + NOVIDADE (parte B, relatório) · risco 🟡 · sem
   schema novo, sem regra nova, sem permissão nova
 Aprovada pelo dono em 04/11/2026 ("já vamos incluir histórico de desempenho")

@@ -1911,7 +1911,7 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   }
 
   /* ═══ OS CASOS DE CADA RESPONSÁVEL E O HISTÓRICO DE DESEMPENHO (04/11/2026) ═══
-     Spec docs/specs/DEVOLUCOES-DESEMPENHO.md. Escritos antes do código. */
+     Spec docs/arquivo/DEVOLUCOES-DESEMPENHO.md. Escritos antes do código. */
   secao('por responsável — o quadro dos casos abertos');
   {
     const L = lista(1);

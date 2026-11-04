@@ -2082,7 +2082,7 @@ dinheiro não vem junto.
 >   passa a acusar.
 
 > ⚠️ **"CASOS DE:" E O DESEMPENHO POR RESPONSÁVEL** (spec
-> `DEVOLUCOES-DESEMPENHO.md`, 04/11/2026, dono: *"ver os casos que estão para o
+> `docs/arquivo/DEVOLUCOES-DESEMPENHO.md`, 04/11/2026, dono: *"ver os casos que estão para o
 > Renato e se ele está fazendo as tarefas dentro do prazo"*). Nenhuma regra,
 > permissão ou schema novo: só leitura do que está gravado.
 > - **"Casos de: Todos · Eu · [pessoas] · Sem responsável"** substituiu o botão
@@ -2102,6 +2102,16 @@ dinheiro não vem junto.
 >   nunca "0 de 0". **Nenhum valor em reais.**
 > - **Conta daqui para frente**: o nome escrito à mão dos casos antigos não é
 >   pessoa e vai para **"Sem responsável"**, sem chute.
+>
+> ✅ **NO AR E CONFERIDO EM 04/11/2026** (PR #275): o dono fez o deploy e o
+> teste de segurança (telas 302, API 401, `/login` 200, inclusive
+> `/api/devolucao-casos/desempenho`) e conferiu na tela o "Casos de: Renato",
+> o clique no quadro "Por responsável" filtrando e a aba Desempenho — e disse
+> *"bateu tudo"*. A spec foi para `docs/arquivo/`. ⚠️ **AINDA NÃO PROVADO:**
+> o primeiro mês com casos encerrados que tenham responsável escolhido (os
+> números do Desempenho com dado real), um prazo prorrogado contando pelo novo
+> e um caso parado entrando em "vezes parado". Prova que não foi feita se
+> escreve como não feita.
 
 **Rode `node teste_devolucao_casos.js` (870 casos) — e, na tela, `node teste_devolucao_casos_tela.js` (193) — ao mexer no
 `devcaso_dominio.js`, no `devcaso_route.js`, no bipe ou na baixa do

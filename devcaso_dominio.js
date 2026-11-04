@@ -1645,7 +1645,7 @@ function comProximo(db, linhas, h, lim){
 }
 
 /* ═══ OS CASOS DE CADA RESPONSÁVEL E O HISTÓRICO DE DESEMPENHO (04/11/2026) ═══
-   Spec docs/specs/DEVOLUCOES-DESEMPENHO.md. Dono único das duas contas: a
+   Spec docs/arquivo/DEVOLUCOES-DESEMPENHO.md. Dono único das duas contas: a
    tela só desenha. O caso conta para o RESPONSÁVEL (a pessoa escolhida no
    sistema, `responsavel_id`); o nome escrito à mão de antes não é pessoa e
    vai para "Sem responsável" — sem chute (decisões do dono, 04/11/2026).
