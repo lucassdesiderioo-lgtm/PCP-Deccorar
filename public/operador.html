@@ -206,6 +206,7 @@ function abrirRev(cur){
   c.style.cssText='padding:11px 20px;border-radius:9px;border:1px solid #c9d1db;background:transparent;color:#3b4552;font-size:14px;cursor:pointer';
   c.onclick=cancelarRev;
   var b=document.createElement('button'); b.type='button'; b.id='rjBt'; b.textContent='Peça com problema';
+  b.setAttribute('data-perm','revisao.rejeitar');   // some para quem não registra peça com problema (R-TEL-04)
   b.style.cssText='padding:11px 20px;border-radius:9px;border:1px solid #efb1ad;background:transparent;color:#c62828;font-size:14px;cursor:pointer';
   b.onclick=rjAbrir;
   lin.appendChild(c); lin.appendChild(b); bn.appendChild(lin);

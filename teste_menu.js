@@ -79,13 +79,15 @@ const MINHAS_OP = { telas:[ { n:101, nome:'Revisão', rota:'/operador', modulo:1
   ok('a tela aberta vem marcada', /aria-current="page"><b>101<\/b>/.test(html) && !/aria-current="page"><b>251/.test(html));
 
   console.log('\n── 3. o botão de ação que a pessoa não tem some (R-TEL-04) ──');
-  const css = t.estilos.map(s => s.textContent || '').join('\n');
-  ok('todo [data-perm] nasce escondido', /\[data-perm\]\{display:none/.test(css), css.slice(0, 200));
-  ok('e aparece o que ela tem', /\[data-perm~="revisao\.executar"\]/.test(css));
-  ok('   e não o que ela não tem', !/\[data-perm~="custo\.ver"\]/.test(css));
+  const regra = e => ((e.estilos.find(x => x.id === 'permCss') || {}).textContent || '');
+  const css = regra(t);
+  ok('esconde o botão cuja marca não tem nenhuma chave dela', /^\[data-perm\](:not\(\[data-perm~="[^"]+"\]\))+\{display:none !important\}$/.test(css), css.slice(0, 200));
+  ok('   as chaves dela ficam de fora da regra (o botão dela não some)', /:not\(\[data-perm~="revisao\.executar"\]\)/.test(css));
+  ok('   e a que ela não tem não entra (o botão some)', !/custo\.ver/.test(css));
+  ok('nunca força a aparecer: nada de display:revert (a tela que esconde continua escondendo)', !/revert !important['"]/.test(NAV));
   const ag = abrir('/admin/estoque', { logado:true, id:1, nome:'Lucas', destino:{} }, { telas:[], modulos:{}, perms:[], admin_geral:true });
   await ag.esperar();
-  ok('o Admin Geral vê todos os botões', /\[data-perm\]\{display:revert/.test(ag.estilos.map(s => s.textContent || '').join('\n')));
+  ok('o Admin Geral vê todos os botões (nenhuma regra de esconder)', regra(ag) === '', regra(ag));
 
   console.log('\n── 4. o servidor manda o menu e trava por baixo ──');
   const P = require('./perfis_acesso'); const B = P.montar(); require('./admin_telas')(B.app, B.db);
@@ -102,6 +104,52 @@ const MINHAS_OP = { telas:[ { n:101, nome:'Revisão', rota:'/operador', modulo:1
   const html2 = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
   const marcados = (html2.match(/data-perm="/g) || []).length;
   ok('as telas do Admin marcam os botões de ação com a permissão (data-perm): ' + marcados, marcados >= 8);
+
+  console.log('\n── 5. o botão cuja ação pede OUTRA chave que a da tela leva data-perm (AJUSTE de 04/11/2026) ──');
+  /* Cada linha: o arquivo, um pedaço único do botão e a chave que a ROTA dele
+     exige (permDaRota). Botão que usa a mesma chave da tela não precisa de
+     marca: quem abriu a tela já a tem. E as telas que já escondem pela
+     permissão vinda do servidor (Devoluções em andamento, a venda cancelada,
+     a aprovação do ajuste e a da contagem de peça) ficam como estão. */
+  const MARCAS = [
+    ['public/operador.html',  "b.id='rjBt'",                                   'revisao.rejeitar'],
+    ['public/embalagem.html', 'id="upBox"',                                    'pdf.subir'],
+    ['public/expedicao.html', 'onclick="imp(',                                 'etiqueta.emitir'],
+    ['public/carregamento.html', 'onclick="fecharSaida(true)"',                'saida.liberar'],
+    ['public/carregamento.html', 'onclick="fecharViagem(true)"',               'saida.liberar'],
+    ['public/index.html', "data-resolvediv=\"'+r.id+'\" data-sku=\"'+esc(sug.codigo)", 'sku.cadastrar'],
+    ['public/index.html', "data-resolvediv=\"'+r.id+'\" data-sku=\"'+esc(outras[k2].codigo)", 'sku.cadastrar'],
+    ['public/index.html', "data-resolveoutro=\"'+r.id+'\">Confirmar",       'sku.cadastrar'],
+    ['public/index.html', "data-ajsalvar=\"'+esc(cod)+'\">pedir",            'estoque.ajustar'],
+    ['public/index.html', 'onclick="ctAprovar([',                              'contagem.ajustar'],
+    ['public/index.html', 'onclick="ctRejeitar([',                             'contagem.ajustar'],
+    ['public/index.html', 'data-tipo="modelo" data-id=',                         'modelo.cadastrar'],
+    ['public/index.html', 'data-tipo="modelo">Adicionar',                         'modelo.cadastrar'],
+    ['public/index.html', 'data-tipo="tecido" data-id=',                         'sku.cadastrar'],
+    ['public/index.html', 'data-tipo="tecido">Adicionar',                         'sku.cadastrar'],
+    ['public/index.html', 'data-tipo="cor" data-id=',                            'sku.cadastrar'],
+    ['public/index.html', 'data-tipo="cor">Adicionar',                            'sku.cadastrar'],
+    ['public/index.html', "data-nova-cor=",                                    'sku.cadastrar'],
+    ['public/index.html', 'id="edSalvar"',                                     'modelo.cadastrar'],
+    ['public/index.html', 'id="edExcluir"',                                    'modelo.cadastrar'],
+    ['public/index.html', 'cdAdd" data-perm',                                    'listas.editar'],
+    ['public/index.html', 'cdDel" data-perm',                                   'listas.editar'],
+    ['public/index.html', 'id="cdKitBt"',                                      'kit.editar']
+  ];
+  for(const [arq, pedaco, chave] of MARCAS){
+    const txt = fs.readFileSync(path.join(__dirname, arq), 'utf8');
+    const i = txt.indexOf(pedaco);
+    if(i < 0){ ok(arq + ': o botão "' + pedaco + '" existe', false); continue; }
+    /* a marca mora no mesmo elemento: entre o "<button" (ou o createElement) que
+       abre e o fim da tag */
+    const ini = Math.max(txt.lastIndexOf('<button', i), txt.lastIndexOf('<div', i), txt.lastIndexOf('createElement', i));
+    const fim = txt.indexOf('>', i + pedaco.length);
+    /* o botão criado por createElement recebe a marca nas linhas de baixo
+       (setAttribute); o escrito em texto, dentro da própria tag — e a janela
+       acaba nela, senão a marca do botão vizinho passaria por esta */
+    const trecho = /createElement/.test(txt.slice(ini, i)) ? txt.slice(ini, i + 400) : txt.slice(ini, fim + 1);
+    ok(arq.replace('public/','') + ' · ' + pedaco.slice(0, 40) + ' → ' + chave, new RegExp('data-perm[\\"=,\' ]+' + chave.replace('.', '\\.')).test(trecho) || trecho.indexOf("setAttribute('data-perm','" + chave + "')") >= 0, trecho.slice(0, 220));
+  }
 
   console.log('\n' + (n - falhas) + ' ok, ' + falhas + ' falha(s)\n');
   process.exit(falhas ? 1 : 0);
