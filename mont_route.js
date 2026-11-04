@@ -270,7 +270,16 @@ module.exports=function(app,db){
            fase 1 do livro (21/09/2026). A referencia e a linha de `montagem`:
            daqui a um mes, o extrato do SKU responde QUAL embalagem somou esta
            peca, com a hora e o tempo de bancada ao lado. */
-        ESTOQUE.movimentar(db,{codigo:cod, delta:+1, tipo:'embalagem',
+        /* ⚠️ SOB MEDIDA NAO SOMA (R-EST-05, CONSERTO de 04/11/2026). A peca e
+           feita contra o pedido e a Conferencia nao a baixa (§7): o +1 aqui
+           deixava o saldo do SOBMEDIDA 1 acima a cada embalagem, para sempre.
+           Achado pelo teste_regras_estoque.js. A embalagem continua registrada
+           (montagem, fila, ordem do dia) — so o saldo nao anda. Banco sem a
+           tabela `modelo` (teste antigo) le como medida padrao, como antes. */
+        let sobMedida=false;
+        try{ const m=db.prepare('SELECT COALESCE(m.sob_medida,0) s FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id WHERE s.codigo=?').get(cod);
+             sobMedida=!!(m&&m.s); }catch(e){ sobMedida=false; }
+        if(!sobMedida) ESTOQUE.movimentar(db,{codigo:cod, delta:+1, tipo:'embalagem',
           referencia:'montagem:'+mid, usuario:req.usuario});
         if(modo==='hoje'){
           const r=db.prepare("SELECT id FROM producao WHERE codigo=? AND data=date('now','localtime') AND produzido<qtd ORDER BY id LIMIT 1").get(cod);

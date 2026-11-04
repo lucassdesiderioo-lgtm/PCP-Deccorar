@@ -205,6 +205,28 @@ ok('o resumo do dia continua respondendo', Array.isArray(r.body));
 r = chamar('GET','/api/fila');
 ok('a fila continua respondendo', Array.isArray(r.body));
 
+console.log('\n── 8. sob medida NÃO soma na embalagem (R-EST-05, CONSERTO de 04/11/2026) ──');
+/* Achado pelo teste_regras_estoque.js: a embalagem somava +1 para QUALQUER
+   SKU, e a Conferencia nao baixa sob medida (§7) — cada SOBMEDIDA embalado
+   deixava o saldo dele 1 acima, para sempre. A embalagem continua sendo
+   registrada (montagem, fila, ordem do dia); so o saldo nao anda. */
+db.exec(`CREATE TABLE IF NOT EXISTS modelo (id INTEGER PRIMARY KEY, nome TEXT, sob_medida INTEGER DEFAULT 0);
+  INSERT INTO modelo (id,nome,sob_medida) VALUES (91,'Rolô',0),(92,'Sob medida',1);`);
+try{ db.exec('ALTER TABLE skus ADD COLUMN modelo_id INTEGER'); }catch(e){}
+db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('SOBMEDIDA',0,92),('BK100100BEGE',0,91)").run();
+{
+  const movs = c => db.prepare('SELECT COUNT(*) n FROM movimento_estoque WHERE codigo=?').get(c).n;
+  const ant = db.prepare('SELECT COUNT(*) n FROM montagem').get().n;
+  let r8 = chamar('POST','/api/montagem',{codigo:'SOBMEDIDA', kit_ok:1});
+  eq('a embalagem do sob medida responde ok', r8.status, 200);
+  eq('o saldo do sob medida continua zero', db.prepare("SELECT estoque FROM skus WHERE codigo='SOBMEDIDA'").get().estoque, 0);
+  eq('   e nenhuma linha no livro', movs('SOBMEDIDA'), 0);
+  eq('   mas a embalagem fica registrada', db.prepare('SELECT COUNT(*) n FROM montagem').get().n, ant + 1);
+  r8 = chamar('POST','/api/montagem',{codigo:'BK100100BEGE', kit_ok:1});
+  eq('o SKU de modelo comum continua somando +1', db.prepare("SELECT estoque FROM skus WHERE codigo='BK100100BEGE'").get().estoque, 1);
+  eq('   com a linha de embalagem no livro', movs('BK100100BEGE'), 1);
+}
+
 console.log('\n────────────────────────────────────────────');
 console.log(falhas ? '  ' + falhas + ' de ' + n + ' FALHARAM' : '  todos os ' + n + ' casos passaram');
 try{ db.close(); fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
