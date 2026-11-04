@@ -224,6 +224,16 @@ async function selPessoa(id){
   EST=await jget('/api/acesso/usuario/'+id);   // {setores:[{nome,nivel}], permissoes:[...]}
   renderDetalhe();
 }
+async function salvarNivel(){
+  var nv=$('#pNivel').value, ant=EST.nivel;
+  if(nv===ant) return;
+  var nomes={operacao:'Operação',supervisor:'Supervisor',admin:'Admin',admin_geral:'Admin Geral'};
+  if(!confirm('Mudar o nível de '+((PESSOAS.find(function(x){return x.id===SEL;})||{}).nome||'')+' de '+nomes[ant]+' para '+nomes[nv]+'?')){ $('#pNivel').value=ant; return; }
+  var r=await jpost('/api/acesso/usuario/'+SEL+'/nivel',{nivel:nv});
+  if(r.erro){ $('#nvMsg').style.color='#f85149'; $('#nvMsg').textContent=r.erro; $('#pNivel').value=ant; return; }
+  EST=await jget('/api/acesso/usuario/'+SEL); renderDetalhe();
+  $('#nvMsg').style.color='#2ea043'; $('#nvMsg').textContent='nível salvo';
+}
 function meusSetorIds(){
   // reconstroi os ids a partir dos nomes (EST.setores traz nome/nivel)
   var nomes={}; EST.setores.forEach(function(s){nomes[s.nome]=1;});
@@ -247,6 +257,17 @@ function renderDetalhe(){
     +'<div class="sub" style="margin-bottom:8px">Saiu do time? <b>Desativar</b> bloqueia o login na hora e mantém o histórico (recomendado). <b>Excluir</b> remove a pessoa da lista de vez.</div>'
     +(p.ativo?'':'<div class="warn">Esta pessoa está <b>inativa</b> — não consegue entrar até ser reativada.</div>')
     +(isAG?'<div class="orig exc" style="display:inline-block;margin-bottom:4px">Admin Geral · todas as permissões</div>':'');
+  /* O NÍVEL DA PESSOA (spec ACESSO-POR-TELA-E-NIVEL, fase 3): um só, e é o
+     teto do que ela alcança. Mudar é ato separado, só do Admin Geral, e vai
+     para a auditoria (R-NIV-04) — por isso tem o botão dele, e não salva junto
+     com o nome. */
+  var NV=[['operacao','Operação'],['supervisor','Supervisor'],['admin','Admin'],['admin_geral','Admin Geral']];
+  h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0 4px">'
+    +'<b>Nível:</b> <select class="tin" id="pNivel"'+(isAG?' disabled title="quem está no setor Admin Geral é nível Admin Geral"':'')+'>'
+    +NV.map(function(x){ return '<option value="'+x[0]+'"'+(EST.nivel===x[0]?' selected':'')+'>'+x[1]+'</option>'; }).join('')
+    +'</select>'+(isAG?'':'<button class="ghost" onclick="salvarNivel()">Mudar nível</button>')
+    +'<span class="msg" id="nvMsg"></span></div>'
+    +'<div class="sub" style="margin-bottom:8px">O nível é o teto: a pessoa só alcança tela e ação do nível dela ou abaixo, venha do setor ou de exceção.</div>';
   // SETORES
   h+='<h2 style="margin-top:16px">Setores</h2>';
   h+=SETORES.filter(function(s){return s.ativo;}).map(function(s){

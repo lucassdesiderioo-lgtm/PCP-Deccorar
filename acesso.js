@@ -181,6 +181,15 @@ module.exports = function(app, db){
     );
   `);
 
+  /* usuarios.nivel (fase 3 da ACESSO-POR-TELA-E-NIVEL). O dono da tabela e o
+     auth.js (CREATE e ALTER la); o ALTER guardado repete aqui porque este
+     modulo sobe sozinho nos testes e nos scripts, e a migracao do nivel mora
+     aqui — sem a coluna ela estouraria calada no try (a familia do §17). */
+  try{
+    const cu = db.prepare("SELECT name FROM pragma_table_info('usuarios')").all().map(c => c.name);
+    if(cu.length && cu.indexOf('nivel') < 0) db.exec("ALTER TABLE usuarios ADD COLUMN nivel TEXT NOT NULL DEFAULT 'operacao'");
+  }catch(e){ console.log('[acesso] coluna usuarios.nivel falhou: '+e.message); }
+
   // Auditoria (Fase 4): registra o que MUDA coisas. Nunca lanca (log nao pode
   // derrubar a acao). IP e nome ficam junto do id (sobrevive a desativacao).
   function auditar(req, categoria, acao, alvo, detalhe){
@@ -519,7 +528,8 @@ module.exports = function(app, db){
     const uid = +req.params.id;
     const setores = db.prepare(`SELECT s.nome, s.nivel FROM usuario_setor us
       JOIN setores s ON s.id=us.setor_id WHERE us.usuario_id=? ORDER BY s.nome`).all(uid);
-    res.json({ usuario_id:uid, setores, permissoes:[...permissoesDe(uid)].sort() });
+    const nv = db.prepare('SELECT nivel FROM usuarios WHERE id=?').get(uid);
+    res.json({ usuario_id:uid, setores, permissoes:[...permissoesDe(uid)].sort(), nivel:(nv && nv.nivel) || 'operacao' });
   });
 
   // ══════════════ FASE 2 — tela de cadastro (le o registro) ══════════════
@@ -1118,6 +1128,60 @@ module.exports = function(app, db){
     ['sobmedida.montagem','sobmedida'], ['sobmedida.revisao','sobmedida'],
     ['sobmedida.embalagem','sobmedida']
   ];
+  /* ══ O NÍVEL DA PESSOA (spec ACESSO-POR-TELA-E-NIVEL, fase 3, 04/11/2026) ══
+     O nível passa a ser da PESSOA, e é um só: Operação, Supervisor, Admin ou
+     Admin Geral (R-NIV-02). Na fase 3 ele só existe e aparece; quem o faz
+     valer como teto é a fase 4.
+
+     ⚠️ A MIGRAÇÃO DÁ A CADA UM O MAIOR NÍVEL QUE ELE JÁ ALCANÇA HOJE (R-NIV-05,
+     decisão do dono: "depois que estiver pronto vou editar o nível de cada
+     um"), e roda UMA VEZ só (`config.nivel_pessoa_1`). "Alcança" é o nível da
+     permissão mais alta que a pessoa TEM de fato, por setor ou exceção — e
+     não o nível do setor: quem está num setor marcado Admin com só chaves de
+     Operação ganharia o Admin na fase 4, que é exatamente o que a trava
+     existe para impedir. Quem está no setor Admin Geral é Admin Geral.
+     Rodar de novo apagaria o ajuste que o dono fez pessoa a pessoa. */
+  function nivelAlcancado(uid){
+    if(ehAdminGeral(uid)) return 'admin_geral';
+    let melhor = 'operacao';
+    for(const c of permissoesDe(uid)){
+      const i = infoPerm[c];
+      if(i && NIVEIS[i.nivel] > NIVEIS[melhor]) melhor = i.nivel;
+    }
+    return melhor;
+  }
+  function migrarNiveis(){
+    if(db.prepare("SELECT 1 FROM config WHERE chave='nivel_pessoa_1'").get()) return 0;
+    const pessoas = db.prepare('SELECT id FROM usuarios').all();
+    const up = db.prepare('UPDATE usuarios SET nivel=? WHERE id=?');
+    db.transaction(() => {
+      pessoas.forEach(u => up.run(nivelAlcancado(u.id), u.id));
+      db.prepare("INSERT OR REPLACE INTO config (chave,valor) VALUES ('nivel_pessoa_1', datetime('now','localtime'))").run();
+    })();
+    return pessoas.length;
+  }
+  try{ const q = migrarNiveis(); if(q) console.log('[acesso] nível da pessoa: '+q+' pessoa(s) receberam o maior nível que já alcançam (uma vez só)'); }
+  catch(e){ console.log('[acesso] migração do nível da pessoa falhou: '+e.message); }
+
+  app.post('/api/acesso/usuario/:id/nivel', (req, res) => {
+    if(!soAdmin(req, res)) return;
+    /* SÓ O ADMIN GERAL MUDA O NÍVEL (R-NIV-04): subir de nível é promoção, não
+       caixinha. A rota já é de `pessoas.gerenciar` (intransferível); a guarda
+       aqui é defesa em profundidade. */
+    if(!req.usuario || !ehAdminGeral(req.usuario.id)) return res.status(403).json({ erro:'Só o Admin Geral muda o nível de uma pessoa.' });
+    const uid = +req.params.id;
+    const u = db.prepare('SELECT id,nome,nivel FROM usuarios WHERE id=?').get(uid);
+    if(!u) return res.status(404).json({ erro:'pessoa não encontrada' });
+    const nivel = String((req.body || {}).nivel || '');
+    if(!NIVEIS[nivel]) return res.status(400).json({ erro:'Nível inválido: escolha Operação, Supervisor, Admin ou Admin Geral.' });
+    if(ehAdminGeral(uid) && nivel !== 'admin_geral')
+      return res.status(400).json({ erro:'Esta pessoa está no setor Admin Geral, e quem está lá é nível Admin Geral. Tire-a do setor antes de baixar o nível.' });
+    db.prepare('UPDATE usuarios SET nivel=? WHERE id=?').run(nivel, uid);
+    sincronizarAreas(uid);
+    auditar(req, 'sistema', 'usuario_nivel', String(uid), (u.nivel || '—') + ' → ' + nivel + ' (' + u.nome + ')');
+    res.json({ ok:true, nivel });
+  });
+
   function sincronizarAreas(uid){
     try{
       const ag = ehAdminGeral(uid);
@@ -1424,5 +1488,5 @@ module.exports = function(app, db){
    que remonta a coluna pela propria leitura concorda com o defeito — e a
    licao do QR (§4 do CLAUDE.md): ele pergunta a si mesmo. Nenhuma rota usa
    este campo; ele e leitura para teste e diagnostico. */
-  app.locals.acesso = { permissoesDe, compararDivergencias, AREA_CHAVE, decidir, modoAcesso, permDaRota, auditar, podePermissao, ehAdminGeral, ehUltimoAdminGeral, coberturaDeRotas, sincronizarAreas };
+  app.locals.acesso = { permissoesDe, compararDivergencias, AREA_CHAVE, decidir, modoAcesso, permDaRota, auditar, podePermissao, ehAdminGeral, ehUltimoAdminGeral, coberturaDeRotas, sincronizarAreas, migrarNiveis, nivelAlcancado };
 };
