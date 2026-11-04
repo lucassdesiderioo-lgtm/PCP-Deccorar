@@ -97,6 +97,9 @@
   .linha .passo{font-size:13px;margin-top:5px;color:var(--txt);overflow-wrap:anywhere}
   .linha .passo.fora{color:var(--muted)}
   .foraGrupo{margin-top:8px}
+  .obrig{color:var(--amber);font-weight:800}
+  .chip.falta{white-space:normal;overflow-wrap:anywhere}
+  .campoFalta{border-color:var(--red)!important;box-shadow:0 0 0 1px var(--red)}
   .meusBar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px}
   .meusBar .sub{overflow-wrap:anywhere}
   .foraGrupo summary{cursor:pointer;color:var(--muted);font-size:13px;font-weight:700;padding:8px 0}
@@ -120,7 +123,7 @@
       <div id="bResultado"></div>
     </div>
     <div class="card" id="cardLancar" style="display:none">
-      <h2>Lançar devolução</h2>
+      <h2>Lançar devolução</h2><div class="sub" style="margin:-4px 0 10px">Os campos com <span class="obrig">*</span> são obrigatórios. SKU e comprador vêm sozinhos quando a venda está no sistema.</div>
       <div class="tipos" style="margin-bottom:10px">
         <button class="bt sec" data-tipo="coleta" id="tpColeta">Nós coletamos</button>
         <button class="bt sec" data-tipo="ml" id="tpMl">ML devolve</button>
@@ -128,12 +131,12 @@
       <div class="grade">
         <div><label for="lVenda">Venda ou NF (bipe ou digite)</label><input id="lVenda" autocomplete="off" autocorrect="off"></div>
         <div><label for="lNf">NF</label><input id="lNf" autocomplete="off"></div>
-        <div><label for="lSku">SKU</label><input id="lSku" autocomplete="off"></div>
-        <div><label for="lComprador">Comprador</label><input id="lComprador" autocomplete="off"></div>
-        <div><label for="lMotivo">Motivo</label><select id="lMotivo"></select><a href="#" id="lNovoMotivo" class="sub" style="display:none;margin-top:4px">+ cadastrar motivo</a></div>
+        <div><label for="lSku">SKU <span class="obrig" title="obrigatório">*</span></label><input id="lSku" autocomplete="off"></div>
+        <div><label for="lComprador">Comprador <span class="obrig" title="obrigatório">*</span></label><input id="lComprador" autocomplete="off"></div>
+        <div><label for="lMotivo">Motivo <span class="obrig" title="obrigatório">*</span></label><select id="lMotivo"></select><a href="#" id="lNovoMotivo" class="sub" style="display:none;margin-top:4px">+ cadastrar motivo</a></div>
         <div id="boxPrazo"><label for="lPrazo">Mandar o comprovante ao ML até</label><input id="lPrazo" type="date"></div>
         <div id="boxAberta"><label for="lAberta">Reclamação aberta em</label><input id="lAberta" type="date"><div class="sub" id="lColetaAte" style="margin-top:4px"></div></div>
-        <div id="boxResp"><label for="lResp">Responsável</label><select id="lResp"><option value="">— escolher —</option></select></div>
+        <div id="boxResp"><label for="lResp">Responsável <span class="obrig" title="obrigatório">*</span></label><select id="lResp"><option value="">— escolher —</option></select></div>
         <div id="boxPassado"><label for="lPassado">Passado em</label><input id="lPassado" type="date"></div>
         <div><label for="lObs">Observação</label><input id="lObs" autocomplete="off"></div>
         <div class="larga" id="boxJa"><div class="bloco" style="margin:4px 0 0"><h3>Já adiantar a coleta e o valor (opcional)</h3>
@@ -152,7 +155,7 @@
         <div class="soDin"><label for="lEtiqueta">Custo da etiqueta de devolução</label><input id="lEtiqueta" placeholder="R$ — se o ML cobrou" autocomplete="off"></div>
         <div class="larga"><label>Venda via publicidade? (obrigatório)</label>
           <div class="simnao" id="lPub"><button class="bt sec" data-pub="1">Sim</button><button class="bt sec" data-pub="0">Não</button></div></div>
-        <div class="larga"><label for="lLink">Link da conversa da reclamação (cole o endereço do ML)</label>
+        <div class="larga"><label for="lLink">Link da conversa da reclamação (cole o endereço do ML) <span class="obrig" title="obrigatório">*</span></label>
           <input id="lLink" placeholder="https://www.mercadolivre.com.br/…" autocomplete="off" autocorrect="off" autocapitalize="off" inputmode="url"></div>
         <div class="larga"><label for="lMsgMl">Mensagem do Mercado Livre (cole aqui)</label>
           <textarea id="lMsgMl" rows="6" placeholder="Cole a mensagem que o ML mandou sobre a reclamação"></textarea></div>
@@ -241,7 +244,7 @@ function virg(v){ return Number(v).toFixed(2).replace('.',','); }
 function reais(v){ if(v===null||v===undefined) return '—'; return 'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function api(metodo, url, corpo){
   return fetch(url,{method:metodo,headers:corpo?{'Content-Type':'application/json'}:{},body:corpo?JSON.stringify(corpo):undefined})
-    .then(function(r){ return r.json().catch(function(){return {};}).then(function(b){ if(!r.ok){ var e=new Error(b.erro||('Erro '+r.status)); e.status=r.status; throw e; } return b; }); });
+    .then(function(r){ return r.json().catch(function(){return {};}).then(function(b){ if(!r.ok){ var e=new Error(b.erro||('Erro '+r.status)); e.status=r.status; e.corpo=b; throw e; } return b; }); });
 }
 function pecaDe(sku){
   var s=ESTADO.skus[String(sku||'').toUpperCase()];
@@ -308,7 +311,7 @@ function linhaCaso(c){
   if(nomeResp(c)) chips+='<span class="chip">'+(c.responsavel_id && c.responsavel_id===ESTADO.eu?'👤 ':'')+esc(nomeResp(c))+'</span>';
   if(c.prazo_original) chips+='<span class="chip">comprovante prorrogado (era '+dataBR(c.prazo_original)+')</span>';
   if(c.prazo_coleta_original) chips+='<span class="chip">coleta prorrogada (era '+dataBR(c.prazo_coleta_original)+')</span>';
-  chips+=chipPub(c)+chipLink(c);
+  chips+=chipFalta(c)+chipPub(c)+chipLink(c);
   if(c.mesmo_comprador && c.mesmo_comprador.length) chips+='<span class="chip pub">👥 mesmo comprador: '+c.mesmo_comprador.map(function(i){return '#'+i;}).join(', ')+'</span>';
   return '<div class="linha '+esc(c.cor||'')+'" data-id="'+c.id+'">'+
     '<div class="t1"><span>#'+c.id+'</span><span>Venda '+esc(c.venda||'—')+'</span><span>NF '+esc(c.nf||'—')+'</span></div>'+
@@ -393,7 +396,7 @@ function setTipo(t){
   ESTADO.tipo=t;
   document.getElementById('tpColeta').className='bt '+(t==='coleta'?'':'sec');
   document.getElementById('tpMl').className='bt '+(t==='ml'?'':'sec');
-  ['boxPrazo','boxAberta','boxResp','boxPassado','boxJa'].forEach(function(id){ document.getElementById(id).style.display = t==='coleta' ? '' : 'none'; });
+  ['boxPrazo','boxAberta','boxPassado','boxJa'].forEach(function(id){ document.getElementById(id).style.display = t==='coleta' ? '' : 'none'; });
 }
 document.getElementById('tpColeta').onclick=function(){ setTipo('coleta'); };
 /* "Via publicidade?" começa sem resposta de propósito: quem decide se falta é o
@@ -442,6 +445,17 @@ function acharVenda(){
 var tVenda=null;
 document.getElementById('lVenda').addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key==='Tab'){ if(e.key==='Enter') e.preventDefault(); acharVenda(); } });
 document.getElementById('lVenda').addEventListener('input',function(){ clearTimeout(tVenda); tVenda=setTimeout(acharVenda,500); });
+/* O QUE O LANÇAMENTO EXIGE (04/11/2026): a recusa vem do servidor, com a
+   lista dos campos; a tela só marca cada um, e o digitado fica. */
+var CAMPO_FALTA={ motivo:'lMotivo', sku:'lSku', comprador:'lComprador', responsavel_id:'lResp', link_ml:'lLink' };
+function marcarFalta(lista){
+  Object.keys(CAMPO_FALTA).forEach(function(k){ document.getElementById(CAMPO_FALTA[k]).classList.toggle('campoFalta', lista.indexOf(k)>=0); });
+}
+Object.keys(CAMPO_FALTA).forEach(function(k){
+  var el=document.getElementById(CAMPO_FALTA[k]);
+  ['input','change'].forEach(function(ev){ el.addEventListener(ev, function(){ el.classList.remove('campoFalta'); }); });
+});
+function chipFalta(c){ return (c.falta_lancamento&&c.falta_lancamento.length) ? '<span class="chip falta">falta: '+esc(c.falta_lancamento.join(' · '))+'</span>' : ''; }
 document.getElementById('btLancar').onclick=function(){
   var msg=document.getElementById('lMsg'); msg.innerHTML='';
   var v=document.getElementById('lVenda').value.trim().replace(/\s+/g,'');
@@ -461,8 +475,10 @@ document.getElementById('btLancar').onclick=function(){
   }
   // O campo de cima aceita venda OU NF: número curto é NF.
   if(v && v.length<=7 && !corpo.nf) corpo.nf=v; else corpo.venda=v;
-  if(ESTADO.tipo==='coleta'){ corpo.prazo=document.getElementById('lPrazo').value; if(document.getElementById('lResp').value) corpo.responsavel_id=+document.getElementById('lResp').value; corpo.passado_em=document.getElementById('lPassado').value; }
-  var b=this; b.disabled=true;
+  /* O responsável é obrigatório nos dois tipos (04/11/2026). */
+  corpo.responsavel_id=document.getElementById('lResp').value ? +document.getElementById('lResp').value : '';
+  if(ESTADO.tipo==='coleta'){ corpo.prazo=document.getElementById('lPrazo').value; corpo.passado_em=document.getElementById('lPassado').value; }
+  var b=this; b.disabled=true; marcarFalta([]);
   api('POST','/api/devolucao-casos',corpo).then(function(r){
     msg.innerHTML='<div class="okmsg">Caso #'+r.id+' lançado.</div>';
     ['lVenda','lNf','lSku','lComprador','lObs','lPrazo','lResp','lPassado','lLink','lMsgMl','lCep','lTransp','lCusto','lSit','lValor','lEtiqueta','lAgenda','lLimite'].forEach(function(id){ document.getElementById(id).value=''; });
@@ -470,7 +486,7 @@ document.getElementById('btLancar').onclick=function(){
     setPub(null); passadoHoje();
     document.getElementById('lMotivo').value=''; document.getElementById('lAchou').textContent='';
     carregar();
-  }).catch(function(e){ msg.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; })
+  }).catch(function(e){ msg.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; marcarFalta((e.corpo&&e.corpo.faltam)||[]); })
     .then(function(){ b.disabled=false; });
 };
 
@@ -593,7 +609,7 @@ function desenharCaso(d){
     '<button class="bt sec" onclick="fechar()">Fechar</button></div>';
   h+='<div class="chips">'+chipPrazo(c)+(c.tipo==='coleta'&&c.parado?'<span class="chip parado">parado há '+plural(c.dias_parado,'dia','dias')+'</span>':'')+
      (c.tipo==='ml'?'<span class="chip">esperando há '+plural(c.dias_esperando||0,'dia','dias')+'</span>'+chipRevisei(c)+chipRevisao(c):'')+
-     (c.saida_nome?'<span class="chip">'+esc(c.saida_nome)+'</span>':'')+chipPub(c)+'</div>';
+     (c.saida_nome?'<span class="chip">'+esc(c.saida_nome)+'</span>':'')+chipFalta(c)+chipPub(c)+'</div>';
   if(aberto) h+=cartaoProximo(c);
   h+='<div class="trilha">'+trilha+'</div>';
   h+='<div class="dados">'+
