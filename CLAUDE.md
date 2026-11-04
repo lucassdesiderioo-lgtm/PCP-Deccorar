@@ -1964,7 +1964,7 @@ dinheiro não vem junto.
 > tudo"*.
 
 > ⚠️ **TODO CASO ABERTO DIZ O PRÓXIMO PASSO, DE QUEM É A VEZ E ATÉ QUANDO**
-> (spec `DEVOLUCOES-PROXIMO-PASSO.md`, fases 1 a 3, 04/11/2026, dono: *"quando
+> (spec `docs/arquivo/DEVOLUCOES-PROXIMO-PASSO.md`, fases 1 a 3, 04/11/2026, dono: *"quando
 > ele abre o caso, não está claro qual é o próximo passo que ele precisa
 > dar"*). `devcaso_dominio.proximoPasso` é o **dono único**: o passo é
 > **calculado** do que já está gravado (etapa, prazos, última tentativa de
@@ -2003,6 +2003,18 @@ dinheiro não vem junto.
 > pelo `responsavel_id` da pessoa logada; quem não tem caso vê a lista inteira,
 > e a tela diz. **Lançar caso novo continua sendo `devolucao.lancar`**, que já
 > é separada e se dá pela tela de Acessos (decisão do dono, 04/11/2026).
+>
+> ✅ **NO AR E CONFERIDO EM 04/11/2026** (PR #270): o dono fez o backup, o
+> deploy e o teste de segurança (telas 302, API 401, `/login` 200, inclusive
+> `/api/devolucao-casos/responsaveis`) e percorreu o roteiro na tela — o
+> próximo passo de cada etapa e o "Ir para a ação ↓", o "Esperando outros"
+> recolhido, a escolha do responsável e o "Meus casos", e o texto escrito à
+> mão dos casos antigos aparecendo — e disse *"bateu tudo … ficou muito
+> bom"*. A spec foi para `docs/arquivo/`. ⚠️ **AINDA NÃO PROVADO:** o passo
+> acompanhando um caso de verdade do lançamento ao reembolso (as linhas do
+> mapa que só aparecem com o tempo: o "parado" devolvendo a vez, a coleta de
+> data passada, o valor do ML pedido há dias). Prova que não foi feita se
+> escreve como não feita.
 
 **Rode `node teste_devolucao_casos.js` (820 casos) — e, na tela, `node teste_devolucao_casos_tela.js` (170) — ao mexer no
 `devcaso_dominio.js`, no `devcaso_route.js`, no bipe ou na baixa do

@@ -2,8 +2,9 @@
 
 ```
 STATUS
-Situação: FASES 1, 2 e 3 EM CÓDIGO (04/11/2026), num PR só — falta o deploy
-  e a conferência do dono na tela
+Situação: CONCLUÍDA E ARQUIVADA (04/11/2026) — as fases 1, 2 e 3 no ar
+  (PR #270), conferidas pelo dono na tela: "bateu tudo … ficou muito bom".
+  A fase 4 (o passo na central de Pendências) ficou de fora, como na §5
 Tipo: NOVIDADE · risco 🟡 nas fases 1 e 2, 🔴 na fase 3 (schema)
 Aprovada pelo dono em 04/11/2026 ("pode mesclar e seguir com a fase 1, 2, 3")
 O que mudou na construção (vale o CLAUDE.md §9-B):
