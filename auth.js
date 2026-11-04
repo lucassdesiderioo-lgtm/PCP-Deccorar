@@ -72,7 +72,7 @@ const API_ADMIN=['/api/teste','/api/usuarios','/api/estoque','/api/alvo','/api/b
 const LIVRE=['/login','/login.html','/nav.js','/favicon.ico'];
 
 module.exports=function(app, db){
-  db.exec("CREATE TABLE IF NOT EXISTS usuarios(id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, salt TEXT NOT NULL, pin_hash TEXT NOT NULL, areas TEXT NOT NULL DEFAULT '', ativo INTEGER NOT NULL DEFAULT 1, criado_em TEXT DEFAULT (datetime('now','localtime')), pin_curto INTEGER NOT NULL DEFAULT 1, fora_rodizio INTEGER DEFAULT 0, nivel TEXT NOT NULL DEFAULT 'operacao')");
+  db.exec("CREATE TABLE IF NOT EXISTS usuarios(id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, salt TEXT NOT NULL, pin_hash TEXT NOT NULL, areas TEXT NOT NULL DEFAULT '', ativo INTEGER NOT NULL DEFAULT 1, criado_em TEXT DEFAULT (datetime('now','localtime')), pin_curto INTEGER NOT NULL DEFAULT 1, fora_rodizio INTEGER DEFAULT 0, nivel TEXT)");
   /* PIN DE 6 DIGITOS (ACESSOS-UNIFICADOS fase 5-A, 21/10/2026). `pin_curto=1`
      quer dizer "esta pessoa ainda entra com o PIN de 4 e tem que trocar". O
      hash nao diz o tamanho do PIN, entao a marca e uma coluna: quem ja estava
@@ -87,8 +87,11 @@ module.exports=function(app, db){
      contagem.planejar (inventario_route). No fim, por ALTER (§17). */
   try{ db.exec('ALTER TABLE usuarios ADD COLUMN fora_rodizio INTEGER DEFAULT 0'); }catch(e){ /* ja existe */ }
   /* O NIVEL DA PESSOA (spec ACESSO-POR-TELA-E-NIVEL, fase 3): o teto do que ela
-     alcanca. Depois do fora_rodizio, na ordem do CREATE (§17). A migracao (o maior nivel que cada um ja alcanca) e o acesso.js. */
-  try{ if(db.prepare("SELECT name FROM pragma_table_info('usuarios')").all().every(c=>c.name!=='nivel')) db.exec("ALTER TABLE usuarios ADD COLUMN nivel TEXT NOT NULL DEFAULT 'operacao'"); }catch(e){ console.log('[auth] coluna nivel falhou: '+e.message); }
+     alcanca. Depois do fora_rodizio, na ordem do CREATE (§17). A migracao (o maior nivel que cada um ja alcanca) e o acesso.js.
+     ⚠️ SEM DEFAULT, DE PROPOSITO: vazio quer dizer "sem nivel gravado" (a
+     linha nasceu por SQL direto, um teste ou um script) e nao corta nada; a
+     pessoa criada pela tela nasce `operacao`, gravado aqui no `criar`. */
+  try{ if(db.prepare("SELECT name FROM pragma_table_info('usuarios')").all().every(c=>c.name!=='nivel')) db.exec("ALTER TABLE usuarios ADD COLUMN nivel TEXT"); }catch(e){ console.log('[auth] coluna nivel falhou: '+e.message); }
   const PIN_OK=/^[0-9]{6}$/;
   const ERRO_PIN='O PIN tem que ter 6 números.';
 
@@ -104,7 +107,9 @@ module.exports=function(app, db){
   // nasce marcado e cai na troca no primeiro uso.
   function criar(nome,pin,areas){
     const salt=crypto.randomBytes(16).toString('hex');
-    return db.prepare('INSERT INTO usuarios(nome,salt,pin_hash,areas,pin_curto) VALUES(?,?,?,?,?)')
+    // Pessoa nova nasce de nivel Operacao (spec ACESSO-POR-TELA-E-NIVEL): quem
+    // sobe de nivel e o Admin Geral, pela tela de Acessos.
+    return db.prepare("INSERT INTO usuarios(nome,salt,pin_hash,areas,pin_curto,nivel) VALUES(?,?,?,?,?,'operacao')")
       .run(nome,salt,hash(pin,salt),(areas||[]).join(','),PIN_OK.test(String(pin))?0:1);
   }
   function gravarPin(id,pin){

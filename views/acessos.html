@@ -309,6 +309,9 @@ function renderDetalhe(){
 async function salvarSetoresPessoa(){
   var ids=[].slice.call(document.querySelectorAll('.setchk:checked')).map(function(x){return +x.value;});
   var r=await jpost('/api/acesso/usuario/'+SEL+'/setores',{setores:ids});
+  /* A trava do nível (fase 4) recusa na hora e diz por quê; nada é salvo, e a
+     ficha volta ao que estava gravado. */
+  if(r.erro){ alert(r.erro); await selPessoa(SEL); return; }
   $('#msgSet').textContent='setores salvos'; setTimeout(function(){$('#msgSet').textContent='';},2000);
   EST.permissoes=r.permissoes; await carregarSetores(); await selPessoa(SEL);
 }
@@ -322,6 +325,7 @@ document.addEventListener('change',async function(e){
   else if(!marcado && temSetor) body={chave:chave,concede:0};       // revoga o herdado
   else body={chave:chave,limpar:true};                             // nada a fazer
   var r=await jpost('/api/acesso/usuario/'+SEL+'/excecao',body);
+  if(r.erro){ alert(r.erro); renderDetalhe(); return; }
   EST.permissoes=r.permissoes; renderDetalhe();
 });
 

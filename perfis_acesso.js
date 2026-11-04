@@ -76,6 +76,15 @@ function montar(){
     app.locals.acesso.sincronizarAreas(id);
     pessoas.push(Object.assign({ id }, p));
   }
+  /* A migracao do nivel (fase 3) roda no boot, antes de existir gente aqui: o
+     banco de exemplo a roda de novo, depois das pessoas — como em producao,
+     onde elas ja existem no boot do deploy. Daqui em diante o retrato e o de
+     DEPOIS da migracao e da trava, e tem que ser igual ao de antes. */
+  if(typeof app.locals.acesso.migrarNiveis === 'function'){
+    db.prepare("DELETE FROM config WHERE chave='nivel_pessoa_1'").run();
+    app.locals.acesso.migrarNiveis();
+    pessoas.forEach(p => app.locals.acesso.sincronizarAreas(p.id));
+  }
   return { db, dir, app, rotas, AC: app.locals.acesso, pessoas,
     fechar(){ try{ db.close(); }catch(e){} fs.rmSync(dir, { recursive:true, force:true }); } };
 }
