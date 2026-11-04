@@ -1,0 +1,52 @@
+{
+  "id": "2026-11-04-nf-9124",
+  "data": "2026-11-04",
+  "registrado_em": "2026-11-04",
+  "o_que_aconteceu": "Etiqueta nova do ML, 'Etiqueta válida para envíos': sem a linha Despachar, sem rota e sem endereço; NF escrita 'Nota fiscal #9124' e o comprador debaixo de 'Destinatario:'. O número do código de barras (48405880346) aparece na identificação da folha (MEL48405880346FMXDF01). Antes do conserto a caixa ficava retida por modalidade, sem NF e '(sem nome)'. O dono decidiu: esse formato é coleta.",
+  "origem": "PDF do Mercado Livre lido pelo registrar_caso.js, com nomes e endereços trocados",
+  "paginas": [
+    [
+      "lucas desiderio lucas des #136721278",
+      "Rua Jussara 1250 Tamboré",
+      "Barueri BR-SP 06465070",
+      "Pack ID: 20000 15817769511",
+      "Etiqueta válida para envíos",
+      "484058 80346",
+      "Nota fiiscal #9124",
+      "Destinatario:",
+      "Cliente A (APELIDO)"
+    ],
+    [
+      "1 - Saida Chave de acesso",
+      "35261140119477000105550020000091241849478948",
+      "Número 9,124/Serie 2",
+      "Emissão 04/11/2026",
+      "Protocolo de Autorização de uso",
+      "35261140119477000105550020000091241849478948",
+      "Remetente: LUCAS DA SILVA DESIDERIO",
+      "CNPJ: 40119477000105 INSCRIÇÃO ESTADUAL: 712176898115 UF: SP",
+      "DESTINATARIO: Cliente A",
+      "DANFE SIMPLIFICADO"
+    ],
+    [
+      "Despache a sua venda o quanto antes. Não demore, o seu comprador está esperando.",
+      "Identifiicação Produto",
+      "MEL48405880346FMXDF01 Cortina Rolo Blackout 1,50x1,50 Persiana Cinza",
+      "Pack ID: 2000015817769511 SKU: BK150150CINZA",
+      "Venda: 2000019290872456 Quantidade: 1",
+      "Cliente A Cor: Cinza",
+      "Desenho do tecido: Liso"
+    ]
+  ],
+  "esperado": [
+    {
+      "chave": "2000015817769511",
+      "cliente": "Cliente A",
+      "pecas": [
+        "1xBK150150CINZA"
+      ],
+      "estagio": "pendente",
+      "card": null
+    }
+  ]
+}

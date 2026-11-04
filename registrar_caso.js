@@ -20,7 +20,7 @@
 const fs=require('fs'), path=require('path');
 const pdfjs=require('pdfjs-dist/legacy/build/pdf.js');
 const {pageLines,tipoDaPagina,nfDaNota,itensDaFolha,itemDaFolha}=require('./folha');
-const {nomeDaEtiqueta}=require('./parse');
+const {nomeDaEtiqueta,nfDaEtiqueta}=require('./parse');
 const {mesmoCliente}=require('./nome');
 
 const args=process.argv.slice(2);
@@ -47,6 +47,19 @@ function apelido(n){
 function limparEtiqueta(linhas, nome){
   const out=[]; let depoisDoEndereco=false;
   const ei=linhas.findIndex(l=>/^Endere[çc]o:/.test(l));
+  /* A ETIQUETA NOVA (04/11/2026, NF 9124): sem "Endereço:", o nome vem na
+     linha do "Destinatario:" ou logo abaixo dela. Sem isto o nome real da
+     cliente ia para o caderno, que vai para o Git. */
+  if(ei<0){
+    const di=linhas.findIndex(l=>/^Destinat[aá]rio\s*:/i.test(String(l).trim()));
+    if(di<0) return linhas.slice();
+    const naMesma=String(linhas[di]).replace(/^\s*Destinat[aá]rio\s*:\s*/i,'').trim();
+    return linhas.map((l,k)=>{
+      if(k===di) return naMesma ? 'Destinatario: '+nome+' (APELIDO)' : 'Destinatario:';
+      if(k===di+1 && !naMesma) return nome+' (APELIDO)';
+      return l;
+    });
+  }
   /* O nome partido em duas linhas (o mesmo caso do nomeDaEtiqueta): a linha
      antes do "Endereço:" começa com "(" ou traz um ")" sem o "(". Só então a
      linha de cima também é nome — senão ela é a da NF, e não pode sair. */
@@ -91,7 +104,7 @@ function limparNota(linhas, nome){
     if(x.tipo!=='label') return;
     const t=x.linhas.join('\n');
     const g=re=>{ const m=t.match(re); return m?m[1].replace(/\s+/g,''):null; };
-    const pack=g(/Pack ID:\s*([\d ]+)/), venda=g(/Venda:\s*([\d ]+)/), nf=(t.match(/NF:\s*(\d+)/)||[])[1]||null;
+    const pack=g(/Pack ID:\s*([\d ]+)/), venda=g(/Venda:\s*([\d ]+)/), nf=nfDaEtiqueta(t);
     const nome=nomeDaEtiqueta(x.linhas);
     const a=(nome && alias.get(nome)) || novo();
     if(nome) alias.set(nome,a);
