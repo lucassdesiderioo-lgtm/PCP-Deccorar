@@ -1,6 +1,6 @@
 # Conferência da expedição — tela enxuta, fechamento com prova e o que sobrou no fim do dia
 
-> **STATUS: em construção · 03/11/2026 — fase 1 no ar (PR #261); fases 2, 3 e 4 em código, falta subir**
+> **STATUS: no ar · 04/11/2026 — as quatro fases no ar (PRs #261 e #263); falta a prova de fábrica das fases 2 a 4**
 > Desenhada no Projeto do Claude com o Lucas em 03/11/2026. Nada construído.
 > Spec aprovada e salva no repositório em 03/11/2026; decisões em `docs/DECISOES.md`.
 >
@@ -22,9 +22,9 @@
 > | Fase | O quê | Risco | Situação |
 > |---|---|---|---|
 > | 1 | Enxugar a tela: lista única com marcação Coleta / Agência | 🟡 | **no ar (03/11/2026, PR #261)**; falta a conferência num dia real |
-> | 2 | Fechamento da agência com foto e "quem levou" | 🔴 | **em código (03/11/2026), falta subir** |
-> | 3 | Fim do dia: "a coleta não passou" e o selo "de ontem" | 🟡 | **em código (03/11/2026), falta subir** |
-> | 4 | Venda cancelada: operador marca, gestão confirma, peça volta ao estoque | 🔴 | **em código (03/11/2026), falta subir** |
+> | 2 | Fechamento da agência com foto e "quem levou" | 🔴 | **no ar (04/11/2026, PR #263)**; falta a prova de fábrica |
+> | 3 | Fim do dia: "a coleta não passou" e o selo "de ontem" | 🟡 | **no ar (04/11/2026, PR #263)**; falta a prova de fábrica |
+> | 4 | Venda cancelada: operador marca, gestão confirma, peça volta ao estoque | 🔴 | **no ar (04/11/2026, PR #263)**; falta a prova de fábrica |
 >
 > **Fase 1 em código (03/11/2026):** saíram da tela os quadros do topo (No
 > carro, Faltam no carro, Coleta esperando, Peças adiantadas), o "Conferir carga
@@ -78,6 +78,12 @@
 > prova de fábrica — a primeira viagem fechada com quem levou, o primeiro "a
 > coleta não passou" com o selo no dia seguinte, e a primeira venda cancelada
 > confirmada por outra pessoa.
+>
+> ✅ **NO AR EM 04/11/2026** (PR #263): o dono fez o deploy e disse *"deu tudo
+> certo"*. ⚠️ Isso prova que o sistema subiu, e **não** que os três fluxos
+> funcionam com caixa de verdade: a primeira viagem com quem levou, o primeiro
+> selo "de ontem" e a primeira venda cancelada confirmada por outra pessoa
+> ainda não foram vistos. Prova que não foi feita se escreve como não feita.
 
 ---
 

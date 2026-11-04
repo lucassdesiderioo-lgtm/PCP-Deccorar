@@ -1437,6 +1437,12 @@ mostra contagem regressiva para o despacho, ficando **amarela** abaixo de 2 h e
 > "Conferir carga do carro", que saiu. **`node teste_conferencia_tela.js`** (38,
 > num Chromium de verdade; sem navegador diz PULADO e o CI não o roda) trava a
 > cor do cabeçalho.
+>
+> ✅ **AS QUATRO FASES ESTÃO NO AR DESDE 04/11/2026** (PRs #261 e #263): o dono
+> fez o deploy e disse *"deu tudo certo"*. ⚠️ **AINDA NÃO PROVADO:** a primeira
+> viagem fechada com quem levou, o primeiro "a coleta não passou" com o selo
+> no dia seguinte e a primeira venda cancelada separada por um e confirmada
+> por outro. Prova que não foi feita se escreve como não feita.
 
 | Cartão | Regra em uma linha |
 |---|---|
