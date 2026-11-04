@@ -152,11 +152,32 @@
 - **História:** armadilha #20.
 
 ### R-REV-06 · Peça com problema volta para a produção e não entra na fila
-- **Regra:** durante a revisão, "Peça com problema" grava em `rejeicao` o motivo, o tempo até a detecção, o modo e quem rejeitou. A peça não vai para a embalagem. Os motivos são cadastro (`listas`, tipo `rejeicao`).
+- **Regra:** durante a revisão, "Peça com problema" grava em `rejeicao` o motivo, o tempo até a detecção, o modo e quem rejeitou — o nome em `usuario` e, desde 04/11/2026, o `usuario_id` ao lado, pelo `quem.js`; sem login, 401. A peça não vai para a embalagem. Os motivos são cadastro (`listas`, tipo `rejeicao`). **É só para defeito de verdade**: o bipe errado se resolve no "Cancelar revisão" (R-REV-08).
 - **Por quê:** a peça com defeito não pode virar estoque.
 - **Exceções:** nenhuma.
-- **Teste que trava:** ⚠ **sem teste**.
-- **Status:** no ar.
+- **Teste que trava:** `teste_revisao.js` (seção 15: quem rejeitou e o 401) · ⚠ que a peça rejeitada não entra na fila continua **sem teste**.
+- **Status:** no ar; o `usuario_id` em código em 04/11/2026.
+
+### R-REV-07 · Bipe de fim abaixo de 15 s é recusado, e a revisão continua
+- **Regra:** o bipe que fecharia uma revisão com menos de `config.rev_minimo_seg` segundos (padrão **15**, editável sem deploy) é **recusado, não perguntado**. A tela apita, diz "rápido demais — a revisão continua" e o cronômetro segue; o operador termina e bipa de novo. O `POST /api/revisao` recusa também (409, `motivo:'rapido_demais'`), sem `revisao` e sem `fila`, e grava o evento `rapido_demais` em `revisao_evento`, com quem bipou.
+- **Por quê:** o bipe duplo acidental gravava uma revisão de 1 s e mandava para a embalagem uma peça que ninguém revisou. Nos 30 dias até 04/11/2026 a revisão de verdade começa por volta de 20 s; abaixo de 15 s eram 23 revisões, quase só bipe acidental.
+- **Exceções:** ⚠ **o limite NÃO é 1 minuto**: quase metade das revisões reais fica abaixo de 60 s, e trava que dispara no caso normal vira desvio (#6).
+- **Teste que trava:** `teste_revisao.js` (seção 7).
+- **Status:** em código em 04/11/2026 (spec `QUEM-FEZ-E-REVISAO`, fase 1).
+
+### R-REV-08 · "Cancelar revisão" zera a revisão em andamento
+- **Regra:** com revisão em andamento, o botão "Cancelar revisão" (ao lado de "Peça com problema") zera tudo num toque, sem motivo e sem confirmação. Nada vai para a fila, nada é contado; fica o evento `cancelada` em `revisao_evento`, com quem cancelou.
+- **Por quê:** o erro que ele resolve é de um segundo atrás.
+- **Exceções:** ⚠ **não é a "Peça com problema"**: aquela grava defeito em `rejeicao`, e cada bipe errado faria o número de qualidade da fábrica mentir.
+- **Teste que trava:** `teste_revisao.js` (seção 9).
+- **Status:** em código em 04/11/2026.
+
+### R-REV-09 · "Desfazer última": só a própria, só do dia, só antes de embalar, uma vez
+- **Regra:** depois que uma revisão fecha, o botão "Desfazer última revisão" mostra o que vai desfazer (`Desfazer BK150150BEGE · 1,50 × 1,50 BEGE · revisada há 40s?`) e pede um toque de confirmação. A "última" é a revisão mais recente **com o `usuario_id` de quem está logado**, de hoje — não a do tablet. Numa transação só: copia a revisão inteira para `revisao_evento` (`desfeita`, com quem), **apaga** a linha de `revisao` e a linha de `fila` ligada a ela (`fila.revisao_id`), **só se** ela estiver `aguardando`. Recusa (409, nada muda): embalada ou fora da fila, de outra pessoa, de outro dia, que não é a última, ou — em modo teste — revisão de verdade.
+- **Por quê:** não havia como voltar um bipe errado. **Apagar, e não marcar `desfeita=1`**: a revisão é contada em cinco lugares (`/api/revisao/hoje`, `ordem_dia.js`, `st_route.js`, `ger_route.js`, painel), e uma coluna nova obrigaria cada um a lembrar de filtrar. O rastro inteiro fica no evento. A falta da ordem do dia (#20) volta ao número certo sozinha.
+- **Exceções:** ⚠ **uma vez só**: depois de desfazer, o botão some até a próxima revisão fechar — uma pilha de desfazer vira jeito de apagar o dia (a conta: evento `desfeita` da pessoa com `revisao_id` maior bloqueia). ⚠ Embalada, a peça já é estoque (+1), e desfazer seria mexer em saldo: não é desta regra. As linhas de fila anteriores a 04/11/2026 não têm `revisao_id` e não se desfazem.
+- **Teste que trava:** `teste_revisao.js` (seções 10 a 14 e 17).
+- **Status:** em código em 04/11/2026.
 
 ---
 
@@ -216,8 +237,8 @@
 - **Regra:** cada linha de `revisao` e de `montagem` grava `usuario_id` e `usuario_nome` de quem bipou. O nome vai como retrato: a revisão de ontem continua sendo de quem era, mesmo que a pessoa mude de nome no cadastro. O ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`).
 - **Por quê:** sem isso não há como medir a produtividade nem a autonomia de ninguém (dívida 9; R-ACE-06 da `ACESSOS-UNIFICADOS`).
 - **Exceções:** as linhas de antes de 26/10/2026 ficam com a pessoa vazia — não há de onde tirar.
-- **Teste que trava:** `teste_revisao.js` (seção 6, com a tabela de antes, sem a coluna) · `teste_montagem.js` (6-B).
-- **Status:** em código em 26/10/2026. Nenhuma tela mostra ainda: o dado começa a se acumular.
+- **Teste que trava:** `teste_revisao.js` (seção 6, com a tabela de antes, sem a coluna; seção 8, sem login é 401) · `teste_montagem.js` (6-B).
+- **Status:** em código em 26/10/2026. Desde 04/11/2026 a revisão lê quem fez pelo `quem.js` (dono único, spec `QUEM-FEZ-E-REVISAO`) e recusa sem login (401); a embalagem ainda lê `req.usuario` direto (fase 2). Nenhuma tela mostra ainda: o dado começa a se acumular.
 
 ---
 
@@ -514,3 +535,9 @@ Ficam aqui para virar trabalho, e não esquecimento.
   (§2, armadilha #1)
 - ❌ Fazer a reimpressão baixar estoque "porque imprimiu de novo"
   (§2, armadilha #1-B)
+- ❌ Trocar a recusa dos 15 s por um "confirma?", ou subir o limite para 1 minuto
+  "porque a média é 1 min": metade das revisões reais fica abaixo (R-REV-07)
+- ❌ Usar a "Peça com problema" para bipe errado, ou marcar a revisão desfeita
+  com uma coluna em vez de apagá-la: são cinco contas que teriam de filtrar (R-REV-08, R-REV-09)
+- ❌ Deixar desfazer revisão de outra pessoa, de outro dia, já embalada, ou duas
+  seguidas (R-REV-09)

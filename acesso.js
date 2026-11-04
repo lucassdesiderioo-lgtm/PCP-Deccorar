@@ -890,6 +890,11 @@ module.exports = function(app, db){
     if(pre('/api/acesso')) return 'pessoas.gerenciar';
     if(eq('/api/backup')) return '@ag';
     if(M !== 'GET' && eq('/api/revisao')) return 'revisao.executar';
+    /* QUEM-FEZ-E-REVISAO (04/11/2026): cancelar, desfazer e a ultima sao a
+       mesma bancada e a mesma pessoa. Sem estas linhas elas cairiam no
+       `pre('/api/revisao')` das leituras, que aceita o admin: o admin
+       desfaria revisao sem operar a bancada. */
+    if(eq('/api/revisao/cancelar') || eq('/api/revisao/desfazer') || eq('/api/revisao/ultima')) return 'revisao.executar';
     if(M !== 'GET' && eq('/api/rejeicao')) return 'revisao.rejeitar';
     if(M !== 'GET' && eq('/api/montagem')) return 'embalagem.executar';
     if(M !== 'GET' && eq('/api/embalar')) return 'etiqueta.emitir';

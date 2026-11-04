@@ -463,6 +463,9 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 |---|---|
 | R-REV-05 | A ordem urgente atendida pelo estoque não cobra produção (`ordem_dia.js`, #20) |
 | R-REV-06 | Peça com problema volta para a produção e não entra na fila |
+| R-REV-07 | Bipe de fim abaixo de 15 s (`config.rev_minimo_seg`) é recusado, e a revisão continua |
+| R-REV-08 | "Cancelar revisão" zera a revisão em andamento — não é "Peça com problema" |
+| R-REV-09 | "Desfazer última": só a própria, só do dia, só antes de embalar, uma vez |
 | R-EMB-01 | Sem o bipe do kit a embalagem não fecha — a trava é do servidor (#26) |
 | R-EMB-02 | Embalar não exige a peça estar na fila (não é defeito) |
 | R-EMB-03 | Só a embalagem de fila "hoje" abate a ordem do dia |
@@ -484,6 +487,31 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 `kit_pdf.js`, no card do kit, no `kit_etiqueta.js`, no `qr.js` ou no
 `barras.js`: `node teste_kit.js` e `node teste_qr.js` (e, no `barras.js`, também
 `cd tecido && npm test`). Na revisão: `node teste_revisao.js`.
+
+> ⚠️ **A REVISÃO RECUSA O BIPE RÁPIDO, CANCELA E DESFAZ (04/11/2026)** — fase 1
+> da spec `QUEM-FEZ-E-REVISAO`, cartões R-REV-07 a R-REV-09. O bipe duplo
+> acidental gravava revisão de 1 s e mandava para a embalagem peça que ninguém
+> revisou. Três coisas parecem bug e não são:
+>
+> - **A revisão desfeita é APAGADA**, junto com a linha da `fila` dela
+>   (`fila.revisao_id`). Não há coluna `desfeita`: a revisão é contada em cinco
+>   lugares, e o que esquecesse o filtro voltaria a contar. O rastro inteiro está
+>   em `revisao_evento` (`rapido_demais`, `cancelada`, `desfeita`), com quem fez.
+> - **Depois de desfazer, o botão some** até a próxima revisão fechar. A anterior
+>   não se desfaz: uma pilha de desfazer vira jeito de apagar o dia.
+> - **Revisão sem login é 401.** Quem fez vem do `quem.js` (`quem(req)`), dono
+>   único de "quem está fazendo isto": sempre do servidor, nunca da tela. As
+>   outras rotas passam a usá-lo fase a fase (spec, fases 2 a 7).
+>
+> As três rotas novas (`/api/revisao/cancelar`, `/desfazer`, `/ultima`) têm linha
+> própria no `permDaRota()` (`revisao.executar`); sem ela cairiam no
+> `pre('/api/revisao')` das leituras, que aceita o admin. O `GET
+> /api/revisao/hoje` saiu do `server.js` para o `revisao_route.js`, sem mudar o
+> SQL. **`node teste_revisao.js` (120)**: dez defeitos foram reintroduzidos um a
+> um — a barreira desligada (reprova 13), sem "só a própria" (1), a pilha de
+> desfazer (4), sem "só do dia" (1), desfazer embalada (2), desfazer em modo
+> teste a de verdade (1), `revisao_evento` fora de `TABELAS` (3), sem a linha no
+> `permDaRota` (3), sem login gravando (9) e a fila sem `revisao_id` (17).
 
 > ⚠️ **A FILA DA EMBALAGEM FOI ACERTADA PELA MESA DO FIM DO DIA 04/11/2026**
 > (linha em `docs/DECISOES.md`). `node ajustar_fila_embalagem.js` simula, e
@@ -2622,7 +2650,8 @@ guarda o saldo é a coluna, o movimento é só a história dela.
 28/09/2026), `correcao` (Mesa de correções fase 1, 02/10/2026),
 `venda_sem_etiqueta` e `pdf_conta_aberta` (27/10/2026), `fim_dia` e
 `cancelamento_caixa` (03/11/2026), `recusa_estoque` e `inventario_escala`
-(04/11/2026, conferência v2).
+(04/11/2026, conferência v2), `revisao_evento` (04/11/2026, a revisão
+cancelada, recusada e desfeita — QUEM-FEZ-E-REVISAO).
 (`foto_estoque` saiu na Fase 3.)
 
 A lista fica em `TABELAS`, no topo do `teste_route.js`. Cada entrada traz a coluna
@@ -3024,7 +3053,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (51), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (910) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (40), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (20); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (51), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (910) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (40), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (20); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |

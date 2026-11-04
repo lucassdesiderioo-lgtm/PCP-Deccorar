@@ -9,6 +9,10 @@ module.exports=function(app, db){
   // 'rotulo' e o nome mostrado na tela do admin.
   var TABELAS=[
     {nome:'revisao',      pk:'id',   rotulo:'revisao'},
+    /* O que a bancada de revisao cancelou, recusou ou desfez (QUEM-FEZ-E-REVISAO,
+       04/11/2026). Sem ela, cancelar e desfazer em modo teste sujariam o
+       registro real de quem fez. */
+    {nome:'revisao_evento', pk:'id', rotulo:'revisao (canceladas e desfeitas)'},
     {nome:'producao',     pk:'id',   rotulo:'producao'},
     {nome:'montagem',     pk:'id',   rotulo:'embalagem'},
     {nome:'lote',         pk:'id',   rotulo:'expedicao'},

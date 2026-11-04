@@ -171,23 +171,122 @@ function toggle(codigo){
        peca — a proxima revisao desse SKU e estoque, e o aviso tem que dizer. */
     var fora=(MODO==='hoje')&&!DIA.some(function(d){return d.codigo===codigo&&d.a_produzir>0;});
     emRev={codigo:codigo,cor:info.cor||'',inicio:Date.now(),fora:fora}; renderTiles();
-    var md=medidaDe(codigo);
-    banner('rev', md? md.medida+'  '+md.cor : codigo, fora?'⚠ NÃO está nos pedidos de hoje — vai contar como estoque':(codigo+' — bipe de novo ao terminar'), true);
-    setTimeout(function(){ var bn=document.getElementById("banner"); if(bn && !document.getElementById("rjBt")){ var b=document.createElement("button"); b.id="rjBt"; b.textContent="Peça com problema"; b.style.cssText="margin-top:14px;padding:11px 20px;border-radius:9px;border:1px solid #efb1ad;background:transparent;color:#c62828;font-size:14px;cursor:pointer"; b.onclick=rjAbrir; bn.appendChild(b); } },50);
-    clearInterval(tick); tick=setInterval(()=>{ const t=$('#timer'); if(emRev&&t) t.textContent=mmss(Date.now()-emRev.inicio); },250);
+    abrirRev(emRev);
     beep(true);
   } else { finish(); }
 }
+/* QUEM-FEZ-E-REVISAO, fase 1 (04/11/2026). O bipe duplo acidental fechava a
+   revisao em 1 s e mandava a peca para a fila da embalagem, sem volta. Tres
+   coisas aqui, e a regra mora no SERVIDOR (revisao_route.js):
+     - a BARREIRA: abaixo de REV_MIN segundos o bipe de fim e recusado na hora,
+       o cronometro segue e a revisao continua. O POST vai assim mesmo, para o
+       servidor gravar que houve o bipe rapido (e o 409 de la vale tambem para
+       quando o numero do config mudou e a tela ainda nao sabe);
+     - CANCELAR: zera a revisao em andamento — nao e a "Peca com problema",
+       que grava defeito;
+     - DESFAZER A ULTIMA: depois que a revisao fecha, so a propria, so do dia,
+       so antes de embalar, uma vez. */
+var REV_MIN=15, ULTIMA=null, ULTIMA_EM=0;
+function escH(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+async function lerUltima(){
+  try{ var u=await (await fetch('/api/revisao/ultima')).json();
+    if(u && typeof u.minimo_seg==='number') REV_MIN=u.minimo_seg;
+    ULTIMA=u?u.desfazer:null; ULTIMA_EM=Date.now();
+  }catch(e){ ULTIMA=null; }
+  return ULTIMA;
+}
+lerUltima();
+function abrirRev(cur){
+  var md=medidaDe(cur.codigo);
+  banner('rev', md? md.medida+'  '+md.cor : cur.codigo, cur.fora?'⚠ NÃO está nos pedidos de hoje — vai contar como estoque':(cur.codigo+' — bipe de novo ao terminar'), true);
+  var bn=$('#banner');
+  var lin=document.createElement('div'); lin.id='revAcoes';
+  lin.style.cssText='margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap';
+  var c=document.createElement('button'); c.type='button'; c.id='cancBt'; c.textContent='Cancelar revisão';
+  c.style.cssText='padding:11px 20px;border-radius:9px;border:1px solid #c9d1db;background:transparent;color:#3b4552;font-size:14px;cursor:pointer';
+  c.onclick=cancelarRev;
+  var b=document.createElement('button'); b.type='button'; b.id='rjBt'; b.textContent='Peça com problema';
+  b.style.cssText='padding:11px 20px;border-radius:9px;border:1px solid #efb1ad;background:transparent;color:#c62828;font-size:14px;cursor:pointer';
+  b.onclick=rjAbrir;
+  lin.appendChild(c); lin.appendChild(b); bn.appendChild(lin);
+  clearInterval(tick); tick=setInterval(()=>{ const t=$('#timer'); if(emRev&&t) t.textContent=mmss(Date.now()-emRev.inicio); },250);
+  $('#timer').textContent=mmss(Date.now()-cur.inicio);
+}
+function rapidoDemais(seg, minimo){
+  var bn=$('#banner'); if(!bn) return;
+  var a=document.getElementById('rapAviso');
+  if(!a){ a=document.createElement('div'); a.id='rapAviso';
+    a.style.cssText='margin-top:12px;padding:10px 14px;border-radius:9px;background:#fbe9e8;border:1px solid #efb1ad;color:#c62828;font-size:15px;font-weight:700';
+    var t=$('#timer'); if(t&&t.nextSibling) bn.insertBefore(a,t.nextSibling); else bn.appendChild(a); }
+  a.textContent='Rápido demais ('+seg+' s, o mínimo é '+minimo+' s) — a revisão continua. Termine de revisar e bipe de novo.';
+  beep(false);
+}
 async function finish(){
-  const cur=emRev; clearInterval(tick); tick=null; emRev=null; renderTiles();
+  const cur=emRev;
   const seg=Math.round((Date.now()-cur.inicio)/1000);
+  const corpo=JSON.stringify({codigo:cur.codigo,segundos:seg,modo:(cur.fora?'estoque':MODO),inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()});
+  if(seg<REV_MIN){
+    /* A revisao NAO fecha: so avisa, e o servidor grava o bipe rapido. */
+    rapidoDemais(seg, REV_MIN);
+    fetch('/api/revisao',{method:'POST',headers:{'Content-Type':'application/json'},body:corpo}).catch(function(){});
+    return;
+  }
+  clearInterval(tick); tick=null; emRev=null; renderTiles();
   try{
-    const r=await (await fetch('/api/revisao',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({codigo:cur.codigo,segundos:seg,modo:(cur.fora?'estoque':MODO),inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})})).json();
+    const r=await (await fetch('/api/revisao',{method:'POST',headers:{'Content-Type':'application/json'},body:corpo})).json();
+    if(r.motivo==='rapido_demais'){
+      /* O minimo do servidor e maior que o desta tela: a revisao volta a correr. */
+      if(typeof r.minimo==='number') REV_MIN=r.minimo;
+      emRev=cur; renderTiles(); abrirRev(cur); rapidoDemais(seg, r.minimo); return;
+    }
     if(r.erro){ banner('err','Erro',r.erro); beep(false); return; }
     banner('ok','Revisada ✓ ('+fmt(seg)+')', cur.codigo+' · liberada para a EMBALAGEM');
     beep(true); load();
+    await lerUltima(); mostrarDesfazer();
   }catch(e){ banner('err','Falha de conexão',String(e)); beep(false); }
+}
+async function cancelarRev(){
+  var cur=emRev; if(!cur) return;
+  var seg=Math.round((Date.now()-cur.inicio)/1000);
+  clearInterval(tick); tick=null; emRev=null; renderTiles();
+  try{
+    var r=await (await fetch('/api/revisao/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({codigo:cur.codigo,segundos:seg,modo:(cur.fora?'estoque':MODO),inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})})).json();
+    if(r.erro){ banner('err','Não deu para registrar o cancelamento',r.erro+' — a revisão não foi gravada.'); beep(false); return; }
+    banner('','Revisão cancelada',cur.codigo+' · nada foi para a embalagem. Bipe o código para começar de novo.');
+    beep(true); load();
+  }catch(e){ banner('err','Sem conexão','A revisão não foi gravada. Bipe o código para começar de novo.'); beep(false); }
+}
+/* O botao mora DENTRO do banner verde da revisao que fechou: quando a proxima
+   revisao comeca, o banner e redesenhado e o botao some sozinho. */
+function mostrarDesfazer(){
+  var bn=$('#banner'); var u=ULTIMA; if(!bn||!u) return;
+  var box=document.createElement('div'); box.id='desfBox'; box.style.cssText='margin-top:14px';
+  var b=document.createElement('button'); b.type='button'; b.id='desfBt'; b.textContent='Desfazer última revisão';
+  b.style.cssText='padding:11px 20px;border-radius:9px;border:1px solid #c9d1db;background:transparent;color:#3b4552;font-size:14px;cursor:pointer';
+  b.onclick=pedirDesfazer; box.appendChild(b); bn.appendChild(box);
+}
+function pedirDesfazer(){
+  var u=ULTIMA, box=document.getElementById('desfBox'); if(!u||!box) return;
+  if(!u.pode){ box.innerHTML='<div style="color:#c62828;font-size:15px;font-weight:700">'+escH(u.erro||'Não dá para desfazer.')+'</div>'; beep(false); return; }
+  var md=medidaDe(u.codigo), ha=Math.round((u.ha_seg||0)+(Date.now()-ULTIMA_EM)/1000);
+  var oque=escH(u.codigo)+(md?' · '+escH(md.medida+(md.cor?' '+md.cor:'')):'')+' · revisada há '+escH(fmt(ha));
+  box.innerHTML='<div style="font-size:16px;margin-bottom:10px">Desfazer <b>'+oque+'</b>?<br><span style="color:#5a6472;font-size:14px">A peça sai da fila da embalagem e a revisão deixa de contar.</span></div>'
+    +'<button type="button" id="desfSim" style="padding:11px 20px;border-radius:9px;border:1px solid #c62828;background:#c62828;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin:0 5px">Sim, desfazer</button>'
+    +'<button type="button" id="desfNao" style="padding:11px 20px;border-radius:9px;border:1px solid #c9d1db;background:transparent;color:#3b4552;font-size:14px;cursor:pointer;margin:0 5px">Não</button>';
+  document.getElementById('desfSim').onclick=confirmarDesfazer;
+  document.getElementById('desfNao').onclick=function(){ var bx=document.getElementById('desfBox'); if(bx) bx.remove(); mostrarDesfazer(); };
+}
+async function confirmarDesfazer(){
+  var u=ULTIMA; if(!u) return;
+  try{
+    var r=await (await fetch('/api/revisao/desfazer',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({revisao_id:u.revisao_id})})).json();
+    ULTIMA=null;
+    if(r.erro){ banner('err','Não desfeita',r.erro); beep(false); return; }
+    banner('','Revisão desfeita',r.codigo+' · saiu da fila da embalagem e não conta mais como revisada.');
+    beep(true); load();
+  }catch(e){ banner('err','Sem conexão','Não sei se a revisão foi desfeita — confira a lista da embalagem antes de bipar de novo.'); beep(false); }
 }
 $('#tiles').addEventListener('click',e=>{ const b=e.target.closest('.tile'); if(b) toggle(b.dataset.cod); });
 const scan=$('#scan');
