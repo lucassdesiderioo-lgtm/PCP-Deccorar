@@ -2378,7 +2378,7 @@ que `GET /api/producao` apareceu, no boot, depois de o outro teste dizer zero.
 
 ### A alçada — tudo que é novo entra no controle de acesso (04/11/2026)
 
-Spec `docs/specs/ACESSO-POR-TELA-E-NIVEL.md` §3, regra do dono: *"tudo que for
+Spec `docs/arquivo/ACESSO-POR-TELA-E-NIVEL.md` §3, regra do dono: *"tudo que for
 novo no sistema, a partir de hoje, tem que ser revisado e entrar no controle de
 alçadas — nível, tela, acesso."* Linha em `docs/DECISOES.md`.
 
@@ -2540,6 +2540,19 @@ mexível, com o aviso: sai quando alguém a desmarca. A grade **telas × setores
 permissões.** Cinco defeitos foram reintroduzidos (o registro sem o mapa, ação
 sumindo da tela, a grade sem o nível, setor sem nível aceito, chave nova
 entrando sozinha num setor), e cada um reprova.
+
+> ✅ **AS OITO FASES ESTÃO NO AR E CONFERIDAS EM 04/11/2026** (PR #282): o dono
+> fez o backup, o deploy e o teste de segurança (telas 302, inclusive as
+> `/admin/...`, API 401, `/login` 200), e o `nivel_relatorio.js` deu **ninguém**
+> perdendo permissão e **nenhum** setor acima do nível, com 10 pessoas
+> recebendo o nível na migração. Na tela ele conferiu a ficha com as caixinhas
+> cinzas, a grade telas × setores, o ☰ Menu sem rodapé, o tablet de operador
+> sem o Admin, o `/admin#dv` caindo na 253 e a baixa "por" ele — e disse
+> *"bateu tudo"*. A spec foi para `docs/arquivo/`.
+>
+> ⚠️ **AINDA NÃO PROVADO:** a primeira tela ou ação nova de verdade nascendo só
+> para o Admin Geral e sendo dada pela grade, e a primeira recusa "exige nível X"
+> numa concessão de verdade. Prova que não foi feita se escreve como não feita.
 
 **`node nivel_relatorio.js` (só lê)** copia o banco com `db.backup()` e sobe o
 `acesso.js` em cima da cópia: lista cada pessoa com o nível, quem perderia

@@ -1,6 +1,8 @@
 # Acesso por tela e por nível — quem não pode, não vê
 
-> **STATUS: em código · 04/11/2026 — as oito fases construídas; falta o deploy e a conferência na fábrica.**
+> **STATUS: concluída e arquivada · 04/11/2026 — as oito fases no ar (PR #282) e conferidas na tela pelo dono ("bateu tudo").**
+> No deploy, o `nivel_relatorio.js` deu: quem perderia permissão, **ninguém**; setor acima do nível, **nenhum**; 10 pessoas com nível gravado.
+> As regras que parecem bug estão no `CLAUDE.md` §0, §9, §10, §15 e §20. Este arquivo é histórico — não é fonte de regra.
 > **Antes:** em construção · — decisões do dono no "pode seguir":
 > **D1 (b)** — o Planejamento (401) continua abrindo com `planilha.importar`;
 > **D2 (A)** — cada tela do Admin abre com as chaves das ações dela; Estoque
