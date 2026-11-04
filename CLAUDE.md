@@ -1956,6 +1956,11 @@ dinheiro não vem junto.
 > do remetente"** — sem acento e sem maiúscula, palavra a palavra. **Quem
 > escolhe continua sendo ele**: o sistema não liga sozinho pelo nome, porque o
 > apelido e o nome do ML nem sempre batem.
+>
+> ✅ **NO AR E CONFERIDO EM 04/11/2026** (PR #265): o dono fez o deploy e
+> conferiu na tela do Edvaldo o nome e a cidade do comprador em letra grande e
+> o filtro pelo remetente com mais de um caso do mesmo SKU — e disse *"bateu
+> tudo"*.
 
 **Rode `node teste_devolucao_casos.js` (732 casos) — e, na tela, `node teste_devolucao_casos_tela.js` (141) — ao mexer no
 `devcaso_dominio.js`, no `devcaso_route.js`, no bipe ou na baixa do

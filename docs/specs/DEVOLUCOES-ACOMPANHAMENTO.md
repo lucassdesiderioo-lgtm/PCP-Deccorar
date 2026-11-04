@@ -11,7 +11,7 @@ Falta: um caso "nós coletamos" levado até o fim pelo Renato, e a tarja no prim
 No ar e conferido (03/11/2026, PRs #259 e #260, AJUSTE, decisão do dono "a"): a baixa dentro do caso, e desligar a revisão ligada à peça errada,
   com motivo — o caso volta a "Chegou" (reabre se encerrou por ela) e a baixa daquela peça é
   desfeita; o cartão de cada revisão com a etiqueta bipada e o "Conferir no ML ↗".
-Em código (03/11/2026, AJUSTE): sem Pack ID na etiqueta de devolução, a lista de esperadas do
+No ar e conferido (04/11/2026, PR #265, AJUSTE): sem Pack ID na etiqueta de devolução, a lista de esperadas do
   Edvaldo mostra o nome e a cidade do comprador, com filtro pelo remetente.
 Criada em: 03/11/2026
 Última atualização: 03/11/2026
