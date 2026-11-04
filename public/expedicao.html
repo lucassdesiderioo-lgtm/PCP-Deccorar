@@ -89,7 +89,7 @@ async function lista(){
   $('#corpo').innerHTML=d.map(r=>'<tr><td>'+r.id+'</td><td class="c">'+(r.codigo||'<span style=color:#f85149>sem SKU</span>')+'</td><td>'+r.buyer+'</td><td>'+(r.nf||'—')+'</td><td>'+r.estagio+'</td><td>'
     +(r.estagio==='pendente'
         ? '<span style="font-size:12px;color:#8b97a5">imprima pela <b>Etiqueta de Venda</b> (é lá que a peça fica reservada)</span>'
-        : '<button class="pr" onclick="imp('+r.id+')">imprimir</button>')
+        : '<button class="pr" data-perm="etiqueta.emitir" onclick="imp('+r.id+')">imprimir</button>')
     +'</td></tr>').join('');
 }
 function imp(id){ const fr=$('#pr'); fr.onload=()=>{ try{fr.contentWindow.print();}catch(e){ window.open('/api/print/'+id,'_blank'); } }; fr.src='/api/print/'+id; }

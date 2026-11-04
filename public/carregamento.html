@@ -880,7 +880,7 @@ function desenharSaida(){
           '<button class="mini" onclick="foiNoCaminhao('+f.id+')">foi no caminhão</button>'); }).join(''):'')
     +'<div style="margin-top:12px"><b>Liberar o caminhão assim mesmo</b> — só supervisor ou admin, e fica registrado com o seu nome:'
     +'<input class="motivo" id="motivoLib" placeholder="Por que está liberando com número diferente?" maxlength="300">'
-    +'<button class="btn ghost" style="margin-top:8px" onclick="fecharSaida(true)">Liberar com divergência</button></div></div>';
+    +'<button class="btn ghost" data-perm="saida.liberar" style="margin-top:8px" onclick="fecharSaida(true)">Liberar com divergência</button></div></div>';
   devolverDigitado('motivoLib',motivoAntes);
 }
 async function abrirSaida(){
@@ -944,7 +944,7 @@ function desenharViagem(){
                                    :'Agora bate. Toque em <b>Fechar viagem</b> de novo.'))
     +'<div style="margin-top:12px"><b>Liberar a viagem assim mesmo</b> — só supervisor ou admin, e fica registrado com o seu nome:'
     +'<input class="motivo" id="motivoLibV" placeholder="Por que está liberando com número diferente?" maxlength="300">'
-    +'<button class="btn ghost" style="margin-top:8px" onclick="fecharViagem(true)">Liberar com divergência</button></div></div>';
+    +'<button class="btn ghost" data-perm="saida.liberar" style="margin-top:8px" onclick="fecharViagem(true)">Liberar com divergência</button></div></div>';
   devolverDigitado('motivoLibV',motivoAntes);
 }
 async function abrirViagem(){

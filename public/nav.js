@@ -77,11 +77,15 @@ function menuHtml(d, atual){
     }).join('')+'</div>';
   }).join('');
 }
+/* SÓ ESCONDE, NUNCA FORÇA A APARECER: a regra pega o botão cuja marca não
+   tem NENHUMA chave da pessoa. O que ela tem segue a tela — se a própria tela
+   esconde o botão (`display:none` no estilo), ele continua escondido. Um
+   `display:revert !important` no permitido passaria por cima disso. */
 function estiloDasPermissoes(d){
-  if(d.admin_geral) return '[data-perm]{display:revert !important}';
-  return '[data-perm]{display:none !important}'+(d.perms||[]).map(function(c){
-    return '[data-perm~="'+String(c).replace(/[^a-z0-9_.]/gi,'')+'"]{display:revert !important}';
-  }).join('');
+  if(d.admin_geral) return '';
+  return '[data-perm]'+(d.perms||[]).map(function(c){
+    return ':not([data-perm~="'+String(c).replace(/[^a-z0-9_.]/gi,'')+'"])';
+  }).join('')+'{display:none !important}';
 }
 (function(){
   if(location.pathname.indexOf('/login')===0) return;

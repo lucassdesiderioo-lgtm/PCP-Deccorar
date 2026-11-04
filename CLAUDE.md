@@ -3053,7 +3053,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (51), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (910) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (40), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (20); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (51), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (910) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (40), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (44); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3784,17 +3784,42 @@ abaixo) e o **Alt+0** do "Sair".
 > outra.chave"` no botão, e o `nav.js` o esconde de quem não tem nenhuma delas
 > (o `/api/telas/minhas` manda as permissões **da própria pessoa**). Ele nasce
 > escondido, para não piscar. **Esconder é conforto, não segurança**: a rota
-> continua recusando. Hoje estão marcados 21 botões das telas do Admin (lançar
-> produção, salvar SKU, ficha, pedir ajuste, aplicar alvo, compras, assinar a
-> caixa, cadastrar bloqueado, dar baixa, etiqueta do kit, aprovar contagem,
-> planejar a conferência). **Botão novo de ação nasce com `data-perm`.**
+> continua recusando. Na fase 6 foram marcados 21 botões das telas do Admin;
+> **o AJUSTE de 04/11/2026 marcou mais 23** — "Peça com problema" (101,
+> `revisao.rejeitar`), a caixa "Subir PDF" da Etiqueta de Venda (201,
+> `pdf.subir`), o "imprimir" da 203 (`etiqueta.emitir`), os dois "Liberar com
+> divergência" da Conferência (202, `saida.liberar`), a decisão da divergência
+> de leitura (204, `sku.cadastrar`), o "pedir" do ajuste (301), o aprovar e
+> rejeitar da contagem de material (302), o cadastro de modelo, cor e tecido
+> (402), o salvar e excluir da ficha (404) e as listas e o código do kit (902).
+> A regra é: **marca quem tem a ação numa chave diferente da que abre a tela**
+> — quem abriu a tela já tem a chave dela. **Botão novo de ação nasce com
+> `data-perm`**, e o `teste_menu.js` tem a lista, botão a botão, com a chave.
+>
+> ⚠️ **A REGRA SÓ ESCONDE, NUNCA FORÇA A APARECER** (desde o AJUSTE de
+> 04/11/2026). Ela pega o botão cuja marca não tem **nenhuma** chave da pessoa
+> (`[data-perm]:not([data-perm~="a"]):not(...)`); o que ela tem segue a tela.
+> Até ali o permitido levava `display:revert !important`, que passaria por cima
+> de um botão que a **própria tela** esconde (`display:none`, como a caixa
+> "Subir PDF" antes de saber quem é a pessoa). Nenhum dos 21 da fase 6 era
+> escondido assim, então nada errado chegou ao ar. O Admin Geral não recebe
+> regra nenhuma.
+>
+> ⚠️ **AS TELAS QUE JÁ ESCONDEM PELO SERVIDOR NÃO LEVAM `data-perm`**:
+> Devoluções em andamento (os botões vêm de `lancar`, `acompanhar`, `dinheiro`
+> e `baixar` da resposta), a confirmação da venda cancelada na Conferência
+> (`pode_confirmar`), a aprovação do ajuste de estoque (`pode_aprovar`) e a
+> decisão da contagem de peça (`pode_aprovar`). Ali quem decide é a rota, que
+> também diz por que não.
 >
 > ⚠️ **A APARÊNCIA DO MENU NÃO É DESTA SPEC** — é da conversa de design. Aqui
 > ele é funcional, no visual da barra de sessão.
 
 **Rode `node teste_menu.js` e `node teste_atalho.js` ao mexer no `nav.js`, no
 `/api/telas/minhas` ou num `data-perm`.** Cinco defeitos foram reintroduzidos um
-a um, e cada um reprova.
+a um, e cada um reprova; no AJUSTE dos botões, mais quatro (o "Liberar" sem
+marca, a marca com a chave errada, o botão criado por JS sem marca e o
+`display:revert` de volta).
 
 ### Regra A — toda tela interna tem a troca de operação
 

@@ -588,7 +588,7 @@ function preencherDoCodigo(){
   if(!el) return;
   el.innerHTML=co?'' :
     '<span style="color:var(--amber)">Cor ainda não está na lista: </span>'
-    +'<button class="ghost small" data-nova-cor="'+esc(p.cor)+'">cadastrar cor '+esc(p.cor)+'</button>';
+    +'<button class="ghost small" data-perm="sku.cadastrar" data-nova-cor="'+esc(p.cor)+'">cadastrar cor '+esc(p.cor)+'</button>';
 }
 /* Preenchimento automatico ao digitar o codigo. */
 document.addEventListener('input',function(e){ if(e.target&&e.target.id==='codigo') preencherDoCodigo(); });
@@ -659,28 +659,28 @@ function renderMC(){
       +'<input type="checkbox" class="mcMedida" data-cod="'+esc(m.codigo)+'" style="width:auto"'+(m.exige_medida?' checked':'')+'> tem medida</label>'
       +'<label title="Peça feita contra o pedido: não tem estoque pra consultar" style="display:flex;align-items:center;gap:5px;text-transform:none;letter-spacing:0;white-space:nowrap;margin:0">'
       +'<input type="checkbox" class="mcSob" data-cod="'+esc(m.codigo)+'" style="width:auto"'+(m.sob_medida?' checked':'')+'> sob medida</label>'
-      +(m.ativo?'<button class="ghost small mcOff" data-tipo="modelo" data-id="'+m.id+'">desativar</button>'
+      +(m.ativo?'<button class="ghost small mcOff" data-perm="modelo.cadastrar" data-tipo="modelo" data-id="'+m.id+'">desativar</button>'
                :'<span class="sub">inativo</span>')+'</div>';
   h+='<div class="mcrow"><input id="mcModCod" placeholder="código (ex.: ROLO)"><input id="mcModNome" placeholder="nome">'
-    +'<button class="primary small mcAdd" data-tipo="modelo">Adicionar</button></div></div>';
+    +'<button class="primary small mcAdd" data-perm="modelo.cadastrar" data-tipo="modelo">Adicionar</button></div></div>';
 
   h+='<div><div class="sub" style="margin-bottom:8px">TECIDOS (material)</div>';
   for(const t of TECIDOS)
     h+='<div class="mcrow"'+(t.ativo?'':' style="opacity:.45"')+'><span class="code">'+esc(t.codigo)+'</span>'
       +'<input class="mcNome" data-tipo="tecido" data-cod="'+esc(t.codigo)+'" value="'+esc(t.nome)+'" placeholder="nome do tecido">'
-      +(t.ativo?'<button class="ghost small mcOff" data-tipo="tecido" data-id="'+esc(t.codigo)+'">desativar</button>'
+      +(t.ativo?'<button class="ghost small mcOff" data-perm="sku.cadastrar" data-tipo="tecido" data-id="'+esc(t.codigo)+'">desativar</button>'
                :'<span class="sub">inativo</span>')+'</div>';
   h+='<div class="mcrow"><input id="mcTecCod" placeholder="código (ex.: BLACKOUT)"><input id="mcTecNome" placeholder="nome">'
-    +'<button class="primary small mcAdd" data-tipo="tecido">Adicionar</button></div></div>';
+    +'<button class="primary small mcAdd" data-perm="sku.cadastrar" data-tipo="tecido">Adicionar</button></div></div>';
 
   h+='<div><div class="sub" style="margin-bottom:8px">CORES</div>';
   for(const c of CORES)
     h+='<div class="mcrow"'+(c.ativa?'':' style="opacity:.45"')+'><span class="code">'+esc(c.codigo)+'</span>'
       +'<input class="mcNome" data-tipo="cor" data-cod="'+esc(c.codigo)+'" value="'+esc(c.nome)+'" placeholder="nome da cor">'
-      +(c.ativa?'<button class="ghost small mcOff" data-tipo="cor" data-id="'+esc(c.codigo)+'">desativar</button>'
+      +(c.ativa?'<button class="ghost small mcOff" data-perm="sku.cadastrar" data-tipo="cor" data-id="'+esc(c.codigo)+'">desativar</button>'
                :'<span class="sub">inativa</span>')+'</div>';
   h+='<div class="mcrow"><input id="mcCorCod" placeholder="código (ex.: BEGE)"><input id="mcCorNome" placeholder="nome">'
-    +'<button class="primary small mcAdd" data-tipo="cor">Adicionar</button></div></div>';
+    +'<button class="primary small mcAdd" data-perm="sku.cadastrar" data-tipo="cor">Adicionar</button></div></div>';
   el.innerHTML=h;
 }
 /* rota da lista pelo tipo — usada pelo salvar de nome, adicionar e desativar */
@@ -955,9 +955,9 @@ function editorHTML(l){
         +'<input id="edObs" placeholder="a folga de 20 cm é bainha + volta no tubo" value="'+esc(novo?'':l.observacao)+'"></div>'
       +'<div id="edPrev" style="margin-top:10px;font-size:13px;min-height:18px"></div>'
       +'<div class="row-actions">'
-        +'<button class="primary" id="edSalvar">Salvar</button>'
+        +'<button class="primary" data-perm="modelo.cadastrar" id="edSalvar">Salvar</button>'
         +'<button class="ghost" id="edCancelar">Cancelar</button>'
-        +(novo?'':'<button class="del" id="edExcluir">Excluir da ficha</button>')
+        +(novo?'':'<button class="del" data-perm="modelo.cadastrar" id="edExcluir">Excluir da ficha</button>')
         +'<span class="msg" id="edMsg"></span>'
       +'</div>'
     +'</div></td></tr>';
@@ -2141,7 +2141,7 @@ document.addEventListener("click",async e=>{
       +motivos.map(m=>'<option>'+esc(m.valor||m)+'</option>').join('')
       +'</select>'
       +'<input class="setin" id="ajObs" placeholder="observação (opcional)" style="width:210px">'
-      +'<button class="ghost small" data-ajsalvar="'+esc(cod)+'">pedir</button>'
+      +'<button class="ghost small" data-perm="estoque.ajustar" data-ajsalvar="'+esc(cod)+'">pedir</button>'
       +'<span class="sub" id="ajMsg"></span></div>'
       +'<div class="sub">O saldo <b>não muda agora</b>: o pedido vai para "Ajustes esperando aprovação", e outra pessoa aprova. O saldo novo vira a diferença contra o saldo de agora.</div></td>';
     tr.after(linha);
@@ -2341,7 +2341,7 @@ async function carregarDiv(){
     if(sug){
       var txtS=pecaTexto(pecaDeSku(sug));
       h+='<div style="font-size:12px;color:#5a6472;margin-bottom:4px">O sistema leu:</div>'
-        +'<button style="display:block;width:100%;text-align:left;padding:12px;margin-bottom:12px;'
+        +'<button data-perm="sku.cadastrar" style="display:block;width:100%;text-align:left;padding:12px;margin-bottom:12px;'
         +'border:2px solid #2ea043;border-radius:8px;background:#f2fbf4;cursor:pointer" '
         +'data-resolvediv="'+r.id+'" data-sku="'+esc(sug.codigo)+'" data-peca="'+esc(txtS)+'">'
         +'<div style="font-weight:700;color:#1a7f37">✓ Confirmar esta peça</div>'
@@ -2357,7 +2357,7 @@ async function carregarDiv(){
       +(sug?'Ou escolha a peça certa:':'Escolha a peça certa:')+'</div>';
     for(var k2=0;k2<outras.length;k2++){
       var txt=pecaTexto(pecaDeSku(outras[k2]));
-      h+='<button class="ghost" style="display:block;width:100%;text-align:left;margin-bottom:6px;padding:10px 12px" '
+      h+='<button class="ghost" data-perm="sku.cadastrar" style="display:block;width:100%;text-align:left;margin-bottom:6px;padding:10px 12px" '
         +'data-resolvediv="'+r.id+'" data-sku="'+esc(outras[k2].codigo)+'" data-peca="'+esc(txt)+'">'
         +'<b style="font-family:ui-monospace,monospace">'+esc(outras[k2].codigo)+'</b>'
         +(txt?('<span style="color:#5a6472"> — '+esc(txt)+'</span>'):'')
@@ -2376,7 +2376,7 @@ async function carregarDiv(){
     h+='<div style="display:flex;gap:6px;margin-top:6px">'
       +'<input id="divOutro'+r.id+'" placeholder="ou bipe o SKU com o leitor" autocorrect="off" autocapitalize="characters" '
       +'style="flex:1;padding:9px;border:1px solid #d8dee6;border-radius:6px;font-family:ui-monospace,monospace">'
-      +'<button class="ghost" data-resolveoutro="'+r.id+'">Confirmar</button></div>';
+      +'<button class="ghost" data-perm="sku.cadastrar" data-resolveoutro="'+r.id+'">Confirmar</button></div>';
     if(r.gravado && !r.gravado_cadastrado)
       h+='<div style="font-size:12px;color:#8a2020;margin-top:6px">O código gravado ('
         +esc(r.gravado)+') não está no cadastro de SKU — só sai daqui com um código cadastrado.</div>';
@@ -3129,9 +3129,9 @@ async function carregarCad(){
     var l=[]; try{ l=await (await fetch('/api/listas/'+tp.t)).json(); }catch(e){}
     h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:12px">'+tp.n+'</div>';
     for(var j=0;j<l.length;j++){
-      h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span>'+l[j].valor+'</span><button class="ghost small cdDel" data-id="'+l[j].id+'">remover</button></div>';
+      h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span>'+l[j].valor+'</span><button class="ghost small cdDel" data-perm="listas.editar" data-id="'+l[j].id+'">remover</button></div>';
     }
-    h+='<div style="display:flex;gap:8px;margin-top:14px"><input id="cdIn_'+tp.t+'" placeholder="novo item" style="flex:1"><button class="primary cdAdd" data-t="'+tp.t+'">Adicionar</button></div>';
+    h+='<div style="display:flex;gap:8px;margin-top:14px"><input id="cdIn_'+tp.t+'" placeholder="novo item" style="flex:1"><button class="primary cdAdd" data-perm="listas.editar" data-t="'+tp.t+'">Adicionar</button></div>';
     h+='</div>';
   }
   var cnf=false; try{ cnf=!!(await (await fetch('/api/config/conferencia')).json()).ligada; }catch(e){}
@@ -3142,7 +3142,7 @@ async function carregarCad(){
   var kit=''; try{ kit=(await (await fetch('/api/config/kit')).json()).kit||''; }catch(e){}
   h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:6px">Código do kit (o que o operador bipa)</div>';
   h+='<div class="sub" style="margin-bottom:12px">É o código que o operador bipa na embalagem para confirmar o kit. Use um código <b>simples, só com letras/números</b> — ex.: <b>KITENVIO</b>. Imprima esse código de barras na etiqueta (abaixo). A tela da embalagem só confere, não altera.</div>';
-  h+='<div style="display:flex;gap:8px"><input id="cdKit" placeholder="ex.: KITENVIO" value="'+String(kit).replace(/"/g,"&quot;")+'" style="flex:1"><button class="primary" id="cdKitBt">Salvar</button></div>';
+  h+='<div style="display:flex;gap:8px"><input id="cdKit" placeholder="ex.: KITENVIO" value="'+String(kit).replace(/"/g,"&quot;")+'" style="flex:1"><button class="primary" data-perm="kit.editar" id="cdKitBt">Salvar</button></div>';
   h+='<div id="cdKitMsg" style="margin-top:10px;font-size:14px"></div>';
   /* O CONTEUDO da etiqueta (spec GERADOR-ETIQUETA-KIT, fase 1). O codigo de
      barras nao tem campo aqui de proposito: ele e SEMPRE o Codigo do kit acima
@@ -3518,7 +3518,7 @@ async function ctPendentes(){
     var tag=l.tipo==='componente' ? ' <span class="sub" style="font-size:12px">material</span>' : '';
     var un=l.tipo==='componente' && l.cor ? ' <span class="sub">'+l.cor+'</span>' : '';
     h+='<tr><td><b>'+l.codigo+'</b>'+tag+'</td><td>'+op+'</td><td align=center><b>'+l.contado+'</b>'+un+'</td><td align=center>'+(l.estoque_atual==null?'-':l.estoque_atual)+un+'</td><td>'+(l.contado_por||'-')+'</td><td class="sub">'+(l.criado_em||'')+'</td>'
-      +'<td><button class="primary" style="padding:6px 10px" onclick="ctAprovar(['+l.id+'])">Aprovar</button> <button class="ghost" style="padding:6px 10px" onclick="ctRejeitar(['+l.id+'])">Rejeitar</button></td></tr>';
+      +'<td><button class="primary" data-perm="contagem.ajustar" style="padding:6px 10px" onclick="ctAprovar(['+l.id+'])">Aprovar</button> <button class="ghost" data-perm="contagem.ajustar" style="padding:6px 10px" onclick="ctRejeitar(['+l.id+'])">Rejeitar</button></td></tr>';
   }
   h+='</tbody></table>';
   h+='<div style="margin-top:10px"><button class="primary" data-perm="contagem.ajustar" onclick="ctAprovarTodos()">Aprovar todos</button></div>';
