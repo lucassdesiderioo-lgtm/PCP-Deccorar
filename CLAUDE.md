@@ -1789,6 +1789,11 @@ dinheiro não vem junto.
 > fica. A chegada do bipe do Edvaldo não se desfaz por aqui: ali a peça está
 > revisada, e o caminho é o "desligar a peça errada".
 >
+> ✅ **NO AR E CONFERIDO EM 04/11/2026** (PR #279): o dono fez o deploy e
+> conferiu na tela o "A caixa chegou" seguido do "↩ Desfazer" voltando o caso,
+> o desfazer escondido para outro login e para o caso com a peça já revisada
+> — e disse *"bateu tudo"*.
+>
 > ⚠️ **O MOTIVO SE ESCOLHE NO ALTO DO CASO** (AJUSTE de 03/11/2026, dono: *"uma
 > vez lançado não conseguimos mais colocar o motivo"*). Ele já se editava, mas
 > só em "Editar o lançamento", lá embaixo; no alto era texto. Hoje é um campo
