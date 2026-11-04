@@ -1,6 +1,7 @@
 # Acesso por tela e por nível — quem não pode, não vê
 
-> **STATUS: em construção · 04/11/2026** — decisões do dono no "pode seguir":
+> **STATUS: em código · 04/11/2026 — as oito fases construídas; falta o deploy e a conferência na fábrica.**
+> **Antes:** em construção · — decisões do dono no "pode seguir":
 > **D1 (b)** — o Planejamento (401) continua abrindo com `planilha.importar`;
 > **D2 (A)** — cada tela do Admin abre com as chaves das ações dela; Estoque
 > (301), Pendências (204) e Problemas (104) continuam abrindo para todo nível Admin.
@@ -23,7 +24,7 @@
 > | 4 | A trava do nível | 🔴 | feito (04/11) — relatório de quem perderia: **vazio** no banco de exemplo; 7 defeitos reintroduzidos; em produção, conferir com `node nivel_relatorio.js` depois do deploy |
 > | 5 | O Admin de 16 abas vira telas | 🔴 | feito (04/11) — 13 telas `/admin/...` + 401/904/901; o mesmo `index.html` servido com `TELA_ADMIN`; 6 defeitos reintroduzidos |
 > | 6 | O menu por pessoa, e o rodapé sai | 🟡 | feito (04/11) — ☰ Menu da barra de sessão, do `/api/telas/minhas`; `data-perm` em 21 botões do Admin; 5 defeitos reintroduzidos |
-> | 7 | A tela de Acessos organizada pelo mapa | 🔴 | planejado |
+> | 7 | A tela de Acessos organizada pelo mapa | 🔴 | feito (04/11) — caixinhas por tela, cinza acima do nível, grade telas × setores; 5 defeitos reintroduzidos |
 >
 > **Leia junto com:** `ACESSOS-UNIFICADOS.md` (a lista única de permissões, de onde
 > esta parte), `DEVOLUCOES-ACOMPANHAMENTO.md`, `CLAUDE.md` §9-B, §10 (armadilhas #28 e

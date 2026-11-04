@@ -597,7 +597,43 @@ module.exports = function(app, db){
       g.permissoes.push({ chave:p.chave, rotulo:p.rotulo, desc:p.desc, nivel:p.nivel,
         sensivel:!!p.sensivel, intransferivel:!!p.intransferivel });
     });
-    res.json({ grupos, niveis:NIVEIS });
+    res.json({ grupos, niveis:NIVEIS, mapa:mapaDeAcessos() });
+  });
+
+  /* ══ A TELA DE ACESSOS PELO MAPA (fase 7 da ACESSO-POR-TELA-E-NIVEL) ══
+     Os módulos, as telas de cada um (número, nível) e as AÇÕES penduradas na
+     tela onde são usadas (o campo `tela` de cada permissão, R-ALC-03). Tela e
+     ação novas aparecem aqui sozinhas, sem setor nenhum marcado (R-TEL-03). */
+  function todasAsTelas(){
+    const MP = require('./telas');
+    return MP.TELAS.map(t => Object.assign({ modulo:MP.moduloDe(t.n) }, t))
+      .concat(MP.telasSobMedida().map(t => Object.assign({ modulo:600 }, t)));
+  }
+  function mapaDeAcessos(){
+    const MP = require('./telas');
+    const telas = todasAsTelas(), mods = {};
+    telas.forEach(t => {
+      const m = mods[t.modulo] = mods[t.modulo] || { modulo:t.modulo, nome:MP.MODULOS[t.modulo] || String(t.modulo), telas:[] };
+      m.telas.push({ n:t.n, nome:t.nome, rota:t.rota, nivel:t.nivel, onde:t.onde || '', abrem:t.perms.slice(),
+        acoes: PERMISSOES.filter(p => +p.tela === t.n).map(p => ({ chave:p.chave, rotulo:p.rotulo, desc:p.desc || '', nivel:p.nivel,
+          sensivel:!!p.sensivel, intransferivel:!!p.intransferivel })) });
+    });
+    return Object.keys(mods).map(Number).sort((a, b) => a - b).map(k => { mods[k].telas.sort((a, b) => a.n - b.n); return mods[k]; });
+  }
+  /* A GRADE TELAS × SETORES: bate o olho e vê o que cada setor recebe. O setor
+     "recebe" a tela quando carrega uma das permissões que a abrem e o nível
+     dele cabe a tela ('@admin' = setor de nível Admin). */
+  app.get('/api/acesso/grade', (req, res) => {
+    if(!soAdmin(req, res)) return;
+    const setores = db.prepare("SELECT id,nome,nivel FROM setores WHERE ativo=1 ORDER BY nivel DESC, nome").all()
+      .map(st => Object.assign(st, { perms:new Set(db.prepare('SELECT chave FROM setor_permissao WHERE setor_id=?').all(st.id).map(r => r.chave)) }));
+    const recebe = (st, t) => {
+      if(st.nivel === 'admin_geral') return true;
+      if(NIVEIS[st.nivel] < NIVEIS[t.nivel]) return false;
+      return t.perms.some(c => c === '@admin' ? NIVEIS[st.nivel] >= NIVEIS.admin : st.perms.has(c));
+    };
+    res.json({ setores: setores.map(st => ({ id:st.id, nome:st.nome, nivel:st.nivel })),
+      telas: todasAsTelas().map(t => ({ n:t.n, nome:t.nome, nivel:t.nivel, modulo:t.modulo, setores: setores.map(st => recebe(st, t)) })) });
   });
 
   app.get('/api/acesso/setores', (req, res) => {

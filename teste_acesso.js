@@ -918,6 +918,54 @@ if(cob){
     repetidos.map(k => '"' + k + '": ' + porNome[k].join(', ')).join(' · '));
 }
 
+/* ══ A TELA DE ACESSOS PELO MAPA (spec ACESSO-POR-TELA-E-NIVEL, fase 7) ══
+   R-TEL-03 e R-ALC-06: tela e ação NOVAS nascem só para o Admin Geral e
+   aparecem sozinhas na tela de Acessos, sem setor nenhum marcado. R-ALC-04:
+   setor novo sem nível reprova. */
+{
+  const P = require('./perfis_acesso'), MAPA = require('./telas'), PERMS = require('./permissoes');
+  const B = P.montar();
+  const lucas = Object.assign(B.db.prepare("SELECT * FROM usuarios WHERE nome LIKE 'Lucas%'").get(), { areas:[] });
+  const rodar = (metodo, rota, corpo) => { const h = B.rotas[metodo + ' ' + rota]; const out = { status:200, body:null };
+    const res = { status(c){ out.status = c; return res; }, json(b){ out.body = b; return res; } };
+    h({ body:corpo || {}, params:{}, query:{}, headers:{}, socket:{}, usuario:lucas }, res); return out; };
+  let r = rodar('POST', '/api/acesso/setores', { nome:'Setor Sem Nivel', permissoes:['revisao.executar'], todas:true });
+  eq('fase 7: setor novo sem nível é recusado (400)', r.status, 400);
+  ok('   e não nasceu', !B.db.prepare("SELECT 1 FROM setores WHERE nome='Setor Sem Nivel'").get());
+  r = rodar('GET', '/api/acesso/registro');
+  const reg = r.body || {};
+  ok('fase 7: o registro manda o mapa (módulos → telas → ações penduradas)', Array.isArray(reg.mapa) && reg.mapa.length > 0, JSON.stringify(Object.keys(reg)));
+  const t301 = (reg.mapa || []).reduce((a, m) => a.concat(m.telas), []).find(t => t.n === 301) || {};
+  ok('   a 301 Estoque tem nível e as ações dela (pedir ajuste, aprovar ajuste, alvo)',
+    t301.nivel === 'admin' && ['estoque.ajustar','estoque.aprovar_ajuste','alvo.editar'].every(c => (t301.acoes || []).some(a => a.chave === c)), JSON.stringify(t301));
+  const todasAcoes = (reg.mapa || []).reduce((a, m) => a.concat(m.telas), []).reduce((a, t) => a.concat((t.acoes || []).map(x => x.chave)), []);
+  ok('   toda permissão aparece pendurada numa tela (nenhuma some da tela de Acessos)', PERMS.every(p => todasAcoes.indexOf(p.chave) >= 0),
+    PERMS.filter(p => todasAcoes.indexOf(p.chave) < 0).map(p => p.chave).join(', '));
+  ok('   e as telas do sob medida estão lá (600)', (reg.mapa || []).some(m => m.modulo === 600 && m.telas.length >= 16));
+  r = rodar('GET', '/api/acesso/grade');
+  const g = r.body || {};
+  ok('fase 7: a grade telas × setores existe', Array.isArray(g.setores) && Array.isArray(g.telas), JSON.stringify(Object.keys(g)));
+  const ix = (g.setores || []).findIndex(x => x.nome === 'Operador / Revisão');
+  const lin101 = (g.telas || []).find(t => t.n === 101) || {}, lin301 = (g.telas || []).find(t => t.n === 301) || {};
+  ok('   o setor Operador / Revisão recebe a 101 e não recebe a 301', ix >= 0 && lin101.setores && lin101.setores[ix] === true && lin301.setores[ix] === false);
+
+  // TELA E AÇÃO NOVAS, num banco que já existe (o deploy de amanhã)
+  PERMS.push({ chave:'teste.tela_nova', grupo:'Sistema', nivel:'operacao', tela:999, rotulo:'Tela nova de teste', desc:'' });
+  MAPA.TELAS.push({ n:999, nome:'Tela nova de teste', rota:'/tela-nova-de-teste', nivel:'operacao', onde:'tablet', perms:['teste.tela_nova'] });
+  const app2 = { locals:{}, router:{ stack:[] }, get(p, h){ B.rotas['GET ' + p] = h; }, post(p, h){ B.rotas['POST ' + p] = h; }, delete(){} };
+  const log = console.log; console.log = () => {};
+  try{ require('./acesso')(app2, B.db); } finally { console.log = log; }
+  const AC2 = app2.locals.acesso;
+  const chegam = B.pessoas.filter(p => AC2.decidir(Object.assign(B.db.prepare('SELECT * FROM usuarios WHERE id=?').get(p.id), { areas:[] }), '/tela-nova-de-teste', 'GET').ok).map(p => p.nome);
+  ok('fase 7: a tela nova não chega a ninguém além do Admin Geral', chegam.length === 1 && /Admin Geral/.test(chegam[0]), chegam.join(', '));
+  ok('   nenhum setor recebeu a ação nova sozinho', !B.db.prepare("SELECT 1 FROM setor_permissao WHERE chave='teste.tela_nova'").get());
+  const reg2 = (() => { let o = null; B.rotas['GET /api/acesso/registro']({ usuario:lucas, body:{}, params:{}, query:{} }, { status(){ return this; }, json(b){ o = b; } }); return o; })();
+  const t999 = (reg2.mapa || []).reduce((a, m) => a.concat(m.telas), []).find(t => t.n === 999);
+  ok('   e ela aparece sozinha na tela de Acessos, com a ação pendurada', !!t999 && t999.acoes.some(a => a.chave === 'teste.tela_nova'));
+  PERMS.pop(); MAPA.TELAS.pop();
+  B.fechar();
+}
+
 db.close();
 try{ fs.rmSync(dir, { recursive:true, force:true }); }catch(e){}
 console.log('');
