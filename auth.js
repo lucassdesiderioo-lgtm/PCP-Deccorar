@@ -67,6 +67,10 @@ const TELAS={
      arquivo do disco sem sessao nenhuma (armadilha #3 da secao 10). */
   '/setor':'*','/setor.html':'*'
 };
+/* AS TELAS DO ADMIN (fase 5 da ACESSO-POR-TELA-E-NIVEL): cada aba virou uma
+   tela `/admin/...`, e elas entram nesta lista protegida a partir do mapa —
+   fora dela, sem sessao, o pedido cairia no next() (armadilha #3). */
+try{ require('./telas').TELAS.forEach(t=>{ if(t.rota.indexOf('/admin/')===0) TELAS[t.rota]='admin'; }); }catch(e){}
 
 const API_ADMIN=['/api/teste','/api/usuarios','/api/estoque','/api/alvo','/api/backup'];
 const LIVRE=['/login','/login.html','/nav.js','/favicon.ico'];

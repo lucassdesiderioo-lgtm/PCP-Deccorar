@@ -165,9 +165,9 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
     <div class="card" id="estAjustes"></div>
   </div>
 
-  <div id="v-plan" class="hide"><iframe id="ifPlan" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
-  <div id="v-rel" class="hide"><iframe id="ifRel" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
-  <div id="v-acs" class="hide"><iframe id="ifAcs" style="width:100%;height:calc(100vh - 170px);border:0;border-radius:14px" src="about:blank"></iframe></div>
+  <div id="v-plan" class="hide"></div>
+  <div id="v-rel" class="hide"></div>
+  <div id="v-acs" class="hide"></div>
   <!-- CADASTRO -->
   <div id="v-pend" class="hide">
     <div class="card"><div style="font-weight:700;margin-bottom:4px">SKUs incompletos</div>
@@ -469,7 +469,21 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
 <script>
 let SKUS=[];
 const $=s=>document.querySelector(s);
+/* ══ O ADMIN VIROU TELAS (spec ACESSO-POR-TELA-E-NIVEL, fase 5) ══════════
+   Esta página é servida por `/admin/<tela>` com `window.TELA_ADMIN` (a aba que
+   ela é) e `window.ROTA_DA_ABA`. A faixa de abas some, só a carga desta tela
+   roda (`naTela`), e o caminho para outra aba — um card da central de
+   Pendências, o "Cadastrar" de um bloqueado — vira o endereço da tela dela,
+   que o portão julga como qualquer tela. */
+var TELA=window.TELA_ADMIN||null, ROTA_DA_ABA=window.ROTA_DA_ABA||{};
+function naTela(){ return !TELA || Array.prototype.indexOf.call(arguments, TELA.aba) >= 0; }
+if(TELA){
+  document.querySelector('.tabs').style.display='none';
+  document.title=TELA.n+' · '+TELA.nome;
+  var h1t=document.querySelector('header h1'); if(h1t) h1t.textContent=TELA.n+' · '+TELA.nome;
+}
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  if(TELA && t.dataset.t!==TELA.aba && ROTA_DA_ABA[t.dataset.t]){ location.href=ROTA_DA_ABA[t.dataset.t]; return; }
   document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));t.classList.add("active");
   $("#v-prod").classList.toggle("hide",t.dataset.t!=="prod");
   $("#v-est").classList.toggle("hide",t.dataset.t!=="est");
@@ -499,10 +513,10 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   var vcp=$("#v-compras"); if(vcp) vcp.classList.toggle("hide",t.dataset.t!=="compras");
   if(t.dataset.t==="compras"){ carregarCompras(); carregarListaCompras(); }
   if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); invCarregar(); }
-  var ifn=$("#ifPlan"), ifr=$("#ifRel"), ifa=$("#ifAcs");
-  if(t.dataset.t==="plan" && ifn && !ifn.dataset.l){ ifn.src="/planejamento"; ifn.dataset.l=1; }
-  if(t.dataset.t==="rel" && ifr && !ifr.dataset.l){ ifr.src="/relatorios"; ifr.dataset.l=1; }
-  if(t.dataset.t==="acs" && ifa && !ifa.dataset.l){ ifa.src="/acessos"; ifa.dataset.l=1; }
+  /* O iframe de Planejamento, Relatórios e Acessos SAIU (fase 5 da
+     ACESSO-POR-TELA-E-NIVEL): cada um é a tela dele, e o clique acima já
+     levou a ela. Com o iframe, cada uma carregava o próprio rodapé — o rodapé
+     aparecia duplicado. */
 });
 async function carregar(){
   await carregarListas();   // antes do renderCad: a lista de SKU mostra o nome do modelo
@@ -2733,7 +2747,7 @@ document.addEventListener("click",function(e){
   var t=document.querySelector('.tab[data-t="'+a.getAttribute("data-pendaba")+'"]'); if(t){ t.click(); window.scrollTo(0,0); }
 });
 async function carregarBloq(){
-carregarCanc();
+if(naTela('blq')) carregarCanc();
 var l=[]; try{ l=await (await fetch("/api/bloqueados")).json(); }catch(e){}
 var n=0; for(var i=0;i<l.length;i++) n+=l[i].qtd;
 var nd=await carregarDiv();
@@ -2768,8 +2782,7 @@ var ci=document.getElementById("codigo");
 if(ci){ ci.value=b.getAttribute("data-cadbloq"); ci.focus(); }
 window.scrollTo(0,0);
 });
-setInterval(carregarBloq,30000);
-carregarBloq();
+if(naTela('blq')){ setInterval(carregarBloq,30000); carregarBloq(); }
 
 fetch('/api/auth/eu').then(function(r){return r.json();}).then(function(u){
   if(!u.logado) return;
@@ -2841,7 +2854,7 @@ async function verCruz(){
     document.getElementById('cruz').innerHTML='<b style="color:#2ea043">Lancado: '+j.urgentes+' urgentes.</b>';
   };
 }
-verCruz();
+if(naTela('prod')) verCruz();
 
 var CTSES='';
 function ctSessao(){
@@ -2963,7 +2976,7 @@ async function ctAjustar(){
 // nunca muda por UPDATE, passa pelo dono unico (regra 10).
 function ctItem(l){ return {tipo:l.tipo||'sku', codigo:l.codigo, componente_id:l.componente_id||null}; }
 document.addEventListener('DOMContentLoaded',function(){
-  ctComponentes();
+  if(naTela('ct')) ctComponentes();
   var q=document.getElementById('ctCompQtd');
   if(q) q.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); ctLancarComp(); } });
   var b=document.getElementById('ctBipe');
@@ -4078,7 +4091,11 @@ async function corHistorico(){
   }).join('');
 }
 
-/*AUTO_ADMIN*/ setInterval(function(){ var a=document.activeElement; if(a && a.tagName==='INPUT') return; carregar(); },4000);
+/*AUTO_ADMIN*/ if(naTela('prod','est','cad','pend')) setInterval(function(){ var a=document.activeElement; if(a && a.tagName==='INPUT') return; carregar(); },4000);
+/* A tela desta página abre sozinha (fase 5): o clique na aba dela faz a
+   mesma carga que o clique da pessoa fazia. No fim do script, para todas as
+   funções já existirem. */
+if(TELA){ var tt=document.querySelector('.tab[data-t="'+TELA.aba+'"]'); if(tt) tt.click(); }
 </script>
 <script src="/nav.js"></script>
 </body></html>

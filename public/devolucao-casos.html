@@ -215,7 +215,7 @@
    (/api/devolucao/abas). Com uma aba só, a faixa não aparece: a tela fica
    igual à de sempre. Esconder não é segurança; quem tranca é a chave da tela. */
 (function(){
-  var ABAS=[['receber','Receber peça','/devolucao'],['andamento','Em andamento','/devolucao-casos'],['baixa','Baixa','/admin#dv']];
+  var ABAS=[['receber','Receber peça','/devolucao'],['andamento','Em andamento','/devolucao-casos'],['baixa','Baixa','/admin/devolucoes']];
   var aqui=location.pathname.replace(/\/$/,'');
   fetch('/api/devolucao/abas').then(function(r){ return r.ok ? r.json() : null; }).then(function(p){
     if(!p) return;

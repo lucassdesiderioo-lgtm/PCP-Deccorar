@@ -860,7 +860,7 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   eq('Renato vai a Em andamento', porta(2).para, '/devolucao-casos');
   eq('o admin geral vai a Em andamento', porta(1).para, '/devolucao-casos');
   PERMS[7] = new Set(['devolucao.baixar']); NOMES[7] = 'SoBaixa';
-  eq('quem só dá baixa vai ao Admin, na aba Devoluções', porta(7).para, '/admin#dv');
+  eq('quem só dá baixa vai à tela 253 (Admin → Devoluções, desde a fase 5 da ACESSO-POR-TELA-E-NIVEL)', porta(7).para, '/admin/devolucoes');
   PERMS[8] = new Set([]); NOMES[8] = 'Nada';
   eq('quem não tem nada vai à tela de sempre (e o portão responde como hoje)', porta(8).para, '/devolucao');
   eq('sem sessão vai ao login, e volta à porta depois', porta('ninguem').para, '/login?r=%2Fdevolucoes');
@@ -873,7 +873,7 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
   for(const tela of ['devolucao.html','devolucao-casos.html']){
     const H = fs.readFileSync(path.join(__dirname,'public',tela),'utf8');
     ok(tela + ' pede as abas ao servidor (/api/devolucao/abas)', /\/api\/devolucao\/abas/.test(H));
-    ok(tela + ' liga as três abas às três telas', /'\/devolucao'/.test(H) && /'\/devolucao-casos'/.test(H) && /'\/admin#dv'/.test(H));
+    ok(tela + ' liga as três abas às três telas', /'\/devolucao'/.test(H) && /'\/devolucao-casos'/.test(H) && /'\/admin\/devolucoes'/.test(H));
   }
   const ADM = fs.readFileSync(path.join(__dirname,'public','index.html'),'utf8');
   ok('o admin abre direto na aba pelo endereço (#dv)', /location\.hash/.test(ADM) && /data-t="dv"/.test(ADM));

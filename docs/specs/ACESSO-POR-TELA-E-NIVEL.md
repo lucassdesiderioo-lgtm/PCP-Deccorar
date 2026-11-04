@@ -21,7 +21,7 @@
 > | 2 | O mapa de telas: uma linha por tela, um dono só | 🔴 | feito (04/11) — `telas.js`, 8 defeitos reintroduzidos; o rodapé (`nav.js`) passa a ler do mapa na fase 6, quando vira o menu |
 > | 3 | O nível na pessoa (sem trava ainda) | 🔴 | feito (04/11) — `usuarios.nivel`, migração uma vez só, botão do Admin Geral, `nivel_relatorio.js`; 5 defeitos reintroduzidos |
 > | 4 | A trava do nível | 🔴 | feito (04/11) — relatório de quem perderia: **vazio** no banco de exemplo; 7 defeitos reintroduzidos; em produção, conferir com `node nivel_relatorio.js` depois do deploy |
-> | 5 | O Admin de 16 abas vira telas | 🔴 | planejado |
+> | 5 | O Admin de 16 abas vira telas | 🔴 | feito (04/11) — 13 telas `/admin/...` + 401/904/901; o mesmo `index.html` servido com `TELA_ADMIN`; 6 defeitos reintroduzidos |
 > | 6 | O menu por pessoa, e o rodapé sai | 🟡 | planejado |
 > | 7 | A tela de Acessos organizada pelo mapa | 🔴 | planejado |
 >

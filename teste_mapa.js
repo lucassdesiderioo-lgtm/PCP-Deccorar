@@ -49,7 +49,7 @@ ok('as telas 101 a 904 da spec estão todas no mapa',
   [101,102,103,104,105,201,202,203,204,205,251,252,253,301,302,303,401,402,403,404,501,502,901,902,903,904].every(x => M.porNumero(x)));
 
 console.log('\n── 2. tela fora do mapa reprova ──');
-const FORA = { 'login':'o login', 'setor':'a escolha de operação', 'index':'o Admin antigo — cada aba é uma linha com `aba`' };
+const FORA = { 'login':'o login', 'setor':'a escolha de operação', 'index':'o Admin antigo — cada aba é uma linha com `aba`', 'admin_porta':'a porta do Admin, que só redireciona' };
 const htmls = fs.readdirSync(path.join(__dirname, 'public')).filter(f => /\.html$/.test(f))
   .concat(fs.readdirSync(path.join(__dirname, 'views')).filter(f => /\.html$/.test(f)));
 const orfas = htmls.map(f => f.replace(/\.html$/, '')).filter(b => !FORA[b] && !M.porRota('/' + b));
@@ -84,7 +84,7 @@ ok('o nível da tela do sob medida não é menor que o da permissão que a abre'
 
 console.log('\n── 5. a trava do servidor e o destino leem do mapa ──');
 const B = P.montar();
-const difRota = M.TELAS.filter(t => !t.aba || t.area).filter(t => {
+const difRota = M.TELAS.filter(t => {
   const d = B.AC.permDaRota(t.rota, 'GET'); const arr = Array.isArray(d) ? d : [d];
   return JSON.stringify(arr) !== JSON.stringify(t.perms);
 }).map(t => t.n + ' ' + t.rota + ' → ' + JSON.stringify(B.AC.permDaRota(t.rota, 'GET')));

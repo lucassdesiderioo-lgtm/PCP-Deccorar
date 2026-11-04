@@ -104,7 +104,7 @@ module.exports=function(app,db){
   app.get('/devolucoes',(req,res)=>{
     if(!req.usuario) return res.redirect('/login?r='+encodeURIComponent('/devolucoes'));
     const a=abasDe(req.usuario);
-    res.redirect(a.andamento?'/devolucao-casos':a.receber?'/devolucao':a.baixa?'/admin#dv':'/devolucao');
+    res.redirect(a.andamento?'/devolucao-casos':a.receber?'/devolucao':a.baixa?'/admin/devolucoes':'/devolucao');
   });
 
   app.get('/api/devolucao/pendentes',(req,res)=> res.json(devolucoesPendentes(db)));

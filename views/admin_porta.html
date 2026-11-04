@@ -1,0 +1,41 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin</title>
+<style>
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0b0f14;color:#eef1f6;
+       min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .box{max-width:520px;text-align:center}
+  .sub{color:#8b97a5;font-size:15px}
+  a{color:#58a6ff}
+</style></head><body>
+<!-- PORTA_ADMIN (spec ACESSO-POR-TELA-E-NIVEL, fase 5). O Admin deixou de ser
+     uma página de 16 abas: cada aba é uma tela com endereço próprio. Esta porta
+     leva a pessoa à tela certa — a do link antigo (`/admin#dv`), ou a primeira
+     tela do Admin que ela alcança. A âncora (#dv) não chega ao servidor, por
+     isso quem a lê é esta página. -->
+<div class="box" id="caixa"><div class="sub">Abrindo…</div></div>
+<script>
+/* As 16 abas do Admin antigo e a tela nova de cada uma (o mapa `telas.js`
+   manda a mesma lista em `rota_da_aba`; esta cópia só serve se a resposta
+   não vier). */
+var ABA_ANTIGA={"prod":"/admin/producao","pb":"/admin/problemas","blq":"/admin/pendencias","cor":"/admin/correcoes",
+  "dv":"/admin/devolucoes","est":"/admin/estoque","ct":"/admin/contagem","plan":"/planejamento","cad":"/admin/skus",
+  "pend":"/admin/sku-incompleto","ficha":"/admin/ficha","compras":"/admin/compras","acs":"/acessos","cd":"/admin/cadastros",
+  "tst":"/admin/teste","rel":"/relatorios"};
+fetch('/api/telas/minhas',{credentials:'same-origin'}).then(function(r){ return r.json(); }).then(function(d){
+  var telas=(d&&d.telas)||[], mapa=(d&&d.rota_da_aba)||ABA_ANTIGA;
+  var aba=(location.hash||'').replace('#','');
+  var alcanca=function(r){ return telas.some(function(t){ return t.rota===r; }); };
+  if(aba && mapa[aba] && alcanca(mapa[aba])){ location.replace(mapa[aba]); return; }
+  var primeira=telas.filter(function(t){ return t.rota.indexOf('/admin/')===0; })[0];
+  if(primeira){ location.replace(primeira.rota); return; }
+  var outra=telas.filter(function(t){ return t.rota.indexOf('/sobmedida')!==0; })[0];
+  if(outra){ location.replace(outra.rota); return; }
+  document.getElementById('caixa').innerHTML='<h2>Sem permissão</h2><div class="sub">Seu acesso não alcança nenhuma tela do Admin.</div><p><a href="/login">Entrar com outro usuário</a></p>';
+}).catch(function(){
+  document.getElementById('caixa').innerHTML='<h2>Sem conexão</h2><div class="sub">Não deu para saber suas telas. Recarregue a página.</div>';
+});
+</script>
+<!-- A barra de toda tela interna (§20, Regra A): se a porta não achar tela
+     nenhuma, "Trocar setor" e o sair continuam aqui. -->
+<script src="/nav.js"></script></body></html>

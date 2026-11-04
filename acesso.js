@@ -824,7 +824,7 @@ module.exports = function(app, db){
      permDaRota leem daqui. As de API nao mudam. */
   const MAPA = require('./telas');
   const TELA_DA_ROTA = {};
-  MAPA.TELAS.forEach(t => { if(t.rota.indexOf('/admin/') !== 0) TELA_DA_ROTA[t.rota] = t; });
+  MAPA.TELAS.forEach(t => { TELA_DA_ROTA[t.rota] = t; });
   function permDaRota(pathRaw, method){
     const p = (pathRaw || '').replace(/\/+$/,'') || '/';
     const M = (method || 'GET').toUpperCase();
@@ -835,11 +835,13 @@ module.exports = function(app, db){
     /* AS TELAS SAEM DO MAPA (spec ACESSO-POR-TELA-E-NIVEL, fase 2): uma linha
        por tela em `telas.js`, com as permissoes que a abrem. Tela nova entra
        la, e nao aqui — e tela fora do mapa continua nascendo negada (#29).
-       As telas do Admin (`/admin/...`) so passam a responder na fase 5. */
+       Desde a fase 5 as telas do Admin (`/admin/...`) tambem saem daqui. */
     const tela = TELA_DA_ROTA[p];
     if(tela) return tela.perms.length === 1 ? tela.perms[0] : tela.perms.slice();
     // A porta unica do rodape (so redireciona, pela permissao, no dev_route).
     if(eq('/devolucoes')) return '@logado';
+    // As telas que a pessoa abre (fase 5): cada um ve as proprias, so nome e endereco.
+    if(eq('/api/telas/minhas')) return '@logado';
     if(eq('/baixar-backup')) return '@ag';
     // ── acoes/admin por API ──
     if(pre('/api/teste')) return 'teste.operar';
@@ -1465,6 +1467,14 @@ module.exports = function(app, db){
                        : c === '@admin'  ? ehNivelAdmin(u.id, perms)
                        : c === '@ag'     ? false
                        : perms.has(c);
+    /* A TELA TEM NIVEL (fase 4/5 da ACESSO-POR-TELA-E-NIVEL, R-NIV-01): alem
+       da permissao, a pessoa tem que ser do nivel da tela ou acima. Sem isso
+       um Supervisor com `compras.ver` (nivel Supervisor) abriria a 501, que e
+       de nivel Admin. Sem nivel gravado, so a permissao, como antes. */
+    const telaR = TELA_DA_ROTA[(pathRaw || '').replace(/\/+$/,'').replace(/\.html$/,'') || '/'];
+    const nvP = telaR ? nivelDaPessoa(u.id) : null;
+    if(telaR && nvP && ORDEM_NIVEL[nvP] < ORDEM_NIVEL[telaR.nivel])
+      return { ok:false, chave:exigidas[0], motivo:'nivel' };
     const atendida = exigidas.find(passa);
     return { ok: !!atendida, chave: atendida || exigidas[0],
              motivo: exigidas.length > 1 ? 'permissao_lista'

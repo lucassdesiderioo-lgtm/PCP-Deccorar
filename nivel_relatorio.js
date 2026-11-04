@@ -17,7 +17,10 @@
  *   2. quem PERDERIA alguma permissão se a trava cortasse no nível de hoje
  *      (pela migração, a lista tem que sair VAZIA);
  *   3. os setores que carregam permissão acima do nível deles (não se apaga
- *      nada: é a lista para o dono decidir, R-ALC-04).
+ *      nada: é a lista para o dono decidir, R-ALC-04);
+ *   4. (fase 5, decisão D2 (A)) quem é de nível Admin e NÃO abre alguma das
+ *      telas do Admin — até a fase 5 essa pessoa via as 16 abas, e a aba sem
+ *      a chave dava 403 dentro. É a lista para o dono marcar o que faltar.
  */
 const fs = require('fs'), os = require('os'), path = require('path');
 const Database = require('better-sqlite3');
@@ -48,8 +51,14 @@ async function relatorio(origem){
     ? pessoas.map(p => ({ nome:p.nome, nivel:p.nivel, cortadas:AC.cortadasPeloNivel(p.id) })).filter(x => x.cortadas.length)
     : null;
   const setoresAcima = typeof AC.setoresAcimaDoNivel === 'function' ? AC.setoresAcimaDoNivel() : null;
+  const M = require('./telas');
+  const ABAS = M.TELAS.filter(t => t.aba);
+  const semTela = pessoas.filter(p => p.ativo && (p.nivel === 'admin' || p.nivel === 'admin_geral')).map(p => {
+    const u = Object.assign({}, p, { areas:[] });
+    return { nome:p.nome, nao: ABAS.filter(t => !AC.decidir(u, t.rota, 'GET').ok).map(t => t.n + ' ' + t.nome) };
+  }).filter(x => x.nao.length);
   db.close(); fs.rmSync(dir, { recursive:true, force:true });
-  return { lista, perderia, setoresAcima };
+  return { lista, perderia, setoresAcima, semTela };
 }
 
 if(require.main === module){
@@ -68,6 +77,9 @@ if(require.main === module){
     if(r.setoresAcima === null) console.log('  (a conta ainda não existe neste código)');
     else if(!r.setoresAcima.length) console.log('  nenhum');
     else r.setoresAcima.forEach(s => console.log('  ' + s.nome + ' (' + NOME[s.nivel] + '): ' + s.acima.join(', ')));
+    console.log('\n4. TELAS DO ADMIN QUE A PESSOA DE NÍVEL ADMIN NÃO ABRE (até a fase 5 ela via as 16 abas)');
+    if(!r.semTela.length) console.log('  ninguém');
+    else r.semTela.forEach(x => console.log('  ' + x.nome + ': ' + x.nao.join(', ')));
     console.log('');
   }).catch(e => { console.error('ERRO: ' + e.message); process.exit(1); });
 }

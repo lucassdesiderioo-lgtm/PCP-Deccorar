@@ -2480,6 +2480,43 @@ reintroduzidos um a um, e cada um reprova.
 > chave (#29). **Baixar o nível de alguém não apaga nada**: subindo de volta, ele
 > tem tudo de novo.
 
+### ⚠️ O ADMIN VIROU TELAS (fase 5, 04/11/2026)
+
+O Admin de 16 abas acabou (R-TEL-05): cada aba é uma tela do mapa com endereço,
+número e permissão próprios — `/admin/producao` (103), `/admin/problemas`
+(104), `/admin/pendencias` (204), `/admin/correcoes` (205),
+`/admin/devolucoes` (253), `/admin/estoque` (301), `/admin/contagem` (302),
+`/admin/skus` (402), `/admin/sku-incompleto` (403), `/admin/ficha` (404),
+`/admin/compras` (501), `/admin/cadastros` (902) e `/admin/teste` (903). A aba
+de Planejamento, Relatórios e Acessos era um iframe: **saiu**, e o caminho leva
+à tela deles (401, 904, 901).
+
+> ⚠️ **CADA TELA ABRE COM AS CHAVES DAS AÇÕES DELA** (decisão D2 (A) do dono):
+> quem via uma aba sem ter nenhuma chave dela **deixa de ver** — a seção 4 do
+> `nivel_relatorio.js` lista, pessoa a pessoa, para o dono marcar o que faltar.
+> **Estoque (301), Pendências (204) e Problemas (104)** continuam abrindo para
+> todo nível Admin (`@admin` no mapa). E a tela também tem **nível**: o
+> Supervisor com `compras.ver` não abre a 501, que é de nível Admin.
+>
+> ⚠️ **É O MESMO `index.html`, SERVIDO COM `window.TELA_ADMIN`** (`admin_telas.js`):
+> a faixa de abas some, só a carga daquela tela roda (`naTela`), e o caminho para
+> outra aba — um card da central, o "Cadastrar" de um bloqueado — vira o endereço
+> da tela dela, que o portão julga. Não foram escritos 16 arquivos novos.
+>
+> ⚠️ **A PORTA (`/`, `/admin`, `/index.html`) SÓ REDIRECIONA** (`views/admin_porta.html`):
+> à tela do link antigo (`/admin#dv` → `/admin/devolucoes`; a âncora não chega ao
+> servidor, quem lê é a página) ou à primeira tela do Admin que a pessoa alcança.
+> O `admin_telas.js` fica **entre o `auth` e o `express.static`**, e o static sobe
+> com `index:false` — sem isso o `/` entregaria as 16 abas direto do disco
+> (armadilha #3). As telas `/admin/...` entram na lista protegida do `auth.js`
+> a partir do mapa. `GET /api/telas/minhas` (`@logado`) diz as telas que a
+> pessoa abre, pela mesma conta do portão.
+
+**Rode `node teste_admin_telas.js` ao mexer no `admin_telas.js`, na porta, na
+ordem do `server.js` ou no modo de tela do `index.html`.** Seis defeitos foram
+reintroduzidos um a um, e cada um reprova. E o teste de segurança da §10 com as
+telas novas (está no CI).
+
 **`node nivel_relatorio.js` (só lê)** copia o banco com `db.backup()` e sobe o
 `acesso.js` em cima da cópia: lista cada pessoa com o nível, quem perderia
 alguma permissão com a trava (tem que sair vazio) e os setores com chave acima
@@ -2508,7 +2545,11 @@ curl -s -o /dev/null -w "/login  %{http_code}\n" http://localhost:3010/login
 ```
 
 Esperado: telas `302`, API `401`, `/login` `200`.
-**Qualquer `200` numa tela é furo de segurança.**
+**Qualquer `200` numa tela é furo de segurança.** Desde a fase 5 da
+`ACESSO-POR-TELA-E-NIVEL` a lista inclui as telas do Admin: `/admin/producao`,
+`/admin/problemas`, `/admin/pendencias`, `/admin/correcoes`, `/admin/devolucoes`,
+`/admin/estoque`, `/admin/contagem`, `/admin/skus`, `/admin/sku-incompleto`,
+`/admin/ficha`, `/admin/compras`, `/admin/cadastros` e `/admin/teste`.
 
 Proteção contra força bruta: 5 PINs errados bloqueiam a pessoa por 1 minuto —
 **inclusive com o PIN certo**, senão a trava só atrasaria quem chuta —, e a trava é
@@ -2946,7 +2987,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (360), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (51), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (910) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (60), `teste_nivel.js` (98); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (68), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (360), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (51), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (53), `teste_area.js` (29), `teste_segunda_pessoa.js` (25), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (27), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (910) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (60), `teste_nivel.js` (98), `teste_admin_telas.js` (54); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3118,7 +3159,11 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   que ninguém ganhou nem perdeu acesso (§10)
 - ❌ Criar tela, ação (permissão), setor ou rota sem a declaração de alçada —
   nível e lugar —, ou entregar o PLANO sem o bloco 🔐 ALÇADA (§0, §10, R-ALC)
-- ❌ Mover `express.static` para antes do `auth`
+- ❌ Mover `express.static` para antes do `auth`, tirar o `index:false` dele, ou
+  registrar o `admin_telas.js` depois do static: o `/` voltaria a entregar as 16
+  abas direto do disco (§10, fase 5)
+- ❌ Voltar a pôr tela do Admin em iframe, ou a mostrar as 16 abas a quem
+  entra: cada aba é uma tela, com a permissão dela (§10, R-TEL-05)
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor
 - ❌ Criar tabela de equivalências de SKU (decisão explícita do dono)
