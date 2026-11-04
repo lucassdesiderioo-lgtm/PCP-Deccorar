@@ -552,14 +552,15 @@ const srv = app.listen(0, async () => {
     const pm = await pg();
     await pm.goto(B + '/devolucao-casos'); await pm.waitForTimeout(1000);
     const meus = db.prepare('SELECT id FROM devolucao_caso WHERE encerrado_em IS NULL AND responsavel_id=2').all().map(x => x.id).sort((a,b) => a-b);
-    ok('o botão diz quantos casos são da pessoa', (await pm.textContent('#btMeus')).includes('('+meus.length+')'), await pm.textContent('#btMeus'));
-    await pm.click('#btMeus'); await pm.waitForTimeout(300); await abreFora(pm);
+    /* Desde 04/11/2026 o "Meus casos" é a opção "Eu" do "Casos de:". */
+    ok('a opção "Eu" diz quantos casos são da pessoa', (await pm.textContent('#casosDe option[value="eu"]')).includes('('+meus.length+')'), await pm.textContent('#casosDe option[value="eu"]'));
+    await pm.selectOption('#casosDe', 'eu'); await pm.waitForTimeout(300); await abreFora(pm);
     const vistos = await pm.$$eval('#listaColeta .linha, #listaMl .linha', ls => ls.map(l => +l.getAttribute('data-id')).sort((a,b) => a-b));
     eq('"Meus casos" deixa só os casos em que o Renato é o responsável', vistos.join(','), meus.join(','));
     ok('   e a tela diz que está filtrando', /só os casos em que você é o responsável/.test(await pm.textContent('#meusAviso')));
     await pm.evaluate(() => carregar()); await pm.waitForTimeout(700);
     eq('   o filtro continua depois do redesenho', (await pm.$$eval('#listaColeta .linha, #listaMl .linha', ls => ls.length)), meus.length);
-    await pm.click('#btMeus'); await pm.waitForTimeout(300);
+    await pm.selectOption('#casosDe', 'todos'); await pm.waitForTimeout(300);
     ok('desligado, volta a lista inteira', (await pm.$$eval('#listaColeta .linha, #listaMl .linha', ls => ls.length)) > meus.length);
     await pm.close();
     db.prepare('UPDATE devolucao_caso SET responsavel_id=NULL, responsavel_nome=NULL WHERE responsavel_id=1').run();
@@ -567,7 +568,7 @@ const srv = app.listen(0, async () => {
     const pz = await pg();
     await pz.goto(B + '/devolucao-casos'); await pz.waitForTimeout(1000);
     const total = await pz.$$eval('#listaColeta .linha, #listaMl .linha', ls => ls.length);
-    await pz.click('#btMeus'); await pz.waitForTimeout(300);
+    await pz.selectOption('#casosDe', 'eu'); await pz.waitForTimeout(300);
     eq('quem não tem caso nenhum vê a lista inteira', await pz.$$eval('#listaColeta .linha, #listaMl .linha', ls => ls.length), total);
     ok('   e a tela diz isso', /nenhum caso aberto: mostrando todos/.test(await pz.textContent('#meusAviso')), await pz.textContent('#meusAviso'));
     await pz.close();
@@ -602,6 +603,50 @@ const srv = app.listen(0, async () => {
     await po.locator('#listaMl .linha', { hasText:'#'+antigo.id+' ' }).first().locator('.t1').click(); await po.waitForTimeout(900);
     ok('   e no caso aberto', /falta: motivo/.test(await po.locator('#painel .chips').first().textContent()));
     await po.close();
+
+    /* ═════════ "CASOS DE:", O QUADRO POR RESPONSÁVEL E O DESEMPENHO (04/11/2026) ═════════ */
+    secao('casos de cada responsável — o filtro, o quadro e o histórico');
+    QUEM = 1;
+    const pcd = await pg();
+    await pcd.goto(B + '/devolucao-casos'); await pcd.waitForTimeout(1000);
+    const jl = await api(pcd, 'GET', '/api/devolucao-casos');
+    const deRen = jl.coleta.concat(jl.ml).filter(c => c.responsavel_id === 2).map(c => c.id).sort((a,b) => a-b);
+    ok('há casos do Renato para o teste', deRen.length > 0, JSON.stringify(deRen));
+    await pcd.selectOption('#casosDe', '2'); await pcd.waitForTimeout(300); await abreFora(pcd);
+    eq('"Casos de: Renato Tela" mostra só os dele', (await pcd.$$eval('#listaColeta .linha, #listaMl .linha', ls => ls.map(l => +l.getAttribute('data-id')).sort((a,b) => a-b))).join(','), deRen.join(','));
+    ok('   e a tela diz de quem', /Mostrando os casos de Renato Tela/.test(await pcd.textContent('#meusAviso')));
+    const semRe = jl.coleta.concat(jl.ml).filter(c => !c.responsavel_id).map(c => c.id).sort((a,b) => a-b);
+    await pcd.selectOption('#casosDe', 'sem'); await pcd.waitForTimeout(300); await abreFora(pcd);
+    eq('"Sem responsável" mostra os sem pessoa escolhida', (await pcd.$$eval('#listaColeta .linha, #listaMl .linha', ls => ls.map(l => +l.getAttribute('data-id')).sort((a,b) => a-b))).join(','), semRe.join(','));
+    await pcd.selectOption('#casosDe', 'todos'); await pcd.waitForTimeout(300);
+    const linR = jl.por_responsavel.find(x => x.id === 2);
+    const txtQ = await pcd.textContent('#porResp');
+    ok('o quadro "Por responsável" mostra a linha do Renato com o número do servidor', /Renato Tela/.test(txtQ) && (await pcd.$eval('#porResp [data-casosde="2"] td:nth-child(2)', e => e.textContent)) === String(linR.casos), txtQ);
+    await pcd.click('#porResp [data-casosde="2"]'); await pcd.waitForTimeout(300);
+    eq('   tocar na linha filtra os casos dela', await pcd.inputValue('#casosDe'), '2');
+    await pcd.click('#porResp [data-casosde="2"]'); await pcd.waitForTimeout(300);
+    eq('   tocar de novo volta para todos', await pcd.inputValue('#casosDe'), 'todos');
+    // o histórico: um caso encerrado do Renato, no mês atual
+    const cdes = await api(pcd, 'POST', '/api/devolucao-casos', { tipo:'ml', venda:'2000000000099501', publicidade:false, responsavel_id:2 });
+    db.prepare("UPDATE devolucao_caso SET etapa='encerrado', saida='revisado_ml', encerrado_em=datetime('now','localtime') WHERE id=?").run(cdes.id);
+    await pcd.click('#tabs [data-t="des"]'); await pcd.waitForTimeout(900);
+    const jd = await api(pcd, 'GET', '/api/devolucao-casos/desempenho?mes=' + dia(0).slice(0,7));
+    const pRen = jd.pessoas.find(x => x.id === 2) || {};
+    const txtD = await pcd.textContent('#desBox');
+    ok('a aba Desempenho mostra o Renato com os números do servidor', /Renato Tela/.test(txtD) && txtD.indexOf('Revisado (ML devolve): ' + (pRen.saidas||{}).revisado_ml) >= 0, txtD.slice(0,300));
+    const iRen = jd.pessoas.findIndex(x => x.id === 2);
+    await pcd.click('#desBox [data-des="' + iRen + '"]'); await pcd.waitForTimeout(200);
+    ok('   tocar na pessoa abre a lista dos casos dela', await pcd.isVisible('#desDet' + iRen) && (await pcd.textContent('#desDet' + iRen)).includes('#' + cdes.id));
+    for(const w of [400, 768]){
+      await pcd.setViewportSize({ width:w, height:900 }); await pcd.waitForTimeout(300);
+      const mw = await pcd.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+      ok('a ' + w + ' px a aba Desempenho não rola de lado', mw[0] <= mw[1], JSON.stringify(mw));
+      await pcd.click('#tabs [data-t="and"]'); await pcd.waitForTimeout(400);
+      const mw2 = await pcd.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+      ok('   nem a lista com o quadro', mw2[0] <= mw2[1], JSON.stringify(mw2));
+      await pcd.click('#tabs [data-t="des"]'); await pcd.waitForTimeout(500);
+    }
+    await pcd.close();
 
     /* ═════════ 5. o celular ═════════ */
     secao('a 400 px — a página não rola de lado, e o caso abre');

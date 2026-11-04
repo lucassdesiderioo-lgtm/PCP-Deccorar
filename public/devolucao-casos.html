@@ -102,6 +102,13 @@
   .campoFalta{border-color:var(--red)!important;box-shadow:0 0 0 1px var(--red)}
   .meusBar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px}
   .meusBar .sub{overflow-wrap:anywhere}
+  .prLinha{cursor:pointer}
+  .prLinha:hover td{background:var(--panel2)}
+  .prLinha.prOn td{background:var(--ambg)}
+  td.prVerm{color:var(--red);font-weight:800}
+  td.prAmb{color:var(--amber);font-weight:800}
+  .desDet td{background:#0b0f14;font-size:13px}
+  .desCaso{cursor:pointer;text-decoration:underline;color:var(--blue)}
   .foraGrupo summary{cursor:pointer;color:var(--muted);font-size:13px;font-weight:700;padding:8px 0}
 </style></head><body>
 <header><div class="mark">D</div><div><h1>Devoluções em andamento</h1>
@@ -112,6 +119,7 @@
     <button class="tab on" data-t="and">Em andamento</button>
     <button class="tab" data-t="enc">Encerrados</button>
     <button class="tab" data-t="rel">Relatório do mês</button>
+    <button class="tab" data-t="des">Desempenho</button>
     <button class="tab" data-t="tra" id="tabTra">Transportadoras</button>
     <button class="tab" data-t="mot" id="tabMot" style="display:none">Motivos</button>
   </div>
@@ -164,7 +172,8 @@
       <div style="margin-top:10px"><button class="bt" id="btLancar">Lançar</button></div>
       <div id="lMsg"></div>
     </div>
-    <div class="meusBar"><button class="bt sec" id="btMeus" aria-pressed="false">Meus casos</button><span class="sub" id="meusAviso"></span></div>
+    <div class="meusBar"><label for="casosDe" style="margin:0">Casos de</label><select id="casosDe" style="max-width:260px"></select><span class="sub" id="meusAviso"></span></div>
+    <div class="card" id="cardPorResp" style="display:none"><h2>Por responsável <span class="sub">casos abertos · toque numa linha para ver só os dela</span></h2><div id="porResp"></div></div>
     <div class="cols">
       <div class="card"><h2>Nós coletamos <span class="sub" id="nColeta"></span></h2><div class="sub" style="margin:-4px 0 10px">Pelo prazo do ML — vencido em cima</div><div id="listaColeta"></div></div>
       <div class="card"><h2>ML devolve <span class="sub" id="nMl"></span></h2><div class="sub" style="margin:-4px 0 10px">Pelos dias esperando a peça chegar</div><div id="listaMl"></div></div>
@@ -176,6 +185,10 @@
     <div class="sub" style="margin-bottom:10px">Conta os casos lançados no mês e as devoluções recebidas no mês sem caso (pelo motivo da baixa). A devolução ligada a um caso conta uma vez.</div>
     <div class="acoes"><label for="rMes" style="margin:0;align-self:center">Mês</label><input id="rMes" type="month" style="max-width:180px"></div>
     <div id="relBox"></div></div></div>
+  <div id="secDes" style="display:none"><div class="card"><h2>Desempenho por responsável</h2>
+    <div class="sub" style="margin-bottom:10px">Os casos <b>encerrados</b> no mês, de quem era o responsável quando o caso fechou. Os prazos contam pelo prazo final do ML (o prorrogado, pelo novo); o tempo é a mediana, com o maior ao lado. Caso sem pessoa escolhida fica em "Sem responsável".</div>
+    <div class="acoes"><label for="dMes" style="margin:0;align-self:center">Mês</label><input id="dMes" type="month" style="max-width:180px"></div>
+    <div id="desBox"></div></div></div>
   <div id="secMot" style="display:none"><div class="card"><h2>Motivos de devolução</h2>
     <div class="sub" style="margin-bottom:10px">A mesma lista da baixa (Admin → Cadastros). Remover tira o motivo das opções; os casos que já usam ele continuam com o texto.</div>
     <div id="listaMot"></div>
@@ -222,7 +235,10 @@ var ESTADO={pode:{}, coleta:[], ml:[], skus:{}, motivos:[], tipo:'coleta', abert
    lista vem do servidor — pessoa ativa que lança ou acompanha — e diz quem
    está logado, para o "Meus casos". O texto livre de antes continua
    aparecendo até alguém escolher a pessoa. */
-try{ ESTADO.meus = localStorage.getItem('devcasos_meus')==='1'; }catch(e){}
+/* "Casos de:" (04/11/2026): todos, eu, uma pessoa, ou sem responsável. Quem
+   tinha o "Meus casos" ligado entra em "Eu". Lembrado por aparelho. */
+ESTADO.casosDe='todos';
+try{ ESTADO.casosDe = localStorage.getItem('devcasos_de') || (localStorage.getItem('devcasos_meus')==='1' ? 'eu' : 'todos'); }catch(e){}
 function nomeResp(c){ return c.responsavel_nome || c.responsavel || ''; }
 function opcoesResp(atual){
   var lista=ESTADO.pessoas.slice(), h='<option value="">— escolher —</option>';
@@ -326,23 +342,55 @@ function linhaCaso(c){
    diz de quem é a vez é o servidor (proximo.nossa). O aberto/fechado do grupo
    de fora sobrevive ao redesenho de 30 s. */
 function meusTotal(){ var eu=ESTADO.eu; return eu ? ESTADO.coleta.concat(ESTADO.ml).filter(function(c){ return c.responsavel_id===eu; }).length : 0; }
-/* "Meus casos": os casos em que a pessoa logada é a responsável. Quem não
-   tem caso nenhum vê a lista inteira, e a tela diz isso. */
+/* "Casos de:" — o filtro da lista. "Eu" é o "Meus casos" de antes: quem não
+   tem caso nenhum vê a lista inteira, e a tela diz. A CONTA do quadro "Por
+   responsável" vem do servidor (por_responsavel); aqui só se filtra a lista. */
 function filtrarMeus(l){
-  if(!ESTADO.meus || !meusTotal()) return l;
-  return l.filter(function(c){ return c.responsavel_id===ESTADO.eu; });
+  var v=ESTADO.casosDe;
+  if(v==='todos' || !v) return l;
+  if(v==='eu'){ if(!meusTotal()) return l; return l.filter(function(c){ return c.responsavel_id===ESTADO.eu; }); }
+  if(v==='sem') return l.filter(function(c){ return !c.responsavel_id; });
+  return l.filter(function(c){ return String(c.responsavel_id)===v; });
+}
+function nomePessoa(v){
+  var p=(ESTADO.pessoas||[]).filter(function(x){ return String(x.id)===v; })[0] || (ESTADO.porResp||[]).filter(function(x){ return String(x.id)===v; })[0];
+  return p ? p.nome : '#'+v;
 }
 function desenharMeus(){
-  var b=document.getElementById('btMeus'), a=document.getElementById('meusAviso'), n=meusTotal();
-  b.className = ESTADO.meus ? 'bt' : 'bt sec'; b.setAttribute('aria-pressed', ESTADO.meus ? 'true' : 'false');
-  b.textContent = 'Meus casos' + (ESTADO.eu ? ' ('+n+')' : '');
-  a.textContent = ESTADO.meus ? (n ? 'Mostrando só os casos em que você é o responsável.' : 'Você não é responsável por nenhum caso aberto: mostrando todos.') : '';
+  var sel=document.getElementById('casosDe'), a=document.getElementById('meusAviso'), n=meusTotal();
+  var gente={}; (ESTADO.pessoas||[]).forEach(function(x){ gente[x.id]=x.nome; }); (ESTADO.porResp||[]).forEach(function(x){ if(x.id) gente[x.id]=gente[x.id]||x.nome; });
+  var ids=Object.keys(gente).sort(function(x,y){ return String(gente[x]).localeCompare(String(gente[y]),'pt-BR'); });
+  var v=ESTADO.casosDe||'todos';
+  if(v!=='todos' && v!=='eu' && v!=='sem' && !gente[v]) gente[v]=nomePessoa(v), ids.push(v);
+  sel.innerHTML='<option value="todos">Todos</option><option value="eu">Eu'+(ESTADO.eu?' ('+n+')':'')+'</option>'+
+    ids.map(function(id){ return '<option value="'+esc(id)+'">'+esc(gente[id])+'</option>'; }).join('')+'<option value="sem">Sem responsável</option>';
+  sel.value=v;
+  var noFiltro=filtrarMeus(ESTADO.coleta).length+filtrarMeus(ESTADO.ml).length;
+  a.textContent = v==='eu' ? (n ? 'Mostrando só os casos em que você é o responsável.' : 'Você não é responsável por nenhum caso aberto: mostrando todos.')
+    : v==='sem' ? (noFiltro ? 'Mostrando os casos sem responsável escolhido.' : 'Nenhum caso aberto sem responsável.')
+    : v!=='todos' ? (noFiltro ? 'Mostrando os casos de '+gente[v]+'.' : 'Nenhum caso aberto de '+gente[v]+'.') : '';
+  desenharPorResp();
 }
-document.getElementById('btMeus').onclick=function(){
-  ESTADO.meus=!ESTADO.meus;
-  try{ localStorage.setItem('devcasos_meus', ESTADO.meus?'1':'0'); }catch(e){}
+/* O quadro "Por responsável": uma linha por pessoa com caso aberto. */
+function desenharPorResp(){
+  var pr=ESTADO.porResp||[], box=document.getElementById('porResp');
+  document.getElementById('cardPorResp').style.display = pr.length ? '' : 'none';
+  var n=function(v, cls){ return '<td class="num'+(v?' '+cls:'')+'">'+v+'</td>'; };
+  box.innerHTML=pr.length ? '<div class="rolaH"><table><thead><tr><th>Responsável</th><th class="num">Casos</th><th class="num">Esperando a gente</th><th class="num">Vencidos</th><th class="num">Vencem hoje/amanhã</th><th class="num">Parados</th></tr></thead><tbody>'+
+    pr.map(function(x){ var v=x.id===null?'sem':String(x.id);
+      return '<tr class="prLinha'+(v===ESTADO.casosDe?' prOn':'')+'" data-casosde="'+esc(v)+'"><td><b>'+esc(x.nome)+'</b></td><td class="num">'+x.casos+'</td>'+
+        n(x.esperando,'')+n(x.vencidos,'prVerm')+n(x.vermelhos,'prVerm')+n(x.parados,'prAmb')+'</tr>'; }).join('')+'</tbody></table></div>' : '';
+}
+function escolherCasosDe(v){
+  ESTADO.casosDe=v;
+  try{ localStorage.setItem('devcasos_de', v); }catch(e){}
   desenharListas();
-};
+}
+document.getElementById('casosDe').onchange=function(){ escolherCasosDe(this.value); };
+document.getElementById('porResp').addEventListener('click', function(e){
+  var l=e.target.closest('[data-casosde]'); if(!l) return;
+  var v=l.getAttribute('data-casosde'); escolherCasosDe(ESTADO.casosDe===v ? 'todos' : v);
+});
 function ehNossa(c){ return !c.proximo || c.proximo.nossa; }
 function grupoLista(id, casos, vazio){
   var nos=casos.filter(ehNossa), fora=casos.filter(function(c){ return !ehNossa(c); });
@@ -368,7 +416,7 @@ function desenharListas(){
 function digitando(){ var a=document.activeElement; return a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName); }
 function carregar(){
   return api('GET','/api/devolucao-casos').then(function(d){
-    ESTADO.coleta=d.coleta||[]; ESTADO.ml=d.ml||[]; ESTADO.pode=d.pode||{}; ESTADO.limites=d.limites||{};
+    ESTADO.coleta=d.coleta||[]; ESTADO.ml=d.ml||[]; ESTADO.pode=d.pode||{}; ESTADO.limites=d.limites||{}; ESTADO.porResp=d.por_responsavel||[];
     document.getElementById('cardLancar').style.display = ESTADO.pode.lancar ? '' : 'none';
     document.getElementById('tabMot').style.display = ESTADO.pode.listas ? '' : 'none';
     // Os valores são de quem lança ou acompanha (AJUSTE de 03/11/2026).
@@ -1210,6 +1258,35 @@ GANCHOS.push({
 });
 
 ABAS_EXTRA.push('rel');
+/* ── O HISTÓRICO DE DESEMPENHO (04/11/2026, spec DEVOLUCOES-DESEMPENHO) ──
+   A conta é do servidor (devcaso_dominio.desempenho); aqui só se desenha. */
+ABAS_EXTRA.push('des');
+function carregarDes(){
+  var el=document.getElementById('desBox'), mes=document.getElementById('dMes').value;
+  api('GET','/api/devolucao-casos/desempenho?mes='+encodeURIComponent(mes)).then(function(r){
+    ESTADO.des=r;
+    if(!r.pessoas.length){ el.innerHTML='<div class="vazio">Nenhum caso encerrado neste mês.</div>'; return; }
+    var NS=r.nomes_saida||{};
+    el.innerHTML='<div class="rolaH"><table><thead><tr><th>Responsável</th><th class="num">Casos</th><th>Prazos do ML</th><th>Encerrados como</th><th>Tempo até encerrar</th><th>Vezes parado</th></tr></thead><tbody>'+
+      r.pessoas.map(function(p, i){
+        var pz=p.prazos, prz = pz.decididos ? '<b>'+pz.cumpridos+' de '+pz.decididos+'</b> no prazo'+(pz.vencidos?' · <span style="color:var(--red)">'+pz.vencidos+' vencido'+(pz.vencidos>1?'s':'')+'</span>':'')+(pz.prorrogados?' · '+pz.prorrogados+' prorrogado'+(pz.prorrogados>1?'s':''):'') : '—';
+        var sai=Object.keys(p.saidas).map(function(k){ return '<span class="chip">'+esc(NS[k]||k)+': '+p.saidas[k]+'</span>'; }).join(' ');
+        var tempo = p.dias_mediana===null ? '—' : plural(p.dias_mediana,'dia','dias')+' (mediana) · maior '+plural(p.dias_maior,'dia','dias');
+        var par = p.vezes_parado ? '<span style="color:var(--amber)">'+p.vezes_parado+'×</span> · maior '+plural(p.maior_parado,'dia','dias') : '0';
+        return '<tr class="prLinha" data-des="'+i+'"><td><b>'+esc(p.nome)+'</b></td><td class="num">'+p.casos+'</td><td>'+prz+'</td><td>'+sai+'</td><td>'+tempo+'</td><td>'+par+'</td></tr>'+
+          '<tr class="desDet" id="desDet'+i+'" style="display:none"><td colspan="6">'+p.lista.map(function(c){
+            return '<div><span class="desCaso" data-abrir="'+c.id+'">#'+c.id+'</span> · '+(c.tipo==='coleta'?'Nós coletamos':'ML devolve')+' · venda '+esc(c.venda||'—')+' · '+esc(c.saida_nome||'')+
+              ' · '+plural(c.dias||0,'dia','dias')+(c.prazos_vencidos?' · <span style="color:var(--red)">'+c.prazos_vencidos+' prazo vencido</span>':'')+(c.vezes_parado?' · parado '+c.vezes_parado+'×':'')+'</div>'; }).join('')+'</td></tr>';
+      }).join('')+'</tbody></table></div>';
+  }).catch(function(e){ el.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; });
+}
+document.getElementById('desBox').addEventListener('click', function(e){
+  var a=e.target.closest('[data-abrir]'); if(a){ abrir(+a.getAttribute('data-abrir')); return; }
+  var l=e.target.closest('[data-des]'); if(!l) return;
+  var d=document.getElementById('desDet'+l.getAttribute('data-des')); d.style.display = d.style.display==='none' ? '' : 'none';
+});
+ABAS_GANCHO.push({ aba:'des', abrir:function(){ var m=document.getElementById('dMes'); if(!m.value){ var d=new Date(); m.value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); } carregarDes(); } });
+document.getElementById('dMes').addEventListener('change', carregarDes);
 function carregarRel(){
   var el=document.getElementById('relBox'), mes=document.getElementById('rMes').value;
   api('GET','/api/devolucao-casos/relatorio?mes='+encodeURIComponent(mes)).then(function(r){

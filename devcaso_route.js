@@ -123,6 +123,9 @@ module.exports = function(app, db){
      pessoa ativa que lança ou acompanha. Só id e nome; e quem está logado,
      para o filtro "Meus casos". */
   const temChaveResp = (uid) => podeChave({ usuario:{ id:uid } }, 'devolucao.lancar') || podeChave({ usuario:{ id:uid } }, 'devolucao.acompanhar');
+  /* O histórico de desempenho por responsável, mês a mês (spec
+     DEVOLUCOES-DESEMPENHO): sem valor em reais, a quem já abre a tela. */
+  app.get('/api/devolucao-casos/desempenho', (req,res) => responder(res, () => D.desempenho(db, (req.query||{}).mes)));
   app.get('/api/devolucao-casos/responsaveis', (req,res) => responder(res, () =>
     ({ pessoas: D.responsaveis(db, temChaveResp), eu: (req.usuario && req.usuario.id) || null })));
   app.get('/api/devolucao-casos/:id/revisoes-soltas', (req,res) => responder(res, () => ({ revisoes: D.revisoesSoltas(db, req.params.id) })));
