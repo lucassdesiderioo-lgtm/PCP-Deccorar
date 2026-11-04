@@ -77,6 +77,49 @@ do SKU, os impressos, o relógio de despacho e as duas listas do carregamento
 leem dali. Duas réguas mandariam a mesma caixa pro carro numa tela e pro
 canto na outra.
 
+### ⚠️ A ETIQUETA "Etiqueta válida para envíos" — o terceiro formato (04/11/2026, NF 9124)
+
+O dono emitiu pela aba de **coleta** do Mercado Livre e recebeu uma etiqueta
+diferente de todas as anteriores (venda 2000019290872456, BK150150CINZA). O
+PDF está no caderno de casos reais (`casos/2026-11-04-nf-9124.json`), com o
+nome trocado. Lado a lado com a de sempre:
+
+| | Etiqueta de sempre | Etiqueta nova |
+|---|---|---|
+| Pack ID | `Pack ID: 20000 15759511409` | `Pack ID: 2000015817769511` |
+| Despachar | `Despachar: quinta 29/out` | **não vem** |
+| Rota (`XSP1 > …`) | vem | **não vem** |
+| NF | `NF: 8809` | `Nota fiscal #9124` — o pdf.js lê **"fiiscal"** |
+| Comprador | a linha acima de `Endereço:` | debaixo de `Destinatario:` |
+| Endereço e cidade | vêm | **não vêm** |
+| Frase | — | `Etiqueta válida para envíos` |
+| Número do código de barras | `483761 04608` | `484058 80346` — **e ele está na folha**: `MEL48405880346FMXDF01` |
+
+**O que acontecia com ela até o conserto:** a caixa ficava retida por
+modalidade (sem a linha "Despachar:"), entrava **sem NF** (a busca por nota não
+a achava) e com o comprador **"(sem nome)"** — e com isso a conferência do
+comprador parava calada. E o `registrar_caso.js` não trocava o nome da
+cliente, porque também procurava `Endereço:`.
+
+> ⚠️ **ESSE FORMATO É COLETA SOZINHO, POR DECISÃO DO DONO** (linha em
+> `docs/DECISOES.md`): *"pode deixar como padrão coleta, e se a coleta não
+> receber saberemos e vamos levar até a agência"*. A caixa que o caminhão não
+> leva fica no canto, o "🚚 A coleta não passou" lhe dá nome (R-FIM-01), e o
+> carro pode levá-la (R-VIA-03). Sem data lida, ela entra na lista de hoje (§8).
+>
+> ⚠️ **A MARCA É A FRASE, E NÃO A FALTA DA LINHA.** É a regra desta armadilha
+> mantida: a etiqueta comum que só perdeu o "Despachar:" na leitura continua
+> `null` e continua retida. E a frase junto com um "Despachar:" estranho
+> continua `desconhecida`.
+>
+> ⚠️ **A FORMA 6 DE LIGAR ETIQUETA E FOLHA** nasceu daqui: o número do código
+> de barras dentro do MEL da folha (R-VOL-09, leitura L5). Ela acha o item quando
+> pack e venda não acham, retém quando aponta um item diferente do pack, e conta
+> as peças — o pacote cujo segundo item tem venda e comprador próprios, que a
+> ausência não vê. Na folha antiga a identificação é aleatória e ela não vota.
+> **Ainda não houve PDF real com dois SKUs neste formato**: o teste de dois
+> SKUs é montado à mão. A prova é o primeiro pacote assim.
+
 ### O fluxo da coleta
 
 1. **Etiqueta de Venda**: o bipe do SKU mostra a tarja violeta **"COLETA — o

@@ -85,9 +85,19 @@ function linhaDespacho(texto){
   if(lines[i+1] && /^\s*antes\s+das/i.test(lines[i+1])) s+=' '+lines[i+1];
   return s.replace(/\s+/g,' ').trim();
 }
+/* ⚠️ A ETIQUETA "Etiqueta válida para envíos" (04/11/2026, NF 9124) NAO TRAZ
+ * A LINHA "Despachar:" — nem rota, nem endereco. Decisao do dono: *"pode
+ * deixar como padrao coleta, e se a coleta nao receber saberemos e vamos levar
+ * ate a agencia"* (a caixa que o caminhao nao leva fica no canto, o "A coleta
+ * nao passou" lhe da nome, e o carro pode leva-la — R-VIA-03).
+ *
+ * A marca e POSITIVA, a frase, e nao a falta da linha: a etiqueta comum que so
+ * perdeu o "Despachar:" na leitura continua null e continua retida (#21). E se
+ * a frase vier junto com um "Despachar:", quem decide e a linha, como sempre. */
+const RE_ETIQUETA_ENVIOS=/Etiqueta\s+v[áa]lida\s+para\s+env[íi]os/i;
 function modalidadeDespacho(texto){
   const s=linhaDespacho(texto);
-  if(s===null) return null;
+  if(s===null) return RE_ETIQUETA_ENVIOS.test(String(texto||'')) ? 'coleta' : null;
   if(RE_AGENCIA.test(s)) return 'agencia';
   if(RE_COLETA.test(s)) return 'coleta';
   return 'desconhecida';
@@ -113,7 +123,7 @@ function modalidadeDespacho(texto){
  */
 function nomeDaEtiqueta(lines){
   const ei=(lines||[]).findIndex(l=>/^Endere[çc]o:/.test(l));
-  if(ei<=0) return '';
+  if(ei<=0) return nomeDoDestinatario(lines);
   let nome=lines[ei-1]||'';
   const orfao=s=>s.indexOf(')')>=0 && s.indexOf('(')<0;   // rabo de parentetico
   if(ei>1 && (/^\(/.test(nome) || orfao(nome))) nome=(lines[ei-2]||'')+' '+nome;
@@ -122,6 +132,41 @@ function nomeDaEtiqueta(lines){
      acima nao alcanca. Corta do ")" para tras, junto com a palavra que o carrega. */
   if(orfao(nome)) nome=nome.slice(0,nome.indexOf(')')).replace(/[\s(]+\S*$/,'').trim();
   return nome;
+}
+
+/* O COMPRADOR NA ETIQUETA NOVA (04/11/2026, NF 9124): sem "Endereço:", o nome
+   vem DEBAIXO de "Destinatario:" (ou na mesma linha), com o apelido entre
+   parenteses: "Elaine Cristina Régis (ELAINE REGIS)". Sem isto o volume entrava
+   "(sem nome)" e a conferencia do comprador (§5) parava calada. */
+function nomeDoDestinatario(lines){
+  const L=lines||[];
+  const di=L.findIndex(l=>/^Destinat[aá]rio\s*:/i.test(String(l||'').trim()));
+  if(di<0) return '';
+  let nome=String(L[di]).replace(/^\s*Destinat[aá]rio\s*:\s*/i,'').trim();
+  if(!nome) nome=String(L[di+1]||'').trim();
+  nome=nome.replace(/\s*\([^)]*\)?\s*$/,'').trim();
+  return /[:0-9]/.test(nome) ? '' : nome;
+}
+/* A NF DA ETIQUETA: "NF: 8809" na de sempre, "Nota fiscal #9124" na nova — e o
+   pdf.js le "fiiscal" (a ligadura "fi" vira duas letras, como no
+   "Identifiicação" da folha). */
+function nfDaEtiqueta(texto){
+  const t=String(texto||'');
+  const m=t.match(/NF:\s*(\d+)/) || t.match(/Nota\s+fi+scal\s*#\s*(\d+)/i);
+  return m?m[1]:null;
+}
+/* O NUMERO DO CODIGO DE BARRAS DA ETIQUETA: a linha so de digitos, de 10 a 12
+   (o pdf.js a parte em dois: "484058 80346"). Pack e venda tem 16 e ficam de
+   fora. A etiqueta de sempre tambem tem essa linha; o que muda e que so a folha
+   nova a repete (no MEL), entao so ali ela vota. */
+function envioDaEtiqueta(lines){
+  for(const l of (lines||[])){
+    const t=String(l||'').trim();
+    if(!/^\d[\d ]*\d$/.test(t)) continue;
+    const d=t.replace(/\s+/g,'');
+    if(d.length>=10 && d.length<=12) return d;
+  }
+  return null;
 }
 
 function pageLines(tc){
@@ -248,7 +293,8 @@ async function parsePdf(uint8){
     if(pages[p].type!=='label')continue;
     const t=pages[p].text;
     const g=re=>{ const mm=t.match(re); return mm?mm[1].replace(/\s+/g,''):null; };
-    etiquetasDoPdf.push({packId:g(/Pack ID:\s*([\d ]+)/), venda:g(/Venda:\s*([\d ]+)/)});
+    etiquetasDoPdf.push({packId:g(/Pack ID:\s*([\d ]+)/), venda:g(/Venda:\s*([\d ]+)/),
+      envio:envioDaEtiqueta(pages[p].lines)});
   }
   /* A conta sai do `folha.js` — a MESMA que o backfill_pacote.js usa. Duas
      copias significaria o backfill gravar peca que o upload teria retido. */
@@ -265,7 +311,8 @@ async function parsePdf(uint8){
     const t=pages[p].text, lines=pages[p].lines;
     const grab=re=>{ const mm=t.match(re); return mm?mm[1].replace(/\s+/g,''):null; };
     const packId=grab(/Pack ID:\s*([\d ]+)/), venda=grab(/Venda:\s*([\d ]+)/);
-    const nf=(t.match(/NF:\s*(\d+)/)||[])[1]||null;
+    const nf=nfDaEtiqueta(t);
+    const envio=envioDaEtiqueta(lines);
     const despacharEm=dataDespacho(t);
     const modalidade=modalidadeDespacho(t);
     const despachoLinha=linhaDespacho(t);   // o texto cru, pro bloqueio dizer o que o ML escreveu
@@ -281,8 +328,26 @@ async function parsePdf(uint8){
        e qualquer uma delas segura a peca — o preco de reter um volume e uma
        conversa; o de mandar a peca errada e a reputacao no Mercado Livre. */
     const busca=(L)=>(venda&&L.venda[venda])||(packId&&L.pack[packId])||null;
-    const r1=busca(leitura1), r2=busca(leitura2), rec=r1||r2;
+    let r1=busca(leitura1);
+    const r2=busca(leitura2);
     const motivos=[];
+    /* ── FORMA 6: O NUMERO DO CODIGO DE BARRAS NO MEL DA FOLHA (04/11/2026) ──
+       Os itens da folha cujo MEL traz o numero desta etiqueta. So a folha da
+       etiqueta nova o tem; na antiga a lista e vazia e nada muda.
+       Ela faz tres coisas, e nenhuma solta caixa que outra leitura reteve:
+         a. ACHA o item quando pack e venda nao acharam — mas so se o item nao
+            tiver pack ou venda DIFERENTES dos da etiqueta (seria outra venda);
+         b. RETEM quando pack/venda apontam um item e o numero aponta OUTRO;
+         c. CONTA as pecas (leitura L5, logo abaixo). */
+    const porEnvio = envio ? itensFolha.filter(i=>i.envio===envio) : [];
+    const rE = porEnvio[0]||null;
+    if(!r1 && !r2 && rE
+       && !(rE.packId && packId && rE.packId!==packId)
+       && !(rE.venda && venda && rE.venda!==venda)) r1=rE;
+    if(r1 && rE && !porEnvio.includes(r1))
+      motivos.push('o codigo de barras da etiqueta ('+envio+') aparece na folha no item '
+        +rE.sku+(rE.comprador?' de '+rE.comprador:'')+', e o pack/venda aponta o item '+r1.sku);
+    const rec=r1||r2;
 
     /* ESTA ETIQUETA LEVA MAIS DE UM PRODUTO? (§5-B)
        Os irmaos saem do `itensFolha` pela regua do folha.js, e o pai tem que
@@ -347,6 +412,20 @@ async function parsePdf(uint8){
     if(l2 && l2>pecasDoPai)
       duvidas.push('a folha lida item a item diz '+l2+' peca(s) e a leitura por bloco '
         +(r1?'diz '+pecasDoPai:'nao achou o item'));
+    /* L5 — AS PECAS PELO NUMERO DO ENVIO. Todo item da folha com o MEL desta
+       etiqueta viaja nesta caixa, e o irmao de cada um tambem. E a unica
+       leitura que ve o pacote cujo segundo item traz venda e comprador
+       proprios (e por isso nao e "irmao" pela ausencia). Dizendo MAIS, retem,
+       como as outras (R-VOL-09). Sem MEL, nao vota. */
+    let l5=null;
+    if(r1 && porEnvio.includes(r1)){
+      const grupo=[];
+      porEnvio.forEach(i=>{ [i].concat(irmaosDe(itensFolha,i)).forEach(x=>{ if(!grupo.includes(x)) grupo.push(x); }); });
+      l5={itens:grupo, total:grupo.reduce((s,i)=>s+Math.max(1,i.qtd||1),0)};
+      if(l5.total>lido)
+        duvidas.push('o codigo de barras da etiqueta ('+envio+') aparece em '+porEnvio.length
+          +' item(ns) da folha, com '+l5.total+' peca(s), e a leitura por bloco diz '+lido);
+    }
     const duvidaQuantidade = duvidas.length ? duvidas.join(' · ') : null;
     if(duvidaQuantidade && !irmaoSemLicenca){
       /* A caixa vai com o MAIOR numero lido ja escrito. */
@@ -355,6 +434,8 @@ async function parsePdf(uint8){
       if(crua && crua.pecas.length) opcoes.push(crua.pecas.map((p,n)=>({sku:p.sku, qtd:p.qtd,
         cor:n===0&&r1?(r1.cor||null):null, descricao:n===0&&r1?(r1.desc||null):null})));
       if(l2) opcoes.push([{sku:rec.sku, qtd:l2, cor:rec.cor||null, descricao:rec.desc||null}]);
+      if(l5 && l5.total>lido) opcoes.push(l5.itens.map(b=>({sku:b.sku, qtd:Math.max(1,b.qtd||1),
+        cor:b.cor||null, descricao:b.desc||null})));
       const soma=l=>l.reduce((s,i)=>s+(i.qtd||1),0);
       itensDoVolume = opcoes.sort((a,b)=>soma(b)-soma(a))[0] || itensDoVolume;
     }
@@ -485,7 +566,8 @@ async function parsePdf(uint8){
        com peca a menos, que nao existia. Agora a venda com pack ou venda na
        folha e SEM etiqueta neste PDF sai pelo numero; `resto` e so o que
        nenhuma explicacao cobre, e so ele fica no aviso generico. */
-    const temEtiqueta=i=>etiquetasDoPdf.some(e=>(i.packId&&e.packId===i.packId)||(i.venda&&e.venda===i.venda));
+    const temEtiqueta=i=>etiquetasDoPdf.some(e=>(i.packId&&e.packId===i.packId)||(i.venda&&e.venda===i.venda)
+      ||(i.envio&&e.envio===i.envio));
     const semEtiqueta=itensFolha.filter(i=>(i.packId||i.venda) && !temEtiqueta(i))
       .map(i=>({venda:i.venda||null, packId:i.packId||null, sku:i.sku, qtd:Math.max(1,i.qtd||1)}));
     const explicadas=semEtiqueta.reduce((a,i)=>a+i.qtd,0);
@@ -497,4 +579,5 @@ async function parsePdf(uint8){
 /* A comparacao de nomes NAO sai por aqui: ela e do nome.js, e reexportar criaria
    uma segunda porta pra mesma regua — quem importasse pelo parse carregaria o
    pdf.js inteiro atras de uma comparacao de string. */
-module.exports={parsePdf,dataDespacho,modalidadeDespacho,linhaDespacho,nomeDaEtiqueta};
+module.exports={parsePdf,dataDespacho,modalidadeDespacho,linhaDespacho,nomeDaEtiqueta,
+  nfDaEtiqueta,envioDaEtiqueta};

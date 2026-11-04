@@ -324,9 +324,24 @@ function itensDaFolha(linhas){
       comprador=t; break;
     }
     const med=medidaDoTitulo(desc);   // regua unica: ver MEDIDA_TITULO
+    /* O NUMERO DO ENVIO NA IDENTIFICACAO (04/11/2026, NF 9124). Na folha da
+       etiqueta "Etiqueta valida para envios" a identificacao do item traz o
+       numero do codigo de barras da etiqueta: "MEL48405880346FMXDF01" na folha,
+       "484058 80346" na etiqueta. E a forma 6 de ligar os dois papeis, e a
+       unica POSITIVA alem do pack e da venda (o irmao do pacote e por
+       ausencia). Na folha antiga a identificacao e um codigo aleatorio
+       ("CLONAPDJ..."), sem o numero: `envio` fica null e nao vota (#10).
+       Procura de baixo para cima na janela do item, como o titulo: o MEL mais
+       perto do SKU e o dele. */
+    let envio=null;
+    for(let k=largo.length-1;k>=0 && !envio;k--){
+      const mm=String(largo[k]||'').match(/\bMEL(\d{8,})/);
+      if(mm) envio=mm[1];
+    }
     itens.push({
       packId:(pega(/Pack ID:\s*([\d ]+)/)||'').replace(/\s+/g,'')||null,
       venda:(pega(/Venda:\s*([\d ]+)/)||'').replace(/\s+/g,'')||null,
+      envio,
       sku:ms[1].trim(), cor:(pega(/Cor:\s*([^\n|]+)/)||'').trim()||null,
       comprador:comprador||null, desc:desc||null,
       /* QUANTIDADE — quantas PECAS aquele item tem.
@@ -461,12 +476,13 @@ function pecasDaFolhaInteira(linhas){
 
 /* Mapas pack->sku e venda->sku, primeira ocorrencia manda (igual ao parse). */
 function mapasDaFolha(blocos){
-  const porPack={}, porVenda={};
+  const porPack={}, porVenda={}, porEnvio={};
   (blocos||[]).forEach(b=>{
     if(b.packId && !porPack[b.packId]) porPack[b.packId]=b.sku;
     if(b.venda && !porVenda[b.venda]) porVenda[b.venda]=b.sku;
+    if(b.envio && !porEnvio[b.envio]) porEnvio[b.envio]=b.sku;
   });
-  return {porPack,porVenda};
+  return {porPack,porVenda,porEnvio};
 }
 
 /* O SKU que a folha atribui a um volume ja gravado. NULL quando a folha nao
@@ -506,7 +522,11 @@ function itemDaFolha(volume, itens){
 function etiquetasSemItem(etiquetas, blocos){
   const m=mapasDaFolha(blocos);
   return (etiquetas||[]).filter(e =>
-    !((e.venda&&m.porVenda[e.venda])||(e.packId&&m.porPack[e.packId])));
+    !((e.venda&&m.porVenda[e.venda])||(e.packId&&m.porPack[e.packId])
+      /* A etiqueta nova cujo pack e venda nao aparecem na folha, mas cujo
+         numero do codigo de barras aparece no MEL de um item (forma 6). Quem
+         nao manda `envio` (o backfill_pacote) le como sempre. */
+      ||(e.envio&&m.porEnvio[e.envio])));
 }
 function pdfFecha(etiquetas, blocos){ return etiquetasSemItem(etiquetas,blocos).length===0; }
 

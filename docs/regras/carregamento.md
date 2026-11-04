@@ -35,10 +35,10 @@ Etiqueta de Venda ────┤
 ## A modalidade: o que a etiqueta disse
 
 ### R-MOD-01 · A modalidade se lê pela linha "Despachar", contra dois formatos exatos
-- **Regra:** `parse.js → modalidadeDespacho()` compara a caixa "Despachar" com o formato da agência (`qua 9/set, antes das 15:45 h`) e o da coleta (`quinta 10/set`, sem hora). Qualquer outra coisa é `desconhecida`; etiqueta sem a linha é `null`. Os dois **retêm o volume** no upload, com `bloqueio='modalidade: <texto cru>'`. A hora quebrada para a linha de baixo é emendada antes de conferir.
+- **Regra:** `parse.js → modalidadeDespacho()` compara a caixa "Despachar" com o formato da agência (`qua 9/set, antes das 15:45 h`) e o da coleta (`quinta 10/set`, sem hora). Qualquer outra coisa é `desconhecida`; etiqueta sem a linha é `null`. **Desde 04/11/2026 há um terceiro formato:** a etiqueta com a frase *"Etiqueta válida para envíos"* e **sem** a linha "Despachar:" é `coleta` (decisão do dono; a frase é a marca, não a falta da linha). Os dois **retêm o volume** no upload, com `bloqueio='modalidade: <texto cru>'`. A hora quebrada para a linha de baixo é emendada antes de conferir.
 - **Por quê:** os dois PDFs são idênticos em tudo, e a coleta se reconhece **por ausência** (a hora que falta). Um "quase igual" que passasse como coleta mandaria para o canto, em silêncio, uma caixa que era do carro.
-- **Exceções:** se o ML mudar a etiqueta de vez, o conserto é no `modalidadeDespacho()`, com o PDF novo na mão.
-- **Teste que trava:** `teste_parse.js` (caso 15: os formatos exatos e quatro variações que caem em `desconhecida`).
+- **Exceções:** se o ML mudar a etiqueta de vez, o conserto é no `modalidadeDespacho()`, com o PDF novo na mão — foi o que aconteceu em 04/11/2026 (NF 9124). Se o caminhão não levar a caixa da etiqueta nova, o carro leva (R-VIA-03).
+- **Teste que trava:** `teste_parse.js` (caso 15: os formatos exatos e quatro variações que caem em `desconhecida`) · `teste_etiqueta_envios.js` (o formato novo é coleta; sem a frase continua retida) · `teste_casos_reais.js` (`2026-11-04-nf-9124`).
 - **Status:** no ar desde 10/09/2026.
 - **História:** armadilha #21.
 
