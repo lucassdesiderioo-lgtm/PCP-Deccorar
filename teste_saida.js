@@ -36,6 +36,7 @@ const NOVAS = ['impresso_por','conferido_por','conferido_em','no_carro_em','no_c
 
 /* O `app` de mentira: guarda as rotas. O `req.usuario` e quem esta logado —
    o auth.js o poe ali em producao. */
+let ultimoStatus = 200;
 function montar(db, modulos){
   const rotas = {};
   const app = { get:(p,...h)=>{ rotas['GET '+p]=h[h.length-1]; },
@@ -43,7 +44,8 @@ function montar(db, modulos){
                 use:()=>{}, locals:{ acesso:{ auditar(){} } } };
   for(const m of modulos) require(m)(app, db);
   const chamar = (k, body, usuario) => new Promise(r => {
-    const res = { json:o=>r(o), status(){ return res; }, send:o=>r(o), setHeader(){} };
+    ultimoStatus = 200;
+    const res = { json:o=>r(o), status(c){ ultimoStatus = c; return res; }, send:o=>r(o), setHeader(){} };
     rotas[k]({ body:body||{}, params:{}, query:{}, headers:{}, usuario:usuario||null }, res);
   });
   return chamar;
@@ -109,9 +111,31 @@ function montar(db, modulos){
      !!recusa.erro && l(id1).impresso_por === 'Ana');
 
   const id2 = vol.run('BK140140BEGE','Cliente Dois','102','9002','8002','["9002"]','pendente',hoje,hoje,pdf,null).lastInsertRowid;
+  /* ATÉ 05/11/2026 a impressão sem login passava com o nome vazio. Desde a fase
+     3 da QUEM-FEZ-E-REVISAO (regra-mãe, spec §2.3, linha no DECISOES.md de
+     04/11/2026) ela é RECUSADA, e nada é gravado. */
   await chamar('POST /api/embalar', {id:id2}, null);
-  ok('sem ninguém logado a impressão não quebra — o nome fica vazio, não inventado',
-     l(id2).estagio === 'embalado' && !l(id2).impresso_por, JSON.stringify(l(id2).impresso_por));
+  ok('sem ninguém logado a impressão é recusada (401)', ultimoStatus === 401, String(ultimoStatus));
+  ok('e nada é gravado: a caixa continua pendente, sem nome inventado',
+     l(id2).estagio === 'pendente' && !l(id2).impresso_por, JSON.stringify(l(id2)));
+  ok('quem imprimiu fica também pelo id', l(id1).impresso_por_id === 1, JSON.stringify(l(id1).impresso_por_id));
+
+  /* A REIMPRESSÃO GRAVA QUEM, UMA LINHA POR VEZ (fase 3). A coluna "último que
+     reimprimiu" apagaria quem reimprimiu antes. */
+  const reimp = id => db.prepare('SELECT * FROM lote_reimpressao WHERE lote_id=? ORDER BY id').all(id);
+  const vezesAntes = l(id1).reimpressoes;
+  await chamar('POST /api/reimprimir', {id:id1}, null);
+  ok('reimprimir sem login é recusado (401)', ultimoStatus === 401, String(ultimoStatus));
+  ok('e não conta a reimpressão', l(id1).reimpressoes === vezesAntes, String(l(id1).reimpressoes));
+  await chamar('POST /api/reimprimir', {id:id1}, ANA);
+  let rs = []; try{ rs = reimp(id1); }catch(e){}
+  ok('cada reimpressão é uma linha, com quem reimprimiu', rs.length === 2 &&
+     rs[0].usuario_id === 2 && rs[0].usuario_nome === 'Beto' && rs[1].usuario_id === 1 && rs[1].usuario_nome === 'Ana',
+     JSON.stringify(rs));
+  ok('e com a hora', rs.every(x => !!x.em), JSON.stringify(rs));
+  ok('o contador acompanha as linhas', l(id1).reimpressoes === rs.length, l(id1).reimpressoes + ' x ' + rs.length);
+  ok('e a reimpressão não troca quem imprimiu (nem o nome, nem o id)',
+     l(id1).impresso_por === 'Ana' && l(id1).impresso_por_id === 1);
 
   // ── 3. O BIPE NO CARREGAMENTO: QUEM CONFERIU ─────────────────────────────
   r = await chamar('POST /api/carregar', {code:'9001'}, BETO);
@@ -327,6 +351,11 @@ function montar(db, modulos){
   ok('o script tem o modo --nao-bipadas, exige --ate e faz backup antes de gravar',
      /--nao-bipadas/.test(texto) && /--ate/.test(texto) &&
      texto.indexOf('await db.backup(') < texto.lastIndexOf('fecharNaoBipadas(db,{aplicar:true'));
+
+  // ── 6. O MODO TESTE COBRE A REIMPRESSÃO (fase 3 da QUEM-FEZ-E-REVISAO) ────
+  require('./teste_route')({ get(){}, post(){}, locals:{} }, db);
+  ok('lote_reimpressao está em TABELAS: tem o gatilho do modo teste',
+     !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='trg_teste_lote_reimpressao'").get());
 
   console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'tudo certo') + ' — ' + casos + ' casos');
   process.exit(falhas ? 1 : 0);

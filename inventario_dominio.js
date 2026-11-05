@@ -156,13 +156,16 @@ function garantirRecusa(db){
     em           TEXT DEFAULT (datetime('now','localtime')),
     usuario_nome TEXT,
     lote_id      INTEGER,
-    teste        INTEGER DEFAULT 0
+    teste        INTEGER DEFAULT 0,
+    usuario_id   INTEGER
   );`);
+  /* Quem tentou imprimir, pelo id (QUEM-FEZ-E-REVISAO fase 3, 05/11/2026). */
+  try{ db.exec('ALTER TABLE recusa_estoque ADD COLUMN usuario_id INTEGER'); }catch(e){}
 }
-function registrarRecusa(db, { codigo, usuario_nome, lote_id }){
+function registrarRecusa(db, { codigo, usuario_id, usuario_nome, lote_id }){
   garantirRecusa(db);
-  db.prepare('INSERT INTO recusa_estoque (codigo,em,usuario_nome,lote_id) VALUES (?,?,?,?)')
-    .run(String(codigo || '').toUpperCase(), RELOGIO.agora(), usuario_nome || null, lote_id || null);
+  db.prepare('INSERT INTO recusa_estoque (codigo,em,usuario_id,usuario_nome,lote_id) VALUES (?,?,?,?,?)')
+    .run(String(codigo || '').toUpperCase(), RELOGIO.agora(), usuario_id != null ? usuario_id : null, usuario_nome || null, lote_id || null);
 }
 
 /* ─── config ─────────────────────────────────────────────────────────────── */

@@ -1,7 +1,14 @@
 const {VENCE_HOJE,ORDEM_URGENCIA}=require('./fila_dia');
 const {ehColeta,COLETA,AGENCIA}=require('./carga');
 const BAIXA=require('./baixa_dominio');
+const QUEM=require('./quem');
 module.exports=function(app,db){
+  /* QUEM FEZ (QUEM-FEZ-E-REVISAO fase 3, 05/11/2026): as colunas do id moram no
+     exp_route, o dono do `lote`; o ALTER guardado fica aqui tambem porque e
+     esta rota que grava nelas, e um banco que subiu sem o exp_route (um
+     teste, um script) estouraria na primeira impressao. */
+  try{ db.exec('ALTER TABLE lote ADD COLUMN impresso_por_id INTEGER'); }catch(e){}
+  try{ db.exec('ALTER TABLE lote_item ADD COLUMN conferido_por_id INTEGER'); }catch(e){}
   /* A coluna `baixado_em` (e a virada, uma vez so) e do baixa_dominio. O
      exp_route ja chama no boot; chamar aqui tambem e o modulo nao depender da
      ordem de `require` — carregado sozinho, num script ou num teste, a baixa
@@ -129,6 +136,7 @@ module.exports=function(app,db){
      imprimir" — esconder viraria adivinhacao, nao rigor. O que o sistema nao
      faz e dar a peca por conferida sem o bipe. */
   app.post('/api/lote/conferir',(req,res)=>{
+    const q=QUEM.exigir(req,res); if(!q) return;
     const b=req.body||{};
     const id=Number(b.id), sku=String(b.codigo||'').trim().toUpperCase();
     if(!id||!sku) return res.status(400).json({erro:'sem volume ou sem codigo'});
@@ -155,14 +163,13 @@ module.exports=function(app,db){
         ? 'Todas as peças desse SKU já foram conferidas nesta caixa.'
         : 'Esse SKU não é desta caixa.', faltam:restantes()});
     }
-    const quem=(req.usuario&&req.usuario.nome)||'';
     alvo.conferidos=(alvo.conferidos||0)+1;
     const fechou = alvo.conferidos >= (alvo.qtd||1);
     /* `conferido_em` marca quando a LINHA fechou — a ultima unidade. E o que a
        auditoria quer saber: quando aquela peca parou de faltar. */
-    db.prepare(`UPDATE lote_item SET conferidos=?, conferido_por=?,
+    db.prepare(`UPDATE lote_item SET conferidos=?, conferido_por=?, conferido_por_id=?,
         conferido_em=CASE WHEN ? THEN datetime('now','localtime') ELSE conferido_em END
-      WHERE id=?`).run(alvo.conferidos, quem, fechou?1:0, alvo.id);
+      WHERE id=?`).run(alvo.conferidos, q.usuario_nome, q.usuario_id, fechou?1:0, alvo.id);
     res.json({ok:true, codigo:alvo.codigo, qtd:alvo.qtd,
       /* `conferidos` e `qtd` juntos deixam a tela escrever "1 de 2" sem contar
          por fora — e `faltam` e a conta da CAIXA, em persianas. */
@@ -170,6 +177,10 @@ module.exports=function(app,db){
   });
 
   app.post('/api/embalar',(req,res)=>{
+    /* QUEM IMPRIMIU vem do `quem.js`, e sem login nada grava (QUEM-FEZ-E-
+       REVISAO fase 3). Ate 05/11/2026 a impressao sem login passava com o nome
+       vazio. O 401 vem antes de olhar a caixa. */
+    const q=QUEM.exigir(req,res); if(!q) return;
     const id=(req.body&&req.body.id);
     if(!id) return res.status(400).json({erro:'sem id'});
     const o=db.prepare('SELECT * FROM lote WHERE id=?').get(id);
@@ -246,7 +257,7 @@ module.exports=function(app,db){
            (degrau 1). Ate 04/11/2026 ela so respondia para a tela. Falhar em
            gravar nao muda a recusa: a bancada continua sabendo que faltou. */
         try{ require('./inventario_dominio').registrarRecusa(db, { codigo:c,
-          usuario_nome:(req.usuario&&req.usuario.nome)||null, lote_id:id }); }
+          usuario_id:q.usuario_id, usuario_nome:q.usuario_nome, lote_id:id }); }
         catch(e){ console.log('[etiqueta] recusa sem estoque nao gravada: '+e.message); }
         return res.json({erro: linhas.length>1
           ? ('Sem estoque livre de '+c+' (precisa de '+precisa[c]+', livre '+livre+
@@ -259,8 +270,8 @@ module.exports=function(app,db){
          CONFERENCIA). So aqui, na primeira impressao — o /api/reimprimir nao
          toca neste campo, porque papel repetido nao e outra contagem. Sem
          ninguem logado fica vazio: nome inventado mentiria no fechamento. */
-      db.prepare("UPDATE lote SET estagio='embalado', embalado_em=datetime('now','localtime'), impresso_por=? WHERE id=?")
-        .run((req.usuario&&req.usuario.nome)||null, id);
+      db.prepare("UPDATE lote SET estagio='embalado', embalado_em=datetime('now','localtime'), impresso_por=?, impresso_por_id=? WHERE id=?")
+        .run(q.usuario_nome, q.usuario_id, id);
       /* ⚠️ A IMPRESSAO NAO BAIXA MAIS (CONFERENCIA-E-BAIXA, fase 2-A,
          22/10/2026). Ate aqui saia daqui uma linha de livro `etiqueta` por SKU
          da caixa; hoje a caixa so RESERVA as pecas (`estagio='embalado'` sem

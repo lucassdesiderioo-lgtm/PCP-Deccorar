@@ -80,9 +80,17 @@ const app = { get:(p,...h)=>{ rotas['GET '+p]=h[h.length-1]; },
 require('./estoque_dominio').garantirSchema(db);
 require('./etq_route')(app, db);
 
-const chamar = (k, body, params) => new Promise(r => {
-  const res = { json:o=>r(o), status(){ return this; }, send:o=>r(o) };
-  rotas[k]({ body:body||{}, params:params||{}, query:{}, headers:{} }, res);
+/* QUEM-FEZ-E-REVISAO fase 3 (05/11/2026): sem login a Etiqueta de Venda nao
+   grava (401). O teste sempre chamou sem `usuario` porque nada dependia dele;
+   agora toda chamada vai com uma pessoa logada, e a secao do fim chama sem de
+   proposito. `ultimoStatus` guarda o codigo da ultima resposta. */
+const ETIQ = { id:5, nome:'Etiq' };
+let ultimoStatus = 200;
+const chamar = (k, body, params, usuario) => new Promise(r => {
+  ultimoStatus = 200;
+  const res = { json:o=>r(o), status(c){ ultimoStatus = c; return this; }, send:o=>r(o) };
+  rotas[k]({ body:body||{}, params:params||{}, query:{}, headers:{},
+             usuario: usuario === undefined ? ETIQ : usuario }, res);
 });
 const estoqueDe = c => db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(c).estoque;
 /* O LIVRE (CONFERENCIA-E-BAIXA, fase 2-A, 22/10/2026): desde que a baixa foi
@@ -437,6 +445,57 @@ const ok = (n, c, extra) => { casos++;
       ok('3 persianas: o número acompanha a caixa', /vão 3 persianas/.test(fita(3)), fita(3));
     }
     ok('a frase antiga do "saco maior" não sobrou na tela', !/Saco maior/i.test(html));
+  }
+
+  // ── QUEM FEZ (QUEM-FEZ-E-REVISAO fase 3, 05/11/2026) ─────────────────────
+  /* A regra-mae (spec §2.3): sem login nada grava, e quem fez vem do servidor
+     pelo `quem.js` — o id manda, o nome e o retrato. */
+  {
+    const IRIS = { id:9, nome:'Iris' };
+    db.prepare("INSERT INTO skus (codigo,estoque,modelo_id,largura_cm,altura_cm) VALUES ('BK090090BEGE',0,1,90,90)").run();
+    require('./estoque_dominio').movimentar(db, { codigo:'BK090090BEGE', delta:+5, tipo:'ajuste', referencia:'teste' });
+    const col = (t, c) => db.prepare(`SELECT name FROM pragma_table_info('${t}')`).all().some(x => x.name === c);
+    const v = db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data,despachar_em)
+      VALUES ('BK090090BEGE','Quem Fez','9101','9101','9101','pendente',?,?)`).run(hoje,hoje).lastInsertRowid;
+    const lv = () => db.prepare('SELECT * FROM lote WHERE id=?').get(v);
+    const livre0 = livreDe('BK090090BEGE');
+
+    let r = await chamar('POST /api/embalar', {id:v}, undefined, null);
+    ok('imprimir sem login leva 401', ultimoStatus === 401, String(ultimoStatus));
+    ok('e nada muda: a caixa continua pendente, sem quem imprimiu e sem reservar',
+       lv().estagio === 'pendente' && !lv().impresso_por && livreDe('BK090090BEGE') === livre0, JSON.stringify(lv()));
+    r = await chamar('POST /api/embalar', {id:v}, undefined, { nome:'Sem Id' });
+    ok('pessoa sem id tambem leva 401', ultimoStatus === 401, String(ultimoStatus));
+    r = await chamar('POST /api/embalar', {id:999999}, undefined, null);
+    ok('o 401 vem antes de olhar a caixa (venda que nao existe, sem login, e 401 e nao 404)', ultimoStatus === 401, String(ultimoStatus));
+
+    r = await chamar('POST /api/embalar', {id:v}, undefined, IRIS);
+    ok('logada, a Iris imprime', !!r.ok, JSON.stringify(r));
+    ok('o lote grava a coluna impresso_por_id', col('lote','impresso_por_id'));
+    ok('impresso_por_id e o id dela', lv().impresso_por_id === 9, JSON.stringify(lv().impresso_por_id));
+    ok('e o impresso_por continua sendo o nome (o carregamento compara por ele)', lv().impresso_por === 'Iris', lv().impresso_por);
+
+    /* A CAIXA DE VARIAS: o bipe de cada persiana grava o id de quem bipou. */
+    const p = db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data,despachar_em)
+      VALUES ('BK090090BEGE','Quem Fez Duas','9102','9102','9102','pendente',?,?)`).run(hoje,hoje).lastInsertRowid;
+    db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd) VALUES (?,'BK090090BEGE',2)").run(p);
+    const it = () => db.prepare('SELECT * FROM lote_item WHERE lote_id=?').get(p);
+    r = await chamar('POST /api/lote/conferir', {id:p, codigo:'BK090090BEGE'}, undefined, null);
+    ok('bipar a persiana sem login leva 401', ultimoStatus === 401, String(ultimoStatus));
+    ok('e o bipe nao conta', (it().conferidos||0) === 0, JSON.stringify(it()));
+    r = await chamar('POST /api/lote/conferir', {id:p, codigo:'BK090090BEGE'}, undefined, IRIS);
+    ok('logada, o bipe conta', r.ok && r.conferidos === 1, JSON.stringify(r));
+    ok('o lote_item grava a coluna conferido_por_id', col('lote_item','conferido_por_id'));
+    ok('com o id de quem bipou', it().conferido_por_id === 9, JSON.stringify(it()));
+    ok('e o nome ao lado, como sempre', it().conferido_por === 'Iris', it().conferido_por);
+
+    /* A RECUSA SEM ESTOQUE fica gravada com o id de quem tentou imprimir. */
+    const s = db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,estagio,data,despachar_em)
+      VALUES ('BK160160CINZA','Sem Peca','9103','9103','9103','pendente',?,?)`).run(hoje,hoje).lastInsertRowid;
+    r = await chamar('POST /api/embalar', {id:s}, undefined, IRIS);
+    const rec = db.prepare('SELECT * FROM recusa_estoque WHERE lote_id=? ORDER BY id DESC').get(s);
+    ok('sem estoque, recusa', !!r.erro, JSON.stringify(r));
+    ok('e a recusa grava o id de quem tentou', !!rec && rec.usuario_id === 9 && rec.usuario_nome === 'Iris', JSON.stringify(rec));
   }
 
   console.log('');

@@ -20,6 +20,9 @@ module.exports=function(app, db){
     // volume de teste e deixar os itens dele de pe criaria linha orfa, e o
     // proximo volume com o mesmo id herdaria pecas que nunca foram dele.
     {nome:'lote_item',    pk:'id',   rotulo:'pecas do volume'},
+    /* Cada reimpressao da etiqueta de venda, com quem (QUEM-FEZ-E-REVISAO fase
+       3, 05/11/2026). Sem ela, reimprimir em modo teste sujaria o registro real. */
+    {nome:'lote_reimpressao', pk:'id', rotulo:'reimpressoes da etiqueta'},
     {nome:'fila',         pk:'id',   rotulo:'fila'},
     {nome:'devolucao',    pk:'id',   rotulo:'devolucoes'},
     {nome:'rejeicao',     pk:'id',   rotulo:'problemas'},

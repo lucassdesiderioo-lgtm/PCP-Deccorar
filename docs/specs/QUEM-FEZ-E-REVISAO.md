@@ -1,6 +1,17 @@
-> **STATUS · 04/11/2026 — EM CONSTRUÇÃO · fase 1 no ar · fase 2 em código, falta subir**
+> **STATUS · 05/11/2026 — EM CONSTRUÇÃO · fases 1 e 2 no ar · fase 3 em código, falta subir**
 > - Desenhado no Projeto do Claude com o Lucas em 04/11/2026.
-> - **Fase 2 (Embalagem) em código em 04/11/2026**: o `POST /api/montagem` lê quem
+> - **Fase 3 (Etiqueta de Venda) em código em 05/11/2026**: imprimir, reimprimir e
+>   bipar a persiana da caixa de várias passam pelo `quem.js` e são 401 sem login
+>   (até ali a impressão passava com o nome vazio). Colunas novas, ao lado dos nomes:
+>   `lote.impresso_por_id`, `lote_item.conferido_por_id` e `recusa_estoque.usuario_id`.
+>   **Tabela nova `lote_reimpressao`** (quem e quando, uma linha por reimpressão), em
+>   `TABELAS` do modo teste; a spec dizia só "`lote`", mas uma coluna de "último que
+>   reimprimiu" apagaria quem reimprimiu antes. O `lote_item` ganhou o
+>   `conferidos_carga` no CREATE, para a ordem das colunas bater com a produção (§17).
+>   `teste_etiqueta.js` (84) e `teste_saida.js` (62). A R-SEG-01 (quem imprimiu não
+>   confere) continua pelo nome: passa ao id na fase 4.
+> - **Fase 2 (Embalagem) no ar desde 05/11/2026** (PR #287; o dono fez o deploy e o
+>   grep deu 1). Em código em 04/11/2026: o `POST /api/montagem` lê quem
 >   fez pelo `quem.js` e, sem login, responde 401 antes de olhar SKU e kit — nada
 >   grava, nem a embalagem nem o +1 do livro. A linha do `movimento_estoque` do +1
 >   grava o mesmo quem. As colunas já existiam (26/10/2026): não houve schema.
