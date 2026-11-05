@@ -1129,6 +1129,7 @@ module.exports = function(app, db){
        escolhe a saída; corrigir horário, a semana e a história ficam com
        `coleta.horario`, que é de Supervisor e Admin (AJUSTE de 05/11/2026). */
     if(M === 'GET' && eq('/api/saidas/dia')) return ['coleta.horario','pdf.subir'];
+    if(M === 'POST' && eq('/api/saidas/conferir')) return ['pdf.subir','coleta.horario'];   // o primeiro upload confere o dia (fase 3)
     if(pre('/api/saidas')) return 'coleta.horario';
     /* `pre` e nao `eq`: o conteudo da etiqueta (/api/config/kit/etiqueta, spec
        GERADOR-ETIQUETA-KIT) e a mesma pergunta do mesmo card — o que a

@@ -244,7 +244,11 @@ function estiloDasPermissoes(d){
    até o INÍCIO da janela (o caminhão pode chegar no começo, R-HCO-06): âmbar
    abaixo de 2 h, vermelho abaixo de 1 h e dentro da janela, a mesma régua do
    relógio da agência (§8). As caixas são as DESTA coleta; as que ninguém
-   marcou aparecem à parte. Não fecha, não bloqueia, e fica fora do bipe. */
+   marcou aparecem à parte. Não fecha, não bloqueia, e fica fora do bipe.
+   Fase 3 (§12 da spec): as TAREFAS dos horários (a semana a confirmar, o
+   "mudou" avisado, o dia sem lançar) aparecem em QUALQUER tela, numa tarja
+   própria que leva à 206 — só para quem corrige horário (o servidor manda
+   `tarefas` vazio para os outros). Âmbar quando atrasada. */
 (function(){
   if(location.pathname.indexOf('/login')===0) return;
   var EXP=['/embalagem','/carregamento','/admin/producao','/coleta-horarios'];
@@ -254,6 +258,7 @@ function estiloDasPermissoes(d){
   function plural(n,s,p){ return n+' '+(n===1?s:p); }
   function pinta(){
     fetch('/api/saidas/status',{credentials:'same-origin'}).then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+      tarefas(d && d.tarefas || []);
       var el=document.getElementById('colBar');
       if(!d || (!naExpedicao && !d.em_toda_tela)){ if(el) el.remove(); return; }
       if(!el){
@@ -264,7 +269,10 @@ function estiloDasPermissoes(d){
       var cor='#2a2f3a', txt='#e6edf3', t;
       var sm=d.sem_marca||{}, semMarca=(sm.por_imprimir||0)+(sm.por_conferir||0);
       var semTxt=semMarca?' · '+plural(semMarca,'caixa sem coleta marcada','caixas sem coleta marcada'):'';
-      if(d.sem_coleta) t='Hoje não tem coleta'+semTxt;
+      if(d.sem_coleta) t='Hoje não tem coleta'+(d.motivo_texto?' ('+(d.motivo==='feriado'?'Feriado: ':'')+d.motivo_texto+')':'')+semTxt;
+      /* quem corrige tem a tarefa do "mudou": a faixa não repete */
+      else if(d.mudou && !d.pode_editar){ t='⚠ Avisaram que o horário de hoje mudou no ML — aguardando a correção'+semTxt; cor='#c98a00'; txt='#1a1300'; }
+      else if(d.rascunho){ t='Horário de hoje copiado da semana passada — falta conferir (no primeiro PDF do dia)'+semTxt; cor='#3a3f4a'; txt='#c9d1d9'; }
       else if(!d.lancado){ t='Horário da coleta de hoje não lançado'+semTxt; cor='#3a3f4a'; txt='#c9d1d9'; }
       else if(!d.proxima) t='Coletas de hoje encerradas'+semTxt;
       else {
@@ -281,6 +289,25 @@ function estiloDasPermissoes(d){
       el.style.background=cor; el.style.color=txt; el.textContent=t;
     }).catch(function(){});
   }
+  function tarefas(lista){
+    var el=document.getElementById('colTarefas');
+    if(!lista.length){ if(el) el.remove(); return; }
+    if(!el){
+      el=document.createElement('div'); el.id='colTarefas';
+      el.style.cssText='position:relative;z-index:9998';
+      var bar=document.getElementById('colBar');
+      document.body.insertBefore(el, bar ? bar.nextSibling : document.body.firstChild);
+    }
+    el.innerHTML='';
+    lista.forEach(function(t){
+      var a=document.createElement('a'); a.href='/coleta-horarios';
+      a.style.cssText='display:block;text-align:center;font:700 14px system-ui;padding:8px 12px;text-decoration:none;'
+        +(t.atrasada?'background:#c98a00;color:#1a1300':'background:#1565c0;color:#fff');
+      a.textContent=(t.tipo==='semana'?'📋 ':'⚠ ')+t.texto+(t.atrasada&&t.tipo==='semana'?' (atrasada)':'')+'  →';
+      el.appendChild(a);
+    });
+  }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',pinta); else pinta();
   setInterval(pinta,60000);
+  try{ window.addEventListener('saidas-mudou',pinta); }catch(e){}   // o quadro do upload ou a 206 mudou o dia
 })();

@@ -21,6 +21,18 @@
  *     corte novo deixa o corte "a conferir" (R-HCO-07). Vazio de propósito apaga;
  *   - dia que já passou não se edita (R-HCO-08).
  *
+ * Fase 3 (§12 da spec, 05/11/2026):
+ *   - a semana nasce copiada da anterior como RASCUNHO, só nos dias vazios, no
+ *     primeiro pedido de segunda a sábado (`garantirSemana`, sem cron); o
+ *     "sem coleta" (o feriado) é da data e não se copia (R-HCO-12);
+ *   - o rascunho NÃO vale: a faixa, a agência e a saída do upload o ignoram
+ *     (R-HCO-13). Lançar o dia, conferir o dia ou confirmar a semana o tira;
+ *   - o primeiro upload do dia confere ("certo" ou "mudou", `conferir`); a
+ *     saída do upload só vale com o dia conferido (R-HCO-14). O "mudou" de
+ *     quem não corrige não trava nada: o PDF sobe sem saída, e quem corrige
+ *     recebe a tarefa até lançar o dia (R-HCO-15);
+ *   - "sem coleta" ganha motivo: feriado (com o nome) ou outro (R-HCO-16).
+ *
  * O relógio é o `relogio.js` (em produção, só o relógio do servidor).
  */
 const R = require('./relogio');
@@ -35,34 +47,57 @@ function garantirSchema(db){
       ordem INTEGER NOT NULL, inicio TEXT, fim TEXT NOT NULL, corte TEXT,
       corte_conferir INTEGER DEFAULT 0, removido_em TEXT, origem TEXT,
       usuario_id INTEGER, usuario_nome TEXT,
-      criado_em TEXT DEFAULT (datetime('now','localtime')), atualizado_em TEXT);
+      criado_em TEXT DEFAULT (datetime('now','localtime')), atualizado_em TEXT,
+      rascunho INTEGER DEFAULT 0);
     CREATE INDEX IF NOT EXISTS ix_saida_horario_data ON saida_horario(data);
     CREATE TABLE IF NOT EXISTS saida_dia (
       data TEXT PRIMARY KEY, sem_coleta INTEGER DEFAULT 0,
-      usuario_id INTEGER, usuario_nome TEXT, em TEXT);
+      usuario_id INTEGER, usuario_nome TEXT, em TEXT,
+      motivo TEXT, motivo_texto TEXT,
+      conferido_em TEXT, conferido_por_id INTEGER, conferido_por TEXT,
+      mudou_em TEXT, mudou_por_id INTEGER, mudou_por TEXT);
     CREATE TABLE IF NOT EXISTS saida_horario_evento (
       id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT NOT NULL, antes TEXT, depois TEXT,
       origem TEXT, usuario_id INTEGER, usuario_nome TEXT,
-      em TEXT DEFAULT (datetime('now','localtime')));`);
+      em TEXT DEFAULT (datetime('now','localtime')), acao TEXT);
+    CREATE TABLE IF NOT EXISTS saida_semana (
+      segunda TEXT PRIMARY KEY, copiada_em TEXT,
+      confirmada_em TEXT, confirmada_por_id INTEGER, confirmada_por TEXT);`);
+  /* o ALTER guardado do banco que já tinha as tabelas da fase 1 (§17) */
+  const cols = t => db.prepare(`SELECT name FROM pragma_table_info('${t}')`).all().map(c => c.name);
+  const add = (t, c, tipo) => { if(!cols(t).includes(c)) db.exec(`ALTER TABLE ${t} ADD COLUMN ${c} ${tipo}`); };
+  add('saida_horario', 'rascunho', 'INTEGER DEFAULT 0');
+  ['motivo TEXT', 'motivo_texto TEXT', 'conferido_em TEXT', 'conferido_por_id INTEGER', 'conferido_por TEXT',
+   'mudou_em TEXT', 'mudou_por_id INTEGER', 'mudou_por TEXT'].forEach(x => { const [c, t] = x.split(' '); add('saida_dia', c, t); });
+  add('saida_horario_evento', 'acao', 'TEXT');
 }
+const MOTIVOS = ['feriado', 'outro'];
 
 function erro(msg){ const e = new Error(msg); e.status = 400; return e; }
 const min = hm => { const [h, m] = String(hm).split(':').map(Number); return h * 60 + m; };
 
 /* O dia como a tela o lê. `lancado` diz se alguém lançou alguma coisa. */
 function dia(db, data){
-  const rows = db.prepare(`SELECT id,tipo,ordem,inicio,fim,corte,corte_conferir FROM saida_horario
+  const rows = db.prepare(`SELECT id,tipo,ordem,inicio,fim,corte,corte_conferir,rascunho FROM saida_horario
     WHERE data=? AND removido_em IS NULL ORDER BY tipo, ordem`).all(data);
-  const d = db.prepare('SELECT sem_coleta FROM saida_dia WHERE data=?').get(data);
+  rows.forEach(r => { r.rascunho = r.rascunho ? 1 : 0; });
+  const d = db.prepare('SELECT * FROM saida_dia WHERE data=?').get(data) || {};
   const coletas = rows.filter(r => r.tipo === 'coleta');
   const agencia = rows.find(r => r.tipo === 'agencia') || null;
-  const sem = !!(d && d.sem_coleta);
+  const sem = !!d.sem_coleta;
+  const lancado = coletas.length > 0 || sem || !!agencia;
+  const conferido = d.conferido_em ? { em:d.conferido_em, por_id:d.conferido_por_id, por:d.conferido_por } : null;
+  const mudou = d.mudou_em ? { em:d.mudou_em, por_id:d.mudou_por_id, por:d.mudou_por } : null;
   return { data, coletas, agencia, sem_coleta: sem,
-    lancado: coletas.length > 0 || sem || !!agencia, passado: data < R.hoje() };
+    motivo: sem ? (d.motivo || null) : null, motivo_texto: sem ? (d.motivo_texto || null) : null,
+    lancado, passado: data < R.hoje(),
+    rascunho: rows.some(r => r.rascunho === 1),
+    conferido, mudou,
+    precisa_conferir: lancado && !conferido && !mudou };
 }
 
 /* Para a história: só o que se lê, sem id interno de linha removida. */
-const retrato = x => ({ sem_coleta: x.sem_coleta,
+const retrato = x => ({ sem_coleta: x.sem_coleta, motivo: x.motivo || null, motivo_texto: x.motivo_texto || null,
   coletas: x.coletas.map(c => ({ ordem:c.ordem, inicio:c.inicio, fim:c.fim, corte:c.corte })),
   agencia: x.agencia ? { fim: x.agencia.fim } : null });
 
@@ -70,6 +105,9 @@ const retrato = x => ({ sem_coleta: x.sem_coleta,
      coletas    [{id?, inicio, fim, corte?}]  — ausente: as coletas não mudam
      agencia    {fim} | null                  — ausente: não muda; null tira
      sem_coleta true|false                    — ausente: não muda
+     motivo     'feriado'|'outro'|null e motivo_texto — só com "sem coleta" (R-HCO-16)
+   Lançar o dia tira o rascunho dele; lançar o dia de HOJE conta como a
+   conferência do dia e fecha o "mudou" (R-HCO-14, R-HCO-15).
    `pessoa` = {id, nome}; `origem` = 'tela' | 'upload'. */
 function lancar(db, data, corpo, pessoa, origem){
   corpo = corpo || {};
@@ -111,8 +149,20 @@ function lancar(db, data, corpo, pessoa, origem){
   let sem;
   if(tem('sem_coleta')) sem = !!corpo.sem_coleta;
   const coletasFinal = coletas || antes.coletas;
-  if((sem === undefined ? antes.sem_coleta : sem) && coletasFinal.length)
+  const semFinal = sem === undefined ? antes.sem_coleta : sem;
+  if(semFinal && coletasFinal.length)
     throw erro('"Hoje não tem coleta" junto com uma coleta lançada: escolha um dos dois.');
+  /* o motivo: ausente preserva; sem "sem coleta" ele não existe */
+  let motivo = antes.motivo, motivoTexto = antes.motivo_texto;
+  if(tem('motivo')){
+    motivo = corpo.motivo == null || corpo.motivo === '' ? null : String(corpo.motivo);
+    motivoTexto = String(corpo.motivo_texto == null ? '' : corpo.motivo_texto).trim().slice(0, 60) || null;
+    if(motivo != null && !MOTIVOS.includes(motivo)) throw erro('Motivo: escolha Feriado ou Outro.');
+    if(motivo != null && !semFinal) throw erro('O motivo é do dia sem coleta: marque "não tem coleta" junto.');
+    if(motivo != null && !motivoTexto) throw erro(motivo === 'feriado' ? 'Diga o nome do feriado.' : 'Diga o motivo de não ter coleta.');
+    if(motivo == null) motivoTexto = null;
+  }
+  if(!semFinal){ motivo = null; motivoTexto = null; }
 
   const pid = pessoa ? pessoa.id : null, pnome = pessoa ? pessoa.nome : null;
   db.transaction(() => {
@@ -151,10 +201,21 @@ function lancar(db, data, corpo, pessoa, origem){
           VALUES (?,'agencia',1,NULL,?,?,?,?,datetime('now','localtime'))`).run(data, agencia.fim, origem, pid, pnome);
       }
     }
-    if(sem !== undefined && sem !== antes.sem_coleta)
-      db.prepare(`INSERT INTO saida_dia (data,sem_coleta,usuario_id,usuario_nome,em) VALUES (?,?,?,?,datetime('now','localtime'))
-        ON CONFLICT(data) DO UPDATE SET sem_coleta=excluded.sem_coleta, usuario_id=excluded.usuario_id,
-          usuario_nome=excluded.usuario_nome, em=excluded.em`).run(data, sem ? 1 : 0, pid, pnome);
+    if((sem !== undefined && sem !== antes.sem_coleta) || motivo !== antes.motivo || motivoTexto !== antes.motivo_texto)
+      db.prepare(`INSERT INTO saida_dia (data,sem_coleta,motivo,motivo_texto,usuario_id,usuario_nome,em) VALUES (?,?,?,?,?,?,datetime('now','localtime'))
+        ON CONFLICT(data) DO UPDATE SET sem_coleta=excluded.sem_coleta, motivo=excluded.motivo, motivo_texto=excluded.motivo_texto,
+          usuario_id=excluded.usuario_id, usuario_nome=excluded.usuario_nome, em=excluded.em`)
+        .run(data, semFinal ? 1 : 0, motivo, motivoTexto, pid, pnome);
+    /* quem lança olhou: o rascunho do dia acaba (R-HCO-13) */
+    db.prepare('UPDATE saida_horario SET rascunho=0 WHERE data=? AND rascunho=1').run(data);
+    /* o dia de HOJE lançado conta como conferido, e fecha o "mudou" (R-HCO-14/15) */
+    if(data === R.hoje()){
+      db.prepare("INSERT INTO saida_dia (data) VALUES (?) ON CONFLICT(data) DO NOTHING").run(data);
+      db.prepare(`UPDATE saida_dia SET conferido_em=COALESCE(conferido_em, datetime('now','localtime')),
+          conferido_por_id=CASE WHEN conferido_em IS NULL THEN ? ELSE conferido_por_id END,
+          conferido_por=CASE WHEN conferido_em IS NULL THEN ? ELSE conferido_por END,
+          mudou_em=NULL, mudou_por_id=NULL, mudou_por=NULL WHERE data=?`).run(pid, pnome, data);
+    }
     const depois = dia(db, data);
     const a = JSON.stringify(retrato(antes)), b = JSON.stringify(retrato(depois));
     const marcas = x => JSON.stringify(x.coletas.map(c => c.corte_conferir));
@@ -165,16 +226,118 @@ function lancar(db, data, corpo, pessoa, origem){
   return dia(db, data);
 }
 
-/* A semana de segunda a sábado que contém `data`. */
+/* A segunda da semana (de segunda a sábado) que contém `data`; o domingo é da
+   semana que começa no dia seguinte. */
+function segundaDe(data){
+  const ds = R.diaSemana(data);
+  return R.somarDias(data, ds === 0 ? 1 : 1 - ds);
+}
 function semana(db, data){
   if(!DATA.test(String(data || ''))) data = R.hoje();
-  const ds = R.diaSemana(data);
-  const seg = R.somarDias(data, ds === 0 ? 1 : 1 - ds);
+  const seg = segundaDe(data);
   return [0, 1, 2, 3, 4, 5].map(i => dia(db, R.somarDias(seg, i)));
+}
+function infoSemana(db, data){
+  const seg = segundaDe(DATA.test(String(data || '')) ? data : R.hoje());
+  const s = db.prepare('SELECT * FROM saida_semana WHERE segunda=?').get(seg) || {};
+  return { segunda:seg, copiada_em:s.copiada_em || null, confirmada_em:s.confirmada_em || null,
+    confirmada_por_id:s.confirmada_por_id || null, confirmada_por:s.confirmada_por || null };
+}
+
+/* ── A SEMANA COMO TAREFA (fase 3) ─────────────────────────────────────
+   No primeiro pedido de segunda a sábado, cada dia de hoje em diante SEM
+   NADA LANÇADO recebe, como rascunho, as coletas e a agência do mesmo dia da
+   semana anterior. O "sem coleta" (o feriado) não se copia: o dia nasce
+   vazio. Roda uma vez por semana (`saida_semana.copiada_em`). */
+function garantirSemana(db){
+  const hoje = R.hoje();
+  if(R.diaSemana(hoje) === 0) return;
+  const seg = segundaDe(hoje);
+  const ja = db.prepare('SELECT copiada_em FROM saida_semana WHERE segunda=?').get(seg);
+  if(ja && ja.copiada_em) return;
+  db.transaction(() => {
+    db.prepare("INSERT INTO saida_semana (segunda) VALUES (?) ON CONFLICT(segunda) DO NOTHING").run(seg);
+    const marcou = db.prepare("UPDATE saida_semana SET copiada_em=datetime('now','localtime') WHERE segunda=? AND copiada_em IS NULL").run(seg);
+    if(!marcou.changes) return;                       // outro pedido copiou junto
+    for(let i = 0; i < 6; i++){
+      const data = R.somarDias(seg, i);
+      if(data < hoje) continue;
+      const alvo = dia(db, data);
+      if(alvo.lancado) continue;
+      const fonte = dia(db, R.somarDias(data, -7));
+      if(fonte.sem_coleta || (!fonte.coletas.length && !fonte.agencia)) continue;
+      const ins = db.prepare(`INSERT INTO saida_horario (data,tipo,ordem,inicio,fim,corte,corte_conferir,origem,rascunho,atualizado_em)
+        VALUES (?,?,?,?,?,?,?,'copia',1,datetime('now','localtime'))`);
+      fonte.coletas.forEach(c => ins.run(data, 'coleta', c.ordem, c.inicio, c.fim, c.corte, c.corte_conferir));
+      if(fonte.agencia) ins.run(data, 'agencia', 1, null, fonte.agencia.fim, null, 0);
+      db.prepare("INSERT INTO saida_horario_evento (data,antes,depois,origem,acao) VALUES (?,?,?,'copia','copia')")
+        .run(data, JSON.stringify(retrato(alvo)), JSON.stringify(retrato(dia(db, data))));
+    }
+  })();
+}
+
+/* "Confirmar semana" (`coleta.horario`): tira o rascunho da semana inteira. */
+function confirmarSemana(db, data, pessoa){
+  const seg = segundaDe(DATA.test(String(data || '')) ? data : R.hoje());
+  if(R.somarDias(seg, 5) < R.hoje()) throw erro('Essa semana já passou.');
+  const pid = pessoa ? pessoa.id : null, pnome = pessoa ? pessoa.nome : null;
+  db.transaction(() => {
+    const fim = R.somarDias(seg, 5);
+    const dias = db.prepare('SELECT DISTINCT data FROM saida_horario WHERE data BETWEEN ? AND ? AND rascunho=1 AND removido_em IS NULL').all(seg, fim).map(r => r.data);
+    db.prepare('UPDATE saida_horario SET rascunho=0 WHERE data BETWEEN ? AND ? AND rascunho=1').run(seg, fim);
+    db.prepare("INSERT INTO saida_semana (segunda) VALUES (?) ON CONFLICT(segunda) DO NOTHING").run(seg);
+    db.prepare("UPDATE saida_semana SET confirmada_em=datetime('now','localtime'), confirmada_por_id=?, confirmada_por=? WHERE segunda=?").run(pid, pnome, seg);
+    const ev = db.prepare("INSERT INTO saida_horario_evento (data,antes,depois,origem,usuario_id,usuario_nome,acao) VALUES (?,NULL,NULL,'tela',?,?,'confirmou_semana')");
+    dias.forEach(d => ev.run(d, pid, pnome));
+  })();
+  return infoSemana(db, seg);
+}
+
+/* A conferência do primeiro upload do dia (R-HCO-14/15). `resposta`:
+   'certo' — o horário de hoje bate com o ML: confere o dia e tira o rascunho;
+   'mudou' — quem não corrige avisa: nada trava, e quem corrige recebe a tarefa.
+   O dia já conferido (ou avisado) não muda: vale a primeira resposta. */
+function conferir(db, resposta, pessoa){
+  if(resposta !== 'certo' && resposta !== 'mudou') throw erro('Responda "Está certo" ou "Mudou".');
+  const hoje = R.hoje();
+  const d = dia(db, hoje);
+  if(!d.lancado) throw erro('O horário de hoje ainda não foi lançado: não há o que conferir. O PDF sobe sem saída.');
+  if(!d.precisa_conferir) return d;
+  const pid = pessoa ? pessoa.id : null, pnome = pessoa ? pessoa.nome : null;
+  db.transaction(() => {
+    db.prepare("INSERT INTO saida_dia (data) VALUES (?) ON CONFLICT(data) DO NOTHING").run(hoje);
+    if(resposta === 'certo'){
+      db.prepare("UPDATE saida_dia SET conferido_em=datetime('now','localtime'), conferido_por_id=?, conferido_por=? WHERE data=?").run(pid, pnome, hoje);
+      db.prepare('UPDATE saida_horario SET rascunho=0 WHERE data=? AND rascunho=1').run(hoje);
+    } else {
+      db.prepare("UPDATE saida_dia SET mudou_em=datetime('now','localtime'), mudou_por_id=?, mudou_por=? WHERE data=?").run(pid, pnome, hoje);
+    }
+    db.prepare("INSERT INTO saida_horario_evento (data,antes,depois,origem,usuario_id,usuario_nome,acao) VALUES (?,NULL,NULL,'upload',?,?,?)")
+      .run(hoje, pid, pnome, resposta === 'certo' ? 'conferiu' : 'mudou');
+  })();
+  return dia(db, hoje);
+}
+
+/* As tarefas dos horários, para quem CORRIGE horário (a rota filtra):
+   'semana' — a semana de hoje não foi confirmada (atrasada depois das 12:00
+              de segunda); 'mudou' — alguém avisou que o de hoje mudou;
+   'hoje'   — nada lançado para hoje (nem "sem coleta"). */
+function tarefas(db){
+  const hoje = R.hoje(), ds = R.diaSemana(hoje);
+  if(ds === 0) return [];
+  const out = [];
+  const d = dia(db, hoje);
+  if(d.mudou) out.push({ tipo:'mudou', atrasada:true,
+    texto:'Horário de hoje mudou no ML — avisado por ' + (d.mudou.por || '?') + ' às ' + String(d.mudou.em).slice(11, 16) + ': corrija' });
+  else if(!d.lancado) out.push({ tipo:'hoje', atrasada:true, texto:'Horário da coleta de hoje não lançado: lance' });
+  const s = infoSemana(db, hoje);
+  if(!s.confirmada_em) out.push({ tipo:'semana', atrasada: ds > 1 || min(R.hora()) >= 12 * 60,
+    texto:'Tarefa semanal: confira e confirme os horários de coleta desta semana' });
+  return out;
 }
 
 function historia(db, data){
-  return db.prepare('SELECT id,data,antes,depois,origem,usuario_id,usuario_nome,em FROM saida_horario_evento WHERE data=? ORDER BY id')
+  return db.prepare('SELECT id,data,antes,depois,origem,usuario_id,usuario_nome,em,acao FROM saida_horario_evento WHERE data=? ORDER BY id')
     .all(data).map(e => Object.assign(e, { antes: JSON.parse(e.antes || 'null'), depois: JSON.parse(e.depois || 'null') }));
 }
 
@@ -184,6 +347,10 @@ function saidaDeHoje(db, id){
   const s = db.prepare('SELECT * FROM saida_horario WHERE id=?').get(+id);
   if(!s || s.removido_em) throw erro('Essa saída não está lançada. Confira os horários de hoje e escolha de novo.');
   if(s.data !== R.hoje()) throw erro('Essa saída não é de hoje. Escolha uma das saídas de hoje.');
+  if(s.rascunho) throw erro('O horário de hoje veio copiado da semana passada e ninguém conferiu: responda "Está certo" antes.');
+  const d = dia(db, s.data);
+  if(d.mudou) throw erro('Avisaram que o horário de hoje mudou no ML: até alguém corrigir, o PDF sobe sem saída.');
+  if(!d.conferido) throw erro('Confira o horário de hoje antes ("Está certo" ou "Mudou").');
   return s;
 }
 /* Por que a venda NÃO ganha a marca: 'outro_dia' (a etiqueta é de outro dia,
@@ -208,9 +375,12 @@ function contar(db, onde, ...p){
            por_conferir: q("estagio='embalado' AND conferido_em IS NULL") };
 }
 function status(db){
+  garantirSemana(db);
   const hoje = R.hoje(), agora = min(R.hora());
   const d = dia(db, hoje);
-  const coletas = d.coletas.map(c => {
+  /* o rascunho não vale (R-HCO-13): para o relógio, o dia é "não lançado" */
+  const valeColetas = d.rascunho ? [] : d.coletas;
+  const coletas = valeColetas.map(c => {
     const ini = min(c.inicio), fim = min(c.fim);
     const estado = agora < ini ? 'antes' : agora < fim ? 'janela' : 'passou';
     return Object.assign({ id:c.id, ordem:c.ordem, inicio:c.inicio, fim:c.fim, corte:c.corte,
@@ -219,15 +389,16 @@ function status(db){
   const proxima = coletas.find(c => c.estado !== 'passou') || null;
   const sem_marca = contar(db, `COALESCE(modalidade,'agencia')='coleta'
       AND (despachar_em IS NULL OR despachar_em<=?) AND (horario_id IS NULL OR horario_id NOT IN (${ATIVA}))`, hoje);
-  return { data:hoje, agora:R.hora(), lancado:d.lancado, sem_coleta:d.sem_coleta, coletas, proxima,
+  return { data:hoje, agora:R.hora(), lancado:d.lancado && !d.rascunho, rascunho:d.rascunho,
+    mudou:d.mudou, motivo:d.motivo, motivo_texto:d.motivo_texto, sem_coleta:d.sem_coleta, coletas, proxima,
     encerradas: coletas.length > 0 && !proxima, sem_marca,
-    agencia: d.agencia ? { id:d.agencia.id, fim:d.agencia.fim, minutos: min(d.agencia.fim) - agora } : null };
+    agencia: d.agencia && !d.rascunho ? { id:d.agencia.id, fim:d.agencia.fim, minutos: min(d.agencia.fim) - agora } : null };
 }
 
 /* O horário da agência lançado para hoje, ou null (aí vale o config). */
 function agenciaDeHoje(db){
-  try{ const a = dia(db, R.hoje()).agencia; return a ? a.fim : null; }catch(e){ return null; }
+  try{ const d = dia(db, R.hoje()); return d.agencia && !d.rascunho ? d.agencia.fim : null; }catch(e){ return null; }
 }
 
-module.exports = { garantirSchema, dia, lancar, semana, historia, saidaDeHoje, motivoSemMarca, rotulo,
-  status, agenciaDeHoje, MAX_COLETAS };
+module.exports = { garantirSchema, dia, lancar, semana, infoSemana, historia, saidaDeHoje, motivoSemMarca, rotulo,
+  status, agenciaDeHoje, garantirSemana, confirmarSemana, conferir, tarefas, MAX_COLETAS };

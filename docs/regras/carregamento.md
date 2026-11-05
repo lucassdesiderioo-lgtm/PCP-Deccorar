@@ -130,6 +130,31 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 - **Por quê:** a etiqueta de outro dia vai em outro caminhão; reescrever a modalidade pelo que a pessoa disse apagaria o que o documento diz.
 - **Status:** em código em 05/11/2026, falta subir.
 
+### R-HCO-12 · A semana nasce copiada da anterior, como rascunho (05/11/2026)
+- **Regra:** no primeiro pedido de segunda a sábado (`garantirSemana`, sem cron), cada dia de hoje em diante **sem nada lançado** recebe, marcadas `rascunho`, as coletas e a agência do mesmo dia da semana anterior. O dia que já tem lançamento não é tocado. O "sem coleta" (o feriado) é da data e **não se copia**: o dia nasce vazio. Roda uma vez por semana (`saida_semana.copiada_em`). Quem tem `coleta.horario` vê a tarefa da semana em qualquer tela até clicar **"Confirmar semana"** na 206 (âmbar depois das 12:00 de segunda).
+- **Por quê:** o dono — *"na segunda a gente monta a lista da semana"*; a cópia adianta a digitação, e o horário continua gravado na data.
+- **Teste que trava:** `teste_horario_coleta.js` (seção 9).
+- **Status:** em código em 05/11/2026, falta subir.
+
+### R-HCO-13 · O rascunho não vale
+- **Regra:** a faixa, a agência e a saída do upload ignoram o dia de rascunho: para eles ele é "não lançado". Salvar o dia, o "Está certo" do upload ou o "Confirmar semana" tiram o rascunho.
+- **Por quê:** horário copiado e errado contando tempo para a bancada é pior que nenhum.
+- **Teste que trava:** `teste_horario_coleta.js` (seção 9).
+
+### R-HCO-14 · O primeiro upload do dia confere o horário
+- **Regra:** no primeiro upload do dia com horário lançado, o quadro da 103 mostra as saídas de hoje e só deixa subir depois de **"✓ Está certo"** ou **"✗ Mudou"** (`POST /api/saidas/conferir`, `pdf.subir` ou `coleta.horario`). O "Está certo" grava quem e quando e tira o rascunho do dia; os outros uploads do dia não perguntam (D2). Lançar o dia de hoje (206 ou quadro) também conta como a conferência. A saída do upload só vale com o dia conferido.
+- **Por quê:** o ML muda o horário no meio da semana; quem sobe o PDF está com a tela do ML aberta.
+- **Teste que trava:** `teste_horario_coleta.js` (seção 9).
+
+### R-HCO-15 · O "Mudou" de quem não corrige nunca trava o upload
+- **Regra:** quem tem `coleta.horario` que clica "Mudou" corrige ali. Quem é Operação avisa: o dia fica com `mudou_*` (quem e quando), o PDF **sobe sem saída** (D1) — as vendas ficam "sem coleta marcada" —, e quem corrige vê a tarefa *"Horário de hoje mudou no ML — avisado por …"* até lançar o dia.
+- **Por quê:** decisão do dono (D1 "sobe e avisa"): travar faria a expedição parar esperando o Supervisor (#6).
+- **Teste que trava:** `teste_horario_coleta.js` (seção 9).
+
+### R-HCO-16 · "Sem coleta" tem motivo
+- **Regra:** o "não tem coleta" do dia leva o motivo **Feriado** (com o nome) ou **Outro** (com o texto); o motivo sem o "sem coleta", o motivo desconhecido e o feriado sem nome são recusados (400). Sem calendário anual (D3).
+- **Teste que trava:** `teste_horario_coleta.js` (seção 9).
+
 ### R-HCO-11 · Operação vê e escolhe; Supervisor e Admin corrigem (05/11/2026)
 - **Regra:** ver os horários do dia e escolher a saída no upload são de quem sobe o PDF (`pdf.subir`, nível Operação), com os horários travados no quadro. Lançar ou corrigir horário, a tela 206, a semana e a história são de `coleta.horario`, de nível Supervisor.
 - **Por quê:** decisão do dono — quem sobe o PDF confere, mas quem responde pelo horário é Supervisor ou Admin.

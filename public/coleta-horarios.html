@@ -35,17 +35,26 @@
   .hist{margin-top:8px;font-size:12px;color:var(--sub)}
   .hist div{padding:3px 0;border-top:1px solid var(--borda)}
   .ajuda{color:var(--sub);font-size:13px;margin:0 0 14px;line-height:1.45}
+  .dia.rasc{border-color:var(--amb);border-style:dashed}
+  .rascTxt{color:var(--amb);font-size:12px;font-weight:700;margin:-4px 0 6px}
+  .feriado{color:var(--txt);font-size:13px;padding:6px 0;font-weight:600}
+  .semBar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 14px;padding:10px 12px;border:1px solid var(--borda);border-radius:10px;background:var(--card);font-size:13px}
+  .semBar.pend{border-color:var(--amb)}
+  select,input.mt{font:inherit;font-size:13px;padding:3px 6px;border-radius:6px;border:1px solid var(--borda);background:#0b0f14;color:var(--txt)}
+  input.mt{width:12em}
+  .conf2{color:var(--sub);font-size:12px;margin-top:4px}
 </style></head><body>
 <header><div class="mark">⏱</div><div><b>Horários de coleta</b><div style="font-size:12px;color:var(--sub)">Copie de Mercado Livre → Preferências de venda → Horários de envio</div></div></header>
 <div class="wrap">
   <p class="ajuda">Na segunda, lance a semana: a janela de cada coleta (o caminhão do ML) e o corte (“envie o que tiver vendido até”). O horário muda durante a semana: quem sobe o PDF confere e corrige o do dia. Dia que já passou fica só como registro.</p>
   <div class="abas"><button id="abaA" class="on" type="button">Semana atual</button><button id="abaP" type="button">Próxima semana</button></div>
+  <div class="semBar" id="semBar" style="display:none"></div>
   <div class="grade" id="grade"><div class="vazio">carregando…</div></div>
 </div>
 <script>
 var NOMES=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
 var esc=function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
-var estado={ de:null, hoje:null, dias:[], edit:{}, msg:{}, hist:{} };
+var estado={ de:null, hoje:null, dias:[], edit:{}, msg:{}, hist:{}, semana:null, ver:null };
 function somar(data,n){ var p=data.split('-').map(Number); var d=new Date(Date.UTC(p[0],p[1]-1,p[2]+n)); return d.toISOString().slice(0,10); }
 function dow(data){ var p=data.split('-').map(Number); return new Date(Date.UTC(p[0],p[1]-1,p[2])).getUTCDay(); }
 function br(data){ return data.slice(8,10)+'/'+data.slice(5,7); }
@@ -55,15 +64,18 @@ function br(data){ return data.slice(8,10)+'/'+data.slice(5,7); }
 function rascunho(d){
   if(!estado.edit[d.data]) estado.edit[d.data]={
     coletas:(d.coletas||[]).map(function(c){ return { id:c.id, inicio:c.inicio, fim:c.fim, corte:c.corte||'', conferir:!!c.corte_conferir }; }),
-    agencia:d.agencia?d.agencia.fim:'', sem:!!d.sem_coleta };
+    agencia:d.agencia?d.agencia.fim:'', sem:!!d.sem_coleta, motivo:d.motivo||'feriado', motivo_texto:d.motivo_texto||'' };
   return estado.edit[d.data];
 }
 function desenhar(){
   var h='';
   estado.dias.forEach(function(d){
     var r=rascunho(d), pas=d.passado, dis=pas?' disabled':'';
-    h+='<div class="dia'+(d.data===estado.hoje?' hoje':'')+'" data-dia="'+d.data+'"><h3>'+NOMES[dow(d.data)]+' <small>'+br(d.data)+(d.data===estado.hoje?' · hoje':'')+'</small></h3>';
-    if(r.sem) h+='<div class="vazio">Sem coleta neste dia.</div>';
+    h+='<div class="dia'+(d.data===estado.hoje?' hoje':'')+(d.rascunho?' rasc':'')+'" data-dia="'+d.data+'"><h3>'+NOMES[dow(d.data)]+' <small>'+br(d.data)+(d.data===estado.hoje?' · hoje':'')+'</small></h3>';
+    if(d.rascunho) h+='<div class="rascTxt">Copiado da semana passada — confira e salve, ou confirme a semana</div>';
+    if(r.sem) h+=(d.sem_coleta&&d.motivo_texto&&pas?'<div class="feriado">'+(d.motivo==='feriado'?'🎌 ':'')+esc(d.motivo_texto)+' — sem coleta</div>':'<div class="vazio">Sem coleta neste dia.</div>');
+    if(r.sem&&!pas) h+='<div class="col"><span class="rot">motivo</span><select data-k="motivo"><option value="feriado"'+(r.motivo==='feriado'?' selected':'')+'>Feriado</option><option value="outro"'+(r.motivo==='outro'?' selected':'')+'>Outro</option></select>'
+      +'<input class="mt" data-k="motivo_texto" placeholder="'+(r.motivo==='feriado'?'nome do feriado':'por quê')+'" value="'+esc(r.motivo_texto)+'"></div>';
     else if(!r.coletas.length) h+='<div class="vazio">'+(d.lancado?'Nenhuma coleta.':'Não lançado.')+'</div>';
     r.coletas.forEach(function(c,i){
       h+='<div class="col c1"><b>Coleta '+(i+1)+'</b><input type="time" data-k="inicio" data-i="'+i+'" value="'+esc(c.inicio)+'"'+dis+'> às '
@@ -79,21 +91,49 @@ function desenhar(){
         +'<label class="rot"><input type="checkbox" data-sem="1"'+(r.sem?' checked':'')+'> não tem coleta</label>'
         +'<button class="p" type="button" data-salva="1">Salvar</button></div>';
     }
+    if(d.conferido) h+='<div class="conf2">Conferido por '+esc(d.conferido.por||'?')+' às '+esc(String(d.conferido.em).slice(11,16))+'</div>';
+    if(d.mudou) h+='<div class="conf2" style="color:var(--amb);font-weight:700">'+esc(d.mudou.por||'?')+' avisou às '+esc(String(d.mudou.em).slice(11,16))+' que mudou no ML: corrija e salve</div>';
     var m=estado.msg[d.data];
     h+='<div class="msg '+(m&&m.err?'err':'ok')+'">'+(m?esc(m.t):'')+'</div>';
     h+='<button class="g" type="button" style="margin-top:6px" data-hist="1">'+(estado.hist[d.data]?'esconder a história':'quem mudou')+'</button>';
     if(estado.hist[d.data]) h+='<div class="hist">'+(estado.hist[d.data].length?estado.hist[d.data].map(function(e){
-      var t=function(x){ if(!x) return '—'; if(x.sem_coleta) return 'sem coleta'; var s=(x.coletas||[]).map(function(c){ return c.inicio+'–'+c.fim+(c.corte?' (corte '+c.corte+')':''); }).join(' · ')||'nenhuma'; return s+(x.agencia?' · agência até '+x.agencia.fim:''); };
-      return '<div>'+esc(e.em.slice(8,10)+'/'+e.em.slice(5,7)+' '+e.em.slice(11,16))+' · <b>'+esc(e.usuario_nome||'?')+'</b> ('+(e.origem==='upload'?'no upload do PDF':'nesta tela')+'): '+esc(t(e.antes))+' → '+esc(t(e.depois))+'</div>';
+      var t=function(x){ if(!x) return '—'; if(x.sem_coleta) return 'sem coleta'+(x.motivo_texto?' ('+x.motivo_texto+')':''); var s=(x.coletas||[]).map(function(c){ return c.inicio+'–'+c.fim+(c.corte?' (corte '+c.corte+')':''); }).join(' · ')||'nenhuma'; return s+(x.agencia?' · agência até '+x.agencia.fim:''); };
+      var quando=esc(e.em.slice(8,10)+'/'+e.em.slice(5,7)+' '+e.em.slice(11,16));
+      if(e.acao==='copia') return '<div>'+quando+' · copiado da semana passada: '+esc(t(e.depois))+'</div>';
+      if(e.acao==='confirmou_semana') return '<div>'+quando+' · <b>'+esc(e.usuario_nome||'?')+'</b> confirmou a semana</div>';
+      if(e.acao==='conferiu') return '<div>'+quando+' · <b>'+esc(e.usuario_nome||'?')+'</b> conferiu no upload do PDF: está certo</div>';
+      if(e.acao==='mudou') return '<div>'+quando+' · <b>'+esc(e.usuario_nome||'?')+'</b> avisou no upload do PDF: mudou no ML</div>';
+      return '<div>'+quando+' · <b>'+esc(e.usuario_nome||'?')+'</b> ('+(e.origem==='upload'?'no upload do PDF':'nesta tela')+'): '+esc(t(e.antes))+' → '+esc(t(e.depois))+'</div>';
     }).join(''):'<div>Nenhuma mudança.</div>')+'</div>';
     h+='</div>';
   });
   document.getElementById('grade').innerHTML=h||'<div class="vazio">nada</div>';
+  barraSemana();
+}
+/* A tarefa da semana: "Confirmar semana" tira o rascunho de todos os dias. */
+function barraSemana(){
+  var b=document.getElementById('semBar'), s=estado.semana;
+  if(!s||!estado.dias.length||estado.dias[estado.dias.length-1].data<estado.hoje){ b.style.display='none'; return; }
+  var rasc=estado.dias.filter(function(d){ return d.rascunho; }).length;
+  var ok=!!s.confirmada_em;
+  b.className='semBar'+(ok?'':' pend'); b.style.display='flex';
+  b.innerHTML=ok
+    ?'<span>✓ Semana confirmada por <b>'+esc(s.confirmada_por||'?')+'</b> em '+esc(String(s.confirmada_em).slice(8,10)+'/'+String(s.confirmada_em).slice(5,7)+' às '+String(s.confirmada_em).slice(11,16))+'.</span>'
+      +(rasc?'<button class="p" type="button" id="btConfSem">Confirmar semana de novo</button>':'')
+    :'<span>📋 <b>Tarefa da semana:</b> confira cada dia com o Mercado Livre'+(rasc?' ('+rasc+' dia'+(rasc>1?'s':'')+' copiado'+(rasc>1?'s':'')+' da semana passada)':'')+' e confirme.</span><button class="p" type="button" id="btConfSem">Confirmar semana</button>';
+  var bt=document.getElementById('btConfSem');
+  if(bt) bt.onclick=async function(){
+    var res=await fetch('/api/saidas/semana/confirmar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({de:estado.ver||estado.hoje})});
+    var j={}; try{ j=await res.json(); }catch(e){}
+    if(!res.ok){ alert(j.erro||'Não deu para confirmar.'); return; }
+    carregar(estado.ver);
+    try{ window.dispatchEvent(new Event('saidas-mudou')); }catch(e){}   // a tarja some na hora
+  };
 }
 document.getElementById('grade').addEventListener('input',function(ev){
   var t=ev.target, card=t.closest('[data-dia]'); if(!card) return;
   var r=estado.edit[card.getAttribute('data-dia')], k=t.getAttribute('data-k');
-  if(k==='agencia') r.agencia=t.value; else if(k){ r.coletas[+t.getAttribute('data-i')][k]=t.value; }
+  if(k==='agencia') r.agencia=t.value; else if(k==='motivo'){ r.motivo=t.value; desenhar(); return; } else if(k==='motivo_texto') r.motivo_texto=t.value; else if(k){ r.coletas[+t.getAttribute('data-i')][k]=t.value; }
   if(t.hasAttribute('data-sem')){ r.sem=t.checked; desenhar(); }
 });
 document.getElementById('grade').addEventListener('click',async function(ev){
@@ -109,17 +149,19 @@ document.getElementById('grade').addEventListener('click',async function(ev){
   }
   else if(t.hasAttribute('data-salva')){
     var corpo={ data:data, origem:'tela', sem_coleta:r.sem, agencia:r.agencia?{fim:r.agencia}:null,
+      motivo:r.sem?r.motivo:null, motivo_texto:r.sem?r.motivo_texto:'',
       coletas:r.sem?[]:r.coletas.map(function(c){ var o={inicio:c.inicio,fim:c.fim,corte:c.corte||null}; if(c.id) o.id=c.id; return o; }) };
     var res=await fetch('/api/saidas/dia',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)});
     var j={}; try{ j=await res.json(); }catch(e){}
     if(!res.ok){ estado.msg[data]={err:true,t:j.erro||'Não deu para salvar.'}; desenhar(); return; }
     estado.msg[data]={t:'Salvo.'}; delete estado.edit[data]; delete estado.hist[data];
     estado.dias=estado.dias.map(function(d){ return d.data===data?j:d; }); desenhar();
+    try{ window.dispatchEvent(new Event('saidas-mudou')); }catch(e){}
   }
 });
 async function carregar(de){
   var j=await (await fetch('/api/saidas/semana'+(de?'?de='+de:''))).json();
-  estado.hoje=j.hoje; estado.dias=j.dias||[]; estado.edit={}; estado.msg={}; estado.hist={};
+  estado.hoje=j.hoje; estado.dias=j.dias||[]; estado.edit={}; estado.msg={}; estado.hist={}; estado.semana=j.semana||null; estado.ver=de||null;
   if(!estado.de) estado.de=estado.dias.length?estado.dias[0].data:null;
   desenhar();
 }
