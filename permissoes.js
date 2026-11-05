@@ -294,7 +294,10 @@ module.exports = [
      PDF diz ser a das vendas. Nasce só para o Admin Geral (R-ALC-06): quem
      recebe é decisão do dono, na tela de Acessos. Não é sensível — não mexe
      em estoque, dinheiro, acesso nem dado de pessoa. */
-  { chave:'coleta.horario',       grupo:'Expedição',    tela:206, nivel:'operacao',
+  /* Desde o AJUSTE de 05/11/2026 (decisão do dono): quem é Operação VÊ os
+     horários e escolhe a saída do PDF (pela permissão de subir o PDF), mas
+     não corrige horário — esta chave é de Supervisor e Admin. */
+  { chave:'coleta.horario',       grupo:'Expedição',    tela:206, nivel:'supervisor',
     rotulo:'Lançar horários de coleta', desc:'As coletas e a agência do dia, e a saída do PDF' },
   { chave:'horarios.editar',      grupo:'Configuração', tela:902, nivel:'admin',
     rotulo:'Editar horários',     desc:'Corte e despacho por dia',

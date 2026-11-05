@@ -1125,6 +1125,10 @@ module.exports = function(app, db){
        de quem trabalha na Expedicao — e de todo nivel Supervisor ou acima,
        que ve a faixa em qualquer tela (D5). So horas e numeros de caixa. */
     if(eq('/api/saidas/status')) return ['coleta.horario','etiqueta.emitir','carregamento.executar','pdf.subir','@supervisor'];
+    /* Ver os horários do dia é também de quem sobe o PDF — é no upload que ele
+       escolhe a saída; corrigir horário, a semana e a história ficam com
+       `coleta.horario`, que é de Supervisor e Admin (AJUSTE de 05/11/2026). */
+    if(M === 'GET' && eq('/api/saidas/dia')) return ['coleta.horario','pdf.subir'];
     if(pre('/api/saidas')) return 'coleta.horario';
     /* `pre` e nao `eq`: o conteudo da etiqueta (/api/config/kit/etiqueta, spec
        GERADOR-ETIQUETA-KIT) e a mesma pergunta do mesmo card — o que a

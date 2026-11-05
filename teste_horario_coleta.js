@@ -184,11 +184,12 @@ async function main(){
     const sexta = (await dia('2026-11-06')).body.coletas[0];
     r = await subir([vol({ venda:'V-SEXTA' })], { saida:sexta.id });
     eq('saída de outro dia é recusada', r.status, 400);
+    /* desde o AJUSTE de 05/11/2026 escolher a saída é de quem SOBE O PDF (a rota
+       já pede pdf.subir): quem é Operação escolhe, só não corrige o horário */
     podeHorario = false;
     r = await subir([vol({ venda:'V-SEMPERM' })], { saida:c15.id });
-    eq('sem coleta.horario o upload passa', r.status, 200);
-    eq('mas a escolha é ignorada', volume('V-SEMPERM').horario_id, null);
-    ok('e a resposta DIZ que ignorou', r.body.saida && r.body.saida.ignorada === 'sem_permissao');
+    eq('sem coleta.horario (Operação) o upload passa', r.status, 200);
+    eq('e a saída escolhida vale: quem sobe o PDF escolhe a coleta', volume('V-SEMPERM').horario_id, c15.id);
     podeHorario = true;
 
     console.log('\n── 5. o relógio da coleta (fase 2) ──');
@@ -201,7 +202,7 @@ async function main(){
     eq('falta até o INÍCIO da janela (06:50 → 12:30)', s.proxima && s.proxima.minutos, 340);
     eq('por imprimir desta coleta', s.proxima && s.proxima.por_imprimir, 1);
     eq('por conferir desta coleta', s.proxima && s.proxima.por_conferir, 1);
-    eq('a sem marca de hoje aparece à parte (V-SEM e V-SEMPERM)', s.sem_marca && s.sem_marca.por_imprimir, 2);
+    eq('a sem marca de hoje aparece à parte (V-SEM)', s.sem_marca && s.sem_marca.por_imprimir, 1);
     RELOGIO.fixar('2026-11-05 13:00');
     s = (await req('GET', '/api/saidas/status')).body;
     eq('dentro da janela, a coleta está "na janela"', s.proxima && s.proxima.estado, 'janela');
@@ -216,7 +217,7 @@ async function main(){
     r = await lancar({ data:'2026-11-05', origem:'tela', coletas:[{ id:c15.id, inicio:'15:00', fim:'17:00' }] });
     eq('tirar a coleta que tem caixas passa', r.status, 200);
     s = (await req('GET', '/api/saidas/status')).body;
-    eq('e as caixas dela vão para "sem coleta marcada"', s.sem_marca && s.sem_marca.por_imprimir, 3);
+    eq('e as caixas dela vão para "sem coleta marcada"', s.sem_marca && s.sem_marca.por_imprimir, 2);
     RELOGIO.fixar('2026-11-10 08:00');
     s = (await req('GET', '/api/saidas/status')).body;
     ok('dia marcado sem coleta diz isso', s.sem_coleta === true && s.proxima === null);
@@ -257,12 +258,12 @@ async function main(){
     usuario = { id:1, nome:'Expedição' };
     const M = require('./telas');
     const t = M.porNumero(206);
-    ok('a tela 206 está no mapa', !!t && t.rota === '/coleta-horarios' && t.nivel === 'operacao');
+    ok('a tela 206 está no mapa, de nível Supervisor (Operação não edita horário)', !!t && t.rota === '/coleta-horarios' && t.nivel === 'supervisor');
     eq('e abre com coleta.horario', t && t.perms, ['coleta.horario']);
     const P = require('./permissoes');
     const lista = P.PERMISSOES || P.permissoes || P;
     const pc = (Array.isArray(lista) ? lista : []).find(p => p.chave === 'coleta.horario');
-    ok('coleta.horario existe, nível Operação, na tela 206, não sensível', !!pc && pc.nivel === 'operacao' && pc.tela === 206 && !pc.sensivel);
+    ok('coleta.horario existe, nível Supervisor, na tela 206, não sensível', !!pc && pc.nivel === 'supervisor' && pc.tela === 206 && !pc.sensivel);
     const auth = fs.readFileSync(path.join(__dirname, 'auth.js'), 'utf8');
     ok('a tela 206 está na lista protegida do auth.js (sem sessão, 302)', /'\/coleta-horarios':/.test(auth));
     const srvTxt = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
@@ -270,6 +271,28 @@ async function main(){
     ok('e serve a tela', /'\/coleta-horarios'/.test(srvTxt));
     const ac = fs.readFileSync(path.join(__dirname, 'acesso.js'), 'utf8');
     ok('as rotas de escrita dos horários pedem coleta.horario', /\/api\/saidas[\s\S]{0,200}coleta\.horario/.test(ac));
+    console.log('\n── 8. a trava: Operação vê e escolhe, Supervisor e Admin editam (AJUSTE de 05/11/2026) ──');
+    const PA = require('./perfis_acesso');
+    const B = PA.montar();
+    const pessoa = n => Object.assign(B.db.prepare('SELECT * FROM usuarios WHERE id=?').get(B.pessoas.find(x => x.nome.indexOf(n) === 0).id), { areas:[] });
+    const dec = (n, rota, m) => B.AC.decidir(pessoa(n), rota, m || 'GET').ok;
+    eq('Davi (Expedição, Operação) vê os horários do dia', dec('Davi', '/api/saidas/dia'), true);
+    eq('mas não grava horário', dec('Davi', '/api/saidas/dia', 'POST'), false);
+    eq('nem abre a 206', dec('Davi', '/coleta-horarios'), false);
+    eq('nem vê a semana', dec('Davi', '/api/saidas/semana'), false);
+    eq('e sobe o PDF (que é onde escolhe a saída)', dec('Davi', '/api/lote/upload', 'POST'), true);
+    const davi = B.pessoas.find(x => /^Davi/.test(x.nome)).id;
+    B.db.prepare("INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,'coleta.horario',1)").run(davi);
+    eq('nem com coleta.horario no banco ele grava: a chave é de nível Supervisor', dec('Davi', '/api/saidas/dia', 'POST'), false);
+    const sergio = B.pessoas.find(x => /^Sergio/.test(x.nome)).id;
+    eq('Sergio (Supervisor) sem a chave não grava', dec('Sergio', '/api/saidas/dia', 'POST'), false);
+    B.db.prepare("INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,'coleta.horario',1)").run(sergio);
+    eq('com a chave, o Supervisor grava', dec('Sergio', '/api/saidas/dia', 'POST'), true);
+    eq('e abre a 206', dec('Sergio', '/coleta-horarios'), true);
+    eq('o Admin Geral grava', dec('Lucas', '/api/saidas/dia', 'POST'), true);
+    B.fechar();
+    const tela = fs.readFileSync(path.join(__dirname, 'public', 'saida_upload.js'), 'utf8');
+    ok('o quadro do upload sabe se a pessoa edita (pode_editar) e trava os campos', /pode_editar/.test(tela) && /disabled/.test(tela));
   }catch(e){
     falhas++; console.log('  ESTOUROU — ' + (e.stack || e));
   }finally{

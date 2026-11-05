@@ -217,17 +217,15 @@ module.exports=function(app,db){
     try{
       const b64=((req.body&&req.body.pdf)||'').replace(/^data:[^,]*,/,'');
       if(!b64) return res.status(400).json({erro:'sem pdf'});
-      /* PARA QUAL SAIDA SAO ESTAS VENDAS (spec HORARIOS-DE-COLETA, D4). Saida
-         que nao existe ou nao e de hoje e RECUSADA antes de ler o PDF — nada
-         gravado. Sem `coleta.horario`, a escolha e ignorada e a resposta DIZ
-         (§15: campo mandado nao some calado). Sem escolha, passa (D1). */
-      let saida=null, saidaIgnorada=null;
+      /* PARA QUAL SAIDA SAO ESTAS VENDAS (spec HORARIOS-DE-COLETA, D4). Quem
+         escolhe e quem SOBE O PDF (esta rota ja pede pdf.subir) — corrigir o
+         horario e que e de Supervisor e Admin (AJUSTE de 05/11/2026). Saida que
+         nao existe ou nao e de hoje e RECUSADA antes de ler o PDF — nada
+         gravado. Sem escolha, passa (D1). */
+      let saida=null;
       const pedida=req.body&&req.body.saida;
       if(pedida!=null && pedida!==''){
-        const ac=app.locals&&app.locals.acesso;
-        const pode=!!(ac&&ac.podePermissao&&ac.podePermissao(req.usuario,'coleta.horario'));
-        if(!pode) saidaIgnorada='sem_permissao';
-        else { try{ saida=SAIDAS.saidaDeHoje(db,pedida); }catch(e){ return res.status(e.status||400).json({erro:e.message, motivo:'saida'}); } }
+        try{ saida=SAIDAS.saidaDeHoje(db,pedida); }catch(e){ return res.status(e.status||400).json({erro:e.message, motivo:'saida'}); }
       }
       const marca={marcadas:0,outro_dia:0,outra_modalidade:0};
       const marcar=saida?db.prepare('UPDATE lote SET horario_id=? WHERE id=?'):null;
@@ -431,7 +429,7 @@ module.exports=function(app,db){
                 sem_sku:semsku,bloqueados:bloq,divergencias:divs,coleta,modalidade_duvida:modal,
                 pacotes, folha_nao_fecha:naoFecha, varias_pecas:variasPecas,
                 saida: saida ? Object.assign({id:saida.id, tipo:saida.tipo, rotulo:SAIDAS.rotulo(saida)}, marca)
-                     : (saidaIgnorada ? {ignorada:saidaIgnorada} : {sem_saida:true}),
+                     : {sem_saida:true},
                 desconhecidos:Object.keys(desconhecidos).map(k=>({sku:k,qtd:desconhecidos[k]}))});
     }catch(e){ console.error(e); res.status(500).json({erro:String(e.message||e)}); }
   });

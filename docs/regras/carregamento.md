@@ -130,6 +130,12 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 - **Por quê:** a etiqueta de outro dia vai em outro caminhão; reescrever a modalidade pelo que a pessoa disse apagaria o que o documento diz.
 - **Status:** em código em 05/11/2026, falta subir.
 
+### R-HCO-11 · Operação vê e escolhe; Supervisor e Admin corrigem (05/11/2026)
+- **Regra:** ver os horários do dia e escolher a saída no upload são de quem sobe o PDF (`pdf.subir`, nível Operação), com os horários travados no quadro. Lançar ou corrigir horário, a tela 206, a semana e a história são de `coleta.horario`, de nível Supervisor.
+- **Por quê:** decisão do dono — quem sobe o PDF confere, mas quem responde pelo horário é Supervisor ou Admin.
+- **Teste que trava:** `teste_horario_coleta.js` (seção 8).
+- **Status:** em código em 05/11/2026, falta subir.
+
 ### R-HCO-10 · A coleta tirada solta as caixas
 - **Regra:** tirar uma coleta que tem caixas marcadas passa (não trava); ela fica com `removido_em`, e as caixas dela contam como "sem coleta marcada".
 - **Status:** em código em 05/11/2026, falta subir.

@@ -76,6 +76,9 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
 (function(){
   fetch('/api/planejamento/status').then(function(r){return r.json();}).then(function(s){
     var el=document.getElementById('mlTask'); if(!el) return;
+    /* sem permissão (quem só sobe PDF na 103, desde 05/11/2026): a tarefa da
+       planilha não é dela, e o 403 não vira "nenhuma planilha importada" */
+    if(!s || s.erro) return;
     var d=s.dias, per=s.periodo_dias||30, cls, txt;
     if(d==null){ cls='late';
       txt='📋 <b>Tarefa semanal do Mercado Livre:</b> nenhuma planilha importada ainda — exporte o relatório de vendas dos últimos '+per+' dias e suba em Planejamento.'; }

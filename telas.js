@@ -54,7 +54,7 @@ const TELAS = [
   // 203 Subir PDF (/expedicao) SAIU em 05/11/2026: o upload é só na 103 (D2). O número fica vago.
   { n:204, nome:'Pendências',            rota:'/admin/pendencias', nivel:'admin',   onde:'computador', perms:['@admin'],                aba:'blq' },
   { n:205, nome:'Correções',             rota:'/admin/correcoes', nivel:'admin',    onde:'computador', perms:['correcao.executar'],     aba:'cor' },
-  { n:206, nome:'Horários de coleta',    rota:'/coleta-horarios', nivel:'operacao', onde:'computador', perms:['coleta.horario'] },
+  { n:206, nome:'Horários de coleta',    rota:'/coleta-horarios', nivel:'supervisor', onde:'computador', perms:['coleta.horario'] },   // Operação não edita horário (05/11/2026)
   // ── 250 · Devoluções (bloco dentro da Expedição; a porta é /devolucoes) ──
   { n:251, nome:'Devoluções — receber',  rota:'/devolucao',     nivel:'operacao',   onde:'tablet',     perms:['devolucao.registrar'],   area:'devolucao' },
   { n:252, nome:'Devoluções — em andamento', rota:'/devolucao-casos', nivel:'supervisor', onde:'computador',
