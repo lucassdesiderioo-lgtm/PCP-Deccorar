@@ -441,6 +441,8 @@ async function main(){
     ok('a 206 tem o "Confirmar semana" e o motivo do "sem coleta"', /Confirmar semana/.test(t206) && /Feriado/.test(t206));
     const navTxt = fs.readFileSync(path.join(__dirname, 'public', 'nav.js'), 'utf8');
     ok('o nav.js mostra as tarefas dos horários', /tarefas/.test(navTxt));
+    ok('e não repete o "não lançado" na faixa de quem já tem a tarefa (AJUSTE)', /tipo==='hoje'/.test(navTxt) && /el\.remove\(\); return; \}/.test(navTxt));
+    ok('o /expedicao é registrado um caminho por linha (sem aviso falso no boot)', !/app\.get\(\[\s*'\/expedicao'/.test(srvTxt) && /app\.get\('\/expedicao'/.test(srvTxt) && /app\.get\('\/expedicao\.html'/.test(srvTxt));
   }catch(e){
     falhas++; console.log('  ESTOUROU — ' + (e.stack || e));
   }finally{
