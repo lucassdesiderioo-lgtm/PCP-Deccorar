@@ -1,4 +1,8 @@
-> **STATUS · 05/11/2026 — AS SETE FASES EM CÓDIGO · fases 1 a 3 no ar · a 4 mesclada (PR #289) · 4 a 7 sobem juntas, num deploy só**
+> **STATUS · 05/11/2026 — CONCLUÍDA E ARQUIVADA · as sete fases no ar**
+> - **No ar:** fase 1 pelo PR #284, 2 pelo #287, 3 pelo #288, 4 pelo #289 e 5 a 7 pelo #290 (um deploy só, decisão do dono). O dono fez o backup, o deploy e o teste de segurança (telas 302, API 401, `/login` 200), e os greps deram `mesmaPessoa` 2 e `portao` 4.
+> - As regras que parecem bug estão no `CLAUDE.md` (§4, §8-B, §9, §9-B, §10 — a regra-mãe e as sessões —, §15 e §18) e nos cartões de `docs/regras/`. **Este arquivo é história: não use como fonte de regra.**
+> - ⚠️ **AINDA NÃO PROVADO COM DADO REAL:** o primeiro bipe duplo recusado na bancada; um "Desfazer última" de verdade tirando a peça da Embalagem; a primeira sessão nova registrada (`sessao`) quando alguém entrar com o PIN; a primeira troca de setor gravada. Prova que não foi feita se escreve como não feita.
+> - O que vem abaixo é o STATUS como estava durante a construção.
 > - Desenhado no Projeto do Claude com o Lucas em 04/11/2026.
 > - **As fases 5, 6 e 7 foram feitas de uma vez, num PR só, com um deploy no fim**
 >   (decisão do dono, 05/11/2026: *"concluir todas as fases e testes e por último
