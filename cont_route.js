@@ -44,7 +44,13 @@ function contagemPendentes(db){
     LEFT JOIN componente c ON p.tipo='componente' AND c.id=p.componente_id
     WHERE p.aprovado=0 ORDER BY p.criado_em, p.codigo`).all();
 }
+const QUEM=require('./quem');
 module.exports=function(app,db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
+
   db.exec("CREATE TABLE IF NOT EXISTS contagem (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, contado_em TEXT DEFAULT (datetime('now','localtime')), sessao TEXT, teste INTEGER DEFAULT 0)");
   // contagem_pendente (secao 10) e criada em acesso.js; garantimos aqui tambem,
   // para o modulo funcionar mesmo carregado isolado. IF NOT EXISTS = idempotente.
@@ -66,8 +72,15 @@ module.exports=function(app,db){
     for(const par of novas)
       if(tem.indexOf(par[0]) < 0) db.exec('ALTER TABLE '+tabela+' ADD COLUMN '+par[0]+' '+par[1]);
   };
-  colunas('contagem',          [['tipo',"TEXT DEFAULT 'sku'"],['componente_id','INTEGER'],['qtd','REAL DEFAULT 1']]);
-  colunas('contagem_pendente', [['tipo',"TEXT DEFAULT 'sku'"],['componente_id','INTEGER']]);
+  colunas('contagem',          [['tipo',"TEXT DEFAULT 'sku'"],['componente_id','INTEGER'],['qtd','REAL DEFAULT 1'],
+                                ['usuario_id','INTEGER'],['usuario_nome','TEXT']]);
+  colunas('contagem_pendente', [['tipo',"TEXT DEFAULT 'sku'"],['componente_id','INTEGER'],
+                                ['contado_por_id','INTEGER'],['aprovado_por_id','INTEGER']]);
+  /* QUEM CONTOU E QUEM APROVOU, pelo id (QUEM-FEZ-E-REVISAO fase 5,
+     05/11/2026). Os nomes (`contado_por`, `aprovado_por`) ficam, como retrato;
+     o id entra ao lado. Cada lancamento de `contagem` tambem guarda quem o
+     fez. Pela mesma funcao `colunas` das outras: assim o banco novo e o
+     antigo terminam com as colunas na mesma ordem (§17). */
   /* contagem_pendente.contado foi declarado INTEGER, e material pode ser 3,5 m.
      Em SQLite isso e afinidade, nao restricao: um REAL so vira INTEGER se a
      conversao for exata. 3,5 continua 3,5. Nao ha coluna a trocar — mas ha um
@@ -191,26 +204,26 @@ module.exports=function(app,db){
      das contagens nao deixava data nenhuma — e a aba Estoque, que lia a idade da
      conferencia de `contagem`, mostrava um numero que ja tinha sido apagado.
      Aqui a linha nasce ja aprovada: nao ha segunda pessoa a esperar. */
-  function registrarDireto(req, sessao, it, operacao, contado, sistemaEra){
-    const quem = (req.usuario && req.usuario.nome) || '';
+  function registrarDireto(q, sessao, it, operacao, contado, sistemaEra){
+    const quem = q.usuario_nome || '';
     db.prepare(`INSERT INTO contagem_pendente
         (sessao,codigo,contado,sistema_era,operacao,contado_por,tipo,componente_id,
-         aprovado,aprovado_por,aprovado_em)
-      VALUES (?,?,?,?,?,?,?,?,1,?,datetime('now','localtime'))`)
+         aprovado,aprovado_por,aprovado_em,contado_por_id,aprovado_por_id)
+      VALUES (?,?,?,?,?,?,?,?,1,?,datetime('now','localtime'),?,?)`)
       .run(sessao, rotulo(it), contado, sistemaEra, operacao, quem,
-           it.tipo, it.componente_id||null, quem);
+           it.tipo, it.componente_id||null, quem, q.usuario_id, q.usuario_id);
   }
 
   // enfileira o ajuste para aprovacao posterior; captura a contagem e o estoque
   // do momento, e limpa a sessao (o dado agora vive em contagem_pendente).
-  function enfileirar(req, sessao, itens, operacao){
-    const ins  = db.prepare("INSERT INTO contagem_pendente (sessao,codigo,contado,sistema_era,operacao,contado_por,tipo,componente_id) VALUES (?,?,?,?,?,?,?,?)");
-    const quem = (req.usuario && req.usuario.nome) || '';
+  function enfileirar(q, sessao, itens, operacao){
+    const ins  = db.prepare("INSERT INTO contagem_pendente (sessao,codigo,contado,sistema_era,operacao,contado_por,tipo,componente_id,contado_por_id) VALUES (?,?,?,?,?,?,?,?,?)");
+    const quem = q.usuario_nome || '';
     let n = 0;
     db.transaction(()=>{
       itens.forEach(it=>{
         ins.run(sessao, rotulo(it), contadoNaSessao(sessao,it), sistemaAgora(it),
-                operacao, quem, it.tipo, it.componente_id||null);
+                operacao, quem, it.tipo, it.componente_id||null, q.usuario_id);
         n++;
       });
       db.prepare('DELETE FROM contagem WHERE sessao=?').run(sessao);
@@ -218,7 +231,10 @@ module.exports=function(app,db){
     return n;
   }
 
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 5, 05/11/2026): toda
+     escrita da contagem de material comeca pelo quem.js, que responde 401. */
   app.post('/api/contagem/bipe',(req,res)=>{
+    if(!QUEM.exigir(req,res)) return;
     const cod=((req.body&&req.body.codigo)||'').trim().toUpperCase();
     const ses=((req.body&&req.body.sessao)||'').trim();
     if(!cod) return res.status(400).json({erro:'sem codigo'});
@@ -253,6 +269,7 @@ module.exports=function(app,db){
      duas prateleiras, lanca duas vezes. Zero e um lancamento valido: e assim que
      um material que ACABOU entra na contagem em vez de ficar de fora dela. */
   app.post('/api/contagem/componente',(req,res)=>{
+    const q0=QUEM.exigir(req,res); if(!q0) return;
     const b=req.body||{};
     const id=+b.componente_id, ses=String(b.sessao||'').trim();
     const q=b.quantidade===''||b.quantidade==null ? NaN : +b.quantidade;
@@ -260,8 +277,8 @@ module.exports=function(app,db){
     if(!Number.isFinite(q) || q<0) return res.status(400).json({erro:'quantidade inválida'});
     const c=db.prepare("SELECT id,nome,COALESCE(unidade,'un') unidade,COALESCE(estoque,0) estoque FROM componente WHERE id=? AND ativo=1").get(id);
     if(!c) return res.status(400).json({erro:'componente não encontrado'});
-    db.prepare("INSERT INTO contagem (codigo,sessao,tipo,componente_id,qtd) VALUES (?,?,'componente',?,?)")
-      .run(c.nome, ses, c.id, r3(q));
+    db.prepare("INSERT INTO contagem (codigo,sessao,tipo,componente_id,qtd,usuario_id,usuario_nome) VALUES (?,?,'componente',?,?,?,?)")
+      .run(c.nome, ses, c.id, r3(q), q0.usuario_id, q0.usuario_nome);
     res.json({ok:true, componente_id:c.id, nome:c.nome, unidade:c.unidade,
       contado:contadoNaSessao(ses,{tipo:'componente',componente_id:c.id}), estoque:r3(c.estoque)});
   });
@@ -273,22 +290,23 @@ module.exports=function(app,db){
   });
 
   app.post('/api/contagem/pendentes/aprovar',(req,res)=>{
+    const qq=QUEM.exigir(req,res); if(!qq) return;
     const ids=(req.body&&req.body.ids)||[];
     if(!ids.length) return res.status(400).json({erro:'sem ids'});
-    const quem=(req.usuario&&req.usuario.nome)||'';
+    const quem=qq.usuario_nome||'';
     let n=0;
     db.transaction(()=>{
       const get=db.prepare("SELECT *, COALESCE(tipo,'sku') tipo FROM contagem_pendente WHERE id=? AND aprovado=0");
-      const mark=db.prepare("UPDATE contagem_pendente SET aprovado=1,aprovado_por=?,aprovado_em=datetime('now','localtime') WHERE id=?");
+      const mark=db.prepare("UPDATE contagem_pendente SET aprovado=1,aprovado_por=?,aprovado_por_id=?,aprovado_em=datetime('now','localtime') WHERE id=?");
       ids.forEach(id=>{
         const p=get.get(id); if(!p) return;
         const it={tipo:p.tipo, codigo:p.codigo, componente_id:p.componente_id};
         /* `sistemaEra` e o saldo de quando a pessoa terminou de contar. Sem ele
            a aprovacao apagaria o que a fabrica fez enquanto esperava. */
         aplicar(it, p.operacao, p.contado, {sessao:p.sessao, quem,
-          usuario_id:(req.usuario&&req.usuario.id)||null,
+          usuario_id:qq.usuario_id,
           sistemaEra:p.sistema_era, contou:p.contado_por});
-        mark.run(quem,id); n++;
+        mark.run(quem,qq.usuario_id,id); n++;
         auditar(req,'contagem_aprovada',rotulo(it),p.operacao+' contado='+p.contado+' (contou: '+p.contado_por+')');
       });
     })();
@@ -296,6 +314,7 @@ module.exports=function(app,db){
   });
 
   app.post('/api/contagem/pendentes/rejeitar',(req,res)=>{
+    if(!QUEM.exigir(req,res)) return;
     const ids=(req.body&&req.body.ids)||[];
     if(!ids.length) return res.status(400).json({erro:'sem ids'});
     let n=0;
@@ -365,15 +384,16 @@ module.exports=function(app,db){
   // ajustar = SUBSTITUI (estoque := contado). Direto p/ quem tem contagem.ajustar;
   // senao vira pendente.
   app.post('/api/contagem/ajustar',(req,res)=>{
+    const qq=QUEM.exigir(req,res); if(!qq) return;
     const ses=((req.body&&req.body.sessao)||'').trim();
     const itens=itensDoCorpo(req.body);
     if(!ses||!itens.length) return res.status(400).json({erro:'faltam dados'});
     if(recusaPeca(res, itens)) return;
     if(!podeAjustar(req)){
-      const pend=enfileirar(req,ses,itens,'ajustar');
+      const pend=enfileirar(qq,ses,itens,'ajustar');
       return res.json({ok:true,pendente:pend});
     }
-    const quem=(req.usuario&&req.usuario.nome)||'';
+    const quem=qq.usuario_nome||'';
     let n=0;
     db.transaction(()=>{
       itens.forEach(it=>{
@@ -382,8 +402,8 @@ module.exports=function(app,db){
            agora, e por isso ele nao e passado. O registro guarda esse numero
            para a idade da conferencia e para o extrato. */
         const era=sistemaAgora(it);
-        aplicar(it,'ajustar',q,{sessao:ses,quem,usuario_id:(req.usuario&&req.usuario.id)||null,contou:quem}); n++;
-        registrarDireto(req,ses,it,'ajustar',q,era);
+        aplicar(it,'ajustar',q,{sessao:ses,quem,usuario_id:qq.usuario_id,contou:quem}); n++;
+        registrarDireto(qq,ses,it,'ajustar',q,era);
         auditar(req,'contagem_ajuste',rotulo(it),'substitui -> '+q);
       });
     })();
@@ -393,22 +413,23 @@ module.exports=function(app,db){
   // lancar = SOMA (estoque += contado). Direto p/ quem tem contagem.ajustar;
   // senao vira pendente.
   app.post('/api/contagem/lancar',(req,res)=>{
+    const qq=QUEM.exigir(req,res); if(!qq) return;
     const ses=((req.body&&req.body.sessao)||'').trim();
     const itens=itensDoCorpo(req.body);
     if(!ses||!itens.length) return res.status(400).json({erro:'faltam dados'});
     if(recusaPeca(res, itens)) return;
     if(!podeAjustar(req)){
-      const pend=enfileirar(req,ses,itens,'lancar');
+      const pend=enfileirar(qq,ses,itens,'lancar');
       return res.json({ok:true,pendente:pend});
     }
-    const quem=(req.usuario&&req.usuario.nome)||'';
+    const quem=qq.usuario_nome||'';
     let n=0;
     db.transaction(()=>{
       itens.forEach(it=>{
         const q=contadoNaSessao(ses,it);
         const era=sistemaAgora(it);
-        aplicar(it,'lancar',q,{sessao:ses,quem,usuario_id:(req.usuario&&req.usuario.id)||null,contou:quem}); n++;
-        registrarDireto(req,ses,it,'lancar',q,era);
+        aplicar(it,'lancar',q,{sessao:ses,quem,usuario_id:qq.usuario_id,contou:quem}); n++;
+        registrarDireto(qq,ses,it,'lancar',q,era);
         auditar(req,'contagem_lancamento',rotulo(it),'soma +'+q);
       });
       db.prepare('DELETE FROM contagem WHERE sessao=?').run(ses);
@@ -417,6 +438,7 @@ module.exports=function(app,db){
   });
 
   app.delete('/api/contagem/:sessao',(req,res)=>{
+    if(!QUEM.exigir(req,res)) return;
     const n=db.prepare('DELETE FROM contagem WHERE sessao=?').run(req.params.sessao).changes;
     res.json({ok:true,apagados:n});
   });

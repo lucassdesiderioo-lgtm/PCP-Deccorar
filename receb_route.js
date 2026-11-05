@@ -17,9 +17,15 @@
 const DOM = require('./componente_dominio');
 const CUSTO = require('./custo_dominio');
 
+const QUEM = require('./quem');
 module.exports = function(app, db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
 
-  const usuario = req => (req.usuario && req.usuario.nome) || null;
+
+  const usuario = req => QUEM.nomeDe(req) || null;   // quem fez: do quem.js
   const auditar = (req,acao,alvo,det) => {
     try{ const ac=app.locals.acesso; if(ac&&ac.auditar) ac.auditar(req,'compras',acao,alvo,det); }catch(e){}
   };
@@ -74,9 +80,9 @@ module.exports = function(app, db){
 
     let recId, entradas=0, devolvidos=0;
     db.transaction(()=>{
-      const r=db.prepare(`INSERT INTO recebimento (pedido_id,nota_fiscal,nota_data,recebido_por)
-        VALUES (?,?,?,?)`).run(ped.id, (b.nota_fiscal||'').trim()||null,
-          (b.nota_data||'').trim()||null, usuario(req));
+      const r=db.prepare(`INSERT INTO recebimento (pedido_id,nota_fiscal,nota_data,recebido_por,recebido_por_id)
+        VALUES (?,?,?,?,?)`).run(ped.id, (b.nota_fiscal||'').trim()||null,
+          (b.nota_data||'').trim()||null, usuario(req), QUEM.idDe(req));
       recId=r.lastInsertRowid;
       const insI=db.prepare(`INSERT INTO recebimento_item (recebimento_id,pedido_item_id,
         qtd_embalagem,qtd_consumo,qtd_devolvida,motivo_devolucao,divergencia) VALUES (?,?,?,?,?,?,?)`);
@@ -94,7 +100,7 @@ module.exports = function(app, db){
              tudo dentro de componente_dominio.js. */
           DOM.entrada(db,{ componente_id:p.pi.componente_id, delta:qtdConsumo,
             custo_unit:(p.pi.preco_unit||0)/(p.pi.fator||1),
-            referencia:ped.numero, usuario_nome:usuario(req) });
+            referencia:ped.numero, usuario_nome:usuario(req), usuario_id:QUEM.idDe(req) });
           entradas++;
         }
         if(devConsumo>0) devolvidos++;
@@ -151,11 +157,11 @@ module.exports = function(app, db){
         if(preco===antigo) continue;
 
         if(ri.oferta_id){
-          db.prepare(`INSERT INTO preco_historico (oferta_id,preco_antigo,preco_novo,variacao_pct,fonte,referencia,usuario_nome)
-            VALUES (?,?,?,?,'compra',?,?)`).run(ri.oferta_id, antigo, preco,
-              antigo>0 ? (preco-antigo)/antigo*100 : null, rec.numero, usuario(req));
+          db.prepare(`INSERT INTO preco_historico (oferta_id,preco_antigo,preco_novo,variacao_pct,fonte,referencia,usuario_nome,usuario_id)
+            VALUES (?,?,?,?,'compra',?,?,?)`).run(ri.oferta_id, antigo, preco,
+              antigo>0 ? (preco-antigo)/antigo*100 : null, rec.numero, usuario(req), QUEM.idDe(req));
           db.prepare(`UPDATE oferta SET preco=?, atualizado_em=datetime('now','localtime'),
-            atualizado_por=? WHERE id=?`).run(preco, usuario(req), ri.oferta_id);
+            atualizado_por=?, atualizado_por_id=? WHERE id=?`).run(preco, usuario(req), QUEM.idDe(req), ri.oferta_id);
         }
         if(ri.componente_id && ri.qtd_consumo>0)
           DOM.corrigirCustoPago(db,{ componente_id:ri.componente_id, quantidade:ri.qtd_consumo,
@@ -169,7 +175,7 @@ module.exports = function(app, db){
        mudou. Fora da transacao: historico nunca derruba o lancamento da nota. */
     try{ for(const m of mudancas) if(m.componente_id)
       CUSTO.porComponente(db, m.componente_id, 'preço pago na nota '+(rec.nota_fiscal||rec.numero),
-        {usuario_nome:usuario(req), referencia:rec.numero}); }catch(e){}
+        {usuario_nome:usuario(req), usuario_id:QUEM.idDe(req), referencia:rec.numero}); }catch(e){}
     for(const m of mudancas)
       auditar(req,'divergencia_de_preco',rec.numero,
         m.item+': R$ '+m.de.toFixed(2)+' -> R$ '+m.para.toFixed(2)

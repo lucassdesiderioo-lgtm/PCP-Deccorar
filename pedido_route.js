@@ -14,9 +14,15 @@
  */
 const CALC = require('./compras_calc');
 
+const QUEM = require('./quem');
 module.exports = function(app, db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
 
-  const usuario = req => (req.usuario && req.usuario.nome) || null;
+
+  const usuario = req => QUEM.nomeDe(req) || null;   // quem fez: do quem.js
   const auditar = (req,acao,alvo,det) => {
     try{ const ac=app.locals.acesso; if(ac&&ac.auditar) ac.auditar(req,'compras',acao,alvo,det); }catch(e){}
   };
@@ -59,8 +65,8 @@ module.exports = function(app, db){
         const frete=+(b.frete!=null?b.frete:forn.frete_padrao)||0;
         const valor=lista.reduce((s,p)=>s+p.calc.embalagens*p.calc.preco_embalagem,0)+frete;
         const numero=proximoNumero();
-        const r=db.prepare(`INSERT INTO pedido_compra (numero,fornecedor_id,valor_previsto,frete,observacao,criado_por)
-          VALUES (?,?,?,?,?,?)`).run(numero,+fid,valor,frete,(b.observacao||'').trim()||null,usuario(req));
+        const r=db.prepare(`INSERT INTO pedido_compra (numero,fornecedor_id,valor_previsto,frete,observacao,criado_por,criado_por_id)
+          VALUES (?,?,?,?,?,?,?)`).run(numero,+fid,valor,frete,(b.observacao||'').trim()||null,usuario(req),QUEM.idDe(req));
         const ins=db.prepare(`INSERT INTO pedido_item (pedido_id,oferta_id,componente_id,sku,embalagem,fator,
           preco_unit,qtd_embalagem,qtd_consumo,motivo_escolha) VALUES (?,?,?,?,?,?,?,?,?,?)`);
         for(const p of lista)
@@ -169,8 +175,8 @@ module.exports = function(app, db){
   app.post('/api/pedidos/:id/pagar',(req,res)=>{
     const p=db.prepare('SELECT numero FROM pedido_compra WHERE id=?').get(req.params.id);
     if(!p) return res.status(404).json({erro:'pedido não encontrado'});
-    db.prepare(`UPDATE pedido_compra SET pago_em=datetime('now','localtime'), pago_por=? WHERE id=?`)
-      .run(usuario(req),req.params.id);
+    db.prepare(`UPDATE pedido_compra SET pago_em=datetime('now','localtime'), pago_por=?, pago_por_id=? WHERE id=?`)
+      .run(usuario(req),QUEM.idDe(req),req.params.id);
     auditar(req,'pedido_pago',p.numero,'');
     res.json({ok:true});
   });

@@ -11,9 +11,15 @@
 const CUSTO = require('./custo_dominio');
 const NEC   = require('./necessidade_dominio');
 
+const QUEM = require('./quem');
 module.exports = function(app, db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app, { auditar:'compras' });   // a linha nao tem autor: quem fez vai na auditoria
 
-  const usuario = req => (req.usuario && req.usuario.nome) || null;
+
+  const usuario = req => QUEM.nomeDe(req) || null;   // quem fez: do quem.js
 
   /* Codigo repetido e erro de digitacao, nao falha de servidor. Sem isto o
      Express devolve 500 com stack trace em HTML — ilegivel para quem cadastra e
@@ -198,7 +204,7 @@ module.exports = function(app, db){
     const campos={ fornecedor_id:forn, componente_id:comp, sku:sku||null,
       codigo_fornec:txt(b.codigo_fornec), embalagem:emb, fator, preco,
       multiplo:num(b.multiplo)||1, qtd_minima:num(b.qtd_minima)||1,
-      frete:num(b.frete)||0, prazo_entrega:num(b.prazo_entrega), quem:usuario(req) };
+      frete:num(b.frete)||0, prazo_entrega:num(b.prazo_entrega), quem:usuario(req), quem_id:QUEM.idDe(req) };
 
     try{
       const gravar = db.transaction(()=>{
@@ -208,22 +214,22 @@ module.exports = function(app, db){
           db.prepare(`UPDATE oferta SET fornecedor_id=@fornecedor_id,componente_id=@componente_id,
             sku=@sku,codigo_fornec=@codigo_fornec,embalagem=@embalagem,fator=@fator,preco=@preco,
             multiplo=@multiplo,qtd_minima=@qtd_minima,frete=@frete,prazo_entrega=@prazo_entrega,
-            ativo=1,atualizado_em=datetime('now','localtime'),atualizado_por=@quem
+            ativo=1,atualizado_em=datetime('now','localtime'),atualizado_por=@quem,atualizado_por_id=@quem_id
             WHERE id=@id`).run(Object.assign({id:+b.id},campos));
           id=+b.id;
         } else {
           const r=db.prepare(`INSERT INTO oferta (fornecedor_id,componente_id,sku,codigo_fornec,
-            embalagem,fator,preco,multiplo,qtd_minima,frete,prazo_entrega,atualizado_por)
+            embalagem,fator,preco,multiplo,qtd_minima,frete,prazo_entrega,atualizado_por,atualizado_por_id)
             VALUES (@fornecedor_id,@componente_id,@sku,@codigo_fornec,@embalagem,@fator,@preco,
-            @multiplo,@qtd_minima,@frete,@prazo_entrega,@quem)`).run(campos);
+            @multiplo,@qtd_minima,@frete,@prazo_entrega,@quem,@quem_id)`).run(campos);
           id=r.lastInsertRowid;
         }
         const antigo = antes ? antes.preco : null;
         if(antigo===null || antigo!==preco)
-          db.prepare(`INSERT INTO preco_historico (oferta_id,preco_antigo,preco_novo,variacao_pct,fonte,usuario_nome)
-            VALUES (?,?,?,?,?,?)`).run(id, antigo, preco,
+          db.prepare(`INSERT INTO preco_historico (oferta_id,preco_antigo,preco_novo,variacao_pct,fonte,usuario_nome,usuario_id)
+            VALUES (?,?,?,?,?,?,?)`).run(id, antigo, preco,
               (antigo!=null&&antigo>0) ? ((preco-antigo)/antigo*100) : null,
-              txt(b.fonte)||'cadastro', usuario(req));
+              txt(b.fonte)||'cadastro', usuario(req), QUEM.idDe(req));
         return id;
       });
       const id=gravar();
@@ -232,7 +238,7 @@ module.exports = function(app, db){
          custo_sku_historico fica vazia para sempre e a pergunta "por que o custo
          subiu?" nunca tem resposta. */
       try{
-        const quem={usuario_nome:usuario(req)};
+        const quem={usuario_nome:usuario(req), usuario_id:QUEM.idDe(req)};
         if(comp) CUSTO.porComponente(db, comp, null, quem);
         else if(sku) CUSTO.porSku(db, sku, 'preço de fornecedor alterado', quem);
       }catch(e){ /* historico nunca derruba a gravacao do preco */ }

@@ -98,6 +98,9 @@ function sessao(eu,dest){
   if(dest&&dest.duas&&dest.padrao){
     var at=document.createElement('a');
     at.className='trocaOp atalho'; at.href=dest.padrao; at.textContent='Medida padrão →';
+    // A troca de setor fica registrada no PCP (QUEM-FEZ-E-REVISAO fase 6).
+    at.addEventListener('click',function(){ try{ fetch('/api/auth/setor',{method:'POST',keepalive:true,credentials:'same-origin',
+      headers:{'content-type':'application/json'},body:JSON.stringify({para:'padrao'})}).catch(function(){}); }catch(e){} });
     b.appendChild(at);
   }
   var trocar=document.createElement('a');

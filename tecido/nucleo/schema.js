@@ -2015,6 +2015,17 @@ INSERT INTO sm_faixa_suporte_nova(id,modelo_id,largura_max_mm,quantidade,compone
   SELECT id,modelo_id,largura_max_mm,quantidade,NULL FROM sm_faixa_suporte;
 DROP TABLE sm_faixa_suporte;
 ALTER TABLE sm_faixa_suporte_nova RENAME TO sm_faixa_suporte;
+`},
+
+{n:39, nome:'a auditoria grava quem fez pelo id', sql:`
+/* === QUEM FEZ, PELO ID ======================================================
+   Spec QUEM-FEZ-E-REVISAO, fase 7 (05/11/2026): toda acao que grava, grava o
+   usuario_id e o usuario_nome do login. No sob medida toda escrita passa
+   pela porta unica (nucleo/registro.js), e a porta ja auditava a escrita — so
+   com o nome. O id entra ao lado: o nome muda no cadastro do PCP, o id nao.
+   A linha de antes fica sem id — nao se inventa. */
+ALTER TABLE auditoria ADD COLUMN usuario_id INTEGER;
+CREATE INDEX idx_auditoria_usuario ON auditoria(usuario_id);
 `}
 ];
 

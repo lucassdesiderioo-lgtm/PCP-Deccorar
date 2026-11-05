@@ -12,7 +12,13 @@ const F = require('./formula');
 const FICHA = require('./ficha_dominio');
 const CUSTO = require('./custo_dominio');
 
+const QUEM = require('./quem');
 module.exports = function(app, db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app, { auditar:'compras' });   // a linha nao tem autor: quem fez vai na auditoria
+
 
   const txt = v => { const t=String(v==null?'':v).trim(); return t===''?null:t; };
 
@@ -170,14 +176,14 @@ module.exports = function(app, db){
       /* O recalculo de custo continua sendo disparado pela linha inteira, e nao
          so pela `expressao`: mexer no corte nao muda centavo, mas o carimbo de
          "quando esta ficha foi tocada" tem que valer para a linha toda. */
-      CUSTO.porModelo(db, modelo, 'fórmula alterada', {usuario_nome:(req.usuario&&req.usuario.nome)});
+      CUSTO.porModelo(db, modelo, 'fórmula alterada', {usuario_nome:QUEM.nomeDe(req), usuario_id:QUEM.idDe(req)});
       return res.json({ok:true,id:+b.id,testes:v.testes});
     }
     const r=db.prepare(`INSERT INTO ficha_formula (modelo_id,componente_id,familia,expressao,observacao,ordem,
         corte_largura,corte_altura,corte_unidade)
       VALUES (@modelo_id,@componente_id,@familia,@expressao,@observacao,@ordem,
         @corte_largura,@corte_altura,@corte_unidade)`).run(campos);
-    CUSTO.porModelo(db, modelo, 'linha acrescentada à ficha', {usuario_nome:(req.usuario&&req.usuario.nome)});
+    CUSTO.porModelo(db, modelo, 'linha acrescentada à ficha', {usuario_nome:QUEM.nomeDe(req), usuario_id:QUEM.idDe(req)});
     res.json({ok:true,id:r.lastInsertRowid,testes:v.testes});
   });
 
@@ -196,7 +202,7 @@ module.exports = function(app, db){
   app.delete('/api/formulas/:id',(req,res)=>{
     const f=db.prepare('SELECT modelo_id FROM ficha_formula WHERE id=?').get(req.params.id);
     db.prepare('DELETE FROM ficha_formula WHERE id=?').run(req.params.id);
-    if(f) CUSTO.porModelo(db, f.modelo_id, 'linha removida da ficha', {usuario_nome:(req.usuario&&req.usuario.nome)});
+    if(f) CUSTO.porModelo(db, f.modelo_id, 'linha removida da ficha', {usuario_nome:QUEM.nomeDe(req), usuario_id:QUEM.idDe(req)});
     res.json({ok:true});
   });
 

@@ -8,10 +8,17 @@
  */
 const AJ = require('./ajuste_dominio');
 
+const QUEM = require('./quem');
 module.exports = function(app, db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
+
   AJ.garantirSchema(db);
 
-  const quem = req => { const u = req.usuario || {}; return { id: u.id != null ? u.id : null, nome: u.nome || '' }; };
+  // Quem fez: do quem.js, o dono unico, no formato que o dominio conhece.
+  const quem = req => ({ id: QUEM.idDe(req), nome: QUEM.nomeDe(req) });
   function pode(req, chave){
     try{ return !!app.locals.acesso.podePermissao(req.usuario, chave); }
     catch(e){ return (((req.usuario||{}).areas)||[]).indexOf('admin') >= 0; }

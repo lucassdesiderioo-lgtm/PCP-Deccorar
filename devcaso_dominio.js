@@ -88,7 +88,8 @@ function garantir(db){
     revisao_pedida_em TEXT, revisao_numero TEXT, revisao_resultado TEXT, revisao_resp_em TEXT, valor_revisao REAL,
     aberta_em TEXT, prazo_coleta TEXT, prazo_coleta_original TEXT, limite_frete REAL,
     revisar_ate TEXT, revisao_pede TEXT, etiqueta_devolucao TEXT,
-    responsavel_id INTEGER, responsavel_nome TEXT)`);
+    responsavel_id INTEGER, responsavel_nome TEXT,
+    criado_por_id INTEGER, encerrado_por_id INTEGER)`);
   /* FASE 5 — desde quando o valor do ML está nesta situação (R18: "pedir" há
      ≥ 2 dias entra no parado). O ALTER fica ao lado do CREATE, no fim da
      tabela, para o banco que nasceu antes desta fase (§17). */
@@ -130,6 +131,11 @@ function garantir(db){
      apagado nem convertido — e aparece até alguém escolher a pessoa. (§17) */
   for(const col of ['responsavel_id INTEGER','responsavel_nome TEXT'])
     try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN "+col); }catch(e){}
+  /* QUEM LANÇOU E QUEM ENCERROU, pelo id (QUEM-FEZ-E-REVISAO fase 5,
+     05/11/2026): o nome (`criado_por`, `encerrado_por`) fica, como retrato; o
+     id entra ao lado. O caso de antes fica sem o id — não se inventa. (§17) */
+  for(const col of ['criado_por_id INTEGER','encerrado_por_id INTEGER'])
+    try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN "+col); }catch(e){}
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_venda ON devolucao_caso(venda)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_aberto ON devolucao_caso(encerrado_em)");
   db.exec(`CREATE TABLE IF NOT EXISTS devolucao_evento (
@@ -154,15 +160,20 @@ function garantir(db){
     cep TEXT, pedida_em TEXT DEFAULT (datetime('now','localtime')), custo REAL,
     resultado TEXT DEFAULT 'aguardando', obs TEXT, usuario TEXT,
     criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0,
-    agendada_para TEXT)`);
+    agendada_para TEXT, usuario_id INTEGER)`);
   // O dia em que a transportadora vai buscar (AJUSTE de 03/11/2026). No fim (§17).
   try{ db.exec("ALTER TABLE devolucao_coleta ADD COLUMN agendada_para TEXT"); }catch(e){}
+  // Quem pediu a coleta, pelo id (QUEM-FEZ-E-REVISAO fase 5). No fim (§17).
+  try{ db.exec("ALTER TABLE devolucao_coleta ADD COLUMN usuario_id INTEGER"); }catch(e){}
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcoleta_caso ON devolucao_coleta(caso_id)");
   // FASE 4 — os anexos: documentos da coleta e a foto do comprador.
   db.exec(`CREATE TABLE IF NOT EXISTS devolucao_anexo (
     id INTEGER PRIMARY KEY AUTOINCREMENT, caso_id INTEGER NOT NULL, tipo TEXT NOT NULL,
     doc_tipo TEXT, arquivo TEXT, usuario TEXT,
-    criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0)`);
+    criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0,
+    usuario_id INTEGER)`);
+  // Quem anexou, pelo id (QUEM-FEZ-E-REVISAO fase 5). No fim (§17).
+  try{ db.exec("ALTER TABLE devolucao_anexo ADD COLUMN usuario_id INTEGER"); }catch(e){}
   db.exec("CREATE INDEX IF NOT EXISTS idx_devanexo_caso ON devolucao_anexo(caso_id)");
   const ins = db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES (?,?)");
   for(const [k,v] of Object.entries(PADROES)) ins.run(k, v);
@@ -326,9 +337,17 @@ function custosPorCaso(db){
   return m;
 }
 
+/* TODO evento grava quem fez: o id e o nome como retrato (QUEM-FEZ-E-REVISAO
+   fase 5, 05/11/2026). Até ali só o nome ia sempre, e o id só no clique de
+   etapa — o relatório por pessoa não teria de onde tirar a história do caso.
+   `usuario` é a pessoa ({id, nome}); um texto solto ainda é aceito (é só o
+   nome) para um chamador de fora que ainda não mande a pessoa. */
 function evento(db, caso_id, tipo, de, para, texto, usuario){
-  return db.prepare('INSERT INTO devolucao_evento (caso_id,tipo,de,para,texto,usuario) VALUES (?,?,?,?,?,?)')
-    .run(caso_id, tipo, de == null ? null : String(de), para == null ? null : String(para), texto || null, usuario || null).lastInsertRowid;
+  const pessoa = usuario && typeof usuario === 'object';
+  const nome = pessoa ? (usuario.nome || null) : (usuario || null);
+  const uid = pessoa && usuario.id != null && usuario.id !== '' ? usuario.id : null;
+  return db.prepare('INSERT INTO devolucao_evento (caso_id,tipo,de,para,texto,usuario,usuario_id) VALUES (?,?,?,?,?,?,?)')
+    .run(caso_id, tipo, de == null ? null : String(de), para == null ? null : String(para), texto || null, nome, uid).lastInsertRowid;
 }
 
 /* ── leituras ── */
@@ -442,6 +461,7 @@ function aberto(db, id){
   return c;
 }
 const nomeDe = (u) => (u && u.nome) || null;
+const idDe = (u) => (u && u.id != null && u.id !== '') ? u.id : null;
 
 /* "Via publicidade?" — Sim ou Não, e nada mais. Vazio não é "não": seria o
    esquecimento contando como resposta (o custo vazio do R9 pela outra porta). */
@@ -529,19 +549,19 @@ function lancar(db, b, usuario, opt){
   let id;
   db.transaction(() => {
     id = db.prepare(`INSERT INTO devolucao_caso (tipo,venda,pack_id,nf,sku,comprador,lote_id,motivo,etapa,prazo,
-        responsavel,passado_em,cep,valor_ml,valor_ml_situacao,obs,criado_por,publicidade,mensagem_ml,link_ml,aberta_em,prazo_coleta)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+        responsavel,passado_em,cep,valor_ml,valor_ml_situacao,obs,criado_por,publicidade,mensagem_ml,link_ml,aberta_em,prazo_coleta,criado_por_id)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
         tipo, venda || null, pack || null, nf || null,
         txt(b.sku) || (lt ? lt.codigo : null), txt(b.comprador) || (lt ? lt.buyer : null), lt ? lt.id : null,
         motivo, etapa, prazo,
         txt(b.responsavel), passado_em, cepDe(b.cep),
         b._valor_ml === undefined ? null : b._valor_ml, b._valor_ml_situacao || null,
-        txt(b.obs), nomeDe(usuario), publicidade, mensagem_ml, link_ml, aberta_em, prazo_coleta).lastInsertRowid;
+        txt(b.obs), nomeDe(usuario), publicidade, mensagem_ml, link_ml, aberta_em, prazo_coleta, idDe(usuario)).lastInsertRowid;
     if(b._valor_ml_situacao) db.prepare("UPDATE devolucao_caso SET valor_ml_desde=datetime('now','localtime') WHERE id=?").run(id);
     if(resp) db.prepare('UPDATE devolucao_caso SET responsavel_id=?, responsavel_nome=? WHERE id=?').run(resp.id, resp.nome, id);
     evento(db, id, 'lancado', null, etapa, (tipo === 'coleta' ? 'Nós coletamos' : 'ML devolve') +
       (prazo ? ' · comprovante até '+br(prazo)+' · coletar até '+br(prazo_coleta) : '') +
-      (publicidade == null ? '' : ' · via publicidade: '+simNao(publicidade)), nomeDe(usuario));
+      (publicidade == null ? '' : ' · via publicidade: '+simNao(publicidade)), usuario);
   })();
   return ler(db, id);
 }
@@ -621,7 +641,7 @@ function trocarTipo(db, id, b, usuario){
     if(para === 'coleta' && !c.passado_em) db.prepare('UPDATE devolucao_caso SET passado_em=? WHERE id=?').run(String(c.criado_em||'').slice(0,10) || hoje(db), c.id);
     evento(db, c.id, 'tipo', c.tipo, para, (c.tipo === 'coleta' ? 'Nós coletamos' : 'ML devolve')+' → '+(para === 'coleta' ? 'Nós coletamos' : 'ML devolve')+
       (para === 'coleta' ? ' · comprovante até '+br(prazo)+' · coletar até '+br(prazo_coleta) : '')+
-      (etapa !== c.etapa ? ' · etapa '+(NOME_ETAPA[c.etapa]||c.etapa)+' → '+(NOME_ETAPA[etapa]||etapa) : ''), nomeDe(usuario));
+      (etapa !== c.etapa ? ' · etapa '+(NOME_ETAPA[c.etapa]||c.etapa)+' → '+(NOME_ETAPA[etapa]||etapa) : ''), usuario);
   })();
   return ler(db, c.id);
 }
@@ -642,7 +662,7 @@ function pedirRevisaoFrete(db, id, b, usuario){
   if(!PEDE[pede]) throw new Recusa(400, 'Diga o que se pede ao ML: o valor cobrado, a reputação, ou os dois.');
   db.transaction(() => {
     db.prepare("UPDATE devolucao_caso SET revisao_pedida_em=datetime('now','localtime'), revisao_numero=?, revisao_pede=? WHERE id=?").run(numero, pede, c.id);
-    evento(db, c.id, 'revisao_frete', null, 'pedida', 'pedi revisão ao ML: '+PEDE[pede]+(numero ? ' · nº '+numero : ''), nomeDe(usuario));
+    evento(db, c.id, 'revisao_frete', null, 'pedida', 'pedi revisão ao ML: '+PEDE[pede]+(numero ? ' · nº '+numero : ''), usuario);
   })();
   return ler(db, c.id);
 }
@@ -661,7 +681,7 @@ function respostaRevisaoFrete(db, id, b, usuario){
   let mud = [];
   db.transaction(() => {
     db.prepare("UPDATE devolucao_caso SET revisao_resultado=?, revisao_resp_em=datetime('now','localtime') WHERE id=?").run(resultado, c.id);
-    evento(db, c.id, 'revisao_frete', 'pedida', resultado, resultado === 'devolveu' ? 'o ML atendeu a revisão' : 'o ML negou a revisão', nomeDe(usuario));
+    evento(db, c.id, 'revisao_frete', 'pedida', resultado, resultado === 'devolveu' ? 'o ML atendeu a revisão' : 'o ML negou a revisão', usuario);
     if(resultado === 'devolveu' && b.valor_revisao !== undefined && String(b.valor_revisao).trim() !== '')
       mud = lancarValor(db, c.id, { valor_revisao: b.valor_revisao }, usuario);
     // Com a baixa e o "Já revisei" já feitos, a resposta encerra.
@@ -762,14 +782,14 @@ function editar(db, id, b, usuario, opt){
   if(!sets.length) return c;
   db.transaction(() => {
     db.prepare('UPDATE devolucao_caso SET '+sets.join(',')+' WHERE id=?').run(...vals, c.id);
-    evento(db, c.id, 'editado', null, null, mud.join(' · '), nomeDe(usuario));
+    evento(db, c.id, 'editado', null, null, mud.join(' · '), usuario);
   })();
   return ler(db, c.id);
 }
 
 function moverEtapa(db, c, para, usuario, texto, tipoEvento){
   db.prepare("UPDATE devolucao_caso SET etapa=?, etapa_desde=datetime('now','localtime') WHERE id=?").run(para, c.id);
-  const ev = evento(db, c.id, tipoEvento || 'etapa', c.etapa, para, texto, nomeDe(usuario));
+  const ev = evento(db, c.id, tipoEvento || 'etapa', c.etapa, para, texto, usuario);
   db.prepare('UPDATE devolucao_evento SET usuario_id=?, etapa_desde_antes=? WHERE id=?').run((usuario && usuario.id) || null, c.etapa_desde || null, ev);
 }
 
@@ -822,7 +842,7 @@ function desfazerEtapa(db, id, usuario){
   db.transaction(() => {
     db.prepare('UPDATE devolucao_caso SET etapa=?, etapa_desde=? WHERE id=?').run(e.de, e.etapa_desde_antes, c.id);
     if(d.chegada) db.prepare('UPDATE devolucao_caso SET chegou_em=NULL WHERE id=?').run(c.id);
-    const ev = evento(db, c.id, 'desfeito', e.para, e.de, 'desfeito: '+(NOME_ETAPA[e.para]||e.para)+' → '+(NOME_ETAPA[e.de]||e.de), nomeDe(usuario));
+    const ev = evento(db, c.id, 'desfeito', e.para, e.de, 'desfeito: '+(NOME_ETAPA[e.para]||e.para)+' → '+(NOME_ETAPA[e.de]||e.de), usuario);
     db.prepare('UPDATE devolucao_evento SET usuario_id=? WHERE id=?').run(usuario.id, ev);
   })();
   return ler(db, c.id);
@@ -868,7 +888,7 @@ function pedirProrrogacao(db, id, usuario, texto, qual){
   if(c.tipo !== 'coleta') throw new Recusa(400, 'No "ML devolve" não há prazo do ML para prorrogar.');
   const q = qualPrazo(db, c, qual);
   evento(db, c.id, 'prorrogacao_pedida', q === 'coleta' ? c.prazo_coleta : c.prazo, null,
-    (texto || 'pedi prorrogação ao ML')+' · prazo '+(q === 'coleta' ? 'da coleta' : 'do comprovante'), nomeDe(usuario));
+    (texto || 'pedi prorrogação ao ML')+' · prazo '+(q === 'coleta' ? 'da coleta' : 'do comprovante'), usuario);
   return ler(db, c.id);
 }
 /* R6: o ML aceitou — lança o prazo novo, e o ORIGINAL fica guardado. O
@@ -883,18 +903,18 @@ function novoPrazo(db, id, prazo, usuario, qual){
   if(p === c[col]) throw new Recusa(400, 'Esse já é o prazo '+(q === 'coleta' ? 'da coleta' : 'do comprovante')+'.');
   db.transaction(() => {
     db.prepare('UPDATE devolucao_caso SET '+col+'=?, '+orig+'=COALESCE('+orig+', ?) WHERE id=?').run(p, c[col], c.id);
-    evento(db, c.id, 'prazo', c[col], p, 'prazo novo do ML · '+(q === 'coleta' ? 'coleta' : 'comprovante'), nomeDe(usuario));
+    evento(db, c.id, 'prazo', c[col], p, 'prazo novo do ML · '+(q === 'coleta' ? 'coleta' : 'comprovante'), usuario);
   })();
   return ler(db, c.id);
 }
 
 /* Encerrar. Só por decisão (R7, R16, R19): a leitura nunca encerra. */
 function encerrar(db, c, saida, usuario, texto, extra){
-  const sets = ["etapa='encerrado'", 'saida=?', "encerrado_em=datetime('now','localtime')", 'encerrado_por=?'];
-  const vals = [saida, nomeDe(usuario)];
+  const sets = ["etapa='encerrado'", 'saida=?', "encerrado_em=datetime('now','localtime')", 'encerrado_por=?', 'encerrado_por_id=?'];
+  const vals = [saida, nomeDe(usuario), idDe(usuario)];
   for(const [k,v] of Object.entries(extra || {})){ sets.push(k+'=?'); vals.push(v); }
   db.prepare('UPDATE devolucao_caso SET '+sets.join(',')+' WHERE id=?').run(...vals, c.id);
-  evento(db, c.id, 'encerrado', c.etapa, 'encerrado', (NOME_SAIDA[saida]||saida) + (texto ? ' · '+texto : ''), nomeDe(usuario));
+  evento(db, c.id, 'encerrado', c.etapa, 'encerrado', (NOME_SAIDA[saida]||saida) + (texto ? ' · '+texto : ''), usuario);
 }
 /* R7: o vencido fica no topo até o admin geral escolher. Encerrar como perda
    registra o valor perdido — vazio fica NULO, e o total do mês sai como piso (R9). */
@@ -964,7 +984,7 @@ function chegou(db, id, usuario, b){
     db.prepare("UPDATE devolucao_caso SET chegou_em=datetime('now','localtime') WHERE id=?").run(c.id);
     if(revisar) db.prepare('UPDATE devolucao_caso SET revisar_ate=? WHERE id=?').run(revisar, c.id);
     if(etapas.indexOf(c.etapa) < etapas.indexOf('chegou')) moverEtapa(db, c, 'chegou', usuario, 'a caixa chegou');
-    else evento(db, c.id, 'chegou', null, null, 'a caixa chegou', nomeDe(usuario));
+    else evento(db, c.id, 'chegou', null, null, 'a caixa chegou', usuario);
   })();
   return ler(db, c.id);
 }
@@ -989,7 +1009,7 @@ function avisarML(db, id, usuario){
   if(ja) throw new Recusa(409, 'O aviso ao ML do caso #'+c.id+' já foi registrado.');
   db.transaction(() => {
     if(c.etapa === 'chegou') moverEtapa(db, c, 'ml_avisado', usuario, 'avisamos o ML que recebemos', 'aviso_ml');
-    else evento(db, c.id, 'aviso_ml', null, null, 'avisamos o ML que recebemos', nomeDe(usuario));
+    else evento(db, c.id, 'aviso_ml', null, null, 'avisamos o ML que recebemos', usuario);
   })();
   return ler(db, c.id);
 }
@@ -1010,7 +1030,7 @@ function ligarRevisao(db, ref, devolucao_id, usuario){
   const etq = etiquetaDeDevolucao(c, ref.codigo);
   db.prepare(`UPDATE devolucao_caso SET devolucao_id=?, chegou_em=COALESCE(chegou_em, datetime('now','localtime')),
     etapa='revisado', etapa_desde=datetime('now','localtime'), etiqueta_devolucao=COALESCE(?, etiqueta_devolucao) WHERE id=?`).run(devolucao_id, etq, c.id);
-  evento(db, c.id, 'revisado', c.etapa, 'revisado', 'revisão #'+devolucao_id+' na tela de Devoluções'+(etq ? ' · etiqueta de devolução '+etq : ''), nomeDe(usuario));
+  evento(db, c.id, 'revisado', c.etapa, 'revisado', 'revisão #'+devolucao_id+' na tela de Devoluções'+(etq ? ' · etiqueta de devolução '+etq : ''), usuario);
   return c.id;
 }
 
@@ -1082,8 +1102,8 @@ function ligarManual(db, caso_id, devolucao_id, usuario, confirmar){
       .run(d.id, d.recebido_em || null, etiquetaDeDevolucao(c, d.codigo_ml), c.id);
     if(!c.chegou_em && !d.recebido_em) db.prepare("UPDATE devolucao_caso SET chegou_em=datetime('now','localtime') WHERE id=?").run(c.id);
     evento(db, c.id, 'revisado', c.etapa, 'revisado', 'revisão #'+d.id+' ligada à mão (etiqueta bipada: '+(d.codigo_ml || '—')+')'+
-      (diferente ? ' · SKU recebido '+skuD+' diferente do vendido '+skuC : ''), nomeDe(usuario));
-    if(d.baixado && c.tipo === 'ml') evento(db, c.id, 'baixa', null, null, 'a revisão #'+d.id+' já tinha baixa — falta marcar "Já revisei" no ML', nomeDe(usuario));
+      (diferente ? ' · SKU recebido '+skuD+' diferente do vendido '+skuC : ''), usuario);
+    if(d.baixado && c.tipo === 'ml') evento(db, c.id, 'baixa', null, null, 'a revisão #'+d.id+' já tinha baixa — falta marcar "Já revisei" no ML', usuario);
   })();
   return ler(db, c.id);
 }
@@ -1116,7 +1136,6 @@ function desligarRevisao(db, caso_id, motivo, usuario){
   if(!m) throw new Recusa(400, 'Diga por que esta não é a peça certa (por exemplo: a etiqueta é da venda de outro cliente).');
   const d = db.prepare('SELECT * FROM devolucao WHERE id=?').get(c.devolucao_id) || { id:c.devolucao_id };
   const etq = etiquetaDeDevolucao(c, d.codigo_ml);
-  const quem = nomeDe(usuario);
   db.transaction(() => {
     if(d.baixado){
       db.prepare('UPDATE devolucao SET baixado=0, baixado_em=NULL, reputacao=NULL, motivo=NULL WHERE id=?').run(d.id);
@@ -1124,16 +1143,16 @@ function desligarRevisao(db, caso_id, motivo, usuario){
          nao existir num banco que ainda nao subiu com o dev_route novo */
       try{ db.prepare('UPDATE devolucao SET baixado_por_id=NULL, baixado_por=NULL WHERE id=?').run(d.id); }catch(e){}
       evento(db, c.id, 'baixa', null, null, 'baixa da revisão #'+d.id+' desfeita (era: afetou a reputação '+(d.reputacao||'—')+' · motivo '+(d.motivo||'—')+
-        (d.baixado_em ? ' · de '+d.baixado_em.slice(8,10)+'/'+d.baixado_em.slice(5,7) : '')+(d.baixado_por ? ' · por '+d.baixado_por : '')+') — ela volta para a Baixa sem caso', quem);
+        (d.baixado_em ? ' · de '+d.baixado_em.slice(8,10)+'/'+d.baixado_em.slice(5,7) : '')+(d.baixado_por ? ' · por '+d.baixado_por : '')+') — ela volta para a Baixa sem caso', usuario);
     }
     db.prepare(`UPDATE devolucao_caso SET devolucao_id=NULL, etapa='chegou', etapa_desde=datetime('now','localtime'),
-      chegou_em=COALESCE(chegou_em, datetime('now','localtime')), encerrado_em=NULL, encerrado_por=NULL, saida=NULL,
+      chegou_em=COALESCE(chegou_em, datetime('now','localtime')), encerrado_em=NULL, encerrado_por=NULL, encerrado_por_id=NULL, saida=NULL,
       etiqueta_devolucao=CASE WHEN etiqueta_devolucao=? THEN NULL ELSE etiqueta_devolucao END WHERE id=?`).run(etq, c.id);
     const avisos = [];
     if(c.encerrado_em) avisos.push('caso reaberto');
     if(c.etapa === 'ml_revisei' || (c.encerrado_em && c.tipo === 'ml')) avisos.push('o "Já revisei" tinha sido marcado com esta peça — marque de novo depois de ligar a certa');
     evento(db, c.id, 'desligado', c.etapa, 'chegou', 'revisão #'+d.id+' desligada (etiqueta bipada: '+(d.codigo_ml || '—')+') · motivo: '+m+
-      (avisos.length ? ' · '+avisos.join(' · ') : ''), quem);
+      (avisos.length ? ' · '+avisos.join(' · ') : ''), usuario);
   })();
   return ler(db, c.id);
 }
@@ -1150,7 +1169,7 @@ function baixaDaDevolucao(db, devolucao_id, motivoEscolhido, usuario){
   if(!c.motivo && motivoEscolhido){
     // Um motivo por caso: o caso sem motivo ganha o da baixa, e isso é história.
     db.prepare('UPDATE devolucao_caso SET motivo=? WHERE id=?').run(motivoEscolhido, c.id);
-    evento(db, c.id, 'editado', null, null, 'motivo: — → '+motivoEscolhido+' (na baixa)', nomeDe(usuario));
+    evento(db, c.id, 'editado', null, null, 'motivo: — → '+motivoEscolhido+' (na baixa)', usuario);
   }
   if(c.tipo === 'ml'){
     /* A baixa encerra o ML devolve só com o "Já revisei" marcado e sem
@@ -1159,7 +1178,7 @@ function baixaDaDevolucao(db, devolucao_id, motivoEscolhido, usuario){
     const falta = [];
     if(c.etapa !== 'ml_revisei') falta.push('marcar "Já revisei" no ML');
     if(c.revisao_pedida_em && !c.revisao_resultado) falta.push('a resposta da revisão do frete');
-    if(falta.length) evento(db, c.id, 'baixa', null, null, 'baixa da devolução #'+devolucao_id+' — o caso fica aberto: falta '+falta.join(' e '), nomeDe(usuario));
+    if(falta.length) evento(db, c.id, 'baixa', null, null, 'baixa da devolução #'+devolucao_id+' — o caso fica aberto: falta '+falta.join(' e '), usuario);
     else talvezEncerrarML(db, c.id, usuario, true, 'baixa da devolução #'+devolucao_id);
   }
   return { motivo, caso:c.id };
@@ -1231,7 +1250,7 @@ function agendarColeta(db, caso_id, b, usuario){
   const num = db.prepare('SELECT COUNT(*) n FROM devolucao_coleta WHERE caso_id=? AND id<=?').get(c.id, k.id).n;
   db.transaction(() => {
     db.prepare('UPDATE devolucao_coleta SET agendada_para=? WHERE id=?').run(d, k.id);
-    evento(db, c.id, 'coleta', k.agendada_para, d, num+'ª tentativa · '+(d ? 'agendada para '+br(d) : 'data agendada apagada'), nomeDe(usuario));
+    evento(db, c.id, 'coleta', k.agendada_para, d, num+'ª tentativa · '+(d ? 'agendada para '+br(d) : 'data agendada apagada'), usuario);
   })();
   return ler(db, c.id);
 }
@@ -1258,12 +1277,12 @@ function pedirColeta(db, caso_id, b, usuario){
   if(ja) throw new Recusa(409, 'Já há uma tentativa de coleta aguardando neste caso. Registre o resultado dela antes.');
   const n = db.prepare('SELECT COUNT(*) n FROM devolucao_coleta WHERE caso_id=?').get(c.id).n + 1;
   db.transaction(() => {
-    db.prepare('INSERT INTO devolucao_coleta (caso_id,transportadora_id,cep,custo,obs,usuario,agendada_para) VALUES (?,?,?,?,?,?,?)')
-      .run(c.id, t.id, cep, custo, String(b.obs||'').trim() || null, nomeDe(usuario), agendada);
+    db.prepare('INSERT INTO devolucao_coleta (caso_id,transportadora_id,cep,custo,obs,usuario,agendada_para,usuario_id) VALUES (?,?,?,?,?,?,?,?)')
+      .run(c.id, t.id, cep, custo, String(b.obs||'').trim() || null, nomeDe(usuario), agendada, idDe(usuario));
     if(cep && !c.cep) db.prepare('UPDATE devolucao_caso SET cep=? WHERE id=?').run(cep, c.id);
     const tx = n+'ª tentativa · '+t.nome + (agendada ? ' · agendada para '+br(agendada) : '');
     if(c.etapa !== 'coleta_pedida') moverEtapa(db, c, 'coleta_pedida', usuario, tx, 'coleta');
-    else evento(db, c.id, 'coleta', null, null, tx, nomeDe(usuario));
+    else evento(db, c.id, 'coleta', null, null, tx, usuario);
   })();
   return ler(db, c.id);
 }
@@ -1286,13 +1305,13 @@ function resultadoColeta(db, caso_id, b, usuario){
       .run(...[res].concat(custo !== undefined && custo !== null ? [custo] : []).concat([k.id]));
     if(res === 'coletou'){
       if(ETAPAS.coleta.indexOf(c.etapa) < ETAPAS.coleta.indexOf('a_caminho')) moverEtapa(db, c, 'a_caminho', usuario, 'coletou · '+(t.nome||''), 'coleta');
-      else evento(db, c.id, 'coleta', null, null, 'coletou · '+(t.nome||''), nomeDe(usuario));
+      else evento(db, c.id, 'coleta', null, null, 'coletou · '+(t.nome||''), usuario);
     } else {
       db.prepare('INSERT INTO devolucao_coleta (caso_id,transportadora_id,cep,custo,usuario) VALUES (?,?,?,NULL,?)')
         .run(c.id, k.transportadora_id, k.cep, nomeDe(usuario));
       const txt = 'não achou o cliente · '+(t.nome||'')+' · nova tentativa aberta';
       if(c.etapa !== 'coleta_pedida') moverEtapa(db, c, 'coleta_pedida', usuario, txt, 'coleta');
-      else evento(db, c.id, 'coleta', null, null, txt, nomeDe(usuario));
+      else evento(db, c.id, 'coleta', null, null, txt, usuario);
     }
   })();
   return ler(db, c.id);
@@ -1366,12 +1385,12 @@ function anexar(db, caso_id, b, usuario, dir){
   let id, caminho;
   try{
     db.transaction(() => {
-      id = db.prepare('INSERT INTO devolucao_anexo (caso_id,tipo,doc_tipo,usuario) VALUES (?,?,?,?)').run(c.id, tipo, doc, nomeDe(usuario)).lastInsertRowid;
+      id = db.prepare('INSERT INTO devolucao_anexo (caso_id,tipo,doc_tipo,usuario,usuario_id) VALUES (?,?,?,?,?)').run(c.id, tipo, doc, nomeDe(usuario), idDe(usuario)).lastInsertRowid;
       fs.mkdirSync(dir, { recursive:true });
       caminho = path.join(dir, 'caso-'+c.id+'-anexo-'+id+'-'+tipo+'.'+arq.ext);
       fs.writeFileSync(caminho, arq.buf);
       db.prepare('UPDATE devolucao_anexo SET arquivo=? WHERE id=?').run(caminho, id);
-      evento(db, c.id, 'anexo', null, null, tipo === 'doc' ? doc : 'foto do comprador', nomeDe(usuario));
+      evento(db, c.id, 'anexo', null, null, tipo === 'doc' ? doc : 'foto do comprador', usuario);
     })();
   }catch(e){
     if(e instanceof Recusa) throw e;
@@ -1410,7 +1429,7 @@ function situacaoValor(db, id, sit, usuario){
   if(sit === c.valor_ml_situacao) throw new Recusa(400, 'O valor já está nessa situação.');
   db.transaction(() => {
     db.prepare("UPDATE devolucao_caso SET valor_ml_situacao=?, valor_ml_desde=datetime('now','localtime') WHERE id=?").run(sit, c.id);
-    evento(db, c.id, 'valor_situacao', c.valor_ml_situacao, sit, 'valor do ML: '+SITUACOES_VALOR[sit], nomeDe(usuario));
+    evento(db, c.id, 'valor_situacao', c.valor_ml_situacao, sit, 'valor do ML: '+SITUACOES_VALOR[sit], usuario);
   })();
   return ler(db, c.id);
 }
@@ -1452,7 +1471,7 @@ function lancarValor(db, id, b, usuario){
   db.transaction(() => {
     if(sets.length) db.prepare('UPDATE devolucao_caso SET '+sets.join(',')+' WHERE id=?').run(...vals, c.id);
     if(tent && custo !== tent.custo) db.prepare('UPDATE devolucao_coleta SET custo=? WHERE id=?').run(custo, tent.id);
-    evento(db, c.id, 'valor', null, null, 'lançado: '+mud.join(', '), nomeDe(usuario));
+    evento(db, c.id, 'valor', null, null, 'lançado: '+mud.join(', '), usuario);
   })();
   return mud;
 }

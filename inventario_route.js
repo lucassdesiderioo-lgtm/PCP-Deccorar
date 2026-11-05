@@ -17,14 +17,25 @@
  * outro setor ou por excecao entra (spec §8.1).
  */
 const INV = require('./inventario_dominio');
+const QUEM = require('./quem');
 
 module.exports = function(app, db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
+
   INV.garantirSchema(db);
 
+  /* Quem faz vem do quem.js, o dono unico (QUEM-FEZ-E-REVISAO fase 5,
+     05/11/2026), no formato que o dominio ja conhece ({id, nome}). As
+     leituras (a lista, a tarja) aceitam ninguem e devolvem pouco; toda
+     ESCRITA passa pelo `post` abaixo, que responde 401 sem login. */
   const quem = req => {
-    const u = req.usuario || {};
-    return { id: u.id != null ? u.id : null, nome: u.nome || '' };
+    const q = QUEM.quem(req);
+    return q ? { id: q.usuario_id, nome: q.usuario_nome || '' } : { id: null, nome: '' };
   };
+  const post = (rota, h) => app.post(rota, (req,res) => { if(!QUEM.exigir(req,res)) return; return h(req,res); });
   function pode(req, chave){
     try{ return !!app.locals.acesso.podePermissao(req.usuario, chave); }
     catch(e){ return (((req.usuario||{}).areas)||[]).indexOf('admin') >= 0; }
@@ -74,13 +85,13 @@ module.exports = function(app, db){
   app.get('/api/inventario/tarja', (req,res) => responder(res, () =>
     ({ tarja: tx(() => INV.tarja(db, { quem:quem(req), pode:podeDe(req), temChave:temChaveRodizio })) })));
 
-  app.post('/api/inventario/bipe', (req,res) => responder(res, () => {
+  post('/api/inventario/bipe', (req,res) => responder(res, () => {
     const b = req.body || {};
     return tx(() => INV.contar(db, { codigo:b.codigo, quantidade:b.quantidade, zerar:!!b.zerar, abrir:!!b.abrir,
       quem:quem(req), pode:podeDe(req) }));
   }));
 
-  app.post('/api/inventario/terminar', (req,res) => responder(res, () => {
+  post('/api/inventario/terminar', (req,res) => responder(res, () => {
     const b = req.body || {};
     const r = tx(() => INV.terminar(db, { codigo:b.codigo, nenhuma:!!b.nenhuma, quem:quem(req), pode:podeDe(req) }));
     if(r.invalidada){
@@ -91,7 +102,7 @@ module.exports = function(app, db){
     return r;
   }));
 
-  app.post('/api/inventario/geral/terminar-prateleira', (req,res) => responder(res, () => {
+  post('/api/inventario/geral/terminar-prateleira', (req,res) => responder(res, () => {
     const b = req.body || {};
     const r = tx(() => INV.terminarPrateleira(db, { quem:quem(req), pode:podeDe(req), confirmar:!!b.confirmar }));
     if(r.zerados != null) auditar(req, 'inventario_prateleira_zero', 'geral', r.zerados + ' SKU(s) sem nenhuma peça');
@@ -105,25 +116,25 @@ module.exports = function(app, db){
   app.get('/api/inventario/andamento', (req,res) => responder(res, () =>
     tx(() => { INV.garantirDia(db, ctx); return INV.andamento(db, ctx); })));
 
-  app.post('/api/inventario/abrir', (req,res) => responder(res, () => {
+  post('/api/inventario/abrir', (req,res) => responder(res, () => {
     const b = req.body || {};
     const r = tx(() => INV.abrir(db, { tipo:b.tipo, codigos:b.codigos, quem:quem(req), confirmar:!!b.confirmar }));
     auditar(req, 'inventario_aberto', 'conferencia #' + r.ciclo_id, r.tipo + ' · ' + r.itens + ' SKU(s)');
     return r;
   }));
-  app.post('/api/inventario/geral/abrir', (req,res) => responder(res, () => {
+  post('/api/inventario/geral/abrir', (req,res) => responder(res, () => {
     const b = req.body || {};
     const r = tx(() => INV.abrir(db, { tipo:'geral', quem:quem(req), confirmar:!!b.confirmar }));
     auditar(req, 'inventario_aberto', 'conferencia #' + r.ciclo_id, 'geral · ' + r.itens + ' SKU(s) · expedição parada');
     return r;
   }));
-  app.post('/api/inventario/quinzenal/abrir', (req,res) => responder(res, () => {
+  post('/api/inventario/quinzenal/abrir', (req,res) => responder(res, () => {
     const r = tx(() => INV.abrirQuinzenal(db, { quem:quem(req) }));
     auditar(req, 'inventario_aberto', 'conferencia #' + r.ciclo_id, 'quinzenal antecipada · ' + r.itens + ' SKU(s) · prazo ' + r.prazo);
     return r;
   }));
 
-  app.post('/api/inventario/encerrar', (req,res) => responder(res, () => {
+  post('/api/inventario/encerrar', (req,res) => responder(res, () => {
     const id = +((req.body || {}).ciclo_id);
     const r = tx(() => INV.encerrar(db, id));
     auditar(req, 'inventario_encerrado', 'conferencia #' + id, r.nao_contados + ' nao contado(s)');
@@ -132,7 +143,7 @@ module.exports = function(app, db){
 
   app.get('/api/inventario/rodizio', (req,res) => responder(res, () =>
     ({ pessoas: INV.rodizio(db, temChaveRodizio) })));
-  app.post('/api/inventario/rodizio', (req,res) => responder(res, () => {
+  post('/api/inventario/rodizio', (req,res) => responder(res, () => {
     const b = req.body || {};
     const r = tx(() => INV.marcarRodizio(db, { usuario_id:b.usuario_id, fora:!!b.fora }));
     auditar(req, 'rodizio_' + (r.fora ? 'fora' : 'dentro'), r.nome, r.fora ? 'fora do rodízio da contagem' : 'de volta ao rodízio');
@@ -172,9 +183,9 @@ module.exports = function(app, db){
     auditar(req, 'inventario_contar_de_novo', r.codigo, (b.motivo || '') + (r.amanha ? ' · volta na lista de amanhã' : ' · volta a contar do zero'));
     return r;
   }
-  app.post('/api/inventario/aprovar', (req,res) => responder(res, () => aplicar(req)));
-  app.post('/api/inventario/rejeitar', (req,res) => responder(res, () => recontar(req)));
-  app.post('/api/inventario/resolver', (req,res) => responder(res, () =>
+  post('/api/inventario/aprovar', (req,res) => responder(res, () => aplicar(req)));
+  post('/api/inventario/rejeitar', (req,res) => responder(res, () => recontar(req)));
+  post('/api/inventario/resolver', (req,res) => responder(res, () =>
     (((req.body || {}).acao) === 'recontar') ? recontar(req) : aplicar(req)));
 
   // ── o relatorio de furos (§7.3) ───────────────────────────────────────────

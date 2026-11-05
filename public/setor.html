@@ -61,4 +61,13 @@ fetch('/api/auth/eu',{credentials:'same-origin'}).then(function(r){return r.json
    document.getElementById('oi').textContent='Ola, '+u.nome+'. Onde voce vai trabalhar?';
    if(u.destino&&u.destino.padrao) document.getElementById('opPadrao').href=u.destino.padrao;
  });
+/* A TROCA DE SETOR FICA REGISTRADA (QUEM-FEZ-E-REVISAO fase 6): o clique avisa
+   o servidor e segue o link como sempre. O `keepalive` deixa o aviso chegar
+   mesmo com a pagina indo embora; falhar o aviso nunca segura a pessoa. */
+function avisarSetor(para){
+  try{ fetch('/api/auth/setor',{method:'POST',keepalive:true,credentials:'same-origin',
+    headers:{'content-type':'application/json'},body:JSON.stringify({para:para})}).catch(function(){}); }catch(e){}
+}
+document.getElementById('opPadrao').addEventListener('click',function(){ avisarSetor('padrao'); });
+document.getElementById('opMedida').addEventListener('click',function(){ avisarSetor('sobmedida'); });
 </script></body></html>

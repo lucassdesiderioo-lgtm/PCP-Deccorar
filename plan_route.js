@@ -17,7 +17,13 @@ const FLUXO = require('./fluxo_estoque');
 const MEDIA = require('./media_dominio');
 const CANC = require('./cancelada_dominio');
 
+const QUEM = require('./quem');
 module.exports = function(app, db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
+
   // Schema no mesmo commit em que o codigo passa a usar (CLAUDE.md secao 17).
   db.exec(`CREATE TABLE IF NOT EXISTS venda_futura (
     venda_id     TEXT PRIMARY KEY,

@@ -1,4 +1,10 @@
+const QUEM = require('./quem');
 module.exports=function(app,db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app, { auditar:'cadastro' });   // a linha nao tem autor: quem fez vai na auditoria
+
   db.exec("CREATE TABLE IF NOT EXISTS listas (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, valor TEXT, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1)");
   db.exec("CREATE TABLE IF NOT EXISTS rejeicao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, motivo TEXT, obs TEXT, segundos INTEGER, modo TEXT, usuario TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, usuario_id INTEGER)");
   /* QUEM-FEZ-E-REVISAO (04/11/2026): a "Peca com problema" ja gravava o NOME

@@ -333,7 +333,7 @@ secao('19. modo teste: as tabelas novas estão cobertas');
 require('./estoque_dominio');
 const rotasT = {};
 require('./teste_route')({ get(p,h){ rotasT['GET '+p]=h; }, post(p,h){ rotasT['POST '+p]=h; } }, db);
-function chamarT(m, p){ const out={}; rotasT[m+' '+p]({body:{}}, { json(b){ out.body=b; } }); return out.body; }
+function chamarT(m, p){ const out={}; const rs={ status(){ return rs; }, json(b){ out.body=b; return rs; } }; rotasT[m+' '+p]({body:{}, usuario:{id:1,nome:'Lucas'}}, rs); return out.body; }
 let t = chamarT('GET','/api/teste');
 const nc = (t.naoCobertas || []).map(x => x.tabela);
 ok('devolucao_caso e devolucao_evento NÃO estão em naoCobertas', !nc.includes('devolucao_caso') && !nc.includes('devolucao_evento'), JSON.stringify(t.naoCobertas));
@@ -1820,10 +1820,13 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
     novo.exec("CREATE TABLE devolucao_caso (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT NOT NULL, etapa TEXT NOT NULL, venda TEXT, encerrado_em TEXT)");
     DD.garantir(novo);
     const cn = cols(novo);
-    ok('banco antigo: o ALTER acrescenta as duas no fim', cn.slice(-2).join(',') === 'responsavel_id,responsavel_nome', cn.slice(-4).join(','));
+    /* Depois do responsável vieram o criado_por_id e o encerrado_por_id
+       (QUEM-FEZ-E-REVISAO fase 5): as duas continuam juntas, logo antes. */
+    const fimR = (c) => c.slice(c.indexOf('responsavel_id'), c.indexOf('responsavel_id') + 4).join(',');
+    ok('banco antigo: o ALTER acrescenta as duas no fim', fimR(cn) === 'responsavel_id,responsavel_nome,criado_por_id,encerrado_por_id' && cn.slice(-1)[0] === 'encerrado_por_id', cn.slice(-4).join(','));
     const zero = new Database(':memory:'); DD.garantir(zero);
     const cz = cols(zero);
-    ok('   e a ordem do banco novo é a mesma do antigo depois do ALTER (§17)', cz.slice(-2).join(',') === 'responsavel_id,responsavel_nome', cz.slice(-4).join(','));
+    ok('   e a ordem do banco novo é a mesma do antigo depois do ALTER (§17)', cz.slice(-4).join(',') === cn.slice(-4).join(',') && fimR(cz) === fimR(cn), cz.slice(-4).join(','));
     const antigo = new Database(':memory:');
     antigo.exec("CREATE TABLE devolucao_caso (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT NOT NULL, etapa TEXT NOT NULL, venda TEXT, encerrado_em TEXT, responsavel TEXT)");
     antigo.prepare("INSERT INTO devolucao_caso (tipo,etapa,responsavel) VALUES ('coleta','lancado','Renato do texto')").run();

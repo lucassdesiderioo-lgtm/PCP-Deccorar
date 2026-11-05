@@ -91,7 +91,7 @@ function chamar(metodo, caminho, corpo, params){
      de baixo nunca rodavam, entao o defeito aparecia como "travou", nao como
      vermelho. E a mesma licao do `teste_compras_sobmedida.js`: teste que
      morre nao diz o que quebrou. */
-  try{ f({body:corpo||{}, params:params||{}, query:{}, usuario:{nome:'Teste'}}, res); }
+  try{ f({body:corpo||{}, params:params||{}, query:{}, usuario:{id:1,nome:'Teste'}}, res); }
   catch(e){ return {status:500, corpo:{erro:'a rota estourou: '+e.message}}; }
   return {status:st, corpo:out};
 }

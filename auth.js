@@ -1,6 +1,7 @@
 const crypto=require('crypto'), fs=require('fs'), path=require('path');
 // Para onde a pessoa vai (login, /setor e as duas barras): dono unico.
 const {destino}=require('./destino');
+const QUEM=require('./quem');
 
 const AREAS=[
   {id:'admin',       nome:'Admin (controle geral)'},
@@ -96,6 +97,58 @@ module.exports=function(app, db){
      linha nasceu por SQL direto, um teste ou um script) e nao corta nada; a
      pessoa criada pela tela nasce `operacao`, gravado aqui no `criar`. */
   try{ if(db.prepare("SELECT name FROM pragma_table_info('usuarios')").all().every(c=>c.name!=='nivel')) db.exec("ALTER TABLE usuarios ADD COLUMN nivel TEXT"); }catch(e){ console.log('[auth] coluna nivel falhou: '+e.message); }
+  /* A ENTRADA E A SAIDA DO LOGIN (QUEM-FEZ-E-REVISAO fase 6, 05/11/2026). Uma
+     linha de `sessao` por login — quem, quando entrou, quando e COMO saiu
+     (logout, bloqueado, expirou), o IP e o aparelho —, e cada coisa que
+     acontece com ela em `sessao_evento`: login, logout, troca de setor,
+     troca de PIN, a que caiu porque a pessoa foi bloqueada e a que expirou.
+     E a base do relogio de aba do PCP-CONTROLE-E-VISAO (fase 2 de la).
+
+     ⚠️ FICAM FORA DO MODO TESTE (`TABELAS` do teste_route.js), de proposito:
+     o login feito com o modo ligado e um login de verdade, e apagar ao
+     encerrar o teste tiraria da historia quem esteve no sistema.
+
+     ⚠️ O COOKIE DE ANTES (so com o id) CONTINUA VALENDO: a sessao dura 1 ano e
+     os tablets quase nunca passam pela tela de PIN. Ninguem e deslogado pelo
+     deploy; o que ele faz vira evento com quem e quando, sem `sessao_id` — o
+     passado nao se reconstroi. */
+  db.exec(`CREATE TABLE IF NOT EXISTS sessao (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, usuario_id INTEGER NOT NULL, usuario_nome TEXT,
+      entrou_em TEXT DEFAULT (datetime('now','localtime')), saiu_em TEXT, como_saiu TEXT,
+      ip TEXT, aparelho TEXT);
+    CREATE INDEX IF NOT EXISTS idx_sessao_aberta ON sessao(saiu_em);
+    CREATE TABLE IF NOT EXISTS sessao_evento (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, sessao_id INTEGER, usuario_id INTEGER, usuario_nome TEXT,
+      tipo TEXT NOT NULL, detalhe TEXT, em TEXT DEFAULT (datetime('now','localtime')), ip TEXT);
+    CREATE INDEX IF NOT EXISTS idx_sessao_evento_usuario ON sessao_evento(usuario_id);`);
+  const ipDe=req=>String((req&&req.headers&&req.headers['x-forwarded-for'])||(req&&req.socket&&req.socket.remoteAddress)||'').split(',')[0].trim()||null;
+  const aparelhoDe=req=>{ const a=String((req&&req.headers&&req.headers['user-agent'])||'').slice(0,200); return a||null; };
+  /* Registrar NUNCA derruba o login: o registro e historia, a entrada e o
+     trabalho. Um erro aqui vai para o log, e a pessoa entra do mesmo jeito. */
+  function sessEvento(sessaoId,u,tipo,detalhe,req){
+    try{ db.prepare('INSERT INTO sessao_evento (sessao_id,usuario_id,usuario_nome,tipo,detalhe,ip) VALUES (?,?,?,?,?,?)')
+      .run(sessaoId||null,u&&u.id!=null?u.id:null,u&&u.nome!=null?String(u.nome):null,tipo,detalhe==null?null:String(detalhe),ipDe(req)); }
+    catch(e){ console.log('[auth] evento de sessao falhou: '+e.message); }
+  }
+  /* Fecha a sessao UMA vez: so a que ainda esta aberta. */
+  function fecharSessao(sessaoId,como,u,req){
+    if(!sessaoId) return false;
+    try{
+      const r=db.prepare("UPDATE sessao SET saiu_em=datetime('now','localtime'), como_saiu=? WHERE id=? AND saiu_em IS NULL").run(como,sessaoId);
+      if(r.changes){ sessEvento(sessaoId,u,como,null,req); return true; }
+    }catch(e){ console.log('[auth] fechar sessao falhou: '+e.message); }
+    return false;
+  }
+  /* A sessao aberta ha mais de 1 ano (o Max-Age do cookie) ja nao vale no
+     navegador: fecha como "expirou". Roda no boot e a cada login — o servidor
+     nao fica sabendo da hora em que o cookie vence, entao fecha quando passa. */
+  function fecharExpiradas(){
+    try{
+      const velhas=db.prepare("SELECT id,usuario_id,usuario_nome FROM sessao WHERE saiu_em IS NULL AND entrou_em < datetime('now','localtime','-365 days')").all();
+      velhas.forEach(v=>fecharSessao(v.id,'expirou',{id:v.usuario_id,nome:v.usuario_nome},null));
+    }catch(e){ console.log('[auth] sessoes expiradas falharam: '+e.message); }
+  }
+  fecharExpiradas();
   const PIN_OK=/^[0-9]{6}$/;
   const ERRO_PIN='O PIN tem que ter 6 números.';
 
@@ -138,8 +191,14 @@ module.exports=function(app, db){
     try{
       const o=JSON.parse(Buffer.from(corpo,'base64').toString('utf8'));
       const u=db.prepare('SELECT id,nome,areas,ativo,pin_curto FROM usuarios WHERE id=?').get(o.id);
-      if(!u||!u.ativo) return null;
-      return {id:u.id,nome:u.nome,areas:u.areas.split(',').filter(Boolean),trocarPin:!!u.pin_curto};
+      /* Bloqueado no cadastro: a sessao cai (como sempre) e, se ela tem
+         numero, fecha como "bloqueado" — uma vez so, nao a cada pedido. */
+      if(!u||!u.ativo){ if(u&&Number.isInteger(o.s)) fecharSessao(o.s,'bloqueado',{id:u.id,nome:u.nome},req); return null; }
+      const s={id:u.id,nome:u.nome,areas:u.areas.split(',').filter(Boolean),trocarPin:!!u.pin_curto};
+      /* O numero da sessao viaja escondido: nao entra no `...u` do
+         /api/auth/eu, e a tela nao precisa dele. */
+      Object.defineProperty(s,'sessao',{value:Number.isInteger(o.s)?o.s:null,enumerable:false});
+      return s;
     }catch(e){ return null; }
   }
 
@@ -236,7 +295,13 @@ module.exports=function(app, db){
       return res.status(401).json({erro:'PIN incorreto'});
     }
     delete falhas[id];
-    const corpo=Buffer.from(JSON.stringify({id:u.id})).toString('base64');
+    fecharExpiradas();
+    let sessaoId=null;
+    try{ sessaoId=db.prepare('INSERT INTO sessao (usuario_id,usuario_nome,ip,aparelho) VALUES (?,?,?,?)')
+      .run(u.id,u.nome,ipDe(req),aparelhoDe(req)).lastInsertRowid; }
+    catch(e){ console.log('[auth] abrir sessao falhou: '+e.message); }
+    sessEvento(sessaoId,u,'login',null,req);
+    const corpo=Buffer.from(JSON.stringify(sessaoId?{id:u.id,s:Number(sessaoId)}:{id:u.id})).toString('base64');
     res.setHeader('Set-Cookie','sess='+encodeURIComponent(corpo+'.'+assina(corpo))+'; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax'+seguro(req));
     aud({usuario:{id:u.id,nome:u.nome},headers:req.headers,socket:req.socket},'acesso','login',u.nome,'');
     const areasU=u.areas.split(',').filter(Boolean);
@@ -264,13 +329,32 @@ module.exports=function(app, db){
     if(!PIN_OK.test(String(novo==null?'':novo))) return res.status(400).json({erro:ERRO_PIN});
     gravarPin(s.id,String(novo));
     aud(quem,'acesso','troca_pin',s.nome,'');
+    sessEvento(s.sessao,s,'troca_pin',null,req);
     res.json({ok:true,destino:destino(s.areas)});
   });
 
   app.post('/api/auth/logout',(req,res)=>{
     const u=lerSessao(req);
-    if(u) aud({usuario:u,headers:req.headers,socket:req.socket},'acesso','logout',u.nome,'');
+    if(u){
+      aud({usuario:u,headers:req.headers,socket:req.socket},'acesso','logout',u.nome,'');
+      // O evento sempre (com ou sem numero); a sessao fecha uma vez so.
+      sessEvento(u.sessao,u,'logout',null,req);
+      if(u.sessao){ try{ db.prepare("UPDATE sessao SET saiu_em=datetime('now','localtime'), como_saiu='logout' WHERE id=? AND saiu_em IS NULL").run(u.sessao); }catch(e){} }
+    }
     res.setHeader('Set-Cookie','sess=; Path=/; Max-Age=0'+seguro(req));
+    res.json({ok:true});
+  });
+
+  /* A TROCA DE SETOR: a /setor e os atalhos "Sob medida →" e "Medida padrao →"
+     avisam aqui ao clicar (fase 6). So registra; nao muda nada da sessao nem do
+     destino. Sem sessao, 401 e nada grava; destino fora da lista, 400. */
+  const SETORES=['padrao','sobmedida'];
+  app.post('/api/auth/setor',(req,res)=>{
+    const u=lerSessao(req);
+    if(!u) return res.status(401).json({erro:'nao_logado'});
+    const para=String((req.body||{}).para||'');
+    if(SETORES.indexOf(para)<0) return res.status(400).json({erro:'Setor desconhecido.'});
+    sessEvento(u.sessao,u,'troca_setor',para,req);
     res.json({ok:true});
   });
 
@@ -285,6 +369,8 @@ module.exports=function(app, db){
     res.json(db.prepare('SELECT id,nome,areas,ativo FROM usuarios ORDER BY nome').all()));
 
   app.post('/api/usuarios',(req,res)=>{
+    // Sem login nada grava (QUEM-FEZ-E-REVISAO fase 7): o cadastro de pessoas e escrita.
+    if(!QUEM.exigir(req,res)) return;
     const {id,nome,pin,areas,ativo}=req.body||{};
     if(!nome) return res.status(400).json({erro:'nome obrigatorio'});
     if(id){
@@ -323,6 +409,7 @@ module.exports=function(app, db){
   }
 
   app.delete('/api/usuarios/:id',(req,res)=>{
+    if(!QUEM.exigir(req,res)) return;
     const id=req.params.id;
     const hard=req.query.hard==='1';
     if(ehUltimoAdminGeral(id))

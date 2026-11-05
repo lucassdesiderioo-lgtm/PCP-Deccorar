@@ -161,12 +161,15 @@ ok('a recusa da baixa repetida diz quem deu', /por Renato/.test(r.body.erro || '
 db.prepare("UPDATE devolucao SET baixado=1, baixado_em='2026-10-01 09:00:00', baixado_por_id=NULL, baixado_por=NULL WHERE id=?").run(pend[1].id);
 r = chamar('POST','/api/devolucao/baixa',{ id:pend[1].id, reputacao:'sim', motivo:'y' });
 ok('a baixa antiga continua sem nome, e a recusa não inventa um', r.status === 409 && !/ por /.test(r.body.erro || ''), JSON.stringify(r.body));
-/* sem sessao (script) a baixa nao grava nome falso */
+/* sem sessao a baixa NAO GRAVA (QUEM-FEZ-E-REVISAO fase 5, 05/11/2026): ate
+   ali ela gravava com quem deu vazio; agora e 401, e a devolucao continua
+   esperando a baixa de alguem logado (spec §2.3). */
 const pend2 = chamar('GET','/api/devolucao/pendentes').body;
+let st4 = 200;
 rotas['POST /api/devolucao/baixa']({ body:{ id:pend2[0].id, reputacao:'nao', motivo:'z' }, params:{}, query:{}, headers:{} },
-  { status(){ return this; }, json(){ return this; } });
+  { status(c){ st4 = c; return this; }, json(){ return this; } });
 const d4 = db.prepare('SELECT * FROM devolucao WHERE id=?').get(pend2[0].id);
-ok('sem pessoa na sessão, quem deu fica vazio (nunca um nome inventado)', d4.baixado === 1 && d4.baixado_por_id == null && d4.baixado_por == null, JSON.stringify(d4));
+ok('sem pessoa na sessão a baixa é recusada (401) e nada grava', st4 === 401 && d4.baixado === 0 && d4.baixado_por_id == null && d4.baixado_por == null, st4 + ' ' + JSON.stringify(d4));
 
 /* banco de PRODUCAO: a tabela ja existe sem as colunas, e o boot as acrescenta */
 const db2 = new Database(path.join(tmp, 'antigo.db'));

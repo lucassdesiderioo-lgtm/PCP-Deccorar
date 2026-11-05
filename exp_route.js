@@ -16,8 +16,14 @@ function bloqueadosPendentes(db){
   const datas = [v.desde, s.desde, c.desde].filter(Boolean).map(String).sort();
   return { n: v.n + s.n + c.n, desde: datas[0] || null, sem_etiqueta: s.n };
 }
+const QUEM = require('./quem');
 module.exports=function(app,db){
-  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT, impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, no_carro_em TEXT, no_carro_por TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT, cancelada_em TEXT, cancelada_origem TEXT, cancelada_estagio TEXT, cancelada_motivo TEXT, cancelada_varias INTEGER DEFAULT 0, cancelada_aviso_em TEXT, cancelada_resolvida_em TEXT, cancelada_resolvida_por TEXT, cancelada_voltou INTEGER, cancelada_por TEXT, baixado_em TEXT, impresso_por_id INTEGER, conferido_por_id INTEGER, no_carro_por_id INTEGER);");
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
+
+  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT, impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, no_carro_em TEXT, no_carro_por TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT, cancelada_em TEXT, cancelada_origem TEXT, cancelada_estagio TEXT, cancelada_motivo TEXT, cancelada_varias INTEGER DEFAULT 0, cancelada_aviso_em TEXT, cancelada_resolvida_em TEXT, cancelada_resolvida_por TEXT, cancelada_voltou INTEGER, cancelada_por TEXT, baixado_em TEXT, impresso_por_id INTEGER, conferido_por_id INTEGER, no_carro_por_id INTEGER, resolvido_por_id INTEGER);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
   // sao so historia: quantas vezes o volume voltou pra impressora e quando foi a
   // ultima. O ALTER mora aqui, no dono da tabela (§17 do CLAUDE.md), com a
@@ -79,6 +85,9 @@ module.exports=function(app,db){
   /* Quem conferiu e quem pôs no carro, pelo id (fase 4, 05/11/2026). */
   try{ db.exec("ALTER TABLE lote ADD COLUMN conferido_por_id INTEGER"); }catch(e){}
   try{ db.exec("ALTER TABLE lote ADD COLUMN no_carro_por_id INTEGER"); }catch(e){}
+  /* Quem decidiu o bloqueado (pacote, modalidade, divergencia), pelo id
+     (fase 7, 05/11/2026). O nome (`resolvido_por`) fica, como retrato. */
+  try{ db.exec("ALTER TABLE lote ADD COLUMN resolvido_por_id INTEGER"); }catch(e){}
   /* CADA REIMPRESSAO, COM QUEM E QUANDO (mesma fase). Uma linha por vez: uma
      coluna "ultimo que reimprimiu" apagaria quem reimprimiu antes. O contador
      `reimpressoes` continua sendo o que as telas leem. */
@@ -427,7 +436,9 @@ module.exports=function(app,db){
     qtd INTEGER DEFAULT 1, pdf TEXT,
     visto_em TEXT DEFAULT (datetime('now','localtime')), ultimo_visto_em TEXT,
     resolvida_em TEXT, resolucao TEXT, resolvida_por TEXT, motivo TEXT,
-    teste INTEGER DEFAULT 0)`);
+    teste INTEGER DEFAULT 0, resolvida_por_id INTEGER)`);
+  // Quem resolveu, pelo id (QUEM-FEZ-E-REVISAO fase 7). No fim (§17).
+  try{ db.exec("ALTER TABLE venda_sem_etiqueta ADD COLUMN resolvida_por_id INTEGER"); }catch(e){}
   function gravarSemEtiqueta(lista, arquivo){
     let novas=0, resolvidas=0;
     /* Preparadas AQUI, e nao no carregamento do modulo: os testes de outras
@@ -479,7 +490,9 @@ module.exports=function(app,db){
     folha INTEGER, sistema INTEGER, resto INTEGER,
     visto_em TEXT DEFAULT (datetime('now','localtime')), ultimo_visto_em TEXT,
     resolvida_em TEXT, resolucao TEXT, resolvida_por TEXT, motivo TEXT,
-    teste INTEGER DEFAULT 0)`);
+    teste INTEGER DEFAULT 0, resolvida_por_id INTEGER)`);
+  // Quem resolveu, pelo id (QUEM-FEZ-E-REVISAO fase 7). No fim (§17).
+  try{ db.exec("ALTER TABLE pdf_conta_aberta ADD COLUMN resolvida_por_id INTEGER"); }catch(e){}
   /* As NFs do PDF, em faixa: e por elas que se acha o papel. O nome do arquivo
      gravado e um numero de relogio, que nao diz nada a quem procura. */
   function faixaDeNfs(orders){
@@ -518,9 +531,9 @@ module.exports=function(app,db){
     const c=db.prepare('SELECT * FROM pdf_conta_aberta WHERE id=?').get(id);
     if(!c) return res.status(404).json({erro:'PDF não encontrado. Atualize a lista.'});
     if(c.resolvida_em) return res.status(409).json({erro:'este PDF já foi resolvido em '+c.resolvida_em});
-    const quem=(req.usuario&&req.usuario.nome)||'';
+    const quem=QUEM.nomeDe(req), quemId=QUEM.idDe(req);
     db.prepare(`UPDATE pdf_conta_aberta SET resolvida_em=datetime('now','localtime'), resolucao=?,
-      resolvida_por=?, motivo=? WHERE id=?`).run(resolucao, quem, motivo, id);
+      resolvida_por=?, resolvida_por_id=?, motivo=? WHERE id=?`).run(resolucao, quem, quemId, motivo, id);
     try{ app.locals.acesso.auditar(req,'expedicao','resolver_conta_aberta',id,
       (c.nfs||c.pdf||'')+': folha '+c.folha+' × sistema '+c.sistema+' — '+RESOLUCAO_CONTA[resolucao]+' — '+motivo); }catch(e){}
     res.json({ok:true});
@@ -536,9 +549,9 @@ module.exports=function(app,db){
     const v=db.prepare('SELECT * FROM venda_sem_etiqueta WHERE id=?').get(id);
     if(!v) return res.status(404).json({erro:'venda nao encontrada'});
     if(v.resolvida_em) return res.status(409).json({erro:'esta venda ja foi resolvida em '+v.resolvida_em});
-    const quem=(req.usuario&&req.usuario.nome)||'';
+    const quem=QUEM.nomeDe(req), quemId=QUEM.idDe(req);
     db.prepare(`UPDATE venda_sem_etiqueta SET resolvida_em=datetime('now','localtime'), resolucao=?,
-      resolvida_por=?, motivo=? WHERE id=?`).run(resolucao, quem, motivo, id);
+      resolvida_por=?, resolvida_por_id=?, motivo=? WHERE id=?`).run(resolucao, quem, quemId, motivo, id);
     try{ app.locals.acesso.auditar(req,'expedicao','resolver_sem_etiqueta',id,
       'venda '+(v.venda||v.packId)+' ('+v.sku+'): '+RESOLUCAO[resolucao]+' — '+motivo); }catch(e){}
     /* A caixa que saiu por fora nunca foi conferida, entao nunca baixou: o
@@ -603,7 +616,7 @@ module.exports=function(app,db){
         '. Cadastre em Cadastro de SKU e volte aqui — a trava do §6 recusaria a etiqueta de qualquer jeito.'});
       limpos.push({sku,qtd,cor:it.cor||null,descricao:it.descricao||null});
     }
-    const quem=(req.usuario&&req.usuario.nome)||'';
+    const quem=QUEM.nomeDe(req), quemId=QUEM.idDe(req);
     /* O `lote.codigo` fica sendo o da PRIMEIRA peca. Ele nao descreve mais a
        caixa inteira — quem descreve e o `lote_item` —, mas continua sendo por
        onde o bipe do SKU acha esta venda na Etiqueta de Venda, e toda tela
@@ -614,8 +627,8 @@ module.exports=function(app,db){
         VALUES (?,?,?,?,?,'gestao')`);
       for(const it of limpos) ins.run(id,it.sku,it.qtd,it.cor,it.descricao);
       db.prepare(`UPDATE lote SET codigo=?, estagio='pendente', bloqueio=NULL,
-        bloqueio_resolvido=?, resolvido_por=?, resolvido_em=datetime('now','localtime')
-        WHERE id=?`).run(limpos[0].sku, o.bloqueio, quem, id);
+        bloqueio_resolvido=?, resolvido_por=?, resolvido_por_id=?, resolvido_em=datetime('now','localtime')
+        WHERE id=?`).run(limpos[0].sku, o.bloqueio, quem, quemId, id);
     })();
     const pecas=limpos.reduce((s,i)=>s+i.qtd,0);
     try{ app.locals.acesso.auditar(req,'expedicao','resolver_pacote',id,
@@ -643,7 +656,7 @@ module.exports=function(app,db){
     if(mod!=='agencia' && mod!=='coleta') return res.status(400).json({erro:'modalidade tem que ser agencia ou coleta'});
     const ids=(Array.isArray(b.ids)?b.ids:[b.id]).map(Number).filter(n=>n>0);
     if(!ids.length) return res.status(400).json({erro:'informe o(s) volume(s)'});
-    const quem=(req.usuario&&req.usuario.nome)||'';
+    const quem=QUEM.nomeDe(req), quemId=QUEM.idDe(req);
     const existe=db.prepare('SELECT 1 FROM skus WHERE codigo=?');
     let liberados=0, aindaSemSku=0, ignorados=0;
     db.transaction(()=>{ for(const id of ids){
@@ -651,8 +664,8 @@ module.exports=function(app,db){
       if(!o || o.estagio!=='bloqueado' || !/^modalidade/.test(String(o.bloqueio||''))){ ignorados++; continue; }
       const cadastrado = o.codigo && existe.get(String(o.codigo).toUpperCase());
       db.prepare(`UPDATE lote SET modalidade=?, estagio=?, bloqueio=?,
-          bloqueio_resolvido=?, resolvido_por=?, resolvido_em=datetime('now','localtime') WHERE id=?`)
-        .run(mod, cadastrado?'pendente':'bloqueado', cadastrado?null:'sku_nao_cadastrado', o.bloqueio, quem, id);
+          bloqueio_resolvido=?, resolvido_por=?, resolvido_por_id=?, resolvido_em=datetime('now','localtime') WHERE id=?`)
+        .run(mod, cadastrado?'pendente':'bloqueado', cadastrado?null:'sku_nao_cadastrado', o.bloqueio, quem, quemId, id);
       if(cadastrado) liberados++; else aindaSemSku++;
       try{ app.locals.acesso.auditar(req,'expedicao','resolver_modalidade',id,
         String(o.bloqueio||'')+'  ->  '+mod+(cadastrado?'':'  (segue bloqueado: SKU sem cadastro)')); }catch(e){}
@@ -773,10 +786,10 @@ module.exports=function(app,db){
        retem o volume; o texto dele fica guardado ao lado de quem desempatou.
        Volume resolvido as pressas e volume resolvido com o pedido aberto na
        tela sao a mesma linha no banco se ninguem gravar a diferenca. */
-    const quem=(req.usuario&&req.usuario.nome)||'';
+    const quem=QUEM.nomeDe(req), quemId=QUEM.idDe(req);
     db.prepare(`UPDATE lote SET codigo=?, estagio='pendente', bloqueio=NULL,
-      bloqueio_resolvido=?, resolvido_por=?, resolvido_em=datetime('now','localtime')
-      WHERE id=?`).run(sku,o.bloqueio,quem,id);
+      bloqueio_resolvido=?, resolvido_por=?, resolvido_por_id=?, resolvido_em=datetime('now','localtime')
+      WHERE id=?`).run(sku,o.bloqueio,quem,quemId,id);
     try{ app.locals.acesso.auditar(req,'expedicao','resolver_divergencia',id,
       String(o.bloqueio||'')+'  ->  '+sku+(String(o.codigo||'').toUpperCase()===sku?'  (confirmou o que estava gravado)':'')); }catch(e){}
     res.json({ok:true,id:id,codigo:sku,manteve:String(o.codigo||'').toUpperCase()===sku});

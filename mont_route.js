@@ -7,6 +7,11 @@ const KIT_BIPE = require('./public/kit_bipe.js');
 const ESTOQUE  = require('./estoque_dominio');
 const QUEM     = require('./quem');
 module.exports=function(app,db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
+
   db.exec("CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT);");
   // Le uma chave do `config`. null = a chave NAO EXISTE (diferente de gravada
   // vazia, que e uma decisao de quem editou — ver etiquetaAtual()).
