@@ -296,7 +296,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Por quê:** carimbar hoje cria pico falso e some com o volume da tela no dia em que ele sair de verdade. E fechar o que vence hoje apaga a fila do dia: o contador do passivo já não contava essas vendas, e o bloco passou a concordar com ele.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_correcao2.js`.
-- **Status:** no ar desde 02/10/2026; o corte em ontem, em 28/10/2026 (aguarda deploy).
+- **Status:** no ar desde 02/10/2026; o corte em ontem, no ar e conferido em 28/10/2026 (PR #245): o dono fez o deploy, tentou "Fechar vencidos" até hoje e a Mesa recusou em vermelho.
 
 ### R-COR-05 · O terminal e o botão usam a mesma régua
 - **Regra:** os scripts de passivo (`limpar_fantasmas`, `fechar_vencidos`, `regularizar_saida`, `reabrir_futuros`, `limpar_fila`) chamam as ações do `correcoes.js` e gravam em `correcao`, com `terminal: <script>` como autor.
