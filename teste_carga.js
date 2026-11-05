@@ -85,9 +85,14 @@ for(const c of ["BK100100BEGE", "BK120120BEGE", "BK120120CINZA", "BK140140BEGE",
 require('./estoque_dominio').garantirSchema(db);
 require('./carreg_route')(app,db);
 require('./saida_route')(app,db);
+/* QUEM-FEZ-E-REVISAO fase 4 (05/11/2026): sem login a Conferência não grava
+   (401). Este teste sempre chamou sem `usuario` porque nada dependia dele;
+   agora toda chamada vai com uma pessoa logada — muda a entrada, não o
+   esperado. A recusa sem login está no teste_quem_carregamento.js. */
+const BANCADA={id:7,nome:'Bancada'};
 const chamar=(k,body)=>new Promise(r=>{
   const res={ json:o=>r(o), status(){ return this; }, send:o=>r(o) };
-  rotas[k]({body:body||{},headers:{}}, res);
+  rotas[k]({body:body||{},headers:{},usuario:BANCADA}, res);
 });
 
 let falhas=0, casos=0;

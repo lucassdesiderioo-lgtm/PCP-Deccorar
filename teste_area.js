@@ -154,11 +154,18 @@ const pilha = async () => (await chamar('GET /api/carregamento')).pilha;
 
   /* Ninguém logado nos DOIS bipes: vazio igual a vazio não é "a mesma pessoa",
      é não saber quem fez. Sem a guarda, dois nomes em branco batiam. */
+  /* Desde a fase 4 da QUEM-FEZ-E-REVISAO (05/11/2026) o bipe SEM LOGIN é
+     recusado (401) e não grava: a caixa conferida sem nome dos dois lados só
+     existe no passado. Ela é montada direto no banco, e a pilha tem que
+     continuar chamando de "sem registro". */
   const anon = vol('Anonimo', 'embalado', agora, null);
   r = await chamar('POST /api/carregar', {code:'PAnonimo'}, null);
+  ok('bipe sem ninguém logado é recusado e não confere', r.motivo === 'sem_login' && !db.prepare('SELECT conferido_em c FROM lote WHERE id=?').get(anon).c,
+     JSON.stringify(r));
+  db.prepare("UPDATE lote SET conferido_em=datetime('now','localtime') WHERE id=?").run(anon);
   p = await pilha();
-  ok('ninguém logado nos dois bipes é "sem registro", nunca "mesma pessoa"',
-     r.ok && p.hoje.sem_registro === 2 && !p.sem_segunda.some(s => s.id === anon), JSON.stringify(p.hoje));
+  ok('ninguém nos dois bipes (a caixa de antes) é "sem registro", nunca "mesma pessoa"',
+     p.hoje.sem_registro === 2 && !p.sem_segunda.some(s => s.id === anon), JSON.stringify(p.hoje));
 
   // ── a de ontem ──
   r = await chamar('POST /api/carregar', {code:'PVelha'}, BETO);

@@ -110,12 +110,17 @@ const lote = id => q1('SELECT * FROM lote WHERE id=?', id);
   r = await chamar('POST /api/carregar', {code:'PSemNome'}, ANA);
   ok('caixa sem nome de quem imprimiu: não é "mesma pessoa", confere', r.ok === true, JSON.stringify(r));
   ok('e a resposta não inventa nome', !r.impresso_por, JSON.stringify(r));
-  vol('Anon', 'Ana', false);
+  /* ATÉ 05/11/2026 o bipe sem login conferia a caixa (com a pessoa vazia).
+     Desde a fase 4 da QUEM-FEZ-E-REVISAO (regra-mãe, spec §2.3) ele é
+     RECUSADO (401) e não grava. "Vazio não é igual a vazio" continua valendo
+     na régua (quem.js) e na pilha (teste_area.js, teste_quem_carregamento.js). */
+  const anon = vol('Anon', 'Ana', false);
   r = await chamar('POST /api/carregar', {code:'PAnon'}, null);
-  ok('bipe sem ninguém logado não é "mesma pessoa"', r.ok === true, JSON.stringify(r));
-  vol('Ninguem', null, false);
+  ok('bipe sem ninguém logado é recusado (401)', r._status === 401, JSON.stringify(r));
+  ok('e a caixa não foi conferida', !lote(anon).conferido_em, JSON.stringify(lote(anon)));
+  const ning = vol('Ninguem', null, false);
   r = await chamar('POST /api/carregar', {code:'PNinguem'}, null);
-  ok('sem nome dos DOIS lados não é "mesma pessoa": vazio não é igual a vazio', r.ok === true, JSON.stringify(r));
+  ok('nem a caixa sem nome de quem imprimiu se confere sem login', r._status === 401 && !lote(ning).conferido_em, JSON.stringify(r));
 
   // ── sem liberação: o cruzamento é automático ──
   ok('não existe rota de liberação', !rotas['POST /api/carregar/liberar'], Object.keys(rotas).join(' '));
