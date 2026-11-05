@@ -1,6 +1,6 @@
 # PRODUÇÃO SÓ DO PDF — a 103 vira "Subir PDF de vendas"
 
-> **STATUS · 05/11/2026 — RASCUNHO, espera as respostas do dono (§7)**
+> **STATUS · 05/11/2026 — APROVADA pelo dono (§9), espera o "pode seguir" do plano**
 > - Nasceu da D3 da conversa do upload único (05/11/2026): *"vejo que essa
 >   lista já não faz mais sentido também em ter"*. O dono respondeu: a produção
 >   nasce **só do PDF e do arquivo que subimos no Planejamento**; a 103 pode se
@@ -67,8 +67,10 @@ produção nasce.
 - **R-PRD-01** A ordem do dia nasce de dois lugares: a urgência do PDF (sozinha,
   no upload) e a reposição da planilha (tela azul, ao vivo). Não há lançamento à
   mão.
-- **R-PRD-02** Aplicar a urgência no upload é idempotente e não apaga o que já
-  foi produzido (o `produzido` das ordens do dia fica).
+- **R-PRD-02** Aplicar a urgência no upload é o MESMO recálculo de hoje
+  (R-URG-02): apaga as ordens `ml` do dia e refaz as urgentes pela conta de
+  agora — que já desconta o que foi produzido e expedido, e por isso não infla.
+  As ordens manuais antigas não se tocam.
 
 ## 6. Alçada (R-ALC-08)
 
@@ -99,3 +101,11 @@ cd /opt/expedicao && sqlite3 dados.db "SELECT data, COUNT(*) linhas, SUM(qtd) pe
 | Fase | O quê | Risco |
 |---|---|---|
 | **1** | a lista sai, a urgência entra no upload (se D1 = sim), o nome muda, cartões e testes | 🔴 dados de produção (a ordem do dia) |
+
+## 9. Decisões do dono (05/11/2026) — valem sobre o texto acima
+
+- **D1 · sozinha.** A urgência do PDF entra na ordem do dia a cada upload; o
+  botão "Lançar N urgentes" sai.
+- **D2 · ninguém usa.** O dono conferiu: ninguém lançou nada na lista.
+- **D3 · "PDF de vendas".** A 103 se chama **Subir PDF de vendas**, e o
+  subtítulo fala do PDF de vendas do Mercado Livre.
