@@ -1117,6 +1117,12 @@ module.exports = function(app, db){
     if(eq('/api/contagem/componentes')) return 'contagem.contar';
     if(M !== 'GET' && pre('/api/contagem')) return 'contagem.contar';
     if(M !== 'GET' && eq('/api/config/horarios')) return 'horarios.editar';
+    /* OS HORARIOS DE SAIDA (spec HORARIOS-DE-COLETA): lancar, ler o dia, a
+       semana e a historia e de quem tem `coleta.horario`. O relogio (status) e
+       de quem trabalha na Expedicao — e de todo nivel Supervisor ou acima,
+       que ve a faixa em qualquer tela (D5). So horas e numeros de caixa. */
+    if(eq('/api/saidas/status')) return ['coleta.horario','etiqueta.emitir','carregamento.executar','pdf.subir','@supervisor'];
+    if(pre('/api/saidas')) return 'coleta.horario';
     /* `pre` e nao `eq`: o conteudo da etiqueta (/api/config/kit/etiqueta, spec
        GERADOR-ETIQUETA-KIT) e a mesma pergunta do mesmo card — o que a
        Embalagem bipa e o que vai impresso nela. Com `eq` a rota nova cairia no
@@ -1515,6 +1521,9 @@ module.exports = function(app, db){
     const passa = (c) => c === '@logado' ? true
                        : c === '@admin'  ? ehNivelAdmin(u.id, perms)
                        : c === '@ag'     ? false
+                       /* '@supervisor' = o NIVEL da pessoa e Supervisor ou acima
+                          (HORARIOS-DE-COLETA, D5: o relogio da coleta). */
+                       : c === '@supervisor' ? (() => { const nv = nivelDaPessoa(u.id); return !!nv && ORDEM_NIVEL[nv] >= ORDEM_NIVEL.supervisor; })()
                        : perms.has(c);
     /* A TELA TEM NIVEL (fase 4/5 da ACESSO-POR-TELA-E-NIVEL, R-NIV-01): alem
        da permissao, a pessoa tem que ser do nivel da tela ou acima. Sem isso

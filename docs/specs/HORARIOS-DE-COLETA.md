@@ -1,6 +1,18 @@
 # HORÁRIOS DE COLETA — a hora do caminhão do ML dentro do PCP
 
-> **STATUS · 05/11/2026 — APROVADA, falta construir**
+> **STATUS · 05/11/2026 — EM CÓDIGO (fases 1 e 2), falta subir**
+> - **Fases 1 e 2 em código em 05/11/2026**: `coleta_horario.js` (dono único),
+>   `coleta_horario_route.js`, a tela 206 `/coleta-horarios`, o quadro do upload
+>   (`public/saida_upload.js`) nas três portas, `lote.horario_id`, a faixa da
+>   próxima coleta no `nav.js` e a agência pelo horário lançado. Cartões R-HCO-01
+>   a R-HCO-10; `teste_horario_coleta.js` (79). Falta o deploy e a prova de
+>   fábrica: o primeiro PDF subido com a saída e a faixa contando as caixas.
+> - **O que se decidiu na construção (vale o `CLAUDE.md`):** a venda de outro
+>   dia e a de outra modalidade não ganham a marca (a modalidade é a da
+>   etiqueta); a coleta corrigida mantém o id e a tirada solta as caixas; o
+>   relógio do status é aberto a quem trabalha na Expedição e a todo nível
+>   Supervisor ou acima (`@supervisor`, token novo no `permDaRota`); Revisão e TV
+>   ficaram de fora (D5).
 > - Desenhado na conversa com o Lucas em 05/11/2026, com duas telas do Mercado
 >   Livre na mão (Preferências de venda → Horários de envio, e Vendas → Envios
 >   de hoje). **Aprovada pelo dono no mesmo dia**, com as respostas da §11 —

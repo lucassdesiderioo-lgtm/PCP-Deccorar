@@ -22,12 +22,14 @@
 <header><div class="mark">X</div><div><b>Expedição — leitura de PDFs</b><div style="font-size:12px;color:#8b97a5">Suba um ou vários PDFs do Mercado Livre</div></div>
 <a class="link" href="/painel">Painel</a></header>
 <div class="wrap">
+  <div id="saidaQuadro" style="display:none;margin-bottom:14px;padding:12px 14px;border:1px solid #262d37;border-radius:12px;background:#161b22"></div>
   <div class="drop" id="drop">📄 Clique ou solte um ou mais PDFs do Mercado Livre aqui
     <input type="file" id="file" accept="application/pdf" multiple style="display:none"></div>
   <div class="res" id="res"></div>
   <table id="tbl" style="display:none"><thead><tr><th>#</th><th>SKU</th><th>Comprador</th><th>NF</th><th>Estágio</th><th></th></tr></thead><tbody id="corpo"></tbody></table>
 </div>
 <iframe id="pr"></iframe>
+<script src="/saida_upload.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 $('#drop').onclick=()=>$('#file').click();
@@ -62,12 +64,17 @@ function avisoQuantidade(qtd,contas){
 async function upMany(fileList){
   const files=[...fileList].filter(f=>/pdf/i.test(f.type)||/\.pdf$/i.test(f.name));
   if(!files.length) return;
+  /* a saida das vendas (HORARIOS-DE-COLETA, D4): grava os horarios mudados e
+     diz o id; recusa do servidor para o upload, com o motivo no quadro */
+  let saida=null;
+  try{ saida=await saidaUpload.escolha(); }catch(e){ $('#res').innerHTML='<b style="color:#f85149">'+e.message+'</b>'; return; }
   let totQtd=0,contas=[],totNov=0,totRep=0,totRel=0,totSem=0,totPdf=0,totCol=0,totMod=0,ok=0;
   for(let i=0;i<files.length;i++){
     $('#res').innerHTML='Lendo '+(i+1)+' de '+files.length+': <b>'+files[i].name+'</b>…';
     try{
-      const j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
-      if(j.erro){ console.error(files[i].name, j.erro); continue; }
+      const j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i]), saida:saida})})).json();
+      if(j.erro){ console.error(files[i].name, j.erro); if(j.motivo==='saida'){ $('#res').innerHTML='<b style="color:#f85149">'+j.erro+'</b>'; return; } continue; }
+      saidaUpload.somar(j);
       totNov+=j.novos; totRep+=j.repetidas; totRel+=j.religadas||0; totQtd+=j.quantidade_duvida||0; if(j.conta_pdf&&!j.conta_pdf.fecha) contas.push(Object.assign({nome:files[i].name},j.conta_pdf)); totSem+=j.sem_sku; totPdf+=j.total; totCol+=j.coleta||0; totMod+=j.modalidade_duvida||0; ok++;
     }catch(e){ console.error(files[i].name,e); }
   }
@@ -75,7 +82,7 @@ async function upMany(fileList){
     +(totRel?' · <b>'+totRel+' antiga(s) voltaram a ter PDF</b> (já dá pra reimprimir)':'')
     +(totCol?' · <b style="color:#b9a3e6">🚚 '+totCol+' pra coleta (o caminhão do ML vem buscar)</b>':'')
     +(totMod?'<div style="margin-top:8px;color:#d2b8ff;font-weight:700">⚠ '+totMod+' etiqueta(s) num formato desconhecido — retidas. Defina agência ou coleta em Admin → Pendências.</div>':'')
-    +avisoQuantidade(totQtd,contas);
+    +avisoQuantidade(totQtd,contas)+saidaUpload.texto();
   lista();
 }
 async function lista(){
@@ -94,5 +101,6 @@ async function lista(){
 }
 function imp(id){ const fr=$('#pr'); fr.onload=()=>{ try{fr.contentWindow.print();}catch(e){ window.open('/api/print/'+id,'_blank'); } }; fr.src='/api/print/'+id; }
 lista();
+saidaUpload.montar(document.getElementById('saidaQuadro'));
 </script><script src="/nav.js"></script>
 </body></html>

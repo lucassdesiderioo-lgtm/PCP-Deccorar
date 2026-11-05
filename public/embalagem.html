@@ -179,6 +179,7 @@
   <div class="up" id="upBox" data-perm="pdf.subir" style="display:none;margin-top:16px">
     <button class="uphd" id="upTgl" type="button">📄 Subir PDF do Mercado Livre (vendas do dia) ▾</button>
     <div class="upbody" id="upBody" style="display:none">
+      <div id="saidaQuadro" style="display:none;margin-bottom:12px;padding:10px 12px;border:1px solid rgba(128,128,128,.4);border-radius:10px"></div>
       <label class="drop" for="file">Clique ou solte um ou mais PDFs do Mercado Livre aqui<input type="file" id="file" accept="application/pdf" multiple style="display:none"></label>
       <div class="upres" id="upRes"></div>
     </div>
@@ -187,6 +188,7 @@
 <!-- antes do bloco de baixo: e dele que vem pecaTexto -->
 <script src="/sku.js"></script>
 <script src="/pendencias_aviso.js"></script>
+<script src="/saida_upload.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 let confirmar=null, last={c:null,t:0};
@@ -1028,12 +1030,16 @@ function avisoQuantidade(qtd,contas){
 async function upMany(fileList){
   var files=[].slice.call(fileList).filter(function(f){ return /pdf/i.test(f.type)||/\.pdf$/i.test(f.name); });
   if(!files.length) return;
+  /* a saida das vendas (HORARIOS-DE-COLETA, D4) */
+  var saida=null;
+  try{ saida=await saidaUpload.escolha(); }catch(e){ document.getElementById('upRes').innerHTML='<b style="color:#c62828">'+e.message+'</b>'; return; }
   var totQtd=0,contas=[],totNov=0,totRep=0,totRel=0,totSem=0,totPdf=0,totCol=0,totMod=0,ok=0;
   for(var i=0;i<files.length;i++){
     document.getElementById('upRes').innerHTML='Lendo '+(i+1)+' de '+files.length+': <b>'+files[i].name+'</b>…';
     try{
-      var j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
-      if(j.erro){ continue; }
+      var j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i]), saida:saida})})).json();
+      if(j.erro){ if(j.motivo==='saida'){ document.getElementById('upRes').innerHTML='<b style="color:#c62828">'+j.erro+'</b>'; return; } continue; }
+      saidaUpload.somar(j);
       totNov+=j.novos||0; totRep+=j.repetidas||0; totRel+=j.religadas||0; totQtd+=j.quantidade_duvida||0; if(j.conta_pdf&&!j.conta_pdf.fecha) contas.push(Object.assign({nome:files[i].name},j.conta_pdf)); totSem+=j.sem_sku||0; totPdf+=j.total||0; totCol+=j.coleta||0; totMod+=j.modalidade_duvida||0; ok++;
     }catch(e){}
   }
@@ -1046,7 +1052,7 @@ async function upMany(fileList){
     +(totRel?' · <b>'+totRel+' antiga(s) voltaram a ter PDF</b> (já dá pra reimprimir)':'')
     +(totCol?' · <span class="tagC" style="margin-left:0">🚚 '+totCol+' pra coleta</span>':'')
     +(totMod?'<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#efe9fb;border:2px solid #6f42c1;color:#4b2a91;font-weight:700">⚠ '+totMod+' etiqueta(s) num formato que o sistema não conhece — retidas. Defina agência ou coleta em Admin → Pendências.</div>':'')
-    +avisoQuantidade(totQtd,contas);
+    +avisoQuantidade(totQtd,contas)+saidaUpload.texto();
   stats(); listaPend();
 }
 (async function(){
@@ -1055,6 +1061,7 @@ async function upMany(fileList){
     var pode=u.logado && (u.areas||[]).some(function(a){ return a==='expedicao'||a==='admin'; });
     if(!pode) return;
     document.getElementById('upBox').style.display='block';
+    saidaUpload.montar(document.getElementById('saidaQuadro'));
     document.getElementById('upTgl').onclick=function(){ var b=document.getElementById('upBody'); b.style.display=(b.style.display==='none'?'block':'none'); };
     document.getElementById('file').onchange=function(e){ upMany(e.target.files); e.target.value=''; };
     var drop=document.querySelector('.drop');

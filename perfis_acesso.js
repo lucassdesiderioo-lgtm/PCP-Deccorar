@@ -106,12 +106,19 @@ function retrato(B, p, rotas){
    depois do redirecionamento, em "Sem permissão": não perdeu tela nenhuma.
    Devolve '' quando bate, ou o que mudou. */
 const CHAVES_DEV = ['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro','devolucao.baixar'];
+/* AS AÇÕES QUE NASCERAM DEPOIS DO RETRATO (R-ALC-06): toda chave nova nasce
+   só para o Admin Geral, que passa em tudo — então ela aparece nas permissões
+   dele e de mais ninguém. Ela sai da comparação pelo NOME, uma a uma; a outra
+   ponta (ninguém mais a recebe) é travada no `teste_acesso.js` e no teste da
+   própria entrega. */
+const NASCERAM_DEPOIS = ['coleta.horario'];   // HORARIOS-DE-COLETA, 05/11/2026
 function comparar(antes, agora){
   if(!antes) return 'sem retrato de antes';
   const tira = l => (l || []).filter(r => r !== '/devolucoes');
   const dif = [];
   if(JSON.stringify(tira(antes.abre)) !== JSON.stringify(tira(agora.abre))) dif.push('telas ' + JSON.stringify(tira(antes.abre)) + ' → ' + JSON.stringify(tira(agora.abre)));
-  if(JSON.stringify(antes.perms) !== JSON.stringify(agora.perms)) dif.push('permissões mudaram');
+  const semNovas = l => (l || []).filter(c => NASCERAM_DEPOIS.indexOf(c) < 0);
+  if(JSON.stringify(semNovas(antes.perms)) !== JSON.stringify(semNovas(agora.perms))) dif.push('permissões mudaram');
   if(antes.destino !== agora.destino) dif.push('destino ' + antes.destino + ' → ' + agora.destino);
   const temDev = (agora.perms || []).some(c => CHAVES_DEV.indexOf(c) >= 0);
   if((agora.abre || []).indexOf('/devolucoes') >= 0 && !temDev && agora.abre.indexOf('/') < 0 || ((agora.abre || []).indexOf('/devolucoes') < 0 && temDev))

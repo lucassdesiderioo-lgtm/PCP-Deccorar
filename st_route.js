@@ -10,9 +10,11 @@ module.exports=function(app,db){
     try{ const c=db.prepare('SELECT valor FROM config WHERE chave=?').get(chave); if(c&&c.valor) return c.valor; }catch(e){}
     return padrao;
   }
+  /* A hora vem do relogio.js: em producao e so o relogio do servidor (o mesmo
+     de antes); os testes o fixam (HORARIOS-DE-COLETA, 05/11/2026). */
+  const RELOGIO=require('./relogio');
   function hoje(){
-    const a=new Date();
-    return {d:DIAS[a.getDay()], hm:String(a.getHours()).padStart(2,'0')+':'+String(a.getMinutes()).padStart(2,'0')};
+    return {d:DIAS[RELOGIO.diaSemana(RELOGIO.hoje())], hm:RELOGIO.hora()};
   }
   app.get('/api/revisao/status',(req,res)=>{
     const h=hoje();
@@ -28,7 +30,11 @@ module.exports=function(app,db){
   });
   app.get('/api/expedicao/status',(req,res)=>{
     const h=hoje();
-    const desp=cfg('despacho_'+h.d,'15:00');
+    /* A AGENCIA USA O HORARIO LANCADO DO DIA (HORARIOS-DE-COLETA, D6): quem
+       sobe o PDF de agencia diz o horario que o ML mostra. Sem ele, vale o
+       config de sempre, por dia da semana. */
+    let lancado=null; try{ lancado=require('./coleta_horario').agenciaDeHoje(db); }catch(e){}
+    const desp=lancado||cfg('despacho_'+h.d,'15:00');
     /* Mesma regua da fila (fila_dia.js). Contando por dia de importacao, o
        relogio de despacho ficava vermelho por causa de venda que so vence em
        setembro — pressa por trabalho que nao e do dia. */
@@ -47,7 +53,7 @@ module.exports=function(app,db){
     let falta=0;
     const p1=desp.split(':'), p2=h.hm.split(':');
     falta=(+p1[0]*60+ +p1[1])-(+p2[0]*60+ +p2[1]);
-    res.json({despacho:desp, agora:h.hm, minutosRestantes:falta, passou:falta<0,
+    res.json({despacho:desp, despacho_origem:lancado?'lancado':'config', agora:h.hm, minutosRestantes:falta, passou:falta<0,
       pendentes:pend, pendentes_coleta:pendCol, embalados:emb, carregados:car});
   });
   app.get('/api/config/horarios',(req,res)=>{
