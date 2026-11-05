@@ -228,15 +228,22 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Regra:** `cruz_route.js` compara os volumes `pendente` com o estoque: sem estoque vira produção **urgente**; com estoque sai direto pela Etiqueta de Venda, sem ordem. A reposição vem da tela azul.
 - **Por quê:** a urgência se corrige sozinha — o volume processado sai de `pendente`.
 - **Exceções:** nenhuma.
-- **Teste que trava:** `teste_cruzamento.js` (14).
-- **Status:** no ar desde 14/08/2026.
+- **Teste que trava:** `teste_cruzamento.js` (18).
+- **Status:** no ar desde 14/08/2026. **Desde 05/11/2026 a conta de aplicar mora no `urgencia.js` (`aplicar`), e o upload a chama sozinho (R-PRD-01).**
 
 ### R-URG-02 · O recálculo é idempotente e não apaga o manual
 - **Regra:** `POST /api/cruzamento/aplicar` apaga as ordens `origem='ml'` do dia e refaz. O lançamento manual fica.
 - **Por quê:** subir o mesmo PDF duas vezes não pode duplicar a ordem.
-- **Exceções:** ⚠ manual e PDF no mesmo SKU **duplicam** a ordem: PDF cobre venda, manual cobre produção sem venda.
+- **Exceções:** ⚠ manual e PDF no mesmo SKU **duplicavam** a ordem: PDF cobre venda, manual cobre produção sem venda. Desde 05/11/2026 não há lançamento manual novo (R-PRD-01); os antigos ficam.
 - **Teste que trava:** `teste_cruzamento.js`.
 - **Status:** no ar.
+
+### R-PRD-01 · A urgência do PDF entra sozinha; não há lançamento à mão (05/11/2026)
+- **Regra:** no fim de cada upload, o servidor aplica a urgência (`urgencia.aplicar`, a mesma conta da rota, numa transação): a venda sem estoque deste dia vira ordem `origem='ml'`, `urgente=1`, para quem quer que suba o PDF. A lista "Selecione os SKUs" e o `POST /api/producao` saíram; a 103 se chama **Subir PDF de vendas**. A reposição continua sendo a tela azul (planilha).
+- **Por quê:** o dono — *"só do PDF e do arquivo que subimos no Planejamento"*; a lista não era usada, e a urgência dependia de um Admin clicar, que quem é Operação nem via.
+- **Exceções:** falhar ao aplicar não derruba o upload (`urgentes:null`, log). A rota `POST /api/cruzamento/aplicar` fica para reaplicar à mão (`producao.lancar`).
+- **Teste que trava:** `teste_horario_coleta.js` (seção 10) e `teste_cruzamento.js`.
+- **Status:** em código em 05/11/2026, falta subir.
 
 ---
 

@@ -45,4 +45,21 @@ function calcular(db, data){
   });
 }
 
-module.exports = { calcular };
+/* APLICAR: a urgência vira ordem do dia (`producao`, origem 'ml', urgente).
+   Desde a spec PRODUCAO-SO-DO-PDF (05/11/2026) roda SOZINHO no fim de cada
+   upload (R-PRD-01); até ali dependia de um Admin clicar "Lançar N urgentes",
+   e quem é Operação, que sobe o PDF, nem via o botão.
+   É idempotente (R-URG-02, R-PRD-02): apaga as ordens 'ml' do dia e refaz as
+   urgentes pela conta de agora, que já desconta o produzido e o expedido —
+   reaplicar não infla. A ordem manual antiga (origem vazia ou 'manual') não se
+   toca. O domínio não abre transação; quem chama abre (R-EST-07). */
+function aplicar(db){
+  const linhas = calcular(db);
+  let urgentes = 0;
+  db.prepare("DELETE FROM producao WHERE data=date('now','localtime') AND origem='ml'").run();
+  const ins = db.prepare("INSERT INTO producao (codigo,qtd,origem,urgente) VALUES (?,?,'ml',1)");
+  for(const l of linhas){ if(l.urgente > 0){ ins.run(l.codigo, l.urgente); urgentes += l.urgente; } }
+  return { urgentes, linhas };
+}
+
+module.exports = { calcular, aplicar };

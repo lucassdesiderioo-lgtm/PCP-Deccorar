@@ -584,6 +584,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 | R-CONF-06 | A cobertura das conferências é medida na auditoria |
 | R-URG-01 | O PDF gera só urgência |
 | R-URG-02 | O recálculo é idempotente e não apaga o manual |
+| R-PRD-01 | A urgência do PDF entra sozinha na ordem do dia no fim de cada upload; não há lançamento à mão (05/11/2026) |
 | R-CAR-01 | O carregamento não filtra por dia (#9) |
 | R-CAR-02 | Só carrega o que passou pela Etiqueta de Venda (#27) |
 | R-CAR-03 | O segundo bipe do carregamento, quando ligado, é cego |
@@ -1476,7 +1477,7 @@ Spec `docs/specs/HORARIOS-DE-COLETA.md` (fases 1 e 2), linha em
   `saida_horario_evento` (o antes, o depois, quem e por onde).
 - **Tela 206 Horários de coleta** (`/coleta-horarios`): a semana atual e a
   próxima, de segunda a sábado; o dia passado é só registro.
-- **No upload** — que desde 05/11/2026 é **só na 103 Lançar produção** (bloco
+- **No upload** — que desde 05/11/2026 é **só na 103 Subir PDF de vendas** (antes "Lançar produção") (bloco
   abaixo) —, o quadro *"Para qual saída são estas
   vendas?"* (`public/saida_upload.js`) grava o horário mudado (origem `upload`)
   e manda a saída; a venda nova de **hoje** e da **mesma modalidade** ganha
@@ -1544,7 +1545,7 @@ Decisão do dono (D1 (a) e D2, linha em `docs/DECISOES.md`). Até aqui o PDF sub
 por três portas — a 201 Etiqueta de Venda, a 203 Subir PDF e a 103 —, e o quadro
 da saída teria de ser conferido em três lugares.
 
-- **A 103 Lançar produção é o lugar único.** Ela abre com `producao.lancar`
+- **A 103 Subir PDF de vendas (antes "Lançar produção") é o lugar único.** Ela abre com `producao.lancar`
   **ou** `pdf.subir`, e por isso passou a ser de **nível Operação**; herdou da
   203 a área de chegada `expedicao` e o lugar dela na ordem de chegada. Quem só
   tem `pdf.subir` vê o bloco de upload; a lista "Lançar para produção" continua
@@ -1556,9 +1557,21 @@ da saída teria de ser conferido em três lugares.
   rota sem permissão (aviso falso, AJUSTE de 05/11/2026).
 - **A caixa "Subir PDF" da 201 saiu.** A rota e o que o upload faz não mudaram.
 
-> ⚠️ **O NOME "LANÇAR PRODUÇÃO" FICOU**, mesmo para quem só sobe PDF. A lista de
-> lançar produção à mão vai sair por decisão do dono, como `REGRA` com spec (a
-> produção passaria a nascer só do PDF e da tela azul) — e o nome muda junto.
+> ⚠️ **A 103 SE CHAMA "SUBIR PDF DE VENDAS", E A LISTA DE LANÇAR À MÃO SAIU**
+> (spec `PRODUCAO-SO-DO-PDF`, 05/11/2026, linha em `docs/DECISOES.md`; o dono:
+> *"não usamos mais"*). A ordem do dia nasce de dois lugares: a **urgência do
+> PDF**, que entra **sozinha no fim de cada upload**, para quem quer que suba
+> (`urgencia.aplicar`, dono único; R-PRD-01), e a **reposição** da tela azul
+> (planilha do Planejamento, que não mudou). O botão "Lançar N urgentes" saiu
+> — até ali a urgência só chegava à Revisão quando um Admin clicava, e quem é
+> Operação nem via o botão —, e o quadro do cruzamento ficou só leitura. O
+> `POST /api/producao` **não existe mais**; o `GET` e o `POST
+> /api/cruzamento/aplicar` (reaplicar à mão, `producao.lancar`) ficaram. As
+> ordens manuais antigas ficam no banco. O endereço `/admin/producao` não mudou
+> (é o que os favoritos guardam), nem a chave `producao.lancar` (#13).
+>
+> ⚠️ **A URGÊNCIA QUE FALHA NO UPLOAD NÃO DERRUBA O UPLOAD**: as vendas já estão
+> gravadas; o erro vai para o log e a resposta diz `urgentes:null`.
 >
 > ⚠️ **O RETRATO DE ANTES NÃO FOI REGRAVADO.** O `perfis_acesso.js` tira o
 > `/expedicao` da comparação pelo nome, e o `teste_mapa.js` confere, pessoa a
@@ -2582,7 +2595,7 @@ logado"*. Linhas em `docs/DECISOES.md`.
 |---|---|
 | Quem fez vem do servidor (`req.usuario`), **nunca** da tela | `quem.js` |
 | `quem.js` é o dono único: `quem`, `exigir` (401), `nomeDe`, `idDe`, `pessoa`, `mesmaPessoa`, `portao`, `auditar` | `teste_quem.js` (estático) |
-| **Sem login, nenhuma escrita grava** (401) — as 143 do PCP, mais as duas do `server.js` | `teste_quem.js` (dinâmico) |
+| **Sem login, nenhuma escrita grava** (401) — as 143 do PCP (o `server.js` não tem escrita desde 05/11/2026) | `teste_quem.js` (dinâmico) |
 | O id entra **ao lado** do nome que já existia; o nome fica, como retrato | cada teste da tela |
 | A linha que **não tem autor** (cadastro, configuração) vira linha na `auditoria`, que já guarda `usuario_id` | `teste_quem.js` (1-B) |
 
@@ -2628,7 +2641,7 @@ logado"*. Linhas em `docs/DECISOES.md`.
 > recusado na bancada, um desfazer de verdade e a primeira sessão nova gravada
 > em `sessao`. Prova que não foi feita se escreve como não feita.
 
-**Rode `node teste_quem.js` (244) ao criar QUALQUER rota de escrita, mexer no
+**Rode `node teste_quem.js` (241) ao criar QUALQUER rota de escrita, mexer no
 `quem.js` ou num `require` de módulo de rotas.** Ele sobe os módulos na ordem do
 `server.js` e chama cada escrita sem login; rota nova que não passa pelo `quem.js`
 reprova no mesmo minuto em que é escrita.
@@ -3279,13 +3292,13 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 1c | ~~**Embalagem em teste consome linha real da `fila`**~~ **RESOLVIDO em 17/09/2026** — a fila é filtrada pelo mesmo `teste` do momento: em modo teste consome linha de teste, fora dele consome linha real (§4, armadilha #26) | — |
 | 2 | **Sem HTTPS.** PINs trafegam em texto aberto. O PIN passou a ter 6 dígitos em 21/10/2026 (fase 5-A da `ACESSOS-UNIFICADOS`). **Em código desde 26/10/2026 (fase 5-B):** `https://pcp.deccorar.com.br` pelo Traefik que já existe, cookie `Secure` por https (§10, `docs/HTTPS.md`). **Só se risca quando a porta 3010 fechar** (etapa 2): enquanto ela estiver aberta, o PIN ainda pode viajar aberto por quem usa o endereço velho | Alto se exposto à internet |
 | 3 | **Revisão perdida em falha de conexão** — sem fila local de reenvio | Médio — buraco silencioso no relatório |
-| 4 | `POST /api/producao` (manual) não aceita `data`, `origem` nem `urgente` | Médio — impede lançar adiantado pela tela |
+| 4 | ~~`POST /api/producao` (manual) não aceita `data`, `origem` nem `urgente`~~ **DEIXOU DE EXISTIR em 05/11/2026** — a rota saiu com a lista de lançar à mão (spec `PRODUCAO-SO-DO-PDF`) | — |
 | 5 | Upload não permite escolher a data das vendas | Médio — vendas de amanhã entram como hoje |
 | 6 | `POST /api/revisao` retorna campos obsoletos (`estoque`, `pedido`, `feito`) | Baixo — confunde quem lê a API |
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (84), `teste_quem.js` (244), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (910) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (152); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (84), `teste_quem.js` (241), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (910) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3590,6 +3603,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   saldo sobe para sempre (R-EST-05, CONSERTO de 04/11/2026)
 - ❌ Pôr de volta uma segunda porta de upload do PDF, ou reaproveitar o número
   203: o upload é só na 103 (§8, 05/11/2026)
+- ❌ Fazer a urgência do PDF depender de um clique de novo, ou pôr de volta a
+  lista de lançar produção à mão: a ordem do dia nasce do PDF e da tela azul
+  (§8, R-PRD-01)
 - ❌ Guardar o horário da coleta por dia da semana, reescrever a modalidade da
   etiqueta pela saída escolhida no upload, marcar com a coleta de hoje a venda
   de outro dia, ou travar o upload sem saída (§8, R-HCO)

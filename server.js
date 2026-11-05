@@ -68,16 +68,10 @@ app.get('/api/estoque/ajustes',(req,res)=>{
   res.json(cod ? db.prepare(q).all(cod) : db.prepare(q).all());
 });
 
-app.post('/api/producao',(req,res)=>{
-  /* Sem login nada grava, e quem lancou vai na auditoria — a linha de
-     `producao` nao tem autor (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026). */
-  if(!QUEM.exigir(req,res)) return;
-  const itens=(req.body&&req.body.itens)||[];
-  const ins=db.prepare('INSERT INTO producao (codigo,qtd) VALUES (?,?)');
-  db.transaction(l=>{ for(const it of l){ if(it.codigo && +it.qtd>0) ins.run(it.codigo,+it.qtd); } })(itens);
-  QUEM.auditar(app, req, 'producao', 'POST /api/producao', '', itens.length+' item(ns)');
-  res.json({ok:true,lancados:itens.length});
-});
+/* O LANÇAMENTO À MÃO SAIU (spec PRODUCAO-SO-DO-PDF, 05/11/2026, decisão do
+   dono — "não usamos mais"): a ordem do dia nasce da urgência do PDF, aplicada
+   no upload, e a reposição é a tela azul (planilha). O POST /api/producao não
+   existe mais (nasce negado, #29); as ordens manuais antigas ficam no banco. */
 app.get('/api/producao',(req,res)=> res.json(db.prepare(`SELECT p.*, s.estoque, s.alvo, s.cor FROM producao p
   LEFT JOIN skus s ON s.codigo=p.codigo WHERE p.data=date('now','localtime') ORDER BY p.id DESC`).all()));
 

@@ -26,15 +26,11 @@ module.exports=function(app,db){
 
   app.get('/api/cruzamento',(req,res)=> res.json(calcular()));
 
+  /* Desde 05/11/2026 (PRODUCAO-SO-DO-PDF) o upload aplica sozinho, e a tela
+     não tem mais o botão. A rota fica para reaplicar à mão (`producao.lancar`),
+     e chama a MESMA conta do domínio. */
   app.post('/api/cruzamento/aplicar',(req,res)=>{
-    const linhas=calcular();
-    let urg=0;
-    db.transaction(()=>{
-      // idempotente: apaga as ordens 'ml' do dia e refaz so as urgentes
-      db.prepare("DELETE FROM producao WHERE data=date('now','localtime') AND origem='ml'").run();
-      const ins=db.prepare("INSERT INTO producao (codigo,qtd,origem,urgente) VALUES (?,?,'ml',1)");
-      for(const l of linhas){ if(l.urgente>0){ ins.run(l.codigo,l.urgente); urg+=l.urgente; } }
-    })();
-    res.json({ok:true,urgentes:urg,linhas});
+    const r = db.transaction(() => URGENCIA.aplicar(db))();
+    res.json({ok:true,urgentes:r.urgentes,linhas:r.linhas});
   });
 };

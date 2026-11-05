@@ -57,7 +57,12 @@ const db = new Database(path.join(tmp, 't.db'));
 db.exec(`CREATE TABLE skus (codigo TEXT PRIMARY KEY, largura_cm INT, altura_cm INT,
     cor_codigo TEXT, cor TEXT, tecido_codigo TEXT, modelo_id INT, estoque INT DEFAULT 0);
   INSERT INTO skus (codigo,estoque) VALUES ('BK160140BEGE',30);
-  CREATE TABLE config (chave TEXT PRIMARY KEY, valor TEXT);`);
+  CREATE TABLE config (chave TEXT PRIMARY KEY, valor TEXT);
+  INSERT INTO skus (codigo,estoque) VALUES ('BK100100CINZA',0);
+  CREATE TABLE modelo (id INTEGER PRIMARY KEY, sob_medida INTEGER DEFAULT 0);
+  CREATE TABLE producao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, qtd INTEGER,
+    produzido INTEGER DEFAULT 0, data TEXT DEFAULT (date('now','localtime')),
+    origem TEXT, urgente INTEGER DEFAULT 0, teste INTEGER DEFAULT 0);`);
 
 /* Quem está logado e o que pode: o teste troca a cada caso. */
 let usuario = { id:1, nome:'Expedição' };
@@ -443,6 +448,28 @@ async function main(){
     ok('o nav.js mostra as tarefas dos horários', /tarefas/.test(navTxt));
     ok('e não repete o "não lançado" na faixa de quem já tem a tarefa (AJUSTE)', /tipo==='hoje'/.test(navTxt) && /el\.remove\(\); return; \}/.test(navTxt));
     ok('o /expedicao é registrado um caminho por linha (sem aviso falso no boot)', !/app\.get\(\[\s*'\/expedicao'/.test(srvTxt) && /app\.get\('\/expedicao'/.test(srvTxt) && /app\.get\('\/expedicao\.html'/.test(srvTxt));
+
+    console.log('\n── 10. PRODUCAO-SO-DO-PDF: a urgência entra sozinha no upload (R-PRD-01) ──');
+    RELOGIO.fixar('2026-11-23 09:00');
+    podeHorario = false; usuario = { id:3, nome:'Beto' };   // quem sobe o PDF é Operação, sem producao.lancar
+    db.prepare("INSERT INTO producao (codigo,qtd,origem) VALUES ('BK100100CINZA',5,NULL)").run();   // ordem manual antiga
+    const pdfU = [vol({ venda:'V-URG-1', sku:'BK100100CINZA', despacharEm:'2026-11-23' }), vol({ venda:'V-URG-2', sku:'BK100100CINZA', despacharEm:'2026-11-23' })];
+    r = await subir(pdfU);
+    eq('o upload de quem é Operação responde 200', r.status, 200);
+    const urgN = () => db.prepare("SELECT COALESCE(SUM(qtd),0) t FROM producao WHERE origem='ml' AND urgente=1 AND codigo='BK100100CINZA' AND data=date('now','localtime')").get().t;
+    eq('as 2 vendas sem estoque viram 2 urgentes na ordem do dia, sem clique de ninguém', urgN(), 2);
+    ok('e a resposta diz quantas urgentes o PDF gerou', r.body.urgentes >= 2, JSON.stringify(r.body.urgentes));
+    r = await subir(pdfU);
+    eq('subir o mesmo PDF de novo não dobra', urgN(), 2);
+    ok('a ordem manual antiga não é tocada', !!db.prepare("SELECT 1 FROM producao WHERE codigo='BK100100CINZA' AND qtd=5 AND origem IS NULL").get());
+    podeHorario = true; usuario = { id:1, nome:'Expedição' };
+    const srv10 = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
+    ok('a rota de lançar produção à mão saiu (POST /api/producao)', !/app\.post\('\/api\/producao'/.test(srv10));
+    const idx10 = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+    ok('a lista "Selecione os SKUs" e o "Lançamentos de hoje" saíram da 103', !/id="sellist"/.test(idx10) && !/Lançamentos de hoje/.test(idx10) && !/function lancar\(/.test(idx10));
+    ok('o botão "Lançar N urgentes" saiu (a urgência entra sozinha)', !/btAplicar/.test(idx10) && !/cruzamento\/aplicar/.test(idx10));
+    const t103 = require('./telas').porNumero(103);
+    ok('a 103 se chama "Subir PDF de vendas", mesmo endereço e nível Operação', t103 && t103.nome === 'Subir PDF de vendas' && t103.rota === '/admin/producao' && t103.nivel === 'operacao');
   }catch(e){
     falhas++; console.log('  ESTOUROU — ' + (e.stack || e));
   }finally{
