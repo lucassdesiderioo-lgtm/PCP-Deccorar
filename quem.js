@@ -27,4 +27,22 @@ function exigir(req, res){
   return q;
 }
 
-module.exports = { quem, exigir };
+/* "ESTAS DUAS SAO A MESMA PESSOA?" — dono unico da regua (QUEM-FEZ-E-REVISAO
+   fase 4, 05/11/2026). E a pergunta de tres travas: quem imprimiu nao confere
+   (R-SEG-01), quem conferiu nao separa a cancelada (D8) e a conta "sem segunda
+   pessoa" da pilha e da saida. Cada lado e { id, nome }.
+     - com o id dos DOIS lados, vale o id: quem mudou de nome no cadastro
+       continua sendo a mesma pessoa, e duas pessoas de nome igual nao sao;
+     - sem o id de um dos lados (a linha de antes do id), vale o nome, como
+       sempre foi: sem espaco nas pontas e sem diferenca de maiuscula;
+     - vazio nunca e igual a vazio: nao saber quem fez nao vira acusacao. */
+const normNome = s => String(s == null ? '' : s).trim().toLowerCase();
+const idOuNulo = v => (v == null || v === '' || !Number.isFinite(+v)) ? null : +v;
+function mesmaPessoa(a, b){
+  const ia = idOuNulo(a && a.id), ib = idOuNulo(b && b.id);
+  if(ia != null && ib != null) return ia === ib;
+  const na = normNome(a && a.nome), nb = normNome(b && b.nome);
+  return na !== '' && nb !== '' && na === nb;
+}
+
+module.exports = { quem, exigir, mesmaPessoa };

@@ -171,14 +171,19 @@ const nomeIgual = (a, b) => String(a||'').trim().toLowerCase() === String(b||'')
    que existir: vazio igual a vazio nao e a mesma pessoa, e nao saber quem fez
    (a mesma guarda do "sem segunda pessoa" da pilha). */
 const temNomeP = s => String(s||'').trim() !== '';
-const mesmaPessoa = (impresso, quem) => temNomeP(impresso) && temNomeP(quem) && nomeIgual(impresso, quem);
+/* Desde a fase 4 da QUEM-FEZ-E-REVISAO (05/11/2026) a regua e a do `quem.js`,
+   pelo id quando os dois lados o tem. Esta continua aqui, so pelo nome, para
+   quem ainda chama com dois nomes. */
+const QUEM = require('./quem');
+const mesmaPessoa = (impresso, quem) => QUEM.mesmaPessoa({ nome:impresso }, { nome:quem });
 function pilhaDaArea(db){
   const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
-  const cols = 'id, codigo, buyer, nf, despachar_em, modalidade, embalado_em, impresso_por, conferido_por, '
-             + 'conferido_em, estagio, saida_id';
-  const doDia = db.prepare(`SELECT ${cols}, ${CONFERIDA} AS conferida FROM lote
+  /* `*` e nao uma lista: o id de quem imprimiu e de quem conferiu (fase 4 da
+     QUEM-FEZ-E-REVISAO) so existe no banco que ja passou pelo ALTER, e a lista
+     estouraria num banco de antes. */
+  const doDia = db.prepare(`SELECT *, ${CONFERIDA} AS conferida FROM lote
     WHERE ${PILHA_HOJE} ORDER BY embalado_em, id`).all();
-  const anteriores = db.prepare(`SELECT ${cols} FROM lote
+  const anteriores = db.prepare(`SELECT * FROM lote
     WHERE estagio='embalado' AND conferido_em IS NULL
       AND (embalado_em IS NULL OR date(embalado_em) < date('now','localtime'))
     ORDER BY embalado_em, id`).all();
@@ -191,8 +196,8 @@ function pilhaDaArea(db){
     coleta: ehColeta(v), adiantada: futuro(v, hoje) });
   const conferidas = doDia.filter(v => v.conferida);
   const temNome = s => String(s||'').trim() !== '';
-  const semSegunda = conferidas.filter(v => temNome(v.impresso_por) && temNome(v.conferido_por)
-                                        && nomeIgual(v.impresso_por, v.conferido_por));
+  const semSegunda = conferidas.filter(v => QUEM.mesmaPessoa({ id:v.impresso_por_id, nome:v.impresso_por },
+                                                              { id:v.conferido_por_id, nome:v.conferido_por }));
   /* FOI NO CAMINHAO SEM CONFERENCIA (02/10/2026): saiu numa saida, carregada,
      e ninguem bipou — o botao "foi no caminhao" deixa a conferencia vazia de
      proposito. E linha propria, e nao "sem registro": la e nao saber quem

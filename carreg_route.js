@@ -1,4 +1,4 @@
-const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro,ehColeta,AGENCIA,COLETA,AGUARDA_CAMINHAO,saidasAdiantadas,pilhaDaArea,acharVolumes,PRONTA_PRO_CARRO,mesmaPessoa}=require('./carga');
+const {PRA_CARREGAR,ORDEM_CARGA,atrasado,futuro,ehColeta,AGENCIA,COLETA,AGUARDA_CAMINHAO,saidasAdiantadas,pilhaDaArea,acharVolumes,PRONTA_PRO_CARRO}=require('./carga');
 const fs=require('fs'), path=require('path');
 /* Onde ficam as fotos da conferencia com o motorista. Fora do git e FORA de
    lotes/ (que o cron apaga em 7 dias): a foto e prova, e prova nao expira
@@ -36,6 +36,15 @@ module.exports=function(app,db){
   require('./fim_dia').garantir(db);
   require('./cancel_conf').garantir(db);
   const nomeLimpo=s=>{ const t=String(s||'').trim(); return t||null; };
+  /* QUEM FEZ (QUEM-FEZ-E-REVISAO fase 4, 05/11/2026): toda escrita desta tela
+     passa pelo `quem.js` — sem login, 401 e nada grava — e "a mesma pessoa" e
+     a regua de la, pelo id quando os dois lados o tem. As colunas do id moram
+     no exp_route (dono do `lote`); o ALTER guardado fica aqui tambem porque e
+     esta rota que grava nelas. */
+  const QUEM=require('./quem');
+  for(const c of ['impresso_por_id INTEGER','conferido_por_id INTEGER'])
+    try{ db.exec('ALTER TABLE lote ADD COLUMN '+c); }catch(e){}
+  const eu=req=>({ id:req.usuario&&req.usuario.id, nome:req.usuario&&req.usuario.nome });
   /* ── CONFERENCIA DUPLA (etiqueta de venda + SKU da caixa) ──────────────────
      A ultima rede antes do carro. Bipe 1 = a etiqueta de venda JA COLADA;
      bipe 2 = o codigo de barras do SKU na propria caixa (que continua visivel,
@@ -96,6 +105,7 @@ module.exports=function(app,db){
 
   // bipe da etiqueta de venda -> acha o pacote pelos codigos e marca carregado
   app.post('/api/carregar',(req,res)=>{
+    if(!QUEM.exigir(req,res)) return;
     let code=((req.body&&req.body.code)||'').trim();
     const skuLido=soCodigo((req.body&&req.body.sku)||'');
     if(!code) return res.status(400).json({erro:'sem codigo'});
@@ -214,8 +224,7 @@ module.exports=function(app,db){
        total. Uma porta de liberar vira o caminho de todo dia, e ai a regra
        deixa de existir. Quem imprime e quem confere sao pessoas diferentes
        por desenho da equipe, nao por excecao. */
-    const quemBipou=(req.usuario&&req.usuario.nome)||null;
-    if(mesmaPessoa(alvo.impresso_por, quemBipou)){
+    if(QUEM.mesmaPessoa({ id:alvo.impresso_por_id, nome:alvo.impresso_por }, eu(req))){
       try{ const ac=app.locals.acesso;
            if(ac&&ac.auditar) ac.auditar(req,'expedicao','carregar_mesma_pessoa',
              'NF '+(alvo.nf||alvo.id), 'impressa por '+nomeLimpo(alvo.impresso_por)+' — bipada pela mesma pessoa'); }catch(e){}
@@ -230,6 +239,7 @@ module.exports=function(app,db){
      canto (coleta). Devolve a resposta. */
   function concluir(req,alvo){
     const quemBipou=(req.usuario&&req.usuario.nome)||null;
+    const quemId=(req.usuario&&req.usuario.id!=null)?req.usuario.id:null;
     /* ⚠️ A BAIXA E AQUI (spec CONFERENCIA-E-BAIXA, fase 2-A, 22/10/2026): a
        etiqueta so reservou a peca, e ela sai do estoque quando a conferencia
        bate com a etiqueta — por peca, uma vez so (baixa_dominio.js). Quem chama
@@ -242,16 +252,16 @@ module.exports=function(app,db){
        caixa conferida. Na COLETA nada muda: conferir e levar pro canto, e o
        canto e o lugar de onde o caminhao leva. */
     if(!ehColeta(alvo)){
-      db.prepare(`UPDATE lote SET conferido_por=?, conferido_em=datetime('now','localtime') WHERE id=?`)
-        .run(quemBipou, alvo.id);
+      db.prepare(`UPDATE lote SET conferido_por=?, conferido_por_id=?, conferido_em=datetime('now','localtime') WHERE id=?`)
+        .run(quemBipou, quemId, alvo.id);
       const p2=progresso();
       const hoje2=db.prepare("SELECT date('now','localtime') d").get().d;
       return ({ok:true,conferida:true,pedido:alvo,itens:pecasDaCaixa(alvo.id),carregados:p2.carregados,total:p2.total,
         prontas:p2.carro.prontas,coleta:false,adiantado:futuro(alvo,hoje2),impresso_por:nomeLimpo(alvo.impresso_por)});
     }
     db.prepare(`UPDATE lote SET estagio='carregado', carregado_em=datetime('now','localtime'),
-        conferido_por=?, conferido_em=datetime('now','localtime') WHERE id=?`)
-      .run(quemBipou, alvo.id);
+        conferido_por=?, conferido_por_id=?, conferido_em=datetime('now','localtime') WHERE id=?`)
+      .run(quemBipou, quemId, alvo.id);
     const p=progresso();
     /* A COLETA RESPONDE COM O NUMERO QUE O MOTORISTA VAI TER QUE BATER.
        "Esta indo N" depois de cada bipe e o que faz a pessoa saber, na hora,
@@ -306,6 +316,7 @@ module.exports=function(app,db){
     return id ? db.prepare('SELECT * FROM lote WHERE id=?').get(id) : null; };
 
   app.post('/api/carregar/peca',(req,res)=>{
+    if(!QUEM.exigir(req,res)) return;
     const alvo=loteDoCorpo(req);
     if(!alvo) return res.json({ok:false,motivo:'nao_encontrado'});
     const barra=barrar(req,alvo);
@@ -347,6 +358,7 @@ module.exports=function(app,db){
   });
 
   app.post('/api/carregar/recomecar',(req,res)=>{
+    if(!QUEM.exigir(req,res)) return;
     const alvo=loteDoCorpo(req);
     if(!alvo) return res.json({ok:false,motivo:'nao_encontrado'});
     db.prepare('UPDATE lote_item SET conferidos_carga=0 WHERE lote_id=?').run(alvo.id);
@@ -373,8 +385,8 @@ module.exports=function(app,db){
   const MOTIVO_SOBRA={cancelada:'Venda cancelada',motorista:'Motorista recusou'};
   app.post('/api/carregamento/sobra',(req,res)=>{
     const CANC=require('./cancelada_dominio'), BAIXA=require('./baixa_dominio');
-    const quem=req.usuario||null;
-    if(!quem || (quem.id==null && !quem.nome)) return res.status(401).json({ok:false,motivo:'sem_login',aviso:'Entre com o seu login para marcar a sobra.'});
+    if(!QUEM.exigir(req,res)) return;
+    const quem=req.usuario;
     const b=req.body||{};
     let alvo=null;
     if(b.id!=null) alvo=db.prepare('SELECT * FROM lote WHERE id=?').get(+b.id)||null;
@@ -388,7 +400,7 @@ module.exports=function(app,db){
     const pedido=v=>({id:v.id,buyer:v.buyer,nf:v.nf,codigo:v.codigo,city:v.city,modalidade:v.modalidade});
     const nao=CANC.naoSobra(alvo)||BAIXA.travaTeste(db,alvo);
     if(nao) return res.json(Object.assign({ok:false},nao,alvo?{pedido:pedido(alvo)}:{}));
-    if(mesmaPessoa(alvo.conferido_por,quem.nome)){
+    if(QUEM.mesmaPessoa({ id:alvo.conferido_por_id, nome:alvo.conferido_por }, eu(req))){
       try{ const ac=app.locals.acesso;
            if(ac&&ac.auditar) ac.auditar(req,'expedicao','sobra_mesma_pessoa','NF '+(alvo.nf||alvo.id),
              'conferida por '+nomeLimpo(alvo.conferido_por)+' — sobra pedida pela mesma pessoa'); }catch(e){}
@@ -454,6 +466,7 @@ module.exports=function(app,db){
   /* CONFIRMAR / RECUSAR a venda cancelada (fase 4). A chave e conferida no
      portao (permDaRota) E aqui: esconder o botao nao e seguranca. */
   function decidir(req,res,acao){
+    if(!QUEM.exigir(req,res)) return;
     if(!podeConfirmar(req)) return res.status(403).json({ok:false,motivo:'sem_permissao',chave:'cancelamento.confirmar',
       aviso:'Confirmar ou recusar venda cancelada é de quem tem a permissão "Confirmar venda cancelada".'});
     const CONF=require('./cancel_conf'), b=req.body||{};
@@ -480,6 +493,7 @@ module.exports=function(app,db){
      esperando conferencia e conferidas esperando sair, de hoje e atrasadas
      (a venda futura nao "ficou", ela nem era de hoje). Nao mexe em nada. */
   app.post('/api/carregamento/fimdia',(req,res)=>{
+    if(!QUEM.exigir(req,res)) return;
     const p=progresso();
     const ids=[].concat(p.faltam,p.coleta.faltam,p.coleta.aguardando).map(v=>v.id);
     const FIM=require('./fim_dia');

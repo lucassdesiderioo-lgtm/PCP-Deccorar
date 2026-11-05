@@ -50,6 +50,20 @@ module.exports = function(app, db){
     try{ const ac = app.locals.acesso; if(ac && ac.auditar) ac.auditar(req, 'expedicao', acao, alvo, det); }catch(e){}
   };
   const quem = req => (req.usuario && req.usuario.nome) || '';
+  /* QUEM FEZ (QUEM-FEZ-E-REVISAO fase 4, 05/11/2026). Toda escrita da saída do
+     caminhão e da viagem passa pelo `quem.js`: sem login, 401 e nada grava —
+     até aqui ela gravava com a pessoa vazia. O id entra ao lado de cada nome
+     (`aberta_por_id`, `fechado_por_id`, `liberado_por_id`, `no_carro_por_id`),
+     e "sem segunda pessoa" é a régua do `quem.js`, pelo id quando os dois lados
+     o têm. As colunas moram no saida_schema e no exp_route; o ALTER guardado
+     do `lote` fica aqui também, porque é esta rota que grava nele. */
+  const QUEM = require('./quem');
+  for(const c of ['impresso_por_id INTEGER', 'conferido_por_id INTEGER', 'no_carro_por_id INTEGER'])
+    try{ db.exec('ALTER TABLE lote ADD COLUMN ' + c); }catch(e){}
+  const quemId = req => (req.usuario && req.usuario.id != null) ? req.usuario.id : null;
+  const post = (rota, h) => app.post(rota, (req, res) => { if(!QUEM.exigir(req, res)) return; return h(req, res); });
+  const semSegunda = l => l.filter(x => QUEM.mesmaPessoa({ id:x.impresso_por_id, nome:x.impresso_por },
+                                                         { id:x.conferido_por_id, nome:x.conferido_por })).length;
   // As pecas da caixa de varias nas listas da saida e da viagem (05/10/2026).
   const pecasDaCaixa = require('./pecas_caixa')(db);
   const lista = s => { try{ const v = JSON.parse(s||'[]'); return Array.isArray(v) ? v : []; }catch(e){ return []; } };
@@ -83,10 +97,10 @@ module.exports = function(app, db){
 
   app.get('/api/saida/aberta', (req, res) => res.json(retrato(aberta())));
 
-  app.post('/api/saida/abrir', (req, res) => {
+  post('/api/saida/abrir', (req, res) => {
     let s = aberta();
     if(!s){
-      const id = db.prepare("INSERT INTO saida (tipo, aberta_por) VALUES ('coleta', ?)").run(quem(req)).lastInsertRowid;
+      const id = db.prepare("INSERT INTO saida (tipo, aberta_por, aberta_por_id) VALUES ('coleta', ?, ?)").run(quem(req), quemId(req)).lastInsertRowid;
       s = db.prepare('SELECT * FROM saida WHERE id=?').get(id);
     }
     res.json(Object.assign({ ok:true }, retrato(s)));
@@ -96,7 +110,7 @@ module.exports = function(app, db){
     aviso:'Nenhuma saída de caminhão aberta. Toque em "Saída do caminhão" antes de bipar as sobras.' });
 
   /* O BIPE DAS SOBRAS: a caixa ficou no canto e não foi no caminhão. */
-  app.post('/api/saida/sobra', (req, res) => {
+  post('/api/saida/sobra', (req, res) => {
     const s = aberta(); if(!s) return semSaida(res);
     const code = String((req.body && req.body.code) || '').trim();
     if(!code) return res.status(400).json({ erro:'sem codigo' });
@@ -122,7 +136,7 @@ module.exports = function(app, db){
     res.json(Object.assign({ ok:true, pedido:{ id:alvo.id, buyer:alvo.buyer, nf:alvo.nf } },
       retrato(db.prepare('SELECT * FROM saida WHERE id=?').get(s.id))));
   });
-  app.post('/api/saida/sobra/tirar', (req, res) => {
+  post('/api/saida/sobra/tirar', (req, res) => {
     const s = aberta(); if(!s) return semSaida(res);
     const id = parseInt(req.body && req.body.id, 10);
     const sobras = lista(s.sobras).filter(x => x !== id);
@@ -131,7 +145,7 @@ module.exports = function(app, db){
   });
 
   /* "NÃO FICOU NADA": o passo das sobras respondido com o vazio. */
-  app.post('/api/saida/nada', (req, res) => {
+  post('/api/saida/nada', (req, res) => {
     const s = aberta(); if(!s) return semSaida(res);
     const r = retrato(s);
     if(r.sobras.length) return res.json(Object.assign({ ok:false, motivo:'tem_sobras',
@@ -141,7 +155,7 @@ module.exports = function(app, db){
   });
 
   /* "FOI NO CAMINHÃO": a troca de porta, por botão. */
-  app.post('/api/saida/levou', (req, res) => {
+  post('/api/saida/levou', (req, res) => {
     const s = aberta(); if(!s) return semSaida(res);
     const id = parseInt(req.body && req.body.id, 10);
     const levou = lista(s.levou);
@@ -155,14 +169,14 @@ module.exports = function(app, db){
     db.prepare('UPDATE saida SET levou=? WHERE id=?').run(JSON.stringify(levou), s.id);
     res.json(Object.assign({ ok:true }, retrato(db.prepare('SELECT * FROM saida WHERE id=?').get(s.id))));
   });
-  app.post('/api/saida/levou/tirar', (req, res) => {
+  post('/api/saida/levou/tirar', (req, res) => {
     const s = aberta(); if(!s) return semSaida(res);
     const id = parseInt(req.body && req.body.id, 10);
     db.prepare('UPDATE saida SET levou=? WHERE id=?').run(JSON.stringify(lista(s.levou).filter(x => x !== id)), s.id);
     res.json(Object.assign({ ok:true }, retrato(db.prepare('SELECT * FROM saida WHERE id=?').get(s.id))));
   });
 
-  app.post('/api/saida/cancelar', (req, res) => {
+  post('/api/saida/cancelar', (req, res) => {
     const s = aberta(); if(!s) return semSaida(res);
     db.prepare('DELETE FROM saida WHERE id=? AND fechada_em IS NULL').run(s.id);
     auditar(req, 'saida_cancelada', 'saida '+s.id, 'aberta por '+(s.aberta_por||'?'));
@@ -220,18 +234,19 @@ module.exports = function(app, db){
       const up = db.prepare(`UPDATE lote SET saida_id=?, saiu_em=datetime('now','localtime'), saiu_por='coleta',
           retirado_em=COALESCE(retirado_em, datetime('now','localtime')) WHERE id=? AND saida_id IS NULL`);
       for(const id of ids) up.run(s.id, id);
-      const sem2 = ids.length ? db.prepare(`SELECT impresso_por, conferido_por FROM lote WHERE id IN (${ids.map(()=>'?').join(',')})`)
-        .all(...ids).filter(v => String(v.impresso_por||'').trim() && String(v.conferido_por||'').trim()
-                              && nomeIgual(v.impresso_por, v.conferido_por)).length : 0;
+      const sem2 = ids.length ? semSegunda(db.prepare(`SELECT impresso_por, impresso_por_id, conferido_por, conferido_por_id
+          FROM lote WHERE id IN (${ids.map(()=>'?').join(',')})`).all(...ids)) : 0;
       /* O arquivo leva o id da saída: acha-se a foto pela linha e a linha pela
          foto. Gravado DENTRO da transação — se o disco recusar, a saída não
          fecha e as caixas continuam no canto. */
       arq = path.join(FOTOS_DIR, 'saida-' + s.id + '.' + foto.ext);
       fs.writeFileSync(arq, foto.buf);
       db.prepare(`UPDATE saida SET fechada_em=datetime('now','localtime'), fechado_por=?, qtd_sistema=?, qtd_externa=?,
-          divergente=?, liberado_por=?, motivo=?, foto=?, sobras=?, ids=?, sem_segunda_pessoa=? WHERE id=?`)
+          divergente=?, liberado_por=?, motivo=?, foto=?, sobras=?, ids=?, sem_segunda_pessoa=?,
+          fechado_por_id=?, liberado_por_id=? WHERE id=?`)
         .run(autor, r.sistema, mot, divergente?1:0, divergente ? autor : null, motivo || null, arq,
-             JSON.stringify(r.sobras.map(v => v.id)), JSON.stringify(ids), sem2, s.id);
+             JSON.stringify(r.sobras.map(v => v.id)), JSON.stringify(ids), sem2,
+             quemId(req), divergente ? quemId(req) : null, s.id);
     })();
     if(divergente) auditar(req, 'saida_liberada_divergente', 'saida '+s.id,
       'sistema '+r.sistema+' / motorista '+mot+' — '+motivo);
@@ -240,8 +255,8 @@ module.exports = function(app, db){
       troca_de_porta: r.levou.filter(v => v.troca_de_porta).length, sobras:r.sobras.length,
       foto:'/api/saida/foto/'+s.id });
   }
-  app.post('/api/saida/fechar', (req, res) => fechar(req, res, false));
-  app.post('/api/saida/liberar', (req, res) => fechar(req, res, true));
+  post('/api/saida/fechar', (req, res) => fechar(req, res, false));
+  post('/api/saida/liberar', (req, res) => fechar(req, res, true));
 
   /* A prova, de volta. Só leitura: ninguém edita nem apaga foto por rota. */
   app.get('/api/saida/foto/:id', (req, res) => {
@@ -275,8 +290,8 @@ module.exports = function(app, db){
   function retratoViagem(v){
     if(!v) return { viagem:null };
     const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
-    const noCarro = db.prepare(`SELECT id,codigo,buyer,nf,modalidade,despachar_em,no_carro_em,no_carro_por,impresso_por,conferido_por
-      FROM lote WHERE saida_id=? AND saiu_em IS NULL ORDER BY no_carro_em, id`).all(v.id)
+    const noCarro = db.prepare(`SELECT id,codigo,buyer,nf,modalidade,despachar_em,no_carro_em,no_carro_por,impresso_por,conferido_por,
+      impresso_por_id,conferido_por_id FROM lote WHERE saida_id=? AND saiu_em IS NULL ORDER BY no_carro_em, id`).all(v.id)
       .map(x => Object.assign(x, { troca_de_porta: ehColeta(x), itens: pecasDaCaixa(x.id) }));
     const prontas = pecasDaCaixa.anotar(db.prepare(`SELECT id,codigo,buyer,nf,despachar_em FROM lote WHERE ${PRONTA_PRO_CARRO}
       ORDER BY COALESCE(despachar_em,data), id`).all());
@@ -300,15 +315,15 @@ module.exports = function(app, db){
      foto do atendente. Em modo teste so a caixa de teste entra (§11).
      ⚠️ A VENDA FUTURA NAO ENTRA SOZINHA (carga.js → futuro, #9): ela nao e da
      carga de hoje. Se for mandada adiantada, entra pelo "Bipar no carro". */
-  app.post('/api/viagem/abrir', (req, res) => {
+  post('/api/viagem/abrir', (req, res) => {
     let v = viagemAberta();
     if(!v){
       db.transaction(() => {
-        const id = db.prepare("INSERT INTO saida (tipo, aberta_por) VALUES ('agencia', ?)").run(quem(req)).lastInsertRowid;
+        const id = db.prepare("INSERT INTO saida (tipo, aberta_por, aberta_por_id) VALUES ('agencia', ?, ?)").run(quem(req), quemId(req)).lastInsertRowid;
         db.prepare(`UPDATE lote SET estagio='carregado', carregado_em=COALESCE(carregado_em, datetime('now','localtime')),
-            no_carro_em=datetime('now','localtime'), no_carro_por=?, saida_id=?
+            no_carro_em=datetime('now','localtime'), no_carro_por=?, no_carro_por_id=?, saida_id=?
           WHERE ${PRONTA_PRO_CARRO} AND (despachar_em IS NULL OR despachar_em <= date('now','localtime'))${temTeste() ? ' AND COALESCE(teste,0)=' + (BAIXA.emTeste(db) ? 1 : 0) : ''}`)
-          .run(quem(req) || null, id);
+          .run(quem(req) || null, quemId(req), id);
         v = db.prepare('SELECT * FROM saida WHERE id=?').get(id);
       })();
     }
@@ -317,7 +332,7 @@ module.exports = function(app, db){
 
   /* O BIPE "FICOU NA FABRICA": tira do carro a caixa que nao foi. E o mesmo
      "tirar do carro", pelo codigo da etiqueta — o bipe so quer dizer "ficou". */
-  app.post('/api/viagem/ficou', (req, res) => {
+  post('/api/viagem/ficou', (req, res) => {
     const v = viagemAberta(); if(!v) return semViagem(res);
     const code = String((req.body && req.body.code) || '').trim();
     if(!code) return res.status(400).json({ erro:'sem codigo' });
@@ -327,15 +342,15 @@ module.exports = function(app, db){
     const ped = b => ({ id:b.id, buyer:b.buyer, nf:b.nf, codigo:b.codigo });
     if(!x) return res.json(Object.assign({ ok:false, motivo:'fora_do_carro', pedido:ped(batem[0]),
       aviso:'Esta caixa não está no carro desta viagem.' }, retratoViagem(v)));
-    if(ehColeta(x)) db.prepare('UPDATE lote SET no_carro_em=NULL, no_carro_por=NULL, saida_id=NULL WHERE id=?').run(x.id);
-    else db.prepare(`UPDATE lote SET estagio='embalado', carregado_em=NULL, no_carro_em=NULL, no_carro_por=NULL,
+    if(ehColeta(x)) db.prepare('UPDATE lote SET no_carro_em=NULL, no_carro_por=NULL, no_carro_por_id=NULL, saida_id=NULL WHERE id=?').run(x.id);
+    else db.prepare(`UPDATE lote SET estagio='embalado', carregado_em=NULL, no_carro_em=NULL, no_carro_por=NULL, no_carro_por_id=NULL,
         saida_id=NULL WHERE id=?`).run(x.id);
     res.json(Object.assign({ ok:true, pedido:ped(x) }, retratoViagem(v)));
   });
 
   /* O BIPE NO CARRO. A ordem das recusas é a da caixa na mão: não existe,
      sem etiqueta, já saiu, já está no carro, não foi conferida. */
-  app.post('/api/viagem/carro', (req, res) => {
+  post('/api/viagem/carro', (req, res) => {
     const v = viagemAberta(); if(!v) return semViagem(res);
     const code = String((req.body && req.body.code) || '').trim();
     if(!code) return res.status(400).json({ erro:'sem codigo' });
@@ -362,25 +377,25 @@ module.exports = function(app, db){
         aviso:'Esta caixa já saiu da fábrica (ou já foi carregada antes das viagens existirem).' });
     }
     db.prepare(`UPDATE lote SET estagio='carregado', carregado_em=COALESCE(carregado_em, datetime('now','localtime')),
-        no_carro_em=datetime('now','localtime'), no_carro_por=?, saida_id=? WHERE id=?`)
-      .run(quem(req) || null, v.id, alvo.id);
+        no_carro_em=datetime('now','localtime'), no_carro_por=?, no_carro_por_id=?, saida_id=? WHERE id=?`)
+      .run(quem(req) || null, quemId(req), v.id, alvo.id);
     res.json(Object.assign({ ok:true, pedido:ped, troca_de_porta: ehColeta(alvo) }, retratoViagem(v)));
   });
 
   /* TIRAR DO CARRO: desfaz o bipe. A de agência volta à área, conferida; a de
      coleta volta ao canto. Só vale para a viagem aberta. */
-  app.post('/api/viagem/tirar', (req, res) => {
+  post('/api/viagem/tirar', (req, res) => {
     const v = viagemAberta(); if(!v) return semViagem(res);
     const id = parseInt(req.body && req.body.id, 10);
     const x = db.prepare('SELECT * FROM lote WHERE id=? AND saida_id=? AND saiu_em IS NULL').get(id, v.id);
     if(!x) return res.json(Object.assign({ ok:false, motivo:'fora_do_carro' }, retratoViagem(v)));
-    if(ehColeta(x)) db.prepare('UPDATE lote SET no_carro_em=NULL, no_carro_por=NULL, saida_id=NULL WHERE id=?').run(id);
-    else db.prepare(`UPDATE lote SET estagio='embalado', carregado_em=NULL, no_carro_em=NULL, no_carro_por=NULL,
+    if(ehColeta(x)) db.prepare('UPDATE lote SET no_carro_em=NULL, no_carro_por=NULL, no_carro_por_id=NULL, saida_id=NULL WHERE id=?').run(id);
+    else db.prepare(`UPDATE lote SET estagio='embalado', carregado_em=NULL, no_carro_em=NULL, no_carro_por=NULL, no_carro_por_id=NULL,
         saida_id=NULL WHERE id=?`).run(id);
     res.json(Object.assign({ ok:true }, retratoViagem(v)));
   });
 
-  app.post('/api/viagem/cancelar', (req, res) => {
+  post('/api/viagem/cancelar', (req, res) => {
     const v = viagemAberta(); if(!v) return semViagem(res);
     const r = retratoViagem(v);
     if(r.sistema) return res.json(Object.assign({ ok:false, motivo:'carro_cheio',
@@ -425,14 +440,14 @@ module.exports = function(app, db){
           retirado_em=CASE WHEN COALESCE(modalidade,'agencia')='coleta' THEN COALESCE(retirado_em, datetime('now','localtime'))
                            ELSE retirado_em END
         WHERE saida_id=? AND saiu_em IS NULL`).run(v.id);
-      const sem2 = r.lista.filter(x => String(x.impresso_por||'').trim() && String(x.conferido_por||'').trim()
-                                    && nomeIgual(x.impresso_por, x.conferido_por)).length;
+      const sem2 = semSegunda(r.lista);
       const arq = path.join(FOTOS_DIR, 'saida-' + v.id + '.' + foto.ext);
       fs.writeFileSync(arq, foto.buf);
       db.prepare(`UPDATE saida SET fechada_em=datetime('now','localtime'), fechado_por=?, qtd_sistema=?, qtd_externa=?,
-          divergente=?, liberado_por=?, motivo=?, foto=?, ids=?, sem_segunda_pessoa=?, quem_levou_id=?, quem_levou=? WHERE id=?`)
+          divergente=?, liberado_por=?, motivo=?, foto=?, ids=?, sem_segunda_pessoa=?, quem_levou_id=?, quem_levou=?,
+          fechado_por_id=?, liberado_por_id=? WHERE id=?`)
         .run(autor, r.sistema, at, divergente?1:0, divergente ? autor : null, motivo || null, arq,
-             JSON.stringify(ids), sem2, levou.id, levou.nome, v.id);
+             JSON.stringify(ids), sem2, levou.id, levou.nome, quemId(req), divergente ? quemId(req) : null, v.id);
     })();
     if(divergente) auditar(req, 'viagem_liberada_divergente', 'saida '+v.id, 'carro '+r.sistema+' / atendente '+at+' — '+motivo);
     const troca = r.lista.filter(x => x.troca_de_porta).length;
@@ -441,6 +456,6 @@ module.exports = function(app, db){
     res.json({ ok:true, id:v.id, sistema:r.sistema, atendente:at, divergente, troca_de_porta:troca, quem_levou:levou.nome,
       foto:'/api/saida/foto/'+v.id });
   }
-  app.post('/api/viagem/fechar', (req, res) => fecharViagem(req, res, false));
-  app.post('/api/viagem/liberar', (req, res) => fecharViagem(req, res, true));
+  post('/api/viagem/fechar', (req, res) => fecharViagem(req, res, false));
+  post('/api/viagem/liberar', (req, res) => fecharViagem(req, res, true));
 };

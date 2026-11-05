@@ -108,11 +108,11 @@ Etiqueta de Venda ────┤
 - **Status:** no ar desde 26/09/2026; o id, a tabela e o 401 em código em 05/11/2026 (fase 3 da `QUEM-FEZ-E-REVISAO`).
 
 ### R-QUEM-02 · O bipe do Carregamento grava quem conferiu
-- **Regra:** o bipe da área (agência) e o do canto (coleta) gravam `conferido_por` e `conferido_em` — o bipe 2.
-- **Por quê:** é a segunda contagem da dupla conferência.
+- **Regra:** o bipe da área (agência) e o do canto (coleta) gravam `conferido_por` e `conferido_em` — o bipe 2 — e, desde 05/11/2026, `conferido_por_id`. **Sem login o bipe é recusado (401) e nada grava**, e isso vale para toda escrita da Conferência, da saída do caminhão e da viagem: o id de quem abriu, fechou e liberou a saída (`saida.aberta_por_id`, `fechado_por_id`, `liberado_por_id`) e de quem pôs no carro (`lote.no_carro_por_id`) entra ao lado do nome.
+- **Por quê:** é a segunda contagem da dupla conferência. O id porque o nome muda no cadastro e se repete entre pessoas (spec `QUEM-FEZ-E-REVISAO` §2).
 - **Exceções:** a caixa que foi no caminhão sem ninguém bipar fica sem conferência (R-SAI-05).
-- **Teste que trava:** `teste_saida.js`.
-- **Status:** no ar desde 26/09/2026.
+- **Teste que trava:** `teste_saida.js` · `teste_quem_carregamento.js` (o 401 em cada rota, os ids).
+- **Status:** no ar desde 26/09/2026; o id e o 401 em código em 05/11/2026 (fase 4 da `QUEM-FEZ-E-REVISAO`).
 
 ### R-PIL-01 · A conferência da pilha fecha caixa a caixa: impressas = conferidas + faltam
 - **Regra:** o card "Conferência da pilha" conta as etiquetas **impressas hoje** (`embalado_em`), as conferidas e as que faltam, e o que falta tem nome. Conferida é a que tem `conferido_em` **ou** está `carregado`. `carga.js → pilhaDaArea(db)` é o dono único; o `GET /api/carregamento` a devolve em `pilha`.
@@ -150,10 +150,10 @@ Etiqueta de Venda ────┤
 - **Status:** no ar desde 26/09/2026.
 
 ### R-SEG-01 · Quem imprimiu não confere
-- **Regra:** o bipe da **área** (agência) e o do **canto** (coleta) recusam quando o login é o mesmo do `impresso_por`: *"OUTRA PESSOA TEM QUE CONFERIR"*, com o nome de quem imprimiu e o botão **Trocar de pessoa** (`/login?r=/carregamento`). A recusa vai para a auditoria. A régua é `carga.js → mesmaPessoa`: ignora espaço e maiúscula, e **vazio nunca é igual a vazio** — caixa sem `impresso_por`, ou bipe sem login, passa.
+- **Regra:** o bipe da **área** (agência) e o do **canto** (coleta) recusam quando o login é o mesmo do `impresso_por`: *"OUTRA PESSOA TEM QUE CONFERIR"*, com o nome de quem imprimiu e o botão **Trocar de pessoa** (`/login?r=/carregamento`). A recusa vai para a auditoria. A régua é `quem.js → mesmaPessoa` (desde 05/11/2026): **com o id dos dois lados vale o id** — quem mudou de nome no cadastro continua barrado, e duas pessoas de nome igual não se barram; sem o id de um dos lados (a caixa impressa antes de 05/11/2026), vale o nome, ignorando espaço e maiúscula; e **vazio nunca é igual a vazio** — caixa sem `impresso_por` passa. Bipe sem login não chega aqui: é 401.
 - **Por quê:** a bancada imprime e não repara que a venda leva mais de uma persiana; com a mesma pessoa conferindo, a mesma atenção conferia. O Carregamento é a última vez que alguém está com a caixa na mão.
 - **Exceções:** o bipe da viagem (pôr no carro) e as sobras do caminhão não travam: ali a caixa já foi conferida por outra pessoa.
-- **Teste que trava:** `teste_segunda_pessoa.js` (área, canto, nome, auditoria e vazio). ⚠ A exceção da viagem e das sobras **não tem teste**.
+- **Teste que trava:** `teste_segunda_pessoa.js` (área, canto, nome, auditoria e vazio) · `teste_quem_carregamento.js` (pelo id, e a caixa antiga pelo nome). ⚠ A exceção da viagem e das sobras **não tem teste**.
 - **Status:** no ar desde 01/10/2026 (PR #164) · conferida na fábrica em 05/10/2026 a metade em que outra pessoa confere · a recusa de verdade ainda não foi relatada.
 - **História:** fase 1 da spec `CARREGAMENTO-SEGUNDA-PESSOA`.
 
@@ -250,10 +250,10 @@ Etiqueta de Venda ────┤
 - **Status:** no ar desde 22/10/2026 (PR #222).
 
 ### R-REC-04 · Quem conferiu a caixa não marca a sobra dela (D8)
-- **Regra:** a recusa diz quem conferiu e oferece **Trocar de pessoa**. Sem liberação, nem para o Admin Geral. Caixa sem `conferido_por` passa (a régua do `carga.js → mesmaPessoa`).
+- **Regra:** a recusa diz quem conferiu e oferece **Trocar de pessoa**. Sem liberação, nem para o Admin Geral. Caixa sem `conferido_por` passa. A régua é a do `quem.js → mesmaPessoa`, pelo id quando a caixa tem o `conferido_por_id` (desde 05/11/2026).
 - **Por quê:** a sobra contradiz a contagem dele, e a mesma atenção conferiria a própria conta. Confirmado pelo dono em 22/10/2026.
 - **Exceções:** nenhuma.
-- **Teste que trava:** `teste_sobra.js`.
+- **Teste que trava:** `teste_sobra.js` · `teste_quem_carregamento.js` (pelo id).
 - **Status:** no ar desde 22/10/2026 (PR #222).
 
 ### R-REC-05 · A lista das canceladas zera
@@ -327,7 +327,7 @@ Etiqueta de Venda ────┤
 - **Por quê:** até 02/10/2026 ela saía com o nome de quem fechou a saída, uma pessoa que nunca a bipou.
 - **Exceções:** as que saíram antes de 02/10/2026 ficam com o nome de quem fechou; o histórico não foi reescrito. Anotado e não consertado: ela ainda conta em "conferidas" na pilha (R-PIL-01 conta `carregado`).
 - **Teste que trava:** `teste_saida_coleta.js` · `teste_area.js`.
-- **Status:** no ar desde 02/10/2026.
+- **Status:** no ar desde 02/10/2026. Desde 05/11/2026 a saída grava também `fechado_por_id`, e a conta "sem segunda pessoa" (da saída e da pilha) é a régua do `quem.js`, pelo id.
 
 ### R-SAI-06 · Sem a foto não fecha; com divergência, só com permissão e motivo
 - **Regra:** fechar exige a foto da tela do celular do motorista e o número dele. A foto é do `foto.js`: só `data:image/*` com conteúdo, gravada **dentro** da transação, numa pasta fora de `lotes/` (o cron não a apaga), e volta por `GET /api/coleta/foto/:id`. **Liberar com divergência** é outra rota, com a chave `saida.liberar` e motivo obrigatório; grava quem liberou e vai para a auditoria.

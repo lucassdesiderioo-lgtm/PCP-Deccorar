@@ -1,6 +1,17 @@
-> **STATUS · 05/11/2026 — EM CONSTRUÇÃO · fases 1 e 2 no ar · fase 3 em código, falta subir**
+> **STATUS · 05/11/2026 — EM CONSTRUÇÃO · fases 1 a 3 no ar · fase 4 em código, falta subir**
 > - Desenhado no Projeto do Claude com o Lucas em 04/11/2026.
-> - **Fase 3 (Etiqueta de Venda) em código em 05/11/2026**: imprimir, reimprimir e
+> - **Fase 4 (Carregamento e saídas) em código em 05/11/2026**: toda escrita da
+>   Conferência (`carreg_route`), da saída do caminhão e da viagem (`saida_route`) passa
+>   pelo `quem.js` — 401 sem login (até ali gravava com a pessoa vazia). Colunas do id:
+>   `lote.conferido_por_id`, `lote.no_carro_por_id`, `saida.aberta_por_id`,
+>   `fechado_por_id` e `liberado_por_id`. **"A mesma pessoa" ganhou dono único,
+>   `quem.js → mesmaPessoa`**: pelo id quando os dois lados o têm, pelo nome só na
+>   linha de antes — vale para R-SEG-01, D8 e o "sem segunda pessoa" da pilha e das
+>   saídas (linha nova em `DECISOES.md`, aprovada no PLANO). A spec dava risco 🟡; foi
+>   tratada como 🔴 (schema). O cancelamento em duas pessoas (`cancel_conf.js`) já
+>   comparava pelo id e só ganhou o 401. `teste_quem_carregamento.js` (56).
+> - **Fase 3 (Etiqueta de Venda) no ar desde 05/11/2026** (PR #288; o grep deu 2).
+>   Em código em 05/11/2026: imprimir, reimprimir e
 >   bipar a persiana da caixa de várias passam pelo `quem.js` e são 401 sem login
 >   (até ali a impressão passava com o nome vazio). Colunas novas, ao lado dos nomes:
 >   `lote.impresso_por_id`, `lote_item.conferido_por_id` e `recusa_estoque.usuario_id`.
