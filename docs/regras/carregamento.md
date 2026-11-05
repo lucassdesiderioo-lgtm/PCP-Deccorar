@@ -94,47 +94,47 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 ### R-HCO-01 · O horário é da DATA, e não do dia da semana
 - **Regra:** cada data tem as suas coletas e a sua agência; o `corte_<dia>`/`despacho_<dia>` do `config` só vale para a agência sem horário lançado.
 - **Por quê:** o ML muda o horário durante a semana (na quinta 05/11 a coleta das 9h sumiu e as outras andaram).
-- **Status:** em código em 05/11/2026, falta subir.
+- **Status:** no ar desde 05/11/2026 (PRs #292 e #293); falta a prova com dado real.
 
 ### R-HCO-02 · De 0 a 3 coletas por dia; janela e corte
 - **Regra:** cada coleta tem janela `HH:MM` às `HH:MM` (início antes do fim) e corte ("vendido até") opcional, no máximo no início. A Coleta 1 é a mais cedo. Sábado entra.
-- **Status:** em código em 05/11/2026, falta subir.
+- **Status:** no ar desde 05/11/2026 (PRs #292 e #293); falta a prova com dado real.
 
 ### R-HCO-03 · Lançar de novo substitui, e a história fica
 - **Regra:** cada lançamento que muda o dia grava o antes, o depois, quem e por onde (`tela` ou `upload`). A coleta corrigida **mantém o id**, e as caixas continuam ligadas a ela; lançar igual não grava evento.
-- **Status:** em código em 05/11/2026, falta subir.
+- **Status:** no ar desde 05/11/2026 (PRs #292 e #293); falta a prova com dado real.
 
 ### R-HCO-04 · Vazio não é "sem coleta"
 - **Regra:** dia sem lançamento diz "não lançado", em cinza e sem alarme; "hoje não tem coleta" é marcação feita por alguém, e não convive com coleta lançada (400).
-- **Status:** em código em 05/11/2026, falta subir.
+- **Status:** no ar desde 05/11/2026 (PRs #292 e #293); falta a prova com dado real.
 
 ### R-HCO-05 · Nada trava
 - **Regra:** o PDF sobe sem saída escolhida (D1), e a tela avisa em âmbar que as vendas ficam "sem coleta marcada". Só se recusa a saída que não existe ou não é de hoje — antes de ler o PDF, nada gravado.
-- **Status:** em código em 05/11/2026, falta subir.
+- **Status:** no ar desde 05/11/2026 (PRs #292 e #293); falta a prova com dado real.
 
 ### R-HCO-06 · O relógio conta até o INÍCIO da janela
 - **Regra:** a faixa da próxima coleta conta até o início (o caminhão pode chegar no começo); âmbar abaixo de 2 h e vermelho abaixo de 1 h quando ainda falta caixa; dentro da janela, vermelho. Depois do fim, passa para a próxima; depois da última, "Coletas de hoje encerradas".
 - **Onde aparece:** 201, 202, 103 (onde se sobe o PDF) e 206 para todo mundo, e qualquer tela para nível Supervisor ou acima (D5).
-- **Status:** em código em 05/11/2026, falta subir.
+- **Status:** no ar desde 05/11/2026 (PRs #292 e #293); falta a prova com dado real.
 
 ### R-HCO-07 · Janela mudada sem corte novo deixa o corte "a conferir"
 - **Regra:** o campo `corte` ausente preserva o gravado (ausente não é vazio); vazio de propósito apaga. Se a janela mudou e o corte não veio — o caso do upload, onde o Envios de hoje não mostra o corte —, ele fica "a conferir" em âmbar até alguém lançar.
-- **Status:** em código em 05/11/2026, falta subir.
+- **Status:** no ar desde 05/11/2026 (PRs #292 e #293); falta a prova com dado real.
 
 ### R-HCO-08 · Dia passado é só registro
 - **Regra:** lançar num dia que já passou é recusado (400); a tela mostra o dia sem campos.
-- **Status:** em código em 05/11/2026, falta subir.
+- **Status:** no ar desde 05/11/2026 (PRs #292 e #293); falta a prova com dado real.
 
 ### R-HCO-09 · O PDF diz a saída, e só marca o que é dela
 - **Regra:** a venda nova do PDF ganha a saída escolhida **só** se a etiqueta é de hoje (ou sem data) **e** da mesma modalidade (coleta↔coleta, agência↔agência). A de outro dia e a de outra modalidade ficam sem marca, e a resposta diz quantas. A modalidade continua sendo a da etiqueta (R-MOD-01 não muda); a venda repetida não ganha marca nova. Sem `coleta.horario`, a escolha é ignorada e a resposta diz.
 - **Por quê:** a etiqueta de outro dia vai em outro caminhão; reescrever a modalidade pelo que a pessoa disse apagaria o que o documento diz.
-- **Status:** em código em 05/11/2026, falta subir.
+- **Status:** no ar desde 05/11/2026 (PRs #292 e #293); falta a prova com dado real.
 
 ### R-HCO-12 · A semana nasce copiada da anterior, como rascunho (05/11/2026)
 - **Regra:** no primeiro pedido de segunda a sábado (`garantirSemana`, sem cron), cada dia de hoje em diante **sem nada lançado** recebe, marcadas `rascunho`, as coletas e a agência do mesmo dia da semana anterior. O dia que já tem lançamento não é tocado. O "sem coleta" (o feriado) é da data e **não se copia**: o dia nasce vazio. Roda uma vez por semana (`saida_semana.copiada_em`). Quem tem `coleta.horario` vê a tarefa da semana em qualquer tela até clicar **"Confirmar semana"** na 206 (âmbar depois das 12:00 de segunda).
 - **Por quê:** o dono — *"na segunda a gente monta a lista da semana"*; a cópia adianta a digitação, e o horário continua gravado na data.
 - **Teste que trava:** `teste_horario_coleta.js` (seção 9).
-- **Status:** em código em 05/11/2026, falta subir.
+- **Status:** no ar desde 05/11/2026 (PRs #292 e #293); falta a prova com dado real.
 
 ### R-HCO-13 · O rascunho não vale
 - **Regra:** a faixa, a agência e a saída do upload ignoram o dia de rascunho: para eles ele é "não lançado". Salvar o dia, o "Está certo" do upload ou o "Confirmar semana" tiram o rascunho.
@@ -159,11 +159,11 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 - **Regra:** ver os horários do dia e escolher a saída no upload são de quem sobe o PDF (`pdf.subir`, nível Operação), com os horários travados no quadro. Lançar ou corrigir horário, a tela 206, a semana e a história são de `coleta.horario`, de nível Supervisor.
 - **Por quê:** decisão do dono — quem sobe o PDF confere, mas quem responde pelo horário é Supervisor ou Admin.
 - **Teste que trava:** `teste_horario_coleta.js` (seção 8).
-- **Status:** em código em 05/11/2026, falta subir.
+- **Status:** no ar desde 05/11/2026 (PRs #292 e #293); falta a prova com dado real.
 
 ### R-HCO-10 · A coleta tirada solta as caixas
 - **Regra:** tirar uma coleta que tem caixas marcadas passa (não trava); ela fica com `removido_em`, e as caixas dela contam como "sem coleta marcada".
-- **Status:** em código em 05/11/2026, falta subir.
+- **Status:** no ar desde 05/11/2026 (PRs #292 e #293); falta a prova com dado real.
 
 ### R-COL-03 · A caixa de coleta não entra na conta do carro; na tela, lista única com a marcação
 - **Regra:** a caixa de coleta nunca entra na conta do carro (`faltam` e `carregados` da rota são só agência). **Desde 03/11/2026 a tela mostra agência e coleta numa lista única** (`listaUnica`, CONFERENCIA-EXPEDICAO fase 1), cada caixa com a marcação 🟣 Coleta / 🚗 Agência, em duas partes: **Esperando conferência** (agência não conferida + coleta fora do canto, a de dia anterior em cima) e **Conferidas, esperando sair** (agência conferida na área + coleta no canto). A tela só junta as listas que a rota já manda: quem diz o que é coleta continua sendo o `carga.js`. O bipe pro canto é o mesmo `POST /api/carregar`, que responde `coleta:true` e "Está indo N peças". Os cards da viagem (agência) e da saída do caminhão (coleta) ficam embaixo, lado a lado; abaixo de 900 px empilham.
