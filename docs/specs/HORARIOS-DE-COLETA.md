@@ -1,6 +1,9 @@
 # HORÁRIOS DE COLETA — a hora do caminhão do ML dentro do PCP
 
-> **STATUS · 05/11/2026 — EM CÓDIGO (fases 1 e 2), falta subir**
+> **STATUS · 05/11/2026 — fases 1 e 2 MESCLADAS (PR #292), falta o deploy · fase 3 PROPOSTA (§12), espera aprovação**
+> - **Fase 3 proposta em 05/11/2026 (§12):** a semana copiada como rascunho e a
+>   tarefa de segunda, a conferência no primeiro upload do dia e o feriado com
+>   nome. Respostas do dono: D1 sobe e avisa · D2 só no primeiro · D3 simples.
 > - **Fases 1 e 2 em código em 05/11/2026**: `coleta_horario.js` (dono único),
 >   `coleta_horario_route.js`, a tela 206 `/coleta-horarios`, o quadro do upload
 >   (`public/saida_upload.js`) no upload (só na 103 desde o AJUSTE do mesmo dia), `lote.horario_id`, a faixa da
@@ -239,3 +242,108 @@ nenhuma chave nova para ver.
   dizendo *"Agência"* e o horário que aparece na tela do ML. O relógio da
   agência passa a usar esse horário; sem ele, continua o `despacho_<dia>` do
   `config`.
+
+## 12. Fase 3 — a semana como tarefa, a conferência do dia e o feriado (proposta de 05/11/2026)
+
+Pedido do dono depois de abrir a 206: *"na correria do dia a dia, isso deveria
+passar a aparecer como tarefa"*, *"na segunda a gente monta a lista da semana,
+mas na terça eu preciso conferir … no primeiro lançamento do dia"*, e *"ter a
+opção de dizer que segunda foi feriado, então não tinha coleta"*. Respostas
+dele: **D1 sobe e avisa · D2 só no primeiro upload · D3 feriado simples**.
+
+### 12.1 Segunda-feira: montar a semana (a tarefa semanal)
+
+- **A semana nasce copiada da anterior, como RASCUNHO.** No primeiro pedido da
+  semana (a 206, o quadro do upload ou a faixa — como a lista do Inventário
+  nasce no primeiro pedido depois das 7h, sem cron), cada dia de segunda a
+  sábado **sem nada lançado** recebe as coletas e a agência do **mesmo dia da
+  semana anterior**, marcadas `rascunho`. O dia que já tem lançamento não é
+  tocado.
+- **O feriado não se copia, nem o "sem coleta"**: são da DATA. O dia que na
+  semana anterior não teve coleta nasce **vazio**, e a tarefa o aponta.
+- **O rascunho não vale:** a faixa, a agência e a marca das vendas no upload
+  **não o usam** — para eles o dia continua "não lançado". Horário copiado e
+  errado contando tempo para a bancada seria pior que nenhum.
+- **"Confirmar semana"** (botão na 206, `coleta.horario`) tira o rascunho de
+  todos os dias da semana, grava quem e quando, e entra na história.
+- **A tarja da tarefa** (no `nav.js`, em qualquer tela, como a da contagem):
+  só para quem tem `coleta.horario`; aparece na segunda enquanto a semana
+  não for confirmada — *"📋 Tarefa semanal: confira e confirme os horários de
+  coleta desta semana →"* —, âmbar ("atrasada") depois das 12:00 de segunda
+  e em qualquer dia seguinte. Leva à 206.
+
+> Não fere o *"não guardar horário por dia da semana"* (§15 do `CLAUDE.md`): o
+> que se grava continua sendo da data; a cópia só adianta a digitação, e o
+> rascunho não vale até alguém conferir.
+
+### 12.2 Todo dia: o primeiro upload do dia confere o horário
+
+- No **primeiro upload do dia** (o dia ainda sem conferência), o quadro da 103
+  mostra as saídas de hoje — *"Hoje: 2 coletas · 1ª 11:00–13:00 · 2ª
+  15:00–17:00. Confira no ML → Envios de hoje."* — e o upload **só segue depois
+  de um dos dois botões** (`pdf.subir`):
+  - **✓ Está certo** — grava quem conferiu e a hora (`saida_dia.conferido_*`,
+    na história do dia). **Se o dia era rascunho, deixa de ser**: quem sobe o
+    PDF olhou o ML e disse que vale. O upload segue, com a escolha da saída.
+  - **✗ Mudou** —
+    - **Supervisor ou Admin** (`coleta.horario`): os campos abrem ali para
+      corrigir, inclusive acrescentar ou tirar coleta (1 a 3); salvar conta
+      como a conferência do dia.
+    - **Operação**: não corrige (R-HCO-11). **O PDF sobe sem saída (D1)** — as
+      vendas ficam "sem coleta marcada" — e nasce o **aviso**, gravado com
+      quem e quando: tarja âmbar para quem tem `coleta.horario`, *"Horário de
+      hoje mudou no ML — avisado por Beto às 08:40: corrija na 206 →"*. A
+      correção na 206 (ou no quadro) fecha o aviso e confere o dia.
+- **Dia sem nada lançado**: não há o que conferir. O quadro diz "horário de
+  hoje não lançado", o PDF sobe sem saída (D1), e quem tem `coleta.horario`
+  vê a tarja "lance o horário de hoje".
+- **Só o primeiro upload pergunta (D2).** Os outros do dia vão direto à escolha
+  da saída. Corrigir o horário depois (206 ou quadro) não pede nova conferência.
+
+### 12.3 Feriado com nome (D3, simples)
+
+- O "não tem coleta" do dia ganha o motivo: **Feriado** (com o nome, ex.
+  *Finados*) ou **Outro** (com o texto). O cartão do dia mostra *"🎌 Finados
+  — sem coleta"*; a história guarda.
+- Pode ser lançado com antecedência, na data. Não se copia (12.1).
+- Sem calendário anual (D3).
+
+### 12.4 Dados (no `coleta_horario.js`, dono único; `CREATE` + `ALTER` guardado, §17)
+
+| Onde | Coluna | O quê |
+|---|---|---|
+| `saida_horario` | `rascunho` (0/1) | veio da cópia e ninguém conferiu |
+| `saida_dia` | `motivo` (`feriado`/`outro`), `motivo_texto` | o porquê do "sem coleta" |
+| `saida_dia` | `conferido_em`, `conferido_por_id`, `conferido_por` | a conferência do primeiro upload |
+| `saida_dia` | `mudou_em`, `mudou_por_id`, `mudou_por` | o "✗ Mudou" de quem não corrige; limpa quando alguém corrige |
+| `saida_semana` (nova) | `segunda` (PK), `copiada_em`, `confirmada_em`, `confirmada_por_id`, `confirmada_por` | a tarefa da semana |
+
+### 12.5 Regras (cartões R-HCO-12 a R-HCO-16)
+
+- **R-HCO-12** A semana nasce copiada da anterior como rascunho, só nos dias
+  vazios; feriado e "sem coleta" não se copiam.
+- **R-HCO-13** Rascunho não vale para a faixa, a agência nem a marca do upload.
+- **R-HCO-14** O primeiro upload do dia exige "Está certo" ou "Mudou"; o
+  "Está certo" confere o dia e tira o rascunho dele.
+- **R-HCO-15** O "Mudou" de quem não corrige nunca trava o upload: sobe sem
+  saída e avisa quem corrige, até alguém corrigir.
+- **R-HCO-16** "Sem coleta" tem motivo (feriado com nome, ou outro).
+
+### 12.6 Alçada
+
+| | | |
+|---|---|---|
+| Telas novas | nenhuma | tudo na 206 e no quadro da 103 |
+| Ações novas | nenhuma | conferir o dia é de `pdf.subir`; confirmar a semana, corrigir e o feriado são de `coleta.horario` (Supervisor) |
+| Setores novos | nenhum | |
+
+Rotas novas (com linha no `permDaRota` e pelo `QUEM.portao`):
+`POST /api/saidas/conferir` (`pdf.subir` ou `coleta.horario`) e
+`POST /api/saidas/semana/confirmar` (`coleta.horario`); a tarefa entra no
+`GET /api/saidas/status`, que a faixa já lê.
+
+### 12.7 Fase
+
+| Fase | O quê | Risco |
+|---|---|---|
+| **3** | 12.1 a 12.5, num commit, com `teste_horario_coleta.js` crescendo antes do código | 🟡 tela e aviso · schema pequeno (colunas e uma tabela) |
