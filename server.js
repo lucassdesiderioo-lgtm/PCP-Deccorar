@@ -93,7 +93,11 @@ require('./painel_route')(app, db);
 require('./exp_route')(app, db);
 /* A 203 Subir PDF SAIU (05/11/2026, D2): o upload é só na 103. O endereço antigo
    (favorito, ícone de tablet) leva à 103, que o portão julga. */
-app.get(['/expedicao','/expedicao.html'],(req,res)=>res.redirect('/admin/producao'));
+/* uma linha por caminho: registrado como lista, o caminho aparece para a
+   varredura do boot como "/expedicao,/expedicao.html" e vira um aviso falso de
+   rota sem permissão (AJUSTE de 05/11/2026) */
+app.get('/expedicao',(req,res)=>res.redirect('/admin/producao'));
+app.get('/expedicao.html',(req,res)=>res.redirect('/admin/producao'));
 require('./mont_route')(app, db);
 app.get('/montagem',(req,res)=>res.sendFile(require('path').join(__dirname,'public','montagem.html')));
 app.get('/painel',(req,res)=>res.sendFile(path.join(__dirname,'public','painel.html')));

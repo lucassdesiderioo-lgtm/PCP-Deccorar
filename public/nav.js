@@ -261,6 +261,11 @@ function estiloDasPermissoes(d){
       tarefas(d && d.tarefas || []);
       var el=document.getElementById('colBar');
       if(!d || (!naExpedicao && !d.em_toda_tela)){ if(el) el.remove(); return; }
+      /* quem corrige já tem a tarefa "lance o horário de hoje": a faixa cinza
+         dizendo o mesmo saía duas vezes (AJUSTE de 05/11/2026). Com caixa sem
+         coleta marcada a faixa fica, porque ela diz quantas são */
+      var smx=d.sem_marca||{};
+      if((d.tarefas||[]).some(function(x){ return x.tipo==='hoje'; }) && !((smx.por_imprimir||0)+(smx.por_conferir||0))){ if(el) el.remove(); return; }
       if(!el){
         el=document.createElement('div'); el.id='colBar';
         el.style.cssText='position:relative;z-index:9998;text-align:center;font:700 14px system-ui;padding:8px 12px;line-height:1.35';
