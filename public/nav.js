@@ -236,3 +236,51 @@ function estiloDasPermissoes(d){
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',pinta); else pinta();
   setInterval(pinta,60000);
 })();
+
+/* ---- a faixa da próxima coleta (spec HORARIOS-DE-COLETA, fase 2, 05/11/2026) ----
+   Nas telas de operação da Expedição (201 Etiqueta de Venda, 202 Conferência,
+   203 Subir PDF, 206 Horários de coleta) para todo mundo, e em qualquer tela para quem tem nível
+   Supervisor ou acima (D5) — quem decide é o servidor (`em_toda_tela`). Conta
+   até o INÍCIO da janela (o caminhão pode chegar no começo, R-HCO-06): âmbar
+   abaixo de 2 h, vermelho abaixo de 1 h e dentro da janela, a mesma régua do
+   relógio da agência (§8). As caixas são as DESTA coleta; as que ninguém
+   marcou aparecem à parte. Não fecha, não bloqueia, e fica fora do bipe. */
+(function(){
+  if(location.pathname.indexOf('/login')===0) return;
+  var EXP=['/embalagem','/carregamento','/expedicao','/coleta-horarios'];
+  var aqui=location.pathname.replace(/\.html$/,'').replace(/\/+$/,'');
+  var naExpedicao=EXP.indexOf(aqui)>=0;
+  function hm(m){ m=Math.max(0,m); var h=Math.floor(m/60), r=m%60; return h?(h+'h'+(r<10?'0':'')+r):(r+' min'); }
+  function plural(n,s,p){ return n+' '+(n===1?s:p); }
+  function pinta(){
+    fetch('/api/saidas/status',{credentials:'same-origin'}).then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+      var el=document.getElementById('colBar');
+      if(!d || (!naExpedicao && !d.em_toda_tela)){ if(el) el.remove(); return; }
+      if(!el){
+        el=document.createElement('div'); el.id='colBar';
+        el.style.cssText='position:relative;z-index:9998;text-align:center;font:700 14px system-ui;padding:8px 12px;line-height:1.35';
+        document.body.insertBefore(el, document.body.firstChild);
+      }
+      var cor='#2a2f3a', txt='#e6edf3', t;
+      var sm=d.sem_marca||{}, semMarca=(sm.por_imprimir||0)+(sm.por_conferir||0);
+      var semTxt=semMarca?' · '+plural(semMarca,'caixa sem coleta marcada','caixas sem coleta marcada'):'';
+      if(d.sem_coleta) t='Hoje não tem coleta'+semTxt;
+      else if(!d.lancado){ t='Horário da coleta de hoje não lançado'+semTxt; cor='#3a3f4a'; txt='#c9d1d9'; }
+      else if(!d.proxima) t='Coletas de hoje encerradas'+semTxt;
+      else {
+        var p=d.proxima, jan=p.inicio+'–'+p.fim;
+        var falta=p.por_imprimir+p.por_conferir;
+        var resto=' · '+plural(p.por_imprimir,'por imprimir','por imprimir')+' · '+plural(p.por_conferir,'por conferir','por conferir')+semTxt;
+        if(p.estado==='janela'){ t='🚚 Coleta '+jan+' — o caminhão pode estar na porta'+resto; cor='#b42318'; txt='#fff'; }
+        else {
+          t='🚚 Próxima coleta '+jan+' — faltam '+hm(p.minutos)+resto+(p.corte?' · corte '+p.corte+(p.corte_conferir?' (a conferir)':(d.agora&&p.corte<=d.agora?' (passou)':'')):'');
+          if(falta && p.minutos<60){ cor='#b42318'; txt='#fff'; }
+          else if(falta && p.minutos<120){ cor='#c98a00'; txt='#1a1300'; }
+        }
+      }
+      el.style.background=cor; el.style.color=txt; el.textContent=t;
+    }).catch(function(){});
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',pinta); else pinta();
+  setInterval(pinta,60000);
+})();
