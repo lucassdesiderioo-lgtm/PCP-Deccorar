@@ -2302,6 +2302,45 @@ de 6 pela própria tela de login (`POST /api/auth/trocar-pin`).
 > um PIN de 3 dígitos na edição de uma pessoa era descartado em silêncio e a tela
 > dizia "salvo" — a pessoa saía achando que o PIN tinha mudado.
 
+### ⚠️ A ENTRADA E A SAÍDA DO LOGIN FICAM REGISTRADAS (05/11/2026)
+
+Fase 6 da spec `QUEM-FEZ-E-REVISAO` (linha em `docs/DECISOES.md`). O `auth.js`
+é o dono das duas tabelas:
+
+| Tabela | Uma linha por | O que guarda |
+|---|---|---|
+| `sessao` | login | quem, `entrou_em`, `saiu_em`, `como_saiu` (`logout`, `bloqueado`, `expirou`), IP e aparelho |
+| `sessao_evento` | coisa que acontece | `login`, `logout`, `troca_setor` (com o destino), `troca_pin`, `bloqueado`, `expirou` |
+
+> ⚠️ **O COOKIE PASSOU A LEVAR O NÚMERO DA SESSÃO (`{id, s}`), E O DE ANTES
+> CONTINUA VALENDO.** A sessão dura 1 ano e os tablets quase nunca passam pela
+> tela de PIN: rejeitar o cookie só com o id deslogaria a fábrica inteira no
+> deploy. O que esse cookie faz vira evento com quem e quando, **sem
+> `sessao_id`** — o passado não se reconstrói. O número não vai para a tela (não
+> entra no `/api/auth/eu`).
+>
+> ⚠️ **NINGUÉM AVISA O SERVIDOR QUANDO O COOKIE VENCE.** A sessão aberta há mais
+> de 365 dias fecha como `expirou` no boot e a cada login. A de quem foi
+> **bloqueado** no cadastro fecha como `bloqueado` no primeiro pedido que chega
+> com ela — uma vez só, não a cada pedido.
+>
+> ⚠️ **A TROCA DE SETOR É UM AVISO DA TELA** (`POST /api/auth/setor`, `para` =
+> `padrao` ou `sobmedida`): a `/setor` e os dois atalhos da barra ("Sob medida →",
+> "Medida padrão →") avisam ao clicar, com `keepalive`, e seguem o link. Sem
+> sessão é 401; destino fora da lista é 400. A rota é do portão (`/api/auth/*`),
+> como o logout: não tem chave.
+>
+> ⚠️ **AS DUAS TABELAS FICAM FORA DO MODO TESTE**, de propósito: o login feito com
+> o modo ligado é um login de verdade. Registrar nunca derruba o login — um erro
+> ali vai para o log, e a pessoa entra do mesmo jeito.
+>
+> ⚠️ **SAIR NÃO INVALIDA O COOKIE NO SERVIDOR** (era assim antes, e ficou): o
+> logout apaga o cookie no navegador e fecha a linha da sessão. Recusar o cookie
+> de sessão fechada seria regra nova de acesso — não estava no plano.
+
+**Rode `node teste_login.js` (115) ao mexer na sessão, no logout ou na `/setor`.**
+Doze defeitos foram reintroduzidos um a um, e cada um reprova.
+
 ### ⚠️ O HTTPS ENTRA PELO TRAEFIK QUE JÁ EXISTE NO SERVIDOR (26/10/2026)
 
 Fase 5-B da spec `ACESSOS-UNIFICADOS` (dívida 2). Endereço novo:
@@ -2647,7 +2686,7 @@ Esperado: telas `302`, API `401`, `/login` `200`.
 
 Proteção contra força bruta: 5 PINs errados bloqueiam a pessoa por 1 minuto —
 **inclusive com o PIN certo**, senão a trava só atrasaria quem chuta —, e a trava é
-por pessoa. **Rode `node teste_login.js` (83 casos) ao mexer no `auth.js` ou no `login.html`**: ele
+por pessoa. **Rode `node teste_login.js` (115 casos) ao mexer no `auth.js` ou no `login.html`**: ele
 trava o PIN guardado como scrypt com salt próprio, o bloqueio e o minuto (o
 relógio do teste é trocado), o cookie assinado (trocar o id dentro dele não vira
 outra pessoa), a sessão que cai quando a pessoa é bloqueada no cadastro e a
@@ -3083,7 +3122,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (84), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (83), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (910) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (40), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (44); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (14), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (84), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (44), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (910) e `teste_devolucao_casos_tela.js` (202, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (40), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (44); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3260,6 +3299,8 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   abas direto do disco (§10, fase 5)
 - ❌ Voltar a pôr tela do Admin em iframe, ou a mostrar as 16 abas a quem
   entra: cada aba é uma tela, com a permissão dela (§10, R-TEL-05)
+- ❌ Rejeitar o cookie antigo (só com o id) ou pôr `sessao`/`sessao_evento` no
+  modo teste: o deploy deslogaria os tablets, e o login em teste é de verdade (§10)
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor
 - ❌ Criar tabela de equivalências de SKU (decisão explícita do dono)

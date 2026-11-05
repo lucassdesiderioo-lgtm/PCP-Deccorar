@@ -3,6 +3,16 @@
 > - **As fases 5, 6 e 7 foram feitas de uma vez, num PR só, com um deploy no fim**
 >   (decisão do dono, 05/11/2026: *"concluir todas as fases e testes e por último
 >   subimos ao sistema de uma única vez"*). Um commit por fase.
+> - **Fase 6 (entrada e saída do login) em código em 05/11/2026**: tabelas `sessao`
+>   (uma por login: entrou, saiu, como saiu — `logout`, `bloqueado`, `expirou` —,
+>   IP e aparelho) e `sessao_evento` (`login`, `logout`, `troca_setor`, `troca_pin`,
+>   `bloqueado`, `expirou`), no `auth.js`. O cookie passa a levar o número da sessão;
+>   **o de antes continua valendo**, e o que ele faz vira evento sem `sessao_id`
+>   (ninguém é deslogado pelo deploy). A troca de setor é um aviso da `/setor` e
+>   dos dois atalhos da barra (`POST /api/auth/setor`). As duas tabelas ficam fora
+>   do modo teste. `teste_login.js` (115). Divergência: "expiração de sessão" não
+>   é vista pelo servidor na hora (o cookie vence no navegador) — a sessão aberta há
+>   mais de 1 ano fecha como `expirou` no boot e no próximo login.
 > - **Fase 5 (Devolução e Inventário/contagem) em código em 05/11/2026**: Receber
 >   peça (`/devolucao`), ligar ao caso, a baixa, as 24 escritas das devoluções em
 >   andamento, as 7 da contagem de material e as 11 do Inventário passam pelo

@@ -157,7 +157,7 @@ function estiloDasPermissoes(d){
     // operacoes. Quem decide e o servidor (destino.js) — esconder aqui nao e
     // seguranca, so evita mostrar um caminho que da "sem permissao".
     var dest=u.destino||{};
-    var atalho=(dest.duas&&dest.sobmedida) ? '<a class="sessOp atalho" href="'+dest.sobmedida+'">Sob medida →</a>' : '';
+    var atalho=(dest.duas&&dest.sobmedida) ? '<a class="sessOp atalho" id="sessAtalho" href="'+dest.sobmedida+'">Sob medida →</a>' : '';
     d.innerHTML=fadj+'<button class="sessOp" id="sessMenu" aria-expanded="false" aria-controls="menuTelas">☰ Menu</button>'+
       '<span><b style="color:'+CH.sName+'">'+u.nome+'</b></span>'+
       atalho+'<a class="sessOp" id="sessSetor" href="/setor">Trocar setor</a><button id="sessSair">Sair</button>';
@@ -171,6 +171,11 @@ function estiloDasPermissoes(d){
     var bm=document.getElementById('sessMenu');
     if(bm) bm.onclick=function(){ var ab=pn.style.display==='none'; pn.style.display=ab?'block':'none'; bm.setAttribute('aria-expanded',ab?'true':'false'); };
     document.getElementById('sessSair').onclick=sair;
+    /* O atalho para a outra operacao avisa a troca de setor (QUEM-FEZ-E-REVISAO
+       fase 6), sem segurar o link; falhar o aviso nao muda nada. */
+    var ata=document.getElementById('sessAtalho');
+    if(ata) ata.addEventListener('click',function(){ try{ fetch('/api/auth/setor',{method:'POST',keepalive:true,credentials:'same-origin',
+      headers:{'content-type':'application/json'},body:JSON.stringify({para:'sobmedida'})}).catch(function(){}); }catch(e){} });
     var fa=document.getElementById('fadj');
     if(fa){ fa.addEventListener('click',function(e){ var btn=e.target.closest('[data-fd]'); if(!btn) return;
       FONT.set(FONT.get()+ (+btn.getAttribute('data-fd')));

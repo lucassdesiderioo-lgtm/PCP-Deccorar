@@ -237,6 +237,102 @@ async function main(){
        dbVelho.prepare("SELECT pin_curto FROM usuarios WHERE nome='Velho'").get().pin_curto, 1);
     dbVelho.close();
 
+    console.log('\n── 11. a entrada e a saida do login ficam registradas (QUEM-FEZ-E-REVISAO fase 6) ──');
+    /* `sessao`: uma linha por login (quem, quando entrou, quando e como saiu,
+       IP e aparelho). `sessao_evento`: login, logout, troca de setor, troca de
+       PIN, sessao que caiu por bloqueio e sessao que expirou. */
+    const IVO = pessoa('Ivo', '135790', 'painel');
+    const ses = id => db.prepare('SELECT * FROM sessao WHERE id=?').get(id);
+    const evs = (uid, tipo) => db.prepare('SELECT * FROM sessao_evento WHERE usuario_id=?' + (tipo ? ' AND tipo=?' : '') + ' ORDER BY id')
+      .all(...(tipo ? [uid, tipo] : [uid]));
+    let ri = await fetch(base + '/api/auth/login', { method:'POST',
+      headers:{ 'content-type':'application/json', 'user-agent':'iPad bancada 3', 'x-forwarded-for':'10.0.0.7' },
+      body: JSON.stringify({ id:IVO, pin:'135790' }) });
+    const ckIvo = sess(ri.headers.get('set-cookie') || '');
+    const corpoIvo = JSON.parse(Buffer.from(decodeURIComponent(ckIvo.slice(5)).split('.')[0], 'base64').toString('utf8'));
+    ok('o cookie leva o numero da sessao', corpoIvo.id === IVO && Number.isInteger(corpoIvo.s), JSON.stringify(corpoIvo));
+    const sIvo = ses(corpoIvo.s) || {};
+    ok('o login abre a linha da sessao, com quem e quando', sIvo.usuario_id === IVO && sIvo.usuario_nome === 'Ivo' && !!sIvo.entrou_em && sIvo.saiu_em == null, JSON.stringify(sIvo));
+    ok('   com o IP e o aparelho', sIvo.ip === '10.0.0.7' && sIvo.aparelho === 'iPad bancada 3', sIvo.ip + ' / ' + sIvo.aparelho);
+    const eLogin = evs(IVO, 'login');
+    ok('e o evento "login", ligado a sessao', eLogin.length === 1 && eLogin[0].sessao_id === sIvo.id && eLogin[0].usuario_nome === 'Ivo' && !!eLogin[0].em, JSON.stringify(eLogin));
+    eq('a sessao nova vale', (await eu(ckIvo)).nome, 'Ivo');
+    ok('e o numero da sessao NAO vai para a tela', !('s' in (await eu(ckIvo))) && !('sessao' in (await eu(ckIvo))));
+
+    const setor = async (cookie, para) => { const h = { 'content-type':'application/json' }; if(cookie) h.cookie = cookie;
+      return (await fetch(base + '/api/auth/setor', { method:'POST', headers:h, body: JSON.stringify({ para }) })).status; };
+    eq('a troca de setor e registrada (200)', await setor(ckIvo, 'sobmedida'), 200);
+    let eSet = evs(IVO, 'troca_setor');
+    ok('   evento "troca_setor" com o destino e a sessao', eSet.length === 1 && eSet[0].detalhe === 'sobmedida' && eSet[0].sessao_id === sIvo.id, JSON.stringify(eSet));
+    eq('   e para a medida padrao tambem', await setor(ckIvo, 'padrao'), 200);
+    const nSetor = db.prepare('SELECT COUNT(*) n FROM sessao_evento').get().n;
+    eq('troca de setor sem sessao: 401', await setor(null, 'sobmedida'), 401);
+    eq('destino que nao existe: 400', await setor(ckIvo, 'qualquer'), 400);
+    eq('   e nenhum dos dois grava', db.prepare('SELECT COUNT(*) n FROM sessao_evento').get().n, nSetor);
+
+    ri = await fetch(base + '/api/auth/trocar-pin', { method:'POST', headers:{ 'content-type':'application/json', cookie:ckIvo },
+      body: JSON.stringify({ atual:'135790', novo:'975310' }) });
+    eq('a troca de PIN passa', ri.status, 200);
+    ok('   e fica registrada ("troca_pin")', evs(IVO, 'troca_pin').length === 1 && evs(IVO, 'troca_pin')[0].sessao_id === sIvo.id);
+
+    ri = await fetch(base + '/api/auth/logout', { method:'POST', headers:{ cookie:ckIvo } });
+    const sIvo2 = ses(sIvo.id);
+    ok('o logout fecha a sessao: quando e "logout"', sIvo2.saiu_em != null && sIvo2.como_saiu === 'logout', JSON.stringify(sIvo2));
+    ok('   e grava o evento "logout"', evs(IVO, 'logout').length === 1 && evs(IVO, 'logout')[0].sessao_id === sIvo.id);
+    /* O relogio do SQLite nao anda com o do teste: a hora de saida e
+       marcada a mao, e um segundo logout nao pode mexer nela. */
+    db.prepare("UPDATE sessao SET saiu_em='2026-01-01 08:00:00' WHERE id=?").run(sIvo.id);
+    await fetch(base + '/api/auth/logout', { method:'POST', headers:{ cookie:ckIvo } });
+    eq('sair de novo com o mesmo cookie nao refecha a sessao', ses(sIvo.id).saiu_em, '2026-01-01 08:00:00');
+
+    /* O COOKIE DE ANTES (sem o numero da sessao) CONTINUA VALENDO — a sessao
+       dura 1 ano, e os tablets nao passam pela tela de PIN. */
+    const SEG = fs.readFileSync(SEGREDO, 'utf8').trim();
+    const assinar = v => crypto.createHmac('sha256', SEG).update(v).digest('hex').slice(0, 32);
+    const corpoVelho = Buffer.from(JSON.stringify({ id:IVO })).toString('base64');
+    const ckVelho = 'sess=' + encodeURIComponent(corpoVelho + '.' + assinar(corpoVelho));
+    const nSessoes = db.prepare('SELECT COUNT(*) n FROM sessao').get().n;
+    eq('o cookie de antes (sem o numero da sessao) continua valendo', (await eu(ckVelho)).nome, 'Ivo');
+    eq('   a troca de setor com ele e registrada', await setor(ckVelho, 'padrao'), 200);
+    const eVelho = evs(IVO, 'troca_setor').slice(-1)[0] || {};
+    ok('   com quem e quando, sem sessao (o passado nao se reconstroi)', eVelho.sessao_id == null && eVelho.usuario_nome === 'Ivo');
+    await fetch(base + '/api/auth/logout', { method:'POST', headers:{ cookie:ckVelho } });
+    ok('   o logout dele vira evento, sem sessao', evs(IVO, 'logout').slice(-1)[0].sessao_id == null && evs(IVO, 'logout').length === 3);
+    eq('   e nenhuma linha de sessao nasce para ele', db.prepare('SELECT COUNT(*) n FROM sessao').get().n, nSessoes);
+
+    /* BLOQUEADO: a sessao de quem saiu do cadastro fecha UMA vez. */
+    const KAI = pessoa('Kai', '864200', 'painel');
+    const ckKai = sess((await login(KAI, '864200')).cookie);
+    const sKai = db.prepare('SELECT * FROM sessao WHERE usuario_id=? ORDER BY id DESC').get(KAI);
+    db.prepare('UPDATE usuarios SET ativo=0 WHERE id=?').run(KAI);
+    eq('bloqueado, a sessao deixa de valer (como sempre)', (await eu(ckKai)).logado, false);
+    await eu(ckKai); await fetch(base + '/api/coisa', { headers:{ cookie:ckKai } });
+    const sKai2 = ses(sKai.id);
+    ok('   e fecha como "bloqueado"', sKai2.saiu_em != null && sKai2.como_saiu === 'bloqueado', JSON.stringify(sKai2));
+    eq('   uma vez so, por mais pedidos que cheguem', evs(KAI, 'bloqueado').length, 1);
+
+    /* EXPIROU: a sessao aberta ha mais de um ano fecha no proximo login. */
+    const LIA = pessoa('Lia', '112233', 'painel');
+    await login(LIA, '112233');
+    const sLia = db.prepare('SELECT * FROM sessao WHERE usuario_id=? ORDER BY id DESC').get(LIA);
+    db.prepare("UPDATE sessao SET entrou_em=datetime('now','localtime','-366 days') WHERE id=?").run(sLia.id);
+    const sRecente = db.prepare('SELECT id FROM sessao WHERE saiu_em IS NULL AND id<>? ORDER BY id DESC').get(sLia.id);
+    await login(ADMIN === undefined ? LIA : LIA, '112233');
+    const sLia2 = ses(sLia.id);
+    ok('a sessao de mais de 1 ano fecha como "expirou" no proximo login', sLia2.saiu_em != null && sLia2.como_saiu === 'expirou', JSON.stringify(sLia2));
+    eq('   com o evento "expirou"', evs(LIA, 'expirou').length, 1);
+    await login(LIA, '112233');
+    eq('   uma vez so', evs(LIA, 'expirou').length, 1);
+    ok('   e a sessao recente continua aberta', !sRecente || ses(sRecente.id).saiu_em == null);
+
+    /* O banco e o modo teste. */
+    const cS = db.prepare("SELECT name FROM pragma_table_info('sessao')").all().map(c => c.name).join(',');
+    eq('a tabela sessao', cS, 'id,usuario_id,usuario_nome,entrou_em,saiu_em,como_saiu,ip,aparelho');
+    const cE = db.prepare("SELECT name FROM pragma_table_info('sessao_evento')").all().map(c => c.name).join(',');
+    eq('a tabela sessao_evento', cE, 'id,sessao_id,usuario_id,usuario_nome,tipo,detalhe,em,ip');
+    const tr = fs.readFileSync(path.join(__dirname, 'teste_route.js'), 'utf8');
+    ok('as duas ficam FORA do modo teste: o login em modo teste e um login de verdade', !/['"]sessao(_evento)?['"]/.test(tr));
+
     console.log('\n── 10. pelo HTTPS o cookie ganha Secure; pelo http, nao (fase 5-B) ──');
     /* O Traefik recebe o https e repassa ao PCP em http, avisando pelo
        X-Forwarded-Proto. Com Secure o navegador nunca manda a sessao por
