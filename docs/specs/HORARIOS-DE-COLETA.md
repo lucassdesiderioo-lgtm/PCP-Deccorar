@@ -1,13 +1,13 @@
 # HORÁRIOS DE COLETA — a hora do caminhão do ML dentro do PCP
 
-> **STATUS · 05/11/2026 — RASCUNHO, espera a aprovação do dono**
+> **STATUS · 05/11/2026 — APROVADA, falta construir**
 > - Desenhado na conversa com o Lucas em 05/11/2026, com duas telas do Mercado
 >   Livre na mão (Preferências de venda → Horários de envio, e Vendas → Envios
->   de hoje).
+>   de hoje). **Aprovada pelo dono no mesmo dia**, com as respostas da §11 —
+>   **onde a §11 e o resto do texto divergirem, vale a §11.**
 > - `NOVIDADE` e muda uma regra que está no ar (**R-COL-02**: *"o relógio de
 >   despacho é só da agência"*; e o §8-B do `CLAUDE.md`: *"coleta: só o dia — o
->   caminhão não tem hora"*). Nada é construído antes do "aprovado".
-> - Perguntas que ainda faltam o dono responder: §9.
+>   caminhão não tem hora"*).
 
 ---
 
@@ -198,3 +198,24 @@ rotas de status que essas telas já leem, com a permissão que elas já têm:
 nenhuma chave nova para ver.
 
 `horarios.editar` (agência) **não muda**.
+
+## 11. Decisões do dono (05/11/2026) — valem sobre o texto acima
+
+- **D1 · aviso.** Subir o PDF sem horário passa, com o aviso âmbar.
+- **D2 · sábado entra** na grade, vazio quando não houver coleta.
+- **D3 · ok.** `coleta.horario`, nível Operação, para quem sobe o PDF; a 206
+  abre com ela.
+- **D4 · muda o desenho: o PDF diz de qual saída são as vendas.** No upload, a
+  pessoa escolhe **para qual saída** são as vendas daquele PDF — *Coleta
+  12:00–14:00*, *Coleta 15:00–17:00*… — e cada volume novo do PDF fica ligado
+  àquela coleta (`lote.horario_id`). Com isso a bancada conta **por coleta**
+  (o §5 deixa de dizer "as de hoje que faltam" e passa a dizer "as desta
+  coleta que faltam"), e a R-HCO-09 cai. O que não foi marcado (PDF subido sem
+  escolher, venda de antes) aparece à parte, como **"sem coleta marcada"**.
+- **D5 · onde aparece:** em **todas as telas de operação do módulo Expedição**
+  (201 Etiqueta de Venda, 202 Conferência, 203 Subir PDF) e para **quem tem
+  nível Supervisor ou acima**, em qualquer tela.
+- **D6 · a agência também.** Quando houver venda para agência, o PDF sobe
+  dizendo *"Agência"* e o horário que aparece na tela do ML. O relógio da
+  agência passa a usar esse horário; sem ele, continua o `despacho_<dia>` do
+  `config`.
