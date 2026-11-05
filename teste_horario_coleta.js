@@ -18,7 +18,13 @@
  *      caixas por coleta e as "sem coleta marcada"; a coleta tirada solta as
  *      caixas para "sem coleta marcada" (decisão 4 do plano);
  *   6. a agência usa o horário lançado, e sem ele o config (D6);
- *   7. sem login nada grava (401), e a alçada: tela 206, `coleta.horario`.
+ *   7. sem login nada grava (401), e a alçada: tela 206, `coleta.horario`;
+ *   8. a trava: Operação vê e escolhe, Supervisor e Admin editam;
+ *   9. FASE 3 (§12 da spec): a semana nasce copiada como RASCUNHO só nos dias
+ *      vazios, sem o feriado (R-HCO-12); o rascunho não vale (R-HCO-13); o
+ *      primeiro upload confere o dia (R-HCO-14); o "Mudou" de quem não corrige
+ *      sobe sem saída e avisa (R-HCO-15); "sem coleta" com motivo (R-HCO-16);
+ *      a tarefa da semana e o "Confirmar semana".
  *
  * Sobe um Express de verdade numa porta livre, num banco temporário. O
  * parsePdf é trocado por um que devolve os volumes já lidos (como no
@@ -293,6 +299,148 @@ async function main(){
     B.fechar();
     const tela = fs.readFileSync(path.join(__dirname, 'public', 'saida_upload.js'), 'utf8');
     ok('o quadro do upload sabe se a pessoa edita (pode_editar) e trava os campos', /pode_editar/.test(tela) && /disabled/.test(tela));
+    console.log('\n── 9. FASE 3: a semana como tarefa, a conferência do dia e o feriado ──');
+    const conferir = resp => req('POST', '/api/saidas/conferir', { resposta:resp });
+    const status = async () => (await req('GET', '/api/saidas/status')).body;
+    const tarefas = st => (st.tarefas || []).map(t => t.tipo);
+    // a semana de 16/11 é a de origem; lançada num domingo, antes de começar
+    RELOGIO.fixar('2026-11-15 08:00');
+    r = await lancar({ data:'2026-11-16', origem:'tela', coletas:[{ inicio:'11:00', fim:'13:00', corte:'09:00' }, { inicio:'15:00', fim:'17:00' }] });
+    eq('segunda 16/11 lançada', r.status, 200);
+    await lancar({ data:'2026-11-17', origem:'tela', coletas:[{ inicio:'12:00', fim:'14:00' }] });
+    r = await lancar({ data:'2026-11-20', origem:'tela', sem_coleta:true, motivo:'feriado', motivo_texto:'Consciência Negra' });
+    eq('sexta 20/11 marcada sem coleta, Feriado com nome (R-HCO-16)', r.status, 200);
+    r = await dia('2026-11-20');
+    ok('o dia diz o motivo e o nome', r.body.sem_coleta === true && r.body.motivo === 'feriado' && r.body.motivo_texto === 'Consciência Negra');
+    eq('feriado sem o nome é recusado', (await lancar({ data:'2026-11-19', origem:'tela', sem_coleta:true, motivo:'feriado' })).status, 400);
+    eq('motivo que não existe é recusado', (await lancar({ data:'2026-11-19', origem:'tela', sem_coleta:true, motivo:'chuva', motivo_texto:'x' })).status, 400);
+    eq('motivo sem "sem coleta" é recusado', (await lancar({ data:'2026-11-19', origem:'tela', motivo:'outro', motivo_texto:'x' })).status, 400);
+    ok('e a 19/11 continua sem nada', (await dia('2026-11-19')).body.lancado === false);
+    const hf = (await req('GET', '/api/saidas/historia?data=2026-11-20')).body.eventos || [];
+    ok('a história guarda o feriado', hf.some(e => /Consciência Negra/.test(JSON.stringify(e.depois))));
+    await lancar({ data:'2026-11-21', origem:'tela', agencia:{ fim:'14:00' } });
+    let st = await status();
+    ok('no domingo a semana não é copiada nem cobrada', !(st.tarefas || []).some(t => t.tipo === 'semana'));
+
+    // domingo 22/11: alguém já adianta a terça 24/11
+    RELOGIO.fixar('2026-11-22 18:00');
+    await lancar({ data:'2026-11-24', origem:'tela', coletas:[{ inicio:'10:00', fim:'12:00' }] });
+
+    // segunda 23/11: o primeiro pedido copia a semana anterior
+    RELOGIO.fixar('2026-11-23 07:30');
+    st = await status();
+    let d23 = (await dia('2026-11-23')).body;
+    eq('a segunda nasce com as coletas da segunda anterior (R-HCO-12)', (d23.coletas||[]).map(c => c.inicio + '-' + c.fim + ' ' + c.corte), ['11:00-13:00 09:00', '15:00-17:00 null']);
+    ok('marcada como rascunho', d23.rascunho === true && (d23.coletas||[]).every(c => c.rascunho === 1));
+    eq('a terça que já tinha lançamento não é tocada', ((await dia('2026-11-24')).body.coletas||[]).map(c => c.inicio + ' ' + c.rascunho), ['10:00 0']);
+    let d27 = (await dia('2026-11-27')).body;
+    ok('o feriado NÃO é copiado: a sexta nasce vazia', d27.lancado === false && d27.sem_coleta === false && !(d27.coletas||[]).length);
+    eq('o sábado copia a agência', ((await dia('2026-11-28')).body.agencia || {}).fim, '14:00');
+    ok('a quarta e a quinta (vazias na semana anterior) nascem vazias', (await dia('2026-11-25')).body.lancado === false && (await dia('2026-11-26')).body.lancado === false);
+    const nCop = db.prepare("SELECT COUNT(*) n FROM saida_horario WHERE data BETWEEN '2026-11-23' AND '2026-11-28'").get().n;
+    await status(); await req('GET', '/api/saidas/semana');
+    eq('a cópia acontece uma vez só', db.prepare("SELECT COUNT(*) n FROM saida_horario WHERE data BETWEEN '2026-11-23' AND '2026-11-28'").get().n, nCop);
+    ok('a história diz que veio da cópia', ((await req('GET', '/api/saidas/historia?data=2026-11-23')).body.eventos || []).some(e => e.acao === 'copia'));
+
+    console.log('   · o rascunho não vale (R-HCO-13)');
+    ok('para a faixa, o dia de rascunho é "não lançado"', st.lancado === false && st.proxima === null && st.rascunho === true);
+    r = await subir([vol({ venda:'V-RASC', despacharEm:'2026-11-23' })], { saida:d23.coletas[0].id });
+    eq('a saída de rascunho é recusada no upload', r.status, 400);
+    eq('e nada foi gravado', volume('V-RASC'), undefined);
+    ok('o dia pede a conferência', d23.precisa_conferir === true);
+
+    console.log('   · a tarefa da semana');
+    eq('quem corrige horário vê a tarefa da semana', tarefas(st).includes('semana'), true);
+    ok('ainda não atrasada às 07:30', (st.tarefas||[]).find(t => t.tipo === 'semana').atrasada === false);
+    podeHorario = false;
+    eq('quem é Operação não vê tarefa nenhuma', (await status()).tarefas, []);
+    podeHorario = true;
+    RELOGIO.fixar('2026-11-23 12:30');
+    ok('depois das 12:00 de segunda, atrasada', ((await status()).tarefas||[]).find(t => t.tipo === 'semana').atrasada === true);
+
+    console.log('   · o primeiro upload confere o dia (R-HCO-14)');
+    RELOGIO.fixar('2026-11-23 07:40');
+    podeHorario = false;   // quem sobe o PDF é Operação
+    r = await conferir('certo');
+    eq('"Está certo" de quem sobe o PDF responde 200', r.status, 200);
+    d23 = (await dia('2026-11-23')).body;
+    ok('grava quem conferiu e quando', d23.conferido && d23.conferido.por === 'Expedição' && !!d23.conferido.em);
+    ok('e o dia deixa de ser rascunho', d23.rascunho === false && (d23.coletas||[]).every(c => c.rascunho === 0));
+    ok('e não pede mais conferência (D2)', d23.precisa_conferir === false);
+    ok('as outras datas da semana continuam rascunho', (await dia('2026-11-28')).body.rascunho === true);
+    st = await status();
+    ok('agora a faixa conta até a coleta das 11:00', st.lancado === true && st.proxima && st.proxima.inicio === '11:00');
+    r = await subir([vol({ venda:'V-CONF', despacharEm:'2026-11-23' })], { saida:d23.coletas[0].id });
+    eq('e a saída vale no upload', volume('V-CONF') && volume('V-CONF').horario_id, d23.coletas[0].id);
+    usuario = { id:2, nome:'Outro' };
+    r = await conferir('certo');
+    eq('conferir de novo não dá erro', r.status, 200);
+    eq('e não troca quem conferiu primeiro', (await dia('2026-11-23')).body.conferido.por, 'Expedição');
+    usuario = { id:1, nome:'Expedição' };
+    eq('resposta que não existe é recusada', (await conferir('talvez')).status, 400);
+    podeHorario = true;
+
+    console.log('   · o "Mudou" de quem não corrige (R-HCO-15)');
+    RELOGIO.fixar('2026-11-24 07:00');
+    let d24 = (await dia('2026-11-24')).body;
+    ok('a terça lançada no domingo ainda pede a conferência de hoje', d24.precisa_conferir === true);
+    r = await subir([vol({ venda:'V-SEMCONF', despacharEm:'2026-11-24' })], { saida:d24.coletas[0].id });
+    eq('sem conferir, a saída é recusada no upload', r.status, 400);
+    podeHorario = false; usuario = { id:3, nome:'Beto' };
+    r = await conferir('mudou');
+    eq('"Mudou" de quem é Operação responde 200', r.status, 200);
+    d24 = (await dia('2026-11-24')).body;
+    ok('grava quem avisou e quando', d24.mudou && d24.mudou.por === 'Beto');
+    ok('e não pergunta de novo no próximo upload (D2)', d24.precisa_conferir === false);
+    r = await subir([vol({ venda:'V-MUDOU', despacharEm:'2026-11-24' })]);
+    eq('o PDF sobe sem saída (D1: não trava)', r.status, 200);
+    eq('e a venda fica sem coleta marcada', volume('V-MUDOU').horario_id, null);
+    r = await subir([vol({ venda:'V-MUDOU2', despacharEm:'2026-11-24' })], { saida:d24.coletas[0].id });
+    eq('a saída do horário avisado como errado é recusada', r.status, 400);
+    eq('para quem é Operação, nenhuma tarefa', (await status()).tarefas, []);
+    podeHorario = true; usuario = { id:4, nome:'Sara' };
+    st = await status();
+    const tm = (st.tarefas||[]).find(t => t.tipo === 'mudou');
+    ok('quem corrige vê o aviso, com quem avisou', !!tm && /Beto/.test(tm.texto) && tm.atrasada === true);
+    r = await lancar({ data:'2026-11-24', origem:'upload', coletas:[{ id:d24.coletas[0].id, inicio:'10:30', fim:'12:30' }] });
+    eq('a Supervisora corrige', r.status, 200);
+    d24 = (await dia('2026-11-24')).body;
+    ok('a correção fecha o aviso e confere o dia', !d24.mudou && d24.conferido && d24.conferido.por === 'Sara' && d24.precisa_conferir === false);
+    ok('e o aviso some', !tarefas(await status()).includes('mudou'));
+
+    console.log('   · dia sem lançamento');
+    RELOGIO.fixar('2026-11-25 07:00');
+    eq('conferir um dia sem nada lançado é recusado', (await conferir('certo')).status, 400);
+    ok('quem corrige vê a tarefa de lançar o de hoje', tarefas(await status()).includes('hoje'));
+
+    console.log('   · confirmar a semana');
+    RELOGIO.fixar('2026-11-25 07:05');
+    r = await req('POST', '/api/saidas/semana/confirmar', {});
+    eq('"Confirmar semana" responde 200', r.status, 200);
+    ok('tira o rascunho de toda a semana', db.prepare("SELECT COUNT(*) n FROM saida_horario WHERE data BETWEEN '2026-11-23' AND '2026-11-28' AND rascunho=1").get().n === 0);
+    ok('e a tarefa da semana some', !tarefas(await status()).includes('semana'));
+    r = await req('GET', '/api/saidas/semana');
+    ok('a semana diz quem confirmou', r.body.semana && r.body.semana.confirmada_por === 'Sara');
+
+    console.log('   · a alçada da fase 3');
+    const B3 = PA.montar();
+    const p3 = n => Object.assign(B3.db.prepare('SELECT * FROM usuarios WHERE id=?').get(B3.pessoas.find(x => x.nome.indexOf(n) === 0).id), { areas:[] });
+    const dec3 = (n, rota, m) => B3.AC.decidir(p3(n), rota, m || 'GET').ok;
+    eq('quem sobe o PDF (Operação) confere o dia', dec3('Davi', '/api/saidas/conferir', 'POST'), true);
+    eq('mas não confirma a semana', dec3('Davi', '/api/saidas/semana/confirmar', 'POST'), false);
+    const sergio3 = B3.pessoas.find(x => /^Sergio/.test(x.nome)).id;
+    B3.db.prepare("INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,'coleta.horario',1)").run(sergio3);
+    eq('o Supervisor com a chave confirma a semana', dec3('Sergio', '/api/saidas/semana/confirmar', 'POST'), true);
+    B3.fechar();
+    usuario = null;
+    eq('conferir sem login é 401', (await conferir('certo')).status, 401);
+    usuario = { id:1, nome:'Expedição' };
+    const tela3 = fs.readFileSync(path.join(__dirname, 'public', 'saida_upload.js'), 'utf8');
+    ok('o quadro do upload pergunta "Está certo" / "Mudou"', /Está certo/.test(tela3) && /Mudou/.test(tela3) && /\/api\/saidas\/conferir/.test(tela3));
+    const t206 = fs.readFileSync(path.join(__dirname, 'public', 'coleta-horarios.html'), 'utf8');
+    ok('a 206 tem o "Confirmar semana" e o motivo do "sem coleta"', /Confirmar semana/.test(t206) && /Feriado/.test(t206));
+    const navTxt = fs.readFileSync(path.join(__dirname, 'public', 'nav.js'), 'utf8');
+    ok('o nav.js mostra as tarefas dos horários', /tarefas/.test(navTxt));
   }catch(e){
     falhas++; console.log('  ESTOUROU — ' + (e.stack || e));
   }finally{

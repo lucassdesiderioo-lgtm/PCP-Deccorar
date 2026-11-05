@@ -1,9 +1,14 @@
 # HORÁRIOS DE COLETA — a hora do caminhão do ML dentro do PCP
 
-> **STATUS · 05/11/2026 — fases 1 e 2 MESCLADAS (PR #292), falta o deploy · fase 3 PROPOSTA (§12), espera aprovação**
-> - **Fase 3 proposta em 05/11/2026 (§12):** a semana copiada como rascunho e a
->   tarefa de segunda, a conferência no primeiro upload do dia e o feriado com
->   nome. Respostas do dono: D1 sobe e avisa · D2 só no primeiro · D3 simples.
+> **STATUS · 05/11/2026 — fases 1 e 2 MESCLADAS (PR #292), falta o deploy · fase 3 EM CÓDIGO, falta subir**
+> - **Fase 3 aprovada e em código em 05/11/2026 (§12):** a semana copiada como
+>   rascunho e a tarefa de segunda, a conferência no primeiro upload do dia e o
+>   feriado com nome. Respostas do dono: D1 sobe e avisa · D2 só no primeiro ·
+>   D3 simples. Cartões R-HCO-12 a 16; `teste_horario_coleta.js` (150).
+>   **Decidido na construção:** o "Está certo" de quem é Operação tira o
+>   rascunho do dia (o dono viu no plano); lançar o dia de HOJE conta como a
+>   conferência; a cópia só olha de hoje em diante e não roda no domingo; para
+>   quem corrige, o "mudou" aparece só na tarefa (a faixa não repete).
 > - **Fases 1 e 2 em código em 05/11/2026**: `coleta_horario.js` (dono único),
 >   `coleta_horario_route.js`, a tela 206 `/coleta-horarios`, o quadro do upload
 >   (`public/saida_upload.js`) no upload (só na 103 desde o AJUSTE do mesmo dia), `lote.horario_id`, a faixa da
