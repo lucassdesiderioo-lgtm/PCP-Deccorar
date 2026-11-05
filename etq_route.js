@@ -3,6 +3,11 @@ const {ehColeta,COLETA,AGENCIA}=require('./carga');
 const BAIXA=require('./baixa_dominio');
 const QUEM=require('./quem');
 module.exports=function(app,db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
+
   /* QUEM FEZ (QUEM-FEZ-E-REVISAO fase 3, 05/11/2026): as colunas do id moram no
      exp_route, o dono do `lote`; o ALTER guardado fica aqui tambem porque e
      esta rota que grava nelas, e um banco que subiu sem o exp_route (um

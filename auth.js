@@ -1,6 +1,7 @@
 const crypto=require('crypto'), fs=require('fs'), path=require('path');
 // Para onde a pessoa vai (login, /setor e as duas barras): dono unico.
 const {destino}=require('./destino');
+const QUEM=require('./quem');
 
 const AREAS=[
   {id:'admin',       nome:'Admin (controle geral)'},
@@ -368,6 +369,8 @@ module.exports=function(app, db){
     res.json(db.prepare('SELECT id,nome,areas,ativo FROM usuarios ORDER BY nome').all()));
 
   app.post('/api/usuarios',(req,res)=>{
+    // Sem login nada grava (QUEM-FEZ-E-REVISAO fase 7): o cadastro de pessoas e escrita.
+    if(!QUEM.exigir(req,res)) return;
     const {id,nome,pin,areas,ativo}=req.body||{};
     if(!nome) return res.status(400).json({erro:'nome obrigatorio'});
     if(id){
@@ -406,6 +409,7 @@ module.exports=function(app, db){
   }
 
   app.delete('/api/usuarios/:id',(req,res)=>{
+    if(!QUEM.exigir(req,res)) return;
     const id=req.params.id;
     const hard=req.query.hard==='1';
     if(ehUltimoAdminGeral(id))

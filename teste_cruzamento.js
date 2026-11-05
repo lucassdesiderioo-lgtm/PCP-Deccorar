@@ -63,7 +63,7 @@ require('./cruz_route')(app, db);
 
 const chamar = (k, body) => new Promise(r => {
   const res = { json:o=>r(o), status(){ return this; }, send:o=>r(o) };
-  rotas[k]({ body:body||{}, query:{}, headers:{} }, res);
+  rotas[k]({ body:body||{}, query:{}, headers:{}, usuario:{ id:1, nome:'Teste' } }, res);   // logado: sem login nada grava (QUEM-FEZ fase 7)
 });
 
 let falhas = 0, casos = 0;

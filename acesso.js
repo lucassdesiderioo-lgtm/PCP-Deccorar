@@ -131,7 +131,13 @@ function setoresNativos(){
   ];
 }
 
+const QUEM = require('./quem');
 module.exports = function(app, db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
+
   /* ⚠️ O `config` E CRIADO AQUI TAMBEM, E ISSO NAO E REDUNDANCIA (17/09/2026).
      Este arquivo GRAVA em `config` (o seed do pacote.assinar, o modo de acesso
      e a marca da migracao de areas), mas quem cria a tabela e o `mont_route`,

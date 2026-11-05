@@ -31,7 +31,13 @@
  *     abriu. A resposta passou a dizer QUANTOS volumes soltou: "ok:true" nao
  *     distingue "soltei tres" de "nao soltei nada".
  */
+const QUEM = require('./quem');
 module.exports = function(app, db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app, { auditar:'cadastro' });   // a linha nao tem autor: quem fez vai na auditoria
+
 
 /* Vai junto o NOME de cor, tecido e modelo. As colunas de `skus` guardam o
    codigo ('BEGE'), e quem confere a peca na bancada precisa ler a palavra. Sao

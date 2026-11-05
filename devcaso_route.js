@@ -19,11 +19,16 @@ const QUEM = require('./quem');
 const CAMINHOS = require('./caminhos');
 
 module.exports = function(app, db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
+
   D.garantir(db);
 
   /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 5, 05/11/2026). Toda escrita
      das devolucoes em andamento passa por esta porta: o quem.js responde 401
-     antes de o handler olhar o caso. Quem fez segue no req.usuario, que o
+     antes de o handler olhar o caso. Quem fez vai pelo QUEM.pessoa(req), que o
      dominio grava em cada evento (id e nome). */
   const post = (rota, h) => app.post(rota, (req,res) => { if(!QUEM.exigir(req,res)) return; return h(req,res); });
 
@@ -134,10 +139,10 @@ module.exports = function(app, db){
      DEVOLUCOES-DESEMPENHO): sem valor em reais, a quem já abre a tela. */
   app.get('/api/devolucao-casos/desempenho', (req,res) => responder(res, () => D.desempenho(db, (req.query||{}).mes)));
   app.get('/api/devolucao-casos/responsaveis', (req,res) => responder(res, () =>
-    ({ pessoas: D.responsaveis(db, temChaveResp), eu: (req.usuario && req.usuario.id) || null })));
+    ({ pessoas: D.responsaveis(db, temChaveResp), eu: QUEM.idDe(req) })));
   app.get('/api/devolucao-casos/:id/revisoes-soltas', (req,res) => responder(res, () => ({ revisoes: D.revisoesSoltas(db, req.params.id) })));
 
-  app.get('/api/devolucao-casos/:id', (req,res) => responder(res, () => D.detalhe(db, req.params.id, { comDinheiro: comValores(req), usuario: req.usuario })));
+  app.get('/api/devolucao-casos/:id', (req,res) => responder(res, () => D.detalhe(db, req.params.id, { comDinheiro: comValores(req), usuario: QUEM.pessoa(req) })));
 
   /* ── lançar e editar (devolucao.lancar) ── */
   post('/api/devolucao-casos', (req,res) => {
@@ -152,28 +157,28 @@ module.exports = function(app, db){
     if((b.coleta && cheio(b.coleta.transportadora_id) || cheio(b.valor_ml_situacao)) && !pode2.acompanhar)
       return res.status(403).json({ erro:'Pedir a coleta e marcar a situação do valor são de quem acompanha as devoluções. Lance sem eles.', chave:'devolucao.acompanhar' });
     responder(res, () => {
-      const r = D.lancarCompleto(db, b, req.usuario, { temChave: temChaveResp });
+      const r = D.lancarCompleto(db, b, QUEM.pessoa(req), { temChave: temChaveResp });
       if(r.valorMudou && r.valorMudou.length) auditar(req, 'valor', r.caso.id, 'lançou no lançamento '+r.valorMudou.join(', ')+': '+JSON.stringify({ valor_ml: b.valor_ml, custo_etiqueta: b.custo_etiqueta, limite_frete: b.limite_frete, custo: b.coleta && b.coleta.custo }));
       return { ok:true, id:r.caso.id };
     });
   });
   post('/api/devolucao-casos/:id/editar', (req,res) => responder(res, () => {
-    D.editar(db, req.params.id, req.body, req.usuario, { temChave: temChaveResp });
+    D.editar(db, req.params.id, req.body, QUEM.pessoa(req), { temChave: temChaveResp });
     return { ok:true };
   }));
 
   /* ── acompanhar (devolucao.acompanhar) ── */
   post('/api/devolucao-casos/:id/etapa', (req,res) => responder(res, () => {
     const b = req.body || {};
-    D.etapa(db, req.params.id, b.para, req.usuario, b.texto);
+    D.etapa(db, req.params.id, b.para, QUEM.pessoa(req), b.texto);
     return { ok:true };
   }));
   post('/api/devolucao-casos/:id/prorrogacao', (req,res) => responder(res, () => {
-    D.pedirProrrogacao(db, req.params.id, req.usuario, (req.body||{}).texto, (req.body||{}).qual);
+    D.pedirProrrogacao(db, req.params.id, QUEM.pessoa(req), (req.body||{}).texto, (req.body||{}).qual);
     return { ok:true };
   }));
   post('/api/devolucao-casos/:id/prazo', (req,res) => responder(res, () => {
-    D.novoPrazo(db, req.params.id, (req.body||{}).prazo, req.usuario, (req.body||{}).qual);
+    D.novoPrazo(db, req.params.id, (req.body||{}).prazo, QUEM.pessoa(req), (req.body||{}).qual);
     return { ok:true };
   }));
 
@@ -181,7 +186,7 @@ module.exports = function(app, db){
      editar. A chave é conferida aqui também: o portão é a primeira trava. */
   post('/api/devolucao-casos/:id/tipo', (req,res) => {
     if(!pode(req).lancar) return res.status(403).json({ erro:'Trocar o tipo do caso é de quem lança as devoluções.', chave:'devolucao.lancar' });
-    responder(res, () => { D.trocarTipo(db, req.params.id, req.body, req.usuario); return { ok:true }; });
+    responder(res, () => { D.trocarTipo(db, req.params.id, req.body, QUEM.pessoa(req)); return { ok:true }; });
   });
 
   /* A revisão do frete do "ML devolve" (de quem acompanha, com o valor
@@ -189,13 +194,13 @@ module.exports = function(app, db){
   const semAcompanhar = (res) => res.status(403).json({ erro:'A revisão do frete é de quem acompanha as devoluções.', chave:'devolucao.acompanhar' });
   post('/api/devolucao-casos/:id/revisao-frete', (req,res) => {
     if(!pode(req).acompanhar) return semAcompanhar(res);
-    responder(res, () => { D.pedirRevisaoFrete(db, req.params.id, req.body, req.usuario); return { ok:true }; });
+    responder(res, () => { D.pedirRevisaoFrete(db, req.params.id, req.body, QUEM.pessoa(req)); return { ok:true }; });
   });
   post('/api/devolucao-casos/:id/revisao-frete-resposta', (req,res) => {
     if(!pode(req).acompanhar) return semAcompanhar(res);
     const b = req.body || {};
     responder(res, () => {
-      const r = D.respostaRevisaoFrete(db, req.params.id, b, req.usuario);
+      const r = D.respostaRevisaoFrete(db, req.params.id, b, QUEM.pessoa(req));
       if(r.valorMudou && r.valorMudou.length) auditar(req, 'valor', req.params.id, 'lançou '+r.valorMudou.join(', ')+': '+JSON.stringify({ valor_revisao: b.valor_revisao }));
       return { ok:true };
     });
@@ -203,54 +208,54 @@ module.exports = function(app, db){
 
   /* Desfazer a última mudança de etapa feita à mão — só quem a fez. */
   post('/api/devolucao-casos/:id/desfazer-etapa', (req,res) => responder(res, () => {
-    D.desfazerEtapa(db, req.params.id, req.usuario);
+    D.desfazerEtapa(db, req.params.id, QUEM.pessoa(req));
     return { ok:true };
   }));
 
   /* Ligar à mão uma revisão solta a este caso (quem acompanha). */
   post('/api/devolucao-casos/:id/ligar', (req,res) => {
     if(!pode(req).acompanhar) return res.status(403).json({ erro:'Ligar a revisão é de quem acompanha as devoluções.', chave:'devolucao.acompanhar' });
-    responder(res, () => { const b = req.body || {}; D.ligarManual(db, req.params.id, b.devolucao_id, req.usuario, !!b.confirmar); return { ok:true }; });
+    responder(res, () => { const b = req.body || {}; D.ligarManual(db, req.params.id, b.devolucao_id, QUEM.pessoa(req), !!b.confirmar); return { ok:true }; });
   });
 
   /* Desligar a revisão errada (AJUSTE de 03/11/2026): com motivo, e a baixa
      daquela peça é desfeita junto (decisão do dono). Quem acompanha. */
   post('/api/devolucao-casos/:id/desligar-revisao', (req,res) => {
     if(!pode(req).acompanhar) return res.status(403).json({ erro:'Desligar a revisão é de quem acompanha as devoluções.', chave:'devolucao.acompanhar' });
-    responder(res, () => { D.desligarRevisao(db, req.params.id, (req.body || {}).motivo, req.usuario); return { ok:true }; });
+    responder(res, () => { D.desligarRevisao(db, req.params.id, (req.body || {}).motivo, QUEM.pessoa(req)); return { ok:true }; });
   });
 
   /* A caixa chegou e ainda não foi revisada (fase 2). */
   post('/api/devolucao-casos/:id/chegou', (req,res) => responder(res, () => {
-    D.chegou(db, req.params.id, req.usuario, req.body);
+    D.chegou(db, req.params.id, QUEM.pessoa(req), req.body);
     return { ok:true };
   }));
   post('/api/devolucao-casos/:id/aviso-ml', (req,res) => responder(res, () => {
-    D.avisarML(db, req.params.id, req.usuario);
+    D.avisarML(db, req.params.id, QUEM.pessoa(req));
     return { ok:true };
   }));
 
   /* As tentativas de coleta (fase 3, R8). */
   post('/api/devolucao-casos/:id/coleta', (req,res) => responder(res, () => {
-    D.pedirColeta(db, req.params.id, req.body, req.usuario);
+    D.pedirColeta(db, req.params.id, req.body, QUEM.pessoa(req));
     return { ok:true };
   }));
   post('/api/devolucao-casos/:id/coleta-agenda', (req,res) => responder(res, () => {
-    D.agendarColeta(db, req.params.id, req.body, req.usuario);
+    D.agendarColeta(db, req.params.id, req.body, QUEM.pessoa(req));
     return { ok:true };
   }));
   post('/api/devolucao-casos/:id/coleta-resultado', (req,res) => responder(res, () => {
-    D.resultadoColeta(db, req.params.id, req.body, req.usuario);
+    D.resultadoColeta(db, req.params.id, req.body, QUEM.pessoa(req));
     return { ok:true };
   }));
 
   /* Os anexos (fase 4, R11, R21). */
   post('/api/devolucao-casos/:id/anexo', (req,res) => responder(res, () =>
-    ({ ok:true, id: D.anexar(db, req.params.id, req.body, req.usuario, CAMINHOS.DEVOLUCOES) })));
+    ({ ok:true, id: D.anexar(db, req.params.id, req.body, QUEM.pessoa(req), CAMINHOS.DEVOLUCOES) })));
 
   /* A situação do valor do ML (R18) é de quem acompanha; o número, não. */
   post('/api/devolucao-casos/:id/situacao-valor', (req,res) => responder(res, () => {
-    D.situacaoValor(db, req.params.id, (req.body||{}).situacao, req.usuario);
+    D.situacaoValor(db, req.params.id, (req.body||{}).situacao, QUEM.pessoa(req));
     return { ok:true };
   }));
 
@@ -261,7 +266,7 @@ module.exports = function(app, db){
     if(!podeValores(req)) return res.status(403).json({ erro:'Os valores do caso são de quem lança ou acompanha as devoluções.', chave:'devolucao.acompanhar' });
     if(('valor_perdido' in b || 'valor_devolvido' in b) && !podeDinheiro(req)) return semDinheiro(req, res);
     responder(res, () => {
-      const mud = D.lancarValor(db, req.params.id, req.body, req.usuario);
+      const mud = D.lancarValor(db, req.params.id, req.body, QUEM.pessoa(req));
       if(mud.length) auditar(req, 'valor', req.params.id, 'lançou '+mud.join(', ')+': '+JSON.stringify(req.body||{}));
       return { ok:true, mudou:mud };
     });
@@ -270,7 +275,7 @@ module.exports = function(app, db){
   post('/api/devolucao-casos/:id/reembolso', (req,res) => {
     if(!podeDinheiro(req)) return semDinheiro(req, res);
     responder(res, () => {
-      const c = D.baixaReembolso(db, req.params.id, (req.body||{}).resultado, req.usuario);
+      const c = D.baixaReembolso(db, req.params.id, (req.body||{}).resultado, QUEM.pessoa(req));
       auditar(req, c.saida, c.id, 'baixa do reembolso: '+(c.saida === 'reembolso_recebido' ? 'recebido' : 'não recebido'));
       return { ok:true };
     });
@@ -278,7 +283,7 @@ module.exports = function(app, db){
   post('/api/devolucao-casos/:id/devolver-comprador', (req,res) => {
     if(!podeDinheiro(req)) return semDinheiro(req, res);
     responder(res, () => {
-      const c = D.devolverComprador(db, req.params.id, req.body, req.usuario);
+      const c = D.devolverComprador(db, req.params.id, req.body, QUEM.pessoa(req));
       auditar(req, 'devolvido_comprador', c.id, 'devolveu o dinheiro ao comprador sem coletar'+(c.valor_devolvido != null ? ' · R$ '+c.valor_devolvido.toFixed(2) : ' · sem valor lançado'));
       return { ok:true };
     });
@@ -286,7 +291,7 @@ module.exports = function(app, db){
   post('/api/devolucao-casos/:id/perda', (req,res) => {
     if(!podeDinheiro(req)) return semDinheiro(req, res);
     responder(res, () => {
-      const c = D.encerrarPerda(db, req.params.id, req.body, req.usuario);
+      const c = D.encerrarPerda(db, req.params.id, req.body, QUEM.pessoa(req));
       auditar(req, 'perda_prazo', c.id, 'encerrou como perda por prazo'+(c.valor_perdido != null ? ' · R$ '+c.valor_perdido.toFixed(2) : ' · sem valor lançado'));
       return { ok:true };
     });

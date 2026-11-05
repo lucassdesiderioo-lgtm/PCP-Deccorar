@@ -20,6 +20,11 @@ const INV = require('./inventario_dominio');
 const QUEM = require('./quem');
 
 module.exports = function(app, db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
+
   INV.garantirSchema(db);
 
   /* Quem faz vem do quem.js, o dono unico (QUEM-FEZ-E-REVISAO fase 5,

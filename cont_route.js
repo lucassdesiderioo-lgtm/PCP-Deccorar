@@ -46,6 +46,11 @@ function contagemPendentes(db){
 }
 const QUEM=require('./quem');
 module.exports=function(app,db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
+
   db.exec("CREATE TABLE IF NOT EXISTS contagem (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, contado_em TEXT DEFAULT (datetime('now','localtime')), sessao TEXT, teste INTEGER DEFAULT 0)");
   // contagem_pendente (secao 10) e criada em acesso.js; garantimos aqui tambem,
   // para o modulo funcionar mesmo carregado isolado. IF NOT EXISTS = idempotente.

@@ -44,8 +44,12 @@ function garantirSchema(db){
     criado_em    TEXT DEFAULT (datetime('now','localtime')),
     desfeita_em  TEXT,
     desfeita_por TEXT,
-    teste        INTEGER DEFAULT 0
+    teste        INTEGER DEFAULT 0,
+    desfeita_por_id INTEGER
   );`);
+  /* Quem desfez, pelo id (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026). O nome fica,
+     como retrato; quem fez a correcao ja ia pelo `usuario_id`. No fim (§17). */
+  try{ db.exec('ALTER TABLE correcao ADD COLUMN desfeita_por_id INTEGER'); }catch(e){}
   db.exec('CREATE INDEX IF NOT EXISTS ix_correcao_alvo ON correcao(alvo_tipo, alvo_id)');
 }
 
@@ -836,8 +840,8 @@ function desfazer(db, { id, quem }){
     ' por ' + (c.desfeita_por || '?'));
   if(!quem || (quem.id == null && !quem.nome)) throw erro(401, 'sem pessoa logada');
   acao(c.acao).desfazer(db, c, quem);
-  db.prepare(`UPDATE correcao SET desfeita_em=datetime('now','localtime'), desfeita_por=? WHERE id=?`)
-    .run(quem.nome || '', c.id);
+  db.prepare(`UPDATE correcao SET desfeita_em=datetime('now','localtime'), desfeita_por=?, desfeita_por_id=? WHERE id=?`)
+    .run(quem.nome || '', quem.id != null ? quem.id : null, c.id);
   return { id:c.id, acao:c.acao, alvo:c.alvo_tipo + ':' + c.alvo_id };
 }
 

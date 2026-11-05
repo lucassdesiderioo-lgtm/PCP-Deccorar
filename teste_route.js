@@ -1,5 +1,11 @@
 const ESTOQUE=require('./estoque_dominio');
+const QUEM = require('./quem');
 module.exports=function(app, db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app, { auditar:'sistema' });   // a linha nao tem autor: quem fez vai na auditoria
+
   db.exec("CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT)");
 
   // Tabelas cobertas pelo modo teste.

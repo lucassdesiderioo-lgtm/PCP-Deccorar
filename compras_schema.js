@@ -112,6 +112,7 @@ function garantirSchemaCompras(db){
       atualizado_em  TEXT DEFAULT (datetime('now','localtime')),
       atualizado_por TEXT,
       ativo          INTEGER DEFAULT 1,
+      atualizado_por_id INTEGER,   -- quem fez, pelo id (QUEM-FEZ-E-REVISAO fase 7)
       CHECK ( (componente_id IS NULL) <> (sku IS NULL) )
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_oferta_comp
@@ -133,7 +134,8 @@ function garantirSchemaCompras(db){
       referencia   TEXT,          -- n do pedido, quando fonte='compra'
       usuario_nome TEXT,
       criado_em    TEXT DEFAULT (datetime('now','localtime')),
-      data         TEXT DEFAULT (date('now','localtime'))
+      data         TEXT DEFAULT (date('now','localtime')),
+      usuario_id INTEGER    -- quem fez, pelo id (QUEM-FEZ-E-REVISAO fase 7)
     );
     CREATE INDEX IF NOT EXISTS idx_preco_hist ON preco_historico(oferta_id, data);
 
@@ -154,7 +156,8 @@ function garantirSchemaCompras(db){
       referencia     TEXT,
       usuario_nome   TEXT,
       criado_em      TEXT DEFAULT (datetime('now','localtime')),
-      data           TEXT DEFAULT (date('now','localtime'))
+      data           TEXT DEFAULT (date('now','localtime')),
+      usuario_id INTEGER    -- quem fez, pelo id (QUEM-FEZ-E-REVISAO fase 7)
     );
     CREATE INDEX IF NOT EXISTS idx_custo_sku ON custo_sku_historico(sku, data);
 
@@ -180,7 +183,9 @@ function garantirSchemaCompras(db){
       pago_em        TEXT,                    -- §8: uma marca, nao contas a pagar
       pago_por       TEXT,
       data           TEXT DEFAULT (date('now','localtime')),
-      teste          INTEGER DEFAULT 0
+      teste          INTEGER DEFAULT 0,
+      criado_por_id INTEGER,
+      pago_por_id INTEGER    -- quem fez, pelo id (QUEM-FEZ-E-REVISAO fase 7)
     );
 
     /* Regra 9 do §13: o pedido CONGELA embalagem, fator e preco no momento em
@@ -217,7 +222,8 @@ function garantirSchemaCompras(db){
       recebido_por TEXT,
       criado_em    TEXT DEFAULT (datetime('now','localtime')),
       data         TEXT DEFAULT (date('now','localtime')),
-      teste        INTEGER DEFAULT 0
+      teste        INTEGER DEFAULT 0,
+      recebido_por_id INTEGER    -- quem fez, pelo id (QUEM-FEZ-E-REVISAO fase 7)
     );
     CREATE TABLE IF NOT EXISTS recebimento_item (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -333,6 +339,15 @@ function garantirSchemaCompras(db){
      em cima, entao o ALTER dela mora aqui: um ALTER guardado fora do modulo dono
      ja rodou antes da tabela existir uma vez (a nota do §17 sobre a
      contagem_pendente), e a coluna so nasceu no segundo boot. */
+  /* QUEM FEZ, PELO ID (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): ao lado de cada
+     nome que ja era gravado — quem atualizou a oferta, quem mudou o preco, quem
+     criou e quem pagou o pedido, quem recebeu. No CREATE e aqui, no fim (§17).
+     O `enviado_por` do pedido NAO e pessoa (pdf, whatsapp, outro). */
+  colunas('oferta', [['atualizado_por_id','INTEGER']]);
+  colunas('preco_historico', [['usuario_id','INTEGER']]);
+  colunas('custo_sku_historico', [['usuario_id','INTEGER']]);
+  colunas('pedido_compra', [['criado_por_id','INTEGER'], ['pago_por_id','INTEGER']]);
+  colunas('recebimento', [['recebido_por_id','INTEGER']]);
   colunas('ficha_formula', [
     ['corte_largura','TEXT'], ['corte_altura','TEXT'], ['corte_unidade','TEXT']
   ]);

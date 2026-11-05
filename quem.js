@@ -45,4 +45,72 @@ function mesmaPessoa(a, b){
   return na !== '' && nb !== '' && na === nb;
 }
 
-module.exports = { quem, exigir, mesmaPessoa };
+/* O nome e o id de quem esta fazendo isto, soltos, para quem grava numa coluna
+   de nome (`recebido_por`, `resolvido_por`…) e na do id ao lado. Sem login:
+   nome '' e id null — mas uma rota de escrita nunca chega aqui sem login,
+   porque passou pelo `exigir` (ou pelo `portao`) antes. */
+const nomeDe = req => { const q = quem(req); return q && q.usuario_nome != null ? q.usuario_nome : ''; };
+const idDe = req => { const q = quem(req); return q ? q.usuario_id : null; };
+/* A pessoa no formato que os dominios recebem ({id, nome}) — para passar
+   adiante quem fez, em vez do `req.usuario` inteiro (que leva areas e o resto
+   da sessao). Sem login, null. */
+const pessoa = req => { const q = quem(req); return q ? { id: q.usuario_id, nome: q.usuario_nome } : null; };
+
+/* A PORTA DO MODULO (fase 7, 05/11/2026). `app = QUEM.portao(app)` no comeco de
+   um modulo de rotas faz TODA escrita registrada ali (post, put, patch,
+   delete) passar pelo `exigir` antes do handler — inclusive a rota que alguem
+   escrever amanha nesse modulo, sem lembrar de nada. As leituras e o resto do
+   `app` (locals, use, get) passam direto.
+
+   O `exigir` entra no lugar do ULTIMO handler, e nao como um middleware a
+   mais na frente: o upload grande (`bigJson`) continua lendo o corpo antes, e
+   os testes que chamam o handler direto (o ultimo da lista) encontram a porta.
+   ⚠️ No Express 5 `bind` e um verbo HTTP do app (BIND, do WebDAV): nunca
+   `v.bind(...)` aqui dentro. */
+const ESCRITA = new Set(['post','put','patch','delete']);
+/* `opcoes.auditar` (uma categoria da auditoria): para o modulo cuja linha NAO
+   tem coluna de autor — o cadastro de SKU, de cor, de fornecedor, uma
+   configuracao. A escrita que deu certo (resposta sem erro) vira uma linha na
+   `auditoria`, que ja guarda `usuario_id` e `usuario_nome` (decisao de
+   05/11/2026: espalhar `atualizado_por_id` por dez tabelas de cadastro seria
+   schema demais para o mesmo dado). Registrar nunca derruba a acao. */
+function auditar(app, req, categoria, acao, alvo, detalhe){
+  try{ const ac = app && app.locals && app.locals.acesso; if(ac && ac.auditar) ac.auditar(req, categoria, acao, alvo, detalhe); }catch(e){}
+}
+const alvoDe = req => { const p = req.params || {}, b = req.body || {};
+  const v = p.codigo || p.id || p.sku || p.tid || b.codigo || b.id || b.chave || b.nome || '';
+  return String(v == null ? '' : v).slice(0, 120); };
+function portao(app, opcoes){
+  const cat = opcoes && opcoes.auditar;
+  return new Proxy(app, {
+    get(alvo, k){
+      const v = alvo[k];
+      if(ESCRITA.has(k) && typeof v === 'function') return function(rota, ...hs){
+        if(typeof rota !== 'string' || !hs.length) return v.apply(alvo, [rota, ...hs]);
+        const h = hs[hs.length-1];
+        const metodo = String(k).toUpperCase();
+        const comPorta = function(req, res, next){
+          if(!exigir(req, res)) return;
+          if(cat && res && typeof res.json === 'function'){
+            const json = res.json, st = () => (res.statusCode == null ? 200 : res.statusCode);
+            res.json = function(o){
+              if(st() < 400 && !(o && (o.erro || o.ok === false))) auditar(alvo, req, cat, metodo + ' ' + rota, alvoDe(req), '');
+              return json.apply(this, arguments);
+            };
+          }
+          return h.call(this, req, res, next);
+        };
+        return v.apply(alvo, [rota, ...hs.slice(0,-1), comPorta]);
+      };
+      /* O resto passa COMO ESTA, sem amarrar a funcao: no Express 5 o
+         `app.router` e ele mesmo uma funcao (com o `.stack` pendurado), e uma
+         copia amarrada perderia o `.stack` — a cobertura do §10 deixaria de ver
+         as rotas. Chamado pela porta, o metodo do Express recebe a porta como
+         `this`, e tudo o que ele le ou grava nela cai no app (o `set` abaixo). */
+      return v;
+    },
+    set(alvo, k, v){ alvo[k] = v; return true; }
+  });
+}
+
+module.exports = { quem, exigir, mesmaPessoa, nomeDe, idDe, pessoa, portao, auditar };

@@ -22,7 +22,13 @@ function sobrasEsperando(db){
   const aguardando=CONF.aguardando(db).map(p=>Object.assign({},p,{de:'aguardando',cancelada_em:p.marcado_em}));
   return a_separar.concat(aguardando);
 }
+const QUEM=require('./quem');
 module.exports=function(app,db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
+
   /* A tabela das saidas (caminhao e agencia) tem dono proprio: o script do
      passivo tambem a cria, e duas copias do CREATE divergem. */
   require('./saida_schema').garantirSaida(db);
@@ -41,10 +47,9 @@ module.exports=function(app,db){
      a regua de la, pelo id quando os dois lados o tem. As colunas do id moram
      no exp_route (dono do `lote`); o ALTER guardado fica aqui tambem porque e
      esta rota que grava nelas. */
-  const QUEM=require('./quem');
   for(const c of ['impresso_por_id INTEGER','conferido_por_id INTEGER'])
     try{ db.exec('ALTER TABLE lote ADD COLUMN '+c); }catch(e){}
-  const eu=req=>({ id:req.usuario&&req.usuario.id, nome:req.usuario&&req.usuario.nome });
+  const eu=req=>({ id:QUEM.idDe(req), nome:QUEM.nomeDe(req) });   // quem fez: do quem.js
   /* ── CONFERENCIA DUPLA (etiqueta de venda + SKU da caixa) ──────────────────
      A ultima rede antes do carro. Bipe 1 = a etiqueta de venda JA COLADA;
      bipe 2 = o codigo de barras do SKU na propria caixa (que continua visivel,
@@ -238,13 +243,13 @@ module.exports=function(app,db){
   /* O fim do bipe: a caixa conferida (agencia, fica na area) ou levada pro
      canto (coleta). Devolve a resposta. */
   function concluir(req,alvo){
-    const quemBipou=(req.usuario&&req.usuario.nome)||null;
-    const quemId=(req.usuario&&req.usuario.id!=null)?req.usuario.id:null;
+    const quemBipou=QUEM.nomeDe(req)||null;
+    const quemId=QUEM.idDe(req);
     /* ⚠️ A BAIXA E AQUI (spec CONFERENCIA-E-BAIXA, fase 2-A, 22/10/2026): a
        etiqueta so reservou a peca, e ela sai do estoque quando a conferencia
        bate com a etiqueta — por peca, uma vez so (baixa_dominio.js). Quem chama
        embrulha numa transacao: a baixa e a marca de conferida entram juntas. */
-    BAIXA.baixar(db,alvo,req.usuario);
+    BAIXA.baixar(db,alvo,QUEM.pessoa(req));
     /* O BIPE DA AREA E A CONFERENCIA (bipe 2). Fase 4 da spec
        SAIDA-E-DUPLA-CONFERENCIA, decisao D1 do dono (26/09/2026): a caixa de
        AGENCIA ganhou um segundo bipe. Aqui ela e so CONFERIDA e fica na area;
@@ -386,7 +391,7 @@ module.exports=function(app,db){
   app.post('/api/carregamento/sobra',(req,res)=>{
     const CANC=require('./cancelada_dominio'), BAIXA=require('./baixa_dominio');
     if(!QUEM.exigir(req,res)) return;
-    const quem=req.usuario;
+    const quem={ id:QUEM.idDe(req), nome:QUEM.nomeDe(req) };   // quem fez: do quem.js
     const b=req.body||{};
     let alvo=null;
     if(b.id!=null) alvo=db.prepare('SELECT * FROM lote WHERE id=?').get(+b.id)||null;
@@ -470,7 +475,7 @@ module.exports=function(app,db){
     if(!podeConfirmar(req)) return res.status(403).json({ok:false,motivo:'sem_permissao',chave:'cancelamento.confirmar',
       aviso:'Confirmar ou recusar venda cancelada é de quem tem a permissão "Confirmar venda cancelada".'});
     const CONF=require('./cancel_conf'), b=req.body||{};
-    const r=db.transaction(()=> acao==='confirmar' ? CONF.confirmar(db,b.id,req.usuario) : CONF.recusar(db,b.id,req.usuario,b.motivo))();
+    const r=db.transaction(()=> acao==='confirmar' ? CONF.confirmar(db,b.id, QUEM.pessoa(req)) : CONF.recusar(db,b.id, QUEM.pessoa(req),b.motivo))();
     if(!r.ok) return res.json(r);
     const p=CONF.pegar(db,b.id)||{};
     const n=(r.estoque||[]).reduce((s,l)=>s+l.delta,0);
@@ -497,7 +502,7 @@ module.exports=function(app,db){
     const p=progresso();
     const ids=[].concat(p.faltam,p.coleta.faltam,p.coleta.aguardando).map(v=>v.id);
     const FIM=require('./fim_dia');
-    const r=FIM.registrar(db,ids,req.usuario);
+    const r=FIM.registrar(db,ids,QUEM.pessoa(req));
     try{ const ac=app.locals.acesso;
          if(ac&&ac.auditar) ac.auditar(req,'expedicao','coleta_nao_passou','fim do dia '+r.dia, ids.length+' caixa(s) ficaram'); }catch(e){}
     res.json({ok:true,fim_dia:r,caixas:ids.length});

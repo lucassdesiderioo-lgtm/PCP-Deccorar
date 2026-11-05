@@ -1,6 +1,12 @@
 const URGENCIA = require('./urgencia');
 
+const QUEM = require('./quem');
 module.exports=function(app,db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app, { auditar:'planejamento' });   // a linha nao tem autor: quem fez vai na auditoria
+
   // Fase 3 (docs/DESENHO-PLANEJAMENTO.md, secoes 5 e 9): o PDF passa a gerar
   // SO urgencia. A reposicao saiu do cruzamento — agora vem do calculo ao vivo
   // (tela azul, /api/revisao/producao). Com isso a foto_estoque perdeu a razao

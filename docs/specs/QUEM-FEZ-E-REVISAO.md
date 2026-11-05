@@ -1,8 +1,27 @@
-> **STATUS · 05/11/2026 — EM CONSTRUÇÃO · fases 1 a 4 no ar · fases 5 a 7 em código, sobem juntas**
+> **STATUS · 05/11/2026 — AS SETE FASES EM CÓDIGO · fases 1 a 3 no ar · a 4 mesclada (PR #289) · 4 a 7 sobem juntas, num deploy só**
 > - Desenhado no Projeto do Claude com o Lucas em 04/11/2026.
 > - **As fases 5, 6 e 7 foram feitas de uma vez, num PR só, com um deploy no fim**
 >   (decisão do dono, 05/11/2026: *"concluir todas as fases e testes e por último
 >   subimos ao sistema de uma única vez"*). Um commit por fase.
+> - **Fase 7 (escritório e cobertura) em código em 05/11/2026**: todo módulo de rotas
+>   com escrita começa com `app = QUEM.portao(app)` — a porta põe o `exigir` antes de
+>   cada `post`/`put`/`patch`/`delete`, inclusive na rota que nascer amanhã. Sem
+>   login, as 143 escritas do PCP (e as duas do `server.js`) são 401. O nome de quem
+>   fez sai do `quem.js` (`nomeDe`, `idDe`, `pessoa`), nunca do `req.usuario` direto.
+>   O id entrou ao lado do nome em `lote.resolvido_por_id`, `venda_sem_etiqueta` e
+>   `pdf_conta_aberta.resolvida_por_id`, `correcao.desfeita_por_id`,
+>   `oferta.atualizado_por_id`, `preco_historico`/`custo_sku_historico.usuario_id`,
+>   `pedido_compra.criado_por_id`/`pago_por_id` e `recebimento.recebido_por_id`.
+>   **Onde a linha não tem autor** (cadastros, configurações), quem fez vai na
+>   `auditoria` (`QUEM.portao(app, {auditar})`) — linha em `DECISOES.md`. O sob
+>   medida grava o `usuario_id` na auditoria da porta única (migração 39). Teste
+>   novo **`teste_quem.js` (240)**: sobe os módulos na ordem do `server.js` e chama
+>   cada escrita sem login, e varre o texto (o `quem.js` carregado, a porta em todo
+>   módulo, nenhum nome lido do `req.usuario`). Regra no `CLAUDE.md` §10 (R-ALC-09)
+>   e §15. Divergências: a spec dizia "compras, recebimento, cadastros, Bloqueados,
+>   ajustes" — entraram também o modo teste, os Acessos, o cadastro de pessoas e o
+>   planejamento, porque a regra é toda escrita; e as tabelas próprias do sob medida
+>   não ganharam coluna (o quem delas está na auditoria da porta).
 > - **Fase 6 (entrada e saída do login) em código em 05/11/2026**: tabelas `sessao`
 >   (uma por login: entrou, saiu, como saiu — `logout`, `bloqueado`, `expirou` —,
 >   IP e aparelho) e `sessao_evento` (`login`, `logout`, `troca_setor`, `troca_pin`,
@@ -25,7 +44,7 @@
 >   `teste_quem_devolucao_contagem.js` (84). Divergência: a baixa sem sessão
 >   gravava com quem deu vazio, e o `teste_devolucao.js` esperava isso — passa a
 >   esperar 401, que é a regra-mãe (§2.3).
-> - **Fase 4 (Carregamento e saídas) no ar desde 05/11/2026** (PR #289). Em código em 05/11/2026: toda escrita da
+> - **Fase 4 (Carregamento e saídas) mesclada em 05/11/2026** (PR #289) e ainda **não subiu**: o deploy feito antes do merge deu 0 no grep, e ela vai junto com as fases 5 a 7. Em código em 05/11/2026: toda escrita da
 >   Conferência (`carreg_route`), da saída do caminhão e da viagem (`saida_route`) passa
 >   pelo `quem.js` — 401 sem login (até ali gravava com a pessoa vazia). Colunas do id:
 >   `lote.conferido_por_id`, `lote.no_carro_por_id`, `saida.aberta_por_id`,

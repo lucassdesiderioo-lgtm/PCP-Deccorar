@@ -112,7 +112,13 @@ const MSG = {
   nada:           'Não há revisão para desfazer agora.'
 };
 
+const QUEM = require('./quem');
 module.exports=function(app,db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
+
   garantirSchema(db);
 
   app.post('/api/revisao',(req,res)=>{

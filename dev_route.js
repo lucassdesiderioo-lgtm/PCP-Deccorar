@@ -15,6 +15,11 @@ function devolucoesPendentes(db){
 const CASO=require('./devcaso_dominio');
 const QUEM=require('./quem');
 module.exports=function(app,db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
+
   db.exec("CREATE TABLE IF NOT EXISTS devolucao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo_ml TEXT, sku_fisico TEXT, sku_venda TEXT, venda_id INTEGER, buyer TEXT, embalagem TEXT, tecido TEXT, tubo TEXT, base TEXT, comando TEXT, kit TEXT, destinacao TEXT, obs TEXT, reputacao TEXT, motivo TEXT, baixado INTEGER DEFAULT 0, baixado_em TEXT, recebido_em TEXT DEFAULT (datetime('now','localtime')), data TEXT DEFAULT (date('now','localtime')), teste INTEGER DEFAULT 0, baixado_por_id INTEGER, baixado_por TEXT, revisado_por_id INTEGER, revisado_por TEXT)");
   /* QUEM DEU A BAIXA (spec ACESSO-POR-TELA-E-NIVEL, fase 1, 04/11/2026): o id
      e o nome como retrato, como `revisao.usuario_nome`. Ate aqui a baixa
@@ -66,7 +71,7 @@ module.exports=function(app,db){
     let ok=false; try{ ok=!!app.locals.acesso.podePermissao(req.usuario,'devolucao.baixar'); }catch(e){}
     if(!ok) return res.status(403).json({erro:'Ligar a revisão pela Baixa é de quem dá baixa nas devoluções.',chave:'devolucao.baixar'});
     const b=req.body||{};
-    try{ CASO.ligarManual(db,b.caso_id,b.devolucao_id,req.usuario,!!b.confirmar); res.json({ok:true}); }
+    try{ CASO.ligarManual(db,b.caso_id,b.devolucao_id, QUEM.pessoa(req),!!b.confirmar); res.json({ok:true}); }
     catch(e){ if(e instanceof CASO.Recusa) return res.status(e.status).json(Object.assign({erro:e.message},e.extra)); console.log('[devolucao] '+(e&&e.stack||e)); res.status(500).json({erro:'Não deu para gravar. Nada foi alterado.'}); }
   });
 
@@ -89,7 +94,7 @@ module.exports=function(app,db){
         db.prepare("INSERT INTO fila (codigo,modo) VALUES (?,'devolucao')").run(sku);
         naFila=true;
       }
-      casoId=CASO.ligarRevisao(db,{caso_id:b.caso_id,codigo:b.codigo_ml},info.lastInsertRowid,req.usuario);
+      casoId=CASO.ligarRevisao(db,{caso_id:b.caso_id,codigo:b.codigo_ml},info.lastInsertRowid, QUEM.pessoa(req));
     })();
     const resp={ok:true,id:info.lastInsertRowid,naFila};
     if(casoId) resp.caso_id=casoId;
@@ -134,7 +139,7 @@ module.exports=function(app,db){
     /* Ligada a um caso em andamento, o motivo vem do caso quando ninguem
        escolheu (R12), e o "ML devolve" encerra aqui (R19). Uma transacao. */
     db.transaction(()=>{
-      const bx=CASO.baixaDaDevolucao(db,b.id,b.motivo||null,req.usuario);
+      const bx=CASO.baixaDaDevolucao(db,b.id,b.motivo||null, QUEM.pessoa(req));
       db.prepare("UPDATE devolucao SET reputacao=?, motivo=?, baixado=1, baixado_em=datetime('now','localtime'), baixado_por_id=?, baixado_por=? WHERE id=? AND baixado=0")
         .run(b.reputacao||null,bx.motivo,q.usuario_id,q.usuario_nome,b.id);
     })();

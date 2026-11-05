@@ -333,7 +333,7 @@ secao('19. modo teste: as tabelas novas estão cobertas');
 require('./estoque_dominio');
 const rotasT = {};
 require('./teste_route')({ get(p,h){ rotasT['GET '+p]=h; }, post(p,h){ rotasT['POST '+p]=h; } }, db);
-function chamarT(m, p){ const out={}; rotasT[m+' '+p]({body:{}}, { json(b){ out.body=b; } }); return out.body; }
+function chamarT(m, p){ const out={}; const rs={ status(){ return rs; }, json(b){ out.body=b; return rs; } }; rotasT[m+' '+p]({body:{}, usuario:{id:1,nome:'Lucas'}}, rs); return out.body; }
 let t = chamarT('GET','/api/teste');
 const nc = (t.naoCobertas || []).map(x => x.tabela);
 ok('devolucao_caso e devolucao_evento NÃO estão em naoCobertas', !nc.includes('devolucao_caso') && !nc.includes('devolucao_evento'), JSON.stringify(t.naoCobertas));

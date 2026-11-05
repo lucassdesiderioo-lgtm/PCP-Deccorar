@@ -38,7 +38,13 @@ const { decodificarFoto, tipoDaFoto } = require('./foto');
 const FOTOS_DIR = require('./caminhos').COLETAS;
 const BAIXA = require('./baixa_dominio');
 
+const QUEM=require('./quem');
 module.exports = function(app, db){
+  /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
+     registrada neste modulo passa pelo quem.js antes do handler — a de amanha
+     tambem. */
+  app = QUEM.portao(app);
+
   require('./saida_schema').garantirSaida(db);
   /* A coluna `baixado_em` (e a virada, uma vez so) e do baixa_dominio. O
      exp_route ja chama no boot; chamar aqui tambem e o modulo nao depender da
@@ -49,7 +55,7 @@ module.exports = function(app, db){
   const auditar = (req, acao, alvo, det) => {
     try{ const ac = app.locals.acesso; if(ac && ac.auditar) ac.auditar(req, 'expedicao', acao, alvo, det); }catch(e){}
   };
-  const quem = req => (req.usuario && req.usuario.nome) || '';
+  const quem = req => QUEM.nomeDe(req);   // quem fez: do quem.js
   /* QUEM FEZ (QUEM-FEZ-E-REVISAO fase 4, 05/11/2026). Toda escrita da saída do
      caminhão e da viagem passa pelo `quem.js`: sem login, 401 e nada grava —
      até aqui ela gravava com a pessoa vazia. O id entra ao lado de cada nome
@@ -57,10 +63,9 @@ module.exports = function(app, db){
      e "sem segunda pessoa" é a régua do `quem.js`, pelo id quando os dois lados
      o têm. As colunas moram no saida_schema e no exp_route; o ALTER guardado
      do `lote` fica aqui também, porque é esta rota que grava nele. */
-  const QUEM = require('./quem');
   for(const c of ['impresso_por_id INTEGER', 'conferido_por_id INTEGER', 'no_carro_por_id INTEGER'])
     try{ db.exec('ALTER TABLE lote ADD COLUMN ' + c); }catch(e){}
-  const quemId = req => (req.usuario && req.usuario.id != null) ? req.usuario.id : null;
+  const quemId = req => QUEM.idDe(req);
   const post = (rota, h) => app.post(rota, (req, res) => { if(!QUEM.exigir(req, res)) return; return h(req, res); });
   const semSegunda = l => l.filter(x => QUEM.mesmaPessoa({ id:x.impresso_por_id, nome:x.impresso_por },
                                                          { id:x.conferido_por_id, nome:x.conferido_por })).length;
@@ -230,7 +235,7 @@ module.exports = function(app, db){
          levou sem ninguem bipar sairia da fabrica com a peca ainda no saldo.
          A conferencia dela continua VAZIA — ninguem conferiu, e a pilha mostra
          isso. As do canto ja baixaram no bipe: `baixar` nao baixa duas vezes. */
-      for(const id of ids) BAIXA.baixar(db, { id }, req.usuario);
+      for(const id of ids) BAIXA.baixar(db, { id }, QUEM.pessoa(req));
       const up = db.prepare(`UPDATE lote SET saida_id=?, saiu_em=datetime('now','localtime'), saiu_por='coleta',
           retirado_em=COALESCE(retirado_em, datetime('now','localtime')) WHERE id=? AND saida_id IS NULL`);
       for(const id of ids) up.run(s.id, id);

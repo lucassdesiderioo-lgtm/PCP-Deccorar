@@ -12,10 +12,12 @@ const {pode}=require('./permissoes');
 // a ultima rota registrada venceria — em silencio, e so em producao.
 function montar(app, db, modulos, prefixo){
   const pre=prefixo||'';
+  /* Quem fez vai pelo ID e pelo nome (QUEM-FEZ-E-REVISAO fase 7, migracao 39):
+     o nome muda no cadastro do PCP, o id nao. */
   const gravaAud=db.prepare(
-    'INSERT INTO auditoria(usuario_nome,permissao,metodo,caminho,detalhe,ok) VALUES(?,?,?,?,?,?)');
+    'INSERT INTO auditoria(usuario_id,usuario_nome,permissao,metodo,caminho,detalhe,ok) VALUES(?,?,?,?,?,?,?)');
   const audita=(u,perm,metodo,caminho,detalhe,ok)=>{
-    try{ gravaAud.run(u?u.nome:null,perm||null,metodo,caminho,detalhe||null,ok?1:0); }catch(e){}
+    try{ gravaAud.run(u&&u.id!=null?u.id:null,u?u.nome:null,perm||null,metodo,caminho,detalhe||null,ok?1:0); }catch(e){}
   };
 
   let n=0;

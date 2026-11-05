@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const db = require('./db');
 const ESTOQUE = require('./estoque_dominio');
+const QUEM = require('./quem');
 const app = express();
 /* A PORTA E 3010, E CONTINUA SENDO. `PCP_PORTA` existe para o teste que sobe o
    servidor de verdade (teste_regras_estoque.js) numa porta livre: rodado no
@@ -68,9 +69,13 @@ app.get('/api/estoque/ajustes',(req,res)=>{
 });
 
 app.post('/api/producao',(req,res)=>{
+  /* Sem login nada grava, e quem lancou vai na auditoria — a linha de
+     `producao` nao tem autor (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026). */
+  if(!QUEM.exigir(req,res)) return;
   const itens=(req.body&&req.body.itens)||[];
   const ins=db.prepare('INSERT INTO producao (codigo,qtd) VALUES (?,?)');
   db.transaction(l=>{ for(const it of l){ if(it.codigo && +it.qtd>0) ins.run(it.codigo,+it.qtd); } })(itens);
+  QUEM.auditar(app, req, 'producao', 'POST /api/producao', '', itens.length+' item(ns)');
   res.json({ok:true,lancados:itens.length});
 });
 app.get('/api/producao',(req,res)=> res.json(db.prepare(`SELECT p.*, s.estoque, s.alvo, s.cor FROM producao p
