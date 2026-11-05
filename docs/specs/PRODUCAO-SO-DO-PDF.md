@@ -1,6 +1,6 @@
 # PRODUÇÃO SÓ DO PDF — a 103 vira "Subir PDF de vendas"
 
-> **STATUS · 05/11/2026 — EM CÓDIGO (fase 1), falta subir**
+> **STATUS · 05/11/2026 — NO AR (PR #296; o dono: "deu tudo certo no deploy") · falta a prova com dado real: o primeiro PDF com venda sem estoque pondo a peça no vermelho sem clique**
 > - Construída em 05/11/2026: `urgencia.aplicar` (dono único; a rota e o upload
 >   chamam o mesmo), o upload aplica sozinho, a lista e o `POST /api/producao`
 >   saíram, a 103 virou "Subir PDF de vendas". Cartão R-PRD-01 (a R-PRD-02 da §5

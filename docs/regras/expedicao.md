@@ -243,7 +243,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Por quê:** o dono — *"só do PDF e do arquivo que subimos no Planejamento"*; a lista não era usada, e a urgência dependia de um Admin clicar, que quem é Operação nem via.
 - **Exceções:** falhar ao aplicar não derruba o upload (`urgentes:null`, log). A rota `POST /api/cruzamento/aplicar` fica para reaplicar à mão (`producao.lancar`).
 - **Teste que trava:** `teste_horario_coleta.js` (seção 10) e `teste_cruzamento.js`.
-- **Status:** em código em 05/11/2026, falta subir.
+- **Status:** no ar desde 05/11/2026 (PR #296); falta a prova com dado real.
 
 ---
 
