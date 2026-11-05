@@ -57,6 +57,8 @@ const TELAS={
   '/devolucao':'devolucao','/devolucao.html':'devolucao',
   '/montagem':'montagem','/montagem.html':'montagem',
   '/embalagem':'embalagem','/embalagem.html':'embalagem',
+  /* /expedicao (a antiga 203) só redireciona para a 103 desde 05/11/2026; fica na
+     lista para quem não tem sessão ir ao login, e não cair no static. */
   '/expedicao':'expedicao','/expedicao.html':'expedicao',
   '/carregamento':'carregamento','/carregamento.html':'carregamento',
   '/recebimento':'recebimento','/recebimento.html':'recebimento',

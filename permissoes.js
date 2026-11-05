@@ -20,7 +20,7 @@ module.exports = [
     rotulo:'Embalar peças',       desc:'Bipar SKU, kit e finalizar' },
 
   // ─── EXPEDIÇÃO ──────────────────────────────────────────────
-  { chave:'pdf.subir',            grupo:'Expedição',  tela:203, nivel:'operacao',
+  { chave:'pdf.subir',            grupo:'Expedição',  tela:103, nivel:'operacao',
     rotulo:'Lançar NF de venda',  desc:'Subir o PDF do Mercado Livre' },
   { chave:'etiqueta.emitir',      grupo:'Expedição',  tela:201, nivel:'operacao',
     rotulo:'Emitir NF de venda',  desc:'Imprimir etiqueta e dar baixa no estoque' },

@@ -883,6 +883,9 @@ module.exports = function(app, db){
     /* A ENTRADA DO BLOCO 250 NO MENU (fase 6 da ACESSO-POR-TELA-E-NIVEL): a
        porta so redireciona (dev_route), e deixa de ser @logado — abre para
        quem alcanca alguma das tres telas das devolucoes. */
+    /* O endereço da antiga 203 Subir PDF só redireciona para a 103 (05/11/2026,
+       D2) — quem julga é o portão da 103. */
+    if(eq('/expedicao') || eq('/expedicao.html')) return '@logado';
     if(eq('/devolucoes')) return ['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro','devolucao.baixar'];
     // As telas que a pessoa abre (fase 5): cada um ve as proprias, so nome e endereco.
     if(eq('/api/telas/minhas')) return '@logado';

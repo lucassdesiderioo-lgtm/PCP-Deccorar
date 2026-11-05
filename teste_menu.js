@@ -113,8 +113,7 @@ const MINHAS_OP = { telas:[ { n:101, nome:'Revisão', rota:'/operador', modulo:1
      a aprovação do ajuste e a da contagem de peça) ficam como estão. */
   const MARCAS = [
     ['public/operador.html',  "b.id='rjBt'",                                   'revisao.rejeitar'],
-    ['public/embalagem.html', 'id="upBox"',                                    'pdf.subir'],
-    ['public/expedicao.html', 'onclick="imp(',                                 'etiqueta.emitir'],
+    /* a caixa "Subir PDF" da 201 saiu em 05/11/2026: o upload é só na 103 (D2) */
     ['public/carregamento.html', 'onclick="fecharSaida(true)"',                'saida.liberar'],
     ['public/carregamento.html', 'onclick="fecharViagem(true)"',               'saida.liberar'],
     ['public/index.html', "data-resolvediv=\"'+r.id+'\" data-sku=\"'+esc(sug.codigo)", 'sku.cadastrar'],

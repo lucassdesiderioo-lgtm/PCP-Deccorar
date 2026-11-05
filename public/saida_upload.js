@@ -1,8 +1,8 @@
 /* saida_upload.js — "PARA QUAL SAÍDA SÃO ESTAS VENDAS?" no upload do PDF
  * (spec HORARIOS-DE-COLETA, D4 e D6, 05/11/2026).
  *
- * Um quadro só, usado nas três portas de upload (201 Etiqueta de Venda, 203
- * Subir PDF e o Admin). Quem sobe o PDF olha o ML → Envios de hoje, confere o
+ * Um quadro só, no único lugar de subir o PDF: a 103 Lançar produção (desde
+ * 05/11/2026 a 201 e a 203 não sobem mais PDF — decisão do dono). Quem sobe o PDF olha o ML → Envios de hoje, confere o
  * horário das coletas (corrige ali se mudou) e escolhe a saída das vendas.
  *
  *   saidaUpload.montar(el)   desenha o quadro dentro de `el`. Sem a permissão

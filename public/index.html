@@ -117,12 +117,15 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
   </div>
 </div>
 
-    <div class="card"><div style="font-weight:700;margin-bottom:10px">Selecione os SKUs e as quantidades a produzir</div>
+    <!-- Desde 05/11/2026 a 103 abre também para quem só sobe o PDF (pdf.subir,
+         nível Operação): os dois cards de lançar produção são de quem tem
+         producao.lancar, e somem para os outros (data-perm, só esconde). -->
+    <div class="card" data-perm="producao.lancar"><div style="font-weight:700;margin-bottom:10px">Selecione os SKUs e as quantidades a produzir</div>
       <div id="sellist"></div>
       <div class="row-actions"><button class="primary" data-perm="producao.lancar" onclick="lancar()">Lançar para produção</button>
         <button class="ghost" onclick="limparSel()">Limpar quantidades</button><span class="msg" id="msgProd"></span></div>
     </div>
-    <div class="card"><div style="font-weight:700;margin-bottom:10px">Lançamentos de hoje</div>
+    <div class="card" data-perm="producao.lancar"><div style="font-weight:700;margin-bottom:10px">Lançamentos de hoje</div>
       <table><thead><tr><th>SKU</th><th>Pedido</th><th>Produzido</th><th>Estoque</th><th>Situação</th></tr></thead><tbody id="hoje"></tbody></table></div>
   </div>
 
@@ -698,6 +701,7 @@ async function carregarPend(){
   let d;
   try{ d=await (await fetch('/api/skus/pendencias')).json(); }
   catch(e){ box.innerHTML='<div class="card">Não consegui carregar as pendências.</div>'; return; }
+  if(!d || !d.medida) return;   // sem permissão (a 103 abre para quem só sobe PDF): a aba não é dela
 
   const cor=n=>n?'var(--amber)':'var(--green)';
   res.innerHTML=
@@ -2007,6 +2011,7 @@ async function lancar(){
 }
 async function carregarHoje(){
   const p=await (await fetch('/api/producao')).json();
+  if(!Array.isArray(p)) return;   // sem permissão (quem só sobe PDF na 103): nada a desenhar
   $('#hoje').innerHTML = p.map(r=>{ const est=r.estoque??0, cobre=est>=r.qtd;
     const sit = cobre ? `<span class="ok">✔ tem em estoque (${est})</span>` : `<span class="baixo">produzir ${r.qtd-est}</span>`;
     return `<tr><td class="code">${r.codigo}</td><td>${r.qtd}</td><td>${r.produzido}/${r.qtd}</td><td>${est}</td><td>${sit}</td></tr>`;

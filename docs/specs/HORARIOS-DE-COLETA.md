@@ -3,10 +3,15 @@
 > **STATUS · 05/11/2026 — EM CÓDIGO (fases 1 e 2), falta subir**
 > - **Fases 1 e 2 em código em 05/11/2026**: `coleta_horario.js` (dono único),
 >   `coleta_horario_route.js`, a tela 206 `/coleta-horarios`, o quadro do upload
->   (`public/saida_upload.js`) nas três portas, `lote.horario_id`, a faixa da
+>   (`public/saida_upload.js`) no upload (só na 103 desde o AJUSTE do mesmo dia), `lote.horario_id`, a faixa da
 >   próxima coleta no `nav.js` e a agência pelo horário lançado. Cartões R-HCO-01
 >   a R-HCO-10; `teste_horario_coleta.js` (79). Falta o deploy e a prova de
 >   fábrica: o primeiro PDF subido com a saída e a faixa contando as caixas.
+> - **AJUSTE do mesmo dia (decisão do dono, D1 (a) e D2):** subir o PDF passou a
+>   ser num lugar só, a **103 Lançar produção** (que abre também com
+>   `pdf.subir` e caiu para nível Operação); a **203 Subir PDF saiu** do mapa
+>   (`/expedicao` só redireciona) e a caixa de upload da 201 também. O quadro da
+>   saída e a faixa ficaram na 103.
 > - **O que se decidiu na construção (vale o `CLAUDE.md`):** a venda de outro
 >   dia e a de outra modalidade não ganham a marca (a modalidade é a da
 >   etiqueta); a coleta corrigida mantém o id e a tirada solta as caixas; o

@@ -164,7 +164,10 @@ async function main(){
     ok('o card não se redesenha com o motivo digitado', guarda>0 && busca>guarda && /activeElement/.test(fn) && /return SEM_N/.test(fn));
     const emb=fs.readFileSync(path.join(__dirname,'public','embalagem.html'),'utf8');
     ok('a Etiqueta de Venda mostra a linha (pela central, fase 3)', /\/pendencias_aviso\.js/.test(emb) && /id="pendAviso"/.test(emb));
-    ok('e manda para Admin → Pendências, sem botão de resolver', /Admin → Pendências/.test(emb) && !/semetiqueta\/resolver/.test(emb));
+    /* a frase mora no pendencias_aviso.js (a linha da central); o texto que a
+       embalagem.html tinha era do upload, que saiu dela em 05/11/2026 (D2) */
+    const aviso=fs.readFileSync(path.join(__dirname,'public','pendencias_aviso.js'),'utf8');
+    ok('e manda para Admin → Pendências, sem botão de resolver', /Admin → Pendências/.test(aviso) && !/semetiqueta\/resolver/.test(emb));
 
     console.log('\n── 7. o modo teste cobre a lista ──');
     const tr=fs.readFileSync(path.join(__dirname,'teste_route.js'),'utf8');

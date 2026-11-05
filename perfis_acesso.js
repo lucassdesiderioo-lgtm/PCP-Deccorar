@@ -114,12 +114,17 @@ const CHAVES_DEV = ['devolucao.registrar','devolucao.acompanhar','devolucao.lanc
 const NASCERAM_DEPOIS = ['coleta.horario'];   // HORARIOS-DE-COLETA, 05/11/2026
 function comparar(antes, agora){
   if(!antes) return 'sem retrato de antes';
-  const tira = l => (l || []).filter(r => r !== '/devolucoes');
+  /* A 203 Subir PDF SAIU em 05/11/2026 (decisão do dono, D2): o endereço
+     `/expedicao` só redireciona para a 103, e abre a qualquer pessoa logada —
+     quem julga é o portão da 103. Ele sai da comparação pelo NOME; a outra
+     ponta (quem abria a 203 abre a 103) é conferida no teste_mapa, seção 6. */
+  const tira = l => (l || []).filter(r => r !== '/devolucoes' && r !== '/expedicao');
   const dif = [];
   if(JSON.stringify(tira(antes.abre)) !== JSON.stringify(tira(agora.abre))) dif.push('telas ' + JSON.stringify(tira(antes.abre)) + ' → ' + JSON.stringify(tira(agora.abre)));
   const semNovas = l => (l || []).filter(c => NASCERAM_DEPOIS.indexOf(c) < 0);
   if(JSON.stringify(semNovas(antes.perms)) !== JSON.stringify(semNovas(agora.perms))) dif.push('permissões mudaram');
-  if(antes.destino !== agora.destino) dif.push('destino ' + antes.destino + ' → ' + agora.destino);
+  const dest = d => d === '/expedicao' ? '/admin/producao' : d;   // a 203 virou a 103 (D2)
+  if(dest(antes.destino) !== agora.destino) dif.push('destino ' + antes.destino + ' → ' + agora.destino);
   const temDev = (agora.perms || []).some(c => CHAVES_DEV.indexOf(c) >= 0);
   if((agora.abre || []).indexOf('/devolucoes') >= 0 && !temDev && agora.abre.indexOf('/') < 0 || ((agora.abre || []).indexOf('/devolucoes') < 0 && temDev))
     dif.push('a porta /devolucoes não segue as chaves das devoluções');

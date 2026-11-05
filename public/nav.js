@@ -239,7 +239,7 @@ function estiloDasPermissoes(d){
 
 /* ---- a faixa da próxima coleta (spec HORARIOS-DE-COLETA, fase 2, 05/11/2026) ----
    Nas telas de operação da Expedição (201 Etiqueta de Venda, 202 Conferência,
-   203 Subir PDF, 206 Horários de coleta) para todo mundo, e em qualquer tela para quem tem nível
+   103 Lançar produção — onde se sobe o PDF —, 206 Horários de coleta) para todo mundo, e em qualquer tela para quem tem nível
    Supervisor ou acima (D5) — quem decide é o servidor (`em_toda_tela`). Conta
    até o INÍCIO da janela (o caminhão pode chegar no começo, R-HCO-06): âmbar
    abaixo de 2 h, vermelho abaixo de 1 h e dentro da janela, a mesma régua do
@@ -247,7 +247,7 @@ function estiloDasPermissoes(d){
    marcou aparecem à parte. Não fecha, não bloqueia, e fica fora do bipe. */
 (function(){
   if(location.pathname.indexOf('/login')===0) return;
-  var EXP=['/embalagem','/carregamento','/expedicao','/coleta-horarios'];
+  var EXP=['/embalagem','/carregamento','/admin/producao','/coleta-horarios'];
   var aqui=location.pathname.replace(/\.html$/,'').replace(/\/+$/,'');
   var naExpedicao=EXP.indexOf(aqui)>=0;
   function hm(m){ m=Math.max(0,m); var h=Math.floor(m/60), r=m%60; return h?(h+'h'+(r<10?'0':'')+r):(r+' min'); }

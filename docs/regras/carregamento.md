@@ -88,7 +88,7 @@ Etiqueta de Venda ────┤
 agência de cada data), `saida_dia` ("hoje não tem coleta") e
 `saida_horario_evento` (a história). `lote.horario_id` aponta a saída que o PDF
 disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
-"Para qual saída são estas vendas?" nas três portas de upload, com
+"Para qual saída são estas vendas?" no upload — desde 05/11/2026 só na 103 Lançar produção —, com
 `coleta.horario` (Operação). **`node teste_horario_coleta.js`** trava os cartões abaixo.
 
 ### R-HCO-01 · O horário é da DATA, e não do dia da semana
@@ -114,7 +114,7 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 
 ### R-HCO-06 · O relógio conta até o INÍCIO da janela
 - **Regra:** a faixa da próxima coleta conta até o início (o caminhão pode chegar no começo); âmbar abaixo de 2 h e vermelho abaixo de 1 h quando ainda falta caixa; dentro da janela, vermelho. Depois do fim, passa para a próxima; depois da última, "Coletas de hoje encerradas".
-- **Onde aparece:** 201, 202 e 203 para todo mundo, e qualquer tela para nível Supervisor ou acima (D5).
+- **Onde aparece:** 201, 202, 103 (onde se sobe o PDF) e 206 para todo mundo, e qualquer tela para nível Supervisor ou acima (D5).
 - **Status:** em código em 05/11/2026, falta subir.
 
 ### R-HCO-07 · Janela mudada sem corte novo deixa o corte "a conferir"

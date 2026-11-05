@@ -252,7 +252,9 @@ async function main(){
     limpar();
 
     console.log('\n── 6-C. as telas de upload dizem a venda ──');
-    for(const tela of ['embalagem','expedicao','index']){
+    /* desde 05/11/2026 o PDF sobe num lugar só, a 103 (o index.html servido como
+       /admin/producao): a 201 e a 203 não sobem mais PDF (D2) */
+    for(const tela of ['index']){
       const html=fs.readFileSync(path.join(__dirname,'public',tela+'.html'),'utf8');
       ok(tela+'.html mostra a venda sem etiqueta pelo número', /semEtiqueta/.test(html) && /sem etiqueta neste PDF/.test(html));
     }
