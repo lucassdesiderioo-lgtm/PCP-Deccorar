@@ -239,7 +239,7 @@ function estiloDasPermissoes(d){
 
 /* ---- a faixa da próxima coleta (spec HORARIOS-DE-COLETA, fase 2, 05/11/2026) ----
    Nas telas de operação da Expedição (201 Etiqueta de Venda, 202 Conferência,
-   103 Lançar produção — onde se sobe o PDF —, 206 Horários de coleta) para todo mundo, e em qualquer tela para quem tem nível
+   103 Subir PDF de vendas —, 206 Horários de coleta) para todo mundo, e em qualquer tela para quem tem nível
    Supervisor ou acima (D5) — quem decide é o servidor (`em_toda_tela`). Conta
    até o INÍCIO da janela (o caminhão pode chegar no começo, R-HCO-06): âmbar
    abaixo de 2 h, vermelho abaixo de 1 h e dentro da janela, a mesma régua do

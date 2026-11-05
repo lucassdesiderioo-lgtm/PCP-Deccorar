@@ -17,6 +17,7 @@ function bloqueadosPendentes(db){
   return { n: v.n + s.n + c.n, desde: datas[0] || null, sem_etiqueta: s.n };
 }
 const QUEM = require('./quem');
+const URGENCIA = require('./urgencia');
 module.exports=function(app,db){
   /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
      registrada neste modulo passa pelo quem.js antes do handler — a de amanha
@@ -414,6 +415,16 @@ module.exports=function(app,db){
       /* E A CONTA QUE NAO FECHA SEM EXPLICACAO TAMBEM FICA (central de
          pendencias, fase 2): o aviso do upload aparecia uma vez e sumia. */
       const ca=gravarContaAberta(orders.conta, fname, orders);
+      /* A URGÊNCIA ENTRA SOZINHA (spec PRODUCAO-SO-DO-PDF, D1, 05/11/2026,
+         R-PRD-01): a venda sem estoque deste PDF vira ordem do dia agora, para
+         quem quer que suba. Até ali só entrava quando um Admin clicava
+         "Lançar N urgentes", e quem é Operação nem via o botão. É o mesmo
+         recálculo idempotente da rota (R-URG-02). Falhar aqui não derruba o
+         upload — as vendas já estão gravadas —, mas vai para o log e a
+         resposta diz `urgentes:null`. */
+      let urgentes=null;
+      try{ urgentes=db.transaction(()=>URGENCIA.aplicar(db))().urgentes; }
+      catch(e){ console.error('[upload] aplicar a urgência falhou: '+e.message); }
       /* `coleta` vai na resposta pra quem subiu o PDF ver na hora quantos
          volumes o caminhao vai buscar — e estranhar se der zero num PDF de
          coleta, ou o lote inteiro num PDF de agencia (a marca e fraca).
@@ -422,7 +433,7 @@ module.exports=function(app,db){
          gravou para este PDF (leitura L4). Nao retem ninguem — quando nao
          fecha, nao da para dizer qual caixa ficou com menos —, mas a tela
          mostra em vermelho, para alguem olhar antes de imprimir. */
-      res.json({ok:true,total:orders.length,novos,repetidas:rep,religadas,
+      res.json({ok:true,total:orders.length,novos,repetidas:rep,religadas,urgentes,
                 quantidade_duvida:qtdDuvida, conta_pdf:orders.conta||null,
                 sem_etiqueta_novas:se.novas, sem_etiqueta_resolvidas:se.resolvidas,
                 conta_aberta_nova:ca,

@@ -200,7 +200,7 @@ module.exports = [
 
   // ─── PLANEJAMENTO ───────────────────────────────────────────
   { chave:'producao.lancar',      grupo:'Planejamento', tela:103, nivel:'admin',
-    rotulo:'Lançar produção',     desc:'Criar ordens manualmente' },
+    rotulo:'Lançar produção',     desc:'Reaplicar a urgência do PDF à mão (a lista de lançar à mão saiu em 05/11/2026; a urgência entra sozinha no upload)' },
   { chave:'planilha.importar',    grupo:'Planejamento', tela:401, nivel:'admin',
     rotulo:'Importar planilha do ML', desc:'Atualizar a demanda futura' },
   { chave:'sku.cadastrar',        grupo:'Planejamento', tela:402, nivel:'admin',

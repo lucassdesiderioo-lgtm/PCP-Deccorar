@@ -1025,7 +1025,6 @@ module.exports = function(app, db){
     if(eq('/api/estoque/painel') || eq('/api/estoque/ajustes') ||
        pre('/api/estoque/extrato')) return '@admin';
     if(M !== 'GET' && eq('/api/alvo')) return 'alvo.editar';
-    if(M !== 'GET' && eq('/api/producao')) return 'producao.lancar';
     if(M !== 'GET' && pre('/api/planejamento')) return 'planilha.importar';
     if(M !== 'GET' && eq('/api/skus')) return 'sku.cadastrar';
     /* A etiqueta de SKU em PDF (20/10/2026) e LEITURA, apesar do POST: ela so

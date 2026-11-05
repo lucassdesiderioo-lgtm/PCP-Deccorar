@@ -133,6 +133,19 @@ const ok = (n, c, extra) => { casos++;
      (l2.find(x => x.codigo === 'BK140140BEGE') || {}).urgente === 2,
      JSON.stringify(l2.find(x => x.codigo === 'BK140140BEGE')));
 
+  // ── PRODUCAO-SO-DO-PDF (05/11/2026): o aplicar é do DOMÍNIO ─────────────
+  /* O upload chama a mesma conta que a rota: uma régua só (R-PRD-02). */
+  const U = require('./urgencia');
+  ok('o urgencia.js tem o aplicar (dono único: a rota e o upload chamam o mesmo)', typeof U.aplicar === 'function');
+  if(typeof U.aplicar === 'function'){
+    const r1 = U.aplicar(db), r2 = U.aplicar(db);
+    const n = db.prepare("SELECT COUNT(*) n, COALESCE(SUM(qtd),0) t FROM producao WHERE origem='ml'").get();
+    ok('aplicar pelo domínio dá o mesmo número da rota, e duas vezes não dobra', r1.urgentes === 2 && r2.urgentes === 2 && n.t === 2, JSON.stringify([r1.urgentes, r2.urgentes, n]));
+    ok('e o lançamento manual antigo continua', !!db.prepare("SELECT 1 FROM producao WHERE origem='manual' AND qtd=9").get());
+  }
+  const rotaTxt = fs.readFileSync(path.join(__dirname, 'cruz_route.js'), 'utf8');
+  ok('a rota usa o aplicar do domínio (sem cópia da conta)', /URGENCIA\.aplicar\(db\)/.test(rotaTxt) && !/INSERT INTO producao/.test(rotaTxt));
+
   console.log('');
   console.log(falhas ? ('FALHARAM ' + falhas + ' de ' + casos)
                      : ('todos os ' + casos + ' casos passaram'));

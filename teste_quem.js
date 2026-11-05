@@ -179,7 +179,7 @@ const escritas = rotas.filter(r => /^(POST|PUT|PATCH|DELETE)$/.test(r.metodo));
   /* A PORTA DO MODULO: rota nova escrita amanha num modulo de rotas ja nasce
      passando pelo quem.js. O auth.js e o server.js chamam o exigir rota a
      rota (o portao do login nao pode exigir login). */
-  const SEM_PORTAO = { 'auth.js':'é o próprio login', 'server.js':'chama o exigir na rota dele (caso abaixo)' };
+  const SEM_PORTAO = { 'auth.js':'é o próprio login', 'server.js':'chama o exigir na rota de escrita que tiver (caso abaixo; hoje não tem nenhuma)' };
   comEscrita.filter(f => !SEM_PORTAO[f]).forEach(f => ok('   ' + f + ' passa as escritas pela porta do módulo (QUEM.portao)',
     /app\s*=\s*QUEM\.portao\(\s*app\b/.test(semComentario(texto(f)))));
 
@@ -206,7 +206,12 @@ const escritas = rotas.filter(r => /^(POST|PUT|PATCH|DELETE)$/.test(r.metodo));
   /* o server.js não sobe em teste nenhum: a rota dele é conferida pelo texto */
   const srv = semComentario(texto('server.js'));
   const escritasSrv = [...srv.matchAll(/app\.(post|put|patch|delete)\(\s*'([^']+)'\s*,\s*\(req,\s*res\)\s*=>\s*\{([^]*?)\n\}\);/g)];
-  ok('o server.js tem a sua escrita na conta', escritasSrv.length >= 1, escritasSrv.length);
+  /* a única escrita do server.js era o POST /api/producao (lançar à mão), que
+     saiu em 05/11/2026 (spec PRODUCAO-SO-DO-PDF). Escrita nova ali tem de
+     passar pelo exigir (casos abaixo); e nenhuma rota de escrita fica fora da
+     conta por estar escrita de outro jeito. */
+  const escritasSoltas = (srv.match(/app\.(post|put|patch|delete)\(/g) || []).length;
+  ok('o server.js não tem escrita fora da conta', escritasSoltas === escritasSrv.length, escritasSoltas + ' × ' + escritasSrv.length);
   escritasSrv.forEach(m => ok('   server.js ' + m[1].toUpperCase() + ' ' + m[2] + ' passa pelo quem.js',
     /QUEM\.exigir\(req,\s*res\)/.test(m[3].split('\n').slice(0,3).join('\n'))));
 

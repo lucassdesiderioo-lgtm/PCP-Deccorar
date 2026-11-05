@@ -44,8 +44,11 @@ const TELAS = [
   /* A 103 é o LUGAR ÚNICO de subir o PDF desde 05/11/2026 (decisão do dono,
      D1 (a) e D2): abre com `pdf.subir` também, e por isso é de nível Operação;
      herdou da 203 a área de chegada `expedicao`. A lista "Lançar para produção"
-     continua escondida de quem não tem `producao.lancar` (data-perm). */
-  { n:103, nome:'Lançar produção',       rota:'/admin/producao', nivel:'operacao',  onde:'computador', perms:['producao.lancar','pdf.subir'], area:'expedicao', aba:'prod' },
+     continua escondida de quem não tem `producao.lancar` (data-perm).
+     Desde 05/11/2026 (spec PRODUCAO-SO-DO-PDF, D3) ela se chama "Subir PDF de
+     vendas": a lista de lançar à mão saiu. `producao.lancar` continua abrindo
+     a tela (tirá-la mudaria quem abre — #13), sem lista nenhuma. */
+  { n:103, nome:'Subir PDF de vendas',   rota:'/admin/producao', nivel:'operacao',  onde:'computador', perms:['producao.lancar','pdf.subir'], area:'expedicao', aba:'prod' },
   { n:104, nome:'Problemas',             rota:'/admin/problemas', nivel:'admin',    onde:'computador', perms:['@admin'],                aba:'pb' },
   { n:105, nome:'Painel da TV',          rota:'/painel',        nivel:'operacao',   onde:'TV',         perms:['painel.ver'],            area:'painel' },
   // ── 200 · Expedição ──
