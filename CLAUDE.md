@@ -2522,6 +2522,12 @@ logado"*. Linhas em `docs/DECISOES.md`.
 > `cancelada_por`/`cancelada_resolvida_por` do `lote` ficam só com o nome: o id
 > está no `cancelamento_caixa` (fase 4) e na `correcao` (a Mesa).
 
+> ✅ **AS SETE FASES ESTÃO NO AR DESDE 05/11/2026** (PRs #284 a #290): o dono
+> fez o backup, o deploy e o teste de segurança, e o grep do `portao` deu 4. A
+> spec foi para `docs/arquivo/`. ⚠️ **AINDA NÃO PROVADO:** o primeiro bipe duplo
+> recusado na bancada, um desfazer de verdade e a primeira sessão nova gravada
+> em `sessao`. Prova que não foi feita se escreve como não feita.
+
 **Rode `node teste_quem.js` (240) ao criar QUALQUER rota de escrita, mexer no
 `quem.js` ou num `require` de módulo de rotas.** Ele sobe os módulos na ordem do
 `server.js` e chama cada escrita sem login; rota nova que não passa pelo `quem.js`
