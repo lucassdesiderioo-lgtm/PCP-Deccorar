@@ -83,9 +83,6 @@
   .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
   .stat .n{font-size:28px;font-weight:800}.stat .l{font-size:12px;color:var(--muted);text-transform:uppercase}
   .stat.pend .n{color:var(--amber)}.stat.emb .n{color:var(--green)}
-  .up{border:1px solid var(--line);border-radius:12px;margin-bottom:14px;overflow:hidden}
-  .uphd{width:100%;text-align:left;background:var(--panel);color:var(--txt);border:0;padding:12px 16px;font-weight:700;font-size:14px;cursor:pointer}
-  .upbody{padding:14px 16px}
   .drop{display:block;border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;background:#fff;cursor:pointer;color:var(--muted);font-size:14px}
   .drop:hover{border-color:var(--amber)}
   .upres{margin-top:10px;font-size:13px;color:var(--muted)}.upres b{color:var(--txt)}
@@ -174,15 +171,8 @@
       <div class="card span2" id="futBox" style="display:none;border-left:4px solid #7aa3d8"></div>
     </div>
   </div>
-  <!-- Subir PDF desceu pro fim: e tarefa de quem administra, uma vez por dia,
-       e ocupava espaco nobre na tela de quem bipa cem vezes. -->
-  <div class="up" id="upBox" data-perm="pdf.subir" style="display:none;margin-top:16px">
-    <button class="uphd" id="upTgl" type="button">📄 Subir PDF do Mercado Livre (vendas do dia) ▾</button>
-    <div class="upbody" id="upBody" style="display:none">
-      <label class="drop" for="file">Clique ou solte um ou mais PDFs do Mercado Livre aqui<input type="file" id="file" accept="application/pdf" multiple style="display:none"></label>
-      <div class="upres" id="upRes"></div>
-    </div>
-  </div></div>
+  <!-- O Subir PDF saiu desta tela em 05/11/2026: o upload é só na 103 Lançar produção (D2). -->
+</div>
 <iframe id="pr"></iframe>
 <!-- antes do bloco de baixo: e dele que vem pecaTexto -->
 <script src="/sku.js"></script>
@@ -997,71 +987,7 @@ async function relogioDesp(){
 setInterval(relogioDesp,30000);
 relogioDesp();
 
-// Subir PDF do ML — mesma bancada da expedicao. Painel so aparece pra quem
-// pode subir (pdf.subir => area 'expedicao', ou admin). O upload alimenta a
-// mesma lista que esta tela imprime.
-function b64(f){ return new Promise(function(r){var fr=new FileReader();fr.onload=function(){r(fr.result);};fr.readAsDataURL(f);}); }
-function avisoQuantidade(qtd,contas){
-  /* A conferencia da quantidade (spec CONFERENCIA-DA-QUANTIDADE): caixa retida
-     porque as leituras da folha discordam, e PDF cuja conta de persianas nao
-     fecha. Os dois em vermelho: o segundo nao retem ninguem, e por isso mesmo
-     precisa gritar antes de alguem imprimir.
-     A venda da folha SEM etiqueta no PDF sai pelo numero (27/10/2026): o
-     primeiro caso real era uma venda que nunca entrou no sistema, e o aviso
-     generico mandava procurar uma caixa errada que nao existia. */
-  var e=function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
-  var caixa=function(t){ return '<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#fdecea;border:2px solid #c62828;color:#8e1b1b;font-weight:700">⚠ '+t+'</div>'; };
-  var h='';
-  if(qtd) h+=caixa(qtd+' caixa(s) retida(s) por QUANTIDADE EM DÚVIDA — a folha foi lida de jeitos diferentes e eles não bateram. Confira o pedido no Mercado Livre e libere em Admin → Pendências (pacote).');
-  (contas||[]).forEach(function(c){
-    var sem=c.semEtiqueta||[];
-    sem.forEach(function(v){
-      h+=caixa(e(c.nome)+': a venda <b>'+e(v.venda||v.packId)+'</b> ('+e(v.sku)+(v.qtd>1?', '+v.qtd+' peças':'')+') está na folha do ML e <b>sem etiqueta neste PDF</b> — ela não entrou no sistema. Confira no Mercado Livre: se não foi cancelada, falta subir o PDF com a etiqueta dela.');
-    });
-    var resto=(c.resto!=null)?c.resto:(c.folha-c.sistema);
-    if(resto) h+=caixa(e(c.nome)+': a folha do ML tem '+c.folha+' persiana(s) e o sistema gravou '+c.sistema
-      +(sem.length?' — '+(c.folha-c.sistema-resto)+' explicada(s) acima, e '+resto+' sem explicação':'')
-      +'. Alguma caixa pode estar com peça a menos (ou a mais) — confira antes de imprimir.');
-  });
-  return h;
-}
-async function upMany(fileList){
-  var files=[].slice.call(fileList).filter(function(f){ return /pdf/i.test(f.type)||/\.pdf$/i.test(f.name); });
-  if(!files.length) return;
-  var totQtd=0,contas=[],totNov=0,totRep=0,totRel=0,totSem=0,totPdf=0,totCol=0,totMod=0,ok=0;
-  for(var i=0;i<files.length;i++){
-    document.getElementById('upRes').innerHTML='Lendo '+(i+1)+' de '+files.length+': <b>'+files[i].name+'</b>…';
-    try{
-      var j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
-      if(j.erro){ continue; }
-      totNov+=j.novos||0; totRep+=j.repetidas||0; totRel+=j.religadas||0; totQtd+=j.quantidade_duvida||0; if(j.conta_pdf&&!j.conta_pdf.fecha) contas.push(Object.assign({nome:files[i].name},j.conta_pdf)); totSem+=j.sem_sku||0; totPdf+=j.total||0; totCol+=j.coleta||0; totMod+=j.modalidade_duvida||0; ok++;
-    }catch(e){}
-  }
-  // Quantas o caminhão vem buscar sai aqui, na hora: é o momento de estranhar
-  // um PDF de coleta que deu zero, ou um de agência que virou coleta inteiro.
-  // E se a etiqueta mudou de formato, o aviso é aqui — a gestão decide em Bloqueados.
-  document.getElementById('upRes').innerHTML='<b>'+ok+' PDF(s)</b> · '+totNov+' vendas adicionadas · '+totPdf+' no total · '+totRep+' repetidas · '+totSem+' sem SKU'
-    /* A venda antiga cujo PDF o cron apagou volta a reimprimir quando o PDF
-       sobe de novo — e quem subiu precisa saber que funcionou. */
-    +(totRel?' · <b>'+totRel+' antiga(s) voltaram a ter PDF</b> (já dá pra reimprimir)':'')
-    +(totCol?' · <span class="tagC" style="margin-left:0">🚚 '+totCol+' pra coleta</span>':'')
-    +(totMod?'<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#efe9fb;border:2px solid #6f42c1;color:#4b2a91;font-weight:700">⚠ '+totMod+' etiqueta(s) num formato que o sistema não conhece — retidas. Defina agência ou coleta em Admin → Pendências.</div>':'')
-    +avisoQuantidade(totQtd,contas);
-  stats(); listaPend();
-}
-(async function(){
-  try{
-    var u=await (await fetch('/api/auth/eu')).json();
-    var pode=u.logado && (u.areas||[]).some(function(a){ return a==='expedicao'||a==='admin'; });
-    if(!pode) return;
-    document.getElementById('upBox').style.display='block';
-    document.getElementById('upTgl').onclick=function(){ var b=document.getElementById('upBody'); b.style.display=(b.style.display==='none'?'block':'none'); };
-    document.getElementById('file').onchange=function(e){ upMany(e.target.files); e.target.value=''; };
-    var drop=document.querySelector('.drop');
-    ['dragover','dragenter'].forEach(function(ev){ drop.addEventListener(ev,function(e){ e.preventDefault(); }); });
-    drop.addEventListener('drop',function(e){ e.preventDefault(); upMany(e.dataTransfer.files); });
-  }catch(e){}
-})();
+// O Subir PDF saiu desta tela em 05/11/2026 (D2): o upload é só na 103 Lançar produção.
 
 </script><script src="/nav.js"></script>
 </body></html>

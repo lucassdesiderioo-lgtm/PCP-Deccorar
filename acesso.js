@@ -883,6 +883,9 @@ module.exports = function(app, db){
     /* A ENTRADA DO BLOCO 250 NO MENU (fase 6 da ACESSO-POR-TELA-E-NIVEL): a
        porta so redireciona (dev_route), e deixa de ser @logado — abre para
        quem alcanca alguma das tres telas das devolucoes. */
+    /* O endereço da antiga 203 Subir PDF só redireciona para a 103 (05/11/2026,
+       D2) — quem julga é o portão da 103. */
+    if(eq('/expedicao') || eq('/expedicao.html')) return '@logado';
     if(eq('/devolucoes')) return ['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro','devolucao.baixar'];
     // As telas que a pessoa abre (fase 5): cada um ve as proprias, so nome e endereco.
     if(eq('/api/telas/minhas')) return '@logado';
@@ -1117,6 +1120,16 @@ module.exports = function(app, db){
     if(eq('/api/contagem/componentes')) return 'contagem.contar';
     if(M !== 'GET' && pre('/api/contagem')) return 'contagem.contar';
     if(M !== 'GET' && eq('/api/config/horarios')) return 'horarios.editar';
+    /* OS HORARIOS DE SAIDA (spec HORARIOS-DE-COLETA): lancar, ler o dia, a
+       semana e a historia e de quem tem `coleta.horario`. O relogio (status) e
+       de quem trabalha na Expedicao — e de todo nivel Supervisor ou acima,
+       que ve a faixa em qualquer tela (D5). So horas e numeros de caixa. */
+    if(eq('/api/saidas/status')) return ['coleta.horario','etiqueta.emitir','carregamento.executar','pdf.subir','@supervisor'];
+    /* Ver os horários do dia é também de quem sobe o PDF — é no upload que ele
+       escolhe a saída; corrigir horário, a semana e a história ficam com
+       `coleta.horario`, que é de Supervisor e Admin (AJUSTE de 05/11/2026). */
+    if(M === 'GET' && eq('/api/saidas/dia')) return ['coleta.horario','pdf.subir'];
+    if(pre('/api/saidas')) return 'coleta.horario';
     /* `pre` e nao `eq`: o conteudo da etiqueta (/api/config/kit/etiqueta, spec
        GERADOR-ETIQUETA-KIT) e a mesma pergunta do mesmo card — o que a
        Embalagem bipa e o que vai impresso nela. Com `eq` a rota nova cairia no
@@ -1515,6 +1528,9 @@ module.exports = function(app, db){
     const passa = (c) => c === '@logado' ? true
                        : c === '@admin'  ? ehNivelAdmin(u.id, perms)
                        : c === '@ag'     ? false
+                       /* '@supervisor' = o NIVEL da pessoa e Supervisor ou acima
+                          (HORARIOS-DE-COLETA, D5: o relogio da coleta). */
+                       : c === '@supervisor' ? (() => { const nv = nivelDaPessoa(u.id); return !!nv && ORDEM_NIVEL[nv] >= ORDEM_NIVEL.supervisor; })()
                        : perms.has(c);
     /* A TELA TEM NIVEL (fase 4/5 da ACESSO-POR-TELA-E-NIVEL, R-NIV-01): alem
        da permissao, a pessoa tem que ser do nivel da tela ou acima. Sem isso

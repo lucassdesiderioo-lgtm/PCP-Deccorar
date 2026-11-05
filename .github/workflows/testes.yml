@@ -198,6 +198,7 @@ jobs:
                       /admin/producao /admin/problemas /admin/pendencias /admin/correcoes \
                       /admin/devolucoes /admin/estoque /admin/contagem /admin/skus \
                       /admin/sku-incompleto /admin/ficha /admin/compras /admin/cadastros /admin/teste \
+                      /coleta-horarios \
                       /sobmedida /sobmedida/corte /sobmedida/cadastros \
                       /sobmedida/telas/corte.html; do
             confere "$tela" 302

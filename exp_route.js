@@ -23,7 +23,7 @@ module.exports=function(app,db){
      tambem. */
   app = QUEM.portao(app);
 
-  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT, impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, no_carro_em TEXT, no_carro_por TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT, cancelada_em TEXT, cancelada_origem TEXT, cancelada_estagio TEXT, cancelada_motivo TEXT, cancelada_varias INTEGER DEFAULT 0, cancelada_aviso_em TEXT, cancelada_resolvida_em TEXT, cancelada_resolvida_por TEXT, cancelada_voltou INTEGER, cancelada_por TEXT, baixado_em TEXT, impresso_por_id INTEGER, conferido_por_id INTEGER, no_carro_por_id INTEGER, resolvido_por_id INTEGER);");
+  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT, impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, no_carro_em TEXT, no_carro_por TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT, cancelada_em TEXT, cancelada_origem TEXT, cancelada_estagio TEXT, cancelada_motivo TEXT, cancelada_varias INTEGER DEFAULT 0, cancelada_aviso_em TEXT, cancelada_resolvida_em TEXT, cancelada_resolvida_por TEXT, cancelada_voltou INTEGER, cancelada_por TEXT, baixado_em TEXT, impresso_por_id INTEGER, conferido_por_id INTEGER, no_carro_por_id INTEGER, resolvido_por_id INTEGER, horario_id INTEGER);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
   // sao so historia: quantas vezes o volume voltou pra impressora e quando foi a
   // ultima. O ALTER mora aqui, no dono da tabela (§17 do CLAUDE.md), com a
@@ -119,6 +119,11 @@ module.exports=function(app,db){
      cancela e uma pessoa da expedicao, e nao o relatorio do ML, o nome dela
      fica aqui — o relatorio nunca tem nome, e a marcacao a mao tem que ter. */
   try{ db.exec("ALTER TABLE lote ADD COLUMN cancelada_por TEXT"); }catch(e){}
+  /* A SAIDA DO PDF (spec HORARIOS-DE-COLETA, D4, 05/11/2026): a coleta (ou a
+     agencia) que quem subiu o PDF disse ser a destas vendas. Aponta para
+     `saida_horario`; vazia e "sem coleta marcada". No fim e por ALTER (§17). */
+  try{ db.exec("ALTER TABLE lote ADD COLUMN horario_id INTEGER"); }catch(e){}
+  const SAIDAS=require('./coleta_horario'); SAIDAS.garantirSchema(db);
   /* A BAIXA NA CONFERENCIA (spec CONFERENCIA-E-BAIXA, fase 2-A, 22/10/2026):
      `baixado_em` diz se a caixa ja saiu do estoque. A coluna e a VIRADA (que
      marca como baixado o que foi impresso antes do deploy) moram no
@@ -212,6 +217,18 @@ module.exports=function(app,db){
     try{
       const b64=((req.body&&req.body.pdf)||'').replace(/^data:[^,]*,/,'');
       if(!b64) return res.status(400).json({erro:'sem pdf'});
+      /* PARA QUAL SAIDA SAO ESTAS VENDAS (spec HORARIOS-DE-COLETA, D4). Quem
+         escolhe e quem SOBE O PDF (esta rota ja pede pdf.subir) — corrigir o
+         horario e que e de Supervisor e Admin (AJUSTE de 05/11/2026). Saida que
+         nao existe ou nao e de hoje e RECUSADA antes de ler o PDF — nada
+         gravado. Sem escolha, passa (D1). */
+      let saida=null;
+      const pedida=req.body&&req.body.saida;
+      if(pedida!=null && pedida!==''){
+        try{ saida=SAIDAS.saidaDeHoje(db,pedida); }catch(e){ return res.status(e.status||400).json({erro:e.message, motivo:'saida'}); }
+      }
+      const marca={marcadas:0,outro_dia:0,outra_modalidade:0};
+      const marcar=saida?db.prepare('UPDATE lote SET horario_id=? WHERE id=?'):null;
       const buf=Buffer.from(b64,'base64');
       const orders=await parsePdf(new Uint8Array(buf));
       const fname=require('path').join(LOTES,Date.now()+'.pdf'); fs.writeFileSync(fname,buf);
@@ -372,6 +389,10 @@ module.exports=function(app,db){
         if(o.modalidade==='coleta') coleta++;
         const modGravada=(o.modalidade==='agencia'||o.modalidade==='coleta')?o.modalidade:null;
         const r=ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null,o.despacharEm||null,modGravada); novos++;
+        if(saida){
+          const m=SAIDAS.motivoSemMarca(saida,{despacharEm:o.despacharEm||null, modalidade:modGravada});
+          if(m) marca[m]++; else { marcar.run(saida.id, r.lastInsertRowid); marca.marcadas++; }
+        }
         /* AS PECAS DA CAIXA SAO GRAVADAS MESMO COM O VOLUME RETIDO — ou melhor,
            JUSTAMENTE por ele estar retido: e esta lista que a gestao vai ler na
            tela pra assinar os SKUs. `origem='folha'` marca que quem disse isso
@@ -407,6 +428,8 @@ module.exports=function(app,db){
                 conta_aberta_nova:ca,
                 sem_sku:semsku,bloqueados:bloq,divergencias:divs,coleta,modalidade_duvida:modal,
                 pacotes, folha_nao_fecha:naoFecha, varias_pecas:variasPecas,
+                saida: saida ? Object.assign({id:saida.id, tipo:saida.tipo, rotulo:SAIDAS.rotulo(saida)}, marca)
+                     : {sem_saida:true},
                 desconhecidos:Object.keys(desconhecidos).map(k=>({sku:k,qtd:desconhecidos[k]}))});
     }catch(e){ console.error(e); res.status(500).json({erro:String(e.message||e)}); }
   });

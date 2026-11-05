@@ -463,7 +463,7 @@ eq('mas .html NAO e arquivo de apoio — herda a tela', AC.permDaRota('/operador
 console.log('\n── 13. a gemea .html vale o mesmo que a tela ──');
 const GEMEAS = [['/operador','revisao.executar'],['/montagem','embalagem.executar'],
   ['/embalagem','etiqueta.emitir'],['/carregamento','carregamento.executar'],
-  ['/expedicao','pdf.subir'],['/devolucao','devolucao.registrar'],
+  ['/devolucao','devolucao.registrar'],
   ['/painel','painel.ver'],['/relatorios','relatorios.ver'],
   ['/planejamento','planilha.importar'],['/recebimento','pedido.receber']];
 let gemeasOk = 0;
@@ -471,7 +471,7 @@ for(const [rota,chave] of GEMEAS){
   if(AC.permDaRota(rota,'GET') === chave && AC.permDaRota(rota+'.html','GET') === chave) gemeasOk++;
   else console.log('       ' + rota + ': rota=' + AC.permDaRota(rota,'GET') + ' gemea=' + AC.permDaRota(rota+'.html','GET'));
 }
-eq('as 10 telas e as 10 gemeas pedem a MESMA chave', gemeasOk, GEMEAS.length);
+eq('as 9 telas e as 9 gemeas pedem a MESMA chave (a 203 /expedicao saiu em 05/11/2026)', gemeasOk, GEMEAS.length);
 eq('/index.html continua sendo o admin', AC.permDaRota('/index.html','GET'), '@admin');
 eq('a escolha de setor e de qualquer sessao', AC.permDaRota('/setor','GET'), '@logado');
 eq('e a gemea dela tambem', AC.permDaRota('/setor.html','GET'), '@logado');

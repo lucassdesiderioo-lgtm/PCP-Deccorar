@@ -45,8 +45,11 @@ const abaixo = M.TELAS.filter(t => {
   return niv.length && Math.min.apply(null, niv) > M.ordemNivel(t.nivel);
 }).map(t => t.n);
 ok('o nível da tela nunca é menor que a permissão mais baixa que a abre', !abaixo.length, abaixo.join(','));
-ok('as telas 101 a 904 da spec estão todas no mapa',
-  [101,102,103,104,105,201,202,203,204,205,251,252,253,301,302,303,401,402,403,404,501,502,901,902,903,904].every(x => M.porNumero(x)));
+ok('as telas 101 a 904 da spec estão todas no mapa (a 203 saiu em 05/11/2026)',
+  [101,102,103,104,105,201,202,204,205,251,252,253,301,302,303,401,402,403,404,501,502,901,902,903,904].every(x => M.porNumero(x)));
+ok('a 203 Subir PDF saiu, e o número ficou vago (D2, 05/11/2026)', !M.porNumero(203) && !M.porRota('/expedicao'));
+ok('subir o PDF é só na 103: ela abre com pdf.subir e é de nível Operação',
+  M.porNumero(103).perms.indexOf('pdf.subir') >= 0 && M.porNumero(103).nivel === 'operacao');
 
 console.log('\n── 2. tela fora do mapa reprova ──');
 const FORA = { 'login':'o login', 'setor':'a escolha de operação', 'index':'o Admin antigo — cada aba é uma linha com `aba`', 'admin_porta':'a porta do Admin, que só redireciona' };
@@ -102,6 +105,9 @@ for(const p of B.pessoas){
   const agora = P.retrato(B, p), era = antes[p.nome] || {};
   const d = P.comparar(era, agora);
   ok(p.nome + ': abre as mesmas telas, com as mesmas permissões e o mesmo destino', d === '', d);
+  /* quem abria a 203 (subia o PDF) continua alcançando um lugar de upload: a 103 */
+  if((era.abre || []).indexOf('/expedicao') >= 0)
+    ok(p.nome + ': abria a 203, e agora abre a 103 (onde se sobe o PDF)', B.AC.decidir(Object.assign(B.db.prepare('SELECT * FROM usuarios WHERE id=?').get(p.id), { areas:[] }), '/admin/producao', 'GET').ok);
 }
 B.fechar();
 

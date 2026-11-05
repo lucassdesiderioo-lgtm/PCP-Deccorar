@@ -91,7 +91,9 @@ require('./revisao_route')(app, db);   // e o GET /api/revisao/hoje, que saiu da
 app.get('/operador',(req,res)=> res.sendFile(path.join(__dirname,'public','operador.html')));
 require('./painel_route')(app, db);
 require('./exp_route')(app, db);
-app.get('/expedicao',(req,res)=>res.sendFile(require('path').join(__dirname,'public','expedicao.html')));
+/* A 203 Subir PDF SAIU (05/11/2026, D2): o upload é só na 103. O endereço antigo
+   (favorito, ícone de tablet) leva à 103, que o portão julga. */
+app.get(['/expedicao','/expedicao.html'],(req,res)=>res.redirect('/admin/producao'));
 require('./mont_route')(app, db);
 app.get('/montagem',(req,res)=>res.sendFile(require('path').join(__dirname,'public','montagem.html')));
 app.get('/painel',(req,res)=>res.sendFile(path.join(__dirname,'public','painel.html')));
@@ -152,6 +154,9 @@ require('./receb_route')(app, db);
 app.get('/recebimento',(req,res)=>res.sendFile(path.join(__dirname,'public','recebimento.html')));
 require('./ger_route')(app, db);
 require('./st_route')(app, db);
+/* Os horarios de saida do dia e a tela 206 (spec HORARIOS-DE-COLETA, 05/11/2026). */
+require('./coleta_horario_route')(app, db);
+app.get('/coleta-horarios',(req,res)=> res.sendFile(path.join(__dirname,'public','coleta-horarios.html')));
 // A central de pendencias (fase 1): so le, e pergunta a funcao de cada tela
 // dona — por isso depois de todas elas.
 require('./pendencias_route')(app, db);

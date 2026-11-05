@@ -76,6 +76,9 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
 (function(){
   fetch('/api/planejamento/status').then(function(r){return r.json();}).then(function(s){
     var el=document.getElementById('mlTask'); if(!el) return;
+    /* sem permissão (quem só sobe PDF na 103, desde 05/11/2026): a tarefa da
+       planilha não é dela, e o 403 não vira "nenhuma planilha importada" */
+    if(!s || s.erro) return;
     var d=s.dias, per=s.periodo_dias||30, cls, txt;
     if(d==null){ cls='late';
       txt='📋 <b>Tarefa semanal do Mercado Livre:</b> nenhuma planilha importada ainda — exporte o relatório de vendas dos últimos '+per+' dias e suba em Planejamento.'; }
@@ -109,6 +112,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
 <div id="boxUp" style="display:none;margin-bottom:16px">
   <div id="upTit" style="cursor:pointer;background:#161b22;border:1px solid #262d37;border-radius:12px;padding:12px 16px;font-weight:700;font-size:14px">Subir PDFs do Mercado Livre</div>
   <div id="upCorpo" style="display:none;background:#161b22;border:1px solid #262d37;border-top:0;border-radius:0 0 12px 12px;padding:16px">
+    <div id="saidaQuadro" style="display:none;margin-bottom:12px;padding:10px 12px;border:1px solid #262d37;border-radius:10px"></div>
     <div id="drop" style="border:2px dashed #3a4351;border-radius:12px;padding:26px;text-align:center;cursor:pointer;color:#8b97a5">Clique ou solte os PDFs aqui
       <input type="file" id="file" accept="application/pdf" multiple style="display:none"></div>
     <div id="res" style="margin-top:12px;font-size:14px"></div>
@@ -116,12 +120,15 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
   </div>
 </div>
 
-    <div class="card"><div style="font-weight:700;margin-bottom:10px">Selecione os SKUs e as quantidades a produzir</div>
+    <!-- Desde 05/11/2026 a 103 abre também para quem só sobe o PDF (pdf.subir,
+         nível Operação): os dois cards de lançar produção são de quem tem
+         producao.lancar, e somem para os outros (data-perm, só esconde). -->
+    <div class="card" data-perm="producao.lancar"><div style="font-weight:700;margin-bottom:10px">Selecione os SKUs e as quantidades a produzir</div>
       <div id="sellist"></div>
       <div class="row-actions"><button class="primary" data-perm="producao.lancar" onclick="lancar()">Lançar para produção</button>
         <button class="ghost" onclick="limparSel()">Limpar quantidades</button><span class="msg" id="msgProd"></span></div>
     </div>
-    <div class="card"><div style="font-weight:700;margin-bottom:10px">Lançamentos de hoje</div>
+    <div class="card" data-perm="producao.lancar"><div style="font-weight:700;margin-bottom:10px">Lançamentos de hoje</div>
       <table><thead><tr><th>SKU</th><th>Pedido</th><th>Produzido</th><th>Estoque</th><th>Situação</th></tr></thead><tbody id="hoje"></tbody></table></div>
   </div>
 
@@ -466,6 +473,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
 <script src="/barras.js"></script>
 <script src="/qr.js"></script>
 <script src="/kit_etiqueta.js"></script>
+<script src="/saida_upload.js"></script>
 <script>
 let SKUS=[];
 const $=s=>document.querySelector(s);
@@ -696,6 +704,7 @@ async function carregarPend(){
   let d;
   try{ d=await (await fetch('/api/skus/pendencias')).json(); }
   catch(e){ box.innerHTML='<div class="card">Não consegui carregar as pendências.</div>'; return; }
+  if(!d || !d.medida) return;   // sem permissão (a 103 abre para quem só sobe PDF): a aba não é dela
 
   const cor=n=>n?'var(--amber)':'var(--green)';
   res.innerHTML=
@@ -2005,6 +2014,7 @@ async function lancar(){
 }
 async function carregarHoje(){
   const p=await (await fetch('/api/producao')).json();
+  if(!Array.isArray(p)) return;   // sem permissão (quem só sobe PDF na 103): nada a desenhar
   $('#hoje').innerHTML = p.map(r=>{ const est=r.estoque??0, cobre=est>=r.qtd;
     const sit = cobre ? `<span class="ok">✔ tem em estoque (${est})</span>` : `<span class="baixo">produzir ${r.qtd-est}</span>`;
     return `<tr><td class="code">${r.codigo}</td><td>${r.qtd}</td><td>${r.produzido}/${r.qtd}</td><td>${est}</td><td>${sit}</td></tr>`;
@@ -2790,7 +2800,7 @@ if(naTela('blq')){ setInterval(carregarBloq,30000); carregarBloq(); }
 fetch('/api/auth/eu').then(function(r){return r.json();}).then(function(u){
   if(!u.logado) return;
   var pode = u.areas.indexOf('expedicao')>=0 || u.areas.indexOf('admin')>=0;
-  if(pode) document.getElementById('boxUp').style.display='block';
+  if(pode){ document.getElementById('boxUp').style.display='block'; saidaUpload.montar(document.getElementById('saidaQuadro')); }
 });
 document.getElementById('upTit').onclick=function(){
   var c=document.getElementById('upCorpo');
@@ -2826,19 +2836,23 @@ function avisoQuantidade(qtd,contas){
 async function upMany(fl){
   var files=[].slice.call(fl).filter(function(f){ return /pdf/i.test(f.type)||/\.pdf$/i.test(f.name); });
   if(!files.length) return;
+  /* a saida das vendas (HORARIOS-DE-COLETA, D4) */
+  var saida=null;
+  try{ saida=await saidaUpload.escolha(); }catch(e){ document.getElementById('res').innerHTML='<b style="color:#ff6b6b">'+e.message+'</b>'; return; }
   var nov=0,rep=0,rel=0,bloq=0,ok=0,totQtd=0,contas=[];
   for(var i=0;i<files.length;i++){
     document.getElementById('res').innerHTML='Lendo '+(i+1)+' de '+files.length+'...';
     try{
-      var j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i])})})).json();
-      if(j.erro) continue;
+      var j=await (await fetch('/api/lote/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf:await b64(files[i]), saida:saida})})).json();
+      if(j.erro){ if(j.motivo==='saida'){ document.getElementById('res').innerHTML='<b style="color:#ff6b6b">'+j.erro+'</b>'; return; } continue; }
+      saidaUpload.somar(j);
       nov+=j.novos; rep+=j.repetidas; rel+=(j.religadas||0); bloq+=(j.bloqueados||0); totQtd+=j.quantidade_duvida||0; if(j.conta_pdf&&!j.conta_pdf.fecha) contas.push(Object.assign({nome:files[i].name},j.conta_pdf)); ok++;
     }catch(e){}
   }
   var msg='<b>'+ok+' PDF(s)</b> - '+nov+' vendas novas, '+rep+' repetidas';
   if(rel>0) msg+=', '+rel+' antiga(s) voltaram a ter PDF (já dá pra reimprimir)';
   if(bloq>0) msg+=', <b style="color:#ff6b6b">'+bloq+' BLOQUEADAS</b> (SKU fora do cadastro)';
-  document.getElementById('res').innerHTML=msg+avisoQuantidade(totQtd,contas);
+  document.getElementById('res').innerHTML=msg+avisoQuantidade(totQtd,contas)+saidaUpload.texto();
   verCruz();
 }
 async function verCruz(){

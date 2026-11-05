@@ -41,15 +41,20 @@ const TELAS = [
   // ── 100 · Produção ──
   { n:101, nome:'Revisão',               rota:'/operador',      nivel:'operacao',   onde:'tablet',     perms:['revisao.executar'],      area:'operador' },
   { n:102, nome:'Embalagem',             rota:'/montagem',      nivel:'operacao',   onde:'tablet',     perms:['embalagem.executar'],    area:'montagem' },
-  { n:103, nome:'Lançar produção',       rota:'/admin/producao', nivel:'admin',     onde:'computador', perms:['producao.lancar'],       aba:'prod' },
+  /* A 103 é o LUGAR ÚNICO de subir o PDF desde 05/11/2026 (decisão do dono,
+     D1 (a) e D2): abre com `pdf.subir` também, e por isso é de nível Operação;
+     herdou da 203 a área de chegada `expedicao`. A lista "Lançar para produção"
+     continua escondida de quem não tem `producao.lancar` (data-perm). */
+  { n:103, nome:'Lançar produção',       rota:'/admin/producao', nivel:'operacao',  onde:'computador', perms:['producao.lancar','pdf.subir'], area:'expedicao', aba:'prod' },
   { n:104, nome:'Problemas',             rota:'/admin/problemas', nivel:'admin',    onde:'computador', perms:['@admin'],                aba:'pb' },
   { n:105, nome:'Painel da TV',          rota:'/painel',        nivel:'operacao',   onde:'TV',         perms:['painel.ver'],            area:'painel' },
   // ── 200 · Expedição ──
   { n:201, nome:'Etiqueta de Venda',     rota:'/embalagem',     nivel:'operacao',   onde:'tablet',     perms:['etiqueta.emitir'],       area:'embalagem' },
   { n:202, nome:'Conferência',           rota:'/carregamento',  nivel:'operacao',   onde:'tablet',     perms:['carregamento.executar'], area:'carregamento' },
-  { n:203, nome:'Subir PDF',             rota:'/expedicao',     nivel:'operacao',   onde:'tablet',     perms:['pdf.subir'],             area:'expedicao' },
+  // 203 Subir PDF (/expedicao) SAIU em 05/11/2026: o upload é só na 103 (D2). O número fica vago.
   { n:204, nome:'Pendências',            rota:'/admin/pendencias', nivel:'admin',   onde:'computador', perms:['@admin'],                aba:'blq' },
   { n:205, nome:'Correções',             rota:'/admin/correcoes', nivel:'admin',    onde:'computador', perms:['correcao.executar'],     aba:'cor' },
+  { n:206, nome:'Horários de coleta',    rota:'/coleta-horarios', nivel:'supervisor', onde:'computador', perms:['coleta.horario'] },   // Operação não edita horário (05/11/2026)
   // ── 250 · Devoluções (bloco dentro da Expedição; a porta é /devolucoes) ──
   { n:251, nome:'Devoluções — receber',  rota:'/devolucao',     nivel:'operacao',   onde:'tablet',     perms:['devolucao.registrar'],   area:'devolucao' },
   { n:252, nome:'Devoluções — em andamento', rota:'/devolucao-casos', nivel:'supervisor', onde:'computador',
@@ -82,7 +87,7 @@ const TELAS = [
    alcança decide. É a ordem que existia no `PADRAO`, e mudá-la mudaria para
    onde cada pessoa vai de manhã — por isso ela é uma lista própria, e não a
    ordem do mapa. O Admin (a porta '/admin') vem primeiro, como sempre. */
-const CHEGADA = [105, 101, 102, 201, 202, 203, 904, 401, 502, 303, 251, 252];
+const CHEGADA = [105, 101, 102, 201, 202, 103, 904, 401, 502, 303, 251, 252];   // a 103 no lugar da 203 (05/11/2026)
 
 const NIVEIS = ['operacao', 'supervisor', 'admin', 'admin_geral'];
 const NOME_NIVEL = { operacao:'Operação', supervisor:'Supervisor', admin:'Admin', admin_geral:'Admin Geral' };

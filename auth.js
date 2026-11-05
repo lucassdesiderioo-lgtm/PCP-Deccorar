@@ -57,11 +57,14 @@ const TELAS={
   '/devolucao':'devolucao','/devolucao.html':'devolucao',
   '/montagem':'montagem','/montagem.html':'montagem',
   '/embalagem':'embalagem','/embalagem.html':'embalagem',
+  /* /expedicao (a antiga 203) só redireciona para a 103 desde 05/11/2026; fica na
+     lista para quem não tem sessão ir ao login, e não cair no static. */
   '/expedicao':'expedicao','/expedicao.html':'expedicao',
   '/carregamento':'carregamento','/carregamento.html':'carregamento',
   '/recebimento':'recebimento','/recebimento.html':'recebimento',
   '/inventario':'inventario','/inventario.html':'inventario',
   '/devolucao-casos':'devolucao_casos','/devolucao-casos.html':'devolucao_casos',
+  '/coleta-horarios':'coleta_horarios','/coleta-horarios.html':'coleta_horarios',
   /* A escolha de setor. O '*' quer dizer QUALQUER SESSAO: nao ha area para
      escolher onde trabalhar. Ela precisa estar nesta lista de todo jeito —
      fora dela, o pedido cairia no next() e o express.static entregaria o

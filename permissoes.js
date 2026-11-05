@@ -20,7 +20,7 @@ module.exports = [
     rotulo:'Embalar peças',       desc:'Bipar SKU, kit e finalizar' },
 
   // ─── EXPEDIÇÃO ──────────────────────────────────────────────
-  { chave:'pdf.subir',            grupo:'Expedição',  tela:203, nivel:'operacao',
+  { chave:'pdf.subir',            grupo:'Expedição',  tela:103, nivel:'operacao',
     rotulo:'Lançar NF de venda',  desc:'Subir o PDF do Mercado Livre' },
   { chave:'etiqueta.emitir',      grupo:'Expedição',  tela:201, nivel:'operacao',
     rotulo:'Emitir NF de venda',  desc:'Imprimir etiqueta e dar baixa no estoque' },
@@ -289,6 +289,16 @@ module.exports = [
      fazia aquilo — aqui ninguem fazia, porque a impressao nao existia. */
   { chave:'kit.imprimir',         grupo:'Configuração', tela:902, nivel:'supervisor',
     rotulo:'Imprimir etiqueta do kit', desc:'Gerar o PDF do rolo de etiquetas' },
+  /* Os horários de saída do dia (spec HORARIOS-DE-COLETA, 05/11/2026): as
+     coletas do caminhão do ML e a agência, lançados por DATA, e a saída que o
+     PDF diz ser a das vendas. Nasce só para o Admin Geral (R-ALC-06): quem
+     recebe é decisão do dono, na tela de Acessos. Não é sensível — não mexe
+     em estoque, dinheiro, acesso nem dado de pessoa. */
+  /* Desde o AJUSTE de 05/11/2026 (decisão do dono): quem é Operação VÊ os
+     horários e escolhe a saída do PDF (pela permissão de subir o PDF), mas
+     não corrige horário — esta chave é de Supervisor e Admin. */
+  { chave:'coleta.horario',       grupo:'Expedição',    tela:206, nivel:'supervisor',
+    rotulo:'Lançar horários de coleta', desc:'As coletas e a agência do dia, e a saída do PDF' },
   { chave:'horarios.editar',      grupo:'Configuração', tela:902, nivel:'admin',
     rotulo:'Editar horários',     desc:'Corte e despacho por dia',
     sensivel:true },
