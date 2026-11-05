@@ -379,7 +379,7 @@
 - **Por quê:** a contagem antiga de peça não tinha conferência cega nem segunda pessoa.
 - **Exceções:** a fila antiga de peça pendente no deploy sai pela tela antiga.
 - **Teste que trava:** `teste_contagem.js`.
-- **Status:** no ar desde 26/09/2026.
+- **Status:** no ar desde 26/09/2026. Desde 05/11/2026 (fase 5 da `QUEM-FEZ-E-REVISAO`) a contagem de material grava quem contou e quem aprovou pelo id (`contagem.usuario_id`, `contagem_pendente.contado_por_id` e `aprovado_por_id`, ao lado dos nomes), e toda escrita da aba Contagem e do Inventário é 401 sem login (`teste_quem_devolucao_contagem.js`).
 
 ### R-EST-22 · A idade da conferência
 - **Regra:** `inventario_dominio.conferencias()` é o único que responde. Vale a data da **1ª contagem** de item confirmado ou aprovado, junto com a história anterior (`contagem` e `contagem_pendente` aprovada), cada fonte por si. Contagem de material e de modo teste não contam. Acima de 30 dias fica âmbar; nunca conferido tem chip.

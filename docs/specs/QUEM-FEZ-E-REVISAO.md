@@ -1,6 +1,21 @@
-> **STATUS · 05/11/2026 — EM CONSTRUÇÃO · fases 1 a 3 no ar · fase 4 em código, falta subir**
+> **STATUS · 05/11/2026 — EM CONSTRUÇÃO · fases 1 a 4 no ar · fases 5 a 7 em código, sobem juntas**
 > - Desenhado no Projeto do Claude com o Lucas em 04/11/2026.
-> - **Fase 4 (Carregamento e saídas) em código em 05/11/2026**: toda escrita da
+> - **As fases 5, 6 e 7 foram feitas de uma vez, num PR só, com um deploy no fim**
+>   (decisão do dono, 05/11/2026: *"concluir todas as fases e testes e por último
+>   subimos ao sistema de uma única vez"*). Um commit por fase.
+> - **Fase 5 (Devolução e Inventário/contagem) em código em 05/11/2026**: Receber
+>   peça (`/devolucao`), ligar ao caso, a baixa, as 24 escritas das devoluções em
+>   andamento, as 7 da contagem de material e as 11 do Inventário passam pelo
+>   `quem.js` — 401 sem login. Colunas do id: `devolucao.revisado_por_id` e
+>   `revisado_por` (quem recebeu a peça), `devolucao_caso.criado_por_id` e
+>   `encerrado_por_id`, `devolucao_coleta.usuario_id`, `devolucao_anexo.usuario_id`,
+>   `contagem.usuario_id`/`usuario_nome`, `contagem_pendente.contado_por_id` e
+>   `aprovado_por_id`. **Todo evento do caso grava o `usuario_id`** (até ali só o
+>   clique de etapa). As tabelas do Inventário já tinham o id: lá só a porta mudou.
+>   `teste_quem_devolucao_contagem.js` (84). Divergência: a baixa sem sessão
+>   gravava com quem deu vazio, e o `teste_devolucao.js` esperava isso — passa a
+>   esperar 401, que é a regra-mãe (§2.3).
+> - **Fase 4 (Carregamento e saídas) no ar desde 05/11/2026** (PR #289). Em código em 05/11/2026: toda escrita da
 >   Conferência (`carreg_route`), da saída do caminhão e da viagem (`saida_route`) passa
 >   pelo `quem.js` — 401 sem login (até ali gravava com a pessoa vazia). Colunas do id:
 >   `lote.conferido_por_id`, `lote.no_carro_por_id`, `saida.aberta_por_id`,
