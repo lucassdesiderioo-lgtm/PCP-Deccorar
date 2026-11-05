@@ -101,11 +101,11 @@ Etiqueta de Venda ────┤
 ## Quem fez: a dupla conferência
 
 ### R-QUEM-01 · `impresso_por` é a PRIMEIRA impressão, e a reimpressão não o toca
-- **Regra:** o `POST /api/embalar` grava quem imprimiu (o bipe 1). O `POST /api/reimprimir` não mexe no campo. Sem ninguém logado, ele fica **vazio**.
-- **Por quê:** papel repetido não é outra contagem (armadilha #1-B pela porta do nome). Se a reimpressão sobrescrevesse, a caixa diria que foi impressa por quem só destravou a impressora.
-- **Exceções:** nenhuma.
-- **Teste que trava:** `teste_saida.js`.
-- **Status:** no ar desde 26/09/2026.
+- **Regra:** o `POST /api/embalar` grava quem imprimiu (o bipe 1): o nome em `impresso_por` e, desde 05/11/2026, o id em `impresso_por_id`, pelo `quem.js`. O `POST /api/reimprimir` não mexe em nenhum dos dois: **cada reimpressão** vira uma linha em `lote_reimpressao` (quem e quando), e o contador `reimpressoes` anda junto. **Sem ninguém logado, imprimir, reimprimir e bipar a persiana da caixa de várias são recusados (401)** e nada é gravado — até 05/11/2026 a impressão passava com o nome vazio. O bipe de cada persiana grava `lote_item.conferido_por_id` ao lado do nome, e a recusa "sem estoque" grava `recusa_estoque.usuario_id`.
+- **Por quê:** papel repetido não é outra contagem (armadilha #1-B pela porta do nome). Se a reimpressão sobrescrevesse, a caixa diria que foi impressa por quem só destravou a impressora. E uma coluna "último que reimprimiu" apagaria quem reimprimiu antes: por isso a tabela.
+- **Exceções:** a trava "quem imprimiu não confere" (R-SEG-01) ainda compara pelo **nome**; passa a comparar pelo id na fase 4 da `QUEM-FEZ-E-REVISAO`.
+- **Teste que trava:** `teste_saida.js` (reimpressão, 401, `lote_reimpressao` em `TABELAS`) · `teste_etiqueta.js` (seção "quem fez").
+- **Status:** no ar desde 26/09/2026; o id, a tabela e o 401 em código em 05/11/2026 (fase 3 da `QUEM-FEZ-E-REVISAO`).
 
 ### R-QUEM-02 · O bipe do Carregamento grava quem conferiu
 - **Regra:** o bipe da área (agência) e o do canto (coleta) gravam `conferido_por` e `conferido_em` — o bipe 2.
