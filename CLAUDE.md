@@ -1527,6 +1527,13 @@ Spec `docs/specs/HORARIOS-DE-COLETA.md` (fases 1 e 2), linha em
 > conferência. As horas de `conferido_em`/`mudou_em` são do relógio do banco.
 >
 > ⚠️ **"SEM COLETA" TEM MOTIVO** (R-HCO-16): feriado com o nome, ou outro.
+>
+> ✅ **AS TRÊS FASES ESTÃO NO AR DESDE 05/11/2026** (PRs #292 e #293): o dono
+> fez o backup, o deploy e o teste de segurança e disse *"deu tudo certo no
+> deploy"*. ⚠️ **AINDA NÃO PROVADO COM DADO REAL:** o primeiro PDF subido com a
+> saída e a faixa contando as caixas, a primeira segunda com a semana copiada e
+> a tarefa, o primeiro "Está certo" na bancada e o primeiro "Mudou" virando
+> aviso. Prova que não foi feita se escreve como não feita.
 
 **Rode `node teste_horario_coleta.js` ao mexer no `coleta_horario.js`, na rota,
 no upload (a saída), no `st_route.js` ou na faixa.**

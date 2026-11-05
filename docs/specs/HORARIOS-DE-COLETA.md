@@ -1,6 +1,6 @@
 # HORÁRIOS DE COLETA — a hora do caminhão do ML dentro do PCP
 
-> **STATUS · 05/11/2026 — fases 1 e 2 MESCLADAS (PR #292), falta o deploy · fase 3 EM CÓDIGO, falta subir**
+> **STATUS · 05/11/2026 — fases 1, 2 e 3 NO AR (PRs #292 e #293; o dono: "deu tudo certo no deploy") · falta a prova com dado real**
 > - **Fase 3 aprovada e em código em 05/11/2026 (§12):** a semana copiada como
 >   rascunho e a tarefa de segunda, a conferência no primeiro upload do dia e o
 >   feriado com nome. Respostas do dono: D1 sobe e avisa · D2 só no primeiro ·
