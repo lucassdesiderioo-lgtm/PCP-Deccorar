@@ -5,8 +5,8 @@ STATUS
 Situação: em construção
 Criada em: 06/11/2026
 Última atualização: 06/11/2026
-Fase atual: 2 em código (06/11/2026) — falta subir
-Fases: 1 ☑ (em código)  2 ☑ (em código)  3 ☐
+Fase atual: as 3 em código (06/11/2026) — falta o deploy e a prova na tela
+Fases: 1 ☑  2 ☑  3 ☑ (em código, não no ar)
 Risco: 🔴 (schema, dinheiro, toca no caso de devolução que está no ar)
 Depende de: DEVOLUCOES-ACOMPANHAMENTO (no ar) · QUEM-FEZ-E-REVISAO (no ar, arquivada)
 Mudanças no caminho (decisões do dono no plano, 06/11/2026, e o que diverge do texto):
@@ -30,6 +30,12 @@ Mudanças no caminho (decisões do dono no plano, 06/11/2026, e o que diverge do
     trocado" sem o número); o frete é de quem lança ou acompanha; ML AVISADO
     é o `aviso-ml` de sempre, com o anexo `print_ml`; os prints são só do
     envio, e o envio não aceita documento da coleta nem foto do comprador.
+  · Fase 3: o rastro vai no `GET` do caso (`rastro`, só no envio), sem rota
+    nova; o relatório ganha `envio` (casos, reputação sim/não/sem resposta,
+    confirmados, sem confirmação, abertos), a coluna `envio` por motivo e,
+    só com `devolucao.dinheiro`, `dinheiro.frete_envio`. O Desempenho conta o
+    envio: prazo do ML cumprido encerrando, "sair até" cumprido enviando.
+  · Regras que parecem bug: `CLAUDE.md` §9-B, bloco "O TERCEIRO TIPO".
   · No WhatsApp, "Comprador avisado" leva sozinho a "Aguardando confirmação"
     (evento `auto`), e o desfazer desse clique volta as duas.
 ```

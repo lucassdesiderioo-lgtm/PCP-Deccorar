@@ -2462,7 +2462,77 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
     secao('envio [16] — de novo: nada do envio mexeu no estoque');
     eq('skus, componente, fila e montagem iguais depois das fases 1 e 2', contaEstoque(), estoque0);
 
-    /*__FASE3__*/
+
+    /* ═══════════ ITEM-FALTANTE fase 3 — o rastro da venda e o relatório ═══════════ */
+    for(const col of ['impresso_por TEXT','impresso_por_id INTEGER','embalado_em TEXT','conferido_por TEXT','conferido_por_id INTEGER','conferido_em TEXT',
+                      'no_carro_por TEXT','no_carro_por_id INTEGER','no_carro_em TEXT','saida_id INTEGER','saiu_em TEXT','saiu_por TEXT'])
+      try{ db.exec('ALTER TABLE lote ADD COLUMN '+col); }catch(e){}
+    db.exec("CREATE TABLE IF NOT EXISTS saida (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, fechada_em TEXT, fechado_por TEXT DEFAULT '', quem_levou TEXT)");
+    try{ db.exec('ALTER TABLE montagem ADD COLUMN usuario_nome TEXT'); }catch(e){}
+    db.exec("INSERT INTO montagem (codigo, usuario_nome) VALUES ('BK160140BEGE','Embalador Fantasma')");
+    const sid = db.prepare("INSERT INTO saida (tipo,fechada_em,fechado_por) VALUES ('coleta','2026-11-05 15:10:00','Renato')").run().lastInsertRowid;
+    db.exec(`INSERT INTO lote (codigo,buyer,nf,venda,impresso_por,impresso_por_id,embalado_em,conferido_por,conferido_por_id,conferido_em,no_carro_por,no_carro_em,saida_id,saiu_em,saiu_por)
+      VALUES ('BK160140BEGE','Rita Rastro','9301','2000000000009301','Ana',3,'2026-11-05 09:00:00','Edvaldo',4,'2026-11-05 10:00:00','Lucas','2026-11-05 11:00:00',${sid},'2026-11-05 15:10:00','coleta')`);
+    db.exec("INSERT INTO lote (codigo,buyer,nf,venda) VALUES ('BK160140BEGE','Sergio Novo','9302','2000000000009302')");
+
+    secao('envio [34] — o rastro da venda: impressão, conferência, carro e saída');
+    r = env({ venda:'2000000000009301', origem:'fora_ml', sku:undefined, comprador:undefined });
+    const r34 = (det(r.body.id).rastro) || {};
+    eq('a venda está no sistema', r34.no_sistema, true);
+    const passos = (r34.itens || []).map(x => x.passo).join(',');
+    eq('os quatro passos, em ordem', passos, 'impressao,conferencia,carro,saida');
+    const it = (p) => (r34.itens || []).find(x => x.passo === p) || {};
+    eq('   quem imprimiu, e quando', it('impressao').nome + ' ' + it('impressao').em, 'Ana 2026-11-05 09:00:00');
+    eq('   quem conferiu', it('conferencia').nome + ' ' + it('conferencia').em, 'Edvaldo 2026-11-05 10:00:00');
+    eq('   quem pôs no carro', it('carro').nome + ' ' + it('carro').em, 'Lucas 2026-11-05 11:00:00');
+    ok('   a saída: a porta, a data e quem fechou', it('saida').porta === 'coleta' && it('saida').em === '2026-11-05 15:10:00' && it('saida').nome === 'Renato', JSON.stringify(it('saida')));
+
+    secao('envio [37] — quem embalou NUNCA aparece');
+    ok('nenhum nome tirado de montagem', !JSON.stringify(r34).includes('Embalador Fantasma'));
+    ok('   e nenhum passo de embalagem', !(r34.itens || []).some(x => /embal/.test(x.passo)));
+
+    secao('envio [35] — a venda ainda não impressa mostra só o que existe');
+    r = env({ venda:'2000000000009302', origem:'fora_ml', sku:undefined, comprador:undefined });
+    const r35 = det(r.body.id).rastro || {};
+    ok('no sistema, sem nenhum passo e sem nome inventado', r35.no_sistema === true && (r35.itens || []).length === 0, JSON.stringify(r35));
+
+    secao('envio [36] — a venda fora do lote');
+    const r36 = det(e4.id).rastro || {};
+    ok('"venda não está no sistema"', r36.no_sistema === false && /não está no sistema/.test(r36.texto || ''), JSON.stringify(r36));
+    eq('o rastro é só do envio (a devolução não tem)', det(d12).rastro, undefined);
+
+    secao('envio [38] — o relatório do mês');
+    {
+      const mes = dia(0).slice(0,7);
+      const R1 = chamar('GET','/api/devolucao-casos/relatorio',null,1,{},{ mes }).body;
+      const nEnv = contar('devolucao_caso', "tipo='envio' AND teste=0 AND substr(criado_em,1,7)='"+mes+"'");
+      eq('casos de envio do mês', (R1.envio||{}).casos, nEnv);
+      eq('   que afetaram a reputação', (R1.envio||{}).reputacao_sim, contar('devolucao_caso', "tipo='envio' AND teste=0 AND reputacao='sim' AND substr(criado_em,1,7)='"+mes+"'"));
+      eq('   encerrados sem confirmação, à parte', (R1.envio||{}).sem_confirmacao, 1);
+      eq('   encerrados com o comprador confirmando', (R1.envio||{}).confirmados, contar('devolucao_caso', "tipo='envio' AND teste=0 AND saida='confirmado' AND substr(criado_em,1,7)='"+mes+"'"));
+      const fk = (R1.por_motivo||[]).find(l => l.motivo === 'Falta de kit') || {};
+      ok('o envio conta nos casos por motivo, uma vez cada', (fk.envio||0) === contar('devolucao_caso', "tipo='envio' AND teste=0 AND motivo='Falta de kit' AND substr(criado_em,1,7)='"+mes+"'"), JSON.stringify(fk));
+      eq('   e o total do mês soma cada caso uma vez', R1.casos, contar('devolucao_caso', "teste=0 AND substr(criado_em,1,7)='"+mes+"'"));
+
+      secao('envio [39] — o frete total só com devolucao.dinheiro');
+      const soma = db.prepare("SELECT ROUND(COALESCE(SUM(custo_envio),0),2) s FROM devolucao_caso WHERE tipo='envio' AND teste=0 AND substr(criado_em,1,7)=?").get(mes).s;
+      eq('com a chave: o frete total', (R1.dinheiro||{}).frete_envio, soma);
+      ok('   e ele não é zero (há envios com frete)', soma > 0);
+      const R2 = chamar('GET','/api/devolucao-casos/relatorio',null,2,{},{ mes }).body;
+      ok('sem a chave: a resposta não tem o total', !temChave(R2, 'frete_envio') && !('dinheiro' in R2), JSON.stringify(Object.keys(R2)));
+      ok('   mas tem as contagens do envio', (R2.envio||{}).casos === nEnv);
+
+      secao('envio — o desempenho conta o envio, pelo prazo da origem');
+      const Dz = chamar('GET','/api/devolucao-casos/desempenho',null,1,{},{ mes }).body;
+      const casosD = [].concat(...(Dz.pessoas||[]).map(p => p.lista));
+      const cm = casosD.find(x => x.id === m1) || {}, cwD = casosD.find(x => x.id === w1) || {};
+      ok('o envio do ML encerrado dentro do prazo conta como cumprido', cm.prazos_cumpridos === 1, JSON.stringify(cm));
+      ok('o do WhatsApp enviado até o "sair até" também', cwD.prazos_cumpridos === 1, JSON.stringify(cwD));
+    }
+
+    secao('envio [16] — de novo, depois de tudo: nada mexeu no estoque');
+    eq('skus, componente, fila iguais', JSON.stringify(JSON.parse(contaEstoque()).slice(0,4)), JSON.stringify(JSON.parse(estoque0).slice(0,4)));
+
   }
 
   fim();

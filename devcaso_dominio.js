@@ -512,7 +512,40 @@ function detalhe(db, id, opt){
               nenhuma se oferece (CONSERTO de 04/11/2026). */
            etapas: etapasDoCaso(c), manuais: manuaisDoCaso(c), nomes: NOME_ETAPA,
            desfazer: podeDesfazer(db, c, o.usuario),
+           rastro: c.tipo === 'envio' ? rastroDaVenda(db, c) : undefined,
            mesmo_comprador: mesmoComprador(db, c.comprador, c.id).map(x => ({ id:x.id, venda:x.venda, nf:x.nf, tipo:x.tipo, etapa_nome: NOME_ETAPA[x.etapa] || x.etapa })) };
+}
+
+/* "QUEM TRABALHOU NESTA VENDA" (R-ENV-17, 18): só o que o sistema PROVA,
+   tirado das colunas de quem fez do `lote` — a impressão da etiqueta de venda,
+   a conferência, o carro e a saída (a porta, a data e quem fechou a saída,
+   decisão do dono de 06/11/2026: `saiu_por` é a porta, não uma pessoa).
+   ⚠️ QUEM EMBALOU NÃO APARECE, e não é esquecimento: a embalagem soma estoque
+   por SKU e não se liga a venda nenhuma (§4); mostrar um nome da `montagem`
+   seria adivinhar entre todos que embalaram aquele SKU — a armadilha #10.
+   Esta função nunca lê a `montagem`, e há teste travando. */
+function rastroDaVenda(db, c){
+  let l = null;
+  try{
+    if(c.lote_id) l = db.prepare('SELECT * FROM lote WHERE id=?').get(c.lote_id) || null;
+    if(!l && c.venda) l = db.prepare('SELECT * FROM lote WHERE venda=? OR packId=? ORDER BY id DESC LIMIT 1').get(c.venda, c.venda) || null;
+    if(!l && c.nf) l = db.prepare('SELECT * FROM lote WHERE nf=? ORDER BY id DESC LIMIT 1').get(c.nf) || null;
+  }catch(e){ l = null; }
+  if(!l) return { no_sistema:false, texto:'A venda não está no sistema: não há rastro de quem trabalhou nela.', itens:[] };
+  const itens = [];
+  const nome = (v) => { const t = String(v == null ? '' : v).trim(); return t || null; };
+  if(nome(l.impresso_por)) itens.push({ passo:'impressao', nome:nome(l.impresso_por), em:l.embalado_em || null, texto:'Imprimiu a etiqueta de venda' });
+  if(nome(l.conferido_por)) itens.push({ passo:'conferencia', nome:nome(l.conferido_por), em:l.conferido_em || null, texto:'Conferiu a caixa' });
+  if(nome(l.no_carro_por)) itens.push({ passo:'carro', nome:nome(l.no_carro_por), em:l.no_carro_em || null, texto:'Pôs no carro' });
+  if(l.saiu_em || l.saida_id){
+    let sd = null;
+    try{ if(l.saida_id) sd = db.prepare('SELECT * FROM saida WHERE id=?').get(l.saida_id) || null; }catch(e){ sd = null; }
+    const porta = nome(l.saiu_por) || (sd && sd.tipo) || null;
+    itens.push({ passo:'saida', porta, em:l.saiu_em || (sd && sd.fechada_em) || null, nome: sd ? nome(sd.fechado_por) : null,
+      quem_levou: sd ? nome(sd.quem_levou) : null,
+      texto: 'Saiu '+(porta === 'coleta' ? 'pela coleta' : porta === 'agencia' ? 'pela agência' : 'da fábrica') });
+  }
+  return { no_sistema:true, lote_id:l.id, venda:l.venda || null, nf:l.nf || null, itens };
 }
 
 /* As etapas à mão que este caso oferece agora. No envio: Lançado e Embalado
@@ -1805,9 +1838,10 @@ function relatorio(db, mes, comDinheiro){
   }catch(e){}
   const SEM = 'sem motivo';
   const por = new Map();
-  const linha = (m) => { const k = m || SEM; if(!por.has(k)) por.set(k, { motivo:k, qtd:0, casos:0, sem_caso:0, publicidade:0, perda_prazo:0, devolvido_comprador:0 }); return por.get(k); };
+  const linha = (m) => { const k = m || SEM; if(!por.has(k)) por.set(k, { motivo:k, qtd:0, casos:0, sem_caso:0, envio:0, publicidade:0, perda_prazo:0, devolvido_comprador:0 }); return por.get(k); };
   for(const c of casos){
     const l = linha(c.motivo); l.qtd++; l.casos++;
+    if(c.tipo === 'envio') l.envio++;
     if(c.publicidade === 1) l.publicidade++;
     if(c.saida === 'perda_prazo' && c.valor_perdido != null) l.perda_prazo += c.valor_perdido;
     if(c.saida === 'devolvido_comprador' && c.valor_devolvido != null) l.devolvido_comprador += c.valor_devolvido;
@@ -1816,13 +1850,21 @@ function relatorio(db, mes, comDinheiro){
   const r2 = (v) => Math.round(v * 100) / 100;
   const por_motivo = Array.from(por.values()).sort((a,b) => b.qtd - a.qtd || a.motivo.localeCompare(b.motivo))
     .map(l => comDinheiro ? Object.assign(l, { perda_prazo:r2(l.perda_prazo), devolvido_comprador:r2(l.devolvido_comprador) })
-                          : { motivo:l.motivo, qtd:l.qtd, casos:l.casos, sem_caso:l.sem_caso, publicidade:l.publicidade });
+                          : { motivo:l.motivo, qtd:l.qtd, casos:l.casos, sem_caso:l.sem_caso, envio:l.envio, publicidade:l.publicidade });
   const out = { mes, total: casos.length + semCaso.length, casos: casos.length, sem_caso: semCaso.length, por_motivo,
                 por_saida: casos.reduce((a,c) => { if(c.saida) a[c.saida] = (a[c.saida]||0) + 1; return a; }, {}),
                 /* Só os casos: a devolução recebida sem caso não tem a pergunta. */
                 publicidade: { sim: casos.filter(c => c.publicidade === 1).length,
                                nao: casos.filter(c => c.publicidade === 0).length,
                                nao_informado: casos.filter(c => c.publicidade == null).length } };
+  /* O ENVIO DE ITEM FALTANTE (R-ENV-19): quantos, quantos afetaram a
+     reputação, e os encerrados sem confirmação À PARTE — é exceção que o
+     dono vê, não costume. O frete total só com a chave do dinheiro, abaixo. */
+  const env = casos.filter(c => c.tipo === 'envio');
+  out.envio = { casos: env.length, reputacao_sim: env.filter(c => c.reputacao === 'sim').length,
+    reputacao_nao: env.filter(c => c.reputacao === 'nao').length, reputacao_sem_resposta: env.filter(c => !c.reputacao).length,
+    confirmados: env.filter(c => c.saida === 'confirmado').length, sem_confirmacao: env.filter(c => c.saida === 'entregue_sem_confirmacao').length,
+    abertos: env.filter(c => !c.encerrado_em).length };
   if(comDinheiro){
     const coleta = casos.filter(c => c.tipo === 'coleta');
     const ids = coleta.map(c => c.id);
@@ -1848,6 +1890,10 @@ function relatorio(db, mes, comDinheiro){
       // O que a revisão trouxe de volta, e o que ficou de prejuízo no frete.
       frete_devolvido: r2(casos.reduce((a,c) => a + (c.valor_revisao || 0), 0)),
       frete_prejuizo: r2(casos.reduce((a,c) => a + (c.custo_etiqueta || 0), 0) - casos.reduce((a,c) => a + (c.valor_revisao || 0), 0)),
+      /* O frete dos envios de item faltante: sempre lançado (frete > 0 é
+         obrigatório para enviar), então não há piso — o que não foi enviado
+         ainda não tem frete. Fora do saldo da coleta. */
+      frete_envio: r2(env.reduce((a,c) => a + (c.custo_envio || 0), 0)),
       piso: faltam.length > 0, faltam };
   }
   return out;
@@ -2064,7 +2110,12 @@ function desempenho(db, mes){
       if(quando) prazos.push({ ok: quando <= prazo, prorrogado });
       else if(c.saida === 'perda_prazo') prazos.push({ ok:false, prorrogado });
     };
-    if(c.tipo === 'coleta'){
+    if(c.tipo === 'envio'){
+      /* O envio (ITEM-FALTANTE): o prazo do ML se cumpre encerrando; o "sair
+         até" do WhatsApp, enviando. */
+      if(c.origem === 'ml') decide(c.prazo, dia(c.encerrado_em), !!c.prazo_original);
+      else decide(c.sair_ate, c.enviado_em ? dia(c.enviado_em) : null, false);
+    } else if(c.tipo === 'coleta'){
       decide(c.prazo, chegouEm('docs_enviados'), !!c.prazo_original);
       decide(c.prazo_coleta, chegouEm('a_caminho'), !!c.prazo_coleta_original);
     } else if(c.revisar_ate){

@@ -694,6 +694,20 @@ var GANCHO_ENVIO_TOPO=function(d, c, P, aberto){
    a quem lança ou acompanha — o servidor nem o manda aos outros), os prints e
    os fins. */
 var NOME_ANEXO={ print_ml:'Print mandado ao ML', print_rastreio:'Print do rastreio (entregue)' };
+/* "QUEM TRABALHOU NESTA VENDA" (R-ENV-17): só o que o sistema prova. Quem
+   embalou NÃO aparece: a embalagem não se liga à venda, e o nome seria um chute. */
+function blocoRastro(d){
+  var r=d.rastro; if(!r) return '';
+  var h='<div class="bloco"><h3>Quem trabalhou nesta venda</h3>';
+  if(!r.no_sistema) return h+'<div class="sub">'+esc(r.texto||'A venda não está no sistema.')+'</div></div>';
+  if(!(r.itens||[]).length) h+='<div class="sub">A venda está no sistema, mas a etiqueta de venda ainda não foi impressa: nada registrado.</div>';
+  else h+='<div class="hist">'+r.itens.map(function(x){
+    var quem = x.passo==='saida' ? (x.nome?'saída fechada por <b style="color:var(--txt)">'+esc(x.nome)+'</b>':'')+(x.quem_levou?' · levou: <b style="color:var(--txt)">'+esc(x.quem_levou)+'</b>':'')
+                                 : '<b style="color:var(--txt)">'+esc(x.nome)+'</b>';
+    return '<div><small>'+(x.em?horaBR(x.em):'sem data')+'</small><br>'+esc(x.texto)+(quem?' — '+quem:'')+'</div>';
+  }).join('')+'</div>';
+  return h+'<div class="sub" style="margin-top:6px">Quem embalou não aparece: a embalagem soma estoque por SKU e não se liga a esta venda.</div></div>';
+}
 GANCHOS.push({
   html:function(d, c, P, aberto){
     if(c.tipo!=='envio') return '';
@@ -722,6 +736,7 @@ GANCHOS.push({
       return '<div><a href="/api/devolucao-casos/anexo/'+a.id+'" target="_blank" style="color:var(--amber)">'+esc(NOME_ANEXO[a.tipo])+'</a> <small>· '+a.formato+' · '+horaBR(a.criado_em)+' · '+esc(a.usuario||'')+'</small></div>';
     }).join('')+'</div>' : '';
     h+='<div id="anxMsg"></div></div>';
+    h+=blocoRastro(d);
     if(aberto && P.acompanhar && c.etapa==='aguardando_confirmacao'){
       h+='<div class="bloco"><h3>Confirmação do comprador</h3><div class="sub" style="margin-bottom:6px">Cada cobrança fica na história; ela não zera o "parado".</div>'+
         '<div class="acoes"><input id="cbTexto" placeholder="como cobrou (opcional)" autocomplete="off" style="max-width:280px"><button class="bt sec" id="btCobrei">Cobrei a confirmação</button></div>'+
@@ -1456,11 +1471,20 @@ function carregarRel(){
     var P=r.publicidade||{sim:0,nao:0,nao_informado:0};
     var h='<div class="dados" style="margin:10px 0"><div><b>Total no mês</b>'+r.total+'</div><div><b>Casos lançados</b>'+r.casos+'</div><div><b>Devoluções sem caso</b>'+r.sem_caso+'</div>'+
       '<div><b>Via publicidade</b>'+P.sim+' sim · '+P.nao+' não'+(P.nao_informado?' · '+P.nao_informado+' não informado':'')+'<br><small>só os casos lançados</small></div></div>';
-    h+= r.por_motivo.length ? '<div class="rolaH"><table><thead><tr><th>Motivo</th><th class="num">Qtd</th><th class="num">Casos</th><th class="num">Sem caso</th><th class="num">Via publicidade</th>'+
+    h+= r.por_motivo.length ? '<div class="rolaH"><table><thead><tr><th>Motivo</th><th class="num">Qtd</th><th class="num">Casos</th><th class="num">Sem caso</th><th class="num">Envio de item</th><th class="num">Via publicidade</th>'+
       (din?'<th class="num">Perda por prazo</th><th class="num">Devolvido ao comprador</th>':'')+'</tr></thead><tbody>'+
-      r.por_motivo.map(function(l){ return '<tr><td>'+esc(l.motivo)+'</td><td class="num"><b>'+l.qtd+'</b></td><td class="num">'+l.casos+'</td><td class="num">'+l.sem_caso+'</td><td class="num">'+(l.publicidade||0)+'</td>'+
+      r.por_motivo.map(function(l){ return '<tr><td>'+esc(l.motivo)+'</td><td class="num"><b>'+l.qtd+'</b></td><td class="num">'+l.casos+'</td><td class="num">'+l.sem_caso+'</td><td class="num">'+(l.envio||0)+'</td><td class="num">'+(l.publicidade||0)+'</td>'+
         (din?'<td class="num">'+reais(l.perda_prazo)+'</td><td class="num">'+reais(l.devolvido_comprador)+'</td>':'')+'</tr>'; }).join('')+
       '</tbody></table></div>' : '<div class="vazio">Nenhuma devolução neste mês.</div>';
+    /* O ENVIO DE ITEM FALTANTE (R-ENV-19): a reputação afetada e o "sem
+       confirmação" à parte; o frete total só com a permissão do dinheiro. */
+    var E=r.envio;
+    if(E && E.casos) h+='<div class="bloco"><h3>Enviar item faltante</h3><div class="dados">'+
+      '<div><b>Casos no mês</b>'+E.casos+(E.abertos?'<br><small>'+E.abertos+' em aberto</small>':'')+'</div>'+
+      '<div><b>Afetaram a reputação</b>'+E.reputacao_sim+'<br><small>'+E.reputacao_nao+' não · '+E.reputacao_sem_resposta+' sem resposta</small></div>'+
+      '<div><b>Comprador confirmou</b>'+E.confirmados+'</div>'+
+      '<div><b>Entregue sem confirmação</b><span style="color:'+(E.sem_confirmacao?'var(--amber)':'inherit')+'">'+E.sem_confirmacao+'</span><br><small>exceção, contada à parte</small></div>'+
+      (din?'<div><b>Frete dos envios</b>'+reais(r.dinheiro.frete_envio||0)+'</div>':'')+'</div></div>';
     if(din){
       var D=r.dinheiro, ge=D.piso?'≥ ':'';
       h+='<div class="bloco"><h3>Dinheiro do mês (permissão do dinheiro)</h3>'+(D.piso?'<div class="aviso">Total incompleto — falta: '+esc(D.faltam.join(' · '))+'. Os números são o mínimo (≥), não o total.</div>':'')+
@@ -1489,7 +1513,7 @@ function buscar(){
       var situ = x.encerrado_em ? '<span class="chip">encerrado · '+esc(x.saida_nome||'')+' · '+dataBR(x.encerrado_em)+'</span>'
                                 : '<span class="chip ambar">aberto · '+esc(x.etapa_nome)+'</span>';
       return '<div class="linha" data-id="'+x.id+'"><div class="t1"><span>#'+x.id+'</span><span>Venda '+esc(x.venda||'—')+'</span><span>NF '+esc(x.nf||'—')+'</span></div>'+
-        '<div class="t2">'+(x.tipo==='coleta'?'Nós coletamos':'ML devolve')+' · '+esc(x.sku||'sem SKU')+(x.comprador?' · '+esc(x.comprador):'')+' · '+esc(x.motivo||'sem motivo')+'</div>'+
+        '<div class="t2">'+esc(NOME_TIPO[x.tipo]||x.tipo)+' · '+esc(x.sku||'sem SKU')+(x.comprador?' · '+esc(x.comprador):'')+' · '+esc(x.motivo||'sem motivo')+'</div>'+
         '<div class="chips">'+situ+chipPub(x)+chipLink(x)+'</div></div>';
     }).join('');
   }).catch(function(e){ box.innerHTML='<div class="erro">'+esc(e.message)+'</div>'; });

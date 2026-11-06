@@ -782,7 +782,37 @@ const srv = app.listen(0, async () => {
       QUEM = 1;
     }
 
-    /*__TELA_FASE3__*/
+    secao('envio — "Quem trabalhou nesta venda" e o relatório do mês pela tela');
+    {
+      for(const col of ['impresso_por TEXT','embalado_em TEXT','conferido_por TEXT','conferido_em TEXT','no_carro_por TEXT','no_carro_em TEXT','saida_id INTEGER','saiu_em TEXT','saiu_por TEXT'])
+        try{ db.exec('ALTER TABLE lote ADD COLUMN '+col); }catch(e){}
+      db.exec("CREATE TABLE IF NOT EXISTS saida (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, fechada_em TEXT, fechado_por TEXT DEFAULT '', quem_levou TEXT)");
+      const sid = db.prepare("INSERT INTO saida (tipo,fechada_em,fechado_por,quem_levou) VALUES ('agencia','2026-11-05 16:00:00','Lucas Tela','Motorista Zé')").run().lastInsertRowid;
+      db.prepare(`INSERT INTO lote (codigo,buyer,nf,venda,impresso_por,embalado_em,conferido_por,conferido_em,saida_id,saiu_em,saiu_por)
+        VALUES ('BK140140BEGE','Cliente Rastro','9401','2000000000094001','Ana Impressora','2026-11-05 09:00:00','Edvaldo Conferente','2026-11-05 10:00:00',?,'2026-11-05 16:00:00','agencia')`).run(sid);
+      const px = await pg();
+      const r3 = await api(px, 'POST', '/api/devolucao-casos', { tipo:'envio', origem:'fora_ml', venda:'2000000000094001', publicidade:false });
+      await px.goto(B + '/devolucao-casos'); await px.waitForTimeout(900);
+      await px.locator('#listaEnvio .linha', { hasText:'#'+r3.id+' ' }).first().locator('.t1').click(); await px.waitForTimeout(1000);
+      const txt = await px.textContent('#painel');
+      ok('o bloco mostra quem imprimiu e quem conferiu', /Quem trabalhou nesta venda/.test(txt) && /Ana Impressora/.test(txt) && /Edvaldo Conferente/.test(txt), txt.slice(0,400));
+      ok('   a saída: pela agência, quem fechou e quem levou', /Saiu pela agência/.test(txt) && /saída fechada por Lucas Tela/.test(txt) && /levou: Motorista Zé/.test(txt));
+      ok('   e diz por que quem embalou não aparece', /Quem embalou não aparece/.test(txt));
+      await px.goto(B + '/devolucao-casos'); await px.waitForTimeout(700);
+      await px.click('#tabs [data-t="rel"]'); await px.waitForTimeout(900);
+      const rel = await px.textContent('#relBox');
+      ok('o relatório tem o bloco do envio, com o frete para quem tem o dinheiro', /Enviar item faltante/.test(rel) && /Entregue sem confirmação/.test(rel) && /Frete dos envios/.test(rel), rel.slice(0,300));
+      await px.close();
+      QUEM = 2;
+      const py = await pg();
+      await py.goto(B + '/devolucao-casos'); await py.waitForTimeout(700);
+      await py.click('#tabs [data-t="rel"]'); await py.waitForTimeout(900);
+      const rel2 = await py.textContent('#relBox');
+      ok('sem a permissão do dinheiro: o bloco sem o frete', /Enviar item faltante/.test(rel2) && !/Frete dos envios/.test(rel2), rel2.slice(0,300));
+      await py.close();
+      QUEM = 1;
+    }
+
     }
 
     secao('a 400 px — a página não rola de lado, e o caso abre');
