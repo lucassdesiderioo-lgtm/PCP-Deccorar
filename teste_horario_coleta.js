@@ -467,6 +467,7 @@ async function main(){
     ok('a rota de lançar produção à mão saiu (POST /api/producao)', !/app\.post\('\/api\/producao'/.test(srv10));
     const idx10 = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
     ok('a lista "Selecione os SKUs" e o "Lançamentos de hoje" saíram da 103', !/id="sellist"/.test(idx10) && !/Lançamentos de hoje/.test(idx10) && !/function lancar\(/.test(idx10));
+    ok('o cartão "Subir PDFs" da 103 nasce aberto (AJUSTE)', /id="upCorpo" style="display:block/.test(idx10));
     ok('o botão "Lançar N urgentes" saiu (a urgência entra sozinha)', !/btAplicar/.test(idx10) && !/cruzamento\/aplicar/.test(idx10));
     const t103 = require('./telas').porNumero(103);
     ok('a 103 se chama "Subir PDF de vendas", mesmo endereço e nível Operação', t103 && t103.nome === 'Subir PDF de vendas' && t103.rota === '/admin/producao' && t103.nivel === 'operacao');
