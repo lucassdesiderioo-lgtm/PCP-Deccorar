@@ -1573,6 +1573,12 @@ da saída teria de ser conferido em três lugares.
 > ⚠️ **A URGÊNCIA QUE FALHA NO UPLOAD NÃO DERRUBA O UPLOAD**: as vendas já estão
 > gravadas; o erro vai para o log e a resposta diz `urgentes:null`.
 >
+> ✅ **NO AR DESDE 05/11/2026** (PRs #295 e #296): o dono fez o backup, o deploy
+> e o teste de segurança e disse *"deu tudo certo no deploy"*. ⚠️ **AINDA NÃO
+> PROVADO COM DADO REAL:** o primeiro PDF com venda sem estoque pondo a peça no
+> vermelho da Revisão sem clique de ninguém. Se nesse dia ela não aparecer, é
+> defeito, não silêncio normal. Prova que não foi feita se escreve como não feita.
+>
 > ⚠️ **O RETRATO DE ANTES NÃO FOI REGRAVADO.** O `perfis_acesso.js` tira o
 > `/expedicao` da comparação pelo nome, e o `teste_mapa.js` confere, pessoa a
 > pessoa, que **quem abria a 203 abre a 103**.
