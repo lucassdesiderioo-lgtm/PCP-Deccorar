@@ -277,6 +277,31 @@ module.exports = function(app, db){
       return { ok:true, mudou:mud };
     });
   });
+  /* ── ENVIAR ITEM FALTANTE (spec ITEM-FALTANTE, fase 2) ──
+     O frete é um valor do caso: de quem lança ou acompanha (R-ENV-10). O
+     número vai à auditoria; a história do caso diz só "frete lançado". */
+  post('/api/devolucao-casos/:id/enviar', (req,res) => {
+    if(!podeValores(req)) return res.status(403).json({ erro:'Enviar (com o frete) é de quem lança ou acompanha as devoluções.', chave:'devolucao.acompanhar' });
+    responder(res, () => {
+      const r = D.enviar(db, req.params.id, req.body, QUEM.pessoa(req));
+      if(r.valorMudou.length) auditar(req, 'valor', req.params.id, 'lançou o frete do envio: '+JSON.stringify({ custo_envio:(req.body||{}).custo_envio }));
+      return { ok:true };
+    });
+  });
+  post('/api/devolucao-casos/:id/cobranca', (req,res) => responder(res, () => { D.cobranca(db, req.params.id, req.body, QUEM.pessoa(req)); return { ok:true }; }));
+  post('/api/devolucao-casos/:id/reputacao', (req,res) => responder(res, () => { D.reputacao(db, req.params.id, req.body, QUEM.pessoa(req)); return { ok:true }; }));
+  post('/api/devolucao-casos/:id/confirmado', (req,res) => responder(res, () => { D.confirmado(db, req.params.id, req.body, QUEM.pessoa(req)); return { ok:true }; }));
+  /* A exceção (R-ENV-14) é decisão do caso: devolucao.dinheiro, conferida aqui
+     também — o portão é a primeira trava. */
+  post('/api/devolucao-casos/:id/entregue-sem-confirmacao', (req,res) => {
+    if(!podeDinheiro(req)) return semDinheiro(req, res);
+    responder(res, () => {
+      const c = D.entregueSemConfirmacao(db, req.params.id, req.body, QUEM.pessoa(req));
+      auditar(req, 'entregue_sem_confirmacao', c.id, 'encerrou o envio como entregue sem confirmação do comprador');
+      return { ok:true };
+    });
+  });
+
   /* ── decisões (devolucao.dinheiro) ── */
   post('/api/devolucao-casos/:id/reembolso', (req,res) => {
     if(!podeDinheiro(req)) return semDinheiro(req, res);

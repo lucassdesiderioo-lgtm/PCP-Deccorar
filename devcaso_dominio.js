@@ -1183,6 +1183,7 @@ function chegou(db, id, usuario, b){
    só história — a trilha não volta de "revisado". */
 function avisarML(db, id, usuario){
   const c = aberto(db, id);
+  if(c.tipo === 'envio') return avisarMLEnvio(db, c, usuario);
   if(c.tipo === 'ml'){
     /* "Já revisei no ML" (03/11/2026): só depois da revisão do Edvaldo, uma
        vez; e é ele que, junto com a baixa, encerra o ML devolve. */
@@ -1201,6 +1202,109 @@ function avisarML(db, id, usuario){
     if(c.etapa === 'chegou') moverEtapa(db, c, 'ml_avisado', usuario, 'avisamos o ML que recebemos', 'aviso_ml');
     else evento(db, c.id, 'aviso_ml', null, null, 'avisamos o ML que recebemos', usuario);
   })();
+  return ler(db, c.id);
+}
+
+/* ═══ ENVIAR ITEM FALTANTE — fase 2 (spec ITEM-FALTANTE) ═══ */
+const temAnexo = (db, caso_id, tipo) => !!db.prepare('SELECT 1 FROM devolucao_anexo WHERE caso_id=? AND tipo=? AND arquivo IS NOT NULL').get(caso_id, tipo);
+function abertoEnvio(db, id){
+  const c = aberto(db, id);
+  if(c.tipo !== 'envio') throw new Recusa(400, 'Isto é do envio de item faltante.');
+  return c;
+}
+/* R-ENV-11: "ML avisado" só na origem ML, depois do comprador avisado, com o
+   print anexado. Depois dele o caso vai sozinho a "aguardando confirmação". */
+function avisarMLEnvio(db, c, usuario){
+  if(c.origem !== 'ml') throw new Recusa(400, 'Na origem WhatsApp não há aviso ao ML: a etapa não existe.');
+  if(c.etapa !== 'comprador_avisado') throw new Recusa(400, c.enviado_em ? 'Primeiro mande o rastreio ao comprador e marque "Comprador avisado".' : 'Primeiro marque o item como enviado.');
+  if(!temAnexo(db, c.id, 'print_ml')) throw new Recusa(400, 'Anexe antes o print mandado ao ML: sem ele o aviso não se marca.', { faltam:['print_ml'] });
+  db.transaction(() => {
+    moverEtapa(db, c, 'ml_avisado', usuario, 'avisamos o ML com o print', 'aviso_ml');
+    db.prepare("UPDATE devolucao_caso SET etapa='aguardando_confirmacao', etapa_desde=datetime('now','localtime') WHERE id=?").run(c.id);
+    evento(db, c.id, 'auto', 'ml_avisado', 'aguardando_confirmacao', 'aguardando a confirmação do comprador', usuario);
+  })();
+  return ler(db, c.id);
+}
+/* R-ENV-09: ENVIADO só com transportadora ATIVA da tabela, rastreio não vazio
+   e frete > 0 — CUSTO VAZIO NUNCA VIRA ZERO, e zero digitado é recusado (frete
+   de graça é REGRA nova). A recusa diz tudo o que falta de uma vez. Depois de
+   enviado, a mesma porta corrige, e a história diz "frete trocado", nunca o
+   número (R-ENV-10). Nada aqui toca em estoque (R-ENV-08). */
+function enviar(db, id, b, usuario){
+  const c = abertoEnvio(db, id);
+  b = b || {};
+  const faltam = [];
+  let t = null;
+  const tid = parseInt(b.transportadora_id, 10);
+  if(isFinite(tid)) t = db.prepare('SELECT * FROM transportadora WHERE id=?').get(tid) || null;
+  if(!t || !t.ativo) faltam.push(t && !t.ativo ? 'transportadora ativa (a escolhida está desativada)' : 'transportadora');
+  const rastreio = String(b.rastreio == null ? '' : b.rastreio).trim();
+  if(!rastreio) faltam.push('código de rastreio');
+  if(rastreio.length > 200) throw new Recusa(400, 'O código de rastreio passou de 200 letras.');
+  let frete = null;
+  try{ frete = reais(b.custo_envio, 'o frete'); }catch(e){ frete = -1; }
+  if(frete === null || !(frete > 0)) faltam.push(frete === null ? 'frete' : 'frete maior que zero');
+  if(faltam.length) throw new Recusa(400, 'Para marcar como enviado, falta: '+faltam.join(' · ')+'.', { faltam });
+  const mud = [];
+  db.transaction(() => {
+    if(!c.enviado_em){
+      if(['lancado','embalado'].indexOf(c.etapa) < 0) throw new Recusa(400, 'O caso não está em "Lançado" nem em "Embalado".');
+      db.prepare("UPDATE devolucao_caso SET transportadora_id=?, rastreio=?, custo_envio=?, enviado_em=datetime('now','localtime') WHERE id=?").run(t.id, rastreio, frete, c.id);
+      moverEtapa(db, c, 'enviado', usuario, 'enviado por '+t.nome+' · rastreio '+rastreio+' · frete lançado', 'enviado');
+      mud.push('custo_envio');
+    } else {
+      const txt = [];
+      if(t.id !== c.transportadora_id) txt.push('transportadora: '+t.nome);
+      if(rastreio !== c.rastreio) txt.push('rastreio: '+rastreio);
+      if(frete !== c.custo_envio){ txt.push('frete trocado'); mud.push('custo_envio'); }
+      if(!txt.length) return;
+      db.prepare('UPDATE devolucao_caso SET transportadora_id=?, rastreio=?, custo_envio=? WHERE id=?').run(t.id, rastreio, frete, c.id);
+      evento(db, c.id, 'envio', null, null, 'envio corrigido · '+txt.join(' · '), usuario);
+    }
+  })();
+  return { caso: ler(db, c.id), valorMudou: mud };
+}
+/* R-ENV-12: cada cobrança é história. Não muda a etapa e NÃO zera o parado —
+   o parado mede a etapa, não o esforço. */
+function cobranca(db, id, b, usuario){
+  const c = abertoEnvio(db, id);
+  if(c.etapa !== 'aguardando_confirmacao') throw new Recusa(400, 'Só se cobra a confirmação depois de avisar o comprador'+(c.origem === 'ml' ? ' e o ML' : '')+'.');
+  const t = String((b && b.texto) == null ? '' : b.texto).trim().slice(0, 500);
+  evento(db, c.id, 'cobranca', null, null, 'cobrei a confirmação do comprador'+(t ? ' · '+t : ''), usuario);
+  return ler(db, c.id);
+}
+/* R-ENV-15: "afetou a reputação?" é sim ou não. Vazio NÃO é "não". */
+function reputacao(db, id, b, usuario){
+  const c = abertoEnvio(db, id);
+  const v = String((b && b.reputacao) == null ? '' : b.reputacao).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(v !== 'sim' && v !== 'nao') throw new Recusa(400, 'Responda se afetou a reputação: Sim ou Não.');
+  if(v === c.reputacao) return c;
+  db.transaction(() => {
+    db.prepare('UPDATE devolucao_caso SET reputacao=? WHERE id=?').run(v, c.id);
+    evento(db, c.id, 'reputacao', c.reputacao, v, 'afetou a reputação: '+(v === 'sim' ? 'sim' : 'não'), usuario);
+  })();
+  return ler(db, c.id);
+}
+/* R-ENV-13: o fim normal — o comprador confirmou, com a reputação respondida. */
+function confirmado(db, id, b, usuario){
+  const c = abertoEnvio(db, id);
+  if(c.etapa !== 'aguardando_confirmacao') throw new Recusa(400, 'O caso ainda não está aguardando a confirmação do comprador.');
+  if(!c.reputacao) throw new Recusa(400, 'Para encerrar, falta: responder se afetou a reputação.', { faltam:['reputacao'] });
+  db.transaction(() => encerrar(db, c, 'confirmado', usuario, (b && b.texto) || null))();
+  return ler(db, c.id);
+}
+/* R-ENV-14: a exceção — o rastreio diz entregue e o comprador não confirma. Só
+   com devolucao.dinheiro (a rota confere), só a partir de "aguardando", com o
+   print do rastreio e a reputação. O relatório conta à parte. */
+function entregueSemConfirmacao(db, id, b, usuario){
+  const c = abertoEnvio(db, id);
+  if(c.etapa !== 'aguardando_confirmacao') throw new Recusa(400, 'Só a partir de "aguardando confirmação": o comprador ainda não foi avisado.');
+  const faltam = [];
+  if(!temAnexo(db, c.id, 'print_rastreio')) faltam.push('o print do rastreio dizendo entregue');
+  if(!c.reputacao) faltam.push('responder se afetou a reputação');
+  if(faltam.length) throw new Recusa(400, 'Para encerrar como "entregue sem confirmação", falta: '+faltam.join(' · ')+'.',
+    { faltam: faltam.map(f => /rastreio/.test(f) ? 'print_rastreio' : 'reputacao') });
+  db.transaction(() => encerrar(db, c, 'entregue_sem_confirmacao', usuario, (b && b.texto) || null))();
   return ler(db, c.id);
 }
 
@@ -1563,14 +1667,19 @@ function anexar(db, caso_id, b, usuario, dir){
   const c = aberto(db, caso_id);
   b = b || {};
   const tipo = String(b.tipo||'');
-  if(['doc','foto_comprador'].indexOf(tipo) < 0) throw new Recusa(400, 'O anexo é um documento da coleta ou a foto do comprador.');
+  /* No envio de item faltante a prova é o print mandado ao ML e o print do
+     rastreio dizendo entregue (R-ENV-11, 14) — na mesma pasta, que não expira. */
+  const PRINTS = ['print_ml','print_rastreio'];
+  if(c.tipo === 'envio' && PRINTS.indexOf(tipo) < 0) throw new Recusa(400, 'No envio o anexo é o print mandado ao ML ou o print do rastreio.');
+  if(c.tipo !== 'envio' && PRINTS.indexOf(tipo) >= 0) throw new Recusa(400, 'O print do ML e o do rastreio são do envio de item faltante.');
+  if(['doc','foto_comprador'].concat(PRINTS).indexOf(tipo) < 0) throw new Recusa(400, 'O anexo é um documento da coleta ou a foto do comprador.');
   let doc = null;
   if(tipo === 'doc'){
     doc = String(b.doc_tipo||'').trim();
     if(docsExigidos(db).indexOf(doc) < 0) throw new Recusa(400, 'Documento fora da lista de documentos da devolução: "'+doc+'".');
   }
   const arq = decodificarAnexo(b.arquivo, tipo === 'foto_comprador');
-  if(!arq) throw new Recusa(400, tipo === 'foto_comprador'
+  if(!arq) throw new Recusa(400, PRINTS.indexOf(tipo) >= 0 ? 'O print tem que ser uma imagem ou um PDF com conteúdo.' : tipo === 'foto_comprador'
     ? 'A foto do comprador tem que ser uma imagem com conteúdo (JPEG, PNG ou WebP). Foto vazia não é prova.'
     : 'O documento tem que ser uma imagem ou um PDF com conteúdo.');
   const fs = require('fs'), path = require('path');
@@ -1582,7 +1691,7 @@ function anexar(db, caso_id, b, usuario, dir){
       caminho = path.join(dir, 'caso-'+c.id+'-anexo-'+id+'-'+tipo+'.'+arq.ext);
       fs.writeFileSync(caminho, arq.buf);
       db.prepare('UPDATE devolucao_anexo SET arquivo=? WHERE id=?').run(caminho, id);
-      evento(db, c.id, 'anexo', null, null, tipo === 'doc' ? doc : 'foto do comprador', usuario);
+      evento(db, c.id, 'anexo', null, null, tipo === 'doc' ? doc : tipo === 'print_ml' ? 'print mandado ao ML' : tipo === 'print_rastreio' ? 'print do rastreio' : 'foto do comprador', usuario);
     })();
   }catch(e){
     if(e instanceof Recusa) throw e;
@@ -2001,6 +2110,7 @@ module.exports = {
   abertoPorCodigo, chegou, avisarML, ligarRevisao, baixaDaDevolucao,
   ETAPAS, MANUAIS, NOME_ETAPA, NOME_SAIDA, NOME_TIPO, NOME_ORIGEM, DINHEIRO, Recusa,
   sairAte, etapasDoCaso, abertoDeOutroGrupo,
+  enviar, cobranca, reputacao, confirmado, entregueSemConfirmacao,
   garantir, hoje, dataValida, dias, limites, situacao, publico, evento,
   buscarLote, buscarLotePorNF, ler, abertoDaVenda, listar, encerrados, detalhe,
   motivoValido, reais, aberto, lancar, editar, etapa, moverEtapa, pedirProrrogacao, novoPrazo, prazosDoCaso, agendarColeta,

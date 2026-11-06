@@ -994,7 +994,10 @@ module.exports = function(app, db){
     if(pre('/api/devolucao-casos')){
       const m = p.match(/^\/api\/devolucao-casos\/[^/]+\/([a-z_-]+)$/);
       const acao = m ? m[1] : '';
-      if(M !== 'GET' && ['perda','devolver-comprador','reembolso'].indexOf(acao) >= 0) return 'devolucao.dinheiro';
+      if(M !== 'GET' && ['perda','devolver-comprador','reembolso','entregue-sem-confirmacao'].indexOf(acao) >= 0) return 'devolucao.dinheiro';
+      /* O frete do envio de item faltante é valor do caso: de quem lança ou
+         acompanha (ITEM-FALTANTE R-ENV-10), como o `valor`. */
+      if(M !== 'GET' && acao === 'enviar') return ['devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro'];
       /* Os valores do caso sao de quem lanca e de quem acompanha (AJUSTE de
          03/11/2026, dono); o valor perdido e o devolvido, o handler confere
          o dinheiro. */

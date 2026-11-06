@@ -2284,7 +2284,185 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
       ok('   e as oito colunas novas estão no fim', /,origem,item_enviado,sair_ate,rastreio,transportadora_id,custo_envio,enviado_em,reputacao$/.test(cols(novo)), cols(novo));
       novo.close(); velho.close();
     }
-    /*__FASE2__*/
+
+    /* ═══════════ ITEM-FALTANTE fase 2 — enviar, avisar e encerrar ═══════════ */
+    const IMG = 'data:image/jpeg;base64,' + Buffer.alloc(4000, 9).toString('base64');
+    const enviar = (id, corpo, quem) => chamar('POST','/api/devolucao-casos/:id/enviar', corpo, quem || 2, { id });
+    const anx = (id, tipo, quem) => chamar('POST','/api/devolucao-casos/:id/anexo', { tipo, arquivo:IMG }, quem || 2, { id });
+    const acaoE = (id, a, corpo, quem) => chamar('POST','/api/devolucao-casos/:id/'+a, corpo || {}, quem || 2, { id });
+    const tAtiva = chamar('POST','/api/devolucao-casos/transportadoras',{ nome:'Log Kit' }, 2).body.id;
+    const tInativa = chamar('POST','/api/devolucao-casos/transportadoras',{ nome:'Log Parada' }, 2).body.id;
+    chamar('POST','/api/devolucao-casos/transportadoras/:tid',{ ativo:0 }, 2, { tid:tInativa });
+    const temChave = (o, k) => { const s = JSON.stringify(o); return s.indexOf('"'+k+'"') >= 0; };
+
+    r = env({ venda:'8880101', origem:'ml', prazo:dia(5), link_ml:LINK });
+    const m1 = r.body.id;
+    r = env({ venda:'8880102', origem:'fora_ml' });
+    const w1 = r.body.id;
+
+    secao('envio [19] — ENVIADO exige transportadora, rastreio e frete');
+    r = enviar(w1, {});
+    eq('sem nada → 400', r.status, 400);
+    ok('   a recusa nomeia os três', /transportadora/.test(r.body.erro||'') && /rastreio/.test(r.body.erro||'') && /frete/.test(r.body.erro||''), JSON.stringify(r.body));
+    eq('sem transportadora → 400', enviar(w1, { rastreio:'BR123', custo_envio:'25,00' }).status, 400);
+    eq('sem rastreio (só espaço) → 400', enviar(w1, { transportadora_id:tAtiva, rastreio:'   ', custo_envio:'25,00' }).status, 400);
+    r = enviar(w1, { transportadora_id:tAtiva, rastreio:'BR123', custo_envio:'' });
+    eq('frete vazio → 400', r.status, 400);
+    ok('   dizendo o frete', /frete/.test(r.body.erro||''), JSON.stringify(r.body));
+    eq('frete 0 → 400 (custo vazio nunca vira zero)', enviar(w1, { transportadora_id:tAtiva, rastreio:'BR123', custo_envio:'0' }).status, 400);
+    eq('frete negativo → 400', enviar(w1, { transportadora_id:tAtiva, rastreio:'BR123', custo_envio:'-5' }).status, 400);
+    eq('   e o caso não andou', caso(w1).etapa + '/' + caso(w1).enviado_em, 'lancado/null');
+
+    secao('envio [21] — transportadora desativada não é aceita');
+    eq('transportadora desativada → 400', enviar(w1, { transportadora_id:tInativa, rastreio:'BR123', custo_envio:'25,00' }).status, 400);
+
+    secao('envio [20] — ENVIADO completo');
+    r = enviar(w1, { transportadora_id:tAtiva, rastreio:'  BR123  ', custo_envio:'25,90' });
+    eq('enviado (200)', r.status, 200);
+    let cw = caso(w1);
+    eq('   etapa enviado', cw.etapa, 'enviado');
+    ok('   enviado_em gravado', !!cw.enviado_em);
+    eq('   frete', cw.custo_envio, 25.9);
+    eq('   rastreio sem espaço nas pontas', cw.rastreio, 'BR123');
+    eq('   transportadora', cw.transportadora_id, tAtiva);
+    const evE = eventos(w1).filter(e => e.tipo === 'enviado');
+    ok('   evento "frete lançado" sem o valor', evE.length === 1 && /frete lançado/.test(evE[0].texto) && !/25[,.]9/.test(evE[0].texto), JSON.stringify(evE));
+    ok('   e a auditoria registra o valor', AUDIT.some(a => a.acao === 'valor' && String(a.alvo) === String(w1)), JSON.stringify(AUDIT.slice(-2)));
+    eq('depois de enviado, o "sair até" não pinta mais', (daLista(lista().envio, w1)||{}).cor, '');
+    eq('o caso não volta para antes do envio (→ Embalado: 400)', etp(w1, 'embalado').status, 400);
+    r = enviar(w1, { transportadora_id:tAtiva, rastreio:'BR999', custo_envio:'31,00' });
+    eq('corrigir o envio depois (200)', r.status, 200);
+    ok('   troca e diz "frete trocado", sem o número', caso(w1).custo_envio === 31 && caso(w1).rastreio === 'BR999' &&
+       eventos(w1).some(e => e.tipo === 'envio' && /frete trocado/.test(e.texto) && !/31/.test(e.texto)), JSON.stringify(eventos(w1).slice(-1)));
+    eq('   e a etapa não mexe', caso(w1).etapa, 'enviado');
+
+    secao('envio [22] — quem não lança, não acompanha e não tem o dinheiro não recebe o frete');
+    {
+      const L4 = chamar('GET','/api/devolucao-casos',null,4).body;
+      ok('lista sem custo_envio', !temChave(L4, 'custo_envio'));
+      ok('caso sem custo_envio', !temChave(chamar('GET','/api/devolucao-casos/:id',null,4,{id:w1}).body, 'custo_envio'));
+      ok('encerrados sem custo_envio', !temChave(chamar('GET','/api/devolucao-casos/encerrados',null,4).body, 'custo_envio'));
+      ok('busca sem custo_envio', !temChave(chamar('GET','/api/devolucao-casos/buscar',null,4,{},{ q:'8880102' }).body, 'custo_envio'));
+    }
+
+    secao('envio [23] — quem só acompanha vê e lança o frete');
+    eq('o Renato (só acompanhar) vê o frete no caso', (chamar('GET','/api/devolucao-casos/:id',null,2,{id:w1}).body.caso||{}).custo_envio, 31);
+    eq('   e quem só lança também pode enviar', enviar(m1, { transportadora_id:tAtiva, rastreio:'ML1', custo_envio:'18,00' }, 3).status, 200);
+
+    secao('envio [25] — ML AVISADO na origem WhatsApp não existe');
+    eq('na origem WhatsApp → 400', acaoE(w1, 'aviso-ml').status, 400);
+    ok('   a trilha não tem ml_avisado', (det(w1).etapas||[]).indexOf('ml_avisado') < 0 && (det(m1).etapas||[]).indexOf('ml_avisado') >= 0, JSON.stringify(det(w1).etapas));
+
+    secao('envio [26] — depois do último aviso, "aguardando confirmação" sozinha');
+    eq('comprador avisado (WhatsApp)', etp(w1, 'comprador_avisado').status, 200);
+    eq('   vai sozinho para aguardando_confirmacao', caso(w1).etapa, 'aguardando_confirmacao');
+    eq('   e o desfazer volta as duas (para Enviado)', chamar('POST','/api/devolucao-casos/:id/desfazer-etapa',{}, 2, { id:w1 }).status, 200);
+    eq('   o caso volta a Enviado', caso(w1).etapa, 'enviado');
+    etp(w1, 'comprador_avisado');
+    eq('comprador avisado (ML)', etp(m1, 'comprador_avisado').status, 200);
+    eq('   no ML fica em comprador_avisado, esperando o aviso ao ML', caso(m1).etapa, 'comprador_avisado');
+
+    secao('envio [24] — ML AVISADO pede o print');
+    r = acaoE(m1, 'aviso-ml');
+    eq('sem o print_ml → 400', r.status, 400);
+    ok('   dizendo que falta o print', /print/i.test(r.body.erro||''), JSON.stringify(r.body));
+    eq('anexa o print_ml', anx(m1, 'print_ml').status, 200);
+    eq('com o print → 200', acaoE(m1, 'aviso-ml').status, 200);
+    eq('   e vai sozinho para aguardando_confirmacao', caso(m1).etapa, 'aguardando_confirmacao');
+    ok('   com o aviso na história', eventos(m1).some(e => e.tipo === 'aviso_ml'));
+
+    secao('envio [27] — cobrar a confirmação é história, e não zera o parado');
+    db.prepare("UPDATE devolucao_caso SET etapa_desde='2026-10-20 08:00:00' WHERE id=?").run(w1);
+    r = acaoE(w1, 'cobranca', { texto:'mandei mensagem de novo' });
+    eq('cobrança (200)', r.status, 200);
+    ok('   vira evento cobranca, com o texto', eventos(w1).some(e => e.tipo === 'cobranca' && /de novo/.test(e.texto||'')));
+    eq('   a etapa não muda', caso(w1).etapa, 'aguardando_confirmacao');
+    eq('   etapa_desde não muda (o parado não zera)', caso(w1).etapa_desde, '2026-10-20 08:00:00');
+    eq('   e o caso grita parado', (daLista(lista().envio, w1)||{}).parado, true);
+    eq('cobrar antes de aguardar → 400', acaoE(e4.id, 'cobranca').status, 400);
+
+    secao('envio [29] — "afetou a reputação?" só aceita sim ou não');
+    eq('fora de sim/nao → 400', acaoE(w1, 'reputacao', { reputacao:'talvez' }).status, 400);
+    eq('vazia → 400', acaoE(w1, 'reputacao', { reputacao:'' }).status, 400);
+    eq('   e continua vazia (não vira "não")', caso(w1).reputacao, null);
+
+    secao('envio [28] — "comprador confirmou" exige a reputação');
+    r = acaoE(w1, 'confirmado');
+    eq('sem reputação → 400', r.status, 400);
+    ok('   dizendo que falta a reputação', /reputa/i.test(r.body.erro||'') && (r.body.faltam||[]).includes('reputacao'), JSON.stringify(r.body));
+    eq('   e o caso continua aberto', caso(w1).encerrado_em, null);
+    ok('   a lista diz o que falta para encerrar', ((daLista(lista().envio, w1)||{}).falta||[]).some(f => /reputa/.test(f)));
+    eq('responde "não" (200)', acaoE(w1, 'reputacao', { reputacao:'nao' }).status, 200);
+    eq('   gravado', caso(w1).reputacao, 'nao');
+    r = acaoE(w1, 'confirmado', {}, 3);
+    eq('agora encerra (200)', r.status, 200);
+    cw = caso(w1);
+    eq('   saida confirmado', cw.saida, 'confirmado');
+    eq('   encerrado', cw.etapa, 'encerrado');
+    eq('   por quem', cw.encerrado_por + '/' + cw.encerrado_por_id, 'Ana/3');
+    ok('   e quando', !!cw.encerrado_em);
+
+    secao('envio [31] — "entregue sem confirmação" só a partir de aguardando');
+    eq('antes de aguardando → 400 (com o dinheiro)', acaoE(e4.id, 'entregue-sem-confirmacao', {}, 1).status, 400);
+
+    secao('envio [30] — "entregue sem confirmação": o dinheiro, o print do rastreio e a reputação');
+    r = acaoE(m1, 'entregue-sem-confirmacao', {}, 2);
+    eq('sem devolucao.dinheiro → 403', r.status, 403);
+    r = acaoE(m1, 'entregue-sem-confirmacao', {}, 1);
+    eq('com a chave, sem print_rastreio → 400', r.status, 400);
+    ok('   dizendo o print', /rastreio/i.test(r.body.erro||''), JSON.stringify(r.body));
+    eq('anexa o print do rastreio', anx(m1, 'print_rastreio').status, 200);
+    r = acaoE(m1, 'entregue-sem-confirmacao', {}, 1);
+    eq('sem reputação → 400', r.status, 400);
+    acaoE(m1, 'reputacao', { reputacao:'sim' });
+    r = acaoE(m1, 'entregue-sem-confirmacao', {}, 1);
+    eq('com tudo → 200', r.status, 200);
+    eq('   saida entregue_sem_confirmacao', caso(m1).saida, 'entregue_sem_confirmacao');
+    eq('   por quem', caso(m1).encerrado_por, 'Lucas');
+    ok('   e a auditoria registra a decisão', AUDIT.some(a => a.acao === 'entregue_sem_confirmacao' && String(a.alvo) === String(m1)));
+
+    secao('envio [32] — os prints moram em PCP_DEVOLUCOES_DIR, e o disco que recusa não deixa linha');
+    {
+      const DIRV = process.env.PCP_DEVOLUCOES_DIR;
+      const aa = db.prepare("SELECT * FROM devolucao_anexo WHERE caso_id=? ORDER BY id").all(m1);
+      ok('print_ml e print_rastreio gravados', aa.map(a => a.tipo).join(',') === 'print_ml,print_rastreio', JSON.stringify(aa.map(a => a.tipo)));
+      ok('   dentro da pasta das devoluções, nunca em lotes/', aa.every(a => a.arquivo.indexOf(DIRV) === 0 && !/\/lotes\//.test(a.arquivo) && fs.existsSync(a.arquivo)));
+      r = env({ venda:'8880132', origem:'ml', prazo:dia(5), link_ml:LINK });
+      const k32 = r.body.id, nA = contar('devolucao_anexo');
+      fs.renameSync(DIRV, DIRV + '.bak'); fs.writeFileSync(DIRV, 'arquivo no lugar da pasta');
+      r = anx(k32, 'print_ml');
+      fs.unlinkSync(DIRV); fs.renameSync(DIRV + '.bak', DIRV);
+      ok('o disco recusou → erro', r.status >= 500, JSON.stringify(r));
+      eq('   e o anexo não existe', contar('devolucao_anexo'), nA);
+      eq('print num caso de devolução → 400', anx(d12, 'print_ml').status, 400);
+      eq('documento da coleta num envio → 400', chamar('POST','/api/devolucao-casos/:id/anexo',{ tipo:'foto_comprador', arquivo:IMG }, 2, { id:k32 }).status, 400);
+    }
+
+    secao('envio [33] — o desfazer: as etapas à mão, e nunca ENVIADO nem o encerramento');
+    {
+      r = env({ venda:'8880133', origem:'ml', prazo:dia(5), link_ml:LINK });
+      const k = r.body.id;
+      enviar(k, { transportadora_id:tAtiva, rastreio:'X1', custo_envio:'10,00' });
+      eq('ENVIADO não se desfaz (409)', chamar('POST','/api/devolucao-casos/:id/desfazer-etapa',{}, 2, { id:k }).status, 409);
+      etp(k, 'comprador_avisado');
+      eq('"comprador avisado" (ML) se desfaz', chamar('POST','/api/devolucao-casos/:id/desfazer-etapa',{}, 2, { id:k }).status, 200);
+      eq('   volta a Enviado', caso(k).etapa, 'enviado');
+      eq('o encerrado não se desfaz (409)', chamar('POST','/api/devolucao-casos/:id/desfazer-etapa',{}, 3, { id:w1 }).status, 409);
+    }
+
+    secao('envio — os fins da devolução não servem ao envio');
+    eq('perda → 400', acaoE(e4.id, 'perda', {}, 1).status, 400);
+    eq('devolver ao comprador → 400', acaoE(e4.id, 'devolver-comprador', {}, 1).status, 400);
+    eq('reembolso → 400', acaoE(e4.id, 'reembolso', { resultado:'recebido' }, 1).status, 400);
+    eq('"a caixa chegou" → 400', acaoE(e4.id, 'chegou', {}, 2).status, 400);
+    eq('trocar o tipo → 400', acaoE(e4.id, 'tipo', { para:'ml' }, 1).status, 400);
+    ok('o Edvaldo não acha o envio pelo bipe nem pelo SKU', !(chamar('GET','/api/devolucao/esperadas',null,4,{},{ sku:'BK140140BEGE' }).body.casos||[]).some(c => c.tipo === 'envio'));
+    eq('sem login, enviar é 401', chamar('POST','/api/devolucao-casos/:id/enviar',{}, 'ninguem', { id:e4.id }).status, 401);
+
+    secao('envio [16] — de novo: nada do envio mexeu no estoque');
+    eq('skus, componente, fila e montagem iguais depois das fases 1 e 2', contaEstoque(), estoque0);
+
+    /*__FASE3__*/
   }
 
   fim();

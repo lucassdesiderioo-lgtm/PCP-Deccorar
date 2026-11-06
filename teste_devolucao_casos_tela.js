@@ -731,7 +731,58 @@ const srv = app.listen(0, async () => {
       ok('   sem rolar de lado', mw[0] <= mw[1], JSON.stringify(mw));
       await pw.close();
     }
-    /*__TELA_FASE2__*/
+    secao('envio — enviar, avisar e encerrar pela tela');
+    {
+      const tId = (await api(await pg(), 'POST', '/api/devolucao-casos/transportadoras', { nome:'Log Tela' })).id;
+      const pz = await pg();
+      const r1 = await api(pz, 'POST', '/api/devolucao-casos', { tipo:'envio', origem:'ml', prazo:dia(5), venda:'8770201', publicidade:false });
+      const id = r1.id;
+      await pz.goto(B + '/devolucao-casos'); await pz.waitForTimeout(900);
+      await pz.locator('#listaEnvio .linha', { hasText:'#'+id+' ' }).first().locator('.t1').click(); await pz.waitForTimeout(1200);
+      ok('"Afetou a reputação?" fica no alto, sem resposta', /ainda não respondida/.test(await pz.textContent('#painel')));
+      ok('o bloco Envio tem o botão', await pz.locator('#btEnviar').count() === 1);
+      await pz.selectOption('#evTransp', String(tId)); await pz.fill('#evRastreio', 'BR777');
+      await pz.click('#btEnviar'); await pz.waitForTimeout(900);
+      ok('sem o frete: recusado, o motivo aparece e o caso não anda', /frete/.test(await pz.textContent('#cMsg')) && caso(id).etapa === 'lancado', await pz.textContent('#cMsg'));
+      await pz.fill('#evFrete', '27,40'); await pz.click('#btEnviar'); await pz.waitForTimeout(1000);
+      eq('com o frete: enviado', caso(id).etapa + '/' + caso(id).custo_envio + '/' + caso(id).rastreio, 'enviado/27.4/BR777');
+      ok('   a tela mostra o frete a quem lança', /R\$ 27,40/.test(await pz.textContent('#painel')));
+      await pz.click('#painel [data-etapa="comprador_avisado"]'); await pz.waitForTimeout(900);
+      eq('"→ Comprador avisado"', caso(id).etapa, 'comprador_avisado');
+      await pz.click('#btAvisoML'); await pz.waitForTimeout(900);
+      ok('o aviso ao ML sem o print: recusado', /print/i.test(await pz.textContent('#cMsg')) && caso(id).etapa === 'comprador_avisado', await pz.textContent('#cMsg'));
+      /* Um PDF com conteúdo (o lerArquivo manda PDF como está; foto minúscula é recusada como "vazia"). */
+      await pz.setInputFiles('#painel input[data-print="print_ml"]', { name:'print.pdf', mimeType:'application/pdf', buffer:Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(2000, 32)]) });
+      await pz.waitForTimeout(1500);
+      ok('o print do ML anexado pela tela', db.prepare("SELECT COUNT(*) n FROM devolucao_anexo WHERE caso_id=? AND tipo='print_ml'").get(id).n === 1);
+      await pz.click('#btAvisoML'); await pz.waitForTimeout(900);
+      eq('com o print: aguardando confirmação', caso(id).etapa, 'aguardando_confirmacao');
+      await pz.fill('#cbTexto', 'whats de novo'); await pz.click('#btCobrei'); await pz.waitForTimeout(900);
+      ok('"Cobrei a confirmação" vai para a história', db.prepare("SELECT COUNT(*) n FROM devolucao_evento WHERE caso_id=? AND tipo='cobranca'").get(id).n === 1);
+      pz.once('dialog', dl => dl.accept());
+      await pz.click('#btConfirmou'); await pz.waitForTimeout(900);
+      ok('"Comprador confirmou" sem a reputação: recusado, dizendo', /reputa/i.test(await pz.textContent('#cMsg')) && !caso(id).encerrado_em, await pz.textContent('#cMsg'));
+      await pz.click('#painel [data-rep="nao"]'); await pz.waitForTimeout(900);
+      eq('reputação "Não" pela tela', caso(id).reputacao, 'nao');
+      ok('   o Admin Geral vê "Entregue sem confirmação"', await pz.locator('#btSemConf').count() === 1);
+      pz.once('dialog', dl => dl.accept());
+      await pz.click('#btConfirmou'); await pz.waitForTimeout(900);
+      eq('encerrado como "Comprador confirmou"', caso(id).saida, 'confirmado');
+      await pz.close();
+      /* Quem só acompanha (2) não vê "Entregue sem confirmação". */
+      const r2 = await api(await pg(), 'POST', '/api/devolucao-casos', { tipo:'envio', origem:'fora_ml', venda:'8770202', publicidade:false });
+      db.prepare("UPDATE devolucao_caso SET etapa='aguardando_confirmacao', enviado_em=datetime('now','localtime'), custo_envio=12 WHERE id=?").run(r2.id);
+      QUEM = 2;
+      const pr = await pg();
+      await pr.goto(B + '/devolucao-casos'); await pr.waitForTimeout(900);
+      await pr.locator('#listaEnvio .linha', { hasText:'#'+r2.id+' ' }).first().locator('.t1').click(); await pr.waitForTimeout(1000);
+      ok('quem só acompanha não vê "Entregue sem confirmação"', await pr.locator('#btSemConf').count() === 0 && await pr.locator('#btConfirmou').count() === 1);
+      ok('   mas vê o frete (acompanha)', /R\$ 12,00/.test(await pr.textContent('#painel')));
+      await pr.close();
+      QUEM = 1;
+    }
+
+    /*__TELA_FASE3__*/
     }
 
     secao('a 400 px — a página não rola de lado, e o caso abre');

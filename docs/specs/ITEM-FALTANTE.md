@@ -5,8 +5,8 @@ STATUS
 Situação: em construção
 Criada em: 06/11/2026
 Última atualização: 06/11/2026
-Fase atual: 1 em código (06/11/2026) — falta subir
-Fases: 1 ☑ (em código)  2 ☐  3 ☐
+Fase atual: 2 em código (06/11/2026) — falta subir
+Fases: 1 ☑ (em código)  2 ☑ (em código)  3 ☐
 Risco: 🔴 (schema, dinheiro, toca no caso de devolução que está no ar)
 Depende de: DEVOLUCOES-ACOMPANHAMENTO (no ar) · QUEM-FEZ-E-REVISAO (no ar, arquivada)
 Mudanças no caminho (decisões do dono no plano, 06/11/2026, e o que diverge do texto):
@@ -26,6 +26,10 @@ Mudanças no caminho (decisões do dono no plano, 06/11/2026, e o que diverge do
   · O envio não troca de tipo, não aparece nas portas do Edvaldo, e recusa
     perda, devolver ao comprador, reembolso e "a caixa chegou".
   · A origem se troca só antes de ENVIADO; ENVIADO sai de Lançado ou Embalado.
+  · Fase 2: ENVIADO é `POST …/enviar` (a mesma porta corrige depois, "frete
+    trocado" sem o número); o frete é de quem lança ou acompanha; ML AVISADO
+    é o `aviso-ml` de sempre, com o anexo `print_ml`; os prints são só do
+    envio, e o envio não aceita documento da coleta nem foto do comprador.
   · No WhatsApp, "Comprador avisado" leva sozinho a "Aguardando confirmação"
     (evento `auto`), e o desfazer desse clique volta as duas.
 ```

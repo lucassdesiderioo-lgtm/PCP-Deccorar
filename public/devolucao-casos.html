@@ -680,14 +680,83 @@ function celulasEnvio(c){
     : '<div><b>Sair até</b>'+dataBR(c.sair_ate)+'<br><small>'+(c.enviado_em?'<span style="color:var(--green)">✓ enviado</span>':'fim do dia útil')+'</small></div>';
   return '<div><b>Origem</b>'+(c.origem==='ml'?'Mercado Livre':'WhatsApp ou outro canal')+'</div><div><b>Item a enviar</b>'+esc(c.item_enviado||'—')+'</div>'+pz;
 }
-var GANCHO_ENVIO_TOPO=function(){ return ''; };
+/* "AFETOU A REPUTAÇÃO?" NO ALTO (R-ENV-15): pode ser respondida antes do fim,
+   e os dois fins recusam sem ela. Vazia é "não respondida", nunca "não". Não é
+   dinheiro: todo mundo que abre o caso vê. */
+var GANCHO_ENVIO_TOPO=function(d, c, P, aberto){
+  var r=c.reputacao, txt = r==='sim' ? 'Sim' : r==='nao' ? 'Não' : 'ainda não respondida';
+  var h='<div class="bloco" style="border-color:'+(r?'var(--line)':'var(--amber)')+'"><h3>Afetou a reputação?</h3>'+
+    '<div class="sub" style="margin-bottom:6px">Resposta: <b style="color:'+(r?'var(--txt)':'var(--amber)')+'">'+txt+'</b> — obrigatória para encerrar.</div>';
+  if(aberto && P.acompanhar) h+='<div class="acoes simnao"><button class="bt sec'+(r==='sim'?' on':'')+'" data-rep="sim">Sim</button><button class="bt sec'+(r==='nao'?' on':'')+'" data-rep="nao">Não</button></div>';
+  return h+'</div>';
+};
+/* O BLOCO ENVIO (R-ENV-09 a 14): transportadora, rastreio e frete (o frete só
+   a quem lança ou acompanha — o servidor nem o manda aos outros), os prints e
+   os fins. */
+var NOME_ANEXO={ print_ml:'Print mandado ao ML', print_rastreio:'Print do rastreio (entregue)' };
+GANCHOS.push({
+  html:function(d, c, P, aberto){
+    if(c.tipo!=='envio') return '';
+    var tr=(TRANSP||[]).filter(function(t){ return t.ativo || t.id===c.transportadora_id; });
+    var nomeT=(tr.filter(function(t){ return t.id===c.transportadora_id; })[0]||{}).nome;
+    var h='<div class="bloco"><h3>Envio</h3>';
+    if(c.enviado_em) h+='<div class="dados"><div><b>Enviado em</b>'+horaBR(c.enviado_em)+'</div><div><b>Transportadora</b>'+esc(nomeT||('#'+c.transportadora_id))+'</div>'+
+      '<div><b>Rastreio</b>'+esc(c.rastreio||'—')+'</div>'+('custo_envio' in c?'<div><b>Frete</b>'+reais(c.custo_envio)+'</div>':'')+'</div>';
+    if(aberto && P.valores){
+      h+='<div class="sub" style="margin:6px 0">'+(c.enviado_em?'Corrigir o envio (a história diz o que mudou, sem o valor do frete):':'Marcar como enviado: transportadora, código de rastreio e frete são obrigatórios. O frete sai na hora de gerar a etiqueta.')+'</div>'+
+        '<div class="acoes"><select id="evTransp" style="max-width:220px"><option value="">— transportadora —</option>'+
+        tr.map(function(t){ return '<option value="'+t.id+'"'+(t.id===c.transportadora_id?' selected':'')+'>'+esc(t.nome)+'</option>'; }).join('')+'</select>'+
+        '<input id="evRastreio" placeholder="código de rastreio" autocomplete="off" autocorrect="off" value="'+esc(c.rastreio||'')+'" style="max-width:220px">'+
+        '<input id="evFrete" placeholder="frete (R$)" autocomplete="off" value="'+(c.custo_envio!=null?virg(c.custo_envio):'')+'" style="max-width:140px">'+
+        '<button class="bt" id="btEnviar">'+(c.enviado_em?'Corrigir o envio':'Marcar como enviado')+'</button></div>';
+    } else if(aberto && !c.enviado_em) h+='<div class="sub">Quem lança ou acompanha as devoluções marca o envio, com o frete.</div>';
+    var an=(d.anexos||[]).filter(function(a){ return NOME_ANEXO[a.tipo]; });
+    var tem=function(t){ return an.some(function(a){ return a.tipo===t; }); };
+    if(aberto && P.acompanhar){
+      h+='<div class="acoes" style="margin-top:8px">'+(c.origem==='ml'?'<span class="chip'+(tem('print_ml')?'':' falta')+'">'+(tem('print_ml')?'✓ ':'falta: ')+'print mandado ao ML</span>'+
+        '<label class="bt sec" style="text-transform:none;font-size:13px;margin:0;color:var(--txt)">Anexar print do ML<input type="file" accept="image/*,application/pdf" data-print="print_ml" style="display:none"></label>':'')+
+        '<span class="chip'+(tem('print_rastreio')?'':'')+'">'+(tem('print_rastreio')?'✓ ':'')+'print do rastreio</span>'+
+        '<label class="bt sec" style="text-transform:none;font-size:13px;margin:0;color:var(--txt)">Anexar print do rastreio<input type="file" accept="image/*,application/pdf" data-print="print_rastreio" style="display:none"></label></div>';
+    }
+    h+= an.length ? '<div class="hist" style="margin-top:6px">'+an.map(function(a){
+      return '<div><a href="/api/devolucao-casos/anexo/'+a.id+'" target="_blank" style="color:var(--amber)">'+esc(NOME_ANEXO[a.tipo])+'</a> <small>· '+a.formato+' · '+horaBR(a.criado_em)+' · '+esc(a.usuario||'')+'</small></div>';
+    }).join('')+'</div>' : '';
+    h+='<div id="anxMsg"></div></div>';
+    if(aberto && P.acompanhar && c.etapa==='aguardando_confirmacao'){
+      h+='<div class="bloco"><h3>Confirmação do comprador</h3><div class="sub" style="margin-bottom:6px">Cada cobrança fica na história; ela não zera o "parado".</div>'+
+        '<div class="acoes"><input id="cbTexto" placeholder="como cobrou (opcional)" autocomplete="off" style="max-width:280px"><button class="bt sec" id="btCobrei">Cobrei a confirmação</button></div>'+
+        '<div class="acoes"><button class="bt" id="btConfirmou">Comprador confirmou</button>'+
+        (P.dinheiro?'<button class="bt perigo" id="btSemConf">Entregue sem confirmação</button>':'')+'</div>'+
+        (P.dinheiro?'<div class="sub">"Entregue sem confirmação" é exceção (permissão do dinheiro): exige o print do rastreio dizendo entregue e a reputação respondida.</div>':'')+'</div>';
+    }
+    return h;
+  },
+  ligar:function(d, c, base){
+    if(c.tipo!=='envio') return;
+    var x;
+    if(!TRANSP.length && document.getElementById('evTransp')) carregarTransp().then(function(){ if(ESTADO.aberto===c.id && !sujos().length) abrir(c.id); }).catch(function(){});
+    if((x=document.getElementById('btEnviar'))) x.onclick=function(){
+      acao(base+'/enviar',{ transportadora_id:document.getElementById('evTransp').value, rastreio:document.getElementById('evRastreio').value, custo_envio:document.getElementById('evFrete').value });
+    };
+    document.querySelectorAll('#painel input[data-print]').forEach(function(inp){ inp.onchange=function(){
+      var f=inp.files&&inp.files[0]; if(!f) return;
+      var m=document.getElementById('anxMsg'); m.innerHTML='<div class="sub">Enviando…</div>';
+      lerArquivo(f).then(function(url){ return acao(base+'/anexo',{ tipo:inp.getAttribute('data-print'), arquivo:url }); })
+        .catch(function(){ m.innerHTML='<div class="erro">Não deu para ler o arquivo. Tente de novo.</div>'; });
+    }; });
+    document.querySelectorAll('#painel [data-rep]').forEach(function(b){ b.onclick=function(){ acao(base+'/reputacao',{ reputacao:b.getAttribute('data-rep') }); }; });
+    if((x=document.getElementById('btCobrei'))) x.onclick=function(){ acao(base+'/cobranca',{ texto:document.getElementById('cbTexto').value }); };
+    if((x=document.getElementById('btConfirmou'))) x.onclick=function(){ if(confirm('O comprador confirmou que recebeu? O caso #'+c.id+' encerra.')) acao(base+'/confirmado',{}); };
+    if((x=document.getElementById('btSemConf'))) x.onclick=function(){ if(confirm('Encerrar o caso #'+c.id+' como ENTREGUE SEM CONFIRMAÇÃO? A decisão fica registrada com seu nome.')) acao(base+'/entregue-sem-confirmacao',{}); };
+  }
+});
 /* O cartão "Próximo passo" (fase 1 da spec DEVOLUCOES-PROXIMO-PASSO). O
    botão rola até o bloco do caso que resolve o passo — pelo título dele. */
 var ALVO_PASSO={ pedir_coleta:'Coleta — tentativas', agendar:'Coleta — tentativas', resultado_coleta:'Coleta — tentativas',
   docs:'Documentos e fotos', chegou:'Etapa', aviso_ml:'Etapa', revisei:'Etapa', prazo:'Prazos do ML',
   valor:'Valor do ML pela coleta', reembolso:'Valores do caso', baixa:'Baixa da devolução',
   revisao_frete:'Revisão no ML', revisar:'A peça já foi revisada?',
-  envio:'Etapa', etapas:'Etapa', cobranca:'Etapa', reputacao:'Etapa' };
+  envio:'Envio', etapas:'Etapa', cobranca:'Confirmação do comprador', reputacao:'Afetou a reputação?' };
 var VEZ_NOME={ nos:'a gente', dinheiro:'a gente (o dinheiro)', receber_peca:'quem recebe a peça', transportadora:'a transportadora', ml:'o Mercado Livre' };
 function cartaoProximo(c){
   var p=c.proximo; if(!p) return '';
@@ -754,6 +823,8 @@ function desenharCaso(d){
        baixa (e a resposta da revisão, se pedida), o caso encerra. */
     if(c.tipo==='ml' && c.devolucao_id && c.etapa!=='ml_revisei')
       botoes+='<button class="bt" id="btAvisoML">Marquei "Já revisei" no ML</button>';
+    if(c.tipo==='envio' && c.origem==='ml' && c.etapa==='comprador_avisado')
+      botoes+='<button class="bt" id="btAvisoML">Avisamos o ML (com o print)</button>';
     if(c.tipo==='coleta' && c.chegou_em && c.etapa!=='ml_avisado' && !d.eventos.some(function(e){return e.tipo==='aviso_ml';}))
       botoes+='<button class="bt sec" id="btAvisoML">Avisamos o ML que recebemos</button>';
     /* O desfazer (AJUSTE de 03/11/2026): só aparece a quem fez a última mudança
@@ -1107,6 +1178,7 @@ function lerArquivo(file){
 }
 GANCHOS.push({
   html:function(d, c, P, aberto){
+    if(c.tipo==='envio') return '';   // o envio tem os prints no bloco Envio
     var h='<div class="bloco"><h3>Documentos e fotos</h3>';
     if(c.tipo==='coleta' && (d.docs||[]).length){
       h+='<div class="sub" style="margin-bottom:6px">Para ir a "Documentos ao ML", todos os documentos da lista precisam estar anexados.</div>';
@@ -1259,7 +1331,7 @@ GANCHOS.push({
    confirmação, e a confirmação fica na história como envio diferente. */
 GANCHOS.push({
   html:function(d, c, P, aberto){
-    if(!aberto || c.devolucao_id || !P.acompanhar) return '';
+    if(!aberto || c.devolucao_id || !P.acompanhar || c.tipo==='envio') return '';
     return '<div class="bloco"><h3>A peça já foi revisada?</h3><div class="sub" style="margin-bottom:6px">Se o Edvaldo revisou bipando a etiqueta de devolução do ML, a revisão pode ter ficado sem caso. Ligue aqui.</div><div id="soltasBox" class="sub">carregando…</div></div>';
   },
   ligar:function(d, c, base){
@@ -1296,6 +1368,7 @@ function campoEtiqueta(c){
 GANCHOS.push({
   html:function(d, c, P, aberto){
     var h='';
+    if(c.tipo==='envio') return '';   // o frete do envio mora no bloco Envio
     if(c.tipo==='coleta' && aberto && P.acompanhar){
       h+='<div class="bloco"><h3>Valor do ML pela coleta</h3><div class="sub" style="margin-bottom:6px">Situação: <b style="color:var(--txt)">'+esc(NOME_SIT[c.valor_ml_situacao]||'não informada')+'</b>'+
         (c.parado_valor?' · <span style="color:var(--amber)">a pedir há '+plural(c.dias_valor,'dia','dias')+'</span>':'')+'</div><div class="acoes">'+
