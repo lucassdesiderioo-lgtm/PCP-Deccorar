@@ -2,11 +2,11 @@
 
 ```
 STATUS
-Situação: em construção
+Situação: arquivado — no ar e conferido na tela em 06/11/2026 (PR #299)
 Criada em: 06/11/2026
 Última atualização: 06/11/2026
-Fase atual: as 3 em código (06/11/2026) — falta o deploy e a prova na tela
-Fases: 1 ☑  2 ☑  3 ☑ (em código, não no ar)
+Fase atual: concluída — o dono fez o deploy e disse "bateu tudo" (06/11/2026)
+Fases: 1 ☑  2 ☑  3 ☑ (no ar)
 Risco: 🔴 (schema, dinheiro, toca no caso de devolução que está no ar)
 Depende de: DEVOLUCOES-ACOMPANHAMENTO (no ar) · QUEM-FEZ-E-REVISAO (no ar, arquivada)
 Mudanças no caminho (decisões do dono no plano, 06/11/2026, e o que diverge do texto):

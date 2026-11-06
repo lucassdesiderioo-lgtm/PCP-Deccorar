@@ -2100,7 +2100,7 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
     ok('   e a chegada fica', !!caso(c2).chegou_em);
   }
 
-  /* ═══════════ ITEM-FALTANTE — o tipo "envio" (spec docs/specs/ITEM-FALTANTE.md §10) ═══════════
+  /* ═══════════ ITEM-FALTANTE — o tipo "envio" (spec docs/arquivo/ITEM-FALTANTE.md §10) ═══════════
      Escritos ANTES do código (risco 🔴). Os números entre colchetes são os da §10 da spec. */
   {
     const D = require('./devcaso_dominio');

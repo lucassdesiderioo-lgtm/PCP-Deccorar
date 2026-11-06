@@ -2370,7 +2370,7 @@ dinheiro não vem junto.
 > `devcaso_route.js`. O caso e o evento de antes ficam sem id: não se inventa.
 
 > ⚠️ **O TERCEIRO TIPO: "ENVIAR ITEM FALTANTE" (`tipo='envio'`, 06/11/2026)** —
-> spec `docs/specs/ITEM-FALTANTE.md`, as três fases numa entrega só, cinco linhas
+> spec `docs/arquivo/ITEM-FALTANTE.md`, as três fases numa entrega só, cinco linhas
 > em `docs/DECISOES.md`. O kit de instalação que faltou na caixa: é o **único
 > tipo em que a peça SAI** da fábrica. Mesma tela (a terceira lista, entre
 > "Nós coletamos" e "ML devolve"), mesmo dono (`devcaso_dominio.js`), mesma
@@ -2430,9 +2430,15 @@ dinheiro não vem junto.
 >   botão próprio**, como o prazo novo: não entram no "Salvar alterações". O
 >   item (`eItem`) entra.
 >
-> ⚠️ **AINDA NÃO PROVADO:** o deploy, os ~3 casos de kit faltante lançados pela
-> tela, o primeiro envio com frete e rastreio, e o primeiro encerramento com a
-> reputação respondida. Prova que não foi feita se escreve como não feita.
+> ✅ **NO AR E CONFERIDO EM 06/11/2026** (PR #299): o dono fez o backup, o
+> deploy e o teste de segurança e percorreu o roteiro na tela — o caso de
+> WhatsApp com o "sair até", o envio recusado sem frete e aceito com ele, o
+> aviso ao ML com o print, a cobrança, a reputação para encerrar, "Quem
+> trabalhou nesta venda" e o relatório do mês — e disse *"bateu tudo"*. A spec
+> foi para `docs/arquivo/`. ⚠️ **AINDA NÃO PROVADO:** um caso real levado até
+> o comprador confirmar, o primeiro "entregue sem confirmação" de verdade e o
+> frete do mês no relatório com dado real. Prova que não foi feita se escreve
+> como não feita.
 
 **Rode `node teste_devolucao_casos.js` (1104 casos) — e, na tela, `node teste_devolucao_casos_tela.js` (247) — ao mexer no
 `devcaso_dominio.js`, no `devcaso_route.js`, no bipe ou na baixa do
