@@ -1,0 +1,1779 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Code Map</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --surface: #ffffff;
+      --surface-2: #eef2f6;
+      --ink: #17202a;
+      --muted: #617080;
+      --line: #c7d0d9;
+      --strong-line: #738395;
+      --api: #2563eb;
+      --auth: #0f766e;
+      --worker: #7c3aed;
+      --data: #b45309;
+      --external: #475569;
+      --risk: #b91c1c;
+      --ok: #047857;
+      --radius: 8px;
+      --shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 10px 28px rgba(15, 23, 42, 0.08);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.45;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    header {
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+      padding: 16px 22px 14px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0;
+      font-weight: 720;
+    }
+
+    .subtitle {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 26px;
+      padding: 3px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: #2e3b48;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(640px, 1fr) 390px;
+      gap: 16px;
+      padding: 16px;
+      min-height: 0;
+    }
+
+    .workspace {
+      display: grid;
+      grid-auto-rows: min-content;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .search {
+      min-width: min(360px, 100%);
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      background: #fbfcfe;
+      border-radius: 7px;
+      padding: 6px 10px;
+    }
+
+    .search input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--ink);
+      min-height: 26px;
+    }
+
+    .segmented {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .segmented button,
+    .flow-tabs button {
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      color: #263544;
+      min-height: 30px;
+      border-radius: 7px;
+      padding: 5px 9px;
+      cursor: pointer;
+    }
+
+    .segmented button.active,
+    .flow-tabs button.active {
+      color: #fff;
+      border-color: #1f2937;
+      background: #1f2937;
+    }
+
+    .diagram-shell {
+      position: relative;
+      height: 58vh;
+      min-height: 440px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background:
+        radial-gradient(circle at 1px 1px, rgba(15, 23, 42, 0.05) 1px, transparent 0) 0 0 / 22px 22px,
+        #fbfcfe;
+      box-shadow: var(--shadow);
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 440px;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    svg.panning {
+      cursor: grabbing;
+    }
+
+    .zoom-controls {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      gap: 6px;
+      z-index: 3;
+    }
+
+    .zoom-controls button {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.94);
+      color: #263544;
+      min-width: 30px;
+      min-height: 30px;
+      border-radius: 7px;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-weight: 650;
+      box-shadow: var(--shadow);
+    }
+
+    .zoom-controls button:hover {
+      border-color: #1f2937;
+    }
+
+    .zoom-hint {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 3;
+      font-size: 11px;
+      color: #5a6b7c;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 10px;
+    }
+
+    .cluster-label {
+      fill: #64748b;
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .cluster-box {
+      fill: transparent;
+      stroke: #d7dee7;
+      stroke-width: 1;
+      stroke-dasharray: 6 5;
+    }
+
+    .edge {
+      fill: none;
+      stroke: var(--strong-line);
+      stroke-width: 1.4;
+      marker-end: url(#arrow);
+      opacity: 0.4;
+      transition: opacity 0.18s ease, stroke 0.18s ease, stroke-width 0.18s ease;
+    }
+
+    .edge-group {
+      cursor: pointer;
+    }
+
+    .edge-hit {
+      fill: none;
+      stroke: transparent;
+      stroke-width: 14;
+    }
+
+    .edge-label {
+      pointer-events: none;
+      fill: #34414e;
+      font-size: 10px;
+      font-weight: 600;
+      paint-order: stroke;
+      stroke: #fbfcfe;
+      stroke-width: 3.5px;
+      opacity: 0;
+      transition: opacity 0.18s ease;
+    }
+
+    /* Connected to the current selection (or part of a traced flow) */
+    .edge-group.flow .edge {
+      stroke-width: 2.6;
+      opacity: 0.95;
+      stroke: #1f2937;
+      marker-end: url(#arrow-active);
+    }
+
+    .edge-group.flow .edge-label {
+      opacity: 1;
+    }
+
+    .edge-group.faded {
+      opacity: 0.12;
+    }
+
+    .edge-group.dim {
+      opacity: 0.07;
+    }
+
+    .node {
+      cursor: pointer;
+    }
+
+    .node rect {
+      stroke: #cdd6e0;
+      stroke-width: 1.2;
+      rx: 11;
+      ry: 11;
+      filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.08));
+      transition: stroke 0.18s ease, stroke-width 0.18s ease, opacity 0.18s ease;
+    }
+
+    .node text {
+      pointer-events: none;
+      letter-spacing: 0;
+    }
+
+    .node .label {
+      fill: var(--ink);
+      font-weight: 720;
+      font-size: 13px;
+    }
+
+    .node .hint {
+      fill: var(--muted);
+      font-size: 11px;
+    }
+
+    .node .stripe {
+      stroke-width: 4;
+      stroke-linecap: round;
+    }
+
+    .node.active rect {
+      stroke: #1f2937;
+      stroke-width: 2.6;
+      filter: drop-shadow(0 3px 10px rgba(15, 23, 42, 0.18));
+    }
+
+    .node.focus rect {
+      stroke: #5a6b7c;
+      stroke-width: 1.8;
+    }
+
+    .node.faded {
+      opacity: 0.34;
+    }
+
+    .node.dim {
+      opacity: 0.16;
+    }
+
+    .legend {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      max-width: 70%;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .legend .key {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #344456;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    aside {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 14px;
+    }
+
+    .panel,
+    .section {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .panel {
+      overflow: hidden;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .panel-head {
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfe;
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .panel-head p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .panel-body {
+      overflow: auto;
+      padding: 14px;
+    }
+
+    .detail-block {
+      margin-bottom: 18px;
+    }
+
+    .detail-block h3,
+    .section h2 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #415162;
+    }
+
+    .detail-block ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .detail-block li {
+      margin: 5px 0;
+    }
+
+    .file-list {
+      display: grid;
+      gap: 5px;
+    }
+
+    code,
+    .file {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: #1f3b57;
+      background: #eef4fa;
+      border: 1px solid #dae6ef;
+      padding: 2px 5px;
+      border-radius: 5px;
+    }
+
+    .section {
+      padding: 14px;
+    }
+
+    .flows {
+      display: grid;
+      grid-template-rows: auto auto;
+      gap: 12px;
+    }
+
+    .flow-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .flow-content {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr);
+      gap: 12px;
+    }
+
+    .flow-content ol {
+      margin: 0;
+      padding-left: 19px;
+    }
+
+    .flow-content li {
+      margin: 6px 0;
+    }
+
+    .matrix {
+      display: grid;
+      grid-template-columns: 1.1fr 0.8fr 1.4fr 1.4fr 0.9fr;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    .matrix div {
+      padding: 8px 9px;
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      font-size: 12px;
+      min-height: 34px;
+    }
+
+    .matrix .head {
+      background: #edf2f7;
+      color: #334155;
+      font-weight: 720;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 11px;
+    }
+
+    .matrix div:nth-child(5n) {
+      border-right: 0;
+    }
+
+    .matrix div:nth-last-child(-n + 5) {
+      border-bottom: 0;
+    }
+
+    .warn {
+      border-left: 4px solid var(--risk);
+      padding-left: 10px;
+    }
+
+    .ok {
+      border-left: 4px solid var(--ok);
+      padding-left: 10px;
+    }
+
+    .info {
+      border-left: 4px solid var(--api);
+      padding-left: 10px;
+    }
+
+    .guide {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      margin-top: 8px;
+    }
+
+    .guide .item {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: #44545f;
+    }
+
+    .guide .glyph {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 5px;
+      border: 1px solid var(--line);
+      background: #f1f5f9;
+      font-size: 11px;
+      color: #334155;
+    }
+
+    .detail-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+      color: #344456;
+    }
+
+    .neighbors {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .neighbors button {
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      color: #1f3b57;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .neighbors button:hover {
+      border-color: #1f2937;
+    }
+
+    .neighbors .dir {
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    .job-matrix {
+      grid-template-columns: 1.3fr 0.8fr 1.7fr 1.6fr;
+    }
+
+    .job-matrix div:nth-child(5n) {
+      border-right: 1px solid var(--line);
+    }
+
+    .job-matrix div:nth-child(4n) {
+      border-right: 0;
+    }
+
+    .job-matrix div:nth-last-child(-n + 4) {
+      border-bottom: 0;
+    }
+
+    .job-matrix code {
+      font-size: 11px;
+    }
+
+    /* ----- Overview ----- */
+    .overview {
+      padding: 16px;
+    }
+
+    .overview h2 {
+      margin: 0 0 6px;
+      font-size: 16px;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--ink);
+    }
+
+    .overview p {
+      margin: 0 0 10px;
+      font-size: 13.5px;
+      color: #38454f;
+      max-width: 78ch;
+    }
+
+    .overview p .accent {
+      color: var(--ink);
+      font-weight: 650;
+    }
+
+    .caps {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .cap {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: #2e3b48;
+      border: 1px solid var(--line);
+      background: #fbfcfe;
+      border-radius: 999px;
+      padding: 4px 11px;
+    }
+
+    .cap .dot {
+      width: 8px;
+      height: 8px;
+    }
+
+    .runtimes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .runtime {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      background: #fbfcfe;
+    }
+
+    .runtime h3 {
+      margin: 0 0 3px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .runtime.api h3 {
+      color: var(--api);
+    }
+
+    .runtime.worker h3 {
+      color: var(--worker);
+    }
+
+    .runtime p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* ----- Request lifecycle ----- */
+    .req {
+      display: grid;
+      gap: 12px;
+    }
+
+    .req-top {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .req-controls {
+      display: flex;
+      gap: 6px;
+    }
+
+    .req-controls button {
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      color: #263544;
+      min-height: 30px;
+      border-radius: 7px;
+      padding: 5px 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .req-controls button.primary {
+      background: #1f2937;
+      color: #fff;
+      border-color: #1f2937;
+    }
+
+    .req-controls button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .req-request {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      line-height: 1.7;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    .req-request .method {
+      color: #7dd3fc;
+      font-weight: 700;
+    }
+
+    .req-request .path {
+      color: #fbbf24;
+    }
+
+    .req-request .hdr-k {
+      color: #94a3b8;
+    }
+
+    .req-request .hdr-v {
+      color: #cbd5e1;
+    }
+
+    .req-progress {
+      height: 6px;
+      background: var(--surface-2);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .req-progress .bar {
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, var(--api), var(--worker));
+      transition: width 0.35s ease;
+    }
+
+    .req-track {
+      display: grid;
+      gap: 8px;
+    }
+
+    .req-stage {
+      display: grid;
+      grid-template-columns: 34px 1fr auto;
+      gap: 10px;
+      align-items: start;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px 10px 14px;
+      background: #fbfcfe;
+      opacity: 0.5;
+      transition: opacity 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      position: relative;
+    }
+
+    .req-stage .stripe2 {
+      position: absolute;
+      left: 0;
+      top: 9px;
+      bottom: 9px;
+      width: 4px;
+      border-radius: 0 4px 4px 0;
+    }
+
+    .req-stage .num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      background: var(--surface-2);
+      color: #475569;
+      border: 1px solid var(--line);
+    }
+
+    .req-stage.done {
+      opacity: 1;
+    }
+
+    .req-stage.done .num {
+      background: var(--ok);
+      color: #fff;
+      border-color: var(--ok);
+    }
+
+    .req-stage.active {
+      opacity: 1;
+      border-color: #1f2937;
+      box-shadow: var(--shadow);
+    }
+
+    .req-stage.active .num {
+      background: #1f2937;
+      color: #fff;
+      border-color: #1f2937;
+    }
+
+    .req-stage .title {
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .req-stage .desc {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .req-stage .file {
+      margin-top: 6px;
+      display: inline-block;
+    }
+
+    .req-stage .badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+      align-self: center;
+    }
+
+    .req-stage .badge.gate {
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+
+    .req-stage .badge.pass {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+    }
+
+    .req-stage .badge.return {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+
+    @media (max-width: 1040px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        grid-template-rows: auto;
+      }
+
+      .flow-content {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      header,
+      main {
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+
+      .toolbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .matrix {
+        grid-template-columns: 1fr;
+      }
+
+      .matrix div {
+        border-right: 0;
+      }
+
+      .matrix .head {
+        display: none;
+      }
+
+      .runtimes {
+        grid-template-columns: 1fr;
+      }
+
+      .req-stage {
+        grid-template-columns: 30px 1fr;
+      }
+
+      .req-stage .badge {
+        grid-column: 2;
+        justify-self: start;
+        margin-top: 6px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="title-row">
+        <div>
+          <h1 id="bm-title"></h1>
+          <p class="subtitle" id="bm-subtitle"></p>
+          <div class="guide">
+            <span class="item"><span class="glyph">&#9673;</span> click a node to spotlight its connections + see details</span>
+            <span class="item"><span class="glyph">&rarr;</span> click an edge to read what flows between two parts</span>
+            <span class="item"><span class="glyph">&#9678;</span> pick a flow tab to trace a whole path</span>
+            <span class="item"><span class="glyph">&times;</span> click empty space to clear</span>
+          </div>
+        </div>
+        <div class="meta" id="bm-meta"></div>
+      </div>
+    </header>
+
+    <main>
+      <section class="workspace">
+        <div class="section overview">
+          <h2 id="bm-ov-title">Overview</h2>
+          <p id="bm-summary"></p>
+          <div class="caps" id="bm-caps"></div>
+        </div>
+
+        <div class="toolbar">
+          <label class="search" aria-label="Search components">
+            <span>Search</span>
+            <input id="search" type="search" placeholder="component, file, endpoint, design decision" />
+          </label>
+          <div class="segmented" role="group" aria-label="Layer filter" id="bm-segmented"></div>
+        </div>
+
+        <div class="diagram-shell">
+          <span class="zoom-hint">Drag to pan &middot; scroll to zoom</span>
+          <div class="zoom-controls">
+            <button type="button" data-zoom="in" aria-label="Zoom in">+</button>
+            <button type="button" data-zoom="out" aria-label="Zoom out">&minus;</button>
+            <button type="button" data-zoom="reset">Reset</button>
+          </div>
+          <svg id="diagram" viewBox="0 0 1560 720" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Interactive backend architecture diagram">
+            <defs>
+              <marker id="arrow" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L8,3 z" fill="#738395"></path>
+              </marker>
+              <marker id="arrow-active" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L8,3 z" fill="#1f2937"></path>
+              </marker>
+            </defs>
+            <g id="viewport">
+              <g id="clusters"></g>
+              <g id="edges"></g>
+              <g id="nodes"></g>
+            </g>
+          </svg>
+          <div class="legend" id="bm-legend"></div>
+        </div>
+
+        <div class="section req">
+          <div class="req-top">
+            <div>
+              <h2 id="bm-wt-title">Worked example</h2>
+              <p class="subtitle" style="margin:4px 0 0">Step through a path stage by stage. Pick a scenario, then play or step.</p>
+            </div>
+            <div class="flow-tabs" id="reqScenarios"></div>
+          </div>
+          <div id="reqRequest" class="req-request"></div>
+          <div class="req-progress"><div id="reqBar" class="bar"></div></div>
+          <div class="req-top">
+            <span class="subtitle" id="reqStatus">Stage 0 / 0</span>
+            <div class="req-controls">
+              <button type="button" id="reqPlay" class="primary">Play</button>
+              <button type="button" id="reqStep">Step</button>
+              <button type="button" id="reqReset">Reset</button>
+            </div>
+          </div>
+          <div id="reqTrack" class="req-track"></div>
+        </div>
+
+        <div class="section flows">
+          <div>
+            <h2>Flow Walkthroughs</h2>
+            <div id="flowTabs" class="flow-tabs"></div>
+          </div>
+          <div id="flowContent" class="flow-content"></div>
+        </div>
+
+        <div class="section" id="bm-matrices-section">
+          <h2 id="bm-matrices-title">Reference tables</h2>
+          <div id="bm-matrices"></div>
+        </div>
+
+            </section>
+
+      <aside>
+        <div class="panel">
+          <div class="panel-head">
+            <h2 id="detailTitle">Select a component</h2>
+            <p id="detailSubtitle">Click any node in the diagram or a flow tab to inspect how it works.</p>
+          </div>
+          <div id="detailBody" class="panel-body"></div>
+        </div>
+
+        <div class="section">
+          <h2>Scan Notes</h2>
+          <div id="bm-notes"></div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    const DATA = {"title":"PCP Deccorar — o sistema inteiro","subtitle":"Lido no código: server.js, os módulos de rota, os domínios, db.js e o módulo tecido/ (sob medida).","summary":"Um processo Node + Express só, na porta 3010, com dois bancos SQLite. A medida padrão (dados.db) leva a peça da ordem de produção ao caminhão: o PDF do Mercado Livre vira volumes e urgência, a bancada revisa, embala (+1), imprime a etiqueta (reserva) e confere (−1). O sob medida (tecido/, tecido.db) é montado no mesmo servidor em /sobmedida, com portão e banco próprios, e o mesmo PIN. Todo pedido passa pelo portão (auth → acesso → quem); o saldo só anda pelos domínios donos únicos, sempre com linha no livro.","mode":"architecture","meta":["Node + Express","SQLite WAL (dados.db + tecido.db)","pm2 · porta 3010","Traefik (HTTPS)","Tablets + leitor de código"],"layers":[{"key":"fora","label":"Fora do sistema","color":"#475569","tint":"#e5e7ea"},{"key":"tela","label":"Tela","color":"#2563eb","tint":"#e0e9fc"},{"key":"portao","label":"Portão","color":"#c62828","tint":"#f7e1e1"},{"key":"rota","label":"Rotas","color":"#7c3aed","tint":"#ede3fc"},{"key":"dominio","label":"Domínio (dono único)","color":"#0f766e","tint":"#ddeceb"},{"key":"dados","label":"Dados","color":"#b45309","tint":"#f5e7dd"}],"clusters":[{"key":"ext","label":"Mercado Livre e impressoras","x":24,"y":24,"w":190,"h":286},{"key":"telas","label":"Telas","x":244,"y":24,"w":368,"h":202},{"key":"porta","label":"Portão do servidor","x":642,"y":24,"w":368,"h":202},{"key":"rotas","label":"Rotas da medida padrão","x":24,"y":346,"w":546,"h":286},{"key":"dom","label":"Domínios","x":24,"y":668,"w":546,"h":286},{"key":"base","label":"Banco e operação","x":24,"y":990,"w":368,"h":118},{"key":"sm","label":"Sob medida (/sobmedida)","x":422,"y":990,"w":368,"h":118}],"nodes":[{"id":"ml-pdf","label":"PDF de vendas do ML","hint":"etiqueta + folha + NF","layer":"fora","x":44,"y":68,"description":"O PDF que a expedição baixa do Mercado Livre todo dia: etiquetas, folha de controle (SKU) e notas.","decisions":["Não é e-commerce: a venda chega pronta; o sistema cuida do que vem depois.","O PDF é apagado em 7 dias pelo cron (lotes/)."],"files":["exp_route.js:217"],"data":["vendas, pack, NF, modalidade, prazo"]},{"id":"ml-plan","label":"Planilha do ML","hint":"Planejamento","layer":"fora","x":44,"y":152,"description":"Relatório de vendas importado no Planejamento: a média dos últimos dias e o comprometido dos envios futuros.","decisions":["Espelha só as FUTURAS; a venda passada nunca é apagada por ausência (#11).","Linha com 'cancel' cancela o volume."],"files":["plan_route.js:73","cancelada_dominio.js"],"data":["venda, data, estado"]},{"id":"zebra","label":"Impressoras","hint":"Zebra · PDFs","layer":"fora","x":44,"y":236,"description":"Etiqueta do SKU (100×35 mm), do kit e da produção sob medida saem em PDF do servidor, já no tamanho do rolo.","decisions":["Um CODE128 só (public/barras.js) para os três desenhos."],"files":["sku_etq_pdf.js","kit_pdf.js","public/barras.js"],"data":[]},{"id":"t-bancada","label":"Estações da bancada","hint":"tablets · iPad","layer":"tela","x":264,"y":68,"description":"Revisão, Embalagem, Etiqueta de Venda, Conferência, Inventário e Devolução — campo de bipe visível, botões grandes, som.","decisions":["Cada estação é um app de Tela de Início com manifest próprio.","A URL /carregamento ficou com o nome antigo de propósito."],"files":["public/operador.html","public/montagem.html","public/embalagem.html","public/carregamento.html","public/inventario.html","public/devolucao.html"],"data":[]},{"id":"t-admin","label":"Telas do escritório","hint":"Admin em telas","layer":"tela","x":442,"y":68,"description":"O antigo Admin de 16 abas virou telas numeradas (/admin/estoque, /admin/pendencias…), mais Planejamento, Relatórios, Acessos, Devoluções em andamento e Horários de coleta.","decisions":["É o mesmo index.html, servido com window.TELA_ADMIN.","O Admin só se abre no computador."],"files":["admin_telas.js","public/index.html","public/planejamento.html","public/devolucao-casos.html","views/acessos.html"],"data":[]},{"id":"t-tv","label":"Painel da TV","hint":"/painel","layer":"tela","x":264,"y":152,"description":"A TV da fábrica: o que falta produzir, o livre por SKU e as pendências.","decisions":["Lê a falta pela mesma conta da tela azul (demanda_dominio)."],"files":["public/painel.html","painel_route.js:53"],"data":[]},{"id":"t-nav","label":"nav.js","hint":"menu · tarjas","layer":"tela","x":442,"y":152,"description":"Barra de sessão de toda tela: ☰ Menu pelas telas que a pessoa alcança, Trocar setor, tarja do modo teste e da contagem, esconder botão sem permissão (data-perm).","decisions":["Esconder botão é conforto; quem tranca é a rota."],"files":["public/nav.js","admin_telas.js:75"],"data":[]},{"id":"server","label":"server.js","hint":"a ordem é segurança","layer":"portao","x":662,"y":68,"description":"Sobe o Express: json(25mb) → auth → admin_telas → static → ~40 módulos de rota → acesso → teste_route → /sobmedida.","decisions":["auth antes do static (#3).","teste_route é o último require."],"files":["server.js:12","server.js:13","server.js:18","server.js:163","server.js:168","server.js:212"],"data":[]},{"id":"auth","label":"auth.js","hint":"PIN · sessão","layer":"portao","x":840,"y":68,"description":"PIN de 6 dígitos (scrypt), cookie assinado, req.usuario, registro de login e saída (sessao, sessao_evento).","decisions":["5 PINs errados travam a pessoa 1 minuto.","Cookie Secure só quando entrou por HTTPS."],"files":["auth.js:185","auth.js:224"],"data":["usuarios","sessao","sessao_evento"]},{"id":"acesso","label":"acesso.js","hint":"chave · nível · tela","layer":"portao","x":662,"y":152,"description":"Decide cada pedido pela chave da rota (permDaRota), setores, exceções e o teto do nível. O mapa de telas (telas.js) dá número e nível a cada tela.","decisions":["Rota sem declaração nasce negada (#29).","Tudo novo nasce só para o Admin Geral (R-ALC-06)."],"files":["acesso.js:870","acesso.js:1509","permissoes.js","telas.js","destino.js"],"data":["setor, permissões, auditoria"]},{"id":"quem","label":"quem.js","hint":"quem fez","layer":"portao","x":840,"y":152,"description":"Dono de 'quem está fazendo isto'. QUEM.portao(app) fecha toda escrita do módulo: sem login, 401.","decisions":["O nome vem do servidor, nunca da tela."],"files":["quem.js:24","quem.js:83"],"data":[]},{"id":"r-exp","label":"Expedição","hint":"upload · etiqueta","layer":"rota","x":44,"y":390,"description":"Sobe o PDF (só na tela 103), cria um volume por etiqueta, retém o que tem dúvida, aplica a urgência; imprime a etiqueta de venda (reserva).","decisions":["Recusa Pack ID ou venda repetida no histórico inteiro (#5).","Trava por volume, não por lote."],"files":["exp_route.js:217","exp_route.js:426","etq_route.js:184"],"data":["lote","lote_item"]},{"id":"r-prod","label":"Produção","hint":"revisão · embalagem","layer":"rota","x":222,"y":390,"description":"Revisão (fila, sem estoque) e Embalagem (+1 com kit conferido); a tela azul do que produzir.","decisions":["Revisar não mexe no estoque (#1)."],"files":["revisao_route.js:124","mont_route.js:251","plan_route.js:201"],"data":["revisao","fila","montagem","producao"]},{"id":"r-carr","label":"Conferência e saída","hint":"caminhão · agência","layer":"rota","x":400,"y":390,"description":"Confere a caixa (−1 por peça), separa a venda cancelada, e fecha a saída do caminhão da coleta ou a viagem à agência com foto.","decisions":["Quem imprimiu não confere (R-SEG-01).","Separar a cancelada não mexe em saldo; outra pessoa confirma."],"files":["carreg_route.js:112","saida_route.js:105","cancel_conf.js","fim_dia.js"],"data":["lote","saida","cancelamento_caixa"]},{"id":"r-est","label":"Estoque e inventário","hint":"contagem · ajuste","layer":"rota","x":44,"y":474,"description":"Aba Estoque e extrato do livro, lista diária de contagem cega em duas pessoas, ajuste manual com aprovação.","decisions":["Duas contagens que batem aplicam sozinhas (v2).","Quem conta não vê o saldo."],"files":["est_route.js:102","inventario_route.js:117","ajuste_route.js","cont_route.js"],"data":["inventario_ciclo","ajuste_pedido"]},{"id":"r-dev","label":"Devoluções","hint":"peça · casos","layer":"rota","x":222,"y":474,"description":"Receber a peça (bipe + triagem), os casos em andamento do aviso do ML até o reembolso, e a baixa.","decisions":["Registrar devolução não mexe no saldo; o +1 é da embalagem.","Valores só para quem lança ou acompanha."],"files":["dev_route.js:78","devcaso_route.js:85"],"data":["devolucao","devolucao_caso"]},{"id":"r-adm","label":"Pendências e correções","hint":"central · Mesa","layer":"rota","x":400,"y":474,"description":"A central de pendências (só números, perguntando a cada tela dona) e a Mesa de correções do passivo.","decisions":["A central não tem conta própria (#12).","A Mesa nunca mexe em saldo."],"files":["pendencias_route.js","pendencias_dominio.js:98","correcao_route.js","correcoes.js"],"data":["correcao","pdf_conta_aberta"]},{"id":"r-cad","label":"Cadastros","hint":"SKU · kit · listas","layer":"rota","x":44,"y":558,"description":"Cadastro de SKU (destrava volumes bloqueados), modelo, cor, tecido, kit e listas.","decisions":["Cadastro de SKU não mexe em saldo, e diz que ignorou (R-EST-09).","Sem tabela de equivalências de SKU."],"files":["sku_cad_route.js","sku_route.js","cad_route.js","mont_route.js:80"],"data":["skus","modelo","config"]},{"id":"r-comp","label":"Compras","hint":"ficha · pedido","layer":"rota","x":222,"y":558,"description":"O que comprar, de quem e quanto custa: ficha por modelo (fórmula), ofertas, pedidos e recebimento.","decisions":["A embalagem mora na oferta, não no componente.","Custo sem preço é null, nunca zero."],"files":["compras_route.js:453","ficha_route.js","pedido_route.js:40","receb_route.js"],"data":["componente","pedido_compra"]},{"id":"r-hor","label":"Horários de coleta","hint":"tela 206","layer":"rota","x":400,"y":558,"description":"Os horários de saída por data (até 3 coletas), a faixa da próxima coleta e a saída escolhida no upload.","decisions":["A modalidade continua sendo a da etiqueta."],"files":["coleta_horario_route.js","coleta_horario.js"],"data":["saida_horario"]},{"id":"d-est","label":"estoque_dominio","hint":"saldo + livro","layer":"dominio","x":44,"y":712,"description":"Único que escreve skus.estoque, sempre com linha em movimento_estoque.","decisions":["SUM(delta) = saldo (R-EST-06).","Não abre transação: quem chama abre."],"files":["estoque_dominio.js:114"],"data":["skus","movimento_estoque"]},{"id":"d-baixa","label":"baixa_dominio","hint":"reserva · livre","layer":"dominio","x":222,"y":712,"description":"Dono da baixa na conferência, da reserva da etiqueta, do livre e da devolução da cancelada.","decisions":["Baixa uma vez só (baixado_em).","Sob medida não baixa."],"files":["baixa_dominio.js:75","baixa_dominio.js:148"],"data":["lote.baixado_em"]},{"id":"d-dem","label":"demanda_dominio","hint":"o 'precisa'","layer":"dominio","x":400,"y":712,"description":"Comprometido + alvo − estoque, SKU a SKU: a mesma conta para a tela azul, a aba Estoque, a TV e a compra de material.","decisions":["Uma conta só (#12).","A média do sistema (media_dominio) por enquanto é só comparação."],"files":["demanda_dominio.js:33","media_dominio.js","necessidade_dominio.js:34"],"data":["planilha","skus"]},{"id":"d-pdf","label":"parse + folha","hint":"leitura do PDF","layer":"dominio","x":44,"y":796,"description":"Lê etiqueta, folha de controle e NF; liga as três pelas formas conhecidas (pack, venda, MEL); conta peças por vários caminhos.","decisions":["Cinco conferências; qualquer uma retém o volume.","Todo problema real vira caso no caderno de testes."],"files":["parse.js:172","folha.js","nome.js"],"data":["volumes lidos"]},{"id":"d-urg","label":"urgência e ordem do dia","hint":"o que produzir hoje","layer":"dominio","x":222,"y":796,"description":"A venda sem estoque vira ordem urgente no fim de cada upload; a ordem atendida pelo estoque não cobra produção.","decisions":["Idempotente e não apaga o manual (R-URG-02)."],"files":["urgencia.js:56","ordem_dia.js","fila_dia.js"],"data":["producao"]},{"id":"d-dev","label":"devcaso_dominio","hint":"casos de devolução","layer":"dominio","x":400,"y":796,"description":"Etapas, prazos e cor, próximo passo, responsável, relatório e desempenho dos casos de devolução e de envio de item faltante.","decisions":["O vencido não encerra sozinho (R7).","O passo é calculado, nunca gravado."],"files":["devcaso_dominio.js"],"data":["devolucao_caso","devolucao_evento"]},{"id":"d-comp","label":"Domínios de compras","hint":"ficha · material","layer":"dominio","x":44,"y":880,"description":"Saldo e custo médio do material, ficha e custo do SKU, fórmula sem eval, desembolso da compra.","decisions":["formula.js é a única porta que executa expressão do banco."],"files":["componente_dominio.js:39","ficha_dominio.js:75","formula.js","compras_calc.js"],"data":["componente","movimento_componente"]},{"id":"db","label":"dados.db","hint":"db.js · WAL","layer":"dados","x":44,"y":1034,"description":"O banco da medida padrão. Tabelas nascem no CREATE do módulo dono; coluna nova vai no CREATE e no ALTER guardado (§17).","decisions":["cp dá backup vazio por causa do WAL."],"files":["db.js:8","db.js:9","caminhos.js"],"data":["skus, lote, fila, revisao, montagem, movimento_estoque…"]},{"id":"ops","label":"Backup e modo teste","hint":"backup.js · teste_route","layer":"dados","x":222,"y":1034,"description":"Backup diário dos dois bancos por db.backup(), 30 cópias cada; modo teste marca o que nasce e fotografa o estoque.","decisions":["O modo teste só mexe em caixa de teste."],"files":["backup.js:46","teste_route.js:16"],"data":["backups/","foto do estoque"]},{"id":"sm-mod","label":"Módulo sob medida","hint":"tecido/montar.js","layer":"rota","x":442,"y":1034,"description":"Revenda, pedidos, plano de corte, rolos e sobras, bancada por setor, etiquetas de produção, quadro, boletos e indicadores.","decisions":["Portão próprio; a liberação é uma área do PCP, com o mesmo PIN.","O tubo vai para o Compras do PCP."],"files":["tecido/montar.js:97","tecido/rotas/pedido.js","tecido/rotas/producao.js","tecido/dominio/corte.js","tecido/dominio/persiana.js"],"data":[]},{"id":"sm-db","label":"tecido.db","hint":"nucleo/db.js","layer":"dados","x":620,"y":1034,"description":"O banco do sob medida, com migrações numeradas e auditoria própria (com o id de quem fez).","decisions":["Caminho do tecido/nucleo/caminho.js, separado do caminhos.js de propósito."],"files":["tecido/nucleo/db.js","tecido/nucleo/caminho.js","tecido/nucleo/registro.js"],"data":["pedidos, rolos, sobras, etiquetas"]}],"edges":[["ml-pdf","r-exp","upload na 103"],["ml-plan","r-prod","import Planejamento"],["t-bancada","server","bipes (POST)"],["t-admin","server","telas /admin/..."],["t-tv","server","GET /api/painel"],["t-nav","acesso","/api/telas/minhas"],["server","auth","1º middleware"],["auth","acesso","decidir()"],["acesso","quem","escrita"],["quem","r-exp","401 ou segue"],["quem","r-prod","401 ou segue"],["quem","r-carr","401 ou segue"],["quem","r-est",""],["quem","r-dev",""],["quem","r-adm",""],["quem","r-cad",""],["quem","r-comp",""],["quem","r-hor",""],["server","sm-mod","monta /sobmedida"],["r-exp","d-pdf","parsePdf()"],["r-exp","d-urg","URGENCIA.aplicar"],["r-exp","d-baixa","livre (reserva)"],["r-prod","d-est","+1 embalagem"],["r-prod","d-dem","tela azul"],["r-carr","d-baixa","baixar −1"],["r-est","d-est","ajuste / contagem"],["r-est","d-dem","falta de estoque"],["r-dev","d-dev","casos"],["r-comp","d-comp","ficha · custo"],["d-comp","d-dem","necessidade"],["d-baixa","d-est","movimentar"],["d-est","db","saldo + livro"],["d-urg","db","producao"],["r-cad","db","skus"],["r-cad","zebra","etiqueta SKU/kit"],["sm-mod","sm-db","lê e grava"],["sm-mod","r-comp","tubo no Compras"],["sm-mod","zebra","etiqueta produção"],["ops","db","db.backup()"],["ops","sm-db","db.backup()"]],"flows":[{"id":"venda","label":"Venda do ML","title":"Do PDF do ML até a ordem do dia","nodes":["ml-pdf","t-admin","server","auth","acesso","quem","r-exp","d-pdf","d-urg","db"],"steps":["A expedição sobe o PDF na tela 103.","parse.js + folha.js leem etiqueta, folha e NF e criam um volume por etiqueta em lote; o que tem dúvida fica bloqueado.","No fim do upload, urgencia.aplicar põe a venda sem estoque na ordem do dia — sem clique de ninguém."],"decisions":["Venda repetida é recusada pelo histórico inteiro."]},{"id":"peca","label":"Caminho da peça","title":"Revisão → embalagem → etiqueta → conferência","nodes":["t-bancada","server","quem","r-prod","r-exp","r-carr","d-est","d-baixa","db"],"steps":["Revisão: a peça entra na fila, sem estoque.","Embalagem com kit: +1 pelo estoque_dominio.","Etiqueta de venda: reserva (livre = saldo − caixa impressa).","Conferência: −1 por peça pelo baixa_dominio, uma vez só."],"decisions":["O detalhe está em docs/mapas/mapa-bipe.html."]},{"id":"planejar","label":"Planejar e comprar","title":"Da planilha ao que produzir e comprar","nodes":["ml-plan","r-prod","d-dem","t-tv","r-est","d-comp","r-comp"],"steps":["A planilha do ML dá média e comprometido.","demanda_dominio calcula o 'precisa' de cada SKU.","A tela azul, a aba Estoque e a TV leem esse número.","necessidade_dominio explode a ficha e a lista de compras sai pelo compras_calc."],"decisions":["Uma conta só para produção e compra."]},{"id":"sobmedida","label":"Sob medida","title":"A segunda operação, no mesmo servidor","nodes":["server","auth","sm-mod","sm-db","r-comp","zebra"],"steps":["/sobmedida passa pelo auth (sessão e PIN) e segue para o portão próprio do módulo.","Pedido da revenda → aprovação → plano de corte → bancada por setor → etiqueta de produção.","O tubo da escada vira necessidade no Compras do PCP."],"decisions":["Banco e caminho próprios; backup cobre os dois."]}],"matrices":[{"title":"Onde o estoque anda","headers":["Evento","Rota","Efeito","Dono"],"rows":[["Revisão","POST /api/revisao","nenhum","—"],["Embalagem","POST /api/montagem","+1","estoque_dominio"],["Etiqueta de venda","POST /api/embalar","reserva","baixa_dominio"],["Conferência","POST /api/carregar","−1 por peça","baixa_dominio"],["Cancelada confirmada","cancelamento.confirmar","+1 por peça, se já baixou","baixa_dominio.devolver"],["Ajuste manual","ajuste_route.js","diferença, com aprovação","estoque_dominio"],["Inventário","inventario_route.js","diferença, duas contagens","estoque_dominio"]]},{"title":"Testes por área","headers":["Área","Testes"],"rows":[["Portão e acesso","teste_login · teste_acesso · teste_cobertura · teste_quem · teste_mapa"],["Estoque","teste_livro · teste_estoque · teste_baixa_conferencia · teste_regras_estoque"],["PDF e expedição","teste_parse · teste_upload · teste_casos_reais · teste_etiqueta"],["Conferência e saída","teste_carga · teste_saida · teste_sobra · teste_conferencia_expedicao"],["Devoluções","teste_devolucao · teste_devolucao_casos"],["Sob medida","cd tecido && npm test"]]}],"walkthroughs":[],"notes":[{"kind":"ok","text":"Um processo, um portão: toda rota é declarada (permDaRota) e toda escrita passa pelo quem.js."},{"kind":"ok","text":"O saldo tem um dono só (estoque_dominio) e um livro que precisa bater."},{"kind":"info","text":"Mapa de componentes: cada caixa junta vários arquivos. O sistema tem ~40 módulos de rota; aqui eles estão agrupados por área."},{"kind":"warn","text":"Dívida aberta (§14): a tarja 'sem estoque' da Etiqueta de Venda só acusa livre ≤ 0."},{"kind":"warn","text":"Dívida aberta (§14): a porta 3010 ainda está aberta ao lado do HTTPS."}],"sections":{},"viewBox":"0 0 1034 1132"};
+
+    const colors = Object.fromEntries((DATA.layers || []).map((l) => [l.key, l.color]));
+    const layerTint = Object.fromEntries((DATA.layers || []).map((l) => [l.key, l.tint]));
+    const clusters = DATA.clusters || [];
+    const nodes = DATA.nodes || [];
+    const edges = DATA.edges || [];
+    const flowDefs = DATA.flows || [];
+    const matrices = DATA.matrices || [];
+    const requestScenarios = (DATA.walkthroughs || []).map((w) => ({
+      id: w.id,
+      label: w.label,
+      request: { method: (w.header && w.header.kind) || '', path: (w.header && w.header.path) || '', headers: (w.header && w.header.pairs) || [] },
+      stages: w.stages || []
+    }));
+
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const edgeKey = (a, b) => `${a}->${b}`;
+    const edgeByKey = new Map(edges.map(([a, b, label]) => [edgeKey(a, b), label]));
+
+    const NODE_W = 150;
+    const NODE_H = 58;
+
+    const adjacency = new Map(nodes.map((node) => [node.id, new Set([node.id])]));
+    const neighborEdges = new Map(nodes.map((node) => [node.id, []]));
+    for (const [a, b, label] of edges) {
+      adjacency.get(a)?.add(b);
+      adjacency.get(b)?.add(a);
+      neighborEdges.get(a)?.push({ other: b, label, dir: 'out' });
+      neighborEdges.get(b)?.push({ other: a, label, dir: 'in' });
+    }
+
+    let currentFilter = 'all';
+    let currentQuery = '';
+    let selectedId = (nodes[0] && nodes[0].id) || null;
+    let selectedEdge = null; // { from, to }
+    let highlighted = new Set();
+
+    // Pan / zoom state
+    const view = { scale: 1, tx: 0, ty: 0 };
+
+    function borderPoint(node, target) {
+      const cx = node.x + NODE_W / 2;
+      const cy = node.y + NODE_H / 2;
+      const dx = target.x + NODE_W / 2 - cx;
+      const dy = target.y + NODE_H / 2 - cy;
+      if (dx === 0 && dy === 0) return { x: cx, y: cy };
+      const halfW = NODE_W / 2 + 3;
+      const halfH = NODE_H / 2 + 3;
+      const scaleX = dx !== 0 ? halfW / Math.abs(dx) : Infinity;
+      const scaleY = dy !== 0 ? halfH / Math.abs(dy) : Infinity;
+      const scale = Math.min(scaleX, scaleY);
+      return { x: cx + dx * scale, y: cy + dy * scale };
+    }
+
+    function wrapText(text, maxChars) {
+      const words = text.split(' ');
+      const lines = [];
+      let line = '';
+      for (const word of words) {
+        const candidate = line ? `${line} ${word}` : word;
+        if (candidate.length > maxChars && line) {
+          lines.push(line);
+          line = word;
+        } else {
+          line = candidate;
+        }
+      }
+      if (line) lines.push(line);
+      return lines.slice(0, 2);
+    }
+
+    function matchesNode(node) {
+      if (currentFilter !== 'all' && node.layer !== currentFilter) return false;
+      if (!currentQuery) return true;
+      const haystack = [
+        node.label,
+        node.hint,
+        node.description,
+        ...(node.decisions || []),
+        ...(node.files || []),
+        ...(node.data || [])
+      ].join(' ').toLowerCase();
+      return haystack.includes(currentQuery);
+    }
+
+    function renderDiagram() {
+      const clusterGroup = document.getElementById('clusters');
+      const edgeGroup = document.getElementById('edges');
+      const nodeGroup = document.getElementById('nodes');
+      clusterGroup.innerHTML = '';
+      edgeGroup.innerHTML = '';
+      nodeGroup.innerHTML = '';
+
+      for (const cluster of clusters) {
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('class', 'cluster-box');
+        rect.setAttribute('x', cluster.x);
+        rect.setAttribute('y', cluster.y);
+        rect.setAttribute('width', cluster.w);
+        rect.setAttribute('height', cluster.h);
+        rect.setAttribute('rx', 10);
+        clusterGroup.appendChild(rect);
+
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('class', 'cluster-label');
+        label.setAttribute('x', cluster.x + 12);
+        label.setAttribute('y', cluster.y + 18);
+        label.textContent = cluster.label;
+        clusterGroup.appendChild(label);
+      }
+
+      const visible = new Set(nodes.filter(matchesNode).map((node) => node.id));
+      const flowActive = highlighted.size > 0;
+      const flowEdges = new Set();
+      if (flowActive) {
+        const ids = Array.from(highlighted);
+        for (let i = 0; i < ids.length - 1; i++) flowEdges.add(edgeKey(ids[i], ids[i + 1]));
+      }
+      const neighborSet = (!flowActive && selectedId) ? (adjacency.get(selectedId) || new Set([selectedId])) : null;
+      const hasFocusContext = flowActive || !!neighborSet || !!selectedEdge;
+
+      for (const [fromId, toId, label] of edges) {
+        const from = nodeById.get(fromId);
+        const to = nodeById.get(toId);
+        const p1 = borderPoint(from, to);
+        const p2 = borderPoint(to, from);
+
+        const isSearchDim = (currentFilter !== 'all' || currentQuery) && (!visible.has(fromId) || !visible.has(toId));
+        let connects = false;
+        if (flowActive) {
+          connects = flowEdges.has(edgeKey(fromId, toId)) || (highlighted.has(fromId) && highlighted.has(toId));
+        } else if (selectedEdge) {
+          connects = selectedEdge.from === fromId && selectedEdge.to === toId;
+        } else if (selectedId) {
+          connects = fromId === selectedId || toId === selectedId;
+        }
+
+        let edgeClass = 'edge-group';
+        if (isSearchDim) edgeClass += ' dim';
+        else if (connects) edgeClass += ' flow';
+        else if (hasFocusContext) edgeClass += ' faded';
+
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        group.setAttribute('class', edgeClass);
+        group.dataset.from = fromId;
+        group.dataset.to = toId;
+        group.dataset.label = label;
+
+        // gentle curve via quadratic control point offset perpendicular to the segment
+        const mx = (p1.x + p2.x) / 2;
+        const my = (p1.y + p2.y) / 2;
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const bow = Math.min(26, len * 0.08);
+        const cxp = mx + (-dy / len) * bow;
+        const cyp = my + (dx / len) * bow;
+        const d = `M ${p1.x} ${p1.y} Q ${cxp} ${cyp} ${p2.x} ${p2.y}`;
+
+        const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        hit.setAttribute('class', 'edge-hit');
+        hit.setAttribute('d', d);
+        group.appendChild(hit);
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('class', 'edge');
+        path.setAttribute('d', d);
+        group.appendChild(path);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('class', 'edge-label');
+        text.setAttribute('x', cxp);
+        text.setAttribute('y', cyp - 3);
+        text.setAttribute('text-anchor', 'middle');
+        text.textContent = label;
+        group.appendChild(text);
+
+        group.addEventListener('click', (event) => {
+          event.stopPropagation();
+          selectEdge(fromId, toId, label);
+        });
+
+        edgeGroup.appendChild(group);
+      }
+
+      for (const node of nodes) {
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        const visibleMatch = matchesNode(node);
+
+        const classList = ['node'];
+        if (node.id === selectedId) classList.push('active');
+        if (!visibleMatch) {
+          classList.push('dim');
+        } else if (flowActive) {
+          if (!highlighted.has(node.id)) classList.push('dim');
+        } else if (selectedEdge) {
+          if (node.id === selectedEdge.from || node.id === selectedEdge.to) classList.push('focus');
+          else classList.push('faded');
+        } else if (neighborSet && node.id !== selectedId) {
+          classList.push(neighborSet.has(node.id) ? 'focus' : 'faded');
+        }
+        g.setAttribute('class', classList.join(' '));
+        g.setAttribute('transform', `translate(${node.x}, ${node.y})`);
+        g.setAttribute('role', 'button');
+        g.setAttribute('tabindex', '0');
+        g.dataset.id = node.id;
+
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('width', 150);
+        rect.setAttribute('height', 58);
+        rect.setAttribute('fill', layerTint[node.layer] || '#ffffff');
+        g.appendChild(rect);
+
+        const stripe = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        stripe.setAttribute('class', 'stripe');
+        stripe.setAttribute('x1', 8);
+        stripe.setAttribute('y1', 7);
+        stripe.setAttribute('x2', 8);
+        stripe.setAttribute('y2', 51);
+        stripe.setAttribute('stroke', colors[node.layer]);
+        g.appendChild(stripe);
+
+        const lines = wrapText(node.label, 17);
+        lines.forEach((lineText, index) => {
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('class', 'label');
+          text.setAttribute('x', 18);
+          text.setAttribute('y', 22 + index * 14);
+          text.textContent = lineText;
+          g.appendChild(text);
+        });
+
+        const hint = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        hint.setAttribute('class', 'hint');
+        hint.setAttribute('x', 18);
+        hint.setAttribute('y', 48);
+        hint.textContent = node.hint;
+        g.appendChild(hint);
+
+        g.addEventListener('click', (event) => {
+          event.stopPropagation();
+          selectNode(node.id);
+        });
+        g.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            selectNode(node.id);
+          }
+        });
+        nodeGroup.appendChild(g);
+      }
+
+      applyViewTransform();
+    }
+
+    function applyViewTransform() {
+      const viewport = document.getElementById('viewport');
+      if (viewport) {
+        viewport.setAttribute('transform', `translate(${view.tx} ${view.ty}) scale(${view.scale})`);
+      }
+    }
+
+    function selectNode(id) {
+      selectedId = id;
+      selectedEdge = null;
+      highlighted = new Set();
+      renderDiagram();
+      renderDetail(nodeById.get(id));
+      setActiveFlowButton(null);
+    }
+
+    function selectEdge(fromId, toId, label) {
+      selectedId = null;
+      selectedEdge = { from: fromId, to: toId };
+      highlighted = new Set();
+      renderDiagram();
+      renderEdgeDetail(fromId, toId, label);
+      setActiveFlowButton(null);
+    }
+
+    function deselect() {
+      if (!selectedId && !selectedEdge && highlighted.size === 0) return;
+      selectedId = null;
+      selectedEdge = null;
+      highlighted = new Set();
+      renderDiagram();
+      setActiveFlowButton(null);
+      document.getElementById('detailTitle').textContent = 'Select a component';
+      document.getElementById('detailSubtitle').textContent = 'Click any node or edge in the diagram, or pick a flow tab.';
+      document.getElementById('detailBody').innerHTML =
+        '<div class="detail-block"><p class="hint">Click a node to see its files, design decisions, and connections. Click an edge to read what flows between two components. Click empty space to clear.</p></div>';
+    }
+
+    const layerNames = Object.fromEntries((DATA.layers || []).map((l) => [l.key, l.label]));
+
+    function renderDetail(node) {
+      document.getElementById('detailTitle').textContent = node.label;
+      document.getElementById('detailSubtitle').textContent = `${node.hint} - ${layerNames[node.layer] || node.layer}`;
+      const conns = (neighborEdges.get(node.id) || []);
+      const body = document.getElementById('detailBody');
+      body.innerHTML = `
+        <div class="detail-meta">
+          <span class="tag"><span class="dot" style="background:${colors[node.layer]}"></span>${escapeHtml(layerNames[node.layer] || node.layer)}</span>
+          <span class="tag">${conns.length} connection${conns.length === 1 ? '' : 's'}</span>
+        </div>
+        <div class="detail-block" style="margin-top:14px">
+          <h3>What it does</h3>
+          <p>${escapeHtml(node.description)}</p>
+        </div>
+        <div class="detail-block">
+          <h3>Design decisions</h3>
+          <ul>${node.decisions.map((d) => `<li>${escapeHtml(d)}</li>`).join('')}</ul>
+        </div>
+        <div class="detail-block">
+          <h3>Connections</h3>
+          <div class="neighbors">${conns.map((c) => `<button data-goto="${c.other}"><span class="dir">${c.dir === 'out' ? '&rarr;' : '&larr;'}</span> ${escapeHtml(nodeById.get(c.other).label)}</button>`).join('') || '<span class="hint">No direct edges.</span>'}</div>
+        </div>
+        <div class="detail-block">
+          <h3>Source files</h3>
+          <div class="file-list">${node.files.map((f) => `<span class="file">${escapeHtml(f)}</span>`).join('')}</div>
+        </div>
+        <div class="detail-block">
+          <h3>Data touched</h3>
+          <ul>${node.data.map((d) => `<li>${escapeHtml(d)}</li>`).join('')}</ul>
+        </div>
+      `;
+      body.querySelectorAll('button[data-goto]').forEach((button) => {
+        button.addEventListener('click', () => selectNode(button.dataset.goto));
+      });
+    }
+
+    function renderEdgeDetail(fromId, toId, label) {
+      const from = nodeById.get(fromId);
+      const to = nodeById.get(toId);
+      document.getElementById('detailTitle').textContent = `${from.label} \u2192 ${to.label}`;
+      document.getElementById('detailSubtitle').textContent = `Relationship: ${label}`;
+      const body = document.getElementById('detailBody');
+      body.innerHTML = `
+        <div class="detail-block" style="margin-top:6px">
+          <h3>Direction</h3>
+          <p><strong>${escapeHtml(from.label)}</strong> (${escapeHtml(layerNames[from.layer] || from.layer)}) calls <strong>${escapeHtml(to.label)}</strong> (${escapeHtml(layerNames[to.layer] || to.layer)}).</p>
+          <p class="hint">${escapeHtml(label)}</p>
+        </div>
+        <div class="detail-block">
+          <h3>Source endpoints</h3>
+          <p>${escapeHtml(from.label)}</p>
+          <p>${escapeHtml(from.description)}</p>
+        </div>
+        <div class="detail-block">
+          <h3>Target endpoint</h3>
+          <p>${escapeHtml(to.label)}</p>
+          <p>${escapeHtml(to.description)}</p>
+        </div>
+        <div class="detail-block">
+          <h3>Inspect</h3>
+          <div class="neighbors">
+            <button data-goto="${fromId}">Open ${escapeHtml(from.label)}</button>
+            <button data-goto="${toId}">Open ${escapeHtml(to.label)}</button>
+          </div>
+        </div>
+      `;
+      body.querySelectorAll('button[data-goto]').forEach((button) => {
+        button.addEventListener('click', () => selectNode(button.dataset.goto));
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function setActiveFlowButton(id) {
+      document.querySelectorAll('#flowTabs button').forEach((button) => {
+        button.classList.toggle('active', button.dataset.flow === id);
+      });
+    }
+
+    function renderFlow(flowId) {
+      const flow = flowDefs.find((item) => item.id === flowId) || flowDefs[0];
+      highlighted = new Set(flow.nodes);
+      selectedId = flow.nodes[0];
+      selectedEdge = null;
+      setActiveFlowButton(flow.id);
+      renderDiagram();
+      document.getElementById('flowContent').innerHTML = `
+        <div>
+          <h3>${escapeHtml(flow.title)}</h3>
+          <ol>${flow.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join('')}</ol>
+        </div>
+        <div>
+          <h3>Design decisions</h3>
+          <ul>${flow.decisions.map((decision) => `<li>${escapeHtml(decision)}</li>`).join('')}</ul>
+        </div>
+      `;
+      renderDetail(nodeById.get(flow.nodes[0]));
+    }
+
+    function renderFlows() {
+      const tabs = document.getElementById('flowTabs');
+      tabs.innerHTML = flowDefs.map((flow) => `<button data-flow="${flow.id}">${escapeHtml(flow.label)}</button>`).join('');
+      tabs.querySelectorAll('button').forEach((button) => {
+        button.addEventListener('click', () => renderFlow(button.dataset.flow));
+      });
+      if (flowDefs.length) renderFlow(flowDefs[0].id);
+    }
+
+    function renderMatrices() {
+      const host = document.getElementById('bm-matrices');
+      if (!host) return;
+      if (!matrices.length) { const sec = host.closest('.section'); if (sec) sec.style.display = 'none'; return; }
+      host.innerHTML = matrices.map((m) => {
+        const cols = (m.headers || []).length || 1;
+        const head = (m.headers || []).map((h) => `<div class="head">${escapeHtml(h)}</div>`).join('');
+        const rows = (m.rows || []).map((r) => r.map((c) => `<div>${escapeHtml(c)}</div>`).join('')).join('');
+        return `<div style="margin-bottom:18px"><h3 style="margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:0.04em;color:#415162">${escapeHtml(m.title || '')}</h3>` +
+          `<div class="matrix" style="grid-template-columns:repeat(${cols}, minmax(0,1fr))">${head}${rows}</div></div>`;
+      }).join('');
+    }
+
+    // ----- Request lifecycle -----
+    let reqScenarioId = requestScenarios[0] ? requestScenarios[0].id : null;
+    let reqStep = 0;
+    let reqTimer = null;
+
+    function currentReqScenario() {
+      return requestScenarios.find((s) => s.id === reqScenarioId) || requestScenarios[0];
+    }
+
+    function renderReqScenarios() {
+      const tabs = document.getElementById('reqScenarios');
+      tabs.innerHTML = requestScenarios
+        .map((s) => `<button data-req="${s.id}"${s.id === reqScenarioId ? ' class="active"' : ''}>${escapeHtml(s.label)}</button>`)
+        .join('');
+      tabs.querySelectorAll('button').forEach((button) => {
+        button.addEventListener('click', () => selectReqScenario(button.dataset.req));
+      });
+    }
+
+    function renderReqRequest() {
+      const scenario = currentReqScenario();
+      const headers = scenario.request.headers
+        .map(([k, v]) => `<div><span class="hdr-k">${escapeHtml(k)}:</span> <span class="hdr-v">${escapeHtml(v)}</span></div>`)
+        .join('');
+      document.getElementById('reqRequest').innerHTML =
+        `<div><span class="method">${escapeHtml(scenario.request.method)}</span> <span class="path">${escapeHtml(scenario.request.path)}</span></div>` + headers;
+    }
+
+    function renderReqTrack() {
+      const scenario = currentReqScenario();
+      const track = document.getElementById('reqTrack');
+      track.innerHTML = scenario.stages.map((stage, index) => {
+        const badge = stage.badge ? `<span class="badge ${stage.badge.type}">${escapeHtml(stage.badge.text)}</span>` : '<span></span>';
+        const file = stage.file ? `<span class="file">${escapeHtml(stage.file)}</span>` : '';
+        return `
+          <div class="req-stage" data-index="${index}">
+            <span class="stripe2" style="background:${colors[stage.layer]}"></span>
+            <span class="num">${index + 1}</span>
+            <div>
+              <div class="title">${escapeHtml(stage.title)}</div>
+              <div class="desc">${escapeHtml(stage.desc)}</div>
+              ${file}
+            </div>
+            ${badge}
+          </div>`;
+      }).join('');
+      track.querySelectorAll('.req-stage').forEach((el) => {
+        el.addEventListener('click', () => {
+          stopReqPlay();
+          reqStep = Number(el.dataset.index) + 1;
+          paintReqState();
+        });
+      });
+      paintReqState();
+    }
+
+    function paintReqState() {
+      const scenario = currentReqScenario();
+      const total = scenario.stages.length;
+      document.querySelectorAll('#reqTrack .req-stage').forEach((el) => {
+        const index = Number(el.dataset.index);
+        el.classList.toggle('done', index < reqStep - 1);
+        el.classList.toggle('active', index === reqStep - 1);
+        if (index >= reqStep) el.classList.remove('done', 'active');
+      });
+      const pct = total > 1 ? (Math.max(0, reqStep - 1) / (total - 1)) * 100 : 0;
+      document.getElementById('reqBar').style.width = `${reqStep === 0 ? 0 : pct}%`;
+      document.getElementById('reqStatus').textContent =
+        reqStep === 0 ? `Ready - ${total} stages` : `Stage ${reqStep} / ${total}: ${scenario.stages[reqStep - 1].title}`;
+      const active = document.querySelector('#reqTrack .req-stage.active');
+      if (active) active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    function stepReq() {
+      const total = currentReqScenario().stages.length;
+      if (reqStep >= total) {
+        stopReqPlay();
+        return false;
+      }
+      reqStep += 1;
+      paintReqState();
+      return reqStep < total;
+    }
+
+    function stopReqPlay() {
+      if (reqTimer) {
+        clearInterval(reqTimer);
+        reqTimer = null;
+      }
+      const play = document.getElementById('reqPlay');
+      if (play) play.textContent = 'Play';
+    }
+
+    function playReq() {
+      if (reqTimer) {
+        stopReqPlay();
+        return;
+      }
+      const total = currentReqScenario().stages.length;
+      if (reqStep >= total) reqStep = 0;
+      document.getElementById('reqPlay').textContent = 'Pause';
+      stepReq();
+      reqTimer = setInterval(() => {
+        if (!stepReq()) stopReqPlay();
+      }, 950);
+    }
+
+    function resetReq() {
+      stopReqPlay();
+      reqStep = 0;
+      paintReqState();
+    }
+
+    function selectReqScenario(id) {
+      stopReqPlay();
+      reqScenarioId = id;
+      reqStep = 0;
+      renderReqScenarios();
+      renderReqRequest();
+      renderReqTrack();
+    }
+
+    function initRequestFlow() {
+      renderReqScenarios();
+      renderReqRequest();
+      renderReqTrack();
+      document.getElementById('reqPlay').addEventListener('click', playReq);
+      document.getElementById('reqStep').addEventListener('click', () => {
+        stopReqPlay();
+        stepReq();
+      });
+      document.getElementById('reqReset').addEventListener('click', resetReq);
+    }
+
+    // ----- Pan & zoom -----
+    const svg = document.getElementById('diagram');
+
+    function clampScale(value) {
+      return Math.max(0.5, Math.min(3, value));
+    }
+
+    function clientToViewBox(clientX, clientY) {
+      const pt = svg.createSVGPoint();
+      pt.x = clientX;
+      pt.y = clientY;
+      return pt.matrixTransform(svg.getScreenCTM().inverse());
+    }
+
+    function zoomAt(clientX, clientY, factor) {
+      const v = clientToViewBox(clientX, clientY);
+      const cx = (v.x - view.tx) / view.scale;
+      const cy = (v.y - view.ty) / view.scale;
+      view.scale = clampScale(view.scale * factor);
+      view.tx = v.x - view.scale * cx;
+      view.ty = v.y - view.scale * cy;
+      applyViewTransform();
+    }
+
+    function resetView() {
+      view.scale = 1;
+      view.tx = 0;
+      view.ty = 0;
+      applyViewTransform();
+    }
+
+    function initPanZoom() {
+      svg.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.12 : 1 / 1.12);
+      }, { passive: false });
+
+      let pending = false; // pointer down on background, not yet a drag
+      let dragging = false;
+      let moved = 0;
+      const DRAG_THRESHOLD = 4;
+
+      svg.addEventListener('pointerdown', (event) => {
+        if (event.target.closest('.node') || event.target.closest('.edge-group')) return;
+        pending = true;
+        dragging = false;
+        moved = 0;
+      });
+      svg.addEventListener('pointermove', (event) => {
+        if (!pending) return;
+        moved += Math.abs(event.movementX) + Math.abs(event.movementY);
+        if (!dragging && moved > DRAG_THRESHOLD) {
+          dragging = true;
+          svg.classList.add('panning');
+          svg.setPointerCapture(event.pointerId);
+        }
+        if (dragging) {
+          const ctm = svg.getScreenCTM();
+          view.tx += event.movementX / ctm.a;
+          view.ty += event.movementY / ctm.d;
+          applyViewTransform();
+        }
+      });
+      const endPointer = () => {
+        if (pending && !dragging) deselect(); // clean click on empty canvas
+        pending = false;
+        dragging = false;
+        svg.classList.remove('panning');
+      };
+      svg.addEventListener('pointerup', endPointer);
+      svg.addEventListener('pointercancel', endPointer);
+
+      document.querySelectorAll('.zoom-controls button').forEach((button) => {
+        button.addEventListener('click', () => {
+          const action = button.dataset.zoom;
+          if (action === 'reset') return resetView();
+          const rect = svg.getBoundingClientRect();
+          zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, action === 'in' ? 1.2 : 1 / 1.2);
+        });
+      });
+    }
+
+    document.getElementById('search').addEventListener('input', (event) => {
+      currentQuery = event.target.value.trim().toLowerCase();
+      renderDiagram();
+    });
+
+    function renderHeader() {
+      const t = document.getElementById('bm-title'); if (t) t.textContent = DATA.title || 'Code Map';
+      const s = document.getElementById('bm-subtitle'); if (s) s.textContent = DATA.subtitle || '';
+      const m = document.getElementById('bm-meta'); if (m) m.innerHTML = (DATA.meta || []).map((x) => `<span class="pill">${escapeHtml(x)}</span>`).join('');
+      const ot = document.getElementById('bm-ov-title'); if (ot) ot.textContent = DATA.title || 'Overview';
+      const wt = document.getElementById('bm-wt-title'); if (wt) wt.textContent = (DATA.sections && DATA.sections.walkthroughTitle) || 'Worked example';
+      const mt = document.getElementById('bm-matrices-title'); if (mt) mt.textContent = (DATA.sections && DATA.sections.matricesTitle) || 'Reference tables';
+    }
+    function renderOverview() {
+      const p = document.getElementById('bm-summary'); if (p) p.textContent = DATA.summary || '';
+      const caps = document.getElementById('bm-caps');
+      if (caps) caps.innerHTML = (DATA.layers || []).map((l) => `<span class="cap"><span class="dot" style="background:${l.color}"></span>${escapeHtml(l.label)}</span>`).join('');
+    }
+    function renderFilters() {
+      const host = document.getElementById('bm-segmented'); if (!host) return;
+      const btns = ['<button class="active" data-filter="all">All</button>']
+        .concat((DATA.layers || []).map((l) => `<button data-filter="${escapeHtml(l.key)}">${escapeHtml(l.label)}</button>`));
+      host.innerHTML = btns.join('');
+      host.querySelectorAll('button').forEach((button) => {
+        button.addEventListener('click', () => {
+          host.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
+          button.classList.add('active');
+          currentFilter = button.dataset.filter;
+          selectedId = null; selectedEdge = null; highlighted = new Set();
+          setActiveFlowButton(null); renderDiagram();
+        });
+      });
+    }
+    function renderLegend() {
+      const host = document.getElementById('bm-legend'); if (!host) return;
+      host.innerHTML = (DATA.layers || []).map((l) => `<span class="key"><span class="dot" style="background:${l.color}"></span>${escapeHtml(l.label)}</span>`).join('');
+    }
+    function renderNotes() {
+      const host = document.getElementById('bm-notes'); if (!host) return;
+      if (!(DATA.notes || []).length) { const sec = host.closest('.section'); if (sec) sec.style.display = 'none'; return; }
+      host.innerHTML = (DATA.notes || []).map((n) => `<div class="detail-block ${n.kind || 'info'}"><p>${escapeHtml(n.text)}</p></div>`).join('');
+    }
+    function hideWalkSection() {
+      const el = document.getElementById('reqRequest'); const sec = el && el.closest('.section'); if (sec) sec.style.display = 'none';
+    }
+
+    renderHeader();
+    renderOverview();
+    renderFilters();
+    renderLegend();
+    renderMatrices();
+    renderNotes();
+    document.getElementById('diagram').setAttribute('viewBox', DATA.viewBox || '0 0 1560 720');
+    renderFlows();
+    if (!flowDefs.length) { renderDiagram(); if (selectedId) renderDetail(nodeById.get(selectedId)); }
+    if (requestScenarios.length) initRequestFlow(); else hideWalkSection();
+    initPanZoom();
+  </script>
+</body>
+</html>
