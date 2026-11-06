@@ -102,7 +102,12 @@ module.exports = function(app, db){
        sabendo, antes de lançar, que há mais peça da mesma pessoa. */
     const irm = v && v.buyer ? D.mesmoComprador(db, v.buyer, ja ? ja.id : null)
       .map(x => ({ id:x.id, venda:x.venda, nf:x.nf, etapa_nome: D.NOME_ETAPA[x.etapa] || x.etapa })) : [];
-    return { achou: !!v, venda: v, caso_aberto: ja ? ja.id : null, comprador_casos: irm };
+    /* Os casos abertos da venda por grupo: o envio de item faltante e a
+       devolução não se barram (R-ENV-16); a tela avisa ou recusa conforme o
+       tipo que está sendo lançado. */
+    const jaEnv = D.abertoDaVenda(db, venda, 'envio'), jaDev = D.abertoDaVenda(db, venda, 'coleta');
+    return { achou: !!v, venda: v, caso_aberto: ja ? ja.id : null, caso_aberto_envio: jaEnv ? jaEnv.id : null,
+      caso_aberto_devolucao: jaDev ? jaDev.id : null, comprador_casos: irm };
   }));
   /* ── transportadoras (fase 3). ANTES do `/:id`: no Express, a rota com
      parâmetro registrada primeiro engoliria "transportadoras" como um id. ── */
@@ -159,7 +164,8 @@ module.exports = function(app, db){
     responder(res, () => {
       const r = D.lancarCompleto(db, b, QUEM.pessoa(req), { temChave: temChaveResp });
       if(r.valorMudou && r.valorMudou.length) auditar(req, 'valor', r.caso.id, 'lançou no lançamento '+r.valorMudou.join(', ')+': '+JSON.stringify({ valor_ml: b.valor_ml, custo_etiqueta: b.custo_etiqueta, limite_frete: b.limite_frete, custo: b.coleta && b.coleta.custo }));
-      return { ok:true, id:r.caso.id };
+      /* R-ENV-16: o caso do outro grupo na mesma venda avisa, não recusa. */
+      return r.aviso ? { ok:true, id:r.caso.id, aviso:r.aviso } : { ok:true, id:r.caso.id };
     });
   });
   post('/api/devolucao-casos/:id/editar', (req,res) => responder(res, () => {
@@ -271,6 +277,31 @@ module.exports = function(app, db){
       return { ok:true, mudou:mud };
     });
   });
+  /* ── ENVIAR ITEM FALTANTE (spec ITEM-FALTANTE, fase 2) ──
+     O frete é um valor do caso: de quem lança ou acompanha (R-ENV-10). O
+     número vai à auditoria; a história do caso diz só "frete lançado". */
+  post('/api/devolucao-casos/:id/enviar', (req,res) => {
+    if(!podeValores(req)) return res.status(403).json({ erro:'Enviar (com o frete) é de quem lança ou acompanha as devoluções.', chave:'devolucao.acompanhar' });
+    responder(res, () => {
+      const r = D.enviar(db, req.params.id, req.body, QUEM.pessoa(req));
+      if(r.valorMudou.length) auditar(req, 'valor', req.params.id, 'lançou o frete do envio: '+JSON.stringify({ custo_envio:(req.body||{}).custo_envio }));
+      return { ok:true };
+    });
+  });
+  post('/api/devolucao-casos/:id/cobranca', (req,res) => responder(res, () => { D.cobranca(db, req.params.id, req.body, QUEM.pessoa(req)); return { ok:true }; }));
+  post('/api/devolucao-casos/:id/reputacao', (req,res) => responder(res, () => { D.reputacao(db, req.params.id, req.body, QUEM.pessoa(req)); return { ok:true }; }));
+  post('/api/devolucao-casos/:id/confirmado', (req,res) => responder(res, () => { D.confirmado(db, req.params.id, req.body, QUEM.pessoa(req)); return { ok:true }; }));
+  /* A exceção (R-ENV-14) é decisão do caso: devolucao.dinheiro, conferida aqui
+     também — o portão é a primeira trava. */
+  post('/api/devolucao-casos/:id/entregue-sem-confirmacao', (req,res) => {
+    if(!podeDinheiro(req)) return semDinheiro(req, res);
+    responder(res, () => {
+      const c = D.entregueSemConfirmacao(db, req.params.id, req.body, QUEM.pessoa(req));
+      auditar(req, 'entregue_sem_confirmacao', c.id, 'encerrou o envio como entregue sem confirmação do comprador');
+      return { ok:true };
+    });
+  });
+
   /* ── decisões (devolucao.dinheiro) ── */
   post('/api/devolucao-casos/:id/reembolso', (req,res) => {
     if(!podeDinheiro(req)) return semDinheiro(req, res);

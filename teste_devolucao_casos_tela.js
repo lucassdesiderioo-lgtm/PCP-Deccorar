@@ -677,6 +677,144 @@ const srv = app.listen(0, async () => {
     await pdc.close();
 
     /* ═════════ 5. o celular ═════════ */
+    /* ═════════ ITEM-FALTANTE — o tipo "envio" pela tela ═════════ */
+    {
+    secao('envio — lançar um caso de WhatsApp pela tela');
+    const pe = await pg();
+    await pe.goto(B + '/devolucao-casos'); await pe.waitForTimeout(900);
+    await pe.click('#tpEnvio'); await pe.waitForTimeout(150);
+    eq('o motivo nasce "Falta de kit"', await pe.inputValue('#lMotivo'), 'Falta de kit');
+    eq('o item nasce "Kit de instalação"', await pe.inputValue('#lItem'), 'Kit de instalação');
+    eq('os campos da coleta somem no envio', await pe.isVisible('#lPrazo'), false);
+    await pe.fill('#lVenda', '8770001'); await pe.waitForTimeout(700);
+    await pe.fill('#lSku', 'BK140140BEGE'); await pe.fill('#lComprador', 'Cliente Kit Tela');
+    await pe.selectOption('#lResp', '2'); await pe.click('#lPub [data-pub="0"]');
+    await pe.click('#btLancar'); await pe.waitForTimeout(900);
+    ok('sem a origem, o servidor recusa e a tela diz', /origem/i.test(await pe.textContent('#lMsg')), await pe.textContent('#lMsg'));
+    await pe.click('#lOrigem [data-origem="fora_ml"]'); await pe.waitForTimeout(100);
+    eq('no WhatsApp o link da conversa some', await pe.isVisible('#lLink'), false);
+    ok('   e a prévia do "sair até" aparece', /Sair até \d\d\/\d\d\/\d{4}/.test(await pe.textContent('#lSairAte')), await pe.textContent('#lSairAte'));
+    await pe.click('#btLancar'); await pe.waitForTimeout(1000);
+    const eid = +((await pe.textContent('#lMsg')).match(/#(\d+)/) || [])[1];
+    const ec = caso(eid) || {};
+    eq('lançou o envio', ec.tipo, 'envio');
+    eq('   origem WhatsApp', ec.origem, 'fora_ml');
+    ok('   com o "sair até" gravado', /^\d{4}-\d\d-\d\d$/.test(ec.sair_ate||''), ec.sair_ate);
+    eq('   item', ec.item_enviado, 'Kit de instalação');
+    eq('   responsável', ec.responsavel_id, 2);
+    await pe.waitForTimeout(400);
+    ok('a terceira lista mostra o caso, com o chip WhatsApp', /WhatsApp/.test(await pe.locator('#listaEnvio .linha', { hasText:'#'+eid+' ' }).first().textContent()));
+    ok('   e o próximo passo "Embalar o kit"', /Embalar o kit/.test(await pe.locator('#listaEnvio .linha', { hasText:'#'+eid+' ' }).first().textContent()));
+    const ordem = await pe.evaluate(() => ['listaColeta','listaEnvio','listaMl'].map(id => document.getElementById(id).getBoundingClientRect().left));
+    ok('as três listas lado a lado: coleta, envio, ML', ordem[0] < ordem[1] && ordem[1] < ordem[2], JSON.stringify(ordem));
+    await pe.locator('#listaEnvio .linha', { hasText:'#'+eid+' ' }).first().locator('.t1').click(); await pe.waitForTimeout(800);
+    const trilha = await pe.textContent('#painel .trilha');
+    ok('a trilha do WhatsApp não tem "ML avisado"', !/ML avisado/.test(trilha) && /Aguardando confirmação/.test(trilha), trilha);
+    eq('não há "A caixa chegou" no envio', await pe.locator('#btChegou').count(), 0);
+    await pe.click('#painel [data-etapa="embalado"]'); await pe.waitForTimeout(900);
+    eq('"→ Embalado" pela tela', caso(eid).etapa, 'embalado');
+    ok('   e o passo vira "Despachar até"', /Despachar até/.test(await pe.textContent('#cxProximo')), await pe.textContent('#cxProximo'));
+    await pe.click('#btDesfazer'); await pe.waitForTimeout(900);
+    eq('   o desfazer volta para Lançado', caso(eid).etapa, 'lancado');
+    await pe.click('#btOrigem'); await pe.waitForTimeout(900);
+    ok('trocar para ML sem o prazo: recusado, com o motivo', /prazo/i.test(await pe.textContent('#cMsg')) && caso(eid).origem === 'fora_ml', await pe.textContent('#cMsg'));
+    await pe.fill('#oPrazo', dia(4)); await pe.click('#btOrigem'); await pe.waitForTimeout(900);
+    eq('   com o prazo: vira ML', caso(eid).origem + '/' + caso(eid).prazo, 'ml/' + dia(4));
+    ok('   e o "ML avisado" volta à trilha', /ML avisado/.test(await pe.textContent('#painel .trilha')));
+    await pe.close();
+    {
+      const pw = await pg(400);
+      await pw.goto(B + '/devolucao-casos'); await pw.waitForTimeout(800);
+      const pos = await pw.evaluate(() => ['listaColeta','listaEnvio','listaMl'].map(id => document.getElementById(id).getBoundingClientRect().top));
+      ok('a 400 px as listas empilham: coleta, envio, ML', pos[0] < pos[1] && pos[1] < pos[2], JSON.stringify(pos));
+      const mw = await pw.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+      ok('   sem rolar de lado', mw[0] <= mw[1], JSON.stringify(mw));
+      await pw.close();
+    }
+    secao('envio — enviar, avisar e encerrar pela tela');
+    {
+      const tId = (await api(await pg(), 'POST', '/api/devolucao-casos/transportadoras', { nome:'Log Tela' })).id;
+      const pz = await pg();
+      const r1 = await api(pz, 'POST', '/api/devolucao-casos', { tipo:'envio', origem:'ml', prazo:dia(5), venda:'8770201', publicidade:false });
+      const id = r1.id;
+      await pz.goto(B + '/devolucao-casos'); await pz.waitForTimeout(900);
+      await pz.locator('#listaEnvio .linha', { hasText:'#'+id+' ' }).first().locator('.t1').click(); await pz.waitForTimeout(1200);
+      ok('"Afetou a reputação?" fica no alto, sem resposta', /ainda não respondida/.test(await pz.textContent('#painel')));
+      ok('o bloco Envio tem o botão', await pz.locator('#btEnviar').count() === 1);
+      await pz.selectOption('#evTransp', String(tId)); await pz.fill('#evRastreio', 'BR777');
+      await pz.click('#btEnviar'); await pz.waitForTimeout(900);
+      ok('sem o frete: recusado, o motivo aparece e o caso não anda', /frete/.test(await pz.textContent('#cMsg')) && caso(id).etapa === 'lancado', await pz.textContent('#cMsg'));
+      await pz.fill('#evFrete', '27,40'); await pz.click('#btEnviar'); await pz.waitForTimeout(1000);
+      eq('com o frete: enviado', caso(id).etapa + '/' + caso(id).custo_envio + '/' + caso(id).rastreio, 'enviado/27.4/BR777');
+      ok('   a tela mostra o frete a quem lança', /R\$ 27,40/.test(await pz.textContent('#painel')));
+      await pz.click('#painel [data-etapa="comprador_avisado"]'); await pz.waitForTimeout(900);
+      eq('"→ Comprador avisado"', caso(id).etapa, 'comprador_avisado');
+      await pz.click('#btAvisoML'); await pz.waitForTimeout(900);
+      ok('o aviso ao ML sem o print: recusado', /print/i.test(await pz.textContent('#cMsg')) && caso(id).etapa === 'comprador_avisado', await pz.textContent('#cMsg'));
+      /* Um PDF com conteúdo (o lerArquivo manda PDF como está; foto minúscula é recusada como "vazia"). */
+      await pz.setInputFiles('#painel input[data-print="print_ml"]', { name:'print.pdf', mimeType:'application/pdf', buffer:Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(2000, 32)]) });
+      await pz.waitForTimeout(1500);
+      ok('o print do ML anexado pela tela', db.prepare("SELECT COUNT(*) n FROM devolucao_anexo WHERE caso_id=? AND tipo='print_ml'").get(id).n === 1);
+      await pz.click('#btAvisoML'); await pz.waitForTimeout(900);
+      eq('com o print: aguardando confirmação', caso(id).etapa, 'aguardando_confirmacao');
+      await pz.fill('#cbTexto', 'whats de novo'); await pz.click('#btCobrei'); await pz.waitForTimeout(900);
+      ok('"Cobrei a confirmação" vai para a história', db.prepare("SELECT COUNT(*) n FROM devolucao_evento WHERE caso_id=? AND tipo='cobranca'").get(id).n === 1);
+      pz.once('dialog', dl => dl.accept());
+      await pz.click('#btConfirmou'); await pz.waitForTimeout(900);
+      ok('"Comprador confirmou" sem a reputação: recusado, dizendo', /reputa/i.test(await pz.textContent('#cMsg')) && !caso(id).encerrado_em, await pz.textContent('#cMsg'));
+      await pz.click('#painel [data-rep="nao"]'); await pz.waitForTimeout(900);
+      eq('reputação "Não" pela tela', caso(id).reputacao, 'nao');
+      ok('   o Admin Geral vê "Entregue sem confirmação"', await pz.locator('#btSemConf').count() === 1);
+      pz.once('dialog', dl => dl.accept());
+      await pz.click('#btConfirmou'); await pz.waitForTimeout(900);
+      eq('encerrado como "Comprador confirmou"', caso(id).saida, 'confirmado');
+      await pz.close();
+      /* Quem só acompanha (2) não vê "Entregue sem confirmação". */
+      const r2 = await api(await pg(), 'POST', '/api/devolucao-casos', { tipo:'envio', origem:'fora_ml', venda:'8770202', publicidade:false });
+      db.prepare("UPDATE devolucao_caso SET etapa='aguardando_confirmacao', enviado_em=datetime('now','localtime'), custo_envio=12 WHERE id=?").run(r2.id);
+      QUEM = 2;
+      const pr = await pg();
+      await pr.goto(B + '/devolucao-casos'); await pr.waitForTimeout(900);
+      await pr.locator('#listaEnvio .linha', { hasText:'#'+r2.id+' ' }).first().locator('.t1').click(); await pr.waitForTimeout(1000);
+      ok('quem só acompanha não vê "Entregue sem confirmação"', await pr.locator('#btSemConf').count() === 0 && await pr.locator('#btConfirmou').count() === 1);
+      ok('   mas vê o frete (acompanha)', /R\$ 12,00/.test(await pr.textContent('#painel')));
+      await pr.close();
+      QUEM = 1;
+    }
+
+    secao('envio — "Quem trabalhou nesta venda" e o relatório do mês pela tela');
+    {
+      for(const col of ['impresso_por TEXT','embalado_em TEXT','conferido_por TEXT','conferido_em TEXT','no_carro_por TEXT','no_carro_em TEXT','saida_id INTEGER','saiu_em TEXT','saiu_por TEXT'])
+        try{ db.exec('ALTER TABLE lote ADD COLUMN '+col); }catch(e){}
+      db.exec("CREATE TABLE IF NOT EXISTS saida (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, fechada_em TEXT, fechado_por TEXT DEFAULT '', quem_levou TEXT)");
+      const sid = db.prepare("INSERT INTO saida (tipo,fechada_em,fechado_por,quem_levou) VALUES ('agencia','2026-11-05 16:00:00','Lucas Tela','Motorista Zé')").run().lastInsertRowid;
+      db.prepare(`INSERT INTO lote (codigo,buyer,nf,venda,impresso_por,embalado_em,conferido_por,conferido_em,saida_id,saiu_em,saiu_por)
+        VALUES ('BK140140BEGE','Cliente Rastro','9401','2000000000094001','Ana Impressora','2026-11-05 09:00:00','Edvaldo Conferente','2026-11-05 10:00:00',?,'2026-11-05 16:00:00','agencia')`).run(sid);
+      const px = await pg();
+      const r3 = await api(px, 'POST', '/api/devolucao-casos', { tipo:'envio', origem:'fora_ml', venda:'2000000000094001', publicidade:false });
+      await px.goto(B + '/devolucao-casos'); await px.waitForTimeout(900);
+      await px.locator('#listaEnvio .linha', { hasText:'#'+r3.id+' ' }).first().locator('.t1').click(); await px.waitForTimeout(1000);
+      const txt = await px.textContent('#painel');
+      ok('o bloco mostra quem imprimiu e quem conferiu', /Quem trabalhou nesta venda/.test(txt) && /Ana Impressora/.test(txt) && /Edvaldo Conferente/.test(txt), txt.slice(0,400));
+      ok('   a saída: pela agência, quem fechou e quem levou', /Saiu pela agência/.test(txt) && /saída fechada por Lucas Tela/.test(txt) && /levou: Motorista Zé/.test(txt));
+      ok('   e diz por que quem embalou não aparece', /Quem embalou não aparece/.test(txt));
+      await px.goto(B + '/devolucao-casos'); await px.waitForTimeout(700);
+      await px.click('#tabs [data-t="rel"]'); await px.waitForTimeout(900);
+      const rel = await px.textContent('#relBox');
+      ok('o relatório tem o bloco do envio, com o frete para quem tem o dinheiro', /Enviar item faltante/.test(rel) && /Entregue sem confirmação/.test(rel) && /Frete dos envios/.test(rel), rel.slice(0,300));
+      await px.close();
+      QUEM = 2;
+      const py = await pg();
+      await py.goto(B + '/devolucao-casos'); await py.waitForTimeout(700);
+      await py.click('#tabs [data-t="rel"]'); await py.waitForTimeout(900);
+      const rel2 = await py.textContent('#relBox');
+      ok('sem a permissão do dinheiro: o bloco sem o frete', /Enviar item faltante/.test(rel2) && !/Frete dos envios/.test(rel2), rel2.slice(0,300));
+      await py.close();
+      QUEM = 1;
+    }
+
+    }
+
     secao('a 400 px — a página não rola de lado, e o caso abre');
     const p4 = await pg(400);
     await p4.goto(B + '/devolucao-casos'); await p4.waitForTimeout(800);

@@ -92,7 +92,8 @@ const caso = () => dbA.prepare('SELECT * FROM devolucao_caso WHERE id=?').get(ca
 console.log('\n── A2. sem login, toda escrita da devolução responde 401 e nada muda ──');
 const antesA = retratoA();
 const escritasA = Object.keys(rA).filter(k => /^(POST|DELETE) \/api\/devolucao/.test(k));
-ok('as escritas da devolução estão todas na conta (3 da peça + 24 dos casos)', escritasA.length === 27, escritasA.length);
+/* + 5 do envio de item faltante (ITEM-FALTANTE, 06/11/2026): enviar, cobranca, reputacao, confirmado e entregue-sem-confirmacao. */
+ok('as escritas da devolução estão todas na conta (3 da peça + 29 dos casos)', escritasA.length === 32, escritasA.length);
 escritasA.forEach(k => {
   const x = A(k, { id:1, ids:[1], sku_fisico:'BK140140BEGE', motivo:'x', para:'chegou', tipo:'doc', arquivo:FOTO,
     transportadora_id:tid, nome:'Outra', caso_id:casoId, devolucao_id:1, prazo:'2099-01-01', texto:'x' }, null, { id:casoId, tid });
