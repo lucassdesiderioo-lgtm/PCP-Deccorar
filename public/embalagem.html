@@ -565,6 +565,24 @@ function fita(n){
    25/09/2026) não repete a porta de saída — a coluna já é ela, e a marca que
    não separa nada deixa de marcar. No painel do "depois", que mistura as duas,
    a marca continua. */
+/* A TARJA "SEM ESTOQUE", NUM LUGAR SÓ (CONSERTO de 06/11/2026, dívida 21).
+   O servidor diz, em cada linha e em cada peça da caixa de várias, quanto a
+   fila de HOJE pede do SKU e quanto falta (`pedido_hoje`, `falta`, do
+   tarja_estoque.js): o SKU com alguma peça, mas não para todas, agora avisa
+   antes do bipe. Sem `falta` (o painel do "depois", ou o servidor de antes)
+   vale a regra antiga: a linha acusa livre ≤ 0; a peça, livre menor que a
+   quantidade dela. Sob medida nunca: não usa estoque. A trava da impressão
+   não mudou — isto só avisa. */
+/*TARJA_ESTOQUE_INICIO*/
+function tarjaEstoque(o){
+  if(!o || o.sob_medida || o.estoque==null) return '';
+  if(o.falta===undefined)
+    return (o.estoque<=0 || (o.peca && o.estoque<Math.max(1,o.qtd||1))) ? 'sem estoque — precisa produzir' : '';
+  if(!(o.falta>0)) return '';
+  if(o.estoque<=0) return 'sem estoque — precisa produzir';
+  return 'só '+o.estoque+(o.estoque===1?' livre':' livres')+' para '+o.pedido_hoje+' de hoje — '+(o.falta===1?'falta 1':'faltam '+o.falta)+': precisa produzir';
+}
+/*TARJA_ESTOQUE_FIM*/
 function blocoCaixa(v, sep, naColuna){
   var its=v.itens||[];
   var h='<div style="padding:10px 0'+(sep?';border-top:1px solid #e6dcc8':'')+'">'
@@ -586,7 +604,7 @@ function blocoCaixa(v, sep, naColuna){
          descobrir. Por peça e contra a QUANTIDADE dela — a mesma conta da
          trava do `/api/embalar`: com 1 na prateleira, a linha de 2 unidades
          não imprime, e dizer "tem estoque" ali seria mentira (§5, #23). */
-      +((it.estoque!=null && it.estoque<(it.qtd||1))?'<div style="color:#c0392b;font-size:12px;font-weight:700">sem estoque — precisa produzir</div>':'')
+      +(tarjaEstoque(Object.assign({peca:true},it))?'<div style="color:#c0392b;font-size:12px;font-weight:700">'+esc(tarjaEstoque(Object.assign({peca:true},it)))+'</div>':'')
       +'</span></div>';
   }
   /* No painel do "depois" a frase vai POR CAIXA — o número é de cada uma, e
@@ -669,7 +687,7 @@ function linhasPend(l, marcar){
       medida:(r.exige_medida && r.largura_cm && r.altura_cm)?(r.largura_cm+' × '+r.altura_cm):null,
       cor:r.cor_nome||null, tecido:r.tecido_nome||null, modelo:r.modelo_nome||null}) : '';
     // Sem estoque a caixa não está lá — avisa antes da pessoa ir procurar.
-    var semEst=(r.estoque!=null && r.estoque<=0);
+    var semEst=tarjaEstoque(r);
     /* O número grande é CAIXA. A caixa de várias persianas não chega mais
        aqui (opção B, 25/09/2026): ela tem bloco próprio na coluna
        (`caixaNaColuna`), então nesta linha caixa e persiana são o mesmo número. */
@@ -683,7 +701,7 @@ function linhasPend(l, marcar){
       +'<b style="color:'+(atr?'#c0392b':'#b26a00')+';font-size:22px;line-height:1">'+r.qtd+'</b></div>'
       +(desc?'<div style="font-size:15px;font-weight:600;margin-top:2px">'+esc(desc)+'</div>':'')
       +(atr?'<div style="color:#c0392b;font-size:12px;font-weight:700;margin-top:3px">⚠ '+r.atrasados+' fora do prazo</div>':'')
-      +(semEst?'<div style="color:#c0392b;font-size:12px;font-weight:700;margin-top:3px">sem estoque — precisa produzir</div>':'')
+      +(semEst?'<div style="color:#c0392b;font-size:12px;font-weight:700;margin-top:3px">'+esc(semEst)+'</div>':'')
       +'</div>';
   }
   return h;

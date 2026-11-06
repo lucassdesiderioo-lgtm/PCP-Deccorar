@@ -60,22 +60,21 @@ const de = c => r.find(s=>s.codigo===c);
 let ok = 0, falhou = 0;
 const caso = (nome, cond) => { if(cond){ ok++; console.log('  ok   '+nome); } else { falhou++; console.log('  FALHOU '+nome); } };
 
-caso('A: 1 livre para 3 vendas — a tela não mostra tarja', de('A_PARCIAL').grupo==='TARJA_FALTANDO');
-caso('A: 2 vão ser recusadas no bipe', de('A_PARCIAL').recusadas===2);
-caso('A: a causa é a linha pedir mais que o livre', de('A_PARCIAL').causas.some(c=>/pede mais/.test(c)));
-caso('B: Agência + Coleta com 1 livre — sem tarja nas duas', de('B_DUAS_LISTAS').grupo==='TARJA_FALTANDO' && de('B_DUAS_LISTAS').tarjas===0);
-caso('B: a causa é estar nas duas listas', de('B_DUAS_LISTAS').causas.some(c=>/Agência E na Coleta/.test(c)));
+/* DESDE O CONSERTO DE 06/11/2026 (dívida 21) a tela conta a fila inteira do
+   SKU: os casos que antes ficavam sem tarja agora a têm em todos os lugares. */
+caso('A: 1 livre para 3 vendas — a tarja aparece', de('A_PARCIAL').grupo==='OK' && de('A_PARCIAL').tarjas===1);
+caso('A: 2 vão ser recusadas no bipe (a trava não mudou)', de('A_PARCIAL').recusadas===2);
+caso('B: Agência + Coleta com 1 livre — tarja nas duas', de('B_DUAS_LISTAS').grupo==='OK' && de('B_DUAS_LISTAS').tarjas===2);
 caso('B: 1 recusada', de('B_DUAS_LISTAS').recusadas===1);
-caso('C: caixa de várias + linha disputando 2 livres — sem tarja', de('C_VARIAS').grupo==='TARJA_FALTANDO');
+caso('C: caixa de várias + linha disputando 2 livres — tarja na linha e na peça', de('C_VARIAS').grupo==='OK' && de('C_VARIAS').tarjas===2);
 caso('C: pede 3, 1 recusada', de('C_VARIAS').pede===3 && de('C_VARIAS').recusadas===1);
-caso('C: a causa é a caixa de várias', de('C_VARIAS').causas.some(c=>/caixa de várias/.test(c)));
 caso('D: livre zero — a tarja aparece nos dois lugares', de('D_ZERO').grupo==='OK' && de('D_ZERO').tarjas===2);
-caso('E: 1 livre para 1 venda — o sistema acha que tem', de('E_TEM').grupo==='SISTEMA_ACHA_QUE_TEM' && de('E_TEM').livre===1);
-caso('F: sob medida com tarja na tela — tarja falsa', de('F_SOBMEDIDA').grupo==='TARJA_FALSA_SOB_MEDIDA');
+caso('E: 1 livre para 1 venda — o sistema acha que tem, sem tarja', de('E_TEM').grupo==='SISTEMA_ACHA_QUE_TEM' && de('E_TEM').livre===1 && de('E_TEM').tarjas===0);
+caso('F: sob medida — sem tarja falsa', de('F_SOBMEDIDA').grupo==='OK' && de('F_SOBMEDIDA').tarjas===0);
 caso('G: peça reservada por caixa impressa — livre 0 e a tarja aparece', de('G_RESERVADO').grupo==='OK' && de('G_RESERVADO').livre===0);
-caso('H: código em minúscula no lote — sem ligação com o cadastro', de('H_CAIXA') && de('H_CAIXA').grupo==='SEM_LIGACAO_COM_CADASTRO');
+caso('H: código em minúscula no lote — agora liga ao cadastro e ganha a tarja', de('H_CAIXA') && de('H_CAIXA').grupo==='OK' && de('H_CAIXA').tarjas===1);
 caso('I: venda futura fica fora da fila de hoje', !de('I_FUTURO'));
-caso('a ordem põe a tarja faltando em cima', r[0].grupo==='TARJA_FALTANDO');
+caso('nenhum SKU com tarja faltando', !r.some(s=>s.grupo==='TARJA_FALTANDO'||s.grupo==='TARJA_EM_PARTE'||s.grupo==='TARJA_FALSA_SOB_MEDIDA'));
 
 db.close();
 fs.rmSync(tmp, { recursive:true, force:true });

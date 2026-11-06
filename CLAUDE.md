@@ -794,41 +794,57 @@ ou na Mesa dentro da aba.** Cinco defeitos foram reintroduzidos: a impressão
 digital pelos bytes (reprova 8), gravar a diferença já explicada (5), resolver
 sem motivo (4), o resolvido reabrindo (2) e a tabela fora do modo teste (1).
 
-### ⚠️ A TARJA "SEM ESTOQUE" DA ETIQUETA DE VENDA SÓ ACUSA O ZERO (06/11/2026, achado, NÃO consertado)
+### ⚠️ A TARJA "SEM ESTOQUE" DA ETIQUETA DE VENDA CONTA A FILA INTEIRA DO SKU (CONSERTO de 06/11/2026)
 
 O dono: *"tem outras persianas que também estão sem estoque que não está
-mostrando"*. Revisão feita, **nada mudou no código da tela** (decisão do dono:
-primeiro entender). A causa:
+mostrando"*. A tela comparava o **livre** (saldo − caixa impressa esperando a
+Conferência) com um pedaço da fila de cada vez: a linha por SKU só acusava
+**livre ≤ 0**, e a peça da caixa de várias, livre menor que a quantidade dela.
+O SKU com **alguma** peça, mas não para todas, ficava sem tarja, e a venda era
+recusada só no bipe — com mais vendas que peças na mesma lista, com o SKU na
+Agência **e** na Coleta, e com o SKU também dentro de caixa de várias.
 
-| Onde | A conta de hoje |
-|---|---|
-| tela, linha por SKU (`embalagem.html`, `linhasPend`) | tarja só se **livre ≤ 0** |
-| tela, peça da caixa de várias (`blocoCaixa`) | tarja se livre < a quantidade **daquela peça** |
-| trava da impressão (`etq_route.js`, `/api/embalar`) | recusa se livre < o que **esta caixa** pede, uma de cada vez |
-
-O número que o servidor manda está certo (é o **livre**, saldo − caixa impressa
-esperando a Conferência). O que falta é a tela comparar o livre com **a fila
-inteira do SKU**. Por isso o SKU que tem **alguma** peça, mas não para todas,
-fica sem tarja, e a venda é recusada só no bipe:
-
-- **mais vendas que peças na mesma lista** (1 livre, 3 vendas: sem tarja, 2 recusadas);
-- **o SKU na Agência E na Coleta**: cada lista compara o livre inteiro com a sua parte;
-- **o SKU também dentro de caixa de várias**: a caixa e a linha disputam as mesmas
-  peças, e nenhuma desconta a outra.
-
-Dois achados a mais, no mesmo lugar: o **sob medida** pode ganhar tarja falsa (a
-lista não sabe que ele não usa estoque, e a impressão deixa passar), e o JOIN
-da linha por SKU é por igualdade exata (`s.codigo=l.codigo`), embora o
-comentário diga `UPPER` — código escrito diferente no `lote` deixa a linha sem
-número e sem tarja nunca. E o caso que a tela **não** erra: o sistema diz que há
-peça livre e a prateleira está vazia — aí é o saldo, e o caminho é o Inventário.
+- **`tarja_estoque.js` é o dono único** de "a fila de hoje tem peça para todas?":
+  soma o que a fila de **hoje** pede de cada SKU (a régua do `filaDoDia`, com as
+  peças da caixa de várias pelo `qtd` do `lote_item`), e cada linha do
+  `GET /api/pendentes` e cada peça do `GET /api/pendentes/varias` levam
+  `pedido_hoje`, `falta` e `sob_medida`. A tela só desenha (`tarjaEstoque`, no
+  `embalagem.html`, a mesma função para a linha e para a peça): livre ≤ 0 é
+  *"sem estoque — precisa produzir"*; livre que não basta é *"só N livres para
+  M de hoje — faltam K: precisa produzir"*, em **todo** lugar onde o SKU aparece.
+- ⚠️ **ISTO SÓ AVISA: A TRAVA DA IMPRESSÃO NÃO MUDOU.** O `/api/embalar` continua
+  recusando caixa a caixa (livre < o que esta caixa pede). O `etq_route.js` não
+  usa o `tarja_estoque.js`, e há teste conferindo.
+- ⚠️ **O LIVRE NÃO SE CALCULA NO `tarja_estoque.js`**: chega pronto do `livre()`
+  do `exp_route.js` (`baixa_dominio.reservados`). Uma segunda conta de livre
+  seria a #12.
+- ⚠️ **SOB MEDIDA NUNCA TEM TARJA** (não usa estoque, §7), e o SKU sem número do
+  cadastro também não — a trava do SKU não cadastrado (§6) cuida dele.
+- ⚠️ **O JOIN DA LINHA POR SKU É EM MAIÚSCULA** (`s.codigo=UPPER(l.codigo)`),
+  como o da caixa de várias: o código escrito em minúscula no `lote` deixava a
+  linha sem número, e sem tarja nunca.
+- ⚠️ **O PAINEL "PRA DESPACHAR DEPOIS" FICOU COM A REGRA DE ANTES** (livre ≤ 0):
+  ele não recebe `falta`, e a tela, sem `falta`, volta à regra antiga — que é
+  também o que vale para a página antiga num tablet com cache. Contar o que sobra
+  depois de hoje, data a data, é outra conta, e ficou de fora.
+- E o caso que a tela **não** erra: o sistema diz que há peça livre e a
+  prateleira está vazia — aí é o saldo, e o caminho é o Inventário.
 
 **`node diagnosticar_tarja_estoque.js` (só lê, copia o banco com `db.backup()`)**
 lista SKU a SKU da fila de hoje: saldo, em caixa impressa, livre, o que a fila
 pede (agência · coleta · caixa de várias), onde a tarja aparece, quantas vão ser
-recusadas e por quê. `--sku CODIGO`, `--todos`, `--json`. `node
-teste_diagnosticar_tarja_estoque.js` (16) trava a conta. **O conserto é
-CONSERTO 🟡** (cálculo exibido, não mexe em saldo), e espera o "pode seguir".
+recusadas no bipe e por quê — **pela mesma conta da tela** (`tarja_estoque.js`).
+Depois do conserto, os grupos "tarja faltando" e "tarja em parte" têm que sair
+vazios; se não saírem, é defeito. `--sku CODIGO`, `--todos`, `--json`.
+
+**Rode `node teste_tarja_estoque.js` (23) e `node teste_diagnosticar_tarja_estoque.js`
+(13) ao mexer no `tarja_estoque.js`, no `linhasDeSku`/`caixasDeVarias` do
+`exp_route.js` ou no `tarjaEstoque` do `embalagem.html`.** E **abra a tela**: a
+frase é texto montado.
+
+> ⚠️ **AINDA NÃO PROVADO COM DADO REAL:** o deploy e a tela da bancada com um SKU
+> que tem alguma peça, mas não para todas, mostrando a tarja antes do bipe. Prova
+> que não foi feita se escreve como não feita.
 
 Ferramentas que só leem: `node rastrear.js --lote` (os sete degraus do PDF até a
 tela), `node rastrear.js --auditar [dias]`, `node conferir_nf.js --pdf` e `node
@@ -3411,7 +3427,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (246), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (246), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -3421,7 +3437,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 17 | ~~**Acesso: duas travas faltando**~~ **RESOLVIDO em 17/09/2026** — a exceção recusa conceder chave `intransferivel`, a troca de setores tem a trava do último Admin Geral (mesma conta do `auth.js`, agora no `acesso.js`), setor novo não nasce `admin_geral` e a migração de `areas` virou evento de uma vez só (a porta A, que promovia a Admin Geral em silêncio). Ver §10, armadilha #28 | — |
 | 19 | ~~**`minimo.definir` é uma chave que nenhuma rota lê.**~~ **RESOLVIDO em 26/10/2026** (fase 3 da `ACESSOS-UNIFICADOS`) — a chave saiu do registro, do setor Comprador e das exceções (uma vez só, `config.acesso_minimo_definir`). Quem manda no card Materiais continua sendo `componente.cadastrar` e `compras.ver`; ninguém perdeu nada · `teste_setor_salvar.js` | — |
 | 20 | ~~**Editar um setor APAGA, sem avisar, as permissões que ele tem acima do próprio nível.**~~ **RESOLVIDO em 26/10/2026** (fase 3 da `ACESSOS-UNIFICADOS`, R-ACE-03) — o nível do setor virou **etiqueta**: a tela mostra a caixinha acima do nível como ela está (marcada, com o aviso "acima do nível do setor") e manda a lista inteira (`todas`); a tela antiga, sem a marca, não apaga nada. A permissão **sensível nova** pede confirmação (409 `sensiveis`) antes de entrar. As três **intransferíveis** continuam fora de qualquer setor que não seja o Admin Geral, agora por trava própria, e não mais pelo nível · `teste_setor_salvar.js` (26). **Desde 04/11/2026 o nível volta a travar** (fase 4 da `ACESSO-POR-TELA-E-NIVEL`), mas recusando a chave **nova** na hora, dizendo por quê — a que já estava fica, nunca se apaga (§10) | — |
-| 21 | **A tarja "sem estoque" da Etiqueta de Venda só acusa o livre ≤ 0**, e não a fila inteira do SKU: com alguma peça, mas não para todas, a tela não avisa e o bipe recusa (§5, achado de 06/11/2026). Diagnóstico: `node diagnosticar_tarja_estoque.js` | Médio — a bancada descobre a falta na prateleira, e a produção não é chamada a tempo |
+| 21 | ~~**A tarja "sem estoque" da Etiqueta de Venda só acusa o livre ≤ 0**, e não a fila inteira do SKU~~ **RESOLVIDO em 06/11/2026** (CONSERTO) — a linha e a peça da caixa contam a fila inteira de hoje do SKU (`tarja_estoque.js`, dono único), o sob medida não ganha tarja e o JOIN da linha é em maiúscula. A trava da impressão não mudou. **Fica aberto:** o painel "Pra despachar depois" continua com a regra antiga · `teste_tarja_estoque.js` (23) | — |
 | 18 | **Nada acusa uma regra INERTE** — e ela tem pelo menos **três formas**: dado que ninguém preencheu, **rota que nenhuma tela chama** (o extrato do livro ficou um dia no ar sem botão, §2; o `POST /api/componentes` ficou **oito meses**, e no lugar dele se fazia `INSERT` à mão — §7-B, armadilha #33) e **chave de permissão que nenhuma rota lê** (a `minimo.definir` da linha abaixo). `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
 
 ---
