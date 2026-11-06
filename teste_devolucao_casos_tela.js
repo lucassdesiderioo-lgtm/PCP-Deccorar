@@ -677,6 +677,63 @@ const srv = app.listen(0, async () => {
     await pdc.close();
 
     /* ═════════ 5. o celular ═════════ */
+    /* ═════════ ITEM-FALTANTE — o tipo "envio" pela tela ═════════ */
+    {
+    secao('envio — lançar um caso de WhatsApp pela tela');
+    const pe = await pg();
+    await pe.goto(B + '/devolucao-casos'); await pe.waitForTimeout(900);
+    await pe.click('#tpEnvio'); await pe.waitForTimeout(150);
+    eq('o motivo nasce "Falta de kit"', await pe.inputValue('#lMotivo'), 'Falta de kit');
+    eq('o item nasce "Kit de instalação"', await pe.inputValue('#lItem'), 'Kit de instalação');
+    eq('os campos da coleta somem no envio', await pe.isVisible('#lPrazo'), false);
+    await pe.fill('#lVenda', '8770001'); await pe.waitForTimeout(700);
+    await pe.fill('#lSku', 'BK140140BEGE'); await pe.fill('#lComprador', 'Cliente Kit Tela');
+    await pe.selectOption('#lResp', '2'); await pe.click('#lPub [data-pub="0"]');
+    await pe.click('#btLancar'); await pe.waitForTimeout(900);
+    ok('sem a origem, o servidor recusa e a tela diz', /origem/i.test(await pe.textContent('#lMsg')), await pe.textContent('#lMsg'));
+    await pe.click('#lOrigem [data-origem="fora_ml"]'); await pe.waitForTimeout(100);
+    eq('no WhatsApp o link da conversa some', await pe.isVisible('#lLink'), false);
+    ok('   e a prévia do "sair até" aparece', /Sair até \d\d\/\d\d\/\d{4}/.test(await pe.textContent('#lSairAte')), await pe.textContent('#lSairAte'));
+    await pe.click('#btLancar'); await pe.waitForTimeout(1000);
+    const eid = +((await pe.textContent('#lMsg')).match(/#(\d+)/) || [])[1];
+    const ec = caso(eid) || {};
+    eq('lançou o envio', ec.tipo, 'envio');
+    eq('   origem WhatsApp', ec.origem, 'fora_ml');
+    ok('   com o "sair até" gravado', /^\d{4}-\d\d-\d\d$/.test(ec.sair_ate||''), ec.sair_ate);
+    eq('   item', ec.item_enviado, 'Kit de instalação');
+    eq('   responsável', ec.responsavel_id, 2);
+    await pe.waitForTimeout(400);
+    ok('a terceira lista mostra o caso, com o chip WhatsApp', /WhatsApp/.test(await pe.locator('#listaEnvio .linha', { hasText:'#'+eid+' ' }).first().textContent()));
+    ok('   e o próximo passo "Embalar o kit"', /Embalar o kit/.test(await pe.locator('#listaEnvio .linha', { hasText:'#'+eid+' ' }).first().textContent()));
+    const ordem = await pe.evaluate(() => ['listaColeta','listaEnvio','listaMl'].map(id => document.getElementById(id).getBoundingClientRect().left));
+    ok('as três listas lado a lado: coleta, envio, ML', ordem[0] < ordem[1] && ordem[1] < ordem[2], JSON.stringify(ordem));
+    await pe.locator('#listaEnvio .linha', { hasText:'#'+eid+' ' }).first().locator('.t1').click(); await pe.waitForTimeout(800);
+    const trilha = await pe.textContent('#painel .trilha');
+    ok('a trilha do WhatsApp não tem "ML avisado"', !/ML avisado/.test(trilha) && /Aguardando confirmação/.test(trilha), trilha);
+    eq('não há "A caixa chegou" no envio', await pe.locator('#btChegou').count(), 0);
+    await pe.click('#painel [data-etapa="embalado"]'); await pe.waitForTimeout(900);
+    eq('"→ Embalado" pela tela', caso(eid).etapa, 'embalado');
+    ok('   e o passo vira "Despachar até"', /Despachar até/.test(await pe.textContent('#cxProximo')), await pe.textContent('#cxProximo'));
+    await pe.click('#btDesfazer'); await pe.waitForTimeout(900);
+    eq('   o desfazer volta para Lançado', caso(eid).etapa, 'lancado');
+    await pe.click('#btOrigem'); await pe.waitForTimeout(900);
+    ok('trocar para ML sem o prazo: recusado, com o motivo', /prazo/i.test(await pe.textContent('#cMsg')) && caso(eid).origem === 'fora_ml', await pe.textContent('#cMsg'));
+    await pe.fill('#oPrazo', dia(4)); await pe.click('#btOrigem'); await pe.waitForTimeout(900);
+    eq('   com o prazo: vira ML', caso(eid).origem + '/' + caso(eid).prazo, 'ml/' + dia(4));
+    ok('   e o "ML avisado" volta à trilha', /ML avisado/.test(await pe.textContent('#painel .trilha')));
+    await pe.close();
+    {
+      const pw = await pg(400);
+      await pw.goto(B + '/devolucao-casos'); await pw.waitForTimeout(800);
+      const pos = await pw.evaluate(() => ['listaColeta','listaEnvio','listaMl'].map(id => document.getElementById(id).getBoundingClientRect().top));
+      ok('a 400 px as listas empilham: coleta, envio, ML', pos[0] < pos[1] && pos[1] < pos[2], JSON.stringify(pos));
+      const mw = await pw.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+      ok('   sem rolar de lado', mw[0] <= mw[1], JSON.stringify(mw));
+      await pw.close();
+    }
+    /*__TELA_FASE2__*/
+    }
+
     secao('a 400 px — a página não rola de lado, e o caso abre');
     const p4 = await pg(400);
     await p4.goto(B + '/devolucao-casos'); await p4.waitForTimeout(800);

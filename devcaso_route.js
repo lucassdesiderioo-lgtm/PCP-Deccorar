@@ -102,7 +102,12 @@ module.exports = function(app, db){
        sabendo, antes de lançar, que há mais peça da mesma pessoa. */
     const irm = v && v.buyer ? D.mesmoComprador(db, v.buyer, ja ? ja.id : null)
       .map(x => ({ id:x.id, venda:x.venda, nf:x.nf, etapa_nome: D.NOME_ETAPA[x.etapa] || x.etapa })) : [];
-    return { achou: !!v, venda: v, caso_aberto: ja ? ja.id : null, comprador_casos: irm };
+    /* Os casos abertos da venda por grupo: o envio de item faltante e a
+       devolução não se barram (R-ENV-16); a tela avisa ou recusa conforme o
+       tipo que está sendo lançado. */
+    const jaEnv = D.abertoDaVenda(db, venda, 'envio'), jaDev = D.abertoDaVenda(db, venda, 'coleta');
+    return { achou: !!v, venda: v, caso_aberto: ja ? ja.id : null, caso_aberto_envio: jaEnv ? jaEnv.id : null,
+      caso_aberto_devolucao: jaDev ? jaDev.id : null, comprador_casos: irm };
   }));
   /* ── transportadoras (fase 3). ANTES do `/:id`: no Express, a rota com
      parâmetro registrada primeiro engoliria "transportadoras" como um id. ── */
@@ -159,7 +164,8 @@ module.exports = function(app, db){
     responder(res, () => {
       const r = D.lancarCompleto(db, b, QUEM.pessoa(req), { temChave: temChaveResp });
       if(r.valorMudou && r.valorMudou.length) auditar(req, 'valor', r.caso.id, 'lançou no lançamento '+r.valorMudou.join(', ')+': '+JSON.stringify({ valor_ml: b.valor_ml, custo_etiqueta: b.custo_etiqueta, limite_frete: b.limite_frete, custo: b.coleta && b.coleta.custo }));
-      return { ok:true, id:r.caso.id };
+      /* R-ENV-16: o caso do outro grupo na mesma venda avisa, não recusa. */
+      return r.aviso ? { ok:true, id:r.caso.id, aviso:r.aviso } : { ok:true, id:r.caso.id };
     });
   });
   post('/api/devolucao-casos/:id/editar', (req,res) => responder(res, () => {

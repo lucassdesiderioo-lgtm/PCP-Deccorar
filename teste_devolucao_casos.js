@@ -1823,7 +1823,9 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
     /* Depois do responsável vieram o criado_por_id e o encerrado_por_id
        (QUEM-FEZ-E-REVISAO fase 5): as duas continuam juntas, logo antes. */
     const fimR = (c) => c.slice(c.indexOf('responsavel_id'), c.indexOf('responsavel_id') + 4).join(',');
-    ok('banco antigo: o ALTER acrescenta as duas no fim', fimR(cn) === 'responsavel_id,responsavel_nome,criado_por_id,encerrado_por_id' && cn.slice(-1)[0] === 'encerrado_por_id', cn.slice(-4).join(','));
+    ok('banco antigo: o ALTER acrescenta as duas no fim', fimR(cn) === 'responsavel_id,responsavel_nome,criado_por_id,encerrado_por_id' && cn[cn.indexOf('encerrado_por_id')+1] === 'origem', cn.slice(-12).join(','));
+    /* Depois delas vieram as oito do envio de item faltante (ITEM-FALTANTE): o
+       encerrado_por_id deixou de ser a última, e fica logo antes de `origem`. */
     const zero = new Database(':memory:'); DD.garantir(zero);
     const cz = cols(zero);
     ok('   e a ordem do banco novo é a mesma do antigo depois do ALTER (§17)', cz.slice(-4).join(',') === cn.slice(-4).join(',') && fimR(cz) === fimR(cn), cz.slice(-4).join(','));
@@ -2096,6 +2098,193 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
     chamar('POST','/api/devolucao-casos/:id/aviso-ml',{}, 3, {id:c2});
     eq('depois do "Avisamos o ML", a chegada não se desfaz (409)', desf2(c2,3).status, 409);
     ok('   e a chegada fica', !!caso(c2).chegou_em);
+  }
+
+  /* ═══════════ ITEM-FALTANTE — o tipo "envio" (spec docs/specs/ITEM-FALTANTE.md §10) ═══════════
+     Escritos ANTES do código (risco 🔴). Os números entre colchetes são os da §10 da spec. */
+  {
+    const D = require('./devcaso_dominio');
+    db.exec("CREATE TABLE IF NOT EXISTS montagem (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT)");
+    db.exec("CREATE TABLE IF NOT EXISTS componente (id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT, estoque REAL DEFAULT 0)");
+    db.exec("INSERT INTO lote (codigo,buyer,city,nf,venda,packId) VALUES ('BK140140BEGE','Paula Kit','Campinas','9101','2000000000009101',NULL)");
+    /* Lançar um envio CRU: o `chamar` não põe padrão nenhum (o motivo padrão do
+       envio é "Falta de kit", e não o do resto do arquivo). */
+    const env = (corpo, quem) => chamar('POST','/api/devolucao-casos', Object.assign({ _cru:true, tipo:'envio', publicidade:false,
+      responsavel_id:1, sku:'BK140140BEGE', comprador:'Comprador Kit' }, corpo), quem || 3);
+    const LINK = 'https://www.mercadolivre.com.br/reclamacao/kit';
+    const det = (id, quem) => chamar('GET','/api/devolucao-casos/:id',null,quem||1,{id}).body;
+    const etp = (id, para, quem) => chamar('POST','/api/devolucao-casos/:id/etapa',{ para }, quem || 2, { id });
+    const contaEstoque = () => JSON.stringify([contar('skus'), db.prepare('SELECT COALESCE(SUM(estoque),0) s FROM skus').get().s,
+      db.prepare('SELECT COALESCE(SUM(estoque),0) s FROM componente').get().s, contar('fila'), contar('montagem')]);
+    const estoque0 = contaEstoque();
+
+    secao('envio [1] — lançar origem ML');
+    r = env({ venda:'8880001', origem:'ml', prazo:dia(5), link_ml:LINK });
+    eq('lança (200)', r.status, 200);
+    const e1 = caso(r.body.id);
+    eq('tipo envio', e1 && e1.tipo, 'envio');
+    eq('nasce em "lancado"', e1 && e1.etapa, 'lancado');
+    eq('item nasce "Kit de instalação"', e1 && e1.item_enviado, 'Kit de instalação');
+    eq('motivo nasce "Falta de kit"', e1 && e1.motivo, 'Falta de kit');
+    eq('origem gravada', e1 && e1.origem, 'ml');
+    eq('prazo do ML gravado', e1 && e1.prazo, dia(5));
+    eq('sem "sair até" na origem ML', e1 && e1.sair_ate, null);
+    ok('evento do lançamento gravado', eventos(e1.id).length === 1 && eventos(e1.id)[0].para === 'lancado', JSON.stringify(eventos(e1.id)));
+
+    secao('envio [2] — a origem é obrigatória');
+    eq('sem origem → 400', env({ venda:'8880002' }).status, 400);
+    eq('origem fora da lista → 400', env({ venda:'8880002', origem:'email' }).status, 400);
+
+    secao('envio [3] — o prazo depende da origem');
+    eq('ML sem prazo → 400', env({ venda:'8880003', origem:'ml', link_ml:LINK }).status, 400);
+    r = env({ venda:'8880004', origem:'fora_ml' });
+    eq('WhatsApp sem prazo → aceita', r.status, 200);
+    const e4 = caso(r.body.id);
+    eq('   e grava o "sair até"', e4.sair_ate, D.sairAte(dia(0), 1));
+    eq('   sem prazo do ML', e4.prazo, null);
+    eq('   o link da conversa não é exigido no WhatsApp', e4.link_ml, null);
+    eq('ML sem link → 400 (o link só é exigido no ML)', env({ venda:'8880005', origem:'ml', prazo:dia(5) }).status, 400);
+    eq('sem publicidade → 400 (nos dois)', env({ venda:'8880005', origem:'fora_ml', publicidade:'' }).status, 400);
+    r = env({ venda:'8880005', origem:'fora_ml', responsavel_id:'', sku:'', comprador:'' });
+    eq('sem responsável, SKU e comprador → 400', r.status, 400);
+    ok('   e a recusa diz os três', ['sku','comprador','responsavel_id'].every(k => (r.body.faltam||[]).includes(k)), JSON.stringify(r.body));
+
+    secao('envio [4] — "sair até" é o fim do próximo dia útil');
+    eq('segunda → terça', D.sairAte('2026-11-02', 1), '2026-11-03');
+    eq('sexta → segunda', D.sairAte('2026-11-06', 1), '2026-11-09');
+    eq('sábado → segunda', D.sairAte('2026-11-07', 1), '2026-11-09');
+    eq('domingo → segunda', D.sairAte('2026-11-08', 1), '2026-11-09');
+
+    secao('envio [5] — os dias úteis são do config');
+    eq('com 2: segunda → quarta', D.sairAte('2026-11-02', 2), '2026-11-04');
+    eq('com 2: sexta → terça', D.sairAte('2026-11-06', 2), '2026-11-10');
+    eq('o padrão nasce no config (1)', (db.prepare("SELECT valor FROM config WHERE chave='envio_fora_ml_dias_uteis'").get()||{}).valor, '1');
+    db.prepare("UPDATE config SET valor='2' WHERE chave='envio_fora_ml_dias_uteis'").run();
+    r = env({ venda:'8880006', origem:'fora_ml' });
+    eq('trocar o config para 2 muda o "sair até" do caso novo', caso(r.body.id).sair_ate, D.sairAte(dia(0), 2));
+    db.prepare("UPDATE config SET valor='1' WHERE chave='envio_fora_ml_dias_uteis'").run();
+    const e6 = r.body.id;
+
+    secao('envio [6] — a cor do "sair até"');
+    db.prepare('UPDATE devolucao_caso SET sair_ate=? WHERE id=?').run(dia(1), e4.id);
+    let L = lista();
+    ok('a lista tem a terceira coluna (envio)', Array.isArray(L.envio), Object.keys(L).join(','));
+    eq('"sair até" amanhã → vermelho', (daLista(L.envio, e4.id)||{}).cor, 'vermelho');
+    db.prepare('UPDATE devolucao_caso SET sair_ate=? WHERE id=?').run(dia(-1), e4.id);
+    L = lista();
+    eq('ontem e não enviado → vencido', (daLista(L.envio, e4.id)||{}).cor, 'vencido');
+    db.prepare("UPDATE devolucao_caso SET sair_ate=?, enviado_em=datetime('now','localtime'), etapa='enviado' WHERE id=?").run(dia(-1), e6);
+    L = lista();
+    eq('depois de ENVIADO o "sair até" não pinta mais', (daLista(L.envio, e6)||{}).cor, '');
+
+    secao('envio [7] — o prazo do ML: cores, prorrogação e prazo novo');
+    db.prepare('UPDATE devolucao_caso SET prazo=? WHERE id=?').run(dia(3), e1.id);
+    eq('3 dias → âmbar', (daLista(lista().envio, e1.id)||{}).cor, 'ambar');
+    db.prepare('UPDATE devolucao_caso SET prazo=? WHERE id=?').run(dia(0), e1.id);
+    eq('vence hoje → vermelho', (daLista(lista().envio, e1.id)||{}).cor, 'vermelho');
+    db.prepare('UPDATE devolucao_caso SET prazo=? WHERE id=?').run(dia(-2), e1.id);
+    eq('passou → vencido', (daLista(lista().envio, e1.id)||{}).cor, 'vencido');
+    r = chamar('POST','/api/devolucao-casos/:id/prorrogacao',{ texto:'pedi mais prazo' }, 2, { id:e1.id });
+    eq('pedir prorrogação (200)', r.status, 200);
+    eq('   o prazo não muda', caso(e1.id).prazo, dia(-2));
+    ok('   vira evento', eventos(e1.id).some(e => e.tipo === 'prorrogacao_pedida'));
+    eq('prazo novo (200)', chamar('POST','/api/devolucao-casos/:id/prazo',{ prazo:dia(4) }, 2, { id:e1.id }).status, 200);
+    eq('   guarda o original', caso(e1.id).prazo_original, dia(-2));
+    chamar('POST','/api/devolucao-casos/:id/prazo',{ prazo:dia(6) }, 2, { id:e1.id });
+    eq('   o segundo prazo novo não sobrescreve o original', caso(e1.id).prazo_original, dia(-2));
+    eq('na origem WhatsApp não se prorroga (400)', chamar('POST','/api/devolucao-casos/:id/prorrogacao',{}, 2, { id:e4.id }).status, 400);
+
+    secao('envio [8] — vencido não encerra em nenhuma leitura');
+    for(let i = 0; i < 3; i++){ lista(); det(e4.id); chamar('GET','/api/devolucao-casos/encerrados',null,1); chamar('GET','/api/devolucao-casos/buscar',null,1,{},{ q:'8880004' }); }
+    eq('o caso vencido continua aberto', caso(e4.id).encerrado_em, null);
+    ok('   e a busca acha o envio', (chamar('GET','/api/devolucao-casos/buscar',null,1,{},{ q:'8880004' }).body.casos||[]).some(c => c.id === e4.id));
+
+    secao('envio [9] — o parado vale para todo o tipo');
+    db.prepare("UPDATE devolucao_caso SET etapa_desde=datetime('now','localtime','-2 days') WHERE id=?").run(e6);
+    eq('etapa parada há 2 dias → parado', (daLista(lista().envio, e6)||{}).parado, true);
+    db.prepare("UPDATE devolucao_caso SET etapa='aguardando_confirmacao' WHERE id=?").run(e6);
+    eq('   inclusive em "aguardando confirmação"', (daLista(lista().envio, e6)||{}).parado, true);
+
+    secao('envio [10] — a venda do lote preenche; a que não existe também lança');
+    r = env({ venda:'2000000000009101', origem:'fora_ml', sku:undefined, comprador:undefined });
+    eq('venda no lote lança', r.status, 200);
+    const e10 = caso(r.body.id);
+    eq('   comprador do lote', e10.comprador, 'Paula Kit');
+    eq('   SKU do lote', e10.sku, 'BK140140BEGE');
+    eq('   NF do lote', e10.nf, '9101');
+    eq('venda que não existe lança também', env({ venda:'8880010', origem:'fora_ml' }).status, 200);
+
+    secao('envio [11] — um envio aberto por venda');
+    r = env({ venda:'2000000000009101', origem:'fora_ml' });
+    eq('segundo envio aberto na mesma venda → recusado (409)', r.status, 409);
+    ok('   dizendo qual caso existe', new RegExp('#'+e10.id).test(r.body.erro||'') && r.body.caso_id === e10.id, JSON.stringify(r.body));
+    db.prepare("UPDATE devolucao_caso SET encerrado_em=datetime('now','localtime'), etapa='encerrado', saida='confirmado' WHERE id=?").run(e10.id);
+    eq('com o anterior encerrado → aceita', env({ venda:'2000000000009101', origem:'fora_ml' }).status, 200);
+
+    secao('envio [12] — devolução aberta na mesma venda avisa, não recusa');
+    r = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8880012', sku:'BK140140BEGE' }, 3);
+    const d12 = r.body.id;
+    r = env({ venda:'8880012', origem:'fora_ml' });
+    eq('envio com devolução aberta na venda → aceita', r.status, 200);
+    ok('   e devolve o aviso com o número do caso', r.body.aviso && r.body.aviso.caso_id === d12 && new RegExp('#'+d12).test(r.body.aviso.texto||''), JSON.stringify(r.body));
+    r = chamar('POST','/api/devolucao-casos',{ tipo:'coleta', venda:'8880004', sku:'BK140140BEGE', prazo:dia(5) }, 3);
+    eq('e a devolução com envio aberto na venda também lança', r.status, 200);
+    eq('duas devoluções na mesma venda continuam recusadas (409)', chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'8880004', sku:'BK140140BEGE' }, 3).status, 409);
+
+    secao('envio [13] — motivo e item');
+    eq('motivo fora da lista → 400', env({ venda:'8880013', origem:'fora_ml', motivo:'Inventado' }).status, 400);
+    eq('item vazio → 400', env({ venda:'8880013', origem:'fora_ml', item_enviado:'  ' }).status, 400);
+    r = env({ venda:'8880013', origem:'fora_ml', item_enviado:'Suporte extra', motivo:'Comando quebrado' });
+    eq('item e motivo editáveis no lançamento', [caso(r.body.id).item_enviado, caso(r.body.id).motivo].join('|'), 'Suporte extra|Comando quebrado');
+
+    secao('envio [14] — ENVIADO e ML AVISADO têm porta própria');
+    eq('"enviado" pela etapa à mão → 400', etp(e4.id, 'enviado').status, 400);
+    eq('"ml_avisado" pela etapa à mão → 400', etp(e1.id, 'ml_avisado').status, 400);
+    eq('"embalado" à mão → 200', etp(e1.id, 'embalado').status, 200);
+    eq('   o caso fica em "embalado"', caso(e1.id).etapa, 'embalado');
+    ok('   com evento', eventos(e1.id).some(e => e.tipo === 'etapa' && e.para === 'embalado'));
+    eq('desfazer o "embalado" (quem clicou)', chamar('POST','/api/devolucao-casos/:id/desfazer-etapa',{}, 2, { id:e1.id }).status, 200);
+    eq('   volta a "lancado"', caso(e1.id).etapa, 'lancado');
+    eq('"comprador avisado" antes de enviar → 400', etp(e1.id, 'comprador_avisado').status, 400);
+
+    secao('envio [15] — a ordem da lista');
+    {
+      const Lx = lista().envio;
+      const pos = (id) => Lx.findIndex(c => c.id === id);
+      const venc = Lx.filter(c => c.cor === 'vencido');
+      ok('vencidos em cima', venc.every(v => Lx.indexOf(v) < Lx.findIndex(c => c.cor !== 'vencido') || Lx.findIndex(c => c.cor !== 'vencido') < 0), JSON.stringify(Lx.map(c => [c.id,c.cor,c.dias_prazo])));
+      const comPrazo = Lx.filter(c => c.dias_prazo !== null && c.dias_prazo !== undefined);
+      ok('depois pela data mais próxima (ML e "sair até" na mesma régua)', comPrazo.every((c,i) => i === 0 || comPrazo[i-1].dias_prazo <= c.dias_prazo), JSON.stringify(comPrazo.map(c => c.dias_prazo)));
+      const sem = Lx.filter(c => c.dias_prazo === null || c.dias_prazo === undefined);
+      ok('sem prazo no fim, o mais parado primeiro', sem.every((c,i) => i === 0 || (sem[i-1].dias_parado||0) >= (c.dias_parado||0)) && (sem.length === 0 || pos(sem[0].id) > pos(comPrazo[comPrazo.length-1].id)), JSON.stringify(sem.map(c => [c.id,c.dias_parado])));
+      ok('o envio não aparece nas listas da devolução', !lista().coleta.concat(lista().ml).some(c => c.tipo === 'envio'));
+    }
+
+    secao('envio [16] — nada do tipo envio mexe no estoque');
+    eq('skus, componente, fila e montagem iguais depois das escritas da fase 1', contaEstoque(), estoque0);
+
+    secao('envio [17] — modo teste');
+    chamarT('POST','/api/teste/ligar');
+    r = env({ venda:'TESTE-ENV-1', origem:'fora_ml' });
+    const et = r.body.id;
+    eq('o envio lançado em teste nasce marcado', caso(et) && caso(et).teste, 1);
+    chamarT('POST','/api/teste/limpar');
+    eq('"apagar tudo" apaga o envio de teste', caso(et), undefined);
+    ok('devolucao_caso fora de naoCobertas', !((chamarT('GET','/api/teste').naoCobertas||[]).map(x => x.tabela)).includes('devolucao_caso'));
+
+    secao('envio [18] — banco novo e banco antigo terminam com as mesmas colunas');
+    {
+      const cols = (d) => d.prepare("SELECT name FROM pragma_table_info('devolucao_caso')").all().map(x => x.name).join(',');
+      const novo = new Database(':memory:'); D.garantir(novo);
+      const velho = new Database(':memory:');
+      const semNovas = cols(novo).split(',').filter(c => ['origem','item_enviado','sair_ate','rastreio','transportadora_id','custo_envio','enviado_em','reputacao'].indexOf(c) < 0);
+      velho.exec('CREATE TABLE devolucao_caso (' + semNovas.map(c => c === 'id' ? 'id INTEGER PRIMARY KEY AUTOINCREMENT' : c).join(',') + ')');
+      D.garantir(velho);
+      eq('mesma lista, na mesma ordem', cols(velho), cols(novo));
+      ok('   e as oito colunas novas estão no fim', /,origem,item_enviado,sair_ate,rastreio,transportadora_id,custo_envio,enviado_em,reputacao$/.test(cols(novo)), cols(novo));
+      novo.close(); velho.close();
+    }
+    /*__FASE2__*/
   }
 
   fim();

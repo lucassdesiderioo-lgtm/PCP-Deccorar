@@ -25,12 +25,17 @@ const ETAPAS = {
   /* `ml_revisei` (03/11/2026, decisão do dono): depois da revisão do Edvaldo,
      alguém marca "Já revisei" no ML — sem isso o ML entende que a peça chegou
      como esperado e o prazo de contestar passa. */
-  ml:     ['aguardando','chegou','revisado','ml_revisei','encerrado']
+  ml:     ['aguardando','chegou','revisado','ml_revisei','encerrado'],
+  /* ENVIAR ITEM FALTANTE (spec ITEM-FALTANTE, 06/11/2026): o único tipo em que
+     a peça SAI da fábrica — o kit que faltou na caixa do cliente. `ml_avisado`
+     só existe na origem ML (etapasDoCaso): no WhatsApp não há a quem avisar. */
+  envio:  ['lancado','embalado','enviado','comprador_avisado','ml_avisado','aguardando_confirmacao','encerrado']
 };
 const NOME_ETAPA = {
   lancado:'Lançado', coleta_pedida:'Coleta pedida', docs_enviados:'Documentos ao ML',
   a_caminho:'A caminho', chegou:'Chegou', ml_avisado:'ML avisado', revisado:'Revisado',
-  encerrado:'Encerrado', aguardando:'Aguardando chegar', ml_revisei:'Já revisei no ML'
+  encerrado:'Encerrado', aguardando:'Aguardando chegar', ml_revisei:'Já revisei no ML',
+  embalado:'Embalado', enviado:'Enviado', comprador_avisado:'Comprador avisado', aguardando_confirmacao:'Aguardando confirmação'
 };
 /* As que se movem À MÃO pela tela. As outras têm porta própria:
    - `chegou` é o botão "chegou" (ou o bipe do Edvaldo);
@@ -42,18 +47,34 @@ const NOME_ETAPA = {
    - `encerrado` é decisão (R19). */
 const MANUAIS = {
   coleta: ['lancado','coleta_pedida','docs_enviados','a_caminho'],
-  ml:     ['aguardando']
+  ml:     ['aguardando'],
+  /* No envio, `enviado` (transportadora, rastreio e frete) e `ml_avisado` (o
+     print) têm porta própria; `aguardando_confirmacao` vem sozinha depois do
+     último aviso; `encerrado` é decisão (R-ENV-09, 11, 13, 14). */
+  envio:  ['lancado','embalado','comprador_avisado']
 };
 const NOME_SAIDA = {
   reembolso_recebido:'Reembolso recebido', reembolso_nao_recebido:'Reembolso não recebido',
-  revisado_ml:'Revisado (ML devolve)', devolvido_comprador:'Devolvido ao comprador', perda_prazo:'Perda por prazo'
+  revisado_ml:'Revisado (ML devolve)', devolvido_comprador:'Devolvido ao comprador', perda_prazo:'Perda por prazo',
+  confirmado:'Comprador confirmou', entregue_sem_confirmacao:'Entregue sem confirmação'
 };
+/* O nome do tipo, para a história e as recusas. */
+const NOME_TIPO = { coleta:'Nós coletamos', ml:'ML devolve', envio:'Enviar item faltante' };
+const NOME_ORIGEM = { ml:'Mercado Livre', fora_ml:'WhatsApp ou outro canal' };
+/* A trilha do caso: no envio da origem WhatsApp não há "ML avisado" (R-ENV-11). */
+function etapasDoCaso(c){
+  const e = ETAPAS[c.tipo] || [];
+  return (c.tipo === 'envio' && c.origem !== 'ml') ? e.filter(x => x !== 'ml_avisado') : e;
+}
 /* Os campos em reais. Ficam fora de tudo que vai para quem não tem a chave. */
-const DINHEIRO = ['valor_ml','valor_devolvido','valor_perdido','custo_etiqueta','valor_revisao','limite_frete'];
+const DINHEIRO = ['valor_ml','valor_devolvido','valor_perdido','custo_etiqueta','valor_revisao','limite_frete','custo_envio'];
 
 /* devol_coleta_dias: o ML dá 20 dias CORRIDOS, contados da abertura da
    reclamação, para a coleta no comprador (AJUSTE de 03/11/2026, dono). */
-const PADROES = { devol_prazo_ambar:'3', devol_prazo_vermelho:'1', devol_parado_dias:'2', devol_coleta_dias:'20' };
+const PADROES = { devol_prazo_ambar:'3', devol_prazo_vermelho:'1', devol_parado_dias:'2', devol_coleta_dias:'20',
+  /* O envio de item faltante que veio por WhatsApp sai até o fim do N-ésimo
+     dia útil depois do lançamento (R-ENV-03). */
+  envio_fora_ml_dias_uteis:'1' };
 
 class Recusa extends Error {
   constructor(status, msg, extra){ super(msg); this.status = status; this.extra = extra || {}; }
@@ -89,7 +110,9 @@ function garantir(db){
     aberta_em TEXT, prazo_coleta TEXT, prazo_coleta_original TEXT, limite_frete REAL,
     revisar_ate TEXT, revisao_pede TEXT, etiqueta_devolucao TEXT,
     responsavel_id INTEGER, responsavel_nome TEXT,
-    criado_por_id INTEGER, encerrado_por_id INTEGER)`);
+    criado_por_id INTEGER, encerrado_por_id INTEGER,
+    origem TEXT, item_enviado TEXT, sair_ate TEXT, rastreio TEXT, transportadora_id INTEGER,
+    custo_envio REAL, enviado_em TEXT, reputacao TEXT)`);
   /* FASE 5 — desde quando o valor do ML está nesta situação (R18: "pedir" há
      ≥ 2 dias entra no parado). O ALTER fica ao lado do CREATE, no fim da
      tabela, para o banco que nasceu antes desta fase (§17). */
@@ -135,6 +158,13 @@ function garantir(db){
      05/11/2026): o nome (`criado_por`, `encerrado_por`) fica, como retrato; o
      id entra ao lado. O caso de antes fica sem o id — não se inventa. (§17) */
   for(const col of ['criado_por_id INTEGER','encerrado_por_id INTEGER'])
+    try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN "+col); }catch(e){}
+  /* ENVIAR ITEM FALTANTE (spec ITEM-FALTANTE, 06/11/2026): a origem (ml ·
+     fora_ml), o item, o "sair até" calculado (fora_ml), o envio (rastreio,
+     transportadora, frete — DINHEIRO, R-ENV-10) e a reputação (sim · nao ·
+     NULL, que NÃO é "não"). No fim da tabela, na ordem do CREATE (§17). */
+  for(const col of ['origem TEXT','item_enviado TEXT','sair_ate TEXT','rastreio TEXT','transportadora_id INTEGER',
+                    'custo_envio REAL','enviado_em TEXT','reputacao TEXT'])
     try{ db.exec("ALTER TABLE devolucao_caso ADD COLUMN "+col); }catch(e){}
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_venda ON devolucao_caso(venda)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_devcaso_aberto ON devolucao_caso(encerrado_em)");
@@ -198,7 +228,20 @@ function dias(de, ate){
 function limites(db){
   const ler = (k) => { const r = db.prepare('SELECT valor FROM config WHERE chave=?').get(k);
     const v = parseInt(r ? r.valor : PADROES[k], 10); return isFinite(v) ? v : parseInt(PADROES[k], 10); };
-  return { ambar: ler('devol_prazo_ambar'), vermelho: ler('devol_prazo_vermelho'), parado: ler('devol_parado_dias'), coleta: ler('devol_coleta_dias') };
+  return { ambar: ler('devol_prazo_ambar'), vermelho: ler('devol_prazo_vermelho'), parado: ler('devol_parado_dias'), coleta: ler('devol_coleta_dias'),
+           uteis: Math.max(1, ler('envio_fora_ml_dias_uteis')) };
+}
+/* "SAIR ATÉ" (R-ENV-03): o fim do N-ésimo dia útil DEPOIS da data — de segunda
+   a sexta. Lançado na sexta, sai até segunda; no sábado ou no domingo, também
+   segunda. Feriado conta como dia útil nesta versão: a única régua com feriado
+   é a do sob medida, no outro banco (§19), e ligar os dois não estava na spec. */
+function sairAte(data, n){
+  const t = Date.parse(String(data||'').slice(0,10)+'T00:00:00Z');
+  if(!isFinite(t)) return null;
+  let d = new Date(t), cont = 0;
+  const alvo = Math.max(1, parseInt(n, 10) || 1);
+  while(cont < alvo){ d = new Date(d.getTime() + 86400000); const w = d.getUTCDay(); if(w !== 0 && w !== 6) cont++; }
+  return d.toISOString().slice(0,10);
 }
 
 /* Os prazos do ML de um caso "nós coletamos", em ordem: mandar o comprovante
@@ -206,7 +249,7 @@ function limites(db){
    o comprovante, quando o caso chegou a "Documentos ao ML"; a coleta, quando
    chegou a "A caminho" (a transportadora coletou). O caso de antes dos dois
    prazos, sem a abertura, só tem o do comprovante. */
-const NOME_PRAZO = { comprovante:'Mandar o comprovante ao ML', coleta:'Coletar' };
+const NOME_PRAZO = { comprovante:'Mandar o comprovante ao ML', coleta:'Coletar', ml:'Resolver no ML', sair:'Despachar' };
 function prazosDoCaso(c, h){
   const i = ETAPAS.coleta.indexOf(c.etapa);
   const fim = c.etapa === 'encerrado';
@@ -236,6 +279,31 @@ function situacao(c, h, lim){
   const aberto = !c.encerrado_em;
   const o = { dias_prazo:null, cor:'', dias_parado:null, parado:false, parado_valor:false, dias_esperando:null };
   o.dias_parado = dias(c.etapa_desde || c.criado_em, h);
+  if(c.tipo === 'envio'){
+    /* ENVIAR ITEM FALTANTE (R-ENV-03 a 05). Um prazo só: na origem ML, o do ML,
+       que pinta até ENCERRAR (decisão do dono, 06/11/2026: o ML fecha a
+       reclamação com a confirmação do comprador); no WhatsApp, o "sair até",
+       que vale até ENVIADO. O parado vale para o tipo inteiro, inclusive
+       "aguardando confirmação" — é ele que cobra o caso depois de enviado. */
+    o.prazos = [];
+    if(c.origem === 'ml' && c.prazo) o.prazos.push({ qual:'ml', nome:NOME_PRAZO.ml, data:c.prazo, original:c.prazo_original || null,
+      dias: dias(h, c.prazo), feito: !aberto });
+    if(c.origem !== 'ml' && c.sair_ate) o.prazos.push({ qual:'sair', nome:NOME_PRAZO.sair, data:c.sair_ate, original:null,
+      dias: dias(h, c.sair_ate), feito: !aberto || !!c.enviado_em });
+    const vig = o.prazos.find(x => !x.feito && x.dias !== null) || null;
+    o.prazo_qual = vig ? vig.qual : null; o.prazo_nome = vig ? vig.nome : null; o.prazo_data = vig ? vig.data : null;
+    if(vig){
+      o.dias_prazo = vig.dias;
+      if(o.dias_prazo < 0) o.cor = 'vencido';
+      else if(o.dias_prazo <= lim.vermelho) o.cor = 'vermelho';
+      else if(o.dias_prazo <= lim.ambar) o.cor = 'ambar';
+    }
+    o.parado = aberto && o.dias_parado !== null && o.dias_parado >= lim.parado;
+    /* O que falta para encerrar: a reputação respondida (R-ENV-15). */
+    o.falta = [];
+    if(aberto && c.etapa === 'aguardando_confirmacao' && !c.reputacao) o.falta.push('responder se afetou a reputação');
+    return o;
+  }
   if(c.tipo === 'coleta'){
     /* OS DOIS PRAZOS (AJUSTE de 03/11/2026): a cor, o número e a ordem vêm do
        PRÓXIMO prazo aberto — o mais perto dos que ainda não foram cumpridos.
@@ -363,9 +431,17 @@ function buscarLotePorNF(db, nf){
   return db.prepare('SELECT id,codigo,buyer,city,nf,venda,packId,data FROM lote WHERE nf=? ORDER BY id DESC LIMIT 1').get(s) || null;
 }
 function ler(db, id){ return db.prepare('SELECT * FROM devolucao_caso WHERE id=?').get(+id) || null; }
-function abertoDaVenda(db, venda){
+/* O caso aberto da venda. Com `tipo`, só do MESMO grupo: o envio de item
+   faltante e a devolução são problemas diferentes da mesma venda (R-ENV-16) —
+   um não barra o outro, só avisa. Sem `tipo`, qualquer um (a tela de lançar). */
+function abertoDaVenda(db, venda, tipo){
   if(!venda) return null;
-  return db.prepare('SELECT id FROM devolucao_caso WHERE venda=? AND encerrado_em IS NULL ORDER BY id LIMIT 1').get(venda) || null;
+  const grupo = tipo === undefined ? '' : (tipo === 'envio' ? " AND tipo='envio'" : " AND tipo<>'envio'");
+  return db.prepare('SELECT id, tipo FROM devolucao_caso WHERE venda=? AND encerrado_em IS NULL'+grupo+' ORDER BY id LIMIT 1').get(venda) || null;
+}
+function abertoDeOutroGrupo(db, venda, tipo){
+  if(!venda) return null;
+  return db.prepare('SELECT id, tipo FROM devolucao_caso WHERE venda=? AND encerrado_em IS NULL AND '+(tipo === 'envio' ? "tipo<>'envio'" : "tipo='envio'")+' ORDER BY id LIMIT 1').get(venda) || null;
 }
 
 function listar(db, opt){
@@ -392,7 +468,12 @@ function listar(db, opt){
     const x = a.dias_prazo === null || a.dias_prazo === undefined ? 1e9 : a.dias_prazo, y = b.dias_prazo === null || b.dias_prazo === undefined ? 1e9 : b.dias_prazo;
     return x - y || (b.dias_esperando||0) - (a.dias_esperando||0) || a.id - b.id;
   });
-  return { hoje:h, limites:lim, coleta, ml, por_responsavel: resumoPorResponsavel(linhas) };
+  /* R-ENV (tela): vencido → o prazo mais curto (o do ML e o "sair até" na
+     mesma régua de data) → sem prazo, o mais parado primeiro. */
+  const semP = (c) => c.dias_prazo === null || c.dias_prazo === undefined;
+  const envio = linhas.filter(c => c.tipo === 'envio').sort((a,b) =>
+    (semP(a) - semP(b)) || (semP(a) ? (b.dias_parado||0) - (a.dias_parado||0) : a.dias_prazo - b.dias_prazo) || a.id - b.id);
+  return { hoje:h, limites:lim, coleta, ml, envio, por_responsavel: resumoPorResponsavel(linhas) };
 }
 function encerrados(db, opt){
   const o = opt || {}, h = hoje(db), lim = limites(db);
@@ -429,9 +510,18 @@ function detalhe(db, id, opt){
            revisao: revisaoLigada(db, c.devolucao_id),
            /* As etapas à mão são todas de antes da chegada: com a caixa na fábrica,
               nenhuma se oferece (CONSERTO de 04/11/2026). */
-           etapas: ETAPAS[c.tipo], manuais: c.chegou_em ? [] : MANUAIS[c.tipo], nomes: NOME_ETAPA,
+           etapas: etapasDoCaso(c), manuais: manuaisDoCaso(c), nomes: NOME_ETAPA,
            desfazer: podeDesfazer(db, c, o.usuario),
            mesmo_comprador: mesmoComprador(db, c.comprador, c.id).map(x => ({ id:x.id, venda:x.venda, nf:x.nf, tipo:x.tipo, etapa_nome: NOME_ETAPA[x.etapa] || x.etapa })) };
+}
+
+/* As etapas à mão que este caso oferece agora. No envio: Lançado e Embalado
+   antes de ENVIADO; "Comprador avisado" só logo depois de ENVIADO. */
+function manuaisDoCaso(c){
+  if(c.tipo !== 'envio') return c.chegou_em ? [] : MANUAIS[c.tipo];
+  if(c.encerrado_em) return [];
+  if(!c.enviado_em) return ['lancado','embalado'];
+  return c.etapa === 'enviado' ? ['comprador_avisado'] : [];
 }
 
 /* ── validações ── */
@@ -497,19 +587,36 @@ const br = (d) => d ? String(d).slice(0,10).split('-').reverse().join('/') : '�
 function lancar(db, b, usuario, opt){
   b = b || {};
   const tipo = String(b.tipo||'').trim();
-  if(!ETAPAS[tipo]) throw new Recusa(400, 'Escolha o tipo: "ML devolve" ou "Nós coletamos".');
+  if(!ETAPAS[tipo]) throw new Recusa(400, 'Escolha o tipo: "ML devolve", "Nós coletamos" ou "Enviar item faltante".');
   let venda = String(b.venda||'').replace(/\s+/g,'');
   let nf = String(b.nf||'').trim();
   let pack = String(b.pack_id||'').replace(/\s+/g,'');
   if(!venda && !nf && !pack) throw new Recusa(400, 'Informe a venda, o pack ou a NF.');
   let prazo = null, aberta_em = null, prazo_coleta = null;
+  /* O ENVIO (R-ENV-02, 03, 06, 07): origem obrigatória — vazio não conta como
+     nenhuma das duas; o prazo do ML obrigatório na origem ML; o "sair até"
+     calculado na origem WhatsApp; o item nasce "Kit de instalação" e o motivo
+     "Falta de kit", os dois editáveis. */
+  let origem = null, item_enviado = null, sair_ate = null, motivoEnvio;
+  if(tipo === 'envio'){
+    origem = String(b.origem == null ? '' : b.origem).trim();
+    if(!NOME_ORIGEM[origem]) throw new Recusa(400, 'Escolha a origem: "Mercado Livre" ou "WhatsApp ou outro canal".');
+    if(origem === 'ml'){
+      prazo = dataValida(b.prazo);
+      if(!prazo) throw new Recusa(400, 'Na origem Mercado Livre o prazo do ML para resolver é obrigatório.');
+    } else sair_ate = sairAte(hoje(db), limites(db).uteis);
+    item_enviado = ('item_enviado' in b) ? String(b.item_enviado == null ? '' : b.item_enviado).trim() : 'Kit de instalação';
+    if(!item_enviado) throw new Recusa(400, 'Diga o item que vai ser enviado.');
+    if(item_enviado.length > 200) throw new Recusa(400, 'O nome do item passou de 200 letras.');
+    motivoEnvio = String(b.motivo == null ? '' : b.motivo).trim() || 'Falta de kit';
+  }
   if(tipo === 'coleta'){
     prazo = dataValida(b.prazo);
     if(!prazo) throw new Recusa(400, 'No "Nós coletamos" o prazo do ML para mandar o comprovante é obrigatório.');
     aberta_em = abertaValida(db, b.aberta_em);
     prazo_coleta = somarDias(aberta_em, limites(db).coleta);
   }
-  const motivo = motivoValido(db, b.motivo);
+  const motivo = motivoValido(db, tipo === 'envio' ? motivoEnvio : b.motivo);
   /* Obrigatória no lançamento (decisão do dono, 03/11/2026). Só o script dos
      casos iniciais, que é de antes da pergunta, lança sem ela. */
   const publicidade = (opt && opt.semPublicidade && b.publicidade === undefined) ? null : publicidadeValida(b.publicidade);
@@ -531,15 +638,18 @@ function lancar(db, b, usuario, opt){
     if(!pack && lt.packId) pack = lt.packId;
     if(!nf && lt.nf) nf = lt.nf;
   }
-  const ja = abertoDaVenda(db, venda);
-  if(ja) throw new Recusa(409, 'Já existe o caso #'+ja.id+' aberto para a venda '+venda+'.', { caso_id: ja.id });
+  const ja = abertoDaVenda(db, venda, tipo);
+  if(ja) throw new Recusa(409, 'Já existe o caso #'+ja.id+' aberto para a venda '+venda+(tipo === 'envio' ? ' (envio de item faltante)' : '')+'.', { caso_id: ja.id });
+  /* R-ENV-16: o caso do OUTRO grupo (envio × devolução) na mesma venda não
+     recusa — avisa, com o número, como o "mesmo comprador". */
+  const outro = abertoDeOutroGrupo(db, venda, tipo);
   /* O QUE NÃO PODE FALTAR NO LANÇAMENTO (decisão do dono, 04/11/2026): sem
      isso alguém abre o caso depois para completar. O SKU e o comprador que
      vieram da venda no sistema contam. A recusa é UMA, dizendo todos. Só o
      script dos casos iniciais, de antes da regra, lança sem eles. */
   if(!(opt && opt.semObrigatorios)){
     const t = (v) => { const x = String(v == null ? '' : v).trim(); return x || null; };
-    const faltam = faltaLancamento({ motivo, sku: t(b.sku) || (lt ? lt.codigo : null),
+    const faltam = faltaLancamento({ tipo, origem, item_enviado, motivo, sku: t(b.sku) || (lt ? lt.codigo : null),
       comprador: t(b.comprador) || (lt ? lt.buyer : null), responsavel_id: resp ? resp.id : null, link_ml }, true);
     if(faltam.length) throw new Recusa(400, 'Para lançar, falta: '+faltam.map(x => x.nome).join(' · ')+'.', { faltam: faltam.map(x => x.campo) });
   }
@@ -559,11 +669,17 @@ function lancar(db, b, usuario, opt){
         txt(b.obs), nomeDe(usuario), publicidade, mensagem_ml, link_ml, aberta_em, prazo_coleta, idDe(usuario)).lastInsertRowid;
     if(b._valor_ml_situacao) db.prepare("UPDATE devolucao_caso SET valor_ml_desde=datetime('now','localtime') WHERE id=?").run(id);
     if(resp) db.prepare('UPDATE devolucao_caso SET responsavel_id=?, responsavel_nome=? WHERE id=?').run(resp.id, resp.nome, id);
-    evento(db, id, 'lancado', null, etapa, (tipo === 'coleta' ? 'Nós coletamos' : 'ML devolve') +
+    if(tipo === 'envio') db.prepare('UPDATE devolucao_caso SET origem=?, item_enviado=?, sair_ate=? WHERE id=?').run(origem, item_enviado, sair_ate, id);
+    evento(db, id, 'lancado', null, etapa, (tipo === 'envio' ? 'Enviar item faltante · '+NOME_ORIGEM[origem]+' · '+item_enviado +
+      (prazo ? ' · resolver no ML até '+br(prazo) : '') + (sair_ate ? ' · sair até '+br(sair_ate) : '') + (outro ? ' · caso #'+outro.id+' aberto na mesma venda' : '') :
+      (tipo === 'coleta' ? 'Nós coletamos' : 'ML devolve')) +
       (prazo ? ' · comprovante até '+br(prazo)+' · coletar até '+br(prazo_coleta) : '') +
       (publicidade == null ? '' : ' · via publicidade: '+simNao(publicidade)), usuario);
   })();
-  return ler(db, id);
+  const out = ler(db, id);
+  if(outro) Object.defineProperty(out, '_aviso', { value: { caso_id: outro.id, tipo: outro.tipo,
+    texto: 'Atenção: o caso #'+outro.id+' ('+NOME_TIPO[outro.tipo]+') está aberto para a mesma venda — são problemas diferentes, e os dois seguem.' } });
+  return out;
 }
 
 /* O LANÇAMENTO COMPLETO (AJUSTE de 03/11/2026, dono: "no lançar devolução é
@@ -586,6 +702,8 @@ function lancarCompleto(db, b, usuario, opt){
   const limite = preenchido(b.limite_frete) ? b.limite_frete : null;
   if((co || sit || valor !== null || limite !== null) && String(b.tipo||'').trim() === 'ml')
     throw new Recusa(400, 'No "ML devolve" a coleta, o limite do frete e o valor são do Mercado Livre: lance sem eles.');
+  if((co || sit || valor !== null || limite !== null || preenchido(b.custo_etiqueta)) && String(b.tipo||'').trim() === 'envio')
+    throw new Recusa(400, 'No envio de item faltante não há coleta nem valor do ML: o frete entra quando o item for enviado.');
   let c, valorMudou = [];
   db.transaction(() => {
     c = lancar(db, b, usuario, opt);
@@ -597,7 +715,7 @@ function lancarCompleto(db, b, usuario, opt){
     if(valor !== null) valorMudou = lancarValor(db, c.id, sit ? { valor_ml: valor, valor_ml_situacao: sit } : { valor_ml: valor }, usuario);
     if(preenchido(b.custo_etiqueta)) valorMudou = valorMudou.concat(lancarValor(db, c.id, { custo_etiqueta: b.custo_etiqueta }, usuario));
   })();
-  return { caso: ler(db, c.id), valorMudou };
+  return { caso: ler(db, c.id), valorMudou, aviso: c._aviso || null };
 }
 
 /* TROCAR O TIPO (AJUSTE de 03/11/2026, dono: "ainda não sei se o ML vai me
@@ -617,6 +735,7 @@ function trocarTipo(db, id, b, usuario){
   b = b || {};
   const para = String(b.para || '').trim();
   if(!ETAPAS[para]) throw new Recusa(400, 'O tipo é "ML devolve" ou "Nós coletamos".');
+  if(c.tipo === 'envio' || para === 'envio') throw new Recusa(400, 'O envio de item faltante não troca de tipo: é outro problema. Lance o caso do tipo certo.');
   if(para === c.tipo) throw new Recusa(400, 'O caso já é '+(para === 'coleta' ? '"Nós coletamos"' : '"ML devolve"')+'.');
   let prazo = c.prazo, etapa, aberta_em = c.aberta_em, prazo_coleta = c.prazo_coleta;
   if(para === 'coleta'){
@@ -717,21 +836,43 @@ function responsavelValido(db, v, temChave){
    falta neste caso"). O responsável conta pela PESSOA: o texto escrito à mão
    de antes não alimenta o "Meus casos". `comCampo` devolve também a chave. */
 const OBRIGATORIOS = [['motivo','motivo'],['sku','SKU'],['comprador','comprador'],['responsavel_id','responsável'],['link_ml','link da conversa']];
+/* No envio (decisão do dono, 06/11/2026): o item entra, e o link da conversa
+   só é exigido na origem ML — no WhatsApp não há conversa no ML. */
+const OBRIGATORIOS_ENVIO = [['motivo','motivo'],['item_enviado','item enviado'],['sku','SKU'],['comprador','comprador'],['responsavel_id','responsável'],['link_ml','link da conversa']];
 function faltaLancamento(c, comCampo){
   const vazio = (v) => v === null || v === undefined || String(v).trim() === '';
-  const f = OBRIGATORIOS.filter(([k]) => vazio(c[k]));
+  const lista = c.tipo === 'envio' ? OBRIGATORIOS_ENVIO.filter(([k]) => k !== 'link_ml' || c.origem === 'ml') : OBRIGATORIOS;
+  const f = lista.filter(([k]) => vazio(c[k]));
   return comCampo ? f.map(([campo, nome]) => ({ campo, nome })) : f.map(([, nome]) => nome);
 }
 const nomeResp = (c) => (c && (c.responsavel_nome || c.responsavel)) || '—';
 
 /* Editar o que foi lançado. CAMPO AUSENTE NÃO É CAMPO VAZIO (§6, #25): só o
    que veio no corpo muda, e o resto fica como está. */
-const EDITAVEIS = ['motivo','nf','sku','comprador','responsavel','passado_em','cep','obs','publicidade','mensagem_ml','link_ml','aberta_em','revisar_ate'];
+const EDITAVEIS = ['motivo','nf','sku','comprador','responsavel','passado_em','cep','obs','publicidade','mensagem_ml','link_ml','aberta_em','revisar_ate','item_enviado'];
 function editar(db, id, b, usuario, opt){
   const c = aberto(db, id);
   b = b || {};
   const mud = [];
   const sets = [], vals = [];
+  /* A ORIGEM DO ENVIO se troca só antes de ENVIADO (o "sair até" vale até lá).
+     Para ML, o prazo do ML é obrigatório; para WhatsApp, o "sair até" é
+     recalculado do dia do lançamento. */
+  if(c.tipo === 'envio' && 'origem' in b && String(b.origem == null ? '' : b.origem).trim() !== c.origem){
+    const o = String(b.origem == null ? '' : b.origem).trim();
+    if(!NOME_ORIGEM[o]) throw new Recusa(400, 'Escolha a origem: "Mercado Livre" ou "WhatsApp ou outro canal".');
+    if(c.enviado_em) throw new Recusa(400, 'O item já foi enviado: a origem não se troca mais.');
+    if(o === 'ml'){
+      const pz = dataValida(b.prazo) || c.prazo;
+      if(!pz) throw new Recusa(400, 'Na origem Mercado Livre o prazo do ML para resolver é obrigatório.');
+      sets.push('origem=?','prazo=?','sair_ate=?'); vals.push('ml', pz, null);
+      mud.push('origem: '+NOME_ORIGEM[c.origem]+' → '+NOME_ORIGEM.ml+' (resolver até '+br(pz)+')');
+    } else {
+      const sa = sairAte(String(c.criado_em||hoje(db)).slice(0,10), limites(db).uteis);
+      sets.push('origem=?','sair_ate=?'); vals.push('fora_ml', sa);
+      mud.push('origem: '+NOME_ORIGEM[c.origem]+' → '+NOME_ORIGEM.fora_ml+' (sair até '+br(sa)+')');
+    }
+  }
   if('responsavel_id' in b){
     const u = responsavelValido(db, b.responsavel_id, opt && opt.temChave);
     if((u ? u.id : null) !== (c.responsavel_id == null ? null : c.responsavel_id)){
@@ -753,6 +894,12 @@ function editar(db, id, b, usuario, opt){
       if(c.tipo !== 'ml') continue;
       v = (v === '' || v == null) ? null : dataValida(v);
       if(b[k] && !v) throw new Recusa(400, 'Data impossível em "revisar no ML até".');
+    }
+    else if(k === 'item_enviado'){
+      if(c.tipo !== 'envio') continue;
+      v = String(v == null ? '' : v).trim();
+      if(!v) throw new Recusa(400, 'Diga o item que vai ser enviado.');
+      if(v.length > 200) throw new Recusa(400, 'O nome do item passou de 200 letras.');
     }
     else if(k === 'aberta_em'){
       if(c.tipo !== 'coleta') continue;
@@ -799,7 +946,7 @@ function moverEtapa(db, c, para, usuario, texto, tipoEvento){
    COM a data de antes. A história guarda o clique e o desfeito: nada se apaga.
    Andar no caso é o que muda a etapa por outra porta (lançar, coleta, chegada,
    revisão, aviso, encerrar, desfazer); editar, anexar, prazo e valor não. */
-const ANDAM = ['lancado','etapa','desfeito','coleta','chegou','aviso_ml','revisado','encerrado','tipo','desligado'];
+const ANDAM = ['lancado','etapa','desfeito','coleta','chegou','aviso_ml','revisado','encerrado','tipo','desligado','enviado'];
 function ultimoAndar(db, caso_id){
   return db.prepare('SELECT * FROM devolucao_evento WHERE caso_id=? AND tipo IN ('+ANDAM.map(()=>'?').join(',')+') ORDER BY id DESC LIMIT 1')
     .get(caso_id, ...ANDAM) || null;
@@ -810,7 +957,8 @@ function podeDesfazer(db, c, usuario){
   const e = ultimoAndar(db, c.id);
   /* A chegada também grava um evento "etapa" (pelo moverEtapa): só conta como
      mudança à mão a etapa que se marca à mão (MANUAIS). */
-  if(!e || e.tipo !== 'etapa' || e.para !== c.etapa || !e.de || !e.etapa_desde_antes) return null;
+  if(!e || e.tipo !== 'etapa' || !e.de || !e.etapa_desde_antes) return null;
+  if(e.para !== c.etapa && !parAuto(c, e)) return null;
   /* AJUSTE de 04/11/2026: o "A caixa chegou" clicado por engano também se
      desfaz — só pelo botão (a chegada do bipe do Edvaldo liga a revisão) e só
      enquanto a peça não foi revisada. */
@@ -818,6 +966,12 @@ function podeDesfazer(db, c, usuario){
   if(MANUAIS[c.tipo].indexOf(e.para) < 0 && !chegada) return null;
   if(e.usuario_id !== usuario.id) return null;
   return { evento_id: e.id, de: e.para, para: e.de, nome: NOME_ETAPA[e.de] || e.de, chegada };
+}
+/* No envio do WhatsApp o "Comprador avisado" leva sozinho a "Aguardando
+   confirmação" (evento `auto`, que não é andar): desfazer o clique volta as
+   duas, com a data de antes. */
+function parAuto(c, e){
+  return c.tipo === 'envio' && c.origem !== 'ml' && c.etapa === 'aguardando_confirmacao' && e.para === 'comprador_avisado';
 }
 function desfazChegada(c, e){
   return e.para === 'chegou' && !!c.chegou_em && !c.devolucao_id;
@@ -827,7 +981,7 @@ function desfazerEtapa(db, id, usuario){
   const d = podeDesfazer(db, c, usuario);
   if(!d){
     const e = ultimoAndar(db, c.id);
-    if(e && e.tipo === 'etapa' && e.para === c.etapa && (MANUAIS[c.tipo].indexOf(e.para) >= 0 || desfazChegada(c, e)) && e.usuario_id && usuario && e.usuario_id !== usuario.id)
+    if(e && e.tipo === 'etapa' && (e.para === c.etapa || parAuto(c, e)) && (MANUAIS[c.tipo].indexOf(e.para) >= 0 || desfazChegada(c, e)) && e.usuario_id && usuario && e.usuario_id !== usuario.id)
       throw new Recusa(403, e.para === 'chegou'
         ? 'Só quem marcou a chegada ('+(e.usuario||'outra pessoa')+') pode desfazer.'
         : 'Só quem mudou a etapa ('+(e.usuario||'outra pessoa')+') pode desfazer. Para voltar, use os botões de etapa.');
@@ -853,7 +1007,8 @@ function desfazerEtapa(db, id, usuario){
 function etapa(db, id, para, usuario, texto, travas){
   const c = aberto(db, id);
   para = String(para||'').trim();
-  if(ETAPAS[c.tipo].indexOf(para) < 0) throw new Recusa(400, 'A etapa "'+para+'" não existe para este tipo de devolução.');
+  if(etapasDoCaso(c).indexOf(para) < 0) throw new Recusa(400, 'A etapa "'+para+'" não existe para este tipo de caso.');
+  if(c.tipo === 'envio') return etapaEnvio(db, c, para, usuario, texto);
   if(MANUAIS[c.tipo].indexOf(para) < 0) throw new Recusa(400, '"'+(NOME_ETAPA[para]||para)+'" não se marca à mão: '+
     (para === 'revisado' ? 'é o bipe da tela de Devoluções.' : para === 'chegou' ? 'use o botão "chegou".' : 'é uma decisão com botão próprio.'));
   if(para === c.etapa) throw new Recusa(400, 'O caso já está em "'+(NOME_ETAPA[para]||para)+'".');
@@ -872,6 +1027,27 @@ function etapa(db, id, para, usuario, texto, travas){
   return ler(db, c.id);
 }
 
+/* As etapas à mão do envio (R-ENV-01): Lançado e Embalado antes de ENVIADO;
+   "Comprador avisado" logo depois. ENVIADO e ML AVISADO têm porta própria. No
+   WhatsApp, avisado o comprador o caso vai sozinho a "Aguardando confirmação". */
+function etapaEnvio(db, c, para, usuario, texto){
+  if(MANUAIS.envio.indexOf(para) < 0) throw new Recusa(400, '"'+(NOME_ETAPA[para]||para)+'" não se marca à mão: '+
+    (para === 'enviado' ? 'use "Marcar como enviado", com a transportadora, o rastreio e o frete.' :
+     para === 'ml_avisado' ? 'use "Avisamos o ML", com o print anexado.' : 'é uma decisão com botão próprio.'));
+  if(para === c.etapa) throw new Recusa(400, 'O caso já está em "'+(NOME_ETAPA[para]||para)+'".');
+  if(para === 'comprador_avisado'){
+    if(c.etapa !== 'enviado') throw new Recusa(400, c.enviado_em ? 'O comprador já foi avisado.' : 'Primeiro marque o item como enviado: o rastreio vem do envio.');
+  } else if(c.enviado_em) throw new Recusa(400, 'O item já foi enviado: o caso não volta para antes do envio.');
+  db.transaction(() => {
+    moverEtapa(db, c, para, usuario, texto);
+    if(para === 'comprador_avisado' && c.origem !== 'ml'){
+      db.prepare("UPDATE devolucao_caso SET etapa='aguardando_confirmacao', etapa_desde=datetime('now','localtime') WHERE id=?").run(c.id);
+      evento(db, c.id, 'auto', 'comprador_avisado', 'aguardando_confirmacao', 'aguardando a confirmação do comprador', usuario);
+    }
+  })();
+  return ler(db, c.id);
+}
+
 /* R6: prorrogar é PEDIDO, e o prazo não muda. */
 /* Qual prazo: o que veio (comprovante ou coleta), ou o PRÓXIMO aberto — é o
    que a tela mostra. Sem nenhum aberto, o do comprovante. */
@@ -883,8 +1059,19 @@ function qualPrazo(db, c, qual){
   }
   return situacao(c, hoje(db), limites(db)).prazo_qual || 'comprovante';
 }
+/* No envio da origem ML o prazo é um só, `prazo` (R-ENV-03); no WhatsApp o
+   "sair até" é nosso, e não se prorroga com o ML. */
+function prazoEnvio(c){
+  if(c.tipo !== 'envio') return false;
+  if(c.origem !== 'ml') throw new Recusa(400, 'No envio que veio por WhatsApp não há prazo do ML: o "sair até" é nosso.');
+  return true;
+}
 function pedirProrrogacao(db, id, usuario, texto, qual){
   const c = aberto(db, id);
+  if(prazoEnvio(c)){
+    evento(db, c.id, 'prorrogacao_pedida', c.prazo, null, (texto || 'pedi prorrogação ao ML')+' · prazo do ML', usuario);
+    return ler(db, c.id);
+  }
   if(c.tipo !== 'coleta') throw new Recusa(400, 'No "ML devolve" não há prazo do ML para prorrogar.');
   const q = qualPrazo(db, c, qual);
   evento(db, c.id, 'prorrogacao_pedida', q === 'coleta' ? c.prazo_coleta : c.prazo, null,
@@ -895,15 +1082,16 @@ function pedirProrrogacao(db, id, usuario, texto, qual){
    segundo prazo novo não sobrescreve o original: ele é o primeiro, sempre. */
 function novoPrazo(db, id, prazo, usuario, qual){
   const c = aberto(db, id);
-  if(c.tipo !== 'coleta') throw new Recusa(400, 'No "ML devolve" não há prazo do ML.');
-  const q = qualPrazo(db, c, qual);
+  const envio = prazoEnvio(c);
+  if(!envio && c.tipo !== 'coleta') throw new Recusa(400, 'No "ML devolve" não há prazo do ML.');
+  const q = envio ? 'comprovante' : qualPrazo(db, c, qual);
   const p = dataValida(prazo);
   if(!p) throw new Recusa(400, 'Data impossível para o prazo novo.');
   const col = q === 'coleta' ? 'prazo_coleta' : 'prazo', orig = col + '_original';
-  if(p === c[col]) throw new Recusa(400, 'Esse já é o prazo '+(q === 'coleta' ? 'da coleta' : 'do comprovante')+'.');
+  if(p === c[col]) throw new Recusa(400, 'Esse já é o prazo '+(envio ? 'do ML' : q === 'coleta' ? 'da coleta' : 'do comprovante')+'.');
   db.transaction(() => {
     db.prepare('UPDATE devolucao_caso SET '+col+'=?, '+orig+'=COALESCE('+orig+', ?) WHERE id=?').run(p, c[col], c.id);
-    evento(db, c.id, 'prazo', c[col], p, 'prazo novo do ML · '+(q === 'coleta' ? 'coleta' : 'comprovante'), usuario);
+    evento(db, c.id, 'prazo', c[col], p, 'prazo novo do ML · '+(envio ? 'resolver' : q === 'coleta' ? 'coleta' : 'comprovante'), usuario);
   })();
   return ler(db, c.id);
 }
@@ -934,7 +1122,8 @@ function abertoPorCodigo(db, cod, opt){
   const c = String(cod||'').trim(), dig = c.replace(/\D/g,'');
   if(!c) return null;
   const semRevisao = (opt && opt.semRevisao) ? ' AND devolucao_id IS NULL' : '';
-  const exato = db.prepare(`SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL`+semRevisao+`
+  /* O envio de item faltante não aparece aqui: a peça não volta (ITEM-FALTANTE). */
+  const exato = db.prepare(`SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL AND tipo<>'envio'`+semRevisao+`
     AND (venda=? OR venda=? OR pack_id=? OR pack_id=? OR nf=? OR nf=? OR etiqueta_devolucao=? OR etiqueta_devolucao=?) ORDER BY id DESC LIMIT 1`)
     .get(c, dig, c, dig, c, dig, c, dig);
   if(exato) return exato;
@@ -948,7 +1137,7 @@ function abertoPorCodigo(db, cod, opt){
 function porFinais(db, dig, semRevisao){
   if(!/^\d{5,10}$/.test(dig || '')) return [];
   const like = '%' + dig;
-  return db.prepare(`SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL`+(semRevisao || '')+`
+  return db.prepare(`SELECT * FROM devolucao_caso WHERE encerrado_em IS NULL AND tipo<>'envio'`+(semRevisao || '')+`
     AND (venda LIKE ? OR pack_id LIKE ?) ORDER BY id`).all(like, like);
 }
 /* Os casos abertos sem revisão cujos finais batem, quando são MAIS de um: a
@@ -971,6 +1160,7 @@ function etiquetaDeDevolucao(c, cod){
    — revisar depois não regrava a data (teste 27). */
 function chegou(db, id, usuario, b){
   const c = aberto(db, id);
+  if(c.tipo === 'envio') throw new Recusa(400, 'No envio de item faltante nada chega: o item sai da fábrica.');
   if(c.chegou_em) throw new Recusa(409, 'A chegada do caso #'+c.id+' já foi marcada em '+c.chegou_em.slice(8,10)+'/'+c.chegou_em.slice(5,7)+'.');
   const etapas = ETAPAS[c.tipo];
   /* No ML devolve, a chegada já pode trazer o "revisar no ML até" (o prazo
@@ -1065,7 +1255,7 @@ function esperadas(db, sku){
   return db.prepare(`SELECT c.id,c.tipo,c.venda,c.pack_id,c.nf,c.comprador,c.motivo,c.etapa,c.sku,
         ${comCidade ? "NULLIF(TRIM(l.city),'')" : 'NULL'} cidade
       FROM devolucao_caso c ${comCidade ? 'LEFT JOIN lote l ON l.id=c.lote_id' : ''}
-      WHERE c.encerrado_em IS NULL AND c.devolucao_id IS NULL AND UPPER(c.sku)=? ORDER BY c.id`).all(s)
+      WHERE c.encerrado_em IS NULL AND c.devolucao_id IS NULL AND c.tipo<>'envio' AND UPPER(c.sku)=? ORDER BY c.id`).all(s)
     .map(c => Object.assign(c, { etapa_nome: NOME_ETAPA[c.etapa] || c.etapa }));
 }
 
@@ -1074,6 +1264,7 @@ function esperadas(db, sku){
 function revisoesSoltas(db, caso_id){
   const c = ler(db, caso_id);
   if(!c) throw new Recusa(404, 'Caso não encontrado. Atualize a lista.');
+  if(c.tipo === 'envio') return [];
   const sku = String(c.sku || '').toUpperCase();
   return db.prepare(`SELECT ${CAMPOS_REVISAO.map(k => 'd.'+k).join(',')},d.baixado FROM devolucao d
       WHERE NOT EXISTS (SELECT 1 FROM devolucao_caso x WHERE x.devolucao_id=d.id)
@@ -1088,6 +1279,7 @@ function revisoesSoltas(db, caso_id){
    depois da baixa, o ML devolve segue a regra de encerrar. */
 function ligarManual(db, caso_id, devolucao_id, usuario, confirmar){
   const c = aberto(db, caso_id);
+  if(c.tipo === 'envio') throw new Recusa(400, 'O envio de item faltante não tem peça voltando: não se liga revisão a ele.');
   if(c.devolucao_id) throw new Recusa(409, 'O caso #'+c.id+' já tem a revisão #'+c.devolucao_id+' ligada.');
   const d = db.prepare('SELECT * FROM devolucao WHERE id=?').get(+devolucao_id || 0);
   if(!d) throw new Recusa(404, 'Revisão não encontrada. Atualize a lista.');
@@ -1409,6 +1601,7 @@ function arquivoDoAnexo(db, aid){
    que o comprador mandou ao ML anexada. A chave é conferida na rota (R16). */
 function devolverComprador(db, id, b, usuario){
   const c = aberto(db, id);
+  if(c.tipo === 'envio') throw new Recusa(400, 'O envio de item faltante encerra com o comprador confirmando (ou "entregue sem confirmação").');
   const foto = db.prepare("SELECT 1 FROM devolucao_anexo WHERE caso_id=? AND tipo='foto_comprador' AND arquivo IS NOT NULL").get(c.id);
   if(!foto) throw new Recusa(400, 'Anexe antes a foto que o comprador mandou ao ML: sem ela o caso não encerra por este caminho.');
   const v = reais((b||{}).valor_devolvido, 'o valor devolvido');
@@ -1588,6 +1781,7 @@ function proximoPasso(c, ctx){
   ctx = ctx || {};
   const h = ctx.h, lim = ctx.lim || { parado: parseInt(PADROES.devol_parado_dias, 10) };
   const sit = ctx.sit || situacao(c, h, lim);
+  if(c.tipo === 'envio') return proximoEnvio(c, sit, lim);
   if(c.tipo === 'coleta'){
     // C1 — algum prazo vencido: pode ter havido prorrogação não lançada (R7).
     if(sit.cor === 'vencido')
@@ -1663,6 +1857,25 @@ function proximoPasso(c, ctx){
     return passo('Aguardar a resposta do ML à revisão (pedida há '+diasTxt(sit.dias_revisao)+')', 'ml', null, 'revisao_frete');
   }
   return passo('Conferir o caso: a baixa, o "Já revisei" e a revisão estão feitos e ele não encerrou', 'nos', null, null);
+}
+/* O PASSO DO ENVIO DE ITEM FALTANTE (spec ITEM-FALTANTE §8): uma frase por
+   etapa, sempre a vez de quem acompanha. Sem reais. */
+function proximoEnvio(c, sit, lim){
+  const ate = sit.prazo_data || null;
+  if(sit.cor === 'vencido'){
+    if(sit.prazo_qual === 'ml') return passo('O prazo do ML venceu em '+br(sit.prazo_data)+': lançar o prazo novo do ML (ou pedir prorrogação) e resolver', 'nos', sit.prazo_data, 'prazo');
+    return passo('Despachar hoje: o "sair até" venceu em '+br(sit.prazo_data), 'nos', sit.prazo_data, 'envio');
+  }
+  const kit = !c.item_enviado || c.item_enviado === 'Kit de instalação';
+  if(c.etapa === 'lancado') return passo(kit ? 'Embalar o kit' : 'Embalar: '+c.item_enviado, 'nos', ate, 'envio');
+  if(c.etapa === 'embalado') return passo(ate ? 'Despachar até '+br(ate) : 'Despachar', 'nos', ate, 'envio');
+  if(c.etapa === 'enviado') return passo('Mandar o rastreio ao comprador', 'nos', ate, 'etapas');
+  if(c.etapa === 'comprador_avisado') return passo('Avisar o ML com o print', 'nos', ate, 'aviso_ml');
+  if(c.etapa === 'aguardando_confirmacao'){
+    const t = 'Cobrar a confirmação do comprador (há '+diasTxt(sit.dias_parado)+')';
+    return passo(c.reputacao ? t : t+' e responder se afetou a reputação', 'nos', ate, c.reputacao ? 'cobranca' : 'reputacao');
+  }
+  return passo('Conferir o caso', 'nos', ate, null);
 }
 /* O passo de uma porção de casos abertos de uma vez — a lista não faz uma
    consulta por caso. Devolve as linhas com `proximo`. */
@@ -1786,7 +1999,8 @@ module.exports = {
   docsExigidos, situacaoDocs, listarAnexos, anexar, arquivoDoAnexo, devolverComprador,
   RESULTADOS, listarTransportadoras, salvarTransportadora, tentativas, pedirColeta, resultadoColeta, sugerirTransportadoras,
   abertoPorCodigo, chegou, avisarML, ligarRevisao, baixaDaDevolucao,
-  ETAPAS, MANUAIS, NOME_ETAPA, NOME_SAIDA, DINHEIRO, Recusa,
+  ETAPAS, MANUAIS, NOME_ETAPA, NOME_SAIDA, NOME_TIPO, NOME_ORIGEM, DINHEIRO, Recusa,
+  sairAte, etapasDoCaso, abertoDeOutroGrupo,
   garantir, hoje, dataValida, dias, limites, situacao, publico, evento,
   buscarLote, buscarLotePorNF, ler, abertoDaVenda, listar, encerrados, detalhe,
   motivoValido, reais, aberto, lancar, editar, etapa, moverEtapa, pedirProrrogacao, novoPrazo, prazosDoCaso, agendarColeta,
