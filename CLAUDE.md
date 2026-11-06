@@ -794,6 +794,42 @@ ou na Mesa dentro da aba.** Cinco defeitos foram reintroduzidos: a impressão
 digital pelos bytes (reprova 8), gravar a diferença já explicada (5), resolver
 sem motivo (4), o resolvido reabrindo (2) e a tabela fora do modo teste (1).
 
+### ⚠️ A TARJA "SEM ESTOQUE" DA ETIQUETA DE VENDA SÓ ACUSA O ZERO (06/11/2026, achado, NÃO consertado)
+
+O dono: *"tem outras persianas que também estão sem estoque que não está
+mostrando"*. Revisão feita, **nada mudou no código da tela** (decisão do dono:
+primeiro entender). A causa:
+
+| Onde | A conta de hoje |
+|---|---|
+| tela, linha por SKU (`embalagem.html`, `linhasPend`) | tarja só se **livre ≤ 0** |
+| tela, peça da caixa de várias (`blocoCaixa`) | tarja se livre < a quantidade **daquela peça** |
+| trava da impressão (`etq_route.js`, `/api/embalar`) | recusa se livre < o que **esta caixa** pede, uma de cada vez |
+
+O número que o servidor manda está certo (é o **livre**, saldo − caixa impressa
+esperando a Conferência). O que falta é a tela comparar o livre com **a fila
+inteira do SKU**. Por isso o SKU que tem **alguma** peça, mas não para todas,
+fica sem tarja, e a venda é recusada só no bipe:
+
+- **mais vendas que peças na mesma lista** (1 livre, 3 vendas: sem tarja, 2 recusadas);
+- **o SKU na Agência E na Coleta**: cada lista compara o livre inteiro com a sua parte;
+- **o SKU também dentro de caixa de várias**: a caixa e a linha disputam as mesmas
+  peças, e nenhuma desconta a outra.
+
+Dois achados a mais, no mesmo lugar: o **sob medida** pode ganhar tarja falsa (a
+lista não sabe que ele não usa estoque, e a impressão deixa passar), e o JOIN
+da linha por SKU é por igualdade exata (`s.codigo=l.codigo`), embora o
+comentário diga `UPPER` — código escrito diferente no `lote` deixa a linha sem
+número e sem tarja nunca. E o caso que a tela **não** erra: o sistema diz que há
+peça livre e a prateleira está vazia — aí é o saldo, e o caminho é o Inventário.
+
+**`node diagnosticar_tarja_estoque.js` (só lê, copia o banco com `db.backup()`)**
+lista SKU a SKU da fila de hoje: saldo, em caixa impressa, livre, o que a fila
+pede (agência · coleta · caixa de várias), onde a tarja aparece, quantas vão ser
+recusadas e por quê. `--sku CODIGO`, `--todos`, `--json`. `node
+teste_diagnosticar_tarja_estoque.js` (16) trava a conta. **O conserto é
+CONSERTO 🟡** (cálculo exibido, não mexe em saldo), e espera o "pode seguir".
+
 Ferramentas que só leem: `node rastrear.js --lote` (os sete degraus do PDF até a
 tela), `node rastrear.js --auditar [dias]`, `node conferir_nf.js --pdf` e `node
 conferir_carregados.js`.
@@ -3314,6 +3350,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 17 | ~~**Acesso: duas travas faltando**~~ **RESOLVIDO em 17/09/2026** — a exceção recusa conceder chave `intransferivel`, a troca de setores tem a trava do último Admin Geral (mesma conta do `auth.js`, agora no `acesso.js`), setor novo não nasce `admin_geral` e a migração de `areas` virou evento de uma vez só (a porta A, que promovia a Admin Geral em silêncio). Ver §10, armadilha #28 | — |
 | 19 | ~~**`minimo.definir` é uma chave que nenhuma rota lê.**~~ **RESOLVIDO em 26/10/2026** (fase 3 da `ACESSOS-UNIFICADOS`) — a chave saiu do registro, do setor Comprador e das exceções (uma vez só, `config.acesso_minimo_definir`). Quem manda no card Materiais continua sendo `componente.cadastrar` e `compras.ver`; ninguém perdeu nada · `teste_setor_salvar.js` | — |
 | 20 | ~~**Editar um setor APAGA, sem avisar, as permissões que ele tem acima do próprio nível.**~~ **RESOLVIDO em 26/10/2026** (fase 3 da `ACESSOS-UNIFICADOS`, R-ACE-03) — o nível do setor virou **etiqueta**: a tela mostra a caixinha acima do nível como ela está (marcada, com o aviso "acima do nível do setor") e manda a lista inteira (`todas`); a tela antiga, sem a marca, não apaga nada. A permissão **sensível nova** pede confirmação (409 `sensiveis`) antes de entrar. As três **intransferíveis** continuam fora de qualquer setor que não seja o Admin Geral, agora por trava própria, e não mais pelo nível · `teste_setor_salvar.js` (26). **Desde 04/11/2026 o nível volta a travar** (fase 4 da `ACESSO-POR-TELA-E-NIVEL`), mas recusando a chave **nova** na hora, dizendo por quê — a que já estava fica, nunca se apaga (§10) | — |
+| 21 | **A tarja "sem estoque" da Etiqueta de Venda só acusa o livre ≤ 0**, e não a fila inteira do SKU: com alguma peça, mas não para todas, a tela não avisa e o bipe recusa (§5, achado de 06/11/2026). Diagnóstico: `node diagnosticar_tarja_estoque.js` | Médio — a bancada descobre a falta na prateleira, e a produção não é chamada a tempo |
 | 18 | **Nada acusa uma regra INERTE** — e ela tem pelo menos **três formas**: dado que ninguém preencheu, **rota que nenhuma tela chama** (o extrato do livro ficou um dia no ar sem botão, §2; o `POST /api/componentes` ficou **oito meses**, e no lugar dele se fazia `INSERT` à mão — §7-B, armadilha #33) e **chave de permissão que nenhuma rota lê** (a `minimo.definir` da linha abaixo). `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
 
 ---
