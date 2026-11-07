@@ -87,6 +87,35 @@ const LINHAS = [
       return { n:l.length, desde:maisAntiga(l.map(x => x.cancelada_em)),
                canceladas:l.filter(x => x.de === 'cancelada').map(x => x.id) };
     } },
+  /* COMPRAS-E-RECEBIMENTO fase 1 (R-CMP-05): material sem almoxarifado padrão
+     não sabe para onde vai no Recebimento nem em que contagem entra. */
+  { chave:'material_sem_almox', nome:'Material sem almoxarifado', perm:['componente.cadastrar'], onde:{ aba:'compras' },
+    ajuda:'material cadastrado sem o almoxarifado onde ele mora',
+    contar(db){ const r = require('./material_dominio').pendencias(db).sem_almoxarifado; return { n:r.n, desde:r.desde }; } },
+  { chave:'pedido_aprovacao', nome:'Pedido de compra aguardando aprovação', perm:['pedido.aprovar'], onde:{ aba:'compras' },
+    ajuda:'pedido acima da alçada de quem o criou (R-CMP-17)',
+    contar(db){ const r = require('./compra_dominio').pendencias(db).aguardando_aprovacao; return { n:r.n, desde:r.desde }; } },
+  /* COMPRAS-E-RECEBIMENTO fase 3 (R-CMP-32/33): o retido nao entra no saldo
+     ate alguem decidir; o aviso entrou e espera a ciencia. */
+  { chave:'recebimento_retido', nome:'Recebimento retido', perm:['recebimento.liberar'], onde:{ aba:'compras' },
+    ajuda:'entrega que não bateu o peso ou a quantidade declarada: aceitar, aceitar e reclamar, ou devolver',
+    contar(db){ const r = require('./recebimento_dominio').pendencias(db).retido; return { n:r.n, desde:r.desde }; } },
+  { chave:'recebimento_aviso', nome:'Recebimento com aviso de peso', perm:['recebimento.liberar'], onde:{ aba:'compras' },
+    ajuda:'entrou no saldo com o peso entre as duas tolerâncias: dar ciência',
+    contar(db){ const r = require('./recebimento_dominio').pendencias(db).aviso; return { n:r.n, desde:r.desde }; } },
+  /* COMPRAS-E-RECEBIMENTO fase 6 (R-CMP-42): a contagem de material que passou
+     da tolerancia espera outra pessoa aprovar. */
+  { chave:'contagem_material', nome:'Contagem de material por almoxarifado', perm:['contagem.aprovar'], onde:{ aba:'ct' },
+    ajuda:'diferença acima da tolerância na contagem cega da 504',
+    contar(db){ return require('./contagem_material_dominio').pendencias(db); } },
+  /* fase 11 (R-CMP-52, R-CMP-55): o certificado vencendo/vencido, e a nota da
+     Receita de fornecedor sem pedido (alguem comprou por fora). */
+  { chave:'certificado', nome:'Certificado digital vencendo ou vencido', perm:['certificado.gerenciar'], onde:{ aba:'compras' },
+    ajuda:'menos de 30 dias para vencer, ou já vencido (a busca da Receita para)',
+    contar(db){ return require('./certificado_dominio').pendencias(db); } },
+  { chave:'nota_sem_pedido', nome:'Nota da Receita sem pedido ou que não entrou', perm:['nota.lancar'], onde:{ aba:'compras' },
+    ajuda:'nota emitida contra a Deccorar por fornecedor sem pedido no sistema, ou documento da Receita que não entrou',
+    contar(db){ return require('./dfe_dominio').pendencias(db); } },
   { chave:'devolucoes', nome:'Devoluções', perm:['devolucao.baixar'], onde:{ aba:'dv' },
     ajuda:'devoluções esperando a baixa com reputação e motivo',
     contar(db){

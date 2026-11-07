@@ -16,6 +16,15 @@
 > - A tabela `componente` é provisória (o dono é `PRODUCAO-MONTAGEM.md` §6).
 >
 > Movido do Projeto "PCP - Deccorar" para o repositório em 17/09/2026.
+>
+> ⚠️ **07/11/2026 — PARTE DESTA SPEC FOI SUBSTITUÍDA** pela §2 da
+> [`COMPRAS-E-RECEBIMENTO.md`](COMPRAS-E-RECEBIMENTO.md): preço com impostos,
+> nota completa, alçada por pessoa, parcelas, prazo medido, fator real da compra
+> por kg, componente = tudo que se compra (`vai_ficha`), o dono do cadastro de
+> material e a contagem de material. **O resto desta spec continua valendo**:
+> oferta, comparação de preço, histórico de preço, os dois gatilhos da lista,
+> quem recebe não vê preço, recebimento parcial, devolução ao fornecedor, custo
+> indefinido nunca vira zero.
 
 ---
 

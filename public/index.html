@@ -205,6 +205,10 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
   </div>
 
   <div id="v-compras" class="hide">
+    <!-- COMPRAS-E-RECEBIMENTO (07/11/2026): as abas da 501 sao desenhadas pelo
+         /compras_abas.js; os cards de antes ficam dentro delas. -->
+    <div id="cmpAbas"></div><div id="cmpCorpo"></div>
+    <div id="cmpVelhoLista">
     <div class="card"><div style="font-weight:700;margin-bottom:4px">De quem comprar</div>
       <div class="sub" style="margin-bottom:14px">Ninguém compra fração de embalagem. Se você precisa de 7 m e o fornecedor vende barra de 6 m, você leva 12 m e paga por 12 — e quem ordena pelo preço de tabela escolhe errado nessa hora. Por isso os <b>três números aparecem sempre</b>: preço por unidade, desembolso do pedido e sobra que entra no estoque.</div>
       <div class="grid-med" style="grid-template-columns:3fr 1fr 1fr">
@@ -221,20 +225,25 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
       <button class="ghost" id="lcVer">Atualizar</button></div>
       <div id="lcRes" style="margin-top:14px"></div></div>
 
+    </div>
+    <div id="cmpVelhoPedidos">
     <div class="card"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div><div style="font-weight:700">Pedidos</div>
-        <div class="sub">Enviado, o item passa a contar como <b>a caminho</b> e sai da lista de compras.</div></div>
+        <div class="sub">Comprado (na aba Pedidos), o item passa a contar como <b>a caminho</b> e sai da lista de compras.</div></div>
       <button class="ghost" id="pdVer">Atualizar</button></div>
       <div id="pdRes" style="margin-top:14px"></div></div>
 
-    <div class="card"><div style="font-weight:700;margin-bottom:4px">Materiais</div>
+    </div>
+    <div id="cmpVelhoMateriais">
+    <div class="card"><div style="font-weight:700;margin-bottom:4px">Ponto de pedido (mínimo e ideal)</div>
       <div class="sub" style="margin-bottom:12px">Os insumos que a ficha consome e que a lista de compras pede.
         <b>Mínimo</b> é quando disparar; <b>ideal</b> é até onde encher.
         O <b>estoque</b> não se edita aqui — ele entra pelo Recebimento e se corrige pela Contagem.</div>
       <div id="lcMin"></div></div>
+    </div>
   </div>
 
-  <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="sub" id="dvUltima" style="margin:0 0 10px 4px"></div><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide">
+  <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="sub" id="dvUltima" style="margin:0 0 10px 4px"></div><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide"><div class="card" id="cmAprov" style="display:none"></div>
   <!-- A CONFERENCIA DE PECA (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA, 26/09/2026).
        Contar e no tablet, as cegas, em /inventario; aqui fica o que e de quem
        planeja e de quem aprova. A contagem de MATERIAL continua logo abaixo,
@@ -242,28 +251,10 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
   <div class="card" id="invAprov" style="display:none"></div>
   <div class="card" id="invConf" style="display:none"></div>
   <div class="card" id="invRel" style="display:none"></div>
-  <div class="card">
-    <div style="font-weight:700;margin-bottom:4px">Material</div>
-    <div class="sub" style="margin-bottom:12px">Pe&ccedil;a n&atilde;o se conta mais aqui: ela se conta &agrave;s cegas na tela
-      <a href="/inventario" style="color:#4493f8">Invent&aacute;rio</a>, e quem aprova &eacute; outra pessoa. Esta parte conta s&oacute; material.</div>
-    <div class="sub" style="margin-bottom:10px">Material n&atilde;o tem etiqueta: escolha na lista e digite quanto tem. Cada lan&ccedil;amento SOMA &mdash; contou duas prateleiras, lance duas vezes. <b>Zero vale</b>: &eacute; assim que um material que acabou entra na contagem.</div>
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-      <select id="ctComp" onchange="ctCompUnidade()" style="flex:1;min-width:260px;padding:12px;font-size:15px"></select>
-      <input id="ctCompQtd" type="number" min="0" step="0.001" placeholder="quanto tem" style="width:150px;padding:12px;font-size:15px;text-align:center">
-      <span class="sub" id="ctCompUn" style="min-width:64px"></span>
-      <button class="ghost" onclick="ctLancarComp()">Lan&ccedil;ar na contagem</button>
-    </div>
-    <div id="ctCompUlt" style="margin-top:10px;font-size:15px"></div>
-    <div id="ctUlt" style="margin-top:6px;font-size:15px"></div>
-    <!-- Os botoes que aplicam vem DEPOIS de contar: e a ordem em que se usa. -->
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid #30363d">
-      <button class="primary" onclick="ctLancar()">Lancar no estoque (soma)</button><button class="ghost" onclick="ctAjustar()">Ajustar (substitui)</button>
-      <button class="ghost" onclick="ctNova()">Nova contagem</button>
-    </div>
-  </div>
-  <div class="card">
-    <table><thead><tr><th>Item</th><th>Sistema</th><th>Contado</th><th>Diferenca</th></tr></thead><tbody id="ctLista"></tbody></table>
-  </div>
+  <!-- A contagem antiga de MATERIAL saiu (revisão do PR #305, 07/11/2026):
+       material se conta só na 504, por almoxarifado e às cegas. -->
+  <div class="card"><div style="font-weight:700;margin-bottom:4px">Material</div>
+    <div class="sub">Material se conta na tela <a href="/contagem-material" style="color:#4493f8">504 Contagem de material</a>, por almoxarifado e às cegas. A aprovação dela fica no alto desta tela.</div></div>
   <div class="card" id="ctAlertas"></div>
   <div class="card" id="ctPend" style="display:none"></div>
 </div>
@@ -467,6 +458,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
 <script src="/qr.js"></script>
 <script src="/kit_etiqueta.js"></script>
 <script src="/saida_upload.js"></script>
+<script src="/compras_abas.js"></script>
 <script>
 let SKUS=[];
 const $=s=>document.querySelector(s);
@@ -518,7 +510,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   var vfx=$("#v-ficha"); if(vfx) vfx.classList.toggle("hide",t.dataset.t!=="ficha");
   if(t.dataset.t==="ficha") carregarFicha();
   var vcp=$("#v-compras"); if(vcp) vcp.classList.toggle("hide",t.dataset.t!=="compras");
-  if(t.dataset.t==="compras"){ carregarCompras(); carregarListaCompras(); }
+  if(t.dataset.t==="compras"){ carregarCompras(); carregarListaCompras(); if(window.CMP) window.CMP.abrir(); }
   if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); invCarregar(); }
   /* O iframe de Planejamento, Relatórios e Acessos SAIU (fase 5 da
      ACESSO-POR-TELA-E-NIVEL): cada um é a tela dele, e o clique acima já
@@ -836,6 +828,7 @@ function analisarForma(expr){
 
 async function carregarFicha(){
   try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){ COMPS=[]; }
+  if(!Array.isArray(COMPS)) COMPS=[];   // sem compras.ver a rota responde {erro}: lista vazia, e nao estouro (rodada 2)
   const m=$('#fxModelo');
   if(m && !m.dataset.pronto){
     m.innerHTML=MODELOS.filter(x=>x.ativo).map(x=>'<option value="'+x.id+'">'+esc(rotuloLista(x))+'</option>').join('')
@@ -980,9 +973,9 @@ function prepararEditor(){
        simplesmente não roda. Tecido se aponta pela FAMÍLIA, e a cor do SKU mais
        a largura da bobina decidem qual item de estoque sai. */
     c.innerHTML='<option value="">— escolha —</option>'
-      +COMPS.filter(x=>x.ativo && !x.familia).map(x=>'<option value="'+x.id+'">'+esc(x.nome)
+      +COMPS.filter(x=>x.ativo && !x.familia && x.vai_ficha!==0).map(x=>'<option value="'+x.id+'">'+esc(x.nome)
         +(x.unidade?' ('+esc(x.unidade)+')':'')+'</option>').join('')
-      +[...new Set(COMPS.filter(x=>x.familia && x.ativo).map(x=>x.familia))]
+      +[...new Set(COMPS.filter(x=>x.familia && x.ativo && x.vai_ficha!==0).map(x=>x.familia))]
         .map(fam=>'<option value="fam:'+esc(fam)+'">Tecido da família '+esc(fam)
           +' (a cor do SKU escolhe a bobina)</option>').join('');
   }
@@ -1153,7 +1146,7 @@ document.addEventListener('click',async function(e){
    desembolso e sobra. Ordenar por um só, escondendo os outros, é como o
    comprador é enganado. O sistema ordena e escreve o motivo; quem decide é ele. */
 async function carregarCompras(){
-  if(!COMPS.length){ try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){} }
+  if(!COMPS.length){ try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){} if(!Array.isArray(COMPS)) COMPS=[]; }
   const el=$('#cpItem'); if(!el) return;
   el.innerHTML=COMPS.filter(c=>c.ativo).map(c=>'<option value="c'+c.id+'">'+esc(c.nome)
       +(c.unidade?' ('+esc(c.unidade)+')':'')+'</option>').join('')
@@ -1345,7 +1338,7 @@ function pendenciasHTML(p){
 const UNIDADES=[['m','metro'],['un','unidade'],['kg','quilo']];
 async function verMinimos(){
   const box=$('#lcMin'); if(!box) return;
-  if(!COMPS.length){ try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){} }
+  if(!COMPS.length){ try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){} if(!Array.isArray(COMPS)) COMPS=[]; }
   const opts=(sel)=>UNIDADES.map(u=>'<option value="'+u[0]+'"'+(u[0]===sel?' selected':'')+'>'+u[1]+'</option>').join('');
   const linha=c=>'<tr'+(c.ativo?'':' style="opacity:.55"')+'>'
       +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="nome" value="'+esc(c.nome||'')+'" style="width:220px">'
@@ -1373,14 +1366,10 @@ async function verMinimos(){
     /* A linha de criar fica EMBAIXO da lista, e não em cima: quem chega aqui
        quase sempre vem ajustar mínimo, e um formulário em cima empurraria a
        lista para fora da tela todo dia por causa do uso raro. */
-    +'<div class="row-actions" style="margin-top:14px;align-items:flex-end;flex-wrap:wrap;gap:8px">'
-    +'<div><label class="sub">Material novo</label><br><input id="cnNome" placeholder="Tubo 38 mm" style="width:220px"></div>'
-    +'<div><label class="sub">Código</label><br><input id="cnCod" placeholder="(opcional)" style="width:100px"></div>'
-    +'<div><label class="sub">Unidade</label><br><select id="cnUn" style="width:100px">'+opts('un')+'</select></div>'
-    +'<button class="primary" data-perm="componente.cadastrar" id="cnAdd">Adicionar</button>'
-    +'<span class="msg" id="lcMsg"></span></div>'
-    +'<div class="sub" style="margin-top:8px">A <b>unidade</b> é como a ficha gasta o material — metro para tubo, '
-    +'fita e tecido; unidade para comando, tampa e parafuso. Ela decide a conta, então trocar depois muda o que a lista de compras pede.</div>';
+    /* O MATERIAL NOVO nasce no formulario de cima ("+ Material novo") desde a
+       fase 1 da COMPRAS-E-RECEBIMENTO: ele exige o modo de saldo (R-CMP-03), e
+       a linha curta daqui nasceria recusada. */
+    +'<div class="sub" style="margin-top:10px">Material novo: use <b>+ Material novo</b>, no card de cima — ele pede o modo de saldo e o almoxarifado.</div>';
 }
 /* Pedidos (§8). O status conta a história: rascunho → enviado → parcial →
    recebido. Enviado, o item passa a contar como "a caminho" na lista. */
@@ -1398,7 +1387,9 @@ async function verPedidos(){
       +'<td class="sub">'+esc(String(p.criado_em||'').slice(0,16))+'</td>'
       +'<td><button class="ghost small pdWa" data-id="'+p.id+'">WhatsApp</button> '
       +'<button class="ghost small pdImp" data-id="'+p.id+'">imprimir</button>'
-      +(p.status==='rascunho'?' <button class="primary small pdEnv" data-perm="pedido.criar" data-id="'+p.id+'">enviar</button>':'')
+      /* "enviar" saiu (R-CMP-15): o rascunho vira "comprado" na aba Pedidos,
+         com canal, nº do pedido no fornecedor e data (revisao do PR #305) */
+      +(p.status==='rascunho'?' <button class="primary small pdComprar" data-perm="pedido.criar">comprar →</button>':'')
       +(p.status!=='cancelado'&&p.status!=='recebido'?' <button class="del pdCanc" data-perm="pedido.criar" data-id="'+p.id+'">cancelar</button>':'')
       +'</td></tr>').join('')+'</tbody></table>';
 }
@@ -1493,6 +1484,7 @@ document.addEventListener('click',async function(e){
   }
   const imp=t.closest&&t.closest('.pdImp');
   if(imp){ imprimirPedido(imp.dataset.id); return; }
+  if(t.closest&&t.closest('.pdComprar')){ if(window.CMP) window.CMP.abrir('pedidos'); return; }
   const env=t.closest&&t.closest('.pdEnv');
   if(env){
     if(!confirm('Marcar como enviado? A partir daí estes itens contam como "a caminho" e saem da lista de compras.')) return;
@@ -2881,43 +2873,8 @@ async function ctBipar(cod){
 // Mesma sessao, mesma tabela, mesma fila de aprovacao das pecas. A unica coisa
 // diferente e a forma de entrar: lista + quantidade, porque material nao tem
 // etiqueta e nem sempre e inteiro.
-var CTCOMPS=[];
-async function ctComponentes(){
-  var s=document.getElementById('ctComp'); if(!s) return;
-  try{ CTCOMPS=await (await fetch('/api/contagem/componentes')).json(); }catch(e){ CTCOMPS=[]; }
-  if(!CTCOMPS.length){ s.innerHTML='<option value="">nenhum material cadastrado</option>'; return; }
-  var h='<option value="">escolha o material</option>';
-  for(var i=0;i<CTCOMPS.length;i++){
-    var c=CTCOMPS[i];
-    h+='<option value="'+c.id+'">'+c.nome+' ('+c.unidade+')</option>';
-  }
-  s.innerHTML=h; ctCompUnidade();
-}
-function ctCompAtual(){
-  var s=document.getElementById('ctComp'); if(!s||!s.value) return null;
-  for(var i=0;i<CTCOMPS.length;i++) if(String(CTCOMPS[i].id)===String(s.value)) return CTCOMPS[i];
-  return null;
-}
-function ctCompUnidade(){
-  var c=ctCompAtual(), el=document.getElementById('ctCompUn');
-  if(el) el.textContent=c?c.unidade:'';
-}
-async function ctLancarComp(){
-  var c=ctCompAtual();
-  if(!c){ alert('Escolha o material.'); return; }
-  var q=document.getElementById('ctCompQtd');
-  if(!q||q.value===''){ alert('Digite quanto tem. Se acabou, digite 0.'); return; }
-  var n=Number(q.value);
-  if(!isFinite(n)||n<0){ alert('Quantidade invalida.'); return; }
-  var r=await (await fetch('/api/contagem/componente',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({componente_id:c.id,quantidade:n,sessao:ctSessao()})})).json();
-  var u=document.getElementById('ctCompUlt');
-  if(r.erro){ if(u) u.innerHTML='<b style="color:#ff6b6b">'+r.erro+'</b>'; return; }
-  if(u) u.innerHTML='<b style="color:#2ea043">'+r.nome+'</b> - contado '+r.contado+' '+r.unidade+' (sistema: '+r.estoque+' '+r.unidade+')';
-  q.value=''; q.focus();
-  ctLista();
-}
 async function ctLista(){
+  if(!document.getElementById('ctLista')) return;   // a contagem antiga de material saiu (504)
   var d={linhas:[],desconhecidos:[],naoContados:[]};
   try{ d=await (await fetch('/api/contagem/'+ctSessao())).json(); }catch(e){}
   var h='';
@@ -2965,9 +2922,7 @@ async function ctAjustar(){
 // nunca muda por UPDATE, passa pelo dono unico (regra 10).
 function ctItem(l){ return {tipo:l.tipo||'sku', codigo:l.codigo, componente_id:l.componente_id||null}; }
 document.addEventListener('DOMContentLoaded',function(){
-  if(naTela('ct')) ctComponentes();
-  var q=document.getElementById('ctCompQtd');
-  if(q) q.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); ctLancarComp(); } });
+  if(naTela('ct') && window.CMP && window.CMP.contagemAprov) window.CMP.contagemAprov(document.getElementById('cmAprov'));
   var b=document.getElementById('ctBipe');
   if(!b) return;
   b.addEventListener('keydown',function(e){

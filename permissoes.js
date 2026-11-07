@@ -236,18 +236,46 @@ module.exports = [
     rotulo:'Ver pedidos em aberto', desc:'O que está a caminho, sem preço' },
   { chave:'pedido.receber',       grupo:'Compras', tela:502, nivel:'operacao',
     rotulo:'Registrar recebimento', desc:'Conferir a entrega e dar entrada no estoque' },
+  /* COMPRAS-E-RECEBIMENTO R-CMP-33: decidir o retido (aceitar, aceitar e
+     reclamar, devolver) e dar ciencia do aviso. Backfill: quem tem pedido.criar. */
+  { chave:'recebimento.liberar',  grupo:'Compras', tela:501, nivel:'admin',
+    rotulo:'Liberar recebimento retido', desc:'Aceitar, aceitar e reclamar ou devolver a entrega retida; dar ciência do aviso de peso',
+    sensivel:true },
+  /* COMPRAS-E-RECEBIMENTO §7: guardar, mover e abrir volume na 503, por bipe.
+     Backfill: quem tem pedido.receber. */
+  { chave:'volume.movimentar',    grupo:'Compras', tela:503, nivel:'operacao',
+    rotulo:'Guardar, mover e abrir volume', desc:'No almoxarifado, por bipe: guardar e mover rolo e caixa, e abrir o rolo do ML (sai do saldo)' },
   { chave:'pedido.devolver',      grupo:'Compras', tela:502, nivel:'operacao',
     rotulo:'Devolver ao fornecedor', desc:'Recusar item na conferência, com motivo' },
   { chave:'pedido.pagar',         grupo:'Compras', tela:501, nivel:'admin',
-    rotulo:'Marcar pedido como pago', desc:'Fecha o ciclo — não é contas a pagar',
+    rotulo:'Pagar pedido (parcelas)', desc:'Registrar e baixar as parcelas do pedido — não é contas a pagar',
     sensivel:true },
+  /* COMPRAS-E-RECEBIMENTO §7. pedido.aprovar: backfill de quem tem pedido.criar.
+     nota.lancar: de quem tem pedido.pagar (entra na fase 2 porque a poda das
+     parcelas ja a pergunta, R-CMP-27). alcada.definir: so o Admin Geral. */
+  { chave:'pedido.aprovar',       grupo:'Compras', tela:501, nivel:'admin',
+    rotulo:'Aprovar pedido acima da alçada', desc:'Passar para comprado o pedido de quem tem você como aprovador',
+    sensivel:true },
+  { chave:'nota.lancar',          grupo:'Compras', tela:501, nivel:'admin',
+    rotulo:'Lançar nota fiscal de compra', desc:'Nota, itens, impostos e custo pago/líquido' },
+  /* fase 11 (R-CMP-51): enviar, trocar e remover o certificado digital. Nunca
+     baixar. So o Admin Geral. */
+  { chave:'certificado.gerenciar', grupo:'Compras', tela:501, nivel:'admin_geral',
+    rotulo:'Gerenciar o certificado digital', desc:'Enviar, trocar e remover o .pfx que baixa as notas da Receita (nunca baixar)',
+    sensivel:true, intransferivel:true },
+  { chave:'alcada.definir',       grupo:'Compras', tela:501, nivel:'admin_geral',
+    rotulo:'Definir alçada de compra', desc:'O limite de cada pessoa e quem aprova acima dele',
+    sensivel:true, intransferivel:true },
   // Custo do produto e a informacao mais estrategica do sistema — mais que
   // produtividade nominal. Nao vaza por padrao e todo acesso vai para a auditoria.
   { chave:'custo.ver',            grupo:'Compras', tela:404, nivel:'admin',
     rotulo:'Ver custo do produto', desc:'Custo por SKU e evolução',
     sensivel:true },
   { chave:'componente.cadastrar', grupo:'Compras', tela:501, nivel:'admin',
-    rotulo:'Cadastrar componente', desc:'Insumos e matérias-primas' },
+    rotulo:'Cadastrar material', desc:'Tudo que a empresa compra: matéria-prima, tecido, embalagem, limpeza, copa…' },
+  /* COMPRAS-E-RECEBIMENTO §7. Backfill: quem tem `componente.cadastrar`. */
+  { chave:'almoxarifado.cadastrar', grupo:'Compras', tela:501, nivel:'admin',
+    rotulo:'Cadastrar almoxarifado', desc:'Criar, renomear e desativar almoxarifado e os endereços dele' },
   /* `minimo.definir` SAIU em 26/10/2026 (fase 3 da ACESSOS-UNIFICADOS,
      divida 19): nenhuma rota a lia. Quem manda no mínimo e no ideal do card
      Materiais e `componente.cadastrar` (escrever) e `compras.ver` (ler), e a

@@ -1,0 +1,102 @@
+<!doctype html><html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Almoxarifado — Deccorar</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Almoxarifado">
+<link rel="stylesheet" href="/ipad.css">
+<style>
+/* 503 ALMOXARIFADO (spec COMPRAS-E-RECEBIMENTO, fase 5). Estacao de OPERACAO:
+   fundo claro, alvo minimo 52 px, fonte minima 15 px (DESIGN.md). O campo de
+   bipe e VISIVEL (o iPad tira o foco de campo fora da tela, §12). */
+:root{--bg:#fff;--pan:#F4F6F8;--line:#D8DEE6;--txt:#1A1D23;--sub:#5A6472;--verm:#C62828;--ambar:#B26A00;--verde:#2E7D32;--azul:#1565C0}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif;font-size:16px}
+header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.mark{width:34px;height:34px;border-radius:9px;background:var(--azul);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800}
+h1{font-size:19px;margin:0}.sub{color:var(--sub);font-size:15px}
+.wrap{max-width:900px;margin:0 auto;padding:18px}
+.card{background:var(--pan);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+.big{font-size:22px;font-weight:800}
+input[type=text]{font-family:inherit;font-size:22px;padding:14px;border:2px solid var(--azul);border-radius:12px;width:100%;background:#fff;color:var(--txt)}
+.b{min-height:56px;padding:0 22px;font-size:16px;font-weight:700;border-radius:12px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--txt);margin:6px 6px 0 0}
+.b.pri{background:var(--azul);border-color:var(--azul);color:#fff}
+.b.verm{background:var(--verm);border-color:var(--verm);color:#fff}
+.avi{border-radius:10px;padding:12px 14px;margin-top:12px;font-size:15px}
+.ok{background:#EAF3E7;border:1px solid #A9CEA2;color:#1F5E22}
+.err{background:#FBEBEB;border:1px solid #E4A9A9;color:#8A2020}
+.am{background:#FDF3E3;border:1px solid #E8C48A;color:#7A4A06}
+.lin{padding:10px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+select{font-size:16px;padding:12px;border-radius:10px;border:1px solid var(--line);width:100%}
+</style></head><body>
+<header><div class="mark">A</div><div><h1>503 · Almoxarifado</h1>
+  <div class="sub">Bipe o volume. Depois, bipe o endereço para guardar ou mover — ou toque em "Abri".</div></div></header>
+<div class="wrap">
+  <div class="card"><div class="sub" id="dica">Bipe a etiqueta do volume (M-…) ou de um endereço (E-…)</div>
+    <input type="text" id="bipe" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="M-000001"></div>
+  <div id="atual"></div>
+  <div id="faltam"></div>
+</div>
+<script src="/nav.js"></script>
+<script>
+var $=function(s){return document.querySelector(s);};
+function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+function n3(v){return (Math.round((+v||0)*1000)/1000).toString().replace('.',',');}
+var VOL=null, ALM=[], tempo=null;
+async function api(m,u,b){ try{ var r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined}); var j=await r.json(); if(!r.ok && !j.erro) j.erro='recusado'; return j; }catch(e){ return {erro:'SEM CONEXÃO — confira o Wi-Fi e bipe de novo'}; } }
+function foco(){ var b=$('#bipe'); b.value=''; b.focus(); }
+function aviso(cls, t){ $('#atual').insertAdjacentHTML('afterbegin','<div class="avi '+cls+'">'+esc(t)+'</div>'); }
+async function faltam(){
+  var l=await api('GET','/api/volumes?sem_endereco=1'); if(!Array.isArray(l)) l=[];
+  $('#faltam').innerHTML='<div class="card"><div class="big">Falta guardar ('+l.length+')</div>'
+    +(l.length?l.map(function(v){ return '<div class="lin"><span><b>'+esc(v.codigo)+'</b> · '+esc(v.material)+'</span><span>'+n3(v.saldo)+' '+esc(v.unidade||'')+'</span></div>'; }).join('')
+      :'<div class="sub">Tudo guardado.</div>')+'</div>';
+}
+function desenharVolume(){
+  if(!VOL){ $('#atual').innerHTML=''; $('#dica').textContent='Bipe a etiqueta do volume (M-…) ou de um endereço (E-…)'; return; }
+  $('#dica').textContent='Agora bipe o ENDEREÇO para guardar/mover '+VOL.codigo+' — ou escolha abaixo';
+  var opts=ALM.map(function(n){ return '<option value="'+n.id+'">'+esc(n.nome)+(n.volumes?' · ocupado':'')+'</option>'; }).join('');
+  $('#atual').innerHTML='<div class="card"><div class="big">'+esc(VOL.codigo)+' · '+esc(VOL.material)+'</div>'
+    +'<div class="sub">'+n3(VOL.saldo)+' '+esc(VOL.unidade||'')+' · '+(VOL.endereco?'em '+esc(VOL.endereco):'<b>sem endereço</b>')+'</div>'
+    +(opts?'<div class="sub" style="margin-top:12px">Ou escolha o endereço</div><select id="nivelSel"><option value="">—</option>'+opts+'</select><button class="b pri" id="guardar">Guardar aqui</button>':'')
+    +'<div style="margin-top:14px"><button class="b verm" id="abrir">Abri este volume</button> <a class="b" style="display:inline-flex;align-items:center;text-decoration:none" target="_blank" href="/api/volumes/'+encodeURIComponent(VOL.codigo)+'/etiqueta">Etiqueta</a> <button class="b" id="limpar">Outro volume</button></div>'
+    +'<div class="sub" style="margin-top:8px">"Abri" consome o volume inteiro: ele sai do saldo e não volta.</div></div>';
+}
+async function carregarNiveis(){
+  ALM=[]; var al=await api('GET','/api/almoxarifados'); if(!Array.isArray(al)) return;
+  for(var i=0;i<al.length;i++){ if(!al[i].ativo) continue; var e=await api('GET','/api/almoxarifados/'+al[i].id+'/enderecos'); if(e && e.niveis) ALM=ALM.concat(e.niveis); }
+}
+async function bipou(cod){
+  cod=String(cod||'').trim().toUpperCase().replace(/[^A-Z0-9-]/g,'');
+  if(!cod) return foco();
+  if(/^E-?\d+$/.test(cod)){
+    if(VOL){ var r=await api('POST','/api/volumes/'+encodeURIComponent(VOL.codigo)+'/mover',{nivel:cod});
+      if(r.erro){ desenharVolume(); aviso('err', r.erro); return foco(); }
+      VOL=null; desenharVolume(); aviso('ok','✓ Guardado em '+r.endereco); faltam(); carregarNiveis(); return foco(); }
+    var n=await api('GET','/api/enderecos/'+encodeURIComponent(cod));
+    if(n.erro){ aviso('err', n.erro); return foco(); }
+    $('#atual').innerHTML='<div class="card"><div class="big">'+esc(n.nome)+'</div>'+((n.volumes||[]).length||(n.fora||[]).length
+      ?(n.volumes||[]).map(function(v){ return '<div class="lin"><b>'+esc(v.codigo)+'</b><span>'+esc(v.material)+' · '+n3(v.saldo)+' '+esc(v.unidade||'')+'</span></div>'; }).join('')
+        +(n.fora||[]).map(function(t){ return '<div class="lin"><b>'+esc(t)+'</b><span>sob medida</span></div>'; }).join('')
+      :'<div class="sub">Vazio.</div>')+'</div>';
+    return foco();
+  }
+  var v=await api('GET','/api/volumes/'+encodeURIComponent(cod));
+  if(v.erro){ aviso('err', v.erro); return foco(); }
+  if(v.situacao==='encerrado'){ VOL=null; desenharVolume(); aviso('am', v.codigo+' já foi aberto/encerrado.'); return foco(); }
+  VOL=v; desenharVolume(); foco();
+}
+$('#bipe').addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); clearTimeout(tempo); bipou(this.value); } });
+$('#bipe').addEventListener('input',function(){ var t=this; clearTimeout(tempo); tempo=setTimeout(function(){ if(t.value.length>=8) bipou(t.value); },350); });
+document.addEventListener('click',async function(ev){
+  var t=ev.target;
+  if(t.id==='limpar'){ VOL=null; desenharVolume(); return foco(); }
+  if(t.id==='guardar'){ var s=$('#nivelSel'); if(!s||!s.value) return aviso('err','escolha o endereço');
+    var r=await api('POST','/api/volumes/'+encodeURIComponent(VOL.codigo)+'/mover',{nivel_id:+s.value});
+    if(r.erro){ aviso('err', r.erro); return; } VOL=null; desenharVolume(); aviso('ok','✓ Guardado em '+r.endereco); faltam(); carregarNiveis(); return foco(); }
+  if(t.id==='abrir'){
+    if(!confirm('Abrir '+VOL.codigo+'? O volume sai inteiro do saldo ('+n3(VOL.saldo)+' '+(VOL.unidade||'')+').')) return;
+    var r2=await api('POST','/api/volumes/'+encodeURIComponent(VOL.codigo)+'/abrir',{});
+    if(r2.erro){ aviso('err', r2.erro); return; } var c=VOL.codigo; VOL=null; desenharVolume(); aviso('ok','✓ '+c+' aberto: saíram '+n3(r2.saiu)); faltam(); return foco(); }
+});
+carregarNiveis(); faltam(); foco();
+</script></body></html>
