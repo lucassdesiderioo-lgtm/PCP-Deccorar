@@ -148,6 +148,18 @@ function liquidoDoItem(db, pedido_item_id){
 /* A nota que chega DEPOIS do recebimento corrige o custo medio pelo que ja
    entrou: o custo de antes (o que o recebimento usou) contra o liquido ÷ o
    recebido. Fica no componente_dominio (dono unico do custo medio). */
+/* QUANTAS UNIDADES DA CASA A NOTA COBRA (revisao do PR #305). A quantidade da
+   nota vem como o fornecedor faturou: na compra por unidade de compra (kg, cx),
+   ela e nessa unidade e o fator a converte; na compra por embalagem, ela so e
+   embalagem quando bate com as embalagens do pedido — senao ja e unidade da
+   casa ("UN 20" de uma caixa de 10). */
+function unidadesDaNota(pi, q){
+  q = +q || 0;
+  const f = +pi.fator || 1;
+  if(pi.qtd_compra != null) return q * f;
+  if(f !== 1 && pi.qtd_embalagem != null && Math.abs(q - pi.qtd_embalagem) < 1e-9) return q * f;
+  return q;
+}
 function corrigirPeloLiquido(db, pi){
   if(!pi.componente_id) return;
   const rec = db.prepare(`SELECT SUM(qtd_contada) q, SUM(qtd_contada*custo_unit) v FROM recebimento_item
@@ -160,8 +172,9 @@ function corrigirPeloLiquido(db, pi){
      custo. Com o item todo recebido vale o contado (R-CMP-34: 400 kg com 590
      tubos, cada tubo custa valor ÷ 590). */
   const atual = db.prepare('SELECT * FROM pedido_item WHERE id=?').get(pi.id) || pi;
-  const completo = atual.status === 'recebido';
-  const daNota = (liq.quantidade || 0) * (atual.fator || 1);
+  /* fechado: recebido, ou cancelado o resto ("fornecedor nao vai entregar") */
+  const completo = atual.status === 'recebido' || (atual.status === 'cancelado' && atual.qtd_recebida > 0);
+  const daNota = unidadesDaNota(atual, liq.quantidade);
   const base = completo ? (atual.qtd_recebida || rec.q) : (daNota > 0 ? daNota : rec.q);
   const antigo = rec.v / rec.q, novo = liq.valor / base;
   const comp = db.prepare('SELECT modo_saldo FROM componente WHERE id=?').get(pi.componente_id);
@@ -180,4 +193,4 @@ function listar(db, q){
   return l;
 }
 
-module.exports = { Recusa, REGIMES, IMPOSTOS, regimeVigente, mudarRegime, aproveita, regras, novaRegra, lancar, listar, liquidoDoItem, corrigirPeloLiquido };
+module.exports = { unidadesDaNota, Recusa, REGIMES, IMPOSTOS, regimeVigente, mudarRegime, aproveita, regras, novaRegra, lancar, listar, liquidoDoItem, corrigirPeloLiquido };

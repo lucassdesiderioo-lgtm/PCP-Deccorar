@@ -229,7 +229,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
     <div id="cmpVelhoPedidos">
     <div class="card"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div><div style="font-weight:700">Pedidos</div>
-        <div class="sub">Enviado, o item passa a contar como <b>a caminho</b> e sai da lista de compras.</div></div>
+        <div class="sub">Comprado (na aba Pedidos), o item passa a contar como <b>a caminho</b> e sai da lista de compras.</div></div>
       <button class="ghost" id="pdVer">Atualizar</button></div>
       <div id="pdRes" style="margin-top:14px"></div></div>
 
@@ -828,6 +828,7 @@ function analisarForma(expr){
 
 async function carregarFicha(){
   try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){ COMPS=[]; }
+  if(!Array.isArray(COMPS)) COMPS=[];   // sem compras.ver a rota responde {erro}: lista vazia, e nao estouro (rodada 2)
   const m=$('#fxModelo');
   if(m && !m.dataset.pronto){
     m.innerHTML=MODELOS.filter(x=>x.ativo).map(x=>'<option value="'+x.id+'">'+esc(rotuloLista(x))+'</option>').join('')
@@ -1145,7 +1146,7 @@ document.addEventListener('click',async function(e){
    desembolso e sobra. Ordenar por um só, escondendo os outros, é como o
    comprador é enganado. O sistema ordena e escreve o motivo; quem decide é ele. */
 async function carregarCompras(){
-  if(!COMPS.length){ try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){} }
+  if(!COMPS.length){ try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){} if(!Array.isArray(COMPS)) COMPS=[]; }
   const el=$('#cpItem'); if(!el) return;
   el.innerHTML=COMPS.filter(c=>c.ativo).map(c=>'<option value="c'+c.id+'">'+esc(c.nome)
       +(c.unidade?' ('+esc(c.unidade)+')':'')+'</option>').join('')
@@ -1337,7 +1338,7 @@ function pendenciasHTML(p){
 const UNIDADES=[['m','metro'],['un','unidade'],['kg','quilo']];
 async function verMinimos(){
   const box=$('#lcMin'); if(!box) return;
-  if(!COMPS.length){ try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){} }
+  if(!COMPS.length){ try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){} if(!Array.isArray(COMPS)) COMPS=[]; }
   const opts=(sel)=>UNIDADES.map(u=>'<option value="'+u[0]+'"'+(u[0]===sel?' selected':'')+'>'+u[1]+'</option>').join('');
   const linha=c=>'<tr'+(c.ativo?'':' style="opacity:.55"')+'>'
       +'<td><input class="lcCampo" data-id="'+c.id+'" data-campo="nome" value="'+esc(c.nome||'')+'" style="width:220px">'

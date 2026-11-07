@@ -297,6 +297,8 @@ module.exports=function(app,db){
     const qq=QUEM.exigir(req,res); if(!qq) return;
     const ids=(req.body&&req.body.ids)||[];
     if(!ids.length) return res.status(400).json({erro:'sem ids'});
+    if(db.prepare(`SELECT 1 FROM contagem_pendente WHERE aprovado=0 AND tipo='componente' AND id IN (${ids.map(()=>'?').join(',')})`).get(...ids.map(x=>+x)))
+      return res.status(410).json({erro:NA_504.erro+': este pendente de material é da contagem antiga — rejeite-o e conte de novo na 504'});
     const quem=qq.usuario_nome||'';
     let n=0;
     db.transaction(()=>{
@@ -377,6 +379,14 @@ module.exports=function(app,db){
      uma aba aberta antes do deploy, ou alguem chamando por fora — e recusado
      inteiro, e NADA e gravado: aplicar so a parte de material faria a pessoa
      achar que a contagem inteira entrou. */
+  /* O MATERIAL SAIU DESTA PORTA INTEIRA (revisao do PR #305, decisao do dono):
+     nem ajustar, nem somar, nem aprovar o pendente antigo mexem no saldo do
+     material. Material se conta so na 504; o pendente antigo se rejeita. */
+  function recusaMaterial(res, itens){
+    if(!itens.some(i=>i.tipo==='componente')) return false;
+    res.status(410).json(NA_504);
+    return true;
+  }
   function recusaPeca(res, itens){
     const pecas=itens.filter(i=>i.tipo!=='componente').map(i=>i.codigo);
     if(!pecas.length) return false;
@@ -393,6 +403,7 @@ module.exports=function(app,db){
     const itens=itensDoCorpo(req.body);
     if(!ses||!itens.length) return res.status(400).json({erro:'faltam dados'});
     if(recusaPeca(res, itens)) return;
+    if(recusaMaterial(res, itens)) return;
     if(!podeAjustar(req)){
       const pend=enfileirar(qq,ses,itens,'ajustar');
       return res.json({ok:true,pendente:pend});
@@ -422,6 +433,7 @@ module.exports=function(app,db){
     const itens=itensDoCorpo(req.body);
     if(!ses||!itens.length) return res.status(400).json({erro:'faltam dados'});
     if(recusaPeca(res, itens)) return;
+    if(recusaMaterial(res, itens)) return;
     if(!podeAjustar(req)){
       const pend=enfileirar(qq,ses,itens,'lancar');
       return res.json({ok:true,pendente:pend});

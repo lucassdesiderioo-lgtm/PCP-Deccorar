@@ -48,12 +48,16 @@ async function inicio(){
   /* O TECIDO DE ANTES (decisao do dono, 07/11/2026): ficou "por quantidade" ate
      cada rolo ser registrado aqui com a metragem da etiqueta. So aparece a quem
      aprova a contagem (a rota recusa os outros), e sem o saldo. */
-  var et=await api('GET','/api/contagem-material/a-etiquetar');
+  /* so quem aprova a contagem pergunta (sem isso, o 403 no console de todo
+     contador — rodada 2 da revisao) */
+  var mi=await api('GET','/api/telas/minhas');
+  var aprova=mi && (mi.admin_geral || (mi.perms||[]).indexOf('contagem.aprovar')>=0);
+  var et=aprova ? await api('GET','/api/contagem-material/a-etiquetar') : null;
   if(Array.isArray(et) && et.length){
     $('#app').insertAdjacentHTML('beforeend','<div class="card"><div class="nome">Tecido de antes: etiquetar os rolos</div>'
       +'<div class="sub">Estes tecidos ainda não são controlados por volume. Meça cada rolo, escreva uma metragem por linha e etiquete: o saldo passa a ser a soma dos rolos.</div>'
       +et.map(function(t){return '<div class="lin" style="flex-wrap:wrap"><span style="flex:1 1 200px"><b>'+esc(t.nome)+'</b> · '+esc(t.almoxarifado||'sem almoxarifado')+'</span>'
-        +'<textarea data-etq-m="'+t.id+'" rows="3" placeholder="50&#10;48,5" style="flex:1 1 140px;font-size:18px"></textarea>'
+        +'<textarea data-etq-m="'+t.id+'" rows="3" placeholder="uma metragem por linha" style="flex:1 1 140px;font-size:18px"></textarea>'
         +'<button class="b pri" data-etq="'+t.id+'">Etiquetar</button><div data-etq-msg="'+t.id+'" style="flex-basis:100%"></div></div>';}).join('')+'</div>');
   }
 }
@@ -67,8 +71,9 @@ document.addEventListener('click', async function(ev){
   var r=await api('POST','/api/contagem-material/etiquetar',{componente_id:+id,volumes:vols});
   b.disabled=false;
   if(r.erro){ box.innerHTML='<div class="avi">'+esc(r.erro)+'</div>'; return; }
-  box.innerHTML='<div class="avi ok">✓ '+(r.volumes||[]).length+' volume(s): '+(r.volumes||[]).map(function(v){return esc(v.codigo)+' ('+n3(v.metragem)+')';}).join(', ')+'. Imprima as etiquetas na 503.</div>';
-  setTimeout(inicio,4000);
+  box.innerHTML='<div class="avi ok">✓ '+(r.volumes||[]).length+' volume(s): '+(r.volumes||[]).map(function(v){return '<span style="white-space:nowrap">'+esc(v.codigo)+'</span> ('+n3(v.metragem)+')';}).join(', ')+'. Imprima as etiquetas na 503.</div>';
+  /* o redesenho espera: metragem digitada em outro tecido nao some (§12) */
+  setTimeout(function(){ var dig=[].some.call(document.querySelectorAll('[data-etq-m]'),function(t){return t.value.trim();}); if(!dig) inicio(); },4000);
 });
 async function abrirC(id, limpar){
   /* o redesenho devolve o que estava digitado nos OUTROS materiais (§12) */

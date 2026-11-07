@@ -31,7 +31,7 @@
 - História:         fase 1.
 
 ### R-CMP-03 · O modo de saldo é escolha obrigatória para nascer
-- Regra:            `componente.modo_saldo` = `sem` · `quantidade` · `volume`. Sem a escolha, o cadastro recusa (400). Na edição ele não se apaga, e **com saldo ele não muda** (400, dizendo o caminho). Os materiais de antes receberam `quantidade` num backfill de uma vez só (`config.cmp_material_backfill_1`); o tecido com família **e sem saldo** recebeu `volume`, um por nível. **O tecido com saldo de antes fica `quantidade`** até alguém com `contagem.aprovar` etiquetar os rolos na 504 (aba "Tecido de antes: etiquetar os rolos"): cada rolo vira volume com a metragem medida, o material passa a `volume` e o saldo vira a soma deles — a diferença entra no livro como `contagem`, com quem (decisão do dono, 07/11/2026).
+- Regra:            `componente.modo_saldo` = `sem` · `quantidade` · `volume`. Sem a escolha, o cadastro recusa (400). Na edição ele não se apaga, e **com saldo ele não muda** (400, dizendo o caminho). Os materiais de antes receberam `quantidade` num backfill de uma vez só (`config.cmp_material_backfill_1`); o tecido com família **e sem saldo** recebeu `volume`, um por nível. **O tecido com saldo de antes fica `quantidade`** até alguém com `contagem.aprovar` etiquetar os rolos na 504 (só tecido com família, nunca o do sob medida) (aba "Tecido de antes: etiquetar os rolos"): cada rolo vira volume com a metragem medida, o material passa a `volume` e o saldo vira a soma deles — a diferença entra no livro como `contagem`, com quem (decisão do dono, 07/11/2026).
 - Por quê:          regra que nasce com o valor que ninguém escolheu fica inerte em silêncio (armadilha #30); e um material "por volume" sem volume nenhum teria o saldo sem os rolos que o compõem (R-CMP-39).
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_material.js` (sem o "obrigatório", reprova 1; sem o backfill, 1; o tecido com saldo virando volume, 1); `teste_revisao_compras.js` (a troca com saldo e o etiquetar na 504)
@@ -227,7 +227,7 @@
 - História:         fase 3.
 
 ### R-CMP-32 · Tolerância em três faixas
-- Regra:            até `tol_aviso_pct` entra normal; até `tol_retem_pct` entra no saldo e vai para ciência; acima — ou contagem **acima** da quantidade declarada — RETÉM: não entra no saldo. **A entrega abaixo do declarado entra** (o pedido fica parcial, o resto a caminho), e a diferença só é cobrada **no fechamento**: o "fechar pedido parcial" põe na aba Recebimento retido uma linha "fechamento" (o que chegou × o declarado), que se decide com aceitar ou aceitar e reclamar e **não mexe no saldo** (decisão do dono, 07/11/2026). O peso é conferido a cada entrega, e a régua da nota é proporcional: o kg que falta ÷ as unidades declaradas que faltam.
+- Regra:            até `tol_aviso_pct` entra normal; até `tol_retem_pct` entra no saldo e vai para ciência; acima — ou contagem **acima** da quantidade declarada — RETÉM: não entra no saldo. **A entrega abaixo do declarado entra** (o pedido fica parcial, o resto a caminho), e a diferença só é cobrada **no fechamento**: o "fechar pedido parcial" põe na aba Recebimento retido uma linha "fechamento" (o que chegou × o declarado), que se decide com aceitar ou aceitar e reclamar e **não mexe no saldo** (decisão do dono, 07/11/2026). Pedido com entrega retida esperando decisão **não fecha** (409): o retido ainda pode entrar. O peso é conferido a cada entrega, e a régua da nota é proporcional: o kg que falta ÷ as unidades declaradas que faltam.
 - Por quê:          numa compra de R$ 40–50 mil o material pior não pode passar; e a compra por kg chega em partes no caso normal — reter toda parcial era a trava que dispara no caso normal (armadilha #6).
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_recebimento.js` (sem a faixa de aviso, reprova; contagem acima do declarado passando, reprova); `teste_revisao_compras.js` (a parcial retida, a régua dobrada e a diferença sem ir para quem libera, reprovam)
@@ -243,7 +243,7 @@
 - História:         fase 3.
 
 ### R-CMP-34 · O custo é por unidade recebida
-- Regra:            na compra por kg, o valor do item ÷ o que chegou contado (400 kg, 590 tubos: ÷ 590). A entrega parcial (abaixo do declarado) custa pelo declarado; quando o pedido fecha com falta e o kg inteiro chegou, o custo vira o valor ÷ o contado (`fecharComFalta`). A nota lançada depois corrige pelo líquido ÷ o que ela cobra (quantidade × fator), ou ÷ o recebido quando o item já fechou. Fora do kg, o preço da embalagem ÷ o fator.
+- Regra:            na compra por kg, o valor do item ÷ o que chegou contado (400 kg, 590 tubos: ÷ 590). A entrega parcial (abaixo do declarado) custa pelo declarado; quando o pedido fecha com falta e o kg inteiro chegou, o custo vira o valor ÷ o contado (`fecharComFalta`). A nota lançada depois corrige pelo líquido ÷ as unidades da casa que ela cobra, ou ÷ o recebido quando o item já fechou (recebido, ou o resto cancelado). A quantidade da nota vale como unidade de compra na compra por kg/caixa declarada; na compra por embalagem, só é embalagem quando bate com as embalagens do pedido — "UN 20" de uma caixa de 10 já é unidade. Fora do kg, o preço da embalagem ÷ o fator.
 - Por quê:          o tubo que faltou encarece os que vieram.
 - Exceções:         ver acima.
 - Teste que trava:  `teste_recebimento.js` (pelo declarado, reprova 1)
@@ -365,7 +365,7 @@
 - Por quê:          a contagem de material ganhou spec própria.
 - Exceções:         material por volume nunca é ajustado aqui: o saldo dele é a soma dos volumes; a diferença vai para ciência, e corrige-se na 503.
 - Teste que trava:  `teste_contagem_material.js` (saldo vazando, reprova 1; aplicando tudo sozinho, reprova; quem contou aprovando, 1; o saldo do "terminei", 2)
-- Status:           em código desde 07/11/2026. **A contagem de material antiga da 302 foi aposentada** (decisão do dono, 07/11/2026): o card saiu e o `POST /api/contagem/componente` responde 410 apontando a 504. Material se conta só aqui.
+- Status:           em código desde 07/11/2026. **A contagem de material antiga da 302 foi aposentada** (decisão do dono, 07/11/2026): o card saiu, e lançar, ajustar, somar e aprovar o pendente antigo de material pela porta antiga respondem 410 apontando a 504 (o pendente antigo se rejeita). Material se conta só aqui.
 - História:         fase 6.
 
 ### R-CMP-43 · Tubo cortado ainda é material
@@ -473,7 +473,7 @@
 - História:         fase 11.
 
 ### R-CMP-53 · A busca das notas na Receita
-- Regra:            com certificado válido, o servidor consulta a distribuição de DF-e do Ambiente Nacional (`NFeDistribuicaoDFe`, `distNSU`) pelo próprio relógio (`dfe_route.js`, olha a cada 5 min se já passou a `proxima_consulta`; sem cron), guardando o último NSU lido. `cStat 138` com mais a ler (`ultNSU < maxNSU`) volta em 2 min; `138` com tudo lido, `137` (nada novo) e `656` (consumo indevido) esperam **pelo menos uma hora**, seja qual for o `config.dfe_intervalo_min` (padrão 60; valor que não é número vira 60) — e depois de 137/656 o "consultar agora" também espera. Cada documento do lote entra sozinho: o que não abre vira linha "não entrou", com o motivo, e o NSU só anda depois do lote. Cada nota emitida contra o CNPJ aparece em 501 → Notas → **Notas recebidas da Receita**, com emitente, valor e data. O Admin Geral pode "Consultar a Receita agora".
+- Regra:            com certificado válido, o servidor consulta a distribuição de DF-e do Ambiente Nacional (`NFeDistribuicaoDFe`, `distNSU`) pelo próprio relógio (`dfe_route.js`, olha a cada 5 min se já passou a `proxima_consulta`; sem cron), guardando o último NSU lido. `cStat 138` com mais a ler (`ultNSU < maxNSU`) volta em 2 min; `138` com tudo lido, `137` (nada novo) e `656` (consumo indevido) esperam **pelo menos uma hora**, seja qual for o `config.dfe_intervalo_min` (padrão 60; valor que não é número vira 60) — e depois de 137/656 o "consultar agora" também espera. Cada documento do lote entra sozinho: o que não abre vira linha "não entrou", com o motivo **e o conteúdo**, e o NSU só anda depois do lote; a linha é tentada de novo nas consultas seguintes (até 10 vezes), conta na central de Pendências e sai com "ciente" e motivo. Cada nota emitida contra o CNPJ aparece em 501 → Notas → **Notas recebidas da Receita**, com emitente, valor e data. O Admin Geral pode "Consultar a Receita agora".
 - Por quê:          a nota chega antes da mercadoria, e a Receita bloqueia quem consulta demais.
 - Exceções:         `PCP_DFE_AUTOMATICO=0` desliga o relógio (é o que os testes usam).
 - Teste que trava:  `teste_dfe.js` (o 137 sem esperar a hora, reprova 1; o "consultar agora" depois do 137, 1; o 138 sem mais nada, 1; o documento estragado derrubando o lote, 4)
@@ -483,13 +483,13 @@
 ### R-CMP-54 · Só a ciência da operação é automática
 - Regra:            para cada resumo (`resNFe`) o sistema envia o evento 210210 (ciência da operação), assinado (XMLDSig, C14N, RSA-SHA1) com a chave do certificado, que sai do `.pfx` só em memória, pelo `openssl` do servidor. 135, 136 e 573 contam como feita. Confirmação, desconhecimento e operação não realizada **não existem** no sistema.
 - Por quê:          a Receita só entrega o XML completo depois da ciência, e a ciência não confirma nem nega a compra.
-- Exceções:         sem `openssl` no servidor, ou a Receita recusando, a ciência fica pendente e a nota diz por quê (não trava nada); a pendente é tentada de novo a cada consulta seguinte.
+- Exceções:         sem `openssl` no servidor, ou a Receita recusando, a ciência fica pendente e a nota diz por quê (não trava nada); a que falhou por falta de resposta ou de assinatura é tentada de novo a cada consulta seguinte — a que a Receita recusou (nota cancelada) não é reenviada.
 - Teste que trava:  `teste_dfe.js` (sem a ciência, reprova 1; o evento conferido contra a chave pública do certificado; a ciência que falhou sem nova tentativa, 1)
 - Status:           em código desde 07/11/2026. ⚠️ A assinatura foi conferida pela chave pública, não pela Receita.
 - História:         fase 11.
 
 ### R-CMP-55 · A nota baixada vira a nota da fase 8, sem adivinhar
-- Regra:            o XML completo (`procNFe`) fica guardado em `ANEXOS_COMPRAS/dfe/` e entra pelo leitor da fase 8 (`nota_xml.js`, origem `dfe`). Lança sozinho **só** quando o emitente tem UM pedido, ele está **a caminho** (comprado ou parcial — o já recebido não recebe nota sozinho) e todo item casa; com dois pedidos, pedido já recebido, ou item que não casa, fica "escolha o pedido e os itens" na tela (e o motivo do lançamento que não deu fica escrito); sem pedido do emitente, **"nota sem pedido"** — e isso é linha na central de Pendências (`nota.lancar`). A nota sem pedido é olhada de novo a cada consulta (o pedido pode aparecer), e quem tem `nota.lancar` pode marcá-la **"ciente, sem pedido"**, com motivo, quem e quando — aí ela sai das Pendências.
+- Regra:            o XML completo (`procNFe`) fica guardado em `ANEXOS_COMPRAS/dfe/` e entra pelo leitor da fase 8 (`nota_xml.js`, origem `dfe`). Lança sozinho **só** quando o emitente tem UM pedido, ele está **a caminho** (comprado ou parcial — o já recebido não recebe nota sozinho) e todo item casa; com dois pedidos, pedido já recebido, ou item que não casa, fica "escolha o pedido e os itens" na tela (e o motivo do lançamento que não deu fica escrito); sem pedido do emitente, **"nota sem pedido"** — e isso é linha na central de Pendências (`nota.lancar`). A nota sem pedido é olhada de novo a cada consulta (o pedido pode aparecer), e quem tem `nota.lancar` pode marcá-la **"ciente, sem pedido"**, com motivo, quem e quando — aí ela sai das Pendências. A mesma nota já digitada à mão (mesmo número e emitente) não é lançada de novo: fica para escolher, dizendo qual.
 - Por quê:          a regra da fase 8 (R-CMP-08): o que se adivinha é onde o erro se esconde.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_dfe.js` (dois pedidos adivinhados, reprova 2; o pedido já recebido, 1; o "ciente" sem motivo, 1; a reavaliação, 1)

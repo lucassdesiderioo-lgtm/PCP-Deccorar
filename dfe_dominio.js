@@ -137,24 +137,40 @@ async function consultar(db, opcoes){
       if(d.erro) throw new Error(d.erro);
       const x = await guardar(db, d, cert, transporte, opcoes);
       r.documentos++; if(x.ciencia) r.ciencias++; if(x.lancada) r.lancadas++;
-    }catch(e){
-      r.erros++;
-      db.prepare("INSERT OR IGNORE INTO dfe_documento (nsu, tipo, situacao, erro) VALUES (?, 'erro', 'erro', ?)").run(d.nsu, String(e && e.message || e).slice(0, 500));
-      db.prepare("UPDATE dfe_documento SET erro=COALESCE(erro, ?) WHERE nsu=?").run(String(e && e.message || e).slice(0, 500), d.nsu);
-    }
+    }catch(e){ r.erros++; gravarErro(db, d, e); }
+  }
+  /* O DOCUMENTO QUE NAO ENTROU E TENTADO DE NOVO (rodada 2 da revisao): o NSU ja
+     passou, entao a Receita nao o manda mais — o conteudo guardado na linha de
+     erro e o que sobra. Ate 10 tentativas; depois fica na Pendencia, com o motivo. */
+  for(const e of db.prepare("SELECT * FROM dfe_documento WHERE situacao='erro' AND bruto IS NOT NULL AND COALESCE(tentativas,0) < 10 ORDER BY id LIMIT 20").all()){
+    if(docs.some(d => d.nsu === e.nsu)) continue;
+    db.prepare('DELETE FROM dfe_documento WHERE id=?').run(e.id);
+    const d = { nsu:e.nsu, schema:e.schema_doc, xml:e.bruto };
+    try{ const x = await guardar(db, d, cert, transporte, opcoes); r.documentos++; if(x.lancada) r.lancadas++; }
+    catch(x){ gravarErro(db, d, x, (e.tentativas || 0) + 1); }
   }
   db.prepare('UPDATE dfe_controle SET ultimo_nsu=COALESCE(?, ultimo_nsu), ultima_consulta=?, proxima_consulta=?, ultimo_erro=?, ultimo_cstat=? WHERE id=1')
     .run(ult || null, agora(), prox, (cStat === '137' || cStat === '138') ? (r.erros ? r.erros + ' documento(s) da Receita não entraram: veja a lista' : null) : (cStat + ' ' + (xMotivo || '')), cStat || null);
   /* a ciencia que falhou e tentada de novo, e a nota sem pedido e olhada de
      novo: o pedido pode ter aparecido (revisao do PR #305) */
   const desteLote = new Set(docs.map(d => d.nsu));
-  const sem = db.prepare("SELECT * FROM dfe_documento WHERE tipo='resumo' AND ciencia_em IS NULL AND ciencia_erro IS NOT NULL ORDER BY id LIMIT 20").all()
+  /* so a falha PASSAGEIRA (a Receita nao respondeu, ou o openssl nao assinou):
+     a que a Receita recusou (nota cancelada...) nao e reenviada */
+  const sem = db.prepare("SELECT * FROM dfe_documento WHERE tipo='resumo' AND ciencia_em IS NULL AND (ciencia_erro LIKE 'a Receita não respondeu%' OR ciencia_erro LIKE 'não consegui assinar%') ORDER BY id LIMIT 20").all()
     .filter(d => !desteLote.has(d.nsu));
   for(const doc of sem){ try{ if(await ciencia(db, doc, cert, transporte)) r.ciencias++; }catch(e){} }
   r.lancadas += reavaliar(db);
   return r;
 }
 
+/* A linha de erro guarda o documento como veio (o NSU ja passou: a Receita nao
+   o manda de novo) e o motivo. */
+function gravarErro(db, d, e, tentativas){
+  const msg = String(e && e.message || e).slice(0, 500);
+  db.prepare("INSERT OR IGNORE INTO dfe_documento (nsu, tipo, situacao) VALUES (?, 'erro', 'erro')").run(d.nsu);
+  db.prepare("UPDATE dfe_documento SET erro=?, bruto=COALESCE(bruto, ?), schema_doc=COALESCE(schema_doc, ?), tentativas=COALESCE(?, tentativas, 0) WHERE nsu=?")
+    .run(msg, d.xml || null, d.schema || null, tentativas == null ? null : tentativas, d.nsu);
+}
 async function guardar(db, d, cert, transporte, opcoes){
   const out = {};
   if(/^resNFe/.test(d.schema)){
@@ -205,6 +221,14 @@ function ligar(db, chave){
   const peds = X.pedidosDoEmitente(db, nota.emitente_cnpj);
   if(!peds.length){ db.prepare("UPDATE dfe_documento SET situacao='sem_pedido' WHERE id=?").run(doc.id); return false; }
   const abertos = X.pedidosAbertosDoEmitente(db, nota.emitente_cnpj);
+  /* A MESMA NOTA DIGITADA A MAO NAO E LANCADA DE NOVO (rodada 2 da revisao): a
+     de mao nao tem chave, entao confere-se o numero e o emitente. */
+  const dig = s => String(s || '').replace(/\D/g, '');
+  const mao = nota.numero ? db.prepare('SELECT id, emitente_cnpj FROM nota_compra WHERE numero=?').all(String(nota.numero)).find(n => dig(n.emitente_cnpj) === dig(nota.emitente_cnpj)) : null;
+  if(mao){
+    db.prepare("UPDATE dfe_documento SET situacao='escolher', erro=? WHERE id=?").run('já existe a nota nº ' + nota.numero + ' deste fornecedor lançada à mão (nota #' + mao.id + '): confira antes de lançar esta', doc.id);
+    return false;
+  }
   if(abertos.length === 1 && peds.length === abertos.length){
     const c = X.casar(db, abertos[0].id, nota);
     if(c.every(x => x.pedido_item_id)){
@@ -236,7 +260,7 @@ function reavaliar(db){
 function ciente(db, id, b, quem){
   const doc = db.prepare('SELECT * FROM dfe_documento WHERE id=?').get(+id);
   if(!doc) throw new X.Recusa(404, 'nota da Receita não encontrada');
-  if(doc.situacao !== 'sem_pedido') throw new X.Recusa(409, 'esta nota não está como "sem pedido" (' + doc.situacao + ')');
+  if(doc.situacao !== 'sem_pedido' && doc.situacao !== 'erro') throw new X.Recusa(409, 'esta nota não está como "sem pedido" nem "não entrou" (' + doc.situacao + ')');
   const motivo = String((b && b.motivo) || '').trim();
   if(!motivo) throw new X.Recusa(400, 'diga por que esta nota não tem pedido — o motivo fica gravado');
   db.prepare("UPDATE dfe_documento SET situacao='ciente', ciente_motivo=?, ciente_por=?, ciente_por_id=?, ciente_em=? WHERE id=?")
@@ -262,7 +286,7 @@ function lerXml(db, id){
   return fs.readFileSync(path.join(CAMINHOS.ANEXOS_COMPRAS, 'dfe', path.basename(doc.xml)), 'utf8');
 }
 function pendencias(db){
-  const n = db.prepare("SELECT COUNT(*) n, MIN(criado_em) d FROM dfe_documento WHERE situacao='sem_pedido'").get();
+  const n = db.prepare("SELECT COUNT(*) n, MIN(criado_em) d FROM dfe_documento WHERE situacao IN ('sem_pedido','erro')").get();
   return { n:n.n, desde:n.d };
 }
 /* O RELOGIO: de tempos em tempos (o agendador do dfe_route chama), consulta

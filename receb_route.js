@@ -114,6 +114,12 @@ module.exports = function(app, db){
     const p=db.prepare('SELECT numero,status FROM pedido_compra WHERE id=?').get(req.params.id);
     if(!p) return res.status(404).json({erro:'pedido não encontrado'});
     if(p.status!=='parcial') return res.status(400).json({erro:'só pedido parcial se fecha assim'});
+    /* Com entrega RETIDA esperando decisao, o pedido nao fecha (revisao do PR
+       #305): o que esta retido ainda pode entrar, e o custo e a falta do
+       fechamento sairiam errados. O receber ja recusa o mesmo. */
+    if(db.prepare(`SELECT 1 FROM recebimento_item ri JOIN recebimento r ON r.id=ri.recebimento_id
+        WHERE r.pedido_id=? AND ri.faixa='retido' AND ri.decisao IS NULL`).get(req.params.id))
+      return res.status(409).json({erro:'este pedido tem entrega retida esperando decisão (501, aba Recebimento retido): decida antes de fechar'});
     db.transaction(()=>{
       db.prepare(`UPDATE pedido_compra SET status='recebido',
         fechado_em=datetime('now','localtime'), motivo_fecho=? WHERE id=?`).run(motivo,req.params.id);

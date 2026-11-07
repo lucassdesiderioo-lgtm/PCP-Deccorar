@@ -172,15 +172,21 @@ eq('`lancar` continua SOMANDO ao saldo de agora (7+2)', saldo('BK120120BEGE'), 9
 
 console.log('\n=== 2. A MESMA REGRA VALE PARA MATERIAL ===\n');
 
-/* A porta de LANÇAR material saiu (revisão do PR #305: a contagem de material é
-   só pela 504). A sessão antiga, de antes do deploy, ainda é aprovada daqui. */
+/* A contagem antiga de material saiu INTEIRA (revisão do PR #305, decisão do
+   dono): nem lançar, nem ajustar, nem aprovar o pendente antigo mexem no saldo
+   do material — material se conta só na 504. O pendente antigo se rejeita. */
 db.prepare("INSERT INTO contagem (codigo,sessao,tipo,componente_id,qtd) VALUES ('Tubo 32 mm','s4','componente',1,8)").run();
-chamar('POST','/api/contagem/ajustar',{sessao:'s4',itens:[{tipo:'componente',componente_id:1,codigo:'Tubo 32 mm'}]},{id:2,nome:'Joao'});
-pend = pendentes();
-eq('material tambem guarda o saldo do momento', pend[0].sistema_era, 10);
-db.prepare("UPDATE componente SET estoque=estoque+2 WHERE codigo='TUBO32'").run();
-chamar('POST','/api/contagem/pendentes/aprovar',{ids:[pend[0].id]},{id:1,nome:'Ana'});
-eq('material: aprovar aplica a diferenca, nao o numero contado', material(), 10);
+const antesMat = material();
+let r2 = chamar('POST','/api/contagem/ajustar',{sessao:'s4',itens:[{tipo:'componente',componente_id:1,codigo:'Tubo 32 mm'}]},{id:2,nome:'Joao'});
+eq('ajustar material pela porta antiga é recusado', r2.status, 410);
+r2 = chamar('POST','/api/contagem/lancar',{sessao:'s4',itens:[{tipo:'componente',componente_id:1,codigo:'Tubo 32 mm'}]},{id:2,nome:'Joao'});
+eq('lançar (somar) material pela porta antiga é recusado', r2.status, 410);
+const pidAnt = db.prepare("INSERT INTO contagem_pendente (sessao,codigo,contado,sistema_era,operacao,contado_por,tipo,componente_id) VALUES ('s4','Tubo 32 mm',8,10,'ajustar','Joao','componente',1)").run().lastInsertRowid;
+r2 = chamar('POST','/api/contagem/pendentes/aprovar',{ids:[pidAnt]},{id:1,nome:'Ana'});
+eq('aprovar o pendente antigo de material é recusado (conte de novo na 504)', r2.status, 410);
+eq('   e o saldo do material não mexeu', material(), antesMat);
+r2 = chamar('POST','/api/contagem/pendentes/rejeitar',{ids:[pidAnt]},{id:1,nome:'Ana'});
+ok('   o pendente antigo se rejeita (sai da lista)', r2.status === 200 && !db.prepare('SELECT 1 FROM contagem_pendente WHERE id=? AND aprovado=0',).get(pidAnt), JSON.stringify(r2.body));
 
 console.log('\n=== 4. TODA CONTAGEM DE PECA DEIXA RASTRO EM `ajuste_estoque` ===\n');
 
@@ -208,8 +214,8 @@ console.log('\n=== 6. MATERIAL NAO ENTRA EM `ajuste_estoque` ===\n');
    le `ajuste_estoque` por SKU, passaria a mostrar tubo. */
 eq('a contagem de material nao gravou em ajuste_estoque',
    db.prepare("SELECT COUNT(*) n FROM ajuste_estoque WHERE codigo LIKE 'Tubo%'").get().n, 0);
-ok('e gravou no livro do material',
-   db.prepare("SELECT COUNT(*) n FROM movimento_componente WHERE motivo='contagem'").get().n > 0);
+ok('e nem no livro do material (a porta antiga não aplica mais)',
+   db.prepare("SELECT COUNT(*) n FROM movimento_componente WHERE motivo='contagem'").get().n === 0);
 
 console.log('\n=== 7. A CONTAGEM APROVADA FICA DE PE (a idade le dali) ===\n');
 
@@ -219,15 +225,6 @@ console.log('\n=== 7. A CONTAGEM APROVADA FICA DE PE (a idade le dali) ===\n');
 const reg = db.prepare("SELECT * FROM contagem_pendente WHERE codigo='BK140140BEGE' ORDER BY id").all();
 eq('a contagem pendente continua registrada depois de aprovada', reg.length, 1);
 eq('   marcada como aprovada', reg[0].aprovado, 1);
-/* O caminho DIRETO de material tambem deixa registro, ja aprovado. */
-TEM_AJUSTAR = true;
-db.prepare("INSERT INTO contagem (codigo,sessao,tipo,componente_id,qtd) VALUES ('Tubo 32 mm','s9','componente',1,4)").run();
-chamar('POST','/api/contagem/ajustar',{sessao:'s9',itens:[{tipo:'componente',componente_id:1,codigo:'Tubo 32 mm'}]},{id:1,nome:'Ana'});
-const direto = db.prepare("SELECT * FROM contagem_pendente WHERE tipo='componente' ORDER BY id").all();
-eq('o caminho DIRETO de material deixa registro', direto.length, 2);
-eq('   e ele ja nasce aprovado', direto[1].aprovado, 1);
-ok('   assinado por quem aplicou', direto[1].aprovado_por === 'Ana', 'veio: '+direto[1].aprovado_por);
-eq('   e o saldo do material e o contado', material(), 4);
 
 console.log('\n=== 8. A CONTAGEM ANTIGA DE MATERIAL SAIU (revisão do PR #305) ===\n');
 /* Decisão do dono: a contagem de material é só pela 504, às cegas. A porta

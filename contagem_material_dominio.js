@@ -191,12 +191,16 @@ function pendencias(db){
 function aEtiquetar(db){
   return db.prepare(`SELECT c.id, c.nome, c.unidade, c.almoxarifado_id, a.nome almoxarifado FROM componente c
     LEFT JOIN almoxarifado a ON a.id=c.almoxarifado_id
-    WHERE c.ativo=1 AND c.modo_saldo='quantidade' AND c.familia IS NOT NULL AND COALESCE(c.estoque,0) > 0 ORDER BY c.nome`).all();
+    WHERE c.ativo=1 AND c.modo_saldo='quantidade' AND c.familia IS NOT NULL AND c.sm_tecido_id IS NULL AND COALESCE(c.estoque,0) > 0 ORDER BY c.nome`).all();
 }
 function etiquetar(db, b, quem){
   const c = db.prepare('SELECT * FROM componente WHERE id=?').get(+(b && b.componente_id));
   if(!c || !c.ativo) throw new Recusa(404, 'material não encontrado');
   if(c.modo_saldo !== 'quantidade') throw new Recusa(400, c.nome + ' já não é por quantidade: não há o que etiquetar');
+  /* so o TECIDO de antes (com familia), e nunca o do sob medida: aquele vira
+     rolo la, nao volume aqui (R-CMP-49) — rodada 2 da revisao */
+  if(!c.familia) throw new Recusa(400, c.nome + ' não é tecido: o etiquetar da 504 é só para o tecido que já tinha saldo');
+  if(c.sm_tecido_id) throw new Recusa(400, c.nome + ' é tecido do sob medida: o rolo dele é de lá, não vira volume no PCP');
   const vs = Array.isArray(b.volumes) ? b.volumes : [];
   if(!vs.length) throw new Recusa(400, 'registre cada rolo, com a metragem da etiqueta');
   const volumes = vs.map((v, k) => { const m = parseFloat(String(v && v.metragem).replace(',', '.'));

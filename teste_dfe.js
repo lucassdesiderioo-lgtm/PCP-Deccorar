@@ -192,10 +192,61 @@ const transporte = async (cert, url, corpo) => {
   await DFE.consultar(db, { transporte });
   const dX = db.prepare('SELECT * FROM dfe_documento WHERE chave=?').get(CHX);
   ok('outra nota sem pedido', dX && dX.situacao === 'sem_pedido', () => JSON.stringify(dX));
+  const LP = require('./pendencias_dominio').LINHAS.find(l => l.chave === 'nota_sem_pedido'), antesP = LP.contar(db).n;
   r = await post('/api/dfe/' + dX.id + '/ciente', { motivo:'comprado no balcao, sem pedido' }, AG);
   const dX2 = db.prepare('SELECT * FROM dfe_documento WHERE id=?').get(dX.id);
   ok('"ciente" com motivo: grava quem e o motivo, e sai das Pendencias', r.status === 200 && dX2.situacao === 'ciente' && dX2.ciente_motivo && dX2.ciente_por === 'Lucas'
-     && require('./pendencias_dominio').LINHAS.find(l => l.chave === 'nota_sem_pedido').contar(db).n === 0, () => JSON.stringify(r) + JSON.stringify(dX2));
+     && LP.contar(db).n === antesP - 1, () => JSON.stringify(r) + JSON.stringify(dX2));
+  const dLixo = db.prepare("SELECT id FROM dfe_documento WHERE nsu='000000000000007'").get();
+  r = await post('/api/dfe/' + dLixo.id + '/ciente', { motivo:'documento ilegível, conferido no portal da Receita' }, AG);
+  ok('o documento que nao entrou tambem sai das Pendencias com "ciente" e motivo', r.status === 200 && LP.contar(db).n === antesP - 2, () => JSON.stringify(r) + LP.contar(db).n);
+
+  secao('rodada 2: o documento que falhou por erro passageiro e reprocessado, e aparece nas Pendencias');
+  const CH11 = '43261166777888000199550010000001111000001111';
+  const XML_11 = XML_FORA.replace(new RegExp(CH_FORA, 'g'), CH11).replace('<emit><CNPJ>99888777000166</CNPJ>', '<emit><CNPJ>66777888000199</CNPJ>');
+  const fsMod = require('fs'), wf = fsMod.writeFileSync;
+  let falhar = true;
+  fsMod.writeFileSync = function(f){ if(falhar && /dfe[\\/]\d{44}\.xml$/.test(String(f))){ falhar = false; throw new Error('disco cheio de mentira'); } return wf.apply(this, arguments); };
+  db.prepare('UPDATE dfe_controle SET proxima_consulta=NULL WHERE id=1').run();
+  fila = [ret('138', '000000000000011', '000000000000011', [['000000000000011', 'procNFe_v4.00.xsd', XML_11]])];
+  await DFE.consultar(db, { transporte });
+  ok('o disco falhou: o documento ficou como erro', db.prepare("SELECT situacao FROM dfe_documento WHERE nsu='000000000000011'").get().situacao === 'erro');
+  ok('e o erro aparece na central de Pendencias (nao some calado)', require('./pendencias_dominio').LINHAS.find(l => l.chave === 'nota_sem_pedido').contar(db).n >= 1);
+  db.prepare('UPDATE dfe_controle SET proxima_consulta=NULL WHERE id=1').run();
+  fila = [ret('138', '000000000000011', '000000000000011', [])];
+  await DFE.consultar(db, { transporte });
+  fsMod.writeFileSync = wf;
+  const d11 = db.prepare('SELECT * FROM dfe_documento WHERE chave=?').get(CH11);
+  ok('na consulta seguinte ele e reprocessado e entra (o NSU ja tinha passado)', d11 && d11.situacao === 'sem_pedido' && d11.xml, () => JSON.stringify(db.prepare("SELECT * FROM dfe_documento WHERE nsu='000000000000011'").get()));
+
+  secao('rodada 2: a nota ja lancada a mao nao e lancada de novo pela reavaliacao');
+  const fZ = (await post('/api/fornecedores', { nome:'Loja 66', cnpj:'66.777.888/0001-99' }, AG)).corpo.id;
+  const ofZT = (await post('/api/ofertas', { fornecedor_id:fZ, componente_id:tubo, embalagem:'barra', fator:1, preco:8, codigo_fornec:'TB-38-6000' }, AG)).corpo.id;
+  const ofZB = (await post('/api/ofertas', { fornecedor_id:fZ, componente_id:base, embalagem:'un', fator:1, preco:5 }, AG)).corpo.id;
+  const pZ = (await post('/api/pedidos', { itens:[{ oferta_id:ofZT, necessidade:600 }, { oferta_id:ofZB, necessidade:100 }] }, AG)).corpo.pedidos[0].id;
+  await post('/api/pedidos/' + pZ + '/comprar', { canal:'direto', numero_externo:'OC-Z', comprado_em:'2026-11-03' }, AG);
+  const nNF = (XML_11.match(/<nNF>(\d+)<\/nNF>/) || [])[1];
+  const itZ = db.prepare('SELECT id FROM pedido_item WHERE pedido_id=? ORDER BY id').get(pZ).id;
+  r = await post('/api/notas', { pedido_id:pZ, numero:nNF, emitente_cnpj:'66.777.888/0001-99', emissao:'2026-11-05', itens:[{ pedido_item_id:itZ, quantidade:600, valor_produto:4800 }] }, AG);
+  ok('a nota foi digitada a mao', r.status === 200, () => JSON.stringify(r));
+  db.prepare('UPDATE dfe_controle SET proxima_consulta=NULL WHERE id=1').run();
+  fila = [ret('138', '000000000000011', '000000000000011', [])];
+  await DFE.consultar(db, { transporte });
+  ok('a reavaliacao nao lanca a mesma nota de novo (fica para escolher, dizendo por que)', db.prepare('SELECT COUNT(*) n FROM nota_compra WHERE pedido_id=?').get(pZ).n === 1
+     && db.prepare('SELECT situacao FROM dfe_documento WHERE chave=?').get(CH11).situacao === 'escolher', () => db.prepare('SELECT COUNT(*) n FROM nota_compra WHERE pedido_id=?').get(pZ).n + ' ' + JSON.stringify(db.prepare('SELECT situacao, erro FROM dfe_documento WHERE chave=?').get(CH11)));
+
+  secao('rodada 2: a ciencia que a Receita RECUSOU nao e reenviada a cada consulta');
+  const CH12 = '43261177888999000111550010000001212000001212';
+  const recusa = '<retEnvEvento><cStat>128</cStat><retEvento><infEvento><cStat>650</cStat><xMotivo>Evento recusado: NF-e cancelada</xMotivo></infEvento></retEvento></retEnvEvento>';
+  let nEv = 0;
+  const transp3 = async (cert, url) => { if(url === DFE.URL_EVENTO){ nEv++; return recusa; } return fila.shift(); };
+  db.prepare('UPDATE dfe_controle SET proxima_consulta=NULL WHERE id=1').run();
+  fila = [ret('138', '000000000000012', '000000000000012', [['000000000000012', 'resNFe_v1.01.xsd', resNFe(CH12, '77888999000111', 'CANCELADA', '1.00')]])];
+  await DFE.consultar(db, { transporte:transp3 });
+  db.prepare('UPDATE dfe_controle SET proxima_consulta=NULL WHERE id=1').run();
+  fila = [ret('138', '000000000000012', '000000000000012', [])];
+  await DFE.consultar(db, { transporte:transp3 });
+  ok('recusada uma vez, nao volta a ser enviada', nEv === 1, () => 'enviada ' + nEv + ' vezes');
 
   secao('revisao do PR #305: 138 sem mais nada a ler tambem espera a hora');
   ok('ultNSU = maxNSU: a proxima consulta fica para daqui a uma hora ou mais', (() => { const c = DFE.controle(db); return (Date.parse(String(c.proxima_consulta).replace(' ', 'T')) - Date.now()) / 60000 >= 59; })(), () => DFE.controle(db).proxima_consulta);
@@ -204,14 +255,14 @@ const transporte = async (cert, url, corpo) => {
   db.prepare('UPDATE dfe_controle SET proxima_consulta=NULL WHERE id=1').run();
   /* intervalo de 5 min: o 137 tem que esperar a hora mesmo assim */
   db.prepare("INSERT INTO config (chave,valor) VALUES ('dfe_intervalo_min','5') ON CONFLICT(chave) DO UPDATE SET valor='5'").run();
-  fila = [ret('137', '000000000000010', '000000000000010', [])];
+  fila = [ret('137', '000000000000012', '000000000000012', [])];
   r = await DFE.consultar(db, { transporte });
   const ctl = DFE.controle(db);
   const espera = ctl.proxima_consulta ? (Date.parse(String(ctl.proxima_consulta).replace(' ', 'T')) - Date.now()) / 60000 : 0;
   ok('cStat 137: a proxima consulta fica para daqui a uma hora (ou mais)', espera >= 59, () => ctl.proxima_consulta);
-  ok('o NSU continua o mesmo', ctl.ultimo_nsu === '000000000000010', () => ctl.ultimo_nsu);
+  ok('o NSU continua o mesmo', ctl.ultimo_nsu === '000000000000012', () => ctl.ultimo_nsu);
   let chamou = false;
-  r = await DFE.consultar(db, { transporte:async () => { chamou = true; return ret('137', '000000000000010', '000000000000010', []); } });
+  r = await DFE.consultar(db, { transporte:async () => { chamou = true; return ret('137', '000000000000012', '000000000000012', []); } });
   ok('depois do 137, o "consultar agora" tambem espera a hora (e diz ate quando)', !r.consultou && !chamou && /espera|hora|depois/i.test(r.motivo || ''), () => JSON.stringify(r));
   fim();
 })().catch(e => { console.error(e); process.exit(1); });

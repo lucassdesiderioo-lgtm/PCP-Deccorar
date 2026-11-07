@@ -116,7 +116,7 @@ module.exports = function(app, db){
      nota ou vê custo; os outros recebem o pedido sem dinheiro nem quantidade. */
   const INTEIRO = ['compras.ver','pedido.criar','pedido.aprovar','pedido.pagar','nota.lancar','custo.ver'];
   const veInteiro = req => INTEIRO.some(c => { try{ return !!app.locals.acesso.podePermissao(req.usuario, c); }catch(e){ return false; } });
-  const CEGO = /^(valor|preco|desembolso|frete|desconto|custo|qtd_|alcada)/;
+  const CEGO = /^(valor|preco|desembolso|frete|desconto|custo|qtd_|alcada|fator)/;   // o fator da compra por kg da o peso esperado (revisao do PR #305)
   function podar(o){
     if(Array.isArray(o)) return o.map(podar);
     if(!o || typeof o !== 'object') return o;

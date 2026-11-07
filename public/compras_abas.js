@@ -665,7 +665,7 @@
           + '<td><span class="cmpChip ' + (d.situacao === 'sem_pedido' || d.situacao === 'erro' ? 'vm' : d.situacao === 'lancada' ? 'vd' : 'am') + '">' + esc(SIT[d.situacao] || d.situacao) + '</span>'
           + (d.erro ? '<div class="sub">' + esc(d.erro) + '</div>' : '') + (d.ciente_motivo ? '<div class="sub">' + esc(d.ciente_motivo) + ' — ' + esc(d.ciente_por || '') + '</div>' : '') + '</td>'
           + '<td>' + (d.situacao === 'escolher' || d.situacao === 'sem_pedido' ? '<button class="ghost" data-dfe="' + d.id + '">Abrir</button>' : '')
-          + (d.situacao === 'sem_pedido' && pode('nota.lancar') ? ' <button class="ghost" data-dfe-ciente="' + d.id + '">Ciente, sem pedido</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div>'
+          + ((d.situacao === 'sem_pedido' || d.situacao === 'erro') && pode('nota.lancar') ? ' <button class="ghost" data-dfe-ciente="' + d.id + '">Ciente, sem pedido</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div>'
         : '<div class="sub">Nenhuma nota baixada ainda.</div>') + '<div id="dfeDet"></div></div>';
     box.onclick = async function(ev){
       /* a nota sem pedido: quem lanca nota diz por que ela nao tem pedido, e ela

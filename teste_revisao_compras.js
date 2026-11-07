@@ -18,7 +18,7 @@ const SUP  = { id:3, nome:'Sup', permissoes:['compras.ver'] };
 const NOTA = { id:4, nome:'Nina', permissoes:['nota.lancar','pedido.ver'] };
 
 function chaves(o, acc){ acc = acc || new Set(); if(Array.isArray(o)) o.forEach(x => chaves(x, acc)); else if(o && typeof o === 'object') for(const k of Object.keys(o)){ acc.add(k); chaves(o[k], acc); } return acc; }
-const DINHEIRO_OU_ESPERADO = /^(valor|preco|desembolso|frete|desconto|custo|qtd_|alcada)/;
+const DINHEIRO_OU_ESPERADO = /^(valor|preco|desembolso|frete|desconto|custo|qtd_|alcada|fator)/;   // o fator da compra por kg da o peso esperado
 
 (async () => {
   db.exec('CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY, nome TEXT, pin_hash TEXT, salt TEXT, areas TEXT, ativo INTEGER DEFAULT 1)');
@@ -123,6 +123,10 @@ const DINHEIRO_OU_ESPERADO = /^(valor|preco|desembolso|frete|desconto|custo|qtd_
      && db.prepare("SELECT usuario_nome FROM movimento_componente WHERE componente_id=? AND motivo='contagem' ORDER BY id DESC").get(tec).usuario_nome === 'Aprova');
   r = await post('/api/contagem-material/etiquetar', { componente_id:tec, volumes:[{ metragem:10 }] }, APR);
   ok('etiquetar de novo e recusado (ja e por volume)', r.status === 400);
+  const tuboV = (await post('/api/componentes', { nome:'Tubo 70 velho', unidade:'m', modo_saldo:'quantidade', almoxarifado_id:alm }, AG)).corpo.id;
+  require('./componente_dominio').movimentar(db, { componente_id:tuboV, delta:30, motivo:'ajuste', referencia:'saldo de antes' });
+  r = await post('/api/contagem-material/etiquetar', { componente_id:tuboV, volumes:[{ metragem:6 }] }, APR);
+  ok('rodada 2: material que nao e tecido nao se etiqueta por aqui', r.status === 400 && db.prepare('SELECT modo_saldo FROM componente WHERE id=?').get(tuboV).modo_saldo === 'quantidade', () => JSON.stringify(r));
 
   secao('o modo teste cobre as tabelas novas da Compras (o que nasce em teste sai no "apagar tudo")');
   r = await get('/api/teste', AG);
@@ -157,6 +161,45 @@ const DINHEIRO_OU_ESPERADO = /^(valor|preco|desembolso|frete|desconto|custo|qtd_
   const iX = db.prepare('SELECT id FROM pedido_item WHERE pedido_id=?').get(pX).id;
   r = await post('/api/recebimento', { pedido_id:pX, itens:[{ pedido_item_id:iX, qtd_contada:610, peso_1_kg:0.656, peso_10_kg:6.56 }] }, AG);
   ok('a entrega que passa do declarado (610 de 600) RETEM na hora', r.corpo.retidos === 1, () => JSON.stringify(r.corpo));
+
+  secao('rodada 2: fechar com entrega retida esperando decisao e recusado');
+  const pR2 = await pedir([{ oferta_id:of2, necessidade:600, unidade_compra:'kg', qtd_compra:400, preco_unid_compra:12.5, qtd_declarada:600 }]);
+  const iR2 = db.prepare('SELECT id FROM pedido_item WHERE pedido_id=?').get(pR2).id;
+  await post('/api/recebimento', { pedido_id:pR2, itens:[{ pedido_item_id:iR2, qtd_contada:300, peso_1_kg:0.667, peso_10_kg:6.67 }] }, AG);
+  r = await post('/api/recebimento', { pedido_id:pR2, itens:[{ pedido_item_id:iR2, qtd_contada:310, peso_1_kg:0.667, peso_10_kg:6.67 }] }, AG);
+  ok('a segunda entrega passou do declarado: retida', r.corpo.retidos === 1, () => JSON.stringify(r.corpo));
+  const cAntes = sd().custo_medio;
+  r = await post('/api/pedidos/' + pR2 + '/fechar', { motivo:'restante chegou' }, AG);
+  ok('fechar com o retido aberto e recusado, dizendo para decidir antes', r.status === 409 && /retid/i.test(r.corpo.erro || ''), () => JSON.stringify(r));
+  ok('e o custo medio nao mexeu', Math.abs(sd().custo_medio - cAntes) < 1e-9);
+
+  secao('rodada 2: a nota em unidade da casa nao divide pelo fator da embalagem');
+  const cmd = (await post('/api/componentes', { nome:'Comando 38', unidade:'un', modo_saldo:'quantidade', almoxarifado_id:alm }, AG)).corpo.id;
+  const ofCmd = (await post('/api/ofertas', { fornecedor_id:forn, componente_id:cmd, embalagem:'caixa 10', fator:10, preco:50 }, AG)).corpo.id;
+  const pCmd = await pedir([{ oferta_id:ofCmd, necessidade:20 }]);
+  const iCmd = db.prepare('SELECT id FROM pedido_item WHERE pedido_id=?').get(pCmd).id;
+  await post('/api/recebimento', { pedido_id:pCmd, itens:[{ pedido_item_id:iCmd, qtd_contada:10 }] }, AG);
+  const cc = () => db.prepare('SELECT custo_medio FROM componente WHERE id=?').get(cmd).custo_medio;
+  ok('recebido pela caixa: R$ 5 o comando', Math.abs(cc() - 5) < 1e-6, () => cc());
+  r = await post('/api/notas', { pedido_id:pCmd, numero:'7703', emissao:'2026-11-07', itens:[{ pedido_item_id:iCmd, quantidade:20, valor_produto:100 }] }, AG);
+  ok('a nota diz "20 un por R$ 100": continua R$ 5 (e nao R$ 0,50)', r.status === 200 && Math.abs(cc() - 5) < 1e-6, () => r.status + ' ' + cc());
+  const pCx = await pedir([{ oferta_id:ofCmd, necessidade:20 }]);
+  const iCx = db.prepare('SELECT id FROM pedido_item WHERE pedido_id=?').get(pCx).id;
+  await post('/api/recebimento', { pedido_id:pCx, itens:[{ pedido_item_id:iCx, qtd_contada:10 }] }, AG);
+  r = await post('/api/notas', { pedido_id:pCx, numero:'7704', emissao:'2026-11-07', itens:[{ pedido_item_id:iCx, quantidade:2, valor_produto:120 }] }, AG);
+  ok('a nota diz "2 caixas por R$ 120": cada comando custa R$ 6 (pelo fator)', r.status === 200
+     && Math.abs(db.prepare('SELECT custo_unit FROM recebimento_item WHERE pedido_item_id=?').get(iCx).custo_unit - 6) < 1e-6, () => db.prepare('SELECT custo_unit FROM recebimento_item WHERE pedido_item_id=?').get(iCx).custo_unit);
+
+  secao('rodada 2: com nota e "fornecedor nao vai entregar", o kg inteiro faz o custo virar valor / contado');
+  const t3 = (await post('/api/componentes', { nome:'Tubo 63', unidade:'un', modo_saldo:'quantidade', almoxarifado_id:alm }, AG)).corpo.id;
+  const of3 = (await post('/api/ofertas', { fornecedor_id:forn, componente_id:t3, embalagem:'barra', fator:1, preco:8 }, AG)).corpo.id;
+  const p3 = await pedir([{ oferta_id:of3, necessidade:600, unidade_compra:'kg', qtd_compra:400, preco_unid_compra:12.5, qtd_declarada:600 }]);
+  const i3 = db.prepare('SELECT id FROM pedido_item WHERE pedido_id=?').get(p3).id;
+  await post('/api/recebimento', { pedido_id:p3, itens:[{ pedido_item_id:i3, qtd_contada:590, peso_1_kg:0.678, peso_10_kg:6.78 }] }, AG);
+  await post('/api/notas', { pedido_id:p3, numero:'7705', emissao:'2026-11-07', itens:[{ pedido_item_id:i3, quantidade:400, valor_produto:5000 }] }, AG);
+  r = await post('/api/pedidos/' + p3 + '/fechar', { motivo:'fornecedor não vai entregar' }, AG);
+  const c3 = db.prepare('SELECT custo_medio FROM componente WHERE id=?').get(t3).custo_medio;
+  ok('custo = R$ 5.000 / 590 (R-CMP-34), e nao / 600', r.status === 200 && Math.abs(c3 - 5000 / 590) < 1e-4, () => r.status + ' ' + c3);
 
   fim();
 })().catch(e => { console.error(e); process.exit(1); });

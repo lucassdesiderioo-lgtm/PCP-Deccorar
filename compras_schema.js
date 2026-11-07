@@ -312,7 +312,8 @@ function garantirSchemaCompras(db){
       nota_compra_id INTEGER, criado_em TEXT DEFAULT (datetime('now','localtime')),
       /* revisao do PR #305: o motivo do documento que nao entrou (erro) e o
          "ciente" da nota sem pedido — quem, quando e por que */
-      erro TEXT, ciente_motivo TEXT, ciente_por TEXT, ciente_por_id INTEGER, ciente_em TEXT
+      erro TEXT, ciente_motivo TEXT, ciente_por TEXT, ciente_por_id INTEGER, ciente_em TEXT,
+      bruto TEXT, schema_doc TEXT, tentativas INTEGER   -- o documento que nao entrou, para tentar de novo (rodada 2)
     );
     CREATE INDEX IF NOT EXISTS idx_dfe_chave ON dfe_documento(chave);
 
@@ -622,7 +623,7 @@ function garantirSchemaCompras(db){
     ['esperado_cadastro_kg','REAL'],['desvio_pct','REAL'],['faixa','TEXT'],['decisao','TEXT'],['decidido_por','TEXT'],
     ['decidido_por_id','INTEGER'],['decidido_em','TEXT'],['motivo_decisao','TEXT'],['fator_real','REAL'],['almoxarifado_id','INTEGER'],['custo_unit','REAL'],['volumes_json','TEXT']]);
   colunas('dfe_controle', [['ultimo_cstat','TEXT']]);
-  colunas('dfe_documento', [['erro','TEXT'],['ciente_motivo','TEXT'],['ciente_por','TEXT'],['ciente_por_id','INTEGER'],['ciente_em','TEXT']]);
+  colunas('dfe_documento', [['erro','TEXT'],['ciente_motivo','TEXT'],['ciente_por','TEXT'],['ciente_por_id','INTEGER'],['ciente_em','TEXT'],['bruto','TEXT'],['schema_doc','TEXT'],['tentativas','INTEGER']]);
   colunas('pedido_item', [['unidade_compra','TEXT'],['qtd_compra','REAL'],['preco_unid_compra','REAL'],['qtd_declarada','REAL']]);
   /* R-CMP-25: o Simples Nacional nao aproveita credito — a tabela nasce com
      isso, uma vez so. Os outros regimes o contador lanca pela tela. */
