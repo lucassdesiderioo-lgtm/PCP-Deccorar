@@ -258,7 +258,7 @@ async function verDanfe(){
   if(!fs.existsSync(v.srcfile)){ T('O PDF ja saiu do servidor (limpeza de 7 dias).'); return; }
   const pdfjs=require('pdfjs-dist/legacy/build/pdf.js');
   const {pageLines}=require('./folha');
-  const pdf=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(v.srcfile))}).promise;
+  const pdf=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(v.srcfile)), isEvalSupported:false}).promise;
   const pag=v.danfePage+1;                       // danfePage e 0-based
   if(pag<1||pag>pdf.numPages){ T('Pagina da nota fora do PDF ('+pag+' de '+pdf.numPages+').'); return; }
   const linhas=pageLines(await (await pdf.getPage(pag)).getTextContent());
@@ -284,7 +284,7 @@ async function verFolha(){
   if(!arq||!fs.existsSync(arq.srcfile)){ T('Nenhum PDF recente disponivel no servidor.'); return; }
   const pdfjs=require('pdfjs-dist/legacy/build/pdf.js');
   const {pageLines}=require('./folha');
-  const pdf=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(arq.srcfile))}).promise;
+  const pdf=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(arq.srcfile)), isEvalSupported:false}).promise;
 
   /* Guarda o texto de todas as paginas uma vez so: os tres blocos abaixo leem
      o mesmo material por angulos diferentes. */

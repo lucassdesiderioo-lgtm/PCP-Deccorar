@@ -176,7 +176,7 @@ function pageLines(tc){
   return Object.keys(rows).map(Number).sort((a,b)=>b-a).map(y=>rows[y].sort((a,b)=>a.x-b.x).map(o=>o.s).join(' ').replace(/\s+/g,' ').trim());
 }
 async function parsePdf(uint8){
-  const pdf=await pdfjs.getDocument({data:uint8}).promise;
+  const pdf=await pdfjs.getDocument({data:uint8, isEvalSupported:false}).promise;
   const N=pdf.numPages, pages=[], controlLines=[];
   for(let p=1;p<=N;p++){
     const lines=pageLines(await (await pdf.getPage(p)).getTextContent());
