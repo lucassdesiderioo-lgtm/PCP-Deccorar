@@ -288,6 +288,30 @@ function garantirSchemaCompras(db){
     );
     CREATE INDEX IF NOT EXISTS idx_cm_item_comp ON contagem_material_item(componente_id, contado_em);
 
+    /* ── O CERTIFICADO E AS NOTAS DA RECEITA (fase 11, R-CMP-51 a 55) ───────
+       O certificado: o CAMINHO do arquivo (nunca o conteudo) e a senha
+       CIFRADA. O controle da busca: o ultimo NSU lido e quando perguntar de
+       novo. O documento: cada resumo, nota completa ou evento baixado. */
+    CREATE TABLE IF NOT EXISTS certificado (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cnpj TEXT, titular TEXT, validade TEXT,
+      arquivo TEXT NOT NULL, senha_cifrada TEXT NOT NULL,
+      enviado_por TEXT, enviado_por_id INTEGER, enviado_em TEXT DEFAULT (datetime('now','localtime')),
+      ativo INTEGER DEFAULT 1, removido_em TEXT
+    );
+    CREATE TABLE IF NOT EXISTS dfe_controle (
+      id INTEGER PRIMARY KEY, ultimo_nsu TEXT, ultima_consulta TEXT, proxima_consulta TEXT, ultimo_erro TEXT
+    );
+    CREATE TABLE IF NOT EXISTS dfe_documento (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nsu TEXT UNIQUE, chave TEXT, tipo TEXT,           -- resumo | completa | evento
+      emitente_cnpj TEXT, emitente_nome TEXT, valor REAL, emissao TEXT,
+      ciencia_em TEXT, ciencia_erro TEXT, xml TEXT, nsu_xml TEXT,
+      situacao TEXT,                                    -- aguardando_xml | escolher | sem_pedido | lancada | evento
+      nota_compra_id INTEGER, criado_em TEXT DEFAULT (datetime('now','localtime'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_dfe_chave ON dfe_documento(chave);
+
     /* ── FORNECEDOR (§9) ──────────────────────────────────────────────────── */
     CREATE TABLE IF NOT EXISTS fornecedor (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,

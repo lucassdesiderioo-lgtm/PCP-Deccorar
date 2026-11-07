@@ -145,3 +145,28 @@ tubos podem bater na contagem com material mais fino.
   migração certa não tem divergência a mostrar.
 - **A simulação roda a migração em CÓPIAS dos dois bancos** (`db.backup`) e mostra
   a conferência — a única forma de simular dois bancos sem transação entre eles.
+
+## Fase 11 — notas baixadas da Receita (07/11/2026)
+
+- **Construída sem certificado real**, como a spec mandou. O teste gera um
+  certificado na hora com o `openssl` (titular `DECCORAR LTDA:98765432000110`,
+  o formato do e-CNPJ da ICP-Brasil) e grava as respostas da Receita no layout
+  dela. Nada de certificado, senha ou chave no repositório: a pasta vem do
+  `caminhos.js` e está no `.gitignore`.
+- **O Node lê o `.pfx`, mas não tira a chave dele.** `tls.createSecureContext`
+  confere a senha e entrega o certificado; a chave privada, para assinar a
+  ciência, sai pelo `openssl pkcs12` do servidor, com a senha por variável de
+  ambiente (nunca na linha de comando) e o arquivo temporário apagado no fim.
+  Tenta com e sem `-legacy`, porque o A1 costuma vir com cifra antiga.
+- **O CNPJ da Deccorar não existia no sistema.** Criado (`config.cnpj`, com o
+  código da UF ao lado), e a falta aparece na tela em âmbar — o envio do
+  certificado recusa dizendo que falta.
+- **A regra do "137 espera uma hora" só se provava com intervalo curto.** Com o
+  padrão de 60 minutos, tirar a guarda não mudava nada; o teste passou a usar
+  5 minutos. E o caso "dois pedidos, nunca adivinhado" passava com o defeito
+  porque o primeiro pedido já tinha nota: entraram dois pedidos novos, com os
+  dois materiais.
+- **A tarja de vencimento foi para as Notas recebidas também**: a aba
+  Certificado é só do Admin Geral, e quem lança nota precisa saber que a busca
+  vai parar.
+

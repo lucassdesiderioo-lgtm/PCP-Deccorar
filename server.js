@@ -158,6 +158,7 @@ require('./nota_route')(app, db);   // a nota fiscal de compra, o regime e a tab
 require('./almox_route')(app, db);   // enderecos, volumes e a 503 Almoxarifado (fase 5)
 require('./contagem_material_route')(app, db);   // a 504 Contagem de material e o consumo (fase 6)
 require('./programada_route')(app, db);   // a compra programada (fase 7)
+require('./dfe_route')(app, db);   // o certificado e as notas baixadas da Receita (fase 11)
 app.get('/recebimento',(req,res)=>res.sendFile(path.join(__dirname,'public','recebimento.html')));
 require('./ger_route')(app, db);
 require('./st_route')(app, db);

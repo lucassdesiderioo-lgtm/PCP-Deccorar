@@ -454,6 +454,56 @@
 - Status:           em código desde 07/11/2026; a migração roda no deploy, depois da fase 9.
 - História:         fase 10.
 
+## J. Notas baixadas da Receita (fase 11)
+
+### R-CMP-51 · O certificado entra pela tela, nunca pelo repositório
+- Regra:            501 → aba **Certificado**, só o Admin Geral (`certificado.gerenciar`, intransferível e sensível): cadastrar o CNPJ e o código da UF da Deccorar, enviar o `.pfx` com a senha, trocar e remover. O Node abre o `.pfx` com a senha (senha errada é recusada na hora) e lê titular, CNPJ e validade; o CNPJ tem que ser o da Deccorar (`config.cnpj`), e sem ele cadastrado o envio é recusado dizendo isso. O arquivo vai para `caminhos.CERTIFICADO` (`PCP_CERTIFICADO_DIR`, padrão `<pasta do PCP>/certificado`, fora de `lotes/` e de `backups/`), com permissão 0600. A senha é cifrada (AES-256-GCM, `v1:`) com uma chave própria do servidor, no arquivo `.chave` da mesma pasta (0600, criado na primeira vez). Trocar apaga o arquivo do anterior. **Não há rota que entregue o arquivo**, e a pasta, `*.pfx` e `*.p12` estão no `.gitignore`.
+- Por quê:          o certificado A1 assina pela empresa; vazado, alguém emite e manifesta nota em nome da Deccorar.
+- Exceções:         nenhuma. A senha nunca vai ao JSON, ao log ou ao banco em texto; a decifra só acontece dentro do servidor, na hora da busca.
+- Teste que trava:  `teste_certificado.js` (senha em texto no banco, reprova 1; sem conferir o CNPJ, 1; sem exigir o CNPJ da empresa, 1; o arquivo sem 0600, 1; trocar sem apagar o anterior, 2)
+- Status:           em código desde 07/11/2026. ⚠️ Testado com certificado gerado na hora pelo `openssl`: a prova com o e-CNPJ real é o dono enviá-lo pela tela.
+- História:         fase 11.
+
+### R-CMP-52 · A validade à vista
+- Regra:            vencendo em menos de 30 dias: tarja âmbar na aba Certificado e nas **Notas recebidas**, e a linha "Certificado digital vencendo ou vencido" na central de Pendências (quem tem `certificado.gerenciar`). Vencido: a busca para e diz por quê. Certificado já vencido não entra.
+- Por quê:          certificado que vence calado faz a busca parar sem ninguém ver.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_certificado.js` (a régua dos 30 dias trocada, reprova 2)
+- Status:           em código desde 07/11/2026.
+- História:         fase 11.
+
+### R-CMP-53 · A busca das notas na Receita
+- Regra:            com certificado válido, o servidor consulta a distribuição de DF-e do Ambiente Nacional (`NFeDistribuicaoDFe`, `distNSU`) pelo próprio relógio (`dfe_route.js`, olha a cada 5 min se já passou a `proxima_consulta`; sem cron), guardando o último NSU lido. `cStat 138` com mais a ler volta em 2 min; `137` (nada novo) e `656` (consumo indevido) esperam **pelo menos uma hora**, seja qual for o `config.dfe_intervalo_min` (padrão 60). Cada nota emitida contra o CNPJ aparece em 501 → Notas → **Notas recebidas da Receita**, com emitente, valor e data. O Admin Geral pode "Consultar a Receita agora".
+- Por quê:          a nota chega antes da mercadoria, e a Receita bloqueia quem consulta demais.
+- Exceções:         `PCP_DFE_AUTOMATICO=0` desliga o relógio (é o que os testes usam).
+- Teste que trava:  `teste_dfe.js` (o 137 sem esperar a hora, reprova 1)
+- Status:           em código desde 07/11/2026. ⚠️ As respostas da Receita do teste foram gravadas no layout dela, não vieram dela: a prova é a primeira consulta de verdade.
+- História:         fase 11.
+
+### R-CMP-54 · Só a ciência da operação é automática
+- Regra:            para cada resumo (`resNFe`) o sistema envia o evento 210210 (ciência da operação), assinado (XMLDSig, C14N, RSA-SHA1) com a chave do certificado, que sai do `.pfx` só em memória, pelo `openssl` do servidor. 135, 136 e 573 contam como feita. Confirmação, desconhecimento e operação não realizada **não existem** no sistema.
+- Por quê:          a Receita só entrega o XML completo depois da ciência, e a ciência não confirma nem nega a compra.
+- Exceções:         sem `openssl` no servidor, ou a Receita recusando, a ciência fica pendente e a nota diz por quê (não trava nada).
+- Teste que trava:  `teste_dfe.js` (sem a ciência, reprova 1; o evento conferido contra a chave pública do certificado)
+- Status:           em código desde 07/11/2026. ⚠️ A assinatura foi conferida pela chave pública, não pela Receita.
+- História:         fase 11.
+
+### R-CMP-55 · A nota baixada vira a nota da fase 8, sem adivinhar
+- Regra:            o XML completo (`procNFe`) fica guardado em `ANEXOS_COMPRAS/dfe/` e entra pelo leitor da fase 8 (`nota_xml.js`, origem `dfe`). Lança sozinho **só** quando o emitente tem UM pedido comprado e todo item casa; com dois pedidos, ou item que não casa, fica "escolha o pedido e os itens" na tela; sem pedido do emitente, **"nota sem pedido"** — e isso é linha na central de Pendências (`nota.lancar`).
+- Por quê:          a regra da fase 8 (R-CMP-08): o que se adivinha é onde o erro se esconde.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_dfe.js` (dois pedidos adivinhados, reprova 2)
+- Status:           em código desde 07/11/2026.
+- História:         fase 11.
+
+### R-CMP-56 · Sem certificado, tudo funciona
+- Regra:            sem certificado a aba diz "nenhum certificado enviado", as Notas recebidas dizem que a busca liga quando ele chegar, a busca não roda e diz por quê, e as fases 1 a 10 não dependem dele.
+- Por quê:          o certificado é do dono, e a fábrica não pode parar esperando.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_certificado.js` (a busca sem certificado não chama a Receita)
+- Status:           em código desde 07/11/2026.
+- História:         fase 11.
+
 ---
 
 ## O que NÃO fazer
@@ -477,3 +527,7 @@
 - ❌ Criar ou renomear endereço só no sob medida depois da migração
 - ❌ Dar entrada de tecido do sob medida no estoque do PCP, ou reabrir a entrada de rolo do sob medida: o rolo nasce lá pelo Recebimento
 - ❌ Mexer no saldo de material por volume fora do volume (ele é a soma dos volumes não encerrados), ou encerrar volume sem a saída pelo livro
+- ❌ Gravar certificado, senha ou chave de cifra no repositório, criar rota que entregue o `.pfx`, ou mandar a senha (mesmo cifrada) pelo JSON (R-CMP-51)
+- ❌ Ligar confirmação, desconhecimento ou operação não realizada sozinho: só a ciência é automática (R-CMP-54)
+- ❌ Consultar a Receita de novo antes da hora depois de um 137 ou 656 (R-CMP-53)
+- ❌ Lançar sozinha a nota baixada com mais de um pedido do emitente (R-CMP-55)

@@ -47,7 +47,8 @@ const CHAVES = [
   ['nota.lancar', 'admin', 'pedido.pagar'],
   ['alcada.definir', 'admin_geral', null],
   ['recebimento.liberar', 'admin', 'pedido.criar'],
-  ['volume.movimentar', 'operacao', 'pedido.receber']
+  ['volume.movimentar', 'operacao', 'pedido.receber'],
+  ['certificado.gerenciar', 'admin_geral', null]
 ];
 for(const [chave, nivel, de] of CHAVES){
   const p = PERM.find(x => x.chave === chave);
@@ -112,7 +113,14 @@ const ROTAS = [
   ['GET', '/api/compras/programada', 'compras.ver'],
   ['POST', '/api/compras/programada/pedido', 'pedido.criar'],
   ['POST', '/api/notas/xml/ler', 'nota.lancar'],
-  ['POST', '/api/notas/xml', 'nota.lancar']
+  ['POST', '/api/notas/xml', 'nota.lancar'],
+  ['GET', '/api/certificado', 'certificado.gerenciar'],
+  ['POST', '/api/certificado', 'certificado.gerenciar'],
+  ['DELETE', '/api/certificado', 'certificado.gerenciar'],
+  ['POST', '/api/certificado/dados', 'certificado.gerenciar'],
+  ['POST', '/api/dfe/consultar', 'certificado.gerenciar'],
+  ['GET', '/api/dfe', 'nota.lancar'],
+  ['POST', '/api/dfe/4/lancar', 'nota.lancar']
 ];
 /* A excecao de Bia (componente.cadastrar) e o setor Compras da casa
    (pedido.criar, pedido.pagar) tem de levar as chaves certas — e o setor que

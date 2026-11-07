@@ -258,6 +258,11 @@ module.exports = [
     sensivel:true },
   { chave:'nota.lancar',          grupo:'Compras', tela:501, nivel:'admin',
     rotulo:'Lançar nota fiscal de compra', desc:'Nota, itens, impostos e custo pago/líquido' },
+  /* fase 11 (R-CMP-51): enviar, trocar e remover o certificado digital. Nunca
+     baixar. So o Admin Geral. */
+  { chave:'certificado.gerenciar', grupo:'Compras', tela:501, nivel:'admin_geral',
+    rotulo:'Gerenciar o certificado digital', desc:'Enviar, trocar e remover o .pfx que baixa as notas da Receita (nunca baixar)',
+    sensivel:true, intransferivel:true },
   { chave:'alcada.definir',       grupo:'Compras', tela:501, nivel:'admin_geral',
     rotulo:'Definir alçada de compra', desc:'O limite de cada pessoa e quem aprova acima dele',
     sensivel:true, intransferivel:true },

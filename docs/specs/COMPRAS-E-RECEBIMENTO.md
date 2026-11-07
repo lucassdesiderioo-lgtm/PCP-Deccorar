@@ -2,11 +2,11 @@
 
 ```
 STATUS
-Situação: em construção (execução contínua das fases 1 a 11 autorizada pelo dono em 07/11/2026)
+Situação: em código, falta subir (as onze fases construídas em 07/11/2026; o deploy e as migrações das fases 9 e 10 esperam o dono)
 Criada em: 06/11/2026
 Última atualização: 07/11/2026
-Fase atual: ver o diário de construção logo abaixo
-Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☑  8 ☑  9 ☑  10 ☑  11 ☐
+Fase atual: todas em código · PR aberto, não mesclado · roteiro de deploy no PR
+Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☑  8 ☑  9 ☑  10 ☑  11 ☑
 Decidido em 07/11/2026: fase 10 = o PCP é dono do endereço, o sob medida do rolo e
 da sobra (R-CMP-50) · fase 11 construída sem certificado, pronta para recebê-lo
 Risco: 🔴 (schema, estoque de material, custo, acesso, dado do sob medida)
@@ -345,6 +345,43 @@ renomear lá, 1). `migrar_enderecos_sobmedida.js` e `migrar_fornecedor_sobmedida
 pela linha de comando em bancos temporários (simulação sem gravar; `--aplicar` com os dois
 backups). **A migração NÃO foi rodada em produção** — está no roteiro de deploy.
 
+### Fase 11 — notas baixadas da Receita (07/11/2026) ☑
+
+```
+📋 PLANO
+Tipo: FASE 11 da spec COMPRAS-E-RECEBIMENTO        Risco: 🔴
+O que vai ser feito: a aba Certificado (só o Admin Geral), a guarda do .pfx e da senha
+  cifrada, a validade, a busca na distribuição de DF-e, a ciência automática e a nota
+  baixada entrando pelo leitor da fase 8. Sem certificado real: tudo pronto para ele.
+O que vou mudar: certificado_dominio.js (novo) · dfe_dominio.js (novo) · dfe_route.js
+  (novo) · caminhos.js (CERTIFICADO) · .gitignore · compras_schema.js (certificado,
+  dfe_controle, dfe_documento) · permissoes.js (certificado.gerenciar) · acesso.js ·
+  telas.js (501) · server.js · pendencias_dominio.js (vencendo; nota sem pedido) ·
+  public/compras_abas.js (aba Certificado; Notas recebidas)
+Regra de negócio muda? NÃO (é NOVIDADE da spec: R-CMP-51 a 56, decididas em 07/11)
+Como vou testar: teste_certificado.js e teste_dfe.js (novos, antes do código, com
+  certificado gerado na hora pelo openssl e respostas da Receita gravadas); defeitos
+  reintroduzidos; o envio pela tela num navegador de verdade; teste_caminhos.js
+Fica de fora: manifestações conclusivas (só a ciência); o certificado real (é do dono,
+  pela tela, depois do deploy)
+
+🔐 ALÇADA
+Telas novas: nenhuma (aba Certificado dentro da 501)
+Ações novas: certificado.gerenciar · admin_geral · 501 · sensível e intransferível
+Setores novos: nenhum
+Quem recebe: só o Admin Geral (intransferível)
+```
+
+**Feito.** `teste_certificado.js` 28 casos e `teste_dfe.js` 22. Nove defeitos
+reintroduzidos: a senha em texto no banco (reprova 1), sem conferir o CNPJ (1), sem
+exigir o CNPJ da empresa (1), a régua dos 30 dias trocada (2), o arquivo sem 0600 (1),
+trocar sem apagar o anterior (2), o 137 sem esperar a hora (1 — só depois de o teste
+usar intervalo de 5 min), dois pedidos adivinhados (2 — só depois de o teste ter dois
+pedidos que casam) e sem a ciência (1). O envio pela tela foi feito num Chromium de
+verdade com um `.pfx` de teste: entrou, mostrou titular, CNPJ, validade e a tarja de
+20 dias, também nas Notas recebidas. **Nenhum certificado, senha ou chave no
+repositório.**
+
 ### Mudanças no caminho
 
 (decisões de construção que não mudam regra — nome de coluna, layout, ordem de campos)
@@ -444,6 +481,18 @@ backups). **A migração NÃO foi rodada em produção** — está no roteiro de
   nível, como sempre).
 - **Fase 10:** a simulação do script roda a migração em cópias dos dois bancos e mostra a
   conferência.
+- **Fase 11:** o CNPJ da Deccorar não existia no sistema: virou `config.cnpj`, com o código
+  da UF (`config.uf_codigo`, IBGE) ao lado, os dois cadastrados na aba Certificado; a falta
+  aparece em âmbar e o envio recusa dizendo que falta.
+- **Fase 11:** a chave privada sai do `.pfx` pelo `openssl` do servidor (o Node não abre
+  PKCS#12), com a senha por variável de ambiente e o arquivo temporário apagado. Sem
+  `openssl`, a ciência fica pendente com o motivo.
+- **Fase 11:** a busca roda pelo relógio do próprio servidor (olha a cada 5 min se já é hora),
+  sem cron; `PCP_DFE_AUTOMATICO=0` desliga. Intervalo em `config.dfe_intervalo_min` (60).
+- **Fase 11:** a tarja de vencimento aparece na aba Certificado, nas Notas recebidas (quem
+  lança nota) e na central de Pendências — a aba é só do Admin Geral.
+- **Fase 11:** a pasta do certificado fica fora do `backup.js`: perdido o servidor, o
+  certificado é enviado de novo pela tela.
 
 ### Achei no caminho (não mexi)
 

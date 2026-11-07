@@ -419,10 +419,11 @@
           : '<tr><td colspan="7" class="sub">Nenhuma nota lançada.</td></tr>') + '</tbody></table></div></div>'
         + (pode('nota.lancar') ? '<div class="card"><div style="font-weight:700">Lançar nota</div><div class="cmpG"><div style="grid-column:span 2"><label>Pedido</label><select id="ntPed">'
             + opt(peds.filter(function(p){ return p.status !== 'cancelado' && p.status !== 'rascunho'; }).map(function(p){ return { valor:p.id, nome:p.numero + ' · ' + (p.fornecedor_nome || p.loja || '—') }; }), '', '— escolha —') + '</select></div></div><div id="ntForm"></div></div>' : '')
-        + '<div id="ntXml"></div><div id="ntRegras"></div>';
+        + '<div id="ntDfe"></div><div id="ntXml"></div><div id="ntRegras"></div>';
       var sel = $('#ntPed'); if(sel) sel.onchange = function(){ formNota(+this.value); };
       regrasCredito($('#ntRegras'), reg);
       if(window.CMP.xml) window.CMP.xml($('#ntXml'));
+      if(window.CMP.dfe) window.CMP.dfe($('#ntDfe'));
     } });
 
   async function formNota(pid){
@@ -603,6 +604,79 @@
         var r2 = await api('POST', '/api/notas/xml', { xml:XML, pedido_id:$('#xmPed').value, escolhas:esc2 });
         if(r2.erro) return msg($('#xmMsg2'), r2); abrir('notas');
       }
+    };
+  };
+
+  /* ── CERTIFICADO (fase 11, R-CMP-51 a 56) — só o Admin Geral ──────────
+     Enviar, trocar e remover. NUNCA baixar: não há botão nem rota. */
+  registrar({ id:'certificado', nome:'Certificado', perms:['certificado.gerenciar'],
+    desenhar: async function(box){
+      var e = await api('GET', '/api/certificado');
+      box.innerHTML = '<div class="card"><div style="font-weight:700">Certificado digital (A1) — notas baixadas da Receita</div>'
+        + '<div class="sub" style="margin:4px 0 10px">Com o certificado, o sistema consulta a Receita de hora em hora e traz cada nota emitida contra a Deccorar <b>antes da mercadoria chegar</b>. '
+        + 'Ele dá sozinho a <b>ciência da operação</b> (não confirma nem nega a compra). O arquivo fica guardado no servidor e <b>nunca pode ser baixado</b>; a senha fica cifrada. Sem certificado, tudo funciona.</div>'
+        + '<div class="cmpG"><div><label>CNPJ da Deccorar</label><input id="ctCnpj" value="' + esc(e.cnpj_empresa || '') + '" placeholder="00.000.000/0000-00"></div>'
+        + '<div><label>Código da UF (IBGE)</label><input id="ctUf" value="' + esc(e.uf_codigo || '') + '" placeholder="43 = RS, 35 = SP…"></div></div>'
+        + '<button class="ghost" id="ctDados">Salvar CNPJ e UF</button> <span class="msg" id="ctDadosMsg"></span>'
+        + (e.falta_cnpj ? '<div class="cmpAvi">Falta o CNPJ da Deccorar: é por ele que o certificado é conferido.</div>' : '')
+        + '<div style="margin-top:14px;font-weight:600">Situação</div>'
+        + (e.tem ? '<div>' + esc(e.titular) + ' · CNPJ ' + esc(e.cnpj) + ' · válido até <b>' + data(e.validade) + '</b>' + (e.vencido ? ' <span class="cmpChip vm">VENCIDO — a busca parou</span>' : e.vencendo ? ' <span class="cmpChip am">vence em ' + e.dias + ' dia(s)</span>' : '') + '</div>'
+            + '<div class="sub">enviado por ' + esc(e.enviado_por || '—') + ' em ' + data(e.enviado_em) + '</div>'
+          : '<div class="sub">' + esc(e.mensagem) + '.</div>')
+        + '<div class="sub" style="margin-top:6px">Última consulta: ' + data(e.ultima_consulta) + ' · próxima: ' + data(e.proxima_consulta) + ' · último NSU: ' + esc(e.ultimo_nsu || '—') + (e.ultimo_erro ? '<br><span style="color:var(--amber)">' + esc(e.ultimo_erro) + '</span>' : '') + '</div>'
+        + '<div style="margin-top:14px;font-weight:600">' + (e.tem ? 'Trocar o certificado' : 'Enviar o certificado') + '</div>'
+        + '<div class="cmpG"><div><label>Arquivo .pfx</label><input id="ctArq" type="file" accept=".pfx,.p12"></div><div><label>Senha do certificado</label><input id="ctSenha" type="password" autocomplete="new-password"></div></div>'
+        + '<button class="primary" id="ctEnviar">' + (e.tem ? 'Trocar' : 'Enviar') + '</button> '
+        + (e.tem ? '<button class="ghost" id="ctRemover">Remover o certificado</button> <button class="ghost" id="ctConsultar">Consultar a Receita agora</button>' : '')
+        + ' <span class="msg" id="ctMsg"></span></div>';
+      box.onclick = async function(ev){
+        var r;
+        if(ev.target.id === 'ctDados'){ r = await api('POST', '/api/certificado/dados', { cnpj:$('#ctCnpj').value || null, uf_codigo:$('#ctUf').value || null }); if(r.erro) return msg($('#ctDadosMsg'), r); return abrir('certificado'); }
+        if(ev.target.id === 'ctEnviar'){
+          var f = $('#ctArq').files[0]; if(!f) return msg($('#ctMsg'), { erro:'escolha o arquivo .pfx' });
+          var b64 = await new Promise(function(ok){ var fr = new FileReader(); fr.onload = function(){ ok(String(fr.result).split(',')[1]); }; fr.readAsDataURL(f); });
+          r = await api('POST', '/api/certificado', { base64:b64, senha:$('#ctSenha').value });
+          $('#ctSenha').value = '';
+          if(r.erro) return msg($('#ctMsg'), r); return abrir('certificado');
+        }
+        if(ev.target.id === 'ctRemover'){ if(!confirm('Remover o certificado? A busca na Receita para até um novo ser enviado.')) return; r = await api('DELETE', '/api/certificado'); if(r.erro) return msg($('#ctMsg'), r); return abrir('certificado'); }
+        if(ev.target.id === 'ctConsultar'){ msg($('#ctMsg'), null, 'consultando…'); r = await api('POST', '/api/dfe/consultar', {}); msg($('#ctMsg'), r.erro ? r : null, r.consultou ? (r.documentos + ' documento(s) novo(s)') : (r.motivo || '')); }
+      };
+    } });
+
+  /* AS NOTAS RECEBIDAS DA RECEITA (fase 11), dentro da aba Notas */
+  window.CMP.dfe = async function(box){
+    if(!box) return;
+    var r = await api('GET', '/api/dfe'); if(r.erro || !r.documentos) return;
+    var SIT = { aguardando_xml:'esperando o XML completo', escolher:'escolha o pedido e os itens', sem_pedido:'NOTA SEM PEDIDO', lancada:'lançada' };
+    box.innerHTML = '<div class="card"><div style="font-weight:700">Notas recebidas da Receita</div>'
+      + (!r.certificado.tem ? '<div class="sub">' + esc(r.certificado.mensagem) + ' — a busca automática liga quando o Admin Geral enviar o certificado (aba Certificado).</div>' : '')
+      + (r.certificado.tem && r.certificado.vencido ? '<div class="cmpAvi">O certificado digital venceu em ' + data(r.certificado.validade) + ': a busca na Receita parou até o Admin Geral enviar um novo.</div>'
+        : r.certificado.tem && r.certificado.vencendo ? '<div class="cmpAvi">O certificado digital vence em ' + r.certificado.dias + ' dia(s) (' + data(r.certificado.validade) + '): peça um novo antes, senão a busca na Receita para.</div>' : '')
+      + (r.documentos.length ? '<div class="cmpRola"><table class="cmpTab"><thead><tr><th>Emitente</th><th>Emissão</th><th>Valor</th><th>Ciência</th><th>Situação</th><th></th></tr></thead><tbody>'
+        + r.documentos.map(function(d){ return '<tr><td>' + esc(d.emitente_nome || d.emitente_cnpj || '—') + '<div class="sub code">' + esc(d.chave || '') + '</div></td><td>' + data(d.emissao) + '</td><td>' + brl(d.valor) + '</td>'
+          + '<td>' + (d.ciencia_em ? data(d.ciencia_em) : (d.ciencia_erro ? '<span style="color:var(--amber)">' + esc(d.ciencia_erro) + '</span>' : '—')) + '</td>'
+          + '<td><span class="cmpChip ' + (d.situacao === 'sem_pedido' ? 'vm' : d.situacao === 'lancada' ? 'vd' : 'am') + '">' + esc(SIT[d.situacao] || d.situacao) + '</span></td>'
+          + '<td>' + (d.situacao === 'escolher' || d.situacao === 'sem_pedido' ? '<button class="ghost" data-dfe="' + d.id + '">Abrir</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div>'
+        : '<div class="sub">Nenhuma nota baixada ainda.</div>') + '<div id="dfeDet"></div></div>';
+    box.onclick = async function(ev){
+      var b = ev.target.closest('[data-dfe]'); if(!b) return;
+      var id = b.getAttribute('data-dfe'), x = await api('GET', '/api/dfe/' + id + '/ler');
+      if(x.erro) return alert(x.erro);
+      var peds = x.pedidos_do_emitente || [];
+      $('#dfeDet').innerHTML = '<div class="sub" style="margin-top:8px">NF ' + esc(x.nota.numero) + ' · ' + esc(x.nota.emitente_nome) + (peds.length ? '' : ' — <b>nenhum pedido deste fornecedor</b>: alguém comprou por fora?') + '</div>'
+        + '<div class="cmpG"><div><label>Pedido</label><select id="dfePed">' + opt(peds.map(function(p){ return { valor:p.id, nome:p.numero }; }), '', '— escolha —') + '</select></div></div><div id="dfeItens"></div>';
+      $('#dfePed').onchange = async function(){
+        var y = await api('GET', '/api/dfe/' + id + '/ler?pedido_id=' + this.value);
+        $('#dfeItens').innerHTML = '<table class="cmpTab">' + y.nota.itens.map(function(dd){ var c = (y.casamento || []).find(function(k){ return k.n === dd.n; }) || {};
+          return '<tr><td>' + esc(dd.descricao) + '</td><td><select data-dfi="' + dd.n + '"><option value="">— escolha —</option><option value="nao">não é deste pedido</option>'
+            + (y.pedido_itens || []).map(function(i){ return '<option value="' + i.id + '"' + (c.pedido_item_id === i.id ? ' selected' : '') + '>' + esc(i.item) + '</option>'; }).join('') + '</select></td></tr>'; }).join('')
+          + '</table><button class="primary" id="dfeOk">Lançar a nota</button> <span class="msg" id="dfeMsg"></span>';
+        $('#dfeOk').onclick = async function(){
+          var es = {}; document.querySelectorAll('[data-dfi]').forEach(function(s){ if(s.value === 'nao') es[s.getAttribute('data-dfi')] = false; else if(s.value) es[s.getAttribute('data-dfi')] = +s.value; });
+          var rr = await api('POST', '/api/dfe/' + id + '/lancar', { pedido_id:$('#dfePed').value, escolhas:es }); if(rr.erro) return msg($('#dfeMsg'), rr); abrir('notas');
+        };
+      };
     };
   };
 

@@ -75,7 +75,7 @@ const TELAS = [
   { n:404, nome:'Ficha técnica',         rota:'/admin/ficha',   nivel:'admin',      onde:'computador', perms:['modelo.cadastrar','custo.ver','compras.ver'], aba:'ficha' },
   // ── 500 · Compras ──
   { n:501, nome:'Compras',               rota:'/admin/compras', nivel:'admin',      onde:'computador',
-    perms:['compras.ver','fornecedor.cadastrar','preco.lancar','pedido.criar','pedido.pagar','componente.cadastrar','almoxarifado.cadastrar'], aba:'compras' },
+    perms:['compras.ver','fornecedor.cadastrar','preco.lancar','pedido.criar','pedido.pagar','componente.cadastrar','almoxarifado.cadastrar','certificado.gerenciar'], aba:'compras' },
   { n:502, nome:'Recebimento',           rota:'/recebimento',   nivel:'operacao',   onde:'tablet',     perms:['pedido.receber'],        area:'recebimento' },
   // COMPRAS-E-RECEBIMENTO fase 5: guardar, mover e abrir volume por bipe (nasce so para quem tem a chave — backfill da spec §7)
   { n:503, nome:'Almoxarifado',          rota:'/almoxarifado',  nivel:'operacao',   onde:'tablet',     perms:['volume.movimentar'] },

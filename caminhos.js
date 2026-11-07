@@ -47,5 +47,9 @@ module.exports = {
   DEVOLUCOES: de('PCP_DEVOLUCOES_DIR', 'devolucoes'),
   /* Os anexos das compras (spec COMPRAS-E-RECEBIMENTO, R-CMP-20): orcamento,
      nota em PDF ou foto, XML, comprovante. FORA de lotes/, pela mesma razao. */
-  ANEXOS_COMPRAS: de('PCP_ANEXOS_COMPRAS_DIR', 'anexos_compras')
+  ANEXOS_COMPRAS: de('PCP_ANEXOS_COMPRAS_DIR', 'anexos_compras'),
+  /* O certificado digital A1 (spec COMPRAS-E-RECEBIMENTO, R-CMP-51): o .pfx e a
+     chave que cifra a senha. Fora de lotes/ e dos backups comuns; no servidor,
+     a pasta fica ao lado das outras e esta no .gitignore. Nunca e servida. */
+  CERTIFICADO: de('PCP_CERTIFICADO_DIR', 'certificado')
 };

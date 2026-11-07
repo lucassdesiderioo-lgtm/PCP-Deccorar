@@ -1476,6 +1476,8 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 | `programada_dominio.js` | a compra programada: lista do mês e aviso pela data, o maior e nunca a soma (fase 7) |
 | `almox_dominio.js` (fase 10) | também a árvore para o espelho do sob medida, o endereço criado pela bancada de lá e o saldo numa lista só |
 | `nota_xml.js` | o leitor do XML da NF-e e o casamento sem adivinhar (fase 8; e a porta da nota baixada da Receita, fase 11) |
+| `certificado_dominio.js` | o certificado A1: receber, conferir CNPJ e validade, a senha cifrada, a chave só em memória (fase 11) |
+| `dfe_dominio.js` | a busca na distribuição de DF-e da Receita, o último NSU, o limite de consultas, a ciência automática e a nota baixada entrando pela fase 8 (fase 11) |
 | `recebimento_dominio.js` | a fila sem preço, a contagem cega, a pesagem, as réguas e as faixas, o retido, o custo por recebido, o fator real e o prazo medido (fase 3) |
 
 > ⚠️ **MATERIAL NOVO NÃO NASCE SEM O MODO DE SALDO** (R-CMP-03, armadilha #30):
@@ -1528,9 +1530,22 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 > são ESPELHO (só a porta `tecido/nucleo/enderecos_pcp.js` escreve), e o rolo e a
 > sobra guardam o nível do PCP ao lado do `nivel_id` de sempre. **Não troque o
 > `nivel_id` pelo id do PCP**: o corte grava rolo, sobra e plano numa transação só.
+>
+> ⚠️ **O CERTIFICADO DIGITAL SÓ ENTRA PELA TELA, E NUNCA SAI** (R-CMP-51, fase 11):
+> 501 → aba Certificado, só o Admin Geral. O `.pfx` mora em `caminhos.CERTIFICADO`
+> (0600, no `.gitignore`), a senha fica **cifrada** com a chave do arquivo `.chave` da
+> mesma pasta, e não há rota que entregue o arquivo. **Nunca commite certificado,
+> senha ou essa chave.** Perdida a pasta (servidor novo), o certificado é enviado de
+> novo pela tela — ela não entra no `backup.js`, de propósito.
+>
+> ⚠️ **SÓ A CIÊNCIA DA OPERAÇÃO É AUTOMÁTICA** (R-CMP-54); as manifestações
+> conclusivas não existem no sistema. A assinatura sai pelo `openssl` do servidor: sem
+> ele, a ciência fica pendente dizendo por quê. Depois de um `137`/`656` a Receita só é
+> consultada de novo depois de uma hora (R-CMP-53), e a nota baixada só se lança sozinha
+> com UM pedido do emitente e todo item casando (R-CMP-55).
 
 **Rode `node teste_material.js`, `node teste_pedido_compra.js`, `node
-teste_recebimento.js`, `node teste_nota_compra.js`, `node teste_almoxarifado.js`, `node teste_contagem_material.js`, `node teste_compra_programada.js`, `node teste_nota_xml.js`, `node teste_porta_sobmedida.js` (e `cd tecido && npm test`) e `node teste_acesso_compras.js` ao mexer no cadastro de material, no almoxarifado, no
+teste_recebimento.js`, `node teste_nota_compra.js`, `node teste_almoxarifado.js`, `node teste_contagem_material.js`, `node teste_compra_programada.js`, `node teste_nota_xml.js`, `node teste_porta_sobmedida.js`, `node teste_porta_almox.js` (e `cd tecido && npm test`), `node teste_certificado.js`, `node teste_dfe.js` e `node teste_acesso_compras.js` ao mexer no cadastro de material, no almoxarifado, no
 pedido, no fornecedor ou nas chaves de Compras.**
 
 ---
@@ -3320,8 +3335,10 @@ restart`, ninguém edita variável de ambiente no servidor.
 | `LOTES` | os PDFs do ML (o cron apaga em 7 dias) | `PCP_LOTES` |
 | `COLETAS` | as fotos da conferência com o motorista (§8-B) | `PCP_COLETAS_DIR` |
 | `BACKUPS` | as cópias do `backup.js` — dos **dois** bancos | `PCP_BACKUPS` |
+| `ANEXOS_COMPRAS` | os anexos do pedido e da nota, e o XML das notas baixadas da Receita (fora de `lotes/`) | `PCP_ANEXOS_COMPRAS_DIR` |
+| `CERTIFICADO` | o certificado digital e a chave que cifra a senha — **nunca no repositório nem no backup comum** | `PCP_CERTIFICADO_DIR` |
 
-`PCP_DIR` move as quatro de uma vez; a variável específica ganha da geral.
+`PCP_DIR` move todas de uma vez; a variável específica ganha da geral.
 
 > O **`tecido.db` não está nesta tabela**, e não é esquecimento: ele mora ao
 > lado do módulo e quem responde por ele é `tecido/nucleo/caminho.js`

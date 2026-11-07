@@ -108,6 +108,14 @@ const LINHAS = [
   { chave:'contagem_material', nome:'Contagem de material por almoxarifado', perm:['contagem.aprovar'], onde:{ aba:'ct' },
     ajuda:'diferença acima da tolerância na contagem cega da 504',
     contar(db){ return require('./contagem_material_dominio').pendencias(db); } },
+  /* fase 11 (R-CMP-52, R-CMP-55): o certificado vencendo/vencido, e a nota da
+     Receita de fornecedor sem pedido (alguem comprou por fora). */
+  { chave:'certificado', nome:'Certificado digital vencendo ou vencido', perm:['certificado.gerenciar'], onde:{ aba:'compras' },
+    ajuda:'menos de 30 dias para vencer, ou já vencido (a busca da Receita para)',
+    contar(db){ return require('./certificado_dominio').pendencias(db); } },
+  { chave:'nota_sem_pedido', nome:'Nota da Receita sem pedido', perm:['nota.lancar'], onde:{ aba:'compras' },
+    ajuda:'nota emitida contra a Deccorar por fornecedor sem pedido no sistema',
+    contar(db){ return require('./dfe_dominio').pendencias(db); } },
   { chave:'devolucoes', nome:'Devoluções', perm:['devolucao.baixar'], onde:{ aba:'dv' },
     ajuda:'devoluções esperando a baixa com reputação e motivo',
     contar(db){
