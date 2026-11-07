@@ -1623,10 +1623,25 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 > ⚠️ **A NOTA BAIXADA DA RECEITA (`dfe_documento`) FICA FORA DO MODO TESTE**: a
 > consulta avança o último NSU, e a nota apagada não se baixa de novo.
 
-> ✅ **NO AR DESDE 07/11/2026** (PR #305, junto com o #309): o dono fez o deploy e
-> disse *"deu tudo certo"*. ⚠️ **O que as migrações das fases 9 e 10 responderam
-> no servidor (a lista dos fornecedores e o "Tudo bate" dos endereços) não foi
-> relatado aqui**, e nada disto está provado com dado real ainda:
+> ✅ **NO AR DESDE 07/11/2026** (PR #305, junto com o #309): o dono fez o backup,
+> o deploy e o teste de segurança (telas 302, inclusive `/admin/compras`,
+> `/almoxarifado`, `/contagem-material` e `/recebimento`; API 401; `/login` 200).
+>
+> ✅ **AS DUAS MIGRAÇÕES RODARAM E FORAM CONFERIDAS COM DADO REAL:**
+> - **endereços (fase 10):** 16 rolos em "Tecidos novos" (2 hastes, 61 níveis) e
+>   139 sobras em "Sobras de tecido" (3 hastes, 17 níveis) — **159 conferidos, 0
+>   divergência**, e a segunda rodada diz "(já migrado)" e "Tudo bate";
+> - **fornecedores (fase 9):** 7 do sob medida — o JP ligado ao JP do PCP (#1) e
+>   seis criados no PCP (#6 a #11: Ação, CKS Brasil, J Serrano, Mova, Sosten,
+>   Wiler K); a segunda rodada diz "já ligado" em todos.
+>
+> ⚠️ **"AÇÃO" (#6) PODE SER O "AC" (#2) QUE O PCP JÁ TINHA** — o script só junta o
+> mesmo nome. Se for o mesmo fornecedor, são dois cadastros dele, e quem decide
+> qual fica é o dono. Também ficaram como fornecedor o "ML" (#3) e o "SHOPI" (#5),
+> que pela R-CMP-13 são **canal**, não fornecedor: os pedidos antigos continuam
+> apontando para eles, e isso é decisão do dono, não conserto.
+>
+> Nada disto está provado com dado real ainda:
 > - quem recebe as cinco chaves novas, marcado na tela de Acessos;
 > - a primeira compra por kg recebida em partes, e o "fechar com falta" dela;
 > - o primeiro tecido de antes etiquetado na 504;
