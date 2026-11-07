@@ -157,6 +157,7 @@ require('./recebimento_route')(app, db);   // retidos, decidir, ciencia, prazo m
 require('./nota_route')(app, db);   // a nota fiscal de compra, o regime e a tabela de credito (fase 4)
 require('./almox_route')(app, db);   // enderecos, volumes e a 503 Almoxarifado (fase 5)
 require('./contagem_material_route')(app, db);   // a 504 Contagem de material e o consumo (fase 6)
+require('./programada_route')(app, db);   // a compra programada (fase 7)
 app.get('/recebimento',(req,res)=>res.sendFile(path.join(__dirname,'public','recebimento.html')));
 require('./ger_route')(app, db);
 require('./st_route')(app, db);

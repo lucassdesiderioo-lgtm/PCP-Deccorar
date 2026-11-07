@@ -392,6 +392,32 @@
 - Status:           em código desde 07/11/2026.
 - História:         fase 6.
 
+## H. Compra programada (fase 7)
+
+### R-CMP-46 · Lista do mês para o que não tem saldo
+- Regra:            a aba Compra programada (501) monta, para cada material sem saldo, a média mensal das compras (R-CMP-45) menos o que está a caminho, arredondada para cima na embalagem da última compra (sem compra, a da oferta mais barata). O dia da lista é `config.compra_programada_dia` (padrão 1), e a tela diz se é hoje. É sugestão: a quantidade se edita, e "Gerar pedido(s)" cria rascunhos — agrupados pelo fornecedor da oferta da última compra; quem não tem oferta vai num rascunho sem fornecedor.
+- Por quê:          compra que não depende de lembrar.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_compra_programada.js` (sem arredondar à embalagem, reprova 1)
+- Status:           em código desde 07/11/2026.
+- História:         fase 7.
+
+### R-CMP-47 · Aviso pela data para o que tem saldo
+- Regra:            dias até acabar = (saldo + a caminho) ÷ consumo diário (R-CMP-44); pedir até = hoje + dias até acabar − prazo (R-CMP-36) − `margem_dias`. O material entra quando o "pedir até" chega. Sem consumo medido, não entra pela data — só pelo mínimo — e a tela diz "sem consumo medido".
+- Por quê:          o prazo do fornecedor e o consumo decidem quando pedir, não o susto.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_compra_programada.js` (pedir até sem o prazo, reprova 5; a lista com tudo, 2)
+- Status:           em código desde 07/11/2026.
+- História:         fase 7.
+
+### R-CMP-48 · A data não soma com o mínimo
+- Regra:            o ponto de pedido é o MAIOR entre o `estoque_minimo` e o calculado pela data (consumo × (prazo + margem)), nunca a soma, e sempre desconta o que está a caminho. A sugestão enche até o maior entre o ideal e o ponto.
+- Por quê:          a mesma régua dos dois gatilhos do `COMPRAS.md`.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_compra_programada.js` (a soma, reprova 3; sem descontar a caminho, 1)
+- Status:           em código desde 07/11/2026.
+- História:         fase 7.
+
 ---
 
 ## O que NÃO fazer
@@ -409,4 +435,5 @@
 - ❌ Pôr o ICMS próprio no custo pago
 - ❌ Mandar o saldo a quem conta material, ou tratar material não contado como zero
 - ❌ Dar consumo zero com uma contagem só (é `null`)
+- ❌ Somar o mínimo com o ponto pela data, ou esquecer o que está a caminho
 - ❌ Mexer no saldo de material por volume fora do volume (ele é a soma dos volumes não encerrados), ou encerrar volume sem a saída pelo livro

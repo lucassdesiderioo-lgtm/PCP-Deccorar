@@ -96,3 +96,11 @@ tubos podem bater na contagem com material mais fino.
   quem aprova não opera a 504.
 - **O `teste_linguagem` pegou "dono" num apelido de coluna do SQL** da contagem: a
   função e a coluna viraram "quem abriu".
+
+## Fase 7 — compra programada (07/11/2026)
+
+- **Nenhuma conta nova mora na compra programada**: o consumo vem do
+  `contagem_material_dominio`, o prazo do `recebimento_dominio`, o saldo do
+  `componente`. Ela só junta.
+- **Sem compra ainda, a embalagem é a da oferta mais barata**: senão o tubo que
+  nunca foi comprado seria sugerido em metros soltos.

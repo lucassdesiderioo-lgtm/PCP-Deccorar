@@ -6,7 +6,7 @@ Situação: em construção (execução contínua das fases 1 a 11 autorizada pe
 Criada em: 06/11/2026
 Última atualização: 07/11/2026
 Fase atual: ver o diário de construção logo abaixo
-Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☐  8 ☐  9 ☐  10 ☐  11 ☐
+Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☑  8 ☐  9 ☐  10 ☐  11 ☐
 Decidido em 07/11/2026: fase 10 = o PCP é dono do endereço, o sob medida do rolo e
 da sobra (R-CMP-50) · fase 11 construída sem certificado, pronta para recebê-lo
 Risco: 🔴 (schema, estoque de material, custo, acesso, dado do sob medida)
@@ -229,6 +229,31 @@ vazando reprova 1; aplicando tudo sozinho, reprova; quem contou aprovando, 1; co
 1; não contado virando zero, 2; cortado sem metro, reprova; o saldo do "terminei", 2; sem a
 tarja do pouco histórico, 1). A 504 a 1024 px, com o digitado do outro material preservado.
 
+### Fase 7 — compra programada (07/11/2026) ☑
+
+```
+📋 PLANO
+Tipo: FASE 7 da spec COMPRAS-E-RECEBIMENTO        Risco: 🟡
+O que vai ser feito: lista do mês (R-CMP-46), aviso pela data (R-CMP-47), o maior e não
+  a soma (R-CMP-48), a aba na 501, e a sugestão virando pedido em rascunho.
+O que vou mudar: programada_dominio.js e programada_route.js (novos) ·
+  public/compras_abas.js (aba Compra programada) · acesso.js
+Regra de negócio muda? NÃO além da spec
+Como vou testar: teste_compra_programada.js (novo, antes do código); defeitos
+  reintroduzidos; a aba aberta no navegador
+Fica de fora: avisar (e-mail, WhatsApp) — a lista é para abrir e olhar
+
+🔐 ALÇADA
+Telas novas: nenhuma (a 501 ganha Compra programada)
+Ações novas: nenhuma (ler: compras.ver; gerar o pedido: pedido.criar)
+Setores novos: nenhum
+Quem recebe: —
+```
+
+**Feito.** `teste_compra_programada.js` 18 casos; cinco defeitos reintroduzidos (a soma
+reprova 3; sem descontar a caminho, 1; sem arredondar à embalagem, 1; pedir até sem o prazo,
+5; a lista com tudo, 2). A aba gerou os rascunhos pela tela.
+
 ### Mudanças no caminho
 
 (decisões de construção que não mudam regra — nome de coluna, layout, ordem de campos)
@@ -298,6 +323,12 @@ tarja do pouco histórico, 1). A 504 a 1024 px, com o digitado do outro material
 - **Fase 6:** a aprovação aparece na 302 (aba Contagem), porque quem aprova é de nível Admin e
   não opera a 504.
 - **Fase 6:** uma contagem aberta por almoxarifado; só quem abriu lança, tira linha e termina.
+- **Fase 7:** a lista do mês aparece todo dia (a tela diz qual é o dia dela e se é hoje); não
+  há envio automático.
+- **Fase 7:** sem compra anterior, a embalagem da sugestão é a da oferta mais barata.
+- **Fase 7:** a sugestão pela data enche até o maior entre o ideal e o ponto de pedido.
+- **Fase 7:** os rascunhos gerados vão para o fornecedor da oferta da última compra; quem não
+  tem oferta vai num rascunho sem fornecedor (vira compra rápida ou ganha fornecedor).
 
 ### Achei no caminho (não mexi)
 

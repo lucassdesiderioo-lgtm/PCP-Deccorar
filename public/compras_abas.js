@@ -519,6 +519,39 @@
     };
   };
 
+  /* ── COMPRA PROGRAMADA (fase 7, R-CMP-46 a 48) ──────────────────────── */
+  registrar({ id:'programada', nome:'Compra programada', perms:['compras.ver','pedido.criar'],
+    desenhar: async function(box){
+      var p = await api('GET', '/api/compras/programada');
+      if(p.erro){ box.innerHTML = '<div class="card" style="color:var(--red)">' + esc(p.erro) + '</div>'; return; }
+      var lm = p.lista_mes || [], pd = p.pela_data || [];
+      box.innerHTML = '<div class="card"><div style="font-weight:700">Lista do mês — o que não tem saldo</div>'
+        + '<div class="sub" style="margin:4px 0 10px">A média mensal das compras de cada material, arredondada para a embalagem da última compra. A lista sai no dia ' + p.dia
+        + ' de cada mês' + (p.hoje_e_o_dia ? ' — <b>é hoje</b>' : '') + '. É sugestão: edite a quantidade e gere o pedido.</div>'
+        + '<div class="cmpRola"><table class="cmpTab"><thead><tr><th></th><th>Material</th><th>Média/mês</th><th>A caminho</th><th>Sugestão</th></tr></thead><tbody>'
+        + (lm.length ? lm.map(function(x){ return '<tr><td><input type="checkbox" data-pg-sel="' + x.componente_id + '"' + (x.sugestao > 0 ? ' checked' : '') + '></td><td>' + esc(x.nome)
+            + (x.pouco_historico ? ' <span class="cmpChip am">pouco histórico</span>' : '') + '</td><td>' + (x.media_mes == null ? '<span class="sub">' + esc(x.motivo) + '</span>' : n3(x.media_mes) + ' <span class="sub">(de ' + x.meses + ' mês/meses)</span>') + '</td>'
+            + '<td>' + n3(x.a_caminho) + '</td><td><input data-pg-q="' + x.componente_id + '" type="number" min="0" step="any" value="' + (x.sugestao || '') + '" style="width:90px"> ' + esc(x.unidade || '') + (x.embalagem ? ' <span class="sub">(' + esc(x.embalagem) + ')</span>' : '') + '</td></tr>'; }).join('')
+          : '<tr><td colspan="5" class="sub">Nenhum material sem saldo cadastrado.</td></tr>') + '</tbody></table></div></div>'
+        + '<div class="card"><div style="font-weight:700">Pela data — o que tem saldo</div>'
+        + '<div class="sub" style="margin:4px 0 10px"><b>pedir até</b> = hoje + dias até acabar − prazo do fornecedor − margem. O ponto de pedido é o <b>maior</b> entre o mínimo e o calculado pela data, nunca a soma, e sempre desconta o que está a caminho. '
+        + 'Material sem consumo medido (menos de duas contagens) só entra pelo mínimo.</div>'
+        + '<div class="cmpRola"><table class="cmpTab"><thead><tr><th></th><th>Material</th><th>Disponível</th><th>Consumo/dia</th><th>Prazo</th><th>Pedir até</th><th>Ponto</th><th>Sugestão</th></tr></thead><tbody>'
+        + (pd.length ? pd.map(function(x){ return '<tr><td><input type="checkbox" data-pg-sel="' + x.componente_id + '" checked></td><td>' + esc(x.nome) + ' <span class="cmpChip ' + (x.gatilho === 'data' ? 'vm' : 'am') + '">' + (x.gatilho === 'data' ? 'pela data' : 'pelo mínimo') + '</span>'
+            + (x.sem_consumo ? ' <span class="cmpChip">sem consumo medido</span>' : '') + '</td><td>' + n3(x.disponivel) + ' <span class="sub">(' + n3(x.saldo) + ' + ' + n3(x.a_caminho) + ' a caminho)</span></td>'
+            + '<td>' + (x.consumo_dia ? n3(x.consumo_dia) : '—') + '</td><td>' + (x.prazo_dias != null ? n3(x.prazo_dias) + ' d <span class="sub">(' + esc(x.prazo_fonte) + ')</span>' : '—') + '</td>'
+            + '<td>' + (x.pedir_ate ? data(x.pedir_ate) : '—') + '</td><td>' + n3(x.ponto) + '</td><td><input data-pg-q="' + x.componente_id + '" type="number" min="0" step="any" value="' + (x.sugestao || '') + '" style="width:90px"> ' + esc(x.unidade || '') + '</td></tr>'; }).join('')
+          : '<tr><td colspan="8" class="sub">Nada a pedir hoje pela data nem pelo mínimo.</td></tr>') + '</tbody></table></div>'
+        + '<button class="primary" data-perm="pedido.criar" id="pgGerar">Gerar pedido(s) com os marcados</button> <span class="msg" id="pgMsg"></span></div>';
+      $('#pgGerar').onclick = async function(){
+        var itens = Array.prototype.filter.call(box.querySelectorAll('[data-pg-sel]'), function(c){ return c.checked; }).map(function(c){
+          var id = c.getAttribute('data-pg-sel'); var q = box.querySelector('[data-pg-q="' + id + '"]'); return { componente_id:+id, quantidade:q ? q.value : 0 }; });
+        var r = await api('POST', '/api/compras/programada/pedido', { itens:itens });
+        if(r.erro) return msg($('#pgMsg'), r);
+        msg($('#pgMsg'), null, r.pedidos.length + ' pedido(s) em rascunho: ' + r.pedidos.map(function(x){ return x.numero; }).join(', ') + ' — veja na aba Pedidos');
+      };
+    } });
+
   /* ── COMPRA RAPIDA (fase 2, R-CMP-21) ───────────────────────────────── */
   registrar({ id:'rapida', nome:'Compra rápida', perms:['pedido.criar'],
     desenhar: async function(box){
