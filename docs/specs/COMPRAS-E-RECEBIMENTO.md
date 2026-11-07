@@ -6,7 +6,7 @@ Situação: em construção (execução contínua das fases 1 a 11 autorizada pe
 Criada em: 06/11/2026
 Última atualização: 07/11/2026
 Fase atual: ver o diário de construção logo abaixo
-Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☑  8 ☑  9 ☐  10 ☐  11 ☐
+Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☑  8 ☑  9 ☑  10 ☐  11 ☐
 Decidido em 07/11/2026: fase 10 = o PCP é dono do endereço, o sob medida do rolo e
 da sobra (R-CMP-50) · fase 11 construída sem certificado, pronta para recebê-lo
 Risco: 🔴 (schema, estoque de material, custo, acesso, dado do sob medida)
@@ -279,6 +279,36 @@ sozinha porque o `nota_dominio` também recusa (proteção em dobro). ⚠️ **O
 foram montados no layout 4.00 — não são de fornecedor real.** A prova com XML real é a
 primeira nota que o dono anexar.
 
+### Fase 9 — o sob medida pela mesma porta (07/11/2026) ☑
+
+```
+📋 PLANO
+Tipo: FASE 9 da spec COMPRAS-E-RECEBIMENTO        Risco: 🔴
+O que vai ser feito: o fornecedor do sob medida migra para o do PCP (o texto antigo do rolo
+  é preservado); o recebimento do tecido do sob medida cria o rolo lá pela porta, com
+  fornecedor, nota e preço por m²; a entrada antiga de rolo é recusada.
+O que vou mudar: tecido/nucleo/schema.js (migração 40) · tecido/dominio/recebimento_pcp.js
+  (novo) · tecido/montar.js (a porta de volta) · tecido/rotas/rolos.js e
+  tecido/public/telas/rolos.html (a entrada aposentada) · sobmedida_rolo.js (novo, a porta
+  no PCP) · migrar_fornecedor_sobmedida.js (novo, simula e aplica com backup) ·
+  compras_schema.js (componente.sm_tecido_id) · material_dominio.js/material_route.js ·
+  recebimento_dominio.js (o rolo em vez da entrada) · server.js · compras_abas.js
+Regra de negócio muda? SIM → antes: rolo entrava pela tela do sob medida, com fornecedor
+  próprio. Depois: só pelo Recebimento do PCP, fornecedor do PCP (DECISOES.md 06/11)
+Como vou testar: teste_porta_sobmedida.js (novo, antes do código, com o sob medida de
+  verdade num banco temporário); defeitos reintroduzidos; cd tecido && npm test
+Fica de fora: os endereços (fase 10)
+
+🔐 ALÇADA
+Telas novas: nenhuma · Ações novas: nenhuma · Setores: nenhum · Quem recebe: —
+(a aba "Entrada de rolo" do sob medida passa a só explicar o caminho novo)
+```
+
+**Feito.** `teste_porta_sobmedida.js` 22 casos; cinco defeitos reintroduzidos (o tecido
+entrando no PCP reprova; sem o espelho do fornecedor, 1; a entrada antiga aberta, 1; o nome
+sem normalizar, 1; sem o preço, 1). O teste tinha uma expectativa errada (98 m de 100 m
+"fechando" o pedido) e foi corrigido: o pedido fica parcial, como deve.
+
 ### Mudanças no caminho
 
 (decisões de construção que não mudam regra — nome de coluna, layout, ordem de campos)
@@ -359,6 +389,14 @@ primeira nota que o dono anexar.
 - **Fase 8:** a mesma chave de acesso não entra duas vezes (409).
 - **Fase 8:** "ler" devolve a nota, o casamento e os pedidos do emitente (pelo CNPJ do
   fornecedor) sem gravar; "lançar" exige todo item decidido.
+- **Fase 9:** o cadastro de fornecedor do sob medida não é apagado: vira espelho do PCP
+  (`fornecedor_pcp_id`), porque o rolo, o custo e os relatórios de lá leem `fornecedor_id`.
+- **Fase 9:** o material do PCP aponta o tecido do sob medida por `componente.sm_tecido_id`; a
+  largura do rolo vem de `largura_bobina_cm` do material.
+- **Fase 9:** o preço por m² do rolo = custo da unidade (R$/m linear) ÷ largura da bobina.
+- **Fase 9:** o tecido do sob medida não fica retido por contagem ≠ declarado (o rolo nasce lá).
+- **Fase 9:** o fornecedor que só existe no sob medida é criado no PCP pela migração, com a
+  observação "veio do cadastro do sob medida"; o tipo fica para alguém completar.
 
 ### Achei no caminho (não mexi)
 

@@ -51,8 +51,13 @@ module.exports={rotas:[
   {metodo:'GET', caminho:'/api/rolos/:id/movimentos', permissao:'rolo.ler',
    manipulador:({params})=>rolo.movimentos(params.id)},
 
+  /* A ENTRADA DE ROLO ESTA APOSENTADA (COMPRAS-E-RECEBIMENTO R-CMP-49/50, fase
+     9): rolo novo so nasce pelo Recebimento do PCP (502), que o cria aqui pela
+     porta, ja com fornecedor, nota e preco por m². A rota fica e recusa
+     dizendo o caminho — tablet com a tela antiga no cache. */
   {metodo:'POST', caminho:'/api/rolos', permissao:'rolo.entrada',
-   manipulador:({corpo,usuario})=>rolo.entrada(corpo,usuario.nome),
+   manipulador:()=>{ throw new (require('../nucleo/erros').ErroDeRegra)('entrada_aposentada',
+     'Rolo novo nasce pelo Recebimento do PCP (tela 502): la a compra e conferida e o rolo entra aqui sozinho, com o fornecedor, a nota e o preco. Se o rolo ja esta na fabrica sem compra, fale com quem compra.'); },
    detalhe:(req,d)=>'entrada '+(d&&d.codigo)+' · '+(d&&d.metragem_inicial)+' m · bobina '+(d&&d.largura)},
 
   /* MUDOU DE LUGAR NA ESTANTE. Permissao 'rolo.entrada' — quem poe rolo na

@@ -2064,6 +2064,16 @@ const SEMENTE=[
   }}
 ];
 
+/* ── COMPRAS-E-RECEBIMENTO fase 9 (07/11/2026, R-CMP-11 e R-CMP-49) ───────
+   O fornecedor e UM so, o do PCP: o cadastro deste modulo vira o espelho que o
+   rolo, o custo e os relatorios ja leem, e cada linha guarda o fornecedor do
+   PCP ao lado. O texto antigo do rolo (`rolo.fornecedor`) fica como estava. */
+MIGRACOES.push({n:40, nome:'o fornecedor e o rolo apontam o fornecedor do PCP', sql:`
+ALTER TABLE fornecedor ADD COLUMN fornecedor_pcp_id INTEGER;
+ALTER TABLE rolo ADD COLUMN fornecedor_pcp_id INTEGER;
+CREATE INDEX idx_fornecedor_pcp ON fornecedor(fornecedor_pcp_id);
+`});
+
 function aplicar(db){
   db.exec("CREATE TABLE IF NOT EXISTS migracao(n INTEGER PRIMARY KEY, nome TEXT, aplicada_em TEXT DEFAULT (datetime('now','localtime')))");
   const feitas=new Set(db.prepare('SELECT n FROM migracao').all().map(r=>r.n));

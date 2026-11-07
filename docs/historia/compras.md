@@ -116,3 +116,17 @@ tubos podem bater na contagem com material mais fino.
 - **A escolha de item de outro pedido é recusada duas vezes**: no leitor e no
   `nota_dominio`. Tirar a primeira trava não reprova o teste, porque a segunda
   segura — está anotado no STATUS.
+
+## Fase 9 — o sob medida pela mesma porta (07/11/2026)
+
+- **O rolo nasce pelo mesmo `rolo.entrada` de sempre**, chamado pela porta: o dono
+  único do saldo do rolo continua um só, e a etiqueta, a largura que ensina a
+  lista e o livro do rolo funcionam igual.
+- **O cadastro de fornecedor do sob medida virou espelho**, e não foi apagado: o
+  rolo, o custo e os relatórios de lá leem `fornecedor_id`. Cada linha ganhou o
+  fornecedor do PCP ao lado, e o recebimento acha (ou cria) o espelho certo.
+- **Sem a porta, recusa.** Tecido recebido no estoque do PCP no lugar do rolo seria
+  o tecido que o corte não acha.
+- **A varredura do `teste_backup` pegou o nome `tecido.db` escrito no teste novo** (o
+  banco temporário do sob medida): só o `tecido/nucleo/caminho.js` diz onde ele fica.
+  O arquivo temporário passou a se chamar `sob-medida.db`.

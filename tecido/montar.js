@@ -175,7 +175,12 @@ function montar(app, prefixo, opcoes){
      lado: este modulo sobe dentro de um try/catch justamente para que uma
      falha aqui nao derrube a expedicao (o comentario do topo). Um require
      desfaria isso em silencio. */
-  return { consumoDeMaterial: ()=>require('./dominio/consumo').materialDeCompra() };
+  return { consumoDeMaterial: ()=>require('./dominio/consumo').materialDeCompra(),
+    /* COMPRAS-E-RECEBIMENTO fase 9: o rolo nasce aqui pelo Recebimento do PCP
+       (a porta de volta e o `sobmedida_rolo.js` de la), e a lista de tecidos
+       para o cadastro de material do PCP apontar. */
+    criarRolosDoRecebimento: a=>require('./dominio/recebimento_pcp').criarRolos(a),
+    tecidosParaCompras: ()=>require('./dominio/recebimento_pcp').tecidos() };
 }
 
 module.exports={montar, MODULOS, PREFIXO:'/sobmedida'};

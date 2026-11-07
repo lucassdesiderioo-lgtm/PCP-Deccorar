@@ -120,7 +120,8 @@ function receber(db, b, quem){
 
   const prep = [];
   for(const it of itens){
-    const pi = db.prepare(`SELECT i.*, c.nome cnome, c.modo_saldo, c.peso_padrao_kg, c.tol_aviso_pct, c.tol_retem_pct, c.almoxarifado_id calm
+    const pi = db.prepare(`SELECT i.*, c.nome cnome, c.modo_saldo, c.peso_padrao_kg, c.tol_aviso_pct, c.tol_retem_pct, c.almoxarifado_id calm,
+        c.sm_tecido_id, c.largura_bobina_cm
       FROM pedido_item i LEFT JOIN componente c ON c.id=i.componente_id WHERE i.id=? AND i.pedido_id=?`).get(+it.pedido_item_id, ped.id);
     if(!pi) throw new Recusa(400, 'item ' + it.pedido_item_id + ' não é deste pedido');
     const nome = pi.cnome || pi.sku;
@@ -152,12 +153,16 @@ function receber(db, b, quem){
     let alm = it.almoxarifado_id ? +it.almoxarifado_id : (pi.calm || null);
     if(alm && !db.prepare('SELECT 1 FROM almoxarifado WHERE id=?').get(alm)) throw new Recusa(400, 'o almoxarifado escolhido para ' + nome + ' não existe');
     if(qtd === 0 && dev === 0) continue;
-    prep.push({ pi, nome, modo, qtd, dev: dev * (pi.fator || 1), motivoDev: dev > 0 ? it.motivo_devolucao : null, p1, p10, porKg, alm, volumes });
+    /* O TECIDO DO SOB MEDIDA (fase 9, R-CMP-49): o rolo nasce LA, pela porta, e
+       nada entra no estoque do PCP. Precisa da largura da bobina. */
+    const sm = !!(pi.sm_tecido_id && modo === 'volume');
+    if(sm && !(pi.largura_bobina_cm > 0)) throw new Recusa(400, nome + ' é tecido do sob medida: falta a largura da bobina no cadastro do material');
+    prep.push({ pi, nome, modo, qtd, dev: dev * (pi.fator || 1), motivoDev: dev > 0 ? it.motivo_devolucao : null, p1, p10, porKg, alm, volumes, sm });
   }
   if(!prep.length) throw new Recusa(400, 'nada foi informado como recebido ou devolvido');
 
   let recId, retidos = 0, avisos = 0, entradas = 0;
-  const volumesCriados = [];
+  const volumesCriados = [], rolosCriados = [];
   db.transaction(() => {
     recId = db.prepare('INSERT INTO recebimento (pedido_id, nota_fiscal, nota_data, recebido_por, recebido_por_id) VALUES (?,?,?,?,?)')
       .run(ped.id, b.nota_fiscal || null, b.nota_data || null, quem && quem.nome || null, quem && quem.id || null).lastInsertRowid;
@@ -178,8 +183,9 @@ function receber(db, b, quem){
         const av = pi.tol_aviso_pct != null ? pi.tol_aviso_pct : 2, rt = pi.tol_retem_pct != null ? pi.tol_retem_pct : 5;
         if(desvio != null) faixa = desvio <= av ? 'ok' : (desvio <= rt ? 'aviso' : 'retido');
       }
-      /* Contagem diferente da quantidade declarada RETEM (R-CMP-32). */
-      if(pi.qtd_declarada != null && x.qtd > 0 && Math.abs((pi.qtd_recebida || 0) + x.qtd - pi.qtd_declarada) > 1e-9) faixa = 'retido';
+      /* Contagem diferente da quantidade declarada RETEM (R-CMP-32). O tecido do
+         sob medida nao retem: o rolo nasce la, e la e que se acerta (R9). */
+      if(!x.sm && pi.qtd_declarada != null && x.qtd > 0 && Math.abs((pi.qtd_recebida || 0) + x.qtd - pi.qtd_declarada) > 1e-9) faixa = 'retido';
       const ri = db.prepare(`INSERT INTO recebimento_item (recebimento_id, pedido_item_id, qtd_embalagem, qtd_consumo, qtd_devolvida, motivo_devolucao,
           divergencia, qtd_contada, peso_1_kg, peso_10_kg, esperado_nota_kg, esperado_cadastro_kg, desvio_pct, faixa, fator_real, almoxarifado_id)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(recId, pi.id, pi.fator ? x.qtd / pi.fator : x.qtd, x.qtd, x.dev, x.motivoDev,
@@ -188,6 +194,18 @@ function receber(db, b, quem){
       if(faixa === 'aviso') avisos++;
       const custo = custoUnit(pi, x.qtd, db);
       db.prepare('UPDATE recebimento_item SET custo_unit=? WHERE id=?').run(custo, ri);
+      if(x.sm){
+        const larg = pi.largura_bobina_cm / 100;
+        const f = db.prepare('SELECT f.id, f.nome FROM pedido_compra p LEFT JOIN fornecedor f ON f.id=p.fornecedor_id WHERE p.id=?').get(ped.id);
+        let r;
+        try{ r = require('./sobmedida_rolo').criarRolos({ tecido_id:pi.sm_tecido_id, largura:larg, volumes:x.volumes, nf:b.nota_fiscal || null,
+          fornecedor: f && f.id ? { id:f.id, nome:f.nome } : null, preco_m2: custo != null ? custo / larg : null, usuario_nome:quem && quem.nome }); }
+        catch(e){ throw new Recusa(503, 'o rolo do sob medida não foi criado: ' + ((e && (e.mensagem || e.message)) || e)); }
+        rolosCriados.push.apply(rolosCriados, r || []);
+        somarRecebido(db, pi, x.qtd);
+        entradas++;
+        continue;
+      }
       darEntrada(db, pi, { modo_saldo:x.modo }, x.qtd, custo, ped.numero, quem);
       if(x.qtd > 0) entradas++;
       somarRecebido(db, pi, x.qtd);
@@ -197,7 +215,7 @@ function receber(db, b, quem){
   })();
   const st = db.prepare('SELECT status FROM pedido_compra WHERE id=?').get(ped.id).status;
   /* A resposta a quem recebe NAO traz desvio nem esperado: so o que fazer. */
-  return { recebimento_id:recId, status_pedido:st, entradas, retidos, avisos, volumes:volumesCriados,
+  return { recebimento_id:recId, status_pedido:st, entradas, retidos, avisos, volumes:volumesCriados, rolos:rolosCriados,
     aviso: retidos ? retidos + ' item(ns) ficou(aram) RETIDO(S): não guarde no estoque, deixe separado — quem libera decide.' :
            st === 'parcial' ? 'O pedido continua aberto — o saldo segue contando como a caminho.' : null };
 }

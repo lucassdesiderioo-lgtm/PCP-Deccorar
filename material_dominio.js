@@ -65,6 +65,17 @@ function lerCampos(db, b, atual){
     }
   }
 
+  /* O TECIDO DO SOB MEDIDA (fase 9): conferido pela porta — tecido que nao
+     existe la e recusado; sem a porta, nao da para apontar. */
+  if(tem('sm_tecido_id')){
+    if(b.sm_tecido_id === '' || b.sm_tecido_id === null) c.sm_tecido_id = null;
+    else{
+      const t = require('./sobmedida_rolo').tecidos();
+      if(t.fora) throw new Recusa(400, 'não dá para apontar o tecido do sob medida agora: ' + t.motivo);
+      if(!t.tecidos.some(x => x.id === +b.sm_tecido_id)) throw new Recusa(400, 'o tecido ' + b.sm_tecido_id + ' não existe no sob medida');
+      c.sm_tecido_id = +b.sm_tecido_id;
+    }
+  }
   if(tem('um_por_nivel')) c.um_por_nivel = b.um_por_nivel ? 1 : 0;
   else if(nascer) c.um_por_nivel = (c.modo_saldo === 'volume' && txt(b.familia)) ? 1 : 0;
 

@@ -2938,3 +2938,14 @@ de clicar na quarta, mesmo quando já podia.
 
 ---
 
+
+
+## Compras e Recebimento pela porta do PCP (spec COMPRAS-E-RECEBIMENTO, 07/11/2026)
+
+- **Fase 9 — o rolo nasce pelo Recebimento do PCP.** A entrada de rolo desta tela
+  está aposentada (`POST /api/rolos` recusa dizendo o caminho). O tecido é comprado
+  pela 501 e recebido pela 502 do PCP, que cria o rolo aqui pela porta
+  (`montar().criarRolosDoRecebimento` → `dominio/recebimento_pcp.js`), pelo
+  `rolo.entrada` de sempre. O fornecedor é o do PCP: a tabela `fornecedor` daqui é
+  o espelho (`fornecedor_pcp_id`, migração 40). O `tecido.db` continua sem ver o
+  `dados.db`.

@@ -144,7 +144,8 @@
       ['peso_padrao_kg','Peso de 1 unidade (kg)','num'],
       ['tol_aviso_pct','Tolerância de aviso (%)','num'], ['tol_retem_pct','Tolerância de reter (%)','num'],
       ['contagem_dias','Contar a cada (dias)','num'], ['margem_dias','Margem do "pedir até" (dias)','num'],
-      ['como_sai','Como sai do estoque','sel', OPC.como_sai, null]
+      ['como_sai','Como sai do estoque','sel', OPC.como_sai, null],
+      ['sm_tecido_id','Tecido do sob medida (o rolo nasce lá)','sel', ((OPC.tecidos_sm && OPC.tecidos_sm.tecidos) || []).map(function(t){ return { valor:t.id, nome:t.nome }; }), '— não é tecido do sob medida —']
     ];
     var val = function(k){ if(novo){ return ({ vai_ficha:1, um_por_nivel:0, unidade:'un', como_sai:'contagem', tol_aviso_pct:2, tol_retem_pct:5, contagem_dias:30, margem_dias:5 })[k]; } return c[k]; };
     box.innerHTML = '<div class="card"><div style="font-weight:700">' + (novo ? 'Material novo' : esc(c.nome)) + '</div>'

@@ -428,6 +428,24 @@
 - Status:           em código desde 07/11/2026. ⚠️ Os XML do teste foram montados no layout da Receita, não vieram de fornecedor: a prova com XML real é o primeiro que o dono anexar.
 - História:         fase 8.
 
+## I. Sob medida e almoxarifado único (fases 9 e 10)
+
+### R-CMP-11 (fase 9) · Um cadastro de fornecedor só
+- Regra:            o fornecedor é o do PCP. `node migrar_fornecedor_sobmedida.js` (simula; `--aplicar` com backup dos dois bancos) liga cada fornecedor do sob medida ao do PCP de mesmo nome (sem diferença de maiúscula e espaço) ou o cria lá; duplicatas de nome viram um só. O cadastro do sob medida vira espelho (`fornecedor.fornecedor_pcp_id`); o texto antigo do rolo fica; o rolo ganha `fornecedor_pcp_id` ao lado.
+- Por quê:          dois cadastros do mesmo fornecedor divergem.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_porta_sobmedida.js` (nome sem normalizar, reprova 1)
+- Status:           em código desde 07/11/2026; a migração roda no deploy.
+- História:         fase 9.
+
+### R-CMP-49 · Uma porta de entrada para o tecido do sob medida
+- Regra:            o material do PCP que é tecido do sob medida aponta o tecido de lá (`componente.sm_tecido_id`, conferido pela porta). Comprado pela 501 e recebido pela 502 por volume, o rolo NASCE no sob medida pela porta (`sobmedida_rolo.js` → `montar().criarRolosDoRecebimento`), um por volume, pelo `rolo.entrada` de sempre, com o tecido, a largura da bobina do cadastro, a nota, o fornecedor do PCP (pelo espelho) e o preço por m² (custo da unidade ÷ largura). Nada entra no estoque do PCP. Sem a porta, o recebimento desse tecido recusa (503) e nada é gravado. A entrada de rolo do sob medida (aba "Entrada de rolo", `POST /api/rolos`) está aposentada e recusa dizendo o caminho.
+- Por quê:          tecido tinha duas portas de entrada e dois cadastros de fornecedor.
+- Exceções:         o tecido do sob medida não fica retido pela contagem ≠ declarado: o rolo nasce lá, e lá se acerta (R9).
+- Teste que trava:  `teste_porta_sobmedida.js` (o tecido entrando no PCP, reprova; sem o espelho do fornecedor, 1; a entrada antiga aberta, 1; sem o preço, 1)
+- Status:           em código desde 07/11/2026.
+- História:         fase 9.
+
 ---
 
 ## O que NÃO fazer
@@ -447,4 +465,5 @@
 - ❌ Dar consumo zero com uma contagem só (é `null`)
 - ❌ Somar o mínimo com o ponto pela data, ou esquecer o que está a caminho
 - ❌ Casar item da nota por nome parecido ou por valor: só código do fornecedor ou NCM único
+- ❌ Dar entrada de tecido do sob medida no estoque do PCP, ou reabrir a entrada de rolo do sob medida: o rolo nasce lá pelo Recebimento
 - ❌ Mexer no saldo de material por volume fora do volume (ele é a soma dos volumes não encerrados), ou encerrar volume sem a saída pelo livro

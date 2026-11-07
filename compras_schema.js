@@ -64,7 +64,10 @@ const COLUNAS_COMPONENTE = [
   ['ncm',                'TEXT'],                  // 8 digitos, casa o XML (R-CMP-08)
   ['como_sai',           "TEXT DEFAULT 'contagem'"], // contagem | ficha (esperando a montagem, R-CMP-09)
   ['contagem_dias',      'INTEGER DEFAULT 30'],    // frequencia da contagem (R-CMP-42)
-  ['margem_dias',        'INTEGER DEFAULT 5']      // folga do "pedir ate" (R-CMP-47)
+  ['margem_dias',        'INTEGER DEFAULT 5'],     // folga do "pedir ate" (R-CMP-47)
+  /* fase 9 (R-CMP-49): o tecido do SOB MEDIDA que este material e — o
+     recebimento dele cria o rolo la, pela porta, e nao entra aqui. */
+  ['sm_tecido_id',       'INTEGER']
 ];
 
 const COLUNAS_SKU = [

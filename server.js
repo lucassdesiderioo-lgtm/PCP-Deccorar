@@ -224,6 +224,9 @@ try{
     materiais: () => db.prepare('SELECT id,nome,unidade,marca,modelo FROM componente WHERE ativo=1 ORDER BY nome').all()
   });
   require('./sobmedida_material').ligar(sm && sm.consumoDeMaterial);
+  /* A PORTA DO ROLO (COMPRAS-E-RECEBIMENTO fase 9): o recebimento do tecido do
+     sob medida cria o rolo la, e o cadastro de material do PCP aponta o tecido. */
+  require('./sobmedida_rolo').ligar(sm && { criarRolos:sm.criarRolosDoRecebimento, tecidos:sm.tecidosParaCompras });
 }catch(e){
   console.error('[sobmedida] NAO SUBIU:',e);
   app.use('/sobmedida',(req,res)=>res.status(503).send(

@@ -25,7 +25,8 @@ module.exports = function(app, db){
   app.get('/api/componentes/opcoes', (req, res) => res.json({
     modos: MAT.MODOS.map(m => ({ valor:m, nome:MAT.NOME_MODO[m] })),
     como_sai: MAT.COMO_SAI,
-    categorias: db.prepare("SELECT valor FROM listas WHERE tipo='categoria_material' AND ativo=1 ORDER BY ordem,id").all().map(r => r.valor)
+    categorias: db.prepare("SELECT valor FROM listas WHERE tipo='categoria_material' AND ativo=1 ORDER BY ordem,id").all().map(r => r.valor),
+    tecidos_sm: require('./sobmedida_rolo').tecidos()
   }));
 
   app.get('/api/componentes/pendencias', (req, res) => res.json(MAT.pendencias(db)));

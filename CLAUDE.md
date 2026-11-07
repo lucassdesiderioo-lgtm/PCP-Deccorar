@@ -1517,8 +1517,13 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 > segurança da fase 5. As telas `/admin/...` entram sozinhas, a partir do mapa; as
 > outras, não. Rode o teste da §10 com a tela nova na lista.
 
+> ⚠️ **O TECIDO DO SOB MEDIDA NÃO ENTRA NO ESTOQUE DO PCP** (R-CMP-49, fase 9): o
+> material com `sm_tecido_id` recebido por volume cria o ROLO lá, pela porta
+> (`sobmedida_rolo.js`), e sem a porta o recebimento recusa. A entrada de rolo do
+> sob medida está aposentada. O fornecedor é um só, o do PCP (o de lá é espelho).
+
 **Rode `node teste_material.js`, `node teste_pedido_compra.js`, `node
-teste_recebimento.js`, `node teste_nota_compra.js`, `node teste_almoxarifado.js`, `node teste_contagem_material.js`, `node teste_compra_programada.js`, `node teste_nota_xml.js` e `node teste_acesso_compras.js` ao mexer no cadastro de material, no almoxarifado, no
+teste_recebimento.js`, `node teste_nota_compra.js`, `node teste_almoxarifado.js`, `node teste_contagem_material.js`, `node teste_compra_programada.js`, `node teste_nota_xml.js`, `node teste_porta_sobmedida.js` (e `cd tecido && npm test`) e `node teste_acesso_compras.js` ao mexer no cadastro de material, no almoxarifado, no
 pedido, no fornecedor ou nas chaves de Compras.**
 
 ---
