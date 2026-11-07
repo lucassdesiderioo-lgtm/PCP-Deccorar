@@ -55,7 +55,7 @@ function nfDaNota(texto){
    manda. */
 async function lerFolha(arquivo){
   const pdfjs=require('pdfjs-dist/legacy/build/pdf.js');
-  const pdf=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(arquivo))}).promise;
+  const pdf=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(arquivo)), isEvalSupported:false}).promise;
   const etiquetas=[], notas=[], ctrlLinhas=[];
   for(let p=1;p<=pdf.numPages;p++){
     const lines=pageLines(await (await pdf.getPage(p)).getTextContent());

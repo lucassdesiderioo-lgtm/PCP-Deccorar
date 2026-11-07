@@ -72,7 +72,7 @@ if(require.main===module) (async()=>{
   async function lerItens(nome){
     const arq=path.join(C.LOTES, path.basename(nome));
     if(!fs.existsSync(arq)) return null;
-    const doc=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(arq))}).promise;
+    const doc=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(arq)), isEvalSupported:false}).promise;
     const folha=[];
     for(let p=1;p<=doc.numPages;p++){
       const linhas=pageLines(await (await doc.getPage(p)).getTextContent());

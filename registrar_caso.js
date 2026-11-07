@@ -84,7 +84,7 @@ function limparNota(linhas, nome){
 }
 
 (async()=>{
-  const doc=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(ARQ))}).promise;
+  const doc=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(ARQ)), isEvalSupported:false}).promise;
   const pags=[];
   for(let p=1;p<=doc.numPages;p++){
     const linhas=pageLines(await (await doc.getPage(p)).getTextContent());
