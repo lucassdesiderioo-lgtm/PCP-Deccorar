@@ -284,9 +284,14 @@ saem **dois** números, de lugares diferentes:
 | **Estado** (`"Para enviar no dia 17 de agosto"`) | o comprometido | os envios futuros |
 
 ```
-alvo    = max(alvo_minimo, média_na_janela × dias_cobertura)
+alvo    = max(alvo_minimo, ritmo × dias_cobertura)
+ritmo   = max(média da janela, média da janela curta)      ← desde 07/11/2026
 precisa = comprometido + alvo − estoque
 ```
+
+> Desde 07/11/2026 (PLANEJAMENTO-VENDAS-FUTURAS) a média e o comprometido contam
+> **peça** (Unidades) e cada linha segue a tabela do dono (`planilha_estado.js`) —
+> bloco "A PLANILHA SE LÊ PELA TABELA DO DONO", mais abaixo.
 
 > ⚠️ **ATÉ 26/09/2026 O IMPORT APAGAVA o que não veio no arquivo**, e um
 > recorte só com os próximos dias apagava os 30 dias de histórico: a média de
@@ -340,9 +345,10 @@ não depende de ninguém subir planilha inteira. `media_dominio.js` é o **dono
 > cujo original entrou no dia 31 não é venda nova. A tela diz quantos descartou.
 
 > ⚠️ **AS DUAS COLUNAS NÃO MEDEM A MESMA COISA, e a diferença não é defeito por
-> si.** A planilha conta **venda** (linha do arquivo) pela data da venda; o
-> sistema conta **peça** pela data do PDF. A caixa de 2 persianas é 1 na
-> planilha e 2 aqui. É exatamente isso que o dono vai conferir antes da troca.
+> si.** A planilha conta pela data da venda; o sistema conta **peça** pela data
+> do PDF. ~~A caixa de 2 persianas é 1 na planilha e 2 aqui~~ — **desde
+> 07/11/2026 a planilha também conta peça** (coluna Unidades, R-PLN-02), e o
+> pós-venda entra na média dela. É exatamente isso que o dono vai conferir antes da troca.
 
 > **O render achou duas coisas:** o resumo escrevia "últimos 18 dias" na frente
 > dos dois números com a janela do sistema cortada — a planilha parecia contada
@@ -410,7 +416,9 @@ relatório (`daPlanilha`) e marca os volumes (`marcar`); o import e o
 > ⚠️ **SÓ "CANCEL" CANCELA VOLUME.** As três frases do relatório (*"Cancelada
 > pelo comprador"*, *"Venda cancelada. Não envie."*, *"Pacote cancelado pelo
 > Mercado Livre"*) dizem "cancel". Devolução e reembolso (~260 linhas) são
-> **depois de entregue**: continuam só fora da média da planilha, como sempre.
+> **depois de entregue**: não cancelam volume. ~~Continuam só fora da média da
+> planilha~~ — **desde 07/11/2026 entram na média** (decisão do dono, §3-B da
+> PLANEJAMENTO-VENDAS-FUTURAS).
 >
 > ⚠️ **A CAIXA DE VÁRIAS NUNCA É CANCELADA SOZINHA**, porque cada item do
 > pacote tem o seu Estado: cancelar a caixa inteira tiraria da fila as
@@ -521,13 +529,17 @@ Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), sete linhas 
 - **Antes da primeira venda do SKU não há falta**: o saldo negativo (R-EST-08)
   entra na falta da primeira venda, e não numa coluna "Atrasada" vazia.
 - **A ordem pela data da falta (fase 4) nasce DESLIGADA**
-  (`config.ordem_por_falta = 0`) **e só o nível Admin Geral liga**, pelo botão
+  (`config.ordem_por_falta = 0`) **e só o Admin Geral liga** (quem está no
+  setor Admin Geral, pelo `ehAdminGeral` — a régua do §10), pelo botão
   da 401 (o `POST /api/planejamento/config` recusa os outros com 403 antes de
   gravar qualquer campo). Desligada, o `/api/revisao/producao` responde
   exatamente como antes. A reposição usa **dia corrido**, inclusive domingo.
 - **A cobertura do fechamento (`fluxo_estoque.cobertura`) lê a média do
   `demanda_dominio`** (R1): era uma segunda conta, por linha.
 - **Os botões 7 · 14 · 30 · 45 da 401 não gravam nada** (R9).
+- **Duas rotas novas de leitura**, `GET /api/planejamento/futuras` e
+  `/janelas`, caem na linha `pre('/api/planejamento')` → `@admin`, a mesma da
+  401. Nenhuma tela, ação ou setor novo.
 
 **Rode `node teste_vendas_futuras.js` (94) ao mexer no `planilha_estado.js`, no
 import do `plan_route.js`, no `demanda_dominio.js` ou na 401** — ele importa o
@@ -3755,7 +3767,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Contar LINHA da planilha onde a conta é PEÇA, ou contar a média, o
   comprometido ou a falta por dia fora do `demanda_dominio.js` (§3, R1/R2)
 - ❌ Ligar a `config.ordem_por_falta` por seed, script ou SQL: quem liga é o
-  dono, pela 401, e só o nível Admin Geral passa (§3, fase 4)
+  dono, pela 401, e só o Admin Geral passa (§3, fase 4)
 - ❌ Voltar a apagar a venda PASSADA por ausência no import da planilha: o
   recorte volta a zerar a média — e até a fase 3 ela ainda é gravada (§3, VENDAS F2)
 - ❌ Deixar `devolu|reembols` cancelar volume: é depois de entregue, e o card

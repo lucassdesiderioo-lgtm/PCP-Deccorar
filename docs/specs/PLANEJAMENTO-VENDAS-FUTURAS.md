@@ -8,8 +8,9 @@
 > - **A3 confirmado por construção** (a peça conferida sai do saldo e fica no
 >   comprometido até a próxima planilha; a coluna Atrasada estica isso). O dono
 >   escolheu **(a)**: construir assim, e a correção vira plano à parte.
-> - A chave da fase 4 só é ligada pelo **nível Admin Geral** (o §7 não cria ação
->   nova; a rota confere o nível). A fase 3 vale a partir do deploy.
+> - A chave da fase 4 só é ligada pelo **Admin Geral** (o setor; o §7 não cria
+>   ação nova, a rota confere). As rotas novas de leitura (`/futuras`, `/janelas`)
+>   caem em `@admin`, como a 401. A fase 3 vale a partir do deploy.
 > - "Pronto para coleta… segunda-feira" num relatório de segunda é o mesmo dia;
 >   sem dia na Descrição, dia seguinte "a confirmar".
 > - A simulação (`simular_ritmo.js`, 21 dias avaliados), com a régua que a
