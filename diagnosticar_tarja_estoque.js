@@ -20,13 +20,14 @@
  *   - o que a TRAVA da impressão vai fazer: quantas peças a fila pede, quantas
  *     estão livres, e quantas vendas vão ser recusadas no bipe.
  *
- * As duas contas estão escritas aqui DO JEITO QUE O CÓDIGO FAZ HOJE (06/11/2026):
- *   tela, linha por SKU  (public/embalagem.html, linhasPend):  livre <= 0
- *   tela, caixa de várias (public/embalagem.html, blocoCaixa): livre < qtd da peça
- *   trava da impressão   (etq_route.js, /api/embalar):          livre < o que ESTA caixa pede
+ * DESDE O CONSERTO DE 06/11/2026 (dívida 21) a tela usa a conta da FILA
+ * INTEIRA do SKU, e este diagnóstico usa a MESMA (tarja_estoque.js, dono único):
+ *   tela (linha por SKU e peça da caixa): falta = o que a fila de hoje pede − livre > 0
+ *   trava da impressão (etq_route.js, /api/embalar): livre < o que ESTA caixa pede
  *   livre = skus.estoque − peças em caixa impressa e não conferida (baixa_dominio.reservados)
- * A tela olha cada linha sozinha; a fila inteira do SKU não entra em conta
- * nenhuma da tela. É essa diferença que o relatório mede.
+ * Até ali a linha só acusava livre ≤ 0 e a peça comparava o livre só com a
+ * quantidade dela — era isso que deixava o SKU com alguma peça sem tarja. Hoje
+ * os grupos de "tarja faltando" têm que sair vazios; se não saírem, é defeito.
  *
  * ⚠️ O QUE ELE NÃO SABE: a prateleira. Se o sistema diz "2 livres" e a
  * prateleira está vazia, a tela está fazendo a conta certa com um saldo
@@ -38,6 +39,7 @@ const fs = require('fs'), os = require('os'), path = require('path');
 const { filaDoDia } = require('./fila_dia');
 const { COLETA, VARIAS } = require('./carga');
 const BAIXA = require('./baixa_dominio');
+const TARJA = require('./tarja_estoque');
 
 const up = s => String(s || '').toUpperCase();
 
@@ -45,13 +47,16 @@ const up = s => String(s || '').toUpperCase();
    teste confere (teste_diagnosticar_tarja_estoque.js). */
 function diagnosticar(db){
   const resv = BAIXA.reservados(db);
+  const ped = TARJA.pedidoHoje(db);
+  /* a tarja da tela: a conta do tarja_estoque (sob medida nunca) */
+  const tarjaTela = (c, livre, sob) => !sob && livre != null && ((ped.get(up(c))||0) - Math.max(0, livre)) > 0;
 
   /* 1. AS LINHAS POR SKU DA TELA — o mesmo SELECT do `linhasDeSku` do
-     exp_route.js (o JOIN por igualdade exata, sem UPPER, como lá). */
+     exp_route.js (o JOIN em maiúscula, como lá desde 06/11/2026). */
   const linhas = db.prepare(`SELECT l.codigo, COUNT(*) qtd,
       CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END modalidade,
       s.estoque, s.codigo cad
-    FROM lote l LEFT JOIN skus s ON s.codigo=l.codigo
+    FROM lote l LEFT JOIN skus s ON s.codigo=UPPER(l.codigo)
     WHERE ${filaDoDia('l')} AND NOT COALESCE(${VARIAS('l')},0)
     GROUP BY l.codigo, CASE WHEN ${COLETA('l')} THEN 'coleta' ELSE 'agencia' END`).all();
 
@@ -84,7 +89,7 @@ function diagnosticar(db){
     const livreTela = l.estoque==null ? null : l.estoque - (resv[up(l.codigo)]||0);
     s.lugares.push({ onde: l.modalidade==='coleta' ? 'linha da Coleta' : 'linha da Agência',
       pede:l.qtd, livre_na_tela:livreTela, sem_ligacao:l.estoque==null,
-      tarja: livreTela!=null && livreTela<=0 });
+      tarja: tarjaTela(l.codigo, livreTela, s.sob_medida) });
   }
   for(const c of caixas){
     for(const it of itensDe.all(c.id)){
@@ -93,7 +98,7 @@ function diagnosticar(db){
       s.caixas.push('NF '+(c.nf||'?')+' ('+(c.buyer||'sem comprador')+')');
       const livreTela = it.estoque==null ? null : it.estoque - (resv[up(it.codigo)]||0);
       s.lugares.push({ onde:'caixa de várias, NF '+(c.nf||'?'), pede:q, livre_na_tela:livreTela,
-        sem_ligacao:it.estoque==null, tarja: livreTela!=null && livreTela<q });
+        sem_ligacao:it.estoque==null, tarja: tarjaTela(it.codigo, livreTela, s.sob_medida) });
     }
   }
 

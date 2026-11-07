@@ -889,7 +889,7 @@ module.exports=function(app,db){
       m.nome modelo_nome, COALESCE(m.exige_medida,1) exige_medida,
       s.estoque
     FROM lote l
-    LEFT JOIN skus s ON s.codigo=l.codigo
+    LEFT JOIN skus s ON s.codigo=UPPER(l.codigo)
     LEFT JOIN cor c ON c.codigo=s.cor_codigo
     LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
     LEFT JOIN modelo m ON m.id=s.modelo_id
@@ -904,7 +904,11 @@ module.exports=function(app,db){
     linhas.forEach(l=>{ if(l.estoque!=null) l.estoque=l.estoque-(resv[String(l.codigo||'').toUpperCase()]||0); });
     return linhas;
   }
-  app.get('/api/pendentes',(req,res)=> res.json(livre(linhasDeSku(filaDoDia('l'),false))));
+  /* A TARJA "SEM ESTOQUE" CONTA A FILA INTEIRA DO SKU (CONSERTO de 06/11/2026,
+     dívida 21): cada linha leva `pedido_hoje` e `falta`, do tarja_estoque.js.
+     O JOIN acima passou a usar UPPER, como o da caixa de várias: o código
+     escrito em minúscula no lote deixava a linha sem número e sem tarja nunca. */
+  app.get('/api/pendentes',(req,res)=> res.json(require('./tarja_estoque').marcar(db, livre(linhasDeSku(filaDoDia('l'),false)))));
   /* ⚠️ AS CAIXAS DE VARIAS PERSIANAS TEM CARD PROPRIO, E POR UM MOTIVO FISICO.
      A coleta ganhou card proprio porque e um LUGAR diferente (§8-B); esta ganha
      porque e uma EMBALAGEM diferente — saco maior, as pecas juntas com fita, em
@@ -968,7 +972,11 @@ module.exports=function(app,db){
      cache continua chamando sem ele e recebe exatamente o que recebia. */
   app.get('/api/pendentes/varias',(req,res)=>{
     const depois=String((req.query&&req.query.quando)||'').toLowerCase()==='depois';
-    res.json(caixasDeVarias(depois ? DEPOIS('l') : filaDoDia('l')));
+    const cxs=caixasDeVarias(depois ? DEPOIS('l') : filaDoDia('l'));
+    /* As peças da caixa de HOJE levam a mesma conta da fila (tarja_estoque.js);
+       o painel do "depois" fica com a regra de antes. */
+    if(!depois){ const T=require('./tarja_estoque'), ped=T.pedidoHoje(db); cxs.forEach(v=>T.marcar(db, v.itens, ped)); }
+    res.json(cxs);
   });
   /* O GROUP BY repete a expressao em vez de usar o apelido `modalidade`: com o
      apelido, o SQLite agrupava pela COLUNA l.modalidade e o NULL (= agencia)
