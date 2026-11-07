@@ -56,3 +56,14 @@ tubos podem bater na contagem com material mais fino.
   custo médio dele é a média de todas as compras — senão seria o preço da última.
 - **O redesenho da 502 guarda o digitado** (a lição do §12): os campos são lidos
   na hora de confirmar, e um toque que redesenha devolve o que estava escrito.
+
+## Fase 4 — nota fiscal e custo (07/11/2026)
+
+- **O ICMS próprio não entra no custo pago**: ele está dentro do preço do produto.
+  O que se soma é o IPI e o ICMS-ST, que vêm por fora.
+- **O crédito é tabela, e a nota guarda o regime dela.** Quando a empresa mudar de
+  regime, a compra feita no Simples não ganha crédito para trás.
+- **A nota pode chegar antes ou depois da mercadoria.** Antes: o recebimento já
+  entra pelo líquido. Depois: o custo médio é corrigido pelo mesmo
+  `corrigirCustoPago` que o "preço da nota" de antes usava — o dono único do custo
+  médio continua um só.

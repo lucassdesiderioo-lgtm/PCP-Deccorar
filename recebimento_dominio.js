@@ -64,9 +64,14 @@ function fatorMedio(db, componente_id, excetoRecItem){
 }
 
 /* ── O CUSTO DE UMA UNIDADE DA CASA DESTE ITEM (R-CMP-34) ───────────────── */
-function custoUnit(pi, contadaAgora){
+function custoUnit(pi, contadaAgora, db){
+  /* Com nota lancada ANTES do recebimento, o valor e o LIQUIDO da nota
+     (R-CMP-26, fase 4). */
+  const nota = db ? require('./nota_dominio').liquidoDoItem(db, pi.id) : null;
+  if(nota && !(pi.qtd_compra != null && pi.preco_unid_compra != null))
+    return nota.quantidade > 0 ? nota.valor / (nota.quantidade * (pi.fator || 1)) : null;
   if(pi.qtd_compra != null && pi.preco_unid_compra != null){
-    const valor = pi.qtd_compra * pi.preco_unid_compra;
+    const valor = nota ? nota.valor : pi.qtd_compra * pi.preco_unid_compra;
     /* Primeira entrega do item: o valor inteiro ÷ o que chegou contado. Entrega
        parcial depois da primeira: pelo declarado (a conta exata so fecha com a
        nota, na fase 4). */
@@ -181,7 +186,7 @@ function receber(db, b, quem){
           faixa === 'ok' ? 'nenhuma' : 'quantidade', x.qtd, x.p1, x.p10, espN, espC, desvio, faixa, fator, x.alm).lastInsertRowid;
       if(faixa === 'retido'){ retidos++; continue; }
       if(faixa === 'aviso') avisos++;
-      const custo = custoUnit(pi, x.qtd);
+      const custo = custoUnit(pi, x.qtd, db);
       db.prepare('UPDATE recebimento_item SET custo_unit=? WHERE id=?').run(custo, ri);
       darEntrada(db, pi, { modo_saldo:x.modo }, x.qtd, custo, ped.numero, quem);
       if(x.qtd > 0) entradas++;
@@ -225,7 +230,7 @@ function decidir(db, id, b, quem){
       /* O devolvido NAO entra e continua a caminho: o fornecedor ainda deve. */
       db.prepare('UPDATE recebimento_item SET qtd_devolvida=?, motivo_devolucao=? WHERE id=?').run(ri.qtd_contada, b.motivo_devolucao || 'defeito', ri.id);
     }else{
-      const custo = custoUnit(pi, ri.qtd_contada);
+      const custo = custoUnit(pi, ri.qtd_contada, db);
       db.prepare('UPDATE recebimento_item SET custo_unit=? WHERE id=?').run(custo, ri.id);
       darEntrada(db, pi, { modo_saldo:pi.modo_saldo }, ri.qtd_contada, custo, ri.numero + ' (liberado)', quem);
       somarRecebido(db, pi, ri.qtd_contada);

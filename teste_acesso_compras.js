@@ -89,7 +89,11 @@ const ROTAS = [
   ['POST', '/api/recebimento/itens/5/ciencia', 'recebimento.liberar'],
   ['GET', '/api/compras/prazo', 'compras.ver'],
   ['GET', '/api/recebimento/aguardando', 'pedido.ver'],
-  ['POST', '/api/recebimento', 'pedido.receber']
+  ['POST', '/api/recebimento', 'pedido.receber'],
+  ['GET', '/api/notas', 'custo.ver'],
+  ['GET', '/api/notas', 'nota.lancar'],
+  ['POST', '/api/notas', 'nota.lancar'],
+  ['POST', '/api/notas/regime', 'nota.lancar']
 ];
 /* A excecao de Bia (componente.cadastrar) e o setor Compras da casa
    (pedido.criar, pedido.pagar) tem de levar as chaves certas — e o setor que

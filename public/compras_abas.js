@@ -400,6 +400,77 @@
       };
     } });
 
+  /* ── NOTAS (fase 4, R-CMP-22 a 27) ───────────────────────────────────── */
+  var CAMPOS_NOTA = [['quantidade','Qtd'],['valor_produto','Produto'],['desconto','Desconto'],['frete','Frete'],['seguro','Seguro'],['outras','Outras'],['ipi','IPI'],['icms','ICMS'],['icms_st','ICMS-ST']];
+  registrar({ id:'notas', nome:'Notas', perms:['nota.lancar','custo.ver'],
+    desenhar: async function(box){
+      var reg = await api('GET', '/api/notas/regime');
+      var notas = await api('GET', '/api/notas'); if(!Array.isArray(notas)) notas = [];
+      var peds = await api('GET', '/api/pedidos'); if(!Array.isArray(peds)) peds = [];
+      var nomeReg = function(v){ var x = (reg.regimes || []).find(function(r){ return r.valor === v; }); return x ? x.nome : v; };
+      box.innerHTML = '<div class="card"><div style="font-weight:700">Notas fiscais de compra</div>'
+        + '<div class="sub" style="margin:4px 0 10px"><b>Custo pago</b> = produto − desconto + frete + seguro + outras + IPI + ICMS-ST. <b>Custo líquido</b> = pago − os créditos que o regime aproveita. '
+        + 'Regime vigente: <b>' + esc(nomeReg(reg.vigente)) + '</b> — cada nota grava o regime da data dela. O custo médio do material anda pelo líquido ÷ o que foi recebido.</div>'
+        + '<div class="cmpRola"><table class="cmpTab"><thead><tr><th>Nota</th><th>Pedido</th><th>Emitente</th><th>Emissão</th><th>Regime</th><th>Total pago</th><th>Líquido</th></tr></thead><tbody>'
+        + (notas.length ? notas.map(function(n){ var liq = (n.itens || []).reduce(function(s, i){ return s + (i.custo_liquido || 0); }, 0);
+            return '<tr><td>' + (n.sem_nota ? '<span class="cmpChip am">sem nota</span>' : esc(n.numero) + (n.serie ? '/' + esc(n.serie) : '')) + (n.origem && n.origem !== 'manual' ? ' <span class="cmpChip">' + esc(n.origem) + '</span>' : '') + '</td>'
+              + '<td class="code">' + esc(n.pedido_numero || '—') + '</td><td>' + esc(n.emitente_nome || '—') + '</td><td>' + data(n.emissao) + '</td><td>' + esc(nomeReg(n.regime)) + '</td><td>' + brl(n.total_nota) + '</td><td>' + brl(liq) + '</td></tr>'; }).join('')
+          : '<tr><td colspan="7" class="sub">Nenhuma nota lançada.</td></tr>') + '</tbody></table></div></div>'
+        + (pode('nota.lancar') ? '<div class="card"><div style="font-weight:700">Lançar nota</div><div class="cmpG"><div style="grid-column:span 2"><label>Pedido</label><select id="ntPed">'
+            + opt(peds.filter(function(p){ return p.status !== 'cancelado' && p.status !== 'rascunho'; }).map(function(p){ return { valor:p.id, nome:p.numero + ' · ' + (p.fornecedor_nome || p.loja || '—') }; }), '', '— escolha —') + '</select></div></div><div id="ntForm"></div></div>' : '')
+        + '<div id="ntXml"></div><div id="ntRegras"></div>';
+      var sel = $('#ntPed'); if(sel) sel.onchange = function(){ formNota(+this.value); };
+      regrasCredito($('#ntRegras'), reg);
+      if(window.CMP.xml) window.CMP.xml($('#ntXml'));
+    } });
+
+  async function formNota(pid){
+    var box = $('#ntForm'); if(!pid){ box.innerHTML = ''; return; }
+    var p = await api('GET', '/api/pedidos/' + pid);
+    box.innerHTML = '<div class="cmpG"><div><label>Sem nota?</label><select id="ntSem"><option value="0">não — tem nota</option><option value="1">sim — compra sem nota</option></select></div>'
+      + '<div><label>Número</label><input id="ntNum"></div><div><label>Série</label><input id="ntSerie"></div><div><label>Emissão</label><input id="ntEmi" type="date" value="' + new Date().toISOString().slice(0,10) + '"></div>'
+      + '<div><label>CNPJ do emitente</label><input id="ntCnpj"></div><div><label>Emitente</label><input id="ntEmit" value="' + esc(p.fornecedor_nome || p.loja || '') + '"></div>'
+      + '<div><label>Frete só no total (R$)</label><input id="ntFrete" type="number" step="0.01" min="0"></div><div><label>Desconto só no total (R$)</label><input id="ntDesc" type="number" step="0.01" min="0"></div>'
+      + '<div><label>Seguro só no total</label><input id="ntSeg" type="number" step="0.01" min="0"></div><div><label>Outras despesas no total</label><input id="ntOut" type="number" step="0.01" min="0"></div></div>'
+      + '<div class="sub">O que vier só no total da nota é <b>rateado pelo valor</b> entre os itens.</div>'
+      + '<div class="cmpRola"><table class="cmpTab"><thead><tr><th>Item</th>' + CAMPOS_NOTA.map(function(c){ return '<th>' + c[1] + '</th>'; }).join('') + '<th>Pago (sem nota)</th></tr></thead><tbody>'
+      + (p.itens || []).map(function(i){ return '<tr data-nti="' + i.id + '"><td>' + esc(i.item) + '</td>' + CAMPOS_NOTA.map(function(c){
+          var v = c[0] === 'quantidade' ? (i.qtd_compra != null ? i.qtd_compra : i.qtd_embalagem) : (c[0] === 'valor_produto' ? Math.round((i.desembolso || 0) * 100) / 100 : '');
+          return '<td><input data-ntc="' + c[0] + '" type="number" step="any" min="0" value="' + esc(v) + '" style="width:90px"></td>'; }).join('')
+          + '<td><input data-ntc="valor_pago" type="number" step="0.01" min="0" style="width:90px"></td></tr>'; }).join('')
+      + '</tbody></table></div><button class="primary" data-perm="nota.lancar" id="ntOk">Lançar nota</button> <span class="msg" id="ntMsg"></span>';
+    $('#ntOk').onclick = async function(){
+      var itens = Array.prototype.map.call(box.querySelectorAll('[data-nti]'), function(tr){
+        var o = { pedido_item_id:+tr.getAttribute('data-nti') };
+        tr.querySelectorAll('[data-ntc]').forEach(function(e){ if(e.value !== '') o[e.getAttribute('data-ntc')] = e.value; });
+        return o; });
+      var r = await api('POST', '/api/notas', { pedido_id:pid, sem_nota:$('#ntSem').value === '1', numero:$('#ntNum').value, serie:$('#ntSerie').value, emissao:$('#ntEmi').value,
+        emitente_cnpj:$('#ntCnpj').value, emitente_nome:$('#ntEmit').value, frete_total:$('#ntFrete').value, desconto_total:$('#ntDesc').value,
+        seguro_total:$('#ntSeg').value, outras_total:$('#ntOut').value, itens:itens });
+      if(r.erro) return msg($('#ntMsg'), r);
+      abrir('notas');
+    };
+  }
+
+  function regrasCredito(box, reg){
+    if(!box) return;
+    var ag = pode('alcada.definir');
+    box.innerHTML = '<div class="card"><div style="font-weight:700">Regime e tabela de crédito</div>'
+      + '<div class="sub" style="margin:4px 0 10px">O crédito de ICMS e IPI vem desta tabela, e não do código. Mudar o regime não dá crédito retroativo: cada nota guarda o regime dela. '
+      + (ag ? '' : 'Só o Admin Geral muda.') + '</div>'
+      + '<table class="cmpTab"><thead><tr><th>Regime</th><th>Imposto</th><th>Aproveita?</th><th>Desde</th></tr></thead><tbody>'
+      + (reg.regras || []).map(function(r){ return '<tr><td>' + esc(r.regime) + '</td><td>' + esc(r.imposto) + '</td><td>' + (r.aproveita ? 'sim' : 'não') + '</td><td>' + data(r.vigente_desde) + '</td></tr>'; }).join('') + '</tbody></table>'
+      + (ag ? '<div class="cmpG"><div><label>Regime vigente</label><select id="rgVig">' + opt(reg.regimes, reg.vigente) + '</select></div></div><button class="ghost" id="rgOk">Mudar regime</button> <span class="msg" id="rgMsg"></span>'
+        + '<div class="cmpG"><div><label>Regime</label><select id="rcReg">' + opt(reg.regimes, 'real') + '</select></div><div><label>Imposto</label><select id="rcImp"><option value="icms">ICMS</option><option value="ipi">IPI</option></select></div>'
+        + '<div><label>Aproveita?</label><select id="rcAp"><option value="1">sim</option><option value="0">não</option></select></div><div><label>Desde</label><input id="rcDesde" type="date"></div></div>'
+        + '<button class="ghost" id="rcOk">Acrescentar regra</button> <span class="msg" id="rcMsg"></span>' : '') + '</div>';
+    box.onclick = async function(ev){
+      var r;
+      if(ev.target.id === 'rgOk'){ r = await api('POST', '/api/notas/regime', { vigente:$('#rgVig').value }); if(r.erro) return msg($('#rgMsg'), r); return abrir('notas'); }
+      if(ev.target.id === 'rcOk'){ r = await api('POST', '/api/notas/regras', { regime:$('#rcReg').value, imposto:$('#rcImp').value, aproveita:$('#rcAp').value === '1', vigente_desde:$('#rcDesde').value }); if(r.erro) return msg($('#rcMsg'), r); return abrir('notas'); }
+    };
+  }
+
   /* ── COMPRA RAPIDA (fase 2, R-CMP-21) ───────────────────────────────── */
   registrar({ id:'rapida', nome:'Compra rápida', perms:['pedido.criar'],
     desenhar: async function(box){

@@ -6,7 +6,7 @@ Situação: em construção (execução contínua das fases 1 a 11 autorizada pe
 Criada em: 06/11/2026
 Última atualização: 07/11/2026
 Fase atual: ver o diário de construção logo abaixo
-Fases: 1 ☑  2 ☑  3 ☑  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐  9 ☐  10 ☐  11 ☐
+Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☐  6 ☐  7 ☐  8 ☐  9 ☐  10 ☐  11 ☐
 Decidido em 07/11/2026: fase 10 = o PCP é dono do endereço, o sob medida do rolo e
 da sobra (R-CMP-50) · fase 11 construída sem certificado, pronta para recebê-lo
 Risco: 🔴 (schema, estoque de material, custo, acesso, dado do sob medida)
@@ -140,6 +140,34 @@ custo pelo declarado, 1; contagem ≠ declarado passando, reprova; prazo sempre 
 decidir sem motivo, 4; sem a faixa de aviso, reprova). Tela: a 502 a 1024 px, sem
 rolagem de lado; a aba Recebimento retido mostrando o retido com as réguas.
 
+### Fase 4 — nota fiscal e custo (07/11/2026) ☑
+
+```
+📋 PLANO
+Tipo: FASE 4 da spec COMPRAS-E-RECEBIMENTO        Risco: 🔴
+O que vai ser feito: nota e itens digitados, impostos, rateio, sem nota, regime e
+  regra_credito, custo pago e líquido, custo médio pelo líquido.
+O que vou mudar: compras_schema.js (nota_compra, nota_compra_item, regra_credito, semente
+  do Simples) · nota_dominio.js e nota_route.js (novos) · recebimento_dominio.js (entra
+  pelo líquido quando a nota veio antes) · pedido_route.js (as notas no pedido, podadas) ·
+  acesso.js · public/compras_abas.js (aba Notas, regime e tabela)
+Regra de negócio muda? SIM → antes: preço sem impostos, nota só número e data. Depois:
+  nota completa, custo pago/líquido (DECISOES.md 06/11)
+Como vou testar: teste_nota_compra.js (novo, antes do código); defeitos reintroduzidos;
+  a aba Notas no navegador
+Fica de fora: a nota por XML (fase 8)
+
+🔐 ALÇADA
+Telas novas: nenhuma (a 501 ganha a aba Notas)
+Ações novas: nenhuma (nota.lancar entrou na fase 2); regime e tabela de crédito: só o Admin Geral
+Setores novos: nenhum
+Quem recebe: —
+```
+
+**Feito.** `teste_nota_compra.js` 32 casos; sete defeitos reintroduzidos um a um (ICMS no
+custo pago reprova 7; crédito sem a tabela, 3; sem rateio, 7; custo médio parado, 2; notas
+sem poda, 1; recebimento ignorando a nota, 1; regime que não é o vigente, 2).
+
 ### Mudanças no caminho
 
 (decisões de construção que não mudam regra — nome de coluna, layout, ordem de campos)
@@ -185,6 +213,13 @@ rolagem de lado; a aba Recebimento retido mostrando o retido com as réguas.
 - **Fase 3:** a decisão do retido grava `decidido_por_id` além do nome (a spec listava só o nome).
 - **Fase 3:** a tela antiga mandava "embalagens recebidas"; a rota ainda aceita (tablet com
   cache), convertendo pelo fator.
+- **Fase 4:** mudar o regime vigente e acrescentar regra de crédito é do Admin Geral (a rota
+  pede `nota.lancar` e o handler exige o Admin Geral): a §7 não tem chave para isso, e a
+  tabela muda o custo de tudo.
+- **Fase 4:** o regime gravado na nota é o vigente no momento do lançamento, e a regra de
+  crédito escolhida é a vigente na data de EMISSÃO.
+- **Fase 4:** `nota_compra_item.codigo_fornecedor` entrou (o cProd do XML, para a fase 8 casar
+  pela oferta).
 
 ### Achei no caminho (não mexi)
 

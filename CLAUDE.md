@@ -1470,6 +1470,7 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 |---|---|
 | `material_dominio.js` | as regras das colunas novas do material e o almoxarifado (fase 1) |
 | `compra_dominio.js` | o caminho do pedido depois do rascunho, a alçada, as parcelas e a compra rápida (fase 2) |
+| `nota_dominio.js` | a nota de compra, o rateio, o regime e a tabela de crédito, o custo pago e líquido (fase 4) |
 | `recebimento_dominio.js` | a fila sem preço, a contagem cega, a pesagem, as réguas e as faixas, o retido, o custo por recebido, o fator real e o prazo medido (fase 3) |
 
 > ⚠️ **MATERIAL NOVO NÃO NASCE SEM O MODO DE SALDO** (R-CMP-03, armadilha #30):
@@ -1496,9 +1497,13 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 > nem o peso esperado do item por quantidade — e não é esquecimento. O retido
 > (peso acima da tolerância, ou contagem ≠ declarado) **não entra no saldo** até
 > alguém com `recebimento.liberar` decidir, com motivo (501, aba Recebimento retido).
+>
+> ⚠️ **O CRÉDITO DE IMPOSTO VEM DA TABELA `regra_credito`, NÃO DO CÓDIGO** (R-CMP-25),
+> e cada nota grava o regime da data dela: mudar o regime não dá crédito para trás.
+> O custo médio anda pelo LÍQUIDO ÷ o recebido, pelo `componente_dominio` (R-CMP-26).
 
 **Rode `node teste_material.js`, `node teste_pedido_compra.js`, `node
-teste_recebimento.js` e `node teste_acesso_compras.js` ao mexer no cadastro de material, no almoxarifado, no
+teste_recebimento.js`, `node teste_nota_compra.js` e `node teste_acesso_compras.js` ao mexer no cadastro de material, no almoxarifado, no
 pedido, no fornecedor ou nas chaves de Compras.**
 
 ---

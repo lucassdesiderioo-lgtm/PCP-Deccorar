@@ -274,6 +274,56 @@
 - Status:           em código desde 07/11/2026.
 - História:         fase 3.
 
+## D. Nota fiscal e custo (fase 4)
+
+### R-CMP-22 · Nota é registro próprio, e sem nota também é registro
+- Regra:            `nota_compra` + `nota_compra_item`; um pedido pode ter várias notas. Compra sem nota é permitida e marcada (`sem_nota = 1`), com o valor pago digitado no item. Nota (com nota) sem número é recusada.
+- Por quê:          sem os itens da nota não há custo real nem crédito.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_nota_compra.js`
+- Status:           em código desde 07/11/2026.
+- História:         fase 4.
+
+### R-CMP-23 · Os valores do item são gravados como vieram, e o total é rateado pelo valor
+- Regra:            produto, desconto, frete, seguro, outras, IPI, ICMS, ICMS-ST, CFOP e NCM por item. Frete, desconto, seguro e outras lançados só no total da nota são repartidos pelo valor do produto (o centavo do arredondamento vai para o último).
+- Por quê:          a mesma régua do `COMPRAS.md`.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_nota_compra.js` (sem rateio, reprova 7)
+- Status:           em código desde 07/11/2026.
+- História:         fase 4.
+
+### R-CMP-24 · Custo pago e custo líquido
+- Regra:            pago = produto − desconto + frete + seguro + outras + IPI + ICMS-ST (o ICMS próprio não entra); líquido = pago − os créditos que o regime aproveita. Os dois gravados por item. No Simples, iguais.
+- Por quê:          o custo real, e o crédito que a mudança de regime vai pedir.
+- Exceções:         sem nota: pago = líquido = o valor pago.
+- Teste que trava:  `teste_nota_compra.js` (ICMS no pago, reprova 7)
+- Status:           em código desde 07/11/2026.
+- História:         fase 4.
+
+### R-CMP-25 · O crédito vem de uma tabela por regime, e a nota grava o regime da data dela
+- Regra:            `regra_credito` (regime, imposto, aproveita, vigente desde), semeada com o Simples sem crédito; regime vigente em `config.regime_vigente`. Mudar o regime ou a tabela é do Admin Geral. A nota guarda o regime: a compra do Simples nunca ganha crédito retroativo.
+- Por quê:          a lição do preço congelado no pedido.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_nota_compra.js` (crédito sem a tabela, reprova 3; regime não vigente, 2)
+- Status:           em código desde 07/11/2026.
+- História:         fase 4.
+
+### R-CMP-26 · O custo médio anda pelo líquido ÷ o recebido
+- Regra:            nota lançada depois do recebimento corrige o custo médio pelo `componente_dominio.corrigirCustoPago` (dono único); nota lançada antes faz o recebimento entrar pelo líquido. O custo médio continua só se movendo na entrada.
+- Por quê:          o preço médio real de cada material, café incluído.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_nota_compra.js` (custo médio parado, reprova 2; recebimento ignorando a nota, 1)
+- Status:           em código desde 07/11/2026.
+- História:         fase 4.
+
+### R-CMP-27 · Quem vê nota, impostos e parcelas
+- Regra:            só `custo.ver` ou `nota.lancar` (as parcelas, também `pedido.pagar`). As rotas `/api/notas` pedem essas chaves, e o pedido completo poda as notas no JSON.
+- Por quê:          regra 14 do §13: não é a tela que esconde.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_nota_compra.js` (notas sem poda, reprova 1); `teste_acesso_compras.js`
+- Status:           em código desde 07/11/2026.
+- História:         fase 4.
+
 ---
 
 ## O que NÃO fazer
@@ -287,3 +337,5 @@
 - ❌ Deixar a compra rápida passar por fora da alçada
 - ❌ Mandar à fila do Recebimento o pedido, o declarado ou o peso esperado do item por quantidade: a contagem é cega
 - ❌ Dar entrada no saldo do retido antes de alguém decidir
+- ❌ Calcular crédito de imposto no código, ou recalcular o líquido de uma nota antiga quando o regime muda
+- ❌ Pôr o ICMS próprio no custo pago

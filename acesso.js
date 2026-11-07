@@ -1111,6 +1111,11 @@ module.exports = function(app, db){
     // vem — e por isso a leitura NAO carrega preco (regra 14 do §13).
     // Recebimento (§8): a tela e as rotas de conferencia sao de OPERACAO e nao
     // carregam preco. Lancar o preco da nota e do Comprador.
+    /* COMPRAS-E-RECEBIMENTO fase 4: a nota (R-CMP-27: so custo.ver ou nota.lancar).
+       Regime e tabela de credito: a rota pede nota.lancar, e o handler exige o
+       Admin Geral. */
+    if(M !== 'GET' && pre('/api/notas')) return 'nota.lancar';
+    if(pre('/api/notas')) return ['custo.ver','nota.lancar'];
     /* COMPRAS-E-RECEBIMENTO fase 3: o retido e o aviso (R-CMP-33), o prazo medido. */
     if(eq('/api/recebimento/retidos')) return ['recebimento.liberar','compras.ver'];
     if(M !== 'GET' && pre('/api/recebimento/itens')) return 'recebimento.liberar';

@@ -141,6 +141,8 @@ module.exports = function(app, db){
     /* AS PARCELAS SO VIAJAM A QUEM TEM custo.ver, nota.lancar OU pedido.pagar
        (COMPRAS-E-RECEBIMENTO R-CMP-27): a poda e no JSON, nao na tela. */
     if(pode(req,'custo.ver')||pode(req,'nota.lancar')||pode(req,'pedido.pagar')) p.parcelas=D.parcelasDe(db,p.id);
+    /* As NOTAS (impostos, custo pago e liquido) so com custo.ver ou nota.lancar (R-CMP-27). */
+    if(pode(req,'custo.ver')||pode(req,'nota.lancar')){ try{ p.notas=require('./nota_dominio').listar(db,{pedido_id:p.id}); }catch(e){ p.notas=[]; } }
     const a=D.alcadaDe(db,p.criado_por_id);
     p.alcada=a?{limite:a.limite, aprovador_id:a.aprovador_id}:null;
     try{ p.anexos=db.prepare('SELECT id,tipo,nome,criado_em,criado_por FROM compra_anexo WHERE pedido_id=? ORDER BY id').all(p.id); }catch(e){ p.anexos=[]; }

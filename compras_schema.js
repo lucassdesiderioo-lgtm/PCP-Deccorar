@@ -172,6 +172,38 @@ function garantirSchemaCompras(db){
       criado_por     TEXT, criado_por_id INTEGER
     );
 
+    /* ── NOTA FISCAL DE COMPRA (COMPRAS-E-RECEBIMENTO fase 4, R-CMP-22 a 26) ──
+       Um pedido pode ter varias notas (entrega parcial). Compra SEM nota tambem
+       e registro (sem_nota = 1), com o valor pago digitado no item. Cada nota
+       grava o REGIME da data dela (R-CMP-25). origem: manual | xml | dfe. */
+    CREATE TABLE IF NOT EXISTS nota_compra (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pedido_id INTEGER REFERENCES pedido_compra(id),
+      chave TEXT, numero TEXT, serie TEXT, emitente_cnpj TEXT, emitente_nome TEXT, emissao TEXT,
+      total_produtos REAL, total_desconto REAL, total_frete REAL, total_seguro REAL, total_outras REAL,
+      total_ipi REAL, total_icms REAL, total_icms_st REAL, total_nota REAL,
+      sem_nota INTEGER DEFAULT 0, regime TEXT, origem TEXT DEFAULT 'manual',
+      criado_em TEXT DEFAULT (datetime('now','localtime')), criado_por TEXT, criado_por_id INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_nota_pedido ON nota_compra(pedido_id);
+    CREATE TABLE IF NOT EXISTS nota_compra_item (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nota_id INTEGER NOT NULL REFERENCES nota_compra(id),
+      pedido_item_id INTEGER, componente_id INTEGER,
+      descricao TEXT, ncm TEXT, cfop TEXT, unidade TEXT, quantidade REAL,
+      valor_produto REAL, desconto REAL, frete REAL, seguro REAL, outras REAL,
+      ipi REAL, icms REAL, icms_st REAL, credito_icms REAL, credito_ipi REAL,
+      custo_pago REAL, custo_liquido REAL, codigo_fornecedor TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_nota_item_pi ON nota_compra_item(pedido_item_id);
+    /* O credito vem de uma TABELA por regime, nao do codigo (R-CMP-25). */
+    CREATE TABLE IF NOT EXISTS regra_credito (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      regime TEXT NOT NULL, imposto TEXT NOT NULL, aproveita INTEGER NOT NULL DEFAULT 0,
+      vigente_desde TEXT NOT NULL,
+      criado_em TEXT DEFAULT (datetime('now','localtime')), criado_por TEXT, criado_por_id INTEGER
+    );
+
     /* ── FORNECEDOR (§9) ──────────────────────────────────────────────────── */
     CREATE TABLE IF NOT EXISTS fornecedor (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -475,6 +507,18 @@ function garantirSchemaCompras(db){
     ['esperado_cadastro_kg','REAL'],['desvio_pct','REAL'],['faixa','TEXT'],['decisao','TEXT'],['decidido_por','TEXT'],
     ['decidido_por_id','INTEGER'],['decidido_em','TEXT'],['motivo_decisao','TEXT'],['fator_real','REAL'],['almoxarifado_id','INTEGER'],['custo_unit','REAL']]);
   colunas('pedido_item', [['unidade_compra','TEXT'],['qtd_compra','REAL'],['preco_unid_compra','REAL'],['qtd_declarada','REAL']]);
+  /* R-CMP-25: o Simples Nacional nao aproveita credito — a tabela nasce com
+     isso, uma vez so. Os outros regimes o contador lanca pela tela. */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='cmp_regra_credito_1'").get()){
+      db.transaction(() => {
+        for(const imp of ['icms','ipi'])
+          db.prepare("INSERT INTO regra_credito (regime, imposto, aproveita, vigente_desde, criado_por) VALUES ('simples', ?, 0, '2000-01-01', 'semente')").run(imp);
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('regime_vigente','simples')").run();
+        db.prepare("INSERT INTO config (chave,valor) VALUES ('cmp_regra_credito_1','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[compras] semente da regra de credito falhou: ' + e.message); }
   /* R-CMP-15: o status `enviado` passa a se chamar COMPRADO. Nada real foi
      lancado, mas a migracao e feita assim mesmo, uma vez so: a data da compra
      de quem ja estava `enviado` e o `enviado_em`. */
