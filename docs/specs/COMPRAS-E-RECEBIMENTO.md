@@ -6,7 +6,7 @@ Situação: em construção (execução contínua das fases 1 a 11 autorizada pe
 Criada em: 06/11/2026
 Última atualização: 07/11/2026
 Fase atual: ver o diário de construção logo abaixo
-Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☑  8 ☐  9 ☐  10 ☐  11 ☐
+Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☑  8 ☑  9 ☐  10 ☐  11 ☐
 Decidido em 07/11/2026: fase 10 = o PCP é dono do endereço, o sob medida do rolo e
 da sobra (R-CMP-50) · fase 11 construída sem certificado, pronta para recebê-lo
 Risco: 🔴 (schema, estoque de material, custo, acesso, dado do sob medida)
@@ -254,6 +254,31 @@ Quem recebe: —
 reprova 3; sem descontar a caminho, 1; sem arredondar à embalagem, 1; pedir até sem o prazo,
 5; a lista com tudo, 2). A aba gerou os rascunhos pela tela.
 
+### Fase 8 — nota por XML (07/11/2026) ☑
+
+```
+📋 PLANO
+Tipo: FASE 8 da spec COMPRAS-E-RECEBIMENTO        Risco: 🟡
+O que vai ser feito: anexar o XML preenche nota e itens; casa material pelo código do
+  fornecedor na oferta e pelo NCM; o que não casar fica para escolher, nunca adivinhado.
+O que vou mudar: nota_xml.js (novo, o leitor e o casamento) · nota_route.js (ler e lançar
+  pelo XML) · teste_dados/nfe/ (dois XML) · public/compras_abas.js (a seção na aba Notas)
+Regra de negócio muda? NÃO além da spec
+Como vou testar: teste_nota_xml.js (novo, antes do código); defeitos reintroduzidos;
+  a leitura pela tela
+Fica de fora: ler o DANFE em PDF (spec §5)
+
+🔐 ALÇADA
+Telas novas: nenhuma · Ações novas: nenhuma (nota.lancar) · Setores: nenhum · Quem recebe: —
+```
+
+**Feito.** `teste_nota_xml.js` 25 casos; defeitos reintroduzidos (NCM ambíguo adivinhado
+reprova 1; lançar sem decidir, reprova; a chave duas vezes, 1; sem tirar o namespace,
+reprova; sem desescapar o "&amp;", 1). A trava "item de outro pedido" do leitor não reprova
+sozinha porque o `nota_dominio` também recusa (proteção em dobro). ⚠️ **Os dois XML do teste
+foram montados no layout 4.00 — não são de fornecedor real.** A prova com XML real é a
+primeira nota que o dono anexar.
+
 ### Mudanças no caminho
 
 (decisões de construção que não mudam regra — nome de coluna, layout, ordem de campos)
@@ -329,6 +354,11 @@ reprova 3; sem descontar a caminho, 1; sem arredondar à embalagem, 1; pedir at�
 - **Fase 7:** a sugestão pela data enche até o maior entre o ideal e o ponto de pedido.
 - **Fase 7:** os rascunhos gerados vão para o fornecedor da oferta da última compra; quem não
   tem oferta vai num rascunho sem fornecedor (vira compra rápida ou ganha fornecedor).
+- **Fase 8:** o leitor do XML é próprio (expressões sobre um documento de formato fixo), sem
+  dependência nova.
+- **Fase 8:** a mesma chave de acesso não entra duas vezes (409).
+- **Fase 8:** "ler" devolve a nota, o casamento e os pedidos do emitente (pelo CNPJ do
+  fornecedor) sem gravar; "lançar" exige todo item decidido.
 
 ### Achei no caminho (não mexi)
 

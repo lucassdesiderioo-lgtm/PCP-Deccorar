@@ -1474,6 +1474,7 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 | `almox_dominio.js` | o endereço (haste → andar → nível), o volume etiquetado, guardar, mover e abrir (fase 5) |
 | `contagem_material_dominio.js` | a contagem de material por almoxarifado (504), a tolerância, a aprovação, o consumo pela contagem e a média de compra (fase 6) |
 | `programada_dominio.js` | a compra programada: lista do mês e aviso pela data, o maior e nunca a soma (fase 7) |
+| `nota_xml.js` | o leitor do XML da NF-e e o casamento sem adivinhar (fase 8; e a porta da nota baixada da Receita, fase 11) |
 | `recebimento_dominio.js` | a fila sem preço, a contagem cega, a pesagem, as réguas e as faixas, o retido, o custo por recebido, o fator real e o prazo medido (fase 3) |
 
 > ⚠️ **MATERIAL NOVO NÃO NASCE SEM O MODO DE SALDO** (R-CMP-03, armadilha #30):
@@ -1517,7 +1518,7 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 > outras, não. Rode o teste da §10 com a tela nova na lista.
 
 **Rode `node teste_material.js`, `node teste_pedido_compra.js`, `node
-teste_recebimento.js`, `node teste_nota_compra.js`, `node teste_almoxarifado.js`, `node teste_contagem_material.js`, `node teste_compra_programada.js` e `node teste_acesso_compras.js` ao mexer no cadastro de material, no almoxarifado, no
+teste_recebimento.js`, `node teste_nota_compra.js`, `node teste_almoxarifado.js`, `node teste_contagem_material.js`, `node teste_compra_programada.js`, `node teste_nota_xml.js` e `node teste_acesso_compras.js` ao mexer no cadastro de material, no almoxarifado, no
 pedido, no fornecedor ou nas chaves de Compras.**
 
 ---

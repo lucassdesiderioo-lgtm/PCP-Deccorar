@@ -552,6 +552,43 @@
       };
     } });
 
+  /* ── NOTA POR XML (fase 8) ────────────────────────────────────────────
+     Anexar o XML preenche nota e itens; o que nao casa fica para escolher. */
+  window.CMP.xml = async function(box){
+    if(!box || !pode('nota.lancar')) return;
+    var peds = await api('GET', '/api/pedidos'); if(!Array.isArray(peds)) peds = [];
+    box.innerHTML = '<div class="card"><div style="font-weight:700">Lançar nota pelo XML</div>'
+      + '<div class="sub" style="margin:4px 0 10px">O item da nota casa com o do pedido pelo <b>código do fornecedor</b> (o da oferta) ou pelo <b>NCM</b> (quando um só item do pedido tem ele). '
+      + 'O que não casar fica para você escolher — nunca é adivinhado.</div>'
+      + '<div class="cmpG"><div style="grid-column:span 2"><label>Pedido</label><select id="xmPed">' + opt(peds.filter(function(p){ return p.status !== 'cancelado' && p.status !== 'rascunho'; }).map(function(p){ return { valor:p.id, nome:p.numero + ' · ' + (p.fornecedor_nome || p.loja || '—') }; }), '', '— escolha —') + '</select></div>'
+      + '<div style="grid-column:span 2"><label>Arquivo XML da NF-e</label><input id="xmArq" type="file" accept=".xml,text/xml"></div></div>'
+      + '<button class="ghost" id="xmLer">Ler o XML</button> <span class="msg" id="xmMsg"></span><div id="xmRes"></div></div>';
+    var XML = null;
+    box.onclick = async function(ev){
+      if(ev.target.id === 'xmLer'){
+        var f = $('#xmArq').files[0]; if(!f) return msg($('#xmMsg'), { erro:'escolha o arquivo' });
+        XML = await f.text();
+        var r = await api('POST', '/api/notas/xml/ler', { xml:XML, pedido_id:$('#xmPed').value || null });
+        if(r.erro) return msg($('#xmMsg'), r);
+        var p = r.pedido_itens || [];
+        $('#xmRes').innerHTML = '<div class="sub" style="margin-top:8px">NF ' + esc(r.nota.numero) + ' · ' + esc(r.nota.emitente_nome || '') + ' · ' + data(r.nota.emissao) + ' · total ' + brl(r.nota.total_nota)
+          + (r.pedidos_do_emitente && r.pedidos_do_emitente.length ? ' · pedidos deste fornecedor: ' + r.pedidos_do_emitente.map(function(x){ return esc(x.numero); }).join(', ') : '') + '</div>'
+          + '<table class="cmpTab"><thead><tr><th>#</th><th>Na nota</th><th>Qtd</th><th>Valor</th><th>Item do pedido</th></tr></thead><tbody>'
+          + r.nota.itens.map(function(d){ var c = (r.casamento || []).find(function(x){ return x.n === d.n; }) || {};
+              return '<tr><td>' + d.n + '</td><td>' + esc(d.descricao) + '<div class="sub">' + esc(d.codigo_fornecedor || '') + ' · NCM ' + esc(d.ncm || '—') + '</div></td><td>' + n3(d.quantidade) + ' ' + esc(d.unidade || '') + '</td><td>' + brl(d.valor_produto) + '</td>'
+                + '<td><select data-xm="' + d.n + '"><option value="">— escolha —</option><option value="nao">não é deste pedido</option>' + p.map(function(i){ return '<option value="' + i.id + '"' + (c.pedido_item_id === i.id ? ' selected' : '') + '>' + esc(i.item) + '</option>'; }).join('') + '</select>'
+                + (c.por ? ' <span class="cmpChip vd">' + (c.por === 'ncm' ? 'pelo NCM' : 'pelo código') + '</span>' : (c.motivo ? '<div class="sub" style="color:var(--amber)">' + esc(c.motivo) + '</div>' : '')) + '</td></tr>'; }).join('')
+          + '</tbody></table><button class="primary" data-perm="nota.lancar" id="xmOk">Lançar esta nota</button> <span class="msg" id="xmMsg2"></span>';
+        return;
+      }
+      if(ev.target.id === 'xmOk'){
+        var esc2 = {}; box.querySelectorAll('[data-xm]').forEach(function(s){ if(s.value === 'nao') esc2[s.getAttribute('data-xm')] = false; else if(s.value) esc2[s.getAttribute('data-xm')] = +s.value; });
+        var r2 = await api('POST', '/api/notas/xml', { xml:XML, pedido_id:$('#xmPed').value, escolhas:esc2 });
+        if(r2.erro) return msg($('#xmMsg2'), r2); abrir('notas');
+      }
+    };
+  };
+
   /* ── COMPRA RAPIDA (fase 2, R-CMP-21) ───────────────────────────────── */
   registrar({ id:'rapida', nome:'Compra rápida', perms:['pedido.criar'],
     desenhar: async function(box){

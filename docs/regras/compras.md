@@ -418,6 +418,16 @@
 - Status:           em código desde 07/11/2026.
 - História:         fase 7.
 
+## Nota por XML (fase 8)
+
+### R-CMP-08 (fase 8) · O XML casa sem adivinhar
+- Regra:            anexar o XML da NF-e (layout 4.00, com ou sem `nfeProc` e namespace) preenche nota e itens com os valores e impostos como vieram. O item casa com o do pedido pelo código do fornecedor da oferta (`codigo_fornec` = `cProd`) ou, se um só item do pedido tem aquele NCM, pelo NCM. Dois candidatos, ou nenhum, ficam para escolher na tela; a nota só se lança com todo item decidido ("não é deste pedido" é uma escolha). A mesma chave não entra duas vezes (409). Origem `xml`.
+- Por quê:          digitar nota é onde o erro entra; adivinhar é onde ele se esconde.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_nota_xml.js` (NCM ambíguo adivinhado, reprova 1; lançar sem decidir, reprova; a chave duas vezes, 1; sem tirar o namespace, reprova)
+- Status:           em código desde 07/11/2026. ⚠️ Os XML do teste foram montados no layout da Receita, não vieram de fornecedor: a prova com XML real é o primeiro que o dono anexar.
+- História:         fase 8.
+
 ---
 
 ## O que NÃO fazer
@@ -436,4 +446,5 @@
 - ❌ Mandar o saldo a quem conta material, ou tratar material não contado como zero
 - ❌ Dar consumo zero com uma contagem só (é `null`)
 - ❌ Somar o mínimo com o ponto pela data, ou esquecer o que está a caminho
+- ❌ Casar item da nota por nome parecido ou por valor: só código do fornecedor ou NCM único
 - ❌ Mexer no saldo de material por volume fora do volume (ele é a soma dos volumes não encerrados), ou encerrar volume sem a saída pelo livro

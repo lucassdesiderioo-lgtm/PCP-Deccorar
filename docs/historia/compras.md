@@ -104,3 +104,15 @@ tubos podem bater na contagem com material mais fino.
   `componente`. Ela só junta.
 - **Sem compra ainda, a embalagem é a da oferta mais barata**: senão o tubo que
   nunca foi comprado seria sugerido em metros soltos.
+
+## Fase 8 — nota por XML (07/11/2026)
+
+- **Leitor próprio, sem biblioteca**: o XML da NF-e tem formato fixo e só algumas
+  tags importam; uma dependência nova seria mais uma coisa para atualizar.
+- **Os dois XML do teste foram montados no layout 4.00**, de dois fornecedores
+  (um em regime normal com IPI, ICMS, frete, desconto e um brinde fora do pedido;
+  um do Simples, com CSOSN, seguro e outras). Não são XML reais — isso está dito
+  no teste e no cartão.
+- **A escolha de item de outro pedido é recusada duas vezes**: no leitor e no
+  `nota_dominio`. Tirar a primeira trava não reprova o teste, porque a segunda
+  segura — está anotado no STATUS.
