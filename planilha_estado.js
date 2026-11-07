@@ -55,8 +55,9 @@ function dataDoTexto(txt, ref){
    do relatorio; relatorio tirado na segunda e o mesmo dia (a coleta passa hoje). */
 function dataDaSemana(txt, ref){
   const s = String(txt||'').toLowerCase();
-  if(/\bhoje\b/.test(s)) return iso(ref);
-  if(/\bamanh[ãa]\b/.test(s)) return iso(mais(ref, 1));
+  if(/(^|[^a-zà-ú])hoje($|[^a-zà-ú])/.test(s)) return iso(ref);
+  // `\b` nao fecha depois de "ã" no JavaScript: a fronteira e escrita a mao
+  if(/(^|[^a-zà-ú])amanh[ãa]($|[^a-zà-ú])/.test(s)) return iso(mais(ref, 1));
   const m = s.match(/\b(domingo|segunda|terça|terca|quarta|quinta|sexta|sábado|sabado)\b/);
   if(!m) return null;
   const alvo = SEMANA[m[1]];

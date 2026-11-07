@@ -27,6 +27,10 @@ const P = require('./planilha_estado');
 
 function simular(linhas, opts){
   const cob = (opts && opts.cobertura) || 10, minimo = opts && opts.minimo != null ? opts.minimo : 2;
+  /* A REGUA. 'producao' e a do demanda_dominio: `data_venda >= hoje − N`, que
+     sao N+1 dias divididos por N (a de 14 sai ~7% e a de 30 ~3% acima numa
+     venda reta). 'cheios' sao N dias cheios. A prova vale com as duas. */
+  const extra = (opts && opts.regua) === 'cheios' ? 0 : 1;
   const col = P.colunas(linhas);
   const rel = P.dataDoRelatorio(linhas, opts && opts.nome);
   const vendas = {};              // sku -> { 'aaaa-mm-dd': pecas }
@@ -34,6 +38,9 @@ function simular(linhas, opts){
   for(const l of linhas){
     if(!/^\d{6,}$/.test(String(l[col.venda]||'').trim())) continue;
     const sku = String(l[col.sku]||'').replace(/\s+/g,'').toUpperCase();
+    /* O relatorio nao diz o modelo; o sob medida sai pelo nome do SKU, e so
+       aqui — o sistema nunca deduz pelo codigo (§7). Um SKU sob medida de outro
+       nome entra na conta, e o dono le na tabela. */
     if(!sku || /SOBMEDIDA/.test(sku)) continue;
     const ref = P.deIso(rel ? rel.data : P.iso(new Date()));
     if(!P.classificar(l[col.estado], l[col.descricao], ref).media) continue;
@@ -47,7 +54,7 @@ function simular(linhas, opts){
   const fim = rel ? rel.data : ultimo;
   const soma = (m, de, ate) => { let s = 0; for(let d = de; d <= ate; d = P.iso(P.mais(P.deIso(d), 1))) s += m[d] || 0; return s; };
   const dias = [];
-  for(let d = P.iso(P.mais(P.deIso(primeiro), 30)); P.iso(P.mais(P.deIso(d), cob - 1)) < fim; d = P.iso(P.mais(P.deIso(d), 1))) dias.push(d);
+  for(let d = P.iso(P.mais(P.deIso(primeiro), 31)); P.iso(P.mais(P.deIso(d), cob - 1)) < fim; d = P.iso(P.mais(P.deIso(d), 1))) dias.push(d);
 
   const porSku = [];
   const tot = { velho:{ falta:0, sobra:0, dias_falta:0 }, novo:{ falta:0, sobra:0, dias_falta:0 }, real:0 };
@@ -57,8 +64,8 @@ function simular(linhas, opts){
                 media30_fim:0, media14_fim:0 };
     for(const d of dias){
       const ontem = P.iso(P.mais(P.deIso(d), -1));
-      const m30 = soma(m, P.iso(P.mais(P.deIso(d), -30)), ontem) / 30;
-      const m14 = soma(m, P.iso(P.mais(P.deIso(d), -14)), ontem) / 14;
+      const m30 = soma(m, P.iso(P.mais(P.deIso(d), -30 - extra)), ontem) / 30;
+      const m14 = soma(m, P.iso(P.mais(P.deIso(d), -14 - extra)), ontem) / 14;
       const real = soma(m, d, P.iso(P.mais(P.deIso(d), cob - 1)));
       const av = Math.max(minimo, Math.ceil(m30 * cob)), an = Math.max(minimo, Math.ceil(Math.max(m30, m14) * cob));
       for(const [k, alvo] of [['velho', av], ['novo', an]]){
@@ -75,7 +82,7 @@ function simular(linhas, opts){
     porSku.push(r);
   }
   porSku.sort((a,b)=> (b.velho.falta - b.novo.falta) - (a.velho.falta - a.novo.falta) || a.sku.localeCompare(b.sku));
-  return { de: primeiro, ate: fim, dias_avaliados: dias.length, primeiro_dia: dias[0], ultimo_dia: dias[dias.length-1],
+  return { regua: extra ? 'producao' : 'cheios', de: primeiro, ate: fim, dias_avaliados: dias.length, primeiro_dia: dias[0], ultimo_dia: dias[dias.length-1],
            cobertura: cob, minimo, total: tot, skus: porSku,
            melhora: tot.novo.falta < tot.velho.falta };
 }
@@ -87,9 +94,13 @@ if(require.main === module){
   const arq = args.find(a => !a.startsWith('--') && !/^\d+$/.test(a));
   const num = (k, p) => { const i = args.indexOf(k); return i >= 0 ? +args[i+1] : p; };
   if(!arq){ console.error('uso: node simular_ritmo.js <relatorio.xlsx|.csv> [--cobertura 10] [--minimo 2] [--json]'); process.exit(2); }
-  const r = simular(lerPlanilha(fs.readFileSync(arq)), { cobertura: num('--cobertura', 10), minimo: num('--minimo', 2), nome: arq });
+  const linhasArq = lerPlanilha(fs.readFileSync(arq));
+  const o = { cobertura: num('--cobertura', 10), minimo: num('--minimo', 2), nome: arq };
+  const r = simular(linhasArq, Object.assign({ regua:'producao' }, o));
+  const rc = simular(linhasArq, Object.assign({ regua:'cheios' }, o));
   if(r.erro){ console.error(r.erro); process.exit(1); }
-  if(args.indexOf('--json') >= 0){ console.log(JSON.stringify(r, null, 2)); process.exit(0); }
+  if(args.indexOf('--json') >= 0){ console.log(JSON.stringify({ producao:r, cheios:rc }, null, 2)); process.exit(0); }
+  console.log('RÉGUA DA PRODUÇÃO (data_venda >= dia − N, ÷ N — a que o sistema usa)');
   console.log('Relatório de ' + r.de + ' a ' + r.ate + ' · ' + r.dias_avaliados + ' dias avaliados (' + r.primeiro_dia + ' a ' + r.ultimo_dia
     + ') · cobertura ' + r.cobertura + ' dias · alvo mínimo ' + r.minimo);
   console.log('peças que FALTARIAM (venda dos ' + r.cobertura + ' dias seguintes acima do alvo), somadas dia a dia\n');
@@ -102,4 +113,7 @@ if(require.main === module){
   console.log('\nTOTAL' + ' '.repeat(31) + lp(t.velho.falta, 13) + lp(t.novo.falta, 12) + lp(t.velho.sobra, 13) + lp(t.novo.sobra, 12));
   console.log('\n' + (r.melhora ? 'A REGRA NOVA FALTA MENOS: ' : 'A REGRA NOVA NÃO MELHORA A FALTA: ')
     + t.velho.falta + ' → ' + t.novo.falta + ' peças faltando · sobra ' + t.velho.sobra + ' → ' + t.novo.sobra);
+  const tc = rc.total;
+  console.log('com N dias cheios (sem o viés da borda): ' + (rc.melhora ? 'falta menos: ' : 'NÃO melhora: ')
+    + tc.velho.falta + ' → ' + tc.novo.falta + ' · sobra ' + tc.velho.sobra + ' → ' + tc.novo.sobra);
 }

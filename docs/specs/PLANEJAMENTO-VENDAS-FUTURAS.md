@@ -12,8 +12,12 @@
 >   nova; a rota confere o nível). A fase 3 vale a partir do deploy.
 > - "Pronto para coleta… segunda-feira" num relatório de segunda é o mesmo dia;
 >   sem dia na Descrição, dia seguinte "a confirmar".
-> - A simulação (`simular_ritmo.js`, 22 dias avaliados): falta **2.207 → 1.625**
->   peças, sobra **1.942 → 2.855**.
+> - A simulação (`simular_ritmo.js`, 21 dias avaliados), com a régua que a
+>   produção usa: falta **2.005 → 1.386** peças, sobra **2.091 → 3.232**; com N
+>   dias cheios, falta 2.130 → 1.584.
+> - A ③ REVISÃO achou e consertou: a atrasada ausente do arquivo era APAGADA
+>   (e saía da média, #11) — agora perde a data e passa a "já saiu"; o saldo
+>   negativo virava "faltam N atrasadas" — agora a falta começa na venda do SKU.
 > - Regras que parecem bug no `CLAUDE.md` §3; cartões R-PLN-01 a 05 e R-REV-03.
 > - Falta: o deploy, a prova da fase 1 com dado real (a aba batendo com a
 >   bancada por alguns dias) e o dono ligar a fase 4.

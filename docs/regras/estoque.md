@@ -429,7 +429,7 @@
 
 ### R-PLN-05 · O ritmo é o maior entre a média da janela e a de 14 dias
 - **Regra:** `ritmo = max(média de config.janela_media, média de config.janela_curta = 14)`; o alvo e a cobertura usam o ritmo. Quando a curta vence, a tela diz *"subindo: 6,3 → 8,9/dia"*.
-- **Por quê:** a média de 30 atrasava o SKU que acelera. A simulação nos 60 dias do relatório de 07/11 (`simular_ritmo.js`) deu 2.207 → 1.625 peças faltando, com a sobra subindo de 1.942 para 2.855 — o preço decidido.
+- **Por quê:** a média de 30 atrasava o SKU que acelera. A simulação nos 60 dias do relatório de 07/11 (`simular_ritmo.js`, 21 dias avaliados) deu, com a régua da produção, 2.005 → 1.386 peças faltando, com a sobra subindo de 2.091 para 3.232 — o preço decidido; com N dias cheios, 2.130 → 1.584.
 - **Exceções:** a queda **não** derruba o alvo antes dos 30 dias. Sob medida continua sem alvo (R-REV-04).
 - **Teste que trava:** `teste_vendas_futuras.js`.
 - **Status:** em código desde 07/11/2026; vale a partir do deploy.

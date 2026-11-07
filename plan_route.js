@@ -162,9 +162,15 @@ module.exports = function(app, db){
          diante, como sempre; as classificadas, todas que tem data de envio —
          so a venda futura recebe data (planilha_estado.js). A passada sem
          grupo nunca sai por ausencia (#11). */
-      const futurasHoje = db.prepare("SELECT venda_id FROM venda_futura WHERE teste=0 AND data_envio IS NOT NULL "+
-        "AND (data_envio >= ? OR grupo IS NOT NULL)").all(hoje);
+      const futurasHoje = db.prepare("SELECT venda_id FROM venda_futura WHERE teste=0 AND data_envio >= ?").all(hoje);
+      /* A ATRASADA (data ja passada) QUE NAO VEIO NO ARQUIVO NAO E APAGADA: ela
+         tem data de venda no passado e e da media — apagar seria a #11 por
+         outra porta (③ REVISAO, 07/11/2026). Ela perde a data de envio e passa
+         a "ja saiu": deixa de ser venda futura e continua sendo venda. */
+      const atrasadasGravadas = db.prepare("SELECT venda_id FROM venda_futura WHERE teste=0 AND data_envio < ? "+
+        "AND grupo IS NOT NULL").all(hoje);
       const sairiam = futurasHoje.filter(r => !vistos.has(r.venda_id)).map(r => r.venda_id);
+      const atrasadasSairam = atrasadasGravadas.filter(r => !vistos.has(r.venda_id)).map(r => r.venda_id);
       const confirmar = !!(req.body && req.body.confirmar);
       if(futurasHoje.length && sairiam.length * 2 > futurasHoje.length && !confirmar)
         return res.status(409).json({ ok:false, motivo:'confirmar', sairiam: sairiam.length,
@@ -186,6 +192,8 @@ module.exports = function(app, db){
            por ausencia — e historia, e ate a fase 3 e dela que sai a media da
            planilha. Era esta linha que fazia o recorte zerar a media (#11). */
         for(const v of sairiam){ del.run(v); removidas++; }
+        const saiu = db.prepare("UPDATE venda_futura SET data_envio=NULL, data_confirmar=0, grupo='saiu' WHERE venda_id=? AND teste=0");
+        for(const v of atrasadasSairam){ saiu.run(v); }
         cancVol = CANC.marcar(db, cancelVol, { origem:'planilha' });
         /* R8: a aba diz quando o relatorio foi TIRADO (o titulo dele), nao so
            quando subiu. */
@@ -202,6 +210,7 @@ module.exports = function(app, db){
       res.json({ ok:true, linhas_arquivo:linhas.length, novas, atualizadas,
         removidas, sem_sku:semSku, sem_data_envio:semData, canceladas, futuras,
         canceladas_volumes: cancVol,
+        atrasadas_sairam: atrasadasSairam.length,
         grupos, relatorio_em: rel ? rel.data+' '+rel.hora : null,
         pecas_futuras: regs.filter(r => r.futura).reduce((a,r)=>a+r.un,0),
         /* Estado novo NAO TRAVA (decisao do dono): contou como venda — e como

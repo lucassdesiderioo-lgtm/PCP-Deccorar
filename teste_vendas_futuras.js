@@ -231,13 +231,31 @@ const csv64 = txt => 'data:text/csv;base64,' + Buffer.from(txt, 'utf8').toString
   r = await B.chamar('POST /api/planejamento/importar', { arquivo: csv64([CAB,
     linhaCsv('2000000000000001', 'Para entregar na coleta do dia ' + ext(2), 'A', '2.0'),
     linhaCsv('2000000000000002', 'Aguardando algo novo do dia ' + ext(4), 'A')].join('\n') + '\n'), confirmar:true });
-  ok('o espelho tira a atrasada que não veio no arquivo (saiu ou cancelou)', r.ok && !vfB('2000000000000004'), r);
+  /* ③ REVISÃO (07/11/2026): apagar a atrasada ausente levava a venda junto
+     com a média — a #11 por outra porta. Ela fica, sem data de envio: saiu. */
+  ok('a atrasada que não veio no arquivo NÃO é apagada (#11): perde a data e conta como saída',
+     r.ok && !!vfB('2000000000000004') && vfB('2000000000000004').data_envio == null && vfB('2000000000000004').grupo === 'saiu'
+     && vfB('2000000000000004').cancelada === 0 && r.atrasadas_sairam === 1, [r, vfB('2000000000000004')]);
   ok('...e a passada sem data nunca sai por ausência (#11)', !!vfB('2000000000000003'));
   ok('"Pronto para coleta" num relatório de segunda é o mesmo dia',
      P.classificar('Pronto para coleta', 'Você deve entregar o pacote à coleta que passará na segunda-feira.', new Date(2026,10,9)).data_envio === '2026-11-09');
   ok('"Pronto para coleta" sem dia na descrição: dia seguinte, a confirmar',
      (c => c.data_envio === '2026-11-08' && c.data_confirmar === 1)(P.classificar('Pronto para coleta', '', new Date(2026,10,7))));
   ok('estado novo com "cancel" não é cancelada: conta como venda e avisa', P.classificar('Cancelamento em análise', '', new Date()).grupo === 'novo');
+
+  /* ③ REVISÃO: saldo negativo sem venda atrasada não pode virar "atrasada". */
+  B = novoBanco();
+  B.db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('NEG',-2,1),('OUTRO',0,1)").run();
+  const vn = B.db.prepare(`INSERT INTO venda_futura (venda_id,codigo,data_venda,data_envio,unidades,grupo) VALUES (?,?,?,?,1,'fabrica')`);
+  vn.run('n1', 'NEG', dia(B.db,0), dia(B.db,5)); vn.run('n2', 'OUTRO', dia(B.db,-3), dia(B.db,-1));
+  const pN = DEMANDA.porDia(B.db).linhas.find(l => l.codigo === 'NEG');
+  ok('saldo negativo: a falta começa no dia da venda do SKU, e não na coluna Atrasada',
+     pN.falta_desde === dia(B.db,5) && pN.celulas[0].falta === 0 && pN.falta_primeiro === 3, pN);
+  B.db.prepare("UPDATE config SET valor='1' WHERE chave='ordem_por_falta'").run();
+  const cN = DEMANDA.calcular(B.db).linhas.find(l => l.codigo === 'NEG');
+  ok('...e o motivo não diz "atrasadas" para quem não tem venda atrasada', !/atrasad/.test(cN.motivo) && cN.data_falta === dia(B.db,5), cN.motivo);
+  ok('"amanhã" na descrição dá o dia seguinte sem "a confirmar"',
+     (c => c.data_envio === '2026-11-08' && c.data_confirmar === 0)(P.classificar('Pronto para coleta', 'A coleta passa amanhã.', new Date(2026,10,7))));
 
   /* ═════════ 3. AS JANELAS, SÓ PARA OLHAR ═════════ */
   B = novoBanco();
@@ -334,12 +352,15 @@ const csv64 = txt => 'data:text/csv;base64,' + Buffer.from(txt, 'utf8').toString
   ok('o Admin Geral desliga, e volta a ordem de sempre', r.ok && DEMANDA.calcular(d5).config.ordem_por_falta === 0);
 
   /* ═════════ 6. A SIMULAÇÃO DA FASE 3, nos 60 dias do relatório real ═════════ */
-  const SIM = require('./simular_ritmo').simular(L, { cobertura:10, minimo:2 });
-  ok('a simulação avalia os dias com 30 de história antes e 10 de venda depois (07/10 a 28/10)',
-     SIM.dias_avaliados === 22 && SIM.primeiro_dia === '2026-10-07' && SIM.ultimo_dia === '2026-10-28', SIM);
-  ok('nos 60 dias de 07/11/2026, o ritmo novo falta MENOS: 2.207 → 1.625 peças',
-     SIM.melhora === true && SIM.total.velho.falta === 2207 && SIM.total.novo.falta === 1625, SIM.total);
-  ok('...e o preço é sobra maior (1.942 → 2.855), o decidido', SIM.total.velho.sobra === 1942 && SIM.total.novo.sobra === 2855, SIM.total);
+  const SIM = require('./simular_ritmo').simular(L, { cobertura:10, minimo:2, regua:'producao' });
+  const SIMc = require('./simular_ritmo').simular(L, { cobertura:10, minimo:2, regua:'cheios' });
+  ok('a simulação avalia os dias com 30 de história antes e 10 de venda depois (08/10 a 28/10)',
+     SIM.dias_avaliados === 21 && SIM.primeiro_dia === '2026-10-08' && SIM.ultimo_dia === '2026-10-28', SIM.dias_avaliados);
+  ok('com a régua da produção (N+1 dias ÷ N), o ritmo novo falta MENOS: 2.005 → 1.386 peças',
+     SIM.melhora === true && SIM.total.velho.falta === 2005 && SIM.total.novo.falta === 1386, SIM.total);
+  ok('...e o preço é sobra maior (2.091 → 3.232), o decidido', SIM.total.velho.sobra === 2091 && SIM.total.novo.sobra === 3232, SIM.total);
+  ok('com N dias cheios (sem o viés da borda) também: 2.130 → 1.584', SIMc.melhora === true
+     && SIMc.total.velho.falta === 2130 && SIMc.total.novo.falta === 1584, SIMc.total);
   const s150 = SIM.skus.find(x => x.sku === 'BK150150BRANCO');
   ok('o BK150150BRANCO da spec: 6,33/dia na de 30 e 8,93 na de 14', s150 && s150.media30_fim === 6.33 && s150.media14_fim === 8.93, s150);
 

@@ -127,7 +127,10 @@ function porDia(db){
     for(const x of cel){
       acum += x.vendas;
       x.acumulado = acum;
-      x.falta = Math.max(0, acum - estoque);
+      /* Antes da primeira venda do SKU nao ha falta: o saldo negativo
+         (R-EST-08) nao vira "atrasada" numa coluna em que o SKU nao vendeu
+         nada (③ REVISAO, 07/11/2026). Ele entra na falta da primeira venda. */
+      x.falta = acum > 0 ? Math.max(0, acum - estoque) : 0;
       if(x.falta > 0 && faltaDesde == null){ faltaDesde = x.dia; faltaPrimeiro = x.falta; }
       total[x.dia].vendas += x.vendas; total[x.dia].falta += x.falta; total[x.dia].confirmar += x.confirmar;
     }

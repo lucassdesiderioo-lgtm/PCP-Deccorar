@@ -64,13 +64,14 @@
   .vf td.sk{position:sticky;left:0;background:var(--panel);z-index:1}
   .vf .fdesde{color:#ff8c84;font-weight:700}
   .vf .sem{color:var(--muted)}
-  .jn{margin:0 0 22px}
+  .jn{margin:26px 0 22px}
+  .ord button.ghost{border:1px solid var(--line);border-radius:9px;padding:11px 16px;font-weight:700;cursor:pointer;color:var(--txt)}
   .jbtn{background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:700}
   .jbtn.on{background:var(--blue);color:#04121f;border-color:var(--blue)}
   .seta.sobe{color:#7ee2a0}.seta.desce{color:#ffb4ae}.seta.igual{color:var(--muted)}
   .ord{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
   .ord .est{font-weight:800}.ord .est.lig{color:#7ee2a0}.ord .est.des{color:var(--muted)}
-  .sobe{color:#7ee2a0;font-size:11px}
+  .subindo{color:#7ee2a0;font-size:11px}
   .apl{background:transparent;color:var(--blue);border:1px solid var(--line);border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}.apl:hover{border-color:var(--blue)}
 </style></head><body>
 <header><div class="mark">P</div>
@@ -290,6 +291,14 @@ function desenhar(){
   } else {
     let h='', degrauAtual=null;
     for(const r of mostrar){
+      /* Com a ordem pela falta LIGADA, a lista nao segue os degraus: um
+         cabecalho so, e cada linha diz o porque no proprio motivo. */
+      if(ORDEM){
+        if(degrauAtual===null){ degrauAtual='falta';
+          h+='<tr class="deg"><td colspan="8" style="border-left:3px solid #4493f8;color:#4493f8">Pela data da falta — a mais cedo primeiro</td></tr>'; }
+        if(r.prioridade===0 && degrauAtual!=='alvo'){ degrauAtual='alvo';
+          h+='<tr class="deg"><td colspan="8" style="border-left:3px solid #2f3a48;color:var(--muted)">No alvo — nada a produzir</td></tr>'; }
+      } else
       if(r.prioridade!==degrauAtual){
         degrauAtual=r.prioridade;
         const g=DEGRAUS[r.prioridade];
@@ -308,7 +317,7 @@ function desenhar(){
       h+=`<tr>
         <td class="l code">${r.codigo}${r.cadastrado?'':' <span class="novoSku">s/ cadastro</span>'}
             ${r.motivo?`<div class="dim" style="font-size:11px;font-family:system-ui">${r.motivo}</div>`:''}</td>
-        <td>${r.vendas_janela}<div class="dim" style="font-size:11px">${r.media_dia}/d</div>${r.subindo?`<div class="sobe">subindo: ${dec1(r.media_dia)} → ${dec1(r.media_curta)}/dia</div>`:''}</td>
+        <td>${r.vendas_janela}<div class="dim" style="font-size:11px">${r.media_dia}/d</div>${r.subindo?`<div class="subindo">subindo: ${dec1(r.media_dia)} → ${dec1(r.media_curta)}/dia</div>`:''}</td>
         <td>${comp}</td>
         <td>${fmt(r.estoque)}</td>
         <td>${cob}</td>
@@ -360,7 +369,8 @@ async function importar(confirmar){
     if(r.erro){ $('#msgImp').style.color='#f85149'; $('#msgImp').textContent='erro: '+r.erro; return; }
     $('#msgImp').style.color='#2ea043';
     $('#msgImp').textContent=`${r.futuras} futuras no arquivo · ${r.novas} novas · ${r.atualizadas} atualizadas · ${r.removidas} futuras saíram`
-      +(r.canceladas?` · ${r.canceladas} fora da média (cancel./devol.)`:'')
+      +(r.canceladas?` · ${r.canceladas} fora da média (canceladas ou não são venda)`:'')
+      +(r.atrasadas_sairam?` · ${r.atrasadas_sairam} atrasadas não vieram e passaram a "já saiu"`:'')
       +(r.sem_sku?` · ${r.sem_sku} sem SKU`:'');
     /* O resumo pela tabela §3-B, e o aviso do estado novo (nao trava). */
     const G=r.grupos||{}, NM={fabrica:'na fábrica',saiu:'já saíram',entregue:'entregues',pos_venda:'pós-venda',cancelada:'canceladas',nao_venda:'não são venda',novo:'estado novo'};
