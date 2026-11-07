@@ -172,10 +172,14 @@ module.exports = function(app, db){
       const sairiam = futurasHoje.filter(r => !vistos.has(r.venda_id)).map(r => r.venda_id);
       const atrasadasSairam = atrasadasGravadas.filter(r => !vistos.has(r.venda_id)).map(r => r.venda_id);
       const confirmar = !!(req.body && req.body.confirmar);
-      if(futurasHoje.length && sairiam.length * 2 > futurasHoje.length && !confirmar)
-        return res.status(409).json({ ok:false, motivo:'confirmar', sairiam: sairiam.length,
-          futuras_hoje: futurasHoje.length,
-          aviso:'Este arquivo tira '+sairiam.length+' de '+futurasHoje.length+' vendas futuras do sistema. '+
+      /* O guarda conta a ATRASADA junto: ela sai do comprometido igual a futura
+         (③ REVISAO, rodada 3). */
+      const naFabrica = futurasHoje.length + atrasadasGravadas.length;
+      const saem = sairiam.length + atrasadasSairam.length;
+      if(naFabrica && saem * 2 > naFabrica && !confirmar)
+        return res.status(409).json({ ok:false, motivo:'confirmar', sairiam: saem,
+          futuras_hoje: naFabrica,
+          aviso:'Este arquivo tira '+saem+' de '+naFabrica+' vendas futuras do sistema (atrasadas incluídas). '+
                 'Se ele é um recorte, falta período. Confirme só se essas vendas foram mesmo enviadas ou canceladas.' });
 
       /* ── 3. GRAVAR, TUDO OU NADA ──────────────────────────────────────────── */
@@ -192,7 +196,8 @@ module.exports = function(app, db){
            por ausencia — e historia, e ate a fase 3 e dela que sai a media da
            planilha. Era esta linha que fazia o recorte zerar a media (#11). */
         for(const v of sairiam){ del.run(v); removidas++; }
-        const saiu = db.prepare("UPDATE venda_futura SET data_envio=NULL, data_confirmar=0, grupo='saiu' WHERE venda_id=? AND teste=0");
+        const saiu = db.prepare("UPDATE venda_futura SET data_envio=NULL, data_confirmar=0, grupo='saiu', "+
+          "estado='(não veio no arquivo — estava '||COALESCE(estado,'')||')' WHERE venda_id=? AND teste=0");
         for(const v of atrasadasSairam){ saiu.run(v); }
         cancVol = CANC.marcar(db, cancelVol, { origem:'planilha' });
         /* R8: a aba diz quando o relatorio foi TIRADO (o titulo dele), nao so

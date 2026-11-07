@@ -237,6 +237,18 @@ const csv64 = txt => 'data:text/csv;base64,' + Buffer.from(txt, 'utf8').toString
      r.ok && !!vfB('2000000000000004') && vfB('2000000000000004').data_envio == null && vfB('2000000000000004').grupo === 'saiu'
      && vfB('2000000000000004').cancelada === 0 && r.atrasadas_sairam === 1, [r, vfB('2000000000000004')]);
   ok('...e a passada sem data nunca sai por ausência (#11)', !!vfB('2000000000000003'));
+  /* ③ REVISÃO, rodada 3: o guarda dos 50% conta a atrasada — ela sai do
+     comprometido igual à futura. Um recorte que tira 10 atrasadas e deixa 1
+     futura pede confirmação, e nada grava antes. */
+  B = novoBanco();
+  B.db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('A',0,1)").run();
+  const va = B.db.prepare(`INSERT INTO venda_futura (venda_id,codigo,data_venda,data_envio,unidades,grupo,estado) VALUES (?,?,?,?,1,'fabrica','x')`);
+  for(let i = 0; i < 10; i++) va.run('300000000000000' + i, 'A', dia(B.db,-5), dia(B.db,-2));
+  va.run('2000000000000001', 'A', dia(B.db,-1), dia(B.db,2));
+  r = await B.chamar('POST /api/planejamento/importar', { arquivo: csv64([CAB,
+    linhaCsv('2000000000000001', 'Para entregar na coleta do dia ' + ext(2), 'A')].join('\n') + '\n') });
+  ok('o recorte que tira as atrasadas pede confirmação (409), e nada grava',
+     r.__st === 409 && r.motivo === 'confirmar' && DEMANDA.calcular(B.db).linhas.find(l => l.codigo === 'A').comprometido === 11, r);
   ok('"Pronto para coleta" num relatório de segunda é o mesmo dia',
      P.classificar('Pronto para coleta', 'Você deve entregar o pacote à coleta que passará na segunda-feira.', new Date(2026,10,9)).data_envio === '2026-11-09');
   ok('"Pronto para coleta" sem dia na descrição: dia seguinte, a confirmar',
