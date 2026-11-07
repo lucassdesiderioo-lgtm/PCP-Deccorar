@@ -113,6 +113,20 @@ async function req(quem, metodo, url, corpo){
   ok('o modo teste continua ligado depois das tentativas do operador',
     (await req('Lucas', 'GET', '/api/teste/ativo')).d.ativo === true);
 
+  console.log('\n── no modo de acesso ANTIGO (a chave de emergencia da tela de Acessos) ──');
+  r = await req('Lucas', 'POST', '/api/acesso/modo', { modo:'antigo' });
+  ok('o Admin Geral troca para o modo antigo', r.st === 200, r);
+  r = await req('Op', 'GET', '/api/teste/ativo');
+  ok('no modo antigo o operador tambem ve a tarja acesa', r.st === 200 && r.d && r.d.ativo === true, r);
+  r = await req('Op', 'GET', '/api/teste');
+  ok('no modo antigo o painel continua fechado para o operador', r.st === 403, r);
+  r = await req('Op', 'POST', '/api/teste/limpar', {});
+  ok('no modo antigo o operador continua sem apagar o teste', r.st === 403, r);
+  r = await req('Op', 'POST', '/api/teste/ativo', {});
+  ok('no modo antigo o /ativo tambem so abre para GET (POST barrado com 403)', r.st === 403, r);
+  r = await req('Lucas', 'POST', '/api/acesso/modo', { modo:'novo' });
+  ok('e volta para o modo novo', r.st === 200, r);
+
   console.log('\n── o nav.js pergunta pela porta certa ──');
   const nav = fs.readFileSync(path.join(__dirname, 'public', 'nav.js'), 'utf8');
   ok('a tarja pergunta ao /api/teste/ativo', /fetch\(\s*['"]\/api\/teste\/ativo['"]/.test(nav));

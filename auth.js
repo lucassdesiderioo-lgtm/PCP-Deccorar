@@ -268,6 +268,9 @@ module.exports=function(app, db){
       }catch(e){ /* fallback pro modelo antigo */ }
     }
     if(area&&!tem(u,area)) return negaTela(res);
+    // A tarja do modo teste aparece para todos tambem no modo antigo (§11): so o
+    // booleano, so GET. O resto do /api/teste continua de admin.
+    if(api&&req.method==='GET'&&p==='/api/teste/ativo') return next();
     if(api&&API_ADMIN.some(x=>p.startsWith(x))&&!tem(u,'admin')) return res.status(403).json({erro:'sem_permissao'});
     next();
   });
