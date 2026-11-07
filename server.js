@@ -149,6 +149,16 @@ require('./compras_route')(app, db);
 require('./ficha_route')(app, db);
 require('./pedido_route')(app, db);
 require('./receb_route')(app, db);
+/* COMPRAS-E-RECEBIMENTO (07/11/2026): o almoxarifado e as opcoes do cadastro
+   de material (fase 1). Depois do compras_route, dono do `componente`. */
+require('./material_route')(app, db);
+require('./compra_route')(app, db);   // comprar, alcada, parcelas, anexos, compra rapida (fase 2)
+require('./recebimento_route')(app, db);   // retidos, decidir, ciencia, prazo medido (fase 3)
+require('./nota_route')(app, db);   // a nota fiscal de compra, o regime e a tabela de credito (fase 4)
+require('./almox_route')(app, db);   // enderecos, volumes e a 503 Almoxarifado (fase 5)
+require('./contagem_material_route')(app, db);   // a 504 Contagem de material e o consumo (fase 6)
+require('./programada_route')(app, db);   // a compra programada (fase 7)
+require('./dfe_route')(app, db);   // o certificado e as notas baixadas da Receita (fase 11)
 app.get('/recebimento',(req,res)=>res.sendFile(path.join(__dirname,'public','recebimento.html')));
 require('./ger_route')(app, db);
 require('./st_route')(app, db);
@@ -212,9 +222,19 @@ try{
   const sm = require('./tecido/montar').montar(app, null, {
     permissoes: uid => [...app.locals.acesso.permissoesDe(uid)],
     pessoas: () => db.prepare('SELECT id,nome FROM usuarios WHERE ativo=1 ORDER BY nome').all(),
-    materiais: () => db.prepare('SELECT id,nome,unidade,marca,modelo FROM componente WHERE ativo=1 ORDER BY nome').all()
+    materiais: () => db.prepare('SELECT id,nome,unidade,marca,modelo FROM componente WHERE ativo=1 ORDER BY nome').all(),
+    /* COMPRAS-E-RECEBIMENTO fase 10 (R-CMP-50): o PCP e dono do ENDERECO; o sob
+       medida le a arvore, cria o buraco novo da bancada e pergunta se um volume
+       do PCP ocupa o nivel — tudo por aqui. */
+    enderecos: { niveis: id => require('./almox_dominio').paraSobMedida(db, id),
+                 criar: b => require('./almox_dominio').criarParcial(db, b),
+                 ocupado: id => require('./almox_dominio').ocupadoPorVolume(db, id) }
   });
   require('./sobmedida_material').ligar(sm && sm.consumoDeMaterial);
+  /* A PORTA DO ROLO (COMPRAS-E-RECEBIMENTO fase 9): o recebimento do tecido do
+     sob medida cria o rolo la, e o cadastro de material do PCP aponta o tecido. */
+  require('./sobmedida_rolo').ligar(sm && { criarRolos:sm.criarRolosDoRecebimento, tecidos:sm.tecidosParaCompras });
+  require('./sobmedida_almox').ligar(sm && { estoque:sm.estoqueParaPcp });   // o saldo numa lista so (fase 10)
 }catch(e){
   console.error('[sobmedida] NAO SUBIU:',e);
   app.use('/sobmedida',(req,res)=>res.status(503).send(

@@ -1467,6 +1467,96 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 | Mínimos são placeholder | Foram semeados com um valor padrão ("depois eu edito"). Enquanto forem, o gatilho 1 vence quase sempre e a demanda quase não aparece na lista — não é bug da fase 6, é dado a revisar |
 | Modelo ACESSORIO sem ficha | Os dois kits têm venda e nenhuma linha de ficha. Ou lançam ficha, ou viram `tem_ficha=0` (revenda) com custo direto |
 
+
+## 7-C. Compras e Recebimento — a spec nova (desde 07/11/2026)
+
+> Spec `docs/specs/COMPRAS-E-RECEBIMENTO.md` (fases 1 a 11). **As regras estão em
+> [`docs/regras/compras.md`](docs/regras/compras.md)** (cartões R-CMP), e o porquê
+> em [`docs/historia/compras.md`](docs/historia/compras.md). A §2 da spec substitui
+> parte das decisões do `COMPRAS.md` (§7-B acima); o resto do §7-B continua.
+
+| Dono único | O quê |
+|---|---|
+| `material_dominio.js` | as regras das colunas novas do material e o almoxarifado (fase 1) |
+| `compra_dominio.js` | o caminho do pedido depois do rascunho, a alçada, as parcelas e a compra rápida (fase 2) |
+| `nota_dominio.js` | a nota de compra, o rateio, o regime e a tabela de crédito, o custo pago e líquido (fase 4) |
+| `almox_dominio.js` | o endereço (haste → andar → nível), o volume etiquetado, guardar, mover e abrir (fase 5) |
+| `contagem_material_dominio.js` | a contagem de material por almoxarifado (504), a tolerância, a aprovação, o consumo pela contagem e a média de compra (fase 6) |
+| `programada_dominio.js` | a compra programada: lista do mês e aviso pela data, o maior e nunca a soma (fase 7) |
+| `almox_dominio.js` (fase 10) | também a árvore para o espelho do sob medida, o endereço criado pela bancada de lá e o saldo numa lista só |
+| `nota_xml.js` | o leitor do XML da NF-e e o casamento sem adivinhar (fase 8; e a porta da nota baixada da Receita, fase 11) |
+| `certificado_dominio.js` | o certificado A1: receber, conferir CNPJ e validade, a senha cifrada, a chave só em memória (fase 11) |
+| `dfe_dominio.js` | a busca na distribuição de DF-e da Receita, o último NSU, o limite de consultas, a ciência automática e a nota baixada entrando pela fase 8 (fase 11) |
+| `recebimento_dominio.js` | a fila sem preço, a contagem cega, a pesagem, as réguas e as faixas, o retido, o custo por recebido, o fator real e o prazo medido (fase 3) |
+
+> ⚠️ **MATERIAL NOVO NÃO NASCE SEM O MODO DE SALDO** (R-CMP-03, armadilha #30):
+> o `POST /api/componentes` sem `modo_saldo` é 400. Os de antes receberam o modo
+> num backfill de uma vez só (`config.cmp_material_backfill_1`) — rodá-lo de novo
+> desfaria o que alguém mudou depois.
+>
+> ⚠️ **`como_sai = 'ficha'` É RECUSADO DE PROPÓSITO** até a montagem existir
+> (R-CMP-09): é a regra que diz que está esperando.
+>
+> ⚠️ **A FICHA RECUSA NO SERVIDOR o material com `vai_ficha = 0`** — esconder da
+> lista da 404 não basta (R-CMP-02).
+>
+> ⚠️ **O STATUS `enviado` NÃO EXISTE MAIS: É `comprado`** (R-CMP-15), migrado uma
+> vez só (`config.cmp_status_comprado_1`). "Comprado" exige canal, nº do pedido no
+> fornecedor e data; acima da alçada de quem criou, espera o aprovador. O `POST
+> /api/pedidos/:id/enviar` só responde 400 dizendo o caminho novo.
+>
+> ⚠️ **PARCELAS E DADOS DE PAGAMENTO DO FORNECEDOR SÃO PODADOS NO JSON** (R-CMP-12,
+> R-CMP-27): parcelas só a `custo.ver`, `nota.lancar` ou `pedido.pagar`; Pix, banco e
+> conta só a `pedido.pagar`.
+>
+> ⚠️ **A 502 É CONTAGEM CEGA** (R-CMP-29): a fila não traz o pedido, o declarado
+> nem o peso esperado do item por quantidade — e não é esquecimento. O retido
+> (peso acima da tolerância, ou contagem ≠ declarado) **não entra no saldo** até
+> alguém com `recebimento.liberar` decidir, com motivo (501, aba Recebimento retido).
+>
+> ⚠️ **O CRÉDITO DE IMPOSTO VEM DA TABELA `regra_credito`, NÃO DO CÓDIGO** (R-CMP-25),
+> e cada nota grava o regime da data dela: mudar o regime não dá crédito para trás.
+> O custo médio anda pelo LÍQUIDO ÷ o recebido, pelo `componente_dominio` (R-CMP-26).
+>
+> ⚠️ **O SALDO DO MATERIAL POR VOLUME É A SOMA DOS VOLUMES NÃO ENCERRADOS**
+> (R-CMP-39): o volume nasce no recebimento e o "Abri" da 503 é a saída pelo livro
+> (motivo `abertura`), na mesma transação. Nada move esse saldo por fora.
+>
+> ⚠️ **TELA NOVA FORA DO `/admin/` TEM QUE ENTRAR NA LISTA `TELAS` DO `auth.js`**
+> (armadilha #3 por outra porta, 07/11/2026). O mapa (`telas.js`) e o `permDaRota`
+> não bastam: sem a linha no `auth.js`, o pedido SEM sessão cai no `next()` e a
+> tela é servida — a 503 `/almoxarifado` respondeu **200** sem login no teste de
+> segurança da fase 5. As telas `/admin/...` entram sozinhas, a partir do mapa; as
+> outras, não. Rode o teste da §10 com a tela nova na lista.
+
+> ⚠️ **O TECIDO DO SOB MEDIDA NÃO ENTRA NO ESTOQUE DO PCP** (R-CMP-49, fase 9): o
+> material com `sm_tecido_id` recebido por volume cria o ROLO lá, pela porta
+> (`sobmedida_rolo.js`), e sem a porta o recebimento recusa. A entrada de rolo do
+> sob medida está aposentada. O fornecedor é um só, o do PCP (o de lá é espelho).
+>
+> ⚠️ **O ENDEREÇO É DO PCP; O ROLO, A SOBRA E O CORTE CONTINUAM NO `tecido.db`**
+> (R-CMP-50, fase 10). Depois da migração, armazem/haste/andar/nivel do sob medida
+> são ESPELHO (só a porta `tecido/nucleo/enderecos_pcp.js` escreve), e o rolo e a
+> sobra guardam o nível do PCP ao lado do `nivel_id` de sempre. **Não troque o
+> `nivel_id` pelo id do PCP**: o corte grava rolo, sobra e plano numa transação só.
+>
+> ⚠️ **O CERTIFICADO DIGITAL SÓ ENTRA PELA TELA, E NUNCA SAI** (R-CMP-51, fase 11):
+> 501 → aba Certificado, só o Admin Geral. O `.pfx` mora em `caminhos.CERTIFICADO`
+> (0600, no `.gitignore`), a senha fica **cifrada** com a chave do arquivo `.chave` da
+> mesma pasta, e não há rota que entregue o arquivo. **Nunca commite certificado,
+> senha ou essa chave.** Perdida a pasta (servidor novo), o certificado é enviado de
+> novo pela tela — ela não entra no `backup.js`, de propósito.
+>
+> ⚠️ **SÓ A CIÊNCIA DA OPERAÇÃO É AUTOMÁTICA** (R-CMP-54); as manifestações
+> conclusivas não existem no sistema. A assinatura sai pelo `openssl` do servidor: sem
+> ele, a ciência fica pendente dizendo por quê. Depois de um `137`/`656` a Receita só é
+> consultada de novo depois de uma hora (R-CMP-53), e a nota baixada só se lança sozinha
+> com UM pedido do emitente e todo item casando (R-CMP-55).
+
+**Rode `node teste_material.js`, `node teste_pedido_compra.js`, `node
+teste_recebimento.js`, `node teste_nota_compra.js`, `node teste_almoxarifado.js`, `node teste_contagem_material.js`, `node teste_compra_programada.js`, `node teste_nota_xml.js`, `node teste_porta_sobmedida.js`, `node teste_porta_almox.js` (e `cd tecido && npm test`), `node teste_certificado.js`, `node teste_dfe.js` e `node teste_acesso_compras.js` ao mexer no cadastro de material, no almoxarifado, no
+pedido, no fornecedor ou nas chaves de Compras.**
+
 ---
 
 ## 8. Horário de corte e despacho
@@ -3254,8 +3344,10 @@ restart`, ninguém edita variável de ambiente no servidor.
 | `LOTES` | os PDFs do ML (o cron apaga em 7 dias) | `PCP_LOTES` |
 | `COLETAS` | as fotos da conferência com o motorista (§8-B) | `PCP_COLETAS_DIR` |
 | `BACKUPS` | as cópias do `backup.js` — dos **dois** bancos | `PCP_BACKUPS` |
+| `ANEXOS_COMPRAS` | os anexos do pedido e da nota, e o XML das notas baixadas da Receita (fora de `lotes/`) | `PCP_ANEXOS_COMPRAS_DIR` |
+| `CERTIFICADO` | o certificado digital e a chave que cifra a senha — **nunca no repositório nem no backup comum** | `PCP_CERTIFICADO_DIR` |
 
-`PCP_DIR` move as quatro de uma vez; a variável específica ganha da geral.
+`PCP_DIR` move todas de uma vez; a variável específica ganha da geral.
 
 > O **`tecido.db` não está nesta tabela**, e não é esquecimento: ele mora ao
 > lado do módulo e quem responde por ele é `tecido/nucleo/caminho.js`

@@ -42,3 +42,10 @@ coletas/
 
 # relatorios da coleta de auditoria da VPS (scripts/auditoria/) - ficam so no Mac
 auditoria_coletas/
+
+# COMPRAS-E-RECEBIMENTO (07/11/2026): o CERTIFICADO DIGITAL (.pfx e a chave que
+# cifra a senha) e os anexos das compras (notas, XML, comprovantes). NUNCA versionar.
+certificado/
+anexos_compras/
+*.pfx
+*.p12

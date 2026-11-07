@@ -58,7 +58,7 @@ require('./estoque_dominio').garantirSchema(db);
 const MODULOS = ['auth','admin_telas','sku_cad_route','ajuste_route','revisao_route','painel_route','exp_route',
   'mont_route','carreg_route','saida_route','backup_route','rel_route','alvo_route','est_route','plan_route',
   'modo_route','cruz_route','cont_route','inventario_route','etq_route','correcao_route','dev_route',
-  'devcaso_route','cad_route','sku_route','compras_route','ficha_route','pedido_route','receb_route',
+  'devcaso_route','cad_route','sku_route','compras_route','ficha_route','pedido_route','receb_route','material_route','compra_route','recebimento_route','nota_route','almox_route','contagem_material_route','programada_route','dfe_route',
   'ger_route','st_route','pendencias_route','acesso','teste_route'];
 const deQuem = {};
 for(const m of MODULOS){
@@ -141,10 +141,10 @@ const escritas = rotas.filter(r => /^(POST|PUT|PATCH|DELETE)$/.test(r.metodo));
   require('./correcoes').garantirSchema(velho);
   const cv = t => velho.prepare(`SELECT name FROM pragma_table_info('${t}')`).all().map(c => c.name);
   [['oferta',['atualizado_por_id']],['preco_historico',['usuario_id']],['custo_sku_historico',['usuario_id']],
-   ['pedido_compra',['criado_por_id','pago_por_id']],['recebimento',['recebido_por_id']],['correcao',['desfeita_por_id']]]
+   ['pedido_compra',['criado_por_id','pago_por_id','canal','loja','numero_externo','comprado_em','comprado_por','comprado_por_id','aprovacao','aprovado_por','aprovado_por_id','aprovado_em','motivo_aprovacao','rapida']],['recebimento',['recebido_por_id']],['correcao',['desfeita_por_id']]]
     .forEach(([t,cs]) => ok('banco antigo: ' + t + ' termina em ' + cs.join(','), cv(t).slice(-cs.length).join(',') === cs.join(','), cv(t).slice(-3).join(',')));
   /* e a ordem do banco novo é a mesma (o id no fim de cada uma) */
-  [['oferta',['atualizado_por_id']],['pedido_compra',['criado_por_id','pago_por_id']],['recebimento',['recebido_por_id']],['correcao',['desfeita_por_id']],
+  [['oferta',['atualizado_por_id']],['pedido_compra',['criado_por_id','pago_por_id','canal','loja','numero_externo','comprado_em','comprado_por','comprado_por_id','aprovacao','aprovado_por','aprovado_por_id','aprovado_em','motivo_aprovacao','rapida']],['recebimento',['recebido_por_id']],['correcao',['desfeita_por_id']],
    ['lote',['resolvido_por_id','horario_id']],['venda_sem_etiqueta',['resolvida_por_id']],['pdf_conta_aberta',['resolvida_por_id']]]
     .forEach(([t,cs]) => ok('banco novo: ' + t + ' termina em ' + cs.join(',') + ' (a mesma ordem do ALTER)', cols(t).slice(-cs.length).join(',') === cs.join(','), cols(t).slice(-3).join(',')));
   velho.close();

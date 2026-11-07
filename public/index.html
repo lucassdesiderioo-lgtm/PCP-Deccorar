@@ -205,6 +205,10 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
   </div>
 
   <div id="v-compras" class="hide">
+    <!-- COMPRAS-E-RECEBIMENTO (07/11/2026): as abas da 501 sao desenhadas pelo
+         /compras_abas.js; os cards de antes ficam dentro delas. -->
+    <div id="cmpAbas"></div><div id="cmpCorpo"></div>
+    <div id="cmpVelhoLista">
     <div class="card"><div style="font-weight:700;margin-bottom:4px">De quem comprar</div>
       <div class="sub" style="margin-bottom:14px">Ninguém compra fração de embalagem. Se você precisa de 7 m e o fornecedor vende barra de 6 m, você leva 12 m e paga por 12 — e quem ordena pelo preço de tabela escolhe errado nessa hora. Por isso os <b>três números aparecem sempre</b>: preço por unidade, desembolso do pedido e sobra que entra no estoque.</div>
       <div class="grid-med" style="grid-template-columns:3fr 1fr 1fr">
@@ -221,20 +225,25 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
       <button class="ghost" id="lcVer">Atualizar</button></div>
       <div id="lcRes" style="margin-top:14px"></div></div>
 
+    </div>
+    <div id="cmpVelhoPedidos">
     <div class="card"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div><div style="font-weight:700">Pedidos</div>
         <div class="sub">Enviado, o item passa a contar como <b>a caminho</b> e sai da lista de compras.</div></div>
       <button class="ghost" id="pdVer">Atualizar</button></div>
       <div id="pdRes" style="margin-top:14px"></div></div>
 
+    </div>
+    <div id="cmpVelhoMateriais">
     <div class="card"><div style="font-weight:700;margin-bottom:4px">Materiais</div>
       <div class="sub" style="margin-bottom:12px">Os insumos que a ficha consome e que a lista de compras pede.
         <b>Mínimo</b> é quando disparar; <b>ideal</b> é até onde encher.
         O <b>estoque</b> não se edita aqui — ele entra pelo Recebimento e se corrige pela Contagem.</div>
       <div id="lcMin"></div></div>
+    </div>
   </div>
 
-  <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="sub" id="dvUltima" style="margin:0 0 10px 4px"></div><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide">
+  <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="sub" id="dvUltima" style="margin:0 0 10px 4px"></div><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide"><div class="card" id="cmAprov" style="display:none"></div>
   <!-- A CONFERENCIA DE PECA (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA, 26/09/2026).
        Contar e no tablet, as cegas, em /inventario; aqui fica o que e de quem
        planeja e de quem aprova. A contagem de MATERIAL continua logo abaixo,
@@ -467,6 +476,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
 <script src="/qr.js"></script>
 <script src="/kit_etiqueta.js"></script>
 <script src="/saida_upload.js"></script>
+<script src="/compras_abas.js"></script>
 <script>
 let SKUS=[];
 const $=s=>document.querySelector(s);
@@ -518,7 +528,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   var vfx=$("#v-ficha"); if(vfx) vfx.classList.toggle("hide",t.dataset.t!=="ficha");
   if(t.dataset.t==="ficha") carregarFicha();
   var vcp=$("#v-compras"); if(vcp) vcp.classList.toggle("hide",t.dataset.t!=="compras");
-  if(t.dataset.t==="compras"){ carregarCompras(); carregarListaCompras(); }
+  if(t.dataset.t==="compras"){ carregarCompras(); carregarListaCompras(); if(window.CMP) window.CMP.abrir(); }
   if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); invCarregar(); }
   /* O iframe de Planejamento, Relatórios e Acessos SAIU (fase 5 da
      ACESSO-POR-TELA-E-NIVEL): cada um é a tela dele, e o clique acima já
@@ -980,9 +990,9 @@ function prepararEditor(){
        simplesmente não roda. Tecido se aponta pela FAMÍLIA, e a cor do SKU mais
        a largura da bobina decidem qual item de estoque sai. */
     c.innerHTML='<option value="">— escolha —</option>'
-      +COMPS.filter(x=>x.ativo && !x.familia).map(x=>'<option value="'+x.id+'">'+esc(x.nome)
+      +COMPS.filter(x=>x.ativo && !x.familia && x.vai_ficha!==0).map(x=>'<option value="'+x.id+'">'+esc(x.nome)
         +(x.unidade?' ('+esc(x.unidade)+')':'')+'</option>').join('')
-      +[...new Set(COMPS.filter(x=>x.familia && x.ativo).map(x=>x.familia))]
+      +[...new Set(COMPS.filter(x=>x.familia && x.ativo && x.vai_ficha!==0).map(x=>x.familia))]
         .map(fam=>'<option value="fam:'+esc(fam)+'">Tecido da família '+esc(fam)
           +' (a cor do SKU escolhe a bobina)</option>').join('');
   }
@@ -1373,14 +1383,10 @@ async function verMinimos(){
     /* A linha de criar fica EMBAIXO da lista, e não em cima: quem chega aqui
        quase sempre vem ajustar mínimo, e um formulário em cima empurraria a
        lista para fora da tela todo dia por causa do uso raro. */
-    +'<div class="row-actions" style="margin-top:14px;align-items:flex-end;flex-wrap:wrap;gap:8px">'
-    +'<div><label class="sub">Material novo</label><br><input id="cnNome" placeholder="Tubo 38 mm" style="width:220px"></div>'
-    +'<div><label class="sub">Código</label><br><input id="cnCod" placeholder="(opcional)" style="width:100px"></div>'
-    +'<div><label class="sub">Unidade</label><br><select id="cnUn" style="width:100px">'+opts('un')+'</select></div>'
-    +'<button class="primary" data-perm="componente.cadastrar" id="cnAdd">Adicionar</button>'
-    +'<span class="msg" id="lcMsg"></span></div>'
-    +'<div class="sub" style="margin-top:8px">A <b>unidade</b> é como a ficha gasta o material — metro para tubo, '
-    +'fita e tecido; unidade para comando, tampa e parafuso. Ela decide a conta, então trocar depois muda o que a lista de compras pede.</div>';
+    /* O MATERIAL NOVO nasce no formulario de cima ("+ Material novo") desde a
+       fase 1 da COMPRAS-E-RECEBIMENTO: ele exige o modo de saldo (R-CMP-03), e
+       a linha curta daqui nasceria recusada. */
+    +'<div class="sub" style="margin-top:10px">Material novo: use <b>+ Material novo</b>, no card de cima — ele pede o modo de saldo e o almoxarifado.</div>';
 }
 /* Pedidos (§8). O status conta a história: rascunho → enviado → parcial →
    recebido. Enviado, o item passa a contar como "a caminho" na lista. */
@@ -2966,6 +2972,7 @@ async function ctAjustar(){
 function ctItem(l){ return {tipo:l.tipo||'sku', codigo:l.codigo, componente_id:l.componente_id||null}; }
 document.addEventListener('DOMContentLoaded',function(){
   if(naTela('ct')) ctComponentes();
+  if(naTela('ct') && window.CMP && window.CMP.contagemAprov) window.CMP.contagemAprov(document.getElementById('cmAprov'));
   var q=document.getElementById('ctCompQtd');
   if(q) q.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); ctLancarComp(); } });
   var b=document.getElementById('ctBipe');

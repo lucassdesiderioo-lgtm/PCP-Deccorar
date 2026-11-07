@@ -304,6 +304,35 @@ module.exports = function(app, db){
     }
   }catch(e){ console.log('[acesso] seed de cancelamento.confirmar falhou: '+e.message); }
 
+  /* ── 3-C3. AS CHAVES DA COMPRAS-E-RECEBIMENTO (spec §7, 07/11/2026) ──
+     Chave nova em banco que ja existe nao chega a ninguem (#13). A spec diz
+     quem recebe cada uma: quem JA TEM a chave de origem, por setor ou por
+     excecao concedida. Uma marca por FASE (cada fase acrescenta as dela), e
+     cada uma roda uma vez so: quem desmarcar depois nao a ve voltar. As duas
+     intransferiveis (`alcada.definir`, `certificado.gerenciar`) nao entram:
+     so o Admin Geral, que passa por nivel. */
+  const CMP_BACKFILL = [
+    ['seed_cmp_f1', [['almoxarifado.cadastrar','componente.cadastrar']]],
+    ['seed_cmp_f2', [['pedido.aprovar','pedido.criar'], ['nota.lancar','pedido.pagar']]],
+    ['seed_cmp_f3', [['recebimento.liberar','pedido.criar']]],
+    ['seed_cmp_f5', [['volume.movimentar','pedido.receber']]]
+  ];
+  for(const [marca, pares] of CMP_BACKFILL){
+    try{
+      if(db.prepare('SELECT 1 FROM config WHERE chave=?').get(marca)) continue;
+      db.transaction(() => {
+        for(const [nova, de] of pares){
+          db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
+            SELECT setor_id, ? FROM setor_permissao WHERE chave=?`).run(nova, de);
+          db.prepare(`INSERT OR IGNORE INTO usuario_excecao (usuario_id,chave,concede)
+            SELECT usuario_id, ?, 1 FROM usuario_excecao e WHERE chave=? AND concede=1
+              AND NOT EXISTS (SELECT 1 FROM usuario_excecao x WHERE x.usuario_id=e.usuario_id AND x.chave=?)`).run(nova, de, nova);
+        }
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES (?, '1')").run(marca);
+      })();
+    }catch(e){ console.log('[acesso] backfill ' + marca + ' falhou: ' + e.message); }
+  }
+
   /* ── 3-D. A CONFERENCIA EM TRES PAPEIS (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA,
      26/09/2026) ──
      Mesma razao do 3-B: chave nova em banco que ja existe nao chega a ninguem,
@@ -1062,6 +1091,34 @@ module.exports = function(app, db){
        que esta usa prefixo: a proxima leitura de formula ja nasce coberta. */
     if(pre('/api/formulas')) return 'compras.ver';
     if(M !== 'GET' && pre('/api/fornecedores')) return 'fornecedor.cadastrar';
+    /* COMPRAS-E-RECEBIMENTO fase 11: o certificado (so o Admin Geral) e as notas
+       da Receita (quem lanca nota ou ve custo; consultar agora: certificado). */
+    if(pre('/api/certificado')) return 'certificado.gerenciar';
+    if(eq('/api/dfe/consultar')) return 'certificado.gerenciar';
+    if(M !== 'GET' && pre('/api/dfe')) return 'nota.lancar';
+    if(pre('/api/dfe')) return ['nota.lancar','custo.ver'];
+    /* COMPRAS-E-RECEBIMENTO fase 7: a compra programada (R-CMP-46 a 48). */
+    if(M !== 'GET' && pre('/api/compras/programada')) return 'pedido.criar';
+    if(pre('/api/compras/programada')) return ['compras.ver','pedido.criar'];
+    /* COMPRAS-E-RECEBIMENTO fase 6: a contagem de material (R-CMP-42 a 45),
+       pelas chaves de contagem que ja existem. */
+    if(eq('/api/contagem-material/pendentes')) return ['contagem.aprovar','contagem.ajustar'];
+    if(M !== 'GET' && pre('/api/contagem-material/itens')) return 'contagem.aprovar';
+    if(eq('/api/contagem-material/consumo')) return ['compras.ver','contagem.aprovar','contagem.contar'];
+    if(pre('/api/contagem-material')) return 'contagem.contar';
+    /* COMPRAS-E-RECEBIMENTO fase 5: o endereco e o volume (R-CMP-38 a 41). */
+    if(M !== 'GET' && /\/enderecos$/.test(p) && pre('/api/almoxarifados')) return 'almoxarifado.cadastrar';
+    if(/\/enderecos$/.test(p) && pre('/api/almoxarifados')) return ['almoxarifado.cadastrar','volume.movimentar','compras.ver','contagem.contar','pedido.receber'];
+    if(M !== 'GET' && pre('/api/enderecos')) return 'almoxarifado.cadastrar';   // renomear/desativar (fase 10)
+    if(/\/estoque$/.test(p) && pre('/api/almoxarifados')) return ['volume.movimentar','almoxarifado.cadastrar','compras.ver','contagem.contar'];
+    if(pre('/api/enderecos')) return ['volume.movimentar','almoxarifado.cadastrar','contagem.contar'];
+    if(M !== 'GET' && pre('/api/volumes')) return 'volume.movimentar';
+    if(pre('/api/volumes')) return ['volume.movimentar','pedido.receber','compras.ver','almoxarifado.cadastrar'];
+    /* COMPRAS-E-RECEBIMENTO fase 1: o almoxarifado (R-CMP-38). Ler e de quem
+       cadastra material, de quem compra, recebe ("levar para") e conta. */
+    if(M !== 'GET' && pre('/api/almoxarifados')) return 'almoxarifado.cadastrar';
+    if(pre('/api/almoxarifados')) return ['almoxarifado.cadastrar','componente.cadastrar','compras.ver','pedido.receber','contagem.contar'];
+    if(eq('/api/componentes/opcoes') || eq('/api/componentes/pendencias')) return ['componente.cadastrar','compras.ver'];
     if(M !== 'GET' && pre('/api/componentes')) return 'componente.cadastrar';
     if(M !== 'GET' && pre('/api/ofertas')) return 'preco.lancar';
     // Leituras de compras: preco de fornecedor nao e leitura de operacao. Quem
@@ -1078,11 +1135,32 @@ module.exports = function(app, db){
     // vem — e por isso a leitura NAO carrega preco (regra 14 do §13).
     // Recebimento (§8): a tela e as rotas de conferencia sao de OPERACAO e nao
     // carregam preco. Lancar o preco da nota e do Comprador.
+    /* COMPRAS-E-RECEBIMENTO fase 4: a nota (R-CMP-27: so custo.ver ou nota.lancar).
+       Regime e tabela de credito: a rota pede nota.lancar, e o handler exige o
+       Admin Geral. */
+    if(M !== 'GET' && pre('/api/notas')) return 'nota.lancar';
+    if(pre('/api/notas')) return ['custo.ver','nota.lancar'];
+    /* COMPRAS-E-RECEBIMENTO fase 3: o retido e o aviso (R-CMP-33), o prazo medido. */
+    if(eq('/api/recebimento/retidos')) return ['recebimento.liberar','compras.ver'];
+    if(M !== 'GET' && pre('/api/recebimento/itens')) return 'recebimento.liberar';
+    if(eq('/api/compras/prazo')) return ['compras.ver','pedido.criar'];
     if(eq('/recebimento')) return 'pedido.receber';
     if(eq('/api/recebimento/aguardando')) return 'pedido.ver';
     if(M !== 'GET' && /\/preco$/.test(p) && pre('/api/recebimento')) return 'preco.lancar';
     if(M !== 'GET' && eq('/api/recebimento')) return 'pedido.receber';
     if(eq('/api/recebimento/devolucoes')) return 'compras.ver';
+    /* COMPRAS-E-RECEBIMENTO fase 2: aprovar (alcada), parcelas, anexos, compra
+       rapida, alcadas. Antes do generico de /api/pedidos. */
+    if(M !== 'GET' && /\/aprovar$/.test(p) && pre('/api/pedidos')) return 'pedido.aprovar';
+    if(/\/parcelas$/.test(p) && pre('/api/pedidos')) return M === 'GET' ? ['custo.ver','nota.lancar','pedido.pagar'] : ['pedido.criar','pedido.pagar'];
+    if(M !== 'GET' && /\/pagar$/.test(p) && pre('/api/parcelas')) return 'pedido.pagar';
+    if(M === 'DELETE' && pre('/api/parcelas')) return ['pedido.criar','pedido.pagar'];
+    if(eq('/api/compras/opcoes')) return ['compras.ver','pedido.criar','pedido.receber','componente.cadastrar'];
+    if(M !== 'GET' && pre('/api/compras/alcadas')) return 'alcada.definir';
+    if(pre('/api/compras/alcadas')) return ['alcada.definir','pedido.aprovar','pedido.criar'];
+    if(M !== 'GET' && eq('/api/compras/anexos')) return ['pedido.criar','pedido.pagar','nota.lancar','pedido.receber'];
+    if(pre('/api/compras/anexos')) return ['compras.ver','pedido.criar','pedido.pagar','nota.lancar'];
+    if(M !== 'GET' && eq('/api/compras/rapida')) return 'pedido.criar';
     if(M !== 'GET' && /\/fechar$/.test(p) && pre('/api/pedidos')) return 'pedido.criar';
     if(eq('/api/pedidos/zumbis')) return 'compras.ver';
     if(M !== 'GET' && pre('/api/pedidos') && /\/pagar$/.test(p)) return 'pedido.pagar';

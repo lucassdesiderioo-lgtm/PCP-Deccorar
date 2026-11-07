@@ -65,6 +65,12 @@ const TELAS={
   '/inventario':'inventario','/inventario.html':'inventario',
   '/devolucao-casos':'devolucao_casos','/devolucao-casos.html':'devolucao_casos',
   '/coleta-horarios':'coleta_horarios','/coleta-horarios.html':'coleta_horarios',
+  /* COMPRAS-E-RECEBIMENTO (07/11/2026): a 503 Almoxarifado e a 504 Contagem de
+     material. Fora desta lista, sem sessao, o pedido cairia no next() e a tela
+     seria servida do disco — o teste de seguranca da §10 pegou a 503 com 200
+     na primeira rodada. Quem decide de verdade e a chave (permDaRota). */
+  '/almoxarifado':'almoxarifado','/almoxarifado.html':'almoxarifado',
+  '/contagem-material':'contagem_material','/contagem-material.html':'contagem_material',
   /* A escolha de setor. O '*' quer dizer QUALQUER SESSAO: nao ha area para
      escolher onde trabalhar. Ela precisa estar nesta lista de todo jeito —
      fora dela, o pedido cairia no next() e o express.static entregaria o

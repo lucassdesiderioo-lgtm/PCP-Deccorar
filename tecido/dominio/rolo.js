@@ -53,6 +53,11 @@ function medida(valor,rotulo,maximo){
    manda a bancada procurar — e com o tubo na mao ela nao procura: ela lanca
    sem endereco, que e o dado que nao volta depois. */
 function exigirNivelVago(nivel_id,exceto_rolo_id){
+  /* fase 10 (R-CMP-50): o nivel e do PCP, e um volume do PCP la (rolo do ML,
+     caixa) tambem ocupa o buraco. */
+  const doPcp=require('../nucleo/enderecos_pcp').ocupadoNoPcp(nivel_id);
+  if(doPcp) throw new ErroDeRegra('endereco_ocupado','O endereco '+endereco.descrever(nivel_id)+' ja tem o volume '+doPcp+
+    ' do PCP. Cada nivel guarda um so: escolha outro nivel.');
   const o=dRolo.ocupante(nivel_id,exceto_rolo_id);
   if(!o) return;
   throw new ErroDeRegra('endereco_ocupado',

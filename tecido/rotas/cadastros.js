@@ -139,6 +139,10 @@ module.exports={rotas:[
   // ── Endereco ───────────────────────────────────────────────────────────
   {metodo:'GET', caminho:'/api/armazens', permissao:LER,
    manipulador:()=>endereco.listarArmazens()},
+  /* COMPRAS-E-RECEBIMENTO fase 10: o endereco e do PCP; a tela pergunta aqui se
+     a lista esta em dia ("sem atualizacao" quando a porta caiu). */
+  {metodo:'GET', caminho:'/api/enderecos-pcp/estado', permissao:LER,
+   manipulador:()=>endereco.estadoPcp()},
   {metodo:'GET', caminho:'/api/enderecos/:armazem', permissao:LER,
    manipulador:({params})=>endereco.arvore(params.armazem)},
 
@@ -150,21 +154,21 @@ module.exports={rotas:[
    manipulador:({corpo,usuario})=>endereco.criarHaste(corpo,usuario),
    detalhe:(req)=>req.body.armazem_chave+' haste '+req.body.nome},
   {metodo:'PUT', caminho:'/api/hastes/:id', permissao:EDITAR,
-   manipulador:({params,corpo})=>dHaste.atualizar(params.id,corpo),
+   manipulador:({params,corpo})=>{ endereco.exigirEditavelAqui(); return dHaste.atualizar(params.id,corpo); },
    detalhe:(req)=>req.body.nome!==undefined?('renomeou para '+req.body.nome):null},
 
   {metodo:'POST', caminho:'/api/andares', permissao:CRIAR_END,
    manipulador:({corpo,usuario})=>endereco.criarAndar(corpo,usuario),
    detalhe:(req)=>'andar '+req.body.nome},
   {metodo:'PUT', caminho:'/api/andares/:id', permissao:EDITAR,
-   manipulador:({params,corpo})=>dAndar.atualizar(params.id,corpo),
+   manipulador:({params,corpo})=>{ endereco.exigirEditavelAqui(); return dAndar.atualizar(params.id,corpo); },
    detalhe:(req)=>req.body.nome!==undefined?('renomeou para '+req.body.nome):null},
 
   {metodo:'POST', caminho:'/api/niveis', permissao:CRIAR_END,
    manipulador:({corpo,usuario})=>endereco.criarNivel(corpo,usuario),
    detalhe:(req)=>'nivel '+req.body.nome},
   {metodo:'PUT', caminho:'/api/niveis/:id', permissao:EDITAR,
-   manipulador:({params,corpo})=>dNivel.atualizar(params.id,corpo),
+   manipulador:({params,corpo})=>{ endereco.exigirEditavelAqui(); return dNivel.atualizar(params.id,corpo); },
    detalhe:(req)=>req.body.nome!==undefined?('renomeou para '+req.body.nome):null},
 
   // ── Motivos de recusa e condicoes da sobra ─────────────────────────────
