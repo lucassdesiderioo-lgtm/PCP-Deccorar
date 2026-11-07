@@ -314,7 +314,8 @@ module.exports = function(app, db){
   const CMP_BACKFILL = [
     ['seed_cmp_f1', [['almoxarifado.cadastrar','componente.cadastrar']]],
     ['seed_cmp_f2', [['pedido.aprovar','pedido.criar'], ['nota.lancar','pedido.pagar']]],
-    ['seed_cmp_f3', [['recebimento.liberar','pedido.criar']]]
+    ['seed_cmp_f3', [['recebimento.liberar','pedido.criar']]],
+    ['seed_cmp_f5', [['volume.movimentar','pedido.receber']]]
   ];
   for(const [marca, pares] of CMP_BACKFILL){
     try{
@@ -1090,6 +1091,12 @@ module.exports = function(app, db){
        que esta usa prefixo: a proxima leitura de formula ja nasce coberta. */
     if(pre('/api/formulas')) return 'compras.ver';
     if(M !== 'GET' && pre('/api/fornecedores')) return 'fornecedor.cadastrar';
+    /* COMPRAS-E-RECEBIMENTO fase 5: o endereco e o volume (R-CMP-38 a 41). */
+    if(M !== 'GET' && /\/enderecos$/.test(p) && pre('/api/almoxarifados')) return 'almoxarifado.cadastrar';
+    if(/\/enderecos$/.test(p) && pre('/api/almoxarifados')) return ['almoxarifado.cadastrar','volume.movimentar','compras.ver','contagem.contar','pedido.receber'];
+    if(pre('/api/enderecos')) return ['volume.movimentar','almoxarifado.cadastrar','contagem.contar'];
+    if(M !== 'GET' && pre('/api/volumes')) return 'volume.movimentar';
+    if(pre('/api/volumes')) return ['volume.movimentar','pedido.receber','compras.ver','almoxarifado.cadastrar'];
     /* COMPRAS-E-RECEBIMENTO fase 1: o almoxarifado (R-CMP-38). Ler e de quem
        cadastra material, de quem compra, recebe ("levar para") e conta. */
     if(M !== 'GET' && pre('/api/almoxarifados')) return 'almoxarifado.cadastrar';

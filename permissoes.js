@@ -241,6 +241,10 @@ module.exports = [
   { chave:'recebimento.liberar',  grupo:'Compras', tela:501, nivel:'admin',
     rotulo:'Liberar recebimento retido', desc:'Aceitar, aceitar e reclamar ou devolver a entrega retida; dar ciência do aviso de peso',
     sensivel:true },
+  /* COMPRAS-E-RECEBIMENTO §7: guardar, mover e abrir volume na 503, por bipe.
+     Backfill: quem tem pedido.receber. */
+  { chave:'volume.movimentar',    grupo:'Compras', tela:503, nivel:'operacao',
+    rotulo:'Guardar, mover e abrir volume', desc:'No almoxarifado, por bipe: guardar e mover rolo e caixa, e abrir o rolo do ML (sai do saldo)' },
   { chave:'pedido.devolver',      grupo:'Compras', tela:502, nivel:'operacao',
     rotulo:'Devolver ao fornecedor', desc:'Recusar item na conferência, com motivo' },
   { chave:'pedido.pagar',         grupo:'Compras', tela:501, nivel:'admin',

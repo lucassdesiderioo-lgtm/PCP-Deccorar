@@ -280,4 +280,8 @@ function prazo(db, q){
   return { dias:dig, fonte: dig != null ? 'digitado' : null, n:total };
 }
 
-module.exports = { Recusa, DECISOES, MOTIVOS_DEV, fila, receber, retidos, decidir, ciencia, pendencias, prazo, fatorMedio, custoUnit, criarVolumes:null };
+module.exports = { Recusa, DECISOES, MOTIVOS_DEV, fila, receber, retidos, decidir, ciencia, pendencias, prazo, fatorMedio, custoUnit,
+  /* O volume nasce NA MESMA transacao da entrada (fase 5, R-CMP-39). Um gancho,
+     e nao um require no topo: o almox_dominio tambem le o componente_dominio,
+     e a ordem de carga fica de um lado so. */
+  criarVolumes:(db, a) => require('./almox_dominio').criarVolumes(db, a) };

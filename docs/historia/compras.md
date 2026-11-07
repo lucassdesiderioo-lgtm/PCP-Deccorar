@@ -67,3 +67,18 @@ tubos podem bater na contagem com material mais fino.
   entra pelo líquido. Depois: o custo médio é corrigido pelo mesmo
   `corrigirCustoPago` que o "preço da nota" de antes usava — o dono único do custo
   médio continua um só.
+
+## Fase 5 — almoxarifados e volumes (07/11/2026)
+
+- **O volume nasce no recebimento, na mesma transação da entrada.** É o que mantém
+  "saldo = soma dos volumes" sem segunda régua: entrada e volume entram juntos, e
+  abrir é uma saída pelo livro junto com o encerramento.
+- **O código do endereço é `E-` + o número do nível** (`E-000017`), e o do volume
+  `M-` sequencial. Os dois se bipam na 503.
+- **A 503 nasceu como tela de tablet** (tema claro, campo de bipe visível, Enter e
+  Tab), e a chave `volume.movimentar` chega a quem já recebia (`pedido.receber`).
+- **A 503 nasceu ABERTA, e o teste de segurança da §10 pegou** (200 sem login em
+  `/almoxarifado`). O mapa de telas e o `permDaRota` estavam certos; faltava a
+  linha na lista `TELAS` do `auth.js`, que é o que manda quem não tem sessão para o
+  login. As telas `/admin/...` entram nessa lista sozinhas, a partir do mapa; as
+  outras, não. A 504 já entrou junto.

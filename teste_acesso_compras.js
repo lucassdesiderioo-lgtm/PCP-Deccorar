@@ -46,7 +46,8 @@ const CHAVES = [
   ['pedido.aprovar', 'admin', 'pedido.criar'],
   ['nota.lancar', 'admin', 'pedido.pagar'],
   ['alcada.definir', 'admin_geral', null],
-  ['recebimento.liberar', 'admin', 'pedido.criar']
+  ['recebimento.liberar', 'admin', 'pedido.criar'],
+  ['volume.movimentar', 'operacao', 'pedido.receber']
 ];
 for(const [chave, nivel, de] of CHAVES){
   const p = PERM.find(x => x.chave === chave);
@@ -55,7 +56,8 @@ for(const [chave, nivel, de] of CHAVES){
     ok(chave + ': o setor que tinha ' + de + ' recebeu', temSetor(sid, chave));
     ok(chave + ': a excecao concedida de ' + de + ' virou excecao da nova',
        !!db.prepare('SELECT 1 FROM usuario_excecao WHERE usuario_id=? AND chave=? AND concede=1').get(u, chave));
-    ok(chave + ': o setor que NAO tinha ' + de + ' nao recebeu', !temSetor(oper, chave));
+    if(de !== 'pedido.receber') ok(chave + ': o setor que NAO tinha ' + de + ' nao recebeu', !temSetor(oper, chave));
+    else ok(chave + ': o setor de quem recebe (operacao) recebeu', temSetor(oper, chave));
   }else{
     const fora = db.prepare("SELECT s.nome FROM setor_permissao sp JOIN setores s ON s.id=sp.setor_id WHERE sp.chave=? AND s.nome<>'Admin Geral'").all(chave);
     ok(chave + ': so o Admin Geral (nenhum outro setor a tem)', fora.length === 0, JSON.stringify(fora));
@@ -93,7 +95,14 @@ const ROTAS = [
   ['GET', '/api/notas', 'custo.ver'],
   ['GET', '/api/notas', 'nota.lancar'],
   ['POST', '/api/notas', 'nota.lancar'],
-  ['POST', '/api/notas/regime', 'nota.lancar']
+  ['POST', '/api/notas/regime', 'nota.lancar'],
+  ['POST', '/api/almoxarifados/2/enderecos', 'almoxarifado.cadastrar'],
+  ['GET', '/api/almoxarifados/2/enderecos', 'volume.movimentar'],
+  ['POST', '/api/volumes/M-000001/mover', 'volume.movimentar'],
+  ['POST', '/api/volumes/M-000001/abrir', 'volume.movimentar'],
+  ['GET', '/api/volumes/M-000001/etiqueta', 'volume.movimentar'],
+  ['GET', '/api/enderecos/E-000001', 'volume.movimentar'],
+  ['GET', '/almoxarifado', 'volume.movimentar']
 ];
 /* A excecao de Bia (componente.cadastrar) e o setor Compras da casa
    (pedido.criar, pedido.pagar) tem de levar as chaves certas — e o setor que

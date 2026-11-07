@@ -155,6 +155,7 @@ require('./material_route')(app, db);
 require('./compra_route')(app, db);   // comprar, alcada, parcelas, anexos, compra rapida (fase 2)
 require('./recebimento_route')(app, db);   // retidos, decidir, ciencia, prazo medido (fase 3)
 require('./nota_route')(app, db);   // a nota fiscal de compra, o regime e a tabela de credito (fase 4)
+require('./almox_route')(app, db);   // enderecos, volumes e a 503 Almoxarifado (fase 5)
 app.get('/recebimento',(req,res)=>res.sendFile(path.join(__dirname,'public','recebimento.html')));
 require('./ger_route')(app, db);
 require('./st_route')(app, db);

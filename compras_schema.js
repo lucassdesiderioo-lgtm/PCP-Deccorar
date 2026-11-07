@@ -204,6 +204,52 @@ function garantirSchemaCompras(db){
       criado_em TEXT DEFAULT (datetime('now','localtime')), criado_por TEXT, criado_por_id INTEGER
     );
 
+    /* ── O ENDERECO DO ALMOXARIFADO (COMPRAS-E-RECEBIMENTO fase 5, R-CMP-38):
+       haste -> andar -> nivel, no MESMO desenho do armazem do sob medida —
+       e e para ca que os enderecos dele migram na fase 10. */
+    CREATE TABLE IF NOT EXISTS alm_haste (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      almoxarifado_id INTEGER NOT NULL REFERENCES almoxarifado(id),
+      nome TEXT NOT NULL, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+      UNIQUE(almoxarifado_id, nome)
+    );
+    CREATE TABLE IF NOT EXISTS alm_andar (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      haste_id INTEGER NOT NULL REFERENCES alm_haste(id),
+      nome TEXT NOT NULL, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+      UNIQUE(haste_id, nome)
+    );
+    CREATE TABLE IF NOT EXISTS alm_nivel (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      andar_id INTEGER NOT NULL REFERENCES alm_andar(id),
+      nome TEXT NOT NULL, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+      UNIQUE(andar_id, nome)
+    );
+    /* O VOLUME (R-CMP-39): a peca fisica etiquetada (M-000001). O saldo de um
+       material por volume e a soma dos volumes nao encerrados. */
+    CREATE TABLE IF NOT EXISTS volume_material (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      codigo TEXT UNIQUE COLLATE NOCASE,
+      componente_id INTEGER NOT NULL REFERENCES componente(id),
+      recebimento_item_id INTEGER,
+      qtd_inicial REAL NOT NULL, saldo REAL NOT NULL,
+      nivel_id INTEGER REFERENCES alm_nivel(id),
+      situacao TEXT NOT NULL DEFAULT 'guardado',   -- guardado | aberto | encerrado
+      metragem REAL, codigo_fornecedor TEXT, almoxarifado_id INTEGER,
+      criado_em TEXT DEFAULT (datetime('now','localtime')), criado_por TEXT, criado_por_id INTEGER,
+      encerrado_em TEXT, encerrado_por TEXT, encerrado_por_id INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_volume_nivel ON volume_material(nivel_id, situacao);
+    CREATE INDEX IF NOT EXISTS idx_volume_comp ON volume_material(componente_id, situacao);
+    /* A historia do volume: recebido, guardado, movido, aberto — com quem. */
+    CREATE TABLE IF NOT EXISTS volume_evento (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      volume_id INTEGER NOT NULL REFERENCES volume_material(id),
+      tipo TEXT NOT NULL, de_nivel_id INTEGER, para_nivel_id INTEGER, obs TEXT,
+      usuario_id INTEGER, usuario_nome TEXT,
+      criado_em TEXT DEFAULT (datetime('now','localtime'))
+    );
+
     /* ── FORNECEDOR (§9) ──────────────────────────────────────────────────── */
     CREATE TABLE IF NOT EXISTS fornecedor (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,

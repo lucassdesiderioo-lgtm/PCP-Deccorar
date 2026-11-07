@@ -324,6 +324,40 @@
 - Status:           em código desde 07/11/2026.
 - História:         fase 4.
 
+## F. Almoxarifado e volumes (fase 5)
+
+### R-CMP-39 · Volume é a peça física etiquetada
+- Regra:            `volume_material` (código `M-000001`, material, recebimento de origem, quantidade inicial, saldo, nível, situação `guardado` · `aberto` · `encerrado`). Nasce no recebimento do material por volume, na mesma transação da entrada, um por volume. O saldo de um material por volume é a soma dos volumes não encerrados. Cada movimento fica em `volume_evento`, com quem.
+- Por quê:          o rolo e a caixa têm endereço e etiqueta.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_almoxarifado.js` (sem o volume no recebimento, reprova)
+- Status:           em código desde 07/11/2026.
+- História:         fase 5.
+
+### R-CMP-40 · Abrir o rolo do ML é consumir o rolo
+- Regra:            o bipe "Abri" (503) encerra o volume e lança a saída do saldo inteiro pelo livro do material (motivo `abertura`), com quem. Abrir de novo é recusado.
+- Por quê:          a bobina do ML é aberta e picotada inteira.
+- Exceções:         como ela é cortada fica fora (decisão de produção).
+- Teste que trava:  `teste_almoxarifado.js` (abrir sem saída, reprova 3; abrir duas vezes, 1)
+- Status:           em código desde 07/11/2026.
+- História:         fase 5.
+
+### R-CMP-41 · Mover é bipe; um por nível recusa o nível ocupado
+- Regra:            bipe no volume, bipe (`E-000000`) ou escolha do endereço novo. Com `um_por_nivel` no material, o nível ocupado por outro volume recusa (409) dizendo qual está lá. Mover não mexe em saldo; volume encerrado não se move.
+- Por quê:          a regra do sob medida, um rolo por nível.
+- Exceções:         material sem "um por nível" divide o nível.
+- Teste que trava:  `teste_almoxarifado.js` (sem um por nível, reprova 2)
+- Status:           em código desde 07/11/2026.
+- História:         fase 5.
+
+### R-CMP-38 (fase 5) · O endereço do almoxarifado
+- Regra:            haste → andar → nível por almoxarifado (`alm_haste`, `alm_andar`, `alm_nivel`), criado pela 501 (aba Almoxarifados) com `almoxarifado.cadastrar`, no desenho do armazém do sob medida. Criar o mesmo endereço de novo não duplica.
+- Por quê:          o mesmo desenho que o sob medida já usa, e para onde os endereços dele migram na fase 10.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_almoxarifado.js`
+- Status:           em código desde 07/11/2026.
+- História:         fase 5.
+
 ---
 
 ## O que NÃO fazer
@@ -339,3 +373,4 @@
 - ❌ Dar entrada no saldo do retido antes de alguém decidir
 - ❌ Calcular crédito de imposto no código, ou recalcular o líquido de uma nota antiga quando o regime muda
 - ❌ Pôr o ICMS próprio no custo pago
+- ❌ Mexer no saldo de material por volume fora do volume (ele é a soma dos volumes não encerrados), ou encerrar volume sem a saída pelo livro

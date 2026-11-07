@@ -6,7 +6,7 @@ Situação: em construção (execução contínua das fases 1 a 11 autorizada pe
 Criada em: 06/11/2026
 Última atualização: 07/11/2026
 Fase atual: ver o diário de construção logo abaixo
-Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☐  6 ☐  7 ☐  8 ☐  9 ☐  10 ☐  11 ☐
+Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☐  7 ☐  8 ☐  9 ☐  10 ☐  11 ☐
 Decidido em 07/11/2026: fase 10 = o PCP é dono do endereço, o sob medida do rolo e
 da sobra (R-CMP-50) · fase 11 construída sem certificado, pronta para recebê-lo
 Risco: 🔴 (schema, estoque de material, custo, acesso, dado do sob medida)
@@ -168,6 +168,37 @@ Quem recebe: —
 custo pago reprova 7; crédito sem a tabela, 3; sem rateio, 7; custo médio parado, 2; notas
 sem poda, 1; recebimento ignorando a nota, 1; regime que não é o vigente, 2).
 
+### Fase 5 — almoxarifados e volumes (07/11/2026) ☑
+
+```
+📋 PLANO
+Tipo: FASE 5 da spec COMPRAS-E-RECEBIMENTO        Risco: 🟡 (mexe em saldo de material: tratado como 🔴, teste antes)
+O que vai ser feito: endereços (haste/andar/nível) por almoxarifado, volume_material,
+  etiqueta, a 503, "um por nível", abrir o rolo do ML.
+O que vou mudar: compras_schema.js (alm_haste, alm_andar, alm_nivel, volume_material,
+  volume_evento) · almox_dominio.js, almox_route.js, volume_etq_pdf.js (novos) ·
+  recebimento_dominio.js (o gancho que cria o volume) · public/almoxarifado.html (nova) ·
+  public/compras_abas.js (endereços na aba Almoxarifados) · telas.js (503) · acesso/permissoes
+Regra de negócio muda? NÃO além da spec (o volume é novidade)
+Como vou testar: teste_almoxarifado.js (novo, antes do código); defeitos reintroduzidos;
+  a 503 aberta a 1024 px
+Fica de fora: a contagem por volume (fase 6); os endereços do sob medida (fase 10)
+
+🔐 ALÇADA
+Telas novas: 503 · Almoxarifado · Compras · operação (tablet)
+Ações novas: volume.movimentar · operação · 503 · não sensível
+Setores novos: nenhum
+Quem recebe: quem tem pedido.receber (backfill da spec §7); o resto, só o Admin Geral
+```
+
+**O teste de segurança da §10 pegou a 503 aberta** (200 sem login): faltava a linha
+na lista `TELAS` do `auth.js`. Consertado na mesma fase, com a 504 junto; a armadilha
+foi para o `CLAUDE.md` §7-C.
+
+**Feito.** `teste_almoxarifado.js` 34 casos; quatro defeitos reintroduzidos (sem um por
+nível reprova 2; abrir sem saída, 3; sem o volume no recebimento, reprova; abrir duas vezes,
+1). A 503 a 1024 px: guardou por bipe e recusou o nível ocupado dizendo o volume.
+
 ### Mudanças no caminho
 
 (decisões de construção que não mudam regra — nome de coluna, layout, ordem de campos)
@@ -220,6 +251,12 @@ sem poda, 1; recebimento ignorando a nota, 1; regime que não é o vigente, 2).
   crédito escolhida é a vigente na data de EMISSÃO.
 - **Fase 4:** `nota_compra_item.codigo_fornecedor` entrou (o cProd do XML, para a fase 8 casar
   pela oferta).
+- **Fase 5:** o volume nasce com situação `guardado` e sem endereço; a 503 mostra "Falta
+  guardar". A spec lista três situações e não "a guardar": o "sem endereço" é o nível vazio.
+- **Fase 5:** a história do volume ficou numa tabela própria (`volume_evento`, com quem).
+- **Fase 5:** o código de bipe do endereço é `E-` + o id do nível; o do volume, `M-` sequencial.
+- **Fase 5:** a etiqueta do volume é um PDF de 100 × 35 mm (a Zebra da casa), com o CODE128
+  do `public/barras.js`.
 
 ### Achei no caminho (não mexi)
 

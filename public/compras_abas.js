@@ -471,6 +471,32 @@
     };
   }
 
+  /* ── ENDERECOS DOS ALMOXARIFADOS (fase 5, R-CMP-38) ──────────────────── */
+  window.CMP.enderecos = async function(box, l){
+    if(!box) return;
+    var ativos = l.filter(function(a){ return a.ativo; });
+    var cad = pode('almoxarifado.cadastrar');
+    box.innerHTML = '<div class="card"><div style="font-weight:700">Endereços</div><div class="sub" style="margin:4px 0 10px">haste → andar → nível, como no armazém do sob medida. '
+      + 'Cada nível tem um código de bipe (E-000000) para a tela 503 Almoxarifado.</div>'
+      + '<div class="cmpG"><div><label>Almoxarifado</label><select id="enAlm">' + opt(ativos.map(function(a){ return { valor:a.id, nome:a.nome }; }), '', '— escolha —') + '</select></div></div>'
+      + '<div id="enLista"></div>'
+      + (cad ? '<div class="cmpG"><div><label>Haste</label><input id="enH" placeholder="H1"></div><div><label>Andares (separados por vírgula)</label><input id="enA" placeholder="A1, A2, A3"></div>'
+        + '<div><label>Níveis por andar</label><input id="enN" placeholder="N1, N2"></div></div><button class="ghost" id="enOk">Criar endereços</button> <span class="msg" id="enMsg"></span>' : '') + '</div>';
+    async function lista(){
+      var id = $('#enAlm').value; if(!id){ $('#enLista').innerHTML = ''; return; }
+      var e = await api('GET', '/api/almoxarifados/' + id + '/enderecos');
+      $('#enLista').innerHTML = (e.niveis || []).length ? '<div class="cmpRola"><table class="cmpTab"><thead><tr><th>Código</th><th>Endereço</th><th>Volumes</th></tr></thead><tbody>'
+        + e.niveis.map(function(n){ return '<tr><td class="code">' + esc(n.codigo) + '</td><td>' + esc(n.nome) + '</td><td>' + n.volumes + '</td></tr>'; }).join('') + '</tbody></table></div>'
+        : '<div class="sub">Sem endereço ainda.</div>';
+    }
+    $('#enAlm').onchange = lista;
+    var ok2 = $('#enOk'); if(ok2) ok2.onclick = async function(){
+      var sp = function(v){ return String(v || '').split(',').map(function(x){ return x.trim(); }).filter(Boolean); };
+      var r = await api('POST', '/api/almoxarifados/' + $('#enAlm').value + '/enderecos', { haste:$('#enH').value, andares:sp($('#enA').value), niveis:sp($('#enN').value) });
+      msg($('#enMsg'), r, r.erro ? null : r.niveis + ' níveis na haste'); if(!r.erro) lista();
+    };
+  };
+
   /* ── COMPRA RAPIDA (fase 2, R-CMP-21) ───────────────────────────────── */
   registrar({ id:'rapida', nome:'Compra rápida', perms:['pedido.criar'],
     desenhar: async function(box){

@@ -77,6 +77,8 @@ const TELAS = [
   { n:501, nome:'Compras',               rota:'/admin/compras', nivel:'admin',      onde:'computador',
     perms:['compras.ver','fornecedor.cadastrar','preco.lancar','pedido.criar','pedido.pagar','componente.cadastrar','almoxarifado.cadastrar'], aba:'compras' },
   { n:502, nome:'Recebimento',           rota:'/recebimento',   nivel:'operacao',   onde:'tablet',     perms:['pedido.receber'],        area:'recebimento' },
+  // COMPRAS-E-RECEBIMENTO fase 5: guardar, mover e abrir volume por bipe (nasce so para quem tem a chave — backfill da spec §7)
+  { n:503, nome:'Almoxarifado',          rota:'/almoxarifado',  nivel:'operacao',   onde:'tablet',     perms:['volume.movimentar'] },
   // ── 600 · Sob medida: as telas moram em tecido/nucleo/telas.js (numero e nivel la) ──
   // ── 700 · Frota e 800 · Mercado Livre: reservados para as specs deles ──
   // ── 900 · Sistema ──
