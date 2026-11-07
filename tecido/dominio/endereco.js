@@ -40,12 +40,26 @@ const marca=usuario=>({
   conferir: pode(usuario,'cadastro.editar')?0:1
 });
 
+/* DEPOIS DA MIGRACAO DA FASE 10 (COMPRAS-E-RECEBIMENTO, R-CMP-50) o endereco
+   e do PCP: a bancada continua criando o buraco novo (R-SME-01), mas ele nasce
+   LA, pela porta, e chega aqui pelo espelho. Antes da migracao, nada muda. */
+const PCP=require('../nucleo/enderecos_pcp');
+function viaPcp(arm,haste,andar,nivel,usuario,tabela,onde){
+  PCP.criarNoPcp(arm,haste,andar,nivel);
+  const r=onde();
+  exigir(r,'endereco_nao_chegou','O endereco foi criado no PCP, mas nao chegou aqui. Recarregue a tela.');
+  const m=marca(usuario);
+  db.prepare('UPDATE '+tabela+' SET criado_por=?, conferir=? WHERE id=?').run(m.criado_por,m.conferir,r.id);
+  return {...r,criado_por:m.criado_por,conferir:m.conferir};
+}
 function criarHaste(dados,usuario){
   const nome=nomeLimpo(dados.nome,'a haste');
   const arm=dArmazem.porChave(dados.armazem_chave);
   exigir(arm,'armazem_inexistente','Escolha o armazem (Rolos ou Sobras).');
   if(dHaste.listar(arm.chave).some(h=>h.nome.toLowerCase()===nome.toLowerCase()))
     throw new ErroDeRegra('haste_repetida','O armazem '+arm.nome+' ja tem a haste "'+nome+'".');
+  if(PCP.migrado(arm.chave))
+    return viaPcp(arm.chave,nome,null,null,usuario,'haste',()=>dHaste.listar(arm.chave).find(h=>h.nome===nome));
   return dHaste.criar({nome,armazem_chave:arm.chave,ordem:dados.ordem,...marca(usuario)});
 }
 
@@ -55,6 +69,8 @@ function criarAndar(dados,usuario){
   exigir(haste,'haste_inexistente','Escolha a haste.');
   if(dAndar.listar(haste.id).some(a=>a.nome.toLowerCase()===nome.toLowerCase()))
     throw new ErroDeRegra('andar_repetido','A haste '+haste.nome+' ja tem o andar "'+nome+'".');
+  if(PCP.migrado(haste.armazem_chave))
+    return viaPcp(haste.armazem_chave,haste.nome,nome,null,usuario,'andar',()=>dAndar.listar(haste.id).find(a=>a.nome===nome));
   return dAndar.criar({nome,haste_id:haste.id,ordem:dados.ordem,...marca(usuario)});
 }
 
@@ -64,6 +80,9 @@ function criarNivel(dados,usuario){
   exigir(andar,'andar_inexistente','Escolha o andar.');
   if(dNivel.listar(andar.id).some(n=>n.nome.toLowerCase()===nome.toLowerCase()))
     throw new ErroDeRegra('nivel_repetido','O andar '+andar.nome+' ja tem o nivel "'+nome+'".');
+  const h=dHaste.porId(andar.haste_id);
+  if(h&&PCP.migrado(h.armazem_chave))
+    return viaPcp(h.armazem_chave,h.nome,andar.nome,nome,usuario,'nivel',()=>dNivel.listar(andar.id).find(n=>n.nome===nome));
   return dNivel.criar({nome,andar_id:andar.id,ordem:dados.ordem,...marca(usuario)});
 }
 
@@ -133,7 +152,18 @@ function exigirArmazem(nivel_id,armazem_chave){
    torto. Vem no mesmo pacote porque a tela ja tem os nomes na mao: perguntar
    de novo ao servidor seria uma ida a rede para contar o que ela acabou de
    receber. */
+/* Renomear e desativar endereco, depois da migracao, e no PCP (501 →
+   Almoxarifados): aqui o espelho recebe na proxima leitura. */
+function exigirEditavelAqui(){
+  if(PCP.algumMigrado()) throw new ErroDeRegra('endereco_e_do_pcp',
+    'O endereco agora e do PCP: renomeie ou desative em Compras → Almoxarifados (tela 501). A mudanca aparece aqui sozinha.');
+}
+/* O estado da ligacao com o PCP, para a tela dizer "sem atualizacao" em vez
+   de mostrar vazio. */
+const estadoPcp=()=>{ if(!PCP.algumMigrado()) return {migrado:false}; const s=PCP.sincronizar(); return {migrado:true,sem_atualizacao:!!s.sem_atualizacao,motivo:s.motivo||null}; };
+
 function arvore(armazem_chave){
+  if(PCP.migrado(armazem_chave)) PCP.sincronizar();
   return dHaste.listar(armazem_chave).map(h=>{
     const andares=dAndar.listar(h.id);
     return {...h,
@@ -147,6 +177,6 @@ function arvore(armazem_chave){
 
 module.exports={
   criarHaste, criarAndar, criarNivel, proximoNome,
-  completo, descrever, exigirArmazem, arvore,
+  completo, descrever, exigirArmazem, arvore, exigirEditavelAqui, estadoPcp,
   listarArmazens:()=>dArmazem.listar()
 };

@@ -78,7 +78,7 @@ app.locals.acesso = {
 };
 app.use((req, res, next) => { req.usuario = QUEM === 1 ? { id:1, nome:'Lucas Tela' } : QUEM === 2 ? { id:2, nome:'Renato Tela' } : { id:3, nome:'Edvaldo Tela' }; next(); });
 app.get('/api/auth/eu', (req, res) => res.json({ logado:true, nome:'Lucas Tela', destino:{} }));
-app.get('/api/teste', (req, res) => res.json({ ativo:false }));
+app.get('/api/teste/ativo', (req, res) => res.json({ ativo:false }));
 app.get('/api/skus', (req, res) => res.json(db.prepare('SELECT * FROM skus').all()));
 require('./cad_route')(app, db);
 require('./dev_route')(app, db);

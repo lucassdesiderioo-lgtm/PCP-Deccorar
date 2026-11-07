@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+  <infNFe Id="NFe35261111222333000144550020000098761000098765" versao="4.00">
+    <ide><serie>2</serie><nNF>9876</nNF><dhEmi>2026-11-06T14:00:00-03:00</dhEmi></ide>
+    <emit><CNPJ>11222333000144</CNPJ><xNome>TEXTIL BOM PRECO ME</xNome><CRT>1</CRT></emit>
+    <dest><CNPJ>98765432000110</CNPJ></dest>
+    <det nItem="1">
+      <prod><cProd>7788</cProd><xProd>TECIDO SCREEN CINZA 2,80</xProd><NCM>54076100</NCM><CFOP>6102</CFOP><uCom>M</uCom><qCom>100.0000</qCom><vProd>1800.00</vProd><vSeg>18.00</vSeg><vOutro>12.00</vOutro></prod>
+      <imposto><ICMS><ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102></ICMS></imposto>
+    </det>
+    <det nItem="2">
+      <prod><cProd>7790</cProd><xProd>TECIDO SCREEN BEGE 2,80</xProd><NCM>54076100</NCM><CFOP>6102</CFOP><uCom>M</uCom><qCom>50.0000</qCom><vProd>900.00</vProd></prod>
+      <imposto><ICMS><ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102></ICMS></imposto>
+    </det>
+    <total><ICMSTot><vProd>2700.00</vProd><vSeg>18.00</vSeg><vOutro>12.00</vOutro><vNF>2730.00</vNF></ICMSTot></total>
+  </infNFe>
+</NFe>

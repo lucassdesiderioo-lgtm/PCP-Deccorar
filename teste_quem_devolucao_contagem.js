@@ -177,7 +177,8 @@ const retratoB = () => JSON.stringify(['contagem','contagem_pendente','component
   .map(t => dbB.prepare('SELECT * FROM '+t).all()));
 
 console.log('\n── B1. sem login, toda escrita da contagem responde 401 e nada muda ──');
-B('POST /api/contagem/componente', { componente_id:tubo, sessao:'S0', quantidade:3 }, ANA);   // uma sessão em andamento
+/* uma sessão em andamento, de antes do deploy (a porta de lançar material saiu: 504) */
+dbB.prepare("INSERT INTO contagem (codigo,sessao,tipo,componente_id,qtd,usuario_id,usuario_nome) VALUES ('Tubo 32 mm','S0','componente',?,3,7,'Ana')").run(tubo);
 const antesB = retratoB();
 const escritasB = Object.keys(rB).filter(k => /^(POST|DELETE) \/api\/contagem/.test(k));
 ok('as 7 escritas da contagem estão na conta', escritasB.length === 7, escritasB.join(' | '));
@@ -191,18 +192,15 @@ ok('o banco não mudou', retratoB() === antesB);
 console.log('\n── B2. o id de quem contou e de quem aprovou ──');
 const linhaC = dbB.prepare("SELECT * FROM contagem WHERE sessao='S0'").get() || {};
 ok('contagem.usuario_id e usuario_nome em cada lançamento', linhaC.usuario_id === 7 && linhaC.usuario_nome === 'Ana', linhaC.usuario_id + '/' + linhaC.usuario_nome);
+/* A contagem antiga de material saiu inteira (revisão do PR #305): somar,
+   ajustar e aprovar material por aqui é 410, e nada grava. */
+const nPend = dbB.prepare('SELECT COUNT(*) n FROM contagem_pendente').get().n;
 r = B('POST /api/contagem/lancar', { sessao:'S0', itens:[{ tipo:'componente', componente_id:tubo }] }, ANA);
-ok('sem contagem.ajustar vira pendente', r.status === 200 && r.body.pendente === 1, JSON.stringify(r.body));
-const pend = dbB.prepare('SELECT * FROM contagem_pendente ORDER BY id DESC').get() || {};
-ok('contagem_pendente.contado_por_id = quem contou', pend.contado_por_id === 7 && pend.contado_por === 'Ana', pend.contado_por_id + '/' + pend.contado_por);
-r = B('POST /api/contagem/pendentes/aprovar', { ids:[pend.id] }, BIA);
-const pend2 = dbB.prepare('SELECT * FROM contagem_pendente WHERE id=?').get(pend.id) || {};
-ok('contagem_pendente.aprovado_por_id = quem aprovou', r.status === 200 && pend2.aprovado_por_id === 8 && pend2.aprovado_por === 'Bia', pend2.aprovado_por_id + '/' + pend2.aprovado_por);
+ok('somar material pela porta antiga é recusado (410)', r.status === 410, JSON.stringify(r.body));
 AJUSTA = true;
-B('POST /api/contagem/componente', { componente_id:tubo, sessao:'S1', quantidade:2 }, BIA);
-r = B('POST /api/contagem/ajustar', { sessao:'S1', itens:[{ tipo:'componente', componente_id:tubo }] }, BIA);
-const dir = dbB.prepare('SELECT * FROM contagem_pendente ORDER BY id DESC').get() || {};
-ok('o caminho direto grava os dois ids', r.status === 200 && dir.contado_por_id === 8 && dir.aprovado_por_id === 8, JSON.stringify(dir));
+r = B('POST /api/contagem/ajustar', { sessao:'S0', itens:[{ tipo:'componente', componente_id:tubo }] }, BIA);
+ok('ajustar material pela porta antiga é recusado (410)', r.status === 410, JSON.stringify(r.body));
+ok('e nenhum pendente nasceu', dbB.prepare('SELECT COUNT(*) n FROM contagem_pendente').get().n === nPend);
 ok('banco novo: as colunas no CREATE', ['contado_por_id','aprovado_por_id'].every(c => cols(dbB,'contagem_pendente').indexOf(c) >= 0)
   && ['usuario_id','usuario_nome'].every(c => cols(dbB,'contagem').indexOf(c) >= 0));
 const velhoB = new Database(path.join(tmp, 'velhoB.db'));

@@ -98,4 +98,21 @@ function corrigirCustoPago(db, args){
   return { custo_medio:novo };
 }
 
-module.exports = { saldo, movimentar, entrada, corrigirCustoPago };
+/* O CUSTO MEDIO DO MATERIAL SEM SALDO (o cafe, R-CMP-45): ele nao guarda
+   estoque — entra e sai na mesma hora —, entao a correcao "sobre o saldo de
+   agora" nunca o alcancaria. O custo dele e a media ponderada de TODAS as
+   compras aceitas, pelo custo da unidade de cada recebimento (que a nota
+   corrige). Mora aqui porque o custo medio tem dono unico (revisao do PR #305:
+   o UPDATE morava no recebimento_dominio). */
+function recalcularMediaSemSaldo(db, componente_id){
+  const m = db.prepare(`SELECT SUM(ri.qtd_contada*ri.custo_unit) v, SUM(ri.qtd_contada) q FROM recebimento_item ri
+    JOIN pedido_item pi ON pi.id=ri.pedido_item_id
+    WHERE pi.componente_id=? AND ri.custo_unit IS NOT NULL AND ri.qtd_contada > 0
+      AND (ri.decisao IS NULL OR ri.decisao IN ('aceitar','aceitar_reclamar','ciente'))`).get(componente_id);
+  if(!m || !(m.q > 0)) return null;
+  const novo = m6(m.v / m.q);
+  db.prepare('UPDATE componente SET custo_medio=? WHERE id=?').run(novo, componente_id);
+  return { custo_medio:novo };
+}
+
+module.exports = { saldo, movimentar, entrada, corrigirCustoPago, recalcularMediaSemSaldo };

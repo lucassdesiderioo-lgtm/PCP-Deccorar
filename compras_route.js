@@ -10,6 +10,7 @@
  */
 const CUSTO = require('./custo_dominio');
 const NEC   = require('./necessidade_dominio');
+const MAT   = require('./material_dominio');
 
 const QUEM = require('./quem');
 module.exports = function(app, db){
@@ -38,28 +39,49 @@ module.exports = function(app, db){
   const txt  = v => { const t = String(v==null?'':v).trim(); return t===''?null:t; };
 
   /* ── FORNECEDOR ─────────────────────────────────────────────────────────── */
-  app.get('/api/fornecedores',(req,res)=>
-    res.json(db.prepare('SELECT * FROM fornecedor ORDER BY ativo DESC, nome').all()));
+  /* OS DADOS DE PAGAMENTO (Pix, banco, agencia, conta) SO VIAJAM A QUEM TEM
+     `pedido.pagar` (COMPRAS-E-RECEBIMENTO R-CMP-12): a poda e no JSON. */
+  const podeP=(req,chave)=>{ try{ return !!app.locals.acesso.podePermissao(req.usuario,chave); }catch(e){ return false; } };
+  const PAGAMENTO=['pix','banco','agencia','conta'];
+  app.get('/api/fornecedores',(req,res)=>{
+    const l=db.prepare('SELECT * FROM fornecedor ORDER BY ativo DESC, nome').all();
+    if(!podeP(req,'pedido.pagar')) l.forEach(f=>PAGAMENTO.forEach(k=>delete f[k]));
+    res.json(l);
+  });
 
+  /* CAMPO AUSENTE NAO E CAMPO VAZIO (#33, desde a fase 2 da
+     COMPRAS-E-RECEBIMENTO): o UPDATE escrevia todos os campos, e um POST so com
+     o telefone apagava o Pix, o prazo e o frete. Ausente preserva; vazio de
+     proposito apaga. */
   app.post('/api/fornecedores',(req,res)=>{
     const b=req.body||{};
-    const nome=txt(b.nome);
-    if(!nome) return res.status(400).json({erro:'nome obrigatório'});
-    const campos={ nome, cnpj:txt(b.cnpj), contato:txt(b.contato), telefone:txt(b.telefone),
-      email:txt(b.email), prazo_entrega:num(b.prazo_entrega), pedido_minimo:num(b.pedido_minimo)||0,
-      pagamento:txt(b.pagamento), frete_padrao:num(b.frete_padrao)||0, regime:txt(b.regime),
-      whatsapp:txt(b.whatsapp), observacao:txt(b.observacao) };
+    const tem=k=>Object.prototype.hasOwnProperty.call(b,k);
+    const TXT=['nome','cnpj','contato','telefone','email','pagamento','regime','whatsapp','observacao','tipo'].concat(PAGAMENTO);
+    const campos={};
+    for(const k of TXT) if(tem(k)) campos[k]=txt(b[k]);
+    for(const [k,zero] of [['prazo_entrega',false],['pedido_minimo',true],['frete_padrao',true]]){
+      if(!tem(k)) continue;
+      if(b[k]===''||b[k]===null){ campos[k]=zero?0:null; continue; }
+      const n=num(b[k]);
+      if(n===null||n<0) return res.status(400).json({erro:k.replace('_',' ')+' tem que ser um número maior ou igual a zero — veio "'+b[k]+'"'});
+      campos[k]=n;
+    }
+    const TIPOS=require('./compra_dominio').TIPOS_FORNECEDOR;
+    if(campos.tipo && TIPOS.indexOf(campos.tipo)<0)
+      return res.status(400).json({erro:'o tipo do fornecedor tem que ser: '+TIPOS.join(', ')+' — veio "'+campos.tipo+'"'});
+    if(PAGAMENTO.some(k=>tem(k)) && !podeP(req,'pedido.pagar'))
+      return res.status(403).json({erro:'os dados de pagamento do fornecedor são de quem tem "Pagar pedido (parcelas)"'});
     if(b.id){
-      db.prepare(`UPDATE fornecedor SET nome=@nome,cnpj=@cnpj,contato=@contato,telefone=@telefone,
-        email=@email,prazo_entrega=@prazo_entrega,pedido_minimo=@pedido_minimo,pagamento=@pagamento,
-        frete_padrao=@frete_padrao,regime=@regime,whatsapp=@whatsapp,observacao=@observacao
-        WHERE id=@id`).run(Object.assign({id:+b.id},campos));
+      if(tem('nome') && !campos.nome) return res.status(400).json({erro:'o nome não pode ficar vazio'});
+      const cols=Object.keys(campos);
+      if(cols.length) db.prepare('UPDATE fornecedor SET '+cols.map(c=>c+'=@'+c).join(',')+' WHERE id=@id').run(Object.assign({id:+b.id},campos));
       return res.json({ok:true,id:+b.id});
     }
-    const r=db.prepare(`INSERT INTO fornecedor (nome,cnpj,contato,telefone,email,prazo_entrega,
-      pedido_minimo,pagamento,frete_padrao,regime,whatsapp,observacao)
-      VALUES (@nome,@cnpj,@contato,@telefone,@email,@prazo_entrega,@pedido_minimo,@pagamento,
-      @frete_padrao,@regime,@whatsapp,@observacao)`).run(campos);
+    if(!campos.nome) return res.status(400).json({erro:'nome obrigatório'});
+    if(campos.pedido_minimo===undefined) campos.pedido_minimo=0;
+    if(campos.frete_padrao===undefined) campos.frete_padrao=0;
+    const cols=Object.keys(campos);
+    const r=db.prepare('INSERT INTO fornecedor ('+cols.join(',')+') VALUES ('+cols.map(c=>'@'+c).join(',')+')').run(campos);
     res.json({ok:true,id:r.lastInsertRowid});
   });
 
@@ -70,8 +92,11 @@ module.exports = function(app, db){
   });
 
   /* ── COMPONENTE ─────────────────────────────────────────────────────────── */
+  /* O nome do almoxarifado vai junto (fase 1 da COMPRAS-E-RECEBIMENTO): e o
+     "levar para" do Recebimento e o filtro da Contagem. */
   app.get('/api/componentes',(req,res)=>
-    res.json(db.prepare('SELECT * FROM componente ORDER BY ativo DESC, nome').all()));
+    res.json(db.prepare(`SELECT c.*, a.nome almoxarifado_nome FROM componente c
+      LEFT JOIN almoxarifado a ON a.id=c.almoxarifado_id ORDER BY c.ativo DESC, c.nome`).all()));
 
   /* ── O CADASTRO DE MATERIAL ────────────────────────────────────────────
      Cria (sem `id`) e edita (com `id`). Ate 24/09/2026 a rota CRIAVA e nenhuma
@@ -128,6 +153,15 @@ module.exports = function(app, db){
     for(const k of ['nome','codigo','unidade','familia','marca','modelo']) if(tem(k)) campos[k]=txt(b[k]);
     if(tem('cor')) campos.cor = txt(b.cor) && String(b.cor).toUpperCase();
     if(tem('sobra_aproveitavel')) campos.sobra_aproveitavel = b.sobra_aproveitavel?1:0;
+
+    /* As colunas da fase 1 da COMPRAS-E-RECEBIMENTO (R-CMP-01 a 10): o
+       material_dominio e o dono das regras delas — modo de saldo obrigatorio
+       para nascer, como_sai 'ficha' esperando a montagem, vai_ficha que nao se
+       desmarca com o material numa ficha, e a #33 inteira. */
+    const atual = editando ? db.prepare('SELECT * FROM componente WHERE id=?').get(+b.id) : null;
+    if(editando && !atual) return res.status(404).json({erro:'material não encontrado'});
+    try{ Object.assign(campos, MAT.lerCampos(db, b, atual)); }
+    catch(e){ if(e instanceof MAT.Recusa) return res.status(e.status).json({erro:e.message}); throw e; }
     if(tem('ativo')) campos.ativo = b.ativo?1:0;
 
     /* O nome e obrigatorio para NASCER, e so. Na edicao ele segue a regra de
@@ -333,7 +367,7 @@ module.exports = function(app, db){
     const m={};
     for(const r of db.prepare(`SELECT i.componente_id, SUM(i.qtd_consumo - i.qtd_recebida) q
       FROM pedido_item i JOIN pedido_compra p ON p.id=i.pedido_id
-      WHERE p.status IN ('enviado','parcial') AND i.status IN ('aberto','parcial')
+      WHERE p.status IN ('comprado','parcial') AND i.status IN ('aberto','parcial')
         AND i.componente_id IS NOT NULL GROUP BY i.componente_id`).all()) m[r.componente_id]=r.q;
     return m;
   }

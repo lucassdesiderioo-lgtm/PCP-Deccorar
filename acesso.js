@@ -53,7 +53,11 @@ function setoresNativos(){
      nasce no setor Admin: em producao o setor ja existe e nao a recebe, e o
      dono a da pela tela de Acessos a quem decide (o Financeiro). Banco novo
      igual a producao (§17). */
-  const SO_PELA_TELA = ['devolucao.dinheiro'];
+  /* E as chaves da COMPRAS-E-RECEBIMENTO (07/11/2026): decisão do dono na
+     revisão do PR #305 — a R-ALC-06 vale sobre a spec §7. Nascem só para o
+     Admin Geral, e quem recebe é marcado na tela de Acessos. */
+  const SO_PELA_TELA = ['devolucao.dinheiro',
+    'almoxarifado.cadastrar','pedido.aprovar','nota.lancar','recebimento.liberar'];
   const admin = PERMISSOES.filter(p => p.nivel === 'admin' && SO_PELA_TELA.indexOf(p.chave) < 0).map(p => p.chave);
   return [
     { nome:'Operador / Revisão',             nivel:'operacao',
@@ -303,6 +307,12 @@ module.exports = function(app, db){
       })();
     }
   }catch(e){ console.log('[acesso] seed de cancelamento.confirmar falhou: '+e.message); }
+
+  /* ── 3-C3. AS CHAVES DA COMPRAS-E-RECEBIMENTO (07/11/2026) ──
+     NÃO HÁ BACKFILL, de propósito. A spec §7 mandava dar cada chave nova a
+     quem já tinha a de origem; na revisão do PR #305 o dono decidiu pela
+     R-ALC-06: tudo novo nasce só para o Admin Geral, e quem recebe é marcado
+     na tela de Acessos depois do deploy (linha em docs/DECISOES.md). */
 
   /* ── 3-D. A CONFERENCIA EM TRES PAPEIS (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA,
      26/09/2026) ──
@@ -891,6 +901,8 @@ module.exports = function(app, db){
     if(eq('/api/telas/minhas')) return '@logado';
     if(eq('/baixar-backup')) return '@ag';
     // ── acoes/admin por API ──
+    // A tarja do modo teste aparece para todos (§11): so o booleano, so leitura.
+    if(M === 'GET' && eq('/api/teste/ativo')) return '@logado';
     if(pre('/api/teste')) return 'teste.operar';
     if(pre('/api/usuarios')) return 'pessoas.gerenciar';
     if(pre('/api/acesso/setores')) return 'setores.gerenciar';
@@ -1062,6 +1074,38 @@ module.exports = function(app, db){
        que esta usa prefixo: a proxima leitura de formula ja nasce coberta. */
     if(pre('/api/formulas')) return 'compras.ver';
     if(M !== 'GET' && pre('/api/fornecedores')) return 'fornecedor.cadastrar';
+    /* COMPRAS-E-RECEBIMENTO fase 11: o certificado (so o Admin Geral) e as notas
+       da Receita (quem lanca nota ou ve custo; consultar agora: certificado). */
+    if(pre('/api/certificado')) return 'certificado.gerenciar';
+    if(eq('/api/dfe/consultar')) return 'certificado.gerenciar';
+    if(M !== 'GET' && pre('/api/dfe')) return 'nota.lancar';
+    if(pre('/api/dfe')) return ['nota.lancar','custo.ver'];
+    /* COMPRAS-E-RECEBIMENTO fase 7: a compra programada (R-CMP-46 a 48). */
+    if(M !== 'GET' && pre('/api/compras/programada')) return 'pedido.criar';
+    if(pre('/api/compras/programada')) return ['compras.ver','pedido.criar'];
+    /* COMPRAS-E-RECEBIMENTO fase 6: a contagem de material (R-CMP-42 a 45),
+       pelas chaves de contagem que ja existem. */
+    if(eq('/api/contagem-material/pendentes')) return ['contagem.aprovar','contagem.ajustar'];
+    /* o tecido de antes etiquetado na 504 muda o saldo: e de quem aprova a contagem */
+    if(eq('/api/contagem-material/a-etiquetar') || eq('/api/contagem-material/etiquetar')) return 'contagem.aprovar';
+    if(M !== 'GET' && pre('/api/contagem-material/itens')) return 'contagem.aprovar';
+    if(eq('/api/contagem-material/consumo')) return ['compras.ver','contagem.aprovar','contagem.contar'];
+    if(pre('/api/contagem-material')) return 'contagem.contar';
+    /* COMPRAS-E-RECEBIMENTO fase 5: o endereco e o volume (R-CMP-38 a 41). */
+    if(M !== 'GET' && /\/enderecos$/.test(p) && pre('/api/almoxarifados')) return 'almoxarifado.cadastrar';
+    if(/\/enderecos$/.test(p) && pre('/api/almoxarifados')) return ['almoxarifado.cadastrar','volume.movimentar','compras.ver','contagem.contar','pedido.receber'];
+    if(M !== 'GET' && pre('/api/enderecos')) return 'almoxarifado.cadastrar';   // renomear/desativar (fase 10)
+    /* SEM contagem.contar (revisão do PR #305): o estoque traz o saldo, e a
+       contagem da 504 é cega (R-CMP-42). */
+    if(/\/estoque$/.test(p) && pre('/api/almoxarifados')) return ['volume.movimentar','almoxarifado.cadastrar','compras.ver'];
+    if(pre('/api/enderecos')) return ['volume.movimentar','almoxarifado.cadastrar'];
+    if(M !== 'GET' && pre('/api/volumes')) return 'volume.movimentar';
+    if(pre('/api/volumes')) return ['volume.movimentar','pedido.receber','compras.ver','almoxarifado.cadastrar'];
+    /* COMPRAS-E-RECEBIMENTO fase 1: o almoxarifado (R-CMP-38). Ler e de quem
+       cadastra material, de quem compra, recebe ("levar para") e conta. */
+    if(M !== 'GET' && pre('/api/almoxarifados')) return 'almoxarifado.cadastrar';
+    if(pre('/api/almoxarifados')) return ['almoxarifado.cadastrar','componente.cadastrar','compras.ver','pedido.receber','contagem.contar','volume.movimentar'];
+    if(eq('/api/componentes/opcoes') || eq('/api/componentes/pendencias')) return ['componente.cadastrar','compras.ver'];
     if(M !== 'GET' && pre('/api/componentes')) return 'componente.cadastrar';
     if(M !== 'GET' && pre('/api/ofertas')) return 'preco.lancar';
     // Leituras de compras: preco de fornecedor nao e leitura de operacao. Quem
@@ -1078,11 +1122,32 @@ module.exports = function(app, db){
     // vem — e por isso a leitura NAO carrega preco (regra 14 do §13).
     // Recebimento (§8): a tela e as rotas de conferencia sao de OPERACAO e nao
     // carregam preco. Lancar o preco da nota e do Comprador.
+    /* COMPRAS-E-RECEBIMENTO fase 4: a nota (R-CMP-27: so custo.ver ou nota.lancar).
+       Regime e tabela de credito: a rota pede nota.lancar, e o handler exige o
+       Admin Geral. */
+    if(M !== 'GET' && pre('/api/notas')) return 'nota.lancar';
+    if(pre('/api/notas')) return ['custo.ver','nota.lancar'];
+    /* COMPRAS-E-RECEBIMENTO fase 3: o retido e o aviso (R-CMP-33), o prazo medido. */
+    if(eq('/api/recebimento/retidos')) return ['recebimento.liberar','compras.ver'];
+    if(M !== 'GET' && pre('/api/recebimento/itens')) return 'recebimento.liberar';
+    if(eq('/api/compras/prazo')) return ['compras.ver','pedido.criar'];
     if(eq('/recebimento')) return 'pedido.receber';
     if(eq('/api/recebimento/aguardando')) return 'pedido.ver';
     if(M !== 'GET' && /\/preco$/.test(p) && pre('/api/recebimento')) return 'preco.lancar';
     if(M !== 'GET' && eq('/api/recebimento')) return 'pedido.receber';
     if(eq('/api/recebimento/devolucoes')) return 'compras.ver';
+    /* COMPRAS-E-RECEBIMENTO fase 2: aprovar (alcada), parcelas, anexos, compra
+       rapida, alcadas. Antes do generico de /api/pedidos. */
+    if(M !== 'GET' && /\/aprovar$/.test(p) && pre('/api/pedidos')) return 'pedido.aprovar';
+    if(/\/parcelas$/.test(p) && pre('/api/pedidos')) return M === 'GET' ? ['custo.ver','nota.lancar','pedido.pagar'] : ['pedido.criar','pedido.pagar'];
+    if(M !== 'GET' && /\/pagar$/.test(p) && pre('/api/parcelas')) return 'pedido.pagar';
+    if(M === 'DELETE' && pre('/api/parcelas')) return ['pedido.criar','pedido.pagar'];
+    if(eq('/api/compras/opcoes')) return ['compras.ver','pedido.criar','pedido.receber','componente.cadastrar'];
+    if(M !== 'GET' && pre('/api/compras/alcadas')) return 'alcada.definir';
+    if(pre('/api/compras/alcadas')) return ['alcada.definir','pedido.aprovar','pedido.criar'];
+    if(M !== 'GET' && eq('/api/compras/anexos')) return ['pedido.criar','pedido.pagar','nota.lancar','pedido.receber'];
+    if(pre('/api/compras/anexos')) return ['compras.ver','pedido.criar','pedido.pagar','nota.lancar'];
+    if(M !== 'GET' && eq('/api/compras/rapida')) return 'pedido.criar';
     if(M !== 'GET' && /\/fechar$/.test(p) && pre('/api/pedidos')) return 'pedido.criar';
     if(eq('/api/pedidos/zumbis')) return 'compras.ver';
     if(M !== 'GET' && pre('/api/pedidos') && /\/pagar$/.test(p)) return 'pedido.pagar';
@@ -1268,6 +1333,8 @@ module.exports = function(app, db){
     ['devolucao.acompanhar','devolucao_casos'], ['devolucao.lancar','devolucao_casos'], ['devolucao.dinheiro','devolucao_casos'],
     ['painel.ver','painel'], ['relatorios.ver','relatorios'], ['necessidade.ver','necessidade'],
     ['pedido.receber','recebimento'],
+    // A 503 (revisão do PR #305): sem a área, quem só tem esta chave voltava ao login.
+    ['volume.movimentar','almoxarifado'],
     /* A tela de conferencia (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA). A area
        existe para a tela ficar na lista protegida do auth.js (armadilha #3) e
        para o fallback do modelo antigo; quem decide e a chave. Duas chaves

@@ -13,6 +13,7 @@
  * Sem aprovacao por valor — decisao explicita do §8. Quem compra, compra.
  */
 const CALC = require('./compras_calc');
+const D = require('./compra_dominio');
 
 const QUEM = require('./quem');
 module.exports = function(app, db){
@@ -50,7 +51,22 @@ module.exports = function(app, db){
       if(!o) return res.status(400).json({erro:'oferta '+it.oferta_id+' não existe ou está inativa'});
       const N=parseFloat(String(it.necessidade||'').replace(',','.'));
       if(!Number.isFinite(N)||N<=0) return res.status(400).json({erro:'quantidade inválida em '+(o.embalagem||'')});
-      prep.push({ oferta:o, calc:CALC.avaliarOferta(o,N), motivo:(it.motivo_escolha||'').trim()||null });
+      /* COMPRA POR KG COM QUANTIDADE DECLARADA (COMPRAS-E-RECEBIMENTO R-CMP-18):
+         o item guarda a unidade em que se comprou, a quantidade e o preco
+         nela, e o que o fornecedor declara na unidade da casa. O pedido vale
+         qtd_compra x preco; o "a caminho" e o declarado. */
+      let kg=null;
+      if(it.qtd_compra!=null && it.qtd_compra!==''){
+        const qc=parseFloat(String(it.qtd_compra).replace(',','.')), pu=parseFloat(String(it.preco_unid_compra).replace(',','.'));
+        const qd=(it.qtd_declarada==null||it.qtd_declarada==='')?null:parseFloat(String(it.qtd_declarada).replace(',','.'));
+        const un=String(it.unidade_compra||'').trim();
+        if(!un) return res.status(400).json({erro:'diga a unidade de compra (kg, un, m, cx…) de '+o.embalagem});
+        if(!Number.isFinite(qc)||qc<=0) return res.status(400).json({erro:'a quantidade de compra tem que ser maior que zero em '+o.embalagem});
+        if(!Number.isFinite(pu)||pu<0) return res.status(400).json({erro:'o preço por '+un+' tem que ser um número maior ou igual a zero'});
+        if(qd!==null && !(Number.isFinite(qd)&&qd>0)) return res.status(400).json({erro:'a quantidade declarada tem que ser maior que zero'});
+        kg={un, qc, pu, qd};
+      }
+      prep.push({ oferta:o, calc:CALC.avaliarOferta(o,N), motivo:(it.motivo_escolha||'').trim()||null, kg });
     }
     /* Um pedido POR FORNECEDOR. Itens de fornecedores diferentes viram pedidos
        diferentes na mesma chamada — e o que a tela faz ao "gerar por fornecedor". */
@@ -63,16 +79,25 @@ module.exports = function(app, db){
         const lista=grupos[fid];
         const forn=db.prepare('SELECT nome, frete_padrao, pedido_minimo FROM fornecedor WHERE id=?').get(fid);
         const frete=+(b.frete!=null?b.frete:forn.frete_padrao)||0;
-        const valor=lista.reduce((s,p)=>s+p.calc.embalagens*p.calc.preco_embalagem,0)+frete;
+        const valor=lista.reduce((s,p)=>s+(p.kg ? p.kg.qc*p.kg.pu : p.calc.embalagens*p.calc.preco_embalagem),0)+frete;
         const numero=proximoNumero();
         const r=db.prepare(`INSERT INTO pedido_compra (numero,fornecedor_id,valor_previsto,frete,observacao,criado_por,criado_por_id)
           VALUES (?,?,?,?,?,?,?)`).run(numero,+fid,valor,frete,(b.observacao||'').trim()||null,usuario(req),QUEM.idDe(req));
         const ins=db.prepare(`INSERT INTO pedido_item (pedido_id,oferta_id,componente_id,sku,embalagem,fator,
-          preco_unit,qtd_embalagem,qtd_consumo,motivo_escolha) VALUES (?,?,?,?,?,?,?,?,?,?)`);
-        for(const p of lista)
-          ins.run(r.lastInsertRowid, p.oferta.id, p.oferta.componente_id, p.oferta.sku,
+          preco_unit,qtd_embalagem,qtd_consumo,motivo_escolha,unidade_compra,qtd_compra,preco_unid_compra,qtd_declarada)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+        for(const p of lista){
+          if(p.kg){
+            /* fator = unidades da casa por unidade de compra, pelo DECLARADO;
+               sem declarado, o fator da oferta. */
+            const fator = p.kg.qd ? p.kg.qd/p.kg.qc : (p.oferta.fator||1);
+            ins.run(r.lastInsertRowid, p.oferta.id, p.oferta.componente_id, p.oferta.sku,
+              p.oferta.embalagem, fator, p.kg.pu, p.kg.qc, p.kg.qd!=null ? p.kg.qd : p.kg.qc*fator, p.motivo,
+              p.kg.un, p.kg.qc, p.kg.pu, p.kg.qd);
+          }else ins.run(r.lastInsertRowid, p.oferta.id, p.oferta.componente_id, p.oferta.sku,
             p.oferta.embalagem, p.oferta.fator, p.oferta.preco,
-            p.calc.embalagens, p.calc.qtd_comprada, p.motivo);
+            p.calc.embalagens, p.calc.qtd_comprada, p.motivo, null, null, null, null);
+        }
         criados.push({id:r.lastInsertRowid, numero, fornecedor:forn.nome, itens:lista.length, valor});
         auditar(req,'pedido_criado',numero,forn.nome+' · R$ '+valor.toFixed(2)+' · '+lista.length+' item(ns)');
         for(const p of lista) if(p.motivo)
@@ -84,10 +109,37 @@ module.exports = function(app, db){
   });
 
   /* ── LER ─────────────────────────────────────────────────────────────────── */
+  /* QUEM SÓ RECEBE NÃO LÊ O PEDIDO INTEIRO (revisão do PR #305, R-CMP-28/29/30):
+     o setor Recebimento tem pedido.ver, e esta rota entregava preço, o
+     declarado, os kg e a alçada — a contagem e a pesagem cegas da 502 deixavam
+     de ser cegas. Quem vê o pedido inteiro é quem compra, aprova, paga, lança
+     nota ou vê custo; os outros recebem o pedido sem dinheiro nem quantidade. */
+  const INTEIRO = ['compras.ver','pedido.criar','pedido.aprovar','pedido.pagar','nota.lancar','custo.ver'];
+  const veInteiro = req => INTEIRO.some(c => { try{ return !!app.locals.acesso.podePermissao(req.usuario, c); }catch(e){ return false; } });
+  const CEGO = /^(valor|preco|desembolso|frete|desconto|custo|qtd_|alcada|fator)/;   // o fator da compra por kg da o peso esperado (revisao do PR #305)
+  function podar(o){
+    if(Array.isArray(o)) return o.map(podar);
+    if(!o || typeof o !== 'object') return o;
+    const n = {};
+    for(const k of Object.keys(o)) if(!CEGO.test(k)) n[k] = podar(o[k]);
+    return n;
+  }
+  app.get('/api/pedidos',(req,res,next)=>{
+    if(veInteiro(req)) return next();
+    const j = res.json.bind(res); res.json = c => j(podar(c)); next();
+  });
+  app.get('/api/pedidos/:id',(req,res,next)=>{
+    if(veInteiro(req)) return next();
+    const j = res.json.bind(res); res.json = c => j(podar(c)); next();
+  });
+  app.get('/api/pedidos/:id/whatsapp',(req,res,next)=>{
+    if(veInteiro(req)) return next();
+    res.status(403).json({ erro:'o texto do pedido tem preço: só para quem compra' });
+  });
   app.get('/api/pedidos',(req,res)=>{
     const w=[], p=[];
     if(req.query.status){ w.push('p.status=?'); p.push(req.query.status); }
-    if(req.query.abertos==='1'){ w.push("p.status IN ('rascunho','enviado','parcial')"); }
+    if(req.query.abertos==='1'){ w.push("p.status IN ('rascunho','aguardando_aprovacao','comprado','parcial')"); }
     res.json(db.prepare(`SELECT p.*, f.nome fornecedor_nome,
         (SELECT COUNT(*) FROM pedido_item i WHERE i.pedido_id=p.id) itens
       FROM pedido_compra p LEFT JOIN fornecedor f ON f.id=p.fornecedor_id
@@ -109,9 +161,18 @@ module.exports = function(app, db){
       desembolso:i.qtd_embalagem*i.preco_unit, qtd_comprada:i.qtd_consumo })), p.frete||0);
     return p;
   }
+  const pode=(req,chave)=>{ try{ return !!app.locals.acesso.podePermissao(req.usuario,chave); }catch(e){ return false; } };
   app.get('/api/pedidos/:id',(req,res)=>{
     const p=pedidoCompleto(+req.params.id);
     if(!p) return res.status(404).json({erro:'pedido não encontrado'});
+    /* AS PARCELAS SO VIAJAM A QUEM TEM custo.ver, nota.lancar OU pedido.pagar
+       (COMPRAS-E-RECEBIMENTO R-CMP-27): a poda e no JSON, nao na tela. */
+    if(pode(req,'custo.ver')||pode(req,'nota.lancar')||pode(req,'pedido.pagar')) p.parcelas=D.parcelasDe(db,p.id);
+    /* As NOTAS (impostos, custo pago e liquido) so com custo.ver ou nota.lancar (R-CMP-27). */
+    if(pode(req,'custo.ver')||pode(req,'nota.lancar')){ try{ p.notas=require('./nota_dominio').listar(db,{pedido_id:p.id}); }catch(e){ p.notas=[]; } }
+    const a=D.alcadaDe(db,p.criado_por_id);
+    p.alcada=a?{limite:a.limite, aprovador_id:a.aprovador_id}:null;
+    try{ p.anexos=db.prepare('SELECT id,tipo,nome,criado_em,criado_por FROM compra_anexo WHERE pedido_id=? ORDER BY id').all(p.id); }catch(e){ p.anexos=[]; }
     res.json(p);
   });
 
@@ -141,18 +202,12 @@ module.exports = function(app, db){
   });
 
   /* ── ENVIAR / CANCELAR ───────────────────────────────────────────────────── */
-  app.post('/api/pedidos/:id/enviar',(req,res)=>{
-    const via=((req.body&&req.body.via)||'outro');
-    const p=db.prepare('SELECT numero,status FROM pedido_compra WHERE id=?').get(req.params.id);
-    if(!p) return res.status(404).json({erro:'pedido não encontrado'});
-    if(p.status!=='rascunho') return res.status(400).json({erro:'este pedido já saiu do rascunho ('+p.status+')'});
-    db.prepare(`UPDATE pedido_compra SET status='enviado',
-      enviado_em=datetime('now','localtime'), enviado_por=? WHERE id=?`).run(via,req.params.id);
-    /* A partir daqui o item conta como A CAMINHO na lista de compras — e o que
-       impede o comprador de comprar de novo o que ja esta vindo. */
-    auditar(req,'pedido_enviado',p.numero,'via '+via);
-    res.json({ok:true});
-  });
+  /* O STATUS `enviado` VIROU `comprado` (COMPRAS-E-RECEBIMENTO R-CMP-15/16):
+     "comprado" exige canal, numero do pedido no fornecedor e data, e passa pela
+     alcada — e isso e o POST /api/pedidos/:id/comprar (compra_route.js). Esta
+     rota fica para a tela antiga num tablet com cache, e diz o caminho. */
+  app.post('/api/pedidos/:id/enviar',(req,res)=>
+    res.status(400).json({erro:'o pedido agora passa para "comprado", com o canal, o número do pedido no fornecedor e a data da compra — use "Comprado" na tela de Pedidos'}));
 
   app.post('/api/pedidos/:id/cancelar',(req,res)=>{
     const motivo=((req.body&&req.body.motivo)||'').trim();
@@ -160,6 +215,7 @@ module.exports = function(app, db){
     const p=db.prepare('SELECT numero,status FROM pedido_compra WHERE id=?').get(req.params.id);
     if(!p) return res.status(404).json({erro:'pedido não encontrado'});
     if(p.status==='recebido') return res.status(400).json({erro:'pedido já recebido não se cancela'});
+    if(p.status==='cancelado') return res.status(409).json({erro:'este pedido já está cancelado'});
     db.transaction(()=>{
       db.prepare(`UPDATE pedido_compra SET status='cancelado',
         fechado_em=datetime('now','localtime'), motivo_fecho=? WHERE id=?`).run(motivo,req.params.id);
@@ -175,8 +231,9 @@ module.exports = function(app, db){
   app.post('/api/pedidos/:id/pagar',(req,res)=>{
     const p=db.prepare('SELECT numero FROM pedido_compra WHERE id=?').get(req.params.id);
     if(!p) return res.status(404).json({erro:'pedido não encontrado'});
-    db.prepare(`UPDATE pedido_compra SET pago_em=datetime('now','localtime'), pago_por=?, pago_por_id=? WHERE id=?`)
-      .run(usuario(req),QUEM.idDe(req),req.params.id);
+    /* O pago virou DERIVADO das parcelas (R-CMP-19): sem parcela, este botao
+       grava uma parcela paga do valor do pedido; com parcelas, paga as abertas. */
+    D.pagarTudo(db, req.params.id, QUEM.pessoa(req));
     auditar(req,'pedido_pago',p.numero,'');
     res.json({ok:true});
   });

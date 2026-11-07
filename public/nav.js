@@ -193,16 +193,19 @@ function estiloDasPermissoes(d){
 (function(){
   if(location.pathname.indexOf('/login')===0) return;
   function pinta(){
-    fetch('/api/teste').then(function(r){return r.json();}).then(function(t){
+    fetch('/api/teste/ativo').then(function(r){return r.json();}).then(function(t){
       var el=document.getElementById('tstBar');
-      if(!t.ativo){ if(el) el.remove(); document.body.style.paddingTop=''; return; }
+      /* Na BASE da tela: no topo, fixa, ela cobria a barra de sessão (Menu,
+         Trocar setor, Sair — §20). A página ganha o espaço dela embaixo. */
+      if(!t.ativo){ if(el) el.remove(); document.body.style.paddingBottom=''; return; }
       if(!el){
         el=document.createElement('div'); el.id='tstBar';
-        el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:10000;background:#f0b429;'+
+        el.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:10000;background:#f0b429;'+
           'color:#12141a;text-align:center;font:800 13px system-ui;padding:7px;letter-spacing:.5px';
         el.textContent='MODO TESTE — nada aqui conta como produção real';
         document.body.appendChild(el);
       }
+      document.body.style.paddingBottom=el.offsetHeight+'px';
     }).catch(function(){});
   }
   pinta(); setInterval(pinta,10000);
