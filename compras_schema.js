@@ -47,7 +47,27 @@ const COLUNAS_COMPONENTE = [
      com id, nome e unidade. Vazio nunca trava nada: o campo so nao sai no
      papel. */
   ['marca',              'TEXT'],
-  ['modelo',             'TEXT']
+  ['modelo',             'TEXT'],
+  /* O CADASTRO DE MATERIAL (spec COMPRAS-E-RECEBIMENTO, fase 1, 07/11/2026):
+     componente passa a ser TUDO que a empresa compra (R-CMP-01). Nenhuma destas
+     colunas decide nada sozinha com o valor que ninguem escolheu (armadilha
+     #30): `modo_saldo` nasce NULL e a rota exige a escolha; os que ja existiam
+     recebem o que eles sao hoje no backfill de uma vez so, logo abaixo. */
+  ['categoria',          'TEXT'],                  // lista `categoria_material` (R-CMP-04)
+  ['vai_ficha',          'INTEGER'],               // a ficha so oferece = 1 (R-CMP-02)
+  ['modo_saldo',         'TEXT'],                  // sem | quantidade | volume (R-CMP-03)
+  ['almoxarifado_id',    'INTEGER'],               // onde ele mora (R-CMP-05)
+  ['um_por_nivel',       'INTEGER DEFAULT 0'],     // cada nivel guarda um volume (R-CMP-06)
+  ['peso_padrao_kg',     'REAL'],                  // peso de 1 unidade (R-CMP-07)
+  ['tol_aviso_pct',      'REAL DEFAULT 2'],
+  ['tol_retem_pct',      'REAL DEFAULT 5'],
+  ['ncm',                'TEXT'],                  // 8 digitos, casa o XML (R-CMP-08)
+  ['como_sai',           "TEXT DEFAULT 'contagem'"], // contagem | ficha (esperando a montagem, R-CMP-09)
+  ['contagem_dias',      'INTEGER DEFAULT 30'],    // frequencia da contagem (R-CMP-42)
+  ['margem_dias',        'INTEGER DEFAULT 5'],     // folga do "pedir ate" (R-CMP-47)
+  /* fase 9 (R-CMP-49): o tecido do SOB MEDIDA que este material e — o
+     recebimento dele cria o rolo la, pela porta, e nao entra aqui. */
+  ['sm_tecido_id',       'INTEGER']
 ];
 
 const COLUNAS_SKU = [
@@ -58,6 +78,31 @@ const COLUNAS_SKU = [
   ['tem_ficha',    'INTEGER DEFAULT 1'],
   ['custo_direto', 'REAL']                       // so quando tem_ficha = 0
 ];
+
+/* O BACKFILL DA FASE 1 (R-CMP-03): os materiais que ja existiam recebem o que
+   eles sao hoje — vao para a ficha e tem saldo por quantidade; o tecido (com
+   `familia`) e volume, um por nivel. UMA VEZ SO (marca em `config`): rodar de
+   novo desfaria o que alguem desmarcou depois. O `config` e criado aqui
+   tambem, porque este arquivo roda no boot do db.js, antes do modulo que o cria
+   (a licao do §17 e da armadilha #28). */
+function backfillMaterial(db){
+  try{
+    db.exec('CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT)');
+    if(db.prepare("SELECT 1 FROM config WHERE chave='cmp_material_backfill_1'").get()) return;
+    db.transaction(() => {
+      db.prepare('UPDATE componente SET vai_ficha=1 WHERE vai_ficha IS NULL').run();
+      db.prepare("UPDATE componente SET modo_saldo='volume', um_por_nivel=1 WHERE modo_saldo IS NULL AND familia IS NOT NULL AND COALESCE(estoque,0) <= 0").run();   // com saldo, fica quantidade ate a 504 (decisao do dono, 07/11/2026)
+      db.prepare("UPDATE componente SET modo_saldo='quantidade' WHERE modo_saldo IS NULL").run();
+      db.prepare("UPDATE componente SET como_sai='contagem' WHERE como_sai IS NULL").run();
+      /* Os dois almoxarifados que a fabrica ja tem fora do sob medida (§3 da
+         spec). Os do tecido (ROLO e SOBRA) chegam pela migracao da fase 10. */
+      for(const [nome, fin] of [['Comandos e montagem','comando, emenda, limitador, fita crepe'],
+                                ['Expedição','parafuso, bucha, fita durex']])
+        db.prepare('INSERT OR IGNORE INTO almoxarifado (nome, finalidade) VALUES (?,?)').run(nome, fin);
+      db.prepare("INSERT INTO config (chave,valor) VALUES ('cmp_material_backfill_1','1')").run();
+    })();
+  }catch(e){ console.log('[compras] backfill do cadastro de material falhou: ' + e.message); }
+}
 
 function garantirSchemaCompras(db){
   db.exec(`
@@ -71,6 +116,206 @@ function garantirSchemaCompras(db){
       ativo     INTEGER DEFAULT 1,
       criado_em TEXT DEFAULT (datetime('now','localtime'))
     );
+
+    /* ── ALMOXARIFADO (spec COMPRAS-E-RECEBIMENTO, R-CMP-38, fase 1) ─────────
+       Quantos a empresa quiser, criados pela tela (501, aba Almoxarifados). Na
+       fase 1 so o NOME (e onde o material mora); o endereco haste -> andar ->
+       nivel entra na fase 5. Com material dentro nao se apaga: desativa. */
+    CREATE TABLE IF NOT EXISTS almoxarifado (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      local       TEXT,
+      finalidade  TEXT,
+      ativo       INTEGER DEFAULT 1,
+      criado_em   TEXT DEFAULT (datetime('now','localtime')),
+      criado_por  TEXT,
+      criado_por_id INTEGER,
+      origem_sm   TEXT        -- fase 10: a chave do armazem do sob medida (ROLO, SOBRA), para a migracao ser conferivel
+    );
+
+    /* ── ALCADA POR PESSOA (COMPRAS-E-RECEBIMENTO R-CMP-17) ─────────────────
+       Pedido acima do limite de quem o criou espera o aprovador (ou o Admin
+       Geral). Quem nao tem linha aqui nao tem limite. */
+    CREATE TABLE IF NOT EXISTS compra_alcada (
+      usuario_id   INTEGER PRIMARY KEY,
+      limite       REAL NOT NULL,
+      aprovador_id INTEGER,
+      definido_por TEXT, definido_por_id INTEGER,
+      definido_em  TEXT DEFAULT (datetime('now','localtime'))
+    );
+
+    /* ── PARCELAS (R-CMP-19): o formato do sm_boleto do sob medida — valor
+       em CENTAVOS, vencimento AAAA-MM-DD, pago_em/pago_por —, para o
+       financeiro futuro juntar a pagar e a receber sem traducao. NAO e contas a
+       pagar: nao ha lista do que vence, nem aviso. */
+    CREATE TABLE IF NOT EXISTS pagamento_parcela (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      pedido_id      INTEGER REFERENCES pedido_compra(id),
+      nota_id        INTEGER,
+      numero         INTEGER NOT NULL,
+      forma          TEXT NOT NULL,      -- pix|boleto|cartao|dinheiro|transferencia
+      valor_centavos INTEGER NOT NULL,
+      vencimento     TEXT,
+      pago_em        TEXT, pago_por TEXT, pago_por_id INTEGER,
+      obs            TEXT,
+      criado_em      TEXT DEFAULT (datetime('now','localtime')),
+      criado_por     TEXT, criado_por_id INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_parcela_pedido ON pagamento_parcela(pedido_id);
+
+    /* ── ANEXOS (R-CMP-20): o arquivo mora em caminhos.ANEXOS_COMPRAS, fora de
+       lotes/ (o cron apaga). Aqui so o nome dele no disco. */
+    CREATE TABLE IF NOT EXISTS compra_anexo (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      pedido_id      INTEGER, nota_id INTEGER, recebimento_id INTEGER,
+      tipo           TEXT NOT NULL,      -- orcamento|nota_pdf|nota_foto|xml|comprovante|outro
+      nome           TEXT,               -- o nome original, so para mostrar
+      arquivo        TEXT NOT NULL,      -- o nome no disco, gerado aqui
+      tamanho        INTEGER,
+      criado_em      TEXT DEFAULT (datetime('now','localtime')),
+      criado_por     TEXT, criado_por_id INTEGER
+    );
+
+    /* ── NOTA FISCAL DE COMPRA (COMPRAS-E-RECEBIMENTO fase 4, R-CMP-22 a 26) ──
+       Um pedido pode ter varias notas (entrega parcial). Compra SEM nota tambem
+       e registro (sem_nota = 1), com o valor pago digitado no item. Cada nota
+       grava o REGIME da data dela (R-CMP-25). origem: manual | xml | dfe. */
+    CREATE TABLE IF NOT EXISTS nota_compra (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pedido_id INTEGER REFERENCES pedido_compra(id),
+      chave TEXT, numero TEXT, serie TEXT, emitente_cnpj TEXT, emitente_nome TEXT, emissao TEXT,
+      total_produtos REAL, total_desconto REAL, total_frete REAL, total_seguro REAL, total_outras REAL,
+      total_ipi REAL, total_icms REAL, total_icms_st REAL, total_nota REAL,
+      sem_nota INTEGER DEFAULT 0, regime TEXT, origem TEXT DEFAULT 'manual',
+      criado_em TEXT DEFAULT (datetime('now','localtime')), criado_por TEXT, criado_por_id INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_nota_pedido ON nota_compra(pedido_id);
+    CREATE TABLE IF NOT EXISTS nota_compra_item (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nota_id INTEGER NOT NULL REFERENCES nota_compra(id),
+      pedido_item_id INTEGER, componente_id INTEGER,
+      descricao TEXT, ncm TEXT, cfop TEXT, unidade TEXT, quantidade REAL,
+      valor_produto REAL, desconto REAL, frete REAL, seguro REAL, outras REAL,
+      ipi REAL, icms REAL, icms_st REAL, credito_icms REAL, credito_ipi REAL,
+      custo_pago REAL, custo_liquido REAL, codigo_fornecedor TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_nota_item_pi ON nota_compra_item(pedido_item_id);
+    /* O credito vem de uma TABELA por regime, nao do codigo (R-CMP-25). */
+    CREATE TABLE IF NOT EXISTS regra_credito (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      regime TEXT NOT NULL, imposto TEXT NOT NULL, aproveita INTEGER NOT NULL DEFAULT 0,
+      vigente_desde TEXT NOT NULL,
+      criado_em TEXT DEFAULT (datetime('now','localtime')), criado_por TEXT, criado_por_id INTEGER
+    );
+
+    /* ── O ENDERECO DO ALMOXARIFADO (COMPRAS-E-RECEBIMENTO fase 5, R-CMP-38):
+       haste -> andar -> nivel, no MESMO desenho do armazem do sob medida —
+       e e para ca que os enderecos dele migram na fase 10. */
+    CREATE TABLE IF NOT EXISTS alm_haste (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      almoxarifado_id INTEGER NOT NULL REFERENCES almoxarifado(id),
+      nome TEXT NOT NULL, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+      origem_sm_id INTEGER,    -- fase 10: o id antigo no sob medida
+      UNIQUE(almoxarifado_id, nome)
+    );
+    CREATE TABLE IF NOT EXISTS alm_andar (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      haste_id INTEGER NOT NULL REFERENCES alm_haste(id),
+      nome TEXT NOT NULL, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+      origem_sm_id INTEGER,
+      UNIQUE(haste_id, nome)
+    );
+    CREATE TABLE IF NOT EXISTS alm_nivel (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      andar_id INTEGER NOT NULL REFERENCES alm_andar(id),
+      nome TEXT NOT NULL, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+      origem_sm_id INTEGER,
+      UNIQUE(andar_id, nome)
+    );
+    /* O VOLUME (R-CMP-39): a peca fisica etiquetada (M-000001). O saldo de um
+       material por volume e a soma dos volumes nao encerrados. */
+    CREATE TABLE IF NOT EXISTS volume_material (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      codigo TEXT UNIQUE COLLATE NOCASE,
+      componente_id INTEGER NOT NULL REFERENCES componente(id),
+      recebimento_item_id INTEGER,
+      qtd_inicial REAL NOT NULL, saldo REAL NOT NULL,
+      nivel_id INTEGER REFERENCES alm_nivel(id),
+      situacao TEXT NOT NULL DEFAULT 'guardado',   -- guardado | aberto | encerrado
+      metragem REAL, codigo_fornecedor TEXT, almoxarifado_id INTEGER,
+      criado_em TEXT DEFAULT (datetime('now','localtime')), criado_por TEXT, criado_por_id INTEGER,
+      encerrado_em TEXT, encerrado_por TEXT, encerrado_por_id INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_volume_nivel ON volume_material(nivel_id, situacao);
+    CREATE INDEX IF NOT EXISTS idx_volume_comp ON volume_material(componente_id, situacao);
+    /* A historia do volume: recebido, guardado, movido, aberto — com quem. */
+    CREATE TABLE IF NOT EXISTS volume_evento (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      volume_id INTEGER NOT NULL REFERENCES volume_material(id),
+      tipo TEXT NOT NULL, de_nivel_id INTEGER, para_nivel_id INTEGER, obs TEXT,
+      usuario_id INTEGER, usuario_nome TEXT,
+      criado_em TEXT DEFAULT (datetime('now','localtime'))
+    );
+
+    /* ── A CONTAGEM DE MATERIAL (COMPRAS-E-RECEBIMENTO fase 6, R-CMP-42 a 44):
+       uma pessoa, cega, por almoxarifado. A cabeca (quem e onde), as linhas
+       que quem conta lanca (inteiros e cortados) e o resultado por material
+       (contado, sistema, diferenca e o que aconteceu: igual, aplicado sozinho,
+       pendente, aprovado, rejeitado, ciente). */
+    CREATE TABLE IF NOT EXISTS contagem_material (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      almoxarifado_id INTEGER NOT NULL REFERENCES almoxarifado(id),
+      situacao TEXT NOT NULL DEFAULT 'aberta',     -- aberta | terminada
+      usuario_id INTEGER, usuario_nome TEXT,
+      aberta_em TEXT DEFAULT (datetime('now','localtime')), terminada_em TEXT
+    );
+    CREATE TABLE IF NOT EXISTS contagem_material_linha (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      contagem_id INTEGER NOT NULL REFERENCES contagem_material(id),
+      componente_id INTEGER NOT NULL REFERENCES componente(id),
+      tipo TEXT NOT NULL DEFAULT 'inteiro',        -- inteiro | cortado
+      medida_m REAL, quantidade REAL NOT NULL,
+      usuario_id INTEGER, criado_em TEXT DEFAULT (datetime('now','localtime')),
+      sistema REAL                                 -- o saldo na hora desta linha (nunca vai para a tela)
+    );
+    CREATE TABLE IF NOT EXISTS contagem_material_item (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      contagem_id INTEGER NOT NULL REFERENCES contagem_material(id),
+      componente_id INTEGER NOT NULL REFERENCES componente(id),
+      contado REAL, sistema REAL, diferenca REAL, diferenca_pct REAL,
+      situacao TEXT,                               -- igual|aplicado|pendente|aprovado|rejeitado|ciente
+      contado_em TEXT, decidido_por TEXT, decidido_por_id INTEGER, decidido_em TEXT, motivo TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_cm_item_comp ON contagem_material_item(componente_id, contado_em);
+
+    /* ── O CERTIFICADO E AS NOTAS DA RECEITA (fase 11, R-CMP-51 a 55) ───────
+       O certificado: o CAMINHO do arquivo (nunca o conteudo) e a senha
+       CIFRADA. O controle da busca: o ultimo NSU lido e quando perguntar de
+       novo. O documento: cada resumo, nota completa ou evento baixado. */
+    CREATE TABLE IF NOT EXISTS certificado (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cnpj TEXT, titular TEXT, validade TEXT,
+      arquivo TEXT NOT NULL, senha_cifrada TEXT NOT NULL,
+      enviado_por TEXT, enviado_por_id INTEGER, enviado_em TEXT DEFAULT (datetime('now','localtime')),
+      ativo INTEGER DEFAULT 1, removido_em TEXT
+    );
+    CREATE TABLE IF NOT EXISTS dfe_controle (
+      id INTEGER PRIMARY KEY, ultimo_nsu TEXT, ultima_consulta TEXT, proxima_consulta TEXT, ultimo_erro TEXT,
+      ultimo_cstat TEXT   -- o cStat da ultima consulta: depois de 137/656 o "consultar agora" tambem espera (revisao do PR #305)
+    );
+    CREATE TABLE IF NOT EXISTS dfe_documento (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nsu TEXT UNIQUE, chave TEXT, tipo TEXT,           -- resumo | completa | evento
+      emitente_cnpj TEXT, emitente_nome TEXT, valor REAL, emissao TEXT,
+      ciencia_em TEXT, ciencia_erro TEXT, xml TEXT, nsu_xml TEXT,
+      situacao TEXT,                                    -- aguardando_xml | escolher | sem_pedido | lancada | evento
+      nota_compra_id INTEGER, criado_em TEXT DEFAULT (datetime('now','localtime')),
+      /* revisao do PR #305: o motivo do documento que nao entrou (erro) e o
+         "ciente" da nota sem pedido — quem, quando e por que */
+      erro TEXT, ciente_motivo TEXT, ciente_por TEXT, ciente_por_id INTEGER, ciente_em TEXT,
+      bruto TEXT, schema_doc TEXT, tentativas INTEGER   -- o documento que nao entrou, para tentar de novo (rodada 2)
+    );
+    CREATE INDEX IF NOT EXISTS idx_dfe_chave ON dfe_documento(chave);
 
     /* ── FORNECEDOR (§9) ──────────────────────────────────────────────────── */
     CREATE TABLE IF NOT EXISTS fornecedor (
@@ -88,7 +333,10 @@ function garantirSchemaCompras(db){
       whatsapp      TEXT,             -- §8: pedido vai em PDF e texto de WhatsApp
       observacao    TEXT,
       ativo         INTEGER DEFAULT 1,
-      criado_em     TEXT DEFAULT (datetime('now','localtime'))
+      criado_em     TEXT DEFAULT (datetime('now','localtime')),
+      /* COMPRAS-E-RECEBIMENTO R-CMP-12: o tipo e os dados de pagamento, que so
+         viajam a quem tem pedido.pagar. */
+      tipo TEXT, pix TEXT, banco TEXT, agencia TEXT, conta TEXT
     );
 
     /* ── OFERTA: fornecedor x item x embalagem (§4) ───────────────────────────
@@ -185,7 +433,11 @@ function garantirSchemaCompras(db){
       data           TEXT DEFAULT (date('now','localtime')),
       teste          INTEGER DEFAULT 0,
       criado_por_id INTEGER,
-      pago_por_id INTEGER    -- quem fez, pelo id (QUEM-FEZ-E-REVISAO fase 7)
+      pago_por_id INTEGER,   -- quem fez, pelo id (QUEM-FEZ-E-REVISAO fase 7)
+      /* COMPRAS-E-RECEBIMENTO fase 2 (R-CMP-13 a 21), na ordem do ALTER (§17) */
+      canal TEXT, loja TEXT, numero_externo TEXT, comprado_em TEXT, comprado_por TEXT,
+      comprado_por_id INTEGER, aprovacao TEXT, aprovado_por TEXT, aprovado_por_id INTEGER,
+      aprovado_em TEXT, motivo_aprovacao TEXT, rapida INTEGER DEFAULT 0
     );
 
     /* Regra 9 do §13: o pedido CONGELA embalagem, fator e preco no momento em
@@ -205,7 +457,11 @@ function garantirSchemaCompras(db){
       qtd_recebida   REAL DEFAULT 0,
       preco_pago     REAL,
       motivo_escolha TEXT,   -- regra 11: escolher fora do melhor preco exige motivo
-      status         TEXT DEFAULT 'aberto'    -- aberto|parcial|recebido|cancelado
+      status         TEXT DEFAULT 'aberto',   -- aberto|parcial|recebido|cancelado
+      /* COMPRAS-E-RECEBIMENTO R-CMP-18: a unidade em que se COMPROU (kg, un, m,
+         cx), a quantidade e o preco nela, e o que o fornecedor declara na
+         unidade da casa ("400 kg ≈ 600 tubos"). */
+      unidade_compra TEXT, qtd_compra REAL, preco_unid_compra REAL, qtd_declarada REAL
     );
     CREATE INDEX IF NOT EXISTS idx_pedido_item_aberto ON pedido_item(componente_id, status);
 
@@ -237,7 +493,15 @@ function garantirSchemaCompras(db){
       qtd_devolvida    REAL DEFAULT 0,
       motivo_devolucao TEXT,       -- fora_medida|defeito|veio_errado|qtd_a_mais
       preco_pago       REAL,       -- lancado DEPOIS, pelo comprador
-      divergencia      TEXT        -- nenhuma|quantidade|preco|ambos
+      divergencia      TEXT,       -- nenhuma|quantidade|preco|ambos
+      /* COMPRAS-E-RECEBIMENTO fase 3 (R-CMP-29 a 37), na ordem do ALTER (§17):
+         a contagem cega, os dois pesos, as reguas, a faixa, a decisao de quem
+         libera, o fator real (kg por unidade), o lugar real e o custo da
+         unidade recebida. */
+      qtd_contada REAL, peso_1_kg REAL, peso_10_kg REAL, esperado_nota_kg REAL, esperado_cadastro_kg REAL,
+      desvio_pct REAL, faixa TEXT, decisao TEXT, decidido_por TEXT, decidido_por_id INTEGER, decidido_em TEXT,
+      motivo_decisao TEXT, fator_real REAL, almoxarifado_id INTEGER, custo_unit REAL,
+      volumes_json TEXT   -- os volumes do item RETIDO, para nascerem quando aceito (revisao do PR #305)
     );
     CREATE INDEX IF NOT EXISTS idx_receb_devol
       ON recebimento_item(motivo_devolucao) WHERE qtd_devolvida > 0;
@@ -332,6 +596,7 @@ function garantirSchemaCompras(db){
     }
   };
   colunas('componente', COLUNAS_COMPONENTE);
+  backfillMaterial(db);
   colunas('skus', COLUNAS_SKU);
   /* §17: coluna nova entra no CREATE do modulo dono E no ALTER, no mesmo commit,
      acrescentada NO FIM — que e onde o SQLite a coloca, e e o que mantem a ordem
@@ -348,6 +613,41 @@ function garantirSchemaCompras(db){
   colunas('custo_sku_historico', [['usuario_id','INTEGER']]);
   colunas('pedido_compra', [['criado_por_id','INTEGER'], ['pago_por_id','INTEGER']]);
   colunas('recebimento', [['recebido_por_id','INTEGER']]);
+  colunas('fornecedor', [['tipo','TEXT'],['pix','TEXT'],['banco','TEXT'],['agencia','TEXT'],['conta','TEXT']]);
+  colunas('pedido_compra', [['canal','TEXT'],['loja','TEXT'],['numero_externo','TEXT'],['comprado_em','TEXT'],
+    ['comprado_por','TEXT'],['comprado_por_id','INTEGER'],['aprovacao','TEXT'],['aprovado_por','TEXT'],
+    ['aprovado_por_id','INTEGER'],['aprovado_em','TEXT'],['motivo_aprovacao','TEXT'],['rapida','INTEGER DEFAULT 0']]);
+  colunas('almoxarifado', [['origem_sm','TEXT']]);
+  for(const t of ['alm_haste','alm_andar','alm_nivel']) colunas(t, [['origem_sm_id','INTEGER']]);
+  colunas('recebimento_item', [['qtd_contada','REAL'],['peso_1_kg','REAL'],['peso_10_kg','REAL'],['esperado_nota_kg','REAL'],
+    ['esperado_cadastro_kg','REAL'],['desvio_pct','REAL'],['faixa','TEXT'],['decisao','TEXT'],['decidido_por','TEXT'],
+    ['decidido_por_id','INTEGER'],['decidido_em','TEXT'],['motivo_decisao','TEXT'],['fator_real','REAL'],['almoxarifado_id','INTEGER'],['custo_unit','REAL'],['volumes_json','TEXT']]);
+  colunas('dfe_controle', [['ultimo_cstat','TEXT']]);
+  colunas('dfe_documento', [['erro','TEXT'],['ciente_motivo','TEXT'],['ciente_por','TEXT'],['ciente_por_id','INTEGER'],['ciente_em','TEXT'],['bruto','TEXT'],['schema_doc','TEXT'],['tentativas','INTEGER']]);
+  colunas('pedido_item', [['unidade_compra','TEXT'],['qtd_compra','REAL'],['preco_unid_compra','REAL'],['qtd_declarada','REAL']]);
+  /* R-CMP-25: o Simples Nacional nao aproveita credito — a tabela nasce com
+     isso, uma vez so. Os outros regimes o contador lanca pela tela. */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='cmp_regra_credito_1'").get()){
+      db.transaction(() => {
+        for(const imp of ['icms','ipi'])
+          db.prepare("INSERT INTO regra_credito (regime, imposto, aproveita, vigente_desde, criado_por) VALUES ('simples', ?, 0, '2000-01-01', 'semente')").run(imp);
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('regime_vigente','simples')").run();
+        db.prepare("INSERT INTO config (chave,valor) VALUES ('cmp_regra_credito_1','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[compras] semente da regra de credito falhou: ' + e.message); }
+  /* R-CMP-15: o status `enviado` passa a se chamar COMPRADO. Nada real foi
+     lancado, mas a migracao e feita assim mesmo, uma vez so: a data da compra
+     de quem ja estava `enviado` e o `enviado_em`. */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='cmp_status_comprado_1'").get()){
+      db.transaction(() => {
+        db.prepare("UPDATE pedido_compra SET status='comprado', comprado_em=COALESCE(comprado_em, enviado_em), aprovacao=COALESCE(aprovacao,'nao_precisa') WHERE status='enviado'").run();
+        db.prepare("INSERT INTO config (chave,valor) VALUES ('cmp_status_comprado_1','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[compras] migracao do status comprado falhou: ' + e.message); }
   colunas('ficha_formula', [
     ['corte_largura','TEXT'], ['corte_altura','TEXT'], ['corte_unidade','TEXT']
   ]);

@@ -102,6 +102,9 @@ function montar(app, prefixo, opcoes){
      so. Ela entra para o cadastro poder apontar; o caminho de VOLTA e o
      `consumoDeMaterial` devolvido la embaixo. */
   materiais.ligar(opcoes&&opcoes.materiais);
+  /* COMPRAS-E-RECEBIMENTO fase 10: a porta dos ENDERECOS do PCP (o dono deles);
+     sem ela, o endereco migrado fica como estava e a tela diz "sem atualizacao". */
+  require('./nucleo/enderecos_pcp').ligar(opcoes&&opcoes.enderecos);
   /* `opcoes.permissoes(uid)` e a PORTA do acesso: devolve as chaves do PCP que
      a pessoa tem (o mesmo `permissoesDe` que decide as telas de la). Sem ela
      — num teste — vale a lista que vier em `req.usuario.permissoes`; sem as
@@ -175,7 +178,14 @@ function montar(app, prefixo, opcoes){
      lado: este modulo sobe dentro de um try/catch justamente para que uma
      falha aqui nao derrube a expedicao (o comentario do topo). Um require
      desfaria isso em silencio. */
-  return { consumoDeMaterial: ()=>require('./dominio/consumo').materialDeCompra() };
+  return { consumoDeMaterial: ()=>require('./dominio/consumo').materialDeCompra(),
+    /* COMPRAS-E-RECEBIMENTO fase 9: o rolo nasce aqui pelo Recebimento do PCP
+       (a porta de volta e o `sobmedida_rolo.js` de la), e a lista de tecidos
+       para o cadastro de material do PCP apontar. */
+    criarRolosDoRecebimento: a=>require('./dominio/recebimento_pcp').criarRolos(a),
+    tecidosParaCompras: ()=>require('./dominio/recebimento_pcp').tecidos(),
+    /* fase 10: o que este modulo guarda em cada endereco do PCP */
+    estoqueParaPcp: ()=>require('./dominio/estoque_pcp').estoque() };
 }
 
 module.exports={montar, MODULOS, PREFIXO:'/sobmedida'};

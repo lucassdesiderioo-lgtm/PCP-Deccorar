@@ -111,7 +111,13 @@ const CHAVES_DEV = ['devolucao.registrar','devolucao.acompanhar','devolucao.lanc
    dele e de mais ninguém. Ela sai da comparação pelo NOME, uma a uma; a outra
    ponta (ninguém mais a recebe) é travada no `teste_acesso.js` e no teste da
    própria entrega. */
-const NASCERAM_DEPOIS = ['coleta.horario'];   // HORARIOS-DE-COLETA, 05/11/2026
+const NASCERAM_DEPOIS = ['coleta.horario',   // HORARIOS-DE-COLETA, 05/11/2026
+  /* COMPRAS-E-RECEBIMENTO (07/11/2026): nascem so para o Admin Geral, sem
+     backfill (decisao do dono na revisao do PR #305, R-ALC-06 vale sobre a spec
+     §7). Saem da comparacao pelo nome; que ninguem mais as recebe e travado no
+     teste_acesso_compras.js. */
+  'almoxarifado.cadastrar','pedido.aprovar','nota.lancar','recebimento.liberar','volume.movimentar',
+  'alcada.definir','certificado.gerenciar'];
 function comparar(antes, agora){
   if(!antes) return 'sem retrato de antes';
   /* A 203 Subir PDF SAIU em 05/11/2026 (decisão do dono, D2): o endereço

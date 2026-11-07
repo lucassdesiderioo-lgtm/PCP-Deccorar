@@ -73,6 +73,14 @@ db.exec(`
    O `compras_route.js` so registra rotas; nao precisa de servidor de verdade
    para exercita-las. Guardar o manipulador por metodo+caminho e o bastante, e
    evita abrir porta num teste (a secao 10 existe justamente por causa disso). */
+/* As colunas da fase 1 da COMPRAS-E-RECEBIMENTO (modo de saldo, almoxarifado,
+   vai_ficha...) e a tabela `almoxarifado` entram pelo schema de verdade, por
+   cima do retrato acima — e o mesmo ALTER que o banco de producao recebe. */
+{
+  const tem=db.prepare('PRAGMA table_info(componente)').all().map(c=>c.name);
+  for(const [c,t] of require('./compras_schema').COLUNAS_COMPONENTE) if(tem.indexOf(c)<0) db.exec('ALTER TABLE componente ADD COLUMN '+c+' '+t);
+  db.exec("CREATE TABLE almoxarifado (id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL UNIQUE COLLATE NOCASE, local TEXT, finalidade TEXT, ativo INTEGER DEFAULT 1)");
+}
 const rotas={};
 const app={ get:(c,f)=>rotas['GET '+c]=f, post:(c,f)=>rotas['POST '+c]=f,
             put:(c,f)=>rotas['PUT '+c]=f, delete:(c,f)=>rotas['DELETE '+c]=f,
@@ -95,7 +103,11 @@ function chamar(metodo, caminho, corpo, params){
   catch(e){ return {status:500, corpo:{erro:'a rota estourou: '+e.message}}; }
   return {status:st, corpo:out};
 }
-const criar = c => chamar('POST','/api/componentes',c);
+/* ⚠️ Desde a fase 1 da COMPRAS-E-RECEBIMENTO (R-CMP-03) material novo NAO
+   nasce sem a escolha do modo de saldo — a recusa dessa falta e do
+   teste_material.js. Aqui, que trava a #33, todo material nasce "por
+   quantidade", que e o que todos os deste arquivo sao. */
+const criar = c => chamar('POST','/api/componentes', c && !c.id && !('modo_saldo' in c) ? Object.assign({modo_saldo:'quantidade'}, c) : c);
 const ler   = id => db.prepare('SELECT * FROM componente WHERE id=?').get(id);
 
 let casos=0, falhas=0;

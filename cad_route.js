@@ -47,6 +47,10 @@ module.exports=function(app,db){
   /* Os documentos que a coleta exige antes de "Documentos ao ML" (R11). Lista
      cadastravel, nasce com os dois de hoje, pelo mesmo acrescimo de uma vez so. */
   acrescentar('seed_doc_devolucao_1','doc_devolucao',['Etiqueta de coleta','Comprovante de pagamento da transportadora']);
+  /* As categorias de material (COMPRAS-E-RECEBIMENTO R-CMP-04): lista editavel,
+     semeada uma vez. Servem para filtrar e para a compra programada — nao
+     decidem regra nenhuma. */
+  acrescentar('seed_categoria_material_1','categoria_material',require('./material_dominio').CATEGORIAS);
 
   app.get('/api/listas/:tipo',(req,res)=>
     res.json(db.prepare('SELECT id,valor FROM listas WHERE tipo=? AND ativo=1 ORDER BY ordem,id').all(req.params.tipo)));

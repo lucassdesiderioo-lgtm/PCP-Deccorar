@@ -1508,6 +1508,127 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 | Mínimos são placeholder | Foram semeados com um valor padrão ("depois eu edito"). Enquanto forem, o gatilho 1 vence quase sempre e a demanda quase não aparece na lista — não é bug da fase 6, é dado a revisar |
 | Modelo ACESSORIO sem ficha | Os dois kits têm venda e nenhuma linha de ficha. Ou lançam ficha, ou viram `tem_ficha=0` (revenda) com custo direto |
 
+
+## 7-C. Compras e Recebimento — a spec nova (desde 07/11/2026)
+
+> Spec `docs/specs/COMPRAS-E-RECEBIMENTO.md` (fases 1 a 11). **As regras estão em
+> [`docs/regras/compras.md`](docs/regras/compras.md)** (cartões R-CMP), e o porquê
+> em [`docs/historia/compras.md`](docs/historia/compras.md). A §2 da spec substitui
+> parte das decisões do `COMPRAS.md` (§7-B acima); o resto do §7-B continua.
+
+| Dono único | O quê |
+|---|---|
+| `material_dominio.js` | as regras das colunas novas do material e o almoxarifado (fase 1) |
+| `compra_dominio.js` | o caminho do pedido depois do rascunho, a alçada, as parcelas e a compra rápida (fase 2) |
+| `nota_dominio.js` | a nota de compra, o rateio, o regime e a tabela de crédito, o custo pago e líquido (fase 4) |
+| `almox_dominio.js` | o endereço (haste → andar → nível), o volume etiquetado, guardar, mover e abrir (fase 5) |
+| `contagem_material_dominio.js` | a contagem de material por almoxarifado (504), a tolerância, a aprovação, o consumo pela contagem e a média de compra (fase 6) |
+| `programada_dominio.js` | a compra programada: lista do mês e aviso pela data, o maior e nunca a soma (fase 7) |
+| `almox_dominio.js` (fase 10) | também a árvore para o espelho do sob medida, o endereço criado pela bancada de lá e o saldo numa lista só |
+| `nota_xml.js` | o leitor do XML da NF-e e o casamento sem adivinhar (fase 8; e a porta da nota baixada da Receita, fase 11) |
+| `certificado_dominio.js` | o certificado A1: receber, conferir CNPJ e validade, a senha cifrada, a chave só em memória (fase 11) |
+| `dfe_dominio.js` | a busca na distribuição de DF-e da Receita, o último NSU, o limite de consultas, a ciência automática e a nota baixada entrando pela fase 8 (fase 11) |
+| `recebimento_dominio.js` | a fila sem preço, a contagem cega, a pesagem, as réguas e as faixas, o retido, o custo por recebido, o fator real e o prazo medido (fase 3) |
+
+> ⚠️ **MATERIAL NOVO NÃO NASCE SEM O MODO DE SALDO** (R-CMP-03, armadilha #30):
+> o `POST /api/componentes` sem `modo_saldo` é 400. Os de antes receberam o modo
+> num backfill de uma vez só (`config.cmp_material_backfill_1`) — rodá-lo de novo
+> desfaria o que alguém mudou depois.
+>
+> ⚠️ **`como_sai = 'ficha'` É RECUSADO DE PROPÓSITO** até a montagem existir
+> (R-CMP-09): é a regra que diz que está esperando.
+>
+> ⚠️ **A FICHA RECUSA NO SERVIDOR o material com `vai_ficha = 0`** — esconder da
+> lista da 404 não basta (R-CMP-02).
+>
+> ⚠️ **O STATUS `enviado` NÃO EXISTE MAIS: É `comprado`** (R-CMP-15), migrado uma
+> vez só (`config.cmp_status_comprado_1`). "Comprado" exige canal, nº do pedido no
+> fornecedor e data; acima da alçada de quem criou, espera o aprovador. O `POST
+> /api/pedidos/:id/enviar` só responde 400 dizendo o caminho novo.
+>
+> ⚠️ **PARCELAS E DADOS DE PAGAMENTO DO FORNECEDOR SÃO PODADOS NO JSON** (R-CMP-12,
+> R-CMP-27): parcelas só a `custo.ver`, `nota.lancar` ou `pedido.pagar`; Pix, banco e
+> conta só a `pedido.pagar`.
+>
+> ⚠️ **A 502 É CONTAGEM CEGA** (R-CMP-29): a fila não traz o pedido, o declarado
+> nem o peso esperado do item por quantidade — e não é esquecimento. O retido
+> (peso acima da tolerância, ou contagem ≠ declarado) **não entra no saldo** até
+> alguém com `recebimento.liberar` decidir, com motivo (501, aba Recebimento retido).
+>
+> ⚠️ **O CRÉDITO DE IMPOSTO VEM DA TABELA `regra_credito`, NÃO DO CÓDIGO** (R-CMP-25),
+> e cada nota grava o regime da data dela: mudar o regime não dá crédito para trás.
+> O custo médio anda pelo LÍQUIDO ÷ o recebido, pelo `componente_dominio` (R-CMP-26).
+>
+> ⚠️ **O SALDO DO MATERIAL POR VOLUME É A SOMA DOS VOLUMES NÃO ENCERRADOS**
+> (R-CMP-39): o volume nasce no recebimento e o "Abri" da 503 é a saída pelo livro
+> (motivo `abertura`), na mesma transação. Nada move esse saldo por fora.
+>
+> ⚠️ **TELA NOVA FORA DO `/admin/` TEM QUE ENTRAR NA LISTA `TELAS` DO `auth.js`**
+> (armadilha #3 por outra porta, 07/11/2026). O mapa (`telas.js`) e o `permDaRota`
+> não bastam: sem a linha no `auth.js`, o pedido SEM sessão cai no `next()` e a
+> tela é servida — a 503 `/almoxarifado` respondeu **200** sem login no teste de
+> segurança da fase 5. As telas `/admin/...` entram sozinhas, a partir do mapa; as
+> outras, não. Rode o teste da §10 com a tela nova na lista.
+
+> ⚠️ **O TECIDO DO SOB MEDIDA NÃO ENTRA NO ESTOQUE DO PCP** (R-CMP-49, fase 9): o
+> material com `sm_tecido_id` recebido por volume cria o ROLO lá, pela porta
+> (`sobmedida_rolo.js`), e sem a porta o recebimento recusa. A entrada de rolo do
+> sob medida está aposentada. O fornecedor é um só, o do PCP (o de lá é espelho).
+>
+> ⚠️ **O ENDEREÇO É DO PCP; O ROLO, A SOBRA E O CORTE CONTINUAM NO `tecido.db`**
+> (R-CMP-50, fase 10). Depois da migração, armazem/haste/andar/nivel do sob medida
+> são ESPELHO (só a porta `tecido/nucleo/enderecos_pcp.js` escreve), e o rolo e a
+> sobra guardam o nível do PCP ao lado do `nivel_id` de sempre. **Não troque o
+> `nivel_id` pelo id do PCP**: o corte grava rolo, sobra e plano numa transação só.
+>
+> ⚠️ **O CERTIFICADO DIGITAL SÓ ENTRA PELA TELA, E NUNCA SAI** (R-CMP-51, fase 11):
+> 501 → aba Certificado, só o Admin Geral. O `.pfx` mora em `caminhos.CERTIFICADO`
+> (0600, no `.gitignore`), a senha fica **cifrada** com a chave do arquivo `.chave` da
+> mesma pasta, e não há rota que entregue o arquivo. **Nunca commite certificado,
+> senha ou essa chave.** Perdida a pasta (servidor novo), o certificado é enviado de
+> novo pela tela — ela não entra no `backup.js`, de propósito.
+>
+> ⚠️ **SÓ A CIÊNCIA DA OPERAÇÃO É AUTOMÁTICA** (R-CMP-54); as manifestações
+> conclusivas não existem no sistema. A assinatura sai pelo `openssl` do servidor: sem
+> ele, a ciência fica pendente dizendo por quê. Depois de um `137`/`656` a Receita só é
+> consultada de novo depois de uma hora (R-CMP-53), e a nota baixada só se lança sozinha
+> com UM pedido do emitente e todo item casando (R-CMP-55).
+
+> ⚠️ **A REVISÃO DO PR #305 MUDOU QUATRO COISAS, POR DECISÃO DO DONO** (07/11/2026,
+> quatro linhas em `docs/DECISOES.md`):
+>
+> - **Chave nova da Compras nasce só para o Admin Geral, sem backfill** (R-ALC-06
+>   vale sobre a spec §7). Depois do deploy, o dono marca quem recebe na tela de
+>   Acessos — até lá só ele abre a 503, libera retido, lança nota e aprova pedido.
+> - **Compra por kg em partes: a entrega abaixo do declarado ENTRA.** A que passa do
+>   declarado retém na hora; a diferença abaixo é cobrada no "fechar pedido parcial"
+>   (uma linha "fechamento" na aba Recebimento retido, que **não mexe no saldo**). A
+>   régua do peso da nota é o kg que falta ÷ as unidades declaradas que faltam.
+> - **O tecido com saldo de antes fica "por quantidade"** até alguém com
+>   `contagem.aprovar` etiquetar os rolos na 504; com saldo, o modo do material não
+>   muda pelo cadastro (400).
+> - **A contagem de material antiga da 302 saiu**: lançar, ajustar, somar e aprovar
+>   material pelas rotas `/api/contagem/*` é 410 apontando a 504.
+>
+> ⚠️ **O PEDIDO SE PODA PARA QUEM SÓ RECEBE** (R-CMP-28): sem chave de compra, nota ou
+> custo, o `GET /api/pedidos` sai sem `valor*`, `preco*`, `custo*`, `qtd_*`, `frete*`,
+> `desconto*`, `desembolso*` e `alcada*`, e o texto de WhatsApp é 403. **Campo de
+> dinheiro novo no pedido segue esse prefixo**, senão viaja.
+>
+> ⚠️ **O ROLO DO SOB MEDIDA NASCE NUMA CHAMADA SÓ, NO FIM DA TRANSAÇÃO DO PCP**
+> (`criarRolos` aceita a lista): chamada a chamada, o segundo tecido recusado deixava o
+> primeiro rolo lá com o PCP desfeito. **O retido guarda os volumes**
+> (`recebimento_item.volumes_json`) e eles nascem quando quem libera aceita.
+>
+> ⚠️ **A NOTA BAIXADA DA RECEITA (`dfe_documento`) FICA FORA DO MODO TESTE**: a
+> consulta avança o último NSU, e a nota apagada não se baixa de novo.
+
+**Rode `node teste_revisao_compras.js` e `node teste_migrar_simula.js` (a simulação
+das duas migrações não toca os bancos de verdade), além de `node teste_material.js`,
+`node teste_pedido_compra.js`, `node
+teste_recebimento.js`, `node teste_nota_compra.js`, `node teste_almoxarifado.js`, `node teste_contagem_material.js`, `node teste_compra_programada.js`, `node teste_nota_xml.js`, `node teste_porta_sobmedida.js`, `node teste_porta_almox.js` (e `cd tecido && npm test`), `node teste_certificado.js`, `node teste_dfe.js` e `node teste_acesso_compras.js` ao mexer no cadastro de material, no almoxarifado, no
+pedido, no fornecedor ou nas chaves de Compras.**
+
 ---
 
 ## 8. Horário de corte e despacho
@@ -3075,8 +3196,11 @@ guarda o saldo é a coluna, o movimento é só a história dela.
 `cancelamento_caixa` (03/11/2026), `recusa_estoque` e `inventario_escala`
 (04/11/2026, conferência v2), `revisao_evento` (04/11/2026, a revisão
 cancelada, recusada e desfeita — QUEM-FEZ-E-REVISAO), `lote_reimpressao`
-(05/11/2026, cada reimpressão da etiqueta de venda, com quem).
-(`foto_estoque` saiu na Fase 3.)
+(05/11/2026, cada reimpressão da etiqueta de venda, com quem),
+`volume_material`, `volume_evento`, `contagem_material` (+ `_item` e `_linha`),
+`nota_compra` (+ `_item`), `pagamento_parcela` e `compra_anexo` (07/11/2026,
+COMPRAS-E-RECEBIMENTO — a `dfe_documento` fica fora: a nota apagada não se baixa de
+novo). (`foto_estoque` saiu na Fase 3.)
 
 A lista fica em `TABELAS`, no topo do `teste_route.js`. Cada entrada traz a coluna
 de chave primária — hoje todas usam `id`. O campo ficou genérico por causa da
@@ -3307,8 +3431,10 @@ restart`, ninguém edita variável de ambiente no servidor.
 | `LOTES` | os PDFs do ML (o cron apaga em 7 dias) | `PCP_LOTES` |
 | `COLETAS` | as fotos da conferência com o motorista (§8-B) | `PCP_COLETAS_DIR` |
 | `BACKUPS` | as cópias do `backup.js` — dos **dois** bancos | `PCP_BACKUPS` |
+| `ANEXOS_COMPRAS` | os anexos do pedido e da nota, e o XML das notas baixadas da Receita (fora de `lotes/`) | `PCP_ANEXOS_COMPRAS_DIR` |
+| `CERTIFICADO` | o certificado digital e a chave que cifra a senha — **nunca no repositório nem no backup comum** | `PCP_CERTIFICADO_DIR` |
 
-`PCP_DIR` move as quatro de uma vez; a variável específica ganha da geral.
+`PCP_DIR` move todas de uma vez; a variável específica ganha da geral.
 
 > O **`tecido.db` não está nesta tabela**, e não é esquecimento: ele mora ao
 > lado do módulo e quem responde por ele é `tecido/nucleo/caminho.js`
@@ -3489,7 +3615,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (246), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_tarja_modo_teste.js` (26); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (246), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |

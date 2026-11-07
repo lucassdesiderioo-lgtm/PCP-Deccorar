@@ -2064,6 +2064,62 @@ const SEMENTE=[
   }}
 ];
 
+/* ── COMPRAS-E-RECEBIMENTO fase 9 (07/11/2026, R-CMP-11 e R-CMP-49) ───────
+   O fornecedor e UM so, o do PCP: o cadastro deste modulo vira o espelho que o
+   rolo, o custo e os relatorios ja leem, e cada linha guarda o fornecedor do
+   PCP ao lado. O texto antigo do rolo (`rolo.fornecedor`) fica como estava. */
+MIGRACOES.push({n:40, nome:'o fornecedor e o rolo apontam o fornecedor do PCP', sql:`
+ALTER TABLE fornecedor ADD COLUMN fornecedor_pcp_id INTEGER;
+ALTER TABLE rolo ADD COLUMN fornecedor_pcp_id INTEGER;
+CREATE INDEX idx_fornecedor_pcp ON fornecedor(fornecedor_pcp_id);
+`});
+
+/* ── COMPRAS-E-RECEBIMENTO fase 10 (07/11/2026, R-CMP-50) ────────────────
+   Um sistema de almoxarifado: o PCP e dono do ENDERECO; este modulo, do rolo,
+   da sobra e do corte. armazem/haste/andar/nivel viram o ESPELHO do PCP (cada
+   linha guarda o id de la), e o rolo e a sobra guardam o nivel do PCP e o nome
+   dele — se a porta cair, o endereco nao some. Os gatilhos mantem o nivel do
+   PCP do rolo e da sobra em dia quando o `nivel_id` muda (guardar, mover, o
+   corte que gera sobra), sem tocar em nenhum desses caminhos. */
+MIGRACOES.push({n:41, nome:'o endereco e do PCP: o espelho e o nivel do PCP no rolo e na sobra', sql:`
+ALTER TABLE armazem ADD COLUMN pcp_almox_id INTEGER;
+ALTER TABLE armazem ADD COLUMN pcp_nome TEXT;
+ALTER TABLE haste ADD COLUMN pcp_id INTEGER;
+ALTER TABLE andar ADD COLUMN pcp_id INTEGER;
+ALTER TABLE nivel ADD COLUMN pcp_id INTEGER;
+ALTER TABLE rolo ADD COLUMN nivel_pcp_id INTEGER;
+ALTER TABLE rolo ADD COLUMN nivel_pcp_nome TEXT;
+ALTER TABLE sobra ADD COLUMN nivel_pcp_id INTEGER;
+ALTER TABLE sobra ADD COLUMN nivel_pcp_nome TEXT;
+CREATE INDEX idx_nivel_pcp ON nivel(pcp_id);
+CREATE INDEX idx_rolo_nivel_pcp ON rolo(nivel_pcp_id);
+CREATE INDEX idx_sobra_nivel_pcp ON sobra(nivel_pcp_id);
+CREATE TRIGGER rolo_nivel_pcp_ins AFTER INSERT ON rolo WHEN NEW.nivel_id IS NOT NULL BEGIN
+  UPDATE rolo SET nivel_pcp_id=(SELECT n.pcp_id FROM nivel n WHERE n.id=NEW.nivel_id),
+    nivel_pcp_nome=(SELECT COALESCE(ar.pcp_nome,ar.nome)||' · '||h.nome||' · '||a.nome||' · '||n.nome FROM nivel n JOIN andar a ON a.id=n.andar_id
+      JOIN haste h ON h.id=a.haste_id JOIN armazem ar ON ar.chave=h.armazem_chave WHERE n.id=NEW.nivel_id AND n.pcp_id IS NOT NULL)
+  WHERE id=NEW.id;
+END;
+CREATE TRIGGER rolo_nivel_pcp_upd AFTER UPDATE OF nivel_id ON rolo BEGIN
+  UPDATE rolo SET nivel_pcp_id=(SELECT n.pcp_id FROM nivel n WHERE n.id=NEW.nivel_id),
+    nivel_pcp_nome=(SELECT COALESCE(ar.pcp_nome,ar.nome)||' · '||h.nome||' · '||a.nome||' · '||n.nome FROM nivel n JOIN andar a ON a.id=n.andar_id
+      JOIN haste h ON h.id=a.haste_id JOIN armazem ar ON ar.chave=h.armazem_chave WHERE n.id=NEW.nivel_id AND n.pcp_id IS NOT NULL)
+  WHERE id=NEW.id;
+END;
+CREATE TRIGGER sobra_nivel_pcp_ins AFTER INSERT ON sobra WHEN NEW.nivel_id IS NOT NULL BEGIN
+  UPDATE sobra SET nivel_pcp_id=(SELECT n.pcp_id FROM nivel n WHERE n.id=NEW.nivel_id),
+    nivel_pcp_nome=(SELECT COALESCE(ar.pcp_nome,ar.nome)||' · '||h.nome||' · '||a.nome||' · '||n.nome FROM nivel n JOIN andar a ON a.id=n.andar_id
+      JOIN haste h ON h.id=a.haste_id JOIN armazem ar ON ar.chave=h.armazem_chave WHERE n.id=NEW.nivel_id AND n.pcp_id IS NOT NULL)
+  WHERE id=NEW.id;
+END;
+CREATE TRIGGER sobra_nivel_pcp_upd AFTER UPDATE OF nivel_id ON sobra BEGIN
+  UPDATE sobra SET nivel_pcp_id=(SELECT n.pcp_id FROM nivel n WHERE n.id=NEW.nivel_id),
+    nivel_pcp_nome=(SELECT COALESCE(ar.pcp_nome,ar.nome)||' · '||h.nome||' · '||a.nome||' · '||n.nome FROM nivel n JOIN andar a ON a.id=n.andar_id
+      JOIN haste h ON h.id=a.haste_id JOIN armazem ar ON ar.chave=h.armazem_chave WHERE n.id=NEW.nivel_id AND n.pcp_id IS NOT NULL)
+  WHERE id=NEW.id;
+END;
+`});
+
 function aplicar(db){
   db.exec("CREATE TABLE IF NOT EXISTS migracao(n INTEGER PRIMARY KEY, nome TEXT, aplicada_em TEXT DEFAULT (datetime('now','localtime')))");
   const feitas=new Set(db.prepare('SELECT n FROM migracao').all().map(r=>r.n));

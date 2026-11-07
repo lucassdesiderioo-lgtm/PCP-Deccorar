@@ -136,6 +136,10 @@ module.exports = function(app, db){
       return res.status(400).json({erro:'a linha aponta um componente OU uma família de tecido, não os dois'});
     if(comp && !db.prepare('SELECT 1 FROM componente WHERE id=?').get(comp))
       return res.status(400).json({erro:'componente inválido'});
+    /* R-CMP-02 (COMPRAS-E-RECEBIMENTO fase 1): a ficha so aceita material com
+       `vai_ficha = 1`. Cafe e estilete sao material, mas nao sao da ficha. */
+    if(comp){ const v=require('./material_dominio').podeIrParaFicha(db, comp);
+      if(!v.ok) return res.status(400).json({erro:v.erro}); }
     const expr=txt(b.expressao);
     if(!expr) return res.status(400).json({erro:'fórmula obrigatória'});
 

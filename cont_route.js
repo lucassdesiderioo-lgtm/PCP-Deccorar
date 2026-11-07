@@ -260,16 +260,20 @@ module.exports=function(app,db){
 
   /* Lista de materiais para a tela de contagem. Nome, unidade e saldo — NUNCA
      preco: quem opera nao ve preco em lugar nenhum (regra 14 do §13). */
-  app.get('/api/contagem/componentes',(req,res)=>{
-    res.json(db.prepare(`SELECT id,codigo,nome,COALESCE(unidade,'un') unidade,COALESCE(estoque,0) estoque
-      FROM componente WHERE ativo=1 ORDER BY nome`).all());
-  });
+  /* A CONTAGEM ANTIGA DE MATERIAL SAIU (revisão do PR #305, decisão do dono,
+     07/11/2026): material se conta só na 504, por almoxarifado e às cegas
+     (R-CMP-42). Esta lista mostrava o saldo a quem conta. As duas portas
+     respondem 410 dizendo onde contar; a aprovação das contagens antigas que
+     ainda esperam (contagem_pendente) continua logo abaixo. */
+  const NA_504 = {erro:'a contagem de material é na tela 504 (Contagem de material), por almoxarifado e às cegas'};
+  app.get('/api/contagem/componentes',(req,res)=>res.status(410).json(NA_504));
 
   /* Lancamento de material. SOMA a quantidade, igual ao bipe soma 1 — contou
      duas prateleiras, lanca duas vezes. Zero e um lancamento valido: e assim que
      um material que ACABOU entra na contagem em vez de ficar de fora dela. */
   app.post('/api/contagem/componente',(req,res)=>{
     const q0=QUEM.exigir(req,res); if(!q0) return;
+    return res.status(410).json(NA_504);
     const b=req.body||{};
     const id=+b.componente_id, ses=String(b.sessao||'').trim();
     const q=b.quantidade===''||b.quantidade==null ? NaN : +b.quantidade;
@@ -293,6 +297,8 @@ module.exports=function(app,db){
     const qq=QUEM.exigir(req,res); if(!qq) return;
     const ids=(req.body&&req.body.ids)||[];
     if(!ids.length) return res.status(400).json({erro:'sem ids'});
+    if(db.prepare(`SELECT 1 FROM contagem_pendente WHERE aprovado=0 AND tipo='componente' AND id IN (${ids.map(()=>'?').join(',')})`).get(...ids.map(x=>+x)))
+      return res.status(410).json({erro:NA_504.erro+': este pendente de material é da contagem antiga — rejeite-o e conte de novo na 504'});
     const quem=qq.usuario_nome||'';
     let n=0;
     db.transaction(()=>{
@@ -373,6 +379,14 @@ module.exports=function(app,db){
      uma aba aberta antes do deploy, ou alguem chamando por fora — e recusado
      inteiro, e NADA e gravado: aplicar so a parte de material faria a pessoa
      achar que a contagem inteira entrou. */
+  /* O MATERIAL SAIU DESTA PORTA INTEIRA (revisao do PR #305, decisao do dono):
+     nem ajustar, nem somar, nem aprovar o pendente antigo mexem no saldo do
+     material. Material se conta so na 504; o pendente antigo se rejeita. */
+  function recusaMaterial(res, itens){
+    if(!itens.some(i=>i.tipo==='componente')) return false;
+    res.status(410).json(NA_504);
+    return true;
+  }
   function recusaPeca(res, itens){
     const pecas=itens.filter(i=>i.tipo!=='componente').map(i=>i.codigo);
     if(!pecas.length) return false;
@@ -389,6 +403,7 @@ module.exports=function(app,db){
     const itens=itensDoCorpo(req.body);
     if(!ses||!itens.length) return res.status(400).json({erro:'faltam dados'});
     if(recusaPeca(res, itens)) return;
+    if(recusaMaterial(res, itens)) return;
     if(!podeAjustar(req)){
       const pend=enfileirar(qq,ses,itens,'ajustar');
       return res.json({ok:true,pendente:pend});
@@ -418,6 +433,7 @@ module.exports=function(app,db){
     const itens=itensDoCorpo(req.body);
     if(!ses||!itens.length) return res.status(400).json({erro:'faltam dados'});
     if(recusaPeca(res, itens)) return;
+    if(recusaMaterial(res, itens)) return;
     if(!podeAjustar(req)){
       const pend=enfileirar(qq,ses,itens,'lancar');
       return res.json({ok:true,pendente:pend});

@@ -48,58 +48,82 @@ input[type=text]{font-family:inherit;font-size:16px;padding:14px;border:1px soli
 <div class="wrap"><div id="app">carregando…</div></div>
 <script src="/nav.js"></script>
 <script>
-var PED=[], SEL=null, EST={};
+/* A 502 NOVA (spec COMPRAS-E-RECEBIMENTO, fase 3, 07/11/2026).
+   ⚠️ CONTAGEM CEGA: a fila NAO traz o que foi pedido nem o declarado do item
+   por quantidade — quem conta digita o que contou. So o item "sem saldo"
+   (cafe, detergente) mostra o pedido, porque ele se recebe com um toque.
+   ⚠️ COMPRA POR KG: pese 1 unidade e pese 10. Sem os dois o item nao fecha, e a
+   tela nao mostra o peso esperado.
+   ⚠️ O DIGITADO NAO SE REDESENHA: os campos sao lidos na hora de confirmar
+   (a licao do §12 — redesenho apaga campo). */
+var PED=[], SEL=null, ALM=[], VOL={}, CHEGOU={}, DEV={};
 var $=function(s){return document.querySelector(s);};
+var $$=function(s){return Array.prototype.slice.call(document.querySelectorAll(s));};
 function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
 function n3(v){return (Math.round((+v||0)*1000)/1000).toString().replace('.',',');}
-
+function numero(v){ var t=String(v==null?'':v).trim().replace(',','.'); return t===''?null:+t; }
 async function carregar(){
-  try{ PED=await (await fetch('/api/recebimento/aguardando')).json(); }catch(e){ PED=[]; }
-  SEL=null; EST={}; render();
+  try{ PED=await (await fetch('/api/recebimento/aguardando')).json(); }catch(e){ PED=null; }
+  try{ ALM=await (await fetch('/api/almoxarifados')).json(); if(!Array.isArray(ALM)) ALM=[]; }catch(e){ ALM=[]; }
+  SEL=null; VOL={}; CHEGOU={}; DEV={}; render();
+}
+function levar(i){
+  var opts=ALM.filter(function(a){return a.ativo;}).map(function(a){
+    return '<option value="'+a.id+'"'+(i.levar_para&&i.levar_para.id===a.id?' selected':'')+'>'+esc(a.nome)+'</option>'; }).join('');
+  return '<div class="lb" style="margin-top:12px">Levar para</div><select data-alm="'+i.id+'" style="font-size:16px;padding:12px;border-radius:10px;border:1px solid var(--line);width:100%">'
+    +(i.levar_para?'':'<option value="">— escolha onde guardar —</option>')+opts+'</select>';
 }
 function render(){
   var el=$('#app');
+  if(PED===null){ el.innerHTML='<div class="card err avi">Sem conexão com o servidor. Toque para tentar de novo. <button class="b" id="tenta">Tentar de novo</button></div>'; return; }
   if(!PED.length){ el.innerHTML='<div class="card"><div class="ped">Nada a caminho</div>'
-    +'<div class="sub">Quando o comprador enviar um pedido, ele aparece aqui.</div></div>'; return; }
+    +'<div class="sub">Quando uma compra for marcada como comprada, ela aparece aqui.</div></div>'; return; }
   if(!SEL){
     el.innerHTML='<div class="card"><div class="ped">O que está a caminho</div>'
-      +'<div class="sub">Toque no pedido que chegou.</div></div>'
-      +PED.map(function(p){ return '<div class="card"><div class="ped">'+esc(p.numero)+' · '+esc(p.fornecedor)+'</div>'
-        +'<div class="ped-lin">'+p.itens.length+' item(ns) aguardando'
-        +(p.status==='parcial'?' · <b>entrega parcial</b>':'')+'</div>'
+      +'<div class="sub">Toque na compra que chegou.</div></div>'
+      +PED.map(function(p){ return '<div class="card"><div class="ped">'+esc(p.numero)+' · '+esc(p.fornecedor||p.loja||'—')+'</div>'
+        +'<div class="ped-lin">'+p.itens.length+' item(ns)'+(p.status==='parcial'?' · <b>entrega parcial</b>':'')+'</div>'
         +'<button class="b pri" data-abrir="'+p.id+'">Conferir esta entrega</button></div>'; }).join('');
     return;
   }
   var p=PED.find(function(x){return x.id==SEL;});
-  var h='<div class="card"><div class="ped">'+esc(p.numero)+' · '+esc(p.fornecedor)+'</div>'
-    +'<div class="ped-lin">Informe quantas embalagens chegaram de cada item.</div>';
+  var h='<div class="card"><div class="ped">'+esc(p.numero)+' · '+esc(p.fornecedor||p.loja||'—')+'</div>'
+    +'<div class="ped-lin">Conte o que chegou. Não precisa saber o que foi pedido nem o preço.</div>';
   p.itens.forEach(function(i){
-    var e=EST[i.id]||(EST[i.id]={rec:Math.round((i.falta_embalagem||0)*1000)/1000,dev:0,motivo:null});
-    h+='<div class="item"><div class="nome">'+esc(i.item)+'</div>'
-      +'<div class="ped-lin">Pedido: '+n3(i.falta_embalagem)+' × '+esc(i.embalagem)
-      +' &nbsp;=&nbsp; '+n3(i.falta_consumo)+' '+esc(i.unidade||'')+'</div>'
-      +'<div class="lb">Chegou quantas?</div>'
-      +'<div class="step"><button class="stepb" data-mais="'+i.id+'" data-d="-1">−</button>'
-      +'<div class="stepv" id="v'+i.id+'">'+n3(e.rec)+'</div>'
-      +'<button class="stepb" data-mais="'+i.id+'" data-d="1">+</button>'
-      +'<span class="un">× '+esc(i.embalagem)+'</span></div>';
-    var falta=(i.falta_embalagem||0)-e.rec-e.dev;
-    if(Math.abs(falta)>0.0001)
-      h+='<div class="avi">⚠ '+(falta>0?n3(falta)+' a menos que o pedido':n3(-falta)+' a mais que o pedido')+'</div>';
-    h+='<div class="dev"><div class="lb">Veio algo com problema?</div>'
-      +'<div class="step"><button class="stepb" data-dev="'+i.id+'" data-d="-1">−</button>'
-      +'<div class="stepv" id="d'+i.id+'">'+n3(e.dev)+'</div>'
-      +'<button class="stepb" data-dev="'+i.id+'" data-d="1">+</button>'
-      +'<span class="un">devolvidas</span></div>';
-    if(e.dev>0){
-      h+='<div class="lb">Por quê?</div><div class="ops">'
-        +[['fora_medida','Fora da medida'],['defeito','Defeito'],
-          ['veio_errado','Veio errado'],['qtd_a_mais','Quantidade a mais']]
-          .map(function(m){ return '<button class="b'+(e.motivo===m[0]?' on':'')+'" data-mot="'+i.id+'" data-v="'+m[0]+'">'
-            +(e.motivo===m[0]?'✓ ':'')+m[1]+'</button>'; }).join('')+'</div>'
-        +'<div class="avi">O que volta <b>não entra no estoque</b> e continua contando como a caminho — o fornecedor ainda deve.</div>';
+    h+='<div class="item"><div class="nome">'+esc(i.item)+'</div>';
+    if(i.modo_saldo==='sem'){
+      /* NADA NASCE MARCADO (revisao do PR #305): com "Chegou tudo" ja marcado, o
+         toque em "Receber" de quem nem olhou o cafe dava entrada nele inteiro. */
+      var tudo=CHEGOU[i.id]===true, faltou=CHEGOU[i.id]===false;
+      h+='<div class="ped-lin">Pedido: '+n3(i.pedido)+' '+esc(i.unidade)+'</div>'
+        +'<div class="ops"><button class="b'+(tudo?' on':'')+'" data-tudo="'+i.id+'" data-v="1">'+(tudo?'✓ ':'')+'Chegou tudo</button>'
+        +'<button class="b'+(faltou?' on':'')+'" data-tudo="'+i.id+'" data-v="0">'+(faltou?'✓ ':'')+'Faltou algo</button></div>'
+        +(!faltou?'':'<div class="lb" style="margin-top:12px">O que veio ('+esc(i.unidade)+')</div><input type="text" inputmode="decimal" data-qtd="'+i.id+'" autocomplete="off">');
+    }else if(i.modo_saldo==='volume'){
+      var vs=VOL[i.id]||(VOL[i.id]=[{}]);
+      h+='<div class="ped-lin">Um registro por volume (rolo, caixa), com a metragem da etiqueta do fornecedor.</div>'
+        +vs.map(function(v,k){ return '<div class="g2" style="margin-bottom:8px"><div><div class="lb">Volume '+(k+1)+' — metragem ('+esc(i.unidade)+')</div>'
+          +'<input type="text" inputmode="decimal" data-vol="'+i.id+'" data-k="'+k+'" autocomplete="off"></div>'
+          +'<div><div class="lb">Código na etiqueta do fornecedor (opcional)</div><input type="text" data-volcod="'+i.id+'" data-k="'+k+'" autocomplete="off"></div></div>'; }).join('')
+        +'<button class="b" data-maisvol="'+i.id+'">+ outro volume</button>';
+    }else{
+      h+='<div class="lb">Quantas '+esc(i.unidade==='un'?'unidades':i.unidade)+' você contou?</div>'
+        +'<input type="text" inputmode="decimal" data-qtd="'+i.id+'" autocomplete="off" style="font-size:22px;max-width:220px">';
     }
-    h+='</div></div>';
+    if(i.pesar){
+      h+='<div class="avi">Comprado por quilo: <b>pese 1 unidade</b> e <b>pese 10 unidades</b> juntas. Sem os dois pesos este item não fecha.</div>'
+        +'<div class="g2"><div><div class="lb">Peso de 1 unidade (kg)</div><input type="text" inputmode="decimal" data-p1="'+i.id+'" autocomplete="off"></div>'
+        +'<div><div class="lb">Peso de 10 unidades (kg)</div><input type="text" inputmode="decimal" data-p10="'+i.id+'" autocomplete="off"></div></div>';
+    }
+    h+=levar(i);
+    var d=DEV[i.id];
+    h+='<div class="dev"><div class="lb">Veio algo com problema para devolver?</div>'
+      +(d?'<div class="g2"><div><div class="lb">Embalagens devolvidas</div><input type="text" inputmode="decimal" data-dev="'+i.id+'" autocomplete="off"></div><div><div class="lb">Por quê?</div>'
+        +'<select data-mot="'+i.id+'" style="font-size:16px;padding:12px;border-radius:10px;border:1px solid var(--line);width:100%"><option value="">—</option>'
+        +[['fora_medida','Fora da medida'],['defeito','Defeito'],['veio_errado','Veio errado'],['qtd_a_mais','Quantidade a mais']].map(function(m){return '<option value="'+m[0]+'">'+m[1]+'</option>';}).join('')
+        +'</select></div></div><div class="avi">O que volta <b>não entra no estoque</b> e continua contando como a caminho.</div>'
+        :'<button class="b" data-querdev="'+i.id+'">Sim, devolver</button>')+'</div>';
+    h+='</div>';
   });
   h+='<div class="dev"><div class="g2"><div><div class="lb">Número da nota</div>'
     +'<input type="text" id="nf" inputmode="numeric" autocomplete="off"></div>'
@@ -107,32 +131,45 @@ function render(){
     +'<div class="rod"><button class="b" id="volta">Voltar</button>'
     +'<button class="b pri" id="conf">Confirmar entrega</button></div>'
     +'<div id="msg"></div></div>';
+  /* o redesenho guarda e devolve o que ja estava digitado */
+  var guard={}; $$('#app input,#app select').forEach(function(e){ var k=Array.prototype.map.call(e.attributes,function(a){return a.name+'='+a.value;}).filter(function(x){return /^data-|^id=/.test(x);}).join('&'); if(k) guard[k]=e.value; });
   el.innerHTML=h;
+  $$('#app input,#app select').forEach(function(e){ var k=Array.prototype.map.call(e.attributes,function(a){return a.name+'='+a.value;}).filter(function(x){return /^data-|^id=/.test(x);}).join('&'); if(k && guard[k]!=null && guard[k]!=='') e.value=guard[k]; });
 }
 document.addEventListener('click',async function(ev){
   var t=ev.target, b;
+  if(t.id==='tenta'){ carregar(); return; }
   if((b=t.closest('[data-abrir]'))){ SEL=+b.getAttribute('data-abrir'); render(); return; }
   if(t.id==='volta'){ SEL=null; render(); return; }
-  if((b=t.closest('[data-mais]'))){
-    var id=b.getAttribute('data-mais'), e=EST[id];
-    e.rec=Math.max(0,Math.round((e.rec+ +b.getAttribute('data-d'))*1000)/1000); render(); return; }
-  if((b=t.closest('[data-dev]'))){
-    var id2=b.getAttribute('data-dev'), e2=EST[id2];
-    e2.dev=Math.max(0,Math.round((e2.dev+ +b.getAttribute('data-d'))*1000)/1000);
-    if(e2.dev===0) e2.motivo=null; render(); return; }
-  if((b=t.closest('[data-mot]'))){ EST[b.getAttribute('data-mot')].motivo=b.getAttribute('data-v'); render(); return; }
+  if((b=t.closest('[data-tudo]'))){ CHEGOU[b.getAttribute('data-tudo')]=b.getAttribute('data-v')==='1'; render(); return; }
+  if((b=t.closest('[data-maisvol]'))){ VOL[b.getAttribute('data-maisvol')].push({}); render(); return; }
+  if((b=t.closest('[data-querdev]'))){ DEV[b.getAttribute('data-querdev')]=true; render(); return; }
   if(t.id==='conf'){
     var p=PED.find(function(x){return x.id==SEL;});
-    var itens=p.itens.map(function(i){ var e=EST[i.id];
-      return {pedido_item_id:i.id, embalagens_recebidas:e.rec, embalagens_devolvidas:e.dev,
-              motivo_devolucao:e.motivo}; }).filter(function(x){ return x.embalagens_recebidas>0||x.embalagens_devolvidas>0; });
-    var r=await fetch('/api/recebimento',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({pedido_id:SEL, nota_fiscal:$('#nf').value, nota_data:$('#nd').value, itens:itens})});
-    var j=await r.json();
+    var itens=p.itens.map(function(i){
+      var o={pedido_item_id:i.id};
+      var a=$('[data-alm="'+i.id+'"]'); if(a && a.value) o.almoxarifado_id=+a.value;
+      if(i.modo_saldo==='sem' && CHEGOU[i.id]===true) o.chegou_tudo=true;
+      else if(i.modo_saldo==='volume'){
+        o.volumes=$$('[data-vol="'+i.id+'"]').map(function(e){ var c=$('[data-volcod="'+i.id+'"][data-k="'+e.getAttribute('data-k')+'"]');
+          return {metragem:numero(e.value), codigo_fornecedor:c?c.value:null}; }).filter(function(v){return v.metragem!=null;});
+        if(!o.volumes.length) delete o.volumes;
+      }else{ var q=$('[data-qtd="'+i.id+'"]'); o.qtd_contada=q?numero(q.value):null; }
+      var p1=$('[data-p1="'+i.id+'"]'), p10=$('[data-p10="'+i.id+'"]');
+      if(p1) o.peso_1_kg=numero(p1.value); if(p10) o.peso_10_kg=numero(p10.value);
+      var dv=$('[data-dev="'+i.id+'"]'), mt=$('[data-mot="'+i.id+'"]');
+      if(dv && numero(dv.value)>0){ o.embalagens_devolvidas=numero(dv.value); o.motivo_devolucao=mt?mt.value:null; }
+      return o;
+    }).filter(function(o){ return o.chegou_tudo || o.volumes || (o.qtd_contada!=null && o.qtd_contada!=='') || o.embalagens_devolvidas>0; });
+    if(!itens.length){ $('#msg').innerHTML='<div class="avi err">Informe o que chegou de pelo menos um item.</div>'; return; }
+    var j, r;
+    try{ r=await fetch('/api/recebimento',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pedido_id:SEL, nota_fiscal:$('#nf').value, nota_data:$('#nd').value, itens:itens})}); j=await r.json(); }
+    catch(e){ $('#msg').innerHTML='<div class="avi err">SEM CONEXÃO — confira o Wi-Fi e toque em Confirmar de novo.</div>'; return; }
     if(!r.ok){ $('#msg').innerHTML='<div class="avi err">'+esc(j.erro||'não deu')+'</div>'; return; }
-    $('#msg').innerHTML='<div class="avi ok">✓ Entrada registrada.'
+    $('#msg').innerHTML='<div class="avi '+(j.retidos?'err':'ok')+'">✓ Entrega registrada.'
       +(j.aviso?'<br>'+esc(j.aviso):'')+'</div>';
-    setTimeout(carregar,1800);
+    setTimeout(carregar, j.retidos?5000:1800);
   }
 });
 carregar();
