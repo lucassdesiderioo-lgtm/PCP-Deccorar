@@ -2,10 +2,10 @@
 
 ```
 STATUS
-Situação: em código, falta subir (as onze fases construídas em 07/11/2026; o deploy e as migrações das fases 9 e 10 esperam o dono)
+Situação: NO AR desde 07/11/2026 (PR #305): o dono fez o deploy e disse "deu tudo certo"
 Criada em: 06/11/2026
 Última atualização: 07/11/2026
-Fase atual: todas em código · revisão do PR #305 feita (07/11/2026, 4 decisões do dono) · PR aberto, não mesclado · roteiro de deploy no PR
+Fase atual: todas no ar · revisão do PR #305 feita (3 rodadas, 4 decisões do dono) · falta provar com dado real (ver o fim do §7-C do CLAUDE.md)
 Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☑  8 ☑  9 ☑  10 ☑  11 ☑
 Decidido em 07/11/2026: fase 10 = o PCP é dono do endereço, o sob medida do rolo e
 da sobra (R-CMP-50) · fase 11 construída sem certificado, pronta para recebê-lo

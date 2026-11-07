@@ -1623,6 +1623,19 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 > ⚠️ **A NOTA BAIXADA DA RECEITA (`dfe_documento`) FICA FORA DO MODO TESTE**: a
 > consulta avança o último NSU, e a nota apagada não se baixa de novo.
 
+> ✅ **NO AR DESDE 07/11/2026** (PR #305, junto com o #309): o dono fez o deploy e
+> disse *"deu tudo certo"*. ⚠️ **O que as migrações das fases 9 e 10 responderam
+> no servidor (a lista dos fornecedores e o "Tudo bate" dos endereços) não foi
+> relatado aqui**, e nada disto está provado com dado real ainda:
+> - quem recebe as cinco chaves novas, marcado na tela de Acessos;
+> - a primeira compra por kg recebida em partes, e o "fechar com falta" dela;
+> - o primeiro tecido de antes etiquetado na 504;
+> - o primeiro rolo do sob medida nascendo pela 502;
+> - a primeira nota baixada da Receita — que só começa depois de o certificado
+>   ser enviado pela 501.
+>
+> Prova que não foi feita se escreve como não feita.
+
 **Rode `node teste_revisao_compras.js` e `node teste_migrar_simula.js` (a simulação
 das duas migrações não toca os bancos de verdade), além de `node teste_material.js`,
 `node teste_pedido_compra.js`, `node
