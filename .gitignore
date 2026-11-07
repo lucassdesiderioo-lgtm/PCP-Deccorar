@@ -17,6 +17,10 @@ lotes/
 *.xlsx
 *.xls
 *.csv
+# A copia do relatorio do ML para o teste (PLANEJAMENTO-VENDAS-FUTURAS): so as 7 colunas
+# que a conta usa (venda, data, estado, descricao, pacote, unidades, SKU) — sem nome, CPF
+# nem endereco. O relatorio inteiro continua fora.
+!casos/planilha-ml-*.csv
 
 # Dados de uma rodada de CI ou de um servidor local com PCP_DIR apontado para
 # ca (§13). Efemero no runner; aqui aparece so se alguem rodar o mesmo comando.
