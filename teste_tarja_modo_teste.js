@@ -117,6 +117,13 @@ async function req(quem, metodo, url, corpo){
   const nav = fs.readFileSync(path.join(__dirname, 'public', 'nav.js'), 'utf8');
   ok('a tarja pergunta ao /api/teste/ativo', /fetch\(\s*['"]\/api\/teste\/ativo['"]/.test(nav));
   ok('e nao mais ao painel /api/teste', !/fetch\(\s*['"]\/api\/teste['"]/.test(nav));
+  /* A tarja nao pode cobrir a barra de sessao (Menu, Trocar setor, Sair: §20,
+     Regra A). No topo, fixa, ela ficava por cima do #sessBar sem empurrar nada
+     — so apareceu quando a bancada passou a ve-la (testador-tela, 07/11/2026).
+     Ela mora na BASE da tela, e a pagina ganha o espaco dela embaixo. */
+  const bloco = (nav.match(/tarja de modo teste[\s\S]*?\}\)\(\);/) || [''])[0];
+  ok('a tarja fica na base da tela, e nao no topo (nao cobre a barra de sessao)', /bottom:0/.test(bloco) && !/top:0/.test(bloco), bloco.slice(0, 200));
+  ok('e a pagina ganha o espaco dela embaixo (nada fica escondido atras)', /paddingBottom\s*=\s*[^'"]/.test(bloco) || /paddingBottom=el\./.test(bloco));
 
   console.log('\n── desligado de novo ──');
   r = await req('Lucas', 'POST', '/api/teste/limpar', {});
