@@ -102,12 +102,13 @@ module.exports = function(app, db){
     return r;
   }));
 
-  post('/api/inventario/geral/terminar-prateleira', (req,res) => responder(res, () => {
-    const b = req.body || {};
-    const r = tx(() => INV.terminarPrateleira(db, { quem:quem(req), pode:podeDe(req), confirmar:!!b.confirmar }));
-    if(r.zerados != null) auditar(req, 'inventario_prateleira_zero', 'geral', r.zerados + ' SKU(s) sem nenhuma peça');
-    return r;
-  }));
+  /* O "Terminei a prateleira" SAIU em 07/11/2026 (spec INVENTARIO-CONFERIR-
+     ZERADOS, D2): com os zerados na geral ele zeraria dezenas de SKUs num toque.
+     Cada SKU sem peca se assinala um a um. A rota fica respondendo para a tela
+     antiga em cache num tablet, e nao grava nada. */
+  post('/api/inventario/geral/terminar-prateleira', (req,res) =>
+    res.status(410).json({ ok:false, motivo:'saiu',
+      erro:'O "Terminei a prateleira" saiu: em cada SKU sem peça, toque "Não encontrei — está zerado". Recarregue a tela.' }));
 
   // ── quem planeja ──────────────────────────────────────────────────────────
   app.get('/api/inventario/sugestao', (req,res) => responder(res, () =>

@@ -375,15 +375,19 @@ async function entrar(nome, id, pin){
   const sg = saldo(gsku);
   await contar('Lucas', gsku, 2); await terminar('Lucas', gsku);
   eq('4. o Admin Geral que contou A não pode ser B', (await post('Lucas', '/api/inventario/bipe', { codigo:gsku })).motivo, 'mesma_pessoa');
-  const p1 = await post('Caio', '/api/inventario/geral/terminar-prateleira', {});
-  ok('"terminei a prateleira" pergunta quantos ficaram sem bipe', p1.confirmar && p1.n > 0, JSON.stringify(p1));
-  await post('Caio', '/api/inventario/geral/terminar-prateleira', { confirmar:true });
-  const outro = db.prepare("SELECT codigo FROM inventario_item WHERE ciclo_id=? AND codigo<>? AND status='recontar' ORDER BY codigo LIMIT 1").get(g.ciclo_id, gsku).codigo;
+  const p1 = await post('Caio', '/api/inventario/geral/terminar-prateleira', { confirmar:true });
+  eq('"terminei a prateleira" saiu (07/11/2026): a rota recusa', p1.__st, 410);
+  /* cada SKU sem peca e assinalado um a um: "Nao encontrei — esta zerado" */
+  const outro = db.prepare(`SELECT i.codigo FROM inventario_item i JOIN skus s ON s.codigo=i.codigo
+    WHERE i.ciclo_id=? AND i.codigo NOT IN (?,?) AND i.status='a_contar' AND s.estoque>0 ORDER BY i.codigo LIMIT 1`).get(g.ciclo_id, gsku, SK.Q).codigo;
   const so = saldo(outro);
   const livreDe = c => require('./baixa_dominio').disponivel(db, c);
-  eq('a zero de UMA pessoa não mexe no saldo', saldo(outro), so);
-  await post('Ana', '/api/inventario/geral/terminar-prateleira', { confirmar:true });
-  eq('as duas confirmaram "não tem nenhuma": a prateleira do SKU vira zero (o livre)', livreDe(outro), 0);
+  await contar('Caio', outro, 0); await terminar('Caio', outro, true);
+  await contar('Caio', gsku, 0); await terminar('Caio', gsku, true);
+  eq('o zero de UMA pessoa não mexe no saldo', saldo(outro), so);
+  await contar('Ana', outro, 0); await terminar('Ana', outro, true);
+  await contar('Ana', gsku, 0); await terminar('Ana', gsku, true);
+  eq('as duas assinalaram "não encontrei": a prateleira do SKU vira zero (o livre)', livreDe(outro), 0);
   ok('o SKU que Lucas contou 2: Caio (B) e Ana (C) confirmaram zero — duas de três batem, vale o zero',
      item(gsku).status === 'aplicado' && livreDe(gsku) === 0, item(gsku).status + ' livre ' + livreDe(gsku));
   eq('15. o livro fecha', livroBate(), true);
